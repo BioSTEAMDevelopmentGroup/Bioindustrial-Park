@@ -501,6 +501,7 @@ chems.set_synonym('Dipalmitin', 'DAG')
 chems.set_synonym('Pelargonic_acid','Nonanoic_acid')
 chems.set_synonym('HCl2','Liquid_HCl')
 chems.set_synonym('CaSO4', 'Gypsum')
+chems.set_synonym('Citric_acid', 'CitricAcid')
 
 ###References###
 #[1] DOI: 10.1021/ie100160v

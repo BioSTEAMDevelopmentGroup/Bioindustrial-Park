@@ -1,116 +1,47 @@
 # -*- coding: utf-8 -*-
 """
 Created on Wed Sep  6 14:19:25 2023
-
-@author: lavan
 """
 
 import biosteam as bst
 import numpy as np
-import chaospy
-from chaospy import distributions as shape
 import matplotlib.pyplot as plt
-import numpy as np
-from biorefineries.oleochemicals.systems_baseline_hosun import F
-from biorefineries.oleochemicals import Tag_compositions
-from Tag_compositions import *
-from biorefineries.oleochemicals.systems_baseline_hosun import aa_baseline_sys
-import numpy as np
-from lca_tea_baseline_hosun import TEA_baseline
-from biosteam.evaluation import Model, Metric
-# TODO: were these prices adjusted to 2013 prices?
-from biorefineries.lipidcane._process_settings import price
-from biorefineries.cane.data.lca_characterization_factors import GWP_characterization_factors
-from biorefineries.tea.cellulosic_ethanol_tea import CellulosicEthanolTEA, create_cellulosic_ethanol_tea
-from units_baseline import HydrolysisReactor
-from biorefineries.oleochemicals import prices_and_GWP_factors
-from prices_and_GWP_factors import prices_per_Kg, GWP_factors,transesterification_catalyst_price
+import pandas as pd
+from biorefineries.oleochemicals.systems_baseline import F
+from biorefineries.oleochemicals.system_simulate import azelaic_acid_tea,aa_baseline
 from biosteam import preferences
 from biosteam import report
 from biosteam.plots.utils import CABBI_green_colormap
 from thermosteam.utils import GG_colors,GG_light_colors
-import contourplots  
-import models_hosun
-from models_hosun import *
-import matplotlib.pyplot as plt
-import pandas as pd
+import contourplots 
+from biorefineries.oleochemicals.uncertainity_analysis import *
+# get_net_GWP,get_feedstock_GWP,get_other_materials_impact,get_heating_demand_GWP,\
+# get_cooling_demand_GWP,get_electricity_demand_non_cooling_GWP,get_other_products_impact,get_total_non_BT_direct_emissions_GWP,get_electricity_demand_non_cooling_GWP,\
+# get_total_emissions_GWP,get_total_emissions_GWP,get_EOL_GWP,Direct_emmisions_from_BT
 
 
 
+#shortform stream names for ease
 #stacked bar plot
 # %% Plot GWP breakdown stacked plot
 #plotting the GWP stacked plot
+impacts_3 = [get_feedstock_GWP()*100/get_net_GWP(),
+            get_other_materials_impact()*100/get_net_GWP(),
+            get_ng_GWP()*100/get_net_GWP(), #ignoring net electricity use
+            Direct_emmisions()*100/get_net_GWP(),
+            -get_other_products_impact()*100/get_net_GWP(),]
 
+df_gwp =pd.DataFrame({"GWP breakdown":impacts_3})
 
+index_3= ['Feedstock','Other input materials',
+     'Natural gas','Direct emissions',
+     'Co-products']
 
-# PA = aa_baseline_sys.get_material_impact(F.pelargonic_acid_rich_fraction,GWP)/aa_baseline_sys.get_mass_flow(azelaic_acid)
-
-# recovered_C5_to_C8_MCA_fraction = aa_baseline_sys.get_material_impact(F.recovered_C5_to_C8_MCA_fraction,GWP)/aa_baseline_sys.get_mass_flow(azelaic_acid)
-# fatty_acid_blend = aa_baseline_sys.get_material_impact(F.fatty_acid_blend,GWP)/aa_baseline_sys.get_mass_flow(azelaic_acid)
-# crude_methanol =aa_baseline_sys.get_material_impact(F.crude_methanol,GWP)/aa_baseline_sys.get_mass_flow(azelaic_acid)
-# crude_glycerol = aa_baseline_sys.get_material_impact(F.crude_glycerol,GWP)/aa_baseline_sys.get_mass_flow(azelaic_acid)
-# co_products = PA+recovered_C5_to_C8_MCA_fraction+fatty_acid_blend+crude_methanol+crude_glycerol
-
-# b = sum([get_feedstock_GWP(),
-#          get_other_materials_impact(),
-#          get_total_non_BT_direct_emissions_GWP(),
-#          get_heating_demand_GWP(),#not significant
-#          get_cooling_demand_GWP(),#not significant
-#          get_electricity_demand_non_cooling_GWP(),#not significant
-#          -co_products
-#          ])
-# #below is because we want to plot
-# c = [     
-#      -get_feedstock_GWP()*100/b,
-#      -get_other_materials_impact()*100/b,
-#      -get_total_non_BT_direct_emissions_GWP()*100/b,  
-#      -get_heating_demand_GWP()*100/b,
-#      -get_cooling_demand_GWP()*100/b,
-#      -get_electricity_demand_non_cooling_GWP()*100/b,
-#      co_products*100/b
-#      ]
-
-# df_gwp =pd.DataFrame({"GWP breakdown":c})
-# df_gwp.index = ['Feedstock',
-#                 'Other materials',
-#                 'Total direct emissions GWP (non BT)',
-#                 'Heating demand',
-#                 'Cooling demand',
-#                 'Electricity demand (non cooling)',
-#                 'Co-products']
-
-# stacked_bar_plot(df_gwp,y_ticks = [-350,-300,-250,-200,-150,-100,-50,0,50,100,150,200,250],
-#                  fig_width=4,
-#                  colors =contourplots.utils.defaults_dict['colors']['Guest_Group_TEA_Breakdown'])
-
-
-# b = sum([get_feedstock_GWP(),
-#          get_other_materials_impact(),
-#          get_ng_GWP(),
-#          get_total_direct_BT_emissions_GWP(),
-#          get_total_non_BT_direct_emissions_GWP(),
-#          -co_products
-#          ])
-# #below is because we want to plot
-# c = [     
-#      -get_feedstock_GWP()*100/b,
-#      -get_other_materials_impact()*100/b,
-#      -get_ng_GWP()*100/b,
-#      -get_total_direct_BT_emissions_GWP()*100/b,
-#      -get_total_non_BT_direct_emissions_GWP()*100/b,
-#      co_products*100/b
-#      ]
-
-# df_gwp =pd.DataFrame({"GWP breakdown":c})
-# df_gwp.index = ['Feedstock',
-#                 'Other feed inputs',
-#                 'Natural gas',
-#                 'Total direct BT emissions GWP',
-#                 'Total non BT direct emissions GWP',
-#                 'Co-products']
-
-
-# stacked_bar_plot(df_gwp,y_ticks = [-100,-75,-50,-25,0,25,50,75,100,125,150,175,200,225])
+df_gwp.index = [index_3]
+contourplots.stacked_bar_plot(df_gwp,
+                  y_ticks = [-350,-300,-250,-200,-150,-100,-50,0,50,100,150,200,250,350],
+                  fig_width=4,
+                  colors =contourplots.utils.defaults_dict['colors']['Guest_Group_TEA_Breakdown'])
 
 #%%MPSP sensitivity plots
 
@@ -142,7 +73,7 @@ import pandas as pd
 # width = 0.4
 # fig, ax = plt.subplots()
 # bottom = np.zeros(5)
-#%%
+# #%%
 # for boolean, weight_count in weight_counts.items():
 #     p = ax.bar(species, weight_count, width, label=boolean, bottom=bottom)
 #     bottom += weight_count
@@ -156,49 +87,81 @@ import pandas as pd
 
 
 #%% Perform analysis
+#crude_veg_oil
+#shortform stream names for ease
+azelaic_acid = F.stream.azelaic_acid_product_stream
+recovered_C5_to_C8_MCA_fraction = F.stream.recovered_C5_to_C8_MCA_fraction
+pelargonic_acid_rich_fraction = F.stream.pelargonic_acid_rich_fraction
+fatty_acid_blend = F.stream.fatty_acid_blend
+crude_methanol = F.stream.crude_methanol
+crude_glycerol = F.stream.crude_glycerol
+crude_vegetable_oil = F.stream.crude_vegetable_oil 
+fresh_tungsten_catalyst = F.stream.fresh_tungsten_catalyst
+fresh_cobalt_catalyst = F.stream.fresh_cobalt_catalyst_stream
+fresh_solvent = F.stream.solvent_for_extraction
+fresh_HP = F.stream.fresh_HP
+citric_acid = F.stream.citricacid_for_degumming
+polystyrene_based_catalyst = F.stream.polystyrene_based_catalyst
+conc_hydrochloric_acid = F.stream.conc_hydrochloric_acid
+calcium_chloride = F.stream.calcium_chloride_for_cat_sep
+Resin = F.stream.polystyrene_based_catalyst
+Liquid_HCl = F.stream.Liquid_HCl
+natural_gas = F.stream.natural_gas
 
-# x_data = dihydroxylation = np.linspace(0.7,0.95,25)
-# y_data = moles_of_air = np.linspace(1.00,2.00,25)
+# hoysoy_prices = np.linspace(0.7,1.7,5)#based on smallest and largest values of hoysoy obtained from models.table
+# pelargonic_acid = np.linspace(3,8,5)#based on price of pelargonic acid obtained from models.table
+# price_data = []
+# premiums = np.linspace(0.75,2.20,11)
+# dol_per_kg_soybean = [0.48, 0.43, 0.34, 0.3, 0.32, 0.31, 0.28, 0.29, 0.36, 0.44, 0.48]
+# soybean_oil_price_per_kg =  [1.04, 0.84, 0.7, 0.66, 0.72, 0.66, 0.62, 0.65, 1.25, 1.61, 1.45]
+# for j in premiums:
+#     price_data.append([])
+#     for i in range(len(dol_per_kg_soybean)):
+#         hoysoy_price = (dol_per_kg_soybean[i]+j)*soybean_oil_price_per_kg[i]/dol_per_kg_soybean[i]
+#         price_data[-1].append(hoysoy_price)
 # z_data = [1,]
 # w_data = []
 
 # def MPSP_at_x_and_y(x,y):  
-#     F.unit.R200.X_dih = x
-#     F.unit.R300.specifications[0].args[2] = y
-#     aa_baseline_sys.simulate()
-#     return (tea_azelaic_baseline.solve_price(azelaic_acid))
+#     crude_vegetable_oil.price = x
+#     pelargonic_acid_rich_fraction.price = y
+#     aa_baseline.simulate()
+#     return (azelaic_acid_tea.solve_price(azelaic_acid))
 
-# for i in x_data:
+# #for each y you vary the x
+# for j in y_data:
 #     w_data.append([])
-#     for j in y_data:
+#     for i in x_data:
 #         w_data[-1].append(MPSP_at_x_and_y(i,j))
 
 # w_data =[w_data]
-
-# # %% Plot results
-# contourplots.animated_contourplot(w_data_vs_x_y_at_multiple_z=w_data, # shape = z * x * y # values of the metric you want to plot on the color axis; e.g., MPSP
-#                                 x_data=x_data, # x axis values
-#                                 y_data=y_data, # y axis values
+# print(w_data)
+# %% Plot results
+# contourplots.animated_contourplot(w_data_vs_x_y_at_multiple_z=[price_data], # shape = z * x * y # values of the metric you want to plot on the color axis; e.g., MPSP
+#                                 x_data=np.sort(dol_per_kg_soybean), # x axis values
+#                                 y_data=premiums, # y axis values
 #                                 z_data=z_data, # z axis values
-#                                 x_label= "Dihydroxylation reaction conversion",
-#                                 y_label= "Air mass factor",
+#                                 x_label= "soybean oilseed price",
+#                                 y_label= "Premium on soybean seeds",
 #                                 z_label= "ignore", # title of the z axis
 #                                 w_label="MPSP", # title of the color axis
-#                                 x_ticks= np.linspace(0.7,0.95,5),
-#                                 y_ticks = np.linspace(1.0,2.0,5),
+#                                 x_ticks= dol_per_kg_soybean,
+#                                 y_ticks = premiums,
 #                                 z_ticks=[0,1,2],
-#                                 w_levels=np.array([i for i in range(20)]), # levels for unlabeled, filled contour areas (labeled and ticked only on color bar)
-#                                 w_ticks=np.array([i for i in range(0,25,1)]),
-#                                 x_units="%",
-#                                 y_units="moles*",
+#                                 w_levels=np.array([i for i in range(2,11)]), # levels for unlabeled, filled contour areas (labeled and ticked only on color bar)
+#                                 w_ticks=np.array([i for i in range(3,11,1)]),
+#                                 x_units="$/kg",
+#                                 y_units="$/kg",
 #                                 z_units=" ",
 #                                 w_units="$/kg",
 #                                 fmt_clabel=lambda cvalue: "{:.2f}".format(cvalue), # format of contour labels
 #                                 cmap=CABBI_green_colormap(), # can use 'viridis' or other default matplotlib colormaps
-#                                 cbar_ticks= np.linspace(0,20,num = 10),
+#                                 cbar_ticks= [3,4,5,6,7,8,9],
+#                                 clabel_fontsize = 8,
+#                                 # np.linspace(3,12,num = 12),
 #                                 z_marker_color='g', # default matplotlib color names
 #                                 axis_title_fonts={'size': {'x': 7, 'y':7,
-#                                                            'z':7, 'w':7}},
+#                                                             'z':7, 'w':7}},
 #                                 fps=3, # animation frames (z values traversed) per second
 #                                 n_loops='inf', # the number of times the animated contourplot should loop animation over z; infinite by default
 #                                 animated_contourplot_filename='MPSP_contourplot_', # file name to save animated contourplot as (no extensions)

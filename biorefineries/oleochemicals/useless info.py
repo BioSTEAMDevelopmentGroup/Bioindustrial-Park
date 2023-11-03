@@ -157,71 +157,9 @@ Created on Wed Oct 18 11:31:23 2023
 #             for j in i.ins:
 #                 j.price = prices_per_Kg[j.ID]         
 
-# azelaic_acid = F.stream.azelaic_acid_product_stream
-# recovered_C5_to_C8_MCA_fraction = F.stream.recovered_C5_to_C8_MCA_fraction
-# pelargonic_acid_rich_fraction = F.stream.pelargonic_acid_rich_fraction
-# fatty_acid_blend = F.stream.fatty_acid_blend
-# crude_methanol = F.stream.crude_methanol
-# crude_glycerol = F.stream.crude_glycerol
-# crude_HOSO = F.stream.crude_vegetable_oil
-# crude_oil_feedstock = F.stream.crude_vegetable_oil 
-# fresh_tungsten_catalyst = F.stream.fresh_tungsten_catalyst
-# fresh_cobalt_catalyst = F.stream.fresh_cobalt_catalyst_stream
-# fresh_solvent = F.stream.solvent_for_extraction
-# fresh_HP = F.stream.fresh_HP
-# citric_acid = F.stream.citricacid_for_degumming
-# polystyrene_based_catalyst = F.stream.polystyrene_based_catalyst
-# conc_hydrochloric_acid = F.stream.conc_hydrochloric_acid
-# calcium_chloride = F.stream.calcium_chloride
 
 # #######################################################################################################################
 # #####################################################################################################
-# def tea_azelaic_baseline(system, IRR, duration, 
-#                          depreciation,startup_months,
-#                          startup_FOCfrac, startup_VOCfrac,
-#                          startup_salesfrac,
-#                          finance_interest,
-#                          finance_years, finance_fraction,
-#                          income_tax,operating_days, lang_factor,
-#                          construction_schedule,
-#                          WC_over_FCI,
-#                          operating_labor_cost,
-#                          direct_supervisory_clerical_labor,
-#                          maintenance_and_repairs,
-#                          operating_supplies,          
-#                          laboratory_charges,
-#                          local_taxes_and_insurance,
-#                          plant_overhead,
-#                          administration_costs,
-#                          OSBL_units):
-    
-#     tea_azelaic_baseline = TEA_baseline(
-#     system=system,lang_factor=None,
-#     IRR = IRR,duration = duration,
-#     depreciation = depreciation,
-#     income_tax=income_tax,
-#     operating_days =operating_days,
-#     construction_schedule=construction_schedule,
-#     startup_months = startup_months,
-#     startup_FOCfrac = startup_FOCfrac,
-#     startup_VOCfrac = startup_VOCfrac,
-#     WC_over_FCI = WC_over_FCI,
-#     finance_interest = finance_interest,
-#     finance_years=finance_years,
-#     finance_fraction= finance_fraction,
-#     operating_labor_cost=operating_labor_cost,
-#     direct_supervisory_clerical_labor=direct_supervisory_clerical_labor,
-#     maintenance_and_repairs=maintenance_and_repairs,
-#     operating_supplies=operating_supplies,
-#     laboratory_charges=laboratory_charges,
-#     local_taxes_and_insurance=local_taxes_and_insurance,
-#     plant_overhead=plant_overhead,
-#     administration_costs=administration_costs)
-    
-#     return tea_azelaic_baseline
-
-       
-   
 # print(
 #     report.lca_inventory_table(
 #         systems=[aa_baseline_sys],
@@ -234,17 +172,6 @@ Created on Wed Oct 18 11:31:23 2023
 #         key=GWP,
 #         items=[azelaic_acid], # For dividing yearly impact by ethanol production
 #     ))       
-         
-        
-    #14: METHOD FOR PURIFYING AZELAIC ACID , patent number : US 2003/0032825 A1   
-    #15: 72 - 1080 Kg/hour.m2 #Ref: Rule of thumb,#Power: 0.9–1.1 kW/m2#Ref: Rule of thumb for Grooved surface drums for liquids that will not wet the surface..
-    #16:: https://www.usgs.gov/mission-areas/water-resources/science/industrial-water-use#science
-    #17:#Composition based on latest report by NSA 2022
-    #Ref book for tungstic acid waste disposal: Chemical Engineering Design Principles, Practice and Economics of Plant and Process Design By Gavin Towler, Ray Sinnott   
-    #18:Storage MOC:
-#Water for industrial use comes from public water supply [16]
-#Composition by [17]    
-
  
 
 #TAG compositions
@@ -1150,27 +1077,127 @@ Created on Wed Oct 18 11:31:23 2023
 #           MPSP_at_i  = tea_azelaic_baseline.solve_price(azelaic_acid)
 #           MPSPs_at_diff_hoysoy_varieties.append(MPSP_at_i)
 #for all varieties 
-MPSPs_at_diff_hoysoy_varieties = []          
-for i in range(len(hoysoy_fcc_tag_combos)):
-          feed =  F.T101.ins[0]
-#changing compositions
-          feed.imass['OOO'] = hoysoy_fcc_tag_combos[i]['OOO']
-          feed.imass['PPP'] =  hoysoy_fcc_tag_combos[i]['PPP']
-          feed.imass['SSS'] = hoysoy_fcc_tag_combos[i]['SSS']
-          feed.imass['LLL'] = hoysoy_fcc_tag_combos[i]['LLL']
-          feed.imass['LnLnLn'] = hoysoy_fcc_tag_combos[i]['LnLnLn']
-          feed.imass['PL'] = 1
-          feed.imass['MAG'] = 0
-          feed.imass['DAG'] = 0
-          feed.imass['Water'] =0.05 
-          feed.imass['Oleic_acid']= 0.95
-          feed.characterization_factors = {'GWP100':GWP_factors['HoySoy_oil']}
-          feed.set_total_flow(34635.99842,'kg/hr')
-          feed.phase = 'l'
-          feed.price = prices_per_Kg['Crude_HoySoy_oil']
-          try:
-              aa_baseline_sys.simulate()
-          except:
-              pass
-          MPSP_at_i  = tea_azelaic_baseline.solve_price(azelaic_acid)
-          MPSPs_at_diff_hoysoy_varieties.append(MPSP_at_i)
+# MPSPs_at_diff_hoysoy_varieties = []          
+# for i in range(len(hoysoy_fcc_tag_combos)):
+#           feed =  F.T101.ins[0]
+# #changing compositions
+#           feed.imass['OOO'] = hoysoy_fcc_tag_combos[i]['OOO']
+#           feed.imass['PPP'] =  hoysoy_fcc_tag_combos[i]['PPP']
+#           feed.imass['SSS'] = hoysoy_fcc_tag_combos[i]['SSS']
+#           feed.imass['LLL'] = hoysoy_fcc_tag_combos[i]['LLL']
+#           feed.imass['LnLnLn'] = hoysoy_fcc_tag_combos[i]['LnLnLn']
+#           feed.imass['PL'] = 1
+#           feed.imass['MAG'] = 0
+#           feed.imass['DAG'] = 0
+#           feed.imass['Water'] =0.05 
+#           feed.imass['Oleic_acid']= 0.95
+#           feed.characterization_factors = {'GWP100':GWP_factors['HoySoy_oil']}
+#           feed.set_total_flow(34635.99842,'kg/hr')
+#           feed.phase = 'l'
+#           feed.price = prices_per_Kg['Crude_HoySoy_oil']
+#           try:
+#               aa_baseline_sys.simulate()
+#           except:
+#               pass
+#           MPSP_at_i  = tea_azelaic_baseline.solve_price(azelaic_acid)
+#           MPSPs_at_diff_hoysoy_varieties.append(MPSP_at_i)
+
+#TODO: discuss with someone about the below
+# def set_feedstock_price(feedstock_price):
+#         crude_vegetable_oil.price = feedstock_price
+# def get_feedstock_price(sample):
+#     return(sample)
+# p1 = Parameter(name = 'feed price',setter = set_feedstock_price,
+#                element = crude_vegetable_oil,distribution = chaospy.Uniform(),
+#                kind = 'isolated',baseline = 2, bounds = (1,3),scale = 1,units = 'kg/hr',
+#                system = aa_baseline, hook = get_feedstock_price, description = 'lol')
+
+
+# PA_GWP = aa_baseline.get_material_impact(F.pelargonic_acid_rich_fraction,'GWP100')/aa_baseline.get_mass_flow(azelaic_acid)
+# C5_C8_fraction_GWP = aa_baseline.get_material_impact(recovered_C5_to_C8_MCA_fraction,'GWP100')/aa_baseline.get_mass_flow(azelaic_acid)
+# fatty_acid_blend_GWP = aa_baseline.get_material_impact(fatty_acid_blend,'GWP100')/aa_baseline.get_mass_flow(azelaic_acid)
+# glycerol_GWP = aa_baseline.get_material_impact(crude_glycerol,'GWP100')/aa_baseline.get_mass_flow(azelaic_acid)
+# methanol_GWP = aa_baseline.get_material_impact(crude_methanol,'GWP100')/aa_baseline.get_mass_flow(azelaic_acid)
+# products_GWP_sum = PA_GWP +C5_C8_fraction_GWP +fatty_acid_blend_GWP+fatty_acid_blend_GWP +glycerol_GWP +methanol_GWP
+
+
+# class Methanolseparationsystem(bst.Unit,isabstract = True):
+#       _N_ins = 1
+#       _N_outs = 2 
+      
+#       auxiliary_unit_names = ('distillation_column1',
+#                                 'heat_exchanger1')
+#       def __init__(self, ID='', ins=(), outs=(),
+#                     thermo=None):
+#           Unit.__init__(self, ID, ins, outs, thermo)
+#           self.distillation_column1 = distillation_column1 = bst.BinaryDistillation(ID ='D601',
+#                                                                                 ins = 'methanol_water_mixture',
+                                                                                # LHK = ('Methanol',
+                                                                                      # 'Water'),
+                                                                                # Lr = 0.999, Hr = 0.999,
+                                                                                # k = 2,
+                                                                                # P = 101325)
+#           self.heat_exchanger1 = heat_exchanger1 = bst.HXutility(ID = 'HX608',
+#                                                             ins = 'purified_methanol_stream',
+#                                                             T = 25+273,
+#                                                             cool_only = True,
+#                                                             rigorous= True
+#                                                             )
+
+# #This unit only recovers methanol if it is greater than 32 wt.% in the incoming feed 
+# #Only cooling takes place if the stream has less than 32 wt.% of methanol in the incoming feed
+# #In that case the cooled water is sent out as wastewater
+
+#       def _run(self):
+#         feed = self.ins[0]
+#         top,bottom, = self.outs
+#         if  feed.imass['Methanol']/feed.F_mass < 0.32:
+#             self.heat_exchanger1.ins[0].copy_like(feed)
+#             # self.heat_exchanger1._run()
+#             self.heat_exchanger1.simulate()
+#             bottom.copy_like(self.heat_exchanger1.outs[0])
+#         else:
+#             self.distillation_column1.ins[0].copy_like(feed)
+#             # self.distillation_column1._run()
+#             self.distillation_column1.simulate()
+#             self.heat_exchanger1.ins[0].copy_like(self.distillation_column1.outs[0])
+#             # self.heat_exchanger1._run()
+#             self.heat_exchanger1.simulate()
+#             top.copy_like(self.heat_exchanger1.outs[0])
+#             bottom.copy_like(self.distillation_column1.outs[1])
+
+# #TODO: figure out why cost is not working
+        # def _design(self):
+        #     self.distillation_column1._design()
+        #     self.heat_exchanger1._design()    
+          
+        # def _cost(self):
+        #     self.distillation_column1._cost()
+        #     self.heat_exchanger1._cost()
+# fraction_of_impacts_1 = [get_feedstock_GWP()*100/get_net_GWP(),
+#                         get_other_materials_impact()*100/get_net_GWP(),
+#                         get_heating_demand_GWP()*100/get_net_GWP(),\
+#                         get_cooling_demand_GWP()*100/get_net_GWP(),\
+#                         get_electricity_demand_non_cooling_GWP()*100/get_net_GWP(),\
+#                         get_total_non_BT_direct_emissions_GWP()*100/get_net_GWP(),\
+#                         -get_other_products_impact()*100/get_net_GWP()
+#                         ]
+
+# impacts_2 = [get_feedstock_GWP()*100/get_net_GWP(),
+#                          get_other_materials_impact()*100/get_net_GWP(),
+#                          get_heating_demand_GWP()*100/get_net_GWP(),
+#                          get_cooling_demand_GWP()*100/get_net_GWP(),
+#                         get_electricity_demand_non_cooling_GWP()*100/get_net_GWP(),
+#                         get_total_emissions_GWP()*100/get_net_GWP(),
+#                          -get_other_products_impact()*100/get_net_GWP(),
+#                         -get_EOL_GWP()*100/get_net_GWP(),
+#                         -Direct_emmisions_from_BT()*100/get_net_GWP()]
+# i1 = ['Feedstock',
+    # 'Other input materials',
+    # 'Heating demand',
+    # 'Cooling demand',
+    # 'Co-products']
+# i2 = ['Feedstock','Other input materials','Heating demand',
+      # 'Cooling demand','Electricity demand (non cooling)',
+      # 'Total emissions','Co-products','EOL emissions','Direct emissions from BT']
+
