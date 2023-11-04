@@ -20,7 +20,8 @@ import biosteam as bst
 import thermosteam as tmo
 from biorefineries.TAL.chemicals_data import chems
 
-bst.CE = 607.5 # year 2022
+bst.CE = 607.5 # year 2019
+
 _kg_per_ton = 907.18474
 _lb_per_kg = 2.20462
 _liter_per_gallon = 3.78541
@@ -48,7 +49,7 @@ chem_index = { # Dictionary of chemical indices
                     2016: 88.8,
                     2017: 92.7,
                     2018: 93.3,
-                    2019: 97.0,
+                    2019: 97.0, # the TEA year for the 2023 TAL production study
                     2020: 100.2,
                     2021: 112.0,
                     2022: 125.829,
@@ -205,7 +206,8 @@ sodium_acetate_price = acetic_acid_price # unused
 CSL_price = 0.0339 * _lb_per_kg * chem_index[2019]/chem_index[2016] # from lactic acid paper
 amberlyst70_price = 30. #!!!
 
-acetylacetone_price = 1.5 # 2,4-pentanedione or acetylacetone
+# 2.0/kg from https://www.alibaba.com/product-detail/Desiccant-for-paints-and-varnishes-Acetylacetone_10000004008185.html?spm=a2700.galleryofferlist.normal_offer.d_price.e82458eazJeqeC
+acetylacetone_price = 2.0 # 2,4-pentanedione or acetylacetone
 
 price = {'SA': SA_price,
          'PD': acetylacetone_price, # 2,4-pentanedione or acetylacetone

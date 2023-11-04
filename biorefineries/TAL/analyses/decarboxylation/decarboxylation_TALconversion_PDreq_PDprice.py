@@ -9,6 +9,9 @@ Created on Fri Jul 31 13:57:09 2020
 from warnings import filterwarnings
 filterwarnings('ignore')
 
+import contourplots
+get_rounded_str = contourplots.utils.get_rounded_str
+
 from biosteam.utils import  colors
 import numpy as np
 
@@ -36,12 +39,16 @@ ig = np.seterr(invalid='ignore')
 
 product = TAL_product
 
+
+# search page for high end: https://www.alibaba.com/trade/search?spm=a2700.galleryofferlist.0.0.2a995827YzqZVg&fsb=y&IndexArea=product_en&assessmentCompany=true&keywords=590-00-1+sorbate&productTag=1200000228&ta=y&tab=all&
 SA_market_range=np.array([
-                          6.45, # 2022 North America price from https://www.chemanalyst.com/Pricing-data/sorbic-acid-1402
-                          7.43, # 2019 North America price from Sorbic Acid Market, Transparency Market Research
+                          6.74, # 2019 global high end from Sorbic Acid Market, Transparency Market Research
+                          6.50 * 1.3397087, # $6.50/kg-potassium-sorbate from https://www.alibaba.com/product-detail/Lifecare-Supply-Potassium-Sorbate-High-Quality_1600897125355.html?spm=a2700.galleryofferlist.p_offer.d_title.1bc15827eAs1TL&s=p
                           ]) 
 
 TAL_maximum_viable_market_range = SA_market_range / theoretical_max_g_TAL_per_g_SA
+
+# TAL_maximum_viable_market_range = np.array([5.99, 7.74])
 
 s, u = flowsheet.stream, flowsheet.unit
 
@@ -128,18 +135,22 @@ TAL_metrics = [get_product_MPSP, lambda: TAL_lca.GWP, lambda: TAL_lca.FEC,
 
 # %% Generate 3-specification meshgrid and set specification loading functions
 
-steps = (30, 30, 10)
+steps = (50, 50, 3)
 
 # Yield, titer, productivity (rate)
 spec_1 = TAL_decarb_convs = np.linspace(0., 0.5, steps[0]) # yield
 spec_2 = PD_reqs = np.linspace(0., 2., steps[1]) # titer
 
 
-spec_3 = PD_prices =\
-    np.array([Acetylacetone_fresh.price])
+# spec_3 = PD_prices =\
+#     np.array([Acetylacetone_fresh.price])
     
+# spec_3 = PD_prices =\
+#     np.linspace(1e-5, 5., steps[2])
+
 spec_3 = PD_prices =\
-    np.linspace(1e-5, 5., steps[2])
+    np.array([Acetylacetone_fresh.price/5., Acetylacetone_fresh.price, Acetylacetone_fresh.price*5.])
+
 
 #%% Plot stuff
 
@@ -156,7 +167,7 @@ y_ticks = [0., 0.5, 1., 1.5, 2.]
 
 z_label = r"$\bfAcetylacetone$"  +" "+ r"$\bfPrice$"# # title of the z axis
 z_units =  r"$\mathrm{\$} \cdot \mathrm{kg}^{-1}$"
-z_ticks = [0, 1, 2, 3, 4, 5]
+z_ticks = [0, 2, 4, 6, 8, 10]
 
 # Metrics
 MPSP_w_label = r"$\bfMPSP$" # title of the color axis
@@ -370,7 +381,6 @@ print(f'Max HXN Q bal error was {round(max_HXN_qbal_percent_error, 3)} %.')
 
 #%% Plot metrics vs titer, yield, and productivity
 
-import contourplots
 chdir(TAL_results_filepath)
 
 results_metric_1 = np.array(results_metric_1)
@@ -468,9 +478,9 @@ print('\nCreating and saving contour plots ...\n')
 #%% MPSP
 
 # MPSP_w_levels, MPSP_w_ticks, MPSP_cbar_ticks = get_contour_info_from_metric_data(results_metric_1, lb=3)
-MPSP_w_levels = np.arange(2, 8.1, 0.2)
-MPSP_cbar_ticks = np.arange(2, 8.1, 1.)
-MPSP_w_ticks = [ 4, 4.5, 5, 8]
+MPSP_w_levels = np.arange(2, 10.1, 0.1)
+MPSP_cbar_ticks = np.arange(2, 10.1, 1.)
+MPSP_w_ticks = [3.25, 3.5, 3.75, 4, 4.5, 5, 10]
 # MPSP_w_levels = np.arange(0., 15.5, 0.5)
 
 contourplots.animated_contourplot(w_data_vs_x_y_at_multiple_z=results_metric_1, # shape = z * x * y # values of the metric you want to plot on the color axis; e.g., MPSP
@@ -492,7 +502,7 @@ contourplots.animated_contourplot(w_data_vs_x_y_at_multiple_z=results_metric_1, 
                                 z_units=z_units,
                                 w_units=MPSP_units,
                                 # fmt_clabel=lambda cvalue: r"$\mathrm{\$}$"+" {:.1f} ".format(cvalue)+r"$\cdot\mathrm{kg}^{-1}$", # format of contour labels
-                                fmt_clabel = lambda cvalue:  f"{round(cvalue,1)}",
+                                fmt_clabel = lambda cvalue:  get_rounded_str(cvalue, 3),
                                 cmap=CABBI_green_colormap(), # can use 'viridis' or other default matplotlib colormaps
                                 cmap_over_color = colors.grey_dark.shade(8).RGBn,
                                 extend_cmap='max',
@@ -516,8 +526,8 @@ contourplots.animated_contourplot(w_data_vs_x_y_at_multiple_z=results_metric_1, 
 #%% GWP
 
 # GWP_w_levels, GWP_w_ticks, GWP_cbar_ticks = get_contour_info_from_metric_data(results_metric_2,)
-GWP_w_levels = np.arange(0, 20, 0.4)
-GWP_cbar_ticks = np.arange(0, 20, 2.)
+GWP_w_levels = np.arange(0, 20.3, 0.4)
+GWP_cbar_ticks = np.arange(0, 20.3, 2.)
 GWP_w_ticks = [3, 4, 6, 10, 14, 20]
 contourplots.animated_contourplot(w_data_vs_x_y_at_multiple_z=results_metric_2, # shape = z * x * y # values of the metric you want to plot on the color axis; e.g., GWP
                                 x_data=100*TAL_decarb_convs, # x axis values
@@ -561,9 +571,9 @@ contourplots.animated_contourplot(w_data_vs_x_y_at_multiple_z=results_metric_2, 
 #%% FEC
 
 # FEC_w_levels, FEC_w_ticks, FEC_cbar_ticks = get_contour_info_from_metric_data(results_metric_3,)
-FEC_w_levels = np.arange(-40, 61, 2.)
-FEC_cbar_ticks = np.arange(-40, 61, 10)
-FEC_w_ticks = [-30, -20, 0, 25, 50]
+FEC_w_levels = np.arange(-100, 101, 2.)
+FEC_cbar_ticks = np.arange(-100, 101, 25)
+FEC_w_ticks = [-100, -25, 0, 25, 50, 75, 100]
 contourplots.animated_contourplot(w_data_vs_x_y_at_multiple_z=results_metric_3, # shape = z * x * y # values of the metric you want to plot on the color axis; e.g., FEC
                                 x_data=100*TAL_decarb_convs, # x axis values
                                 y_data=PD_reqs, # y axis values
@@ -583,7 +593,7 @@ contourplots.animated_contourplot(w_data_vs_x_y_at_multiple_z=results_metric_3, 
                                 w_units=FEC_units,
                                 # fmt_clabel=lambda cvalue: r"$\mathrm{\$}$"+" {:.1f} ".format(cvalue)+r"$\cdot\mathrm{kg}^{-1}$", # format of contour labels
                                 fmt_clabel = lambda cvalue:  f"{round(cvalue,1)}",
-                                cmap=CABBI_green_colormap(), # can use 'viridis' or other default matplotlib colormaps
+                                cmap=CABBI_green_colormap(120), # can use 'viridis' or other default matplotlib colormaps
                                 cmap_over_color = colors.grey_dark.shade(8).RGBn,
                                 extend_cmap='max',
                                 cbar_ticks=FEC_cbar_ticks,
