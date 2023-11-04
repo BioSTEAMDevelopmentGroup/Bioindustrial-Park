@@ -55,6 +55,7 @@ def set_price_of_all_streams(feedstock_type):
               F.stream.Liquid_HCl,
               #streams which are a part of the imported lipidcane transesterification unit
               F.stream.NaOH,
+              F.catalyst,
               F.stream.methanol,
               F.stream.HCl]:
         i.price = prices_per_stream[i.ID]
@@ -65,8 +66,10 @@ def set_price_of_all_streams(feedstock_type):
               F.organic_phase_separation_and_catalyst_recovery,
               F.nonanoic_acid_fraction_separation,
               F.azelaic_acid_production,
+              F.WWT901,
               F.BT901,
               F.CT901,
+              F.CW901,
               F.PWT901
               ]:
             for j in i.ins:
@@ -74,35 +77,42 @@ def set_price_of_all_streams(feedstock_type):
                     j.price = prices_per_stream[j.ID]
             for k in i.outs:
                 if k.ID in prices_per_stream.keys():
-                    k.price = prices_per_stream[k.ID]
+                    k.price = prices_per_stream[k.ID]                    
     
                     
 
 def set_environmental_impact_of_all_streams(indicator,feedstock_type):
     #Feedstock stream                    
     if feedstock_type == 'HoSun':
-          F.crude_vegetable_oil.characterization_factors = {indicator : GWP_per_stream['crude_vegetable_HoSun']}
-    else: F.crude_vegetable_oil.characterization_factors = {indicator : GWP_per_stream['crude_vegetable_Hoysoy']}
+          F.crude_vegetable_oil.characterization_factors[indicator] = GWP_per_stream['crude_vegetable_HoSun']
+    else: F.crude_vegetable_oil.characterization_factors[indicator] = GWP_per_stream['crude_vegetable_Hoysoy']
     for i in [F.crude_HO_oil_to_biodiesel,
               F.dihydroxylation_system,
               F.oxidative_cleavage_system,
               F.organic_phase_separation_and_catalyst_recovery,
               F.nonanoic_acid_fraction_separation,
-              F.azelaic_acid_production]:
+              F.azelaic_acid_production,
+               F.BT901,
+                F.CT901,
+                F.CW901,
+                F.PWT901,
+                F.WWT901
+              ]:
         for j in i.ins:
             if j.ID in GWP_per_stream.keys():                
-                j.characterization_factors = {indicator : GWP_per_stream[j.ID]}               
+                j.characterization_factors[indicator]= GWP_per_stream[j.ID]            
         for k in i.outs:
             if k.ID in GWP_per_stream.keys():                
-                k.characterization_factors = {indicator : GWP_per_stream[k.ID]}    
+                k.characterization_factors[indicator] = GWP_per_stream[k.ID]
     for i in [ #streams defined inside the system
               F.stream.polystyrene_based_catalyst,
               F.stream.Liquid_HCl,
               #streams which are a part of the imported lipidcane transesterification unit
               F.stream.NaOH,
               F.stream.methanol,
+              F.stream.catalyst,
               F.stream.HCl]:
-        i.characterization_factors = {indicator : GWP_per_stream[k.ID]}       
+        i.characterization_factors[indicator] = GWP_per_stream[i.ID]  
        
 
 
@@ -162,9 +172,11 @@ def tea_azelaic_baseline(system,WC_over_FCI,operating_days,payrate,IRR):
     factor_administration_costs_fci= 0.009,
     factor_administration_costs_lc=0.177,#0.177*operating_labor_cost and 0.09*FCI[8]
     factor_plant_overhead_fci = 0.708,#0.708*operating_labor_cost + 0.036*FCI[8]
-    factor_plant_overhead_lc = 0.306)#[8]  
-    
+    factor_plant_overhead_lc = 0.306)#[8]      
     return tea_azelaic_baseline
+
+
+        
 #References    
 #[1]https://doi.org/10.1016/j.fuproc.2009.04.017
 #[2]https://taxfoundation.org/data/all/state/combined-federal-state-corporate-tax-rates-2022/

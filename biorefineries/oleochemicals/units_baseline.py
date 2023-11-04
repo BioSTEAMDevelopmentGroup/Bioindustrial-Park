@@ -29,7 +29,7 @@ class FFA_neutralisation_tank(bst.units.tank.MixTank):
 class DihydroxylationReactor(bst.CSTR):
     _N_ins = 1
     _N_outs = 2
-    X_dih = 0.99 #There is no mention of methyl oleate in the dihydroxylated product oily phase[1] 
+    X_dih = 0.99 #There is no mention of methyl oleate in the dihydroxylated product oily phase indicating almost complete conversion[1] 
   
 #Novovols's patent mentions that linoeleic and palmitoleic acid esters can be oxidatively cleaved,this would mean that they can also get dihydroxylated [3]
 #Methyl palmitate has no unsaturation, therefore doesn't participate in the reaction [1]
@@ -251,62 +251,59 @@ class HydrolysisReactor(bst.BatchBioreactor):
 #########################################################################################################################################################################################################################          
 #This unit is to separate the methanol and water mixture produced as condensate in the hydrolysis unit
 #Patent [2] mentions continous methanol recovery from the condensate obtained in the hydrolysis unit
+            
 class Methanolseparationsystem(bst.Unit,isabstract = True):
-      _N_ins = 1
-      _N_outs = 2 
+    _N_ins = 1
+    _N_outs = 2 
       
-      auxiliary_unit_names = ('distillation_column1',
-                               'heat_exchanger1')
-      def __init__(self, ID='', ins=(), outs=(),
-                   thermo=None):
+    auxiliary_unit_names = ('distillation_column1',
+                                'heat_exchanger1')
+    def __init__(self, ID='', ins=(), outs=(),
+                    thermo=None):
           Unit.__init__(self, ID, ins, outs, thermo)
-          self.distillation_column1 = distillation_column1 = bst.BinaryDistillation(ID ='D601',
-                                                                               ins = 'methanol_water_mixture',
-                                                                               LHK = ('Methanol',
-                                                                                      'Water'),
-                                                                               Lr = 0.999, Hr = 0.999,
-                                                                               k = 2,
-                                                                               P = 101325)
-          self.heat_exchanger1 = heat_exchanger1 = bst.HXutility(ID = 'HX608',
-                                                            ins = 'purified_methanol_stream',
-                                                            T = 25+273,
-                                                            cool_only = True,
-                                                            rigorous= True
-                                                            )
+          distillation_column1 = self.auxiliary('distillation_column1',
+                                                  bst.BinaryDistillation,
+                                                  LHK = ('Methanol',
+                                                  'Water'),
+                                                  Lr = 0.999, 
+                                                  Hr = 0.999,
+                                                  k = 2,
+                                                  P = 101325)
+          
+          heat_exchanger1 = self.auxiliary('heat_exchanger1',
+                                              bst.HXutility,
+                                              cool_only = True,
+                                              rigorous= True,
+                                              T = 25+273
+                                              )
 
-#This unit only recovers methanol if it is greater than 40 wt.% in the incoming feed 
-#Only cooling takes place if the stream has less than 40 wt.% of methanol in the incoming feed
+#This unit only recovers methanol if it is greater than 32 wt.% in the incoming feed 
+#Only cooling takes place if the stream has less than 32 wt.% of methanol in the incoming feed
+#In that case the cooled water is sent out as wastewater
 
-      def _run(self):
-        feed = self.ins[0]
-        top,bottom, = self.outs
-        if  feed.imass['Methanol']/feed.F_mass < 0.32:
-            self.heat_exchanger1.ins[0].copy_like(feed)
-            self.heat_exchanger1._setup()
-            self.heat_exchanger1._run()
-            bottom.copy_like(self.heat_exchanger1.outs[0])
-        else:
-            self.distillation_column1.ins[0].copy_like(feed)
-            self.distillation_column1._setup()
-            self.distillation_column1._run()
-            self.heat_exchanger1.ins[0].copy_like(self.distillation_column1.outs[0])
-            self.heat_exchanger1._setup()
-            self.heat_exchanger1._run()
-            top.copy_like(self.heat_exchanger1.outs[0])
-            bottom.copy_like(self.distillation_column1.outs[1])
-
-#TODO: figure out why costing is not working
-        def _design(self):
+    def _run(self):
+            feed = self.ins[0]
+            top,bottom, = self.outs
+            if  feed.imass['Methanol']/feed.F_mass < 0.32:
+                self.heat_exchanger1.ins[0].copy_like(feed)
+                self.heat_exchanger1._run()
+                bottom.copy_like(self.heat_exchanger1.outs[0])
+            else:
+                self.distillation_column1.ins[0].copy_like(feed)
+                self.distillation_column1._run()
+                self.heat_exchanger1.ins[0].copy_like(self.distillation_column1.outs[0])
+                self.heat_exchanger1._run()
+                top.copy_like(self.heat_exchanger1.outs[0])
+                bottom.copy_like(self.distillation_column1.outs[1])    
+    def _design(self):
             self.distillation_column1._design()
             self.heat_exchanger1._design()    
           
-        def _cost(self):
+    def _cost(self):
             self.distillation_column1._cost()
-            self.heat_exchanger1._cost()
-            # for i in self.auxiliary_unit: i._cost()
-            # bst.Unit._cost()
-
-
+            self.heat_exchanger1._cost()                
+                
+                
 ##################################################################################################################################################################################################################
 #Solids flaker is a user defined unit  essential for the final recovery of azelaic acid [9]
 #It is to convert azelaic acid in molten form to solid flakes of azelaic acid 

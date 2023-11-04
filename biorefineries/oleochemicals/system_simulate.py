@@ -3,6 +3,10 @@ Created on Wed Feb 15 13:45:33 2023
 @author: Lavanya
 """
 
+#TODO: check M901/M903 convergence errors when high rate WWT is used
+#TODO: purchase cost of the isentropic compressor is missing
+#TODO:
+
 import biosteam as bst
 from biorefineries.oleochemicals.systems_baseline import F
 from biorefineries.oleochemicals.systems_baseline import aa_baseline_sys
@@ -32,7 +36,7 @@ aa_baseline_groups = bst.UnitGroup.group_by_area(aa_baseline.units)
 setting_prices = set_price_of_all_streams(feedstock_type='HoySoy')
 setting_EI_factors = set_environmental_impact_of_all_streams(indicator = 'GWP100',
                                                              feedstock_type='HoySoy')
-# tea_azelaic_baseline = create_conventional_ethanol_tea
+
 tea_azelaic_baseline= tea_azelaic_baseline(system = aa_baseline,
                                            operating_days=300,
                                            WC_over_FCI = 0.05,#[1]
