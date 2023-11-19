@@ -169,6 +169,7 @@ def create_TAL_fermentation_process(ins, outs,):
 @SystemFactory(ID = 'TAL_separation_solubility_exploit_process',
                ins=[dict(ID='fermentation_broth', TAL=1, Water=100),
                     dict(ID='acetylacetone_decarboxylation_equilibrium', PD=1.),
+                    dict(ID='recycled_supernatant', TAL=0.1, Water=100),
                ],
                 outs=[dict(ID='decarboxylation_vent', CO2=20),
                       dict(ID='S401_solid', FermMicrobe=1, Water=1),
@@ -178,7 +179,7 @@ def create_TAL_fermentation_process(ins, outs,):
                                                )
 def create_TAL_separation_solubility_exploit_process(ins, outs,):
     
-    fermentation_broth, acetylacetone_decarboxylation_equilibrium = ins
+    fermentation_broth, acetylacetone_decarboxylation_equilibrium, recycled_supernatant = ins
     decarboxylation_vent, S401_solid, liquid_waste, solid_TAL = outs
     
     # =============================================================================
@@ -210,14 +211,17 @@ def create_TAL_separation_solubility_exploit_process(ins, outs,):
         U401_outs_0.imol['l', 'TAL'] = min(mol_TAL_dissolved, tot_TAL)
         U401_outs_0.imol['s', 'TAL'] = tot_TAL - min(mol_TAL_dissolved, tot_TAL)
     
-    M401 = bst.LiquidsMixingTank('M401', ins=(U401-0, acetylacetone_decarboxylation_equilibrium), 
-                                 outs=('fermentation_broth_heated_mixed'))
+    M401 = bst.LiquidsMixingTank('M401', 
+                                 ins=(U401-0, 
+                                      acetylacetone_decarboxylation_equilibrium, 
+                                      recycled_supernatant), 
+                                 outs=('fermentation_broth_mixed'))
     M401.mol_acetylacetone_per_mol_TAL = 0.
     @M401.add_specification(run=False)
     def M401_spec():
         M401.ins[1].imol['PD'] = M401.mol_acetylacetone_per_mol_TAL * M401.ins[0].imol['TAL']
         M401._run()
-        
+        M401
     # Change broth temperature to adjust TAL solubility
     H401 = bst.HXutility('H401', ins=M401-0, outs=('fermentation_broth_heated'), 
                          T=273.15+56., # initial value; updated in specification to minimum T required to completely dissolve TAL 
@@ -246,7 +250,9 @@ def create_TAL_separation_solubility_exploit_process(ins, outs,):
             H401.T=lb_T
         else:
             H401_spec_obj_fn = lambda T: TAL_solubility_multiplier*get_mol_TAL_dissolved(T, H401_ins_0_water) - tot_TAL
-            H401.T = IQ_interpolation(H401_spec_obj_fn, lb_T, ub_T, ytol=1e-3)
+            H401.T = IQ_interpolation(H401_spec_obj_fn, lb_T, ub_T, 
+                                      ytol=5e-2, 
+                                      maxiter=300)
         
         H401._run()
         H401_outs_0 = H401.outs[0]
@@ -257,8 +263,11 @@ def create_TAL_separation_solubility_exploit_process(ins, outs,):
         H401_outs_0.imol['s', 'TAL'] = max(0., round(tot_TAL - min(mol_TAL_dissolved, tot_TAL), 5))
     
     
+    M402 = bst.LiquidsMixingTank('M402', 
+                                 ins=(H401-0, ), 
+                                 outs=('fermentation_broth_heated_mixed'))
 
-    U402 = bst.FakeSplitter('U402', ins=H401-0, outs = ('thermally_decarboxylated_broth',decarboxylation_vent))
+    U402 = bst.FakeSplitter('U402', ins=M402-0, outs = ('thermally_decarboxylated_broth',decarboxylation_vent))
     U402.decarboxylation_rxns = ParallelRxn([
         Rxn('TAL + H2O -> PD + CO2', 'TAL',   0.25),
         ])

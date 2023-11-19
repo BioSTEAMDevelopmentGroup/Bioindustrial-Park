@@ -218,6 +218,9 @@ class BatchCoFermentation(BatchBioreactor):
     # 40 g/L peptone
     # 20 g/L yeast extract
     
+    # Replacing yeast extract with CSL can actually enhance the pyruvate carboxylation pathway
+    # in Y. lipolytica (Liu et al. 2015; https://doi.org/10.1016/j.indcrop.2015.10.029)
+    
     # From Tan et al. 2016 (DOI 10.1088/1755-1315/36/1/012058):
     # Yeast extract total N = 10 - 11.8 dry wt%
     # CSL total N = 7.7 - 8.2 dry wt%
@@ -363,6 +366,9 @@ class BatchCoFermentation(BatchBioreactor):
         
         vapor, effluent = self.outs
         
+        # vapor.empty()
+        # effluent.empty()
+        
         effluent.mix_from([feed, seed])
         
         current_acetate_loading = effluent.imass[self.acetate_ID] / effluent.F_vol
@@ -377,7 +383,7 @@ class BatchCoFermentation(BatchBioreactor):
             self.air_exit_F_mol_needed = (1./0.21) * (1/32.) * self.air_flow_rate_safety_factor_for_DO_saturation_basis * self.DO_saturation_concentration_kg_per_m3 * self.DO_saturation_target_level\
                 *(seed.F_vol+feed.F_vol)
             
-            air.F_mol = 1e6 # initial value; updated after reactions
+            air.F_mol = 1e8 # initial value; updated after reactions
         
         elif self.aeration_rate_basis == 'fixed rate basis':
             air.F_vol = self.air_m3_per_h_per_m3_reactor * (seed.F_vol+feed.F_vol) * self.tau

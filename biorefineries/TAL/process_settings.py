@@ -274,14 +274,14 @@ _hps.T = 266 + 273.15
 
 _cooling = bst.HeatUtility.get_cooling_agent('cooling_water')
 _chilled = bst.HeatUtility.get_cooling_agent('chilled_water')
-_cooling.regeneration_price = 0
+_chilled_brine = bst.HeatUtility.get_cooling_agent('chilled_brine')
+
 _cooling.T = 28 + 273.15
 _cooling.T_limit = _cooling.T + 9
-
 # Side steam in CHP not a heat utility, thus will cause problem in TEA utility
 # cost calculation if price not set to 0 here, costs for regeneration of heating
 # and cooling utilities will be considered as CAPEX and OPEX of CHP and CT, respectively
-for i in (_lps, _mps, _hps, _cooling, _chilled):
+for i in (_lps, _mps, _hps, _cooling, _chilled, _chilled_brine):
     i.heat_transfer_price = i.regeneration_price = 0
     # if i == _cooling: continue
     # i.heat_transfer_efficiency = 0.85
