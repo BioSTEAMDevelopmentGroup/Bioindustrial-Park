@@ -64,6 +64,7 @@ def get_mass_acetone_needed_per_mass_KSA():
                ins=[dict(ID='sugar_juice_or_slurry', Glucose=10, Water=100),
                     dict(ID='CSL', CSL=100),
                     dict(ID='Acetate_spiking', SodiumAcetate=100),
+                    dict(ID='DAP', DAP=100),
                ],
                 outs=[dict(ID='F301_top_product', Water=20),
                       dict(ID='fermentation_liquid_effluent', TAL=1, Water=100),
@@ -73,7 +74,7 @@ def get_mass_acetone_needed_per_mass_KSA():
                                                )
 def create_TAL_fermentation_process(ins, outs,):
     
-    sugar_juice_or_slurry, CSL, Acetate_spiking = ins
+    sugar_juice_or_slurry, CSL, Acetate_spiking, DAP = ins
     F301_top_product, fermentation_liquid_effluent, fermentation_vent, seedtrain_vent = outs
       
     # =============================================================================
@@ -119,7 +120,7 @@ def create_TAL_fermentation_process(ins, outs,):
         for i in S302.outs: i.phases = ('l',)
     # Cofermentation
     R302 = units.BatchCoFermentation('R302', 
-                                    ins=(S302-1, '', CSL, Acetate_spiking, '', ''),
+                                    ins=(S302-1, '', CSL, Acetate_spiking, DAP, ''),
                                     outs=(fermentation_vent, fermentation_liquid_effluent),
                                     acetate_ID='AceticAcid',
                                     aeration_rate_basis='DO saturation basis',
@@ -251,7 +252,9 @@ def create_TAL_separation_solubility_exploit_process(ins, outs,):
         else:
             H401_spec_obj_fn = lambda T: TAL_solubility_multiplier*get_mol_TAL_dissolved(T, H401_ins_0_water) - tot_TAL
             H401.T = IQ_interpolation(H401_spec_obj_fn, lb_T, ub_T, 
-                                      ytol=5e-2, 
+                                      # ytol=5e-2,
+                                       # ytol=0.1, 
+                                      ytol = 0.5,
                                       maxiter=300)
         
         H401._run()
@@ -290,6 +293,7 @@ def create_TAL_separation_solubility_exploit_process(ins, outs,):
             raise ValueError(f"U402.decarboxylation_conversion_basis must be 'fixed' or 'temperature-dependent', not '{U402.decarboxylation_conversion_basis}'.")
         
         U402.decarboxylation_rxns[0].adiabatic_reaction(U402_outs_0['l'])
+        U402.outs[1].empty()
         U402.outs[1].imol['CO2'] = U402_outs_0.imol['l', 'CO2']
         U402.outs[1].phase = 'g'
         U402_outs_0.imol['l', 'CO2'] = 0.

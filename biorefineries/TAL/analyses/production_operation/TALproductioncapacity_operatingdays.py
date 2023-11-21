@@ -99,6 +99,8 @@ print('\nLoaded samples.')
 model.exception_hook = 'warn'
 print('\n\nSimulating baseline ...')
 baseline_initial = model.metrics_at_baseline()
+# load_annual_operating_days(baseline_op_days)
+# load_production_capacity(baseline_prod_cap)
 
 #%% Parameter loading functions
 U402, M401 = u.U402, u.M401
@@ -135,11 +137,11 @@ TAL_metrics = [get_product_MPSP, lambda: TAL_lca.GWP, lambda: TAL_lca.FEC,
 
 # %% Generate 3-specification meshgrid and set specification loading functions
 
-steps = (80, 80, 1)
+steps = (60, 60, 1)
 
 # Yield, titer, productivity (rate)
 spec_1 = prod_caps = np.linspace(2000., 120000., steps[0])
-spec_2 = ann_op_days = np.linspace(20, 360, steps[1])
+spec_2 = ann_op_days = np.linspace(6, 360, steps[1])
 
 
 spec_3 = PD_prices =\
@@ -259,16 +261,22 @@ def tickmarks(dmin, dmax, accuracy=50, N_points=5):
 #%% Create meshgrid
 spec_1, spec_2 = np.meshgrid(spec_1, spec_2)
 
+#%% Finish simulating baseline
+for i in range(3):
+    spec.set_production_capacity(desired_annual_production=spec.desired_annual_production)
+print(f'\nSimulated baseline: MPSP is ${round(get_product_MPSP(),2)}/kg.\n')
+
+
 #%% Initial simulation
-# simulate_and_print()
+simulate_and_print()
 
 print('\n\nSimulating the initial point to avoid bugs ...')
 
 load_acetylacetone_price(PD_prices[0])
 load_annual_operating_days(ann_op_days[0])
 load_production_capacity(prod_caps[0])
-
-spec.set_production_capacity(desired_annual_production=spec.desired_annual_production)
+for i in range(3):
+    spec.set_production_capacity(desired_annual_production=spec.desired_annual_production)
 simulate_and_print()
 
 # %% Run TRY analysis 
@@ -296,6 +304,13 @@ max_HXN_qbal_percent_error = 0.
 curr_no = 0
 total_no = len(prod_caps)*len(ann_op_days)*len(PD_prices)
 
+
+simulate_baseline_first_each_time = True
+baseline_op_days = 180
+baseline_prod_cap = 13385.197
+
+# prod_caps = [13385.197 for i in range(60)]
+
 for p in PD_prices:
     # data_1 = TAL_data = spec.evaluate_across_specs(
     #         TAL_sys, spec_1, spec_2, TAL_metrics, [p])
@@ -316,10 +331,24 @@ for p in PD_prices:
             error_message = None
             try:
                 # spec.load_specifications(spec_1=y, spec_2=t, spec_3=p)
+                if simulate_baseline_first_each_time:
+                    
+                    system.reset_cache()
+                    system.empty_recycles()
+                    print('Reset cache and emptying recycles.')
+                    load_annual_operating_days(baseline_op_days)
+                    load_production_capacity(baseline_prod_cap)
+                    # for i in range(3):
+                    #     spec.set_production_capacity(desired_annual_production=spec.desired_annual_production)
+                    simulate_and_print()
+                    print(f'\nRe-simulated baseline: MPSP is ${round(get_product_MPSP(),2)}/kg.\n')
+                    print(TAL_tea.operating_days, product.imass['TAL'] * TAL_tea.operating_hours / 1e3)
+                    
                 load_annual_operating_days(t)
                 load_production_capacity(y)
-                
-                spec.set_production_capacity(desired_annual_production=spec.desired_annual_production)
+                for i in range(3):
+                    spec.set_production_capacity(desired_annual_production=spec.desired_annual_production)
+                # print(product.imass['TAL'] * TAL_tea.operating_hours / 1e3)
                 
                 # system.simulate()
                 d1_Metric1[-1].append(TAL_metrics[0]())
@@ -485,6 +514,7 @@ keep_frames = True
 
 print('\nCreating and saving contour plots ...\n')
 
+
 #%% MPSP
 
 # MPSP_w_levels, MPSP_w_ticks, MPSP_cbar_ticks = get_contour_info_from_metric_data(results_metric_1, lb=3)
@@ -492,7 +522,7 @@ MPSP_w_levels = np.arange(2, 10.25, 0.25)
 MPSP_cbar_ticks = np.arange(2, 10.1, 1.)
 MPSP_w_ticks = [
                 # 2.75, 
-                3., 3.5, 4.5, 10.]
+                2.5, 3., 3.5, 4.5, 10.]
 # MPSP_w_levels = np.arange(0., 15.5, 0.5)
 
 contourplots.animated_contourplot(w_data_vs_x_y_at_multiple_z=results_metric_1, # shape = z * x * y # values of the metric you want to plot on the color axis; e.g., MPSP
@@ -720,6 +750,7 @@ contourplots.animated_contourplot(w_data_vs_x_y_at_multiple_z=results_metric_4, 
                                 additional_hlines=[],
                                 additional_hline_colors=[],
                                 additional_points ={(13385.197/1000, 180):('D', 'w', 6)},
+                                text_boxes = {'>200': [(98,30), 'white']},
                                 )
 
 #%% TCI
@@ -783,6 +814,7 @@ contourplots.animated_contourplot(w_data_vs_x_y_at_multiple_z=results_metric_5, 
                                 additional_hlines=[],
                                 additional_hline_colors=[],
                                 additional_points ={(13385.197/1000, 180):('D', 'w', 6)},
+                                text_boxes = {'>2000': [(90,30), 'white']},
                                 )
 
 #%% Purity

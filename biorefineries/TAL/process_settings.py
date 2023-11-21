@@ -301,6 +301,7 @@ CFs = {}
 GWP_CFs = {
     'CH4': 0.40, # NA NG from shale and conventional recovery
     'CSL': 1.55,
+    'DAP': 1.6354, # ecoinvent 3.8 diammonium phosphate production, RoW
     
     # 'Enzyme': 2.24, 
     'Ethanol': 1.44,
@@ -354,6 +355,7 @@ CFs['GWP_CFs'] = GWP_CFs
 FEC_CFs = {
     'CH4': 50, # NA NG from shale and conventional recovery
     'CSL': 12,
+    'DAP': 22.028, # ecoinvent 3.8 diammonium phosphate production, RoW
     
     'Ethanol': 16,
     'Acetone': 66.852, #  ecoinvent 3.8 market for acetone, liquid, RoW

@@ -18,8 +18,6 @@ import numpy as np
 from biorefineries import TAL
 from biorefineries.TAL.systems.system_TAL_solubility_exploit_ethanol_sugarcane import TAL_tea, TAL_lca, R302, spec, TAL_product, simulate_and_print, theoretical_max_g_TAL_per_g_SA, flowsheet
 
-from flexsolve import IQ_interpolation
-
 from  matplotlib.colors import LinearSegmentedColormap
 import pandas as pd
 
@@ -31,6 +29,8 @@ from math import log
 import os
 
 from biorefineries.TAL.models import models_TAL_solubility_exploit as models
+
+from flexsolve import IQ_interpolation
 
 chdir = os.chdir
 
@@ -126,7 +126,8 @@ def load_M401_acetylacetone_req(mol_acetylacetone_per_mol_TAL):
 
 def load_acetylacetone_price(acetylacetone_price):
     Acetylacetone_fresh.price = acetylacetone_price
-    
+
+
 #%%  Metrics
 broth = R302.outs[1]
 # SA_price_range = [6500, 7500]
@@ -144,16 +145,18 @@ get_TAL_sugars_conc = lambda: sum(R302.outs[0].imass['Glucose', 'Xylose'])/R302.
 
 get_TAL_inhibitors_conc = lambda: 1000*sum(R302.outs[0].imass['AceticAcid', 'Furfural', 'HMF'])/R302.outs[0].F_vol
 
+get_M401_addition = lambda: M401.mol_acetylacetone_per_mol_TAL
+
 TAL_metrics = [get_product_MPSP, lambda: TAL_lca.GWP, lambda: TAL_lca.FEC, 
-               get_TAL_AOC, get_TAL_FCI, get_product_purity]
+               get_TAL_AOC, get_TAL_FCI, get_product_purity, get_M401_addition]
 
 # %% Generate 3-specification meshgrid and set specification loading functions
 
 steps = (60, 60, 1)
 
 # Yield, titer, productivity (rate)
-spec_1 = TAL_decarb_convs = np.linspace(0., 0.5, steps[0]) # yield
-spec_2 = PD_reqs = np.linspace(0., 5., steps[1]) # titer
+spec_1 = TAL_decarb_convs = np.linspace(0.01, 0.5, steps[0]) # yield
+spec_2 = PD_reqs = np.linspace(0.01, 5., steps[1]) # titer
 
 
 # spec_3 = PD_prices =\
@@ -163,11 +166,7 @@ spec_2 = PD_reqs = np.linspace(0., 5., steps[1]) # titer
 #     np.linspace(1e-5, 5., steps[2])
 
 spec_3 = PD_prices =\
-    np.array([
-        # Acetylacetone_fresh.price/5.,
-        Acetylacetone_fresh.price, 
-        # Acetylacetone_fresh.price*5.,
-        ])
+    np.array([Acetylacetone_fresh.price])
 
 
 #%% Plot stuff
@@ -178,7 +177,7 @@ x_label = r"$\bfTAL$"  +" "+ r"$\bfDecarboxylation$"  +" "+ r"$\bfConversion$" #
 x_units = r"$\mathrm{\%}$"  +" "+ r"$\mathrm{theoretical}$"
 x_ticks = [0, 10, 20, 30, 40, 50]
 
-y_label = r"$\bfAcetylacetone$"  +" "+ r"$\bfAddition$"# title of the y axis
+y_label = r"$\bfAcetylacetone$"  +" "+ r"$\bfPresence$"# title of the y axis
 y_units =r"$\mathrm{mol} \cdot \mathrm{mol-TAL}^{-1}$"
 y_ticks = [0., 1., 2., 3., 4., 5.]
 
@@ -205,6 +204,9 @@ FCI_units = r"$\mathrm{MM\$}$"
 
 Purity_w_label = r"$\bfPurity$" # title of the color axis
 Purity_units = r"$\mathrm{\%}$"
+
+M401_addition_w_label = r"$\bfAcetylacetone$"  +" "+ r"$\bfAdded$" # title of the color axis
+M401_addition_units = r"$\mathrm{mol} \cdot \mathrm{mol-TAL}^{-1}$"
 
 #%% Colors
 
@@ -292,6 +294,7 @@ system = TAL_sys
 HXN = spec.HXN
 results_metric_1, results_metric_2, results_metric_3 = [], [], []
 results_metric_4, results_metric_5, results_metric_6 = [], [], []
+results_metric_7 = []
 
 def print_status(curr_no, total_no, s1, s2, s3, HXN_qbal_error, results=None, exception_str=None,):
     print('\n\n')
@@ -315,6 +318,7 @@ for p in PD_prices:
     
     d1_Metric1, d1_Metric2, d1_Metric3 = [], [], []
     d1_Metric4, d1_Metric5, d1_Metric6 = [], [], []
+    d1_Metric7 = []
     
     for y in TAL_decarb_convs:
         d1_Metric1.append([])
@@ -323,6 +327,7 @@ for p in PD_prices:
         d1_Metric4.append([])
         d1_Metric5.append([])
         d1_Metric6.append([])
+        d1_Metric7.append([])
         for t in PD_reqs:
             curr_no +=1
             error_message = None
@@ -340,6 +345,7 @@ for p in PD_prices:
                 d1_Metric4[-1].append(TAL_metrics[3]())
                 d1_Metric5[-1].append(TAL_metrics[4]())
                 d1_Metric6[-1].append(TAL_metrics[5]())
+                d1_Metric7[-1].append(TAL_metrics[6]())
                 
                 HXN_qbal_error = HXN.energy_balance_percent_error
                 if abs(max_HXN_qbal_percent_error)<abs(HXN_qbal_error): max_HXN_qbal_percent_error = HXN_qbal_error
@@ -351,6 +357,7 @@ for p in PD_prices:
                 d1_Metric4[-1].append(np.nan)
                 d1_Metric5[-1].append(np.nan)
                 d1_Metric6[-1].append(np.nan)
+                d1_Metric7[-1].append(np.nan)
                 error_message = str(e1)
             
             except ValueError as e1:
@@ -360,20 +367,24 @@ for p in PD_prices:
                 d1_Metric4[-1].append(np.nan)
                 d1_Metric5[-1].append(np.nan)
                 d1_Metric6[-1].append(np.nan)
+                d1_Metric7[-1].append(np.nan)
                 error_message = str(e1)
             
             print_status(curr_no, total_no,
                          y, t, p, 
                          results=[d1_Metric1[-1][-1], d1_Metric2[-1][-1], d1_Metric3[-1][-1],
-                                  d1_Metric4[-1][-1], d1_Metric5[-1][-1], d1_Metric6[-1][-1],],
+                                  d1_Metric4[-1][-1], d1_Metric5[-1][-1], d1_Metric6[-1][-1],
+                                  d1_Metric7[-1][-1]],
                          HXN_qbal_error=HXN.energy_balance_percent_error,
                          exception_str=error_message)
     
     d1_Metric1, d1_Metric2, d1_Metric3 = np.array(d1_Metric1), np.array(d1_Metric2), np.array(d1_Metric3)
     d1_Metric4, d1_Metric5, d1_Metric6 = np.array(d1_Metric4), np.array(d1_Metric5), np.array(d1_Metric6)
+    d1_Metric7 = np.array(d1_Metric7)
     
     d1_Metric1, d1_Metric2, d1_Metric3 = d1_Metric1.transpose(), d1_Metric2.transpose(), d1_Metric3.transpose()
     d1_Metric4, d1_Metric5, d1_Metric6 = d1_Metric4.transpose(), d1_Metric5.transpose(), d1_Metric6.transpose()
+    d1_Metric7 = d1_Metric7.transpose()
     
     results_metric_1.append(d1_Metric1)
     results_metric_2.append(d1_Metric2)
@@ -381,12 +392,13 @@ for p in PD_prices:
     results_metric_4.append(d1_Metric4)
     results_metric_5.append(d1_Metric5)
     results_metric_6.append(d1_Metric6)
+    results_metric_7.append(d1_Metric7)
 
 
     # %% Save generated data
     
     minute = '0' + str(dateTimeObj.minute) if len(str(dateTimeObj.minute))==1 else str(dateTimeObj.minute)
-    file_to_save = f'_{steps}_steps_'+'TAL_decarboxylation_%s.%s.%s-%s.%s'%(dateTimeObj.year, dateTimeObj.month, dateTimeObj.day, dateTimeObj.hour, minute)
+    file_to_save = f'_{steps}_steps_'+'TAL_decarboxylation_purchasing_PD%s.%s.%s-%s.%s'%(dateTimeObj.year, dateTimeObj.month, dateTimeObj.day, dateTimeObj.hour, minute)
     np.save(TAL_results_filepath+file_to_save, np.array([d1_Metric1, d1_Metric2, d1_Metric3]))
     
     pd.DataFrame(d1_Metric1).to_csv(TAL_results_filepath+'MPSP-'+file_to_save+'.csv')
@@ -395,6 +407,7 @@ for p in PD_prices:
     pd.DataFrame(d1_Metric4).to_csv(TAL_results_filepath+'AOC-'+file_to_save+'.csv')
     pd.DataFrame(d1_Metric5).to_csv(TAL_results_filepath+'FCI-'+file_to_save+'.csv')
     pd.DataFrame(d1_Metric6).to_csv(TAL_results_filepath+'Purity-'+file_to_save+'.csv')
+    pd.DataFrame(d1_Metric7).to_csv(TAL_results_filepath+'M401_addition-'+file_to_save+'.csv')
     
 
 #%% Report maximum HXN energy balance error
@@ -801,3 +814,53 @@ contourplots.animated_contourplot(w_data_vs_x_y_at_multiple_z=results_metric_6, 
                                 # comparison_range_hatch_pattern='////',
                                 units_on_newline = (True, True, False, False), # x,y,z,w
                                 )
+
+#%% Acetylacetone addition required
+
+# M401_addition_w_levels, M401_addition_w_ticks, M401_addition_cbar_ticks = get_contour_info_from_metric_data(results_metric_6,)
+M401_addition_w_levels = M401_addition_cbar_ticks = M401_addition_w_ticks = np.arange(0., 5.0, 0.2)
+# M401_addition_cbar_ticks = np.arange(2, 8.1, 1.)
+# M401_addition_w_ticks = [ 4, 4.5, 5, 8]
+# M401_addition_w_levels = np.arange(0., 15.5, 0.5)
+
+contourplots.animated_contourplot(w_data_vs_x_y_at_multiple_z=results_metric_7, # shape = z * x * y # values of the metric you want to plot on the color axis; e.g., M401_addition
+                                x_data=100*TAL_decarb_convs, # x axis values
+                                # x_data = TAL_decarb_convs/theoretical_max_g_TAL_acid_per_g_glucose,
+                                y_data=PD_reqs, # y axis values
+                                z_data=PD_prices, # z axis values
+                                x_label=x_label, # title of the x axis
+                                y_label=y_label, # title of the y axis
+                                z_label=z_label, # title of the z axis
+                                w_label=M401_addition_w_label, # title of the color axis
+                                x_ticks=100*x_ticks,
+                                y_ticks=y_ticks,
+                                z_ticks=z_ticks,
+                                w_levels=M401_addition_w_levels, # levels for unlabeled, filled contour areas (labeled and ticked only on color bar)
+                                w_ticks=M401_addition_w_ticks, # labeled, lined contours; a subset of w_levels
+                                x_units=x_units,
+                                y_units=y_units,
+                                z_units=z_units,
+                                w_units=M401_addition_units,
+                                # fmt_clabel=lambda cvalue: r"$\mathrm{\$}$"+" {:.1f} ".format(cvalue)+r"$\cdot\mathrm{kg}^{-1}$", # format of contour labels
+                                fmt_clabel = lambda cvalue:  f"{round(cvalue,1)}",
+                                cmap=CABBI_green_colormap(), # can use 'viridis' or other default matplotlib colormaps
+                                cmap_over_color = colors.grey_dark.shade(8).RGBn,
+                                extend_cmap='max',
+                                cbar_ticks=M401_addition_cbar_ticks,
+                                z_marker_color='g', # default matplotlib color names
+                                fps=fps, # animation frames (z values traversed) per second
+                                n_loops='inf', # the number of times the animated contourplot should loop animation over z; infinite by default
+                                animated_contourplot_filename='M401_addition_animated_contourplot_'+file_to_save, # file name to save animated contourplot as (no extensions)
+                                keep_frames=keep_frames, # leaves frame PNG files undeleted after running; False by default
+                                axis_title_fonts=axis_title_fonts,
+                                clabel_fontsize = clabel_fontsize,
+                                default_fontsize = default_fontsize,
+                                axis_tick_fontsize = axis_tick_fontsize,
+                                # comparison_range=TAL_maximum_viable_market_range,
+                                n_minor_ticks = 1,
+                                cbar_n_minor_ticks = 1,
+                                # comparison_range=[M401_addition_w_levels[-2], M401_addition_w_levels[-1]],
+                                # comparison_range_hatch_pattern='////',
+                                units_on_newline = (True, True, False, False), # x,y,z,w
+                                )
+

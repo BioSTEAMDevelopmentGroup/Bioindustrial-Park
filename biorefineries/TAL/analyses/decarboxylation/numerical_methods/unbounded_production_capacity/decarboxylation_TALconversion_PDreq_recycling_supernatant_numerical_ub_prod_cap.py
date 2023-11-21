@@ -108,14 +108,16 @@ H401, U402, S403 = u.H401, u.U402, u.S403
 def solve_decarb_conv_for_mol_ratio(mol_PD_per_mol_TAL):
     def obj_f(x):
         U402.decarboxylation_conversion = x
-        spec.set_production_capacity()
+        # spec.set_production_capacity()
+        system.simulate()
         return U402.outs[0].imol['Acetylacetone']/U402.outs[0].imol['TAL'] - mol_PD_per_mol_TAL
     return IQ_interpolation(obj_f, 0.01, 0.225, ytol=1e-3)
     
 def solve_mol_ratio_for_decarb_conv(x):
     U402.decarboxylation_conversion = x
     def obj_f(mol_PD_per_mol_TAL):
-        spec.set_production_capacity()
+        # spec.set_production_capacity()
+        system.simulate()
         return U402.outs[0].imol['Acetylacetone']/U402.outs[0].imol['TAL'] - mol_PD_per_mol_TAL
     return IQ_interpolation(obj_f, 0.01, 0.6, ytol=1e-3)
     
@@ -123,9 +125,17 @@ def solve_split_for_mol_ratio_and_decarb_conv(mol_PD_per_mol_TAL, x):
     U402.decarboxylation_conversion = x
     def obj_f(spl):
         S403.split = spl
-        spec.set_production_capacity()
+        # spec.set_production_capacity()
+        system.simulate()
         return U402.outs[0].imol['Acetylacetone']/U402.outs[0].imol['TAL'] - mol_PD_per_mol_TAL
-    return IQ_interpolation(obj_f, 0., 0.95, ytol=5e-3)
+    return IQ_interpolation(obj_f, 
+                            0., 
+                            0.95, 
+                            # 0.90,
+                            ytol=5e-3,
+                            # ytol=1e-2,
+                            maxiter=100,
+                            )
 
 
 #%% Parameter loading functions
@@ -192,7 +202,7 @@ x_label = r"$\bfTAL$"  +" "+ r"$\bfDecarboxylation$"  +" "+ r"$\bfConversion$" #
 x_units = r"$\mathrm{\%}$"  +" "+ r"$\mathrm{theoretical}$"
 x_ticks = [0, 10, 20, 30, 40, 50]
 
-y_label = r"$\bfAcetylacetone$"  +" "+ r"$\bfPresence$"# title of the y axis
+y_label = r"$\bfAcetylacetone$"  +" "+ r"$\bfPresence$"  +"\n"+ r"$\bfMaintained$"# title of the y axis
 y_units =r"$\mathrm{mol} \cdot \mathrm{mol-TAL}^{-1}$"
 y_ticks = [0., 1., 2., 3., 4., 5.]
 
@@ -220,7 +230,7 @@ FCI_units = r"$\mathrm{MM\$}$"
 Purity_w_label = r"$\bfPurity$" # title of the color axis
 Purity_units = r"$\mathrm{\%}$"
 
-S403_split_w_label = r"$\bfSupernatant$"  +" "+ r"$\bfRecycling$" +" "+ r"$\bfRequired$" # title of the color axis
+S403_split_w_label = r"$\bfSupernatant$"  +" "+ r"$\bfRecycling$" +"\n"+ r"$\bfRequired$" # title of the color axis
 S403_split_units = r"$\mathrm{\%}$"
 
 #%% Colors
@@ -320,12 +330,17 @@ def print_status(curr_no, total_no, s1, s2, s3, HXN_qbal_error, results=None, ex
     print(f'HXN Qbal error = {round(HXN_qbal_error, 2)} %.')
     print('\n')
     print(results)
+    
+    print('\n')
+    print(f'Error: {exception_str}')
+    print('\n')
 
 max_HXN_qbal_percent_error = 0.
 
 curr_no = 0
 total_no = len(TAL_decarb_convs)*len(PD_reqs)*len(PD_prices)
 
+error_messages = []
 for p in PD_prices:
     # data_1 = TAL_data = spec.evaluate_across_specs(
     #         TAL_sys, spec_1, spec_2, TAL_metrics, [p])
@@ -351,9 +366,9 @@ for p in PD_prices:
                 load_decarboxylation_conversion(y)
                 load_M401_acetylacetone_req(t)
                 
-                spec.set_production_capacity(desired_annual_production=spec.desired_annual_production)
+                # spec.set_production_capacity(desired_annual_production=spec.desired_annual_production)
+                system.simulate()
                 
-                # system.simulate()
                 d1_Metric1[-1].append(TAL_metrics[0]())
                 d1_Metric2[-1].append(TAL_metrics[1]())
                 d1_Metric3[-1].append(TAL_metrics[2]())
@@ -392,6 +407,24 @@ for p in PD_prices:
                                   d1_Metric7[-1][-1]],
                          HXN_qbal_error=HXN.energy_balance_percent_error,
                          exception_str=error_message)
+            error_messages.append(error_message)
+            if curr_no%50==0: 
+                print(f'\nError messages in the first {curr_no} simulations: {len([i for i in error_messages if not i==None])}\n')
+                opp_sign_count = 0
+                max_iter_count = 0
+                for em in error_messages:
+                    if em:
+                        if 'opposite sign' in em: opp_sign_count += 1
+                        elif 'iterations' in em: 
+                            max_iter_count += 1
+                            print(em)
+                            # breakpoint()
+                        else: 
+                            print(em)
+                            # breakpoint()
+                            
+                print(f'{opp_sign_count} error messages were related to solver bounds (likely infeasible region).')
+                print(f'{max_iter_count} error messages were related to solver maximum iterations.')
     
     d1_Metric1, d1_Metric2, d1_Metric3 = np.array(d1_Metric1), np.array(d1_Metric2), np.array(d1_Metric3)
     d1_Metric4, d1_Metric5, d1_Metric6 = np.array(d1_Metric4), np.array(d1_Metric5), np.array(d1_Metric6)
@@ -413,7 +446,7 @@ for p in PD_prices:
     # %% Save generated data
     
     minute = '0' + str(dateTimeObj.minute) if len(str(dateTimeObj.minute))==1 else str(dateTimeObj.minute)
-    file_to_save = f'_{steps}_steps_'+'TAL_decarboxylation_recycling_supernatant%s.%s.%s-%s.%s'%(dateTimeObj.year, dateTimeObj.month, dateTimeObj.day, dateTimeObj.hour, minute)
+    file_to_save = f'_{steps}_steps_'+'TAL_decarboxylation_recycling_supernatant_unbounded_prod_cap%s.%s.%s-%s.%s'%(dateTimeObj.year, dateTimeObj.month, dateTimeObj.day, dateTimeObj.hour, minute)
     np.save(TAL_results_filepath+file_to_save, np.array([d1_Metric1, d1_Metric2, d1_Metric3]))
     
     pd.DataFrame(d1_Metric1).to_csv(TAL_results_filepath+'MPSP-'+file_to_save+'.csv')
@@ -525,12 +558,175 @@ keep_frames = True
 
 print('\nCreating and saving contour plots ...\n')
 
+#%% interpolate error-related nans
+results_metric_1 = results_metric_1.tolist()
+#%%
+for i in range(len(results_metric_1)):
+    for j in range(len(results_metric_1[i])):
+        for k in range(len(results_metric_1[i][j])):
+            if str(results_metric_1[i][j][k]).lower() == 'nan':
+                try:
+                    results_metric_1[i][j][k] = 0.25*(
+                          results_metric_1[i][j][k+1] + results_metric_1[i][j][k-1]
+                        + results_metric_1[i][j+1][k] + results_metric_1[i][j-1][k])
+                except:
+                    try:
+                        results_metric_1[i][j][k] = 0.5*(
+                            results_metric_1[i][j][k+1] + results_metric_1[i][j][k-1])
+                    except:
+                        try:
+                            results_metric_1[i][j][k] = 0.5*(
+                                results_metric_1[i][j+1][k] + results_metric_1[i][j-1][k])
+                        except:
+                            pass
+results_metric_1 = np.array(results_metric_1)
+
+#%% interpolate error-related nans
+results_metric_2 = results_metric_2.tolist()
+#%%
+for i in range(len(results_metric_2)):
+    for j in range(len(results_metric_2[i])):
+        for k in range(len(results_metric_2[i][j])):
+            if str(results_metric_2[i][j][k]).lower() == 'nan':
+                try:
+                    results_metric_2[i][j][k] = 0.25*(
+                          results_metric_2[i][j][k+1] + results_metric_2[i][j][k-1]
+                        + results_metric_2[i][j+1][k] + results_metric_2[i][j-1][k])
+                except:
+                    try:
+                        results_metric_2[i][j][k] = 0.5*(
+                            results_metric_2[i][j][k+1] + results_metric_2[i][j][k-1])
+                    except:
+                        try:
+                            results_metric_2[i][j][k] = 0.5*(
+                                results_metric_2[i][j+1][k] + results_metric_2[i][j-1][k])
+                        except:
+                            pass
+                        
+results_metric_2 = np.array(results_metric_2)
+
+#%% interpolate error-related nans
+results_metric_3 = results_metric_3.tolist()
+#%%
+for i in range(len(results_metric_3)):
+    for j in range(len(results_metric_3[i])):
+        for k in range(len(results_metric_3[i][j])):
+            if str(results_metric_3[i][j][k]).lower() == 'nan':
+                try:
+                    results_metric_3[i][j][k] = 0.25*(
+                          results_metric_3[i][j][k+1] + results_metric_3[i][j][k-1]
+                        + results_metric_3[i][j+1][k] + results_metric_3[i][j-1][k])
+                except:
+                    try:
+                        results_metric_3[i][j][k] = 0.5*(
+                            results_metric_3[i][j][k+1] + results_metric_3[i][j][k-1])
+                    except:
+                        try:
+                            results_metric_3[i][j][k] = 0.5*(
+                                results_metric_3[i][j+1][k] + results_metric_3[i][j-1][k])
+                        except:
+                            pass
+results_metric_3 = np.array(results_metric_3)
+
+#%% interpolate error-related nans
+# results_metric_4 = results_metric_4.tolist()
+
+for i in range(len(results_metric_4)):
+    for j in range(len(results_metric_4[i])):
+        for k in range(len(results_metric_4[i][j])):
+            if str(results_metric_4[i][j][k]).lower() == 'nan':
+                try:
+                    results_metric_4[i][j][k] = 0.25*(
+                          results_metric_4[i][j][k+1] + results_metric_4[i][j][k-1]
+                        + results_metric_4[i][j+1][k] + results_metric_4[i][j-1][k])
+                except:
+                    try:
+                        results_metric_4[i][j][k] = 0.5*(
+                            results_metric_4[i][j][k+1] + results_metric_4[i][j][k-1])
+                    except:
+                        try:
+                            results_metric_4[i][j][k] = 0.5*(
+                                results_metric_4[i][j+1][k] + results_metric_4[i][j-1][k])
+                        except:
+                            pass
+results_metric_4 = np.array(results_metric_4)
+
+#%% interpolate error-related nans
+# results_metric_5 = results_metric_5.tolist()
+
+for i in range(len(results_metric_5)):
+    for j in range(len(results_metric_5[i])):
+        for k in range(len(results_metric_5[i][j])):
+            if str(results_metric_5[i][j][k]).lower() == 'nan':
+                try:
+                    results_metric_5[i][j][k] = 0.25*(
+                          results_metric_5[i][j][k+1] + results_metric_5[i][j][k-1]
+                        + results_metric_5[i][j+1][k] + results_metric_5[i][j-1][k])
+                except:
+                    try:
+                        results_metric_5[i][j][k] = 0.5*(
+                            results_metric_5[i][j][k+1] + results_metric_5[i][j][k-1])
+                    except:
+                        try:
+                            results_metric_5[i][j][k] = 0.5*(
+                                results_metric_5[i][j+1][k] + results_metric_5[i][j-1][k])
+                        except:
+                            pass
+results_metric_5 = np.array(results_metric_5)
+
+#%% interpolate error-related nans
+# results_metric_6 = results_metric_6.tolist()
+
+for i in range(len(results_metric_6)):
+    for j in range(len(results_metric_6[i])):
+        for k in range(len(results_metric_6[i][j])):
+            if str(results_metric_6[i][j][k]).lower() == 'nan':
+                try:
+                    results_metric_6[i][j][k] = 0.25*(
+                          results_metric_6[i][j][k+1] + results_metric_6[i][j][k-1]
+                        + results_metric_6[i][j+1][k] + results_metric_6[i][j-1][k])
+                except:
+                    try:
+                        results_metric_6[i][j][k] = 0.5*(
+                            results_metric_6[i][j][k+1] + results_metric_6[i][j][k-1])
+                    except:
+                        try:
+                            results_metric_6[i][j][k] = 0.5*(
+                                results_metric_6[i][j+1][k] + results_metric_6[i][j-1][k])
+                        except:
+                            pass
+results_metric_6 = np.array(results_metric_6)
+
+#%% interpolate error-related nans
+# results_metric_7 = results_metric_7.tolist()
+
+for i in range(len(results_metric_7)):
+    for j in range(len(results_metric_7[i])):
+        for k in range(len(results_metric_7[i][j])):
+            if str(results_metric_7[i][j][k]).lower() == 'nan':
+                try:
+                    results_metric_7[i][j][k] = 0.25*(
+                          results_metric_7[i][j][k+1] + results_metric_7[i][j][k-1]
+                        + results_metric_7[i][j+1][k] + results_metric_7[i][j-1][k])
+                except:
+                    try:
+                        results_metric_7[i][j][k] = 0.5*(
+                            results_metric_7[i][j][k+1] + results_metric_7[i][j][k-1])
+                    except:
+                        try:
+                            results_metric_7[i][j][k] = 0.5*(
+                                results_metric_7[i][j+1][k] + results_metric_7[i][j-1][k])
+                        except:
+                            pass
+results_metric_7 = np.array(results_metric_7)
+
+
 #%% MPSP
 
 # MPSP_w_levels, MPSP_w_ticks, MPSP_cbar_ticks = get_contour_info_from_metric_data(results_metric_1, lb=3)
 MPSP_w_levels = np.arange(2, 10.25, 0.25)
 MPSP_cbar_ticks = np.arange(2, 10.1, 1.)
-MPSP_w_ticks = [3.25, 3.5, 3.75, 4, 4.5, 5, 10]
+MPSP_w_ticks = [3.25, 3.5, 3.75, 4, 4.5, 5, 5.5, 9, 10]
 # MPSP_w_levels = np.arange(0., 15.5, 0.5)
 
 contourplots.animated_contourplot(w_data_vs_x_y_at_multiple_z=results_metric_1, # shape = z * x * y # values of the metric you want to plot on the color axis; e.g., MPSP
@@ -581,7 +777,7 @@ contourplots.animated_contourplot(w_data_vs_x_y_at_multiple_z=results_metric_1, 
                                 #     MPSP_w_ticks[6]: (45,1.75),
                                 #     },
                                 additional_points ={(22.5, baseline_acetylacetone_presence):('D', 'w', 6)},
-                                # text_boxes = {'>10.0': [(41,1.8), 'white']},
+                                # text_boxes = {'>10.0': [(41,4.5), 'white']},
                                 )
 
 #%% GWP
@@ -589,7 +785,8 @@ contourplots.animated_contourplot(w_data_vs_x_y_at_multiple_z=results_metric_1, 
 # GWP_w_levels, GWP_w_ticks, GWP_cbar_ticks = get_contour_info_from_metric_data(results_metric_2,)
 GWP_w_levels = np.arange(0, 20.1, 0.5)
 GWP_cbar_ticks = np.arange(0, 20.1, 2.)
-GWP_w_ticks = [6, 8, 10, 12, 16, 20]
+# GWP_w_ticks = [6, 8, 10, 12, 16, 20]
+GWP_w_ticks = [2, 3, 4, 6, 8, 9, 10, 11, 14, 16, 20]
 contourplots.animated_contourplot(w_data_vs_x_y_at_multiple_z=results_metric_2, # shape = z * x * y # values of the metric you want to plot on the color axis; e.g., GWP
                                 x_data=100*TAL_decarb_convs, # x axis values
                                 y_data=PD_reqs, # y axis values
@@ -608,7 +805,7 @@ contourplots.animated_contourplot(w_data_vs_x_y_at_multiple_z=results_metric_2, 
                                 z_units=z_units,
                                 w_units=GWP_units,
                                 # fmt_clabel=lambda cvalue: r"$\mathrm{\$}$"+" {:.1f} ".format(cvalue)+r"$\cdot\mathrm{kg}^{-1}$", # format of contour labels
-                                fmt_clabel = lambda cvalue:  f"{round(cvalue,1)}",
+                                fmt_clabel = lambda cvalue:  get_rounded_str(cvalue, 3),
                                 cmap=CABBI_green_colormap(), # can use 'viridis' or other default matplotlib colormaps
                                 cmap_over_color = colors.grey_dark.shade(8).RGBn,
                                 extend_cmap='max',
@@ -634,6 +831,7 @@ contourplots.animated_contourplot(w_data_vs_x_y_at_multiple_z=results_metric_2, 
                                 #     MPSP_w_ticks[3]: (20 ,1),
                                 #     MPSP_w_ticks[4]: (35,1.25),
                                 #     }
+                                # text_boxes = {'>20.0': [(41,4.5), 'white']},
                                 )
 
 
@@ -642,7 +840,8 @@ contourplots.animated_contourplot(w_data_vs_x_y_at_multiple_z=results_metric_2, 
 # FEC_w_levels, FEC_w_ticks, FEC_cbar_ticks = get_contour_info_from_metric_data(results_metric_3,)
 FEC_w_levels = np.arange(-100, 101, 10.)
 FEC_cbar_ticks = np.arange(-100, 101, 20)
-FEC_w_ticks = [-100, -60, -20, 0, 20, 40, 60, 100]
+FEC_w_ticks = [-100, -60, -40, -20, 0, 20, 40, 60, 100]
+# FEC_w_ticks = [-100, -60, -30, 0, 30, 60, 100]
 contourplots.animated_contourplot(w_data_vs_x_y_at_multiple_z=results_metric_3, # shape = z * x * y # values of the metric you want to plot on the color axis; e.g., FEC
                                 x_data=100*TAL_decarb_convs, # x axis values
                                 y_data=PD_reqs, # y axis values
@@ -661,7 +860,7 @@ contourplots.animated_contourplot(w_data_vs_x_y_at_multiple_z=results_metric_3, 
                                 z_units=z_units,
                                 w_units=FEC_units,
                                 # fmt_clabel=lambda cvalue: r"$\mathrm{\$}$"+" {:.1f} ".format(cvalue)+r"$\cdot\mathrm{kg}^{-1}$", # format of contour labels
-                                fmt_clabel = lambda cvalue:  f"{round(cvalue,1)}",
+                                fmt_clabel = lambda cvalue: get_rounded_str(cvalue, 3),
                                 cmap=CABBI_green_colormap(120), # can use 'viridis' or other default matplotlib colormaps
                                 cmap_over_color = colors.grey_dark.shade(8).RGBn,
                                 extend_cmap='max',
@@ -681,14 +880,15 @@ contourplots.animated_contourplot(w_data_vs_x_y_at_multiple_z=results_metric_3, 
                                 # comparison_range_hatch_pattern='////',
                                 units_on_newline = (True, True, False, False), # x,y,z,w
                                 additional_points ={(22.5, baseline_acetylacetone_presence):('D', 'w', 6)},
+                                # text_boxes = {'>100': [(4,4.5), 'white']},
                                 )
 
 #%% AOC
 
 AOC_w_levels, AOC_w_ticks, AOC_cbar_ticks = get_contour_info_from_metric_data(results_metric_4,)
-# AOC_w_levels = np.arange(2, 8.1, 0.2)
-# AOC_cbar_ticks = np.arange(2, 8.1, 1.)
-# AOC_w_ticks = [ 4, 4.5, 5, 8]
+AOC_w_levels = np.arange(0, 120.1, 10)
+AOC_cbar_ticks = np.arange(0, 120.1, 20)
+AOC_w_ticks = [0, 10, 20, 30, 40, 50, 120]
 # AOC_w_levels = np.arange(0., 15.5, 0.5)
 
 contourplots.animated_contourplot(w_data_vs_x_y_at_multiple_z=results_metric_4, # shape = z * x * y # values of the metric you want to plot on the color axis; e.g., AOC
@@ -710,7 +910,7 @@ contourplots.animated_contourplot(w_data_vs_x_y_at_multiple_z=results_metric_4, 
                                 z_units=z_units,
                                 w_units=AOC_units,
                                 # fmt_clabel=lambda cvalue: r"$\mathrm{\$}$"+" {:.1f} ".format(cvalue)+r"$\cdot\mathrm{kg}^{-1}$", # format of contour labels
-                                fmt_clabel = lambda cvalue:  f"{round(cvalue,1)}",
+                                fmt_clabel = lambda cvalue: get_rounded_str(cvalue, 3),
                                 cmap=CABBI_green_colormap(), # can use 'viridis' or other default matplotlib colormaps
                                 cmap_over_color = colors.grey_dark.shade(8).RGBn,
                                 extend_cmap='max',
@@ -735,9 +935,9 @@ contourplots.animated_contourplot(w_data_vs_x_y_at_multiple_z=results_metric_4, 
 #%% FCI
 
 FCI_w_levels, FCI_w_ticks, FCI_cbar_ticks = get_contour_info_from_metric_data(results_metric_5,)
-# FCI_w_levels = np.arange(2, 8.1, 0.2)
-# FCI_cbar_ticks = np.arange(2, 8.1, 1.)
-# FCI_w_ticks = [ 4, 4.5, 5, 8]
+FCI_w_levels = np.arange(200, 400.1, 10)
+FCI_cbar_ticks = np.arange(200, 400.1, 20)
+FCI_w_ticks = np.arange(200, 400.1, 20)
 # FCI_w_levels = np.arange(0., 15.5, 0.5)
 
 contourplots.animated_contourplot(w_data_vs_x_y_at_multiple_z=results_metric_5, # shape = z * x * y # values of the metric you want to plot on the color axis; e.g., FCI
@@ -759,7 +959,7 @@ contourplots.animated_contourplot(w_data_vs_x_y_at_multiple_z=results_metric_5, 
                                 z_units=z_units,
                                 w_units=FCI_units,
                                 # fmt_clabel=lambda cvalue: r"$\mathrm{\$}$"+" {:.1f} ".format(cvalue)+r"$\cdot\mathrm{kg}^{-1}$", # format of contour labels
-                                fmt_clabel = lambda cvalue:  f"{round(cvalue,1)}",
+                                fmt_clabel = lambda cvalue: get_rounded_str(cvalue, 3),
                                 cmap=CABBI_green_colormap(), # can use 'viridis' or other default matplotlib colormaps
                                 cmap_over_color = colors.grey_dark.shade(8).RGBn,
                                 extend_cmap='max',
@@ -784,12 +984,14 @@ contourplots.animated_contourplot(w_data_vs_x_y_at_multiple_z=results_metric_5, 
 #%% Purity
 
 # Purity_w_levels, Purity_w_ticks, Purity_cbar_ticks = get_contour_info_from_metric_data(results_metric_6,)
-Purity_w_levels = Purity_cbar_ticks = Purity_w_ticks = np.arange(0.7, 1.0, 0.01)
-# Purity_cbar_ticks = np.arange(2, 8.1, 1.)
-# Purity_w_ticks = [ 4, 4.5, 5, 8]
+Purity_w_levels = Purity_cbar_ticks = Purity_w_ticks = 100*np.arange(0.78, 0.92005, 0.005)
+Purity_cbar_ticks = 100*np.arange(0.78, 0.92005, 0.02)
+# Purity_w_ticks = np.arange(0.76, 0.921, 0.02)
+# Purity_w_ticks = 100*np.arange(0.78, 0.92005, 0.01)
+Purity_w_ticks = [80, 82, 84, 86, 88, 90, 91]
 # Purity_w_levels = np.arange(0., 15.5, 0.5)
 
-contourplots.animated_contourplot(w_data_vs_x_y_at_multiple_z=results_metric_6, # shape = z * x * y # values of the metric you want to plot on the color axis; e.g., Purity
+contourplots.animated_contourplot(w_data_vs_x_y_at_multiple_z=100*np.array(results_metric_6), # shape = z * x * y # values of the metric you want to plot on the color axis; e.g., Purity
                                 x_data=100*TAL_decarb_convs, # x axis values
                                 # x_data = TAL_decarb_convs/theoretical_max_g_TAL_acid_per_g_glucose,
                                 y_data=PD_reqs, # y axis values
@@ -808,7 +1010,7 @@ contourplots.animated_contourplot(w_data_vs_x_y_at_multiple_z=results_metric_6, 
                                 z_units=z_units,
                                 w_units=Purity_units,
                                 # fmt_clabel=lambda cvalue: r"$\mathrm{\$}$"+" {:.1f} ".format(cvalue)+r"$\cdot\mathrm{kg}^{-1}$", # format of contour labels
-                                fmt_clabel = lambda cvalue:  f"{round(cvalue,1)}",
+                                fmt_clabel = lambda cvalue: get_rounded_str(cvalue, 2),
                                 cmap=CABBI_green_colormap(), # can use 'viridis' or other default matplotlib colormaps
                                 cmap_over_color = colors.grey_dark.shade(8).RGBn,
                                 extend_cmap='max',
@@ -833,12 +1035,13 @@ contourplots.animated_contourplot(w_data_vs_x_y_at_multiple_z=results_metric_6, 
 #%% S403 split required
 
 # S403_split_w_levels, S403_split_w_ticks, S403_split_cbar_ticks = get_contour_info_from_metric_data(results_metric_6,)
-S403_split_w_levels = S403_split_cbar_ticks = S403_split_w_ticks = np.arange(0., 1.0, 0.05)
-# S403_split_cbar_ticks = np.arange(2, 8.1, 1.)
-# S403_split_w_ticks = [ 4, 4.5, 5, 8]
+S403_split_w_levels = S403_split_cbar_ticks = S403_split_w_ticks = 100*np.arange(0., 1.05, 0.05)
+S403_split_cbar_ticks = 100*np.arange(0., 1.05, 0.1)
+# S403_split_w_ticks = 100*np.arange(0., 1.05, 0.2)
+S403_split_w_ticks = [20, 40, 60, 70, 80, 85, 90]
 # S403_split_w_levels = np.arange(0., 15.5, 0.5)
 
-contourplots.animated_contourplot(w_data_vs_x_y_at_multiple_z=results_metric_7, # shape = z * x * y # values of the metric you want to plot on the color axis; e.g., S403_split
+contourplots.animated_contourplot(w_data_vs_x_y_at_multiple_z=100*np.array(results_metric_7), # shape = z * x * y # values of the metric you want to plot on the color axis; e.g., S403_split
                                 x_data=100*TAL_decarb_convs, # x axis values
                                 # x_data = TAL_decarb_convs/theoretical_max_g_TAL_acid_per_g_glucose,
                                 y_data=PD_reqs, # y axis values
@@ -857,10 +1060,10 @@ contourplots.animated_contourplot(w_data_vs_x_y_at_multiple_z=results_metric_7, 
                                 z_units=z_units,
                                 w_units=S403_split_units,
                                 # fmt_clabel=lambda cvalue: r"$\mathrm{\$}$"+" {:.1f} ".format(cvalue)+r"$\cdot\mathrm{kg}^{-1}$", # format of contour labels
-                                fmt_clabel = lambda cvalue:  f"{round(cvalue,1)}",
+                                fmt_clabel = lambda cvalue: get_rounded_str(cvalue, 2),
                                 cmap=CABBI_green_colormap(), # can use 'viridis' or other default matplotlib colormaps
                                 cmap_over_color = colors.grey_dark.shade(8).RGBn,
-                                extend_cmap='max',
+                                extend_cmap='neither',
                                 cbar_ticks=S403_split_cbar_ticks,
                                 z_marker_color='g', # default matplotlib color names
                                 fps=fps, # animation frames (z values traversed) per second
