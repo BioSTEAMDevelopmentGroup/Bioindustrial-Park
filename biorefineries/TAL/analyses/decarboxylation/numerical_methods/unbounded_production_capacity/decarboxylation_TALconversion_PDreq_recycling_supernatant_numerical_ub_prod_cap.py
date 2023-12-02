@@ -561,23 +561,30 @@ print('\nCreating and saving contour plots ...\n')
 #%% interpolate error-related nans
 results_metric_1 = results_metric_1.tolist()
 #%%
+
+stp = 1
 for i in range(len(results_metric_1)):
     for j in range(len(results_metric_1[i])):
         for k in range(len(results_metric_1[i][j])):
             if str(results_metric_1[i][j][k]).lower() == 'nan':
                 try:
-                    results_metric_1[i][j][k] = 0.25*(
-                          results_metric_1[i][j][k+1] + results_metric_1[i][j][k-1]
-                        + results_metric_1[i][j+1][k] + results_metric_1[i][j-1][k])
+                    val = 0.25*(
+                          results_metric_1[i][j][k+stp] + results_metric_1[i][j][k-stp]
+                        + results_metric_1[i][j+stp][k] + results_metric_1[i][j-stp][k])
+                    assert not str(val) == 'nan'
+                    results_metric_1[i][j][k] = val
                 except:
                     try:
-                        results_metric_1[i][j][k] = 0.5*(
-                            results_metric_1[i][j][k+1] + results_metric_1[i][j][k-1])
+                        val = 0.5*(
+                            results_metric_1[i][j][k+stp] + results_metric_1[i][j][k-stp])
+                        assert not str(val) == 'nan'
+                        results_metric_1[i][j][k] = val
                     except:
                         try:
                             results_metric_1[i][j][k] = 0.5*(
-                                results_metric_1[i][j+1][k] + results_metric_1[i][j-1][k])
+                                results_metric_1[i][j+stp][k] + results_metric_1[i][j-stp][k])
                         except:
+                            print(1)
                             pass
 results_metric_1 = np.array(results_metric_1)
 
