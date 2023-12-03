@@ -194,6 +194,7 @@ def exponential_val(x, nA): # A x ^ n
     return A * x ** n
 
 def YRCP2023():
+    bst.Model.default_convergence_model = 'linear regressor'
     Biorefinery.default_conversion_performance_distribution = 'longterm'
     Biorefinery.default_prices_correleted_to_crude_oil = True
     Biorefinery.default_oil_content_range = [1.8, 5.4]
