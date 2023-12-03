@@ -425,27 +425,27 @@ def run_all(N, across_lines=False, rule='L', configurations=None,
         )
 
 def run_sugarcane_microbial_oil_and_ethanol(N=None):
-    if N is None: N = 2000
+    if N is None: N = 5000
     filterwarnings('ignore')
     cane.YRCP2023()
-    # run_uncertainty_and_sensitivity('S1.WT', N)
-    # run_uncertainty_and_sensitivity('S2.WT', N)
+    run_uncertainty_and_sensitivity('S1.WT', N)
+    run_uncertainty_and_sensitivity('S2.WT', N)
     run_uncertainty_and_sensitivity('O7.WT', N)
     run_uncertainty_and_sensitivity('O9.WT', N)
     
 def run_oilcane_microbial_oil_and_ethanol(N=None):
-    if N is None: N = 2000
+    if N is None: N = 5000
     filterwarnings('ignore')
     cane.YRCP2023()
     # run_uncertainty_and_sensitivity('O1', N)
     # run_uncertainty_and_sensitivity('O2', N)    
-    # run_uncertainty_and_sensitivity('O7', N)
+    run_uncertainty_and_sensitivity('O7', N)
     run_uncertainty_and_sensitivity('O9', N)
     # run_uncertainty_and_sensitivity('O8', N, line='WT')
     # run_uncertainty_and_sensitivity('O8', N)
 
 def run_oilcane_ethanol_constant_biomass(N=None):
-    if N is None: N = 2000
+    if N is None: N = 5000
     filterwarnings('ignore')
     cane.YRCP2023()
     run_uncertainty_and_sensitivity('O1|constant biomass yield', N)
@@ -506,3 +506,8 @@ def save_target_biomass_yield(configuration='O7'):
     df.to_excel(
         file, 'Summarized'
     )
+    
+# run_oilcane_ethanol_constant_biomass
+# run_oilcane_microbial_oil_across_lines
+# run_oilcane_microbial_oil_and_ethanol
+# run_sugarcane_microbial_oil_and_ethanol
