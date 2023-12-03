@@ -71,7 +71,7 @@ class LCA:
         return self
 
     def __init__(self, system, CFs, feedstock, main_product, main_product_chemical_IDs, by_products,
-                 cooling_tower=None, chilled_water_processing_unit=None,
+                 cooling_tower=None, chilled_water_processing_units=None,
                  boiler=None, has_turbogenerator=None, feedstock_ID='Sugarcane',
                  FU='1 kg', demand_allocation_method='steam pool',
                  credit_feedstock_CO2_capture=False, add_EOL_GWP=False,
@@ -125,7 +125,7 @@ class LCA:
         self.BT = self.boiler = boiler
         self.natural_gas = self.BT.natural_gas
         self.CT = self.cooling_tower = cooling_tower
-        self.CWP = self.chilled_water_processing_unit = chilled_water_processing_unit
+        self.CWP_units = self.chilled_water_processing_units = chilled_water_processing_units
         
         # self.conc_CO2_sequestered_in_liquid_waste_streams = conc_CO2_sequestered_in_liquid_waste_streams
         
@@ -245,7 +245,7 @@ class LCA:
     
     @property
     def cooling_electricity_demand(self):
-        return self.CT.power_utility.rate + self.CWP.power_utility.rate
+        return self.CT.power_utility.rate + sum([i.power_utility.rate for i in self.CWP_units])
     
     @property
     def BT_steam_kJph_heating(self):

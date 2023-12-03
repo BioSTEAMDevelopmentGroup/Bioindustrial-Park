@@ -31,8 +31,8 @@ def plot_solubility_model(experimental_Ts, experimental_solubilities,
                           legend_loc='center left',
                           fontname="Arial Unicode",
                           fontsize="12",
-                          predicted_plot_color='blue',
-                          experimental_plot_color='orange',
+                          predicted_plot_color='black',
+                          experimental_plot_color='#63C6CE', 
                           experimental_plot_marker='x',
                           dpi=600,
                           bbox_inches='tight',
@@ -45,10 +45,10 @@ def plot_solubility_model(experimental_Ts, experimental_solubilities,
     model_solubilities = [get_TAL_solubility_in_water_gpL(T) for T in model_Ts]
     
     plt.plot(model_Ts-273.15, model_solubilities, color=predicted_plot_color, 
-             label='predicted')
+             label='predicted', zorder=1)
     
     plt.scatter(experimental_Ts-273.15, experimental_solubilities, marker=experimental_plot_marker, color=experimental_plot_color,
-                label='experimental')
+                label='experimental', zorder=2)
     
     plt.text(5, 180, f'R\u00b2 = {round(R_squared, 3)}')
     

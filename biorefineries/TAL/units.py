@@ -218,6 +218,9 @@ class BatchCoFermentation(BatchBioreactor):
     # 40 g/L peptone
     # 20 g/L yeast extract
     
+    # Replacing yeast extract with CSL can actually enhance the pyruvate carboxylation pathway
+    # in Y. lipolytica (Liu et al. 2015; https://doi.org/10.1016/j.indcrop.2015.10.029)
+    
     # From Tan et al. 2016 (DOI 10.1088/1755-1315/36/1/012058):
     # Yeast extract total N = 10 - 11.8 dry wt%
     # CSL total N = 7.7 - 8.2 dry wt%
@@ -236,7 +239,7 @@ class BatchCoFermentation(BatchBioreactor):
     
     # !!! METHOD I: Therefore, CSL concentration required for same total N
     # (a) Using low end of total N for yeast extract and high end for CSL
-    # = 7.8468 / 0.07 = 112.1 g/L
+    # = 7.8468 / 0.077 = 101.9 g/L
     # (a) Using high end of total N for yeast extract and low end for CSL
     # = 7.4868 / 0.082 = 91.30 g/L
     
@@ -254,7 +257,7 @@ class BatchCoFermentation(BatchBioreactor):
     # = 0.07155 * 47.8 = 3.42 g/L
     # !!! METHOD II: Therefore, CSL concentration required for same total N 
     # (a) Using low end of total N for CSL
-    # = 3.42 / 0.07 = 48.857 g/L
+    # = 3.42 / 0.077 = 44.416 g/L
     # (b) Using high end of total N for CSL
     # = 3.42 / 0.082 = 41.707 g/L
     
@@ -263,10 +266,24 @@ class BatchCoFermentation(BatchBioreactor):
     
     # !!! Assuming the same dry cell mass here, yield of cell mass on glucose
     # = (47.8/180) / (6 * 23.48 / 180.156) = 0.339
+    
+    ####### BASELINE AND RANGE FOR DAP LOADING #######
+    # Humbird et al. 2011 DAP:CSL: 
+    # 1. (0.33 g-DAP/L / 2.5 g-CSL/L)
+    # 2. (0.67 g-DAP/L / 5 g-CSL/L)
+    # ~= 0.133 g-DAP/g-CSL
+    # therefore baseline is: 0.133 * 76.903 = 10.228 g/L
+    # therefore range is:
+        # low end: 0.133 * 41.707 = 5.547 g/L
+        # high end 0.133 * 112.1 = 14.909 g/L
+    
     ###############################################
     
     CSL_loading = 76.903 # g/L
     # CSL_loading = 32.5 # g/L
+    
+    DAP_loading = 10.228 # g-
+    
     regular_microbe_conversion = 0.339
     regular_citric_acid_conversion = 0.08856 # from Markham et al.; 16 g/L citrate from 180 g/L glucose
     
@@ -358,10 +375,13 @@ class BatchCoFermentation(BatchBioreactor):
         self.acetate_to_CO2_rxn = self.CO2_generation_rxns[2]
 
     def _run(self):
-        feed, seed, CSL, Acetate_spiking, yeast_extract, air = self.ins
-        for i in [CSL, Acetate_spiking]: i.empty()
+        feed, seed, CSL, Acetate_spiking, DAP, air = self.ins
+        for i in [CSL, Acetate_spiking, DAP]: i.empty()
         
         vapor, effluent = self.outs
+        
+        # vapor.empty()
+        # effluent.empty()
         
         effluent.mix_from([feed, seed])
         
@@ -377,7 +397,7 @@ class BatchCoFermentation(BatchBioreactor):
             self.air_exit_F_mol_needed = (1./0.21) * (1/32.) * self.air_flow_rate_safety_factor_for_DO_saturation_basis * self.DO_saturation_concentration_kg_per_m3 * self.DO_saturation_target_level\
                 *(seed.F_vol+feed.F_vol)
             
-            air.F_mol = 1e6 # initial value; updated after reactions
+            air.F_mol = 1e8 # initial value; updated after reactions
         
         elif self.aeration_rate_basis == 'fixed rate basis':
             air.F_vol = self.air_m3_per_h_per_m3_reactor * (seed.F_vol+feed.F_vol) * self.tau
@@ -385,6 +405,8 @@ class BatchCoFermentation(BatchBioreactor):
         else: raise RuntimeError(f"Unsupported aeration_rate_basis ({self.aeration_rate_basis}); must be 'fixed rate basis' or 'DO saturation basis'.")
         
         CSL.imass['CSL'] = (seed.F_vol+feed.F_vol) * self.CSL_loading 
+        
+        DAP.imass['DAP'] = (seed.F_vol+feed.F_vol) * self.DAP_loading 
         
         effluent.mix_from([effluent, Acetate_spiking, air])
         effluent.T = vapor.T = self.T

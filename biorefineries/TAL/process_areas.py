@@ -64,6 +64,7 @@ def get_mass_acetone_needed_per_mass_KSA():
                ins=[dict(ID='sugar_juice_or_slurry', Glucose=10, Water=100),
                     dict(ID='CSL', CSL=100),
                     dict(ID='Acetate_spiking', SodiumAcetate=100),
+                    dict(ID='DAP', DAP=100),
                ],
                 outs=[dict(ID='F301_top_product', Water=20),
                       dict(ID='fermentation_liquid_effluent', TAL=1, Water=100),
@@ -73,7 +74,7 @@ def get_mass_acetone_needed_per_mass_KSA():
                                                )
 def create_TAL_fermentation_process(ins, outs,):
     
-    sugar_juice_or_slurry, CSL, Acetate_spiking = ins
+    sugar_juice_or_slurry, CSL, Acetate_spiking, DAP = ins
     F301_top_product, fermentation_liquid_effluent, fermentation_vent, seedtrain_vent = outs
       
     # =============================================================================
@@ -119,7 +120,7 @@ def create_TAL_fermentation_process(ins, outs,):
         for i in S302.outs: i.phases = ('l',)
     # Cofermentation
     R302 = units.BatchCoFermentation('R302', 
-                                    ins=(S302-1, '', CSL, Acetate_spiking, '', ''),
+                                    ins=(S302-1, '', CSL, Acetate_spiking, DAP, ''),
                                     outs=(fermentation_vent, fermentation_liquid_effluent),
                                     acetate_ID='AceticAcid',
                                     aeration_rate_basis='DO saturation basis',
@@ -169,6 +170,7 @@ def create_TAL_fermentation_process(ins, outs,):
 @SystemFactory(ID = 'TAL_separation_solubility_exploit_process',
                ins=[dict(ID='fermentation_broth', TAL=1, Water=100),
                     dict(ID='acetylacetone_decarboxylation_equilibrium', PD=1.),
+                    dict(ID='recycled_supernatant', TAL=0.1, Water=100),
                ],
                 outs=[dict(ID='decarboxylation_vent', CO2=20),
                       dict(ID='S401_solid', FermMicrobe=1, Water=1),
@@ -178,7 +180,7 @@ def create_TAL_fermentation_process(ins, outs,):
                                                )
 def create_TAL_separation_solubility_exploit_process(ins, outs,):
     
-    fermentation_broth, acetylacetone_decarboxylation_equilibrium = ins
+    fermentation_broth, acetylacetone_decarboxylation_equilibrium, recycled_supernatant = ins
     decarboxylation_vent, S401_solid, liquid_waste, solid_TAL = outs
     
     # =============================================================================
@@ -210,14 +212,17 @@ def create_TAL_separation_solubility_exploit_process(ins, outs,):
         U401_outs_0.imol['l', 'TAL'] = min(mol_TAL_dissolved, tot_TAL)
         U401_outs_0.imol['s', 'TAL'] = tot_TAL - min(mol_TAL_dissolved, tot_TAL)
     
-    M401 = bst.LiquidsMixingTank('M401', ins=(U401-0, acetylacetone_decarboxylation_equilibrium), 
-                                 outs=('fermentation_broth_heated_mixed'))
+    M401 = bst.LiquidsMixingTank('M401', 
+                                 ins=(U401-0, 
+                                      acetylacetone_decarboxylation_equilibrium, 
+                                      recycled_supernatant), 
+                                 outs=('fermentation_broth_mixed'))
     M401.mol_acetylacetone_per_mol_TAL = 0.
     @M401.add_specification(run=False)
     def M401_spec():
         M401.ins[1].imol['PD'] = M401.mol_acetylacetone_per_mol_TAL * M401.ins[0].imol['TAL']
         M401._run()
-        
+        M401
     # Change broth temperature to adjust TAL solubility
     H401 = bst.HXutility('H401', ins=M401-0, outs=('fermentation_broth_heated'), 
                          T=273.15+56., # initial value; updated in specification to minimum T required to completely dissolve TAL 
@@ -246,7 +251,11 @@ def create_TAL_separation_solubility_exploit_process(ins, outs,):
             H401.T=lb_T
         else:
             H401_spec_obj_fn = lambda T: TAL_solubility_multiplier*get_mol_TAL_dissolved(T, H401_ins_0_water) - tot_TAL
-            H401.T = IQ_interpolation(H401_spec_obj_fn, lb_T, ub_T, ytol=1e-3)
+            H401.T = IQ_interpolation(H401_spec_obj_fn, lb_T, ub_T, 
+                                      # ytol=5e-2,
+                                       # ytol=0.1, 
+                                      ytol = 0.5,
+                                      maxiter=300)
         
         H401._run()
         H401_outs_0 = H401.outs[0]
@@ -257,35 +266,64 @@ def create_TAL_separation_solubility_exploit_process(ins, outs,):
         H401_outs_0.imol['s', 'TAL'] = max(0., round(tot_TAL - min(mol_TAL_dissolved, tot_TAL), 5))
     
     
-
-    U402 = bst.FakeSplitter('U402', ins=H401-0, outs = ('thermally_decarboxylated_broth',decarboxylation_vent))
+    M402 = bst.LiquidsMixingTank('M402', 
+                                 ins=(H401-0, ), 
+                                 outs=('fermentation_broth_heated_mixed'))
+    
+    #%% Decarboxylation occurs in this unit ##!!!##
+    
+    U402 = bst.FakeSplitter('U402', ins=M402-0, outs = ('thermally_decarboxylated_broth',decarboxylation_vent))
     U402.decarboxylation_rxns = ParallelRxn([
         Rxn('TAL + H2O -> PD + CO2', 'TAL',   0.25),
         ])
     U402.line = 'Background unit for decarboxylation'
     U402._graphics = U401._graphics
     
-    U402.decarboxylation_conversion_basis = 'fixed' # 'fixed' or 'temperature-dependent'
+    U402.decarboxylation_conversion_basis = 'fixed' # 'fixed' or 'temperature-dependent' or 'equilibrium-based'
     U402.decarboxylation_conversion = 0.225 # only used if basis is 'fixed' # experimental value at T = 80 degrees C
+    U402.equilibrium_acetylacetone_presence = 0.2903 # equilibrium PD:TAL (mol:mol) ratio; only used if basis is 'equilibrium-based'
     
-    @U402.add_specification()
-    def U402_spec():
+    def U402_spec_helper():
         U402_outs_0 = U402.outs[0]
         U402_outs_0.copy_like(U402.ins[0])
         U402_outs_0.phases = ('l', 's')
-        if U402.decarboxylation_conversion_basis == 'fixed':
-            U402.decarboxylation_rxns[0].X = U402.decarboxylation_conversion
-        elif U402.decarboxylation_conversion_basis == 'temperature-dependent':
-            U402.decarboxylation_rxns[0].X = get_TAL_decarboxylation_conversion(T=U402_outs_0.T)
-        else:
-            raise ValueError(f"U402.decarboxylation_conversion_basis must be 'fixed' or 'temperature-dependent', not '{U402.decarboxylation_conversion_basis}'.")
-        
         U402.decarboxylation_rxns[0].adiabatic_reaction(U402_outs_0['l'])
+        U402.outs[1].empty()
         U402.outs[1].imol['CO2'] = U402_outs_0.imol['l', 'CO2']
         U402.outs[1].phase = 'g'
         U402_outs_0.imol['l', 'CO2'] = 0.
+
+    get_acetylacetone_presence_out = lambda: U402.outs[0].imol['Acetylacetone']/U402.outs[0].imol['TAL']
+    # get_acetylacetone_presence_in = lambda: U402.ins[0].imol['Acetylacetone']/U402.ins[0].imol['TAL']
+
+    def load_decarboxylation_conversion(equilibrium_acetylacetone_presence):
+        U402_spec_helper()
+        if get_acetylacetone_presence_out() >= equilibrium_acetylacetone_presence:
+            U402.decarboxylation_rxns[0].X = 0.
+            # print(1)
+        else:
+            def obj_f_decarb_conv(decarb_conv):
+                U402.decarboxylation_rxns[0].X = decarb_conv
+                U402_spec_helper()
+                return get_acetylacetone_presence_out() - equilibrium_acetylacetone_presence
+            IQ_interpolation(obj_f_decarb_conv, 0., 0.5, ytol=1e-4)
+            
+    @U402.add_specification()
+    def U402_spec():
+        if U402.decarboxylation_conversion_basis == 'fixed':
+            U402.decarboxylation_rxns[0].X = U402.decarboxylation_conversion
+            U402_spec_helper()
+        elif U402.decarboxylation_conversion_basis == 'temperature-dependent':
+            U402.decarboxylation_rxns[0].X = get_TAL_decarboxylation_conversion(T=U402.outs[0].T)
+            U402_spec_helper()
+        elif U402.decarboxylation_conversion_basis == 'equilibrium-based':
+            load_decarboxylation_conversion(U402.equilibrium_acetylacetone_presence)
+        else:
+            raise ValueError(f"U402.decarboxylation_conversion_basis must be 'fixed' or 'temperature-dependent', not '{U402.decarboxylation_conversion_basis}'.")
+
+    #%% #### #### #### #### #### #### #### ####
     
-        
+    
     # # Remove solids from fermentation broth, modified from the pressure filter in Humbird et al.
     S401_index = [splits_df.index[0]] + splits_df.index[2:].to_list()
     S401_cell_mass_split = [splits_df['stream_571'][0]] + splits_df['stream_571'][2:].to_list()

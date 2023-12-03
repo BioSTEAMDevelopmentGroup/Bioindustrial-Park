@@ -34,6 +34,10 @@ def plot_kde_formatted(
                         save_fig = True,
                         filename = 'Bivariate_KDE.png',
                         
+                        vlines=[],
+                        hlines=[],
+                        
+                        fill_between=[], # [(x, y1, y2), ...]
                         ):
     ax = plot_kde(xdata, 
                 ydata,
@@ -45,6 +49,20 @@ def plot_kde_formatted(
                 ybox_kwargs=ybox_kwargs,
                 )
     
+    if vlines:
+        ax.vlines(vlines, yticks[0], yticks[-1], 
+                  colors='#c0c1c2', 
+                  linestyles='solid', zorder=0)
+    if hlines:
+        ax.vlines(hlines, xticks[0], xticks[-1],
+                  colors='#c0c1c2', 
+                  linestyles='solid', zorder=0)
+    if fill_between:
+        for fb in fill_between:
+            ax.fill_between(fb[0], fb[1], fb[2], 
+                            # color='#c0c1c2',
+                            color='gray',
+                            zorder=0)
     ax.set_xlabel(xlabel)
     ax.set_ylabel(ylabel)
     

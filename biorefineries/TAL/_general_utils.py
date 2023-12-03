@@ -41,7 +41,7 @@ def get_more_unit_groups(system,
                                         'heat exchanger network',
                                         'natural gas (for steam generation)',
                                         'natural gas (for product drying)',
-                                        'chilled brine',
+                                        # 'chilled brine',
                                         'fixed operating cost',
                                         'electricity consumption',
                                         'heating duty',
@@ -78,7 +78,7 @@ def get_more_unit_groups(system,
     
     if 'cooling utility facilities' in groups_to_get:
         cooling_utility_facilities_group = UnitGroup('cooling utility facilities', 
-                                                         units=(u.CT801, u.CWP802,))
+                                                         units=(u.CT801, u.CWP802, u.CWP803))
         unit_groups_.append(cooling_utility_facilities_group)
 
     # if 'other facilities' in groups_to_get:
@@ -208,7 +208,9 @@ def add_metrics_to_unit_groups(unit_groups,
         if i.name == 'chilled brine':
             i.metrics[-2].getter=lambda: sum([i.cost for i in system.heat_utilities 
                                               if i.agent.ID in ('chilled_brine', 'chilled brine')])
-            
+        if i.name == 'boiler & turbogenerator':
+            i.metrics[-2].getter = lambda: sum([i.cost for i in BT.ins]) +\
+                                        abs(BT.ash_disposal_price*BT.ash_disposal.F_mass)
         ##############  ##############
         if i.name == 'fixed operating cost':
             i.metrics[-2].getter=lambda: TEA.FOC/TEA.operating_hours
@@ -223,13 +225,13 @@ def add_metrics_to_unit_groups(unit_groups,
             
         if i.name == 'excess electricity':
             i.metrics[-2].getter=\
-                lambda: TEA.utility_cost/TEA.operating_hours -\
-                                        sum([i.cost for i in system.heat_utilities 
-                                            if i.agent.ID in ('chilled_brine', 'chilled brine')])-\
-                                        sum([j.utility_cost-j.power_utility.cost
-                                              for j in natural_gas_utilizing_non_BT_system_units])
-                
-                # lambda: system.power_utility.cost
+                lambda: system.power_utility.cost
+                # lambda: TEA.utility_cost/TEA.operating_hours -\
+                #                         sum([i.cost for i in system.heat_utilities 
+                #                             if i.agent.ID in ('chilled_brine', 'chilled brine')])-\
+                #                         sum([j.utility_cost-j.power_utility.cost
+                #                               for j in natural_gas_utilizing_non_BT_system_units])
+
         ############## Electricity consumption ##############
         if i.name == 'cooling utility facilities':
             i.metrics[3].getter=lambda: sum([ui.power_utility.rate for ui in i.units])

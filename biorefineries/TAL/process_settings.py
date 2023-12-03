@@ -20,7 +20,8 @@ import biosteam as bst
 import thermosteam as tmo
 from biorefineries.TAL.chemicals_data import chems
 
-bst.CE = 607.5 # year 2022
+bst.CE = 607.5 # year 2019
+
 _kg_per_ton = 907.18474
 _lb_per_kg = 2.20462
 _liter_per_gallon = 3.78541
@@ -48,7 +49,7 @@ chem_index = { # Dictionary of chemical indices
                     2016: 88.8,
                     2017: 92.7,
                     2018: 93.3,
-                    2019: 97.0,
+                    2019: 97.0, # the TEA year for the 2023 TAL production study
                     2020: 100.2,
                     2021: 112.0,
                     2022: 125.829,
@@ -205,7 +206,8 @@ sodium_acetate_price = acetic_acid_price # unused
 CSL_price = 0.0339 * _lb_per_kg * chem_index[2019]/chem_index[2016] # from lactic acid paper
 amberlyst70_price = 30. #!!!
 
-acetylacetone_price = 1.5 # 2,4-pentanedione or acetylacetone
+# 2.0/kg from https://www.alibaba.com/product-detail/Desiccant-for-paints-and-varnishes-Acetylacetone_10000004008185.html?spm=a2700.galleryofferlist.normal_offer.d_price.e82458eazJeqeC
+acetylacetone_price = 2.0 # 2,4-pentanedione or acetylacetone
 
 price = {'SA': SA_price,
          'PD': acetylacetone_price, # 2,4-pentanedione or acetylacetone
@@ -272,14 +274,14 @@ _hps.T = 266 + 273.15
 
 _cooling = bst.HeatUtility.get_cooling_agent('cooling_water')
 _chilled = bst.HeatUtility.get_cooling_agent('chilled_water')
-_cooling.regeneration_price = 0
+_chilled_brine = bst.HeatUtility.get_cooling_agent('chilled_brine')
+
 _cooling.T = 28 + 273.15
 _cooling.T_limit = _cooling.T + 9
-
 # Side steam in CHP not a heat utility, thus will cause problem in TEA utility
 # cost calculation if price not set to 0 here, costs for regeneration of heating
 # and cooling utilities will be considered as CAPEX and OPEX of CHP and CT, respectively
-for i in (_lps, _mps, _hps, _cooling, _chilled):
+for i in (_lps, _mps, _hps, _cooling, _chilled, _chilled_brine):
     i.heat_transfer_price = i.regeneration_price = 0
     # if i == _cooling: continue
     # i.heat_transfer_efficiency = 0.85
@@ -299,6 +301,7 @@ CFs = {}
 GWP_CFs = {
     'CH4': 0.40, # NA NG from shale and conventional recovery
     'CSL': 1.55,
+    'DAP': 1.6354, # ecoinvent 3.8 diammonium phosphate production, RoW
     
     # 'Enzyme': 2.24, 
     'Ethanol': 1.44,
@@ -352,6 +355,7 @@ CFs['GWP_CFs'] = GWP_CFs
 FEC_CFs = {
     'CH4': 50, # NA NG from shale and conventional recovery
     'CSL': 12,
+    'DAP': 22.028, # ecoinvent 3.8 diammonium phosphate production, RoW
     
     'Ethanol': 16,
     'Acetone': 66.852, #  ecoinvent 3.8 market for acetone, liquid, RoW
