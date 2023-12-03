@@ -195,9 +195,9 @@ mc_metric_settings = {
     'production': (production, f"Production\n[{format_units('L/MT')}]", None),
     'electricity_production': (electricity_production, f"Elec. prod.\n[{format_units('kWhr/MT')}]", None),
     # 'natural_gas_consumption': (natural_gas_consumption, f"NG cons.\n[{format_units('m^3/MT')}]", None),
-    'GWP_ethanol_displacement': (GWP_ethanol_displacement, "GWP$_{\\mathrm{displacement}}$" f"\n[{GWP_units_L}]", None),
-    'GWP_economic': ((GWP_ethanol, GWP_biodiesel), "GWP$_{\\mathrm{economic}}$" f"\n[{GWP_units_L}]", None),
-    'GWP_energy': ((GWP_ethanol_allocation, GWP_biodiesel_allocation), "GWP$_{\\mathrm{energy}}$" f"\n[{GWP_units_L}]", None),
+    'GWP_ethanol_displacement': (GWP_ethanol_displacement, "Carbon intensity$_{\\mathrm{displacement}}$" f"\n[{GWP_units_L}]", None),
+    'GWP_economic': ((GWP_ethanol, GWP_biodiesel), "Carbon intensity$_{\\mathrm{economic}}$" f"\n[{GWP_units_L}]", None),
+    'GWP_energy': ((GWP_ethanol_allocation, GWP_biodiesel_allocation), "Carbon intensity$_{\\mathrm{energy}}$" f"\n[{GWP_units_L}]", None),
 }
 
 mc_line_metric_settings = {
@@ -208,9 +208,9 @@ mc_line_metric_settings = {
     'ROI': (ROI, f"ROI\n[{format_units('%/y')}]"),
     # 'Electricity production': (electricity_production, f"Elec. prod.\n[{format_units('kWhr/MT')}]"),
     'Biodiesel yield': (biodiesel_yield, f"Biodiesel yield\n[{format_units('L/ha/y')}]"),
-    'GWP energy': (GWP_biodiesel_allocation,"GWP$_{\\mathrm{energy}}$\n" f"[{GWP_units_L}]"),
-    'GWP economic': (GWP_biodiesel, "GWP$_{\\mathrm{economic}}$\n" f"[{GWP_units_L}]"),
-    'GWP displacement': (GWP_biodiesel_displacement, "GWP$_{\\mathrm{displacement}}$\n" f"[{GWP_units_L}]"),
+    'GWP energy': (GWP_biodiesel_allocation,"Carbon intensity$_{\\mathrm{energy}}$\n" f"[{GWP_units_L}]"),
+    'GWP economic': (GWP_biodiesel, "Carbon intensity$_{\\mathrm{economic}}$\n" f"[{GWP_units_L}]"),
+    'GWP displacement': (GWP_biodiesel_displacement, "Carbon intensity$_{\\mathrm{displacement}}$\n" f"[{GWP_units_L}]"),
 }
 line_metrics = dict(
     economic=['MBSP', 'TCI', 'Biodiesel yield'],
@@ -224,9 +224,9 @@ mc_comparison_settings = {
     'electricity_production': (electricity_production, r"$\Delta$" + f"Elec. prod.\n[{format_units('kWhr/MT')}]", None),
     'GWP biofuel': (GWP_biofuel_allocation, r"$\Delta$" +  f"GWP [{GWP_units_GGE}]", None),
     # 'natural_gas_consumption': (natural_gas_consumption, r"$\Delta$" + f"NG cons.\n[{format_units('m^3/MT')}]", None),
-    'GWP_ethanol_displacement': (GWP_ethanol_displacement, r"$\Delta$" + "GWP$_{\\mathrm{displacement}}$" f"\n[{GWP_units_L}]", None),
-    'GWP_economic': (GWP_ethanol, r"$\Delta$" + "GWP$_{\\mathrm{economic}}$" f"\n[{GWP_units_L}]", None),
-    'GWP_energy': (GWP_ethanol_allocation, r"$\Delta$" + "GWP$_{\\mathrm{energy}}$" f"\n[{GWP_units_L}]", None),
+    'GWP_ethanol_displacement': (GWP_ethanol_displacement, r"$\Delta$" + "Carbon intensity$_{\\mathrm{displacement}}$" f"\n[{GWP_units_L}]", None),
+    'GWP_economic': (GWP_ethanol, r"$\Delta$" + "Carbon intensity$_{\\mathrm{economic}}$" f"\n[{GWP_units_L}]", None),
+    'GWP_energy': (GWP_ethanol_allocation, r"$\Delta$" + "Carbon intensity$_{\\mathrm{energy}}$" f"\n[{GWP_units_L}]", None),
     'GWP_property_allocation': ((GWP_ethanol, GWP_ethanol_allocation), r"$\Delta$" + f"GWP\n[{GWP_units_L}]", None),
 }
 
@@ -963,7 +963,7 @@ def plot_microbial_oil_kde_2023(fs=None):
         metrics=[GWP_biodiesel_allocation, biodiesel_yield],
         x_center=1.29,
         y_center=617,
-        xlabel="GWP$_{\\mathrm{energy}}$\n" f"[{GWP_units_L}]",
+        xlabel="Carbon intensity$_{\\mathrm{energy}}$\n" f"[{GWP_units_L}]",
         ylabel=f"Biodiesel yield\n[{format_units('L/ha/y')}]",
         fs=fs,
     )
@@ -1472,7 +1472,7 @@ def _plot_competitive_biomass_yield_across_oil_content(
     df = pd.read_excel(file, sheet_name=features.competitive_biomass_yield.short_description, index_col=0)
     df = df.dropna()
     oil_content = np.array(df.columns) * 100
-    plt.ylabel(f"Competitive biomass yield\n[{format_units('DMT/ha/y')}]")
+    plt.ylabel(f"Biomass yield\n[{format_units('DMT/ha/y')}]")
     _plot_theoretical_competitive_biomass_yield_across_oil_content()
     biomass_yields = bst.plots.plot_montecarlo_across_coordinate(
         oil_content, df, 
@@ -1686,7 +1686,7 @@ def plot_spearman(configurations, labels=None, metric=None,
             metric_name = metric.name
         elif kind == 'LCA':
             metric = GWP_economic
-            metric_name = r'GWP$_{\mathrm{economic}}$'
+            metric_name = r'Carbon intensity$_{\mathrm{economic}}$'
         else:
             raise ValueError(f"invalid kind '{kind}'")
     else:
@@ -1819,7 +1819,7 @@ def plot_spearman_YRCP2023(configurations=None, labels=None,
         metric_name = metric.name
     elif kind == 'LCA':
         metric = GWP_biofuel_allocation
-        metric_name = r'GWP$_{\mathrm{energy}}$'
+        metric_name = r'Carbon intensity$_{\mathrm{energy}}$'
     else:
         raise ValueError(f"invalid kind '{kind}'")
     rhos = []

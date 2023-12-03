@@ -172,7 +172,7 @@ def plot_oil_recovery_integration_manuscript(load=True, fs=8):
     colors[:] = [[light_letter_color, light_letter_color, light_letter_color],
                  [light_letter_color, light_letter_color, light_letter_color]]
     _add_letter_labels(axes, 0.62, 0.62, colors)
-    plt.subplots_adjust(left=0.12, right=0.95, wspace=0.15, top=0.9, bottom=0.15)
+    plt.subplots_adjust(left=0.135, right=0.95, wspace=0.15, top=0.9, bottom=0.15)
     for i in ('svg', 'png'):
         file = os.path.join(images_folder, f'oil_recovery_integration_contours.{i}')
         plt.savefig(file, transparent=True)
@@ -334,8 +334,9 @@ def plot_metrics_across_composition(
                             verticalalignment='bottom',
                             bbox=txtbox_1580, 
                         )
+                    elif name == 'Target':
+                        continue
                     else:
-                    
                         text = f"{feedstock} {name}: {biomass_yield:.0f} {CBY_units}"
                         plt.text(
                             lipid + 0.15, fiber, text, c=color,
@@ -456,7 +457,7 @@ def plot_metrics_across_biomass_yield(
     d0 = data[:, :, 0, :]
     metric_bars = [
         MetricBar('MBSP', format_units('USD/L'), plt.cm.get_cmap('viridis_r'), tickmarks(d0[~np.isnan(d0)], 5, 1, expand=0, p=0.5), 15, 1),
-        MetricBar('GWP', format_units(GWP.units).replace('CO2', 'CO_2'), plt.cm.get_cmap('inferno_r'), tickmarks(d0[~np.isnan(d0)], 5, 0.1, expand=0, p=0.1), 15, 1),
+        MetricBar('Carbon intensity', format_units(GWP.units).replace('CO2', 'CO_2'), plt.cm.get_cmap('inferno_r'), tickmarks(d0[~np.isnan(d0)], 5, 0.1, expand=0, p=0.1), 15, 1),
     ]
     fig, axes, CSs, CB, other_axes = plot_contour_2d(
         X, Y, data, xlabel, ylabel, xticks, yticks, 
@@ -506,6 +507,7 @@ def plot_metrics_across_biomass_yield(
                 for j, ax in enumerate(axes_columns):
                     plt.sca(ax._cached_ytwin)
                     value = line_results[i, j]
+                    if name == 'Target': continue
                     text = f"{feedstock} {name}:\n{value:.1f} {units}"
                     plt.text(
                         x, y, text, c=color,
@@ -611,15 +613,16 @@ def plot_oil_recovery_integration(
     Z = Z[..., metric_index]
     # Plot contours
     xlabel = 'Microbial oil recovery [%]'
-    ylabel = "Microbial oil yield [wt %]"
-    titer_units = r'$g \cdot L^{-1}$'
-    productivity_units = r'$g \cdot L^{-1} \cdot h^{-1}$'
+    yield_units = format_units('g*g^-1')
+    ylabel = f'Microbial oil yield [{yield_units}]'
+    titer_units = format_units('g*L^-1')
+    productivity_units = format_units('g*L^-1*h^-1')
     ylabels = [f"{ylabel}\n"
                f"productivity = {round(productivity[i], 2)} {productivity_units}\n"
                f"titer = {round(titer[i], 2)} {titer_units}"
                for i in range(len(productivity))]
     xticks = [50, 60, 70, 80, 90]
-    yticks = [12, 14, 16, 18, 20, 22]
+    yticks = [0.12, 0.14, 0.16, 0.18, 0.20, 0.22]
     titles = ['Direct Cogeneration',
               'Integrated\nCo-Fermentation', 
               'Integrated Co-Fermentation\n& Recovery']
@@ -627,6 +630,7 @@ def plot_oil_recovery_integration(
     metric_bar = MetricBar(
         metric.name, units, plt.cm.get_cmap('viridis_r'), tickmarks(Z[~np.isnan(Z)], 5, 0.5, expand=0, p=0.5), 25, 2
     )
+    Y /= 100
     fig, axes, CSs, CB, other_axes = plot_contour_single_metric(
         X, Y, Z, xlabel, ylabels, xticks, yticks, metric_bar,  titles,
         fillcolor=None, styleaxiskw=dict(xtick0=False), label=True,
@@ -635,7 +639,7 @@ def plot_oil_recovery_integration(
                   edgecolor='None', alpha=0.99, pad=0.1)
     color = GG_colors.orange.RGBn
     x = np.array([70, 70, 50])
-    y = 100 * perf.hydrolysate_lipid_yield
+    y = perf.hydrolysate_lipid_yield
     Z0 = Z[..., 0, :]
     new_shape = [Z0.shape[0] * Z0.shape[1], Z0.shape[-1]]
     interp = LinearNDInterpolator(list(zip(X.flatten(), Y.flatten())), Z0.reshape(new_shape))
@@ -645,7 +649,7 @@ def plot_oil_recovery_integration(
         value = baseline_values[i, i]
         text = f'Baseline:\n{value:.2f} {units}'
         plt.text(
-            x[i] + 0.9, y + 0.7, text, c=color,
+            x[i] + 0.9, y + 0.7/100, text, c=color,
             verticalalignment='center',
             bbox=txtbox, 
         )
@@ -655,7 +659,7 @@ def plot_oil_recovery_integration(
             color=color, edgecolor=edgecolor, clip_on=False, zorder=1e6,
         )
     color = GG_colors.yellow.RGBn
-    y = 100 * perf.batch_lipid_yield_mean
+    y = perf.batch_lipid_yield_mean
     Z1 = Z[..., 1, :]
     interp = LinearNDInterpolator(list(zip(X.flatten(), Y.flatten())), Z1.reshape(new_shape))
     target_values = interp(x, y)
@@ -664,7 +668,7 @@ def plot_oil_recovery_integration(
         value = target_values[i, i]
         text = f'Target:\n{value:.2f} {units}'
         plt.text(
-            x[i] + 0.9, y + 0.7, text, c=color,
+            x[i] + 0.9, y + 0.7/100, text, c=color,
             verticalalignment='center',
             bbox=txtbox, 
         )
