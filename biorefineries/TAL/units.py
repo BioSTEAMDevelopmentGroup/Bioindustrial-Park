@@ -611,7 +611,7 @@ class SeedHoldTank(Unit): pass
 # =============================================================================
 
 class TALCrystallizer(BatchCrystallizer):
-    
+    TAL_solubility_multiplier = 1.
     _SA_vol_per_mass = 0.0008252419812169215
     def __init__(self, ID='', ins=None, outs=(), 
                  target_recovery=0.6,
@@ -661,7 +661,8 @@ class TALCrystallizer(BatchCrystallizer):
             
         out_stream.T = self.T
         
-        TAL_solubility = self.get_mol_TAL_dissolved_given_T_and_mol_water(out_stream.T, out_stream.imol['Water'])
+        TAL_solubility = self.TAL_solubility_multiplier *\
+            self.get_mol_TAL_dissolved_given_T_and_mol_water(out_stream.T, out_stream.imol['Water'])
         out_stream.phases = ('s', 'l')
         TAL_dissolved = min(TAL_solubility, tot_TAL)
         out_stream.imol['l', 'TAL'] = TAL_dissolved

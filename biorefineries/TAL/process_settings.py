@@ -30,6 +30,7 @@ _ft3_per_m3 = 35.3147
 _GDP_2007_to_2016 = 1.114 / 0.961
 _GDP_2008_to_2016 = 1.114 / 0.990
 _GDP_2008_to_2010 = 1.012 / 0.990
+_GDP_2007_to_2010 = 1.012 / 0.961
 
 _chemical_2011to2016 = 102.5 / 91.7
 _chemical_2013to2016 = 102.5 / 101.3
@@ -209,6 +210,13 @@ amberlyst70_price = 30. #!!!
 # 2.0/kg from https://www.alibaba.com/product-detail/Desiccant-for-paints-and-varnishes-Acetylacetone_10000004008185.html?spm=a2700.galleryofferlist.normal_offer.d_price.e82458eazJeqeC
 acetylacetone_price = 2.0 # 2,4-pentanedione or acetylacetone
 
+
+# 225 - 230 $/tonne in 2007 # https://web.archive.org/web/20161125084558/http://www.icis.com:80/chemicals/channel-info-chemicals-a-z/
+# 895.32 $/US ton in 2011 #  Humbird 2011 https://doi.org/10.2172/1013269
+DAP_price = 0.5*\
+            (0.2275 * _GDP_2007_to_2010 * chem_index[2019]/chem_index[2010]
+             +
+             0.89532 * chem_index[2019]/chem_index[2011])
 price = {'SA': SA_price,
          'PD': acetylacetone_price, # 2,4-pentanedione or acetylacetone
          'TCP': TCP_price,

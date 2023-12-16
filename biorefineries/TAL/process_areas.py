@@ -13,7 +13,7 @@ from thermosteam import Stream
 from biorefineries.TAL import units
 from biorefineries.TAL.process_settings import price, CFs
 from biorefineries.TAL.utils import find_split, splits_df
-from biorefineries.TAL.chemicals_data import chemical_groups
+from biorefineries.TAL.chemicals_data import chemical_groups, chems
 from biorefineries.TAL.models.solubility.fit_TAL_solubility_in_water_one_parameter_van_laar_activity import get_mol_TAL_dissolved, get_TAL_solubility_in_water_gpL
 from biosteam import SystemFactory
 from flexsolve import IQ_interpolation
@@ -366,20 +366,26 @@ def create_TAL_separation_solubility_exploit_process(ins, outs,):
     #     H402_outs_0.imol['l', 'TAL'] = TAL_dissolved
     #     H402_outs_0.imol['s', 'TAL'] = max(0, tot_TAL - TAL_dissolved)
     
-    F401 = bst.units.MultiEffectEvaporator('F401', ins=S401-1, outs=('F401_b', 'F401_t'), 
-                                           # chemical='Water',
-                                            P = (101325, 73581, 50892, 32777, 20000), 
-                                            V = 0.)
-    @F401.add_specification()
-    def F401_spec():
-        F401.ins[0].phases = ('l',)
-        F401._run()
+    # F401 = bst.units.MultiEffectEvaporator('F401', ins=S401-1, outs=('F401_b', 'F401_t'), 
+    #                                        # chemical='Water',
+    #                                         P = (101325, 73581, 50892, 32777, 20000), 
+    #                                         V = 0.)
+    # @F401.add_specification(run=False)
+    # def F401_spec():
+    #     F401.ins[0].phases = ('l',)
+    #     F401._run()
     
-    C401 = units.TALCrystallizer('C401', ins=F401-0, outs=('C401_0',), 
+    # F401_P = bst.units.Pump('F401_P', ins=F401-0, P=101325., material='Stainless steel',)
+   
+    C401 = units.TALCrystallizer('C401', ins=S401-1, outs=('C401_0',), 
                                    get_mol_TAL_dissolved_given_T_and_mol_water=get_mol_TAL_dissolved,
                                    fixed_operating_T=273.15+1.,
                                    )
     C401.line = 'Crystallizer'
+    @C401.add_specification(run=False)
+    def C401_spec():
+        C401.TAL_solubility_multiplier = U401.TAL_solubility_multiplier
+        C401._run()
     
     S402 = bst.units.SolidsCentrifuge('S402', ins=C401-0, outs=('S402_solid_fraction', liquid_waste),
                                 moisture_content=0.50,
@@ -395,10 +401,17 @@ def create_TAL_separation_solubility_exploit_process(ins, outs,):
     
     
     S402.solid_split = 0.95
+    S402_solids_split_indices = chems.indices(S402.solids)
+    @S402.add_specification(run=False)
+    def S402_spec():
+        S402_ins_0 = S402.ins[0]
+        S402_solid_split = S402.solid_split
+        S402.split[S402_solids_split_indices] = S402_solid_split
+        S402.isplit['TAL'] = S402_solid_split * S402_ins_0.imass['s', 'TAL']/S402_ins_0.imass['TAL']
+        S402._run()
     
-    for i in S402.solids:
-        S402.isplit[i] = S402.solid_split
-    
+    # def S402_spec():
+    #     S402.isplit['TAL'] = 
     F402 = bst.DrumDryer('F402', 
                          ins=(S402-0, 'F402_air', 'F402_natural_gas'),
                          outs=(solid_TAL, 'F402_hot_air', 'F402_emissions'),
