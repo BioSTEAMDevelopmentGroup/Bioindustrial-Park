@@ -24,8 +24,7 @@ __all__ = ('SeedTrain', 'CoFermentation', 'OleinCrystallizer')
     
 class SeedTrain(SeedTrain):
     
-    def __init__(self, ID='', ins=None, outs=(), thermo=None, reactions=None, saccharification=False):
-        bst.Unit.__init__(self, ID, ins, outs, thermo)
+    def _init(self, reactions=None, saccharification=False):
         self.saccharification = saccharification
         chemicals = self.chemicals
         self.reactions = reactions or PRxn([
@@ -52,10 +51,9 @@ class SeedTrain(SeedTrain):
 
 class CoFermentation(CoFermentation):
     
-    def __init__(self, ID='', ins=None, outs=(), thermo=None,
-                 tau=36, N=None, V=3785.4118, T=305.15, P=101325,
-                 Nmin=2, Nmax=36, cofermentation=None):
-        bst.BatchBioreactor.__init__(self, ID, ins, outs, thermo, tau, N, V, T, P, Nmin, Nmax)
+    def _init(self, tau=36, N=None, V=3785.4118, T=305.15, P=101325,
+              Nmin=2, Nmax=36, cofermentation=None):
+        bst.BatchBioreactor._init(self, tau, N, V, T, P, Nmin, Nmax)
         self.P = P
         chemicals = self.chemicals
         self.loss = None
@@ -85,15 +83,14 @@ class CoFermentation(CoFermentation):
           
 class AeratedCoFermentation(bst.AeratedBioreactor): # For microbial oil production
     V_max_default = 500
-    def __init__(
-            self, ID='', ins=None, outs=(), thermo=None,  
-            *, cofermentation, theta_O2=0.5, 
+    def _init(
+            self, cofermentation, theta_O2=0.5, 
             dT_hx_loop=8,
             Q_O2_consumption=-460240, # [kJ/kmol] equivalent to 110 kcal / mol as in https://www.academia.edu/19636928/Bioreactor_Design_for_Chemical_Engineers
             batch=True,
             **kwargs,
         ):
-        bst.StirredTankReactor.__init__(self, ID, ins, outs, thermo, batch=batch, dT_hx_loop=dT_hx_loop, **kwargs)
+        bst.StirredTankReactor._init(self, batch=batch, dT_hx_loop=dT_hx_loop, **kwargs)
         chemicals = self.chemicals
         self.theta_O2 = theta_O2
         self.hydrolysis_reaction = Rxn('Sucrose + Water -> 2Glucose', 'Sucrose', 1.00, chemicals)
@@ -118,15 +115,14 @@ class AeratedCoFermentation(bst.AeratedBioreactor): # For microbial oil producti
         
 class AeratedFermentation(bst.AeratedBioreactor): # For microbial oil production
     V_max_default = 500
-    def __init__(
-            self, ID='', ins=None, outs=(), thermo=None,  
-            *, fermentation_reaction, cell_growth_reaction, theta_O2=0.5,
+    def _init(
+            self, fermentation_reaction, cell_growth_reaction, theta_O2=0.5,
             dT_hx_loop=8,
             Q_O2_consumption=-460240, # [kJ/kmol] equivalent to 110 kcal / mol as in https://www.academia.edu/19636928/Bioreactor_Design_for_Chemical_Engineers
             batch=True,
             **kwargs,
         ):
-        bst.StirredTankReactor.__init__(self, ID, ins, outs, thermo, batch=batch, dT_hx_loop=dT_hx_loop, **kwargs)
+        bst.StirredTankReactor._init(self, batch=batch, dT_hx_loop=dT_hx_loop, **kwargs)
         chemicals = self.chemicals
         self.theta_O2 = theta_O2
         self.hydrolysis_reaction = Rxn('Sucrose + Water -> 2Glucose', 'Sucrose', 1.00, chemicals)
@@ -153,12 +149,10 @@ class AeratedFermentation(bst.AeratedBioreactor): # For microbial oil production
     
 class OleinCrystallizer(bst.BatchCrystallizer):
     
-    def __init__(self, ID='', ins=None, outs=(), thermo=None, *, 
-                 T, solid_purity=0.98, melt_purity=0.90,
-                 solid_IDs=('TAG', 'FFA', 'PL'), melt_IDs=('AcTAG',),
-                 order=None):
-        bst.BatchCrystallizer.__init__(self, ID, ins, outs, thermo,
-                                       tau=5, V=1e6, T=T)
+    def _init(self, T, solid_purity=0.98, melt_purity=0.90,
+              solid_IDs=('TAG', 'FFA', 'PL'), melt_IDs=('AcTAG',),
+              order=None):
+        super()._init(tau=5, V=1e6, T=T)
         self.melt_purity = melt_purity
         self.solid_purity = solid_purity
         self.solid_IDs = solid_IDs

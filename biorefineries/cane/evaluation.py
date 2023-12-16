@@ -425,29 +425,30 @@ def run_all(N, across_lines=False, rule='L', configurations=None,
         )
 
 def run_sugarcane_microbial_oil_and_ethanol(N=None):
-    if N is None: N = 2000
+    if N is None: N = 5000
     filterwarnings('ignore')
     cane.YRCP2023()
-    # run_uncertainty_and_sensitivity('S1.WT', N)
-    # run_uncertainty_and_sensitivity('S2.WT', N)
+    run_uncertainty_and_sensitivity('S1.WT', N)
+    run_uncertainty_and_sensitivity('S2.WT', N)
     run_uncertainty_and_sensitivity('O7.WT', N)
     run_uncertainty_and_sensitivity('O9.WT', N)
     
 def run_oilcane_microbial_oil_and_ethanol(N=None):
-    if N is None: N = 2000
+    if N is None: N = 5000
     filterwarnings('ignore')
     cane.YRCP2023()
     # run_uncertainty_and_sensitivity('O1', N)
     # run_uncertainty_and_sensitivity('O2', N)    
-    # run_uncertainty_and_sensitivity('O7', N)
+    run_uncertainty_and_sensitivity('O7', N)
     run_uncertainty_and_sensitivity('O9', N)
     # run_uncertainty_and_sensitivity('O8', N, line='WT')
     # run_uncertainty_and_sensitivity('O8', N)
 
 def run_oilcane_ethanol_constant_biomass(N=None):
-    if N is None: N = 2000
+    if N is None: N = 5000
     filterwarnings('ignore')
     cane.YRCP2023()
+    bst.Model.default_convergence_model = 'linear regressor'
     run_uncertainty_and_sensitivity('O1|constant biomass yield', N)
     run_uncertainty_and_sensitivity('O2|constant biomass yield', N)
 
@@ -455,6 +456,7 @@ def run_oilcane_microbial_oil_constant_biomass(N=None):
     if N is None: N = 2000
     filterwarnings('ignore')
     cane.YRCP2023()
+    bst.Model.default_convergence_model = 'linear regressor'
     run_uncertainty_and_sensitivity('O7|constant biomass yield', N)
     run_uncertainty_and_sensitivity('O9|constant biomass yield', N)
 
@@ -471,9 +473,10 @@ def run_oilcane_microbial_oil_across_oil_content(N=None, N_coordinate=None, conf
     # run_uncertainty_and_sensitivity('O2', N, across_oil_content='oilcane vs sugarcane')        
     
 def run_oilcane_microbial_oil_across_lines(N=None, configurations=None):
-    if N is None: N = 1000
+    if N is None: N = 2000
     filterwarnings('ignore')
     cane.YRCP2023()
+    bst.Model.default_convergence_model = 'linear regressor'
     if configurations is None: configurations = ('O7', 'O9')
     elif isinstance(configurations, str): configurations = [configurations]
     for i in configurations: run_uncertainty_and_sensitivity(i, N, across_lines=True)
@@ -506,3 +509,8 @@ def save_target_biomass_yield(configuration='O7'):
     df.to_excel(
         file, 'Summarized'
     )
+    
+# run_oilcane_ethanol_constant_biomass
+# run_oilcane_microbial_oil_across_lines
+# run_oilcane_microbial_oil_and_ethanol
+# run_sugarcane_microbial_oil_and_ethanol
