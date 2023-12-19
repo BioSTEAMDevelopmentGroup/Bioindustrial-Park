@@ -376,12 +376,12 @@ class BatchCoFermentation(BatchBioreactor):
 
     def _run(self):
         feed, seed, CSL, Acetate_spiking, DAP, air = self.ins
-        for i in [CSL, Acetate_spiking, DAP]: i.empty()
+        for i in [CSL, Acetate_spiking, DAP, air]: i.empty()
         
         vapor, effluent = self.outs
         
-        # vapor.empty()
-        # effluent.empty()
+        vapor.empty()
+        effluent.empty()
         
         effluent.mix_from([feed, seed])
         
@@ -408,7 +408,7 @@ class BatchCoFermentation(BatchBioreactor):
         
         DAP.imass['DAP'] = (seed.F_vol+feed.F_vol) * self.DAP_loading 
         
-        effluent.mix_from([effluent, Acetate_spiking, air])
+        effluent.mix_from([effluent, Acetate_spiking, air, CSL, DAP])
         effluent.T = vapor.T = self.T
         
         self.acetate_hydrolysis_rxns(effluent.mol)
@@ -433,7 +433,7 @@ class BatchCoFermentation(BatchBioreactor):
         vapor.imol['CO2', 'O2', 'N2'] = effluent.imol['CO2', 'O2', 'N2']
         vapor.phase = 'g'
         effluent.imol['CO2', 'O2', 'N2'] = 0, 0, 0
-        effluent.imass['CSL'] = 0
+        effluent.imass['CSL', 'DAP'] = 0, 0
         
         vapor.imol['CO2'] += CSL.get_atomic_flow('C')
         
