@@ -135,6 +135,10 @@ def get_monte_carlo(name, features=None, cache={}):
             if (subkey:=(key, index)) in cache:
                 df = cache[subkey]
             else:
+                # file = monte_carlo_file(key)
+                # cache[key] = df = pd.read_excel(file, header=[0, 1], index_col=[0])
+                # df = df[list(index)]
+                
                 file = monte_carlo_file(key, across_lines=True)
                 line = key.line
                 data = np.hstack([
@@ -150,9 +154,10 @@ def get_monte_carlo(name, features=None, cache={}):
                     )
                 )
         else:
-            file = monte_carlo_file(key, features)
+            file = monte_carlo_file(key)
             cache[key] = df = pd.read_excel(file, header=[0, 1], index_col=[0])
-            df = df[index]
+            df = df[list(index)]
+                
     elif isinstance(key, ConfigurationComparison):
         df_a = get_monte_carlo(key.a, features)
         df_b = get_monte_carlo(key.b, features)
