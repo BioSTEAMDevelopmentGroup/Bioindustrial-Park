@@ -13,7 +13,7 @@ from thermosteam import Stream
 from biorefineries.TAL import units
 from biorefineries.TAL.process_settings import price, CFs
 from biorefineries.TAL.utils import find_split, splits_df
-from biorefineries.TAL.chemicals_data import chemical_groups
+from biorefineries.TAL.chemicals_data import chemical_groups, chems
 from biorefineries.TAL.models.solubility.fit_TAL_solubility_in_water_one_parameter_van_laar_activity import get_mol_TAL_dissolved, get_TAL_solubility_in_water_gpL
 from biosteam import SystemFactory
 from flexsolve import IQ_interpolation
@@ -170,7 +170,7 @@ def create_TAL_fermentation_process(ins, outs,):
 @SystemFactory(ID = 'TAL_separation_solubility_exploit_process',
                ins=[dict(ID='fermentation_broth', TAL=1, Water=100),
                     dict(ID='acetylacetone_decarboxylation_equilibrium', PD=1.),
-                    dict(ID='recycled_supernatant', TAL=0.1, Water=100),
+                    dict(ID='recycled_nonevaporated_supernatant', TAL=0.1, Water=100),
                ],
                 outs=[dict(ID='decarboxylation_vent', CO2=20),
                       dict(ID='S401_solid', FermMicrobe=1, Water=1),
@@ -180,7 +180,7 @@ def create_TAL_fermentation_process(ins, outs,):
                                                )
 def create_TAL_separation_solubility_exploit_process(ins, outs,):
     
-    fermentation_broth, acetylacetone_decarboxylation_equilibrium, recycled_supernatant = ins
+    fermentation_broth, acetylacetone_decarboxylation_equilibrium, recycled_nonevaporated_supernatant = ins
     decarboxylation_vent, S401_solid, liquid_waste, solid_TAL = outs
     
     # =============================================================================
@@ -215,7 +215,8 @@ def create_TAL_separation_solubility_exploit_process(ins, outs,):
     M401 = bst.LiquidsMixingTank('M401', 
                                  ins=(U401-0, 
                                       acetylacetone_decarboxylation_equilibrium, 
-                                      recycled_supernatant), 
+                                      recycled_nonevaporated_supernatant,
+                                      'recyled_top_prod_from_evaporating_supernatant',), 
                                  outs=('fermentation_broth_mixed'))
     M401.mol_acetylacetone_per_mol_TAL = 0.
     @M401.add_specification(run=False)
@@ -367,21 +368,28 @@ def create_TAL_separation_solubility_exploit_process(ins, outs,):
     #     H402_outs_0.imol['s', 'TAL'] = max(0, tot_TAL - TAL_dissolved)
     
     F401 = bst.units.MultiEffectEvaporator('F401', ins=S401-1, outs=('F401_b', 'F401_t'), 
-                                           # chemical='Water',
+                                            # chemical='Water',
                                             P = (101325, 73581, 50892, 32777, 20000), 
                                             V = 0.)
-    @F401.add_specification()
+    @F401.add_specification(run=False)
     def F401_spec():
         F401.ins[0].phases = ('l',)
         F401._run()
     
-    C401 = units.TALCrystallizer('C401', ins=F401-0, outs=('C401_0',), 
+    F401_P0 = bst.units.Pump('F401_P0', ins=F401-0, P=101325., material='Stainless steel',)
+    F401_P1 = bst.units.Pump('F401_P1', ins=F401-1, P=101325., material='Stainless steel',)
+  
+    C401 = units.TALCrystallizer('C401', ins=F401_P0-0, outs=('C401_0',), 
                                    get_mol_TAL_dissolved_given_T_and_mol_water=get_mol_TAL_dissolved,
                                    fixed_operating_T=273.15+1.,
                                    )
     C401.line = 'Crystallizer'
+    @C401.add_specification(run=False)
+    def C401_spec():
+        C401.TAL_solubility_multiplier = U401.TAL_solubility_multiplier
+        C401._run()
     
-    S402 = bst.units.SolidsCentrifuge('S402', ins=C401-0, outs=('S402_solid_fraction', liquid_waste),
+    S402 = bst.units.SolidsCentrifuge('S402', ins=C401-0, outs=('S402_solid_fraction', 'S402_liquid_fraction'),
                                 moisture_content=0.50,
                                 # split=find_split(S401_index,
                                 #                   S401_cell_mass_split,
@@ -395,10 +403,17 @@ def create_TAL_separation_solubility_exploit_process(ins, outs,):
     
     
     S402.solid_split = 0.95
+    S402_solids_split_indices = chems.indices(S402.solids)
+    @S402.add_specification(run=False)
+    def S402_spec():
+        S402_ins_0 = S402.ins[0]
+        S402_solid_split = S402.solid_split
+        S402.split[S402_solids_split_indices] = S402_solid_split
+        S402.isplit['TAL'] = S402_solid_split * S402_ins_0.imass['s', 'TAL']/S402_ins_0.imass['TAL']
+        S402._run()
     
-    for i in S402.solids:
-        S402.isplit[i] = S402.solid_split
-    
+    # def S402_spec():
+    #     S402.isplit['TAL'] = 
     F402 = bst.DrumDryer('F402', 
                          ins=(S402-0, 'F402_air', 'F402_natural_gas'),
                          outs=(solid_TAL, 'F402_hot_air', 'F402_emissions'),
@@ -423,6 +438,22 @@ def create_TAL_separation_solubility_exploit_process(ins, outs,):
         F402_outs_0.phases = ('l', 's')
         F402_outs_0.imol['s', 'TAL'] = solid_TAL
         F402_outs_0.imol['l', 'TAL'] = liquid_TAL
+    
+    F403 = bst.units.MultiEffectEvaporator('F403', ins=S402-1, outs=('F403_b', 'F403_t_PD_water'), 
+                                            # chemical='Water',
+                                            P = (101325, 73581, 50892, 32777, 20000), 
+                                            V = 0.)
+    @F403.add_specification(run=False)
+    def F403_spec():
+        F403.ins[0].phases = ('l',)
+        F403._run()
+    
+    F403_P0 = bst.units.Pump('F403_P0', ins=F403-0, 
+                             outs=liquid_waste, # non-evaporated supernatant; can be recycled using S403 in system_TAL_solubility_exploit_eethanol_sugarcane, controlled by S403.split (0 by default)
+                             P=101325., material='Stainless steel',)
+    F403_P1 = bst.units.Pump('F403_P1', ins=F403-1, 
+                             outs=3-M401, # top product from evaporating supernatant; can be recycled in the separation process defined here, controlled by F403.V (0 by default)
+                             P=101325., material='Stainless steel',)
 
 #%% Unused: separation of acetylacetone formed by TAL decarboxylation in heated fermentation broths
 
