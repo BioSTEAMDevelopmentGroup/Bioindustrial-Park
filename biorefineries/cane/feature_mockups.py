@@ -241,12 +241,18 @@ def get_YRCP2023_spearman_names(configuration, kind=None):
         d = f.distribution
         dname = type(d).__name__
         if units is None: units = f.units
+        if units == 'dry wt. %': units = 'dw %'
+        elif 'yield' in name and units == '%': 
+            units = format_units('g*g^-1', ends='')
         if dname == 'Triangle':
             distribution = ', '.join([format(j, '.3g')
                                       for j in d._repr.values()])
         elif dname == 'Uniform':
             distribution = ' $-$ '.join([format(j, '.3g')
                                          for j in d._repr.values()])
+        elif dname == 'Trunc':
+            distribution = ', '.join([format(j, '.3g')
+                                      for j in d._repr['dist']._repr.values()])
         return f"{name}\n[{distribution} {format_units(units)}]"
         
     def get_full_name(f):
