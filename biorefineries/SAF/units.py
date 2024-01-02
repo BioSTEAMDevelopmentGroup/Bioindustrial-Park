@@ -10,7 +10,7 @@ Created on Tue Oct 31 08:16:49 2023
 import biosteam as bst
 import thermosteam as tmo
 from biosteam import Stream, Unit
-from biosteam.units import HXutility, Mixer, SolidsSeparator
+from biosteam.units import HXutility, Mixer, SolidsSeparator, Compressor
 from biosteam.units.decorators import cost
 from biosteam.units.design_tools import size_batch
 from thermosteam import MultiStream
@@ -501,7 +501,7 @@ class Reactor(Unit, PressureVessel, isabstract=True):
 
 #%% Upgrading
 
-# Dehydration reactor
+### Dehydration
 class AdiabaticFixedbedDehydrationReactor(Reactor):
     _N_ins=2
     _N_outs=2
@@ -524,8 +524,8 @@ class AdiabaticFixedbedDehydrationReactor(Reactor):
     # main components of Al2O3-MgO/SiO2
     
     def __init__(self, ID, ins, outs,
-                 T=350+273.15, # Based on Process Design for the Production of Ethylene from Ethanol
-                 P=6*101325, # Based on Process Design for the Production of Ethylene from Ethanol
+                 T=350+273.15, # Based on Bioethylene Production from Ethanol: A Review and Techno-economical Evaluation
+                 P=1.4*101325, # Based on Bioethylene Production from Ethanol: A Review and Techno-economical Evaluation
                  length_to_diameter=3,
                  vessel_material='Stainless steel 304',
                  vessel_type='Vertical',
@@ -595,7 +595,7 @@ class AdiabaticFixedbedDehydrationReactor(Reactor):
         
         hx = self.heat_exchanger
         self.baseline_purchase_costs['Heat exchangers'] = hx.purchase_cost
-        self.heat_utilities += hx.heat_utilities
+        self.heat_utilities = hx.heat_utilities
        
     
 
@@ -770,16 +770,14 @@ class StripperColumn(bst.BinaryDistillation):
     
     
     
-    
+### Oligomerization 
+
+# First and second oligomerization are based on 'Aviation fuel production pathways from lignocellulosic biomass via alcohol intermediates – A technical analysis' and 'Systems and processes for conversion of ethylene feedstocks to hydrocarbon fuels'
 
 
 
 
-
-
-
-# 
-class EthyleneDimerizationReactor(Reactor):
+class EthyleneDimerizationReactor(Reactor): 
     _N_ins=2
     _N_outs=2
     
@@ -797,9 +795,10 @@ class EthyleneDimerizationReactor(Reactor):
     
     _F_BM_default={**Reactor._F_BM_default,
                    'Heat exchanger':3.17,
+                   # 'Compressor':2.15,
                    '1st catalyst':1} # a transition metal catalyst based on nickel on an amorphous aluminum silicate support
      
-    def __init__(self,ID="",ins=None,outs=(),thermo=None,*,
+    def __init__(self, ID, ins, outs,
                  T=85+273.15,
                  P=21*101325,
                  length_to_diameter=3,
@@ -808,7 +807,7 @@ class EthyleneDimerizationReactor(Reactor):
                  WHSV=3, 
                  tau=1/3,
                  catalyst_price=12.3,
-                 ): 
+                 **kwargs): 
         Reactor.__init__(self, ID, ins,outs)
         self.T=T
         self.P=P
@@ -819,6 +818,7 @@ class EthyleneDimerizationReactor(Reactor):
         self.tau=tau
         self.catalyst_price=catalyst_price
         self.heat_exchanger=hx=HXutility(None,None,None,T=T)
+        # self.compressor=Compressor(ins=self.ins[0],P=P)
     
     def _setup(self):
         super()._setup()
@@ -834,6 +834,7 @@ class EthyleneDimerizationReactor(Reactor):
         feed,fresh_catalyst=self.ins
         effluent,spent_catalyst=self.outs
         effluent.T=self.T
+        effluent.P=self.P
         
         effluent.copy_like(feed)
         self.oligomerization_rxns(effluent.mol)
@@ -848,6 +849,7 @@ class EthyleneDimerizationReactor(Reactor):
         self.heat_exchanger.simulate_as_auxiliary_exchanger(ins=(feed,),
                                                             duty=duty,
                                                             vle=True)
+        # self.compressor._design()
         
     def _cost(self):
         super()._cost()
@@ -857,7 +859,10 @@ class EthyleneDimerizationReactor(Reactor):
         
         hx = self.heat_exchanger
         self.baseline_purchase_costs['Heat exchangers'] = hx.purchase_cost
-        self.heat_utilities += hx.heat_utilities
+        self.heat_utilities = hx.heat_utilities
+        
+        # self.compressor._cost()
+       
 
 
 
@@ -868,7 +873,7 @@ class EthyleneDimerizationReactor(Reactor):
 
 
 
-# Intermediate to C12~ # Refer to Synthesis of jet fuel through the oligomerization of butenes on zeolite catalysts
+# Intermediate to C12~ 
 class OligomerizationReactor(Reactor):
     _N_ins=3
     _N_outs=2
@@ -912,7 +917,8 @@ class OligomerizationReactor(Reactor):
     def _run(self):
         feed, recycle, fresh_catalyst=self.ins
         effluent, spent_catalyst=self.outs
-        effluent.mix_from(feed,recycle)
+        
+        effluent.mix_from([feed,recycle])
         
         effluent.imass['C4H8']=0.097*self.ins[0].F_mass
         effluent.imass['C5H10']=0.016*self.ins[0].F_mass 
@@ -935,7 +941,6 @@ class OligomerizationReactor(Reactor):
         Reactor._design(self)
         duty=sum([i.H for i in self.outs])-sum([i.H for i in self.ins])
         feed=tmo.Stream()
-        feed.mix_from(self.outs)
         feed.T=self.ins[0].T
         self.heat_exchanger.simulate_as_auxiliary_exchanger(ins=(feed,),
                                                             duty=duty,
@@ -959,74 +964,190 @@ class OligomerizationReactor(Reactor):
     
 
 
-# Hydrogenation # Based on 'Comparative techno-economic analysis and process design for indirect liquefaction pathways to distillate-range fuels via biomass-derived oxygenated intermediates upgrading'
-#@cost(Compressor)
-class HydrogenationReactor():
-    _N_ins = 2
-    _N_outs = 1
+### Hydrogenation 
+
+# Two catalysts commonly used: 
+# 1. Cobalt molybdenum (Como) catalyst. Reaction parameters are based on 'Techno-economic analysis for upgrading the biomass-derived ethanol-to-jet blendstocks'
+# 2. Pd/Al2O3 catalyst. Reaction parameters are based on 'comparative techno-economic analysis and process design for indirect liquefaction pathways to distillate-range fuels via biomass-derived oxygenated intermediates upgrading'
+
+# 1 has lower price of catalyst but higher temperature
+# 2 has higher price of catalyst but longer lifetime and lower temperature
+# Twp ways are considered here as a variable
+
+class HydrogenationReactor1(Reactor): # 1
+    _N_ins = 3
+    _N_outs = 2
     
     auxiliary_unit_names=('heat_exchanger')
 
 
     _F_BM_default = {**Reactor._F_BM_default,
             'Heat exchangers': 3.17,
-            'Compressor':2.15,
-            'Pd/Al2O3 catalyst': 1}
+            # 'Compressor':2.15,
+            'como catalyst': 1}
     
     def __init__(self, ID='', ins=None, outs=(), thermo=None, *,
                  T=45.+273.15,
-                 P=34.5*101325, 
-                 length_to_diameter=2,
+                 P=3.6*10E6, 
+                 length_to_diameter=3,
                  vessel_material='Stainless steel 304',
                  vessel_type='Vertical',
-                 WHSV=1, 
-                 catalyst_price=55.20/_lb2kg, # lifetime 3 yrs 
+                 WHSV=3, 
+                 tau=1/3,
+                 catalyst_price=19/_lb2kg, # lifetime 3 yrs 
                  **kargs):
-        Reactor.__init__(self, ID,ins,outs,thermo)
+        Reactor.__init__(self, ID,ins,outs)
         self.T = T
         self.P = P
         self.length_to_diameter = length_to_diameter
         self.vessel_material = vessel_material
         self.vessel_type = vessel_type
         self.WHSV=WHSV
+        self.tau=tau
         self.catalyst_price=catalyst_price
         self.heat_exchanger=hx=bst.HXutility(None,None,None,T=T)
+    
+    def _setup(self):
+        super()._setup()
         self.hydrogenation_rxns = ParallelRxn([
             #   Reaction definition           Reactant   Conversion
-            Rxn('C4H8 + H2 -> C4H10',          'C4H8',     1.00),
             Rxn('C6H12 + H2 -> C6H14',         'C6H12',    1.00),
+            Rxn('C7H14 + H2 -> C7H16',         'C7H14',    1.00),
             Rxn('C8H16 + H2 -> C8H18',         'C8H16',    1.00),
+            Rxn('C9H18 + H2 -> C9H20',         'C9H18',    1.00),
             Rxn('C10H20 + H2 -> C10H22',       'C10H20',   1.00),
+            Rxn('C11H22 + H2 -> C11H24',       'C11H22',   1.00),
             Rxn('C12H24 + H2 -> C12H26',       'C12H24',   1.00),
+            Rxn('C13H26 + H2 -> C13H28',       'C13H26',   1.00),
             Rxn('C14H28 + H2 -> C14H30',       'C14H28',   1.00),
             Rxn('C16H32 + H2 -> C16H34',       'C16H32',   1.00),
             Rxn('C18H36 + H2 -> C18H38',       'C18H36',   1.00),
                 ])                                      
-        self.C4H8_to_C4H10_rxn = self.hydrogenation_rxns[0]
-        self.C6H12_to_C6H14_rxn = self.hydrogenation_rxns[1]
-        self.C8H16_to_C8H18_rxn = self.hydrogenation_rxns[2]
-        self.C10H20_to_C10H22_rxn = self.hydrogenation_rxns[3]
-        self.C12H24_to_C12H26_rxn = self.hydrogenation_rxns[4]
-        self.C14H28_to_C14H30_rxn = self.hydrogenation_rxns[5]
-        self.C16H32_to_C16H34_rxn = self.hydrogenation_rxns[6]
-        self.C18H36_to_C18H38_rxn = self.hydrogenation_rxns[7]
         
     def _run(self):
-        C4H8,C6H12,C8H16,C10H20,C12H24,C14H28,C16H32,C18H36, H2 ,fresh_catalyst = self.ins
-        C4H10,C6H14,C8H18,C10H22,C12H26,C14H30,C16H34,C18H38,spent_catalyst = self.outs
-        hydrogenation_rxns=self.hydrogenation_rxns
-        alkene=[C4H8,C6H12,C8H16,C10H20,C12H24,C14H28,C16H32,C18H36]
-        alkane=[C4H10,C6H14,C8H18,C10H22,C12H26,C14H30,C16H34,C18H38]
-        alkane.T=self.T
-        alkane.P=self.P
-        self.hydrogenation_rxns(alkane.mol)
-        H2.imol['H2'] = alkene.F_mol
+        influent, h2 ,fresh_catalyst = self.ins
+        effluent, spent_catalyst = self.outs
         
+        effluent.mix_from([influent,h2])
+       
+        self.hydrogenation_rxns(effluent.mol)
+        effluent.T=self.T
+        
+        h2.imol['H2'] = self.ins[0].F_mol
+        
+    def _design(self):
+        Reactor._design(self)
         duty=sum([i.H for i in self.outs])-sum([i.H for i in self.ins])
-        self.heat_exchanger.simulate_as_auxiliary_exchanger(ins=self.ins,duty=duty,vle=False)
-   
+        feed=tmo.Stream()
+        feed.T=self.ins[0].T
+        self.heat_exchanger.simulate_as_auxiliary_exchanger(ins=(feed,),
+                                                            duty=duty,
+                                                            vle=True)
+        
     def _cost(self):
         super()._cost()
-        self.catalyst_weight=self.WHSV*self.alkene.F_mass
-        self.purchase_costs['Pd/Al2O3 catalyst']=self.catalyst_weight*self.catalyst_price
+        
+        self.catalyst_weight = self.ins[0].F_mass/self.WHSV 
+        # assuming catalyst lifetime of 12 months
+        self.purchase_costs['como_catalyst']=self.catalyst_weight * self.catalyst_price
+        
+        hx = self.heat_exchanger
+        self.baseline_purchase_costs['Heat exchangers'] = hx.purchase_cost
+        self.heat_utilities += hx.heat_utilities
+
+
+
+class HydrogenationReactor(Reactor): # 2
+    _N_ins = 3
+    _N_outs = 2
+    
+    auxiliary_unit_names=('heat_exchanger')
+
+
+    _F_BM_default = {**Reactor._F_BM_default,
+            'Heat exchangers': 3.17,
+            # 'Compressor':2.15,
+            'Pd/Al2O3 catalyst': 1}
+    
+    def __init__(self, ID='', ins=None, outs=(), thermo=None, *,
+                 T=45.+273.15,
+                 P=34.5*101325, 
+                 length_to_diameter=3,
+                 vessel_material='Stainless steel 304',
+                 vessel_type='Vertical',
+                 WHSV=1, 
+                 tau=1,
+                 catalyst_price=55.20/_lb2kg, # lifetime 3 yrs 
+                 **kargs):
+        Reactor.__init__(self, ID,ins,outs)
+        self.T = T
+        self.P = P
+        self.length_to_diameter = length_to_diameter
+        self.vessel_material = vessel_material
+        self.vessel_type = vessel_type
+        self.WHSV=WHSV
+        self.tau=tau
+        self.catalyst_price=catalyst_price
+        self.heat_exchanger=hx=bst.HXutility(None,None,None,T=T)
+    
+    def _setup(self):
+        super()._setup()
+        self.hydrogenation_rxns = ParallelRxn([
+            #   Reaction definition           Reactant   Conversion
+            Rxn('C6H12 + H2 -> C6H14',         'C6H12',    1.00),
+            Rxn('C7H14 + H2 -> C7H16',         'C7H14',    1.00),
+            Rxn('C8H16 + H2 -> C8H18',         'C8H16',    1.00),
+            Rxn('C9H18 + H2 -> C9H20',         'C9H18',    1.00),
+            Rxn('C10H20 + H2 -> C10H22',       'C10H20',   1.00),
+            Rxn('C11H22 + H2 -> C11H24',       'C11H22',   1.00),
+            Rxn('C12H24 + H2 -> C12H26',       'C12H24',   1.00),
+            Rxn('C13H26 + H2 -> C13H28',       'C13H26',   1.00),
+            Rxn('C14H28 + H2 -> C14H30',       'C14H28',   1.00),
+            Rxn('C16H32 + H2 -> C16H34',       'C16H32',   1.00),
+            Rxn('C18H36 + H2 -> C18H38',       'C18H36',   1.00),
+                ])                                      
+        
+    def _run(self):
+        influent, h2 ,fresh_catalyst = self.ins
+        effluent, spent_catalyst = self.outs
+        
+        effluent.mix_from([influent,h2])
+        
+        # effluent.imol['C6H14']=self.ins[0].imol['C6H12']
+        # effluent.imol['C7H16']=self.ins[0].imol['C7H14']
+        # effluent.imol['C8H18']=self.ins[0].imol['C8H16']
+        # effluent.imol['C9H20']=self.ins[0].imol['C9H18']
+        # effluent.imol['C10H22']=self.ins[0].imol['C10H20']
+        # effluent.imol['C11H24']=self.ins[0].imol['C11H22']
+        # effluent.imol['C12H26']=self.ins[0].imol['C12H24']
+        # effluent.imol['C13H28']=self.ins[0].imol['C13H26']
+        # effluent.imol['C14H30']=self.ins[0].imol['C14H28']
+        # effluent.imol['C16H34']=self.ins[0].imol['C16H32']
+        # effluent.imol['C18H38']=self.ins[0].imol['C18H36']
+       
+        self.hydrogenation_rxns(effluent.mol)
+        effluent.T=self.T
+        
+        h2.imol['H2'] = self.ins[0].F_mol
+        
+    def _design(self):
+        Reactor._design(self)
+        duty=sum([i.H for i in self.outs])-sum([i.H for i in self.ins])
+        feed=tmo.Stream()
+        feed.T=self.ins[0].T
+        self.heat_exchanger.simulate_as_auxiliary_exchanger(ins=(feed,),
+                                                            duty=duty,
+                                                            vle=True)
+        
+    def _cost(self):
+        super()._cost()
+        
+        self.catalyst_weight = self.ins[0].F_mass/self.WHSV 
+        # assuming catalyst lifetime of 36 months
+        self.purchase_costs['Pd_Al2O3_catalyst']=self.catalyst_weight * self.catalyst_price
+        
+        hx = self.heat_exchanger
+        self.baseline_purchase_costs['Heat exchangers'] = hx.purchase_cost
+        self.heat_utilities += hx.heat_utilities
+        
         

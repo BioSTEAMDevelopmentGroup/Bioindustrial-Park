@@ -245,7 +245,7 @@ def sugar_concentration_at_fraction_evaporation(V):
 
 #%%
 
-# A200 Pretreatment process
+### A200 Pretreatment process
 
 solids_loading=0.305
 nonsolids=['Water']
@@ -387,9 +387,7 @@ sys_SSCF.simulate()
 
 #%%
 
-# A400 Upgrading process
-
-### Dehydration
+### A400 Upgrading
 
 # Add a heating agent
 import qsdsan as qs
@@ -404,7 +402,7 @@ BIP = qs.Component.from_chemical('BIP', chemical=BIP_chem, particle_size='Solubl
 
 HTF_thermo = bst.Thermo((DPO, BIP,))
 
-HTF = bst.UtilityAgent('HTF', DPO=0.735, BIP=0.265, T=673.15, P=951477, phase='g',
+HTF = bst.UtilityAgent('HTF', DPO=0.735, BIP=0.265, T=673.15, P=10.6*101325, phase='g',
                        # 400 C (673.15 K) and 138 psig (951477 pa) are max temp and pressure for HTF
                        thermo=HTF_thermo,
                        # T_limit = 495 F (530.372 K) is the highest temp that vapor can exist
@@ -417,9 +415,24 @@ bst.HeatUtility.heating_agents.append(HTF)
 
 bst.CE = qs.CEPCI_by_year[2020] # use 2020$ to match up with latest PNNL report
 
-light_keys=chems.light_keys
-heavy_keys=chems.heavy_keys
-llight_keys=chems.llignt_keys
+# Add a cooling agent
+Decamethyltetrasiloxane_chem = qs.Chemical('Decamethyltetrasiloxane_chem',search_ID='141-62-8')
+Octamethyltrisiloxane_chem = qs.Chemical('Octamethyltrisiloxane',search_ID='107-51-7')
+
+DEC = qs.Component.from_chemical('DEC', chemical=Decamethyltetrasiloxane_chem, particle_size='Soluble',
+                                 degradability='Slowly', organic=True)
+
+OCT = qs.Component.from_chemical('OCT', chemical=Octamethyltrisiloxane_chem, particle_size='Soluble',
+                                 degradability='Slowly', organic=True)
+LTF_thermo = bst.Thermo((DEC,OCT,))
+
+LTF = bst.UtilityAgent('LTF', DEC=0.4, OCT=0.6, T=173.15, P=5.2*101325, phase='l',
+                       thermo = LTF_thermo,
+                       regeneration_price=1)
+bst.HeatUtility.cooling_agents.append(LTF)
+
+
+# Dehydration
 
 ethanol_to_storage = Stream('ethanol_to_storage',
                             phase='l', T=298.15, P=101325,
@@ -427,26 +440,32 @@ ethanol_to_storage = Stream('ethanol_to_storage',
                             Ethanol=694,
                             units='kmol/hr') 
 # Stream
-recycled_water=Stream('washing_water',
-                      Water=700,
-                      T=20+273.15,
-                      phase='l',
-                      units='kmol/hr')
+
 NaOH=Stream('NaOH',NaOH=0.5,Water=0.5,units='kg/hr')
 Syndol_catalyst=Stream('Syndol_catalyst',units='kg/hr')
 
-H400=bst.HXutility('H400', ins=ethanol_to_storage,V=1,rigorous=True)
-H401=bst.HXutility('H401', ins=H400-0,T=350+273.15)
-R401=_units.AdiabaticFixedbedDehydrationReactor('R401', ins=(H401-0,Syndol_catalyst),outs=('','spent_catalyst'))
+P401=bst.Pump('P401',ins=ethanol_to_storage,P=4.5*101325)
+H400=bst.HXutility('H400', ins=P401-0,V=1,rigorous=True)
 
-T401=bst.IsentropicTurbine('T401', ins=R401-0,P=101325)
+R401=_units.AdiabaticFixedbedDehydrationReactor('R401', ins=(H400-0,Syndol_catalyst),outs=('','spent_catalyst'))
 
-H402=bst.HXutility('H402', ins=T401-0,T=15+273.15,outs='crude_ethylene',rigorous=True)
+# Depressurize to 1 bar before quenching
+V401=bst.IsenthalpicValve('V401', ins=R401-0,P=101325)
+H402=bst.HXutility('H402', ins=V401-0,T=50+273.15,outs='crude_ethylene',rigorous=True)
 S401=bst.PhaseSplitter('S401', ins=H402-0,outs=('vapor','liquid'))
 
-# Pressurize to 27 bar before purification
-# based on Bioethylene Production from Ethanol: A Review and Techno-economical Evaluation
+S401.target_ethylene_cwt=0.921
+@H402.add_bounded_numerical_specification(x0=20+273.15,x1=80+273.15,xtol=1e-5,ytol=1e-2)
+def ethylene_cwt_at_T(T):
+    H402.T=T
+    H402.run_until(S401,inclusive=True)
+    ethylene_cwt=S401.outs[0].get_mass_fraction('Ethylene')
+    return S401.target_ethylene_cwt - ethylene_cwt
+
+# Pressurize to 27 bar before purification;
+# Based on Bioethylene Production from Ethanol: A Review and Techno-economical Evaluation
 C401=bst.MultistageCompressor('C401', ins=S401-0,n_stages=3,pr=3,eta=0.72,vle=True)
+# Condense water
 S402=bst.PhaseSplitter('S402', ins=C401-0,outs=('vapor','liquid'))
 # Remove CO2
 U402=_units.CausticTower('U402', ins=(S402-0, NaOH),P=27*101325)
@@ -454,28 +473,18 @@ U402=_units.CausticTower('U402', ins=(S402-0, NaOH),P=27*101325)
 U403=bst.MolecularSieve('U403', ins=U402-0,outs=('water_and_ethanol','dried_ethylene'),
                         split=dict(Water=1,
                                    Ethanol=1))
-# Reduce temperature before distillation, liquid required for ins (by low temperature + high pressure)
+
+# Reduce temperature before cryogenic distillation low temperature + high pressure
 # Temperature is based on Bioethylene Production from Ethanol: A Review and Techno-economical Evaluation
-# My quesiton is although rigorous=True, outs of H404 is still gas. The vle results shows liquid (in vle.module)
-# Why is this so? Are they based on different algorithum?
 H404=bst.HXutility('H404',ins=U403-1,T=-25+273.15,rigorous=True)
 
-# To make ins liquid, I extract the vle results as a stream input of distillation
-Ins=Stream('ins',
-           Ethylene=682,
-           Butene=1.73,
-           Ethane=1.86,
-           Propene=0.13,
-           units='kmol/hr',
-           phase='l',
-           P=27*101325,
-           T=253.15)
-# Now my second question is even liquid ins, distillation cannot work still.
-D401=bst.ShortcutColumn('D401',ins=Ins,outs=('distillate','bottoms'),
+# D401 cannot work!!
+D401=bst.BinaryDistillation('D401',ins=H404-0,outs=('distillate','bottoms'),
                             LHK=('Ethylene','Ethane'),
-                            y_top=0.999,
-                            x_bot=0.001,
-                            k=3,
+                            Lr=681.5/682,
+                            Hr=1.7/1.86,
+                            product_specification_format='Recovery',
+                            k=1.2,
                             is_divided=True,
                             partial_condenser=True,
                             )
@@ -488,17 +497,16 @@ D401=bst.ShortcutColumn('D401',ins=Ins,outs=('distillate','bottoms'),
 #                           )
 
 
-### Oligomerization
+# Oligomerization
+
 first_catalyst=Stream('first_catalyst',units='kg/hr')
 second_catalyst=Stream('second_catalyst',units='kg/hr')
 
-ethylene=Stream('ethylene',Ethylene=682,units='kmol/hr',phase='g',T=85+273.15,P=2.068e6)
-
-# Pressurize to 300 psig, still in gas
-# C402=bst.MultistageCompressor('C402',ins=ethylene,n_stages=3,pr=2.7,eta=0.72,vle=True)
+ethylene=Stream('ethylene',Ethylene=682,units='kmol/hr',phase='g',T=25+273.15)
 
 # First oligomerization
-R402=_units.EthyleneDimerizationReactor('R402', ins=(ethylene,first_catalyst))
+C402=bst.IsentropicCompressor('C402',ins=ethylene,P=21*101325,eta=1, compressor_type='Centrifugal')
+R402=_units.EthyleneDimerizationReactor('R402', ins=(C402-0,first_catalyst),outs=('','spent_catalyst'))
 
 # Second oligomerization
 R403=_units.OligomerizationReactor('R403',ins=(R402-0,'',second_catalyst))
@@ -512,43 +520,34 @@ H405=bst.HXutility('H405', ins=D403-0,outs=1-R403,V=0,rigorous=True)
 # Light olefins recycled to the 2nd oligomerization reactor
 
 
-### Hydrogenation
+# Hydrogenation
 
-# Based on 10.1002/bbb.1710
+# Stream
 
-hydrogen=bst.Stream('H2',units='kg/hr')
-C402=bst.Compressor('C402',ins=hydrogen,P=34.5*101325)
-R403=units.HydrogenationReactor('R403', ins=(D403-1,C402-0))
+Pd_Al2O3_catalyst=Stream('Pd_Al2O3_catalyst',units='kg/hr')
+como_catalyst=Stream('como_catalyst',units='kg/hr')
+h2=Stream('h2',H2=1,P=34.5*101325,units='kg/hr')
 
-### Fractionation
+R403=_units.HydrogenationReactor('R403', ins=(D403-1,h2,Pd_Al2O3_catalyst))
 
-more_than_C4=chems.more_than_C4
-C6_C8=chems.C6_C8
-more_than_C8=chems.more_than_C8
-C10_C16=chems.C10_C16
-more_than_C16=chems.more_than_C16
 
-T401=bst.Turbine('T401', ins=R403-0,P=101325)
-D404=bst.BinaryDistillation('D404', ins=T401-0,outs=('distillate','bottoms_product'),
-                            LHK=('C4H10',more_than_C4),
-                            y_top=1,
-                            x_bottom=0,
-                            k=2,
-                            is_divided=True)
-D405=bst.BinaryDistillation('D405', ins=D404-0,outs=('distillate','bottoms_product'),
-                            LHK=(C6_C8,more_than_C8),
-                            y_top=1,
-                            x_bottom=0,
-                            k=2,
-                            is_divided=True)
-D406=bst.BinaryDistillation('D406', ins=D405-0,outs=('distillate','bottoms_product'),
-                            LHK=(C10_C16,more_than_C16),
-                            y_top=1,
-                            x_bottom=0,
-                            k=2,
+
+
+# Fractionation
+
+D404=bst.BinaryDistillation('D404', ins=R403-0,outs=('distillate','bottoms'),
+                            LHK=('C8H18','C9H20'),
+                            Lr=0.999,
+                            Hr=0.999,
+                            k=3,
                             is_divided=True)
 
-
+D405=bst.BinaryDistillation('D405', ins=D404-1,outs=('distillate','bottoms'),
+                            LHK=('C16H34','C18H38'),
+                            Lr=0.999,
+                            Hr=0.999,
+                            k=3,
+                            is_divided=True)
   
 sys=bst.main_flowsheet.create_system('sys')
 

@@ -236,9 +236,13 @@ C18H36=chemical_database('C18H36','Octadecene')
  
 C4H10=chemical_database('C4H10','Butane')
 C6H14=chemical_database('C6H14','Hexane')
-C8H18=chemical_database('C8H18','Octane')
+C7H16=chemical_database('C7H16','3-ethylpentane')
+C8H18=chemical_database('C8H18','3-ethyl-3-methylpentane')
+C9H20=chemical_database('C9H20','2,2,3,3-tetramethylpentane')
 C10H22=chemical_database('C10H22','Decane')
+C11H24=chemical_database('C11H24','2,3-dimethylnonane')
 C12H26=chemical_database('C12H26','Dodecane')
+C13H28=chemical_database('C13H28','2,3-dimethylundecane')
 C14H30=chemical_database('C14H30','Tetradecane')
 C16H34=chemical_database('C16H34','Hexadecane')
 C18H38=chemical_database('C18H38','Octadecane')
@@ -279,6 +283,8 @@ DenaturedEnzyme = chemical_copied('DenaturedEnzyme', Enzyme)
 MethylLactate = chemical_database('MethylLactate', Hf=-643.1e3)
 FermMicrobeXyl = chemical_copied('FermMicrobeXyl', FermMicrobe)
 Xylitol=chemical_database('Xylitol', search_ID='Xylitol')
+
+DMP = chemical_database('DimethylPolysiloxane',search_ID='Dimethyl Polysiloxane')
 #%%
 
 default_nonsolids = ['Water', 'Ethanol', 'AceticAcid', 
