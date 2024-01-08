@@ -190,11 +190,9 @@ def create_lipidcane_to_biodiesel_and_conventional_ethanol_system(ins, outs):
     
     CWP = bst.ChilledWaterPackage('CWP')
     PWC = bst.ProcessWaterCenter('PWC',
-                                   (bst.Stream(), makeup_water),
-                                   (),
-                                   None,
-                                   makeup_water_streams,
-                                   process_water_streams)
+                                 (bst.Stream(), makeup_water),
+                                 makeup_water_streams=makeup_water_streams,
+                                 process_water_streams=process_water_streams)
     
     F301 = u.F301
     D303 = u.D303
