@@ -170,7 +170,7 @@ def create_TAL_fermentation_process(ins, outs,):
 @SystemFactory(ID = 'TAL_separation_solubility_exploit_process',
                ins=[dict(ID='fermentation_broth', TAL=1, Water=100),
                     dict(ID='acetylacetone_decarboxylation_equilibrium', PD=1.),
-                    dict(ID='recycled_nonevaporated_supernatant', TAL=0.1, Water=100),
+                    dict(ID='recycled_nonevaporated_supernatant', Water=1e-3),
                ],
                 outs=[dict(ID='decarboxylation_vent', CO2=20),
                       dict(ID='S401_solid', FermMicrobe=1, Water=1),
