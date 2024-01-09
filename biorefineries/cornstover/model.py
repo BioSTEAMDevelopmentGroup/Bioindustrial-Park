@@ -6,10 +6,19 @@ Created on Tue Aug 13 21:43:56 2019
 """
 from biosteam.evaluation import evaluation_tools as tools
 from biosteam.evaluation import Model, Metric
-from biorefineries.cornstover import \
-    cornstover_sys, cornstover_tea, \
-    ethanol, cornstover, R301, R303, ethanol_density_kggal, \
-    areas, BT, Area700, AllAreas
+from biorefineries import cornstover as cs
+    
+cornstover_sys = cs.cornstover_sys
+cornstover_tea = cs.cornstover_tea
+ethanol = cs.ethanol
+cornstover = cs.cornstover
+R301 = cs.R301
+R303 = cs.R303
+ethanol_density_kggal = cs.ethanol_density_kggal
+areas = cs.areas
+BT = cs. BT
+Area700 = cs.Area700
+AllAreas = cs.AllAreas
 
 cornstover_sys.simulate()
 get_MESP = lambda: cornstover_tea.solve_price(ethanol) * ethanol_density_kggal
