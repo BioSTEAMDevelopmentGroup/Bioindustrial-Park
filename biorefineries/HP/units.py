@@ -420,9 +420,11 @@ class SeedTrain(Unit):
         effluent, CO2 = self.outs
         effluent.copy_like(feed)
         CO2.phase = 'g'
+        effluent.phase='l'
         
         if 'Sucrose' in effluent.chemicals:
-            self.sucrose_hydrolysis_rxn.force_reaction(effluent)
+            # self.sucrose_hydrolysis_rxn.force_reaction(effluent)
+            self.sucrose_hydrolysis_rxn(effluent)
             if effluent.imol['Water'] < 0.: effluent.imol['Water'] = 0.
         
         self.cofermentation_rxns(effluent.mol)
@@ -696,9 +698,10 @@ class CoFermentation(Reactor):
         
         effluent, vapor = self.outs
         effluent.mix_from([feed, sugars, CSL])
-        
+        effluent.phase='l'
         if 'Sucrose' in effluent.chemicals:
-            self.sucrose_hydrolysis_rxn.force_reaction(effluent)
+            # self.sucrose_hydrolysis_rxn.force_reaction(effluent)
+            self.sucrose_hydrolysis_rxn(effluent)
             if effluent.imol['Water'] < 0.: effluent.imol['Water'] = 0.
         
         effluent.T = vapor.T = self.T
