@@ -56,6 +56,7 @@ import matplotlib.pyplot as plt
 import copy
 from biorefineries.cornstover import CellulosicEthanolTEA
 from biosteam import SystemFactory
+from biorefineries.cellulosic import create_facilities
 # from lactic.hx_network import HX_Network
 
 # # Do this to be able to show more streams in a diagram
@@ -93,7 +94,7 @@ System.strict_convergence = True # True => throw exception if system does not co
 
 @SystemFactory(ID = 'HP_sys')
 def create_HP_sys(ins, outs):
-    
+    u, s = flowsheet.unit, flowsheet.stream
     process_groups = []
     # %% 
     
@@ -105,6 +106,8 @@ def create_HP_sys(ins, outs):
                         baseline_feedflow.copy(),
                         units='kg/hr',
                         price=price[feedstock_ID])
+    
+    get_flow_tpd = lambda: (feedstock.F_mass-feedstock.imass['H2O'])*24/907.185
     
     U101 = units.FeedstockPreprocessing('U101', ins=feedstock, outs='milled_feedstock')
     
@@ -431,12 +434,18 @@ def create_HP_sys(ins, outs):
 
     
     Kds = dict(IDs=('HP', 'Water', 'Hexanol', 'AceticAcid'),
-               K=np.array([1./1.9379484051844278, 3.690183610720956, 0.0060176892697821486, 1./0.4867537504125923]), # T = 80. + 273.15 K
+                # K=np.array([1./1.9379484051844278, 3.690183610720956, 0.0060176892697821486, 1./0.4867537504125923]), # T = 80. + 273.15 K
+                K=np.array([1.9379484051844278, 1/3.690183610720956, 1/0.0060176892697821486, 0.4867537504125923]), # T = 80. + 273.15 K
                phi = 0.5)
     
+    
+    max_N_stages = 3
+    
     S404 = bst.units.MultiStageMixerSettlers('S404', ins = (F401_H-0, M401_H-0),
-                                         outs = ('raffinate', 'extract'),
-                                         N_stages = 15, partition_data = Kds,) 
+                                         outs = ('extract', 'raffinate'),
+                                         N_stages = max_N_stages, 
+                                          partition_data = Kds,
+                                         ) 
                               
                               
     S404.vol_frac = 0.05
@@ -444,16 +453,26 @@ def create_HP_sys(ins, outs):
     
     tolerable_loss_fraction = 0.001
     
+    # @S404.add_specification(run=False)
+    def S404_spec_hexanol():
+        feed_hexanol, solvent_recycle = M401.ins
+        req_hexanol = S404.ins[0].imol['HP'] * 10.
+        feed_hexanol.imol['Hexanol'] = max(0, req_hexanol - solvent_recycle.imol['Hexanol'])
+        M401._run()
+        M401_H._run()
+        S404._run()
+        
     @S404.add_specification(run=False)
     def adjust_S404_streams():
-        S404.N_stages = 15 # reset
+        S404.N_stages = max_N_stages # reset
         S404._setup() # reset
         feed_hexanol, solvent_recycle = M401.ins
         process_stream = S404.ins[0]
         process_stream_F_mol = process_stream.F_mol
         existing_hexanol = solvent_recycle.imol['Hexanol'] + process_stream.imol['Hexanol']
     
-        K_raffinate = S404.partition_data['K'][0]
+        # K_raffinate = S404.partition_data['K'][0]
+        K_raffinate = 1./S404.partition_data['K'][0]
     
         HP_recovery = 1-tolerable_loss_fraction
         reqd_hexanol =  HP_recovery * K_raffinate * process_stream_F_mol
@@ -468,12 +487,14 @@ def create_HP_sys(ins, outs):
         S404_run()
         
         if existing_hexanol > reqd_hexanol:
-            feed_hexanol.imol['Hexanol'] = S404.outs[0].imol['Hexanol']
+            # feed_hexanol.imol['Hexanol'] = S404.outs[0].imol['Hexanol']
+            feed_hexanol.imol['Hexanol'] = S404.outs[1].imol['Hexanol']
             
         
     def update_Ks(lle_unit, solute_indices = (0,), carrier_indices = (1,), solvent_indices = (2,)):
         IDs = lle_unit.partition_data['IDs']
-        Ks = lle_unit.partition_data['K']
+        # Ks = lle_unit.partition_data['K']
+        Ks = 1./lle_unit.partition_data['K']
         solute_chemicals = tuple([IDs[index] for index in solute_indices])
         carrier_chemicals = tuple([IDs[index] for index in carrier_indices])
         solvent_chemicals = tuple([IDs[index] for index in solvent_indices])
@@ -488,7 +509,7 @@ def create_HP_sys(ins, outs):
         test_stream.imol[solvent_chemicals] = solvent_stream.imol[solvent_chemicals]
         test_stream.lle(T=process_stream.T, top_chemical = 'Hexanol')
         # test_stream.show()
-        Ks_new = (test_stream['L'].imol[IDs]/test_stream['L'].F_mol)/(test_stream['l'].imol[IDs]/test_stream['l'].F_mol)
+        Ks_new = (test_stream['l'].imol[IDs]/test_stream['l'].F_mol)/(test_stream['L'].imol[IDs]/test_stream['L'].F_mol)
         
         return Ks_new
     
@@ -503,7 +524,7 @@ def create_HP_sys(ins, outs):
             # pdb.set_trace()
             S404.N_stages-=1
             if S404.N_stages == 0:
-                S404.N_stages = 15 # reset
+                S404.N_stages = max_N_stages # reset
                 S404._setup() # reset
                 raise InfeasibleRegion('number of stages in %s'%(S404.ID))   
             else:
@@ -520,18 +541,25 @@ def create_HP_sys(ins, outs):
                 
     # S404.specification = adjust_S404_streams
     
+    S404_spec = S404.specifications[0]
+    globals().update({'S404_spec': S404_spec})
+    
     ideal_thermo = S404.thermo.ideal()
     
-    D401 = bst.units.BinaryDistillation('D401', ins=S404-1, outs=('D401_g', 'D401_l'),
+    D401 = bst.units.BinaryDistillation('D401', ins=S404-0, outs=('D401_g', 'D401_l'),
                                         LHK=('Hexanol', 'HP'),
                                         is_divided=True,
                                         product_specification_format='Recovery',
                                         Lr=0.999, Hr=0.999, k=1.05, P = 101325./20.,
                                         vessel_material = 'Stainless steel 316',
                                         partial_condenser = False,
-                                        condenser_thermo = ideal_thermo,
-                                        boiler_thermo = ideal_thermo,
+                                        # condenser_thermo = ideal_thermo,
+                                        # boiler_thermo = ideal_thermo,
                                         thermo=ideal_thermo)
+    
+    @D401.add_specification(run=True)
+    def D401_spec():
+        D401.ins[0].phase = 'l'
     # D401_H = bst.units.HXutility('D401_H', ins=D401-0, V=0., rigorous=True)
     D401_H_P = units.HPPump('D401_H_P', ins=D401-0, P = 101325)
     D401_H_P-0-1-M401
@@ -626,6 +654,10 @@ def create_HP_sys(ins, outs):
                                           R402, R402_H, D402, D402_P, D403, D403_H, D403_P))
     process_groups.append(separation_group)
     
+
+    #%%# !!!
+    
+    
     # %% 
     
     # =============================================================================
@@ -646,113 +678,34 @@ def create_HP_sys(ins, outs):
     # =============================================================================
     
     # Mix waste liquids for treatment
-    M501 = bst.units.Mixer('M501', ins=(F301_P-0, D402_dP-0, F401-1, S404-0)) # without sugars recycle
+    M501 = bst.units.Mixer('M501', ins=(F301_P-0, D402_dP-0, F401-1, S404-1,
+                                        H201-0,
+                                        ))
     
-    # This represents the total cost of wastewater treatment system
-    WWT_cost = units.WastewaterSystemCost('WWT_cost', ins=M501-0)
+    wastewater_treatment_sys = bst.create_wastewater_treatment_system(
+        kind='conventional',
+        ins=M501-0,
+        mockup=True,
+        area=500,
+    )
     
-    # R501 = units.AnaerobicDigestion('R501', ins=WWT_cost-0,
-    #                                 outs=('biogas', 'anaerobic_treated_water', 
-    #                                       'anaerobic_sludge'),
-    #                                 reactants=soluble_organics + ['Glycerol', 'HP', 'Hexanol', 'AcrylicAcid'],
-    #                                 split=find_split(splits_df.index,
-    #                                                  splits_df['stream_611'],
-    #                                                  splits_df['stream_612'],
-    #                                                  chemical_groups),
-    #                                 T=35+273.15)
-    
-    R501 = bst.AnaerobicDigestion('R501', ins=WWT_cost-0,
-                                    outs=('biogas', 'anaerobic_treated_water', 
-                                          'anaerobic_sludge'),
-                                    # reactants=soluble_organics,
-                                    sludge_split=find_split(splits_df.index,
-                                                     splits_df['stream_611'],
-                                                     splits_df['stream_612'],
-                                                     chemical_groups),
-                                    # T=35+273.15,
-                                    )
-    
-    # fix_split(R501.isplit, 'Glucose')
-    
-    # In TRY analysis, we aren't looking at the implications of varying yield of byproducts on 
-    # sugars, but solely that of 3-HP. 
-    # The extremes of this assumption doesn not significantly affect results.
-    R501.byproducts_combustion_rxns = ParallelRxn([
-        Rxn('AceticAcid -> 3 CO2 + H2O + O2', 'AceticAcid', 1.-1e-6, correct_atomic_balance=True),
-        Rxn('Glycerol -> 3 CO2 + H2O + O2', 'Glycerol', 1.-1e-6, correct_atomic_balance=True)])
-    for i in R501.byproducts_combustion_rxns:
-        i.istoichiometry['O2'] = 0.
-    def R501_specification():
-        R501.byproducts_combustion_rxns(R501.ins[0])
-        R501._run()
-    # R501.specification = R501_specification # Comment this out for anything other than TRY analysis
-    
-    get_flow_tpd = lambda: (feedstock.F_mass-feedstock.imass['H2O'])*24/907.185
-    
-    # Mix recycled stream and wastewater after R501
-    M502 = bst.units.Mixer('M502', ins=(R501-1, ''))
-    # R502 = units.AerobicDigestion('R502', ins=(M502-0, air_lagoon, aerobic_caustic),
-    #                               outs=('aerobic_vent', 'aerobic_treated_water'),
-    #                               reactants=soluble_organics + ['Glycerol', 'HP', 'Hexanol', 'AcrylicAcid'],
-    #                               ratio=get_flow_tpd()/2205)
-    
-    R502 = bst.AerobicDigestion('R502', ins=(M502-0, 
-                                                air_lagoon, aerobic_caustic,
-                                               ),
-                                  outs=('aerobic_vent', 'aerobic_treated_water', 
-                                        # 'sludge',
-                                        ),
-                                  )
-    
-    # Membrane bioreactor to split treated wastewater from R502
-    S501 = bst.units.Splitter('S501', ins=R502-1, outs=('membrane_treated_water', 
-                                                        'membrane_sludge'),
-                              split=find_split(splits_df.index,
-                                               splits_df['stream_624'],
-                                               splits_df['stream_625'],
-                                               chemical_groups))
-    
-    S501.line = 'Membrane bioreactor'
-    fix_split(S501.isplit, 'Glucose')
-    # Recycled sludge stream of memberane bioreactor, the majority of it (96%)
-    # goes to aerobic digestion and the rest to sludge holding tank then to BT
-    S502 = bst.units.Splitter('S502', ins=S501-1, outs=('to_aerobic_digestion', 
-                                                        'to_boiler_turbogenerator'),
-                              split=0.96)
-    
-    M503 = bst.units.Mixer('M503', ins=(S502-0, 'centrate'), outs=1-M502)
-    
-    # Mix anaerobic and 4% of membrane bioreactor sludge
-    M504 = bst.units.Mixer('M504', ins=(R501-2, S502-1))
-    
-    # Sludge centrifuge to separate water (centrate) from sludge
-    S503 = bst.units.Splitter('S503', ins=M504-0, outs=(1-M503, 'sludge'),
-                              split=find_split(splits_df.index,
-                                               splits_df['stream_616'],
-                                               splits_df['stream_623'],
-                                               chemical_groups))
-    fix_split(S503.isplit, 'Glucose')
-    S503.line = 'Sludge centrifuge'
-    
-    # Reverse osmosis to treat membrane separated water
-    S504 = bst.units.Splitter('S504', ins=S501-0, outs=('discharged_water', 'waste_brine'),
-                              split=find_split(splits_df.index,
-                                               splits_df['stream_626'],
-                                               splits_df['stream_627'],
-                                               chemical_groups))
-    S504.line = 'Reverse osmosis'
-    
-    # Mix solid wastes to boiler turbogeneration
-    
-    # Mention results with and without S401-0 in manuscript
-    M505 = bst.units.Mixer('M505', ins=(S503-1, S301-0, S401-0), 
+    # Mix solid wastes to boiler turbogenerator
+    M510 = bst.units.Mixer('M510', ins=(
+                                    # S503-1,
+                                    S301-0, S401-0),
                             outs='wastes_to_boiler_turbogenerator')
     
+    MX = bst.Mixer(900, ['', ''])
+    
+    M503 = u.M503
+    @M503.add_specification(run=False)
+    def M503_spec():
+        for i in M503.ins: i.phase='l'
+        M503._run()
+        for j in M503.outs: j.phase='l'
     
     WWT_group = UnitGroup('WWT_group', 
-                                   units=(M501, WWT_cost,R501, M502, R502,
-                                          S501, S502, M503, M504, S503, S504,
-                                          M505,))
+                                   units=wastewater_treatment_sys.units)
     process_groups.append(WWT_group)
     
     # %% 
@@ -807,6 +760,12 @@ def create_HP_sys(ins, outs):
     fire_water_in = Stream('fire_water_in', 
                            Water=8021*get_flow_tpd()/2205, units='kg/hr')
     
+    
+    #%% new
+    imbibition_water = Stream('imbibition_water', price=price['Makeup water'])
+    rvf_wash_water = Stream('rvf_wash_water', price=price['Makeup water'])
+    
+    #%%
     # =============================================================================
     # Facilities units
     # =============================================================================
@@ -842,90 +801,64 @@ def create_HP_sys(ins, outs):
     T607 = bst.units.StorageTank('T607', ins = hexanol_fresh, outs = separation_hexanol)
     T607.line = 'Hexanol storage tank'
 
-    CIP = bst.CIPpackage('CIP')
+
+    ############################
     
-    # ADP = facilities.ADP('ADP902', ins=plant_air_in, outs='plant_air_out',
-    #                      ratio=get_flow_dry_tpd()/2205)
+    create_facilities(
+        solids_to_boiler=M510-0,
+        gas_to_boiler=wastewater_treatment_sys-0,
+        process_water_streams=[
+         imbibition_water,
+         rvf_wash_water,
+         dilution_water,
+         system_makeup_water,
+         # s.fire_water,
+         # s.boiler_makeup_water,
+         # s.CIP,
+         # s.recirculated_chilled_water,
+         # s.s.3,
+         # s.cooling_tower_makeup_water,
+         # s.cooling_tower_chemicals,
+         ],
+        feedstock=feedstock,
+        RO_water=wastewater_treatment_sys-2,
+        recycle_process_water=MX-0,
+        BT_area=700,
+        area=900,
+    )
     
+    # CWP803 = bst.ChilledWaterPackage('CWP803', agent=bst.HeatUtility.cooling_agents[-2])
     
-    ADP = bst.AirDistributionPackage('ADP')
-    # FWT = units.FireWaterTank('FWT903', ins=fire_water_in, outs='fire_water_out')
+    BT = u.BT701
+    BT.natural_gas_price = price['Natural gas']
+    BT.ins[4].price = price['Lime']
     
-    FWT = bst.FireWaterTank('FWT')
+    HXN = bst.HeatExchangerNetwork('HXN1001',
+                                                ignored=
+                                                [
+                                                 # D401,
+                                                 # D403,
+                                                 ],
+                                              cache_network=False,
+                                              )
     
-    # CWP = facilities.CWP('CWP802', ins='return_chilled_water',
-    #                      outs='process_chilled_water')
-    
-    CWP = bst.ChilledWaterPackage('CWP')
-    # M505-0 is the liquid/solid mixture, R501-0 is the biogas, blowdown is discharged
-    # BT = facilities.BT('BT', ins=(M505-0, R501-0, 
-    #                                           FGD_lime, boiler_chems,
-    #                                           baghouse_bag, natural_gas,
-    #                                           'BT_makeup_water'),
-    #                                 B_eff=0.8, TG_eff=0.85,
-    #                                 combustibles=combustibles,
-    #                                 side_streams_to_heat=(water_M201, water_M202, steam_M203),
-    #                                 outs=('gas_emission', ash, 'boiler_blowdown_water'))
-    
-    BT = bst.facilities.BoilerTurbogenerator('BT',
-                                                      ins=(M505-0,
-                                                          R501-0, 
-                                                          'boiler_makeup_water',
-                                                          'natural_gas',
-                                                          'lime',
-                                                          'boilerchems'), 
-                                                      outs=('gas_emission', 'boiler_blowdown_water', ash,),
-                                                      turbogenerator_efficiency=0.85)
-    
-    # BT = bst.BDunits.BoilerTurbogenerator('BT',
-    #                                    ins=(M505-0, R501-0, 'boiler_makeup_water', 'natural_gas', FGD_lime, boiler_chems),
-    #                                    boiler_efficiency=0.80,
-    #                                    turbogenerator_efficiency=0.85)
-    
-    # Blowdown is discharged
-    
-    
-    CT = bst.facilities.CoolingTower('CT')
-    
-    # CT = facilities.CT('CT801', ins=('return_cooling_water', cooling_tower_chems,
-    #                               'CT_makeup_water'),
-    #                    outs=('process_cooling_water', 'cooling_tower_blowdown'))
-    
-    # All water used in the system, here only consider water usage,
-    # if heating needed, then heeating duty required is considered in BT
-    
-    # AWM = AutoWasteManagement('AWM905', wastewater_mixer=M501, boiler_solids_mixer=M505,
-    #                           to_wastewater_mixer_ID_key='to_WWT',
-    #                           to_boiler_solids_mixer_ID_key='to_boiler')
-    
-    process_water_streams = (enzyme_water,
-                             aerobic_caustic, 
-                             CIP.ins[-1], BT.ins[-1], CT.ins[-1])
-    
-    # PWC = facilities.PWC('PWC904', ins=(system_makeup_water, S504-0),
-    #                      process_water_streams=process_water_streams,
-    #                      recycled_blowdown_streams=None,
-    #                      outs=('process_water', 'discharged_water'))
-    
-    PWC = bst.ProcessWaterCenter('PWC')
-    
-    # Heat exchange network
-    HXN = bst.facilities.HeatExchangerNetwork('HXN', 
-                                              ignored=[D401, D403])
     def HXN_no_run_cost():
         HXN.heat_utilities = []
         HXN._installed_cost = 0.
     
-    # To simulate without HXN, uncomment the following 3 lines:
-    HXN._cost = HXN_no_run_cost
-    HXN.energy_balance_percent_error = 0.
-    HXN.new_HXs = HXN.new_HX_utils = []
+    # # To simulate without HXN, simply uncomment the following 3 lines:
+    # HXN._cost = HXN_no_run_cost
+    # HXN.energy_balance_percent_error = 0.
+    # HXN.new_HXs = HXN.new_HX_utils = []
     
     HXN_group = UnitGroup('HXN_group', 
                                    units=(HXN,))
     process_groups.append(HXN_group)
     
-
+    BT = u.BT701
+    CT = u.CT901
+    # except: breakpoint()
+    
     BT_group = UnitGroup('BT_group',
                                    units=(BT,))
     process_groups.append(BT_group)
@@ -936,10 +869,15 @@ def create_HP_sys(ins, outs):
     
     facilities_no_hu_group = UnitGroup('facilities_no_hu_group',
                                    units=(T601, T602, T603, T604, T605, 
-                                          T606, T606_P, T607, PWC, ADP, CIP))
+                                          T606, T606_P, T607, u.CIP901,
+                                          # u.ADP902, 
+                                          # u.FWT903, 
+                                          # u.PWC904,
+                                          ))
     process_groups.append(facilities_no_hu_group)
 
     globals().update({'process_groups': process_groups})
+    
 # %% System setup
 
 HP_sys = create_HP_sys()
@@ -991,24 +929,46 @@ HP_tea = CellulosicEthanolTEA(system=HP_sys, IRR=0.10, duration=(2016, 2046),
         # biosteam Splitters and Mixers have no cost, 
         # cost of all wastewater treatment units are included in WWT_cost,
         # BT is not included in this TEA
-        OSBL_units=(u.U101, u.WWT_cost,
-                    u.T601, u.T602, u.T603, u.T606, u.T606_P,
-                    u.CWP, u.CT, u.PWC, u.CIP, u.ADP, u.FWT, u.BT),
+        OSBL_units=(u.U101, 
+                    # u.WWT_cost,
+                    u.BT701, u.CT901, u.CWP901,  u.CIP901, u.ADP901, u.FWT901, u.PWC901,
+                    ),
         warehouse=0.04, site_development=0.09, additional_piping=0.045,
         proratable_costs=0.10, field_expenses=0.10, construction=0.20,
         contingency=0.10, other_indirect_costs=0.10, 
         labor_cost=3212962*get_flow_tpd()/2205,
         labor_burden=0.90, property_insurance=0.007, maintenance=0.03,
-        steam_power_depreciation='MACRS20', boiler_turbogenerator=u.BT)
+        steam_power_depreciation='MACRS20', boiler_turbogenerator=u.BT701)
+
 
 HP_no_BT_tea = HP_tea
 # %% 
 # =============================================================================
 # Simulate system and get results
 # =============================================================================
+BT = u.BT701
+CT = u.CT901
+CWP = u.CWP901
+HXN = u.HXN1001
+
 
 num_sims = 3
 num_solve_tea = 3
+
+try:
+    HP_sys.simulate()
+except:
+    try:
+        S404.add_specification(S404_spec)
+        S404.specifications[0]()
+        S404.simulate()
+        HP_sys.simulate()
+    except:
+        S404.add_specification(S404_spec)
+        S404.specifications[0]()
+        S404.simulate()
+        HP_sys.simulate()
+
 def get_AA_MPSP():
     for i in range(num_sims):
         HP_sys.simulate()
@@ -1016,8 +976,15 @@ def get_AA_MPSP():
         AA.price = HP_tea.solve_price(AA)
     return AA.price
 
-# get_AA_MPSP()
-
+# try:
+#     get_AA_MPSP()
+# except:
+#     # S404.add_specification(S404_spec)
+#     # S404.specifications[0]()
+#     # S404.simulate()
+#     # get_AA_MPSP()
+#     pass
+# a_1
 seed_train_system = bst.System('seed_train_system', path=(u.S302, u.R303, u.T301))
 
 # yearly_production = 125000 # ton/yr; baseline
@@ -1038,7 +1005,7 @@ spec = ProcessSpecification(
     feedstock = feedstock,
     dehydration_reactor = u.R401,
     byproduct_streams = [],
-    HXN = u.HXN,
+    HXN = HXN,
     maximum_inhibitor_concentration = 1.,
     # pre_conversion_units = process_groups_dict['feedstock_group'].units + process_groups_dict['pretreatment_group'].units + [u.H301], # if the line below does not work (depends on BioSTEAM version)
     pre_conversion_units = HP_sys.split(u.F301.ins[0])[0],
