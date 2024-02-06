@@ -204,6 +204,7 @@ def YRCP2023():
     Biorefinery.default_dry_biomass_yield_distribution = shape.Uniform(
         0.19 * Biorefinery.baseline_dry_biomass_yield, Biorefinery.baseline_dry_biomass_yield
     )
+    Biorefinery.default_update_feedstock_price = False
     Biorefinery._derivative_disabled = True
 
 class Biorefinery:
@@ -219,6 +220,7 @@ class Biorefinery:
     default_oil_content_range = [5, 15]
     default_income_tax_range = [21, 28] # Davis et al. 2018; https://www.nrel.gov/docs/fy19osti/71949.pdf
     default_baseline_oil_content = 10
+    default_update_feedstock_price = True
     baseline_moisture_content = 0.70
     baseline_feedstock_CF = GWP_characterization_factors['sugarcane'] # [kg CO2e / kg sugarcane] with transportation
     baseline_feedstock_price = 0.035 # [USD / kg sugarcane] with transportation
@@ -340,7 +342,7 @@ class Biorefinery:
             update_feedstock_price=None,
             simulate=True,
         ):
-        if update_feedstock_price is None: update_feedstock_price = True
+        if update_feedstock_price is None: cls.default_update_feedstock_price = True
         if year is None: year = cls.default_year
         if conversion_performance_distribution is None: 
             conversion_performance_distribution = cls.default_conversion_performance_distribution
@@ -364,6 +366,9 @@ class Biorefinery:
             return cache[key]
         else:
             self = super().__new__(cls)
+        
+        ## Add BioSTEAM objects to module for easy access
+        self.price_distribution_module = dist = get_price_distributions_module(year)
         self.configuration = configuration
         flowsheet_name = format_configuration(configuration, latex=False)
         flowsheet = bst.Flowsheet(flowsheet_name)
@@ -600,6 +605,11 @@ class Biorefinery:
                 microbial_oil_centrifuge, juice, screw_press, fermentor,
             )
         
+        bst.settings.register_credit('Biodiesel RIN D4', dist.mean_RIN_D4_price * 1.5 * biodiesel_L_per_kg)
+        bst.settings.register_credit('Biodiesel RIN D3', dist.mean_RIN_D3_price * 1.5 * biodiesel_L_per_kg)
+        bst.settings.register_credit('Ethanol RIN D5', dist.mean_RIN_D5_price * ethanol_L_per_kg)
+        bst.settings.register_credit('Ethanol RIN D3', dist.mean_RIN_D3_price * ethanol_L_per_kg)
+        
         ## Account for cellulosic vs advanced RINs
         if number in cellulosic_ethanol_configurations:
             # Note that GREET cellulosic ethanol from corn stover results in a 
@@ -625,14 +635,15 @@ class Biorefinery:
                 )
                 RIN_splitter.split[:] = juice_sugar / (juice_sugar + hydrolysate_sugar)
             
+            RIN_splitter.define_credit('Ethanol RIN D5', RIN_splitter.outs[0])
+            RIN_splitter.define_credit('Ethanol RIN D3', RIN_splitter.outs[1])
             cane_sys.update_configuration([*cane_sys.units, RIN_splitter])
             assert RIN_splitter in cane_sys.units
         elif number in conventional_ethanol_configurations:
             s.ethanol.ID = 'advanced_ethanol'
             s.advanced_ethanol.register_alias('ethanol')
-        elif number in conventional_ethanol_configurations:
-            s.ethanol.ID = 'advanced_ethanol'
-            s.advanced_ethanol.register_alias('ethanol')
+            source = s.ethanol.source
+            source.define_credit('Ethanol RIN D5', s.ethanol)
         if number in biodiesel_configurations:
             if (number not in cellulosic_ethanol_configurations
                 and number in cellulosic_configurations):
@@ -659,11 +670,15 @@ class Biorefinery:
                     )
                     RIN_splitter.split[:] = juice_sugar / (juice_sugar + hydrolysate_sugar)
                 
+                RIN_splitter.define_credit('Biodiesel RIN D4', RIN_splitter.outs[0])
+                RIN_splitter.define_credit('Biodiesel RIN D3', RIN_splitter.outs[1])
                 cane_sys.update_configuration([*cane_sys.units, RIN_splitter])
                 assert RIN_splitter in cane_sys.units
             else:
                 # A biodiesel stream should already exist
                 s.biodiesel.register_alias('biomass_based_diesel')
+                source = s.biodiesel.source
+                source.define_credit('Biodiesel RIN D4', s.biodiesel)
         
         ## Additional modifications for speed
         for i in sys.units:
@@ -726,9 +741,6 @@ class Biorefinery:
         bst.PowerUtility.set_CF(GWP, GWP_characterization_factors['Electricity'])
         self.natural_gas_streams = natural_gas_streams = [natural_gas]
         for stream in natural_gas_streams: set_GWPCF(stream, 'CH4')
-        
-        ## Add BioSTEAM objects to module for easy access
-        self.price_distribution_module = dist = get_price_distributions_module(year)
         
         ## Model
         model = bst.Model(sys, exception_hook='raise', retry_evaluation=False)
@@ -833,30 +845,41 @@ class Biorefinery:
         def set_baseline_feedstock_price(price):
             self.baseline_feedstock_price = price
         
+        # USDA ERS historical price data without EPA RIN prices
+        @parameter(distribution=dist.ethanol_no_RIN_price_distribution, element='Ethanol', 
+                   baseline=dist.mean_ethanol_no_RIN_price, units='USD/L')
+        def set_ethanol_price(price): # Triangular distribution fitted over the past 10 years Sep 2009 to Nov 2020
+            advanced_ethanol.price = cellulosic_ethanol.price = price * ethanol_L_per_kg
+        
+        # USDA ERS historical price data without EPA RIN prices
+        @parameter(distribution=dist.biodiesel_no_RIN_price_distribution,
+                   baseline=dist.mean_biodiesel_no_RIN_price,
+                   element='Biodiesel', units='USD/L')
+        def set_biodiesel_price(price): # Triangular distribution fitted over the past 10 years Sep 2009 to March 2021
+            cellulosic_based_diesel.price = biomass_based_diesel.price = price * biodiesel_L_per_kg
+        
+        # USDA ERS historical price data without EPA RIN prices
+        @parameter(distribution=dist.RIN_D3_price_distribution, element='RIN D3', 
+                   baseline=dist.mean_RIN_D3_price, units='USD/RIN')
+        def set_RIN_D3_price(price): # Triangular distribution fitted over the past 10 years Sep 2009 to Nov 2020
+            bst.settings.register_credit('Ethanol RIN D3', price * ethanol_L_per_kg)    
+            bst.settings.register_credit('Biodiesel RIN D3', price * 1.5 * biodiesel_L_per_kg)
+            
+        @parameter(distribution=dist.RIN_D4_price_distribution, element='RIN D4', 
+                   baseline=dist.mean_RIN_D4_price, units='USD/RIN')
+        def set_RIN_D4_price(price): # Triangular distribution fitted over the past 10 years Sep 2009 to Nov 2020
+            bst.settings.register_credit('Biodiesel RIN D4', price * 1.5 * biodiesel_L_per_kg)
+            
+        # USDA ERS historical price data
+        @parameter(distribution=dist.RIN_D5_price_distribution, 
+                   element='RIN D5', units='USD/RIN',
+                   baseline=dist.mean_RIN_D5_price)
+        def set_RIN_D5_price(price): # Triangular distribution fitted over the past 10 years Sep 2009 to March 2021
+            bst.settings.register_credit('Ethanol RIN D5', price * ethanol_L_per_kg)
+        
         if prices_correleted_to_crude_oil:
             predict = lambda name, scalar: dist.models[name].predict(np.array([[scalar]]))[0]
-                                                                     
-            @parameter(distribution=dist.residual_distributions['Cellulosic ethanol'],
-                       element='Cellulosic ethanol', baseline=0., units='USD/L')
-            def set_cellulosic_ethanol_price(price): 
-                cellulosic_ethanol.price = predict('Cellulosic ethanol', self.crude_oil_price + price) * ethanol_L_per_kg
-                
-            @parameter(distribution=dist.residual_distributions['Advanced ethanol'],
-                       element='Advanced ethanol', baseline=0., units='USD/L')
-            def set_advanced_ethanol_price(price): 
-                advanced_ethanol.price =  predict('Advanced ethanol', self.crude_oil_price + price) * ethanol_L_per_kg
-                
-            # USDA ERS historical price data
-            @parameter(distribution=dist.residual_distributions['Biomass based diesel'], 
-                       element='Biomass based diesel', units='USD/L', baseline=0.)
-            def set_biomass_based_diesel_price(price):
-                biomass_based_diesel.price =  predict('Biomass based diesel', self.crude_oil_price + price) * biodiesel_L_per_kg
-        
-            @parameter(distribution=dist.residual_distributions['Cellulosic based diesel'],
-                       element='Cellulosic based diesel', units='USD/L', baseline=0.)
-            def set_cellulosic_based_diesel_price(price):
-                cellulosic_based_diesel.price =  predict('Cellulosic based diesel', self.crude_oil_price + price) * biodiesel_L_per_kg
-        
+                       
             # https://www.eia.gov/energyexplained/natural-gas/prices.php
             @parameter(distribution=dist.residual_distributions['Natural gas'],
                        element='Natural gas', units='USD/m3', baseline=0.)
@@ -869,26 +892,7 @@ class Biorefinery:
                 bst.PowerUtility.price = predict('Electricity', self.crude_oil_price + price)
                 
         else:
-            # USDA ERS historical price data with EPA RIN prices
-            @parameter(distribution=dist.cepd, element='Cellulosic ethanol', 
-                       baseline=dist.mcep, units='USD/L')
-            def set_cellulosic_ethanol_price(price): # Triangular distribution fitted over the past 10 years Sep 2009 to Nov 2020
-                cellulosic_ethanol.price = price * ethanol_L_per_kg
-                
-            @parameter(distribution=dist.aepd, element='Advanced ethanol', 
-                       baseline=dist.maep, units='USD/L')
-            def set_advanced_ethanol_price(price): # Triangular distribution fitted over the past 10 years Sep 2009 to Nov 2020
-                advanced_ethanol.price = price * ethanol_L_per_kg
-                
-            # USDA ERS historical price data
-            @parameter(distribution=dist.bpd, element='Biomass based diesel', units='USD/L', baseline=dist.mbp)
-            def set_biomass_based_diesel_price(price): # Triangular distribution fitted over the past 10 years Sep 2009 to March 2021
-                biomass_based_diesel.price = price * biodiesel_L_per_kg
-        
-            @parameter(distribution=dist.cbpd, element='Cellulosic based diesel', units='USD/L', baseline=dist.mcbp)
-            def set_cellulosic_based_diesel_price(price): # Triangular distribution fitted over the past 10 years Sep 2009 to March 2021
-                cellulosic_based_diesel.price = price * biodiesel_L_per_kg
-        
+            
             # https://www.eia.gov/energyexplained/natural-gas/prices.php
             @parameter(distribution=dist.natural_gas_price_distribution, element='Natural gas', units='USD/m3',
                        baseline=4.73 * 35.3146667/1e3)
@@ -1598,10 +1602,11 @@ class Biorefinery:
         set_baseline(set_juicing_oil_recovery, 60)
         set_baseline(set_microbial_oil_recovery)
         set_baseline(set_crude_oil_price) 
-        set_baseline(set_advanced_ethanol_price) 
-        set_baseline(set_cellulosic_ethanol_price) 
-        set_baseline(set_biomass_based_diesel_price)
-        set_baseline(set_cellulosic_based_diesel_price)
+        set_baseline(set_ethanol_price) 
+        set_baseline(set_biodiesel_price)
+        set_baseline(set_RIN_D3_price) 
+        set_baseline(set_RIN_D4_price) 
+        set_baseline(set_RIN_D5_price) 
         set_baseline(set_crude_glycerol_price, dist.mean_glycerol_price)
         set_baseline(set_natural_gas_price)
         set_baseline(set_electricity_price)

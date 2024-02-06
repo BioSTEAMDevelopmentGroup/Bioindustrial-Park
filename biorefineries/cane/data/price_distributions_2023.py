@@ -179,9 +179,13 @@ def fit_gaussian_from_residuals(residuals):
     )
 
 # Price distributions
+RIN_D3_price_distribution = triangular_distribution(RIN_D3_prices)
+RIN_D4_price_distribution = triangular_distribution(RIN_D4_prices)
+RIN_D5_price_distribution = triangular_distribution(RIN_D5_prices)
 ethanol_no_RIN_price_distribution = triangular_distribution(ethanol_no_RIN_prices)
 advanced_ethanol_price_distribution = triangular_distribution(advanced_ethanol_prices)
 cellulosic_ethanol_price_distribution = triangular_distribution(cellulosic_ethanol_prices)
+biodiesel_no_RIN_price_distribution = triangular_distribution(biodiesel_no_RIN_prices)
 biomass_based_diesel_price_distribution = triangular_distribution(biomass_based_diesel_prices)
 cellulosic_based_diesel_price_distribution = triangular_distribution(cellulosic_based_diesel_prices)
 natural_gas_price_distribution = triangular_distribution(natural_gas_prices)
@@ -191,10 +195,12 @@ crude_oil_price_distribution = triangular_distribution(crude_oil_prices)
 # Mean values
 mean_glycerol_price = (0.10 + 0.22) * 0.5 
 mean_RIN_D3_price = np.mean(RIN_D3_prices)
+mean_RIN_D4_price = np.mean(RIN_D4_prices)
 mean_RIN_D5_price = np.mean(RIN_D5_prices)
 mean_ethanol_no_RIN_price = np.mean(ethanol_no_RIN_prices)
 mean_cellulosic_ethanol_price = np.mean(cellulosic_ethanol_prices)
 mean_advanced_ethanol_price = np.mean(advanced_ethanol_prices)
+mean_biodiesel_no_RIN_price = np.mean(biodiesel_no_RIN_prices)
 mean_biomass_based_diesel_price = np.mean(biomass_based_diesel_prices)
 mean_cellulosic_based_diesel_price = np.mean(cellulosic_based_diesel_prices)
 mean_natural_gas_price = np.mean(natural_gas_prices)
@@ -218,6 +224,8 @@ copd = crude_oil_price_distribution
 predictor = crude_oil_prices[:, np.newaxis]
 prices = {
     'Natural gas': natural_gas_prices,
+    'Ethanol': ethanol_no_RIN_prices,
+    'Biodiesel': biodiesel_no_RIN_prices,
     'Biomass based diesel': biomass_based_diesel_prices,
     'Cellulosic based diesel': cellulosic_based_diesel_prices,
     'Advanced ethanol': advanced_ethanol_prices,
