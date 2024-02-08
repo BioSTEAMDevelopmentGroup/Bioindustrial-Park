@@ -249,9 +249,8 @@ def create_system(flowsheet=None, biorefinery_settings=None):
         'T608', 
         (MX5-0, 'makeup_water'), 
         ('process_water', 'wastewater'),
-        None,
-        (),
-        (recycled_process_water,)
+        makeup_water_streams=(),
+        process_water_streams=(recycled_process_water,)
     )
     other_facilities = units.PlantAir_CIP_WasteWater_Facilities('other_facilities', feedstock)
     # HXN = bst.HeatExchangerNetwork('HXN', 

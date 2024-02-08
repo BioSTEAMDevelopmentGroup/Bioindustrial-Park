@@ -46,7 +46,9 @@ def get_more_unit_groups(system,
                                         'electricity consumption',
                                         'heating duty',
                                         'excess electricity',
-                                        ]
+                                        ],
+                         wastewater_areas=[500,],
+                         storage_and_other_facilities_areas=[600,900],
                          ):
     unit_groups_temp = UnitGroup.group_by_area(system.units)
     u = system.flowsheet.unit
@@ -59,14 +61,14 @@ def get_more_unit_groups(system,
     unit_groups_ = []
     
     if 'wastewater' in groups_to_get:
-        wastewater_group = [i for i in unit_groups_temp if has_area_unit(i.units, 500)][0]
+        wastewater_group = [i for i in unit_groups_temp if has_area_unit(i.units, wastewater_areas[0])][0]
         wastewater_group.name = 'wastewater'
         unit_groups_.append(wastewater_group)
         
     if 'storage & other facilities' in groups_to_get:
         storage_group = UnitGroup('storage & other facilities',
-        units=[i for i in unit_groups_temp if has_area_unit(i.units, 600)][0].units+\
-            [i for i in unit_groups_temp if has_area_unit(i.units, 900)][0].units,
+        units=[i for i in unit_groups_temp if has_area_unit(i.units, storage_and_other_facilities_areas[0])][0].units+\
+            [i for i in unit_groups_temp if has_area_unit(i.units, storage_and_other_facilities_areas[1])][0].units,
             )
         # storage_group.name = 'storage & other facilities'
         unit_groups_.append(storage_group)

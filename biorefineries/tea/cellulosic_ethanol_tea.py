@@ -45,7 +45,7 @@ class CellulosicEthanolTEA(TEA):
                  'maintenance', '_ISBL_DPI_cached', '_FCI_cached',
                  '_utility_cost_cached', '_steam_power_depreciation',
                  '_steam_power_depreciation_array',
-                 'boiler_turbogenerator')
+                 'boiler_turbogenerator', '_DPI_cached')
     
     def __init__(self, system, IRR, duration, depreciation, income_tax,
                  operating_days, lang_factor, construction_schedule,
@@ -132,20 +132,26 @@ class CellulosicEthanolTEA(TEA):
             self._ISBL_DPI_cached = installed_equipment_cost - self.OSBL_installed_equipment_cost
         return self._ISBL_DPI_cached
         
-    def _DPI(self, installed_equipment_cost):
+    def _DPI(self, installed_equipment_cost): # Direct Permanent Investment
         factors = self.warehouse + self.site_development + self.additional_piping
-        return installed_equipment_cost + self._ISBL_DPI(installed_equipment_cost) * factors
+        self._DPI_cached = DPI = installed_equipment_cost + self._ISBL_DPI(installed_equipment_cost) * factors
+        return DPI
     
-    def _indirect_costs(self, TDC):
-        return TDC*(self.proratable_costs + self.field_expenses
-                    + self.construction + self.contingency
-                    + self.other_indirect_costs)
+    def _TDC(self, DPI): # Total Depreciable Capital
+        return DPI + self._depreciable_indirect_costs(DPI)
     
-    def _FCI(self, TDC):
-        self._FCI_cached = FCI = TDC + self._indirect_costs(TDC)
+    def _nondepreciable_indirect_costs(self, DPI):
+        return DPI * self.other_indirect_costs
+    
+    def _depreciable_indirect_costs(self, DPI):
+        return DPI * (self.proratable_costs + self.field_expenses
+                      + self.construction + self.contingency)
+    
+    def _FCI(self, TDC): # Fixed Capital Investment
+        self._FCI_cached = FCI = TDC + self._nondepreciable_indirect_costs(self._DPI_cached)
         return FCI
     
-    def _FOC(self, FCI):
+    def _FOC(self, FCI): # Fixed Operating Costs
         return (FCI * self.property_insurance
                 + self._ISBL_DPI_cached * self.maintenance
                 + self.labor_cost * (1 + self.labor_burden))

@@ -108,6 +108,7 @@ class Biorefinery:
         self.Area800 = UnitGroup('Area 800', (u.CWP, u.CT, u.PWC, u.ADP, u.CIP))
         self.areas = (self.Area100, self.Area200, self.Area300, self.Area400,
                       self.Area500, self.Area600, self.Area700, self.Area800)
+        self.AllAreas = UnitGroup('All areas', sum([i.units for i in self.areas], []))
         WWTsys = sys.find_system(u.R602)
         WWTsys.set_tolerance(method='fixed-point', maxiter=1000, mol=10)
         self.__dict__.update(self.flowsheet.to_dict())

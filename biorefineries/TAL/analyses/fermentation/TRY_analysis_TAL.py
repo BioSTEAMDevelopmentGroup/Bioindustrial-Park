@@ -98,6 +98,8 @@ model.exception_hook = 'warn'
 print('\n\nSimulating baseline ...')
 baseline_initial = model.metrics_at_baseline()
 
+#%%
+# simulate_and_print()
 
 #%%  Metrics
 broth = R302.outs[1]
@@ -110,18 +112,18 @@ get_production = lambda: sum([product.imass[i] for i in product_chemical_IDs])
 
 get_product_recovery = lambda: sum([product.imass[i] for i in product_chemical_IDs])/sum([broth.imass[i] for i in product_chemical_IDs])
 get_TAL_AOC = lambda: TAL_tea.AOC / 1e6 # million USD / y
-get_TAL_FCI = lambda: TAL_tea.FCI / 1e6 # million USD
+get_TAL_TCI = lambda: TAL_tea.TCI / 1e6 # million USD
 
 get_TAL_sugars_conc = lambda: sum(R302.outs[0].imass['Glucose', 'Xylose'])/R302.outs[0].F_vol
 
 get_TAL_inhibitors_conc = lambda: 1000*sum(R302.outs[0].imass['AceticAcid', 'Furfural', 'HMF'])/R302.outs[0].F_vol
 
 TAL_metrics = [get_product_MPSP, 
-                # lambda: TAL_lca.GWP,
-                lambda: TAL_lca.GWP - TAL_lca.net_electricity_GWP, 
-                # lambda: TAL_lca.FEC, 
-                lambda: TAL_lca.FEC - TAL_lca.net_electricity_FEC,
-               get_TAL_AOC, get_TAL_FCI, 
+                lambda: TAL_lca.GWP,
+                # lambda: TAL_lca.GWP - TAL_lca.net_electricity_GWP, 
+                lambda: TAL_lca.FEC, 
+                # lambda: TAL_lca.FEC - TAL_lca.net_electricity_FEC,
+               get_TAL_AOC, get_TAL_TCI, 
                get_product_purity]
 
 # %% Generate 3-specification meshgrid and set specification loading functions
@@ -133,7 +135,7 @@ spec_1 = yields = np.linspace(0.05, 0.95, steps[0]) # yield
 spec_2 = titers = np.linspace(5., 
                               100., # although sugar concentration limit of 600 g/L would allow as high as 230 g-TAL/L, we set an upper limit of 100 g/L
                                    # based on achieved (50-68 g/L using E.coli, Candida) and targeted (100 g/L) titers for adipic acid, another organic solid with low water solubility
-                                   # Skoog et al., 2018 (https://doi.org/10.1016/j.biotechadv.2018.10.012)
+                                   # Skoog et al., 2018 ( https://doi.org/10.1016/j.biotechadv.2018.10.012 )
                                 steps[1]) # titer
 
 
@@ -173,8 +175,8 @@ FEC_units = r"$\mathrm{MJ}\cdot\mathrm{kg}^{-1}$"
 AOC_w_label = r"$\bfAOC$" # title of the color axis
 AOC_units = r"$\mathrm{MM\$}\cdot\mathrm{y}^{-1}$"
 
-FCI_w_label = r"$\bfFCI$" # title of the color axis
-FCI_units = r"$\mathrm{MM\$}$"
+TCI_w_label = r"$\bfTCI$" # title of the color axis
+TCI_units = r"$\mathrm{MM\$}$"
 
 Purity_w_label = r"$\bfPurity$" # title of the color axis
 Purity_units = "dry " + r"$\mathrm{\%}$"
@@ -361,7 +363,7 @@ for p in productivities:
     pd.DataFrame(d1_Metric2).to_csv(TAL_results_filepath+'GWP-'+file_to_save+'.csv')
     pd.DataFrame(d1_Metric3).to_csv(TAL_results_filepath+'FEC-'+file_to_save+'.csv')
     pd.DataFrame(d1_Metric4).to_csv(TAL_results_filepath+'AOC-'+file_to_save+'.csv')
-    pd.DataFrame(d1_Metric5).to_csv(TAL_results_filepath+'FCI-'+file_to_save+'.csv')
+    pd.DataFrame(d1_Metric5).to_csv(TAL_results_filepath+'TCI-'+file_to_save+'.csv')
     pd.DataFrame(d1_Metric6).to_csv(TAL_results_filepath+'Purity-'+file_to_save+'.csv')
     
 
@@ -741,15 +743,17 @@ contourplots.animated_contourplot(w_data_vs_x_y_at_multiple_z=results_metric_4, 
                                 text_boxes = {'>50.0': [(5,2), 'white']},
                                 )
 
-#%% FCI
+#%% TCI
 
-FCI_w_levels, FCI_w_ticks, FCI_cbar_ticks = get_contour_info_from_metric_data(results_metric_5,)
-# FCI_w_levels = np.arange(2, 8.1, 0.2)
-# FCI_cbar_ticks = np.arange(2, 8.1, 1.)
-FCI_w_ticks = [100, 150, 200, 300, 400,]
-# FCI_w_levels = np.arange(0., 15.5, 0.5)
+TCI_w_levels, TCI_w_ticks, TCI_cbar_ticks = get_contour_info_from_metric_data(results_metric_5,)
+# TCI_w_levels = np.arange(2, 8.1, 0.2)
+# TCI_cbar_ticks = np.arange(2, 8.1, 1.)
 
-contourplots.animated_contourplot(w_data_vs_x_y_at_multiple_z=results_metric_5, # shape = z * x * y # values of the metric you want to plot on the color axis; e.g., FCI
+# TCI_w_ticks = [150, 200, 300, 400,]
+
+# TCI_w_levels = np.arange(0., 15.5, 0.5)
+
+contourplots.animated_contourplot(w_data_vs_x_y_at_multiple_z=results_metric_5, # shape = z * x * y # values of the metric you want to plot on the color axis; e.g., TCI
                                 x_data=100*yields, # x axis values
                                 # x_data = yields/theoretical_max_g_TAL_acid_per_g_glucose,
                                 y_data=titers, # y axis values
@@ -757,26 +761,26 @@ contourplots.animated_contourplot(w_data_vs_x_y_at_multiple_z=results_metric_5, 
                                 x_label=x_label, # title of the x axis
                                 y_label=y_label, # title of the y axis
                                 z_label=z_label, # title of the z axis
-                                w_label=FCI_w_label, # title of the color axis
+                                w_label=TCI_w_label, # title of the color axis
                                 x_ticks=100*x_ticks,
                                 y_ticks=y_ticks,
                                 z_ticks=z_ticks,
-                                w_levels=FCI_w_levels, # levels for unlabeled, filled contour areas (labeled and ticked only on color bar)
-                                w_ticks=FCI_w_ticks, # labeled, lined contours; a subset of w_levels
+                                w_levels=TCI_w_levels, # levels for unlabeled, filled contour areas (labeled and ticked only on color bar)
+                                w_ticks=TCI_w_ticks, # labeled, lined contours; a subset of w_levels
                                 x_units=x_units,
                                 y_units=y_units,
                                 z_units=z_units,
-                                w_units=FCI_units,
+                                w_units=TCI_units,
                                 # fmt_clabel=lambda cvalue: r"$\mathrm{\$}$"+" {:.1f} ".format(cvalue)+r"$\cdot\mathrm{kg}^{-1}$", # format of contour labels
                                 fmt_clabel = lambda cvalue: get_rounded_str(cvalue, 3),
                                 cmap=CABBI_green_colormap(), # can use 'viridis' or other default matplotlib colormaps
                                 cmap_over_color = colors.grey_dark.shade(8).RGBn,
                                 extend_cmap='max',
-                                cbar_ticks=FCI_cbar_ticks,
+                                cbar_ticks=TCI_cbar_ticks,
                                 z_marker_color='g', # default matplotlib color names
                                 fps=fps, # animation frames (z values traversed) per second
                                 n_loops='inf', # the number of times the animated contourplot should loop animation over z; infinite by default
-                                animated_contourplot_filename='FCI_animated_contourplot_'+file_to_save, # file name to save animated contourplot as (no extensions)
+                                animated_contourplot_filename='TCI_animated_contourplot_'+file_to_save, # file name to save animated contourplot as (no extensions)
                                 keep_frames=keep_frames, # leaves frame PNG files undeleted after running; False by default
                                 axis_title_fonts=axis_title_fonts,
                                 clabel_fontsize = clabel_fontsize,
@@ -785,7 +789,7 @@ contourplots.animated_contourplot(w_data_vs_x_y_at_multiple_z=results_metric_5, 
                                 # comparison_range=TAL_maximum_viable_market_range,
                                 n_minor_ticks = 1,
                                 cbar_n_minor_ticks = 4,
-                                # comparison_range=[FCI_w_levels[-2], FCI_w_levels[-1]],
+                                # comparison_range=[TCI_w_levels[-2], TCI_w_levels[-1]],
                                 # comparison_range_hatch_pattern='////',fill_bottom_with_cmap_over_color=True, # for TRY
                                 
                                 fill_bottom_with_cmap_over_color=True, # for TRY

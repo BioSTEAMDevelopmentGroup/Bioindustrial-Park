@@ -562,20 +562,27 @@ for i in range(len(results_metric_1)):
     for j in range(len(results_metric_1[i])):
         for k in range(len(results_metric_1[i][j])):
             if str(results_metric_1[i][j][k]).lower() == 'nan':
-                try:
-                    results_metric_1[i][j][k] = 0.25*(
-                          results_metric_1[i][j][k+1] + results_metric_1[i][j][k-1]
-                        + results_metric_1[i][j+1][k] + results_metric_1[i][j-1][k])
-                except:
+                m = 1
+                for m in range(3):
                     try:
-                        results_metric_1[i][j][k] = 0.5*(
-                            results_metric_1[i][j][k+1] + results_metric_1[i][j][k-1])
+                        results_metric_1[i][j][k] = 0.25*(
+                              results_metric_1[i][j][k+m] + results_metric_1[i][j][k-m]
+                            + results_metric_1[i][j+m][k] + results_metric_1[i][j-m][k])
+                        assert not str(results_metric_1[i][j][k]).lower() == 'nan'
                     except:
                         try:
                             results_metric_1[i][j][k] = 0.5*(
-                                results_metric_1[i][j+1][k] + results_metric_1[i][j-1][k])
+                                results_metric_1[i][j][k+m] + results_metric_1[i][j][k-m])
+                            assert not str(results_metric_1[i][j][k]).lower() == 'nan'
                         except:
-                            pass
+                            try:
+                                results_metric_1[i][j][k] = 0.5*(
+                                    results_metric_1[i][j+m][k] + results_metric_1[i][j-m][k])
+                                assert not str(results_metric_1[i][j][k]).lower() == 'nan'
+                            except:
+                                pass
+                    if not str(results_metric_1[i][j][k]).lower() == 'nan':
+                        break
 results_metric_1 = np.array(results_metric_1)
 
 #%% interpolate error-related nans
@@ -585,21 +592,27 @@ for i in range(len(results_metric_2)):
     for j in range(len(results_metric_2[i])):
         for k in range(len(results_metric_2[i][j])):
             if str(results_metric_2[i][j][k]).lower() == 'nan':
-                try:
-                    results_metric_2[i][j][k] = 0.25*(
-                          results_metric_2[i][j][k+1] + results_metric_2[i][j][k-1]
-                        + results_metric_2[i][j+1][k] + results_metric_2[i][j-1][k])
-                except:
+                m = 1
+                for m in range(3):
                     try:
-                        results_metric_2[i][j][k] = 0.5*(
-                            results_metric_2[i][j][k+1] + results_metric_2[i][j][k-1])
+                        results_metric_2[i][j][k] = 0.25*(
+                              results_metric_2[i][j][k+m] + results_metric_2[i][j][k-m]
+                            + results_metric_2[i][j+m][k] + results_metric_2[i][j-m][k])
+                        assert not str(results_metric_2[i][j][k]).lower() == 'nan'
                     except:
                         try:
                             results_metric_2[i][j][k] = 0.5*(
-                                results_metric_2[i][j+1][k] + results_metric_2[i][j-1][k])
+                                results_metric_2[i][j][k+m] + results_metric_2[i][j][k-m])
+                            assert not str(results_metric_2[i][j][k]).lower() == 'nan'
                         except:
-                            pass
-                        
+                            try:
+                                results_metric_2[i][j][k] = 0.5*(
+                                    results_metric_2[i][j+m][k] + results_metric_2[i][j-m][k])
+                                assert not str(results_metric_2[i][j][k]).lower() == 'nan'
+                            except:
+                                pass
+                    if not str(results_metric_2[i][j][k]).lower() == 'nan':
+                        break
 results_metric_2 = np.array(results_metric_2)
 
 #%% interpolate error-related nans
@@ -609,122 +622,155 @@ for i in range(len(results_metric_3)):
     for j in range(len(results_metric_3[i])):
         for k in range(len(results_metric_3[i][j])):
             if str(results_metric_3[i][j][k]).lower() == 'nan':
-                try:
-                    results_metric_3[i][j][k] = 0.25*(
-                          results_metric_3[i][j][k+1] + results_metric_3[i][j][k-1]
-                        + results_metric_3[i][j+1][k] + results_metric_3[i][j-1][k])
-                except:
+                m = 1
+                for m in range(3):
                     try:
-                        results_metric_3[i][j][k] = 0.5*(
-                            results_metric_3[i][j][k+1] + results_metric_3[i][j][k-1])
+                        results_metric_3[i][j][k] = 0.25*(
+                              results_metric_3[i][j][k+m] + results_metric_3[i][j][k-m]
+                            + results_metric_3[i][j+m][k] + results_metric_3[i][j-m][k])
+                        assert not str(results_metric_3[i][j][k]).lower() == 'nan'
                     except:
                         try:
                             results_metric_3[i][j][k] = 0.5*(
-                                results_metric_3[i][j+1][k] + results_metric_3[i][j-1][k])
+                                results_metric_3[i][j][k+m] + results_metric_3[i][j][k-m])
+                            assert not str(results_metric_3[i][j][k]).lower() == 'nan'
                         except:
-                            pass
+                            try:
+                                results_metric_3[i][j][k] = 0.5*(
+                                    results_metric_3[i][j+m][k] + results_metric_3[i][j-m][k])
+                                assert not str(results_metric_3[i][j][k]).lower() == 'nan'
+                            except:
+                                pass
+                    if not str(results_metric_3[i][j][k]).lower() == 'nan':
+                        break
 results_metric_3 = np.array(results_metric_3)
 
 #%% interpolate error-related nans
-# results_metric_4 = results_metric_4.tolist()
-
+results_metric_4 = results_metric_4.tolist()
+#%%
 for i in range(len(results_metric_4)):
     for j in range(len(results_metric_4[i])):
         for k in range(len(results_metric_4[i][j])):
             if str(results_metric_4[i][j][k]).lower() == 'nan':
-                try:
-                    results_metric_4[i][j][k] = 0.25*(
-                          results_metric_4[i][j][k+1] + results_metric_4[i][j][k-1]
-                        + results_metric_4[i][j+1][k] + results_metric_4[i][j-1][k])
-                except:
+                m = 1
+                for m in range(3):
                     try:
-                        results_metric_4[i][j][k] = 0.5*(
-                            results_metric_4[i][j][k+1] + results_metric_4[i][j][k-1])
+                        results_metric_4[i][j][k] = 0.25*(
+                              results_metric_4[i][j][k+m] + results_metric_4[i][j][k-m]
+                            + results_metric_4[i][j+m][k] + results_metric_4[i][j-m][k])
+                        assert not str(results_metric_4[i][j][k]).lower() == 'nan'
                     except:
                         try:
                             results_metric_4[i][j][k] = 0.5*(
-                                results_metric_4[i][j+1][k] + results_metric_4[i][j-1][k])
+                                results_metric_4[i][j][k+m] + results_metric_4[i][j][k-m])
+                            assert not str(results_metric_4[i][j][k]).lower() == 'nan'
                         except:
-                            pass
+                            try:
+                                results_metric_4[i][j][k] = 0.5*(
+                                    results_metric_4[i][j+m][k] + results_metric_4[i][j-m][k])
+                                assert not str(results_metric_4[i][j][k]).lower() == 'nan'
+                            except:
+                                pass
+                    if not str(results_metric_4[i][j][k]).lower() == 'nan':
+                        break
 results_metric_4 = np.array(results_metric_4)
 
 #%% interpolate error-related nans
-# results_metric_5 = results_metric_5.tolist()
-
+results_metric_5 = results_metric_5.tolist()
+#%%
 for i in range(len(results_metric_5)):
     for j in range(len(results_metric_5[i])):
         for k in range(len(results_metric_5[i][j])):
             if str(results_metric_5[i][j][k]).lower() == 'nan':
-                try:
-                    results_metric_5[i][j][k] = 0.25*(
-                          results_metric_5[i][j][k+1] + results_metric_5[i][j][k-1]
-                        + results_metric_5[i][j+1][k] + results_metric_5[i][j-1][k])
-                except:
+                m = 1
+                for m in range(3):
                     try:
-                        results_metric_5[i][j][k] = 0.5*(
-                            results_metric_5[i][j][k+1] + results_metric_5[i][j][k-1])
+                        results_metric_5[i][j][k] = 0.25*(
+                              results_metric_5[i][j][k+m] + results_metric_5[i][j][k-m]
+                            + results_metric_5[i][j+m][k] + results_metric_5[i][j-m][k])
+                        assert not str(results_metric_5[i][j][k]).lower() == 'nan'
                     except:
                         try:
                             results_metric_5[i][j][k] = 0.5*(
-                                results_metric_5[i][j+1][k] + results_metric_5[i][j-1][k])
+                                results_metric_5[i][j][k+m] + results_metric_5[i][j][k-m])
+                            assert not str(results_metric_5[i][j][k]).lower() == 'nan'
                         except:
-                            pass
+                            try:
+                                results_metric_5[i][j][k] = 0.5*(
+                                    results_metric_5[i][j+m][k] + results_metric_5[i][j-m][k])
+                                assert not str(results_metric_5[i][j][k]).lower() == 'nan'
+                            except:
+                                pass
+                    if not str(results_metric_5[i][j][k]).lower() == 'nan':
+                        break
 results_metric_5 = np.array(results_metric_5)
 
 #%% interpolate error-related nans
-# results_metric_6 = results_metric_6.tolist()
-
+results_metric_6 = results_metric_6.tolist()
+#%%
 for i in range(len(results_metric_6)):
     for j in range(len(results_metric_6[i])):
         for k in range(len(results_metric_6[i][j])):
             if str(results_metric_6[i][j][k]).lower() == 'nan':
-                try:
-                    results_metric_6[i][j][k] = 0.25*(
-                          results_metric_6[i][j][k+1] + results_metric_6[i][j][k-1]
-                        + results_metric_6[i][j+1][k] + results_metric_6[i][j-1][k])
-                except:
+                m = 1
+                for m in range(3):
                     try:
-                        results_metric_6[i][j][k] = 0.5*(
-                            results_metric_6[i][j][k+1] + results_metric_6[i][j][k-1])
+                        results_metric_6[i][j][k] = 0.25*(
+                              results_metric_6[i][j][k+m] + results_metric_6[i][j][k-m]
+                            + results_metric_6[i][j+m][k] + results_metric_6[i][j-m][k])
+                        assert not str(results_metric_6[i][j][k]).lower() == 'nan'
                     except:
                         try:
                             results_metric_6[i][j][k] = 0.5*(
-                                results_metric_6[i][j+1][k] + results_metric_6[i][j-1][k])
+                                results_metric_6[i][j][k+m] + results_metric_6[i][j][k-m])
+                            assert not str(results_metric_6[i][j][k]).lower() == 'nan'
                         except:
-                            pass
+                            try:
+                                results_metric_6[i][j][k] = 0.5*(
+                                    results_metric_6[i][j+m][k] + results_metric_6[i][j-m][k])
+                                assert not str(results_metric_6[i][j][k]).lower() == 'nan'
+                            except:
+                                pass
+                    if not str(results_metric_6[i][j][k]).lower() == 'nan':
+                        break
 results_metric_6 = np.array(results_metric_6)
 
 #%% interpolate error-related nans
-# results_metric_7 = results_metric_7.tolist()
-
+results_metric_7 = results_metric_7.tolist()
+#%%
 for i in range(len(results_metric_7)):
     for j in range(len(results_metric_7[i])):
         for k in range(len(results_metric_7[i][j])):
             if str(results_metric_7[i][j][k]).lower() == 'nan':
-                try:
-                    results_metric_7[i][j][k] = 0.25*(
-                          results_metric_7[i][j][k+1] + results_metric_7[i][j][k-1]
-                        + results_metric_7[i][j+1][k] + results_metric_7[i][j-1][k])
-                except:
+                m = 1
+                for m in range(3):
                     try:
-                        results_metric_7[i][j][k] = 0.5*(
-                            results_metric_7[i][j][k+1] + results_metric_7[i][j][k-1])
+                        results_metric_7[i][j][k] = 0.25*(
+                              results_metric_7[i][j][k+m] + results_metric_7[i][j][k-m]
+                            + results_metric_7[i][j+m][k] + results_metric_7[i][j-m][k])
+                        assert not str(results_metric_7[i][j][k]).lower() == 'nan'
                     except:
                         try:
                             results_metric_7[i][j][k] = 0.5*(
-                                results_metric_7[i][j+1][k] + results_metric_7[i][j-1][k])
+                                results_metric_7[i][j][k+m] + results_metric_7[i][j][k-m])
+                            assert not str(results_metric_7[i][j][k]).lower() == 'nan'
                         except:
-                            pass
+                            try:
+                                results_metric_7[i][j][k] = 0.5*(
+                                    results_metric_7[i][j+m][k] + results_metric_7[i][j-m][k])
+                                assert not str(results_metric_7[i][j][k]).lower() == 'nan'
+                            except:
+                                pass
+                    if not str(results_metric_7[i][j][k]).lower() == 'nan':
+                        break
 results_metric_7 = np.array(results_metric_7)
-
 
 #%% MPSP
 
 MPSP_w_levels, MPSP_w_ticks, MPSP_cbar_ticks = get_contour_info_from_metric_data(results_metric_1, lb=3)
-# MPSP_w_levels = np.arange(2, 10.25, 0.25)
-# MPSP_cbar_ticks = np.arange(2, 10.1, 1.)
-# MPSP_w_ticks = MPSP_cbar_ticks
-# [3.25, 3.5, 3.75, 4, 4.5, 5, 5.5, 9, 10]
+MPSP_w_levels = np.arange(2, 10.25, 0.25)
+MPSP_cbar_ticks = np.arange(2, 10.1, 1.)
+MPSP_w_ticks = [3.25, 3.5, 3.75, 4, 4.5, 5, 5.5, 9, 10]
 # MPSP_w_levels = np.arange(0., 15.5, 0.5)
 
 contourplots.animated_contourplot(w_data_vs_x_y_at_multiple_z=results_metric_1, # shape = z * x * y # values of the metric you want to plot on the color axis; e.g., MPSP
@@ -775,7 +821,7 @@ contourplots.animated_contourplot(w_data_vs_x_y_at_multiple_z=results_metric_1, 
                                 #     MPSP_w_ticks[6]: (45,1.75),
                                 #     },
                                 additional_points ={(22.5, baseline_acetylacetone_presence):('D', 'w', 6)},
-                                # text_boxes = {'>10.0': [(41,4.5), 'white']},
+                                text_boxes = {'>10.0': [(41,4.5), 'white']},
                                 )
 
 #%% GWP
