@@ -6,7 +6,6 @@ Created on Sat Oct 28 09:43:21 2023
 @author: wenjun
 """
 
-import numpy as np
 import pandas as pd
 import thermosteam as tmo
 from thermosteam import functional as fn
@@ -14,18 +13,10 @@ from biorefineries.sugarcane import chemicals as sugarcane_chemicals
 
 
 __all__=('energycane_chemicals',
-          'chemical_groups',
-          'default_nonsolids',
-          'default_insoluble_solids',
-          'default_ignored',
-          'heavy_keys',
-          'light_keys',
-          'llignt_keys',
-          'more_than_C4',
-          'C6_C8',
-          'more_than_C8',
-          'C10_C16',
-          'more_than_C16')
+         'chemical_groups',
+         'default_nonsolids',
+         'default_insoluble_solids',
+         'default_ignored')
 #%% 
 # Constants
 
@@ -76,7 +67,7 @@ H2O = chemical_database('H2O')
 O2 = chemical_database('O2', phase='g', Hf=0)
 N2 = chemical_database('N2', phase='g', Hf=0)
 H2 = chemical_database('H2', Hf=0)
-CH4 = chemical_database('CH4')
+CH4 = chemical_database('Methane')
 CO = chemical_database('CarbonMonoxide', Hf=-26400*_cal2joule)
 CO2 = chemical_database('CO2')
 NH3 = chemical_database('NH3', Hf=-10963*_cal2joule)
@@ -85,16 +76,16 @@ NO2 = chemical_database('NO2')
 H2S = chemical_database('H2S', phase='g', Hf=-4927*_cal2joule)
 SO2 = chemical_database('SO2', phase='g')
 C2H4 = chemical_database('Ethylene')
-C3H6 = chemical_database('Propene')
-C4H8 = chemical_database('Butene')
+C3H6 = chemical_database('Propylene')
+C4H8 = chemical_database('Butadiene')
 C2H6 = chemical_database('Ethane')
-CH3OCH3 = chemical_database('CH3OCH3')
-CH3CHO = chemical_database('CH3CHO')
+CH3OCH3 = chemical_database('Diethyl ether')
+CH3CHO = chemical_database('Acetaldehyde')
 
 # =============================================================================
 # Soluble inorganics
 # =============================================================================
-
+H3PO4 = chemical_database('H3PO4',phase='l')
 H2SO4 = chemical_database('H2SO4', phase='l')
 DiammoniumSulfate = chemical_database('DiammoniumSulfate', phase='l',
                                     Hf=-288994*_cal2joule)
@@ -121,7 +112,7 @@ CaSO4.Cn.move_up_model_priority('LASTOVKA_S', 0)
 
 AmmoniumAcetate = chemical_database('AmmoniumAcetate', phase='l', 
                                          Hf=-154701*_cal2joule)
-Acetate = chemical_database('Acetate', phase='l', Hf=-108992*_cal2joule)
+
 # =============================================================================
 # Soluble organics
 # =============================================================================
@@ -132,6 +123,7 @@ LacticAcid = chemical_database('LacticAcid')
 LacticAcid.Hfus = 11.34e3
 AceticAcid = chemical_database('AceticAcid')
 
+Acetate = chemical_copied('Acetate',chems.AceticAcid)
 # Hfus from NIST, accessed 04/07/2020
 # https://webbook.nist.gov/cgi/cbook.cgi?ID=C50215&Mask=4
 
@@ -197,17 +189,18 @@ FermMicrobe = chemical_defined('FermMicrobe', phase='l',
 
 Glucan = chemical_defined('Glucan', phase='s', formula='C6H10O5', Hf=-233200*_cal2joule)
 Glucan.copy_models_from(Glucose, ['Cn'])
-Mannan = chemical_copied('Mannan', Glucan)
+
 Galactan = chemical_copied('Galactan', Glucan)
 
 Xylan = chemical_defined('Xylan', phase='s', formula='C5H8O4', Hf=-182100*_cal2joule)
 Xylan.copy_models_from(Xylose, ['Cn'])
 Arabinan = chemical_copied('Arabinan', Xylan)
 
-Cellulose=chemical_defined('Cellulose', formula="C6H10O5", # Glucose monomer minus water
-                           Hf=-233200.06*_cal2joule)
-Hemicellulose=chemical_defined('Hemicellulose', formula='C5H8O4', # Xylose monomer minus water
-                               Hf=-761906.4)
+
+# Cellulose=chemical_defined('Cellulose', formula="C6H10O5", # Glucose monomer minus water
+#                            Hf=-233200.06*_cal2joule)
+# Hemicellulose=chemical_defined('Hemicellulose', formula='C5H8O4', # Xylose monomer minus water
+#                                Hf=-761906.4)
 Flocculant = chemical_defined('Flocculant',
                                  MW=1.)
 Lignin = chemical_database('Lignin', phase='s')
@@ -219,33 +212,33 @@ Cellulase=chemical_copied('Cellulase',Enzyme)
 Yeast = chemical_defined('Yeast', formula='CH1.61O0.56N0.16')
 Yeast.Hf = Glucose.Hf / Glucose.MW * Yeast.MW # Same as glucose to ignore heats related to growth
 
-C5H10=chemical_database('C5H10','Pentene')
-C6H12=chemical_database('C6H12','1-Hexene')
-C7H14=chemical_database('C7H14','1-Heptene')
-C8H16=chemical_database('C8H16','1-Octene')
-C9H18=chemical_database('C9H18','1-Nonene')
-C10H20=chemical_database('C10H20','1-Decene')
-C11H22=chemical_database('C11H22','1-Undecene')
-C12H24=chemical_database('C12H24','1-Dodecene')
+C5H10=chemical_database('C5H10', search_ID='Pentene')
+C6H12=chemical_database('C6H12', search_ID='1-Hexene')
+C7H14=chemical_database('C7H14', search_ID='1-Heptene')
+C8H16=chemical_database('C8H16', search_ID='1-Octene')
+C9H18=chemical_database('C9H18', search_ID='1-Nonene')
+C10H20=chemical_database('C10H20', search_ID='1-Decene')
+C11H22=chemical_database('C11H22', search_ID='1-Undecene')
+C12H24=chemical_database('C12H24', search_ID='1-Dodecene')
 C13H26=chemical_database('C13H26')
-C14H28=chemical_database('C14H28','Tetradecene')
-C15H30=chemical_database('C15H30','Pentadecene')
-C16H32=chemical_database('C16H32','Hexadecene')
-C17H34=chemical_database('C17H34','1-Heptadecene')
-C18H36=chemical_database('C18H36','Octadecene')
+C14H28=chemical_database('C14H28', search_ID='Tetradecene')
+C15H30=chemical_database('C15H30', search_ID='Pentadecene')
+C16H32=chemical_database('C16H32', search_ID='Hexadecene')
+C17H34=chemical_database('C17H34', search_ID='1-Heptadecene')
+C18H36=chemical_database('C18H36', search_ID='Octadecene')
  
-C4H10=chemical_database('C4H10','Butane')
-C6H14=chemical_database('C6H14','Hexane')
-C7H16=chemical_database('C7H16','3-ethylpentane')
-C8H18=chemical_database('C8H18','3-ethyl-3-methylpentane')
-C9H20=chemical_database('C9H20','2,2,3,3-tetramethylpentane')
-C10H22=chemical_database('C10H22','Decane')
-C11H24=chemical_database('C11H24','2,3-dimethylnonane')
-C12H26=chemical_database('C12H26','Dodecane')
-C13H28=chemical_database('C13H28','2,3-dimethylundecane')
-C14H30=chemical_database('C14H30','Tetradecane')
-C16H34=chemical_database('C16H34','Hexadecane')
-C18H38=chemical_database('C18H38','Octadecane')
+C4H10=chemical_database('C4H10', search_ID='Butane')
+C6H14=chemical_database('C6H14', search_ID='Hexane')
+C7H16=chemical_database('C7H16', search_ID='3-ethylpentane')
+C8H18=chemical_database('C8H18', search_ID='3-ethyl-3-methylpentane')
+C9H20=chemical_database('C9H20', search_ID='2,2,3,3-tetramethylpentane')
+C10H22=chemical_database('C10H22', search_ID='decane')
+C11H24=chemical_database('C11H24', search_ID='2,3-dimethylnonane')
+C12H26=chemical_database('C12H26', search_ID='Dodecane')
+C13H28=chemical_database('C13H28', search_ID='2,3-dimethylundecane')
+C14H30=chemical_database('C14H30', search_ID='Tetradecane')
+C16H34=chemical_database('C16H34', search_ID='Hexadecane')
+C18H38=chemical_database('C18H38', search_ID='Octadecane')
 
 # =============================================================================
 # Insoluble inorganics
@@ -275,8 +268,10 @@ DAP = chemical_database('DAP', search_ID='DiammoniumPhosphate',
 BoilerChems = chemical_database(ID='BoilerChems',search_ID='DiammoniumPhosphate',
                                 phase='l', Hf=0, HHV=0, LHV=0)
 
+BaghouseBag = chemical_defined('BaghouseBag', phase='s', MW=1, Hf=0, HHV=0, LHV=0)
+BaghouseBag.Cn.add_model(0)
+CoolingTowerChems = chemical_copied('CoolingTowerChems', BaghouseBag)
 
-Denaturant = chemical_database('Denaturant', search_ID='n-Heptane')
 DenaturedEnzyme = chemical_copied('DenaturedEnzyme', Enzyme)
 
 # Hf from DIPPR value in Table 3 of Vatani et al., Int J Mol Sci 2007, 8 (5), 407–432
@@ -284,39 +279,17 @@ MethylLactate = chemical_database('MethylLactate', Hf=-643.1e3)
 FermMicrobeXyl = chemical_copied('FermMicrobeXyl', FermMicrobe)
 Xylitol=chemical_database('Xylitol', search_ID='Xylitol')
 
-DMP = chemical_database('DimethylPolysiloxane',search_ID='Dimethyl Polysiloxane')
 #%%
 
 default_nonsolids = ['Water', 'Ethanol', 'AceticAcid', 
                      'Furfural', 'H2SO4', 'NH3', 'HMF']
 
 #: Default insolible chemicals for saccharification solids-loading specification
-default_insoluble_solids = ['Glucan', 'Mannan', 'Xylan', 
+default_insoluble_solids = ['Glucan', 'Xylan', 
                             'Arabinan', 'Galactan', 'Lignin']
 
 #: Default ignored chemicals for saccharification solids-loading specification
 default_ignored = ['TAG', 'DAG', 'MAG', 'FFA', 'PL']
-
-#: Heavy keys in Ethylene column
-heavy_keys=['C3H6', 'C4H8', 'CH3CHO', 'CH3OCH3', 'C2H6']
-
-#: Light keys in Ethylene column
-light_keys=['C2H4', 'H2', 'CH4']
-
-#: Light keys in stripper column
-llignt_keys=['H2', 'CH4']
-
-
-#: Fractionation
-more_than_C4=['C6H14','C8H18','C10H22','C12H26','C14H30','C16H34','C18H38']
-
-C6_C8=['C6H14','C8H18']
-
-more_than_C8=['C10H22','C12H26','C14H30','C16H34','C18H38']
-
-C10_C16=['C10H22','C12H26','C14H30','C16H34']
-
-more_than_C16=['C18H38']
 
 #%%
 chemical_groups = dict(
@@ -344,7 +317,6 @@ chemical_groups = dict(
     Furfurals = ('Furfural', 
                  'HMF'),
     OtherOrganics = ('Glycerol',
-                     'Denaturant',
                      'Xylitol',
                      'SuccinicAcid'),
     COSOxNOxH2S = ('NO', 
@@ -362,11 +334,23 @@ chemical_groups = dict(
                             'Ash',
                             'Lime'),
     OtherStructuralCarbohydrates = ('Arabinan',
-                                    'Mannan', 
                                     'Galactan'))
+def get_grouped_chemicals(stream, units='kmol/hr'):
+    new_stream = tmo.Stream(stream.thermo)
+    new_stream.set_flow(stream.mol, units, stream.chemicals.IDs)
+    data = {group: new_stream.get_flow(units, IDs).sum() for group, IDs in chemical_groups.items()}
+    return pd.Series(data)
 
-phase_change_chemicals = ['Methanol', 'Ethanol', 'H2O', 'Denaturant',
-                          'Furfural', 'LacticAcid', 'HMF']
+phase_change_chemicals = ['Methanol', 'Ethanol', 'H2O',
+                          'Furfural', 'LacticAcid', 'HMF', 'Ethylene', 
+                          'Ethane', 'H2','CarbonMonoxide', 'Propylene',
+                          'Butadiene', 'Acetaldehyde', 'Diethyl ether',
+                          'CH4','C5H10','C6H12','C6H14','C7H14','C7H16',
+                          'C8H16','C8H18','C9H18','C9H20','C10H20','C10H22',
+                          'C11H22','C11H24','C12H24','C12H26','C13H26','C13H28',
+                          'C14H28','C14H30','C15H30','C15H32','C16H32','C16H34',
+                          'C17H34','C18H36','C18H38']
+                                 
 # This group is needed in the system.py module
 # soluble_groups = ('OtherSugars', 'SugarOligomers', 'OrganicSolubleSolids',
 #                   'Furfurals', 'OtherOrganics', 'Proteins', 'CellMass')
@@ -380,11 +364,11 @@ solubles=('CaO','H3PO4', 'Glucose', 'Sucrose','Glycerol',
           'Mannose', 'Galactose', 'Cellobiose', 'GlucoseOligomer',
           'XyloseOligomer', 'GalactoseOligomer','ArabinoseOligomer',
           'MannoseOligomer','AmmoniumAcetate', 'SolubleLignin', 'Extract', 
-          'LacticAcid', 'Cellulase','Furfural', 'HMF','Glycerol','Denaturant', 
-          'Xylitol','Protein', 'Enzyme', 'DenaturedEnzyme','Z_mobilis','T_reesei','Acetate')
-insolubles=('Tar','Ash', 'Lime','Cellulose', 'Hemicellulose',
-                  'Flocculant', 'Lignin', 'Solids', 'Yeast', 
-                  'P4O10', 'Arabinan', 'Mannan', 'Galactan','WWTsludge')
+          'LacticAcid', 'Cellulase','Furfural', 'HMF','Glycerol', 'Xylitol',
+          'Protein', 'Enzyme', 'DenaturedEnzyme','Z_mobilis','T_reesei','Acetate')
+insolubles=('Tar','Ash', 'Lime', 'Flocculant', 'Solids', 'Yeast', 
+            'Lignin', 'Glucan', 'Xylan', 'Arabinan',
+            'P4O10', 'Galactan','WWTsludge')
 
 for chem in chems:
     if chem.ID in phase_change_chemicals: pass
@@ -399,6 +383,8 @@ for chem in chems:
         if chem.ID in insolubles:
             chem.phase_ref = 's'
             chem.at_state('s')
+        if chem.phase_ref == 'l':
+            chem.at_state('l')
 
 # %% 
 
@@ -431,7 +417,7 @@ for chemical in chems:
 for chemical in chems: chemical.default()
 
 defined_chemicals = {
-    'Cellulose', 'Lime', '3-Hydroxybutanone', '3-Hydroxypropionic acid'
+    'Lime', '3-Hydroxybutanone', '3-Hydroxypropionic acid'
     'AA', 'tri-n-octylamine', 'Dipotassium hydrogen phosphate',
     'Water', 'SulfuricAcid', 'Ammonia', 'NH4SO4', 'Octane',
     'CarbonDioxide', 'CO', 'NO', 'Gypsum', 'PhosphorusPentoxide',
@@ -444,25 +430,27 @@ energycane_chemicals.extend([i for i in sugarcane_chemicals if i.ID not in defin
 # Though set_thermo will first compile the Chemicals object,
 # compile beforehand is easier to debug because of the helpful error message
 chems.compile()
-tmo.settings.set_thermo(chems)
-# chems.set_synonym('Glucan', 'Cellulose')
+tmo.settings.set_thermo(chems, cache=True)
+
 chems.set_synonym('CalciumDihydroxide', 'Lime')
 chems.set_synonym('H2O', 'Water')
 chems.set_synonym('H2SO4', 'SulfuricAcid')
 chems.set_synonym('NH3', 'Ammonia')
 chems.set_synonym('AmmoniumSulfate', '(NH4)2SO4')
+# chems.set_synonym('Acetate', 'AceticAcid')
 chems.set_synonym('CO2', 'CarbonDioxide')
-chems.set_synonym('CarbonMonoxide', 'CO')
-chems.set_synonym('NitricOxide', 'NO')
+chems.set_synonym('CO', 'CarbonMonoxide')
+chems.set_synonym('NO', 'NitricOxide')
 chems.set_synonym('CaSO4', 'Gypsum')
 chems.set_synonym('P4O10', 'PhosphorusPentoxide')
 chems.set_synonym('Na2SO4', 'SodiumSulfate')
 chems.set_synonym('AmmoniumHydroxide', 'NH4OH')
 chems.set_synonym('Ethanol', 'C2H5OH')
-chems.set_synonym('Ethylene', 'C2H4')
-chems.set_synonym('Ethane', 'C2H6')
-
-
+chems.set_synonym('C2H4', 'Ethylene')
+chems.set_synonym('C2H6', 'Ethane')
+chems.set_synonym('Diethyl ether', 'CH3OCH3')
+chems.set_synonym('Acetaldehyde', 'CH3CHO')
+chems.set_synonym('Butadiene', 'C4H8')
 
 # %% Set all "None" Hfus values to 0
 for chem in energycane_chemicals:

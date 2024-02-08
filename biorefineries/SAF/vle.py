@@ -17,11 +17,21 @@ vle(T=298.15,P=199438)
 vle
 
 
-settings.set_thermo(['Ethylene','Ethane','Propene','Butene','H2'], cache=True)
+settings.set_thermo(['Ethylene','Ethane','Propene','Butene','H2','CH4','H2O'], cache=True)
 imol = indexer.MolarFlowIndexer(
-            l=[('Ethylene',0),('Ethane', 0),('Propene', 0),('Butene', 0),('H2', 0)],
-            g=[('Ethylene', 682),('Ethane', 1.86),('Propene', 0.138),('Butene', 1.73),('H2', 1.23)])
+            l=[('Ethylene',0),('Ethane', 0),('Propene', 0),('Butene', 0),('H2', 0), ('CH4', 0),('H2O', 0)],
+            g=[('Ethylene', 6.7),('Ethane', 0),('Propene', 0),('Butene', 0),('H2', 0), ('CH4', 0), ('H2O', 657)])
+               
 vle = equilibrium.VLE(imol)
-vle(T=248.15,P=27*101325)
+vle(T=308.75,P=101325)
 vle
 
+
+settings.set_thermo(['Ethylene','Butadiene','C6H12','C8H16','1-decene','CH4','H2O'], cache=True)
+imol = indexer.MolarFlowIndexer(
+            l=[('Ethylene',0),('Butadiene', 0),('C6H12', 0),('C8H16', 0),('1-decene', 0), ('CH4', 0),('H2O', 0)],
+            g=[('Ethylene', 4.42),('Butadiene', 337),('C6H12', 0.118),('C8H16', 0.341),('1-decene', 0.409), ('CH4', 0), ('H2O', 0)])
+               
+vle = equilibrium.VLE(imol)
+vle(T=358.15,P=101325)
+vle
