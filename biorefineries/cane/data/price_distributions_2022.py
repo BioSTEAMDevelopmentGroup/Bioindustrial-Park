@@ -13,6 +13,7 @@ from math import sqrt
 
 __all__ = (
     'ethanol_no_RIN_price_distribution', 
+    'biodiesel_no_RIN_price_distribution',
     'advanced_ethanol_price_distribution',
     'cellulosic_ethanol_price_distribution',
     'biomass_based_diesel_price_distribution',
@@ -161,9 +162,13 @@ def plot_histogram(x, *args, bins=10, density=True, **kwargs):
 
 # Price distributions
 electricity_price_distribution = shape.Triangle(0.0583, 0.065, 0.069) # Data from historical prices, 2010-2020; https://www.eia.gov/outlooks/aeo/pdf/00%20AEO2021%20Chart%20Library.pdf
+RIN_D3_price_distribution = triangular_distribution(RIN_D3_prices)
+RIN_D4_price_distribution = triangular_distribution(RIN_D4_prices)
+RIN_D5_price_distribution = triangular_distribution(RIN_D5_prices)
 ethanol_no_RIN_price_distribution = triangular_distribution(ethanol_no_RIN_prices)
 advanced_ethanol_price_distribution = triangular_distribution(advanced_ethanol_prices)
 cellulosic_ethanol_price_distribution = triangular_distribution(cellulosic_ethanol_prices)
+biodiesel_no_RIN_price_distribution = triangular_distribution(biodiesel_no_RIN_prices)
 biomass_based_diesel_price_distribution = triangular_distribution(biomass_based_diesel_prices)
 cellulosic_based_diesel_price_distribution = triangular_distribution(cellulosic_based_diesel_prices)
 natural_gas_price_distribution = triangular_distribution(natural_gas_prices)
@@ -176,8 +181,10 @@ electricity_price_distribution = shape.Triangle(0.0583, 0.065, 0.069)
 # Mean values
 mean_glycerol_price = (0.10 + 0.22) * 0.5 
 mean_RIN_D3_price = np.mean(RIN_D3_prices)
+mean_RIN_D4_price = np.mean(RIN_D4_prices)
 mean_RIN_D5_price = np.mean(RIN_D5_prices)
 mean_ethanol_no_RIN_price = np.mean(ethanol_no_RIN_prices)
+mean_biodiesel_no_RIN_price = np.mean(biodiesel_no_RIN_prices)
 mean_cellulosic_ethanol_price = np.mean(cellulosic_ethanol_prices)
 mean_advanced_ethanol_price = np.mean(advanced_ethanol_prices)
 mean_biomass_based_diesel_price = np.mean(biomass_based_diesel_prices)
