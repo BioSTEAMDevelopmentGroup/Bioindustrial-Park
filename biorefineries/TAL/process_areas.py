@@ -395,7 +395,7 @@ def create_TAL_separation_solubility_exploit_process(ins, outs,):
                                 #                   S401_cell_mass_split,
                                 #                   S401_filtrate_split,
                                 #                   chemical_groups), 
-                                split=1e-2,
+                                split=1e-2, # initial value; updated in S402.specification
                                 solids =\
                                     ['Xylan', 'Glucan', 'Lignin', 'FermMicrobe',\
                                       'Ash', 'Arabinan', 'Galactan', 'Mannan',
@@ -452,7 +452,8 @@ def create_TAL_separation_solubility_exploit_process(ins, outs,):
                              outs=liquid_waste, # non-evaporated supernatant; can be recycled using S403 in system_TAL_solubility_exploit_eethanol_sugarcane, controlled by S403.split (0 by default)
                              P=101325., material='Stainless steel',)
     F403_P1 = bst.units.Pump('F403_P1', ins=F403-1, 
-                             outs=3-M401, # top product from evaporating supernatant; can be recycled in the separation process defined here, controlled by F403.V (0 by default)
+                               outs=3-M401, # top product from evaporating supernatant; can be recycled in the separation process defined here, controlled by F403.V (0 by default)
+                              # outs=('',),
                              P=101325., material='Stainless steel',)
 
 #%% Unused: separation of acetylacetone formed by TAL decarboxylation in heated fermentation broths
@@ -766,15 +767,15 @@ def create_TAL_to_sorbic_acid_upgrading_process(ins, outs,):
                                    vessel_material='Stainless steel 316',)
     
     R403_P = bst.Pump('R403_P', ins=R403-0, P=101325.)
-    F403 = bst.DrumDryer('F403', 
-                         ins=(R403_P-0, 'F403_air', 'F403_natural_gas'),
-                         outs=('dry_KSA', 'F403_hot_air', 'F403_emissions'),
+    F404 = bst.DrumDryer('F404', 
+                         ins=(R403_P-0, 'F404_air', 'F404_natural_gas'),
+                         outs=('dry_KSA', 'F404_hot_air', 'F404_emissions'),
                          moisture_content=0.05, 
                          split=0.,
                          moisture_ID='Ethanol')
     
     H410 = bst.units.HXutility(
-        'H410', ins=F403-1, outs=('H410_cooled_ethanol_laden_air'), 
+        'H410', ins=F404-1, outs=('H410_cooled_ethanol_laden_air'), 
         T=265.,
         rigorous=True
     )
@@ -790,7 +791,7 @@ def create_TAL_to_sorbic_acid_upgrading_process(ins, outs,):
         
     S410-1-2-M405
     
-    M406 = bst.Mixer('M406', ins=(F403-0, acetone_purification, ''),)
+    M406 = bst.Mixer('M406', ins=(F404-0, acetone_purification, ''),)
     
     @M406.add_specification()
     def M406_ethanol_spec():
@@ -816,15 +817,15 @@ def create_TAL_to_sorbic_acid_upgrading_process(ins, outs,):
         S406_outs_1.copy_like(S406_ins_0)
         S406_outs_1.imol['KSA'] = S406.KSA_loss * tot_KSA
         
-    F404 = bst.DrumDryer('F404', 
-                         ins=(S406-1, 'F404_air', 'F404_natural_gas'),
-                         outs=(impurities_to_boiler, 'F404_hot_air', 'F404_emissions'),
+    F405 = bst.DrumDryer('F405', 
+                         ins=(S406-1, 'F405_air', 'F405_natural_gas'),
+                         outs=(impurities_to_boiler, 'F405_hot_air', 'F405_emissions'),
                          moisture_content=0.01, 
                          split=0.,
                          moisture_ID='Acetone')
     
     H408 = bst.units.HXutility(
-        'H408', ins=F404-1, outs=('cooled_acetone_laden_air'), 
+        'H408', ins=F405-1, outs=('cooled_acetone_laden_air'), 
         T=265.,
         rigorous=True
     )
@@ -920,15 +921,15 @@ def create_TAL_to_sorbic_acid_upgrading_process_IPA_ethanol(ins, outs,):
                                    vessel_material='Stainless steel 316',)
     
     R403_P = bst.Pump('R403_P', ins=R403-0, P=101325.)
-    F403 = bst.DrumDryer('F403', 
-                         ins=(R403_P-0, 'F403_air', 'F403_natural_gas'),
-                         outs=('dry_KSA', 'F403_hot_air', 'F403_emissions'),
+    F404 = bst.DrumDryer('F404', 
+                         ins=(R403_P-0, 'F404_air', 'F404_natural_gas'),
+                         outs=('dry_KSA', 'F404_hot_air', 'F404_emissions'),
                          moisture_content=0.05, 
                          split=0.,
                          moisture_ID='Ethanol')
     
     H410 = bst.units.HXutility(
-        'H410', ins=F403-1, outs=('H410_cooled_ethanol_laden_air'), 
+        'H410', ins=F404-1, outs=('H410_cooled_ethanol_laden_air'), 
         T=265.,
         rigorous=True
     )
@@ -944,7 +945,7 @@ def create_TAL_to_sorbic_acid_upgrading_process_IPA_ethanol(ins, outs,):
         
     S410-1-2-M405
     
-    M406 = bst.Mixer('M406', ins=(F403-0, acetone_purification, ''),)
+    M406 = bst.Mixer('M406', ins=(F404-0, acetone_purification, ''),)
     
     @M406.add_specification()
     def M406_ethanol_spec():
@@ -970,15 +971,15 @@ def create_TAL_to_sorbic_acid_upgrading_process_IPA_ethanol(ins, outs,):
         S406_outs_1.copy_like(S406_ins_0)
         S406_outs_1.imol['KSA'] = S406.KSA_loss * tot_KSA
         
-    F404 = bst.DrumDryer('F404', 
-                         ins=(S406-1, 'F404_air', 'F404_natural_gas'),
-                         outs=(impurities_to_boiler, 'F404_hot_air', 'F404_emissions'),
+    F405 = bst.DrumDryer('F405', 
+                         ins=(S406-1, 'F405_air', 'F405_natural_gas'),
+                         outs=(impurities_to_boiler, 'F405_hot_air', 'F405_emissions'),
                          moisture_content=0.01, 
                          split=0.,
                          moisture_ID='Acetone')
     
     H408 = bst.units.HXutility(
-        'H408', ins=F404-1, outs=('cooled_acetone_laden_air'), 
+        'H408', ins=F405-1, outs=('cooled_acetone_laden_air'), 
         T=265.,
         rigorous=True
     )
