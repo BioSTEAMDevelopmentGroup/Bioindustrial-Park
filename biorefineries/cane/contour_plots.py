@@ -138,7 +138,7 @@ def plot_metrics_across_composition_manuscript(load=True, fs=8, smooth=1):
     plt.subplots_adjust(left=0.1, right=0.95, wspace=0.15, top=0.9, bottom=0.15)
     for i in ('svg', 'png'):
         file = os.path.join(images_folder, f'metrics_across_composition_contours.{i}')
-        plt.savefig(file, transparent=True)
+        plt.savefig(file, dpi=900, transparent=True)
 
 def plot_metrics_across_biomass_yield_manuscript(load=True, fs=8, smooth=1):
     set_font(size=fs)
@@ -157,7 +157,7 @@ def plot_metrics_across_biomass_yield_manuscript(load=True, fs=8, smooth=1):
     plt.subplots_adjust(left=0.1, right=0.95, wspace=0.15, top=0.9, bottom=0.15)
     for i in ('svg', 'png'):
         file = os.path.join(images_folder, f'metrics_biomass_yield_contours.{i}')
-        plt.savefig(file, transparent=True)
+        plt.savefig(file, dpi=900, transparent=True)
 
 def plot_oil_recovery_integration_manuscript(load=True, fs=8):
     set_font(size=fs)
@@ -175,7 +175,7 @@ def plot_oil_recovery_integration_manuscript(load=True, fs=8):
     plt.subplots_adjust(left=0.135, right=0.95, wspace=0.15, top=0.9, bottom=0.15)
     for i in ('svg', 'png'):
         file = os.path.join(images_folder, f'oil_recovery_integration_contours.{i}')
-        plt.savefig(file, transparent=True)
+        plt.savefig(file, dpi=900, transparent=True)
 
 def plot_recovery_and_oil_content_contours_manuscript(load=True, fs=8, smooth=1):
     set_font(size=fs)
@@ -191,7 +191,7 @@ def plot_recovery_and_oil_content_contours_manuscript(load=True, fs=8, smooth=1)
     plt.subplots_adjust(right=0.92, wspace=0.1 * (fs/8) ** 2, top=0.9, bottom=0.10)
     for i in ('svg', 'png'):
         file = os.path.join(images_folder, f'recovery_and_oil_content_contours.{i}')
-        plt.savefig(file, transparent=True)
+        plt.savefig(file, dpi=900, transparent=True)
 
 def plot_recovery_and_oil_content_contours_with_oilsorghum_only(fs=10, smooth=1):
     set_font(size=fs)
@@ -207,7 +207,7 @@ def plot_recovery_and_oil_content_contours_with_oilsorghum_only(fs=10, smooth=1)
     plt.subplots_adjust(left=.2, right=0.92, wspace=0.1 * (fs/8) ** 2, top=0.9, bottom=0.10)
     for i in ('svg', 'png'):
         file = os.path.join(images_folder, f'recovery_and_oil_content_contours.{i}')
-        plt.savefig(file, transparent=True)
+        plt.savefig(file, dpi=900, transparent=True)
 
 def plot_recovery_and_oil_content_contours_biodiesel_only(load=True, fs=8, metric_indices=None):
     set_font(size=fs)
@@ -228,7 +228,7 @@ def plot_recovery_and_oil_content_contours_biodiesel_only(load=True, fs=8, metri
         plt.subplots_adjust(right=0.92, wspace=0.1 * (fs/8) ** 2, top=0.9, bottom=0.10)
         for j in ('svg', 'png'):
             file = os.path.join(images_folder, f'recovery_and_oil_content_contours_biodiesel_only_{i}.{j}')
-            plt.savefig(file, transparent=True)
+            plt.savefig(file, dpi=900, transparent=True)
 
 def plot_sorghum_oil_content_and_cane_oil_content_contours_manuscript(load=True, fs=8, smooth=0.9, configuration_index=None):
     set_font(size=fs)
@@ -243,7 +243,7 @@ def plot_sorghum_oil_content_and_cane_oil_content_contours_manuscript(load=True,
     plt.subplots_adjust(left=0.12, right=0.92, wspace=0.12, hspace=0.12, top=0.9, bottom=0.12)
     for i in ('svg', 'png'):
         file = os.path.join(images_folder, f'relative_sorghum_oil_content_and_cane_oil_content_contours.{i}')
-        plt.savefig(file, transparent=True)
+        plt.savefig(file, dpi=900, transparent=True)
 
 def plot_sorghum_oil_content_and_cane_oil_content_contours_seminar(load=True):
     plot_sorghum_oil_content_and_cane_oil_content_contours_manuscript(load, 10, 1.3, [2, 6])
@@ -311,14 +311,14 @@ def plot_metrics_across_composition(
                  data['Fiber (dw)']['Mean'] * 100,
                  data['Water (wt)']['Mean'] * 100,
                  data['Biomass yield (dry MT/ha)']['Mean'],
-                 color.RGBn)
+                 color)
             )
         for i in axes.flat: 
             if hasattr(i, '_cached_ytwin'):
                 plt.sca(i); plt.xlim(xlim)
                 plt.sca(i._cached_ytwin); plt.xlim(xlim)
-        txtbox = dict(boxstyle='round', facecolor=colors.neutral.shade(20).RGBn, 
-                      edgecolor='None', alpha=0.99, pad=0.1)
+        txtbox = dict(boxstyle='round', facecolor=colors.neutral.shade(40).RGBn, 
+                      edgecolor='None', pad=0.1)
         
         for i, (*axes_columns, _) in enumerate(axes):
             for (name, lipid, fiber, moisture, biomass_yield, color) in lines:
@@ -330,7 +330,7 @@ def plot_metrics_across_composition(
                         txtbox_1580 = txtbox.copy()
                         txtbox_1580['pad'] = 0.3
                         plt.text(
-                            lipid + 0.15, fiber, text, c=color,
+                            lipid + 0.15, fiber, text, c=color.tint(15).RGBn,
                             verticalalignment='bottom',
                             bbox=txtbox_1580, 
                         )
@@ -339,13 +339,13 @@ def plot_metrics_across_composition(
                     else:
                         text = f"{feedstock} {name}: {biomass_yield:.0f} {CBY_units}"
                         plt.text(
-                            lipid + 0.15, fiber, text, c=color,
+                            lipid + 0.15, fiber, text, c=color.tint(15).RGBn,
                             verticalalignment='bottom',
                             bbox=txtbox, 
                         )
                     plot_scatter_points(
                         [lipid], [fiber], marker='o', s=20,  linewidth=0.6,
-                        color=color, edgecolor=edgecolor, clip_on=False, zorder=1e6,
+                        color=color.RGBn, edgecolor=edgecolor, clip_on=False, zorder=1e6,
                     )
                     
     return fig, axes
@@ -427,7 +427,7 @@ def plot_lines_biomass_yield():
     plt.ylabel(f'Biomass yield [{CBY_units}]')
     for i in ('svg', 'png'):
         file = os.path.join(images_folder, f'lines_oil_content_and_biomass_yield.{i}')
-        plt.savefig(file, transparent=True)
+        plt.savefig(file, dpi=900, transparent=True)
 
 def plot_metrics_across_biomass_yield(
         load=False, N_decimals=1, 
@@ -480,14 +480,14 @@ def plot_metrics_across_biomass_yield(
                 (name, 
                  oil, 
                  data['Biomass yield (dry MT/ha)']['Mean'],
-                 color.RGBn)
+                 color)
             )
         for i in axes.flat: 
             if hasattr(i, '_cached_ytwin'):
                 plt.sca(i); plt.xlim(xlim)
                 plt.sca(i._cached_ytwin); plt.xlim(xlim)
-        txtbox = dict(boxstyle='round', facecolor=colors.neutral.shade(20).RGBn, 
-                      edgecolor='None', alpha=0.999, pad=0.3)
+        txtbox = dict(boxstyle='round', facecolor=colors.neutral.shade(40).RGBn, 
+                      edgecolor='None', pad=0.3)
         
         for (name, lipid, biomass_yield, color) in lines:
             feedstock = 'Sugarcane' if name == 'WT' else 'Oilcane'
@@ -510,12 +510,12 @@ def plot_metrics_across_biomass_yield(
                     if name == 'Target': continue
                     text = f"{feedstock} {name}:\n{value:.1f} {units}"
                     plt.text(
-                        x, y, text, c=color,
+                        x, y, text, c=color.tint(15).RGBn,
                         bbox=txtbox, verticalalignment=verticalalignment,
                     )
                     plot_scatter_points(
                         [lipid], [biomass_yield], marker='o', s=20,  linewidth=0.6,
-                        color=color, edgecolor=edgecolor, clip_on=False, zorder=1e6,
+                        color=color.RGBn, edgecolor=edgecolor, clip_on=False, zorder=1e6,
                     )
                     
     return fig, axes
@@ -635,9 +635,9 @@ def plot_oil_recovery_integration(
         X, Y, Z, xlabel, ylabels, xticks, yticks, metric_bar,  titles,
         fillcolor=None, styleaxiskw=dict(xtick0=False), label=True,
     )
-    txtbox = dict(boxstyle='round', facecolor=colors.neutral.shade(20).RGBn, 
-                  edgecolor='None', alpha=0.99, pad=0.1)
-    color = GG_colors.orange.RGBn
+    txtbox = dict(boxstyle='round', facecolor=colors.neutral.shade(40).RGBn, 
+                  edgecolor='None', pad=0.1)
+    color = GG_colors.orange
     x = np.array([70, 70, 50])
     y = perf.hydrolysate_lipid_yield
     Z0 = Z[..., 0, :]
@@ -649,16 +649,16 @@ def plot_oil_recovery_integration(
         value = baseline_values[i, i]
         text = f'Baseline:\n{value:.2f} {units}'
         plt.text(
-            x[i] + 0.9, y + 0.7/100, text, c=color,
+            x[i] + 0.9, y + 0.7/100, text, c=color.tint(15).RGBn,
             verticalalignment='center',
             bbox=txtbox, 
         )
         plot_scatter_points(
             [x[i]], [y], 
             marker='o', s=20, linewidth=0.6,
-            color=color, edgecolor=edgecolor, clip_on=False, zorder=1e6,
+            color=color.RGBn, edgecolor=edgecolor, clip_on=False, zorder=1e6,
         )
-    color = GG_colors.yellow.RGBn
+    color = GG_colors.yellow
     y = perf.batch_lipid_yield_mean
     Z1 = Z[..., 1, :]
     interp = LinearNDInterpolator(list(zip(X.flatten(), Y.flatten())), Z1.reshape(new_shape))
@@ -668,14 +668,14 @@ def plot_oil_recovery_integration(
         value = target_values[i, i]
         text = f'Target:\n{value:.2f} {units}'
         plt.text(
-            x[i] + 0.9, y + 0.7/100, text, c=color,
+            x[i] + 0.9, y + 0.7/100, text, c=color.tint(15).RGBn,
             verticalalignment='center',
             bbox=txtbox, 
         )
         plot_scatter_points(
             [x[i]], [y], 
             marker='o', s=20, linewidth=0.6,
-            color=color, edgecolor=edgecolor, clip_on=False, zorder=1e6,
+            color=color.RGBn, edgecolor=edgecolor, clip_on=False, zorder=1e6,
         )
     return fig, axes, other_axes
 

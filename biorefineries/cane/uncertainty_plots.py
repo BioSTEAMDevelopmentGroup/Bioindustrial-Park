@@ -972,7 +972,7 @@ def plot_microbial_oil_kde_2023(fs=None):
     )
     for i in ('svg', 'png'):
         file = os.path.join(images_folder, f'microbial_oil_kde.{i}')
-        plt.savefig(file, transparent=True)
+        plt.savefig(file, dpi=900, transparent=True)
 
 def plot_configuration_comparison_kde(fs=None):
     plot_kde(
