@@ -14,10 +14,19 @@ from biorefineries.tea.cellulosic_ethanol_tea import foc_table, capex_table
 from thermosteam.utils import array_roundsigfigs
 
 __all__ = (
+    'save_system_reports',
     'save_detailed_expenditure_tables',
     'save_detailed_life_cycle_tables',  
     'save_YRCP2023_distribution_table',
 )
+
+def save_system_reports():
+    cane.YRCP2023
+    for i, name in (('O7.WT', 'DC_sugarcane_to_biodiesel'),
+                    ('O8.WT', 'ICFR_sugarcane_to_biodiesel'),
+                    ('O9.WT', 'ICF_sugarcane_to_biodiesel')):
+        br = cane.Biorefinery(i)
+        br.sys.save_report(name + '_detailed_report.xlsx')
 
 def save_detailed_expenditure_tables(sigfigs=3, product=None):
     folder = os.path.dirname(__file__)
