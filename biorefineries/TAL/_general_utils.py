@@ -338,3 +338,80 @@ def update_facility_IDs(system):
     u.ADP901.ID = 'ADP902'
     u.FWT901.ID = 'FWT903'
     u.PWC901.ID = 'PWC904'
+
+#%%
+import biosteam as bst
+import pandas as pd
+import re
+
+def get_major_units_df(units, unit_groups, save_filename='major_units.xlsx', 
+                       # non_biosteam_sources={},
+                       remove_units_with_no_equipment=False):
+    u = units
+    IDs, lines, equipment, areas, sources = [], [], [], [], []
+    for ui in u:
+        IDs.append(ui.ID)
+        lines.append(ui.line)
+        equipment.append(list([i.lower() for i in ui.baseline_purchase_costs.keys()])
+                         + list(ui.auxiliary_unit_names))
+        
+        found_area = False
+        for j in unit_groups:
+            if ui in j.units:
+                areas.append(j.name)
+                found_area = True
+        if not found_area: areas.append('?')
+        
+        # found_source = False
+        # for v in bst.units.__dict__.values(): 
+        #     if type(v)==type:
+        #         if v.__name__.lower() == ui.__class__.__name__.lower():
+        #             sources.append('BioSTEAM')
+        #             found_source = True
+        #             break
+        # if not found_source:
+        #     for src_ID, src in non_biosteam_sources.items():
+        #         for w in src.__dict__.values(): 
+        #             if type(w)==type:
+        #                 if w.__name__.lower() == ui.__class__.__name__.lower():
+        #                     sources.append(src_ID)
+        #                     found_source = True
+        #                     break
+        #         if found_source: break
+        # if not found_source: sources.append('?')
+        sources.append(ui.__class__.__module__)
+    
+    equipment_strings = [str(i) for i in equipment]
+    equipment_strings = [re.sub('_', ' ', i) for i in equipment_strings]
+    equipment_strings = [re.sub('\[', '', i) for i in equipment_strings]
+    equipment_strings = [re.sub('\]', '', i) for i in equipment_strings]
+    equipment_strings = [re.sub("'", '', i) for i in equipment_strings]
+    
+    exc_ind = [i for i in range(len(equipment)) if not equipment[i]] if remove_units_with_no_equipment else []
+    
+    areas, IDs, lines, equipment_strings, sources =\
+        exclude_given_indices_from_list(areas, exc_ind),\
+        exclude_given_indices_from_list(IDs, exc_ind),\
+        exclude_given_indices_from_list(lines, exc_ind),\
+        exclude_given_indices_from_list(equipment_strings, exc_ind),\
+        exclude_given_indices_from_list(sources, exc_ind)
+    
+    df = pd.DataFrame(data={'Process': areas, 'ID': IDs, 'Unit': lines, 'Equipment': equipment_strings, 'Sources': sources})
+    df.to_excel(save_filename)
+    
+
+    return df
+
+def replace_first_instance_in_string(given_string, old_partial_string, new_partial_string):
+    if old_partial_string in given_string:
+        print(old_partial_string, given_string)
+        partial_string_index = given_string.index(old_partial_string)
+        len_partial_string = len(old_partial_string)
+        return given_string[0:partial_string_index] +\
+            new_partial_string +\
+            given_string[partial_string_index+len_partial_string:]
+    else:
+        return given_string
+    
+def exclude_given_indices_from_list(given_list, given_indices):
+    return [given_list[i] for i in range(len(given_list)) if not i in given_indices]
