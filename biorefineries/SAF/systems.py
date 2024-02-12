@@ -585,7 +585,7 @@ def SAF_sys(ins,outs):
                                            units='kg/hr'),
                                     sys_1.outs[0]))
                                     
-    sys_3 = fermentation_sys(ins = (sys_2.outs[0],
+    sys_3 = fermentation_sys(ins = (sys_2.outs[1],
                                     sys_1.outs[-1],
                                     Stream(ID='enzyme_M301',
                                            units='kg/hr',
@@ -733,10 +733,12 @@ def SAF_sys(ins,outs):
                           
                                                                 
                                 
+
+                             
+
+        
+                                 
                                      
-                                     
-                                     
-                                                          
                                                    
       
     

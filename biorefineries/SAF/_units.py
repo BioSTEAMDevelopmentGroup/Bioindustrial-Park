@@ -660,7 +660,10 @@ class AdiabaticFixedbedDehydrationReactor(Reactor):
         self.catalyst_price = catalyst_price # In USD/kg
         self.heat_exchanger = hx = HXutility(None, None,None, T=T)
     
-    def _setup(self):
+    # def _setup(self):
+        
+        
+    def _run(self):
         super()._setup()
         self.overall_C2H5OH_conversion=overall_C2H5OH_conversion=0.995
         self.C2H5OH_to_C2H4_selectivity=C2H5OH_to_C2H4_selectivity=0.988
@@ -684,7 +687,6 @@ class AdiabaticFixedbedDehydrationReactor(Reactor):
         Rxn('C2H5OH +H2O -> CO2 + CH4 + H2',      'C2H5OH',   C2H5OH_to_CO2_selectivity*overall_C2H5OH_conversion),
             ])
         
-    def _run(self):
         feed, fresh_catalyst = self.ins
         effluent, spent_catalyst = self.outs
         
