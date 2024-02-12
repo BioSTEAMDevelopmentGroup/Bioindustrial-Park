@@ -479,7 +479,6 @@ def run_oilcane_microbial_oil_across_lines(N=None, configurations=None):
 def save_target_biomass_yield(configuration='O7'):
     # Set CABBI feedstock target
     br = cane.Biorefinery(configuration, simulate=False)
-    br.set_cane_oil_content.setter(10)
     file = monte_carlo_file(configuration, across_lines=False, across_oil_content='oilcane vs sugarcane')
     CBY_df = pd.read_excel(
         file, 
@@ -494,7 +493,7 @@ def save_target_biomass_yield(configuration='O7'):
     composition_folder = os.path.join(os.path.dirname(__file__), 'data')
     file = os.path.join(composition_folder, 'cane_composition_data.xlsx')
     df = pd.read_excel(file, header=[0, 1], index_col=[0])
-    df.loc['Target', ('Water (wt)', 'Mean')] = feedstock.get_mass_fraction('Water')
+    df.loc['Target', ('Water (wt)', 'Mean')] = 0.65
     feedstock.imass['Water'] = 0.
     df.loc['Target', ('Fiber (dw)', 'Mean')] = feedstock.get_mass_fraction('Fiber')
     df.loc['Target', ('Sugar (dw)', 'Mean')] = feedstock.get_mass_fraction('Sugar')

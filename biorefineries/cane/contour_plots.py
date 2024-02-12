@@ -42,6 +42,7 @@ __all__ = (
     'plot_recovery_and_oil_content_contours_biodiesel_only',
     'plot_recovery_and_oil_content_contours_with_oilsorghum_only',
     'plot_metrics_across_biomass_yield',
+    'plot_metrics_across_biomass_yield_TOC',
     'plot_metrics_across_composition',
     'plot_oil_recovery_integration',
     'plot_lines_biomass_yield',
@@ -155,6 +156,21 @@ def plot_metrics_across_biomass_yield_manuscript(load=True, fs=8, smooth=1):
                  [light_letter_color, light_letter_color]]
     _add_letter_labels(axes, 0.9, 0.8, colors)
     plt.subplots_adjust(left=0.1, right=0.95, wspace=0.15, top=0.9, bottom=0.15)
+    for i in ('svg', 'png'):
+        file = os.path.join(images_folder, f'metrics_biomass_yield_contours.{i}')
+        plt.savefig(file, dpi=900, transparent=True)
+
+def plot_metrics_across_biomass_yield_TOC(load=True, fs=12, smooth=1):
+    set_font(size=fs)
+    width = 5
+    aspect_ratio = 1.2
+    #x = 0.58
+    set_figure_size(width=width, aspect_ratio=aspect_ratio)
+    fig, axes = _plot_metrics_across_biomass_yield_TOC(
+        load=load, 
+        smooth=smooth,
+    )
+    plt.subplots_adjust(left=0.12, right=0.95, wspace=0.15, top=0.9, bottom=0.15)
     for i in ('svg', 'png'):
         file = os.path.join(images_folder, f'metrics_biomass_yield_contours.{i}')
         plt.savefig(file, dpi=900, transparent=True)
@@ -428,6 +444,113 @@ def plot_lines_biomass_yield():
     for i in ('svg', 'png'):
         file = os.path.join(images_folder, f'lines_oil_content_and_biomass_yield.{i}')
         plt.savefig(file, dpi=900, transparent=True)
+
+def _plot_metrics_across_biomass_yield_TOC(
+        load=False, N_decimals=1, 
+        yticks=None, titles=None, 
+        cmap=None, smooth=None,
+    ):
+    xticks = [0,   2,   4,   6,   8,   10]
+    xlim = (xticks[0], xticks[-1])
+    yticks = [13, 18, 23, 28]
+    ylim = (yticks[0], yticks[-1])
+    metrics = MBSP, GWP = [cane.MBSP, cane.GWP_biofuel_allocation]
+    metric_indices = [cane.all_metric_mockups.index(i) for i in metrics] 
+    cane.YRCP2023()
+    X, Y, data = generate_contour_data(
+        cane.evaluate_metrics_at_biomass_yield,
+        xlim, ylim, file=contour_file('configurations_biomass_yield_analysis'),
+        smooth=smooth,
+        load=load,
+        n=10,
+    )
+    data = data[:, :, metric_indices, 1] # ICF
+    # Plot contours
+    xlabel = 'Oil content [dw %]'
+    BY_units = format_units('DMT/ha/y')
+    ylabel = f"Biomass yield [{BY_units}]"
+    d0 = data[:, :, 0]
+    d1 = data[:, :, 1]
+    metric_bars = [
+        MetricBar('MBSP', format_units('USD/L'), plt.cm.get_cmap('viridis_r'), tickmarks(d0[~np.isnan(d0)], 5, 1, expand=0, p=0.5), 15, 1),
+        MetricBar('Carbon intensity', format_units(GWP.units).replace('CO2', 'CO_2'), plt.cm.get_cmap('inferno_r'), tickmarks(d1[~np.isnan(d0)], 5, 0.1, expand=0, p=0.1), 15, 1),
+    ]
+    fig, axes, CSs, CB, other_axes = plot_contour_2d(
+        X, Y, data, xlabel, '', xticks, yticks, 
+        metric_bars=metric_bars, titles=titles,
+        styleaxiskw=dict(xtick0=True), 
+        label=True, wbar=2.1
+    )
+    fig.text(0, 0.5, ylabel, va='center', rotation='vertical')
+    try:
+        df = cane.get_composition_data()
+    except:
+        pass
+    else:
+        names = df.index
+        lines = []
+        for name, color in zip(names, line_color_wheel):
+            data = df.loc[name]
+            if str(name) in ('19B', '316', '1565'): continue
+            oil = data['Stem oil (dw)']['Mean'] * 100
+            lines.append(
+                (name, 
+                 oil, 
+                 data['Biomass yield (dry MT/ha)']['Mean'],
+                 color)
+            )
+        for i in axes.flat: 
+            if hasattr(i, '_cached_ytwin'):
+                plt.sca(i); plt.xlim(xlim)
+                plt.sca(i._cached_ytwin); plt.xlim(xlim)
+        boxc = colors.neutral.shade(50).RGBn
+        txtbox = dict(boxstyle='round', facecolor=boxc, 
+                      edgecolor=boxc, pad=0.25, clip_on=False)
+        
+        for (name, lipid, biomass_yield, color) in lines:
+            feedstock = 'Sugarcane' if name == 'WT' else 'Oilcane'
+            line_results = cane.evaluate_metrics_at_biomass_yield(lipid, biomass_yield)[metric_indices]
+            for i, (*axes_columns, _) in enumerate(axes):
+                mb = metric_bars[i]
+                units = mb.units.replace('CO2', 'CO_2')
+                y = biomass_yield
+                if biomass_yield > 25:
+                    verticalalignment = 'center'
+                elif biomass_yield < 10:
+                    verticalalignment = 'bottom'
+                else:
+                    verticalalignment = 'bottom'
+                if lipid >= 10:
+                    x = lipid - 0.2
+                    horizontalalignment = 'right'
+                    verticalalignment = 'top'
+                else:
+                    x = lipid + 0.2
+                    horizontalalignment = 'left'
+                for j, ax in enumerate(axes_columns):
+                    plt.sca(ax._cached_ytwin)
+                    value = line_results[i, j]
+                    if name == '1580': continue
+                    elif name == '1566': name = 'prototype'
+                    if name == 'Target': 
+                        text = f"Target oilcane:\n{value:.1f} {units}"
+                    elif name == 'WT':
+                        text = f"{feedstock}:\n{value:.1f} {units}"
+                    else:
+                        text = f"{feedstock} {name}:\n{value:.1f} {units}"
+                    plt.text(
+                        x, y, text, c=color.tint(15).RGBn,
+                        bbox=txtbox, verticalalignment=verticalalignment,
+                        horizontalalignment=horizontalalignment,
+                        fontsize=10,
+                    )
+                    plot_scatter_points(
+                        [lipid], [biomass_yield], marker='o', s=20,  linewidth=0.6,
+                        color=color.RGBn, edgecolor=edgecolor, clip_on=False, zorder=1e6,
+                    )
+                    
+    return fig, axes
+
 
 def plot_metrics_across_biomass_yield(
         load=False, N_decimals=1, 

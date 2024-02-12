@@ -189,8 +189,9 @@ def get_YRCP2023_spearman_names(configuration, kind=None):
         br.set_baseline_feedstock_price: 'Baseline feedstock price',
         # br.set_cellulosic_ethanol_price: full_name,
         # br.set_advanced_ethanol_price: full_name,
-        br.set_biomass_based_diesel_price: full_name,
-        br.set_cellulosic_based_diesel_price: full_name,
+        br.set_biodiesel_price: full_name,
+        br.set_RIN_D4_price: full_name,
+        br.set_RIN_D3_price: full_name,
         br.set_natural_gas_price: full_name,
         br.set_electricity_price: full_name, 
         br.set_IRR: name,
@@ -225,7 +226,7 @@ def get_YRCP2023_spearman_names(configuration, kind=None):
     if configuration == 'O7':
         del GWP_spearman_labels[br.set_cellulase_GWP]
         del GWP_spearman_labels[br.set_natural_gas_GWP]
-        del tea_spearman_labels[br.set_cellulosic_based_diesel_price]
+        del tea_spearman_labels[br.set_RIN_D3_price]
         del tea_spearman_labels[br.set_saccharification_reaction_time]
         del tea_spearman_labels[br.set_cellulase_price]
         del tea_spearman_labels[br.set_cellulase_loading]
