@@ -26,7 +26,7 @@ from warnings import warn
 from flexsolve import aitken_secant
 from biosteam import Unit
 from biosteam.units import Flash, HXutility, Mixer, MixTank, Pump, \
-    SolidsSeparator, StorageTank, LiquidsSplitSettler
+    SolidsSeparator, StorageTank, LiquidsSplitSettler, StirredTankReactor
 from biosteam.units.decorators import cost
 from thermosteam import Stream, MultiStream
 from biorefineries.HP.process_settings import price
@@ -73,8 +73,8 @@ class SulfuricAcidAdditionTank(Unit):
     # Bseline is (18+4.1) mg/g dry biomass as in Humbird et al., 93% purity
     acid_loading = 22.1
 
-    def __init__(self, ID='', ins=None, outs=(), *, feedstock_dry_mass):
-        Unit.__init__(self, ID, ins, outs)
+    def _init(self, feedstock_dry_mass):
+        
         self.feedstock_dry_mass = feedstock_dry_mass
 
     def _run(self):
@@ -125,8 +125,8 @@ class PretreatmentReactorSystem(Unit):
     _N_outs = 2
     _graphics = Flash._graphics
     
-    def __init__(self, ID='', ins=None, outs=(), T=130+273.15):
-        Unit.__init__(self, ID, ins, outs)
+    def _init(self, T=130+273.15):
+        
         self._multistream = MultiStream(None)
         self.T = T
         vapor, liquid = self.outs
@@ -304,8 +304,8 @@ class Saccharification(Unit):
     tau_saccharification = 24. # Humbird
     
 
-    def __init__(self, ID='', ins=None, outs=(), T=50+273.15):
-        Unit.__init__(self, ID, ins, outs)
+    def _init(self, T=50+273.15):
+        
         self.T = T
         
         # Based on Table 9 on Page 28 of Humbird et al.
@@ -371,8 +371,8 @@ class SeedTrain(Unit):
     
     # ferm_ratio is the ratio of conversion relative to the fermenter
 
-    def __init__(self, ID='', ins=None, outs=(), T=30.+273.15, ferm_ratio=0.9):
-        Unit.__init__(self, ID, ins, outs)
+    def _init(self, T=30.+273.15, ferm_ratio=0.9):
+        
         self.T = T
         self.ferm_ratio = ferm_ratio
 
@@ -504,14 +504,14 @@ class Reactor(Unit, PressureVessel, isabstract=True):
     # converted from ft3 to m3
     _V_max = pi/4*(20**2)*40/35.3147 
     
-    def __init__(self, ID='', ins=None, outs=(), *, 
+    def _init(self, 
                   P=101325, tau=0.5, V_wf=0.8,
                   length_to_diameter=2, kW_per_m3=0.985,
                   wall_thickness_factor=1,
                   vessel_material='Stainless steel 316',
                   vessel_type='Vertical'):
         
-        Unit.__init__(self, ID, ins, outs)
+        
         self.P = P
         self.tau = tau
         self.V_wf = V_wf
@@ -615,10 +615,11 @@ class CoFermentation(Reactor):
     
     productivity = 0.76 # in g/L/hr
 
-    def __init__(self, ID='', ins=None, outs=(), thermo=None, *, T=30.+273.15,
+    def _init(self, thermo=None, *, T=30.+273.15,
                   P=101325, V_wf=0.8, length_to_diameter=2,
                   kW_per_m3=0.0985, # Perry's handbook
-                  wall_thickness_factor=1,
+                   wall_thickness_factor=1,
+                   # tau=120., #reset by spec.set_productivity
                   vessel_material='Stainless steel 316',
                   vessel_type='Vertical',
                   neutralization=True,
@@ -626,13 +627,21 @@ class CoFermentation(Reactor):
                   allow_dilution=False,
                   allow_concentration=False):
         
-        Unit.__init__(self, ID, ins, outs)
+        
+        Reactor._init(self, P=P, 
+                      # tau=tau,
+                      V_wf=V_wf,
+        length_to_diameter=length_to_diameter, kW_per_m3=kW_per_m3,
+        wall_thickness_factor=wall_thickness_factor,
+        vessel_material=vessel_material,
+        vessel_type=vessel_type)
+        
         self.T = T
         self.P = P
         self.V_wf = V_wf
         self.length_to_diameter = length_to_diameter
         self.kW_per_m3 = kW_per_m3
-        self.wall_thickness_factor = wall_thickness_factor
+        # self.wall_thickness_factor = wall_thickness_factor
         self.vessel_material = vessel_material
         self.vessel_type = vessel_type
         self.neutralization = neutralization
@@ -845,8 +854,8 @@ class AcidulationReactor(Reactor):
     _N_ins = 2
     _N_outs = 1
     
-    def __init__(self, *args, **kwargs):
-        Reactor.__init__(self, *args, **kwargs)
+    def _init(self, *args, **kwargs):
+        Reactor._init(self, *args, **kwargs)
         self.acidulation_rxns = ParallelRxn([
             #   Reaction definition                                        Reactant        Conversion
             Rxn('CalciumLactate + H2SO4 -> 2 HP + CaSO4',                 'CalciumLactate',       1.),
@@ -910,13 +919,13 @@ class DehydrationReactor(Reactor):
     mcat_frac = 12/1.5 # kg per kg/h # 1/WHSV # Calculated from Dishisha et al. 2015
 
     # _equipment_lifetime = {'TiO2 catalyst': 1,}
-    def __init__(self, ID='', ins=None, outs=(), thermo=None, *, T=230.+273.15,
+    def _init(self, thermo=None, *, T=230.+273.15,
                   P=101325., V_wf=0.8, length_to_diameter=2, tau = 1,
                   kW_per_m3=0.0985, # Perry's handbook
                   wall_thickness_factor=1,
                   vessel_material='Stainless steel 304',
                   vessel_type='Vertical', X = 0.80):  # 80% based on Dunn et al. 2015
-        Unit.__init__(self, ID, ins, outs)
+        
         
         self.T = T
         self.P = P
@@ -1006,8 +1015,8 @@ class AnaerobicDigestion(Unit):
     _N_ins = 1	
     _N_outs = 3
     
-    def __init__(self, ID='', ins=None, outs=(), *, reactants, split=(), T=35+273.15):	
-        Unit.__init__(self, ID, ins, outs)	
+    def _init(self, reactants, split=(), T=35+273.15):	
+        	
         self.reactants = reactants	
         self.isplit = isplit = self.thermo.chemicals.isplit(split, None)
         self.split = isplit.data
@@ -1084,8 +1093,8 @@ class AerobicDigestion(Unit):
     # streams 622, 630, 611, 632, 621, and 616  in Humbird et al.
     evaporation = 4350/(4379+356069+2252+2151522+109089)
     
-    def __init__(self, ID='', ins=None, outs=(), *, reactants, ratio=0):
-        Unit.__init__(self, ID, ins, outs)
+    def _init(self, reactants, ratio=0):
+        
         self.reactants = reactants
         self.ratio = ratio
         chems = self.chemicals
