@@ -257,7 +257,7 @@ def create_succinic_sys(ins, outs):
         A301._run()
         K301.specifications[0]()
         R302.specifications[0]()
-        return R302.CO2_required
+        return R302.fresh_CO2_required
 
     @A301.add_specification(run=False)
     def A301_spec():
@@ -974,9 +974,18 @@ get_product_stream_MPSP()
 
 #%% LCA
 
-succinic_LCA = SuccinicLCA(succinic_sys, CFs, sugarcane, product_stream, ['SuccinicAcid',], 
-                           [], CT801, CWP802, BT701, True,
-                           credit_feedstock_CO2_capture=True, add_EOL_GWP=True)
+succinic_LCA = SuccinicLCA(system=succinic_sys, 
+                 CFs=CFs, 
+                 feedstock=sugarcane, 
+                 main_product=product_stream, 
+                 main_product_chemical_IDs=['SuccinicAcid',], 
+                 by_products=[], 
+                 cooling_tower=u.CT801, 
+                 chilled_water_processing_units=[u.CWP802,], 
+                 boiler=u.BT701, has_turbogenerator=True,
+                 credit_feedstock_CO2_capture=True, 
+                 add_EOL_GWP=True,
+                 )
 
 #%% Simulate and print
 spec.load_specifications(spec.baseline_yield, spec.baseline_titer, spec.baseline_productivity)
