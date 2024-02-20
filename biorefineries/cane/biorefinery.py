@@ -637,6 +637,7 @@ class Biorefinery:
             
             RIN_splitter.define_credit('Ethanol RIN D5', RIN_splitter.outs[0])
             RIN_splitter.define_credit('Ethanol RIN D3', RIN_splitter.outs[1])
+            RIN_splitter._cost = lambda: None # Workaround to be included in TEA
             cane_sys.update_configuration([*cane_sys.units, RIN_splitter])
             assert RIN_splitter in cane_sys.units
         elif number in conventional_ethanol_configurations:
@@ -672,12 +673,14 @@ class Biorefinery:
                 
                 RIN_splitter.define_credit('Biodiesel RIN D4', RIN_splitter.outs[0])
                 RIN_splitter.define_credit('Biodiesel RIN D3', RIN_splitter.outs[1])
+                RIN_splitter._cost = lambda: None # Workaround to be included in TEA
                 cane_sys.update_configuration([*cane_sys.units, RIN_splitter])
                 assert RIN_splitter in cane_sys.units
             else:
                 # A biodiesel stream should already exist
                 s.biodiesel.register_alias('biomass_based_diesel')
                 source = s.biodiesel.source
+                source._has_cost = True # Workaround to be included in TEA
                 source.define_credit('Biodiesel RIN D4', s.biodiesel)
         
         ## Additional modifications for speed

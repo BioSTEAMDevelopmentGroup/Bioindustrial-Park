@@ -84,7 +84,7 @@ class TEA_baseline(bst.TEA):
         return FCI 
 
     def _FOC(self, FCI):
-#All assumptions for FOC based on      
+#All assumptions for FOC based on [2]      
         return (FCI*(self.factor_local_taxes_and_insurance +
                      self.factor_maintenance_and_repairs + 
                      self.factor_operating_supplies +

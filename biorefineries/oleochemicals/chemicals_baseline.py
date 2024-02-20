@@ -13,7 +13,7 @@ from tag_properties import *
 #chems is a list of all the chemicals used in the azelaic acid production process
 chems = tmo.Chemicals([
 #1.Biodiesel production
-#Feedstock(TAGs in the composition)[1]
+#Feedstock TAGs in the composition, properties modelled based on[1]
 #TAGs of high oleic oils
         tmo.Chemical('OOO',#Triolein
                      search_ID = '122-32-7',
@@ -115,7 +115,7 @@ chems = tmo.Chemicals([
         tmo.Chemical('Nitrogen',phase = 'g'),
         tmo.Chemical('Oxygen',phase = 'g'),        
 #Products of oxidative cleavage
-        tmo.Chemical('Monomethyl_azelate'),
+        tmo.Chemical('Monomethyl_azelate','l'),
         tmo.Chemical('Monomethyl_suberate',search_ID = '3946-32-5'),
         tmo.Chemical('Caprylic_acid'),
         tmo.Chemical('Hexanoic_acid'),
@@ -199,7 +199,6 @@ chems = tmo.Chemicals([
         tmo.Chemical('Calcium_acetate',phase = 'l', default = True),
         tmo.Chemical('Cobalt_hydroxide',phase = 's', default = True, Tb = 100+273.15), #Solid precipitate obtained after catalyst seperation which is used as such [7], Tb from [11]
         tmo.Chemical('HCl2',
-                     # phase = 'l',
                      search_ID = 'HCl'),
         tmo.Chemical('Sodium_acetate', phase = 'l'),
         tmo.Chemical('Chromic_acid',default = True,phase = 'l'),#Because properties in the same vertical column of a periodic table remain the same
@@ -228,7 +227,9 @@ chems = tmo.Chemicals([
         tmo.Chemical('Heptane'),
 #Facilities        
 #Natural gas for heating purposes 
-        tmo.Chemical('Natural_gas',search_ID = 'CH4'), 
+        # tmo.Chemical('Natural_gas',search_ID = 'CH4'), 
+        tmo.Chemical('Methane',search_ID = 'CH4',phase = 'g'), 
+        
 #Chemicals required by the boilerturbogenerator (lactic acid chemicals from lactic acid bioerefinery) [10]
         tmo.Chemical('Ash',
                      MW = 1,
@@ -249,7 +250,9 @@ chems = tmo.Chemicals([
         tmo.Chemical('H2S', phase='g', Hf=-4927*4.184),
         tmo.Chemical('SO2', phase='g'),
         tmo.Chemical('CaSO4',search_ID = 'Calcium_sulfate'),
-        tmo.Chemical('Calcium_dihydroxide', phase='s', Hf=-235522*4.184),        
+        tmo.Chemical('Calcium_oxide',phase='s', Hf=-235522*4.184),     
+        tmo.Chemical('BoilerChems', search_ID='DiammoniumPhosphate',
+                                phase='l', Hf=0, HHV=0, LHV=0),
 #WWTs sludge based on cellulosic.chemicals     
         tmo.Chemical('WWTsludge',
                      search_db = False,
@@ -280,9 +283,10 @@ chems.Methyl_palmitate.Cn.l.method = 'ROWLINSON_BONDI'
 chems.Palmitic_acid.Cn.l.method = 'ROWLINSON_BONDI'
 chems.Stearic_acid.Cn.l.method = 'ROWLINSON_BONDI'
 chems.Oleic_acid.Cn.l.method = 'ROWLINSON_BONDI'
-chems.Natural_gas.Cn.l.method = 'DADGOSTAR_SHAW' #This method works for hydrocarbons
 chems.Malonic_acid.Cn.g.method = 'LASTOVKA_SHAW'
 chems.Malonic_acid.Cn.l.method = 'ROWLINSON_POLING'
+
+# TODO:RuntimeError: <System: SYS19> <System: SYS17> <System: SYS16> <ShortcutColumn: D604> Failed to extrapolate integral of gas heat capacity method 'HEOS_FIT' between T=-998.6322733218122 to 175.61 K for component with CASRN '67-56-1'
 
 #Making assumptions for missing viscosity of below TAGS 
 TAGs_with_unknown_props = [ 'LLL','OOO','LnLnLn','SSS']
@@ -291,11 +295,11 @@ for i in TAGs_with_unknown_props:
 
 # Feedstock, reactants and products     
 chems.Sodium_oleate.copy_models_from(chems.Oleic_acid,['mu','Hvap','Psat','Cn','V'])
-chems.Methyl_linoleate.copy_models_from(chems.Methyl_oleate,['V'])
-chems.Methyl_linolenate.copy_models_from(chems.Methyl_oleate,['V'])
+chems.Methyl_linoleate.copy_models_from(chems.Linoleic_acid,['V'])
+chems.Methyl_linolenate.copy_models_from(chems.Linolenic_acid,['V'])
 chems.Malonic_acid.copy_models_from(chems.Adipic_acid,['mu'])
-chems.Methyl_palmitate.copy_models_from(chems.Methyl_oleate,['mu'])
-chems.Methyl_stearate.copy_models_from(chems.Methyl_oleate,['mu'])
+chems.Methyl_palmitate.copy_models_from(chems.Palmitic_acid,['mu'])
+chems.Methyl_stearate.copy_models_from(chems.Stearic_acid,['mu'])
 chems.Monomethyl_azelate.copy_models_from(chems.Azelaic_acid,['Cn','Hvap'])
 
 ## Modelling properties of dihydroxylated compounds, mono and diester side products as MDHSA                                    
@@ -389,7 +393,8 @@ chems.Tungstic_acid.copy_models_from(chems.Chromic_acid,['Hvap','Psat','V'])
 chems.Sodium_tungstate.copy_models_from(chems.Chromic_acid,['Hvap','Psat'])
 chems.Calcium_tungstate.copy_models_from(chems.Chromic_acid,['Hvap','Psat','Cn'])
 
-#TODO: change the below
+#TODO; could not find better assumptions
+#set phase = s
 chems.Calcium_hydroxide.copy_models_from(tmo.Chemical('NaOH'),['Psat'])
 chems.Calcium_chloride.copy_models_from(tmo.Chemical('NaOH'),['Psat'])
 chems.Calcium_acetate.copy_models_from(tmo.Chemical('NaOH'),['Psat'])
@@ -399,10 +404,10 @@ chems.Cobalt_hydroxide.copy_models_from(chems.Cobalt_chloride,['Hvap','Psat'])
 chems.Calcium_tungstate.V.add_model(fn.rho_to_V(5800,
                                                 chems.Calcium_tungstate.MW),
                                                 top_priority = True)       
-chems.Calcium_hydroxide.V.add_model(fn.rho_to_V(2.34,
+chems.Calcium_hydroxide.V.add_model(fn.rho_to_V(2.34*1000,
                                                 chems.Calcium_hydroxide.MW),
                                                 top_priority = True)
-chems.Calcium_chloride.V.add_model(fn.rho_to_V(2.15,#Wiki
+chems.Calcium_chloride.V.add_model(fn.rho_to_V(2.15*1000,#Wiki
                                                 chems.Calcium_chloride.MW),
                                                 top_priority = True)    
 
@@ -419,7 +424,7 @@ chems.Sodium_methoxide.copy_models_from (LiquidMethanol,
 chems.Methanol.sigma.method = 'BROCK_BIRD'
 chems.Methanol.copy_models_from (LiquidMethanol,
                                          ['V',
-                                          'kappa', 'Cn',
+                                          'kappa',
                                           'Psat','mu'])
 
 
@@ -501,6 +506,7 @@ chems.set_synonym('Dipalmitin', 'DAG')
 chems.set_synonym('Pelargonic_acid','Nonanoic_acid')
 chems.set_synonym('HCl2','Liquid_HCl')
 chems.set_synonym('CaSO4', 'Gypsum')
+chems.set_synonym('Calcium_oxide', 'Lime')
 chems.set_synonym('Citric_acid', 'CitricAcid')
 
 ###References###
