@@ -51,11 +51,11 @@ get_adjusted_MSP = models.get_adjusted_MSP
 
 # %% 
 
-N_simulations_per_mode = 5000 # 2000
+N_simulations_per_mode = 50 # 2000
 
 percentiles = [0, 0.05, 0.1, 0.25, 0.5, 0.75, 0.9, 0.95, 1]
 
-notification_interval = 50
+notification_interval = 10
 
 results_dict = {'Baseline':{'MPSP':{}, 'GWP100a':{}, 'FEC':{}, 
                             'GWP Breakdown':{}, 'FEC Breakdown':{},},
@@ -63,15 +63,17 @@ results_dict = {'Baseline':{'MPSP':{}, 'GWP100a':{}, 'FEC':{},
                 'Sensitivity':{'Spearman':{'MPSP':{}, 'GWP100a':{}, 'FEC':{}}},}
 
 modes = [
-           #  'lab_batch',
-           # # 'lab_fed-batch', 
+             'lab_batch',
+            'lab_fed-batch', 
             'pilot_batch',
+            'pilot_fed-batch'
          ]
 
 parameter_distributions_filenames = [
-                                    # 'parameter-distributions_lab-scale_batch.xlsx',
-                                    # 'parameter-distributions_lab-scale_fed-batch.xlsx',
+                                    'parameter-distributions_lab-scale_batch.xlsx',
+                                    'parameter-distributions_lab-scale_fed-batch.xlsx',
                                     'parameter-distributions_pilot-scale_batch.xlsx',
+                                    'parameter-distributions_pilot-scale_fed-batch.xlsx',
                                     ]
 
 #%%
@@ -244,13 +246,13 @@ for i in range(len(modes)):
     
     
     results_dict['Uncertainty']['MPSP'][mode] = model.table.Biorefinery['Adjusted minimum selling price [$/kg]']
-    results_dict['Uncertainty']['GWP100a'][mode] = model.table.Biorefinery['Total GWP100a [kg-CO2-eq/kg]']
+    results_dict['Uncertainty']['GWP100a'][mode] = model.table.Biorefinery['Total gwp100a [kg-CO2-eq/kg]']
     results_dict['Uncertainty']['FEC'][mode] = model.table.Biorefinery['Total FEC [kg-CO2-eq/kg]']
     
     df_rho, df_p = model.spearman_r()
     
     results_dict['Sensitivity']['Spearman']['MPSP'][mode] = df_rho['Biorefinery', 'Adjusted minimum selling price [$/kg]']
-    results_dict['Sensitivity']['Spearman']['GWP100a'][mode] = df_rho['Biorefinery', 'Total GWP100a [kg-CO2-eq/kg]']
+    results_dict['Sensitivity']['Spearman']['GWP100a'][mode] = df_rho['Biorefinery', 'Total gwp100a [kg-CO2-eq/kg]']
     results_dict['Sensitivity']['Spearman']['FEC'][mode] = df_rho['Biorefinery', 'Total FEC [kg-CO2-eq/kg]']
 
 #%% Clean up NaN values for plotting
@@ -264,6 +266,7 @@ for mode in modes:
             if np.isnan(results_dict['Uncertainty'][metric][mode][i]):
                 results_dict['Uncertainty'][metric][mode][i] = median_val
                 tot_NaN_vals_dict[metric][mode] += 1
+                
 # %% Plots
 import contourplots
 
@@ -274,14 +277,18 @@ FEC_units = r"$\mathrm{MJ}\cdot\mathrm{kg}^{-1}$"
 
 scenario_name_labels = ['Lab. batch', 
                         'Lab. fed-batch', 
-                        'Pilot batch']
+                        'Pilot batch',
+                        'Pilot fed-batch']
 
 def get_small_range(num, offset):
     return(num-offset, num+offset)
 #%% MPSP
-MPSP_uncertainty = [results_dict['Uncertainty']['MPSP'][modes[0]],
+MPSP_uncertainty = [
+                    results_dict['Uncertainty']['MPSP'][modes[0]],
                     results_dict['Uncertainty']['MPSP'][modes[1]],
-                    results_dict['Uncertainty']['MPSP'][modes[2]]]
+                    results_dict['Uncertainty']['MPSP'][modes[2]],
+                    results_dict['Uncertainty']['MPSP'][modes[3]],
+                    ]
 market_range = (2.53, 2.89)
 biobased_lit_MPSP_range = (1.08, 3.63)
 
@@ -316,7 +323,8 @@ fossilbased_GWPs = [3.27, 3.43, 10.3, 12.1]
 
 GWP_uncertainty = [results_dict['Uncertainty']['GWP100a'][modes[0]],
                     results_dict['Uncertainty']['GWP100a'][modes[1]],
-                    results_dict['Uncertainty']['GWP100a'][modes[2]]]
+                    results_dict['Uncertainty']['GWP100a'][modes[2]],
+                    results_dict['Uncertainty']['GWP100a'][modes[3]]]
 
 
 biobased_lit_GWP_values = [1, 2, 3] #!!!
@@ -353,7 +361,8 @@ fossilbased_FECs = [59.2, 60.8, 112, 124]
 
 FEC_uncertainty = [results_dict['Uncertainty']['FEC'][modes[0]],
                     results_dict['Uncertainty']['FEC'][modes[1]],
-                    results_dict['Uncertainty']['FEC'][modes[2]]]
+                    results_dict['Uncertainty']['FEC'][modes[2]],
+                    results_dict['Uncertainty']['FEC'][modes[3]]]
 
 
 biobased_lit_FEC_values = [1, 2, 3] #!!!
@@ -408,7 +417,7 @@ contourplots.stacked_bar_plot(dataframe=df_TEA_breakdown,
 
 #%% LCA breakdown figures
 # GWP
-temp_GWP_breakdown_dict = results_dict['Baseline']['GWP Breakdown'][modes[2]]
+temp_GWP_breakdown_dict = results_dict['Baseline']['GWP Breakdown'][modes[3]]
 GWP_breakdown_dict = {
                         # 'areas': list(temp_GWP_breakdown_dict.keys()), 
                       'contributions': [100*i for i in list(temp_GWP_breakdown_dict.values())]}

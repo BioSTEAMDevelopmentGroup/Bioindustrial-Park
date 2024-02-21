@@ -122,7 +122,7 @@ class LCA:
         return self
 
     def __init__(self, system, system_chemicals, CFs, feedstock, feedstock_ID, main_product,
-                 cooling_and_chilled_water_production_units,
+                 BT, CT, CWP,
                  FU='1 kg', has_turbogenerator=True, demand_allocation_method='steam pool',
                  BT_sys = None):
         #: [System] System being evaluated.
@@ -150,10 +150,10 @@ class LCA:
         
         self.BT_sys = BT_sys # for older biorefineries
         
-        self.BT = self.units.BT
-        self.CT = self.units.CT
-        self.CWP = self.units.CWP
-        self.cooling_and_chilled_water_production_units = cooling_and_chilled_water_production_units
+        self.BT = BT
+        self.CT = CT
+        self.CWP = CWP
+        # self.cooling_and_chilled_water_production_units = cooling_and_chilled_water_production_units
         
         system._LCA = self
 

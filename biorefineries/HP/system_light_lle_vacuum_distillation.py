@@ -893,7 +893,7 @@ feeds = HP_sys.feeds
 
 products = [AA] # Don't include gypsum since we want to include carbon impurities in GWP calculation
 
-emissions = [i for i in flowsheet.stream
+emissions_from_sys = [i for i in flowsheet.stream
                             if i.source and not i.sink and not i in products]
     
 BT = flowsheet('BT')
@@ -1062,7 +1062,7 @@ FEC_CF_stream = CFs['FEC_CF_stream']
 
 # Carbon balance
 total_C_in = sum([feed.get_atomic_flow('C') for feed in feeds])
-total_C_out = AA.get_atomic_flow('C') + sum([emission.get_atomic_flow('C') for emission in emissions])
+total_C_out = AA.get_atomic_flow('C') + sum([emission.get_atomic_flow('C') for emission in emissions_from_sys])
 C_bal_error = (total_C_out - total_C_in)/total_C_in
 
 def get_unit_atomic_balance(unit, atom='C'):
@@ -1336,7 +1336,7 @@ def get_material_cost_breakdown_breakdown_fractional():
     return mcbbf_dict    
 
 
-HP_lca = LCA(HP_sys, HP_chemicals, CFs, feedstock, feedstock_ID, AA, [CT, CWP])
+HP_lca = LCA(HP_sys, HP_chemicals, CFs, feedstock, feedstock_ID, AA, BT, CT, CWP)
 
 # %% Full analysis
 # p11, p22, p33 = get_AA_MPSP(), HP_lca.GWP, HP_lca.FEC
