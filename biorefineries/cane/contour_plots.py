@@ -763,6 +763,9 @@ def plot_oil_recovery_integration(
     color = GG_colors.orange
     x = np.array([70, 70, 50])
     y = perf.hydrolysate_lipid_yield
+    # breakpoint()
+    # values = cane.evaluate_metrics_oil_recovery_integration(x[0], 100*y, productivity, titer)
+    # breakpoint()
     Z0 = Z[..., 0, :]
     new_shape = [Z0.shape[0] * Z0.shape[1], Z0.shape[-1]]
     interp = LinearNDInterpolator(list(zip(X.flatten(), Y.flatten())), Z0.reshape(new_shape))

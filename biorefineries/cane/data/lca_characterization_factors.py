@@ -22,9 +22,9 @@ GWP_characterization_factors = { # Material GWP cradle-to-gate [kg*CO2*eq / kg]
     'cellulase': 8.07, # GREET
     'H3PO4': 1.00, # GREET
     'lime': 1.164, # GREET
-    'MgSO4': 0.86221, # Ecoinvent 2021
+    'MgSO4': 3.9902e-1, # Ecoinvent 3.6, IPCC 2013
     'urea': 1.81, # GREET
-    'pure-glycerol': 1.6678, # Ecoinvent, TRACI, market for glycerine, RoW; 
+    'pure-glycerol': 3.3318, # Ecoinvent, IPCC 2013, market for glycerine, RoW; 
     'crude-glycerol': 0.36, # GREET
     'biodiesel': 1.13, # Soybean biodiesel GREET
     'DAP': 1.66, # GREET

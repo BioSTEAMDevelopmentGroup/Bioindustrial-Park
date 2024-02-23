@@ -651,7 +651,7 @@ def plot_breakdowns(biodiesel_only=False):
     if biodiesel_only:
         cane.YRCP2023()
         fig, axes = plt.subplots(nrows=1, ncols=3)
-        configurations = ('O7', 'O9', 'O8')
+        configurations = ('O7.WT', 'O9.WT', 'O8.WT')
         yticks = [-20, 0, 20, 40, 60, 80, 100]
         ytexts = ['']*len(yticks)
         for i, config in enumerate(configurations):
@@ -675,7 +675,7 @@ def plot_breakdowns(biodiesel_only=False):
         for i in ('svg', 'png'):
             name = f'breakdowns_biodiesel_only.{i}'
             file = os.path.join(images_folder, name)
-            plt.savefig(file, transparent=True)
+            plt.savefig(file, dpi=900, transparent=True)
     else:
         fig, axes = plt.subplots(nrows=1, ncols=2)
         plt.sca(axes[0])
@@ -697,7 +697,7 @@ def plot_breakdowns(biodiesel_only=False):
         for i in ('svg', 'png'):
             name = f'breakdowns.{i}'
             file = os.path.join(images_folder, name)
-            plt.savefig(file, transparent=True)
+            plt.savefig(file, dpi=900, transparent=True)
 
 # %% KDE
 
