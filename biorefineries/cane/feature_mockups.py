@@ -284,7 +284,7 @@ def get_YRCP2023_spearman_names(configuration, kind=None):
     lca_spearman_labels = {
         i: j for i, j in
         tea_spearman_labels.items()
-        if not any([k in ''.join(i) for k in ('price', 'cost', 'days', 'land', 'IRR')])
+        if not any([k in ''.join(i).lower() for k in ('price', 'cost', 'days', 'land', 'irr')])
     }
     lca_spearman_labels.update(GWP_spearman_labels)
     if kind == 'TEA':
