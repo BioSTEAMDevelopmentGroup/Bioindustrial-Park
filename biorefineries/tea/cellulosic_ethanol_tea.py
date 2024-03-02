@@ -181,7 +181,7 @@ def create_cellulosic_ethanol_tea(sys, OSBL_units=None, cls=None):
         WC_over_FCI=0.05,
         finance_interest=0.08,
         finance_years=10,
-        finance_fraction=0.4,
+        finance_fraction=0.6,
         OSBL_units=OSBL_units,
         warehouse=0.04, 
         site_development=0.09, 
