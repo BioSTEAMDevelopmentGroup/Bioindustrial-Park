@@ -10,11 +10,59 @@ import numpy as np
 import biosteam as bst
 import qsdsan as qs
 import biorefineries.SAF._chemicals as chems
+from biorefineries.SAF.systems import F
 
-__all__=('add_utility_agent','price', 'GWP_CFs')
+__all__=('load_preferences_and_process_settings',
+         'add_utility_agent',
+         'price',
+         'GWP_CFs')
 
-#%% 
 
+# %%
+ 
+
+# =============================================================================
+# System preferences and settings
+# =============================================================================
+def load_preferences_and_process_settings(T,flow_units,N,P_units,CE,
+                                          indicator,electricity_price,
+                                          electricity_EI):
+    bst.preferences.T = T
+    bst.preferences.flow = flow_units
+    bst.preferences.N = N
+    bst.preferences.P = P_units
+    bst.preferences.composition = True
+    bst.preferences.light_mode()
+    bst.preferences.save()
+    bst.settings.CEPCI = CE  
+    bst.settings.define_impact_indicator(key=indicator, units='kg*CO2e')
+    bst.settings.electricity_price = electricity_price
+    bst.settings.set_electricity_CF(indicator,electricity_EI, basis='kWhr', units='kg*CO2e')
+   
+    lps = bst.HeatUtility.get_heating_agent('low_pressure_steam')
+    mps = bst.HeatUtility.get_heating_agent('medium_pressure_steam')
+    hps = bst.HeatUtility.get_heating_agent('high_pressure_steam')
+    
+    # hps.T = 266 + 273.15
+    # hps.P = 44e5
+
+    # Side steam in CHP not a heat utility, thus will cause problem in TEA utility
+    # cost calculation if price not set to 0 here, costs for regeneration of heating
+    # and cooling utilities will be considered as CAPEX and OPEX of CHP and CT, respectively
+    for i in (lps, mps, hps):
+        i.heat_transfer_price = i.regeneration_price = 0
+    
+    bst.settings.get_agent('cooling_water').regeneration_price = 0
+    bst.settings.get_agent('chilled_water').heat_transfer_price = 0
+    bst.settings.get_agent('chilled_brine').heat_transfer_price = 0
+    bst.settings.get_agent('propane').heat_transfer_price = 0
+    
+
+
+
+# =============================================================================
+# Add utility agent: heating + cooling(for cryogenic distillation)
+# =============================================================================
 def add_utility_agent():
     # Add a heating agent
     DPO_chem = qs.Chemical('DPO_chem', search_ID='101-84-8')
@@ -28,13 +76,13 @@ def add_utility_agent():
                            # 400 C (673.15 K) and 138 psig (951477 pa) are max temp and pressure for HTF
                            thermo=HTF_thermo,
                            # T_limit = 495 F (530.372 K) is the highest temp that vapor can exist
-                           regeneration_price=1) # Lang
-                           # use default heat transfer efficiency (1)
+                           regeneration_price=1) 
+    # from Lang, C.; Lee, B. Heat Transfer Fluid Life Time Analysis of Diphenyl Oxide/Biphenyl Grades for Concentrated Solar Power Plants.
+                          
     # Temperature and pressure: https://www.dow.com/content/dam/dcc/documents/\
     # en-us/app-tech-guide/176/176-01334-01-dowtherm-heat-transfer-fluids-\
     # engineering-manual.pdf?iframe=true (accessed on 11-16-2022)
     bst.HeatUtility.heating_agents.append(HTF)
-    bst.CE = qs.CEPCI_by_year[2020] # use 2020$ to match up with latest PNNL report
 
     # Add a cooling agent
     Decamethyltetrasiloxane_chem = qs.Chemical('Decamethyltetrasiloxane_chem',search_ID='141-62-8')
@@ -46,21 +94,21 @@ def add_utility_agent():
     LTF_thermo = bst.Thermo((DEC,OCT,))
     LTF = bst.UtilityAgent('LTF', DEC=0.4, OCT=0.6, T=173.15, P=5.2*101325, phase='l',
                            thermo = LTF_thermo,
-                           regeneration_price=1)
+                           heat_transfer_price=0.00001317) # Based on propane heat transfer price
     bst.HeatUtility.cooling_agents.append(LTF)
-
-
 
 # =============================================================================
 # Prices for techno-economic analysis (TEA)
 # Adjust price to 2023 to match up with jet fuel tax credit for 2023-2024
 # =============================================================================
-
 _lb2kg = 0.453592
 _ft3_per_m3 = 35.3147
-_kgal_to_L = 3.785412 *1000
-
-bst.CE = 798.7 # Aug 2023 # https://toweringskills.com/financial-analysis/cost-indices/
+_kgal_to_L = 3.785412 * 1000
+_gal_to_L = 3.785412
+gasoline_density = 0.7489 # in kg/L
+gasoline_price_conversion_index = 1 / _gal_to_L / gasoline_density # from $/gal to $/kg
+diesel_density = 0.838 # in kg/L
+diesel_price_conversion_index = 1 / _gal_to_L / diesel_density # from $/gal to $/kg
 
 # Producer price index (PPI) by Commodity: Chemicals and Allied Products, 
 # from https://fred.stlouisfed.org/series/WPU06
@@ -93,16 +141,13 @@ PPI_utility_2016_2022 = [PPI_utility_2016,
                          PPI_utility_2021,
                          PPI_utility_2022]
 
-PPI_utility_2023 = 197.546 # Sept 2023 
+PPI_utility_2023 = 187.389 # Average 2023
 _utility_2016_2022_period_to2023 = PPI_utility_2023/np.mean(PPI_utility_2016_2022)
-_utility_2016_to2023 = PPI_utility_2023/PPI_utility_2016
+_utility_2021_to2023 = PPI_utility_2023/PPI_utility_2021
 
 _GDP_2007to2023 = 122.254/86.346 # https://fred.stlouisfed.org/series/GDPDEF
 
 energycane_price = 0.035
-# From 'Techno-economic feasibility analysis of engineered energycane-based biorefinery co-producing biodiesel and ethanol (2021)'
-# "Techno-economic analysis of biodiesel and ethanol co-production from lipid-producing sugarcane (2016)"
-# $35/metric ton to $/kg, for 60% moisture content
 
 H3PO4_price = 1.25 # https://catcost.chemcatbio.org/materials-library accessed Jan 7 2024
 
@@ -144,7 +189,7 @@ natural_gas_price_2016_to_2022 = [3.51,4.08,4.19,3.90,3.32,5.44,7.66] # https://
 
 electricity_price_2016_to_2022 = [6.76,6.88,6.92,6.81,6.67,7.18,8.45]  # https://www.eia.gov/electricity/data/browser/#/topic/7?agg=2,0,1&geo=g&freq=M cents/Kwh
 
-water_price_2008_2012_2016 = [2.44,3.02,3.38] # $/kGal Provided by USDOE
+water_price_2021 = 3.86 # $2021/kGal https://www.osti.gov/servlets/purl/1975260
 
 CH4_V = chems.CH4.V(298.15, 101325) # molar volume in m3/mol
 CH4_MW = chems.CH4.MW
@@ -152,42 +197,46 @@ natural_gas_price = np.mean(natural_gas_price_2016_to_2022)/1e3*_ft3_per_m3*CH4_
      
 electricity_price = np.mean(electricity_price_2016_to_2022) * _utility_2016_2022_period_to2023/100 # cents to $
 
-water_price = np.mean(water_price_2008_2012_2016) * _kgal_to_L * _utility_2016_to2023
+water_price = water_price_2021 / _kgal_to_L * _utility_2021_to2023
 
 # Co-product credits
-diesel_price_2021_to_2023 = [3.1,4.059,3.635] # $/gallon https://www.eia.gov/dnav/pet/pet_pri_gnd_dcus_nus_a.htm
+gasoline_price_2021_to_2023 = [3.1,4.059,3.635] # $/gallon https://www.eia.gov/dnav/pet/pet_pri_gnd_dcus_nus_a.htm
 
-gasoline_price_2021_to_2023 = [3.287,4.989,4.214] # $/gallon https://www.eia.gov/dnav/pet/pet_pri_gnd_dcus_nus_a.htm
+diesel_price_2021_to_2023 = [3.287,4.989,4.214] # $/gallon https://www.eia.gov/dnav/pet/pet_pri_gnd_dcus_nus_a.htm
 
-diesel_price = np.mean(diesel_price_2021_to_2023)
+jet_fuel_price_2023 = 2.437 # $/kg https://www.iata.org/en/iata-repository/publications/economic-reports/sustainable-aviation-fuel-output-increases-but-volumes-still-low/
 
-gasoline_price = np.mean(gasoline_price_2021_to_2023) 
+gasoline_price = np.mean(gasoline_price_2021_to_2023) * gasoline_price_conversion_index # s/gallon to $/kg
 
+diesel_price = np.mean(diesel_price_2021_to_2023) * diesel_price_conversion_index # s/gallon to $/kg
+
+jet_fuel_price = jet_fuel_price_2023
 
 # All in 2023 $/kg
 price = {
-    'Feedstock': energycane_price,
-    'Water': water_price,
+    'feedstock': energycane_price,
+    'water': water_price,
     'H3PO4': H3PO4_price * _chemical_2021to2023, 
-    'Flocculant': flocculant_price, 
-    'Lime': lime_price * _chemical_2021to2023,  
-    'Enzyme': enzyme_price,
+    'flocculant': flocculant_price, 
+    'lime': lime_price * _chemical_2021to2023,  
+    'enzyme': enzyme_price,
     'CSL': CSL_price, 
     'DAP': DAP_price,
-    'NaOH': NaOH_price/2 * _chemical_2021to2023, # 50% NaOH
+    'NaOH': NaOH_price * 0.5 * _chemical_2021to2023, # 50% NaOH
     'Syndol catalyst': Syndol_catalyst_price, 
     'Ni-loaded aluminosilicate catalyst': Ni_loaded_aluminosilicate_catalyst_price, 
     'Aluminosilicate catalyst': Aluminosilicate_catalyst_price,
     'Como catalyst': Como_catalyst_price, 
-    'H2': H2_price,
-    'Ash disposal': ash_disposal_price,
-    'Boiler chems': boiler_chems_price,
-    'Cooling tower chems': cooling_tower_price,
-    'Baghouse bag': baghouse_bag_price,
-    'Natural gas': natural_gas_price,
-    'Electricity': electricity_price,
-    'Diesel': -diesel_price,
-    'Gasoline': -gasoline_price
+    'h2': H2_price,
+    'ash disposal': ash_disposal_price,
+    'boiler chems': boiler_chems_price,
+    'cooling tower chems': cooling_tower_price,
+    'baghouse bag': baghouse_bag_price,
+    'natural gas': natural_gas_price,
+    'electricity': electricity_price,
+    'gasoline': gasoline_price,
+    'jet fuel': jet_fuel_price,
+    'diesel': diesel_price
         }
 
 
@@ -199,25 +248,22 @@ price = {
 # =============================================================================
 
 # 100-year global warming potential (GWP) in kg CO2-eq/kg
+
 GWP_CFs = {
-    'Feedstock': 1,
+    'feedstock': 0.069, # 69g/kg dry miscanthus
     'H3PO4': 0.86829, # ecoinvent 3.8 market for phosphoric acid, RoW
-    'Flocculant': 3.1996, # ecoinvent 3.8 market for polyacrylamide-based anionic flocculants, GLO
-    'Lime': 1.29,
-    'Enzyme': 2.24,
+    'flocculant': 3.1996, # ecoinvent 3.8 market for polyacrylamide-based anionic flocculants, GLO
+    'lime': 1.29,
+    'enzyme': 2.24,
     'CSL': 1.55,
     'DAP': 1.6445, # ecoinvent 3.8 market for diammonium phosphate, RoW
     'NaOH': 2.11,
-    'H2': 1.5624, # ecoinvent 3.8 market for hydrogen, gaseous, GLO
-    'Natural gas': 0.40, # NA NG from shale and conventional recovery
-    'Electricity': (0.48, 0.48), # assume production==consumption, both in kg CO2-eq/kWh
-    'Gasoline': -0.8433, # Gasoline blendstock for U.S crude oil refinery from GREET, negative as it is a coproduct 
-    'Diesel': -0.6566 # Diesel for U.S crude oil for U.S crude oil refinery from GREET, negative as it is a coproduct 
+    'h2': 1.5624, # ecoinvent 3.8 market for hydrogen, gaseous, GLO
+    'natural gas': 0.40, # NA NG from shale and conventional recovery
+    'electricity': 0.48, # in kg CO2-eq/kWh
+    'gasoline': -0.8433, # Gasoline blendstock for U.S crude oil refinery from GREET, negative as it is a coproduct 
+    'diesel': -0.6566 # Diesel for U.S crude oil for U.S crude oil refinery from GREET, negative as it is a coproduct 
     }
-
-
-
-
 
 
 

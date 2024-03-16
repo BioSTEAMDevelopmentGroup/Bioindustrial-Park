@@ -12,7 +12,7 @@ from thermosteam import functional as fn
 from biorefineries.sugarcane import chemicals as sugarcane_chemicals
 
 
-__all__=('energycane_chemicals',
+__all__=('SAF_chemicals',
          'chemical_groups',
          'default_nonsolids',
          'default_insoluble_solids',
@@ -24,7 +24,7 @@ _cal2joule=4.184
 
 #%% 
 
-chems=energycane_chemicals=tmo.Chemicals([])
+chems=SAF_chemicals=tmo.Chemicals([])
 
 database_chemicals_dict={}
 copied_chemicals_dict={}
@@ -191,16 +191,18 @@ Glucan = chemical_defined('Glucan', phase='s', formula='C6H10O5', Hf=-233200*_ca
 Glucan.copy_models_from(Glucose, ['Cn'])
 
 Galactan = chemical_copied('Galactan', Glucan)
+Mannan = chemical_copied('Mannan', Glucan)
 
 Xylan = chemical_defined('Xylan', phase='s', formula='C5H8O4', Hf=-182100*_cal2joule)
 Xylan.copy_models_from(Xylose, ['Cn'])
 Arabinan = chemical_copied('Arabinan', Xylan)
 
 
-# Cellulose=chemical_defined('Cellulose', formula="C6H10O5", # Glucose monomer minus water
-#                            Hf=-233200.06*_cal2joule)
-# Hemicellulose=chemical_defined('Hemicellulose', formula='C5H8O4', # Xylose monomer minus water
-#                                Hf=-761906.4)
+Cellulose=chemical_defined('Cellulose', formula="C6H10O5", # Glucose monomer minus water
+                            Hf=-233200.06*_cal2joule)
+Hemicellulose=chemical_defined('Hemicellulose', formula='C5H8O4', # Xylose monomer minus water
+                                Hf=-761906.4)
+
 Flocculant = chemical_defined('Flocculant',
                                  MW=1.)
 Lignin = chemical_database('Lignin', phase='s')
@@ -285,7 +287,7 @@ default_nonsolids = ['Water', 'Ethanol', 'AceticAcid',
                      'Furfural', 'H2SO4', 'NH3', 'HMF']
 
 #: Default insolible chemicals for saccharification solids-loading specification
-default_insoluble_solids = ['Glucan', 'Xylan', 
+default_insoluble_solids = ['Glucan', 'Xylan', 'Mannan'
                             'Arabinan', 'Galactan', 'Lignin']
 
 #: Default ignored chemicals for saccharification solids-loading specification
@@ -334,7 +336,8 @@ chemical_groups = dict(
                             'Ash',
                             'Lime'),
     OtherStructuralCarbohydrates = ('Arabinan',
-                                    'Galactan'))
+                                    'Galactan',
+                                    'Mannan'))
 def get_grouped_chemicals(stream, units='kmol/hr'):
     new_stream = tmo.Stream(stream.thermo)
     new_stream.set_flow(stream.mol, units, stream.chemicals.IDs)
@@ -421,10 +424,10 @@ defined_chemicals = {
     'AA', 'tri-n-octylamine', 'Dipotassium hydrogen phosphate',
     'Water', 'SulfuricAcid', 'Ammonia', 'NH4SO4', 'Octane',
     'CarbonDioxide', 'CO', 'NO', 'Gypsum', 'PhosphorusPentoxide',
-    'SodiumSulfate', 'NH4OH', 'IBA', *[i.ID for i in energycane_chemicals]
+    'SodiumSulfate', 'NH4OH', 'IBA', *[i.ID for i in SAF_chemicals]
 }
 
-energycane_chemicals.extend([i for i in sugarcane_chemicals if i.ID not in defined_chemicals])
+SAF_chemicals.extend([i for i in sugarcane_chemicals if i.ID not in defined_chemicals])
 # %%
 
 # Though set_thermo will first compile the Chemicals object,
@@ -453,6 +456,6 @@ chems.set_synonym('Acetaldehyde', 'CH3CHO')
 chems.set_synonym('Butadiene', 'C4H8')
 
 # %% Set all "None" Hfus values to 0
-for chem in energycane_chemicals:
+for chem in SAF_chemicals:
     if chem.Hfus == None:
         chem.Hfus = 0

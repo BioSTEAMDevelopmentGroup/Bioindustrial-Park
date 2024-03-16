@@ -7,6 +7,7 @@ Created on Tue Oct 31 08:16:49 2023
 """
 
 #%%
+from typing import Optional
 import numpy as np
 import biosteam as bst
 import thermosteam as tmo
@@ -16,6 +17,7 @@ from biosteam.units.decorators import cost
 from biosteam.units.design_tools import size_batch
 from thermosteam import MultiStream
 from biosteam.units.design_tools.geometry import cylinder_diameter_from_volume
+from biorefineries.SAF._process_settings import price
 
 _lb2kg = 0.453592
 _gal2m3 = 0.003785
@@ -27,6 +29,7 @@ Rxn = tmo.reaction.Reaction
 ParallelRxn = tmo.reaction.ParallelReaction
 
 CEPCI = bst.design_tools.CEPCI_by_year
+
 #%% 
 
 # Pretreatment
@@ -55,10 +58,10 @@ class PretreatmentReactor(bst.units.design_tools.PressureVessel, Unit):
         Rxn('Glucan + H2O -> Glucose',                   'Glucan',   0.0990, chemicals),
         Rxn('Glucan + H2O -> GlucoseOligomer',           'Glucan',   0.0030, chemicals),
         Rxn('Glucan -> HMF + 2 H2O',                     'Glucan',   0.0030, chemicals),
-        # Rxn('Galactan + H2O -> GalactoseOligomer',       'Galactan', 0.0240, chemicals),
-        # Rxn('Galactan -> HMF + 2 H2O',                   'Galactan', 0.0030, chemicals),
-        # Rxn('Mannan + H2O -> MannoseOligomer',           'Mannan',   0.0030, chemicals),
-        # Rxn('Mannan -> HMF + 2 H2O',                     'Mannan',   0.0030, chemicals),
+        Rxn('Galactan + H2O -> GalactoseOligomer',       'Galactan', 0.0240, chemicals),
+        Rxn('Galactan -> HMF + 2 H2O',                   'Galactan', 0.0030, chemicals),
+        Rxn('Mannan + H2O -> MannoseOligomer',           'Mannan',   0.0030, chemicals),
+        Rxn('Mannan -> HMF + 2 H2O',                     'Mannan',   0.0030, chemicals),
         Rxn('Sucrose -> HMF + Glucose + 2H2O',           'Sucrose',  1.0000, chemicals),
         Rxn('Xylan + H2O -> Xylose',                     'Xylan',    0.9000, chemicals),
         Rxn('Xylan + H2O -> XyloseOligomer',             'Xylan',    0.0240, chemicals),
@@ -127,28 +130,23 @@ class PretreatmentReactor(bst.units.design_tools.PressureVessel, Unit):
         self._decorated_cost()
 
 
-# Fermentation
 
+
+
+# Fermentation
 @cost(basis='Flow rate', ID='Mixer', units='kg/hr',
       kW=74.57, cost=109000, S=379938, CE=CEPCI[2009], n=0.5, BM=1.7)
 class EnzymeHydrolysateMixer(Mixer):
+    
     _N_ins = 3
     _N_outs = 1
     _graphics = Mixer._graphics
-    auxiliary_unit_names = ('heat_exchanger',)
 
     def __init__(self, ID='', ins=None, outs=(),
                  enzyme_loading=20, solids_loading=0.2, T=None):
         Unit.__init__(self, ID, ins, outs)
         self.enzyme_loading = enzyme_loading
         self.solids_loading = solids_loading
-        self.T = T
-        ID = self.ID
-        hx_in = Stream(f'{ID}_hx_in')
-        hx_out = Stream(f'{ID}_hx_out')
-        # Add '.' in ID for auxiliary units
-        self.heat_exchanger = HXutility(ID=f'.{ID}_hx', ins=hx_in, outs=hx_out, T=T)
-
 
     def _run(self):
         hydrolysate, enzyme, water = self.ins
@@ -163,15 +161,14 @@ class EnzymeHydrolysateMixer(Mixer):
         water.imass['Water'] = max(0, total_mass-mixture.F_mass)
 
         effluent.mix_from([hydrolysate, enzyme, water])
-        if self.T: effluent.T = self.T
-
 
     def _design(self):
         self.design_results['Flow rate'] = self.F_mass_in
-        hx = self.heat_exchanger
-        hx.ins[0].mix_from(self.ins)
-        hx.outs[0].copy_like(self.outs[0])
-        hx.simulate_as_auxiliary_exchanger(ins=hx.ins, outs=hx.outs)
+          
+       
+    
+
+
 
 
 
@@ -179,6 +176,8 @@ class EnzymeHydrolysateMixer(Mixer):
 
 @cost('Flow rate', 'Recirculation pumps', kW=30, S=340*_gpm2m3hr,
       cost=47200, n=0.8, BM=2.3, CE=522, N='N_reactors')
+@cost('Reactor duty', 'Heat exchangers', CE=522, cost=23900,
+      S=-5*_Gcal2kJ, n=0.7, BM=2.2, N='N_reactors') # Based on a similar heat exchanger
 @cost('Reactor volume', 'Agitators', CE=522, cost=52500,
       S=1e6*_gal2m3, n=0.5, kW=90, BM=1.5, N='N_reactors')
 @cost('Reactor volume', 'Reactors', CE=522, cost=844000,
@@ -188,14 +187,17 @@ class SaccharificationAndCoFermentation(Unit):
     _N_outs = 3
     
 
-    # #: Saccharification temperature (K)
-    # T_saccharification = 48+273.15
+    #: Saccharification temperature (K)
+    T_saccharification = 48+273.15
 
-    # #: Fermentation temperature (K)
-    # T_fermentation = 32+273.15
+    #: Fermentation temperature (K)
+    T_fermentation = 32+273.15
     
-    #: Saccharification and Co-Fermentation time (hr)
-    tau = 72
+    #: Saccharification time (hr)
+    tau_saccharification = 60
+    
+    #: Co-Fermentation time (hr)
+    tau_cofermentation = 36
     
     #: Unload and clean up time (hr)
     tau_0 = 4
@@ -209,24 +211,19 @@ class SaccharificationAndCoFermentation(Unit):
     _units = {'Flow rate': 'm3/hr',
               'Reactor volume': 'm3',
               'Reactor duty': 'kJ/hr'}
-    
-    auxiliary_unit_names = ('heat_exchanger',)
 
     # Split to outs[2]
     inoculum_ratio = 0.1
 
-    def __init__(self, ID='', ins=None, outs=(), T=34+273.15, P=101325):
+    def __init__(self, ID='', ins=None, outs=(), P=101325):
         Unit.__init__(self, ID, ins, outs)
-        self.T = T
         self.P = P
         ID = self.ID
-        self.saccharified_stream = Stream(f'{ID}_ss')
-        hx_in = Stream(f'{ID}_hx_in')
-        hx_out = Stream(f'{ID}_hx_out')
-        self.heat_exchanger = HXutility(ID=f'.{ID}_hx', ins=hx_in, outs=hx_out,T=T)
+        self.saccharified_stream = tmo.Stream(None)
 
         self.saccharification_rxns = ParallelRxn([
     #   Reaction definition                   Reactant     Conversion
+    Rxn('Sucrose + Water -> 2 Glucose',       'Sucrose',     1), # Juice hydrolysis
     Rxn('Glucan -> GlucoseOligomer',          'Glucan',      0.04),
     Rxn('Glucan + 0.5 H2O -> 0.5 Cellobiose', 'Glucan',      0.012),
     Rxn('Glucan + H2O -> Glucose',            'Glucan',      0.9),
@@ -265,21 +262,19 @@ class SaccharificationAndCoFermentation(Unit):
         DAP.imass['DAP'] = 0.33 * (feed.F_vol + concentrated_juice.F_vol)
         
         ss.mix_from((feed, inoculum, CSL, DAP, concentrated_juice))
-        ss.T = sidedraw.T = effluent.T = self.T
-        
-        vent.P = effluent.P = sidedraw.P = self.P
-        vent.phase = 'g'
-        
+        ss.T = sidedraw.T = self.T_saccharification
         
         self.saccharification_rxns(ss.mol)
         # Sidedraw to seedtrain
         sidedraw.mol = ss.mol * self.inoculum_ratio
         effluent.mol = ss.mol - sidedraw.mol
         
-        
         self.loss_rxns(effluent.mol)
         self.cofermentation_rxns(effluent.mol)
         
+        vent.T = effluent.T = sidedraw.T = self.T_fermentation
+        vent.P = effluent.P = sidedraw.P = self.P
+        vent.phase = 'g'
         vent.empty()
         vent.receive_vent(effluent, energy_balance=False)
 
@@ -288,14 +283,144 @@ class SaccharificationAndCoFermentation(Unit):
         v_0 = effluent.F_vol
         Design = self.design_results
         Design['Flow rate'] = v_0 / self.N_reactors
-        Design.update(size_batch(v_0, self.tau, self.tau_0, self.N_reactors, self.V_wf))
+        tau=self.tau_saccharification + self.tau_cofermentation
+        Design.update(size_batch(v_0, tau, self.tau_0, self.N_reactors, self.V_wf))
 
+        Design['Reactor duty'] = reactor_duty = self.Hnet
+        self.add_heat_utility(reactor_duty, effluent.T)
+
+
+
+
+
+@cost('Flow rate', 'Recirculation pumps', kW=30, S=340*_gpm2m3hr,
+      cost=47200, n=0.8, BM=2.3, CE=522, N='N_reactors')
+@cost('Batch duty', 'Fermentor batch cooler', CE=522, cost=86928,
+      S=-5*_Gcal2kJ, n=0.7, BM=1.8) # Based on a similar heat exchanger
+@cost('Reactor duty', 'Heat exchangers', CE=522, cost=23900,
+      S=-5*_Gcal2kJ, n=0.7, BM=2.2, N='N_reactors') # Based on a similar heat exchanger
+@cost('Reactor volume', 'Agitators', CE=522, cost=52500,
+      S=1e6*_gal2m3, n=0.5, kW=90, BM=1.5, N='N_reactors')
+@cost('Reactor volume', 'Reactors', CE=522, cost=844000,
+      S=1e6*_gal2m3, n=0.5, BM=1.5, N='N_reactors')
+class SaccharificationAndCoFermentation2(Unit): # Cellulosic Unit
+    _N_ins = 5
+    _N_outs = 3
+    
+    _units = {'Flow rate': 'm3/hr',
+              'Reactor volume': 'm3',
+              'Batch duty': 'kJ/hr',
+              'Reactor duty': 'kJ/hr'}
+    
+    #: Number of reactors
+    N_reactors = 12
+    
+    #: Working volume fraction (filled tank to total tank volume)
+    V_wf = 0.9
+
+    #: Saccharification temperature (K)
+    T_saccharification = 48+273.15
+
+    #: Fermentation temperature (K)
+    T_fermentation = 32+273.15
+    
+    #: Saccharification time (hr)
+    tau_saccharification = 60
+    
+    #: Co-Fermentation time (hr)
+    tau_cofermentation = 36
+    
+    #: Unload and clean up time (hr)
+    tau_0 = 4
+    
+    # Split to outs[2]
+    inoculum_ratio = 0.1
+    
+    CSL_loading = 0.0025 # 0.25%
+    
+    DAP_loading = 0.33 # g/L (kg/m3)
+
+    def __init__(self, ID='', ins=None, outs=(), P=101325, C5_saccharification=True):
+        Unit.__init__(self, ID, ins, outs)
+        self.P = P
+        self.C5_saccharification = C5_saccharification
+        self.saccharified_stream = tmo.Stream(None)
+
+        self.saccharification_rxns_C6 = ParallelRxn([
+    #   Reaction definition                   Reactant     Conversion
+    Rxn('Sucrose + Water -> 2 Glucose',       'Sucrose',     1), # Juice hydrolysis
+    Rxn('Glucan -> GlucoseOligomer',          'Glucan',      0.04),
+    Rxn('Glucan + 0.5 H2O -> 0.5 Cellobiose', 'Glucan',      0.012),
+    Rxn('Glucan + H2O -> Glucose',            'Glucan',      0.9),
+    Rxn('Cellobiose + H2O -> Glucose',        'Cellobiose',  1)])
+
+        self.saccharification_rxns_C5 = ParallelRxn([
+    #   Reaction definition                   Reactant     Conversion
+    Rxn('Xylan + H2O -> Xylose',              'Xylan',       0.9),
+    Rxn('Arabinan + H2O -> Arabinose',        'Arabinan',    0.85)])
+
+        self.loss_rxns = ParallelRxn([
+    #   Reaction definition               Reactant    Conversion
+    Rxn('Glucose -> 2 LacticAcid',       'Glucose',   0.03),
+    Rxn('3 Xylose -> 5 LacticAcid',      'Xylose',    0.03),
+    Rxn('3 Arabinose -> 5 LacticAcid',   'Arabinose', 0.03),
+    Rxn('Galactose -> 2 LacticAcid',     'Galactose', 0.03),
+    Rxn('Mannose -> 2 LacticAcid',       'Mannose',   0.03),])
+
+        self.fermentation_rxns = ParallelRxn([
+    #   Reaction definition                                          Reactant    Conversion
+    Rxn('Glucose -> 2 Ethanol + 2 CO2',                             'Glucose',   0.95),
+    Rxn('Glucose + 0.047 CSL + 0.018 DAP -> 6 Z_mobilis + 2.4 H2O', 'Glucose',   0.02),
+    Rxn('Glucose + 2 H2O -> 2 Glycerol + O2',                       'Glucose',   0.004),
+    Rxn('Glucose + 2 CO2 -> 2 SuccinicAcid + O2',                   'Glucose',   0.006),
+    Rxn('3 Xylose -> 5 Ethanol + 5 CO2',                            'Xylose',    0.85),
+    Rxn('Xylose + 0.039 CSL + 0.015 DAP -> 5 Z_mobilis + 2 H2O',
+                                                                    'Xylose',    0.019),
+    Rxn('3 Xylose + 5 H2O -> 5 Glycerol + 2.5 O2',                  'Xylose',    0.003),
+    Rxn('Xylose + H2O -> Xylitol + 0.5 O2',                         'Xylose',    0.046),
+    Rxn('3 Xylose + 5 CO2 -> 5 SuccinicAcid + 2.5 O2',              'Xylose',    0.009),
+    ])
+
+    def _run(self):
+        feed, inoculum, CSL, DAP, concentrated_juice = self.ins
+        vent, effluent, sidedraw = self.outs
+        effluent.copy_like(feed)
+        vent.P = effluent.P = sidedraw.P = self.P
+        ss = self.saccharified_stream
+        vent.phase = 'g'
+
+        CSL.imass['CSL'] = feed.imass['CSL'] = self.CSL_loading * feed.F_mass
+        DAP.imass['DAP'] = feed.imass['DAP'] = self.DAP_loading * feed.F_vol
+        ss.mix_from(self.ins)
+        self.saccharification_rxns_C6(ss.mol)
+        if self.C5_saccharification:
+            self.saccharification_rxns_C5(ss.mol)
         
-        hx = self.heat_exchanger
-        hx.ins[0].mix_from(self.ins[0:4])
-        hx.outs[0].mix_from(self.outs[0:2])
-        hx.outs[0].T = self.T
-        hx.simulate_as_auxiliary_exchanger(ins=hx.ins,outs=hx.outs)
+        sidedraw.mol = ss.mol * self.inoculum_ratio
+        effluent.mol = ss.mol - sidedraw.mol
+        self.loss_rxns(effluent.mol)
+        self.fermentation_rxns(effluent.mol)
+        vent.receive_vent(effluent)
+
+        ss.T = sidedraw.T = self.T_saccharification
+        vent.T = effluent.T = self.T_fermentation
+
+    def _design(self):
+        effluent = self.outs[1]
+        v_0 = effluent.F_vol
+        Design = self.design_results
+        
+        Design['Flow rate'] = v_0 / self.N_reactors
+        Design.update(size_batch(v_0, self.tau, self.tau_0, self.N_reactors, self.V_wf))
+        Design['Reactor duty'] = reactor_duty = self.Hnet
+        self.add_heat_utility(reactor_duty, effluent.T)
+
+
+
+
+
+
+
 
 
 
@@ -404,6 +529,11 @@ class SeedTrain(Unit):
 
 
 
+
+
+
+
+
 @cost(basis='Flow rate', ID='Tank', units='kg/hr',
       cost=439000, S=40414, CE=CEPCI[2009], n=0.7, BM=1.8)
 @cost(basis='Flow rate', ID='Agitator', units='kg/hr',
@@ -416,6 +546,11 @@ class SeedHoldTank(Unit): pass
 
 
 
+
+
+
+
+
 @cost(basis='Flow rate', ID='Tank', units='kg/hr',
       cost=636000, S=425878, CE=CEPCI[2009], n=0.7, BM=1.8)
 @cost(basis='Flow rate', ID='Agitator', units='kg/hr',
@@ -423,6 +558,11 @@ class SeedHoldTank(Unit): pass
 @cost(basis='Flow rate', ID='Pump', units='kg/hr',
       kW=93.2125, cost=26800, S=488719, CE=CEPCI[2009], n=0.8, BM=2.3)
 class BeerTank(Unit): pass
+
+
+
+
+
 
 
 
@@ -530,7 +670,7 @@ class Reactor(Unit, PressureVessel, isabstract=True):
     
     def __init__(self, ID='', ins=None, outs=(), *, 
                   P=101325, tau=0.5, V_wf=0.8,
-                  length_to_diameter=2, kW_per_m3=0.985,
+                  length_to_diameter=2, kW_per_m3=0.0985,
                   wall_thickness_factor=1,
                   vessel_material='Stainless steel 316',
                   vessel_type='Vertical'):
@@ -592,26 +732,8 @@ class Reactor(Unit, PressureVessel, isabstract=True):
                 purchase_costs[i] *= Design['Number of reactors']
             
             self.power_utility(self.kW_per_m3 * Design['Total volume'])
-    # def _run(self):
-    #     PressureVessel._run()
-    @property
-    def BM(self):
-        vessel_type = self.vessel_type
-        if not vessel_type:
-            raise AttributeError('vessel_type not defined')
-        elif vessel_type == 'Vertical':
-            return self.BM_vertical
-        elif vessel_type == 'Horizontal':
-            return self.BM_horizontal 
-        else:
-            raise RuntimeError("invalid vessel type")
-
-
-
     
-
-
-
+   
 
 
 
@@ -633,31 +755,38 @@ class AdiabaticFixedbedDehydrationReactor(Reactor):
     # volume of reactor 1–10 000 L
     _V_max = 10
     
-    _F_BM_default={**Reactor._F_BM_default,
+    _F_BM_default={**PressureVessel._F_BM_default,
                    'Heat exchanger':3.17,
-                   'SynDol catalyst':1.0} 
-    # from Bioethylene Production from Ethanol: A Review and Techno-economical Evaluation : 
-    # main components of Al2O3-MgO/SiO2
+                   'SynDol catalyst':1.0} # main components of Al2O3-MgO/SiO2
+    # from Bioethylene Production from Ethanol: A Review and Techno-economical Evaluation 
+    
     
     def __init__(self, ID, ins, outs,
                  T=350+273.15, # from Bioethylene Production from Ethanol: A Review and Techno-economical Evaluation
                  P=1.4*101325, # from Bioethylene Production from Ethanol: A Review and Techno-economical Evaluation
+                 WHSV=0.43, # WHSV=0.3-2, from patent 'Systems and processes for conversion of ethylene feedstocks to hydrocarbon fuels'
+                 tau=3.14/3600, # tau=3.14-4.05, from Process Design for the Production of Ethylene from Ethanol
+                 catalyst_price=price['Syndol catalyst'], 
+                 V_wf=0.8,
                  length_to_diameter=3,
+                 wall_thickness_factor=1,
+                 kW_per_m3=0., # from Rules of thumb in engineering practice, no power
                  vessel_material='Stainless steel 304',
                  vessel_type='Vertical',
-                 WHSV=0.43, # from 	Catalytic dehydration of bioethanol to ethylene
-                 tau=3.14/3600, # from Process Design for the Production of Ethylene from Ethanol
-                 catalyst_price=20.48, # Price ['Syndol price']
                  **wargs): 
-        Reactor.__init__(self, ID, ins, outs)
+        Unit.__init__(self, ID, ins, outs)
         self.T=T
         self.P=P
+        self.WHSV=WHSV # Residence time in kg/hr feed / kg catalyst
         self.tau=tau
-        self.length_to_diameter = length_to_diameter #: Length to diameter ratio
-        self.vessel_material = vessel_material # Vessel material
-        self.vessel_type = vessel_type # 'Horizontal' or 'Vertical'
-        self.WHSV = WHSV # Residence time in kg/hr feed / kg catalyst
         self.catalyst_price = catalyst_price # In USD/kg
+        self.V_wf=V_wf
+        self.length_to_diameter=length_to_diameter #: Length to diameter ratio
+        self.wall_thickness_factor=wall_thickness_factor
+        self.kW_per_m3=kW_per_m3
+        self.vessel_material=vessel_material # Vessel material
+        self.vessel_type=vessel_type # 'Horizontal' or 'Vertical'
+        
         self.heat_exchanger = hx = HXutility(None, None,None, T=T)
     
     # def _setup(self):
@@ -714,20 +843,38 @@ class AdiabaticFixedbedDehydrationReactor(Reactor):
         hx = self.heat_exchanger
         self.baseline_purchase_costs['Heat exchangers'] = hx.purchase_cost
         self.heat_utilities = hx.heat_utilities
-       
-    
 
 
 
 
-class CausticTower(bst.Unit):
+
+
+
+
+
+
+@cost(basis='Total flow', ID='Absorber', units='kmol/hr',
+      cost=4.81e6, S=24123, CE=CEPCI[2009], n=0.6, BM=4.3)
+@cost(basis='Total flow', ID='Stripper', units='kmol/hr',
+      cost=4e6, S=24123, CE=CEPCI[2009], n=0.6, BM=4.3)
+@cost(basis='Total flow', ID='Condenser', units='kmol/hr',
+      cost=0.27e6, S=24123, CE=CEPCI[2009], n=0.6, BM=4.17)
+@cost(basis='Total flow', ID='Reboiler', units='kmol/hr',
+      cost=0.53e6, S=24123, CE=CEPCI[2009], n=0.6, BM=3.17)
+@cost(basis='Total flow', ID='Cross heat exchanger', units='kmol/hr',
+      cost=2.28e6, S=24123, CE=CEPCI[2009], n=0.6, BM=3.17)
+@cost(basis='Total flow', ID='Cooler', units='kmol/hr',
+      cost=0.09e6, S=24123, CE=CEPCI[2009], n=0.6, BM=3.17)
+@cost(basis='Total flow', ID='Makeup tank', units='kmol/hr',
+      cost=0.23e6, S=24123, CE=CEPCI[2009], n=0.6, BM=2.3)
+class CausticTower(bst.Unit): 
     _N_ins=2
     _N_outs=1
     
     _outs_size_is_fixed=False
     
-    _units={'Feed volumetric flow':'m3/hr',
-            'Caustic flow':'kg/hr'}
+    _units={'Total flow':'kmol/hr'}
+            
 
     def __init__(self, ID='',ins=None,outs=(),P=27*101325):
         Unit.__init__(self, ID,ins,outs)
@@ -740,93 +887,88 @@ class CausticTower(bst.Unit):
         effluent=self.outs[0]
         
         caustic.imol['NaOH'] = 2*influent.imol['CO2']
-        caustic.imass['H2O'] = caustic.imass['NaOH']
+        caustic.imass['H2O'] = caustic.imass['NaOH'] # 50% NaOH liquid
         
         effluent.copy_like(self.ins[0])
         effluent.P=self.P
         effluent.phase='g'
         effluent.imol['CO2']=0
+        
+        effluent.T=40+273.15 # Assume temperature rise due to reaction heat excluding heat utility
     
     def _design(self):
         Design=self.design_results
-        Design['Feed volumetric flow']=self.F_vol_in
-        Design['Caustic flow']=self.ins[1].F_mass
-        
+        Design['Total flow']=self.ins[0].F_mol
 
 
-            
-        
-   
-    
-    
-    
-    
-    
-    
+
+
+
+
+
+
+
+
 ### Oligomerization 
 
-# First and second oligomerization are from 'Aviation fuel production pathways from lignocellulosic biomass via alcohol intermediates – A technical analysis' and 'Systems and processes for conversion of ethylene feedstocks to hydrocarbon fuels'
-
-class EthyleneDimerizationReactor(Reactor): 
+# Oligomerization1_Reactor is semi-batch reactor from Continuous stirred tank reactor for ethylene oligomerization catalyzed by NiMCM-41
+class Oligomerization1_Reactor(bst.CSTR): 
     _N_ins=2
     _N_outs=2
     
-    ins_size_is_fixed = False 
+    @property
+    def effluent(self):
+        return self.outs[0]
+    product = effluent
     
-    auxiliary_unit_names = ('heat_exchanger')
+    def _init(self, 
+              T = 85+273.15,
+              P = 21*101325, 
+              tau = 48, # Oligomerization of Ethene In a Slurry Reactor Using a Nickel(II)-Exchanged Silica–Alumina Catalyst
+              WHSV = 5, # WHSV=0.5-5 from Systems and processes for conversion of ethylene feedstocks to hydrocarbon fuels' P14
+              catalyst_price = price['Ni-loaded aluminosilicate catalyst'],
+              dT_hx_loop = 5,
+              V_wf = 0.8,
+              V_max = 1000, # Maximum volume=1000000L, from Rules of thumb in engineering practice P281 
+              length_to_diameter = 3, 
+              kW_per_m3 = 1., # 0.05–2 kW/m3 for Gas–liquid with catalyst solid, from Rules of thumb in engineering practice P282
+              vessel_material = 'Stainless steel 316', # stainless steel 316 is better from https://onlinelibrary.wiley.com/doi/pdf/10.1002/cjce.5450620612
+              vessel_type = 'Vertical',
+              batch = True,
+              tau_0 = 3,
+              adiabatic = False):
+              
+             self.T = T
+             self.P = P
+             self.WHSV = WHSV
+             self.tau = tau
+             self.catalyst_price = catalyst_price
+             self.dT_hx_loop = dT_hx_loop
+             self.V_wf = V_wf
+             self.V_max = V_max
+             self.length_to_diameter = length_to_diameter
+             self.kW_per_m3 = kW_per_m3
+             self.vessel_material = vessel_material
+             self.vessel_type = vessel_type
+             self.batch = batch
+             self.tau_0 = tau_0
+             self.adiabatic = adiabatic
+             self.load_auxiliaries()
     
-    _units={**PressureVessel._units,
-            'Residence time':'hr',
-            'Total Volume':'m^3',
-            'Reactor volume':'m^3',
-            'Catalyst weight':'kg'}
     
-    # For a single reactor, from diameter and length from PressureVessel._bounds,
-    # converted from ft3 to m3
-    _V_max = pi/4*(20**2)*40/35.3147 
-    
-    _F_BM_default={**Reactor._F_BM_default,
-                   'Heat exchanger':3.17,
-                   'Ni-loaded aluminosilicate':1} # a catalyst from nickel on an amorphous aluminum silicate support (SiO2-Al2O3)
-     
-    def __init__(self, ID, ins, outs,
-                 T=85+273.15,
-                 P=101325, # reactor pressure = 22 bar, maintained by N2
-                 length_to_diameter=3,
-                 vessel_material='Stainless steel 304',
-                 vessel_type='Vertical',
-                 WHSV=5, 
-                 tau=1/5,
-                 catalyst_price=12.3, # Price['Ni-loaded aluminosilicate catalyst']
-                 **kwargs): 
-        Reactor.__init__(self, ID, ins,outs)
-        self.T=T
-        self.P=P
-        self.length_to_diameter=length_to_diameter
-        self.vessel_material=vessel_material
-        self.vessel_type=vessel_type
-        self.WHSV=WHSV
-        self.tau=tau
-        self.catalyst_price=catalyst_price
-        self.heat_exchanger=hx=HXutility(None,None,None,T=T)
-       
     def _setup(self):
-        super()._setup()
-        self.C2H4_to_C4H8_conversion=C2H4_to_C4H8_conversion=0.988
-        self.C2H4_to_C6H12_conversion=C2H4_to_C6H12_conversion=0.00052
-        self.C2H4_to_C8H16_conversion=C2H4_to_C8H16_conversion=0.002
-        self.C2H4_to_C10H20_conversion=C2H4_to_C10H20_conversion=0.003
-        self.oligomerization_rxns=ParallelRxn([
+            super()._setup()  
+            self.C2H4_to_C4H8_conversion=C2H4_to_C4H8_conversion=0.988
+            self.C2H4_to_C6H12_conversion=C2H4_to_C6H12_conversion=0.00052
+            self.C2H4_to_C8H16_conversion=C2H4_to_C8H16_conversion=0.002
+            self.C2H4_to_C10H20_conversion=C2H4_to_C10H20_conversion=0.003
+            self.oligomerization_rxns=ParallelRxn([
             #   Reaction definition               Reactant       Conversion
             Rxn('2 C2H4 -> C4H8',                 'C2H4',     C2H4_to_C4H8_conversion),
             Rxn('3 C2H4 -> C6H12',                'C2H4',     C2H4_to_C6H12_conversion),
             Rxn('4 C2H4 -> C8H16',                'C2H4',     C2H4_to_C8H16_conversion),
             Rxn('5 C2H4 -> C10H20',               'C2H4',     C2H4_to_C10H20_conversion),
                 ])
-        self.C2H4_to_C4H8_rxn=self.oligomerization_rxns[0]
-        self.C2H4_to_C6H12_rxn=self.oligomerization_rxns[1]
-        self.C2H4_to_C8H16_rxn=self.oligomerization_rxns[2]
-        self.C2H4_to_C10H20_rxn=self.oligomerization_rxns[3]
         
     def _run(self):
         feed,fresh_catalyst=self.ins
@@ -837,29 +979,34 @@ class EthyleneDimerizationReactor(Reactor):
         effluent.T=self.T
         effluent.P=self.P
         
+        fresh_catalyst.phase='s'
         spent_catalyst.phase='s'
             
+    def load_auxiliaries(self):
+        super().load_auxiliaries()
+
+    def _get_duty(self):
+        return self.Hnet
+
     def _design(self):
-        Reactor._design(self)
-        duty=sum([i.H for i in self.outs])-sum([i.H for i in self.ins])
-        feed=tmo.Stream()
-        feed.mix_from(self.outs)
-        feed.T=self.ins[0].T
-        self.heat_exchanger.simulate_as_auxiliary_exchanger(ins=(feed,),
-                                                            duty=duty,
-                                                            vle=True)
-        
+        super()._design()
+            
     def _cost(self):
-        super()._cost()
-        self.catalyst_weight = self.ins[0].F_mass/self.WHSV 
+        Design = self.design_results
+        baseline_purchase_costs = self.baseline_purchase_costs
+        volume = Design['Reactor volume']
+        if volume != 0:
+            baseline_purchase_costs.update(
+                self._vessel_purchase_cost(
+                    Design['Weight'], Design['Diameter'], Design['Length'],
+                )
+            )
+            kW = self.kW_per_m3 * volume * self.V_wf
+            if kW > 0: self.agitator = bst.Agitator(kW)
+        
+        self.catalyst_weight = self.ins[0].F_mass/self.WHSV
         # assuming catalyst lifetime of 12 months, enough for one year
         self.purchase_costs['1st catalyst']=self.catalyst_weight * self.catalyst_price
-        
-        hx = self.heat_exchanger
-        self.baseline_purchase_costs['Heat exchangers'] = hx.purchase_cost
-        self.heat_utilities = hx.heat_utilities
-    
-       
 
 
 
@@ -870,139 +1017,156 @@ class EthyleneDimerizationReactor(Reactor):
 
 
 
-# Intermediate to C12~ 
-class OligomerizationReactor(Reactor):
+class Oligomerization2_Reactor(bst.CSTR): 
     _N_ins=3
     _N_outs=2
     
-    auxiliary_unit_names = ('heat_exchanger')
+    @property
+    def effluent(self):
+        return self.outs[0]
+    product = effluent
     
-    _units={**PressureVessel._units,
-            'Residence time':'hr',
-            'Total Volume':'m^3',
-            'Reactor volume':'m^3',
-            'Catalyst weight':'kg'}
+    def _init(self, 
+              T = 225+273.15,
+              P = 21*101325, 
+              tau = 48,  # Assume same time as oligomerization1_reactor
+              WHSV = 10, # WHSV=0.5-10 from Systems and processes for conversion of ethylene feedstocks to hydrocarbon fuels' P15
+              catalyst_price = price['Aluminosilicate catalyst'],
+              dT_hx_loop = 5,
+              V_wf = 0.8,
+              V_max = 1000,
+              length_to_diameter = 3, 
+              kW_per_m3 = 1.6, # Power input 0.2–3 kW/m3 for liquid-liquid; from Rules of thumb in engineering practice P282
+              vessel_material = 'Stainless steel 316', # stainless steel 316 is better from https://onlinelibrary.wiley.com/doi/pdf/10.1002/cjce.5450620612
+              vessel_type = 'Vertical',
+              batch = True,
+              tau_0 = 3,
+              adiabatic = False):
+              
+             self.T = T
+             self.P = P
+             self.WHSV = WHSV
+             self.tau = tau
+             self.catalyst_price = catalyst_price
+             self.dT_hx_loop = dT_hx_loop
+             self.V_wf = V_wf
+             self.V_max = V_max
+             self.length_to_diameter = length_to_diameter
+             self.kW_per_m3 = kW_per_m3
+             self.vessel_material = vessel_material
+             self.vessel_type = vessel_type
+             self.batch = batch
+             self.tau_0 = tau_0
+             self.adiabatic = adiabatic
+             self.load_auxiliaries()
     
-    # For a single reactor, from diameter and length from PressureVessel._bounds,
-    # converted from ft3 to m3
-    _V_max = pi/4*(20**2)*40/35.3147 
-    
-    _F_BM_default={**Reactor._F_BM_default,
-                   'Heat exchanger':3.17,
-                   'SiO2-Al2O3 catalyst':1} # Acid catalyst 
-    def __init__(self,ID,ins=None,outs=(),thermo=None,*,
-                 T=225+273.15,
-                 P=101325,
-                 length_to_diameter=3,
-                 vessel_material='Stainless steel 304',
-                 vessel_type='Vertical',
-                 WHSV=3,
-                 tau=1/3,
-                 catalyst_price=12.3,
-                 ):
-        Reactor.__init__(self,ID,ins,outs)
-        self.T=T
-        self.P=P
-        self.length_to_diameter=length_to_diameter
-        self.vessel_material=vessel_material
-        self.vessel_type=vessel_type
-        self.WHSV=WHSV
-        self.tau=tau
-        self.catalyst_price=catalyst_price
-        self.heat_exchanger=hx=HXutility(None, None,None,T=T)
-        
     def _run(self):
         feed, recycle, fresh_catalyst=self.ins
         effluent, spent_catalyst=self.outs
-        # effluent. = ['C4H8','C5H10','C6H12','C7H14','C8H16','C9H18','C10H20','C11H22',
-        # 'C12H24','C13H26','C14H28','C16H32','C18H36']
         
-        effluent.imass['C4H8']=0.097*(self.ins[0].F_mass+self.ins[1].F_mass)
-        effluent.imass['C5H10']=0.016*(self.ins[0].F_mass+self.ins[1].F_mass)
-        effluent.imass['C6H12']=0.169*(self.ins[0].F_mass+self.ins[1].F_mass)
-        effluent.imass['C7H14']=0.002*(self.ins[0].F_mass+self.ins[1].F_mass)
-        effluent.imass['C8H16']=0.21*(self.ins[0].F_mass+self.ins[1].F_mass)
-        effluent.imass['C9H18']=0.022*(self.ins[0].F_mass+self.ins[1].F_mass)
-        effluent.imass['C10H20']=0.175*(self.ins[0].F_mass+self.ins[1].F_mass)
+        effluent.imass['C4H8']=0.081*(self.ins[0].F_mass+self.ins[1].F_mass)
+        effluent.imass['C5H10']=0.017*(self.ins[0].F_mass+self.ins[1].F_mass)
+        effluent.imass['C6H12']=0.101*(self.ins[0].F_mass+self.ins[1].F_mass)
+        effluent.imass['C7H14']=0.020*(self.ins[0].F_mass+self.ins[1].F_mass)
+        effluent.imass['C8H16']=0.168*(self.ins[0].F_mass+self.ins[1].F_mass)
+        effluent.imass['C9H18']=0.036*(self.ins[0].F_mass+self.ins[1].F_mass)
+        effluent.imass['C10H20']=0.180*(self.ins[0].F_mass+self.ins[1].F_mass)
         effluent.imass['C11H22']=0.012*(self.ins[0].F_mass+self.ins[1].F_mass)
-        effluent.imass['C12H24']=0.123*(self.ins[0].F_mass+self.ins[1].F_mass)
-        effluent.imass['C13H26']=0.011*(self.ins[0].F_mass+self.ins[1].F_mass)
-        effluent.imass['C14H28']=0.079*(self.ins[0].F_mass+self.ins[1].F_mass)
-        effluent.imass['C16H32']=0.052*(self.ins[0].F_mass+self.ins[1].F_mass)
-        effluent.imass['C18H36']=0.013*(self.ins[0].F_mass+self.ins[1].F_mass)
+        effluent.imass['C12H24']=0.139*(self.ins[0].F_mass+self.ins[1].F_mass)
+        effluent.imass['C13H26']=0.020*(self.ins[0].F_mass+self.ins[1].F_mass)
+        effluent.imass['C14H28']=0.116*(self.ins[0].F_mass+self.ins[1].F_mass)
+        effluent.imass['C16H32']=0.081*(self.ins[0].F_mass+self.ins[1].F_mass)
+        effluent.imass['C18H36']=0.028*(self.ins[0].F_mass+self.ins[1].F_mass)
         
         effluent.T=self.T
         effluent.phase='l'
+        fresh_catalyst.phase='s'
         spent_catalyst.phase='s'
-            
+        
+        
+    def load_auxiliaries(self):
+        super().load_auxiliaries()
+
+    def _get_duty(self):
+        return self.Hnet
+
     def _design(self):
-        Reactor._design(self)
-        duty=sum([i.H for i in self.outs])-sum([i.H for i in self.ins])
-        feed=tmo.Stream()
-        feed.T=self.ins[0].T
-        self.heat_exchanger.simulate_as_auxiliary_exchanger(ins=(feed,),
-                                                            duty=duty,
-                                                            vle=True)
-        
+        super()._design()
+            
     def _cost(self):
-        super()._cost()
-        self.catalyst_weight = self.ins[0].F_mass/self.WHSV 
+        Design = self.design_results
+        baseline_purchase_costs = self.baseline_purchase_costs
+        volume = Design['Reactor volume']
+        if volume != 0:
+            baseline_purchase_costs.update(
+                self._vessel_purchase_cost(
+                    Design['Weight'], Design['Diameter'], Design['Length'],
+                )
+            )
+            kW = self.kW_per_m3 * volume * self.V_wf
+            if kW > 0: self.agitator = bst.Agitator(kW)
+        
+        self.catalyst_weight = self.ins[0].F_mass/self.WHSV
         # assuming catalyst lifetime of 12 months, enough for one year
-        self.purchase_costs['2nd catalyst']=self.catalyst_weight * self.catalyst_price
-        
-        hx = self.heat_exchanger
-        self.baseline_purchase_costs['Heat exchangers'] = hx.purchase_cost
-        self.heat_utilities += hx.heat_utilities
-         
-        
-        
-        
-    
-    
-    
+        self.purchase_costs['2st catalyst']=self.catalyst_weight * self.catalyst_price
+
+
+
+
+
+
+
+
 
 
 ### Hydrogenation 
-
-# Two catalysts commonly used: 
-# 1. Cobalt molybdenum (Como) catalyst. Reaction parameters are from 'Techno-economic analysis for upgrading the biomass-derived ethanol-to-jet blendstocks'
-# 2. Pd/Al2O3 catalyst. Reaction parameters are from 'comparative techno-economic analysis and process design for indirect liquefaction pathways to distillate-range fuels via biomass-derived oxygenated intermediates upgrading'
-
-# 1 has lower price of catalyst but higher temperature
-# 2 has higher price of catalyst but longer lifetime and lower temperature
-# Twp ways are considered here as a variable
-
-class HydrogenationReactor(Reactor): # 1
-    _N_ins = 3
-    _N_outs = 2
+@cost(basis='H2 flow', ID='H2 makeup compressor', units='kg/hr',
+      cost=1661679, S=406, CE=CEPCI[2011], n=0.6, BM=1.09)
+@cost(basis='Flow rate', ID='Hot high-pressure separator', units='kg/hr',
+      cost=197681, S=54336, CE=CEPCI[2013], n=1, BM=1.5)
+class HydrogenationReactor(bst.CSTR): # CSTR mix well from figure in Techno-economic analysis for upgrading the biomass-derived ethanol-to-jet blendstocks
+    _N_ins=3
+    _N_outs=2
     
-    auxiliary_unit_names=('heat_exchanger')
+    _units= {'H2 flow': 'kg/hr',
+             'Flow rate': 'kg/hr'}
 
-
-    _F_BM_default = {**Reactor._F_BM_default,
-            'Heat exchangers': 3.17,
-            'Como catalyst': 1}
+    @property
+    def effluent(self):
+        return self.outs[0]
+    product = effluent
     
-    def __init__(self, ID='', ins=None, outs=(), thermo=None, *,
-                 T=45.+273.15,
-                 P=3.6*10E6, 
-                 length_to_diameter=3,
-                 vessel_material='Stainless steel 304',
-                 vessel_type='Vertical',
-                 WHSV=3, 
-                 tau=1/3,
-                 catalyst_price=19/_lb2kg, # lifetime 3 yrs 
-                 **kargs):
-        Reactor.__init__(self, ID,ins,outs)
-        self.T = T
-        self.P = P
-        self.length_to_diameter = length_to_diameter
-        self.vessel_material = vessel_material
-        self.vessel_type = vessel_type
-        self.WHSV=WHSV
-        self.tau=tau
-        self.catalyst_price=catalyst_price
-        self.heat_exchanger=hx=bst.HXutility(None,None,None,T=T)
+    def _init(self, 
+              T = 350+273.15,
+              P = 3.6*10e6, 
+              tau = 1,  # from Historical Developments in Hydroprocessing Bio-oils
+              WHSV = 3, # WHSV=1-3 from Techno-economic analysis for upgrading the biomass-derived ethanol-to-jet blendstocks
+              catalyst_price = price['Como catalyst'],
+              dT_hx_loop = 5,
+              V_wf = 0.8,
+              V_max = 1000,
+              length_to_diameter = 3, 
+              kW_per_m3 = 0.5, # 0.2–0.8 kW/m3 for hydrogenation from Rules of thumb in engineering practice P236
+              vessel_material = 'Stainless steel 316', # stainless steel 316 is better from https://onlinelibrary.wiley.com/doi/pdf/10.1002/cjce.5450620612
+              vessel_type = 'Vertical',
+              batch = False,
+              adiabatic = False):
+              
+             self.T = T
+             self.P = P
+             self.WHSV = WHSV
+             self.tau = tau
+             self.catalyst_price = catalyst_price
+             self.dT_hx_loop = dT_hx_loop
+             self.V_wf = V_wf
+             self.V_max = V_max
+             self.length_to_diameter = length_to_diameter
+             self.kW_per_m3 = kW_per_m3
+             self.vessel_material = vessel_material
+             self.vessel_type = vessel_type
+             self.batch = batch
+             self.adiabatic = adiabatic
+             self.load_auxiliaries()
     
     def _setup(self):
         super()._setup()
@@ -1031,122 +1195,40 @@ class HydrogenationReactor(Reactor): # 1
         self.hydrogenation_rxns(effluent.mol)
         
         fresh_catalyst.phase='s'
+        spent_catalyst.phase='s'
         
+        
+    def load_auxiliaries(self):
+        super().load_auxiliaries()
+
+    def _get_duty(self):
+        return self.Hnet
+
     def _design(self):
-        Reactor._design(self)
-        duty=sum([i.H for i in self.outs])-sum([i.H for i in self.ins])
-        feed=tmo.Stream()
-        feed.T=self.ins[0].T
-        self.heat_exchanger.simulate_as_auxiliary_exchanger(ins=(feed,),
-                                                            duty=duty,
-                                                            vle=True)
-        
+        super()._design()
+        Design = self.design_results
+        Design['H2 flow']=self.ins[1].F_mass
+            
     def _cost(self):
-        super()._cost()
+        Design = self.design_results
+        baseline_purchase_costs = self.baseline_purchase_costs
+        volume = Design['Reactor volume']
+        if volume != 0:
+            baseline_purchase_costs.update(
+                self._vessel_purchase_cost(
+                    Design['Weight'], Design['Diameter'], Design['Length'],
+                )
+            )
+            kW = self.kW_per_m3 * volume * self.V_wf
+            if kW > 0: self.agitator = bst.Agitator(kW)
         
-        self.catalyst_weight = self.ins[0].F_mass/self.WHSV 
-        # assuming catalyst lifetime of 12 months
-        self.purchase_costs['como_catalyst']=self.catalyst_weight * self.catalyst_price
+        Design['Flow rate'] = self.F_mass_out
         
-        hx = self.heat_exchanger
-        self.baseline_purchase_costs['Heat exchangers'] = hx.purchase_cost
-        self.heat_utilities += hx.heat_utilities
+        self.catalyst_weight = self.ins[0].F_mass/self.WHSV
+        # assuming catalyst lifetime of 12 months, enough for one year
+        self.purchase_costs['como_catalyst'] = self.catalyst_weight * self.catalyst_price
 
 
-
-class HydrogenationReactor2(Reactor): # 2
-    _N_ins = 3
-    _N_outs = 2
-    
-    auxiliary_unit_names=('heat_exchanger')
-
-
-    _F_BM_default = {**Reactor._F_BM_default,
-            'Heat exchangers': 3.17,
-            # 'Compressor':2.15,
-            'Pd/Al2O3 catalyst': 1}
-    
-    def __init__(self, ID='', ins=None, outs=(), thermo=None, *,
-                 T=45.+273.15,
-                 P=34.5*101325, 
-                 length_to_diameter=3,
-                 vessel_material='Stainless steel 304',
-                 vessel_type='Vertical',
-                 WHSV=1, 
-                 tau=1,
-                 catalyst_price=55.20/_lb2kg, # lifetime 3 yrs 
-                 **kargs):
-        Reactor.__init__(self, ID,ins,outs)
-        self.T = T
-        self.P = P
-        self.length_to_diameter = length_to_diameter
-        self.vessel_material = vessel_material
-        self.vessel_type = vessel_type
-        self.WHSV=WHSV
-        self.tau=tau
-        self.catalyst_price=catalyst_price
-        self.heat_exchanger=hx=bst.HXutility(None,None,None,T=T)
-    
-    def _setup(self):
-        super()._setup()
-        self.hydrogenation_rxns = ParallelRxn([
-            #   Reaction definition           Reactant   Conversion
-            Rxn('C6H12 + H2 -> C6H14',         'C6H12',    1.00),
-            Rxn('C7H14 + H2 -> C7H16',         'C7H14',    1.00),
-            Rxn('C8H16 + H2 -> C8H18',         'C8H16',    1.00),
-            Rxn('C9H18 + H2 -> C9H20',         'C9H18',    1.00),
-            Rxn('C10H20 + H2 -> C10H22',       'C10H20',   1.00),
-            Rxn('C11H22 + H2 -> C11H24',       'C11H22',   1.00),
-            Rxn('C12H24 + H2 -> C12H26',       'C12H24',   1.00),
-            Rxn('C13H26 + H2 -> C13H28',       'C13H26',   1.00),
-            Rxn('C14H28 + H2 -> C14H30',       'C14H28',   1.00),
-            Rxn('C16H32 + H2 -> C16H34',       'C16H32',   1.00),
-            Rxn('C18H36 + H2 -> C18H38',       'C18H36',   1.00),
-                ])                                      
-        
-    def _run(self):
-        influent, h2 ,fresh_catalyst = self.ins
-        effluent, spent_catalyst = self.outs
-        
-        effluent.mix_from([influent,h2])
-        
-        # effluent.imol['C6H14']=self.ins[0].imol['C6H12']
-        # effluent.imol['C7H16']=self.ins[0].imol['C7H14']
-        # effluent.imol['C8H18']=self.ins[0].imol['C8H16']
-        # effluent.imol['C9H20']=self.ins[0].imol['C9H18']
-        # effluent.imol['C10H22']=self.ins[0].imol['C10H20']
-        # effluent.imol['C11H24']=self.ins[0].imol['C11H22']
-        # effluent.imol['C12H26']=self.ins[0].imol['C12H24']
-        # effluent.imol['C13H28']=self.ins[0].imol['C13H26']
-        # effluent.imol['C14H30']=self.ins[0].imol['C14H28']
-        # effluent.imol['C16H34']=self.ins[0].imol['C16H32']
-        # effluent.imol['C18H38']=self.ins[0].imol['C18H36']
-       
-        self.hydrogenation_rxns(effluent.mol)
-        effluent.T=self.T
-        
-        h2.imol['H2'] = self.ins[0].F_mol
-        
-    def _design(self):
-        Reactor._design(self)
-        duty=sum([i.H for i in self.outs])-sum([i.H for i in self.ins])
-        feed=tmo.Stream()
-        feed.T=self.ins[0].T
-        self.heat_exchanger.simulate_as_auxiliary_exchanger(ins=(feed,),
-                                                            duty=duty,
-                                                            vle=True)
-        
-    def _cost(self):
-        super()._cost()
-        
-        self.catalyst_weight = self.ins[0].F_mass/self.WHSV 
-        # assuming catalyst lifetime of 36 months
-        self.purchase_costs['Pd_Al2O3_catalyst']=self.catalyst_weight * self.catalyst_price
-        
-        hx = self.heat_exchanger
-        self.baseline_purchase_costs['Heat exchangers'] = hx.purchase_cost
-        self.heat_utilities += hx.heat_utilities
-        
 
 
 
@@ -1165,101 +1247,34 @@ class FireWaterTank(Unit): pass
 
 
 
-# Units in configuration 2 : Guerbet coupling of ethanol
 
-class GuerbetCouplingReactor(Reactor):
-# From "Advanced fuels from ethanol – a superstructure optimization approach."
-    _N_ins=2
-    _N_outs=2
-    
-    auxiliary_unit_names=('heat exchanger')
-    
-    _units = {**PressureVessel._units,
-              'Residence time': 'hr',
-              'Total volume': 'm3',
-              'Reactor volume': 'm3'}
-    # from Rules of thumb in engineering practice,
-    # for a single fixed bed of solid catalyst reactor, 
-    # volume of reactor 1–10 000 L
-    _V_max = 10
-    
-    _F_BM_default={**Reactor._F_BM_default,
-                   'Heat exchanger':3.17,
-                   'Ca-HAP catalyst':1.0} 
-    # from 
-    
-    def __init__(self, ID, ins, outs,
-                 T=350+273.15, 
-                 P=1.*101325, 
-                 length_to_diameter=3,
-                 vessel_material='Stainless steel 304',
-                 vessel_type='Vertical',
-                 WHSV=0.05, 
-                 tau=1.78/3600, # From "Review of catalytic systems and thermodynamics for the Guerbet condensation reaction and challenges for biomass valorization."
-                 catalyst_price=8, 
-                 **wargs): 
-        Reactor.__init__(self, ID, ins, outs)
-        self.T=T
-        self.P=P
-        self.tau=tau
-        self.length_to_diameter = length_to_diameter #: Length to diameter ratio
-        self.vessel_material = vessel_material # Vessel material
-        self.vessel_type = vessel_type # 'Horizontal' or 'Vertical'
-        self.WHSV = WHSV # Residence time in kg/hr feed / kg catalyst
-        self.catalyst_price = catalyst_price # In USD/kg
-        self.heat_exchanger = hx = HXutility(None, None,None, T=T)
-    
-    def _setup(self):
-        super()._setup()
-        self.overall_C2H5OH_conversion=overall_C2H5OH_conversion=0.75
-        self.C2H5OH_to_C2H4_selectivity=C2H5OH_to_C2H4_selectivity=0.030/0.75
-        self.C2H5OH_to_C4H8_selectivity=C2H5OH_to_C4H8_selectivity=0.034/0.75
-        self.C2H5OH_to_C6H12_selectivity=C2H5OH_to_C6H12_selectivity=0.016/0.75
-        self.C2H5OH_to_C4H6_selectivity=C2H5OH_to_C4H6_selectivity=0.047/0.75
-        self.C2H5OH_to_C6H10_selectivity=C2H5OH_to_C6H10_selectivity=0.035/0.75
-        self.C2H5OH_to_C4H9OH_selectivity=C2H5OH_to_C4H9OH_selectivity=0.031/0.75
-        self.C2H5OH_to_C5H11OH_selectivity=C2H5OH_to_C5H11OH_selectivity=0.267/0.75
-        self.C2H5OH_to_C6H13OH_selectivity=C2H5OH_to_C6H13OH_selectivity=0.112/0.75
-        self.C2H5OH_to_C7H15OH_selectivity=C2H5OH_to_C7H15OH_selectivity=0.096/0.75
-        self.C2H5OH_to_C8H17OH_selectivity=C2H5OH_to_C8H17OH_selectivity=0.142/0.75
-        
-        self.Guerbet_rxn=ParallelRxn([
-        #   Reaction definition                    Reactant    Conversion
-        Rxn('C2H5OH -> C2H4 + H2O',               'C2H5OH',   C2H5OH_to_C2H4_selectivity*overall_C2H5OH_conversion),
-        Rxn('2 C2H5OH -> C4H8 + 2 H2O',           'C2H5OH',   C2H5OH_to_C4H8_selectivity*overall_C2H5OH_conversion),
-        Rxn('3 C2H5OH -> C6H12 + 3H2O',           'C2H5OH',   C2H5OH_to_C6H12_selectivity*overall_C2H5OH_conversion),
-        Rxn('2 C2H5OH + H2 -> 2 C2H6 +2 H2O',     'C2H5OH',   C2H5OH_to_C4H6_selectivity*overall_C2H5OH_conversion),
-        Rxn('3 C2H5OH -> C3H6 + 3 H2O',           'C2H5OH',   C2H5OH_to_C6H10_selectivity*overall_C2H5OH_conversion),
-        Rxn('',           'C2H5OH',   C2H5OH_to_C4H9OH_selectivity*overall_C2H5OH_conversion),
-        Rxn('2 C2H5OH -> CO + CH4 + H2',          'C2H5OH',   C2H5OH_to_C5H11OH_selectivity*overall_C2H5OH_conversion),
-        Rxn('C2H5OH +H2O -> CO2 + CH4 + H2',      'C2H5OH',   C2H5OH_to_C6H13OH_selectivity*overall_C2H5OH_conversion),
-            ])
-        
-    def _run(self):
-        feed, fresh_catalyst = self.ins
-        effluent, spent_catalyst = self.outs
-        
-        effluent.copy_like(feed)
-        self.dehydration_rxns(effluent.mol)
-        effluent.T=self.T
-        effluent.P=self.P
-        
-    def _design(self):
-        Reactor._design(self)
-        duty=sum([i.H for i in self.outs])-sum([i.H for i in self.ins])
-        feed=tmo.Stream()
-        feed.mix_from(self.outs)
-        feed.T=self.ins[0].T
-        self.heat_exchanger.simulate_as_auxiliary_exchanger(ins=(feed,),
-                                                            duty=duty,
-                                                            vle=False)
-        
-    def _cost(self):
-        super()._cost()
-        self.catalyst_weight = self.ins[0].F_mass/self.WHSV 
-        # assuming SynDol lifetime of 12 months, enough for one year
-        self.purchase_costs['SynDol catalyst']=self.catalyst_weight * self.catalyst_price
-        
-        hx = self.heat_exchanger
-        self.baseline_purchase_costs['Heat exchangers'] = hx.purchase_cost
-        self.heat_utilities = hx.heat_utilities
+
+
+
+
+@cost('Flow rate', 'Tank', S=1393, units='kg/hr',
+      CE=522, cost=70000, n=0.7, BM=2.6)
+@cost('Flow rate', 'Pump', S=1393, units='kg/hr',
+      CE=522, cost=3000, n=0.8, BM=3.1, kW=0.37285)
+@cost('Flow rate', 'Agitator', S=1393, units='kg/hr',
+      CE=522, cost=21200, n=0.5, BM=1.5, kW=7.457)
+class CSLStorageTank(Unit): pass
+
+
+
+
+
+
+
+
+
+
+@cost('Flow rate', 'Tank', S=163, units='kg/hr',
+      CE=522, cost=102000, n=0.7, BM=1.8)
+@cost('Flow rate', 'Pump', S=163, units='kg/hr',
+      CE=522, cost=3000, n=0.8, BM=3.1, kW=0.37735)
+@cost('Flow rate', 'Agitator', S=163, units='kg/hr',
+      CE=522, cost=9800, n=0.5, BM=1.5, kW=4.10135)
+@cost('Flow rate', 'Bag unloader', S=163, units='kg/hr',
+      CE=522, cost=30000, n=0.6, BM=1.7)
+class DAPStorageTank(Unit): pass
