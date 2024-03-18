@@ -39,7 +39,6 @@ import flexsolve as flx
 import numpy as np
 from numba import njit
 from biosteam import main_flowsheet as F
-from biosteam.process_tools import BoundedNumericalSpecification
 from biosteam import System
 from thermosteam import Stream
 from biorefineries.HP import units, facilities
@@ -489,7 +488,8 @@ def create_HP_sys(ins, outs):
         if existing_hexanol > reqd_hexanol:
             # feed_hexanol.imol['Hexanol'] = S404.outs[0].imol['Hexanol']
             feed_hexanol.imol['Hexanol'] = S404.outs[1].imol['Hexanol']
-            
+        
+        for i in S404.outs: i.T = M401_H.outs[0].T
         
     def update_Ks(lle_unit, solute_indices = (0,), carrier_indices = (1,), solvent_indices = (2,)):
         IDs = lle_unit.partition_data['IDs']
@@ -881,7 +881,8 @@ def create_HP_sys(ins, outs):
 # %% System setup
 
 HP_sys = create_HP_sys()
-HP_sys.subsystems[-1].relative_molar_tolerance = 0.005
+# HP_sys.subsystems[-1].relative_molar_tolerance = 0.005
+HP_sys.set_tolerance(mol=1e-1, rmol=1e-3, subsystems=True)
 
 u = flowsheet.unit
 s = flowsheet.stream
@@ -1120,7 +1121,7 @@ get_FGHTP_GWP = lambda: (feedstock.F_mass-feedstock.imass['Water']) \
 get_feedstock_CO2_capture = lambda: feedstock.get_atomic_flow('C')* HP_chemicals.CO2.MW/AA.F_mass
 get_feedstock_GWP = lambda: get_FGHTP_GWP() - get_feedstock_CO2_capture()
 # get_feedstock_GWP = lambda: get_FGHTP_GWP()
-get_emissions_GWP = lambda: sum([stream.get_atomic_flow('C') for stream in emissions]) * HP_chemicals.CO2.MW / AA.F_mass
+get_emissions_GWP = lambda: sum([stream.get_atomic_flow('C') for stream in emissions_from_sys]) * HP_chemicals.CO2.MW / AA.F_mass
 # GWP from electricity
 get_net_electricity = lambda: sum(i.power_utility.rate for i in HP_sys.units)
 get_net_electricity_GWP = lambda: get_net_electricity()*CFs['GWP_CFs']['Electricity'] \
@@ -1128,7 +1129,7 @@ get_net_electricity_GWP = lambda: get_net_electricity()*CFs['GWP_CFs']['Electric
 
 
 get_total_electricity_demand = get_electricity_use = lambda: -BT.power_utility.rate
-get_cooling_electricity_demand = lambda: u.CT.power_utility.rate + CWP.power_utility.rate
+get_cooling_electricity_demand = lambda: u.CT901.power_utility.rate + CWP.power_utility.rate
 
 get_BT_steam_kJph_heating = lambda: sum([i.duty for i in BT.steam_utilities])
 get_BT_steam_kJph_turbogen = lambda: 3600.*BT.electricity_demand/BT.turbogenerator_efficiency

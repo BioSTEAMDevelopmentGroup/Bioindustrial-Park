@@ -43,9 +43,9 @@ from biosteam.utils import TicToc
 from biosteam.plots import plot_montecarlo_across_coordinate
 from biorefineries.HP.system_light_lle_vacuum_distillation import spec, HP_sys, get_AA_MPSP, get_GWP, get_FEC, R301
 
-from biorefineries.HP.analyses import models # for the baseline biorefinery
+# from biorefineries.HP.analyses import models # for the baseline biorefinery
 # from biorefineries.HP.analyses import models_targeted_improvements as models # for a biorefinery with targeted improvements over the baseline biorefinery
-
+from biorefineries.HP.analyses import models_achieved_improvements as models # for the biorefinery with achieved fermentation performance improvements
 from datetime import datetime
 
 
@@ -159,7 +159,7 @@ baseline_initial = model.metrics_at_baseline()
 baseline = pd.DataFrame(data=np.array([[i for i in baseline_initial.values],]), 
                         columns=baseline_initial.keys())
 
-model.evaluate()
+model.evaluate(notify=50, autoload=None, autosave=None, file=None)
 
 # Baseline results
 baseline_end = model.metrics_at_baseline()

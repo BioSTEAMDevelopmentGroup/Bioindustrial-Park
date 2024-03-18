@@ -20,7 +20,7 @@ from biosteam.utils import colors
 
 # from TAL.system_solubility_exploit import TAL_sys, TAL_tea, R302, spec
 from biorefineries import TAL
-from biorefineries.TAL.systems.system_SA_adsorption_sugarcane import TAL_sys, TAL_tea, TAL_lca, R302, KSA_product, u, TAL_chemicals
+from biorefineries.TAL.systems.system_SA_solubility_exploit_ethanol_sugarcane import TAL_sys, TAL_tea, TAL_lca, R302, KSA_product, u, TAL_chemicals
 # from biorefineries.TAL.system_TAL_adsorption_glucose import TAL_sys, TAL_tea, R302, spec, SA
 # from biorefineries.TAL.system_ethyl_esters import TAL_sys, TAL_tea, R302, spec, Mixed_esters
 # get_GWP, get_non_bio_GWP, get_FEC, get_SPED
@@ -57,7 +57,10 @@ TAL_results_filepath = TAL_filepath + '\\analyses\\results\\'
 R401, R402, R403 = u.R401, u.R402, u.R403
 
 fresh_R401_cat_stream = R401.ins[4]
-spec_upgrading = TAL.models._general_process_specification.GeneralProcessSpecification(
+
+from biorefineries.TAL.models import _general_process_specification
+
+spec_upgrading = _general_process_specification.GeneralProcessSpecification(
     system=TAL_sys,
     baseline_spec_values=[R401.TAL_to_HMTHP_rxn.X, 
                           R401.tau, 
@@ -86,7 +89,7 @@ spec = spec_upgrading
 
 # %% Generate 3-specification meshgrid and set specification loading functions
 
-steps = (5, 5, 20)
+steps = (10, 10, 20)
 
 # Yield, titer, productivity (rate)
 spec_1 = HMP_yields = np.linspace(0.3, 0.999, steps[0]) # TAL->HMTHP conversion in the hydrogenation reactor
@@ -332,7 +335,7 @@ def get_contour_info_from_metric_data(
 #%% MPSP
 
 MPSP_w_levels, MPSP_w_ticks, MPSP_cbar_ticks = get_contour_info_from_metric_data(results_metric_1, lb=0)
-
+MPSP_w_levels = np.arange(0., 20.1, 0.5)
 
 contourplots.animated_contourplot(w_data_vs_x_y_at_multiple_z=results_metric_1, # shape = z * x * y # values of the metric you want to plot on the color axis; e.g., MPSP
                                 x_data=100*HMP_yields, # x axis values
@@ -364,7 +367,7 @@ contourplots.animated_contourplot(w_data_vs_x_y_at_multiple_z=results_metric_1, 
                                 axis_title_fonts=axis_title_fonts,
                                 clabel_fontsize = clabel_fontsize,
                                 default_fontsize = default_fontsize,
-                                comparison_range=[6.5, 7.5],
+                                # comparison_range=[6.5, 7.5],
                                 # comparison_range=[MPSP_w_levels[-2], MPSP_w_levels[-1]],
                                 comparison_range_hatch_pattern='////',
                                 )

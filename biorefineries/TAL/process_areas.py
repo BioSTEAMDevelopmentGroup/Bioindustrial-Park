@@ -199,7 +199,7 @@ def create_TAL_separation_solubility_exploit_process(ins, outs,):
     U401.line = 'Background unit for SLE'
     
     # from biosteam._graphics import stream_unit
-    U401._graphics = bst._graphics.junction_graphics
+    U401._graphics = tmo._graphics.junction_graphics
     
     @U401.add_specification()
     def U401_spec():
