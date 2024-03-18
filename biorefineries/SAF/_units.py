@@ -824,6 +824,8 @@ class AdiabaticFixedbedDehydrationReactor(Reactor):
         effluent.T=self.T
         effluent.P=self.P
         
+        fresh_catalyst.phase = spent_catalyst.phase = 's'
+        
     def _design(self):
         Reactor._design(self)
         duty=sum([i.H for i in self.outs])-sum([i.H for i in self.ins])

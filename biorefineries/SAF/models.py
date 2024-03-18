@@ -75,10 +75,6 @@ def set_GWP_of_streams(indicator):
 set_prices = set_price_of_streams()
 set_GWP = set_GWP_of_streams(indicator='GWP100')
 
-sys.simulate()
-
-
-
 # For simplification 
 feedstock = F.feedstock
 ethanol = F.ethanol_to_storage
@@ -94,7 +90,7 @@ get_annual_factor = lambda: tea_SAF.operating_days * 24
 
 # Functions to calculate all the metrics
 # 1. Product characteristics
-get_jet_density = lambda: jet_fuel.rho
+#get_jet_density = jet_fuel.rho
 
 get_ethanol_yield = lambda: ethanol.F_vol * _gal_per_m3 * get_annual_factor() / 1e6 # in MMGal (million gallon)
 get_jet_yield = lambda:  jet_fuel.F_vol * _gal_per_m3 * get_annual_factor() / 1e6
@@ -117,10 +113,10 @@ get_conversion_efficiency = lambda: get_total_energy() / get_ethanol_energy()
 
 get_MPSP = lambda: tea_SAF.solve_price(F.jet_fuel)  # $/kg
 
-_jet_price_conversion_index_vol = _L_per_gal * get_jet_density() / 1000 # from $/kg to $/gal
+_jet_price_conversion_index_vol = lambda: _L_per_gal * jet_fuel.rho / 1000 # from $/kg to $/gal
 #_jet_price_conversion_index_energy = 
 
-get_MPSP_per_gallon = lambda: get_MPSP() * _jet_price_conversion_index_vol
+get_MPSP_per_gallon = lambda: get_MPSP() * _jet_price_conversion_index_vol()
 # get_jet_price_per_GGE = lambda: get_MPSP()
     
 get_NPV = lambda: tea_SAF.NPV
@@ -140,41 +136,19 @@ get_electricity_credit = lambda: get_excess_power() * electricity_price /1e6
 
 
 
-
-class Metrics(list):
-    def __init__(self, metrics):
-        self.extend(metrics)
-    def append(self, metric):
-        repeated = False
-        for i in self:
-            if i.index == metric.index:
-                repeated = True
-                break
-        if repeated:
-            warn("Metric {metric.index} already exists in Metrics object. Second instance has been deleted.")
-        else:
-            super().append(metric)
-    def extend(self,metrics):
-        for i in metrics:
-            self.append(i)
-
-
-
-
-
-
-metrics = Metrics([Metric('Minimum selling price per kg', get_MPSP, '$/kg'),
-                   Metric('Minimum selling price per gallon', get_MPSP_per_gallon, '$/gal'),
-                   Metric('Jet volume yield', get_jet_yield, 'MMGal/yr'),
-                   Metric('Jet energy yield', get_jet_energy, 'GGE/yr'),
-                   Metric('Jet volume ratio', get_jet_vol_ratio, '%'),
-                   Metric('Jet volume ratio to ethanol', get_jet_to_eth_ratio, '%'),
-                   Metric('Conversion efficiency', get_conversion_efficiency, '%'),
-                   Metric('Total capital investment', get_overall_TCI, '10^6 $'),
-                   Metric('Annual operating cost', get_overall_AOC, '10^6 $/yr'),
-                   Metric('Annual material cost', get_material_cost, '10^6 $/yr'),
-                   Metric('Annual product sale', get_annual_sale, '10^6 $/yr'),
-                   Metric('Annual electricity credit', get_electricity_credit, '10^6 $/yr')])
+metrics = [Metric('Minimum selling price per kg', get_MPSP, '$/kg'),
+           Metric('Minimum selling price per gallon', get_MPSP_per_gallon, '$/gal'),
+           Metric('Jet volume yield', get_jet_yield, 'MMGal/yr'),
+           Metric('Jet energy yield', get_jet_energy, 'GGE/yr'),
+           Metric('Jet volume ratio', get_jet_vol_ratio, '%'),
+           Metric('Jet volume ratio to ethanol', get_jet_to_eth_ratio, '%'),
+           Metric('Conversion efficiency', get_conversion_efficiency, '%'),
+           Metric('Total capital investment', get_overall_TCI, '10^6 $'),
+           Metric('Annual operating cost', get_overall_AOC, '10^6 $/yr'),
+           Metric('Annual material cost', get_material_cost, '10^6 $/yr'),
+           Metric('Annual product sale', get_annual_sale, '10^6 $/yr'),
+           Metric('Annual electricity credit', get_electricity_credit, '10^6 $/yr')]
+                   
           
 
 
@@ -182,8 +156,8 @@ metrics = Metrics([Metric('Minimum selling price per kg', get_MPSP, '$/kg'),
 
 # Breakdowns by process groups
 # index in per gallon jet fuel
-jet_fuel_gal_per_hr = jet_fuel.F_vol * _gal_per_m3
-jet_fuel_gal_per_year = jet_fuel_gal_per_hr * sys.operating_hours
+jet_fuel_gal_per_hr = lambda: jet_fuel.F_vol * _gal_per_m3
+jet_fuel_gal_per_year = lambda: jet_fuel_gal_per_hr() * sys.operating_hours
 
 def get_group_heating_demand(group):
     return sum([sum([hu.duty for hu in unit.heat_utilities if hu.duty*hu.flow>0.]) for unit in group.units])
@@ -194,96 +168,96 @@ def get_group_cooling_demand(group):
 metrics.extend((Metric('Preprocessing_group-heating demand', 
                       lambda: 0.001*sum([sum([hu.duty for hu in unit.heat_utilities \
                                               if hu.duty*hu.flow>0.]) for unit in \
-                                         process_groups_dict['Preprocessing_group'].units])/jet_fuel_gal_per_hr,
+                                         process_groups_dict['Preprocessing_group'].units])/jet_fuel_gal_per_hr(),
                       'MJ/gal'),))
 metrics.extend((Metric('Pretreatment_group-heating demand', 
                       lambda: 0.001*sum([sum([hu.duty for hu in unit.heat_utilities \
                                               if hu.duty*hu.flow>0.]) for unit in \
-                                         process_groups_dict['Pretreatment_group'].units])/jet_fuel_gal_per_hr,
+                                         process_groups_dict['Pretreatment_group'].units])/jet_fuel_gal_per_hr(),
                       'MJ/gal'),))
 metrics.extend((Metric('Fermentation_group-heating demand', 
                       lambda: 0.001*sum([sum([hu.duty for hu in unit.heat_utilities \
                                               if hu.duty*hu.flow>0.]) for unit in \
-                                         process_groups_dict['Fermentation_group'].units])/jet_fuel_gal_per_hr,
+                                         process_groups_dict['Fermentation_group'].units])/jet_fuel_gal_per_hr(),
                       'MJ/gal'),))
 metrics.extend((Metric('Upgrading_group-heating demand', 
                       lambda: 0.001*sum([sum([hu.duty for hu in unit.heat_utilities \
                                               if hu.duty*hu.flow>0.]) for unit in \
-                                         process_groups_dict['Upgrading_group'].units])/jet_fuel_gal_per_hr,
+                                         process_groups_dict['Upgrading_group'].units])/jet_fuel_gal_per_hr(),
                       'MJ/gal'),))
 metrics.extend((Metric('WWT_group-heating demand', 
                       lambda: 0.001*sum([sum([hu.duty for hu in unit.heat_utilities \
                                               if hu.duty*hu.flow>0.]) for unit in \
-                                         process_groups_dict['WWT_group'].units])/jet_fuel_gal_per_hr,
+                                         process_groups_dict['WWT_group'].units])/jet_fuel_gal_per_hr(),
                       'MJ/gal'),))
 metrics.extend((Metric('HXN_group-heating demand', 
                       lambda: 0.001*sum([sum([hu.duty for hu in unit.heat_utilities \
                                               if hu.duty*hu.flow>0.]) for unit in \
-                                         process_groups_dict['HXN_group'].units])/jet_fuel_gal_per_hr,
+                                         process_groups_dict['HXN_group'].units])/jet_fuel_gal_per_hr(),
                       'MJ/gal'),))
 metrics.extend((Metric('BT_group-heating demand', 
                       lambda: 0.001*sum([sum([hu.duty for hu in unit.heat_utilities \
                                               if hu.duty*hu.flow>0.]) for unit in \
-                                         process_groups_dict['BT_group'].units])/jet_fuel_gal_per_hr,
+                                         process_groups_dict['BT_group'].units])/jet_fuel_gal_per_hr(),
                       'MJ/gal'),))
 metrics.extend((Metric('CT_group-heating demand', 
                       lambda: 0.001*sum([sum([hu.duty for hu in unit.heat_utilities \
                                               if hu.duty*hu.flow>0.]) for unit in \
-                                         process_groups_dict['CT_group'].units])/jet_fuel_gal_per_hr,
+                                         process_groups_dict['CT_group'].units])/jet_fuel_gal_per_hr(),
                       'MJ/gal'),))
 metrics.extend((Metric('Facilities_no_hu_group-heating demand', 
                       lambda: 0.001*sum([sum([hu.duty for hu in unit.heat_utilities \
                                               if hu.duty*hu.flow>0.]) for unit in \
-                                         process_groups_dict['Facilities_no_hu_group'].units])/jet_fuel_gal_per_hr,
+                                         process_groups_dict['Facilities_no_hu_group'].units])/jet_fuel_gal_per_hr(),
                       'MJ/gal'),))
 
 
     
 # Cooling duty
-metrics.extend((Metric('Preprocessing_group-heating demand', 
+metrics.extend((Metric('Preprocessing_group-cooling demand', 
                       lambda: 0.001*sum([sum([hu.duty for hu in unit.heat_utilities \
                                               if hu.duty*hu.flow<0.]) for unit in \
-                                         process_groups_dict['Preprocessing_group'].units])/jet_fuel_gal_per_hr,
+                                         process_groups_dict['Preprocessing_group'].units])/jet_fuel_gal_per_hr(),
                       'MJ/gal'),))
-metrics.extend((Metric('Pretreatment_group-heating demand', 
+metrics.extend((Metric('Pretreatment_group-cooling demand', 
                       lambda: 0.001*sum([sum([hu.duty for hu in unit.heat_utilities \
                                               if hu.duty*hu.flow<0.]) for unit in \
-                                         process_groups_dict['Pretreatment_group'].units])/jet_fuel_gal_per_hr,
+                                         process_groups_dict['Pretreatment_group'].units])/jet_fuel_gal_per_hr(),
                       'MJ/gal'),))
-metrics.extend((Metric('Fermentation_group-heating demand', 
+metrics.extend((Metric('Fermentation_group-cooling demand', 
                       lambda: 0.001*sum([sum([hu.duty for hu in unit.heat_utilities \
                                               if hu.duty*hu.flow<0.]) for unit in \
-                                         process_groups_dict['Fermentation_group'].units])/jet_fuel_gal_per_hr,
+                                         process_groups_dict['Fermentation_group'].units])/jet_fuel_gal_per_hr(),
                       'MJ/gal'),))
-metrics.extend((Metric('Upgrading_group-heating demand', 
+metrics.extend((Metric('Upgrading_group-cooling demand', 
                       lambda: 0.001*sum([sum([hu.duty for hu in unit.heat_utilities \
                                               if hu.duty*hu.flow<0.]) for unit in \
-                                         process_groups_dict['Upgrading_group'].units])/jet_fuel_gal_per_hr,
+                                         process_groups_dict['Upgrading_group'].units])/jet_fuel_gal_per_hr(),
                       'MJ/gal'),))
-metrics.extend((Metric('WWT_group-heating demand', 
+metrics.extend((Metric('WWT_group-cooling demand', 
                       lambda: 0.001*sum([sum([hu.duty for hu in unit.heat_utilities \
                                               if hu.duty*hu.flow<0.]) for unit in \
-                                         process_groups_dict['WWT_group'].units])/jet_fuel_gal_per_hr,
+                                         process_groups_dict['WWT_group'].units])/jet_fuel_gal_per_hr(),
                       'MJ/gal'),))
-metrics.extend((Metric('HXN_group-heating demand', 
+metrics.extend((Metric('HXN_group-cooling demand', 
                       lambda: 0.001*sum([sum([hu.duty for hu in unit.heat_utilities \
                                               if hu.duty*hu.flow<0.]) for unit in \
-                                         process_groups_dict['HXN_group'].units])/jet_fuel_gal_per_hr,
+                                         process_groups_dict['HXN_group'].units])/jet_fuel_gal_per_hr(),
                       'MJ/gal'),))
-metrics.extend((Metric('BT_group-heating demand', 
+metrics.extend((Metric('BT_group-cooling demand', 
                       lambda: 0.001*sum([sum([hu.duty for hu in unit.heat_utilities \
                                               if hu.duty*hu.flow<0.]) for unit in \
-                                         process_groups_dict['BT_group'].units])/jet_fuel_gal_per_hr,
+                                         process_groups_dict['BT_group'].units])/jet_fuel_gal_per_hr(),
                       'MJ/gal'),))
-metrics.extend((Metric('CT_group-heating demand', 
+metrics.extend((Metric('CT_group-cooling demand', 
                       lambda: 0.001*sum([sum([hu.duty for hu in unit.heat_utilities \
                                               if hu.duty*hu.flow<0.]) for unit in \
-                                         process_groups_dict['CT_group'].units])/jet_fuel_gal_per_hr,
+                                         process_groups_dict['CT_group'].units])/jet_fuel_gal_per_hr(),
                       'MJ/gal'),))
-metrics.extend((Metric('Facilities_no_hu_group-heating demand', 
+metrics.extend((Metric('Facilities_no_hu_group-cooling demand', 
                       lambda: 0.001*sum([sum([hu.duty for hu in unit.heat_utilities \
                                               if hu.duty*hu.flow<0.]) for unit in \
-                                         process_groups_dict['Facilities_no_hu_group'].units])/jet_fuel_gal_per_hr,
+                                         process_groups_dict['Facilities_no_hu_group'].units])/jet_fuel_gal_per_hr(),
                       'MJ/gal'),))
 
     
@@ -321,31 +295,31 @@ metrics.extend((Metric('Facilities_no_hu_group - installed equipment cost',
 
 # Power utility demand in MW/gal
 metrics.extend((Metric('Preprocessing_group - power utility demand',
-                       lambda:process_groups_dict['Preprocessing_group'].get_electricity_consumption()/jet_fuel_gal_per_hr,
+                       lambda:process_groups_dict['Preprocessing_group'].get_electricity_consumption()/jet_fuel_gal_per_hr(),
                        'MW/gal'),))
 metrics.extend((Metric('Pretreatment_group - power utility demand',
-                       lambda:process_groups_dict['Pretreatment_group'].get_electricity_consumption()/jet_fuel_gal_per_hr,
+                       lambda:process_groups_dict['Pretreatment_group'].get_electricity_consumption()/jet_fuel_gal_per_hr(),
                        'MW/gal'),))
 metrics.extend((Metric('Fermentation_group - power utility demand',
-                       lambda:process_groups_dict['Fermentation_group'].get_electricity_consumption()/jet_fuel_gal_per_hr,
+                       lambda:process_groups_dict['Fermentation_group'].get_electricity_consumption()/jet_fuel_gal_per_hr(),
                        'MW/gal'),))
 metrics.extend((Metric('Upgrading_group - power utility demand',
-                       lambda:process_groups_dict['Upgrading_group'].get_electricity_consumption()/jet_fuel_gal_per_hr,
+                       lambda:process_groups_dict['Upgrading_group'].get_electricity_consumption()/jet_fuel_gal_per_hr(),
                        'MW/gal'),))
 metrics.extend((Metric('WWT_group - power utility demand',
-                       lambda:process_groups_dict['WWT_group'].get_electricity_consumption()/jet_fuel_gal_per_hr,
+                       lambda:process_groups_dict['WWT_group'].get_electricity_consumption()/jet_fuel_gal_per_hr(),
                        'MW/gal'),))
 metrics.extend((Metric('HXN_group - power utility demand',
-                       lambda:process_groups_dict['HXN_group'].get_electricity_consumption()/jet_fuel_gal_per_hr,
+                       lambda:process_groups_dict['HXN_group'].get_electricity_consumption()/jet_fuel_gal_per_hr(),
                        'MW/gal'),))
 metrics.extend((Metric('BT_group - power utility demand',
-                       lambda:process_groups_dict['BT_group'].get_electricity_consumption()/jet_fuel_gal_per_hr,
+                       lambda:process_groups_dict['BT_group'].get_electricity_consumption()/jet_fuel_gal_per_hr(),
                        'MW/gal'),))
 metrics.extend((Metric('CT_group - power utility demand',
-                       lambda:process_groups_dict['CT_group'].get_electricity_consumption()/jet_fuel_gal_per_hr,
+                       lambda:process_groups_dict['CT_group'].get_electricity_consumption()/jet_fuel_gal_per_hr(),
                        'MW/gal'),))
 metrics.extend((Metric('Facilities_no_hu_group - power utility demand',
-                       lambda:process_groups_dict['Facilities_no_hu_group'].get_electricity_consumption()/jet_fuel_gal_per_hr,
+                       lambda:process_groups_dict['Facilities_no_hu_group'].get_electricity_consumption()/jet_fuel_gal_per_hr(),
                        'MW/gal'),))  
 
 
@@ -365,9 +339,9 @@ def get_material_cost_breakdown():
                 for unit in group.units:
                     for instream in unit.ins:
                         if instream.shares_flow_rate_with(feed) and not feed in counted_feeds:
-                            group_material_costs[group.name] += feed.price*feed.F_mass/jet_fuel_gal_per_hr
+                            group_material_costs[group.name] += feed.price*feed.F_mass/jet_fuel_gal_per_hr()
                             counted_feeds.append(feed)
-    group_material_costs['BT_group'] += BT.natural_gas_price*BT.natural_gas.F_mass/jet_fuel_gal_per_hr
+    group_material_costs['BT_group'] += BT.natural_gas_price*BT.natural_gas.F_mass/jet_fuel_gal_per_hr()
     return group_material_costs
 
 def get_material_cost_breakdown_fractional():
@@ -401,9 +375,9 @@ def get_material_cost_breakdown_breakdown():
                     for instream in unit.ins:
                         if instream.shares_flow_rate_with(feed) and not feed in counted_feeds:
                             feed_main_chem = get_main_chem(feed)
-                            group_material_costs[group.name][feed_main_chem]= feed.price*feed.F_mass/jet_fuel_gal_per_hr
+                            group_material_costs[group.name][feed_main_chem]= feed.price*feed.F_mass/jet_fuel_gal_per_hr()
                             counted_feeds.append(feed)
-    group_material_costs['BT_group']['NG'] = BT.natural_gas_price*BT.natural_gas.F_mass/jet_fuel_gal_per_hr
+    group_material_costs['BT_group']['NG'] = BT.natural_gas_price*BT.natural_gas.F_mass/jet_fuel_gal_per_hr()
     return group_material_costs
 
 def get_material_cost_breakdown_breakdown_fractional():
@@ -462,16 +436,16 @@ coproducts = [diesel, gasoline]
 emissions = [i for i in F.stream if i.source and not i.sink and i not in main_product and i not in coproducts]
 
 # Emission contribution
-get_GWP_emissions_total = lambda: sum([stream.get_atomic_flow('C') for stream in emissions]) * SAF_chemicals.CO2.MW / jet_fuel_gal_per_hr
+get_GWP_emissions_total = lambda: sum([stream.get_atomic_flow('C') for stream in emissions]) * SAF_chemicals.CO2.MW / jet_fuel_gal_per_hr()
 
 # End of life emissions are indirect emissions
-get_GWP_emissions_EOL = lambda: sum([stream.get_atomic_flow('C') for stream in main_product]) * SAF_chemicals.CO2.MW / jet_fuel_gal_per_hr
+get_GWP_emissions_EOL = lambda: sum([stream.get_atomic_flow('C') for stream in main_product]) * SAF_chemicals.CO2.MW / jet_fuel_gal_per_hr()
 
 get_GWP_emissions_direct = lambda: get_GWP_emissions_total() - get_GWP_emissions_EOL()
 
 # BT contribution to direct emissions
 get_GWP_emissions_direct_BT = lambda: sum([i.get_atomic_flow('C') for i in F.BT.outs]) * SAF_chemicals.CO2.MW \
-                            / jet_fuel_gal_per_hr * get_GWP_emissions_direct() / get_GWP_emissions_total()
+                            / jet_fuel_gal_per_hr() * get_GWP_emissions_direct() / get_GWP_emissions_total()
 
 get_GWP_emissions_direct_without_BT = lambda: get_GWP_emissions_direct() - get_GWP_emissions_direct_BT()
 
@@ -490,7 +464,7 @@ get_GWP_total = get_GWP_emissions_total() + get_GWP_material_total()
 # Electricity (BT satisfies all electricity in system by buying natural gas if needed, no buying electricity)
 get_electricity_use_total = lambda: sum(i.power_utility.rate for i in sys.units) # per hour
 
-get_GWP_electricity_use_total = lambda: get_electricity_use_total() * GWP_CFs['Electricty'] / jet_fuel_gal_per_hr
+get_GWP_electricity_use_total = lambda: get_electricity_use_total() * GWP_CFs['Electricty'] / jet_fuel_gal_per_hr()
 
 get_electricity_demand_total = get_electricity_use = lambda: -BT.power_utility.rate # Outside BT
 
@@ -555,435 +529,442 @@ metrics.extend((Metric('cGWP - System non-cooling electricity demand', lambda:ge
 
 #%%
 
-def conduct_uncertainity_analysis(system=sys, 
-                                  metrics=metrics, 
-                                  N_samples=100,
-                                  exception_hook='warn', # raise/warn
-                                  rule='L', # For Latin-Hypercube sampling
-                                  notify_runs=20, # runs after which you are notified 
-                                  indicator='GWP100',
-                                  #feedstock_type = 'HoySoy_oil' #can also provide 'HoSun_oil
-                                 ):
-    model = Model(sys, metrics, exception_hook=exception_hook)
-    param = model.parameter 
-    
-    # ============================================================================
-    # TEA parameters
-    # =============================================================================
+model = Model(sys, metrics)
+param = model.parameter
 
-    ##### Financial parameters #####
-    D = shape.Triangle(0.84, 0.9, 0.96)
-    @param(name='Plant uptime', element='TEA', kind='isolated', units='%',
-           baseline=0.9, distribution=D)
-    def set_operating_days(uptime):
-        tea_SAF.operating_days = 365. * uptime
+# ============================================================================
+# TEA parameters
+# =============================================================================
 
+##### Financial parameters #####
+D = shape.Triangle(0.84, 0.9, 0.96)
+@param(name='Plant uptime', element='TEA', kind='isolated', units='%',
+       baseline=0.9, distribution=D)
+def set_operating_days(uptime):
+    tea_SAF.operating_days = 365. * uptime
 
 
-    D = shape.Triangle(0.75, 1, 1.25)
-    @param(name='TCI ratio', element='TEA', kind='isolated', units='% of baseline',
-            baseline=1, distribution=D)
-    def set_TCI_ratio(new_ratio):
-        old_ratio = tea_SAF._TCI_ratio_cached
-        for unit in sys.units:
-            if hasattr(unit, 'cost_items'):
-                for item in unit.cost_items:
-                    unit.cost_items[item].cost /= old_ratio
-                    unit.cost_items[item].cost *= new_ratio
-        tea_SAF._TCI_ratio_cached = new_ratio
 
+D = shape.Triangle(0.75, 1, 1.25)
+@param(name='TCI ratio', element='TEA', kind='isolated', units='% of baseline',
+        baseline=1, distribution=D)
+def set_TCI_ratio(new_ratio):
+    old_ratio = tea_SAF._TCI_ratio_cached
+    for unit in sys.units:
+        if hasattr(unit, 'cost_items'):
+            for item in unit.cost_items:
+                unit.cost_items[item].cost /= old_ratio
+                unit.cost_items[item].cost *= new_ratio
+    tea_SAF._TCI_ratio_cached = new_ratio
 
 
-    ##### Material price #####
-    D = shape.Triangle(0.0583, 0.0637, 0.069) # From historical price
-    @param(name='Electricity price', element='TEA', kind='isolated', units='$/kWh',
-           baseline=0.070, distribution=D)
-    def set_electricity_price(price): 
-        bst.PowerUtility.price = price
 
+##### Material price #####
+D = shape.Triangle(0.0583, 0.0637, 0.069) # From historical price
+@param(name='Electricity price', element='TEA', kind='isolated', units='$/kWh',
+       baseline=0.070, distribution=D)
+def set_electricity_price(price): 
+    bst.PowerUtility.price = price
 
 
-    natural_gas_price = price['natural gas']
-    D = shape.Triangle(natural_gas_price*0.9, natural_gas_price, natural_gas_price*1.1)
-    @param(name='Natural gas price', element='TEA', kind='isolated', units='$/kWh',
-           baseline=natural_gas_price, distribution=D)
-    def set_natural_gas_price(price): 
-        F.natural_gas.price = price
 
+natural_gas_price = price['natural gas']
+D = shape.Triangle(natural_gas_price*0.9, natural_gas_price, natural_gas_price*1.1)
+@param(name='Natural gas price', element='TEA', kind='isolated', units='$/kWh',
+       baseline=natural_gas_price, distribution=D)
+def set_natural_gas_price(price): 
+    F.natural_gas.price = price
 
 
-    feedstock = F.feedstock
-    moisture = F.feedstock.imass['Water'] / F.feedstock.F_mass
-    D = shape.Triangle(75, 87.5, 100)
-    @param(name='Feedstock unit price', element='TEA', kind='isolated', units='$/dry-ton',
-           baseline=87.5, distribution=D)
-    def set_feedstock_price(price):
-        F.feedstock.price = price * (1-moisture)
 
+feedstock = F.feedstock
+moisture = F.feedstock.imass['Water'] / F.feedstock.F_mass
+D = shape.Triangle(75, 87.5, 100)
+@param(name='Feedstock unit price', element='TEA', kind='isolated', units='$/dry-ton',
+       baseline=87.5, distribution=D)
+def set_feedstock_price(price):
+    F.feedstock.price = price * (1-moisture)
 
 
-    ash_disposal_price = price['ash disposal']
-    D = shape.Triangle(ash_disposal_price*1.5, ash_disposal_price, ash_disposal_price*0.5)
-    @param(name='Ash disposal price', element='TEA', kind='isolated', units='$/kg',
-           baseline=ash_disposal_price, distribution=D)
-    def set_ash_disposal_price(price):
-        F.ash.price = price
 
+ash_disposal_price = price['ash disposal']
+D = shape.Triangle(ash_disposal_price*1.5, ash_disposal_price, ash_disposal_price*0.5)
+@param(name='Ash disposal price', element='TEA', kind='isolated', units='$/kg',
+       baseline=ash_disposal_price, distribution=D)
+def set_ash_disposal_price(price):
+    F.ash.price = price
 
 
-    H3PO4_price = price['H3PO4']
-    D = shape.Triangle(H3PO4_price*0.8, H3PO4_price, H3PO4_price*1.2)
-    @param(name='H3PO4 price', element='TEA', kind='isolated', units='$/kg',
-           baseline=H3PO4_price, distribution=D)
-    def set_H3PO4_price(price):
-        F.H3PO4.price = price
 
+H3PO4_price = price['H3PO4']
+D = shape.Triangle(H3PO4_price*0.8, H3PO4_price, H3PO4_price*1.2)
+@param(name='H3PO4 price', element='TEA', kind='isolated', units='$/kg',
+       baseline=H3PO4_price, distribution=D)
+def set_H3PO4_price(price):
+    F.H3PO4.price = price
 
 
-    enzymeM301_price = price['enzyme']
-    D = shape.Triangle(enzymeM301_price*0.8, enzymeM301_price, enzymeM301_price*1.2)
-    @param(name='Enzyme_price', element='TEA', kind='isolated', units='$/kg',
-           baseline=enzymeM301_price, distribution=D)
-    def set_enzymeM301_price(price):
-        F.enzyme_M301.price = price
 
+enzymeM301_price = price['enzyme']
+D = shape.Triangle(enzymeM301_price*0.8, enzymeM301_price, enzymeM301_price*1.2)
+@param(name='Enzyme_price', element='TEA', kind='isolated', units='$/kg',
+       baseline=enzymeM301_price, distribution=D)
+def set_enzymeM301_price(price):
+    F.enzyme_M301.price = price
 
 
-    CSL_price = price['CSL']
-    D = shape.Triangle(CSL_price*0.8, CSL_price, CSL_price*1.2)
-    @param(name='CSL price', element='TEA', kind='isolated', units='$/kg',
-           baseline=CSL_price, distribution=D)
-    def set_CSL_price(price):
-        F.CSL.price = price
 
+CSL_price = price['CSL']
+D = shape.Triangle(CSL_price*0.8, CSL_price, CSL_price*1.2)
+@param(name='CSL price', element='TEA', kind='isolated', units='$/kg',
+       baseline=CSL_price, distribution=D)
+def set_CSL_price(price):
+    F.CSL.price = price
 
 
-    DAP_price = price['DAP']
-    D = shape.Triangle(DAP_price*0.8, DAP_price, DAP_price*1.2)
-    @param(name='DAP price', element='TEA', kind='isolated', units='$/kg',
-           baseline=DAP_price, distribution=D)
-    def set_DAP_price(price):
-        F.DAP.price = price
 
+DAP_price = price['DAP']
+D = shape.Triangle(DAP_price*0.8, DAP_price, DAP_price*1.2)
+@param(name='DAP price', element='TEA', kind='isolated', units='$/kg',
+       baseline=DAP_price, distribution=D)
+def set_DAP_price(price):
+    F.DAP.price = price
 
 
-    NaOH_Price = price['NaOH']
-    D = shape.Triangle(NaOH_Price*0.8, NaOH_Price, NaOH_Price*1.2)
-    @param(name='NaOH price', element='TEA', kind='isolated', units='$/kg',
-           baseline=NaOH_Price, distribution=D)
-    def set_NaOH_price(price):
-        F.NaOH.price = price
-        #F.WWT.NaOH_price = price
 
+NaOH_Price = price['NaOH']
+D = shape.Triangle(NaOH_Price*0.8, NaOH_Price, NaOH_Price*1.2)
+@param(name='NaOH price', element='TEA', kind='isolated', units='$/kg',
+       baseline=NaOH_Price, distribution=D)
+def set_NaOH_price(price):
+    F.NaOH.price = price
+    #F.WWT.NaOH_price = price
 
 
-    Syndol_catalyst_price = price['Syndol catalyst']
-    D = shape.Triangle(Syndol_catalyst_price*0.7, Syndol_catalyst_price, Syndol_catalyst_price*1.3)
-    @param(name='Syndol catalyst price', element='TEA', kind='isolated', units='$/kg',
-           baseline=Syndol_catalyst_price, distribution=D)
-    def set_Syndol_catalyst_price(price):
-        F.R401.catalyst_price = price
 
+Syndol_catalyst_price = price['Syndol catalyst']
+D = shape.Triangle(Syndol_catalyst_price*0.7, Syndol_catalyst_price, Syndol_catalyst_price*1.3)
+@param(name='Syndol catalyst price', element='TEA', kind='isolated', units='$/kg',
+       baseline=Syndol_catalyst_price, distribution=D)
+def set_Syndol_catalyst_price(price):
+    F.R401.catalyst_price = price
 
 
-    Oligomerization1_catalyst_price = price['Ni-loaded aluminosilicate catalyst']
-    D = shape.Triangle(Oligomerization1_catalyst_price*0.7, Oligomerization1_catalyst_price, Oligomerization1_catalyst_price*1.3)
-    @param(name='Oligomerization1 catalyst price', element='TEA', kind='isolated', units='$/kg',
-           baseline=Oligomerization1_catalyst_price, distribution=D)
-    def set_oligomerization1_catalyst_price(price):
-        F.R402.catalyst_price = price
 
+Oligomerization1_catalyst_price = price['Ni-loaded aluminosilicate catalyst']
+D = shape.Triangle(Oligomerization1_catalyst_price*0.7, Oligomerization1_catalyst_price, Oligomerization1_catalyst_price*1.3)
+@param(name='Oligomerization1 catalyst price', element='TEA', kind='isolated', units='$/kg',
+       baseline=Oligomerization1_catalyst_price, distribution=D)
+def set_oligomerization1_catalyst_price(price):
+    F.R402.catalyst_price = price
 
 
-    Oligomerization2_catalyst_price = price['Aluminosilicate catalyst']
-    D = shape.Triangle(Oligomerization2_catalyst_price*0.7, Oligomerization2_catalyst_price, Oligomerization2_catalyst_price*1.3)
-    @param(name='Oligomerization2 catalyst price', element='TEA', kind='isolated', units='$/kg',
-           baseline=Oligomerization2_catalyst_price, distribution=D)
-    def set_oligomerization2_catalyst_price(price):
-        F.R403.catalyst_price = price
 
+Oligomerization2_catalyst_price = price['Aluminosilicate catalyst']
+D = shape.Triangle(Oligomerization2_catalyst_price*0.7, Oligomerization2_catalyst_price, Oligomerization2_catalyst_price*1.3)
+@param(name='Oligomerization2 catalyst price', element='TEA', kind='isolated', units='$/kg',
+       baseline=Oligomerization2_catalyst_price, distribution=D)
+def set_oligomerization2_catalyst_price(price):
+    F.R403.catalyst_price = price
 
 
-    Hydrogenation_catalyst_price = price['Como catalyst']
-    D = shape.Triangle(Hydrogenation_catalyst_price*0.7, Hydrogenation_catalyst_price, Hydrogenation_catalyst_price*1.3)
-    @param(name='Hydrogenation catalyst price', element='TEA', kind='isolated', units='$/kg',
-           baseline=Hydrogenation_catalyst_price, distribution=D)
-    def set_hydrogenation_catalyst_price(price):
-        F.R404.catalyst_price = price
 
+Hydrogenation_catalyst_price = price['Como catalyst']
+D = shape.Triangle(Hydrogenation_catalyst_price*0.7, Hydrogenation_catalyst_price, Hydrogenation_catalyst_price*1.3)
+@param(name='Hydrogenation catalyst price', element='TEA', kind='isolated', units='$/kg',
+       baseline=Hydrogenation_catalyst_price, distribution=D)
+def set_hydrogenation_catalyst_price(price):
+    F.R404.catalyst_price = price
 
 
-    H2_price = price['h2']
-    D = shape.Triangle(H2_price*0.7, H2_price, H2_price*1.3)
-    @param(name='H2 price', element='TEA', kind='isolated', units='$/kg',
-           baseline=H2_price, distribution=D)
-    def set_hydrogen_price(price):
-        F.hydrogen.price = price
 
+H2_price = price['h2']
+D = shape.Triangle(H2_price*0.7, H2_price, H2_price*1.3)
+@param(name='H2 price', element='TEA', kind='isolated', units='$/kg',
+       baseline=H2_price, distribution=D)
+def set_hydrogen_price(price):
+    F.hydrogen.price = price
 
-    ###### Coproduct price ######
-    diesel_price = price['diesel']
-    D = shape.Triangle(diesel_price*0.7, diesel_price, diesel_price*1.5) # Fluctuation maximum rate=0.4
-    @param(name='Diesel price', element='TEA', kind='isolated', units='$/kg',
-           baseline=diesel_price, distribution=D)
-    def set_diesel_price(price):
-        diesel.price = price
 
+###### Coproduct price ######
+diesel_price = price['diesel']
+D = shape.Triangle(diesel_price*0.7, diesel_price, diesel_price*1.5) # Fluctuation maximum rate=0.4
+@param(name='Diesel price', element='TEA', kind='isolated', units='$/kg',
+       baseline=diesel_price, distribution=D)
+def set_diesel_price(price):
+    diesel.price = price
 
 
-    gasoline_price = price['gasoline']
-    D = shape.Triangle(gasoline_price*0.8, gasoline_price, gasoline_price*1.2) # Fluctuation maximum rate=0.2
-    @param(name='Gasoline price', element='TEA', kind='isolated', units='$/kg',
-           baseline=gasoline_price, distribution=D)
-    def set_gasoline_price(price):
-        gasoline.price = price
 
+gasoline_price = price['gasoline']
+D = shape.Triangle(gasoline_price*0.8, gasoline_price, gasoline_price*1.2) # Fluctuation maximum rate=0.2
+@param(name='Gasoline price', element='TEA', kind='isolated', units='$/kg',
+       baseline=gasoline_price, distribution=D)
+def set_gasoline_price(price):
+    gasoline.price = price
 
 
-    ###### Bagasse distribution ######
-    S102 = F.S102
-    D = shape.Uniform(0.5,1.0)
-    @param(name='Bagasse split for ethanol', element=S102, kind='coupled', units='%',
-           baseline=0.8, distribution=D)
-    def set_bagasse_split(split):
-        S102.split = split
 
+###### Bagasse distribution ######
+S102 = F.S102
+D = shape.Uniform(0.5,1.0)
+@param(name='Bagasse split for ethanol', element=S102, kind='coupled', units='%',
+       baseline=0.8, distribution=D)
+def set_bagasse_split(split):
+    S102.split = split
 
 
-    ###### Pretreatment parameters ######
-    M201 = F.M201
-    D = shape.Triangle(0.25, 0.305, 0.4)
-    @param(name='Pretreatment solids loading', element=M201, kind='coupled', units='%',
-           baseline=0.305, distribution=D)
-    def set_pretreatment_solids_loading(loading):
-        M201.solids_loading = loading
 
+###### Pretreatment parameters ######
+M201 = F.M201
+D = shape.Triangle(0.25, 0.305, 0.4)
+@param(name='Pretreatment solids loading', element=M201, kind='coupled', units='%',
+       baseline=0.305, distribution=D)
+def set_pretreatment_solids_loading(loading):
+    M201.solids_loading = loading
 
 
-    R201 = F.R201
-    D = shape.Triangle(0.06, 0.099, 0.12)
-    @param(name='Pretreatment glucan-to-glucose', element=R201, kind='coupled', units='%',
-           baseline=0.099, distribution=D)
-    def set_R201_glucan_conversion(X): 
-        R201.reactions[0].X = X    
 
+R201 = F.R201
+D = shape.Triangle(0.06, 0.099, 0.12)
+@param(name='Pretreatment glucan-to-glucose', element=R201, kind='coupled', units='%',
+       baseline=0.099, distribution=D)
+def set_R201_glucan_conversion(X): 
+    R201.reactions[0].X = X    
 
 
-    D = shape.Triangle(0.8, 0.9, 0.92)
-    @param(name='Pretreatment xylan-to-xylose', element=R201, kind='coupled', units='%',
-           baseline=0.9, distribution=D)
-    def set_R201_xylan_conversion(X): 
-        R201.reactions[4].X = X   
 
+D = shape.Triangle(0.8, 0.9, 0.92)
+@param(name='Pretreatment xylan-to-xylose', element=R201, kind='coupled', units='%',
+       baseline=0.9, distribution=D)
+def set_R201_xylan_conversion(X): 
+    R201.reactions[4].X = X   
 
-    ###### Fermentation parameters ######
-    M301 = F.M301
-    R301 = F.R301
 
-    D = shape.Triangle(0.175, 0.2, 0.25)
-    @param(name='Enzymatic hydrolysis solids loading', element=M301, kind='coupled', units='%',
-           baseline=0.2, distribution=D)
-    def set_R301_solids_loading(loading):
-        M301.solids_loading = loading
+###### Fermentation parameters ######
+M301 = F.M301
+R301 = F.R301
 
+D = shape.Triangle(0.175, 0.2, 0.25)
+@param(name='Enzymatic hydrolysis solids loading', element=M301, kind='coupled', units='%',
+       baseline=0.2, distribution=D)
+def set_R301_solids_loading(loading):
+    M301.solids_loading = loading
 
 
-    D = shape.Triangle(10, 20, 30)
-    @param(name='Enzyme loading', element=M301, kind='coupled', units='mg/g',
-           baseline=20, distribution=D)
-    def set_R301_enzyme_loading(loading):
-        M301.enzyme_loading = loading
 
+D = shape.Triangle(10, 20, 30)
+@param(name='Enzyme loading', element=M301, kind='coupled', units='mg/g',
+       baseline=20, distribution=D)
+def set_R301_enzyme_loading(loading):
+    M301.enzyme_loading = loading
 
 
-    D = shape.Triangle(0.002, 0.0025, 0.003)
-    @param(name='CSL loading', element=R301, kind='coupled', units='g/L',
-           baseline=0.0025, distribution=D)
-    def set_CSL_loading(loading):
-        R301.CSL_loading = loading
 
+D = shape.Triangle(0.002, 0.0025, 0.003)
+@param(name='CSL loading', element=R301, kind='coupled', units='g/L',
+       baseline=0.0025, distribution=D)
+def set_CSL_loading(loading):
+    R301.CSL_loading = loading
 
 
-    D = shape.Triangle(0.75, 0.9, 0.948-1e-6)
-    @param(name='Enzymatic hydrolysis glucan-to-glucose', element=R301, kind='coupled', units='%',
-           baseline=0.9, distribution=D)
-    def set_R301_glucan_to_glucose_conversion(X):
-        R301.saccharification_rxns[3].X = X
-           
 
+D = shape.Triangle(0.75, 0.9, 0.948-1e-6)
+@param(name='Enzymatic hydrolysis glucan-to-glucose', element=R301, kind='coupled', units='%',
+       baseline=0.9, distribution=D)
+def set_R301_glucan_to_glucose_conversion(X):
+    R301.saccharification_rxns[3].X = X
+       
 
-    D = shape.Triangle(0.9, 0.95, 0.97)
-    @param(name='Fermentation glucose-to-ethanol', element=R301, kind='coupled', units='%',
-           baseline = 0.9, distribution=D)
-    def set_R301_glucose_to_ethanol_conversion(X):
-        R301.cofermentation_rxns[0].X = X
 
+D = shape.Triangle(0.9, 0.95, 0.97)
+@param(name='Fermentation glucose-to-ethanol', element=R301, kind='coupled', units='%',
+       baseline = 0.95, distribution=D)
+def set_R301_glucose_to_ethanol_conversion(X):
+    R301.cofermentation_rxns[0].X = X
 
 
-    ##### Upgrading parameters #####
-    R401 = F.R401
-    S401 = F.S401
-    R402 = F.R402
-    R403 = F.R403
-    R404 = F.R404
 
-    D = shape.Triangle(0.99, 0.995, 0.999)
-    @param(name='Dehydration ethanol conversion', element=R401, kind='coupled', units='%',
-           baseline = 0.995, distribution=D)
-    def set_R401_ethanol_conversion(X):
-        R401.overall_C2H5OH_conversion = X
+##### Upgrading parameters #####
+R401 = F.R401
+S401 = F.S401
+R402 = F.R402
+R403 = F.R403
+R404 = F.R404
 
+D = shape.Triangle(0.99, 0.995, 0.999)
+@param(name='Dehydration ethanol conversion', element=R401, kind='coupled', units='%',
+       baseline = 0.995, distribution=D)
+def set_R401_ethanol_conversion(X):
+    R401.overall_C2H5OH_conversion = X
 
 
-    D = shape.Triangle(0.3, 0.43, 2)
-    @param(name='Dehydration WHSV', element=R401, kind='coupled', units='h^-1',
-           baseline = 0.43, distribution=D)
-    def set_R401_WHSV(X):
-        R401.WHSV = X
 
+D = shape.Triangle(0.3, 0.43, 2)
+@param(name='Dehydration WHSV', element=R401, kind='coupled', units='h^-1',
+       baseline = 0.43, distribution=D)
+def set_R401_WHSV(X):
+    R401.WHSV = X
 
 
-    D = shape.Uniform(3.14/3600, 4.05/3600)
-    @param(name='Dehydration residence time', element=R401, kind='coupled', units='hr',
-           baseline = 3.14/3600, distribution=D)
-    def set_R401_residence_time(X):
-        R401.tau = X
 
+D = shape.Uniform(3.14/3600, 4.05/3600)
+@param(name='Dehydration residence time', element=R401, kind='coupled', units='hr',
+       baseline = 3.14/3600, distribution=D)
+def set_R401_residence_time(X):
+    R401.tau = X
 
 
-    # D = shape.Triangle(0.95, 0.98, 0.995) # SEE WHAT HAPPEDS
-    # @param(name='Split etheylene cwt', element=S401, kind='coupled', units='%',
-    #        baseline = 0.98, distribution=D)
-    # def set_S401_etheylene_cwt(X):
-    #     S401.target_ethylene_cwt = X
 
+# D = shape.Triangle(0.95, 0.98, 0.995) # SEE WHAT HAPPEDS
+# @param(name='Split etheylene cwt', element=S401, kind='coupled', units='%',
+#        baseline = 0.98, distribution=D)
+# def set_S401_etheylene_cwt(X):
+#     S401.target_ethylene_cwt = X
 
 
-    D = shape.Uniform(0.5, 5) 
-    @param(name='1st oligomerization WHSV', element=R402, kind='coupled', units='h^-1',
-           baseline = 5, distribution=D)
-    def set_R402_WHSV(X):
-        R402.WHSX = X
 
+D = shape.Uniform(0.5, 5) 
+@param(name='1st oligomerization WHSV', element=R402, kind='coupled', units='h^-1',
+       baseline = 5, distribution=D)
+def set_R402_WHSV(X):
+    R402.WHSX = X
 
 
-    D = shape.Uniform(0.5, 10) 
-    @param(name='2nd oligomerization WHSV', element=R403, kind='coupled', units='h^-1',
-           baseline = 10, distribution=D)
-    def set_R403_WHSV(X):
-        R403.WHSX = X
 
+D = shape.Uniform(0.5, 10) 
+@param(name='2nd oligomerization WHSV', element=R403, kind='coupled', units='h^-1',
+       baseline = 10, distribution=D)
+def set_R403_WHSV(X):
+    R403.WHSX = X
 
 
-    D = shape.Uniform(1, 3)
-    @param(name='Hydrogenation WHSV', element=R404, kind='coupled', units='h^-1',
-           baseline = 3, distribution=D)
-    def set_R404_WHSV(X):
-        R404.WHSX = X
 
+D = shape.Uniform(1, 3)
+@param(name='Hydrogenation WHSV', element=R404, kind='coupled', units='h^-1',
+       baseline = 3, distribution=D)
+def set_R404_WHSV(X):
+    R404.WHSX = X
 
 
-    ##### Facilities parameter #####
-    BT = F.BT
-    D = shape.Uniform(0.8*(1-0.1), 0.8*(1+0.1))
-    @param(name='Boiler efficiency', element=BT, kind='coupled', units='%',
-           baseline=0.8, distribution=D)
-    def set_boiler_efficiency(efficiency):
-        BT.boiler_efficiency = efficiency
 
+##### Facilities parameter #####
+BT = F.BT
+D = shape.Uniform(0.8*(1-0.1), 0.8*(1+0.1))
+@param(name='Boiler efficiency', element=BT, kind='coupled', units='%',
+       baseline=0.8, distribution=D)
+def set_boiler_efficiency(efficiency):
+    BT.boiler_efficiency = efficiency
 
 
-    # =============================================================================
-    # LCA parameters
-    # =============================================================================
-    D = shape.Uniform(0.05, 0.15)
-    @param(name='Feedstock GWP', element=feedstock, kind='isolated', units='kg CO2-eq/kg',
-           baseline = 0.10, distribution=D)
-    def set_feedstock_GWP(X):
-        feedstock.characterization_factors['GWP100'] = X
 
+# =============================================================================
+# LCA parameters
+# =============================================================================
+D = shape.Uniform(0.05, 0.15)
+@param(name='Feedstock GWP', element=feedstock, kind='isolated', units='kg CO2-eq/kg',
+       baseline = 0.10, distribution=D)
+def set_feedstock_GWP(X):
+    feedstock.characterization_factors['GWP100'] = X
 
 
-    D = shape.Uniform(0.86829*(1-0.5), 0.86829*(1+0.5))
-    @param(name='H3PO4 GWP', element=F.H3PO4, kind='isolated', units='kg CO2-eq/kg',
-           baseline = 0.86829, distribution=D)
-    def set_H3PO4_GWP(X):
-        F.H3PO4.characterization_factors['GWP100'] = X
 
+D = shape.Uniform(0.86829*(1-0.5), 0.86829*(1+0.5))
+@param(name='H3PO4 GWP', element=F.H3PO4, kind='isolated', units='kg CO2-eq/kg',
+       baseline = 0.86829, distribution=D)
+def set_H3PO4_GWP(X):
+    F.H3PO4.characterization_factors['GWP100'] = X
 
 
-    D = shape.Uniform(3.1996*(1-0.5), 3.1996*(1+0.5))
-    @param(name='Flocculant GWP', element=F.polymer, kind='isolated', units='kg CO2-eq/kg',
-           baseline = 3.1996, distribution=D)
-    def set_flocculant_GWP(X):
-        F.polymer.characterization_factors['GWP100'] = X
 
+D = shape.Uniform(3.1996*(1-0.5), 3.1996*(1+0.5))
+@param(name='Flocculant GWP', element=F.polymer, kind='isolated', units='kg CO2-eq/kg',
+       baseline = 3.1996, distribution=D)
+def set_flocculant_GWP(X):
+    F.polymer.characterization_factors['GWP100'] = X
 
 
-    D = shape.Uniform(2.24*(1-0.5), 2.24*(1+0.5))
-    @param(name='Enzyme GWP', element=F.enzyme_M301, kind='isolated', units='kg CO2-eq/kg',
-           baseline = 2.24, distribution=D)
-    def set_enzyme_GWP(X):
-        F.enzyme_M301.characterization_factors['GWP100'] = X
 
+D = shape.Uniform(2.24*(1-0.5), 2.24*(1+0.5))
+@param(name='Enzyme GWP', element=F.enzyme_M301, kind='isolated', units='kg CO2-eq/kg',
+       baseline = 2.24, distribution=D)
+def set_enzyme_GWP(X):
+    F.enzyme_M301.characterization_factors['GWP100'] = X
 
 
-    D = shape.Uniform(1.55*(1-0.5), 1.55*(1+0.5))
-    @param(name='CSL GWP', element=F.CSL, kind='isolated', units='kg CO2-eq/kg',
-           baseline = 1.55, distribution=D)
-    def set_CSL_GWP(X):
-        F.CSL.characterization_factors['GWP100'] = X
 
+D = shape.Uniform(1.55*(1-0.5), 1.55*(1+0.5))
+@param(name='CSL GWP', element=F.CSL, kind='isolated', units='kg CO2-eq/kg',
+       baseline = 1.55, distribution=D)
+def set_CSL_GWP(X):
+    F.CSL.characterization_factors['GWP100'] = X
 
 
-    D = shape.Uniform(1.6445*(1-0.5), 1.6445*(1+0.5))
-    @param(name='DAP GWP', element=F.DAP, kind='isolated', units='kg CO2-eq/kg',
-           baseline = 1.6445, distribution=D)
-    def set_DAP_GWP(X):
-        F.DAP.characterization_factors['GWP100'] = X
 
+D = shape.Uniform(1.6445*(1-0.5), 1.6445*(1+0.5))
+@param(name='DAP GWP', element=F.DAP, kind='isolated', units='kg CO2-eq/kg',
+       baseline = 1.6445, distribution=D)
+def set_DAP_GWP(X):
+    F.DAP.characterization_factors['GWP100'] = X
 
 
-    D = shape.Uniform(2.11*(1-0.5), 2.11*(1+0.5))
-    @param(name='NaOH GWP', element=F.lime, kind='isolated', units='kg CO2-eq/kg',
-           baseline = 2.11, distribution=D)
-    def set_NaOH_GWP(X):
-        F.lime.characterization_factors['GWP100'] = X
 
+D = shape.Uniform(2.11*(1-0.5), 2.11*(1+0.5))
+@param(name='NaOH GWP', element=F.lime, kind='isolated', units='kg CO2-eq/kg',
+       baseline = 2.11, distribution=D)
+def set_NaOH_GWP(X):
+    F.lime.characterization_factors['GWP100'] = X
 
 
-    D = shape.Uniform(1.5624*(1-0.5), 1.5624*(1+0.5))
-    @param(name='H2 GWP', element=F.hydrogen, kind='isolated', units='kg CO2-eq/kg',
-           baseline = 1.5624, distribution=D)
-    def set_H2_GWP(X):
-        F.hydrogen.characterization_factors['GWP100'] = X
 
+D = shape.Uniform(1.5624*(1-0.5), 1.5624*(1+0.5))
+@param(name='H2 GWP', element=F.hydrogen, kind='isolated', units='kg CO2-eq/kg',
+       baseline = 1.5624, distribution=D)
+def set_H2_GWP(X):
+    F.hydrogen.characterization_factors['GWP100'] = X
 
 
-    D = shape.Uniform(0.4*(1-0.5), 0.4*(1+0.5))
-    @param(name='Natural gas GWP', element=F.natural_gas, kind='isolated', units='kg CO2-eq/kWh',
-           baseline = 0.4, distribution=D)
-    def set_natural_gas_GWP(X):
-        F.natural_gas.characterization_factors['GWP100'] = X
-        
-    
-    
-    if N_samples > 0:
-        rule = rule
-        np.random.seed(1234) # For consistent results
-        samples = model.sample(N_samples,rule)
-        model.load_samples(samples,optimize=True)
-        convergence_model = bst.ConvergenceModel(predictors=model.parameters)
-        model.evaluate(notify=10,convergence_model=convergence_model)
-        model.show()
-        model.table.to_excel('model_table_.xlsx')
-        df_rho,df_p = model.spearman_r()
-        df_rho.to_excel('df_rho_.xlsx')
-        df_p.to_excel('df_p_.xlsx')
-    else:
-        model.show()
-    return model
 
+D = shape.Uniform(0.4*(1-0.5), 0.4*(1+0.5))
+@param(name='Natural gas GWP', element=F.natural_gas, kind='isolated', units='kg CO2-eq/kWh',
+       baseline = 0.4, distribution=D)
+def set_natural_gas_GWP(X):
+    F.natural_gas.characterization_factors['GWP100'] = X
+ 
+
+
+# def conduct_uncertainity_analysis(system=sys, 
+#                                   metrics=metrics, 
+#                                   N_samples=100,
+#                                   exception_hook='warn', # raise/warn
+#                                   rule='L', # For Latin-Hypercube sampling
+#                                   notify_runs=20, # runs after which you are notified 
+#                                   #indicator='GWP100',
+#                                   #feedstock_type = 'HoySoy_oil' 
+#                                   ):
+#     if N_samples > 0:
+#         rule = rule
+#         np.random.seed(1234) # For consistent results
+#         samples = model.sample(N_samples,rule)
+#         model.load_samples(samples,optimize=True)
+#         convergence_model = bst.ConvergenceModel(predictors=model.parameters)
+#         model.evaluate(notify=10,convergence_model=convergence_model)
+#         model.show()
+#         model.table.to_excel('model_table_.xlsx')
+#         df_rho,df_p = model.spearman_r()
+#         df_rho.to_excel('df_rho_.xlsx')
+#         df_p.to_excel('df_p_.xlsx')
+#     else:
+#         model.show()
+#     return model
+rule = 'L'
+np.random.seed(1234) # For consistent results
+samples = model.sample(100,rule)
+model.load_samples(samples,optimize=True)
+convergence_model = bst.ConvergenceModel(predictors=model.parameters)
+model.evaluate(notify=10,convergence_model=convergence_model)
+model.show()
+model.table.to_excel('model_table_.xlsx')
 
 
 

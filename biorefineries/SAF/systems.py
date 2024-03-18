@@ -760,6 +760,8 @@ def SAF_sys(ins,outs):
 #%% System setup and process groups
 
 sys = SAF_sys()
+
+sys.simulate()
 BT_sys = bst.System('BT_sys', path=(F.BT,))
 
 preprocessing = UnitGroup('Preprocessing_group', units = [i for i in sys.units if i.ID[1]=='1'])
