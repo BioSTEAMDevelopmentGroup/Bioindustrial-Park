@@ -143,7 +143,7 @@ def evaluate_metrics_oil_recovery_integration(microbial_oil_recovery, microbial_
     nrows = productivity.size
     data = np.zeros([nrows, 3, N_metrics])
     for i in range(nrows):
-        for j, configuration in enumerate(['O7', 'O9', 'O8']):
+        for j, configuration in enumerate(['O7.WT', 'O9.WT', 'O8.WT']):
             # print(configuration, microbial_oil_recovery, microbial_oil_yield)
             br = cane.Biorefinery(configuration)
             br.set_fermentation_microbial_oil_productivity.setter(productivity[i])
@@ -443,7 +443,6 @@ def run_oilcane_ethanol_constant_biomass(N=None):
     if N is None: N = 5000
     filterwarnings('ignore')
     cane.YRCP2023()
-    bst.Model.default_convergence_model = 'linear regressor'
     run_uncertainty_and_sensitivity('O1|constant biomass yield', N)
     run_uncertainty_and_sensitivity('O2|constant biomass yield', N)
 
@@ -451,7 +450,6 @@ def run_oilcane_microbial_oil_constant_biomass(N=None):
     if N is None: N = 2000
     filterwarnings('ignore')
     cane.YRCP2023()
-    bst.Model.default_convergence_model = 'linear regressor'
     run_uncertainty_and_sensitivity('O7|constant biomass yield', N)
     run_uncertainty_and_sensitivity('O9|constant biomass yield', N)
 
@@ -471,7 +469,6 @@ def run_oilcane_microbial_oil_across_lines(N=None, configurations=None):
     if N is None: N = 2000
     filterwarnings('ignore')
     cane.YRCP2023()
-    bst.Model.default_convergence_model = 'linear regressor'
     if configurations is None: configurations = ('O7', 'O9')
     elif isinstance(configurations, str): configurations = [configurations]
     for i in configurations: run_uncertainty_and_sensitivity(i, N, across_lines=True)

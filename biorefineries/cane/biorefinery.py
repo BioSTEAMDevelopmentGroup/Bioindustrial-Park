@@ -194,6 +194,7 @@ def exponential_val(x, nA): # A x ^ n
     return A * x ** n
 
 def YRCP2023():
+    bst.Model.default_convergence_model = 'linear regressor'
     Biorefinery.default_conversion_performance_distribution = 'longterm'
     Biorefinery.default_prices_correleted_to_crude_oil = True
     Biorefinery.default_oil_content_range = [1.8, 5.4]
@@ -1594,32 +1595,24 @@ class Biorefinery:
             p.setter(x)
         
         if number in cellulosic_ethanol_configurations:
-            set_baseline(set_sorghum_glucose_yield, 79)
-            set_baseline(set_sorghum_xylose_yield, 86)
-            set_baseline(set_cane_glucose_yield, 91.0)
-            set_baseline(set_cane_xylose_yield, 97.5)
-            set_baseline(set_glucose_to_ethanol_yield, 90)
-            set_baseline(set_xylose_to_ethanol_yield, 42)
-        set_baseline(set_cane_oil_content, self.default_baseline_oil_content)
-        set_baseline(set_bagasse_oil_recovery, 70)
-        set_baseline(set_juicing_oil_recovery, 60)
-        set_baseline(set_microbial_oil_recovery)
-        set_baseline(set_crude_oil_price) 
-        set_baseline(set_ethanol_price) 
-        set_baseline(set_biodiesel_price)
-        set_baseline(set_RIN_D3_price) 
-        set_baseline(set_RIN_D4_price) 
-        set_baseline(set_RIN_D5_price) 
-        set_baseline(set_crude_glycerol_price, dist.mean_glycerol_price)
-        set_baseline(set_natural_gas_price)
-        set_baseline(set_electricity_price)
+            set_sorghum_glucose_yield.baseline = 79
+            set_sorghum_xylose_yield.baseline = 86
+            set_cane_glucose_yield.baseline = 91.0
+            set_cane_xylose_yield.baseline = 97.5
+            set_glucose_to_ethanol_yield.baseline = 90
+            set_xylose_to_ethanol_yield.baseline = 42
+        set_cane_oil_content.baseline = self.default_baseline_oil_content
+        set_bagasse_oil_recovery.baseline = 70
+        set_juicing_oil_recovery.baseline = 60
+        set_crude_glycerol_price.baseline = dist.mean_glycerol_price
         if number in cellulosic_ethanol_configurations:
             get_stream('ethanol').price = 0.789
         if number > 0:
-            set_baseline(set_cane_PL_content, 10)
-            set_baseline(set_cane_FFA_content, 10)
-        
-        for i in model._parameters: setattr(self, i.setter.__name__, i)
+            set_cane_PL_content.baseline = 10
+            set_cane_FFA_content.baseline = 10
+        for i in model._parameters: 
+            setattr(self, i.setter.__name__, i)
+            i.setter(i.baseline)
         for i in model._metrics: setattr(self, i.getter.__name__, i)
         self.sys = sys
         self.tea = tea

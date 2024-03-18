@@ -22,11 +22,15 @@ __all__ = (
 
 def save_system_reports():
     cane.YRCP2023
+    folder = os.path.dirname(__file__)
+    folder = os.path.join(folder, 'results')
     for i, name in (('O7.WT', 'DC_sugarcane_to_biodiesel'),
                     ('O8.WT', 'ICFR_sugarcane_to_biodiesel'),
                     ('O9.WT', 'ICF_sugarcane_to_biodiesel')):
         br = cane.Biorefinery(i)
-        br.sys.save_report(name + '_detailed_report.xlsx')
+        filename = name + '_detailed_report.xlsx'
+        file = os.path.join(folder, filename)
+        br.sys.save_report(file)
 
 def save_detailed_expenditure_tables(sigfigs=3, product=None):
     folder = os.path.dirname(__file__)
@@ -38,6 +42,10 @@ def save_detailed_expenditure_tables(sigfigs=3, product=None):
     
     def get_sys(name):
         brf = Biorefinery(name, update_feedstock_price=False)
+        try: brf.biodiesel.ID = 'biomass_based_diesel'
+        except: pass   
+        try: brf.FGD_lime.ID = 'flue_gas_desulfurization_lime'
+        except: pass
         return brf.sys
     
     def get_tea(name):
