@@ -491,7 +491,7 @@ def _plot_metrics_across_biomass_yield_TOC(
         lines = []
         for name, color in zip(names, line_color_wheel):
             data = df.loc[name]
-            if str(name) in ('19B', '316', '1565'): continue
+            if str(name) in ('19B', '316', '1565', 'Ideal'): continue
             oil = data['Stem oil (dw)']['Mean'] * 100
             lines.append(
                 (name, 
@@ -516,12 +516,13 @@ def _plot_metrics_across_biomass_yield_TOC(
                 y = biomass_yield
                 if biomass_yield > 25:
                     verticalalignment = 'center'
-                elif biomass_yield < 10:
-                    verticalalignment = 'bottom'
+                    x = lipid + 0.2
                 else:
+                    y = biomass_yield + 0.5
                     verticalalignment = 'bottom'
                 if lipid >= 10:
                     x = lipid - 0.2
+                    y = biomass_yield - 0.5
                     horizontalalignment = 'right'
                     verticalalignment = 'top'
                 else:

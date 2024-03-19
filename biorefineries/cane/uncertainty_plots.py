@@ -71,7 +71,6 @@ __all__ = (
     'plot_configuration_breakdown',
     'plot_feedstock_conventional_comparison_kde',
     'plot_feedstock_cellulosic_comparison_kde',
-    'plot_configuration_comparison_kde',
     'plot_open_comparison_kde',
     'plot_feedstock_comparison_kde',
     'plot_feedstock_comparison_kde_2023',
@@ -92,6 +91,10 @@ __all__ = (
     'area_hatches_biodiesel',
     'plot_spearman_YRCP2023',
     'plot_spearman_lca_YRCP2023',
+    'plot_oilcane_microbial_oil_development_sustainability_kde_2023',
+    'plot_oilcane_microbial_oil_development_economics_kde_2023',
+    'plot_oilcane_cellulosic_microbial_oil_development_sustainability_kde_2023',
+    'plot_oilcane_cellulosic_microbial_oil_development_economics_kde_2023',
     # 'plot_competitive_biomass_yield_across_oil_content_TOC',
 )
 
@@ -761,7 +764,7 @@ def plot_kde_fake_scenarios_ethanol_price(name, xticks=None, yticks=None,
     ys = tuple([y + (i - df[ethanol_price.index]) * df[ethanol_production.index]
                   + (i + j - df[ethanol_price.index] + df[relative_biodiesel_price.index]) * df[biodiesel_production.index]
                 for (i, j) in zip(ethanol_price_range, biodiesel_price_range)])
-    ax = bst.plots.plot_kde(
+    fig, ax = bst.plots.plot_kde(
         y=ys, x=xs, xticks=xticks, yticks=yticks,
         xticklabels=ticklabels, yticklabels=ticklabels,
         xbox_kwargs=xbox_kwargs or dict(light=CABBI_colors.orange.RGBn, dark=CABBI_colors.orange.shade(60).RGBn),
@@ -783,15 +786,17 @@ def plot_kde_fake_scenarios_ethanol_price(name, xticks=None, yticks=None,
         top=0.98, bottom=0.15,
         left=0.15, right=0.98,
     )
+    return fig, ax
 
 def plot_kde_2d(name, metrics=(GWP_biofuel_allocation, MFPP), xticks=None, yticks=None,
                 top_left='', top_right='', bottom_left='',
                 bottom_right='', xbox_kwargs=None, ybox_kwargs=None, titles=None,
                 fs=None, ticklabels=True, rotate_quadrants=0,
                 x_center=None, y_center=None, 
-                xlabel=None, ylabel=None):
+                xlabel=None, ylabel=None, fst=None, revqlabel=None,
+                box_size=1, aspect_ratio=0.6):
     set_font(size=fs or 8)
-    set_figure_size(aspect_ratio=0.6)
+    set_figure_size(aspect_ratio=aspect_ratio)
     if isinstance(name, str): name = (name,)
     Xi, Yi = [i.index for i in metrics]
     dfs = [get_monte_carlo(i, metrics) for i in name]
@@ -803,19 +808,25 @@ def plot_kde_2d(name, metrics=(GWP_biofuel_allocation, MFPP), xticks=None, ytick
         _, ylabel, fy = sY
         if fx: xs *= fx
         if fy: ys *= fy
-    ticklabels = [True, True] if ticklabels else [False, False]
-    axes = bst.plots.plot_kde_2d(
+    ticklabels = True if ticklabels else False
+    fig, axes = bst.plots.plot_kde_2d(
         xs=xs, ys=ys,
         xticks=xticks, yticks=yticks,
         xticklabels=ticklabels, yticklabels=ticklabels,
-        xbox_kwargs=2*[xbox_kwargs or dict(light=CABBI_colors.orange.RGBn, dark=CABBI_colors.orange.shade(60).RGBn)],
-        ybox_kwargs=2*[ybox_kwargs or dict(light=CABBI_colors.blue.RGBn, dark=CABBI_colors.blue.shade(60).RGBn)],
-        aspect_ratio=1.,
+        xbox_kwargs=[xbox_kwargs or dict(light=CABBI_colors.orange.RGBn, dark=CABBI_colors.orange.shade(60).RGBn)],
+        ybox_kwargs=[ybox_kwargs or dict(light=CABBI_colors.blue.RGBn, dark=CABBI_colors.blue.shade(60).RGBn)],
+        aspect_ratio=box_size,
     )
     M, N = axes.shape
     text = [top_left, top_right, bottom_left, bottom_right]
-    for i in range(M):
-        for j in range(N):
+    if revqlabel: 
+        Mrange = range(M-1, -1, -1)
+        Nrange = range(N-1, -1, -1)
+    else:
+        Mrange = range(M)
+        Nrange = range(N)
+    for i in Mrange:
+        for j in Nrange:
             ax = axes[i, j]
             plt.sca(ax)
             if i == M - 1: plt.xlabel(xlabel)
@@ -834,13 +845,15 @@ def plot_kde_2d(name, metrics=(GWP_biofuel_allocation, MFPP), xticks=None, ytick
         plt.subplots_adjust(
             top=0.90,
         )
+        if fst is None: fst = 10
         for ax, letter in zip(axes[0, :], titles):
             plt.sca(ax)
             ylb, yub = plt.ylim()
             xlb, xub = plt.xlim()
             plt.text((xlb + xub) * 0.5, ylb + (yub - ylb) * 1.17, letter, color=letter_color,
                       horizontalalignment='center', verticalalignment='center',
-                      fontsize=10, fontweight='bold')
+                      fontsize=fst, fontweight='bold')
+    return fig, axes
 
 def plot_unlabeled_feedstock_conventional_comparison_kde(fake_scenarios=True):
     mfpp = kde_comparison_settings[MFPP]
@@ -977,7 +990,7 @@ def plot_microbial_oil_economics_kde_2023(fs=None):
         plt.savefig(file, dpi=900, transparent=True)
 
 def plot_microbial_oil_sustainability_kde_2023(fs=None):
-    plot_kde_2d(
+    fig, axes = plot_kde_2d(
         ('O7.WT', 'O9.WT'),
         yticks=[[0, 800, 1600, 2400, 3200, 4000, 4800]],
         xticks=[[0, 0.5, 1.0, 1.5, 2.0, 2.5],
@@ -1001,20 +1014,176 @@ def plot_microbial_oil_sustainability_kde_2023(fs=None):
         file = os.path.join(images_folder, f'microbial_oil_kde.{i}')
         plt.savefig(file, dpi=900, transparent=True)
 
-def plot_configuration_comparison_kde(fs=None):
-    plot_kde(
-        'O2 - O1',
-        yticks=sorted([-1 * i for i in [-39, -26, -13, 0, 13, 26]]),
-        xticks=sorted([-1 * i for i in [-0.06, -0.04, -0.02, 0, 0.02, 0.04]]),
-        top_right='GWP\nTradeoff()',
-        bottom_left='MFPP\nTradeoff()',
-        top_left='ICF\nFavored()',
-        bottom_right='DC Favored()',
+def plot_oilcane_microbial_oil_development_sustainability_kde_2023(fs=None):
+    fig, axes = plot_kde_2d(
+        ('O7.1566|baseline fermentation performance', 
+         'O7.1566|target fermentation performance',
+         'O7.Target|target fermentation performance',
+         'O7.Ideal|target fermentation performance'),
+        titles=['Baseline\noilcane', 
+                'Impoved\nfermentation',
+                'Target\noilcane',
+                'Ideal\noilcane',],
+        yticks=[[0, 800, 1600, 2400, 3200, 4000]],
+        xticks=[[0.2, 0.4, 0.6, 0.8],
+                [0.2, 0.4, 0.6, 0.8],
+                [0.2, 0.4, 0.6, 0.8],
+                [0.2, 0.4, 0.6, 0.8]],
+        # top_right='GWP\nTradeoff()',
+        # bottom_left='Yield\nTradeoff()',
+        top_left='Microbial oil\nfavored()',
+        # bottom_right='Soybean oil\nFavored()',
+        metrics=[GWP_biodiesel_allocation, biodiesel_yield],
+        x_center=1.29,
+        y_center=617,
+        xlabel="",
+        ylabel=f"Biodiesel yield [{format_units('L/ha/y')}]",
         fs=fs,
+        box_size=2,
+        aspect_ratio=0.45,
+    )
+    plt.subplots_adjust(
+        wspace=0,
+        top=0.85,
+    )
+    fig.text(
+        0.5, 0.03,
+        "Carbon intensity (energy allocation) " f"[{GWP_units_L}]",
+        ha='center', 
+        rotation='horizontal'
     )
     for i in ('svg', 'png'):
-        file = os.path.join(images_folder, f'configuration_comparison_kde.{i}')
-        plt.savefig(file, transparent=True)
+        file = os.path.join(images_folder, f'oilcane_microbial_oil_development_sustainability_kde.{i}')
+        plt.savefig(file, dpi=900, transparent=True)
+
+def plot_oilcane_microbial_oil_development_economics_kde_2023(fs=None):
+    fig, axes = plot_kde_2d(
+        ('O7.1566|baseline fermentation performance', 
+         'O7.1566|target fermentation performance',
+         'O7.Target|target fermentation performance',
+         'O7.Ideal|target fermentation performance'),
+        titles=['Baseline\noilcane', 
+                'Impoved\nfermentation',
+                'Target\noilcane',
+                'Ideal\noilcane',],
+        yticks=[[0, 2, 4, 6, 8]],
+        xticks=[[0, 200, 400, 600, 800],
+                [0, 200, 400, 600, 800],
+                [0, 200, 400, 600, 800],
+                [0, 200, 400, 600, 800]],
+        top_right='Soybean oil\nfavored()',
+        # bottom_left='Microbial oil\nFavored()',
+        # top_left='MBSP\nTradeoff()',
+        #bottom_right='TCI tradeoff()',
+        revqlabel=True,
+        metrics=[TCI, MBSP],
+        x_center=83.9,
+        y_center=[0.45, 1.11],
+        xlabel="",
+        ylabel=f"MBSP [{format_units('USD/L')}]",
+        fs=fs,
+        box_size=2,
+        aspect_ratio=0.45,
+    )
+    plt.subplots_adjust(
+        wspace=0,
+        top=0.85,
+    )
+    fig.text(
+        0.5, 0.03,
+        f"TCI [{format_units('10^6*USD')}]",
+        ha='center', 
+        rotation='horizontal'
+    )
+    for i in ('svg', 'png'):
+        file = os.path.join(images_folder, f'oilcane_microbial_oil_development_economics_kde.{i}')
+        plt.savefig(file, dpi=900, transparent=True)
+
+
+def plot_oilcane_cellulosic_microbial_oil_development_sustainability_kde_2023(fs=None):
+    fig, axes = plot_kde_2d(
+        ('O9.1566|baseline fermentation performance', 
+         'O9.1566|target fermentation performance',
+         'O9.Target|target fermentation performance',
+         'O9.Ideal|target fermentation performance'),
+        titles=['Baseline\noilcane', 
+                'Impoved\nfermentation',
+                'Target\noilcane',
+                'Ideal\noilcane',],
+        yticks=[[0, 1200, 2400, 3600, 4800, 6000]],
+        xticks=[[0.3, 0.6, 0.9, 1.2, 1.5],
+                [0.3, 0.6, 0.9, 1.2, 1.5],
+                [0.3, 0.6, 0.9, 1.2, 1.5],
+                [0.3, 0.6, 0.9, 1.2, 1.5]],
+        # top_right='GWP\nTradeoff()',
+        # bottom_left='Yield\nTradeoff()',
+        top_left='Microbial oil\nfavored()',
+        # bottom_right='Soybean oil\nFavored()',
+        metrics=[GWP_biodiesel_allocation, biodiesel_yield],
+        x_center=1.29,
+        y_center=617,
+        xlabel="",
+        ylabel=f"Biodiesel yield [{format_units('L/ha/y')}]",
+        fs=fs,
+        box_size=2,
+        aspect_ratio=0.45,
+    )
+    plt.subplots_adjust(
+        wspace=0,
+        top=0.85,
+    )
+    fig.text(
+        0.5, 0.03,
+        "Carbon intensity (energy allocation) " f"[{GWP_units_L}]",
+        ha='center', 
+        rotation='horizontal'
+    )
+    for i in ('svg', 'png'):
+        file = os.path.join(images_folder, f'oilcane_cellulosic_microbial_oil_development_sustainability_kde.{i}')
+        plt.savefig(file, dpi=900, transparent=True)
+
+def plot_oilcane_cellulosic_microbial_oil_development_economics_kde_2023(fs=None):
+    fig, axes = plot_kde_2d(
+        ('O9.1566|baseline fermentation performance', 
+         'O9.1566|target fermentation performance',
+         'O9.Target|target fermentation performance',
+         'O9.Ideal|target fermentation performance'),
+        titles=['Baseline\noilcane', 
+                'Impoved\nfermentation',
+                'Target\noilcane',
+                'Ideal\noilcane',],
+        yticks=[[0, 2, 4, 6, 8]],
+        xticks=[[0, 350, 700, 1050, 1400],
+                [0, 350, 700, 1050, 1400],
+                [0, 350, 700, 1050, 1400],
+                [0, 350, 700, 1050, 1400]],
+        top_right='Soybean oil\nfavored()',
+        # bottom_left='Microbial oil\nFavored()',
+        # top_left='MBSP\nTradeoff()',
+        #bottom_right='TCI tradeoff()',
+        revqlabel=True,
+        metrics=[TCI, MBSP],
+        x_center=83.9,
+        y_center=[0.45, 1.11],
+        xlabel="",
+        ylabel=f"MBSP [{format_units('USD/L')}]",
+        fs=fs,
+        box_size=2,
+        aspect_ratio=0.45,
+    )
+    plt.subplots_adjust(
+        wspace=0,
+        top=0.85,
+    )
+    fig.text(
+        0.5, 0.03,
+        f"TCI [{format_units('10^6*USD')}]",
+        ha='center', 
+        rotation='horizontal'
+    )
+    for i in ('svg', 'png'):
+        file = os.path.join(images_folder, f'oilcane_cellulosic_microbial_oil_development_economics_kde.{i}')
+        plt.savefig(file, dpi=900, transparent=True)
 
 def plot_microbial_oil_feedstock_comparison_kde(fs=None):
     plot_kde_2d(
@@ -1555,7 +1724,7 @@ def _add_lines_biomass_yield_vs_oil_content(f5, f50, f95):
         text, pnt.x, pnt.y, horizontalalignment='center',
         verticalalignment='bottom', arrowkwargs=dict(head_width=0),
         textcolor=pnt.c, linecolor=pnt.c,
-        dx=0, dy=6, dx_text=0, dy_text=0.1, fontsize=8,
+        dx=0, dy=5, dx_text=0, dy_text=0.1, fontsize=8,
     )
 
 def _plot_theoretical_competitive_biomass_yield_across_oil_content():
