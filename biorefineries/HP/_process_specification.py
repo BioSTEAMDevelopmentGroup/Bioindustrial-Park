@@ -299,7 +299,7 @@ class ProcessSpecification(bst.process_tools.ReactorSpecification):
         data = np.zeros([M, P])
         for i in range(P):
             self.load_spec_3(spec_3[i])
-            self.reactor._summary()
+            # self.reactor._summary()
             data[:, i] = [j() for j in metrics]
         print(data)
         return data
@@ -399,12 +399,12 @@ class ProcessSpecification(bst.process_tools.ReactorSpecification):
         
         # reactor.xylose_to_HP_rxn.X = yield_
         
-        rem_glucose = min(0.08, (1. - reactor.glucose_to_biomass_rxn.X) - reactor.glucose_to_HP_rxn.X)
+        rem_glucose = max(0., min(0.08, (1. - reactor.glucose_to_biomass_rxn.X) - reactor.glucose_to_HP_rxn.X))
         reactor.glucose_to_acetic_acid_rxn.X = (40./80.) * rem_glucose
         reactor.glucose_to_glycerol_rxn.X = (40./80.) * rem_glucose
         # reactor.glucose_to_biomass_rxn.X = (50./130.) * rem_glucose
         
-        rem_xylose = min(0.08, (1. - reactor.xylose_to_biomass_rxn.X) - reactor.xylose_to_HP_rxn.X)
+        rem_xylose = max(0., min(0.08, (1. - reactor.xylose_to_biomass_rxn.X) - reactor.xylose_to_HP_rxn.X))
         reactor.xylose_to_acetic_acid_rxn.X = (40./80.) * rem_xylose
         reactor.xylose_to_glycerol_rxn.X = (40./80.) * rem_xylose
         # reactor.xylose_to_biomass_rxn.X = (50./130.) * rem_glucose

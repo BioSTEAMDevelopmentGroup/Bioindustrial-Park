@@ -37,128 +37,137 @@ def plot_kde_formatted(
                         vlines=[],
                         hlines=[],
                         
-                        fill_between=[], # [(x, y1, y2), ...]
+                        fill_between=[], # [(x_iterable, y1, y2, color), ...]
+                        
+                        cmaps=('Greens',),
+                        
+                        ax = None,
                         ):
+    axis_given = not (ax is None)
     ax = plot_kde(xdata, 
                 ydata,
+                ax=ax,
                 xticks=xticks,
                 xticklabels=xticks,
                 yticks=yticks,
+                cmaps=cmaps,
                 yticklabels=yticks,
                 xbox_kwargs=xbox_kwargs,
                 ybox_kwargs=ybox_kwargs,
                 )
     
-    if vlines:
-        ax.vlines(vlines, yticks[0], yticks[-1], 
-                  colors='#c0c1c2', 
-                  linestyles='solid', zorder=0)
-    if hlines:
-        ax.vlines(hlines, xticks[0], xticks[-1],
-                  colors='#c0c1c2', 
-                  linestyles='solid', zorder=0)
-    if fill_between:
-        for fb in fill_between:
-            ax.fill_between(fb[0], fb[1], fb[2], 
-                            # color='#c0c1c2',
-                            color='gray',
-                            zorder=0)
-    ax.set_xlabel(xlabel)
-    ax.set_ylabel(ylabel)
-    
-    
-    ####################### METHOD 1 ############################
-    ax.xaxis.set_minor_locator(AutoMinorLocator(n_minor_ticks+1))
-    ax.yaxis.set_minor_locator(AutoMinorLocator(n_minor_ticks+1))
-    # ########--########
-    ax.tick_params(
-        axis='y',          # changes apply to the y-axis
-        which='both',      # both major and minor ticks are affected
-        direction='inout',
-        right=True,
-        width=0.65,
-        )
-    
-    # ax.tick_params(
-    #     axis='y',          # changes apply to the y-axis
-    #     which='both',      # both major and minor ticks are affected
-    #     direction='inout',
-    #     right=False,
-    #     width=0.65,
-    #     )
-    
-    ax.tick_params(
-        axis='y',          
-        which='major',      
-        length=7,
-        )
-    
-    ax.tick_params(
-        axis='y',          
-        which='minor',      
-        length=3.5,
-        )
-    
-    ax.tick_params(
-        axis='y',          
-        which='major', 
-        right=True,     
-        length=7,
-        )
-    
-    ax.tick_params(
-        axis='y',          
-        which='minor',     
-        right=True,
-        length=3.5,
-        )
-    
-    
-    ax.tick_params(
-        axis='x',          # changes apply to the x-axis
-        which='both',      # both major and minor ticks are affected
-        direction='inout',
-        right=True,
-        top=True,
-        width=0.65,
-        )
-    
-    # ax.tick_params(
-    #     axis='x',          # changes apply to the x-axis
-    #     which='both',      # both major and minor ticks are affected
-    #     direction='inout',
-    #     right=False,
-    #     top=False,
-    #     width=0.65,
-    #     )
-    
-    ax.tick_params(
-        axis='x',          
-        which='major',      
-        length=7,
-        )
-    
-    ax.tick_params(
-        axis='x',          
-        which='minor',      
-        length=3.5,
-        )
-    
-    ax.tick_params(
-        axis='x',          
-        which='major',      
-        length=7,
-        right=True,
-        top=True,
-        )
-    
-    ax.tick_params(
-        axis='x',          
-        which='minor',      
-        length=3.5,
-        right=True,
-        top=True,
-        )
+    if not axis_given:
+        if vlines:
+            ax.vlines(vlines, yticks[0], yticks[-1], 
+                      colors='#c0c1c2', 
+                      linestyles='solid', zorder=0)
+        if hlines:
+            ax.vlines(hlines, xticks[0], xticks[-1],
+                      colors='#c0c1c2', 
+                      linestyles='solid', zorder=0)
+        if fill_between:
+            for fb in fill_between:
+                ax.fill_between(fb[0], fb[1], fb[2], 
+                                # color='#c0c1c2',
+                                # color='gray',
+                                color=fb[3],
+                                zorder=0)
+        ax.set_xlabel(xlabel)
+        ax.set_ylabel(ylabel)
+        
+        
+        ####################### METHOD 1 ############################
+        ax.xaxis.set_minor_locator(AutoMinorLocator(n_minor_ticks+1))
+        ax.yaxis.set_minor_locator(AutoMinorLocator(n_minor_ticks+1))
+        # ########--########
+        ax.tick_params(
+            axis='y',          # changes apply to the y-axis
+            which='both',      # both major and minor ticks are affected
+            direction='inout',
+            right=True,
+            width=0.65,
+            )
+        
+        # ax.tick_params(
+        #     axis='y',          # changes apply to the y-axis
+        #     which='both',      # both major and minor ticks are affected
+        #     direction='inout',
+        #     right=False,
+        #     width=0.65,
+        #     )
+        
+        ax.tick_params(
+            axis='y',          
+            which='major',      
+            length=7,
+            )
+        
+        ax.tick_params(
+            axis='y',          
+            which='minor',      
+            length=3.5,
+            )
+        
+        ax.tick_params(
+            axis='y',          
+            which='major', 
+            right=True,     
+            length=7,
+            )
+        
+        ax.tick_params(
+            axis='y',          
+            which='minor',     
+            right=True,
+            length=3.5,
+            )
+        
+        
+        ax.tick_params(
+            axis='x',          # changes apply to the x-axis
+            which='both',      # both major and minor ticks are affected
+            direction='inout',
+            right=True,
+            top=True,
+            width=0.65,
+            )
+        
+        # ax.tick_params(
+        #     axis='x',          # changes apply to the x-axis
+        #     which='both',      # both major and minor ticks are affected
+        #     direction='inout',
+        #     right=False,
+        #     top=False,
+        #     width=0.65,
+        #     )
+        
+        ax.tick_params(
+            axis='x',          
+            which='major',      
+            length=7,
+            )
+        
+        ax.tick_params(
+            axis='x',          
+            which='minor',      
+            length=3.5,
+            )
+        
+        ax.tick_params(
+            axis='x',          
+            which='major',      
+            length=7,
+            right=True,
+            top=True,
+            )
+        
+        ax.tick_params(
+            axis='x',          
+            which='minor',      
+            length=3.5,
+            right=True,
+            top=True,
+            )
     ##################### END METHOD 1 ###################
     
     
@@ -253,3 +262,4 @@ def plot_kde_formatted(
                     facecolor=ax.get_facecolor(),
                     transparent=False,
                     )
+    return ax
