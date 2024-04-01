@@ -259,13 +259,11 @@ def fermentation_sys(ins,outs):
     
     H301 = bst.HXutility('H301', ins=M301-0,T=48+273.15)
     
-    DAP_storage = _units.DAPStorageTank('DAP_storage', ins=DAP, outs='')
+    DAP_storage = _units.DAPStorageTank('DAP_storage', ins=DAP)
+    S300_DAP = bst.MockSplitter('S300_DAP', DAP_storage-0, outs=['DAP_R301', 'DAP_R302'])
     
-    S300_DAP = bst.ReversedSplitter('S300_DAP', ins=DAP_storage-0, outs=['DAP_R301', 'DAP_R302'])
-    
-    CSL_storage = _units.CSLStorageTank('CSL_storage', ins=CSL, outs='')
-    
-    S300_CSL = bst.ReversedSplitter('S300_CSL', ins=CSL_storage-0, outs=['CSL_R301', 'CSL_R302'])
+    CSL_storage = _units.CSLStorageTank('CSL_storage', ins=CSL)
+    S300_CSL = bst.MockSplitter('S300_CSL', CSL_storage-0, outs=['CSL_R301', 'CSL_R302'])
     
     R301 = _units.SaccharificationAndCoFermentation('R301',ins=(H301-0,'',S300_CSL-0,S300_DAP-0,concentrated_juice), 
                                                     outs=('R301_g','effluent','side_draw'))
@@ -274,15 +272,7 @@ def fermentation_sys(ins,outs):
     T301 = _units.SeedHoldTank('T301', ins=R302-1,outs=1-R301)
 
     M302 = bst.Mixer('M302',ins=(R301-0,R302-0),outs='fermentation_vapor')
-    
-    @DAP_storage.add_specification(run=True)
-    def update_DAP_storage_DAP():
-        DAP.imass['DAP'] = S300_DAP.outs[0].F_mass + S300_DAP.outs[1].F_mass
-        
-    @CSL_storage.add_specification(run=True)
-    def update_CSL_storage_DAP():
-        CSL.imass['CSL'] = S300_CSL.outs[0].F_mass + S300_CSL.outs[1].F_mass
-    
+
     U301 = bst.VentScrubber('U301', ins=(water_U301, M302-0), 
                             outs=(U301_vent, 'U301_recycled'),
                             gas=('CO2', 'NH3', 'O2'))
@@ -362,14 +352,13 @@ def fermentation_sys(ins,outs):
     outs=[dict(ID='F401_to_WWT'),
           dict(ID='D401_heavy_impurities'),
           dict(ID='D402_top_product'),
-          dict(ID='CH4_C2H6'),
           dict(ID='gasoline'),
           dict(ID='jet_fuel'),
           dict(ID='diesel')])
           
 def upgrading_sys(ins,outs):
     NaOH,Syndol_catalyst,first_catalyst,second_catalyst,ethanol_to_storage,hydrogen,Como_catalyst = ins
-    F401_to_WWT,D401_heavy_impurities,D402_top_product,CH4_C2H6,gasoline,jet_fuel,diesel = outs
+    F401_to_WWT,D401_heavy_impurities,D402_top_product,gasoline,jet_fuel,diesel = outs
     
     P401 = bst.Pump('P401',ins=ethanol_to_storage,P=4.5*101325)
     M400 = bst.Mixer('M401', (P401-0,''))
@@ -381,18 +370,32 @@ def upgrading_sys(ins,outs):
     V401 = bst.IsenthalpicValve('V401', ins=R401-0,P=101325)
 
     # Simulate as a quench tower
-    H402 = bst.HXutility('H402', ins=V401-0,T=40+273.15,outs='crude_ethylene',rigorous=True)
+    H402 = bst.HXutility('H402', ins=V401-0,T=50+273.15,outs='crude_ethylene',rigorous=True)
     S401 = bst.PhaseSplitter('S401', ins=H402-0,outs=('vapor','liquid'))
+
+    S401.target_ethylene_cwt=0.98
+    @H402.add_bounded_numerical_specification(x0=10+273.15,x1=80+273.15,xtol=1e-5,ytol=1e-2)
+    def ethylene_cwt_at_T(T):
+        H402.T=T
+        H402.run_until(S401,inclusive=True)
+        ethylene_cwt=S401.outs[0].get_mass_fraction('Ethylene')
+        return S401.target_ethylene_cwt - ethylene_cwt
 
     # Recover ethylene from water in S401-1 and S402-1
     M401 = bst.Mixer('M401',ins=(S401-1,''),rigorous=False)
-    
-    # Split flash setting based on eq.plot_vle_binary_phase_envelope(['Ethylene', 'Water'], P=101325) NO VACCUM (T cannot meet)
-    F401 = bst.SplitFlash('F401', ins=M401-0, outs=('recovered_ethylene',F401_to_WWT), 
-                          T=230, P=101325, split=dict(Ethylene=0.999,
-                                                      Water=0.0001))
+    F401 = bst.Flash('F401',ins=M401-0,outs=('recovered_ethylene',F401_to_WWT),T=353,P=101325)
+
+    F401.target_ethylene_recovery_ratio=0.99
+    @F401.add_bounded_numerical_specification(x0=280,x1=373,xtol=1e-5,ytol=1e-2)
+    def ethylene_recovery_at_T(T):
+        F401.T=T
+        F401.run()
+        ethylene_recovery=F401.outs[0].imass['Ethylene']
+        ethylene_recovery_ratio=ethylene_recovery/F401.ins[0].imass['Ethylene']
+        return F401.target_ethylene_recovery_ratio-ethylene_recovery_ratio
+
     # Only consider ethylene and water in recovered_ethylene, ignore impurities to simplify
-    M402 = bst.Mixer('M402',ins=(S401-0,F401-0),outs='')
+    M402 = bst.Mixer('M402',ins=(S401-0,F401-0),outs='',rigorous=False)
 
     # Reduce temperature to 15 C
     # H403 = bst.HXutility('H403', ins=M402-0,outs='',T=15+273.15)
@@ -438,11 +441,12 @@ def upgrading_sys(ins,outs):
                                   P=22*101325,
                                   Lr=0.99, Hr=0.999,
                                   k=1.2)
-    
+    # S403 = bst.Splitter('S403',ins=D402-0,outs=('recycled_D402_top_product', 'wasted_D402_top_product'),split=0.5)
+    # S403-0-1-M403
     H405 = bst.HXutility('H405', ins=D402-1, T=10+273.15)
 
-    # Ethylene purity is 100%, ignore impurity for simplification but considered in LCA
-    S403 = bst.Splitter('S403', ins=H405-0, outs=('pure_ethylene',CH4_C2H6),
+    # Ethylene purity is 100%, ignore impurity for simplification
+    S403 = bst.Splitter('S403', ins=H405-0, outs=('pure_ethylene','CH4_C2H6'),
                         split=dict(Ethylene=1))
 
     # First oligomerization
@@ -461,7 +465,7 @@ def upgrading_sys(ins,outs):
 
     # Hydrogenation
     P402 = bst.Pump('P402', ins=D403-1, outs='')
-    R404 = _units.HydrogenationReactor('R404', ins=(P402-0,hydrogen,Como_catalyst),outs=('spent_catalyst_R404',''))
+    R404 = _units.HydrogenationReactor('R404', ins=(P402-0,hydrogen,Como_catalyst),outs=('','spent_catalyst_R404'))
     
     @R404.add_specification(run=True)
     def correct_hydrogen_flow():
@@ -471,7 +475,7 @@ def upgrading_sys(ins,outs):
 
     # Fractionation
 
-    D404 = bst.BinaryDistillation('D404', ins=R404-1,outs=('C6_C8_distillate','more_than_C9_bottoms'),
+    D404 = bst.BinaryDistillation('D404', ins=R404-0,outs=('C6_C8_distillate','more_than_C9_bottoms'),
                                   LHK=('C8H18','C9H20'),
                                   Lr=0.9999,
                                   Hr=0.9999,
@@ -564,15 +568,12 @@ def SAF_sys(ins,outs):
                                            units='kg/hr',
                                            price=price['water']),
                                     Stream(ID='CSL',
-                                           CSL=1,
                                            units='kg/hr',
                                            price=price['CSL']),
                                     Stream(ID='DAP',
-                                           DAP=1,
                                            units='kg/hr',
                                            price=price['DAP']),
                                     Stream(ID='water_U301',
-                                           Water=1,
                                            units='kg/hr',
                                            price=price['water'])))
                                     
@@ -582,34 +583,27 @@ def SAF_sys(ins,outs):
                                        units='kg/hr',
                                        price=price['NaOH']),
                                  Stream(ID='Syndol_catalyst',
-                                        Ash=1,
-                                        phase='s',
                                         units='kg/hr',
                                         price=price['Syndol catalyst']),
                                  Stream(ID='first_catalyst',
-                                        Ash=1,
                                         phase='s',
                                         units='kg/hr',
                                         price=price['Ni-loaded aluminosilicate catalyst']),
                                  Stream(ID='second_catalyst',
-                                        Ash=1,
                                         phase='s',
                                         units='kg/hr',
                                         price=price['Aluminosilicate catalyst']),
                                  sys_3.outs[-1],
                                  Stream(ID='hydrogen',
-                                        phase='g',
                                         units='kg/hr',
                                         price=price['h2']),
                                  Stream('Como_catalyst',
-                                        Ash=1,
                                         phase='s',
                                         units='kg/hr',
                                         price=price['Como catalyst'])),
                           outs = (Stream(ID='F401_to_WWT'),
                                   Stream(ID='D401_heavy_impurities'),
                                   Stream(ID='D402_top_product'),
-                                  Stream(ID='CH4_C2H6'),
                                   Stream(ID='gasoline',
                                          price=price['gasoline']),
                                   Stream(ID='jet_fuel',
@@ -705,6 +699,7 @@ def SAF_sys(ins,outs):
                                     F.water_M301,
                                     F.water_U301)
                              
+                             
     PWC = bst.ProcessWaterCenter('PWC',
                                   ins=(F.RO_treated_water_from_wastewater_treatment, # WWT.outs[2],
                                       '',
@@ -719,9 +714,50 @@ def SAF_sys(ins,outs):
     CIP = bst.CIPpackage('CIP', ins=CIP_chems_in, outs='CIP_chems_out')
 
     FWT = _units.FireWaterTank('FWT', ins=fire_water_in, outs='fire_water_out')
-    
-    HXN = bst.HeatExchangerNetwork('HXN',cache_network=True)
-    
+                                                              
+    HXN = bst.HeatExchangerNetwork('HXN', units = [F.E101,
+                                                   F.H101,
+                                                   F.H102,
+                                                   F.H103,
+                                                   F.H104,
+                                                  
+                                                   F.M201,
+                                                   F.H201,
+                                                  
+                                                   #F.H301, # make HXN not converge
+                                                   F.R301,
+                                                   F.R302,
+                                                   F.D301,
+                                                   F.D302,
+                                                   F.S301_H,
+                                                  
+                                                   F.R401,
+                                                   F.R402,
+                                                   F.R403,
+                                                   F.R404,
+                                                   F.F401,
+                                                   F.C401,
+                                                   F.U403,
+                                                   F.H400,
+                                                   F.H402,
+                                                   F.H404,
+                                                   F.H405,
+                                                   F.H406,
+                                                   F.H407,
+                                                   F.H408,
+                                                   F.D401,
+                                                   F.D402,
+                                                   F.D403,
+                                                   F.D404,
+                                                   F.D405,
+                                                  
+                                                   F.WWT,
+                                                   F.BT,
+                                                   F.CWP,
+                                                   F.CT,
+                                                   F.PWC,],
+                                   cache_network=True)
+    # HXN = bst.HeatExchangerNetwork('HXN',ignored=[F.H301])
 #%% System setup and process groups
 
 sys = SAF_sys()
@@ -748,9 +784,7 @@ facilities_no_hu = UnitGroup('Facilities_no_hu_group', units = (F.CIP,))
 
 
 process_groups = [preprocessing, pretreatment, fermentation, upgrading,
-                  wastewater_treatment, 
-                  heat_exchange_network, 
-                  boiler_turbogenerator,
+                  wastewater_treatment, heat_exchange_network, boiler_turbogenerator,
                   cooling_tower, facilities_no_hu]
 
 process_groups_dict = {}

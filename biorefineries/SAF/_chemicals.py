@@ -69,7 +69,7 @@ N2 = chemical_database('N2', phase='g', Hf=0)
 H2 = chemical_database('H2', Hf=0)
 CH4 = chemical_database('Methane')
 CO = chemical_database('CarbonMonoxide', Hf=-26400*_cal2joule)
-CO2 = chemical_database('CO2')
+CO2 = chemical_database('CO2', phase='g')
 NH3 = chemical_database('NH3', Hf=-10963*_cal2joule)
 NO = chemical_database('NitricOxide')
 NO2 = chemical_database('NO2')
@@ -81,6 +81,8 @@ C4H8 = chemical_database('Butadiene')
 C2H6 = chemical_database('Ethane')
 CH3OCH3 = chemical_database('Diethyl ether')
 CH3CHO = chemical_database('Acetaldehyde')
+
+CO2.Cn.method = 'JANAF'
 
 # =============================================================================
 # Soluble inorganics
@@ -428,7 +430,7 @@ defined_chemicals = {
 }
 
 SAF_chemicals.extend([i for i in sugarcane_chemicals if i.ID not in defined_chemicals])
-# %%
+#%%
 
 # Though set_thermo will first compile the Chemicals object,
 # compile beforehand is easier to debug because of the helpful error message
@@ -459,3 +461,5 @@ chems.set_synonym('Butadiene', 'C4H8')
 for chem in SAF_chemicals:
     if chem.Hfus == None:
         chem.Hfus = 0
+
+

@@ -766,7 +766,7 @@ class AdiabaticFixedbedDehydrationReactor(Reactor):
                  P=1.4*101325, # from Bioethylene Production from Ethanol: A Review and Techno-economical Evaluation
                  WHSV=0.43, # WHSV=0.3-2, from patent 'Systems and processes for conversion of ethylene feedstocks to hydrocarbon fuels'
                  tau=3.14/3600, # tau=3.14-4.05, from Process Design for the Production of Ethylene from Ethanol
-                 catalyst_lifetime=7884, # SynDol lifetime = 8-12 months from Catalytic dehydration of bioethanol to ethylene
+                 catalyst_price=price['Syndol catalyst'], 
                  V_wf=0.8,
                  length_to_diameter=3,
                  wall_thickness_factor=1,
@@ -779,7 +779,7 @@ class AdiabaticFixedbedDehydrationReactor(Reactor):
         self.P=P
         self.WHSV=WHSV # Residence time in kg/hr feed / kg catalyst
         self.tau=tau
-        self.catalyst_lifetime = catalyst_lifetime
+        self.catalyst_price = catalyst_price # In USD/kg
         self.V_wf=V_wf
         self.length_to_diameter=length_to_diameter #: Length to diameter ratio
         self.wall_thickness_factor=wall_thickness_factor
@@ -825,7 +825,6 @@ class AdiabaticFixedbedDehydrationReactor(Reactor):
         effluent.P=self.P
         
         fresh_catalyst.phase = spent_catalyst.phase = 's'
-        fresh_catalyst.F_mass = self.ins[0].F_mass/self.WHSV/self.catalyst_lifetime
         
     def _design(self):
         Reactor._design(self)
@@ -839,8 +838,9 @@ class AdiabaticFixedbedDehydrationReactor(Reactor):
         
     def _cost(self):
         super()._cost()
-        
-        
+        self.catalyst_weight = self.ins[0].F_mass/self.WHSV 
+        # SynDol lifetime of 12 months from Catalytic dehydration of bioethanol to ethylene
+        self.purchase_costs['SynDol catalyst']=self.catalyst_weight * self.catalyst_price
         
         hx = self.heat_exchanger
         self.baseline_purchase_costs['Heat exchangers'] = hx.purchase_cost
@@ -995,7 +995,7 @@ class Oligomerization1_Reactor(bst.CSTR):
               P = 21*101325, 
               tau = 48, # Oligomerization of Ethene In a Slurry Reactor Using a Nickel(II)-Exchanged Silica–Alumina Catalyst
               WHSV = 5, # WHSV=0.5-5 from Systems and processes for conversion of ethylene feedstocks to hydrocarbon fuels' P14
-              catalyst_lifetime = 7884,
+              catalyst_price = price['Ni-loaded aluminosilicate catalyst'],
               dT_hx_loop = 5,
               V_wf = 0.8,
               V_max = 1000, # Maximum volume=1000000L, from Rules of thumb in engineering practice P281 
@@ -1009,9 +1009,9 @@ class Oligomerization1_Reactor(bst.CSTR):
               
              self.T = T
              self.P = P
-             self.tau = tau
              self.WHSV = WHSV
-             self.catalyst_lifetime = catalyst_lifetime
+             self.tau = tau
+             self.catalyst_price = catalyst_price
              self.dT_hx_loop = dT_hx_loop
              self.V_wf = V_wf
              self.V_max = V_max
@@ -1048,8 +1048,6 @@ class Oligomerization1_Reactor(bst.CSTR):
         effluent.T=self.T
         effluent.P=self.P
         
-        fresh_catalyst.F_mass=self.ins[0].F_mass/self.WHSV/self.catalyst_lifetime
-        
         fresh_catalyst.phase='s'
         spent_catalyst.phase='s'
             
@@ -1074,6 +1072,11 @@ class Oligomerization1_Reactor(bst.CSTR):
             )
             kW = self.kW_per_m3 * volume * self.V_wf
             if kW > 0: self.agitator = bst.Agitator(kW)
+        
+        self.catalyst_weight = self.ins[0].F_mass/self.WHSV
+        # assuming catalyst lifetime of 12 months, enough for one year
+        self.purchase_costs['1st catalyst']=self.catalyst_weight * self.catalyst_price
+
 
 
 
@@ -1097,7 +1100,7 @@ class Oligomerization2_Reactor(bst.CSTR):
               P = 21*101325, 
               tau = 48,  # Assume same time as oligomerization1_reactor
               WHSV = 10, # WHSV=0.5-10 from Systems and processes for conversion of ethylene feedstocks to hydrocarbon fuels' P15
-              catalyst_lifetime = 7884,
+              catalyst_price = price['Aluminosilicate catalyst'],
               dT_hx_loop = 5,
               V_wf = 0.8,
               V_max = 1000,
@@ -1111,9 +1114,9 @@ class Oligomerization2_Reactor(bst.CSTR):
               
              self.T = T
              self.P = P
-             self.tau = tau
              self.WHSV = WHSV
-             self.catalyst_lifetime = catalyst_lifetime
+             self.tau = tau
+             self.catalyst_price = catalyst_price
              self.dT_hx_loop = dT_hx_loop
              self.V_wf = V_wf
              self.V_max = V_max
@@ -1146,9 +1149,6 @@ class Oligomerization2_Reactor(bst.CSTR):
         
         effluent.T=self.T
         effluent.phase='l'
-        
-        fresh_catalyst.F_mass=self.ins[0].F_mass/self.WHSV/self.catalyst_lifetime
-        
         fresh_catalyst.phase='s'
         spent_catalyst.phase='s'
         
@@ -1174,6 +1174,11 @@ class Oligomerization2_Reactor(bst.CSTR):
             )
             kW = self.kW_per_m3 * volume * self.V_wf
             if kW > 0: self.agitator = bst.Agitator(kW)
+        
+        self.catalyst_weight = self.ins[0].F_mass/self.WHSV
+        # assuming catalyst lifetime of 12 months, enough for one year
+        self.purchase_costs['2nd catalyst']=self.catalyst_weight * self.catalyst_price
+
 
 
 
@@ -1200,7 +1205,7 @@ class HydrogenationReactor(bst.CSTR): # CSTR mix well from figure in Techno-econ
               P = 3600000, # not reactor pressure
               tau = 1,  # from Historical Developments in Hydroprocessing Bio-oils
               WHSV = 3, # WHSV=1-3 from Techno-economic analysis for upgrading the biomass-derived ethanol-to-jet blendstocks
-              catalyst_lifetime = 7884, # about 1 year from Thermochemical Ethanol via Indirect Gasification and Mixed Alcohol Synthesis of Lignocellulosic Biomass
+              catalyst_price = price['Como catalyst'],
               dT_hx_loop = 5,
               V_wf = 0.8,
               V_max = 1000,
@@ -1210,23 +1215,22 @@ class HydrogenationReactor(bst.CSTR): # CSTR mix well from figure in Techno-econ
               vessel_type = 'Vertical',
               batch = False,
               adiabatic = False):
-        self.T = T
-        self.P = P
-        self.tau = tau
-        self.WHSV = WHSV
-        self.catalyst_lifetime = catalyst_lifetime
-        self.dT_hx_loop = dT_hx_loop
-        self.V_wf = V_wf
-        self.V_max = V_max
-        self.length_to_diameter = length_to_diameter
-        self.kW_per_m3 = kW_per_m3
-        self.vessel_material = vessel_material
-        self.vessel_type = vessel_type
-        self.batch = batch
-        self.adiabatic = adiabatic
-        self.load_auxiliaries()
               
-             
+             self.T = T
+             self.P = P
+             self.WHSV = WHSV
+             self.tau = tau
+             self.catalyst_price = catalyst_price
+             self.dT_hx_loop = dT_hx_loop
+             self.V_wf = V_wf
+             self.V_max = V_max
+             self.length_to_diameter = length_to_diameter
+             self.kW_per_m3 = kW_per_m3
+             self.vessel_material = vessel_material
+             self.vessel_type = vessel_type
+             self.batch = batch
+             self.adiabatic = adiabatic
+             self.load_auxiliaries()
     
     def _setup(self):
         super()._setup()
@@ -1257,7 +1261,6 @@ class HydrogenationReactor(bst.CSTR): # CSTR mix well from figure in Techno-econ
         
         spent_catalyst.empty()
         
-        fresh_catalyst.F_mass=self.ins[0].F_mass/self.WHSV/self.catalyst_lifetime
         fresh_catalyst.phase='s'
         spent_catalyst.phase='s'
         
@@ -1287,6 +1290,11 @@ class HydrogenationReactor(bst.CSTR): # CSTR mix well from figure in Techno-econ
             if kW > 0: self.agitator = bst.Agitator(kW)
         
         Design['Flow rate'] = self.outs[1].F_mass
+        
+        self.catalyst_weight = self.ins[0].F_mass/self.WHSV
+        # assuming catalyst lifetime of 12 months, enough for one year
+        self.purchase_costs['como_catalyst'] = self.catalyst_weight * self.catalyst_price
+
 
 
 

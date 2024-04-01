@@ -10,7 +10,7 @@ import numpy as np
 import biosteam as bst
 import qsdsan as qs
 import biorefineries.SAF._chemicals as chems
-from biorefineries.SAF.systems import F
+
 
 __all__=('load_preferences_and_process_settings',
          'add_utility_agent',
@@ -161,13 +161,13 @@ CSL_price = 0.0339 / _lb2kg *_chemical_2016to2023# From lactic in $2016
 
 DAP_price = 0.1645 /_lb2kg *_chemical_2016to2023 # From ethanol_adiapic
 
-NaOH_price = 0.86 # https://catcost.chemcatbio.org/materials-library accessed Jan 7 2024
+NaOH_price = 0.86 * _chemical_2021to2023 # https://catcost.chemcatbio.org/materials-library accessed Mar 19
 
 Syndol_catalyst_price = 20.48 * _chemical_2021to2023 # From Advanced fuels from ethanol – a superstructure optimization approach(2021)
 
 Ni_loaded_aluminosilicate_catalyst_price = 12.3 # Bulk price accessed in Jan 7 2024 from https://www.sigmaaldrich.com/US/en/product/aldrich/208779 accessed Jan 7 2024
 
-Aluminosilicate_catalyst_price = 1.34 # $1340/MT for Sodium Aluminosilicate https://www.chemanalyst.com/Pricing-data/aluminosilicate-1518 accessed Feb 2 2024
+Aluminosilicate_catalyst_price = 1.34 # $1340/MT for Sodium Aluminosilicate https://www.chemanalyst.com/Pricing-data/aluminosilicate-1518 accessed Feb 2 2024 
 
 Como_catalyst_price = 5 # Cobalt molybdenum catalyst, for 50 kg above, https://biz.alibaba.com/contract/poBuy.htm?productData=[{%22productId%22:1600703116039,%22quantity%22:50}]&channelType=PRODUCT_DETAIL accessed Jan 7 2024
 
@@ -222,7 +222,7 @@ price = {
     'enzyme': enzyme_price,
     'CSL': CSL_price, 
     'DAP': DAP_price,
-    'NaOH': NaOH_price * 0.5 * _chemical_2021to2023, # 50% NaOH
+    'NaOH': NaOH_price * 0.5, # 50% NaOH
     'Syndol catalyst': Syndol_catalyst_price, 
     'Ni-loaded aluminosilicate catalyst': Ni_loaded_aluminosilicate_catalyst_price, 
     'Aluminosilicate catalyst': Aluminosilicate_catalyst_price,
@@ -250,19 +250,19 @@ price = {
 # 100-year global warming potential (GWP) in kg CO2-eq/kg
 
 GWP_CFs = {
-    'feedstock': 0.069, # 69g/kg dry miscanthus
+    'feedstock': 0.024/0.3*0.4, # 70% moisture sugarcane value to 60% moisture
     'H3PO4': 0.86829, # ecoinvent 3.8 market for phosphoric acid, RoW
-    'flocculant': 3.1996, # ecoinvent 3.8 market for polyacrylamide-based anionic flocculants, GLO
+    'polymer': 3.1996, # ecoinvent 3.8 market for polyacrylamide-based anionic flocculants, GLO
     'lime': 1.29,
-    'enzyme': 2.24,
+    'lime_boiler':1.29,
+    'enzyme_M301': 2.24,
     'CSL': 1.55,
     'DAP': 1.6445, # ecoinvent 3.8 market for diammonium phosphate, RoW
     'NaOH': 2.11,
-    'h2': 1.5624, # ecoinvent 3.8 market for hydrogen, gaseous, GLO
-    'natural gas': 0.40, # NA NG from shale and conventional recovery
-    'electricity': 0.48, # in kg CO2-eq/kWh
-    'gasoline': -0.8433, # Gasoline blendstock for U.S crude oil refinery from GREET, negative as it is a coproduct 
-    'diesel': -0.6566 # Diesel for U.S crude oil for U.S crude oil refinery from GREET, negative as it is a coproduct 
+    'caustic':2.11,
+    'hydrogen': 1.5624, # ecoinvent 3.8 market for hydrogen, gaseous, GLO
+    'natural_gas': 0.40, # NA NG from shale and conventional recovery
+    'electricity': 0.48, # in kg CO2-eq/kWh https://www.eia.gov/tools/faqs/faq.php?id=74&t=11
     }
 
 

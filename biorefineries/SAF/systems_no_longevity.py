@@ -259,13 +259,11 @@ def fermentation_sys(ins,outs):
     
     H301 = bst.HXutility('H301', ins=M301-0,T=48+273.15)
     
-    DAP_storage = _units.DAPStorageTank('DAP_storage', ins=DAP, outs='')
+    DAP_storage = _units.DAPStorageTank('DAP_storage', ins=DAP)
+    S300_DAP = bst.MockSplitter('S300_DAP', DAP_storage-0, outs=['DAP_R301', 'DAP_R302'])
     
-    S300_DAP = bst.ReversedSplitter('S300_DAP', ins=DAP_storage-0, outs=['DAP_R301', 'DAP_R302'])
-    
-    CSL_storage = _units.CSLStorageTank('CSL_storage', ins=CSL, outs='')
-    
-    S300_CSL = bst.ReversedSplitter('S300_CSL', ins=CSL_storage-0, outs=['CSL_R301', 'CSL_R302'])
+    CSL_storage = _units.CSLStorageTank('CSL_storage', ins=CSL)
+    S300_CSL = bst.MockSplitter('S300_CSL', CSL_storage-0, outs=['CSL_R301', 'CSL_R302'])
     
     R301 = _units.SaccharificationAndCoFermentation('R301',ins=(H301-0,'',S300_CSL-0,S300_DAP-0,concentrated_juice), 
                                                     outs=('R301_g','effluent','side_draw'))
@@ -274,15 +272,7 @@ def fermentation_sys(ins,outs):
     T301 = _units.SeedHoldTank('T301', ins=R302-1,outs=1-R301)
 
     M302 = bst.Mixer('M302',ins=(R301-0,R302-0),outs='fermentation_vapor')
-    
-    @DAP_storage.add_specification(run=True)
-    def update_DAP_storage_DAP():
-        DAP.imass['DAP'] = S300_DAP.outs[0].F_mass + S300_DAP.outs[1].F_mass
-        
-    @CSL_storage.add_specification(run=True)
-    def update_CSL_storage_DAP():
-        CSL.imass['CSL'] = S300_CSL.outs[0].F_mass + S300_CSL.outs[1].F_mass
-    
+
     U301 = bst.VentScrubber('U301', ins=(water_U301, M302-0), 
                             outs=(U301_vent, 'U301_recycled'),
                             gas=('CO2', 'NH3', 'O2'))
@@ -564,15 +554,12 @@ def SAF_sys(ins,outs):
                                            units='kg/hr',
                                            price=price['water']),
                                     Stream(ID='CSL',
-                                           CSL=1,
                                            units='kg/hr',
                                            price=price['CSL']),
                                     Stream(ID='DAP',
-                                           DAP=1,
                                            units='kg/hr',
                                            price=price['DAP']),
                                     Stream(ID='water_U301',
-                                           Water=1,
                                            units='kg/hr',
                                            price=price['water'])))
                                     
@@ -582,17 +569,13 @@ def SAF_sys(ins,outs):
                                        units='kg/hr',
                                        price=price['NaOH']),
                                  Stream(ID='Syndol_catalyst',
-                                        Ash=1,
-                                        phase='s',
                                         units='kg/hr',
                                         price=price['Syndol catalyst']),
                                  Stream(ID='first_catalyst',
-                                        Ash=1,
                                         phase='s',
                                         units='kg/hr',
                                         price=price['Ni-loaded aluminosilicate catalyst']),
                                  Stream(ID='second_catalyst',
-                                        Ash=1,
                                         phase='s',
                                         units='kg/hr',
                                         price=price['Aluminosilicate catalyst']),
@@ -602,7 +585,6 @@ def SAF_sys(ins,outs):
                                         units='kg/hr',
                                         price=price['h2']),
                                  Stream('Como_catalyst',
-                                        Ash=1,
                                         phase='s',
                                         units='kg/hr',
                                         price=price['Como catalyst'])),
