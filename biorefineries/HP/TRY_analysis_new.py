@@ -83,7 +83,7 @@ HP_metrics = [get_product_MPSP,
 
 # %% Generate 3-specification meshgrid and set specification loading functions
 
-steps = (20, 20, 25)
+steps = (20, 20, 20)
 
 # Yield, titer, productivity (rate)
 spec_1 = yields = np.linspace(0.05, 0.95, steps[0]) # yield
@@ -203,6 +203,11 @@ def tickmarks(dmin, dmax, accuracy=50, N_points=5):
     step = (dmax - dmin) / (N_points - 1)
     return [dmin + step * i for i in range(N_points)]
 
+#%%
+
+minute = '0' + str(dateTimeObj.minute) if len(str(dateTimeObj.minute))==1 else str(dateTimeObj.minute)
+file_to_save = f'_{steps}_steps_'+'HP_TRY_%s.%s.%s-%s.%s'%(dateTimeObj.year, dateTimeObj.month, dateTimeObj.day, dateTimeObj.hour, minute)
+
 #%% Create meshgrid
 spec_1, spec_2 = np.meshgrid(spec_1, spec_2)
 
@@ -311,17 +316,15 @@ for p in productivities:
 
     # %% Save generated data
     
-    minute = '0' + str(dateTimeObj.minute) if len(str(dateTimeObj.minute))==1 else str(dateTimeObj.minute)
-    file_to_save = f'_{steps}_steps_'+'HP_TRY_%s.%s.%s-%s.%s'%(dateTimeObj.year, dateTimeObj.month, dateTimeObj.day, dateTimeObj.hour, minute)
-    np.save(HP_results_filepath+file_to_save, np.array([d1_Metric1, d1_Metric2, d1_Metric3]))
+    csv_file_to_save = file_to_save + f'_prod_{p}'
+    pd.DataFrame(d1_Metric1).to_csv(HP_results_filepath+'MPSP-'+csv_file_to_save+'.csv')
+    pd.DataFrame(d1_Metric2).to_csv(HP_results_filepath+'GWP-'+csv_file_to_save+'.csv')
+    pd.DataFrame(d1_Metric3).to_csv(HP_results_filepath+'FEC-'+csv_file_to_save+'.csv')
+    pd.DataFrame(d1_Metric4).to_csv(HP_results_filepath+'AOC-'+csv_file_to_save+'.csv')
+    pd.DataFrame(d1_Metric5).to_csv(HP_results_filepath+'TCI-'+csv_file_to_save+'.csv')
+    pd.DataFrame(d1_Metric6).to_csv(HP_results_filepath+'Purity-'+csv_file_to_save+'.csv')
     
-    pd.DataFrame(d1_Metric1).to_csv(HP_results_filepath+'MPSP-'+file_to_save+'.csv')
-    pd.DataFrame(d1_Metric2).to_csv(HP_results_filepath+'GWP-'+file_to_save+'.csv')
-    pd.DataFrame(d1_Metric3).to_csv(HP_results_filepath+'FEC-'+file_to_save+'.csv')
-    pd.DataFrame(d1_Metric4).to_csv(HP_results_filepath+'AOC-'+file_to_save+'.csv')
-    pd.DataFrame(d1_Metric5).to_csv(HP_results_filepath+'TCI-'+file_to_save+'.csv')
-    pd.DataFrame(d1_Metric6).to_csv(HP_results_filepath+'Purity-'+file_to_save+'.csv')
-    
+
 
 #%% Report maximum HXN energy balance error
 print(f'Max HXN Q bal error was {round(max_HXN_qbal_percent_error, 3)} %.')
@@ -334,8 +337,14 @@ results_metric_1 = np.array(results_metric_1)
 results_metric_2 = np.array(results_metric_2)
 results_metric_3 = np.array(results_metric_3)
 
+#%% Save generated numpy file
+np.save(HP_results_filepath+'MPSP-'+file_to_save, results_metric_1)
+np.save(HP_results_filepath+'GWP-'+file_to_save, results_metric_2)
+np.save(HP_results_filepath+'FEC-'+file_to_save, results_metric_3)
+
 #%% interpolate error-related nans
 results_metric_1 = results_metric_1.tolist()
+
 #%%
 for i in range(len(results_metric_1)):
     for j in range(len(results_metric_1[i])):
