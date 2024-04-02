@@ -212,6 +212,9 @@ diesel_price = np.mean(diesel_price_2021_to_2023) * diesel_price_conversion_inde
 
 jet_fuel_price = jet_fuel_price_2023
 
+MEA_price = 1.44 # from https://businessanalytiq.com/procurementanalytics/index/monoethanolamine-price-index/
+
+
 # All in 2023 $/kg
 price = {
     'feedstock': energycane_price,
@@ -236,7 +239,8 @@ price = {
     'electricity': electricity_price,
     'gasoline': gasoline_price,
     'jet fuel': jet_fuel_price,
-    'diesel': diesel_price
+    'diesel': diesel_price,
+    'MEA': MEA_price
         }
 
 
@@ -263,6 +267,7 @@ GWP_CFs = {
     'hydrogen': 1.5624, # ecoinvent 3.8 market for hydrogen, gaseous, GLO
     'natural_gas': 0.40, # NA NG from shale and conventional recovery
     'electricity': 0.48, # in kg CO2-eq/kWh https://www.eia.gov/tools/faqs/faq.php?id=74&t=11
+    'MEA': 3.4062, # ecoinvent 3.8 ethanolamine production, RoW [monoethanolamine]
     }
 
 

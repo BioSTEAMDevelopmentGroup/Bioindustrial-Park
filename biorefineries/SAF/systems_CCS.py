@@ -650,6 +650,7 @@ def SAF_sys(ins,outs):
     ash = Stream('ash', price=price['ash disposal'])
     cooling_tower_chems = Stream('cooling_tower_chems', price=price['cooling tower chems'])
     system_makeup_water = Stream('system_makeup_water', price=price['water'])
+    makeup_MEA = Stream('makeup_MEA', units='kg/hr', price=price['MEA'])
 
     plant_air_in = bst.Stream('plant_air_in',phase='g',units='kg/hr',
                               N2=0.79*1372608*get_flow_tpd()/2205,
@@ -694,10 +695,23 @@ def SAF_sys(ins,outs):
                                      
     CT = bst.CoolingTower('CT')
     CT.ins[-1].price = price['cooling tower chems']
+    
+    
+    M903 = bst.Mixer('M903', ins=(F.U301_vent,BT.outs[0]), outs='CO2_mixture')
+    @M903.add_specification(run=True)
+    def run_M903():
+        M903.outs[0].mix_from([M903.ins[0],M903.ins[1]])
+
+    # CCS1 = bst.AmineAbsorption('CCS1', ins=(M603-0,makeup_MEA,'CCS1_makeup_water'), outs=('CO2_stripped_vent','captured_CO2'),
+    #                            CO2_recovery=0.45)
+    
+    # CCS2 = bst.CO2Compression('CCS2', ins=CCS1-1, outs='compressed_CO2')
+    
                                                          
     # All water used in the system, here only consider water usage
     system_makeup_water_streams = (F.boiler_makeup_water,
-                                   CT.ins[1]) # Second ins of CT (cooling_tower_makeup_water)
+                                   CT.ins[1],)
+                                   # F.CCS1_makeup_water) # Second ins of CT (cooling_tower_makeup_water)
                              
     system_process_water_streams = (F.imbibition_water,
                                     F.rvf_wash_water,

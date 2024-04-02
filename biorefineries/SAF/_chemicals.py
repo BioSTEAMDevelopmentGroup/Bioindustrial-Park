@@ -244,6 +244,7 @@ C14H30=chemical_database('C14H30', search_ID='Tetradecane')
 C16H34=chemical_database('C16H34', search_ID='Hexadecane')
 C18H38=chemical_database('C18H38', search_ID='Octadecane')
 
+MEA = chemical_database(ID='MEA', search_ID='Monoethanolamine')
 # =============================================================================
 # Insoluble inorganics
 # =============================================================================

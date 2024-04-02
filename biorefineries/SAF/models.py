@@ -489,6 +489,8 @@ get_GWP_emission_CSL = lambda: F.CSL.get_atomic_flow('C') * SAF_chemicals.CO2.MW
 # BT contribution to direct emissions
 get_GWP_emissions_BT = lambda: F.natural_gas.get_atomic_flow('C') * SAF_chemicals.CO2.MW * 1000 / _total_energy_per_hr()
 
+#get_GWP_captured = lambda: F.compressed_CO2.get_atomic_flow('C') * SAF_chemicals.CO2.MW * 1000 / _total_energy_per_hr()
+
 # get_GWP_emissions_without_BT = lambda: get_GWP_emissions_process() - get_GWP_emissions_BT()
 
 # Material contribution
