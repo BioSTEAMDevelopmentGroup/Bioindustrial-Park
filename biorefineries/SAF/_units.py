@@ -186,6 +186,7 @@ class SaccharificationAndCoFermentation(Unit):
     _N_ins = 5
     _N_outs = 3
     
+    _ins_size_is_fixed = False
 
     #: Saccharification temperature (K)
     T_saccharification = 48+273.15
@@ -825,7 +826,7 @@ class AdiabaticFixedbedDehydrationReactor(Reactor):
         effluent.P=self.P
         
         fresh_catalyst.phase = spent_catalyst.phase = 's'
-        fresh_catalyst.F_mass = self.ins[0].F_mass/self.WHSV/self.catalyst_lifetime
+        fresh_catalyst.F_mass = spent_catalyst.F_mass = self.ins[0].F_mass/self.WHSV/self.catalyst_lifetime
         
     def _design(self):
         Reactor._design(self)
@@ -1048,7 +1049,7 @@ class Oligomerization1_Reactor(bst.CSTR):
         effluent.T=self.T
         effluent.P=self.P
         
-        fresh_catalyst.F_mass=self.ins[0].F_mass/self.WHSV/self.catalyst_lifetime
+        fresh_catalyst.F_mass=spent_catalyst.F_mass=self.ins[0].F_mass/self.WHSV/self.catalyst_lifetime
         
         fresh_catalyst.phase='s'
         spent_catalyst.phase='s'
@@ -1147,7 +1148,7 @@ class Oligomerization2_Reactor(bst.CSTR):
         effluent.T=self.T
         effluent.phase='l'
         
-        fresh_catalyst.F_mass=self.ins[0].F_mass/self.WHSV/self.catalyst_lifetime
+        fresh_catalyst.F_mass=spent_catalyst.F_mass=self.ins[0].F_mass/self.WHSV/self.catalyst_lifetime
         
         fresh_catalyst.phase='s'
         spent_catalyst.phase='s'
@@ -1255,9 +1256,7 @@ class HydrogenationReactor(bst.CSTR): # CSTR mix well from figure in Techno-econ
        
         self.hydrogenation_rxns(effluent.mol)
         
-        spent_catalyst.empty()
-        
-        fresh_catalyst.F_mass=self.ins[0].F_mass/self.WHSV/self.catalyst_lifetime
+        fresh_catalyst.F_mass=spent_catalyst.F_mass=self.ins[0].F_mass/self.WHSV/self.catalyst_lifetime
         fresh_catalyst.phase='s'
         spent_catalyst.phase='s'
         
@@ -1337,3 +1336,35 @@ class CSLStorageTank(Unit): pass
 @cost('Flow rate', 'Bag unloader', S=163, units='kg/hr',
       CE=522, cost=30000, n=0.6, BM=1.7)
 class DAPStorageTank(Unit): pass
+
+
+
+
+
+
+
+
+
+
+# from https://netl.doe.gov/projects/files/ComparativeAnalysisofTransportandStorageOptionsfromaCO2SourcePerspective_042018.pdf
+# class CCS_trans_storage(Unit):
+#     _N_ins = 1
+#     _N_outs = 1
+#     def __init__(self, ID='', ins=None, outs=(), transport_price=0.022, storage_price=0.03):
+#         Unit.__init__(self, ID, ins, outs)
+#         self.transport_price = transport_price # $/kg
+#         self.storage_price = storage_price
+    
+#     def _run(self):
+#         compressed_CO2, = self.ins
+#         storage_CO2, = self.outs
+#         storage_CO2.copy_like(compressed_CO2)
+    
+#     def _cost(self):
+#         super()._cost()
+#         self._inlet_cost_indices['TS cost'] = self.ins[0].F_mass * (self.transport_price + self.storage_price)
+
+#%% For miscanthus (no juicing process)
+@cost('Flow rate', 'System', S=94697, units='kg/hr',
+      CE=522, cost=13329690, n=0.6, BM=1.7, kW=783)
+class FeedStockHandling(Unit): pass

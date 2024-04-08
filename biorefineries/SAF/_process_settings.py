@@ -214,6 +214,7 @@ jet_fuel_price = jet_fuel_price_2023
 
 MEA_price = 1.44 # from https://businessanalytiq.com/procurementanalytics/index/monoethanolamine-price-index/
 
+compressed_CO2_price = -1*(0.022 + 0.03) # Transportation and storage price from https://netl.doe.gov/projects/files/ComparativeAnalysisofTransportandStorageOptionsfromaCO2SourcePerspective_042018.pdf
 
 # All in 2023 $/kg
 price = {
@@ -240,7 +241,8 @@ price = {
     'gasoline': gasoline_price,
     'jet fuel': jet_fuel_price,
     'diesel': diesel_price,
-    'MEA': MEA_price
+    'MEA': MEA_price * 0.3, # 30% MEA
+    'compressed CO2': compressed_CO2_price
         }
 
 
