@@ -20,7 +20,6 @@ from biorefineries.SAF.utils import convert_ethanol_wt_2_mol
 from biorefineries.SAF._process_settings import add_utility_agent, price
 
 
-
 add_utility_agent()
 F = bst.Flowsheet('SAF')
 bst.main_flowsheet.set_flowsheet(F)
@@ -278,14 +277,10 @@ def fermentation_sys(ins,outs):
     
     @DAP_storage.add_specification(run=True)
     def update_DAP_storage_DAP():
-        R301.run()
-        R302.run()
         DAP.imass['DAP'] = S300_DAP.outs[0].F_mass + S300_DAP.outs[1].F_mass
         
     @CSL_storage.add_specification(run=True)
     def update_CSL_storage_DAP():
-        R301.run()
-        R302.run()
         CSL.imass['CSL'] = S300_CSL.outs[0].F_mass + S300_CSL.outs[1].F_mass
     
     U301 = bst.VentScrubber('U301', ins=(water_U301, M302-0), 
@@ -370,21 +365,17 @@ def fermentation_sys(ins,outs):
           dict(ID='CH4_C2H6'),
           dict(ID='gasoline'),
           dict(ID='jet_fuel'),
-          dict(ID='diesel'),
-          dict(ID='spent_catalyst_R401'),
-          dict(ID='spent_catalyst_R402'),
-          dict(ID='spent_catalyst_R403'),
-          dict(ID='spent_catalyst_R404'),])
+          dict(ID='diesel')])
           
 def upgrading_sys(ins,outs):
     NaOH,Syndol_catalyst,first_catalyst,second_catalyst,ethanol_to_storage,hydrogen,Como_catalyst = ins
-    F401_to_WWT,D401_heavy_impurities,D402_top_product,CH4_C2H6,gasoline,jet_fuel,diesel,spent_catalyst_R401,spent_catalyst_R402,spent_catalyst_R403,spent_catalyst_R404= outs
+    F401_to_WWT,D401_heavy_impurities,D402_top_product,CH4_C2H6,gasoline,jet_fuel,diesel = outs
     
     P401 = bst.Pump('P401',ins=ethanol_to_storage,P=4.5*101325)
     M400 = bst.Mixer('M401', (P401-0,''))
     H400 = bst.HXutility('H400',ins=M400-0,V=1,rigorous=True)
 
-    R401 = _units.AdiabaticFixedbedDehydrationReactor('R401', ins=(H400-0,Syndol_catalyst),outs=('',spent_catalyst_R401))
+    R401 = _units.AdiabaticFixedbedDehydrationReactor('R401', ins=(H400-0,Syndol_catalyst),outs=('','spent_catalyst_R401'))
 
     # Depressurize to 1 bar before quenching
     V401 = bst.IsenthalpicValve('V401', ins=R401-0,P=101325)
@@ -455,10 +446,10 @@ def upgrading_sys(ins,outs):
                         split=dict(Ethylene=1))
 
     # First oligomerization
-    R402 = _units.Oligomerization1_Reactor('R402', ins=(S403-0,first_catalyst),outs=('',spent_catalyst_R402))
+    R402 = _units.Oligomerization1_Reactor('R402', ins=(S403-0,first_catalyst),outs=('','spent_catalyst_R402'))
 
     # Second oligomerization
-    R403 = _units.Oligomerization2_Reactor('R403',ins=(R402-0,'',second_catalyst),outs=('',spent_catalyst_R403))
+    R403 = _units.Oligomerization2_Reactor('R403',ins=(R402-0,'',second_catalyst),outs=('','spent_catalyst_R403'))
 
     # Recycle light olefins to R403
     D403 = bst.BinaryDistillation('D403', ins=R403-0,outs=('light_olefins','heavy_olefins'),
@@ -470,7 +461,7 @@ def upgrading_sys(ins,outs):
 
     # Hydrogenation
     P402 = bst.Pump('P402', ins=D403-1, outs='')
-    R404 = _units.HydrogenationReactor('R404', ins=(P402-0,hydrogen,Como_catalyst),outs=(spent_catalyst_R404,''))
+    R404 = _units.HydrogenationReactor('R404', ins=(P402-0,hydrogen,Como_catalyst),outs=('spent_catalyst_R404',''))
     
     @R404.add_specification(run=True)
     def correct_hydrogen_flow():
@@ -624,15 +615,8 @@ def SAF_sys(ins,outs):
                                   Stream(ID='jet_fuel',
                                          price=price['jet fuel']),
                                   Stream(ID='diesel',
-                                         price=price['diesel']),
-                                  Stream(ID='spent_catalyst_R401',
-                                         Ash=1),
-                                  Stream(ID='spent_catalyst_R402',
-                                         Ash=1),
-                                  Stream(ID='spent_catalyst_R403',
-                                         Ash=1),
-                                  Stream(ID='spent_catalyst_R404',
-                                         Ash=1),))
+                                         price=price['diesel'])
+                                  ))
                                   
     #==============================================================================
     #                      Area 500 WWT
@@ -664,10 +648,8 @@ def SAF_sys(ins,outs):
     lime_boiler = Stream('lime_boiler', price=price['lime'])
     boiler_chems = Stream('boiler_chems', price=price['boiler chems'])
     ash = Stream('ash', price=price['ash disposal'])
-    # cooling_tower_chems = Stream('cooling_tower_chems', price=price['cooling tower chems'])
-    # system_makeup_water = Stream('system_makeup_water', price=price['water'])
-    makeup_MEA = Stream('makeup_MEA', units='kg/hr', price=price['MEA'])
-    compressed_CO2 = Stream('compressed_CO2', units='kg/hr', price=price['compressed CO2'])
+    cooling_tower_chems = Stream('cooling_tower_chems', price=price['cooling tower chems'])
+    system_makeup_water = Stream('system_makeup_water', price=price['water'])
 
     plant_air_in = bst.Stream('plant_air_in',phase='g',units='kg/hr',
                               N2=0.79*1372608*get_flow_tpd()/2205,
@@ -706,30 +688,6 @@ def SAF_sys(ins,outs):
                                   ) # price separately set by the stream
                                   
     BT.register_alias('CHP')
-    
-    # @BT.add_specification(run=False)
-    # def BT_spec():
-    #     BT._run()
-    #     #M903.simulate() # can do run for non-rigorous mixer
-    #     BT_downstream_units = BT.get_downstream_units()
-    #     for i in BT_downstream_units: 
-    #         i.simulate() # can do run for non-rigorous units
-    @BT.add_specification(run=False)
-    def BT_spec():
-        BT.run()
-        M903.run()
-        M903.simulate() # can do run for non-rigorous mixer
-        CCS1.simulate()
-        CCS2.simulate()
-        
-    M903 = bst.Mixer('M903', ins=(F.gas_emission, F.U301_vent), outs='')
-    
-    CCS1 = bst.AmineAbsorption('CCS1', ins=(M903-0,makeup_MEA,'CCS1_makeup_water'), outs=('CO2_stripped_vent','captured_CO2'),
-                                CO2_recovery=0.45)
-    
-    CCS2 = bst.CO2Compression('CCS2', ins=CCS1-1, outs=compressed_CO2)
-    
-    # CCS3 = _units.CCS_trans_storage('CCS3', ins=CCS2-0, outs='storage_CO2')
 
     # Chilled water package for cooling requirements
     CWP = bst.ChilledWaterPackage('CWP')
@@ -739,8 +697,7 @@ def SAF_sys(ins,outs):
                                                          
     # All water used in the system, here only consider water usage
     system_makeup_water_streams = (F.boiler_makeup_water,
-                                   CT.ins[1], # Second ins of CT (cooling_tower_makeup_water)
-                                   CCS1.ins[-1])
+                                   CT.ins[1]) # Second ins of CT (cooling_tower_makeup_water)
                              
     system_process_water_streams = (F.imbibition_water,
                                     F.rvf_wash_water,
@@ -752,7 +709,7 @@ def SAF_sys(ins,outs):
                                   ins=(F.RO_treated_water_from_wastewater_treatment, # WWT.outs[2],
                                       '',
                                       F.condensate, # E101.outs[1],
-                                      'system_makeup_water'),
+                                      system_makeup_water),
                                   outs=('','process_water', 'discharged_water'),
                                   makeup_water_streams=system_makeup_water_streams,
                                   process_water_streams=system_process_water_streams)
@@ -764,7 +721,7 @@ def SAF_sys(ins,outs):
     FWT = _units.FireWaterTank('FWT', ins=fire_water_in, outs='fire_water_out')
     
     HXN = bst.HeatExchangerNetwork('HXN',cache_network=True)
-
+    
 #%% System setup and process groups
 
 sys = SAF_sys()
@@ -789,12 +746,12 @@ cooling_tower = UnitGroup('CT_group', units = (F.CT,))
 
 facilities_no_hu = UnitGroup('Facilities_no_hu_group', units = (F.CIP,)) 
 
-CCS = UnitGroup('CCS', units = (F.CCS1, F.CCS2))
-
 
 process_groups = [preprocessing, pretreatment, fermentation, upgrading,
-                  wastewater_treatment, heat_exchange_network, 
-                  boiler_turbogenerator, cooling_tower, facilities_no_hu, CCS]
+                  wastewater_treatment, 
+                  heat_exchange_network, 
+                  boiler_turbogenerator,
+                  cooling_tower, facilities_no_hu]
 
 process_groups_dict = {}
 for i in range(len(process_groups)):

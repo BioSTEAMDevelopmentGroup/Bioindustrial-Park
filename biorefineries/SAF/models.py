@@ -605,15 +605,6 @@ def set_TCI_ratio(new_ratio):
 
 
 
-feedstock_flow = feedstock.F_mass
-D = shape.Triangle(0.8*feedstock_flow, feedstock_flow, 1.2*feedstock_flow)
-@param(name='Feedstock flow', element='feedstock', kind='coupled', units='kg/hr',
-        baseline=feedstock_flow, distribution=D)
-def set_feedstock_flow(X):
-    F.feedstock.F_mass = X
-
-
-
 ##### Material price #####
 D = shape.Triangle(0.0583, 0.0637, 0.069) # From historical price
 @param(name='Electricity price', element='Electricity', kind='isolated', units='$/kWh',
@@ -740,22 +731,6 @@ def set_hydrogen_price(price):
     F.hydrogen.price = price
 
 
-
-# MEA_price = price['MEA']
-# D = shape.Uniform(MEA_price*0.7, MEA_price*1.3)
-# @param(name='MEA price', element='makeup_MEA', kind='isolated', units='$/kg',
-#        baseline=MEA_price, distribution=D)
-# def set_MEA_price(price):
-#     F.makeup_MEA.price = price
-
-
-
-# CO2_TS_price = price['compressed CO2']
-# D = shape.Uniform(CO2_TS_price*1.5, CO2_TS_price*0.5)
-# @param(name='CO2 TS price', element='compressed CO2', kind='isolated', units='$/kg',
-#        baseline=CO2_TS_price, distribution=D)
-# def set_CO2_TS_price(price):
-#     F.compressed_CO2.price = price
 
 ###### Coproduct price ######
 diesel_price = price['diesel']
@@ -974,13 +949,6 @@ def set_boiler_efficiency(efficiency):
 
 
 
-# CCS1 = F.CCS1
-# D = shape.Uniform(0.6,1.0)
-# @param(name='CO2 capture ratio', element=CCS1, kind='coupled', units='',
-#        baseline=0.9, distribution=D)
-# def set_CO2_capture(X):
-#     CCS1.CO2_recovery = X
-
 # =============================================================================
 # LCA parameters
 # =============================================================================
@@ -1056,16 +1024,9 @@ def set_natural_gas_GWP(X):
 
 
 
-# D = shape.Uniform(0.033*(1-0.5), 0.033*(1+0.5))
-# @param(name='CO2 TS GWP', element='', kind='isolated', units='',
-#        baseline=0.033, distribution=D)
-# def set_TS_ratio(X):
-#     TS_ratio = X
-
-
 rule = 'L'
 np.random.seed(1234) # For consistent results
-samples = model.sample(2000,rule)
+samples = model.sample(1000,rule)
 model.load_samples(samples)
 model.evaluate(notify=10)
 model.show()
