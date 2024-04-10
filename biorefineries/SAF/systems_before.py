@@ -365,17 +365,21 @@ def fermentation_sys(ins,outs):
           dict(ID='CH4_C2H6'),
           dict(ID='gasoline'),
           dict(ID='jet_fuel'),
-          dict(ID='diesel')])
+          dict(ID='diesel'),
+          dict(ID='spent_catalyst_R401'),
+          dict(ID='spent_catalyst_R402'),
+          dict(ID='spent_catalyst_R403'),
+          dict(ID='spent_catalyst_R404'),])
           
 def upgrading_sys(ins,outs):
     NaOH,Syndol_catalyst,first_catalyst,second_catalyst,ethanol_to_storage,hydrogen,Como_catalyst = ins
-    F401_to_WWT,D401_heavy_impurities,D402_top_product,CH4_C2H6,gasoline,jet_fuel,diesel = outs
+    F401_to_WWT,D401_heavy_impurities,D402_top_product,CH4_C2H6,gasoline,jet_fuel,diesel,spent_catalyst_R401,spent_catalyst_R402,spent_catalyst_R403,spent_catalyst_R404 = outs
     
     P401 = bst.Pump('P401',ins=ethanol_to_storage,P=4.5*101325)
     M400 = bst.Mixer('M401', (P401-0,''))
     H400 = bst.HXutility('H400',ins=M400-0,V=1,rigorous=True)
 
-    R401 = _units.AdiabaticFixedbedDehydrationReactor('R401', ins=(H400-0,Syndol_catalyst),outs=('','spent_catalyst_R401'))
+    R401 = _units.AdiabaticFixedbedDehydrationReactor('R401', ins=(H400-0,Syndol_catalyst),outs=('',spent_catalyst_R401))
 
     # Depressurize to 1 bar before quenching
     V401 = bst.IsenthalpicValve('V401', ins=R401-0,P=101325)
@@ -446,10 +450,10 @@ def upgrading_sys(ins,outs):
                         split=dict(Ethylene=1))
 
     # First oligomerization
-    R402 = _units.Oligomerization1_Reactor('R402', ins=(S403-0,first_catalyst),outs=('','spent_catalyst_R402'))
+    R402 = _units.Oligomerization1_Reactor('R402', ins=(S403-0,first_catalyst),outs=('',spent_catalyst_R402))
 
     # Second oligomerization
-    R403 = _units.Oligomerization2_Reactor('R403',ins=(R402-0,'',second_catalyst),outs=('','spent_catalyst_R403'))
+    R403 = _units.Oligomerization2_Reactor('R403',ins=(R402-0,'',second_catalyst),outs=('',spent_catalyst_R403))
 
     # Recycle light olefins to R403
     D403 = bst.BinaryDistillation('D403', ins=R403-0,outs=('light_olefins','heavy_olefins'),
@@ -461,7 +465,7 @@ def upgrading_sys(ins,outs):
 
     # Hydrogenation
     P402 = bst.Pump('P402', ins=D403-1, outs='')
-    R404 = _units.HydrogenationReactor('R404', ins=(P402-0,hydrogen,Como_catalyst),outs=('spent_catalyst_R404',''))
+    R404 = _units.HydrogenationReactor('R404', ins=(P402-0,hydrogen,Como_catalyst),outs=(spent_catalyst_R404,''))
     
     @R404.add_specification(run=True)
     def correct_hydrogen_flow():
@@ -615,7 +619,15 @@ def SAF_sys(ins,outs):
                                   Stream(ID='jet_fuel',
                                          price=price['jet fuel']),
                                   Stream(ID='diesel',
-                                         price=price['diesel'])
+                                         price=price['diesel']),
+                                  Stream(ID='spent_catalyst_R401',
+                                         Ash=1),
+                                  Stream(ID='spent_catalyst_R402',
+                                         Ash=1),
+                                  Stream(ID='spent_catalyst_R403',
+                                         Ash=1),
+                                  Stream(ID='spent_catalyst_R404',
+                                         Ash=1)
                                   ))
                                   
     #==============================================================================

@@ -1368,3 +1368,125 @@ class DAPStorageTank(Unit): pass
 @cost('Flow rate', 'System', S=94697, units='kg/hr',
       CE=522, cost=13329690, n=0.6, BM=1.7, kW=783)
 class FeedStockHandling(Unit): pass
+
+
+
+
+
+
+
+
+
+@cost('Flow rate', 'Recirculation pumps', kW=30, S=340*_gpm2m3hr,
+      cost=47200, n=0.8, BM=2.3, CE=522, N='N_reactors')
+@cost('Reactor duty', 'Heat exchangers', CE=522, cost=23900,
+      S=-5*_Gcal2kJ, n=0.7, BM=2.2, N='N_reactors') # Based on a similar heat exchanger
+@cost('Reactor volume', 'Agitators', CE=522, cost=52500,
+      S=1e6*_gal2m3, n=0.5, kW=90, BM=1.5, N='N_reactors')
+@cost('Reactor volume', 'Reactors', CE=522, cost=844000,
+      S=1e6*_gal2m3, n=0.5, BM=1.5, N='N_reactors')
+class SaccharificationAndCoFermentation2(Unit):
+    _N_ins = 4
+    _N_outs = 3
+
+    #: Saccharification temperature (K)
+    T_saccharification = 48+273.15
+
+    #: Fermentation temperature (K)
+    T_fermentation = 32+273.15
+    
+    #: Saccharification time (hr)
+    tau_saccharification = 60
+    
+    #: Co-Fermentation time (hr)
+    tau_cofermentation = 36
+    
+    #: Unload and clean up time (hr)
+    tau_0 = 4
+    
+    #: Working volume fraction (filled tank to total tank volume)
+    V_wf = 0.9
+    
+    #: Number of reactors
+    N_reactors = 12
+    
+    _units = {'Flow rate': 'm3/hr',
+              'Reactor volume': 'm3',
+              'Reactor duty': 'kJ/hr'}
+
+    # Split to outs[2]
+    inoculum_ratio = 0.1
+
+    def __init__(self, ID='', ins=None, outs=(), P=101325):
+        Unit.__init__(self, ID, ins, outs)
+        self.P = P
+        ID = self.ID
+        self.saccharified_stream = tmo.Stream(None)
+
+        self.saccharification_rxns = ParallelRxn([
+    #   Reaction definition                   Reactant     Conversion
+    Rxn('Sucrose + Water -> 2 Glucose',       'Sucrose',     1), # Juice hydrolysis
+    Rxn('Glucan -> GlucoseOligomer',          'Glucan',      0.04),
+    Rxn('Glucan + 0.5 H2O -> 0.5 Cellobiose', 'Glucan',      0.012),
+    Rxn('Glucan + H2O -> Glucose',            'Glucan',      0.9),
+    Rxn('Cellobiose + H2O -> Glucose',        'Cellobiose',  1),
+    Rxn('Xylan + H2O -> Xylose',              'Xylan',       0.9),
+    Rxn('Arabinan + H2O -> Arabinose',        'Arabinan',    0.85)])
+
+        self.loss_rxns = ParallelRxn([
+    #   Reaction definition               Reactant    Conversion
+    Rxn('Glucose -> 2 LacticAcid',       'Glucose',   0.03),
+    Rxn('3 Xylose -> 5 LacticAcid',      'Xylose',    0.03),
+    Rxn('3 Arabinose -> 5 LacticAcid',   'Arabinose', 0.03),
+    Rxn('Galactose -> 2 LacticAcid',     'Galactose', 0.03),
+    Rxn('Mannose -> 2 LacticAcid',       'Mannose',   0.03),])
+
+        self.cofermentation_rxns = ParallelRxn([
+    #   Reaction definition                                          Reactant    Conversion
+    Rxn('Glucose -> 2 Ethanol + 2 CO2',                             'Glucose',   0.95),
+    Rxn('Glucose + 0.047 CSL + 0.018 DAP -> 6 Z_mobilis + 2.4 H2O', 'Glucose',   0.02),
+    Rxn('Glucose + 2 H2O -> 2 Glycerol + O2',                       'Glucose',   0.004),
+    Rxn('Glucose + 2 CO2 -> 2 SuccinicAcid + O2',                   'Glucose',   0.006),
+    Rxn('3 Xylose -> 5 Ethanol + 5 CO2',                            'Xylose',    0.85),
+    Rxn('Xylose + 0.039 CSL + 0.015 DAP -> 5 Z_mobilis + 2 H2O',    'Xylose',    0.019),
+    Rxn('3 Xylose + 5 H2O -> 5 Glycerol + 2.5 O2',                  'Xylose',    0.003),
+    Rxn('Xylose + H2O -> Xylitol + 0.5 O2',                         'Xylose',    0.046),
+    Rxn('3 Xylose + 5 CO2 -> 5 SuccinicAcid + 2.5 O2',              'Xylose',    0.009),
+    ])
+
+    def _run(self):
+        feed, inoculum, CSL, DAP,  = self.ins
+        vent, effluent, sidedraw = self.outs
+        ss = self.saccharified_stream
+        
+        # 0.25 wt% and 0.33 g/L (kg/m3) based on ref [1]
+        CSL.imass['CSL'] = 0.0025 * feed.F_mass
+        DAP.imass['DAP'] = 0.33 * feed.F_vol
+        
+        ss.mix_from((feed, inoculum, CSL, DAP))
+        ss.T = sidedraw.T = self.T_saccharification
+        
+        self.saccharification_rxns(ss.mol)
+        # Sidedraw to seedtrain
+        sidedraw.mol = ss.mol * self.inoculum_ratio
+        effluent.mol = ss.mol - sidedraw.mol
+        
+        self.loss_rxns(effluent.mol)
+        self.cofermentation_rxns(effluent.mol)
+        
+        vent.T = effluent.T = sidedraw.T = self.T_fermentation
+        vent.P = effluent.P = sidedraw.P = self.P
+        vent.phase = 'g'
+        vent.empty()
+        vent.receive_vent(effluent, energy_balance=False)
+
+    def _design(self):
+        effluent = self.outs[1]
+        v_0 = effluent.F_vol
+        Design = self.design_results
+        Design['Flow rate'] = v_0 / self.N_reactors
+        tau=self.tau_saccharification + self.tau_cofermentation
+        Design.update(size_batch(v_0, tau, self.tau_0, self.N_reactors, self.V_wf))
+
+        Design['Reactor duty'] = reactor_duty = self.Hnet
+        self.add_heat_utility(reactor_duty, effluent.T)

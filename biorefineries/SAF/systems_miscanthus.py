@@ -20,22 +20,24 @@ from biorefineries.SAF.utils import convert_ethanol_wt_2_mol
 from biorefineries.SAF._process_settings import add_utility_agent, price
 
 
+
+
 add_utility_agent()
 F = bst.Flowsheet('SAF')
 bst.main_flowsheet.set_flowsheet(F)
 
 #%%
 @SystemFactory(
-    ID='handling_sys',
+    ID='preprocessing_sys',
     ins=[dict(ID='feedstock')],
-    outs=[dict(ID='feedstock_to_pretreatment'),
-          dict(ID='feedstock_to_BT'),])
+    outs=[dict(ID='bagasse_to_pretreatment'),
+          dict(ID='bagasse_to_CHP'),])
 def preprocessing_sys(ins,outs):
     feedstock = ins
-    feedstock_to_pretreatment, feedstock_to_CHP = outs
+    bagasse_to_pretreatment, bagasse_to_CHP = outs
     U101 = _units.FeedStockHandling('U101', ins=feedstock, outs='')
     U101.cost_items['System'].cost = 0.
-    S102 = bst.Splitter('S102', ins=U101-0, outs=[feedstock_to_pretreatment,feedstock_to_CHP],split=0.95)
+    S102 = bst.Splitter('S102', ins=U101-0, outs=[bagasse_to_pretreatment,bagasse_to_CHP],split=0.95)
 
 
 
@@ -108,7 +110,7 @@ def fermentation_sys(ins,outs):
     
     S300_CSL = bst.ReversedSplitter('S300_CSL', ins=CSL_storage-0, outs=['CSL_R301', 'CSL_R302'])
     
-    R301 = _units.SaccharificationAndCoFermentation('R301',ins=(H301-0,'',S300_CSL-0,S300_DAP-0,), 
+    R301 = _units.SaccharificationAndCoFermentation2('R301',ins=(H301-0,'',S300_CSL-0,S300_DAP-0,), 
                                                     outs=('R301_g','effluent','side_draw'))
     R302 = _units.SeedTrain('R302', ins=(R301-2,S300_CSL-1,S300_DAP-1,),
                            outs=('R302_g','seed'))
@@ -206,17 +208,21 @@ def fermentation_sys(ins,outs):
           dict(ID='CH4_C2H6'),
           dict(ID='gasoline'),
           dict(ID='jet_fuel'),
-          dict(ID='diesel')])
+          dict(ID='diesel'),
+          dict(ID='spent_catalyst_R401'),
+          dict(ID='spent_catalyst_R402'),
+          dict(ID='spent_catalyst_R403'),
+          dict(ID='spent_catalyst_R404'),])
           
 def upgrading_sys(ins,outs):
     NaOH,Syndol_catalyst,first_catalyst,second_catalyst,ethanol_to_storage,hydrogen,Como_catalyst = ins
-    F401_to_WWT,D401_heavy_impurities,D402_top_product,CH4_C2H6,gasoline,jet_fuel,diesel = outs
+    F401_to_WWT,D401_heavy_impurities,D402_top_product,CH4_C2H6,gasoline,jet_fuel,diesel,spent_catalyst_R401,spent_catalyst_R402,spent_catalyst_R403,spent_catalyst_R404 = outs
     
     P401 = bst.Pump('P401',ins=ethanol_to_storage,P=4.5*101325)
     M400 = bst.Mixer('M401', (P401-0,''))
     H400 = bst.HXutility('H400',ins=M400-0,V=1,rigorous=True)
 
-    R401 = _units.AdiabaticFixedbedDehydrationReactor('R401', ins=(H400-0,Syndol_catalyst),outs=('','spent_catalyst_R401'))
+    R401 = _units.AdiabaticFixedbedDehydrationReactor('R401', ins=(H400-0,Syndol_catalyst),outs=('',spent_catalyst_R401))
 
     # Depressurize to 1 bar before quenching
     V401 = bst.IsenthalpicValve('V401', ins=R401-0,P=101325)
@@ -287,10 +293,10 @@ def upgrading_sys(ins,outs):
                         split=dict(Ethylene=1))
 
     # First oligomerization
-    R402 = _units.Oligomerization1_Reactor('R402', ins=(S403-0,first_catalyst),outs=('','spent_catalyst_R402'))
+    R402 = _units.Oligomerization1_Reactor('R402', ins=(S403-0,first_catalyst),outs=('',spent_catalyst_R402))
 
     # Second oligomerization
-    R403 = _units.Oligomerization2_Reactor('R403',ins=(R402-0,'',second_catalyst),outs=('','spent_catalyst_R403'))
+    R403 = _units.Oligomerization2_Reactor('R403',ins=(R402-0,'',second_catalyst),outs=('',spent_catalyst_R403))
 
     # Recycle light olefins to R403
     D403 = bst.BinaryDistillation('D403', ins=R403-0,outs=('light_olefins','heavy_olefins'),
@@ -302,7 +308,7 @@ def upgrading_sys(ins,outs):
 
     # Hydrogenation
     P402 = bst.Pump('P402', ins=D403-1, outs='')
-    R404 = _units.HydrogenationReactor('R404', ins=(P402-0,hydrogen,Como_catalyst),outs=('spent_catalyst_R404',''))
+    R404 = _units.HydrogenationReactor('R404', ins=(P402-0,hydrogen,Como_catalyst),outs=(spent_catalyst_R404,''))
     
     @R404.add_specification(run=True)
     def correct_hydrogen_flow():
@@ -344,7 +350,20 @@ def upgrading_sys(ins,outs):
 # Complete energycane to SAF system
 @SystemFactory(ID='SAF_sys')
 def SAF_sys(ins,outs):
-    sys_1 = preprocessing_sys(ins = miscanthus)
+    sys_1 = preprocessing_sys(ins = (Stream(ID='feedstock',
+                                            Water=0.2,
+                                            Ash=0.0301,
+                                            Glucan=0.3472,
+                                            Xylan=0.2048,
+                                            Galactan=0.0112,
+                                            Arabinan=0.0136,
+                                            Lignin=0.1616,
+                                            Extract=0.0223,
+                                            Acetate=0.0034,
+                                            Protein=0.0058,
+                                            total_flow=2000000/24/0.8,
+                                            units='kg/hr',
+                                            price=0.08*0.8)))
 
     sys_2 = pretreatment_sys(ins = (Stream(ID='warm_process_water',
                                            T=368.15,
@@ -418,7 +437,15 @@ def SAF_sys(ins,outs):
                                   Stream(ID='jet_fuel',
                                          price=price['jet fuel']),
                                   Stream(ID='diesel',
-                                         price=price['diesel'])
+                                         price=price['diesel']),
+                                  Stream(ID='spent_catalyst_R401',
+                                         Ash=1),
+                                  Stream(ID='spent_catalyst_R402',
+                                         Ash=1),
+                                  Stream(ID='spent_catalyst_R403',
+                                         Ash=1),
+                                  Stream(ID='spent_catalyst_R404',
+                                         Ash=1)
                                   ))
                                   
     #==============================================================================
@@ -463,8 +490,6 @@ def SAF_sys(ins,outs):
     # Stream mixer to boiler turbogenerator for burning
     M901 = bst.Mixer('M901',
                      ins=(F.bagasse_to_CHP,
-                          F.filter_cake,
-                          F.fiber_fines,
                           F.U302_cell_mass,
                           F.D401_heavy_impurities,
                           F.sludge_from_wastewater_treatment), # WWT.outs[1]
@@ -502,16 +527,13 @@ def SAF_sys(ins,outs):
     system_makeup_water_streams = (F.boiler_makeup_water,
                                    CT.ins[1]) # Second ins of CT (cooling_tower_makeup_water)
                              
-    system_process_water_streams = (F.imbibition_water,
-                                    F.rvf_wash_water,
-                                    F.warm_process_water,
+    system_process_water_streams = (F.warm_process_water,
                                     F.water_M301,
                                     F.water_U301)
                              
     PWC = bst.ProcessWaterCenter('PWC',
                                   ins=(F.RO_treated_water_from_wastewater_treatment, # WWT.outs[2],
                                       '',
-                                      F.condensate, # E101.outs[1],
                                       system_makeup_water),
                                   outs=('','process_water', 'discharged_water'),
                                   makeup_water_streams=system_makeup_water_streams,
