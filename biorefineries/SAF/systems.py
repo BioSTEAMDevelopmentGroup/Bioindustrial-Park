@@ -20,7 +20,6 @@ from biorefineries.SAF.utils import convert_ethanol_wt_2_mol
 from biorefineries.SAF._process_settings import add_utility_agent, price
 
 
-
 add_utility_agent()
 F = bst.Flowsheet('SAF')
 bst.main_flowsheet.set_flowsheet(F)
@@ -278,14 +277,10 @@ def fermentation_sys(ins,outs):
     
     @DAP_storage.add_specification(run=True)
     def update_DAP_storage_DAP():
-        R301.run()
-        R302.run()
         DAP.imass['DAP'] = S300_DAP.outs[0].F_mass + S300_DAP.outs[1].F_mass
         
     @CSL_storage.add_specification(run=True)
     def update_CSL_storage_DAP():
-        R301.run()
-        R302.run()
         CSL.imass['CSL'] = S300_CSL.outs[0].F_mass + S300_CSL.outs[1].F_mass
     
     U301 = bst.VentScrubber('U301', ins=(water_U301, M302-0), 
@@ -378,7 +373,7 @@ def fermentation_sys(ins,outs):
           
 def upgrading_sys(ins,outs):
     NaOH,Syndol_catalyst,first_catalyst,second_catalyst,ethanol_to_storage,hydrogen,Como_catalyst = ins
-    F401_to_WWT,D401_heavy_impurities,D402_top_product,CH4_C2H6,gasoline,jet_fuel,diesel,spent_catalyst_R401,spent_catalyst_R402,spent_catalyst_R403,spent_catalyst_R404= outs
+    F401_to_WWT,D401_heavy_impurities,D402_top_product,CH4_C2H6,gasoline,jet_fuel,diesel,spent_catalyst_R401,spent_catalyst_R402,spent_catalyst_R403,spent_catalyst_R404 = outs
     
     P401 = bst.Pump('P401',ins=ethanol_to_storage,P=4.5*101325)
     M400 = bst.Mixer('M401', (P401-0,''))
@@ -632,7 +627,8 @@ def SAF_sys(ins,outs):
                                   Stream(ID='spent_catalyst_R403',
                                          Ash=1),
                                   Stream(ID='spent_catalyst_R404',
-                                         Ash=1),))
+                                         Ash=1)
+                                  ))
                                   
     #==============================================================================
     #                      Area 500 WWT
@@ -664,8 +660,8 @@ def SAF_sys(ins,outs):
     lime_boiler = Stream('lime_boiler', price=price['lime'])
     boiler_chems = Stream('boiler_chems', price=price['boiler chems'])
     ash = Stream('ash', price=price['ash disposal'])
-    #cooling_tower_chems = Stream('cooling_tower_chems', price=price['cooling tower chems'])
-    #system_makeup_water = Stream('system_makeup_water', price=price['water'])
+    cooling_tower_chems = Stream('cooling_tower_chems', price=price['cooling tower chems'])
+    system_makeup_water = Stream('system_makeup_water', price=price['water'])
 
     plant_air_in = bst.Stream('plant_air_in',phase='g',units='kg/hr',
                               N2=0.79*1372608*get_flow_tpd()/2205,
@@ -725,7 +721,7 @@ def SAF_sys(ins,outs):
                                   ins=(F.RO_treated_water_from_wastewater_treatment, # WWT.outs[2],
                                       '',
                                       F.condensate, # E101.outs[1],
-                                      'system_makeup_water'),
+                                      system_makeup_water),
                                   outs=('','process_water', 'discharged_water'),
                                   makeup_water_streams=system_makeup_water_streams,
                                   process_water_streams=system_process_water_streams)
