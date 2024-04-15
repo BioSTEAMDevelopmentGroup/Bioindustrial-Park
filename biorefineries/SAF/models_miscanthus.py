@@ -231,11 +231,11 @@ metrics.extend((Metric('Facilities_no_hu_group-heating demand',
                                               if hu.duty>0 and hu.flow>0.]) for unit in \
                                          process_groups_dict['Facilities_no_hu_group'].units])/jet_fuel_gal_per_hr(),
                       'MJ/gal'),))
-metrics.extend((Metric('CCS-heating demand', 
-                      lambda: 0.001*sum([sum([hu.duty for hu in unit.heat_utilities \
-                                              if hu.duty>0 and hu.flow>0.]) for unit in \
-                                         process_groups_dict['CCS'].units])/jet_fuel_gal_per_hr(),
-                      'MJ/gal'),))
+# metrics.extend((Metric('CCS-heating demand', 
+#                       lambda: 0.001*sum([sum([hu.duty for hu in unit.heat_utilities \
+#                                               if hu.duty>0 and hu.flow>0.]) for unit in \
+#                                          process_groups_dict['CCS'].units])/jet_fuel_gal_per_hr(),
+#                       'MJ/gal'),))
 
 
     
@@ -290,11 +290,11 @@ metrics.extend((Metric('Facilities_no_hu_group-cooling demand',
                                               if hu.duty<0 and hu.flow>0.]) for unit in \
                                          process_groups_dict['Facilities_no_hu_group'].units])/jet_fuel_gal_per_hr(),
                       'MJ/gal'),))
-metrics.extend((Metric('CCS-cooling demand', 
-                      lambda: 0.001*sum([sum([hu.duty for hu in unit.heat_utilities \
-                                              if hu.duty<0 and hu.flow>0.]) for unit in \
-                                         process_groups_dict['CCS'].units])/jet_fuel_gal_per_hr(),
-                      'MJ/gal'),))
+# metrics.extend((Metric('CCS-cooling demand', 
+#                       lambda: 0.001*sum([sum([hu.duty for hu in unit.heat_utilities \
+#                                               if hu.duty<0 and hu.flow>0.]) for unit in \
+#                                          process_groups_dict['CCS'].units])/jet_fuel_gal_per_hr(),
+#                       'MJ/gal'),))
     
     
 # Installed equipment cost
@@ -325,9 +325,9 @@ metrics.extend((Metric('CT_group - installed equipment cost',
 metrics.extend((Metric('Facilities_no_hu_group - installed equipment cost',
                        lambda:process_groups_dict['Facilities_no_hu_group'].get_installed_cost(),
                        '10^6 $'),))
-metrics.extend((Metric('CCS-installed equipment cost', 
-                      lambda: process_groups_dict['CCS'].get_installed_cost(),
-                       '10^6 $'),))
+# metrics.extend((Metric('CCS-installed equipment cost', 
+#                       lambda: process_groups_dict['CCS'].get_installed_cost(),
+#                        '10^6 $'),))
 
 
 # Power utility demand in MW/gal
@@ -358,9 +358,9 @@ metrics.extend((Metric('CT_group - power utility demand',
 metrics.extend((Metric('Facilities_no_hu_group - power utility demand',
                        lambda:process_groups_dict['Facilities_no_hu_group'].get_electricity_consumption()/jet_fuel_gal_per_hr(),
                        'MW/gal'),))  
-metrics.extend((Metric('CCS - power utility demand',
-                       lambda:process_groups_dict['CCS'].get_electricity_consumption()/jet_fuel_gal_per_hr(),
-                       'MW/gal'),))  
+# metrics.extend((Metric('CCS - power utility demand',
+#                        lambda:process_groups_dict['CCS'].get_electricity_consumption()/jet_fuel_gal_per_hr(),
+#                        'MW/gal'),))  
 
 
 # Material cost
@@ -427,9 +427,9 @@ metrics.extend((Metric('CT_group - material cost',
 metrics.extend((Metric('Facilities_no_hu_group - material cost',
                        lambda:get_material_cost_breakdown()['Facilities_no_hu_group'],
                        '$/gal'),))
-metrics.extend((Metric('CCS - material cost',
-                       lambda:get_material_cost_breakdown()['CCS'],
-                       '$/gal'),))
+# metrics.extend((Metric('CCS - material cost',
+#                        lambda:get_material_cost_breakdown()['CCS'],
+#                        '$/gal'),))
 
 # 3. LCA
 # in g CO2 eq / MJ blend fuel
@@ -468,7 +468,7 @@ get_GWP_NG = lambda: sys.get_material_impact(natural_gas, key='GWP100') * 1000 /
 
 get_GWP_caustic = lambda: (sys.get_material_impact(F.NaOH, key='GWP100') + sys.get_material_impact(F.caustic, key='GWP100')) * 1000 / _total_energy_per_year()
 
-get_GWP_lime = lambda: (sys.get_material_impact(F.lime, key='GWP100') + sys.get_material_impact(F.lime_boiler, key='GWP100')) * 1000 / _total_energy_per_year()
+# get_GWP_lime = lambda: (sys.get_material_impact(F.lime, key='GWP100') + sys.get_material_impact(F.lime_boiler, key='GWP100')) * 1000 / _total_energy_per_year()
 
 get_GWP_other_materials = lambda: get_GWP_material_total()  - get_GWP_feedstock_input() - get_GWP_NG()
 
@@ -545,7 +545,7 @@ metrics.extend((Metric('GWP - other materials', get_GWP_other_materials, 'g CO2-
 
 metrics.extend((Metric('GWP - caustic', get_GWP_caustic, 'g CO2-eq/MJ blend fuel', 'LCA'),))
 
-metrics.extend((Metric('GWP - lime', get_GWP_lime, 'g CO2-eq/MJ blend fuel', 'LCA'),))
+# metrics.extend((Metric('GWP - lime', get_GWP_lime, 'g CO2-eq/MJ blend fuel', 'LCA'),))
 
 metrics.extend((Metric('GWP - electricity', get_GWP_electricity_use_total, 'g CO2-eq/MJ blend fuel', 'LCA'),))
 
@@ -635,15 +635,6 @@ def create_model(system=sys,
 
 
 
-    H3PO4_price = price['H3PO4']
-    D = shape.Triangle(H3PO4_price*0.8, H3PO4_price, H3PO4_price*1.2)
-    @param(name='H3PO4 price', element='H3PO4', kind='isolated', units='$/kg',
-           baseline=H3PO4_price, distribution=D)
-    def set_H3PO4_price(price):
-        F.H3PO4.price = price
-
-
-
     enzymeM301_price = price['enzyme']
     D = shape.Triangle(enzymeM301_price*0.8, enzymeM301_price, enzymeM301_price*1.2)
     @param(name='Enzyme_price', element='Enzyme', kind='isolated', units='$/kg',
@@ -725,21 +716,21 @@ def create_model(system=sys,
 
 
 
-    MEA_price = price['MEA']
-    D = shape.Uniform(MEA_price*0.7, MEA_price*1.3)
-    @param(name='MEA price', element='makeup_MEA', kind='isolated', units='$/kg',
-           baseline=MEA_price, distribution=D)
-    def set_MEA_price(price):
-        F.makeup_MEA.price = price
+    # MEA_price = price['MEA']
+    # D = shape.Uniform(MEA_price*0.7, MEA_price*1.3)
+    # @param(name='MEA price', element='makeup_MEA', kind='isolated', units='$/kg',
+    #        baseline=MEA_price, distribution=D)
+    # def set_MEA_price(price):
+    #     F.makeup_MEA.price = price
 
 
 
-    CO2_TS_price = price['compressed CO2']
-    D = shape.Uniform(CO2_TS_price*1.5, CO2_TS_price*0.5)
-    @param(name='CO2 TS price', element='compressed CO2', kind='isolated', units='$/kg',
-           baseline=CO2_TS_price, distribution=D)
-    def set_CO2_TS_price(price):
-        F.compressed_CO2.price = price
+    # CO2_TS_price = price['compressed CO2']
+    # D = shape.Uniform(CO2_TS_price*1.5, CO2_TS_price*0.5)
+    # @param(name='CO2 TS price', element='compressed CO2', kind='isolated', units='$/kg',
+    #        baseline=CO2_TS_price, distribution=D)
+    # def set_CO2_TS_price(price):
+    #     F.compressed_CO2.price = price
 
     ###### Coproduct price ######
     diesel_price = price['diesel']
@@ -958,12 +949,12 @@ def create_model(system=sys,
 
 
 
-    CCS1 = F.CCS1
-    D = shape.Triangle(0.3,0.45,0.6)
-    @param(name='CO2 capture ratio', element=CCS1, kind='coupled', units='',
-           baseline=0.45, distribution=D)
-    def set_CO2_capture(X):
-        CCS1.CO2_recovery = X
+    # CCS1 = F.CCS1
+    # D = shape.Triangle(0.3,0.45,0.6)
+    # @param(name='CO2 capture ratio', element=CCS1, kind='coupled', units='',
+    #        baseline=0.45, distribution=D)
+    # def set_CO2_capture(X):
+    #     CCS1.CO2_recovery = X
 
     # =============================================================================
     # LCA parameters
@@ -973,22 +964,6 @@ def create_model(system=sys,
            baseline=0.10, distribution=D)
     def set_feedstock_GWP(X):
         feedstock.characterization_factors['GWP100'] = X
-
-
-
-    D = shape.Uniform(0.86829*(1-0.5), 0.86829*(1+0.5))
-    @param(name='H3PO4 GWP', element='H3PO4', kind='isolated', units='kg CO2-eq/kg',
-           baseline=0.86829, distribution=D)
-    def set_H3PO4_GWP(X):
-        F.H3PO4.characterization_factors['GWP100'] = X
-
-
-
-    D = shape.Uniform(3.1996*(1-0.5), 3.1996*(1+0.5))
-    @param(name='Flocculant GWP', element='Flocculant', kind='isolated', units='kg CO2-eq/kg',
-           baseline=3.1996, distribution=D)
-    def set_flocculant_GWP(X):
-        F.polymer.characterization_factors['GWP100'] = X
 
 
 
@@ -1040,11 +1015,11 @@ def create_model(system=sys,
 
 
 
-    D = shape.Uniform(0.033*(1-0.5), 0.033*(1+0.5))
-    @param(name='CO2 TS GWP', element='', kind='isolated', units='',
-           baseline=0.033, distribution=D)
-    def set_TS_ratio(X):
-        TS_ratio = X
+    # D = shape.Uniform(0.033*(1-0.5), 0.033*(1+0.5))
+    # @param(name='CO2 TS GWP', element='', kind='isolated', units='',
+    #        baseline=0.033, distribution=D)
+    # def set_TS_ratio(X):
+    #     TS_ratio = X
     
     
     if N > 0:
