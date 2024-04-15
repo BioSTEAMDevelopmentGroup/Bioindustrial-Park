@@ -362,8 +362,8 @@ def SAF_sys(ins,outs):
                                             Acetate=0.0034,
                                             Protein=0.0058,
                                             total_flow=2000000/24/0.8,
-                                            units='kg/hr',
-                                            price=0.08*0.8)))
+                                            price=price['feedstock'],
+                                            units='kg/hr',)))
 
     sys_2 = pretreatment_sys(ins = (Stream(ID='warm_process_water',
                                            T=368.15,
