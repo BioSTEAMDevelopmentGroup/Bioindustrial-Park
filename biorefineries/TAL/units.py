@@ -326,7 +326,7 @@ class BatchCoFermentation(BatchBioreactor):
         
         self.cofermentation_rxns = ParallelRxn([
         #      Reaction definition            Reactant    Conversion
-        Rxn('Glucose -> 0.6667 TAL + 2 CO2',        'Glucose',   0.19), 
+        Rxn('Glucose -> 0.666667 TAL + 2 CO2',        'Glucose',   0.19), 
         Rxn('Glucose -> 0.3 VitaminA',               'Glucose',   1e-8), # retinol
         Rxn('Glucose + O2 -> CitricAcid + H2O',               'Glucose',  self.regular_citric_acid_conversion), # 2H+ excluded # from Markham et al.; 16 g/L citrate from 180 g/L glucose
         Rxn('Glucose -> 6 FermMicrobe',       'Glucose',   self.regular_microbe_conversion),
@@ -336,7 +336,7 @@ class BatchCoFermentation(BatchBioreactor):
         Rxn('Xylose -> 0.8333 CitricAcid + H2O',               'Xylose',  self.regular_citric_acid_conversion),
         Rxn('Xylose -> 5 FermMicrobe',        'Xylose',    self.regular_microbe_conversion),
         
-        Rxn('AceticAcid -> 0.22218 TAL + 2CO2 + 6H2O',       'AceticAcid',    0.19),
+        Rxn('AceticAcid -> 0.333333 TAL + 3H2O',       'AceticAcid',    0.19),
         Rxn('AceticAcid -> 0.1 VitaminA',       'AceticAcid',    1e-8),
         Rxn('AceticAcid -> 0.0714 VitaminD2',       'AceticAcid',    1e-8),
         Rxn('AceticAcid -> 2 FermMicrobe',        'AceticAcid',    1e-8),
@@ -494,7 +494,7 @@ class SeedTrain(Unit):
         
         self.cofermentation_rxns = ParallelRxn([
         #      Reaction definition            Reactant    Conversion
-        Rxn('Glucose -> 0.6667 TAL + 2 CO2',        'Glucose',   0.19), 
+        Rxn('Glucose -> 0.666667 TAL + 2 CO2',        'Glucose',   0.19), 
         Rxn('Glucose -> 0.3 VitaminA',               'Glucose',   1e-8), # retinol
         Rxn('Glucose -> CitricAcid + H2O',               'Glucose',  self.regular_citric_acid_conversion), # 2H+ excluded # from Markham et al.; 16 g/L citrate from 180 g/L glucose
         Rxn('Glucose -> 6 FermMicrobe',       'Glucose',   self.regular_microbe_conversion),
@@ -504,7 +504,7 @@ class SeedTrain(Unit):
         Rxn('Xylose -> 0.8333 CitricAcid + H2O',               'Xylose',  self.regular_citric_acid_conversion),
         Rxn('Xylose -> 5 FermMicrobe',        'Xylose',    self.regular_microbe_conversion),
         
-        Rxn('AceticAcid -> 0.22218 TAL + 2CO2 + 6H2O',       'AceticAcid',    0.19),
+        Rxn('AceticAcid -> 0.333333 TAL + 2CO2 + 6H2O',       'AceticAcid',    0.19),
         Rxn('AceticAcid -> 0.1 VitaminA',       'AceticAcid',    1e-8),
         Rxn('AceticAcid -> 0.0714 VitaminD2',       'AceticAcid',    1e-8),
         Rxn('AceticAcid -> 2 FermMicrobe',        'AceticAcid',    1e-8),

@@ -129,7 +129,7 @@ TAL_metrics = [get_product_MPSP,
 
 # %% Generate 3-specification meshgrid and set specification loading functions
 
-steps = (20, 20, 20)
+steps = (60, 60, 1)
 
 # Yield, titer, productivity (rate)
 spec_1 = yields = np.linspace(0.05, 0.95, steps[0]) # yield
@@ -139,11 +139,16 @@ spec_2 = titers = np.linspace(5.,
                                    # Skoog et al., 2018 ( https://doi.org/10.1016/j.biotechadv.2018.10.012 )
                                 steps[1]) # titer
 
-spec_3 = productivities =\
-    np.linspace(0.05, 1.5, steps[2])
-    
 # spec_3 = productivities =\
-#     np.array([0.2*spec.baseline_productivity, spec.baseline_productivity, 5.*spec.baseline_productivity])
+#     np.linspace(0.05, 1.5, steps[2])
+    
+spec_3 = productivities =\
+    np.array([spec.baseline_productivity,])
+
+# spec_3 = productivities =\
+#     np.array([0.25*spec.baseline_productivity, 0.5*spec.baseline_productivity, 
+#               spec.baseline_productivity, 
+#               2.*spec.baseline_productivity, 4.*spec.baseline_productivity])
 
 # spec_3 = productivities =\
 #     np.array([0.2*spec.baseline_productivity, spec.baseline_productivity, 5*spec.baseline_productivity,])
@@ -288,6 +293,8 @@ max_HXN_qbal_percent_error = 0.
 curr_no = 0
 total_no = len(yields)*len(titers)*len(productivities)
 
+print_status_every_n_simulations = 5
+
 for p in productivities:
     # data_1 = TAL_data = spec.evaluate_across_specs(
     #         TAL_sys, spec_1, spec_2, TAL_metrics, [p])
@@ -339,12 +346,13 @@ for p in productivities:
                 d1_Metric6[-1].append(np.nan)
                 error_message = str(e1)
             
-            print_status(curr_no, total_no,
-                         y, t, p, 
-                         results=[d1_Metric1[-1][-1], d1_Metric2[-1][-1], d1_Metric3[-1][-1],
-                                  d1_Metric4[-1][-1], d1_Metric5[-1][-1], d1_Metric6[-1][-1],],
-                         HXN_qbal_error=HXN.energy_balance_percent_error,
-                         exception_str=error_message)
+            if curr_no%print_status_every_n_simulations==0:
+                print_status(curr_no, total_no,
+                             y, t, p, 
+                             results=[d1_Metric1[-1][-1], d1_Metric2[-1][-1], d1_Metric3[-1][-1],
+                                      d1_Metric4[-1][-1], d1_Metric5[-1][-1], d1_Metric6[-1][-1],],
+                             HXN_qbal_error=HXN.energy_balance_percent_error,
+                             exception_str=error_message)
     
     d1_Metric1, d1_Metric2, d1_Metric3 = np.array(d1_Metric1), np.array(d1_Metric2), np.array(d1_Metric3)
     d1_Metric4, d1_Metric5, d1_Metric6 = np.array(d1_Metric4), np.array(d1_Metric5), np.array(d1_Metric6)
@@ -760,7 +768,8 @@ TCI_w_levels, TCI_w_ticks, TCI_cbar_ticks = get_contour_info_from_metric_data(re
 # TCI_cbar_ticks = np.arange(2, 8.1, 1.)
 
 # TCI_w_ticks = [150, 200, 300, 400,]
-
+TCI_w_levels = np.arange(150, 401, 10)
+TCI_cbar_ticks = TCI_w_ticks = [150, 200, 250, 300, 350, 400]
 # TCI_w_levels = np.arange(0., 15.5, 0.5)
 
 contourplots.animated_contourplot(w_data_vs_x_y_at_multiple_z=results_metric_5, # shape = z * x * y # values of the metric you want to plot on the color axis; e.g., TCI
