@@ -415,3 +415,15 @@ def replace_first_instance_in_string(given_string, old_partial_string, new_parti
     
 def exclude_given_indices_from_list(given_list, given_indices):
     return [given_list[i] for i in range(len(given_list)) if not i in given_indices]
+
+def identify_accumulating_and_depleting_streams(sys, threshold_F_mol=1):
+    streams = list(sys.flowsheet.stream)
+    stream_F_mol_1 = [i.F_mol for i in streams]
+    sys.simulate()
+    stream_F_mol_2 = [i.F_mol for i in streams]
+    
+    acc_indices = [i for i in range(len(streams)) if stream_F_mol_2[i] - stream_F_mol_1[i] > threshold_F_mol]
+    
+    dep_indices = [i for i in range(len(streams)) if stream_F_mol_1[i] - stream_F_mol_2[i] > threshold_F_mol]
+    
+    return [streams[i] for i in acc_indices], [streams[i] for i in dep_indices]

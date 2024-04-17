@@ -287,13 +287,14 @@ def print_status(curr_no, total_no, s1, s2, s3, HXN_qbal_error, results=None, ex
     print(f'HXN Qbal error = {round(HXN_qbal_error, 2)} %.')
     print('\n')
     print(results)
+    print('\nError: ', exception_str)
 
 max_HXN_qbal_percent_error = 0.
 
 curr_no = 0
 total_no = len(yields)*len(titers)*len(productivities)
 
-print_status_every_n_simulations = 5
+print_status_every_n_simulations = 50
 
 for p in productivities:
     # data_1 = TAL_data = spec.evaluate_across_specs(
@@ -346,7 +347,7 @@ for p in productivities:
                 d1_Metric6[-1].append(np.nan)
                 error_message = str(e1)
             
-            if curr_no%print_status_every_n_simulations==0:
+            if curr_no%print_status_every_n_simulations==0 or (error_message and not 'sugar' in error_message and not 'opposite sign' in error_message):
                 print_status(curr_no, total_no,
                              y, t, p, 
                              results=[d1_Metric1[-1][-1], d1_Metric2[-1][-1], d1_Metric3[-1][-1],

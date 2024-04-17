@@ -116,6 +116,7 @@ def solve_addition_for_mol_ratio_and_decarb_conv(mol_PD_per_mol_TAL, x):
 #%% Parameter loading functions
 U402, M401 = u.U402, u.M401
 Acetylacetone_fresh = s.Acetylacetone_fresh
+U402.decarboxylation_conversion_basis = 'fixed'
 
 def load_decarboxylation_conversion(decarboxylation_conversion):
     U402.decarboxylation_conversion = decarboxylation_conversion
@@ -152,7 +153,7 @@ TAL_metrics = [get_product_MPSP, lambda: TAL_lca.GWP, lambda: TAL_lca.FEC,
 
 # %% Generate 3-specification meshgrid and set specification loading functions
 
-steps = (60, 60, 1)
+steps = (10, 10, 1)
 
 # Yield, titer, productivity (rate)
 spec_1 = TAL_decarb_convs = np.linspace(0.01, 0.5, steps[0]) # yield
@@ -305,6 +306,7 @@ def print_status(curr_no, total_no, s1, s2, s3, HXN_qbal_error, results=None, ex
     print(f'HXN Qbal error = {round(HXN_qbal_error, 2)} %.')
     print('\n')
     print(results)
+    print('\nError: ', exception_str)
 
 max_HXN_qbal_percent_error = 0.
 
