@@ -589,58 +589,58 @@ def plot_metrics_across_biomass_yield(
         styleaxiskw=dict(xtick0=True), 
         label=True, wbar=2.1
     )
-    try:
-        df = cane.get_composition_data()
-    except:
-        pass
-    else:
-        names = df.index
-        lines = []
-        for name, color in zip(names, line_color_wheel):
-            data = df.loc[name]
-            if str(name) in ('19B', '316', '1565'): continue
-            oil = data['Stem oil (dw)']['Mean'] * 100
-            lines.append(
-                (name, 
-                 oil, 
-                 data['Biomass yield (dry MT/ha)']['Mean'],
-                 color)
-            )
-        for i in axes.flat: 
-            if hasattr(i, '_cached_ytwin'):
-                plt.sca(i); plt.xlim(xlim)
-                plt.sca(i._cached_ytwin); plt.xlim(xlim)
-        txtbox = dict(boxstyle='round', facecolor=colors.neutral.shade(40).RGBn, 
-                      edgecolor='None', pad=0.3)
+    # try:
+    #     df = cane.get_composition_data()
+    # except:
+    #     pass
+    # else:
+    #     names = df.index
+    #     lines = []
+    #     for name, color in zip(names, line_color_wheel):
+    #         data = df.loc[name]
+    #         if str(name) in ('19B', '316', '1565'): continue
+    #         oil = data['Stem oil (dw)']['Mean'] * 100
+    #         lines.append(
+    #             (name, 
+    #              oil, 
+    #              data['Biomass yield (dry MT/ha)']['Mean'],
+    #              color)
+    #         )
+    #     for i in axes.flat: 
+    #         if hasattr(i, '_cached_ytwin'):
+    #             plt.sca(i); plt.xlim(xlim)
+    #             plt.sca(i._cached_ytwin); plt.xlim(xlim)
+    #     txtbox = dict(boxstyle='round', facecolor=colors.neutral.shade(40).RGBn, 
+    #                   edgecolor='None', pad=0.3)
         
-        for (name, lipid, biomass_yield, color) in lines:
-            feedstock = 'Sugarcane' if name == 'WT' else 'Oilcane'
-            line_results = cane.evaluate_metrics_at_biomass_yield(lipid, biomass_yield)[metric_indices]
-            for i, (*axes_columns, _) in enumerate(axes):
-                mb = metric_bars[i]
-                units = mb.units.replace('CO2', 'CO_2')
-                x = lipid + 0.2
-                y = biomass_yield
-                if biomass_yield > 25:
-                    verticalalignment = 'top'
-                elif biomass_yield < 10:
-                    verticalalignment = 'bottom'
-                else:
-                    verticalalignment = 'center'
+    #     for (name, lipid, biomass_yield, color) in lines:
+    #         feedstock = 'Sugarcane' if name == 'WT' else 'Oilcane'
+    #         line_results = cane.evaluate_metrics_at_biomass_yield(lipid, biomass_yield)[metric_indices]
+    #         for i, (*axes_columns, _) in enumerate(axes):
+    #             mb = metric_bars[i]
+    #             units = mb.units.replace('CO2', 'CO_2')
+    #             x = lipid + 0.2
+    #             y = biomass_yield
+    #             if biomass_yield > 25:
+    #                 verticalalignment = 'top'
+    #             elif biomass_yield < 10:
+    #                 verticalalignment = 'bottom'
+    #             else:
+    #                 verticalalignment = 'center'
                     
-                for j, ax in enumerate(axes_columns):
-                    plt.sca(ax._cached_ytwin)
-                    value = line_results[i, j]
-                    if name == 'Target': continue
-                    text = f"{feedstock} {name}:\n{value:.1f} {units}"
-                    plt.text(
-                        x, y, text, c=color.tint(15).RGBn,
-                        bbox=txtbox, verticalalignment=verticalalignment,
-                    )
-                    plot_scatter_points(
-                        [lipid], [biomass_yield], marker='o', s=20,  linewidth=0.6,
-                        color=color.RGBn, edgecolor=edgecolor, clip_on=False, zorder=1e6,
-                    )
+    #             for j, ax in enumerate(axes_columns):
+    #                 plt.sca(ax._cached_ytwin)
+    #                 value = line_results[i, j]
+    #                 if name == 'Target': continue
+    #                 text = f"{feedstock} {name}:\n{value:.1f} {units}"
+    #                 plt.text(
+    #                     x, y, text, c=color.tint(15).RGBn,
+    #                     bbox=txtbox, verticalalignment=verticalalignment,
+    #                 )
+    #                 plot_scatter_points(
+    #                     [lipid], [biomass_yield], marker='o', s=20,  linewidth=0.6,
+    #                     color=color.RGBn, edgecolor=edgecolor, clip_on=False, zorder=1e6,
+    #                 )
                     
     return fig, axes
 

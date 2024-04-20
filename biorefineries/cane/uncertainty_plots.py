@@ -53,6 +53,7 @@ from scipy import interpolate
 __all__ = (
     'plot_all',
     # 'plot_montecarlo_main_manuscript',
+    'plot_competitive_biomass_yield_across_oil_content_presentation',
     'plot_breakdowns',
     'plot_montecarlo_feedstock_comparison',
     'plot_montecarlo_configuration_comparison',
@@ -1510,6 +1511,33 @@ def plot_monte_carlo(derivative=False, absolute=True, comparison=True,
     fig.align_ylabels(axes)
     return fig, axes
 
+
+def plot_competitive_biomass_yield_across_oil_content_presentation(
+        fs=None,
+    ):
+    if fs is None: fs = 10
+    set_figure_size(aspect_ratio=0.6)
+    lines = ('WT', '1566', '1580', 'Target')
+    for i in range(len(lines) + 1):
+        fig, ax = plt.subplots(ncols=1, nrows=1)
+        set_font(size=fs)
+        xs, fys = _plot_competitive_biomass_yield_across_oil_content(
+            'O7', theoretical=False, fs=fs, spread=True,
+        )
+        plt.xlim([0, 15])
+        plt.ylim([0, 40])
+        plt.xlabel('Oil content [dw %]')
+        bst.plots.style_axis(
+            xticks=[0, 3, 6, 9, 12, 15],
+            ytick0=False,
+            ytickf=True,
+        )
+        _add_lines_biomass_yield_vs_oil_content(*fys, names=lines[:i], fs=fs, spread=True)
+        plt.subplots_adjust(hspace=0.05, left=0.125, right=0.96, bottom=0.10, top=0.95)
+        for j in ('svg', 'png'):
+            file = os.path.join(images_folder, f'competitive_biomass_yield_MCAC_{i}.{j}')
+            plt.savefig(file, dpi=900, transparent=True)
+
 def plot_competitive_biomass_yield_across_oil_content(
         fs=None,
     ):
@@ -1555,96 +1583,11 @@ def plot_competitive_biomass_yield_across_oil_content(
         file = os.path.join(images_folder, f'competitive_biomass_yield_MCAC.{i}')
         plt.savefig(file, dpi=900, transparent=True)
 
-# def plot_competitive_biomass_yield_across_oil_content_TOC(
-#         fs=None,
-#     ):
-#     if fs is None: fs = 10
-#     set_figure_size(aspect_ratio=0.6)
-#     fig, ax = plt.subplots(ncols=1, nrows=1)
-#     set_font(size=fs)
-#     xs, fys = _plot_competitive_biomass_yield_across_oil_content('O9', theoretical=False)
-#     plt.xlim([0, 15])
-#     plt.ylim([0, 40])
-#     bst.plots.style_axis(
-#         xticks=[0, 3, 6, 9, 12, 15],
-#         xticklabels=False,
-#         ytick0=False,
-#         ytickf=True,
-#     )
-#     _add_lines_biomass_yield_vs_oil_content_TOC(*fys)
-#     plt.subplots_adjust(hspace=0.05, left=0.125, right=0.96, bottom=0.10, top=0.95)
-#     for i in ('svg', 'png'):
-#         file = os.path.join(images_folder, f'competitive_biomass_yield_MCAC_TOC.{i}')
-#         plt.savefig(file, dpi=900, transparent=True)
-
-# def _add_lines_biomass_yield_vs_oil_content_TOC(f5, f50, f95):
-#     df = cane.get_composition_data()
-#     points = {i: None for i in ('WT', '1566', 'Target')}
-#     for name, color in zip(df.index, line_color_wheel):
-#         line = df.loc[name]
-#         name = str(name)
-#         if name not in points: continue
-#         oil = line['Stem oil (dw)']['Mean'] * 100
-#         biomass = line['Biomass yield (dry MT/ha)']['Mean']
-#         points[name] = Point(oil, biomass, color.shade(50).RGBn)
-#         bst.plots.plot_scatter_points(
-#             [oil], [biomass], marker='o', s=20, color=color.RGBn,
-#             edgecolor=edgecolor, clip_on=False, zorder=3,
-#             linewidth=0.6,
-#         )
-#     arrow = r'$\rightarrow$'
-#     name = 'WT'
-#     pnt = points[name]
-#     y50_target = f50(pnt.x)
-#     x_units = f"{format_units('dw')} % oil"
-#     y_units = f"{format_units('DMT/ha/y')}"
-#     text = (
-#         f"Sugarcane {name}, {pnt.x:.2g} {x_units}\n"
-#         f"Yield: {pnt.y:.1f} {y_units}"
-#     )
-#     bst.plots.annotate_point(
-#         text, pnt.x, pnt.y, horizontalalignment='left', 
-#         textcolor=pnt.c, linecolor=pnt.c, arrowkwargs=dict(head_width=0),
-#         dx=0.3, dy=7, dx_text=-0.1, dy_text=0, fontsize=8,
-#     )
-    
-#     name = '1566'
-#     pnt = points[name]
-#     y5_target, y50_target, y95_target = f5(pnt.x), f50(pnt.x), f95(pnt.x)
-#     ax = plt.gca()
-#     ax.annotate('',
-#         xy=(pnt.x, y50_target + 0.25), 
-#         xytext=(pnt.x, pnt.y),
-#         arrowprops=dict(arrowstyle="->", color=pnt.c),
-#     )
-#     text = (
-#         f"Oilcane {name}, {pnt.x:.2g} {x_units}\n"
-#         f"Yield: {pnt.y:.1f} {arrow} {y50_target:.1f} [{y5_target:.1f}, {y95_target:.1f}] {y_units}\n"
-#     )
-#     bst.plots.annotate_point(
-#         text, pnt.x, pnt.y, horizontalalignment='left', verticalalignment='center',
-#         textcolor=pnt.c, linecolor=pnt.c, arrowkwargs=dict(head_width=0),
-#         dx=2.8, dy=14.5, dx_text=0.1, dy_text=0, fontsize=8,
-#     )
-    
-#     name = 'Target'
-#     pnt = points[name]
-#     y5_target, y50_target, y95_target = f5(pnt.x), f50(pnt.x), f95(pnt.x)
-#     ax = plt.gca()
-#     text = (
-#         f"Oilcane {name}, {pnt.x:.2g} {x_units}\n"
-#         f"Yield: {pnt.y:.1f} {y_units}"
-#     )
-#     bst.plots.annotate_point(
-#         text, pnt.x, pnt.y, horizontalalignment='center',
-#         verticalalignment='bottom', arrowkwargs=dict(head_width=0),
-#         textcolor=pnt.c, linecolor=pnt.c,
-#         dx=0, dy=6, dx_text=0, dy_text=0.1, fontsize=8,
-#     )
-
-def _add_lines_biomass_yield_vs_oil_content(f5, f50, f95):
+def _add_lines_biomass_yield_vs_oil_content(f5, f50, f95, names=None, fs=None, spread=False):
     df = cane.get_composition_data()
-    points = {i: None for i in ('WT', '1566', '1580', 'Target')}
+    if names is None: names = ('WT', '1566', '1580', 'Target')
+    if fs is None: fs = 8
+    points = {i: None for i in names}
     for name, color in zip(df.index, line_color_wheel):
         line = df.loc[name]
         name = str(name)
@@ -1659,73 +1602,81 @@ def _add_lines_biomass_yield_vs_oil_content(f5, f50, f95):
         )
     arrow = r'$\rightarrow$'
     name = 'WT'
-    pnt = points[name]
-    y50_target = f50(pnt.x)
     x_units = f"{format_units('dw')} % oil"
     y_units = f"{format_units('DMT/ha/y')}"
-    text = (
-        f"Sugarcane {name}, {pnt.x:.2g} {x_units}\n"
-        f"Yield: {pnt.y:.1f} {y_units}"
-    )
-    bst.plots.annotate_point(
-        text, pnt.x, pnt.y, horizontalalignment='left', 
-        textcolor=pnt.c, linecolor=pnt.c, arrowkwargs=dict(head_width=0),
-        dx=0.3, dy=7, dx_text=-0.1, dy_text=0, fontsize=8,
-    )
-    
+    if name in names:
+        pnt = points[name]
+        y50_target = f50(pnt.x)
+        text = (
+            f"Sugarcane {name}, {pnt.x:.2g} {x_units}\n"
+            f"Yield: {pnt.y:.1f} {y_units}"
+        )
+        bst.plots.annotate_point(
+            text, pnt.x, pnt.y, horizontalalignment='left', 
+            textcolor=pnt.c, linecolor=pnt.c, arrowkwargs=dict(head_width=0),
+            dx=0.3, dy=7, dx_text=-0.1, dy_text=0, fontsize=fs,
+        )
     name = '1566'
-    pnt = points[name]
-    y5_target, y50_target, y95_target = f5(pnt.x), f50(pnt.x), f95(pnt.x)
-    ax = plt.gca()
-    ax.annotate('',
-        xy=(pnt.x, y50_target + 0.25), 
-        xytext=(pnt.x, pnt.y),
-        arrowprops=dict(arrowstyle="->", color=pnt.c),
-    )
-    text = (
-        f"Oilcane {name}, {pnt.x:.2g} {x_units}\n"
-        f"Yield: {pnt.y:.1f} {arrow} {y50_target:.1f} [{y5_target:.1f}, {y95_target:.1f}] {y_units}\n"
-    )
-    bst.plots.annotate_point(
-        text, pnt.x, pnt.y, horizontalalignment='left', verticalalignment='center',
-        textcolor=pnt.c, linecolor=pnt.c, arrowkwargs=dict(head_width=0),
-        dx=2.8, dy=14.5, dx_text=0.1, dy_text=0, fontsize=8,
-    )
-    
+    if name in names:
+        pnt = points[name]
+        y5_target, y50_target, y95_target = f5(pnt.x), f50(pnt.x), f95(pnt.x)
+        ax = plt.gca()
+        ax.annotate('',
+            xy=(pnt.x, y50_target + 0.25), 
+            xytext=(pnt.x, pnt.y),
+            arrowprops=dict(arrowstyle="->", color=pnt.c),
+        )
+        text = (
+            f"Oilcane {name}, {pnt.x:.2g} {x_units}\n"
+            f"Yield: {pnt.y:.1f} {arrow} {y50_target:.1f} [{y5_target:.1f}, {y95_target:.1f}] {y_units}\n"
+        )
+        if spread:
+            bst.plots.annotate_point(
+                text, pnt.x, pnt.y, horizontalalignment='left', verticalalignment='center',
+                textcolor=pnt.c, linecolor=pnt.c, arrowkwargs=dict(head_width=0),
+                dx=3.8, dy=13.5, dx_text=0.1, dy_text=0, fontsize=fs,
+            )
+        else:
+            bst.plots.annotate_point(
+                text, pnt.x, pnt.y, horizontalalignment='left', verticalalignment='center',
+                textcolor=pnt.c, linecolor=pnt.c, arrowkwargs=dict(head_width=0),
+                dx=2.8, dy=14.5, dx_text=0.1, dy_text=0, fontsize=fs,
+            )
     name = '1580'
-    pnt = points[name]
-    y5_target, y50_target, y95_target = f5(pnt.x), f50(pnt.x), f95(pnt.x)
-    ax = plt.gca()
-    ax.annotate('',
-        xy=(pnt.x, y50_target + 0.25), 
-        xytext=(pnt.x, pnt.y),
-        arrowprops=dict(arrowstyle="->", color=pnt.c),
-    )
-    text = (
-        f"Oilcane {name}, {pnt.x:.2g} {x_units}\n"
-        f"Yield: {pnt.y:.1f} {arrow} {y50_target:.1f} [{y5_target:.1f}, {y95_target:.1f}] {y_units}\n"
-    )
-    bst.plots.annotate_point(
-        text, pnt.x, pnt.y, horizontalalignment='left',
-        verticalalignment='center', arrowkwargs=dict(head_width=0),
-        textcolor=pnt.c, linecolor=pnt.c,
-        dx=0.25, dy=0, dx_text=0.1, dy_text=0, fontsize=8,
-    )
-    
+    if name in names:
+        pnt = points[name]
+        y5_target, y50_target, y95_target = f5(pnt.x), f50(pnt.x), f95(pnt.x)
+        ax = plt.gca()
+        ax.annotate('',
+            xy=(pnt.x, y50_target + 0.25), 
+            xytext=(pnt.x, pnt.y),
+            arrowprops=dict(arrowstyle="->", color=pnt.c),
+        )
+        text = (
+            f"Oilcane {name}, {pnt.x:.2g} {x_units}\n"
+            f"Yield: {pnt.y:.1f} {arrow} {y50_target:.1f} [{y5_target:.1f}, {y95_target:.1f}] {y_units}\n"
+        )
+        bst.plots.annotate_point(
+            text, pnt.x, pnt.y, horizontalalignment='left',
+            verticalalignment='center', arrowkwargs=dict(head_width=0),
+            textcolor=pnt.c, linecolor=pnt.c,
+            dx=0.25, dy=0, dx_text=0.1, dy_text=0, fontsize=fs,
+        )
     name = 'Target'
-    pnt = points[name]
-    y5_target, y50_target, y95_target = f5(pnt.x), f50(pnt.x), f95(pnt.x)
-    ax = plt.gca()
-    text = (
-        f"Oilcane {name}, {pnt.x:.2g} {x_units}\n"
-        f"Yield: {pnt.y:.1f} {y_units}"
-    )
-    bst.plots.annotate_point(
-        text, pnt.x, pnt.y, horizontalalignment='center',
-        verticalalignment='bottom', arrowkwargs=dict(head_width=0),
-        textcolor=pnt.c, linecolor=pnt.c,
-        dx=0, dy=5, dx_text=0, dy_text=0.1, fontsize=8,
-    )
+    if name in names:
+        pnt = points[name]
+        y5_target, y50_target, y95_target = f5(pnt.x), f50(pnt.x), f95(pnt.x)
+        ax = plt.gca()
+        text = (
+            f"Oilcane {name}, {pnt.x:.2g} {x_units}\n"
+            f"Yield: {pnt.y:.1f} {y_units}"
+        )
+        bst.plots.annotate_point(
+            text, pnt.x, pnt.y, horizontalalignment='center',
+            verticalalignment='bottom', arrowkwargs=dict(head_width=0),
+            textcolor=pnt.c, linecolor=pnt.c,
+            dx=0, dy=5, dx_text=0, dy_text=0.1, fontsize=fs,
+        )
 
 def _plot_theoretical_competitive_biomass_yield_across_oil_content():
     f = 0.93 # Maximum fraction of fiber/sugar
@@ -1750,8 +1701,9 @@ def _plot_theoretical_competitive_biomass_yield_across_oil_content():
     )
     
 def _plot_competitive_biomass_yield_across_oil_content(
-        configuration, theoretical=True
+        configuration, theoretical=True, fs=None, spread=False,
     ):
+    if fs is None: fs = 8
     file = monte_carlo_file(configuration, across_lines=False, across_oil_content='oilcane vs sugarcane')
     df = pd.read_excel(file, sheet_name=features.competitive_biomass_yield.short_description, index_col=0)
     df = df.dropna()
@@ -1767,14 +1719,24 @@ def _plot_competitive_biomass_yield_across_oil_content(
     )
     index = [0, 2, 4]
     f5, f50, f95 = [interpolate.interp1d(oil_content, biomass_yields[i]) for i in index]
-    bst.plots.annotate_point(
-        'Financially\ncompetitive\ntargets', 13.5, f50(13.5),
-        dy=-4, dy_text=-0.3, fontsize=8,
-        linecolor=CABBI_colors.green_dirty.shade(40).RGBn,
-        textcolor=CABBI_colors.green_dirty.shade(40).RGBn,
-        verticalalignment='top',
-        arrowkwargs=dict(head_width=0),
-    )
+    if spread:
+        bst.plots.annotate_point(
+            'Financially\ncompetitive\ntargets', 13.5, f50(13.5),
+            dy=4, dy_text=0.3, fontsize=fs,
+            linecolor=CABBI_colors.green_dirty.shade(40).RGBn,
+            textcolor=CABBI_colors.green_dirty.shade(40).RGBn,
+            verticalalignment='bottom',
+            arrowkwargs=dict(head_width=0),
+        )
+    else:
+        bst.plots.annotate_point(
+            'Financially\ncompetitive\ntargets', 13.5, f50(13.5),
+            dy=-4, dy_text=-0.3, fontsize=fs,
+            linecolor=CABBI_colors.green_dirty.shade(40).RGBn,
+            textcolor=CABBI_colors.green_dirty.shade(40).RGBn,
+            verticalalignment='top',
+            arrowkwargs=dict(head_width=0),
+        )
     return (oil_content, (f5, f50, f95))
 
 def plot_competitive_microbial_oil_yield_across_oil_content(
