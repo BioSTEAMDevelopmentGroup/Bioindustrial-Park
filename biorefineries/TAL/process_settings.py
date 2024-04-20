@@ -201,7 +201,7 @@ spent_PdC_price = 1. # assumed
 
 acetone_price = 0.63 * _GDP_2008_to_2016 * _lb_per_kg # average of range ($0.44 - $0.82 /lb) from https://web.archive.org/web/20161125084558/http://www.icis.com:80/chemicals/channel-info-chemicals-a-z/
 
-acetic_acid_price = 1.135 * _GDP_2008_to_2010 * chem_index[2019]/chem_index[2010] # average of range ($ 0.772 - 1.499 /kg) from # https://web.archive.org/web/20161125084558/http://www.icis.com:80/chemicals/channel-info-chemicals-a-z/
+acetic_acid_price = 0.38 *_lb_per_kg * _GDP_2008_to_2010 * chem_index[2019]/chem_index[2010] # average of 2008$ range ($ 0.35 - 0.41 /lb) from # https://web.archive.org/web/20161125084558/http://www.icis.com:80/chemicals/channel-info-chemicals-a-z/
 sodium_acetate_price = acetic_acid_price # unused
 
 CSL_price = 0.0339 * _lb_per_kg * chem_index[2019]/chem_index[2016] # from lactic acid paper

@@ -138,6 +138,7 @@ def solve_split_for_mol_ratio_and_decarb_conv(mol_PD_per_mol_TAL, x):
 #%% Parameter loading functions
 U402, M401 = u.U402, u.M401
 Acetylacetone_fresh = s.Acetylacetone_fresh
+U402.decarboxylation_conversion_basis = 'fixed'
 
 def load_decarboxylation_conversion(decarboxylation_conversion):
     U402.decarboxylation_conversion = decarboxylation_conversion
@@ -161,7 +162,7 @@ get_product_purity = lambda: get_production()/product.F_mass
 
 get_product_recovery = lambda: sum([product.imass[i] for i in product_chemical_IDs])/sum([broth.imass[i] for i in product_chemical_IDs])
 get_TAL_AOC = lambda: TAL_tea.AOC / 1e6 # million USD / y
-get_TAL_FCI = lambda: TAL_tea.FCI / 1e6 # million USD
+get_TAL_TCI = lambda: TAL_tea.TCI / 1e6 # million USD
 
 get_TAL_sugars_conc = lambda: sum(R302.outs[0].imass['Glucose', 'Xylose'])/R302.outs[0].F_vol
 
@@ -170,7 +171,7 @@ get_TAL_inhibitors_conc = lambda: 1000*sum(R302.outs[0].imass['AceticAcid', 'Fur
 get_S403_split = lambda: S403.split[0]
 
 TAL_metrics = [get_product_MPSP, lambda: TAL_lca.GWP, lambda: TAL_lca.FEC, 
-               get_TAL_AOC, get_TAL_FCI, get_product_purity, get_S403_split]
+               get_TAL_AOC, get_TAL_TCI, get_product_purity, get_S403_split]
 
 # %% Generate 3-specification meshgrid and set specification loading functions
 
@@ -221,8 +222,8 @@ FEC_units = r"$\mathrm{MJ}\cdot\mathrm{kg}^{-1}$"
 AOC_w_label = r"$\bfAOC$" # title of the color axis
 AOC_units = r"$\mathrm{MM\$}\cdot\mathrm{y}^{-1}$"
 
-FCI_w_label = r"$\bfFCI$" # title of the color axis
-FCI_units = r"$\mathrm{MM\$}$"
+TCI_w_label = r"$\bfTCI$" # title of the color axis
+TCI_units = r"$\mathrm{MM\$}$"
 
 Purity_w_label = r"$\bfPurity$" # title of the color axis
 Purity_units = r"$\mathrm{\%}$"
@@ -450,7 +451,7 @@ for p in PD_prices:
     pd.DataFrame(d1_Metric2).to_csv(TAL_results_filepath+'GWP-'+file_to_save+'.csv')
     pd.DataFrame(d1_Metric3).to_csv(TAL_results_filepath+'FEC-'+file_to_save+'.csv')
     pd.DataFrame(d1_Metric4).to_csv(TAL_results_filepath+'AOC-'+file_to_save+'.csv')
-    pd.DataFrame(d1_Metric5).to_csv(TAL_results_filepath+'FCI-'+file_to_save+'.csv')
+    pd.DataFrame(d1_Metric5).to_csv(TAL_results_filepath+'TCI-'+file_to_save+'.csv')
     pd.DataFrame(d1_Metric6).to_csv(TAL_results_filepath+'Purity-'+file_to_save+'.csv')
     pd.DataFrame(d1_Metric7).to_csv(TAL_results_filepath+'S403_split-'+file_to_save+'.csv')
     
@@ -976,15 +977,15 @@ contourplots.animated_contourplot(w_data_vs_x_y_at_multiple_z=results_metric_4, 
                                 units_on_newline = (True, True, False, False), # x,y,z,w
                                 )
 
-#%% FCI
+#%% TCI
 
-FCI_w_levels, FCI_w_ticks, FCI_cbar_ticks = get_contour_info_from_metric_data(results_metric_5,)
-FCI_w_levels = np.arange(200, 400.1, 10)
-FCI_cbar_ticks = np.arange(200, 400.1, 20)
-FCI_w_ticks = np.arange(200, 400.1, 20)
-# FCI_w_levels = np.arange(0., 15.5, 0.5)
+TCI_w_levels, TCI_w_ticks, TCI_cbar_ticks = get_contour_info_from_metric_data(results_metric_5,)
+TCI_w_levels = np.arange(200, 400.1, 10)
+TCI_cbar_ticks = np.arange(200, 400.1, 20)
+TCI_w_ticks = np.arange(200, 400.1, 20)
+# TCI_w_levels = np.arange(0., 15.5, 0.5)
 
-contourplots.animated_contourplot(w_data_vs_x_y_at_multiple_z=results_metric_5, # shape = z * x * y # values of the metric you want to plot on the color axis; e.g., FCI
+contourplots.animated_contourplot(w_data_vs_x_y_at_multiple_z=results_metric_5, # shape = z * x * y # values of the metric you want to plot on the color axis; e.g., TCI
                                 x_data=100*TAL_decarb_convs, # x axis values
                                 # x_data = TAL_decarb_convs/theoretical_max_g_TAL_acid_per_g_glucose,
                                 y_data=PD_reqs, # y axis values
@@ -992,26 +993,26 @@ contourplots.animated_contourplot(w_data_vs_x_y_at_multiple_z=results_metric_5, 
                                 x_label=x_label, # title of the x axis
                                 y_label=y_label, # title of the y axis
                                 z_label=z_label, # title of the z axis
-                                w_label=FCI_w_label, # title of the color axis
+                                w_label=TCI_w_label, # title of the color axis
                                 x_ticks=100*x_ticks,
                                 y_ticks=y_ticks,
                                 z_ticks=z_ticks,
-                                w_levels=FCI_w_levels, # levels for unlabeled, filled contour areas (labeled and ticked only on color bar)
-                                w_ticks=FCI_w_ticks, # labeled, lined contours; a subset of w_levels
+                                w_levels=TCI_w_levels, # levels for unlabeled, filled contour areas (labeled and ticked only on color bar)
+                                w_ticks=TCI_w_ticks, # labeled, lined contours; a subset of w_levels
                                 x_units=x_units,
                                 y_units=y_units,
                                 z_units=z_units,
-                                w_units=FCI_units,
+                                w_units=TCI_units,
                                 # fmt_clabel=lambda cvalue: r"$\mathrm{\$}$"+" {:.1f} ".format(cvalue)+r"$\cdot\mathrm{kg}^{-1}$", # format of contour labels
                                 fmt_clabel = lambda cvalue: get_rounded_str(cvalue, 3),
                                 cmap=CABBI_green_colormap(), # can use 'viridis' or other default matplotlib colormaps
                                 cmap_over_color = colors.grey_dark.shade(8).RGBn,
                                 extend_cmap='max',
-                                cbar_ticks=FCI_cbar_ticks,
+                                cbar_ticks=TCI_cbar_ticks,
                                 z_marker_color='g', # default matplotlib color names
                                 fps=fps, # animation frames (z values traversed) per second
                                 n_loops='inf', # the number of times the animated contourplot should loop animation over z; infinite by default
-                                animated_contourplot_filename='FCI_animated_contourplot_'+file_to_save, # file name to save animated contourplot as (no extensions)
+                                animated_contourplot_filename='TCI_animated_contourplot_'+file_to_save, # file name to save animated contourplot as (no extensions)
                                 keep_frames=keep_frames, # leaves frame PNG files undeleted after running; False by default
                                 axis_title_fonts=axis_title_fonts,
                                 clabel_fontsize = clabel_fontsize,
@@ -1020,7 +1021,7 @@ contourplots.animated_contourplot(w_data_vs_x_y_at_multiple_z=results_metric_5, 
                                 # comparison_range=TAL_maximum_viable_market_range,
                                 n_minor_ticks = 1,
                                 cbar_n_minor_ticks = 1,
-                                # comparison_range=[FCI_w_levels[-2], FCI_w_levels[-1]],
+                                # comparison_range=[TCI_w_levels[-2], TCI_w_levels[-1]],
                                 # comparison_range_hatch_pattern='////',
                                 units_on_newline = (True, True, False, False), # x,y,z,w
                                 )
