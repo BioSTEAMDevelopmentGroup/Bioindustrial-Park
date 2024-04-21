@@ -50,6 +50,8 @@ class Biorefinery(bst.ProcessModel):
     >>> (model.MSP(), model.tea.TCI / 1e6)
     (1.66, 631.57)
     
+    >>>
+    
     """
     name = 'OHFA'
     
