@@ -31,7 +31,7 @@ Step 2: Change 'feedstock' stream in function 'def SAF_sys', which maybe at the 
 
 Step 3: Go to '_process_settings', where you can customize price and GWP of feedstock.
 
-Step 4: Call funtion 'create_model' from your chosen configuration models, ('create_model' is shared by all configurations),
+Step 4: Call funtion 'create_model' from your chosen configuration models,
         eg, "from biorefineries.SAF.models_miscanthus import create_model", then "create_model()". 
             I set N_runs 2000, but you can also change it by passing a value. Try not to change the random seed for no error.
             
