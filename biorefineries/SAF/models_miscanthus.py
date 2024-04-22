@@ -38,7 +38,6 @@ load_preferences_and_process_settings(T='K',
 sys.set_tolerance(rmol=1e-6, mol=1e-5, maxiter=400)
 tea_SAF = create_SAF_tea(sys=sys)
 sys.operating_hours = tea_SAF.operating_days * 24
-sys.simulate()
 
 
 def set_price_of_streams():
@@ -565,7 +564,7 @@ metrics.extend((Metric('GWP - jet', get_GWP_jet, 'g CO2-eq/MJ jet fuel', 'LCA'),
 
 def create_model(system=sys,
                  metrics=metrics,
-                 N=2000,
+                 N=2000 ,
                  rule='L',
                  notify_runs=10,):
     model = Model(sys,metrics)
