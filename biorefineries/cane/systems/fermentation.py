@@ -8,167 +8,14 @@ import flexsolve as flx
 import thermosteam as tmo
 from biosteam import SystemFactory
 from .pretreatment import create_cane_combined_1_and_2g_pretreatment
-from biorefineries.cellulosic import create_cellulosic_fermentation_system
+from biorefineries.cellulosic import create_cellulosic_fermentation_system, add_urea_nutrient
 from warnings import warn
 from .. import streams as s
 from .. import units
 
 __all__ = (
-    'add_urea_MgSO4_nutrients',
-    'add_urea_nutrient',
     'create_sucrose_fermentation_system',
 )
-
-# %% Fermentation extensions
-
-def add_urea_MgSO4_nutrients(fermentor, 
-        seedtrain=None,
-        seed_train_requirement=None,
-        fermentor_requirement=None,
-    ):
-    urea = bst.Stream('urea', price=90/907.185) # https://www.alibaba.com/product-detail/High-Quality-UREA-Fertilizer-Factory-price_1600464698965.html?spm=a2700.galleryofferlist.topad_classic.d_title.a69046eeVn83ML
-    MgSO4 = bst.Stream('MgSO4', price=110/907.185) # https://www.alibaba.com/product-detail/Magnesium-Sulfate-Sulphate-Sulphate-Magnesium-Sulfate_1600305131579.html?spm=a2700.galleryofferlist.topad_creative.d_image.ad602e15oP8kqh
-    Urea_storage = bst.StorageTank('Urea_storage', urea)
-    MgSO4_storage = bst.StorageTank('MgSO4_storage', MgSO4)
-    if seedtrain:
-        urea_1 = bst.Stream(
-            'urea_1',
-            Urea=26,
-            units='kg/hr'
-        )
-        urea_2 = bst.Stream(
-            'urea_2',
-            Urea=116,
-            units='kg/hr',
-        )
-        MgSO4_1 = bst.Stream(
-            'MgSO4_1',
-             MgSO4=211,
-             units='kg/hr',
-        )
-        MgSO4_2 = bst.Stream(
-            'MgSO4_2',
-            MgSO4=948,
-            units='kg/hr',
-        )
-        S301 = bst.MockSplitter('S301', Urea_storage-0, outs=(urea_1, urea_2))
-        S302 = bst.MockSplitter('S302', MgSO4_storage-0, outs=(MgSO4_1, MgSO4_2))
-        nutrients_1 = (urea_1, MgSO4_1)
-        nutrients_2 = (urea_2, MgSO4_2)
-        seedtrain.ins.extend(nutrients_1)
-        fermentor.ins.extend(nutrients_2)
-        @seedtrain.add_specification(run=True)
-        def adjust_nutrients_to_seed_train():
-            *feeds, urea, MgSO4 = seedtrain.ins
-            if seed_train_requirement:
-                urea_demand, MgSO4_demand = seed_train_requirement(
-                    seedtrain, [i for i in feeds if i.phase != 'g']
-                )
-            else:
-                F_vol = sum([i.F_vol - i.ivol['Lipid'] for i in feeds if i.phase != 'g'])
-                urea_demand = 0.5 * F_vol
-                MgSO4_demand = 0.04 * F_vol
-            urea.imass['Urea'] = urea_demand
-            MgSO4.imass['MgSO4'] = MgSO4_demand
-            
-        @fermentor.add_specification(run=True, impacted_units=[Urea_storage, MgSO4_storage])
-        def adjust_urea_and_MgSO4_feed_to_fermentor():
-            feed, seed, *others, urea, MgSO4, = fermentor.ins
-            if fermentor_requirement:
-                urea_demand, MgSO4_demand = fermentor_requirement(
-                    fermentor, [i for i in [feed, *others] if i.phase != 'g']
-                )
-            else:
-                if 'Lipid' in feed.chemicals:
-                    F_vol = sum([i.F_vol - i.ivol['Lipid'] for i in others if i.phase != 'g'], feed.F_vol - feed.ivol['Lipid'])
-                else:
-                    F_vol = sum([i.F_vol for i in others if i.phase != 'g'], feed.F_vol)
-                urea_demand = 0.5 * F_vol
-                MgSO4_demand = 0.04 * F_vol
-            urea.imass['Urea'] = urea_demand
-            MgSO4.imass['MgSO4'] = MgSO4_demand
-            S301.ins[0].mix_from(S301.outs)
-            S302.ins[0].mix_from(S302.outs)
-    else:
-        fermentor.ins.append(Urea_storage-0)
-        fermentor.ins.append(MgSO4_storage-0)
-        @fermentor.add_specification(run=True, impacted_units=[Urea_storage, MgSO4_storage])
-        def adjust_nutrients_feed_to_fermentor():
-            feed, *others, urea, MgSO4, = fermentor.ins
-            if fermentor_requirement:
-                urea_demand, MgSO4_demand = fermentor_requirement(
-                    fermentor, [i for i in [feed, *others] if i.phase != 'g']
-                )
-            else:
-                if 'Lipid' in feed.chemicals:
-                    F_vol = sum([i.F_vol - i.ivol['Lipid'] for i in others if i.phase != 'g'], feed.F_vol - feed.ivol['Lipid'])
-                else:
-                    F_vol = sum([i.F_vol for i in others if i.phase != 'g'], feed.F_vol)
-                urea_demand = 0.5 * F_vol
-                MgSO4_demand = 0.04 * F_vol
-            urea.imass['Urea'] = urea_demand
-            MgSO4.imass['MgSO4'] = MgSO4_demand
-
-def add_urea_nutrient(fermentor, seedtrain=None, 
-                      seed_train_requirement=None,
-                      fermentor_requirement=None):
-    urea = bst.Stream('urea', price=90/907.185) # https://www.alibaba.com/product-detail/High-Quality-UREA-Fertilizer-Factory-price_1600464698965.html?spm=a2700.galleryofferlist.topad_classic.d_title.a69046eeVn83ML
-    Urea_storage = bst.StorageTank('Urea_storage', urea)
-    if seedtrain:
-        urea_1 = bst.Stream(
-            'urea_1',
-            Urea=26,
-            units='kg/hr'
-        )
-        urea_2 = bst.Stream(
-            'urea_2',
-            Urea=116,
-            units='kg/hr',
-        )
-        S301 = bst.MockSplitter('S301', Urea_storage-0, outs=(urea_1, urea_2))
-        seedtrain.ins.append(urea_1)
-        fermentor.ins.append(urea_2)
-        @seedtrain.add_specification(run=True)
-        def adjust_nutrients_to_seed_train():
-            *feeds, urea, = seedtrain.ins
-            if seed_train_requirement:
-                urea.imass['Urea'] = seed_train_requirement(seedtrain, [i for i in feeds if i.phase != 'g'])
-            else:
-                F_vol = sum([i.F_vol - i.ivol['Lipid'] for i in feeds if i.phase != 'g'])
-                urea.imass['Urea'] = 0.5 * F_vol
-            
-        @fermentor.add_specification(run=True, impacted_units=[Urea_storage])
-        def adjust_urea_feed_to_fermentor():
-            feed, seed, *others, urea, = fermentor.ins
-            if fermentor_requirement:
-                urea_demand = fermentor_requirement(
-                    fermentor, [i for i in [feed, *others] if i.phase != 'g']
-                )
-            else:
-                if 'Lipid' in feed.chemicals:
-                    F_vol = sum([i.F_vol - i.ivol['Lipid'] for i in others if i.phase != 'g'], feed.F_vol - feed.ivol['Lipid'])
-                else:
-                    F_vol = sum([i.F_vol for i in others if i.phase != 'g'], feed.F_vol)
-                urea_demand = 0.5 * F_vol
-            urea.imass['Urea'] = urea_demand
-            S301.ins[0].mix_from(S301.outs)
-            Urea_storage.ins[0].imol['Urea'] = S301.ins[0].imol['Urea']
-    else:
-        fermentor.ins.append(Urea_storage-0)
-        @fermentor.add_specification(run=True, impacted_units=[Urea_storage])
-        def adjust_nutrients_feed_to_fermentor():
-            feed, *others, urea, = fermentor.ins
-            if fermentor_requirement:
-                urea_demand = fermentor_requirement(
-                    fermentor, [i for i in [feed, *others] if i.phase != 'g'], urea
-                )
-            else:
-                if 'Lipid' in feed.chemicals:
-                    F_vol = sum([i.F_vol - i.ivol['Lipid'] for i in others if i.phase != 'g'], feed.F_vol - feed.ivol['Lipid'])
-                else:
-                    F_vol = sum([i.F_vol for i in others if i.phase != 'g'], feed.F_vol)
-                urea_demand = 0.5 * F_vol
-            Urea_storage.ins[0].imass['Urea'] = urea_demand
   
 @SystemFactory(
     ID='sucrose_fermentation_sys',
@@ -177,7 +24,7 @@ def add_urea_nutrient(fermentor, seedtrain=None,
 )
 def create_sucrose_fermentation_system(ins, outs,
         scrubber=None, product_group=None, Fermentor=None, titer=None,
-        productivity=None, ignored_volume=None, fermentation_reaction=None,
+        productivity=None, fermentation_reaction=None,
         fed_batch=None, add_urea=None, cell_growth_reaction=None, 
         SeedTrain=None, fermentation_kwargs=None,
         seed_train_reaction=None, nutrient_kwargs=None,
@@ -397,10 +244,9 @@ def create_sucrose_fermentation_system(ins, outs,
     
     def get_titer():
         s = R301.outs[1]
-        ignored = s.ivol[ignored_volume] if ignored_volume in s.chemicals else 0.
         ignored_product = P306.outs[0].imass[product_group]
         ignored_product_vol = P306.outs[0].ivol[product_group]
-        return (s.imass[product_group] - ignored_product) / (s.F_vol - ignored_product_vol - ignored)
+        return (s.imass[product_group] - ignored_product) / (s.F_vol - ignored_product_vol)
     R301.get_titer = get_titer
     
     def get_additional_dilution_water():
@@ -437,7 +283,7 @@ def create_sucrose_fermentation_system(ins, outs,
 )
 def create_cane_to_combined_1_and_2g_fermentation(
         ins, outs, titer=None, productivity=None, product_group=None,
-        SeedTrain=None, CoFermentation=None, ignored_volume=None,
+        SeedTrain=None, CoFermentation=None,
         cofermentation_reactions=None,
         seed_train_reactions=None,
         fed_batch=None,
@@ -655,21 +501,10 @@ def create_cane_to_combined_1_and_2g_fermentation(
     
     def get_titer():
         beer = cofermentation.outs[1]
-        # has_ignored_rxn = hasattr(cofermentation, 'lipid_reaction')
-        # if has_ignored_rxn:
-        #     old_mol = beer.mol.copy()
-        #     revrxn = bst.SRxn([
-        #         bst.Rxn('OleicAcid + DiOlein -> Water + TriOlein ', reactant='DiOlein', X=1., basis='mol'),
-        #         bst.Rxn('Glycerol + 3 OleicAcid -> 3 Water + TriOlein ', reactant='Glycerol', X=1., basis='mol'),
-        #     ])
-        #     revrxn(beer)
         feed = EvX.outs[0]
-        ignored = beer.ivol[ignored_volume] if ignored_volume in cofermentation.chemicals else 0.
         ignored_product = feed.imass[product_group] if product_group in feed.chemicals else 0.
         ignored_product_vol = feed.ivol[product_group] if product_group in feed.chemicals else 0.
-        titer = (beer.imass[product_group] - ignored_product) / (beer.ivol['Water', product_group].sum() - ignored_product_vol - ignored)
-        # if has_ignored_rxn:
-        #     beer.mol = old_mol
+        titer = (beer.imass[product_group] - ignored_product) / (beer.ivol['Water', product_group].sum() - ignored_product_vol)
         return titer
     cofermentation.get_titer = get_titer
     cofermentation.titer = titer
