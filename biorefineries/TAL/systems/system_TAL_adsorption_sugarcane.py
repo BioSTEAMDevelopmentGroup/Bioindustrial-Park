@@ -434,7 +434,8 @@ unit_groups += get_more_unit_groups(system=TAL_sys,
                                         'electricity consumption',
                                         'heating duty',
                                         'excess electricity',
-                                        ]
+                                        ],
+                         has_brine_facility = False
                          )
 
 
