@@ -734,9 +734,9 @@ D = shape.Triangle(0.75, 0.9, 0.948-1e-6)
 def set_R301_glucan_conversion(X): R301.saccharification_rxns[2].X = X
 
 
-D = shape.Triangle(0.8, 1., 1.2)
+D = shape.Triangle(1.118*0.8, 1.118, 1.118*1.2)
 @param(name='Productivity', element=R302, kind='coupled', units='g/L/hr',
-       baseline=1., distribution=D)
+       baseline=1.118, distribution=D)
 def set_HP_productivity(productivity):
     if not lock_productivity:
         spec.spec_3 = productivity
@@ -747,19 +747,31 @@ D = shape.Triangle(5., 10., 15.)
 def set_CSL_loading(loading): R302.CSL_loading = loading
 
 
-D = shape.Triangle(0.65*0.8, 0.65, 0.65*1.2) # +/- 20% of baseline
+D = shape.Triangle(0.76*0.8, 0.76, 0.76*1.2) # +/- 20% of baseline
 @param(name='3-Hydroxypropionic acid yield', element=R302, kind='coupled', units='% theoretical',
-        baseline=0.65, distribution=D)
+        baseline=0.76, distribution=D)
 def set_R302_HP_yield(X):
     if not lock_yield:
         spec.spec_1 = X
 
-D = shape.Triangle(101.*0.8, 101., 101.*1.2) # +/- 20% of baseline
+D = shape.Triangle(126.*0.8, 126., 126.*1.2) # +/- 20% of baseline
 @param(name='3-Hydroxypropionic acid titer', element=R302, kind='coupled', units='g/L',
-        baseline=101., distribution=D)
+        baseline=126., distribution=D)
 def set_R302_HP_titer(X):
     if not lock_titer:
         spec.spec_2 = X
+    
+D = shape.Triangle(0.45*0.8, 0.45, 0.45*1.2) # +/- 20% of baseline
+@param(name='Biomass C frac from CO2', element=R302, kind='coupled', units='mol%',
+        baseline=0.45, distribution=D)
+def set_biomass_C_frac_From_CO2(X):
+    R302.fraction_of_biomass_C_from_CO2 = X
+
+D = shape.Uniform(1., 3.) # +/- 20% of baseline
+@param(name='CO2 rate safety factor', element=R302, kind='coupled', units='%',
+        baseline=2., distribution=D)
+def set_CO2_rate_safety_factor(X):
+    R302.CO2_safety_factor = X
     
 ##############################################################################################
 
