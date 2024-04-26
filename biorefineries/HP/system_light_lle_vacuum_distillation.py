@@ -58,6 +58,7 @@ from biosteam import SystemFactory
 from biorefineries.cellulosic import create_facilities
 # from lactic.hx_network import HX_Network
 
+IQ_interpolation = flx.IQ_interpolation
 # # Do this to be able to show more streams in a diagram
 # bst.units.Mixer._graphics.edge_in *= 2
 
@@ -250,6 +251,12 @@ def create_HP_sys(ins, outs):
     # For diluting concentrated, inhibitor-reduced hydrolysate
     dilution_water = Stream('dilution_water', units='kg/hr')
     
+    fresh_CO2_fermentation = Stream('fresh_CO2_fermentation', units='kg/hr',
+                              price=price['Liquid carbon dioxide'],
+                              P=1*101325.)
+    
+       
+    makeup_MEA_A301 = Stream('makeup_MEA_A301', units='kg/hr', price=price['Monoethanolamine'])
     
     # =============================================================================
     # Conversion units
@@ -305,18 +312,32 @@ def create_HP_sys(ins, outs):
                         outs = ('to_seedtrain', 'to_cofermentation'),
                         split = 0.07) # split = inoculum ratio
     
+    S303 = bst.FakeSplitter('S303', ins=fresh_CO2_fermentation,
+                        outs = ('CO2_to_seedtrain', 'CO2_to_cofermentation'),
+                        )
+    @S303.add_specification(run=False)
+    def S303_spec():
+        S303.ins[0].imol['CO2'] = S303.outs[0].imol['CO2'] + S303.outs[1].imol['CO2']
+      
+        
     # Cofermentation
     
     R302 = units.CoFermentation('R302', 
-                                    ins=(S302-1, '', CSL, fermentation_lime),
+                                    ins=(S302-1, '', CSL, fermentation_lime, S303-1, ''),
                                     outs=('fermentation_effluent', 'CO2_fermentation'),
                                     vessel_material='Stainless steel 316',
-                                    neutralization=True)
+                                    neutralization=False)
     
     @R302.add_specification(run=False)
-    def include_seed_CSL_in_cofermentation(): # note: effluent always has 0 CSL
+    def R302_spec(): # note: effluent always has 0 CSL
+        # R302.show(N=100)
         R302._run()
-        R302.ins[2].F_mass*=1./(1-S302.split[0])
+        if R302.ins[2].F_mol:
+            R302.ins[2].F_mass*=1./(1-S302.split[0])
+        R302._run()
+        S303._specifications[0]()
+        # K301.specifications[0]()
+        
     # R302.specification = include_seed_CSL_in_cofermentation
     
     # ferm_ratio is the ratio of conversion relative to the fermenter
@@ -324,6 +345,74 @@ def create_HP_sys(ins, outs):
     
     T301 = units.SeedHoldTank('T301', ins=R303-0, outs=1-R302)
     
+    M305 = bst.Mixer('M305', ins=(R302-1, R303-1,), outs=('mixed_fermentation_and_seed_vent'))
+    
+    A301 = bst.AmineAbsorption('A301', ins=(M305-0, makeup_MEA_A301, 'A301_makeup_water'), outs=('absorption_vent', 'captured_CO2'),
+                               CO2_recovery=0.52)
+    
+    def A301_obj_f(CO2_recovery):
+        A301.CO2_recovery = CO2_recovery
+        A301._run()
+        K301.specifications[0]()
+        R302.specifications[0]()
+        return R302.fresh_CO2_required
+
+    A301.bypass = False
+    
+    @A301.add_specification(run=False)
+    def A301_spec():
+        A301.bypass = False
+        if not R302.fraction_of_biomass_C_from_CO2 > 0.: A301.bypass = True
+        if not A301.bypass:
+            # A301.outs[1].phase='g'
+            A301._run()
+            if A301_obj_f(1-1e-3)>0.:
+                pass
+            else:
+                IQ_interpolation(A301_obj_f, 1e-3, 1-1e-3, x=0.5, ytol=1e-4)
+            A301.outs[1].phase='g'
+        else:
+            for i in A301.ins[1:]: i.empty()
+            A301.outs[1].empty()
+            A301.outs[0].copy_like(A301.ins[0])
+            
+            
+    K301 = units.IsothermalCompressor('K301', ins=A301-1, outs=('recycled_CO2'), 
+                                    P=3e7, 
+                                    # vle=True,
+                                    eta=0.6,
+                                    driver='Electric motor',
+                                    )
+    
+    K301-0-5-R302
+    
+    K301.bypass = False
+    
+    K301_design = K301._design
+    K301_cost = K301._cost
+    @K301.add_specification(run=False)
+    def K301_spec():
+        K301.bypass = False
+        if not R302.fraction_of_biomass_C_from_CO2 > 0.: K301.bypass = True
+        if not K301.bypass:
+            K301._design = K301_design
+            K301._cost = K301_cost
+            # A301.outs[1].phases=('g','l')
+            s1, s2 = K301.ins[0], K301.outs[0]
+            for Kstream in s1, s2:
+                Kstream.imol['CO2_compressible'] = Kstream.imol['CO2']
+                Kstream.imol['CO2'] = 0.
+            K301._run()
+            for Kstream in s1, s2:
+                Kstream.imol['CO2'] = Kstream.imol['CO2_compressible']
+                Kstream.imol['CO2_compressible'] = 0.
+            K301.outs[0].phase='l'
+        else:
+            K301._design = lambda: 0
+            K301._cost = lambda: 0
+            for i in K301.ins: i.empty()
+            for i in K301.outs: i.empty()
+        
     
     conversion_group = UnitGroup('conversion_group', 
                                    units=(H301, M301, R301, S301, F301, F301_P,
@@ -839,7 +928,7 @@ def create_HP_sys(ins, outs):
                                                  # D401,
                                                  # D403,
                                                  ],
-                                              cache_network=False,
+                                              # cache_network=True,
                                               )
     
     def HXN_no_run_cost():
@@ -882,7 +971,7 @@ def create_HP_sys(ins, outs):
 
 HP_sys = create_HP_sys()
 # HP_sys.subsystems[-1].relative_molar_tolerance = 0.005
-HP_sys.set_tolerance(mol=1e-1, rmol=1e-3, subsystems=True)
+HP_sys.set_tolerance(mol=1e-2, rmol=1e-3, subsystems=True)
 
 u = flowsheet.unit
 s = flowsheet.stream
