@@ -270,6 +270,11 @@ GWP_CFs = {
     'natural_gas': 0.40, # NA NG from shale and conventional recovery
     'electricity': 0.48, # in kg CO2-eq/kWh https://www.eia.gov/tools/faqs/faq.php?id=74&t=11
     'MEA': 3.4062, # ecoinvent 3.8 ethanolamine production, RoW [monoethanolamine]
+    'ash':0.01, # from Production of Sustainable Aviation Fuels in Petroleum Refineries: Evaluation of New Bio-Refinery Concepts
+    'Syndol_catalyst':10+1, # production+disposal, assume prodution=10 based on similar chemicalss
+    'first_catalyst':10+1, # production+disposal, assume prodution=10 based on similar chemicalss
+    'second_catalyst':10+1, # production+disposal, assume prodution=10 based on similar chemicalss
+    'Como_catalyst':9.52+1 # production+disposal, from Production of Sustainable Aviation Fuels in Petroleum Refineries: Evaluation of New Bio-Refinery Concepts
     }
 
 

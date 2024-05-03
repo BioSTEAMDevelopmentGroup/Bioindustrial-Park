@@ -43,6 +43,8 @@ def preprocessing_sys(ins,outs):
     feedstock,imbibition_water,rvf_wash_water,H3PO4,lime,polymer = ins
     bagasse_to_ethanol,bagasse_to_CHP,filter_cake,fiber_fines,condensate,concentrated_juice = outs
     
+    H3PO4_storage = bst.StorageTank('H3PO4_storage', ins=H3PO4, outs='')
+    
     U101 = bst.ConveyingBelt('U101', ins=feedstock)
     U102 = bst.MagneticSeparator('U102', ins=U101-0, outs=('A','B'))
     U103 = bst.Shredder('U103', ins=U102-0,outs='')
@@ -94,7 +96,7 @@ def preprocessing_sys(ins,outs):
     H101 = bst.HXutility('H101',ins=T101-0,T=343.15,rigorous=True)
             
     # Mix with acid #
-    T102 = bst.MixTank('T102',ins=[H101-0,H3PO4])
+    T102 = bst.MixTank('T102',ins=[H101-0,H3PO4_storage-0])
             
     # Pump solution #
     P101 = bst.Pump('P101',ins=T102-0)
@@ -248,11 +250,11 @@ def pretreatment_sys(ins,outs):
           dict(ID='U302_cell_mass'),
           dict(ID='U302_to_WWT'),
           dict(ID='D302_to_WWT'),
-          dict(ID='ethanol_to_storage')])
+          dict(ID='ethanol')])
           
 def fermentation_sys(ins,outs):
     pretreated_bagasse,concentrated_juice,enzyme_M301,water_M301,CSL,DAP,water_U301 = ins
-    U301_vent,U302_cell_mass,U302_to_WWT,D302_to_WWT,ethanol_to_storage = outs
+    U301_vent,U302_cell_mass,U302_to_WWT,D302_to_WWT,ethanol = outs
     
     M301 = _units.EnzymeHydrolysateMixer('M301',ins=(pretreated_bagasse,enzyme_M301,water_M301),outs='',
                                          enzyme_loading=20,solids_loading=0.2)
@@ -343,10 +345,10 @@ def fermentation_sys(ins,outs):
     #                           order=('Ethanol', 'Water'))
                                     
     # Condense ethanol product
-    S301_H = bst.HXutility('S301_H', ins=D302-0, outs=ethanol_to_storage,
+    S301_H = bst.HXutility('S301_H', ins=D302-0, outs='ethanol_to_storage',
                            V=0, T=20+273.15)
    
-    
+    ethanol_storage = bst.StorageTank('ethanol_storage', ins=S301_H-0, outs=ethanol,tau=7*24)
     
 #%%
 
@@ -356,7 +358,7 @@ def fermentation_sys(ins,outs):
          dict(ID='Syndol_catalyst'),
          dict(ID='first_catalyst'),
          dict(ID='second_catalyst'),
-         dict(ID='ethanol_to_storage'),
+         dict(ID='ethanol'),
          dict(ID='hydrogen'),
          dict(ID='Como_catalyst'),],
     outs=[dict(ID='F401_to_WWT'),
@@ -372,10 +374,10 @@ def fermentation_sys(ins,outs):
           dict(ID='spent_catalyst_R404'),])
           
 def upgrading_sys(ins,outs):
-    NaOH,Syndol_catalyst,first_catalyst,second_catalyst,ethanol_to_storage,hydrogen,Como_catalyst = ins
+    NaOH,Syndol_catalyst,first_catalyst,second_catalyst,ethanol,hydrogen,Como_catalyst = ins
     F401_to_WWT,D401_heavy_impurities,D402_top_product,CH4_C2H6,gasoline,jet_fuel,diesel,spent_catalyst_R401,spent_catalyst_R402,spent_catalyst_R403,spent_catalyst_R404 = outs
     
-    P401 = bst.Pump('P401',ins=ethanol_to_storage,P=4.5*101325)
+    P401 = bst.Pump('P401',ins=ethanol,P=4.5*101325)
     M400 = bst.Mixer('M401', (P401-0,''))
     H400 = bst.HXutility('H400',ins=M400-0,V=1,rigorous=True)
 
@@ -490,18 +492,22 @@ def upgrading_sys(ins,outs):
                                   is_divided=False)
 
     # Standard temperature for storing gasoline is around 15 C
-    H406 = bst.HXutility('H406', ins=D404-0,outs=gasoline,T=15+273.15,rigorous=True)
+    H406 = bst.HXutility('H406', ins=D404-0,outs='gasoline1',T=15+273.15,rigorous=True)
 
     # Standard temperature for storing jet fuel is around 15 C
-    H407 = bst.HXutility('H407', ins=D405-0,outs=jet_fuel,T=15+273.15,rigorous=True)
+    H407 = bst.HXutility('H407', ins=D405-0,outs='jet_fuel1',T=15+273.15,rigorous=True)
 
     # Standard temperature for storing diesel is around 20 C
-    H408 = bst.HXutility('H408', ins=D405-1,outs=diesel,T=20+273.15,rigorous=True)
+    H408 = bst.HXutility('H408', ins=D405-1,outs='diesel1',T=20+273.15,rigorous=True)
     
-
-
-
-
+    gasoline_storage = bst.StorageTank('gasoline_storage', ins=H406-0, outs=gasoline, tau=7*24, vessel_type='Floating roof', vessel_material='Carbon steel')
+    
+    jet_storage = bst.StorageTank('jet_storage', ins=H407-0, outs=jet_fuel, tau=7*24, vessel_type='Floating roof', vessel_material='Carbon steel')
+    
+    diesel_storage = bst.StorageTank('diesel_storage', ins=H408-0, outs=diesel, tau=7*24, vessel_type='Floating roof', vessel_material='Carbon steel')
+    
+    
+    
 #%%
 
 # Complete energycane to SAF system
@@ -734,6 +740,10 @@ def SAF_sys(ins,outs):
     
     HXN = bst.HeatExchangerNetwork('HXN',cache_network=True)
     
+    
+    
+    
+    
 #%% System setup and process groups
 
 sys = SAF_sys()
@@ -771,5 +781,5 @@ for i in range(len(process_groups)):
     process_groups_dict[group.name] = group           
                  
 
-
-                            
+raw_meterial_storage = UnitGroup('raw_meterial_storage', units=(F.H3PO4_storage, F.DAP_storage, F.CSL_storage))
+product_storage = UnitGroup('product_storage', units=(F.ethanol_storage, F.gasoline_storage, F.jet_storage, F.diesel_storage))
