@@ -139,7 +139,7 @@ class OxidativeCleavageReactor(bst.CSTR):
 
     #Based on [3], diol formed from oleyl alcohol almost completely (99%) gets consumed in this reactor.
     #Information on methyl oleate diol was not provided in [3]
-    #A total consumption of 97% was assumed
+    #A conservative estimate of a total consumption of 98% was assumed
     #Series reaction conversion for MDHSA to Nonanal and Ox-nonanoic acid can be calculated from [2] as 95.4%
     #No information on the presence of Nonanal and Ox-nonanoic acid intermediates was provided in [1],[2]
     #Therfore, it was assumed almost of all the intermediate gets consumed in the paralell reactions(99%)
@@ -215,8 +215,8 @@ class OxidativeCleavageReactor(bst.CSTR):
         vent,effluent, = self.outs 
         effluent.mix_from(self.ins)   
         self.reactions(effluent)
-        effluent.T = self.T
         effluent.P = self.P
+        effluent.T = self.T
         vent.empty()
         vent.phase = 'g'
         vent.copy_flow(effluent,('Carbon_dioxide','Oxygen','Nitrogen'),remove = True)
@@ -395,38 +395,28 @@ class Methanolseparationsystem(bst.Unit,isabstract = True):
     def _run(self):
             feed = self.ins[0]
             top,bottom, = self.outs
-            if  feed.imass['Methanol']/feed.F_mass < 0.32:#infeasible below this fraction
-                self.heat_exchanger1.ins[0].copy_like(feed)
-                self.heat_exchanger1._run()
-                bottom.copy_like(self.heat_exchanger1.outs[0])
-            elif feed.imass['Methanol']/feed.F_mass > 0.80:#infeasible above this fraction
-                self.heat_exchanger1.ins[0].copy_like(feed)
-                self.heat_exchanger1._run()
-                top.copy_like(self.heat_exchanger1.outs[0])
-            else:
+            try:
                 self.distillation_column1.ins[0].copy_like(feed)
                 self.distillation_column1._run()
                 self.heat_exchanger1.ins[0].copy_like(self.distillation_column1.outs[0])
                 self.heat_exchanger1._run()
                 top.copy_like(self.heat_exchanger1.outs[0])
                 bottom.copy_like(self.distillation_column1.outs[1])    
+            except:
+                if  feed.imass['Methanol']/feed.F_mass < 0.70:#infeasible below this fraction
+                    self.heat_exchanger1.ins[0].copy_like(feed)
+                    self.heat_exchanger1._run()
+                    bottom.copy_like(self.heat_exchanger1.outs[0])
+                if feed.imass['Methanol']/feed.F_mass > 0.70:#infeasible above this fraction
+                    self.heat_exchanger1.ins[0].copy_like(feed)
+                    self.heat_exchanger1._run()
+                    top.copy_like(self.heat_exchanger1.outs[0]) #methanol is sent out directly as a product
+                    
     def _design(self):
-        feed = self.ins[0]
-        if  feed.imass['Methanol']/feed.F_mass < 0.32:#infeasible below this fraction
-            self.heat_exchanger1._design()
-        elif feed.imass['Methanol']/feed.F_mass > 0.80:#infeasible above this fraction
-            self.heat_exchanger1._design()
-        else:
             self.distillation_column1._design()
             self.heat_exchanger1._design()   
           
     def _cost(self):
-        feed = self.ins[0]
-        if  feed.imass['Methanol']/feed.F_mass < 0.32:#infeasible below this fraction
-            self.heat_exchanger1._cost()
-        elif feed.imass['Methanol']/feed.F_mass > 0.80:#infeasible above this fraction
-            self.heat_exchanger1._cost()            
-        else:
             self.distillation_column1._cost()
             self.heat_exchanger1._cost()              
                 

@@ -22,6 +22,7 @@ __all__ = ('prices_per_Kg',
 
 #Freds Producers price index was used to update the prices of chemicals to 2023 prices[1]
 #Index was chosen for the general category of all chemicals and allied products
+PPI_1984 = 100 # Dec 1984 (Chemical manufacturing industry)[39]
 PPI_2016 = 270.400 #Dec 2016
 PPI_2021 = 349.906 #Dec 2021
 PPI_2022 = 357.404 #Dec 2022
@@ -48,6 +49,7 @@ ratio_2023from2022 = PPI_2023/PPI_2022
 ratio_2023from1997 = PPI_2023/PPI_1997
 ratio_2023from2016 = PPI_2023/PPI_2016
 ratio_2023from2018 = PPI_2023/PPI_2018
+ratio_2023from1984 = PPI_2023/PPI_1984
 ratio_utility_2023from2016 = PPI_utility_2023/PPI_utility_2016
 ratio_utility_2023from2022 = PPI_utility_2023/PPI_utility_2022 
 ratio_utility_2023from2017_2022_period_mean = PPI_utility_2023/np.mean(PPI_utility_2017_2022)
@@ -63,6 +65,10 @@ prices_per_Kg = {
         'Methanol':0.792*ratio_2023from2021,#[2]
         'Resin': 106, #2023 price, [3]      
         'Sodium_methoxide': 2.93*ratio_2023from2016,# [4]
+        'biodiesel_sold_as_product': 1.35, #[37],[38] based on general biodiesel prices and mass of biodiesel
+        'Oleic acid_1': 1.62*ratio_2023from2021,
+        'Oleic acid_2': 1.60*ratio_2023from2021,
+        'Price of ozone1': 1.03*ratio_2023from1984 #[39]
         }
 
 #feedstock prices
@@ -96,6 +102,7 @@ product_prices_per_kg = {
         'Crude_glycerol': 0.16*ratio_2023from2022,#Prices based on [14]
         'Crude_methanol':0.792*ratio_2023from2021,#[2]
         }
+
 
 
 #Bulk prices for several chemicals were not available
@@ -187,6 +194,7 @@ prices_per_stream = { #input prices
                       'methanol':prices_per_Kg['Methanol'],
                       'catalyst':0.25*prices_per_Kg['Sodium_methoxide'] + 0.75*prices_per_Kg['Methanol'],
                       'HCl': prices_per_Kg['HCl'],
+                      'biodiesel_sold_as_product': prices_per_Kg['biodiesel_sold_as_product'],
                       
                       #product prices
                       'crude_glycerol':product_prices_per_kg['Crude_glycerol'],
@@ -212,11 +220,10 @@ prices_per_stream = { #input prices
 #%% Global warming potential factors (kg CO2-eq/Kg)
 
 lbsperMWh_to_KgsperKWh = 4.53592e-4  
-LHV_of_soybean_oil = 39.2 #MJ/kg [37]
-kgCo2eqperMJ_to_perKg = 0.0126*LHV_of_soybean_oil           
+
 GWP_factors_per_Kg = {  #inputs
                         'HoSun_oil':0.76, #Based on GWP of sunflower oil (incl. iLUC and biogenic CO2 uptake) [25]                                               
-                        'HoySoy_oil':kgCo2eqperMJ_to_perKg,#Based on GWP of high oleic soybean oil includes farming and crushing impacts using mass based allocation [35]
+                        'HoySoy_oil': 0.485,#Based on GWP of commodity soybean oil as it is same for HO variety (excluding biogenic emissions), obtained value for GREET [35],[26]
                         'Citric_acid': 1.4821,#GHG-100 GREET 2022 [26]
                         'Hydrogen_peroxide':1.0813, #GHG-100 GREET 2022 [26]
                         'Tungstic_acid':68.5,#Value based on midpoint results available for tungsten carbide[27]
@@ -358,23 +365,23 @@ Ox_time_upper = 10
 
 #Oxidative cleavage reactions
 #Oxidative cleavage reaction primary
-Oxcp_lower_bound = 0.90#TODO: random
+Oxcp_lower_bound = 0.80#TODO: random
 Oxcp_upper_bound = 0.98#TODO: random
 
 #Oxidative cleavage reaction of intermediates to form azelaic acid and pelargonic acid
-Ox_lower_bound = 0.90 #TODO: random
+Ox_lower_bound = 0.80 #TODO: random
 Ox_upper_bound = 0.98 #TODO: random
 
 #Dihydroxylation reaction conversion
-Dih_lower_bound = 0.86 #Lowest reported
+Dih_lower_bound = 0.70 #Lowest reported
 Dih_upper_bound = 0.99 #Highest reported
 
 #Ranges for mimimum and maximum catalyst reuse were not available and were assumed
 #TODO: find ranges 
 TA_reuse_lower = 1
-TA_reuse_upper = 15
+TA_reuse_upper = 10
 CA_reuse_lower = 1
-CA_reuse_upper = 15
+CA_reuse_upper = 10
 
 #Turbogen efficiency and boiler efficiencies were varied uniformly based on ranges available in literature
 Turbogen_eff_lower = 0.80 #[33] #TODO:random 
@@ -405,19 +412,19 @@ coupled_para_dist = {'Tungstic acid moles': chaospy.Triangle(TA_moles_lower_boun
                      'Crude_oil_composition':chaospy.Uniform(Oil_compo_lower,Oil_compo_upper)
                      }
 
-environmental_facs_dist = {'Oil_GWP':{'HoSun_oil':chaospy.Uniform(Lower_bound_factor_50_per*GWP_factors_per_Kg['HoSun_oil'],Upper_bound_factor_50_per*GWP_factors_per_Kg['HoSun_oil']),
-                                      'HoySoy_oil':chaospy.Uniform(Lower_bound_factor_50_per*GWP_factors_per_Kg['HoySoy_oil'],Upper_bound_factor_50_per*GWP_factors_per_Kg['HoySoy_oil'])},
-                           'Tungstic_acid':chaospy.Uniform(Lower_bound_factor_50_per*GWP_factors_per_Kg['Tungstic_acid'],Upper_bound_factor_50_per*GWP_factors_per_Kg['Tungstic_acid']),
-                           'Cobalt_acetate':chaospy.Uniform(Lower_bound_factor_50_per*GWP_factors_per_Kg['Cobalt_acetate'],Upper_bound_factor_50_per*GWP_factors_per_Kg['Cobalt_acetate']),
-                           'HCl':chaospy.Uniform(Lower_bound_factor_50_per*GWP_factors_per_Kg['HCl'],Upper_bound_factor_50_per*GWP_factors_per_Kg['HCl']),
-                           'Resin':chaospy.Uniform(Lower_bound_factor_50_per*GWP_factors_per_Kg['Resin'],Upper_bound_factor_50_per*GWP_factors_per_Kg['Resin']),
-                           'Sodium methoxide':chaospy.Uniform(Lower_bound_factor_50_per*GWP_factors_per_Kg['Sodium methoxide'],Upper_bound_factor_50_per*GWP_factors_per_Kg['Sodium methoxide']),
-                           'Heptane':chaospy.Uniform(Lower_bound_factor_50_per*GWP_factors_per_Kg['Heptane'],Upper_bound_factor_50_per*GWP_factors_per_Kg['Heptane']),
-                           'Cooling_tower_chemicals': chaospy.Uniform(Lower_bound_factor_50_per*Utility_GWP_factors['Cooling_tower_chemicals'],Upper_bound_factor_50_per*Utility_GWP_factors['Cooling_tower_chemicals']),
-                           'Boiler_chems':chaospy.Uniform(Lower_bound_factor_50_per*Utility_GWP_factors['Boiler_chems'],Upper_bound_factor_50_per*Utility_GWP_factors['Boiler_chems']),
-                           'Lime_boiler':chaospy.Uniform(Lower_bound_factor_50_per*Utility_GWP_factors['Lime_boiler'],Upper_bound_factor_50_per*Utility_GWP_factors['Lime_boiler']),
-                           'Electricity':chaospy.Uniform(Lower_bound_factor_50_per*Utility_GWP_factors['Electricity'],Upper_bound_factor_50_per*Utility_GWP_factors['Electricity']),
-                           'Hydrogen peroxide':chaospy.Uniform(Lower_bound_factor_50_per*GWP_factors_per_Kg['Hydrogen_peroxide'],Upper_bound_factor_50_per*GWP_factors_per_Kg['Hydrogen_peroxide']),
+environmental_facs_dist = {'Oil_GWP':{'HoSun_oil':chaospy.Uniform(Lower_bound_factor_25_per*GWP_factors_per_Kg['HoSun_oil'],Upper_bound_factor_25_per*GWP_factors_per_Kg['HoSun_oil']),
+                                      'HoySoy_oil':chaospy.Uniform(Lower_bound_factor_25_per*GWP_factors_per_Kg['HoySoy_oil'],Upper_bound_factor_25_per*GWP_factors_per_Kg['HoySoy_oil'])},
+                           'Tungstic_acid':chaospy.Uniform(Lower_bound_factor_25_per*GWP_factors_per_Kg['Tungstic_acid'],Upper_bound_factor_25_per*GWP_factors_per_Kg['Tungstic_acid']),
+                           'Cobalt_acetate':chaospy.Uniform(Lower_bound_factor_25_per*GWP_factors_per_Kg['Cobalt_acetate'],Upper_bound_factor_25_per*GWP_factors_per_Kg['Cobalt_acetate']),
+                           'HCl':chaospy.Uniform(Lower_bound_factor_25_per*GWP_factors_per_Kg['HCl'],Upper_bound_factor_25_per*GWP_factors_per_Kg['HCl']),
+                           'Resin':chaospy.Uniform(Lower_bound_factor_25_per*GWP_factors_per_Kg['Resin'],Upper_bound_factor_25_per*GWP_factors_per_Kg['Resin']),
+                           'Sodium methoxide':chaospy.Uniform(Lower_bound_factor_25_per*GWP_factors_per_Kg['Sodium methoxide'],Upper_bound_factor_25_per*GWP_factors_per_Kg['Sodium methoxide']),
+                           'Heptane':chaospy.Uniform(Lower_bound_factor_25_per*GWP_factors_per_Kg['Heptane'],Upper_bound_factor_25_per*GWP_factors_per_Kg['Heptane']),
+                           'Cooling_tower_chemicals': chaospy.Uniform(Lower_bound_factor_25_per*Utility_GWP_factors['Cooling_tower_chemicals'],Upper_bound_factor_25_per*Utility_GWP_factors['Cooling_tower_chemicals']),
+                           'Boiler_chems':chaospy.Uniform(Lower_bound_factor_25_per*Utility_GWP_factors['Boiler_chems'],Upper_bound_factor_25_per*Utility_GWP_factors['Boiler_chems']),
+                           'Lime_boiler':chaospy.Uniform(Lower_bound_factor_25_per*Utility_GWP_factors['Lime_boiler'],Upper_bound_factor_25_per*Utility_GWP_factors['Lime_boiler']),
+                           'Electricity':chaospy.Uniform(Lower_bound_factor_25_per*Utility_GWP_factors['Electricity'],Upper_bound_factor_25_per*Utility_GWP_factors['Electricity']),
+                           'Hydrogen peroxide':chaospy.Uniform(Lower_bound_factor_25_per*GWP_factors_per_Kg['Hydrogen_peroxide'],Upper_bound_factor_25_per*GWP_factors_per_Kg['Hydrogen_peroxide']),
 }
                             
 #%%
@@ -456,6 +463,9 @@ environmental_facs_dist = {'Oil_GWP':{'HoSun_oil':chaospy.Uniform(Lower_bound_fa
 #[33]https://www.energy.gov/sites/prod/files/2016/09/f33/CHP-Steam%20Turbine.pdf
 #[34]https://iea-etsap.org/E-TechDS/PDF/I01-ind_boilers-GS-AD-gct.pdf#:~:text=The%20amount%20of%20input%20fuel%20depends%20on%20the,be%20improved%20by%20preventing%20and%2For%20recovering%20heat%20loss.
 
-#[35]https://doi-org.proxy2.library.illinois.edu/10.1111/j.1467-7652.2009.00408.x
-#[36]https://doi-org.proxy2.library.illinois.edu/10.1002/bbb.2462
-#[37]https://feedtables.com/content/soybean-oil
+#[35]https://onlinelibrary-wiley-com.proxy2.library.illinois.edu/doi/full/10.1002/bbb.2462
+#[36]https://doi-org.proxy2.library.illinois.edu/10.1111/j.1467-7652.2009.00408.x
+#[37] https://www.aqua-calc.com/calculate/volume-to-weight
+#[38]https://afdc.energy.gov/fuels/prices.html
+#[39]https://fred.stlouisfed.org/series/PCU325325
+#[40]Large-Scale Production and Application of Highly Concentrated Ozone HANS-PETER KLEIN, BBC Brown Boveri & Cie., CH-8050, Z0rich, Switzerland

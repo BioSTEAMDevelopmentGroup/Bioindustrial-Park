@@ -1,8 +1,7 @@
-# -*- coding: utf-8 -*-
 """
 Created on Wed Sep  6 14:19:25 2023
 """
-
+# %% importing all modules
 import biosteam as bst
 import numpy as np
 import matplotlib.pyplot as plt
@@ -12,55 +11,134 @@ from biorefineries.oleochemicals.system_simulate import azelaic_acid_tea,aa_base
 from biosteam import preferences
 from biosteam import report
 from biosteam.plots.utils import CABBI_green_colormap
+from biosteam.plots import *
 from thermosteam.utils.colors import *
-# from colors import GG_colors,GG_light_colors,CABBI_colors
 import contourplots 
 from biorefineries.oleochemicals.uncertainity_analysis import *
 from biorefineries.oleochemicals.tag_compositions import high_oleic_vari_adjusted
+from biorefineries.oleochemicals.prices_and_GWP_factors import correlation_based_bulk_prices
 
 #stacked bar plot
 # %% Plot GWP breakdown stacked plot
 #plotting the GWP stacked plot
 
-def GWP_stacked_plots_displacement():
-    fractions_of_impacts_just= [get_feedstock_GWP()*100/get_net_GWP_PA_1(),
-                            get_other_materials_impact()*100/get_net_GWP_PA_1(),
-                            get_ng_GWP()*100/get_net_GWP_PA_1(),
-                            get_electricity_consumption_GWP()*100/get_net_GWP_PA_1(),
-                            get_total_direct_emissions_GWP()*100/get_net_GWP_PA_1(),
-                            -sum_displacement*100/get_net_GWP_PA_1()]
-    fractions_of_impacts = [(value / 5) for value in fractions_of_impacts_just]
-    indices_of_impacts = ['Feedstock','Other input materials','Natural gas',
-                          'Electricity consumption','Direct emissions','Products']
-    df_gwp =pd.DataFrame({"GWP breakdown":fractions_of_impacts})
-    df_gwp.index = indices_of_impacts
+def GWP_stacked_plots_displacement_1():
+    #Values per kg of product
 
-    contourplots.stacked_bar_plot(df_gwp,
-                      y_ticks = [-100,-75,-50,-25,0,25,50,75,100],
-                      fig_width=3,
-                      hatch_patterns=('\\','x'),
-                      colors = [
-                                # colors.green_shade.RGBn,
-                                # colors.green_tint.RGBn,
-                                # colors.green.RGBn,
-                                # colors.yellow.RGBn,
-                                # colors.CABBI_teal_green.RGBn,
-                                # colors.CABBI_green.RGBn,
-                                colors.CABBI_teal_green.RGBn,
-                                colors.CABBI_brown.RGBn,
-                                colors.yellow_tint.RGBn,
-                                ], dpi = 1500)
+    #herbicide
+    #Glyphosate production (ecoinvent)
+    PA_1 = 11.239* aa_baseline.get_mass_flow(pelargonic_acid_rich_fraction)/aa_baseline.get_mass_flow(azelaic_acid)
+
+    #replaces conventionally produced acetic acid which is used to make peroxyacetic acid
+    #pelargonic acid based peroxy ca are used for the same purposes
+    PA_2 = 1.77*aa_baseline.get_mass_flow(pelargonic_acid_rich_fraction)/aa_baseline.get_mass_flow(azelaic_acid)
+
+    #biodiesel
+    #Based on conventional diesel from US Crude refineries
+    FA = 0.67*aa_baseline.get_mass_flow(fatty_acid_blend)/aa_baseline.get_mass_flow(azelaic_acid)
+
+    # https://www.ncbi.nlm.nih.gov/pmc/articles/PMC5480234/
+    #novel production method for caproic acid production
+    MCA = 0.23*aa_baseline.get_mass_flow(recovered_C5_to_C9_MCA_fraction)/aa_baseline.get_mass_flow(azelaic_acid)
+
+    #glycerine production, from epichlorohydrin, RoW (Ecoinvent)
+    CG = 4.2879*aa_baseline.get_mass_flow(crude_glycerol)/aa_baseline.get_mass_flow(azelaic_acid)
+
+    #methanol production conventional from natural gas (GREET)
+    CM = 0.4955*aa_baseline.get_mass_flow(crude_methanol)/aa_baseline.get_mass_flow(azelaic_acid)
+    sum_displacement = PA_1 + FA + MCA + + CG + CM
     
-def GWP_stacked_plots_mass():
-    fractions_of_impacts_just= [get_feedstock_GWP()*100/get_net_GWP_PA_1(),
-                            get_other_materials_impact()*100/get_net_GWP_PA_1(),
-                            get_ng_GWP()*100/get_net_GWP_PA_1(),
-                            get_electricity_consumption_GWP()*100/get_net_GWP_PA_1(),
-                            get_total_direct_emissions_GWP()*100/get_net_GWP_PA_1(),
-                            -sum_mass*100/get_net_GWP_PA_1()]
-    fractions_of_impacts = [(value / 5) for value in fractions_of_impacts_just]
+    fractions_of_impacts_just = [-get_feedstock_GWP()*100/get_net_GWP_PA_1(),
+                                 -get_other_materials_impact()*100/get_net_GWP_PA_1(),
+                                 -get_ng_GWP()*100/get_net_GWP_PA_1(),
+                                 -net_electricity_purchased_GWP()*100/get_net_GWP_PA_1(),
+                                 -get_total_emissions_GWP()*100/get_net_GWP_PA_1(),
+                                 sum_displacement*100/get_net_GWP_PA_1()]
+    fractions_of_impacts = [value for value in fractions_of_impacts_just]
     indices_of_impacts = ['Feedstock','Other input materials','Natural gas',
-                          'Electricity consumption','Direct emissions','Products']
+                         'Electricity demand','Total emissions',
+                         'Products']
+    df_gwp =pd.DataFrame({"GWP breakdown":fractions_of_impacts})
+    df_gwp.index = indices_of_impacts
+
+    contourplots.stacked_bar_plot(df_gwp,
+                      y_ticks = [-200,-150,-100,-50,0,50,100],
+                      fig_width=3,
+                      hatch_patterns=('\\','x'),
+                      colors = [
+                               CABBI_colors.green_dirty.RGBn,
+                               CABBI_colors.teal.RGBn,
+                               GG_colors.purple.RGBn,
+                               GG_dark_colors.purple.RGBn,
+                                GG_dark_colors.green.RGBn,
+                               
+                                ], dpi = 1000)
+    
+def GWP_stacked_plots_displacement():
+    sum_other_products = FA + MCA + + CG + CM
+    sum_pelargonic_acid= PA_1
+    fractions_of_impacts_just =  np.round(np.array([-get_feedstock_GWP()*100/get_net_GWP_PA_1(),
+                                 -get_other_materials_impact()*100/get_net_GWP_PA_1(),
+                                 -heating_demand_GWP()*100/get_net_GWP_PA_1(),
+                                 -cooling_demand_GWP()*100/get_net_GWP_PA_1(),
+                                 -electricity_demand_non_cooling_GWP()*100/get_net_GWP_PA_1(),
+                                 # -direct_emmisions_without_BT()*100/get_net_GWP_PA_1(),
+                                 sum_pelargonic_acid*100/get_net_GWP_PA_1(),
+                                 sum_other_products*100/get_net_GWP_PA_1(),
+                                 ]))
+    fractions_of_impacts = [value for value in fractions_of_impacts_just]
+    indices_of_impacts = ['feedstock','other input materials','heating demand',
+                         'cooling demand','electricity demand',
+                         # 'direct emissions',
+                         'pelargonic acid',
+                         'other products']
+    df_gwp =pd.DataFrame({"GWP breakdown":fractions_of_impacts})
+    df_gwp.index = indices_of_impacts
+
+    contourplots.stacked_bar_plot(df_gwp,
+                      y_ticks = [-175,-150,-125,-100,-75,-50,-25,0,25,50,75,100],
+                      fig_width=3,
+                      hatch_patterns=('\\', '//', 'x',  '|'),
+                      colors = [
+                          
+                               GG_dark_colors.purple.RGBn,
+                               # CABBI_colors.green_dirty.RGBn,
+                               # CABBI_colors.teal.RGBn,
+                               GG_colors.purple.RGBn,
+                                # GG_dark_colors.green.RGBn,
+                               
+                                ])    
+def GWP_stacked_plots_mass():
+    def get_total_product_mass():
+        return(sum([aa_baseline.get_mass_flow(azelaic_acid),
+                    aa_baseline.get_mass_flow(recovered_C5_to_C9_MCA_fraction),
+                    aa_baseline.get_mass_flow(pelargonic_acid_rich_fraction),
+                    aa_baseline.get_mass_flow(crude_glycerol),       
+                    aa_baseline.get_mass_flow(fatty_acid_blend),
+                    aa_baseline.get_mass_flow(crude_methanol)
+                    ]))
+        
+    #Mass allocation
+    mass_C5_C9_fraction = aa_baseline.get_mass_flow(recovered_C5_to_C9_MCA_fraction)*get_system_GWP()/get_total_product_mass()
+    mass_pa_fraction = aa_baseline.get_mass_flow(pelargonic_acid_rich_fraction)*get_system_GWP()/get_total_product_mass()
+    mass_glycerol_fraction = aa_baseline.get_mass_flow(crude_glycerol)*get_system_GWP()/get_total_product_mass() 
+    mass_fa_fraction = aa_baseline.get_mass_flow(fatty_acid_blend)*get_system_GWP()/get_total_product_mass()
+    mass_methanol_fraction = aa_baseline.get_mass_flow(crude_methanol)*get_system_GWP()/get_total_product_mass()
+    sum_mass =  mass_C5_C9_fraction+mass_pa_fraction+mass_glycerol_fraction+mass_fa_fraction+mass_methanol_fraction
+    mass_aa_fraction = aa_baseline.get_mass_flow(azelaic_acid)*get_system_GWP()/get_total_product_mass()
+   
+    fractions_of_impacts_just= [
+                                -get_feedstock_GWP()*100/get_mass_based_AA_GWP(),
+                                -get_other_materials_impact()*100/get_mass_based_AA_GWP(),
+                                -get_ng_GWP()*100/get_mass_based_AA_GWP(),
+                                -net_electricity_purchased_GWP()*100/get_mass_based_AA_GWP(),
+                                -get_total_emissions_GWP()*100/get_mass_based_AA_GWP(),
+                                sum_mass*100/get_mass_based_AA_GWP()
+                                ]
+    fractions_of_impacts = [value for value in fractions_of_impacts_just]
+    indices_of_impacts = ['feedstock','other input materials','natural gas',
+                         'electricity demand','total emissions',
+                         'products']
     df_gwp =pd.DataFrame({"GWP breakdown":fractions_of_impacts})
     df_gwp.index = indices_of_impacts
 
@@ -72,7 +150,7 @@ def GWP_stacked_plots_mass():
                                 # colors.green_shade.RGBn,
                                 # colors.green_tint.RGBn,
                                 # colors.green.RGBn,
-                                # colors.yellow.RGBn,
+                                colors.yellow.RGBn,
                                 # colors.CABBI_teal_green.RGBn,
                                 # colors.CABBI_green.RGBn,
                                 colors.CABBI_teal_green.RGBn,
@@ -81,15 +159,18 @@ def GWP_stacked_plots_mass():
                                 ], dpi = 1500)  
     
 def GWP_stacked_plots_economic():
-    fractions_of_impacts_just= [get_feedstock_GWP()*100/get_net_GWP_PA_1(),
-                            get_other_materials_impact()*100/get_net_GWP_PA_1(),
-                            get_ng_GWP()*100/get_net_GWP_PA_1(),
-                            get_electricity_consumption_GWP()*100/get_net_GWP_PA_1(),
-                            get_total_direct_emissions_GWP()*100/get_net_GWP_PA_1(),
-                            -sum_economic*100/get_net_GWP_PA_1()]
+    fractions_of_impacts_just= [
+                                get_feedstock_GWP()*100/get_net_GWP_PA_1(),
+                                get_other_materials_impact()*100/get_net_GWP_PA_1(),
+                                get_ng_GWP()*100/get_net_GWP_PA_1(),
+                                net_electricity_GWP()*100/get_net_GWP_PA_1(),
+                                get_total_emissions_GWP()*100/get_net_GWP_PA_1(),
+                                get_EOL_GWP()*100/get_net_GWP_PA_1(),
+                                -sum_economic*100/get_net_GWP_PA_1()]
     fractions_of_impacts = [(value / 5) for value in fractions_of_impacts_just]
     indices_of_impacts = ['Feedstock','Other input materials','Natural gas',
-                          'Electricity consumption','Direct emissions','Products']
+                         'Electricity demand','Direct emissions','EOL',
+                         'Products']
     df_gwp =pd.DataFrame({"GWP breakdown":fractions_of_impacts})
     df_gwp.index = indices_of_impacts
 
@@ -112,82 +193,168 @@ def GWP_stacked_plots_economic():
     
 
 #%%MPSP sensitivity plots
-
 def MPSP_sensitivity_plot():
-    bst.plots.plot_spearman_1d(rhos = (0.59,
-                                       -0.48,
-                                       0.18,
-                                       -0.35,
-                                       -0.21,
-                                       -0.43
+    bst.plots.plot_spearman_1d(rhos = (0.44,
+                                       -0.25,
+                                       0.1,
+                                       -0.5,
+                                       -0.5,
+                                        -0.3,
+                                       -0.1,
+                                       0.1,
+                                       0.0,
+                                       0.1,
+                                       0.1,
+                                       
+                                       
                                        ),
-    index = ['High oleic soybean oil unit price',
-             'Pelargonic acid unit price',
-             'Hydrogen peroxide (50wt.%) unit price',
-              'Oxidative reaction conversion (diol to intermediate)',
-              'Oxidative reaction conversion (intermediate to products)',
-              'Dihydroxylation reaction conversion',
+    index = ['feedstock unit cost',
+             'pelargonic acid unit price',
+             'hydrogen peroxide (50wt.%) unit cost',
+             'reaction conversion (FAME to diols)', 
+             'reaction conversion (diols to intermediates)',
+              'reaction conversion (intermediates to products)',
+              'tungstic acid reusability',
+              'water use for extraction',
+              '% of diol recycled',
+              'cobalt acetate loading',
+              'tungstic acid loading',
               ],
     xlabel= 'MPSP',
-    color = GG_colors.blue.RGBn,edgecolors = 'black', sort = False, w = 1./2)
+    color = GG_dark_colors.blue.RGBn,
+    edgecolors = 'black', sort = False, w = 1./2)
     
 def MFPP_sensitivity_plot():
     bst.plots.plot_spearman_1d(rhos = (0,
-                                        0.49,
-                                       -0.15,
-                                       0.51,
-                                       0.27,
-                                       0.61,
+                                        0.2,
+                                       0.1,
+                                       -0.1,
+                                       0.6,
+                                       0.4,
+                                       0.6,
+                                       0,
+                                       0.1,
+                                       0.1,
+                                       0.1,
+                                       -0.1
                                        ),
-    index = ['High oleic soybean oil price',
-             'Pelargonic acid price',
-             'Hydrogen peroxide (50wt.%) price',
-              'Oxidative reaction conversion (diol to intermediate)',
-              'Oxidative reaction conversion (intermediate to products)',
-              'Dihydroxylation reaction conversion',
+    index = ['feedstock unit cost',
+             'pelargonic acid unit price',
+             'hydrogen peroxide (50wt.%) unit cost',
+             'natural gas unit cost',
+             'dihydroxylation reaction conversion', 
+             'oxidative reaction conversion (diol to intermediate)',
+              'oxidative reaction conversion (intermediate to products)',              
+              'tungstic acid reusability',
+              'water use for extraction',
               ],
-    name = "MFPP",
+    xlabel = "MFPP",
+    color = GG_colors.orange.RGBn,edgecolors = 'black', sort = False,w = 1./2)    
+
+def total_heating_demand_plot():
+    bst.plots.plot_spearman_1d(rhos = (0,
+                                       0,
+                                       0,
+                                       0.6,
+                                       0.4,
+                                       -0.3,
+                                       0.0,
+                                       0.4,
+                                       0.2,
+                                       0,
+                                       -0.1 
+                                       ),
+    index = ['feedstock unit cost',
+             'pelargonic acid unit price',
+             'hydrogen peroxide (50wt.%) unit cost',
+             'reaction conversion (FAME to diols)', 
+             'reaction conversion (diols to intermediates)',
+              'reaction conversion (intermediates to products)',
+              'tungstic acid reusability',
+              'water use for extraction',
+              '% of diol recycled',
+              'cobalt acetate loading',
+              'tungstic acid loading',
+              ],
+    xlabel = "heating demand",
     color = GG_colors.orange.RGBn,edgecolors = 'black', sort = False,w = 1./2)    
     
-def GWP_sensitivity_plot_displacement():
-    bst.plots.plot_spearman_1d(rhos = (
-                                       -0.44,
-                                       -0.30,
-                                       -0.59,
+    
+def total_cooling_demand_plot():
+    bst.plots.plot_spearman_1d(rhos = (0,
                                        0,
-                                       0.40,
-                                       0.30
+                                       0,
+                                       0.6,
+                                       0.3,
+                                       -0.1,
+                                       0.0,
+                                       0.7,
+                                       0.2,
+                                       0,
+                                       -0.1 
                                        ),
-    index = [
-             'Pelargonic acid unit price',
-                      'Oxidative reaction conversion (diol to intermediate)',
-                      'Oxidative reaction conversion (intermediate to products)',
-                      'Dihydroxylation reaction conversion',
-                      'Boiler efficiency',
-                      'Feedstock unit environmental impact',
-                      'Hydrogen peroxide unit environmental impact',
-                       ],
-    name = "Azelaic acid GWP(100)-displacement ",
-    color = GG_colors.purple.RGBn,edgecolors = 'black',sort = False,w = 1./2)    
+    index = ['feedstock unit cost',
+             'pelargonic acid unit price',
+             'hydrogen peroxide (50wt.%) unit cost',
+             'reaction conversion (FAME to diols)', 
+             'reaction conversion (diols to intermediates)',
+              'reaction conversion (intermediates to products)',
+              'tungstic acid reusability',
+              'water use for extraction',
+              '% of diol recycled',
+              'cobalt acetate loading',
+              'tungstic acid loading',
+              ],
+     xlabel = "cooling demand ",
+    color = GG_colors.blue.RGBn,edgecolors = 'black',sort = False,w = 1./2)    
 
+def GWP_sensitivity_plot_displacement():
+    bst.plots.plot_spearman_1d(rhos = (0.1,
+                                       0.3,
+                                       -0.3,
+                                       -0.5,
+                                       -0.1,
+                                       0.2,
+                                       0.1,
+                                       -0.1,
+                                       0.5,
+                                       0.4,
+                                       ),
+    index = ['cobalt acetate loading',
+             'reaction conversion (FAME to diols)', 
+             'reaction conversion (diols to intermediates)',
+             'reaction conversion (intermediates to products)',
+             'tungstic acid reusability',
+             'water factor for extraction',
+             'diol recycle fraction',
+             'boiler efficiency',
+             'feedstock CI',
+             'hydrogen peroxide CI',
+             ],
+    xlabel = "displacement ",
+    color =  GG_colors.purple.RGBn,edgecolors = 'black',sort = False,w = 1./2)
+    
 def GWP_sensitivity_plot_mass():
     bst.plots.plot_spearman_1d(rhos = (0,
+                                       0.1,
                                        0.03,
                                        0.05,
                                        -0.04,
                                        -0.11,
                                        0.80,
                                        0.55),
-    index = [ 'Pelargonic acid unit price',
-             'Oxidative reaction conversion (diol to intermediate)',
-             'Oxidative reaction conversion (intermediate to products)',
-             'Dihydroxylation reaction conversion',
-             'Boiler efficiency',
-             'Feedstock unit environmental impact',
-             'Hydrogen peroxide unit environmental impact',
+    index = ['cobalt acetate loading',
+             'tungstic acid loading',
+             'reaction conversion (FAME to diols)', 
+             'reaction conversion (diols to intermediates)',
+             'reaction conversion (intermediates to products)',
+             'tungstic acid reusability',
+             'water factor for extraction',
+             'crude oil CI',
+             'hydrogen peroxide CI'
              ],
-    name = "Azelaic acid GWP(100)-displacement ",
-    color = GG_light_colors.purple.RGBn,edgecolors = 'black',sort = False,w = 1./2)    
+    xlabel = "mass",
+    color = GG_colors.blue.RGBn,edgecolors = 'black',sort = False,w = 1./2)    
     
 def GWP_sensitivity_plot_economic():
     bst.plots.plot_spearman_1d(rhos = (-0.43,
@@ -211,12 +378,12 @@ def GWP_sensitivity_plot_economic():
 #%%box and whiskers plot
 
 def MPSP_box_and_whisk():
-    contourplots.box_and_whiskers_plot(uncertainty_data= [9.58622764136106,7.56112484839384,8.58683290933517,7.03054310048098,8.54812861315455,8.35607037524544,8.36234718187196,6.45994839354373,8.03902137517888,8.92548258080935,8.27608050420627,8.54446510510106,9.13589151119615,7.919187597923,9.5761000172145,7.64627821000604,6.60973873270664,10.2941990890246,9.63514243452232,8.24706961385568,6.52465428766923,7.88531407695069,8.45345776205814,10.2407355478038,7.09498641015596,10.1796398270445,7.9806360135642,7.70957955898361,9.11224331300675,8.11014956915881,8.68108427132372,7.79859643446333,7.85480619078288,8.30212806472984,8.91658612941037,9.33547760402707,8.24232486076401,7.00885806735205,7.04230534071609,8.90910814177371,8.91502666658735,7.45189700892814,8.96369661382869,7.7992881860549,7.786515761108,7.58433809457513,8.8194122300587,7.56588004247189,8.47033166686051,8.22219759464644,10.1718983114714,9.23521789656242,7.54323860715403,7.81430771532644,8.60401677344881,8.03413365509258,8.82041195511099,8.2080635642485,6.28891158943192,7.92489134855216,6.44145142214779,10.0154248346064,8.03654729622437,6.84781553254886,8.16208634214814,10.7600332639871,8.38400777908586,7.62382811701754,8.0099695599813,6.75566861914434,8.19153472691666,10.15044108571,9.05396933926229,9.31150420582019,9.30297301517726,8.11282011848501,9.04620447320258,8.83955292734866,8.72712708547091,9.67933647565223,7.1136875630202,9.11667966934338,9.24239626252418,9.46171822666468,8.38903545765425,8.61226106201955,10.3461570110058,7.58611492864532,8.04803389941279,8.40347947643884,9.31431807784243,7.29080316829781,9.33423345988852,7.3385391847526,9.48705147898447,7.78066742539671,8.91865002972665,9.27786459585244,8.80438760304903,8.98462372002271,10.7194661443551,9.88096254601275,7.84602296674148,10.0890412151241,8.92121851671627,9.4203835256964,8.07102227054117,9.32656804089761,6.96648435926045,7.23229800266512,6.73422861720328,9.02397843577497,9.05160601016444,10.115220751374,7.93766550417078,7.22067878252833,7.8445565401289,6.59587981550485,9.24765282981476,8.41216243659614,7.91464030409977,7.36980096395813,7.27195976728491,8.02373850910776,6.75744746180078,9.45884831982279,8.1458255612126,8.70367188583434,7.96679669986165,8.96344317496459,7.52689231882156,8.22330657289938,8.65062704711836,7.85304730255408,8.31986940149843,5.91241688014749,8.41685099922482,9.2731499434513,8.94363736219876,9.81869011743161,9.86758381137763,7.74914101827958,7.18127427247606,8.61801986409419,10.5133467398244,9.32804982007021,9.49781620695001,9.1373628304607,8.40726916689604,9.87945790687355,8.34032492470921,7.17358649042933,9.41047225230336,7.54017699488549,8.14930590889252,9.78807872777271,8.44765320175751,8.62477953409441,10.0425465105303,6.93426108864427,8.64834146838453,8.08748656147231,9.17432929356189,7.34685188975915,9.47453340415519,9.58486071758891,8.96572596067228,9.2294827299833,7.47512132838501,8.17331624803953,9.69163194572227,8.3110981632985,8.87045326987948,8.53945230378905,8.18223378203523,8.61881168208966,8.93852408208826,10.9660414919987,7.8349690141046,8.51196117226324,7.3711263459299,8.69160885675432,9.02226727905517,6.92739586032932,9.43163038960137,9.00870801258395,8.18315933474756,8.08640758322121,7.88389526696656,7.398351460224,5.98169711815274,9.20400270933454,6.03049123312686,7.96673013849802,7.7847398773613,7.25169876909319,8.94661144645785,8.39523751134592,8.86208416082008,8.20273782913739,7.51212968123632,9.21738181457057,9.26041690429965,9.5576364485195,9.04667613539204,7.85012675665538,9.66846430640856,8.94425756607389,7.82066775810288,7.67718832013925,7.16765569024666,9.37783741185068,7.93281251316371,9.44200498148181,7.9928453257556,8.64735042929055,8.61987201102678,8.80322341451362,6.79492853430449,10.1838300947499,9.72772945379148,9.16371741922316,8.34095126919062,8.34051780637053,9.30067041165858,8.75587118647567,7.7304107948859,7.48495206558548,10.1846352899808,9.04777925775051,8.09988743006226,7.19816693921453,7.50397512742161,9.25583535153974,9.68257013338866,7.4133023815732,8.60944855130444,8.32602556316167,8.69584981637256,7.21597128100491,9.76577834263433,8.69294539478784,9.99287562082265,7.7576209601344,9.6933168220523,8.49184868743703,9.47343646742996,9.3834067958607,7.83947667179465,7.42600117875663,11.0388878172242,9.1465852475492,6.60860820880101,7.30121988396734,8.59998277700385,8.08800393696774,8.27523196587234,7.45918132638495,10.6622614137856,7.68480457998278,7.83861908037304,7.50019681980697,9.11248415730941,8.23682001639671,8.81295366874805,9.17270803470225,9.71840168294788,9.1961308876175,9.85472262496866,7.40922295280102,7.86212419182649,8.02829969181613,8.4365644835662,7.24187625116071,9.43799619379795,8.6440631032084,8.67314984903786,8.70997050017574,6.89023762173939,8.96160883653916,8.47442779662459,9.99867640730086,7.81563903148654,9.1613238157222,7.53845153501858,8.04532010676502,7.85685518888443,9.44294911962867,9.29764440752292,10.4015880989745,9.22771368176933,6.75750627090953,6.89653804014693,8.65496921508355,9.51354011763417,7.4574290255573,8.57745158134977,9.75583480635552,8.04989693759857,8.46360370776699,8.93988951385943,9.56597051130031,9.03312571980557,8.56506616990756,8.14184713027214,7.11071519645429,11.8773216639805,8.19561734478595,9.20029215773079,7.54300242903622,8.98242309216218,10.2019657846918,7.44231775312098,6.29834832248558,7.68854125970562,8.37724828517212,8.1631061911241,9.03372970822609,9.66157964911056,8.69535180025857,8.79931703644786,10.188712653048,8.23513812555773,10.5323695063843,7.89046662681078,8.05190116557643,8.92884870040784,10.4761177017766,7.05364249391933,11.0319529069944,9.59793525842482,6.52082244826835,8.43951030588978,8.40315830952561,8.00270446382342,8.15189778016361,9.01550231402337,7.31653372555941,8.36652656425544,8.53988889421941,7.74822494915183,8.5538557172108,8.5199529525093,7.21934684713934,8.69267942478465,8.0564611432559,9.03393706938336,8.31267926536493,6.5607039656765,8.22941656417372,11.0117093779393,10.0567524047883,9.94925699664135,6.87401583834571,9.8467800974966,10.8989832552183,7.99264726750493,9.0463526016114,9.10827756593412,8.24556324598629,7.98964240708011,6.8408233043944,8.58985200043987,9.59458201129758,8.87329264220312,8.95435964621832,9.8273145722851,7.92596729613188,7.26813045657526,10.0999822775123,7.32034423635741,6.3893007475177,8.39166765427672,9.13545334959969,7.90665992751821,8.68225983158434,8.35646247113314,8.22293511326005,8.04798095101914,9.25408583834679,7.10564492171688,8.85992370912559,7.82659375701534,7.63838140606105,6.3713141633092,9.36755398544596,6.21438913315092,9.32304089575383,9.18491849945907,7.69310500572052,6.65604427806754,9.57924337264331,9.58629844376774,8.51956456472856,8.83396134843197,7.54837271817226,7.88366168788091,9.64215409835526,6.47261821867358,8.12062283140215,8.47903107874815,10.7580769634729,8.6842650705599,8.52234532489674,6.56840148236808,7.97072720293662,9.25751261628796,7.36678658917421,8.5776711205526,8.87011360083579,7.88101748272896,9.75598247509416,9.0724071213284,7.95725304267486,10.8637955553278,7.3857909920822,7.45988972951492,7.91672519290159,8.26927598275003,9.42801757878506,7.27159084156928,10.0036462129775,9.15448441434591,8.93978898355461,8.85409483789503,8.3562740140397,8.90394495337109,7.39333801118871,9.9332262768651,9.11566923937336,8.01744796433844,8.04774033522861,10.2643669800811,8.72824735640091,9.94494187793133,8.77252446283415,10.0464633764326,9.20796768985969,8.98300277503341,9.40218283576002,8.9940427954124,8.95549524824796,8.40770010998437,10.1006153108889,8.44430952918565,9.16396013926978,10.7746017132718,7.61672709184195,9.55264473085076,7.86716964022897,7.17386229250696,11.4631593699515,6.67651619050552,9.08482328689438,7.77958835813902,9.79928960281843,9.38144958507943,9.60716586239649,9.31557236309172,9.24531522990806,9.87056516313081,8.49677378221685,9.08811401930658,7.86343540831298,10.1556064910627,9.05143229608893,8.81930582704982,9.40436345217403,9.57179584461234,10.8518258925005,7.07732481795517,10.0902038151784,8.87779312925201,9.10947164721515,8.45813302642915,8.12576060334817,8.51235684657795,9.14448690944416,10.223526123616,9.60098052113993,9.24454404480782,8.30939926947555,8.10429756684471,8.44288634430733,7.32614994244489,8.40215581934814,10.1387208511042,7.99519489946087,8.45132472034787,7.43046504227211,8.76215923052681,8.38686831182077,10.2601813229028,8.54344296068096,9.20465675174323,8.81596279985644,7.48268879220399,6.55713727720004,7.74091356662333,7.67044274408645,8.04423802742549,7.26168578254711,7.48365835124692,7.28309502848013,8.81882598495262,9.29442612464698,7.52884758399695,10.2962887830579,9.59792024925193,7.89658130772923,8.40128047263509,8.13124564300316,7.35036567410423,9.50550196308143,9.5132023583082,7.30075306739473,7.80721993790253,7.70825302927225,7.81437514905459,8.16132116113179,7.1866864858288,6.73787472940285,8.4481862639951,9.03561409259759,10.2132676001941,8.63653169151632,7.98907910753701,7.67736771922586,7.52019895165985,7.89953122646446,10.9229996630478,8.97170301781479,8.87205019834441,9.0779769973504,8.33958950114434,9.892533034244,10.0748966273011,8.78657336967342,9.38466911496953,7.47889012082058,9.28949406771241,10.003008827454,10.1472980090908,9.29506011112178,9.12280860718551,8.51646159645868,9.11617312187374,8.62285476279578,10.6185103298604,9.18758890511038,6.82910112817853,8.859393041205,9.68737629534865,10.6176088397446,6.80829851795953,8.77682179084073,9.26540465580376,8.92045059921936,9.06243345814854,9.96963504561358,7.69633704952187,10.05056628993,7.51167154599099,11.6066418235837,8.51552106973035,10.2474597101757,10.3534634158003,10.4209629258023,9.33916912563109,8.87566043042599,9.35793668395274,7.50176710504732,8.4927783899229,9.98353559722535,8.43879688708605,8.45848448951781,9.69414931652031,10.9289889820606,7.11806551578612,9.83227498123935,10.9553123103233,8.93622985989977,7.45407795156833,10.3549663671449,7.96723970488088,8.68012738783648,11.8319730635537,11.240948853074,8.04876273455039,6.88786983750805,8.32510342836804,10.4074769986612,10.498506182108,7.3883989918319,8.73478258305253,9.61544011284852,10.4094047346157,8.09040536766418,7.17752627183915,9.29399676525283,8.65810987457867,9.32763579431278,7.29698483040668,8.89539720597732,8.92746949002186,9.1978521254047,11.4118493974195,9.41095229543352,8.59049016512635,8.27721718072352,7.03004999016771,7.62055049708711,6.8029722113118,7.16080719391647,7.16622006191958,10.7970401509219,8.29764094326414,7.37348293711433,10.112384603048,8.44596036665594,12.0293108563647,8.43179626622725,8.90026869767465,8.44617162003548,7.46367636480098,9.95134053090245,10.9168611943121,10.121454771504,8.70931438624293,8.75605525884197,8.4316392347604,8.98857965803017,8.87590003645805,10.2363729124649,8.65764717402844,7.55686691304296,9.99714532035019,8.89368095001615,8.96889611608716,8.58908929757983,8.94607546182254,9.58021743855407,9.51701991108096,7.82490978090795,7.80390467917683,10.1314073606353,8.53754450837392,9.05480047526468,8.08627190462433,8.78347482746768,6.53716983652664,10.3461145322965,7.75256107132134,7.66224892624842,7.18096724721962,8.22707599666207,9.99325140140731,10.773076927997,7.24010318721846,7.15023845385393,8.80553712304961,9.14236445634377,9.3386650751961,8.48958625619232,9.52322263813004,9.21296881062078,8.67404502024183,8.88558343015097,8.33464637147154,9.22408209986993,6.99448510422334,8.0503780005848,9.0021861219099,7.92284961084794,10.0137529241367,10.2345155304894,10.0557416759149,8.20369014149818,7.86256350551213,8.12721154826608,8.70687592964765,8.81330742710546,9.66453072172904,10.5651009469422,8.06573024900486,7.28131478483211,7.57356440353915,6.96030689178997,8.1261984509026,9.10429741143192,8.83437930614988,8.7978909773576,9.39464303787456,9.84741088327893,7.8174912716268,7.08266497522756,7.20094085197505,9.13744683861122,8.64011474634556,6.76246690377533,7.68058866053113,10.5390709235035,10.451030803745,7.04506644343741,11.6496032237938,7.66657389745374,8.9885789196669,8.03497186424988,9.88954201612706,8.68241762744601,7.67725364073518,9.13624511337727,8.22217658107986,7.99906388605831,9.1100903276577,9.51676969522786,8.58167848526075,7.70294493499082,8.76560949259036,7.80131333590289,9.86214157748656,9.95799911908059,8.80206787547552,7.96455642691343,8.77532400481036,9.00863309789539,7.49328498659296,8.11379345410015,10.0836764465234,8.9314434495223,10.2552377377929,9.42001719425975,9.90539836107023,8.93120167920229,10.3515159180563,9.77592328607312,9.01251918249788,10.4469242318688,8.47484053263022,9.00813154864462,8.99055601033784,6.42865407817765,9.58579268919296,7.29523756681259,9.18050172496254,10.1619971264654,7.21447715662084,8.02514793513121,9.17892013577515,8.55046233942239,7.22655750786814,9.86832254204894,7.78649351022375,7.71638789686948,8.40001686291773,8.58045181495504,8.48564547755679,7.46882836597804,7.02527294159842,8.38655641575181,8.55690999823667,8.77636493698823,9.34113077897403,9.87387547323203,7.50479543680839,8.19578554857952,8.94825911160062,9.04728327886151,7.00372496701971,8.22224305491527,7.93272199951883,10.2735841390295,10.4213378421431,8.35229448391188,6.43962903483304,7.64826923080819,8.80825663130514,7.44997561110745,9.08130527278466,8.42880722555947,9.23385629578446,7.47903558225154,10.7563623348811,9.02170145243918,8.99396586164998,8.71970032014533,8.05135226675955,8.73213520439605,7.15976299278343,8.39101797112629,9.75642009915695,9.84260964281874,8.35309377554401,8.15788766063527,7.87544856382118,9.75770474678081,7.1639742331053,8.80830965220486,8.85492540691786,7.61756537007787,7.21477977591625,10.2213605888447,8.31042541702475,7.90595974638818,10.2183789354074,8.71212739869285,8.36146172828644,7.02516355491917,7.72608235574956,8.17370516635201,9.01056822486168,7.11861186079536,10.446198067648,7.58062200537089,8.32955126654175,7.72014005072379,9.01666273381062,7.80659996264738,9.7972790466376,9.32994148630517,9.10255262842935,10.4663927255118,8.10332994534445,9.65315591704483,8.82951049811057,9.75100279659104,7.18860929464701,8.46073285412814,8.20604145496913,9.83866803546701,9.57440392630141,8.86369526845719,10.6642418832977,8.19136410075601,10.0958955388116,8.31081516080017,7.30634761731743,8.74469117340091,7.99382870385441,10.169164876838,7.15866806580692,7.83768213997745,9.46331499976057,7.47130555233441,10.5671181728466,8.26449506363828,7.85644339723342,8.03265679288796,7.9657871323097,7.25554290076938,7.11060947846083,8.37996688871498,7.87723925622946,9.31987947992638,6.87378303341772,8.96488851073872,8.65414443205763,7.75578317946777,7.13951203521609,8.23105696016741,7.33165883557716,10.4863124275749,8.95732068516139,8.85136538858002,9.23207328266122,7.22669824681407,8.10848579022919,9.41834080171923,7.79796537459667,6.79082570841256,10.1083550366427,8.30192648509884,7.60436979438213,10.1044329517189,9.17524650271291,7.44025473582898,8.96125075850574,10.3435647953505,7.97492970034949,9.46786244711106,8.62422208112194,9.63287395523473,7.5712151495454,8.43331377400503,9.16446125028856,9.77924406968499,6.61806488963992,9.11724616242538,9.15285666970938,7.44631195272537,9.13764359181452,9.25092043221416,8.59059034416211,6.23774228591225,9.01681182028693,7.60952111336473,8.3694028186392,6.76220311216499,9.89643727984378,6.98804779262774,8.92825315560711,7.705302979253,7.35316412256845,8.85881370485727,9.49239702738443,7.94451023776663,9.87198663149289,10.1579869706163,8.37984463226003,7.93684085575567,8.93799200797364,8.82382354774623,8.86678688689589,7.9931846849793,8.60548785219044,7.27843482130321,10.7736854177271,9.60682864546263,10.2790947488522,7.3285229769049,8.24423614368898,11.2719492419236,8.48398004889278,8.89899395384745,9.92092543746292,6.35459140796869,8.71454808029718,11.2202998917206,9.32844130996955,8.44762352589062,7.71121911715344,7.72057622258979,7.07929453996959,10.5716593661357,6.54739151181037,8.48314956748191,9.73679453231402,9.06871317503145,8.13493157354759,8.91356075048051,9.35878138636942,9.28585446489755,7.42648612978808,8.40449157145927,10.1625081338286,11.1123685200619,8.67281494884404,10.0178606122608,7.57476626518756,7.78158845114803,8.22219749165174,9.26702077954186,8.65744100240691,8.21961704007378,9.48217848522525,11.7255682398238,9.62972947225522,6.96970693400437,10.6942768612988,7.15732081696656,9.29287568476842,8.03854011503565,7.58169837433852,8.73497059002114,7.63732222459948,7.14179406336058,6.98654140797622,7.762868460133,9.4187443368991,8.08026104584092,8.76943766904357,8.19321415791425,8.18190423839016,7.32198986558192,9.16218589213201,9.75182027561733,9.50319260031457,9.65295818851169,7.8406395601128,7.78235885308112,6.61299263505894,8.4080561478394,9.20648538819517,8.09716513897188,7.7056457956017,10.1794338911268,7.0824499979212,7.95940418863158,7.9005652286948,7.30325348352921,10.2093556793212,8.16574835367919,7.46725016061086,10.0878892624109,9.68172413837418,9.85375975950147,8.59622052591582,8.16593081966538,10.8979604140713,6.44054884790392],
-                                       baseline_values = [azelaic_acid_tea.solve_price(azelaic_acid)],
-                                       y_ticks = [6,7,8,9,10,11,12],
-                                       # ranges_for_comparison=[[10,12]],
-                                       boxcolor=colors.red.RGBn,
-                                       height_ratios = [1, 8],
+    contourplots.box_and_whiskers_plot(uncertainty_data= [6.15899018266673,7.68453931752052,11.60579728352,9.45980056394806,5.86364130301063,13.5473768550634,8.99779142680481,10.2034434175858,7.96347138978316,11.2610342315379,7.87455418709172,7.3385798524017,6.91918222038035,9.23118872450556,9.05593450057507,8.83997043795992,14.1409499616522,10.3380421867047,7.68072997091805,13.4650862328316,9.87946040917888,10.4450970520896,10.3596781208017,7.38206202519861,7.14396346616397,7.8157481099604,11.1174258115555,11.8294905159779,7.13207082057242,7.83757862044691,7.45208434006011,9.3448783958841,6.64439378001805,9.26375595159885,8.73592701295353,7.6493960884554,6.90771953161272,10.0646533216189,9.73851705824911,8.77072995420786,10.7993998828296,11.7912899335373,8.45272001266473,13.4164262384415,7.37948559273279,12.2726339863402,9.56145139236359,6.48358412507234,9.57976248361634,8.16701317017089,8.58790878160128,8.79192219630367,9.22160167766803,7.74955052897816,9.68886700277113,8.41584876963573,12.8998843190462,9.04142059999565,6.59153840148434,10.3720273830597,10.7227608018433,13.3429801192752,8.12017828506723,13.2780426698199,7.80120404551108,13.1415296328375,8.02265542686099,9.81932741988865,9.83230065962352,7.67224916741706,11.7447904603029,13.7097214504845,6.35881925564457,9.49733024785322,8.16830130429095,6.88987387934812,10.8503545601759,8.38768811509963,15.8070848440019,6.60568994982506,10.6590484131083,8.60305448248292,7.31471679639044,9.07078016215378,9.70041311164072,8.0059061855382,10.9318502797704,5.89807513170683,8.88492657913416,9.69654410443568,8.64510660269054,8.695605745002,10.605299919794,8.87572816383629,9.72942031963884,10.1199381322069,8.21450648872858,8.42882489677997,14.5564524188887,9.90981194884592,9.38624605049151,6.66276045705428,10.8426665318845,9.29196354569076,9.66092801152256,8.25834155469634,6.38113413837358,9.87769893721455,7.55340481967918,10.5676891386429,8.52805365829244,11.1009290849571,7.23026320890136,11.0539089632627,6.69070201989636,7.38038384929765,11.3346382270356,8.23933989765301,9.00159116917061,8.802959641501,6.93744706135342,6.90328188544278,8.11448709797856,8.09040756099126,9.23411384547597,9.8060140475053,9.98369772469088,5.3717917772511,11.0720966189997,7.04408292952869,7.93710721717228,6.57071842237418,9.96999729601595,10.4323412920424,6.61513900893637,10.5697709710076,9.30810759967255,6.56533028051588,10.4771908681261,9.51221141058668,13.0634977023041,6.69835787556801,7.22569287769605,10.8172436816422,6.86810431405867,7.07217504971773,7.44897176993243,8.63735020731439,14.3759476719333,7.57996985098972,9.63674831949461,7.31850687772403,7.77440097491849,7.42223061541341,11.6992965179169,8.05595149422649,12.2913336316204,6.51169994951819,10.0828841166558,6.66084715933287,9.42069143304983,8.96020118447844,9.85645689023602,9.3161114382556,9.44376905248134,6.31290874298654,14.9089262525485,8.07701058266606,6.8039752734192,7.68354262772399,12.3419428092073,7.50549710913116,8.8486979839693,8.24482407006304,7.9240304897857,7.94235286113904,12.5614848084765,7.19822962275967,9.04935671977849,9.7662332206828,8.33643349950378,6.44872518706094,9.25753171243793,9.14750430125934,7.74196190471879,7.29969364110621,7.3472983199241,7.78408234630226,9.78798624359912,7.97517918816123,8.02168051817312,9.98871577956757,7.51204202234907,8.04668520134371,9.70342384216395,7.61920433746124,8.66424998170385,6.14864513134924,10.4299635401385,11.3011763111378,13.6200046624826,8.07835765883041,12.7338140921997,10.1349176229001,4.81997512451935,11.665617499148,6.77018545196846,10.3244032283815,7.03389865092087,9.57679591637675,8.501478747482,13.0893297555355,7.4503521643694,8.08787313638632,12.8266953265776,8.25037127043418,11.9763401291512,8.09336720733788,9.40819218044296,7.63872946100924,9.40518898310672,10.2243494561605,9.46242715365352,14.746717415335,7.73800113479493,8.3397441329659,9.22633164861156,7.9191187010125,6.15782977333473,5.85924741409396,8.96534296379618,9.46872303161994,7.05253163389002,9.63916290053294,6.72791439735745,7.03537559714184,10.2509056039333,9.21023690481836,9.42648505954784,10.4940986418777,8.73170970429058,8.94661674824284,6.49785397915819,13.9779276187453,10.4135842224868,7.29376951422861,10.2545066563718,9.51054548572137,7.61169132388453,5.51251257521943,12.4094202721174,7.84734794216086,6.98315646576488,10.4066247593593,5.47222118315915,11.9958336369692,11.3471939675216,6.48683628963541,5.58092681694974,10.5057547302142,11.0829786525623,9.23668421430535,7.33874095578772,10.9438424332129,9.50381218824375,14.8561842632213,6.41849825131362,9.19767857368783,9.13930518933779,11.8733246193286,9.49560262197185,8.87734108097166,6.00181160173474,6.38866428597261,10.8534452228601,11.4184023782568,8.13705729112293,12.0173191042664,7.47909437371784,11.3387335626655,7.39191537378005,8.10241764666289,6.28369052420245,9.56783371741459,9.34439107905143,10.7418743187684,11.4914278974307,9.64544097730242,7.95868505938739,17.1092588169358,4.70526045931658,8.73813918570401,9.36197362050379,8.64431761043461,7.82516649120714,9.83699582335222,7.87683659012973,6.77080920482077,12.2345015463173,11.4307688415615,10.0881764221564,12.0074106621443,8.55317902146249,9.78297960348038,7.42718814962478,9.76307947777533,6.01078687070844,11.6177458644816,8.01149027427546,5.12663375316054,7.22901934901964,9.53075737022397,7.97029350372229,10.2523512028194,8.94869732552576,9.02345345327332,11.0954975846737,13.8804893033335,9.03435364127235,6.63669886341431,10.8760566897896,8.6010622630807,9.74230384501805,7.4528152017942,11.6988909517866,6.49125330438221,8.78793409135664,8.95998380666975,10.3180476277174,5.37528829238386,7.59586227222303,5.49493163251735,11.5511314069359,9.45361817421312,8.29802367717451,5.73094812897702,9.64426884782208,12.5274194639083,9.96055183689034,13.2756036305999,8.31023267380868,5.28242445754091,11.6463936781013,7.52469677069411,12.0520563680493,8.63691733966055,11.7067173943934,10.8568487277843,8.69770704067978,10.3482362082779,9.99965818013703,6.0015326896579,11.1332328202698,11.1658457955681,7.53089783450098,9.1378278246773,11.4733599441243,7.68579651340588,12.3196065193451,7.92434411193801,13.2191720234583,8.2591089052432,9.13717969033824,9.6905352235022,10.4417818016185,6.59912580436634,9.3696838191303,6.41487607930402,10.1113944939928,9.77236728416478,10.1529132903647,6.82601094100279,7.64215032830231,9.23314642968687,8.36808982549844,5.28135008899954,10.9355437887759,7.874546701718,10.2324774265802,8.77081961874001,7.6505428879723,12.2586514247009,6.86223647660643,9.56926083156927,10.1466232453016,10.4732864728853,7.3756697176954,9.43729595226901,10.667522009459,8.75303663973594,10.650209774416,7.49451249814783,10.4669890099964,11.2698938841938,8.39643550235764,14.0717601652222,7.11288182144797,8.90527891242812,7.49015375637963,11.1921488290481,6.98776879168403,13.3790772180077,9.7706681483103,5.32598577342561,12.9895741667255,9.15308089766231,11.1509474277489,8.5295312793185,15.232791735294,11.1849664770302,7.09445679680999,8.81123146631585,7.74769927993263,11.9012672628364,9.26714539860584,7.03289186396099,10.8774083515861,8.1287187478581,9.75083566518356,11.8530499587127,9.41445675616332,8.83432274807924,9.33928710551247,10.0395492583229,9.31685805667989,9.39061516080209,10.4771916977879,7.77503840727155,10.4232891862192,9.58783302997282,7.31534317867197,6.77359297819555,11.368388694573,11.7224943315638,7.37893679501737,7.54136459033484,9.68599893686634,8.02509082188767,6.52136067289675,11.0712869721534,5.67328956649644,6.60210579372953,7.98552300229544,11.2844399263689,9.2961604099806,7.7246091517294,10.4013294727134,10.4579668413713,8.16727720329899,9.91650646763281,9.07789149649761,8.04649517330748,9.90110069972221,7.81491870359857,4.28083261030683,8.97765418515568,8.48856687508256,7.0377552497552,10.1765486910788,10.7425317371944,8.46229299189581,7.75992575571833,10.7038733092927,10.3063924521479,7.66969168891835,13.3278229646025,13.3194193356358,9.18106828945048,8.65837744863851,8.36244591621187,11.3500114532582,8.51119434187817,9.62144420175849,7.43523705500802,8.92785152948607,13.4950927633569,7.61888243907236,5.76387646840151,12.644616571249,11.082398920412,8.9818579855403,9.55531737294139,7.08936629802044,5.44400146637511,8.83590807519391,8.50168365917244,7.25163425481629,6.79810277812481,8.34633538114435,8.89115266644648,9.37248183110801,9.53268145374848,14.6655868834091,10.3409971452242,8.54085885108384,10.0926165687849,8.40402508279953,8.07575301109554,8.58993713924796,7.95030750283858,6.00708792777418,8.57528963480375,9.41604946658058,10.6749663660161,7.13728144877773,7.52855993041035,11.1289798167181,6.62647032949723,9.13807260829862,9.42607336916616,8.58188648985011,8.08950574767466,5.95955117266459,13.9710127521308,11.5384360572668,6.1708656340493,8.19805066116645,9.98648228135901,6.52040986870916,8.90431091190504,8.52628757404277,9.75773301243457,7.85234129570599,11.5068371128162,7.82441753069397,7.37002985003147,5.92852962935412,12.7119471257434,7.81207243764016,6.12626083246385,9.82055881411479,7.37698536206856,7.82046135858385,11.5615558386142,5.69294210565393,12.2972255000208,7.19999149971894,13.9492924985537,12.9716966071549,7.28838231201181,8.45633394464091,8.23896532175445,6.11613040452236,11.3220076597442,10.9034835431449,9.58008461658252,7.79789754892133,11.9252249212001,12.8056064777151,9.8739419367413,8.63329277934822,7.98502161323672,9.71042912630799,11.0795194495022,12.6568766295016,5.89132487733075,15.3407475226827,9.28840369879735,7.57250528086614,7.89196692854109,11.4068905706323,5.91957334933672,11.1406924341399,8.70068154636335,10.2686959445668,6.88006725354903,10.5210006741723,8.7103902270029,9.99574168282062,12.3686910414415,9.67032062888024,9.24904173651167,8.22101008106385,11.6650485376333,7.6184550333035,6.9072651732013,7.35887578688573,6.41645287693195,8.7898246894002,9.16388999869259,6.17002573555576,10.0003771847321,8.94881072279761,9.36189453328445,10.0486031139465,7.87464453437819,12.8180901463929,7.31264781427194,9.4305273052296,7.98008937589047,7.78590125928594,5.72035968075954,14.9691567187204,10.2593323666927,10.3974687545087,7.78755048497476,7.53900918526907,10.2992202356505,10.2874152640809,12.4858432360607,9.59207401003052,14.3783349640016,6.24094003620311,11.4244202506967,6.85564849926997,12.0603154194097,7.7100175263167,11.8801742632149,6.87609013620974,8.75023200152624,8.73103305880076,6.38816344705398,12.0948204132422,7.03092726605075,8.06757550587405,7.25622324953511,7.85751513736222,13.8909192634952,7.78396357267398,6.37018979546577,9.14615202009999,9.68671906597148,8.88068443535689,11.4884254764333,9.87995923952877,4.77663984001678,11.6964467615988,9.41343236780961,15.1536904256746,10.1823085934055,8.72498248335779,10.1140850996939,6.7105617726452,9.50243831719216,10.9822618128249,5.5064789773149,10.0618197886802,6.88211895366802,8.81761981308086,9.13457248639582,7.87867453041798,8.63778289629803,8.87763617623367,7.25086673811117,8.18767399140572,8.28382351672514,9.7787536963865,7.34757953269338,7.68529763221283,8.26120861544621,6.66423996439695,10.5547540090966,8.64511243793379,10.4304856047526,8.44480627298665,7.7253335237214,10.2010082691905,11.7464548121698,5.73787310386083,7.65336127969603,10.7032406675083,8.81263520090874,8.27814334980246,6.44787223870369,10.1521169629021,11.5449528624637,9.13493963149452,8.28881000013647,9.74467050855705,9.7897518629852,9.02725274427264,10.183340278583,11.6770848916264,11.3636459626149,5.57390057995857,9.68370959619809,10.2886790377908,6.70941321523173,10.8494251183399,7.67816067229927,10.5016816131056,8.37603539462496,7.43016617044279,11.7719876030437,9.58699676383916,11.0755748199694,10.0507605490981,7.44360140015864,9.95588615362885,8.3067190958129,6.93218736666659,8.28350348648641,11.9468424442261,9.36516868013082,10.0325404034185,7.56720510304479,7.35700390238085,11.4395760225387,13.7266207227335,9.15775075867197,12.2667037379434,7.36752886710831,7.3865611701016,11.955015623161,14.834010123705,8.68395065365682,6.70722919763504,8.2555374372705,10.6724238353731,7.19932078804945,7.61420751651387,10.1909173859577,13.8197313354237,8.24051226626315,9.64330574115931,6.56557063495833,9.3712784591747,7.96307384413676,8.78487923170474,8.09874816442245,4.93032732192064,9.28019620449716,9.32869348374944,10.1940433527588,8.27437614107626,14.3231493088677,13.2161179321125,11.9483427017285,7.0514075599827,8.59924605692941,6.7895819113313,7.44669249233413,6.8434403889804,7.94195750111677,8.28086588965009,11.635288703996,8.19131593986348,8.58743987244034,9.15406923190116,9.81763314311525,9.49074917532464,13.4624559270703,7.86255270848884,10.8564452859475,7.0411765910926,10.9634509970587,6.76449365291238,6.6743750200638,8.99866773583623,8.66649110462782,7.7333862854039,11.3785351899287,6.54498518602735,7.2317126945369,8.16289960528016,10.8581762943325,8.83111873668468,6.90257224580218,10.881928780182,11.6498051409248,9.28087906239345,7.12504230215998,11.3712327502541,7.1841939643285,9.83502634812992,8.6305585217903,9.11677678426127,7.68880065967849,11.213248518066,8.30277753905985,9.34494517027889,9.97420135939906,9.75344880590069,12.0795888264883,11.2505833868361,8.66164539453475,8.99365603614184,8.8631015671001,5.95075779851304,9.28946825973397,10.8252833163594,8.01246082055118,10.4689038630536,8.93629746074253,9.87724764010419,13.4060425099883,6.50323231106715,8.06828784083836,7.1281375956407,8.43628192750657,7.03225377522949,13.5101359804553,7.21886903222405,8.29412726975633,4.70964046039296,7.87569315605718,12.2865784631053,8.31524641411003,9.9838793622216,11.0584734315453,6.9583105794917,8.3884538229052,11.1244857480638,10.5479159618774,10.2481471432843,12.4168612981983,9.02678110666537,10.7477205572046,6.3363114888312,10.0453897534201,12.6060327564606,5.3643841472955,7.20759451923797,7.05406701779965,8.00772930228291,6.43065680437508,9.88513310252914,7.62560865676315,10.509974606273,9.48601349660263,10.1394284507776,11.1827376194819,5.68836932233839,8.78088613740398,9.0735939261433,5.9827000099575,10.1274537835952,8.59349314974624,8.59490224906094,12.0759814985903,9.25261326602278,9.62973785659873,7.51310723422898,7.6513668157533,10.3218613542308,11.4718655594713,7.72021291538264,6.03386369224287,12.7091000226362,10.6012583075312,9.26996284305168,6.94155352572522,7.44952103864948,8.36940605613771,13.0796757142541,11.5235527238439,6.96490495671516,11.8556326555521,12.7257646344931,10.1806550975645,8.85879114515658,7.89719169254024,5.74143882894081,10.7640119154715,6.84878350105571,9.02069824378331,9.53914277302242,7.18199497212624,7.73468997453973,8.08869449670286,10.9111036761592,11.3077179673599,6.49621590546713,8.00671557775715,7.70212105339909,13.2996935280569,6.11829762336291,6.14412406077858,8.64085328627474,7.66530557857195,8.45699081644345,9.1841172912141,7.19669468579762,10.6855001537675,9.72820298278444,7.43735105000581,9.45433321504237,7.25219745605147,12.1731373861232,9.784903258457,9.85974471691756,7.48901734623219,10.0642718426657,8.60137298314815,13.140347764128,12.8391360933797,4.91493862297431,11.4270641317115,8.99286027804275,6.74894910521813,10.7606052757104,6.52752702916544,13.5970724709214,8.14351942984893,6.81058829122335,6.27992544641916,9.13967303136639,8.88782362580324,8.91290577731202,8.95082524863373,8.43606842455243,9.55742435167723,8.13443179558706,9.59029998567793,8.95558793801226,8.3775528005334,7.71673102180777,12.0777690526975,11.6621057575354,8.01598005425794,6.97954558885838,10.3079146694508,8.42533496550695,7.65534641408931,13.4703957231564,13.4251907439783,8.63117884048333,4.5316406780216,7.94710692346503,15.316220709085,10.0907175338206,9.02167353284733,10.743502448458,7.79656356848851,9.98141362153036,10.2389043266984,8.10195143437777,11.4945019248414,9.83482474306377,7.77826699839965,11.608262041695,12.685263063513,10.4665491618893,8.44259916911728,9.14899984022611,9.57925692461488,9.75064842405958,10.7024975972245,8.51168544310041,6.97890345801113,10.2465820800856,5.25159990337089,13.1341944617912,11.1501340315399,7.39706030550875,7.35533524325352,8.22019358035841,10.0170279090884,8.69922403009622,14.4791417164519,7.60249104309826,9.38459243084667,8.31090477261519,7.96171903154948,7.91226696025302,12.6894726350527,7.11030217722615,7.70469750615271,6.1158224862475,9.70222320624466,6.58900325625289,8.75436401500632,8.86233552503343,8.54225567148325,9.55440156232419,7.23974664367681,4.94128877250625,10.9774346444243,6.86251855571172,8.21973527352984,10.5361036379904,9.07279157320237,10.969393414078,8.02197337880405,6.50630094972042,9.20869166595725,8.90132596977763,9.11031806532037,8.2145521487935,11.442267705506,6.30668098998661,10.7476235612489,10.3179556586456,7.84182163652214,7.41507315210524,12.7806702388211,8.49582688622056,8.21210411406865,7.96949566859721,7.51502287435464,10.3569668878684,10.6620141772656,10.8858798922839,7.49199539411225,16.1859568023743,8.43715694539732,9.22880767988616,9.89065135140213,9.21257024098931,7.37646640659261],
+        baseline_values = [azelaic_acid_tea.solve_price(azelaic_acid)],
+                                       y_ticks = [4,6,8,10,12,14,16,18],
+                                        # ranges_for_comparison=[int(7),int(12)],
+                                       boxcolor=GG_dark_colors.blue.RGBn,
+                                       height_ratios = [1, 5],
                                        fig_height=5.0,
                                        # ranges_for_comparison_colors = colors.CABBI_orange.RGBn
                                        dpi = 1000 )
@@ -233,14 +400,33 @@ def MFPP_box_and_whisk():
                                        dpi = 1000 )    
 
 def GWP_box_and_whisk():
-    contourplots.box_and_whiskers_plot(uncertainty_data=[1.96520423062229,0.208092922781489,2.39263429582925,0.277224412466555,-0.0373547918001247,0.980297931951116,0.46817991236697,0.444043969671803,1.190026318155,2.1701359405553,1.04809773785033,1.278812261853,0.967055850828761,0.836319092122821,0.937837581136138,-0.375331728850313,-0.488756810997835,0.978345784290129,0.684009762834361,0.445973920333063,-0.147190152659196,1.24768334664005,2.23727474745704,0.787263955884178,-0.0802047987119661,1.15148282222552,0.563954061729138,0.797141782781978,1.60468665980445,-0.0607114704131355,2.79764994154206,1.74624545955316,0.614757130934361,1.36921272409721,0.164789705143685,0.815670381825729,-0.123948575942634,-0.166780417999563,0.118821313637953,1.32272556861842,1.95570165118248,1.06464064982065,0.788173920581315,-0.0361857710651687,0.382381852472289,0.646484131858182,0.407089638817844,-0.711315982265237,1.52294344697904,0.631170191139374,1.05650685169066,1.41894903169371,0.0607726848037089,0.185429852344111,-0.10105713873974,0.586278353060017,0.359076081306817,0.342647004982261,-0.609817504244379,-0.193380262700725,-0.637429641822937,1.31095533607142,-0.294119516282413,-0.268438417221141,1.46597758613721,1.25786271293475,0.611837579850249,1.02000364555976,1.35912390819511,-0.093636347208033,0.841182956400342,1.2836147410903,1.12585793297635,1.66204053193214,-0.106033663530621,0.627390274236367,0.797733550632699,0.966602936072132,1.97518018394832,1.07923907077238,-1.05677858237088,0.65045761272938,1.63751608208177,0.331544905783055,0.365164766361612,1.30529964368457,0.837489076794871,-0.933286909404707,1.29229198010733,0.354084447851694,1.06270435852654,0.427756808610226,1.75928737205504,1.20466117433575,0.188538343086861,-0.576631637498643,0.793475503882377,0.296229492962134,1.50707815103727,1.97447893405631,1.70779705743859,1.35465298860323,1.31870715906026,0.646772881667154,1.42239179710398,0.372669104239101,1.24380445110435,0.951050682303986,0.235849427363256,0.429613593590574,-0.339332711924264,1.09057959050809,-0.0710272576129292,0.0671132626177133,0.285445234443632,-0.339842799414322,0.134952314749842,1.09856273260233,0.230161420108928,0.526005066363412,-0.284873491442248,0.118014636939765,0.119352854071863,-0.540532098602839,0.0735434606927825,0.623383193361294,0.987475921787029,1.34769958047189,0.205743171598229,-0.183148180746729,0.0110620339755805,0.921330091020598,0.985366566008036,0.690091978448672,0.6356524554231,-0.379211729992523,1.06413730877463,0.659904363766033,0.656640892199519,1.46980759509228,1.0698907590079,0.480472044567985,1.05119130781306,-0.0346668750922223,1.93486605888996,0.583094525997964,0.857761529780307,-0.114272429007526,0.701965664233228,1.62299892206525,0.64402827326693,1.1532424415384,2.82124051449935,0.966532844737792,0.497704126434098,1.28096922982126,1.11104506347225,1.33703313087012,1.71404359057232,0.00574255763673293,0.83438363764007,0.325283044727861,0.77845429542684,0.157007135820322,1.42500434458622,1.69684186167843,1.60977924175457,2.3141268723795,0.0753917363100172,0.095655092602394,1.42164151592119,0.535870725493231,0.670593680143647,0.628678254175739,1.09647894524193,1.46699556695447,0.445575382890858,2.48308411618858,0.599484363298199,0.772911221461252,1.10839068730172,1.46513367319286,0.25390102919231,0.433947947644818,1.03835882797086,1.37690633151469,1.85527556537658,1.67744260863876,1.64138208730747,0.194328424060565,0.33935680653536,0.211879517670258,0.616958575592102,0.0862749088850094,1.81798698812936,-0.15224291689251,-0.0395471533448895,1.32156775934606,1.23177539632632,1.14919211699543,1.22073149316222,0.955660617256374,1.15311126395155,1.10875821306779,0.614668445944499,0.990921273597674,1.06675022619549,2.44099879145055,0.448329147050124,0.756084642558024,0.915290337358901,1.58062157226858,1.32154516285424,0.418286427379197,0.852837838468618,1.05299364357567,0.289857950895952,1.75049209208799,-0.0492924111810904,1.21081842129618,-0.271205707222206,1.33826467846742,0.618913921985577,0.664500965665999,2.39309231921901,-0.210791140268762,1.30324067377664,1.18850465942445,1.8250352869564,0.645527725655665,0.143814690492663,1.40868241744156,-0.220658720527142,0.545097130744139,1.10366703028864,1.21831296615954,0.504120647965792,0.172055360580089,1.02228026720885,0.928493191191455,0.859400048454578,1.2012187371535,1.46831558806409,1.28161087755545,1.84163982318088,1.32335234002057,0.637825795196527,1.43371877026408,-0.526686483803356,-0.161584938554455,0.65046420792719,0.870582973893235,-0.131583206257176,-0.227745409112554,0.228989799010874,0.810358868258312,1.3066531856839,0.963341477567393,1.43145516632455,0.777899093863859,1.38738299149552,0.175803842645159,-0.162704308561974,1.2896407875185,1.71980490423099,0.723977084223762,1.61743331161492,1.40839546628991,0.836190847991492,0.499988349328074,1.91973813732848,1.30016756170705,0.649239395549261,0.324151556204988,0.254246514648969,0.782782138649514,0.668810048404513,1.53912534160804,-0.511217573031775,1.84614198312537,0.573991195892329,1.46056317581876,0.139666131380356,0.816593697665194,0.772956764957581,0.979813969507425,0.796545360510333,0.359117112119957,1.57515135839118,1.80388551751999,1.54337168600807,0.460669305548079,0.0690469226534969,0.453763803715859,0.0308051643960852,0.207474956654911,1.08554752718924,1.87491150005842,0.300420626961145,0.534198835023993,1.3565831262574,0.611194572718034,1.31821125802783,0.136049389029747,-1.06487664549563,-0.295092764509963,1.41755456961128,-0.487779655491508,0.896774489296071,0.630940975414575,0.565801298476565,1.39248278164975,-0.116195551356565,-0.481488237038421,-0.418096156725156,1.58723607868055,0.118284828328457,0.782380457711593,1.59026825966007,0.937340836494252,1.15231263427078,1.59083722620995,0.814377579707712,2.03931452523915,0.229938187192353,1.43414171773253,0.768508862328313,1.29785743277774,0.88271695321632,1.17166050700035,0.89046324677796,-0.535687054239538,0.917255242018847,0.674201841902612,1.89563716044168,0.755297338335918,-0.265790461326604,0.424447942427825,1.2714696265917,1.66151095320213,-0.148306074277526,0.571298373516001,0.306588705006998,0.271530279349264,0.508173826845823,1.13486113431222,3.55256607427625,1.01141111723018,0.764383552552102,-0.144446072107062,1.93677027214339,0.751782055492171,1.10691145295402,0.0520237930832046,0.927293116561621,0.81592189609626,0.625552312838643,0.945748037863826,1.43411527678807,0.752988960350898,-0.639206481743267,-0.323310990970478,1.34842700595404,0.598905988619848,0.998951154200242,0.538411765210144,0.227792912500798,1.86726135002403,0.142504132281163,1.69363270458128,0.738921895233403,0.135016084648024,1.68040725282797,0.416164738900017,0.599518158536558,1.60666107330949,1.62055572379578,1.33082738424052,0.872122657481057,2.13749494058002,0.133062072933631,1.03463960771564,0.963748514783401,1.22607458696839,-0.226286220667136,1.66206426582792,0.323648476264289,1.91099685298079,0.663644583677694,1.59233519512246,0.755743681024043,1.1892013194752,1.8639667425167,0.701407592169449,1.60833239203785,0.525274846466377,0.171089270197555,0.350619568801033,-0.508906070794847,0.594370041561639,1.23002977667318,1.74503147099703,1.68936010219704,0.765665778724152,-0.0232224418777491,0.607258751992063,0.704432889686306,0.295815724340674,1.5116222567089,0.758819560281189,0.83997357788361,1.88273412872453,1.6450728962723,0.400921915288018,1.50708113695521,0.826518617366744,0.564526594640377,0.644628822329938,1.13383610495867,0.488991998645588,0.336772281108448,2.36698127311455,0.708045539781978,1.15024496940362,0.626790711227894,2.14384906885447,1.30555005702002,1.42527246343261,2.03865019621208,1.13981424360194,0.835708769496868,0.320927476208869,1.39147862856962,1.23254788458631,2.23518388210786,2.60531148569644,1.04040232855126,0.477774727711692,0.0909754635098103,1.34340153183153,0.113628327988296,1.43909266666665,1.15365681136361,1.42194358720449,0.957815984287961,0.781587270033491,1.72656526371953,1.84183920958706,0.184160055452239,0.750436756261387,0.523237152244283,1.12162564269274,0.529794246419298,1.49776318798446,0.0682932227535815,0.923516965051011,0.37534835695303,1.94207421072309,2.13839926342596,1.0739325705875,1.63016499266741,-0.276652169020146,1.23865187013722,0.1153865386259,1.46787522650713,1.551607463079,1.06097781014579,0.530270689120574,1.07309080870429,2.58042006755959,1.27005038761488,1.26838213822841,1.58093727347686,0.673127854534307,-0.46733377450931,0.318387430907354,0.252079427131262,-0.0277504092981218,2.04512572575011,1.19324085512175,1.00028133311333,0.492701935926682,0.830137161453916,1.08240482215219,0.803530271661625,-0.23206415892539,0.934266972072704,1.42364201390229,1.80506037638055,0.685500231032469,0.538371947516463,1.1666669924449,1.03415536692258,0.459997801531568,1.65894489530175,1.21037334807461,-0.0950868344979554,0.301332355377539,0.465799064626996,0.573160343181431,1.58121012959174,1.00754769794304,1.74089474760427,0.537443135259146,0.416124792920858,-0.133943919605755,0.307404598225016,1.63949159880212,0.343628778814043,1.08340313289806,0.00787657971017985,0.836024476336073,-1.0305894820312,1.47655244212554,1.02064664126972,0.540395911434469,1.10134735425282,0.674350569052972,0.935031032459161,0.160209348049827,0.196929408058612,0.0450000251271039,1.19346062862292,1.6786824092427,1.5445511353666,1.51045969182681,0.804311774794058,0.411126041561339,1.20645982668181,0.431178421661512,2.01775273218782,0.470182898912535,0.78510045846151,1.53820383038029,0.57045764771814,1.75185554110647,0.734850440049225,0.851917640510731,0.192853366243391,-0.306295668808321,1.01249435955775,1.07108123901967,1.34057436290347,0.759936902994927,0.630802881126264,1.18520451818034,0.576852189631698,1.6820603875948,2.18025301544304,1.91874382118077,1.50004990860094,1.84934258447486,0.724081955587156,2.19140035443931,0.698141970477131,0.55461296375988,2.31041562263327,1.05591300821417,0.668700625673925,1.59766089697118,-0.0839056267351346,1.50998116227881,0.932690970125751,1.67622972319975,0.549214672708526,1.74643129882384,2.60399230071081,1.31104362016609,0.337364808112664,0.1375540217972,0.989165352298219,-0.556616794074525,1.04886816986004,1.26027058328053,2.04921104825915,1.34289704283926,1.14221987528014,1.68439168281295,0.144481470233068,1.67478655391525,1.27975844511553,-0.796582665322868,0.398352953727816,0.80133320273368,0.299907541976261,1.02915077868109,2.50405453593355,2.44104331944405,0.764219830078689,-0.480032310863319,0.533531979756489,0.800638366429691,1.36532780180481,1.07421847072349,0.354025505665643,1.27540579736185,1.35851333994191,0.507771703061294,-0.028749445752851,0.497013788115996,0.760496597157857,0.656832937002857,0.0537626934858757,1.00427991789082,0.826579099958774,2.24456903450706,2.44243134011414,2.27974409653753,0.952827730980577,1.87897507599956,0.0389137028516444,0.535823067084975,-0.250422068443965,0.85301229569486,0.969428704243828,1.42879732459331,0.990122328046494,0.55244370412106,1.22687831166712,0.858576868967395,1.92475492600495,0.210330947380736,-0.144656469171935,0.597642577784885,-0.328725406842912,1.89481135350498,2.15899310057777,1.72501320773518,0.093305515891597,1.30743421848994,1.64244518244793,1.62858889628345,1.56065094150292,2.404010514959,-0.442290671932758,0.451444548811347,1.66868685400479,0.564312472153842,0.367564277750873,0.825435062975778,0.226064158839211,1.34732362345588,1.24125048871029,-0.269587174676023,-0.365435205536329,1.01993291854313,0.980817970315314,0.0522231028980826,-0.0632479488058788,-0.347598294309964,0.0150802944071202,1.72956668639438,-0.659636701410562,0.70839789089414,0.186928697463213,-0.215363347138139,2.51245427987514,1.22820564906401,0.296208682202948,1.29986526033161,0.011545893683607,0.704682350927765,0.867421237914769,-0.0763981370017817,0.802889638344931,1.8256645772286,0.466247842260664,0.510114786359734,1.2527519833225,0.798548637535145,0.00716162823361266,0.29850470980098,0.784551396014836,0.644044929115347,0.496054623674382,0.432943624917481,1.74223808578356,0.480760267859957,-0.00346519922087296,1.22981167411194,0.613981132824549,0.36212037219124,0.901364669526998,1.04486032544975,-0.562315810506282,0.546258315263653,1.48390060319619,1.92098344110069,0.97489313948417,0.913349664663038,0.44850234275096,1.18892054445381,1.76208782880442,1.67805498304763,0.703723167259572,0.530274790950742,0.933183560425066,0.554033509311658,1.07644096620344,-0.564020634802363,1.17116285587687,2.36403158615233,1.84501342878288,0.392537826660636,2.13110387020102,1.39748862111186,0.863568614255946,0.404066535690656,1.09909715321554,1.85448321394946,0.998951402012072,0.823336355685139,1.76935007597392,1.02995093753368,0.473621924975888,1.0568381570502,1.13850665807854,1.52767529590758,0.197382220880357,-0.0796605005772619,0.772633469974242,1.83425520961671,1.57286927526226,0.0475938056515197,1.22373456174805,2.29600768966807,0.486907936687075,1.06308999265221,2.15292474196687,0.977700737138733,1.83142596234573,0.636472458898735,1.9820623420289,0.307147278801271,1.21087879619499,0.221091189075537,2.08391702687617,1.85021886470511,0.0903053500385695,0.0416818967071926,1.2615783226096,-0.555554643978736,-0.163586796810723,0.309654085300501,0.829465406698528,1.0723498650155,0.221297233563634,-0.314678040944825,0.939751396326402,0.630578891010327,0.706228440892383,1.07096486546945,0.350015283762676,0.47912938806785,0.422178928238914,1.33893825110557,0.140138314308366,0.956849192802942,-0.668959026621446,-0.439547066039275,0.421328367373542,1.11717315470769,1.46944129085664,0.864982909751616,-0.455455063323379,0.127382797731057,0.0950643655558725,0.370231761568952,0.357789386196117,1.09368359670077,1.73133903418633,1.08055594990589,1.60961451408899,0.454018985459623,-0.37575645938767,0.343586069498045,1.84171004157414,0.142705006894193,0.113478036805706,0.109420742026312,0.648118408733634,-0.305055112331861,1.23081411520681,0.383456164125501,2.11814611680211,0.163867900104201,0.256542051817227,1.85330417456978,-0.753482428552051,0.414778853789704,0.697618444304233,0.250729075899965,-0.304273407537451,0.38206534789947,1.26004993434261,1.08175780562242,0.648670600856725,0.961601135598599,0.168767539163998,-0.0954500636248969,0.473630232041055,0.881062324370749,0.484996936316508,-0.325796992037116,0.786866231485272,0.350849374626495,1.58322910175051,0.839006074561752,1.17395273909349,0.974766896765232,0.0710870753625592,1.90541882459676,0.804841418236283,1.33982657221039,1.11071294786021,0.936069893210352,0.0473818307963061,0.148837484653463,1.68197348005819,0.686634910548406,0.718265630894297,0.808094797670149,0.474819414725037,0.60248075524925,0.882973474938634,0.736049501548099,1.02253945450185,1.32929318182512,0.724367041450501,1.33605645432946,1.59725341967825,0.257014821004741,1.6959244994578,1.34509148972249,1.33450196502028,1.067564589452,0.8392490948768,0.946907520555191,-0.80256243085848,1.18046119991508,0.398276027020065,1.08561746376793,0.835292606827419,-0.126923006392367,1.31812027520362,1.5659366112856,-0.477296879742852,-0.140650521921728,-0.63056305709717,0.444235710068215,0.286115567194779,0.784657529533348,1.60603942236465,1.03589538901477,-0.252994662809119,0.427592209067635,0.000398792727178687,0.672398984988675,-0.644855097979105,0.763118749602482,-0.582940354003302,0.609409996801514,0.481877171344777,-0.577038404756165,0.415548350632934,1.53812196299063,0.145218429745988,0.850198144230934,-0.0964733131346378,0.313678573448048,1.7522205415441,0.74574574988956,0.253516973787033,0.783853559891915,1.54826313812521,0.692063564390498,1.17787007245238,1.75448556617737,-0.269299348731394,0.0334194461176409,0.349686844846026,-0.0914162524052511,0.279960968490645,0.596769270389231,1.03048817612133,0.286516905283662,-0.632002610153908,1.19626818099496,1.5758781100103,0.355731402421473,1.39495838368266,0.12823358564631,0.519475088927766,-0.083754618082498,-0.0733745864552695,0.197954006281519,0.847739605647217,-0.0979735836805098,1.24543706780506,-0.476246464015118,1.01903656777702,-0.852765363817372,-1.01018825034297,1.02699305209605,0.33698964087438,0.254856937876084,1.05645974250397,0.591620832292051,-0.0984804433011632,-0.152413964592208,0.0446484728500955,0.987183677273709,0.930614860791552,-0.479927819920146,0.0284655305528894,0.164879743067601,2.84154728530395,0.729396914252785,1.22685808180562,0.634337303393348,-0.713648304391763,0.825499074862616,0.341808550047364,0.961680626664535,1.12172968398542,-0.654614798733274,0.62281609399127,1.40225476264397,-1.05507010104521,0.229709946111568,0.693694725406925,1.01700221139762,-0.299313382127973,1.26309859861661,-0.0470720477600644,-0.244694917232556,1.17218230408794,0.81900586264414,0.678909013340235,0.420429496729131,0.767437432940547,0.461337601116023,0.0765080174496013,0.756834295228774,1.36285495357433,2.44147521685335,1.98964752738257,2.14341417039305,0.771688321175588,2.22739793348721,1.9955391110942,0.955417764548155,0.396047839835344,0.617762528970161,0.583133880257808,1.76116466516741,0.882063043164074,-0.0887867168517751,1.59327964541831,-0.145794759828743,0.364868193315457,0.558979522423265,0.293252744653282,0.608195375026197,0.494682972091109,1.07474067463271,-0.30388772474025,0.98296383112563,1.09458892019311,0.476734985417021,0.562377090820181,0.439369385283868,1.51111245381933,-0.124302157404145,1.37533869316237,1.91096062264537,1.25660317305493,0.681251596767723,0.558565076003704,0.561057338882453,-0.40224069918459,1.19712567083263,0.779807564727893,-0.0591919192010231,0.308029157706107,1.91150490144335,0.404149974508247,0.197811464788703,1.71944437324817,0.423918739170748,1.48694422648709,0.987668725440683,0.394551860270342,0.938504524519931,0.969491675217677,0.85626921085748,-0.180926210542758,0.850835627090706,1.50541029304765,-0.248058976913814,],
-                                       baseline_values= [2.230], 
-                                       y_ticks = [-1,0,1,2,3,4],
-                                       height_ratios = [1,8],
+    contourplots.box_and_whiskers_plot(uncertainty_data=[-8.26162945698534,-6.88071871288166,-6.17634510905333,-7.14408427178409,-7.45196988749381,-5.52402001304305,-7.8055741993395,-6.68607048452048,-7.41034188031595,-6.46698900582458,-7.38983344174092,-6.90679901745604,-7.85348890878655,-7.3953624061078,-6.84579210761012,-6.98210292788042,-5.04119257382494,-6.56114047691588,-7.20161765245781,-5.60982866384365,-7.04515412864306,-6.46065018069494,-5.55224106094558,-7.37345250013937,-7.63495887175154,-6.69043122541219,-7.21628577905179,-6.27527006422709,-7.19857047724854,-7.67649291953338,-7.79061593575582,-6.92610166440342,-6.67697787973994,-6.90223450895813,-7.77934989535745,-7.98891691892949,-7.20019574626217,-5.79666670217456,-7.1157295877042,-7.20678127095968,-5.83730003633383,-6.39075092084054,-7.01548744292713,-5.37717489579992,-7.93513751401952,-7.05275309457924,-7.3369971920391,-7.18750429915455,-6.95962830992196,-6.7530072744154,-6.75842813725391,-5.91802879788934,-7.38300577900915,-7.17470519499583,-6.68011403720082,-7.3822769596275,-5.18065253252673,-7.30603118602501,-7.58070947406486,-6.75537727463139,-6.22807235161029,-5.47272448210245,-6.74059639421283,-5.61919652242849,-7.2847197160743,-6.53974470483417,-7.62528633183916,-6.76276564476042,-6.77162447803189,-6.60174688571489,-5.83988156175687,-6.54772031955183,-8.03351753875487,-7.09626885850732,-6.80820685627882,-6.83102631256877,-6.59508572900047,-6.89713685623035,-5.52931012559716,-7.60163431262359,-7.181570718501,-6.77068783850559,-6.42515316498343,-6.80862615889746,-6.0641273812655,-6.67147363734197,-6.99009678695212,-7.56036117565952,-5.73154637281431,-5.97322398693198,-7.5994912138293,-7.62232480640346,-6.07118757747886,-6.69554125048312,-7.56560560901024,-7.06986502575785,-8.04017251413714,-7.37544841047041,-5.89468443530995,-7.20044677947498,-7.62592274972894,-7.90893981083654,-6.26382137823093,-6.50799943232661,-7.08110623364291,-6.88139701160789,-8.2329080787441,-6.70689988995895,-6.86145717202265,-6.16739890209728,-6.97232792616187,-5.26461781143273,-7.02368694188043,-5.8577664841349,-8.21475603625844,-7.8149329240514,-7.07778946426377,-6.20136114495674,-7.35674907288754,-6.88365284549387,-7.79500828399664,-7.51079969006656,-6.28725285353593,-7.78677125594504,-6.64959587180163,-7.42592953621499,-7.91848944504999,-8.19631549982617,-6.19164564695977,-7.3581644831004,-7.19244177411143,-7.07392323612998,-7.24958140162976,-6.3624054600017,-7.59975153610819,-7.11265958860046,-6.05958263148574,-8.00836103076042,-5.8211782423646,-6.79871240675171,-5.79718904202203,-7.10797842217855,-7.87568895103868,-6.66036007362207,-7.66919223154617,-7.95193437551731,-7.81477749157336,-6.68288425183782,-5.15518797823034,-7.49001778846817,-6.23129577269242,-6.99283326426887,-7.16242634497289,-7.489777442052,-6.50803904726632,-7.52807827375994,-5.41604962259535,-7.53236056244672,-5.99017697653495,-7.52546836335666,-6.99343462234695,-7.03216294826575,-6.16020476927263,-7.50751305342343,-7.21260319139373,-7.05764190574559,-5.67694376739929,-7.46822669199735,-7.43057204101265,-6.04162383102909,-5.04888253216127,-6.94435528273269,-7.11595497045782,-7.14788630678152,-7.69547796584224,-7.47715221683024,-7.22382396528374,-6.75752579931335,-7.54766619840599,-6.63614155390783,-6.77866417495074,-6.86490856507215,-6.82576658478618,-7.34922254478051,-7.48036905587588,-8.17829435830883,-7.10662350911192,-7.69813117910222,-6.48908500110455,-6.66889274979413,-6.7798008588502,-6.66295998136649,-6.69355774972152,-6.70696307667145,-7.36483418236113,-7.05255028587843,-6.85953632978905,-7.3129393057865,-6.38836148125046,-5.39060722919277,-6.17106659320373,-6.76631901874965,-6.60878011822082,-7.29473052208372,-8.56861091071525,-6.6627043442286,-7.37345318416394,-6.28113934964449,-7.55907663961502,-6.18123480478004,-6.81803345769209,-5.57683601285688,-7.47718403251449,-7.76461459050453,-5.50631091933873,-7.79344981263656,-5.27930030858601,-7.66267011782171,-7.57890936358692,-7.30869547706189,-6.49055013092381,-6.87897996380089,-6.9624946630075,-5.25968746680356,-6.98556386491953,-7.54477231457737,-6.52750882842414,-6.84040304074238,-7.74152961849241,-7.69945737187609,-7.6628288874076,-7.58132302935703,-7.55704102529426,-6.63180780905463,-7.18829942570108,-7.36324713138796,-7.49776305322527,-6.75044289056363,-6.97737820495476,-7.73663173772644,-7.26970367066455,-7.81074761734601,-6.76918623941876,-5.72779493681913,-5.71640741291439,-6.51652954390515,-6.11429594359345,-6.97681155054152,-6.83602419238951,-7.69795185409066,-5.58452433663689,-7.47877825796487,-7.70757112223895,-7.34789788970893,-8.24101192403984,-5.8291029265603,-7.37960308616371,-7.77537097318799,-8.55910491435947,-5.9352300472525,-6.30988131785688,-7.99515820901999,-7.0795847997089,-6.16164074185629,-6.4967971615397,-6.16359848152628,-7.50047425801373,-6.41400846935653,-6.81619341211464,-6.11632381119723,-7.33622286470771,-7.83860491500336,-8.23740456625943,-7.01950007144787,-6.49098110959039,-5.50887545979798,-6.14333658755972,-6.10620728532972,-7.55385831353901,-6.41194375606997,-7.35880923752898,-7.60743788955539,-6.963629003707,-6.65678171489751,-5.69714975446161,-5.96576580983667,-5.49376543680136,-6.40565751748377,-7.09410794198742,-4.02471637665774,-7.64894540117173,-6.73128126109529,-6.46688693808804,-6.91567537071176,-7.75259633792761,-7.30942170578578,-7.30453852958478,-7.19498552185512,-5.82907364070068,-6.79020354692058,-7.0884811278527,-6.50763832017187,-6.73966085939301,-6.27924310404164,-7.72345569136565,-7.29108329296154,-8.20665323169866,-6.38981230946629,-7.84140704517454,-8.02249555758248,-7.81105844549053,-7.04577526337029,-8.18275515780821,-6.81942518679306,-6.52269703435075,-6.44158378734678,-6.65410078568572,-5.90048058813049,-7.50405066028684,-6.96532863881186,-5.41349849737947,-7.92049343665637,-6.49293428175456,-7.91864464317144,-6.3257467376323,-7.38304841622227,-6.627529513371,-6.45799740202114,-7.2683114369061,-7.67506116803352,-7.11341058183728,-8.1527414381763,-6.19249849530861,-7.39627721372929,-6.64594699087136,-7.40131212191692,-6.05235032458783,-5.92678051605613,-6.29584760374699,-5.2099460480544,-8.24431729344107,-7.90206730589718,-6.15634243548509,-7.19778124616469,-6.44973095191227,-7.31930795155305,-5.60029354532703,-6.11745736112529,-6.87642236444149,-5.81196319197878,-6.64913543027375,-8.06782050690274,-6.40747339649686,-5.65318771906048,-7.58075123513741,-6.44105428219092,-6.21036386692513,-7.28046660469893,-5.43722018571351,-6.74699586188837,-6.72657687611318,-7.98404139365958,-7.0424948402777,-6.70351589646361,-6.62277145187663,-7.32680344642274,-7.4599983976137,-7.57619767386476,-5.52626950480439,-7.67474682541599,-6.89063475366034,-7.71026779828537,-7.74825788756712,-7.36506468098926,-7.12870361616123,-7.71422834317947,-5.46967227711567,-6.20939140682881,-6.77217937703679,-7.49469999227383,-7.72217488129827,-6.93288913524499,-6.84214966005271,-7.85121306378252,-7.15578870231425,-5.91696776325947,-7.71514069136557,-7.44508330983678,-6.38204540715961,-6.30388691175004,-6.04793836788264,-7.27041462418261,-6.46392528291559,-6.02833714110937,-7.64046488786401,-5.57599751254867,-7.48472800517174,-6.66258433236376,-7.81849748439863,-6.24496916372524,-7.34942535606082,-5.21654072292618,-7.23052771912063,-8.09990893983178,-6.29038549329248,-7.10952640651956,-6.87447229472549,-7.32295772907688,-5.81927123307848,-6.26234049015605,-7.77048153514284,-6.96326030474994,-7.55938941706851,-4.61049652502653,-6.01090369852707,-7.12198652949329,-5.94334028519367,-7.65175102378476,-6.91756785666376,-6.21461814352559,-7.35758090714102,-6.7279688528711,-7.07237009746538,-6.17141715957659,-7.23089366202864,-5.83152736649103,-6.60090453845994,-7.53900025561977,-6.28052321642939,-7.05835367451025,-7.59815415024872,-7.12656764903904,-6.16293490478033,-5.7697438920717,-7.74771697170803,-8.03251190070727,-7.1501328398205,-7.1902249229256,-6.79616404273765,-6.708780541531,-7.64179476342879,-7.45491029948455,-7.18004568839107,-6.11954376907271,-7.42479110104002,-7.13509104901305,-5.96645175489543,-6.04145149381655,-7.2355230300132,-6.03093189234833,-6.21488842300095,-6.57160146606624,-7.21192921076288,-7.47589595238161,-7.807455275866,-6.88728616303726,-7.63077912219494,-6.76843810870632,-6.25367650619723,-6.55573402937568,-6.66172965526696,-6.92755568294906,-6.74757636209986,-5.91189405019807,-7.66856894804062,-5.65393191513618,-5.14817209902791,-6.59144877561946,-7.36439826301533,-6.32136374377209,-5.78648683870375,-7.52602201439031,-6.77979879885014,-7.75054364397956,-7.53442539925676,-4.43423733902378,-6.79016814747284,-7.45147461480423,-6.16526589474616,-6.85662306308719,-6.66415540625436,-7.73141580142832,-7.53228317991265,-7.88983695636639,-6.31858289680404,-6.64708601653436,-7.06076929627681,-8.12566550738497,-6.84929449510117,-6.82981169825446,-6.65378283955321,-5.82246852906758,-5.20863517819161,-6.63673217428459,-6.15436044024659,-6.9375080783241,-7.10314455665071,-7.3462288467073,-6.04700395565082,-6.77797565818955,-8.40296573290594,-7.22964736873915,-7.39915251674225,-7.77384295426698,-7.87711366071146,-7.36554676277965,-6.40269548858872,-7.04720657817691,-6.70005813682384,-6.65005306401387,-7.8795748098354,-7.61148328467013,-7.49729103670358,-5.96543721608059,-6.34876651603434,-7.41289861155373,-7.02940844160793,-6.73102831635073,-8.00548464580607,-6.26778334811851,-7.53858041373712,-7.41434269872671,-7.83767612912164,-6.73785549558984,-7.65939532001592,-7.67262383457416,-7.76170111591206,-5.85536809542932,-6.90180791656071,-7.5133419846053,-6.94228914056663,-7.75896115561376,-6.67227630363193,-5.73883806288291,-7.99981525620967,-5.61844356043511,-6.98529665142176,-6.07036436911557,-6.18686896785006,-7.76810051450545,-7.29096860095288,-7.7587802923497,-7.91087499428619,-6.25115740248272,-6.80790299733941,-7.00048307416124,-7.70939657709282,-6.67302498287158,-6.30146387061606,-7.36119804400323,-7.92843447986404,-7.10653651397501,-6.26922421411506,-5.58980317826511,-5.64427966736408,-7.59681930403034,-5.87763289021136,-6.67944739117035,-7.32673548512425,-6.45028553725579,-5.29051496940355,-7.43495416191966,-5.84815366876246,-7.26337616063993,-7.11615752703022,-7.53562211009644,-5.62862319627999,-7.65859490123214,-6.78399698370195,-6.4078731901515,-7.22279616013327,-6.88897500666017,-6.36873210974108,-5.87975654582252,-6.97068966671909,-7.06438837356466,-7.70988801113047,-8.02291944568601,-7.01909741773163,-7.46120120690338,-7.25675839412098,-6.83394296223397,-7.3722907213895,-7.1502402373127,-5.34963550970991,-6.90666762528252,-6.14216809892915,-7.43661324685389,-6.42408138170718,-7.73215793161831,-7.18920693789599,-7.84330977598204,-5.27524404759126,-6.22196421981358,-6.87837655235034,-6.17340240665563,-7.65185984916504,-7.03331096225253,-7.40152940426444,-5.5481216389975,-6.41371817567181,-5.45984932328866,-7.92616416475519,-6.69276382312879,-7.14069442254097,-5.98180441283565,-7.22820038786505,-6.62620744210943,-7.53944222698045,-7.6941473892602,-6.16047680590896,-7.0329871151442,-6.88309693051225,-7.76246090717264,-7.92433995580503,-7.77731678999365,-8.00768566036318,-6.11042851877444,-7.66241935432604,-7.61329115038235,-6.49633687616961,-7.58951862546754,-6.22915943504408,-6.3469454175185,-6.70597022710466,-8.14135761341382,-5.46194465962903,-6.22793610507296,-4.80356521093387,-7.3388546081434,-7.77948623506178,-6.72412316429232,-8.214118766257,-7.9015300084542,-6.41884823147092,-7.85472115948766,-7.40636482086156,-7.86411457658135,-6.99366815133041,-7.99970108250519,-7.31546677224252,-7.80635822335747,-7.33096459419883,-7.84626663208899,-7.42762202359292,-6.64041136865145,-7.27987702218002,-7.57273455750643,-7.42426307911642,-7.3827712112823,-7.17465043834842,-6.53530400200865,-7.40773894904284,-6.73015025360217,-7.304863383187,-8.06788269519866,-6.40362127392594,-6.11317101221519,-8.536631099971,-7.18591322251391,-6.15695466185747,-7.19099944080547,-7.49527213599155,-7.24049989175671,-5.79989492475388,-6.72727487319428,-6.76800445069721,-7.31602039480006,-7.5764546576788,-6.26415569244076,-6.331837675586,-6.33253140384626,-4.93648568845579,-6.04680784235615,-7.78452183326478,-5.98841761602963,-6.90192296495376,-7.24128249473129,-6.12027981725617,-7.93208537337226,-6.61331337458495,-7.48668616588083,-7.59161854307787,-7.19042837369141,-6.8915197948411,-6.23104948377206,-6.17444548750939,-7.70846631663615,-6.68153530489784,-6.852089687366,-7.35830052167764,-7.50559904175337,-6.24513773688522,-7.18786270820891,-6.93764809885659,-8.02793348093773,-7.49503576542955,-6.99665554861496,-5.76902936160558,-6.94985300787071,-5.62969412499868,-6.87432022543208,-7.69736714241281,-6.00964230539051,-4.698737273694,-7.44560248703891,-7.36531810109351,-6.87000976402942,-7.23401152379581,-7.50879676062455,-7.79074937599514,-6.44537690627806,-6.39018134753526,-7.38759145113669,-6.35696563285327,-8.07394345165582,-6.66276666638407,-7.18722676013481,-7.43146457049066,-7.42173856388853,-8.19837441515378,-6.79758961899171,-6.8866093419755,-6.8059196990831,-7.6632088902772,-4.7964162573558,-5.02456297039234,-6.82022101039595,-7.95144543771842,-6.91972662793135,-7.63245923224483,-7.07103149492649,-6.94620232532105,-7.14907208056632,-6.90311775839425,-6.42334381326018,-6.97868510622663,-5.56394218192047,-6.50271498084139,-7.3518862246166,-7.42243173945811,-6.24715245153994,-7.33440574100375,-6.75281933984606,-7.77038107163502,-6.35427681394058,-7.74923108820047,-7.89217215833737,-6.35231255459821,-7.80339507194303,-7.97470130413521,-6.47176593317267,-7.89902144137644,-6.96541071000339,-7.05912808257366,-6.14693033457845,-6.78361770458317,-7.25560124759382,-5.06745721200165,-6.16549559771057,-6.79447705230927,-7.02884281268865,-6.95707529847504,-7.05595095434896,-7.80011525084689,-7.58784051174887,-7.09007517451054,-6.91065313243764,-6.39818860228511,-6.84351416626449,-7.33702736530018,-7.20022906153815,-7.41937647568909,-5.90980448388586,-6.51525050894314,-6.32878157612123,-7.15896870112099,-7.34545297339296,-7.6794716500044,-7.67204136399735,-6.49361745038459,-7.44263072437631,-5.42003070823364,-6.52317324916142,-5.9265556990748,-6.40043942479395,-7.3279600140222,-6.46996522376313,-7.00514980590164,-6.83909922252616,-7.07832004915181,-6.55243630725641,-6.49802232344189,-7.53913891831722,-7.75779762930293,-7.24088699025848,-6.43410103310813,-7.50354229918555,-7.04862387157588,-6.52559131241096,-7.50733464378205,-7.14990398454898,-4.87088940188536,-5.83878750642523,-6.75295636663764,-6.0205965412461,-6.62316279406233,-6.22349217328554,-7.75016095537128,-7.63926798128926,-6.69088595934035,-8.3682176150492,-8.09264094820136,-7.27886085393425,-6.73888733546691,-7.59820543703016,-7.16969664396764,-7.23590454896808,-7.56068566356435,-6.32693234044017,-5.91987303875998,-5.98915535765359,-7.90562658426902,-6.95894546310234,-7.60410314039653,-7.3501827923586,-6.47885871334215,-7.60946267106561,-7.69842227057736,-6.32230161145737,-6.83118417942584,-7.09460167914441,-8.33763004164479,-6.33849577593445,-6.22100701531888,-5.1837560764934,-7.37309152740412,-8.26043869005628,-3.75842422937761,-6.64331032383721,-7.2284066131646,-7.10232938582826,-7.54412950920991,-6.51096163705034,-5.47682335905382,-6.35301612558808,-7.70027120140468,-5.99844154292639,-5.43294479025344,-6.42583902614398,-7.83135738424267,-7.79188418100026,-7.76570265429679,-6.50058867752778,-7.31643550245339,-6.60369329241188,-6.34371484827876,-7.12285564193822,-7.27721170981593,-7.49143145448683,-6.28085451580211,-6.79846518701463,-7.57983942459411,-7.29335969449275,-6.68804916682824,-5.41456899143677,-7.87409313030776,-7.78868440535564,-7.07975358398067,-6.68372873710308,-5.91526103146735,-6.99858517249158,-7.42825916001077,-6.77576549434561,-6.88590469882536,-7.00668788281342,-6.26216400588324,-6.81704005549265,-5.97715454835283,-6.97808644537373,-7.36235340209033,-7.81116330330306,-6.80704824819527,-6.15926524509003,-5.36092122264075,-6.55943100193457,-7.77020908684295,-6.9028491687757,-7.40123149248055,-6.84179845405896,-6.08920018686544,-8.24596693199754,-6.09855553515231,-7.4780181641741,-7.82954091952317,-7.18439674957587,-7.39121279967135,-7.36486751826083,-6.74095993642696,-6.82557067776847,-7.36575412107419,-6.82342872849962,-7.81658239242742,-7.22900076049029,-6.49139222545261,-6.79148850421068,-7.35423268169602,-7.06482330747906,-5.8931120176254,-6.98891942366468,-7.28119797188708,-6.57580891139535,-7.315502733211,-7.11801629548406,-4.72869685659922,-4.92688835820686,-6.8739853605794,-8.46631032323808,-6.34942514353529,-5.39426012718467,-6.11998741498775,-6.40639279071248,-6.11235562245784,-7.39826432315177,-6.31482805402711,-6.37603439578674,-6.28993307153206,-6.45089036231574,-7.12357797569466,-7.11185036252087,-5.56318884914758,-4.60882592785248,-6.56539029851415,-6.88443996465787,-6.47607070559596,-5.74831931782297,-7.54536607302275,-7.27981213164455,-7.32656533382895,-7.71762286409242,-6.93354994623086,-8.16888194564488,-4.64362784314183,-6.51905214712719,-7.30395379073546,-7.5691943004734,-7.64671510179264,-6.34694244011932,-7.12324029533988,-5.29361843902681,-6.50098381202548,-6.37644640190682,-6.86790583595035,-7.10743774234296,-7.82493086485139,-6.17546023639132,-8.04850045804888,-7.36676018547474,-8.06606604628415,-6.77742338861314,-7.14927348585844,-6.19106384430913,-7.04709709776531,-6.90889566099181,-6.7573584000289,-7.61762135338325,-8.20742274460317,-6.05787809557446,-8.33527126429491,-6.58755845702624,-6.33027733440925,-6.55922893999322,-7.1558175451371,-7.86824213159821,-7.39312000000764,-6.56911483777004,-6.71613310843216,-7.84743800840362,-7.61356681933017,-6.23041389375423,-7.59701106462211,-6.4237984398712,-7.05515298802122,-6.41625603031329,-8.06371746454978,-5.40623285675431,-7.1428124673983,-7.92292676251409,-7.80676370508936,-8.0142294120321,-5.63864932280824,-7.52167887752115,-7.23338219752276,-6.98993418623398,-4.9579029262297,-6.72944439736275,-6.60397567599115,-6.79446360562597,-7.29773327615783,-6.56959107023275],
+                                       baseline_values= [ -6.873858869705506], 
+                                       y_ticks = [-10,-8,-6,-4,-2,0,2],
+                                       height_ratios = [1,5],
                                        fig_height=5.0,
                                        dpi = 1000,
-                                       boxcolor = colors.brown_tint.RGBn
+                                       boxcolor = colors.purple_tint.RGBn,
                                        )
+def GWP_box_and_whisk_economic():
+    contourplots.box_and_whiskers_plot(uncertainty_data=[2.56325020881417,3.14898712577222,3.45665454800935,3.05651774555816,2.78100484371748,4.02454067497266,2.85688253193033,3.31770189751369,2.89398985923581,3.43974547414621,2.96691689438608,3.19951592680707,2.67232114152658,2.94856921023082,3.35033203346972,3.27965758322477,3.93643186765224,3.52043327692703,2.91086980640561,3.61854375781205,3.05936943355925,3.44073166567221,3.72197926489609,3.02221058970656,2.71762135052471,3.23753890662381,3.13723255126813,3.93902574287631,3.17994555830565,2.8569241604546,2.92951110750064,3.21124645977902,3.33487489765723,3.45360637343747,2.86379153279992,2.64482540577489,3.09212373649153,3.63212405438782,3.27450129384901,3.07806213734814,3.74081845573764,3.30204017698805,3.32378093070272,3.8245012059112,2.56356770996598,3.27385574490812,3.14211353630985,2.891649280088,3.37631286333944,3.33985246650423,3.23297419073494,3.66416549102769,2.90637266082294,3.06668153358843,3.55185290067078,2.9195967725932,3.80023350135448,2.96223390891939,2.86329130120248,3.1004038074173,3.42670946497263,3.78118870800815,3.0704547685638,3.67505444107196,2.91708000911336,3.56145072994574,2.98459504196294,3.52568190921162,3.38233876019875,3.45904758522698,3.63773272901611,3.54819528150066,2.50272705580633,3.30420997041338,3.28802110599025,3.19965852145142,3.18612285851665,3.1363026839723,4.30111570731192,2.67009501924581,2.99851217260411,3.3713873558307,3.40315617072552,3.3458890720395,3.56835560335726,3.20166925228494,3.03197714604059,2.82406703566571,3.36640454227361,3.61217638041169,2.72182593234108,2.75375590227471,3.53634651673668,3.3355619577476,2.89823111146965,3.05533432831307,2.72352625463622,3.0765190234867,3.8128117588644,3.01601899555422,2.94999977262965,2.64656548296773,3.36855813664976,3.32134952789177,3.20798219759062,3.26085504091309,2.32955415825616,3.40944134213735,3.12390970433199,3.65372672292622,3.07034697269372,4.10233834222475,3.03846317670328,3.69039139252809,2.44435763183228,2.65516555327721,3.28665518499609,3.56466495282941,3.08105520050942,3.21052235693949,2.7085616157411,3.07991158623925,3.51436083006587,2.63659687360811,3.48186114630271,2.9827777610679,2.65483424183886,2.32123560007989,3.39654425532641,2.92190251533822,2.98302914105408,3.01870877116469,3.1641089429462,3.57821790879874,2.76713186528948,3.00704019475415,3.86376410982154,2.5438086722018,3.6881722656912,3.14177975481689,3.90095294703365,3.0216325472453,2.84877868386016,3.11282657429979,2.92188073208824,2.52428016014562,2.84273435183021,3.16582359284487,3.99519928091181,2.72050292552311,3.39067133326325,3.02306050707194,3.07473985790557,2.83229860624937,3.65932051791596,2.9566191042149,4.17808734599192,2.73613324191207,3.62919008807804,2.61695806235999,3.08944135916183,3.08038229695209,3.70549257431725,2.7843873721184,3.17851069828939,3.01108753057577,4.12269159094532,2.92052851652604,2.93103274140844,3.53056226674387,4.35804083500484,3.11536731326201,3.09628914463391,3.21249499716543,2.93545080451208,2.82250508800539,3.08936514084926,3.24273443829314,2.92550654318931,3.25048574396636,3.45549974851949,3.16853602449364,3.52767205335557,3.09153955593147,2.86196985791839,2.54657238913809,3.29704497801766,2.58165070427334,3.45672408455158,3.42147085320794,3.26604880045833,3.39387447577352,3.23019820972204,3.3489737405197,2.90889965413473,3.27876976028536,3.1536911454427,2.87687778809363,3.62094125454299,3.82531669315545,3.56866721211109,3.28883511616706,3.30186109210649,3.25111777815044,2.12948916263285,3.43284926875587,2.8440243705765,3.67938975560671,2.81796305551429,3.46690872281996,3.30855262740486,3.91895680039491,2.87972822041348,2.71773366776703,3.7397848374805,2.83780329781452,4.06695951935413,2.79840509663882,2.84116992659156,2.93895224345195,3.23224182421168,3.24553578395557,2.9075432000864,4.25420185112733,3.47924968016425,2.93013262873844,3.45078047991837,3.14143735088481,2.7551331628362,2.62639746966507,2.92873254133389,3.00942580908197,2.97690129080489,3.25632573637703,3.03335918949305,3.07785585386036,3.06113630298063,3.24260554852695,3.31190402290871,2.81120361081199,2.83606746545284,2.52911734031345,3.09489615134419,3.65529021398174,3.88199816025868,3.3200992921724,3.67691924925987,3.27348209304481,3.23242710083479,2.65522768254421,3.68317402553458,3.12720107059485,2.96006353088835,3.0326946642625,2.33356473582754,3.59779654823359,3.04663876581371,2.91201233231969,2.11536189989244,3.50574066030964,3.31707415708944,2.7395989088457,3.21329981978161,3.58558309296318,3.08690595272368,3.67459214863157,2.862337777704,3.28022681874992,3.22680090858009,3.88873808640281,2.97585627149937,2.81475297543993,2.53423881104306,2.99423525235883,3.38231839562882,3.97131535083957,3.43183469822344,3.50370827996602,2.81777683448928,3.49498781041538,2.91413333898688,2.83434829802197,3.19392482178901,3.34489489910128,3.62335847972867,3.55372626031423,3.83669395937621,3.68248645700182,2.89504131025981,4.60231492812559,2.70133173841403,3.15665500004444,3.28278499146676,3.06634262946071,2.77725873964631,3.16901224952013,2.9617999339888,3.06703419682702,3.73902506338819,3.20361518426657,3.12808523057593,3.41449207477871,3.24926441343168,3.51765142907272,2.77275533600898,3.00510960664402,2.32046996942806,3.33201213790693,2.82305269468788,2.49366619044287,2.56578317788267,3.23752767523183,2.67207185588669,3.18262939563566,3.44244532604458,3.52045769036525,3.39342246136418,3.61573061056306,2.90800712654335,3.14628228113711,3.62723615929131,2.61470154533825,3.42907602353771,2.73484406669903,3.46390315181593,2.83492855922825,3.1464703726669,3.34399319154369,2.93328129461942,2.59822708379297,3.06373121592186,2.35226527953556,3.60730667970667,3.17199816565457,3.45175116429694,2.8364234990959,3.54345650342764,3.71672662347107,3.55229410379859,4.28823040432699,2.4019403934982,2.56838558849654,3.38737127304285,2.97322183307522,3.28018101165407,3.0101117925763,3.79594698704295,3.60918654375712,3.37472439841212,3.70307732656664,3.45131501629638,2.45693839983284,3.44016616032521,3.8080794674619,2.71189566579799,3.21520272629762,3.32002607853956,2.78642223091011,4.11388734387048,3.11629289454643,3.41925213136625,2.66498169643407,2.99947507628339,3.15835484554989,3.49122999345037,2.84238870371688,3.05365157287372,2.67860534072197,3.79144910357642,2.90025771612281,3.08178111636539,2.6611709450187,2.83425734108951,3.02790188433235,3.11577838076006,2.6627880919981,3.77335967846566,3.38924885892105,3.48521446089226,3.08512528278857,2.7233733368443,3.29240014827245,3.06231815092182,2.83946832491629,3.20281509229708,3.81911220949118,2.90046339584425,2.80794918300289,3.52960139891078,3.58267937862596,3.5917143059357,3.01973394352232,3.54855735554526,3.96818232548523,2.69546794884114,4.00523006375426,2.93947606929448,3.33059166619072,2.62631777075032,3.6430792213954,2.82521286639922,4.05954034150026,3.21981926092247,2.45785349222558,3.63608838289364,3.03726882298184,3.27564685979113,2.96594535339204,3.47457768638638,3.73811468261915,2.87599575726339,3.18252196814026,2.72938927168039,3.92265735911974,3.6447593176694,3.01023792498454,3.67472033125483,2.89957352955238,3.2017255099233,3.58083402652273,3.11789746017001,3.4323660839634,2.84655846575709,3.36699287431373,2.99829425822111,3.60880685357127,3.33690164122188,2.86781378768886,3.46457994937671,3.01929348028984,2.76351683998751,3.05332617130465,3.32713722533669,3.91765220518608,2.73824353256775,2.61156557800028,3.22456593390332,2.99442142610716,3.1258774774144,3.38375144066668,2.66978783205028,2.9380166950945,2.90574766608553,3.86662455633909,3.15613541708923,3.01434141107419,3.58710241862989,3.55481099809297,3.06905645592202,3.94169112239288,3.38441692001138,3.26762364960396,3.12487784253921,2.88075980735923,2.62846936960225,3.33888355935306,2.82644281873565,3.1058487080232,3.47392425323823,3.51109378295367,3.30260609659371,3.13004423887616,3.22234414153281,3.99637477300639,2.68547431417611,3.64643815837511,3.89365299034251,3.20613897704521,2.91503793063874,3.45866105419218,3.69476223973675,2.83496551064797,3.61687170645319,2.87066680877283,2.88379442417826,4.35887729844953,3.13732906881783,2.68024942282199,3.53355019270004,3.48308227716188,3.27374997966458,2.85783761933139,2.76087904001751,2.60606892462309,3.73080434716138,3.4937585098788,3.0388526954524,2.71376935892338,3.36829479287708,3.30091765683611,3.38503950223176,3.66823663407639,3.82539601986824,3.24708574792008,3.49626909822145,3.1392554454549,3.0654942396157,2.97328621522193,3.63340979255775,3.54090760816545,2.37062348476382,3.1994547660936,2.97507248140392,2.77876594571061,2.56147577852084,2.95247488947559,3.35044085758284,2.97326990596459,3.52131543364803,3.47426750441301,2.81525593494738,2.83079351010162,2.61702469851227,3.74958466054865,3.84944789729464,2.91955216315307,3.08856819070743,3.28037104043062,2.43003226096299,3.35635321757238,2.76591154934626,3.03201475098499,2.46341513994798,3.42056529871104,2.8605821117393,2.93311290334268,2.64532615556103,3.96552529091845,3.2651900705697,2.84442817621584,3.19745110025264,2.71119751394104,3.20158984499748,4.22745365014072,2.42763532228529,3.97149220306765,3.00376159873015,3.63530977453971,3.66722482293157,2.67754048187623,3.15389505305751,2.7109710336109,2.64554102962238,3.59949323736774,3.47342407731026,3.29291829025517,2.66104542575707,3.27497310507898,3.44807093603752,3.12063849464859,2.7490134315438,3.0930801457415,3.30353440406668,3.45915615640194,3.61811674484214,2.6661736568385,3.62581533499679,3.61548405502701,3.03107727129919,3.24730402487429,3.87125374958051,2.85614022714323,3.65601283553789,3.00098654145154,3.07996204663865,2.76399561139197,3.74741083401557,2.84308074147176,3.27703592611963,3.29597421100339,2.99849078335951,3.00366085330943,3.18381378709032,3.93437422323594,3.35862727021791,3.13409728484632,2.92910951429143,2.52111920395248,3.13112635016423,2.96699316750428,3.06403733210792,3.21470966755437,2.97640351660789,3.12193706227672,4.05788938470901,3.27303696787514,3.90298619732664,2.97205408948785,3.40330324778667,2.82872123398431,2.9599051608764,2.42586657938418,3.75471637479977,3.79850160799565,3.06199332442389,3.51690892434803,2.69264857593069,3.22266166635692,2.86780732144736,4.07134560465882,3.60341458080602,4.1183940537503,2.45920701189677,3.47173033779017,3.24683117865374,3.71626888414988,2.82403361050903,3.49880613355,2.81162345194317,2.72045243920534,3.41329779239899,3.08403239030913,3.20616652889171,2.67213095292806,2.76544746076669,2.66429135000785,2.57079160191179,3.7820077430304,2.83481320133948,2.67695259019755,3.42826072758206,2.95196248547435,3.45279968254281,3.42766037872637,3.34935199751282,2.43553519617189,3.82041784541435,3.25728034025372,3.97466076862125,3.12139530533545,2.85406300720037,3.60952798110145,2.45803172248084,2.76757036049528,3.43637645705582,2.57053989645849,3.08900759254431,2.67314803423008,3.2172104582275,2.71297554061951,3.261991098437,2.64543733697082,3.14143420645679,2.76025276916545,2.86877922748975,3.40508103768993,3.29399096135551,2.7926365526384,2.82482640013046,3.00289676919551,2.96471352152195,3.32275968735236,3.03161556330939,3.27518721831236,2.9360627759145,2.52500586997462,3.18778470185261,3.548817414933,2.23990441878888,3.22878089968706,3.3759474946978,3.22771236387129,2.8290021372828,2.91733802748316,3.63586104893167,3.19435301511715,3.26380026195495,2.90435856605156,2.84690597271318,3.3189822753657,3.21059766457388,3.16394454453211,4.20077272497899,3.68626912140626,2.75534801435563,3.49897679943418,3.26543096876467,2.85175529116409,3.71487934219802,2.54050821016896,3.28051912503872,3.0465220099086,2.69130387705892,2.96408460008285,3.00051760998948,3.41291502917628,3.60310433669175,2.87229007895442,3.55046753904478,3.28820570416464,2.91386185909397,2.77345540295773,3.53435586182304,3.16022173077903,3.20952223589092,2.60699447591267,2.86231075688974,2.96515488821817,3.45989819711495,2.97450997118837,3.97398445332788,3.0402404921741,2.71439333507489,3.56105605378959,4.30132845231144,2.92434105455599,3.06383577616236,3.37547455344816,3.25428475341376,2.87942928716146,2.84996634578841,3.1993305380767,3.56598828576947,2.98525197499108,3.46334987507123,2.61785198778074,3.31399327037047,3.22884516100262,2.89666836137996,3.03356787845886,2.40646461701202,3.21052747670934,3.19379594446861,3.28871951916271,2.91535024161362,4.25251134560507,3.78189351953912,3.23647478958217,2.52738317512101,3.08837513572227,2.83037299719869,3.21885312319141,3.28460032616309,3.00362098581911,2.8885648928224,3.32312718384109,3.2187468912989,3.6704738138618,3.2599441767133,2.94494759651958,2.82128343195258,3.67487442948702,3.20614745035519,3.40708043941585,2.87970953747196,3.82233077091559,2.78724946573339,2.59736590821698,3.28375928571971,2.76266822544983,2.67203791837986,3.28612857814885,2.62639307529791,3.12953649559781,3.22653984879403,3.5540695246358,3.22107823038787,3.00719303528275,3.88715921389681,3.66432802036894,3.29897227281527,3.26298116326692,3.20955951885829,3.17820885551141,2.75825931284623,2.94712893239803,3.14531041542768,2.98596115031891,3.30317521596365,3.00799507357959,2.95281125598173,2.97304485817024,3.05428829697744,3.56383231287971,3.27364375725322,3.60143684117235,3.25763590060641,3.04115256982483,2.6961238899386,2.81949505213464,3.63106873900724,2.95092321117797,3.68362732734767,3.22226528572856,3.52099839410947,3.51610739499322,2.92248516347508,3.38162507491949,2.91087291939595,3.06370991502555,2.88388680156755,3.46025587344758,3.20506194259363,2.98385552181311,2.6665774020306,3.20652878484274,3.65122686924045,2.99623232910436,3.00928646459028,3.35742709343011,2.7370762810169,3.23225081241175,4.25820041722268,3.7910234602763,3.2215963644871,3.70110984331055,3.3156713109885,3.60435029875878,2.73181599726073,2.92853664738198,3.67941912113815,2.31742808944264,2.7471207244257,3.08348907348931,3.50386890242817,2.85048993805218,3.29880794125505,3.15179200832687,2.9065012544159,3.36053538120219,3.62348958387039,3.57609854802414,2.71987661040907,3.30266951711995,2.98267874554035,2.87101503177863,3.51232932578785,2.79975124130809,2.92242748602165,3.58000843163906,3.11413189506953,3.13411218132065,2.50708884592522,3.34781565993722,3.27936885515014,3.85156129886572,3.20258007481195,2.42882016178584,4.47082221421072,3.52750587512798,3.07330597942002,3.06250463016891,2.68380733095605,3.33318414178763,3.8754391486733,3.42378612530817,2.86741578082363,3.40933688893803,4.02273573291437,3.33059180553742,2.8259046991107,2.83236452406691,2.7590438447415,3.30652413464047,2.92903617003932,3.50417915682266,3.66565413843854,3.06990640453654,3.04813297782731,2.82725834564133,3.72556101820546,3.27946093104049,2.74790460717398,2.93663944242125,3.11925532918991,4.33796732729366,2.77435171216973,2.73936539937723,2.92517239387402,3.09955275402003,3.42205715262227,3.17525883498251,2.82072028008543,3.44262544115232,3.42877175751069,3.1339396285249,3.31487594090023,3.15478396575707,3.51459806081811,3.10599716542483,3.00119843587098,2.85624410027861,3.01639192718045,3.24596965612882,3.74992196738029,3.36622725700527,2.58073341343212,3.12195970801162,2.92746666246419,3.14588031597894,3.86742465283058,2.47029574685075,3.93252246463578,2.99011526669282,2.82462907551422,2.923098611531,2.69726888226163,3.04570615204907,3.25511172404454,3.27384016720582,3.01886091104214,3.00812642821851,2.74242856178039,3.07070079958135,3.27416507888487,3.14894613114499,2.77120196478424,3.10697147970762,3.46353368939539,3.01795122977934,3.13926143603293,3.42595563205194,3.18094652407544,3.10969075084295,4.01581543572919,4.03715814105238,3.33501610256528,2.12752817722826,3.25799989358056,3.93731991711166,3.73132455862016,3.4076376755155,3.78341176962021,3.08440859065526,3.47123403431417,3.34679556240517,3.40970670439733,3.06835189364265,2.96699493315647,3.04377670706538,3.78364476084136,4.09568761138271,3.43474556587628,3.23828147204385,3.45878296744388,3.73048943708692,2.88367460469839,3.1337648632867,3.06279919361136,2.92799413671456,3.22229086971186,2.43690430250562,4.11277648879932,3.63328822020846,3.19638173402242,2.79973167175459,2.93887676409488,3.67085050360807,3.10517206568769,4.29613818877948,3.4525551544123,3.40649865030902,3.20262630996871,2.93043655769441,2.48543121418613,3.76013510595903,2.71619204726452,2.83748876935463,2.58914579370609,3.15159106753593,3.06353949493758,3.7080747558829,3.32641919957004,3.31662554205667,3.34246544121652,2.73497823043442,2.34479418574933,3.6930832258592,2.49796801939039,3.20072417140496,3.65671786803198,3.44924477330505,3.33407624811914,2.89029875833738,3.02824649727441,3.13551886225043,3.28851522669121,2.62511947011008,2.7217773093761,3.5978781253929,2.81878110607028,3.33657911683841,3.10907138731159,3.43804401486606,2.50546585216703,4.05438498445098,3.23384901577605,2.73447159138183,2.95565159137721,2.63983387196942,3.86648726766563,3.01772129139543,3.09924873587219,2.83950563683335,4.19751336708415,3.2957132090886,3.49345367118224,3.23571233945473,3.03677840166843,3.08409857124012],
+                                       baseline_values= [3.2590980367878153], 
+                                       y_ticks = [0,1,2,3,4,5,6,7],
+                                       height_ratios = [1,5],
+                                       fig_height=5.0,
+                                       dpi = 1000,
+                                       boxcolor = GG_dark_colors.red.RGBn,
+                                       )    
+def GWP_box_and_whisk_mass():
+    contourplots.box_and_whiskers_plot(uncertainty_data=[1.26833158384708,1.1795692860954,1.19719408857041,1.14190278381166,1.31961159339274,1.27630378342444,1.18416990067307,1.30240828294442,1.28367414436264,1.23571963054962,1.24153851882654,1.30447666482989,1.26102573070218,1.17841103603718,1.23705924335376,1.33949915477645,1.21999354356966,1.26901826132053,1.21985118453914,1.23263925162257,1.20528891099316,1.28308137963112,1.34418110129993,1.26048569268449,1.19784263474955,1.27380788908812,1.19286793437851,1.5010970456636,1.4577581683558,1.24717008306176,1.28687911895642,1.33887162823646,1.44047989239056,1.31940167617024,1.20075841888728,1.29094098735497,1.32681540661889,1.27264342545962,1.29238352085292,1.33332789311667,1.30314145761829,1.08935858193006,1.32148301346423,1.19703304756906,1.15138614018693,1.20092548933707,1.36416927649558,1.26357624283524,1.20781658408365,1.43703605178141,1.28963622170525,1.35990837895382,1.2426663364024,1.19332638067043,1.27392217928882,1.28337387380183,1.32548823982447,1.14106604794057,1.29710881815352,1.19256221499929,1.27921597807376,1.24838591660929,1.30491682530875,1.23739639654001,1.33365883319269,1.18643723920852,1.44612461753767,1.4060378953863,1.39554974132409,1.40529827225449,1.32290088882593,1.13058259945866,1.18167503377573,1.198641452882,1.37634430106638,1.35890641105443,1.21764634536124,1.15446336651545,1.41105211491442,1.27623811387851,1.1417135025426,1.41163337384738,1.39543596620457,1.32666607706569,1.17772751150082,1.31019502193612,1.08888571274925,1.19451118297278,1.19389615325189,1.32608198935256,1.17358274756764,1.23732672365223,1.38730754027924,1.33551552824868,1.21177745378923,1.20545819811481,1.2894680703084,1.34188420995653,1.18662384263325,1.27350496536451,1.17501118909822,1.17985737959845,1.27382923271774,1.20316018346012,1.35729603836897,1.24150511682208,1.15996729514037,1.37195783683946,1.31665964491701,1.37774324868929,1.22429186679934,1.34402674311095,1.22231116526347,1.42632771662004,1.16869714800796,1.10956583167813,1.26557437361416,1.40387621338815,1.22542357057429,1.27342630008656,1.20220321507538,1.40732947525892,1.27177100335395,1.26053788326216,1.37459992776684,1.1682240968691,1.01677827434198,1.18515164343817,1.14644993447211,1.24544786996675,1.30677917903499,1.30695988624814,1.32602480815971,1.23885044197018,1.29728163495276,1.14936135123904,1.48856366039411,1.1884506664727,1.53230403527976,1.25127568310361,1.23066581334855,1.34743034388099,1.33397582164042,1.07784501399389,1.27918937357081,1.26914834698442,1.16347689277527,1.30760544694007,1.24820014902748,1.24169302742172,1.34973864496471,1.26522718871308,1.27810179223536,1.23814869517261,1.2913830452164,1.2118367690486,1.36083388565627,1.30872508498108,1.25775836437982,1.11591442966055,1.19432407264818,1.30426337107065,1.35235719404843,1.10768815799389,1.17873783714234,1.31387030502897,1.27182872419481,1.3036858860332,1.35378381003021,1.32066408262819,1.31052513296032,1.35059461352667,1.35470618881696,1.30791863802667,1.18323994947776,1.24816141471761,1.09268173511228,1.34111980690358,1.27791689058413,1.12516213609387,1.45132963930079,1.36563522450047,1.41932129836908,1.40841891109387,1.14582978853248,1.07233263572724,1.42009353996445,1.19161617469099,1.22254780634953,1.36688830299903,1.31665016865743,1.18268541655221,1.38322584299926,1.30494123916702,1.16145800543257,1.30301974652037,1.24537042494304,1.25491908541304,1.40518418459073,1.33570748988347,1.14238078297959,1.36402960707289,1.14039781530967,1.20995411460916,1.0890318322857,1.27268935670202,1.20807870690782,1.50672025898364,1.24446077451855,1.3559810107433,1.26612959741069,1.32701571962067,1.26694956780989,1.22191267493661,1.16186924800334,1.28647720595263,1.41943755712571,1.25391806978876,1.18585829145804,1.28786788139828,1.28726989380061,1.24929152070562,1.15415501977681,1.33656630832936,1.41203405276385,1.2903028047554,1.32954581341455,1.28062895042328,1.31860835002442,1.16768632259777,1.26660874940986,1.20399542778219,1.28486138289296,1.23982905871674,1.24556012400901,1.36215490729479,1.20355380346848,1.30926052927969,1.40147409148724,1.12730015143944,1.18732085363304,1.09643562344534,1.3589911942295,1.19699897515268,1.42779203354784,1.38769818137908,1.41821254656436,1.29492474836052,1.32997794084837,1.27767436820726,1.24288881939938,1.3439757857513,1.29247696767645,1.19525969546009,1.16549227388642,1.24946102008989,1.13523010569729,1.3136706653025,1.13660551794705,1.1976936553937,1.24028520652586,1.10144404718851,1.38511901294852,1.34852433177201,1.17678900246221,1.17879412456279,1.3540915401879,1.30306724469701,1.1239433918044,1.38704680474073,1.28695849045068,1.24336025433837,1.20027629342992,1.23768132381516,1.33450890967481,1.37042877963757,1.34337694369807,1.21262644013002,1.19618441606053,1.26409964989628,1.32420573695649,1.24936366890419,1.49168433175541,1.19559984573701,1.36975451037529,1.24190456289677,1.38916013727326,1.36616214400836,1.31120190607144,1.35902815730745,1.31544054516117,1.26044474075696,1.15269581585725,1.24000405211695,1.21714866520204,1.29732875472652,1.25539557682077,1.26617888231684,1.2720420985406,1.12312170556542,1.23421367259505,1.22952371715442,1.24252889654075,1.18688203495806,1.32358241458107,1.1434464259642,1.21426797791133,1.22720484926696,1.15658994693062,1.18950489534964,1.16937411388682,1.29117824327367,1.31587844592797,1.17161696996609,1.26112427734399,1.29573303975732,1.24575162751983,1.23963244909889,1.20532294138975,1.25582666261724,1.17406544292197,1.05613706829422,1.22280574982154,1.33577021837423,1.12760031745827,1.31100123734592,1.20051623440282,1.2559291353447,1.19081040201896,1.22464613927482,1.22588727944284,1.18273291094228,1.27371007086585,1.21211200515834,1.43677468546569,1.38887942067217,1.25384311592751,1.29489929320081,1.25628586106619,1.29892551813325,1.06365827548225,1.24408080198232,1.25468091370477,1.25459008358252,1.15893385896119,1.20268792008918,1.25888281899075,1.36535557685616,1.41096226379067,1.36994494984953,1.24251432290419,1.18423090455066,1.22277626710989,1.35990677736577,1.15893751912575,1.30406807943298,1.16467141797967,1.23623993339896,1.31735844487941,1.42361976248088,1.09695242844879,1.17246614566487,1.25978944973305,1.29959922127664,1.19707770780571,1.25269107432744,1.31249185832018,1.17920320840753,1.31332658796172,1.18469194157466,1.12918709915596,1.15105936849512,1.27229878608728,1.27292227707145,1.39809920846362,1.32452370243911,1.30754538205835,1.36607448659489,1.3988301580801,1.35737420179146,1.23500136447821,1.17110125425753,1.26102557808445,1.21045431207484,1.32074273490518,1.39522858328259,1.33413587115684,1.1708298680936,1.21976274703091,1.36592754291209,1.27042744949108,1.33720269621216,1.31069780126478,1.34482703174433,1.18635825258273,1.28599913978812,1.35244880307141,1.18113459735924,1.15053454508926,1.23855271538029,1.27727258603733,1.30551907346448,1.23019785678315,1.24953566040496,1.25597910521348,1.34624024686507,1.14949689060643,1.22902301308188,1.10761748853747,1.44678552918422,1.23040848467592,1.26912469001449,1.1842658599869,1.33237434162794,1.26341720949009,1.27536152336022,1.32315719395703,1.344918664458,1.33077135266839,1.251832442408,1.22242508806076,1.37708471033383,1.15933498932861,1.14810463063294,1.19595309661172,1.30298229770336,1.28275885247423,1.3598549484032,1.28974796401705,1.09974468724233,1.27354754212501,1.25787528618948,1.17404372159561,1.35458265057487,1.23545370534603,1.28043423402884,1.30229468220534,1.23535288675432,1.25946935385586,1.19692835570709,1.2474117092556,1.30322364115515,1.29781952112625,1.31267987031613,1.33536190294363,1.40531278702169,1.27782265026081,1.21575598427192,1.30532655372062,1.43474042640139,1.38329190064473,1.3002010696274,1.25363944466024,1.33179626752744,1.35661508546106,1.34534953693901,1.1321809542053,1.32672846756872,1.18061619653546,1.30790272501314,1.35630422718265,1.20560204475726,1.16291050833918,1.38258063966245,1.20656547923047,1.21449204528201,1.277455958675,1.22543869658453,1.0900629850104,1.43722501549099,1.21122737000847,1.12565836072344,1.46386428592356,1.21501413887013,1.23650438903636,1.3057638145674,1.34249811478216,1.2399612268402,1.15055948734762,1.3736271706155,1.32078101546901,1.12763628783689,1.16372375668258,1.2609135020814,1.35810360012519,1.32471833394318,1.24473449433503,1.21937335792852,1.53934824043781,1.23484174592001,1.38760966073257,1.24729182800463,1.20745570599214,1.2700446412036,1.35362650220525,1.15245317974658,1.28874487760825,1.32380922392961,1.35224695438355,1.39555878316893,1.20525832048976,1.25999557683551,1.1973796656387,1.09606536747514,1.25511483753019,1.25467725200412,1.2515354138586,1.18898969237841,1.28110136978756,1.43027158608389,1.11998189020664,1.33351138483772,1.05804640187791,1.22114197954334,1.34664956056138,1.37483717901848,1.22865333385854,1.3371064710778,1.1820145408817,1.23921646202125,1.13171964589925,1.19815757278234,1.13440481098577,1.28591063995179,1.1404069714068,1.30234443474382,1.24906219176046,1.37699539552342,1.40440328649968,1.38696174675398,1.29553854766529,1.18668195551042,1.20180314652633,1.39082830849148,1.24219236793494,1.32521407996905,1.2460002240677,1.19367194670205,1.30555028413778,1.21050252271877,1.3513106229521,1.18548592878604,1.29150795068142,1.25067503325693,1.24761256487433,1.40029337584748,1.20797618502909,1.13990952838291,1.25385661656317,1.32687848155834,1.20036866843284,1.29546151738737,1.21449878577773,1.29872389636299,1.14120041931995,1.11036357590529,1.16690118440458,1.33255900313552,1.36480166264281,1.27402991110685,1.3616044741535,1.22982888018713,1.32844743058187,1.19638214509618,1.19919426206555,1.25836290759641,1.31875453406295,1.11671856357332,1.30566526942702,1.1710397903311,1.16723852419645,1.26643275967452,1.19637553365873,1.22615688366522,1.4019105226083,1.35104541744302,1.40479844820217,1.1502055754104,1.2312933937582,1.16671968450798,1.43664416054531,1.07435605873697,1.27000084890773,1.29172332447988,1.37906465112722,1.29775789537875,1.30017618319971,1.26199244831794,1.27896206066837,1.21437291729387,1.26592180091452,1.10233229003304,1.12680706581715,1.39785772383958,1.20143397097617,1.39174540184957,1.16580816172721,1.26135907745751,1.08441544661168,1.2857869206396,1.43337508677283,1.33584492864744,1.17928121868677,1.25165068989802,1.45022494170961,1.23615767893951,1.16721584571236,1.24125403025307,1.18200688523835,1.16915445505078,1.24257142934037,1.27697195182036,1.12996047382862,1.10827538254361,1.13492991557912,1.19708981655909,1.17776068287757,1.26386769043971,1.13628201324671,1.20972230394907,1.17575198429938,1.22966733952718,1.25060838444557,1.24143614419551,1.22794049184188,1.28675859033296,1.26542655728286,1.29600781137536,1.21960667471837,1.21913331397283,1.23112854700269,1.28547449917436,1.16015441278977,1.12005329437885,1.26155229264361,1.26761633338787,1.14500693138262,1.32403935443904,1.2873764016188,1.18333779617682,1.45899751450552,1.14451804842108,1.21349825076669,1.26888246535291,1.18752782670894,1.26125810669228,1.37951139598478,1.18190103625654,1.25941383012016,1.2896492369968,1.29163960153335,1.24311559372259,1.30364265014088,1.16609025446311,1.2422453537606,1.16658849060408,1.28592898839142,1.20089718477711,1.14132886990099,1.29769374521493,1.2599451200959,1.23557241697894,1.25533318311903,1.24870486520709,1.23462255265872,1.14592695404225,1.23741493473349,1.20853422259444,1.20581552274342,1.32878200099038,1.10123926550004,1.19548303947888,1.28800653217972,1.26396290142448,1.33195635935796,1.22973063905245,1.33894389695494,1.21521215546127,1.26909259716445,1.14353240895337,1.21499228370402,1.22989586897595,1.17778457005154,1.10863980645433,1.22891263599885,1.29325387844666,1.2327379855921,1.27534826873138,1.37772492570033,1.24608967808341,1.2844392930665,1.20723208589805,1.18404653006336,1.2315609011033,1.23246508478027,1.19276401609978,1.25104921858409,1.07684373046666,1.14248410138255,1.11567660972574,1.31089817905489,1.22119333837581,1.20630859880211,1.25572412441604,1.23284855570013,1.20700312644796,1.35350948118308,1.25740941621611,1.128890571787,1.40485189392324,1.30017754717301,1.15383848341665,1.20712340332083,1.17409776854857,1.18248112167174,1.2163731057297,1.17443629194041,1.29244964895975,1.24933450146123,1.19065134288771,1.26018924098614,1.16732483805823,1.36585353772541,1.28870408369465,1.24759608348101,1.4047403411281,1.28539576080878,1.16141859244152,1.18271335583308,1.15615195859612,1.24174292514767,1.35251426664503,1.37512961011142,1.26838022780336,1.12972096113281,1.05828787704014,1.30842280302757,1.27695607143961,1.18631312731219,1.1888719148045,1.18855093288091,1.17441090774813,1.39654268204401,1.23216708198142,1.28660006431582,1.28595695817946,1.26594226055037,1.18229953729686,1.24023992059765,1.08276185631137,1.18878897292801,1.17720866783115,1.17700037011737,1.42754889656821,1.42068720926196,1.36786719113287,1.28467025360064,1.33315912568919,1.36246532205329,1.34549094184786,1.27603111626683,1.38639404735917,1.19984448666247,1.31705930871168,1.11469320496199,1.28625092110902,1.23016176357117,1.24725918424349,1.24378759985388,1.17574786428526,1.19979776837584,1.19594564925771,1.28048274396812,1.18871909249123,1.1431267658729,1.29806336011074,1.30100452195051,1.26204896122892,1.26348992654246,1.14133568375827,1.31765815106733,1.2532705180295,1.2719954472044,1.33418376886716,1.36454074321823,1.17297965242425,1.31203104235221,1.43027502332821,1.16140501007345,1.20010275097828,1.16382805039037,1.13853881479776,1.29032534131451,1.15783192922426,1.39465225758855,1.25657711490074,1.26690004164175,1.3544112737059,1.16790101033023,1.11549930693559,1.20135621098937,1.32247876327605,1.39901783745934,1.31274349260331,1.27799228214263,1.23014987184359,1.3706092523351,1.3721152608777,1.14901079143431,1.22633994853982,1.3302527025168,1.22373591788931,1.27126764236384,1.35969103298434,1.41047835628621,1.34010136091725,1.37469677427247,1.38752751280905,1.16792876497645,1.26539876794066,1.26293179356335,1.15457773895211,1.27317343713309,1.27546392284841,1.26179033260247,1.2488684795091,1.45006929672821,1.15041641854554,1.22276861355784,1.26730879949073,1.31432702317581,1.28881991987275,1.21776158733649,1.45924707206214,1.1635980980031,1.23872518587934,1.34421571431317,1.27731138750062,1.30323817056333,1.3171870329643,1.21020771615918,1.45996091083772,1.08607137768522,1.28737210945168,1.29670016389985,1.17803506088987,1.29822725978426,1.21244303156708,1.30380831684495,1.26922911686698,1.2856103743855,1.24188408403721,1.36644731388368,1.21880011083088,1.3340973959588,1.3573229818196,1.33204677414954,1.30091593642439,1.2263320971148,1.26537470123524,1.4047169789137,1.17762175010709,1.29035715514441,1.31714074520941,1.27100081681947,1.29890228788404,1.37578566376974,1.32237602145835,1.18468842743239,1.17037787758522,1.25918258010783,1.25562274149839,1.26640450678305,1.34614458977128,1.32325056036443,1.2608546729725,1.13905890170115,1.2815488430279,1.27763114782002,1.19840099688296,1.12855145278204,1.26191795231191,1.1167088317863,1.19504680036434,1.24425773566497,1.14767091512984,1.22745330160603,1.1564310357814,1.24613389957634,1.31422476681745,1.32174250416854,1.17085763763227,1.36387520516801,1.32976920530589,1.24537597294992,1.33412986489416,1.0567063634755,1.13116330916374,1.27518269221658,1.21627635778967,1.24093375631106,1.22618445369853,1.11986026244502,1.28266643796126,1.1315901720366,1.30808739261944,1.18913810535786,1.16486903744047,1.2118034017449,1.19817229848891,1.38900729824236,1.26464324293222,1.26077790097009,1.23526162666063,1.37145937303283,1.23670102775163,1.44280927901996,1.04331237312258,1.29780830727807,1.18138929576345,1.3533260624867,1.20009546365876,1.2305749179209,1.33390459882208,1.35558338182914,1.30784933472143,1.27067395068546,1.1065500916777,1.08872153446846,1.33415004680821,1.38703498664079,1.36063915385957,1.27615118910646,1.25336216030163,1.23706258412733,1.28621530170335,1.13167091203529,1.2190445502325,1.20778343988942,1.33344951257174,1.26409017179846,1.12530860064226,1.38556288624033,1.27511964754343,1.418651234609,1.18812467171791,1.29019104770482,1.30314009765751,1.23719991324985,1.45519697049084,1.46852874846522,1.28625988374508,1.26581993917801,1.26198678606507,1.09087752218466,1.32683211789589,1.19690573816962,1.25539295935267,1.26139810007251,1.19735309984423,1.35581108420611,1.37177722405088,1.22126075123824,1.39890262219299,1.23208594589347,1.1872377631434,1.13131583634435,1.24427104148556,1.15033046896377,1.3758431718481,1.20435414956327,1.35480584021268,1.32723114738481,1.3684862303514,1.39654255210477,1.21531182609562,1.29269235085917,1.10727354968776,1.2373695619267,1.25645491000353,1.36620430019748,1.25565490837868,1.17486836066533,1.4201128534564,1.13868896168074,1.25711086396554,1.30463139676625,1.2206879112787,1.32883524971347,1.16953100403765,1.27905932149888,1.21852029520068,1.20558108098313,1.15086897497962,1.2357544630231,1.36700863094219,1.30830772950913,1.21087533087077,1.25510032005134,1.16150638734004],
+                                       baseline_values= [1.274153273941565], 
+                                       y_ticks = [-2,-1,0,1,2,3,4],
+                                       height_ratios = [1,5],
+                                       fig_height=5.0,
+                                       dpi = 1000,
+                                       boxcolor = GG_dark_colors.orange.RGBn,
+                                       )    
+    
 
 #%% Stacked bar plot
 
@@ -248,18 +434,17 @@ def stacked_plot_across_units(unit_groups = aa_baseline_groups):
     df_unit_groups = bst.UnitGroup.df_from_groups(unit_groups = aa_baseline_groups, fraction=True, 
                                                   scale_fractions_to_positive_values=True)
     df_unit_groups.index = [100,200,300,400,500,600,900,700,800]
-                            # 50]
     df_unit_groups = df_unit_groups.sort_index()    
     df_unit_groups.index = [
-                            'Transesterification',
-                            'Dihydroxylation',
-                            'Oxidative cleavage',
-                            'Catalyst recovery',
-                            'Pelargonic acid and C5-C8 fraction recovery',
-                            'Azelaic acid and heavy tails recovery',
-                            'Boilerturbogenerator',
-                            'Wastewater treatment',
-                            'Other Facilities (cooling tower,air distribution and cleaning auxiliaries)',]
+                            'transesterification',
+                            'dihydroxylation',
+                            'oxidative cleavage',
+                            'catalyst recovery',
+                            'pelargonic acid and C5-C8 fraction recovery',
+                            'azelaic acid and heavy tails recovery',
+                            'boilerturbogenerator',
+                            'wastewater treatment',
+                            'other facilities (cooling tower,air distribution,and cleaning auxiliaries)',]
     
     
     def get_system_heating_demand(): 
@@ -312,73 +497,143 @@ Resin = F.stream.polystyrene_based_catalyst
 Liquid_HCl = F.stream.Liquid_HCl
 natural_gas = F.stream.natural_gas
 
-#based on uncertainity analysis ranges models.table
-# fatty_acid_blend_price = np.linspace(0.4,1.32,10)#based on uncertainity analysis ranges models.table
-# tungstic_acid_moles = np.linspace(0.01/100,6/100,10)#TODO; 
-# tungstic_acid_reusability = np.linspace(1,10,10)
-# air_mass_fac = np.linspace(1.3,2.5,10)
-# y_data= oxidative_cleavage_reaction = np.linspace(0.80,0.98,15)
-# oxidative_cleavage_reaction_1 = np.linspace(0.80,0.98,15)
+# #Ranges for different contour plots
+# #Range 1
+# #Plot between dihydroxylation reaction conversion and oxidative rxn conversion (diol to int)
+# y_data = dih_rxn = np.round(np.linspace(0.78,0.98,21),2)
+# x_data = ox_cl_rxn = np.round(np.linspace(0.78,0.98,21),2)
+# w_data = []
+# def MPSP_at_x_and_y_1(x,y):  
+#     F.unit.R200.X_dih = y
+#     F.unit.R300.X_ox_rxn_1 = x
+#     aa_baseline.simulate()
+#     MPSP = azelaic_acid.price = azelaic_acid_tea.solve_price(azelaic_acid)
+#     return(MPSP)
 
+# for j in y_data:
+#     w_data.append([])
+#     for i in x_data:
+#         try:
+#             print(MPSP_at_x_and_y_1(i,j))
+#             w_data[-1].append(MPSP_at_x_and_y_1(i,j))        
+#         except:
+#             print('Needs_interpolation')
+#             w_data[-1].append(0)  
 
-# oxidative_cleavage_reaction_1
-# x_data = crude_vegetable_oil_price = np.linspace(1,3,15)
-y_data = dih = np.linspace(0.78,0.98,15)
-x_data = pelargonic_acid_price = np.linspace(3,8,15)
-# y_data = oxidative_cleavage_reaction_1 = np.linspace(0.10,0.90,15)
-# x_data = aa_price = np.linspace(2,12,15)
+#Range 2 for CI of AA using displacement
+#Plot between dihydroxylation reaction conversion and oxidative rxn conversion (diol to int)
+# y_data = dih_rxn = np.round(np.linspace(0.78,0.98,21),2)
+# x_data = ox_cl_rxn = np.round(np.linspace(0.78,0.98,21),2)
+# w_data = []
+# def CI_at_x_and_y_1(x,y):  
+#     F.unit.R200.X_dih = y
+#     F.unit.R300.X_ox_rxn_1 = x
+#     aa_baseline.simulate()
+#     CI = get_net_GWP_PA_1()
+#     return(CI)
 
+# for j in y_data:
+#     w_data.append([])
+#     for i in x_data:
+#         try:
+#             print(CI_at_x_and_y_1(i,j))
+#             w_data[-1].append(CI_at_x_and_y_1(i,j))        
+#         except:
+#             print('Needs_interpolation')
+#             w_data[-1].append(0)  
+            
+# y_data = dih_rxn = np.round(np.linspace(0.78,0.98,10),2)
+# x_data = ox_cl_rxn = np.round(np.linspace(0.78,0.98,10),2)
+# w_data = []
+# sum_mass_list = []
+# mass_C5_C9_fraction_list = []
+# mass_pa_fraction_list = []
+# mass_glycerol_fraction_list = []
+# mass_fa_fraction_list = []
+# mass_methanol_fraction_list = []
 
-# y_data = hydrogen_peroxide_price = np.linspace(1,2,15) 
-
-# oxidative_cleavage_reaction
-w_data = []
-
-def MPSP_at_x_and_y(x,y):  
-    # total_fatty_acid_mass = 98
-    # crude_vegetable_oil.price = x
-    pelargonic_acid_rich_fraction.price = x
-    # azelaic_acid.price = x
-    # F.unit.S611.specifications[0].args[0]  = y
-    # fresh_HP.price = y   
-    # F.R200.X_dih = y
-    # F.unit.M200.specifications[0].args[0] = y
-    # F.unit.M200.specifications[0].args[1] = x
-    # F.unit.R300.X_ox_rxn_1 = y
-    F.unit.R300.X_oxidativecleavage = y
-    # F.unit.R200.X_dih = y
-    # F.unit.R300.specifications[0].args[2] = y
-    try:
-        aa_baseline.simulate()
-    except Exception:
-        # crude_vegetable_oil.price = x
-        # F.unit.R200.X_dih = y
-        # fresh_HP.price = y   
-        # F.unit.R300.X_ox_rxn_1 = y
-        # pelargonic_acid_rich_fraction.price = y
+# def CI_mass_at_x_and_y(x,y):  
+#     F.unit.R200.X_dih = y
+#     F.unit.R300.X_ox_rxn_1 = x
+#     aa_baseline.simulate()
+#     def get_total_product_mass():
+#         return(sum([aa_baseline.get_mass_flow(azelaic_acid),
+#                     aa_baseline.get_mass_flow(recovered_C5_to_C9_MCA_fraction),
+#                     aa_baseline.get_mass_flow(pelargonic_acid_rich_fraction),
+#                     aa_baseline.get_mass_flow(crude_glycerol),       
+#                     aa_baseline.get_mass_flow(fatty_acid_blend),
+#                     aa_baseline.get_mass_flow(crude_methanol)
+#                     ]))
         
-        # azelaic_acid.price = x
-        pelargonic_acid_rich_fraction.price = x
-        # F.unit.S611.specifications[0].args[0]  = y
-        # F.unit.R300.X_ox_rxn_1 = y
-        F.unit.R300.X_oxidativecleavage = y
-        # pelargonic_acid_rich_fraction.price = y
-        aa_baseline.simulate()
-    # AOC = azelaic_acid_tea.AOC/1e6
-    # azelaic_acid.price  = 0
-    MFPP = azelaic_acid_tea.solve_price(crude_vegetable_oil)
-    # MPSP = azelaic_acid.price = azelaic_acid_tea.solve_price(azelaic_acid)
-    # Econ_all_AA_GWP = get_economic_based_AA_GWP()
-    return MFPP
-# MPSP
+#     #Mass allocation
+#     mass_C5_C9_fraction = aa_baseline.get_mass_flow(recovered_C5_to_C9_MCA_fraction)*get_system_GWP()/get_total_product_mass()
+#     mass_pa_fraction = aa_baseline.get_mass_flow(pelargonic_acid_rich_fraction)*get_system_GWP()/get_total_product_mass()
+#     mass_glycerol_fraction = aa_baseline.get_mass_flow(crude_glycerol)*get_system_GWP()/get_total_product_mass() 
+#     mass_fa_fraction = aa_baseline.get_mass_flow(fatty_acid_blend)*get_system_GWP()/get_total_product_mass()
+#     mass_methanol_fraction = aa_baseline.get_mass_flow(crude_methanol)*get_system_GWP()/get_total_product_mass()
+#     sum_mass =  mass_C5_C9_fraction+mass_pa_fraction+mass_glycerol_fraction+mass_fa_fraction+mass_methanol_fraction
+#     mass_aa_fraction = aa_baseline.get_mass_flow(azelaic_acid)*get_system_GWP()/get_total_product_mass()
+#     # print('mass_pa_fraction',mass_pa_fraction)
+#     # print('mass_glycerol_fraction',mass_glycerol_fraction)    
+#     # print('mass_fa_fraction',mass_fa_fraction)
+#     # print('mass_methanol_fraction',mass_methanol_fraction)
+#     return mass_aa_fraction#Kg CO2 per kg of AA
 
-# ##for each y you vary the x
+
+# for j in y_data:
+#     w_data.append([])
+#     for i in x_data:
+#         try:
+#             print(CI_mass_at_x_and_y(i,j))
+#             w_data[-1].append(CI_mass_at_x_and_y(i,j))        
+#         except:
+#             print('Needs_interpolation')
+#             w_data[-1].append(0)              
+            
+y_data = dih_rxn = np.round(np.linspace(0.78,0.98,10),2)
+x_data = ox_cl_rxn = np.round(np.linspace(0.78,0.98,10),2)
+w_data = []
+def CI_economic_at_x_and_y(x,y):  
+    F.unit.R200.X_dih = y
+    F.unit.R300.X_ox_rxn_1 = x
+    aa_baseline.simulate()
+    def get_total_product_market_value():
+        return(sum([aa_baseline.get_market_value(azelaic_acid),
+                    aa_baseline.get_market_value(recovered_C5_to_C9_MCA_fraction),
+                    aa_baseline.get_market_value(pelargonic_acid_rich_fraction),
+                    aa_baseline.get_market_value(crude_glycerol),                                
+                    aa_baseline.get_market_value(fatty_acid_blend),    
+                    aa_baseline.get_market_value(crude_methanol),
+                    ]))
+
+    #Economic allocation
+    economic_C5_C9_fraction = aa_baseline.get_market_value(recovered_C5_to_C9_MCA_fraction)*get_system_GWP()/get_total_product_market_value()
+    economic_pa_fraction = aa_baseline.get_market_value(pelargonic_acid_rich_fraction)*get_system_GWP()/get_total_product_market_value()
+    economic_glycerol_fraction = aa_baseline.get_market_value(crude_glycerol)*get_system_GWP()/get_total_product_market_value() 
+    economic_fa_fraction = aa_baseline.get_market_value(fatty_acid_blend)*get_system_GWP()/get_total_product_market_value()          
+    economic_methanol_fraction = aa_baseline.get_market_value(crude_methanol)*get_system_GWP()/get_total_product_market_value()          
+    sum_economic = economic_C5_C9_fraction+economic_pa_fraction+economic_glycerol_fraction+economic_fa_fraction+economic_methanol_fraction 
+    economic_aa_fraction = aa_baseline.get_market_value(azelaic_acid)*get_system_GWP()/get_total_product_market_value()
+    CI_economic = economic_aa_fraction
+    # print('sum_economic',sum_economic)
+    # print('economic_pa_fraction',economic_pa_fraction)
+    # print('economic_C5_C9_fraction',economic_C5_C9_fraction)
+    # print('economic_glycerol_fraction',economic_glycerol_fraction)
+    # print('economic_fa_fraction',economic_fa_fraction)
+    # print('economic_methanol_fraction',economic_methanol_fraction)
+    return(CI_economic)
+
 for j in y_data:
     w_data.append([])
     for i in x_data:
-        print(MPSP_at_x_and_y(i,j))
-        w_data[-1].append(MPSP_at_x_and_y(i,j))
-        
+        try:
+            print(CI_economic_at_x_and_y(i,j))
+            w_data[-1].append(CI_economic_at_x_and_y(i,j))        
+        except:
+            print('Needs_interpolation')
+            w_data[-1].append(0)              
+
+
 # %% Plot results
 
 
@@ -387,41 +642,22 @@ contourplots.animated_contourplot(w_data_vs_x_y_at_multiple_z=[w_data], # shape 
                                     x_data=x_data,# x axis values
                                     y_data=y_data, # y axis values
                                     z_data=z_data, # z axis values
-                                    x_label= "Pelargonic acid price",
-                                    # "Oxidative reaction conversion (intermediate to product)",
-                                    y_label= "Oxidative reaction conversion (intermediate to product)",
-                                    # Oxidative reaction conversion (intermediate to product)",
-                                    # "Oxidative reaction conversion (intermediate to product)",
-                                    # "Oxidative reaction conversion  ",
+                                    x_label= "oxidative reaction conversion (diol to intermediates)",
+                                    y_label= "oxidative reaction conversion (FAMEs to diol)", 
                                     z_label= "ignore", # title of the z axis
-                                    w_label="Maximum feedstock purchase price", # tiecotle of the color axis
-                                    x_ticks= 
-                                    # [2,3,4,5,6,7,8,9,10,11,12],
-                                    [3,3.5,4,4.5,5,5.5,6,6.5,7,7.5,8],
-                                    # [1,1.25,1.5,1.75,2,2.25,2.5,2.75,3],
-                                    # [3,3.5,4,4.5,5,5.5,6,6.5,7,7.5,8],
-                                    # [0.80,0.82,0.84,0.86,0.88,0.90,0.92,0.94,0.96,0.98],
-                                    # np.round(x_data,3),
-                                    y_ticks=  
-                                    # [1,1.1,1.2,1.3,1.4,1.5,1.6,1.7,1.8,1.9,2.0],
-                                    # [1,2,3,4,5,6,7,8,9,10,11],
-                                    # [7,7.5,8,8.5,9,9.5,10,10.5,11,11.5,12],
-                                    # [3,3.5,4,4.5,5,5.5,6,6.5,7,7.5,8],
-                                    # y_ticks = [1,1.1,1.2,1.3,1.4,1.5,1.6,1.7,1.8,1.9,2.0],
-                                    
-                                    [0.78,0.80,0.82,0.84,0.86,0.88,0.90,0.92,0.94,0.96,0.98],
-                                    # np.linspace(0.86,0.99,14),
-                                    # np.round(y_data,3),
+                                    w_label="CI of azelaic acid", # tiecotle of the color axis
+                                    x_ticks=  [0.78,0.80,0.82,0.84,0.86,0.88,0.90,0.92,0.94,0.96,0.98],
+                                    y_ticks=  [0.78,0.80,0.82,0.84,0.86,0.88,0.90,0.92,0.94,0.96,0.98],
                                     z_ticks=[0,1,2],
-                                    w_levels= [i for i in range(2,6)],
-                                    w_ticks= [i for i in range(2,6)],
-                                    x_units="$/kg",
+                                    w_levels= [i/10 for i in range(12,15)],
+                                    w_ticks= [i/10 for i in range(12,15)],
+                                    x_units="%",
                                     y_units="%",
                                     z_units=" ",
-                                    w_units="$/kg",
+                                    w_units="kg CO2 eq/kg",
                                     fmt_clabel=lambda cvalue: "{:.1f}".format(cvalue), # format of contour labels
-                                    cmap=CABBI_green_colormap(), # can use 'viridis' or other default matplotlib colormaps
-                                    cbar_ticks= [i for i in range(2,6)],
+                                    cmap=CABBI_green_colormap(), # can use 'viridis_r' or other default matplotlib colormaps
+                                    cbar_ticks= [i/10 for i in range(12,15)],
                                     clabel_fontsize = 7,
                                     z_marker_color='g', # default matplotlib color names
                                     axis_title_fonts={'size': {'x': 9, 'y':9,
@@ -434,270 +670,2120 @@ contourplots.animated_contourplot(w_data_vs_x_y_at_multiple_z=[w_data], # shape 
 
 # %% Feedstock composition variation
 
-ooo = np.linspace(75,85,11,dtype = int)
-lll = np.linspace(10,1,10,dtype = int)
-lnlnln = np.linspace(9,1,9,dtype = int)
-ppp = np.linspace(8,4,5,dtype = int)
-sss = np.linspace(6,2,5, dtype = int)
 
-
-tag = []
-for o in ooo:
+def feedstock_comp_vary(given_value,k_value = 0):
+    lll = np.arange(1,11,step = 1)
+    lnlnln = np.arange(1,10,step = 1)
+    ppp = [4,6,8]
+    sss = np.arange(2,7,step = 1)
+    
+    tag = []
     tag.append([])
-    for p in ppp:
-        for l in lll:
-            for s in sss:
-                for ln in lnlnln:
+    o = given_value
+    for p in np.round(ppp,1):
+        for l in np.round(lll,1):
+            for s in np.round(sss,1):
+                for ln in np.round(lnlnln,1):
                     sumi = o+p+l+ln+s
-                    if int(sumi) == 98:
+                    if round(sumi,1) == 98:
                         tag[-1].append({'PPP':p,'SSS':s,'OOO':o,'LLL':l,'LnLnLn':ln})
+                            
                         
-                        
-MFPP_ = []    
-k = 0
-for i in range(len(tag[k])):
-    try:
-        crude_vegetable_oil.imass['PPP'] = tag[k][i]['PPP']
-        crude_vegetable_oil.imass['SSS'] = tag[k][i]['SSS']
-        crude_vegetable_oil.imass['LLL'] = tag[k][i]['LLL']
-        crude_vegetable_oil.imass['LnLnLn'] = tag[k][i]['LnLnLn']
-        crude_vegetable_oil.imass['OOO'] = tag[k][i]['OOO']
-        crude_vegetable_oil.imass['PL']= 0
-        crude_vegetable_oil.imass['MAG']=0
-        crude_vegetable_oil.imass['DAG']=0
-        crude_vegetable_oil.imass['Water']=2-0.03
-        crude_vegetable_oil.imass['Oleic_acid']=0.03
-        crude_vegetable_oil.F_mass = 2400
-        aa_baseline.simulate()
-        # MPSP = azelaic_acid.price = azelaic_acid_tea.solve_price(azelaic_acid)
-        # MPSP_1.append(MPSP)
-        MFPP = azelaic_acid_tea.solve_price(crude_vegetable_oil)
-        MFPP_.append(MFPP)
-    except Exception:
-    # This block will run if there is an error in the try block
-        MFPP_.append(0)
-    i = i+1
-    
-LnLnLn = []
-for i in range(len(tag[k])):
-    LnLnLn.append(tag[k][i]['LnLnLn'])
-    i = i+1    
-SSS = []
-for i in range(len(tag[k])):
-    SSS.append(tag[k][i]['SSS'])
-    i = i+1
-PPP = []
-for i in range(len(tag[k])):
-    PPP.append(tag[k][i]['PPP'])
-    i = i+1
-LLL = []
-for i in range(len(tag[k])):
-    LLL.append(tag[k][i]['LLL'])
-    i = i+1
-    
-OOO = []
-for i in range(len(tag[k])):
-    OOO.append(tag[k][i]['OOO'])
-    i = i+1    
-    
-col1 = "P"
-col2 = "S"
-col3 = "L"
-col4 = "Ln"
-col5 = "O"
-col6 = "MFPP"
-
-data = pd.DataFrame({col1: PPP, 
-                     col2: SSS,
-                     col3: LLL,
-                     col4: LnLnLn,
-                     col5: OOO,
-                     col6: MFPP_
-                      })
-o_name = str(OOO[0])
-data.to_excel("O_75.xlsx", sheet_name=o_name, index=False)    
-# %% plotting feedstock variation
-
-
-
-# Load the data from the Excel file
-file_path = 'just tag composition data.xlsx'
-sheet_name = '85'
-df = pd.read_excel(file_path, sheet_name=sheet_name)
-
-# Remove rows with NaN values in 'P' to avoid plotting issues
-df = df.dropna(subset=['P'])
-
-# Get unique values of P excluding NaN
-unique_p_values = df['P'].unique()
-GG_colors = Palette(
-    blue = colors.blue,    
-    purple = colors.purple,
-    red = colors.red,
-    orange = colors.orange,
-    yellow = colors.yellow,
-    green = colors.green,
-)
-color_dict = {1:GG_colors.blue.RGBn,2:GG_colors.red.RGBn,3:GG_colors.purple.RGBn,
-              4:GG_colors.orange.RGBn,
-              5:GG_dark_colors.yellow.RGBn,6:GG_colors.green.RGBn,7:GG_colors.orange.RGBn,
-              8:GG_dark_colors.orange.RGBn,
-              9:GG_dark_colors.green.RGBn,
-              10:GG_dark_colors.red.RGBn} #TODO: put values
-# Create subplots side by side for each unique value of P
-fig, axs = plt.subplots(1, len(unique_p_values), figsize=(32, 7))
-plt.rcParams.update({'font.size': 16})  # Increase the font size
-
-legend_dict = {}  # Initialize an empty dictionary for legend
-
-for i, p_value in enumerate(unique_p_values):
-    df_filtered = df[df['P'] == p_value]
-    unique_l_values = df_filtered['L'].unique()
-
-    for l_value in unique_l_values:
-        df_filtered_l = df_filtered[df_filtered['L'] == l_value]
-        scatter = axs[i].scatter(df_filtered_l['Ln'], df_filtered_l['MPSP'], 
-                                 label=f'%L = {l_value}',color=color_dict[l_value])
-
-        # Add the handles and labels of each scatter plot to the dictionary
-        legend_dict[f'%L = {l_value}'] = scatter
-        #for a line graph below added
-        # axs[i].plot(df_filtered_l['Ln'], df_filtered_l['MPSP'], color=color_dict[l_value], linestyle=':')
+    MPSP_ = []  
+    MFPP_ = []  
+    k = k_value
+    for i in range(len(tag[k])):
+        try:
+            crude_vegetable_oil.imass['PPP'] = tag[k][i]['PPP']
+            crude_vegetable_oil.imass['SSS'] = tag[k][i]['SSS']
+            crude_vegetable_oil.imass['LLL'] = tag[k][i]['LLL']
+            crude_vegetable_oil.imass['LnLnLn'] = tag[k][i]['LnLnLn']
+            crude_vegetable_oil.imass['OOO'] = tag[k][i]['OOO']
+            crude_vegetable_oil.imass['PL']= 0
+            crude_vegetable_oil.imass['MAG']=0
+            crude_vegetable_oil.imass['DAG']=0
+            crude_vegetable_oil.imass['Water']=2-0.03
+            crude_vegetable_oil.imass['Oleic_acid']=0.03
+            crude_vegetable_oil.F_mass = 4000
+            aa_baseline.simulate()
+            MPSP = azelaic_acid.price = azelaic_acid_tea.solve_price(azelaic_acid)            
+            MPSP_.append(MPSP)
+            azelaic_acid.price = correlation_based_bulk_prices['Azelaic_acid']
+            MFPP = azelaic_acid_tea.solve_price(crude_vegetable_oil)
+            MFPP_.append(MFPP)    
+        except:
+            try: 
+                F.D604.V = 0.9
+                crude_vegetable_oil.imass['PPP'] = tag[k][i]['PPP']
+                crude_vegetable_oil.imass['SSS'] = tag[k][i]['SSS']
+                crude_vegetable_oil.imass['LLL'] = tag[k][i]['LLL']
+                crude_vegetable_oil.imass['LnLnLn'] = tag[k][i]['LnLnLn']
+                crude_vegetable_oil.imass['OOO'] = tag[k][i]['OOO']
+                crude_vegetable_oil.imass['PL']= 0
+                crude_vegetable_oil.imass['MAG']=0
+                crude_vegetable_oil.imass['DAG']=0
+                crude_vegetable_oil.imass['Water']=2-0.03
+                crude_vegetable_oil.imass['Oleic_acid']=0.03
+                crude_vegetable_oil.F_mass = 4000
+                aa_baseline.simulate()
+                MPSP = azelaic_acid.price = azelaic_acid_tea.solve_price(azelaic_acid)            
+                MPSP_.append(MPSP)
+                azelaic_acid.price = correlation_based_bulk_prices['Azelaic_acid']
+                MFPP = azelaic_acid_tea.solve_price(crude_vegetable_oil)
+                MFPP_.append(MFPP)    
+            except:
+                MFPP_.append(0)
+                MPSP_.append(0)
+                 
+    LnLnLn = []
+    for i in range(len(tag[k])):
+        LnLnLn.append(tag[k][i]['LnLnLn'])
+        i = i+1    
+    SSS = []
+    for i in range(len(tag[k])):
+        SSS.append(tag[k][i]['SSS'])
+        i = i+1
+    PPP = []
+    for i in range(len(tag[k])):
+        PPP.append(tag[k][i]['PPP'])
+        i = i+1
+    LLL = []
+    for i in range(len(tag[k])):
+        LLL.append(tag[k][i]['LLL'])
+        i = i+1
         
-    axs[i].set_title(f'%P = {p_value}')
-    axs[i].set_xlabel('%Ln')    
-    if i == 0:
-        axs[i].set_ylabel('MPSP[$/kg]')
-
-    axs[i].set_xlim(0, 9.5)  # Adjust X-axis to ensure dots lie inside the frame
-    axs[i].set_ylim(9.8, 10)  # Set the y-axis limits to be between 9.8 and 10
-    axs[i].set_xticks(np.arange(0, 10, 1))  # Ensure all integers from 0 to 10 are shown
-    axs[i].set_yticks(np.arange(9.6, 11.2, 0.1))  # Ensure all values from 9.8 to 10 are shown
-
-# Create a legend for the whole figure
-# for int
-# sorted_legend_dict = dict(sorted(legend_dict.items(), key=lambda item: int(item[0].split('=')[1].strip())))
-#for float
-sorted_legend_dict = dict(sorted(legend_dict.items(), key=lambda item: float(item[0].split('=')[1].strip())))
-fig.legend(sorted_legend_dict.values(), sorted_legend_dict.keys(), loc='right',bbox_to_anchor=(1.06, 0.5))
-
-plt.suptitle('Impact of change in %L and %Ln on MPSP[$/kg] at constant 85% O at different %P')
-plt.tight_layout()
-plt.show()
-
-#%%# Code to plot all Ln and MPSP
+    OOO = []
+    for i in range(len(tag[k])):
+        OOO.append(tag[k][i]['OOO'])
+        i = i+1    
+        
+    col1 = "P"
+    col2 = "S"
+    col3 = "L"
+    col4 = "Ln"
+    col5 = "O"
+    col6 = "MPSP"
+    col7 = "MFPP"
+    
+    data = pd.DataFrame({col1: PPP, 
+                         col2: SSS,
+                         col3: LLL,
+                         col4: LnLnLn,
+                         col5: OOO,
+                         col6: MPSP_,
+                         col7: MFPP_
+                          })
+    o_name = str(OOO[0])
+    data.to_excel("O_85_with_10_steps.xlsx", sheet_name=o_name, index=False)  
+    
+# %% plotting feedstock variation for 75
 import pandas as pd
+import numpy as np
 import matplotlib.pyplot as plt
-import seaborn as sns
+from matplotlib.colors import Normalize
 
-# Load the data from the first sheet
-sheet_name = 'Sheet1'
-df = pd.read_excel('tag comps 2.xlsx', sheet_name=sheet_name)
+#setting font type and size 
+plt.rcParams['font.sans-serif'] = "Arial"
+plt.rcParams['font.size'] = str(26)
+
+
+# Load the specific sheet
+df_75 = pd.read_excel('O_75.xlsx', sheet_name='75')
+
+
+# Filter the dataframe for P = 4, 6, 8
+filtered_df_4_75 = df_75[df_75['P'] == 4]
+filtered_df_6_75 = df_75[df_75['P'] == 6]
+filtered_df_8_75 = df_75[df_75['P'] == 8]
+
+# Pivot the table to get a matrix form suitable for heatmap
+pivot_table_4_75 = filtered_df_4_75.pivot(index='L', columns='Ln', values='MPSP')
+pivot_table_6_75 = filtered_df_6_75.pivot(index='L', columns='Ln', values='MPSP')
+pivot_table_8_75 = filtered_df_8_75.pivot(index='L', columns='Ln', values='MPSP')
+
+
+# Adjusting the plotting to ensure L = 9 is included
+# Calculate global min and max
+global_min = min(pivot_table_4_75.min().min(), pivot_table_6_75.min().min(), pivot_table_8_75.min().min())
+global_max = max(pivot_table_4_75.max().max(), pivot_table_6_75.max().max(), pivot_table_8_75.max().max())
 
 # Plotting
-plt.figure(figsize=(10, 6))
-sns.scatterplot(data=df, x='Ln', y='MPSP', alpha=0.6)
+fig, axs = plt.subplots(1, 3, figsize=(21,7), gridspec_kw={'width_ratios': [1, 1, 1.05]})
+norm = Normalize(vmin=global_min, vmax=global_max)
+c0 = axs[0].pcolormesh(pivot_table_4_75, cmap='viridis_r', norm=norm)
+c1 = axs[1].pcolormesh(pivot_table_6_75, cmap='viridis_r', norm=norm)
+c2 = axs[2].pcolormesh(pivot_table_8_75, cmap='viridis_r', norm=norm)
 
-# Calculate and plot median MPSP values for each Ln value
-medians = df.groupby('Ln')['MPSP'].median().reset_index()
-sns.lineplot(data=medians, x='Ln', y='MPSP', marker='o', color='red', label='Median MPSP')
+# Create a colorbar with the global scale
+# Create a colorbar with the global scale
+bar = fig.colorbar(c2,fraction=0.05, pad=0.04)
+bar.set_ticks(np.round(np.linspace(global_min,global_max,8),2))
+bar.set_label(f'MPSP [$/kg]', rotation=270,labelpad=30)
 
-plt.xlabel('Ln')
-plt.ylabel('MPSP')
-plt.title('MPSP vs. Ln with Median MPSP Values')
-plt.legend()
-plt.grid(True)
+# Set ticks for better readability
+# for ax in axs:
+axs[0].set_xticks(np.arange(len(pivot_table_4_75.columns)) + 0.5, minor=False)
+axs[0].set_xticklabels(pivot_table_4_75.columns)
+axs[0].set_yticks(np.arange(len(pivot_table_4_75.index)) + 0.5, minor=False)
+axs[0].set_yticklabels(pivot_table_4_75.index)
+
+axs[1].set_xticks(np.arange(len(pivot_table_6_75.columns)) + 0.5, minor=False)
+axs[1].set_xticklabels(pivot_table_6_75.columns)
+axs[1].set_yticks(np.arange(len(pivot_table_6_75.index)) + 0.5, minor=False)
+axs[1].set_yticklabels(pivot_table_6_75.index)
+
+axs[2].set_xticks(np.arange(len(pivot_table_8_75.columns)) + 0.5, minor=False)
+axs[2].set_xticklabels(pivot_table_8_75.columns)
+axs[2].set_yticks(np.arange(len(pivot_table_8_75.index)) + 0.5, minor=False)
+axs[2].set_yticklabels(pivot_table_8_75.index)
+
+axs[0].set_title('%O = 75, %P = 4',pad = 20)
+axs[1].set_title('%O = 75, %P = 6',pad = 20)
+axs[2].set_title('%O = 75, %P = 8',pad = 20)
+
+axs[0].set_xlabel(f'%Ln')
+axs[1].set_xlabel(f'%Ln')
+axs[2].set_xlabel(f'%Ln')
+
+axs[0].set_ylabel(f'%L')
+axs[1].set_ylabel(f'%L')
+axs[2].set_ylabel(f'%L')
+plt.tight_layout()
+# plt.show()
+plt.savefig('O_75.pdf', dpi=300) 
+
+
+plt.tight_layout()
 plt.show()
+print('Heatmap generated successfully with a common colorbar and adjustments for L = 9 inclusion.')
 
-#25h and 75th percentile
-# Calculate and plot 25th and 75th percentile MPSP values for each Ln value
-percentiles_25 = df.groupby('Ln')['MPSP'].quantile(0.25).reset_index()
-percentiles_75 = df.groupby('Ln')['MPSP'].quantile(0.75).reset_index()
-
-plt.figure(figsize=(12, 8))
-sns.scatterplot(data=df, x='Ln', y='MPSP', alpha=0.6)
-
-# Plotting median
-sns.lineplot(data=medians, x='Ln', y='MPSP', marker='o', color='red', label='Median MPSP')
-
-# Plotting 25th percentile
-sns.lineplot(data=percentiles_25, x='Ln', y='MPSP', marker='o', color='blue', label='25th Percentile MPSP')
-
-# Plotting 75th percentile
-sns.lineplot(data=percentiles_75, x='Ln', y='MPSP', marker='o', color='green', label='75th Percentile MPSP')
-
-plt.xlabel('Ln')
-plt.ylabel('MPSP')
-plt.title('MPSP vs. Ln with Median, 25th, and 75th Percentile MPSP Values')
-plt.legend()
-plt.grid(True)
-plt.show()
-
-#%% # plotting all MPSPs vs O value
-import matplotlib.pyplot as plt
-import numpy as np
+# %% plotting feedstock variation
 import pandas as pd
+import numpy as np
+import matplotlib.pyplot as plt
+from matplotlib.colors import Normalize
 
-def read_all_sheets_from_excel(path: str) -> dict:
-    xls = pd.ExcelFile(path)
-    df_dict = {}
-    for sheet_name in xls.sheet_names:
-        df_dict[sheet_name] = pd.read_excel(xls, sheet_name)
-    return df_dict
-
-dataframes = read_all_sheets_from_excel('MFPP_combos.xlsx')
-
-# print each dataframe name
-print("Dataframes in this file:", ", ".join(dataframes.keys()))
-
-for k, v in dataframes.items():
-    # strip whitespace where possible from column names; need to check if isinstance(x, str) because some column names are numbers
-    try:
-        v = v.rename(columns=lambda x: x.strip() if isinstance(x, str) else x)
-    except:
-        pass
-
-    # strip whitespace where possible from cells
-    try:
-        v = v.apply(lambda col: col.str.strip() if col.dtype == "object" else col)
-    except:
-        pass
-    dataframes[k] = v
-    print(v.head())
+#setting font type and size 
+plt.rcParams['font.sans-serif'] = "Arial"
+plt.rcParams['font.size'] = str(26)
 
 
-defaults_dict ={'colors':
-                {'Guest_Group_TEA_Breakdown': ['#7BBD84', '#F7C652', '#63C6CE', '#94948C', '#734A8C', '#D1C0E1', '#648496', '#B97A57', '#D1C0E1', '#F8858A', '#F8858A', ]}}
+# Load the specific sheet
+df_75 = pd.read_excel('O_80.xlsx', sheet_name='80')
 
- 
-def plot_mpsp_vs_o(dataframes):
-    relevant_sheets = [str(i) for i in range(75, 86)]  # Sheets from 75 to 85
-    df_list = [dataframes[sheet] for sheet in relevant_sheets if sheet in dataframes]
-    combined_df = pd.concat(df_list)
-    
-    # Plotting
-    plt.figure(figsize=(10, 6))
-    plt.scatter(combined_df['S'], combined_df['MFPP'], c='#B97A57', alpha=0.5)
-    
-    # Calculating and plotting median values
-    median_values = combined_df.groupby('S')['MFPP'].median().reset_index()
-    plt.plot(median_values['S'], median_values['MFPP'], marker='o', color='#F7C652', label='Median MPSP')
-    
-    # Calculate the slope of the median line
-    slope, _ = np.polyfit(median_values['S'], median_values['MFPP'], 1)
-    
-    # Display the slope on the plot
-    plt.text(0.066*13.1, 0.94, f'Slope: {slope:.2f}', transform=plt.gca().transAxes, verticalalignment='top')
-    
-    plt.xlabel('S wt.% ')
-    plt.xticks(np.arange(min(combined_df['S']), max(combined_df['S'])+1, 1.0))  
-    plt.yticks(np.arange(1,5,1)) 
-    plt.ylabel('MFPP $\u00B7kg\u207B\u00B9')
-    plt.title('MFPP $\u00B7kg\u207B\u00B9 vs S wt.%')
-    plt.legend(frameon = False, bbox_to_anchor=(0.2*5,1))
-    plt.show()
-    
-plot_mpsp_vs_o(dataframes)
+# Filter the dataframe for P = 4, 6, 8
+filtered_df_4_75 = df_75[df_75['P'] == 4]
+filtered_df_6_75 = df_75[df_75['P'] == 6]
+filtered_df_8_75 = df_75[df_75['P'] == 8]
+
+# Pivot the table to get a matrix form suitable for heatmap
+pivot_table_4_75 = filtered_df_4_75.pivot(index='L', columns='Ln', values='MPSP')
+pivot_table_6_75 = filtered_df_6_75.pivot(index='L', columns='Ln', values='MPSP')
+pivot_table_8_75 = filtered_df_8_75.pivot(index='L', columns='Ln', values='MPSP')
+
+# Adjusting the plotting to ensure L = 9 is included
+# Calculate global min and max
+global_min = min(pivot_table_4_75.min().min(), pivot_table_6_75.min().min(), pivot_table_8_75.min().min())
+global_max = max(pivot_table_4_75.max().max(), pivot_table_6_75.max().max(), pivot_table_8_75.max().max())
+
+# global_max =13.389
+# global_min = 11.570
+# Plotting
+fig, axs = plt.subplots(1, 3, figsize=(21,7), gridspec_kw={'width_ratios': [1, 1, 1.05]})
+norm = Normalize(vmin=global_min, vmax=global_max)
+c0 = axs[0].pcolormesh(pivot_table_4_75, cmap='viridis_r', norm=norm)
+c1 = axs[1].pcolormesh(pivot_table_6_75, cmap='viridis_r', norm=norm)
+c2 = axs[2].pcolormesh(pivot_table_8_75, cmap='viridis_r', norm=norm)
+
+# Create a colorbar with the global scale
+# Create a colorbar with the global scale
+bar = fig.colorbar(c2,fraction=0.05, pad=0.04)
+bar.set_ticks(np.round(np.linspace(global_min,global_max,8),2))
+bar.set_label(f'MPSP [$/kg]', rotation=270,labelpad=30)
+# Set ticks for better readability
+# for ax in axs:
+axs[0].set_xticks(np.arange(len(pivot_table_4_75.columns)) + 0.5, minor=False)
+axs[0].set_xticklabels(pivot_table_4_75.columns)
+# axs[0].set_xticklabels([1,2,3,4,5,6,7,8,9])
+axs[0].set_yticks(np.arange(len(pivot_table_4_75.index)) + 0.5, minor=False)
+axs[0].set_yticklabels(pivot_table_4_75.index)
+                 
+axs[1].set_xticks(np.arange(len(pivot_table_6_75.columns)) + 0.5, minor=False)
+axs[1].set_xticklabels(pivot_table_6_75.columns)
+axs[1].set_yticks(np.arange(len(pivot_table_6_75.index)) + 0.5, minor=False)
+axs[1].set_yticklabels(pivot_table_6_75.index)
+
+axs[2].set_xticks(np.arange(len(pivot_table_8_75.columns)) + 0.5, minor=False)
+axs[2].set_xticklabels(pivot_table_8_75.columns)
+axs[2].set_yticks(np.arange(len(pivot_table_8_75.index)) + 0.5, minor=False)
+axs[2].set_yticklabels(pivot_table_8_75.index)
+
+axs[0].set_title('%O = 80, %P = 4',pad = 20)
+axs[1].set_title('%O = 80, %P = 6',pad = 20)
+axs[2].set_title('%O = 80, %P = 8',pad = 20)
+
+axs[0].set_xlabel(f'%Ln')
+axs[1].set_xlabel(f'%Ln')
+axs[2].set_xlabel(f'%Ln')
+
+axs[0].set_ylabel(f'%L')
+axs[1].set_ylabel(f'%L')
+axs[2].set_ylabel(f'%L')
+plt.tight_layout()
+plt.savefig('O_80.pdf', dpi=300) 
 
 
+plt.tight_layout()
+plt.show()
+print('Heatmap generated successfully with a common colorbar and adjustments for L = 9 inclusion.')
 
+# %% plotting feedstock variation
+import pandas as pd
+import numpy as np
+import matplotlib.pyplot as plt
+from matplotlib.colors import Normalize
+
+#setting font type and size 
+plt.rcParams['font.sans-serif'] = "Arial"
+plt.rcParams['font.size'] = str(26)
+
+
+# Load the specific sheet
+df_85 = pd.read_excel('O_85.xlsx', sheet_name='85')
+
+# Filter the dataframe for P = 4, 6, 8
+filtered_df_4_85 = df_85[df_85['P'] == 4]
+filtered_df_6_85 = df_85[df_85['P'] == 6]
+filtered_df_8_85 = df_85[df_85['P'] == 8]
+
+# Pivot the table to get a matrix form suitable for heatmap
+pivot_table_4_85 = filtered_df_4_85.pivot(index='L', columns='Ln', values='MPSP')
+pivot_table_6_85 = filtered_df_6_85.pivot(index='L', columns='Ln', values='MPSP')
+pivot_table_8_85 = filtered_df_8_85.pivot(index='L', columns='Ln', values='MPSP')
+
+# Adjusting the plotting to ensure L = 9 is included
+# Calculate global min and max
+global_min = min(pivot_table_4_85.min().min(), pivot_table_6_85.min().min(), pivot_table_8_85.min().min())
+global_max = max(pivot_table_4_85.max().max(), pivot_table_6_85.max().max(), pivot_table_8_85.max().max())
+
+# global_max =13.389
+# global_min = 11.570
+# Plotting
+fig, axs = plt.subplots(1, 3, figsize=(21,7), gridspec_kw={'width_ratios': [1, 1, 1.05]})
+norm = Normalize(vmin=global_min, vmax=global_max)
+c0 = axs[0].pcolormesh(pivot_table_4_85, cmap='viridis_r', norm=norm)
+c1 = axs[1].pcolormesh(pivot_table_6_85, cmap='viridis_r', norm=norm)
+c2 = axs[2].pcolormesh(pivot_table_8_85, cmap='viridis_r', norm=norm)
+
+# Create a colorbar with the global scale
+# Create a colorbar with the global scale
+bar = fig.colorbar(c2,fraction=0.05, pad=0.04)
+bar.set_ticks(np.round(np.linspace(global_min,global_max,8),2))
+bar.set_label(f'MPSP [$/kg]', rotation=270,labelpad=30)
+# Set ticks for better readability
+# for ax in axs:
+axs[0].set_xticks(np.arange(len(pivot_table_4_85.columns)) + 0.5, minor=False)
+axs[0].set_xticklabels(pivot_table_4_85.columns)
+axs[0].set_yticks(np.arange(len(pivot_table_4_85.index)) + 0.5, minor=False)
+axs[0].set_yticklabels(pivot_table_4_85.index)
+                 
+axs[1].set_xticks(np.arange(len(pivot_table_6_85.columns)) + 0.5, minor=False)
+axs[1].set_xticklabels(pivot_table_6_85.columns)
+axs[1].set_yticks(np.arange(len(pivot_table_6_85.index)) + 0.5, minor=False)
+axs[1].set_yticklabels(pivot_table_6_85.index)
+
+axs[2].set_xticks(np.arange(len(pivot_table_8_85.columns)) + 0.5, minor=False)
+axs[2].set_xticklabels(pivot_table_8_85.columns)
+axs[2].set_yticks(np.arange(len(pivot_table_8_85.index)) + 0.5, minor=False)
+axs[2].set_yticklabels(pivot_table_8_85.index)
+
+axs[0].set_title('%O = 85, %P = 4',pad = 20)
+axs[1].set_title('%O = 85, %P = 6',pad = 20)
+axs[2].set_title('%O = 85, %P = 8',pad = 20)
+
+axs[0].set_xlabel(f'%Ln')
+axs[1].set_xlabel(f'%Ln')
+axs[2].set_xlabel(f'%Ln')
+
+axs[0].set_ylabel(f'%L')
+axs[1].set_ylabel(f'%L')
+axs[2].set_ylabel(f'%L')
+plt.tight_layout()
+plt.savefig('O_85.pdf', dpi=300) 
+
+
+plt.tight_layout()
+plt.show()
+print('Heatmap generated successfully with a common colorbar and adjustments for L = 9 inclusion.')
+
+#%% w_data
+[[11.64420799582333,
+  11.289315523486913,
+  10.94294407099659,
+  10.61137756620202,
+  10.289622995215158,
+  10.00224232244272,
+  9.718671900662825,
+  9.443745923480833,
+  9.179007636165544,
+  8.932916505916499,
+  8.685833491286237,
+  8.4518058926957,
+  8.236702873407527,
+  8.021189625515115,
+  7.817362726253632,
+  7.613550862349688,
+  7.422947330910023,
+  7.262812064979062,
+  7.062902421491527,
+  6.889344337829081,
+  6.713011197794629],
+  [11.434474606553428,
+  11.086384497811434,
+  10.743764889313248,
+  10.40678528686296,
+  10.11130163701775,
+  9.814934443662215,
+  9.531812920589276,
+  9.2621395747721,
+  9.003945422224039,
+  8.762405310052369,
+  8.517884582337805,
+  8.29590364934181,
+  8.079086461694974,
+  7.871558874907053,
+  7.67208811030554,
+  7.472160806137619,
+  7.281399338690625,
+  7.100620082057222,
+  6.923415332830618,
+  6.7459279694455665,
+  6.580986672447362],
+  [11.226405963378763,
+  10.878203264011386,
+  10.556037447099701,
+  10.235296089072811,
+  9.929783509576891,
+  9.638279059458506,
+  9.360226304120816,
+  9.094940353289807,
+  8.844782236604546,
+  8.603932631290197,
+  8.3613066541242,
+  8.140368490715915,
+  7.9340172672877385,
+  7.725245707458806,
+  7.523875504142284,
+  7.335496343791208,
+  7.145998421189922,
+  6.96814580670088,
+  6.800409265670694,
+  6.621497636847086,
+  6.458750406395376],
+  [11.03602180133583,
+  10.69439744497229,
+  10.365133403131063,
+  10.04967079926406,
+  9.753646329996913,
+  9.466749670057823,
+  9.193610141554691,
+  8.936421916367928,
+  8.686112584578094,
+  8.441865255357104,
+  8.208314234774631,
+  8.004278797091517,
+  7.791352723501641,
+  7.582890817039865,
+  7.384033856579352,
+  7.192795113152012,
+  7.0112464478478005,
+  6.834996344219685,
+  6.655853007666001,
+  6.4904366348823945,
+  6.330544759556571],
+  [10.84330361743444,
+  10.509127097028696,
+  10.182647873608575,
+  9.872131314939168,
+  9.578523009418955,
+  9.296469985106684,
+  8.963280421699551,
+  8.781502407125497,
+  8.533947626775593,
+  8.296899083347487,
+  8.079077548994093,
+  7.8571750015342605,
+  7.645851029552118,
+  7.442893772149018,
+  7.247732523480301,
+  7.0598456456433185,
+  6.882615098416855,
+  6.7078560267845955,
+  6.531400626308757,
+  6.368446180976658,
+  6.21088390907809],
+  [10.658440293177865,
+  10.32938729371531,
+  10.007904003290413,
+  9.702110895698604,
+  9.410723282581284,
+  9.13799649526163,
+  8.881152365868243,
+  8.629715103676993,
+  8.380863611080928,
+  8.153768934529285,
+  7.933507202478813,
+  7.717984208457377,
+  7.513066931546135,
+  7.313642870687114,
+  7.121213347591009,
+  6.939232661066315,
+  6.763384168322842,
+  6.582178127484563,
+  6.416580156989082,
+  6.267562643694401,
+  6.113107439784481],
+  [10.483029064585814,
+  10.15578102858068,
+  9.841389227156254,
+  9.540848665430117,
+  9.258799991988251,
+  8.988323332834486,
+  8.731117565627782,
+  8.474291795153029,
+  8.169737202237574,
+  8.007238605817648,
+  7.785424959426359,
+  7.572734208570292,
+  7.370323087888379,
+  7.173875316886217,
+  6.992607771386807,
+  6.811513122927912,
+  6.6278623048783825,
+  6.457097357242523,
+  6.312145140076221,
+  6.151339320827683,
+  5.9973286717913075],
+  [10.309450399592613,
+  9.988166724308597,
+  9.677796126287994,
+  9.38086905323544,
+  9.098180763648566,
+  8.832883343963585,
+  8.575479279038772,
+  8.321483119810301,
+  8.0905158711012,
+  7.864475052383405,
+  7.647412620519557,
+  7.438778233427267,
+  7.2398930380169375,
+  7.046622286530718,
+  6.8613299413434286,
+  6.69549951050957,
+  6.519754465542743,
+  6.3507725259152235,
+  6.188864274693349,
+  6.0365803302713985,
+  5.884813667369263],
+  [10.138385451064453,
+  9.822882479167909,
+  9.515366251639568,
+  9.222796900152979,
+  8.94916932762508,
+  8.684043514661553,
+  8.430773132423798,
+  8.185328355330988,
+  7.9612166204660575,
+  7.735652461056903,
+  7.519795741168386,
+  7.315770184863872,
+  7.116628697836176,
+  6.874257156339798,
+  6.747811031773738,
+  6.5727087406048526,
+  6.406107959458105,
+  6.241172612802287,
+  6.0795795444327325,
+  5.923927198389318,
+  5.768316205399257],
+  [9.973904232503969,
+  9.662380977820558,
+  9.359248659713899,
+  9.075384952179515,
+  8.801604443358777,
+  8.540254052375275,
+  8.282750286746378,
+  8.048748672904868,
+  7.819428576541917,
+  7.5993133456609705,
+  7.408052934001564,
+  7.194570922868757,
+  7.001262790622344,
+  6.813773236043202,
+  6.632593673862239,
+  6.456829373930721,
+  6.28736772567328,
+  6.140277119956149,
+  5.972129078707548,
+  5.819248045942168,
+  5.664564597930564],
+  [9.814146724207184,
+  9.508098456956617,
+  9.207000457802831,
+  8.927648394314085,
+  8.657667026418464,
+  8.400217427717426,
+  8.148624217034957,
+  7.926236202996396,
+  7.707927754524126,
+  7.489038051735681,
+  7.271200821288469,
+  7.073202858169916,
+  6.882843708029985,
+  6.707292606773418,
+  6.522205209728417,
+  6.347301315617791,
+  6.180995226530533,
+  6.022724313845904,
+  5.866960367367523,
+  5.707074552179088,
+  5.560090247816239],
+  [9.657199150130692,
+  9.355721881852075,
+  9.063129246911783,
+  8.78677776118274,
+  8.525429719424968,
+  8.273306145828,
+  8.036141891040781,
+  7.8012689043595405,
+  7.580442093787048,
+  7.368963810113505,
+  7.154383154369215,
+  6.956034779664798,
+  6.768667040809723,
+  6.587803834690089,
+  6.408472173807879,
+  6.237913510471275,
+  6.072231896293921,
+  5.912579948604225,
+  5.7585346662805845,
+  5.602179361828798,
+  5.456489610915928],
+  [9.503584399444094,
+  9.207345894378017,
+  8.919272788861424,
+  8.651175744208858,
+  8.393605490971865,
+  8.14144169566374,
+  7.906819066167401,
+  7.669500137585632,
+  7.4587586349599455,
+  7.237484205366695,
+  7.036472282840407,
+  6.847253482609466,
+  6.659352394549368,
+  6.475726680159688,
+  6.299507231763862,
+  6.130057966590767,
+  5.9575800139659,
+  5.800262391144425,
+  5.648344723959542,
+  5.501363018038465,
+  5.363290617080807],
+  [9.355109420154962,
+  9.087530863378484,
+  8.785599817189738,
+  8.513616847544188,
+  8.259412606854992,
+  8.01272380285434,
+  7.780932677900095,
+  7.557961146464536,
+  7.337805777643125,
+  7.122565878766195,
+  6.9195061152789785,
+  6.733949207043143,
+  6.546055614363849,
+  6.365076562116114,
+  6.191264827550195,
+  6.016595433926808,
+  5.8555488559408095,
+  5.700197940028711,
+  5.550050937698796,
+  5.407284888076855,
+  5.2668084308161385],
+  [9.231354683109137,
+  8.931107800686945,
+  8.64904438232635,
+  8.380956089316886,
+  8.128090385706297,
+  7.892501063202116,
+  7.661188587993186,
+  7.435520346893402,
+  7.218763494869908,
+  7.007728435114495,
+  6.8115758934108985,
+  6.618573961018765,
+  6.439423234384483,
+  6.2601925175116895,
+  6.08821850844869,
+  5.915468998158999,
+  5.756265469156221,
+  5.602696188435431,
+  5.45256176861864,
+  5.313146182991899,
+  5.174326789120855],
+  [9.094186489173298,
+  8.794283914854498,
+  8.517241369033076,
+  8.252459326898284,
+  8.006761514969483,
+  7.7699246056536095,
+  7.52951092882146,
+  7.31230481202273,
+  7.097656347198778,
+  6.894845723215566,
+  6.6979279756679455,
+  6.514575433171938,
+  6.33312190260353,
+  6.157423024380468,
+  5.980165366930038,
+  5.816816271311582,
+  5.657760625090953,
+  5.505868116671837,
+  5.36319106639261,
+  5.221313110353133,
+  5.087355990464671],
+  [8.939992885458496,
+  8.664105047598971,
+  8.387455789713838,
+  8.12600380515758,
+  7.886229381755673,
+  7.639953220825232,
+  7.412040619592332,
+  7.197831093549773,
+  6.987080596356581,
+  6.785444038221432,
+  6.590879532317163,
+  6.409782145824186,
+  6.230499006777194,
+  6.055952489027833,
+  5.879248991881162,
+  5.7180223835837385,
+  5.562654684682165,
+  5.419966108141055,
+  5.27491515380066,
+  5.134709133458079,
+  4.9990819504535935],
+  [8.810302567407321,
+  8.533784890016396,
+  8.262768819137534,
+  8.004521948804408,
+  7.766094081543014,
+  7.522807163169316,
+  7.240384590647024,
+  7.08741980255328,
+  6.8778832195586235,
+  6.681120370443139,
+  6.486375030275443,
+  6.307483070495612,
+  6.130314822012955,
+  5.959604818589061,
+  5.793883639599942,
+  5.634426504626004,
+  5.477502399058141,
+  5.329031272648661,
+  5.1856404402860194,
+  5.0470330959742125,
+  4.912946413411292],
+  [8.678107200442499,
+  8.405085949992573,
+  8.139423239243499,
+  7.889027142465148,
+  7.64277681291379,
+  7.410052572228766,
+  7.187600987706471,
+  6.9783585488931426,
+  6.771286343132735,
+  6.5768447091145426,
+  6.388071896721516,
+  6.209431754701535,
+  6.034300221659163,
+  5.863738910704374,
+  5.699911364327404,
+  5.534999013184114,
+  5.387001505139097,
+  5.2402107421901745,
+  5.098436484462869,
+  4.961385972695099,
+  4.8287994672230035],
+  [8.551280425667576,
+  8.281472309131324,
+  7.96230542112478,
+  7.771668890663529,
+  7.528385220295576,
+  7.298432019325935,
+  7.091430864555127,
+  6.884752764425966,
+  6.674872689007669,
+  6.478311430009758,
+  6.286558179912234,
+  6.111869554470436,
+  5.938741404502329,
+  5.770102364290874,
+  5.608117788272626,
+  5.4490273436324586,
+  5.298584939516587,
+  5.153432296859431,
+  5.013233487322001,
+  4.879064625245711,
+  4.747916920562619],
+  [8.427500688492271,
+  8.160816266852558,
+  7.901542297907813,
+  7.66127309501637,
+  7.428398677676222,
+  7.201001324710859,
+  6.984908994857298,
+  6.77126330576849,
+  6.571291258953675,
+  6.378832506884931,
+  6.190615039340672,
+  6.01792641798815,
+  5.843445974498496,
+  5.677297774913653,
+  5.510309537166014,
+  5.361828958936259,
+  5.213223234922939,
+  5.069773150615721,
+  4.931256190757678,
+  4.797230592917213,
+  4.667345204953843]]
+
+#%% w_data _2 baseline
+[[15.667245932278842,
+  15.212912827214426,
+  14.771190898196267,
+  14.348771486853751,
+  13.940404919809652,
+  13.570346719030258,
+  13.207772306305216,
+  12.857275124097754,
+  12.52018028088022,
+  12.204746528442005,
+  11.891150561496556,
+  11.593272263437644,
+  11.318522537743469,
+  11.044046578020705,
+  10.783394173522813,
+  10.523184637527237,
+  10.279968514308663,
+  10.069038661465633,
+  9.82010971545178,
+  9.599229354155955,
+  9.377176952658628],
+  [15.395016968404144,
+  14.949312283404854,
+  14.513069769578253,
+  14.086875141185667,
+  13.70632784003128,
+  13.32875237548409,
+  12.968020271909861,
+  12.624101256645424,
+  12.29481205809778,
+  11.985134346340576,
+  11.677065305023413,
+  11.390488360513467,
+  11.113374792022816,
+  10.849482818659423,
+  10.592597804416435,
+  10.338921925499198,
+  10.09636663867327,
+  9.865639225352686,
+  9.64023447571281,
+  9.416207360657062,
+  9.206296455393534],
+  [15.12591923426629,
+  14.682307126014974,
+  14.268171559979216,
+  13.859811004776482,
+  13.470731505162487,
+  13.09943617424782,
+  12.745119535658912,
+  12.406868588753218,
+  12.086834732839032,
+  11.779006565992642,
+  11.47212313699468,
+  11.189417008487725,
+  10.92384602341261,
+  10.65805062257655,
+  10.40180440823964,
+  10.162042953081897,
+  9.920135709537181,
+  9.693152200551022,
+  9.478003649850242,
+  9.253308067038484,
+  9.046322360641184],
+  [14.87719169573878,
+  14.44144178219172,
+  14.0218193167696,
+  13.620263463184033,
+  13.242111927735959,
+  12.876799523648947,
+  12.52869831270492,
+  12.199783047521368,
+  11.880777086650557,
+  11.570677405302256,
+  11.27393854750087,
+  11.00922811311883,
+  10.739616183023395,
+  10.47344018586282,
+  10.220609967544657,
+  9.977378324223164,
+  9.745715840375112,
+  9.521130836282877,
+  9.295338354121439,
+  9.084871811510967,
+  8.881449465067579],
+  [14.627459884543999,
+  14.20079628474999,
+  13.785517088111963,
+  13.390379910878602,
+  13.016047544253453,
+  12.656899135358664,
+  12.250006940099052,
+  11.997699556584482,
+  11.68258772985669,
+  11.380772060418796,
+  11.102537884734916,
+  10.819219842149835,
+  10.550530272612088,
+  10.292397954408013,
+  10.044126266521548,
+  9.805080634641937,
+  9.578536599926036,
+  9.356213213737147,
+  9.133847462058247,
+  8.926551949391566,
+  8.726141938382336],
+  [14.387248313556078,
+  13.967292747559348,
+  13.558515985446,
+  13.169529183976184,
+  12.79876648293644,
+  12.450227269617951,
+  12.120898738546453,
+  11.80009023515012,
+  11.486650492457542,
+  11.193980166777829,
+  10.912572687130302,
+  10.638326270994465,
+  10.376964129330455,
+  10.123243192167742,
+  9.878547040026142,
+  9.646217224771886,
+  9.421828621515587,
+  9.193801393639513,
+  8.983009522664686,
+  8.790351563824778,
+  8.593702441315333],
+  [14.15808273760737,
+  13.741465037580825,
+  13.341236844388881,
+  12.958882524632,
+  12.598765695515194,
+  12.253717479128339,
+  11.927210963025663,
+  11.60013598524698,
+  11.230194633091074,
+  11.005000541764971,
+  10.723017263243134,
+  10.452533247532827,
+  10.194565721600002,
+  9.944674895469452,
+  9.71195616893453,
+  9.48129378836247,
+  9.249856821463439,
+  9.03299305645363,
+  8.84355052243144,
+  8.639754021762762,
+  8.444202627525764],
+  [13.932288279190399,
+  13.52308940342073,
+  13.128308912909207,
+  12.750902390504944,
+  12.39141318223033,
+  12.052746267296873,
+  11.725179240615851,
+  11.404021888681408,
+  11.108707017801201,
+  10.820958597888687,
+  10.544669819493327,
+  10.279143474277047,
+  10.02556536505518,
+  9.779676858813636,
+  9.543725775048033,
+  9.329086404157044,
+  9.10628465598064,
+  8.89190455589375,
+  8.686170700442897,
+  8.491553251105042,
+  8.298870228105867],
+  [13.71045179700899,
+  13.308490421055204,
+  12.917914449931526,
+  12.546159632314412,
+  12.19695649990708,
+  11.859626836699444,
+  11.53729971528618,
+  11.227610463364204,
+  10.938294610004329,
+  10.651977621972781,
+  10.377809344130888,
+  10.11775347883334,
+  9.864760009628517,
+  9.570581085262015,
+  9.394244057616515,
+  9.171069462395428,
+  8.958119453689003,
+  8.748465893236862,
+  8.543700858037976,
+  8.346344606837286,
+  8.150423354902815],
+  [13.496606163982813,
+  13.100014826972563,
+  12.715146169307802,
+  12.353350127056398,
+  12.005183687381994,
+  11.672756626126244,
+  11.347270019137277,
+  11.048182483089962,
+  10.756492228240898,
+  10.476556120667944,
+  10.227871553374694,
+  9.959220390851643,
+  9.712868253631447,
+  9.47433941347163,
+  9.244012646238922,
+  9.020892177625976,
+  8.80576887304943,
+  8.614636838939434,
+  8.403934707983773,
+  8.209960834586433,
+  8.015555835789762],
+  [13.288829054394828,
+  12.899059282404313,
+  12.517511092158118,
+  12.16143840215779,
+  11.818223209430412,
+  11.490791671443272,
+  11.172256904085222,
+  10.88577443970864,
+  10.6060401319163,
+  10.328231351904254,
+  10.053830701385492,
+  9.801483089604496,
+  9.558871772483695,
+  9.333036259104842,
+  9.09952477622373,
+  8.87796032553943,
+  8.666659146812895,
+  8.46497130987007,
+  8.267287565747699,
+  8.066902374540133,
+  7.8807682914244515],
+  [13.085151681324199,
+  12.701258179789937,
+  12.329456295174811,
+  11.9775660482224,
+  11.644102241592869,
+  11.323059126183468,
+  11.019963459191734,
+  10.721957315258246,
+  10.440622397797904,
+  10.17109961183451,
+  9.900791573376253,
+  9.648878600549681,
+  9.410037886245807,
+  9.179623910407912,
+  8.952573049748079,
+  8.736027911966067,
+  8.525998446571025,
+  8.323552575055531,
+  8.128186541094047,
+  7.931908813606999,
+  7.747625096424816],
+  [12.886045750572691,
+  12.508657823040071,
+  12.142582688735349,
+  11.800090050601016,
+  11.47148903052912,
+  11.151436262741093,
+  10.851862819006879,
+  10.552344932398864,
+  10.281984955594407,
+  10.003516135233731,
+  9.74758892585953,
+  9.505600761678833,
+  9.266952339758548,
+  9.034488551666533,
+  8.811232359623784,
+  8.596452564095843,
+  8.380256313268404,
+  8.180750542014083,
+  7.988094742734384,
+  7.801751512653881,
+  7.6256256029474585],
+  [12.693269672808126,
+  12.345771013279668,
+  11.967008359971025,
+  11.621740279015999,
+  11.297558793344322,
+  10.983982049524931,
+  10.688192133300488,
+  10.403928794976464,
+  10.125020719843608,
+  9.853412190674637,
+  9.596225854894953,
+  9.35865444311381,
+  9.120736026552295,
+  8.891610690224114,
+  8.671427103220935,
+  8.452063492999224,
+  8.247912516526798,
+  8.050962188295125,
+  7.860643661400687,
+  7.679061681346254,
+  7.501057348381187],
+  [12.526357366316857,
+  12.147382123808702,
+  11.78962591886164,
+  11.4493301786933,
+  11.127509511562872,
+  10.82600614040951,
+  10.531620599986791,
+  10.245542038207232,
+  9.970872815104775,
+  9.704271426818995,
+  9.454745988073551,
+  9.210458776673399,
+  8.982004200764328,
+  8.755300511412392,
+  8.537600571102452,
+  8.320777290902459,
+  8.119064378743877,
+  7.92446897742863,
+  7.734714277646984,
+  7.5570135771186315,
+  7.3811778035283675],
+  [12.347132565229675,
+  11.969660574048687,
+  11.618029060350347,
+  11.282087406942056,
+  10.968429941932845,
+  10.666622814399723,
+  10.364035351266669,
+  10.087275753612772,
+  9.815532550921851,
+  9.557936191558412,
+  9.308405186638849,
+  9.07448517765358,
+  8.844393057175362,
+  8.621876264258468,
+  8.399521084879987,
+  8.192701304823789,
+  7.991717519439317,
+  7.799355138479139,
+  7.617594298025864,
+  7.437947879103865,
+  7.267472268566774],
+  [12.151940007435122,
+  11.799608551161665,
+  11.449443996229315,
+  11.117850447609003,
+  10.811082944779539,
+  10.500755294520344,
+  10.211543634669852,
+  9.938614026795952,
+  9.671563523968597,
+  9.415900545916415,
+  9.169448463916474,
+  8.938477970839198,
+  8.71122125038298,
+  8.490494286177727,
+  8.269304858316609,
+  8.065195294532172,
+  7.868463479804685,
+  7.685847312314081,
+  7.502235154226877,
+  7.324763715811737,
+  7.1531028573979665],
+  [11.98226982289844,
+  11.630402660350226,
+  11.286915079713944,
+  10.959516518151439,
+  10.655035515763638,
+  10.348590784433647,
+  10.005719846062037,
+  9.794845785136763,
+  9.529782633385551,
+  9.279732084456304,
+  9.033805396424363,
+  8.805716148268028,
+  8.581221634730824,
+  8.364951753180602,
+  8.155340079461226,
+  7.953571780134072,
+  7.755832631691645,
+  7.567963008504257,
+  7.386519547299021,
+  7.211136750244554,
+  7.041488637083579],
+  [11.811076006309989,
+  11.463769120734733,
+  11.126650014336112,
+  10.808064602185949,
+  10.49667557499932,
+  10.201663460306927,
+  9.919591358461826,
+  9.653228657516964,
+  9.39138273040695,
+  9.144372490438494,
+  8.90508608531542,
+  8.67792644140913,
+  8.45609895859069,
+  8.24058209813077,
+  8.03344396381366,
+  7.8267770736230124,
+  7.638499712883161,
+  7.4528258400208465,
+  7.273494439432825,
+  7.10014586265637,
+  6.932458082424279],
+  [11.64619654468205,
+  11.303138019369808,
+  10.913501884851847,
+  10.655613355057037,
+  10.34808085189569,
+  10.0566856873459,
+  9.790869803672622,
+  9.527839583196313,
+  9.263918807479346,
+  9.015489173496967,
+  8.773911691799974,
+  8.551324657461945,
+  8.33211452898579,
+  8.119108653661632,
+  7.914378465996579,
+  7.714076422659463,
+  7.523874285716636,
+  7.340340904361654,
+  7.16306848522391,
+  6.993066842543701,
+  6.82726612522524],
+  [11.485275674561835,
+  11.146347808790834,
+  10.817565797113941,
+  10.51095666235148,
+  10.214699632544031,
+  9.926684315593993,
+  9.652561941765516,
+  9.383312216189417,
+  9.13001342799455,
+  8.886368398095108,
+  8.64897900398254,
+  8.429016381194618,
+  8.209052209805163,
+  7.999110868136879,
+  7.789927627769723,
+  7.60076433519435,
+  7.412907998608587,
+  7.2315668179423955,
+  7.056445873776959,
+  6.887041127122306,
+  6.7229403105568935]]
+
+#%%w_data 3
+[[19.69028386873437,
+  19.13651013094194,
+  18.59943772539595,
+  18.086165407505497,
+  17.591186844404152,
+  17.138451117054757,
+  16.696872711947613,
+  16.270804325261114,
+  15.861352925594895,
+  15.476576550967517,
+  15.096467630680655,
+  14.734738635185378,
+  14.400342201586083,
+  14.066903793635214,
+  13.749425621741619,
+  13.432818411773217,
+  13.13698969816467,
+  12.875259343456362,
+  12.577319565296987,
+  12.309114370482833,
+  12.041342707522633],
+  [19.355559330254852,
+  18.812240069616664,
+  18.28237464923987,
+  17.76696499550838,
+  17.30135404304481,
+  16.842570306180964,
+  16.404227624330602,
+  15.986062938518764,
+  15.58567869397154,
+  15.207863382628782,
+  14.836246027709025,
+  14.485093323528915,
+  14.147674776343784,
+  13.82740676193508,
+  13.513107497592294,
+  13.205683044860782,
+  12.911333938655918,
+  12.630658368648158,
+  12.357053619029914,
+  12.086486751868549,
+  11.831606237499168],
+  [19.025432505153848,
+  18.48641098680062,
+  17.98030567285873,
+  17.484325920480163,
+  17.01167950131493,
+  16.560593287929002,
+  16.13001276719701,
+  15.718796824216623,
+  15.32887709524906,
+  14.954080500695087,
+  14.58293961886919,
+  14.238465526259535,
+  13.913674778580251,
+  13.590856778365639,
+  13.279733312336994,
+  12.988589562372589,
+  12.694272998328541,
+  12.418158594837395,
+  12.155598033601155,
+  11.885118498044344,
+  11.633894314886994],
+  [18.718361589526836,
+  18.188486120010985,
+  17.67850523099352,
+  17.19085612710401,
+  16.730577525475006,
+  16.286849376694185,
+  15.86378648438904,
+  15.463144179197224,
+  15.07544158872303,
+  14.699489554746522,
+  14.33956286022712,
+  14.01417742914614,
+  13.687882362970177,
+  13.363999273158402,
+  13.057186079418141,
+  12.761961535294319,
+  12.480185232902432,
+  12.207265329206068,
+  11.93482370057688,
+  11.67930698897019,
+  11.432354170578591],
+  [18.41161615165355,
+  17.892465472471287,
+  17.388386302615356,
+  16.908628506818033,
+  16.45357207853766,
+  16.01732828453476,
+  15.536733458498565,
+  15.213896706043473,
+  14.831227832937786,
+  14.464645037490103,
+  14.126002232858177,
+  13.781264683239586,
+  13.455209516137048,
+  13.141902937188744,
+  12.840520009115146,
+  12.550315623201087,
+  12.274458101435222,
+  12.004570401113659,
+  11.736294297807738,
+  11.484657717806483,
+  11.24139996728393],
+  [18.116056333337387,
+  17.60519820198577,
+  17.10912796760158,
+  16.636947472253766,
+  16.186809683833964,
+  15.762458044504513,
+  15.360645111224674,
+  14.970465366623243,
+  14.592437373834164,
+  14.23419139951306,
+  13.8916381717818,
+  13.558668333531559,
+  13.240861541574171,
+  12.932843513648368,
+  12.635880732461278,
+  12.353201788477458,
+  12.080273074708337,
+  11.805424659794475,
+  11.549438888340298,
+  11.313121113921627,
+  11.074297443243282],
+  [17.833136410628935,
+  17.327149045988925,
+  16.841084461061254,
+  16.37691638273955,
+  15.938731398507473,
+  15.519111626467657,
+  15.123304360935187,
+  14.725980174840547,
+  14.29065206345465,
+  14.002762477712292,
+  13.660609567059925,
+  13.33233228579661,
+  13.018812005668932,
+  12.715474474052687,
+  12.43130456648226,
+  12.151074453797037,
+  11.871851338468243,
+  11.608888755664733,
+  11.374937774935772,
+  11.128168723096195,
+  10.891076583853938],
+  [17.555126159368136,
+  17.058043700396226,
+  16.57882169953042,
+  16.120935726695492,
+  15.684645600812093,
+  15.27260919166104,
+  14.874879202192934,
+  14.48656065804597,
+  14.126898164501206,
+  13.777442143393971,
+  13.441927017539491,
+  13.11950871467213,
+  12.811238769442996,
+  12.512731431096555,
+  12.226121608752639,
+  11.962673297382935,
+  11.692814846832597,
+  11.433036585255708,
+  11.183477126992,
+  10.946526171938682,
+  10.712926789228925],
+  [17.28251814295352,
+  16.79409836294251,
+  16.320462648223483,
+  15.869522365282243,
+  15.444743672189077,
+  15.035210158737328,
+  14.643826297651259,
+  14.269892571397426,
+  13.915372599066021,
+  13.56830278335551,
+  13.235822946178356,
+  12.91974969061619,
+  12.612900481484177,
+  12.266905013320963,
+  12.040677083459292,
+  11.769430184185996,
+  11.510130947722061,
+  11.255759173671441,
+  11.007822171248755,
+  10.768762014897476,
+  10.532530504787704],
+  [17.019308096025558,
+  16.53764867612458,
+  16.07104367890171,
+  15.631315301933284,
+  15.20876293140521,
+  14.805259200880144,
+  14.411789751528168,
+  14.047616293755214,
+  13.693555880410049,
+  13.3537988956749,
+  13.04769017274784,
+  12.723869857949385,
+  12.424473715758742,
+  12.134905590900065,
+  11.855431618615611,
+  11.58495498132123,
+  11.324170020425578,
+  11.08896232922416,
+  10.835740337649277,
+  10.6006736232307,
+  10.366547073648967],
+  [16.763511384582454,
+  16.29002010730918,
+  15.828021727043367,
+  15.395228410001492,
+  14.978779392442359,
+  14.58136591566386,
+  14.19588959113549,
+  13.845312675947127,
+  13.504152509308485,
+  13.16742465161832,
+  12.83646058192796,
+  12.529767163157327,
+  12.23489983736579,
+  11.958779911436267,
+  11.676844343131634,
+  11.408619336271295,
+  11.152323067095264,
+  10.90721830687778,
+  10.667614764127872,
+  10.426730196523415,
+  10.201446335032667],
+  [16.513104212517693,
+  16.046794477727822,
+  15.595783343960733,
+  15.168354335772863,
+  14.76277476276228,
+  14.372812106538937,
+  14.003785027342689,
+  13.642645726156955,
+  13.300802701808758,
+  12.973235413555528,
+  12.64719999194365,
+  12.34174036387697,
+  12.051408731259048,
+  11.77144398549687,
+  11.49667392568828,
+  11.234142312661055,
+  10.97976499684812,
+  10.734525201892792,
+  10.49783841590751,
+  10.261638265758158,
+  10.038760582667244],
+  [16.26850710198054,
+  15.809969752230618,
+  15.365892588093288,
+  14.949004356993173,
+  14.549372569100948,
+  14.161430829818446,
+  13.796906571846366,
+  13.43518972675061,
+  13.10521127532498,
+  12.76954806554357,
+  12.458705568444648,
+  12.163948040748199,
+  11.87455228413287,
+  11.59325042317338,
+  11.322957487885793,
+  11.062847161600923,
+  10.802932612183083,
+  10.561238692121593,
+  10.327844761509228,
+  10.102140007269305,
+  9.887960588814108],
+  [16.031429925461293,
+  15.604011162137681,
+  15.148416902752317,
+  14.72986370999026,
+  14.33570498032001,
+  13.955240296195534,
+  13.595451588460872,
+  13.249896443488394,
+  12.91223566249028,
+  12.584258501708767,
+  12.272945594939422,
+  11.983359680024815,
+  11.695416439152904,
+  11.418144818945157,
+  11.151589378097606,
+  10.88753155207164,
+  10.640276177112783,
+  10.401726436937857,
+  10.171236385102581,
+  9.950838474251988,
+  9.735306265946244],
+  [15.821360049524564,
+  15.363656447445331,
+  14.930207455396937,
+  14.517704268069714,
+  14.12692863741944,
+  13.759511217616904,
+  13.402052613136389,
+  13.055563729521063,
+  12.722982135112433,
+  12.40081441938684,
+  12.09793010565616,
+  11.802361760712351,
+  11.524585167144181,
+  11.250408505313093,
+  10.986982633756226,
+  10.72608558364592,
+  10.481863288331537,
+  10.246241766421837,
+  10.016866786675335,
+  9.800880971245366,
+  9.588028817935877],
+  [15.600078640765323,
+  15.14503723324288,
+  14.718816751667616,
+  14.311715486015862,
+  13.930098368422101,
+  13.563321023609557,
+  13.19855977416565,
+  12.862246695647036,
+  12.53340875464494,
+  12.221026660327574,
+  11.918882397260836,
+  11.634394922135227,
+  11.355664211747193,
+  11.086329504530992,
+  10.81887680205535,
+  10.568586338335995,
+  10.325674413787677,
+  10.092842160653582,
+  9.871997529659112,
+  9.654582647854594,
+  9.447588547017883],
+  [15.363887129411747,
+  14.935112054724373,
+  14.511432202744782,
+  14.109697090060424,
+  13.735936506866977,
+  13.361557368215466,
+  13.011046650195528,
+  12.679396960042121,
+  12.356046451580616,
+  12.04635705403248,
+  11.748017395515783,
+  11.467173795854212,
+  11.191943494385894,
+  10.925036083327624,
+  10.659360724752068,
+  10.412368204729125,
+  10.17427227455809,
+  9.95172851684984,
+  9.729555153939984,
+  9.514818298165402,
+  9.307123764687166],
+  [15.154237078389562,
+  14.727020430684066,
+  14.31106133980624,
+  13.914511087971503,
+  13.543976948582312,
+  13.174374405697973,
+  12.771055101477057,
+  12.502271768587066,
+  12.181682046787964,
+  11.878343798469475,
+  11.58123576298109,
+  11.303949226040434,
+  11.032128447448697,
+  10.770298687772138,
+  10.516796518944483,
+  10.272717056204858,
+  10.034162864325154,
+  9.806894744359855,
+  9.587398653607393,
+  9.375240404861335,
+  9.170030860755867],
+  [14.944044812177482,
+  14.522452290497611,
+  14.113876789906938,
+  13.727102061906756,
+  13.350574336171128,
+  12.993274348385082,
+  12.65158172965453,
+  12.328098766140787,
+  12.0114791181006,
+  11.711900272173459,
+  11.422120058111084,
+  11.146421128116717,
+  10.877897695909894,
+  10.617425285557173,
+  10.366976563299922,
+  10.118555134795653,
+  9.889997920266797,
+  9.665440938205718,
+  9.448552395099158,
+  9.238905752617647,
+  9.03611669762555],
+  [14.741112663696532,
+  14.324803730092002,
+  13.864717325010998,
+  13.539557818988891,
+  13.167776483947192,
+  12.814939355807411,
+  12.490308742790123,
+  12.170926402389773,
+  11.852964925122109,
+  11.552666916984181,
+  11.261265204484086,
+  10.990779760843965,
+  10.72548765346925,
+  10.46811494303239,
+  10.220639143720538,
+  9.979125501686468,
+  9.749163631204224,
+  9.527249512213967,
+  9.312903483125822,
+  9.1070690598417,
+  8.906615329887865],
+  [14.54305066112091,
+  14.131879351931456,
+  13.733589296320071,
+  13.360640229686597,
+  13.001000588303917,
+  12.652367306477128,
+  12.320214888673739,
+  11.995361126610348,
+  11.68873559662582,
+  11.393904289305288,
+  11.107342968624408,
+  10.840106344202027,
+  10.574658445111835,
+  10.320923961360107,
+  10.069545718373442,
+  9.839699711452443,
+  9.612592762646367,
+  9.393360485269069,
+  9.181635556796243,
+  8.976851660658324,
+  8.778535416159954]]
+
+#%%## mass based allocation
+[[1.2107967574840826,
+  1.213617589975704,
+  1.217189793842111,
+  1.2207898364622682,
+  1.224369746396485,
+  1.2279404286184303,
+  1.2321615456221648,
+  1.2350990171079133,
+  1.238628427775987,
+  1.2421582241229978,
+  1.2456632567055919,
+  1.2491471610895253,
+  1.253489679167827,
+  1.2569249553511106,
+  1.2603817105237252,
+  1.2637237964799677,
+  1.2665061172580077,
+  1.269884226567011,
+  1.273342128521179,
+  1.2767248198681402,
+  1.2800931647123144],
+ [1.2128486118172777,
+  1.2157973542277003,
+  1.2194148480838627,
+  1.223045004616161,
+  1.2266788599371616,
+  1.230299182100029,
+  1.2339059232483485,
+  1.2374989656026996,
+  1.2410782196277843,
+  1.2446447566065826,
+  1.2489566197818625,
+  1.2518625010868305,
+  1.255315624407658,
+  1.2595877796571724,
+  1.2623321687427285,
+  1.2657744780452482,
+  1.2692437394832645,
+  1.2727008526464247,
+  1.2761442285817617,
+  1.2795674937664592,
+  1.2829910378390763],
+ [1.2149698476277535,
+  1.2179792692178202,
+  1.2216349582459254,
+  1.2253186991319789,
+  1.228991758615519,
+  1.232651189130975,
+  1.23629663747063,
+  1.2399280090406382,
+  1.2435452964385696,
+  1.2471572503219626,
+  1.2507455961126075,
+  1.2549739986082071,
+  1.2579550816007496,
+  1.2614257867214118,
+  1.2649480858988553,
+  1.2692652854340265,
+  1.2720067678542282,
+  1.275439126210853,
+  1.278997482131191,
+  1.2824169305821131,
+  1.2858603975831726],
+ [1.2171122735729196,
+  1.2201166323462929,
+  1.2238204808144262,
+  1.2275432566574516,
+  1.231271176453316,
+  1.2349695649836494,
+  1.2386535337754145,
+  1.2423230853746912,
+  1.2459781618675334,
+  1.2496232454465026,
+  1.2532338374747736,
+  1.2572350181170784,
+  1.2612896410737127,
+  1.2641002233526073,
+  1.2676250634784019,
+  1.2711759175136799,
+  1.274715665208697,
+  1.2782419338560207,
+  1.2817545725225172,
+  1.285253599318977,
+  1.2887321912341345],
+ [1.2192554071025798,
+  1.2223015984675591,
+  1.2260361952764114,
+  1.2297984886002495,
+  1.2335577573854246,
+  1.237294576630389,
+  1.2327925347853677,
+  1.2447439705256285,
+  1.2484187469296846,
+  1.2518750730619854,
+  1.256641776148652,
+  1.2595092959663996,
+  1.2630979829680054,
+  1.2667126230720938,
+  1.2703158011783495,
+  1.273905046364642,
+  1.277480163538358,
+  1.2810341785825081,
+  1.2845803692574718,
+  1.2881207665409453,
+  1.291640212615604],
+ [1.221429598881924,
+  1.2245058382700906,
+  1.2282791654434575,
+  1.2320804226254065,
+  1.235870066387715,
+  1.2396338042216979,
+  1.2433333180358028,
+  1.2471872517375904,
+  1.2516855275225462,
+  1.2546199220663303,
+  1.258293069968235,
+  1.2619630489648244,
+  1.2665924531483113,
+  1.2693214898561107,
+  1.2729498525919873,
+  1.2765614335691469,
+  1.280174661867974,
+  1.283757800563586,
+  1.2875821857887855,
+  1.290949065543872,
+  1.2944848326108862],
+ [1.2235627153744202,
+  1.2266552224375302,
+  1.2304697709108823,
+  1.2343023516808074,
+  1.238129205404033,
+  1.2419265313045258,
+  1.2466168390100894,
+  1.2495879795654958,
+  1.2446819464998464,
+  1.2570626522098298,
+  1.260797375906546,
+  1.2645172818215757,
+  1.268217390536585,
+  1.2719139193458546,
+  1.2756125939526615,
+  1.279272347182494,
+  1.282917105964569,
+  1.2865168346308824,
+  1.2902161080814125,
+  1.2937947962204965,
+  1.2973677479826848],
+ [1.2257293422725235,
+  1.2288439233720154,
+  1.2326898035628402,
+  1.2365706753963392,
+  1.2404385650326606,
+  1.244290325732687,
+  1.248126700322744,
+  1.251946881921351,
+  1.2557508466038139,
+  1.2595391293565927,
+  1.2633115733065294,
+  1.2670684805332797,
+  1.2708173283789164,
+  1.2745427297845664,
+  1.2782200910487613,
+  1.2820006092514313,
+  1.2856580317144923,
+  1.2893090124143733,
+  1.292950037446948,
+  1.2966023044716117,
+  1.3002183482114396],
+ [1.2278663738340079,
+  1.2310279462343066,
+  1.2349164644154347,
+  1.2388341333049,
+  1.2427389713866075,
+  1.2466283250381471,
+  1.2505015297951878,
+  1.255217656973017,
+  1.2583814552423693,
+  1.2621219449883327,
+  1.2659037739384498,
+  1.2696707759900503,
+  1.273442885627683,
+  1.267751640670855,
+  1.2809430405505737,
+  1.2846618069462623,
+  1.288208916501357,
+  1.2921094770876804,
+  1.295782816765127,
+  1.2994438539536237,
+  1.3030733513496662],
+ [1.2300525275705432,
+  1.2332430452806784,
+  1.2371694952595838,
+  1.2411252523019096,
+  1.2450676245588144,
+  1.2489943076323815,
+  1.2529048708329857,
+  1.2567986444379076,
+  1.2606758175896255,
+  1.2645075583111003,
+  1.2684454603279276,
+  1.2722469079818635,
+  1.2760307282472376,
+  1.2798211140966789,
+  1.2835895440206884,
+  1.2873537927068315,
+  1.2911010297447345,
+  1.2948235086186806,
+  1.2986723330086887,
+  1.30231869990834,
+  1.3057794481176563],
+ [1.2322198197744019,
+  1.2354315682287655,
+  1.2393799664733238,
+  1.2433809371203484,
+  1.2473616339416445,
+  1.2513257659096173,
+  1.2552536146460824,
+  1.259783349962699,
+  1.2631367330609125,
+  1.2670244462711,
+  1.2708997480273836,
+  1.274751255516364,
+  1.278599400914629,
+  1.2824173144288442,
+  1.286353093669844,
+  1.2900966909596492,
+  1.2938347445765037,
+  1.297592722762049,
+  1.3013357997255612,
+  1.305028799276375,
+  1.3084463725712712],
+ [1.234355077762533,
+  1.2376135506011088,
+  1.2416079187869595,
+  1.2456340751234727,
+  1.2496501379737512,
+  1.2536544346241323,
+  1.2576165993286281,
+  1.261594291416958,
+  1.2657955525097209,
+  1.269511219697315,
+  1.2734146359627267,
+  1.2773098076801086,
+  1.2811813288373735,
+  1.2850345204837808,
+  1.2888873765552513,
+  1.2927233554552522,
+  1.2965386946986166,
+  1.300336684677086,
+  1.3041176649154307,
+  1.3076858266922642,
+  1.3111334089796718],
+ [1.236508513636079,
+  1.2397988413905363,
+  1.2438305275110688,
+  1.2478943307659256,
+  1.251947715801092,
+  1.2559681126631692,
+  1.2600902109520407,
+  1.2640269806311972,
+  1.2680102091699035,
+  1.2719756546252676,
+  1.2759163554024424,
+  1.2798370399113268,
+  1.2839236135758272,
+  1.2877598672643766,
+  1.2916034629853121,
+  1.2954448569963393,
+  1.299278157712032,
+  1.303099859311446,
+  1.306859925406496,
+  1.3103488522626685,
+  1.313823890215257],
+ [1.2386708649554778,
+  1.2419871011259356,
+  1.2460528996242792,
+  1.2501565075974361,
+  1.2542468005100786,
+  1.258303228247212,
+  1.2624553015701818,
+  1.266444715484704,
+  1.2704547881962502,
+  1.2744540355981835,
+  1.278429006106173,
+  1.2823775239335975,
+  1.2864090868433697,
+  1.2903188820712175,
+  1.2942197751850948,
+  1.2981083370498463,
+  1.301982827012686,
+  1.3058419203495248,
+  1.3094844971400499,
+  1.3130045745628798,
+  1.3165098875562518],
+ [1.2408329042576292,
+  1.2441789156721785,
+  1.2482819130412635,
+  1.2524280518790631,
+  1.2565499500639226,
+  1.2606507049103486,
+  1.264954340466909,
+  1.2688590490529483,
+  1.272908774298596,
+  1.2769376547922888,
+  1.280950222288374,
+  1.2849337978756794,
+  1.289048305281314,
+  1.2929696292573152,
+  1.2968905960141404,
+  1.3008042855544413,
+  1.30470644922098,
+  1.308553930112627,
+  1.3121164703272619,
+  1.3156647534135253,
+  1.319198359536867],
+ [1.2430013985884887,
+  1.2463751841726507,
+  1.2505147139683876,
+  1.254692582914176,
+  1.2588588614779752,
+  1.2629878932339715,
+  1.2672133754928223,
+  1.2712730366152782,
+  1.275353661942593,
+  1.2794200884115492,
+  1.2834638815876547,
+  1.2874803187734363,
+  1.2915806585982377,
+  1.2955380539127046,
+  1.299512603735404,
+  1.3034711786956898,
+  1.3074129106515258,
+  1.311148854227617,
+  1.3147431911647187,
+  1.3183219120090794,
+  1.3218850276217782],
+ [1.2451725903546795,
+  1.2485779064768057,
+  1.2527541067515149,
+  1.2569687633466606,
+  1.261169066536094,
+  1.2653339539915385,
+  1.2695954859093714,
+  1.2736904128712228,
+  1.2778058142825126,
+  1.2819066829834749,
+  1.2859844784521244,
+  1.290034387017105,
+  1.2941686340784824,
+  1.298177842188003,
+  1.3021772176806001,
+  1.3061633540235122,
+  1.3101163531383189,
+  1.313753936571331,
+  1.3173763030854788,
+  1.320983100840237,
+  1.3245742109077943],
+ [1.2473530764529766,
+  1.250783378250685,
+  1.2549959905962704,
+  1.2592471993921017,
+  1.263483697056078,
+  1.2676842774508874,
+  1.2630090534506708,
+  1.276111462698704,
+  1.2802613476722904,
+  1.2843963663378868,
+  1.2885078950022057,
+  1.292591169565428,
+  1.2967593318344894,
+  1.3008009476083853,
+  1.3048324804871592,
+  1.308850482560851,
+  1.3126923416874137,
+  1.3163588507641255,
+  1.3200098408944103,
+  1.3236449650064597,
+  1.3272640989292088],
+ [1.249528826389357,
+  1.2529866636767681,
+  1.2572434755547954,
+  1.2615312239437717,
+  1.2658036565708481,
+  1.2700392355577066,
+  1.2743726208727966,
+  1.2785367165901538,
+  1.282720843154416,
+  1.2868897238285584,
+  1.2910346786875364,
+  1.2951507991627396,
+  1.2993521887515072,
+  1.3034261738190909,
+  1.3074897164381172,
+  1.3115395829903107,
+  1.3152711245312885,
+  1.3189662762408634,
+  1.3226456044150798,
+  1.3263087645820917,
+  1.3299556170470619],
+ [1.2517195938941819,
+  1.2552044057176057,
+  1.2521622665290004,
+  1.2638209211289142,
+  1.2681289881854279,
+  1.2723999518792353,
+  1.276769173164116,
+  1.2809670575182561,
+  1.2851850936945002,
+  1.2893875316880998,
+  1.2935656207228834,
+  1.2977144670576184,
+  1.3019491010084694,
+  1.306054909983046,
+  1.3101500038948188,
+  1.3141143565060176,
+  1.3178531817538948,
+  1.3215767916595134,
+  1.3252842086227006,
+  1.3289750789205794,
+  1.3326495267633491],
+ [1.2539183420808162,
+  1.2574301352465207,
+  1.2617587102497403,
+  1.2661180075432137,
+  1.2704614243933645,
+  1.2747672003215038,
+  1.2791718989318355,
+  1.2834032868542,
+  1.2876549137967779,
+  1.2918906507716243,
+  1.2961014803749802,
+  1.3002827150134437,
+  1.3044755616027335,
+  1.308642988162168,
+  1.3127872623971264,
+  1.3166565622025213,
+  1.320430353105693,
+  1.3241856807523495,
+  1.32792290596816,
+  1.331642510447317,
+  1.3353446375377631]]
