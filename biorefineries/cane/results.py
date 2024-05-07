@@ -33,6 +33,7 @@ __all__ = (
     'mcr_sc_microbial_oil',
     'mcr_target_microbial_oil',
     'mcr_target_microbial_oil_comparison',
+    'mcr_target_improved_fermentation_microbial_oil',
 )
 
 results_folder = os.path.join(os.path.dirname(__file__), 'results')
@@ -45,7 +46,7 @@ def spearman_file(name):
     filename = f'oilcane_spearman_{number}'
     if agile: filename += '_agile'
     if line: filename += '_' + line
-    if case: filename += '_' + case
+    if case: filename += '_' + case.replace(' ', '_')
     filename += '.xlsx'
     return os.path.join(results_folder, filename)
 
@@ -55,7 +56,7 @@ def monte_carlo_file(name, across_lines=False, across_oil_content=None, extentio
     if agile: filename += '_agile'
     if across_lines: filename += '_across_lines'
     elif line: filename += '_' + line
-    if case: filename += '_' + case
+    if case: filename += '_' + case.replace(' ', '_')
     if across_oil_content: 
         if isinstance(across_oil_content, str):
             filename += f"_{across_oil_content.replace(' ', '_')}"
@@ -65,19 +66,10 @@ def monte_carlo_file(name, across_lines=False, across_oil_content=None, extentio
     return os.path.join(results_folder, filename)
 
 def autoload_file_name(name):
-    if '.' in name:
-        name, line = name.split('.')
-    else:
-        line = None
-    if '|' in name:
-        name, case = name.split('|')
-        case = case.replace(' ', '_')
-    else:
-        case = None
-    filename = str(name).replace('*', '_agile')
-    if line: filename += '_' + line
-    if case: filename += '_' + case
-    return os.path.join(results_folder, filename)
+    return os.path.join(
+        results_folder, 
+        name.replace('.', '_').replace('|', '_').replace(' ', '_').replace('*', '_agigle')
+    )
 
 def get_monte_carlo_across_oil_content(name, metric, derivative=False):
     key = parse_configuration(name)
@@ -135,24 +127,25 @@ def get_monte_carlo(name, features=None, cache={}):
             if (subkey:=(key, index)) in cache:
                 df = cache[subkey]
             else:
-                # file = monte_carlo_file(key)
-                # cache[key] = df = pd.read_excel(file, header=[0, 1], index_col=[0])
-                # df = df[list(index)]
-                
-                file = monte_carlo_file(key, across_lines=True)
-                line = key.line
-                data = np.hstack([
-                    pd.read_excel(
-                        file, header=[0, 1], index_col=[0], sheet_name=i.short_description
-                    )[line].values
-                    for i in features
-                ])
-                cache[subkey] = df = pd.DataFrame(
-                    data, 
-                    columns=pd.MultiIndex.from_tuples(
-                        index, names=['Element', 'Name']
+                try:
+                    file = monte_carlo_file(key, across_lines=True)
+                    line = key.line
+                    data = np.hstack([
+                        pd.read_excel(
+                            file, header=[0, 1], index_col=[0], sheet_name=i.short_description
+                        )[line].values
+                        for i in features
+                    ])
+                    cache[subkey] = df = pd.DataFrame(
+                        data, 
+                        columns=pd.MultiIndex.from_tuples(
+                            index, names=['Element', 'Name']
+                        )
                     )
-                )
+                except:
+                    file = monte_carlo_file(key)
+                    cache[key] = df = pd.read_excel(file, header=[0, 1], index_col=[0])
+                    df = df[list(index)]
         else:
             file = monte_carlo_file(key)
             cache[key] = df = pd.read_excel(file, header=[0, 1], index_col=[0])
@@ -377,6 +370,19 @@ def mcr_sc_microbial_oil():
         ]
     )
 
+def mcr_target_improved_fermentation_microbial_oil():
+    return montecarlo_results_short(
+        names=[
+            'O7.Target|target fermentation performance',
+        ],
+        metrics=[
+            f.MBSP,
+            f.TCI,
+            f.GWP_biodiesel_allocation,
+            f.biodiesel_yield,
+        ]
+    )
+
 def mcr_target_microbial_oil():
     return montecarlo_results_short(
         names=[
@@ -394,9 +400,10 @@ def mcr_target_microbial_oil_comparison():
     return montecarlo_results_short(
         names=[
             'O7.Target - O7.WT',
-            'O9.Target - O7.WT',
+            'O9.Target - O9.WT',
         ],
         metrics=[
+            f.MBSP,
             f.biodiesel_yield,
             f.TCI,
             f.GWP_biodiesel_allocation,

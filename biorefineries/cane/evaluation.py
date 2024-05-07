@@ -36,6 +36,7 @@ __all__ = (
     'run_oilcane_ethanol_constant_biomass',
     'run_oilcane_microbial_oil_constant_biomass',
     'save_target_biomass_yield',
+    'run_oilcane_development_pathway',
 )
 
 configuration_names = (
@@ -143,7 +144,7 @@ def evaluate_metrics_oil_recovery_integration(microbial_oil_recovery, microbial_
     nrows = productivity.size
     data = np.zeros([nrows, 3, N_metrics])
     for i in range(nrows):
-        for j, configuration in enumerate(['O7', 'O9', 'O8']):
+        for j, configuration in enumerate(['O7.WT', 'O9.WT', 'O8.WT']):
             # print(configuration, microbial_oil_recovery, microbial_oil_yield)
             br = cane.Biorefinery(configuration)
             br.set_fermentation_microbial_oil_productivity.setter(productivity[i])
@@ -443,15 +444,13 @@ def run_oilcane_ethanol_constant_biomass(N=None):
     if N is None: N = 5000
     filterwarnings('ignore')
     cane.YRCP2023()
-    bst.Model.default_convergence_model = 'linear regressor'
     run_uncertainty_and_sensitivity('O1|constant biomass yield', N)
     run_uncertainty_and_sensitivity('O2|constant biomass yield', N)
 
 def run_oilcane_microbial_oil_constant_biomass(N=None):
-    if N is None: N = 2000
+    if N is None: N = 5000
     filterwarnings('ignore')
     cane.YRCP2023()
-    bst.Model.default_convergence_model = 'linear regressor'
     run_uncertainty_and_sensitivity('O7|constant biomass yield', N)
     run_uncertainty_and_sensitivity('O9|constant biomass yield', N)
 
@@ -467,11 +466,25 @@ def run_oilcane_microbial_oil_across_oil_content(N=None, N_coordinate=None, conf
     # run_uncertainty_and_sensitivity('O1', N, across_oil_content='oilcane vs sugarcane')
     # run_uncertainty_and_sensitivity('O2', N, across_oil_content='oilcane vs sugarcane')        
     
-def run_oilcane_microbial_oil_across_lines(N=None, configurations=None):
-    if N is None: N = 2000
+def run_oilcane_development_pathway(N=None, configuration=None):
+    if N is None: N = 5000
     filterwarnings('ignore')
     cane.YRCP2023()
-    bst.Model.default_convergence_model = 'linear regressor'
+    if configuration is None: configuration = 'O7'
+    for i in (
+        '1566|baseline fermentation performance', 
+        '1566|target fermentation performance',
+        'Target|target fermentation performance',
+        'Ideal|target fermentation performance',
+    ):
+        run_uncertainty_and_sensitivity(
+            f'{configuration}.{i}', N
+        )
+    
+def run_oilcane_microbial_oil_across_lines(N=None, configurations=None):
+    if N is None: N = 5000
+    filterwarnings('ignore')
+    cane.YRCP2023()
     if configurations is None: configurations = ('O7', 'O9')
     elif isinstance(configurations, str): configurations = [configurations]
     for i in configurations: run_uncertainty_and_sensitivity(i, N, across_lines=True)
@@ -486,7 +499,7 @@ def save_target_biomass_yield(configuration='O7'):
         index_col=0)
     CBY_df = CBY_df.dropna()
     oil_content = np.array(CBY_df.columns) * 100
-    q = np.percentile(CBY_df, 95, axis=0)
+    q = np.max(CBY_df, axis=0)
     q = gaussian_filter(q, 1)
     f = interpolate.interp1d(oil_content, q)
     feedstock = br.feedstock.copy()
@@ -500,6 +513,14 @@ def save_target_biomass_yield(configuration='O7'):
     df.loc['Target', ('Stem oil (dw)', 'Mean')] = feedstock.get_mass_fraction('Oil')
     df.loc['Target', ('Biomass yield (dry MT/ha)', 'Mean')] = target_biomass_yield = f(10)
     df.loc['Target', ('Dry biomass yield (WT)', 'Mean')] = target_biomass_yield / br.baseline_dry_biomass_yield
+    
+    df.loc['Ideal', ('Water (wt)', 'Mean')] = 0.65
+    df.loc['Ideal', ('Fiber (dw)', 'Mean')] = feedstock.get_mass_fraction('Fiber')
+    df.loc['Ideal', ('Sugar (dw)', 'Mean')] = feedstock.get_mass_fraction('Sugar')
+    df.loc['Ideal', ('Stem oil (dw)', 'Mean')] = feedstock.get_mass_fraction('Oil')
+    df.loc['Ideal', ('Biomass yield (dry MT/ha)', 'Mean')] = br.baseline_dry_biomass_yield
+    df.loc['Ideal', ('Dry biomass yield (WT)', 'Mean')] = 1.
+    
     df.to_excel(
         file, 'Summarized'
     )

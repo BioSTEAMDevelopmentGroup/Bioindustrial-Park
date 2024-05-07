@@ -194,6 +194,7 @@ def exponential_val(x, nA): # A x ^ n
     return A * x ** n
 
 def YRCP2023():
+    bst.Model.default_convergence_model = 'linear regressor'
     Biorefinery.default_conversion_performance_distribution = 'longterm'
     Biorefinery.default_prices_correleted_to_crude_oil = True
     Biorefinery.default_oil_content_range = [1.8, 5.4]
@@ -232,13 +233,44 @@ class Biorefinery:
     
     cases = {
         'constant biomass yield',
+        'baseline fermentation performance',
+        'target fermentation performance',
     } # Special cases for Monte Carlo
     
     def constant_biomass_yield(self):
-        self.set_dry_biomass_yield.distribution = shape.Uniform(
+        bounds = (
             self.baseline_dry_biomass_yield, 
             self.baseline_dry_biomass_yield + 1e-6 # Work around for constant value
         )
+        self.set_dry_biomass_yield.baseline = self.baseline_dry_biomass_yield
+        self.set_dry_biomass_yield.bounds = bounds
+        self.set_dry_biomass_yield.distribution = shape.Uniform(*bounds)
+    
+    def baseline_fermentation_performance(self):
+        parameters = (
+            self.set_glucose_to_microbial_oil_yield,
+            self.set_xylose_to_microbial_oil_yield,
+            self.set_fermentation_microbial_oil_productivity,
+            self.set_fermentation_microbial_oil_titer,
+        )
+        for i in parameters:
+            lb = i.bounds[0]
+            i.baseline = lb
+            i.bounds = bounds = [lb, lb + 1e-6]
+            i.distribution = shape.Uniform(*bounds)
+            
+    def target_fermentation_performance(self):
+        parameters = (
+            self.set_glucose_to_microbial_oil_yield,
+            self.set_xylose_to_microbial_oil_yield,
+            self.set_fermentation_microbial_oil_productivity,
+            self.set_fermentation_microbial_oil_titer,
+        )
+        for i in parameters:
+            ub = i.bounds[1]
+            i.baseline = ub
+            i.bounds = bounds = [ub, ub + 1e-6]
+            i.distribution = shape.Uniform(*bounds)
     
     def update_feedstock(self):
         feedstock = self.feedstock
@@ -329,6 +361,11 @@ class Biorefinery:
                   self.set_fermentation_microbial_oil_productivity,
                   self.set_fermentation_microbial_oil_titer):
             i.setter(i.bounds[1])
+    
+    def market_competitive_biomass_yield(self):
+        self.ROI_target = 10
+        self.biodiesel.price = self.biomass_based_diesel.price = self.cellulosic_based_diesel.price = 0.75
+        return self.competitive_biomass_yield()
     
     def __new__(cls,
             name, chemicals=None,
@@ -1594,32 +1631,21 @@ class Biorefinery:
             p.setter(x)
         
         if number in cellulosic_ethanol_configurations:
-            set_baseline(set_sorghum_glucose_yield, 79)
-            set_baseline(set_sorghum_xylose_yield, 86)
-            set_baseline(set_cane_glucose_yield, 91.0)
-            set_baseline(set_cane_xylose_yield, 97.5)
-            set_baseline(set_glucose_to_ethanol_yield, 90)
-            set_baseline(set_xylose_to_ethanol_yield, 42)
-        set_baseline(set_cane_oil_content, self.default_baseline_oil_content)
-        set_baseline(set_bagasse_oil_recovery, 70)
-        set_baseline(set_juicing_oil_recovery, 60)
-        set_baseline(set_microbial_oil_recovery)
-        set_baseline(set_crude_oil_price) 
-        set_baseline(set_ethanol_price) 
-        set_baseline(set_biodiesel_price)
-        set_baseline(set_RIN_D3_price) 
-        set_baseline(set_RIN_D4_price) 
-        set_baseline(set_RIN_D5_price) 
-        set_baseline(set_crude_glycerol_price, dist.mean_glycerol_price)
-        set_baseline(set_natural_gas_price)
-        set_baseline(set_electricity_price)
+            set_sorghum_glucose_yield.baseline = 79
+            set_sorghum_xylose_yield.baseline = 86
+            set_cane_glucose_yield.baseline = 91.0
+            set_cane_xylose_yield.baseline = 97.5
+            set_glucose_to_ethanol_yield.baseline = 90
+            set_xylose_to_ethanol_yield.baseline = 42
+        set_cane_oil_content.baseline = self.default_baseline_oil_content
+        set_bagasse_oil_recovery.baseline = 70
+        set_juicing_oil_recovery.baseline = 60
+        set_crude_glycerol_price.baseline = dist.mean_glycerol_price
         if number in cellulosic_ethanol_configurations:
             get_stream('ethanol').price = 0.789
         if number > 0:
-            set_baseline(set_cane_PL_content, 10)
-            set_baseline(set_cane_FFA_content, 10)
-        
-        for i in model._parameters: setattr(self, i.setter.__name__, i)
+            set_cane_PL_content.baseline = 10
+            set_cane_FFA_content.baseline = 10
         for i in model._metrics: setattr(self, i.getter.__name__, i)
         self.sys = sys
         self.tea = tea
@@ -1635,12 +1661,15 @@ class Biorefinery:
         self.net_energy_target = None
         self.microbial_oil_analysis_disactivated = True
         self.__dict__.update(flowsheet.to_dict())
-        if feedstock_line: self.set_feedstock_line(feedstock_line)
-        if cache is not None: cache[key] = self
         
+        for i in model._parameters: 
+            setattr(self, i.setter.__name__, i)
         if case is not None:
             getattr(self, case)()
-        
+        if feedstock_line: self.set_feedstock_line(feedstock_line)
+        if cache is not None: cache[key] = self
+        for i in model._parameters:
+            i.setter(i.baseline)
         # Avoid erros in Monte Carlo of microbial oil production with huge cell
         # mass production
         if number in cellulosic_configurations:
@@ -1669,7 +1698,7 @@ class Biorefinery:
                 feedstock.price = tea.solve_price(feedstock)
         
         ## Tests
-        if feedstock_line is None:
+        if feedstock_line is None and case is None:
             try:
                 assert len(all_parameter_mockups) == len(model.parameters)
                 assert len(all_metric_mockups) == len(model.metrics)

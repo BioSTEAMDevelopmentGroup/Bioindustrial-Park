@@ -118,7 +118,6 @@ Na2SO4 = chemical_database('Na2SO4', phase='l', Hf=-1356.38e3)
 # Soluble organic salts
 # =============================================================================
 
-Acetate = chemical_database('Acetate', phase='l', Hf=-108992*_cal2joule)
 AmmoniumAcetate = chemical_database('AmmoniumAcetate', phase='l', 
                                          Hf=-154701*_cal2joule)
 
@@ -470,7 +469,7 @@ for i in Ethyl_3_5_dihydroxyhexanoate.get_missing_properties():
             pass
 Octanol = chemical_database('Octanol')
 # Esters - Octyl
-OctylyHexanoate = chemical_database(ID='Octyl hexanoate', search_ID='4887-30-3') # used for missing properties
+OctylyHexanoate = chemical_database(ID='Octylhexanoate', search_ID='4887-30-3') # used for missing properties
 
 OctylHydroxyHexanoate = chemical_defined('Octyl_5_hydroxyhexanoate', phase='l', formula='C14H28O3', 
                        # Hf=-233200*_cal2joule,
@@ -776,7 +775,11 @@ chems.set_synonym('P4O10', 'PhosphorusPentoxide')
 chems.set_synonym('Na2SO4', 'SodiumSulfate')
 chems.set_synonym('AmmoniumHydroxide', 'NH4OH')
 
+chems.set_synonym('DAP', 'DiammoniumPhosphate')
+
 chems.set_synonym('Tetrahydrofuran', 'THF')
+
+chems.set_synonym('AceticAcid', 'Acetate')
 
 chems.set_synonym('PD', 'Acetylacetone')
 # chems.set_synonym('Isobutyraldehyde', 'IBA')

@@ -110,12 +110,13 @@ def solve_addition_for_mol_ratio_and_decarb_conv(mol_PD_per_mol_TAL, x):
         M401.mol_acetylacetone_per_mol_TAL = addn_per_mol_TAL_in
         spec.set_production_capacity()
         return U402.outs[0].imol['Acetylacetone']/U402.outs[0].imol['TAL'] - mol_PD_per_mol_TAL
-    return IQ_interpolation(obj_f, 0., 5., ytol=5e-3)
+    return IQ_interpolation(obj_f, 0., 4., ytol=5e-3)
 
 
 #%% Parameter loading functions
 U402, M401 = u.U402, u.M401
 Acetylacetone_fresh = s.Acetylacetone_fresh
+U402.decarboxylation_conversion_basis = 'fixed'
 
 def load_decarboxylation_conversion(decarboxylation_conversion):
     U402.decarboxylation_conversion = decarboxylation_conversion
@@ -152,11 +153,11 @@ TAL_metrics = [get_product_MPSP, lambda: TAL_lca.GWP, lambda: TAL_lca.FEC,
 
 # %% Generate 3-specification meshgrid and set specification loading functions
 
-steps = (60, 60, 1)
+steps = (10, 10, 1)
 
 # Yield, titer, productivity (rate)
 spec_1 = TAL_decarb_convs = np.linspace(0.01, 0.5, steps[0]) # yield
-spec_2 = PD_reqs = np.linspace(0.01, 5., steps[1]) # titer
+spec_2 = PD_reqs = np.linspace(0.01, 4., steps[1]) # titer
 
 
 # spec_3 = PD_prices =\

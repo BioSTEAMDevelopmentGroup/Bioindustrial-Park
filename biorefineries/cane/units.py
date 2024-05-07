@@ -101,7 +101,8 @@ class AeratedCoFermentation(bst.AeratedBioreactor): # For microbial oil producti
         ])
         self.Q_O2_consumption = Q_O2_consumption
         self.optimize_power = True
-        self.kLa_coefficients = "Van't Riet"
+        self.kLa = bst.units.design_tools.aeration.kLa_stirred_Riet
+        self.kLa_kwargs = {'coefficients': "Van't Riet"}
     
     def _run_vent(self, vent, effluent):
         vent.copy_flow(effluent, ('CO2', 'O2', 'N2'), remove=True)
@@ -134,7 +135,8 @@ class AeratedFermentation(bst.AeratedBioreactor): # For microbial oil production
         ])
         self.Q_O2_consumption = Q_O2_consumption
         self.optimize_power = True
-        self.kLa_coefficients = "Van't Riet"
+        self.kLa = bst.units.design_tools.aeration.kLa_stirred_Riet
+        self.kLa_kwargs = {'coefficients': "Van't Riet"}
     
     def _run_vent(self, vent, effluent):
         vent.copy_flow(effluent, ('CO2', 'O2', 'N2'), remove=True)

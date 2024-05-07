@@ -92,7 +92,8 @@ class Reactor(Unit, PressureVessel, isabstract=True):
     # converted from ft3 to m3
     _V_max = pi/4*(20**2)*40/35.3147 
     
-    def __init__(self, ID='', ins=None, outs=(), *, 
+    def _init(self, 
+                 #  *, 
                   P=101325, tau=0.5, V_wf=0.8,
                   length_to_diameter=2, 
                   kW_per_m3=0.985,
@@ -100,7 +101,6 @@ class Reactor(Unit, PressureVessel, isabstract=True):
                   vessel_material='Stainless steel 316',
                   vessel_type='Vertical'):
         
-        Unit.__init__(self, ID, ins, outs)
         self.P = P
         self.tau = tau
         self.V_wf = V_wf
@@ -305,7 +305,8 @@ class BatchCoFermentation(BatchBioreactor):
     
     # autoselect_N  = True
 
-    def __init__(self, ID='', ins=None, outs=(), 
+    def _init(self, 
+                 #  
                  T=28+273.15,
                  P=101325., 
                  tau=120, # initial value; updated by spec.load_productivity
@@ -313,7 +314,7 @@ class BatchCoFermentation(BatchBioreactor):
                  acetate_ID='SodiumAcetate',
                  aeration_rate_basis='fixed rate basis', # 'fixed rate basis' or 'DO saturation basis'
                  ):
-        BatchBioreactor.__init__(self, ID, ins, outs, T=T, P=P, tau=tau, V=V)
+        BatchBioreactor._init(self,  T=T, P=P, tau=tau, V=V)
         
         self.aeration_rate_basis = aeration_rate_basis
         
@@ -325,7 +326,7 @@ class BatchCoFermentation(BatchBioreactor):
         
         self.cofermentation_rxns = ParallelRxn([
         #      Reaction definition            Reactant    Conversion
-        Rxn('Glucose -> 0.6667 TAL + 2 CO2',        'Glucose',   0.19), 
+        Rxn('Glucose -> 0.666667 TAL + 2 CO2',        'Glucose',   0.19), 
         Rxn('Glucose -> 0.3 VitaminA',               'Glucose',   1e-8), # retinol
         Rxn('Glucose + O2 -> CitricAcid + H2O',               'Glucose',  self.regular_citric_acid_conversion), # 2H+ excluded # from Markham et al.; 16 g/L citrate from 180 g/L glucose
         Rxn('Glucose -> 6 FermMicrobe',       'Glucose',   self.regular_microbe_conversion),
@@ -335,7 +336,7 @@ class BatchCoFermentation(BatchBioreactor):
         Rxn('Xylose -> 0.8333 CitricAcid + H2O',               'Xylose',  self.regular_citric_acid_conversion),
         Rxn('Xylose -> 5 FermMicrobe',        'Xylose',    self.regular_microbe_conversion),
         
-        Rxn('AceticAcid -> 0.22218 TAL + 2CO2 + 6H2O',       'AceticAcid',    0.19),
+        Rxn('AceticAcid -> 0.333333 TAL + 3H2O',       'AceticAcid',    0.19),
         Rxn('AceticAcid -> 0.1 VitaminA',       'AceticAcid',    1e-8),
         Rxn('AceticAcid -> 0.0714 VitaminD2',       'AceticAcid',    1e-8),
         Rxn('AceticAcid -> 2 FermMicrobe',        'AceticAcid',    1e-8),
@@ -478,10 +479,9 @@ class SeedTrain(Unit):
     regular_microbe_conversion = 0.339
     regular_citric_acid_conversion = 0.08856 # from Markham et al.; 16 g/L citrate from 180 g/L glucose
     
-    def __init__(self, ID='', ins=None, outs=(), T=30+273.15, 
+    def _init(self,  T=30+273.15, 
                  ferm_ratio=0.95, # ferm_ratio is the ratio of conversion relative to the fermenter
                  ):
-        Unit.__init__(self, ID, ins, outs)
         self.T = T
         self.ferm_ratio = ferm_ratio
         self.heat_exchanger = HXutility(None, None, None, T=T) 
@@ -494,7 +494,7 @@ class SeedTrain(Unit):
         
         self.cofermentation_rxns = ParallelRxn([
         #      Reaction definition            Reactant    Conversion
-        Rxn('Glucose -> 0.6667 TAL + 2 CO2',        'Glucose',   0.19), 
+        Rxn('Glucose -> 0.666667 TAL + 2 CO2',        'Glucose',   0.19), 
         Rxn('Glucose -> 0.3 VitaminA',               'Glucose',   1e-8), # retinol
         Rxn('Glucose -> CitricAcid + H2O',               'Glucose',  self.regular_citric_acid_conversion), # 2H+ excluded # from Markham et al.; 16 g/L citrate from 180 g/L glucose
         Rxn('Glucose -> 6 FermMicrobe',       'Glucose',   self.regular_microbe_conversion),
@@ -504,7 +504,7 @@ class SeedTrain(Unit):
         Rxn('Xylose -> 0.8333 CitricAcid + H2O',               'Xylose',  self.regular_citric_acid_conversion),
         Rxn('Xylose -> 5 FermMicrobe',        'Xylose',    self.regular_microbe_conversion),
         
-        Rxn('AceticAcid -> 0.22218 TAL + 2CO2 + 6H2O',       'AceticAcid',    0.19),
+        Rxn('AceticAcid -> 0.333333 TAL + 2CO2 + 6H2O',       'AceticAcid',    0.19),
         Rxn('AceticAcid -> 0.1 VitaminA',       'AceticAcid',    1e-8),
         Rxn('AceticAcid -> 0.0714 VitaminD2',       'AceticAcid',    1e-8),
         Rxn('AceticAcid -> 2 FermMicrobe',        'AceticAcid',    1e-8),
@@ -613,7 +613,7 @@ class SeedHoldTank(Unit): pass
 class TALCrystallizer(BatchCrystallizer):
     TAL_solubility_multiplier = 1.
     _SA_vol_per_mass = 0.0008252419812169215
-    def __init__(self, ID='', ins=None, outs=(), 
+    def _init(self,  
                  target_recovery=0.6,
                  thermo=None,
                  tau=8, # assumed; uncertainty range is 2-14 h
@@ -628,9 +628,10 @@ class TALCrystallizer(BatchCrystallizer):
                  output_conc_multiplier=1.,
                  kW=0.00746):
         
-        BatchCrystallizer.__init__(self, 
+        BatchCrystallizer._init(self, 
         # BatchCrystallizer._init(self,
-                                    ID, ins, outs, thermo,
+        
+                                     # thermo,
                      tau, N, V, T,
                      Nmin, Nmax, vessel_material,
                      kW)
@@ -724,11 +725,11 @@ class HydrogenationEstersReactor(Reactor):
            ])
     TAL_conversion_rxns = [i for i in hydrogenation_rxns if i.reactant=='TAL']
     
-    def __init__(self, ID, ins, outs, 
+    def _init(self,  
                  tau = (7./3.) * 2., # from Huber group
                  T=323., # from Huber group
                  vessel_material='Stainless steel 316', **args):
-        Reactor.__init__(self, ID, ins, outs, tau=tau, vessel_material=vessel_material)
+        Reactor._init(self,  tau=tau, vessel_material=vessel_material)
         self.T = T
         self.heat_exchanger = hx = HXutility(None, None, None, T=T) 
         
@@ -811,6 +812,9 @@ class HydrogenationReactor(Reactor):
     """
     _N_ins = 5
     _N_outs = 2
+    
+    TEA_operating_hours = 4320
+    
     auxiliary_unit_names = ('heat_exchanger')
     _F_BM_default = {**Reactor._F_BM_default,
             'Heat exchangers': 3.,
@@ -831,14 +835,14 @@ class HydrogenationReactor(Reactor):
     
     spent_catalyst_replacements_per_year = 1. # number of times the entire catalyst_weight is replaced per year
     
-    def __init__(self, ID, ins, outs, 
+    def _init(self,  
                  tau = 17., # from Huber group
                  T=100. + 273.15, # from Huber group
                  P=3e6, # 30 bar # from Huber group
                  vessel_material='Stainless steel 316',
                  NiSiO2_catalyst_price=price['Ni-SiO2'],
                  **args):
-        Reactor.__init__(self, ID, ins, outs, tau=tau, P=P, vessel_material=vessel_material)
+        Reactor._init(self,  tau=tau, P=P, vessel_material=vessel_material)
         self.T = T
         self.heat_exchanger = hx = HXutility(None, None, None, T=T) 
         self.NiSiO2_catalyst_price = NiSiO2_catalyst_price
@@ -873,7 +877,7 @@ class HydrogenationReactor(Reactor):
         # 
         req_cat_mass_flow = cat_weight/tau
         current_cat_mass_flow = recovered_catalyst.imass['NiSiO2']
-        spent_catalyst_mass_flow = self.spent_catalyst_replacements_per_year*cat_weight/self.system.TEA.operating_hours # kg/h
+        spent_catalyst_mass_flow = self.spent_catalyst_replacements_per_year*cat_weight/self.TEA_operating_hours # kg/h
         current_cat_mass_flow-=spent_catalyst_mass_flow
         
         spent_catalyst.phase = 's'
@@ -893,7 +897,15 @@ class HydrogenationReactor(Reactor):
         Reactor._design(self)
         duty = sum([i.H for i in self.outs]) - sum([i.H for i in self.ins])
         mixed_feed = tmo.Stream()
+        
+        for i in self.outs: i.phase = 'l'
         mixed_feed.mix_from(self.outs)
+        for i in self.outs:
+            if i.imol['NiSiO2']:
+                i.phases = ('l', 's')
+                i.imol['s', 'NiSiO2'] = i.imol['l', 'NiSiO2']
+                i.imol['l', 'NiSiO2'] = 0.
+            
         mixed_feed.T=self.ins[0].T
         # mixed_feed.vle(T=mixed_feed.T, P=mixed_feed.P)
         self.heat_exchanger.simulate_as_auxiliary_exchanger(ins=(mixed_feed,), 
@@ -916,6 +928,8 @@ class DehydrationReactor(Reactor):
     _N_ins = 4
     _N_outs = 2
     
+    TEA_operating_hours = 4320
+    
     auxiliary_unit_names = ('heat_exchanger')
     
     _F_BM_default = {**Reactor._F_BM_default,
@@ -933,16 +947,16 @@ class DehydrationReactor(Reactor):
             ])
     HMTHP_to_PSA_rxn = dehydration_rxns[0]
     
-    spent_catalyst_replacements_per_year = 5. # number of times the entire catalyst_weight is replaced per year
+    spent_catalyst_replacements_per_year = 1. # number of times the entire catalyst_weight is replaced per year
     
-    def __init__(self, ID, ins, outs, 
+    def _init(self,  
                  tau = 17.8, # from Huber group
                  T=100. + 273.15, # from Huber group
                  P=3e6, # 30 bar # from Huber group
                  vessel_material='Stainless steel 316',
                  Amberlyst70_catalyst_price=price['Amberlyst-70'],
                  **args):
-        Reactor.__init__(self, ID, ins, outs, tau=tau, P=P, vessel_material=vessel_material)
+        Reactor._init(self,  tau=tau, P=P, vessel_material=vessel_material)
         self.T = T
         self.heat_exchanger = hx = HXutility(None, None, None, T=T) 
         self.Amberlyst70_catalyst_price = Amberlyst70_catalyst_price
@@ -963,7 +977,7 @@ class DehydrationReactor(Reactor):
         
         req_cat_mass_flow = cat_weight/tau
         current_cat_mass_flow = recovered_catalyst.imass['Amberlyst70_']
-        spent_catalyst_mass_flow = self.spent_catalyst_replacements_per_year*cat_weight/self.system.TEA.operating_hours # kg/h
+        spent_catalyst_mass_flow = self.spent_catalyst_replacements_per_year*cat_weight/self.TEA_operating_hours # kg/h
         current_cat_mass_flow-=spent_catalyst_mass_flow
         
         spent_catalyst.phase = 's'
@@ -981,7 +995,15 @@ class DehydrationReactor(Reactor):
         Reactor._design(self)
         duty = sum([i.H for i in self.outs]) - sum([i.H for i in self.ins])
         mixed_feed = tmo.Stream()
+        
+        for i in self.outs: i.phase = 'l'
         mixed_feed.mix_from(self.outs)
+        for i in self.outs:
+            if i.imol['Amberlyst70_']:
+                i.phases = ('l', 's')
+                i.imol['s', 'Amberlyst70_'] = i.imol['l', 'Amberlyst70_']
+                i.imol['l', 'Amberlyst70_'] = 0.
+                
         mixed_feed.T=self.ins[0].T
         # mixed_feed.vle(T=mixed_feed.T, P=mixed_feed.P)
         self.heat_exchanger.simulate_as_auxiliary_exchanger(ins=(mixed_feed,), 
@@ -1025,12 +1047,12 @@ class RingOpeningHydrolysisReactor(Reactor):
             Rxn('PSA -> 0.2PolyPSA',         'PSA',   1.-1e-5) # assumed
                 ])
     
-    def __init__(self, ID, ins, outs, 
+    def _init(self,  
                  tau = 16., # from Huber group
                  T=130. + 273.15, # from Huber group
                  P=3e6, # 30 bar # from Huber group
                  vessel_material='Stainless steel 316', **args):
-        Reactor.__init__(self, ID, ins, outs, tau=tau, P=P, vessel_material=vessel_material)
+        Reactor._init(self,  tau=tau, P=P, vessel_material=vessel_material)
         self.T = T
         self.heat_exchanger = hx = HXutility(None, None, None, T=T)
     
@@ -1187,8 +1209,8 @@ class Crystallization(Reactor):
                 ])
     TAL_to_SA_rxn = dehydration_rxns[0]
     
-    def __init__(self, ID='', ins=None, outs=(), tau=1., T=293.15, reagent_fraction=1.):
-        Reactor.__init__(self, ID, ins, outs, tau=tau)
+    def _init(self,  tau=1., T=293.15, reagent_fraction=1.):
+        Reactor._init(self,  tau=tau)
         self.reagent_fraction = reagent_fraction
     
 

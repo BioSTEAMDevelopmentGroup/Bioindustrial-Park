@@ -568,19 +568,21 @@ contourplots.animated_contourplot(w_data_vs_x_y_at_multiple_z=results_metric_1, 
                                 # comparison_range_hatch_pattern='////',
                                 units_on_newline = (True, True, False, False), # x,y,z,w
                                 # manual_clabels_regular = {10.: (10,50)},
-                                manual_clabels_regular = {
-                                    # MPSP_w_ticks[0]: (80,300),
-                                    # MPSP_w_ticks[1]: (50,320),
-                                    # MPSP_w_ticks[2]: (25,310),
-                                    # MPSP_w_ticks[3]: (18,300),
-                                    # MPSP_w_ticks[4]: (10,50),
+                                
+                                # manual_clabels_regular = {
+                                #     # MPSP_w_ticks[0]: (80,300),
+                                #     # MPSP_w_ticks[1]: (50,320),
+                                #     # MPSP_w_ticks[2]: (25,310),
+                                #     # MPSP_w_ticks[3]: (18,300),
+                                #     # MPSP_w_ticks[4]: (10,50),
                                     
-                                    MPSP_w_ticks[0]: (100,300),
-                                    MPSP_w_ticks[1]: (60,240),
-                                    MPSP_w_ticks[2]: (59,140),
-                                    MPSP_w_ticks[3]: (10,50),
-                                    # MPSP_w_ticks[4]: (10,50),
-                                    },
+                                #     MPSP_w_ticks[0]: (100,300),
+                                #     MPSP_w_ticks[1]: (60,240),
+                                #     MPSP_w_ticks[2]: (59,140),
+                                #     MPSP_w_ticks[3]: (10,50),
+                                #     # MPSP_w_ticks[4]: (10,50),
+                                #     },
+                                
                                 manual_clabels_comparison_range = {TAL_maximum_viable_market_range[0]:(100,70), 
                                                                    TAL_maximum_viable_market_range[1]:(60,50)},
                                 additional_points ={(13385.197/1000, 180):('D', 'w', 6)},
@@ -737,6 +739,19 @@ contourplots.animated_contourplot(w_data_vs_x_y_at_multiple_z=results_metric_4, 
                                 # comparison_range=[AOC_w_levels[-2], AOC_w_levels[-1]],
                                 # comparison_range_hatch_pattern='////',
                                 units_on_newline = (True, True, False, False), # x,y,z,wadditional_points ={(13385.197/1000, 180):('D', 'w', 6)},
+                                
+                                manual_clabels_regular = {
+                                    20:  (10,270), 
+                                    40:  (20,270), 
+                                    60:  (40,270), 
+                                    80:  (60,270), 
+                                    100: (80,270), 
+                                    120: (100,270), 
+                                    140: (120,270),
+                                    160: (110,90),
+                                    200: (85,30),
+                                    },
+                                
                                 additional_vlines=list(theoretical_max_g_TAL_per_g_SA*np.array([
                                                     23802.2/1e3,
                                                     # 27296.1/1e3,

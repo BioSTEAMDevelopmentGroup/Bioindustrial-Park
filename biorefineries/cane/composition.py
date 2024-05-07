@@ -238,7 +238,7 @@ def get_composition_data(minimum_oil_content=None, ignored=frozenset(['316', '19
             performances[name] = performance
         for name, performance in performances.items():
             for other_name, other_performance in performances.items():
-                if other_name == 'Target': continue
+                if other_name in ('Target', 'Ideal'): continue
                 if (name != other_name 
                     and performance.oil_content < other_performance.oil_content
                     and performance.biomass_yield < other_performance.biomass_yield

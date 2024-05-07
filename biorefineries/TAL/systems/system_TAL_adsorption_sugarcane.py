@@ -395,7 +395,7 @@ TAL_lca = TALLCA(system=TAL_sys,
                  main_product_chemical_IDs=['TAL',], 
                  by_products=['PD'], 
                  cooling_tower=u.CT801, 
-                 chilled_water_processing_unit=u.CWP802, 
+                 chilled_water_processing_units=[u.CWP802], 
                  boiler=u.BT701, has_turbogenerator=True,
                  credit_feedstock_CO2_capture=True, 
                  add_EOL_GWP=True,
@@ -434,7 +434,8 @@ unit_groups += get_more_unit_groups(system=TAL_sys,
                                         'electricity consumption',
                                         'heating duty',
                                         'excess electricity',
-                                        ]
+                                        ],
+                         has_brine_facility = False
                          )
 
 

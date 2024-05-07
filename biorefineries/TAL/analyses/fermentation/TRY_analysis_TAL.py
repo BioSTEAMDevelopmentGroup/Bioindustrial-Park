@@ -58,6 +58,7 @@ TAL_filepath = TAL.__file__.replace('\\__init__.py', '')
 # ##
 TAL_results_filepath = TAL_filepath + '\\analyses\\results\\'
 
+
 #%% Load baseline
 model = models.TAL_model
 system = TAL_sys = models.TAL_sys
@@ -128,7 +129,7 @@ TAL_metrics = [get_product_MPSP,
 
 # %% Generate 3-specification meshgrid and set specification loading functions
 
-steps = (60, 60, 3)
+steps = (60, 60, 1)
 
 # Yield, titer, productivity (rate)
 spec_1 = yields = np.linspace(0.05, 0.95, steps[0]) # yield
@@ -138,12 +139,19 @@ spec_2 = titers = np.linspace(5.,
                                    # Skoog et al., 2018 ( https://doi.org/10.1016/j.biotechadv.2018.10.012 )
                                 steps[1]) # titer
 
+# spec_3 = productivities =\
+#     np.linspace(0.05, 1.5, steps[2])
+    
+spec_3 = productivities =\
+    np.array([spec.baseline_productivity,])
 
 # spec_3 = productivities =\
-#     np.array([0.2*spec.baseline_productivity, spec.baseline_productivity, 5.*spec.baseline_productivity])
+#     np.array([0.25*spec.baseline_productivity, 0.5*spec.baseline_productivity, 
+#               spec.baseline_productivity, 
+#               2.*spec.baseline_productivity, 4.*spec.baseline_productivity])
 
-spec_3 = productivities =\
-    np.array([0.2*spec.baseline_productivity, spec.baseline_productivity, 5*spec.baseline_productivity,])
+# spec_3 = productivities =\
+#     np.array([0.2*spec.baseline_productivity, spec.baseline_productivity, 5*spec.baseline_productivity,])
 
 #%% Plot stuff
 
@@ -249,6 +257,10 @@ def tickmarks(dmin, dmax, accuracy=50, N_points=5):
     step = (dmax - dmin) / (N_points - 1)
     return [dmin + step * i for i in range(N_points)]
 
+#%%
+minute = '0' + str(dateTimeObj.minute) if len(str(dateTimeObj.minute))==1 else str(dateTimeObj.minute)
+file_to_save = f'_{steps}_steps_'+'TAL_TRY_%s.%s.%s-%s.%s'%(dateTimeObj.year, dateTimeObj.month, dateTimeObj.day, dateTimeObj.hour, minute)
+
 #%% Create meshgrid
 spec_1, spec_2 = np.meshgrid(spec_1, spec_2)
 
@@ -275,11 +287,14 @@ def print_status(curr_no, total_no, s1, s2, s3, HXN_qbal_error, results=None, ex
     print(f'HXN Qbal error = {round(HXN_qbal_error, 2)} %.')
     print('\n')
     print(results)
+    print('\nError: ', exception_str)
 
 max_HXN_qbal_percent_error = 0.
 
 curr_no = 0
 total_no = len(yields)*len(titers)*len(productivities)
+
+print_status_every_n_simulations = 50
 
 for p in productivities:
     # data_1 = TAL_data = spec.evaluate_across_specs(
@@ -301,9 +316,10 @@ for p in productivities:
             try:
                 spec.load_specifications(spec_1=y, spec_2=t, spec_3=p)
                 
-                spec.set_production_capacity(desired_annual_production=spec.desired_annual_production)
+                # spec.set_production_capacity(desired_annual_production=spec.desired_annual_production)
                 
-                # system.simulate()
+                for i in range(3): system.simulate()
+                
                 d1_Metric1[-1].append(TAL_metrics[0]())
                 d1_Metric2[-1].append(TAL_metrics[1]())
                 d1_Metric3[-1].append(TAL_metrics[2]())
@@ -332,12 +348,13 @@ for p in productivities:
                 d1_Metric6[-1].append(np.nan)
                 error_message = str(e1)
             
-            print_status(curr_no, total_no,
-                         y, t, p, 
-                         results=[d1_Metric1[-1][-1], d1_Metric2[-1][-1], d1_Metric3[-1][-1],
-                                  d1_Metric4[-1][-1], d1_Metric5[-1][-1], d1_Metric6[-1][-1],],
-                         HXN_qbal_error=HXN.energy_balance_percent_error,
-                         exception_str=error_message)
+            if curr_no%print_status_every_n_simulations==0 or (error_message and not 'sugar' in error_message and not 'opposite sign' in error_message):
+                print_status(curr_no, total_no,
+                             y, t, p, 
+                             results=[d1_Metric1[-1][-1], d1_Metric2[-1][-1], d1_Metric3[-1][-1],
+                                      d1_Metric4[-1][-1], d1_Metric5[-1][-1], d1_Metric6[-1][-1],],
+                             HXN_qbal_error=HXN.energy_balance_percent_error,
+                             exception_str=error_message)
     
     d1_Metric1, d1_Metric2, d1_Metric3 = np.array(d1_Metric1), np.array(d1_Metric2), np.array(d1_Metric3)
     d1_Metric4, d1_Metric5, d1_Metric6 = np.array(d1_Metric4), np.array(d1_Metric5), np.array(d1_Metric6)
@@ -355,16 +372,13 @@ for p in productivities:
 
     # %% Save generated data
     
-    minute = '0' + str(dateTimeObj.minute) if len(str(dateTimeObj.minute))==1 else str(dateTimeObj.minute)
-    file_to_save = f'_{steps}_steps_'+'TAL_TRY_%s.%s.%s-%s.%s'%(dateTimeObj.year, dateTimeObj.month, dateTimeObj.day, dateTimeObj.hour, minute)
-    np.save(TAL_results_filepath+file_to_save, np.array([d1_Metric1, d1_Metric2, d1_Metric3]))
-    
-    pd.DataFrame(d1_Metric1).to_csv(TAL_results_filepath+'MPSP-'+file_to_save+'.csv')
-    pd.DataFrame(d1_Metric2).to_csv(TAL_results_filepath+'GWP-'+file_to_save+'.csv')
-    pd.DataFrame(d1_Metric3).to_csv(TAL_results_filepath+'FEC-'+file_to_save+'.csv')
-    pd.DataFrame(d1_Metric4).to_csv(TAL_results_filepath+'AOC-'+file_to_save+'.csv')
-    pd.DataFrame(d1_Metric5).to_csv(TAL_results_filepath+'TCI-'+file_to_save+'.csv')
-    pd.DataFrame(d1_Metric6).to_csv(TAL_results_filepath+'Purity-'+file_to_save+'.csv')
+    csv_file_to_save = file_to_save + f'_prod_{p}'
+    pd.DataFrame(d1_Metric1).to_csv(TAL_results_filepath+'MPSP-'+csv_file_to_save+'.csv')
+    pd.DataFrame(d1_Metric2).to_csv(TAL_results_filepath+'GWP-'+csv_file_to_save+'.csv')
+    pd.DataFrame(d1_Metric3).to_csv(TAL_results_filepath+'FEC-'+csv_file_to_save+'.csv')
+    pd.DataFrame(d1_Metric4).to_csv(TAL_results_filepath+'AOC-'+csv_file_to_save+'.csv')
+    pd.DataFrame(d1_Metric5).to_csv(TAL_results_filepath+'TCI-'+csv_file_to_save+'.csv')
+    pd.DataFrame(d1_Metric6).to_csv(TAL_results_filepath+'Purity-'+csv_file_to_save+'.csv')
     
 
 #%% Report maximum HXN energy balance error
@@ -377,6 +391,12 @@ chdir(TAL_results_filepath)
 results_metric_1 = np.array(results_metric_1)
 results_metric_2 = np.array(results_metric_2)
 results_metric_3 = np.array(results_metric_3)
+
+#%% Save generated numpy file
+np.save(TAL_results_filepath+'MPSP-'+file_to_save, results_metric_1)
+np.save(TAL_results_filepath+'GWP-'+file_to_save, results_metric_2)
+np.save(TAL_results_filepath+'FEC-'+file_to_save, results_metric_3)
+
 
 #%% More plot utils
 
@@ -750,7 +770,8 @@ TCI_w_levels, TCI_w_ticks, TCI_cbar_ticks = get_contour_info_from_metric_data(re
 # TCI_cbar_ticks = np.arange(2, 8.1, 1.)
 
 # TCI_w_ticks = [150, 200, 300, 400,]
-
+TCI_w_levels = np.arange(150, 401, 10)
+TCI_cbar_ticks = TCI_w_ticks = [150, 200, 250, 300, 350, 400]
 # TCI_w_levels = np.arange(0., 15.5, 0.5)
 
 contourplots.animated_contourplot(w_data_vs_x_y_at_multiple_z=results_metric_5, # shape = z * x * y # values of the metric you want to plot on the color axis; e.g., TCI

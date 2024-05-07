@@ -172,7 +172,7 @@ TAL_metrics = [get_product_MPSP, lambda: TAL_lca.GWP, lambda: TAL_lca.FEC,
 
 # %% Generate 3-specification meshgrid and set specification loading functions
 
-steps = (20, 20, 1)
+steps = (10, 10, 1)
 
 # Yield, titer, productivity (rate)
 spec_1 = TAL_decarb_convs = np.linspace(0.01, 0.5, steps[0]) # yield

@@ -17,7 +17,7 @@ import biosteam as bst
 from biosteam.utils import colors
 from matplotlib.ticker import AutoMinorLocator as AML
 
-import biorefineries.HP.analyses.models as HP_models
+import biorefineries.HP.analyses.models_achieved_improvements as HP_models
 
 
 # # Comment this out to run feedstock sugar content-price analysis
@@ -47,9 +47,8 @@ import matplotlib.colors as mcolors
 
 
 
-filterwarnings('ignore', category=bst.utils.CostWarning)
+filterwarnings('ignore')
 ig = np.seterr(invalid='ignore')
-bst.speed_up()
 
 _red_highlight_white_text = '\033[1;47;41m'
 _yellow_text = '\033[1;33m'
@@ -215,13 +214,13 @@ def run_bugfix_barrage():
 # =============================================================================
 
 import pandas as pd
-from biorefineries.HP.analyses import models
+# from biorefineries.HP.analyses import models
 # from datetime import datetime
 
 _kg_per_ton = 907.18474
 
 
-model = models.HP_model
+model = HP_models.HP_model
 
 baseline_sample = model.get_baseline_sample()
 

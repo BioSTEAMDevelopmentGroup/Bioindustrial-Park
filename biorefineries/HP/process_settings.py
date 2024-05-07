@@ -25,6 +25,9 @@ _liter_per_gallon = 3.78541
 _ft3_per_m3 = 35.3147
 _chemical_2011to2016 = 102.5 / 91.7
 _chemical_2020to2016 = 102.5 / 113.8 # average of Jan and Feb
+_chemical_2022to2016 = 102.5 / 145.3
+_chemical_2014to2016 = 102.5 / 105.3
+_chemical_2017to2016 = 102.5 / 106.9
 
 # From USD/dry-ton to USD/kg in 2016$, 20% moisture content
 # changed from Humbird et al., 2011 to Davis et al., 2018
@@ -157,6 +160,17 @@ Hexanediol_price = 2.9
 # https://www.alibaba.com/product-detail/Supply-Best-Price-98-1-8_1600152253896.html?spm=a2700.galleryofferlist.normal_offer.d_title.4ff91a18MzPO0F
 Octanediol_price = 6.5
 
+# 365-380 2022$/MT according to https://www.chemanalyst.com/Pricing-data/liquid-carbon-dioxide-1090
+# Baseline: 0.263 2016$/kg
+# Uncertainty range: 0.257 - 0.268 2016$/kg
+liquid_CO2_price = 0.3725 * _chemical_2022to2016
+
+# Monoethanol amine
+# 1021.69 $/MT in Nov 2014 - 1855.65 $/MT in Oct 2017 range from https://www.intratec.us/chemical-markets/monoethanolamine-price
+# Baseline: 1.426 2016$/kg
+# Uncertainty range: 1.032 - 1.819 2016$/kg
+MEA_price = (1021.69*_chemical_2014to2016 + 1855.65*_chemical_2017to2016)/(2*1000)
+
 # All in 2016$/kg
 price = {'AA': AA_price,
          'TiO2': TiO2_price,
@@ -195,7 +209,10 @@ price = {'AA': AA_price,
          'Butyl acetate': Butyl_acetate_price,
          'Hexanol': Hexanol_price,
          'Hexanediol': Hexanediol_price,
-         'Octanediol': Octanediol_price}
+         'Octanediol': Octanediol_price,
+         'Liquid carbon dioxide': liquid_CO2_price,
+         'Monoethanolamine': MEA_price,
+         }
     
 
 def load_process_settings():
@@ -258,7 +275,10 @@ GWP_CFs = {
     'Lime': 1.29,
     'NaOH': 2.11,
     'H2SO4': 0.04344,
-    'Ethanol': 1.44
+    'Ethanol': 1.44,
+    'MEA': 3.4062, # ecoinvent 3.8 ethanolamine production, RoW [monoethanolamine]
+    'H3PO4': 1.3598, # ecoinvent 3.8 purification of wet-process phosphoric acid to industrial grade, product in 85% solution state, RoW # cradle-to-gate
+    'CO2': 0.87104, # ecoinvent 3.8 carbon dioxide production, liquid, RoW
     }
 H3PO4_GWP_CF = 2.5426
 KOH_GWP_CF = 2.299
@@ -319,7 +339,10 @@ FEC_CFs = {
     'Lime': 4.896,
     'NaOH': 29.,
     'H2SO4': 0.56898,
-    'Ethanol': 16.
+    'Ethanol': 16.,
+    'MEA': 67.898, # ecoinvent 3.8 ethanolamine production, RoW [monoethanolamine]
+    'H3PO4': 16.538, # ecoinvent 3.8 purification of wet-process phosphoric acid to industrial grade, product in 85% solution state, RoW # cradle-to-gate
+    'CO2': 7.4243, # ecoinvent 3.8 carbon dioxide production, liquid, RoW
     }
 H3PO4_FEC_CF = 39.542
 KOH_FEC_CF = 30.421

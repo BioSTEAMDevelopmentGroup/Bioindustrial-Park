@@ -112,7 +112,8 @@ def create_TAL_fermentation_process(ins, outs,):
     # Mix pretreatment hydrolysate/enzyme mixture with fermentation seed
     S302 = bst.Splitter('S302', ins=M304_H-0,
                         outs = ('to_seedtrain', 'to_cofermentation'),
-                        split = 0.07) # split = inoculum ratio
+                        split = 0.05) # split = inoculum ratio
+    
     @S302.add_specification()
     def S302_spec():
         if S302.ins[0]['g'].F_mol: raise RuntimeError('S302.ins[0] has non-zero gas phase flow.')
@@ -133,7 +134,7 @@ def create_TAL_fermentation_process(ins, outs,):
         R302.ins[3].F_mass*=flow_multiplier
     
     # ferm_ratio is the ratio of conversion relative to the fermenter
-    R303 = units.SeedTrain('R303', ins=S302-0, outs=('seed', seedtrain_vent), ferm_ratio=0.9)
+    R303 = units.SeedTrain('R303', ins=S302-0, outs=('seed', seedtrain_vent), ferm_ratio=0.95)
     
     T301 = units.SeedHoldTank('T301', ins=R303-0, outs=1-R302)
 
@@ -174,14 +175,15 @@ def create_TAL_fermentation_process(ins, outs,):
                ],
                 outs=[dict(ID='decarboxylation_vent', CO2=20),
                       dict(ID='S401_solid', FermMicrobe=1, Water=1),
-                      dict(ID='S402_liquid', PD=1, Water=99),
+                      dict(ID='bottom_product_F403', PD=1, Water=99),
+                      dict(ID='liquid_waste_D401', PD=1, Water=99),
                       dict(ID='solid_TAL', TAL=1),
                                 ],
                                                )
 def create_TAL_separation_solubility_exploit_process(ins, outs,):
     
     fermentation_broth, acetylacetone_decarboxylation_equilibrium, recycled_nonevaporated_supernatant = ins
-    decarboxylation_vent, S401_solid, liquid_waste, solid_TAL = outs
+    decarboxylation_vent, S401_solid, bottom_product_F403, liquid_waste_D401, solid_TAL = outs
     
     # =============================================================================
     # Separation streams
@@ -199,7 +201,7 @@ def create_TAL_separation_solubility_exploit_process(ins, outs,):
     U401.line = 'Background unit for SLE'
     
     # from biosteam._graphics import stream_unit
-    U401._graphics = bst._graphics.junction_graphics
+    U401._graphics = tmo._graphics.junction_graphics
     
     @U401.add_specification()
     def U401_spec():
@@ -275,13 +277,13 @@ def create_TAL_separation_solubility_exploit_process(ins, outs,):
     
     U402 = bst.FakeSplitter('U402', ins=M402-0, outs = ('thermally_decarboxylated_broth',decarboxylation_vent))
     U402.decarboxylation_rxns = ParallelRxn([
-        Rxn('TAL + H2O -> PD + CO2', 'TAL',   0.25),
+        Rxn('TAL + H2O -> PD + CO2', 'TAL',   0.183),
         ])
     U402.line = 'Background unit for decarboxylation'
     U402._graphics = U401._graphics
     
-    U402.decarboxylation_conversion_basis = 'fixed' # 'fixed' or 'temperature-dependent' or 'equilibrium-based'
-    U402.decarboxylation_conversion = 0.225 # only used if basis is 'fixed' # experimental value at T = 80 degrees C
+    U402.decarboxylation_conversion_basis = 'temperature-dependent' # 'fixed' or 'temperature-dependent' or 'equilibrium-based'
+    U402.decarboxylation_conversion = 0.183 # only used if basis is 'fixed' # experimental value at T = 80 degrees C
     U402.equilibrium_acetylacetone_presence = 0.2903 # equilibrium PD:TAL (mol:mol) ratio; only used if basis is 'equilibrium-based'
     
     def U402_spec_helper():
@@ -449,13 +451,50 @@ def create_TAL_separation_solubility_exploit_process(ins, outs,):
         F403._run()
     
     F403_P0 = bst.units.Pump('F403_P0', ins=F403-0, 
-                             outs=liquid_waste, # non-evaporated supernatant; can be recycled using S403 in system_TAL_solubility_exploit_eethanol_sugarcane, controlled by S403.split (0 by default)
+                             outs=bottom_product_F403, # non-evaporated supernatant; can be recycled using S403 in system_TAL_solubility_exploit_eethanol_sugarcane, controlled by S403.split (0 by default)
                              P=101325., material='Stainless steel',)
     F403_P1 = bst.units.Pump('F403_P1', ins=F403-1, 
-                               outs=3-M401, # top product from evaporating supernatant; can be recycled in the separation process defined here, controlled by F403.V (0 by default)
                               # outs=('',),
                              P=101325., material='Stainless steel',)
-
+    
+    D401 = bst.BinaryDistillation('D401', ins=F403_P1-0,   
+                                  LHK=('PD','Water'), 
+                                  Lr=0.99, Hr=0.99, 
+                                  k=1.2, P=101325./50.)
+    
+    D401.bypass = True
+    D401.bypass_only_if_no_feed = False
+    
+    D401_design, D401_cost = D401._design, D401._cost
+    @D401.add_specification(run=False)
+    def D401_spec():
+        if D401.ins[0].F_mol and D401.bypass_only_if_no_feed: 
+            D401.bypass = False
+        else:
+            D401.bypass = True
+        
+        if D401.bypass: 
+            D401._design = lambda: 0
+            D401._cost = lambda: 0
+            D401.outs[0].copy_like(D401.ins[0])
+            
+        else:
+            D401._design = D401_design
+            D401._cost = D401_cost
+            D401._run()
+            
+    D401_H0 = bst.HXutility('D401_H0', ins=D401-0,
+                         V=0.,
+                         )
+    
+    D401_P0 = bst.units.Pump('D401_P0', ins=D401_H0-0, 
+                             outs=3-M401, # distillation top product of the top product from evaporating supernatant; can be recycled in the separation process defined here, controlled by F403.V (0 by default)
+                             P=101325., material='Stainless steel',)
+    
+    D401_P1 = bst.units.Pump('D401_P1', ins=D401-1, 
+                             outs=liquid_waste_D401, # distillation top product of the top product from evaporating supernatant; can be recycled in the separation process defined here, controlled by F403.V (0 by default)
+                             P=101325., material='Stainless steel',)
+    
 #%% Unused: separation of acetylacetone formed by TAL decarboxylation in heated fermentation broths
 
 @SystemFactory(ID = 'acetylacetone_separation_distillation_process',

@@ -49,6 +49,7 @@ def get_more_unit_groups(system,
                                         ],
                          wastewater_areas=[500,],
                          storage_and_other_facilities_areas=[600,900],
+                         has_brine_facility=True,
                          ):
     unit_groups_temp = UnitGroup.group_by_area(system.units)
     u = system.flowsheet.unit
@@ -79,8 +80,10 @@ def get_more_unit_groups(system,
         unit_groups_.append(boiler_turbogenerator_group)
     
     if 'cooling utility facilities' in groups_to_get:
+        cuf_units = [u.CT801, u.CWP802]
+        if has_brine_facility: cuf_units.append(u.CWP803)
         cooling_utility_facilities_group = UnitGroup('cooling utility facilities', 
-                                                         units=(u.CT801, u.CWP802, u.CWP803))
+                                                         units=cuf_units)
         unit_groups_.append(cooling_utility_facilities_group)
 
     # if 'other facilities' in groups_to_get:
@@ -415,3 +418,15 @@ def replace_first_instance_in_string(given_string, old_partial_string, new_parti
     
 def exclude_given_indices_from_list(given_list, given_indices):
     return [given_list[i] for i in range(len(given_list)) if not i in given_indices]
+
+def identify_accumulating_and_depleting_streams(sys, threshold_F_mol=1):
+    streams = list(sys.flowsheet.stream)
+    stream_F_mol_1 = [i.F_mol for i in streams]
+    sys.simulate()
+    stream_F_mol_2 = [i.F_mol for i in streams]
+    
+    acc_indices = [i for i in range(len(streams)) if stream_F_mol_2[i] - stream_F_mol_1[i] > threshold_F_mol]
+    
+    dep_indices = [i for i in range(len(streams)) if stream_F_mol_1[i] - stream_F_mol_2[i] > threshold_F_mol]
+    
+    return [streams[i] for i in acc_indices], [streams[i] for i in dep_indices]
