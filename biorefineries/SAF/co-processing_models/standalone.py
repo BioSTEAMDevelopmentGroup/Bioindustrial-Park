@@ -12,8 +12,8 @@ import biosteam as bst
 from biosteam.evaluation import Model, Metric
 from biosteam.evaluation.evaluation_tools.parameter import Setter
 from biorefineries.SAF._chemicals import SAF_chemicals
-from biorefineries.SAF.systems import sys, BT_sys, F, process_groups_dict, process_groups
-from biorefineries.SAF._tea import create_SAF_tea
+from biorefineries.SAF.systems_miscanthus import sys, BT_sys, F, process_groups_dict, process_groups
+from biorefineries.SAF._tea import create_SAF_coprocessing_tea
 from biorefineries.SAF._process_settings import price, GWP_CFs, load_preferences_and_process_settings
 from warnings import warn
 from warnings import filterwarnings; filterwarnings('ignore')
@@ -34,11 +34,16 @@ load_preferences_and_process_settings(T='K',
                                       CE=798, # Average 2023 https://toweringskills.com/financial-analysis/cost-indices/
                                       indicator='GWP100',
                                       electricity_EI=GWP_CFs['electricity'],
-                                      electricity_price=price['electricity'])
+                                      electricity_price=price['electricity'],
+                                      )
+sys.set_tolerance(rmol=1e-6, mol=1e-5, maxiter=400)
 
-tea_SAF = create_SAF_tea(sys=sys)
+tea_SAF = create_SAF_coprocessing_tea(sys=sys,steam_distribution=0.031, water_supply_cooling_pumping=0.057, 
+                                      water_distribution=0.025, electric_substation_and_distribution=0.0,
+                                      gas_supply_and_distribution=0.009, comminication=0.006, safety_installation=0.013,
+                                      material_storage=True, product_storage=True)
+
 sys.operating_hours = tea_SAF.operating_days * 24
-
 
 
 def set_price_of_streams():
@@ -86,7 +91,7 @@ ethanol = F.ethanol_to_storage
 jet_fuel = F.jet_fuel
 diesel = F.diesel
 gasoline = F.gasoline
-CH4_C2H6 = F.CH4_C2H6
+
 
 natural_gas = F.natural_gas
 BT = F.BT
@@ -147,7 +152,6 @@ get_cost_electricity_credit = lambda: get_excess_power() * electricity_price / j
 
 
 
-
 metrics = [Metric('Minimum selling price', get_MPSP_per_gallon, '$/gal'),
            Metric('Jet volume yield', get_jet_yield, '10^6 Gal/yr'),
            Metric('Total volume yield', get_total_yield, '10^6 Gal/yr'),
@@ -162,6 +166,7 @@ metrics = [Metric('Minimum selling price', get_MPSP_per_gallon, '$/gal'),
            #Metric('Annual product sale', get_annual_sale, '10^6 $/yr'),
            Metric('Annual electricity credit', get_electricity_credit, '10^6 $/yr'),
            Metric('Electricity credit to jet', get_cost_electricity_credit, '$/gal'),]
+           
 
            
                    
@@ -231,6 +236,11 @@ metrics.extend((Metric('Facilities_no_hu_group-heating demand',
                                               if hu.duty>0 and hu.flow>0.]) for unit in \
                                          process_groups_dict['Facilities_no_hu_group'].units])/jet_fuel_gal_per_hr(),
                       'MJ/gal'),))
+# metrics.extend((Metric('CCS-heating demand', 
+#                       lambda: 0.001*sum([sum([hu.duty for hu in unit.heat_utilities \
+#                                               if hu.duty>0 and hu.flow>0.]) for unit in \
+#                                          process_groups_dict['CCS'].units])/jet_fuel_gal_per_hr(),
+#                       'MJ/gal'),))
 
 
     
@@ -285,7 +295,11 @@ metrics.extend((Metric('Facilities_no_hu_group-cooling demand',
                                               if hu.duty<0 and hu.flow>0.]) for unit in \
                                          process_groups_dict['Facilities_no_hu_group'].units])/jet_fuel_gal_per_hr(),
                       'MJ/gal'),))
-
+# metrics.extend((Metric('CCS-cooling demand', 
+#                       lambda: 0.001*sum([sum([hu.duty for hu in unit.heat_utilities \
+#                                               if hu.duty<0 and hu.flow>0.]) for unit in \
+#                                          process_groups_dict['CCS'].units])/jet_fuel_gal_per_hr(),
+#                       'MJ/gal'),))
     
     
 # Installed equipment cost
@@ -316,7 +330,9 @@ metrics.extend((Metric('CT_group - installed equipment cost',
 metrics.extend((Metric('Facilities_no_hu_group - installed equipment cost',
                        lambda:process_groups_dict['Facilities_no_hu_group'].get_installed_cost(),
                        '10^6 $'),))
-
+# metrics.extend((Metric('CCS-installed equipment cost', 
+#                       lambda: process_groups_dict['CCS'].get_installed_cost(),
+#                        '10^6 $'),))
 
 
 # Power utility demand in MW/gal
@@ -347,12 +363,14 @@ metrics.extend((Metric('CT_group - power utility demand',
 metrics.extend((Metric('Facilities_no_hu_group - power utility demand',
                        lambda:process_groups_dict['Facilities_no_hu_group'].get_electricity_consumption()/jet_fuel_gal_per_hr(),
                        'MW/gal'),))  
-
+# metrics.extend((Metric('CCS - power utility demand',
+#                        lambda:process_groups_dict['CCS'].get_electricity_consumption()/jet_fuel_gal_per_hr(),
+#                        'MW/gal'),))  
 
 
 # Material cost
 TEA_feeds = [i for i in sys.feeds if i.price]
-TEA_products = [i for i in sys.products if i.price]
+# TEA_products = [i for i in sys.products if i.price]
 
 def get_material_cost_breakdown():
     group_material_costs = {}
@@ -378,45 +396,6 @@ def get_material_cost_breakdown_fractional():
         mcbf_dict[k] = mcb_dict[k]/sum_all
     return mcbf_dict
 
-def get_main_chem(feed):
-    feed_main_chem = None
-    main_chem_flow = 0.
-    for chem in SAF_chemicals:
-        chem_ID = chem.ID
-        feed_imol_chem = feed.imol[chem_ID]
-        if feed_imol_chem>main_chem_flow and not (chem_ID=='H2O' or chem_ID=='Water'):
-            main_chem_flow = feed_imol_chem
-            feed_main_chem = chem_ID
-    return feed_main_chem
-
-def get_material_cost_breakdown_breakdown():
-    group_material_costs = {}
-    for group in process_groups:
-        group_material_costs[group.name] = {}
-    counted_feeds =[]
-    for feed in TEA_feeds:
-        for group in process_groups:
-            if group.name != 'Facilities_no_hu_group':
-                for unit in group.units:
-                    for instream in unit.ins:
-                        if instream.shares_flow_rate_with(feed) and not feed in counted_feeds:
-                            feed_main_chem = get_main_chem(feed)
-                            group_material_costs[group.name][feed_main_chem]= feed.price*feed.F_mass/jet_fuel_gal_per_hr()
-                            counted_feeds.append(feed)
-    group_material_costs['BT_group']['NG'] = BT.natural_gas_price*BT.natural_gas.F_mass/jet_fuel_gal_per_hr()
-    return group_material_costs
-
-def get_material_cost_breakdown_breakdown_fractional():
-    mcbb_dict = get_material_cost_breakdown_breakdown()
-    mcbbf_dict = {}
-    for group in process_groups:
-        mcbbf_dict[group.name] = {}
-    for k1,v1 in mcbb_dict.items():
-        v1_items = v1.items()
-        sum_all = sum([v for k,v in v1_items])
-        for k2, v2 in v1_items:
-            mcbbf_dict[k1][k2] = v2/sum_all
-    return mcbbf_dict    
 
 metrics.extend((Metric('Preprocessing_group - material cost',
                        lambda:get_material_cost_breakdown()['Preprocessing_group'],
@@ -453,7 +432,9 @@ metrics.extend((Metric('CT_group - material cost',
 metrics.extend((Metric('Facilities_no_hu_group - material cost',
                        lambda:get_material_cost_breakdown()['Facilities_no_hu_group'],
                        '$/gal'),))
-
+# metrics.extend((Metric('CCS - material cost',
+#                        lambda:get_material_cost_breakdown()['CCS'],
+#                        '$/gal'),))
 
 # 3. LCA
 # in g CO2 eq / MJ blend fuel
@@ -462,34 +443,26 @@ _total_energy_per_year = lambda: _total_energy_per_hr() * sys.operating_hours
 
 main_product = [jet_fuel]
 coproducts = [diesel, gasoline]
-impurities = [CH4_C2H6] # not counted here
+#impurities = [CH4_C2H6] # not counted here
 
 emissions = [i for i in F.stream if i.source and not i.sink and i not in main_product and i not in coproducts]
 
+
 # Carbon balance
 total_C_in = sum([feed.get_atomic_flow('C') for feed in sys.feeds])
-total_C_out = sum([i.get_atomic_flow('C') for i in emissions]) + sum([i.get_atomic_flow('C') for i in main_product]) + sum([i.get_atomic_flow('C') for i in coproducts])
+total_C_out = sum([i.get_atomic_flow('C') for i in emissions]) + sum([i.get_atomic_flow('C') for i in main_product]) +\
+              sum([i.get_atomic_flow('C') for i in coproducts]) 
 C_bal_error = (total_C_out - total_C_in)/total_C_in
 
 # Feedstock contribution
 get_GWP_feedstock_input = lambda: sys.get_material_impact(feedstock, key='GWP100') * 1000 / _total_energy_per_year()
 
-#get_feedstock_CO2_capture = lambda: feedstock.get_atomic_flow('C') * SAF_chemicals.CO2.MW / _total_energy_per_hr()
-
-#get_GWP_feedstock = lambda: get_GWP_feedstock_input() - get_feedstock_CO2_capture()
-
-#get_GWP_emissions_EOL = lambda: (sum([stream.get_atomic_flow('C') for stream in main_product]) + sum([stream.get_atomic_flow('C') for stream in coproducts])) \
-                               # * SAF_chemicals.CO2.MW / _total_energy_per_hr()
-
-# get_GWP_emissions_process = lambda: sum([stream.get_atomic_flow('C') for stream in emissions]) * SAF_chemicals.CO2.MW * 1000/ _total_energy_per_hr()
-
-#get_GWP_emissions_total = lambda: get_GWP_emissions_process() + get_GWP_emissions_EOL()
-
-get_GWP_emission_CSL = lambda: F.CSL.get_atomic_flow('C') * SAF_chemicals.CO2.MW * 1000 / _total_energy_per_hr()
-# BT contribution to direct emissions
+# Only consider non-biogenic emissions (M301+CSL+NG)
+get_GWP_emissions_non_BT = lambda: (F.CSL.get_atomic_flow('C') + F.enzyme_M301.get_atomic_flow('C'))\
+                                  * SAF_chemicals.CO2.MW * 1000 / _total_energy_per_hr()
+# NG emissions (BT)
 get_GWP_emissions_BT = lambda: F.natural_gas.get_atomic_flow('C') * SAF_chemicals.CO2.MW * 1000 / _total_energy_per_hr()
 
-#get_GWP_captured = lambda: F.compressed_CO2.get_atomic_flow('C') * SAF_chemicals.CO2.MW * 1000 / _total_energy_per_hr()
 
 # get_GWP_emissions_without_BT = lambda: get_GWP_emissions_process() - get_GWP_emissions_BT()
 
@@ -500,13 +473,13 @@ get_GWP_NG = lambda: sys.get_material_impact(natural_gas, key='GWP100') * 1000 /
 
 get_GWP_caustic = lambda: (sys.get_material_impact(F.NaOH, key='GWP100') + sys.get_material_impact(F.caustic, key='GWP100')) * 1000 / _total_energy_per_year()
 
-get_GWP_lime = lambda: (sys.get_material_impact(F.lime, key='GWP100') + sys.get_material_impact(F.lime_boiler, key='GWP100')) * 1000 / _total_energy_per_year()
+# get_GWP_lime = lambda: (sys.get_material_impact(F.lime, key='GWP100') + sys.get_material_impact(F.lime_boiler, key='GWP100')) * 1000 / _total_energy_per_year()
 
 get_GWP_other_materials = lambda: get_GWP_material_total()  - get_GWP_feedstock_input() - get_GWP_NG()
 
 # Total = emission + material
 #get_GWP_total = lambda: get_GWP_emissions_total() + get_GWP_material_total()
-get_GWP_total = lambda: get_GWP_material_total() + get_GWP_emissions_BT() + get_GWP_emission_CSL()
+get_GWP_total = lambda: get_GWP_material_total() + get_GWP_emissions_BT() + get_GWP_emissions_non_BT()
 
 # Electricity (BT satisfies all electricity in system by buying natural gas if needed, no buying electricity)
 get_electricity_use_offset_total = lambda: sum(i.power_utility.rate for i in sys.units) # .= 0 per hour
@@ -577,13 +550,13 @@ metrics.extend((Metric('GWP - other materials', get_GWP_other_materials, 'g CO2-
 
 metrics.extend((Metric('GWP - caustic', get_GWP_caustic, 'g CO2-eq/MJ blend fuel', 'LCA'),))
 
-metrics.extend((Metric('GWP - lime', get_GWP_lime, 'g CO2-eq/MJ blend fuel', 'LCA'),))
+# metrics.extend((Metric('GWP - lime', get_GWP_lime, 'g CO2-eq/MJ blend fuel', 'LCA'),))
 
 metrics.extend((Metric('GWP - electricity', get_GWP_electricity_use_total, 'g CO2-eq/MJ blend fuel', 'LCA'),))
 
 metrics.extend((Metric('GWP - non biogenic emissions', get_GWP_emissions_BT, 'g CO2-eq/MJ blend fuel', 'LCA'),))
 
-metrics.extend((Metric('GWP - other non biogenic emissions', get_GWP_emission_CSL, 'g CO2-eq/MJ blend fuel', 'LCA'),))
+metrics.extend((Metric('GWP - other non biogenic emissions', get_GWP_emissions_non_BT, 'g CO2-eq/MJ blend fuel', 'LCA'),))
 
 metrics.extend((Metric('GWP - heating_demand', get_GWP_heating_demand, 'g CO2-eq/MJ blend fuel', 'LCA'),))
 
@@ -596,8 +569,8 @@ metrics.extend((Metric('GWP - jet', get_GWP_jet, 'g CO2-eq/MJ jet fuel', 'LCA'),
 #%%
 
 def create_model(system=sys,
-                 metric=metrics,
-                 N=2000,
+                 metrics=metrics,
+                 N=2000 ,
                  rule='L',
                  notify_runs=10,):
     model = Model(sys,metrics)
@@ -664,15 +637,6 @@ def create_model(system=sys,
            baseline=ash_disposal_price, distribution=D)
     def set_ash_disposal_price(price):
         F.ash.price = price
-
-
-
-    H3PO4_price = price['H3PO4']
-    D = shape.Triangle(H3PO4_price*0.8, H3PO4_price, H3PO4_price*1.2)
-    @param(name='H3PO4 price', element='H3PO4', kind='isolated', units='$/kg',
-           baseline=H3PO4_price, distribution=D)
-    def set_H3PO4_price(price):
-        F.H3PO4.price = price
 
 
 
@@ -755,6 +719,23 @@ def create_model(system=sys,
     def set_hydrogen_price(price):
         F.hydrogen.price = price
 
+
+
+    # MEA_price = price['MEA']
+    # D = shape.Uniform(MEA_price*0.7, MEA_price*1.3)
+    # @param(name='MEA price', element='makeup_MEA', kind='isolated', units='$/kg',
+    #        baseline=MEA_price, distribution=D)
+    # def set_MEA_price(price):
+    #     F.makeup_MEA.price = price
+
+
+
+    # CO2_TS_price = price['compressed CO2']
+    # D = shape.Uniform(CO2_TS_price*1.5, CO2_TS_price*0.5)
+    # @param(name='CO2 TS price', element='compressed CO2', kind='isolated', units='$/kg',
+    #        baseline=CO2_TS_price, distribution=D)
+    # def set_CO2_TS_price(price):
+    #     F.compressed_CO2.price = price
 
     ###### Coproduct price ######
     diesel_price = price['diesel']
@@ -954,6 +935,7 @@ def create_model(system=sys,
         R404.tau = X
 
 
+
     D = shape.Uniform(7884*0.8,7884)
     @param(name='Hydrogenation catalyst longevity', element=R404, kind='coupled', units='hr',
            baseline=7884, distribution=D)
@@ -965,11 +947,19 @@ def create_model(system=sys,
     ##### Facilities parameter #####
     BT = F.BT
     D = shape.Uniform(0.8*(1-0.1), 0.8*(1+0.1))
-    @param(name='Boiler efficiency', element=BT, kind='coupled', units='%',
+    @param(name='Boiler efficiency', element=BT, kind='coupled', units='',
            baseline=0.8, distribution=D)
     def set_boiler_efficiency(efficiency):
         BT.boiler_efficiency = efficiency
 
+
+
+    # CCS1 = F.CCS1
+    # D = shape.Triangle(0.3,0.45,0.6)
+    # @param(name='CO2 capture ratio', element=CCS1, kind='coupled', units='',
+    #        baseline=0.45, distribution=D)
+    # def set_CO2_capture(X):
+    #     CCS1.CO2_recovery = X
 
     # =============================================================================
     # LCA parameters
@@ -979,22 +969,6 @@ def create_model(system=sys,
            baseline=0.10, distribution=D)
     def set_feedstock_GWP(X):
         feedstock.characterization_factors['GWP100'] = X
-
-
-
-    D = shape.Uniform(0.86829*(1-0.5), 0.86829*(1+0.5))
-    @param(name='H3PO4 GWP', element='H3PO4', kind='isolated', units='kg CO2-eq/kg',
-           baseline=0.86829, distribution=D)
-    def set_H3PO4_GWP(X):
-        F.H3PO4.characterization_factors['GWP100'] = X
-
-
-
-    D = shape.Uniform(3.1996*(1-0.5), 3.1996*(1+0.5))
-    @param(name='Flocculant GWP', element='Flocculant', kind='isolated', units='kg CO2-eq/kg',
-           baseline=3.1996, distribution=D)
-    def set_flocculant_GWP(X):
-        F.polymer.characterization_factors['GWP100'] = X
 
 
 
@@ -1043,7 +1017,15 @@ def create_model(system=sys,
            baseline=0.4, distribution=D)
     def set_natural_gas_GWP(X):
         F.natural_gas.characterization_factors['GWP100'] = X
-        
+
+
+
+    # D = shape.Uniform(0.033*(1-0.5), 0.033*(1+0.5))
+    # @param(name='CO2 TS GWP', element='', kind='isolated', units='',
+    #        baseline=0.033, distribution=D)
+    # def set_TS_ratio(X):
+    #     TS_ratio = X
+    
     
     if N > 0:
         rule=rule
@@ -1056,19 +1038,24 @@ def create_model(system=sys,
         df_rho,df_p = model.spearman_r()
         df_rho.to_excel('df_rho.xlsx')
         df_p.to_excel('df_p.xlsx')
-        
-
-    # rule = 'L'
-    # np.random.seed(1234) # For consistent results
-    # samples = model.sample(2000,rule)
-    # model.load_samples(samples)
-    # model.evaluate(notify=10)
-    # model.show()
-    # model.table.to_excel('model_table_.xlsx')
-    # df_rho,df_p = model.spearman_r()
-    # df_rho.to_excel('df_rho_.xlsx')
-    # df_p.to_excel('df_p_.xlsx')
+    else:
+        model.show()
+    return model
+            
 
 
+
+
+
+# rule = 'L'
+# np.random.seed(1234) # For consistent results
+# samples = model.sample(2000,rule)
+# model.load_samples(samples)
+# model.evaluate(notify=10)
+# model.show()
+# model.table.to_excel('model_table_.xlsx')
+# df_rho,df_p = model.spearman_r()
+# df_rho.to_excel('df_rho_.xlsx')
+# df_p.to_excel('df_p_.xlsx')
  
 

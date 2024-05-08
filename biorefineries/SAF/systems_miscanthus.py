@@ -36,11 +36,8 @@ def preprocessing_sys(ins,outs):
     feedstock = ins
     bagasse_to_pretreatment, bagasse_to_CHP = outs
     U101 = _units.FeedStockHandling('U101', ins=feedstock, outs='')
-    U101.cost_items['System'].cost = 0.
+    # U101.cost_items['System'].cost = 0.
     S102 = bst.Splitter('S102', ins=U101-0, outs=[bagasse_to_pretreatment,bagasse_to_CHP],split=0.95)
-
-
-
 
 
 #%%
@@ -120,10 +117,14 @@ def fermentation_sys(ins,outs):
     
     @DAP_storage.add_specification(run=True)
     def update_DAP_storage_DAP():
+        R301.run()
+        R302.run()
         DAP.imass['DAP'] = S300_DAP.outs[0].F_mass + S300_DAP.outs[1].F_mass
         
     @CSL_storage.add_specification(run=True)
     def update_CSL_storage_DAP():
+        R301.run()
+        R302.run()
         CSL.imass['CSL'] = S300_CSL.outs[0].F_mass + S300_CSL.outs[1].F_mass
     
     U301 = bst.VentScrubber('U301', ins=(water_U301, M302-0), 

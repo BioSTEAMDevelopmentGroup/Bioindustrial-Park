@@ -279,10 +279,14 @@ def fermentation_sys(ins,outs):
     
     @DAP_storage.add_specification(run=True)
     def update_DAP_storage_DAP():
+        R301.run()
+        R302.run()
         DAP.imass['DAP'] = S300_DAP.outs[0].F_mass + S300_DAP.outs[1].F_mass
         
     @CSL_storage.add_specification(run=True)
     def update_CSL_storage_DAP():
+        R301.run()
+        R302.run()
         CSL.imass['CSL'] = S300_CSL.outs[0].F_mass + S300_CSL.outs[1].F_mass
     
     U301 = bst.VentScrubber('U301', ins=(water_U301, M302-0), 
