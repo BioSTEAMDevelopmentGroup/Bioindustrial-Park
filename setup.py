@@ -60,5 +60,5 @@ setup(
                  'Topic :: Scientific/Engineering',
                  'Topic :: Scientific/Engineering :: Chemistry',
                  'Topic :: Scientific/Engineering :: Mathematics'],
-    keywords='chemical process simmulation bioprocess engineering mass CABBI biorefinery biofuel bioproducts lipid-cane corn stover',
+    keywords='chemical process simulation bioprocess engineering mass CABBI biorefinery biofuel bioproducts lipid-cane corn stover',
 )
