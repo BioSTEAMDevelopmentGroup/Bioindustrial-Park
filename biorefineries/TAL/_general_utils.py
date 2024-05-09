@@ -49,6 +49,7 @@ def get_more_unit_groups(system,
                                         ],
                          wastewater_areas=[500,],
                          storage_and_other_facilities_areas=[600,900],
+                         has_brine_facility=True,
                          ):
     unit_groups_temp = UnitGroup.group_by_area(system.units)
     u = system.flowsheet.unit
@@ -79,8 +80,10 @@ def get_more_unit_groups(system,
         unit_groups_.append(boiler_turbogenerator_group)
     
     if 'cooling utility facilities' in groups_to_get:
+        cuf_units = [u.CT801, u.CWP802]
+        if has_brine_facility: cuf_units.append(u.CWP803)
         cooling_utility_facilities_group = UnitGroup('cooling utility facilities', 
-                                                         units=(u.CT801, u.CWP802, u.CWP803))
+                                                         units=cuf_units)
         unit_groups_.append(cooling_utility_facilities_group)
 
     # if 'other facilities' in groups_to_get:

@@ -812,6 +812,9 @@ class HydrogenationReactor(Reactor):
     """
     _N_ins = 5
     _N_outs = 2
+    
+    TEA_operating_hours = 4320
+    
     auxiliary_unit_names = ('heat_exchanger')
     _F_BM_default = {**Reactor._F_BM_default,
             'Heat exchangers': 3.,
@@ -874,7 +877,7 @@ class HydrogenationReactor(Reactor):
         # 
         req_cat_mass_flow = cat_weight/tau
         current_cat_mass_flow = recovered_catalyst.imass['NiSiO2']
-        spent_catalyst_mass_flow = self.spent_catalyst_replacements_per_year*cat_weight/self.system.TEA.operating_hours # kg/h
+        spent_catalyst_mass_flow = self.spent_catalyst_replacements_per_year*cat_weight/self.TEA_operating_hours # kg/h
         current_cat_mass_flow-=spent_catalyst_mass_flow
         
         spent_catalyst.phase = 's'
@@ -894,7 +897,15 @@ class HydrogenationReactor(Reactor):
         Reactor._design(self)
         duty = sum([i.H for i in self.outs]) - sum([i.H for i in self.ins])
         mixed_feed = tmo.Stream()
+        
+        for i in self.outs: i.phase = 'l'
         mixed_feed.mix_from(self.outs)
+        for i in self.outs:
+            if i.imol['NiSiO2']:
+                i.phases = ('l', 's')
+                i.imol['s', 'NiSiO2'] = i.imol['l', 'NiSiO2']
+                i.imol['l', 'NiSiO2'] = 0.
+            
         mixed_feed.T=self.ins[0].T
         # mixed_feed.vle(T=mixed_feed.T, P=mixed_feed.P)
         self.heat_exchanger.simulate_as_auxiliary_exchanger(ins=(mixed_feed,), 
@@ -917,6 +928,8 @@ class DehydrationReactor(Reactor):
     _N_ins = 4
     _N_outs = 2
     
+    TEA_operating_hours = 4320
+    
     auxiliary_unit_names = ('heat_exchanger')
     
     _F_BM_default = {**Reactor._F_BM_default,
@@ -934,7 +947,7 @@ class DehydrationReactor(Reactor):
             ])
     HMTHP_to_PSA_rxn = dehydration_rxns[0]
     
-    spent_catalyst_replacements_per_year = 5. # number of times the entire catalyst_weight is replaced per year
+    spent_catalyst_replacements_per_year = 1. # number of times the entire catalyst_weight is replaced per year
     
     def _init(self,  
                  tau = 17.8, # from Huber group
@@ -964,7 +977,7 @@ class DehydrationReactor(Reactor):
         
         req_cat_mass_flow = cat_weight/tau
         current_cat_mass_flow = recovered_catalyst.imass['Amberlyst70_']
-        spent_catalyst_mass_flow = self.spent_catalyst_replacements_per_year*cat_weight/self.system.TEA.operating_hours # kg/h
+        spent_catalyst_mass_flow = self.spent_catalyst_replacements_per_year*cat_weight/self.TEA_operating_hours # kg/h
         current_cat_mass_flow-=spent_catalyst_mass_flow
         
         spent_catalyst.phase = 's'
@@ -982,7 +995,15 @@ class DehydrationReactor(Reactor):
         Reactor._design(self)
         duty = sum([i.H for i in self.outs]) - sum([i.H for i in self.ins])
         mixed_feed = tmo.Stream()
+        
+        for i in self.outs: i.phase = 'l'
         mixed_feed.mix_from(self.outs)
+        for i in self.outs:
+            if i.imol['Amberlyst70_']:
+                i.phases = ('l', 's')
+                i.imol['s', 'Amberlyst70_'] = i.imol['l', 'Amberlyst70_']
+                i.imol['l', 'Amberlyst70_'] = 0.
+                
         mixed_feed.T=self.ins[0].T
         # mixed_feed.vle(T=mixed_feed.T, P=mixed_feed.P)
         self.heat_exchanger.simulate_as_auxiliary_exchanger(ins=(mixed_feed,), 

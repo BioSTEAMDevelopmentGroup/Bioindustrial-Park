@@ -26,7 +26,7 @@ from warnings import warn
 from flexsolve import aitken_secant
 from biosteam import Unit
 from biosteam.units import Flash, HXutility, Mixer, MixTank, Pump, \
-    SolidsSeparator, StorageTank, LiquidsSplitSettler, StirredTankReactor
+    SolidsSeparator, StorageTank, LiquidsSplitSettler, StirredTankReactor, Compressor
 from biosteam.units.decorators import cost
 from thermosteam import Stream, MultiStream
 from biorefineries.HP.process_settings import price
@@ -614,7 +614,12 @@ class CoFermentation(Reactor):
     effluent_titer = 0
     
     productivity = 0.76 # in g/L/hr
-
+    
+    fraction_of_biomass_C_from_CO2 = 0.
+    
+    CO2_safety_factor = 3.
+    
+    
     def _init(self, thermo=None, *, T=30.+273.15,
                   P=101325, V_wf=0.8, length_to_diameter=2,
                   kW_per_m3=0.0985, # Perry's handbook
@@ -703,7 +708,7 @@ class CoFermentation(Reactor):
         self.get_acetic_acid_conc = lambda: self.outs[0].imass['AceticAcid']/self.outs[0].F_vol
     def _run(self):
         
-        sugars, feed, CSL, lime = self.ins
+        sugars, feed, CSL, lime, CO2_fresh, CO2_recycled = self.ins
         
         effluent, vapor = self.outs
         effluent.mix_from([feed, sugars, CSL])
@@ -715,9 +720,18 @@ class CoFermentation(Reactor):
         
         effluent.T = vapor.T = self.T
         CSL.imass['CSL'] = (sugars.F_vol + feed.F_vol) * self.CSL_loading 
+        
         self.cofermentation_rxns(effluent.mol)
         self.CO2_generation_rxns(effluent.mol)
        
+        self.fresh_CO2_required = fresh_CO2_required = (effluent.imol['FermMicrobe']*\
+                              self.fraction_of_biomass_C_from_CO2*
+                              self.CO2_safety_factor) - CO2_recycled.imol['CO2']
+            
+        CO2_fresh.imol['CO2'] = max(0, fresh_CO2_required)
+        effluent.mix_from([effluent, CO2_fresh, CO2_recycled])
+        
+        
         vapor.imol['CO2'] = effluent.imol['CO2']
         vapor.phase = 'g'
         
@@ -741,6 +755,11 @@ class CoFermentation(Reactor):
             self.vessel_material= 'Stainless steel 316'
             lime.empty()
         self.effluent_titer = compute_HP_titer(effluent)
+        
+        self.abs_mass_bal_diff_CO2_added_to_vent = abs_mass_bal_diff_CO2_added_to_vent = \
+            max(0, self.mol_atom_in('C')-self.mol_atom_out('C'))
+        
+        vapor.imol['CO2'] += abs_mass_bal_diff_CO2_added_to_vent
         
     def _design(self):
         super()._setup()
@@ -790,7 +809,11 @@ class CoFermentation(Reactor):
             
 
 
-
+    def mol_atom_in(self, atom):
+        return sum([stream.get_atomic_flow(atom) for stream in self.ins])
+    
+    def mol_atom_out(self, atom):
+        return sum([stream.get_atomic_flow(atom) for stream in self.outs])
 
 # %% 
 
@@ -1226,3 +1249,31 @@ class HPPump(Pump):
         else: Pump._cost(self)
         
 
+#%% IsothermalCompressor 
+
+# Same as bst.IsothermalCompressor, except that it allows switching with compressible gases 
+# in specification while correctly calculating power requirements
+
+
+class IsothermalCompressor(Compressor, new_graphics=False):
+    def _run(self):
+        feed = self.ins[0]
+        out = self.outs[0]
+        self.ideal_power, self.ideal_duty = None, None
+        out.copy_like(feed)
+        out.P = self.P
+        out.T = feed.T
+        if self.vle is True: out.vle(T=out.T, P=out.P)
+        self.ideal_power, self.ideal_duty = self._calculate_ideal_power_and_duty()
+
+    def _design(self):
+        super()._design()
+        feed = self.ins[0]
+        outlet = self.outs[0]
+        (ideal_power, ideal_duty) = self._calculate_ideal_power_and_duty() if not (self.ideal_power and self.ideal_duty) else (self.ideal_power, self.ideal_duty)
+        Q = ideal_duty / self.eta
+        self.add_heat_utility(unit_duty=Q, T_in=feed.T, T_out=outlet.T)
+        self.design_results['Ideal power'] = ideal_power # kW
+        self.design_results['Ideal duty'] = ideal_duty # kJ / hr
+        self._set_power(ideal_power / self.eta)
+        

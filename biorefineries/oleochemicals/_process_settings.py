@@ -17,8 +17,6 @@ from biorefineries.oleochemicals.prices_and_GWP_factors import prices_per_stream
 def load_preferences_and_process_settings(T,flow_units,N,P_units,CE,
                                           indicator,electricity_price,
                                           electricity_EI,
-                                          heat_transfer_efficiency,
-                                          power_utility_price,
                                           ):    
     bst.preferences.T = T
     bst.preferences.flow = flow_units
@@ -29,14 +27,16 @@ def load_preferences_and_process_settings(T,flow_units,N,P_units,CE,
     bst.preferences.save()
     bst.settings.CEPCI = CE  
     bst.settings.define_impact_indicator(key=indicator, units='kg*CO2e')
-    bst.settings.set_electricity_CF(indicator,electricity_EI, basis='kWhr', units='kg*CO2e')
-    bst.process_tools.default_utilities()
+    bst.settings.set_electricity_CF(indicator,electricity_EI, electricity_EI,
+                                    basis='kWhr', units='kg*CO2e')
     bst.settings.electricity_price = electricity_price
     lps = bst.HeatUtility.get_heating_agent('low_pressure_steam')
     mps = bst.HeatUtility.get_heating_agent('medium_pressure_steam')
     hps = bst.HeatUtility.get_heating_agent('high_pressure_steam')
-    mps.T = 233 + 273.15
-    hps.T = 266 + 273.15
+    lps.T = 412.189 #default biosteam value
+    mps.T = 233 + 273.15 #default biosteam value
+    hps.T = 310+273.15 #saturated temperature, K [9]
+    hps.P = 10000*1000 #saturated pressure at hps.T [9]
     cooling = bst.HeatUtility.get_cooling_agent('cooling_water')
     cooling.T = 28 + 273.15
     cooling.T_limit = cooling.T + 9
@@ -46,7 +46,6 @@ def load_preferences_and_process_settings(T,flow_units,N,P_units,CE,
     #The regeneration and heat transfer prices given are accounted for by the capital cost.        
     bst.settings.get_agent('cooling_water').regeneration_price = 0
     bst.settings.get_agent('chilled_water').heat_transfer_price = 0
-    # bst.PowerUtility.price = power_utility_price 
 
 
 #Feedstock type can be either HoySoy or HoSun
@@ -136,8 +135,8 @@ def tea_azelaic_baseline(system,WC_over_FCI,operating_days,payrate,IRR):
     tea_azelaic_baseline = TEA_baseline(lang_factor=None,
     system = system,    
     IRR=IRR,  
-    duration=(2022, 2032),
-    depreciation='MACRS7',#MARCS used in [1] was not available in Biosteam to us  
+    duration=(2022, 2052), #assumption, 30 years
+    depreciation='MACRS7',#MARCS used in [1] was not available in Biosteam 
     income_tax=0.29+0.05,  #First value denotes federal corporate income tax for Illinois, second value denotes 
     #state income tax for Illinois [2],[3]
     operating_days=operating_days,  # Uncertain, can be varied
@@ -201,5 +200,6 @@ def tea_azelaic_baseline(system,WC_over_FCI,operating_days,payrate,IRR):
 #[6]https://doi.org/10.1016/j.indcrop.2020.112411
 #[7]Warren Sider
 #[8]# Ref(Turton et al., 2013)
+#[9]https://toolbox.tlv.com/global/US/calculator/steam-table-pressure.html
  
 

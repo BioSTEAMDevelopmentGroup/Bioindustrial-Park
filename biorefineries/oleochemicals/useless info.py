@@ -706,3 +706,520 @@ return  heat_duty_handled_by_BT901 #KJ/yr
 # plt.suptitle('Impact of change in %L and %Ln on MPSP[$/kg] at constant 85% O at different %P')
 # plt.tight_layout()
 # plt.show()
+
+#IEC related
+def boiler_IEC():
+    df_unit_groups = df_related()
+    return df_unit_groups['Installed equipment cost']['Boilerturbogenerator']
+
+def Transesterification_IEC():
+    df_unit_groups = df_related()
+    return df_unit_groups['Installed equipment cost']['Transesterification']
+
+def AA_recovery_IEC():
+    df_unit_groups = df_related()
+    return df_unit_groups['Installed equipment cost']['Azelaic acid and heavy tails recovery'] 
+
+def Dih_IEC():
+    df_unit_groups = df_related()
+    return df_unit_groups['Installed equipment cost']['Dihydroxylation'] 
+
+def OX_cl_IEC():
+    df_unit_groups = df_related()
+    return df_unit_groups['Installed equipment cost']['Oxidative cleavage'] 
+
+def Wastewater_IEC():
+    df_unit_groups = df_related()
+    return df_unit_groups['Installed equipment cost']['Wastewater treatment']
+
+def Other_facility_IEC():
+    df_unit_groups = df_related()
+    return df_unit_groups['Installed equipment cost']['Other Facilities (cooling tower,air distribution and cleaning auxiliaries)']
+
+
+#Heating demand related
+def Dih_heating_demand():
+    df_unit_groups = df_related()
+    return df_unit_groups['Heating duty']['Dihydroxylation']
+
+def OX_cl_heating_demand():
+    df_unit_groups = df_related()
+    return df_unit_groups['Heating duty']['Oxidative cleavage']
+
+
+def AA_recovery_heating_demand():
+    df_unit_groups = df_related()
+    return df_unit_groups['Heating duty']['Azelaic acid and heavy tails recovery']
+
+def PA_recovery_heating_demand():
+    df_unit_groups = df_related()
+    return df_unit_groups['Heating duty']['Pelargonic acid and C5-C8 fraction recovery']
+
+def Transes_heating_demand():
+    df_unit_groups = df_related()
+    return df_unit_groups['Heating duty']['Transesterification']
+
+#Cooling demand related
+def AA_recovery_cooling_demand():
+    df_unit_groups = df_related()
+    return df_unit_groups['Cooling duty']['Azelaic acid and heavy tails recovery']
+
+def other_facilities_cooling_demand():
+    df_unit_groups = df_related()
+    return df_unit_groups['Cooling duty']['Other Facilities (cooling tower,air distribution and cleaning auxiliaries)']
+
+def Dihydroxylation_cooling_demand():
+    df_unit_groups = df_related()
+    return df_unit_groups['Cooling duty']['Dihydroxylation']
+
+def Oxidative_cleavage_cooling_demand():
+    df_unit_groups = df_related()
+    return df_unit_groups['Cooling duty']['Oxidative cleavage']
+
+#Electricity consumption
+def PA_recovery_electricity_consumption():
+    df_unit_groups = df_related()
+    return df_unit_groups['Electricity consumption']['Pelargonic acid and C5-C8 fraction recovery']
+
+def other_facilities_electricity_consumption():
+    df_unit_groups = df_related()
+    return df_unit_groups['Electricity consumption']['Other Facilities (cooling tower,air distribution and cleaning auxiliaries)']
+
+def AA_recovery_electricity_consumption():
+    df_unit_groups = df_related()
+    return df_unit_groups['Electricity consumption']['Azelaic acid and heavy tails recovery']
+
+def Dih_electricity_consumption():
+    df_unit_groups = df_related()
+    return df_unit_groups['Electricity consumption']['Dihydroxylation']
+
+def OX_cl_electricity_consumption():
+    df_unit_groups = df_related()
+    return df_unit_groups['Electricity consumption']['Oxidative cleavage']
+
+def Transesterification_MC():
+    df_unit_groups = df_related()
+    return df_unit_groups['Material cost']['Transesterification']
+
+def Dih_MC():
+    df_unit_groups = df_related()
+    return df_unit_groups['Material cost']['Dihydroxylation']
+
+def OX_cl_MC():
+    df_unit_groups = df_related()
+    return df_unit_groups['Material cost']['Oxidative cleavage'] 
+    
+def Cat_rec_MC():
+    df_unit_groups = df_related()
+    return df_unit_groups['Material cost']['Catalyst recovery']  
+    
+def AA_rec_MC():
+    df_unit_groups = df_related()
+    return df_unit_groups['Material cost']['Azelaic acid and heavy tails recovery'] 
+    
+def BT_MC():
+    df_unit_groups = df_related()
+    return df_unit_groups['Material cost']['Boilerturbogenerator'] 
+
+def WWT_MC():
+    df_unit_groups = df_related()
+    return df_unit_groups['Material cost']['Wastewater treatment'] 
+
+def OF_MC():
+    df_unit_groups = df_related()
+    return df_unit_groups['Material cost']['Other Facilities (cooling tower,air distribution and cleaning auxiliaries)'] 
+
+def Pel_rec_MC():
+    df_unit_groups = df_related()
+    return df_unit_groups['Material cost']['Pelargonic acid and C5-C8 fraction recovery']
+    
+#IEC related
+def boiler_IEC_1():
+    df_unit_groups = df_related_non_fraction()
+    return df_unit_groups['Installed equipment cost [MM$]']['Boilerturbogenerator']
+
+def Transesterification_IEC_1():
+    df_unit_groups = df_related_non_fraction()
+    return df_unit_groups['Installed equipment cost [MM$]']['Transesterification']
+
+def AA_recovery_IEC_1():
+    df_unit_groups = df_related_non_fraction()
+    return df_unit_groups['Installed equipment cost [MM$]']['Azelaic acid and heavy tails recovery'] 
+
+def Dih_IEC_1():
+    df_unit_groups = df_related_non_fraction()
+    return df_unit_groups['Installed equipment cost [MM$]']['Dihydroxylation'] 
+
+def OX_cl_IEC_1():
+    df_unit_groups = df_related_non_fraction()
+    return df_unit_groups['Installed equipment cost [MM$]']['Oxidative cleavage'] 
+
+#Heating demand related
+def Dih_heating_demand_1():
+    df_unit_groups = df_related_non_fraction()
+    return df_unit_groups['Heating duty [GJ/hr]']['Dihydroxylation']
+
+def OX_cl_heating_demand_1():
+    df_unit_groups = df_related_non_fraction()
+    return df_unit_groups['Heating duty [GJ/hr]']['Oxidative cleavage']
+
+
+def AA_recovery_heating_demand_1():
+    df_unit_groups = df_related_non_fraction()
+    return df_unit_groups['Heating duty [GJ/hr]']['Azelaic acid and heavy tails recovery']
+
+def PA_recovery_heating_demand_1():
+    df_unit_groups = df_related_non_fraction()
+    return df_unit_groups['Heating duty [GJ/hr]']['Pelargonic acid and C5-C8 fraction recovery']
+
+def Transes_heating_demand_1():
+    df_unit_groups = df_related_non_fraction()
+    return df_unit_groups['Heating duty [GJ/hr]']['Transesterification']
+
+#Cooling demand related
+def AA_recovery_cooling_demand_1():
+    df_unit_groups = df_related_non_fraction()
+    return df_unit_groups['Cooling duty [GJ/hr]']['Azelaic acid and heavy tails recovery']
+
+def other_facilities_cooling_demand_1():
+    df_unit_groups = df_related_non_fraction()
+    return df_unit_groups['Cooling duty [GJ/hr]']['Other Facilities (cooling tower,air distribution and cleaning auxiliaries)']
+
+def Dihydroxylation_cooling_demand_1():
+    df_unit_groups = df_related_non_fraction()
+    return df_unit_groups['Cooling duty [GJ/hr]']['Dihydroxylation']
+
+def Oxidative_cleavage_cooling_demand_1():
+    df_unit_groups = df_related_non_fraction()
+    return df_unit_groups['Cooling duty [GJ/hr]']['Oxidative cleavage']
+
+#Electricity consumption
+def PA_recovery_electricity_consumption_1():
+    df_unit_groups = df_related_non_fraction()
+    return df_unit_groups['Electricity consumption [MW]']['Pelargonic acid and C5-C8 fraction recovery']
+
+def other_facilities_electricity_consumption_1():
+    df_unit_groups = df_related_non_fraction()
+    return df_unit_groups['Electricity consumption [MW]']['Other Facilities (cooling tower,air distribution and cleaning auxiliaries)']
+
+def AA_recovery_electricity_consumption_1():
+    df_unit_groups = df_related_non_fraction()
+    return df_unit_groups['Electricity consumption [MW]']['Azelaic acid and heavy tails recovery']
+
+def Dih_electricity_consumption_1():
+    df_unit_groups = df_related_non_fraction()
+    return df_unit_groups['Electricity consumption [MW]']['Dihydroxylation']
+
+def OX_cl_electricity_consumption_1():
+    df_unit_groups = df_related_non_fraction()
+    return df_unit_groups['Electricity consumption [MW]']['Oxidative cleavage']
+
+def Transesterification_MC_1():
+    df_unit_groups = df_related_non_fraction()
+    return df_unit_groups['Material cost [USD/hr]']['Transesterification']
+
+def Dih_MC_1():
+    df_unit_groups = df_related_non_fraction()
+    return df_unit_groups['Material cost [USD/hr]']['Dihydroxylation']
+
+def OX_cl_MC_1():
+    df_unit_groups = df_related_non_fraction()
+    return df_unit_groups['Material cost [USD/hr]']['Oxidative cleavage'] 
+    
+def Cat_rec_MC_1():
+    df_unit_groups = df_related_non_fraction()
+    return df_unit_groups['Material cost [USD/hr]']['Catalyst recovery']  
+    
+def AA_rec_MC_1():
+    df_unit_groups = df_related_non_fraction()
+    return df_unit_groups['Material cost [USD/hr]']['Azelaic acid and heavy tails recovery'] 
+    
+def BT_MC_1():
+    df_unit_groups = df_related_non_fraction()
+    return df_unit_groups['Material cost [USD/hr]']['Boilerturbogenerator'] 
+
+def WWT_MC_1():
+    df_unit_groups = df_related_non_fraction()
+    return df_unit_groups['Material cost [USD/hr]']['Wastewater treatment'] 
+
+def OF_MC_1():
+    df_unit_groups = df_related_non_fraction()
+    return df_unit_groups['Material cost [USD/hr]']['Other Facilities (cooling tower,air distribution and cleaning auxiliaries)'] 
+
+def Pel_rec_MC_1():
+    df_unit_groups = df_related_non_fraction()
+    return df_unit_groups['Material cost [USD/hr]']['Pelargonic acid and C5-C8 fraction recovery']
+    
+def feedstock_frac_LCA():
+    return (get_feedstock_GWP()*100/get_net_GWP_PA_1())/5
+
+def other_materials_frac_LCA():
+    return (get_other_materials_impact()*100/get_net_GWP_PA_1())/5
+
+def natural_gas_frac_LCA():
+    return (get_ng_GWP()*100/get_net_GWP_PA_1())/5
+
+def direct_emission_frac_LCA():
+    return (get_total_direct_emissions_GWP()*100/get_net_GWP_PA_1())/5
+
+def products_displacement_total_frac_LCA():
+    return (-sum_displacement*100/get_net_GWP_PA_1())/5
+
+
+materials_impact_GWP_1 = lambda: (sum([aa_baseline.get_material_impact(stream,key = 'GWP100') for stream in F.crude_HO_oil_to_biodiesel.ins]))/aa_baseline.get_mass_flow(azelaic_acid)
+materials_impact_GWP_2 = lambda: (sum([aa_baseline.get_material_impact(stream,key = 'GWP100') for stream in F.dihydroxylation_system.ins]))/aa_baseline.get_mass_flow(azelaic_acid)
+materials_impact_GWP_3 = lambda: (sum([aa_baseline.get_material_impact(stream,key = 'GWP100') for stream in F.oxidative_cleavage_system.ins]))/aa_baseline.get_mass_flow(azelaic_acid)
+materials_impact_GWP_4 = lambda: (sum([aa_baseline.get_material_impact(stream,key = 'GWP100') for stream in F.organic_phase_separation_and_catalyst_recovery.ins]))/aa_baseline.get_mass_flow(azelaic_acid)
+materials_impact_GWP_5 = lambda: (sum([aa_baseline.get_material_impact(stream,key = 'GWP100') for stream in F.nonanoic_acid_fraction_separation.ins]))/aa_baseline.get_mass_flow(azelaic_acid)
+materials_impact_GWP_6 = lambda: get_internal_materials_impact()+ (sum([aa_baseline.get_material_impact(stream,key = 'GWP100') for stream in F.azelaic_acid_production.ins]))/aa_baseline.get_mass_flow(azelaic_acid)
+#facs
+materials_impact_GWP_WWT901= lambda: (sum([aa_baseline.get_material_impact(stream,key = 'GWP100') for stream in F.WWT901.ins]))/aa_baseline.get_mass_flow(azelaic_acid)
+materials_impact_GWP_BT801= lambda: (sum([aa_baseline.get_material_impact(stream,key = 'GWP100') for stream in F.BT801.ins]))/aa_baseline.get_mass_flow(azelaic_acid)
+materials_impact_GWP_CT701= lambda: (sum([aa_baseline.get_material_impact(stream,key = 'GWP100') for stream in F.CT701.ins]))/aa_baseline.get_mass_flow(azelaic_acid)
+materials_impact_GWP_CW701= lambda: (sum([aa_baseline.get_material_impact(stream,key = 'GWP100') for stream in F.CW701.ins]))/aa_baseline.get_mass_flow(azelaic_acid)
+materials_impact_GWP_PWT701= lambda: (sum([aa_baseline.get_material_impact(stream,key = 'GWP100') for stream in F.PWT701.ins]))/aa_baseline.get_mass_flow(azelaic_acid)
+sum_fac_GWP = sum([materials_impact_GWP_WWT901(),materials_impact_GWP_BT801(),
+               materials_impact_GWP_CT701(),materials_impact_GWP_CW701(),materials_impact_GWP_PWT701()])
+
+a_1 = []
+for i in F.crude_HO_oil_to_biodiesel.units:
+    for j in i.heat_utilities:
+        if j.duty > 0:
+            a_1.append(j.duty)
+heating_sum_1 = sum(a_1)/azelaic_acid.F_mass   
+heating_sum_1_GWP = heating_sum_1*total_steam_GWP()/BT_steam_kJph_total()
+#Section 2
+a_2 = []
+for i in F.dihydroxylation_system.units:
+    for j in i.heat_utilities:
+        if j.duty > 0:
+            a_2.append(j.duty)
+heating_sum_2 = sum(a_2)/azelaic_acid.F_mass 
+heating_sum_2_GWP = heating_sum_2*total_steam_GWP()/BT_steam_kJph_total()
+#Section 3            
+a_3 = []
+for i in F.oxidative_cleavage_system.units:
+    for j in i.heat_utilities:
+        if j.duty > 0:
+            a_3.append(j.duty)
+heating_sum_3 = sum(a_3)/azelaic_acid.F_mass 
+heating_sum_3_GWP = heating_sum_3*total_steam_GWP()/BT_steam_kJph_total()
+#Section 4
+a_4 = []
+for i in F.organic_phase_separation_and_catalyst_recovery.units:
+    for j in i.heat_utilities:
+        if j.duty > 0:
+            a_4.append(j.duty)
+heating_sum_4 = sum(a_4)/azelaic_acid.F_mass 
+heating_sum_4_GWP = heating_sum_4*total_steam_GWP()/BT_steam_kJph_total()
+#Section 5
+a_5 = []
+for i in F.nonanoic_acid_fraction_separation.units:
+    for j in i.heat_utilities:
+        if j.duty > 0:
+            a_5.append(j.duty)
+heating_sum_5 = sum(a_5)/azelaic_acid.F_mass 
+heating_sum_5_GWP = heating_sum_5*total_steam_GWP()/BT_steam_kJph_total()
+#Section 6
+a_6 = []
+for i in F.azelaic_acid_production.units:
+    for j in i.heat_utilities:
+        if j.duty > 0:
+            a_6.append(j.duty)
+heating_sum_6 = sum(a_6)/azelaic_acid.F_mass #KJ/ Kg
+heating_sum_6_GWP = heating_sum_6*total_steam_GWP()/BT_steam_kJph_total()
+#total a1+a2+a3 etc sums up to sum([i.duty for i in F.BT801.steam_utilities])
+
+e_1 = []
+for i in F.crude_HO_oil_to_biodiesel.units:
+    if i.power_utility:
+        e_1.append(i.power_utility.consumption)
+electricity_sum_1 = sum(e_1)*KW_to_KJ/  azelaic_acid.F_mass 
+electricity_sum_1_GWP = electricity_sum_1* total_steam_GWP()/ BT_steam_kJph_total()
+
+e_2 = []
+for i in F.dihydroxylation_system.units:
+    if i.power_utility:
+        e_2.append(i.power_utility.consumption)
+electricity_sum_2 = sum(e_2)*KW_to_KJ  /azelaic_acid.F_mass 
+electricity_sum_2_GWP = electricity_sum_2* total_steam_GWP()/ BT_steam_kJph_total()
+e_3 = []
+for i in F.oxidative_cleavage_system.units:
+    if i.power_utility:
+        e_3.append(i.power_utility.consumption)
+electricity_sum_3 = sum(e_3)*KW_to_KJ  /azelaic_acid.F_mass      
+electricity_sum_3_GWP = electricity_sum_3* total_steam_GWP()/ BT_steam_kJph_total()
+e_4 = []
+for i in F.organic_phase_separation_and_catalyst_recovery.units:
+    if i.power_utility:
+        e_4.append(i.power_utility.consumption)
+electricity_sum_4 = sum(e_4)*KW_to_KJ   /azelaic_acid.F_mass       
+electricity_sum_4_GWP = electricity_sum_4* total_steam_GWP()/ BT_steam_kJph_total()
+e_5 = []
+for i in F.nonanoic_acid_fraction_separation.units:
+    if i.power_utility:
+        e_5.append(i.power_utility.consumption)
+electricity_sum_5 = sum(e_5)*KW_to_KJ  /azelaic_acid.F_mass             
+electricity_sum_5_GWP = electricity_sum_5* total_steam_GWP()/ BT_steam_kJph_total()
+e_6 = []
+for i in F.azelaic_acid_production.units:
+    if i.power_utility:
+        e_6.append(i.power_utility.consumption)
+electricity_sum_6 = sum(e_6)*KW_to_KJ  /azelaic_acid.F_mass             
+electricity_sum_6_GWP = electricity_sum_6* total_steam_GWP()/ BT_steam_kJph_total()
+fac = []
+for i in [F.WWT901,F.CT701,F.CW701,F.PWT701,F.BT801]:
+    if i.power_utility:
+       fac.append(i.power_utility.consumption)
+electricity_sum_fac = sum(fac)*KW_to_KJ  /azelaic_acid.F_mass             
+electricity_sum_fac_GWP =  electricity_sum_fac* total_steam_GWP()/ BT_steam_kJph_total()
+
+#Emission related
+emissions_1 = [i for i in aa_baseline.products if i not in extra_streams and i not in main_product and i not in products and i not in F.ADP701.outs and i not in F.BT801.outs and i in F.crude_HO_oil_to_biodiesel.streams]
+emissions_1_GWP = lambda: sum([stream.get_atomic_flow('C') for stream in emissions_1]) * chems.CO2.MW / azelaic_acid.F_mass
+emissions_2 = [i for i in aa_baseline.products if i not in extra_streams and i not in main_product and i not in products and i not in F.ADP701.outs and i not in F.BT801.outs and i in F.dihydroxylation_system.streams]
+emissions_2_GWP = lambda: sum([stream.get_atomic_flow('C') for stream in emissions_2]) * chems.CO2.MW / azelaic_acid.F_mass
+emissions_3 = [i for i in aa_baseline.products if i not in extra_streams and i not in main_product and i not in products and i not in F.ADP701.outs and i not in F.BT801.outs and i in F.oxidative_cleavage_system.streams]
+emissions_3_GWP = lambda: sum([stream.get_atomic_flow('C') for stream in emissions_3]) * chems.CO2.MW / azelaic_acid.F_mass
+emissions_4 = [i for i in aa_baseline.products if i not in extra_streams and i not in main_product and i not in products and i not in F.ADP701.outs and i not in F.BT801.outs and i in F.organic_phase_separation_and_catalyst_recovery.streams]
+emissions_4_GWP = lambda: sum([stream.get_atomic_flow('C') for stream in emissions_4]) * chems.CO2.MW / azelaic_acid.F_mass
+emissions_5 = [i for i in aa_baseline.products if i not in extra_streams and i not in main_product and i not in products and i not in F.ADP701.outs and i not in F.BT801.outs and i in F.nonanoic_acid_fraction_separation.streams]
+emissions_5_GWP = lambda: sum([stream.get_atomic_flow('C') for stream in emissions_5]) * chems.CO2.MW / azelaic_acid.F_mass
+emissions_6 = [i for i in aa_baseline.products if i not in extra_streams and i not in main_product and i not in products and i not in F.ADP701.outs and i not in F.BT801.outs and i in F.azelaic_acid_production.streams]
+emissions_6_GWP = lambda: sum([stream.get_atomic_flow('C') for stream in emissions_6]) * chems.CO2.MW / azelaic_acid.F_mass
+#TODO: change the below
+emissions_7 = [F.fire_water_outs,F.rejected_water_and_blowdown_to_PWT, F.cooling_tower_blowdown,F.cooling_tower_evaporation,F.process_water,F.unused_clean_water,F.excess_water]
+emissions_7_GWP = lambda: sum([stream.get_atomic_flow('C') for stream in emissions_1]) * chems.CO2.MW / azelaic_acid.F_mass
+
+#IEC related
+def boiler_IEC_1():
+    df_unit_groups = df_related_non_fraction()
+    return df_unit_groups['Installed equipment cost [MM$]']['Boilerturbogenerator']
+
+def Transesterification_IEC_1():
+    df_unit_groups = df_related_non_fraction()
+    return df_unit_groups['Installed equipment cost [MM$]']['Transesterification']
+
+def AA_recovery_IEC_1():
+    df_unit_groups = df_related_non_fraction()
+    return df_unit_groups['Installed equipment cost [MM$]']['Azelaic acid and heavy tails recovery'] 
+
+def Dih_IEC_1():
+    df_unit_groups = df_related_non_fraction()
+    return df_unit_groups['Installed equipment cost [MM$]']['Dihydroxylation'] 
+
+def OX_cl_IEC_1():
+    df_unit_groups = df_related_non_fraction()
+    return df_unit_groups['Installed equipment cost [MM$]']['Oxidative cleavage'] 
+
+#Heating demand related
+def Dih_heating_demand_1():
+    df_unit_groups = df_related_non_fraction()
+    return df_unit_groups['Heating duty [GJ/hr]']['Dihydroxylation']
+
+def OX_cl_heating_demand_1():
+    df_unit_groups = df_related_non_fraction()
+    return df_unit_groups['Heating duty [GJ/hr]']['Oxidative cleavage']
+
+
+def AA_recovery_heating_demand_1():
+    df_unit_groups = df_related_non_fraction()
+    return df_unit_groups['Heating duty [GJ/hr]']['Azelaic acid and heavy tails recovery']
+
+def PA_recovery_heating_demand_1():
+    df_unit_groups = df_related_non_fraction()
+    return df_unit_groups['Heating duty [GJ/hr]']['Pelargonic acid and C5-C8 fraction recovery']
+
+def Transes_heating_demand_1():
+    df_unit_groups = df_related_non_fraction()
+    return df_unit_groups['Heating duty [GJ/hr]']['Transesterification']
+
+#Cooling demand related
+def AA_recovery_cooling_demand_1():
+    df_unit_groups = df_related_non_fraction()
+    return df_unit_groups['Cooling duty [GJ/hr]']['Azelaic acid and heavy tails recovery']
+
+def other_facilities_cooling_demand_1():
+    df_unit_groups = df_related_non_fraction()
+    return df_unit_groups['Cooling duty [GJ/hr]']['Other Facilities (cooling tower,air distribution and cleaning auxiliaries)']
+
+def Dihydroxylation_cooling_demand_1():
+    df_unit_groups = df_related_non_fraction()
+    return df_unit_groups['Cooling duty [GJ/hr]']['Dihydroxylation']
+
+def Oxidative_cleavage_cooling_demand_1():
+    df_unit_groups = df_related_non_fraction()
+    return df_unit_groups['Cooling duty [GJ/hr]']['Oxidative cleavage']
+
+#Electricity consumption
+def PA_recovery_electricity_consumption_1():
+    df_unit_groups = df_related_non_fraction()
+    return df_unit_groups['Electricity consumption [MW]']['Pelargonic acid and C5-C8 fraction recovery']
+
+def other_facilities_electricity_consumption_1():
+    df_unit_groups = df_related_non_fraction()
+    return df_unit_groups['Electricity consumption [MW]']['Other Facilities (cooling tower,air distribution and cleaning auxiliaries)']
+
+def AA_recovery_electricity_consumption_1():
+    df_unit_groups = df_related_non_fraction()
+    return df_unit_groups['Electricity consumption [MW]']['Azelaic acid and heavy tails recovery']
+
+def Dih_electricity_consumption_1():
+    df_unit_groups = df_related_non_fraction()
+    return df_unit_groups['Electricity consumption [MW]']['Dihydroxylation']
+
+def OX_cl_electricity_consumption_1():
+    df_unit_groups = df_related_non_fraction()
+    return df_unit_groups['Electricity consumption [MW]']['Oxidative cleavage']
+
+def Transesterification_MC_1():
+    df_unit_groups = df_related_non_fraction()
+    return df_unit_groups['Material cost [USD/hr]']['Transesterification']
+
+def Dih_MC_1():
+    df_unit_groups = df_related_non_fraction()
+    return df_unit_groups['Material cost [USD/hr]']['Dihydroxylation']
+
+def OX_cl_MC_1():
+    df_unit_groups = df_related_non_fraction()
+    return df_unit_groups['Material cost [USD/hr]']['Oxidative cleavage'] 
+    
+def Cat_rec_MC_1():
+    df_unit_groups = df_related_non_fraction()
+    return df_unit_groups['Material cost [USD/hr]']['Catalyst recovery']  
+    
+def AA_rec_MC_1():
+    df_unit_groups = df_related_non_fraction()
+    return df_unit_groups['Material cost [USD/hr]']['Azelaic acid and heavy tails recovery'] 
+    
+def BT_MC_1():
+    df_unit_groups = df_related_non_fraction()
+    return df_unit_groups['Material cost [USD/hr]']['Boilerturbogenerator'] 
+
+def WWT_MC_1():
+    df_unit_groups = df_related_non_fraction()
+    return df_unit_groups['Material cost [USD/hr]']['Wastewater treatment'] 
+
+def OF_MC_1():
+    df_unit_groups = df_related_non_fraction()
+    return df_unit_groups['Material cost [USD/hr]']['Other Facilities (cooling tower,air distribution and cleaning auxiliaries)'] 
+
+def Pel_rec_MC_1():
+    df_unit_groups = df_related_non_fraction()
+    return df_unit_groups['Material cost [USD/hr]']['Pelargonic acid and C5-C8 fraction recovery']
+    
+def feedstock_frac_LCA():
+    return (get_feedstock_GWP()*100/get_net_GWP_PA_1())/5
+
+def other_materials_frac_LCA():
+    return (get_other_materials_impact()*100/get_net_GWP_PA_1())/5
+
+def natural_gas_frac_LCA():
+    return (get_ng_GWP()*100/get_net_GWP_PA_1())/5
+
+def direct_emission_frac_LCA():
+    return (get_total_direct_emissions_GWP()*100/get_net_GWP_PA_1())/5
+
+def products_displacement_total_frac_LCA():
+    return (-sum_displacement*100/get_net_GWP_PA_1())/5
+

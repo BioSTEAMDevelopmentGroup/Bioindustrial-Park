@@ -41,11 +41,11 @@ import pandas as pd
 import biosteam as bst
 from biosteam.utils import TicToc
 from biosteam.plots import plot_montecarlo_across_coordinate
-from biorefineries.HP.system_light_lle_vacuum_distillation import spec, HP_sys, get_AA_MPSP, get_GWP, get_FEC, R301
+from biorefineries.HP.system_light_lle_vacuum_distillation import spec, HP_sys, get_AA_MPSP, get_GWP, get_FEC, R301, simulate_and_print
 
 # from biorefineries.HP.analyses import models # for the baseline biorefinery
 # from biorefineries.HP.analyses import models_targeted_improvements as models # for a biorefinery with targeted improvements over the baseline biorefinery
-from biorefineries.HP.analyses import models_achieved_improvements as models # for the biorefinery with achieved fermentation performance improvements
+from biorefineries.HP.analyses import models_2015 as models # for the biorefinery with achieved fermentation performance improvements
 from datetime import datetime
 
 
@@ -54,7 +54,7 @@ percentiles = [0, 0.05, 0.1, 0.25, 0.5, 0.75, 0.9, 0.95, 1]
 
 
 # %%
-
+simulate_and_print()
 # =============================================================================
 # Evaluate and organize results for Monte Carlo analysis
 # =============================================================================
@@ -69,7 +69,7 @@ R301.set_titer_limit = True
 
 # Set seed to make sure each time the same set of random numbers will be used
 np.random.seed(3221)
-N_simulation = 1000 # 1000
+N_simulation = 2000 # 1000
 samples = model.sample(N=N_simulation, rule='L')
 model.load_samples(samples)
 
@@ -161,12 +161,15 @@ baseline = pd.DataFrame(data=np.array([[i for i in baseline_initial.values],]),
 
 model.evaluate(notify=50, autoload=None, autosave=None, file=None)
 
-# Baseline results
+#%% Baseline results
 baseline_end = model.metrics_at_baseline()
 dateTimeObj = datetime.now()
 file_to_save = 'HP_%s.%s.%s-%s.%s'%(dateTimeObj.year, dateTimeObj.month, dateTimeObj.day, dateTimeObj.hour, dateTimeObj.minute)
 
-baseline = baseline.append(baseline_end, ignore_index=True)
+#%%
+# baseline = baseline.append(baseline_end, ignore_index=True)
+baseline = pd.concat([baseline, pd.DataFrame([baseline_end])], ignore_index=True)
+
 baseline.index = ('initial', 'end')
 baseline.to_excel(file_to_save+'_0_baseline.xlsx')
 
@@ -219,74 +222,74 @@ run_number = samples.shape[0]
 
 # %%
 
-# =============================================================================
-# Evaluate the min/max of one parameter each time to ensure the parameter can
-# independently affect the system
-# =============================================================================
+# # =============================================================================
+# # Evaluate the min/max of one parameter each time to ensure the parameter can
+# # independently affect the system
+# # =============================================================================
 
-p_values = [[], [], []]
-MPSPs = [[], [], []]
-GWPs = [[], [], []]
-FECs = [[], [], []]
+# p_values = [[], [], []]
+# MPSPs = [[], [], []]
+# GWPs = [[], [], []]
+# FECs = [[], [], []]
 
-# import pdb
-bst.speed_up()
-for p in parameters:
-    # pdb.set_trace()
-    # [p_min], [p_max] = p.distribution.range().tolist()
-    p_dist = p.distribution
-    # import pdb
-    # pdb.set_trace()
-    [p_min], [p_max] = p_dist.lower.tolist(), p_dist.upper.tolist()
-    # [p_min], [p_max] = p_dist.range()[0], p_dist.range()[1]
-    p_baseline = p.baseline
-    p_value = (p_min, p_max, p_baseline)
-    p.system = HP_sys
-    for i in range(len(p_value)):
-        p.setter(p_value[i])
-        p_values[i].append(p_value[i])
-        MPSP = get_AA_MPSP()
-        MPSPs[i].append(MPSP)
-        GWPs[i].append(get_GWP())
-        FECs[i].append(get_FEC())
-        run_number += 1
+# # import pdb
+# # bst.speed_up()
+# for p in parameters:
+#     # pdb.set_trace()
+#     # [p_min], [p_max] = p.distribution.range().tolist()
+#     p_dist = p.distribution
+#     # import pdb
+#     # pdb.set_trace()
+#     [p_min], [p_max] = p_dist.lower.tolist(), p_dist.upper.tolist()
+#     # [p_min], [p_max] = p_dist.range()[0], p_dist.range()[1]
+#     p_baseline = p.baseline
+#     p_value = (p_min, p_max, p_baseline)
+#     p.system = HP_sys
+#     for i in range(len(p_value)):
+#         p.setter(p_value[i])
+#         p_values[i].append(p_value[i])
+#         MPSP = get_AA_MPSP()
+#         MPSPs[i].append(MPSP)
+#         GWPs[i].append(get_GWP())
+#         FECs[i].append(get_FEC())
+#         run_number += 1
 
-MPSP_baseline = np.asarray(MPSPs[2])
-MPSP_min_diff = np.asarray(MPSPs[0]) - MPSP_baseline
-MPSP_max_diff = np.asarray(MPSPs[1]) - MPSP_baseline
+# MPSP_baseline = np.asarray(MPSPs[2])
+# MPSP_min_diff = np.asarray(MPSPs[0]) - MPSP_baseline
+# MPSP_max_diff = np.asarray(MPSPs[1]) - MPSP_baseline
 
-GWP_baseline = np.asarray(GWPs[2])
-GWP_min_diff = np.asarray(GWPs[0]) - GWP_baseline
-GWP_max_diff = np.asarray(GWPs[1]) - GWP_baseline
+# GWP_baseline = np.asarray(GWPs[2])
+# GWP_min_diff = np.asarray(GWPs[0]) - GWP_baseline
+# GWP_max_diff = np.asarray(GWPs[1]) - GWP_baseline
 
-FEC_baseline = np.asarray(FECs[2])
-FEC_min_diff = np.asarray(FECs[0]) - FEC_baseline
-FEC_max_diff = np.asarray(FECs[1]) - FEC_baseline
+# FEC_baseline = np.asarray(FECs[2])
+# FEC_min_diff = np.asarray(FECs[0]) - FEC_baseline
+# FEC_max_diff = np.asarray(FECs[1]) - FEC_baseline
 
-one_p_df = pd.DataFrame({
-    ('Parameter', 'Name'): [i.name_with_units for i in parameters],
-    ('Parameter', 'Baseline'): p_values[2],
-    ('Parameter', 'Min'): p_values[0],
-    ('Parameter', 'Max'): p_values[1],
-    ('MPSP [$/kg]', 'MPSP baseline'): MPSP_baseline,
-    ('MPSP [$/kg]', 'MPSP min'): MPSPs[0],
-    ('MPSP [$/kg]', 'MPSP min diff'): MPSP_min_diff,
-    ('MPSP [$/kg]', 'MPSP max'): MPSPs[1],
-    ('MPSP [$/kg]', 'MPSP max diff'): MPSP_max_diff,
-    ('GWP [kg CO2-eq/kg]', 'GWP baseline'): GWP_baseline,
-    ('GWP [kg CO2-eq/kg]', 'GWP min'): GWPs[0],
-    ('GWP [kg CO2-eq/kg]', 'GWP min diff'): GWP_min_diff,
-    ('GWP [kg CO2-eq/kg]', 'GWP max'): GWPs[1],
-    ('GWP [kg CO2-eq/kg]', 'GWP max diff'): GWP_max_diff,
-    ('FEC [MJ/kg]', 'FEC baseline'): FEC_baseline,
-    ('FEC [MJ/kg]', 'FEC min'): FECs[0],
-    ('FEC [MJ/kg]', 'FEC min diff'): FEC_min_diff,
-    ('FEC [MJ/kg]', 'FEC max'): FECs[1],
-    ('FEC [MJ/kg]', 'FEC max diff'): FEC_max_diff,
-    })
+# one_p_df = pd.DataFrame({
+#     ('Parameter', 'Name'): [i.name_with_units for i in parameters],
+#     ('Parameter', 'Baseline'): p_values[2],
+#     ('Parameter', 'Min'): p_values[0],
+#     ('Parameter', 'Max'): p_values[1],
+#     ('MPSP [$/kg]', 'MPSP baseline'): MPSP_baseline,
+#     ('MPSP [$/kg]', 'MPSP min'): MPSPs[0],
+#     ('MPSP [$/kg]', 'MPSP min diff'): MPSP_min_diff,
+#     ('MPSP [$/kg]', 'MPSP max'): MPSPs[1],
+#     ('MPSP [$/kg]', 'MPSP max diff'): MPSP_max_diff,
+#     ('GWP [kg CO2-eq/kg]', 'GWP baseline'): GWP_baseline,
+#     ('GWP [kg CO2-eq/kg]', 'GWP min'): GWPs[0],
+#     ('GWP [kg CO2-eq/kg]', 'GWP min diff'): GWP_min_diff,
+#     ('GWP [kg CO2-eq/kg]', 'GWP max'): GWPs[1],
+#     ('GWP [kg CO2-eq/kg]', 'GWP max diff'): GWP_max_diff,
+#     ('FEC [MJ/kg]', 'FEC baseline'): FEC_baseline,
+#     ('FEC [MJ/kg]', 'FEC min'): FECs[0],
+#     ('FEC [MJ/kg]', 'FEC min diff'): FEC_min_diff,
+#     ('FEC [MJ/kg]', 'FEC max'): FECs[1],
+#     ('FEC [MJ/kg]', 'FEC max diff'): FEC_max_diff,
+#     })
 
-time = timer.elapsed_time / 60.
-print(f'\nSimulation time for {run_number} runs is: {time:.1f} min')
+# time = timer.elapsed_time / 60.
+# print(f'\nSimulation time for {run_number} runs is: {time:.1f} min')
 
 
 # %%

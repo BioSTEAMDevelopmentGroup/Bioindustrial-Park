@@ -44,7 +44,7 @@ def plot_kde_formatted(
                         ax = None,
                         ):
     axis_given = not (ax is None)
-    ax = plot_kde(xdata, 
+    fig, ax = plot_kde(xdata, 
                 ydata,
                 ax=ax,
                 xticks=xticks,
