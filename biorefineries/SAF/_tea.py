@@ -80,7 +80,11 @@ class SAF_Coprocessing_TEA(TEA):
                  'maintenance', '_ISBL_DPI_cached', '_FCI_cached',
                  '_utility_cost_cached', '_steam_power_depreciation',
                  '_steam_power_depreciation_array',
-                 'boiler_turbogenerator', '_DPI_cached')
+                 'boiler_turbogenerator', '_DPI_cached',
+                 'steam_distribution', 'water_supply_cooling_pumping', 
+                 'water_distribution', 'electric_substation_and_distribution',
+                 'gas_supply_and_distribution', 'comminication', 
+                 'safety_installation')
     
     def __init__(self, system, IRR, duration, depreciation, income_tax,
                  operating_days, lang_factor, construction_schedule,
@@ -96,10 +100,8 @@ class SAF_Coprocessing_TEA(TEA):
                  water_supply_cooling_pumping, water_distribution, 
                  electric_substation_and_distribution,
                  gas_supply_and_distribution,
-                 comminication, safety_installation,
-                 material_storage,
-                 product_storage
-                 ):
+                 comminication, safety_installation):
+                
         super().__init__(system, IRR, duration, depreciation, income_tax,
                          operating_days, lang_factor, construction_schedule,
                          startup_months, startup_FOCfrac, startup_VOCfrac,
@@ -127,8 +129,8 @@ class SAF_Coprocessing_TEA(TEA):
         self.gas_supply_and_distribution = gas_supply_and_distribution
         self.comminication = comminication
         self.safety_installation = safety_installation
-        self.material_storage = material_storage
-        self.product_storage = product_storage
+        
+        
         
     @property
     def steam_power_depreciation(self):
@@ -144,46 +146,18 @@ class SAF_Coprocessing_TEA(TEA):
     @property
     def ISBL_installed_equipment_cost(self):
         return self._ISBL_DPI(self.DPI)
-    
+        
     @property
     def OSBL_installed_equipment_cost(self):
-        if self.material_storage == True and self.product_storage == True:
-            if self.lang_factor:
-                raise NotImplementedError('lang factor cannot yet be used')
-            elif isinstance(self.system, bst.AgileSystem):
-                unit_capital_costs = self.system.unit_capital_costs
-                OSBL_units = self.OSBL_units
-                return sum([unit_capital_costs[i].installed_cost for i in OSBL_units])
-            else:
-                return sum([i.installed_cost for i in self.OSBL_units])
-        
-        elif self.material_storage == True and self.product_storage == False:
-            if self.lang_factor:
-                raise NotImplementedError('lang factor cannot yet be used')
-            elif isinstance(self.system, bst.AgileSystem):
-                unit_capital_costs = self.system.unit_capital_costs
-                OSBL_units = self.OSBL_units
-                return sum([unit_capital_costs[i].installed_cost for i in OSBL_units]) - sum([unit_capital_costs[i].installed_cost for i in OSBL_units if i in range(3,6)]) 
-            else:
-                return sum([i.installed_cost for i in self.OSBL_units]) - sum(i.installed_cost for i in self.OSBL_units if str(i) in ['gasoline_storage', 'jet_storage',\
-                                                                                                                                      'diesel_storage'])
-
-
-            
-        elif self.material_storage == False and self.product_storage == False:
-            if self.lang_factor:
-                raise NotImplementedError('lang factor cannot yet be used')
-            elif isinstance(self.system, bst.AgileSystem):
-                unit_capital_costs = self.system.unit_capital_costs
-                OSBL_units = self.OSBL_units
-                return sum([unit_capital_costs[i].installed_cost for i in OSBL_units]) - sum([unit_capital_costs[i].installed_cost for i in OSBL_units if i in range(0,6)]) 
-            else:
-                return sum([i.installed_cost for i in self.OSBL_units]) - sum(i.installed_cost for i in self.OSBL_units if str(i) in ['DAP_storage', 'CSL_storage',\
-                                                                                                                                      'ethanol_storage','gasoline_storage',\
-                                                                                                                                      'jet_storage','diesel_storage'])
+        if self.lang_factor:
+            raise NotImplementedError('lang factor cannot yet be used')
+        elif isinstance(self.system, bst.AgileSystem):
+            unit_capital_costs = self.system.unit_capital_costs
+            OSBL_units = self.OSBL_units
+            return sum([unit_capital_costs[i].installed_cost for i in OSBL_units])
+        else:
+            return sum([i.installed_cost for i in self.OSBL_units])
                                                                                                                                   
-        
-    
     def _fill_depreciation_array(self, D, start, years, TDC):
         depreciation_array = self._get_depreciation_array()
         N_depreciation_years = depreciation_array.size
@@ -225,10 +199,10 @@ class SAF_Coprocessing_TEA(TEA):
 
 
 
-
     def _DPI(self, installed_equipment_cost): # Direct Permanent Investment
         factors = self.warehouse + self.site_development + self.additional_piping
-        self._DPI_cached = DPI = installed_equipment_cost + self._ISBL_DPI(installed_equipment_cost) * factors + self._service_facilites_installed_cost(installed_equipment_cost)
+        self._DPI_cached = DPI = installed_equipment_cost + self._ISBL_DPI(installed_equipment_cost) * factors +\
+            self._service_facilites_installed_cost(installed_equipment_cost)
         return DPI
     
     def _TDC(self, DPI): # Total Depreciable Capital
@@ -249,6 +223,7 @@ class SAF_Coprocessing_TEA(TEA):
         return (FCI * self.property_insurance
                 + self._ISBL_DPI_cached * self.maintenance
                 + self.labor_cost * (1 + self.labor_burden))
+    
 
 
 
@@ -267,10 +242,8 @@ def create_SAF_coprocessing_tea(sys,
                                 gas_supply_and_distribution,
                                 comminication, 
                                 safety_installation,
-                                material_storage,
-                                product_storage,
-                                OSBL_units=None):
-    if OSBL_units is None: OSBL_units = bst.get_OSBL(sys.cost_units)
+                                OSBL_units=None,):
+    if OSBL_units is None: OSBL_units = bst.get_OSBL(sys.cost_units)            
     try:
         BT = tmo.utils.get_instance(OSBL_units, (bst.BoilerTurbogenerator, bst.Boiler))
     except:
@@ -313,8 +286,5 @@ def create_SAF_coprocessing_tea(sys,
         electric_substation_and_distribution=electric_substation_and_distribution,
         gas_supply_and_distribution=gas_supply_and_distribution,
         comminication=comminication, 
-        safety_installation=safety_installation,
-        material_storage=material_storage,
-        product_storage=product_storage
-        )
+        safety_installation=safety_installation,)
     return SAF_tea

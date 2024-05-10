@@ -27,7 +27,7 @@ __all__ = ('create_model')
 
 #%%
 
-sys = SAF_sys(material_storage=True, product_storage=True, WWTC=True, BT=True, hydrogenation_distillation=True, h2_purchase=True)
+sys = SAF_sys(material_storage=True, product_storage=False, WWTC=True, BT=True, hydrogenation_distillation=True, h2_purchase=True)
 
 BT_sys = bst.System('BT_sys', path=(F.BT,))
 
@@ -73,7 +73,7 @@ load_preferences_and_process_settings(T='K',
 sys.set_tolerance(rmol=1e-6, mol=1e-5, maxiter=400)
 
 tea_SAF = create_SAF_coprocessing_tea(sys=sys,steam_distribution=0.031, water_supply_cooling_pumping=0.057, 
-                                      water_distribution=0.025, electric_substation_and_distribution=0.072,
+                                      water_distribution=0.025, electric_substation_and_distribution=0.0,
                                       gas_supply_and_distribution=0.009, comminication=0.006, safety_installation=0.013,)
 
 sys.operating_hours = tea_SAF.operating_days * 24

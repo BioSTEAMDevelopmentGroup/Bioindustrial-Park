@@ -12,7 +12,7 @@ import biosteam as bst
 from biosteam.evaluation import Model, Metric
 from biosteam.evaluation.evaluation_tools.parameter import Setter
 from biorefineries.SAF._chemicals import SAF_chemicals
-from biorefineries.SAF.systems_miscanthus import sys, BT_sys, F, process_groups_dict, process_groups
+from biorefineries.SAF.systems_coprocessing import SAF_sys, F
 from biorefineries.SAF._tea import create_SAF_coprocessing_tea
 from biorefineries.SAF._process_settings import price, GWP_CFs, load_preferences_and_process_settings
 from warnings import warn
@@ -27,6 +27,40 @@ __all__ = ('create_model')
 
 #%%
 
+sys = SAF_sys(material_storage=True, product_storage=False, WWTC=True, BT=True, hydrogenation_distillation=False, h2_purchase=True)
+
+BT_sys = bst.System('BT_sys', path=(F.BT,))
+
+preprocessing = bst.UnitGroup('Preprocessing_group', units = [i for i in sys.units if i.ID[1]=='1'])
+                                          
+pretreatment = bst.UnitGroup('Pretreatment_group', units = [i for i in sys.units if i.ID[1]=='2'])
+                                          
+fermentation = bst.UnitGroup('Fermentation_group', units = [i for i in sys.units if i.ID[1]=='3'])
+                                          
+upgrading = bst.UnitGroup('Upgrading_group', units = [i for i in sys.units if i.ID[1]=='4'])
+                                          
+wastewater_treatment = bst.UnitGroup('WWT_group', units = (F.WWT,))
+
+heat_exchange_network = bst.UnitGroup('HXN_group', units = (F.HXN,))
+
+boiler_turbogenerator = bst.UnitGroup('BT_group', units = (F.BT,)) 
+
+cooling_tower = bst.UnitGroup('CT_group', units = (F.CT,)) 
+
+facilities_no_hu = bst.UnitGroup('Facilities_no_hu_group', units = (F.CIP,)) 
+
+
+process_groups = [preprocessing, pretreatment, fermentation, upgrading,
+                  wastewater_treatment, 
+                  heat_exchange_network, 
+                  boiler_turbogenerator,
+                  cooling_tower, facilities_no_hu]
+
+process_groups_dict = {}
+for i in range(len(process_groups)):
+    group = process_groups[i]
+    process_groups_dict[group.name] = group    
+       
 load_preferences_and_process_settings(T='K',
                                       flow_units='kg/hr',
                                       N=100,
@@ -40,8 +74,7 @@ sys.set_tolerance(rmol=1e-6, mol=1e-5, maxiter=400)
 
 tea_SAF = create_SAF_coprocessing_tea(sys=sys,steam_distribution=0.031, water_supply_cooling_pumping=0.057, 
                                       water_distribution=0.025, electric_substation_and_distribution=0.0,
-                                      gas_supply_and_distribution=0.009, comminication=0.006, safety_installation=0.013,
-                                      material_storage=False, product_storage=False)
+                                      gas_supply_and_distribution=0.009, comminication=0.006, safety_installation=0.013,)
 
 sys.operating_hours = tea_SAF.operating_days * 24
 
