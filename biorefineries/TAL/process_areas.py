@@ -172,6 +172,7 @@ def create_TAL_fermentation_process(ins, outs,):
                ins=[dict(ID='fermentation_broth', TAL=1, Water=100),
                     dict(ID='acetylacetone_decarboxylation_equilibrium', PD=1.),
                     dict(ID='recycled_nonevaporated_supernatant', Water=1e-3),
+                    dict(ID='base_for_pH_control', CaO=1.),
                ],
                 outs=[dict(ID='decarboxylation_vent', CO2=20),
                       dict(ID='S401_solid', FermMicrobe=1, Water=1),
@@ -182,7 +183,7 @@ def create_TAL_fermentation_process(ins, outs,):
                                                )
 def create_TAL_separation_solubility_exploit_process(ins, outs,):
     
-    fermentation_broth, acetylacetone_decarboxylation_equilibrium, recycled_nonevaporated_supernatant = ins
+    fermentation_broth, acetylacetone_decarboxylation_equilibrium, recycled_nonevaporated_supernatant, base_for_pH_control = ins
     decarboxylation_vent, S401_solid, bottom_product_F403, liquid_waste_D401, solid_TAL = outs
     
     # =============================================================================
@@ -218,14 +219,57 @@ def create_TAL_separation_solubility_exploit_process(ins, outs,):
                                  ins=(U401-0, 
                                       acetylacetone_decarboxylation_equilibrium, 
                                       recycled_nonevaporated_supernatant,
-                                      'recyled_top_prod_from_evaporating_supernatant',), 
-                                 outs=('fermentation_broth_mixed'))
+                                      'recyled_top_prod_from_evaporating_supernatant',
+                                      base_for_pH_control), 
+                                 outs=('fermentation_broth_mixed'),
+                                 tau = 1.)
+    
     M401.mol_acetylacetone_per_mol_TAL = 0.
+    M401.mol_base_per_m3_broth = 0.
+    M401.base_neutralizes_acids = False
+    M401.base_ID = 'NaOH'
+    
+    M401.neutralization_rxns = ParallelRxn([
+        Rxn('AceticAcid + NaOH -> SodiumAcetate + H2O', 'AceticAcid',   1.-1e-5),
+        Rxn('CitricAcid + 3NaOH -> SodiumCitrate + H2O', 'CitricAcid',   1.-1e-5),
+        Rxn('H3PO4 + NaOH -> SodiumPhosphate + H2O', 'H3PO4',   1.-1e-5),
+        ])
+    
+    M401.mol_base_per_m3_broth_needed_to_completely_neutralize_acids = 0.
+    
     @M401.add_specification(run=False)
     def M401_spec():
-        M401.ins[1].imol['PD'] = M401.mol_acetylacetone_per_mol_TAL * M401.ins[0].imol['TAL']
+        M401_ins_0 = M401.ins[0]
+        M401.ins[1].imol['PD'] = M401.mol_acetylacetone_per_mol_TAL * M401_ins_0.imol['TAL']
+        M401_in_base = M401.ins[4]
+        M401_in_base.empty()
+        M401_in_base.imol[M401.base_ID] = M401.mol_base_per_m3_broth * M401_ins_0.F_vol
+        
+        M401.mol_base_per_m3_broth_needed_to_completely_neutralize_acids =\
+        min_base_req_to_completely_neutralize =\
+            (M401_ins_0.imol['AceticAcid']
+            +3.* M401_ins_0.imol['CitricAcid']
+            + 3.*M401_ins_0.imol['H3PO4'])/M401_ins_0.F_vol
+                                    
         M401._run()
-        M401
+        
+        if M401.base_neutralizes_acids:
+            if M401.mol_base_per_m3_broth < min_base_req_to_completely_neutralize:
+                M401.neutralization_rxns = ParallelRxn([
+                    Rxn('AceticAcid + NaOH -> SodiumAcetate + H2O', 'NaOH',   1.-1e-5),
+                    Rxn('CitricAcid + 3NaOH -> SodiumCitrate + H2O', 'NaOH',   1.-1e-5),
+                    Rxn('H3PO4 + NaOH -> SodiumPhosphate + H2O', 'NaOH',   1.-1e-5),
+                    ])
+            else:
+                M401.neutralization_rxns = ParallelRxn([
+                    Rxn('AceticAcid + NaOH -> SodiumAcetate + H2O', 'AceticAcid',   1.-1e-5),
+                    Rxn('CitricAcid + 3NaOH -> SodiumCitrate + H2O', 'CitricAcid',   1.-1e-5),
+                    Rxn('H3PO4 + NaOH -> SodiumPhosphate + H2O', 'H3PO4',   1.-1e-5),
+                    ])
+                
+            M401.outs[0].phase='l'
+            M401.neutralization_rxns.adiabatic_reaction(M401.outs[0])
+        
     # Change broth temperature to adjust TAL solubility
     H401 = bst.HXutility('H401', ins=M401-0, outs=('fermentation_broth_heated'), 
                          T=273.15+56., # initial value; updated in specification to minimum T required to completely dissolve TAL 
@@ -271,19 +315,20 @@ def create_TAL_separation_solubility_exploit_process(ins, outs,):
     
     M402 = bst.LiquidsMixingTank('M402', 
                                  ins=(H401-0, ), 
-                                 outs=('fermentation_broth_heated_mixed'))
+                                 outs=('fermentation_broth_heated_mixed'),
+                                 tau = 1.)
     
     #%% Decarboxylation occurs in this unit ##!!!##
     
     U402 = bst.FakeSplitter('U402', ins=M402-0, outs = ('thermally_decarboxylated_broth',decarboxylation_vent))
     U402.decarboxylation_rxns = ParallelRxn([
-        Rxn('TAL + H2O -> PD + CO2', 'TAL',   0.183),
+        Rxn('TAL + H2O -> PD + CO2', 'TAL',   0.2087),
         ])
     U402.line = 'Background unit for decarboxylation'
     U402._graphics = U401._graphics
     
     U402.decarboxylation_conversion_basis = 'temperature-dependent' # 'fixed' or 'temperature-dependent' or 'equilibrium-based'
-    U402.decarboxylation_conversion = 0.183 # only used if basis is 'fixed' # experimental value at T = 80 degrees C
+    U402.decarboxylation_conversion = 0.2087 # only used if basis is 'fixed' # value at T = 66.415 degrees C from linear interpolation of conversion vs T experimental data
     U402.equilibrium_acetylacetone_presence = 0.2903 # equilibrium PD:TAL (mol:mol) ratio; only used if basis is 'equilibrium-based'
     
     def U402_spec_helper():

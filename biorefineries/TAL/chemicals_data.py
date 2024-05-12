@@ -144,7 +144,8 @@ AmmoniumAcetate = chemical_database('AmmoniumAcetate', phase='l',
 # =============================================================================
 
 AceticAcid = chemical_database('AceticAcid')
-SodiumAcetate = chemical_database('SodiumAcetate')
+SodiumAcetate = chemical_database('SodiumAcetate', phase='l')
+SodiumCitrate = chemical_database('SodiumCitrate', phase='l')
 Glucose = chemical_database('Glucose', phase = 'l')
 
 CitricAcid = chemical_database('CitricAcid')
@@ -546,6 +547,9 @@ Alanine = chemical_database('Alanine', phase='s')
 
 # Holmes, Trans. Faraday Soc. 1962, 58 (0), 1916–1925, abstract
 # This is for auto-population of combustion reactions
+
+SodiumPhosphate = chemical_database('SodiumPhosphate', phase='l')
+
 P4O10 = chemical_database('P4O10', phase='s', Hf=-713.2*_cal2joule)
 Ash = chemical_database('Ash', search_ID='CaO', phase='s', Hf=-151688*_cal2joule,
                         HHV=0, LHV=0)

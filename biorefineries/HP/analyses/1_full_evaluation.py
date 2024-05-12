@@ -67,6 +67,7 @@ timer.tic()
 model = models.HP_model
 R301.set_titer_limit = True
 
+#%%
 # Set seed to make sure each time the same set of random numbers will be used
 np.random.seed(3221)
 N_simulation = 2000 # 1000
@@ -197,8 +198,7 @@ LCA_results = \
 LCA_percentiles = LCA_results.quantile(q=percentiles)
 
 # Spearman's rank correlation
-spearman_metrics = model.metrics[0:3] + model.metrics[6:8] + \
-    (model.metrics[-34],) + (model.metrics[-33],)
+spearman_metrics = model.metrics[2:11] + model.metrics[77:79]
     # model.metrics[models.index_IRR:models.index_IRR+2]
     
 model.table = model.table.dropna()

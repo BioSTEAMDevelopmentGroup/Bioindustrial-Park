@@ -755,7 +755,7 @@ contourplots.animated_contourplot(w_data_vs_x_y_at_multiple_z=results_metric_2, 
                                 add_shapes = {
                                     # coords as tuple of tuples: (color, zorder),
                                     ((5,14), (55,180), (0,180)): ('white', 2),
-                                    }
+                                    },
                                 
                                 # additional_points ={(40.5, 35.9):('D', 'w', 6)},
                                 

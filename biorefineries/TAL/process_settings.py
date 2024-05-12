@@ -217,6 +217,10 @@ DAP_price = 0.5*\
             (0.2275 * _GDP_2007_to_2010 * chem_index[2019]/chem_index[2010]
              +
              0.89532 * chem_index[2019]/chem_index[2011])
+
+# 390.09-789.25 USD / short ton in 2008; https://web.archive.org/web/20161125084558/http://www.icis.com:80/chemicals/channel-info-chemicals-a-z/            
+NaOH_price = ((390.09+789.25)/2.)/_kg_per_ton * _GDP_2008_to_2010 * chem_index[2019]/chem_index[2010]
+
 price = {'SA': SA_price,
          'PD': acetylacetone_price, # 2,4-pentanedione or acetylacetone
          'TCP': TCP_price,
@@ -243,7 +247,8 @@ price = {'SA': SA_price,
          # 0.1900 is for NH3	
          'AmmoniumHydroxide': 0.1900 * _lb_per_kg * 17.031/35.046,	
          'CSL': CSL_price,
-         'Caustics': 0.2384 * _lb_per_kg * 0.5, # 50 wt% NaOH/water mixture	
+         'Caustics': NaOH_price * 0.5, # 50 wt% NaOH/water mixture	
+         'Sodium hydroxide': NaOH_price,
          'Boiler chems': 2.9772 * _lb_per_kg,	
          'Lime': lime_price,
          'Cooling tower chems': 1.7842 * _lb_per_kg,	

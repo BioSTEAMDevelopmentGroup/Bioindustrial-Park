@@ -8,6 +8,8 @@ from biosteam import UnitGroup
 from biosteam.evaluation import Metric
 from biosteam import HeatExchangerNetwork, DrumDryer
 from flexsolve import IQ_interpolation
+from numba import njit
+from math import log
 
 __all__ = {'call_all_specifications_or_run',
            'get_more_unit_groups',
@@ -16,6 +18,33 @@ __all__ = {'call_all_specifications_or_run',
            'TEA_breakdown',
            'update_facility_IDs',
            }
+
+#%% Estimate the pH of a mixture of polyprotic acids
+def get_molarity(ID, stream):
+    return stream.imol[ID]/stream.F_vol
+
+@njit
+def helper_acid_contribution_upto_triprotic(cH, acid_molarity, Ka1, Ka2, Ka3):
+    return acid_molarity * ((Ka1*cH**2 + 2*cH*Ka1*Ka2 + 3*Ka1*Ka2*Ka3) / (cH**3 + Ka1*cH**2 + cH*Ka1*Ka2 + Ka1*Ka2*Ka3))
+
+def get_acid_contribution_upto_triprotic(cH, acid_molarity, Kas):
+    n_Kas = len(Kas)
+    Ka1 = Kas[0]
+    Ka2 = Kas[1] if n_Kas>1 else 0.
+    Ka3 = Kas[2] if n_Kas>2 else 0.
+    return helper_acid_contribution_upto_triprotic(cH, acid_molarity, Ka1, Ka2, Ka3)
+
+def obj_f_cH_polyprotic_acid_mixture(cH, acid_molarities, Kas):
+    return cH - (10**-14)/cH - sum([get_acid_contribution_upto_triprotic(cH, m, k) 
+                                    for m,k in zip(acid_molarities, Kas)])
+
+def get_cH_polyprotic_acid_mixture(stream, acid_IDs, Kas):
+    acid_molarities = [get_molarity(i, stream) for i in acid_IDs]
+    obj_f = lambda cH: 1000.* obj_f_cH_polyprotic_acid_mixture(cH, acid_molarities, Kas)
+    return IQ_interpolation(obj_f, 10**(-14), 10**(-1), ytol=1e-6)
+
+def get_pH_polyprotic_acid_mixture(stream, acid_IDs, Kas):
+    return -log(get_cH_polyprotic_acid_mixture(stream, acid_IDs, Kas), 10.)
 
 #%% For a given list of units, call all specifications of each unit or run each unit (in the presented order)
 def call_all_specifications_or_run(units_to_run):
