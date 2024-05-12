@@ -45,7 +45,7 @@ from biorefineries.HP.system_light_lle_vacuum_distillation import spec, HP_sys, 
 
 # from biorefineries.HP.analyses import models # for the baseline biorefinery
 # from biorefineries.HP.analyses import models_targeted_improvements as models # for a biorefinery with targeted improvements over the baseline biorefinery
-from biorefineries.HP.analyses import models_2015 as models # for the biorefinery with achieved fermentation performance improvements
+from biorefineries.HP.analyses import models_2021 as models # for the biorefinery with achieved fermentation performance improvements
 from datetime import datetime
 
 
