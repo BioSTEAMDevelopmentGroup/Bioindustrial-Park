@@ -110,7 +110,7 @@ NaNO3 = chemical_database('NaNO3', phase='l', Hf=-118756*_cal2joule)
 # NIST https://webbook.nist.gov/cgi/cbook.cgi?ID=C7757826&Mask=2, accessed 04/07/2020
 Na2SO4 = chemical_database('Na2SO4', phase='l', Hf=-1356.38e3)
 # CaSO4 = chemical_database('CaSO4', phase='s', Hf=-342531*_cal2joule)
-# The default Perry 151 model has a crazy value, use another model instead
+# The default Perry 151 model gives an inordinately high value, use another model instead
 # CaSO4.Cn.move_up_model_priority('Constant', 0)
 # 
 

@@ -21,6 +21,7 @@ from scipy.interpolate import interp1d, interp2d
 
 Rxn = tmo.reaction.Reaction
 ParallelRxn = tmo.reaction.ParallelReaction
+SeriesReaction = tmo.reaction.SeriesReaction
 
 # %% Utils
 
@@ -229,10 +230,10 @@ def create_TAL_separation_solubility_exploit_process(ins, outs,):
     M401.base_neutralizes_acids = False
     M401.base_ID = 'NaOH'
     
-    M401.neutralization_rxns = ParallelRxn([
-        Rxn('AceticAcid + NaOH -> SodiumAcetate + H2O', 'AceticAcid',   1.-1e-5),
+    M401.neutralization_rxns = SeriesReaction([
+        Rxn('H3PO4 + 3NaOH -> SodiumPhosphate + H2O', 'H3PO4',   1.-1e-5),
         Rxn('CitricAcid + 3NaOH -> SodiumCitrate + H2O', 'CitricAcid',   1.-1e-5),
-        Rxn('H3PO4 + NaOH -> SodiumPhosphate + H2O', 'H3PO4',   1.-1e-5),
+        Rxn('AceticAcid + NaOH -> SodiumAcetate + H2O', 'AceticAcid',   1.-1e-5),
         ])
     
     M401.mol_base_per_m3_broth_needed_to_completely_neutralize_acids = 0.
@@ -253,23 +254,69 @@ def create_TAL_separation_solubility_exploit_process(ins, outs,):
                                     
         M401._run()
         
+        M401_outs_0_l = M401.outs[0]['l']
+        
         if M401.base_neutralizes_acids:
             if M401.mol_base_per_m3_broth < min_base_req_to_completely_neutralize:
-                M401.neutralization_rxns = ParallelRxn([
-                    Rxn('AceticAcid + NaOH -> SodiumAcetate + H2O', 'NaOH',   1.-1e-5),
-                    Rxn('CitricAcid + 3NaOH -> SodiumCitrate + H2O', 'NaOH',   1.-1e-5),
-                    Rxn('H3PO4 + NaOH -> SodiumPhosphate + H2O', 'NaOH',   1.-1e-5),
-                    ])
+                
+                # M401.neutralization_rxns = SeriesReaction([
+                #     Rxn('0.3333H3PO4 + NaOH -> 0.3333SodiumPhosphate + 0.3333H2O', 'NaOH',   1.-1e-5),
+                #     Rxn('0.3333CitricAcid + NaOH -> 0.3333SodiumCitrate + 0.3333H2O', 'NaOH',   1.-1e-5),
+                #     Rxn('AceticAcid + NaOH -> SodiumAcetate + H2O', 'NaOH',   1.-1e-5),
+                #     ])
+                
+                if M401_outs_0_l.imol['NaOH'] > 3.*M401_outs_0_l.imol['H3PO4']:
+                    mol_H3PO4 = M401_outs_0_l.imol['H3PO4']
+                    M401_outs_0_l.imol['H3PO4'] = 0.
+                    M401_outs_0_l.imol['NaOH'] -= 3.*mol_H3PO4
+                    M401_outs_0_l.imol['SodiumPhosphate'] += mol_H3PO4
+                    M401_outs_0_l.imol['H2O'] += mol_H3PO4
+                else:
+                    mol_NaOH = M401_outs_0_l.imol['NaOH']
+                    M401_outs_0_l.imol['NaOH'] = 0.
+                    M401_outs_0_l.imol['H3PO4'] -= 0.3333*mol_NaOH
+                    M401_outs_0_l.imol['SodiumPhosphate'] += 0.3333*mol_NaOH
+                    M401_outs_0_l.imol['H2O'] += 0.3333*mol_NaOH
+                    
+                    
+                if M401_outs_0_l.imol['NaOH'] > 3.*M401_outs_0_l.imol['CitricAcid']:
+                    mol_CitricAcid = M401_outs_0_l.imol['CitricAcid']
+                    M401_outs_0_l.imol['CitricAcid'] = 0.
+                    M401_outs_0_l.imol['NaOH'] -= 3.*mol_CitricAcid
+                    M401_outs_0_l.imol['SodiumCitrate'] += mol_CitricAcid
+                    M401_outs_0_l.imol['H2O'] += mol_CitricAcid
+                else:
+                    mol_NaOH = M401_outs_0_l.imol['NaOH']
+                    M401_outs_0_l.imol['NaOH'] = 0.
+                    M401_outs_0_l.imol['CitricAcid'] -= 0.3333*mol_NaOH
+                    M401_outs_0_l.imol['SodiumCitrate'] += 0.3333*mol_NaOH
+                    M401_outs_0_l.imol['H2O'] += 0.3333*mol_NaOH
+                    
+                    
+                if M401_outs_0_l.imol['NaOH'] > M401_outs_0_l.imol['AceticAcid']:
+                    mol_AceticAcid = M401_outs_0_l.imol['AceticAcid']
+                    M401_outs_0_l.imol['AceticAcid'] = 0.
+                    M401_outs_0_l.imol['NaOH'] -= mol_AceticAcid
+                    M401_outs_0_l.imol['SodiumAcetate'] += mol_AceticAcid
+                    M401_outs_0_l.imol['H2O'] += mol_AceticAcid
+                else:
+                    mol_NaOH = M401_outs_0_l.imol['NaOH']
+                    M401_outs_0_l.imol['NaOH'] = 0.
+                    M401_outs_0_l.imol['AceticAcid'] -= mol_NaOH
+                    M401_outs_0_l.imol['SodiumAcetate'] += mol_NaOH
+                    M401_outs_0_l.imol['H2O'] += mol_NaOH
+                
             else:
-                M401.neutralization_rxns = ParallelRxn([
-                    Rxn('AceticAcid + NaOH -> SodiumAcetate + H2O', 'AceticAcid',   1.-1e-5),
-                    Rxn('CitricAcid + 3NaOH -> SodiumCitrate + H2O', 'CitricAcid',   1.-1e-5),
-                    Rxn('H3PO4 + NaOH -> SodiumPhosphate + H2O', 'H3PO4',   1.-1e-5),
+                M401.neutralization_rxns = SeriesReaction([
+                    Rxn('H3PO4 + 3NaOH -> SodiumPhosphate + H2O', 'H3PO4',   1.),
+                    Rxn('CitricAcid + 3NaOH -> SodiumCitrate + H2O', 'CitricAcid',   1.),
+                    Rxn('AceticAcid + NaOH -> SodiumAcetate + H2O', 'AceticAcid',   1.),
                     ])
                 
-            M401.outs[0].phase='l'
-            M401.neutralization_rxns.adiabatic_reaction(M401.outs[0])
-        
+                M401.outs[0].phase='l'
+                # M401.neutralization_rxns.adiabatic_reaction(M401.outs[0])
+                M401.neutralization_rxns(M401.outs[0])
+            
     # Change broth temperature to adjust TAL solubility
     H401 = bst.HXutility('H401', ins=M401-0, outs=('fermentation_broth_heated'), 
                          T=273.15+56., # initial value; updated in specification to minimum T required to completely dissolve TAL 

@@ -196,7 +196,7 @@ class Reactor(Unit, PressureVessel, isabstract=True):
       kW=511.3205, cost=13329690, S=94697, CE=CEPCI[2009], n=0.6, BM=1.7)
 class FeedstockPreprocessing(Unit):
     # 2205 U.S. ton/day (2000 metric tonne/day) as in Humbird et al.
-    _baseline_flow_rate = baseline_feedflow.sum()
+    # _baseline_flow_rate = baseline_feedflow.sum()
     _cached_flow_rate = 2205
 
 #%% Conversion
