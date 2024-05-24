@@ -111,12 +111,12 @@ def get_pH_M401_outs_0():
     if M401_outs_0.imol['CitricAcid', 'H3PO4', 'AceticAcid'].sum() > 0.:
         return get_pH_polyprotic_acid_mixture(M401_outs_0,
                                 ['CitricAcid', 'H3PO4', 'AceticAcid'], 
-                                [[10**-3.128, 10**-4.75, 10**-6.04], 
-                                 [10**-2.15, 10**-7.2, 10**-12.35],
+                                [[10**-3.13, 10**-4.76, 10**-6.40], 
+                                 [10**-2.16, 10**-7.21, 10**-12.32],
                                  [10**-4.76]],
                                 'ideal')
     else:
-        return 14. + log(get_molarity('NaOH', M401_outs_0), 10.) # assume strong base completely dissociates in aqeuous solution
+        return 14. + log(get_molarity('NaOH', M401_outs_0), 10.) # assume strong base completely dissociates in aqueous solution
 
 def get_pH_given_base_addition(mol_base_per_m3_broth):
     M401.mol_base_per_m3_broth = mol_base_per_m3_broth
@@ -158,7 +158,11 @@ get_TAL_sugars_conc = lambda: sum(R302.outs[0].imass['Glucose', 'Xylose'])/R302.
 get_TAL_inhibitors_conc = lambda: 1000*sum(R302.outs[0].imass['AceticAcid', 'Furfural', 'HMF'])/R302.outs[0].F_vol
 
 
-TAL_metrics = [get_product_MPSP, lambda: TAL_lca.GWP, lambda: TAL_lca.FEC, 
+TAL_metrics = [get_product_MPSP, 
+               # lambda: TAL_lca.GWP - TAL_lca.net_electricity_GWP, 
+               # lambda: TAL_lca.FEC - TAL_lca.net_electricity_FEC, 
+               lambda: TAL_lca.GWP, 
+               lambda: TAL_lca.FEC, 
                get_TAL_AOC, get_TAL_FCI, get_product_purity, get_pH_M401_outs_0]
 
 # %% Generate 3-specification meshgrid and set specification loading functions
@@ -589,7 +593,7 @@ contourplots.animated_contourplot(w_data_vs_x_y_at_multiple_z=results_metric_1, 
                                 #     MPSP_w_ticks[5]: (5,.25),
                                 #     MPSP_w_ticks[6]: (45,1.75),
                                 #     },
-                                additional_points ={(baseline_Base_presence, 22.5):('D', 'w', 6)},
+                                additional_points ={(baseline_Base_presence, 20.87):('D', 'w', 6)},
                                 # text_boxes = {'>10.0': [(41,1.8), 'white']},
                                 )
 
@@ -598,7 +602,7 @@ contourplots.animated_contourplot(w_data_vs_x_y_at_multiple_z=results_metric_1, 
 # GWP_w_levels, GWP_w_ticks, GWP_cbar_ticks = get_contour_info_from_metric_data(results_metric_2,)
 GWP_w_levels = np.arange(0, 20.1, 0.5)
 GWP_cbar_ticks = np.arange(0, 20.1, 2.)
-GWP_w_ticks = [6.5, 7, 8, 9, 10, 11, 12, 16, 20]
+GWP_w_ticks = [6.5, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 20]
 contourplots.animated_contourplot(w_data_vs_x_y_at_multiple_z=results_metric_2, # shape = z * x * y # values of the metric you want to plot on the color axis; e.g., GWP
                                 y_data=100*TAL_decarb_convs, # x axis values
                                 x_data=pHs, # y axis values
@@ -638,7 +642,7 @@ contourplots.animated_contourplot(w_data_vs_x_y_at_multiple_z=results_metric_2, 
                                 # comparison_range=[GWP_w_levels[-2], GWP_w_levels[-1]],
                                 # comparison_range_hatch_pattern='////',
                                 units_on_newline = (True, True, False, False), # x,y,z,w
-                                additional_points ={(baseline_Base_presence, 22.5):('D', 'w', 6)},
+                                additional_points ={(baseline_Base_presence, 20.87):('D', 'w', 6)},
                                 # manual_clabels_regular = {
                                 #     MPSP_w_ticks[3]: (20 ,1),
                                 #     MPSP_w_ticks[4]: (35,1.25),
@@ -651,7 +655,7 @@ contourplots.animated_contourplot(w_data_vs_x_y_at_multiple_z=results_metric_2, 
 # FEC_w_levels, FEC_w_ticks, FEC_cbar_ticks = get_contour_info_from_metric_data(results_metric_3,)
 FEC_w_levels = np.arange(-100, 101, 10.)
 FEC_cbar_ticks = np.arange(-100, 101, 20)
-FEC_w_ticks = [-100, -60, -50, -40, -30, -20, -10, 0, 20, 40, 60, 100]
+FEC_w_ticks = [-100, -60, -50, -40, -30, -20, -10, 0, 20, 40, 60, 70, 80, 100]
 contourplots.animated_contourplot(w_data_vs_x_y_at_multiple_z=results_metric_3, # shape = z * x * y # values of the metric you want to plot on the color axis; e.g., FEC
                                 y_data=100*TAL_decarb_convs, # x axis values
                                 x_data=pHs, # y axis values
@@ -689,7 +693,7 @@ contourplots.animated_contourplot(w_data_vs_x_y_at_multiple_z=results_metric_3, 
                                 # comparison_range=[FEC_w_levels[-2], FEC_w_levels[-1]],
                                 # comparison_range_hatch_pattern='////',
                                 units_on_newline = (True, True, False, False), # x,y,z,w
-                                additional_points ={(baseline_Base_presence, 22.5):('D', 'w', 6)},
+                                additional_points ={(baseline_Base_presence, 20.87):('D', 'w', 6)},
                                 )
 
 #%% AOC

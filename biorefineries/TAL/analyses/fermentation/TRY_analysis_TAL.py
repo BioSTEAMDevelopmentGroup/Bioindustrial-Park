@@ -132,8 +132,8 @@ TAL_metrics = [get_product_MPSP,
 steps = (60, 60, 1)
 
 # Yield, titer, productivity (rate)
-spec_1 = yields = np.linspace(0.05, 0.95, steps[0]) # yield
-spec_2 = titers = np.linspace(5., 
+spec_1 = yields = np.linspace(0.01, 0.99, steps[0]) # yield
+spec_2 = titers = np.linspace(2., 
                               100., # although sugar concentration limit of 600 g/L would allow as high as 230 g-TAL/L, we set an upper limit of 100 g/L
                                    # based on achieved (50-68 g/L using E.coli, Candida) and targeted (100 g/L) titers for adipic acid, another organic solid with low water solubility
                                    # Skoog et al., 2018 ( https://doi.org/10.1016/j.biotechadv.2018.10.012 )
@@ -143,7 +143,7 @@ spec_2 = titers = np.linspace(5.,
 #     np.linspace(0.05, 1.5, steps[2])
     
 spec_3 = productivities =\
-    np.array([spec.baseline_productivity,])
+    np.array([5.**spec.baseline_productivity,])
 
 # spec_3 = productivities =\
 #     np.array([0.25*spec.baseline_productivity, 0.5*spec.baseline_productivity, 
@@ -187,7 +187,7 @@ TCI_w_label = r"$\bfTCI$" # title of the color axis
 TCI_units = r"$\mathrm{MM\$}$"
 
 Purity_w_label = r"$\bfPurity$" # title of the color axis
-Purity_units = "dry " + r"$\mathrm{\%}$"
+Purity_units = "wt " + r"$\mathrm{\%}$"
 
 #%% Colors
 
@@ -492,9 +492,9 @@ print('\nCreating and saving contour plots ...\n')
 #%% MPSP
 
 # MPSP_w_levels, MPSP_w_ticks, MPSP_cbar_ticks = get_contour_info_from_metric_data(results_metric_1, lb=3)
-MPSP_w_levels = np.arange(2, 10.25, 0.25)
-MPSP_cbar_ticks = np.arange(2, 10.1, 1.)
-MPSP_w_ticks = [2., 2.5, 3., 3.5, 4, 5, 10]
+MPSP_w_levels = np.arange(0., 10.25, 0.25)
+MPSP_cbar_ticks = np.arange(0., 10.1, 1.)
+MPSP_w_ticks = [1., 1.5, 2., 2.75, 3., 3.5, 4, 5, 10]
 # MPSP_w_levels = np.arange(0., 15.5, 0.5)
 
 contourplots.animated_contourplot(w_data_vs_x_y_at_multiple_z=results_metric_1, # shape = z * x * y # values of the metric you want to plot on the color axis; e.g., MPSP
@@ -560,12 +560,12 @@ contourplots.animated_contourplot(w_data_vs_x_y_at_multiple_z=results_metric_1, 
                                 
                                 
                                 # contourplot_facecolor = colors.grey_dark.shade(8).RGBn,
-                                fill_bottom_with_cmap_over_color=True, # for TRY
+                                fill_bottom_with_cmap_over_color=False, # for TRY
                                 bottom_fill_bounds = ((0,0), 
-                                                      (5,11.),
-                                                      (95,11.)),
+                                                      (1,11.),
+                                                      (99,11.)),
                                 # zoom_data_scale=5,
-                                text_boxes = {'>10.0': [(5,2), 'white']},
+                                text_boxes = {'>10.0': [(5,5), 'white']},
                                 )
 
 #%% GWP
@@ -632,12 +632,12 @@ contourplots.animated_contourplot(w_data_vs_x_y_at_multiple_z=results_metric_2, 
                                 # comparison_range_hatch_pattern='////',
                                 
                                 
-                                fill_bottom_with_cmap_over_color=True, # for TRY
+                                fill_bottom_with_cmap_over_color=False, # for TRY
                                 bottom_fill_bounds = ((0,0), 
-                                                      (5,11.),
-                                                      (95,11.)),
+                                                      (1,11.),
+                                                      (99,11.)),
                                 # zoom_data_scale=5,
-                                text_boxes = {'>20.0': [(5,2), 'white']},
+                                text_boxes = {'>20.0': [(80,5), 'white']},
                                 )
 
 
@@ -647,6 +647,7 @@ contourplots.animated_contourplot(w_data_vs_x_y_at_multiple_z=results_metric_2, 
 FEC_w_levels = np.arange(-100, 101, 10)
 FEC_cbar_ticks = np.arange(-100, 101, 20)
 FEC_w_ticks = [-100, -60, -30, 0, 30, 60, 100]
+# FEC_w_ticks = [40, 50, 70, 80, 100]
 contourplots.animated_contourplot(w_data_vs_x_y_at_multiple_z=results_metric_3, # shape = z * x * y # values of the metric you want to plot on the color axis; e.g., FEC
                                 x_data=100*yields, # x axis values
                                 y_data=titers, # y axis values
@@ -696,10 +697,10 @@ contourplots.animated_contourplot(w_data_vs_x_y_at_multiple_z=results_metric_3, 
                                     FEC_w_ticks[6]: (60,20),
                                     },
                                 
-                                fill_bottom_with_cmap_over_color=True, # for TRY
+                                fill_bottom_with_cmap_over_color=False, # for TRY
                                 bottom_fill_bounds = ((0,0), 
-                                                      (5,5.),
-                                                      (95,7.)),
+                                                      (1,5.),
+                                                      (99,7.)),
                                 # bottom_fill_appears_above_other_areas_to_fill=True,
                                 
                                 # other_areas_to_fill_color = colors.CABBI_orange.shade(1).RGBn,
@@ -712,10 +713,10 @@ contourplots.animated_contourplot(w_data_vs_x_y_at_multiple_z=results_metric_3, 
 
 #%% AOC
 
-AOC_w_levels, AOC_w_ticks, AOC_cbar_ticks = get_contour_info_from_metric_data(results_metric_4,)
-# AOC_w_levels = np.arange(2, 8.1, 0.2)
-# AOC_cbar_ticks = np.arange(2, 8.1, 1.)
-AOC_w_ticks = [10, 15, 20, 25, 30, 40, 50]
+# AOC_w_levels, AOC_w_ticks, AOC_cbar_ticks = get_contour_info_from_metric_data(results_metric_4,)
+AOC_w_levels = np.arange(0, 151., 5.)
+AOC_cbar_ticks = AOC_w_levels = np.arange(0, 151., 10.)
+AOC_w_ticks = [0, 25, 30, 40, 50, 100, 150]
 # AOC_w_levels = np.arange(0., 15.5, 0.5)
 
 contourplots.animated_contourplot(w_data_vs_x_y_at_multiple_z=results_metric_4, # shape = z * x * y # values of the metric you want to plot on the color axis; e.g., AOC
@@ -755,14 +756,15 @@ contourplots.animated_contourplot(w_data_vs_x_y_at_multiple_z=results_metric_4, 
                                 n_minor_ticks = 1,
                                 cbar_n_minor_ticks = 4,
                                 # comparison_range=[AOC_w_levels[-2], AOC_w_levels[-1]],
-                                # comparison_range_hatch_pattern='////',fill_bottom_with_cmap_over_color=True, # for TRY
+                                # comparison_range_hatch_pattern='////',fill_bottom_with_cmap_over_color=False, # for TRY
                                 
-                                fill_bottom_with_cmap_over_color=True, # for TRY
+                                additional_points ={(40.5, 35.9):('D', 'w', 6)},
+                                fill_bottom_with_cmap_over_color=False, # for TRY
                                 bottom_fill_bounds = ((0,0), 
-                                                      (5,11.),
-                                                      (95,11.)),
+                                                      (1,11.),
+                                                      (99,11.)),
                                 # zoom_data_scale=5,
-                                text_boxes = {'>50.0': [(5,2), 'white']},
+                                text_boxes = {'>150': [(80,3), 'white']},
                                 )
 
 #%% TCI
@@ -773,7 +775,8 @@ TCI_w_levels, TCI_w_ticks, TCI_cbar_ticks = get_contour_info_from_metric_data(re
 
 # TCI_w_ticks = [150, 200, 300, 400,]
 TCI_w_levels = np.arange(150, 401, 10)
-TCI_cbar_ticks = TCI_w_ticks = [150, 200, 250, 300, 350, 400]
+TCI_cbar_ticks = [150, 200, 250, 300, 350, 400]
+TCI_w_ticks = [150, 200, 220, 250, 300, 350, 400]
 # TCI_w_levels = np.arange(0., 15.5, 0.5)
 
 contourplots.animated_contourplot(w_data_vs_x_y_at_multiple_z=results_metric_5, # shape = z * x * y # values of the metric you want to plot on the color axis; e.g., TCI
@@ -813,26 +816,27 @@ contourplots.animated_contourplot(w_data_vs_x_y_at_multiple_z=results_metric_5, 
                                 n_minor_ticks = 1,
                                 cbar_n_minor_ticks = 4,
                                 # comparison_range=[TCI_w_levels[-2], TCI_w_levels[-1]],
-                                # comparison_range_hatch_pattern='////',fill_bottom_with_cmap_over_color=True, # for TRY
+                                # comparison_range_hatch_pattern='////',fill_bottom_with_cmap_over_color=False, # for TRY
                                 
-                                fill_bottom_with_cmap_over_color=True, # for TRY
+                                additional_points ={(40.5, 35.9):('D', 'w', 6)},
+                                fill_bottom_with_cmap_over_color=False, # for TRY
                                 bottom_fill_bounds = ((0,0), 
-                                                      (5,11.),
-                                                      (95,11.)),
+                                                      (1,11.),
+                                                      (99,11.)),
                                 # zoom_data_scale=5,
-                                text_boxes = {'>400': [(5,2), 'white']},
+                                text_boxes = {'>400': [(80,5), 'white']},
                                 )
 
 #%% Purity
 
 # Purity_w_levels, Purity_w_ticks, Purity_cbar_ticks = get_contour_info_from_metric_data(results_metric_6,)
-Purity_w_levels = np.arange(0.7, 1.0, 0.01)
-Purity_cbar_ticks = np.arange(0.7, 1.0, 0.05)
+Purity_w_levels = 100.*np.arange(0., 1.01, 0.025)
+Purity_cbar_ticks = 100.*np.arange(0., 1.01, 0.1)
 # Purity_cbar_ticks = np.arange(2, 8.1, 1.)
-Purity_w_ticks = [.85, 0.88, .90, .91, 0.92, 0.93, 0.94, 0.95]
+Purity_w_ticks = 100.*np.array([0.89, 0.90, 0.91, 0.92, 0.93, 0.94, 0.95])
 # Purity_w_levels = np.arange(0., 15.5, 0.5)
 
-contourplots.animated_contourplot(w_data_vs_x_y_at_multiple_z=results_metric_6, # shape = z * x * y # values of the metric you want to plot on the color axis; e.g., Purity
+contourplots.animated_contourplot(w_data_vs_x_y_at_multiple_z=100.*np.array(results_metric_6), # shape = z * x * y # values of the metric you want to plot on the color axis; e.g., Purity
                                 x_data=100*yields, # x axis values
                                 # x_data = yields/theoretical_max_g_TAL_acid_per_g_glucose,
                                 y_data=titers, # y axis values
@@ -854,7 +858,7 @@ contourplots.animated_contourplot(w_data_vs_x_y_at_multiple_z=results_metric_6, 
                                 fmt_clabel = lambda cvalue: get_rounded_str(cvalue, 3),
                                 cmap=CABBI_green_colormap(), # can use 'viridis' or other default matplotlib colormaps
                                 cmap_over_color = colors.grey_dark.shade(8).RGBn,
-                                extend_cmap='max',
+                                extend_cmap='neither',
                                 cbar_ticks=Purity_cbar_ticks,
                                 z_marker_color='g', # default matplotlib color names
                                 fps=fps, # animation frames (z values traversed) per second
@@ -868,6 +872,7 @@ contourplots.animated_contourplot(w_data_vs_x_y_at_multiple_z=results_metric_6, 
                                 # comparison_range=TAL_maximum_viable_market_range,
                                 n_minor_ticks = 1,
                                 cbar_n_minor_ticks = 4,
+                                additional_points ={(40.5, 35.9):('D', 'w', 6)},
                                 # comparison_range=[Purity_w_levels[-2], Purity_w_levels[-1]],
                                 # comparison_range_hatch_pattern='////',
                                 )

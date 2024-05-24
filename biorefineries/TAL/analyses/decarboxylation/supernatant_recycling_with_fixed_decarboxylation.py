@@ -131,7 +131,8 @@ import biosteam as bst
 s,u = bst.main_flowsheet.stream, bst.main_flowsheet.unit
 
 #%%
-splits = np.linspace(0., 0.95, 20)
+steps = 100
+splits = np.linspace(0., 0.95, steps)
 MPSPs, GWPs, FECs = [], [], []
 recoveries = []
 for spl in splits:
@@ -254,12 +255,12 @@ plot_multiple_metrics(100*np.array(splits),
                                   (0,100),
                                   (5,10),
                                   (6,16),
-                                  (-30,60),
+                                  (-60,60),
                                   ],
                       xticks=[0 + 10*i for i in range(0,11)],
                       yticks_list = [[0 + 10*i for i in range(0,11)],
-                                 np.arange(5, 10.1, 1),
-                                 np.arange(6, 16.1, 2),
-                                 np.arange(-30, 60.1, 10),
+                                 np.arange(5, 10.1, 0.5),
+                                 np.arange(6, 16.1, 1),
+                                 np.arange(-60, 60.1, 10),
                                  ]
                       )

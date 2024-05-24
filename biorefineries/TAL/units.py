@@ -282,12 +282,14 @@ class BatchCoFermentation(BatchBioreactor):
     CSL_loading = 76.903 # g/L
     # CSL_loading = 32.5 # g/L
     
-    DAP_loading = 10.228 # g-
+    DAP_loading = 10.228 # g/L
     
     regular_microbe_conversion = 0.339
     regular_citric_acid_conversion = 0.08856 # from Markham et al.; 16 g/L citrate from 180 g/L glucose
     
     acetate_target_loading = 13.667 * (60.05196/82.033789) # g-AceticAcid-eq / L # 13.667 g-sodium acetate /L as in Markham et al. 2018
+    
+    acetate_target_loading_default = 13.667 * (60.05196/82.033789) # g-AceticAcid-eq / L # 13.667 g-sodium acetate /L as in Markham et al. 2018 # default to this acetate loading if target TAL titer-yield combination is feasible
     
     air_m3_per_h_per_m3_reactor = 3.5*60/3 # 3.5 slpm for a 3L bioreactor; Markham et al. 2018 # used when aeration_rate_basis=='fixed rate basis'
     
@@ -395,7 +397,7 @@ class BatchCoFermentation(BatchBioreactor):
         air.imol['O2'] = 0.21
         
         if self.aeration_rate_basis == 'DO saturation basis':
-            self.air_exit_F_mol_needed = (1./0.21) * (1/32.) * self.air_flow_rate_safety_factor_for_DO_saturation_basis * self.DO_saturation_concentration_kg_per_m3 * self.DO_saturation_target_level\
+            self.air_exit_F_mol_needed = (1./0.21) * (1/32.) * self.DO_saturation_concentration_kg_per_m3 * self.DO_saturation_target_level\
                 *(seed.F_vol+feed.F_vol)
             
             air.F_mol = 1e8 # initial value; updated after reactions
@@ -430,6 +432,11 @@ class BatchCoFermentation(BatchBioreactor):
             air.F_mol -= air_mol_excess
             effluent.imol['O2'] -= O2_mol_excess
             effluent.imol['N2'] -= N2_mol_excess
+        
+        aeration_safety_factor = self.air_flow_rate_safety_factor_for_DO_saturation_basis
+        effluent.imol['O2'] += (aeration_safety_factor-1) * air.imol['O2']
+        effluent.imol['N2'] += (aeration_safety_factor-1) * air.imol['N2']
+        air.F_mol += (aeration_safety_factor-1) * air.F_mol
         
         vapor.imol['CO2', 'O2', 'N2'] = effluent.imol['CO2', 'O2', 'N2']
         vapor.phase = 'g'

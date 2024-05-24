@@ -339,13 +339,18 @@ def set_production_capacity(
     if not TEA:
         TEA = system.TEA
     
+    n_iterations_analytical = 1
     if method=='analytical':
-        system.simulate()
-        feedstock_stream.F_mass *= desired_annual_production / (get_pure_product_mass() * system.TEA.operating_hours/1e3)
-        if spec: spec.load_specifications(spec_1=spec.spec_1,
-                                          spec_2=spec.spec_2,
-                                          spec_3=spec.spec_3,)
-        system.simulate()
+        for i in range(n_iterations_analytical):
+            if spec: spec.load_specifications(spec_1=spec.spec_1,
+                                              spec_2=spec.spec_2,
+                                              spec_3=spec.spec_3,)
+            system.simulate()
+            feedstock_stream.F_mass *= desired_annual_production / (get_pure_product_mass() * system.TEA.operating_hours/1e3)
+            if spec: spec.load_specifications(spec_1=spec.spec_1,
+                                              spec_2=spec.spec_2,
+                                              spec_3=spec.spec_3,)
+            system.simulate()
         
     elif method=='IQ_interpolation':
         def obj_f_prod_cap(feedstock_F_mass):

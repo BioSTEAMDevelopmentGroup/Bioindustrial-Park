@@ -105,7 +105,7 @@ def create_TAL_fermentation_process(ins, outs,):
     @M304.add_specification()
     def adjust_M304_water():
         M304_ins_1 = M304.ins[1]
-        M304_ins_1.imol['Water'] = M304.water_to_sugar_mol_ratio * M304.ins[0].imol['Glucose', 'Xylose'].sum()
+        M304_ins_1.imol['Water'] = M304.water_to_sugar_mol_ratio * M304.ins[0].imol['Glucose', 'Xylose', 'Sucrose'].sum()
         M304._run()
     
     M304_H = bst.units.HXutility('M304_H', ins=M304-0, T=30+273.15, rigorous=True)
