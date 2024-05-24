@@ -196,7 +196,7 @@ class Reactor(Unit, PressureVessel, isabstract=True):
       kW=511.3205, cost=13329690, S=94697, CE=CEPCI[2009], n=0.6, BM=1.7)
 class FeedstockPreprocessing(Unit):
     # 2205 U.S. ton/day (2000 metric tonne/day) as in Humbird et al.
-    _baseline_flow_rate = baseline_feedflow.sum()
+    # _baseline_flow_rate = baseline_feedflow.sum()
     _cached_flow_rate = 2205
 
 #%% Conversion
@@ -282,12 +282,14 @@ class BatchCoFermentation(BatchBioreactor):
     CSL_loading = 76.903 # g/L
     # CSL_loading = 32.5 # g/L
     
-    DAP_loading = 10.228 # g-
+    DAP_loading = 10.228 # g/L
     
     regular_microbe_conversion = 0.339
     regular_citric_acid_conversion = 0.08856 # from Markham et al.; 16 g/L citrate from 180 g/L glucose
     
     acetate_target_loading = 13.667 * (60.05196/82.033789) # g-AceticAcid-eq / L # 13.667 g-sodium acetate /L as in Markham et al. 2018
+    
+    acetate_target_loading_default = 13.667 * (60.05196/82.033789) # g-AceticAcid-eq / L # 13.667 g-sodium acetate /L as in Markham et al. 2018 # default to this acetate loading if target TAL titer-yield combination is feasible
     
     air_m3_per_h_per_m3_reactor = 3.5*60/3 # 3.5 slpm for a 3L bioreactor; Markham et al. 2018 # used when aeration_rate_basis=='fixed rate basis'
     
@@ -395,7 +397,7 @@ class BatchCoFermentation(BatchBioreactor):
         air.imol['O2'] = 0.21
         
         if self.aeration_rate_basis == 'DO saturation basis':
-            self.air_exit_F_mol_needed = (1./0.21) * (1/32.) * self.air_flow_rate_safety_factor_for_DO_saturation_basis * self.DO_saturation_concentration_kg_per_m3 * self.DO_saturation_target_level\
+            self.air_exit_F_mol_needed = (1./0.21) * (1/32.) * self.DO_saturation_concentration_kg_per_m3 * self.DO_saturation_target_level\
                 *(seed.F_vol+feed.F_vol)
             
             air.F_mol = 1e8 # initial value; updated after reactions
@@ -430,6 +432,11 @@ class BatchCoFermentation(BatchBioreactor):
             air.F_mol -= air_mol_excess
             effluent.imol['O2'] -= O2_mol_excess
             effluent.imol['N2'] -= N2_mol_excess
+        
+        aeration_safety_factor = self.air_flow_rate_safety_factor_for_DO_saturation_basis
+        effluent.imol['O2'] += (aeration_safety_factor-1) * air.imol['O2']
+        effluent.imol['N2'] += (aeration_safety_factor-1) * air.imol['N2']
+        air.F_mol += (aeration_safety_factor-1) * air.F_mol
         
         vapor.imol['CO2', 'O2', 'N2'] = effluent.imol['CO2', 'O2', 'N2']
         vapor.phase = 'g'
@@ -819,10 +826,10 @@ class HydrogenationReactor(Reactor):
     _F_BM_default = {**Reactor._F_BM_default,
             'Heat exchangers': 3.,
             'Ni-SiO2 catalyst': 1.}
-    mcat_frac = 0.5 # fraction of catalyst by weight in relation to the reactant (TAL)
+    mcat_frac = 0.2 # fraction of catalyst by weight in relation to the reactant (TAL) # from Huber group
     hydrogenation_rxns = ParallelRxn([
             #   Reaction definition   Reactant   Conversion
-            Rxn('TAL + 2H2 -> HMTHP',         'TAL',   0.968), # conversion from Huber group experimental data
+            Rxn('TAL + 2H2 -> HMTHP',         'TAL',   0.969), # conversion from Huber group experimental data
             # Rxn('HMDHP + H2 -> HMTHP',         'HMDHP',   1.-1e-5)
             ])
     byproduct_formation_rxns  = ParallelRxn([
@@ -836,9 +843,9 @@ class HydrogenationReactor(Reactor):
     spent_catalyst_replacements_per_year = 1. # number of times the entire catalyst_weight is replaced per year
     
     def _init(self,  
-                 tau = 17., # from Huber group
+                 tau = 9.4, # from Huber group
                  T=100. + 273.15, # from Huber group
-                 P=3e6, # 30 bar # from Huber group
+                 P=3.5e6, # 35 bar # from Huber group
                  vessel_material='Stainless steel 316',
                  NiSiO2_catalyst_price=price['Ni-SiO2'],
                  **args):
@@ -938,7 +945,7 @@ class DehydrationReactor(Reactor):
     mcat_frac = 0.5 # fraction of catalyst by weight in relation to the reactant (TAL)
     dehydration_rxns = ParallelRxn([
             #   Reaction definition                                       Reactant   Conversion
-            Rxn('HMTHP -> PSA',         'HMTHP',   0.842) # conversion from Huber group experimental data
+            Rxn('HMTHP -> PSA',         'HMTHP',   0.871) # conversion from Huber group experimental data
                 ])
     byproduct_formation_rxns  = ParallelRxn([
             #   Reaction definition   Reactant   Conversion
@@ -950,9 +957,9 @@ class DehydrationReactor(Reactor):
     spent_catalyst_replacements_per_year = 1. # number of times the entire catalyst_weight is replaced per year
     
     def _init(self,  
-                 tau = 17.8, # from Huber group
-                 T=100. + 273.15, # from Huber group
-                 P=3e6, # 30 bar # from Huber group
+                 tau = 6.1, # from Huber group
+                 T=160. + 273.15, # from Huber group
+                 P=2e6, # 20 bar # from Huber group
                  vessel_material='Stainless steel 316',
                  Amberlyst70_catalyst_price=price['Amberlyst-70'],
                  **args):
@@ -1033,13 +1040,13 @@ class RingOpeningHydrolysisReactor(Reactor):
     
     ring_opening_rxns = ParallelRxn([
             #   Reaction definition                                       Reactant   Conversion
-            Rxn('PSA -> SA',         'PSA',   0.99) # conversion from Huber group
+            Rxn('PSA -> SA',         'PSA',   0.999) # conversion from Huber group
                 ])
     
     PSA_to_SA_rxn = ring_opening_rxns[0]
     hydrolysis_rxns = ParallelRxn([
             #   Reaction definition                                       Reactant   Conversion
-            Rxn('SA + KOH -> KSA + H2O',         'SA',   0.99) # conversion from Huber group 
+            Rxn('SA + KOH -> KSA + H2O',         'SA',   1.-1e-5) # assumed 
                 ])
     SA_to_KSA_rxn = hydrolysis_rxns[0]
     byproduct_formation_rxns = ParallelRxn([
@@ -1048,9 +1055,9 @@ class RingOpeningHydrolysisReactor(Reactor):
                 ])
     
     def _init(self,  
-                 tau = 16., # from Huber group
+                 tau = 19., # from Huber group
                  T=130. + 273.15, # from Huber group
-                 P=3e6, # 30 bar # from Huber group
+                 P=2e6, # 20 bar # from Huber group
                  vessel_material='Stainless steel 316', **args):
         Reactor._init(self,  tau=tau, P=P, vessel_material=vessel_material)
         self.T = T

@@ -7,7 +7,11 @@ Created on Tue Aug 22 15:36:06 2023
 from biosteam import UnitGroup
 from biosteam.evaluation import Metric
 from biosteam import HeatExchangerNetwork, DrumDryer
+from thermosteam import equilibrium
 from flexsolve import IQ_interpolation
+from numba import njit
+from math import log
+import numpy as np
 
 __all__ = {'call_all_specifications_or_run',
            'get_more_unit_groups',
@@ -15,7 +19,54 @@ __all__ = {'call_all_specifications_or_run',
            'set_production_capacity',
            'TEA_breakdown',
            'update_facility_IDs',
+           'get_pH_polyprotic_acid_mixture',
            }
+
+#%% Estimate the pH of a mixture of polyprotic acids
+def get_molarity(ID, stream):
+    return stream.imol[ID]/stream.F_vol
+
+@njit
+def helper_acid_contribution_upto_triprotic(cH, acid_molarity, Ka1, Ka2, Ka3):
+    return acid_molarity * ((Ka1*cH**2 + 2*cH*Ka1*Ka2 + 3*Ka1*Ka2*Ka3) / (cH**3 + Ka1*cH**2 + cH*Ka1*Ka2 + Ka1*Ka2*Ka3))
+
+def get_acid_contribution_upto_triprotic(cH, acid_molarity, Kas):
+    n_Kas = len(Kas)
+    Ka1 = Kas[0]
+    Ka2 = Kas[1] if n_Kas>1 else 0.
+    Ka3 = Kas[2] if n_Kas>2 else 0.
+    return helper_acid_contribution_upto_triprotic(cH, acid_molarity, Ka1, Ka2, Ka3)
+
+def obj_f_cH_polyprotic_acid_mixture(cH, acid_molarities, Kas):
+    return cH - (10**-14)/cH - sum([get_acid_contribution_upto_triprotic(cH, m, k) 
+                                    for m,k in zip(acid_molarities, Kas)])
+
+def get_cH_polyprotic_acid_mixture(stream, acid_IDs, Kas, activities):
+    acid_molarities = [get_molarity(i, stream) for i in acid_IDs]
+    gammas = np.ones(len(acid_molarities))
+    
+    if activities=='UNIFAC':
+        stream_chems = stream.chemicals
+        gamma_obj = equilibrium.UNIFACActivityCoefficients(stream_chems)
+        indices = [stream_chems.index(i) for i in acid_IDs]
+        gammas = gamma_obj(stream.mol[:], stream.T)[indices]
+    elif activities=='Dortmund':
+        stream_chems = stream.chemicals
+        gamma_obj = equilibrium.DortmundActivityCoefficients(stream_chems)
+        indices = [stream_chems.index(i) for i in acid_IDs]
+        gammas = gamma_obj(stream.mol[:], stream.T)[indices]
+        
+    acid_molarities = np.multiply(acid_molarities, gammas)
+    
+    obj_f = lambda cH: 1000.* obj_f_cH_polyprotic_acid_mixture(cH, acid_molarities, Kas)
+    return IQ_interpolation(obj_f, 10**(-14), 10**(-1), ytol=1e-6)
+
+def get_pH_polyprotic_acid_mixture(stream, acid_IDs=[], Kas=[], activities='ideal'):
+    implemented_activities = ('ideal', 'UNIFAC', 'Dortmund')
+    if activities not in implemented_activities:
+        raise ValueError(f"Parameter 'activities' must be one of {implemented_activities}, not {activities}.")
+    return -log(get_cH_polyprotic_acid_mixture(stream, acid_IDs, Kas, activities), 10.)
+
 
 #%% For a given list of units, call all specifications of each unit or run each unit (in the presented order)
 def call_all_specifications_or_run(units_to_run):
@@ -288,13 +339,18 @@ def set_production_capacity(
     if not TEA:
         TEA = system.TEA
     
+    n_iterations_analytical = 1
     if method=='analytical':
-        system.simulate()
-        feedstock_stream.F_mass *= desired_annual_production / (get_pure_product_mass() * system.TEA.operating_hours/1e3)
-        if spec: spec.load_specifications(spec_1=spec.spec_1,
-                                          spec_2=spec.spec_2,
-                                          spec_3=spec.spec_3,)
-        system.simulate()
+        for i in range(n_iterations_analytical):
+            if spec: spec.load_specifications(spec_1=spec.spec_1,
+                                              spec_2=spec.spec_2,
+                                              spec_3=spec.spec_3,)
+            system.simulate()
+            feedstock_stream.F_mass *= desired_annual_production / (get_pure_product_mass() * system.TEA.operating_hours/1e3)
+            if spec: spec.load_specifications(spec_1=spec.spec_1,
+                                              spec_2=spec.spec_2,
+                                              spec_3=spec.spec_3,)
+            system.simulate()
         
     elif method=='IQ_interpolation':
         def obj_f_prod_cap(feedstock_F_mass):

@@ -110,7 +110,7 @@ NaNO3 = chemical_database('NaNO3', phase='l', Hf=-118756*_cal2joule)
 # NIST https://webbook.nist.gov/cgi/cbook.cgi?ID=C7757826&Mask=2, accessed 04/07/2020
 Na2SO4 = chemical_database('Na2SO4', phase='l', Hf=-1356.38e3)
 # CaSO4 = chemical_database('CaSO4', phase='s', Hf=-342531*_cal2joule)
-# The default Perry 151 model has a crazy value, use another model instead
+# The default Perry 151 model gives an inordinately high value, use another model instead
 # CaSO4.Cn.move_up_model_priority('Constant', 0)
 # 
 
@@ -144,7 +144,8 @@ AmmoniumAcetate = chemical_database('AmmoniumAcetate', phase='l',
 # =============================================================================
 
 AceticAcid = chemical_database('AceticAcid')
-SodiumAcetate = chemical_database('SodiumAcetate')
+SodiumAcetate = chemical_database('SodiumAcetate', phase='l')
+SodiumCitrate = chemical_database('SodiumCitrate', phase='l')
 Glucose = chemical_database('Glucose', phase = 'l')
 
 CitricAcid = chemical_database('CitricAcid')
@@ -213,7 +214,10 @@ Furfural = chemical_database('Furfural')
 
 
 Ethanol = chemical_database('Ethanol')
+
 Acetone = chemical_database('Acetone')
+IPA = chemical_database(ID='IPA', search_ID='Isopropanol')
+
 Hexanol = chemical_database('Hexanol')
 # Heptane = chemical_database('Heptane')
 
@@ -546,6 +550,9 @@ Alanine = chemical_database('Alanine', phase='s')
 
 # Holmes, Trans. Faraday Soc. 1962, 58 (0), 1916–1925, abstract
 # This is for auto-population of combustion reactions
+
+SodiumPhosphate = chemical_database('SodiumPhosphate', phase='l')
+
 P4O10 = chemical_database('P4O10', phase='s', Hf=-713.2*_cal2joule)
 Ash = chemical_database('Ash', search_ID='CaO', phase='s', Hf=-151688*_cal2joule,
                         HHV=0, LHV=0)
@@ -782,6 +789,9 @@ chems.set_synonym('Tetrahydrofuran', 'THF')
 chems.set_synonym('AceticAcid', 'Acetate')
 
 chems.set_synonym('PD', 'Acetylacetone')
+
+chems.set_synonym('IPA', 'Isopropanol')
+
 # chems.set_synonym('Isobutyraldehyde', 'IBA')
 
 
