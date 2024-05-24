@@ -826,7 +826,7 @@ class HydrogenationReactor(Reactor):
     _F_BM_default = {**Reactor._F_BM_default,
             'Heat exchangers': 3.,
             'Ni-SiO2 catalyst': 1.}
-    mcat_frac = 0.5 # fraction of catalyst by weight in relation to the reactant (TAL)
+    mcat_frac = 0.2 # fraction of catalyst by weight in relation to the reactant (TAL) # from Huber group
     hydrogenation_rxns = ParallelRxn([
             #   Reaction definition   Reactant   Conversion
             Rxn('TAL + 2H2 -> HMTHP',         'TAL',   0.968), # conversion from Huber group experimental data
