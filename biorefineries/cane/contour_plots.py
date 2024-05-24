@@ -82,17 +82,17 @@ CABBI_colors_x = (colors.CABBI_blue_light.tint(90).RGBn,
                   colors.CABBI_teal_green.shade(45).RGBn)
 
 diverging_colormaps = [
-    plt.cm.get_cmap('RdYlGn')
+    plt.get_cmap('RdYlGn')
 ]
 
 colormaps = [
-    plt.cm.get_cmap('viridis'),
-    plt.cm.get_cmap('copper_r'),
+    plt.get_cmap('viridis'),
+    plt.get_cmap('copper_r'),
     # LinearSegmentedColormap.from_list('CABBI', CABBI_colors, 25),
     # LinearSegmentedColormap.from_list('CABBI', CABBI_colors_x, 25),
-    plt.cm.get_cmap('inferno_r'),
-    plt.cm.get_cmap('copper_r'),
-    plt.cm.get_cmap('bone_r'),
+    plt.get_cmap('inferno_r'),
+    plt.get_cmap('copper_r'),
+    plt.get_cmap('bone_r'),
 ] * 2
 
 light_letter_color = colors.neutral.tint(98).RGBn
@@ -298,12 +298,12 @@ def plot_metrics_across_composition(
     metric_bars = [
         # MetricBar(MFPP.name, format_units(MFPP.units), colormaps[1], tickmarks(data[:, :, 0, :], 5, 1, expand=0, p=0.5), 18, 1),
         MetricBar('Competitive biomass yield', CBY_units, 
-                  plt.cm.get_cmap('viridis_r'), 
+                  plt.get_cmap('viridis_r'), 
                   tickmarks(d0[~np.isnan(d0)], 5, 1, expand=0, p=0.5),
                   15, 1),
-        # MetricBar('Biod. prod.', format_units(BP.units), plt.cm.get_cmap('copper'), tickmarks(data[:, :, 1, :], 8, 1, expand=0, p=0.5), 10, 1),
-        # MetricBar('MBSP', format_units(MBSP.units), plt.cm.get_cmap('inferno_r'), tickmarks(d1[~np.isnan(d1)], 5, 0.1, expand=0, p=0.5), 20, 1),
-        # MetricBar('Net energy prod.', format_units(NEP.units), plt.cm.get_cmap('inferno'), tickmarks(d1[~np.isnan(d1)], 5, 1, expand=0, p=2), 20, 1),
+        # MetricBar('Biod. prod.', format_units(BP.units), plt.get_cmap('copper'), tickmarks(data[:, :, 1, :], 8, 1, expand=0, p=0.5), 10, 1),
+        # MetricBar('MBSP', format_units(MBSP.units), plt.get_cmap('inferno_r'), tickmarks(d1[~np.isnan(d1)], 5, 0.1, expand=0, p=0.5), 20, 1),
+        # MetricBar('Net energy prod.', format_units(NEP.units), plt.get_cmap('inferno'), tickmarks(d1[~np.isnan(d1)], 5, 1, expand=0, p=2), 20, 1),
     ]
     fig, axes, CSs, CB, other_axes = plot_contour_2d(
         100.*X, 100.*Y, data, xlabel, ylabel, xticks, yticks, 
@@ -472,8 +472,8 @@ def _plot_metrics_across_biomass_yield_TOC(
     d0 = data[:, :, 0]
     d1 = data[:, :, 1]
     metric_bars = [
-        MetricBar('MBSP', format_units('USD/L'), plt.cm.get_cmap('viridis_r'), tickmarks(d0[~np.isnan(d0)], 5, 1, expand=0, p=0.5), 15, 1),
-        MetricBar('Carbon intensity', format_units(GWP.units).replace('CO2', 'CO_2'), plt.cm.get_cmap('inferno_r'), tickmarks(d1[~np.isnan(d0)], 5, 0.1, expand=0, p=0.1), 15, 1),
+        MetricBar('MBSP', format_units('USD/L'), plt.get_cmap('viridis_r'), tickmarks(d0[~np.isnan(d0)], 5, 1, expand=0, p=0.5), 15, 1),
+        MetricBar('Carbon intensity', format_units(GWP.units).replace('CO2', 'CO_2'), plt.get_cmap('inferno_r'), tickmarks(d1[~np.isnan(d0)], 5, 0.1, expand=0, p=0.1), 15, 1),
     ]
     fig, axes, CSs, CB, other_axes = plot_contour_2d(
         X, Y, data, xlabel, '', xticks, yticks, 
@@ -580,8 +580,8 @@ def plot_metrics_across_biomass_yield(
     if titles is None: titles = np.array(['Direct Cogeneration', 'Integrated Co-Fermentation'])
     d0 = data[:, :, 0, :]
     metric_bars = [
-        MetricBar('MBSP', format_units('USD/L'), plt.cm.get_cmap('viridis_r'), tickmarks(d0[~np.isnan(d0)], 5, 1, expand=0, p=0.5), 15, 1),
-        MetricBar('Carbon intensity', format_units(GWP.units).replace('CO2', 'CO_2'), plt.cm.get_cmap('inferno_r'), tickmarks(d0[~np.isnan(d0)], 5, 0.1, expand=0, p=0.1), 15, 1),
+        MetricBar('MBSP', format_units('USD/L'), plt.get_cmap('viridis_r'), tickmarks(d0[~np.isnan(d0)], 5, 1, expand=0, p=0.5), 15, 1),
+        MetricBar('Carbon intensity', format_units(GWP.units).replace('CO2', 'CO_2'), plt.get_cmap('inferno_r'), tickmarks(d0[~np.isnan(d0)], 5, 0.1, expand=0, p=0.1), 15, 1),
     ]
     fig, axes, CSs, CB, other_axes = plot_contour_2d(
         X, Y, data, xlabel, ylabel, xticks, yticks, 
@@ -696,9 +696,9 @@ def contour_file(name):
 #     d1 = Z[:, :, 1, :]
 #     d2 = Z[:, :, 2, :]
 #     metric_bars = [
-#         MetricBar('MBSP', format_units('USD/L'), plt.cm.get_cmap('viridis_r'), tickmarks(d0[~np.isnan(d0)], 5, 1, expand=0, p=0.5), 15, 1),
-#         MetricBar('ROI', format_units('% USD'), plt.cm.get_cmap('viridis'), tickmarks(d1[~np.isnan(d1)], 5, 1, expand=0, p=1), 15, 1),
-#         MetricBar("GWP", format_units('USD/L'), plt.cm.get_cmap('inferno_r'), tickmarks(d2[~np.isnan(d2)], 5, 0.1, expand=0, p=0.1), 15, 1),
+#         MetricBar('MBSP', format_units('USD/L'), plt.get_cmap('viridis_r'), tickmarks(d0[~np.isnan(d0)], 5, 1, expand=0, p=0.5), 15, 1),
+#         MetricBar('ROI', format_units('% USD'), plt.get_cmap('viridis'), tickmarks(d1[~np.isnan(d1)], 5, 1, expand=0, p=1), 15, 1),
+#         MetricBar("GWP", format_units('USD/L'), plt.get_cmap('inferno_r'), tickmarks(d2[~np.isnan(d2)], 5, 0.1, expand=0, p=0.1), 15, 1),
 #     ]
 #     fig, axes, CSs, CB, other_axes = plot_contour_2d(
 #         X, Y, Z, xlabel, ylabel, xticks, yticks, metric_bars,  titles,
@@ -752,7 +752,7 @@ def plot_oil_recovery_integration(
               'Integrated Co-Fermentation\n& Recovery']
     units = format_units(metric.units)
     metric_bar = MetricBar(
-        metric.name, units, plt.cm.get_cmap('viridis_r'), tickmarks(Z[~np.isnan(Z)], 5, 0.5, expand=0, p=0.5), 25, 2
+        metric.name, units, plt.get_cmap('viridis_r'), tickmarks(Z[~np.isnan(Z)], 5, 0.5, expand=0, p=0.5), 25, 2
     )
     Y /= 100
     fig, axes, CSs, CB, other_axes = plot_contour_single_metric(
