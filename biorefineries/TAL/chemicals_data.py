@@ -214,7 +214,10 @@ Furfural = chemical_database('Furfural')
 
 
 Ethanol = chemical_database('Ethanol')
+
 Acetone = chemical_database('Acetone')
+IPA = chemical_database(ID='IPA', search_ID='Isopropanol')
+
 Hexanol = chemical_database('Hexanol')
 # Heptane = chemical_database('Heptane')
 
@@ -786,6 +789,9 @@ chems.set_synonym('Tetrahydrofuran', 'THF')
 chems.set_synonym('AceticAcid', 'Acetate')
 
 chems.set_synonym('PD', 'Acetylacetone')
+
+chems.set_synonym('IPA', 'Isopropanol')
+
 # chems.set_synonym('Isobutyraldehyde', 'IBA')
 
 

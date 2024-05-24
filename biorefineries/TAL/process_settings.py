@@ -1,20 +1,24 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-"""
-Created on Sun Aug 23 12:11:15 2020
+# Bioindustrial-Park: BioSTEAM's Premier Biorefinery Models and Results
+# Copyright (C) 2023-, Sarang Bhagwat <sarangb2@illinois.edu>,
+#
+# This module is under the UIUC open-source license. See
+# github.com/BioSTEAMDevelopmentGroup/biosteam/blob/master/LICENSE.txt
+# for license details.
 
-Modified from the cornstover biorefinery constructed in Cortes-Peña et al., 2020,
-with modification of fermentation system for 2,3-Butanediol instead of the original ethanol
+'''
+References
+----------
+[1] Argonne National Laboratory. The Greenhouse gases, Regulated Emissions,
+    and Energy use in Transportation (GREET) Model https://greet.es.anl.gov/
+    (accessed Aug 25, 2020).
+[2] Roni et al., Herbaceous Feedstock 2018 State of Technology Report;
+    INL/EXT-18-51654-Rev000; Idaho National Lab. (INL), 2020.
+    https://doi.org/10.2172/1615147.
+[3] ecoinvent 3.6 https://www.ecoinvent.org/home.html (accessed Aug 26, 2020).
 
-[1] Cortes-Peña et al., BioSTEAM: A Fast and Flexible Platform for the Design, 
-    Simulation, and Techno-Economic Analysis of Biorefineries under Uncertainty. 
-    ACS Sustainable Chem. Eng. 2020, 8 (8), 3302–3310. 
-    https://doi.org/10.1021/acssuschemeng.9b07040.
-
-All units are explicitly defined here for transparency and easy reference
-
-@author: sarangbhagwat
-"""
+'''
 
 import biosteam as bst
 import thermosteam as tmo
@@ -132,10 +136,6 @@ CH4_MW = chems.CH4.MW
 natural_gas_price = 4.70/1e3*_ft3_per_m3*CH4_V * (1e3/CH4_MW) *\
     chem_index[2019]/chem_index[2016]
 
-# https://www.rightpricechemicals.com/buy-amberlyst-15-ion-exchange-resin.html	
-# USD 383.13 for 2.5kg (largest available size order), accessed 06/11/2020
-amberlyst_15_price = 153.252 * _chemical_2020to2016
-
 # https://www.alibaba.com/product-detail/Tricalcium-Phosphate-Tricalcium-Phosphate-TCP-Tricalcium_60744013678.html?spm=a2700.galleryofferlist.0.0.42f16684C9iJhz&s=p
 TCP_price = 850 / _kg_per_ton # tricalcium (di)phosphate
 
@@ -201,11 +201,22 @@ spent_PdC_price = 1. # assumed
 
 acetone_price = 0.63 * _GDP_2008_to_2016 * _lb_per_kg # average of range ($0.44 - $0.82 /lb) from https://web.archive.org/web/20161125084558/http://www.icis.com:80/chemicals/channel-info-chemicals-a-z/
 
+# Q1 2022 - Q4 2023 range from https://www.chemanalyst.com/Pricing-data/isopropyl-alcohol-31
+# as reported:
+# min: $1.225 /kg; max: 1.662/kg; mean: $1.387/kg
+# converted to 2019$ (reported * chem_index[2019]/chem_index[2022]): 
+# min: $0.944 /kg; max: 1.281/kg; mean: $1.069/kg
+isopropanol_price = 1.387 * chem_index[2019]/chem_index[2022]
+
 acetic_acid_price = 0.38 *_lb_per_kg * _GDP_2008_to_2010 * chem_index[2019]/chem_index[2010] # average of 2008$ range ($ 0.35 - 0.41 /lb) from # https://web.archive.org/web/20161125084558/http://www.icis.com:80/chemicals/channel-info-chemicals-a-z/
 sodium_acetate_price = acetic_acid_price # unused
 
 CSL_price = 0.0339 * _lb_per_kg * chem_index[2019]/chem_index[2016] # from lactic acid paper
-amberlyst70_price = 30. #!!!
+
+
+# $100/100kg Amberlyst 15 from bulk vendor ("VIP, 6-year, Enterprise Certified") listing https://www.chemicalbook.com/ProductDetail_EN_451808.htm
+# $1/kg Amberlyst 15 from bulk vendor ("VIP, 5-year, Enterprise Certified") listing https://www.chemicalbook.com/ProductDetail_EN_916657.htm
+amberlyst70_price = 1.
 
 # 2.0/kg from https://www.alibaba.com/product-detail/Desiccant-for-paints-and-varnishes-Acetylacetone_10000004008185.html?spm=a2700.galleryofferlist.normal_offer.d_price.e82458eazJeqeC
 acetylacetone_price = 2.0 # 2,4-pentanedione or acetylacetone
@@ -220,6 +231,7 @@ DAP_price = 0.5*\
 
 # 390.09-789.25 USD / short ton in 2008; https://web.archive.org/web/20161125084558/http://www.icis.com:80/chemicals/channel-info-chemicals-a-z/            
 NaOH_price = ((390.09+789.25)/2.)/_kg_per_ton * _GDP_2008_to_2010 * chem_index[2019]/chem_index[2010]
+
 
 price = {'SA': SA_price,
          'PD': acetylacetone_price, # 2,4-pentanedione or acetylacetone
@@ -242,6 +254,7 @@ price = {'SA': SA_price,
          'Hexanol': hexanol_price,
          'Heptane': heptane_price,
          'Toluene': toluene_price,
+         'Isopropanol': isopropanol_price,
          'Acetone': acetone_price,
          'Sulfuric acid': 0.0430 * _lb_per_kg,	
          # 0.1900 is for NH3	
@@ -266,7 +279,6 @@ price = {'SA': SA_price,
          # Below currently not in use
          'Gypsum': gypsum_price,
          'Denaturant': denaturant_price,
-         'Amberlyst15': amberlyst_15_price,
          'DAP': DAP_price,
          'Activated carbon': activated_carbon_price,
          'Sodium acetate': sodium_acetate_price,
@@ -303,7 +315,7 @@ for i in (_lps, _mps, _hps, _cooling, _chilled, _chilled_brine):
 # %%
 
 # =============================================================================
-# Characterization factors (CFs) for life cycle analysis (LCA), all from ref [5] if not noted otherwise
+# Characterization factors (CFs) for life cycle analysis (LCA), all from ref [1] if not noted otherwise
 # =============================================================================
 
 CFs = {}
