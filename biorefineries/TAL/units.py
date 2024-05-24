@@ -829,7 +829,7 @@ class HydrogenationReactor(Reactor):
     mcat_frac = 0.2 # fraction of catalyst by weight in relation to the reactant (TAL) # from Huber group
     hydrogenation_rxns = ParallelRxn([
             #   Reaction definition   Reactant   Conversion
-            Rxn('TAL + 2H2 -> HMTHP',         'TAL',   0.968), # conversion from Huber group experimental data
+            Rxn('TAL + 2H2 -> HMTHP',         'TAL',   0.969), # conversion from Huber group experimental data
             # Rxn('HMDHP + H2 -> HMTHP',         'HMDHP',   1.-1e-5)
             ])
     byproduct_formation_rxns  = ParallelRxn([
@@ -843,9 +843,9 @@ class HydrogenationReactor(Reactor):
     spent_catalyst_replacements_per_year = 1. # number of times the entire catalyst_weight is replaced per year
     
     def _init(self,  
-                 tau = 17., # from Huber group
+                 tau = 9.4, # from Huber group
                  T=100. + 273.15, # from Huber group
-                 P=3e6, # 30 bar # from Huber group
+                 P=3.5e6, # 35 bar # from Huber group
                  vessel_material='Stainless steel 316',
                  NiSiO2_catalyst_price=price['Ni-SiO2'],
                  **args):
@@ -945,7 +945,7 @@ class DehydrationReactor(Reactor):
     mcat_frac = 0.5 # fraction of catalyst by weight in relation to the reactant (TAL)
     dehydration_rxns = ParallelRxn([
             #   Reaction definition                                       Reactant   Conversion
-            Rxn('HMTHP -> PSA',         'HMTHP',   0.842) # conversion from Huber group experimental data
+            Rxn('HMTHP -> PSA',         'HMTHP',   0.871) # conversion from Huber group experimental data
                 ])
     byproduct_formation_rxns  = ParallelRxn([
             #   Reaction definition   Reactant   Conversion
@@ -957,9 +957,9 @@ class DehydrationReactor(Reactor):
     spent_catalyst_replacements_per_year = 1. # number of times the entire catalyst_weight is replaced per year
     
     def _init(self,  
-                 tau = 17.8, # from Huber group
-                 T=100. + 273.15, # from Huber group
-                 P=3e6, # 30 bar # from Huber group
+                 tau = 6.1, # from Huber group
+                 T=160. + 273.15, # from Huber group
+                 P=2e6, # 20 bar # from Huber group
                  vessel_material='Stainless steel 316',
                  Amberlyst70_catalyst_price=price['Amberlyst-70'],
                  **args):
@@ -1040,13 +1040,13 @@ class RingOpeningHydrolysisReactor(Reactor):
     
     ring_opening_rxns = ParallelRxn([
             #   Reaction definition                                       Reactant   Conversion
-            Rxn('PSA -> SA',         'PSA',   0.99) # conversion from Huber group
+            Rxn('PSA -> SA',         'PSA',   0.999) # conversion from Huber group
                 ])
     
     PSA_to_SA_rxn = ring_opening_rxns[0]
     hydrolysis_rxns = ParallelRxn([
             #   Reaction definition                                       Reactant   Conversion
-            Rxn('SA + KOH -> KSA + H2O',         'SA',   0.99) # conversion from Huber group 
+            Rxn('SA + KOH -> KSA + H2O',         'SA',   1.-1e-5) # assumed 
                 ])
     SA_to_KSA_rxn = hydrolysis_rxns[0]
     byproduct_formation_rxns = ParallelRxn([
@@ -1055,9 +1055,9 @@ class RingOpeningHydrolysisReactor(Reactor):
                 ])
     
     def _init(self,  
-                 tau = 16., # from Huber group
+                 tau = 19., # from Huber group
                  T=130. + 273.15, # from Huber group
-                 P=3e6, # 30 bar # from Huber group
+                 P=2e6, # 20 bar # from Huber group
                  vessel_material='Stainless steel 316', **args):
         Reactor._init(self,  tau=tau, P=P, vessel_material=vessel_material)
         self.T = T

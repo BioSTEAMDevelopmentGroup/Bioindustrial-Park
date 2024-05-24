@@ -844,7 +844,7 @@ def create_TAL_to_sorbic_acid_upgrading_process(ins, outs,):
     KSA, impurities_to_boiler, S410_cool_air, S408_cool_air,\
         spent_catalyst_R401, spent_catalyst_R402 = outs
     
-    M405 = bst.Mixer('M405', ins=(solid_TAL, IPA_upgrading_solvent, ''),
+    M405 = bst.Mixer('M405', ins=(solid_TAL, IPA_upgrading_solvent, '', ''),
                      outs=('TAL_in_IPA'))
     
     M405.w_TAL_per_w_IPA = 0.031855
@@ -852,11 +852,11 @@ def create_TAL_to_sorbic_acid_upgrading_process(ins, outs,):
     # => 0.03185528056690577 w-TAL/w-IPA
     @M405.add_specification()
     def M405_IPA_spec():
-        M405_TAL, M405_makeup_IPA, M405_recycled_IPA = M405.ins
+        M405_TAL, M405_makeup_IPA, M405_recycled_IPA_1, M405_recycled_IPA_2 = M405.ins
         M405_mixed, = M405.outs
         M405_makeup_IPA.empty()
         mass_TAL = sum([i.imass['TAL'] for i in M405.ins])
-        current_mass_IPA = sum([i.imass['IPA'] for i in [M405_TAL, M405_recycled_IPA]])
+        current_mass_IPA = sum([i.imass['IPA'] for i in [M405_TAL, M405_recycled_IPA_1, M405_recycled_IPA_2]])
         M405.required_mass_IPA = required_mass_IPA = mass_TAL/M405.w_TAL_per_w_IPA
         M405_makeup_IPA.imass['IPA'] = max(0., required_mass_IPA-current_mass_IPA)
         M405._run()
@@ -900,10 +900,44 @@ def create_TAL_to_sorbic_acid_upgrading_process(ins, outs,):
                                    vessel_material='Stainless steel 316',)
     
     R403_P = bst.Pump('R403_P', ins=R403-0, P=101325.)
+    
+    
+    # F406 = bst.units.MultiEffectEvaporator('F406', ins=R403_P-0, outs=('F406_b', 'F406_t'), 
+    #                                         chemical='IPA',
+    #                                         P = (20000, 10000, 5000, 2500, 1250), 
+    #                                         # P=20000.,
+    #                                         V = 0.2,
+    #                                         thermo = R403.thermo.ideal(),
+    #                                         # T=307.7,
+    #                                         )
+    
+    # F406 = bst.units.Flash('F406', ins=R403_P-0, outs=('F406_t', 'F406_b'), 
+    #                                         # chemical='IPA',
+    #                                         # P = (101325, 73581, 50892, 32777, 20000), 
+    #                                         P=20000.,
+    #                                         V = 0.5,
+    #                                         thermo = R403.thermo.ideal(),
+    #                                         # T=307.7,
+    #                                         )
+    # @F406.add_specification(run=False)
+    # def F406_spec():
+    #     F406_ins_0 = F406.ins[0]
+    #     DHL_mol = F406_ins_0.imol['DHL']
+    #     F406_ins_0.phase = 'l'
+    #     F406_ins_0.imol['DHL'] = 0.
+    #     F406._run()
+    #     F406_ins_0.phase = 'l'
+    #     F406_ins_0.imol['DHL'] = DHL_mol
+    #     F406.outs[1].imol['DHL'] = DHL_mol
+        
+    # F406.flash=False
+    
+    # F406-0-3-M405
+    
     F404 = bst.DrumDryer('F404', 
                          ins=(R403_P-0, 'F404_air', 'F404_natural_gas'),
                          outs=('dry_KSA', 'F404_hot_air', 'F404_emissions'),
-                         moisture_content=0.05, 
+                         moisture_content=0.02, 
                          split=0.,
                          moisture_ID='IPA')
     
@@ -916,13 +950,17 @@ def create_TAL_to_sorbic_acid_upgrading_process(ins, outs,):
     S410 = bst.units.FakeSplitter('S410', ins=H410-0, outs=(S410_cool_air, 'S410_IPA_recovered_from_air'))
     
     @S410.add_specification()
-    def S410_spec():
+    def S410_spec(): # split condensed IPA
         S410_ins_0 = S410.ins[0]
         S410.outs[0].mol[:] = S410_ins_0['g'].mol[:]
         S410.outs[1].mol[:] = S410_ins_0['l'].mol[:]
         M405.specifications[0]()
-        
-    S410-1-2-M405
+    
+    # M407 = bst.Mixer('M407', ins=(S410-1, 
+    #                                 # F406-0,
+    #                               ), outs='recycled_IPA')
+    # M407-0-2-M405 # recycle recovered IPA
+    S410-1-2-M405 # recycle recovered IPA
     
     M406 = bst.Mixer('M406', ins=(F404-0, acetone_purification, ''),)
     
@@ -938,8 +976,8 @@ def create_TAL_to_sorbic_acid_upgrading_process(ins, outs,):
     
     
     S406 = bst.FakeSplitter('S406', ins=M406-0,
-                        outs=(KSA, 'impurities_in_acetone'))
-    S406.KSA_loss = 0.05 # %
+                        outs=('KSA_purified', 'impurities_in_acetone'))
+    S406.KSA_loss = 0.02 # %
     @S406.add_specification()
     def S406_spec():
         S406_ins_0 = S406.ins[0]
@@ -949,7 +987,9 @@ def create_TAL_to_sorbic_acid_upgrading_process(ins, outs,):
         S406_outs_0.T = S406_ins_0.T
         S406_outs_1.copy_like(S406_ins_0)
         S406_outs_1.imol['KSA'] = S406.KSA_loss * tot_KSA
-        
+    
+    M408 = bst.Mixer('M408', ins=(S406-0, ''), outs=KSA)
+    
     F405 = bst.DrumDryer('F405', 
                          ins=(S406-1, 'F405_air', 'F405_natural_gas'),
                          outs=(impurities_to_boiler, 'F405_hot_air', 'F405_emissions'),
