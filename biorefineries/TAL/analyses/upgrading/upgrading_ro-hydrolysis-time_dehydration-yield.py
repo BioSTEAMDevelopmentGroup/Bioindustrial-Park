@@ -49,9 +49,8 @@ SA_market_range=np.array([
                           6.50 * 1.3397087, # $6.50/kg-potassium-sorbate from https://www.alibaba.com/product-detail/Lifecare-Supply-Potassium-Sorbate-High-Quality_1600897125355.html?spm=a2700.galleryofferlist.p_offer.d_title.1bc15827eAs1TL&s=p
                           ]) 
 
-TAL_maximum_viable_market_range = SA_market_range / theoretical_max_g_TAL_per_g_SA
 
-# TAL_maximum_viable_market_range = np.array([5.99, 7.74])
+# SA_market_range = np.array([5.99, 7.74])
 
 s, u = flowsheet.stream, flowsheet.unit
 
@@ -103,6 +102,26 @@ model.exception_hook = 'warn'
 print('\n\nSimulating baseline ...')
 baseline_initial = model.metrics_at_baseline()
 
+#%% Utility functions
+H401, U402, M401 = u.H401, u.U402, u.M401
+
+def get_pH_M401_outs_0():
+    M401_outs_0 = M401.outs[0]
+    if M401_outs_0.imol['CitricAcid', 'H3PO4', 'AceticAcid'].sum() > 0.:
+        return get_pH_polyprotic_acid_mixture(M401_outs_0,
+                                ['CitricAcid', 'H3PO4', 'AceticAcid'], 
+                                [[10**-3.13, 10**-4.76, 10**-6.40], 
+                                 [10**-2.16, 10**-7.21, 10**-12.32],
+                                 [10**-4.76]],
+                                'ideal')
+    else:
+        return 14. + log(get_molarity('NaOH', M401_outs_0), 10.) # assume strong base completely dissociates in aqueous solution
+
+def get_pH_given_base_addition(mol_base_per_m3_broth):
+    M401.mol_base_per_m3_broth = mol_base_per_m3_broth
+    M401.simulate()
+    return get_pH_M401_outs_0()
+
 #%% Parameter loading functions
 U402, M401 = u.U402, u.M401
 base_decarboxylation_fresh = s.base_decarboxylation_fresh
@@ -112,7 +131,9 @@ def load_decarboxylation_conversion(decarboxylation_conversion):
     U402.decarboxylation_conversion = decarboxylation_conversion
 
 def load_pH(pH):
-    M401.pH_to_load = pH
+    obj_f_pH = lambda mol_base_per_m3_broth: get_pH_given_base_addition(mol_base_per_m3_broth)\
+                                        - pH
+    IQ_interpolation(obj_f_pH, 0., 0.4, ytol=0.001)
     
 def load_base_price(base_price):
     base_decarboxylation_fresh.price = base_price
@@ -137,10 +158,29 @@ get_TAL_inhibitors_conc = lambda: 1000*sum(R302.outs[0].imass['AceticAcid', 'Fur
 
 
 TAL_metrics = [get_product_MPSP, 
-               lambda: TAL_lca.GWP - TAL_lca.net_electricity_GWP, 
-               lambda: TAL_lca.FEC - TAL_lca.net_electricity_FEC, 
-               get_TAL_AOC, get_TAL_FCI, get_product_purity, M401.get_pH_maintained]
+               # lambda: TAL_lca.GWP - TAL_lca.net_electricity_GWP, 
+               # lambda: TAL_lca.FEC - TAL_lca.net_electricity_FEC, 
+               lambda: TAL_lca.GWP, 
+               lambda: TAL_lca.FEC, 
+               get_TAL_AOC, get_TAL_FCI, get_product_purity, get_pH_M401_outs_0]
 
+# %% Generate 3-specification meshgrid and set specification loading functions
+
+steps = (60, 60, 1)
+
+# Yield, titer, productivity (rate)
+spec_1 = TAL_decarb_convs = np.linspace(0., 0.5, steps[0]) # yield
+spec_2 = pHs = np.linspace(get_pH_M401_outs_0(), 12., steps[1]) # titer
+
+
+# spec_3 = base_prices =\
+#     np.array([Base_fresh.price])
+    
+# spec_3 = base_prices =\
+#     np.linspace(1e-5, 5., steps[2])
+
+spec_3 = base_prices =\
+    np.array([base_decarboxylation_fresh.price])
 
 
 #%% Plot stuff
@@ -250,39 +290,13 @@ def tickmarks(dmin, dmax, accuracy=50, N_points=5):
     step = (dmax - dmin) / (N_points - 1)
     return [dmin + step * i for i in range(N_points)]
 
-
-#%% Set final fermentative citrate production to zero
-R303 = u.R303
-
-R302.regular_citric_acid_conversion = 0.
-R303.regular_citric_acid_conversion = 0.
+#%% Create meshgrid
+spec_1, spec_2 = np.meshgrid(spec_1, spec_2)
 
 #%% Initial simulation
 simulate_and_print()
-baseline_Base_presence = M401.get_pH_maintained()
+baseline_Base_presence = get_pH_M401_outs_0()
 
-
-
-# %% Generate 3-specification meshgrid and set specification loading functions
-
-steps = (60, 60, 1)
-
-# Yield, titer, productivity (rate)
-spec_1 = TAL_decarb_convs = np.linspace(0., 0.5, steps[0]) # yield
-spec_2 = pHs = np.linspace(M401.get_pH_maintained(), 12., steps[1]) # titer
-
-
-# spec_3 = base_prices =\
-#     np.array([Base_fresh.price])
-    
-# spec_3 = base_prices =\
-#     np.linspace(1e-5, 5., steps[2])
-
-spec_3 = base_prices =\
-    np.array([base_decarboxylation_fresh.price])
-#%% Create meshgrid
-spec_1, spec_2 = np.meshgrid(spec_1, spec_2)
-#%%
 print('\n\nSimulating the initial point to avoid bugs ...')
 # spec.load_specifications(TAL_decarb_convs[0], pHs[0], base_prices[0])
 # spec.set_production_capacity(desired_annual_production=spec.desired_annual_production)
@@ -293,6 +307,7 @@ load_pH(pHs[0])
 get_TAL_MPSP()
 M401.base_neutralizes_acids = True
 get_TAL_MPSP()
+
 
 # %% Run TRY analysis 
 system = TAL_sys
@@ -406,7 +421,7 @@ for p in base_prices:
     # %% Save generated data
     
     minute = '0' + str(dateTimeObj.minute) if len(str(dateTimeObj.minute))==1 else str(dateTimeObj.minute)
-    file_to_save = f'_{steps}_steps_'+'TAL_decarboxylation_purchasing_base_withoutcitrate%s.%s.%s-%s.%s'%(dateTimeObj.year, dateTimeObj.month, dateTimeObj.day, dateTimeObj.hour, minute)
+    file_to_save = f'_{steps}_steps_'+'TAL_decarboxylation_purchasing_base%s.%s.%s-%s.%s'%(dateTimeObj.year, dateTimeObj.month, dateTimeObj.day, dateTimeObj.hour, minute)
     np.save(TAL_results_filepath+file_to_save, np.array([d1_Metric1, d1_Metric2, d1_Metric3]))
     
     pd.DataFrame(d1_Metric1).to_csv(TAL_results_filepath+'MPSP-'+file_to_save+'.csv')
@@ -563,21 +578,21 @@ contourplots.animated_contourplot(w_data_vs_x_y_at_multiple_z=results_metric_1, 
                                 clabel_fontsize = clabel_fontsize,
                                 default_fontsize = default_fontsize,
                                 axis_tick_fontsize = axis_tick_fontsize,
-                                comparison_range=TAL_maximum_viable_market_range,
+                                comparison_range=SA_market_range,
                                 n_minor_ticks = 1,
                                 cbar_n_minor_ticks = 3,
                                 # comparison_range=[MPSP_w_levels[-2], MPSP_w_levels[-1]],
                                 # comparison_range_hatch_pattern='////',
                                 units_on_newline = (True, True, False, False), # x,y,z,w
                                 # manual_clabels_comparison_range =\
-                                #     {TAL_maximum_viable_market_range[0]:(20,0.75), 
-                                #       TAL_maximum_viable_market_range[1]:(30,1.25)},
+                                #     {SA_market_range[0]:(20,0.75), 
+                                #       SA_market_range[1]:(30,1.25)},
                                 # manual_clabels_regular = {
                                 #     # MPSP_w_ticks[4]: (5,.25),
                                 #     MPSP_w_ticks[5]: (5,.25),
                                 #     MPSP_w_ticks[6]: (45,1.75),
                                 #     },
-                                # additional_points ={(baseline_Base_presence, 22.5):('D', 'w', 6)},
+                                additional_points ={(baseline_Base_presence, 20.87):('D', 'w', 6)},
                                 # text_boxes = {'>10.0': [(41,1.8), 'white']},
                                 )
 
@@ -626,7 +641,7 @@ contourplots.animated_contourplot(w_data_vs_x_y_at_multiple_z=results_metric_2, 
                                 # comparison_range=[GWP_w_levels[-2], GWP_w_levels[-1]],
                                 # comparison_range_hatch_pattern='////',
                                 units_on_newline = (True, True, False, False), # x,y,z,w
-                                # additional_points ={(baseline_Base_presence, 22.5):('D', 'w', 6)},
+                                additional_points ={(baseline_Base_presence, 20.87):('D', 'w', 6)},
                                 # manual_clabels_regular = {
                                 #     MPSP_w_ticks[3]: (20 ,1),
                                 #     MPSP_w_ticks[4]: (35,1.25),
@@ -677,7 +692,7 @@ contourplots.animated_contourplot(w_data_vs_x_y_at_multiple_z=results_metric_3, 
                                 # comparison_range=[FEC_w_levels[-2], FEC_w_levels[-1]],
                                 # comparison_range_hatch_pattern='////',
                                 units_on_newline = (True, True, False, False), # x,y,z,w
-                                # additional_points ={(baseline_Base_presence, 22.5):('D', 'w', 6)},
+                                additional_points ={(baseline_Base_presence, 20.87):('D', 'w', 6)},
                                 )
 
 #%% AOC
@@ -721,7 +736,7 @@ contourplots.animated_contourplot(w_data_vs_x_y_at_multiple_z=results_metric_4, 
                                 clabel_fontsize = clabel_fontsize,
                                 default_fontsize = default_fontsize,
                                 axis_tick_fontsize = axis_tick_fontsize,
-                                # comparison_range=TAL_maximum_viable_market_range,
+                                # comparison_range=SA_market_range,
                                 n_minor_ticks = 1,
                                 cbar_n_minor_ticks = 1,
                                 # comparison_range=[AOC_w_levels[-2], AOC_w_levels[-1]],
@@ -770,7 +785,7 @@ contourplots.animated_contourplot(w_data_vs_x_y_at_multiple_z=results_metric_5, 
                                 clabel_fontsize = clabel_fontsize,
                                 default_fontsize = default_fontsize,
                                 axis_tick_fontsize = axis_tick_fontsize,
-                                # comparison_range=TAL_maximum_viable_market_range,
+                                # comparison_range=SA_market_range,
                                 n_minor_ticks = 1,
                                 cbar_n_minor_ticks = 1,
                                 # comparison_range=[FCI_w_levels[-2], FCI_w_levels[-1]],
@@ -819,7 +834,7 @@ contourplots.animated_contourplot(w_data_vs_x_y_at_multiple_z=results_metric_6, 
                                 clabel_fontsize = clabel_fontsize,
                                 default_fontsize = default_fontsize,
                                 axis_tick_fontsize = axis_tick_fontsize,
-                                # comparison_range=TAL_maximum_viable_market_range,
+                                # comparison_range=SA_market_range,
                                 n_minor_ticks = 1,
                                 cbar_n_minor_ticks = 1,
                                 # comparison_range=[Purity_w_levels[-2], Purity_w_levels[-1]],
@@ -865,7 +880,7 @@ contourplots.animated_contourplot(w_data_vs_x_y_at_multiple_z=results_metric_7, 
                                 clabel_fontsize = clabel_fontsize,
                                 default_fontsize = default_fontsize,
                                 axis_tick_fontsize = axis_tick_fontsize,
-                                # comparison_range=TAL_maximum_viable_market_range,
+                                # comparison_range=SA_market_range,
                                 n_minor_ticks = 1,
                                 cbar_n_minor_ticks = 1,
                                 # comparison_range=[M401_addition_w_levels[-2], M401_addition_w_levels[-1]],

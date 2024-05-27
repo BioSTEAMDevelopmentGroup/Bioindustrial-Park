@@ -216,7 +216,7 @@ CSL_price = 0.0339 * _lb_per_kg * chem_index[2019]/chem_index[2016] # from lacti
 
 # $100/100kg Amberlyst 15 from bulk vendor ("VIP, 6-year, Enterprise Certified") listing https://www.chemicalbook.com/ProductDetail_EN_451808.htm
 # $1/kg Amberlyst 15 from bulk vendor ("VIP, 5-year, Enterprise Certified") listing https://www.chemicalbook.com/ProductDetail_EN_916657.htm
-amberlyst70_price = 1.
+amberlyst70_price = 30.
 
 # 2.0/kg from https://www.alibaba.com/product-detail/Desiccant-for-paints-and-varnishes-Acetylacetone_10000004008185.html?spm=a2700.galleryofferlist.normal_offer.d_price.e82458eazJeqeC
 acetylacetone_price = 2.0 # 2,4-pentanedione or acetylacetone
@@ -351,6 +351,9 @@ GWP_CFs = {
     
     'NiSiO2':10., # !!! update
     'Amberlyst70_':10., # !!! update
+    'H2':10., # !!! update
+    'Isopropanol':10., # !!! update
+    
     }
 
 
@@ -406,6 +409,8 @@ FEC_CFs = {
     
     'NiSiO2':10., # !!! update
     'Amberlyst70_':10., # !!! update
+    'H2':10., # !!! update
+    'Isopropanol':10., # !!! update
     
     }
 

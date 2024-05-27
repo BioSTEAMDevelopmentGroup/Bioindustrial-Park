@@ -21,12 +21,12 @@ All units are explicitly defined here for transparency and easy reference
 
 import numpy as np
 import thermosteam as tmo
-from math import exp, pi, log
+from math import exp, pi, log, ceil
 from flexsolve import aitken_secant
 from biosteam import Unit, BatchCrystallizer
 from biosteam.units import Flash, HXutility, Mixer, MixTank, Pump, \
     SolidsSeparator, StorageTank, LiquidsSplitSettler, \
-    BatchBioreactor
+    BatchBioreactor, StirredTankReactor
 from biosteam.units.decorators import cost
 from biosteam.units.design_tools import CEPCI_by_year as CEPCI
 from thermosteam import Stream, MultiStream
@@ -44,7 +44,6 @@ compute_TAL_titer = lambda effluent: effluent.imass['TAL'] / effluent.F_vol
 compute_TAL_mass = lambda effluent: effluent.imass['TAL']
 
 #%% Reactor
-from math import pi, ceil
 from biosteam.units.design_tools import PressureVessel
 from biosteam.exceptions import DesignError
 class Reactor(Unit, PressureVessel, isabstract=True):
@@ -813,19 +812,19 @@ class HydrogenationEstersReactor(Reactor):
 
 
 
-class HydrogenationReactor(Reactor):
+class HydrogenationReactor(StirredTankReactor):
     """
     A hydrogenation reactor.
     """
     _N_ins = 5
-    _N_outs = 2
+    _N_outs = 3
     
     TEA_operating_hours = 4320
     
-    auxiliary_unit_names = ('heat_exchanger')
-    _F_BM_default = {**Reactor._F_BM_default,
-            'Heat exchangers': 3.,
+    # auxiliary_unit_names = ('heat_exchanger')
+    _F_BM_default = {**StirredTankReactor._F_BM_default,
             'Ni-SiO2 catalyst': 1.}
+    
     mcat_frac = 0.2 # fraction of catalyst by weight in relation to the reactant (TAL) # from Huber group
     hydrogenation_rxns = ParallelRxn([
             #   Reaction definition   Reactant   Conversion
@@ -848,17 +847,20 @@ class HydrogenationReactor(Reactor):
                  P=3.5e6, # 35 bar # from Huber group
                  vessel_material='Stainless steel 316',
                  NiSiO2_catalyst_price=price['Ni-SiO2'],
+                 batch=True,
+                 rigorous_hx=False,
                  **args):
-        Reactor._init(self,  tau=tau, P=P, vessel_material=vessel_material)
-        self.T = T
-        self.heat_exchanger = hx = HXutility(None, None, None, T=T) 
+        super()._init(tau=tau, T=T, P=P, batch=batch, vessel_material=vessel_material)
+        # self.T = T
+        # self.heat_exchanger = hx = HXutility(None, None, None, T=T) 
         self.NiSiO2_catalyst_price = NiSiO2_catalyst_price
-        
+        self.heat_exchanger.rigorous = rigorous_hx
     def _run(self):
         feed, recycle, reagent, recovered_catalyst, fresh_catalyst = self.ins
-        effluent, spent_catalyst = self.outs
+        vent, spent_catalyst, effluent = self.outs
         effluent.empty()
         effluent.phase = 'l'
+        vent.phase = 'g'
         # effluent.imol['HMDHP'] += 1e-10
         tau = self.tau
         
@@ -901,51 +903,53 @@ class HydrogenationReactor(Reactor):
 
         
     def _design(self):
-        Reactor._design(self)
-        duty = sum([i.H for i in self.outs]) - sum([i.H for i in self.ins])
-        mixed_feed = tmo.Stream()
+        super()._design()
+        # duty = sum([i.H for i in self.outs]) - sum([i.H for i in self.ins])
+        # mixed_feed = tmo.Stream()
         
-        for i in self.outs: i.phase = 'l'
-        mixed_feed.mix_from(self.outs)
-        for i in self.outs:
-            if i.imol['NiSiO2']:
-                i.phases = ('l', 's')
-                i.imol['s', 'NiSiO2'] = i.imol['l', 'NiSiO2']
-                i.imol['l', 'NiSiO2'] = 0.
+        # for i in self.outs: i.phase = 'l'
+        # mixed_feed.mix_from(self.outs[0])
+        # # for i in self.outs:
+        #     # if i.imol['NiSiO2']:
+        # spent_catalyst = self.outs[1]
+        # spent_catalyst.phases = ('l', 's')
+        # spent_catalyst.imol['s', 'NiSiO2'] = i.imol['l', 'NiSiO2']
+        # spent_catalyst.imol['l', 'NiSiO2'] = 0.
             
-        mixed_feed.T=self.ins[0].T
-        # mixed_feed.vle(T=mixed_feed.T, P=mixed_feed.P)
-        self.heat_exchanger.simulate_as_auxiliary_exchanger(ins=(mixed_feed,), 
-                                                            duty=duty,
-                                                            vle=False)
+        # mixed_feed.T=self.ins[0].T
+        # # mixed_feed.vle(T=mixed_feed.T, P=mixed_feed.P)
+        # self.heat_exchanger.simulate_as_auxiliary_exchanger(ins=(mixed_feed,), 
+        #                                                     duty=duty,
+        #                                                     vle=False)
     
     def _cost(self):
         super()._cost()
         
-        self.purchase_costs['Ni-SiO2 catalyst'] = self.catalyst_weight * self.NiSiO2_catalyst_price
+        # divide catalyst cost by number of reactors as bst.StirredTankReactor currently multiplies
+        # all purchase_cost values by number of reactors
+        self.purchase_costs['Ni-SiO2 catalyst'] = self.catalyst_weight * self.NiSiO2_catalyst_price / self.N_reactors
         
-        hx = self.heat_exchanger
-        self.baseline_purchase_costs['Heat exchangers'] = hx.purchase_cost
-        self.heat_utilities += hx.heat_utilities
+        # hx = self.heat_exchanger
+        # self.baseline_purchase_costs['Heat exchangers'] = hx.purchase_cost
+        # self.heat_utilities += hx.heat_utilities
     
-class DehydrationReactor(Reactor):
+class DehydrationReactor(StirredTankReactor):
     """
     A dehydration reactor.
     """
     _N_ins = 4
-    _N_outs = 2
+    _N_outs = 3
     
     TEA_operating_hours = 4320
     
-    auxiliary_unit_names = ('heat_exchanger')
+    # auxiliary_unit_names = ('heat_exchanger')
     
-    _F_BM_default = {**Reactor._F_BM_default,
-            'Heat exchangers': 3.,
+    _F_BM_default = {**StirredTankReactor._F_BM_default,
             'Amberlyst-70 catalyst': 1}
-    mcat_frac = 0.5 # fraction of catalyst by weight in relation to the reactant (TAL)
+    mcat_frac = 0.5 # fraction of catalyst by weight in relation to the reactant (HMTHP)
     dehydration_rxns = ParallelRxn([
             #   Reaction definition                                       Reactant   Conversion
-            Rxn('HMTHP -> PSA',         'HMTHP',   0.871) # conversion from Huber group experimental data
+            Rxn('HMTHP -> PSA + H2O',         'HMTHP',   0.871) # conversion from Huber group experimental data
                 ])
     byproduct_formation_rxns  = ParallelRxn([
             #   Reaction definition   Reactant   Conversion
@@ -962,18 +966,21 @@ class DehydrationReactor(Reactor):
                  P=2e6, # 20 bar # from Huber group
                  vessel_material='Stainless steel 316',
                  Amberlyst70_catalyst_price=price['Amberlyst-70'],
+                 batch=True,
+                 rigorous_hx=False,
                  **args):
-        Reactor._init(self,  tau=tau, P=P, vessel_material=vessel_material)
-        self.T = T
-        self.heat_exchanger = hx = HXutility(None, None, None, T=T) 
+        super()._init(T = T, tau=tau, P=P, batch=batch, vessel_material=vessel_material)
+        # self.T = T
+        # self.heat_exchanger = hx = HXutility(None, None, None, T=T) 
         self.Amberlyst70_catalyst_price = Amberlyst70_catalyst_price
+        self.heat_exchanger.rigorous = rigorous_hx
     
     def _run(self):
         feed, recycle, recovered_catalyst, fresh_catalyst = self.ins
-        effluent, spent_catalyst = self.outs
+        vent, spent_catalyst, effluent = self.outs
         effluent.empty()
         effluent.phase = 'l'
-        
+        vent.phase = 'g'
         tau = self.tau
         self.catalyst_weight = cat_weight = self.mcat_frac * sum(i.imass['HMTHP'] for i in self.ins) * tau
         
@@ -993,50 +1000,54 @@ class DehydrationReactor(Reactor):
         fresh_catalyst.phase = 's'
         fresh_catalyst.imass['Amberlyst70_'] = fresh_cat_mass_flow = max(0, req_cat_mass_flow - current_cat_mass_flow)
         
-        effluent.T = self.T
+        effluent.T = spent_catalyst.T = self.T
         effluent.P = self.P
         effluent.phases = ('l', 's')
         effluent.imass['s', 'Amberlyst70_'] = fresh_cat_mass_flow+current_cat_mass_flow
         
-    def _design(self):
-        Reactor._design(self)
-        duty = sum([i.H for i in self.outs]) - sum([i.H for i in self.ins])
-        mixed_feed = tmo.Stream()
         
-        for i in self.outs: i.phase = 'l'
-        mixed_feed.mix_from(self.outs)
-        for i in self.outs:
-            if i.imol['Amberlyst70_']:
-                i.phases = ('l', 's')
-                i.imol['s', 'Amberlyst70_'] = i.imol['l', 'Amberlyst70_']
-                i.imol['l', 'Amberlyst70_'] = 0.
+    def _design(self):
+        super()._design()
+        # duty = sum([i.H for i in self.outs]) - sum([i.H for i in self.ins])
+        # mixed_feed = tmo.Stream()
+        
+        # for i in self.outs: i.phase = 'l'
+        # mixed_feed.mix_from(self.outs[0])
+        # # for i in self.outs:
+        # #     if i.imol['Amberlyst70_']:
+        # spent_catalyst = self.outs[1]
+        # spent_catalyst.phases = ('l', 's')
+        # spent_catalyst.imol['s', 'Amberlyst70_'] = i.imol['l', 'Amberlyst70_']
+        # spent_catalyst.imol['l', 'Amberlyst70_'] = 0.
                 
-        mixed_feed.T=self.ins[0].T
-        # mixed_feed.vle(T=mixed_feed.T, P=mixed_feed.P)
-        self.heat_exchanger.simulate_as_auxiliary_exchanger(ins=(mixed_feed,), 
-                                                            duty=duty,
-                                                            vle=False)
+        # mixed_feed.T=self.ins[0].T
+        # # mixed_feed.vle(T=mixed_feed.T, P=mixed_feed.P)
+        # self.heat_exchanger.simulate_as_auxiliary_exchanger(ins=(mixed_feed,), 
+        #                                                     duty=duty,
+        #                                                     vle=False)
     
     def _cost(self):
         super()._cost()
-        self.purchase_costs['Amberlyst-70 catalyst'] = self.catalyst_weight * self.Amberlyst70_catalyst_price
-        
-        hx = self.heat_exchanger
-        self.baseline_purchase_costs['Heat exchangers'] = hx.purchase_cost
-        self.heat_utilities += hx.heat_utilities
+        # divide catalyst cost by number of reactors as bst.StirredTankReactor currently multiplies
+        # all purchase_cost values by number of reactors
+        self.purchase_costs['Amberlyst-70 catalyst'] = self.catalyst_weight * self.Amberlyst70_catalyst_price / self.N_reactors
+
+        # hx = self.heat_exchanger
+        # self.baseline_purchase_costs['Heat exchangers'] = hx.purchase_cost
+        # self.heat_utilities += hx.heat_utilities
 
             
 
-class RingOpeningHydrolysisReactor(Reactor):
+class RingOpeningHydrolysisReactor(StirredTankReactor):
     """
     A ring-opening and hydrolysis reactor.
     """
     _N_ins = 3
-    _N_outs = 1
-    auxiliary_unit_names = ('heat_exchanger')
+    _N_outs = 2
+    # auxiliary_unit_names = ('heat_exchanger')
     
-    _F_BM_default = {**Reactor._F_BM_default,
-            'Heat exchangers': 3.,}
+    # _F_BM_default = {**StirredTankReactor._F_BM_default,
+    #         'Heat exchangers': 3.,}
     
     ring_opening_rxns = ParallelRxn([
             #   Reaction definition                                       Reactant   Conversion
@@ -1058,15 +1069,17 @@ class RingOpeningHydrolysisReactor(Reactor):
                  tau = 19., # from Huber group
                  T=130. + 273.15, # from Huber group
                  P=2e6, # 20 bar # from Huber group
-                 vessel_material='Stainless steel 316', **args):
-        Reactor._init(self,  tau=tau, P=P, vessel_material=vessel_material)
-        self.T = T
-        self.heat_exchanger = hx = HXutility(None, None, None, T=T)
+                 vessel_material='Stainless steel 316', 
+                 batch=True,
+                 rigorous_hx=False,
+                 **args):
+        super()._init(T=T, tau=tau, P=P, batch=batch, vessel_material=vessel_material)
+        self.heat_exchanger.rigorous = rigorous_hx
     
     def _run(self):
         feed, recycle, reagent = self.ins
-        effluent = self.outs[0]
-        
+        vent, effluent = self.outs
+        vent.phase = 'g'
         # effluent = feed.copy()
         
         
@@ -1088,21 +1101,10 @@ class RingOpeningHydrolysisReactor(Reactor):
         effluent.P = self.P
 
     def _design(self):
-        Reactor._design(self)
-        duty = sum([i.H for i in self.outs]) - sum([i.H for i in self.ins])
-        mixed_feed = tmo.Stream()
-        mixed_feed.mix_from(self.outs)
-        mixed_feed.T=self.ins[0].T
-        # mixed_feed.vle(T=mixed_feed.T, P=mixed_feed.P)
-        self.heat_exchanger.simulate_as_auxiliary_exchanger(ins=(mixed_feed,), 
-                                                            duty=duty,
-                                                            vle=False)
+        super()._design()
     
     def _cost(self):
         super()._cost()
-        hx = self.heat_exchanger
-        self.baseline_purchase_costs['Heat exchangers'] = hx.purchase_cost
-        self.heat_utilities += hx.heat_utilities
             
 
             

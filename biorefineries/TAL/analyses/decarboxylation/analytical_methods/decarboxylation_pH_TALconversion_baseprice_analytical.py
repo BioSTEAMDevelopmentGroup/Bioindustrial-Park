@@ -103,25 +103,6 @@ model.exception_hook = 'warn'
 print('\n\nSimulating baseline ...')
 baseline_initial = model.metrics_at_baseline()
 
-#%% Utility functions
-H401, U402, M401 = u.H401, u.U402, u.M401
-
-def get_pH_M401_outs_0():
-    M401_outs_0 = M401.outs[0]
-    if M401_outs_0.imol['CitricAcid', 'H3PO4', 'AceticAcid'].sum() > 0.:
-        return get_pH_polyprotic_acid_mixture(M401_outs_0,
-                                ['CitricAcid', 'H3PO4', 'AceticAcid'], 
-                                [[10**-3.13, 10**-4.76, 10**-6.40], 
-                                 [10**-2.16, 10**-7.21, 10**-12.32],
-                                 [10**-4.76]],
-                                'ideal')
-    else:
-        return 14. + log(get_molarity('NaOH', M401_outs_0), 10.) # assume strong base completely dissociates in aqueous solution
-
-def get_pH_given_base_addition(mol_base_per_m3_broth):
-    M401.mol_base_per_m3_broth = mol_base_per_m3_broth
-    M401.simulate()
-    return get_pH_M401_outs_0()
 
 #%% Parameter loading functions
 U402, M401 = u.U402, u.M401
@@ -132,9 +113,7 @@ def load_decarboxylation_conversion(decarboxylation_conversion):
     U402.decarboxylation_conversion = decarboxylation_conversion
 
 def load_pH(pH):
-    obj_f_pH = lambda mol_base_per_m3_broth: get_pH_given_base_addition(mol_base_per_m3_broth)\
-                                        - pH
-    IQ_interpolation(obj_f_pH, 0., 0.4, ytol=0.001)
+    M401.pH_to_load = pH
     
 def load_base_price(base_price):
     base_decarboxylation_fresh.price = base_price
@@ -163,7 +142,7 @@ TAL_metrics = [get_product_MPSP,
                # lambda: TAL_lca.FEC - TAL_lca.net_electricity_FEC, 
                lambda: TAL_lca.GWP, 
                lambda: TAL_lca.FEC, 
-               get_TAL_AOC, get_TAL_FCI, get_product_purity, get_pH_M401_outs_0]
+               get_TAL_AOC, get_TAL_FCI, get_product_purity, M401.get_pH_maintained]
 
 # %% Generate 3-specification meshgrid and set specification loading functions
 
@@ -171,7 +150,7 @@ steps = (60, 60, 1)
 
 # Yield, titer, productivity (rate)
 spec_1 = TAL_decarb_convs = np.linspace(0., 0.5, steps[0]) # yield
-spec_2 = pHs = np.linspace(get_pH_M401_outs_0(), 12., steps[1]) # titer
+spec_2 = pHs = np.linspace(M401.get_pH_maintained(), 12., steps[1]) # titer
 
 
 # spec_3 = base_prices =\
@@ -296,7 +275,7 @@ spec_1, spec_2 = np.meshgrid(spec_1, spec_2)
 
 #%% Initial simulation
 simulate_and_print()
-baseline_Base_presence = get_pH_M401_outs_0()
+baseline_Base_presence = M401.get_pH_maintained()
 
 print('\n\nSimulating the initial point to avoid bugs ...')
 # spec.load_specifications(TAL_decarb_convs[0], pHs[0], base_prices[0])
