@@ -77,7 +77,7 @@ def get_pH_stream(stream):
 
 def get_pH_given_base_addition(mol_base_per_m3_broth, base_mixer):
     base_mixer.mol_base_per_m3_broth = mol_base_per_m3_broth
-    base_mixer.simulate()
+    base_mixer.simulate_base_addition_and_acids_neutralization()
     return get_pH_stream(base_mixer.outs[0])
 
 def load_pH(pH, base_mixer):
@@ -269,8 +269,8 @@ def create_TAL_separation_solubility_exploit_process(ins, outs,):
     M401.load_pH = lambda pH: load_pH(pH, M401)
     M401.get_pH_maintained = lambda: get_pH_stream(M401.outs[0])
     
-    @M401.add_specification(run=False)
-    def M401_spec():
+    # @M401.add_specification(run=False)
+    def M401_simulate_base_addition_and_acids_neutralization():
         M401_ins_0 = M401.ins[0]
         M401.ins[1].imol['PD'] = M401.mol_acetylacetone_per_mol_TAL * M401_ins_0.imol['TAL']
         M401_in_base = M401.ins[4]
@@ -287,9 +287,7 @@ def create_TAL_separation_solubility_exploit_process(ins, outs,):
         
         M401_outs_0_l = M401.outs[0]['l']
         
-        if not M401.pH_to_load == 'unmodified':
-            M401.load_pH(M401.pH_to_load)
-            
+        
         if M401.base_neutralizes_acids:
             if M401.mol_base_per_m3_broth < min_base_req_to_completely_neutralize:
                 
@@ -353,7 +351,16 @@ def create_TAL_separation_solubility_exploit_process(ins, outs,):
         
         M401.outs[0].phase='l'
     
+    M401.simulate_base_addition_and_acids_neutralization = M401_simulate_base_addition_and_acids_neutralization
     
+    @M401.add_specification(run=False)
+    def M401_pH_loading_spec():
+        if M401.pH_to_load == 'unmodified':
+            M401.mol_base_per_m3_broth = 0.
+            M401.simulate_base_addition_and_acids_neutralization()
+        else:
+            M401.load_pH(M401.pH_to_load)
+            
     # Change broth temperature to adjust TAL solubility
     H401 = bst.HXutility('H401', ins=M401-0, outs=('fermentation_broth_heated'), 
                          T=273.15+56., # initial value; updated in specification to minimum T required to completely dissolve TAL 
