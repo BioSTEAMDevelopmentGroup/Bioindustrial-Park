@@ -176,7 +176,8 @@ z_ticks = [0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6]
 MPSP_w_label = r"$\bfMPSP$" # title of the color axis
 MPSP_units = r"$\mathrm{\$}\cdot\mathrm{kg}^{-1}$"
 
-GWP_w_label = r"$\mathrm{\bfGWP}_{\bf100}$"
+# GWP_w_label = r"$\mathrm{\bfGWP}_{\bf100}$"
+GWP_w_label = r"$\mathrm{\bfCarbon}$" + " " + r"$\mathrm{\bfIntensity}$"
 GWP_units = r"$\mathrm{kg}$"+" "+ r"$\mathrm{CO}_{2}\mathrm{-eq.}\cdot\mathrm{kg}^{-1}$"
 
 FEC_w_label = r"$\bfFEC$" # title of the color axis
