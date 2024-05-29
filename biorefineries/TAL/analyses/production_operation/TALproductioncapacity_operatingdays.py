@@ -115,7 +115,21 @@ def load_annual_operating_days(op_days):
 
 def load_acetylacetone_price(acetylacetone_price):
     Acetylacetone_fresh.price = acetylacetone_price
-    
+
+#%% For this analysis, accept higher volumetric flow rates than allowed by 
+### clarifier design bounds 
+from biosteam.exceptions import DesignError
+
+C201 = u.C201
+C201_design = C201._design
+
+def C201_high_vol_flow_rate_design():
+    try:
+        C201_design()
+    except DesignError as de1:
+        C201.design_results['Material'] = 'Concrete'
+C201._design =  C201_high_vol_flow_rate_design
+
 #%%  Metrics
 broth = R302.outs[1]
 # SA_price_range = [6500, 7500]
@@ -161,7 +175,7 @@ spec_3 = PD_prices =\
 
 x_label = r"$\bfTAL$"  +" "+ r"$\bfProduction$"  +" "+ r"$\bfCapacity$" # title of the x axis
 x_units = r"$\mathrm{10}^{3}$" + " " + r"$\mathrm{metric}$" + " " + r"$\mathrm{ton}\cdot\mathrm{y}^{-1}$"
-x_ticks = [0, 20, 40, 60, 80, 100, 120]
+x_ticks = [0, 50, 100, 150, 200, 250, 300]
 
 y_label = r"$\bfAnnual$"  +" "+ r"$\bfOperating$" +" "+ r"$\bfTime$"# title of the y axis
 y_units =r"$\mathrm{d}$"
