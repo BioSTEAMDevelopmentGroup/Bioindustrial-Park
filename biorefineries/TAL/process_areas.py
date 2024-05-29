@@ -205,14 +205,15 @@ def create_TAL_fermentation_process(ins, outs,):
                 outs=[dict(ID='decarboxylation_vent', CO2=20),
                       dict(ID='S401_solid', FermMicrobe=1, Water=1),
                       dict(ID='bottom_product_F403', PD=1, Water=99),
-                      dict(ID='liquid_waste_D401', PD=1, Water=99),
+                      dict(ID='D401_bottom', PD=1, Water=99),
                       dict(ID='solid_TAL', TAL=1),
+                      dict(ID='D401_top', PD=1, Water=99),
                                 ],
                                                )
 def create_TAL_separation_solubility_exploit_process(ins, outs,):
     
     fermentation_broth, acetylacetone_decarboxylation_equilibrium, recycled_nonevaporated_supernatant, base_for_pH_control = ins
-    decarboxylation_vent, S401_solid, bottom_product_F403, liquid_waste_D401, solid_TAL = outs
+    decarboxylation_vent, S401_solid, bottom_product_F403, D401_bottom, solid_TAL, D401_top = outs
     
     # =============================================================================
     # Separation streams
@@ -592,7 +593,7 @@ def create_TAL_separation_solubility_exploit_process(ins, outs,):
         F403._run()
     
     F403_P0 = bst.units.Pump('F403_P0', ins=F403-0, 
-                             outs=bottom_product_F403, # non-evaporated supernatant; can be recycled using S403 in system_TAL_solubility_exploit_eethanol_sugarcane, controlled by S403.split (0 by default)
+                             outs=bottom_product_F403, # at baseline, this is non-evaporated supernatant; can be recycled using S403 in system_TAL_solubility_exploit_ethanol_sugarcane, controlled by F403.V (0 by default) and S403.split (0 by default)
                              P=101325., material='Stainless steel',)
     F403_P1 = bst.units.Pump('F403_P1', ins=F403-1, 
                               # outs=('',),
@@ -629,11 +630,11 @@ def create_TAL_separation_solubility_exploit_process(ins, outs,):
                          )
     
     D401_P0 = bst.units.Pump('D401_P0', ins=D401_H0-0, 
-                             outs=3-M401, # distillation top product of the top product from evaporating supernatant; can be recycled in the separation process defined here, controlled by F403.V (0 by default)
+                             outs=D401_top, # distillation top product of the top product from evaporating supernatant; can be recycled in the separation process defined here, controlled by F403.V (0 by default)
                              P=101325., material='Stainless steel',)
     
     D401_P1 = bst.units.Pump('D401_P1', ins=D401-1, 
-                             outs=liquid_waste_D401, # distillation top product of the top product from evaporating supernatant; can be recycled in the separation process defined here, controlled by F403.V (0 by default)
+                             outs=D401_bottom, # distillation bottom product of the top product from evaporating supernatant; can be recycled in the separation process defined here, controlled by F403.V (0 by default)
                              P=101325., material='Stainless steel',)
     
 #%% Unused: separation of acetylacetone formed by TAL decarboxylation in heated fermentation broths
