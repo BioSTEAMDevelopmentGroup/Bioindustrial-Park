@@ -545,11 +545,12 @@ comparison_production_capacities = list(theoretical_max_g_TAL_per_g_SA*np.array(
 #%% MPSP
 
 # MPSP_w_levels, MPSP_w_ticks, MPSP_cbar_ticks = get_contour_info_from_metric_data(results_metric_1, lb=3)
-MPSP_w_levels = np.arange(2, 10.25, 0.25)
-MPSP_cbar_ticks = np.arange(2, 10.1, 1.)
+MPSP_w_levels = np.arange(0, 12.25, 0.25)
+MPSP_cbar_ticks = np.arange(0, 12.1, 1.)
 MPSP_w_ticks = [
                 # 2.75, 
-                2.5, 3., 3.5, 4.5, 10.]
+                2.,
+                2.5, 3., 3.5, 4.5, 10., 12.]
 # MPSP_w_levels = np.arange(0., 15.5, 0.5)
 
 contourplots.animated_contourplot(w_data_vs_x_y_at_multiple_z=results_metric_1, # shape = z * x * y # values of the metric you want to plot on the color axis; e.g., MPSP
@@ -575,7 +576,7 @@ contourplots.animated_contourplot(w_data_vs_x_y_at_multiple_z=results_metric_1, 
                                 cmap=CABBI_green_colormap(), # can use 'viridis' or other default matplotlib colormaps
                                 cmap_over_color = colors.grey_dark.shade(8).RGBn,
                                 contourplot_facecolor = colors.grey_dark.shade(8).RGBn,
-                                text_boxes = {'>10.0': [(5,10), 'white']},
+                                text_boxes = {'>12.0': [(225,15), 'white']},
                                 extend_cmap='max',
                                 cbar_ticks=MPSP_cbar_ticks,
                                 z_marker_color='g', # default matplotlib color names

@@ -495,9 +495,9 @@ print('\nCreating and saving contour plots ...\n')
 #%% MPSP
 
 # MPSP_w_levels, MPSP_w_ticks, MPSP_cbar_ticks = get_contour_info_from_metric_data(results_metric_1, lb=3)
-MPSP_w_levels = np.arange(0., 10.25, 0.25)
-MPSP_cbar_ticks = np.arange(0., 10.1, 1.)
-MPSP_w_ticks = [1., 1.5, 2., 2.5, 2.75, 3., 3.5, 4, 5, 10]
+MPSP_w_levels = np.arange(0., 12.25, 0.25)
+MPSP_cbar_ticks = np.arange(0., 12.1, 1.)
+MPSP_w_ticks = [1., 1.5, 2., 2.5, 2.75, 3., 3.5, 4, 5, 10, 12]
 # MPSP_w_levels = np.arange(0., 15.5, 0.5)
 
 contourplots.animated_contourplot(w_data_vs_x_y_at_multiple_z=results_metric_1, # shape = z * x * y # values of the metric you want to plot on the color axis; e.g., MPSP
@@ -568,7 +568,7 @@ contourplots.animated_contourplot(w_data_vs_x_y_at_multiple_z=results_metric_1, 
                                                       (1,11.),
                                                       (99,11.)),
                                 # zoom_data_scale=5,
-                                text_boxes = {'>10.0': [(5,5), 'white']},
+                                text_boxes = {'>12.0': [(5,5), 'white']},
                                 )
 
 #%% GWP
