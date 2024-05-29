@@ -140,7 +140,7 @@ TAL_metrics = [get_product_MPSP, lambda: TAL_lca.GWP, lambda: TAL_lca.FEC,
 steps = (60, 60, 1)
 
 # Yield, titer, productivity (rate)
-spec_1 = prod_caps = np.linspace(2000., 120000., steps[0])
+spec_1 = prod_caps = np.linspace(2000., 300000., steps[0])
 spec_2 = ann_op_days = np.linspace(6, 360, steps[1])
 
 
@@ -515,6 +515,17 @@ keep_frames = True
 
 print('\nCreating and saving contour plots ...\n')
 
+#%%
+comparison_production_capacities = list(theoretical_max_g_TAL_per_g_SA*np.array([
+                    23802.2/1e3,
+                    # 27296.1/1e3,
+                    34554.6/1e3,
+                    # 39352.4/1e3,
+                    72345.8/1e3,
+                    104137.4/1e3,
+                    150000/1e3,
+                    260000/1e3
+                    ]))
 
 #%% MPSP
 
@@ -586,14 +597,7 @@ contourplots.animated_contourplot(w_data_vs_x_y_at_multiple_z=results_metric_1, 
                                 manual_clabels_comparison_range = {TAL_maximum_viable_market_range[0]:(100,70), 
                                                                    TAL_maximum_viable_market_range[1]:(60,50)},
                                 additional_points ={(13385.197/1000, 180):('D', 'w', 6)},
-                                additional_vlines=list(theoretical_max_g_TAL_per_g_SA*np.array([
-                                                    23802.2/1e3,
-                                                    # 27296.1/1e3,
-                                                    34554.6/1e3,
-                                                    # 39352.4/1e3,
-                                                    72345.8/1e3,
-                                                    104137.4/1e3,
-                                                    ])),
+                                additional_vlines=comparison_production_capacities,
                                 additional_vline_colors='white',
                                 additional_vline_linestyles='dashed',
                                 additional_vline_linewidths=0.5,
@@ -752,14 +756,7 @@ contourplots.animated_contourplot(w_data_vs_x_y_at_multiple_z=results_metric_4, 
                                     200: (85,30),
                                     },
                                 
-                                additional_vlines=list(theoretical_max_g_TAL_per_g_SA*np.array([
-                                                    23802.2/1e3,
-                                                    # 27296.1/1e3,
-                                                    34554.6/1e3,
-                                                    # 39352.4/1e3,
-                                                    72345.8/1e3,
-                                                    104137.4/1e3,
-                                                    ])),
+                                additional_vlines=comparison_production_capacities,
                                 additional_vline_colors='white',
                                 additional_vline_linestyles='dashed',
                                 additional_vline_linewidths=0.5,
@@ -816,14 +813,7 @@ contourplots.animated_contourplot(w_data_vs_x_y_at_multiple_z=results_metric_5, 
                                 # comparison_range=[TCI_w_levels[-2], TCI_w_levels[-1]],
                                 # comparison_range_hatch_pattern='////',
                                 units_on_newline = (True, True, False, False), # x,y,z,wadditional_points ={(13385.197/1000, 180):('D', 'w', 6)},
-                                additional_vlines=list(theoretical_max_g_TAL_per_g_SA*np.array([
-                                                    23802.2/1e3,
-                                                    # 27296.1/1e3,
-                                                    34554.6/1e3,
-                                                    # 39352.4/1e3,
-                                                    72345.8/1e3,
-                                                    104137.4/1e3,
-                                                    ])),
+                                additional_vlines=comparison_production_capacities,
                                 additional_vline_colors='white',
                                 additional_vline_linestyles='dashed',
                                 additional_vline_linewidths=0.5,
