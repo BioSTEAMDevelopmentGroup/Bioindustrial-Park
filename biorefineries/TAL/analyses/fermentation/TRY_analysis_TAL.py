@@ -64,13 +64,13 @@ model = models.TAL_model
 system = TAL_sys = models.TAL_sys
 
 modes = [
-            # 'A',
-            'B',
+            'A',
          ]
 
+
 parameter_distributions_filenames = [
-                                    # 'parameter-distributions_A.xlsx',
-                                    'parameter-distributions_B.xlsx',
+                                    'parameter-distributions_TAL_' + mode +'.xlsx' 
+                                    for mode in modes
                                     ]
 mode = modes[0]
 
@@ -129,7 +129,7 @@ TAL_metrics = [get_product_MPSP,
 
 # %% Generate 3-specification meshgrid and set specification loading functions
 
-steps = (60, 60, 1)
+steps = (60, 60, 3)
 
 # Yield, titer, productivity (rate)
 spec_1 = yields = np.linspace(0.01, 0.99, steps[0]) # yield
@@ -143,7 +143,9 @@ spec_2 = titers = np.linspace(2.,
 #     np.linspace(0.05, 1.5, steps[2])
     
 spec_3 = productivities =\
-    np.array([5.**spec.baseline_productivity,])
+    np.array([0.2*spec.baseline_productivity,
+              1.*spec.baseline_productivity,
+              5.*spec.baseline_productivity,])
 
 # spec_3 = productivities =\
 #     np.array([0.25*spec.baseline_productivity, 0.5*spec.baseline_productivity, 

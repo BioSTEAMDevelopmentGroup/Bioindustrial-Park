@@ -65,15 +65,16 @@ model = models.TAL_model
 system = TAL_sys = models.TAL_sys
 
 modes = [
-            # 'A',
-            'B',
+            'A',
          ]
 
+
 parameter_distributions_filenames = [
-                                    # 'parameter-distributions_A.xlsx',
-                                    'parameter-distributions_B.xlsx',
+                                    'parameter-distributions_TAL_' + mode +'.xlsx' 
+                                    for mode in modes
                                     ]
 mode = modes[0]
+
 
 
 parameter_distributions_filename = TAL_filepath+\
