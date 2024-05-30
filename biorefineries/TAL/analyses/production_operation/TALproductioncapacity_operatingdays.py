@@ -714,10 +714,10 @@ contourplots.animated_contourplot(w_data_vs_x_y_at_multiple_z=results_metric_3, 
 
 #%% AOC
 
-AOC_w_levels, AOC_w_ticks, AOC_cbar_ticks = get_contour_info_from_metric_data(results_metric_4,)
-# AOC_w_levels = np.arange(2, 8.1, 0.2)
-AOC_w_ticks = [20, 40, 60, 80, 100, 120, 140, 160, 200]
-AOC_cbar_ticks = np.arange(0., 200.1, 20.)
+# AOC_w_levels, AOC_w_ticks, AOC_cbar_ticks = get_contour_info_from_metric_data(results_metric_4,)
+AOC_w_levels = np.arange(0., 500.1, 10.)
+AOC_w_ticks = [20, 50, 100, 150, 200, 250, 300, 400, 500]
+AOC_cbar_ticks = np.arange(0., 500.1, 50.)
 # AOC_w_levels = np.arange(0., 15.5, 0.5)
 
 contourplots.animated_contourplot(w_data_vs_x_y_at_multiple_z=results_metric_4, # shape = z * x * y # values of the metric you want to plot on the color axis; e.g., AOC
@@ -740,6 +740,7 @@ contourplots.animated_contourplot(w_data_vs_x_y_at_multiple_z=results_metric_4, 
                                 w_units=AOC_units,
                                 # fmt_clabel=lambda cvalue: r"$\mathrm{\$}$"+" {:.1f} ".format(cvalue)+r"$\cdot\mathrm{kg}^{-1}$", # format of contour labels
                                 fmt_clabel =  lambda cvalue:  get_rounded_str(cvalue, 3),
+                                # fmt_clabel =  lambda cvalue: str(round(cvalue, 1)),
                                 cmap=CABBI_green_colormap(), # can use 'viridis' or other default matplotlib colormaps
                                 cmap_over_color = colors.grey_dark.shade(8).RGBn,
                                 extend_cmap='max',
@@ -755,21 +756,21 @@ contourplots.animated_contourplot(w_data_vs_x_y_at_multiple_z=results_metric_4, 
                                 default_fontsize = default_fontsize,
                                 # comparison_range=TAL_maximum_viable_market_range,
                                 n_minor_ticks = 1,
-                                cbar_n_minor_ticks = 1,
+                                cbar_n_minor_ticks = 4,
                                 # comparison_range=[AOC_w_levels[-2], AOC_w_levels[-1]],
                                 # comparison_range_hatch_pattern='////',
                                 units_on_newline = (True, True, False, False), # x,y,z,wadditional_points ={(13385.197/1000, 180):('D', 'w', 6)},
                                 
                                 manual_clabels_regular = {
                                     20:  (10,270), 
-                                    40:  (20,270), 
-                                    60:  (40,270), 
-                                    80:  (60,270), 
-                                    100: (80,270), 
-                                    120: (100,270), 
-                                    140: (120,270),
-                                    160: (110,90),
-                                    200: (85,30),
+                                    50:  (35,270), 
+                                    100:  (60, 60), 
+                                    150:  (100,90), 
+                                    200: (140,120), 
+                                    250: (200,240), 
+                                    300: (210,80),
+                                    400: (250,80),
+                                    500: (240,30),
                                     },
                                 
                                 additional_vlines=comparison_production_capacities,
@@ -779,15 +780,15 @@ contourplots.animated_contourplot(w_data_vs_x_y_at_multiple_z=results_metric_4, 
                                 additional_hlines=[],
                                 additional_hline_colors=[],
                                 additional_points ={(13385.197/1000, 180):('D', 'w', 6)},
-                                text_boxes = {'>200': [(98,30), 'white']},
+                                text_boxes = {'>500': [(250,20), 'white']},
                                 )
 
 #%% TCI
 
 # TCI_w_levels, TCI_w_ticks, TCI_cbar_ticks = get_contour_info_from_metric_data(results_metric_5,)
-TCI_w_levels = np.arange(0, 2000.1, 100)
-TCI_cbar_ticks = np.arange(0, 2000.1, 200)
-TCI_w_ticks = [200, 400, 600, 800, 1000, 1500, 2000]
+TCI_w_levels = np.arange(0, 5000.1, 100)
+TCI_cbar_ticks = np.arange(0, 5000.1, 500)
+TCI_w_ticks = [200, 500, 1000, 1500, 2000, 3000, 4000, 5000]
 # TCI_w_levels = np.arange(0., 15.5, 0.5)
 
 contourplots.animated_contourplot(w_data_vs_x_y_at_multiple_z=results_metric_5, # shape = z * x * y # values of the metric you want to plot on the color axis; e.g., TCI
@@ -825,7 +826,7 @@ contourplots.animated_contourplot(w_data_vs_x_y_at_multiple_z=results_metric_5, 
                                 default_fontsize = default_fontsize,
                                 # comparison_range=TAL_maximum_viable_market_range,
                                 n_minor_ticks = 1,
-                                cbar_n_minor_ticks = 1,
+                                cbar_n_minor_ticks = 4,
                                 # comparison_range=[TCI_w_levels[-2], TCI_w_levels[-1]],
                                 # comparison_range_hatch_pattern='////',
                                 units_on_newline = (True, True, False, False), # x,y,z,wadditional_points ={(13385.197/1000, 180):('D', 'w', 6)},
@@ -836,7 +837,19 @@ contourplots.animated_contourplot(w_data_vs_x_y_at_multiple_z=results_metric_5, 
                                 additional_hlines=[],
                                 additional_hline_colors=[],
                                 additional_points ={(13385.197/1000, 180):('D', 'w', 6)},
-                                text_boxes = {'>2000': [(90,30), 'white']},
+                                text_boxes = {'>5000': [(235,30), 'white']},
+                                
+                                manual_clabels_regular = {
+                                    200: (25, 270),
+                                    500: (25, 115),
+                                    1000: (85, 235),
+                                    1500: (130, 190),
+                                    2000: (215, 240),
+                                    3000: (215, 150),
+                                    4000: (230, 125),
+                                    5000: (260, 90),
+                                    },
+                                
                                 )
 
 #%% Purity
