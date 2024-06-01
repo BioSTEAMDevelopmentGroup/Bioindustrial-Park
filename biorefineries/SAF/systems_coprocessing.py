@@ -37,7 +37,7 @@ def preprocessing_sys(ins,outs):
     bagasse_to_pretreatment, bagasse_to_CHP = outs
     U101 = _units.FeedStockHandling('U101', ins=feedstock, outs='')
     # U101.cost_items['System'].cost = 0.
-    S102 = bst.Splitter('S102', ins=U101-0, outs=[bagasse_to_pretreatment,bagasse_to_CHP],split=0.95)
+    S102 = bst.Splitter('S102', ins=U101-0, outs=[bagasse_to_pretreatment,bagasse_to_CHP],split=0.8)
 
 
 #%%
@@ -209,6 +209,7 @@ def fermentation_sys(ins,outs):
           dict(ID='CH4_C2H6'),
           dict(ID='gasoline'),
           dict(ID='jet_fuel'),
+          dict(ID='oc'),
           dict(ID='diesel'),
           dict(ID='spent_catalyst_R401'),
           dict(ID='spent_catalyst_R402'),
@@ -217,7 +218,7 @@ def fermentation_sys(ins,outs):
           
 def upgrading_sys(ins,outs):
     NaOH,Syndol_catalyst,first_catalyst,second_catalyst,ethanol,hydrogen,Como_catalyst = ins
-    F401_to_WWT,D401_heavy_impurities,D402_top_product,CH4_C2H6,gasoline,jet_fuel,diesel,spent_catalyst_R401,spent_catalyst_R402,spent_catalyst_R403,spent_catalyst_R404 = outs
+    F401_to_WWT,D401_heavy_impurities,D402_top_product,CH4_C2H6,gasoline,jet_fuel,oc,diesel,spent_catalyst_R401,spent_catalyst_R402,spent_catalyst_R403,spent_catalyst_R404 = outs
     
     P401 = bst.Pump('P401',ins=ethanol,P=4.5*101325)
     M400 = bst.Mixer('M401', (P401-0,''))
@@ -348,12 +349,13 @@ def upgrading_sys(ins,outs):
     
     diesel_storage = bst.StorageTank('diesel_storage', ins=H408-0, outs=diesel, tau=7*24, vessel_type='Floating roof', vessel_material='Carbon steel')
     
+    oc_unit = bst.MockMixer('oc_unit', ins='', outs=oc)
 
 #%%
 
 # Complete energycane to SAF system
 @SystemFactory(ID='SAF_sys')
-def SAF_sys(ins,outs,material_storage,product_storage,WWTC,BT,hydrogenation_distillation,h2_purchase):
+def SAF_sys(ins,outs,material_storage,product_storage,WWTC,BoilerTurbo,hydrogenation_distillation,h2_purchase,opportunity_cost):
     sys_1 = preprocessing_sys(ins = (Stream(ID='feedstock',
                                             Water=0.2,
                                             Ash=0.0301,
@@ -440,6 +442,7 @@ def SAF_sys(ins,outs,material_storage,product_storage,WWTC,BT,hydrogenation_dist
                                          price=price['gasoline']),
                                   Stream(ID='jet_fuel',
                                          price=price['jet fuel']),
+                                  Stream(ID='oc',),
                                   Stream(ID='diesel',
                                          price=price['diesel']),
                                   Stream(ID='spent_catalyst_R401',
@@ -492,6 +495,7 @@ def SAF_sys(ins,outs,material_storage,product_storage,WWTC,BT,hydrogenation_dist
     fire_water_in = Stream('fire_water_in', Water=8021*get_flow_tpd()/2205, units='kg/hr')
     
     # Stream mixer to boiler turbogenerator for burning
+    S901 = bst.MockSplitter('S901', ins=natural_gas, outs=('NG_to_BT', 'NG_to_SMR'))
     M901 = bst.Mixer('M901',
                      ins=(F.bagasse_to_CHP,
                           F.U302_cell_mass,
@@ -508,7 +512,7 @@ def SAF_sys(ins,outs,material_storage,product_storage,WWTC,BT,hydrogenation_dist
                                   ins=(F.total_effluent_to_be_burned, # M901 outs[0]
                                        F.total_gas_to_be_burned, # M902 outs[0]
                                        'boiler_makeup_water',
-                                       natural_gas,
+                                       S901-0,
                                        lime_boiler,
                                        boiler_chems),
                                   outs=('gas_emission',
@@ -584,47 +588,7 @@ def SAF_sys(ins,outs,material_storage,product_storage,WWTC,BT,hydrogenation_dist
     else:
         pass
     
-    if WWTC == False:
-        WWTC_cost =F.WWTC._cost
-        WWTC_design = F.WWTC._design
-        def WWTC_no_cost():
-            WWTC_cost()
-            bpc = F.WWTC.baseline_purchase_costs
-            pc = F.WWTC.purchase_costs
-            ic = F.WWTC.installed_costs
-            for i in bpc.keys(): bpc[i] = 0. 
-            for i in pc.keys(): pc[i] = 0. 
-            for i in ic.keys(): ic[i] = 0. 
-        def WWTC_no_cost_design():
-            WWTC_design()
-            bpc = F.WWTC.baseline_purchase_costs
-            pc = F.WWTC.purchase_costs
-            ic = F.WWTC.installed_costs
-            for i in bpc.keys(): bpc[i] = 0. 
-            for i in pc.keys(): pc[i] = 0. 
-            for i in ic.keys(): ic[i] = 0.
-        F.WWTC._cost = WWTC_no_cost
-        F.WWTC._design = WWTC_no_cost_design 
-        def WWTC_summary(design_kwargs=None, cost_kwargs=None, lca_kwargs=None):
-            F.WWTC._check_run()
-            F.WWTC._design()
-            F.WWTC._cost()
-            for i in F.WWTC.auxiliary_units:
-                F.WWTC.heat_utilities += i.heat_utilities
-                F.WWTC.power_utility.rate += i.power_utility.rate
-            F.WWTC._lca()
-            F.WWTC._load_operation_costs()
-        F.WWTC._summary = WWTC_summary
-    else:
-        pass
     
-    if BT == False:
-        @F.BT.add_specification(run=True)
-        def BT_no_cost():
-            F.BT._design = lambda:0
-            F.BT._cost = lambda:0
-    else:
-        pass
     
     if hydrogenation_distillation == False:
         # R404
@@ -822,14 +786,99 @@ def SAF_sys(ins,outs,material_storage,product_storage,WWTC,BT,hydrogenation_dist
     else:
         pass
     
-    if h2_purchase == False:
-        @F.BT.add_specification(run=True)
-        def natural_gas_flow_correction():
-            F.BT.ins[3].imol['CH4'] += 0.5*F.hydrogen.imol['H2'] # assume CH4+O2=CO2+2H2
+    
+    
+    if WWTC == False:
+        WWTC_cost =F.WWTC._cost
+        WWTC_design = F.WWTC._design
+        def WWTC_no_cost():
+            WWTC_cost()
+            bpc = F.WWTC.baseline_purchase_costs
+            pc = F.WWTC.purchase_costs
+            ic = F.WWTC.installed_costs
+            for i in bpc.keys(): bpc[i] = 0. 
+            for i in pc.keys(): pc[i] = 0. 
+            for i in ic.keys(): ic[i] = 0. 
+        def WWTC_no_cost_design():
+            WWTC_design()
+            bpc = F.WWTC.baseline_purchase_costs
+            pc = F.WWTC.purchase_costs
+            ic = F.WWTC.installed_costs
+            for i in bpc.keys(): bpc[i] = 0. 
+            for i in pc.keys(): pc[i] = 0. 
+            for i in ic.keys(): ic[i] = 0.
+        F.WWTC._cost = WWTC_no_cost
+        F.WWTC._design = WWTC_no_cost_design 
+        def WWTC_summary(design_kwargs=None, cost_kwargs=None, lca_kwargs=None):
+            F.WWTC._check_run()
+            F.WWTC._design()
+            F.WWTC._cost()
+            for i in F.WWTC.auxiliary_units:
+                F.WWTC.heat_utilities += i.heat_utilities
+                F.WWTC.power_utility.rate += i.power_utility.rate
+            F.WWTC._lca()
+            F.WWTC._load_operation_costs()
+        F.WWTC._summary = WWTC_summary
     else:
         pass
     
     
+    
+    @S901.add_specification(run=True)
+    def natural_gas_flow_correction():
+        F.R404.run()
+        F.BT.run()
+        if h2_purchase == False:
+            F.S901.outs[1].imol['CH4'] = F.R404.ins[1].imol['H2']/3 # assume CH4+H2O=CO+3H2
+        else:
+            F.S901.outs[1].imol['CH4'] = 0
+    
+    
+    if BoilerTurbo == False:
+        BT_cost = F.BT._cost
+        BT_design = F.BT._design
+        def BT_no_cost():
+            BT_cost()
+            bpc = F.BT.baseline_purchase_costs
+            pc = F.BT.purchase_costs
+            ic = F.BT.installed_costs
+            for i in bpc.keys(): bpc[i] = 0. 
+            for i in pc.keys(): pc[i] = 0. 
+            for i in ic.keys(): ic[i] = 0. 
+        def BT_no_cost_design():
+            BT_design()
+            bpc = F.BT.baseline_purchase_costs
+            pc = F.BT.purchase_costs
+            ic = F.BT.installed_costs
+            for i in bpc.keys(): bpc[i] = 0. 
+            for i in pc.keys(): pc[i] = 0. 
+            for i in ic.keys(): ic[i] = 0.
+        F.BT._design = BT_no_cost_design
+        F.BT._cost = BT_no_cost
+        def BT_summary(design_kwargs=None, cost_kwargs=None, lca_kwargs=None):
+            F.BT._check_run()
+            F.BT._design()
+            F.BT._cost()
+            for i in F.BT.auxiliary_units:
+                F.BT.heat_utilities += i.heat_utilities
+                F.BT.power_utility.rate += i.power_utility.rate
+            F.BT._lca()
+            F.BT._load_operation_costs()
+        F.BT._summary = BT_summary
+    else:
+        pass
+    
+    
+    if opportunity_cost == True:
+        @F.oc_unit.add_specification(run=True)
+        def oc_flow():
+            F.jet_storage.run()
+            F.oc.copy_flow(F.jet_fuel)
+            F.oc.price = - F.diesel.price
+    else:
+        pass
+        
+        
 #%% System setup and process groups
 
 # sys = SAF_sys()

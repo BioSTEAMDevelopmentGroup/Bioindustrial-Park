@@ -256,7 +256,7 @@ price = {
 # 100-year global warming potential (GWP) in kg CO2-eq/kg
 
 GWP_CFs = {
-    'feedstock': 0.024/0.3*0.4, # 70% moisture sugarcane value to 60% moisture
+    'feedstock': -0.15571*0.8, # -154.61 gCO2 is dry miscanthus average CI of PADD2 from Xinxin's data
     'H3PO4': 0.86829, # ecoinvent 3.8 market for phosphoric acid, RoW
     'polymer': 3.1996, # ecoinvent 3.8 market for polyacrylamide-based anionic flocculants, GLO
     'lime': 1.29,

@@ -27,7 +27,7 @@ __all__ = ('create_model')
 
 #%%
 
-sys = SAF_sys(material_storage=False, product_storage=False, WWTC=False, BT=False, hydrogenation_distillation=False,h2_purchase=False)
+sys = SAF_sys(material_storage=True, product_storage=False, WWTC=True, BoilerTurbo=True, hydrogenation_distillation=False, h2_purchase=True)
 
 BT_sys = bst.System('BT_sys', path=(F.BT,))
 
@@ -72,9 +72,10 @@ load_preferences_and_process_settings(T='K',
                                       )
 sys.set_tolerance(rmol=1e-6, mol=1e-5, maxiter=400)
 
-tea_SAF = create_SAF_coprocessing_tea(sys=sys,steam_distribution=0.0, water_supply_cooling_pumping=0.0, 
-                                      water_distribution=0.0, electric_substation_and_distribution=0.0,
-                                      gas_supply_and_distribution=0.009, comminication=0.0, safety_installation=0.013,)
+tea_SAF = create_SAF_coprocessing_tea(sys=sys,steam_distribution=0.031, water_supply_cooling_pumping=0.057, 
+                                      water_distribution=0.025, electric_substation_and_distribution=0.0,
+                                      gas_supply_and_distribution=0.009, comminication=0.006, safety_installation=0.013,
+                                      building=0.29, yard_works=0.12, contingency_new=0.37, land=0.06)
 
 sys.operating_hours = tea_SAF.operating_days * 24
 
@@ -95,7 +96,6 @@ def set_price_of_streams():
         for k in i.outs:
             if k.ID in price.keys():
                 k.price = price[k.ID]
-    F.hydrogen.price=0
 
 def set_GWP_of_streams(indicator):
     F.caustic.set_CF(key='GWP100', value=GWP_CFs['caustic']) # caustic in WWT

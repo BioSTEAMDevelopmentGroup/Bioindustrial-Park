@@ -84,23 +84,22 @@ class SAF_Coprocessing_TEA(TEA):
                  'steam_distribution', 'water_supply_cooling_pumping', 
                  'water_distribution', 'electric_substation_and_distribution',
                  'gas_supply_and_distribution', 'comminication', 
-                 'safety_installation')
+                 'safety_installation', 'building', 'yard_works', 'land')
     
     def __init__(self, system, IRR, duration, depreciation, income_tax,
                  operating_days, lang_factor, construction_schedule,
                  startup_months, startup_FOCfrac, startup_VOCfrac,
                  startup_salesfrac, WC_over_FCI,  finance_interest,
                  finance_years, finance_fraction, OSBL_units, warehouse,
-                 site_development, additional_piping, proratable_costs,
-                 field_expenses, construction, contingency,
-                 other_indirect_costs, labor_cost, labor_burden,
+                 site_development, additional_piping, labor_cost, labor_burden,
                  property_insurance, maintenance, steam_power_depreciation,
                  boiler_turbogenerator, 
                  steam_distribution, 
                  water_supply_cooling_pumping, water_distribution, 
                  electric_substation_and_distribution,
                  gas_supply_and_distribution,
-                 comminication, safety_installation):
+                 comminication, safety_installation,
+                 building, yard_works, land, contingency_new, sanitary_waste_disposal,ESCCL):
                 
         super().__init__(system, IRR, duration, depreciation, income_tax,
                          operating_days, lang_factor, construction_schedule,
@@ -111,11 +110,6 @@ class SAF_Coprocessing_TEA(TEA):
         self.warehouse = warehouse
         self.site_development = site_development
         self.additional_piping = additional_piping
-        self.proratable_costs = proratable_costs
-        self.field_expenses = field_expenses
-        self.construction = construction
-        self.contingency = contingency
-        self.other_indirect_costs = other_indirect_costs
         self.labor_cost = labor_cost
         self.labor_burden = labor_burden
         self.property_insurance = property_insurance
@@ -129,9 +123,25 @@ class SAF_Coprocessing_TEA(TEA):
         self.gas_supply_and_distribution = gas_supply_and_distribution
         self.comminication = comminication
         self.safety_installation = safety_installation
-        
-        
-        
+        self.building = building
+        self.yard_works = yard_works
+        self.land = land
+        self.contingency_new = contingency_new
+        self.sanitary_waste_disposal = sanitary_waste_disposal
+        self.ESCCL = ESCCL
+    
+    
+    
+    
+    @property
+    def DPI(self) -> float:
+        """Direct permanent investment [USD]."""
+        return self._DPI(self.installed_equipment_cost, self.purchase_cost)
+    @property
+    def TDC(self) -> float:
+        """Total depreciable capital [USD]."""
+        return self._TDC(self.DPI, self.installed_equipment_cost)
+    
     @property
     def steam_power_depreciation(self):
         """[str] 'MACRS' + number of years (e.g. 'MACRS7')."""
@@ -157,6 +167,11 @@ class SAF_Coprocessing_TEA(TEA):
             return sum([unit_capital_costs[i].installed_cost for i in OSBL_units])
         else:
             return sum([i.installed_cost for i in self.OSBL_units])
+    
+    @property
+    def OSBL_purchase_equipment_cost(self):
+        return sum([i.purchase_cost for i in self.OSBL_units])
+            
                                                                                                                                   
     def _fill_depreciation_array(self, D, start, years, TDC):
         depreciation_array = self._get_depreciation_array()
@@ -187,36 +202,59 @@ class SAF_Coprocessing_TEA(TEA):
         return self._ISBL_DPI_cached
     
     
-    
+    def _ISBL_purchase_equipment_cost(self, purchase_cost):
+        """Purchase cost of units inside battery limits."""
+        return purchase_cost - self.OSBL_purchase_equipment_cost
     
     
     def _service_facilites_installed_cost(self, installed_equipment_cost):
         """Service facilities installed costs"""
         return self._ISBL_DPI(installed_equipment_cost) * (self.steam_distribution + self.water_supply_cooling_pumping + self.water_distribution +\
                                                            self.electric_substation_and_distribution + self.gas_supply_and_distribution + \
-                                                           self.comminication + self.safety_installation)
+                                                           self.comminication + self.safety_installation + self.sanitary_waste_disposal)
     
 
 
-
-    def _DPI(self, installed_equipment_cost): # Direct Permanent Investment
+    def _building_cost(self, purchase_cost):
+        """Building cost replaces warehouse and construction cost """
+        return self.building * self._ISBL_purchase_equipment_cost(purchase_cost)
+    
+    
+    
+    def _yard_works(self, installed_equipment_cost):
+        return self.yard_works * self._ISBL_DPI(installed_equipment_cost)
+    
+    
+    def _land(self, installed_equipment_cost):
+        return self.land * self._ISBL_DPI(installed_equipment_cost)
+    
+    
+    def _DPI(self, installed_equipment_cost, purchase_cost): # Direct Permanent Investment
         factors = self.warehouse + self.site_development + self.additional_piping
         self._DPI_cached = DPI = installed_equipment_cost + self._ISBL_DPI(installed_equipment_cost) * factors +\
-            self._service_facilites_installed_cost(installed_equipment_cost)
+            self._service_facilites_installed_cost(installed_equipment_cost) + self._building_cost(purchase_cost) + self._yard_works(installed_equipment_cost)+\
+                self._land(installed_equipment_cost)
         return DPI
     
-    def _TDC(self, DPI): # Total Depreciable Capital
-        return DPI + self._depreciable_indirect_costs(DPI)
+    # Indirect cost
+    def _engineering_supervision_construction_contractor_legal_costs(self, installed_equipment_cost):
+        return self.ESCCL * self._ISBL_DPI(installed_equipment_cost)
+        
+    def _contingency(self, installed_equipment_cost):
+        return self.contingency_new * self._ISBL_DPI(installed_equipment_cost)
+        
+    def _TDC(self, DPI, installed_equipment_cost): # Total Depreciable Capital
+        return DPI + self._depreciable_indirect_costs(installed_equipment_cost)
     
-    def _nondepreciable_indirect_costs(self, DPI):
-        return DPI * self.other_indirect_costs
+    # def _nondepreciable_indirect_costs(self, DPI):
+    #     return DPI * self.other_indirect_costs
     
-    def _depreciable_indirect_costs(self, DPI):
-        return DPI * (self.proratable_costs + self.field_expenses
-                      + self.construction + self.contingency)
+    def _depreciable_indirect_costs(self, installed_equipment_cost):
+        return self._engineering_supervision_construction_contractor_legal_costs(installed_equipment_cost) + self._contingency(installed_equipment_cost)
     
     def _FCI(self, TDC): # Fixed Capital Investment
-        self._FCI_cached = FCI = TDC + self._nondepreciable_indirect_costs(self._DPI_cached)
+        self._FCI_cached = FCI = TDC 
+        # + self._nondepreciable_indirect_costs(self._DPI_cached)
         return FCI
     
     def _FOC(self, FCI): # Fixed Operating Costs
@@ -242,6 +280,7 @@ def create_SAF_coprocessing_tea(sys,
                                 gas_supply_and_distribution,
                                 comminication, 
                                 safety_installation,
+                                building, yard_works, contingency_new, land, labor_cost, sanitary_waste_disposal,
                                 OSBL_units=None,):
     if OSBL_units is None: OSBL_units = bst.get_OSBL(sys.cost_units)            
     try:
@@ -266,15 +305,14 @@ def create_SAF_coprocessing_tea(sys,
         finance_years=10,  # From 'Techno-economic analysis for upgrading the biomass-derived ethanol-to-jet blendstocks' (Ling Tao)
         finance_fraction=0.4,
         OSBL_units=OSBL_units,
-        warehouse=0.04, # From 'Techno-economic analysis for upgrading the biomass-derived ethanol-to-jet blendstocks' (Ling Tao)
-        site_development=0.09,  # From 'Techno-economic analysis for upgrading the biomass-derived ethanol-to-jet blendstocks' (Ling Tao)
+        warehouse=0.0, 
+        site_development=0.0,
         additional_piping=0.045, # From 'Techno-economic analysis for upgrading the biomass-derived ethanol-to-jet blendstocks' (Ling Tao)
-        proratable_costs=0.10, 
-        field_expenses=0.10, 
-        construction=0.20,
-        contingency=0.10, 
-        other_indirect_costs=0.10,
-        labor_cost=2.4e6, # =90*0.9*365*24*33.64 more workers than 60 workers in 'Techno-economic analysis for upgrading the biomass-derived ethanol-to-jet blendstocks'(Ling Tao); 33.64 is employment cost of average 2023 from https://data.bls.gov/cgi-bin/srgate
+        # proratable_costs=0.0, 
+        # field_expenses=0.0, 
+        # construction=0.0,
+        # contingency=0.0, 
+        # other_indirect_costs=0.00,
         labor_burden=0.90,
         property_insurance=0.007, 
         maintenance=0.03,
@@ -286,5 +324,13 @@ def create_SAF_coprocessing_tea(sys,
         electric_substation_and_distribution=electric_substation_and_distribution,
         gas_supply_and_distribution=gas_supply_and_distribution,
         comminication=comminication, 
-        safety_installation=safety_installation,)
+        safety_installation=safety_installation,
+        building=building,
+        yard_works=yard_works,
+        contingency_new=contingency_new,
+        land=land,
+        labor_cost=labor_cost,
+        sanitary_waste_disposal = sanitary_waste_disposal,
+        ESCCL=0.89, # 0.32+0.34+0.19+0.04
+        )
     return SAF_tea

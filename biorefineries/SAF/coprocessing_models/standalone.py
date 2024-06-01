@@ -27,7 +27,7 @@ __all__ = ('create_model')
 
 #%%
 
-sys = SAF_sys(material_storage=True, product_storage=False, WWTC=True, BT=True, hydrogenation_distillation=False, h2_purchase=True)
+sys = SAF_sys(material_storage=True, product_storage=True, WWTC=True, BoilerTurbo=True, hydrogenation_distillation=True, h2_purchase=True,opportunity_cost=False)
 
 BT_sys = bst.System('BT_sys', path=(F.BT,))
 
@@ -73,8 +73,10 @@ load_preferences_and_process_settings(T='K',
 sys.set_tolerance(rmol=1e-6, mol=1e-5, maxiter=400)
 
 tea_SAF = create_SAF_coprocessing_tea(sys=sys,steam_distribution=0.031, water_supply_cooling_pumping=0.057, 
-                                      water_distribution=0.025, electric_substation_and_distribution=0.0,
-                                      gas_supply_and_distribution=0.009, comminication=0.006, safety_installation=0.013,)
+                                      water_distribution=0.025, electric_substation_and_distribution=0.072,
+                                      gas_supply_and_distribution=0.009, comminication=0.006, safety_installation=0.013,
+                                      building=0.47, yard_works=0.12, contingency_new=0.37, land=0.06, labor_cost=4525740,
+                                      sanitary_waste_disposal=0.013)
 
 sys.operating_hours = tea_SAF.operating_days * 24
 
@@ -158,6 +160,17 @@ get_gasoline_energy_ratio = lambda: get_gasoline_energy() / get_total_energy() *
 
 # 2. TEA
 
+get_installed_cost = lambda: tea_SAF.installed_equipment_cost / 1e6
+get_installed_cost_OSBL = lambda: sum(i.installed_cost for i in tea_SAF.OSBL_units) / 1e6
+get_installed_cost_ISBL = lambda: get_installed_cost() - get_installed_cost_OSBL()
+get_DPI = lambda: tea_SAF.DPI / 1e6
+get_TDC = lambda: tea_SAF.TDC / 1e6
+get_FCI = lambda: tea_SAF.FCI / 1e6
+get_TCI = lambda: tea_SAF.TCI / 1e6
+get_FOC = lambda: tea_SAF.FOC / 1e6
+get_VOC = lambda: tea_SAF.VOC / 1e6
+get_AOC = lambda: tea_SAF.AOC / 1e6 # Excludes electricity credit
+
 get_MPSP = lambda: tea_SAF.solve_price(F.jet_fuel)  # $/kg
 
 _jet_price_conversion_index_vol = lambda: _L_per_gal * jet_fuel.rho / 1000 # from $/kg to $/gal
@@ -168,8 +181,7 @@ get_MPSP_per_gallon = lambda: get_MPSP() * _jet_price_conversion_index_vol()
     
 get_NPV = lambda: tea_SAF.NPV
 solve_IRR = lambda: tea_SAF.solve_IRR()
-get_overall_TCI = lambda: tea_SAF.TCI / 1e6 # in $MM      
-get_overall_AOC = lambda: tea_SAF.AOC / 1e6 # Excludes electricity credit
+
 get_material_cost = lambda: tea_SAF.material_cost / 1e6 #  Excludes electricity credit but includes the money spent on ash disposal 
 get_annual_sale = lambda: tea_SAF.sales / 1e6
 
@@ -185,7 +197,18 @@ get_cost_electricity_credit = lambda: get_excess_power() * electricity_price / j
 
 
 
-metrics = [Metric('Minimum selling price', get_MPSP_per_gallon, '$/gal'),
+metrics = [Metric('Installed cost', get_installed_cost, '10^6 $'),
+           Metric('Installed cost OSBL', get_installed_cost_OSBL, '10^6 $'),
+           Metric('Installed cost ISBL', get_installed_cost_ISBL, '10^6 $'),
+           Metric('DPI', get_DPI, '10^6 $'),
+           Metric('TDC', get_TDC, '10^6 $'),
+           Metric('FCI', get_FCI, '10^6 $'),
+           Metric('TCI', get_TCI, '10^6 $'),
+           Metric('FOC', get_FOC, '10^6 $/yr'),
+           Metric('VOC', get_VOC, '10^6 $/yr'),
+           Metric('AOC', get_AOC, '10^6 $/yr'),
+           
+           Metric('Minimum selling price', get_MPSP_per_gallon, '$/gal'),
            Metric('Jet volume yield', get_jet_yield, '10^6 Gal/yr'),
            Metric('Total volume yield', get_total_yield, '10^6 Gal/yr'),
            Metric('Jet volume ratio', get_jet_vol_ratio, '%'),
@@ -193,17 +216,11 @@ metrics = [Metric('Minimum selling price', get_MPSP_per_gallon, '$/gal'),
            Metric('Jet volume ratio to ethanol', get_jet_to_eth_ratio, '%'),
            Metric('Conversion efficiency', get_conversion_efficiency, '%'),
            
-           Metric('Total capital investment', get_overall_TCI, '10^6 $'),
-           Metric('Annual operating cost', get_overall_AOC, '10^6 $/yr'),
            Metric('Annual material cost', get_material_cost, '10^6 $/yr'),
-           #Metric('Annual product sale', get_annual_sale, '10^6 $/yr'),
+           Metric('Annual product sale', get_annual_sale, '10^6 $/yr'),
            Metric('Annual electricity credit', get_electricity_credit, '10^6 $/yr'),
            Metric('Electricity credit to jet', get_cost_electricity_credit, '$/gal'),]
-           
 
-           
-                   
-          
 
 
 
@@ -791,7 +808,7 @@ def create_model(system=sys,
 
     ###### Bagasse distribution ######
     S102 = F.S102
-    D = shape.Uniform(0.5,1.0)
+    D = shape.Uniform(0.7,1.0)
     @param(name='Bagasse split for ethanol', element=S102, kind='coupled', units='%',
            baseline=0.8, distribution=D)
     def set_bagasse_split(split):
@@ -997,9 +1014,9 @@ def create_model(system=sys,
     # =============================================================================
     # LCA parameters
     # =============================================================================
-    D = shape.Uniform(0.05, 0.15)
+    D = shape.Uniform(-0.18363*0.8, -0.10874*0.8)
     @param(name='Feedstock GWP', element='Feedstock', kind='isolated', units='kg CO2-eq/kg',
-           baseline=0.10, distribution=D)
+           baseline=-0.14315*0.8, distribution=D)
     def set_feedstock_GWP(X):
         feedstock.characterization_factors['GWP100'] = X
 
@@ -1067,10 +1084,10 @@ def create_model(system=sys,
         model.load_samples(samples)
         model.evaluate(notify=notify_runs)
         model.show()
-        model.table.to_excel('model_table.xlsx')
+        model.table.to_excel('model_table_standalone.xlsx')
         df_rho,df_p = model.spearman_r()
-        df_rho.to_excel('df_rho.xlsx')
-        df_p.to_excel('df_p.xlsx')
+        df_rho.to_excel('df_rho_standalone.xlsx')
+        df_p.to_excel('df_p_stanadlone.xlsx')
     else:
         model.show()
     return model

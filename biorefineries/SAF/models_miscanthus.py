@@ -958,9 +958,9 @@ def create_model(system=sys,
     # =============================================================================
     # LCA parameters
     # =============================================================================
-    D = shape.Uniform(0.05, 0.15)
+    D = shape.Uniform(-0.18363*0.8, -0.10874*0.8)
     @param(name='Feedstock GWP', element='Feedstock', kind='isolated', units='kg CO2-eq/kg',
-           baseline=0.10, distribution=D)
+           baseline=-0.14315*0.8, distribution=D)
     def set_feedstock_GWP(X):
         feedstock.characterization_factors['GWP100'] = X
 

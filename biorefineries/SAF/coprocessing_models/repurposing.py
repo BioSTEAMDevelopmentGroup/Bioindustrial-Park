@@ -27,7 +27,7 @@ __all__ = ('create_model')
 
 #%%
 
-sys = SAF_sys(material_storage=True, product_storage=True, WWTC=True, BT=True, hydrogenation_distillation=True, h2_purchase=True)
+sys = SAF_sys(material_storage=False, product_storage=False, WWTC=False, BoilerTurbo=False, hydrogenation_distillation=False,h2_purchase=False,opportunity_cost=True)
 
 BT_sys = bst.System('BT_sys', path=(F.BT,))
 
@@ -72,9 +72,11 @@ load_preferences_and_process_settings(T='K',
                                       )
 sys.set_tolerance(rmol=1e-6, mol=1e-5, maxiter=400)
 
-tea_SAF = create_SAF_coprocessing_tea(sys=sys,steam_distribution=0.031, water_supply_cooling_pumping=0.057, 
-                                      water_distribution=0.025, electric_substation_and_distribution=0.072,
-                                      gas_supply_and_distribution=0.009, comminication=0.006, safety_installation=0.013,)
+tea_SAF = create_SAF_coprocessing_tea(sys=sys,steam_distribution=0.0, water_supply_cooling_pumping=0.0, 
+                                      water_distribution=0.0, electric_substation_and_distribution=0.0,
+                                      gas_supply_and_distribution=0.009, comminication=0.0, safety_installation=0.013,
+                                      building=0.07, yard_works=0.0, contingency_new=0.1, land=0.0, labor_cost=3763935,
+                                      sanitary_waste_disposal=0.0)
 
 sys.operating_hours = tea_SAF.operating_days * 24
 
@@ -95,6 +97,8 @@ def set_price_of_streams():
         for k in i.outs:
             if k.ID in price.keys():
                 k.price = price[k.ID]
+    F.hydrogen.price=0
+
 
 def set_GWP_of_streams(indicator):
     F.caustic.set_CF(key='GWP100', value=GWP_CFs['caustic']) # caustic in WWT
@@ -136,6 +140,8 @@ get_annual_factor = lambda: tea_SAF.operating_days * 24
 
 # 1. Product characteristics
 
+get_coprocessing_ratio = lambda: F.R404.ins[0].F_vol * 24 / 5595 # in m3; 5595 is capacity of diesel hydrotreater in PR 
+
 get_ethanol_yield = lambda: ethanol.F_vol * _gal_per_m3 * get_annual_factor() / 1e6 # in MMGal (million gallon)
 get_jet_yield = lambda:  jet_fuel.F_vol * _gal_per_m3 * get_annual_factor() / 1e6
 get_diesel_yield = lambda:  diesel.F_vol * _gal_per_m3 * get_annual_factor() / 1e6
@@ -158,6 +164,17 @@ get_gasoline_energy_ratio = lambda: get_gasoline_energy() / get_total_energy() *
 
 # 2. TEA
 
+get_installed_cost = lambda: tea_SAF.installed_equipment_cost / 1e6
+get_installed_cost_OSBL = lambda: sum(i.installed_cost for i in tea_SAF.OSBL_units) / 1e6
+get_installed_cost_ISBL = lambda: get_installed_cost() - get_installed_cost_OSBL()
+get_DPI = lambda: tea_SAF.DPI / 1e6
+get_TDC = lambda: tea_SAF.TDC / 1e6
+get_FCI = lambda: tea_SAF.FCI / 1e6
+get_TCI = lambda: tea_SAF.TCI / 1e6
+get_FOC = lambda: tea_SAF.FOC / 1e6
+get_VOC = lambda: tea_SAF.VOC / 1e6
+get_AOC = lambda: tea_SAF.AOC / 1e6 # Excludes electricity credit
+
 get_MPSP = lambda: tea_SAF.solve_price(F.jet_fuel)  # $/kg
 
 _jet_price_conversion_index_vol = lambda: _L_per_gal * jet_fuel.rho / 1000 # from $/kg to $/gal
@@ -168,8 +185,7 @@ get_MPSP_per_gallon = lambda: get_MPSP() * _jet_price_conversion_index_vol()
     
 get_NPV = lambda: tea_SAF.NPV
 solve_IRR = lambda: tea_SAF.solve_IRR()
-get_overall_TCI = lambda: tea_SAF.TCI / 1e6 # in $MM      
-get_overall_AOC = lambda: tea_SAF.AOC / 1e6 # Excludes electricity credit
+
 get_material_cost = lambda: tea_SAF.material_cost / 1e6 #  Excludes electricity credit but includes the money spent on ash disposal 
 get_annual_sale = lambda: tea_SAF.sales / 1e6
 
@@ -185,7 +201,19 @@ get_cost_electricity_credit = lambda: get_excess_power() * electricity_price / j
 
 
 
-metrics = [Metric('Minimum selling price', get_MPSP_per_gallon, '$/gal'),
+metrics = [Metric('Coprocessing ratio', get_coprocessing_ratio, ''),
+           Metric('Installed cost', get_installed_cost, '10^6 $'),
+           Metric('Installed cost OSBL', get_installed_cost_OSBL, '10^6 $'),
+           Metric('Installed cost ISBL', get_installed_cost_ISBL, '10^6 $'),
+           Metric('DPI', get_DPI, '10^6 $'),
+           Metric('TDC', get_TDC, '10^6 $'),
+           Metric('FCI', get_FCI, '10^6 $'),
+           Metric('TCI', get_TCI, '10^6 $'),
+           Metric('FOC', get_FOC, '10^6 $/yr'),
+           Metric('VOC', get_VOC, '10^6 $/yr'),
+           Metric('AOC', get_AOC, '10^6 $/yr'),
+           
+           Metric('Minimum selling price', get_MPSP_per_gallon, '$/gal'),
            Metric('Jet volume yield', get_jet_yield, '10^6 Gal/yr'),
            Metric('Total volume yield', get_total_yield, '10^6 Gal/yr'),
            Metric('Jet volume ratio', get_jet_vol_ratio, '%'),
@@ -193,17 +221,11 @@ metrics = [Metric('Minimum selling price', get_MPSP_per_gallon, '$/gal'),
            Metric('Jet volume ratio to ethanol', get_jet_to_eth_ratio, '%'),
            Metric('Conversion efficiency', get_conversion_efficiency, '%'),
            
-           Metric('Total capital investment', get_overall_TCI, '10^6 $'),
-           Metric('Annual operating cost', get_overall_AOC, '10^6 $/yr'),
            Metric('Annual material cost', get_material_cost, '10^6 $/yr'),
-           #Metric('Annual product sale', get_annual_sale, '10^6 $/yr'),
+           Metric('Annual product sale', get_annual_sale, '10^6 $/yr'),
            Metric('Annual electricity credit', get_electricity_credit, '10^6 $/yr'),
            Metric('Electricity credit to jet', get_cost_electricity_credit, '$/gal'),]
-           
 
-           
-                   
-          
 
 
 
@@ -611,7 +633,16 @@ def create_model(system=sys,
     
     # ============================================================================
     # TEA parameters
-    # =============================================================================
+    # ============================================================================
+    # ##### Co-processing ratio related #####
+    # moisture = F.feedstock.imass['Water'] / F.feedstock.F_mass
+    # D = shape.Uniform(1000, 3500)
+    # @param(name='Feedstock dry flow', element='feedstock', kind='coupled', units='',
+    #        baseline=2000, distribution=D) # in tonne to sample
+    # def set_feedstock_flow(dry_flow):
+    #     F.feedstock.F_mass = dry_flow / (1-moisture) * 1000 # in kg
+        
+
 
     ##### Financial parameters #####
     D = shape.Triangle(0.84, 0.9, 0.96)
@@ -997,9 +1028,9 @@ def create_model(system=sys,
     # =============================================================================
     # LCA parameters
     # =============================================================================
-    D = shape.Uniform(0.05, 0.15)
+    D = shape.Uniform(-0.18363*0.8, -0.10874*0.8)
     @param(name='Feedstock GWP', element='Feedstock', kind='isolated', units='kg CO2-eq/kg',
-           baseline=0.10, distribution=D)
+           baseline=-0.14315*0.8, distribution=D)
     def set_feedstock_GWP(X):
         feedstock.characterization_factors['GWP100'] = X
 
@@ -1067,10 +1098,10 @@ def create_model(system=sys,
         model.load_samples(samples)
         model.evaluate(notify=notify_runs)
         model.show()
-        model.table.to_excel('model_table.xlsx')
+        model.table.to_excel('model_table_repurposing.xlsx')
         df_rho,df_p = model.spearman_r()
-        df_rho.to_excel('df_rho.xlsx')
-        df_p.to_excel('df_p.xlsx')
+        df_rho.to_excel('df_rho_repurposing.xlsx')
+        df_p.to_excel('df_p_repurposing.xlsx')
     else:
         model.show()
     return model
