@@ -569,6 +569,11 @@ contourplots.animated_contourplot(w_data_vs_x_y_at_multiple_z=results_metric_1, 
                                                       (99,11.)),
                                 # zoom_data_scale=5,
                                 text_boxes = {'>12.0': [(5,5), 'white']},
+                                
+                                add_shapes = {
+                                    # coords as tuple of tuples: (color, zorder),
+                                    ((1,0), (47,100), (1,100)): ('white', 2), # infeasible region smoothing
+                                    }
                                 )
 
 #%% GWP
@@ -641,6 +646,12 @@ contourplots.animated_contourplot(w_data_vs_x_y_at_multiple_z=results_metric_2, 
                                                       (99,11.)),
                                 # zoom_data_scale=5,
                                 text_boxes = {'>20.0': [(80,5), 'white']},
+                                
+                                add_shapes = {
+                                    # coords as tuple of tuples: (color, zorder),
+                                    ((1,0), (47,100), (1,100)): ('white', 2), # infeasible region smoothing
+                                    }
+                                
                                 )
 
 
@@ -712,6 +723,11 @@ contourplots.animated_contourplot(w_data_vs_x_y_at_multiple_z=results_metric_3, 
                                 #                       (95,7.)),
                                 
                                 text_boxes = {'>100': [(80, 5), 'white']},
+                                
+                                add_shapes = {
+                                    # coords as tuple of tuples: (color, zorder),
+                                    ((1,0), (47,100), (1,100)): ('white', 2), # infeasible region smoothing
+                                    }
                                 )
 
 #%% AOC
@@ -768,6 +784,11 @@ contourplots.animated_contourplot(w_data_vs_x_y_at_multiple_z=results_metric_4, 
                                                       (99,11.)),
                                 # zoom_data_scale=5,
                                 text_boxes = {'>150': [(80,3), 'white']},
+                                
+                                add_shapes = {
+                                    # coords as tuple of tuples: (color, zorder),
+                                    ((1,0), (47,100), (1,100)): ('white', 2), # infeasible region smoothing
+                                    }
                                 )
 
 #%% TCI
@@ -828,6 +849,11 @@ contourplots.animated_contourplot(w_data_vs_x_y_at_multiple_z=results_metric_5, 
                                                       (99,11.)),
                                 # zoom_data_scale=5,
                                 text_boxes = {'>400': [(80,5), 'white']},
+                                
+                                add_shapes = {
+                                    # coords as tuple of tuples: (color, zorder),
+                                    ((1,0), (47,100), (1,100)): ('white', 2), # infeasible region smoothing
+                                    }
                                 )
 
 #%% Purity
@@ -878,4 +904,9 @@ contourplots.animated_contourplot(w_data_vs_x_y_at_multiple_z=100.*np.array(resu
                                 additional_points ={(40.5, 35.9):('D', 'w', 6)},
                                 # comparison_range=[Purity_w_levels[-2], Purity_w_levels[-1]],
                                 # comparison_range_hatch_pattern='////',
+                                
+                                add_shapes = {
+                                    # coords as tuple of tuples: (color, zorder),
+                                    ((1,0), (47,100), (1,100)): ('white', 2), # infeasible region smoothing
+                                    }
                                 )
