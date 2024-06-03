@@ -403,9 +403,9 @@ GWP_CFs = {
     # 'DiammoniumSulfate': 1.2901, # ecoinvent 3.8 market for ammonium sulfate, RoW
     # 'MagnesiumSulfate': 1.0411, # ecoinvent 3.8 market for magnesium sulfate, GLO
     
-    'NiSiO2':10., # !!! update
+    'NiSiO2':18.711, # ecoinvent 3.8 market for nickel, class 1
     'Amberlyst70_':10., # !!! update
-    'Isopropanol':10., # !!! update
+    'Isopropanol':2.3219, # ecoinvent 3.8 market for isopropanol, RoW
     
     }
 
@@ -460,9 +460,9 @@ FEC_CFs = {
     # 'DiammoniumSulfate': 15.166, # ecoinvent 3.8 market for ammonium sulfate, RoW
     # 'MagnesiumSulfate': 13.805, # ecoinvent 3.8 market for magnesium sulfate, GLO
     
-    'NiSiO2':10., # !!! update
+    'NiSiO2':229.44	, # ecoinvent 3.8 market for nickel, class 1
     'Amberlyst70_':10., # !!! update
-    'Isopropanol':10., # !!! update
+    'Isopropanol':63.878, # ecoinvent 3.8 market for isopropanol, RoW
     
     }
 
