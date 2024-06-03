@@ -172,9 +172,6 @@ heptane_price = 1900./_kg_per_ton
 # Viswanathan et al. 2020
 toluene_price = 1.1
 
-# assumed
-AuPd_price = 60000. # !!!
-
 # search pages (all with 'trade assurance' and 'verified supplier' filters):
     # https://www.alibaba.com/trade/search?spm=a2700.galleryofferlist.leftFilter.d_filter.6fbb7c9clLc8dv&fsb=y&IndexArea=product_en&assessmentCompany=true&keywords=hydrogen+gas&ta=y&tab=all&
     # https://www.alibaba.com/trade/search?spm=a2700.galleryofferlist.leftFilter.d_filter.76512d31TN44FR&fsb=y&IndexArea=product_en&assessmentCompany=true&keywords=cas+1333-74-0&ta=y&tab=all&
@@ -290,7 +287,6 @@ NaOH_price = ((390.09+789.25)/2.)/_kg_per_ton * _GDP_2008_to_2010 * chem_index[2
 price = {'SA': SA_price,
          'PD': acetylacetone_price, # 2,4-pentanedione or acetylacetone
          'TCP': TCP_price,
-         'AuPd': AuPd_price,
          'IBA': IBA_price,
          'TAL': TAL_price,
          'KOH': KOH_price,
@@ -396,15 +392,15 @@ GWP_CFs = {
     'CO2': 0.87104, # ecoinvent 3.8 carbon dioxide production, liquid, RoW
     'H2': 2.3716, # ecoinvent 3.8 market for hydrogen, liquid, RoW
     
-    'SodiumAcetate': 1., # !!! not used; adjusted acetic acid CF is used instead for fermentation spiking
     'AceticAcid': 1.6198, # market for acetic acid, without water, in 98% solution state, GLO
+    'SodiumAcetate': 1.6198*60.05196/82.033789, # adjusted acetic acid CF 
     
     'PD': (2*(58.080)*3.5917 + 102.089*2.5435)/(2*100.117), # Acetylacetone; based on GLO/RoW IPCC 2013 CFs of markets for precursors acetone and acetyl anhydride
     # 'DiammoniumSulfate': 1.2901, # ecoinvent 3.8 market for ammonium sulfate, RoW
     # 'MagnesiumSulfate': 1.0411, # ecoinvent 3.8 market for magnesium sulfate, GLO
     
     'NiSiO2':18.711, # ecoinvent 3.8 market for nickel, class 1
-    'Amberlyst70_':10., # !!! update
+    'Amberlyst70_':1.3803, # ecoinvent 3.8 market for naphthalene sulfonic acid, GLO # Amberlyst-15 is 1,2-diethenylbenzene; 2-ethenylbenzene-1-sulfonic acid
     'Isopropanol':2.3219, # ecoinvent 3.8 market for isopropanol, RoW
     
     }
@@ -452,8 +448,8 @@ FEC_CFs = {
     'CO2': 7.4243, # ecoinvent 3.8 carbon dioxide production, liquid, RoW
     'H2': 75.747, # ecoinvent 3.8 market for hydrogen, liquid, RoW
 
-    'SodiumAcetate': 1., # !!! not used; adjusted acetic acid CF is used instead for fermentation spiking
     'AceticAcid': 45.611, # market for acetic acid, without water, in 98% solution state, GLO
+    'SodiumAcetate': 45.611*60.05196/82.033789, # adjusted acetic acid CF 
     
     'PD': (2*(58.080)*66.852 + 102.089*70.817)/(2*100.117), # Acetylacetone; based on GLO/RoW cumulative energy demand CFs of markets for precursors acetone and acetyl anhydride
     
@@ -461,7 +457,7 @@ FEC_CFs = {
     # 'MagnesiumSulfate': 13.805, # ecoinvent 3.8 market for magnesium sulfate, GLO
     
     'NiSiO2':229.44	, # ecoinvent 3.8 market for nickel, class 1
-    'Amberlyst70_':10., # !!! update
+    'Amberlyst70_':31.273, # ecoinvent 3.8 market for naphthalene sulfonic acid, GLO # Amberlyst-15 is 1,2-diethenylbenzene; 2-ethenylbenzene-1-sulfonic acid
     'Isopropanol':63.878, # ecoinvent 3.8 market for isopropanol, RoW
     
     }
