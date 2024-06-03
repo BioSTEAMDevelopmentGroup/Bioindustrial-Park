@@ -143,9 +143,11 @@ spec_2 = titers = np.linspace(2.,
 #     np.linspace(0.05, 1.5, steps[2])
     
 spec_3 = productivities =\
-    np.array([0.2*spec.baseline_productivity,
+    np.array([
+              0.2*spec.baseline_productivity,
               1.*spec.baseline_productivity,
-              5.*spec.baseline_productivity,])
+              5.*spec.baseline_productivity,
+              ])
 
 # spec_3 = productivities =\
 #     np.array([0.25*spec.baseline_productivity, 0.5*spec.baseline_productivity, 
@@ -903,6 +905,78 @@ contourplots.animated_contourplot(w_data_vs_x_y_at_multiple_z=100.*np.array(resu
                                 cbar_n_minor_ticks = 4,
                                 additional_points ={(40.5, 35.9):('D', 'w', 6)},
                                 # comparison_range=[Purity_w_levels[-2], Purity_w_levels[-1]],
+                                # comparison_range_hatch_pattern='////',
+                                
+                                add_shapes = {
+                                    # coords as tuple of tuples: (color, zorder),
+                                    ((1,0), (47,100), (1,100)): ('white', 2), # infeasible region smoothing
+                                    }
+                                )
+
+#%% Relative impact of yield and titer on MPSP
+rel_impact = []
+MPSPs = results_metric_1[1]
+y_step = 1
+t_step = 1
+for i in range(len(MPSPs)-1):
+    rel_impact.append([])
+    for j in range(len(MPSPs[i])-1):
+        curr_MPSP = MPSPs[i][j]
+        y_MPSP = MPSPs[i][j+y_step]
+        t_MPSP = MPSPs[i+t_step][j]
+        rel_impact[-1].append((curr_MPSP-t_MPSP)/(curr_MPSP-y_MPSP))
+
+for i in range(len(MPSPs)-1): rel_impact[i].append(np.nan)
+rel_impact.append([])
+for i in range(len(MPSPs[i])): rel_impact[-1].append(np.nan)
+
+
+rel_impact = np.array(rel_impact)
+
+Rel_impact_MPSP_w_levels = np.arange(0., 10.01, 0.25)
+Rel_impact_MPSP_cbar_ticks = np.arange(0., 10.01, 0.5)
+# Rel_impact_MPSP_cbar_ticks = np.arange(2, 8.1, 1.)
+Rel_impact_MPSP_w_ticks = np.arange(0., 10.01, 0.5)
+# Rel_impact_MPSP_w_levels = np.arange(0., 15.5, 0.5)
+
+contourplots.animated_contourplot(w_data_vs_x_y_at_multiple_z=np.array([rel_impact]), # shape = z * x * y # values of the metric you want to plot on the color axis; e.g., Rel_impact_MPSP
+                                x_data=100*yields, # x axis values
+                                # x_data = yields/theoretical_max_g_TAL_acid_per_g_glucose,
+                                y_data=titers, # y axis values
+                                z_data=[productivities[1]], # z axis values
+                                x_label=x_label, # title of the x axis
+                                y_label=y_label, # title of the y axis
+                                z_label=z_label, # title of the z axis
+                                w_label='Rel impact by titer:yield on MPSP', # title of the color axis
+                                x_ticks=100*x_ticks,
+                                y_ticks=y_ticks,
+                                z_ticks=z_ticks,
+                                w_levels=Rel_impact_MPSP_w_levels, # levels for unlabeled, filled contour areas (labeled and ticked only on color bar)
+                                w_ticks=Rel_impact_MPSP_w_ticks, # labeled, lined contours; a subset of w_levels
+                                x_units=x_units,
+                                y_units=y_units,
+                                z_units=z_units,
+                                w_units='',
+                                # fmt_clabel=lambda cvalue: r"$\mathrm{\$}$"+" {:.1f} ".format(cvalue)+r"$\cdot\mathrm{kg}^{-1}$", # format of contour labels
+                                fmt_clabel = lambda cvalue: get_rounded_str(cvalue, 3),
+                                cmap=CABBI_green_colormap(), # can use 'viridis' or other default matplotlib colormaps
+                                cmap_over_color = colors.grey_dark.shade(8).RGBn,
+                                extend_cmap='neither',
+                                cbar_ticks=Rel_impact_MPSP_cbar_ticks,
+                                z_marker_color='g', # default matplotlib color names
+                                fps=fps, # animation frames (z values traversed) per second
+                                n_loops='inf', # the number of times the animated contourplot should loop animation over z; infinite by default
+                                animated_contourplot_filename='Rel_impact_MPSP_animated_contourplot_'+file_to_save, # file name to save animated contourplot as (no extensions)
+                                keep_frames=keep_frames, # leaves frame PNG files undeleted after running; False by default
+                                axis_title_fonts=axis_title_fonts,
+                                clabel_fontsize = clabel_fontsize,
+                                default_fontsize = default_fontsize,
+                                axis_tick_fontsize = axis_tick_fontsize,
+                                # comparison_range=TAL_maximum_viable_market_range,
+                                n_minor_ticks = 1,
+                                cbar_n_minor_ticks = 4,
+                                additional_points ={(40.5, 35.9):('D', 'w', 6)},
+                                # comparison_range=[Rel_impact_MPSP_w_levels[-2], Rel_impact_MPSP_w_levels[-1]],
                                 # comparison_range_hatch_pattern='////',
                                 
                                 add_shapes = {
