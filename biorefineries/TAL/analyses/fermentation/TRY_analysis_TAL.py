@@ -916,15 +916,24 @@ contourplots.animated_contourplot(w_data_vs_x_y_at_multiple_z=100.*np.array(resu
 #%% Relative impact of yield and titer on MPSP
 rel_impact = []
 MPSPs = results_metric_1[1]
-y_step = 1
 t_step = 1
-for i in range(len(MPSPs)-1):
+y_step = 1
+tot_t_steps, tot_y_steps = len(MPSPs), len(MPSPs[0]) # only works if tot_t_steps == tot_y_steps
+max_increment = 1
+for i in range(tot_t_steps-1):
     rel_impact.append([])
-    for j in range(len(MPSPs[i])-1):
-        curr_MPSP = MPSPs[i][j]
-        y_MPSP = MPSPs[i][j+y_step]
-        t_MPSP = MPSPs[i+t_step][j]
-        rel_impact[-1].append((curr_MPSP-t_MPSP)/(curr_MPSP-y_MPSP))
+    for j in range(tot_y_steps-1):
+        t_increments = range(1, min(max_increment+1, tot_t_steps-i))
+        y_increments = range(1, min(max_increment+1, tot_t_steps-j))
+        ri_sum = 0.
+        for inc in zip(t_increments, y_increments): # ensures stopping at the lower maximum increment
+            t_inc, y_inc = inc
+            curr_MPSP = MPSPs[i][j]
+            t_MPSP = MPSPs[i+t_inc][j]
+            y_MPSP = MPSPs[i][j+y_inc]
+            ri_sum += (curr_MPSP-t_MPSP)/(curr_MPSP-y_MPSP)
+        rel_impact[-1].append(ri_sum/len(t_increments)*len(y_increments))
+
 
 for i in range(len(MPSPs)-1): rel_impact[i].append(np.nan)
 rel_impact.append([])
