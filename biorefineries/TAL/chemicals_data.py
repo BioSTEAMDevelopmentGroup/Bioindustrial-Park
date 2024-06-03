@@ -563,9 +563,9 @@ Tar = chemical_copied('Tar', Xylose, phase_ref='s')
 
 PdC = chemical_database('Pd', phase='s')
 
-NiSiO2 = chemical_database('NiSiO2', search_ID='Nickel on silica', phase='s') # modeled simply as nickel
+NiSiO2 = chemical_database('NiSiO2', search_ID='Nickel on silica', phase='s') # Ni-SiO2-Al2O3 # Raney Ni (Ni-Al2O3 alloy) CAS 12635-27-7 is not currently in the database
 
-Amberlyst70_ = chemical_copied('Amberlyst70_', NiSiO2)
+Amberlyst70_ = chemical_copied('Amberlyst70_', NiSiO2) # Amberlyst-70 # Amberlyst-15 CAS 39389-20-3 is not currently in the database
 # =============================================================================
 # Mixtures
 # =============================================================================
