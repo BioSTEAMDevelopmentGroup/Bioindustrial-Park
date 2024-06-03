@@ -58,7 +58,7 @@ conversions_decarb = 0.01 * np.array([13.91875948, 18.4816961, 22.503871])
 decarb_conv_interp = interp1d(Ts_decarb, conversions_decarb)
 # 
 # Acetone washing to remove impurities from KSA
-def get_mass_acetone_needed_per_mass_KSA():
+def get_mass_IPA_needed_per_mass_KSA():
     return 2. #!!! TODO: Ask Min Soo for exp data and update this
 
 def get_pH_stream(stream):
@@ -868,14 +868,14 @@ def create_additional_TAL_recovery_process(ins, outs,):
     
     
 #%% Upgrading TAL to sorbic acid with IPA as the solvent reaction medium
-### and acetone as the solvent for KSA purification 
+### and IPA as the solvent for KSA purification 
 
 @SystemFactory(ID = 'TAL_to_sorbic_acid_upgrading_process',
                ins=[dict(ID='solid_TAL', TAL=1, ),
                     dict(ID='IPA_upgrading_solvent', IPA=1),
                     dict(ID='H2_hydrogenation', H2=1),
                     dict(ID='KOH_hydrolysis', KOH=1),
-                    dict(ID='acetone_purification', Acetone=1),
+                    dict(ID='IPA_purification', IPA=0.1),
                     dict(ID='fresh_catalyst_R401', NiSiO2=1),
                     dict(ID='fresh_catalyst_R402', Amberlyst70_=1),
                ],
@@ -889,7 +889,7 @@ def create_additional_TAL_recovery_process(ins, outs,):
                                                )
 def create_TAL_to_sorbic_acid_upgrading_process(ins, outs,):
     
-    solid_TAL, IPA_upgrading_solvent, H2_hydrogenation, KOH_hydrolysis, acetone_purification,\
+    solid_TAL, IPA_upgrading_solvent, H2_hydrogenation, KOH_hydrolysis, IPA_purification,\
         fresh_catalyst_R401, fresh_catalyst_R402 = ins
     KSA, impurities_to_boiler, S410_cool_air, S408_cool_air,\
         spent_catalyst_R401, spent_catalyst_R402 = outs
@@ -1024,21 +1024,21 @@ def create_TAL_to_sorbic_acid_upgrading_process(ins, outs,):
     # M407-0-2-M405 # recycle recovered IPA
     S410-1-2-M405 # recycle recovered IPA
     
-    M406 = bst.Mixer('M406', ins=(F406_P-0, acetone_purification, ''),)
+    M406 = bst.Mixer('M406', ins=(F406_P-0, IPA_purification, ''),)
     
     @M406.add_specification()
     def M406_IPA_spec():
-        M406_TAL, M406_makeup_acetone, M406_recycled_acetone = M406.ins
+        M406_TAL, M406_makeup_IPA, M406_recycled_IPA = M406.ins
         M406_mixed, = M406.outs
         mass_KSA = sum([i.imass['KSA'] for i in M406.ins])
-        current_mass_acetone = sum([i.imass['Acetone'] for i in [M406_TAL, M406_recycled_acetone]])
-        required_mass_acetone = mass_KSA * get_mass_acetone_needed_per_mass_KSA()
-        M406_makeup_acetone.imass['Acetone'] = max(0., required_mass_acetone-current_mass_acetone)
+        current_mass_IPA = sum([i.imass['IPA'] for i in [M406_TAL, M406_recycled_IPA]])
+        required_mass_IPA = mass_KSA * get_mass_IPA_needed_per_mass_KSA()
+        M406_makeup_IPA.imass['IPA'] = max(0., required_mass_IPA-current_mass_IPA)
         M406._run()
     
     
     S406 = bst.FakeSplitter('S406', ins=M406-0,
-                        outs=('KSA_purified', 'impurities_in_acetone'))
+                        outs=('KSA_purified', 'impurities_in_IPA'))
     
     # From Huber group:
     S406.KSA_loss = 0.02 # % as decimal
@@ -1073,22 +1073,22 @@ def create_TAL_to_sorbic_acid_upgrading_process(ins, outs,):
                          outs=(impurities_to_boiler, 'F405_hot_air', 'F405_emissions'),
                          moisture_content=0.01, 
                          split=0.,
-                         moisture_ID='Acetone')
+                         moisture_ID='IPA')
     
     H408 = bst.units.HXutility(
-        'H408', ins=F405-1, outs=('cooled_acetone_laden_air'), 
+        'H408', ins=F405-1, outs=('cooled_IPA_laden_air'), 
         T=265.,
         rigorous=True
     )
     
-    S408 = bst.units.FakeSplitter('S408', ins=H408-0, outs=(S408_cool_air, 'acetone_recovered_from_air'))
+    S408 = bst.units.FakeSplitter('S408', ins=H408-0, outs=(S408_cool_air, 'S408_IPA_recovered_from_air'))
     
     @S408.add_specification()
     def S408_spec():
         S408_ins_0 = S408.ins[0]
         S408.outs[0].mol[:] = S408_ins_0['g'].mol[:]
         S408.outs[1].mol[:] = S408_ins_0['l'].mol[:]
-    
+        
     S408-1-2-M406
 
 
