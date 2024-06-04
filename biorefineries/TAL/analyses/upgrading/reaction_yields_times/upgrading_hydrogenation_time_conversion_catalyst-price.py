@@ -65,9 +65,9 @@ TAL_results_filepath = TAL_filepath + '\\analyses\\results\\'
 #%% Parameter loading functions
 
 # Set reactor, reaction, and catalyst here
-reactor = u.R402
-rxn = reactor.dehydration_rxns[0]
-catalyst_name = 'Amberlyst70' 
+reactor = u.R401
+rxn = reactor.hydrogenation_rxns[0]
+catalyst_name = 'NiSiO2' 
 #
 
 def load_rxn_conversion(X):
@@ -173,8 +173,8 @@ spec_3 = catalyst_prices =\
 
 # Parameters analyzed across
 
-y_label = r"$\bfEtherification$"  +" "+ r"$\bf&$" +" "+ r"$\bfHydrolysis$" +'\n'+\
-    r"$\bfPSA$"  +" "+ r"$\bfYield$" +" "+ r"$\bfon$" +" "+ r"$\bfHMP$" # title of the x axis
+y_label = r"$\bfHydrogenation$" + '\n'+\
+    r"$\bfHMP$"  +" "+ r"$\bfYield$" +" "+ r"$\bfon$" +" "+ r"$\bfTAL$" # title of the x axis
 y_units = r"$\mathrm{mol}$" + " " + r"$\mathrm{\%}$"
 y_ticks = [40, 50, 60, 70, 80, 90, 100]
 
@@ -183,7 +183,7 @@ x_units =r"$\mathrm{h}$"
 x_ticks = [0, 5, 10, 15, 20, 25]
 
 
-z_label = r"$\bfAmberlyst$" + r"$-$"  + r"$\bf70$" +" "+ r"$\bfCatalyst$" +" "+ r"$\bfPrice$"# # title of the z axis
+z_label = r"$\bfNickel$" + r"$-$"  + r"$\bfSilica$"  + r"$-$"  + r"$\bfAlumina$" +" "+ r"$\bfCatalyst$" +" "+ r"$\bfPrice$"# # title of the z axis
 z_units =  r"$\mathrm{\$} \cdot \mathrm{kg}^{-1}$"
 z_ticks = [0, 10, 20, 30, 40, 50, 60]
 
@@ -406,7 +406,7 @@ for p in catalyst_prices:
     # %% Save generated data
     
     minute = '0' + str(dateTimeObj.minute) if len(str(dateTimeObj.minute))==1 else str(dateTimeObj.minute)
-    file_to_save = f'_{steps}_steps_'+'KSA_etherification-hydrolysis-(dehydration)_yield_tau_%s.%s.%s-%s.%s'%(dateTimeObj.year, dateTimeObj.month, dateTimeObj.day, dateTimeObj.hour, minute)
+    file_to_save = f'_{steps}_steps_'+'KSA_hydrogenation_yield_tau_%s.%s.%s-%s.%s'%(dateTimeObj.year, dateTimeObj.month, dateTimeObj.day, dateTimeObj.hour, minute)
     np.save(TAL_results_filepath+file_to_save, np.array([d1_Metric1, d1_Metric2, d1_Metric3]))
     
     pd.DataFrame(d1_Metric1).to_csv(TAL_results_filepath+'MPSP-'+file_to_save+'.csv')
