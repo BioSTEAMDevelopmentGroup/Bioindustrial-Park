@@ -155,8 +155,8 @@ TAL_metrics = [get_product_MPSP,
 steps = (60, 60, 1)
 
 # Yield, titer, productivity (rate)
-spec_1 = TAL_decarb_convs = np.linspace(0., 0.5, steps[0]) # yield
-spec_2 = pHs = np.linspace(get_pH_M401_outs_0(), 12., steps[1]) # titer
+spec_1 = rxn_Xs = np.linspace(0., 0.5, steps[0]) # yield
+spec_2 = reactor_taus = np.linspace(0.1, 12., steps[1]) # titer
 
 
 # spec_3 = catalyst_prices =\
@@ -284,12 +284,12 @@ simulate_and_print()
 baseline_Base_presence = get_pH_M401_outs_0()
 
 print('\n\nSimulating the initial point to avoid bugs ...')
-# spec.load_specifications(TAL_decarb_convs[0], pHs[0], catalyst_prices[0])
+# spec.load_specifications(rxn_Xs[0], reactor_taus[0], catalyst_prices[0])
 # spec.set_production_capacity(desired_annual_production=spec.desired_annual_production)
 # simulate_and_print()
 load_catalyst_price(catalyst_prices[0])
-load_decarboxylation_conversion(TAL_decarb_convs[0])
-load_pH(pHs[0])
+load_decarboxylation_conversion(rxn_Xs[0])
+load_pH(reactor_taus[0])
 get_TAL_MPSP()
 M401.base_neutralizes_acids = True
 get_TAL_MPSP()
@@ -315,7 +315,7 @@ def print_status(curr_no, total_no, s1, s2, s3, HXN_qbal_error, results=None, ex
 max_HXN_qbal_percent_error = 0.
 
 curr_no = 0
-total_no = len(TAL_decarb_convs)*len(pHs)*len(catalyst_prices)
+total_no = len(rxn_Xs)*len(reactor_taus)*len(catalyst_prices)
 
 n_steps_per_print = 50
 
@@ -328,7 +328,7 @@ for p in catalyst_prices:
     d1_Metric4, d1_Metric5, d1_Metric6 = [], [], []
     d1_Metric7 = []
     
-    for y in pHs:
+    for y in reactor_taus:
         d1_Metric1.append([])
         d1_Metric2.append([])
         d1_Metric3.append([])
@@ -336,7 +336,7 @@ for p in catalyst_prices:
         d1_Metric5.append([])
         d1_Metric6.append([])
         d1_Metric7.append([])
-        for t in TAL_decarb_convs:
+        for t in rxn_Xs:
             curr_no +=1
             error_message = None
             try:
@@ -532,9 +532,9 @@ MPSP_w_ticks = [3.25, 3.5, 3.75, 4, 4.5, 4.75, 5, 5.5, 8.5, 10]
 # MPSP_w_levels = np.arange(0., 15.5, 0.5)
 
 contourplots.animated_contourplot(w_data_vs_x_y_at_multiple_z=results_metric_1, # shape = z * x * y # values of the metric you want to plot on the color axis; e.g., MPSP
-                                y_data=100*TAL_decarb_convs, # x axis values
-                                # y_data = TAL_decarb_convs/theoretical_max_g_TAL_acid_per_g_glucose,
-                                x_data=pHs, # y axis values
+                                y_data=100*rxn_Xs, # x axis values
+                                # y_data = rxn_Xs/theoretical_max_g_TAL_acid_per_g_glucose,
+                                x_data=reactor_taus, # y axis values
                                 z_data=catalyst_prices, # z axis values
                                 y_label=y_label, # title of the x axis
                                 x_label=x_label, # title of the y axis
@@ -589,8 +589,8 @@ GWP_w_levels = np.arange(0, 20.1, 0.5)
 GWP_cbar_ticks = np.arange(0, 20.1, 2.)
 GWP_w_ticks = [6.5, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 20]
 contourplots.animated_contourplot(w_data_vs_x_y_at_multiple_z=results_metric_2, # shape = z * x * y # values of the metric you want to plot on the color axis; e.g., GWP
-                                y_data=100*TAL_decarb_convs, # x axis values
-                                x_data=pHs, # y axis values
+                                y_data=100*rxn_Xs, # x axis values
+                                x_data=reactor_taus, # y axis values
                                 z_data=catalyst_prices, # z axis values
                                 y_label=y_label, # title of the x axis
                                 x_label=x_label, # title of the y axis
@@ -642,8 +642,8 @@ FEC_w_levels = np.arange(-100, 101, 10.)
 FEC_cbar_ticks = np.arange(-100, 101, 20)
 FEC_w_ticks = [-100, -60, -50, -40, -30, -20, -10, 0, 20, 40, 60, 70, 80, 100]
 contourplots.animated_contourplot(w_data_vs_x_y_at_multiple_z=results_metric_3, # shape = z * x * y # values of the metric you want to plot on the color axis; e.g., FEC
-                                y_data=100*TAL_decarb_convs, # x axis values
-                                x_data=pHs, # y axis values
+                                y_data=100*rxn_Xs, # x axis values
+                                x_data=reactor_taus, # y axis values
                                 z_data=catalyst_prices, # z axis values
                                 y_label=y_label, # title of the x axis
                                 x_label=x_label, # title of the y axis
@@ -690,9 +690,9 @@ AOC_w_levels, AOC_w_ticks, AOC_cbar_ticks = get_contour_info_from_metric_data(re
 # AOC_w_levels = np.arange(0., 15.5, 0.5)
 
 contourplots.animated_contourplot(w_data_vs_x_y_at_multiple_z=results_metric_4, # shape = z * x * y # values of the metric you want to plot on the color axis; e.g., AOC
-                                y_data=100*TAL_decarb_convs, # x axis values
-                                # y_data = TAL_decarb_convs/theoretical_max_g_TAL_acid_per_g_glucose,
-                                x_data=pHs, # y axis values
+                                y_data=100*rxn_Xs, # x axis values
+                                # y_data = rxn_Xs/theoretical_max_g_TAL_acid_per_g_glucose,
+                                x_data=reactor_taus, # y axis values
                                 z_data=catalyst_prices, # z axis values
                                 y_label=y_label, # title of the x axis
                                 x_label=x_label, # title of the y axis
@@ -739,9 +739,9 @@ FCI_w_levels, FCI_w_ticks, FCI_cbar_ticks = get_contour_info_from_metric_data(re
 # FCI_w_levels = np.arange(0., 15.5, 0.5)
 
 contourplots.animated_contourplot(w_data_vs_x_y_at_multiple_z=results_metric_5, # shape = z * x * y # values of the metric you want to plot on the color axis; e.g., FCI
-                                y_data=100*TAL_decarb_convs, # x axis values
-                                # y_data = TAL_decarb_convs/theoretical_max_g_TAL_acid_per_g_glucose,
-                                x_data=pHs, # y axis values
+                                y_data=100*rxn_Xs, # x axis values
+                                # y_data = rxn_Xs/theoretical_max_g_TAL_acid_per_g_glucose,
+                                x_data=reactor_taus, # y axis values
                                 z_data=catalyst_prices, # z axis values
                                 y_label=y_label, # title of the x axis
                                 x_label=x_label, # title of the y axis
@@ -788,9 +788,9 @@ Purity_w_levels = Purity_cbar_ticks = Purity_w_ticks = np.arange(0.7, 1.0, 0.01)
 # Purity_w_levels = np.arange(0., 15.5, 0.5)
 
 contourplots.animated_contourplot(w_data_vs_x_y_at_multiple_z=results_metric_6, # shape = z * x * y # values of the metric you want to plot on the color axis; e.g., Purity
-                                y_data=100*TAL_decarb_convs, # x axis values
-                                # y_data = TAL_decarb_convs/theoretical_max_g_TAL_acid_per_g_glucose,
-                                x_data=pHs, # y axis values
+                                y_data=100*rxn_Xs, # x axis values
+                                # y_data = rxn_Xs/theoretical_max_g_TAL_acid_per_g_glucose,
+                                x_data=reactor_taus, # y axis values
                                 z_data=catalyst_prices, # z axis values
                                 y_label=y_label, # title of the x axis
                                 x_label=x_label, # title of the y axis
@@ -834,9 +834,9 @@ contourplots.animated_contourplot(w_data_vs_x_y_at_multiple_z=results_metric_6, 
 pH_w_levels = pH_w_ticks = pH_cbar_ticks = np.arange(0., 14.1, 1.)
 
 contourplots.animated_contourplot(w_data_vs_x_y_at_multiple_z=results_metric_7, # shape = z * x * y # values of the metric you want to plot on the color axis; e.g., M401_addition
-                                y_data=100*TAL_decarb_convs, # x axis values
-                                # y_data = TAL_decarb_convs/theoretical_max_g_TAL_acid_per_g_glucose,
-                                x_data=pHs, # y axis values
+                                y_data=100*rxn_Xs, # x axis values
+                                # y_data = rxn_Xs/theoretical_max_g_TAL_acid_per_g_glucose,
+                                x_data=reactor_taus, # y axis values
                                 z_data=catalyst_prices, # z axis values
                                 y_label=y_label, # title of the x axis
                                 x_label=x_label, # title of the y axis

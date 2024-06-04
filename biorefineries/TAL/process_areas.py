@@ -57,9 +57,6 @@ Ts_decarb = 273.15 + np.array([30, 50, 80])
 conversions_decarb = 0.01 * np.array([13.91875948, 18.4816961, 22.503871])
 decarb_conv_interp = interp1d(Ts_decarb, conversions_decarb)
 # 
-# Acetone washing to remove impurities from KSA
-def get_mass_IPA_needed_per_mass_KSA():
-    return 2. #!!! TODO: Ask Min Soo for exp data and update this
 
 def get_pH_stream(stream):
     if stream.imol['CitricAcid', 'H3PO4', 'AceticAcid'].sum() > 0.:
@@ -897,9 +894,10 @@ def create_TAL_to_sorbic_acid_upgrading_process(ins, outs,):
     M405 = bst.Mixer('M405', ins=(solid_TAL, IPA_upgrading_solvent, '', ''),
                      outs=('TAL_in_IPA'))
     
-    M405.w_TAL_per_w_IPA = 0.031855
+    M405.w_IPA_per_w_TAL = 31.392
     # from Huber group: 7.9 mmol TAL in 40 mL IPA
-    # => 0.03185528056690577 w-TAL/w-IPA
+    # => 31.391969626501833 g-IPA/g-TAL
+    
     @M405.add_specification()
     def M405_IPA_spec():
         M405_TAL, M405_makeup_IPA, M405_recycled_IPA_1, M405_recycled_IPA_2 = M405.ins
@@ -907,7 +905,7 @@ def create_TAL_to_sorbic_acid_upgrading_process(ins, outs,):
         M405_makeup_IPA.empty()
         mass_TAL = sum([i.imass['TAL'] for i in M405.ins])
         current_mass_IPA = sum([i.imass['IPA'] for i in [M405_TAL, M405_recycled_IPA_1, M405_recycled_IPA_2]])
-        M405.required_mass_IPA = required_mass_IPA = mass_TAL/M405.w_TAL_per_w_IPA
+        M405.required_mass_IPA = required_mass_IPA = mass_TAL * M405.w_IPA_per_w_TAL
         M405_makeup_IPA.imass['IPA'] = max(0., required_mass_IPA-current_mass_IPA)
         M405._run()
         
@@ -1026,13 +1024,17 @@ def create_TAL_to_sorbic_acid_upgrading_process(ins, outs,):
     
     M406 = bst.Mixer('M406', ins=(F406_P-0, IPA_purification, ''),)
     
+    M406.w_IPA_per_w_KSA =  31.545
+    # from Huber group: 6.6 mmol KSA in 40 mL IPA
+    # => 31.54515365896877 g-IPA/g-KSA
+    
     @M406.add_specification()
     def M406_IPA_spec():
         M406_TAL, M406_makeup_IPA, M406_recycled_IPA = M406.ins
         M406_mixed, = M406.outs
         mass_KSA = sum([i.imass['KSA'] for i in M406.ins])
         current_mass_IPA = sum([i.imass['IPA'] for i in [M406_TAL, M406_recycled_IPA]])
-        required_mass_IPA = mass_KSA * get_mass_IPA_needed_per_mass_KSA()
+        required_mass_IPA = mass_KSA * M406.w_IPA_per_w_KSA
         M406_makeup_IPA.imass['IPA'] = max(0., required_mass_IPA-current_mass_IPA)
         M406._run()
     
