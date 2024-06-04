@@ -16,7 +16,7 @@ from biosteam.utils import  colors
 import numpy as np
 
 from biorefineries import TAL
-from biorefineries.TAL.systems.system_TAL_solubility_exploit_ethanol_sugarcane import TAL_tea, TAL_lca, R302, spec, TAL_product, get_TAL_MPSP, simulate_and_print, theoretical_max_g_TAL_per_g_SA, flowsheet
+from biorefineries.TAL.systems.system_SA_solubility_exploit_ethanol_sugarcane import TAL_tea, TAL_lca, R302, spec, KSA_product, get_KSA_MPSP, simulate_and_print, theoretical_max_g_TAL_per_g_SA, flowsheet
 from biorefineries.TAL._general_utils import get_pH_polyprotic_acid_mixture, get_molarity
 
 from  matplotlib.colors import LinearSegmentedColormap
@@ -40,7 +40,7 @@ dateTimeObj = datetime.now()
 ig = np.seterr(invalid='ignore')
 # bst.speed_up()
 
-product = TAL_product
+product = KSA_product
 
 
 # search page for high end: https://www.alibaba.com/trade/search?spm=a2700.galleryofferlist.0.0.2a995827YzqZVg&fsb=y&IndexArea=product_en&assessmentCompany=true&keywords=590-00-1+sorbate&productTag=1200000228&ta=y&tab=all&
@@ -61,6 +61,24 @@ TAL_filepath = TAL.__file__.replace('\\__init__.py', '')
 # chdir(TAL.__file__.replace('\\__init__.py', '')+'\\analyses\\results')
 # ##
 TAL_results_filepath = TAL_filepath + '\\analyses\\results\\'
+
+#%% Parameter loading functions
+
+# Set reactor, reaction, and catalyst here
+reactor = u.R402
+rxn = reactor.dehydration_rxns[0]
+catalyst_name = 'Amberlyst70' 
+#
+
+def load_rxn_conversion(X):
+    rxn.X = X
+
+def load_tau(tau):
+    reactor.tau = tau
+    
+def load_catalyst_price(catalyst_price):
+    reactor.__dict__[catalyst_name+'_catalyst_price'] = catalyst_price
+
 
 #%% Load baseline
 model = models.TAL_model
@@ -101,28 +119,9 @@ model.exception_hook = 'warn'
 print('\n\nSimulating baseline ...')
 baseline_initial = model.metrics_at_baseline()
 
-#%% Utility functions
-
-
-#%% Parameter loading functions
-
-# Set reactor, reaction, and catalyst here
-reactor = u.R402
-rxn = reactor.dehydration_rxns[0]
-catalyst_name = 'Amberlyst70' 
-#
-
-base_rxn_X = rxn.X
-base_tau = reactor.tau
-
-def load_rxn_conversion(X):
-    rxn.X = X
-
-def load_tau(tau):
-    reactor.tau = tau
-    
-def load_catalyst_price(catalyst_price):
-    reactor.__dict__[catalyst_name+'_catalyst_price'] = catalyst_price
+baseline_rxn_X = rxn.X
+baseline_tau = reactor.tau
+baseline_catalyst_price = reactor.__dict__[catalyst_name+'_catalyst_price']
 
 
 #%%  Metrics
@@ -148,15 +147,16 @@ TAL_metrics = [get_product_MPSP,
                # lambda: TAL_lca.FEC - TAL_lca.net_electricity_FEC, 
                lambda: TAL_lca.GWP, 
                lambda: TAL_lca.FEC, 
-               get_TAL_AOC, get_TAL_FCI, get_product_purity]
+               get_TAL_AOC, get_TAL_FCI, get_product_purity,
+               lambda: reactor.installed_cost]
 
 # %% Generate 3-specification meshgrid and set specification loading functions
 
-steps = (60, 60, 1)
+steps = (20, 20, 1)
 
 # Yield, titer, productivity (rate)
-spec_1 = rxn_Xs = np.linspace(0., 0.5, steps[0]) # yield
-spec_2 = reactor_taus = np.linspace(0.1, 12., steps[1]) # titer
+spec_1 = rxn_Xs = np.linspace(0.4, 1.-1e-5, steps[0]) # yield
+spec_2 = reactor_taus = np.linspace(0.1, 25., steps[1]) # titer
 
 
 # spec_3 = catalyst_prices =\
@@ -166,31 +166,32 @@ spec_2 = reactor_taus = np.linspace(0.1, 12., steps[1]) # titer
 #     np.linspace(1e-5, 5., steps[2])
 
 spec_3 = catalyst_prices =\
-    np.array([base_decarboxylation_fresh.price])
+    np.array([baseline_catalyst_price])
 
 
 #%% Plot stuff
 
 # Parameters analyzed across
 
-y_label = r"$\bfTAL$"  +" "+ r"$\bfRing-Opening$" +" "+ r"$\bfDecarboxylation$"  # title of the x axis
-y_units = r"$\mathrm{\%}$"  +" "+ r"$\mathrm{theoretical}$"
-y_ticks = [0, 10, 20, 30, 40, 50]
+y_label = r"$\bfEtherification$"  +" "+ r"$\bf&$" +" "+ r"$\bfHydrolysis$" +'\n'+\
+    r"$\bfPSA$"  +" "+ r"$\bfYield$" +" "+ r"$\bfon$" +" "+ r"$\bfHMP$" # title of the x axis
+y_units = r"$\mathrm{mol}$" + " " + r"$\mathrm{\%}$"
+y_ticks = [40, 50, 60, 70, 80, 90, 100]
 
-x_label = r"$\bfpH$"  +" "+ r"$\bfMaintained$" # title of the y axis
-x_units =r"$\mathrm{mol} \cdot \mathrm{m}^{-3}$"
-x_ticks = [2., 4., 6., 8., 10., 12.]
+x_label = r"$\bfReaction$"  +" "+ r"$\bfTime$" # title of the y axis
+x_units =r"$\mathrm{h}$"
+x_ticks = [0, 5, 10, 15, 20, 25]
 
 
-z_label = r"$\bfSodium$"  +" "+ r"$\bfHydroxide$"  +" "+ r"$\bfPrice$"# # title of the z axis
+z_label = r"$\bfAmberlyst$" + r"$-$"  + r"$\bf70$" +" "+ r"$\bfCatalyst$" +" "+ r"$\bfPrice$"# # title of the z axis
 z_units =  r"$\mathrm{\$} \cdot \mathrm{kg}^{-1}$"
-z_ticks = [0, 2, 4, 6, 8, 10]
+z_ticks = [0, 10, 20, 30, 40]
 
 # Metrics
 MPSP_w_label = r"$\bfMPSP$" # title of the color axis
 MPSP_units = r"$\mathrm{\$}\cdot\mathrm{kg}^{-1}$"
 
-GWP_w_label = r"$\mathrm{\bfGWP}_{\bf100}$"
+GWP_w_label = r"$\mathrm{\bfCarbon}$" + " " + r"$\mathrm{\bfIntensity}$"
 GWP_units = r"$\mathrm{kg}$"+" "+ r"$\mathrm{CO}_{2}\mathrm{-eq.}\cdot\mathrm{kg}^{-1}$"
 
 FEC_w_label = r"$\bfFEC$" # title of the color axis
@@ -281,18 +282,16 @@ spec_1, spec_2 = np.meshgrid(spec_1, spec_2)
 
 #%% Initial simulation
 simulate_and_print()
-baseline_Base_presence = get_pH_M401_outs_0()
 
 print('\n\nSimulating the initial point to avoid bugs ...')
 # spec.load_specifications(rxn_Xs[0], reactor_taus[0], catalyst_prices[0])
 # spec.set_production_capacity(desired_annual_production=spec.desired_annual_production)
 # simulate_and_print()
 load_catalyst_price(catalyst_prices[0])
-load_decarboxylation_conversion(rxn_Xs[0])
-load_pH(reactor_taus[0])
-get_TAL_MPSP()
-M401.base_neutralizes_acids = True
-get_TAL_MPSP()
+load_rxn_conversion(rxn_Xs[0])
+load_tau(reactor_taus[0])
+get_KSA_MPSP()
+get_KSA_MPSP()
 
 
 # %% Run TRY analysis 
@@ -341,8 +340,8 @@ for p in catalyst_prices:
             error_message = None
             try:
                 # spec.load_specifications(spec_1=y, spec_2=t, spec_3=p)
-                load_decarboxylation_conversion(t)
-                load_pH(y)
+                load_rxn_conversion(t)
+                load_tau(y)
                 
                 # spec.set_production_capacity(desired_annual_production=spec.desired_annual_production)
                 
@@ -526,9 +525,11 @@ print('\nCreating and saving contour plots ...\n')
 #%% MPSP
 
 # MPSP_w_levels, MPSP_w_ticks, MPSP_cbar_ticks = get_contour_info_from_metric_data(results_metric_1, lb=3)
-MPSP_w_levels = np.arange(2, 10.25, 0.25)
-MPSP_cbar_ticks = np.arange(2, 10.1, 1.)
-MPSP_w_ticks = [3.25, 3.5, 3.75, 4, 4.5, 4.75, 5, 5.5, 8.5, 10]
+MPSP_w_levels = np.arange(4, 14.25, 0.25)
+MPSP_cbar_ticks = np.arange(4, 14.1, 1.)
+MPSP_w_ticks = [
+                # 2.75, 
+                5., 6., 7., 8., 8.5, 9., 10., 11., 12., 14.]
 # MPSP_w_levels = np.arange(0., 15.5, 0.5)
 
 contourplots.animated_contourplot(w_data_vs_x_y_at_multiple_z=results_metric_1, # shape = z * x * y # values of the metric you want to plot on the color axis; e.g., MPSP
@@ -564,7 +565,7 @@ contourplots.animated_contourplot(w_data_vs_x_y_at_multiple_z=results_metric_1, 
                                 clabel_fontsize = clabel_fontsize,
                                 default_fontsize = default_fontsize,
                                 axis_tick_fontsize = axis_tick_fontsize,
-                                comparison_range=KSA_market_range,
+                                # comparison_range=KSA_market_range,
                                 n_minor_ticks = 1,
                                 cbar_n_minor_ticks = 3,
                                 # comparison_range=[MPSP_w_levels[-2], MPSP_w_levels[-1]],
@@ -578,16 +579,18 @@ contourplots.animated_contourplot(w_data_vs_x_y_at_multiple_z=results_metric_1, 
                                 #     MPSP_w_ticks[5]: (5,.25),
                                 #     MPSP_w_ticks[6]: (45,1.75),
                                 #     },
-                                additional_points ={(baseline_Base_presence, 20.87):('D', 'w', 6)},
+                                additional_points ={(baseline_tau, 100*baseline_rxn_X):('D', 'w', 6)},
                                 # text_boxes = {'>10.0': [(41,1.8), 'white']},
+                                text_boxes = {'>14.0': [(20.,45), 'white']},
+                                
                                 )
 
 #%% GWP
 
 # GWP_w_levels, GWP_w_ticks, GWP_cbar_ticks = get_contour_info_from_metric_data(results_metric_2,)
-GWP_w_levels = np.arange(0, 20.1, 0.5)
-GWP_cbar_ticks = np.arange(0, 20.1, 2.)
-GWP_w_ticks = [6.5, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 20]
+GWP_w_levels = np.arange(4, 24.1, 0.5)
+GWP_cbar_ticks = np.arange(4, 24.1, 2.)
+GWP_w_ticks = [6, 7, 8, 9, 10, 11, 12, 14, 15, 16.5, 18, 20, 24]
 contourplots.animated_contourplot(w_data_vs_x_y_at_multiple_z=results_metric_2, # shape = z * x * y # values of the metric you want to plot on the color axis; e.g., GWP
                                 y_data=100*rxn_Xs, # x axis values
                                 x_data=reactor_taus, # y axis values
@@ -627,11 +630,12 @@ contourplots.animated_contourplot(w_data_vs_x_y_at_multiple_z=results_metric_2, 
                                 # comparison_range=[GWP_w_levels[-2], GWP_w_levels[-1]],
                                 # comparison_range_hatch_pattern='////',
                                 units_on_newline = (True, True, False, False), # x,y,z,w
-                                additional_points ={(baseline_Base_presence, 20.87):('D', 'w', 6)},
+                                additional_points ={(baseline_tau, 100*baseline_rxn_X):('D', 'w', 6)},
                                 # manual_clabels_regular = {
                                 #     MPSP_w_ticks[3]: (20 ,1),
                                 #     MPSP_w_ticks[4]: (35,1.25),
                                 #     }
+                                text_boxes = {'>24.0': [(20.,45), 'white']},
                                 )
 
 
@@ -678,7 +682,7 @@ contourplots.animated_contourplot(w_data_vs_x_y_at_multiple_z=results_metric_3, 
                                 # comparison_range=[FEC_w_levels[-2], FEC_w_levels[-1]],
                                 # comparison_range_hatch_pattern='////',
                                 units_on_newline = (True, True, False, False), # x,y,z,w
-                                additional_points ={(baseline_Base_presence, 20.87):('D', 'w', 6)},
+                                additional_points ={(baseline_tau, 100*baseline_rxn_X):('D', 'w', 6)},
                                 )
 
 #%% AOC
