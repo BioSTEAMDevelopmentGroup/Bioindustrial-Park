@@ -66,9 +66,11 @@ corn_stover_price = 71.26 / _kg_per_ton * 0.8
 
 # 2.2 is the average whole-sale ethanol price between 2010-2019 in 2016 $/gal
 # based on Annual Energy Outlook (AEO) from Energy Information Adiministration (EIA)
-# (https://www.eia.gov/outlooks/aeo/), which is $0.7328/gal and similar to the
-# 2.2/(2988/1e3) = $0.736/gal based on a density of 2988 g/gal from H2 Tools
-# Lower and upper bounds are $1.37/gal and $2.79/gal, or $0.460/kg and $0.978/kg
+# (https://www.eia.gov/outlooks/aeo/), which is $0.7402/kg and similar to the
+# 2.2/(2988/1e3) = $0.736/kg based on a density of 2988 g/gal from H2 Tools
+# Lower and upper bounds are $1.37/gal and $2.79/gal, or $0.460/kg and $0.939/kg
+# _ethanol_kg_2_gal =  2.9721617599077566
+# price range in 2016$/kg: 
 _ethanol_V = chems.Ethanol.V('l', 298.15, 101325) # molar volume in m3/mol
 _ethanol_MW = chems.Ethanol.MW
 _ethanol_kg_2_gal = _liter_per_gallon/_ethanol_V*_ethanol_MW/1e6
@@ -283,6 +285,10 @@ DAP_price = 0.5*\
 # 390.09-789.25 USD / short ton in 2008; https://web.archive.org/web/20161125084558/http://www.icis.com:80/chemicals/channel-info-chemicals-a-z/            
 NaOH_price = ((390.09+789.25)/2.)/_kg_per_ton * _GDP_2008_to_2010 * chem_index[2019]/chem_index[2010]
 
+# 1.55 - 1.7/lb # https://web.archive.org/web/20161125084558/http://www.icis.com:80/chemicals/channel-info-chemicals-a-z/
+# => $3.42 - 3.75 /kg in 2007$, mean of $3.58/kg in 2007$
+# => $4.25 - 4.66 /kg in 2019$, mean of $4.45/kg in 2019$
+THF_price = 3.58 * _GDP_2007_to_2010 * chem_index[2019]/chem_index[2010]
 
 price = {'SA': SA_price,
          'PD': acetylacetone_price, # 2,4-pentanedione or acetylacetone
@@ -333,6 +339,7 @@ price = {'SA': SA_price,
          'Activated carbon': activated_carbon_price,
          'Sodium acetate': sodium_acetate_price,
          'Acetic acid': acetic_acid_price,
+         'Tetrahydrofuran': THF_price,
          }
     
 #!!! Round all prices to 4 *decimal places*

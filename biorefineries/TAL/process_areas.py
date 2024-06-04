@@ -1015,11 +1015,7 @@ def create_TAL_to_sorbic_acid_upgrading_process(ins, outs,):
         S410.outs[0].mol[:] = S410_ins_0['g'].mol[:]
         S410.outs[1].mol[:] = S410_ins_0['l'].mol[:]
         M405.specifications[0]()
-    
-    # M407 = bst.Mixer('M407', ins=(S410-1, 
-    #                                 # F406-0,
-    #                               ), outs='recycled_IPA')
-    # M407-0-2-M405 # recycle recovered IPA
+
     S410-1-2-M405 # recycle recovered IPA
     
     M406 = bst.Mixer('M406', ins=(F406_P-0, IPA_purification, ''),)
@@ -1094,6 +1090,250 @@ def create_TAL_to_sorbic_acid_upgrading_process(ins, outs,):
     S408-1-2-M406
 
 
+#%% Upgrading TAL to sorbic acid with THF as the solvent reaction medium
+### and THF as the solvent for KSA purification 
+
+@SystemFactory(ID = 'TAL_to_sorbic_acid_upgrading_process',
+               ins=[dict(ID='solid_TAL', TAL=1, ),
+                    dict(ID='THF_upgrading_solvent', THF=1),
+                    dict(ID='H2_hydrogenation', H2=1),
+                    dict(ID='KOH_hydrolysis', KOH=1),
+                    dict(ID='THF_purification', THF=0.1),
+                    dict(ID='fresh_catalyst_R401', NiSiO2=1),
+                    dict(ID='fresh_catalyst_R402', Amberlyst70_=1),
+                    dict(ID='Ethanol_upgrading_solvent', Ethanol=1),
+               ],
+                outs=[dict(ID='KSA', KSA=1),
+                      dict(ID='impurities_to_boiler', DHL=0.1),
+                      dict(ID='S410_cool_air', N2=1),
+                      dict(ID='S408_cool_air', N2=1),
+                      dict(ID='spent_catalyst_R401', NiSiO2=0.1),
+                      dict(ID='spent_catalyst_R402', Amberlyst70_=0.1),
+                      dict(ID='S411_cool_air', N2=1),
+                                ],
+                                               )
+def create_TAL_to_sorbic_acid_upgrading_process_THF_Ethanol(ins, outs,):
+    
+    solid_TAL, THF_upgrading_solvent, H2_hydrogenation, KOH_hydrolysis, THF_purification,\
+        fresh_catalyst_R401, fresh_catalyst_R402, Ethanol_upgrading_solvent = ins
+    KSA, impurities_to_boiler, S410_cool_air, S408_cool_air,\
+        spent_catalyst_R401, spent_catalyst_R402,\
+            S411_cool_air, = outs
+    
+    M405 = bst.Mixer('M405', ins=(solid_TAL, THF_upgrading_solvent, '', ''),
+                     outs=('TAL_in_THF'))
+    
+    M405.w_THF_per_w_TAL = 35.334
+    # from Huber group: 7.9 mmol TAL in 40 mL THF
+    # => 35.3339090584386 g-THF/g-TAL
+    
+    @M405.add_specification()
+    def M405_THF_spec():
+        M405_TAL, M405_makeup_THF, M405_recycled_THF_1, M405_recycled_THF_2 = M405.ins
+        M405_mixed, = M405.outs
+        M405_makeup_THF.empty()
+        mass_TAL = sum([i.imass['TAL'] for i in M405.ins])
+        current_mass_THF = sum([i.imass['THF'] for i in [M405_TAL, M405_recycled_THF_1, M405_recycled_THF_2]])
+        M405.required_mass_THF = required_mass_THF = mass_TAL * M405.w_THF_per_w_TAL
+        M405_makeup_THF.imass['THF'] = max(0., required_mass_THF-current_mass_THF)
+        M405._run()
+        
+    R401 = units.HydrogenationReactor('R401', ins = (M405-0, '', H2_hydrogenation, '', fresh_catalyst_R401), 
+                                      outs = ('R401_vent', spent_catalyst_R401,'HMTHP_and_cat_in_THF',),
+                                      vessel_material='Stainless steel 316',)
+    
+    # !!! TODO:
+    # Add catalyst regeneration (https://doi.org/10.1006/jcat.1993.1265)
+    # 
+    
+    hydrogenation_CR_process = create_catalyst_recovery_process(
+                                                ID='hydrogenation_CR_process',
+                                                ins=(R401-2,),
+                                                outs=('R401_product_stream_without_catalyst', 'R401_recycled_catalyst'),
+                                                split={'NiSiO2':1.-1e-5},
+                                                catalyst_phase='s',
+                                                product_stream_phase='l',
+                                                )
+    
+    hydrogenation_CR_process-1-3-R401
+    
+    # R401_CR2 = bst.1
+    R402 = units.DehydrationReactor('R402', ins = (hydrogenation_CR_process-0, '', '', fresh_catalyst_R402), 
+                                               outs = ('R402_vent', spent_catalyst_R402, 'PSA_and_cat_in_THF', ),
+                                               vessel_material='Stainless steel 316',)
+    dehydration_CR_process = create_catalyst_recovery_process(
+                                                ID='dehydration_CR_process',
+                                                ins=(R402-2,),
+                                                outs=('R402_product_stream_without_catalyst', 'R402_recycled_catalyst'),
+                                                split={'Amberlyst70_':1.-1e-5},
+                                                catalyst_phase='s',
+                                                product_stream_phase='l',
+                                                )
+    
+    dehydration_CR_process-1-2-R402
+    
+    
+    F407 = bst.DrumDryer('F407', 
+                         ins=(dehydration_CR_process-0, 'F407_air', 'F407_natural_gas'),
+                         outs=('dry_KSA', 'F407_hot_air', 'F407_emissions'),
+                         moisture_content=0.05, 
+                         split=0.,
+                         moisture_ID='THF')
+    
+    F407_P = bst.ConveyingBelt('F407_P', ins=F407-0)
+    
+    H411 = bst.units.HXutility('H411', 
+                         ins=F407-1, 
+                         outs=('H411_cooled_THF_laden_air'), 
+                         T=265.,
+                         rigorous=True
+    )
+    
+    S411 = bst.units.FakeSplitter('S411', ins=H411-0, outs=(S411_cool_air, 'S411_THF_recovered_from_air'))
+    
+    @S411.add_specification()
+    def S411_spec(): # split condensed THF
+        S411_ins_0 = S411.ins[0]
+        S411.outs[0].mol[:] = S411_ins_0['g'].mol[:]
+        S411.outs[1].mol[:] = S411_ins_0['l'].mol[:]
+        M405.specifications[0]()
+    
+    S411-1-2-M405 # recycle recovered THF
+    
+    
+    M407 = bst.Mixer('M407', ins=(F407_P-0, Ethanol_upgrading_solvent, '', '',),
+                     outs=('TAL_in_Ethanol'))
+    
+    M407.w_Ethanol_per_w_PSA = 42.439
+    # from Huber group: 6.6 mmol PSA in 40 mL Ethanol
+    # => 42.439203991029636 g-Ethanol/g-TAL
+    
+    @M407.add_specification()
+    def M407_Ethanol_spec():
+        M407_PSA, M407_makeup_Ethanol, M407_recycled_Ethanol_1, M407_recycled_Ethanol_2 = M407.ins
+        M407_mixed, = M407.outs
+        M407_makeup_Ethanol.empty()
+        mass_PSA = sum([i.imass['PSA'] for i in M407.ins])
+        current_mass_Ethanol = sum([i.imass['Ethanol'] for i in [M407_PSA, M407_recycled_Ethanol_1, M407_recycled_Ethanol_2]])
+        M407.required_mass_Ethanol = required_mass_Ethanol = mass_PSA * M407.w_Ethanol_per_w_PSA
+        M407_makeup_Ethanol.imass['Ethanol'] = max(0., required_mass_Ethanol-current_mass_Ethanol)
+        M407._run()
+        
+    
+    R403 = units.RingOpeningHydrolysisReactor('R403', ins = (M407-0, '', KOH_hydrolysis), 
+                                   outs = ('R403_vent', 'KSA_in_Ethanol'),
+                                   vessel_material='Stainless steel 316',)
+    
+    R403_P = bst.Pump('R403_P', ins=R403-1, P=101325.)
+
+    F404 = bst.DrumDryer('F404', 
+                         ins=(R403_P-0, 'F404_air', 'F404_natural_gas'),
+                         outs=('dry_KSA', 'F404_hot_air', 'F404_emissions'),
+                         moisture_content=0.05, 
+                         split=0.,
+                         moisture_ID='Ethanol')
+    
+    F404_P = bst.ConveyingBelt('F404_P', ins=F404-0)
+    
+    F406 = bst.DrumDryer('F406', 
+                         ins=(F404_P-0, 'F406_air', 'F406_natural_gas'),
+                         outs=('dry_KSA', 'F406_hot_air', 'F406_emissions'),
+                         moisture_content=0.05, 
+                         split=0.,
+                         moisture_ID='H2O')
+    
+    F406_P = bst.ConveyingBelt('F406_P', ins=F406-0)
+    
+    H410 = bst.units.HXutility('H410', 
+                         ins=F404-1, 
+                         outs=('H410_cooled_Ethanol_laden_air'), 
+                         T=265.,
+                         rigorous=True
+    )
+    
+    S410 = bst.units.FakeSplitter('S410', ins=H410-0, outs=(S410_cool_air, 'S410_Ethanol_recovered_from_air'))
+    
+    @S410.add_specification()
+    def S410_spec(): # split condensed THF
+        S410_ins_0 = S410.ins[0]
+        S410.outs[0].mol[:] = S410_ins_0['g'].mol[:]
+        S410.outs[1].mol[:] = S410_ins_0['l'].mol[:]
+        M405.specifications[0]()
+    
+
+    S410-1-2-M407 # recycle recovered Ethanol
+    
+    M406 = bst.Mixer('M406', ins=(F406_P-0, THF_purification, ''),)
+    
+    M406.w_THF_per_w_KSA =  35.506
+    # from Huber group: 6.6 mmol KSA in 40 mL THF
+    # => 35.50632865290145 g-THF/g-KSA
+    
+    @M406.add_specification()
+    def M406_THF_spec():
+        M406_TAL, M406_makeup_THF, M406_recycled_THF = M406.ins
+        M406_mixed, = M406.outs
+        mass_KSA = sum([i.imass['KSA'] for i in M406.ins])
+        current_mass_THF = sum([i.imass['THF'] for i in [M406_TAL, M406_recycled_THF]])
+        required_mass_THF = mass_KSA * M406.w_THF_per_w_KSA
+        M406_makeup_THF.imass['THF'] = max(0., required_mass_THF-current_mass_THF)
+        M406._run()
+    
+    
+    S406 = bst.FakeSplitter('S406', ins=M406-0,
+                        outs=('KSA_purified', 'impurities_in_THF'))
+    
+    # From Huber group:
+    S406.KSA_loss = 0.02 # % as decimal
+    S406.KSA_purity = 0.949 # wt %
+    #
+    
+    @S406.add_specification()
+    def S406_spec():
+        S406_ins_0 = S406.ins[0]
+        S406_outs_0, S406_outs_1 = S406.outs
+        
+        tot_KSA = S406_ins_0.imol['KSA']
+        mol_KSA_recovered = (1.-S406.KSA_loss) * tot_KSA
+        KSA_MW = 150.21688
+        KSA_purity = S406.KSA_purity
+        
+        S406_outs_0.copy_like(S406_ins_0)
+        S406_outs_0.imol['KSA'] = 0.
+        S406_outs_0.F_mass = mol_KSA_recovered*KSA_MW*(1.-KSA_purity)/KSA_purity # impurities
+        
+        S406_outs_0.imol['KSA'] = mol_KSA_recovered
+        S406_outs_0.T = S406_ins_0.T
+        
+        S406_outs_1.copy_like(S406_ins_0)
+        S406_outs_1.mol[:] -= S406_outs_0.mol[:]
+    
+    
+    M408 = bst.Mixer('M408', ins=(S406-0, ''), outs=KSA)
+    
+    F405 = bst.DrumDryer('F405', 
+                         ins=(S406-1, 'F405_air', 'F405_natural_gas'),
+                         outs=(impurities_to_boiler, 'F405_hot_air', 'F405_emissions'),
+                         moisture_content=0.01, 
+                         split=0.,
+                         moisture_ID='THF')
+    
+    H408 = bst.units.HXutility(
+        'H408', ins=F405-1, outs=('cooled_THF_laden_air'), 
+        T=265.,
+        rigorous=True
+    )
+    
+    S408 = bst.units.FakeSplitter('S408', ins=H408-0, outs=(S408_cool_air, 'S408_THF_recovered_from_air'))
+    
+    @S408.add_specification()
+    def S408_spec():
+        S408_ins_0 = S408.ins[0]
+        S408.outs[0].mol[:] = S408_ins_0['g'].mol[:]
+        S408.outs[1].mol[:] = S408_ins_0['l'].mol[:]
+        
+    S408-1-2-M406
+    
 #%% Wastewater treatment system
 @SystemFactory(ID = 'wastewater_treatment_process',
                ins=[dict(ID='mixed_liquid_wastes', Water=100,),
@@ -1141,5 +1381,4 @@ def create_catalyst_recovery_process(ins, outs, split,
         CR._run()
         CR.outs[0].phase = CR.catalyst_phase
         CR.outs[1].phase = CR.product_stream_phase
-        
         
