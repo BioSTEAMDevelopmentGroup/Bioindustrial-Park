@@ -1185,7 +1185,7 @@ def create_TAL_to_sorbic_acid_upgrading_process_THF_Ethanol(ins, outs,):
     H411 = bst.units.HXutility('H411', 
                          ins=F407-1, 
                          outs=('H411_cooled_THF_laden_air'), 
-                         T=265.,
+                         T=245.0,
                          rigorous=True
     )
     
@@ -1247,7 +1247,7 @@ def create_TAL_to_sorbic_acid_upgrading_process_THF_Ethanol(ins, outs,):
     H410 = bst.units.HXutility('H410', 
                          ins=F404-1, 
                          outs=('H410_cooled_Ethanol_laden_air'), 
-                         T=265.,
+                         T=245.0,
                          rigorous=True
     )
     

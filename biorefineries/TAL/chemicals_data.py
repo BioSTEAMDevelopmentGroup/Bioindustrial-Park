@@ -222,7 +222,7 @@ Hexanol = chemical_database('Hexanol')
 # Heptane = chemical_database('Heptane')
 
 
-THF = chemical_database(ID='Tetrahydrofuran')
+THF = chemical_database(ID='THF', search_ID='Tetrahydrofuran')
 # Toluene = chemical_database('Toluene')
 # Tb from chemspider(chemenu database)
 # http://www.chemspider.com/Chemical-Structure.207215.html, accessed 04/07/2020
@@ -784,7 +784,6 @@ chems.set_synonym('AmmoniumHydroxide', 'NH4OH')
 
 chems.set_synonym('DAP', 'DiammoniumPhosphate')
 
-chems.set_synonym('Tetrahydrofuran', 'THF')
 
 chems.set_synonym('AceticAcid', 'Acetate')
 

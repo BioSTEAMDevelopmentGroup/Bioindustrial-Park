@@ -409,7 +409,7 @@ GWP_CFs = {
     'NiSiO2':18.711, # ecoinvent 3.8 market for nickel, class 1
     'Amberlyst70_':1.3803, # ecoinvent 3.8 market for naphthalene sulfonic acid, GLO # Amberlyst-15 is 1,2-diethenylbenzene; 2-ethenylbenzene-1-sulfonic acid
     'Isopropanol':2.3219, # ecoinvent 3.8 market for isopropanol, RoW
-    
+    'THF': 6.0475, # ecoinvent 3.8 market for tetrahydrofuran, GLO
     }
 
 
@@ -466,7 +466,7 @@ FEC_CFs = {
     'NiSiO2':229.44	, # ecoinvent 3.8 market for nickel, class 1
     'Amberlyst70_':31.273, # ecoinvent 3.8 market for naphthalene sulfonic acid, GLO # Amberlyst-15 is 1,2-diethenylbenzene; 2-ethenylbenzene-1-sulfonic acid
     'Isopropanol':63.878, # ecoinvent 3.8 market for isopropanol, RoW
-    
+    'THF': 101.77, # ecoinvent 3.8 market for tetrahydrofuran, GLO
     }
 
 FEC_CF_array = chems.kwarray(FEC_CFs)
