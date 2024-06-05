@@ -538,9 +538,9 @@ Xylan = chemical_defined('Xylan', phase='s', formula='C5H8O4', Hf=-182100*_cal2j
 Xylan.copy_models_from(Xylose, ['Cn'])
 Arabinan = chemical_copied('Arabinan', Xylan)
 
-Lignin = chemical_database('Lignin', phase='s')
-# Hf scaled based on vanillin
-Lignin.Hf = -108248*_cal2joule/tmo.Chemical('Vanillin').MW*Lignin.MW
+# Lignin = chemical_database('Lignin', phase='s')
+# # Hf scaled based on vanillin
+# Lignin.Hf = -108248*_cal2joule/tmo.Chemical('Vanillin').MW*Lignin.MW
 
 Alanine = chemical_database('Alanine', phase='s')
 
@@ -747,6 +747,7 @@ chems.append(sugarcane_chems.Hemicellulose)
 chems.append(sugarcane_chems.CaO)
 chems.append(sugarcane_chems.Solids)
 chems.append(sugarcane_chems.Flocculant)
+chems.append(sugarcane_chems.Lignin)
 
 chems.compile()
 tmo.settings.set_thermo(chems)
