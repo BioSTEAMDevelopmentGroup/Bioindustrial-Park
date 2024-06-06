@@ -215,14 +215,7 @@ Furfural = chemical_database('Furfural')
 
 Ethanol = chemical_database('Ethanol')
 
-Acetone = chemical_database('Acetone')
-IPA = chemical_database(ID='IPA', search_ID='Isopropanol')
 
-Hexanol = chemical_database('Hexanol')
-# Heptane = chemical_database('Heptane')
-
-
-THF = chemical_database(ID='THF', search_ID='Tetrahydrofuran')
 # Toluene = chemical_database('Toluene')
 # Tb from chemspider(chemenu database)
 # http://www.chemspider.com/Chemical-Structure.207215.html, accessed 04/07/2020
@@ -236,181 +229,7 @@ HMF = chemical_database('HMF', Hf=-99677*_cal2joule, Tb=291.5+273.15, Hfus=19800
 HMF.copy_models_from(Furfural, ['V', 'Hvap', 'Psat', 'mu', 'kappa'])
 HMF.Dortmund.update(chems.Furfural.Dortmund)
 
-KSA = Potassiumsorbate = chemical_database(ID='PotassiumSorbate',
-                                           search_ID='Potassium sorbate',
-                                           phase='l')
 
-TAL = Triaceticacidlactone = chemical_database(ID='TAL',
-                                               search_ID='Triacetic acid lactone',
-                                                phase='s',
-                                               )
-Pyrone = chemical_database(ID='Pyrone',
-                           search_ID='2-pyrone',
-                           phase='s')
-
-TAL.Hfus = 30883.66976 # Dannenfelser-Yalkowsky method
-TAL.Tm = KSA.Tm = 185. + 273.15 # (experimental) CAS SciFinder 675-10-5
-TAL.Tb = KSA.Tb =  239.1 + 273.15# (predicted) CAS SciFinder 675-10-5
-TAL.Hf = Pyrone.Hf
-TAL.LHV = Pyrone.LHV
-TAL.HHV = Pyrone.HHV
-
-for i in TAL.get_missing_properties():
-    if not i in Pyrone.get_missing_properties():
-        try:
-            TAL.copy_models_from(Pyrone, [i])
-        except:
-            pass
-
-
-DHL = chemical_database(ID='DHL', search_ID='delta-hexalactone', 
-                        # phase='s',
-                        )
-
-DHL.Hf = Pyrone.Hf
-DHL.LHV = Pyrone.LHV
-DHL.HHV = Pyrone.HHV
-
-
-DHL.Hvap.add_method(lambda T: 45.21e3) # CAS Scifinder 823-22-3
-DHL.V.l.add_model(lambda T: 113.9e-6) # CAS Scifinder 823-22-3
-DHL.Psat.add_method(lambda T: 4.85293421) # assumed to be same as Ethyl_5_HydroxyHexanoate
-# DHL.copy_models_from(EH, ['Psat',])
-DHL.Tb = 215.7 + 273.15 # CAS Scifinder 823-22-3
-DHL.Tm = 17. + 273.15 # CAS Scifinder 823-22-3
-
-for i in DHL.get_missing_properties():
-    if not i in Pyrone.get_missing_properties():
-        try:
-            DHL.copy_models_from(Pyrone, [i])
-        except:
-            pass
-
-# TAL.copy_models_from(tmo.Chemical('2-pyrone'), 
-#                      [i for i in TAL.get_missing_properties() if not i in tmo.Chemical('2-pyrone').get_missing_properties() and not (i=='Hf' or i=='LHV' or i=='HHV' or i=='combustion')]) # doesn't matter, since we never boil TAL in significant amounts
-
-# TAL.Hfus = Furfural.Hfus/2.18
-
-# TAL.Cn.l.add_method(tmo.Chemical('Succinic acid').Cn.l)
-
-
-SA = Sorbicacid =  chemical_database(ID='SorbicAcid', search_ID='Sorbic acid')
-
-HEA = tmo.Chemical('2-hexenoic acid')
-
-SA.Hfus = HEA.Hfus
-
-SA.Hf = 0.
-# SA.LHV = HEA.LHV
-# SA.HHV = HEA.HHV
-
-# https://pubchem.ncbi.nlm.nih.gov/compound/Sorbic-acid#section=Stability-Shelf-Life
-SA.Tb = 228. + 273.15
-
-for i in SA.get_missing_properties():
-    if not i in HEA.get_missing_properties():
-        try:
-            SA.copy_models_from(HEA, [i])
-        except:
-            pass
-
-PSA = chemical_database(ID='PSA', search_ID='parasorbic acid')
-
-PSA.Tb = SA.Tb
-PSA.Tm = SA.Tm
-
-PSA.Hfus = SA.Hfus
-PSA.Hf = SA.Hf
-PSA.LHV = SA.LHV
-PSA.HHV = SA.HHV
-
-for i in PSA.get_missing_properties():
-    if not i in SA.get_missing_properties():
-        try:
-            PSA.copy_models_from(SA, [i])
-        except:
-            pass
-PSA.copy_models_from(H2O, ['V'])
-        
-PolyPSA = chemical_defined(ID='PolyPSA', phase='s', 
-                             formula='C30H40O10', 
-                             Hf=0.)
-
-PolyPSA.Tb = PSA.Tb
-PolyPSA.Tm = PSA.Tm
-
-PolyPSA.Hfus = PSA.Hfus
-PolyPSA.Hf = PSA.Hf
-PolyPSA.LHV = PSA.LHV
-PolyPSA.HHV = PSA.HHV
-
-for i in PolyPSA.get_missing_properties():
-    if not i in PSA.get_missing_properties():
-        try:
-            PolyPSA.copy_models_from(PSA, [i])
-        except:
-            pass
-
-
-BSA = Butylsorbate = chemical_database(ID='ButylSorbate',
-                                       search_ID='Butyl sorbate',
-                                       phase='l')
-# https://pubchem.ncbi.nlm.nih.gov/compound/Sorbic-acid#section=Stability-Shelf-Life
-BSA.Tb = 226.5 + 273.15
-BSA.Tm = 130. + 273.15
-
-# HMTHP = chemical_copied('HMTHP', TAL)
-HMTHP = chemical_database(ID='HMTHP', search_ID='674-26-0',)
-HMTHP.Tm = 273.15 + (27.+28.)/2. # CAS SciFinder 674-26-0
-HMTHP.Tb = 273.15 + (148.+151.)/2. # CAS SciFinder 674-26-0
-
-HB = tmo.Chemical('2-hydroxybenzaldehyde')
-HMTHP.Hfus = TAL.Hfus
-
-HMTHP.Hf = HB.Hf
-HMTHP.LHV = HB.LHV
-HMTHP.HHV = HB.HHV
-
-for i in HMTHP.get_missing_properties():
-    if not i in HB.get_missing_properties():
-        try:
-            HMTHP.copy_models_from(HB, [i])
-        except:
-            pass
-HMTHP.copy_models_from(H2O, ['V'])
-
-HMDHP = chemical_defined(ID='HMDHP', 
-                         phase='l', 
-                         formula='C6H8O3', 
-                         Hf=Pyrone.Hf)
-
-# HMDHP.smiles = 
-# HMDHP.Dortmund = 
-
-HMDHP.Tm = 273.15 + (127.+128.)/2. # CAS SciFinder 33177-29-6
-HMDHP.Tb = TAL.Tb
-HMDHP.Hfus = TAL.Hfus
-
-HMDHP.Hf = Pyrone.Hf
-HMDHP.LHV = Pyrone.LHV
-HMDHP.HHV = Pyrone.HHV
-
-for i in HMDHP.get_missing_properties():
-    if not i in Pyrone.get_missing_properties():
-        try:
-            HMDHP.copy_models_from(Pyrone, [i])
-        except:
-            pass
-        
-
-PD = Pentanedione = chemical_database(ID='PD', search_ID='2,4-pentanedione') # Acetylacetone
-
-
-# PropylAcetate = chemical_database(ID='PropylAcetate', search_ID='Propyl acetate')
-
-
-VitaminA = chemical_database('VitaminA')
-VitaminD2 = chemical_database('VitaminD2')
 # Hfus from NIST, condensed phase, accessed 04/07/2020
 # https://webbook.nist.gov/cgi/cbook.cgi?ID=C87990&Mask=4
 Xylitol = chemical_database('Xylitol', phase='l', Hf=-243145*_cal2joule, Hfus=-1118.6e3)
@@ -426,104 +245,7 @@ Xylitol = chemical_database('Xylitol', phase='l', Hf=-243145*_cal2joule, Hfus=-1
 # EHH.Psat.add_method(lambda: 4.85293421)
 
 # EDHH = chemical_copied('Ethyl 3,5-dihydroxyhexanoate', EHH)
-EH = tmo.Chemical('Ethyl hexanoate')
 
-Ethyl_5_HydroxyHexanoate = chemical_defined('Ethyl_5_hydroxyhexanoate',
-                                            # phase='l', 
-                                            formula='C8H16O3', 
-                       # Hf=-233200*_cal2joule,
-                       )
-Ethyl_5_HydroxyHexanoate.Dortmund.update({1:2, 2:3, 3:1, 14:1, 22:1})
-Ethyl_5_HydroxyHexanoate.UNIFAC.update({1:2, 2:3, 3:1, 14:1, 22:1})
-Ethyl_5_HydroxyHexanoate.Hvap.add_method(lambda T: 52.31e3) # SciFinder CAS 20266-62-0
-Ethyl_5_HydroxyHexanoate.V.l.add_model(lambda T: 161.9e-6) # SciFinder CAS 20266-62-0 
-Ethyl_5_HydroxyHexanoate.Psat.add_method(lambda T: 4.85293421) # SciFinder CAS 20266-62-0
-# Ethyl_5_HydroxyHexanoate.copy_models_from(EH, ['Psat',])
-Ethyl_5_HydroxyHexanoate.Tb = 213.4 + 273.15 # SciFinder CAS 20266-62-0
-Ethyl_5_HydroxyHexanoate.Tm = 0. + 273.15 # assumed
-
-Ethyl_3_5_dihydroxyhexanoate = chemical_defined('Ethyl_3_5_dihydroxyhexanoate',
-                                            # phase='l', 
-                                            formula='C8H16O4', 
-                       # Hf=-233200*_cal2joule,
-                       )
-
-for i in Ethyl_5_HydroxyHexanoate.get_missing_properties():
-    if not i in EH.get_missing_properties():
-        try:
-            Ethyl_5_HydroxyHexanoate.copy_models_from(EH, [i])
-        except:
-            pass
-        
-Ethyl_3_5_dihydroxyhexanoate.Dortmund.update({1:2, 2:2, 3:2, 14:2, 22:1})
-Ethyl_3_5_dihydroxyhexanoate.UNIFAC.update({1:2, 2:2, 3:2, 14:2, 22:1})
-Ethyl_3_5_dihydroxyhexanoate.Hvap.add_method(lambda T: 52.31e3) # assumed to be same as Ethyl_5_HydroxyHexanoate
-Ethyl_3_5_dihydroxyhexanoate.V.l.add_model(lambda T: 161.9e-6) # assumed to be same as Ethyl_5_HydroxyHexanoate
-Ethyl_3_5_dihydroxyhexanoate.Psat.add_method(lambda T: 4.85293421) # assumed to be same as Ethyl_5_HydroxyHexanoate
-# Ethyl_3_5_dihydroxyhexanoate.copy_models_from(EH, ['Psat',])
-Ethyl_3_5_dihydroxyhexanoate.Tb = 213.4 + 273.15 # assumed to be same as Ethyl_5_HydroxyHexanoate
-Ethyl_3_5_dihydroxyhexanoate.Tm = 0. + 273.15 # assumed
-
-        
-for i in Ethyl_3_5_dihydroxyhexanoate.get_missing_properties():
-    if not i in EH.get_missing_properties():
-        try:
-            Ethyl_3_5_dihydroxyhexanoate.copy_models_from(EH, [i])
-        except:
-            pass
-Octanol = chemical_database('Octanol')
-# Esters - Octyl
-OctylyHexanoate = chemical_database(ID='Octylhexanoate', search_ID='4887-30-3') # used for missing properties
-
-OctylHydroxyHexanoate = chemical_defined('Octyl_5_hydroxyhexanoate', phase='l', formula='C14H28O3', 
-                       # Hf=-233200*_cal2joule,
-                       )
-OctylHydroxyHexanoate.Dortmund.update({1:2, 2:10, 22:1, 14:1})
-OctylHydroxyHexanoate.UNIFAC.update({1:2, 2:10, 22:1, 14:1})
-
-OctylHydroxyHexanoate.Tb = 400. + 273.15 # assumed
-OctylHydroxyHexanoate.Tm = 50. + 273.15 # assumed
-
-for i in OctylHydroxyHexanoate.get_missing_properties():
-    if not i in OctylyHexanoate.get_missing_properties():
-        try:
-            OctylHydroxyHexanoate.copy_models_from(OctylyHexanoate, [i])
-        except:
-            pass
-
-
-OctylDihydroxyHexanoate = chemical_defined('Octyl_3_5_dihydroxyhexanoate', phase='l', formula='C14H28O4', 
-                       # Hf=0,
-                       )
-OctylDihydroxyHexanoate.Dortmund.update({1:2, 2:10, 22:1, 14:2})
-OctylDihydroxyHexanoate.UNIFAC.update({1:2, 2:10, 22:1, 14:2})
-OctylDihydroxyHexanoate.Tb = 400. + 273.15 # assumed
-OctylDihydroxyHexanoate.Tm = 50. + 273.15 # assumed
-
-for i in OctylDihydroxyHexanoate.get_missing_properties():
-    if not i in OctylyHexanoate.get_missing_properties():
-        try:
-            OctylDihydroxyHexanoate.copy_models_from(OctylyHexanoate, [i])
-        except:
-            pass
-
-# Acetylacetone = chemical_database(ID='Acetylacetone', 
-#                                                        # phase='s', 
-#                                                        # formula='C6H6O3',
-#                                                        # search_ID='Acetylacetone',
-#                                                        )
-
-Pentenone = chemical_database(ID='Pentenone', search_ID='3-penten-2-one')
-
-
-# for i in TALHydrogenationDegradationProducts.get_missing_properties():
-#     if not i in TAL.get_missing_properties():
-#         try:
-#             TALHydrogenationDegradationProducts.copy_models_from(TAL, [i])
-#         except:
-#             pass
-
-Hexane = chemical_defined('Hexane', phase='l')
 
 # =============================================================================
 # Insoluble organics
@@ -538,9 +260,9 @@ Xylan = chemical_defined('Xylan', phase='s', formula='C5H8O4', Hf=-182100*_cal2j
 Xylan.copy_models_from(Xylose, ['Cn'])
 Arabinan = chemical_copied('Arabinan', Xylan)
 
-# Lignin = chemical_database('Lignin', phase='s')
-# # Hf scaled based on vanillin
-# Lignin.Hf = -108248*_cal2joule/tmo.Chemical('Vanillin').MW*Lignin.MW
+Lignin = chemical_database('Lignin', phase='s')
+# Hf scaled based on vanillin
+Lignin.Hf = -108248*_cal2joule/tmo.Chemical('Vanillin').MW*Lignin.MW
 
 Alanine = chemical_database('Alanine', phase='s')
 
@@ -563,9 +285,9 @@ Tar = chemical_copied('Tar', Xylose, phase_ref='s')
 
 PdC = chemical_database('Pd', phase='s')
 
-NiSiO2 = chemical_database('NiSiO2', search_ID='Nickel on silica', phase='s') # Ni-SiO2-Al2O3 # Raney Ni (Ni-Al2O3 alloy) CAS 12635-27-7 is not currently in the database
+NiSiO2 = chemical_database('NiSiO2', search_ID='Nickel on silica', phase='s') # modeled simply as nickel
 
-Amberlyst70_ = chemical_copied('Amberlyst70_', NiSiO2) # Amberlyst-70 # Amberlyst-15 CAS 39389-20-3 is not currently in the database
+Amberlyst70_ = chemical_copied('Amberlyst70_', NiSiO2)
 # =============================================================================
 # Mixtures
 # =============================================================================
@@ -747,7 +469,6 @@ chems.append(sugarcane_chems.Hemicellulose)
 chems.append(sugarcane_chems.CaO)
 chems.append(sugarcane_chems.Solids)
 chems.append(sugarcane_chems.Flocculant)
-chems.append(sugarcane_chems.Lignin)
 
 chems.compile()
 tmo.settings.set_thermo(chems)
@@ -785,6 +506,7 @@ chems.set_synonym('AmmoniumHydroxide', 'NH4OH')
 
 chems.set_synonym('DAP', 'DiammoniumPhosphate')
 
+chems.set_synonym('Tetrahydrofuran', 'THF')
 
 chems.set_synonym('AceticAcid', 'Acetate')
 

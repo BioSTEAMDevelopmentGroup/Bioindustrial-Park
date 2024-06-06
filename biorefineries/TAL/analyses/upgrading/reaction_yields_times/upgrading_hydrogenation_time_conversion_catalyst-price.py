@@ -16,7 +16,7 @@ from biosteam.utils import  colors
 import numpy as np
 
 from biorefineries import TAL
-from biorefineries.TAL.systems.system_TAL_solubility_exploit_ethanol_sugarcane import TAL_tea, TAL_lca, R302, spec, TAL_product, get_TAL_MPSP, simulate_and_print, theoretical_max_g_TAL_per_g_SA, flowsheet
+from biorefineries.TAL.systems.system_SA_solubility_exploit_ethanol_sugarcane import TAL_tea, TAL_lca, R302, spec, KSA_product, get_KSA_MPSP, simulate_and_print, theoretical_max_g_TAL_per_g_SA, flowsheet
 from biorefineries.TAL._general_utils import get_pH_polyprotic_acid_mixture, get_molarity
 
 from  matplotlib.colors import LinearSegmentedColormap
@@ -29,7 +29,7 @@ from math import log
 
 import os
 
-from biorefineries.TAL.models import models_TAL_solubility_exploit as models
+from biorefineries.TAL.models import models_SA_solubility_exploit as models
 
 from flexsolve import IQ_interpolation
 
@@ -40,18 +40,17 @@ dateTimeObj = datetime.now()
 ig = np.seterr(invalid='ignore')
 # bst.speed_up()
 
-product = TAL_product
+product = KSA_product
 
 
 # search page for high end: https://www.alibaba.com/trade/search?spm=a2700.galleryofferlist.0.0.2a995827YzqZVg&fsb=y&IndexArea=product_en&assessmentCompany=true&keywords=590-00-1+sorbate&productTag=1200000228&ta=y&tab=all&
-SA_market_range=np.array([
-                          6.74, # 2019 global high end from Sorbic Acid Market, Transparency Market Research
-                          6.50 * 1.3397087, # $6.50/kg-potassium-sorbate from https://www.alibaba.com/product-detail/Lifecare-Supply-Potassium-Sorbate-High-Quality_1600897125355.html?spm=a2700.galleryofferlist.p_offer.d_title.1bc15827eAs1TL&s=p
+KSA_market_range = market_range = np.array([
+                          6.74/1.3397087, # 2019 global high end from Sorbic Acid Market, Transparency Market Research
+                          6.50, # $6.50/kg-potassium-sorbate from https://www.alibaba.com/product-detail/Lifecare-Supply-Potassium-Sorbate-High-Quality_1600897125355.html?spm=a2700.galleryofferlist.p_offer.d_title.1bc15827eAs1TL&s=p
                           ]) 
 
-TAL_maximum_viable_market_range = SA_market_range / theoretical_max_g_TAL_per_g_SA
 
-# TAL_maximum_viable_market_range = np.array([5.99, 7.74])
+# KSA_market_range = np.array([5.99, 7.74])
 
 s, u = flowsheet.stream, flowsheet.unit
 
@@ -63,6 +62,26 @@ TAL_filepath = TAL.__file__.replace('\\__init__.py', '')
 # ##
 TAL_results_filepath = TAL_filepath + '\\analyses\\results\\'
 
+#%% Parameter loading functions
+
+# Set reactor, reaction, and catalyst here
+reactor = u.R401
+rxn = reactor.hydrogenation_rxns[0]
+catalyst_name = 'NiSiO2' 
+batch = True
+#
+if not batch: reactor.load_auxiliaries()
+
+def load_rxn_conversion(X):
+    rxn.X = X
+
+def load_tau(tau):
+    reactor.tau = tau
+    
+def load_catalyst_price(catalyst_price):
+    reactor.__dict__[catalyst_name+'_catalyst_price'] = catalyst_price
+
+
 #%% Load baseline
 model = models.TAL_model
 system = TAL_sys = models.TAL_sys
@@ -73,11 +92,10 @@ modes = [
 
 
 parameter_distributions_filenames = [
-                                    'parameter-distributions_TAL_' + mode +'.xlsx' 
+                                    'parameter-distributions_Sorbate_' + mode +'.xlsx' 
                                     for mode in modes
                                     ]
 mode = modes[0]
-
 
 parameter_distributions_filename = TAL_filepath+\
     '\\analyses\\full\\parameter_distributions\\'+parameter_distributions_filenames[0]
@@ -103,27 +121,16 @@ model.exception_hook = 'warn'
 print('\n\nSimulating baseline ...')
 baseline_initial = model.metrics_at_baseline()
 
-
-#%% Parameter loading functions
-U402, M401 = u.U402, u.M401
-base_decarboxylation_fresh = s.base_decarboxylation_fresh
-U402.decarboxylation_conversion_basis = 'fixed'
-
-def load_decarboxylation_conversion(decarboxylation_conversion):
-    U402.decarboxylation_conversion = decarboxylation_conversion
-
-def load_pH(pH):
-    M401.pH_to_load = pH
-    
-def load_base_price(base_price):
-    base_decarboxylation_fresh.price = base_price
+baseline_rxn_X = rxn.X
+baseline_tau = reactor.tau
+baseline_catalyst_price = reactor.__dict__[catalyst_name+'_catalyst_price']
 
 
 #%%  Metrics
 broth = R302.outs[1]
 # SA_price_range = [6500, 7500]
 
-product_chemical_IDs = ['TAL',]
+product_chemical_IDs = ['KSA',]
 get_product_MPSP = lambda: TAL_tea.solve_price(product) / get_product_purity() # USD / pure-kg
 get_production = lambda: sum([product.imass[i] for i in product_chemical_IDs])
 get_product_purity = lambda: get_production()/product.F_mass
@@ -142,49 +149,50 @@ TAL_metrics = [get_product_MPSP,
                # lambda: TAL_lca.FEC - TAL_lca.net_electricity_FEC, 
                lambda: TAL_lca.GWP, 
                lambda: TAL_lca.FEC, 
-               get_TAL_AOC, get_TAL_FCI, get_product_purity, M401.get_pH_maintained]
+               get_TAL_AOC, get_TAL_FCI, get_product_purity,
+               lambda: reactor.installed_cost]
 
 # %% Generate 3-specification meshgrid and set specification loading functions
 
-steps = (60, 60, 1)
+steps = (20, 20, 1)
 
 # Yield, titer, productivity (rate)
-spec_1 = TAL_decarb_convs = np.linspace(0., 0.5, steps[0]) # yield
-spec_2 = pHs = np.linspace(M401.get_pH_maintained(), 12., steps[1]) # titer
+spec_1 = rxn_Xs = np.linspace(0.4, 1.-1e-5, steps[0]) # yield
+spec_2 = reactor_taus = np.linspace(0.1, 25., steps[1]) # titer
 
 
-# spec_3 = base_prices =\
+# spec_3 = catalyst_prices =\
 #     np.array([Base_fresh.price])
     
-# spec_3 = base_prices =\
+# spec_3 = catalyst_prices =\
 #     np.linspace(1e-5, 5., steps[2])
 
-spec_3 = base_prices =\
-    np.array([base_decarboxylation_fresh.price])
+spec_3 = catalyst_prices =\
+    np.array([baseline_catalyst_price])
 
 
 #%% Plot stuff
 
 # Parameters analyzed across
 
-y_label = r"$\bfTAL$"  +" "+ r"$\bfRing-Opening$" +" "+ r"$\bfDecarboxylation$"  # title of the x axis
-y_units = r"$\mathrm{\%}$"  +" "+ r"$\mathrm{theoretical}$"
-y_ticks = [0, 10, 20, 30, 40, 50]
+y_label = r"$\bfHydrogenation$" + '\n'+\
+    r"$\bfHMP$"  +" "+ r"$\bfYield$" +" "+ r"$\bfon$" +" "+ r"$\bfTAL$" # title of the x axis
+y_units = r"$\mathrm{mol}$" + " " + r"$\mathrm{\%}$"
+y_ticks = [40, 50, 60, 70, 80, 90, 100]
 
-x_label = r"$\bfpH$"  +" "+ r"$\bfMaintained$" # title of the y axis
-x_units =r"$\mathrm{mol} \cdot \mathrm{m}^{-3}$"
-x_ticks = [2., 4., 6., 8., 10., 12.]
+x_label = r"$\bfReaction$"  +" "+ r"$\bfTime$" # title of the y axis
+x_units =r"$\mathrm{h}$"
+x_ticks = [0, 5, 10, 15, 20, 25]
 
 
-z_label = r"$\bfSodium$"  +" "+ r"$\bfHydroxide$"  +" "+ r"$\bfPrice$"# # title of the z axis
+z_label = r"$\bfNickel$" + r"$-$"  + r"$\bfSilica$"  + r"$-$"  + r"$\bfAlumina$" +" "+ r"$\bfCatalyst$" +" "+ r"$\bfPrice$"# # title of the z axis
 z_units =  r"$\mathrm{\$} \cdot \mathrm{kg}^{-1}$"
-z_ticks = [0, 2, 4, 6, 8, 10]
+z_ticks = [0, 10, 20, 30, 40, 50, 60]
 
 # Metrics
 MPSP_w_label = r"$\bfMPSP$" # title of the color axis
 MPSP_units = r"$\mathrm{\$}\cdot\mathrm{kg}^{-1}$"
 
-# GWP_w_label = r"$\mathrm{\bfGWP}_{\bf100}$"
 GWP_w_label = r"$\mathrm{\bfCarbon}$" + " " + r"$\mathrm{\bfIntensity}$"
 GWP_units = r"$\mathrm{kg}$"+" "+ r"$\mathrm{CO}_{2}\mathrm{-eq.}\cdot\mathrm{kg}^{-1}$"
 
@@ -276,18 +284,16 @@ spec_1, spec_2 = np.meshgrid(spec_1, spec_2)
 
 #%% Initial simulation
 simulate_and_print()
-baseline_Base_presence = M401.get_pH_maintained()
 
 print('\n\nSimulating the initial point to avoid bugs ...')
-# spec.load_specifications(TAL_decarb_convs[0], pHs[0], base_prices[0])
+# spec.load_specifications(rxn_Xs[0], reactor_taus[0], catalyst_prices[0])
 # spec.set_production_capacity(desired_annual_production=spec.desired_annual_production)
 # simulate_and_print()
-load_base_price(base_prices[0])
-load_decarboxylation_conversion(TAL_decarb_convs[0])
-load_pH(pHs[0])
-get_TAL_MPSP()
-M401.base_neutralizes_acids = True
-get_TAL_MPSP()
+load_catalyst_price(catalyst_prices[0])
+load_rxn_conversion(rxn_Xs[0])
+load_tau(reactor_taus[0])
+get_KSA_MPSP()
+get_KSA_MPSP()
 
 
 # %% Run TRY analysis 
@@ -310,20 +316,20 @@ def print_status(curr_no, total_no, s1, s2, s3, HXN_qbal_error, results=None, ex
 max_HXN_qbal_percent_error = 0.
 
 curr_no = 0
-total_no = len(TAL_decarb_convs)*len(pHs)*len(base_prices)
+total_no = len(rxn_Xs)*len(reactor_taus)*len(catalyst_prices)
 
 n_steps_per_print = 50
 
-for p in base_prices:
+for p in catalyst_prices:
     # data_1 = TAL_data = spec.evaluate_across_specs(
     #         TAL_sys, spec_1, spec_2, TAL_metrics, [p])
-    load_base_price(p)
+    load_catalyst_price(p)
     
     d1_Metric1, d1_Metric2, d1_Metric3 = [], [], []
     d1_Metric4, d1_Metric5, d1_Metric6 = [], [], []
     d1_Metric7 = []
     
-    for y in pHs:
+    for y in reactor_taus:
         d1_Metric1.append([])
         d1_Metric2.append([])
         d1_Metric3.append([])
@@ -331,13 +337,13 @@ for p in base_prices:
         d1_Metric5.append([])
         d1_Metric6.append([])
         d1_Metric7.append([])
-        for t in TAL_decarb_convs:
+        for t in rxn_Xs:
             curr_no +=1
             error_message = None
             try:
                 # spec.load_specifications(spec_1=y, spec_2=t, spec_3=p)
-                load_decarboxylation_conversion(t)
-                load_pH(y)
+                load_rxn_conversion(t)
+                load_tau(y)
                 
                 # spec.set_production_capacity(desired_annual_production=spec.desired_annual_production)
                 
@@ -402,7 +408,7 @@ for p in base_prices:
     # %% Save generated data
     
     minute = '0' + str(dateTimeObj.minute) if len(str(dateTimeObj.minute))==1 else str(dateTimeObj.minute)
-    file_to_save = f'_{steps}_steps_'+'TAL_decarboxylation_pH_%s.%s.%s-%s.%s'%(dateTimeObj.year, dateTimeObj.month, dateTimeObj.day, dateTimeObj.hour, minute)
+    file_to_save = f'_{steps}_steps_'+'KSA_hydrogenation_yield_tau_%s.%s.%s-%s.%s'%(dateTimeObj.year, dateTimeObj.month, dateTimeObj.day, dateTimeObj.hour, minute)
     np.save(TAL_results_filepath+file_to_save, np.array([d1_Metric1, d1_Metric2, d1_Metric3]))
     
     pd.DataFrame(d1_Metric1).to_csv(TAL_results_filepath+'MPSP-'+file_to_save+'.csv')
@@ -521,16 +527,18 @@ print('\nCreating and saving contour plots ...\n')
 #%% MPSP
 
 # MPSP_w_levels, MPSP_w_ticks, MPSP_cbar_ticks = get_contour_info_from_metric_data(results_metric_1, lb=3)
-MPSP_w_levels = np.arange(0, 12.25, 0.25)
-MPSP_cbar_ticks = np.arange(0, 12.1, 1.)
-MPSP_w_ticks = [3.25, 3.5, 3.75, 4, 4.25, 4.5, 4.75, 5, 5.5, 8.5, 10, 12]
+MPSP_w_levels = np.arange(4, 14.25, 0.25)
+MPSP_cbar_ticks = np.arange(4, 14.1, 1.)
+MPSP_w_ticks = [
+                # 2.75, 
+                5., 6., 7., 8., 8.5, 9., 10., 11., 12., 14.]
 # MPSP_w_levels = np.arange(0., 15.5, 0.5)
 
 contourplots.animated_contourplot(w_data_vs_x_y_at_multiple_z=results_metric_1, # shape = z * x * y # values of the metric you want to plot on the color axis; e.g., MPSP
-                                y_data=100*TAL_decarb_convs, # x axis values
-                                # y_data = TAL_decarb_convs/theoretical_max_g_TAL_acid_per_g_glucose,
-                                x_data=pHs, # y axis values
-                                z_data=base_prices, # z axis values
+                                y_data=100*rxn_Xs, # x axis values
+                                # y_data = rxn_Xs/theoretical_max_g_TAL_acid_per_g_glucose,
+                                x_data=reactor_taus, # y axis values
+                                z_data=catalyst_prices, # z axis values
                                 y_label=y_label, # title of the x axis
                                 x_label=x_label, # title of the y axis
                                 z_label=z_label, # title of the z axis
@@ -559,34 +567,36 @@ contourplots.animated_contourplot(w_data_vs_x_y_at_multiple_z=results_metric_1, 
                                 clabel_fontsize = clabel_fontsize,
                                 default_fontsize = default_fontsize,
                                 axis_tick_fontsize = axis_tick_fontsize,
-                                comparison_range=TAL_maximum_viable_market_range,
+                                # comparison_range=KSA_market_range,
                                 n_minor_ticks = 1,
                                 cbar_n_minor_ticks = 3,
                                 # comparison_range=[MPSP_w_levels[-2], MPSP_w_levels[-1]],
                                 # comparison_range_hatch_pattern='////',
                                 units_on_newline = (True, True, False, False), # x,y,z,w
                                 # manual_clabels_comparison_range =\
-                                #     {TAL_maximum_viable_market_range[0]:(20,0.75), 
-                                #       TAL_maximum_viable_market_range[1]:(30,1.25)},
+                                #     {KSA_market_range[0]:(20,0.75), 
+                                #       KSA_market_range[1]:(30,1.25)},
                                 # manual_clabels_regular = {
                                 #     # MPSP_w_ticks[4]: (5,.25),
                                 #     MPSP_w_ticks[5]: (5,.25),
                                 #     MPSP_w_ticks[6]: (45,1.75),
                                 #     },
-                                additional_points ={(baseline_Base_presence, 20.87):('D', 'w', 6)},
+                                additional_points ={(baseline_tau, 100*baseline_rxn_X):('D', 'w', 6)},
                                 # text_boxes = {'>10.0': [(41,1.8), 'white']},
+                                text_boxes = {'>14.0': [(20.,45), 'white']},
+                                
                                 )
 
 #%% GWP
 
 # GWP_w_levels, GWP_w_ticks, GWP_cbar_ticks = get_contour_info_from_metric_data(results_metric_2,)
-GWP_w_levels = np.arange(0, 20.1, 0.5)
-GWP_cbar_ticks = np.arange(0, 20.1, 2.)
-GWP_w_ticks = [6.5, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 20]
+GWP_w_levels = np.arange(4, 24.1, 0.5)
+GWP_cbar_ticks = np.arange(4, 24.1, 2.)
+GWP_w_ticks = [6, 7, 8, 9, 10, 11, 12, 14, 15, 16.5, 18, 20, 24]
 contourplots.animated_contourplot(w_data_vs_x_y_at_multiple_z=results_metric_2, # shape = z * x * y # values of the metric you want to plot on the color axis; e.g., GWP
-                                y_data=100*TAL_decarb_convs, # x axis values
-                                x_data=pHs, # y axis values
-                                z_data=base_prices, # z axis values
+                                y_data=100*rxn_Xs, # x axis values
+                                x_data=reactor_taus, # y axis values
+                                z_data=catalyst_prices, # z axis values
                                 y_label=y_label, # title of the x axis
                                 x_label=x_label, # title of the y axis
                                 z_label=z_label, # title of the z axis
@@ -622,11 +632,12 @@ contourplots.animated_contourplot(w_data_vs_x_y_at_multiple_z=results_metric_2, 
                                 # comparison_range=[GWP_w_levels[-2], GWP_w_levels[-1]],
                                 # comparison_range_hatch_pattern='////',
                                 units_on_newline = (True, True, False, False), # x,y,z,w
-                                additional_points ={(baseline_Base_presence, 20.87):('D', 'w', 6)},
+                                additional_points ={(baseline_tau, 100*baseline_rxn_X):('D', 'w', 6)},
                                 # manual_clabels_regular = {
                                 #     MPSP_w_ticks[3]: (20 ,1),
                                 #     MPSP_w_ticks[4]: (35,1.25),
                                 #     }
+                                text_boxes = {'>24.0': [(20.,45), 'white']},
                                 )
 
 
@@ -637,9 +648,9 @@ FEC_w_levels = np.arange(-100, 101, 10.)
 FEC_cbar_ticks = np.arange(-100, 101, 20)
 FEC_w_ticks = [-100, -60, -50, -40, -30, -20, -10, 0, 20, 40, 60, 70, 80, 100]
 contourplots.animated_contourplot(w_data_vs_x_y_at_multiple_z=results_metric_3, # shape = z * x * y # values of the metric you want to plot on the color axis; e.g., FEC
-                                y_data=100*TAL_decarb_convs, # x axis values
-                                x_data=pHs, # y axis values
-                                z_data=base_prices, # z axis values
+                                y_data=100*rxn_Xs, # x axis values
+                                x_data=reactor_taus, # y axis values
+                                z_data=catalyst_prices, # z axis values
                                 y_label=y_label, # title of the x axis
                                 x_label=x_label, # title of the y axis
                                 z_label=z_label, # title of the z axis
@@ -673,7 +684,7 @@ contourplots.animated_contourplot(w_data_vs_x_y_at_multiple_z=results_metric_3, 
                                 # comparison_range=[FEC_w_levels[-2], FEC_w_levels[-1]],
                                 # comparison_range_hatch_pattern='////',
                                 units_on_newline = (True, True, False, False), # x,y,z,w
-                                additional_points ={(baseline_Base_presence, 20.87):('D', 'w', 6)},
+                                additional_points ={(baseline_tau, 100*baseline_rxn_X):('D', 'w', 6)},
                                 )
 
 #%% AOC
@@ -685,10 +696,10 @@ AOC_w_levels, AOC_w_ticks, AOC_cbar_ticks = get_contour_info_from_metric_data(re
 # AOC_w_levels = np.arange(0., 15.5, 0.5)
 
 contourplots.animated_contourplot(w_data_vs_x_y_at_multiple_z=results_metric_4, # shape = z * x * y # values of the metric you want to plot on the color axis; e.g., AOC
-                                y_data=100*TAL_decarb_convs, # x axis values
-                                # y_data = TAL_decarb_convs/theoretical_max_g_TAL_acid_per_g_glucose,
-                                x_data=pHs, # y axis values
-                                z_data=base_prices, # z axis values
+                                y_data=100*rxn_Xs, # x axis values
+                                # y_data = rxn_Xs/theoretical_max_g_TAL_acid_per_g_glucose,
+                                x_data=reactor_taus, # y axis values
+                                z_data=catalyst_prices, # z axis values
                                 y_label=y_label, # title of the x axis
                                 x_label=x_label, # title of the y axis
                                 z_label=z_label, # title of the z axis
@@ -717,7 +728,7 @@ contourplots.animated_contourplot(w_data_vs_x_y_at_multiple_z=results_metric_4, 
                                 clabel_fontsize = clabel_fontsize,
                                 default_fontsize = default_fontsize,
                                 axis_tick_fontsize = axis_tick_fontsize,
-                                # comparison_range=TAL_maximum_viable_market_range,
+                                # comparison_range=KSA_market_range,
                                 n_minor_ticks = 1,
                                 cbar_n_minor_ticks = 1,
                                 # comparison_range=[AOC_w_levels[-2], AOC_w_levels[-1]],
@@ -734,10 +745,10 @@ FCI_w_levels, FCI_w_ticks, FCI_cbar_ticks = get_contour_info_from_metric_data(re
 # FCI_w_levels = np.arange(0., 15.5, 0.5)
 
 contourplots.animated_contourplot(w_data_vs_x_y_at_multiple_z=results_metric_5, # shape = z * x * y # values of the metric you want to plot on the color axis; e.g., FCI
-                                y_data=100*TAL_decarb_convs, # x axis values
-                                # y_data = TAL_decarb_convs/theoretical_max_g_TAL_acid_per_g_glucose,
-                                x_data=pHs, # y axis values
-                                z_data=base_prices, # z axis values
+                                y_data=100*rxn_Xs, # x axis values
+                                # y_data = rxn_Xs/theoretical_max_g_TAL_acid_per_g_glucose,
+                                x_data=reactor_taus, # y axis values
+                                z_data=catalyst_prices, # z axis values
                                 y_label=y_label, # title of the x axis
                                 x_label=x_label, # title of the y axis
                                 z_label=z_label, # title of the z axis
@@ -766,7 +777,7 @@ contourplots.animated_contourplot(w_data_vs_x_y_at_multiple_z=results_metric_5, 
                                 clabel_fontsize = clabel_fontsize,
                                 default_fontsize = default_fontsize,
                                 axis_tick_fontsize = axis_tick_fontsize,
-                                # comparison_range=TAL_maximum_viable_market_range,
+                                # comparison_range=KSA_market_range,
                                 n_minor_ticks = 1,
                                 cbar_n_minor_ticks = 1,
                                 # comparison_range=[FCI_w_levels[-2], FCI_w_levels[-1]],
@@ -783,10 +794,10 @@ Purity_w_levels = Purity_cbar_ticks = Purity_w_ticks = np.arange(0.7, 1.0, 0.01)
 # Purity_w_levels = np.arange(0., 15.5, 0.5)
 
 contourplots.animated_contourplot(w_data_vs_x_y_at_multiple_z=results_metric_6, # shape = z * x * y # values of the metric you want to plot on the color axis; e.g., Purity
-                                y_data=100*TAL_decarb_convs, # x axis values
-                                # y_data = TAL_decarb_convs/theoretical_max_g_TAL_acid_per_g_glucose,
-                                x_data=pHs, # y axis values
-                                z_data=base_prices, # z axis values
+                                y_data=100*rxn_Xs, # x axis values
+                                # y_data = rxn_Xs/theoretical_max_g_TAL_acid_per_g_glucose,
+                                x_data=reactor_taus, # y axis values
+                                z_data=catalyst_prices, # z axis values
                                 y_label=y_label, # title of the x axis
                                 x_label=x_label, # title of the y axis
                                 z_label=z_label, # title of the z axis
@@ -815,7 +826,7 @@ contourplots.animated_contourplot(w_data_vs_x_y_at_multiple_z=results_metric_6, 
                                 clabel_fontsize = clabel_fontsize,
                                 default_fontsize = default_fontsize,
                                 axis_tick_fontsize = axis_tick_fontsize,
-                                # comparison_range=TAL_maximum_viable_market_range,
+                                # comparison_range=KSA_market_range,
                                 n_minor_ticks = 1,
                                 cbar_n_minor_ticks = 1,
                                 # comparison_range=[Purity_w_levels[-2], Purity_w_levels[-1]],
@@ -829,10 +840,10 @@ contourplots.animated_contourplot(w_data_vs_x_y_at_multiple_z=results_metric_6, 
 pH_w_levels = pH_w_ticks = pH_cbar_ticks = np.arange(0., 14.1, 1.)
 
 contourplots.animated_contourplot(w_data_vs_x_y_at_multiple_z=results_metric_7, # shape = z * x * y # values of the metric you want to plot on the color axis; e.g., M401_addition
-                                y_data=100*TAL_decarb_convs, # x axis values
-                                # y_data = TAL_decarb_convs/theoretical_max_g_TAL_acid_per_g_glucose,
-                                x_data=pHs, # y axis values
-                                z_data=base_prices, # z axis values
+                                y_data=100*rxn_Xs, # x axis values
+                                # y_data = rxn_Xs/theoretical_max_g_TAL_acid_per_g_glucose,
+                                x_data=reactor_taus, # y axis values
+                                z_data=catalyst_prices, # z axis values
                                 y_label=y_label, # title of the x axis
                                 x_label=x_label, # title of the y axis
                                 z_label=z_label, # title of the z axis
@@ -861,7 +872,7 @@ contourplots.animated_contourplot(w_data_vs_x_y_at_multiple_z=results_metric_7, 
                                 clabel_fontsize = clabel_fontsize,
                                 default_fontsize = default_fontsize,
                                 axis_tick_fontsize = axis_tick_fontsize,
-                                # comparison_range=TAL_maximum_viable_market_range,
+                                # comparison_range=KSA_market_range,
                                 n_minor_ticks = 1,
                                 cbar_n_minor_ticks = 1,
                                 # comparison_range=[M401_addition_w_levels[-2], M401_addition_w_levels[-1]],

@@ -62,7 +62,7 @@ from biorefineries.TAL.process_settings import price, CFs, chem_index
 from biorefineries.TAL.chemicals_data import TAL_chemicals, chemical_groups, \
                                 soluble_organics, combustibles
 # from biorefineries.TAL.tea import TALTEA
-from biorefineries.cornstover import CellulosicEthanolTEA as TALTEA
+from biorefineries.TAL.tea import TALTEA
 from biosteam import SystemFactory
 from warnings import filterwarnings
 
@@ -104,6 +104,12 @@ bst.CE = 607.5
 # Set default thermo object for the system
 tmo.settings.set_thermo(TAL_chemicals)
 
+# sc_temp = create_juicing_system_up_to_clarification()
+
+# wwt_temp = bst.create_high_rate_wastewater_treatment_system(
+#     ins=0-sc_temp, 
+#     )
+
 # %% 
 @SystemFactory(ID = 'create_sugarcane_to_TAL_solubility_based_sys')
 def create_sugarcane_to_TAL_solubility_based_sys(ins, outs):
@@ -116,7 +122,13 @@ def create_sugarcane_to_TAL_solubility_based_sys(ins, outs):
     u = sugarcane_juicing_sys.flowsheet.unit
     s = sugarcane_juicing_sys.flowsheet.stream
     
-    u.U201.ins.append(u.M201-0)
+    u.U201.diagram()
+    sugarcane_juicing_sys.diagram('cluster')
+    # u.U201.ins.append(u.M201-0)
+    
+    # u.M201-0-1-u.U201
+    
+    # sugarcane_juicing_sys.simulate(update_configuration=True)
     
     U101 = bst.Unit('U101', ins='', outs='')
     @U101.add_specification(run=False)
@@ -141,14 +153,17 @@ def create_sugarcane_to_TAL_solubility_based_sys(ins, outs):
                                                    )
     
     #%% Separation
-    acetylacetone_decarboxylation_equilibrium = Stream('acetylacetone_decarboxylation_equilibrium', 
-                                                       phase='l', units='kg/hr')
+    # acetylacetone_decarboxylation_equilibrium = Stream('acetylacetone_decarboxylation_equilibrium', 
+    #                                                    phase='l', units='kg/hr')
+    # base_for_pH_control_decarboxylation = Stream('base_for_pH_control_decarboxylation', 
+    #                                                    units='kg/hr')
+    
     separation_sys = create_TAL_separation_solubility_exploit_process(ins=(fermentation_sys-1,),
                                                                   )
     
     # no evaporator before recycle as heating would decarboxylate TAL
     S403 = bst.Splitter('S403', 
-                        ins=separation_sys-2, # recycled supernatant, with or without evaporation
+                        ins=separation_sys-2, 
                         outs=('S403_recycled_supernatant', 'S403_to_WWT'),
                         split=0., # optimal split=0.
                         )
@@ -159,19 +174,23 @@ def create_sugarcane_to_TAL_solubility_based_sys(ins, outs):
         for i in S403.outs: i.phase = 'l'
     S403-0-2-separation_sys
     
-    #%% Upgrading
-    IPA_upgrading_solvent = tmo.Stream('IPA_upgrading_solvent',)
-    H2_hydrogenation = tmo.Stream('H2_hydrogenation',)
-    KOH_hydrolysis = tmo.Stream('KOH_hydrolysis',)
-    IPA_purification = tmo.Stream('IPA_purification',)
+    H420 = bst.HXutility('H420', ins=separation_sys-4, outs='cooled_solid_TAL', 
+                         T=273.15+25.,)
     
-    upgrading_sys = create_TAL_to_sorbic_acid_upgrading_process(ins=(separation_sys-4, # solid TAL
-                                                                      IPA_upgrading_solvent,
-                                                                      H2_hydrogenation,
-                                                                      KOH_hydrolysis,
-                                                                      IPA_purification,
-                                                                      ),
-                                                                )
+    #%% Upgrading
+    # ethanol_minimal = tmo.Stream('ethanol_minimal',)
+    # H2_hydrogenation = tmo.Stream('H2_hydrogenation',)
+    # KOH_hydrolysis = tmo.Stream('KOH_hydrolysis',)
+    # acetone_purification = tmo.Stream('acetone_purification',)
+    
+    # upgrading_sys = create_TAL_to_sorbic_acid_upgrading_process(ins=(separation_sys-3,
+    #                                                                  ethanol_minimal,
+    #                                                                  H2_hydrogenation,
+    #                                                                  KOH_hydrolysis,
+    #                                                                  acetone_purification,
+    #                                                                  ),
+    #                                                             )
+    
     
     
     # %% 
@@ -180,9 +199,7 @@ def create_sugarcane_to_TAL_solubility_based_sys(ins, outs):
     # Facilities streams
     # =============================================================================
     
-    fresh_catalyst_NiSiO2 = Stream('fresh_catalyst_NiSiO2', price=price['Ni-SiO2'])
-    fresh_catalyst_Amberlyst70 = Stream('fresh_catalyst_Amberlyst70', price=price['Amberlyst-70'])
-    
+
     CSL_fresh = Stream('CSL_fresh', price=price['CSL'])
     Acetate_fresh = Stream('Acetate_fresh', price=price['Acetic acid'])
     DAP_fresh = Stream('DAP_fresh', price=price['DAP'])
@@ -190,10 +207,10 @@ def create_sugarcane_to_TAL_solubility_based_sys(ins, outs):
     acetylacetone_fresh = Stream('Acetylacetone_fresh', price=price['PD'])
     base_decarboxylation_fresh = Stream('base_decarboxylation_fresh', price=price['Sodium hydroxide'])
     
-    hydrogen_fresh = Stream('hydrogen_fresh', price=price['Hydrogen'], P=3.5e6)
+    hydrogen_fresh = Stream('hydrogen_fresh', price=price['Hydrogen'], P=101325*300)
     KOH_fresh = Stream('KOH_fresh', price=price['KOH'])
     acetone_fresh = Stream('acetone_fresh', price=price['Acetone'])
-    IPA_fresh = Stream('IPA_fresh', price=price['Isopropanol'])
+    ethanol_fresh = Stream('ethanol_fresh', price=price['Ethanol'])
     
     system_makeup_water = Stream('system_makeup_water', price=price['Makeup water'])
     
@@ -203,7 +220,7 @@ def create_sugarcane_to_TAL_solubility_based_sys(ins, outs):
     dilution_water = Stream('dilution_water', price=price['Makeup water'])
 
     # TAL product
-    KSA_product = Stream('KSA_product', units='kg/hr', price=7.)
+    TAL_product = Stream('TAL_product', units='kg/hr', price=7.)
 
     # =============================================================================
     # Facilities units
@@ -230,42 +247,25 @@ def create_sugarcane_to_TAL_solubility_based_sys(ins, outs):
     T610.line = 'SodiumHydroxide storage tank'
     T610_P = bst.Pump('T610_P', ins=T610-0, outs=3-separation_sys)
     
-    T602 = bst.StorageTank('T602', ins=hydrogen_fresh, outs=2-upgrading_sys)
-    T602.line = 'H2 storage tank'
-    @T602.add_specification(run=True)
-    def H2_P_spec():
-        T602.ins[0].P = R401.P
-        
-    T603 = bst.StorageTank('T603', ins=KOH_fresh,)
-    T603.line = 'KOH storage tank'
-    T603_P = bst.ConveyingBelt('T603_P', ins=T603-0, outs=3-upgrading_sys)
     
+    # T602 = bst.StorageTank('T602', ins=hydrogen_fresh, outs=2-upgrading_sys)
+    # T602.line = 'H2 storage tank'
+    
+    # T603 = bst.StorageTank('T603', ins=KOH_fresh,)
+    # T603.line = 'KOH storage tank'
+    # T603_P = bst.ConveyingBelt('T603_P', ins=T603-0, outs=3-upgrading_sys)
     
     # T604 = bst.StorageTank('T604', ins=acetone_fresh,)
     # T604.line = 'Acetone storage tank'
     # T604_P = bst.Pump('T604_P', ins=T604-0, outs=4-upgrading_sys)
     
-    T605 = bst.StorageTank('T605', ins=IPA_fresh,)
-    T605.line = 'Isopropanol storage tank'
-    T605_P = bst.Pump('T605_P', ins=T605-0, outs='IPA_to_splitter')
+    # T605 = bst.StorageTank('T605', ins=ethanol_fresh,)
+    # T605.line = 'Ethanol storage tank'
+    # T605_P = bst.Pump('T605_P', ins=T605-0, outs=1-upgrading_sys)
     
-    
-    S601 = bst.FakeSplitter('S601', ins=T605_P-0, 
-                            outs=(IPA_upgrading_solvent, IPA_purification))
-    @S601.add_specification(run=False)
-    def S601_IPA_flows_spec():
-        S601.ins[0].mix_from([S601.outs[0], S601.outs[1]])
-        
-    T611 = bst.StorageTank('T611', ins=fresh_catalyst_NiSiO2,)
-    T611.line = 'NiSiO2 storage tank'
-    T611_P = bst.Pump('T611_P', ins=T611-0, outs=5-upgrading_sys)
-    
-    T612 = bst.StorageTank('T612', ins=fresh_catalyst_Amberlyst70,)
-    T612.line = 'NiSiO2 storage tank'
-    T612_P = bst.Pump('T612_P', ins=T612-0, outs=6-upgrading_sys)
     
     # 7-day storage time, similar to ethanol's in Humbird et al.
-    T620 = units.StorageTank('T620', ins=upgrading_sys-0, tau=7*24, V_wf=0.9,
+    T620 = units.StorageTank('T620', ins=H420-0, tau=7*24, V_wf=0.9,
                                           vessel_type='Floating roof',
                                           vessel_material='Stainless steel')
     
@@ -273,7 +273,7 @@ def create_sugarcane_to_TAL_solubility_based_sys(ins, outs):
     
     T620.line = 'TALStorageTank'
     
-    T620_P = bst.Pump('T620_P', ins=T620-0, outs=KSA_product)
+    T620_P = bst.Pump('T620_P', ins=T620-0, outs=TAL_product)
     
     # %% 
     
@@ -300,8 +300,7 @@ def create_sugarcane_to_TAL_solubility_based_sys(ins, outs):
                                         S403-1,
                                         u.F301-1,
                                         u.F401_P1-0,
-                                        separation_sys-3, #  top product of evaporating supernatant. if D401.bypass=False, this is instead the bottom product of distilling the top product of evaporating supernatant.
-                                        separation_sys-5, # at the baseline, reconnect top product of evaporating supernatant here rather than recycling
+                                        u.D401_P1-0,
                                         ))
     M501.citrate_acetate_dissolution_rxns = ParallelRxn([
         Rxn('SodiumAcetate + H2O -> AceticAcid + NaOH', 'SodiumAcetate',   1.-1e-5),
@@ -312,6 +311,7 @@ def create_sugarcane_to_TAL_solubility_based_sys(ins, outs):
     def M501_citrate_acetate_dissolution_spec():
         M501._run()
         M501.citrate_acetate_dissolution_rxns(M501.outs[0].mol[:])
+        
     # wastewater_treatment_sys = bst.create_wastewater_treatment_system(
     #     kind='conventional',
     #     ins=M501-0,
@@ -335,11 +335,10 @@ def create_sugarcane_to_TAL_solubility_based_sys(ins, outs):
         
     # Mix solid wastes to boiler turbogenerator
     M510 = bst.units.Mixer('M510', ins=(
-                                        separation_sys-1, # centrifuged cell mass
+                                        separation_sys-1,
                                         # upgrading_sys-1,
                                         u.U202-0,
                                         u.C202-0,
-                                        u.F405-0,
                                         ),
                             outs='wastes_to_boiler_turbogenerator')
     @M510.add_specification(run=True)
@@ -379,6 +378,7 @@ def create_sugarcane_to_TAL_solubility_based_sys(ins, outs):
         BT_area=700,
         area=900,
     )
+    
     #%%
     CWP803 = bst.ChilledWaterPackage('CWP803', agent=bst.HeatUtility.cooling_agents[-2])
     
@@ -388,15 +388,14 @@ def create_sugarcane_to_TAL_solubility_based_sys(ins, outs):
     
     HXN = bst.HeatExchangerNetwork('HXN1001',
                                                 ignored=[
-                                                        # u.H401, 
-                                                        # u.C401, 
-                                                        # u.F402,
-                                                        # u.F406,
+                                                        u.H401, 
+                                                        u.C401, 
+                                                        u.F402,
+                                                        u.H420,
                                                         # u.H402, 
-                                                        u.R401,
-                                                        u.R402,
-                                                        u.R403,
-                                                        # u.F407,
+                                                        # u.R401,
+                                                        # u.R402,
+                                                        # u.R403,
                                                         # u.M304_H,
                                                         ],
                                               cache_network=False,
@@ -421,14 +420,12 @@ TAL_sys = create_sugarcane_to_TAL_solubility_based_sys()
 
 TAL_sys.set_tolerance(mol=1e-3, rmol=1e-3, subsystems=True)
 
-# TAL_sys.simulate()
-
 f = bst.main_flowsheet
 u = f.unit
 s = f.stream
 
 feedstock = s.sugarcane
-KSA_product = s.KSA_product
+TAL_product = s.TAL_product
 get_flow_tpd = lambda: (feedstock.F_mass-feedstock.imass['H2O'])*24/907.185
 
 for ui in u:
@@ -451,7 +448,7 @@ globals().update(flowsheet.to_dict())
 # =============================================================================
 
 get_flow_dry_tpd = lambda: (feedstock.F_mass-feedstock.imass['H2O'])*24/907.185
-TAL_sys._TEA = TAL_tea = TALTEA(system=TAL_sys, IRR=0.10, duration=(2019, 2049),
+TAL_tea = TALTEA(system=TAL_sys, IRR=0.125, duration=(2019, 2049),
         depreciation='MACRS7', income_tax=0.21, 
         operating_days = 180,
         lang_factor=None, construction_schedule=(0.08, 0.60, 0.32),
@@ -476,18 +473,6 @@ TAL_sys._TEA = TAL_tea = TALTEA(system=TAL_sys, IRR=0.10, duration=(2019, 2049),
 TAL_no_BT_tea = TAL_tea
 
 #%%
-
-R401 = u.R401
-@R401.add_specification(run=True)
-def R401_spec():
-    R401.TEA_operating_hours = TAL_tea.operating_hours
-    
-R402 = u.R402
-@R402.add_specification(run=True)
-def R402_spec():
-    R402.TEA_operating_hours = TAL_tea.operating_hours
-    
-#%%
 # =============================================================================
 # LCA
 # =============================================================================
@@ -495,8 +480,8 @@ def R402_spec():
 TAL_lca = TALLCA(system=TAL_sys, 
                  CFs=CFs, 
                  feedstock=feedstock, 
-                 main_product=KSA_product, 
-                 main_product_chemical_IDs=['KSA',], 
+                 main_product=TAL_product, 
+                 main_product_chemical_IDs=['TAL',], 
                  by_products=['PD'], 
                  cooling_tower=u.CT801, 
                  chilled_water_processing_units=[u.CWP802, u.CWP803], 
@@ -508,11 +493,13 @@ TAL_lca = TALLCA(system=TAL_sys,
 
 #%% Define unit groups and their metrics
 
+
 feedstock_acquisition_group = bst.UnitGroup('feedstock acquisition', units=[u.U101])
 feedstock_juicing_group = f.juicing_sys.to_unit_group('feedstock juicing')
 fermentation_group = f.TAL_fermentation_process.to_unit_group('fermentation')
 separation_group = f.TAL_separation_solubility_exploit_process.to_unit_group('separation')
-upgrading_group = f.TAL_to_sorbic_acid_upgrading_process.to_unit_group('upgrading')
+separation_group.units.extend([u.S403, u.H420])
+# upgrading_group = bst.UnitGroup('upgrading')
 
 
 unit_groups = [
@@ -520,7 +507,7 @@ unit_groups = [
     feedstock_juicing_group,
     fermentation_group,
     separation_group,
-    upgrading_group,
+    # upgrading_group,
     ]
 
 unit_groups += get_more_unit_groups(system=TAL_sys,
@@ -540,6 +527,7 @@ unit_groups += get_more_unit_groups(system=TAL_sys,
                                         ]
                          )
 
+
 add_metrics_to_unit_groups(unit_groups=unit_groups, system=TAL_sys, TEA=TAL_tea, LCA=TAL_lca)
 
 unit_groups_dict = {}
@@ -557,12 +545,15 @@ for i in cooling_facilities_unit_group.metrics:
 # Simulate system and get results
 # =============================================================================
 
-def get_KSA_MPSP():
+try: TAL_sys.simulate()
+except: pass
+
+def get_TAL_MPSP():
     for i in range(3):
         TAL_sys.simulate()
     for i in range(3):
-        KSA_product.price = TAL_tea.solve_price(KSA_product)
-    return KSA_product.price*KSA_product.F_mass/KSA_product.imass['KSA']
+        TAL_product.price = TAL_tea.solve_price(TAL_product)
+    return TAL_product.price*TAL_product.F_mass/TAL_product.imass['TAL']
 
 theoretical_max_g_TAL_per_g_SA = TAL_chemicals.TAL.MW/TAL_chemicals.SorbicAcid.MW
 
@@ -572,18 +563,13 @@ theoretical_max_g_TAL_per_g_acetic_acid = 0.22218*TAL_chemicals.TAL.MW/(TAL_chem
 
 g_sodium_acetate_to_g_acetic_acid = TAL_chemicals.AceticAcid.MW/TAL_chemicals.SodiumAcetate.MW
 
-per_kg_KSA_to_per_kg_SA = TAL_chemicals.PotassiumSorbate.MW/TAL_chemicals.SorbicAcid.MW
-kg_SA_to_kg_KSA = per_kg_KSA_to_per_kg_SA
-
 # fermentation_yield_lower_limit = 0.163/theoretical_max_g_TAL_per_g_glucose # lowest yield with acetate spike reported in Markham et al. 2018
 fermentation_yield_baseline = 35.9/(180.*theoretical_max_g_TAL_per_g_glucose+13.7*g_sodium_acetate_to_g_acetic_acid*theoretical_max_g_TAL_per_g_acetic_acid) # from Markham et al. 2018; 35.9 g-TAL/L from 180 g-glucose/L and 13.7 g-sodium_acetate/L
 # fermentation_yield_upper_limit = 0.203/theoretical_max_g_TAL_per_g_glucose
 
+desired_annual_production = (23_802/2) * theoretical_max_g_TAL_per_g_SA # pure metric ton / y # satisfy 50% of 2019 US demand for sobic acid with 100% TAL->sorbic acid conversion
 
-desired_annual_production = (23_802/2) * kg_SA_to_kg_KSA # pure metric ton / y # satisfy 50% of 2019 US demand for sorbic acid
-
-# desired_annual_production = (23_802) * kg_SA_to_kg_KSA # pure metric ton / y # satisfy 50% of 2019 US demand for sorbic acid
-
+# desired_annual_production = (23_802) * theoretical_max_g_TAL_per_g_SA # pure metric ton / y # satisfy 100% of 2019 US demand for sobic acid with 100% TAL->sorbic acid conversion
 
 spec = ProcessSpecification(
     evaporator = u.F301,
@@ -690,40 +676,41 @@ def load_titer_with_glucose(titer_to_load):
 spec.load_spec_2 = load_titer_with_glucose
 
 # %% Full analysis
+per_kg_KSA_to_per_kg_SA = TAL_chemicals.PotassiumSorbate.MW/TAL_chemicals.SorbicAcid.MW
 
 production_capacity_is_fixed = True
 def simulate_and_print():
     if production_capacity_is_fixed: spec_set_production_capacity(spec.desired_annual_production, method='analytical')
     # set_production_capacity(25000, 'analytical')
     print('\n---------- Simulation Results ----------')
-    MPSP_KSA = get_KSA_MPSP()
-    print(f'MPSP is ${MPSP_KSA:.3f}/kg KSA')
-    print(f'.... or ${MPSP_KSA*per_kg_KSA_to_per_kg_SA:.3f}/kg SorbicAcid')
+    MPSP_KSA = get_TAL_MPSP()
+    print(f'MPSP is ${MPSP_KSA:.3f}/kg TAL')
+    # print(f'.... or ${MPSP_KSA*per_kg_KSA_to_per_kg_SA:.3f}/kg SorbicAcid')
     GWP_KSA, FEC_KSA = TAL_lca.GWP, TAL_lca.FEC
-    print(f'GWP-100a is {GWP_KSA:.3f} kg CO2-eq/kg KSA')
-    print(f'........ or {GWP_KSA*per_kg_KSA_to_per_kg_SA:.3f} kg CO2-eq/kg SorbicAcid')
-    print(f'FEC is {FEC_KSA:.3f} MJ/kg KSA')
-    print(f'... or {FEC_KSA*per_kg_KSA_to_per_kg_SA:.3f} MJ/kg SorbicAcid')
+    print(f'GWP-100a is {GWP_KSA:.3f} kg CO2-eq/kg TAL')
+    # print(f'........ or {GWP_KSA*per_kg_KSA_to_per_kg_SA:.3f} kg CO2-eq/kg SorbicAcid')
+    print(f'FEC is {FEC_KSA:.3f} MJ/kg TAL')
+    # print(f'... or {FEC_KSA*per_kg_KSA_to_per_kg_SA:.3f} MJ/kg SorbicAcid')
     GWP_KSA_without_electricity_credit, FEC_KSA_without_electricity_credit =\
         GWP_KSA - TAL_lca.net_electricity_GWP, FEC_KSA - TAL_lca.net_electricity_FEC
-    print(f'GWP-100a without electricity credit is {GWP_KSA_without_electricity_credit:.3f} kg CO2-eq/kg KSA')
-    print(f'................................... or {GWP_KSA_without_electricity_credit*per_kg_KSA_to_per_kg_SA:.3f} kg CO2-eq/kg SorbicAcid')
-    print(f'FEC without electricity credit is {FEC_KSA_without_electricity_credit:.3f} MJ/kg KSA')
-    print(f'.............................. or {FEC_KSA_without_electricity_credit*per_kg_KSA_to_per_kg_SA:.3f} MJ/kg SorbicAcid')
-    # print(f'FEC is {get_FEC():.2f} MJ/kg KSA or {get_FEC()/TAL_LHV:.2f} MJ/MJ TAL')
-    # print(f'SPED is {get_SPED():.2f} MJ/kg KSA or {get_SPED()/TAL_LHV:.2f} MJ/MJ TAL')
+    print(f'GWP-100a without electricity credit is {GWP_KSA_without_electricity_credit:.3f} kg CO2-eq/kg TAL')
+    # print(f'................................... or {GWP_KSA_without_electricity_credit*per_kg_KSA_to_per_kg_SA:.3f} kg CO2-eq/kg SorbicAcid')
+    print(f'FEC without electricity credit is {FEC_KSA_without_electricity_credit:.3f} MJ/kg TAL')
+    # print(f'.............................. or {FEC_KSA_without_electricity_credit*per_kg_KSA_to_per_kg_SA:.3f} MJ/kg SorbicAcid')
+    # print(f'FEC is {get_FEC():.2f} MJ/kg TAL or {get_FEC()/TAL_LHV:.2f} MJ/MJ TAL')
+    # print(f'SPED is {get_SPED():.2f} MJ/kg TAL or {get_SPED()/TAL_LHV:.2f} MJ/MJ TAL')
     # print('--------------------\n')
 
 # simulate_and_print()
 # TAL_sys.simulate()
-get_KSA_MPSP()
+get_TAL_MPSP()
 
 #%% Misc.
 
 def get_non_gaseous_waste_carbon_as_fraction_of_TAL_GWP100():
     return sum([i.get_atomic_flow('C') for i in TAL_sys.products if i.F_mol 
                 and ('l' in i.phases or 's' in i.phases or i.phase=='l') 
-                and (not i==KSA_product)])/KSA_product.imass['KSA']/TAL_lca.GWP
+                and (not i==TAL_product)])/TAL_product.imass['TAL']/TAL_lca.GWP
 
 #%% Load specifications
 spec.load_specifications(spec.baseline_yield, spec.baseline_titer, spec.baseline_productivity)
@@ -737,8 +724,8 @@ def spec_set_production_capacity(
                         system=TAL_sys,
                         TEA=None,
                         spec=spec,
-                        product_stream=KSA_product, 
-                        product_chemical_IDs=['KSA',],
+                        product_stream=TAL_product, 
+                        product_chemical_IDs=['TAL',],
                         feedstock_stream=feedstock,
                         feedstock_F_mass_range=[5000, 2000_000], # wet-kg/h)
                         ):
@@ -812,7 +799,7 @@ contourplots.stacked_bar_plot(dataframe=df_TEA_breakdown,
                          '#E58835', 
                          '#F7C652', 
                          '#63C6CE', 
-                         '#F8858A', 
+                         # '#b00000', 
                          '#94948C', 
                          '#734A8C', 
                          '#D1C0E1', 
@@ -820,7 +807,7 @@ contourplots.stacked_bar_plot(dataframe=df_TEA_breakdown,
                          # '#B97A57', 
                          '#D1C0E1', 
                          # '#F8858A', 
-                          '#b00000', 
+                         '#F8858A', 
                          # '#63C6CE', 
                          '#94948C', 
                          # '#7BBD84', 

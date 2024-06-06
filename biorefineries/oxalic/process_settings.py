@@ -66,11 +66,9 @@ corn_stover_price = 71.26 / _kg_per_ton * 0.8
 
 # 2.2 is the average whole-sale ethanol price between 2010-2019 in 2016 $/gal
 # based on Annual Energy Outlook (AEO) from Energy Information Adiministration (EIA)
-# (https://www.eia.gov/outlooks/aeo/), which is $0.7402/kg and similar to the
-# 2.2/(2988/1e3) = $0.736/kg based on a density of 2988 g/gal from H2 Tools
-# Lower and upper bounds are $1.37/gal and $2.79/gal, or $0.460/kg and $0.939/kg
-# _ethanol_kg_2_gal =  2.9721617599077566
-# price range in 2016$/kg: 
+# (https://www.eia.gov/outlooks/aeo/), which is $0.7328/gal and similar to the
+# 2.2/(2988/1e3) = $0.736/gal based on a density of 2988 g/gal from H2 Tools
+# Lower and upper bounds are $1.37/gal and $2.79/gal, or $0.460/kg and $0.978/kg
 _ethanol_V = chems.Ethanol.V('l', 298.15, 101325) # molar volume in m3/mol
 _ethanol_MW = chems.Ethanol.MW
 _ethanol_kg_2_gal = _liter_per_gallon/_ethanol_V*_ethanol_MW/1e6
@@ -174,42 +172,18 @@ heptane_price = 1900./_kg_per_ton
 # Viswanathan et al. 2020
 toluene_price = 1.1
 
-# search pages (all with 'trade assurance' and 'verified supplier' filters):
-    # https://www.alibaba.com/trade/search?spm=a2700.galleryofferlist.leftFilter.d_filter.6fbb7c9clLc8dv&fsb=y&IndexArea=product_en&assessmentCompany=true&keywords=hydrogen+gas&ta=y&tab=all&
-    # https://www.alibaba.com/trade/search?spm=a2700.galleryofferlist.leftFilter.d_filter.76512d31TN44FR&fsb=y&IndexArea=product_en&assessmentCompany=true&keywords=cas+1333-74-0&ta=y&tab=all&
-    # https://www.alibaba.com/trade/search?spm=a2700.galleryofferlist.leftFilter.d_filter.542c64bepOk1ZA&fsb=y&IndexArea=product_en&assessmentCompany=true&keywords=1333-74-0&ta=y&tab=all&
+# assumed
+AuPd_price = 60000.
 
-# vendor listing 1: https://www.alibaba.com/product-detail/Industrial-Grade-H2-Hydrogen-Gas-Cylinder_1600624231996.html?spm=a2700.galleryofferlist.normal_offer.d_title.577364beUs9l40
-# vendor listing 2 (same vendor): https://www.alibaba.com/product-detail/Promotion-Compressed-Hydrogen-Gas-With-Cylinder_1600948500210.html?spm=a2700.galleryofferlist.p_offer.d_title.253d7c9c5yZj8z&s=p
-    
+# https://www.alibaba.com/product-detail/Gas-Hydrogen-45kg-Lpg-Gas-Cylinder_62018626105.html?spm=a2700.galleryofferlist.0.0.e9ba7ce2O0TyvK
 hydrogen_price = 1.
 
 # https://www.energy.gov/eere/fuelcells/hydrogen-shot
 hydrogen_renewable_price = 5.
+# https://www.alibaba.com/product-detail/catalyst-raney-nickel-stainless-steel-square_60731133248.html?spm=a2700.galleryofferlist.0.0.2a583524IfakZZ
+RaneyNi_price = 30.
 
-# Ni-Al2O3-SiO2 catalyst
-### --- 2024.06.03 search
-    ## Alibaba listings
-        # search pages: 
-            # Raney Nickel (Nickel-Alumina alloy): https://www.alibaba.com/trade/search?spm=a2700.galleryofferlist.leftFilter.d_filter.33fa26503Y6HGm&fsb=y&IndexArea=product_en&assessmentCompany=true&keywords=raney+nickel&ta=y&tab=all&
-            # Nickel: https://www.alibaba.com/trade/search?spm=a2700.galleryofferlist.leftFilter.d_filter.37af154aqb1xS5&fsb=y&IndexArea=product_en&assessmentCompany=true&keywords=7440-02-0&ta=y&tab=all&
-        # vendor listings:
-            # 1. https://www.alibaba.com/product-detail/Pure-99-99-99-Ni-Powdery_1600796014023.html?spm=a2700.galleryofferlist.normal_offer.d_title.b7d0154ab6qIRO
-                # Nickel: $35/kg
-            # 2. https://www.alibaba.com/product-detail/High-purity-nickel-powder-CAS-7440_1601043582452.html?spm=a2700.galleryofferlist.normal_offer.d_title.b7d0154ab6qIRO
-                # Nickel: $40/kg
-            # 3. https://www.alibaba.com/product-detail/Nickel-Alumina-modium-catalyst-cost-Price_62039092901.html?spm=a2700.galleryofferlist.normal_offer.d_title.31592650y6YlHm
-                # Raney Nickel: $5/kg
-            # 4. https://www.alibaba.com/product-detail/High-quality-customized-NiAl20-Raney-nickel_1601019811920.html?spm=a2700.galleryofferlist.normal_offer.d_title.31592650ztR5t4
-                # $50/kg
-            # 5. https://www.alibaba.com/product-detail/Customized-design-increase-specific-surface-area_1601019920484.html?spm=a2700.galleryofferlist.normal_offer.d_title.31592650ztR5t4
-                # $35/kg
-    ##
-### ---
-# Lowest = $5/kg
-# Highest = $50/kg
-# Mean = $33/kg
-NiSiO2_price = RaneyNi_price = 33.
+NiSiO2_price = RaneyNi_price
 
 # https://www.alibaba.com/product-detail/Reagent-Grade-90-caustic-potash-potassium_62118969650.html?spm=a2700.galleryofferlist.0.0.28555ed4pKlEVC&s=p
 KOH_price = 1.6
@@ -239,37 +213,10 @@ sodium_acetate_price = acetic_acid_price # unused
 
 CSL_price = 0.0339 * _lb_per_kg * chem_index[2019]/chem_index[2016] # from lactic acid paper
 
-# Amberlyst 70 catalyst
-### --- 2024.06.03 search
-    ## Chemicalbook listings
-        # 1. $100/100kg Amberlyst 15 from bulk vendor ("VIP, 6-year, Enterprise Certified") listing https://www.chemicalbook.com/ProductDetail_EN_451808.htm
-        # 2. $1/kg Amberlyst 15 from bulk vendor ("VIP, 5-year, Enterprise Certified") listing https://www.chemicalbook.com/ProductDetail_EN_916657.htm
-    ##
-    ## Alibaba listings # search page: https://www.alibaba.com/trade/search?spm=a2700.galleryofferlist.leftFilter.d_filter.1b624164QCx1xc&fsb=y&IndexArea=product_en&assessmentCompany=true&keywords=amberlyst&ta=y&tab=all&
-        # 3. Amberlyst-15 https://www.alibaba.com/product-detail/Ion-exchange-resin-for-MTBE-equal_62529933735.html?spm=a2700.galleryofferlist.normal_offer.d_title.22a24164j8EA7y
-            # $1.5 /L
-            # 20 kg / 25 L
-            # => $1.875 / kg
-        # 4. Amberlyst DT https://www.alibaba.com/product-detail/High-Temperature-Resistance-Catalyst-Resin-equal_62530999330.html?spm=a2700.galleryofferlist.normal_offer.d_title.22a24164j8EA7y
-            # $2000/metric ton        
-            # => $2/kg
-        # 5. Amberlyst-15: https://www.alibaba.com/product-detail/Chinese-manufacturers-Ion-exchange-resin-for_1600848354148.html?spm=a2700.galleryofferlist.normal_offer.d_title.22a24164j8EA7y
-            # $1/kg
-        # 6. Amberlyst(R) 15: https://www.alibaba.com/product-detail/purity-99-AMBERLYST-R-15-with_1600342344644.html?spm=a2700.galleryofferlist.normal_offer.d_title.22a24164j8EA7y
-            # $1/kg
-        # 7. Amberlyst(R) 15: https://www.alibaba.com/product-detail/AMBERLYST-R-15-cas-9037-24_1600993084228.html?spm=a2700.galleryofferlist.normal_offer.d_title.22a24164j8EA7y
-            # $2100/metric ton
-            # => $2.1/kg
-        # 8. Amberlyst A45: https://www.alibaba.com/product-detail/High-Temperature-Resistance-Catalyst-Resin-equal_62530910597.html?spm=a2700.galleryofferlist.normal_offer.d_title.22a24164j8EA7y
-            # $1/kg
-        # 9. Amberlyst(R) 15: https://www.alibaba.com/product-detail/99-AMBERLYST-R-15-wet-type_1600267306406.html?spm=a2700.galleryofferlist.normal_offer.d_title.22a24164j8EA7y
-            # $2/kg
-    ##
-### ---
-# Lowest = $1/kg
-# Highest = $2.1/kg
-# Mean = $1.442/kg
-amberlyst70_price = 1.442
+
+# $100/100kg Amberlyst 15 from bulk vendor ("VIP, 6-year, Enterprise Certified") listing https://www.chemicalbook.com/ProductDetail_EN_451808.htm
+# $1/kg Amberlyst 15 from bulk vendor ("VIP, 5-year, Enterprise Certified") listing https://www.chemicalbook.com/ProductDetail_EN_916657.htm
+amberlyst70_price = 30.
 
 # 2.0/kg from https://www.alibaba.com/product-detail/Desiccant-for-paints-and-varnishes-Acetylacetone_10000004008185.html?spm=a2700.galleryofferlist.normal_offer.d_price.e82458eazJeqeC
 acetylacetone_price = 2.0 # 2,4-pentanedione or acetylacetone
@@ -285,14 +232,11 @@ DAP_price = 0.5*\
 # 390.09-789.25 USD / short ton in 2008; https://web.archive.org/web/20161125084558/http://www.icis.com:80/chemicals/channel-info-chemicals-a-z/            
 NaOH_price = ((390.09+789.25)/2.)/_kg_per_ton * _GDP_2008_to_2010 * chem_index[2019]/chem_index[2010]
 
-# 1.55 - 1.7/lb # https://web.archive.org/web/20161125084558/http://www.icis.com:80/chemicals/channel-info-chemicals-a-z/
-# => $3.42 - 3.75 /kg in 2007$, mean of $3.58/kg in 2007$
-# => $4.25 - 4.66 /kg in 2019$, mean of $4.45/kg in 2019$
-THF_price = 3.58 * _GDP_2007_to_2010 * chem_index[2019]/chem_index[2010]
 
 price = {'SA': SA_price,
          'PD': acetylacetone_price, # 2,4-pentanedione or acetylacetone
          'TCP': TCP_price,
+         'AuPd': AuPd_price,
          'IBA': IBA_price,
          'TAL': TAL_price,
          'KOH': KOH_price,
@@ -339,7 +283,6 @@ price = {'SA': SA_price,
          'Activated carbon': activated_carbon_price,
          'Sodium acetate': sodium_acetate_price,
          'Acetic acid': acetic_acid_price,
-         'Tetrahydrofuran': THF_price,
          }
     
 #!!! Round all prices to 4 *decimal places*
@@ -399,17 +342,18 @@ GWP_CFs = {
     'CO2': 0.87104, # ecoinvent 3.8 carbon dioxide production, liquid, RoW
     'H2': 2.3716, # ecoinvent 3.8 market for hydrogen, liquid, RoW
     
+    'SodiumAcetate': 1., # !!! update
     'AceticAcid': 1.6198, # market for acetic acid, without water, in 98% solution state, GLO
-    'SodiumAcetate': 1.6198*60.05196/82.033789, # adjusted acetic acid CF 
     
     'PD': (2*(58.080)*3.5917 + 102.089*2.5435)/(2*100.117), # Acetylacetone; based on GLO/RoW IPCC 2013 CFs of markets for precursors acetone and acetyl anhydride
     # 'DiammoniumSulfate': 1.2901, # ecoinvent 3.8 market for ammonium sulfate, RoW
     # 'MagnesiumSulfate': 1.0411, # ecoinvent 3.8 market for magnesium sulfate, GLO
     
-    'NiSiO2':18.711, # ecoinvent 3.8 market for nickel, class 1
-    'Amberlyst70_':1.3803, # ecoinvent 3.8 market for naphthalene sulfonic acid, GLO # Amberlyst-15 is 1,2-diethenylbenzene; 2-ethenylbenzene-1-sulfonic acid
-    'Isopropanol':2.3219, # ecoinvent 3.8 market for isopropanol, RoW
-    'THF': 6.0475, # ecoinvent 3.8 market for tetrahydrofuran, GLO
+    'NiSiO2':10., # !!! update
+    'Amberlyst70_':10., # !!! update
+    'H2':10., # !!! update
+    'Isopropanol':10., # !!! update
+    
     }
 
 
@@ -455,18 +399,19 @@ FEC_CFs = {
     'CO2': 7.4243, # ecoinvent 3.8 carbon dioxide production, liquid, RoW
     'H2': 75.747, # ecoinvent 3.8 market for hydrogen, liquid, RoW
 
+    'SodiumAcetate': 1., # !!! update
     'AceticAcid': 45.611, # market for acetic acid, without water, in 98% solution state, GLO
-    'SodiumAcetate': 45.611*60.05196/82.033789, # adjusted acetic acid CF 
     
     'PD': (2*(58.080)*66.852 + 102.089*70.817)/(2*100.117), # Acetylacetone; based on GLO/RoW cumulative energy demand CFs of markets for precursors acetone and acetyl anhydride
     
     # 'DiammoniumSulfate': 15.166, # ecoinvent 3.8 market for ammonium sulfate, RoW
     # 'MagnesiumSulfate': 13.805, # ecoinvent 3.8 market for magnesium sulfate, GLO
     
-    'NiSiO2':229.44	, # ecoinvent 3.8 market for nickel, class 1
-    'Amberlyst70_':31.273, # ecoinvent 3.8 market for naphthalene sulfonic acid, GLO # Amberlyst-15 is 1,2-diethenylbenzene; 2-ethenylbenzene-1-sulfonic acid
-    'Isopropanol':63.878, # ecoinvent 3.8 market for isopropanol, RoW
-    'THF': 101.77, # ecoinvent 3.8 market for tetrahydrofuran, GLO
+    'NiSiO2':10., # !!! update
+    'Amberlyst70_':10., # !!! update
+    'H2':10., # !!! update
+    'Isopropanol':10., # !!! update
+    
     }
 
 FEC_CF_array = chems.kwarray(FEC_CFs)

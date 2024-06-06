@@ -68,13 +68,13 @@ model = models.TAL_model
 system = TAL_sys = models.TAL_sys
 
 modes = [
-            # 'A',
-            'B',
+            'A',
          ]
 
+
 parameter_distributions_filenames = [
-                                    # 'parameter-distributions_A.xlsx',
-                                    'parameter-distributions_B.xlsx',
+                                    'parameter-distributions_TAL_' + mode +'.xlsx' 
+                                    for mode in modes
                                     ]
 mode = modes[0]
 
@@ -103,26 +103,6 @@ model.exception_hook = 'warn'
 print('\n\nSimulating baseline ...')
 baseline_initial = model.metrics_at_baseline()
 
-#%% Utility functions
-H401, U402, M401 = u.H401, u.U402, u.M401
-
-def get_pH_M401_outs_0():
-    M401_outs_0 = M401.outs[0]
-    if M401_outs_0.imol['CitricAcid', 'H3PO4', 'AceticAcid'].sum() > 0.:
-        return get_pH_polyprotic_acid_mixture(M401_outs_0,
-                                ['CitricAcid', 'H3PO4', 'AceticAcid'], 
-                                [[10**-3.128, 10**-4.75, 10**-6.04], 
-                                 [10**-2.15, 10**-7.2, 10**-12.35],
-                                 [10**-4.76]],
-                                'ideal')
-    else:
-        return 14. + log(get_molarity('NaOH', M401_outs_0), 10.) # assume strong base completely dissociates in aqueous solution
-
-def get_pH_given_base_addition(mol_base_per_m3_broth):
-    M401.mol_base_per_m3_broth = mol_base_per_m3_broth
-    M401.simulate()
-    return get_pH_M401_outs_0()
-
 #%% Parameter loading functions
 U402, M401 = u.U402, u.M401
 base_decarboxylation_fresh = s.base_decarboxylation_fresh
@@ -132,9 +112,7 @@ def load_decarboxylation_conversion(decarboxylation_conversion):
     U402.decarboxylation_conversion = decarboxylation_conversion
 
 def load_pH(pH):
-    obj_f_pH = lambda mol_base_per_m3_broth: get_pH_given_base_addition(mol_base_per_m3_broth)\
-                                        - pH
-    IQ_interpolation(obj_f_pH, 0., 0.4, ytol=0.001)
+    M401.pH_to_load = pH
     
 def load_base_price(base_price):
     base_decarboxylation_fresh.price = base_price
@@ -161,7 +139,7 @@ get_TAL_inhibitors_conc = lambda: 1000*sum(R302.outs[0].imass['AceticAcid', 'Fur
 TAL_metrics = [get_product_MPSP, 
                lambda: TAL_lca.GWP - TAL_lca.net_electricity_GWP, 
                lambda: TAL_lca.FEC - TAL_lca.net_electricity_FEC, 
-               get_TAL_AOC, get_TAL_FCI, get_product_purity, get_pH_M401_outs_0]
+               get_TAL_AOC, get_TAL_FCI, get_product_purity, M401.get_pH_maintained]
 
 
 
@@ -186,7 +164,8 @@ z_ticks = [0, 2, 4, 6, 8, 10]
 MPSP_w_label = r"$\bfMPSP$" # title of the color axis
 MPSP_units = r"$\mathrm{\$}\cdot\mathrm{kg}^{-1}$"
 
-GWP_w_label = r"$\mathrm{\bfGWP}_{\bf100}$"
+# GWP_w_label = r"$\mathrm{\bfGWP}_{\bf100}$"
+GWP_w_label = r"$\mathrm{\bfCarbon}$" + " " + r"$\mathrm{\bfIntensity}$"
 GWP_units = r"$\mathrm{kg}$"+" "+ r"$\mathrm{CO}_{2}\mathrm{-eq.}\cdot\mathrm{kg}^{-1}$"
 
 FEC_w_label = r"$\bfFEC$" # title of the color axis
@@ -281,7 +260,7 @@ R303.regular_citric_acid_conversion = 0.
 
 #%% Initial simulation
 simulate_and_print()
-baseline_Base_presence = get_pH_M401_outs_0()
+baseline_Base_presence = M401.get_pH_maintained()
 
 
 
@@ -291,7 +270,7 @@ steps = (60, 60, 1)
 
 # Yield, titer, productivity (rate)
 spec_1 = TAL_decarb_convs = np.linspace(0., 0.5, steps[0]) # yield
-spec_2 = pHs = np.linspace(get_pH_M401_outs_0(), 12., steps[1]) # titer
+spec_2 = pHs = np.linspace(M401.get_pH_maintained(), 12., steps[1]) # titer
 
 
 # spec_3 = base_prices =\
@@ -428,7 +407,7 @@ for p in base_prices:
     # %% Save generated data
     
     minute = '0' + str(dateTimeObj.minute) if len(str(dateTimeObj.minute))==1 else str(dateTimeObj.minute)
-    file_to_save = f'_{steps}_steps_'+'TAL_decarboxylation_purchasing_base_withoutcitrate%s.%s.%s-%s.%s'%(dateTimeObj.year, dateTimeObj.month, dateTimeObj.day, dateTimeObj.hour, minute)
+    file_to_save = f'_{steps}_steps_'+'TAL_decarboxylation_pH_without_citrate_%s.%s.%s-%s.%s'%(dateTimeObj.year, dateTimeObj.month, dateTimeObj.day, dateTimeObj.hour, minute)
     np.save(TAL_results_filepath+file_to_save, np.array([d1_Metric1, d1_Metric2, d1_Metric3]))
     
     pd.DataFrame(d1_Metric1).to_csv(TAL_results_filepath+'MPSP-'+file_to_save+'.csv')
@@ -547,9 +526,9 @@ print('\nCreating and saving contour plots ...\n')
 #%% MPSP
 
 # MPSP_w_levels, MPSP_w_ticks, MPSP_cbar_ticks = get_contour_info_from_metric_data(results_metric_1, lb=3)
-MPSP_w_levels = np.arange(2, 10.25, 0.25)
-MPSP_cbar_ticks = np.arange(2, 10.1, 1.)
-MPSP_w_ticks = [3.25, 3.5, 3.75, 4, 4.5, 4.75, 5, 5.5, 8.5, 10]
+MPSP_w_levels = np.arange(0, 12.25, 0.25)
+MPSP_cbar_ticks = np.arange(0, 12.1, 1.)
+MPSP_w_ticks = [3.25, 3.5, 3.75, 4, 4.25, 4.5, 4.75, 5, 5.5, 8.5, 10, 12]
 # MPSP_w_levels = np.arange(0., 15.5, 0.5)
 
 contourplots.animated_contourplot(w_data_vs_x_y_at_multiple_z=results_metric_1, # shape = z * x * y # values of the metric you want to plot on the color axis; e.g., MPSP

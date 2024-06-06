@@ -64,13 +64,13 @@ model = models.TAL_model
 system = TAL_sys = models.TAL_sys
 
 modes = [
-            # 'A',
-            'B',
+            'A',
          ]
 
+
 parameter_distributions_filenames = [
-                                    # 'parameter-distributions_A.xlsx',
-                                    'parameter-distributions_B.xlsx',
+                                    'parameter-distributions_TAL_' + mode +'.xlsx' 
+                                    for mode in modes
                                     ]
 mode = modes[0]
 
@@ -129,7 +129,7 @@ TAL_metrics = [get_product_MPSP,
 
 # %% Generate 3-specification meshgrid and set specification loading functions
 
-steps = (60, 60, 1)
+steps = (60, 60, 3)
 
 # Yield, titer, productivity (rate)
 spec_1 = yields = np.linspace(0.01, 0.99, steps[0]) # yield
@@ -143,7 +143,11 @@ spec_2 = titers = np.linspace(2.,
 #     np.linspace(0.05, 1.5, steps[2])
     
 spec_3 = productivities =\
-    np.array([5.**spec.baseline_productivity,])
+    np.array([
+              0.2*spec.baseline_productivity,
+              1.*spec.baseline_productivity,
+              5.*spec.baseline_productivity,
+              ])
 
 # spec_3 = productivities =\
 #     np.array([0.25*spec.baseline_productivity, 0.5*spec.baseline_productivity, 
@@ -174,7 +178,8 @@ z_ticks = [0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6]
 MPSP_w_label = r"$\bfMPSP$" # title of the color axis
 MPSP_units = r"$\mathrm{\$}\cdot\mathrm{kg}^{-1}$"
 
-GWP_w_label = r"$\mathrm{\bfGWP}_{\bf100}$"
+# GWP_w_label = r"$\mathrm{\bfGWP}_{\bf100}$"
+GWP_w_label = r"$\mathrm{\bfCarbon}$" + " " + r"$\mathrm{\bfIntensity}$"
 GWP_units = r"$\mathrm{kg}$"+" "+ r"$\mathrm{CO}_{2}\mathrm{-eq.}\cdot\mathrm{kg}^{-1}$"
 
 FEC_w_label = r"$\bfFEC$" # title of the color axis
@@ -492,9 +497,9 @@ print('\nCreating and saving contour plots ...\n')
 #%% MPSP
 
 # MPSP_w_levels, MPSP_w_ticks, MPSP_cbar_ticks = get_contour_info_from_metric_data(results_metric_1, lb=3)
-MPSP_w_levels = np.arange(0., 10.25, 0.25)
-MPSP_cbar_ticks = np.arange(0., 10.1, 1.)
-MPSP_w_ticks = [1., 1.5, 2., 2.75, 3., 3.5, 4, 5, 10]
+MPSP_w_levels = np.arange(0., 12.25, 0.25)
+MPSP_cbar_ticks = np.arange(0., 12.1, 1.)
+MPSP_w_ticks = [1., 1.5, 2., 2.5, 2.75, 3., 3.5, 4, 5, 10, 12]
 # MPSP_w_levels = np.arange(0., 15.5, 0.5)
 
 contourplots.animated_contourplot(w_data_vs_x_y_at_multiple_z=results_metric_1, # shape = z * x * y # values of the metric you want to plot on the color axis; e.g., MPSP
@@ -565,7 +570,12 @@ contourplots.animated_contourplot(w_data_vs_x_y_at_multiple_z=results_metric_1, 
                                                       (1,11.),
                                                       (99,11.)),
                                 # zoom_data_scale=5,
-                                text_boxes = {'>10.0': [(5,5), 'white']},
+                                text_boxes = {'>12.0': [(5,5), 'white']},
+                                
+                                add_shapes = {
+                                    # coords as tuple of tuples: (color, zorder),
+                                    ((1,0), (47,100), (1,100)): ('white', 2), # infeasible region smoothing
+                                    }
                                 )
 
 #%% GWP
@@ -638,6 +648,12 @@ contourplots.animated_contourplot(w_data_vs_x_y_at_multiple_z=results_metric_2, 
                                                       (99,11.)),
                                 # zoom_data_scale=5,
                                 text_boxes = {'>20.0': [(80,5), 'white']},
+                                
+                                add_shapes = {
+                                    # coords as tuple of tuples: (color, zorder),
+                                    ((1,0), (47,100), (1,100)): ('white', 2), # infeasible region smoothing
+                                    }
+                                
                                 )
 
 
@@ -709,6 +725,11 @@ contourplots.animated_contourplot(w_data_vs_x_y_at_multiple_z=results_metric_3, 
                                 #                       (95,7.)),
                                 
                                 text_boxes = {'>100': [(80, 5), 'white']},
+                                
+                                add_shapes = {
+                                    # coords as tuple of tuples: (color, zorder),
+                                    ((1,0), (47,100), (1,100)): ('white', 2), # infeasible region smoothing
+                                    }
                                 )
 
 #%% AOC
@@ -765,6 +786,11 @@ contourplots.animated_contourplot(w_data_vs_x_y_at_multiple_z=results_metric_4, 
                                                       (99,11.)),
                                 # zoom_data_scale=5,
                                 text_boxes = {'>150': [(80,3), 'white']},
+                                
+                                add_shapes = {
+                                    # coords as tuple of tuples: (color, zorder),
+                                    ((1,0), (47,100), (1,100)): ('white', 2), # infeasible region smoothing
+                                    }
                                 )
 
 #%% TCI
@@ -825,6 +851,11 @@ contourplots.animated_contourplot(w_data_vs_x_y_at_multiple_z=results_metric_5, 
                                                       (99,11.)),
                                 # zoom_data_scale=5,
                                 text_boxes = {'>400': [(80,5), 'white']},
+                                
+                                add_shapes = {
+                                    # coords as tuple of tuples: (color, zorder),
+                                    ((1,0), (47,100), (1,100)): ('white', 2), # infeasible region smoothing
+                                    }
                                 )
 
 #%% Purity
@@ -875,4 +906,90 @@ contourplots.animated_contourplot(w_data_vs_x_y_at_multiple_z=100.*np.array(resu
                                 additional_points ={(40.5, 35.9):('D', 'w', 6)},
                                 # comparison_range=[Purity_w_levels[-2], Purity_w_levels[-1]],
                                 # comparison_range_hatch_pattern='////',
+                                
+                                add_shapes = {
+                                    # coords as tuple of tuples: (color, zorder),
+                                    ((1,0), (47,100), (1,100)): ('white', 2), # infeasible region smoothing
+                                    }
+                                )
+
+#%% Relative impact of yield and titer on MPSP
+rel_impact = []
+MPSPs = results_metric_1[1]
+t_step = 1
+y_step = 1
+tot_t_steps, tot_y_steps = len(MPSPs), len(MPSPs[0]) # only works if tot_t_steps == tot_y_steps
+max_increment = 1
+for i in range(tot_t_steps-1):
+    rel_impact.append([])
+    for j in range(tot_y_steps-1):
+        t_increments = range(1, min(max_increment+1, tot_t_steps-i))
+        y_increments = range(1, min(max_increment+1, tot_t_steps-j))
+        ri_sum = 0.
+        for inc in zip(t_increments, y_increments): # ensures stopping at the lower maximum increment
+            t_inc, y_inc = inc
+            curr_MPSP = MPSPs[i][j]
+            t_MPSP = MPSPs[i+t_inc][j]
+            y_MPSP = MPSPs[i][j+y_inc]
+            ri_sum += (curr_MPSP-t_MPSP)/(curr_MPSP-y_MPSP)
+        rel_impact[-1].append(ri_sum/len(t_increments)*len(y_increments))
+
+
+for i in range(len(MPSPs)-1): rel_impact[i].append(np.nan)
+rel_impact.append([])
+for i in range(len(MPSPs[i])): rel_impact[-1].append(np.nan)
+
+
+rel_impact = np.array(rel_impact)
+
+Rel_impact_MPSP_w_levels = np.arange(0., 10.01, 0.25)
+Rel_impact_MPSP_cbar_ticks = np.arange(0., 10.01, 0.5)
+# Rel_impact_MPSP_cbar_ticks = np.arange(2, 8.1, 1.)
+Rel_impact_MPSP_w_ticks = np.arange(0., 10.01, 0.5)
+# Rel_impact_MPSP_w_levels = np.arange(0., 15.5, 0.5)
+
+contourplots.animated_contourplot(w_data_vs_x_y_at_multiple_z=np.array([rel_impact]), # shape = z * x * y # values of the metric you want to plot on the color axis; e.g., Rel_impact_MPSP
+                                x_data=100*yields, # x axis values
+                                # x_data = yields/theoretical_max_g_TAL_acid_per_g_glucose,
+                                y_data=titers, # y axis values
+                                z_data=[productivities[1]], # z axis values
+                                x_label=x_label, # title of the x axis
+                                y_label=y_label, # title of the y axis
+                                z_label=z_label, # title of the z axis
+                                w_label='Rel impact by titer:yield on MPSP', # title of the color axis
+                                x_ticks=100*x_ticks,
+                                y_ticks=y_ticks,
+                                z_ticks=z_ticks,
+                                w_levels=Rel_impact_MPSP_w_levels, # levels for unlabeled, filled contour areas (labeled and ticked only on color bar)
+                                w_ticks=Rel_impact_MPSP_w_ticks, # labeled, lined contours; a subset of w_levels
+                                x_units=x_units,
+                                y_units=y_units,
+                                z_units=z_units,
+                                w_units='',
+                                # fmt_clabel=lambda cvalue: r"$\mathrm{\$}$"+" {:.1f} ".format(cvalue)+r"$\cdot\mathrm{kg}^{-1}$", # format of contour labels
+                                fmt_clabel = lambda cvalue: get_rounded_str(cvalue, 3),
+                                cmap=CABBI_green_colormap(), # can use 'viridis' or other default matplotlib colormaps
+                                cmap_over_color = colors.grey_dark.shade(8).RGBn,
+                                extend_cmap='neither',
+                                cbar_ticks=Rel_impact_MPSP_cbar_ticks,
+                                z_marker_color='g', # default matplotlib color names
+                                fps=fps, # animation frames (z values traversed) per second
+                                n_loops='inf', # the number of times the animated contourplot should loop animation over z; infinite by default
+                                animated_contourplot_filename='Rel_impact_MPSP_animated_contourplot_'+file_to_save, # file name to save animated contourplot as (no extensions)
+                                keep_frames=keep_frames, # leaves frame PNG files undeleted after running; False by default
+                                axis_title_fonts=axis_title_fonts,
+                                clabel_fontsize = clabel_fontsize,
+                                default_fontsize = default_fontsize,
+                                axis_tick_fontsize = axis_tick_fontsize,
+                                # comparison_range=TAL_maximum_viable_market_range,
+                                n_minor_ticks = 1,
+                                cbar_n_minor_ticks = 4,
+                                additional_points ={(40.5, 35.9):('D', 'w', 6)},
+                                # comparison_range=[Rel_impact_MPSP_w_levels[-2], Rel_impact_MPSP_w_levels[-1]],
+                                # comparison_range_hatch_pattern='////',
+                                
+                                add_shapes = {
+                                    # coords as tuple of tuples: (color, zorder),
+                                    ((1,0), (47,100), (1,100)): ('white', 2), # infeasible region smoothing
+                                    }
                                 )
