@@ -29,6 +29,18 @@ __all__ = ('create_model')
 
 sys = SAF_sys(material_storage=False, product_storage=False, WWTC=False, BoilerTurbo=False, hydrogenation_distillation=False,h2_purchase=False,opportunity_cost=True)
 
+# @sys.add_bounded_numerical_specification(x0=0, x1=0.3, xtol=1e-4, ytol=100)
+# def adjust_bagasse_to_boiler(fraction_burned):
+#     F.S102.split[:] = 1 - fraction_burned
+#     sys.simulate()
+#     excess = F.BT._excess_electricity_without_natural_gas
+#     if fraction_burned == 0 and excess > 0:
+#         return 0
+#     elif fraction_burned == 0.3 and excess < 0:
+#         return 0
+#     else:
+#         return excess
+
 BT_sys = bst.System('BT_sys', path=(F.BT,))
 
 preprocessing = bst.UnitGroup('Preprocessing_group', units = [i for i in sys.units if i.ID[1]=='1'])
@@ -634,17 +646,16 @@ def create_model(system=sys,
     # ============================================================================
     # TEA parameters
     # ============================================================================
-    # ##### Co-processing ratio related #####
-    # moisture = F.feedstock.imass['Water'] / F.feedstock.F_mass
-    # D = shape.Uniform(1000, 3500)
-    # @param(name='Feedstock dry flow', element='feedstock', kind='coupled', units='',
-    #        baseline=2000, distribution=D) # in tonne to sample
-    # def set_feedstock_flow(dry_flow):
-    #     F.feedstock.F_mass = dry_flow / (1-moisture) * 1000 # in kg
-        
-
-
+    
     ##### Financial parameters #####
+    D = shape.Uniform(1000000/24/0.8, 3000000/24/0.8)
+    @param(name='Feedstock flow', element='feedstock', kind='coupled', units='kg/hr',
+           baseline=2000000/24/0.8, distribution=D)
+    def set_feedstock_flow(flow):
+        F.feedstock.F_mass = flow
+        
+        
+        
     D = shape.Triangle(0.84, 0.9, 0.96)
     @param(name='Plant uptime', element='TEA', kind='isolated', units='%',
            baseline=0.9, distribution=D)
@@ -820,13 +831,13 @@ def create_model(system=sys,
 
 
 
-    ###### Bagasse distribution ######
-    S102 = F.S102
-    D = shape.Uniform(0.5,1.0)
-    @param(name='Bagasse split for ethanol', element=S102, kind='coupled', units='%',
-           baseline=0.8, distribution=D)
-    def set_bagasse_split(split):
-        S102.split = split
+    # ###### Bagasse distribution ######
+    # S102 = F.S102
+    # D = shape.Uniform(0.5,1.0)
+    # @param(name='Bagasse split for ethanol', element=S102, kind='coupled', units='%',
+    #        baseline=0.8, distribution=D)
+    # def set_bagasse_split(split):
+    #     S102.split = split
 
 
 
@@ -1098,10 +1109,10 @@ def create_model(system=sys,
         model.load_samples(samples)
         model.evaluate(notify=notify_runs)
         model.show()
-        model.table.to_excel('model_table_repurposing.xlsx')
+        model.table.to_excel('model_table_repurposing_feedchange_split92.xlsx')
         df_rho,df_p = model.spearman_r()
-        df_rho.to_excel('df_rho_repurposing.xlsx')
-        df_p.to_excel('df_p_repurposing.xlsx')
+        df_rho.to_excel('df_rho_repurposing_feedchange_split92.xlsx')
+        df_p.to_excel('df_p_repurposing_feedchange_split92.xlsx')
     else:
         model.show()
     return model

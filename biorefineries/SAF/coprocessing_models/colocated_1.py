@@ -29,6 +29,18 @@ __all__ = ('create_model')
 
 sys = SAF_sys(material_storage=True, product_storage=False, WWTC=True, BoilerTurbo=True, hydrogenation_distillation=True, h2_purchase=True,opportunity_cost=False)
 
+# @sys.add_bounded_numerical_specification(x0=0, x1=0.3, xtol=1e-4, ytol=100)
+# def adjust_bagasse_to_boiler(fraction_burned):
+#     F.S102.split[:] = 1 - fraction_burned
+#     sys.simulate()
+#     excess = F.BT._excess_electricity_without_natural_gas
+#     if fraction_burned == 0 and excess > 0:
+#         return 0
+#     elif fraction_burned == 0.3 and excess < 0:
+#         return 0
+#     else:
+#         return excess
+
 BT_sys = bst.System('BT_sys', path=(F.BT,))
 
 preprocessing = bst.UnitGroup('Preprocessing_group', units = [i for i in sys.units if i.ID[1]=='1'])
@@ -137,6 +149,7 @@ get_annual_factor = lambda: tea_SAF.operating_days * 24
 ##### Functions to calculate all the metrics #####
 
 # 1. Product characteristics
+get_coprocessing_ratio = lambda: F.R404.ins[0].F_vol * 24 / 5595 # not used 
 
 get_ethanol_yield = lambda: ethanol.F_vol * _gal_per_m3 * get_annual_factor() / 1e6 # in MMGal (million gallon)
 get_jet_yield = lambda:  jet_fuel.F_vol * _gal_per_m3 * get_annual_factor() / 1e6
@@ -197,7 +210,8 @@ get_cost_electricity_credit = lambda: get_excess_power() * electricity_price / j
 
 
 
-metrics = [Metric('Installed cost', get_installed_cost, '10^6 $'),
+metrics = [Metric('Co-processing ratio', get_coprocessing_ratio, ''),
+           Metric('Installed cost', get_installed_cost, '10^6 $'),
            Metric('Installed cost OSBL', get_installed_cost_OSBL, '10^6 $'),
            Metric('Installed cost ISBL', get_installed_cost_ISBL, '10^6 $'),
            Metric('DPI', get_DPI, '10^6 $'),
@@ -631,6 +645,14 @@ def create_model(system=sys,
     # =============================================================================
 
     ##### Financial parameters #####
+    D = shape.Uniform(1000000/24/0.8, 3000000/24/0.8)
+    @param(name='Feedstock flow', element='feedstock', kind='coupled', units='kg/hr',
+           baseline=2000000/24/0.8, distribution=D)
+    def set_feedstock_flow(flow):
+        F.feedstock.F_mass = flow
+        
+        
+        
     D = shape.Triangle(0.84, 0.9, 0.96)
     @param(name='Plant uptime', element='TEA', kind='isolated', units='%',
            baseline=0.9, distribution=D)
@@ -806,13 +828,13 @@ def create_model(system=sys,
 
 
 
-    ###### Bagasse distribution ######
-    S102 = F.S102
-    D = shape.Uniform(0.5,1.0)
-    @param(name='Bagasse split for ethanol', element=S102, kind='coupled', units='%',
-           baseline=0.8, distribution=D)
-    def set_bagasse_split(split):
-        S102.split = split
+    # ###### Bagasse distribution ######
+    # S102 = F.S102
+    # D = shape.Uniform(0.5,1.0)
+    # @param(name='Bagasse split for ethanol', element=S102, kind='coupled', units='%',
+    #        baseline=0.8, distribution=D)
+    # def set_bagasse_split(split):
+    #     S102.split = split
 
 
 
@@ -1084,10 +1106,10 @@ def create_model(system=sys,
         model.load_samples(samples)
         model.evaluate(notify=notify_runs)
         model.show()
-        model.table.to_excel('model_table_colocated.xlsx')
+        model.table.to_excel('model_table_colocated_feedchange_split100.xlsx')
         df_rho,df_p = model.spearman_r()
-        df_rho.to_excel('df_rho_colocated.xlsx')
-        df_p.to_excel('df_p_colocated.xlsx')
+        df_rho.to_excel('df_rho_colocated_feedchange_split100.xlsx')
+        df_p.to_excel('df_p_colocated_feedchange_split100.xlsx')
     else:
         model.show()
     return model

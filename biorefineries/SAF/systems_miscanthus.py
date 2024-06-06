@@ -37,7 +37,7 @@ def preprocessing_sys(ins,outs):
     bagasse_to_pretreatment, bagasse_to_CHP = outs
     U101 = _units.FeedStockHandling('U101', ins=feedstock, outs='')
     # U101.cost_items['System'].cost = 0.
-    S102 = bst.Splitter('S102', ins=U101-0, outs=[bagasse_to_pretreatment,bagasse_to_CHP],split=0.95)
+    S102 = bst.Splitter('S102', ins=U101-0, outs=[bagasse_to_pretreatment,bagasse_to_CHP],split=0.92)
 
 
 #%%

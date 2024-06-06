@@ -26,6 +26,17 @@ _kJpersec_to_kJhr = 3600
 __all__ = ('create_model')
 
 #%%
+# @sys.add_bounded_numerical_specification(x0=0, x1=0.3, xtol=1e-4, ytol=100)
+# def adjust_bagasse_to_boiler(fraction_burned):
+#     F.S102.split[:] = 1 - fraction_burned
+#     sys.simulate()
+#     excess = F.BT._excess_electricity_without_natural_gas
+#     if fraction_burned == 0 and excess > 0:
+#         return 0
+#     elif fraction_burned == 0.3 and excess < 0:
+#         return 0
+#     else:
+#         return excess
 
 load_preferences_and_process_settings(T='K',
                                       flow_units='kg/hr',
@@ -96,6 +107,8 @@ get_annual_factor = lambda: tea_SAF.operating_days * 24
 ##### Functions to calculate all the metrics #####
 
 # 1. Product characteristics
+# get_bagasse_split = lambda: F.S102.split
+get_coprocessing_ratio = lambda: F.R404.ins[0].F_vol * 24 / 5595 # not used 
 
 get_ethanol_yield = lambda: ethanol.F_vol * _gal_per_m3 * get_annual_factor() / 1e6 # in MMGal (million gallon)
 get_jet_yield = lambda:  jet_fuel.F_vol * _gal_per_m3 * get_annual_factor() / 1e6
@@ -146,7 +159,8 @@ get_cost_electricity_credit = lambda: get_excess_power() * electricity_price / j
 
 
 
-metrics = [Metric('Minimum selling price', get_MPSP_per_gallon, '$/gal'),
+metrics = [Metric('Co-processing ratio', get_coprocessing_ratio, ''),
+           Metric('Minimum selling price', get_MPSP_per_gallon, '$/gal'),
            Metric('Jet volume yield', get_jet_yield, '10^6 Gal/yr'),
            Metric('Total volume yield', get_total_yield, '10^6 Gal/yr'),
            Metric('Jet volume ratio', get_jet_vol_ratio, '%'),
@@ -564,7 +578,7 @@ metrics.extend((Metric('GWP - jet', get_GWP_jet, 'g CO2-eq/MJ jet fuel', 'LCA'),
 
 def create_model(system=sys,
                  metrics=metrics,
-                 N=2000 ,
+                 N=1000 ,
                  rule='L',
                  notify_runs=10,):
     model = Model(sys,metrics)
@@ -572,7 +586,7 @@ def create_model(system=sys,
     
     # ============================================================================
     # TEA parameters
-    # =============================================================================
+    # ============================================================================
 
     ##### Financial parameters #####
     D = shape.Triangle(0.84, 0.9, 0.96)
@@ -750,13 +764,13 @@ def create_model(system=sys,
 
 
 
-    ###### Bagasse distribution ######
-    S102 = F.S102
-    D = shape.Uniform(0.5,1.0)
-    @param(name='Bagasse split for ethanol', element=S102, kind='coupled', units='%',
-           baseline=0.8, distribution=D)
-    def set_bagasse_split(split):
-        S102.split = split
+    # ###### Bagasse distribution ######
+    # S102 = F.S102
+    # D = shape.Uniform(0.5,1.0)
+    # @param(name='Bagasse split for ethanol', element=S102, kind='coupled', units='%',
+    #         baseline=0.8, distribution=D)
+    # def set_bagasse_split(split):
+    #     S102.split = split
 
 
 
@@ -1028,10 +1042,10 @@ def create_model(system=sys,
         model.load_samples(samples)
         model.evaluate(notify=notify_runs)
         model.show()
-        model.table.to_excel('model_table.xlsx')
+        model.table.to_excel('model_table_feed2000_split0.92.xlsx')
         df_rho,df_p = model.spearman_r()
-        df_rho.to_excel('df_rho.xlsx')
-        df_p.to_excel('df_p.xlsx')
+        df_rho.to_excel('df_rho_feed2000_split0.92.xlsx')
+        df_p.to_excel('df_p_feed2000_split0.92.xlsx')
     else:
         model.show()
     return model

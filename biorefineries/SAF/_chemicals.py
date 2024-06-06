@@ -77,9 +77,10 @@ H2S = chemical_database('H2S', phase='g', Hf=-4927*_cal2joule)
 SO2 = chemical_database('SO2', phase='g')
 C2H4 = chemical_database('Ethylene')
 C3H6 = chemical_database('Propylene')
-C4H8 = chemical_database('Butadiene')
+C4H8 = chemical_database('Butene')
+C4H6 = chemical_database('Butadiene')
 C2H6 = chemical_database('Ethane')
-CH3OCH3 = chemical_database('Diethyl ether')
+C2H5OC2H5 = chemical_database('Diethyl ether')
 CH3CHO = chemical_database('Acetaldehyde')
 
 CO2.Cn.method = 'JANAF'
@@ -349,7 +350,7 @@ def get_grouped_chemicals(stream, units='kmol/hr'):
 
 phase_change_chemicals = ['Methanol', 'Ethanol', 'H2O',
                           'Furfural', 'LacticAcid', 'HMF', 'Ethylene', 
-                          'Ethane', 'H2','CarbonMonoxide', 'Propylene',
+                          'Ethane', 'H2','CarbonMonoxide', 'Propylene', 'Butene',
                           'Butadiene', 'Acetaldehyde', 'Diethyl ether',
                           'CH4','C5H10','C6H12','C6H14','C7H14','C7H16',
                           'C8H16','C8H18','C9H18','C9H20','C10H20','C10H22',
@@ -454,9 +455,9 @@ chems.set_synonym('AmmoniumHydroxide', 'NH4OH')
 chems.set_synonym('Ethanol', 'C2H5OH')
 chems.set_synonym('C2H4', 'Ethylene')
 chems.set_synonym('C2H6', 'Ethane')
-chems.set_synonym('Diethyl ether', 'CH3OCH3')
+chems.set_synonym('Diethyl ether', 'C2H5OC2H5')
 chems.set_synonym('Acetaldehyde', 'CH3CHO')
-chems.set_synonym('Butadiene', 'C4H8')
+chems.set_synonym('Butene', 'C4H8')
 
 # %% Set all "None" Hfus values to 0
 for chem in SAF_chemicals:

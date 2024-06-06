@@ -797,22 +797,22 @@ class AdiabaticFixedbedDehydrationReactor(Reactor):
         super()._setup()
         self.overall_C2H5OH_conversion=overall_C2H5OH_conversion=0.995
         self.C2H5OH_to_C2H4_selectivity=C2H5OH_to_C2H4_selectivity=0.988
-        self.C2H5OH_to_CH3OCH3_selectivity=C2H5OH_to_CH3OCH3_selectivity=0.00052
+        self.C2H5OH_to_C2H5OC2H5_selectivity=C2H5OH_to_C2H5OC2H5_selectivity=0.00052
         self.C2H5OH_to_CH3CHO_selectivity=C2H5OH_to_CH3CHO_selectivity=0.002
         self.C2H5OH_to_C2H6_selectivity=C2H5OH_to_C2H6_selectivityy=0.0027
         self.C2H5OH_to_C3H6_selectivity=C2H5OH_to_C3H6_selectivity=0.0006
-        self.C2H5OH_to_C4H8_selectivity=C2H5OH_to_C4H8_selectivity=0.005
+        self.C2H5OH_to_C4H6_selectivity=C2H5OH_to_C4H6_selectivity=0.005
         self.C2H5OH_to_CO_selectivity=C2H5OH_to_CO_selectivity=0.00007
         self.C2H5OH_to_CO2_selectivity=C2H5OH_to_CO2_selectivity=0.0011
         
         self.dehydration_rxns=ParallelRxn([
         #   Reaction definition                    Reactant    Conversion
         Rxn('C2H5OH -> C2H4 + H2O',               'C2H5OH',   C2H5OH_to_C2H4_selectivity*overall_C2H5OH_conversion),
-        Rxn('2 C2H5OH -> CH3OCH3 + H2O',          'C2H5OH',   C2H5OH_to_CH3OCH3_selectivity*overall_C2H5OH_conversion),
+        Rxn('2 C2H5OH -> C2H5OC2H5 + H2O',        'C2H5OH',   C2H5OH_to_C2H5OC2H5_selectivity*overall_C2H5OH_conversion),
         Rxn('C2H5OH -> CH3CHO +H2',               'C2H5OH',   C2H5OH_to_CH3CHO_selectivity*overall_C2H5OH_conversion),
         Rxn('2 C2H5OH + H2 -> 2 C2H6 +2 H2O',     'C2H5OH',   C2H5OH_to_C2H6_selectivityy*overall_C2H5OH_conversion),
         Rxn('3 C2H5OH -> C3H6 + 3 H2O',           'C2H5OH',   C2H5OH_to_C3H6_selectivity*overall_C2H5OH_conversion),
-        Rxn('2 C2H5OH -> C4H8 + 2 H2O',           'C2H5OH',   C2H5OH_to_C4H8_selectivity*overall_C2H5OH_conversion),
+        Rxn('2 C2H5OH -> C4H6 + 2 H2O + H2',      'C2H5OH',   C2H5OH_to_C4H6_selectivity*overall_C2H5OH_conversion),
         Rxn('2 C2H5OH -> CO + CH4 + H2',          'C2H5OH',   C2H5OH_to_CO_selectivity*overall_C2H5OH_conversion),
         Rxn('C2H5OH +H2O -> CO2 + CH4 + H2',      'C2H5OH',   C2H5OH_to_CO2_selectivity*overall_C2H5OH_conversion),
             ])
