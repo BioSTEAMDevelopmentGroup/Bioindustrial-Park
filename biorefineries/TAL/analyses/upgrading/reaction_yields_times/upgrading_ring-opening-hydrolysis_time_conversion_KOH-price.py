@@ -68,7 +68,9 @@ TAL_results_filepath = TAL_filepath + '\\analyses\\results\\'
 reactor = u.R403
 rxn = reactor.hydrolysis_rxns[0]
 reagent_fresh_stream = s.KOH_fresh
+if not batch: reactor.load_auxiliaries()
 #
+reactor.load_auxiliaries()
 
 def load_rxn_conversion(X):
     rxn.X = X
@@ -529,7 +531,7 @@ MPSP_w_levels = np.arange(4, 14.25, 0.25)
 MPSP_cbar_ticks = np.arange(4, 14.1, 1.)
 MPSP_w_ticks = [
                 # 2.75, 
-                5., 6., 7., 8., 8.5, 9., 10., 11., 12., 14.]
+                5., 6., 7., 7.5, 8., 8.5, 9., 10., 11., 12., 14.]
 # MPSP_w_levels = np.arange(0., 15.5, 0.5)
 
 contourplots.animated_contourplot(w_data_vs_x_y_at_multiple_z=results_metric_1, # shape = z * x * y # values of the metric you want to plot on the color axis; e.g., MPSP

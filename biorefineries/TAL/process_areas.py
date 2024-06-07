@@ -950,7 +950,7 @@ def create_TAL_to_sorbic_acid_upgrading_process(ins, outs,):
     R403_P = bst.Pump('R403_P', ins=R403-1, P=101325.)
     
     
-    # F406 = bst.units.MultiEffectEvaporator('F406', ins=R403_P-0, outs=('F406_b', 'F406_t'), 
+    # F407 = bst.units.MultiEffectEvaporator('F407', ins=R403_P-0, outs=('F407_b', 'F407_t'), 
     #                                         chemical='IPA',
     #                                         P = (20000, 10000, 5000, 2500, 1250), 
     #                                         # P=20000.,
@@ -959,14 +959,26 @@ def create_TAL_to_sorbic_acid_upgrading_process(ins, outs,):
     #                                         # T=307.7,
     #                                         )
     
-    # F406 = bst.units.Flash('F406', ins=R403_P-0, outs=('F406_t', 'F406_b'), 
+    # F407 = bst.units.Flash('F407', ins=R403_P-0, outs=('F407_t', 'F407_b'), 
     #                                         # chemical='IPA',
     #                                         # P = (101325, 73581, 50892, 32777, 20000), 
-    #                                         P=20000.,
+    #                                         P=101325.,
     #                                         V = 0.5,
     #                                         thermo = R403.thermo.ideal(),
     #                                         # T=307.7,
     #                                         )
+    # F407.recycle_loop_units = None
+    # @F407.add_specification(run=False)
+    # def F407_spec():
+    #     F407._run()
+    #     # if not F407.recycle_loop_units:
+    #     #     F407.recycle_loop_units = list(F407.get_upstream_units().intersection(F407.get_downstream_units()))
+    #     # for i in F407.recycle_loop_units: 
+    #     #     if i.specifications:
+    #     #         i.specifications[0]()
+    #     #     else:
+    #     #         i._run()
+                
     # @F406.add_specification(run=False)
     # def F406_spec():
     #     F406_ins_0 = F406.ins[0]
@@ -980,12 +992,15 @@ def create_TAL_to_sorbic_acid_upgrading_process(ins, outs,):
         
     # F406.flash=False
     
-    # F406-0-3-M405
+    # F407_P0 = bst.Pump('F407_P0', ins=F407-0, P=101325.)
+    # F407_P1 = bst.Pump('F407_P1', ins=F407-1, P=101325.)
+    
+    # F407_P0-0-3-M405
     
     F404 = bst.DrumDryer('F404', 
                          ins=(R403_P-0, 'F404_air', 'F404_natural_gas'),
                          outs=('dry_KSA', 'F404_hot_air', 'F404_emissions'),
-                         moisture_content=0.05, 
+                         moisture_content=0.02, 
                          split=0.,
                          moisture_ID='IPA')
     
@@ -994,7 +1009,7 @@ def create_TAL_to_sorbic_acid_upgrading_process(ins, outs,):
     F406 = bst.DrumDryer('F406', 
                          ins=(F404_P-0, 'F406_air', 'F406_natural_gas'),
                          outs=('dry_KSA', 'F406_hot_air', 'F406_emissions'),
-                         moisture_content=0.05, 
+                         moisture_content=0.02, 
                          split=0.,
                          moisture_ID='H2O')
     
@@ -1176,7 +1191,7 @@ def create_TAL_to_sorbic_acid_upgrading_process_THF_Ethanol(ins, outs,):
     F407 = bst.DrumDryer('F407', 
                          ins=(dehydration_CR_process-0, 'F407_air', 'F407_natural_gas'),
                          outs=('dry_KSA', 'F407_hot_air', 'F407_emissions'),
-                         moisture_content=0.05, 
+                         moisture_content=0.02, 
                          split=0.,
                          moisture_ID='THF')
     
@@ -1229,7 +1244,7 @@ def create_TAL_to_sorbic_acid_upgrading_process_THF_Ethanol(ins, outs,):
     F404 = bst.DrumDryer('F404', 
                          ins=(R403_P-0, 'F404_air', 'F404_natural_gas'),
                          outs=('dry_KSA', 'F404_hot_air', 'F404_emissions'),
-                         moisture_content=0.05, 
+                         moisture_content=0.02, 
                          split=0.,
                          moisture_ID='Ethanol')
     
@@ -1238,7 +1253,7 @@ def create_TAL_to_sorbic_acid_upgrading_process_THF_Ethanol(ins, outs,):
     F406 = bst.DrumDryer('F406', 
                          ins=(F404_P-0, 'F406_air', 'F406_natural_gas'),
                          outs=('dry_KSA', 'F406_hot_air', 'F406_emissions'),
-                         moisture_content=0.05, 
+                         moisture_content=0.02, 
                          split=0.,
                          moisture_ID='H2O')
     

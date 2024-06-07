@@ -68,7 +68,9 @@ TAL_results_filepath = TAL_filepath + '\\analyses\\results\\'
 reactor = u.R401
 rxn = reactor.hydrogenation_rxns[0]
 catalyst_name = 'NiSiO2' 
+batch = True
 #
+if not batch: reactor.load_auxiliaries()
 
 def load_rxn_conversion(X):
     rxn.X = X
