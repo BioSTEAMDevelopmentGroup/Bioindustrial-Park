@@ -68,8 +68,9 @@ TAL_results_filepath = TAL_filepath + '\\analyses\\results\\'
 reactor = u.R402
 rxn = reactor.dehydration_rxns[0]
 catalyst_name = 'Amberlyst70' 
-batch = True
+batch = False
 #
+reactor.batch = batch
 if not batch: reactor.load_auxiliaries()
 
 def load_rxn_conversion(X):
@@ -408,7 +409,7 @@ for p in catalyst_prices:
     # %% Save generated data
     
     minute = '0' + str(dateTimeObj.minute) if len(str(dateTimeObj.minute))==1 else str(dateTimeObj.minute)
-    file_to_save = f'_{steps}_steps_'+'KSA_etherification-hydrolysis-(dehydration)_yield_tau_%s.%s.%s-%s.%s'%(dateTimeObj.year, dateTimeObj.month, dateTimeObj.day, dateTimeObj.hour, minute)
+    file_to_save = f'_{steps}_steps_batch_{batch}_'+'KSA_etherification-hydrolysis-(dehydration)_yield_tau_%s.%s.%s-%s.%s'%(dateTimeObj.year, dateTimeObj.month, dateTimeObj.day, dateTimeObj.hour, minute)
     np.save(TAL_results_filepath+file_to_save, np.array([d1_Metric1, d1_Metric2, d1_Metric3]))
     
     pd.DataFrame(d1_Metric1).to_csv(TAL_results_filepath+'MPSP-'+file_to_save+'.csv')
@@ -581,7 +582,7 @@ contourplots.animated_contourplot(w_data_vs_x_y_at_multiple_z=results_metric_1, 
                                 #     MPSP_w_ticks[5]: (5,.25),
                                 #     MPSP_w_ticks[6]: (45,1.75),
                                 #     },
-                                additional_points ={(baseline_tau, 100*baseline_rxn_X):('D', 'w', 6)},
+                                # additional_points ={(baseline_tau, 100*baseline_rxn_X):('D', 'w', 6)},
                                 # text_boxes = {'>10.0': [(41,1.8), 'white']},
                                 text_boxes = {'>14.0': [(20.,45), 'white']},
                                 
@@ -632,7 +633,7 @@ contourplots.animated_contourplot(w_data_vs_x_y_at_multiple_z=results_metric_2, 
                                 # comparison_range=[GWP_w_levels[-2], GWP_w_levels[-1]],
                                 # comparison_range_hatch_pattern='////',
                                 units_on_newline = (True, True, False, False), # x,y,z,w
-                                additional_points ={(baseline_tau, 100*baseline_rxn_X):('D', 'w', 6)},
+                                # additional_points ={(baseline_tau, 100*baseline_rxn_X):('D', 'w', 6)},
                                 # manual_clabels_regular = {
                                 #     MPSP_w_ticks[3]: (20 ,1),
                                 #     MPSP_w_ticks[4]: (35,1.25),
@@ -641,6 +642,7 @@ contourplots.animated_contourplot(w_data_vs_x_y_at_multiple_z=results_metric_2, 
                                 )
 
 
+print(reactor.stopnow)
 #%% FEC
 
 # FEC_w_levels, FEC_w_ticks, FEC_cbar_ticks = get_contour_info_from_metric_data(results_metric_3,)
