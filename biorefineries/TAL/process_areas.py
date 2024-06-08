@@ -1057,6 +1057,7 @@ def create_TAL_to_sorbic_acid_upgrading_process(ins, outs,):
     S406.KSA_loss = 0.02 # % as decimal
     S406.KSA_purity = 0.949 # wt %
     #
+    S406.outlet_mass_ratio_IPA_to_impurities = 0.02
     
     @S406.add_specification()
     def S406_spec():
@@ -1070,6 +1071,9 @@ def create_TAL_to_sorbic_acid_upgrading_process(ins, outs,):
         
         S406_outs_0.copy_like(S406_ins_0)
         S406_outs_0.imol['KSA'] = 0.
+        S406_outs_0.imass['IPA'] = 0.
+        S406_outs_0.imass['IPA'] = S406.outlet_mass_ratio_IPA_to_impurities * S406_outs_0.F_mass
+        
         S406_outs_0.F_mass = mol_KSA_recovered*KSA_MW*(1.-KSA_purity)/KSA_purity # impurities
         
         S406_outs_0.imol['KSA'] = mol_KSA_recovered
@@ -1302,6 +1306,7 @@ def create_TAL_to_sorbic_acid_upgrading_process_THF_Ethanol(ins, outs,):
     S406.KSA_loss = 0.02 # % as decimal
     S406.KSA_purity = 0.949 # wt %
     #
+    S406.outlet_mass_ratio_THF_to_impurities = 0.02
     
     @S406.add_specification()
     def S406_spec():
@@ -1315,6 +1320,9 @@ def create_TAL_to_sorbic_acid_upgrading_process_THF_Ethanol(ins, outs,):
         
         S406_outs_0.copy_like(S406_ins_0)
         S406_outs_0.imol['KSA'] = 0.
+        S406_outs_0.imass['THF'] = 0.
+        S406_outs_0.imass['THF'] = S406.outlet_mass_ratio_THF_to_impurities * S406_outs_0.F_mass
+        
         S406_outs_0.F_mass = mol_KSA_recovered*KSA_MW*(1.-KSA_purity)/KSA_purity # impurities
         
         S406_outs_0.imol['KSA'] = mol_KSA_recovered
