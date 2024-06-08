@@ -535,7 +535,7 @@ MPSP_w_ticks = [
                 5., 6., 7., 7.5, 8., 8.5, 9., 10., 11., 12., 14.]
 # MPSP_w_levels = np.arange(0., 15.5, 0.5)
 
-contourplots.animated_contourplot(w_data_vs_x_y_at_multiple_z=results_metric_1, # shape = z * x * y # values of the metric you want to plot on the color axis; e.g., MPSP
+contourplots.animated_contourplot(w_data_vs_x_y_at_multiple_z=0.75*np.array(results_metric_1), # shape = z * x * y # values of the metric you want to plot on the color axis; e.g., MPSP
                                 y_data=100*rxn_Xs, # x axis values
                                 # y_data = rxn_Xs/theoretical_max_g_TAL_acid_per_g_glucose,
                                 x_data=reactor_taus, # y axis values
