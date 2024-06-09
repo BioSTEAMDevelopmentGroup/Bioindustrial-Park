@@ -1113,6 +1113,9 @@ def create_TAL_to_sorbic_acid_upgrading_process(ins, outs,):
                       dict(ID='spent_catalyst_R401', NiSiO2=0.1),
                       dict(ID='spent_catalyst_R402', Amberlyst70_=0.1),
                       dict(ID='S411_cool_air', N2=1),
+                      dict(ID='solvent_purge_1', THF=0.1),
+                      dict(ID='solvent_purge_2', THF=0.1),
+                      dict(ID='solvent_purge_3', THF=0.1),
                                 ],
                                                )
 def create_TAL_to_sorbic_acid_upgrading_process_THF_Ethanol(ins, outs,):
@@ -1121,7 +1124,8 @@ def create_TAL_to_sorbic_acid_upgrading_process_THF_Ethanol(ins, outs,):
         fresh_catalyst_R401, fresh_catalyst_R402, Ethanol_upgrading_solvent = ins
     KSA, impurities_to_boiler, S410_cool_air, S408_cool_air,\
         spent_catalyst_R401, spent_catalyst_R402,\
-            S411_cool_air, = outs
+            S411_cool_air,\
+            solvent_purge_1, solvent_purge_2, solvent_purge_3 = outs
     
     M405 = bst.Mixer('M405', ins=(solid_TAL, THF_upgrading_solvent, '', ''),
                      outs=('TAL_in_THF'))
@@ -1175,9 +1179,18 @@ def create_TAL_to_sorbic_acid_upgrading_process_THF_Ethanol(ins, outs,):
     
     dehydration_CR_process-1-2-R402
     
+    F415 = bst.units.MultiEffectEvaporator('F415', ins=dehydration_CR_process-0, outs=('F415_b', 'F415_t'), 
+                                           chemical='THF',
+                                            P = (101325, 73581, 50892, 32777, 20000), 
+                                            V = 0.5, # updated to 0.65 after initial simulation
+                                            )
+    F415.flash=False
+    F415_P0 = bst.Pump('F415_P0', ins=F415-0, P=101325.)
+    F415_P1 = bst.Pump('F415_P1', ins=F415-1, P=101325.)
+    
     
     F407 = bst.DrumDryer('F407', 
-                         ins=(dehydration_CR_process-0, 'F407_air', 'F407_natural_gas'),
+                         ins=(F415_P0-0, 'F407_air', 'F407_natural_gas'),
                          outs=('dry_KSA', 'F407_hot_air', 'F407_emissions'),
                          moisture_content=0.02, 
                          split=0.,
@@ -1201,7 +1214,9 @@ def create_TAL_to_sorbic_acid_upgrading_process_THF_Ethanol(ins, outs,):
         S411.outs[1].mol[:] = S411_ins_0['l'].mol[:]
         M405.specifications[0]()
     
-    S411-1-2-M405 # recycle recovered THF
+    # S411-1-2-M405 # recycle recovered THF
+    M415 = bst.Mixer('M415', ins=(F415_P1-0, S411-1), outs='recovered_THF_upgrading')
+    S415 = bst.Splitter('S415', ins=M415-0, split=1.-1e-4, outs=(2-M405, solvent_purge_1))
     
     
     M407 = bst.Mixer('M407', ins=(F407_P-0, Ethanol_upgrading_solvent, '', '',),
@@ -1229,8 +1244,17 @@ def create_TAL_to_sorbic_acid_upgrading_process_THF_Ethanol(ins, outs,):
     
     R403_P = bst.Pump('R403_P', ins=R403-1, P=101325.)
 
+    F412 = bst.units.MultiEffectEvaporator('F412', ins=R403_P-0, outs=('F412_b', 'F412_t'), 
+                                           chemical='Ethanol',
+                                            P = (101325, 73581, 50892, 32777, 20000), 
+                                            V = 0.5, # updated to 0.65 after initial simulation
+                                            )
+    F412.flash=False
+    F412_P0 = bst.Pump('F412_P0', ins=F412-0, P=101325.)
+    F412_P1 = bst.Pump('F412_P1', ins=F412-1, P=101325.)
+
     F404 = bst.DrumDryer('F404', 
-                         ins=(R403_P-0, 'F404_air', 'F404_natural_gas'),
+                         ins=(F412_P0-0, 'F404_air', 'F404_natural_gas'),
                          outs=('dry_KSA', 'F404_hot_air', 'F404_emissions'),
                          moisture_content=0.02, 
                          split=0.,
@@ -1264,7 +1288,10 @@ def create_TAL_to_sorbic_acid_upgrading_process_THF_Ethanol(ins, outs,):
         M405.specifications[0]()
     
 
-    S410-1-2-M407 # recycle recovered Ethanol
+    # S410-1-2-M407 # recycle recovered Ethanol
+    M412 = bst.Mixer('M412', ins=(F412_P1-0, S410-1), outs='recovered_Ethanol_upgrading')
+    S412 = bst.Splitter('S412', ins=M412-0, split=1.-1e-4, outs=(2-M407, solvent_purge_2))
+    
     
     M406 = bst.Mixer('M406', ins=(F406_P-0, THF_purification, ''),)
     
@@ -1318,8 +1345,17 @@ def create_TAL_to_sorbic_acid_upgrading_process_THF_Ethanol(ins, outs,):
     
     M408 = bst.Mixer('M408', ins=(S406-0, ''), outs=KSA)
     
+    F413 = bst.units.MultiEffectEvaporator('F413', ins=S406-1, outs=('F413_b', 'F413_t'), 
+                                           chemical='THF',
+                                            P = (101325, 73581, 50892, 32777, 20000), 
+                                            V = 0.5, # updated to 0.65 after initial simulation
+                                            )
+    F413.flash=False
+    F413_P0 = bst.Pump('F413_P0', ins=F413-0, P=101325.)
+    F413_P1 = bst.Pump('F413_P1', ins=F413-1, P=101325.)
+    
     F405 = bst.DrumDryer('F405', 
-                         ins=(S406-1, 'F405_air', 'F405_natural_gas'),
+                         ins=(F413_P0-0, 'F405_air', 'F405_natural_gas'),
                          outs=(impurities_to_boiler, 'F405_hot_air', 'F405_emissions'),
                          moisture_content=0.01, 
                          split=0.,
@@ -1339,7 +1375,9 @@ def create_TAL_to_sorbic_acid_upgrading_process_THF_Ethanol(ins, outs,):
         S408.outs[0].mol[:] = S408_ins_0['g'].mol[:]
         S408.outs[1].mol[:] = S408_ins_0['l'].mol[:]
         
-    S408-1-2-M406
+    # S408-1-2-M406
+    M413 = bst.Mixer('M413', ins=(F413_P1-0, S408-1), outs='recovered_THF_purification')
+    S413 = bst.Splitter('S413', ins=M413-0, split=1.-1e-4, outs=(2-M406, solvent_purge_3))
     
 #%% Wastewater treatment system
 @SystemFactory(ID = 'wastewater_treatment_process',
