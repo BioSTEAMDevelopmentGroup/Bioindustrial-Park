@@ -1221,7 +1221,7 @@ def create_TAL_to_sorbic_acid_upgrading_process_THF_Ethanol(ins, outs,):
     
     
     M407 = bst.Mixer('M407', ins=(F407_P-0, Ethanol_upgrading_solvent, '', '',),
-                     outs=('TAL_in_Ethanol'))
+                     outs=('PSA_in_Ethanol'))
     
     M407.w_Ethanol_per_w_PSA = 42.439
     # from Huber group: 6.6 mmol PSA in 40 mL Ethanol
