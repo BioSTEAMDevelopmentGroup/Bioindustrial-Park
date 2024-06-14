@@ -410,6 +410,7 @@ GWP_CFs = {
     'Amberlyst70_':1.3803, # ecoinvent 3.8 market for naphthalene sulfonic acid, GLO # Amberlyst-15 is 1,2-diethenylbenzene; 2-ethenylbenzene-1-sulfonic acid
     'Isopropanol':2.3219, # ecoinvent 3.8 market for isopropanol, RoW
     'THF': 6.0475, # ecoinvent 3.8 market for tetrahydrofuran, GLO
+    'KOH': 2.63, # ecoinvent 3.8 market for potassium hydroxide, GLO
     }
 
 
@@ -467,6 +468,7 @@ FEC_CFs = {
     'Amberlyst70_':31.273, # ecoinvent 3.8 market for naphthalene sulfonic acid, GLO # Amberlyst-15 is 1,2-diethenylbenzene; 2-ethenylbenzene-1-sulfonic acid
     'Isopropanol':63.878, # ecoinvent 3.8 market for isopropanol, RoW
     'THF': 101.77, # ecoinvent 3.8 market for tetrahydrofuran, GLO
+    'KOH': 33.33, # ecoinvent 3.8 market for potassium hydroxide, GLO
     }
 
 FEC_CF_array = chems.kwarray(FEC_CFs)

@@ -65,9 +65,9 @@ TAL_results_filepath = TAL_filepath + '\\analyses\\results\\'
 #%% Parameter loading functions
 
 # Set reactor, reaction, and catalyst here
-reactor = u.R402
-rxn = reactor.dehydration_rxns[0]
-catalyst_name = 'Amberlyst70' 
+reactor = u.R401
+rxn = reactor.hydrogenation_rxns[0]
+catalyst_name = 'NiSiO2' 
 batch = False
 #
 reactor.batch = batch
@@ -155,7 +155,7 @@ TAL_metrics = [get_product_MPSP,
 
 # %% Generate 3-specification meshgrid and set specification loading functions
 
-steps = (20, 20, 1)
+steps = (60, 60, 1)
 
 # Yield, titer, productivity (rate)
 spec_1 = rxn_Xs = np.linspace(0.4, 1.-1e-5, steps[0]) # yield
@@ -176,8 +176,8 @@ spec_3 = catalyst_prices =\
 
 # Parameters analyzed across
 
-y_label = r"$\bfEtherification$"  +" "+ r"$\bf&$" +" "+ r"$\bfHydrolysis$" +'\n'+\
-    r"$\bfPSA$"  +" "+ r"$\bfYield$" +" "+ r"$\bfon$" +" "+ r"$\bfHMP$" # title of the x axis
+y_label = r"$\bfHydrogenation$" + '\n'+\
+    r"$\bfHMP$"  +" "+ r"$\bfYield$" +" "+ r"$\bfon$" +" "+ r"$\bfTAL$" # title of the x axis
 y_units = r"$\mathrm{mol}$" + " " + r"$\mathrm{\%}$"
 y_ticks = [40, 50, 60, 70, 80, 90, 100]
 
@@ -186,7 +186,7 @@ x_units =r"$\mathrm{h}$"
 x_ticks = [0, 5, 10, 15, 20, 25]
 
 
-z_label = r"$\bfAmberlyst$" + r"$-$"  + r"$\bf70$" +" "+ r"$\bfCatalyst$" +" "+ r"$\bfPrice$"# # title of the z axis
+z_label = r"$\bfNickel$" + r"$-$"  + r"$\bfSilica$"  + r"$-$"  + r"$\bfAlumina$" +" "+ r"$\bfCatalyst$" +" "+ r"$\bfPrice$"# # title of the z axis
 z_units =  r"$\mathrm{\$} \cdot \mathrm{kg}^{-1}$"
 z_ticks = [0, 10, 20, 30, 40, 50, 60]
 
@@ -409,7 +409,7 @@ for p in catalyst_prices:
     # %% Save generated data
     
     minute = '0' + str(dateTimeObj.minute) if len(str(dateTimeObj.minute))==1 else str(dateTimeObj.minute)
-    file_to_save = f'_{steps}_steps_batch_{batch}_'+'KSA_etherification-hydrolysis-(dehydration)_yield_tau_%s.%s.%s-%s.%s'%(dateTimeObj.year, dateTimeObj.month, dateTimeObj.day, dateTimeObj.hour, minute)
+    file_to_save = f'_{steps}_steps_batch_{batch}_'+'KSA_hydrogenation_yield_tau_%s.%s.%s-%s.%s'%(dateTimeObj.year, dateTimeObj.month, dateTimeObj.day, dateTimeObj.hour, minute)
     np.save(TAL_results_filepath+file_to_save, np.array([d1_Metric1, d1_Metric2, d1_Metric3]))
     
     pd.DataFrame(d1_Metric1).to_csv(TAL_results_filepath+'MPSP-'+file_to_save+'.csv')
@@ -528,11 +528,11 @@ print('\nCreating and saving contour plots ...\n')
 #%% MPSP
 
 # MPSP_w_levels, MPSP_w_ticks, MPSP_cbar_ticks = get_contour_info_from_metric_data(results_metric_1, lb=3)
-MPSP_w_levels = np.arange(4, 14.25, 0.25)
-MPSP_cbar_ticks = np.arange(4, 14.1, 1.)
+MPSP_w_levels = np.arange(4, 16.25, 0.25)
+MPSP_cbar_ticks = np.arange(4, 16.1, 1.)
 MPSP_w_ticks = [
                 # 2.75, 
-                5., 6., 7., 7.5, 8., 8.5, 9., 10., 11., 12., 14.]
+                5., 6., 7., 7.5, 8., 8.5, 9., 10., 11., 12., 14., 16.]
 # MPSP_w_levels = np.arange(0., 15.5, 0.5)
 
 contourplots.animated_contourplot(w_data_vs_x_y_at_multiple_z=results_metric_1, # shape = z * x * y # values of the metric you want to plot on the color axis; e.g., MPSP
@@ -584,7 +584,7 @@ contourplots.animated_contourplot(w_data_vs_x_y_at_multiple_z=results_metric_1, 
                                 #     },
                                 # additional_points ={(baseline_tau, 100*baseline_rxn_X):('D', 'w', 6)},
                                 # text_boxes = {'>10.0': [(41,1.8), 'white']},
-                                text_boxes = {'>14.0': [(20.,45), 'white']},
+                                text_boxes = {'>16.0': [(20.,41), 'white']},
                                 
                                 )
 
@@ -593,7 +593,7 @@ contourplots.animated_contourplot(w_data_vs_x_y_at_multiple_z=results_metric_1, 
 # GWP_w_levels, GWP_w_ticks, GWP_cbar_ticks = get_contour_info_from_metric_data(results_metric_2,)
 GWP_w_levels = np.arange(4, 24.1, 0.5)
 GWP_cbar_ticks = np.arange(4, 24.1, 2.)
-GWP_w_ticks = [6, 7, 8, 9, 10, 11, 12, 14, 15, 16.5, 18, 20, 24]
+GWP_w_ticks = [6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16.5, 18, 20, 24]
 contourplots.animated_contourplot(w_data_vs_x_y_at_multiple_z=results_metric_2, # shape = z * x * y # values of the metric you want to plot on the color axis; e.g., GWP
                                 y_data=100*rxn_Xs, # x axis values
                                 x_data=reactor_taus, # y axis values
@@ -638,9 +638,8 @@ contourplots.animated_contourplot(w_data_vs_x_y_at_multiple_z=results_metric_2, 
                                 #     MPSP_w_ticks[3]: (20 ,1),
                                 #     MPSP_w_ticks[4]: (35,1.25),
                                 #     }
-                                text_boxes = {'>24.0': [(20.,45), 'white']},
+                                # text_boxes = {'>24.0': [(20.,41), 'white']},
                                 )
-
 
 print(reactor.stopnow)
 #%% FEC
