@@ -30,6 +30,7 @@ preprocessing = 15.23/tonnetokg #https://doi.org/10.3389/fenrg.2018.00090
 #%% 
 # create system, find cellulase and causitic characterization factors
 sys = create_ethanol_system()
+sys.save_report()
 sreg = sys.flowsheet.stream
 mxg = sreg.miscanthus
 
@@ -56,7 +57,7 @@ def solveLCA(inputs):
         if math.isnan(inputs.loc[i,'mxg_CI']) == True:
             continue 
         else:
-            mxg.characterization_factors['GWP'] = inputs.loc[i,'mxg_CI']/gtokg + preprocessing
+            mxg.characterization_factors['GWP'] = inputs.loc[i,'mxg_CI']
             #outputs.loc[i,'Mxg Production CI [kgCO2eq/kgDW]'] = mxg.characterization_factors['GWP']
             sys.simulate()
             outputs.loc[i,'Ethanol [kgCO2eq/gal]'] = get_GWP()
@@ -65,7 +66,7 @@ def solveLCA(inputs):
 outputs = solveLCA(inputs)
 
 #%%
-data_path = join(folder, 'daycent_miscanthus-EL-Working-output.xlsx')
+data_path = join(data_folder, 'daycent_miscanthus-EL-Working-output.xlsx')
 with pd.ExcelWriter(data_path, engine='openpyxl',mode='a', if_sheet_exists='replace') as writer:  
     outputs.to_excel(writer, sheet_name='CI_calc')
 #print(f'price: {get_MESP()}')
