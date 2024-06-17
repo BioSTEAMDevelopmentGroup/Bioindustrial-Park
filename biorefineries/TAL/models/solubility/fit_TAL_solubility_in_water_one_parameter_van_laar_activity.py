@@ -12,7 +12,7 @@ Created on Fri Aug 18 17:32:13 2023
 @author: sarangbhagwat
 """
 import numpy as np
-from math import exp as math_exp
+from numba import njit
 from scipy.optimize import minimize
 from flexsolve import IQ_interpolation
 from biorefineries import TAL
@@ -45,8 +45,9 @@ V_TAL = (1*33.5 + 2*13.5 + 1*18.0 + 1*10.0) * 1e-6 # m3/mol # using the method p
 
 V_H2O = H2O_molar_volume * 1e-6 # m3/mol
 
+@njit
 def TAL_solubility_in_water_obj_fn_for_fit(x, T, TAL_c_fit):
-    return -x + math_exp(-(TAL_Hm_by_R) * (1/T - 1/TAL_Tm) -\
+    return -x + np.exp(-(TAL_Hm_by_R) * (1/T - 1/TAL_Tm) -\
                          (TAL_c_fit/(R*T))*(1 + (V_TAL*x)/(V_H2O*(1-x)))**-2)
 
 def get_TAL_solubility_in_water_for_fit(T, TAL_c_fit): # mol TAL : mol (TAL+water)
@@ -81,12 +82,13 @@ TAL_c = res.x
 print(f'\nSolubility model fit to experimental data with R^2 = {round(-get_negative_Rsq(TAL_c), 3)}.\n')
 
 
+@njit
 def TAL_solubility_in_water_obj_fn(x, T, TAL_c_fit=TAL_c):
-    return -x + math_exp(-(TAL_Hm_by_R) * (1/T - 1/TAL_Tm) -\
+    return -x + np.exp(-(TAL_Hm_by_R) * (1/T - 1/TAL_Tm) -\
                          (TAL_c_fit/(R*T))*(1 + (V_TAL*x)/(V_H2O*(1-x)))**-2)
 
 def get_TAL_solubility_in_water(T, TAL_c_fit=TAL_c): # mol TAL : mol (TAL+water)
-    obj_fn = lambda x: TAL_solubility_in_water_obj_fn(x, T=T, TAL_c_fit=TAL_c_fit)
+    obj_fn = lambda x: TAL_solubility_in_water_obj_fn(x, T=T, TAL_c_fit=TAL_c_fit)[0]
     return IQ_interpolation(obj_fn, 1e-6, 1-1e-6, ytol=1e-6)
 
 def get_mol_TAL_dissolved(T, mol_water, TAL_c_fit=TAL_c): # mol TAL dissolved in given mol water

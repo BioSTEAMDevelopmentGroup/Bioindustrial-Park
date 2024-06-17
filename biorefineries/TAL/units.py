@@ -837,7 +837,7 @@ class HydrogenationReactor(StirredTankReactor):
             # Rxn('TAL + H2 -> HMDHP',         'TAL',   1-0.2125),  # conversion from Huber group experimental data
             ])
     
-    TAL_to_HMTHP_rxn = hydrogenation_rxns[0]
+    TAL_to_HMP_rxn = hydrogenation_rxns[0]
     
     spent_catalyst_replacements_per_year = 1. # number of times the entire catalyst_weight is replaced per year
     
@@ -956,7 +956,7 @@ class DehydrationReactor(StirredTankReactor):
             Rxn('HMTHP -> DHL + H2O',         'HMTHP',   1.-1e-5), # conversion from Huber group experimental data
             # Rxn('TAL + H2 -> HMDHP',         'TAL',   1-0.2125),  # conversion from Huber group experimental data
             ])
-    HMTHP_to_PSA_rxn = dehydration_rxns[0]
+    HMP_to_PSA_rxn = dehydration_rxns[0]
     
     spent_catalyst_replacements_per_year = 1. # number of times the entire catalyst_weight is replaced per year
     

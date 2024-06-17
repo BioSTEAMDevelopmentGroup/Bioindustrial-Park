@@ -61,8 +61,10 @@ class EasyInputModel(Model):
             if shape_data.lower() in ['triangular', 'triangle',]:
                 D = shape.Triangle(lower, midpoint, upper)
             elif shape_data.lower() in ['uniform',]:
+                if not str(midpoint)=='nan':
+                    raise ValueError(f"The parameter distribution for {name} ({element}) is 'Uniform' but was associated with a given midpoint value.")
                 D = shape.Uniform(lower, upper)
-            
+                
             param(name=name, 
                   setter=create_function(load_statements, namespace_dict), 
                   element=element, 
