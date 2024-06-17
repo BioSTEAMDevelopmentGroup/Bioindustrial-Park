@@ -504,7 +504,7 @@ class Biorefinery:
                 # Returns energy consumption at given fraction processed (not sent to boiler).
                 splitter.split[:] = 1 - fraction_burned
                 cane_sys.simulate()
-                excess = BT._excess_electricity_without_natural_gas
+                excess = BT._excess_electricity_without_fuel
                 if fraction_burned == minimum_fraction_burned and excess > 0:
                     splitter.neglect_natural_gas_streams = False # No need to neglect
                     return 0 # No need to burn bagasse

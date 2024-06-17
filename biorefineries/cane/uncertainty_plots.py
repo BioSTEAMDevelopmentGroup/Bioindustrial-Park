@@ -507,10 +507,10 @@ def plot_lines_monte_carlo_manuscript(fs=8):
             #             [0, 2, 4, 6, 8, 10]], 
             color_wheel = line_color_wheel,
         )
-        for ax, letter in zip(axes.flat, 'ABCDEFGHIJKL'):
+        for ax, letter in zip(axes.flat, 'abcdefghijkl'):
             plt.sca(ax)
             ylb, yub = plt.ylim()
-            plt.text(-0.25, ylb + (yub - ylb) * 0.9, letter, color=letter_color,
+            plt.text(-0.25, ylb + (yub - ylb) * 0.9, '(' + letter + ')', color=letter_color,
                      horizontalalignment='center',verticalalignment='center',
                      fontsize=10, fontweight='bold')
         plt.subplots_adjust(left=0.12, right=0.95, wspace=0, top=0.95, bottom=0.15)
@@ -668,7 +668,7 @@ def plot_breakdowns(biodiesel_only=False):
             else:
                 plt.yticks(yticks)
         plt.subplots_adjust(left=0.07, right=0.98, wspace=0., top=0.84, bottom=0.31)
-        titles = ['(A) Direct\nCogeneration', '(B) Integrated\nCo-Fermentation', '(C) Integrated\nCo-Fermentation & Recovery']
+        titles = ['(a) Direct\nCogeneration', '(b) Integrated\nCo-Fermentation', '(c) Integrated\nCo-Fermentation & Recovery']
         for ax, letter in zip(axes, titles):
             plt.sca(ax)
             ylb, yub = plt.ylim()
@@ -691,7 +691,7 @@ def plot_breakdowns(biodiesel_only=False):
         plt.yticks(yticks, ['']*len(yticks))
         plt.ylabel('')
         plt.subplots_adjust(left=0.09, right=0.96, wspace=0., top=0.84, bottom=0.31)
-        for ax, letter in zip(axes, ['(A) Direct Cogeneration', '(B) Integrated Co-Fermentation']):
+        for ax, letter in zip(axes, ['(a) Direct Cogeneration', '(b) Integrated Co-Fermentation']):
             plt.sca(ax)
             ylb, yub = plt.ylim()
             xlb, xub = plt.xlim()
@@ -932,7 +932,7 @@ def plot_feedstock_comparison_kde(fs=None):
         bottom_left='MFPP\nTradeoff()',
         top_left='Oilcane\nFavored()',
         bottom_right='\nSugarcane\nFavored()',
-        titles=['(A) Direct Cogeneration', '(B) Integrated Co-Fermentation'],
+        titles=['(a) Direct Cogeneration', '(b) Integrated Co-Fermentation'],
         fs=fs,
     )
     plt.subplots_adjust(
@@ -953,7 +953,7 @@ def plot_feedstock_comparison_kde_2023(fs=None):
         bottom_left='MFPP\nTradeoff()',
         top_left='Oilcane\nFavored()',
         bottom_right='\nSugarcane\nFavored()',
-        titles=['(A) Direct Cogeneration', '(B) Integrated Co-Fermentation'],
+        titles=['(a) Direct Cogeneration', '(b) Integrated Co-Fermentation'],
         metrics=[TCI, MFPP],
         fs=fs,
     )
@@ -975,7 +975,7 @@ def plot_microbial_oil_economics_kde_2023(fs=None):
         bottom_left='Microbial oil\nFavored()',
         top_left='MBSP\nTradeoff()',
         bottom_right='TCI\nTradeoff()',
-        titles=['(A) Direct Cogeneration', '(B) Integrated Co-Fermentation'],
+        titles=['(a) Direct Cogeneration', '(b) Integrated Co-Fermentation'],
         metrics=[TCI, MBSP],
         x_center=83.9,
         y_center=0.75,
@@ -1000,7 +1000,7 @@ def plot_microbial_oil_sustainability_kde_2023(fs=None):
         bottom_left='Yield\nTradeoff()',
         top_left='Microbial oil\nFavored()',
         bottom_right='Soybean oil\nFavored()',
-        titles=['(A) Direct Cogeneration', '(B) Integrated Co-Fermentation'],
+        titles=['(a) Direct Cogeneration', '(b) Integrated Co-Fermentation'],
         metrics=[GWP_biodiesel_allocation, biodiesel_yield],
         x_center=1.29,
         y_center=617,
@@ -1198,8 +1198,8 @@ def plot_microbial_oil_feedstock_comparison_kde(fs=None):
         bottom_left='MFPP\nTradeoff()',
         top_left='Plant oil\nFavored()',
         bottom_right='Microb. oil\nFavored()',
-        titles=['(A) Direct Cogeneration',
-                '(B) Integrated Co-Fermentation'],
+        titles=['(a) Direct Cogeneration',
+                '(b) Integrated Co-Fermentation'],
         fs=fs,
     )
     for i in ('svg', 'png'):
@@ -1216,8 +1216,8 @@ def plot_microbial_oil_bioethanol_comparison_kde(fs=None):
         bottom_left='MFPP\nTradeoff()',
         top_left='Microb. Oil\nFavored()',
         bottom_right='Bioethanol\nFavored()',
-        titles=['(A) Direct Cogeneration',
-                '(B) Integrated Co-Fermentation'],
+        titles=['(a) Direct Cogeneration',
+                '(b) Integrated Co-Fermentation'],
         fs=fs,
     )
     for i in ('svg', 'png'):
@@ -1253,7 +1253,7 @@ def plot_crude_configuration_comparison_kde():
         bottom_left='MFPP\nTradeoff()',
         top_left='Biodiesel\nProduction Favored()',
         bottom_right='Crude Oil\nProduction Favored()',
-        titles=['(A) Direct Cogeneration', '(B) Integrated Co-Fermentation'],
+        titles=['(a) Direct Cogeneration', '(b) Integrated Co-Fermentation'],
     )
     for i in ('svg', 'png'):
         file = os.path.join(images_folder, f'crude_configuration_comparison_kde.{i}')
@@ -1274,7 +1274,7 @@ def plot_agile_comparison_kde(fs=None):
         bottom_right='Cane-only\nFavored()',
         xbox_kwargs=dict(light=CABBI_colors.green_dirty.RGBn, 
                          dark=CABBI_colors.green_dirty.shade(60).RGBn),
-        titles=['(A) Direct Cogeneration', '(B) Integrated Co-Fermentation'],
+        titles=['(a) Direct Cogeneration', '(b) Integrated Co-Fermentation'],
         fs=fs,
     )
     for i in ('svg', 'png'):
@@ -1557,7 +1557,7 @@ def plot_competitive_biomass_yield_across_oil_content(
         ytickf=True,
     )
     plt.text(
-        15 - 0.25, 36, '(A) Direct Cogeneration', weight='bold',
+        15 - 0.25, 36, '(a) Direct Cogeneration', weight='bold',
         ha='right', va='center', fontsize=10,
         c=bst.plots.title_color,
     )
@@ -1573,7 +1573,7 @@ def plot_competitive_biomass_yield_across_oil_content(
         ytickf=True,
     )
     plt.text(
-        15 - 0.25, 36, '(B) Integrated Co-Fermentation', weight='bold', 
+        15 - 0.25, 36, '(b) Integrated Co-Fermentation', weight='bold', 
         ha='right', va='center', fontsize=10,
         c=bst.plots.title_color,
     )

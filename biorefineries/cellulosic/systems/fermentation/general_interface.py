@@ -115,9 +115,10 @@ def add_urea_MgSO4_nutrients(fermentor,
 
 def add_urea_nutrient(fermentor, seedtrain=None, 
                       seed_train_requirement=None,
-                      fermentor_requirement=None):
+                      fermentor_requirement=None,
+                      area=None,):
     urea = bst.Stream('urea', price=90/907.185) # https://www.alibaba.com/product-detail/High-Quality-UREA-Fertilizer-Factory-price_1600464698965.html?spm=a2700.galleryofferlist.topad_classic.d_title.a69046eeVn83ML
-    Urea_storage = bst.StorageTank('Urea_storage', urea)
+    Urea_storage = bst.StorageTank(area or 'Urea_storage', urea)
     if seedtrain:
         urea_1 = bst.Stream(
             'urea_1',
@@ -129,7 +130,7 @@ def add_urea_nutrient(fermentor, seedtrain=None,
             Urea=116,
             units='kg/hr',
         )
-        S301 = bst.MockSplitter('S301', Urea_storage-0, outs=(urea_1, urea_2))
+        S301 = bst.MockSplitter(area or 'Urea_splitter', Urea_storage-0, outs=(urea_1, urea_2))
         seedtrain.ins.append(urea_1)
         fermentor.ins.append(urea_2)
         @seedtrain.add_specification(run=True)
@@ -138,7 +139,10 @@ def add_urea_nutrient(fermentor, seedtrain=None,
             if seed_train_requirement:
                 urea.imass['Urea'] = seed_train_requirement(seedtrain, [i for i in feeds if i.phase != 'g'])
             else:
-                F_vol = sum([i.F_vol - i.ivol['Lipid'] for i in feeds if i.phase != 'g'])
+                if 'Lipid' in urea.chemicals:
+                    F_vol = sum([i.F_vol - i.ivol['Lipid'] for i in feeds if i.phase != 'g'])
+                else:
+                    F_vol = sum([i.F_vol for i in feeds if i.phase != 'g'])
                 urea.imass['Urea'] = 0.5 * F_vol
             
         @fermentor.add_specification(run=True, impacted_units=[Urea_storage])
