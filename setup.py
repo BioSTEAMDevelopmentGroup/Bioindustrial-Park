@@ -11,11 +11,11 @@ setup(
     name='biorefineries',
     packages=['biorefineries'],
     license='MIT',
-    version='2.24.0',
+    version='2.29.0',
     description="Biorefinery models in BioSTEAM",
     long_description=open('README.rst', encoding='utf-8').read(),
     author='Yoel Cortes-Pena',
-    install_requires=['biosteam>=2.35.0,<2.36.0'],
+    install_requires=['biosteam>=2.44.0,<2.45.0'],
     python_requires=">=3.9",
     package_data=
         {'biorefineries': ['biorefineries/*',
@@ -45,6 +45,7 @@ setup(
                            'fattyalcohols/units/*',
                            'LAOs/*',
                            'LAOs/units/*',
+                           'abm/*',
                            'tests/*',
                       ]},
     platforms=['Windows', 'Mac', 'Linux'],
@@ -59,5 +60,5 @@ setup(
                  'Topic :: Scientific/Engineering',
                  'Topic :: Scientific/Engineering :: Chemistry',
                  'Topic :: Scientific/Engineering :: Mathematics'],
-    keywords='chemical process simmulation bioprocess engineering mass CABBI biorefinery biofuel bioproducts lipid-cane corn stover',
+    keywords='chemical process simulation bioprocess engineering mass CABBI biorefinery biofuel bioproducts lipid-cane corn stover',
 )

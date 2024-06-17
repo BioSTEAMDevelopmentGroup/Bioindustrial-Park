@@ -119,13 +119,11 @@ class PretreatmentReactorSystem(bst.units.design_tools.PressureVessel, Unit):
     _units = {'Residence time': 'hr',
               'Reactor volume': 'm3'}
     
-    def __init__(self, ID='', ins=None, outs=(), T=130+273.15, thermo=None, 
-                 tau=0.166, V_wf=0.8, length_to_diameter=2, 
+    def _init(self, T=130+273.15, tau=0.166, V_wf=0.8, length_to_diameter=2, 
                  vessel_material='Stainless steel 316', 
                  vessel_type='Horizontal',
                  reactions=None,
                  run_vle=True):
-        Unit.__init__(self, ID, ins, outs, thermo)
         self._load_components()
         vapor, liquid = self.outs
         vapor.phase = 'g'
@@ -262,9 +260,7 @@ class SeedTrain(Unit):
     # #: Diammonium phosphate loading in g/L of fermentation broth
     # DAP = 0.67 
     
-    def __init__(self, ID='', ins=None, outs=(), thermo=None, 
-                 reactions=None, saccharification=None):
-        Unit.__init__(self, ID, ins, outs, thermo)
+    def _init(self, reactions=None, saccharification=None):
         chemicals = self.chemicals
         if reactions is None:
             self.reactions = ParallelRxn([
@@ -360,8 +356,7 @@ class ContinuousPresaccharification(Unit):
     _units = {'Flow rate': 'm3/hr',
               'Tank volume': 'm3'}
     
-    def __init__(self, ID='', ins=None, outs=(), P=101325, reactions=None):
-        Unit.__init__(self, ID, ins, outs)
+    def _init(self, P=101325, reactions=None):
         self.P = P
         self.reactions = reactions 
         
@@ -395,10 +390,9 @@ class Saccharification(bst.BatchBioreactor):
               'Reactor volume': 'm3',
               'Reactor duty': 'kJ/hr'}
     
-    def __init__(self, ID='', ins=None, outs=(), thermo=None, 
-                 tau=72, N=None, V=3785.4118, T=48+273.15, P=101325,
+    def _init(self, tau=72, N=None, V=3785.4118, T=48+273.15, P=101325,
                  Nmin=2, Nmax=36, reactions=None):
-        bst.BatchBioreactor.__init__(self, ID, ins, outs, thermo, tau, N, V, T, P, Nmin, Nmax)
+        super()._init(tau, N, V, T, P, Nmin, Nmax)
         chemicals = self.chemicals
         #: [ParallelReaction] Enzymatic hydrolysis reactions including from 
         #: downstream batch tank in co-fermentation.
@@ -437,10 +431,9 @@ class CoFermentation(bst.BatchBioreactor):
     #: Unload and clean up time (hr)
     tau_0 = 4
     
-    def __init__(self, ID='', ins=None, outs=(), thermo=None,
-                 tau=36, N=None, V=3785.4118, T=305.15, P=101325,
-                 Nmin=2, Nmax=36, cofermentation=None, loss=None):
-        bst.BatchBioreactor.__init__(self, ID, ins, outs, thermo, tau, N, V, T, P, Nmin, Nmax)
+    def _init(self, tau=36, N=None, V=3785.4118, T=305.15, P=101325,
+              Nmin=2, Nmax=36, cofermentation=None, loss=None):
+        super()._init(tau, N, V, T, P, Nmin, Nmax)
         self.P = P
         chemicals = self.chemicals
         self.loss = loss or ParallelRxn([
@@ -546,9 +539,8 @@ class SaccharificationAndCoFermentation(Unit):
               'Batch duty': 'kJ/hr',
               'Reactor duty': 'kJ/hr'}
     
-    def __init__(self, ID='', ins=None, outs=(), thermo=None, P=101325, saccharification_split=0.1,
-                 saccharification=None, loss=None, cofermentation=None):
-        Unit.__init__(self, ID, ins, outs, thermo)
+    def _init(self, P=101325, saccharification_split=0.1,
+              saccharification=None, loss=None, cofermentation=None):
         self.P = P
         self.saccharification_split = saccharification_split
         chemicals = self.chemicals
@@ -653,9 +645,7 @@ class SimultaneousSaccharificationAndCoFermentation(Unit):
               'Batch duty': 'kJ/hr',
               'Reactor duty': 'kJ/hr'}
     
-    def __init__(self, ID='', ins=None, outs=(), P=101325, thermo=None,
-                 saccharification=None, loss=None, cofermentation=None):
-        Unit.__init__(self, ID, ins, outs, thermo)
+    def _init(self, P=101325, saccharification=None, loss=None, cofermentation=None):
         self.P = P
         chemicals = self.chemicals
         #: [ParallelReaction] Enzymatic hydrolysis reactions including from 
@@ -868,15 +858,15 @@ class FeedStockHandling(Unit): pass
 class PretreatmentFlash(bst.Flash): pass
 
 @cost('Duty', 'Heat exchanger', S=8, units='Gcal/hr',
-      CE=522, cost=85000, n=0.7, BM=2.2)
+      CE=522, cost=85000, n=0.7, BM=2.2, magnitude=True)
 class HydrolysateHeatExchanger(bst.HXutility): pass
 
 @cost('Duty', 'Heat Exchanger', S=8, units='Gcal/hr',
-      CE=551, cost=92000, n=0.7, BM=2.2)
+      CE=551, cost=92000, n=0.7, BM=2.2, magnitude=True)
 class PretreatmentWasteHeater(bst.HXutility): pass
 
 @cost('Duty', 'Heat Exchanger', S=2, units='Gcal/hr',
-      CE=522, cost=34000, n=0.7, BM=2.2)
+      CE=522, cost=34000, n=0.7, BM=2.2, magnitude=True)
 class WasteVaporCondenser(bst.HXutility): pass
 
 @cost('Flow rate', 'Pump', S=402194, units='kg/hr',

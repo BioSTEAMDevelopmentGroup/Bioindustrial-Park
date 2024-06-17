@@ -1,6 +1,17 @@
+#!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-Created on Tue Nov  1 18:00:42 2022
+# Bioindustrial-Park: BioSTEAM's Premier Biorefinery Models and Results
+# Copyright (C) 2021-, Sarang Bhagwat <sarangb2@illinois.edu>
+#
+# This module is under the UIUC open-source license. See
+# github.com/BioSTEAMDevelopmentGroup/biosteam/blob/master/LICENSE.txt
+# for license details.
+
+This module is a modified implementation of modules from the following:
+[1]	Bhagwat et al., Sustainable Production of Acrylic Acid via 3-Hydroxypropionic Acid from Lignocellulosic Biomass. ACS Sustainable Chem. Eng. 2021, 9 (49), 16659–16669. https://doi.org/10.1021/acssuschemeng.1c05441
+[2]	Li et al., Sustainable Lactic Acid Production from Lignocellulosic Biomass. ACS Sustainable Chem. Eng. 2021, 9 (3), 1341–1351. https://doi.org/10.1021/acssuschemeng.0c08055
+[3]	Cortes-Peña et al., BioSTEAM: A Fast and Flexible Platform for the Design, Simulation, and Techno-Economic Analysis of Biorefineries under Uncertainty. ACS Sustainable Chem. Eng. 2020, 8 (8), 3302–3310. https://doi.org/10.1021/acssuschemeng.9b07040
 
 @author: sarangbhagwat
 """
@@ -16,7 +27,6 @@ import flexsolve as flx
 import numpy as np
 
 from numba import njit
-from biosteam.process_tools import BoundedNumericalSpecification
 from biorefineries.succinic._process_specification import ProcessSpecification
 from biosteam import System
 from thermosteam import Stream
@@ -246,7 +256,7 @@ def create_succinic_sys(ins, outs):
         A301._run()
         K301.specifications[0]()
         R302.specifications[0]()
-        return R302.CO2_required
+        return R302.fresh_CO2_required
 
     @A301.add_specification(run=False)
     def A301_spec():
@@ -963,13 +973,22 @@ get_product_stream_MPSP()
 
 #%% LCA
 
-succinic_LCA = SuccinicLCA(succinic_sys, CFs, sugarcane, product_stream, ['SuccinicAcid',], 
-                           [], CT801, CWP802, BT701, True,
-                           credit_feedstock_CO2_capture=True, add_EOL_GWP=True)
+succinic_LCA = SuccinicLCA(system=succinic_sys, 
+                 CFs=CFs, 
+                 feedstock=sugarcane, 
+                 main_product=product_stream, 
+                 main_product_chemical_IDs=['SuccinicAcid',], 
+                 by_products=[], 
+                 cooling_tower=u.CT801, 
+                 chilled_water_processing_units=[u.CWP802,], 
+                 boiler=u.BT701, has_turbogenerator=True,
+                 credit_feedstock_CO2_capture=True, 
+                 add_EOL_GWP=True,
+                 )
 
 #%% Simulate and print
 spec.load_specifications(spec.baseline_yield, spec.baseline_titer, spec.baseline_productivity)
-simulate_and_print()
+get_product_stream_MPSP()
 
 #%% TEA breakdown (old)
 

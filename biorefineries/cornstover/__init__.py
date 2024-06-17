@@ -47,6 +47,7 @@ def load():
     br = Biorefinery('corn stover ethanol')
     dct = globals()
     dct.update(br.__dict__)
+    dct['chemicals'] = br.chemicals
     _biorefinery_loaded = True
 
 def __getattr__(name):

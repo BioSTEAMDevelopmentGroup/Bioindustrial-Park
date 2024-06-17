@@ -22,9 +22,9 @@ GWP_characterization_factors = { # Material GWP cradle-to-gate [kg*CO2*eq / kg]
     'cellulase': 8.07, # GREET
     'H3PO4': 1.00, # GREET
     'lime': 1.164, # GREET
-    'MgSO4': 0.86221, # Ecoinvent 2021
+    'MgSO4': 3.9902e-1, # Ecoinvent 3.6, IPCC 2013
     'urea': 1.81, # GREET
-    'pure-glycerol': 1.6678, # Ecoinvent, TRACI, market for glycerine, RoW; 
+    'pure-glycerol': 3.3318, # Ecoinvent, IPCC 2013, market for glycerine, RoW; 
     'crude-glycerol': 0.36, # GREET
     'biodiesel': 1.13, # Soybean biodiesel GREET
     'DAP': 1.66, # GREET
@@ -38,7 +38,19 @@ GWP_characterization_factors = { # Material GWP cradle-to-gate [kg*CO2*eq / kg]
     'Electricity': 0.36, # [kg*CO2*eq / kWhr] From GREET; NG-Fired Simple-Cycle Gas Turbine CHP Plant
     # 0.66 is the GWP from producing diesel from GREET; Conventional diesel from crude oil for US Refineries.
     # Downstream fuel emissions are added in. Accounts for how biodiesel has less energy than diesel.
-    'biodiesel displacement': 0.92 * (0.66 +  (12 * 12.01 + 24 * 16) / (12 * 12.01 + 23 * 1.008)) 
+    'biodiesel displacement': 0.92 * (0.66 +  (12 * 12.01 + 24 * 16) / (12 * 12.01 + 23 * 1.008)) ,
+    
+    # The following ecoinvent entries are from v3.8, allocation at the point of substitution
+    # Ecoinvent, market for sodium hydrogen sulfite, GLO,
+    # converted to 38% solution
+    'bisulfite': 1.2871 * 0.38,
+
+    # Ecoinvent, market for citric acid, GLO
+    'citric acid': 5.9048,
+
+    # Ecoinvent, market for sodium hypochlorite, without water, in 15% solution state, RoW,
+    # converted to 12.5 wt% solution (15 vol%)
+    'NaOCl': 2.4871 * 0.125,
 }
 
 GWP_characterization_factors['methanol catalyst mixture'] = (

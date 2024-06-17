@@ -34,6 +34,7 @@ __all__ = (
 def create_oilcane_to_biodiesel_and_ethanol_1g(
         ins, outs,
         evaporator_and_beer_column_heat_integration=True,
+        WWT_kwargs=None,
     ):
     oilcane, = ins
     ethanol, biodiesel, crude_glycerol, vinasse = outs
@@ -103,7 +104,7 @@ def create_oilcane_to_biodiesel_and_ethanol_1g(
         area=500,
         udct=True,
     )
-    MX = bst.Mixer(500, [transesterification_and_biodiesel_separation_sys-2, wastewater], 'wastewater')
+    MX1 = bst.Mixer(500, [transesterification_and_biodiesel_separation_sys-2, wastewater], 'wastewater')
 
     ### Facilities ###
     s = f.stream
@@ -112,8 +113,29 @@ def create_oilcane_to_biodiesel_and_ethanol_1g(
         [polar_lipids, bagasse]
     )
     # Burn bagasse from conveyor belt
+    bst.CoolingTower(700)
+    MX3 = bst.Mixer(700, [evaporator_condensate_b, stripper_bottoms_product], 'recycle_process_water')
+    bst.ChilledWaterPackage(700)
+    
+    if WWT_kwargs:
+        outs.remove(vinasse)
+        MX1.ins.append(vinasse)
+        wastewater_treatment_sys = bst.create_wastewater_treatment_system(
+            area=900, ins=[MX1-0], mockup=True, **WWT_kwargs
+        )
+        treated_water = wastewater_treatment_sys.get_outlet('RO_treated_water')
+        sludge = wastewater_treatment_sys.get_outlet('sludge')
+        biogas = wastewater_treatment_sys.get_outlet('biogas')
+        MX2.ins.append(sludge)
+    else:
+        treated_water = ''
+        biogas = ''
+        
+    bst.ProcessWaterCenter(700, [treated_water, 'makeup_RO_water', MX3-0, 'makeup_water'], 
+                           process_water_price=0.000254)
+    
     bst.BoilerTurbogenerator(600,
-        (MX2-0, '', 
+        (MX2-0, biogas, 
          'boiler_makeup_water',
          'natural_gas',
          'FGD_lime',
@@ -121,26 +143,9 @@ def create_oilcane_to_biodiesel_and_ethanol_1g(
         ('emissions', 'rejected_water_and_blowdown', 'ash_disposal'),
         turbogenerator_efficiency=0.85
     )
-    bst.CoolingTower(700)
-    makeup_water_streams = (s.cooling_tower_makeup_water,
-                            s.boiler_makeup_water)
-    process_water_streams = (s.imbibition_water,
-                             s.biodiesel_wash_water,
-                             s.rvf_wash_water,
-                             s.stripping_water,
-                             *makeup_water_streams)
-    makeup_water = bst.Stream('makeup_water', price=0.000254)
-    MX = bst.Mixer(700, [evaporator_condensate_b, stripper_bottoms_product], 'recycle_process_water')
-    bst.ChilledWaterPackage(700)
-    bst.ProcessWaterCenter(700,
-        (MX-0, makeup_water),
-        (),
-        None,
-        makeup_water_streams,
-        process_water_streams
-    )
+    
     def get_hx_issues():
-        hxs = [u.E301, u.D501.boiler, u.D502.boiler, u.H501, u.H502, u.H503, u.H504, oil_pretreatment_dct['F3'], u.H506]
+        hxs = [u.E301, u.D501.reboiler, u.D502.reboiler, u.H501, u.H502, u.H503, u.H504, oil_pretreatment_dct['F3'], u.H506]
         condenser = getattr(u.E401, 'condenser', None)
         if condenser: hxs.append(condenser)
         return hxs

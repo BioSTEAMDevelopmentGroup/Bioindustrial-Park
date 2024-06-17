@@ -10,6 +10,7 @@ import pandas as pd
 import os
 from chaospy import distributions as shape
 from math import sqrt
+from sklearn.linear_model import LinearRegression
 
 __all__ = (
     'ethanol_no_RIN_price_distribution', 
@@ -27,6 +28,7 @@ __all__ = (
     'mean_natural_gas_price',
     'mean_electricity_price',
     'mean_soymeal_price',
+    'prices',
 )
 
 liter_per_gal = 3.7854
@@ -95,6 +97,7 @@ biomass_based_diesel_prices = np.array([ # USD / gal June 2017 - Sep 2022, by mo
 crude_oil_prices = np.array([ # USD / barrel West Texas Intermediate 2018 - 2022; https://www.macrotrends.net/1369/crude-oil-price-history-chart
     65.23, 56.99, 39.68, 68.17, 94.53
 ])
+crude_oil_prices /= 119.240471 # To USD / L
 
 def by_month_to_year(arr):
     N_years = int(len(arr)/12)
@@ -158,6 +161,7 @@ def fit_triangular_distribution(x, median=False):
     else:
         c = 3 * np.mean(x) - (a + b)
         if c < a: c = a + 1e-6
+        elif c > b: c = b - 1e-6
     return a, b, c
 
 def plot_triangular_distribution(a, b, c):
@@ -166,10 +170,22 @@ def plot_triangular_distribution(a, b, c):
 def plot_histogram(x, *args, bins=10, density=True, **kwargs):
     return plt.hist(x, *args, **kwargs)
 
+def fit_gaussian_from_residuals(residuals):
+    std = np.std(residuals, ddof=2)
+    std2 = 2. * std
+    return shape.Trunc(
+        shape.Normal(0, std), 
+        lower=-std2, upper=std2,
+    )
+
 # Price distributions
+RIN_D3_price_distribution = triangular_distribution(RIN_D3_prices)
+RIN_D4_price_distribution = triangular_distribution(RIN_D4_prices)
+RIN_D5_price_distribution = triangular_distribution(RIN_D5_prices)
 ethanol_no_RIN_price_distribution = triangular_distribution(ethanol_no_RIN_prices)
 advanced_ethanol_price_distribution = triangular_distribution(advanced_ethanol_prices)
 cellulosic_ethanol_price_distribution = triangular_distribution(cellulosic_ethanol_prices)
+biodiesel_no_RIN_price_distribution = triangular_distribution(biodiesel_no_RIN_prices)
 biomass_based_diesel_price_distribution = triangular_distribution(biomass_based_diesel_prices)
 cellulosic_based_diesel_price_distribution = triangular_distribution(cellulosic_based_diesel_prices)
 natural_gas_price_distribution = triangular_distribution(natural_gas_prices)
@@ -179,10 +195,12 @@ crude_oil_price_distribution = triangular_distribution(crude_oil_prices)
 # Mean values
 mean_glycerol_price = (0.10 + 0.22) * 0.5 
 mean_RIN_D3_price = np.mean(RIN_D3_prices)
+mean_RIN_D4_price = np.mean(RIN_D4_prices)
 mean_RIN_D5_price = np.mean(RIN_D5_prices)
 mean_ethanol_no_RIN_price = np.mean(ethanol_no_RIN_prices)
 mean_cellulosic_ethanol_price = np.mean(cellulosic_ethanol_prices)
 mean_advanced_ethanol_price = np.mean(advanced_ethanol_prices)
+mean_biodiesel_no_RIN_price = np.mean(biodiesel_no_RIN_prices)
 mean_biomass_based_diesel_price = np.mean(biomass_based_diesel_prices)
 mean_cellulosic_based_diesel_price = np.mean(cellulosic_based_diesel_prices)
 mean_natural_gas_price = np.mean(natural_gas_prices)
@@ -202,23 +220,35 @@ maep = mean_advanced_ethanol_price
 mcop = mean_crude_oil_price
 copd = crude_oil_price_distribution
 
-f_ngp = np.mean(natural_gas_prices) / mcop
-f_elecp = np.mean(electricity_prices) / np.mean(crude_oil_prices[:-1])
-f_bp = mbp / mcop
-f_cbp = mcbp / mcop
-f_aep = maep / mcop
-f_cep = mcep / mcop
+# Use linear regression to create models with crude oil price as the predictor
+predictor = crude_oil_prices[:, np.newaxis]
+prices = {
+    'Natural gas': natural_gas_prices,
+    'Ethanol': ethanol_no_RIN_prices,
+    'Biodiesel': biodiesel_no_RIN_prices,
+    'Biomass based diesel': biomass_based_diesel_prices,
+    'Cellulosic based diesel': cellulosic_based_diesel_prices,
+    'Advanced ethanol': advanced_ethanol_prices,
+    'Cellulosic ethanol': cellulosic_ethanol_prices,
+}
 
-ngp_offset = f_ngp * crude_oil_prices - natural_gas_prices
-elecp_offset = f_elecp * crude_oil_prices[:-1] - electricity_prices
-bp_offset = f_bp * crude_oil_prices - biomass_based_diesel_prices
-cbp_offset = f_cbp * crude_oil_prices - cellulosic_based_diesel_prices
-aep_offset = f_aep * crude_oil_prices - advanced_ethanol_prices
-cep_offset = f_cep * crude_oil_prices - cellulosic_ethanol_prices
+models = {
+    name: LinearRegression().fit(predictor, data)
+    for name, data in prices.items()
+}
 
-ngpd_offset = triangular_distribution(ngp_offset)
-elecpd_offset = triangular_distribution(elecp_offset)
-bpd_offset = triangular_distribution(bp_offset)
-cbpd_offset = triangular_distribution(cbp_offset)
-aepd_offset = triangular_distribution(aep_offset)
-cepd_offset = triangular_distribution(cep_offset)
+scores = {
+    name: model.score(predictor, prices[name]) for name, model in models.items()
+}
+
+residuals = {
+    name: model.predict(predictor) - prices[name] for name, model in models.items()    
+}
+prices['Electricity'] = electricity_prices
+models['Electricity'] = emodel = LinearRegression().fit(predictor[:-1], electricity_prices)
+scores['Electricity'] = emodel.score(predictor[:-1], electricity_prices) # R2s
+residuals['Electricity'] = emodel.predict(predictor[:-1]) - electricity_prices
+residual_distributions = {
+    name: fit_gaussian_from_residuals(diff) for name, diff in residuals.items()    
+}
+

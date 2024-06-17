@@ -283,6 +283,8 @@ Glucan.copy_models_from(Glucose, ['Cn'])
 Mannan = chemical_copied('Mannan', Glucan)
 Galactan = chemical_copied('Galactan', Glucan)
 
+MEA = chemical_database(ID='MEA', search_ID='Monoethanolamine')
+
 Xylan = chemical_defined('Xylan', phase='s', formula='C5H8O4', Hf=-182100*_cal2joule)
 Xylan.copy_models_from(Xylose, ['Cn'])
 Arabinan = chemical_copied('Arabinan', Xylan)
@@ -476,6 +478,8 @@ defined_chemicals = {
 
 HP_chemicals.extend([i for i in sc.chemicals if i.ID not in defined_chemicals])
 # %%
+
+chems.append(tmo.Chemical(ID='CO2_compressible', search_ID='CO2'))
 
 # Though set_thermo will first compile the Chemicals object,
 # compile beforehand is easier to debug because of the helpful error message

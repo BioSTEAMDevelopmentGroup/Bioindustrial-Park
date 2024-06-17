@@ -45,7 +45,7 @@ class CellulosicEthanolTEA(TEA):
                  'maintenance', '_ISBL_DPI_cached', '_FCI_cached',
                  '_utility_cost_cached', '_steam_power_depreciation',
                  '_steam_power_depreciation_array',
-                 'boiler_turbogenerator')
+                 'boiler_turbogenerator', '_DPI_cached')
     
     def __init__(self, system, IRR, duration, depreciation, income_tax,
                  operating_days, lang_factor, construction_schedule,
@@ -91,7 +91,7 @@ class CellulosicEthanolTEA(TEA):
     
     @property
     def ISBL_installed_equipment_cost(self):
-        return self._ISBL_DPI(self.DPI)
+        return self._ISBL_DPI(self.installed_equipment_cost)
     
     @property
     def OSBL_installed_equipment_cost(self):
@@ -132,20 +132,26 @@ class CellulosicEthanolTEA(TEA):
             self._ISBL_DPI_cached = installed_equipment_cost - self.OSBL_installed_equipment_cost
         return self._ISBL_DPI_cached
         
-    def _DPI(self, installed_equipment_cost):
+    def _DPI(self, installed_equipment_cost): # Direct Permanent Investment
         factors = self.warehouse + self.site_development + self.additional_piping
-        return installed_equipment_cost + self._ISBL_DPI(installed_equipment_cost) * factors
+        self._DPI_cached = DPI = installed_equipment_cost + self._ISBL_DPI(installed_equipment_cost) * factors
+        return DPI
     
-    def _indirect_costs(self, TDC):
-        return TDC*(self.proratable_costs + self.field_expenses
-                    + self.construction + self.contingency
-                    + self.other_indirect_costs)
+    def _TDC(self, DPI): # Total Depreciable Capital
+        return DPI + self._depreciable_indirect_costs(DPI)
     
-    def _FCI(self, TDC):
-        self._FCI_cached = FCI = TDC + self._indirect_costs(TDC)
+    def _nondepreciable_indirect_costs(self, DPI):
+        return DPI * self.other_indirect_costs
+    
+    def _depreciable_indirect_costs(self, DPI):
+        return DPI * (self.proratable_costs + self.field_expenses
+                      + self.construction + self.contingency)
+    
+    def _FCI(self, TDC): # Fixed Capital Investment
+        self._FCI_cached = FCI = TDC + self._nondepreciable_indirect_costs(self._DPI_cached)
         return FCI
     
-    def _FOC(self, FCI):
+    def _FOC(self, FCI): # Fixed Operating Costs
         return (FCI * self.property_insurance
                 + self._ISBL_DPI_cached * self.maintenance
                 + self.labor_cost * (1 + self.labor_burden))
@@ -175,7 +181,7 @@ def create_cellulosic_ethanol_tea(sys, OSBL_units=None, cls=None):
         WC_over_FCI=0.05,
         finance_interest=0.08,
         finance_years=10,
-        finance_fraction=0.4,
+        finance_fraction=0.6,
         OSBL_units=OSBL_units,
         warehouse=0.04, 
         site_development=0.09, 
@@ -222,7 +228,6 @@ def capex_table(teas, names=None):
     TCI = FCI + working_capital
     capex.entry('Total capital investment (TCI)', TCI)
     if names is None: names = [i.system.ID for i in teas]
-    names = [i + ' MM$' for i in names]
     return capex.table(names)
 
 voc_table = bst.report.voc_table
@@ -238,5 +243,4 @@ def foc_table(teas, names=None):
     foc.entry('Maintenance', tea.maintenance * ISBL, f'{tea.maintenance:.1%} of ISBL')
     foc.entry('Property insurance', tea.property_insurance * ISBL, f'{tea.property_insurance:.1%} of ISBL')
     if names is None: names = [i.system.ID for i in teas]
-    names = [i + ' MM$/yr' for i in names]
     return foc.table(names)

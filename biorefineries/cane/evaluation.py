@@ -1,11 +1,15 @@
 # -*- coding: utf-8 -*-
 """
 """
+import os
 import numpy as np
+import pandas as pd
 import biosteam as bst
 from warnings import warn
 from warnings import filterwarnings
 from biorefineries import cane
+from scipy import interpolate
+from scipy.ndimage.filters import gaussian_filter
 from chaospy import distributions as shape
 from .feature_mockups import (
     all_metric_mockups, 
@@ -19,11 +23,20 @@ from .results import (
 __all__ = (
     'evaluate_configurations_across_recovery_and_oil_content',
     'evaluate_configurations_across_sorghum_and_cane_oil_content',
-    'evaluate_metrics_across_composition_configurations',
-    'evaluate_metrics_across_composition',
+    'evaluate_metrics_at_composition',
+    'evaluate_metrics_oil_recovery_integration',
+    'evaluate_metrics_at_biomass_yield',
     'run_uncertainty_and_sensitivity',
     'save_pickled_results',
     'run_all',
+    'run_sugarcane_microbial_oil',
+    'run_oilcane_microbial_oil',
+    'run_oilcane_microbial_oil_across_oil_content',
+    'run_oilcane_microbial_oil_across_lines',
+    'run_oilcane_ethanol_constant_biomass',
+    'run_oilcane_microbial_oil_constant_biomass',
+    'save_target_biomass_yield',
+    'run_oilcane_development_pathway',
 )
 
 configuration_names = (
@@ -93,74 +106,55 @@ evaluate_configurations_across_sorghum_and_cane_oil_content = no_derivative(
     )
 )
 
-def evaluate_metrics_at_composition(oil, fiber, water, configuration):
-    br = cane.Biorefinery(configuration)
-    cs = br.composition_specification
-    if br.ROI_target is None:
-        if configuration == 'O2':
-            S2 = cane.Biorefinery('S2')
-            S2.set_cane_oil_content.setter(0)
-            S2.update_dry_biomass_yield(br.baseline_dry_biomass_yield)
-            S2.sys.simulate()
-            br.ROI_target = S2.ROI()
-        else:
-            br.set_cane_oil_content.setter(0)
-            br.composition_specification.oil = -1 # Not zero so that competitive biomass metric works
-            br.update_dry_biomass_yield(br.baseline_dry_biomass_yield)
-            br.sys.simulate()
-            br.ROI_target = br.ROI()
-    try:
-        cane.load_composition(br.feedstock, oil, water, fiber, cs.FFA, cs.PL)
-    except ValueError:
-        return np.array([np.nan for i in br.model.metrics])
-    br.sys.simulate()
-    return np.array([i() for i in br.model.metrics])
-
-evaluate_metrics_across_composition = no_derivative(
-    np.vectorize(
-        evaluate_metrics_at_composition, 
-        excluded=['configuration'],
-        signature=f'(),(),(),()->({N_metrics})'
-    )
-)
-
-def evaluate_metrics_across_composition_configurations(oil, fiber):
-    data = np.zeros([2, N_metrics])
-    for i, configuration in enumerate(['O2', 'O6']):
+@no_derivative
+def evaluate_metrics_at_composition(oil, fiber):
+    data = np.zeros([N_metrics, 2])
+    for i, configuration in enumerate(['O7', 'O9']):
         br = cane.Biorefinery(configuration)
         cs = br.composition_specification
         if br.ROI_target is None:
-            if configuration == 'O2':
-                S2 = cane.Biorefinery('S2')
-                S2.set_cane_oil_content.setter(0)
-                S2.update_dry_biomass_yield(br.baseline_dry_biomass_yield)
-                S2.sys.simulate()
-                br.ROI_target = S2.ROI()
-            else:
-                br.set_cane_oil_content.setter(0)
-                br.composition_specification.oil = -1 # Not zero so that competitive biomass metric works
-                br.update_dry_biomass_yield(br.baseline_dry_biomass_yield)
-                br.sys.simulate()
-                br.ROI_target = br.ROI()
-        water = 0.65
-        if oil == 0 and configuration == 'O2':
-            data[i, :] = [np.nan for i in br.model.metrics]
-            continue
+            br.set_composition_by_line('WT')
+            br.sys.simulate()
+            br.ROI_target = br.ROI()
         try:
-            cane.load_composition(br.feedstock, oil, water, fiber, cs.FFA, cs.PL)
-        except ValueError:
-            data[i, :] = [np.nan for i in br.model.metrics]
+            cane.load_composition(br.feedstock, oil, cs.moisture, fiber, cs.FFA, cs.PL)
+        except ValueError as e:
+            print(e)
+            print(f'oil={oil}, water={cs.water}, fiber={fiber}, FFA={cs.FFA}, PL={cs.PL}')
+            data[:, i] = [np.nan for i in br.model.metrics]
             continue
         br.sys.simulate()
-        data[i, :] = [i() for i in br.model.metrics]
+        data[:, i] = [i() for i in br.model.metrics]
     return data
 
-evaluate_metrics_across_composition_configurations = no_derivative(
-    np.vectorize(
-        evaluate_metrics_across_composition_configurations, 
-        signature=f'(),() ->(2, {N_metrics})'
-    )
-)
+@no_derivative
+def evaluate_metrics_at_biomass_yield(oil, dry_biomass_yield):
+    data = np.zeros([N_metrics, 2])
+    for i, configuration in enumerate(['O7', 'O9']):
+        br = cane.Biorefinery(configuration)
+        br.composition_specification.load_oil_content(oil / 100, moisture=0.65)
+        br.dry_biomass_yield = dry_biomass_yield
+        br.update_feedstock()
+        br.sys.simulate()
+        data[:, i] = [i() for i in br.model.metrics]
+    return data
+
+@no_derivative
+def evaluate_metrics_oil_recovery_integration(microbial_oil_recovery, microbial_oil_yield, productivity, titer):
+    nrows = productivity.size
+    data = np.zeros([nrows, 3, N_metrics])
+    for i in range(nrows):
+        for j, configuration in enumerate(['O7.WT', 'O9.WT', 'O8.WT']):
+            # print(configuration, microbial_oil_recovery, microbial_oil_yield)
+            br = cane.Biorefinery(configuration)
+            br.set_fermentation_microbial_oil_productivity.setter(productivity[i])
+            br.set_fermentation_microbial_oil_titer.setter(titer[i])
+            br.set_microbial_oil_recovery.setter(microbial_oil_recovery)
+            br.set_glucose_to_microbial_oil_yield.setter(microbial_oil_yield)
+            br.set_xylose_to_microbial_oil_yield.setter(microbial_oil_yield)
+            br.sys.simulate()
+            data[i, j, :] = [i() for i in br.model.metrics]
+    return data
 
 def save_pickled_results(N, configurations=None, rule='L', optimize=True):
     from warnings import filterwarnings
@@ -194,7 +188,9 @@ def run_uncertainty_and_sensitivity(name, N, rule='L',
                                     autosave=True,
                                     autoload=True,
                                     optimize=True,
+                                    N_coordinate=None,
                                     **kwargs):
+    print(f"Running {name}!")
     filterwarnings('ignore', category=bst.exceptions.DesignWarning)
     filterwarnings('ignore', category=bst.exceptions.CostWarning)
     br = cane.Biorefinery(name, **kwargs)
@@ -206,10 +202,15 @@ def run_uncertainty_and_sensitivity(name, N, rule='L',
         df = cane.get_composition_data()
         current_line = [None]
         if name == 'O2': 
-            br_sugarcane = cane.Biorefinery(name.replace('O2', 'S2'), **kwargs)
+            sugarcane_name = name.replace('O2', 'S2')
+        else:
+            sugarcane_name = name
+        br_sugarcane = cane.Biorefinery(f'{sugarcane_name}.WT', **kwargs)
         def set_line(line, current_line=current_line):
-            if name == 'O2': 
-                config = br_sugarcane if line in ('WT', 'EC') else br
+            if name in ('O1', 'O2'): 
+                config = br_sugarcane if line == 'WT' else br
+            else:
+                config = br
             config.set_feedstock_line(line)
             current_line[0] = line
             np.random.seed(1)
@@ -218,7 +219,11 @@ def run_uncertainty_and_sensitivity(name, N, rule='L',
         @no_derivative
         def evaluate(current_line=current_line, **kwargs):
             line = current_line[0]
-            if name == 'O2': config = br_sugarcane if line in ('WT', 'EC') else br
+            print(line)
+            if name in ('O1', 'O2'): 
+                config = br_sugarcane if line == 'WT' else br
+            else:
+                config = br
             autoload_file = autoload_file_name(f"{name}_{config.feedstock_line}")
             config.model.evaluate(
                 autosave=autosave, 
@@ -240,6 +245,7 @@ def run_uncertainty_and_sensitivity(name, N, rule='L',
         )
     elif across_oil_content:
         evaluate = None
+        # Remove cane oil content setter and replace with ROI target setter
         parameter = br.set_cane_oil_content
         parameter.name = 'ROI target'
         parameter.element = 'Biorefinery'
@@ -247,6 +253,10 @@ def run_uncertainty_and_sensitivity(name, N, rule='L',
         br.set_ROI_target = parameter
         parameter.units = '%'
         del br.set_cane_oil_content
+        # Ignore dry biomass yield setter
+        parameter = br.set_dry_biomass_yield
+        parameter.setter(br.baseline_dry_biomass_yield)
+        parameter.setter = lambda parameter: None
         np.random.seed(1)
         samples = br.model.sample(N, rule)
         
@@ -254,33 +264,35 @@ def run_uncertainty_and_sensitivity(name, N, rule='L',
             br.ROI_target = ROI_target
             
         br.set_ROI_target.setter = set_ROI_target
-        coordinate = np.linspace(0, 0.1, 15)
+        coordinate = np.round(
+            np.linspace(0, 0.15, N_coordinate or 31),
+            6,
+        )
         if across_oil_content == 'oilcane vs sugarcane':
             # Replace `set_cane_oil_content` parameter with `set_ROI_target`.
             # The actual distribution does not matter because these values are updated
             # on the first coordinate when the oil content is 0 (i.e., when the feedstock is sugarcane).
-            if '5' in name or '6' in name:
+            if any([i in name for i in ('5', '6', '7', '8', '9')]):
                 br_sugarcane = None
                 br.model.metrics = [br.ROI, br.competitive_biomass_yield, br.net_energy_production]
-                br.update_dry_biomass_yield(br.baseline_dry_biomass_yield)
             else:
                 # Only sugarcane needs the ROI metric (which gets added later)
                 br.model.metrics = [br.competitive_biomass_yield, br.energy_competitive_biomass_yield]
                 br_sugarcane = cane.Biorefinery(name.replace('O', 'S'))
-                br_sugarcane.update_dry_biomass_yield(br.baseline_dry_biomass_yield)
         elif across_oil_content == 'microbial oil vs bioethanol':
-            ethanol_name = name.replace('5', '1').replace('6', '2')
-            br_ethanol = cane.Biorefinery(ethanol_name)
-            br.feedstock.price = br_ethanol.feedstock.price = 0.035 # Same feedstock, same price, but actual price does not matter
-            parameter = br_ethanol.set_cane_oil_content
-            parameter.setter = lambda obj: None # Dissable parameter
-            br_ethanol.model.metrics = [br_ethanol.ROI]
-            br.model.metrics = [br.competitive_microbial_oil_yield, br.energy_competitive_microbial_oil_yield] # Only interested in this
-            br.model.specification = lambda: None # No need to simulate before metric
-            br_ethanol.model.load_samples(samples)
-            br_sugarcane = cane.Biorefinery(ethanol_name.replace('O', 'S'))
-            br_ethanol.update_dry_biomass_yield(br_ethanol.baseline_dry_biomass_yield)
-            br.update_dry_biomass_yield(br.baseline_dry_biomass_yield)
+            raise NotImplementedError('microbial oil vs bioethanol is not yet ready')
+            # ethanol_name = name
+            # for i, j in [('5', '1'), ('6', '2'), ('7', '1'), ('8', '2')]:
+            #     ethanol_name = ethanol_name.replace(i, j)
+            # br_ethanol = cane.Biorefinery(ethanol_name)
+            # br.feedstock.price = br_ethanol.feedstock.price = 0.035 # Same feedstock, same price, but actual price does not matter
+            # parameter = br_ethanol.set_cane_oil_content
+            # parameter.setter = lambda obj: None # Dissable parameter
+            # br_ethanol.model.metrics = [br_ethanol.ROI]
+            # br.model.metrics = [br.competitive_microbial_oil_yield, br.energy_competitive_microbial_oil_yield] # Only interested in this
+            # br.model.specification = lambda: None # No need to simulate before metric
+            # br_ethanol.model.load_samples(samples)
+            # br_sugarcane = cane.Biorefinery(ethanol_name.replace('O', 'S'))
         else:
             raise ValueError(
                 "`across_oil_content` must be either 'oilcane vs sugarcane' "
@@ -300,7 +312,6 @@ def run_uncertainty_and_sensitivity(name, N, rule='L',
                 if br.composition_specification.oil == 0.:
                     # Configurations 1 and 2 do not work at zero oil content, so gotta go with respective sugarcane configuration.
                     if br_sugarcane:
-                        br_sugarcane.update_dry_biomass_yield(br_sugarcane.baseline_dry_biomass_yield)
                         br_sugarcane.model.evaluate(
                             autosave=autosave, 
                             autoload=autoload,
@@ -314,7 +325,6 @@ def run_uncertainty_and_sensitivity(name, N, rule='L',
                         br.model._samples[:, br.model.parameters.index(br.set_ROI_target)] = column.values
                         br.model.table[br.competitive_biomass_yield.index] = br.baseline_dry_biomass_yield
                     else:
-                        br.update_dry_biomass_yield(br.baseline_dry_biomass_yield)
                         br.model.evaluate(
                             autosave=autosave, 
                             autoload=autoload,
@@ -332,35 +342,35 @@ def run_uncertainty_and_sensitivity(name, N, rule='L',
                         **kwargs,
                     )
             elif across_oil_content == 'microbial oil vs bioethanol':
-                autoload_file += '_mo_vs_etoh'
-                assert name in ('O6', 'O5')
-                # For configurations 5 and 6, find the microbial oil yield required
-                # to get the same ROI as bioethanol production
-                if br.composition_specification.oil == 0.:
-                    br_sugarcane.update_dry_biomass_yield(br_sugarcane.baseline_dry_biomass_yield)
-                    br_sugarcane.model.evaluate(
-                        autosave=autosave, 
-                        autoload=autoload,
-                        file=autoload_file,
-                        **kwargs,
-                    )
-                    br.model.table[br.set_ROI_target.index] = column = br_sugarcane.model.table[br_sugarcane.ROI.index]
-                else:
-                    br_ethanol.composition_specification.load_oil_content(br.composition_specification.oil) # Load coordinate (oil content)
-                    br_ethanol.model.evaluate(
-                        autosave=autosave, 
-                        autoload=autoload,
-                        file=autoload_file,
-                        **kwargs,
-                    )
-                    br.model.table[br.set_ROI_target.index] = column = br_ethanol.model.table[br_ethanol.ROI.index]
-                br.model._samples[:, br.model.parameters.index(br.set_ROI_target)] = column.values
-                br.model.evaluate(
-                    autosave=autosave, 
-                    autoload=autoload,
-                    file=autoload_file,
-                    **kwargs,
-                )
+                raise NotImplementedError('microbial oil vs bioethanol is not yet ready')
+                # autoload_file += '_mo_vs_etoh'
+                # assert name in ('O6', 'O5')
+                # # For configurations 5 and 6, find the microbial oil yield required
+                # # to get the same ROI as bioethanol production
+                # if br.composition_specification.oil == 0.:
+                #     br_sugarcane.model.evaluate(
+                #         autosave=autosave, 
+                #         autoload=autoload,
+                #         file=autoload_file,
+                #         **kwargs,
+                #     )
+                #     br.model.table[br.set_ROI_target.index] = column = br_sugarcane.model.table[br_sugarcane.ROI.index]
+                # else:
+                #     br_ethanol.composition_specification.load_oil_content(br.composition_specification.oil) # Load coordinate (oil content)
+                #     br_ethanol.model.evaluate(
+                #         autosave=autosave, 
+                #         autoload=autoload,
+                #         file=autoload_file,
+                #         **kwargs,
+                #     )
+                #     br.model.table[br.set_ROI_target.index] = column = br_ethanol.model.table[br_ethanol.ROI.index]
+                # br.model._samples[:, br.model.parameters.index(br.set_ROI_target)] = column.values
+                # br.model.evaluate(
+                #     autosave=autosave, 
+                #     autoload=autoload,
+                #     file=autoload_file,
+                #     **kwargs,
+                # )
             
         br.model.evaluate_across_coordinate(
             name='Oil content',
@@ -372,10 +382,10 @@ def run_uncertainty_and_sensitivity(name, N, rule='L',
             xlfile=file,
         )
     else:
+        autoload_file = autoload_file_name(name)
         np.random.seed(1)
         samples = br.model.sample(N, rule)
         br.model.load_samples(samples, optimize=optimize)
-        autoload_file = autoload_file_name(name)
         success = False
         if not derivative: br.disable_derivative()
         for i in range(3):
@@ -412,10 +422,110 @@ def run_all(N, across_lines=False, rule='L', configurations=None,
     if configurations is None: configurations = configuration_names
     for name in configurations:
         if filter and not filter(name): continue
-        print(f"Running {name}:")
         run_uncertainty_and_sensitivity(
             name, N, rule, across_lines, **kwargs
         )
 
+def run_sugarcane_microbial_oil(N=None):
+    if N is None: N = 5000
+    filterwarnings('ignore')
+    cane.YRCP2023()
+    run_uncertainty_and_sensitivity('O7.WT', N)
+    run_uncertainty_and_sensitivity('O9.WT', N)
     
-        
+def run_oilcane_microbial_oil(N=None):
+    if N is None: N = 5000
+    filterwarnings('ignore')
+    cane.YRCP2023()
+    run_uncertainty_and_sensitivity('O7', N)
+    run_uncertainty_and_sensitivity('O9', N)
+
+def run_oilcane_ethanol_constant_biomass(N=None):
+    if N is None: N = 5000
+    filterwarnings('ignore')
+    cane.YRCP2023()
+    run_uncertainty_and_sensitivity('O1|constant biomass yield', N)
+    run_uncertainty_and_sensitivity('O2|constant biomass yield', N)
+
+def run_oilcane_microbial_oil_constant_biomass(N=None):
+    if N is None: N = 5000
+    filterwarnings('ignore')
+    cane.YRCP2023()
+    run_uncertainty_and_sensitivity('O7|constant biomass yield', N)
+    run_uncertainty_and_sensitivity('O9|constant biomass yield', N)
+
+def run_oilcane_microbial_oil_across_oil_content(N=None, N_coordinate=None, configurations=None):
+    if N is None: N = 200
+    filterwarnings('ignore')
+    cane.YRCP2023()
+    if configurations is None: configurations = ('O7', 'O9')
+    elif isinstance(configurations, str): configurations = [configurations]
+    for config in configurations:
+        run_uncertainty_and_sensitivity(config, N, across_oil_content='oilcane vs sugarcane', N_coordinate=N_coordinate)
+    # run_uncertainty_and_sensitivity('O8', N, across_oil_content='oilcane vs sugarcane')
+    # run_uncertainty_and_sensitivity('O1', N, across_oil_content='oilcane vs sugarcane')
+    # run_uncertainty_and_sensitivity('O2', N, across_oil_content='oilcane vs sugarcane')        
+    
+def run_oilcane_development_pathway(N=None, configuration=None):
+    if N is None: N = 5000
+    filterwarnings('ignore')
+    cane.YRCP2023()
+    if configuration is None: configuration = 'O7'
+    for i in (
+        '1566|baseline fermentation performance', 
+        '1566|target fermentation performance',
+        'Target|target fermentation performance',
+        'Ideal|target fermentation performance',
+    ):
+        run_uncertainty_and_sensitivity(
+            f'{configuration}.{i}', N
+        )
+    
+def run_oilcane_microbial_oil_across_lines(N=None, configurations=None):
+    if N is None: N = 5000
+    filterwarnings('ignore')
+    cane.YRCP2023()
+    if configurations is None: configurations = ('O7', 'O9')
+    elif isinstance(configurations, str): configurations = [configurations]
+    for i in configurations: run_uncertainty_and_sensitivity(i, N, across_lines=True)
+
+def save_target_biomass_yield(configuration='O7'):
+    # Set CABBI feedstock target
+    br = cane.Biorefinery(configuration, simulate=False)
+    file = monte_carlo_file(configuration, across_lines=False, across_oil_content='oilcane vs sugarcane')
+    CBY_df = pd.read_excel(
+        file, 
+        sheet_name=cane.competitive_biomass_yield.short_description,
+        index_col=0)
+    CBY_df = CBY_df.dropna()
+    oil_content = np.array(CBY_df.columns) * 100
+    q = np.max(CBY_df, axis=0)
+    q = gaussian_filter(q, 1)
+    f = interpolate.interp1d(oil_content, q)
+    feedstock = br.feedstock.copy()
+    composition_folder = os.path.join(os.path.dirname(__file__), 'data')
+    file = os.path.join(composition_folder, 'cane_composition_data.xlsx')
+    df = pd.read_excel(file, header=[0, 1], index_col=[0])
+    df.loc['Target', ('Water (wt)', 'Mean')] = 0.65
+    feedstock.imass['Water'] = 0.
+    df.loc['Target', ('Fiber (dw)', 'Mean')] = feedstock.get_mass_fraction('Fiber')
+    df.loc['Target', ('Sugar (dw)', 'Mean')] = feedstock.get_mass_fraction('Sugar')
+    df.loc['Target', ('Stem oil (dw)', 'Mean')] = feedstock.get_mass_fraction('Oil')
+    df.loc['Target', ('Biomass yield (dry MT/ha)', 'Mean')] = target_biomass_yield = f(10)
+    df.loc['Target', ('Dry biomass yield (WT)', 'Mean')] = target_biomass_yield / br.baseline_dry_biomass_yield
+    
+    df.loc['Ideal', ('Water (wt)', 'Mean')] = 0.65
+    df.loc['Ideal', ('Fiber (dw)', 'Mean')] = feedstock.get_mass_fraction('Fiber')
+    df.loc['Ideal', ('Sugar (dw)', 'Mean')] = feedstock.get_mass_fraction('Sugar')
+    df.loc['Ideal', ('Stem oil (dw)', 'Mean')] = feedstock.get_mass_fraction('Oil')
+    df.loc['Ideal', ('Biomass yield (dry MT/ha)', 'Mean')] = br.baseline_dry_biomass_yield
+    df.loc['Ideal', ('Dry biomass yield (WT)', 'Mean')] = 1.
+    
+    df.to_excel(
+        file, 'Summarized'
+    )
+    
+# run_oilcane_ethanol_constant_biomass
+# run_oilcane_microbial_oil_across_lines
+# run_oilcane_microbial_oil_and_ethanol
+# run_sugarcane_microbial_oil_and_ethanol

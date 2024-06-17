@@ -20,6 +20,7 @@ from thermosteam import functional as fn
 from chemicals import atoms_to_Hill
 from thermosteam.utils import chemical_cache
 from biorefineries import cellulosic
+import biosteam as bst
 
 __all__ = (
     'create_sugarcane_chemicals',
@@ -30,19 +31,20 @@ __all__ = (
 )
 
 @chemical_cache
-def create_sugarcane_chemicals():
+def create_sugarcane_chemicals(yeast_includes_nitrogen=None):
+    if yeast_includes_nitrogen is None: yeast_includes_nitrogen = False
     (Water, Ethanol, Glucose, Sucrose, H3PO4, P4O10, CO2, Octane, O2, N2, CH4) = chemicals = tmo.Chemicals(
-        ['Water', 'Ethanol', 'Glucose', 'Sucrose', 'H3PO4', 'P4O10',
-         'CO2', 'Octane', 'O2', 'N2', 'CH4']
+        ['Water', 'Ethanol', 
+         tmo.Chemical('Glucose', phase='l'),
+         tmo.Chemical('Sucrose', phase='l'), 
+         tmo.Chemical('H3PO4', phase='l'),
+         tmo.Chemical('P4O10', phase='l'),
+         tmo.Chemical('CO2', phase='g'), 
+         'Octane', 
+         tmo.Chemical('O2', phase='g'), 
+         tmo.Chemical('N2', phase='g'), 
+         tmo.Chemical('CH4', phase='g')]
     )
-    O2.at_state(phase='g')
-    N2.at_state(phase='g')
-    CH4.at_state(phase='g')
-    CO2.at_state(phase='g')
-    H3PO4.at_state(phase='s')
-    P4O10.at_state(phase='s')
-    Glucose.at_state(phase='s')
-    Sucrose.at_state(phase='s')
     Glucose.N_solutes = 1
     Sucrose.N_solutes = 2
     
@@ -66,11 +68,12 @@ def create_sugarcane_chemicals():
     Solids = create_new_chemical('Solids', MW=1.)
     Yeast = create_new_chemical(
         'Yeast', 
-        formula='CH1.61O0.56N0.16',
+        formula='CH1.61O0.56N0.16' if yeast_includes_nitrogen else 'CH1.61O0.56',
         rho=1540,
+        Cp=Glucose.Cp(298.15),
         default=True,
-        Hf=-130412.73,
     )
+    Yeast.Hf = Glucose.Hf / Glucose.MW * Yeast.MW # Same as glucose to ignore heats related to growth
     CaO = create_new_chemical('CaO', formula='CaO')
 
     
@@ -184,8 +187,8 @@ def create_acetyl_diolein():
     return chemical
 
 @chemical_cache
-def create_oilcane_chemicals():
-    chemicals = create_sugarcane_chemicals().copy()
+def create_oilcane_chemicals(yeast_includes_nitrogen=None):
+    chemicals = create_sugarcane_chemicals(yeast_includes_nitrogen).copy()
     (Water, Ethanol, Glucose, Sucrose, H3PO4, P4O10, CO2, Octane, O2, N2, CH4, 
      Ash, Cellulose, Hemicellulose, Flocculant, Lignin, Solids, DryYeast, CaO) = chemicals
     
@@ -243,18 +246,20 @@ def create_oilcane_chemicals():
     return chemicals
 
 @chemical_cache
-def create_cellulosic_oilcane_chemicals():
-    oilcane_chemicals = create_oilcane_chemicals()
+def create_cellulosic_oilcane_chemicals(yeast_includes_nitrogen=None):
+    oilcane_chemicals = create_oilcane_chemicals(yeast_includes_nitrogen)
     cellulosic_chemicals = cellulosic.create_cellulosic_ethanol_chemicals()
-    removed = {'SuccinicAcid', 'H2SO4', 'Z_mobilis', 'Oil', 'Yeast'}
+    removed = {'SuccinicAcid', 'H2SO4', 'Z_mobilis', 'Oil'}
     chemicals = tmo.Chemicals([
         i for i in (oilcane_chemicals.tuple + cellulosic_chemicals.tuple) if i.ID not in removed
     ])
     chemicals.extend([
         create_acetyl_diolein(),
         tmo.Chemical('Urea', default=True, phase='l'),
-        chemicals.Glucose.copy('Yeast'),
     ])
+    chemicals.extend(
+        bst.wastewater.high_rate.create_missing_wwt_chemicals(chemicals)
+    )
     chemicals.compile()
     chemicals.set_synonym('AcetylDiOlein', 'AcTAG')
     chemicals.define_group('Lipid', ['PL', 'FFA', 'MAG', 'DAG', 'TAG', 'AcTAG'])

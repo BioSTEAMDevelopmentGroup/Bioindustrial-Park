@@ -110,7 +110,7 @@ NaNO3 = chemical_database('NaNO3', phase='l', Hf=-118756*_cal2joule)
 # NIST https://webbook.nist.gov/cgi/cbook.cgi?ID=C7757826&Mask=2, accessed 04/07/2020
 Na2SO4 = chemical_database('Na2SO4', phase='l', Hf=-1356.38e3)
 # CaSO4 = chemical_database('CaSO4', phase='s', Hf=-342531*_cal2joule)
-# The default Perry 151 model has a crazy value, use another model instead
+# The default Perry 151 model gives an inordinately high value, use another model instead
 # CaSO4.Cn.move_up_model_priority('Constant', 0)
 # 
 
@@ -118,8 +118,6 @@ Na2SO4 = chemical_database('Na2SO4', phase='l', Hf=-1356.38e3)
 # Soluble organic salts
 # =============================================================================
 
-Ethanol = chemical_database('Ethanol')
-Acetate = chemical_database('Acetate', phase='l', Hf=-108992*_cal2joule)
 AmmoniumAcetate = chemical_database('AmmoniumAcetate', phase='l', 
                                          Hf=-154701*_cal2joule)
 
@@ -146,8 +144,11 @@ AmmoniumAcetate = chemical_database('AmmoniumAcetate', phase='l',
 # =============================================================================
 
 AceticAcid = chemical_database('AceticAcid')
+SodiumAcetate = chemical_database('SodiumAcetate', phase='l')
+SodiumCitrate = chemical_database('SodiumCitrate', phase='l')
 Glucose = chemical_database('Glucose', phase = 'l')
 
+CitricAcid = chemical_database('CitricAcid')
 # IBA = chemical_database('Isobutyraldehyde')
 # DPHP = chemical_database('DipotassiumHydrogenPhosphate',
 #                          search_ID='Dipotassium hydrogen phosphate',
@@ -192,9 +193,12 @@ Protein = chemical_defined('Protein', phase='l',
 Enzyme = chemical_defined('Enzyme', phase='l', 
                            formula='CH1.59O0.42N0.24S0.01', 
                            Hf=-17618*_cal2joule)
-# Properties of fermentation microbes copied from Z_mobilis as in Humbird et al.
+# Hf from Z_mobilis as in Humbird et al.
+# Empirical formula from Niehus et al. 2018 (DOI: 10.1155/2018/6393749)
 FermMicrobe = chemical_defined('FermMicrobe', phase='l',
-                      formula='CH1.8O0.5N0.2', Hf=-31169.39*_cal2joule)
+                      # formula='CH1.8O0.5N0.2', 
+                      formula='CH1.82O0.51N0.12',
+                      Hf=-31169.39*_cal2joule)
 WWTsludge = chemical_defined('WWTsludge', phase='s', 
                              formula='CH1.64O0.39N0.23S0.0035', 
                              Hf=-23200.01*_cal2joule)
@@ -209,11 +213,16 @@ Furfural = chemical_database('Furfural')
 # Acetoin.Tb = 145.4 + 273.15
 
 
+Ethanol = chemical_database('Ethanol')
+
+Acetone = chemical_database('Acetone')
+IPA = chemical_database(ID='IPA', search_ID='Isopropanol')
+
 Hexanol = chemical_database('Hexanol')
 # Heptane = chemical_database('Heptane')
 
 
-THF = chemical_database(ID='Tetrahydrofuran')
+THF = chemical_database(ID='THF', search_ID='Tetrahydrofuran')
 # Toluene = chemical_database('Toluene')
 # Tb from chemspider(chemenu database)
 # http://www.chemspider.com/Chemical-Structure.207215.html, accessed 04/07/2020
@@ -233,13 +242,14 @@ KSA = Potassiumsorbate = chemical_database(ID='PotassiumSorbate',
 
 TAL = Triaceticacidlactone = chemical_database(ID='TAL',
                                                search_ID='Triacetic acid lactone',
-                                               phase='s')
+                                                phase='s',
+                                               )
 Pyrone = chemical_database(ID='Pyrone',
                            search_ID='2-pyrone',
                            phase='s')
 
 TAL.Hfus = 30883.66976 # Dannenfelser-Yalkowsky method
-TAL.Tm = KSA.Tm = 185. + 273.15 # CAS SciFinder 675-10-5
+TAL.Tm = KSA.Tm = 185. + 273.15 # (experimental) CAS SciFinder 675-10-5
 TAL.Tb = KSA.Tb =  239.1 + 273.15# (predicted) CAS SciFinder 675-10-5
 TAL.Hf = Pyrone.Hf
 TAL.LHV = Pyrone.LHV
@@ -393,7 +403,12 @@ for i in HMDHP.get_missing_properties():
             pass
         
 
-PD = Pentanedione = chemical_database(ID='PD', search_ID='2,4-pentanedione')
+PD = Pentanedione = chemical_database(ID='PD', search_ID='2,4-pentanedione') # Acetylacetone
+
+
+# PropylAcetate = chemical_database(ID='PropylAcetate', search_ID='Propyl acetate')
+
+
 VitaminA = chemical_database('VitaminA')
 VitaminD2 = chemical_database('VitaminD2')
 # Hfus from NIST, condensed phase, accessed 04/07/2020
@@ -458,7 +473,7 @@ for i in Ethyl_3_5_dihydroxyhexanoate.get_missing_properties():
             pass
 Octanol = chemical_database('Octanol')
 # Esters - Octyl
-OctylyHexanoate = chemical_database(ID='Octyl hexanoate', search_ID='4887-30-3') # used for missing properties
+OctylyHexanoate = chemical_database(ID='Octylhexanoate', search_ID='4887-30-3') # used for missing properties
 
 OctylHydroxyHexanoate = chemical_defined('Octyl_5_hydroxyhexanoate', phase='l', formula='C14H28O3', 
                        # Hf=-233200*_cal2joule,
@@ -492,11 +507,11 @@ for i in OctylDihydroxyHexanoate.get_missing_properties():
         except:
             pass
 
-Acetylacetone = chemical_database(ID='Acetylacetone', 
-                                                       # phase='s', 
-                                                       # formula='C6H6O3',
-                                                       # search_ID='Acetylacetone',
-                                                       )
+# Acetylacetone = chemical_database(ID='Acetylacetone', 
+#                                                        # phase='s', 
+#                                                        # formula='C6H6O3',
+#                                                        # search_ID='Acetylacetone',
+#                                                        )
 
 Pentenone = chemical_database(ID='Pentenone', search_ID='3-penten-2-one')
 
@@ -523,9 +538,11 @@ Xylan = chemical_defined('Xylan', phase='s', formula='C5H8O4', Hf=-182100*_cal2j
 Xylan.copy_models_from(Xylose, ['Cn'])
 Arabinan = chemical_copied('Arabinan', Xylan)
 
-Lignin = chemical_database('Lignin', phase='s')
-# Hf scaled based on vanillin
-Lignin.Hf = -108248*_cal2joule/tmo.Chemical('Vanillin').MW*Lignin.MW
+# Lignin = chemical_database('Lignin', phase='s')
+# # Hf scaled based on vanillin
+# Lignin.Hf = -108248*_cal2joule/tmo.Chemical('Vanillin').MW*Lignin.MW
+
+Alanine = chemical_database('Alanine', phase='s')
 
 # =============================================================================
 # Insoluble inorganics
@@ -533,6 +550,9 @@ Lignin.Hf = -108248*_cal2joule/tmo.Chemical('Vanillin').MW*Lignin.MW
 
 # Holmes, Trans. Faraday Soc. 1962, 58 (0), 1916–1925, abstract
 # This is for auto-population of combustion reactions
+
+SodiumPhosphate = chemical_database('SodiumPhosphate', phase='l')
+
 P4O10 = chemical_database('P4O10', phase='s', Hf=-713.2*_cal2joule)
 Ash = chemical_database('Ash', search_ID='CaO', phase='s', Hf=-151688*_cal2joule,
                         HHV=0, LHV=0)
@@ -543,6 +563,9 @@ Tar = chemical_copied('Tar', Xylose, phase_ref='s')
 
 PdC = chemical_database('Pd', phase='s')
 
+NiSiO2 = chemical_database('NiSiO2', search_ID='Nickel on silica', phase='s') # Ni-SiO2-Al2O3 # Raney Ni (Ni-Al2O3 alloy) CAS 12635-27-7 is not currently in the database
+
+Amberlyst70_ = chemical_copied('Amberlyst70_', NiSiO2) # Amberlyst-70 # Amberlyst-15 CAS 39389-20-3 is not currently in the database
 # =============================================================================
 # Mixtures
 # =============================================================================
@@ -592,6 +615,7 @@ chemical_groups = dict(
     SugarOligomers = ('GlucoseOligomer', 'XyloseOligomer', 'GalactoseOligomer',
                       'ArabinoseOligomer', 'MannoseOligomer'),
     OrganicSolubleSolids = ('AmmoniumAcetate', 'SolubleLignin', 'Extract', 'CSL',
+                            'SodiumAcetate',
                             # 'Triacetic acid lactone',
                             'SorbicAcid', 'HMTHP',
                             'PotassiumSorbate', 'ButylSorbate', 'VitaminA', 'VitaminD2'),
@@ -723,6 +747,7 @@ chems.append(sugarcane_chems.Hemicellulose)
 chems.append(sugarcane_chems.CaO)
 chems.append(sugarcane_chems.Solids)
 chems.append(sugarcane_chems.Flocculant)
+chems.append(sugarcane_chems.Lignin)
 
 chems.compile()
 tmo.settings.set_thermo(chems)
@@ -749,7 +774,7 @@ chems.set_synonym('H2O', 'Water')
 chems.set_synonym('H2SO4', 'SulfuricAcid')
 chems.set_synonym('NH3', 'Ammonia')
 chems.set_synonym('AmmoniumSulfate', 'NH4SO4')
-chems.set_synonym('Denaturant', 'Octane')
+# chems.set_synonym('Denaturant', 'Octane')
 chems.set_synonym('CO2', 'CarbonDioxide')
 chems.set_synonym('CarbonMonoxide', 'CO')
 chems.set_synonym('NitricOxide', 'NO')
@@ -758,7 +783,15 @@ chems.set_synonym('P4O10', 'PhosphorusPentoxide')
 chems.set_synonym('Na2SO4', 'SodiumSulfate')
 chems.set_synonym('AmmoniumHydroxide', 'NH4OH')
 
-chems.set_synonym('Tetrahydrofuran', 'THF')
+chems.set_synonym('DAP', 'DiammoniumPhosphate')
+
+
+chems.set_synonym('AceticAcid', 'Acetate')
+
+chems.set_synonym('PD', 'Acetylacetone')
+
+chems.set_synonym('IPA', 'Isopropanol')
+
 # chems.set_synonym('Isobutyraldehyde', 'IBA')
 
 

@@ -49,13 +49,14 @@ def create_facilities(
             
     makeup_water = Stream('makeup_water', price=0.00025353160151260924)
     
-    bst.facilities.ProcessWaterCenter(area or 'PWC',
-        (RO_water, makeup_water, recycle_process_water),
-        (),
-        None,
-        (BT-1, CT-1),
-        process_water_streams
+    bst.facilities.ProcessWaterCenter(ID=area or 'PWC',
+        ins=(RO_water, '', recycle_process_water, makeup_water),
+        outs=(),
+        thermo=None,
+        makeup_water_streams=(BT-1, CT-1),
+        process_water_streams=process_water_streams,
     )
+    
     CIP = Stream('CIP', Water=126, units='kg/hr')
     CIP_package = bst.facilities.CIPpackage(area or 'CIP_package', CIP)
     CIP_package.CIP_over_feedstock = 0.00121

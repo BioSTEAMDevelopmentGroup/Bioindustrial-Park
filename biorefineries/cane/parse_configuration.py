@@ -20,10 +20,10 @@ __all__ = (
 
 def asconfiguration(x):
     try:
-        number, agile, energycane = x
-        return Configuration(int(number), bool(agile), bool(energycane))
+        number, agile, line, case = x
+        return Configuration(int(number), bool(agile), line or None)
     except:
-        return Configuration(int(x), False, False)
+        return Configuration(int(x), False, None, None)
 
 def ascomparison(x):
     a, b = x
@@ -32,21 +32,41 @@ def ascomparison(x):
 class Configuration(NamedTuple):
     number: int
     agile: bool = False
-    energycane: bool = False
+    line: str = None
+    case: str = None
    
 class ConfigurationComparison(NamedTuple):
     a: Configuration
     b: Configuration
 
 def name_to_configuration(name):
-    name = name.replace(' ', '')
-    return Configuration((-1 if name.startswith('S') else 1) * int(name[1:].strip('*+')), '*' in name, '+' in name)
+    if '*' in name:
+        name = name.strip('*')
+        agile = True
+    else:
+        agile = False
+    if '|' in name:
+        name, case = name.split('|')
+        case = case.rstrip(' ').replace(' ', '_')
+    else:
+        case = None
+    if '.' in name:
+        name, line = name.split('.')
+        line = line.rstrip(' ')
+    else:
+        line = None
+    name = name.upper().replace(' ', '')
+    return Configuration(
+        (-1 if name.startswith('S') else 1) * int(name[1:]), 
+        agile, 
+        line,
+        case
+    )
 
 def parse_configuration(x):
     if isinstance(x, int):
         return Configuration(x)
     elif isinstance(x, str):
-        x = x.upper()
         left, *right = x.split('-')
         if right:
             if len(right) == 1:
@@ -80,17 +100,18 @@ def format_name(name):
         raise Exception('unknown error')
 
 def format_configuration(configuration, latex=True):
-    number, agile, energycane = configuration
+    number, agile, line, case = configuration
     if number < 0:
         name = f"S{number}"
     else:
         name = f"O{number}"
     if number == 0 or number > 10 or number < -3: 
         raise ValueError(f'invalid configuration {configuration}')
+    if line: name += "." + line
+    if case: name += '|' + case
     if latex:
         name = r'$\mathtt{' + name + '}$'
     if agile: name += '*'
-    if energycane: name += '+'
     return name
 
 def format_comparison(comparison):

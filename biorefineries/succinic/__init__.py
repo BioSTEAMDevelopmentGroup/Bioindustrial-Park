@@ -1,7 +1,12 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-Created on Sun Aug 23 12:11:15 2020
+# Bioindustrial-Park: BioSTEAM's Premier Biorefinery Models and Results
+# Copyright (C) 2021-, Sarang Bhagwat <sarangb2@illinois.edu>
+#
+# This module is under the UIUC open-source license. See
+# github.com/BioSTEAMDevelopmentGroup/biosteam/blob/master/LICENSE.txt
+# for license details.
 
 This module is a modified implementation of modules from the following:
 [1]	Bhagwat et al., Sustainable Production of Acrylic Acid via 3-Hydroxypropionic Acid from Lignocellulosic Biomass. ACS Sustainable Chem. Eng. 2021, 9 (49), 16659–16669. https://doi.org/10.1021/acssuschemeng.1c05441
@@ -24,28 +29,19 @@ parameter_distributions_filenames = ['parameter-distributions_lab-scale_batch.xl
 
 def load(mode='pilot_batch'):
     parameter_distributions_filename = succinic_filepath+'\\analyses\\parameter_distributions\\'+parameter_distributions_filenames[modes.index(mode)]
-    # print(f'\n\nLoading parameter distributions ({mode}) ...')
     from .models import model, simulate_and_print
     model.parameters = ()
     model.load_parameter_distributions(parameter_distributions_filename)
-    # print(f'\nLoaded parameter distributions ({mode}).')
-    
-    # parameters = model.get_parameters()
-    
-    # print('\n\nLoading samples ...')
-    # samples = model.sample(N=10, rule='L')
-    # model.load_samples(samples)
-    # print('\nLoaded samples.')
-    
-    
+ 
     model.exception_hook = 'warn'
-    # print('\n\nSimulating baseline ...')
     baseline_initial = model.metrics_at_baseline()
-    
-    simulate_and_print()
-    # baseline = DataFrame(data=array([[i for i in baseline_initial.values],]), 
-    #                         columns=baseline_initial.keys())
 
+    globals().update({'simulate_and_print': simulate_and_print,
+                      'system': model.system,
+                       'flowsheet': model.system.flowsheet,
+                       'succinic_tea': model.system.TEA,
+                       'chemicals': model.system.feeds[0].chemicals,
+                      })
 def run_TRY_analysis():
     from .analyses import TRY_analysis
     print('TRY analysis complete. See analyses/results for figures and raw data.')

@@ -61,6 +61,7 @@ from . import biodiesel
 from . import cellulosic_biodiesel
 from . import biodiesel_actag
 from . import cellulosic_biodiesel_actag
+from . import lipid_extraction
 
 __all__ = (
     *bagasse.__all__,
@@ -74,6 +75,7 @@ __all__ = (
     *cellulosic_biodiesel.__all__,
     *biodiesel_actag.__all__,
     *cellulosic_biodiesel_actag.__all__,
+    *lipid_extraction.__all__,
 )
 
 from .bagasse import *
@@ -87,3 +89,4 @@ from .biodiesel import *
 from .cellulosic_biodiesel import *
 from .biodiesel_actag import *
 from .cellulosic_biodiesel_actag import *
+from .lipid_extraction import *

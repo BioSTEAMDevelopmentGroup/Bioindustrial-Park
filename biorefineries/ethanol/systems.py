@@ -22,19 +22,19 @@ def create_beer_distillation_system(ins, outs,
     beer, = ins
     distilled_beer, stillage = outs
     
-    P301 = bst.Pump(IDs.get('Beer pump', 'P301'), P=2. * 101325)
+    P301 = bst.Pump(IDs.get('Beer pump', 'P301'), P=6. * 101325)
     
     # Beer column
-    x_bot = 3.91e-06
+    x_bot = 3.9106e-06
     y_top = 0.28
-    D302 = bst.BinaryDistillation(IDs.get('Beer column', 'D302'), P=2. * 101325,
+    D302 = bst.BinaryDistillation(IDs.get('Beer column', 'D302'), P=2.1 * 101325,
                                     outs=(distilled_beer, ''),
                                 y_top=y_top, x_bot=x_bot, k=1.1, Rmin=0.001,
                                 LHK=('Ethanol', 'Water'))
     D302.tray_material = 'Stainless steel 304'
     D302.vessel_material = 'Stainless steel 304'
-    D302.boiler.U = 1.85
-    P302 = bst.Pump(IDs.get('Beer column bottoms product pump', 'P302'), P=101325.)
+    D302.reboiler.U = 1.85
+    P302 = bst.Pump(IDs.get('Beer column bottoms product pump', 'P302'), P=6 * 101325.)
     
     # Heat up before beer column
     # Exchange heat with stillage    
@@ -60,14 +60,14 @@ def create_ethanol_purification_system_after_beer_column(ins, outs, IDs={}):
     # Mix ethanol Recycle (Set-up)
     M303 = bst.Mixer(IDs.get('Recycle mixer', 'M303'))
     
-    D303 = bst.BinaryDistillation(IDs.get('Distillation', 'D303'), 
-                                x_bot=3.9106e-06, y_top=0.80805, k=1.25, Rmin=0.01,
+    D303 = bst.BinaryDistillation(IDs.get('Distillation', 'D303'),
+                                x_bot=3.9106e-06, y_top=0.80805, k=1.2, Rmin=0.01,
                                 LHK=('Ethanol', 'Water'),
                                 tray_material='Stainless steel 304',
                                 vessel_material='Stainless steel 304',
-                                P=1013250.,
+                                P=1.6 * 101325.,
                                 is_divided=True)
-    D303.boiler.U = 1.85
+    D303.reboiler.U = 1.85
     P303 = bst.Pump(IDs.get('Distillation bottoms product pump', 'P303'), 
                       outs=recycle_process_water)
     

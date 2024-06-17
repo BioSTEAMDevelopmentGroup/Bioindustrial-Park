@@ -18,7 +18,6 @@ from biorefineries.biodiesel import (
     create_lipid_pretreatment_system as create_oil_pretreatment_system,
     create_transesterification_and_biodiesel_separation_system,
 )
-from biorefineries.cellulosic import create_facilities
 from .biodiesel_ethanol import create_oilcane_to_biodiesel_and_ethanol_1g
 from ..fermentation import create_cane_to_combined_1_and_2g_fermentation
 from ..lipid_extraction import create_post_fermentation_oil_separation_system
@@ -32,7 +31,7 @@ __all__ = (
     ins=create_oilcane_to_biodiesel_and_ethanol_1g.ins,
     outs=create_oilcane_to_biodiesel_and_ethanol_1g.outs[:-1],
 )
-def create_oilcane_to_biodiesel_and_ethanol_combined_1_and_2g_post_fermentation_oil_separation(ins, outs):
+def create_oilcane_to_biodiesel_and_ethanol_combined_1_and_2g_post_fermentation_oil_separation(ins, outs, WWT_kwargs=None):
     oilcane, = ins
     ethanol, biodiesel, crude_glycerol = outs
     oilcane_to_fermentation_sys = create_cane_to_combined_1_and_2g_fermentation('oilcane_to_fermentation_sys', ins=oilcane)
@@ -79,37 +78,29 @@ def create_oilcane_to_biodiesel_and_ethanol_combined_1_and_2g_post_fermentation_
         mockup=True,
         area=800,
     )
-    wastewater_treatment_sys = bst.create_wastewater_treatment_system(
+    MX = bst.Mixer(500,
         ins=[wastewater,
              fiber_fines,
              pretreatment_wastewater,
              wastewater_small,
              transesterification_and_biodiesel_separation_sys-2,
              evaporator_condensate],
-        mockup=True,
-        area=500,
     )
     u = f.unit
-    M501 = bst.Mixer(700, (wastewater_treatment_sys-1, lignin, polar_lipids, cellmass, f.stream.filter_cake, bagasse_to_boiler))
-    create_facilities(
-        solids_to_boiler=M501-0,
-        gas_to_boiler=wastewater_treatment_sys-0,
-        process_water_streams=(f.imbibition_water,
-                               f.biodiesel_wash_water,
-                               f.rvf_wash_water,
-                               f.stripping_water,
-                               f.caustic, 
-                               f.warm_process_water,
-                               f.pretreatment_steam,
-                               f.saccharification_water),
+    M501 = bst.Mixer(700, (lignin, polar_lipids, cellmass, f.stream.filter_cake, bagasse_to_boiler))
+    
+    bst.create_all_facilities(
         feedstock=f.bagasse,
-        RO_water=wastewater_treatment_sys-2,
-        recycle_process_water=MX_process_water-0,
-        BT_area=700,
+        recycle_process_water_streams=[MX_process_water-0],
+        WWT_kwargs=WWT_kwargs,
+        CHP_kwargs=dict(
+            ID=700
+        ),
+        HXN_kwargs=dict(
+            ID=1000, 
+            ignored=lambda: [u.H402, u.D801.reboiler, u.D802.reboiler, u.H803, u.H802, u.H801, u.H804, u.H806, u.H809, oil_pretreatment_dct['F3']],
+            Qmin=1e3,
+            acceptable_energy_balance_error=0.01
+        ),
         area=900,
     )
-    HXN = bst.HeatExchangerNetwork(1000,
-        ignored=lambda: [u.H402, u.D801.boiler, u.D802.boiler, u.H803, u.H802, u.H801, u.H804, u.H806, u.H809, oil_pretreatment_dct['F3']],
-        Qmin=1e3,
-    )
-    HXN.acceptable_energy_balance_error = 0.01

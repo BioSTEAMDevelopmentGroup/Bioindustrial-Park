@@ -196,11 +196,12 @@ def create_cellulosic_ethanol_chemicals():
     append_single_phase_chemical('CO', 'Carbon monoxide', Hf=-110.522)
     
     # Will remain as  solid
-    extend_single_phase_chemicals(['Glucose', 'Xylose', 'Sucrose'], Hfus=0)
+    chems.extend([
+        oilcane_chemicals.Glucose,
+        tmo.Chemical('Xylose', phase='l', Hf=cal2joule*-249440),
+        oilcane_chemicals.Sucrose,
+    ])
     append_single_phase_chemical('CaSO4')
-    
-    subgroup = chems['Glucose', 'Xylose', 'Sucrose', 'CaSO4', 'AmmoniumSulfate']
-    for chemical in subgroup: set_Cp(chemical, Cp_cellulosic)
     
     # Analagous sugars
     append_chemical_copy('Mannose', chems.Glucose)
@@ -218,25 +219,27 @@ def create_cellulosic_ethanol_chemicals():
     chems.append(oilcane_chemicals.NaOH)
     append_new_single_phase_chemical('Lignin',
                                      formula='C8H8O3',
+                                     phase='s',
                                      Hf=-108248*cal2joule)
     set_rho(chems.Lignin, 1540)
     set_Cp(chems.Lignin, Cp_cellulosic)
-    append_chemical_copy('SolubleLignin', chems.Lignin)
+    append_new_single_phase_chemical('SolubleLignin',
+                                     formula='C8H8O3',
+                                     phase='l',
+                                     Hf=-108248*cal2joule)
     
     # Create structural carbohydrates
     append_chemical_copy('GlucoseOligomer', chems.Glucose)
     set_Cp(chems.GlucoseOligomer, Cp_cellulosic)
-    chems.GlucoseOligomer._formula = None
-    chems.GlucoseOligomer.formula = "C6H10O5"
     chems.GlucoseOligomer.Hf = -233200*cal2joule
+    chems.GlucoseOligomer.formula = "C6H10O5"
     
     append_chemical_copy('GalactoseOligomer', chems.GlucoseOligomer)
     append_chemical_copy('MannoseOligomer', chems.GlucoseOligomer)
     append_chemical_copy('XyloseOligomer', chems.Xylose)
     set_Cp(chems.XyloseOligomer, Cp_cellulosic)
-    chems.XyloseOligomer._formula =None
-    chems.XyloseOligomer.formula = "C5H8O4"
     chems.XyloseOligomer.Hf = -182100*cal2joule
+    chems.XyloseOligomer.formula = "C5H8O4"
     
     append_chemical_copy('ArabinoseOligomer', chems.XyloseOligomer)
     
@@ -256,10 +259,12 @@ def create_cellulosic_ethanol_chemicals():
                                      Hf=-17618*cal2joule)
     append_new_single_phase_chemical('Glucan', formula='C6H10O5',
                                      Cp=Cp_cellulosic,
-                                     Hf=-233200*cal2joule)
+                                     Hf=-233200*cal2joule,
+                                     phase='s')
     append_new_single_phase_chemical('Xylan', formula="C5H8O4",
                                      Cp=Cp_cellulosic,
-                                     Hf=-182100*cal2joule)
+                                     Hf=-182100*cal2joule,
+                                     phase='s')
     append_new_single_phase_chemical('Xylitol', formula="C5H12O5",
                                      Cp=Cp_cellulosic,
                                      Hf=-243145*cal2joule)
