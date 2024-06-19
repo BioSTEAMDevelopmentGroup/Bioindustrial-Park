@@ -251,7 +251,7 @@ def create_TAL_separation_solubility_exploit_process(ins, outs,):
                                  tau = 1.)
     
     M401.mol_acetylacetone_per_mol_TAL = 0.
-    M401.mol_base_per_m3_broth = 0.
+    M401.mol_base_per_m3_broth = 0. # actually kmol-bsase/m3-broth, or mol-base/L-broth
     M401.base_neutralizes_acids = True
     M401.base_ID = 'NaOH'
     
@@ -1277,7 +1277,7 @@ def create_TAL_to_sorbic_acid_upgrading_process_THF_Ethanol(ins, outs,):
                          T=265.0,
                          rigorous=True
     )
-    
+      
     S410 = bst.units.FakeSplitter('S410', ins=H410-0, outs=(S410_cool_air, 'S410_Ethanol_recovered_from_air'))
     
     @S410.add_specification()

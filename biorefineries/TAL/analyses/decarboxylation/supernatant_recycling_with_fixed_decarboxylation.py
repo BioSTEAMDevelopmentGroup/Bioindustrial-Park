@@ -63,13 +63,13 @@ model = models.TAL_model
 system = TAL_sys = models.TAL_sys
 
 modes = [
-            # 'A',
-            'B',
+            'A',
          ]
 
+
 parameter_distributions_filenames = [
-                                    # 'parameter-distributions_A.xlsx',
-                                    'parameter-distributions_B.xlsx',
+                                    'parameter-distributions_TAL_' + mode +'.xlsx' 
+                                    for mode in modes
                                     ]
 mode = modes[0]
 
@@ -154,7 +154,8 @@ def plot_multiple_metrics(x_axis_list, y_axis_list_of_lists,
                           filename='supernatant_recycling_fixed_decarboxylation_plot.png',
                           ylabels_list=[r"$\bfTAL$"+" " +r"$\bfRecovery$",
                                         r"$\bfMPSP$",
-                                        r"$\mathrm{\bfGWP}_{\bf100}$",
+                                        # r"$\mathrm{\bfGWP}_{\bf100}$",
+                                        r"$\mathrm{\bfCarbon}$" + " " + r"$\mathrm{\bfIntensity}$",
                                         r"$\bfFEC$" ,
                                         ],
                           xlabel=r"$\bfSupernatant$"+" " +r"$\bfRecycling$",
@@ -259,7 +260,7 @@ plot_multiple_metrics(100*np.array(splits),
                                   ],
                       xticks=[0 + 10*i for i in range(0,11)],
                       yticks_list = [[0 + 10*i for i in range(0,11)],
-                                 np.arange(5, 10.1, 0.5),
+                                 np.arange(4, 10.1, 0.5),
                                  np.arange(6, 16.1, 1),
                                  np.arange(-60, 60.1, 10),
                                  ]

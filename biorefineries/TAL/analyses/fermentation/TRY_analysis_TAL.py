@@ -120,16 +120,16 @@ get_TAL_sugars_conc = lambda: sum(R302.outs[0].imass['Glucose', 'Xylose'])/R302.
 get_TAL_inhibitors_conc = lambda: 1000*sum(R302.outs[0].imass['AceticAcid', 'Furfural', 'HMF'])/R302.outs[0].F_vol
 
 TAL_metrics = [get_product_MPSP, 
-                lambda: TAL_lca.GWP,
-                # lambda: TAL_lca.GWP - TAL_lca.net_electricity_GWP, 
-                lambda: TAL_lca.FEC, 
-                # lambda: TAL_lca.FEC - TAL_lca.net_electricity_FEC,
+                # lambda: TAL_lca.GWP,
+                lambda: TAL_lca.GWP - TAL_lca.net_electricity_GWP, 
+                # lambda: TAL_lca.FEC, 
+                lambda: TAL_lca.FEC - TAL_lca.net_electricity_FEC,
                get_TAL_AOC, get_TAL_TCI, 
                get_product_purity]
 
 # %% Generate 3-specification meshgrid and set specification loading functions
 
-steps = (60, 60, 3)
+steps = (60, 60, 1)
 
 # Yield, titer, productivity (rate)
 spec_1 = yields = np.linspace(0.01, 0.99, steps[0]) # yield
@@ -144,9 +144,9 @@ spec_2 = titers = np.linspace(2.,
     
 spec_3 = productivities =\
     np.array([
-              0.2*spec.baseline_productivity,
+              # 0.2*spec.baseline_productivity,
               1.*spec.baseline_productivity,
-              5.*spec.baseline_productivity,
+              # 5.*spec.baseline_productivity,
               ])
 
 # spec_3 = productivities =\
@@ -546,18 +546,21 @@ contourplots.animated_contourplot(w_data_vs_x_y_at_multiple_z=results_metric_1, 
                                 # comparison_range_hatch_pattern='////',
                                 
                                 # manual_clabels_regular = {
-                                #     # MPSP_w_ticks[0]: (80,300),
-                                #     # MPSP_w_ticks[1]: (50,320),
-                                #     # MPSP_w_ticks[2]: (25,310),
-                                #     # MPSP_w_ticks[3]: (18,300),
-                                #     # MPSP_w_ticks[4]: (10,50),
+                                #     2.50: (90,90),
+                                #     2.75: (85,60),
+                                #     3.00: (70,60),
+                                #     3.50: (85,30),
+                                #     4.00: (45,55),
+                                #     5.00: (50,20),
+                                #     10.0: (20,25),
+                                #     12.0: (20,15),
                                     
-                                #     MPSP_w_ticks[0]: (70,70),
-                                #     MPSP_w_ticks[1]: (60,58),
-                                #     MPSP_w_ticks[2]: (60,45),
-                                #     MPSP_w_ticks[3]: (55,30),
-                                #     MPSP_w_ticks[4]: (50,25),
-                                #     MPSP_w_ticks[5]: (12,12),
+                                # #     MPSP_w_ticks[0]: (70,70),
+                                # #     MPSP_w_ticks[1]: (60,58),
+                                # #     MPSP_w_ticks[2]: (60,45),
+                                # #     MPSP_w_ticks[3]: (55,30),
+                                # #     MPSP_w_ticks[4]: (50,25),
+                                # #     MPSP_w_ticks[5]: (12,12),
                                 #     },
                                 # manual_clabels_comparison_range =\
                                 #     {TAL_maximum_viable_market_range[0]:(33,20), 

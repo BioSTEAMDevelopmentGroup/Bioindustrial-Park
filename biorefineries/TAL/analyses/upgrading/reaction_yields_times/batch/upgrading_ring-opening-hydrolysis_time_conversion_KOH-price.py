@@ -532,10 +532,10 @@ MPSP_w_levels = np.arange(4, 16.25, 0.25)
 MPSP_cbar_ticks = np.arange(4, 16.1, 1.)
 MPSP_w_ticks = [
                 # 2.75, 
-                5., 5.5, 6., 6.5, 7., 7.5, 8.,  9., 10., 11., 12., 14., 16.]
+                5., 5.5, 6., 6.5, 7., 7.5, 8., 8.5, 9., 10., 11., 12., 14., 16.]
 # MPSP_w_levels = np.arange(0., 15.5, 0.5)
 
-contourplots.animated_contourplot(w_data_vs_x_y_at_multiple_z=0.75*np.array(results_metric_1), # shape = z * x * y # values of the metric you want to plot on the color axis; e.g., MPSP
+contourplots.animated_contourplot(w_data_vs_x_y_at_multiple_z=np.array(results_metric_1), # shape = z * x * y # values of the metric you want to plot on the color axis; e.g., MPSP
                                 y_data=100*rxn_Xs, # x axis values
                                 # y_data = rxn_Xs/theoretical_max_g_TAL_acid_per_g_glucose,
                                 x_data=reactor_taus, # y axis values
@@ -568,7 +568,7 @@ contourplots.animated_contourplot(w_data_vs_x_y_at_multiple_z=0.75*np.array(resu
                                 clabel_fontsize = clabel_fontsize,
                                 default_fontsize = default_fontsize,
                                 axis_tick_fontsize = axis_tick_fontsize,
-                                comparison_range=KSA_market_range,
+                                # comparison_range=KSA_market_range,
                                 n_minor_ticks = 1,
                                 cbar_n_minor_ticks = 3,
                                 # comparison_range=[MPSP_w_levels[-2], MPSP_w_levels[-1]],
@@ -584,7 +584,7 @@ contourplots.animated_contourplot(w_data_vs_x_y_at_multiple_z=0.75*np.array(resu
                                 #     },
                                 additional_points ={(baseline_tau, 100*baseline_rxn_X):('D', 'w', 6)},
                                 # text_boxes = {'>10.0': [(41,1.8), 'white']},
-                                # text_boxes = {'>16.0': [(20.,41), 'white']},
+                                text_boxes = {'>16.0': [(20.,41), 'white']},
                                 
                                 )
 
