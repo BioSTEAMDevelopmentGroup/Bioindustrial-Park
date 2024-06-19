@@ -43,6 +43,14 @@ Processes:
 
 """
 
+from .models import load
 
 
-__all__ = []
+def load_TAL_model(mode='A'):
+    system, spec, tea, lca, get_adjusted_MSP, simulate_and_print, TEA_breakdown = load.load_TAL_model(mode=mode)
+    globals().update({
+        'system':system, 'spec':spec, 'tea':tea, 'lca':lca, 'get_adjusted_MSP':get_adjusted_MSP,
+        'simulate_and_print':simulate_and_print, 'TEA_breakdown':TEA_breakdown,
+        })
+__all__ = ['load_TAL_model']
+
