@@ -13,10 +13,7 @@ References
 [1] Argonne National Laboratory. The Greenhouse gases, Regulated Emissions,
     and Energy use in Transportation (GREET) Model https://greet.es.anl.gov/
     (accessed Aug 25, 2020).
-[2] Roni et al., Herbaceous Feedstock 2018 State of Technology Report;
-    INL/EXT-18-51654-Rev000; Idaho National Lab. (INL), 2020.
-    https://doi.org/10.2172/1615147.
-[3] ecoinvent 3.6 https://www.ecoinvent.org/home.html (accessed Aug 26, 2020).
+[2] ecoinvent 3.8 https://www.ecoinvent.org/ (accessed May 24, 2024).
 
 '''
 
@@ -30,6 +27,13 @@ _kg_per_ton = 907.18474
 _lb_per_kg = 2.20462
 _liter_per_gallon = 3.78541
 _ft3_per_m3 = 35.3147
+
+#### Method for converting to 2019$ ####
+# Where available, chemical indices are used (2010 - 2022 indices are available).
+# To convert from Y1 to Y2: price_Y2 = price_Y1 * chem_index[Y2]/chem_index[Y1]
+# For years prior to 2010, GDP indices are first used to convert from the given year to 2010,
+# following which chemical indices are used.
+# E.g., to convert from Y0 to Y2: price_Y2 = price_Y0 * GDP_index[Y1]/GDP_index[Y0] * chem_index[Y2]/chem_index[Y1]
 
 _GDP_2007_to_2016 = 1.114 / 0.961
 _GDP_2008_to_2016 = 1.114 / 0.990
@@ -80,7 +84,6 @@ ethanol_price = 2.2 / _ethanol_kg_2_gal
 # Dipotassium hydrogen phosphate (DPHP)
 # https://www.alibaba.com/product-detail/Food-Grade-Dipotassium-Dydrogen-Phosphate-Trihydrate_60842047866.html?spm=a2700.7724857.normalList.2.4ef2457e3gPbfv&s=p
 # DISREGARD: https://www.sigmaaldrich.com/catalog/product/mm/105104?lang=en&region=US
-
 DPHP_price = 1.15
 
 # 2.86 is the average motor gasoline price between 2010-2019 in 2016 $/gal	
@@ -181,7 +184,6 @@ toluene_price = 1.1
 
 # vendor listing 1: https://www.alibaba.com/product-detail/Industrial-Grade-H2-Hydrogen-Gas-Cylinder_1600624231996.html?spm=a2700.galleryofferlist.normal_offer.d_title.577364beUs9l40
 # vendor listing 2 (same vendor): https://www.alibaba.com/product-detail/Promotion-Compressed-Hydrogen-Gas-With-Cylinder_1600948500210.html?spm=a2700.galleryofferlist.p_offer.d_title.253d7c9c5yZj8z&s=p
-    
 hydrogen_price = 1.
 
 # https://www.energy.gov/eere/fuelcells/hydrogen-shot
@@ -383,34 +385,34 @@ CFs = {}
 GWP_CFs = {
     'CH4': 0.40, # NA NG from shale and conventional recovery
     'CSL': 1.55,
-    'DAP': 1.6354, # ecoinvent 3.8 diammonium phosphate production, RoW
+    'DAP': 1.6354, # ecoinvent 3.8 [2] diammonium phosphate production, RoW
     
     # 'Enzyme': 2.24, 
     'Ethanol': 1.44,
-    'Acetone': 2.5435, #  ecoinvent 3.8 market for acetone, liquid, RoW
+    'Acetone': 2.5435, #  ecoinvent 3.8 [2] market for acetone, liquid, RoW
     
     'H2SO4': 44.47/1e3,   
     'Lime': 1.29 * 56.0774/74.093, # CaO to Ca(OH)2
     'CaO': 1.29,
     'NaOH': 2.11,
     # 'NH4OH': 2.64 * 0.4860, # multiplied by chemicals.NH3.MW/chemicals.NH4OH.MW,   
-    # 'MEA': 3.4062, # ecoinvent 3.8 ethanolamine production, RoW [monoethanolamine]
-    'H3PO4': 1.3598, # ecoinvent 3.8 purification of wet-process phosphoric acid to industrial grade, product in 85% solution state, RoW # cradle-to-gate
-    'CO2': 0.87104, # ecoinvent 3.8 carbon dioxide production, liquid, RoW
-    'H2': 2.3716, # ecoinvent 3.8 market for hydrogen, liquid, RoW
+    # 'MEA': 3.4062, # ecoinvent 3.8 [2] ethanolamine production, RoW [monoethanolamine]
+    'H3PO4': 1.3598, # ecoinvent 3.8 [2] purification of wet-process phosphoric acid to industrial grade, product in 85% solution state, RoW # cradle-to-gate
+    'CO2': 0.87104, # ecoinvent 3.8 [2] carbon dioxide production, liquid, RoW
+    'H2': 2.3716, # ecoinvent 3.8 [2] market for hydrogen, liquid, RoW
     
     'AceticAcid': 1.6198, # market for acetic acid, without water, in 98% solution state, GLO
     'SodiumAcetate': 1.6198*60.05196/82.033789, # adjusted acetic acid CF 
     
     'PD': (2*(58.080)*3.5917 + 102.089*2.5435)/(2*100.117), # Acetylacetone; based on GLO/RoW IPCC 2013 CFs of markets for precursors acetone and acetyl anhydride
-    # 'DiammoniumSulfate': 1.2901, # ecoinvent 3.8 market for ammonium sulfate, RoW
-    # 'MagnesiumSulfate': 1.0411, # ecoinvent 3.8 market for magnesium sulfate, GLO
+    # 'DiammoniumSulfate': 1.2901, # ecoinvent 3.8 [2] market for ammonium sulfate, RoW
+    # 'MagnesiumSulfate': 1.0411, # ecoinvent 3.8 [2] market for magnesium sulfate, GLO
     
-    'NiSiO2':18.711, # ecoinvent 3.8 market for nickel, class 1
-    'Amberlyst70_':1.3803, # ecoinvent 3.8 market for naphthalene sulfonic acid, GLO # Amberlyst-15 is 1,2-diethenylbenzene; 2-ethenylbenzene-1-sulfonic acid
-    'Isopropanol':2.3219, # ecoinvent 3.8 market for isopropanol, RoW
-    'THF': 6.0475, # ecoinvent 3.8 market for tetrahydrofuran, GLO
-    'KOH': 2.63, # ecoinvent 3.8 market for potassium hydroxide, GLO
+    'NiSiO2':18.711, # ecoinvent 3.8 [2] market for nickel, class 1
+    'Amberlyst70_':1.3803, # ecoinvent 3.8 [2] market for naphthalene sulfonic acid, GLO # Amberlyst-15 is 1,2-diethenylbenzene; 2-ethenylbenzene-1-sulfonic acid
+    'Isopropanol':2.3219, # ecoinvent 3.8 [2] market for isopropanol, RoW
+    'THF': 6.0475, # ecoinvent 3.8 [2] market for tetrahydrofuran, GLO
+    'KOH': 2.63, # ecoinvent 3.8 [2] market for potassium hydroxide, GLO
     }
 
 
@@ -423,7 +425,7 @@ CFs['GWP_CF_stream'] = GWP_CF_stream
 GWP_CFs['Electricity'] = 0.4490 # kg CO2-eq/kWh GREET 2022 US Mix  # assume production==consumption, both in kg CO2-eq/kWh
 
 
-GWP_CFs['Sugarcane'] = 0.12043 * 0.3/0.286 # ecoinvent 3.8 market for sugarcane, RoW
+GWP_CFs['Sugarcane'] = 0.12043 * 0.3/0.286 # ecoinvent 3.8 [2] market for sugarcane, RoW
 # # adjusted from dry wt content of 28.6% (their assumption) to 30% (our assumption)
 
 
@@ -440,10 +442,10 @@ CFs['GWP_CFs'] = GWP_CFs
 FEC_CFs = {
     'CH4': 50, # NA NG from shale and conventional recovery
     'CSL': 12,
-    'DAP': 22.028, # ecoinvent 3.8 diammonium phosphate production, RoW
+    'DAP': 22.028, # ecoinvent 3.8 [2] diammonium phosphate production, RoW
     
     'Ethanol': 16,
-    'Acetone': 66.852, #  ecoinvent 3.8 market for acetone, liquid, RoW
+    'Acetone': 66.852, #  ecoinvent 3.8 [2] market for acetone, liquid, RoW
     # 'Enzyme': 26,
     
     'H2SO4': 568.98/1e3,
@@ -451,24 +453,24 @@ FEC_CFs = {
     'CaO': 4.896, 
     'NaOH': 29,
     # 'NH4OH': 42 * 0.4860, # multiplied by chemicals.NH3.MW/chemicals.NH4OH.MW,
-    # 'MEA': 67.898, # ecoinvent 3.8 ethanolamine production, RoW [monoethanolamine]
-    'H3PO4': 16.538, # ecoinvent 3.8 purification of wet-process phosphoric acid to industrial grade, product in 85% solution state, RoW # cradle-to-gate
-    'CO2': 7.4243, # ecoinvent 3.8 carbon dioxide production, liquid, RoW
-    'H2': 75.747, # ecoinvent 3.8 market for hydrogen, liquid, RoW
+    # 'MEA': 67.898, # ecoinvent 3.8 [2] ethanolamine production, RoW [monoethanolamine]
+    'H3PO4': 16.538, # ecoinvent 3.8 [2] purification of wet-process phosphoric acid to industrial grade, product in 85% solution state, RoW # cradle-to-gate
+    'CO2': 7.4243, # ecoinvent 3.8 [2] carbon dioxide production, liquid, RoW
+    'H2': 75.747, # ecoinvent 3.8 [2] market for hydrogen, liquid, RoW
 
     'AceticAcid': 45.611, # market for acetic acid, without water, in 98% solution state, GLO
     'SodiumAcetate': 45.611*60.05196/82.033789, # adjusted acetic acid CF 
     
     'PD': (2*(58.080)*66.852 + 102.089*70.817)/(2*100.117), # Acetylacetone; based on GLO/RoW cumulative energy demand CFs of markets for precursors acetone and acetyl anhydride
     
-    # 'DiammoniumSulfate': 15.166, # ecoinvent 3.8 market for ammonium sulfate, RoW
-    # 'MagnesiumSulfate': 13.805, # ecoinvent 3.8 market for magnesium sulfate, GLO
+    # 'DiammoniumSulfate': 15.166, # ecoinvent 3.8 [2] market for ammonium sulfate, RoW
+    # 'MagnesiumSulfate': 13.805, # ecoinvent 3.8 [2] market for magnesium sulfate, GLO
     
-    'NiSiO2':229.44	, # ecoinvent 3.8 market for nickel, class 1
-    'Amberlyst70_':31.273, # ecoinvent 3.8 market for naphthalene sulfonic acid, GLO # Amberlyst-15 is 1,2-diethenylbenzene; 2-ethenylbenzene-1-sulfonic acid
-    'Isopropanol':63.878, # ecoinvent 3.8 market for isopropanol, RoW
-    'THF': 101.77, # ecoinvent 3.8 market for tetrahydrofuran, GLO
-    'KOH': 33.33, # ecoinvent 3.8 market for potassium hydroxide, GLO
+    'NiSiO2':229.44	, # ecoinvent 3.8 [2] market for nickel, class 1
+    'Amberlyst70_':31.273, # ecoinvent 3.8 [2] market for naphthalene sulfonic acid, GLO # Amberlyst-15 is 1,2-diethenylbenzene; 2-ethenylbenzene-1-sulfonic acid
+    'Isopropanol':63.878, # ecoinvent 3.8 [2] market for isopropanol, RoW
+    'THF': 101.77, # ecoinvent 3.8 [2] market for tetrahydrofuran, GLO
+    'KOH': 33.33, # ecoinvent 3.8 [2] market for potassium hydroxide, GLO
     }
 
 FEC_CF_array = chems.kwarray(FEC_CFs)
@@ -479,7 +481,7 @@ CFs['FEC_CF_stream'] = FEC_CF_stream
 
 FEC_CFs['Electricity'] = 5.724 # MJ/kWh # GREET 2022 US Mix #assume production==consumption, both in MJ/kWh
 
-FEC_CFs['Sugarcane'] = 	0.40192 * 0.3/0.286 # ecoinvent 3.8 market for sugarcane, RoW
+FEC_CFs['Sugarcane'] = 	0.40192 * 0.3/0.286 # ecoinvent 3.8 [2] market for sugarcane, RoW
 # # adjusted from dry wt content of 28.6% (their assumption) to 30% (our assumption)
 
 # FEC_CFs['Sugarcane'] = 	0.2265 # GREET 2022
