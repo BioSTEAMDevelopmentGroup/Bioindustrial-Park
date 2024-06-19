@@ -47,10 +47,18 @@ from .models import load
 
 
 def load_TAL_model(mode='A'):
-    system, spec, tea, lca, get_adjusted_MSP, simulate_and_print, TEA_breakdown = load.load_TAL_model(mode=mode)
+    system, spec, tea, lca, get_adjusted_MSP, simulate_and_print, TEA_breakdown, run_TAL_uncertainty_analysis = load.load_TAL_model(mode=mode)
+    globals().update({
+        'system':system, 'spec':spec, 'tea':tea, 'lca':lca, 'get_adjusted_MSP':get_adjusted_MSP,
+        'simulate_and_print':simulate_and_print, 'TEA_breakdown':TEA_breakdown,
+        'run_TAL_uncertainty_analysis':run_TAL_uncertainty_analysis,
+        })
+    
+def load_KS_model(mode='A'):
+    system, spec, tea, lca, get_adjusted_MSP, simulate_and_print, TEA_breakdown = load.load_KS_model(mode=mode)
     globals().update({
         'system':system, 'spec':spec, 'tea':tea, 'lca':lca, 'get_adjusted_MSP':get_adjusted_MSP,
         'simulate_and_print':simulate_and_print, 'TEA_breakdown':TEA_breakdown,
         })
-__all__ = ['load_TAL_model']
-
+    
+__all__ = ['load_TAL_model', 'load_KS_model']
