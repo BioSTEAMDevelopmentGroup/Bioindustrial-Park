@@ -838,8 +838,9 @@ contourplots.animated_contourplot(w_data_vs_x_y_at_multiple_z=results_metric_6, 
 
 #%% Base added
 
-base_added_w_levels = base_added_w_ticks = base_added_cbar_ticks = np.arange(0., 15.1, 1.)
-
+base_added_w_levels =  np.arange(0., 15.01, 0.5)
+base_added_cbar_ticks = np.arange(0., 15.01, 1.)
+base_added_w_ticks = [0.1, 0.2, 0.3, 0.4,]
 contourplots.animated_contourplot(w_data_vs_x_y_at_multiple_z=results_metric_7, # shape = z * x * y # values of the metric you want to plot on the color axis; e.g., M401_addition
                                 y_data=100*TAL_decarb_convs, # x axis values
                                 # y_data = TAL_decarb_convs/theoretical_max_g_TAL_acid_per_g_glucose,
@@ -862,7 +863,7 @@ contourplots.animated_contourplot(w_data_vs_x_y_at_multiple_z=results_metric_7, 
                                 fmt_clabel = lambda cvalue:  f"{round(cvalue,1)}",
                                 cmap=CABBI_green_colormap(), # can use 'viridis' or other default matplotlib colormaps
                                 cmap_over_color = colors.grey_dark.shade(8).RGBn,
-                                extend_cmap='max',
+                                # extend_cmap='max',
                                 cbar_ticks=base_added_cbar_ticks,
                                 z_marker_color='g', # default matplotlib color names
                                 fps=fps, # animation frames (z values traversed) per second
