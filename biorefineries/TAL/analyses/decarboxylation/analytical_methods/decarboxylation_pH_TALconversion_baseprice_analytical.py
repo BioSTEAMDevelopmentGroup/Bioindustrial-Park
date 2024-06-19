@@ -416,12 +416,11 @@ for p in base_prices:
     pd.DataFrame(d1_Metric1).to_csv(TAL_results_filepath+'MPSP-'+file_to_save+'.csv')
     pd.DataFrame(d1_Metric2).to_csv(TAL_results_filepath+'GWP-'+file_to_save+'.csv')
     pd.DataFrame(d1_Metric3).to_csv(TAL_results_filepath+'FEC-'+file_to_save+'.csv')
-    pd.DataFrame(d1_Metric4).to_csv(TAL_results_filepath+'AOC-'+file_to_save+'.csv')
-    pd.DataFrame(d1_Metric5).to_csv(TAL_results_filepath+'FCI-'+file_to_save+'.csv')
+    pd.DataFrame(d1_Metric4).to_csv(TAL_results_filepath+'GWP_no_elec_offset-'+file_to_save+'.csv')
+    pd.DataFrame(d1_Metric5).to_csv(TAL_results_filepath+'FEC_no_elec_offset-'+file_to_save+'.csv')
     pd.DataFrame(d1_Metric6).to_csv(TAL_results_filepath+'Purity-'+file_to_save+'.csv')
-    pd.DataFrame(d1_Metric7).to_csv(TAL_results_filepath+'M401_addition-'+file_to_save+'.csv')
+    pd.DataFrame(d1_Metric7).to_csv(TAL_results_filepath+'base_addn-'+file_to_save+'.csv')
     
-
 #%% Report maximum HXN energy balance error
 print(f'Max HXN Q bal error was {round(max_HXN_qbal_percent_error, 3)} %.')
 
@@ -865,7 +864,7 @@ contourplots.animated_contourplot(w_data_vs_x_y_at_multiple_z=results_metric_7, 
                                 z_marker_color='g', # default matplotlib color names
                                 fps=fps, # animation frames (z values traversed) per second
                                 n_loops='inf', # the number of times the animated contourplot should loop animation over z; infinite by default
-                                animated_contourplot_filename='pH_animated_contourplot_'+file_to_save, # file name to save animated contourplot as (no extensions)
+                                animated_contourplot_filename='base_addn_animated_contourplot_'+file_to_save, # file name to save animated contourplot as (no extensions)
                                 keep_frames=keep_frames, # leaves frame PNG files undeleted after running; False by default
                                 axis_title_fonts=axis_title_fonts,
                                 clabel_fontsize = clabel_fontsize,
