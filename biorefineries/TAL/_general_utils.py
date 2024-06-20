@@ -369,7 +369,7 @@ def set_production_capacity(
 
 #%% Get a breakdown of TEA results by unit group
 def TEA_breakdown(unit_groups_dict,
-                  print_output=False):
+                  print_output=False): # operating cost is in $/h, but unit name is MM$/y  by default for plotting purposes
     unit_groups = list(unit_groups_dict.values())
     metric_breakdowns = {i.name: {} for i in unit_groups[0].metrics}
     for ug in unit_groups:
