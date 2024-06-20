@@ -17,13 +17,13 @@ Two integrated sugarcane + sweet sorghum biorefineries can be loaded using the n
 | Triacetic acid lactone (TAL)  | 'TAL_C' + potential separation improvements                 | 'TAL_D'                 | TAL.load_TAL_model('D')             |
 | Potassium sorbate (KS)        | current state-of-technology using THF and ethanol solvents  | 'Sorbate_THF_Ethanol_A' | TAL.load_KS_model('THF_Ethanol_A')  |
 | Potassium sorbate (KS)        | current state-of-technology using IPA solvent               | 'Sorbate_A'             | TAL.load_KS_model('A')              |
-| Potassium sorbate (KS)        | 'KSA_A' + potential fermentation improvements               | 'Sorbate_B'             | TAL.load_KS_model('B')              |
-| Potassium sorbate (KS)        | 'KSA_B' + sweet sorghum integration                         | 'Sorbate_C'             | TAL.load_KS_model('C')              |
-| Potassium sorbate (KS)        | 'KSA_C' + potential separation improvements                 | 'Sorbate_D'             | TAL.load_KS_model('D')              |
-| Potassium sorbate (KS)        | 'KSA_A' + potential catalytic upgrading improvements        | 'Sorbate_E'             | TAL.load_KS_model('E')              |
-| Potassium sorbate (KS)        | 'KSA_E' + potential fermentation improvements               | 'Sorbate_F'             | TAL.load_KS_model('F')              |
-| Potassium sorbate (KS)        | 'KSA_F' + sweet sorghum integration                         | 'Sorbate_G'             | TAL.load_KS_model('G')              |
-| Potassium sorbate (KS)        | 'KSA_G' + potential separation improvements                 | 'Sorbate_H'             | TAL.load_KS_model('H')              |
+| Potassium sorbate (KS)        | 'Sorbate_A' + potential fermentation improvements           | 'Sorbate_B'             | TAL.load_KS_model('B')              |
+| Potassium sorbate (KS)        | 'Sorbate_B' + sweet sorghum integration                     | 'Sorbate_C'             | TAL.load_KS_model('C')              |
+| Potassium sorbate (KS)        | 'Sorbate_C' + potential separation improvements             | 'Sorbate_D'             | TAL.load_KS_model('D')              |
+| Potassium sorbate (KS)        | 'Sorbate_A' + potential catalytic upgrading improvements    | 'Sorbate_E'             | TAL.load_KS_model('E')              |
+| Potassium sorbate (KS)        | 'Sorbate_E' + potential fermentation improvements           | 'Sorbate_F'             | TAL.load_KS_model('F')              |
+| Potassium sorbate (KS)        | 'Sorbate_F' + sweet sorghum integration                     | 'Sorbate_G'             | TAL.load_KS_model('G')              |
+| Potassium sorbate (KS)        | 'Sorbate_G' + potential separation improvements             | 'Sorbate_H'             | TAL.load_KS_model('H')              |
 
 For example, for biorefineries with TAL as the final product:
 
