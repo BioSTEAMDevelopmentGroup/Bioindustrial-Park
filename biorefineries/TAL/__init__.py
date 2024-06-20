@@ -1,25 +1,16 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 # Bioindustrial-Park: BioSTEAM's Premier Biorefinery Models and Results
-# Copyright (C) 2022-2023, Sarang Bhagwat <sarangb2@illinois.edu> (this biorefinery)
+# Copyright (C) 2021-, Sarang Bhagwat <sarangb2@illinois.edu>
 # 
 # This module is under the UIUC open-source license. See 
 # github.com/BioSTEAMDevelopmentGroup/biosteam/blob/master/LICENSE.txt
 # for license details.
 """
-
-@author: sarangbhagwat
-
-Created on Sun Aug 23 12:11:15 2020
-
-This module is a modified implementation of modules from the following:
-[1]	Bhagwat et al., Sustainable Production of Acrylic Acid via 3-Hydroxypropionic Acid from Lignocellulosic Biomass. ACS Sustainable Chem. Eng. 2021, 9 (49), 16659–16669. https://doi.org/10.1021/acssuschemeng.1c05441
-[2]	Li et al., Sustainable Lactic Acid Production from Lignocellulosic Biomass. ACS Sustainable Chem. Eng. 2021, 9 (3), 1341–1351. https://doi.org/10.1021/acssuschemeng.0c08055
-[3]	Cortes-Peña et al., BioSTEAM: A Fast and Flexible Platform for the Design, Simulation, and Techno-Economic Analysis of Biorefineries under Uncertainty. ACS Sustainable Chem. Eng. 2020, 8 (8), 3302–3310. https://doi.org/10.1021/acssuschemeng.9b07040
-
 All units are explicitly defined here for transparency and easy reference.
 Naming conventions:
     D = Distillation column
+    C = Crystallization
     AC = Adsorption column
     F = Flash tank or multiple-effect evaporator
     H = Heat exchange
@@ -31,7 +22,7 @@ Naming conventions:
     U = Other units
 Processes:
     100: Feedstock preprocessing
-    200: Pretreatment
+    200: Feedstock pretreatment and juicing
     300: Conversion
     400: Separation
     500: Wastewater treatment
@@ -43,10 +34,12 @@ Processes:
 
 """
 
+#%%
 from .models import load
 
-
 def load_TAL_model(mode='A'):
+    implemented_modes = ['A', 'B', 'C', 'D']
+    if not mode in implemented_modes: raise ValueError(f"Mode must be one of {implemented_modes}, not {mode}.")
     system, spec, tea, lca, get_adjusted_MSP, simulate_and_print, TEA_breakdown, run_TAL_uncertainty_analysis = load.load_TAL_model(mode=mode)
     globals().update({
         'system':system, 'spec':spec, 'tea':tea, 'lca':lca, 'get_adjusted_MSP':get_adjusted_MSP,
@@ -55,6 +48,8 @@ def load_TAL_model(mode='A'):
         })
     
 def load_KS_model(mode='A'):
+    implemented_modes = ['THF_Ethanol_A', 'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H']
+    if not mode in implemented_modes: raise ValueError(f"Mode must be one of {implemented_modes}, not {mode}.")
     system, spec, tea, lca, get_adjusted_MSP, simulate_and_print, TEA_breakdown = load.load_KS_model(mode=mode)
     globals().update({
         'system':system, 'spec':spec, 'tea':tea, 'lca':lca, 'get_adjusted_MSP':get_adjusted_MSP,

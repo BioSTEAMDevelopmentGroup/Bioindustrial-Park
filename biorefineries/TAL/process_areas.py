@@ -1,8 +1,37 @@
+#!/usr/bin/env python3
 # -*- coding: utf-8 -*-
+# Bioindustrial-Park: BioSTEAM's Premier Biorefinery Models and Results
+# Copyright (C) 2021-, Sarang Bhagwat <sarangb2@illinois.edu>
+# 
+# This module is under the UIUC open-source license. See 
+# github.com/BioSTEAMDevelopmentGroup/biosteam/blob/master/LICENSE.txt
+# for license details.
 """
-Created on Tue May 16 23:00:23 2023
+All units are explicitly defined here for transparency and easy reference.
+Naming conventions:
+    D = Distillation column
+    C = Crystallization
+    AC = Adsorption column
+    F = Flash tank or multiple-effect evaporator
+    H = Heat exchange
+    M = Mixer
+    P = Pump (including conveying belt)
+    R = Reactor
+    S = Splitter (including solid/liquid separator)
+    T = Tank or bin for storage
+    U = Other units
+Processes:
+    100: Feedstock preprocessing
+    200: Feedstock pretreatment and juicing
+    300: Conversion
+    400: Separation and upgrading
+    500: Wastewater treatment
+    600: Storage
+    700: Co-heat and power
+    800: Cooling utility generation
+    900: Miscellaneous facilities
+    1000: Heat exchanger network
 
-@author: sarangbhagwat
 """
 
 import biosteam as bst

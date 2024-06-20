@@ -1,9 +1,13 @@
+#!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-"""
-Created on Thu Feb  2 17:16:45 2023
+# Bioindustrial-Park: BioSTEAM's Premier Biorefinery Models and Results
+# Copyright (C) 2021-, Sarang Bhagwat <sarangb2@illinois.edu>
+# 
+# This module is under the UIUC open-source license. See 
+# github.com/BioSTEAMDevelopmentGroup/biosteam/blob/master/LICENSE.txt
+# for license details.
 
-@author: sarangbhagwat
-"""
+
 from pandas import DataFrame, read_excel
 from chaospy import distributions as shape
 # from biorefineries.succinic.system_sc import succinic_tea, u, s
