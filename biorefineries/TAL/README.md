@@ -7,7 +7,7 @@ Getting Started
 ---------------
 
 Two integrated sugarcane + sweet sorghum biorefineries can be loaded using the names detailed in the following table
-(baseline values and parameter distributions for all uncertain parameters are detailed in parameter_distributions):
+(baseline values and parameter distributions for all uncertain parameters are detailed in [.analyses/full/parameter_distributions](https://github.com/BioSTEAMDevelopmentGroup/Bioindustrial-Park/tree/master/biorefineries/TAL/analyses/full/parameter_distributions)):
 
 | Products                      | Scenario                                                    | Label               | To Load                             |
 | ----------------------------- | ----------------------------------------------------------  | ------------------- | ----------------------------------- |
