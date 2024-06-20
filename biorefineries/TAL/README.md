@@ -236,4 +236,4 @@ FEC without electricity credit is 123.571 MJ/kg KSA
     Bhagwat, S.S.; Dell'Anna, M.N.; Li, Y.; Cao, M.; Brace, E.C.; Bhagwat, S.S.; Huber, G.W.; Zhao, H.; Guest, J.S. “Sustainable  Triacetic Acid Lactone Production from Sugarcane by Fermentation and Crystallization”. In preparation.
 
 <a id="2">[2]</a> 
-    Kim, M.S.; Bhagwat, S.S.; Santiago-Martinez, L.; Shi, X.; Kyuhyeok, C.; Guest, J.S.; Huber, G.W. “Catalytic Production of Biomass-Based Food Preservative in Food-grade Solvents”. In preparation.
+    Kim, M.S.; Bhagwat, S.S.; Santiago-Martinez, L.; Shi, X.; Kyuhyeok, C.; Guest, J.S.; Huber, G.W. “Catalytic Production of Biomass-Based Food Preservative in Food-Grade Solvents”. In preparation.
