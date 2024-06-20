@@ -29,7 +29,7 @@ For example, for biorefineries with TAL as the final product:
 
 ```python
 >>> from biorefineries import TAL
->>> TAL.load_TAL_model('A') # Load current state-of-technology TAL biorefinery
+>>> TAL.load_TAL_model('A') # Load 'TAL_A': current state-of-technology TAL biorefinery
 >>> TAL.system.show(data=False) # Full system
 Solubility model fit to experimental data with R^2 = 0.992.
 
@@ -166,7 +166,7 @@ electricity consumption: 0.000
 heating duty: 0.000
 excess electricity: 0.000
 
->>> TAL.load_TAL_model('D') # Load 'TAL_C' + potential separation improvements
+>>> TAL.load_TAL_model('D') # Load 'TAL_D': 'TAL_C' + potential separation improvements
 >>> TAL.system.show(data=False)
 
 Loading parameter distributions (D) ...
@@ -191,7 +191,7 @@ Alternatively, for biorefineries with KS (from upgrading TAL) as the final produ
 
 ```python
 >>> from biorefineries import TAL
->>> TAL.load_KS_model('A') # Load current state-of-technology KS biorefinery using IPA solvent during upgrading
+>>> TAL.load_KS_model('A') # Load 'Sorbate_A': current state-of-technology KS biorefinery using IPA solvent for upgrading
 >>> TAL.system.show(data=False) # Full system
 
 Loading system ...
