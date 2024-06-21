@@ -239,9 +239,9 @@ and add it to your PYTHONPATH.
 (ii) Navigate to your local filepath bioindustrial-park/biorefineries/TAL
      in your command prompt, and use:
 
-     ```python
-     pip install -r requirements.txt
-     ```
+```python
+pip install -r requirements.txt
+```
 
 ## References
 <a id="1">[1]</a> 
