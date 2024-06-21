@@ -231,6 +231,15 @@ FEC without electricity credit is 123.571 MJ/kg KSA
 .............................. or 165.550 MJ/kg SorbicAcid
 ```
 
+To reproduce results reported in [[1]](#1) or [[1]](#1), simply do the following:
+(i) Clone the BioSTEAM repository [commit 2252866a05699c2d0a5c08ac360c947fed815903](https://github.com/BioSTEAMDevelopmentGroup/biosteam/tree/2252866a05699c2d0a5c08ac360c947fed815903)
+and add it to your PYTHONPATH.
+(ii) Navigate to your local filepath bioindustrial-park/biorefineries/TAL
+     in your command prompt, and use:
+     ```python
+     pip install -r requirements.txt
+     ```
+
 ## References
 <a id="1">[1]</a> 
     Bhagwat, S.S.; Dell'Anna, M.N.; Li, Y.; Cao, M.; Brace, E.C.; Bhagwat, S.S.; Huber, G.W.; Zhao, H.; Guest, J.S. “Sustainable  Triacetic Acid Lactone Production from Sugarcane by Fermentation and Crystallization”. In preparation.

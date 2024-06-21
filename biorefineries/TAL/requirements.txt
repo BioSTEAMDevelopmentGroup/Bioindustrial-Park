@@ -1,6 +1,6 @@
 # IPython==8.15.0 # uncomment this only if results are vastly different from those in the README
 
-biosteam==2.44.3
+# biosteam commit 2252866a05699c2d0a5c08ac360c947fed815903
 thermosteam==0.42.2
 contourplots==0.3.4
 numpy==1.26.4
