@@ -233,8 +233,10 @@ FEC without electricity credit is 123.571 MJ/kg KSA
 
 To reproduce results reported in [[1]](#1) or [[2]](#2), simply do the following:
 
+(i) Clone the Bioindustrial-Park repository (this commit) and add the 'bioindustrial-park' folder to your PYTHONPATH.
+
 (i) Clone the BioSTEAM repository [commit 2252866a05699c2d0a5c08ac360c947fed815903](https://github.com/BioSTEAMDevelopmentGroup/biosteam/tree/2252866a05699c2d0a5c08ac360c947fed815903)
-and add it to your PYTHONPATH.
+and add the 'biosteam' folder to your PYTHONPATH.
 
 (ii) Navigate to your local filepath bioindustrial-park/biorefineries/TAL
      in your command prompt, and use:
@@ -245,7 +247,7 @@ pip install -r requirements.txt
 
 ## References
 <a id="1">[1]</a> 
-    Bhagwat, S.S.; Dell'Anna, M.N.; Li, Y.; Cao, M.; Brace, E.C.; Bhagwat, S.S.; Huber, G.W.; Zhao, H.; Guest, J.S. “Sustainable  Triacetic Acid Lactone Production from Sugarcane by Fermentation and Crystallization”. In preparation.
+    Bhagwat, S.S.; Dell'Anna, M.N.; Li, Y.; Cao, M.; Brace, E.C.; Bhagwat, S.S.; Huber, G.W.; Zhao, H.; Guest, J.S. Sustainable triacetic acid lactone production from sugarcane by fermentation and crystallization. Green Chemistry. Submitted June 21, 2024. Pre-print available online: [doi.org/10.26434/chemrxiv-2024-4sz8x](doi.org/10.26434/chemrxiv-2024-4sz8x) 
 
 <a id="2">[2]</a> 
-    Kim, M.S.; Bhagwat, S.S.; Santiago-Martinez, L.; Shi, X.; Kyuhyeok, C.; Guest, J.S.; Huber, G.W. “Catalytic Production of Biomass-Based Food Preservative in Food-Grade Solvents”. In preparation.
+    Kim, M.S.; Bhagwat, S.S.; Santiago-Martinez, L.; Shi, X.; Kyuhyeok, C.; Guest, J.S.; Huber, G.W. “Catalytic production of biomass-based food preservative in food-grade solvents”. In preparation.
