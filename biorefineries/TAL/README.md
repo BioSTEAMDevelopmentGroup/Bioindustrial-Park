@@ -247,7 +247,7 @@ pip install -r requirements.txt
 
 ## References
 <a id="1">[1]</a> 
-    Bhagwat, S.S.; Dell'Anna, M.N.; Li, Y.; Cao, M.; Brace, E.C.; Bhagwat, S.S.; Huber, G.W.; Zhao, H.; Guest, J.S. Sustainable triacetic acid lactone production from sugarcane by fermentation and crystallization. Green Chemistry. Submitted June 21, 2024. Pre-print available online: [doi.org/10.26434/chemrxiv-2024-4sz8x](doi.org/10.26434/chemrxiv-2024-4sz8x) 
+    Bhagwat, S.S.; Dell'Anna, M.N.; Li, Y.; Cao, M.; Brace, E.C.; Bhagwat, S.S.; Huber, G.W.; Zhao, H.; Guest, J.S. Sustainable triacetic acid lactone production from sugarcane by fermentation and crystallization. Green Chemistry. Submitted June 21, 2024. Pre-print available online: [doi.org/10.26434/chemrxiv-2024-4sz8x](https://doi.org/10.26434/chemrxiv-2024-4sz8x) 
 
 <a id="2">[2]</a> 
     Kim, M.S.; Bhagwat, S.S.; Santiago-Martinez, L.; Shi, X.; Kyuhyeok, C.; Guest, J.S.; Huber, G.W. “Catalytic production of biomass-based food preservative in food-grade solvents”. In preparation.
