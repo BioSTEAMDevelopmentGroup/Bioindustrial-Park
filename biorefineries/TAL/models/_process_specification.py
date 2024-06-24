@@ -19,7 +19,7 @@ import flexsolve as flx
 import numpy as np
 from biosteam.exceptions import InfeasibleRegion
 from biorefineries.TAL.units import compute_TAL_titer, compute_TAL_mass
-from winsound import Beep
+# from winsound import Beep
 
 _red_highlight_white_text = '\033[1;47;41m'
 _yellow_text = '\033[1;33m'
@@ -147,7 +147,7 @@ def evaluate_across_specs(spec, system,
                         # if spec.set_production_capacity: spec.set_production_capacity(desired_annual_production=spec.desired_annual_production)
                         return get_metrics()
                     except:
-                        Beep(640, 500)
+                        # Beep(640, 500)
                         import pdb
                         pdb.set_trace()
                 except: pass
