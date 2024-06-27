@@ -34,7 +34,7 @@ class DihydroxylationReactor(bst.CSTR):
     _N_outs = 2
     _units = {'Total volume': 'm3'}
     #Even though there is no mention of methyl oleate in the dihydroxylated product oily phase in [1] complete conversion can not be assumed.
-    #Dihydroxylation reaction conversion stated in [3] for oleic acid under H2O2 and tungstic acid as 86 wt.%
+    #Dihydroxylation reaction conversion stated in [11] for oleic acid under H2O2 and tungstic acid as 86 wt.%
      
    #: Default maximum change in temperature for the heat exchanger loop.
     dT_hx_loop_default: Optional[float] = 5
@@ -137,22 +137,22 @@ class OxidativeCleavageReactor(bst.CSTR):
     tau_0_default: Optional[float]  = 3    
     
 
-    #Based on [3], diol formed from oleyl alcohol almost completely (99%) gets consumed in this reactor.
-    #Information on methyl oleate diol was not provided in [3]
+    #Based on [11], diol formed from oleyl alcohol almost completely (99%) gets consumed in this reactor.
+    #Information on methyl oleate diol was not provided in [11]
     #A conservative estimate of a total consumption of 98% was assumed
+    
     #Series reaction conversion for MDHSA to Nonanal and Ox-nonanoic acid can be calculated from [2] as 95.4%
-    #No information on the presence of Nonanal and Ox-nonanoic acid intermediates was provided in [1],[2]
     #Therfore, it was assumed almost of all the intermediate gets consumed in the paralell reactions(99%)
     #Nonanal oxidative cleavage conversion and decarboxylation reaction can be calculated from experidemental data provided in [2]
 
-    # X_ox_rxn_1 = 0.95
+    # X_ox_rxn_1 = 0.90
     # #some unreacted MDHSA remains in the mixture[2]
     # X_oxidativecleavage = 0.96 [2] #Since no information was provided on presence of intermediates like
     # #Nonanal and oxo-nonanoic, almost all of them were assumed to convert to azelaic and nonanoic acid
     # X_decarboxylation = 0.99-X_oxidativecleavage
     #Decarboxylation of intermediates is an unwanted side reaction, 
     #conversion based on almost complete conversion of nonanal and oxo-nonanoic acid 
-    # X_side_rxn*4 = 1- (1-0.97)/(1-X_ox_rxn_1)#Few unwanted esters get generated in small amounts [1]&[2], the actual conversion is uncertain
+    # X_side_rxn*4 = 1- (1-0.98)/(1-X_ox_rxn_1)#Few unwanted esters get generated in small amounts [1]&[2], the actual conversion is uncertain
     # X_decomposition = 0.99 #Nearly all of hydrogen peroxide coming in from the dihydroxylation reactor gets decomposed in the presence of cobalt catalyst [4]
     
     def _init(self, T,P,tau,X_ox_rxn_1,X_oxidativecleavage,X_decomposition,total_consumption_of_diol,
@@ -483,7 +483,7 @@ bst.StorageTank.purchase_cost_algorithms["Solids handling bin"] = TankPurchaseCo
 
 ########################################################################################################################################################################################################################
 #References:
-#[1] IMPROVED PROCESS FOR THE PRODUCTION OF DERIVATIVES OF SATURATED CARBOXYLIC ACIDS,EP 1 926 699 B1    
+#[1]IMPROVED PROCESS FOR THE PRODUCTION OF DERIVATIVES OF SATURATED CARBOXYLIC ACIDS,EP 1 926 699 B1    
 #[2]CONTINUOUS PROCESS FOR THE PRODUCTION OF DERVATIVES OF SATURATED CARBOXYLIC ACDS,US 9.272,975 B2
 #[3]PROCESS FOR THE PREPARATION OF CARBOYLIC ACDS AND ESTERS THEREOF BY OXDATIVE CLEAWAGE OF UNSATURATED EATTY ACDS AND ESTERS, Patent number 5,714,623, 
 #[4]PROCESS FOR RECOVERING COBALT AND TUNGSTEN FROM REACTION LIQUORS
@@ -497,28 +497,3 @@ bst.StorageTank.purchase_cost_algorithms["Solids handling bin"] = TankPurchaseCo
 #[11]Double bond oxidative cleavage of monoenic fatty chains
 
 ########################################################################################################################################################################################################################
-#Conversion data
-#DIH
-#78% conversion, 70 deg cel, h2O2 conc 60%, at 4 hours approx
-#80% pure oleic acid, 1.15% wrt oleic acid unsaturation
-
-#OXcl
-#entire diol reacts, AA,PA and hydroxynonanoic acid are formed
-#oleyl alcohol data available
-#process does not discuss MDHSA
-# does not discuss other compounds etc
-# Oxidative Cleavage of the Double Bond of Monoenic Fatty Chains in
-# Two Steps: A New Promising Route to Azelaic Acid and Other
-# Industrial Products 
-
-#Dih
-# Double bond oxidative cleavage of monoenic fatty chains
-# conversion of OA is 86%
-#Dih product gets completely converted
-
-#Novomont's patent
-#23 moles of MDHSA reacts to form AA and PA
-#0.79 moles of Methyl caprylate are formed meaning
-#nonanal react assuming the same for the others
-
-#

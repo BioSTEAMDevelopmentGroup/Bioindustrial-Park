@@ -223,7 +223,7 @@ lbsperMWh_to_KgsperKWh = 4.53592e-4
 
 GWP_factors_per_Kg = {  #inputs
                         'HoSun_oil':0.76, #Based on GWP of sunflower oil (incl. iLUC and biogenic CO2 uptake) [25]                                               
-                        'HoySoy_oil': 0.485,#Based on GWP of commodity soybean oil as it is same for HO variety (excluding biogenic emissions), obtained value for GREET [35],[26]
+                        'HoySoy_oil': 0.485,#Based on GWP of commodity soybean oil as it is same for HO variety (excluding CO2 capture), obtained value from GREET [35],[26]
                         'Citric_acid': 1.4821,#GHG-100 GREET 2022 [26]
                         'Hydrogen_peroxide':1.0813, #GHG-100 GREET 2022 [26]
                         'Tungstic_acid':68.5,#Value based on midpoint results available for tungsten carbide[27]

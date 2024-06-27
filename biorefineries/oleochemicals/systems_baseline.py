@@ -794,7 +794,7 @@ def azelaic_acid_production(ins,outs):
     R606 = units_baseline.HydrolysisReactor(ID = 'R606',
                                             ins = (T606 -0,water_for_emulsification2,
                                                    ),
-                                            outs = ('to_process_water_center_1',
+                                            outs = ('to_methanol_water_recovery_1',
                                                    'organic_mixture_to_holding_tank_2'),
                                             T = 120+273.15,                                        
                                             tau = 6.5, #considers regeneration time,
@@ -837,7 +837,7 @@ def azelaic_acid_production(ins,outs):
                                             ins = (T607-0,water_for_emulsification3,
                                                    monomethyl_azelate_recycle
                                                    ),
-                                            outs = ('to_process_water_center_2',
+                                            outs = ('to_methanol_water_recovery_2',
                                                    'organic_mixture_to_holding_tank_2'),
                                             T = 120+273.15,                                        
                                             tau = 6.5, #considers regeneration time,
@@ -1382,10 +1382,8 @@ def aa_baseline_sys(ins,outs,tag_compositions):
                                   ])
         plant_air_in.imass['Oxygen'] = total_air_required*0.22
         plant_air_in.imass['Nitrogen'] = total_air_required*0.78
-        
+    
+#TODO: Jeremy had told you this in April        
 #If feedstock has - biogenic emissions you add the EOL of products
 #IF the feedstock does not include biogenic emissions you ignore the EOL of products         
     
-
-#Dates
-# Apr 15,22

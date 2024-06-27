@@ -44,47 +44,47 @@ azelaic_acid_tea = aa_baseline.TEA
 aa_baseline.simulate()
 
 #%% To generate an excel file with total installed equipment costs of each equipment in each area
-# area_1 = []
-# for i in F.crude_HO_oil_to_biodiesel.units:
-#     area_1.append([str(i.ID),i.installed_cost/1e6])
-# df1 = pd.DataFrame(area_1, columns=['IDs', 'IEC'])
+area_1 = []
+for i in F.crude_HO_oil_to_biodiesel.units:
+    area_1.append([str(i.ID),i.installed_cost/1e6])
+df1 = pd.DataFrame(area_1, columns=['IDs', 'IEC'])
 
-# area_2 = []
-# for i in F.dihydroxylation_system.units:
-#     area_2.append([str(i.ID),i.installed_cost/1e6])
-# df2 = pd.DataFrame(area_2, columns=['IDs', 'IEC'])
+area_2 = []
+for i in F.dihydroxylation_system.units:
+    area_2.append([str(i.ID),i.installed_cost/1e6])
+df2 = pd.DataFrame(area_2, columns=['IDs', 'IEC'])
 
-# area_3 = []
-# for i in F.oxidative_cleavage_system.units:
-#     area_3.append([str(i.ID),i.installed_cost/1e6])
-# df3 = pd.DataFrame(area_3, columns=['IDs', 'IEC'])
+area_3 = []
+for i in F.oxidative_cleavage_system.units:
+    area_3.append([str(i.ID),i.installed_cost/1e6])
+df3 = pd.DataFrame(area_3, columns=['IDs', 'IEC'])
 
-# area_4 = []
-# for i in F.organic_phase_separation_and_catalyst_recovery.units:
-#     area_4.append([str(i.ID),i.installed_cost/1e6])
-# df4 = pd.DataFrame(area_4, columns=['IDs', 'IEC'])
+area_4 = []
+for i in F.organic_phase_separation_and_catalyst_recovery.units:
+    area_4.append([str(i.ID),i.installed_cost/1e6])
+df4 = pd.DataFrame(area_4, columns=['IDs', 'IEC'])
 
-# area_5 = []
-# for i in F.nonanoic_acid_fraction_separation.units:
-#     area_5.append([str(i.ID),i.installed_cost/1e6])
-# df5 = pd.DataFrame(area_5, columns=['IDs', 'IEC'])
+area_5 = []
+for i in F.nonanoic_acid_fraction_separation.units:
+    area_5.append([str(i.ID),i.installed_cost/1e6])
+df5 = pd.DataFrame(area_5, columns=['IDs', 'IEC'])
 
-# area_6 = []
-# for i in F.azelaic_acid_production.units:
-#     area_6.append([str(i.ID),i.installed_cost/1e6])
-# df6 = pd.DataFrame(area_6, columns=['IDs', 'IEC'])    
+area_6 = []
+for i in F.azelaic_acid_production.units:
+    area_6.append([str(i.ID),i.installed_cost/1e6])
+df6 = pd.DataFrame(area_6, columns=['IDs', 'IEC'])    
 
-# area_7 = []
-# for i in [  F.BT801,
-#             F.CT701,
-#             F.ADP701,
-#             F.HXN701,
-#             F.CW701,
-#             F.PWT701,
-#             F.WWT901
-#             ]:
-#     area_7.append([str(i.ID),i.installed_cost/1e6])
-# df7 = pd.DataFrame(area_7, columns=['IDs', 'IEC'])    
+area_7 = []
+for i in [  F.BT801,
+            F.CT701,
+            F.ADP701,
+            # F.HXN701,
+            F.CW701,
+            F.PWT701,
+            F.WWT901
+            ]:
+    area_7.append([str(i.ID),i.installed_cost/1e6])
+df7 = pd.DataFrame(area_7, columns=['IDs', 'IEC'])    
 
 #Heat duty
 # area_6_hd = []

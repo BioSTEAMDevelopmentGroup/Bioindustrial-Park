@@ -16,8 +16,7 @@ from biorefineries.oleochemicals.system_simulate import azelaic_acid_tea,aa_base
 import biosteam as bst
 from biosteam import report
 from biosteam import settings
-from model_samples import sample_list
-
+from model_samples import sample_list_1999
 
 #unit conversions
 KJpersec_to_KJhr = 3600 
@@ -96,6 +95,27 @@ def df_related():
                             'Other Facilities (cooling tower,air distribution and cleaning auxiliaries)'
                             ]
     return df_unit_groups
+
+#function to estimate the fraction splits for each of the metrics
+def df_related_fraction(): 
+    df_unit_groups = bst.UnitGroup.df_from_groups(unit_groups = aa_baseline_groups,fraction = True)
+    
+    df_unit_groups.index = [100,200,300,400,500,600,900,700,800]
+
+    df_unit_groups = df_unit_groups.sort_index()    
+    df_unit_groups.index = [
+                            'Transesterification',
+                            'Dihydroxylation',
+                            'Oxidative cleavage',
+                            'Catalyst recovery',
+                            'Pelargonic acid and C5-C8 fraction recovery',
+                            'Azelaic acid and heavy tails recovery',
+                            'Boilerturbogenerator',
+                            'Wastewater treatment',
+                            'Other Facilities (cooling tower,air distribution and cleaning auxiliaries)'
+                            ]
+    return df_unit_groups
+
 # #######################################################################################################################3
 # Environmental impact calculation
 main_product = [azelaic_acid]
@@ -114,17 +134,30 @@ extra_streams = [F.resin_for_hydrolysis_1,
 
 #The emissions originate from R300, D403,D404,D601,HX608,U902,R902,BT801,CT901,PWT901
 #Emissions were assumed to be carbon emissions
+#TODO: should brine count?, rejected water does not matter as such but still?\
+#assumed that carbon related compounds in brine get passively oxidized    
+
+#cradle to gate will be a higher number since EOL is not included
+#gate to gate will not be able let you do a fair comparision between fossil fuel and bioproducts
+
 emissions = [i for i in aa_baseline.products if i not in extra_streams and i not in main_product and i not in products and i not in F.ADP701.outs]
 
 #Total emissions (TE) (unitless)
-get_total_emissions_GWP = TE_GWP = lambda: sum([stream.get_atomic_flow('C') for stream in emissions]) * chems.CO2.MW / azelaic_acid.F_mass
+emissions_GWP = TE_GWP = lambda: sum([stream.get_atomic_flow('C') for stream in emissions]) * chems.CO2.MW / azelaic_acid.F_mass
 
 #End of life emissions (EOL) emissions are indirect emissions
-#Since the feedstock does not include the biogenic emissions, we do not need to consider EOL emissions
-direct_emmisions = get_total_direct_emissions_GWP = lambda: get_total_emissions_GWP() 
+#TODO: Sarang told you this
+#EOL is always included in cradle to grave
+#if feedstock  CF does contain offset for biogenic CO2, meaning it was subracted like in GREET example..then do not do anything..do not subtract fixed carbon based on atomic flow
+#if the offset was not accounted for, as in there was no subtraction of CO2 biogenic 
+# ...then DO subtract the fixed carbon 
+#...in the case that the feedstock CF did not consider iLUC and SOC you can add uncertainty to the CF of the feedstock to account for these
+
+EOL_emissions = EOL_GWP = lambda: sum([stream.get_atomic_flow('C') for stream in products or main_product]) * chems.CO2.MW / azelaic_acid.F_mass
+direct_emmisions = get_total_direct_emissions_GWP = lambda: emissions_GWP() + EOL_emissions()
 
 #Boilerturbogenerator also contributes to direct emissions #(unitless)
-direct_emmisions_from_BT = get_total_direct_BT_emissions_GWP = lambda: (sum([i.get_atomic_flow('C') for i in F.BT801.outs])*chems.CO2.MW/ azelaic_acid.F_mass)*get_total_direct_emissions_GWP()/get_total_emissions_GWP()
+direct_emmisions_from_BT = get_total_direct_BT_emissions_GWP = lambda: (sum([i.get_atomic_flow('C') for i in F.BT801.outs])*chems.CO2.MW/ azelaic_acid.F_mass)*get_total_direct_emissions_GWP()/emissions_GWP()
 direct_emmisions_without_BT = get_total_non_BT_direct_emissions_GWP = lambda: get_total_direct_emissions_GWP() - get_total_direct_BT_emissions_GWP()
 
 #Impact of the total natural gas consumed in the process via the boiler turbogenerator
@@ -166,7 +199,7 @@ def get_system_GWP():
                 get_other_materials_impact(),
                 get_ng_GWP(),
                 net_electricity_purchased_GWP(),
-                get_total_emissions_GWP()
+                get_total_direct_emissions_GWP()
                 ]))
 
 def get_system_GWP1():
@@ -215,9 +248,9 @@ def get_economic_based_AA_GWP():
     economic_aa_fraction = aa_baseline.get_market_value(azelaic_acid)*get_system_GWP()/get_total_product_market_value()
     return economic_aa_fraction #Kg CO2 per kg of AA
 
-def get_mass_based_AA_GWP():
-    def get_total_product_mass():
-        return(sum([aa_baseline.get_mass_flow(azelaic_acid),
+
+def get_total_product_mass():
+    return(sum([aa_baseline.get_mass_flow(azelaic_acid),
                     aa_baseline.get_mass_flow(recovered_C5_to_C9_MCA_fraction),
                     aa_baseline.get_mass_flow(pelargonic_acid_rich_fraction),
                     aa_baseline.get_mass_flow(crude_glycerol),       
@@ -225,15 +258,14 @@ def get_mass_based_AA_GWP():
                     aa_baseline.get_mass_flow(crude_methanol)
                     ]))
         
-    #Mass allocation
-    mass_C5_C9_fraction = aa_baseline.get_mass_flow(recovered_C5_to_C9_MCA_fraction)*get_system_GWP()/get_total_product_mass()
-    mass_pa_fraction = aa_baseline.get_mass_flow(pelargonic_acid_rich_fraction)*get_system_GWP()/get_total_product_mass()
-    mass_glycerol_fraction = aa_baseline.get_mass_flow(crude_glycerol)*get_system_GWP()/get_total_product_mass() 
-    mass_fa_fraction = aa_baseline.get_mass_flow(fatty_acid_blend)*get_system_GWP()/get_total_product_mass()
-    mass_methanol_fraction = aa_baseline.get_mass_flow(crude_methanol)*get_system_GWP()/get_total_product_mass()
-    sum_mass =  mass_C5_C9_fraction+mass_pa_fraction+mass_glycerol_fraction+mass_fa_fraction+mass_methanol_fraction
-    mass_aa_fraction = aa_baseline.get_mass_flow(azelaic_acid)*get_system_GWP()/get_total_product_mass()
-    return mass_aa_fraction#Kg CO2 per kg of AA
+#Mass allocation
+mass_C5_C9_fraction = lambda: aa_baseline.get_mass_flow(recovered_C5_to_C9_MCA_fraction)*get_system_GWP()/get_total_product_mass()
+mass_pa_fraction = lambda: aa_baseline.get_mass_flow(pelargonic_acid_rich_fraction)*get_system_GWP()/get_total_product_mass()
+mass_glycerol_fraction = lambda: aa_baseline.get_mass_flow(crude_glycerol)*get_system_GWP()/get_total_product_mass() 
+mass_fa_fraction = lambda: aa_baseline.get_mass_flow(fatty_acid_blend)*get_system_GWP()/get_total_product_mass()
+mass_methanol_fraction = lambda: aa_baseline.get_mass_flow(crude_methanol)*get_system_GWP()/get_total_product_mass()  
+# sum_mass =  mass_C5_C9_fraction+mass_pa_fraction+mass_glycerol_fraction+mass_fa_fraction+mass_methanol_fraction
+mass_aa_fraction = lambda: aa_baseline.get_mass_flow(azelaic_acid)*get_system_GWP()/get_total_product_mass()
     
 #GWP related functions
 #Displacement scenarios
@@ -243,6 +275,7 @@ def get_mass_based_AA_GWP():
 #TODO: discuss fatty acid production from coconut oil
 #Fatty acid blend - biodiesel
 
+#TODO: discuss if azelaic acid was displacement
 def get_net_GWP_PA_1():
     #Values per kg of product
 
@@ -299,6 +332,7 @@ def aa_recovery_IEC():
 def boiler_IEC():
     df_unit_groups = df_related()
     return df_unit_groups['Installed equipment cost [MM$]']['Boilerturbogenerator']
+
 def wastewater_IEC():
     df_unit_groups = df_related()
     return df_unit_groups['Installed equipment cost [MM$]']['Wastewater treatment']
@@ -449,7 +483,81 @@ def other_facility_electricity_consumption():
     df_unit_groups = df_related()
     return df_unit_groups['Electricity consumption [MW]']['Other Facilities (cooling tower,air distribution and cleaning auxiliaries)']
 
+#functions to estimate fraction splits
+def boiler_IEC_f():
+    df_unit_groups = df_related_fraction()
+    return df_unit_groups['Installed equipment cost']['Boilerturbogenerator']
 
+def boiler_WWT_OF_IEC_f():
+    df_unit_groups = df_related_fraction()
+    sum_of_WWT_OF_BT = df_unit_groups['Installed equipment cost']['Boilerturbogenerator'] + df_unit_groups['Installed equipment cost']['Wastewater treatment'] + df_unit_groups['Installed equipment cost']['Other Facilities (cooling tower,air distribution and cleaning auxiliaries)']  
+    return sum_of_WWT_OF_BT
+
+def AA_Hduty_f():
+    df_unit_groups = df_related_fraction()
+    heating_duty_AA_sept = df_unit_groups['Heating duty']['Azelaic acid and heavy tails recovery']
+    return heating_duty_AA_sept
+
+def AA_Cduty_f():
+    df_unit_groups = df_related_fraction()
+    cooling_duty_AA_sept = df_unit_groups['Cooling duty']['Azelaic acid and heavy tails recovery']
+    return cooling_duty_AA_sept
+
+def HD_before_extraction():
+    sum_1 = sum([j.duty for j in F.HX602.heat_utilities if j.flow > 0 and j.duty > 0])*aa_baseline.operating_hours/1e9
+    sum_2 = sum([j.duty for j in F.HX603.heat_utilities if j.flow > 0 and j.duty > 0])*aa_baseline.operating_hours/1e9
+    fraction = (sum_1+sum_2)*100/get_system_heating_demand()
+    return fraction
+
+def HD_after_extraction_before_water_recovery():
+    sum_hd= sum([j.duty for j in F.H605.heat_utilities if j.flow > 0 and j.duty > 0])*aa_baseline.operating_hours/1e9
+    return sum_hd*100/get_system_heating_demand()
+
+def CD_during_water_extraction():
+    sum_1 = sum([j.duty for j in F.E601.heat_utilities if j.flow > 0 and j.duty < 0])*aa_baseline.operating_hours/1e9
+    fraction = sum_1*100/get_system_cooling_demand()
+    return fraction
+
+def CD_during_methanol_recovery():
+    sum_1 = sum([j.duty for j in F.S607.heat_utilities if j.flow > 0 and j.duty < 0])*aa_baseline.operating_hours/1e9
+    sum_2 = sum([j.duty for j in F.R605.heat_utilities if j.flow > 0 and j.duty < 0])*aa_baseline.operating_hours/1e9
+    sum_3 = sum([j.duty for j in F.R606.heat_utilities if j.flow > 0 and j.duty < 0])*aa_baseline.operating_hours/1e9
+    sum_4 = sum([j.duty for j in F.R607.heat_utilities if j.flow > 0 and j.duty < 0])*aa_baseline.operating_hours/1e9
+    fraction = (sum_1+sum_2+sum_3+sum_4)*100/get_system_cooling_demand()
+    return fraction
+
+def HD_during_methanol_recovery():
+    sum_1 = sum([j.duty for j in F.S607.heat_utilities if j.flow > 0 and j.duty > 0])*aa_baseline.operating_hours/1e9
+    sum_2 = sum([j.duty for j in F.R605.heat_utilities if j.flow > 0 and j.duty > 0])*aa_baseline.operating_hours/1e9
+    sum_3 = sum([j.duty for j in F.R606.heat_utilities if j.flow > 0 and j.duty > 0])*aa_baseline.operating_hours/1e9
+    sum_4 = sum([j.duty for j in F.R607.heat_utilities if j.flow > 0 and j.duty > 0])*aa_baseline.operating_hours/1e9
+    fraction = (sum_1+sum_2+sum_3+sum_4)*100/get_system_heating_demand()
+    return fraction
+
+def CD_pelargonic_acid_recovery():
+    df_unit_groups = df_related_fraction()
+    cooling_duty_PA_sept = df_unit_groups['Cooling duty']['Pelargonic acid and C5-C8 fraction recovery']
+    return cooling_duty_PA_sept
+
+def HD_pelargonic_acid_recovery():
+    df_unit_groups = df_related_fraction()
+    heating_duty_PA_sept = df_unit_groups['Heating duty']['Pelargonic acid and C5-C8 fraction recovery']
+    return heating_duty_PA_sept
+
+def EC_pelargonic_acid_recovery():
+    df_unit_groups = df_related_fraction()
+    EC_PA_sept = df_unit_groups['Electricity consumption']['Pelargonic acid and C5-C8 fraction recovery']
+    return EC_PA_sept 
+
+def transesterification_section_MC():
+    df_unit_groups = df_related_fraction()
+    TA_MC = df_unit_groups['Material cost']['Transesterification']
+    return TA_MC 
+
+def hydrogen_peroxide_section_MC():
+    df_unit_groups = df_related_fraction()
+    HP_MC = df_unit_groups['Material cost']['Dihydroxylation']
+    return HP_MC  
 
 #######################################################################################################################3
 all_metrics = [
@@ -466,66 +574,85 @@ all_metrics = [
     Metric('Total', get_system_cooling_demand,'10^6 MJ/yr', 'Cooling demand'),
     Metric('Price of fatty acid blend',fatty_acid_price,'$/kg'),
     
-    Metric('transesterification_IEC',transesterification_IEC,'MM$'),
-    Metric('transesterification_MC',transesterification_MC,'MM$'),
-    Metric('transesterification_cooling_demand',transesterification_cooling_demand,'GJ/hr'),
-    Metric('transesterification_heating_demand',transesterification_heating_demand,'GJ/hr'),
-    Metric('transesterification_electricity_consumption',transesterification_electricity_consumption,'MW'),
+    # Metric('transesterification_IEC',transesterification_IEC,'MM$'),
+    # Metric('transesterification_MC',transesterification_MC,'MM$'),
+    # Metric('transesterification_cooling_demand',transesterification_cooling_demand,'GJ/hr'),
+    # Metric('transesterification_heating_demand',transesterification_heating_demand,'GJ/hr'),
+    # Metric('transesterification_electricity_consumption',transesterification_electricity_consumption,'MW'),
     
-    Metric('dih_IEC',dih_IEC,'MM$'),
-    Metric('dih_MC',dih_MC,'MM$'),
-    Metric('dih_cooling_demand',dih_cooling_demand,'GJ/hr'),
-    Metric('dih_heating_demand',dih_heating_demand,'GJ/hr'),
-    Metric('dih_electricity_consumption',dih_electricity_consumption,'MW'),
+    # Metric('dih_IEC',dih_IEC,'MM$'),
+    # Metric('dih_MC',dih_MC,'MM$'),
+    # Metric('dih_cooling_demand',dih_cooling_demand,'GJ/hr'),
+    # Metric('dih_heating_demand',dih_heating_demand,'GJ/hr'),
+    # Metric('dih_electricity_consumption',dih_electricity_consumption,'MW'),
     
-    Metric('ox_cl_IEC',ox_cl_IEC,'MM$'),
-    Metric('ox_cl_MC',ox_cl_MC,'MM$'),
-    Metric('ox_cl_cooling_demand',ox_cl_cooling_demand,'GJ/hr'),
-    Metric('ox_cl_heating_demand',ox_cl_heating_demand,'GJ/hr'),
-    Metric('ox_cl_electricity_consumption',ox_cl_electricity_consumption,'MW'),
+    # Metric('ox_cl_IEC',ox_cl_IEC,'MM$'),
+    # Metric('ox_cl_MC',ox_cl_MC,'MM$'),
+    # Metric('ox_cl_cooling_demand',ox_cl_cooling_demand,'GJ/hr'),
+    # Metric('ox_cl_heating_demand',ox_cl_heating_demand,'GJ/hr'),
+    # Metric('ox_cl_electricity_consumption',ox_cl_electricity_consumption,'MW'),
 
-    Metric('cat_recovery_IEC',cat_recovery_IEC,'MM$'),
-    Metric('cat_recovery_MC',cat_recovery_MC,'MM$'),
-    Metric('cat_recovery_cooling_demand',cat_recovery_cooling_demand,'GJ/hr'),
-    Metric('cat_recovery_heating_demand',cat_recovery_heating_demand,'GJ/hr'),
-    Metric('cat_recovery_electricity_consumption',cat_recovery_electricity_consumption,'MW'),
+    # Metric('cat_recovery_IEC',cat_recovery_IEC,'MM$'),
+    # Metric('cat_recovery_MC',cat_recovery_MC,'MM$'),
+    # Metric('cat_recovery_cooling_demand',cat_recovery_cooling_demand,'GJ/hr'),
+    # Metric('cat_recovery_heating_demand',cat_recovery_heating_demand,'GJ/hr'),
+    # Metric('cat_recovery_electricity_consumption',cat_recovery_electricity_consumption,'MW'),
     
     
-    Metric('pa_recovery_IEC',pa_recovery_IEC,'MM$'),
-    Metric('pa_recovery_MC',pa_recovery_MC,'MM$'),
-    Metric('pa_recovery_cooling_demand',pa_recovery_cooling_demand,'GJ/hr'),
-    Metric('pa_recovery_heating_demand',pa_recovery_heating_demand,'GJ/hr'),
-    Metric('pa_recovery_electricity_consumption',pa_recovery_electricity_consumption,'MW'),
+    # Metric('pa_recovery_IEC',pa_recovery_IEC,'MM$'),
+    # Metric('pa_recovery_MC',pa_recovery_MC,'MM$'),
+    # Metric('pa_recovery_cooling_demand',pa_recovery_cooling_demand,'GJ/hr'),
+    # Metric('pa_recovery_heating_demand',pa_recovery_heating_demand,'GJ/hr'),
+    # Metric('pa_recovery_electricity_consumption',pa_recovery_electricity_consumption,'MW'),
     
-    Metric('aa_recovery_IEC',aa_recovery_IEC,'MM$'),
-    Metric('aa_recovery_MC',aa_recovery_MC,'MM$'),
-    Metric('aa_recovery_cooling_demand',aa_recovery_cooling_demand,'GJ/hr'),
-    Metric('aa_recovery_heating_demand',aa_recovery_heating_demand,'GJ/hr'),
-    Metric('aa_recovery_electricity_consumption',aa_recovery_electricity_consumption,'MW'),
+    # Metric('aa_recovery_IEC',aa_recovery_IEC,'MM$'),
+    # Metric('aa_recovery_MC',aa_recovery_MC,'MM$'),
+    # Metric('aa_recovery_cooling_demand',aa_recovery_cooling_demand,'GJ/hr'),
+    # Metric('aa_recovery_heating_demand',aa_recovery_heating_demand,'GJ/hr'),
+    # Metric('aa_recovery_electricity_consumption',aa_recovery_electricity_consumption,'MW'),
 
-    Metric('boiler_IEC',boiler_IEC,'MM$'),
-    Metric('boiler_MC',boiler_MC,'MM$'),
-    Metric('boiler_cooling_demand',boiler_cooling_demand,'GJ/hr'),
-    Metric('boiler_heating_demand',boiler_heating_demand,'GJ/hr'),
-    Metric('boiler_electricity_consumption',boiler_electricity_consumption,'MW'),
+    # Metric('boiler_IEC',boiler_IEC,'MM$'),
+    # Metric('boiler_MC',boiler_MC,'MM$'),
+    # Metric('boiler_cooling_demand',boiler_cooling_demand,'GJ/hr'),
+    # Metric('boiler_heating_demand',boiler_heating_demand,'GJ/hr'),
+    # Metric('boiler_electricity_consumption',boiler_electricity_consumption,'MW'),
 
-    Metric('wastewater_IEC',wastewater_IEC,'MM$'),
-    Metric('wastewater_MC',wastewater_MC,'MM$'),
-    Metric('wastewater_cooling_demand',wastewater_cooling_demand,'GJ/hr'),
-    Metric('wastewater_heating_demand',wastewater_heating_demand,'GJ/hr'),
-    Metric('wastewater_electricity_consumption',wastewater_electricity_consumption,'MW'),
+    # Metric('wastewater_IEC',wastewater_IEC,'MM$'),
+    # Metric('wastewater_MC',wastewater_MC,'MM$'),
+    # Metric('wastewater_cooling_demand',wastewater_cooling_demand,'GJ/hr'),
+    # Metric('wastewater_heating_demand',wastewater_heating_demand,'GJ/hr'),
+    # Metric('wastewater_electricity_consumption',wastewater_electricity_consumption,'MW'),
                 
-    Metric('other_facility_IEC',other_facility_IEC,'MM$'),
-    Metric('other_facility_MC',other_facility_MC,'MM$'),
-    Metric('other_facility_cooling_demand',other_facility_cooling_demand,'GJ/hr'),
-    Metric('other_facility_heating_demand',other_facility_heating_demand,'GJ/hr'),
-    Metric('other_facility_electricity_consumption',other_facility_electricity_consumption,'MW'),
-            
-    Metric('Mass allocation LCA', get_mass_based_AA_GWP, 'kg CO2-eq/kg', 'LCA'),
+    # Metric('other_facility_IEC',other_facility_IEC,'MM$'),
+    # Metric('other_facility_MC',other_facility_MC,'MM$'),
+    # Metric('other_facility_cooling_demand',other_facility_cooling_demand,'GJ/hr'),
+    # Metric('other_facility_heating_demand',other_facility_heating_demand,'GJ/hr'),
+    # Metric('other_facility_electricity_consumption',other_facility_electricity_consumption,'MW'),
+    
+    Metric('Mass AA LCA', mass_aa_fraction, 'kg CO2-eq/kg', 'LCA'),
+    Metric('Mass C5-C9 LCA', mass_C5_C9_fraction, 'kg CO2-eq/kg', 'LCA'),
+    Metric('Mass PA LCA', mass_pa_fraction, 'kg CO2-eq/kg', 'LCA'),
+    Metric('Mass Glycerol LCA', mass_glycerol_fraction, 'kg CO2-eq/kg', 'LCA'),
+    Metric('Mass FA LCA', mass_fa_fraction, 'kg CO2-eq/kg', 'LCA'),
+    Metric('Mass methanol LCA', mass_methanol_fraction, 'kg CO2-eq/kg', 'LCA'),
+    
     Metric('Economic allocation LCA', get_economic_based_AA_GWP, 'kg CO2-eq/kg', 'LCA'),
     Metric('Net GWP displacement 1', get_net_GWP_PA_1, 'kg CO2-eq/kg', 'LCA'),
     
-    ]
+    Metric('boiler_IEC_f', boiler_IEC_f, '%'),
+    Metric('boiler_WWT_OF_IEC_f', boiler_WWT_OF_IEC_f, '%'),
+    Metric('AA_Hduty_f', AA_Hduty_f, '%'),
+    Metric('AA_Cduty_f', AA_Cduty_f, '%'),
+    Metric('HD_before_extraction', HD_before_extraction, '%'),
+    Metric('HD_after_extraction_before_water_recovery', HD_after_extraction_before_water_recovery, '%'),
+    Metric('CD_during_water_extraction', CD_during_water_extraction, '%'),
+    Metric('CD_during_methanol_recovery', CD_during_methanol_recovery, '%'),
+    Metric('HD_during_methanol_recovery', HD_during_methanol_recovery, '%'),
+    Metric('CD_pelargonic_acid_recovery', CD_pelargonic_acid_recovery, '%'),
+    Metric('HD_pelargonic_acid_recovery', HD_pelargonic_acid_recovery, '%'),
+    Metric('EC_pelargonic_acid_recovery', EC_pelargonic_acid_recovery, '%'),
+    Metric('transesterification_section_MC', transesterification_section_MC, '%'),
+    Metric('hydrogen_peroxide_section_MC', hydrogen_peroxide_section_MC, '%') ]
 
 #TODO: try changing feedstock flow rate from 5% of HOSOY production to 30% of HOSun
 
@@ -855,13 +982,12 @@ def conduct_uncertainity_analysis(system = aa_baseline, #name of the system
         rule = rule
         np.random.seed(1234) # For consistent results
         # samples = model.sample(number_of_runs,rule)
-        model.load_samples(sample_list)
+        model.load_samples(sample_list_1999)
         model.evaluate(notify=notify_runs) 
-        model.show()
-        model.table.to_excel('model_table_using_samples_LCA_updated.xlsx')
+        model.table.to_excel('model_table_using_samples_LCA_1999.xlsx')
         df_rho,df_p = model.spearman_r()
-        df_rho.to_excel('df_rho_using_samples_LCA_updated.xlsx')
-        df_p.to_excel('df_p_using_samples_LCA_updated.xlsx')
+        df_rho.to_excel('df_rho_using_samples_LCA_1999.xlsx')
+        df_p.to_excel('df_p_using_samples_LCA_1999.xlsx')
     else:
         model.show()
     return model
