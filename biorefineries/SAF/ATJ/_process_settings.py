@@ -223,7 +223,7 @@ price = {
     'H3PO4': H3PO4_price * _chemical_2021to2023,
     'flocculant': flocculant_price, 
     'lime': lime_price * _chemical_2021to2023,  
-    'enzyme': enzyme_price,
+    # 'enzyme': enzyme_price,
     'CSL': CSL_price, 
     'DAP': DAP_price,
     'NaOH': NaOH_price * 0.5, # 50% NaOH
@@ -258,27 +258,31 @@ price = {
 # 100-year global warming potential (GWP) in kg CO2-eq/kg
 
 GWP_CFs = {
-    'feedstock': -0.14315*0.8, # -154.61 gCO2 is dry miscanthus average CI of PADD2 from Xinxin's data
-    'H3PO4': 0.86829, # ecoinvent 3.8 market for phosphoric acid, RoW
-    'polymer': 3.1996, # ecoinvent 3.8 market for polyacrylamide-based anionic flocculants, GLO
-    'lime': 1.29,
-    'lime_boiler':1.29,
-    'enzyme_M301': 2.24,
-    'CSL': 1.55,
+    'switchgrass': -0.14315*0.8, # -154.61 gCO2 is dry miscanthus average CI of PADD2 from Xinxin's data
+    'sulfuric_acid': 1.3527/1000/0.03, # GREET
+    'ammonia': 3.1996, # ecoinvent 3.8 market for polyacrylamide-based anionic flocculants, GLO
+    'denaturant': 0.8415,
+    # 'ethanol':-1.28*0.915,  # ethanol is a co-product from https://ecoquery.ecoinvent.org/3.8/cutoff/dataset/5353/impact_assessment 91.5% is wt%
+    'cellulase': 2.24*0.05, # 5% concentration
+    'CSL': 1.56,
     'DAP': 1.6445, # ecoinvent 3.8 market for diammonium phosphate, RoW
-    'NaOH': 2.11,
-    'caustic':2.11,
+    'NaOH': 2.01, # Greet
+    'caustic':2.01,
+    'lime': 1.29,
+    'lime_boiler_1':1.29,
+    'FGD_lime':1.29/2, # 50% concentration
+    'boiler_chems':1.5568,
+    'boiler_chems_1':1.5568, # # Based on the production of sulfite which is commonly used as an oxygen scavenger in the boiler
     'hydrogen': 1.5624, # ecoinvent 3.8 market for hydrogen, gaseous, GLO
     'natural_gas': 0.40, # NA NG from shale and conventional recovery
+    'natural_gas_1': 0.40,
     'electricity': 0.48, # in kg CO2-eq/kWh https://www.eia.gov/tools/faqs/faq.php?id=74&t=11
-    'MEA': 3.4062, # ecoinvent 3.8 ethanolamine production, RoW [monoethanolamine]
-    'ash':0.01, # from Production of Sustainable Aviation Fuels in Petroleum Refineries: Evaluation of New Bio-Refinery Concepts
+    'ash':0.01, 
+    'ash_1':0.01,# from Production of Sustainable Aviation Fuels in Petroleum Refineries: Evaluation of New Bio-Refinery Concepts
     'Syndol_catalyst':10+1, # production+disposal, assume prodution=10 based on similar chemicalss
     'first_catalyst':10+1, # production+disposal, assume prodution=10 based on similar chemicalss
     'second_catalyst':10+1, # production+disposal, assume prodution=10 based on similar chemicalss
     'Como_catalyst':9.52+1, # production+disposal, from Production of Sustainable Aviation Fuels in Petroleum Refineries: Evaluation of New Bio-Refinery Concepts
-    'natural_gas_for_h2':0.40,
-    'ethanol_to_sold': -1.28*0.915, # ethanol is a co-product from https://ecoquery.ecoinvent.org/3.8/cutoff/dataset/5353/impact_assessment 91.5% is wt%
     'gasoline':-0.8415, # gasoline is a co-product; from GREET
     'diesel':-0.6535 # diesel is a co-product; from GREET
     }

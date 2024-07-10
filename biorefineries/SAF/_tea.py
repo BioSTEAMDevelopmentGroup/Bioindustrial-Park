@@ -155,8 +155,8 @@ class SAF_Coprocessing_TEA(TEA):
     
     @property
     def ISBL_installed_equipment_cost(self):
-        return self._ISBL_DPI(self.DPI)
-        
+        return self._ISBL_DPI(self.installed_equipment_cost)
+          
     @property
     def OSBL_installed_equipment_cost(self):
         if self.lang_factor:

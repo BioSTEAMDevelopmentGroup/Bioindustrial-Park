@@ -23,7 +23,7 @@ import thermosteam as tmo
 from thermosteam.utils import chemical_cache
 from thermosteam import functional as fn
 import pandas as pd
-
+import biosteam as bst
 __all__ = (
     'create_cellulosic_ethanol_chemicals', 
     'get_grouped_chemicals', 

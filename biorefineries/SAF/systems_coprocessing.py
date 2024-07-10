@@ -36,7 +36,7 @@ def preprocessing_sys(ins,outs):
     feedstock = ins
     bagasse_to_pretreatment, bagasse_to_CHP = outs
     U101 = _units.FeedStockHandling('U101', ins=feedstock, outs='')
-    # U101.cost_items['System'].cost = 0.
+    U101.cost_items['System'].cost = 0
     S102 = bst.Splitter('S102', ins=U101-0, outs=[bagasse_to_pretreatment,bagasse_to_CHP],split=1)
 
 
@@ -52,7 +52,6 @@ def preprocessing_sys(ins,outs):
 def pretreatment_sys(ins,outs):
     warm_process_water,pretreatment_steam,feedstock_to_pretreatment = ins
     pretreatment_to_WWT,pretreated_bagasse = outs
-    #csolids_loading = 0.305
     T_pretreatment_reactor = 130.+273.15
     
     P = pretreatment_steam.chemicals['H2O'].Psat(T_pretreatment_reactor + 25)
@@ -70,9 +69,6 @@ def pretreatment_sys(ins,outs):
     U201 = bst.HammerMill('U201', ins=P202-0,outs=pretreated_bagasse)
 
 
-
-
-
 #%%    
    
 @SystemFactory(
@@ -88,11 +84,12 @@ def pretreatment_sys(ins,outs):
           dict(ID='U302_cell_mass'),
           dict(ID='U302_to_WWT'),
           dict(ID='D302_to_WWT'),
-          dict(ID='ethanol')])
+          dict(ID='ethanol_to_upgrading'),
+          dict(ID='ethanol_to_sold'),])
           
 def fermentation_sys(ins,outs):
     pretreated_bagasse,enzyme_M301,water_M301,CSL,DAP,water_U301 = ins
-    U301_vent,U302_cell_mass,U302_to_WWT,D302_to_WWT,ethanol = outs
+    U301_vent,U302_cell_mass,U302_to_WWT,D302_to_WWT,ethanol_to_upgrading,ethanol_to_sold = outs
     
     M301 = _units.EnzymeHydrolysateMixer('M301',ins=(pretreated_bagasse,enzyme_M301,water_M301),outs='',
                                          enzyme_loading=20,solids_loading=0.2)
@@ -190,7 +187,10 @@ def fermentation_sys(ins,outs):
     S301_H = bst.HXutility('S301_H', ins=D302-0, outs='ethanol_to_storage',
                            V=0, T=20+273.15)
    
-    ethanol_storage = bst.StorageTank('ethanol_storage', ins=S301_H-0, outs=ethanol,tau=7*24)
+    ethanol_storage = bst.StorageTank('ethanol_storage', ins=S301_H-0, outs='ethanol_total', tau=7*24)
+    
+    S304 = bst.Splitter('S304', ins=ethanol_storage-0, outs=[ethanol_to_upgrading, ethanol_to_sold], split=1)
+    
     
 #%%
 
@@ -200,16 +200,17 @@ def fermentation_sys(ins,outs):
          dict(ID='Syndol_catalyst'),
          dict(ID='first_catalyst'),
          dict(ID='second_catalyst'),
-         dict(ID='ethanol'),
+         dict(ID='ethanol_to_upgrading'),
          dict(ID='hydrogen'),
-         dict(ID='Como_catalyst'),],
+         dict(ID='Como_catalyst'),
+         dict(ID='natural_gas_for_h2'),
+         dict(ID='oc'),],
     outs=[dict(ID='F401_to_WWT'),
           dict(ID='D401_heavy_impurities'),
           dict(ID='D402_top_product'),
           dict(ID='CH4_C2H6'),
           dict(ID='gasoline'),
           dict(ID='jet_fuel'),
-          dict(ID='oc'),
           dict(ID='diesel'),
           dict(ID='spent_catalyst_R401'),
           dict(ID='spent_catalyst_R402'),
@@ -217,11 +218,11 @@ def fermentation_sys(ins,outs):
           dict(ID='spent_catalyst_R404'),])
           
 def upgrading_sys(ins,outs):
-    NaOH,Syndol_catalyst,first_catalyst,second_catalyst,ethanol,hydrogen,Como_catalyst = ins
-    F401_to_WWT,D401_heavy_impurities,D402_top_product,CH4_C2H6,gasoline,jet_fuel,oc,diesel,spent_catalyst_R401,spent_catalyst_R402,spent_catalyst_R403,spent_catalyst_R404 = outs
+    NaOH,Syndol_catalyst,first_catalyst,second_catalyst,ethanol_to_upgrading,hydrogen,Como_catalyst,natural_gas_for_h2,oc = ins
+    F401_to_WWT,D401_heavy_impurities,D402_top_product,CH4_C2H6,gasoline,jet_fuel,diesel,spent_catalyst_R401,spent_catalyst_R402,spent_catalyst_R403,spent_catalyst_R404 = outs
     
-    P401 = bst.Pump('P401',ins=ethanol,P=4.5*101325)
-    M400 = bst.Mixer('M401', (P401-0,''))
+    P401 = bst.Pump('P401',ins=ethanol_to_upgrading,P=4.5*101325)
+    M400 = bst.Mixer('M400', (P401-0,''))
     H400 = bst.HXutility('H400',ins=M400-0,V=1,rigorous=True)
 
     R401 = _units.AdiabaticFixedbedDehydrationReactor('R401', ins=(H400-0,Syndol_catalyst),outs=('',spent_catalyst_R401))
@@ -349,7 +350,10 @@ def upgrading_sys(ins,outs):
     
     diesel_storage = bst.StorageTank('diesel_storage', ins=H408-0, outs=diesel, tau=7*24, vessel_type='Floating roof', vessel_material='Carbon steel')
     
-    oc_unit = bst.MockMixer('oc_unit', ins='', outs=oc)
+    U404 = bst.MockMixer('U404', ins=oc, outs='') # opportunity cost unit
+    
+    U405 = bst.MockMixer('U405', ins=natural_gas_for_h2, outs='') # fake SMR
+    
 
 #%%
 
@@ -402,8 +406,15 @@ def SAF_sys(ins,outs,material_storage,product_storage,WWTC,BoilerTurbo,hydrogena
                                     Stream(ID='water_U301',
                                            Water=1,
                                            units='kg/hr',
-                                           price=price['water'])))
-                                    
+                                           price=price['water'])),
+                              outs = (Stream(ID='U301_vent'),
+                                      Stream(ID='U302_cell_mass'),
+                                      Stream(ID='U302_to_WWT'),
+                                      Stream(ID='D302_to_WWT'),
+                                      Stream(ID='ethanol_to_upgrading'),
+                                      Stream(ID='ethanol_to_sold',
+                                             price=price['ethanol'])))
+    
     sys_4 = upgrading_sys(ins = (Stream(ID='NaOH',
                                        NaOH=0.5,
                                        Water=0.5,
@@ -424,7 +435,7 @@ def SAF_sys(ins,outs,material_storage,product_storage,WWTC,BoilerTurbo,hydrogena
                                         phase='s',
                                         units='kg/hr',
                                         price=price['Aluminosilicate catalyst']),
-                                 sys_3.outs[-1],
+                                 sys_3.outs[-2],
                                  Stream(ID='hydrogen',
                                         phase='g',
                                         units='kg/hr',
@@ -433,7 +444,14 @@ def SAF_sys(ins,outs,material_storage,product_storage,WWTC,BoilerTurbo,hydrogena
                                         Ash=1,
                                         phase='s',
                                         units='kg/hr',
-                                        price=price['Como catalyst'])),
+                                        price=price['Como catalyst']),
+                                 Stream('natural_gas_for_h2',
+                                        CH4=1,
+                                        phase='g',
+                                        units='kg/hr',
+                                        price=price['natural gas']),
+                                 Stream(ID='oc',
+                                        price=price['oc']),),
                           outs = (Stream(ID='F401_to_WWT'),
                                   Stream(ID='D401_heavy_impurities'),
                                   Stream(ID='D402_top_product'),
@@ -442,7 +460,6 @@ def SAF_sys(ins,outs,material_storage,product_storage,WWTC,BoilerTurbo,hydrogena
                                          price=price['gasoline']),
                                   Stream(ID='jet_fuel',
                                          price=price['jet fuel']),
-                                  Stream(ID='oc',),
                                   Stream(ID='diesel',
                                          price=price['diesel']),
                                   Stream(ID='spent_catalyst_R401',
@@ -487,15 +504,14 @@ def SAF_sys(ins,outs,material_storage,product_storage,WWTC,BoilerTurbo,hydrogena
     ash = Stream('ash', price=price['ash disposal'])
     cooling_tower_chems = Stream('cooling_tower_chems', price=price['cooling tower chems'])
     system_makeup_water = Stream('system_makeup_water', price=price['water'])
-
+    
     plant_air_in = bst.Stream('plant_air_in',phase='g',units='kg/hr',
                               N2=0.79*1372608*get_flow_tpd()/2205,
                               O2=0.21*1372608*get_flow_tpd()/2205)
     CIP_chems_in = Stream('CIP_chems_in',Water=145*get_flow_tpd()/2205, units='kg/hr')
     fire_water_in = Stream('fire_water_in', Water=8021*get_flow_tpd()/2205, units='kg/hr')
     
-    # Stream mixer to boiler turbogenerator for burning
-    S901 = bst.MockSplitter('S901', ins=natural_gas, outs=('NG_to_BT', 'NG_to_SMR'))
+    
     M901 = bst.Mixer('M901',
                      ins=(F.bagasse_to_CHP,
                           F.U302_cell_mass,
@@ -512,7 +528,7 @@ def SAF_sys(ins,outs,material_storage,product_storage,WWTC,BoilerTurbo,hydrogena
                                   ins=(F.total_effluent_to_be_burned, # M901 outs[0]
                                        F.total_gas_to_be_burned, # M902 outs[0]
                                        'boiler_makeup_water',
-                                       S901-0,
+                                       natural_gas,
                                        lime_boiler,
                                        boiler_chems),
                                   outs=('gas_emission',
@@ -554,6 +570,7 @@ def SAF_sys(ins,outs,material_storage,product_storage,WWTC,BoilerTurbo,hydrogena
     FWT = _units.FireWaterTank('FWT', ins=fire_water_in, outs='fire_water_out')
     
     HXN = bst.HeatExchangerNetwork('HXN',cache_network=True)
+    
     
     if material_storage == False:
         @F.DAP_storage.add_specification(run=True)
@@ -785,6 +802,36 @@ def SAF_sys(ins,outs,material_storage,product_storage,WWTC,BoilerTurbo,hydrogena
     
     else:
         pass
+
+
+    # Operating cost (heat and steam demand shouldn't be accounted since we have considered the opportunity cost)
+    # if hydrogenation_distillation == False:
+    #     @F.R404.add_specification(run=True)
+    #     def R404_no_cost():
+    #         F.R404._design = lambda:0
+    #         F.R404._cost = lambda:0
+    #     @F.D404.add_specification(run=True)
+    #     def D404_no_cost():
+    #         F.D404._design = lambda:0
+    #         F.D404._cost = lambda:0
+    #     @F.D405.add_specification(run=True)
+    #     def D405_no_cost():
+    #         F.D405._design = lambda:0
+    #         F.D405._cost = lambda:0
+    #     @F.H406.add_specification(run=True)
+    #     def H406_no_cost():
+    #         F.H406._design = lambda:0
+    #         F.H406._cost = lambda:0
+    #     @F.H407.add_specification(run=True)
+    #     def H407_no_cost():
+    #         F.H407._design = lambda:0
+    #         F.H407._cost = lambda:0
+    #     @F.H408.add_specification(run=True)
+    #     def H408_no_cost():
+    #         F.H408._design = lambda:0
+    #         F.H408._cost = lambda:0
+    # else:
+    #     pass
     
     
     
@@ -824,14 +871,16 @@ def SAF_sys(ins,outs,material_storage,product_storage,WWTC,BoilerTurbo,hydrogena
     
     
     
-    @S901.add_specification(run=True)
-    def natural_gas_flow_correction():
-        F.R404.run()
-        F.BT.run()
-        if h2_purchase == False:
-            F.S901.outs[1].imol['CH4'] = F.R404.ins[1].imol['H2']/3 # assume CH4+H2O=CO+3H2
-        else:
-            F.S901.outs[1].imol['CH4'] = 0
+    
+    
+    if h2_purchase == False:
+        @F.U405.add_specification(run=True)
+        def ng_flow():
+            F.R404.run()
+            F.U405.ins[0].imol['CH4'] = F.R404.ins[1].imol['H2']/3 # assume CH4+H2O=CO+3H2
+    else:
+        F.U405.ins[0].imol['CH4'] = 0
+            
     
     
     if BoilerTurbo == False:
@@ -870,11 +919,10 @@ def SAF_sys(ins,outs,material_storage,product_storage,WWTC,BoilerTurbo,hydrogena
     
     
     if opportunity_cost == True:
-        @F.oc_unit.add_specification(run=True)
+        @F.U404.add_specification(run=True)
         def oc_flow():
-            F.jet_storage.run()
-            F.oc.copy_flow(F.jet_fuel)
-            F.oc.price = - F.diesel.price
+            oc = F.U404.ins[0]
+            oc.reset_flow(Water=1, phase='l', units='kg/hr', total_flow=1.07*F.R404.ins[0].F_vol*845) # 1.07 is volume gain from https://www.eia.gov/energyexplained/oil-and-petroleum-products/refining-crude-oil-inputs-and-outputs.php; assume 845 is density but will offset when calculating toal price
     else:
         pass
         
