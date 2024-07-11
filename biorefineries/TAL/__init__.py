@@ -40,20 +40,22 @@ from .models import load
 def load_TAL_model(mode='A'):
     implemented_modes = ['A', 'B', 'C', 'D']
     if not mode in implemented_modes: raise ValueError(f"Mode must be one of {implemented_modes}, not {mode}.")
-    system, spec, tea, lca, get_adjusted_MSP, simulate_and_print, TEA_breakdown, run_TAL_uncertainty_analysis = load.load_TAL_model(mode=mode)
+    system, spec, tea, lca, get_adjusted_MSP, simulate_and_print, TEA_breakdown, run_TAL_uncertainty_analysis, unit_groups_dict = load.load_TAL_model(mode=mode)
     globals().update({
         'system':system, 'spec':spec, 'tea':tea, 'lca':lca, 'get_adjusted_MSP':get_adjusted_MSP,
         'simulate_and_print':simulate_and_print, 'TEA_breakdown':TEA_breakdown,
         'run_TAL_uncertainty_analysis':run_TAL_uncertainty_analysis,
+        'unit_groups_dict': unit_groups_dict,
         })
     
 def load_KS_model(mode='A'):
     implemented_modes = ['THF_Ethanol_A', 'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H']
     if not mode in implemented_modes: raise ValueError(f"Mode must be one of {implemented_modes}, not {mode}.")
-    system, spec, tea, lca, get_adjusted_MSP, simulate_and_print, TEA_breakdown = load.load_KS_model(mode=mode)
+    system, spec, tea, lca, get_adjusted_MSP, simulate_and_print, TEA_breakdown, unit_groups_dict = load.load_KS_model(mode=mode)
     globals().update({
         'system':system, 'spec':spec, 'tea':tea, 'lca':lca, 'get_adjusted_MSP':get_adjusted_MSP,
         'simulate_and_print':simulate_and_print, 'TEA_breakdown':TEA_breakdown,
+        'unit_groups_dict': unit_groups_dict,
         })
     
 __all__ = ['load_TAL_model', 'load_KS_model']

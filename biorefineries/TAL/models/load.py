@@ -29,7 +29,7 @@ def load_TAL_model(mode='A'):
     get_adjusted_MSP = models.get_adjusted_MSP
     simulate_and_print = models.simulate_and_print
     models_TEA_breakdown = models.TEA_breakdown
-    TEA_breakdown = lambda: models_TEA_breakdown(unit_groups_dict=unit_groups_dict, print_output=True)
+    TEA_breakdown = lambda print_output: models_TEA_breakdown(unit_groups_dict=unit_groups_dict, print_output=print_output)
     chemicals = models.TAL_chemicals
     
     modes = ['A', 'B', 'C', 'D']
@@ -73,7 +73,8 @@ def load_TAL_model(mode='A'):
     spec.set_production_capacity()
     baseline_initial = model.metrics_at_baseline()
     
-    return system, spec, tea, lca, get_adjusted_MSP, simulate_and_print, TEA_breakdown, run_TAL_uncertainty_analysis
+    return system, spec, tea, lca, get_adjusted_MSP, simulate_and_print,\
+        TEA_breakdown, run_TAL_uncertainty_analysis, unit_groups_dict
 
 
 
@@ -151,7 +152,7 @@ def load_KS_model(mode='A'):
     get_adjusted_MSP = models.get_adjusted_MSP
     simulate_and_print = models.simulate_and_print
     models_TEA_breakdown = models.TEA_breakdown
-    TEA_breakdown = lambda: models_TEA_breakdown(unit_groups_dict=unit_groups_dict, print_output=True)
+    TEA_breakdown = lambda print_output: models_TEA_breakdown(unit_groups_dict=unit_groups_dict, print_output=print_output)
     chemicals = models.TAL_chemicals
     
     ### For continuous catalytic upgrading reactors in catalysis improvement scenarios
@@ -194,4 +195,5 @@ def load_KS_model(mode='A'):
     spec.set_production_capacity()
     baseline_initial = model.metrics_at_baseline()
     
-    return system, spec, tea, lca, get_adjusted_MSP, simulate_and_print, TEA_breakdown
+    return system, spec, tea, lca, get_adjusted_MSP, simulate_and_print,\
+        TEA_breakdown, unit_groups_dict

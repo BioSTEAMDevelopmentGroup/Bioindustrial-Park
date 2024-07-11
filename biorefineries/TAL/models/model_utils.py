@@ -29,6 +29,15 @@ def replace_apostrophes(statement):
     statement = statement.replace('’', "'").replace('‘', "'").replace('“', '"').replace('”', '"')
     return statement
 
+def create_function(code, namespace_dict):
+    def wrapper_fn(statement):
+        def f(x):
+            namespace_dict['x'] = x
+            exec(codify(statement), namespace_dict)
+        return f
+    function = wrapper_fn(code)
+    return function
+
 #%%
 class EasyInputModel(Model):
     """
@@ -47,7 +56,6 @@ class EasyInputModel(Model):
         if type(df) is not DataFrame:
             df = read_excel(distributions)
             
-        create_function = self.create_function
         namespace_dict = self.namespace_dict
         param = self.parameter
         
@@ -59,7 +67,7 @@ class EasyInputModel(Model):
             baseline = row['Baseline']
             shape_data = row['Shape']
             lower, midpoint, upper = row['Lower'], row['Midpoint'], row['Upper']
-            load_statements = codify(row['Load Statements'])
+            load_statements = row['Load Statements']
             
             D = None
             if shape_data.lower() in ['triangular', 'triangle',]:
@@ -77,14 +85,7 @@ class EasyInputModel(Model):
                   baseline=baseline, 
                   distribution=D)
             
-    def create_function(self, code, namespace_dict):
-        def wrapper_fn(statement):
-            def f(x):
-                namespace_dict['x'] = x
-                exec(statement, namespace_dict)
-            return f
-        function = wrapper_fn(code)
-        return function
+    
     
 
     
