@@ -66,8 +66,8 @@ def solveLCA(inputs):
 outputs = solveLCA(inputs)
 
 #%%
-data_path = join(data_folder, 'daycent_miscanthus-EL-Working-output.xlsx')
+data_path = join(data_folder, 'miscanthus_SOC - output.xlsx')
 with pd.ExcelWriter(data_path, engine='openpyxl',mode='a', if_sheet_exists='replace') as writer:  
-    outputs.to_excel(writer, sheet_name='CI_calc')
+    outputs.to_excel(writer, sheet_name='results')
 #print(f'price: {get_MESP()}')
 #print(f'GWP: {get_GWP()}')
