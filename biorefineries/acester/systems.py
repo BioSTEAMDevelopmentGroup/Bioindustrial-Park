@@ -5,8 +5,8 @@ import biosteam as bst
 from math import inf
 from scipy.stats import gmean
 import numpy as np
-from acester.chemicals import create_acetate_ester_chemicals
-from acester.units import CarbonCapture
+from biorefineries.acester.chemicals import create_acetate_ester_chemicals
+from biorefineries.acester.units import CarbonCapture
 
 __all__ = (
     'create_acetyl_ester_system',
@@ -251,7 +251,7 @@ def create_acetic_acid_separation_system(
     
     Examples
     --------
-    >>> import AcEster as ace
+    >>> import biorefineries.acester as ace
     >>> sys = ace.create_acetic_acid_separation_system()
     >>> sys.simulate()
     >>> sys.show()

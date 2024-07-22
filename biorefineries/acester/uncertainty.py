@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """
 """
-import acester as ace
+import biorefineries.acester as ace
 from warnings import filterwarnings, warn
 from biosteam.utils import GG_colors, CABBI_colors
 import biosteam as bst
@@ -144,7 +144,7 @@ def _get_full_name(f):
     return name.replace('Et ac', 'EtAc').replace('co2', 'CO2').replace('Ac es', 'AcEs').replace('Ac OH', 'AcOH')
 
 def get_distribution_table():
-    from acester import Biorefinery
+    from biorefineries.acester import Biorefinery
     br = Biorefinery(simulate=False)
     name = 'name'
     full_name = 'full_name'
@@ -208,7 +208,7 @@ def get_distribution_table():
     return table
 
 def get_optimized_parameters_table():
-    from acester import Biorefinery
+    from biorefineries.acester import Biorefinery
     br = Biorefinery(simulate=False)
     name = 'name'
     full_name = 'full_name'

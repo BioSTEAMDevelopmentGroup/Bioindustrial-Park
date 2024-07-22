@@ -43,7 +43,7 @@ class Biorefinery(bst.ProcessModel):
     """
     Examples
     --------
-    >>> import acester as ace
+    >>> import biorefineries.acester as ace
     >>> model = ace.Biorefinery(simulate=False)
     >>> model.system.simulate()
     >>> model.system.diagram()
