@@ -4,7 +4,7 @@ HP: Production of Acrylic Acid via 3-Hydroxypropionic Acid from Lignocellulosic 
 
 Simplified process flow scheme
 ------------------------------
-.. figure:: ./images/system_diagram.png
+.. figure:: ./images/system_simplified_diagram.png
 
 
 The biorefinery is developed for Bhagwat et al. [1]_ for the production of 
