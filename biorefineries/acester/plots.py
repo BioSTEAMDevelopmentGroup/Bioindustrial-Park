@@ -91,7 +91,7 @@ def plot_MSP_across_AcOH_titer_AcEster_yield(load=True):
     ylabel = 'AcEster Yield\n[% theoretical]'
     yticks = [50, 60, 70, 80, 90]
     xlabel = 'AcOH Titer [$\mathrm{g} \cdot \mathrm{L}^{\mathrm{-1}}$]'
-    xticks = [50, 60, 70, 80, 90, 100]
+    xticks = [50, 60, 70, 80, 90]
     metric_bars = [
         bst.plots.MetricBar(
             'MSP', '$[\mathrm{USD} \cdot \mathrm{kg}^{\mathrm{-1}}]$', plt.cm.get_cmap('viridis_r'), 
