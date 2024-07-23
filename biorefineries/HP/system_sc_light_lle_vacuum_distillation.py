@@ -1,8 +1,14 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
+# !!! Package name and short description goes here.
+# Copyright (C) 2024-, Sarang Bhagwat <sarangb2@illinois.edu>
+# 
+# This module is under the UIUC open-source license. See 
+# github.com/BioSTEAMDevelopmentGroup/biosteam/blob/master/LICENSE.txt
+# for license details.
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
 """
-Created on Sun Aug 23 12:11:15 2020
-@author: sarangbhagwat
 Modified from the cornstover biorefinery constructed in Cortes-Peña et al., 2020,
 with modification of fermentation system for 3-Hydroxypropionic acid instead of the original ethanol
 [1] Cortes-Peña et al., BioSTEAM: A Fast and Flexible Platform for the Design, 
@@ -44,7 +50,7 @@ from thermosteam import Stream
 from biorefineries.HP import units, facilities
 from biorefineries.HP.lca import LCA
 from biorefineries.HP._process_specification import ProcessSpecification
-from biorefineries.HP.process_settings import price, CFs
+from biorefineries.HP.process_settings import price, CFs, chem_index
 from biorefineries.HP.utils import find_split, splits_df, baseline_feedflow
 from biorefineries.HP.chemicals_data import HP_chemicals, chemical_groups, \
                                 soluble_organics, combustibles
@@ -96,329 +102,44 @@ System.strict_convergence = True # True => throw exception if system does not co
 def create_HP_sys(ins, outs):
     u, s = flowsheet.unit, flowsheet.stream
     process_groups = []
-    # %% 
+    # %% Feedstock
     
-    # =============================================================================
-    # Feedstock
-    # =============================================================================
+    # Sugarcane juicing subprocess
+    sugarcane_juicing_sys = create_juicing_system_up_to_clarification()
     
-    feedstock = Stream('feedstock',
-                        baseline_feedflow.copy(),
-                        units='kg/hr',
-                        price=price[feedstock_ID])
+    u = sugarcane_juicing_sys.flowsheet.unit
+    s = sugarcane_juicing_sys.flowsheet.stream
     
-    get_flow_tpd = lambda: (feedstock.F_mass-feedstock.imass['H2O'])*24/907.185
+    u.U201.diagram()
+    sugarcane_juicing_sys.diagram('cluster')
+    # u.U201.ins.append(u.M201-0)
     
-    U101 = units.FeedstockPreprocessing('U101', ins=feedstock, outs='milled_feedstock')
+    # u.M201-0-1-u.U201
     
-    # IFF handling costs/utilities are included in feedstock cost and thus not considered here
-    U101.cost_items['System'].cost = 0
-    U101.cost_items['System'].kW = 0
+    # sugarcane_juicing_sys.simulate(update_configuration=True)
     
-    feedstock_group = UnitGroup('feedstock_group', units=(U101,))
-    process_groups.append(feedstock_group)
+    U101 = bst.Unit('U101', ins='', outs='')
+    @U101.add_specification(run=False)
+    def U101_spec():
+        U101.outs[0].copy_like(U101.ins[0])
     
-    # %% 
+    feedstock = s.sugarcane
+    feedstock_sink = feedstock.sink
+    U101-0-0-feedstock_sink
+    feedstock-0-U101
+    feedstock_sink.ins[0].price = 0.
     
-    # =============================================================================
-    # Pretreatment streams
-    # =============================================================================
+    feedstock.F_mass = 554171.74 # initial value; updated by spec.set_production_capacity
     
-    # For pretreatment, 93% purity
-    sulfuric_acid_T201 = Stream('sulfuric_acid_T201', units='kg/hr')
-    # To be mixed with sulfuric acid, flow updated in SulfuricAcidMixer
-    water_M201 = Stream('water_M201', T=300, units='kg/hr')
+    # Update all prices to 2019$ using chemical indices
+    # sugarcane biorefinery base year is 2019
+    for sugarcane_sys_stream in list(s):
+        sugarcane_sys_stream.price *= chem_index[2019]/chem_index[2019]
         
-    # To be used for feedstock conditioning
-    water_M202 = Stream('water_M202', T=300, units='kg/hr')
+    #%% Fermentation
+    fermentation_sys = create_HP_fermentation_process(ins=(u.C201-0),
+                                                   )
     
-    # To be added to the feedstock/sulfuric acid mixture, flow updated by the SteamMixer
-    water_M203 = Stream('water_M203', phase='l', T=300, P=13.*101325, units='kg/hr')
-    
-    # For neutralization of pretreatment hydrolysate
-    ammonia_M205 = Stream('ammonia_M205', phase='l', units='kg/hr')
-    # To be used for ammonia addition, flow updated by AmmoniaMixer
-    water_M205 = Stream('water_M205', units='kg/hr')
-    
-    
-    # =============================================================================
-    # Pretreatment units
-    # =============================================================================
-    H_M201 = bst.units.HXutility('H_M201', ins=water_M201,
-                                     outs='steam_M201',
-                                     T=99.+273.15, rigorous=True)
-    
-    # H_M201.heat_utilities[0].heat_transfer_efficiency = 1.
-    @H_M201.add_specification(run=False)
-    def H_M201_specification():
-        T201._run()
-        acid_imass = T201.outs[0].imass['SulfuricAcid']
-        H_M201.ins[0].imass['Water'] = acid_imass / 0.05
-        # H_M201.ins[0].imass['H2SO4'] = H_M201.ins[0].imass['Water']/1000.
-        H_M201._run()
-        
-    # H_M201._cost = lambda: None
-    # H_M201._design = lambda: None
-    # H_M201.heat_utilities[0].heat_exchanger = None
-    H_M202 = bst.units.HXutility('H_M202', ins=water_M202,
-                                     outs='hot_water_M202',
-                                     T=99.+273.15, rigorous=True)
-    # H_M202.heat_utilities[0].heat_transfer_efficiency = 1.
-    @H_M202.add_specification(run=False)
-    def H_M202_specification():
-        U101._run()
-        H_M201.run()
-        M201._run()
-        feedstock, acid = U101.outs[0], M201.outs[0]
-        recycled_water = H201.outs[0]
-        mixture_F_mass = feedstock.F_mass + acid.F_mass
-        mixture_imass_water = feedstock.imass['Water'] + acid.imass['Water'] + \
-            recycled_water.imass['Water']
-        total_mass = (mixture_F_mass - mixture_imass_water)/M202.solid_loading
-        H_M202.ins[0].imass['Water'] = total_mass - mixture_F_mass
-        # H_M202.ins[0].imass['H2SO4'] = H_M202.ins[0].imass['Water']/1000.
-        H_M202._run()
-    
-    
-    
-    # Prepare sulfuric acid
-    get_feedstock_dry_mass = lambda: feedstock.F_mass - feedstock.imass['H2O']
-    T201 = units.SulfuricAcidAdditionTank('T201', ins=sulfuric_acid_T201,
-                                          feedstock_dry_mass=get_feedstock_dry_mass())
-    
-    M201 = units.SulfuricAcidMixer('M201', ins=(T201-0, H_M201-0))
-        
-    # Mix sulfuric acid and feedstock, adjust water loading for pretreatment
-    M202 = units.PretreatmentMixer('M202', ins=(U101-0, M201-0, H_M202-0, ''))
-    
-    # Mix feedstock/sulfuric acid mixture and steam
-    # M203 = units.SteamMixer('M203', ins=(M202-0, water_M203), P=5.5*101325)
-    M203 = bst.units.SteamMixer('M203', ins=(M202-0, '', water_M203), P=5.5*101325)
-    # M203.heat_utilities[0].heat_transfer_efficiency = 1.
-    R201 = units.PretreatmentReactorSystem('R201', ins=M203-0, outs=('R201_g', 'R201_l'))
-    
-    # Pump bottom of the pretreatment products to the oligomer conversion tank
-    T202 = units.BlowdownTank('T202', ins=R201-1)
-    T203 = units.OligomerConversionTank('T203', ins=T202-0)
-    F201 = units.PretreatmentFlash('F201', ins=T203-0,
-                                   outs=('F201_waste_vapor', 'F201_to_fermentation'),
-                                   P=101325, Q=0)
-    
-    M204 = bst.units.Mixer('M204', ins=(R201-0, F201-0))
-    @M204.add_specification(run=True)
-    def valve():
-        M204.ins[0].P = 101325
-    H201 = bst.units.HXutility('H201', ins=M204-0,
-                               outs='condensed_pretreatment_waste_vapor',
-                               V=0, rigorous=True)
-    
-    # Neutralize pretreatment hydrolysate
-    M205 = units.AmmoniaMixer('M205', ins=(ammonia_M205, water_M205))
-    @M205.add_specification(run=False)
-    def update_ammonia_and_mix():
-        hydrolysate = F201.outs[1]
-        # Load 10% extra
-        ammonia_M205.imol['NH4OH'] = (2*hydrolysate.imol['H2SO4']) * 1.1
-        M205._run()
-    
-    
-    T204 = units.AmmoniaAdditionTank('T204', ins=(F201-1, M205-0))
-    P201 = units.HydrolysatePump('P201', ins=T204-0)
-    
-    
-    pretreatment_group = UnitGroup('pretreatment_group', 
-                                   units=(H_M201, H_M202, T201, M201, M202, M203,
-                                          R201, T202, T203, F201, M204, H201,
-                                          M205, T204, P201,))
-    process_groups.append(pretreatment_group)
-    
-    # %% 
-    
-    # =============================================================================
-    # Conversion streams
-    # =============================================================================
-    
-    # Flow and price will be updated in EnzymeHydrolysateMixer
-    enzyme = Stream('enzyme', units='kg/hr', price=price['Enzyme'])
-    # Used to adjust enzymatic hydrolysis solid loading, will be updated in EnzymeHydrolysateMixer
-    enzyme_water = Stream('enzyme_water', units='kg/hr')
-    
-    # Corn steep liquor as nitrogen nutrient for microbes, flow updated in R301
-    CSL = Stream('CSL', units='kg/hr')
-    # Lime for neutralization of produced acid
-    fermentation_lime = Stream('fermentation_lime', units='kg/hr')
-    
-    # For diluting concentrated, inhibitor-reduced hydrolysate
-    dilution_water = Stream('dilution_water', units='kg/hr')
-    
-    fresh_CO2_fermentation = Stream('fresh_CO2_fermentation', units='kg/hr',
-                              price=price['Liquid carbon dioxide'],
-                              P=1*101325.)
-    
-       
-    makeup_MEA_A301 = Stream('makeup_MEA_A301', units='kg/hr', price=price['Monoethanolamine'])
-    
-    # =============================================================================
-    # Conversion units
-    # =============================================================================
-    
-    # Cool hydrolysate down to fermentation temperature at 50°C
-    H301 = bst.units.HXutility('H301', ins=P201-0, T=50+273.15, rigorous=True)
-    
-    # Mix enzyme with the cooled pretreatment hydrolysate
-    M301 = units.EnzymeHydrolysateMixer('M301', ins=(H301-0, enzyme, enzyme_water))
-    
-    
-    # Saccharification
-    R301 = units.Saccharification('R301', 
-                                    ins=M301-0,
-                                    outs=('saccharification_effluent'))
-    R301.tau_saccharification = 24. 
-    
-    def fix_split(isplit, ID):
-        isplit['Glycerol', 'Hexanol', 'HP', 'AcrylicAcid', 'Acetate', 'AceticAcid'] = isplit[ID]
-                           
-   
-    # Remove solids from fermentation broth, modified from the pressure filter in Humbird et al.
-    S301_index = [splits_df.index[0]] + splits_df.index[2:].to_list()
-    S301_cell_mass_split = [splits_df['stream_571'][0]] + splits_df['stream_571'][2:].to_list()
-    S301_filtrate_split = [splits_df['stream_535'][0]] + splits_df['stream_535'][2:].to_list()
-    S301 = units.CellMassFilter('S301', ins=R301-0, outs=('solids', ''),
-                                moisture_content=0.35,
-                                split=find_split(S301_index,
-                                                  S301_cell_mass_split,
-                                                  S301_filtrate_split,
-                                                  chemical_groups))
-    fix_split(S301.isplit, 'Glucose')
-    
-    
-    F301 = bst.units.MultiEffectEvaporator('F301', ins=S301-1, outs=('F301_l', 'F301_g'),
-                                            P = (101325, 73581, 50892, 32777, 20000), V = 0.813)
-                                            # P = (101325, 73581, 50892, 32777, 20000), V = 0.001)
-    F301.V = 0.797 #for sugars concentration of 591.25 g/L (599.73 g/L after cooling to 30 C)
-    
-    
-    F301_P = units.HPPump('F301_P', ins=F301-1)
-   
-        
-    M304_P = units.HPPump('M304_P', ins=F301-0)
-    M304 = bst.units.Mixer('M304', ins=(M304_P-0, dilution_water))
-    
-    M304_H = bst.units.HXutility('M304_H', ins=M304-0, T=30+273.15, rigorous=True)
-    
-    # Mix pretreatment hydrolysate/enzyme mixture with fermentation seed
-    
-    S302 = bst.Splitter('S302', ins=M304_H-0,
-                        outs = ('to_seedtrain', 'to_cofermentation'),
-                        split = 0.07) # split = inoculum ratio
-    
-    S303 = bst.FakeSplitter('S303', ins=fresh_CO2_fermentation,
-                        outs = ('CO2_to_seedtrain', 'CO2_to_cofermentation'),
-                        )
-    @S303.add_specification(run=False)
-    def S303_spec():
-        S303.ins[0].imol['CO2'] = S303.outs[0].imol['CO2'] + S303.outs[1].imol['CO2']
-      
-        
-    # Cofermentation
-    
-    R302 = units.CoFermentation('R302', 
-                                    ins=(S302-1, '', CSL, fermentation_lime, S303-1, '', ''),
-                                    outs=('fermentation_effluent', 'CO2_fermentation'),
-                                    vessel_material='Stainless steel 316',
-                                    neutralization=False)
-    
-    @R302.add_specification(run=False)
-    def R302_spec(): # note: effluent always has 0 CSL
-        # R302.show(N=100)
-        R302._run()
-        if R302.ins[2].F_mol:
-            R302.ins[2].F_mass*=1./(1-S302.split[0])
-        R302._run()
-        S303._specifications[0]()
-        # K301.specifications[0]()
-        
-    # R302.specification = include_seed_CSL_in_cofermentation
-    
-    # ferm_ratio is the ratio of conversion relative to the fermenter
-    R303 = units.SeedTrain('R303', ins=S302-0, outs=('seed', 'CO2_seedtrain'), ferm_ratio=0.9)
-    
-    T301 = units.SeedHoldTank('T301', ins=R303-0, outs=1-R302)
-    
-    M305 = bst.Mixer('M305', ins=(R302-1, R303-1,), outs=('mixed_fermentation_and_seed_vent'))
-    
-    A301 = bst.AmineAbsorption('A301', ins=(M305-0, makeup_MEA_A301, 'A301_makeup_water'), outs=('absorption_vent', 'captured_CO2'),
-                               CO2_recovery=0.52)
-    
-    def A301_obj_f(CO2_recovery):
-        A301.CO2_recovery = CO2_recovery
-        A301._run()
-        K301.specifications[0]()
-        R302.specifications[0]()
-        return R302.fresh_CO2_required
-
-    A301.bypass = False
-    
-    @A301.add_specification(run=False)
-    def A301_spec():
-        A301.bypass = False
-        if not R302.fraction_of_biomass_C_from_CO2 > 0.: A301.bypass = True
-        if not A301.bypass:
-            # A301.outs[1].phase='g'
-            A301._run()
-            if A301_obj_f(1-1e-3)>0.:
-                pass
-            else:
-                IQ_interpolation(A301_obj_f, 1e-3, 1-1e-3, x=0.5, ytol=1e-4)
-            A301.outs[1].phase='g'
-        else:
-            for i in A301.ins[1:]: i.empty()
-            A301.outs[1].empty()
-            A301.outs[0].copy_like(A301.ins[0])
-            
-            
-    K301 = units.IsothermalCompressor('K301', ins=A301-1, outs=('recycled_CO2'), 
-                                    P=3e7, 
-                                    # vle=True,
-                                    eta=0.6,
-                                    driver='Electric motor',
-                                    )
-    
-    K301-0-5-R302
-    
-    K301.bypass = False
-    
-    K301_design = K301._design
-    K301_cost = K301._cost
-    @K301.add_specification(run=False)
-    def K301_spec():
-        K301.bypass = False
-        if not R302.fraction_of_biomass_C_from_CO2 > 0.: K301.bypass = True
-        if not K301.bypass:
-            K301._design = K301_design
-            K301._cost = K301_cost
-            # A301.outs[1].phases=('g','l')
-            s1, s2 = K301.ins[0], K301.outs[0]
-            for Kstream in s1, s2:
-                Kstream.imol['CO2_compressible'] = Kstream.imol['CO2']
-                Kstream.imol['CO2'] = 0.
-            K301._run()
-            for Kstream in s1, s2:
-                Kstream.imol['CO2'] = Kstream.imol['CO2_compressible']
-                Kstream.imol['CO2_compressible'] = 0.
-            K301.outs[0].phase='l'
-        else:
-            K301._design = lambda: 0
-            K301._cost = lambda: 0
-            for i in K301.ins: i.empty()
-            for i in K301.outs: i.empty()
-        
-    
-    conversion_group = UnitGroup('conversion_group', 
-                                   units=(H301, M301, R301, S301, F301, F301_P,
-                                          M304_P, M304, M304_H, S302, R302,
-                                          R303, T301))
-    process_groups.append(conversion_group)
     
     # %% 
     

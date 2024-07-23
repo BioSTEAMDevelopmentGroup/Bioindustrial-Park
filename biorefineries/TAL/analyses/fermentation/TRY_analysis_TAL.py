@@ -131,11 +131,11 @@ TAL_metrics = [get_product_MPSP,
 
 # %% Generate 3-specification meshgrid and set specification loading functions
 
-steps = (60, 60, 1)
+steps = (60, 60, 3)
 
 # Yield, titer, productivity (rate)
-spec_1 = yields = np.linspace(0.01, 0.99, steps[0]) # yield
-spec_2 = titers = np.linspace(2., 
+spec_1 = yields = np.linspace(0.15, 0.99, steps[0]) # yield
+spec_2 = titers = np.linspace(15., 
                               100., # although sugar concentration limit of 600 g/L would allow as high as 230 g-TAL/L, we set an upper limit of 100 g/L
                                    # based on achieved (50-68 g/L using E.coli, Candida) and targeted (100 g/L) titers for adipic acid, another organic solid with low water solubility
                                    # Skoog et al., 2018 ( https://doi.org/10.1016/j.biotechadv.2018.10.012 )
@@ -146,9 +146,9 @@ spec_2 = titers = np.linspace(2.,
     
 spec_3 = productivities =\
     np.array([
-              # 0.2*spec.baseline_productivity,
+               0.2*spec.baseline_productivity,
               1.*spec.baseline_productivity,
-              # 5.*spec.baseline_productivity,
+               5.*spec.baseline_productivity,
               ])
 
 # spec_3 = productivities =\
@@ -275,6 +275,7 @@ spec_1, spec_2 = np.meshgrid(spec_1, spec_2)
 # simulate_and_print()
 
 print('\n\nSimulating the initial point to avoid bugs ...')
+spec.byproduct_yields_decrease_policy = 'simultaneous, from 0 product yield'
 spec.load_specifications(yields[0], titers[0], productivities[0])
 # spec.set_production_capacity(desired_annual_production=spec.desired_annual_production)
 # simulate_and_print()
@@ -496,505 +497,510 @@ keep_frames = True
 
 print('\nCreating and saving contour plots ...\n')
 
-#%% MPSP
+#%% Plots
+plot = False
 
-# MPSP_w_levels, MPSP_w_ticks, MPSP_cbar_ticks = get_contour_info_from_metric_data(results_metric_1, lb=3)
-MPSP_w_levels = np.arange(0., 12.25, 0.25)
-MPSP_cbar_ticks = np.arange(0., 12.1, 1.)
-MPSP_w_ticks = [1., 1.5, 2., 2.5, 2.75, 3., 3.5, 4, 5, 10, 12]
-# MPSP_w_levels = np.arange(0., 15.5, 0.5)
-
-contourplots.animated_contourplot(w_data_vs_x_y_at_multiple_z=results_metric_1, # shape = z * x * y # values of the metric you want to plot on the color axis; e.g., MPSP
-                                x_data=100*yields, # x axis values
-                                # x_data = yields/theoretical_max_g_TAL_acid_per_g_glucose,
-                                y_data=titers, # y axis values
-                                z_data=productivities, # z axis values
-                                x_label=x_label, # title of the x axis
-                                y_label=y_label, # title of the y axis
-                                z_label=z_label, # title of the z axis
-                                w_label=MPSP_w_label, # title of the color axis
-                                x_ticks=100*x_ticks,
-                                y_ticks=y_ticks,
-                                z_ticks=z_ticks,
-                                w_levels=MPSP_w_levels, # levels for unlabeled, filled contour areas (labeled and ticked only on color bar)
-                                w_ticks=MPSP_w_ticks, # labeled, lined contours; a subset of w_levels
-                                x_units=x_units,
-                                y_units=y_units,
-                                z_units=z_units,
-                                w_units=MPSP_units,
-                                # fmt_clabel=lambda cvalue: r"$\mathrm{\$}$"+" {:.1f} ".format(cvalue)+r"$\cdot\mathrm{kg}^{-1}$", # format of contour labels
-                                fmt_clabel = lambda cvalue: get_rounded_str(cvalue, 3),
-                                cmap=CABBI_green_colormap(), # can use 'viridis' or other default matplotlib colormaps
-                                cmap_over_color = colors.grey_dark.shade(8).RGBn,
-                                extend_cmap='max',
-                                cbar_ticks=MPSP_cbar_ticks,
-                                z_marker_color='g', # default matplotlib color names
-                                fps=fps, # animation frames (z values traversed) per second
-                                n_loops='inf', # the number of times the animated contourplot should loop animation over z; infinite by default
-                                animated_contourplot_filename='MPSP_animated_contourplot_'+file_to_save, # file name to save animated contourplot as (no extensions)
-                                keep_frames=keep_frames, # leaves frame PNG files undeleted after running; False by default
-                                axis_title_fonts=axis_title_fonts,
-                                clabel_fontsize = clabel_fontsize,
-                                default_fontsize = default_fontsize,
-                                axis_tick_fontsize = axis_tick_fontsize,
-                                comparison_range=TAL_maximum_viable_market_range,
-                                n_minor_ticks = 1,
-                                cbar_n_minor_ticks = 3,
-                                # manual_clabels_regular = {
-                                #     MPSP_w_ticks[5]: (45,28),
-                                #     },
-                                additional_points ={(40.5, 35.9):('D', 'w', 6)},
-                                # comparison_range=[MPSP_w_levels[-2], MPSP_w_levels[-1]],
-                                # comparison_range_hatch_pattern='////',
-                                
-                                # manual_clabels_regular = {
-                                #     2.50: (90,90),
-                                #     2.75: (85,60),
-                                #     3.00: (70,60),
-                                #     3.50: (85,30),
-                                #     4.00: (45,55),
-                                #     5.00: (50,20),
-                                #     10.0: (20,25),
-                                #     12.0: (20,15),
+if plot: 
+    
+    #%% MPSP
+    
+    # MPSP_w_levels, MPSP_w_ticks, MPSP_cbar_ticks = get_contour_info_from_metric_data(results_metric_1, lb=3)
+    MPSP_w_levels = np.arange(0., 12.25, 0.25)
+    MPSP_cbar_ticks = np.arange(0., 12.1, 1.)
+    MPSP_w_ticks = [1., 1.5, 2., 2.5, 2.75, 3., 3.5, 4, 5, 10, 12]
+    # MPSP_w_levels = np.arange(0., 15.5, 0.5)
+    
+    contourplots.animated_contourplot(w_data_vs_x_y_at_multiple_z=results_metric_1, # shape = z * x * y # values of the metric you want to plot on the color axis; e.g., MPSP
+                                    x_data=100*yields, # x axis values
+                                    # x_data = yields/theoretical_max_g_TAL_acid_per_g_glucose,
+                                    y_data=titers, # y axis values
+                                    z_data=productivities, # z axis values
+                                    x_label=x_label, # title of the x axis
+                                    y_label=y_label, # title of the y axis
+                                    z_label=z_label, # title of the z axis
+                                    w_label=MPSP_w_label, # title of the color axis
+                                    x_ticks=100*x_ticks,
+                                    y_ticks=y_ticks,
+                                    z_ticks=z_ticks,
+                                    w_levels=MPSP_w_levels, # levels for unlabeled, filled contour areas (labeled and ticked only on color bar)
+                                    w_ticks=MPSP_w_ticks, # labeled, lined contours; a subset of w_levels
+                                    x_units=x_units,
+                                    y_units=y_units,
+                                    z_units=z_units,
+                                    w_units=MPSP_units,
+                                    # fmt_clabel=lambda cvalue: r"$\mathrm{\$}$"+" {:.1f} ".format(cvalue)+r"$\cdot\mathrm{kg}^{-1}$", # format of contour labels
+                                    fmt_clabel = lambda cvalue: get_rounded_str(cvalue, 3),
+                                    cmap=CABBI_green_colormap(), # can use 'viridis' or other default matplotlib colormaps
+                                    cmap_over_color = colors.grey_dark.shade(8).RGBn,
+                                    extend_cmap='max',
+                                    cbar_ticks=MPSP_cbar_ticks,
+                                    z_marker_color='g', # default matplotlib color names
+                                    fps=fps, # animation frames (z values traversed) per second
+                                    n_loops='inf', # the number of times the animated contourplot should loop animation over z; infinite by default
+                                    animated_contourplot_filename='MPSP_animated_contourplot_'+file_to_save, # file name to save animated contourplot as (no extensions)
+                                    keep_frames=keep_frames, # leaves frame PNG files undeleted after running; False by default
+                                    axis_title_fonts=axis_title_fonts,
+                                    clabel_fontsize = clabel_fontsize,
+                                    default_fontsize = default_fontsize,
+                                    axis_tick_fontsize = axis_tick_fontsize,
+                                    comparison_range=TAL_maximum_viable_market_range,
+                                    n_minor_ticks = 1,
+                                    cbar_n_minor_ticks = 3,
+                                    # manual_clabels_regular = {
+                                    #     MPSP_w_ticks[5]: (45,28),
+                                    #     },
+                                    additional_points ={(40.5, 35.9):('D', 'w', 6)},
+                                    # comparison_range=[MPSP_w_levels[-2], MPSP_w_levels[-1]],
+                                    # comparison_range_hatch_pattern='////',
                                     
-                                # #     MPSP_w_ticks[0]: (70,70),
-                                # #     MPSP_w_ticks[1]: (60,58),
-                                # #     MPSP_w_ticks[2]: (60,45),
-                                # #     MPSP_w_ticks[3]: (55,30),
-                                # #     MPSP_w_ticks[4]: (50,25),
-                                # #     MPSP_w_ticks[5]: (12,12),
-                                #     },
-                                # manual_clabels_comparison_range =\
-                                #     {TAL_maximum_viable_market_range[0]:(33,20), 
-                                #       TAL_maximum_viable_market_range[1]:(32,10)},
-                                
-                                
-                                # contourplot_facecolor = colors.grey_dark.shade(8).RGBn,
-                                fill_bottom_with_cmap_over_color=False, # for TRY
-                                bottom_fill_bounds = ((0,0), 
-                                                      (1,11.),
-                                                      (99,11.)),
-                                # zoom_data_scale=5,
-                                text_boxes = {'>12.0': [(5,5), 'white']},
-                                
-                                add_shapes = {
-                                    # coords as tuple of tuples: (color, zorder),
-                                    ((1,0), (47,100), (1,100)): ('white', 2), # infeasible region smoothing
-                                    }
-                                )
-
-#%% GWP
-
-# GWP_w_levels, GWP_w_ticks, GWP_cbar_ticks = get_contour_info_from_metric_data(results_metric_2,)
-GWP_w_levels = np.arange(0, 20.1, 0.5)
-GWP_cbar_ticks = np.arange(0, 20.1, 2.)
-GWP_w_ticks = [2, 3, 4, 6, 8, 10, 14, 20]
-contourplots.animated_contourplot(w_data_vs_x_y_at_multiple_z=results_metric_2, # shape = z * x * y # values of the metric you want to plot on the color axis; e.g., GWP
-                                x_data=100*yields, # x axis values
-                                y_data=titers, # y axis values
-                                z_data=productivities, # z axis values
-                                x_label=x_label, # title of the x axis
-                                y_label=y_label, # title of the y axis
-                                z_label=z_label, # title of the z axis
-                                w_label=GWP_w_label, # title of the color axis
-                                x_ticks=100*x_ticks,
-                                y_ticks=y_ticks,
-                                z_ticks=z_ticks,
-                                w_levels=GWP_w_levels, # levels for unlabeled, filled contour areas (labeled and ticked only on color bar)
-                                w_ticks=GWP_w_ticks, # labeled, lined contours; a subset of w_levels
-                                x_units=x_units,
-                                y_units=y_units,
-                                z_units=z_units,
-                                w_units=GWP_units,
-                                # fmt_clabel=lambda cvalue: r"$\mathrm{\$}$"+" {:.1f} ".format(cvalue)+r"$\cdot\mathrm{kg}^{-1}$", # format of contour labels
-                                fmt_clabel = lambda cvalue: get_rounded_str(cvalue, 3),
-                                cmap=CABBI_green_colormap(), # can use 'viridis' or other default matplotlib colormaps
-                                cmap_over_color = colors.grey_dark.shade(8).RGBn,
-                                extend_cmap='max',
-                                cbar_ticks=GWP_cbar_ticks,
-                                z_marker_color='g', # default matplotlib color names
-                                fps=fps, # animation frames (z values traversed) per second
-                                n_loops='inf', # the number of times the animated contourplot should loop animation over z; infinite by default
-                                animated_contourplot_filename='GWP_animated_contourplot_'+file_to_save, # file name to save animated contourplot as (no extensions)
-                                keep_frames=keep_frames, # leaves frame PNG files undeleted after running; False by default
-                                axis_title_fonts=axis_title_fonts,
-                                clabel_fontsize = clabel_fontsize,
-                                default_fontsize = default_fontsize,
-                                axis_tick_fontsize = axis_tick_fontsize,
-                                n_minor_ticks = 1,
-                                cbar_n_minor_ticks = 3,
-                                additional_points ={(40.5, 35.9):('D', 'w', 6)},
-                                
-                                # manual_clabels_regular = {
-                                #     # MPSP_w_ticks[0]: (80,300),
-                                #     # MPSP_w_ticks[1]: (50,320),
-                                #     # MPSP_w_ticks[2]: (25,310),
-                                #     # MPSP_w_ticks[3]: (18,300),
-                                #     # MPSP_w_ticks[4]: (10,50),
+                                    # manual_clabels_regular = {
+                                    #     2.50: (90,90),
+                                    #     2.75: (85,60),
+                                    #     3.00: (70,60),
+                                    #     3.50: (85,30),
+                                    #     4.00: (45,55),
+                                    #     5.00: (50,20),
+                                    #     10.0: (20,25),
+                                    #     12.0: (20,15),
+                                        
+                                    # #     MPSP_w_ticks[0]: (70,70),
+                                    # #     MPSP_w_ticks[1]: (60,58),
+                                    # #     MPSP_w_ticks[2]: (60,45),
+                                    # #     MPSP_w_ticks[3]: (55,30),
+                                    # #     MPSP_w_ticks[4]: (50,25),
+                                    # #     MPSP_w_ticks[5]: (12,12),
+                                    #     },
+                                    # manual_clabels_comparison_range =\
+                                    #     {TAL_maximum_viable_market_range[0]:(33,20), 
+                                    #       TAL_maximum_viable_market_range[1]:(32,10)},
                                     
-                                #     GWP_w_ticks[0]: (60,70),
-                                #     GWP_w_ticks[1]: (60,60),
-                                #     GWP_w_ticks[2]: (60,50),
-                                #     GWP_w_ticks[3]: (60,40),
-                                #     GWP_w_ticks[4]: (60,30),
-                                #     GWP_w_ticks[5]: (60,20),
-                                #     GWP_w_ticks[6]: (60,10),
-                                #     }
-                                
-                                # cbar_n_minor_ticks=1,
-                                # comparison_range=[6.5, 7.5],
-                                # comparison_range=[GWP_w_levels[-2], GWP_w_levels[-1]],
-                                # comparison_range_hatch_pattern='////',
-                                
-                                
-                                fill_bottom_with_cmap_over_color=False, # for TRY
-                                bottom_fill_bounds = ((0,0), 
-                                                      (1,11.),
-                                                      (99,11.)),
-                                # zoom_data_scale=5,
-                                text_boxes = {'>20.0': [(80,5), 'white']},
-                                
-                                add_shapes = {
-                                    # coords as tuple of tuples: (color, zorder),
-                                    ((1,0), (47,100), (1,100)): ('white', 2), # infeasible region smoothing
-                                    }
-                                
-                                )
-
-
-#%% FEC
-
-# FEC_w_levels, FEC_w_ticks, FEC_cbar_ticks = get_contour_info_from_metric_data(results_metric_3,)
-FEC_w_levels = np.arange(-100, 101, 10)
-FEC_cbar_ticks = np.arange(-100, 101, 20)
-FEC_w_ticks = [-100, -60, -30, 0, 30, 60, 100]
-# FEC_w_ticks = [40, 50, 70, 80, 100]
-contourplots.animated_contourplot(w_data_vs_x_y_at_multiple_z=results_metric_3, # shape = z * x * y # values of the metric you want to plot on the color axis; e.g., FEC
-                                x_data=100*yields, # x axis values
-                                y_data=titers, # y axis values
-                                z_data=productivities, # z axis values
-                                x_label=x_label, # title of the x axis
-                                y_label=y_label, # title of the y axis
-                                z_label=z_label, # title of the z axis
-                                w_label=FEC_w_label, # title of the color axis
-                                x_ticks=100*x_ticks,
-                                y_ticks=y_ticks,
-                                z_ticks=z_ticks,
-                                w_levels=FEC_w_levels, # levels for unlabeled, filled contour areas (labeled and ticked only on color bar)
-                                w_ticks=FEC_w_ticks, # labeled, lined contours; a subset of w_levels
-                                x_units=x_units,
-                                y_units=y_units,
-                                z_units=z_units,
-                                w_units=FEC_units,
-                                # fmt_clabel=lambda cvalue: r"$\mathrm{\$}$"+" {:.1f} ".format(cvalue)+r"$\cdot\mathrm{kg}^{-1}$", # format of contour labels
-                                fmt_clabel = lambda cvalue: get_rounded_str(cvalue, 3),
-                                cmap=CABBI_green_colormap(200), # can use 'viridis' or other default matplotlib colormaps
-                                cmap_over_color = colors.grey_dark.shade(8).RGBn,
-                                cmap_under_color = colors.CABBI_orange.shade(1).RGBn,
-                                extend_cmap='both',
-                                cbar_ticks=FEC_cbar_ticks,
-                                z_marker_color='g', # default matplotlib color names
-                                fps=fps, # animation frames (z values traversed) per second
-                                n_loops='inf', # the number of times the animated contourplot should loop animation over z; infinite by default
-                                animated_contourplot_filename='FEC_animated_contourplot_'+file_to_save, # file name to save animated contourplot as (no extensions)
-                                keep_frames=keep_frames, # leaves frame PNG files undeleted after running; False by default
-                                axis_title_fonts=axis_title_fonts,
-                                clabel_fontsize = clabel_fontsize,
-                                default_fontsize = default_fontsize,
-                                axis_tick_fontsize = axis_tick_fontsize,
-                                n_minor_ticks = 1,
-                                cbar_n_minor_ticks = 1,
-                                additional_points ={(40.5, 35.9):('D', 'w', 6)},
-                                # comparison_range=[6.5, 7.5],
-                                # comparison_range=[FEC_w_levels[-2], FEC_w_levels[-1]],
-                                # comparison_range_hatch_pattern='////',
-                                manual_clabels_regular = {
-                                    FEC_w_ticks[0]: (15,18),
-                                    FEC_w_ticks[1]: (32,50),
-                                    FEC_w_ticks[2]: (55,45),
-                                    FEC_w_ticks[3]: (55,30),
-                                    FEC_w_ticks[4]: (70,28),
-                                    FEC_w_ticks[5]: (80,20),
-                                    FEC_w_ticks[6]: (60,20),
-                                    },
-                                
-                                fill_bottom_with_cmap_over_color=False, # for TRY
-                                bottom_fill_bounds = ((0,0), 
-                                                      (1,5.),
-                                                      (99,7.)),
-                                # bottom_fill_appears_above_other_areas_to_fill=True,
-                                
-                                # other_areas_to_fill_color = colors.CABBI_orange.shade(1).RGBn,
-                                # other_areas_to_fill_bounds= ((0,0), 
-                                #                       (5,10.),
-                                #                       (95,7.)),
-                                
-                                text_boxes = {'>100': [(80, 5), 'white']},
-                                
-                                add_shapes = {
-                                    # coords as tuple of tuples: (color, zorder),
-                                    ((1,0), (47,100), (1,100)): ('white', 2), # infeasible region smoothing
-                                    }
-                                )
-
-#%% AOC
-
-# AOC_w_levels, AOC_w_ticks, AOC_cbar_ticks = get_contour_info_from_metric_data(results_metric_4,)
-AOC_w_levels = np.arange(0, 151., 5.)
-AOC_cbar_ticks = AOC_w_levels = np.arange(0, 151., 10.)
-AOC_w_ticks = [0, 25, 30, 40, 50, 100, 150]
-# AOC_w_levels = np.arange(0., 15.5, 0.5)
-
-contourplots.animated_contourplot(w_data_vs_x_y_at_multiple_z=results_metric_4, # shape = z * x * y # values of the metric you want to plot on the color axis; e.g., AOC
-                                x_data=100*yields, # x axis values
-                                # x_data = yields/theoretical_max_g_TAL_acid_per_g_glucose,
-                                y_data=titers, # y axis values
-                                z_data=productivities, # z axis values
-                                x_label=x_label, # title of the x axis
-                                y_label=y_label, # title of the y axis
-                                z_label=z_label, # title of the z axis
-                                w_label=AOC_w_label, # title of the color axis
-                                x_ticks=100*x_ticks,
-                                y_ticks=y_ticks,
-                                z_ticks=z_ticks,
-                                w_levels=AOC_w_levels, # levels for unlabeled, filled contour areas (labeled and ticked only on color bar)
-                                w_ticks=AOC_w_ticks, # labeled, lined contours; a subset of w_levels
-                                x_units=x_units,
-                                y_units=y_units,
-                                z_units=z_units,
-                                w_units=AOC_units,
-                                # fmt_clabel=lambda cvalue: r"$\mathrm{\$}$"+" {:.1f} ".format(cvalue)+r"$\cdot\mathrm{kg}^{-1}$", # format of contour labels
-                                fmt_clabel = lambda cvalue: get_rounded_str(cvalue, 3),
-                                cmap=CABBI_green_colormap(), # can use 'viridis' or other default matplotlib colormaps
-                                cmap_over_color = colors.grey_dark.shade(8).RGBn,
-                                extend_cmap='max',
-                                cbar_ticks=AOC_cbar_ticks,
-                                z_marker_color='g', # default matplotlib color names
-                                fps=fps, # animation frames (z values traversed) per second
-                                n_loops='inf', # the number of times the animated contourplot should loop animation over z; infinite by default
-                                animated_contourplot_filename='AOC_animated_contourplot_'+file_to_save, # file name to save animated contourplot as (no extensions)
-                                keep_frames=keep_frames, # leaves frame PNG files undeleted after running; False by default
-                                axis_title_fonts=axis_title_fonts,
-                                clabel_fontsize = clabel_fontsize,
-                                default_fontsize = default_fontsize,
-                                axis_tick_fontsize = axis_tick_fontsize,
-                                # comparison_range=TAL_maximum_viable_market_range,
-                                n_minor_ticks = 1,
-                                cbar_n_minor_ticks = 4,
-                                # comparison_range=[AOC_w_levels[-2], AOC_w_levels[-1]],
-                                # comparison_range_hatch_pattern='////',fill_bottom_with_cmap_over_color=False, # for TRY
-                                
-                                additional_points ={(40.5, 35.9):('D', 'w', 6)},
-                                fill_bottom_with_cmap_over_color=False, # for TRY
-                                bottom_fill_bounds = ((0,0), 
-                                                      (1,11.),
-                                                      (99,11.)),
-                                # zoom_data_scale=5,
-                                text_boxes = {'>150': [(80,3), 'white']},
-                                
-                                add_shapes = {
-                                    # coords as tuple of tuples: (color, zorder),
-                                    ((1,0), (47,100), (1,100)): ('white', 2), # infeasible region smoothing
-                                    }
-                                )
-
-#%% TCI
-
-TCI_w_levels, TCI_w_ticks, TCI_cbar_ticks = get_contour_info_from_metric_data(results_metric_5,)
-# TCI_w_levels = np.arange(2, 8.1, 0.2)
-# TCI_cbar_ticks = np.arange(2, 8.1, 1.)
-
-# TCI_w_ticks = [150, 200, 300, 400,]
-TCI_w_levels = np.arange(150, 401, 10)
-TCI_cbar_ticks = [150, 200, 250, 300, 350, 400]
-TCI_w_ticks = [150, 200, 220, 250, 300, 350, 400]
-# TCI_w_levels = np.arange(0., 15.5, 0.5)
-
-contourplots.animated_contourplot(w_data_vs_x_y_at_multiple_z=results_metric_5, # shape = z * x * y # values of the metric you want to plot on the color axis; e.g., TCI
-                                x_data=100*yields, # x axis values
-                                # x_data = yields/theoretical_max_g_TAL_acid_per_g_glucose,
-                                y_data=titers, # y axis values
-                                z_data=productivities, # z axis values
-                                x_label=x_label, # title of the x axis
-                                y_label=y_label, # title of the y axis
-                                z_label=z_label, # title of the z axis
-                                w_label=TCI_w_label, # title of the color axis
-                                x_ticks=100*x_ticks,
-                                y_ticks=y_ticks,
-                                z_ticks=z_ticks,
-                                w_levels=TCI_w_levels, # levels for unlabeled, filled contour areas (labeled and ticked only on color bar)
-                                w_ticks=TCI_w_ticks, # labeled, lined contours; a subset of w_levels
-                                x_units=x_units,
-                                y_units=y_units,
-                                z_units=z_units,
-                                w_units=TCI_units,
-                                # fmt_clabel=lambda cvalue: r"$\mathrm{\$}$"+" {:.1f} ".format(cvalue)+r"$\cdot\mathrm{kg}^{-1}$", # format of contour labels
-                                fmt_clabel = lambda cvalue: get_rounded_str(cvalue, 3),
-                                cmap=CABBI_green_colormap(), # can use 'viridis' or other default matplotlib colormaps
-                                cmap_over_color = colors.grey_dark.shade(8).RGBn,
-                                extend_cmap='max',
-                                cbar_ticks=TCI_cbar_ticks,
-                                z_marker_color='g', # default matplotlib color names
-                                fps=fps, # animation frames (z values traversed) per second
-                                n_loops='inf', # the number of times the animated contourplot should loop animation over z; infinite by default
-                                animated_contourplot_filename='TCI_animated_contourplot_'+file_to_save, # file name to save animated contourplot as (no extensions)
-                                keep_frames=keep_frames, # leaves frame PNG files undeleted after running; False by default
-                                axis_title_fonts=axis_title_fonts,
-                                clabel_fontsize = clabel_fontsize,
-                                default_fontsize = default_fontsize,
-                                axis_tick_fontsize = axis_tick_fontsize,
-                                # comparison_range=TAL_maximum_viable_market_range,
-                                n_minor_ticks = 1,
-                                cbar_n_minor_ticks = 4,
-                                # comparison_range=[TCI_w_levels[-2], TCI_w_levels[-1]],
-                                # comparison_range_hatch_pattern='////',fill_bottom_with_cmap_over_color=False, # for TRY
-                                
-                                additional_points ={(40.5, 35.9):('D', 'w', 6)},
-                                fill_bottom_with_cmap_over_color=False, # for TRY
-                                bottom_fill_bounds = ((0,0), 
-                                                      (1,11.),
-                                                      (99,11.)),
-                                # zoom_data_scale=5,
-                                text_boxes = {'>400': [(80,5), 'white']},
-                                
-                                add_shapes = {
-                                    # coords as tuple of tuples: (color, zorder),
-                                    ((1,0), (47,100), (1,100)): ('white', 2), # infeasible region smoothing
-                                    }
-                                )
-
-#%% Purity
-
-# Purity_w_levels, Purity_w_ticks, Purity_cbar_ticks = get_contour_info_from_metric_data(results_metric_6,)
-Purity_w_levels = 100.*np.arange(0., 1.01, 0.025)
-Purity_cbar_ticks = 100.*np.arange(0., 1.01, 0.1)
-# Purity_cbar_ticks = np.arange(2, 8.1, 1.)
-Purity_w_ticks = 100.*np.array([0.89, 0.90, 0.91, 0.92, 0.93, 0.94, 0.95])
-# Purity_w_levels = np.arange(0., 15.5, 0.5)
-
-contourplots.animated_contourplot(w_data_vs_x_y_at_multiple_z=100.*np.array(results_metric_6), # shape = z * x * y # values of the metric you want to plot on the color axis; e.g., Purity
-                                x_data=100*yields, # x axis values
-                                # x_data = yields/theoretical_max_g_TAL_acid_per_g_glucose,
-                                y_data=titers, # y axis values
-                                z_data=productivities, # z axis values
-                                x_label=x_label, # title of the x axis
-                                y_label=y_label, # title of the y axis
-                                z_label=z_label, # title of the z axis
-                                w_label=Purity_w_label, # title of the color axis
-                                x_ticks=100*x_ticks,
-                                y_ticks=y_ticks,
-                                z_ticks=z_ticks,
-                                w_levels=Purity_w_levels, # levels for unlabeled, filled contour areas (labeled and ticked only on color bar)
-                                w_ticks=Purity_w_ticks, # labeled, lined contours; a subset of w_levels
-                                x_units=x_units,
-                                y_units=y_units,
-                                z_units=z_units,
-                                w_units=Purity_units,
-                                # fmt_clabel=lambda cvalue: r"$\mathrm{\$}$"+" {:.1f} ".format(cvalue)+r"$\cdot\mathrm{kg}^{-1}$", # format of contour labels
-                                fmt_clabel = lambda cvalue: get_rounded_str(cvalue, 3),
-                                cmap=CABBI_green_colormap(), # can use 'viridis' or other default matplotlib colormaps
-                                cmap_over_color = colors.grey_dark.shade(8).RGBn,
-                                extend_cmap='neither',
-                                cbar_ticks=Purity_cbar_ticks,
-                                z_marker_color='g', # default matplotlib color names
-                                fps=fps, # animation frames (z values traversed) per second
-                                n_loops='inf', # the number of times the animated contourplot should loop animation over z; infinite by default
-                                animated_contourplot_filename='Purity_animated_contourplot_'+file_to_save, # file name to save animated contourplot as (no extensions)
-                                keep_frames=keep_frames, # leaves frame PNG files undeleted after running; False by default
-                                axis_title_fonts=axis_title_fonts,
-                                clabel_fontsize = clabel_fontsize,
-                                default_fontsize = default_fontsize,
-                                axis_tick_fontsize = axis_tick_fontsize,
-                                # comparison_range=TAL_maximum_viable_market_range,
-                                n_minor_ticks = 1,
-                                cbar_n_minor_ticks = 4,
-                                additional_points ={(40.5, 35.9):('D', 'w', 6)},
-                                # comparison_range=[Purity_w_levels[-2], Purity_w_levels[-1]],
-                                # comparison_range_hatch_pattern='////',
-                                
-                                add_shapes = {
-                                    # coords as tuple of tuples: (color, zorder),
-                                    ((1,0), (47,100), (1,100)): ('white', 2), # infeasible region smoothing
-                                    }
-                                )
-
-#%% Relative impact of yield and titer on MPSP
-rel_impact = []
-MPSPs = results_metric_1[1]
-t_step = 1
-y_step = 1
-tot_t_steps, tot_y_steps = len(MPSPs), len(MPSPs[0]) # only works if tot_t_steps == tot_y_steps
-max_increment = 1
-for i in range(tot_t_steps-1):
+                                    
+                                    # contourplot_facecolor = colors.grey_dark.shade(8).RGBn,
+                                    fill_bottom_with_cmap_over_color=False, # for TRY
+                                    bottom_fill_bounds = ((0,0), 
+                                                          (1,11.),
+                                                          (99,11.)),
+                                    # zoom_data_scale=5,
+                                    text_boxes = {'>12.0': [(5,5), 'white']},
+                                    
+                                    add_shapes = {
+                                        # coords as tuple of tuples: (color, zorder),
+                                        ((1,0), (47,100), (1,100)): ('white', 2), # infeasible region smoothing
+                                        }
+                                    )
+    
+    #%% GWP
+    
+    # GWP_w_levels, GWP_w_ticks, GWP_cbar_ticks = get_contour_info_from_metric_data(results_metric_2,)
+    GWP_w_levels = np.arange(0, 20.1, 0.5)
+    GWP_cbar_ticks = np.arange(0, 20.1, 2.)
+    GWP_w_ticks = [2, 3, 4, 6, 8, 10, 14, 20]
+    contourplots.animated_contourplot(w_data_vs_x_y_at_multiple_z=results_metric_2, # shape = z * x * y # values of the metric you want to plot on the color axis; e.g., GWP
+                                    x_data=100*yields, # x axis values
+                                    y_data=titers, # y axis values
+                                    z_data=productivities, # z axis values
+                                    x_label=x_label, # title of the x axis
+                                    y_label=y_label, # title of the y axis
+                                    z_label=z_label, # title of the z axis
+                                    w_label=GWP_w_label, # title of the color axis
+                                    x_ticks=100*x_ticks,
+                                    y_ticks=y_ticks,
+                                    z_ticks=z_ticks,
+                                    w_levels=GWP_w_levels, # levels for unlabeled, filled contour areas (labeled and ticked only on color bar)
+                                    w_ticks=GWP_w_ticks, # labeled, lined contours; a subset of w_levels
+                                    x_units=x_units,
+                                    y_units=y_units,
+                                    z_units=z_units,
+                                    w_units=GWP_units,
+                                    # fmt_clabel=lambda cvalue: r"$\mathrm{\$}$"+" {:.1f} ".format(cvalue)+r"$\cdot\mathrm{kg}^{-1}$", # format of contour labels
+                                    fmt_clabel = lambda cvalue: get_rounded_str(cvalue, 3),
+                                    cmap=CABBI_green_colormap(), # can use 'viridis' or other default matplotlib colormaps
+                                    cmap_over_color = colors.grey_dark.shade(8).RGBn,
+                                    extend_cmap='max',
+                                    cbar_ticks=GWP_cbar_ticks,
+                                    z_marker_color='g', # default matplotlib color names
+                                    fps=fps, # animation frames (z values traversed) per second
+                                    n_loops='inf', # the number of times the animated contourplot should loop animation over z; infinite by default
+                                    animated_contourplot_filename='GWP_animated_contourplot_'+file_to_save, # file name to save animated contourplot as (no extensions)
+                                    keep_frames=keep_frames, # leaves frame PNG files undeleted after running; False by default
+                                    axis_title_fonts=axis_title_fonts,
+                                    clabel_fontsize = clabel_fontsize,
+                                    default_fontsize = default_fontsize,
+                                    axis_tick_fontsize = axis_tick_fontsize,
+                                    n_minor_ticks = 1,
+                                    cbar_n_minor_ticks = 3,
+                                    additional_points ={(40.5, 35.9):('D', 'w', 6)},
+                                    
+                                    # manual_clabels_regular = {
+                                    #     # MPSP_w_ticks[0]: (80,300),
+                                    #     # MPSP_w_ticks[1]: (50,320),
+                                    #     # MPSP_w_ticks[2]: (25,310),
+                                    #     # MPSP_w_ticks[3]: (18,300),
+                                    #     # MPSP_w_ticks[4]: (10,50),
+                                        
+                                    #     GWP_w_ticks[0]: (60,70),
+                                    #     GWP_w_ticks[1]: (60,60),
+                                    #     GWP_w_ticks[2]: (60,50),
+                                    #     GWP_w_ticks[3]: (60,40),
+                                    #     GWP_w_ticks[4]: (60,30),
+                                    #     GWP_w_ticks[5]: (60,20),
+                                    #     GWP_w_ticks[6]: (60,10),
+                                    #     }
+                                    
+                                    # cbar_n_minor_ticks=1,
+                                    # comparison_range=[6.5, 7.5],
+                                    # comparison_range=[GWP_w_levels[-2], GWP_w_levels[-1]],
+                                    # comparison_range_hatch_pattern='////',
+                                    
+                                    
+                                    fill_bottom_with_cmap_over_color=False, # for TRY
+                                    bottom_fill_bounds = ((0,0), 
+                                                          (1,11.),
+                                                          (99,11.)),
+                                    # zoom_data_scale=5,
+                                    text_boxes = {'>20.0': [(80,5), 'white']},
+                                    
+                                    add_shapes = {
+                                        # coords as tuple of tuples: (color, zorder),
+                                        ((1,0), (47,100), (1,100)): ('white', 2), # infeasible region smoothing
+                                        }
+                                    
+                                    )
+    
+    
+    #%% FEC
+    
+    # FEC_w_levels, FEC_w_ticks, FEC_cbar_ticks = get_contour_info_from_metric_data(results_metric_3,)
+    FEC_w_levels = np.arange(-100, 101, 10)
+    FEC_cbar_ticks = np.arange(-100, 101, 20)
+    FEC_w_ticks = [-100, -60, -30, 0, 30, 60, 100]
+    # FEC_w_ticks = [40, 50, 70, 80, 100]
+    contourplots.animated_contourplot(w_data_vs_x_y_at_multiple_z=results_metric_3, # shape = z * x * y # values of the metric you want to plot on the color axis; e.g., FEC
+                                    x_data=100*yields, # x axis values
+                                    y_data=titers, # y axis values
+                                    z_data=productivities, # z axis values
+                                    x_label=x_label, # title of the x axis
+                                    y_label=y_label, # title of the y axis
+                                    z_label=z_label, # title of the z axis
+                                    w_label=FEC_w_label, # title of the color axis
+                                    x_ticks=100*x_ticks,
+                                    y_ticks=y_ticks,
+                                    z_ticks=z_ticks,
+                                    w_levels=FEC_w_levels, # levels for unlabeled, filled contour areas (labeled and ticked only on color bar)
+                                    w_ticks=FEC_w_ticks, # labeled, lined contours; a subset of w_levels
+                                    x_units=x_units,
+                                    y_units=y_units,
+                                    z_units=z_units,
+                                    w_units=FEC_units,
+                                    # fmt_clabel=lambda cvalue: r"$\mathrm{\$}$"+" {:.1f} ".format(cvalue)+r"$\cdot\mathrm{kg}^{-1}$", # format of contour labels
+                                    fmt_clabel = lambda cvalue: get_rounded_str(cvalue, 3),
+                                    cmap=CABBI_green_colormap(200), # can use 'viridis' or other default matplotlib colormaps
+                                    cmap_over_color = colors.grey_dark.shade(8).RGBn,
+                                    cmap_under_color = colors.CABBI_orange.shade(1).RGBn,
+                                    extend_cmap='both',
+                                    cbar_ticks=FEC_cbar_ticks,
+                                    z_marker_color='g', # default matplotlib color names
+                                    fps=fps, # animation frames (z values traversed) per second
+                                    n_loops='inf', # the number of times the animated contourplot should loop animation over z; infinite by default
+                                    animated_contourplot_filename='FEC_animated_contourplot_'+file_to_save, # file name to save animated contourplot as (no extensions)
+                                    keep_frames=keep_frames, # leaves frame PNG files undeleted after running; False by default
+                                    axis_title_fonts=axis_title_fonts,
+                                    clabel_fontsize = clabel_fontsize,
+                                    default_fontsize = default_fontsize,
+                                    axis_tick_fontsize = axis_tick_fontsize,
+                                    n_minor_ticks = 1,
+                                    cbar_n_minor_ticks = 1,
+                                    additional_points ={(40.5, 35.9):('D', 'w', 6)},
+                                    # comparison_range=[6.5, 7.5],
+                                    # comparison_range=[FEC_w_levels[-2], FEC_w_levels[-1]],
+                                    # comparison_range_hatch_pattern='////',
+                                    manual_clabels_regular = {
+                                        FEC_w_ticks[0]: (15,18),
+                                        FEC_w_ticks[1]: (32,50),
+                                        FEC_w_ticks[2]: (55,45),
+                                        FEC_w_ticks[3]: (55,30),
+                                        FEC_w_ticks[4]: (70,28),
+                                        FEC_w_ticks[5]: (80,20),
+                                        FEC_w_ticks[6]: (60,20),
+                                        },
+                                    
+                                    fill_bottom_with_cmap_over_color=False, # for TRY
+                                    bottom_fill_bounds = ((0,0), 
+                                                          (1,5.),
+                                                          (99,7.)),
+                                    # bottom_fill_appears_above_other_areas_to_fill=True,
+                                    
+                                    # other_areas_to_fill_color = colors.CABBI_orange.shade(1).RGBn,
+                                    # other_areas_to_fill_bounds= ((0,0), 
+                                    #                       (5,10.),
+                                    #                       (95,7.)),
+                                    
+                                    text_boxes = {'>100': [(80, 5), 'white']},
+                                    
+                                    add_shapes = {
+                                        # coords as tuple of tuples: (color, zorder),
+                                        ((1,0), (47,100), (1,100)): ('white', 2), # infeasible region smoothing
+                                        }
+                                    )
+    
+    #%% AOC
+    
+    # AOC_w_levels, AOC_w_ticks, AOC_cbar_ticks = get_contour_info_from_metric_data(results_metric_4,)
+    AOC_w_levels = np.arange(0, 151., 5.)
+    AOC_cbar_ticks = AOC_w_levels = np.arange(0, 151., 10.)
+    AOC_w_ticks = [0, 25, 30, 40, 50, 100, 150]
+    # AOC_w_levels = np.arange(0., 15.5, 0.5)
+    
+    contourplots.animated_contourplot(w_data_vs_x_y_at_multiple_z=results_metric_4, # shape = z * x * y # values of the metric you want to plot on the color axis; e.g., AOC
+                                    x_data=100*yields, # x axis values
+                                    # x_data = yields/theoretical_max_g_TAL_acid_per_g_glucose,
+                                    y_data=titers, # y axis values
+                                    z_data=productivities, # z axis values
+                                    x_label=x_label, # title of the x axis
+                                    y_label=y_label, # title of the y axis
+                                    z_label=z_label, # title of the z axis
+                                    w_label=AOC_w_label, # title of the color axis
+                                    x_ticks=100*x_ticks,
+                                    y_ticks=y_ticks,
+                                    z_ticks=z_ticks,
+                                    w_levels=AOC_w_levels, # levels for unlabeled, filled contour areas (labeled and ticked only on color bar)
+                                    w_ticks=AOC_w_ticks, # labeled, lined contours; a subset of w_levels
+                                    x_units=x_units,
+                                    y_units=y_units,
+                                    z_units=z_units,
+                                    w_units=AOC_units,
+                                    # fmt_clabel=lambda cvalue: r"$\mathrm{\$}$"+" {:.1f} ".format(cvalue)+r"$\cdot\mathrm{kg}^{-1}$", # format of contour labels
+                                    fmt_clabel = lambda cvalue: get_rounded_str(cvalue, 3),
+                                    cmap=CABBI_green_colormap(), # can use 'viridis' or other default matplotlib colormaps
+                                    cmap_over_color = colors.grey_dark.shade(8).RGBn,
+                                    extend_cmap='max',
+                                    cbar_ticks=AOC_cbar_ticks,
+                                    z_marker_color='g', # default matplotlib color names
+                                    fps=fps, # animation frames (z values traversed) per second
+                                    n_loops='inf', # the number of times the animated contourplot should loop animation over z; infinite by default
+                                    animated_contourplot_filename='AOC_animated_contourplot_'+file_to_save, # file name to save animated contourplot as (no extensions)
+                                    keep_frames=keep_frames, # leaves frame PNG files undeleted after running; False by default
+                                    axis_title_fonts=axis_title_fonts,
+                                    clabel_fontsize = clabel_fontsize,
+                                    default_fontsize = default_fontsize,
+                                    axis_tick_fontsize = axis_tick_fontsize,
+                                    # comparison_range=TAL_maximum_viable_market_range,
+                                    n_minor_ticks = 1,
+                                    cbar_n_minor_ticks = 4,
+                                    # comparison_range=[AOC_w_levels[-2], AOC_w_levels[-1]],
+                                    # comparison_range_hatch_pattern='////',fill_bottom_with_cmap_over_color=False, # for TRY
+                                    
+                                    additional_points ={(40.5, 35.9):('D', 'w', 6)},
+                                    fill_bottom_with_cmap_over_color=False, # for TRY
+                                    bottom_fill_bounds = ((0,0), 
+                                                          (1,11.),
+                                                          (99,11.)),
+                                    # zoom_data_scale=5,
+                                    text_boxes = {'>150': [(80,3), 'white']},
+                                    
+                                    add_shapes = {
+                                        # coords as tuple of tuples: (color, zorder),
+                                        ((1,0), (47,100), (1,100)): ('white', 2), # infeasible region smoothing
+                                        }
+                                    )
+    
+    #%% TCI
+    
+    TCI_w_levels, TCI_w_ticks, TCI_cbar_ticks = get_contour_info_from_metric_data(results_metric_5,)
+    # TCI_w_levels = np.arange(2, 8.1, 0.2)
+    # TCI_cbar_ticks = np.arange(2, 8.1, 1.)
+    
+    # TCI_w_ticks = [150, 200, 300, 400,]
+    TCI_w_levels = np.arange(150, 401, 10)
+    TCI_cbar_ticks = [150, 200, 250, 300, 350, 400]
+    TCI_w_ticks = [150, 200, 220, 250, 300, 350, 400]
+    # TCI_w_levels = np.arange(0., 15.5, 0.5)
+    
+    contourplots.animated_contourplot(w_data_vs_x_y_at_multiple_z=results_metric_5, # shape = z * x * y # values of the metric you want to plot on the color axis; e.g., TCI
+                                    x_data=100*yields, # x axis values
+                                    # x_data = yields/theoretical_max_g_TAL_acid_per_g_glucose,
+                                    y_data=titers, # y axis values
+                                    z_data=productivities, # z axis values
+                                    x_label=x_label, # title of the x axis
+                                    y_label=y_label, # title of the y axis
+                                    z_label=z_label, # title of the z axis
+                                    w_label=TCI_w_label, # title of the color axis
+                                    x_ticks=100*x_ticks,
+                                    y_ticks=y_ticks,
+                                    z_ticks=z_ticks,
+                                    w_levels=TCI_w_levels, # levels for unlabeled, filled contour areas (labeled and ticked only on color bar)
+                                    w_ticks=TCI_w_ticks, # labeled, lined contours; a subset of w_levels
+                                    x_units=x_units,
+                                    y_units=y_units,
+                                    z_units=z_units,
+                                    w_units=TCI_units,
+                                    # fmt_clabel=lambda cvalue: r"$\mathrm{\$}$"+" {:.1f} ".format(cvalue)+r"$\cdot\mathrm{kg}^{-1}$", # format of contour labels
+                                    fmt_clabel = lambda cvalue: get_rounded_str(cvalue, 3),
+                                    cmap=CABBI_green_colormap(), # can use 'viridis' or other default matplotlib colormaps
+                                    cmap_over_color = colors.grey_dark.shade(8).RGBn,
+                                    extend_cmap='max',
+                                    cbar_ticks=TCI_cbar_ticks,
+                                    z_marker_color='g', # default matplotlib color names
+                                    fps=fps, # animation frames (z values traversed) per second
+                                    n_loops='inf', # the number of times the animated contourplot should loop animation over z; infinite by default
+                                    animated_contourplot_filename='TCI_animated_contourplot_'+file_to_save, # file name to save animated contourplot as (no extensions)
+                                    keep_frames=keep_frames, # leaves frame PNG files undeleted after running; False by default
+                                    axis_title_fonts=axis_title_fonts,
+                                    clabel_fontsize = clabel_fontsize,
+                                    default_fontsize = default_fontsize,
+                                    axis_tick_fontsize = axis_tick_fontsize,
+                                    # comparison_range=TAL_maximum_viable_market_range,
+                                    n_minor_ticks = 1,
+                                    cbar_n_minor_ticks = 4,
+                                    # comparison_range=[TCI_w_levels[-2], TCI_w_levels[-1]],
+                                    # comparison_range_hatch_pattern='////',fill_bottom_with_cmap_over_color=False, # for TRY
+                                    
+                                    additional_points ={(40.5, 35.9):('D', 'w', 6)},
+                                    fill_bottom_with_cmap_over_color=False, # for TRY
+                                    bottom_fill_bounds = ((0,0), 
+                                                          (1,11.),
+                                                          (99,11.)),
+                                    # zoom_data_scale=5,
+                                    text_boxes = {'>400': [(80,5), 'white']},
+                                    
+                                    add_shapes = {
+                                        # coords as tuple of tuples: (color, zorder),
+                                        ((1,0), (47,100), (1,100)): ('white', 2), # infeasible region smoothing
+                                        }
+                                    )
+    
+    #%% Purity
+    
+    # Purity_w_levels, Purity_w_ticks, Purity_cbar_ticks = get_contour_info_from_metric_data(results_metric_6,)
+    Purity_w_levels = 100.*np.arange(0., 1.01, 0.025)
+    Purity_cbar_ticks = 100.*np.arange(0., 1.01, 0.1)
+    # Purity_cbar_ticks = np.arange(2, 8.1, 1.)
+    Purity_w_ticks = 100.*np.array([0.89, 0.90, 0.91, 0.92, 0.93, 0.94, 0.95])
+    # Purity_w_levels = np.arange(0., 15.5, 0.5)
+    
+    contourplots.animated_contourplot(w_data_vs_x_y_at_multiple_z=100.*np.array(results_metric_6), # shape = z * x * y # values of the metric you want to plot on the color axis; e.g., Purity
+                                    x_data=100*yields, # x axis values
+                                    # x_data = yields/theoretical_max_g_TAL_acid_per_g_glucose,
+                                    y_data=titers, # y axis values
+                                    z_data=productivities, # z axis values
+                                    x_label=x_label, # title of the x axis
+                                    y_label=y_label, # title of the y axis
+                                    z_label=z_label, # title of the z axis
+                                    w_label=Purity_w_label, # title of the color axis
+                                    x_ticks=100*x_ticks,
+                                    y_ticks=y_ticks,
+                                    z_ticks=z_ticks,
+                                    w_levels=Purity_w_levels, # levels for unlabeled, filled contour areas (labeled and ticked only on color bar)
+                                    w_ticks=Purity_w_ticks, # labeled, lined contours; a subset of w_levels
+                                    x_units=x_units,
+                                    y_units=y_units,
+                                    z_units=z_units,
+                                    w_units=Purity_units,
+                                    # fmt_clabel=lambda cvalue: r"$\mathrm{\$}$"+" {:.1f} ".format(cvalue)+r"$\cdot\mathrm{kg}^{-1}$", # format of contour labels
+                                    fmt_clabel = lambda cvalue: get_rounded_str(cvalue, 3),
+                                    cmap=CABBI_green_colormap(), # can use 'viridis' or other default matplotlib colormaps
+                                    cmap_over_color = colors.grey_dark.shade(8).RGBn,
+                                    extend_cmap='neither',
+                                    cbar_ticks=Purity_cbar_ticks,
+                                    z_marker_color='g', # default matplotlib color names
+                                    fps=fps, # animation frames (z values traversed) per second
+                                    n_loops='inf', # the number of times the animated contourplot should loop animation over z; infinite by default
+                                    animated_contourplot_filename='Purity_animated_contourplot_'+file_to_save, # file name to save animated contourplot as (no extensions)
+                                    keep_frames=keep_frames, # leaves frame PNG files undeleted after running; False by default
+                                    axis_title_fonts=axis_title_fonts,
+                                    clabel_fontsize = clabel_fontsize,
+                                    default_fontsize = default_fontsize,
+                                    axis_tick_fontsize = axis_tick_fontsize,
+                                    # comparison_range=TAL_maximum_viable_market_range,
+                                    n_minor_ticks = 1,
+                                    cbar_n_minor_ticks = 4,
+                                    additional_points ={(40.5, 35.9):('D', 'w', 6)},
+                                    # comparison_range=[Purity_w_levels[-2], Purity_w_levels[-1]],
+                                    # comparison_range_hatch_pattern='////',
+                                    
+                                    add_shapes = {
+                                        # coords as tuple of tuples: (color, zorder),
+                                        ((1,0), (47,100), (1,100)): ('white', 2), # infeasible region smoothing
+                                        }
+                                    )
+    
+    #%% Relative impact of yield and titer on MPSP
+    rel_impact = []
+    MPSPs = results_metric_1[0]
+    t_step = 1
+    y_step = 1
+    tot_t_steps, tot_y_steps = len(MPSPs), len(MPSPs[0]) # only works if tot_t_steps == tot_y_steps
+    max_increment = 1
+    for i in range(tot_t_steps-1):
+        rel_impact.append([])
+        for j in range(tot_y_steps-1):
+            t_increments = range(1, min(max_increment+1, tot_t_steps-i))
+            y_increments = range(1, min(max_increment+1, tot_t_steps-j))
+            ri_sum = 0.
+            for inc in zip(t_increments, y_increments): # ensures stopping at the lower maximum increment
+                t_inc, y_inc = inc
+                curr_MPSP = MPSPs[i][j]
+                t_MPSP = MPSPs[i+t_inc][j]
+                y_MPSP = MPSPs[i][j+y_inc]
+                ri_sum += (curr_MPSP-t_MPSP)/(curr_MPSP-y_MPSP)
+            rel_impact[-1].append(ri_sum/len(t_increments)*len(y_increments))
+    
+    
+    for i in range(len(MPSPs)-1): rel_impact[i].append(np.nan)
     rel_impact.append([])
-    for j in range(tot_y_steps-1):
-        t_increments = range(1, min(max_increment+1, tot_t_steps-i))
-        y_increments = range(1, min(max_increment+1, tot_t_steps-j))
-        ri_sum = 0.
-        for inc in zip(t_increments, y_increments): # ensures stopping at the lower maximum increment
-            t_inc, y_inc = inc
-            curr_MPSP = MPSPs[i][j]
-            t_MPSP = MPSPs[i+t_inc][j]
-            y_MPSP = MPSPs[i][j+y_inc]
-            ri_sum += (curr_MPSP-t_MPSP)/(curr_MPSP-y_MPSP)
-        rel_impact[-1].append(ri_sum/len(t_increments)*len(y_increments))
-
-
-for i in range(len(MPSPs)-1): rel_impact[i].append(np.nan)
-rel_impact.append([])
-for i in range(len(MPSPs[i])): rel_impact[-1].append(np.nan)
-
-
-rel_impact = np.array(rel_impact)
-
-Rel_impact_MPSP_w_levels = np.arange(0., 10.01, 0.25)
-Rel_impact_MPSP_cbar_ticks = np.arange(0., 10.01, 0.5)
-# Rel_impact_MPSP_cbar_ticks = np.arange(2, 8.1, 1.)
-Rel_impact_MPSP_w_ticks = np.arange(0., 10.01, 0.5)
-# Rel_impact_MPSP_w_levels = np.arange(0., 15.5, 0.5)
-
-contourplots.animated_contourplot(w_data_vs_x_y_at_multiple_z=np.array([rel_impact]), # shape = z * x * y # values of the metric you want to plot on the color axis; e.g., Rel_impact_MPSP
-                                x_data=100*yields, # x axis values
-                                # x_data = yields/theoretical_max_g_TAL_acid_per_g_glucose,
-                                y_data=titers, # y axis values
-                                z_data=[productivities[1]], # z axis values
-                                x_label=x_label, # title of the x axis
-                                y_label=y_label, # title of the y axis
-                                z_label=z_label, # title of the z axis
-                                w_label='Rel impact by titer:yield on MPSP', # title of the color axis
-                                x_ticks=100*x_ticks,
-                                y_ticks=y_ticks,
-                                z_ticks=z_ticks,
-                                w_levels=Rel_impact_MPSP_w_levels, # levels for unlabeled, filled contour areas (labeled and ticked only on color bar)
-                                w_ticks=Rel_impact_MPSP_w_ticks, # labeled, lined contours; a subset of w_levels
-                                x_units=x_units,
-                                y_units=y_units,
-                                z_units=z_units,
-                                w_units='',
-                                # fmt_clabel=lambda cvalue: r"$\mathrm{\$}$"+" {:.1f} ".format(cvalue)+r"$\cdot\mathrm{kg}^{-1}$", # format of contour labels
-                                fmt_clabel = lambda cvalue: get_rounded_str(cvalue, 3),
-                                cmap=CABBI_green_colormap(), # can use 'viridis' or other default matplotlib colormaps
-                                cmap_over_color = colors.grey_dark.shade(8).RGBn,
-                                extend_cmap='neither',
-                                cbar_ticks=Rel_impact_MPSP_cbar_ticks,
-                                z_marker_color='g', # default matplotlib color names
-                                fps=fps, # animation frames (z values traversed) per second
-                                n_loops='inf', # the number of times the animated contourplot should loop animation over z; infinite by default
-                                animated_contourplot_filename='Rel_impact_MPSP_animated_contourplot_'+file_to_save, # file name to save animated contourplot as (no extensions)
-                                keep_frames=keep_frames, # leaves frame PNG files undeleted after running; False by default
-                                axis_title_fonts=axis_title_fonts,
-                                clabel_fontsize = clabel_fontsize,
-                                default_fontsize = default_fontsize,
-                                axis_tick_fontsize = axis_tick_fontsize,
-                                # comparison_range=TAL_maximum_viable_market_range,
-                                n_minor_ticks = 1,
-                                cbar_n_minor_ticks = 4,
-                                additional_points ={(40.5, 35.9):('D', 'w', 6)},
-                                # comparison_range=[Rel_impact_MPSP_w_levels[-2], Rel_impact_MPSP_w_levels[-1]],
-                                # comparison_range_hatch_pattern='////',
-                                
-                                add_shapes = {
-                                    # coords as tuple of tuples: (color, zorder),
-                                    ((1,0), (47,100), (1,100)): ('white', 2), # infeasible region smoothing
-                                    }
-                                )
+    for i in range(len(MPSPs[i])): rel_impact[-1].append(np.nan)
+    
+    
+    rel_impact = np.array(rel_impact)
+    
+    Rel_impact_MPSP_w_levels = np.arange(0., 10.01, 0.25)
+    Rel_impact_MPSP_cbar_ticks = np.arange(0., 10.01, 0.5)
+    # Rel_impact_MPSP_cbar_ticks = np.arange(2, 8.1, 1.)
+    Rel_impact_MPSP_w_ticks = np.arange(0., 10.01, 0.5)
+    # Rel_impact_MPSP_w_levels = np.arange(0., 15.5, 0.5)
+    
+    contourplots.animated_contourplot(w_data_vs_x_y_at_multiple_z=np.array([rel_impact]), # shape = z * x * y # values of the metric you want to plot on the color axis; e.g., Rel_impact_MPSP
+                                    x_data=100*yields, # x axis values
+                                    # x_data = yields/theoretical_max_g_TAL_acid_per_g_glucose,
+                                    y_data=titers, # y axis values
+                                    z_data=[productivities[0]], # z axis values
+                                    x_label=x_label, # title of the x axis
+                                    y_label=y_label, # title of the y axis
+                                    z_label=z_label, # title of the z axis
+                                    w_label='Rel impact by titer:yield on MPSP', # title of the color axis
+                                    x_ticks=100*x_ticks,
+                                    y_ticks=y_ticks,
+                                    z_ticks=z_ticks,
+                                    w_levels=Rel_impact_MPSP_w_levels, # levels for unlabeled, filled contour areas (labeled and ticked only on color bar)
+                                    w_ticks=Rel_impact_MPSP_w_ticks, # labeled, lined contours; a subset of w_levels
+                                    x_units=x_units,
+                                    y_units=y_units,
+                                    z_units=z_units,
+                                    w_units='',
+                                    # fmt_clabel=lambda cvalue: r"$\mathrm{\$}$"+" {:.1f} ".format(cvalue)+r"$\cdot\mathrm{kg}^{-1}$", # format of contour labels
+                                    fmt_clabel = lambda cvalue: get_rounded_str(cvalue, 3),
+                                    cmap=CABBI_green_colormap(), # can use 'viridis' or other default matplotlib colormaps
+                                    cmap_over_color = colors.grey_dark.shade(8).RGBn,
+                                    extend_cmap='neither',
+                                    cbar_ticks=Rel_impact_MPSP_cbar_ticks,
+                                    z_marker_color='g', # default matplotlib color names
+                                    fps=fps, # animation frames (z values traversed) per second
+                                    n_loops='inf', # the number of times the animated contourplot should loop animation over z; infinite by default
+                                    animated_contourplot_filename='Rel_impact_MPSP_animated_contourplot_'+file_to_save, # file name to save animated contourplot as (no extensions)
+                                    keep_frames=keep_frames, # leaves frame PNG files undeleted after running; False by default
+                                    axis_title_fonts=axis_title_fonts,
+                                    clabel_fontsize = clabel_fontsize,
+                                    default_fontsize = default_fontsize,
+                                    axis_tick_fontsize = axis_tick_fontsize,
+                                    # comparison_range=TAL_maximum_viable_market_range,
+                                    n_minor_ticks = 1,
+                                    cbar_n_minor_ticks = 4,
+                                    additional_points ={(40.5, 35.9):('D', 'w', 6)},
+                                    # comparison_range=[Rel_impact_MPSP_w_levels[-2], Rel_impact_MPSP_w_levels[-1]],
+                                    # comparison_range_hatch_pattern='////',
+                                    
+                                    add_shapes = {
+                                        # coords as tuple of tuples: (color, zorder),
+                                        ((1,0), (47,100), (1,100)): ('white', 2), # infeasible region smoothing
+                                        }
+                                    )

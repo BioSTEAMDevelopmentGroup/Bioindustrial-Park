@@ -596,7 +596,7 @@ _316_over_304 = 1.2
       # (304, 306, 311, and 312 in ref [3])
       kW=74.57, cost=47200, S=(42607+443391+948+116), CE=CEPCI[2009], n=0.8, BM=2.3)  
 class CoFermentation(Reactor):
-    _N_ins = 3
+    _N_ins = 6
     _N_outs = 2
     # _N_heat_utilities = 1
     _units= {**Reactor._units,
@@ -708,7 +708,7 @@ class CoFermentation(Reactor):
         self.get_acetic_acid_conc = lambda: self.outs[0].imass['AceticAcid']/self.outs[0].F_vol
     def _run(self):
         
-        sugars, feed, CSL, lime, CO2_fresh, CO2_recycled = self.ins
+        sugars, feed, CSL, lime, CO2_fresh, CO2_recycled, air_fresh = self.ins
         
         effluent, vapor = self.outs
         effluent.mix_from([feed, sugars, CSL])
