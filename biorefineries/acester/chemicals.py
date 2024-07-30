@@ -6,8 +6,20 @@ from biorefineries import cellulosic
 
 __all__ = (
     'create_acetate_ester_chemicals',
+    'create_cc_chemicals'
 )
 
+def create_cc_chemicals():
+    chemicals = bst.Chemicals(['N2', 'CO', 'H2', 'O2', 'CO2', 'CH4', 'Argon', 'H2O'])
+    bst.settings.set_thermo(chemicals)
+        
+    mixture = bst.PRMixture.from_chemicals(chemicals)
+    bst.settings.set_thermo(
+        chemicals,
+        Gamma=bst.IdealActivityCoefficients,
+        mixture=mixture
+    )
+    return bst.settings.thermo
 
 def create_acetate_ester_chemicals(yeast_includes_nitrogen=False):
     Yeast = bst.Chemical(
@@ -21,7 +33,8 @@ def create_acetate_ester_chemicals(yeast_includes_nitrogen=False):
         aliases=['Cellmass'],
     )
     Ash = bst.Chemical('Ash', default=True, phase='s', MW=1, search_db=False)
-    gases = [bst.Chemical(i, phase='g') for i in ('N2', 'CO', 'H2', 'O2', 'CO2', 'CH4')]
+    gases = [bst.Chemical(i, phase='g') for i in ('N2', 'CO', 'H2', 'O2', 'CO2', 'CH4', 'Argon')]
+    #print(gases)
     chemicals = bst.Chemicals([
         'Water', *gases,
         'AceticAcid', 'Ethanol', 'EthylAcetate',

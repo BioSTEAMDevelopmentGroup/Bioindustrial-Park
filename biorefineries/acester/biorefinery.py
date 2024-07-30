@@ -110,9 +110,9 @@ class Biorefinery(bst.ProcessModel):
             bounds = [0.8 * baseline, 1.2 * baseline]
             return parameter(*args, **kwargs, baseline=baseline, bounds=bounds)
         
-        @uniform(units='USD/MT', element='Carbon capture', baseline=100) 
-        def set_carbon_capture_cost(price):
-            self.CC.b = 4.230769230769226 + price
+        # @uniform(units='USD/MT', element='Carbon capture', baseline=100) 
+        # def set_carbon_capture_cost(price):
+        #     self.CC.b = 4.230769230769226 + price
         
         @uniform(units='wt %', element='Boiler flue gas', baseline=5.5) 
         def set_boiler_flue_gas_CO2_content(CO2_content):
