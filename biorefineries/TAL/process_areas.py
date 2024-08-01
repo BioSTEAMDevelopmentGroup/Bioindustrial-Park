@@ -258,14 +258,14 @@ def create_TAL_separation_solubility_exploit_process(ins, outs,):
     
     # from biosteam._graphics import stream_unit
     U401._graphics = tmo._graphics.junction_graphics
-    
+    U401.get_mol_TAL_dissolved_given_T_and_mol_water = get_mol_TAL_dissolved
     @U401.add_specification()
     def U401_spec():
         U401_ins_0 = U401.ins[0]
         tot_TAL = U401_ins_0.imol['TAL']
         U401_outs_0 = U401.outs[0]
         U401_outs_0.copy_like(U401_ins_0)
-        mol_TAL_dissolved = U401.TAL_solubility_multiplier * get_mol_TAL_dissolved(U401_outs_0.T, U401_outs_0.imol['Water'])
+        mol_TAL_dissolved = U401.TAL_solubility_multiplier * U401.get_mol_TAL_dissolved_given_T_and_mol_water(U401_outs_0.T, U401_outs_0.imol['Water'])
         U401_outs_0.phases = ('s', 'l')
         U401_outs_0.imol['l', 'TAL'] = min(mol_TAL_dissolved, tot_TAL)
         U401_outs_0.imol['s', 'TAL'] = tot_TAL - min(mol_TAL_dissolved, tot_TAL)
@@ -409,13 +409,13 @@ def create_TAL_separation_solubility_exploit_process(ins, outs,):
         # ub_T = 99.+273.15
         lb_T = max(H401.lower_bound_T, H401_ins_0.T)
         ub_T = max(H401.upper_bound_T, H401_ins_0.T)
-        
-        if tot_TAL>TAL_solubility_multiplier*get_mol_TAL_dissolved(ub_T, H401_ins_0_water):
+        get_mol_TAL_dissolved_given_T_and_mol_water = U401.get_mol_TAL_dissolved_given_T_and_mol_water
+        if tot_TAL>TAL_solubility_multiplier*get_mol_TAL_dissolved_given_T_and_mol_water(ub_T, H401_ins_0_water):
             H401.T=ub_T
-        elif tot_TAL<TAL_solubility_multiplier*get_mol_TAL_dissolved(lb_T, H401_ins_0_water):
+        elif tot_TAL<TAL_solubility_multiplier*get_mol_TAL_dissolved_given_T_and_mol_water(lb_T, H401_ins_0_water):
             H401.T=lb_T
         else:
-            H401_spec_obj_fn = lambda T: TAL_solubility_multiplier*get_mol_TAL_dissolved(T, H401_ins_0_water) - tot_TAL
+            H401_spec_obj_fn = lambda T: TAL_solubility_multiplier*get_mol_TAL_dissolved_given_T_and_mol_water(T, H401_ins_0_water) - tot_TAL
             H401.T = IQ_interpolation(H401_spec_obj_fn, lb_T, ub_T, 
                                       # ytol=5e-2,
                                        # ytol=0.1, 
@@ -435,7 +435,7 @@ def create_TAL_separation_solubility_exploit_process(ins, outs,):
         M402._run()
         TAL_solubility_multiplier = U401.TAL_solubility_multiplier
         M402_outs_0 = M402.outs[0]
-        mol_TAL_dissolved = TAL_solubility_multiplier*get_mol_TAL_dissolved(M402_outs_0.T, M402_outs_0.imol['Water'])
+        mol_TAL_dissolved = TAL_solubility_multiplier*U401.get_mol_TAL_dissolved_given_T_and_mol_water(M402_outs_0.T, M402_outs_0.imol['Water'])
         tot_TAL = M402_outs_0.imol['TAL']
         M402_outs_0.phases = ('l', 's')
         M402_outs_0.imol['l', 'TAL'] = min(mol_TAL_dissolved, tot_TAL)
@@ -530,7 +530,7 @@ def create_TAL_separation_solubility_exploit_process(ins, outs,):
     #     H402_ins_0 = H402.ins[0]
     #     tot_TAL = H402_ins_0.imol['TAL']
     #     H402_outs_0 = H402.outs[0]
-    #     TAL_solubility = U401.TAL_solubility_multiplier * get_mol_TAL_dissolved(H402_outs_0.T, H402_outs_0.imol['Water'])
+    #     TAL_solubility = U401.TAL_solubility_multiplier * U401.get_mol_TAL_dissolved_given_T_and_mol_water(H402_outs_0.T, H402_outs_0.imol['Water'])
     #     H402_outs_0.phases = ('s', 'l')
     #     H402_outs_0.T = H402.T
     #     TAL_dissolved = min(TAL_solubility, tot_TAL)
@@ -550,12 +550,13 @@ def create_TAL_separation_solubility_exploit_process(ins, outs,):
     F401_P1 = bst.units.Pump('F401_P1', ins=F401-1, P=101325., material='Stainless steel',)
   
     C401 = units.TALCrystallizer('C401', ins=F401_P0-0, outs=('C401_0',), 
-                                   get_mol_TAL_dissolved_given_T_and_mol_water=get_mol_TAL_dissolved,
+                                   get_mol_TAL_dissolved_given_T_and_mol_water=U401.get_mol_TAL_dissolved_given_T_and_mol_water,
                                    fixed_operating_T=273.15+1.,
                                    )
     C401.line = 'Crystallizer'
     @C401.add_specification(run=False)
     def C401_spec():
+        C401.get_mol_TAL_dissolved_given_T_and_mol_water = U401.get_mol_TAL_dissolved_given_T_and_mol_water # !!! may increase computational time; potentially change later 
         C401.TAL_solubility_multiplier = U401.TAL_solubility_multiplier
         C401._run()
     
