@@ -222,7 +222,7 @@ class ProcessSpecification(bst.process_tools.ReactorSpecification):
                  feedstock_mass=104192.83224417375, pretreatment_reactor = None,
                   load_spec_1=None, load_spec_2=None, load_spec_3=None, set_production_capacity=None,
                   desired_annual_production=25000.,
-                  byproduct_yields_decrease_policy=False,):
+                  byproduct_yields_decrease_policy='sequential, when product yield too high',):
         self.substrates = substrates
         self.reactor = reactor #: [Unit] Reactor unit operation
         self.products = products #: tuple[str] Names of main products

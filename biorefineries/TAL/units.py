@@ -838,6 +838,8 @@ class HydrogenationReactor(StirredTankReactor):
     
     spent_catalyst_replacements_per_year = 1. # number of times the entire catalyst_weight is replaced per year
     
+    catalyst_weight = 0. # updated in _run
+    
     def _init(self,  
                  tau = 9.4, # from Huber group
                  T=100. + 273.15, # from Huber group
@@ -881,10 +883,10 @@ class HydrogenationReactor(StirredTankReactor):
         effluent.imol['H2'] = 0.
         
         # 
-        req_cat_mass_flow = cat_weight/tau
         current_cat_mass_flow = recovered_catalyst.imass['NiSiO2']
         spent_catalyst_mass_flow = self.spent_catalyst_replacements_per_year*cat_weight/self.TEA_operating_hours # kg/h
         current_cat_mass_flow-=spent_catalyst_mass_flow
+        req_cat_mass_flow = min(spent_catalyst_mass_flow, cat_weight/tau)
         
         spent_catalyst.phase = 's'
         spent_catalyst.imass['NiSiO2'] = spent_catalyst_mass_flow
