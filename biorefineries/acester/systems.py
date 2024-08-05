@@ -228,7 +228,7 @@ def create_acetyl_ester_system(ins, outs):
         ins=[BT.emissions, AcEster_production-0],
         outs=['CO2', 'distillate', bst.Stream('biogenic_emissions', thermo=thermo)], 
         CO2_target=CO2,
-        priority=bst.BoilerTurbogenerator.network_priority + 1 # Should run after the turbogenerator
+        network_priority=bst.CoolingTower.network_priority - 1 # Should run after the turbogenerator
     )
     mixer = bst.Mixer(ins=CC-0, outs=CO2) # Interfaces property package
     @mixer.add_specification
