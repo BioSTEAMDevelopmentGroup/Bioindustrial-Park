@@ -44,10 +44,10 @@ class Biorefinery(bst.ProcessModel):
     Examples
     --------
     >>> import biorefineries.acester as ace
-    >>> model = ace.Biorefinery(simulate=False)
-    >>> model.system.simulate()
-    >>> model.system.diagram()
-    >>> (model.MSP(), model.GWP(), model.tea.TCI / 1e6)
+    >>> br = ace.Biorefinery(simulate=False)
+    >>> br.system.simulate()
+    >>> br.system.diagram()
+    >>> (br.MSP(), br.GWP(), br.tea.TCI / 1e6)
     (7.30, 2.80, 438.53)
     
     """

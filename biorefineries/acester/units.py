@@ -9,7 +9,7 @@ from biosteam.units.decorators import cost
 import math
 
 __all__ = (
-    'CarbonCapture',
+    'CarbonCaptureCost',
     'MembraneSeparation',
     'CryogenicDistillation',
     'SolarPV',
@@ -53,8 +53,8 @@ class MembraneSeparation(bst.Splitter):
 
 
 # %% Carbon capture
-
-class CarbonCapture(bst.Facility):
+        
+class CarbonCaptureCost(bst.Facility):
     _N_ins = 1
     _N_outs = 2
     _ins_size_is_fixed = False
