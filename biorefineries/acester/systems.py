@@ -564,15 +564,15 @@ def create_ccc_sys(ins, outs):
     flue_gas = ins[0]
     CO2_concentrated = outs[0]
     Destilate = outs[1]
-    Pf = 3.5e6
+    Pf = 6e6
     # first compression stage
-    K1 = bst.IsentropicCompressor('K100', ins=flue_gas,outs = ['s2'], P=0.33e6, vle=True) # in flue gas(1), out 2
+    K1 = bst.IsentropicCompressor('K100', ins=flue_gas,outs = ['s2'], P=0.4e6, vle=True) # in flue gas(1), out 2
     Hx1 = bst.HXutility('HX100', ins = K1-0,outs = ['s3'], T = 29.85+273.15,
                         rigorous =  True) # in 2, out 3
     Fv1 = bst.Flash('F100', ins = Hx1-0, outs = ['s4', 's5'], T = 29.85+273.15 , P = K1.P) # in 3, out 4 and 5
     
     # second compression stage
-    K2 = bst.IsentropicCompressor('K101', ins=Fv1-0, outs = ['s6'], P=1.25e6, vle=True) # in 4, out 6
+    K2 = bst.IsentropicCompressor('K101', ins=Fv1-0, outs = ['s6'], P=2e6, vle=True) # in 4, out 6
     recycle2 = bst.Stream('recycle18')
     
 
@@ -592,20 +592,24 @@ def create_ccc_sys(ins, outs):
     K3 = bst.IsentropicCompressor('K102', ins=Fv2-0,outs = ['s10'], P=Pf, vle=True) # in 9, out 11 
     Hx3_1 = bst.HXutility('HX102', ins = K3-0, outs = ['s12'], T = 29.85+273.15) # in 11, out 12  
     # dehydration unit
-    Sp_1 = bst.Splitter('Sp100', ins = Hx3_1-0, outs = ['s13', 's14'], split = {'H2O': 0, 'O2': 1, 'N2': 1, 'CO2':1, 'Argon': 1}) # in 12, out 13 and 14
+    Sp_1 = bst.Splitter('Sp100', ins = Hx3_1-0, outs = ['s13', 's14'], split=1) # in 12, out 13 and 14
+    Sp_1.isplit['H2O'] = 0
     
     recycle1 = bst.Stream('recycle17')
     Hx3_2 = bst.HXprocess('HX105', ins = [Sp_1-0, recycle1], outs = ['s15', recycle2]) # in 12 and 17, out 15 and 18
     # more cold
-    Hx3_3 = bst.HXutility('HX103', ins = Hx3_2-0,outs = ['s16'], T = 260.53) # in 15, out 16
+    # Hx3_2.show()
+    Hx3_3 = bst.HXutility('HX103', ins = Hx3_2-0,outs = ['s16'], T = 260.53, rigorous = True) # in 15, out 16
     
     @Hx3_3.add_specification(run=True)
     def adjust_temp():
         Hx3_3.T = Hx3_2.outs[0].dew_point_at_P().T
-
-    D1 = bst.ShortcutColumn('D100', ins = Hx3_3-0, outs = [recycle1, 's21'], P = 3.5e6, LHK = ('N2', 'CO2'),
-                            Lr = 0.988717, Hr = 0.751599
-                            , Rmin = 1,k = 1.3)
+    
+    D1 = bst.ShortcutColumn('D100', ins = Hx3_3-0, outs = [recycle1, 's21'], P = Pf, LHK = ('O2', 'CO2'),
+                            y_top = 0.8, x_bot = 0.00416
+                            # Lr = 0.988717, Hr = 0.751599
+                            , k = 1.3)
+    D1.check_LHK = False
     P1 = bst.Pump('P100', ins = D1-1, outs = ['s22'], P = 15e6)
     Hx4_1 = bst.HXutility('HX108', ins = P1-0, outs = ['s23'], T = 20+273.15)
     Hx4_2 = bst.HXutility('HX109', ins = Hx4_1-0, outs = CO2_concentrated, T = 30+273.15)
@@ -615,6 +619,4 @@ if __name__ == "__main__":
     bst.settings.set_thermo(thermo)
     ccc = create_ccc_sys()
     ccc.simulate()
-
-    
     

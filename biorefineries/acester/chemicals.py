@@ -10,7 +10,8 @@ __all__ = (
 )
 
 def create_cc_chemicals():
-    chemicals = bst.Chemicals(['N2', 'CO', 'H2', 'O2', 'CO2', 'CH4', 'Argon', 'H2O'])
+    chemicals = bst.Chemicals(['N2', 'CO', 'H2', 'O2', 'CO2', 'CH4', 'Argon', 'H2O', 'SO2',
+                               'AceticAcid', 'Ethanol', 'EthylAcetate',])
     bst.settings.set_thermo(chemicals)
         
     mixture = bst.PRMixture.from_chemicals(chemicals)
