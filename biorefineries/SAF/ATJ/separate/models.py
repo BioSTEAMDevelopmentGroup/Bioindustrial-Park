@@ -12,13 +12,15 @@ import biosteam as bst
 from biosteam.evaluation import Model, Metric
 from biosteam.evaluation.evaluation_tools.parameter import Setter
 from biorefineries.SAF._chemicals import SAF_chemicals
-from biorefineries.SAF.ATJ.system_upgrading import F, sys
+from biorefineries.SAF.ATJ.separate.system_ethanol import MESP
+from biorefineries.SAF.ATJ.separate.system_upgrading import F, SAF_sys
 from biorefineries.SAF.ATJ._process_settings import price, GWP_CFs, load_preferences_and_process_settings
-from biorefineries.SAF._tea import create_SAF_tea
+from biorefineries.SAF._tea import create_SAF_coprocessing_tea
+
 from warnings import warn
 from warnings import filterwarnings; filterwarnings('ignore')
 
-
+bst.settings.set_thermo(SAF_chemicals, cache=True)
 
 _gal_per_m3 = 1000/3.785412
 _L_per_gal = 3.785412
@@ -30,6 +32,8 @@ __all__ = ('create_model')
 
 #%%
 
+sys = SAF_sys(product_storage=False, WWTC=False, BoilerTurbo=False, hydrogenation_distillation=False,h2_purchase=False,opportunity_cost=True)
+
 load_preferences_and_process_settings(T='K',
                                       flow_units='kg/hr',
                                       N=100,
@@ -39,7 +43,11 @@ load_preferences_and_process_settings(T='K',
                                       electricity_EI=GWP_CFs['electricity'],
                                       electricity_price=price['electricity'])
 sys.set_tolerance(rmol=1e-6, mol=1e-5, maxiter=400)
-tea_SAF = create_SAF_tea(sys=sys)
+tea_SAF = create_SAF_coprocessing_tea(sys=sys,steam_distribution=0.0, water_supply_cooling_pumping=0.0, 
+                                      water_distribution=0.0, electric_substation_and_distribution=0.0,
+                                      gas_supply_and_distribution=0.009, comminication=0.0, safety_installation=0.013,
+                                      building=0.07, yard_works=0.0, contingency_new=0.1, land=0.0, labor_cost=3763935,
+                                      sanitary_waste_disposal=0.0)
 sys.operating_hours = tea_SAF.operating_days * 24
 
 
@@ -47,7 +55,7 @@ def set_price_of_streams():
     for i in sys.streams:
         if i.ID in price.keys():
             i.price = price[i.ID]
-    F.natural_gas.price = price['natural gas']
+    F.ethanol.price = MESP + 0.009 # 0.009 is transportation price
             
 def set_GWP_of_streams(indicator):
     F.caustic.set_CF(key='GWP100', value=GWP_CFs['caustic']) # caustic in WWT
@@ -61,8 +69,7 @@ set_GWP = set_GWP_of_streams(indicator='GWP100')
 
 
 # For simplification 
-feedstock = F.switchgrass
-ethanol = F.J1-0
+ethanol = F.ethanol
 jet_fuel = F.jet_fuel
 diesel = F.diesel
 gasoline = F.gasoline
@@ -70,15 +77,13 @@ gasoline = F.gasoline
 
 natural_gas = F.natural_gas
 BT = F.BT
-HXN = F.HXN_1
+HXN = F.HXN
 
 get_annual_factor = lambda: tea_SAF.operating_days * 24
 
 ##### Functions to calculate all the metrics #####
 
 # 1. Product characteristics
-
-get_coprocessing_ratio = lambda: F.R404_1.ins[0].F_vol * 24 / 5595 # in m3; 5595 is capacity of diesel hydrotreater in PR 
 
 get_ethanol_yield = lambda: ethanol.F_vol * _gal_per_m3 * get_annual_factor() / 1e6 # in MMGal (million gallon)
 get_jet_yield = lambda:  jet_fuel.F_vol * _gal_per_m3 * get_annual_factor() / 1e6
@@ -93,14 +98,14 @@ get_jet_energy = lambda:  jet_fuel.LHV * _GGE_per_J * get_annual_factor() / 1000
 get_diesel_energy = lambda:  diesel.LHV * _GGE_per_J * get_annual_factor() / 1000
 get_gasoline_energy = lambda:  gasoline.LHV * _GGE_per_J * get_annual_factor() / 1000
 get_total_energy = lambda:  get_jet_energy() + get_diesel_energy() + get_gasoline_energy()
-get_conversion_efficiency = lambda: get_total_energy() / get_ethanol_energy()
 
 get_jet_energy_ratio = lambda: get_jet_energy() / get_total_energy() * 100
 get_diesel_energy_ratio = lambda: get_diesel_energy() / get_total_energy() * 100
 get_gasoline_energy_ratio = lambda: get_gasoline_energy() / get_total_energy() * 100
 
-
 # 2. TEA
+
+# get_ethanol_transportation_cost = lambda: tea_SAF.eth_trans_cost / 1e6 # in a year
 
 get_installed_cost = lambda: tea_SAF.installed_equipment_cost / 1e6
 get_installed_cost_OSBL = lambda: sum(i.installed_cost for i in tea_SAF.OSBL_units) / 1e6
@@ -146,8 +151,7 @@ jet_fuel_gal_per_year = lambda: jet_fuel_gal_per_hr() * sys.operating_hours
 get_cost_electricity_credit = lambda: get_excess_power() * electricity_price / jet_fuel_gal_per_year()
 
 
-metrics = [Metric('Coprocessing ratio', get_coprocessing_ratio, ''),
-           Metric('Installed cost', get_installed_cost, '10^6 $'),
+metrics = [Metric('Installed cost', get_installed_cost, '10^6 $'),
            Metric('Installed cost OSBL', get_installed_cost_OSBL, '10^6 $'),
            Metric('Installed cost ISBL', get_installed_cost_ISBL, '10^6 $'),
            Metric('DPI', get_DPI, '10^6 $'),
@@ -164,7 +168,6 @@ metrics = [Metric('Coprocessing ratio', get_coprocessing_ratio, ''),
            Metric('Jet volume ratio', get_jet_vol_ratio, '%'),
            Metric('Jet energy ratio', get_jet_energy_ratio, '%'),
            Metric('Jet volume ratio to ethanol', get_jet_to_eth_ratio, '%'),
-           Metric('Conversion efficiency', get_conversion_efficiency, '%'),
            
            Metric('Annual material cost', get_material_cost, '10^6 $/yr'),
            Metric('Annual product sale', get_annual_sale, '10^6 $/yr'),
@@ -191,35 +194,28 @@ emissions = [i for i in F.stream if i.source and not i.sink and i not in main_pr
 #               sum([i.get_atomic_flow('C') for i in coproducts]) 
 # C_bal_error = (total_C_out - total_C_in)/total_C_in
 
-# Feedstock contribution
-get_GWP_feedstock_input = lambda: sys.get_material_impact(feedstock, key='GWP100') * 1000 / _total_energy_per_year()
 
-# Non-biogenic emissions (ash)
-get_GWP_missions_waste = lambda: (sys.get_material_impact(F.ash, key='GWP100') + sys.get_material_impact(F.ash_1, key='GWP100')) * 1000 / _total_energy_per_year() 
-
-# Non-biogenic emissions (enzyme+CSL)
-get_GWP_emissions_C_source = lambda: (F.CSL.get_atomic_flow('C') + F.cellulase.get_atomic_flow('C'))\
-                                  * SAF_chemicals.CO2.MW * 1000 / _total_energy_per_hr()         
-                                  
-# Displacement GWP (ethnol_to_sold displacement, gasoline, diesel)
+# Displacement GWP (gasoline, diesel)
 get_GWP_displacement = lambda: (sys.get_material_impact(F.gasoline, key='GWP100') + sys.get_material_impact(F.diesel, key='GWP100')) * 1000 / _total_energy_per_year() 
                                   
-get_GWP_emissions_non_BT = lambda: get_GWP_missions_waste() + get_GWP_emissions_C_source()
+get_GWP_emissions_non_BT = 0
 
 # Non-biogenic missions (BT)
-get_GWP_emissions_BT = lambda: (F.natural_gas.get_atomic_flow('C') + F.natural_gas_1.get_atomic_flow('C')) * SAF_chemicals.CO2.MW * 1000 / _total_energy_per_hr()
+get_GWP_emissions_BT = lambda: (F.natural_gas.get_atomic_flow('C') + F.natural_gas.get_atomic_flow('C')) * SAF_chemicals.CO2.MW * 1000 / _total_energy_per_hr()
 
 # Material contribution
 get_GWP_material_total = lambda: sys.get_total_feeds_impact('GWP100') * 1000 / _total_energy_per_year()
 
-get_GWP_NG = lambda: (sys.get_material_impact(F.natural_gas, key='GWP100') + sys.get_material_impact(F.natural_gas_1, key='GWP100')) * 1000 / _total_energy_per_year()
+get_GWP_NG = lambda: (sys.get_material_impact(F.natural_gas, key='GWP100') + sys.get_material_impact(F.natural_gas_for_h2, key='GWP100')) * 1000 / _total_energy_per_year()
 
 
-get_GWP_other_materials = lambda: get_GWP_material_total()  - get_GWP_feedstock_input() - get_GWP_NG()
+get_GWP_other_materials = lambda: get_GWP_material_total() - get_GWP_NG()
+
+get_GWP_ethanol_tranporation = lambda: sys.get_material_impact(F.ethanol, key='GWP100') * 1000 / _total_energy_per_year() # GHG of ethanol transportation
 
 # Total = emission + material
 #get_GWP_total = lambda: get_GWP_emissions_total() + get_GWP_material_total()
-get_GWP_total = lambda: get_GWP_material_total() + get_GWP_emissions_BT() + get_GWP_emissions_non_BT() + get_GWP_displacement()
+get_GWP_total = lambda: get_GWP_material_total() + get_GWP_emissions_BT() + get_GWP_displacement() + get_GWP_ethanol_tranporation()
 
 # Electricity (BT satisfies all electricity in system by buying natural gas if needed, no buying electricity)
 get_electricity_use_offset_total = lambda: sum(i.power_utility.rate for i in sys.units) # .= 0 per hour
@@ -228,7 +224,7 @@ get_GWP_electricity_use_total = lambda: get_electricity_use_offset_total() * GWP
 
 get_electricity_demand_total = get_electricity_use = lambda: -BT.power_utility.rate # Outside BT + BT consumption 
 
-get_electricity_demand_cooling = lambda: F.CT.power_utility.rate + F.CT_1.power_utility.rate+ F.CWP.power_utility.rate
+get_electricity_demand_cooling = lambda: F.CT.power_utility.rate
 
 get_electricity_demand_non_cooling = lambda: get_electricity_demand_total() - get_electricity_demand_cooling()
 
@@ -238,9 +234,9 @@ get_electricity_demand_non_cooling_frac = lambda: get_electricity_demand_non_coo
 
 
 # Steam contribution
-get_steam_heating = lambda: sum([i.duty for i in BT.steam_utilities]) + sum([i.duty for i in F.BT_1.steam_utilities])# in kJ/hr
+get_steam_heating = lambda: sum([i.duty for i in BT.steam_utilities]) + sum([i.duty for i in F.BT.steam_utilities])# in kJ/hr
 
-get_steam_electricity = lambda: 3600. * BT.electricity_demand / BT.turbogenerator_efficiency + 3600. * F.BT_1.electricity_demand / F.BT_1.turbogenerator_efficiency# in kJ/hr
+get_steam_electricity = lambda: 3600. * BT.electricity_demand / BT.turbogenerator_efficiency + 3600. * F.BT.electricity_demand / F.BT.turbogenerator_efficiency# in kJ/hr
 
 get_steam_total = lambda: get_steam_heating() + get_steam_electricity()
 
@@ -259,7 +255,7 @@ get_GWP_steam_total = lambda: get_GWP_NG() + get_GWP_emissions_BT()
 get_GWP_heating_demand = lambda: get_steam_frac_heating() * get_GWP_steam_total()
 
 get_GWP_cooling_demand = lambda: get_steam_frac_cooling() * get_GWP_steam_total() + \
-                                 get_electricity_demand_cooling_frac() * get_GWP_electricity_use_total()
+                                  get_electricity_demand_cooling_frac() * get_GWP_electricity_use_total()
                                  
 get_GWP_electricity_non_cooling = lambda: get_steam_frac_non_cooling() * get_GWP_steam_total() + \
                                           get_electricity_demand_non_cooling_frac() * get_GWP_electricity_use_total()
@@ -277,16 +273,14 @@ get_GWP_jet = lambda: get_GWP_total_with_eletricity_credit()
 
 # get_GWP_gasoline = lambda: get_GWP_total_with_eletricity_credit() * get_gasoline_energy_ratio() / 100
 
-get_SAF_abatement_cost = lambda: (get_jet_price_per_GJ() - kerosene_price_per_GJ) / (89-get_GWP_jet()) * 1000 # in $/tonne CO2
 
+metrics.extend((Metric('GWP - ethanol transportation', get_GWP_ethanol_tranporation, 'g CO2-eq/MJ blend fuel', 'LCA'),))
 
 metrics.extend((Metric('GWP - total', get_GWP_total, 'g CO2-eq/MJ blend fuel', 'LCA'),))
 
 metrics.extend((Metric('GWP - electricity credit', get_GWP_electricity_credit, 'g CO2-eq/MJ blend fuel', 'LCA'),))
 
 metrics.extend((Metric('GWP - total-electricity credit', get_GWP_total_with_eletricity_credit, 'g CO2-eq/MJ blend fuel', 'LCA'),))
-
-metrics.extend((Metric('GWP - feedstock', get_GWP_feedstock_input, 'g CO2-eq/MJ blend fuel', 'LCA'),))
 
 metrics.extend((Metric('GWP - NG', get_GWP_NG, 'g CO2-eq/MJ blend fuel', 'LCA'),))
 
@@ -296,7 +290,7 @@ metrics.extend((Metric('GWP - electricity', get_GWP_electricity_use_total, 'g CO
 
 metrics.extend((Metric('GWP - non biogenic emissions', get_GWP_emissions_BT, 'g CO2-eq/MJ blend fuel', 'LCA'),))
 
-metrics.extend((Metric('GWP - other non biogenic emissions', get_GWP_emissions_non_BT, 'g CO2-eq/MJ blend fuel', 'LCA'),))
+# metrics.extend((Metric('GWP - other non biogenic emissions', 0, 'g CO2-eq/MJ blend fuel', 'LCA'),))
 
 metrics.extend((Metric('GWP - heating_demand', get_GWP_heating_demand, 'g CO2-eq/MJ blend fuel', 'LCA'),))
 
@@ -308,37 +302,33 @@ metrics.extend((Metric('GWP - jet', get_GWP_jet, 'g CO2-eq/MJ jet fuel', 'LCA'),
 
 metrics.extend((Metric('GWP - displacement', get_GWP_displacement, 'g CO2-eq/MJ', 'LCA'),))
 
-
-
 #%%
 
 def create_model(system=sys,
                  metrics=metrics,
-                 N=1,
+                 N=1000,
                  rule='L',
-                 notify_runs=1,):
+                 notify_runs=10,):
     model = Model(sys,metrics)
     param = model.parameter
     
     # ============================================================================
     # TEA parameters
-    # =============================================================================
-    ###### Ethanol distribution ######
-    # S304 = F.S304
-    # D = shape.Uniform(0.6,1.0)
-    # @param(name='Ethanol split for SAF', element=S304, kind='coupled', units='%',
-    #         baseline=1.0, distribution=D)
-    # def set_ethanol_split(split):
-    #     S304.split = split
-    
-    
-    
+    # ============================================================================  
     ##### Financial parameters #####
-    D = shape.Triangle(1000000/24/0.8, 2000000/24/0.8, 3000000/24/0.8)
-    @param(name='Feedstock flow', element='feedstock', kind='coupled', units='kg/hr',
-           baseline=2000000/24/0.8, distribution=D)
-    def set_feedstock_flow(flow):
-        feedstock.F_mass = flow
+    D = shape.Uniform(10000,30000)
+    @param(name='Ethanol flow', element='ethanol', kind='coupled', units='kg/hr',
+           baseline=23254, distribution=D)
+    def set_ethanol_flow(flow):
+        ethanol.F_mass = flow
+        
+        
+    
+    D = shape.Uniform(ethanol.price-0.004,ethanol.price+0.004)
+    @param(name='Ethanol price', element='ethanol', kind='isolated', units='$/kg',
+           baseline=ethanol.price, distribution=D)
+    def set_ethanol_price(price):
+        ethanol.price = price
         
         
         
@@ -379,15 +369,7 @@ def create_model(system=sys,
             baseline=natural_gas_price, distribution=D)
     def set_natural_gas_price(price): 
         F.natural_gas.price = price
-
-
-
-    moisture = feedstock.imass['Water'] / feedstock.F_mass
-    D = shape.Triangle(75, 87.5, 100)
-    @param(name='Feedstock unit price', element='Feedstock', kind='isolated', units='$/dry-ton',
-            baseline=87.5, distribution=D)
-    def set_feedstock_price(price):
-        feedstock.price = price * (1-moisture) / 1000 # in $/kg
+        F.natural_gas_for_h2.price = price
 
 
 
@@ -400,39 +382,12 @@ def create_model(system=sys,
 
 
 
-    enzymeM301_price = F.cellulase.price
-    D = shape.Triangle(enzymeM301_price*0.8, enzymeM301_price, enzymeM301_price*1.2)
-    @param(name='Enzyme_price', element='Enzyme', kind='isolated', units='$/kg',
-            baseline=enzymeM301_price, distribution=D)
-    def set_enzymeM301_price(price):
-        F.cellulase.price = price
-
-
-
-    CSL_price = price['CSL']
-    D = shape.Triangle(CSL_price*0.8, CSL_price, CSL_price*1.2)
-    @param(name='CSL price', element='CSL', kind='isolated', units='$/kg',
-            baseline=CSL_price, distribution=D)
-    def set_CSL_price(price):
-        F.CSL.price = price
-
-
-
-    DAP_price = price['DAP']
-    D = shape.Triangle(DAP_price*0.8, DAP_price, DAP_price*1.2)
-    @param(name='DAP price', element='DAP', kind='isolated', units='$/kg',
-            baseline=DAP_price, distribution=D)
-    def set_DAP_price(price):
-        F.DAP.price = price
-
-
-
     Syndol_catalyst_price = price['Syndol catalyst']
     D = shape.Triangle(Syndol_catalyst_price*0.7, Syndol_catalyst_price, Syndol_catalyst_price*1.3)
     @param(name='Syndol catalyst price', element='Syndol catalyst', kind='isolated', units='$/kg',
             baseline=Syndol_catalyst_price, distribution=D)
     def set_Syndol_catalyst_price(price):
-        F.R401_1.catalyst_price = price
+        F.R401.catalyst_price = price
 
 
 
@@ -441,7 +396,7 @@ def create_model(system=sys,
     @param(name='Oligomerization1 catalyst price', element='Oligomerization1 catalyst', kind='isolated', units='$/kg',
             baseline=Oligomerization1_catalyst_price, distribution=D)
     def set_oligomerization1_catalyst_price(price):
-        F.R402_1.catalyst_price = price
+        F.R402.catalyst_price = price
 
 
 
@@ -450,7 +405,7 @@ def create_model(system=sys,
     @param(name='Oligomerization2 catalyst price', element='Oligomerization2 catalyst', kind='isolated', units='$/kg',
             baseline=Oligomerization2_catalyst_price, distribution=D)
     def set_oligomerization2_catalyst_price(price):
-        F.R403_1.catalyst_price = price
+        F.R403.catalyst_price = price
 
 
 
@@ -459,7 +414,7 @@ def create_model(system=sys,
     @param(name='Hydrogenation catalyst price', element='Hydrogenation catalyst', kind='isolated', units='$/kg',
             baseline=Hydrogenation_catalyst_price, distribution=D)
     def set_hydrogenation_catalyst_price(price):
-        F.R404_1.catalyst_price = price
+        F.R404.catalyst_price = price
 
 
 
@@ -470,15 +425,6 @@ def create_model(system=sys,
     def set_hydrogen_price(price):
         F.hydrogen.price = price
 
-
-
-    ###### Coproduct price ######
-    # D = shape.Triangle(0.41/0.789*0.8, 0.41/0.789, 0.41/0.789*1.3)
-    # @param(name='Ethanol price', element='ethanol', kind='isolated', units='$/kg',
-    #     baseline=0.41/0.789, distribution=D)
-    # def set_ethanol_price(price):
-    #  F.ethanol_to_sold.price = price
-     
      
      
     diesel_price = price['diesel']
@@ -498,73 +444,12 @@ def create_model(system=sys,
         gasoline.price = price
 
 
-    ###### Pretreatment parameters ######
-    M203 = F.M203
-    D = shape.Triangle(0.25, 0.30, 0.4)
-    @param(name='Pretreatment solids loading', element=M203, kind='coupled', units='%',
-            baseline=0.30, distribution=D)
-    def set_pretreatment_solids_loading(loading):
-        M203.solids_loading = loading
-
-
-
-    R201 = F.R201
-    D = shape.Triangle(0.06, 0.099, 0.12)
-    @param(name='Pretreatment glucan-to-glucose', element=R201, kind='coupled', units='%',
-            baseline=0.099, distribution=D)
-    def set_R201_glucan_conversion(X): 
-        R201.reactions[0].X = X    
-
-
-
-    ###### Fermentation parameters ######
-    M301 = F.M301
-    R303 = F.R303
-
-    D = shape.Triangle(0.175, 0.2, 0.25)
-    @param(name='Enzymatic hydrolysis solids loading', element=M301, kind='coupled', units='%',
-            baseline=0.2, distribution=D)
-    def set_M301_solids_loading(loading):
-        M301.solids_loading = loading
-
-
-
-    D = shape.Triangle(0.01, 0.02, 0.03)
-    @param(name='Enzyme loading', element=M301, kind='coupled', units='g/g',
-            baseline=0.02, distribution=D)
-    def set_M301_enzyme_loading(loading):
-        M301.enzyme_loading = loading
-
-
-
-    D = shape.Triangle(0.75, 0.9, 0.948-1e-6)
-    @param(name='Enzymatic hydrolysis glucan-to-glucose', element=R303, kind='coupled', units='%',
-            baseline=0.9, distribution=D)
-    def set_R303_glucan_to_glucose_conversion(X):
-        R303.saccharification[2].X = X
-           
-
-
-    D = shape.Triangle(0.9, 0.95, 0.97)
-    @param(name='Fermentation glucose-to-ethanol', element=R303, kind='coupled', units='%',
-            baseline=0.95, distribution=D)
-    def set_R301_glucose_to_ethanol_conversion(X):
-        R303.cofermentation[0].X = X
-
-
 
     ##### Upgrading parameters #####
-    R401 = F.R401_1
-    R402 = F.R402_1
-    R403 = F.R403_1
-    R404 = F.R404_1
-    # D = shape.Triangle(200+273.15, 350+273.15, 360+273.15)
-    # @param(name='Dehydration temperature', element=R401, kind='coupled', units='K',
-    #        baseline=350+273.15, distribution=D)
-    # def set_R401_temperature(T):
-    #     R401.T = T
-
-
+    R401 = F.R401
+    R402 = F.R402
+    R403 = F.R403
+    R404 = F.R404
 
     D = shape.Triangle(0.99, 0.995, 0.999)
     @param(name='Dehydration ethanol conversion', element=R401, kind='coupled', units='%',
@@ -674,75 +559,47 @@ def create_model(system=sys,
             baseline=0.8, distribution=D)
     def set_boiler_efficiency(efficiency):
         F.BT.boiler_efficiency = efficiency
-    
-    
-    
-    D = shape.Uniform(0.8*(1-0.1), 0.8*(1+0.1))
-    @param(name='Boiler efficiency', element=F.BT_1, kind='coupled', units='',
-            baseline=0.8, distribution=D)
-    def set_boiler_efficiency(efficiency):
-        F.BT_1.boiler_efficiency = efficiency
 
 
 
     # =============================================================================
     # LCA parameters
     # =============================================================================
-    D = shape.Uniform(-0.18363*0.8, -0.10874*0.8)
-    @param(name='Feedstock GWP', element='Feedstock', kind='isolated', units='kg CO2-eq/kg',
-           baseline=-0.14315*0.8, distribution=D)
-    def set_feedstock_GWP(X):
-        feedstock.characterization_factors['GWP100'] = X
-
-
-
-    D = shape.Uniform(2.24*(1-0.5), 2.24*(1+0.5))
-    @param(name='Enzyme GWP', element='Enzyme', kind='isolated', units='kg CO2-eq/kg',
-           baseline=2.24, distribution=D)
-    def set_enzyme_GWP(X):
-        F.cellulase.characterization_factors['GWP100'] = X
-
-
-
-    D = shape.Uniform(1.55*(1-0.5), 1.55*(1+0.5))
-    @param(name='CSL GWP', element='CSL', kind='isolated', units='kg CO2-eq/kg',
-           baseline=1.55, distribution=D)
-    def set_CSL_GWP(X):
-        F.CSL.characterization_factors['GWP100'] = X
-
-
-
-    D = shape.Uniform(1.6445*(1-0.5), 1.6445*(1+0.5))
-    @param(name='DAP GWP', element='DAP', kind='isolated', units='kg CO2-eq/kg',
-           baseline=1.6445, distribution=D)
-    def set_DAP_GWP(X):
-        F.DAP.characterization_factors['GWP100'] = X
-
-
-
     D = shape.Uniform(2.11*(1-0.5), 2.11*(1+0.5))
     @param(name='NaOH GWP', element='NaOH', kind='isolated', units='kg CO2-eq/kg',
-           baseline=2.11, distribution=D)
+            baseline=2.11, distribution=D)
     def set_NaOH_GWP(X):
         F.NaOH.characterization_factors['GWP100'] = X
-        
-
-
-    D = shape.Uniform(1.5624*(1-0.5), 1.5624*(1+0.5))
-    @param(name='H2 GWP', element='H2', kind='isolated', units='kg CO2-eq/kg',
-           baseline=1.5624, distribution=D)
-    def set_H2_GWP(X):
-        F.hydrogen.characterization_factors['GWP100'] = X
 
 
 
     D = shape.Uniform(0.4*(1-0.5), 0.4*(1+0.5))
     @param(name='Natural gas GWP', element='Natural gas', kind='isolated', units='kg CO2-eq/kWh',
-           baseline=0.4, distribution=D)
+            baseline=0.4, distribution=D)
     def set_natural_gas_GWP(X):
         F.natural_gas.characterization_factors['GWP100'] = X
+        F.natural_gas_for_h2.characterization_factors['GWP100'] = X
+
+
+
+    # # =============================================================================
+    # # Ethanol tranportation parameters
+    # # =============================================================================
+    # D = shape.Uniform(0.009*0.8, 0.009*1.2)
+    # @param(name='Ethanol transportation price', element='Ethanol', kind='isolated', units='$/kg',
+    #        baseline=0.009, distribution=D)
+    # def set_ethanol_transportation_price(X):
+    #     tea_SAF.eth_trans_cost = X
+    
+    
+    
+    # D = shape.Uniform(0.0036*0.8, 0.0036*1.2)
+    # @param(name='Ethanol transportation GWP', element='Ethanol', kind='isolated', units='kg CO2e/kg ethanol',
+    #        baseline=0.0036, distribution=D)
+    # def set_ethanol_transportation_GWP(X):
+    #     F.ethanol.characterization_factors['GWP100'] = X
         
-        
+
     
     if N > 0:
         rule=rule

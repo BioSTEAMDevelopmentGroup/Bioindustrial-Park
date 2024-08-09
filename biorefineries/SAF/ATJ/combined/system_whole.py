@@ -191,7 +191,7 @@ def upgrading_sys(ins,outs):
 
 # Complete energycane to SAF system
 @SystemFactory(ID='SAF_sys')
-def SAF_sys(ins,outs):
+def SAF_sys(ins,outs,material_storage,product_storage,WWTC,BoilerTurbo,hydrogenation_distillation,h2_purchase,opportunity_cost):
     #%%
     chem = create_cellulosic_ethanol_chemicals()
     chem.set_synonym('Extract','Extractives')
@@ -372,5 +372,360 @@ def SAF_sys(ins,outs):
     
     HXN_1 = bst.HeatExchangerNetwork('HXN_1',cache_network=True)
     
-#%% System setup and process groups
-sys = SAF_sys()
+    
+    
+    
+    if material_storage == False:
+        @F.DAP_storage.add_specification(run=True)
+        def DAP_storage_no_cost():
+            F.DAP_storage._design = lambda:0
+            F.DAP_storage._cost = lambda:0
+        
+        @F.CSL_storage.add_specification(run=True)
+        def CSL_storage_no_cost():
+            F.CSL_storage._design = lambda:0
+            F.CSL_storage._cost = lambda:0
+    else: 
+        pass
+    
+    if product_storage == False:
+        @F.ethanol_storage.add_specification(run=True)
+        def ethanol_storage_no_cost():
+            F.ethanol_storage._design = lambda:0
+            F.ethanol_storage._cost = lambda:0
+        @F.gasoline_storage.add_specification(run=True)
+        def gasoline_storage_no_cost():
+            F.gasoline_storage._design = lambda:0
+            F.gasoline_storage._cost = lambda:0
+        @F.jet_storage.add_specification(run=True)
+        def jet_storage_no_cost():
+            F.jet_storage._design = lambda:0
+            F.jet_storage._cost = lambda:0
+        @F.diesel_storage.add_specification(run=True)
+        def diesel_storage_no_cost():
+            F.diesel_storage._design = lambda:0
+            F.diesel_storage._cost = lambda:0
+    else:
+        pass
+    
+    
+    
+    if hydrogenation_distillation == False:
+        # R404
+        R404_cost =F.R404._cost
+        R404_design = F.R404._design
+        def R404_no_cost():
+            R404_cost()
+            bpc = F.R404.baseline_purchase_costs
+            pc = F.R404.purchase_costs
+            ic = F.R404.installed_costs
+            for i in bpc.keys(): bpc[i] = 0. 
+            for i in pc.keys(): pc[i] = 0. 
+            for i in ic.keys(): ic[i] = 0. 
+        def R404_no_cost_design():
+            R404_design()
+            bpc = F.R404.baseline_purchase_costs
+            pc = F.R404.purchase_costs
+            ic = F.R404.installed_costs
+            for i in bpc.keys(): bpc[i] = 0. 
+            for i in pc.keys(): pc[i] = 0. 
+            for i in ic.keys(): ic[i] = 0.
+        F.R404._cost = R404_no_cost
+        F.R404._design = R404_no_cost_design 
+        def R404_summary(design_kwargs=None, cost_kwargs=None, lca_kwargs=None):
+            F.R404._check_run()
+            F.R404._design()
+            F.R404._cost()
+            for i in F.R404.auxiliary_units:
+                F.R404.heat_utilities += i.heat_utilities
+                F.R404.power_utility.rate += i.power_utility.rate
+            F.R404._lca()
+            F.R404._load_operation_costs()
+        F.R404._summary = R404_summary
+        
+        # D404
+        D404_cost =F.D404._cost
+        D404_design = F.D404._design
+        def D404_no_cost():
+            D404_cost()
+            bpc = F.D404.baseline_purchase_costs
+            pc = F.D404.purchase_costs
+            ic = F.D404.installed_costs
+            for i in bpc.keys(): bpc[i] = 0. 
+            for i in pc.keys(): pc[i] = 0. 
+            for i in ic.keys(): ic[i] = 0. 
+        def D404_no_cost_design():
+            D404_design()
+            bpc = F.D404.baseline_purchase_costs
+            pc = F.D404.purchase_costs
+            ic = F.D404.installed_costs
+            for i in bpc.keys(): bpc[i] = 0. 
+            for i in pc.keys(): pc[i] = 0. 
+            for i in ic.keys(): ic[i] = 0.
+        F.D404._cost = D404_no_cost
+        F.D404._design = D404_no_cost_design 
+        def D404_summary(design_kwargs=None, cost_kwargs=None, lca_kwargs=None):
+            F.D404._check_run()
+            F.D404._design()
+            F.D404._cost()
+            for i in F.D404.auxiliary_units:
+                F.D404.heat_utilities += i.heat_utilities
+                F.D404.power_utility.rate += i.power_utility.rate
+            F.D404._lca()
+            F.D404._load_operation_costs()
+        F.D404._summary = D404_summary
+        
+        # D405
+        D405_cost =F.D405._cost
+        D405_design = F.D405._design
+        def D405_no_cost():
+            D405_cost()
+            bpc = F.D405.baseline_purchase_costs
+            pc = F.D405.purchase_costs
+            ic = F.D405.installed_costs
+            for i in bpc.keys(): bpc[i] = 0. 
+            for i in pc.keys(): pc[i] = 0. 
+            for i in ic.keys(): ic[i] = 0. 
+        def D405_no_cost_design():
+            D405_design()
+            bpc = F.D405.baseline_purchase_costs
+            pc = F.D405.purchase_costs
+            ic = F.D405.installed_costs
+            for i in bpc.keys(): bpc[i] = 0. 
+            for i in pc.keys(): pc[i] = 0. 
+            for i in ic.keys(): ic[i] = 0.
+        F.D405._cost = D405_no_cost
+        F.D405._design = D405_no_cost_design 
+        def D405_summary(design_kwargs=None, cost_kwargs=None, lca_kwargs=None):
+            F.D405._check_run()
+            F.D405._design()
+            F.D405._cost()
+            for i in F.D405.auxiliary_units:
+                F.D405.heat_utilities += i.heat_utilities
+                F.D405.power_utility.rate += i.power_utility.rate
+            F.D405._lca()
+            F.D405._load_operation_costs()
+        F.D405._summary = D405_summary
+        
+        # H406
+        H406_cost =F.H406._cost
+        H406_design = F.H406._design
+        def H406_no_cost():
+            H406_cost()
+            bpc = F.H406.baseline_purchase_costs
+            pc = F.H406.purchase_costs
+            ic = F.H406.installed_costs
+            for i in bpc.keys(): bpc[i] = 0. 
+            for i in pc.keys(): pc[i] = 0. 
+            for i in ic.keys(): ic[i] = 0. 
+        def H406_no_cost_design():
+            H406_design()
+            bpc = F.H406.baseline_purchase_costs
+            pc = F.H406.purchase_costs
+            ic = F.H406.installed_costs
+            for i in bpc.keys(): bpc[i] = 0. 
+            for i in pc.keys(): pc[i] = 0. 
+            for i in ic.keys(): ic[i] = 0.
+        F.H406._cost = H406_no_cost
+        F.H406._design = H406_no_cost_design 
+        def H406_summary(design_kwargs=None, cost_kwargs=None, lca_kwargs=None):
+            F.H406._check_run()
+            F.H406._design()
+            F.H406._cost()
+            for i in F.H406.auxiliary_units:
+                F.H406.heat_utilities += i.heat_utilities
+                F.H406.power_utility.rate += i.power_utility.rate
+            F.H406._lca()
+            F.H406._load_operation_costs()
+        F.H406._summary = H406_summary
+        
+        # H407
+        H407_cost =F.H407._cost
+        H407_design = F.H407._design
+        def H407_no_cost():
+            H407_cost()
+            bpc = F.H407.baseline_purchase_costs
+            pc = F.H407.purchase_costs
+            ic = F.H407.installed_costs
+            for i in bpc.keys(): bpc[i] = 0. 
+            for i in pc.keys(): pc[i] = 0. 
+            for i in ic.keys(): ic[i] = 0. 
+        def H407_no_cost_design():
+            H407_design()
+            bpc = F.H407.baseline_purchase_costs
+            pc = F.H407.purchase_costs
+            ic = F.H407.installed_costs
+            for i in bpc.keys(): bpc[i] = 0. 
+            for i in pc.keys(): pc[i] = 0. 
+            for i in ic.keys(): ic[i] = 0.
+        F.H407._cost = H407_no_cost
+        F.H407._design = H407_no_cost_design 
+        def H407_summary(design_kwargs=None, cost_kwargs=None, lca_kwargs=None):
+            F.H407._check_run()
+            F.H407._design()
+            F.H407._cost()
+            for i in F.H407.auxiliary_units:
+                F.H407.heat_utilities += i.heat_utilities
+                F.H407.power_utility.rate += i.power_utility.rate
+            F.H407._lca()
+            F.H407._load_operation_costs()
+        F.H407._summary = H407_summary
+        
+        # H408
+        H408_cost =F.H408._cost
+        H408_design = F.H408._design
+        def H408_no_cost():
+            H408_cost()
+            bpc = F.H408.baseline_purchase_costs
+            pc = F.H408.purchase_costs
+            ic = F.H408.installed_costs
+            for i in bpc.keys(): bpc[i] = 0. 
+            for i in pc.keys(): pc[i] = 0. 
+            for i in ic.keys(): ic[i] = 0. 
+        def H408_no_cost_design():
+            H408_design()
+            bpc = F.H408.baseline_purchase_costs
+            pc = F.H408.purchase_costs
+            ic = F.H408.installed_costs
+            for i in bpc.keys(): bpc[i] = 0. 
+            for i in pc.keys(): pc[i] = 0. 
+            for i in ic.keys(): ic[i] = 0.
+        F.H408._cost = H408_no_cost
+        F.H408._design = H408_no_cost_design 
+        def H408_summary(design_kwargs=None, cost_kwargs=None, lca_kwargs=None):
+            F.H408._check_run()
+            F.H408._design()
+            F.H408._cost()
+            for i in F.H408.auxiliary_units:
+                F.H408.heat_utilities += i.heat_utilities
+                F.H408.power_utility.rate += i.power_utility.rate
+            F.H408._lca()
+            F.H408._load_operation_costs()
+        F.H408._summary = H408_summary
+    
+    else:
+        pass
+
+
+    # Operating cost (heat and steam demand shouldn't be accounted since we have considered the opportunity cost)
+    # if hydrogenation_distillation == False:
+    #     @F.R404.add_specification(run=True)
+    #     def R404_no_cost():
+    #         F.R404._design = lambda:0
+    #         F.R404._cost = lambda:0
+    #     @F.D404.add_specification(run=True)
+    #     def D404_no_cost():
+    #         F.D404._design = lambda:0
+    #         F.D404._cost = lambda:0
+    #     @F.D405.add_specification(run=True)
+    #     def D405_no_cost():
+    #         F.D405._design = lambda:0
+    #         F.D405._cost = lambda:0
+    #     @F.H406.add_specification(run=True)
+    #     def H406_no_cost():
+    #         F.H406._design = lambda:0
+    #         F.H406._cost = lambda:0
+    #     @F.H407.add_specification(run=True)
+    #     def H407_no_cost():
+    #         F.H407._design = lambda:0
+    #         F.H407._cost = lambda:0
+    #     @F.H408.add_specification(run=True)
+    #     def H408_no_cost():
+    #         F.H408._design = lambda:0
+    #         F.H408._cost = lambda:0
+    # else:
+    #     pass
+    
+    
+    
+    if WWTC == False:
+        WWTC_cost =F.WWTC._cost
+        WWTC_design = F.WWTC._design
+        def WWTC_no_cost():
+            WWTC_cost()
+            bpc = F.WWTC.baseline_purchase_costs
+            pc = F.WWTC.purchase_costs
+            ic = F.WWTC.installed_costs
+            for i in bpc.keys(): bpc[i] = 0. 
+            for i in pc.keys(): pc[i] = 0. 
+            for i in ic.keys(): ic[i] = 0. 
+        def WWTC_no_cost_design():
+            WWTC_design()
+            bpc = F.WWTC.baseline_purchase_costs
+            pc = F.WWTC.purchase_costs
+            ic = F.WWTC.installed_costs
+            for i in bpc.keys(): bpc[i] = 0. 
+            for i in pc.keys(): pc[i] = 0. 
+            for i in ic.keys(): ic[i] = 0.
+        F.WWTC._cost = WWTC_no_cost
+        F.WWTC._design = WWTC_no_cost_design 
+        def WWTC_summary(design_kwargs=None, cost_kwargs=None, lca_kwargs=None):
+            F.WWTC._check_run()
+            F.WWTC._design()
+            F.WWTC._cost()
+            for i in F.WWTC.auxiliary_units:
+                F.WWTC.heat_utilities += i.heat_utilities
+                F.WWTC.power_utility.rate += i.power_utility.rate
+            F.WWTC._lca()
+            F.WWTC._load_operation_costs()
+        F.WWTC._summary = WWTC_summary
+    else:
+        pass
+    
+    
+    
+    
+    
+    if h2_purchase == False:
+        @F.U405.add_specification(run=True)
+        def ng_flow():
+            F.R404.run()
+            F.U405.ins[0].imol['CH4'] = F.R404.ins[1].imol['H2']/3 # assume CH4+H2O=CO+3H2
+    else:
+        F.U405.ins[0].imol['CH4'] = 0
+            
+    
+    
+    if BoilerTurbo == False:
+        BT_cost = F.BT._cost
+        BT_design = F.BT._design
+        def BT_no_cost():
+            BT_cost()
+            bpc = F.BT.baseline_purchase_costs
+            pc = F.BT.purchase_costs
+            ic = F.BT.installed_costs
+            for i in bpc.keys(): bpc[i] = 0. 
+            for i in pc.keys(): pc[i] = 0. 
+            for i in ic.keys(): ic[i] = 0. 
+        def BT_no_cost_design():
+            BT_design()
+            bpc = F.BT.baseline_purchase_costs
+            pc = F.BT.purchase_costs
+            ic = F.BT.installed_costs
+            for i in bpc.keys(): bpc[i] = 0. 
+            for i in pc.keys(): pc[i] = 0. 
+            for i in ic.keys(): ic[i] = 0.
+        F.BT._design = BT_no_cost_design
+        F.BT._cost = BT_no_cost
+        def BT_summary(design_kwargs=None, cost_kwargs=None, lca_kwargs=None):
+            F.BT._check_run()
+            F.BT._design()
+            F.BT._cost()
+            for i in F.BT.auxiliary_units:
+                F.BT.heat_utilities += i.heat_utilities
+                F.BT.power_utility.rate += i.power_utility.rate
+            F.BT._lca()
+            F.BT._load_operation_costs()
+        F.BT._summary = BT_summary
+    else:
+        pass
+    
+    
+    if opportunity_cost == True:
+        @F.U404.add_specification(run=True)
+        def oc_flow():
+            oc = F.U404.ins[0]
+            oc.reset_flow(Water=1, phase='l', units='kg/hr', total_flow=1.07*F.R404.ins[0].F_vol*845) # 1.07 is volume gain from https://www.eia.gov/energyexplained/oil-and-petroleum-products/refining-crude-oil-inputs-and-outputs.php; assume 845 is density but will offset when calculating toal price
+    else:
+        pass
+    

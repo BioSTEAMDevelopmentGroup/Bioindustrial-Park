@@ -10,6 +10,7 @@ import biosteam as bst
 import thermosteam
 from biorefineries.cellulosic.chemicals import create_cellulosic_ethanol_chemicals
 from biorefineries.cellulosic.systems import create_cellulosic_ethanol_system
+from biorefineries.SAF._tea import create_SAF_tea
 
 
 F = bst.Flowsheet('switchgrass_flor')
@@ -24,7 +25,7 @@ bst.settings.set_thermo(chem, cache= True)
 
 #create streams
 
-swg = bst.Stream('switchgrass',
+feedstock = bst.Stream('switchgrass',
 Arabinan=0.02789023841655421,
 Galactan=0.010436347278452543,
 Glucan=0.2717049032838507,
@@ -39,6 +40,13 @@ units='kg/hr',
 price=0.08)
 
 #create system
-sys_ethanol = create_cellulosic_ethanol_system('sys_switchgrass',ins = swg)
+sys_ethanol = create_cellulosic_ethanol_system('sys_switchgrass',ins = feedstock)
+F.M701.denaturant_fraction = 0. # 0 for SAF
 
 bst.rename_units([i for i in F.unit if i.ID[1] == '6'], 700)
+sys_ethanol.simulate()
+ethanol = sys_ethanol.outs[0]
+
+tea_ethanol = create_SAF_tea(sys=sys_ethanol)
+
+MESP = tea_ethanol.solve_price(F.ethanol)

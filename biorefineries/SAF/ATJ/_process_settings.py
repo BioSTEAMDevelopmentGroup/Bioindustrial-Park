@@ -244,7 +244,6 @@ price = {
     'MEA': MEA_price * 0.3, # 30% MEA
     'compressed CO2': compressed_CO2_price,
     'oc': 0.4/3.78/845*1000,
-    'ethanol': 0.41/0.789, # $0.41/L is from https://www.icao.int/environmental-protection/Pages/SAF_RULESOFTHUMB.aspx
         }
 
 
@@ -284,7 +283,8 @@ GWP_CFs = {
     'second_catalyst':10+1, # production+disposal, assume prodution=10 based on similar chemicalss
     'Como_catalyst':9.52+1, # production+disposal, from Production of Sustainable Aviation Fuels in Petroleum Refineries: Evaluation of New Bio-Refinery Concepts
     'gasoline':-0.8415, # gasoline is a co-product; from GREET
-    'diesel':-0.6535 # diesel is a co-product; from GREET
+    'diesel':-0.6535, # diesel is a co-product; from GREET
+    'ethanol': 0.0036 # ethanol transportation GWP
     }
 
 
