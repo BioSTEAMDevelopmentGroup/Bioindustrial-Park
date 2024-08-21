@@ -81,6 +81,7 @@ def get_spearman_names(parameters):
     }
     
     def with_units(f, name, units=None):
+        name = name.replace('bioreactor ', '').replace('production capacity', 'production')
         d = f.distribution
         dname = type(d).__name__
         if units is None: units = f.units
@@ -250,15 +251,16 @@ def get_optimized_parameters_table():
     return table
 
 def plot_spearman_both(**kwargs):
-    set_font(size=10)
-    set_figure_size(aspect_ratio=0.8)
+    set_font(size=12)
+    set_figure_size(aspect_ratio=1, width=6.6142 * 0.7)
     labels = ['TEA', 'LCA']
     br = ace.Biorefinery(simulate=False, **kwargs)
     rhos = []
     file = spearman_file(br.name)
     df = pd.read_excel(file, header=[0, 1], index_col=[0, 1])
     names = get_spearman_names(br.model.parameters)
-    names = [names[i] for i in df.index]
+    index = [i for i, j in enumerate(df.index) if j in names]
+    names = [names[i] for i in df.index if i in names]
     metric_names = []
     for label in labels:
         if label == 'TEA':
@@ -275,6 +277,7 @@ def plot_spearman_both(**kwargs):
                     values[i.index] = 0
         else:
             raise ValueError(f"invalid label '{label}'")
+        values = values.iloc[index]
         rhos.append(values)
         metric_names.append(metric_name)
     color_wheel = [Color(fg='#0c72b9'), Color(fg='#d34249')]
@@ -282,7 +285,7 @@ def plot_spearman_both(**kwargs):
                                          color_wheel=color_wheel,
                                          name=metric_name,
                                          xlabel="Spearman's rank correlation coefficient",
-                                         cutoff=0.03,
+                                         cutoff=0.035,
                                          **kwargs)
     legend_kwargs = {'loc': 'lower left'}
     plt.legend(
@@ -298,7 +301,7 @@ def plot_spearman_both(**kwargs):
     plt.subplots_adjust(
         hspace=0.05, wspace=0.05,
         top=0.98, bottom=0.15,
-        left=0.35, right=0.95,
+        left=0.45, right=0.9,
     )
     for i in ('svg', 'png'):
         file = os.path.join(images_folder, f'spearman.{i}')
@@ -449,7 +452,7 @@ def get_monte_carlo(name, features, cache={}):
     return mc
     
 def plot_kde():
-    set_font(size=10)
+    set_font(size=12)
     set_figure_size(width='half', aspect_ratio=1.1)
     br = ace.Biorefinery(simulate=False)
     metrics = [br.GWP, br.MSP]
