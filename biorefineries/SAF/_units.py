@@ -789,12 +789,7 @@ class AdiabaticFixedbedDehydrationReactor(Reactor):
         self.vessel_type=vessel_type # 'Horizontal' or 'Vertical'
         
         self.heat_exchanger = hx = HXutility(None, None,None, T=T)
-    
-    # def _setup(self):
         
-        
-    def _run(self):
-        super()._setup()
         self.overall_C2H5OH_conversion=overall_C2H5OH_conversion=0.995
         self.C2H5OH_to_C2H4_selectivity=C2H5OH_to_C2H4_selectivity=0.988
         self.C2H5OH_to_C2H5OC2H5_selectivity=C2H5OH_to_C2H5OC2H5_selectivity=0.00052
@@ -817,6 +812,7 @@ class AdiabaticFixedbedDehydrationReactor(Reactor):
         Rxn('C2H5OH +H2O -> CO2 + CH4 + H2',      'C2H5OH',   C2H5OH_to_CO2_selectivity*overall_C2H5OH_conversion),
             ])
         
+    def _run(self):
         feed, fresh_catalyst = self.ins
         effluent, spent_catalyst = self.outs
         
@@ -1024,22 +1020,21 @@ class Oligomerization1_Reactor(bst.CSTR):
              self.tau_0 = tau_0
              self.adiabatic = adiabatic
              self.load_auxiliaries()
+             
+             self.C2H4_to_C4H8_conversion=C2H4_to_C4H8_conversion=0.988
+             self.C2H4_to_C6H12_conversion=C2H4_to_C6H12_conversion=0.00052
+             self.C2H4_to_C8H16_conversion=C2H4_to_C8H16_conversion=0.002
+             self.C2H4_to_C10H20_conversion=C2H4_to_C10H20_conversion=0.003
+             self.oligomerization_rxns=ParallelRxn([
+             #   Reaction definition               Reactant       Conversion
+             Rxn('2 C2H4 -> C4H8',                 'C2H4',     C2H4_to_C4H8_conversion),
+             Rxn('3 C2H4 -> C6H12',                'C2H4',     C2H4_to_C6H12_conversion),
+             Rxn('4 C2H4 -> C8H16',                'C2H4',     C2H4_to_C8H16_conversion),
+             Rxn('5 C2H4 -> C10H20',               'C2H4',     C2H4_to_C10H20_conversion),
+                 ])
+         
     
-    
-    def _setup(self):
-            super()._setup()  
-            self.C2H4_to_C4H8_conversion=C2H4_to_C4H8_conversion=0.988
-            self.C2H4_to_C6H12_conversion=C2H4_to_C6H12_conversion=0.00052
-            self.C2H4_to_C8H16_conversion=C2H4_to_C8H16_conversion=0.002
-            self.C2H4_to_C10H20_conversion=C2H4_to_C10H20_conversion=0.003
-            self.oligomerization_rxns=ParallelRxn([
-            #   Reaction definition               Reactant       Conversion
-            Rxn('2 C2H4 -> C4H8',                 'C2H4',     C2H4_to_C4H8_conversion),
-            Rxn('3 C2H4 -> C6H12',                'C2H4',     C2H4_to_C6H12_conversion),
-            Rxn('4 C2H4 -> C8H16',                'C2H4',     C2H4_to_C8H16_conversion),
-            Rxn('5 C2H4 -> C10H20',               'C2H4',     C2H4_to_C10H20_conversion),
-                ])
-        
+            
     def _run(self):
         feed,fresh_catalyst=self.ins
         effluent,spent_catalyst=self.outs

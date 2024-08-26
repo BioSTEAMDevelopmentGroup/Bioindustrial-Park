@@ -306,7 +306,7 @@ metrics.extend((Metric('GWP - displacement', get_GWP_displacement, 'g CO2-eq/MJ'
 
 def create_model(system=sys,
                  metrics=metrics,
-                 N=1000,
+                 N=10,
                  rule='L',
                  notify_runs=10,):
     model = Model(sys,metrics)
@@ -316,11 +316,11 @@ def create_model(system=sys,
     # TEA parameters
     # ============================================================================  
     ##### Financial parameters #####
-    D = shape.Uniform(10000,30000)
-    @param(name='Ethanol flow', element='ethanol', kind='coupled', units='kg/hr',
-           baseline=23254, distribution=D)
-    def set_ethanol_flow(flow):
-        ethanol.F_mass = flow
+    # D = shape.Uniform(10000,30000)
+    # @param(name='Ethanol flow', element='ethanol', kind='coupled', units='kg/hr',
+    #        baseline=23254, distribution=D)
+    # def set_ethanol_flow(flow):
+    #     ethanol.F_mass = flow
         
         
     
@@ -451,11 +451,11 @@ def create_model(system=sys,
     R403 = F.R403
     R404 = F.R404
 
-    D = shape.Triangle(0.99, 0.995, 0.999)
-    @param(name='Dehydration ethanol conversion', element=R401, kind='coupled', units='%',
-            baseline=0.995, distribution=D)
+    D = shape.Uniform(0.995*0.988*0.9, 0.995*0.988)
+    @param(name='Dehydration ethanol-to-ethylene', element=R401, kind='coupled', units='%',
+            baseline=0.995*0.988, distribution=D)
     def set_R401_ethanol_conversion(X):
-        R401.overall_C2H5OH_conversion = X
+        R401.dehydration_rxns[0].X = X
 
 
 
@@ -481,7 +481,14 @@ def create_model(system=sys,
         R401.catalyst_lifetime = t
 
 
-
+    D = shape.Uniform(0.988*0.9, 0.988)
+    @param(name='1st oligomerization ethylene-to-C4H8', element=R402, kind='coupled', units='%',
+            baseline=0.988, distribution=D)
+    def set_R402_ethylene_conversion(X):
+        R402.oligomerization_rxns[0].X = X
+        
+        
+        
     D = shape.Uniform(0.5, 5) 
     @param(name='1st oligomerization WHSV', element=R402, kind='coupled', units='h^-1',
             baseline=5, distribution=D)

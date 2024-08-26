@@ -941,11 +941,11 @@ def create_model(system=sys,
 
 
 
-    D = shape.Triangle(0.99, 0.995, 0.999)
-    @param(name='Dehydration ethanol conversion', element=R401, kind='coupled', units='%',
-            baseline=0.995, distribution=D)
+    D = shape.Uniform(0.995*0.988*0.9, 0.995*0.988)
+    @param(name='Dehydration ethanol-to-ethylene', element=R401, kind='coupled', units='%',
+            baseline=0.995*0.988, distribution=D)
     def set_R401_ethanol_conversion(X):
-        R401.overall_C2H5OH_conversion = X
+        R401.dehydration_rxns[0].X = X
 
 
 
@@ -971,7 +971,14 @@ def create_model(system=sys,
         R401.catalyst_lifetime = t
 
 
-
+    D = shape.Uniform(0.988*0.9, 0.988)
+    @param(name='1st oligomerization ethylene-to-C4H8', element=R402, kind='coupled', units='%',
+            baseline=0.988, distribution=D)
+    def set_R402_ethylene_conversion(X):
+        R402.oligomerization_rxns[0].X = X
+        
+        
+        
     D = shape.Uniform(0.5, 5) 
     @param(name='1st oligomerization WHSV', element=R402, kind='coupled', units='h^-1',
             baseline=5, distribution=D)
