@@ -20,8 +20,6 @@ Biodiesel
 
 Fermentation
 ------------
-.. automodule:: biorefineries.cane.systems.fermentation.add_urea_MgSO4_nutrients
-.. automodule:: biorefineries.cane.systems.fermentation.add_urea_nutrient
 .. automodule:: biorefineries.cane.systems.fermentation.create_sucrose_fermentation_system
 
 Juicing
