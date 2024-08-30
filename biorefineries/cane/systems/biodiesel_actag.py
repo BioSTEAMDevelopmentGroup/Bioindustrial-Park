@@ -26,6 +26,7 @@ from .. import streams as s
 
 __all__ = (
     'create_oilcane_to_biodiesel_and_actag_1g',
+    'create_acTAG_separation_system',
 )
 
 @bst.SystemFactory(
