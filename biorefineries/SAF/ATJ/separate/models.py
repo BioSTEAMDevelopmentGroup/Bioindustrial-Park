@@ -46,7 +46,7 @@ sys.set_tolerance(rmol=1e-6, mol=1e-5, maxiter=400)
 tea_SAF = create_SAF_coprocessing_tea(sys=sys,steam_distribution=0.0, water_supply_cooling_pumping=0.0, 
                                       water_distribution=0.0, electric_substation_and_distribution=0.0,
                                       gas_supply_and_distribution=0.009, comminication=0.0, safety_installation=0.013,
-                                      building=0.07, yard_works=0.0, contingency_new=0.1, land=0.0, labor_cost=3763935,
+                                      building=0.07, yard_works=0.0, contingency_new=0.1, land=0.0, labor_cost=4119660,
                                       sanitary_waste_disposal=0.0)
 sys.operating_hours = tea_SAF.operating_days * 24
 
@@ -451,7 +451,7 @@ def create_model(system=sys,
     R403 = F.R403
     R404 = F.R404
 
-    D = shape.Uniform(0.995*0.988*0.9, 0.995*0.988)
+    D = shape.Uniform(0.94, 0.995*0.988) # from Dehydration of Ethanol to Ethylene
     @param(name='Dehydration ethanol-to-ethylene', element=R401, kind='coupled', units='%',
             baseline=0.995*0.988, distribution=D)
     def set_R401_ethanol_conversion(X):

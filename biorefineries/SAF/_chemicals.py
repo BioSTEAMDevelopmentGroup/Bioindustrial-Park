@@ -69,7 +69,7 @@ N2 = chemical_database('N2', phase='g', Hf=0)
 H2 = chemical_database('H2', Hf=0)
 CH4 = chemical_database('Methane')
 CO = chemical_database('CarbonMonoxide', Hf=-26400*_cal2joule)
-CO2 = chemical_database('CO2', phase='g')
+CO2 = chemical_database('CO2')
 NH3 = chemical_database('NH3', Hf=-10963*_cal2joule)
 NO = chemical_database('NitricOxide')
 NO2 = chemical_database('NO2')
@@ -83,7 +83,8 @@ C2H6 = chemical_database('Ethane')
 C2H5OC2H5 = chemical_database('Diethyl ether')
 CH3CHO = chemical_database('Acetaldehyde')
 
-CO2.Cn.method = 'JANAF'
+# H2.Cn.method = 'LASTOVKA_SHAW'
+
 
 # =============================================================================
 # Soluble inorganics
@@ -348,11 +349,11 @@ def get_grouped_chemicals(stream, units='kmol/hr'):
     data = {group: new_stream.get_flow(units, IDs).sum() for group, IDs in chemical_groups.items()}
     return pd.Series(data)
 
-phase_change_chemicals = ['Methanol', 'Ethanol', 'H2O',
+phase_change_chemicals = ['Methanol', 'Ethanol', 'H2O', 'CO', 'CO2', 'CH4', 'H2',
                           'Furfural', 'LacticAcid', 'HMF', 'Ethylene', 
-                          'Ethane', 'H2','CarbonMonoxide', 'Propylene', 'Butene',
+                          'Ethane', 'CarbonMonoxide', 'Propylene', 'Butene',
                           'Butadiene', 'Acetaldehyde', 'Diethyl ether',
-                          'CH4','C5H10','C6H12','C6H14','C7H14','C7H16',
+                          'C5H10','C6H12','C6H14','C7H14','C7H16',
                           'C8H16','C8H18','C9H18','C9H20','C10H20','C10H22',
                           'C11H22','C11H24','C12H24','C12H26','C13H26','C13H28',
                           'C14H28','C14H30','C15H30','C15H32','C16H32','C16H34',

@@ -670,7 +670,7 @@ def create_model(system=sys,
                  N=2000,
                  rule='L',
                  notify_runs=10,):
-    model = Model(sys,metrics)
+    model = Model(sys,metrics,exception_hook='warn')
     param = model.parameter
     
     # ============================================================================
@@ -941,7 +941,7 @@ def create_model(system=sys,
 
 
 
-    D = shape.Uniform(0.995*0.988*0.9, 0.995*0.988)
+    D = shape.Uniform(0.94, 0.995*0.988) # from Dehydration of Ethanol to Ethylene
     @param(name='Dehydration ethanol-to-ethylene', element=R401, kind='coupled', units='%',
             baseline=0.995*0.988, distribution=D)
     def set_R401_ethanol_conversion(X):

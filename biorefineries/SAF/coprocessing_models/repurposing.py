@@ -87,7 +87,7 @@ sys.set_tolerance(rmol=1e-6, mol=1e-5, maxiter=400)
 tea_SAF = create_SAF_coprocessing_tea(sys=sys,steam_distribution=0.0, water_supply_cooling_pumping=0.0, 
                                       water_distribution=0.0, electric_substation_and_distribution=0.0,
                                       gas_supply_and_distribution=0.009, comminication=0.0, safety_installation=0.013,
-                                      building=0.07, yard_works=0.0, contingency_new=0.1, land=0.0, labor_cost=3763935,
+                                      building=0.07, yard_works=0.0, contingency_new=0.1, land=0.0, labor_cost=4119660,
                                       sanitary_waste_disposal=0.0)
 
 sys.operating_hours = tea_SAF.operating_days * 24
@@ -672,7 +672,7 @@ def create_model(system=sys,
                  N=2000,
                  rule='L',
                  notify_runs=10,):
-    model = Model(sys,metrics)
+    model = Model(sys,metrics,exception_hook='warn')
     param = model.parameter
     
     # ============================================================================
@@ -943,7 +943,7 @@ def create_model(system=sys,
 
 
 
-    D = shape.Uniform(0.995*0.988*0.9, 0.995*0.988)
+    D = shape.Uniform(0.94, 0.995*0.988) # from Dehydration of Ethanol to Ethylene
     @param(name='Dehydration ethanol-to-ethylene', element=R401, kind='coupled', units='%',
             baseline=0.995*0.988, distribution=D)
     def set_R401_ethanol_conversion(X):
@@ -1187,24 +1187,24 @@ def create_model(system=sys,
 # #%%
 
 # Co-processing ratio vs MFSP
-y_data = S304_split = np.arange(start=0.95,stop=1.1, step=0.01)
-x_data = feedflow = np.arange(start=100000,stop=140001, step=100)
-w_data = []
-def MFSP_CR_at_x_and_y_1(x,y):  
-    F.S304.split = y
-    F.feedstock.F_mass = x
-    sys.simulate()
-    MFSP = get_MPSP_per_gallon() # in per gallon
-    CR = get_coprocessing_ratio()
-    return(MFSP,CR)
+# y_data = S304_split = np.arange(start=0.95,stop=1.1, step=0.01)
+# x_data = feedflow = np.arange(start=100000,stop=140001, step=100)
+# w_data = []
+# def MFSP_CR_at_x_and_y_1(x,y):  
+#     F.S304.split = y
+#     F.feedstock.F_mass = x
+#     sys.simulate()
+#     MFSP = get_MPSP_per_gallon() # in per gallon
+#     CR = get_coprocessing_ratio()
+#     return(MFSP,CR)
 
-for j in y_data:
-    w_data.append([])
-    for i in x_data:
-        try:
-            print(j, i, MFSP_CR_at_x_and_y_1(i,j))
-            w_data[-1].append(MFSP_CR_at_x_and_y_1(i,j))        
-        except:
-            print('Needs_interpolation')
-            w_data[-1].append(0)
+# for j in y_data:
+#     w_data.append([])
+#     for i in x_data:
+#         try:
+#             print(j, i, MFSP_CR_at_x_and_y_1(i,j))
+#             w_data[-1].append(MFSP_CR_at_x_and_y_1(i,j))        
+#         except:
+#             print('Needs_interpolation')
+#             w_data[-1].append(0)
 

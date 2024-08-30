@@ -56,13 +56,10 @@ __all__ = ('SAF_sys')
     )
           
 def upgrading_sys(ins,outs):
-    NaOH,Syndol_catalyst,first_catalyst,second_catalyst,ethanol,hydrogen,Como_catalyst,natural_gas_for_h2,oc = ins
+    NaOH,Syndol_catalyst,first_catalyst,second_catalyst,ethanol_to_upgrading,hydrogen,Como_catalyst,natural_gas_for_h2,oc = ins
     F401_to_WWT,D401_heavy_impurities,D402_top_product,CH4_C2H6,gasoline,jet_fuel,diesel,spent_catalyst_R401,spent_catalyst_R402,spent_catalyst_R403,spent_catalyst_R404 = outs
     
-    ethanol_storage = bst.StorageTank('ethanol_storage', ins=ethanol, outs='', tau=7*24)
-    
-    P401 = bst.Pump('P401',ins=ethanol_storage-0,P=4.5*101325)
-    
+    P401 = bst.Pump('P401',ins=ethanol_to_upgrading,P=4.5*101325)
     M400 = bst.Mixer('M400', (P401-0,''))
     H400 = bst.HXutility('H400',ins=M400-0,V=1,rigorous=True)
 
@@ -72,7 +69,7 @@ def upgrading_sys(ins,outs):
     V401 = bst.IsenthalpicValve('V401', ins=R401-0,P=101325)
 
     # Simulate as a quench tower
-    H402 = bst.HXutility('H402', ins=V401-0,T=40+273.15,outs='crude_ethylene',rigorous=True)
+    H402 = bst.HXutility('H402', ins=V401-0,T=20+273.15,outs='crude_ethylene',rigorous=True)
     S401 = bst.PhaseSplitter('S401', ins=H402-0,outs=('vapor','liquid'))
 
     # Recover ethylene from water in S401-1 and S402-1
@@ -80,7 +77,7 @@ def upgrading_sys(ins,outs):
     
     # Split flash setting based on eq.plot_vle_binary_phase_envelope(['Ethylene', 'Water'], P=101325) NO VACCUM (T cannot meet)
     F401 = bst.SplitFlash('F401', ins=M401-0, outs=('recovered_ethylene',F401_to_WWT), 
-                          T=230, P=101325, split=dict(Ethylene=0.999,
+                          T=250, P=101325, split=dict(Ethylene=0.999,
                                                       Water=0.0001))
     # Only consider ethylene and water in recovered_ethylene, ignore impurities to simplify
     M402 = bst.Mixer('M402',ins=(S401-0,F401-0),outs='')
@@ -88,9 +85,9 @@ def upgrading_sys(ins,outs):
     # Reduce temperature to 15 C
     # H403 = bst.HXutility('H403', ins=M402-0,outs='',T=15+273.15)
 
-    # Pressurize to 22 bar before purification;
+    # Pressurize to 27 bar before purification;
     # Based on Bioethylene Production from Ethanol: A Review and Techno-economical Evaluation
-    C401 = bst.MultistageCompressor('C401', ins=M402-0,n_stages=3,pr=2.8,vle=True)
+    C401 = bst.MultistageCompressor('C401', ins=M402-0,n_stages=3,pr=3,vle=True)
 
     # Condense water
     S402 = bst.PhaseSplitter('S402', ins=C401-0,outs=('vapor','liquid'))
@@ -100,7 +97,7 @@ def upgrading_sys(ins,outs):
     S402-1-1-M401
 
     # Remove CO2
-    U402 = _units.CausticTower('U402', ins=(S402-0, NaOH),P=22*101325)
+    U402 = _units.CausticTower('U402', ins=(S402-0, NaOH),P=27*101325)
 
     # Remove water and ethanol
     U403 = bst.MolecularSieve('U403', ins=U402-0,outs=('water_and_ethanol','dried_ethylene'),
@@ -111,7 +108,7 @@ def upgrading_sys(ins,outs):
    
     # Reduce temperature before cryogenic distillation low temperature + high pressure
     # Temperature is based on Bioethylene Production from Ethanol: A Review and Techno-economical Evaluation
-    H404 = bst.HXutility('H404',ins=U403-1,T=-25+273.15)
+    H404 = bst.HXutility('H404',ins=U403-1,T=-22+273.15)
 
     # Ethylene column by cryogenic distillation, remove heavy keys (Propylene,
     # Butadiene, Ethane, Diethyl ether, and Acetaldehyde) 
@@ -169,7 +166,7 @@ def upgrading_sys(ins,outs):
                                   k=2,
                                   is_divided=False)
 
-    D405= bst.BinaryDistillation('D405', ins=D404-1,outs=('C9_C16_distillate','more_than_C16_bottoms'),
+    D405 = bst.BinaryDistillation('D405', ins=D404-1,outs=('C9_C16_distillate','more_than_C16_bottoms'),
                                   LHK=('C16H34','C18H38'),
                                   Lr=0.999,
                                   Hr=0.999,
@@ -371,10 +368,10 @@ def SAF_sys(ins,outs,product_storage,WWTC,BoilerTurbo,hydrogenation_distillation
 
     
     if product_storage == False:
-        @F.ethanol_storage.add_specification(run=True)
-        def ethanol_storage_no_cost():
-            F.ethanol_storage._design = lambda:0
-            F.ethanol_storage._cost = lambda:0
+        # @F.ethanol_storage.add_specification(run=True)
+        # def ethanol_storage_no_cost():
+        #     F.ethanol_storage._design = lambda:0
+        #     F.ethanol_storage._cost = lambda:0
         @F.gasoline_storage.add_specification(run=True)
         def gasoline_storage_no_cost():
             F.gasoline_storage._design = lambda:0
