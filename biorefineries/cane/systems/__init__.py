@@ -36,7 +36,7 @@ Bagasse
 
 Lipid extraction
 ----------------
-.. autofunction:: biorefineries.cane.systems.lipid_extraction.create_lipid_exctraction_system
+.. autofunction:: biorefineries.cane.systems.lipid_extraction.create_lipid_extraction_system
 .. autofunction:: biorefineries.cane.systems.lipid_extraction.create_post_fermentation_oil_separation_system
 
 Pretreatment
