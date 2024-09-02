@@ -34,14 +34,13 @@ Naming conventions:
 # %% Setup
 
 from biorefineries.sugarcane import (
-    create_juicing_system_with_fiber_screener
+    create_juicing_system_up_to_clarification
 )
 import biosteam as bst
 import thermosteam as tmo
 import flexsolve as flx
 import numpy as np
 from biosteam import main_flowsheet as F
-from biosteam.process_tools import BoundedNumericalSpecification
 from biosteam import System
 from thermosteam import Stream
 from biorefineries.HP import units, facilities
@@ -64,7 +63,6 @@ from biosteam import SystemFactory
 Rxn = tmo.reaction.Reaction
 ParallelRxn = tmo.reaction.ParallelReaction
 
-bst.speed_up()
 flowsheet = bst.Flowsheet('HP')
 bst.main_flowsheet.set_flowsheet(flowsheet)
 
@@ -118,8 +116,8 @@ def create_HP_sys(ins, outs):
     fermentation_lime = Stream('fermentation_lime', units='kg/hr')
     
     
-    juicing_sys = create_juicing_system_with_fiber_screener(pellet_bagasse=True)
-    juice, bagasse, fiber_fines = juicing_sys.outs
+    juicing_sys = create_juicing_system_up_to_clarification()
+    juice, bagasse = juicing_sys.outs
     feedstock = juicing_sys.ins[0]
     feedstock.ID = 'feedstock'
     

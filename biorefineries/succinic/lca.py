@@ -159,7 +159,7 @@ class LCA:
         return chemical_GWP
     
     @property
-    def material_GWP(self): # does not include BT natural gas as it is an invisible BT stream BT.natural_gas with price BT.natural_gas_price
+    def material_GWP(self): 
         chemical_GWP = self.material_GWP_array
         return sum(chemical_GWP)/self.main_product_kg_per_h
 
@@ -167,7 +167,7 @@ class LCA:
     def material_GWP_breakdown(self):
         # self.LCA_stream.mass = sum(i.mass for i in self.LCA_streams)
         self.LCA_stream.mix_from(self.LCA_streams)
-        chemical_GWP_dict_full = {'H2SO4':0}
+        chemical_GWP_dict_full = {'H2SO4':0, 'CH4':0, 'CO2':0}
         chemical_GWP_dict = {ID: self.LCA_stream.imass[ID] * self.GWP_CF_stream.imass[ID] / self.main_product_kg_per_h \
                              for ID in self.chem_IDs if not self.LCA_stream.imass[ID] * self.GWP_CF_stream.imass[ID] == 0.}
         chemical_GWP_dict_full.update(chemical_GWP_dict)
@@ -184,9 +184,9 @@ class LCA:
     @property
     def material_GWP_breakdown_as_fraction_of_tot_GWP(self):
         chemical_GWP_dict = self.material_GWP_breakdown
-        tot_material_GWP = self.GWP
+        tot_GWP = self.GWP
         for k,v in chemical_GWP_dict.items():
-            chemical_GWP_dict[k] /= tot_material_GWP
+            chemical_GWP_dict[k] /= tot_GWP
         return chemical_GWP_dict
     
     
@@ -352,7 +352,8 @@ class LCA:
   
     @property
     def GWP(self): 
-        return  self.FGHTP_GWP + self.material_GWP + self.ng_GWP +\
+        # return  self.FGHTP_GWP + self.material_GWP + self.ng_GWP +\ # BT natural gas stream is now visible, hence included in material_GWP
+        return  self.FGHTP_GWP + self.material_GWP +\
                        self.net_electricity_GWP + self.direct_emissions_GWP 
     
     @property
@@ -392,7 +393,7 @@ class LCA:
         # self.LCA_stream.mass = sum(i.mass for i in self.LCA_streams)
         self.LCA_stream.mix_from(self.LCA_streams)
         FEC_CF_stream = self.FEC_CF_stream
-        chemical_FEC_dict_full = {'H2SO4':0}
+        chemical_FEC_dict_full = {'H2SO4':0, 'CH4':0, 'CO2':0}
         chemical_FEC_dict = {ID: self.LCA_stream.imass[ID] * FEC_CF_stream.imass[ID] / self.main_product_kg_per_h \
                               for ID in self.chem_IDs if not self.LCA_stream.imass[ID] * FEC_CF_stream.imass[ID] == 0.}
         chemical_FEC_dict_full.update(chemical_FEC_dict)
@@ -454,7 +455,8 @@ class LCA:
     # Total FEC
     @property
     def FEC(self): 
-        return self.material_FEC + self.net_electricity_FEC + self.feedstock_FEC + self.ng_FEC 
+        # return self.material_FEC + self.net_electricity_FEC + self.feedstock_FEC + self.ng_FEC # BT natural gas stream is now visible, hence included in material_GWP
+        return self.material_FEC + self.net_electricity_FEC + self.feedstock_FEC
     
     @property
     def FEC_alternative(self): 

@@ -25,6 +25,8 @@ All units are explicitly defined here for transparency and easy reference
 import thermosteam as tmo
 import biorefineries.sugarcane as sc
 from thermosteam import functional as fn
+from biorefineries.sugarcane import chemicals as sugarcane_chems
+from biorefineries.cornstover import chemicals as cornstover_chems
 
 __all__ = ('HP_chemicals', 'chemical_groups', 'soluble_organics', 'combustibles')
 
@@ -102,8 +104,8 @@ NaOH = chemical_database('NaOH', phase='l')
 AmmoniumHydroxide = chemical_database('AmmoniumHydroxide', phase='l', Hf=-336.719e3)
 CalciumDihydroxide = chemical_database('CalciumDihydroxide',
                                         phase='s', Hf=-235522*_cal2joule)
-AmmoniumSulfate = chemical_database('AmmoniumSulfate', phase='l',
-                                    Hf=-288994*_cal2joule)
+# AmmoniumSulfate = chemical_database('AmmoniumSulfate', phase='l',
+#                                     Hf=-288994*_cal2joule)
 NaNO3 = chemical_database('NaNO3', phase='l', Hf=-118756*_cal2joule)
 # NIST https://webbook.nist.gov/cgi/cbook.cgi?ID=C7757826&Mask=2, accessed 04/07/2020
 Na2SO4 = chemical_database('Na2SO4', phase='l', Hf=-1356.38e3)
@@ -111,14 +113,16 @@ CaSO4 = chemical_database('CaSO4', phase='s', Hf=-342531*_cal2joule)
 # The default Perry 151 model has a crazy value, use another model instead
 CaSO4.Cn.move_up_model_priority('Lastovka solid', 0)
 
+MagnesiumChloride = chemical_database('MagnesiumChloride', phase='s')
+ZincSulfate = chemical_database('ZincSulfate', phase='s')
 
 # =============================================================================
 # Soluble organic salts
 # =============================================================================
 
 Ethanol = chemical_database('Ethanol')
-AmmoniumAcetate = chemical_database('AmmoniumAcetate', phase='l', 
-                                         Hf=-154701*_cal2joule)
+# AmmoniumAcetate = chemical_database('AmmoniumAcetate', phase='l', 
+#                                          Hf=-154701*_cal2joule)
 
 # Calcium 3-hydroxypropionate modeled as Calcium lactate
 # Hf from a Ph.D. dissertation (Lactic Acid Production from Agribusiness Waste Starch
@@ -145,13 +149,13 @@ CalciumSuccinate = chemical_database('CalciumSuccinate', phase='l')
 
 AceticAcid = chemical_database('AceticAcid')
 
-Acetate = chemical_database('Acetate', phase='l', Hf=-108992*_cal2joule)
-
 AcrylicAcid = chemical_database('AcrylicAcid')
 Glucose = chemical_database('Glucose', phase = 'l')
 
 
 Decanol = chemical_database('Decanol')
+Dodecanol = chemical_database('Dodecanol')
+
 TOA = chemical_database('TOA', search_ID='tri-n-octylamine') 
 AQ336 = chemical_database('AQ336', search_ID='63393-96-4') # aliquat 336
 
@@ -162,9 +166,9 @@ AQ336.Hfus = TOA.Hfus
 
 Octanol = chemical_database('Octanol')
 Hexanol = chemical_database('Hexanol')
-MethylButanol = chemical_database('3-methyl-1-butanol')
+# MethylButanol = chemical_database('3-methyl-1-butanol')
 Octanediol = chemical_database('Octanediol', search_ID='1,8-Octanediol')
-Butyl_acetate = chemical_database('Butyl acetate')
+# Butyl_acetate = chemical_database('Butyl acetate')
 Toluene = chemical_database('Toluene')
 # AQ336 = chemical_database('N-Methyl-N,N,N-trioctylammonium chloride') 
 IBA = chemical_database('Isobutyraldehyde')
@@ -262,7 +266,7 @@ MethylHP = chemical_database('MethylHP', search_ID='6149-41-3')
 MethylLactate = tmo.Chemical('MethylLactate')
 MethylHP.copy_models_from(MethylLactate, ('Psat', 'Hvap', 'V'))
 # HP.Tb = 25
-SuccinicAcid = chemical_database('SuccinicAcid', phase_ref='s')
+SuccinicAcid = chemical_database('SuccinicAcid', phase_ref='l')
 
 MethylAcetate = chemical_database('MethylAcetate')
 # Hf from DIPPR value in Table 3 of Vatani et al., Int J Mol Sci 2007, 8 (5), 407–432
@@ -289,9 +293,9 @@ Xylan = chemical_defined('Xylan', phase='s', formula='C5H8O4', Hf=-182100*_cal2j
 Xylan.copy_models_from(Xylose, ['Cn'])
 Arabinan = chemical_copied('Arabinan', Xylan)
 
-Lignin = chemical_database('Lignin', phase='s')
-# Hf scaled based on vanillin
-Lignin.Hf = -108248*_cal2joule/tmo.Chemical('Vanillin').MW*Lignin.MW
+# Lignin = chemical_database('Lignin', phase='s')
+# # Hf scaled based on vanillin
+# Lignin.Hf = -108248*_cal2joule/tmo.Chemical('Vanillin').MW*Lignin.MW
 
 # =============================================================================
 # Insoluble inorganics
@@ -381,7 +385,7 @@ chemical_groups = dict(
     OtherStructuralCarbohydrates = ('Glucan', 'Xylan', 'Lignin', 'Arabinan', 
                                     'Mannan', 'Galactan'),
     SeparatelyListedOrganics = ('Ethanol', 'Glucose', 'Xylose', 'AceticAcid',
-                                'Acetate', 'Lignin'),
+                                 'Lignin'),
     SpearatedlyListedOthers = ('H2O', 'NH3', 'H2SO4', 'CO2', 'CH4', 'O2', 'N2')
     )
 
@@ -468,6 +472,21 @@ for chemical in chems:
 # Default missing properties of chemicals to those of water,
 for chemical in chems: chemical.default()
 
+chems.append(sugarcane_chems.H3PO4)
+chems.append(sugarcane_chems.Cellulose)
+chems.append(sugarcane_chems.Hemicellulose)
+chems.append(sugarcane_chems.CaO)
+chems.append(sugarcane_chems.Solids)
+chems.append(sugarcane_chems.Flocculant)
+chems.append(sugarcane_chems.Lignin)
+
+chems.append(cornstover_chems.Acetate)
+chems.append(cornstover_chems.AmmoniumSulfate)
+chems.append(cornstover_chems.AmmoniumAcetate)
+chems.append(cornstover_chems.Cellulase)
+
+# chems.append(tmo.Chemical(ID='CO2_compressible', search_ID='CO2'))
+
 defined_chemicals = {
     'Cellulose', 'Lime', '3-Hydroxybutanone', '3-Hydroxypropionic acid'
     'AA', 'tri-n-octylamine', 'Dipotassium hydrogen phosphate',
@@ -476,10 +495,10 @@ defined_chemicals = {
     'SodiumSulfate', 'NH4OH', 'IBA', *[i.ID for i in HP_chemicals]
 }
 
-HP_chemicals.extend([i for i in sc.chemicals if i.ID not in defined_chemicals])
+# HP_chemicals.extend([i for i in sc.chemicals if i.ID not in defined_chemicals])
+
 # %%
 
-chems.append(tmo.Chemical(ID='CO2_compressible', search_ID='CO2'))
 
 # Though set_thermo will first compile the Chemicals object,
 # compile beforehand is easier to debug because of the helpful error message
@@ -506,6 +525,8 @@ chems.set_synonym('Na2SO4', 'SodiumSulfate')
 chems.set_synonym('AmmoniumHydroxide', 'NH4OH')
 chems.set_synonym('Isobutyraldehyde', 'IBA')
 chems.set_synonym('Octanediol', '1,8-Octanediol')
+chems.set_synonym('MagnesiumChloride', 'MgCl2')
+chems.set_synonym('ZincSulfate', 'ZnSO4')
 # chems.set_synonym('Acetate', 'AceticAcid')
 
 # %% Set all "None" Hfus values to 0
