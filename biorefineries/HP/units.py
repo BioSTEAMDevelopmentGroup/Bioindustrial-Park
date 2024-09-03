@@ -1111,6 +1111,7 @@ class AcidulationReactor(Reactor):
     _N_ins = 2
     _N_outs = 1
     
+    acid_safety_factor = 1.05 
     def _init(self, *args, **kwargs):
         Reactor._init(self, *args, **kwargs)
         self.acidulation_rxns = ParallelRxn([
@@ -1133,8 +1134,8 @@ class AcidulationReactor(Reactor):
             index = reactant_indices[i]
             needed_acid += -(rxns.stoichiometry[i][acid_index])/rxns.X[i] * feed.mol[index]
         
-        # Set feed acid mol to match acidulation needs with 5% extra
-        acid.imol['H2SO4'] = needed_acid * 1.05
+        # Set feed acid mol to match acidulation needs with some extra
+        acid.imol['H2SO4'] = needed_acid * self.acid_safety_factor
         acid.imass['H2O'] = acid.imass['H2SO4'] / 0.93 * 0.07 # 93% purity
         effluent.mix_from([feed, acid])
         # rxns.adiabatic_reaction(effluent)
