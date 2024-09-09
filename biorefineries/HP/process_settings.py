@@ -195,6 +195,9 @@ MgCl2_price = 0.1387 * _lb_per_kg * _GDP_2007_to_2010 * chem_index[2016]/chem_in
 # Zinc sulfate
 ZnSO4_price = 580 / _kg_per_ton * _GDP_2007_to_2010 * chem_index[2016]/chem_index[2010] # 480 - 680 $/ton in 2007$ # https://web.archive.org/web/20161125084558/http://www.icis.com:80/chemicals/channel-info-chemicals-a-z/
 
+# Dodecanol
+Dodecanol_price = 2.75 # 2500 - 3000 $/ metric ton # https://www.alibaba.com/product-detail/New-Arrival-Liquid-Lauryl-alcohol-Dodecanol_1600489291769.html?spm=a2700.galleryofferlist.normal_offer.6.267b13a0flS0fP
+
 # All prices initially in 2016$/kg
 price = {'AA': AA_price,
          'TiO2': TiO2_price,
@@ -226,6 +229,7 @@ price = {'AA': AA_price,
          'Amberlyst15': amberlyst_15_price,
          'DAP': 0.1645 * _lb_per_kg,
          'Decanol': Decanol_price,
+         'Dodecanol': Dodecanol_price,
          'TOA': TOA_price,
          'AQ336': AQ336_price,
          'Octanol': Octanol_price,
@@ -310,6 +314,8 @@ GWP_CFs = {
     'CO2': 0.87104, # ecoinvent 3.8 carbon dioxide production, liquid, RoW
     'ZincSulfate': 0.76834, # ecoinvent 3.8 market for zinc monosulfate, RoW
     'MagnesiumChloride': 0., # ecoinvent 3.8 market for magnesium chloride, from titanium sponge production
+    'Methanol': 0.66082, # ecoinvent 3.8 market for methanol, GLO
+    'Dodecanol':3.691, # ecoinvent 3.8 market for dodecanol, GLO
     }
 H3PO4_GWP_CF = 2.5426
 KOH_GWP_CF = 2.299
@@ -378,6 +384,8 @@ FEC_CFs = {
     'CO2': 7.4243, # ecoinvent 3.8 carbon dioxide production, liquid, RoW
     'ZincSulfate': 11.420, # ecoinvent 3.8 market for zinc monosulfate, RoW
     'MagnesiumChloride': 0., # ecoinvent 3.8 market for magnesium chloride, from titanium sponge production
+    'Methanol': 34.713, # ecoinvent 3.8 market for methanol, GLO
+    'Dodecanol':47.553, # ecoinvent 3.8 market for dodecanol, GLO
     }
 H3PO4_FEC_CF = 39.542
 KOH_FEC_CF = 30.421

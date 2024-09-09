@@ -49,7 +49,7 @@ from biosteam import System
 from thermosteam import Stream
 from biorefineries.HP import units, facilities
 from biorefineries.HP.process_areas import create_HP_fermentation_process,\
-                                           create_HP_separation_methanol_precipitation_neutralization_process,\
+                                           create_HP_separation_two_step_fractional_distillation_process,\
                                            create_HP_to_acrylic_acid_upgrading_process
 from biorefineries.HP.lca import LCA
 from biorefineries.HP.models._process_specification import ProcessSpecification
@@ -185,20 +185,16 @@ def create_HP_sys(ins, outs):
     # =============================================================================
     separation_sulfuric_acid = Stream('separation_sulfuric_acid', units='kg/hr')
     
-    separation_methanol = Stream('separation_methanol', units='kg/hr')
+    separation_dodecanol = Stream('separation_dodecanol', units='kg/hr')
     
-    separation_base = Stream('separation_base', units='kg/hr')
+    separation_NaOH = Stream('separation_NaOH', units='kg/hr')
     
     # =============================================================================
     # Separation units
     # =============================================================================
-    separation_sys = create_HP_separation_methanol_precipitation_neutralization_process(
-                                                            ins=(
+    separation_sys = create_HP_separation_two_step_fractional_distillation_process(ins=(
                                                            fermentation_sys-0,
-                                                           separation_base,
                                                            separation_sulfuric_acid,
-                                                           separation_methanol,
-                                                           '', '', '', '',
                                                            ),
                                                    )
     s.gypsum.price = price['Gypsum']
@@ -232,8 +228,8 @@ def create_HP_sys(ins, outs):
     CSL_fresh = Stream('CSL_fresh', price=price['CSL'])
     lime_fresh = Stream('lime_fresh', price=price['Lime'])
     
-    methanol_fresh = Stream('methanol_fresh', price=price['Methanol'])
-    lime_fresh2 = Stream('lime_fresh2', price=price['Lime'])
+    dodecanol_fresh = Stream('dodecanol_fresh', price=price['Dodecanol'])
+    NaOH_fresh = Stream('NaOH_fresh', price=price['Caustics'])
     
     MgCl2_fresh = Stream('MgCl2_fresh', price=price['Magnesium chloride'])
     ZnSO4_fresh = Stream('ZnSO4_fresh', price=price['Zinc sulfate'])
@@ -289,10 +285,10 @@ def create_HP_sys(ins, outs):
     T620_P = units.HPPump('T620_P', ins=T620-0, outs=AcrylicAcid)
     
     
-    T607 = bst.units.StorageTank('T607', ins = methanol_fresh, outs = separation_methanol)
-    T607.line = 'Methanol storage tank'
+    T607 = bst.units.StorageTank('T607', ins = dodecanol_fresh, outs = separation_dodecanol)
+    T607.line = 'Hexanol storage tank'
 
-    T608 = bst.units.StorageTank('T608', ins = lime_fresh2, outs = separation_base)
+    T608 = bst.units.StorageTank('T608', ins = NaOH_fresh, outs = separation_NaOH)
     T608.line = 'Sodium hydroxide storage tank'
     
     T609 = bst.units.StorageTank('T609', ins = MgCl2_fresh, outs = fermentation_MgCl2)
@@ -367,9 +363,6 @@ def create_HP_sys(ins, outs):
                                         u.U202-0,
                                         u.C202-0,
                                         u.S401-0,
-                                        separation_sys-5,
-                                        separation_sys-6,
-                                        separation_sys-7,
                                         ),
                             outs='wastes_to_boiler_turbogenerator')
     @M510.add_specification(run=True)
@@ -419,6 +412,7 @@ def create_HP_sys(ins, outs):
     
     HXN = bst.HeatExchangerNetwork('HXN1001',
                                                 ignored=[
+                                                        # u.F401,
                                                         ],
                                               cache_network=False,
                                               )
@@ -521,7 +515,7 @@ HP_lca = HPLCA(system=HP_sys,
 feedstock_acquisition_group = bst.UnitGroup('feedstock acquisition', units=[u.U101])
 feedstock_juicing_group = f.juicing_sys.to_unit_group('feedstock juicing')
 fermentation_group = f.HP_fermentation_process.to_unit_group('fermentation')
-separation_group = f.HP_separation_methanol_precipitation_neutralization_process.to_unit_group('separation')
+separation_group = f.HP_separation_two_step_fractional_distillation_process.to_unit_group('separation')
 upgrading_group = f.HP_to_acrylic_acid_upgrading_process.to_unit_group('upgrading')
 
 
@@ -842,3 +836,4 @@ contourplots.stacked_bar_plot(dataframe=df_TEA_breakdown,
                  units_list=[i.units for i in unit_groups[0].metrics],
                  totals_label_text=r"$\bfsum:$",
                  )
+

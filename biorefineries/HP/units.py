@@ -379,7 +379,7 @@ class SeedTrain(Unit):
         self.T = T
         self.ferm_ratio = ferm_ratio
 
-        self.regular_succinic_acid_conversion = 0.04 * ferm_ratio
+        self.regular_succinic_acid_conversion = 0. * ferm_ratio
         
         self.regular_xylitol_conversion = 0.04 * ferm_ratio
         
@@ -856,7 +856,7 @@ class BatchCoFermentation(BatchBioreactor):
     
     CO2_safety_factor = 2.
     
-    regular_succinic_acid_conversion = 0.018 # %theoretical
+    regular_succinic_acid_conversion = 0. # %theoretical
     
     regular_xylitol_conversion = 0.085 # %theoretical
     
@@ -900,9 +900,9 @@ class BatchCoFermentation(BatchBioreactor):
         #      Reaction definition            Reactant    Conversion
         Rxn('Glucose -> 2 HP',        'Glucose',   .49),
         # Rxn('Glucose -> 3 AceticAcid',        'Glucose',   0.07),
-        Rxn('Glucose + 2 CO2 -> 2 SuccinicAcid + O2',        'Glucose',   0.040),
+        Rxn('Glucose + 2 CO2 -> 2 SuccinicAcid + O2',        'Glucose',   0.),
         Rxn('3 Xylose -> 5 HP',       'Xylose',    0.49),
-        Rxn('Xylose + 1.667 CO2 -> 1.667 SuccinicAcid + 0.4165 O2',       'Xylose',    0.040),
+        Rxn('Xylose + 1.667 CO2 -> 1.667 SuccinicAcid + 0.4165 O2',       'Xylose',    1e-5),
         Rxn('Glucose + 0.545 H2O -> 1.091 Xylitol + 0.545 CO2',        'Glucose',   0.040),
         Rxn('Xylose + H2O -> Xylitol + 0.5 O2',       'Xylose',    0.040),
         Rxn('Glucose -> 6 FermMicrobe + 2.4 H2O',       'Glucose',   0.05-1e-9), 

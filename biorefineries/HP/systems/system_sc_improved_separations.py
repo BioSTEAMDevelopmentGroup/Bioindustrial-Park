@@ -49,7 +49,7 @@ from biosteam import System
 from thermosteam import Stream
 from biorefineries.HP import units, facilities
 from biorefineries.HP.process_areas import create_HP_fermentation_process,\
-                                           create_HP_separation_methanol_precipitation_neutralization_process,\
+                                           create_HP_separation_improved_process,\
                                            create_HP_to_acrylic_acid_upgrading_process
 from biorefineries.HP.lca import LCA
 from biorefineries.HP.models._process_specification import ProcessSpecification
@@ -192,13 +192,11 @@ def create_HP_sys(ins, outs):
     # =============================================================================
     # Separation units
     # =============================================================================
-    separation_sys = create_HP_separation_methanol_precipitation_neutralization_process(
+    separation_sys = create_HP_separation_improved_process(
                                                             ins=(
                                                            fermentation_sys-0,
-                                                           separation_base,
                                                            separation_sulfuric_acid,
-                                                           separation_methanol,
-                                                           '', '', '', '',
+                                                           '', '', '', 
                                                            ),
                                                    )
     s.gypsum.price = price['Gypsum']
@@ -326,7 +324,7 @@ def create_HP_sys(ins, outs):
     # Mix waste liquids for treatment
     M501 = bst.units.Mixer('M501', ins=(u.F301_P-0, 
                                         separation_sys-3,
-                                        separation_sys-4,
+                                        # separation_sys-4,
                                         upgrading_sys-2, 
                                         # u.H201-0,
                                         ))
@@ -367,9 +365,9 @@ def create_HP_sys(ins, outs):
                                         u.U202-0,
                                         u.C202-0,
                                         u.S401-0,
+                                        separation_sys-4,
                                         separation_sys-5,
                                         separation_sys-6,
-                                        separation_sys-7,
                                         ),
                             outs='wastes_to_boiler_turbogenerator')
     @M510.add_specification(run=True)
@@ -521,7 +519,7 @@ HP_lca = HPLCA(system=HP_sys,
 feedstock_acquisition_group = bst.UnitGroup('feedstock acquisition', units=[u.U101])
 feedstock_juicing_group = f.juicing_sys.to_unit_group('feedstock juicing')
 fermentation_group = f.HP_fermentation_process.to_unit_group('fermentation')
-separation_group = f.HP_separation_methanol_precipitation_neutralization_process.to_unit_group('separation')
+separation_group = f.HP_separation_improved_process.to_unit_group('separation')
 upgrading_group = f.HP_to_acrylic_acid_upgrading_process.to_unit_group('upgrading')
 
 

@@ -27,6 +27,9 @@ import biorefineries.sugarcane as sc
 from thermosteam import functional as fn
 from biorefineries.sugarcane import chemicals as sugarcane_chems
 from biorefineries.cornstover import chemicals as cornstover_chems
+from biorefineries import corn
+
+corn_chems = corn.chemicals.create_chemicals()
 
 __all__ = ('HP_chemicals', 'chemical_groups', 'soluble_organics', 'combustibles')
 
@@ -259,8 +262,8 @@ LacticAcid.Hfus = 11.34e3
 # HP = chemical_copied('HP', LacticAcid)
 HP = chemical_database('HP', search_ID='3-Hydroxypropionic acid')
 HP.copy_models_from(LacticAcid, names = ['V', 'Hvap', 'Psat', 'mu', 'kappa'])
-HP.Tm = 15 + 273.15 # CAS says < 25 C
-HP.Tb = 179.75 + 273.15 # CAS
+HP.Tm = 16.8 + 273.15 # CAS says < 25 C # value from ChemicalBook # https://www.chemicalbook.com/ChemicalProductProperty_EN_CB6711580.htm
+HP.Tb = 195.875 + 273.15 # value is average of CAS (179.75 C) and ChemicalBook (212 C) # https://www.chemicalbook.com/ChemicalProductProperty_EN_CB6711580.htm
 HP.Hf = LacticAcid.Hf
 MethylHP = chemical_database('MethylHP', search_ID='6149-41-3')
 MethylLactate = tmo.Chemical('MethylLactate')
@@ -484,6 +487,15 @@ chems.append(cornstover_chems.Acetate)
 chems.append(cornstover_chems.AmmoniumSulfate)
 chems.append(cornstover_chems.AmmoniumAcetate)
 chems.append(cornstover_chems.Cellulase)
+
+
+chems.append(corn_chems.Starch)
+chems.append(corn_chems.Fiber)
+chems.append(corn_chems.SolubleProtein)
+chems.append(corn_chems.InsolubleProtein)
+chems.append(corn_chems.Oil)
+chems.append(corn_chems.Yeast)
+chems.append(corn_chems.Octane)
 
 # chems.append(tmo.Chemical(ID='CO2_compressible', search_ID='CO2'))
 
