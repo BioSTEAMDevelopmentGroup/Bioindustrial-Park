@@ -852,13 +852,16 @@ class BatchCoFermentation(BatchBioreactor):
     
     zinc_sulfate_loading = 0.0066 # g/L (kg/m3)
     
+    CSL_and_micronutrient_consumption_fraction = 0.999 # assumed
+    
     fraction_of_biomass_C_from_CO2 = 0.5 # % as decimal
     
     CO2_safety_factor = 2.
     
     regular_succinic_acid_conversion = 0. # %theoretical
     
-    regular_xylitol_conversion = 0.085 # %theoretical
+    # regular_xylitol_conversion = 0.085 # %theoretical
+    regular_xylitol_conversion = 0. # %theoretical
     
     regular_biomass_conversion = 0.245 # %theoretical
     
@@ -1022,7 +1025,9 @@ class BatchCoFermentation(BatchBioreactor):
         vapor.imol['CO2', 'O2', 'N2'] = effluent.imol['CO2', 'O2', 'N2']
         vapor.phase = 'g'
         effluent.imol['CO2', 'O2', 'N2'] = 0, 0, 0
-        effluent.imass['CSL', 'MagnesiumChloride', 'ZincSulfate'] = 0, 0, 0
+        effluent.imass['CSL', 'MagnesiumChloride', 'ZincSulfate'] = \
+            (1.-self.CSL_and_micronutrient_consumption_fraction) *\
+            effluent.imass['CSL', 'MagnesiumChloride', 'ZincSulfate']
         
         vapor.imol['CO2'] += CSL.get_atomic_flow('C')
         

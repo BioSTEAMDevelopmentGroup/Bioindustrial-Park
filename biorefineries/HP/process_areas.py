@@ -547,7 +547,7 @@ def create_HP_separation_hexanol_extraction_process(ins, outs,):
                     dict(ID='sulfuric_acid_separation', H2SO4=1.),
                     dict(ID='methanol_separation', Methanol=1.),
                     dict(ID='separation_water', Water=1.),
-                    dict(ID='makeup_desorption_fluid', Water=1.),
+                    dict(ID='makeup_regeneration_fluid', Water=1.),
                     dict(ID='makeup_cation_exchange_resin', Water=1.),
                     dict(ID='makeup_anion_exchange_resin', Water=1.),
                ],
@@ -565,7 +565,7 @@ def create_HP_separation_hexanol_extraction_process(ins, outs,):
 def create_HP_separation_methanol_precipitation_neutralization_process(ins, outs,):
     
     fermentation_broth, base_separation, sulfuric_acid_separation, methanol_separation, separation_water,\
-        makeup_desorption_fluid, makeup_cation_exchange_resin, makeup_anion_exchange_resin = ins
+        makeup_regeneration_fluid, makeup_cation_exchange_resin, makeup_anion_exchange_resin = ins
     
     HP_product, cell_mass, gypsum, F401_t, F403_t,\
         color_impurities, cation_impurities, anion_impurities, D401_b = outs
@@ -655,7 +655,7 @@ def create_HP_separation_methanol_precipitation_neutralization_process(ins, outs
     
     S403 = bst.FakeSplitter('S403', 
                             ins=(M402-0, 
-                                 makeup_desorption_fluid, 
+                                 makeup_regeneration_fluid, 
                                  makeup_cation_exchange_resin, 
                                  makeup_anion_exchange_resin),
                             
@@ -770,9 +770,9 @@ def create_HP_separation_methanol_precipitation_neutralization_process(ins, outs
 @SystemFactory(ID = 'HP_separation_improved_process',
                ins=[dict(ID='fermentation_broth', HP=1, Water=100),
                     dict(ID='sulfuric_acid_separation', H2SO4=1.),
-                    dict(ID='makeup_desorption_fluid', Water=1.),
-                    dict(ID='makeup_cation_exchange_resin', Water=1.),
-                    dict(ID='makeup_anion_exchange_resin', Water=1.),
+                    dict(ID='adsorption_makeup_regeneration_fluid', Water=1.),
+                    dict(ID='CEX_makeup_regeneration_HCl', Water=1.),
+                    dict(ID='AEX_makeup_regeneration_NaOH', Water=1.),
                ],
                 outs=[dict(ID='HP_solution', HP=1., Water=2.),
                       dict(ID='cell_mass', FermMicrobe=1, Water=1),
@@ -786,10 +786,13 @@ def create_HP_separation_methanol_precipitation_neutralization_process(ins, outs
 def create_HP_separation_improved_process(ins, outs,):
     
     fermentation_broth, sulfuric_acid_separation,\
-        makeup_desorption_fluid, makeup_cation_exchange_resin, makeup_anion_exchange_resin = ins
+        adsorption_makeup_regeneration_fluid, CEX_makeup_regeneration_HCl, AEX_makeup_regeneration_NaOH = ins
     
     HP_solution, cell_mass, gypsum, F403_t,\
         color_impurities, cation_impurities, anion_impurities = outs
+    
+    f = bst.main_flowsheet
+    u, s = f.unit, f.stream
     
     # Remove solids from fermentation broth, modified from the pressure filter in Humbird et al.
     S401_index = [splits_df.index[0]] + splits_df.index[2:].to_list()
@@ -839,70 +842,150 @@ def create_HP_separation_improved_process(ins, outs,):
             S402.outs[1].mol = S402.ins[0].mol
     
     
-        
+    #########------------Color Removal Adsorption------------#########
     
-    ###------------!!! Placeholder unit----------###
+    # by default, chemicals pass unabsorbed
+    split = {i.ID: 1. for i in tmo.settings.chemicals}
     
-    bst.FakeSplitter._ins_size_is_fixed = False
+    # sharply split adsorbed chemicals
+    split.update({i: 0. for i in 
+             ['FermMicrobe', 'Flocculant', 'Sucrose', 
+              'Glucose', 'Xylitol', 'SuccinicAcid',
+              'SolubleProtein', 'InsolubleProtein', 'Ash', 
+              'Fiber', 'TriOlein', 'CSL']})
     
-    S403 = bst.FakeSplitter('S403', 
-                            ins=(S402-1, 
-                                 makeup_desorption_fluid, 
-                                 makeup_cation_exchange_resin, 
-                                 makeup_anion_exchange_resin),
-                            
-                            outs=('purified_broth', 
-                                  color_impurities, 
-                                  cation_impurities, 
-                                  anion_impurities)
-                                     )
-    S403.line = 'Adsorption_CEx_AEx'
+    # partially adsorbed chemicals
+    split['HP'] = 66.94/71.45 # !!! from Singh Group's initial experimental data
+    
+    color_removal_adsorption_process = create_temperature_swing_adsorption_process(
+                                         ins=(S402-1, adsorption_makeup_regeneration_fluid, ''),
+                                         outs=('', color_impurities, ''),
+                                         ID='color_removal_adsorption_process',
+                                         split=split, 
+                                         # regeneration_fluid_chemical_ID='Ethanol',
+                                         regeneration_fluid_chemical_ID='Water',
+                                         adsorbate_ID='FermMicrobe', 
+                                         target_recovery=0.999,
+                                         regeneration_velocity=3.6, # m/h # 0.001 - 0.004 m/s from https://www.aiche.org/sites/default/files/docs/pages/adsorption_basics_part_1.pdf
+                                         K=2., #!!! update based on experimental data from Singh group
+                                         drying_time=0.,
+                                         adsorbent='Activated carbon',
+                                         void_fraction=0.35,
+                                         recover_regeneration_fluid=False,
+                                         # V_evaporator=0.8,
+                                         # T_condenser=12.+273.15,
+                                         unit_ID_digits=410,
+                                         )
+    u.A410.line = 'Adsorption'
+    #########------------------------------------------------#########
+    
+    bst.AdsorptionColumnTSA.adsorbent_cost.update(
+        {'Dowex G26 H2 form': 300., # !!! update
+         'Amberlite IRA-67 free base': 300., # !!! update
+         }
+        )
+    
+    bst.AdsorptionColumnTSA._default_equipment_lifetime.update(
+        {'Dowex G26 H2 form': 10., # !!! update
+         'Amberlite IRA-67 free base': 10., # !!! update
+         }
+        )
+    
+    #########------------Cation Exchange Process-------------#########
+    
+    M420 = bst.Mixer('M420', ins=(CEX_makeup_regeneration_HCl, ''), outs='CEX_makeup_regeneration_fluid')
+    @M420.add_specification(run=False)
+    def M420_no_run_spec():
+        pass
+    
+    # by default, chemicals pass unabsorbed
+    split = {i.ID: 1. for i in tmo.settings.chemicals}
+    
+    # sharply split adsorbed chemicals
+    split.update({i: 0. for i in 
+             ['Gypsum', 'AmmoniumSulfate', 'ZincSulfate', 'CaO', 'MagnesiumChloride']})
+    
+    # partially adsorbed chemicals
+    split['HP'] = 62.20/66.94 # !!! from Singh Group's initial experimental data
+
+    cation_exchange_process = create_temperature_swing_adsorption_process(
+                                         ins=(color_removal_adsorption_process-0, M420-0, ''),
+                                         outs=('', cation_impurities, ''),
+                                         ID='cation_exchange_process',
+                                         split=split, 
+                                         # regeneration_fluid_chemical_ID='Water',
+                                         regeneration_fluid_composition_dict={'Water':0.9825, 'H2SO4':0.0175}, # 7% HCl; we use equivalent mol-H+ of H2SO4 # https://www.dupont.com/content/dam/dupont/amer/us/en/water-solutions/public/documents/en/IER-AmberLite-Procedure-Cross-Regeneration-Cation-Resin-Sweeteners-TechFact-45-D02505-en.pdf
+                                         adsorbate_ID='MagnesiumChloride', 
+                                         target_recovery=0.999,
+                                         regeneration_velocity=1.8, # m/h # ~3 BV/h based on https://www.dupont.com/content/dam/dupont/amer/us/en/water-solutions/public/documents/en/IER-AmberLite-Procedure-Cross-Regeneration-Cation-Resin-Sweeteners-TechFact-45-D02505-en.pdf
+                                         K=2., #!!! update based on experimental data from Singh group
+                                         drying_time=0.,
+                                         adsorbent='Silica gel', # !!! update
+                                         void_fraction=0.35,
+                                         recover_regeneration_fluid=False,
+                                         unit_ID_digits=420,
+                                         )
+    A420 = u.A420
+    A420.line = 'Cation exchange'
+    @A420.add_specification(run=False)
+    def A420_M420_HCl_req_spec():
+        A420._run()
+        makeup_regen_stream = M420.outs[0]
+        M420.ins[0].imol['H2SO4'] = makeup_regen_stream.imol['H2SO4']
+        M420.ins[1].imol['Water'] = makeup_regen_stream.imol['Water']
+        
+    #########------------------------------------------------#########
+    
+    #########-------------Anion Exchange Process-------------#########
+    
+    M430 = bst.Mixer('M430', ins=(AEX_makeup_regeneration_NaOH, ''), outs='AEX_makeup_regeneration_fluid')
+    @M430.add_specification(run=False)
+    def M430_no_run_spec():
+        pass
+    
+    # by default, chemicals pass unabsorbed
+    split = {i.ID: 1. for i in tmo.settings.chemicals}
+    
+    # sharply split adsorbed chemicals
+    split.update({i: 0. for i in 
+             ['H3PO4', 'H2SO4']})
+    
+    # partially adsorbed chemicals
+    split['HP'] = 51.71/62.20 # !!! from Singh Group's initial experimental data
+    
+    anion_exchange_process = create_temperature_swing_adsorption_process(
+                                         ins=(cation_exchange_process-0, M430-0, ''),
+                                         outs=('', anion_impurities, ''),
+                                         ID='anion_exchange_process',
+                                         split=split, 
+                                         # regeneration_fluid_chemical_ID='Water',
+                                         regeneration_fluid_composition_dict={'Water':0.982, 'NaOH':0.018}, # 4% NaOH from https://www.dupont.com/content/dam/dupont/amer/us/en/water-solutions/public/documents/en/IER-AmberLite-Procedure-Cross-Regeneration-Anion-Resin-Sweeteners-TechFact-45-D02504-en.pdf
+                                         adsorbate_ID='H3PO4', 
+                                         target_recovery=0.999,
+                                         regeneration_velocity=1.8, # m/h # ~3 BV/h based on https://www.dupont.com/content/dam/dupont/amer/us/en/water-solutions/public/documents/en/IER-AmberLite-Procedure-Cross-Regeneration-Cation-Resin-Sweeteners-TechFact-45-D02505-en.pdf
+                                         K=2., #!!! update based on experimental data from Singh group
+                                         drying_time=0.,
+                                         adsorbent='Silica gel', # !!! update
+                                         void_fraction=0.35,
+                                         recover_regeneration_fluid=False,
+                                         unit_ID_digits=430,
+                                         )
+    A430 = u.A430
+    A430.line = 'Anion exchange'
+    @A430.add_specification(run=False)
+    def A430_M430_HCl_req_spec():
+        A430._run()
+        ins0, ins1 = M430.ins
+        makeup_regen_stream = M430.outs[0]
+        ins0.imol['NaOH'] = makeup_regen_stream.imol['NaOH']
+        ins0.imass['Water'] = ins0.imass['NaOH'] # price is for 50 wt% NaOH
+        ins1.imol['Water'] = makeup_regen_stream.imol['Water'] - ins0.imol['Water']
+        
+    #########------------------------------------------------#########
     
     
-    # 3-HP losses data from Singh group
-    S403.stepwise_HP_loss_fractions = 1. - np.array(
-                                        [66.94/71.45, # during color removal
-                                         62.20/66.94, # during cation exchange
-                                         51.71/62.20, # during anion exchange
-                                         ]
-                                        )
-    @S403.add_specification(run=False)
-    def S403_Adsorption_CEx_AEx_spec():
-        broth = S403.ins[0]
-        purified_broth, color_imp, cation_imp, anion_imp = S403.outs
-        purified_broth.copy_like(broth)
-        
-        # impurity removal
-        color_imp.imol['FermMicrobe', 'Flocculant', 'Sucrose', 'Xylitol', 'SuccinicAcid',
-                       'SolubleProtein', 'InsolubleProtein', 'Ash', 'Fiber', 'TriOlein'] =\
-            purified_broth.imol['FermMicrobe', 'Flocculant', 'Sucrose', 'Xylitol', 'SuccinicAcid',
-                           'SolubleProtein', 'InsolubleProtein', 'Ash', 'Fiber', 'TriOlein']
-        
-        purified_broth.imol['FermMicrobe', 'Flocculant', 'Sucrose', 'Xylitol', 'SuccinicAcid',
-                       'SolubleProtein', 'InsolubleProtein', 'Ash', 'Fiber', 'TriOlein'] = 0.
-        
-        cation_imp.imol['Gypsum', 'AmmoniumSulfate', 'ZincSulfate', 'CaO'] =\
-            purified_broth.imol['Gypsum', 'AmmoniumSulfate', 'ZincSulfate', 'CaO']
-        purified_broth.imol['Gypsum', 'AmmoniumSulfate', 'ZincSulfate', 'CaO'] = 0.
-        
-        anion_imp.imol['H3PO4', 'H2SO4'] = purified_broth.imol['H3PO4', 'H2SO4']
-        purified_broth.imol['H3PO4', 'H2SO4'] = 0.
-        
-        # 3-HP losses
-        color_imp.imol['HP'] = purified_broth.imol['HP'] * S403.stepwise_HP_loss_fractions[0]
-        purified_broth.imol['HP'] -= color_imp.imol['HP']
-        
-        cation_imp.imol['HP'] = purified_broth.imol['HP'] * S403.stepwise_HP_loss_fractions[1]
-        purified_broth.imol['HP'] -= cation_imp.imol['HP']
-        
-        anion_imp.imol['HP'] = purified_broth.imol['HP'] * S403.stepwise_HP_loss_fractions[2]
-        purified_broth.imol['HP'] -= anion_imp.imol['HP']
     
-    ###------------------------------------------###
-    
-   
-    
-    F403 = bst.units.MultiEffectEvaporator('F403', ins=S403-0, outs=('F403_l', 'F403_g'),
+    F403 = bst.units.MultiEffectEvaporator('F403', ins=anion_exchange_process-0, outs=('F403_l', 'F403_g'),
                                             P = (101325, 70000, 40000, 20000, 10000), V = 0.5)
     
     target_HP_x = 0.30
@@ -1400,4 +1483,150 @@ def create_catalyst_recovery_process(ins, outs, split,
         CR._run()
         CR.outs[0].phase = CR.catalyst_phase
         CR.outs[1].phase = CR.product_stream_phase
+
+
+
+# temperature-swing adsorption system with liquid regeneration fluid and hot air used to dry adsorbent;
+# recovery of liquid regeneration fluid by sequential evaporation and drying
+@SystemFactory(ID = 'temperature_swing_adsorption_process',
+               ins=[dict(ID='liquid_feed', Water=100, Glucose=1.),
+                    dict(ID='makeup_liquid_regeneration_fluid', Ethanol=0.1),
+                    dict(ID='air_in', N2=1.),
+                    
+                    ],
+                outs=[dict(ID='recovered_adsorbate', Glucose=1.),
+                      dict(ID='air_out', N2=1., Ethnaol=-0.1),
+                      dict(ID='liquid_effluent', Water=100),
+                      
+                      
+                      ],
+                )
+
+def create_temperature_swing_adsorption_process(ins, outs, 
+                                     split, 
+                                     adsorbate_ID='Glucose', 
+                                     target_recovery=0.999,
+                                     regeneration_velocity = 9., # m/h # 0.001 - 0.004 m/s from https://www.aiche.org/sites/default/files/docs/pages/adsorption_basics_part_1.pdf
+                                     K=2., 
+                                     drying_time=2.,
+                                     adsorbent='Activated carbon',
+                                     void_fraction=0.35,
+                                     adsorbent_capacity=0.1,
+                                     
+                                     regeneration_fluid_chemical_ID=None,
+                                     regeneration_fluid_composition_dict=None, # provide either regeneration_fluid_chemical_ID or regeneration_fluid_composition_dict, not both
+                                     
+                                     recover_regeneration_fluid=True, # recovery is not implemented for when regeneration_fluid_composition_dict is provided
+                                     V_evaporator=0.8,
+                                     T_condenser=12.+273.15,
+                                     unit_ID_digits=410, # any integer; just make sure there are no units in the rest of the system that 
+                                                         # have IDs with digits within the range [unit_ID_digits, unit_ID_digits+1] 
+                                                         # inclusive of bounds.
+                                     ):
+    liquid_feed, makeup_liquid_regeneration_fluid, air_in = ins
+    liquid_effluent, recovered_adsorbate, air_out,  = outs
+    
+    if regeneration_fluid_chemical_ID and regeneration_fluid_composition_dict:
+        raise RuntimeError('[{ID}] Must provide either regeneration_fluid_chemical_ID or regeneration_fluid_composition_dict; both were provided.')
+    if not (regeneration_fluid_chemical_ID or regeneration_fluid_composition_dict):
+        raise RuntimeError('[{ID}] Must provide either regeneration_fluid_chemical_ID or regeneration_fluid_composition_dict; neither was provided.')
+    
+    unit_ID_digits_int = unit_ID_digits
+    unit_ID_digits_str = str(unit_ID_digits)
+    
+    if recover_regeneration_fluid:
         
+        if regeneration_fluid_chemical_ID:
+            
+            rf_ID = regeneration_fluid_chemical_ID.lower()
+            M401 = bst.Mixer('M'+unit_ID_digits_str, ins=(makeup_liquid_regeneration_fluid, '', ''), outs='regeneration_fluid_'+rf_ID)
+            @M401.add_specification(run=False)
+            def M401_no_run_spec(): # runs in A401_makeup_regeneration_fluid_spec
+                pass
+            
+            A401 = bst.AdsorptionColumnTSA('A'+unit_ID_digits_str, 
+                                           ins=(liquid_feed, M401-0, air_in),
+                                           outs=(liquid_effluent, 
+                                                 'A'+unit_ID_digits_str+'_adsorbate_in_regeneration_fluid', 
+                                                 air_out),
+                                           adsorbate_ID=adsorbate_ID, 
+                                           regeneration_fluid={regeneration_fluid_chemical_ID:1.},
+                                           regeneration_velocity=regeneration_velocity, 
+                                           K=K,
+                                           target_recovery=target_recovery,
+                                           split = split,
+                                           drying_time = drying_time,
+                                           adsorbent = adsorbent,
+                                           void_fraction = void_fraction,
+                                           adsorbent_capacity = adsorbent_capacity,
+                                           )
+            
+            @A401.add_specification(run=False)
+            def A401_makeup_regeneration_fluid_spec():
+                A401._run()
+                makeup, recycled1, recycled2 = M401.ins
+                mixed, = M401.outs
+                makeup.imol[regeneration_fluid_chemical_ID] = max(0, mixed.imol[regeneration_fluid_chemical_ID] -
+                                               recycled1.imol[regeneration_fluid_chemical_ID] -
+                                               recycled2.imol[regeneration_fluid_chemical_ID])
+            
+            F401 = bst.units.MultiEffectEvaporator('F'+unit_ID_digits_str, ins=A401-1, outs=('F401_b', f'recycled_regeneration_fluid_{rf_ID}_from_evaporator'),
+                                                    P = (101325, 70000, 50000, 30000, 20000), V = V_evaporator,
+                                                    chemical=regeneration_fluid_chemical_ID,
+                                                    )
+            
+            F401_P1 = bst.units.Pump('F'+unit_ID_digits_str+'_P1', ins=F401-0, P=101325.)    
+            F401_P2 = bst.units.Pump('F'+unit_ID_digits_str+'_P2', ins=F401-1, P=101325.)  
+            
+            F401_P2-0-1-M401
+            
+            F402 = bst.units.DrumDryer('F'+str(unit_ID_digits_int+1), ins=F401_P1-0, outs=(recovered_adsorbate, 'recovered_regeneration_fluid'+rf_ID),
+                                                    T=352.58, # ~1 deg C above ethanol boiling temperature
+                                                    split={regeneration_fluid_chemical_ID:1},
+                                                    moisture_content=0.,
+                                                    )
+            
+            V401 = bst.IsenthalpicValve('V'+unit_ID_digits_str, ins=F402-1, P=101325.)
+            H401 = bst.HXutility('H'+unit_ID_digits_str, ins=V401-0, T=T_condenser, rigorous=True)
+            S404 = bst.PhaseSplitter('S'+unit_ID_digits_str, ins=H401-0, outs=(air_out, f'recycled_regeneration_fluid_{rf_ID}_from_dryer'))
+            S404-1-2-M401
+        
+        else:
+            RuntimeError('[{ID}] Regeneration fluid recovery modeling is not implemented for cases where user provides regeneration_fluid_composition_dict rather than regeneration_fluid_chemical_ID.')
+    
+    else:
+        if regeneration_fluid_chemical_ID:
+            A401 = bst.AdsorptionColumnTSA('A'+unit_ID_digits_str, 
+                                           ins=(liquid_feed, makeup_liquid_regeneration_fluid, air_in),
+                                           outs=(liquid_effluent, 
+                                                 recovered_adsorbate, 
+                                                 air_out),
+                                           adsorbate_ID=adsorbate_ID, 
+                                           regeneration_fluid={regeneration_fluid_chemical_ID:1.},
+                                           regeneration_velocity=regeneration_velocity, 
+                                           K=K,
+                                           target_recovery=target_recovery,
+                                           split = split,
+                                           drying_time = drying_time,
+                                           adsorbent = adsorbent,
+                                           void_fraction = void_fraction,
+                                           adsorbent_capacity = adsorbent_capacity,
+                                           )
+        else:
+            A401 = bst.AdsorptionColumnTSA('A'+unit_ID_digits_str, 
+                                           ins=(liquid_feed, makeup_liquid_regeneration_fluid, air_in),
+                                           outs=(liquid_effluent, 
+                                                 recovered_adsorbate, 
+                                                 air_out),
+                                           adsorbate_ID=adsorbate_ID, 
+                                           regeneration_fluid=regeneration_fluid_composition_dict,
+                                           regeneration_velocity=regeneration_velocity, 
+                                           K=K,
+                                           target_recovery=target_recovery,
+                                           split = split,
+                                           drying_time = drying_time,
+                                           adsorbent = adsorbent,
+                                           void_fraction = void_fraction,
+                                           adsorbent_capacity = adsorbent_capacity,
+                                           )
+

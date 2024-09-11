@@ -98,7 +98,7 @@ SO2 = chemical_database('SO2', phase='g')
 # Soluble inorganics
 # =============================================================================
 
-HCl = chemical_database('HCl')
+HCl = chemical_database('HCl', phase='l')
 H2SO4 = chemical_database('H2SO4', phase='l')
 HNO3 = chemical_database('HNO3', phase='l', Hf=-41406*_cal2joule)
 NaOH = chemical_database('NaOH', phase='l')

@@ -185,9 +185,14 @@ def create_HP_sys(ins, outs):
     # =============================================================================
     separation_sulfuric_acid = Stream('separation_sulfuric_acid', units='kg/hr')
     
-    separation_methanol = Stream('separation_methanol', units='kg/hr')
+    # separation_methanol = Stream('separation_methanol', units='kg/hr')
     
     separation_base = Stream('separation_base', units='kg/hr')
+    
+    separation_ethanol_regeneration_fluid = Stream('separation_ethanol_regeneration_fluid', units='kg/hr')
+    
+    separation_CEX_regeneration_fluid = Stream('separation_CEX_regeneration_fluid', units='kg/hr')
+    separation_AEX_regeneration_fluid = Stream('separation_AEX_regeneration_fluid', units='kg/hr')
     
     # =============================================================================
     # Separation units
@@ -196,7 +201,10 @@ def create_HP_sys(ins, outs):
                                                             ins=(
                                                            fermentation_sys-0,
                                                            separation_sulfuric_acid,
-                                                           '', '', '', 
+                                                           # separation_ethanol_regeneration_fluid,
+                                                           '',
+                                                           separation_CEX_regeneration_fluid,
+                                                           separation_AEX_regeneration_fluid,
                                                            ),
                                                    )
     s.gypsum.price = price['Gypsum']
@@ -230,7 +238,7 @@ def create_HP_sys(ins, outs):
     CSL_fresh = Stream('CSL_fresh', price=price['CSL'])
     lime_fresh = Stream('lime_fresh', price=price['Lime'])
     
-    methanol_fresh = Stream('methanol_fresh', price=price['Methanol'])
+    ethanol_fresh = Stream('ethanol_fresh', price=price['Ethanol'])
     lime_fresh2 = Stream('lime_fresh2', price=price['Lime'])
     
     MgCl2_fresh = Stream('MgCl2_fresh', price=price['Magnesium chloride'])
@@ -247,6 +255,9 @@ def create_HP_sys(ins, outs):
     # Isobutyraldehyde product
     IBA = Stream('IBA', units='kg/hr', price=price['IBA'])
     
+    
+    H2SO4_fresh = Stream('H2SO4_fresh', price=price['Sulfuric acid'])
+    NaOH_fresh = Stream('NaOH_fresh', price=price['Caustics'])
     
     #%%
     system_makeup_water = Stream('system_makeup_water', price=price['Makeup water'])
@@ -287,8 +298,8 @@ def create_HP_sys(ins, outs):
     T620_P = units.HPPump('T620_P', ins=T620-0, outs=AcrylicAcid)
     
     
-    T607 = bst.units.StorageTank('T607', ins = methanol_fresh, outs = separation_methanol)
-    T607.line = 'Methanol storage tank'
+    T607 = bst.units.StorageTank('T607', ins = ethanol_fresh, outs = separation_ethanol_regeneration_fluid)
+    T607.line = 'Ethanol storage tank'
 
     T608 = bst.units.StorageTank('T608', ins = lime_fresh2, outs = separation_base)
     T608.line = 'Sodium hydroxide storage tank'
@@ -299,6 +310,11 @@ def create_HP_sys(ins, outs):
     T610 = bst.units.StorageTank('T610', ins = ZnSO4_fresh, outs = fermentation_ZnSO4)
     T610.line = 'Zinc sulfate storage tank'
     
+    T611 = bst.units.StorageTank('T611', ins = H2SO4_fresh, outs = separation_CEX_regeneration_fluid)
+    T611.line = 'Sulfuric acid storage tank'
+    
+    T612 = bst.units.StorageTank('T612', ins = NaOH_fresh, outs = separation_AEX_regeneration_fluid)
+    T612.line = 'Caustics storage tank'
     
     ############################
     
@@ -327,7 +343,17 @@ def create_HP_sys(ins, outs):
                                         # separation_sys-4,
                                         upgrading_sys-2, 
                                         # u.H201-0,
+                                        separation_sys-4,
+                                        separation_sys-5,
+                                        separation_sys-6,
                                         ))
+    
+    @M501.add_specification(run=False)
+    def M501_acid_base_removal_spec():
+        for i in M501.ins:
+            i.imol['NaOH','H2SO4'] = 0.
+        M501._run()
+    
     # M501.citrate_acetate_dissolution_rxns = ParallelRxn([
     #     Rxn('SodiumAcetate + H2O -> AceticAcid + NaOH', 'SodiumAcetate',   1.-1e-5),
     #     Rxn('SodiumCitrate + H2O -> CitricAcid + 3NaOH ', 'SodiumCitrate',   1.-1e-5),
@@ -365,9 +391,6 @@ def create_HP_sys(ins, outs):
                                         u.U202-0,
                                         u.C202-0,
                                         u.S401-0,
-                                        separation_sys-4,
-                                        separation_sys-5,
-                                        separation_sys-6,
                                         ),
                             outs='wastes_to_boiler_turbogenerator')
     @M510.add_specification(run=True)
@@ -417,6 +440,9 @@ def create_HP_sys(ins, outs):
     
     HXN = bst.HeatExchangerNetwork('HXN1001',
                                                 ignored=[
+                                                        u.A410,
+                                                        u.A420,
+                                                        u.A430,
                                                         ],
                                               cache_network=False,
                                               )

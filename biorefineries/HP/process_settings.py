@@ -177,6 +177,9 @@ Hexanediol_price = 2.9
 # https://www.alibaba.com/product-detail/Supply-Best-Price-98-1-8_1600152253896.html?spm=a2700.galleryofferlist.normal_offer.d_title.4ff91a18MzPO0F
 Octanediol_price = 6.5
 
+# https://web.archive.org/web/20161125084558/http://www.icis.com:80/chemicals/channel-info-chemicals-a-z/
+HCl_price = 0.937 * _GDP_2007_to_2010 * chem_index[2016]/chem_index[2010]
+
 # 365-380 2022$/MT according to https://www.chemanalyst.com/Pricing-data/liquid-carbon-dioxide-1090
 # Baseline: 0.263 2016$/kg
 # Uncertainty range: 0.257 - 0.268 2016$/kg
@@ -209,6 +212,7 @@ price = {'AA': AA_price,
          'AmmoniumHydroxide': 0.1900 * _lb_per_kg * 17.031/35.046,	
          'CSL': 0.0339 * _lb_per_kg,
          'Caustics': 0.2384 * _lb_per_kg * 0.5, # 50 wt% NaOH/water mixture	
+         'Hydrochloric acid':HCl_price,
          'Boiler chems': 2.9772 * _lb_per_kg,	
          'Lime': lime_price,
          'Cooling tower chems': 1.7842 * _lb_per_kg,	
@@ -244,7 +248,7 @@ price = {'AA': AA_price,
          }
     
 
-# All prices converted to 2019$/kg
+# !!! All prices should first be set in 2016$/kg; they are then converted below to 2019$/kg
 for k,v in price.items():
     price[k] = v *chem_index[2019]/chem_index[2016]
     
@@ -360,8 +364,9 @@ GWP_CFs['LacticAcid_GREET'] = 1.80
 GWP_CFs['LacticAcid_fossil'] = 4.1787
 
 
-GWP_CFs['Corn stover'] = 0.10945 # see Table S4 of the SI
+GWP_CFs['Corn stover'] = 0.10945 # see Table S4 of the SI of Bhagwat et al. 2021
 GWP_CFs['Sugarcane'] = 0.12158 # ecoinvent 3.6, sugarcane production, RoW, IPCC 2013 GWP-100a
+GWP_CFs['Corn'] = 0.2610 # GREET 2023, Corn Production for Biofuel Refinery (cradle-to-gate)
 
 CFs['GWP_CFs'] = GWP_CFs
 CFs['GWP_CF_stream'] = GWP_CF_stream
@@ -422,8 +427,9 @@ FEC_CFs['LacticAcid'] = 29.
 # From ref [7], lactic acid production, RoW, cumulative energy demand, fossil
 FEC_CFs['LacticAcid_fossil'] = 79.524
 
-FEC_CFs['Corn stover'] = 1.68000 # see Table S4 in the SI
+FEC_CFs['Corn stover'] = 1.68000 # see Table S4 in the SI of Bhagwat et al. 2021
 FEC_CFs['Sugarcane'] = 0.37338 # ecoinvent 3.6, sugarcane production, RoW, IPCC 2013 GWP-100a
+FEC_CFs['Corn'] = 1.684 # GREET 2023, Corn Production for Biofuel Refinery (cradle-to-gate)
 
 
 

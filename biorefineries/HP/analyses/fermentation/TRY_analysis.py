@@ -18,7 +18,8 @@ from biosteam.utils import  colors
 import numpy as np
 
 from biorefineries import HP
-from biorefineries.HP.systems.system_sc_light_lle_vacuum_distillation import HP_tea, HP_lca, R302, spec, AA, simulate_and_print, get_AA_MPSP
+# from biorefineries.HP.systems.system_sc_light_lle_vacuum_distillation import HP_tea, HP_lca, R302, spec, AA, simulate_and_print, get_AA_MPSP
+from biorefineries.HP.systems.system_sc_improved_separations import HP_tea, HP_lca, R302, spec, AA, simulate_and_print, get_AA_MPSP
 
 from  matplotlib.colors import LinearSegmentedColormap
 import pandas as pd
@@ -30,7 +31,7 @@ from math import log
 
 import os
 
-from biorefineries.HP.models import models_AA_hexanol as models
+from biorefineries.HP.models import models_sc_improved_separations as models
 
 chdir = os.chdir
 
@@ -127,7 +128,7 @@ HP_metrics = [get_product_MPSP,
 
 # %% Generate 3-specification meshgrid and set specification loading functions
 
-steps = (30, 30, 1)
+steps = (10, 10, 1)
 
 # Yield, titer, productivity (rate)
 spec_1 = yields = np.linspace(0.05, 0.95, steps[0]) # yield
