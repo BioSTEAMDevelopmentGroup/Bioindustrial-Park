@@ -365,8 +365,9 @@ GWP_CFs['LacticAcid_fossil'] = 4.1787
 
 
 GWP_CFs['Corn stover'] = 0.10945 # see Table S4 of the SI of Bhagwat et al. 2021
-GWP_CFs['Sugarcane'] = 0.12158 # ecoinvent 3.6, sugarcane production, RoW, IPCC 2013 GWP-100a
-GWP_CFs['Corn'] = 0.2610 # GREET 2023, Corn Production for Biofuel Refinery (cradle-to-gate)
+# GWP_CFs['Sugarcane'] = 0.12158 # ecoinvent 3.6, sugarcane production, RoW, IPCC 2013 GWP-100a
+GWP_CFs['Sugarcane'] = 0.044535 # GREET 2023, Sugarcane Production for Brazil Plant
+GWP_CFs['Corn'] = 0.2610 # GREET 2023, Corn Production for Biofuel Refinery
 
 CFs['GWP_CFs'] = GWP_CFs
 CFs['GWP_CF_stream'] = GWP_CF_stream
@@ -428,8 +429,9 @@ FEC_CFs['LacticAcid'] = 29.
 FEC_CFs['LacticAcid_fossil'] = 79.524
 
 FEC_CFs['Corn stover'] = 1.68000 # see Table S4 in the SI of Bhagwat et al. 2021
-FEC_CFs['Sugarcane'] = 0.37338 # ecoinvent 3.6, sugarcane production, RoW, IPCC 2013 GWP-100a
-FEC_CFs['Corn'] = 1.684 # GREET 2023, Corn Production for Biofuel Refinery (cradle-to-gate)
+# FEC_CFs['Sugarcane'] = 0.37338 # ecoinvent 3.6, sugarcane production, RoW, IPCC 2013 GWP-100a
+FEC_CFs['Sugarcane'] = 0.28832 # GREET 2023, Sugarcane Production for Brazil Plant
+FEC_CFs['Corn'] = 1.684 # GREET 2023, Corn Production for Biofuel Refinery
 
 
 

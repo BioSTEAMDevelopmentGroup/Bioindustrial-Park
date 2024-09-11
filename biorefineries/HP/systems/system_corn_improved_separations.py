@@ -64,7 +64,8 @@ import copy
 from biorefineries.cornstover import CellulosicEthanolTEA as HPTEA
 from biosteam import SystemFactory
 from biorefineries.cellulosic import create_facilities
-from biorefineries.sugarcane import create_juicing_system_up_to_clarification
+# from biorefineries.sugarcane import create_juicing_system_up_to_clarification
+from biorefineries import corn
 # from lactic.hx_network import HX_Network
 
 from biorefineries.succinic.lca import LCA as HPLCA
@@ -99,7 +100,7 @@ tmo.settings.set_thermo(HP_chemicals)
 System.default_maxiter = 100
 # System.default_converge_method = 'wegstein'
 # feedstock_ID = 'Corn stover'
-feedstock_ID = 'Sugarcane'
+feedstock_ID = 'Corn'
 
 # System.default_converge_method = 'fixed-point'
 # System.default_converge_method = 'aitken'
@@ -109,21 +110,59 @@ System.default_relative_molar_tolerance = 0.001 # supersedes absolute tolerance
 System.default_molar_tolerance = 0.1
 System.strict_convergence = True # True => throw exception if system does not converge; false => continue with unconverged system
 
+#### Load corn system ####
+def get_corn_system_upto_slurry():
+    # corn.load()
+    sys = corn.create_system()
+    sys.simulate()
+    f = sys.flowsheet
+    disconnect_outs_0_sink = [f.MX, f.P502, f.S1]
+    # include_upstream_of = [f.MH612, f.X611,]
+    include_upstream_of = [f.P322]
+    unit_set = set()
+    for i in disconnect_outs_0_sink: i.outs[0].disconnect_sink()
+    for i in include_upstream_of: 
+        unit_set = unit_set.union(i.get_upstream_units())
+        unit_set.add(i)
+    unit_set.remove(f.E401)
+    
+    units_to_remove = list(f.E413.get_downstream_units().intersection(f.S1.get_upstream_units()))
+    for i in units_to_remove: 
+        try: unit_set.remove(i)
+        except: pass
+    
+    f.V310-0-2-f.V321
+    more_units_to_remove = [f.P407, f.E316, f.V317, f.P318]
+    for i in more_units_to_remove: 
+        try: unit_set.remove(i)
+        except: pass
+    
+    S201 = bst.SolidsCentrifuge('S201', ins=f.P322-0, outs=('insoluble_proteins', 'slurry_to_fermentation_process'),
+                                moisture_content=0.05,
+                                split={'InsolubleProtein':0.85},
+                                )
+    unit_set.add(S201)
+    
+    corn_system_upto_slurry = bst.System.from_units('corn_system_upto_slurry', list(unit_set))
+    for i in corn_system_upto_slurry.outs: i.disconnect_sink()
+    corn_system_upto_slurry.simulate(update_configuration=True)
+    corn_system_upto_slurry.diagram('cluster')
+    
+    return corn_system_upto_slurry
 
-@SystemFactory(ID = 'HP_sys')
+corn_system_upto_slurry = get_corn_system_upto_slurry()
+
+@SystemFactory(ID = 'helper_HP_sys')
 def create_HP_sys(ins, outs):
     u, s = flowsheet.unit, flowsheet.stream
     process_groups = []
     # %% Feedstock
     
     # Sugarcane juicing subprocess
-    sugarcane_juicing_sys = create_juicing_system_up_to_clarification()
     
-    u = sugarcane_juicing_sys.flowsheet.unit
-    s = sugarcane_juicing_sys.flowsheet.stream
+    u = corn_system_upto_slurry.flowsheet.unit
+    s = corn_system_upto_slurry.flowsheet.stream
     
-    u.U201.diagram()
-    sugarcane_juicing_sys.diagram('cluster')
     # u.U201.ins.append(u.M201-0)
     
     # u.M201-0-1-u.U201
@@ -135,7 +174,7 @@ def create_HP_sys(ins, outs):
     def U101_spec():
         U101.outs[0].copy_like(U101.ins[0])
     
-    feedstock = s.sugarcane
+    feedstock = s.corn
     feedstock_sink = feedstock.sink
     U101-0-0-feedstock_sink
     feedstock-0-U101
@@ -145,8 +184,8 @@ def create_HP_sys(ins, outs):
     
     # Update all prices to 2019$ using chemical indices
     # sugarcane biorefinery base year is 2019
-    for sugarcane_sys_stream in list(s):
-        sugarcane_sys_stream.price *= chem_index[2019]/chem_index[2019]
+    for corn_sys_stream in list(s):
+        corn_sys_stream.price *= chem_index[2019]/chem_index[2018]
         
     # %% 
     
@@ -169,7 +208,7 @@ def create_HP_sys(ins, outs):
     makeup_MEA_A301 = Stream('makeup_MEA_A301', units='kg/hr', price=price['Monoethanolamine'])
     
     #%% Fermentation units
-    fermentation_sys = create_HP_fermentation_process(ins=(u.C201-0,
+    fermentation_sys = create_HP_fermentation_process(ins=(u.S201-1,
                                                            CSL,
                                                            fermentation_MgCl2,
                                                            fermentation_ZnSO4,
@@ -316,6 +355,7 @@ def create_HP_sys(ins, outs):
     T612 = bst.units.StorageTank('T612', ins = NaOH_fresh, outs = separation_AEX_regeneration_fluid)
     T612.line = 'Caustics storage tank'
     
+    
     ############################
     
     # %% 
@@ -339,20 +379,14 @@ def create_HP_sys(ins, outs):
     
     # Mix waste liquids for treatment
     M501 = bst.units.Mixer('M501', ins=(u.F301_P-0, 
+                                        # separation_sys-4,
                                         upgrading_sys-2, 
-                                        # u.H201-0,
                                         separation_sys-3,
                                         separation_sys-4,
                                         separation_sys-5,
                                         separation_sys-6,
+                                        # u.H201-0,
                                         ))
-    
-    @M501.add_specification(run=False)
-    def M501_acid_base_removal_spec():
-        for i in M501.ins:
-            i.imol['NaOH','H2SO4'] = 0.
-        M501._run()
-    
     # M501.citrate_acetate_dissolution_rxns = ParallelRxn([
     #     Rxn('SodiumAcetate + H2O -> AceticAcid + NaOH', 'SodiumAcetate',   1.-1e-5),
     #     Rxn('SodiumCitrate + H2O -> CitricAcid + 3NaOH ', 'SodiumCitrate',   1.-1e-5),
@@ -386,9 +420,10 @@ def create_HP_sys(ins, outs):
         
     # Mix solid wastes to boiler turbogenerator
     M510 = bst.units.Mixer('M510', ins=(
-                                        # u.S301-0,
-                                        u.U202-0,
-                                        u.C202-0,
+                                        u.S201-0,
+                                        # u.U202-0,
+                                        # u.C202-0,
+                                        u.MH103-1,
                                         u.S401-0,
                                         ),
                             outs='wastes_to_boiler_turbogenerator')
@@ -423,7 +458,7 @@ def create_HP_sys(ins, outs):
          # s.cooling_tower_makeup_water,
          # s.cooling_tower_chemicals,
          ],
-        feedstock=s.sugarcane,
+        feedstock=s.corn,
         RO_water=wastewater_treatment_sys-2,
         recycle_process_water=MX-0,
         BT_area=700,
@@ -439,9 +474,6 @@ def create_HP_sys(ins, outs):
     
     HXN = bst.HeatExchangerNetwork('HXN1001',
                                                 ignored=[
-                                                        u.A410,
-                                                        u.A420,
-                                                        u.A430,
                                                         ],
                                               cache_network=False,
                                               )
@@ -457,7 +489,9 @@ def create_HP_sys(ins, outs):
     
 # %% System setup
 
-HP_sys = create_HP_sys()
+HP_sys = bst.System.from_units('HP_sys', 
+                               create_HP_sys().units + corn_system_upto_slurry.units)
+
 # HP_sys.subsystems[-1].relative_molar_tolerance = 0.005
 HP_sys.set_tolerance(mol=1e-3, rmol=1e-3, subsystems=True)
 
@@ -465,7 +499,7 @@ f = bst.main_flowsheet
 u = f.unit
 s = f.stream
 
-feedstock = s.sugarcane
+feedstock = s.corn
 AA = s.AcrylicAcid
 get_flow_tpd = lambda: (feedstock.F_mass-feedstock.imass['H2O'])*24/907.185
 
@@ -495,7 +529,7 @@ globals().update(flowsheet.to_dict())
 # Income tax was changed from 0.35 to 0.21 based on Davis et al., 2018 (new legislation)
 
 HP_tea = HPTEA(system=HP_sys, IRR=0.10, duration=(2016, 2046),
-        depreciation='MACRS7', income_tax=0.21, operating_days=240,
+        depreciation='MACRS7', income_tax=0.21, operating_days=330.,
         lang_factor=None, construction_schedule=(0.08, 0.60, 0.32),
         startup_months=3, startup_FOCfrac=1, startup_salesfrac=0.5,
         startup_VOCfrac=0.75, WC_over_FCI=0.05,
@@ -517,7 +551,6 @@ HP_tea = HPTEA(system=HP_sys, IRR=0.10, duration=(2016, 2046),
         labor_burden=0.90, property_insurance=0.007, maintenance=0.03,
         steam_power_depreciation='MACRS20', boiler_turbogenerator=u.BT701)
 
-
 HP_no_BT_tea = HP_tea
 
 #%%
@@ -528,7 +561,7 @@ HP_no_BT_tea = HP_tea
 HP_lca = HPLCA(system=HP_sys, 
                  CFs=CFs, 
                  feedstock=feedstock, 
-                 feedstock_ID='Sugarcane',
+                 feedstock_ID=feedstock_ID,
                  main_product=AA, 
                  main_product_chemical_IDs=['AcrylicAcid',], 
                  by_products=['CaSO4'], 
@@ -542,7 +575,7 @@ HP_lca = HPLCA(system=HP_sys,
 #%% Define unit groups and their metrics
 
 feedstock_acquisition_group = bst.UnitGroup('feedstock acquisition', units=[u.U101])
-feedstock_juicing_group = f.juicing_sys.to_unit_group('feedstock juicing')
+feedstock_juicing_group = f.corn_system_upto_slurry.to_unit_group('feedstock juicing')
 fermentation_group = f.HP_fermentation_process.to_unit_group('fermentation')
 separation_group = f.HP_separation_improved_process.to_unit_group('separation')
 upgrading_group = f.HP_to_acrylic_acid_upgrading_process.to_unit_group('upgrading')
@@ -686,7 +719,7 @@ def F301_titer_obj_fn(V):
 
 def load_titer_with_glucose(titer_to_load):
     # clear_units([V301, K301])
-    F301_lb, F301_ub = 0., 0.8
+    F301_lb, F301_ub = 0., 0.9
     M304_lb, M304_ub = 0., 40000.  # for low-titer high-yield combinations, if infeasible, use a higher upper bound
     
     spec.spec_2 = titer_to_load

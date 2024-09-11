@@ -903,7 +903,7 @@ def create_HP_separation_improved_process(ins, outs,):
     
     # sharply split adsorbed chemicals
     split.update({i: 0. for i in 
-             ['Gypsum', 'AmmoniumSulfate', 'ZincSulfate', 'CaO', 'MagnesiumChloride']})
+             ['Gypsum', 'AmmoniumSulfate', 'ZincSulfate', 'CaO', 'MagnesiumChloride', 'NH3']})
     
     # partially adsorbed chemicals
     split['HP'] = 62.20/66.94 # !!! from Singh Group's initial experimental data
