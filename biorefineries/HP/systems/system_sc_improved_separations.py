@@ -206,6 +206,8 @@ def create_HP_sys(ins, outs):
                                                            separation_CEX_regeneration_fluid,
                                                            separation_AEX_regeneration_fluid,
                                                            ),
+                                                            
+                                                            fermentation_reactor=u.R302,
                                                    )
     s.gypsum.price = price['Gypsum']
     

@@ -783,7 +783,7 @@ def create_HP_separation_methanol_precipitation_neutralization_process(ins, outs
                       dict(ID='anion_impurities', Water=1),
                                 ],
                                                )
-def create_HP_separation_improved_process(ins, outs,):
+def create_HP_separation_improved_process(ins, outs, fermentation_reactor=None):
     
     fermentation_broth, sulfuric_acid_separation,\
         adsorption_makeup_regeneration_fluid, CEX_makeup_regeneration_HCl, AEX_makeup_regeneration_NaOH = ins
@@ -818,7 +818,31 @@ def create_HP_separation_improved_process(ins, outs,):
                                     outs = ('acidulated_broth'),
                                     vessel_material='Stainless steel 316',
                                     tau = 1.)
-    
+    R401_design = R401._design
+    R401_cost = R401._cost
+    R401.bypass = True
+    @R401.add_specification(run=False)
+    def R401_bypass_spec():
+        feed = R401.ins[0]
+        if fermentation_reactor:
+            if not fermentation_reactor.neutralization:
+                R401._design = lambda: 0
+                R401._cost = lambda: 0
+                R401.ins[1].empty()
+            else:
+                R401._design = R401_design
+                R401._cost = R401_cost
+            R401._run()
+        
+        elif feed.imol['CalciumLactate'] > feed.imol['HP']:
+            R401._design = lambda: 0
+            R401._cost = lambda: 0
+            R401.ins[1].empty()
+            R401._run()
+        
+        else:
+            raise RuntimeError(f'[{R401.ID}] Neutralization and reacidulation requirement is not specified by the user.')
+            
     R401_H = bst.units.HXutility('R401_H', ins = R401-0, T = 320, rigorous = False)
     R401_P = bst.units.Pump('R401_P', ins=R401_H-0)
     
@@ -832,16 +856,31 @@ def create_HP_separation_improved_process(ins, outs,):
                                                S402_filtrate_split,
                                                chemical_groups),
                               outs=(gypsum, ''))
-    
-    @S402.add_specification(run=False)
-    def S402_spec():
-        if S402.ins[0].imol['CaSO4']>0:
+    S402_design = S402._design
+    S402_cost = S402._cost
+    S402.bypass = True
+    @S402.add_specification()
+    def S402_bypass_spec():
+        feed = S402.ins[0]
+        if fermentation_reactor:
+            if not fermentation_reactor.neutralization:
+                S402._design = lambda: 0
+                S402._cost = lambda: 0
+                S402.outs[0].empty()
+            else:
+                S402._design = S402_design
+                S402._cost = S402_cost
             S402._run()
+        
+        elif feed.imol['CalciumLactate'] > feed.imol['HP']:
+            S402._design = lambda: 0
+            S402._cost = lambda: 0
+            S402.outs[0].empty()
+            S402._run()
+        
         else:
-            S402.outs[0].mol[:] = 0
-            S402.outs[1].mol = S402.ins[0].mol
-    
-    
+            raise RuntimeError(f'[{S402.ID}] Neutralization and reacidulation requirement is not specified by the user.')
+            
     #########------------Color Removal Adsorption------------#########
     
     # by default, chemicals pass unabsorbed

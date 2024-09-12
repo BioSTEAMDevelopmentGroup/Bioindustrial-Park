@@ -19,7 +19,7 @@ import numpy as np
 
 from biorefineries import HP
 # from biorefineries.HP.systems.system_sc_light_lle_vacuum_distillation import HP_tea, HP_lca, R302, spec, AA, simulate_and_print, get_AA_MPSP
-from biorefineries.HP.systems.system_sc_improved_separations import HP_tea, HP_lca, R302, spec, AA, simulate_and_print, get_AA_MPSP
+from biorefineries.HP.systems.system_corn_improved_separations import HP_tea, HP_lca, R302, spec, AA, simulate_and_print, get_AA_MPSP
 
 from  matplotlib.colors import LinearSegmentedColormap
 import pandas as pd
@@ -31,7 +31,7 @@ from math import log
 
 import os
 
-from biorefineries.HP.models import models_sc_improved_separations as models
+from biorefineries.HP.models import models_corn_improved_separations as models
 
 chdir = os.chdir
 
@@ -56,7 +56,7 @@ HP_results_filepath = HP_filepath + '\\analyses\\results\\'
 
 #%% Load baseline
 
-spec.reactor.neutralization = False # !!!
+# spec.reactor.neutralization = False # !!!
 
 model = models.HP_model
 system = HP_sys = models.HP_sys
@@ -128,7 +128,7 @@ HP_metrics = [get_product_MPSP,
 
 # %% Generate 3-specification meshgrid and set specification loading functions
 
-steps = (10, 10, 1)
+steps = (60, 60, 1)
 
 # Yield, titer, productivity (rate)
 spec_1 = yields = np.linspace(0.05, 0.95, steps[0]) # yield
@@ -292,7 +292,7 @@ max_HXN_qbal_percent_error = 0.
 curr_no = 0
 total_no = len(yields)*len(titers)*len(productivities)
 
-print_status_every_n_simulations = 5
+print_status_every_n_simulations = 50
 
 for p in productivities:
     # data_1 = HP_data = spec.evaluate_across_specs(
@@ -523,7 +523,7 @@ if plot:
     # MPSP_w_levels, MPSP_w_ticks, MPSP_cbar_ticks = get_contour_info_from_metric_data(results_metric_1, lb=3)
     MPSP_w_levels = np.arange(0., 4.01, 0.05)
     MPSP_cbar_ticks = np.arange(0., 4.01, 0.4)
-    MPSP_w_ticks = [1., 1.1, 1.2, 1.3, 2., 2.5, 4.]
+    MPSP_w_ticks = [0.9, 1., 1.2, 2., 4.]
     # MPSP_w_levels = np.arange(0., 15.5, 0.5)
     
     contourplots.animated_contourplot(w_data_vs_x_y_at_multiple_z=results_metric_1, # shape = z * x * y # values of the metric you want to plot on the color axis; e.g., MPSP

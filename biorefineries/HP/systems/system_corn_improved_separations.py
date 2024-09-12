@@ -116,7 +116,9 @@ def get_corn_system_upto_slurry():
     sys = corn.create_system()
     sys.simulate()
     f = sys.flowsheet
-    disconnect_outs_0_sink = [f.MX, f.P502, f.S1]
+    disconnect_outs_0_sink = [f.MX, f.P502, f.S1,
+                              f.P304, # exclude ammonia addition
+                              ]
     # include_upstream_of = [f.MH612, f.X611,]
     include_upstream_of = [f.P322]
     unit_set = set()
@@ -132,10 +134,21 @@ def get_corn_system_upto_slurry():
         except: pass
     
     f.V310-0-2-f.V321
-    more_units_to_remove = [f.P407, f.E316, f.V317, f.P318]
+    more_units_to_remove = [f.P407, f.E316, f.V317, f.P318,
+                            f.V303, f.P304, # exclude ammonia addition
+                            ]
     for i in more_units_to_remove: 
         try: unit_set.remove(i)
         except: pass
+    
+    # # include this heat exchanger if including ammonia addition; slurry has V>1 in some cases, leading to evaporator (F301) issues
+    # H201 = bst.HXutility('H201', ins=f.P322-0, V=0., rigorous=True)
+    # @H201.add_specification(run=False)
+    # def H201_feed_vle_spec():
+    #     H201_feed = H201.ins[0]
+    #     H201_feed.vle(H=H201_feed.H, P=H201_feed.P)
+    #     H201._run()
+    # unit_set.add(H201)
     
     S201 = bst.SolidsCentrifuge('S201', ins=f.P322-0, outs=('insoluble_proteins', 'slurry_to_fermentation_process'),
                                 moisture_content=0.05,
@@ -197,7 +210,7 @@ def create_HP_sys(ins, outs):
     CSL = Stream('CSL', units='kg/hr')
     fermentation_MgCl2 = Stream('fermentation_MgCl2', units='kg/hr')
     fermentation_ZnSO4 = Stream('fermentation_ZnSO4', units='kg/hr')
-    # Lime for neutralization of produced acid
+    # Lime for pH control or neutralization of produced acid
     fermentation_lime = Stream('fermentation_lime', units='kg/hr')
     
     fresh_CO2_fermentation = Stream('fresh_CO2_fermentation', units='kg/hr',
@@ -216,7 +229,7 @@ def create_HP_sys(ins, outs):
                                                            fresh_CO2_fermentation,
                                                            makeup_MEA_A301),
                                                    )
-    
+    u.R302.neutralization = False
     
     # %% 
     # =============================================================================
@@ -245,6 +258,8 @@ def create_HP_sys(ins, outs):
                                                            separation_CEX_regeneration_fluid,
                                                            separation_AEX_regeneration_fluid,
                                                            ),
+                                                            
+                                                            fermentation_reactor=u.R302,
                                                    )
     s.gypsum.price = price['Gypsum']
     
@@ -701,25 +716,26 @@ HP_fermentation_process = f.HP_fermentation_process
 
 def M304_titer_obj_fn(water_to_sugar_mol_ratio):
     M304.water_to_sugar_mol_ratio = water_to_sugar_mol_ratio
-    # call_all_specifications_or_run([M304, M304_H, S302, S303, R303, T301, R302, 
-    #                                 K301, V301, K302, V302,
-    #                                 ])
-    HP_fermentation_process.run()
+    call_all_specifications_or_run([M304, M304_H, S302, S303, R303, T301, R302, 
+                                    K301, V301, K302, V302,
+                                    ])
+    # HP_fermentation_process.run()
     return R302.effluent_titer - R302.titer_to_load
 
 def F301_titer_obj_fn(V):
     F301.V = V
-    # call_all_specifications_or_run([F301, F301_P,
-    #                                 M304_P, 
-    #                                 M304, M304_H, S302, S303, R303, T301, R302, 
-    #                                 V301, K301,
-    #                                 ])
-    HP_fermentation_process.run()
+    call_all_specifications_or_run([F301, F301_P,
+                                    M304_P, 
+                                    M304, M304_H, S302, S303, R303, T301, R302, 
+                                    V301, K301,
+                                    ])
+    # HP_fermentation_process.run()
     return R302.effluent_titer - R302.titer_to_load
 
 def load_titer_with_glucose(titer_to_load):
     # clear_units([V301, K301])
-    F301_lb, F301_ub = 0., 0.9
+    # F301_lb, F301_ub = 1e-3, 1. - 1e-3
+    F301_lb, F301_ub = 0., 1. - 1e-3
     M304_lb, M304_ub = 0., 40000.  # for low-titer high-yield combinations, if infeasible, use a higher upper bound
     
     spec.spec_2 = titer_to_load
