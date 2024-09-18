@@ -16,7 +16,7 @@ from biosteam.utils import  colors
 import numpy as np
 
 from biorefineries import HP
-from biorefineries.HP.system_light_lle_vacuum_distillation import HP_sys, HP_tea, HP_lca, R302, spec, AA, simulate_and_print
+from biorefineries.HP.systems.system_sc_light_lle_vacuum_distillation import HP_sys, HP_tea, HP_lca, R302, spec, AA, simulate_and_print
 
 from  matplotlib.colors import LinearSegmentedColormap
 import pandas as pd
@@ -52,12 +52,7 @@ HP_filepath = HP.__file__.replace('\\__init__.py', '')
 # ##
 HP_results_filepath = HP_filepath + '\\analyses\\results\\'
 
-#%% Loading functions
-# R302 = u.R302
 
-def load_CO2_biomass_C_frac(C_frac):
-    R302.fraction_of_biomass_C_from_CO2 = C_frac
-    
 #%%
 simulate_and_print()
 
@@ -88,20 +83,20 @@ HP_metrics = [get_product_MPSP,
 
 # %% Generate 3-specification meshgrid and set specification loading functions
 
-steps = (30, 30, 5)
+steps = (10, 10, 1)
 
 # Yield, titer, productivity (rate)
 spec_1 = yields = np.linspace(0.05, 0.95, steps[0]) # yield
 spec_2 = titers = np.linspace(5., 
-                              180.,
+                              200.,
                                 steps[1]) # titer
 
-# spec_3 = C_fracs = np.array([spec.baseline_productivity])
-# spec_3 = C_fracs =\
+# spec_3 = productivities = np.array([spec.baseline_productivity])
+# spec_3 = productivities =\
 #     np.array([0.2*spec.baseline_productivity, spec.baseline_productivity, 5.*spec.baseline_productivity])
 
-spec_3 = C_fracs =\
-    np.linspace(0, 100, steps[2])
+spec_3 = productivities =\
+    np.array([spec.baseline_productivity])
 
     # np.array([0.2*spec.baseline_productivity, spec.baseline_productivity, 5*spec.baseline_productivity,])
 
@@ -115,12 +110,12 @@ x_ticks = [0, 10, 20, 30, 40, 50, 60, 70, 80, 90, 100]
 
 y_label = r"$\bfFermentation$" + " " + r"$\bfTiter$" # title of the y axis
 y_units =r"$\mathrm{g} \cdot \mathrm{L}^{-1}$"
-y_ticks = [0, 30, 60, 90, 120, 150, 180]
+y_ticks = [0, 20, 40, 60, 80, 100, 120, 140, 160, 180, 200]
 
 
-z_label = r"$\bfBiomass$" + " " + r"$\bfCarbon$" + " " + r"$\bffrom$" + " " + r"$\bf{CO}_{2}$" # title of the z axis
-z_units = r"$\mathrm{mol}$" + r"$\mathrm{\%}$"
-z_ticks = [0., 20, 40, 60, 80, 100]
+z_label = r"$\bfFermentation$" + " " + r"$\bfProductivity$" # title of the z axis
+z_units =  r"$\mathrm{g} \cdot \mathrm{L}^{-1}  \cdot \mathrm{h}^{-1}$"
+z_ticks = [0., 0.25, 0.5, 0.75, 1., 1.25, 1.5]
 
 # Metrics
 MPSP_w_label = r"$\bfMPSP$" # title of the color axis
@@ -213,28 +208,24 @@ def tickmarks(dmin, dmax, accuracy=50, N_points=5):
 #%%
 
 minute = '0' + str(dateTimeObj.minute) if len(str(dateTimeObj.minute))==1 else str(dateTimeObj.minute)
-file_to_save = f'_{steps}_steps_'+'HP_TY_CO2_%s.%s.%s-%s.%s'%(dateTimeObj.year, dateTimeObj.month, dateTimeObj.day, dateTimeObj.hour, minute)
+file_to_save = f'_{steps}_steps_'+'HP_TRY_%s.%s.%s-%s.%s'%(dateTimeObj.year, dateTimeObj.month, dateTimeObj.day, dateTimeObj.hour, minute)
 
 #%% Create meshgrid
 spec_1, spec_2 = np.meshgrid(spec_1, spec_2)
-
-fixed_productivity = 1.118
 
 #%% Initial simulation
 # simulate_and_print()
 
 print('\n\nSimulating the initial point to avoid bugs ...')
-load_CO2_biomass_C_frac(C_fracs[0])
-spec.load_specifications(yields[0], titers[0],fixed_productivity)
+spec.load_specifications(yields[0], titers[0], productivities[0])
 # spec.set_production_capacity(desired_annual_production=spec.desired_annual_production)
 simulate_and_print()
 
-# %% Run TY_CO2 analysis 
+# %% Run TRY analysis 
 system = HP_sys
 HXN = spec.HXN
 results_metric_1, results_metric_2, results_metric_3 = [], [], []
 results_metric_4, results_metric_5, results_metric_6 = [], [], []
-
 
 def print_status(curr_no, total_no, s1, s2, s3, HXN_qbal_error, results=None, exception_str=None,):
     print('\n\n')
@@ -245,13 +236,14 @@ def print_status(curr_no, total_no, s1, s2, s3, HXN_qbal_error, results=None, ex
     print(f'HXN Qbal error = {round(HXN_qbal_error, 2)} %.')
     print('\n')
     print(results)
+    print(AA.imass['AA'] * HP_tea.operating_hours / 1e3)
 
 max_HXN_qbal_percent_error = 0.
 
 curr_no = 0
-total_no = len(yields)*len(titers)*len(C_fracs)
+total_no = len(yields)*len(titers)*len(productivities)
 
-for p in C_fracs:
+for p in productivities:
     # data_1 = HP_data = spec.evaluate_across_specs(
     #         HP_sys, spec_1, spec_2, HP_metrics, [p])
     
@@ -270,9 +262,7 @@ for p in C_fracs:
             curr_no +=1
             error_message = None
             try:
-                load_CO2_biomass_C_frac(p/100.)
-                
-                spec.load_specifications(spec_1=y, spec_2=t, spec_3=fixed_productivity)
+                spec.load_specifications(spec_1=y, spec_2=t, spec_3=p)
                 
                 # spec.set_production_capacity(desired_annual_production=spec.desired_annual_production)
                 # for i in range(6):
@@ -629,16 +619,16 @@ print('\nCreating and saving contour plots ...\n')
 #%% MPSP
 
 # MPSP_w_levels, MPSP_w_ticks, MPSP_cbar_ticks = get_contour_info_from_metric_data(results_metric_1, lb=3)
-MPSP_w_levels = np.arange(0., 3.01, 0.1)
-MPSP_cbar_ticks = np.arange(0., 3.01, 0.5)
-MPSP_w_ticks = [0.75, 1., 1.25, 2., 3.]
+MPSP_w_levels = np.arange(0., 4.01, 0.05)
+MPSP_cbar_ticks = np.arange(0., 4.01, 0.4)
+MPSP_w_ticks = []
 # MPSP_w_levels = np.arange(0., 15.5, 0.5)
 
-contourplots.animated_contourplot(w_data_vs_x_y_at_multiple_z=results_metric_1, # shape = z * x * y # values of the metric you want to plot on the color axis; e.g., MPSP
+contourplots.animated_contourplot(w_data_vs_x_y_at_multiple_z=results_metric_1/907.185, # shape = z * x * y # values of the metric you want to plot on the color axis; e.g., MPSP
                                 x_data=100*yields, # x axis values
                                 # x_data = yields/theoretical_max_g_HP_acid_per_g_glucose,
                                 y_data=titers, # y axis values
-                                z_data=C_fracs, # z axis values
+                                z_data=productivities, # z axis values
                                 x_label=x_label, # title of the x axis
                                 y_label=y_label, # title of the y axis
                                 z_label=z_label, # title of the z axis
@@ -652,74 +642,39 @@ contourplots.animated_contourplot(w_data_vs_x_y_at_multiple_z=results_metric_1, 
                                 y_units=y_units,
                                 z_units=z_units,
                                 w_units=MPSP_units,
-                                fmt_clabel=lambda cvalue: r"$\mathrm{\$}$"+" {:.2f} ".format(cvalue)+r"$\cdot\mathrm{kg}^{-1}$", # format of contour labels
-                                # fmt_clabel = lambda cvalue: get_rounded_str(cvalue, 3),
+                                # fmt_clabel=lambda cvalue: r"$\mathrm{\$}$"+" {:.1f} ".format(cvalue)+r"$\cdot\mathrm{kg}^{-1}$", # format of contour labels
+                                fmt_clabel = lambda cvalue: get_rounded_str(cvalue, 3),
                                 cmap=CABBI_green_colormap(), # can use 'viridis' or other default matplotlib colormaps
                                 cmap_over_color = colors.grey_dark.shade(8).RGBn,
                                 extend_cmap='max',
                                 cbar_ticks=MPSP_cbar_ticks,
                                 z_marker_color='g', # default matplotlib color names
                                 fps=fps, # animation frames (z values traversed) per second
-                                n_loops=8, # the number of times the animated contourplot should loop animation over z; infinite by default
+                                n_loops='inf', # the number of times the animated contourplot should loop animation over z; infinite by default
                                 animated_contourplot_filename='MPSP_animated_contourplot_'+file_to_save, # file name to save animated contourplot as (no extensions)
                                 keep_frames=keep_frames, # leaves frame PNG files undeleted after running; False by default
                                 axis_title_fonts=axis_title_fonts,
                                 clabel_fontsize = clabel_fontsize,
                                 default_fontsize = default_fontsize,
                                 axis_tick_fontsize = axis_tick_fontsize,
-                                
-                                
-                                comparison_range=AA_market_range,
-                                
-                                
-                                # comparison_range=[1.4,1.7],
-                                n_minor_ticks = [1,2],
-                                cbar_n_minor_ticks = 4,
+                                # comparison_range=AA_market_range,
+                                n_minor_ticks = 1,
+                                cbar_n_minor_ticks = 3,
                                 # manual_clabels_regular = {
                                 #     MPSP_w_ticks[5]: (45,28),
                                 #     },
-                                
-                                # additional_points ={(40.5, 35.9):('D', 'w', 6)},
-                                
-                                # comparison_range=[MPSP_w_levels[-2], MPSP_w_levels[-1]],
-                                # comparison_range_hatch_pattern='////',
-                                
-                                # manual_clabels_regular = {
-                                #     # MPSP_w_ticks[0]: (80,300),
-                                #     # MPSP_w_ticks[1]: (50,320),
-                                #     # MPSP_w_ticks[2]: (25,310),
-                                #     # MPSP_w_ticks[3]: (18,300),
-                                #     # MPSP_w_ticks[4]: (10,50),
-                                    
-                                #     MPSP_w_ticks[0]: (70,70),
-                                #     MPSP_w_ticks[1]: (60,58),
-                                #     MPSP_w_ticks[2]: (60,45),
-                                #     MPSP_w_ticks[3]: (55,30),
-                                #     MPSP_w_ticks[4]: (50,25),
-                                #     MPSP_w_ticks[5]: (12,12),
-                                #     },
-                                # manual_clabels_comparison_range =\
-                                #     {HP_maximum_viable_market_range[0]:(33,20), 
-                                #       HP_maximum_viable_market_range[1]:(32,10)},
-                                
-                                
-                                # contourplot_facecolor = colors.grey_dark.shade(8).RGBn,
-                                
-                                
-                                
-                                # fill_bottom_with_cmap_over_color=True, # for TY_CO2
-                                # bottom_fill_bounds = ((0,0), 
-                                #                       (5,11.),
-                                #                       (95,11.)),
+                                additional_points ={(73, 62.5):('D', 'w', 6)},
+                                fill_bottom_with_cmap_over_color=True, # for TRY
+                                bottom_fill_bounds = ((0,0), 
+                                                      (5,18.),
+                                                      (95,18.)),
+                                # zoom_data_scale=5,
+                                text_boxes = {'>4.0': [(5,5), 'white']},
                                 
                                 add_shapes = {
                                     # coords as tuple of tuples: (color, zorder),
-                                    ((5,14), (55,180), (0,180)): ('white', 2),
+                                    ((0,0), (55,200), (1,200)): ('white', 2), # infeasible region smoothing
                                     }
-                                # zoom_data_scale=5,
-                                
-                                # text_boxes = {'>' +  r"$\mathrm{\$}$"+" {:.2f} ".format(3.00)+r"$\cdot\mathrm{kg}^{-1}$": [(5,2), 'white']},
-                                
                                 )
 
 #%% GWP
@@ -731,7 +686,7 @@ GWP_w_ticks = [2, 2.25, 3, 4, 6, ]
 contourplots.animated_contourplot(w_data_vs_x_y_at_multiple_z=results_metric_2, # shape = z * x * y # values of the metric you want to plot on the color axis; e.g., GWP
                                 x_data=100*yields, # x axis values
                                 y_data=titers, # y axis values
-                                z_data=C_fracs, # z axis values
+                                z_data=productivities, # z axis values
                                 x_label=x_label, # title of the x axis
                                 y_label=y_label, # title of the y axis
                                 z_label=z_label, # title of the z axis
@@ -763,6 +718,11 @@ contourplots.animated_contourplot(w_data_vs_x_y_at_multiple_z=results_metric_2, 
                                 n_minor_ticks = (1,2),
                                 cbar_n_minor_ticks = 3,
                                 
+                                add_shapes = {
+                                    # coords as tuple of tuples: (color, zorder),
+                                    ((5,14), (55,180), (0,180)): ('white', 2),
+                                    },
+                                
                                 # additional_points ={(40.5, 35.9):('D', 'w', 6)},
                                 
                                 # manual_clabels_regular = {
@@ -787,7 +747,7 @@ contourplots.animated_contourplot(w_data_vs_x_y_at_multiple_z=results_metric_2, 
                                 # comparison_range_hatch_pattern='////',
                                 
                                 
-                                # fill_bottom_with_cmap_over_color=True, # for TY_CO2
+                                # fill_bottom_with_cmap_over_color=True, # for TRY
                                 # bottom_fill_bounds = ((0,0), 
                                 #                       (5,11.),
                                 #                       (95,11.)),
@@ -807,7 +767,7 @@ FEC_w_ticks = [20, 30, 40, 60, 100]
 contourplots.animated_contourplot(w_data_vs_x_y_at_multiple_z=results_metric_3, # shape = z * x * y # values of the metric you want to plot on the color axis; e.g., FEC
                                 x_data=100*yields, # x axis values
                                 y_data=titers, # y axis values
-                                z_data=C_fracs, # z axis values
+                                z_data=productivities, # z axis values
                                 x_label=x_label, # title of the x axis
                                 y_label=y_label, # title of the y axis
                                 z_label=z_label, # title of the z axis
@@ -859,7 +819,7 @@ contourplots.animated_contourplot(w_data_vs_x_y_at_multiple_z=results_metric_3, 
                                 #     FEC_w_ticks[6]: (60,20),
                                 #     },
                                 
-                                # fill_bottom_with_cmap_over_color=True, # for TY_CO2
+                                # fill_bottom_with_cmap_over_color=True, # for TRY
                                 # bottom_fill_bounds = ((0,0), 
                                 #                       (5,5.),
                                 #                       (95,7.)),
@@ -887,7 +847,7 @@ contourplots.animated_contourplot(w_data_vs_x_y_at_multiple_z=results_metric_4, 
                                 x_data=100*yields, # x axis values
                                 # x_data = yields/theoretical_max_g_HP_acid_per_g_glucose,
                                 y_data=titers, # y axis values
-                                z_data=C_fracs, # z axis values
+                                z_data=productivities, # z axis values
                                 x_label=x_label, # title of the x axis
                                 y_label=y_label, # title of the y axis
                                 z_label=z_label, # title of the z axis
@@ -920,9 +880,9 @@ contourplots.animated_contourplot(w_data_vs_x_y_at_multiple_z=results_metric_4, 
                                 n_minor_ticks = 1,
                                 cbar_n_minor_ticks = 4,
                                 # comparison_range=[AOC_w_levels[-2], AOC_w_levels[-1]],
-                                # comparison_range_hatch_pattern='////',fill_bottom_with_cmap_over_color=True, # for TY_CO2
+                                # comparison_range_hatch_pattern='////',fill_bottom_with_cmap_over_color=True, # for TRY
                                 
-                                # fill_bottom_with_cmap_over_color=True, # for TY_CO2
+                                # fill_bottom_with_cmap_over_color=True, # for TRY
                                 # bottom_fill_bounds = ((0,0), 
                                 #                       (5,11.),
                                 #                       (95,11.)),
@@ -946,7 +906,7 @@ contourplots.animated_contourplot(w_data_vs_x_y_at_multiple_z=results_metric_5, 
                                 x_data=100*yields, # x axis values
                                 # x_data = yields/theoretical_max_g_HP_acid_per_g_glucose,
                                 y_data=titers, # y axis values
-                                z_data=C_fracs, # z axis values
+                                z_data=productivities, # z axis values
                                 x_label=x_label, # title of the x axis
                                 y_label=y_label, # title of the y axis
                                 z_label=z_label, # title of the z axis
@@ -979,9 +939,9 @@ contourplots.animated_contourplot(w_data_vs_x_y_at_multiple_z=results_metric_5, 
                                 n_minor_ticks = 1,
                                 cbar_n_minor_ticks = 4,
                                 # comparison_range=[TCI_w_levels[-2], TCI_w_levels[-1]],
-                                # comparison_range_hatch_pattern='////',fill_bottom_with_cmap_over_color=True, # for TY_CO2
+                                # comparison_range_hatch_pattern='////',fill_bottom_with_cmap_over_color=True, # for TRY
                                 
-                                fill_bottom_with_cmap_over_color=True, # for TY_CO2
+                                fill_bottom_with_cmap_over_color=True, # for TRY
                                 bottom_fill_bounds = ((0,0), 
                                                       (5,11.),
                                                       (95,11.)),
@@ -1002,7 +962,7 @@ contourplots.animated_contourplot(w_data_vs_x_y_at_multiple_z=results_metric_6, 
                                 x_data=100*yields, # x axis values
                                 # x_data = yields/theoretical_max_g_HP_acid_per_g_glucose,
                                 y_data=titers, # y axis values
-                                z_data=C_fracs, # z axis values
+                                z_data=productivities, # z axis values
                                 x_label=x_label, # title of the x axis
                                 y_label=y_label, # title of the y axis
                                 z_label=z_label, # title of the z axis

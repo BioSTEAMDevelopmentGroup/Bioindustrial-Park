@@ -47,6 +47,8 @@ from biorefineries.HP.chemicals_data import chemical_groups, chems
 from biosteam import SystemFactory
 from flexsolve import IQ_interpolation
 from scipy.interpolate import interp1d, interp2d
+from biosteam.exceptions import InfeasibleRegion
+from numba import njit
 # from biorefineries.HP._general_utils import get_pH_polyprotic_acid_mixture, get_molarity
 
 
@@ -61,47 +63,60 @@ SeriesReaction = tmo.reaction.SeriesReaction
 @SystemFactory(ID = 'HP_fermentation_process',
                ins=[dict(ID='sugar_juice_or_slurry', Glucose=10, Water=100),
                     dict(ID='CSL', CSL=1),
-                    dict(ID='DAP', DAP=1),
-                    dict(ID='lime_fermentation', Lime=1),
+                    dict(ID='magnesium_chloride', CSL=1),
+                    dict(ID='zinc_sulfate', CSL=1),
+                    dict(ID='fermentation_lime', Lime=1),
                     dict(ID='fresh_CO2_fermentation', CO2=1),
                     dict(ID='makeup_MEA_A301', MEA=1),
                ],
                 outs=[
-                      dict(ID='fermentation_liquid_effluent', HP=1, Water=100),
-                      dict(ID='fermentation_vent', CO2=1),
-                      dict(ID='seedtrain_vent', CO2=1),
+                      dict(ID='fermentation_liquid_effluent', HP=1, Water=99),
+                      dict(ID='amine_absorption_vent', CO2=1),
+                      dict(ID='F301_top_product', Water=1),
                                 ],
                                                )
 def create_HP_fermentation_process(ins, outs,):
     
-    sugar_juice_or_slurry, CSL, DAP, lime_fermentation, fresh_CO2_fermentation, makeup_MEA_A301 = ins
-    fermentation_liquid_effluent, fermentation_vent, seedtrain_vent = outs
+    sugar_juice_or_slurry, CSL, magnesium_chloride, zinc_sulfate, fermentation_lime, fresh_CO2_fermentation, makeup_MEA_A301 = ins
+    fermentation_liquid_effluent, amine_absorption_vent, F301_top_product = outs
       
     
     # =============================================================================
     # Fermentation units
     # =============================================================================
 
-    F301 = bst.units.MultiEffectEvaporator('F301', ins=sugar_juice_or_slurry, outs=('F301_l', 'F301_g'),
-                                            P = (101325, 73581, 50892, 32777, 20000), V = 0.813)
+    F301 = bst.MultiEffectEvaporator('F301', ins=sugar_juice_or_slurry, outs=('F301_l', 'F301_g'),
+                                            P = (101325, 73581, 50892, 32777, 20000), V = 0.1)
                                             # P = (101325, 73581, 50892, 32777, 20000), V = 0.001)
     F301.V = 0.797 #for sugars concentration of 591.25 g/L (599.73 g/L after cooling to 30 C)
     
     
-    F301_P = units.HPPump('F301_P', ins=F301-1)
+    F301_P = bst.units.Pump('F301_P', ins=F301-1, outs=F301_top_product, P=101325.)
    
         
-    M304_P = units.HPPump('M304_P', ins=F301-0)
+    M304_P = bst.units.Pump('M304_P', ins=F301-0, P = 101325.)
     M304 = bst.units.Mixer('M304', ins=(M304_P-0, 'dilution_water'))
+    M304.water_to_sugar_mol_ratio = 5. # initial value
     
+    @M304.add_specification(run=False)
+    def adjust_M304_water():
+        M304_ins_1 = M304.ins[1]
+        M304_ins_1.imol['Water'] = M304.water_to_sugar_mol_ratio * M304.ins[0].imol['Glucose', 'Xylose', 'Sucrose'].sum()
+        M304._run()
+        
     M304_H = bst.units.HXutility('M304_H', ins=M304-0, T=30+273.15, rigorous=True)
     
     # Mix pretreatment hydrolysate/enzyme mixture with fermentation seed
     
     S302 = bst.Splitter('S302', ins=M304_H-0,
                         outs = ('to_seedtrain', 'to_cofermentation'),
-                        split = 0.07) # split = inoculum ratio
+                        split = 0.01) # split = inoculum ratio
     
+    @S302.add_specification(run=False)
+    def S302_spec():
+        S302.ins[0].phase = 'l'
+        S302._run()
+        
     S303 = bst.FakeSplitter('S303', ins=fresh_CO2_fermentation,
                         outs = ('CO2_to_seedtrain', 'CO2_to_cofermentation'),
                         )
@@ -112,38 +127,59 @@ def create_HP_fermentation_process(ins, outs,):
         
     # Cofermentation
     
-    R302 = units.CoFermentation('R302', 
-                                    ins=(S302-1, '', CSL, lime_fermentation, S303-1, '', ''),
-                                    outs=('fermentation_effluent', 'CO2_fermentation'),
-                                    vessel_material='Stainless steel 316',
+    R302 = units.BatchCoFermentation('R302', 
+                                    ins=(S302-1, '', CSL, magnesium_chloride, zinc_sulfate, fermentation_lime, S303-1, '', ''),
+                                    outs=('CO2_fermentation', fermentation_liquid_effluent),
+                                    # vessel_material='Stainless steel 316',
                                     neutralization=False)
     
     @R302.add_specification(run=False)
     def R302_spec(): # note: effluent always has 0 CSL
         # R302.show(N=100)
         R302._run()
-        if R302.ins[2].F_mol:
-            R302.ins[2].F_mass*=1./(1-S302.split[0])
-        R302._run()
+        # include all seed train input requirements in fermentation instead
+        for i in [2,3,4,5,6,8]: 
+            if R302.ins[i].F_mol: R302.ins[i].F_mol*=1./(1.-S302.split[0])
+        # R302._run()
         S303._specifications[0]()
         # K301.specifications[0]()
         
     # R302.specification = include_seed_CSL_in_cofermentation
     
     # ferm_ratio is the ratio of conversion relative to the fermenter
-    R303 = units.SeedTrain('R303', ins=S302-0, outs=('seed', 'CO2_seedtrain'), ferm_ratio=0.9)
+    # R303 = units.SeedTrain('R303', ins=S302-0, outs=('seed', 'CO2_seedtrain'), ferm_ratio=0.9)
     
-    T301 = units.SeedHoldTank('T301', ins=R303-0, outs=1-R302)
+    R303 = units.BatchCoFermentation('R303', 
+                                    ins=(S302-0, '', '', '', '', '', '', '', ''),
+                                    outs=('CO2_seedtrain', 'seed'),
+                                    # vessel_material='Stainless steel 316',
+                                    neutralization=False,
+                                    ferm_ratio=0.95)
+    R303.line = 'Seed train'
+    # R303.CO2_safety_factor = 0.
+    # R303.magnesium_chloride_loading = 0.
+    # R303.zinc_sulfate_loading = 0.
+    # R303.CSL_loading = 0.
+    # R303.lime_mol_per_L_loading = 0.
+    # R303.air_flow_rate_safety_factor_for_DO_saturation_basis = air_m3_per_h_per_m3_reactor = 0.
+    @R303.add_specification(run=False)
+    def R303_spec():
+        R303._run()
+        # empty all seed train inputs (included in fermentation R302 instead)
+        for i in [2,3,4,5,6,8]: R303.ins[i].empty()
+        
+    T301 = units.SeedHoldTank('T301', ins=R303-1, outs=1-R302)
     
-    M305 = bst.Mixer('M305', ins=(R302-1, R303-1,), outs=('mixed_fermentation_and_seed_vent'))
+    M305 = bst.Mixer('M305', ins=(R302-0, R303-0,), outs=('mixed_fermentation_and_seed_vent'))
     
-    A301 = bst.AmineAbsorption('A301', ins=(M305-0, makeup_MEA_A301, 'A301_makeup_water'), outs=('absorption_vent', 'captured_CO2'),
+    A301 = bst.AmineAbsorption('A301', ins=(M305-0, makeup_MEA_A301, 'A301_makeup_water'), outs=(amine_absorption_vent, 'captured_CO2'),
                                CO2_recovery=0.52)
     
     def A301_obj_f(CO2_recovery):
         A301.CO2_recovery = CO2_recovery
         A301._run()
-        K301.specifications[0]()
+        # K301.specifications[0]()
+        K301._run()
         R302.specifications[0]()
         return R302.fresh_CO2_required
 
@@ -156,9 +192,12 @@ def create_HP_fermentation_process(ins, outs,):
         if not A301.bypass:
             # A301.outs[1].phase='g'
             A301._run()
+            run_satisfied = False
             if A301_obj_f(1-1e-3)>0.:
-                pass
-            else:
+                run_satisfied = True
+            elif not run_satisfied and A301_obj_f(1e-3)<0.:
+                run_satisfied = True
+            elif not run_satisfied:
                 IQ_interpolation(A301_obj_f, 1e-3, 1-1e-3, x=0.5, ytol=1e-4)
             A301.outs[1].phase='g'
         else:
@@ -174,34 +213,34 @@ def create_HP_fermentation_process(ins, outs,):
                                     driver='Electric motor',
                                     )
     
-    K301-0-5-R302
+    K301-0-7-R302
     
     K301.bypass = False
     
     K301_design = K301._design
     K301_cost = K301._cost
-    @K301.add_specification(run=False)
-    def K301_spec():
-        K301.bypass = False
-        if not R302.fraction_of_biomass_C_from_CO2 > 0.: K301.bypass = True
-        if not K301.bypass:
-            K301._design = K301_design
-            K301._cost = K301_cost
-            # A301.outs[1].phases=('g','l')
-            s1, s2 = K301.ins[0], K301.outs[0]
-            for Kstream in s1, s2:
-                Kstream.imol['CO2_compressible'] = Kstream.imol['CO2']
-                Kstream.imol['CO2'] = 0.
-            K301._run()
-            for Kstream in s1, s2:
-                Kstream.imol['CO2'] = Kstream.imol['CO2_compressible']
-                Kstream.imol['CO2_compressible'] = 0.
-            K301.outs[0].phase='l'
-        else:
-            K301._design = lambda: 0
-            K301._cost = lambda: 0
-            for i in K301.ins: i.empty()
-            for i in K301.outs: i.empty()
+    # @K301.add_specification(run=False)
+    # def K301_spec():
+    #     K301.bypass = False
+    #     if not R302.fraction_of_biomass_C_from_CO2 > 0.: K301.bypass = True
+    #     if not K301.bypass:
+    #         K301._design = K301_design
+    #         K301._cost = K301_cost
+    #         # A301.outs[1].phases=('g','l')
+    #         s1, s2 = K301.ins[0], K301.outs[0]
+    #         for Kstream in s1, s2:
+    #             Kstream.imol['CO2_compressible'] = Kstream.imol['CO2']
+    #             Kstream.imol['CO2'] = 0.
+    #         K301._run()
+    #         for Kstream in s1, s2:
+    #             Kstream.imol['CO2'] = Kstream.imol['CO2_compressible']
+    #             Kstream.imol['CO2_compressible'] = 0.
+    #         K301.outs[0].phase='l'
+    #     else:
+    #         K301._design = lambda: 0
+    #         K301._cost = lambda: 0
+    #         for i in K301.ins: i.empty()
+    #         for i in K301.outs: i.empty()
         
     
 
@@ -221,1206 +260,1221 @@ def create_HP_fermentation_process(ins, outs,):
         K302_ins_0.mol[:] = K302.outs[0].mol[:]
         K302._run()
 
-    V301 = bst.units.IsenthalpicValve('V301', ins=K302-0,
+    V302 = bst.units.IsenthalpicValve('V302', ins=K302-0,
                                       P=101325.,
                                       vle=False,
                                       )
-    V301.line = 'Valve'
-    @V301.add_specification(run=False)
-    def V301_spec():
-        V301.ins[0].mol[:] = V301.outs[0].mol[:]
-        V301._run()
+    V302.line = 'Valve'
+    @V302.add_specification(run=False)
+    def V302_spec():
+        V302.ins[0].mol[:] = V302.outs[0].mol[:]
+        V302._run()
         
-    V301-0-6-R302
+    V302-0-8-R302
     
-#%% Separation of HP by exploiting the temperature-sensitivity of HP solubility 
+#%% Separation of HP by solvent extraction using hexanol (Bhagwat et al., 2021)
 
-@SystemFactory(ID = 'HP_separation_solubility_exploit_process',
+@SystemFactory(ID = 'HP_separation_hexanol_extraction_process',
                ins=[dict(ID='fermentation_broth', HP=1, Water=100),
-                    dict(ID='acetylacetone_decarboxylation_equilibrium', PD=1.),
-                    dict(ID='recycled_nonevaporated_supernatant', Water=1e-3),
-                    dict(ID='base_for_pH_control', CaO=1.),
+                    dict(ID='sulfuric_acid_separation', H2SO4=1.),
+                    dict(ID='separation_hexanol', Hexanol=10.),
                ],
-                outs=[dict(ID='decarboxylation_vent', CO2=20),
-                      dict(ID='S401_solid', FermMicrobe=1, Water=1),
-                      dict(ID='bottom_product_F403', PD=1, Water=99),
-                      dict(ID='D401_bottom', PD=1, Water=99),
-                      dict(ID='solid_HP', HP=1),
-                      dict(ID='D401_top', PD=1, Water=99),
+                outs=[dict(ID='HP_solution', HP=1., Water=2.),
+                      dict(ID='cell_mass', FermMicrobe=1, Water=1),
+                      dict(ID='gypsum', CaSO4=1, Water=1),
+                      dict(ID='F401_t', Water=30),
+                      dict(ID='S404_raffinate', Water=68),
                                 ],
                                                )
-def create_HP_separation_solubility_exploit_process(ins, outs,):
+def create_HP_separation_hexanol_extraction_process(ins, outs,):
     
-    fermentation_broth, acetylacetone_decarboxylation_equilibrium, recycled_nonevaporated_supernatant, base_for_pH_control = ins
-    decarboxylation_vent, S401_solid, bottom_product_F403, D401_bottom, solid_HP, D401_top = outs
+    fermentation_broth, sulfuric_acid_separation, separation_hexanol = ins
+    HP_solution, cell_mass, gypsum, F401_t, S404_raffinate = outs
     
-    # =============================================================================
-    # Separation streams
-    # =============================================================================
-     
-    # None
-    
-    # =============================================================================
-    # Separation units
-    # =============================================================================
-
-    # Fake unit to enable solid-liquid equilibrium for fermentation broth
-    U401 = bst.Unit('U401', ins=fermentation_broth, outs=('fermentation_broth_sle'))
-    U401.HP_solubility_multiplier = 1.
-    U401.line = 'Background unit for SLE'
-    
-    # from biosteam._graphics import stream_unit
-    U401._graphics = tmo._graphics.junction_graphics
-    
-    @U401.add_specification()
-    def U401_spec():
-        U401_ins_0 = U401.ins[0]
-        tot_HP = U401_ins_0.imol['HP']
-        U401_outs_0 = U401.outs[0]
-        U401_outs_0.copy_like(U401_ins_0)
-        mol_HP_dissolved = U401.HP_solubility_multiplier * get_mol_HP_dissolved(U401_outs_0.T, U401_outs_0.imol['Water'])
-        U401_outs_0.phases = ('s', 'l')
-        U401_outs_0.imol['l', 'HP'] = min(mol_HP_dissolved, tot_HP)
-        U401_outs_0.imol['s', 'HP'] = tot_HP - min(mol_HP_dissolved, tot_HP)
-    
-    M401 = bst.LiquidsMixingTank('M401', 
-                                 ins=(U401-0, 
-                                      acetylacetone_decarboxylation_equilibrium, 
-                                      recycled_nonevaporated_supernatant,
-                                      'recyled_top_prod_from_evaporating_supernatant',
-                                      base_for_pH_control), 
-                                 outs=('fermentation_broth_mixed'),
-                                 tau = 1.)
-    
-    M401.mol_acetylacetone_per_mol_HP = 0.
-    M401.mol_base_per_m3_broth = 0. # actually kmol-bsase/m3-broth, or mol-base/L-broth
-    M401.base_neutralizes_acids = True
-    M401.base_ID = 'NaOH'
-    
-    M401.neutralization_rxns = SeriesReaction([
-        Rxn('H3PO4 + 3NaOH -> SodiumPhosphate + H2O', 'H3PO4',   1.-1e-5),
-        Rxn('CitricAcid + 3NaOH -> SodiumCitrate + H2O', 'CitricAcid',   1.-1e-5),
-        Rxn('AceticAcid + NaOH -> SodiumAcetate + H2O', 'AceticAcid',   1.-1e-5),
-        ])
-    
-    M401.mol_base_per_m3_broth_needed_to_completely_neutralize_acids = 0.
-    
-    M401.pH_to_load = 'unmodified'
-    M401.load_pH = lambda pH: load_pH(pH, M401)
-    M401.get_pH_maintained = lambda: get_pH_stream(M401.outs[0])
-    
-    # @M401.add_specification(run=False)
-    def M401_simulate_base_addition_and_acids_neutralization():
-        M401_ins_0 = M401.ins[0]
-        M401.ins[1].imol['PD'] = M401.mol_acetylacetone_per_mol_HP * M401_ins_0.imol['HP']
-        M401_in_base = M401.ins[4]
-        M401_in_base.empty()
-        M401_in_base.imol[M401.base_ID] = M401.mol_base_per_m3_broth * M401_ins_0.F_vol
-        
-        M401.mol_base_per_m3_broth_needed_to_completely_neutralize_acids =\
-        min_base_req_to_completely_neutralize =\
-            (M401_ins_0.imol['AceticAcid']
-            +3.* M401_ins_0.imol['CitricAcid']
-            + 3.*M401_ins_0.imol['H3PO4'])/M401_ins_0.F_vol
-                                    
-        M401._run()
-        
-        M401_outs_0_l = M401.outs[0]['l']
-        
-        
-        if M401.base_neutralizes_acids:
-            if M401.mol_base_per_m3_broth < min_base_req_to_completely_neutralize:
-                
-                # M401.neutralization_rxns = SeriesReaction([
-                #     Rxn('0.3333H3PO4 + NaOH -> 0.3333SodiumPhosphate + 0.3333H2O', 'NaOH',   1.-1e-5),
-                #     Rxn('0.3333CitricAcid + NaOH -> 0.3333SodiumCitrate + 0.3333H2O', 'NaOH',   1.-1e-5),
-                #     Rxn('AceticAcid + NaOH -> SodiumAcetate + H2O', 'NaOH',   1.-1e-5),
-                #     ])
-                
-                if M401_outs_0_l.imol['NaOH'] > 3.*M401_outs_0_l.imol['H3PO4']:
-                    mol_H3PO4 = M401_outs_0_l.imol['H3PO4']
-                    M401_outs_0_l.imol['H3PO4'] = 0.
-                    M401_outs_0_l.imol['NaOH'] -= 3.*mol_H3PO4
-                    M401_outs_0_l.imol['SodiumPhosphate'] += mol_H3PO4
-                    M401_outs_0_l.imol['H2O'] += mol_H3PO4
-                else:
-                    mol_NaOH = M401_outs_0_l.imol['NaOH']
-                    M401_outs_0_l.imol['NaOH'] = 0.
-                    M401_outs_0_l.imol['H3PO4'] -= 0.3333*mol_NaOH
-                    M401_outs_0_l.imol['SodiumPhosphate'] += 0.3333*mol_NaOH
-                    M401_outs_0_l.imol['H2O'] += 0.3333*mol_NaOH
-                    
-                    
-                if M401_outs_0_l.imol['NaOH'] > 3.*M401_outs_0_l.imol['CitricAcid']:
-                    mol_CitricAcid = M401_outs_0_l.imol['CitricAcid']
-                    M401_outs_0_l.imol['CitricAcid'] = 0.
-                    M401_outs_0_l.imol['NaOH'] -= 3.*mol_CitricAcid
-                    M401_outs_0_l.imol['SodiumCitrate'] += mol_CitricAcid
-                    M401_outs_0_l.imol['H2O'] += mol_CitricAcid
-                else:
-                    mol_NaOH = M401_outs_0_l.imol['NaOH']
-                    M401_outs_0_l.imol['NaOH'] = 0.
-                    M401_outs_0_l.imol['CitricAcid'] -= 0.3333*mol_NaOH
-                    M401_outs_0_l.imol['SodiumCitrate'] += 0.3333*mol_NaOH
-                    M401_outs_0_l.imol['H2O'] += 0.3333*mol_NaOH
-                    
-                    
-                if M401_outs_0_l.imol['NaOH'] > M401_outs_0_l.imol['AceticAcid']:
-                    mol_AceticAcid = M401_outs_0_l.imol['AceticAcid']
-                    M401_outs_0_l.imol['AceticAcid'] = 0.
-                    M401_outs_0_l.imol['NaOH'] -= mol_AceticAcid
-                    M401_outs_0_l.imol['SodiumAcetate'] += mol_AceticAcid
-                    M401_outs_0_l.imol['H2O'] += mol_AceticAcid
-                else:
-                    mol_NaOH = M401_outs_0_l.imol['NaOH']
-                    M401_outs_0_l.imol['NaOH'] = 0.
-                    M401_outs_0_l.imol['AceticAcid'] -= mol_NaOH
-                    M401_outs_0_l.imol['SodiumAcetate'] += mol_NaOH
-                    M401_outs_0_l.imol['H2O'] += mol_NaOH
-                
-            else:
-                M401.neutralization_rxns = SeriesReaction([
-                    Rxn('H3PO4 + 3NaOH -> SodiumPhosphate + H2O', 'H3PO4',   1.),
-                    Rxn('CitricAcid + 3NaOH -> SodiumCitrate + H2O', 'CitricAcid',   1.),
-                    Rxn('AceticAcid + NaOH -> SodiumAcetate + H2O', 'AceticAcid',   1.),
-                    ])
-                
-                M401.outs[0].phase='l'
-                # M401.neutralization_rxns.adiabatic_reaction(M401.outs[0])
-                M401.neutralization_rxns(M401.outs[0])
-        
-        M401.outs[0].phase='l'
-    
-    M401.simulate_base_addition_and_acids_neutralization = M401_simulate_base_addition_and_acids_neutralization
-    
-    @M401.add_specification(run=False)
-    def M401_pH_loading_spec():
-        if M401.pH_to_load == 'unmodified':
-            M401.mol_base_per_m3_broth = 0.
-            M401.simulate_base_addition_and_acids_neutralization()
-        else:
-            M401.load_pH(M401.pH_to_load)
-            
-    # Change broth temperature to adjust HP solubility
-    H401 = bst.HXutility('H401', ins=M401-0, outs=('fermentation_broth_heated'), 
-                         T=273.15+56., # initial value; updated in specification to minimum T required to completely dissolve HP 
-                                       # (or current T, if current T is already higher than minimum required T)
-                         )
-    
-    H401.lower_bound_T = 273.15 + 1.
-    H401.upper_bound_T = 273.15 + 99.
-    # H401.HP_solubility_multiplier = 1.
-    
-    @H401.add_specification(run=False)
-    def H401_spec():
-        HP_solubility_multiplier = U401.HP_solubility_multiplier
-        H401_ins_0 = H401.ins[0]
-        H401_ins_0_water=H401_ins_0.imol['Water']
-        tot_HP = H401_ins_0.imol['HP']
-        
-        # lb_T = H401_ins_0.T
-        # ub_T = 99.+273.15
-        lb_T = max(H401.lower_bound_T, H401_ins_0.T)
-        ub_T = max(H401.upper_bound_T, H401_ins_0.T)
-        
-        if tot_HP>HP_solubility_multiplier*get_mol_HP_dissolved(ub_T, H401_ins_0_water):
-            H401.T=ub_T
-        elif tot_HP<HP_solubility_multiplier*get_mol_HP_dissolved(lb_T, H401_ins_0_water):
-            H401.T=lb_T
-        else:
-            H401_spec_obj_fn = lambda T: HP_solubility_multiplier*get_mol_HP_dissolved(T, H401_ins_0_water) - tot_HP
-            H401.T = IQ_interpolation(H401_spec_obj_fn, lb_T, ub_T, 
-                                      # ytol=5e-2,
-                                       # ytol=0.1, 
-                                      ytol = 0.5,
-                                      maxiter=300)
-        
-        H401._run()
-        
-    
-    
-    M402 = bst.LiquidsMixingTank('M402', 
-                                 ins=(H401-0, ), 
-                                 outs=('fermentation_broth_heated_mixed'),
-                                 tau = 1.)
-    @M402.add_specification
-    def M402_HP_solubility_spec(run=False):
-        M402._run()
-        HP_solubility_multiplier = U401.HP_solubility_multiplier
-        M402_outs_0 = M402.outs[0]
-        mol_HP_dissolved = HP_solubility_multiplier*get_mol_HP_dissolved(M402_outs_0.T, M402_outs_0.imol['Water'])
-        tot_HP = M402_outs_0.imol['HP']
-        M402_outs_0.phases = ('l', 's')
-        M402_outs_0.imol['l', 'HP'] = min(mol_HP_dissolved, tot_HP)
-        M402_outs_0.imol['s', 'HP'] = max(0., round(tot_HP - min(mol_HP_dissolved, tot_HP), 5))
-        
-    #%% Decarboxylation occurs in this unit ##!!!##
-    
-    U402 = bst.FakeSplitter('U402', ins=M402-0, outs = ('thermally_decarboxylated_broth',decarboxylation_vent))
-    U402.decarboxylation_rxns = ParallelRxn([
-        Rxn('HP + H2O -> PD + CO2', 'HP',   0.2087),
-        ])
-    U402.line = 'Background unit for decarboxylation'
-    U402._graphics = U401._graphics
-    
-    U402.decarboxylation_conversion_basis = 'temperature-dependent' # 'fixed' or 'temperature-dependent' or 'equilibrium-based'
-    U402.decarboxylation_conversion = 0.2087 # only used if basis is 'fixed' # value at T = 66.415 degrees C from linear interpolation of conversion vs T experimenHP data
-    U402.equilibrium_acetylacetone_presence = 0.2903 # equilibrium PD:HP (mol:mol) ratio; only used if basis is 'equilibrium-based'
-    
-    def U402_spec_helper():
-        U402_outs_0 = U402.outs[0]
-        U402_outs_0.copy_like(U402.ins[0])
-        U402_outs_0.phases = ('l', 's')
-        U402.decarboxylation_rxns[0].adiabatic_reaction(U402_outs_0['l'])
-        U402.outs[1].empty()
-        U402.outs[1].imol['CO2'] = U402_outs_0.imol['l', 'CO2']
-        U402.outs[1].phase = 'g'
-        U402_outs_0.imol['l', 'CO2'] = 0.
-
-    get_acetylacetone_presence_out = lambda: U402.outs[0].imol['Acetylacetone']/U402.outs[0].imol['HP']
-    # get_acetylacetone_presence_in = lambda: U402.ins[0].imol['Acetylacetone']/U402.ins[0].imol['HP']
-
-    def load_decarboxylation_conversion(equilibrium_acetylacetone_presence):
-        U402_spec_helper()
-        if get_acetylacetone_presence_out() >= equilibrium_acetylacetone_presence:
-            U402.decarboxylation_rxns[0].X = 0.
-            # print(1)
-        else:
-            def obj_f_decarb_conv(decarb_conv):
-                U402.decarboxylation_rxns[0].X = decarb_conv
-                U402_spec_helper()
-                return get_acetylacetone_presence_out() - equilibrium_acetylacetone_presence
-            IQ_interpolation(obj_f_decarb_conv, 0., 0.5, ytol=1e-4)
-            
-    @U402.add_specification()
-    def U402_spec():
-        if U402.decarboxylation_conversion_basis == 'fixed':
-            U402.decarboxylation_rxns[0].X = U402.decarboxylation_conversion
-            U402_spec_helper()
-        elif U402.decarboxylation_conversion_basis == 'temperature-dependent':
-            U402.decarboxylation_rxns[0].X = get_HP_decarboxylation_conversion(T=U402.outs[0].T)
-            U402_spec_helper()
-        elif U402.decarboxylation_conversion_basis == 'equilibrium-based':
-            load_decarboxylation_conversion(U402.equilibrium_acetylacetone_presence)
-        else:
-            raise ValueError(f"U402.decarboxylation_conversion_basis must be 'fixed' or 'temperature-dependent', not '{U402.decarboxylation_conversion_basis}'.")
-
-    #%% #### #### #### #### #### #### #### ####
-    
-    
-    # # Remove solids from fermentation broth, modified from the pressure filter in Humbird et al.
+    # Remove solids from fermentation broth, modified from the pressure filter in Humbird et al.
     S401_index = [splits_df.index[0]] + splits_df.index[2:].to_list()
     S401_cell_mass_split = [splits_df['stream_571'][0]] + splits_df['stream_571'][2:].to_list()
     S401_filtrate_split = [splits_df['stream_535'][0]] + splits_df['stream_535'][2:].to_list()
-    S401 = bst.units.SolidsCentrifuge('S401', ins=U402-0, outs=(S401_solid, 'S401_liquid_fraction'),
-                                # moisture_content=0.50,
+    S401 = bst.units.SolidsCentrifuge('S401', ins=(fermentation_broth,), outs=(cell_mass, 'S401_l'),
+                                moisture_content=0.50,
                                 split=find_split(S401_index,
                                                   S401_cell_mass_split,
                                                   S401_filtrate_split,
-                                                  chemical_groups), 
-                                solids =\
+                                                  chemical_groups), solids =\
                                     ['Xylan', 'Glucan', 'Lignin', 'FermMicrobe',\
-                                      'Ash', 'Arabinan', 'Galactan', 'Mannan'])
+                                     'Ash', 'Arabinan', 'Galactan', 'Mannan'])
+    def fix_split(isplit, ID):
+        isplit['Glycerol', 'Hexanol', 'HP', 'AcrylicAcid', 'AceticAcid', 'AceticAcid'] = isplit[ID]
+                  
+    fix_split(S401.isplit, 'Glucose')
+    # NOTE: if there is not enough moisture content, it is impossible to pump
+    # the fluid into the centrifuge; in fact, the centrifuge would not be able
+    # to separate anything.
     
-    @S401.add_specification()
-    def S401_HP_split_spec():
-        S401._run()
-        S401_ins_0 = S401.ins[0]
-        S401.outs[0].imol['s', 'HP'] = S401_ins_0.imol['s', 'HP']
-        S401.outs[0].imol['l', 'HP'] = 0.
-        S401.outs[1].imol['l', 'HP'] = S401_ins_0.imol['l', 'HP']
-        S401.outs[1].imol['s', 'HP'] = 0.
-        
-
+    R401 = units.AcidulationReactor('R401', ins = (S401-1, sulfuric_acid_separation),
+                                    outs = ('acidulated_broth'),
+                                    vessel_material='Stainless steel 316',
+                                    tau = 1.)
     
-    # H402 = bst.HXutility('H402', ins=S401-1, outs=('H402_0'), T=273.15+1.)
+    R401_H = bst.units.HXutility('R401_H', ins = R401-0, T = 320, rigorous = False)
+    R401_P = bst.units.Pump('R401_P', ins=R401_H-0)
     
-
-    # # H402.HP_solubility_multiplier = 1.
-    # @H402.add_specification()
-    # def H402_spec():
-    #     H402._run()
-    #     H402_ins_0 = H402.ins[0]
-    #     tot_HP = H402_ins_0.imol['HP']
-    #     H402_outs_0 = H402.outs[0]
-    #     HP_solubility = U401.HP_solubility_multiplier * get_mol_HP_dissolved(H402_outs_0.T, H402_outs_0.imol['Water'])
-    #     H402_outs_0.phases = ('s', 'l')
-    #     H402_outs_0.T = H402.T
-    #     HP_dissolved = min(HP_solubility, tot_HP)
-    #     H402_outs_0.imol['l', 'HP'] = HP_dissolved
-    #     H402_outs_0.imol['s', 'HP'] = max(0, tot_HP - HP_dissolved)
+    S402_index = S401_index + ['Gypsum']
+    S402_gypsum_split = S401_cell_mass_split + [0.995]
+    S402_filtrate_split = S401_filtrate_split + [0.005]
+    S402 = units.GypsumFilter('S402', ins=R401_P-0,
+                              moisture_content=0.2,
+                              split=find_split(S402_index,
+                                               S402_gypsum_split,
+                                               S402_filtrate_split,
+                                               chemical_groups),
+                              outs=(gypsum, ''))
     
-    F401 = bst.units.MultiEffectEvaporator('F401', ins=S401-1, outs=('F401_b', 'F401_t'), 
-                                            # chemical='Water',
-                                            P = (101325, 73581, 50892, 32777, 20000), 
-                                            V = 0.)
-    @F401.add_specification(run=False)
-    def F401_spec():
-        F401.ins[0].phases = ('l',)
-        F401._run()
-    
-    F401_P0 = bst.units.Pump('F401_P0', ins=F401-0, P=101325., material='Stainless steel',)
-    F401_P1 = bst.units.Pump('F401_P1', ins=F401-1, P=101325., material='Stainless steel',)
-  
-    C401 = units.HPCrysHPlizer('C401', ins=F401_P0-0, outs=('C401_0',), 
-                                   get_mol_HP_dissolved_given_T_and_mol_water=get_mol_HP_dissolved,
-                                   fixed_operating_T=273.15+1.,
-                                   )
-    C401.line = 'CrysHPlizer'
-    @C401.add_specification(run=False)
-    def C401_spec():
-        C401.HP_solubility_multiplier = U401.HP_solubility_multiplier
-        C401._run()
-    
-    S402 = bst.units.SolidsCentrifuge('S402', ins=C401-0, outs=('S402_solid_fraction', 'S402_liquid_fraction'),
-                                moisture_content=0.50,
-                                # split=find_split(S401_index,
-                                #                   S401_cell_mass_split,
-                                #                   S401_filtrate_split,
-                                #                   chemical_groups), 
-                                split=1e-2, # initial value; updated in S402.specification
-                                solids =\
-                                    ['Xylan', 'Glucan', 'Lignin', 'FermMicrobe',\
-                                      'Ash', 'Arabinan', 'Galactan', 'Mannan',
-                                      'HP'])
-    
-    
-    S402.solid_split = 0.95
-    S402_solids_split_indices = chems.indices(S402.solids)
     @S402.add_specification(run=False)
     def S402_spec():
-        S402_ins_0 = S402.ins[0]
-        S402_solid_split = S402.solid_split
-        S402.split[S402_solids_split_indices] = S402_solid_split
-        S402.isplit['HP'] = S402_solid_split * S402_ins_0.imass['s', 'HP']/S402_ins_0.imass['HP']
-        S402._run()
-    
-    # def S402_spec():
-    #     S402.isplit['HP'] = 
-    F402 = bst.DrumDryer('F402', 
-                         ins=(S402-0, 'F402_air', 'F402_natural_gas'),
-                         outs=(solid_HP, 'F402_hot_air', 'F402_emissions'),
-                         moisture_content=0.05, 
-                         split=0.,
-                         moisture_ID='Water')
-    
-    @F402.add_specification(run=False)
-    def F402_spec():
-        F402_ins_0 = F402.ins[0]
-        solid_HP = float(F402_ins_0.imol['s', 'HP'])
-        liquid_HP = float(F402_ins_0.imol['l', 'HP'])
+        if S402.ins[0].imol['CaSO4']>0:
+            S402._run()
+        else:
+            S402.outs[0].mol[:] = 0
+            S402.outs[1].mol = S402.ins[0].mol
         
-        F402_ins_0.phases = ('l')
-        F402._run()
         
-        F402_ins_0.phases = ('l', 's')
-        F402_ins_0.imol['s', 'HP'] = solid_HP
-        F402_ins_0.imol['l', 'HP'] = liquid_HP
+    # S402.specification = S402_spec
+    
+    
+    M401 = bst.units.Mixer('M401', ins=(separation_hexanol,
+                                        ''))
+    
+    M401_H = bst.units.HXutility('M401_H', ins = M401-0, T = 80. + 273.15, rigorous = False)
+    
+    F401 = bst.units.MultiEffectEvaporator('F401', ins=S402-1, outs=('F401_l', 'F401_g'),
+                                            P = (101325, 10000, 4000, 1500, 750), V = 0.1)
+    
+    F401_P2 = bst.units.Pump('F401_P2', ins=F401-1, outs=F401_t, P=101325.)  
+    
+    target_HP_x = 0.10
+    def get_x(chem_ID, stream):
+        return stream.imol[chem_ID]/sum(stream.imol['SuccinicAcid', 'Xylitol', 'AceticAcid', 'Furfural', 'HMF', 'HP', 'Water'])
+    
+    @F401.add_specification(run=False)
+    def F401_specification():
+        instream = F401.ins[0]
+        # ratio = target_water_x/get_x('Water', instream)
+        HP_x = get_x('HP', instream)
+        if HP_x < target_HP_x:
+            ratio = HP_x/target_HP_x
+            F401.V = 1. - ratio
+            F401._run()
+        else:
+            F401.V = 0.
+            F401._run()
+    
+    # F401.specification = F401_specification
+    
+    
+    def F401_no_run_cost():
+        F401.heat_utilities = tuple()
+        F401._installed_cost = 0.
+    # F401._cost = F401_no_run_cost
+    
+    F401_P = bst.units.Pump('F401_P', ins=F401-0, P=101325.)    
+    F401_H = bst.units.HXutility('F401_H', ins = F401_P-0, T = 80. + 273.15, rigorous = False)
+    
+
+    
+    Kds = dict(IDs=('HP', 'Water', 'Hexanol', 'AceticAcid'),
+                # K=np.array([1./1.9379484051844278, 3.690183610720956, 0.0060176892697821486, 1./0.4867537504125923]), # T = 80. + 273.15 K
+                K=np.array([1.9379484051844278, 1/3.690183610720956, 1/0.0060176892697821486, 0.4867537504125923]), # T = 80. + 273.15 K
+               phi = 0.5)
+    
+    
+    max_N_stages = 3
+    
+    S404 = bst.units.MultiStageMixerSettlers('S404', ins = (F401_H-0, M401_H-0),
+                                         outs = ('extract', S404_raffinate),
+                                         N_stages = max_N_stages, 
+                                          partition_data = Kds,
+                                         ) 
+                              
+                              
+    S404.vol_frac = 0.05
+    
+    
+    tolerable_loss_fraction = 0.001
+    
+    # @S404.add_specification(run=False)
+    def S404_spec_hexanol():
+        feed_hexanol, solvent_recycle = M401.ins
+        req_hexanol = S404.ins[0].imol['HP'] * 10.
+        feed_hexanol.imol['Hexanol'] = max(0, req_hexanol - solvent_recycle.imol['Hexanol'])
+        M401._run()
+        M401_H._run()
+        S404._run()
         
-        F402_outs_0 = F402.outs[0]
-        F402_outs_0.phases = ('l', 's')
-        F402_outs_0.imol['s', 'HP'] = solid_HP
-        F402_outs_0.imol['l', 'HP'] = liquid_HP
+    @S404.add_specification(run=False)
+    def adjust_S404_streams():
+        S404.N_stages = max_N_stages # reset
+        S404._setup() # reset
+        feed_hexanol, solvent_recycle = M401.ins
+        process_stream = S404.ins[0]
+        process_stream_F_mol = process_stream.F_mol
+        existing_hexanol = solvent_recycle.imol['Hexanol'] + process_stream.imol['Hexanol']
     
-    F403 = bst.units.MultiEffectEvaporator('F403', ins=S402-1, outs=('F403_b', 'F403_t_PD_water'), 
-                                            # chemical='Water',
-                                            P = (101325, 73581, 50892, 32777, 20000), 
-                                            V = 0.)
-    @F403.add_specification(run=False)
-    def F403_spec():
-        F403.ins[0].phases = ('l',)
-        F403._run()
+        # K_raffinate = S404.partition_data['K'][0]
+        K_raffinate = 1./S404.partition_data['K'][0]
     
-    F403_P0 = bst.units.Pump('F403_P0', ins=F403-0, 
-                             outs=bottom_product_F403, # at baseline, this is non-evaporated supernatant; can be recycled using S403 in system_HP_solubility_exploit_ethanol_sugarcane, controlled by F403.V (0 by default) and S403.split (0 by default)
-                             P=101325., material='Stainless steel',)
-    F403_P1 = bst.units.Pump('F403_P1', ins=F403-1, 
-                              # outs=('',),
-                             P=101325., material='Stainless steel',)
+        HP_recovery = 1-tolerable_loss_fraction
+        reqd_hexanol =  HP_recovery * K_raffinate * process_stream_F_mol
+        if existing_hexanol > reqd_hexanol:
+            feed_hexanol.imol['Hexanol'] = 0.
+            solvent_recycle.imol['Hexanol'] = reqd_hexanol
+        else:
+            feed_hexanol.imol['Hexanol'] = max(0, reqd_hexanol - existing_hexanol)
+        
+        M401._run()
+        M401_H._run()
+        S404_run()
+        
+        if existing_hexanol > reqd_hexanol:
+            # feed_hexanol.imol['Hexanol'] = S404.outs[0].imol['Hexanol']
+            feed_hexanol.imol['Hexanol'] = S404.outs[1].imol['Hexanol']
+        
+        for i in S404.outs: i.T = M401_H.outs[0].T
+        
+    def update_Ks(lle_unit, solute_indices = (0,), carrier_indices = (1,), solvent_indices = (2,)):
+        IDs = lle_unit.partition_data['IDs']
+        # Ks = lle_unit.partition_data['K']
+        Ks = 1./lle_unit.partition_data['K']
+        solute_chemicals = tuple([IDs[index] for index in solute_indices])
+        carrier_chemicals = tuple([IDs[index] for index in carrier_indices])
+        solvent_chemicals = tuple([IDs[index] for index in solvent_indices])
+        process_stream = lle_unit.ins[0]
+        solvent_stream = lle_unit.ins[1]
+        
+        test_stream = bst.Stream('test_stream')
+        test_stream_2 = bst.Stream('test_stream_2')
+        test_stream_2.mix_from([process_stream, solvent_stream])
+        test_stream.imol[solute_chemicals] = process_stream.imol[solute_chemicals]
+        test_stream.imol[carrier_chemicals] = process_stream.imol[carrier_chemicals]
+        test_stream.imol[solvent_chemicals] = solvent_stream.imol[solvent_chemicals]
+        test_stream.lle(T=process_stream.T, top_chemical = 'Hexanol')
+        # test_stream.show()
+        Ks_new = (test_stream['l'].imol[IDs]/test_stream['l'].F_mol)/(test_stream['L'].imol[IDs]/test_stream['L'].F_mol)
+        
+        return Ks_new
     
-    D401 = bst.BinaryDistillation('D401', ins=F403_P1-0,   
-                                  LHK=('PD','Water'), 
-                                  Lr=0.99, Hr=0.99, 
-                                  k=1.2, P=101325./50.)
+    def S404_run():
+        try:
+            S404._run()
+            
+            if has_negative_flows(S404):
+                raise InfeasibleRegion('negative flows')
+        except:
+            # import pdb
+            # pdb.set_trace()
+            S404.N_stages-=1
+            if S404.N_stages == 0:
+                S404.N_stages = max_N_stages # reset
+                S404._setup() # reset
+                raise InfeasibleRegion('number of stages in %s'%(S404.ID))   
+            else:
+                S404._setup()
+                # print('\nReduced S404.N_stages to %s\n'%S404.N_stages)
+            S404_run()
+        
     
-    D401.bypass = True
-    D401.bypass_only_if_no_feed = False
+    def has_negative_flows(unit):
+        for stream in unit.outs + unit.ins:
+            if (stream.mol < 0.).any():
+                return True
+        return False
+                
+    # S404.specification = adjust_S404_streams
     
-    D401_design, D401_cost = D401._design, D401._cost
-    @D401.add_specification(run=False)
+    S404_spec = S404.specifications[0]
+    globals().update({'S404_spec': S404_spec})
+    
+    ideal_thermo = S404.thermo.ideal()
+    
+    D401 = bst.units.BinaryDistillation('D401', ins=S404-0, outs=('D401_g', 'D401_l'),
+                                        LHK=('Hexanol', 'HP'),
+                                        is_divided=True,
+                                        product_specification_format='Recovery',
+                                        Lr=0.999, Hr=0.999, k=1.05, P = 101325./20.,
+                                        vessel_material = 'Stainless steel 316',
+                                        partial_condenser = False,
+                                        # condenser_thermo = ideal_thermo,
+                                        # boiler_thermo = ideal_thermo,
+                                        thermo=ideal_thermo)
+    
+    @D401.add_specification(run=True)
     def D401_spec():
-        if D401.ins[0].F_mol and D401.bypass_only_if_no_feed: 
-            D401.bypass = False
-        else:
-            D401.bypass = True
-        
-        if D401.bypass: 
-            D401._design = lambda: 0
-            D401._cost = lambda: 0
-            D401.outs[0].copy_like(D401.ins[0])
-            
-        else:
-            D401._design = D401_design
-            D401._cost = D401_cost
-            D401._run()
-            
-    D401_H0 = bst.HXutility('D401_H0', ins=D401-0,
-                         V=0.,
-                         )
+        D401.ins[0].phase = 'l'
+    # D401_H = bst.units.HXutility('D401_H', ins=D401-0, V=0., rigorous=True)
+    D401_H_P = bst.units.Pump('D401_H_P', ins=D401-0, P = 101325)
+    D401_H_P-0-1-M401
     
-    D401_P0 = bst.units.Pump('D401_P0', ins=D401_H0-0, 
-                             outs=D401_top, # distillation top product of the top product from evaporating supernatant; can be recycled in the separation process defined here, controlled by F403.V (0 by default)
-                             P=101325., material='Stainless steel',)
+    def get_concentration_gpL(chem_ID, stream):
+        return stream.imass[chem_ID]/stream.F_vol
     
-    D401_P1 = bst.units.Pump('D401_P1', ins=D401-1, 
-                             outs=D401_bottom, # distillation bottom product of the top product from evaporating supernatant; can be recycled in the separation process defined here, controlled by F403.V (0 by default)
-                             P=101325., material='Stainless steel',)
+    def get_mass_percent(chem_ID, stream):
+        return stream.imass[chem_ID]/stream.F_mass
     
-#%% Unused: separation of acetylacetone formed by HP decarboxylation in heated fermentation broths
+    @njit(cache=True)
+    def mass_percent_helper(chemmass, totmass):
+        return chemmass/totmass
+    
+    D401_bP = bst.Pump('D401_bP', ins=D401-1, outs=HP_solution, P=101325.)
+    
+    
+#%% Separation of HP by the following steps (Singh group): 
+#                        (i) evaporation (to 20% of original volume);
+#                        (ii) methanol addition (80% of original volume);
+#                        (iii) filtration of precipitated impurities;
+#                        (iv) methanol evaporation (all; new volume = 20% of original volume);
+#                        (v) re-dilution with water (to 100% of original volume)
+#                        (vi) adsorption for color removal;
+#                        (vii) cation exchange to remove mineral ions;
+#                        (viii) add NaOH to adjust pH;
+#                        (viii) anion exchange to remove sulfate, phosphate, nitrate;
+#                        (ix) add NaOH to neutralize 3-HP;
+#                        (x) evaporate all water, dry salt;
+#                        (xi) re-acidulate salt to 3-HP.
 
-@SystemFactory(ID = 'acetylacetone_separation_distillation_process',
-               ins=[dict(ID='acetylacetone_in_fermentation_broth', PD=5, Water=100),
-               ],
-                outs=[dict(ID='acetylacetone_recovered', PD=4, Water=1),
-                      dict(ID='liquid_waste_to_WWT', PD=1, Water=99),
-                                ],
-                                               )
-def create_acetylacetone_separation_distillation_process(ins, outs):
-    acetylacetone_in_fermentation_broth, = ins
-    acetylacetone_recovered, liquid_waste_to_WWT = outs
-    
-    None
-    
-    
-# %% Separation of HP by adsorption on activated charcoal
-@SystemFactory(ID = 'HP_separation_adsorption_process',
+@SystemFactory(ID = 'HP_separation_methanol_precipitation_neutralization_process',
                ins=[dict(ID='fermentation_broth', HP=1, Water=100),
-                    dict(ID='ethanol_desorption', Ethanol=1),
+                    dict(ID='base_separation', CaO=1.),
+                    dict(ID='sulfuric_acid_separation', H2SO4=1.),
+                    dict(ID='methanol_separation', Methanol=1.),
+                    dict(ID='separation_water', Water=1.),
+                    dict(ID='makeup_regeneration_fluid', Water=1.),
+                    dict(ID='makeup_cation_exchange_resin', Water=1.),
+                    dict(ID='makeup_anion_exchange_resin', Water=1.),
                ],
-                outs=[dict(ID='cooled_HP', HP=1),
-                      dict(ID='S401_solid', FermMicrobe=1, Water=1),
-                      dict(ID='broth_post_adsorption', Water=99),
-                      dict(ID='S403_cool_air', N2=1),
-                      dict(ID='ethanol_for_other_downstream_uses', Ethanol=0),
-                      dict(ID='S407_cool_air', N2=1),
+                outs=[dict(ID='HP_product', HP=1.,),
+                      dict(ID='cell_mass', FermMicrobe=1, Water=1),
+                      dict(ID='gypsum', CaSO4=1, Water=1),
+                      dict(ID='F401_t', Water=1),
+                      dict(ID='F403_t', Water=1),
+                      dict(ID='color_impurities', Water=1),
+                      dict(ID='cation_impurities', Water=1),
+                      dict(ID='anion_impurities', Water=1),
+                      dict(ID='D401_b', Water=1),
                                 ],
                                                )
-def create_HP_separation_adsorption_process(ins, outs,):
+def create_HP_separation_methanol_precipitation_neutralization_process(ins, outs,):
     
-    fermentation_broth, Ethanol_desorption = ins
-    cooled_HP, S401_solid, broth_post_adsorption, S403_cool_air, ethanol_for_other_downstream_uses, S407_cool_air = outs
-
-    # =============================================================================
-    # Separation units
-    # =============================================================================
+    fermentation_broth, base_separation, sulfuric_acid_separation, methanol_separation, separation_water,\
+        makeup_regeneration_fluid, makeup_cation_exchange_resin, makeup_anion_exchange_resin = ins
     
+    HP_product, cell_mass, gypsum, F401_t, F403_t,\
+        color_impurities, cation_impurities, anion_impurities, D401_b = outs
     
-    # # Remove solids from fermentation broth, modified from the pressure filter in Humbird et al.
+    # Remove solids from fermentation broth, modified from the pressure filter in Humbird et al.
     S401_index = [splits_df.index[0]] + splits_df.index[2:].to_list()
     S401_cell_mass_split = [splits_df['stream_571'][0]] + splits_df['stream_571'][2:].to_list()
     S401_filtrate_split = [splits_df['stream_535'][0]] + splits_df['stream_535'][2:].to_list()
-    S401 = bst.units.SolidsCentrifuge('S401', ins=fermentation_broth, outs=(S401_solid, 'S401_liquid_fraction'),
-                                # moisture_content=0.50,
+    S401 = bst.units.SolidsCentrifuge('S401', ins=(fermentation_broth,), outs=(cell_mass, 'S401_l'),
+                                moisture_content=0.50,
                                 split=find_split(S401_index,
                                                   S401_cell_mass_split,
                                                   S401_filtrate_split,
-                                                  chemical_groups), 
-                                solids =\
+                                                  chemical_groups), solids =\
                                     ['Xylan', 'Glucan', 'Lignin', 'FermMicrobe',\
-                                      'Ash', 'Arabinan', 'Galactan', 'Mannan'])
+                                     'Ash', 'Arabinan', 'Galactan', 'Mannan'])
+    def fix_split(isplit, ID):
+        isplit['Glycerol', 'Hexanol', 'HP', 'AcrylicAcid', 'AceticAcid', 'AceticAcid'] = isplit[ID]
+                  
+    fix_split(S401.isplit, 'Glucose')
+    # NOTE: if there is not enough moisture content, it is impossible to pump
+    # the fluid into the centrifuge; in fact, the centrifuge would not be able
+    # to separate anything.
     
-    H401 = bst.units.HXutility('H401', ins=S401-1, outs = ('broth_to_adsorbtion',), T=30. + 273.15)
     
-    M401 = bst.Mixer('M401', ins=(Ethanol_desorption, '',), outs=('mixed_ethanol_for_desorption'))
-    S402 = bst.FakeSplitter('S402', ins=M401-0, outs=('ethanol_to_A401', ethanol_for_other_downstream_uses))
+    F401 = bst.units.MultiEffectEvaporator('F401', ins=S401-1, outs=('F401_l', 'F401_g'),
+                                            P = (101325, 70000, 40000, 20000, 10000), V = 0.8)
     
-    @M401.add_specification()
-    def M401_spec():
-        makeup_ethanol, recycled_ethanol = M401.ins
-        # A401.run()
+    F401_P1 = bst.units.Pump('F401_P1', ins=F401-0, P=101325.)    
+    F401_P2 = bst.units.Pump('F401_P2', ins=F401-1, outs=F401_t, P=101325.)  
+    
+    
+    M401 = bst.Mixer('M401', ins=(F401_P1-0, methanol_separation, 'recycled_methanol'), outs=('methanol_mixed_broth'))
+    
+    M401.methanol_water_volume_ratio = 4.
+    @M401.add_specification(run=False)
+    def M401_methanol_spec():
+        broth, makeup_methanol, recycled_methanol = M401.ins
+        methanol_mixed_broth, = M401.outs
+        req_methanol = (broth.ivol['Water'] + recycled_methanol.ivol['Water']) * M401.methanol_water_volume_ratio
+        makeup_methanol.ivol['Methanol'] = max(0., req_methanol - recycled_methanol.ivol['Methanol'])
         M401._run()
-        M401_outs_0 = M401.outs[0]
-        M401_outs_0.imol['Ethanol'] = sum([i.imol['Ethanol'] for i in M401.ins])
-        makeup_ethanol.imol['Ethanol'] = max(0., M401_outs_0.imol['Ethanol'] - recycled_ethanol.imol['Ethanol'])
-        # S402.run()
-        # M401._run()
-    
-    A401 = bst.AdsorptionColumnTSA(
-        'A401', 
-        # ins=[bst.Stream('feed', HP=0.014, Water=1, units='kg/hr', T=30 + 273.15), 'ethanol'], 
-        ins=[H401-0, S402-0, 'hot_air'],
-        outs=[broth_post_adsorption, 'HP_laden_ethanol', 'ethanol_laden_air'],
-        superficial_velocity=7.2, # m/h; typical velocities are 4 to 14.4 m/h for liquids; Adsorption basics Alan Gabelman (2017) Adsorption basics Part 1. AICHE
-        
-        regeneration_velocity=14.4, # m/h; default value (updated in unit specification based on titer)
-        
-        cycle_time=2., # 1-2 hours required for thermal-swing-adsorption (TSA) for silica gels (add 1 hr for conservativeness); Seader, J. D., Separation Process Principles: Chemical and Biochemical Operations,” 3rd ed., Wiley, Hoboken, NJ (2011).
-        
-        # This is density of activated carbon packing, including voids.
-        # So rho_adsorbent = (1 - epsilon) * rho where epsilon is the void fraction
-        # and rho is the density of activated carbon with no voids.
-        adsorbent='Activated carbon',
-        rho_adsorbent=None, # Bulk density including void fraction; calculated based on void fraction and solid density
-        rho_adsorbent_solid=700, # Solid density excluding void fraction (in kg/m3)  # Seader et al. Table 15.2
-        
-        void_fraction = 0.5, # v/v # Seader et al. Table 15.2
-        adsorbent_capacity=0.091, # default value for unsaturated capacity (updated in unit specification); conservative heuristic from Seider et. al. (2017) Product and Process Design Principles. Wiley
-        T_regeneration=30. + 273.15, 
-        drying_time = 0.55, # h # This is updated to 0.5 h after the first run
-        T_air = 351.39 + 10., # K # HP_chemicals.Ethanol.Tb + 10
-        air_velocity = 2160, # m/h
-        vessel_material='Stainless steel 316',
-        vessel_type='Vertical',
-        regeneration_fluid=dict(phase='l', Ethanol=1., units='kg/hr'),
-        adsorbate_ID='HP',  
-        split=dict(HP=0, Water=1, VitaminA=1., VitaminD2=1., FermMicrobe=1.),
-        length_unused = 1.219, # m; 4 ft based on recommendation by Seader et al. (Separation Process Principles)
-        target_recovery=0.99,
-        wet_retention=0.5, # conservatively assume half a wash's worth of ethanol is retained in the column before dry air is passed through it
-        K = 0.07795, # back-calculated for 1 wash from experimenHP measurements for 3 washes pooled together; 0.125 for 3-wash # constant desorption partition coefficient; calculated for 1 wash from experimenHP data for 3 washes pooled together
-    )
-    A401._default_equipment_lifetime['Activated carbon'] = 1.
-    A401.adsorbent_cost['Activated carbon'] = price['Activated carbon'] # 41. $/ft^3
-    
-    @A401.add_specification
-    def A401_spec(): # update recovery and capacity based on user-input adsorption time and temperature
-        
-        T = A401.ins[0].T
-        t = A401.cycle_time
-        capacity = cap_interp(t, T)
-        A401.adsorbent_capacity = capacity[0]
-        
-        A401._run()
-        
-        M401.run()
-        
-        A401.ins[1].T = M401.outs[0].T
     
     
+    F402 = bst.units.MultiEffectEvaporator('F402', ins=M401-0, outs=('F402_b', 'F402_t'),
+                                            P = (101325, 70000, 40000, 20000, 10000), V = 0.86,
+                                            chemical='Methanol')
+    
+    @F402.add_specification(run=False)
+    def F402_V_spec():
+        F402_ins_0 = F402.ins[0]
+        F402.V = F402_ins_0.imol['Methanol', 'Water'].sum()/F402_ins_0.imol['Methanol', 'Water', 'SuccinicAcid', 'HP'].sum()
+        F402._run()
+        # manually prevent HP evaporation
+        F402.outs[0].imol['HP'] += F402.outs[1].imol['HP']
+        F402.outs[1].imol['HP'] = 0.
         
-    F401 = bst.units.MultiEffectEvaporator('F401', ins=A401-1, outs=('F401_b', 'F401_t'), chemical='Ethanol',
-                                            P = (101325, 73581, 50892, 32777, 20000), V = 0.7)
+    F402_P1 = bst.units.Pump('F402_P1', ins=F402-0, outs='methanol_evaporated_broth', P=101325.)    
+    F402_P2 = bst.units.Pump('F402_P2', ins=F402-1, outs='water_methanol_stream', P=101325.)  
     
-    F401.flash=False
-    F401.HP_solubility_in_ethanol_ww = get_HP_solubility_in_ethanol_ww()
+    D401 = bst.units.BinaryDistillation('D401', ins=F402_P2-0, outs=('D401_g', 'D401_l'),
+                                        LHK=('Methanol', 'Water'),
+                                        is_divided=True,
+                                        product_specification_format='Recovery',
+                                        Lr=0.999, Hr=0.999, k=1.05, P=101325.,
+                                        # partial_condenser=False,
+                                        vessel_material = 'Stainless steel 316')
+    D401_dH = bst.units.HXutility('D401_dH', ins = D401-0, T = 273.15 + 25., rigorous = True)
+    D401_dP = bst.units.Pump('D401_dP', ins=D401_dH-0, outs=2-M401, P=101325.)
+    D401_bP = bst.units.Pump('D401_bP', ins=D401-1, outs=D401_b, P=101325.)
     
-    @F401.add_bounded_numerical_specification(x0=1e-4, x1=1.-1e-4, ytol=1e-4)
-    def F401_obj_fn(V):
-        F401_b = F401.outs[0]
-        # F401_ins_0 = F401.ins[0]
-        # HP_mass = F401_ins_0.imass['HP']
-        # F401_ins_0.imass['HP'] = 0.
+    M402 = bst.Mixer(ins=(F402_P1-0, separation_water, 'recycled_water'), outs=('rediluted_broth'))
+    
+    M402.water_water_volume_ratio = 4.
+    @M402.add_specification(run=False)
+    def M402_methanol_spec():
+        broth, makeup_water, recycled_water = M402.ins
+        rediluted_broth, = M402.outs
+        req_water = broth.ivol['Water'] * M402.water_water_volume_ratio
+        makeup_water.ivol['Water'] = max(0., req_water - recycled_water.ivol['Water'])
+        M402._run()
+        
+    
+    ###------------!!! Placeholder unit----------###
+    
+    bst.FakeSplitter._ins_size_is_fixed = False
+    
+    S403 = bst.FakeSplitter('S403', 
+                            ins=(M402-0, 
+                                 makeup_regeneration_fluid, 
+                                 makeup_cation_exchange_resin, 
+                                 makeup_anion_exchange_resin),
+                            
+                            outs=('purified_broth', 
+                                  color_impurities, 
+                                  cation_impurities, 
+                                  anion_impurities)
+                                     )
+    S403.line = 'Adsorption_CEx_AEx'
+    
+    
+    # 3-HP losses data from Singh group
+    S403.stepwise_HP_loss_fractions = 1. - np.array(
+                                        [66.94/71.45, # during color removal
+                                         62.20/66.94, # during cation exchange
+                                         51.71/62.20, # during anion exchange
+                                         ]
+                                        )
+    @S403.add_specification(run=False)
+    def S403_Adsorption_CEx_AEx_spec():
+        broth = S403.ins[0]
+        purified_broth, color_imp, cation_imp, anion_imp = S403.outs
+        purified_broth.copy_like(broth)
+        
+        # impurity removal
+        color_imp.imol['FermMicrobe', 'Flocculant', 'Sucrose', 'Xylitol', 'SuccinicAcid',
+                       'SolubleProtein', 'InsolubleProtein', 'Ash', 'Fiber', 'TriOlein'] =\
+            purified_broth.imol['FermMicrobe', 'Flocculant', 'Sucrose', 'Xylitol', 'SuccinicAcid',
+                           'SolubleProtein', 'InsolubleProtein', 'Ash', 'Fiber', 'TriOlein']
+        
+        purified_broth.imol['FermMicrobe', 'Flocculant', 'Sucrose', 'Xylitol', 'SuccinicAcid',
+                       'SolubleProtein', 'InsolubleProtein', 'Ash', 'Fiber', 'TriOlein'] = 0.
+        
+        cation_imp.imol['Gypsum', 'AmmoniumSulfate', 'ZincSulfate', 'CaO'] =\
+            purified_broth.imol['Gypsum', 'AmmoniumSulfate', 'ZincSulfate', 'CaO']
+        purified_broth.imol['Gypsum', 'AmmoniumSulfate', 'ZincSulfate', 'CaO'] = 0.
+        
+        anion_imp.imol['H3PO4', 'H2SO4'] = purified_broth.imol['H3PO4', 'H2SO4']
+        purified_broth.imol['H3PO4', 'H2SO4'] = 0.
+        
+        # 3-HP losses
+        color_imp.imol['HP'] = purified_broth.imol['HP'] * S403.stepwise_HP_loss_fractions[0]
+        purified_broth.imol['HP'] -= color_imp.imol['HP']
+        
+        cation_imp.imol['HP'] = purified_broth.imol['HP'] * S403.stepwise_HP_loss_fractions[1]
+        purified_broth.imol['HP'] -= cation_imp.imol['HP']
+        
+        anion_imp.imol['HP'] = purified_broth.imol['HP'] * S403.stepwise_HP_loss_fractions[2]
+        purified_broth.imol['HP'] -= anion_imp.imol['HP']
+    
+    ###------------------------------------------###
+    
+    
+    ###------------!!! Placeholder unit----------###
+    
+    bst.Unit._ins_size_is_fixed = False
+    R403 = bst.Unit('R403', ins = (S403-0, base_separation),
+                                    outs = ('dilute_HP_salt'),)
+    R403.line = 'Neutralization reactor'
+    R403.neutralization_rxns = ParallelRxn([
+    #   Reaction definition                                               Reactant  Conversion
+    Rxn('2 HP + CalciumDihydroxide -> CalciumLactate + 2 H2O',  'HP',   1.-1e-9),
+        ])
+    
+    @R403.add_specification(run=False)
+    def R403_neutralization_spec():
+        reacidulated_stream = R403.outs[0]
+        pure_broth, base_neut = R403.ins
+        base_neut.imol['CalciumDihydroxide'] = 0.5 * pure_broth.imol['HP']
+        reacidulated_stream.mix_from(R403.ins)
+        R403.neutralization_rxns(reacidulated_stream)
+    
+    R403_P = bst.units.Pump('R403_P', ins=R403-0)
+    
+    bst.Unit._ins_size_is_fixed = True
+    ###------------------------------------------###
+    
+    
+    F403 = bst.units.MultiEffectEvaporator('F403', ins=R403_P-0, outs=('F403_l', 'F403_g'),
+                                            P = (101325, 70000, 40000, 20000, 10000), V = 0.999)
+    
+    F403_P1 = bst.units.Pump('F403_P1', ins=F403-0, P=101325.)    
+    F403_P2 = bst.units.Pump('F403_P2', ins=F403-1, outs=F403_t, P=101325.)  
+    
+    
+    R401 = units.AcidulationReactor('R401', ins = (F403_P1-0, sulfuric_acid_separation),
+                                    outs = ('reacidulated_stream'),
+                                    vessel_material='Stainless steel 316',
+                                    tau = 1.,)
+    R401.acid_safety_factor = 1.
+    
+    R401_H = bst.units.HXutility('R401_H', ins = R401-0, T = 273.15 + 25., rigorous = False)
+    R401_P = bst.units.Pump('R401_P', ins=R401_H-0)
+
+    S402 = bst.SolidsCentrifuge('S402', ins=R401_P-0,
+                              moisture_content=0.,
+                              split={'Gypsum':1.},
+                              outs=(gypsum, HP_product))
+    
+    # @S402.add_specification(run=False)
+    def S402_spec():
+        if S402.ins[0].imol['CaSO4']>0:
+            S402._run()
+        else:
+            S402.outs[0].mol[:] = 0
+            S402.outs[1].mol = S402.ins[0].mol
+            
+
+#%% Separation of HP with a potentially improved process 
+# relative to 'HP_separation_methanol_precipitation_neutralization_process'
+
+@SystemFactory(ID = 'HP_separation_improved_process',
+               ins=[dict(ID='fermentation_broth', HP=1, Water=100),
+                    dict(ID='sulfuric_acid_separation', H2SO4=1.),
+                    dict(ID='adsorption_makeup_regeneration_fluid', Water=1.),
+                    dict(ID='CEX_makeup_regeneration_HCl', Water=1.),
+                    dict(ID='AEX_makeup_regeneration_NaOH', Water=1.),
+               ],
+                outs=[dict(ID='HP_solution', HP=1., Water=2.),
+                      dict(ID='cell_mass', FermMicrobe=1, Water=1),
+                      dict(ID='gypsum', CaSO4=1, Water=1),
+                      dict(ID='F403_t', Water=1),
+                      dict(ID='color_impurities', Water=1),
+                      dict(ID='cation_impurities', Water=1),
+                      dict(ID='anion_impurities', Water=1),
+                                ],
+                                               )
+def create_HP_separation_improved_process(ins, outs, fermentation_reactor=None):
+    
+    fermentation_broth, sulfuric_acid_separation,\
+        adsorption_makeup_regeneration_fluid, CEX_makeup_regeneration_HCl, AEX_makeup_regeneration_NaOH = ins
+    
+    HP_solution, cell_mass, gypsum, F403_t,\
+        color_impurities, cation_impurities, anion_impurities = outs
+    
+    f = bst.main_flowsheet
+    u, s = f.unit, f.stream
+    
+    # Remove solids from fermentation broth, modified from the pressure filter in Humbird et al.
+    S401_index = [splits_df.index[0]] + splits_df.index[2:].to_list()
+    S401_cell_mass_split = [splits_df['stream_571'][0]] + splits_df['stream_571'][2:].to_list()
+    S401_filtrate_split = [splits_df['stream_535'][0]] + splits_df['stream_535'][2:].to_list()
+    S401 = bst.units.SolidsCentrifuge('S401', ins=(fermentation_broth,), outs=(cell_mass, 'S401_l'),
+                                moisture_content=0.50,
+                                split=find_split(S401_index,
+                                                  S401_cell_mass_split,
+                                                  S401_filtrate_split,
+                                                  chemical_groups), solids =\
+                                    ['Xylan', 'Glucan', 'Lignin', 'FermMicrobe',\
+                                     'Ash', 'Arabinan', 'Galactan', 'Mannan'])
+    def fix_split(isplit, ID):
+        isplit['Glycerol', 'Hexanol', 'HP', 'AcrylicAcid', 'AceticAcid', 'AceticAcid'] = isplit[ID]
+                  
+    fix_split(S401.isplit, 'Glucose')
+    # NOTE: if there is not enough moisture content, it is impossible to pump
+    # the fluid into the centrifuge; in fact, the centrifuge would not be able
+    # to separate anything.
+    
+    R401 = units.AcidulationReactor('R401', ins = (S401-1, sulfuric_acid_separation),
+                                    outs = ('acidulated_broth'),
+                                    vessel_material='Stainless steel 316',
+                                    tau = 1.)
+    R401_design = R401._design
+    R401_cost = R401._cost
+    R401.bypass = True
+    @R401.add_specification(run=False)
+    def R401_bypass_spec():
+        feed = R401.ins[0]
+        if fermentation_reactor:
+            if not fermentation_reactor.neutralization:
+                R401._design = lambda: 0
+                R401._cost = lambda: 0
+                R401.ins[1].empty()
+            else:
+                R401._design = R401_design
+                R401._cost = R401_cost
+            R401._run()
+        
+        elif feed.imol['CalciumLactate'] > feed.imol['HP']:
+            R401._design = lambda: 0
+            R401._cost = lambda: 0
+            R401.ins[1].empty()
+            R401._run()
+        
+        else:
+            raise RuntimeError(f'[{R401.ID}] Neutralization and reacidulation requirement is not specified by the user.')
+            
+    R401_H = bst.units.HXutility('R401_H', ins = R401-0, T = 320, rigorous = False)
+    R401_P = bst.units.Pump('R401_P', ins=R401_H-0)
+    
+    S402_index = S401_index + ['Gypsum']
+    S402_gypsum_split = S401_cell_mass_split + [0.995]
+    S402_filtrate_split = S401_filtrate_split + [0.005]
+    S402 = units.GypsumFilter('S402', ins=R401_P-0,
+                              moisture_content=0.2,
+                              split=find_split(S402_index,
+                                               S402_gypsum_split,
+                                               S402_filtrate_split,
+                                               chemical_groups),
+                              outs=(gypsum, ''))
+    S402_design = S402._design
+    S402_cost = S402._cost
+    S402.bypass = True
+    @S402.add_specification()
+    def S402_bypass_spec():
+        feed = S402.ins[0]
+        if fermentation_reactor:
+            if not fermentation_reactor.neutralization:
+                S402._design = lambda: 0
+                S402._cost = lambda: 0
+                S402.outs[0].empty()
+            else:
+                S402._design = S402_design
+                S402._cost = S402_cost
+            S402._run()
+        
+        elif feed.imol['CalciumLactate'] > feed.imol['HP']:
+            S402._design = lambda: 0
+            S402._cost = lambda: 0
+            S402.outs[0].empty()
+            S402._run()
+        
+        else:
+            raise RuntimeError(f'[{S402.ID}] Neutralization and reacidulation requirement is not specified by the user.')
+            
+    #########------------Color Removal Adsorption------------#########
+    
+    # by default, chemicals pass unabsorbed
+    split = {i.ID: 1. for i in tmo.settings.chemicals}
+    
+    # sharply split adsorbed chemicals
+    split.update({i: 0. for i in 
+             ['FermMicrobe', 'Flocculant', 'Sucrose', 
+              'Glucose', 'Xylitol', 'SuccinicAcid',
+              'SolubleProtein', 'InsolubleProtein', 'Ash', 
+              'Fiber', 'TriOlein', 'CSL']})
+    
+    # partially adsorbed chemicals
+    split['HP'] = 66.94/71.45 # !!! from Singh Group's initial experimental data
+    
+    color_removal_adsorption_process = create_temperature_swing_adsorption_process(
+                                         ins=(S402-1, adsorption_makeup_regeneration_fluid, ''),
+                                         outs=('', color_impurities, ''),
+                                         ID='color_removal_adsorption_process',
+                                         split=split, 
+                                         # regeneration_fluid_chemical_ID='Ethanol',
+                                         regeneration_fluid_chemical_ID='Water',
+                                         adsorbate_ID='FermMicrobe', 
+                                         target_recovery=0.999,
+                                         regeneration_velocity=3.6, # m/h # 0.001 - 0.004 m/s from https://www.aiche.org/sites/default/files/docs/pages/adsorption_basics_part_1.pdf
+                                         K=2., #!!! update based on experimental data from Singh group
+                                         drying_time=0.,
+                                         adsorbent='Activated carbon',
+                                         void_fraction=0.35,
+                                         recover_regeneration_fluid=False,
+                                         # V_evaporator=0.8,
+                                         # T_condenser=12.+273.15,
+                                         unit_ID_digits=410,
+                                         )
+    u.A410.line = 'Adsorption'
+    #########------------------------------------------------#########
+    
+    bst.AdsorptionColumnTSA.adsorbent_cost.update(
+        {'Dowex G26 H2 form': 300., # !!! update
+         'Amberlite IRA-67 free base': 300., # !!! update
+         }
+        )
+    
+    bst.AdsorptionColumnTSA._default_equipment_lifetime.update(
+        {'Dowex G26 H2 form': 10., # !!! update
+         'Amberlite IRA-67 free base': 10., # !!! update
+         }
+        )
+    
+    #########------------Cation Exchange Process-------------#########
+    
+    M420 = bst.Mixer('M420', ins=(CEX_makeup_regeneration_HCl, ''), outs='CEX_makeup_regeneration_fluid')
+    @M420.add_specification(run=False)
+    def M420_no_run_spec():
+        pass
+    
+    # by default, chemicals pass unabsorbed
+    split = {i.ID: 1. for i in tmo.settings.chemicals}
+    
+    # sharply split adsorbed chemicals
+    split.update({i: 0. for i in 
+             ['Gypsum', 'AmmoniumSulfate', 'ZincSulfate', 'CaO', 'MagnesiumChloride', 'NH3']})
+    
+    # partially adsorbed chemicals
+    split['HP'] = 62.20/66.94 # !!! from Singh Group's initial experimental data
+
+    cation_exchange_process = create_temperature_swing_adsorption_process(
+                                         ins=(color_removal_adsorption_process-0, M420-0, ''),
+                                         outs=('', cation_impurities, ''),
+                                         ID='cation_exchange_process',
+                                         split=split, 
+                                         # regeneration_fluid_chemical_ID='Water',
+                                         regeneration_fluid_composition_dict={'Water':0.9825, 'H2SO4':0.0175}, # 7% HCl; we use equivalent mol-H+ of H2SO4 # https://www.dupont.com/content/dam/dupont/amer/us/en/water-solutions/public/documents/en/IER-AmberLite-Procedure-Cross-Regeneration-Cation-Resin-Sweeteners-TechFact-45-D02505-en.pdf
+                                         adsorbate_ID='MagnesiumChloride', 
+                                         target_recovery=0.999,
+                                         regeneration_velocity=1.8, # m/h # ~3 BV/h based on https://www.dupont.com/content/dam/dupont/amer/us/en/water-solutions/public/documents/en/IER-AmberLite-Procedure-Cross-Regeneration-Cation-Resin-Sweeteners-TechFact-45-D02505-en.pdf
+                                         K=2., #!!! update based on experimental data from Singh group
+                                         drying_time=0.,
+                                         adsorbent='Silica gel', # !!! update
+                                         void_fraction=0.35,
+                                         recover_regeneration_fluid=False,
+                                         unit_ID_digits=420,
+                                         )
+    A420 = u.A420
+    A420.line = 'Cation exchange'
+    @A420.add_specification(run=False)
+    def A420_M420_HCl_req_spec():
+        A420._run()
+        makeup_regen_stream = M420.outs[0]
+        M420.ins[0].imol['H2SO4'] = makeup_regen_stream.imol['H2SO4']
+        M420.ins[1].imol['Water'] = makeup_regen_stream.imol['Water']
+        
+    #########------------------------------------------------#########
+    
+    #########-------------Anion Exchange Process-------------#########
+    
+    M430 = bst.Mixer('M430', ins=(AEX_makeup_regeneration_NaOH, ''), outs='AEX_makeup_regeneration_fluid')
+    @M430.add_specification(run=False)
+    def M430_no_run_spec():
+        pass
+    
+    # by default, chemicals pass unabsorbed
+    split = {i.ID: 1. for i in tmo.settings.chemicals}
+    
+    # sharply split adsorbed chemicals
+    split.update({i: 0. for i in 
+             ['H3PO4', 'H2SO4']})
+    
+    # partially adsorbed chemicals
+    split['HP'] = 51.71/62.20 # !!! from Singh Group's initial experimental data
+    
+    anion_exchange_process = create_temperature_swing_adsorption_process(
+                                         ins=(cation_exchange_process-0, M430-0, ''),
+                                         outs=('', anion_impurities, ''),
+                                         ID='anion_exchange_process',
+                                         split=split, 
+                                         # regeneration_fluid_chemical_ID='Water',
+                                         regeneration_fluid_composition_dict={'Water':0.982, 'NaOH':0.018}, # 4% NaOH from https://www.dupont.com/content/dam/dupont/amer/us/en/water-solutions/public/documents/en/IER-AmberLite-Procedure-Cross-Regeneration-Anion-Resin-Sweeteners-TechFact-45-D02504-en.pdf
+                                         adsorbate_ID='H3PO4', 
+                                         target_recovery=0.999,
+                                         regeneration_velocity=1.8, # m/h # ~3 BV/h based on https://www.dupont.com/content/dam/dupont/amer/us/en/water-solutions/public/documents/en/IER-AmberLite-Procedure-Cross-Regeneration-Cation-Resin-Sweeteners-TechFact-45-D02505-en.pdf
+                                         K=2., #!!! update based on experimental data from Singh group
+                                         drying_time=0.,
+                                         adsorbent='Silica gel', # !!! update
+                                         void_fraction=0.35,
+                                         recover_regeneration_fluid=False,
+                                         unit_ID_digits=430,
+                                         )
+    A430 = u.A430
+    A430.line = 'Anion exchange'
+    @A430.add_specification(run=False)
+    def A430_M430_HCl_req_spec():
+        A430._run()
+        ins0, ins1 = M430.ins
+        makeup_regen_stream = M430.outs[0]
+        ins0.imol['NaOH'] = makeup_regen_stream.imol['NaOH']
+        ins0.imass['Water'] = ins0.imass['NaOH'] # price is for 50 wt% NaOH
+        ins1.imol['Water'] = makeup_regen_stream.imol['Water'] - ins0.imol['Water']
+        
+    #########------------------------------------------------#########
+    
+    
+    
+    F403 = bst.units.MultiEffectEvaporator('F403', ins=anion_exchange_process-0, outs=('F403_l', 'F403_g'),
+                                            P = (101325, 70000, 40000, 20000, 10000), V = 0.5)
+    
+    target_HP_x = 0.30
+    def get_x(chem_ID, stream):
+        return stream.imol[chem_ID]/sum(stream.imol['SuccinicAcid', 'AceticAcid', 'Furfural', 'HMF', 'HP', 'Water'])
+    
+    @F403.add_specification(run=False)
+    def F403_specification():
+        instream = F403.ins[0]
+        # ratio = target_water_x/get_x('Water', instream)
+        HP_x = get_x('HP', instream)
+        if HP_x < target_HP_x:
+            ratio = HP_x/target_HP_x
+            F403.V = 1. - ratio
+            F403._run()
+        else:
+            F403.V = 0.
+            F403._run()
+            
+    F403_P1 = bst.units.Pump('F403_P1', ins=F403-0, outs=HP_solution, P=101325.)    
+    F403_P2 = bst.units.Pump('F403_P2', ins=F403-1, outs=F403_t, P=101325.)  
+    
+
+#%% Separation of HP by the following steps:
+#       (i) centrifuge out cell mass;
+#       (ii) F401: under vacuum, evaporate 3-HP and everything lower-boiling than that (mainly 3-HP and water);
+#       (iv) D401: for the top product of step (ii), distill all water under vacuum to recover 3-HP as the bottom product;
+
+@SystemFactory(ID = 'HP_separation_two_step_fractional_distillation_process',
+               ins=[dict(ID='fermentation_broth', HP=1, Xylitol=0.1, FermMicrobe=1., Water=100),
+                    dict(ID='sulfuric_acid_separation', H2SO4=1.),
+               ],
+                outs=[dict(ID='HP_product', HP=1.,),
+                      dict(ID='cell_mass', FermMicrobe=1, Water=1),
+                      dict(ID='gypsum', CaSO4=1, Water=1),
+                      dict(ID='impurities_to_WWT', Xylitol=0.1),
+                      dict(ID='S403_water_to_WWT', Water=98.),
+                                ],
+                                               )
+def create_HP_separation_two_step_fractional_distillation_process(ins, outs,):
+    
+    fermentation_broth, sulfuric_acid_separation = ins
+    HP_product, cell_mass, gypsum, impurities_to_WWT, S403_water_to_WWT = outs
+    
+    # Remove solids from fermentation broth, modified from the pressure filter in Humbird et al.
+    S401_index = [splits_df.index[0]] + splits_df.index[2:].to_list()
+    S401_cell_mass_split = [splits_df['stream_571'][0]] + splits_df['stream_571'][2:].to_list()
+    S401_filtrate_split = [splits_df['stream_535'][0]] + splits_df['stream_535'][2:].to_list()
+    S401 = bst.units.SolidsCentrifuge('S401', ins=(fermentation_broth,), outs=(cell_mass, 'S401_l'),
+                                moisture_content=0.50,
+                                split=find_split(S401_index,
+                                                  S401_cell_mass_split,
+                                                  S401_filtrate_split,
+                                                  chemical_groups), solids =\
+                                    ['Xylan', 'Glucan', 'Lignin', 'FermMicrobe',\
+                                     'Ash', 'Arabinan', 'Galactan', 'Mannan'])
+    def fix_split(isplit, ID):
+        isplit['Glycerol', 'Hexanol', 'HP', 'AcrylicAcid', 'AceticAcid', 'AceticAcid'] = isplit[ID]
+                  
+    fix_split(S401.isplit, 'Glucose')
+    # NOTE: if there is not enough moisture content, it is impossible to pump
+    # the fluid into the centrifuge; in fact, the centrifuge would not be able
+    # to separate anything.
+    
+    R401 = units.AcidulationReactor('R401', ins = (S401-1, sulfuric_acid_separation),
+                                    outs = ('acidulated_broth'),
+                                    vessel_material='Stainless steel 316',
+                                    tau = 1.)
+    
+    R401_H = bst.units.HXutility('R401_H', ins = R401-0, T = 320, rigorous = False)
+    R401_P = bst.units.Pump('R401_P', ins=R401_H-0)
+    
+    S402_index = S401_index + ['Gypsum']
+    S402_gypsum_split = S401_cell_mass_split + [0.995]
+    S402_filtrate_split = S401_filtrate_split + [0.005]
+    S402 = units.GypsumFilter('S402', ins=R401_P-0,
+                              moisture_content=0.2,
+                              split=find_split(S402_index,
+                                               S402_gypsum_split,
+                                               S402_filtrate_split,
+                                               chemical_groups),
+                              outs=(gypsum, ''))
+    
+    @S402.add_specification(run=False)
+    def S402_spec():
+        if S402.ins[0].imol['CaSO4']>0:
+            S402._run()
+        else:
+            S402.outs[0].mol[:] = 0
+            S402.outs[1].mol = S402.ins[0].mol
+        
+        
+    # S402.specification = S402_spec
+    
+    
+    # S402_P = bst.Pump('S402_P', ins=S402-1, P=15000)
+    # U401 = bst.Unit('U401', ins=S402_P-0)
+    # @U401.add_specification(run=False)
+    # def U401_spec():
+    #     U401_outstream = U401.outs[0]
+    #     U401_outstream.copy_like(U401.ins[0])
+    #     U401_outstream.vle(P=U401_outstream.P, H=U401_outstream.H)
+        
+    F401 = bst.units.Flash('F401', ins=S402-1, outs=('F401_g', 'F401_l'),
+                                            P = 101325., V = 1.-1e-4)
+    
+    F401_H1 = bst.HXutility('F401_H1', ins=F401-0, V=0.5, rigorous=True)
+    # F401_H1.target_HP_mol_frac = 0.3 * chems.Water.MW/chems.HP.MW # equivalent to 30 wt% 3-HP, required for catalytic upgrading
+    F401.target_HP_recovery = 0.95
+    def F401_H1_HP_rec_obj_f(V):
+        F401_H1.V = V
+        F401_H1._run()
+        outstream = F401_H1.outs[0]
+        return outstream.imol['l', 'HP']/outstream.imol['HP'] - F401.target_HP_recovery
+    
+    @F401_H1.add_specification(run=False)
+    def F401_H1_condenser_spec():
+        instream=F401_H1.ins[0]
+        # mol_water, mol_HP = instream.imol['Water', 'HP']
+        # # for analytical solution, assume all HP condenses
+        # # F401_H1.V = 1. - (mol_HP/F401_H1.target_HP_mol_frac)/(mol_HP+mol_water)
+        # F401_H1.V = 1. - (mol_HP)/(mol_HP+mol_water)
+        # F401_H1._run()
+        IQ_interpolation(F401_H1_HP_rec_obj_f, 0.001, 0.999)
+    
+    # F401_P1 = bst.units.Pump('F401_P1', ins=F401_H1-0, outs='water_HP', P=101325.)    
+    F401_P2 = bst.units.Pump('F401_P2', ins=F401-1, outs=impurities_to_WWT, P=101325.)  
+    
+    
+    S403 = bst.PhaseSplitter('S403', ins=F401_H1-0, outs=('water_vapor', 'condensed_HP_product'))
+    S403_H1 = bst.HXutility('S403_H1', ins=S403-0, V=0., outs='condensed_vapor')
+    S403_P1 = bst.units.Pump('S403_P1', ins=S403_H1-0, outs=S403_water_to_WWT, P=101325.)  
+    S403_P2 = bst.units.Pump('S403_P2', ins=S403-1, outs=HP_product, P=101325.)  
+    
+    # # F402 = bst.units.Flash('F402', ins=F401_P1-0, outs=('F402_g', 'F402_l'),
+    # #                                         P = 15000., V = 1.-1e-3)
+    # # F402.target_HP_recovery = 0.92
+    # # @F402.add_specification(run=False)
+    # # def F402_V_spec():
+        
+    # # F402_H1 = bst.HXutility('F402_H1', ins=F402-0, T=273.15+40., rigorous=True)
+    # # F402_P1 = bst.units.Pump('F402_P1', ins=F402_H1-0, outs='water', P=101325.)    
+    # # F402_P2 = bst.units.Pump('F402_P2', ins=F402-1, outs='water_HP', P=101325.)  
+    
+    
+    # D401 = bst.units.BinaryDistillation('D401', ins=F401_H1-0, outs=('D401_g', 'D401_l'),
+    #                                     LHK=('Water', 'HP'),
+    #                                     is_divided=True,
+    #                                     # product_specification_format='Recovery',
+    #                                     # Lr=0.99, Hr=0.99,
+    #                                     k=1.05, 
+    #                                     product_specification_format='Composition',
+    #                                     y_top=0.9999, x_bot=0.7,
+    #                                     P = 10000.,
+    #                                     vessel_material = 'Stainless steel 316',
+    #                                     # partial_condenser = False,
+    #                                     # condenser_thermo = ideal_thermo,
+    #                                     # boiler_thermo = ideal_thermo,
+    #                                     # thermo=ideal_thermo,
+    #                                     )
+    # # @D401.add_specification(run=False)
+    # # def D401_y_top_spec():
+    # #     instream = D401.ins[0]
+    # #     mol_water, mol_HP = instream.imol['Water', 'HP']
+    # #     x_bot = D401.x_bot
+        
+    # D401_H1 = bst.HXutility('D401_H1', ins=D401-0, T=273.15+40., rigorous=True)
+    # D401_P1 = bst.units.Pump('D401_P1', ins=D401_H1-0, outs=D401_t, P=101325.)    
+    # D401_P2 = bst.units.Pump('D401_P2', ins=D401-1, outs=HP_product, P=101325.)  
+    
+    
+
+#%% Separation of HP by the following steps:
+#       (i) centrifuge out cell mass;
+#       (ii) add dodecanol (keeps impurities dissolved and/or suspended during evaporation (step (iii));
+#       (iii) F401: under vacuum, evaporate 3-HP and everything lower-boiling than that (mainly 3-HP and water, although a lot of dodecanol evaporates too);
+#       (iv) D401: for the top product of step (iii), distill all water under vacuum to recover a mixed 3-HP and dodecanol stream as the bottom product;
+#       (v) D402: for the bottom product of step (iv), distill all 3-HP under vacuum (recovered as top product; bottom product dodecanol is recycled)
+#       (vi) F402: for the bottom product of step (iii), perform drying to recover dodecanol for recycling (impurities sent to boiler).
+
+@SystemFactory(ID = 'HP_separation_fractional_distillation_process',
+               ins=[dict(ID='fermentation_broth', HP=1, FermMicrobe=1., Water=100),
+                    dict(ID='sulfuric_acid_separation', H2SO4=1.),
+                    dict(ID='dodecanol_separation', Dodecanol=10.),
+               ],
+                outs=[dict(ID='HP_product', HP=1.,),
+                      dict(ID='cell_mass', FermMicrobe=1, Water=1),
+                      dict(ID='gypsum', CaSO4=1, Water=1),
+                      dict(ID='D401_t', Water=98.),
+                      dict(ID='F402_b', Xylitol=0.1),
+                                ],
+                                               )
+def create_HP_separation_fractional_distillation_process(ins, outs,):
+    
+    fermentation_broth, sulfuric_acid_separation, dodecanol_separation = ins
+    HP_product, cell_mass, gypsum, D401_t, F402_b = outs
+    
+    # Remove solids from fermentation broth, modified from the pressure filter in Humbird et al.
+    S401_index = [splits_df.index[0]] + splits_df.index[2:].to_list()
+    S401_cell_mass_split = [splits_df['stream_571'][0]] + splits_df['stream_571'][2:].to_list()
+    S401_filtrate_split = [splits_df['stream_535'][0]] + splits_df['stream_535'][2:].to_list()
+    S401 = bst.units.SolidsCentrifuge('S401', ins=(fermentation_broth,), outs=(cell_mass, 'S401_l'),
+                                moisture_content=0.50,
+                                split=find_split(S401_index,
+                                                  S401_cell_mass_split,
+                                                  S401_filtrate_split,
+                                                  chemical_groups), solids =\
+                                    ['Xylan', 'Glucan', 'Lignin', 'FermMicrobe',\
+                                     'Ash', 'Arabinan', 'Galactan', 'Mannan'])
+    def fix_split(isplit, ID):
+        isplit['Glycerol', 'Hexanol', 'HP', 'AcrylicAcid', 'AceticAcid', 'AceticAcid'] = isplit[ID]
+                  
+    fix_split(S401.isplit, 'Glucose')
+    # NOTE: if there is not enough moisture content, it is impossible to pump
+    # the fluid into the centrifuge; in fact, the centrifuge would not be able
+    # to separate anything.
+    
+    R401 = units.AcidulationReactor('R401', ins = (S401-1, sulfuric_acid_separation),
+                                    outs = ('acidulated_broth'),
+                                    vessel_material='Stainless steel 316',
+                                    tau = 1.)
+    
+    R401_H = bst.units.HXutility('R401_H', ins = R401-0, T = 320, rigorous = False)
+    R401_P = bst.units.Pump('R401_P', ins=R401_H-0)
+    
+    S402_index = S401_index + ['Gypsum']
+    S402_gypsum_split = S401_cell_mass_split + [0.995]
+    S402_filtrate_split = S401_filtrate_split + [0.005]
+    S402 = units.GypsumFilter('S402', ins=R401_P-0,
+                              moisture_content=0.2,
+                              split=find_split(S402_index,
+                                               S402_gypsum_split,
+                                               S402_filtrate_split,
+                                               chemical_groups),
+                              outs=(gypsum, ''))
+    
+    @S402.add_specification(run=False)
+    def S402_spec():
+        if S402.ins[0].imol['CaSO4']>0:
+            S402._run()
+        else:
+            S402.outs[0].mol[:] = 0
+            S402.outs[1].mol = S402.ins[0].mol
+        
+        
+    # S402.specification = S402_spec
+    
+    
+    M401 = bst.units.Mixer('M401', ins=(S402-1,
+                                        dodecanol_separation, '', ''))
+    M401.dodecanol_water_mol_ratio_required = 0.1416/4 # equivalent to liquid volume ratio of 1:2
+    @M401.add_specification(run=False)
+    def M401_dodecanol_spec():
+        makeup_solvent = M401.ins[1]
+        mixed_stream = M401.outs[0]
+        makeup_solvent.empty()
+        M401._run()
+        makeup_solvent.imol['Dodecanol'] = max(0., mixed_stream.imol['Water']*M401.dodecanol_water_mol_ratio_required
+                                                   - mixed_stream.imol['Dodecanol'])
+        M401._run()
+        
+    # F401 = bst.units.MultiEffectEvaporator('F401', ins=M401-0, outs=('F401_l', 'F401_g'),
+    #                                         P = (101325, 10000, 5000, 1500, 750), V = 0.1)
+    
+    F401 = bst.units.Flash('F401', ins=M401-0, outs=('F401_g', 'F401_l'),
+                                            P = 15000., V = 0.1)
+    
+    F401.target_HP_recovery = 0.92
+
+    @njit
+    def HP_recovery_helper(rec_stream_mol, orig_stream_mol, target_rec):
+        return rec_stream_mol/orig_stream_mol - target_rec
+    def HP_recovery_objective_fn(V):
         F401.V = V
         F401._run()
-        # F401_ins_0.imass['HP']  =HP_mass
-        # F401_b.imass['HP'] = HP_mass
-    
-        return F401.HP_solubility_in_ethanol_ww - F401_b.imass['HP']/F401_b.F_mass
-    
-    P401 = bst.Pump('P401', ins=F401-1, P=101325.)
-    P402 = bst.Pump('P402', ins=F401-0, P=101325.)
-    
-    F402 = bst.DrumDryer('F402', 
-                         ins=(P402-0, 'F402_air', 'F402_natural_gas'),
-                         outs=('dry_HP', 'F402_hot_air', 'F402_emissions'),
-                         moisture_content=0.05, 
-                         split=0.,
-                         moisture_ID='Ethanol')
-    
-    H407 = bst.units.HXutility(
-        'H407', ins=F402-1, outs=('H407_cooled_ethanol_laden_air'), 
-        T=265.,
-        rigorous=True
-    )
-    
-    S407 = bst.units.FakeSplitter('S407', ins=H407-0, outs=(S407_cool_air, 'S407_ethanol_recovered_from_air'))
-    
-    @S407.add_specification()
-    def S407_spec():
-        S407_ins_0 = S407.ins[0]
-        S407_ins_0.phases=('l','g')
-        S407.outs[0].mol[:] = S407_ins_0['g'].mol[:]
-        S407.outs[1].mol[:] = S407_ins_0['l'].mol[:]
-    
-
-    H403 = bst.units.HXutility('H403', ins=F402-0, outs=(cooled_HP), 
-                               T=30.+273.15, rigorous=True)
-    
-    
-    H402 = bst.units.HXutility(
-        'H402', ins=A401-2, outs=('H402_cooled_ethanol_laden_air'), 
-        T=265.,
-        rigorous=True
-    )
-    
-    S403 = bst.units.FakeSplitter('S403', ins=H402-0, outs=(S403_cool_air, 'S403_ethanol_recovered_from_air'))
-    
-    @S403.add_specification()
-    def S403_spec():
-        S403_ins_0 = S403.ins[0]
-        S403.outs[0].mol[:] = S403_ins_0['g'].mol[:]
-        S403.outs[1].mol[:] = S403_ins_0['l'].mol[:]
-        
-    M402 = bst.Mixer('M402', ins=(P401-0, S407-1, S403-1), outs=('recycled_ethanol',))
-    M402-0-1-M401
-
-    
-#%% Unused: Recover HP from waste stream
-
-@SystemFactory(ID = 'additional_HP_recovery_process',
-               ins=[dict(ID='mixed_waste_stream', HP=1, PD=1, Water=100),
-               ],
-                outs=[
-                      dict(ID='recovered_HP', HP=1),
-                      dict(ID='S409_cool_air', N2=1),
-                      dict(ID='actual_waste_stream', Water=100),
-                                ],
-                                               )
-def create_additional_HP_recovery_process(ins, outs,):
-    
-    mixed_waste_stream, = ins
-    recovered_HP, S409_cool_air, actual_waste_stream = outs
-    
-    F405 = bst.DrumDryer('F405', 
-                         ins=(mixed_waste_stream, 'F405_air', 'F405_natural_gas'),
-                         outs=(recovered_HP, 'F405_hot_air', 'F405_emissions'),
-                         moisture_content=0.05, 
-                         split=0.,
-                         # moisture_ID='H2O',
-                         )
-    F405.isplit['PD'] = 1. # assume all PD evaporates along with water
-    
-    H409 = bst.units.HXutility(
-        'H409', ins=F405-1, outs=('cooled_water_PD_laden_air'), 
-        T=280.,
-        rigorous=True
-    )
-    
-    S409 = bst.units.FakeSplitter('S409', ins=H409-0, outs=(S409_cool_air, actual_waste_stream))
-    
-    @S409.add_specification()
-    def S409_spec():
-        S409_ins_0 = S409.ins[0]
-        S409_ins_0.phases=('l','g')
-        S409.outs[0].mol[:] = S409_ins_0['g'].mol[:]
-        S409.outs[1].mol[:] = S409_ins_0['l'].mol[:]
-    
-    
-#%% Upgrading HP to sorbic acid with IPA as the solvent reaction medium
-### and IPA as the solvent for KSA purification 
-
-@SystemFactory(ID = 'HP_to_sorbic_acid_upgrading_process',
-               ins=[dict(ID='solid_HP', HP=1, ),
-                    dict(ID='IPA_upgrading_solvent', IPA=1),
-                    dict(ID='H2_hydrogenation', H2=1),
-                    dict(ID='KOH_hydrolysis', KOH=1),
-                    dict(ID='IPA_purification', IPA=0.1),
-                    dict(ID='fresh_caHPyst_R401', NiSiO2=1),
-                    dict(ID='fresh_caHPyst_R402', Amberlyst70_=1),
-               ],
-                outs=[dict(ID='KSA', KSA=1),
-                      dict(ID='impurities_to_boiler', DHL=0.1),
-                      dict(ID='S410_cool_air', N2=1),
-                      dict(ID='S408_cool_air', N2=1),
-                      dict(ID='spent_caHPyst_R401', NiSiO2=0.1),
-                      dict(ID='spent_caHPyst_R402', Amberlyst70_=0.1),
-                      dict(ID='solvent_purge_1', IPA=0.1),
-                      dict(ID='solvent_purge_2', IPA=0.1),
-                                ],
-                                               )
-def create_HP_to_sorbic_acid_upgrading_process(ins, outs,):
-    
-    solid_HP, IPA_upgrading_solvent, H2_hydrogenation, KOH_hydrolysis, IPA_purification,\
-        fresh_caHPyst_R401, fresh_caHPyst_R402 = ins
-    KSA, impurities_to_boiler, S410_cool_air, S408_cool_air,\
-        spent_caHPyst_R401, spent_caHPyst_R402,\
-        solvent_purge_1, solvent_purge_2 = outs
-    
-    M405 = bst.Mixer('M405', ins=(solid_HP, IPA_upgrading_solvent, '', ''),
-                     outs=('HP_in_IPA'))
-    
-    M405.w_IPA_per_w_HP = 31.392
-    # from Huber group: 7.9 mmol HP in 40 mL IPA
-    # => 31.391969626501833 g-IPA/g-HP
-    
-    @M405.add_specification()
-    def M405_IPA_spec():
-        M405_HP, M405_makeup_IPA, M405_recycled_IPA_1, M405_recycled_IPA_2 = M405.ins
-        M405_mixed, = M405.outs
-        M405_makeup_IPA.empty()
-        mass_HP = sum([i.imass['HP'] for i in M405.ins])
-        current_mass_IPA = sum([i.imass['IPA'] for i in [M405_HP, M405_recycled_IPA_1, M405_recycled_IPA_2]])
-        M405.required_mass_IPA = required_mass_IPA = mass_HP * M405.w_IPA_per_w_HP
-        M405_makeup_IPA.imass['IPA'] = max(0., required_mass_IPA-current_mass_IPA)
-        M405._run()
-        
-    R401 = units.HydrogenationReactor('R401', ins = (M405-0, '', H2_hydrogenation, '', fresh_caHPyst_R401), 
-                                      outs = ('R401_vent', spent_caHPyst_R401,'HMTHP_and_cat_in_IPA',),
-                                      vessel_material='Stainless steel 316',)
-    
-    # !!! TODO:
-    # Add caHPyst regeneration (https://doi.org/10.1006/jcat.1993.1265)
-    # 
-    
-    hydrogenation_CR_process = create_caHPyst_recovery_process(
-                                                ID='hydrogenation_CR_process',
-                                                ins=(R401-2,),
-                                                outs=('R401_product_stream_without_caHPyst', 'R401_recycled_caHPyst'),
-                                                split={'NiSiO2':1.-1e-5},
-                                                caHPyst_phase='s',
-                                                product_stream_phase='l',
-                                                )
-    
-    hydrogenation_CR_process-1-3-R401
-    
-    # R401_CR2 = bst.1
-    R402 = units.DehydrationReactor('R402', ins = (hydrogenation_CR_process-0, '', '', fresh_caHPyst_R402), 
-                                               outs = ('R402_vent', spent_caHPyst_R402, 'PSA_and_cat_in_IPA', ),
-                                               vessel_material='Stainless steel 316',)
-    dehydration_CR_process = create_caHPyst_recovery_process(
-                                                ID='dehydration_CR_process',
-                                                ins=(R402-2,),
-                                                outs=('R402_product_stream_without_caHPyst', 'R402_recycled_caHPyst'),
-                                                split={'Amberlyst70_':1.-1e-5},
-                                                caHPyst_phase='s',
-                                                product_stream_phase='l',
-                                                )
-    
-    dehydration_CR_process-1-2-R402
-    
-    R403 = units.RingOpeningHydrolysisReactor('R403', ins = (dehydration_CR_process-0, '', KOH_hydrolysis), 
-                                   outs = ('R403_vent', 'KSA_in_IPA'),
-                                   vessel_material='Stainless steel 316',)
-    
-    R403_P = bst.Pump('R403_P', ins=R403-1, P=101325.)
-    
-    
-    F407 = bst.units.MultiEffectEvaporator('F407', ins=R403_P-0, outs=('F407_b', 'F407_t'), 
-                                           chemical='IPA',
-                                            P = (101325, 73581, 50892, 32777, 20000), 
-                                            V = 0.5, # updated to 0.65 after initial simulation
-                                            )
-    F407.flash=False
-    F407_P0 = bst.Pump('F407_P0', ins=F407-0, P=101325.)
-    F407_P1 = bst.Pump('F407_P1', ins=F407-1, P=101325.)
-    
-    # F407_P1-0-3-M405
-    
-    F404 = bst.DrumDryer('F404', 
-                         ins=(F407_P0-0, 'F404_air', 'F404_natural_gas'),
-                         outs=('dry_KSA', 'F404_hot_air', 'F404_emissions'),
-                         moisture_content=0.02, 
-                         split=0.,
-                         moisture_ID='IPA')
-    
-    F404_P = bst.ConveyingBelt('F404_P', ins=F404-0)
-    
-    F406 = bst.DrumDryer('F406', 
-                         ins=(F404_P-0, 'F406_air', 'F406_natural_gas'),
-                         outs=('dry_KSA', 'F406_hot_air', 'F406_emissions'),
-                         moisture_content=0.02, 
-                         split=0.,
-                         moisture_ID='H2O')
-    
-    F406_P = bst.ConveyingBelt('F406_P', ins=F406-0)
-    
-    H410 = bst.units.HXutility('H410', 
-                         ins=F404-1, 
-                         outs=('H410_cooled_IPA_laden_air'), 
-                         T=265.,
-                         rigorous=True
-    )
-    H410.outs[0].phases=('l','g') # to clear initial simulation
-    
-    S410 = bst.units.FakeSplitter('S410', ins=H410-0, outs=(S410_cool_air, 'S410_IPA_recovered_from_air'))
-    
-    @S410.add_specification()
-    def S410_spec(): # split condensed IPA
-        S410_ins_0 = S410.ins[0]
-        S410.outs[0].mol[:] = S410_ins_0['g'].mol[:]
-        S410.outs[1].mol[:] = S410_ins_0['l'].mol[:]
-        M405.specifications[0]()
-
-    # S410-1-2-M405 # recycle recovered IPA
-    
-    
-    M430 = bst.Mixer('M430', ins=(F407_P1-0, S410-1), outs='recovered_IPA_upgrading')
-    S430 = bst.Splitter('S430', ins=M430-0, split=1.-1e-4, outs=(2-M405, solvent_purge_1))
-    
-    M406 = bst.Mixer('M406', ins=(F406_P-0, IPA_purification, ''),)
-    
-    M406.w_IPA_per_w_KSA =  31.545
-    # from Huber group: 6.6 mmol KSA in 40 mL IPA
-    # => 31.54515365896877 g-IPA/g-KSA
-    
-    @M406.add_specification()
-    def M406_IPA_spec():
-        M406_HP, M406_makeup_IPA, M406_recycled_IPA = M406.ins
-        M406_mixed, = M406.outs
-        mass_KSA = sum([i.imass['KSA'] for i in M406.ins])
-        current_mass_IPA = sum([i.imass['IPA'] for i in [M406_HP, M406_recycled_IPA]])
-        required_mass_IPA = mass_KSA * M406.w_IPA_per_w_KSA
-        M406_makeup_IPA.imass['IPA'] = max(0., required_mass_IPA-current_mass_IPA)
-        M406._run()
-    
-    
-    S406 = bst.FakeSplitter('S406', ins=M406-0,
-                        outs=('KSA_purified', 'impurities_in_IPA'))
-    
-    # From Huber group:
-    S406.KSA_loss = 0.02 # % as decimal
-    S406.KSA_purity = 0.949 # wt %
-    #
-    S406.outlet_mass_ratio_IPA_to_impurities = 0.02
-    
-    @S406.add_specification()
-    def S406_spec():
-        S406_ins_0 = S406.ins[0]
-        S406_outs_0, S406_outs_1 = S406.outs
-        
-        tot_KSA = S406_ins_0.imol['KSA']
-        mol_KSA_recovered = (1.-S406.KSA_loss) * tot_KSA
-        KSA_MW = 150.21688
-        KSA_purity = S406.KSA_purity
-        
-        S406_outs_0.copy_like(S406_ins_0)
-        S406_outs_0.imol['KSA'] = 0.
-        S406_outs_0.imass['IPA'] = 0.
-        S406_outs_0.imass['IPA'] = S406.outlet_mass_ratio_IPA_to_impurities * S406_outs_0.F_mass
-        
-        S406_outs_0.F_mass = mol_KSA_recovered*KSA_MW*(1.-KSA_purity)/KSA_purity # impurities
-        
-        S406_outs_0.imol['KSA'] = mol_KSA_recovered
-        S406_outs_0.T = S406_ins_0.T
-        
-        S406_outs_1.copy_like(S406_ins_0)
-        S406_outs_1.mol[:] -= S406_outs_0.mol[:]
-    
-    
-    M408 = bst.Mixer('M408', ins=(S406-0, ''), outs=KSA)
-    
-    F409 = bst.units.MultiEffectEvaporator('F409', ins=S406-1, outs=('F409_b', 'F409_t'), 
-                                           chemical='IPA',
-                                            P = (101325, 73581, 50892, 32777, 20000), 
-                                            V = 0.5, # updated to 0.65 after initial simulation
-                                            )
-    F409.flash=False
-    F409_P0 = bst.Pump('F409_P0', ins=F409-0, P=101325.)
-    F409_P1 = bst.Pump('F409_P1', ins=F409-1, P=101325.)
-    
-    F405 = bst.DrumDryer('F405', 
-                         ins=(F409_P0-0, 'F405_air', 'F405_natural_gas'),
-                         outs=(impurities_to_boiler, 'F405_hot_air', 'F405_emissions'),
-                         moisture_content=0.01, 
-                         split=0.,
-                         moisture_ID='IPA')
-    
-    H408 = bst.units.HXutility(
-        'H408', ins=F405-1, outs=('cooled_IPA_laden_air'), 
-        T=265.,
-        rigorous=True
-    )
-    
-    S408 = bst.units.FakeSplitter('S408', ins=H408-0, outs=(S408_cool_air, 'S408_IPA_recovered_from_air'))
-    
-    @S408.add_specification()
-    def S408_spec():
-        S408_ins_0 = S408.ins[0]
-        S408.outs[0].mol[:] = S408_ins_0['g'].mol[:]
-        S408.outs[1].mol[:] = S408_ins_0['l'].mol[:]
-    
-    # S408-1-2-M406
-    M431 = bst.Mixer('M431', ins=(F409_P1-0, S408-1), outs='recovered_IPA_purification')
-    S431 = bst.Splitter('S431', ins=M431-0, split=1.-1e-4, outs=(2-M406, solvent_purge_2))
-    
-
-
-#%% Upgrading HP to sorbic acid with THF as the solvent reaction medium
-### and THF as the solvent for KSA purification 
-
-@SystemFactory(ID = 'HP_to_sorbic_acid_upgrading_process',
-               ins=[dict(ID='solid_HP', HP=1, ),
-                    dict(ID='THF_upgrading_solvent', THF=1),
-                    dict(ID='H2_hydrogenation', H2=1),
-                    dict(ID='KOH_hydrolysis', KOH=1),
-                    dict(ID='THF_purification', THF=0.1),
-                    dict(ID='fresh_caHPyst_R401', NiSiO2=1),
-                    dict(ID='fresh_caHPyst_R402', Amberlyst70_=1),
-                    dict(ID='Ethanol_upgrading_solvent', Ethanol=1),
-               ],
-                outs=[dict(ID='KSA', KSA=1),
-                      dict(ID='impurities_to_boiler', DHL=0.1),
-                      dict(ID='S410_cool_air', N2=1),
-                      dict(ID='S408_cool_air', N2=1),
-                      dict(ID='spent_caHPyst_R401', NiSiO2=0.1),
-                      dict(ID='spent_caHPyst_R402', Amberlyst70_=0.1),
-                      dict(ID='S411_cool_air', N2=1),
-                      dict(ID='solvent_purge_1', THF=0.1),
-                      dict(ID='solvent_purge_2', THF=0.1),
-                      dict(ID='solvent_purge_3', THF=0.1),
-                                ],
-                                               )
-def create_HP_to_sorbic_acid_upgrading_process_THF_Ethanol(ins, outs,):
-    
-    solid_HP, THF_upgrading_solvent, H2_hydrogenation, KOH_hydrolysis, THF_purification,\
-        fresh_caHPyst_R401, fresh_caHPyst_R402, Ethanol_upgrading_solvent = ins
-    KSA, impurities_to_boiler, S410_cool_air, S408_cool_air,\
-        spent_caHPyst_R401, spent_caHPyst_R402,\
-            S411_cool_air,\
-            solvent_purge_1, solvent_purge_2, solvent_purge_3 = outs
-    
-    M405 = bst.Mixer('M405', ins=(solid_HP, THF_upgrading_solvent, '', ''),
-                     outs=('HP_in_THF'))
-    
-    M405.w_THF_per_w_HP = 35.334
-    # from Huber group: 7.9 mmol HP in 40 mL THF
-    # => 35.3339090584386 g-THF/g-HP
-    
-    @M405.add_specification()
-    def M405_THF_spec():
-        M405_HP, M405_makeup_THF, M405_recycled_THF_1, M405_recycled_THF_2 = M405.ins
-        M405_mixed, = M405.outs
-        M405_makeup_THF.empty()
-        mass_HP = sum([i.imass['HP'] for i in M405.ins])
-        current_mass_THF = sum([i.imass['THF'] for i in [M405_HP, M405_recycled_THF_1, M405_recycled_THF_2]])
-        M405.required_mass_THF = required_mass_THF = mass_HP * M405.w_THF_per_w_HP
-        M405_makeup_THF.imass['THF'] = max(0., required_mass_THF-current_mass_THF)
-        M405._run()
-        
-    R401 = units.HydrogenationReactor('R401', ins = (M405-0, '', H2_hydrogenation, '', fresh_caHPyst_R401), 
-                                      outs = ('R401_vent', spent_caHPyst_R401,'HMTHP_and_cat_in_THF',),
-                                      vessel_material='Stainless steel 316',)
-    
-    # !!! TODO:
-    # Add caHPyst regeneration (https://doi.org/10.1006/jcat.1993.1265)
-    # 
-    
-    hydrogenation_CR_process = create_caHPyst_recovery_process(
-                                                ID='hydrogenation_CR_process',
-                                                ins=(R401-2,),
-                                                outs=('R401_product_stream_without_caHPyst', 'R401_recycled_caHPyst'),
-                                                split={'NiSiO2':1.-1e-5},
-                                                caHPyst_phase='s',
-                                                product_stream_phase='l',
-                                                )
-    
-    hydrogenation_CR_process-1-3-R401
-    
-    # R401_CR2 = bst.1
-    R402 = units.DehydrationReactor('R402', ins = (hydrogenation_CR_process-0, '', '', fresh_caHPyst_R402), 
-                                               outs = ('R402_vent', spent_caHPyst_R402, 'PSA_and_cat_in_THF', ),
-                                               vessel_material='Stainless steel 316',)
-    dehydration_CR_process = create_caHPyst_recovery_process(
-                                                ID='dehydration_CR_process',
-                                                ins=(R402-2,),
-                                                outs=('R402_product_stream_without_caHPyst', 'R402_recycled_caHPyst'),
-                                                split={'Amberlyst70_':1.-1e-5},
-                                                caHPyst_phase='s',
-                                                product_stream_phase='l',
-                                                )
-    
-    dehydration_CR_process-1-2-R402
-    
-    F415 = bst.units.MultiEffectEvaporator('F415', ins=dehydration_CR_process-0, outs=('F415_b', 'F415_t'), 
-                                           chemical='THF',
-                                            P = (101325, 73581, 50892, 32777, 20000), 
-                                            V = 0.5, # updated to 0.65 after initial simulation
-                                            )
-    F415.flash=False
-    F415_P0 = bst.Pump('F415_P0', ins=F415-0, P=101325.)
-    F415_P1 = bst.Pump('F415_P1', ins=F415-1, P=101325.)
-    
-    
-    F407 = bst.DrumDryer('F407', 
-                         ins=(F415_P0-0, 'F407_air', 'F407_natural_gas'),
-                         outs=('dry_KSA', 'F407_hot_air', 'F407_emissions'),
-                         moisture_content=0.02, 
-                         split=0.,
-                         moisture_ID='THF')
-    
-    F407_P = bst.ConveyingBelt('F407_P', ins=F407-0)
-    
-    H411 = bst.units.HXutility('H411', 
-                         ins=F407-1, 
-                         outs=('H411_cooled_THF_laden_air'), 
-                         T=245.0,
-                         rigorous=True
-    )
-    
-    S411 = bst.units.FakeSplitter('S411', ins=H411-0, outs=(S411_cool_air, 'S411_THF_recovered_from_air'))
-    
-    @S411.add_specification()
-    def S411_spec(): # split condensed THF
-        S411_ins_0 = S411.ins[0]
-        S411.outs[0].mol[:] = S411_ins_0['g'].mol[:]
-        S411.outs[1].mol[:] = S411_ins_0['l'].mol[:]
-        M405.specifications[0]()
-    
-    # S411-1-2-M405 # recycle recovered THF
-    M415 = bst.Mixer('M415', ins=(F415_P1-0, S411-1), outs='recovered_THF_upgrading')
-    S415 = bst.Splitter('S415', ins=M415-0, split=1.-1e-4, outs=(2-M405, solvent_purge_1))
-    
-    
-    M407 = bst.Mixer('M407', ins=(F407_P-0, Ethanol_upgrading_solvent, '', '',),
-                     outs=('PSA_in_Ethanol'))
-    
-    M407.w_Ethanol_per_w_PSA = 42.439
-    # from Huber group: 6.6 mmol PSA in 40 mL Ethanol
-    # => 42.439203991029636 g-Ethanol/g-HP
-    
-    @M407.add_specification()
-    def M407_Ethanol_spec():
-        M407_PSA, M407_makeup_Ethanol, M407_recycled_Ethanol_1, M407_recycled_Ethanol_2 = M407.ins
-        M407_mixed, = M407.outs
-        M407_makeup_Ethanol.empty()
-        mass_PSA = sum([i.imass['PSA'] for i in M407.ins])
-        current_mass_Ethanol = sum([i.imass['Ethanol'] for i in [M407_PSA, M407_recycled_Ethanol_1, M407_recycled_Ethanol_2]])
-        M407.required_mass_Ethanol = required_mass_Ethanol = mass_PSA * M407.w_Ethanol_per_w_PSA
-        M407_makeup_Ethanol.imass['Ethanol'] = max(0., required_mass_Ethanol-current_mass_Ethanol)
-        M407._run()
-        
-    
-    R403 = units.RingOpeningHydrolysisReactor('R403', ins = (M407-0, '', KOH_hydrolysis), 
-                                   outs = ('R403_vent', 'KSA_in_Ethanol'),
-                                   vessel_material='Stainless steel 316',)
-    
-    R403_P = bst.Pump('R403_P', ins=R403-1, P=101325.)
-
-    F412 = bst.units.MultiEffectEvaporator('F412', ins=R403_P-0, outs=('F412_b', 'F412_t'), 
-                                           chemical='Ethanol',
-                                            P = (101325, 73581, 50892, 32777, 20000), 
-                                            V = 0.5, # updated to 0.65 after initial simulation
-                                            )
-    F412.flash=False
-    F412_P0 = bst.Pump('F412_P0', ins=F412-0, P=101325.)
-    F412_P1 = bst.Pump('F412_P1', ins=F412-1, P=101325.)
-
-    F404 = bst.DrumDryer('F404', 
-                         ins=(F412_P0-0, 'F404_air', 'F404_natural_gas'),
-                         outs=('dry_KSA', 'F404_hot_air', 'F404_emissions'),
-                         moisture_content=0.02, 
-                         split=0.,
-                         moisture_ID='Ethanol')
-    
-    F404_P = bst.ConveyingBelt('F404_P', ins=F404-0)
-    
-    F406 = bst.DrumDryer('F406', 
-                         ins=(F404_P-0, 'F406_air', 'F406_natural_gas'),
-                         outs=('dry_KSA', 'F406_hot_air', 'F406_emissions'),
-                         moisture_content=0.02, 
-                         split=0.,
-                         moisture_ID='H2O')
-    
-    F406_P = bst.ConveyingBelt('F406_P', ins=F406-0)
-    
-    H410 = bst.units.HXutility('H410', 
-                         ins=F404-1, 
-                         outs=('H410_cooled_Ethanol_laden_air'), 
-                         T=265.0,
-                         rigorous=True
-    )
+        return HP_recovery_helper(F401.outs[0].imol['HP'], F401.ins[0].imol['HP'], F401.target_HP_recovery)
       
-    S410 = bst.units.FakeSplitter('S410', ins=H410-0, outs=(S410_cool_air, 'S410_Ethanol_recovered_from_air'))
+    dodecanol_mol_per_L = 3.802 # moles of dodecanol per liter of liquid volume of pure dodecanol
+    F401.max_impurity_conc = 250./dodecanol_mol_per_L # g/mol-dodecanol # eq. to 50 g/L-dodecanol
     
-    @S410.add_specification()
-    def S410_spec(): # split condensed THF
-        S410_ins_0 = S410.ins[0]
-        S410.outs[0].mol[:] = S410_ins_0['g'].mol[:]
-        S410.outs[1].mol[:] = S410_ins_0['l'].mol[:]
-        M405.specifications[0]()
+    @F401.add_specification(run=False)
+    def F401_specification():
+        instream = F401.ins[0]
+        impurity_mass = instream.F_mass - instream.imass['Water', 'HP', 'Dodecanol', 'SuccinicAcid'].sum()
+        req_mol_liq_dodecanol = impurity_mass/F401.max_impurity_conc
+        F401.max_vapor_fraction = max_vapor_fraction = 1. - req_mol_liq_dodecanol/instream.imol['Water', 'HP', 'Dodecanol', 'SuccinicAcid'].sum()
+        # F401.V = max_vapor_fraction
+        # F401._run()
+        IQ_interpolation(HP_recovery_objective_fn, 1e-3, max_vapor_fraction)
+        
+    F401_H1 = bst.HXutility('F401_H1', ins=F401-0, T=273.15+40., rigorous=True)
+    F401_P1 = bst.units.Pump('F401_P1', ins=F401_H1-0, outs='water_HP_dodecanol', P=101325.)    
+    F401_P2 = bst.units.Pump('F401_P2', ins=F401-1, outs='xylitol_impurities_in_dodecanol', P=101325.)  
+    
+    
+    D401 = bst.units.BinaryDistillation('D401', ins=F401_P1-0, outs=('D401_g', 'D401_l'),
+                                        LHK=('Water', 'HP'),
+                                        is_divided=True,
+                                        product_specification_format='Recovery',
+                                        Lr=0.99, Hr=0.99, k=1.05, P = 15000.,
+                                        vessel_material = 'Stainless steel 316',
+                                        # partial_condenser = False,
+                                        # condenser_thermo = ideal_thermo,
+                                        # boiler_thermo = ideal_thermo,
+                                        # thermo=ideal_thermo,
+                                        )
+
+    D401_H1 = bst.HXutility('D401_H1', ins=D401-0, T=273.15+40., rigorous=True)
+    D401_P1 = bst.units.Pump('D401_P1', ins=D401_H1-0, outs=D401_t, P=101325.)    
+    D401_P2 = bst.units.Pump('D401_P2', ins=D401-1, outs='HP_dodecanol', P=101325.)  
+    
+    
+    D402 = bst.units.ShortcutColumn('D402', ins=D401_P2-0, outs=('D402_g', 'D402_l'),
+                                        LHK=('HP', 'Dodecanol'),
+                                        is_divided=True,
+                                        product_specification_format='Recovery',
+                                        Lr=0.999, Hr=0.999, k=1.05, P = 15000.,
+                                        vessel_material = 'Stainless steel 316',
+                                        # partial_condenser = False,
+                                        # condenser_thermo = ideal_thermo,
+                                        # boiler_thermo = ideal_thermo,
+                                        # thermo=ideal_thermo,
+                                        )
+        
+    D402_H1 = bst.HXutility('D402_H1', ins=D402-0, T=273.15+40., rigorous=True)
+    D402_P1 = bst.units.Pump('D402_P1', ins=D402_H1-0, P=101325.)    
+    D402_P2 = bst.units.Pump('D402_P2', ins=D402-1, outs='recycled_dodecanol_1', P=101325.) 
+    D402_P2-0-2-M401
+    
+    S403 = bst.FakeSplitter('S403', ins=D402_P1-0, outs=(HP_product, 'purge_dodecanol'))
+    @S403.add_specification(run=False)
+    def S403_purge_dodecanol_spec():
+        S403_outstream = S403.outs[0]
+        S403_outstream.copy_like(S403.ins[0])
+        S403_outstream.phase = 'l'
+        S403.outs[1].imol['Dodecanol'] = S403_outstream.imol['Dodecanol']
+        S403_outstream.imol['Dodecanol'] = 0.
+    
+    F402 = bst.units.DrumDryer('F402', ins=F401_P2-0, outs=(F402_b, 'recycled_dodecanol_2'),
+                                            T=273.15 + 264.1 + 5., # 5 deg C above dodecanol boiling temperature
+                                            split={'Dodecanol':1},
+                                            moisture_content=0.,
+                                            )
+    V401 = bst.IsenthalpicValve('V401', ins=F402-1, P=101325.)
+    H401 = bst.HXutility('H401', ins=V401-0, T=30.+273.15, rigorous=True)
+    S404 = bst.PhaseSplitter('S404', ins=H401-0, outs=('waste_air', 'recycled_dodecanol_2'))
+    # S403.line = 'Phase splitter'
+    # @S403.add_specification(run=False)
+    # def S403_phase_split_spec():
+    #     instream = S403.ins[0]
+    #     S403.outs[0].copy_like(instream['g'])
+    #     S403.outs[1].copy_like(instream['l'])
+        
+    S404-1-3-M401
+    
+    
+#%% Upgrading HP to Acrylic Acid with water as the solvent reaction medium
+### followed by recovery of acrylic acid at glacial purity
+
+@SystemFactory(ID = 'HP_to_acrylic_acid_upgrading_process',
+               ins=[dict(ID='HP_solution', HP=1, Water=2),
+                    dict(ID='makeup_TiO2_catalyst', TiO2=1),
+               ],
+                outs=[dict(ID='glacial_AA', KSA=1),
+                      dict(ID='spent_TiO2_catalyst', TiO2=0.1),
+                      dict(ID='D408_t_wastewater', Water=2),
+                                ],
+                                               )
+def create_HP_to_acrylic_acid_upgrading_process(ins, outs,):
+    
+    HP_solution, makeup_TiO2_catalyst = ins
+    glacial_AA, spent_TiO2_catalyst, D408_t_wastewater = outs
+    
+    M402 = bst.units.Mixer('M402', ins=(HP_solution,
+                                        'dilution_water2'))
+    
+    M402.HP_wt_frac = 0.3
+    
+    # def M402_objective_fn(Water_imol):
+    #     M402.ins[1].imol['Water'] = Water_imol
+    #     M402._run()
+    #     # return get_concentration_gpL('HP', M402.outs[0]) - 600. # predicted "solubility" of 645 g/L at STP https://hmdb.ca/metabolites/HMDB0000700
+    #     # return get_concentration_gpL('HP', M402.outs[0]) - 270.1 # "Solubility "at 25 C # https://www.chemicalbook.com/ChemicalProductProperty_EN_CB6711580.htm
+    #     # return get_mass_percent('HP', M402.outs[0]) - .15 # Dehydration reaction paper
+    #     # return get_mass_percent('HP', M402.outs[0]) - .35 # 30-35 wt% in https://patents.google.com/patent/WO2013192451A1/en
+    #     # return get_mass_percent('HP', M402.outs[0]) - .30 # 30wt% with 80% conversion in Dunn et al. 2015 LCA of Bioproducts in GREET
+    #     # return get_mass_percent('HP', M402.outs[0]) - .99 # ideal
+    #     return get_mass_percent('HP', M402.outs[0]) - M402.HP_wt_frac
+    
+    @M402.add_specification(run=False)
+    def M402_adjust_water():
+        # IQ_interpolation(M402_objective_fn, 0., 20000, maxiter=50, ytol=1e-2)
+        M402_ins_0 = M402.ins[0]
+        # curr_HP_wt_frac = get_mass_percent('HP', M402_ins_0)
+        HP_wt = M402_ins_0.imass['HP']
+        other_wt = M402_ins_0.F_mass - HP_wt
+        M402.ins[1].imass['Water'] = HP_wt/M402.HP_wt_frac - HP_wt - other_wt
+        M402._run()
+    
+    
+    M402_P = bst.units.Pump('M402_P', ins=M402-0, P=506625.*5.4)
+    
+    R402 = units.DehydrationReactor('R402', ins = (M402_P-0, makeup_TiO2_catalyst, '',),
+                                    outs = ('dilute_acryclic_acid', spent_TiO2_catalyst),
+                                    tau = 57.34/1.5, # Dishisha et al.
+                                    T = 230. + 273.15,
+                                    P = 506625.*5.4,
+                                    vessel_material='Stainless steel 316')
+    # R402.heat_utilities[0].heat_transfer_efficiency = 1. 
     
 
-    # S410-1-2-M407 # recycle recovered Ethanol
-    M412 = bst.Mixer('M412', ins=(F412_P1-0, S410-1), outs='recovered_Ethanol_upgrading')
-    S412 = bst.Splitter('S412', ins=M412-0, split=1.-1e-4, outs=(2-M407, solvent_purge_2))
+    R402_H = bst.units.HXutility('R402_H', ins=R402-0, T = 89. + 273.15, rigorous=True)
     
     
-    M406 = bst.Mixer('M406', ins=(F406_P-0, THF_purification, ''),)
+    D408 = bst.units.ShortcutColumn('D408', ins=R402_H-0, outs=('D408_g', 'D408_l'),
+                                        LHK=('Water', 'AcrylicAcid'),
+                                        is_divided=True,
+                                        product_specification_format='Recovery',
+                                        Lr=0.999, Hr=0.999, k=1.05, P=101325./10.,
+                                        partial_condenser=False,
+                                        vessel_material = 'Stainless steel 316')
     
-    M406.w_THF_per_w_KSA =  35.506
-    # from Huber group: 6.6 mmol KSA in 40 mL THF
-    # => 35.50632865290145 g-THF/g-KSA
-    
-    @M406.add_specification()
-    def M406_THF_spec():
-        M406_HP, M406_makeup_THF, M406_recycled_THF = M406.ins
-        M406_mixed, = M406.outs
-        mass_KSA = sum([i.imass['KSA'] for i in M406.ins])
-        current_mass_THF = sum([i.imass['THF'] for i in [M406_HP, M406_recycled_THF]])
-        required_mass_THF = mass_KSA * M406.w_THF_per_w_KSA
-        M406_makeup_THF.imass['THF'] = max(0., required_mass_THF-current_mass_THF)
-        M406._run()
+    D408_dP = bst.Pump('D408_dP', ins=D408-0, outs=(D408_t_wastewater,), P=101325.)
+    # recycling water makes system convergence fail
+    # D408-0-3-R402
     
     
-    S406 = bst.FakeSplitter('S406', ins=M406-0,
-                        outs=('KSA_purified', 'impurities_in_THF'))
-    
-    # From Huber group:
-    S406.KSA_loss = 0.02 # % as decimal
-    S406.KSA_purity = 0.949 # wt %
-    #
-    S406.outlet_mass_ratio_THF_to_impurities = 0.02
-    
-    @S406.add_specification()
-    def S406_spec():
-        S406_ins_0 = S406.ins[0]
-        S406_outs_0, S406_outs_1 = S406.outs
-        
-        tot_KSA = S406_ins_0.imol['KSA']
-        mol_KSA_recovered = (1.-S406.KSA_loss) * tot_KSA
-        KSA_MW = 150.21688
-        KSA_purity = S406.KSA_purity
-        
-        S406_outs_0.copy_like(S406_ins_0)
-        S406_outs_0.imol['KSA'] = 0.
-        S406_outs_0.imass['THF'] = 0.
-        S406_outs_0.imass['THF'] = S406.outlet_mass_ratio_THF_to_impurities * S406_outs_0.F_mass
-        
-        S406_outs_0.F_mass = mol_KSA_recovered*KSA_MW*(1.-KSA_purity)/KSA_purity # impurities
-        
-        S406_outs_0.imol['KSA'] = mol_KSA_recovered
-        S406_outs_0.T = S406_ins_0.T
-        
-        S406_outs_1.copy_like(S406_ins_0)
-        S406_outs_1.mol[:] -= S406_outs_0.mol[:]
+    D408_P = bst.units.Pump('D408_P', ins=D408-1, P=101325.)
     
     
-    M408 = bst.Mixer('M408', ins=(S406-0, ''), outs=KSA)
+    # D408_H = bst.units.HXutility('D408_H', ins=D408_P-0, T = 330., rigorous=True)
     
-    F413 = bst.units.MultiEffectEvaporator('F413', ins=S406-1, outs=('F413_b', 'F413_t'), 
-                                           chemical='THF',
-                                            P = (101325, 73581, 50892, 32777, 20000), 
-                                            V = 0.5, # updated to 0.65 after initial simulation
-                                            )
-    F413.flash=False
-    F413_P0 = bst.Pump('F413_P0', ins=F413-0, P=101325.)
-    F413_P1 = bst.Pump('F413_P1', ins=F413-1, P=101325.)
     
-    F405 = bst.DrumDryer('F405', 
-                         ins=(F413_P0-0, 'F405_air', 'F405_natural_gas'),
-                         outs=(impurities_to_boiler, 'F405_hot_air', 'F405_emissions'),
-                         moisture_content=0.01, 
-                         split=0.,
-                         moisture_ID='THF')
+    D409 = bst.units.ShortcutColumn('D409', ins=D408_P-0, outs=('D409_g', 'D409_l'),
+                                        LHK=('AcrylicAcid', 'HP'),
+                                        is_divided=True,
+                                        product_specification_format='Recovery',
+                                        Lr=0.9995, Hr=0.9995, k=1.05, P=101325/20.,
+                                        partial_condenser=False,
+                                        vessel_material = 'Stainless steel 316')
+    D409_dP = bst.units.Pump('D409_dP', ins=D409-0, P=101325.)
+    D409_bP = bst.units.Pump('D409_bP', ins=D409-1, P=101325.)
+    D409_bP-0-2-R402
     
-    H408 = bst.units.HXutility(
-        'H408', ins=F405-1, outs=('cooled_THF_laden_air'), 
-        T=265.,
-        rigorous=True
-    )
+    D409_H = bst.units.HXutility('D409_H', ins=D409_dP-0, T = 25.+273.15, rigorous=True)
+    D409_P = bst.units.Pump('D409_P', ins=D409_H-0, outs=glacial_AA)
     
-    S408 = bst.units.FakeSplitter('S408', ins=H408-0, outs=(S408_cool_air, 'S408_THF_recovered_from_air'))
-    
-    @S408.add_specification()
-    def S408_spec():
-        S408_ins_0 = S408.ins[0]
-        S408.outs[0].mol[:] = S408_ins_0['g'].mol[:]
-        S408.outs[1].mol[:] = S408_ins_0['l'].mol[:]
-        
-    # S408-1-2-M406
-    M413 = bst.Mixer('M413', ins=(F413_P1-0, S408-1), outs='recovered_THF_purification')
-    S413 = bst.Splitter('S413', ins=M413-0, split=1.-1e-4, outs=(2-M406, solvent_purge_3))
-    
+
+
+
 #%% Wastewater treatment system
 @SystemFactory(ID = 'wastewater_treatment_process',
                ins=[dict(ID='mixed_liquid_wastes', Water=100,),
@@ -1435,37 +1489,183 @@ def create_conventional_wastewater_treatment_process(ins, outs,):
     
 #%% Utils
 
-# CaHPyst recovery and regeneration system factory
-@SystemFactory(ID = 'caHPyst_recovery_process',
-               ins=[dict(ID='product_stream_with_caHPyst', HMTHP=1, Water=100, NiSiO2=0.5),
+# catalyst recovery and regeneration system factory
+@SystemFactory(ID = 'catalyst_recovery_process',
+               ins=[dict(ID='product_stream_with_catalyst', HMTHP=1, Water=100, NiSiO2=0.5),
                     # dict(ID='regeneration_stream_in', N2=1, H2=0.2),
                     ],
-                outs=[dict(ID='product_stream_without_caHPyst', HMTHP=1, Water=100,),
+                outs=[dict(ID='product_stream_without_catalyst', HMTHP=1, Water=100,),
                        # dict(ID='regeneration_stream_out', N2=1, H2=0.2),
-                      dict(ID='recycled_caHPyst', NiSiO2=0.5),
+                      dict(ID='recycled_catalyst', NiSiO2=0.5),
                       ],
                 )
 
-def create_caHPyst_recovery_process(ins, outs, split, 
+def create_catalyst_recovery_process(ins, outs, split, 
                                      moisture_content=0.,
-                                     caHPyst_phase='s',
+                                     catalyst_phase='s',
                                      product_stream_phase='l',
                                      ):
-    product_stream_with_caHPyst, = ins
-    product_stream_without_caHPyst, recycled_caHPyst = outs
+    product_stream_with_catalyst, = ins
+    product_stream_without_catalyst, recycled_catalyst = outs
     
-    ID = product_stream_with_caHPyst.source.ID
+    ID = product_stream_with_catalyst.source.ID
 
     CR = bst.PressureFilter(ID+'_CR', 
-                             ins=product_stream_with_caHPyst,
-                             outs=(recycled_caHPyst, product_stream_without_caHPyst),
+                             ins=product_stream_with_catalyst,
+                             outs=(recycled_catalyst, product_stream_without_catalyst),
                                    split=split,
                                    moisture_content=moisture_content)
-    CR.caHPyst_phase = caHPyst_phase
+    CR.catalyst_phase = catalyst_phase
     CR.product_stream_phase = product_stream_phase
     @CR.add_specification()
     def CR_spec():
         CR._run()
-        CR.outs[0].phase = CR.caHPyst_phase
+        CR.outs[0].phase = CR.catalyst_phase
         CR.outs[1].phase = CR.product_stream_phase
+
+
+
+# temperature-swing adsorption system with liquid regeneration fluid and hot air used to dry adsorbent;
+# recovery of liquid regeneration fluid by sequential evaporation and drying
+@SystemFactory(ID = 'temperature_swing_adsorption_process',
+               ins=[dict(ID='liquid_feed', Water=100, Glucose=1.),
+                    dict(ID='makeup_liquid_regeneration_fluid', Ethanol=0.1),
+                    dict(ID='air_in', N2=1.),
+                    
+                    ],
+                outs=[dict(ID='recovered_adsorbate', Glucose=1.),
+                      dict(ID='air_out', N2=1., Ethnaol=-0.1),
+                      dict(ID='liquid_effluent', Water=100),
+                      
+                      
+                      ],
+                )
+
+def create_temperature_swing_adsorption_process(ins, outs, 
+                                     split, 
+                                     adsorbate_ID='Glucose', 
+                                     target_recovery=0.999,
+                                     regeneration_velocity = 9., # m/h # 0.001 - 0.004 m/s from https://www.aiche.org/sites/default/files/docs/pages/adsorption_basics_part_1.pdf
+                                     K=2., 
+                                     drying_time=2.,
+                                     adsorbent='Activated carbon',
+                                     void_fraction=0.35,
+                                     adsorbent_capacity=0.1,
+                                     
+                                     regeneration_fluid_chemical_ID=None,
+                                     regeneration_fluid_composition_dict=None, # provide either regeneration_fluid_chemical_ID or regeneration_fluid_composition_dict, not both
+                                     
+                                     recover_regeneration_fluid=True, # recovery is not implemented for when regeneration_fluid_composition_dict is provided
+                                     V_evaporator=0.8,
+                                     T_condenser=12.+273.15,
+                                     unit_ID_digits=410, # any integer; just make sure there are no units in the rest of the system that 
+                                                         # have IDs with digits within the range [unit_ID_digits, unit_ID_digits+1] 
+                                                         # inclusive of bounds.
+                                     ):
+    liquid_feed, makeup_liquid_regeneration_fluid, air_in = ins
+    liquid_effluent, recovered_adsorbate, air_out,  = outs
+    
+    if regeneration_fluid_chemical_ID and regeneration_fluid_composition_dict:
+        raise RuntimeError('[{ID}] Must provide either regeneration_fluid_chemical_ID or regeneration_fluid_composition_dict; both were provided.')
+    if not (regeneration_fluid_chemical_ID or regeneration_fluid_composition_dict):
+        raise RuntimeError('[{ID}] Must provide either regeneration_fluid_chemical_ID or regeneration_fluid_composition_dict; neither was provided.')
+    
+    unit_ID_digits_int = unit_ID_digits
+    unit_ID_digits_str = str(unit_ID_digits)
+    
+    if recover_regeneration_fluid:
         
+        if regeneration_fluid_chemical_ID:
+            
+            rf_ID = regeneration_fluid_chemical_ID.lower()
+            M401 = bst.Mixer('M'+unit_ID_digits_str, ins=(makeup_liquid_regeneration_fluid, '', ''), outs='regeneration_fluid_'+rf_ID)
+            @M401.add_specification(run=False)
+            def M401_no_run_spec(): # runs in A401_makeup_regeneration_fluid_spec
+                pass
+            
+            A401 = bst.AdsorptionColumnTSA('A'+unit_ID_digits_str, 
+                                           ins=(liquid_feed, M401-0, air_in),
+                                           outs=(liquid_effluent, 
+                                                 'A'+unit_ID_digits_str+'_adsorbate_in_regeneration_fluid', 
+                                                 air_out),
+                                           adsorbate_ID=adsorbate_ID, 
+                                           regeneration_fluid={regeneration_fluid_chemical_ID:1.},
+                                           regeneration_velocity=regeneration_velocity, 
+                                           K=K,
+                                           target_recovery=target_recovery,
+                                           split = split,
+                                           drying_time = drying_time,
+                                           adsorbent = adsorbent,
+                                           void_fraction = void_fraction,
+                                           adsorbent_capacity = adsorbent_capacity,
+                                           )
+            
+            @A401.add_specification(run=False)
+            def A401_makeup_regeneration_fluid_spec():
+                A401._run()
+                makeup, recycled1, recycled2 = M401.ins
+                mixed, = M401.outs
+                makeup.imol[regeneration_fluid_chemical_ID] = max(0, mixed.imol[regeneration_fluid_chemical_ID] -
+                                               recycled1.imol[regeneration_fluid_chemical_ID] -
+                                               recycled2.imol[regeneration_fluid_chemical_ID])
+            
+            F401 = bst.units.MultiEffectEvaporator('F'+unit_ID_digits_str, ins=A401-1, outs=('F401_b', f'recycled_regeneration_fluid_{rf_ID}_from_evaporator'),
+                                                    P = (101325, 70000, 50000, 30000, 20000), V = V_evaporator,
+                                                    chemical=regeneration_fluid_chemical_ID,
+                                                    )
+            
+            F401_P1 = bst.units.Pump('F'+unit_ID_digits_str+'_P1', ins=F401-0, P=101325.)    
+            F401_P2 = bst.units.Pump('F'+unit_ID_digits_str+'_P2', ins=F401-1, P=101325.)  
+            
+            F401_P2-0-1-M401
+            
+            F402 = bst.units.DrumDryer('F'+str(unit_ID_digits_int+1), ins=F401_P1-0, outs=(recovered_adsorbate, 'recovered_regeneration_fluid'+rf_ID),
+                                                    T=352.58, # ~1 deg C above ethanol boiling temperature
+                                                    split={regeneration_fluid_chemical_ID:1},
+                                                    moisture_content=0.,
+                                                    )
+            
+            V401 = bst.IsenthalpicValve('V'+unit_ID_digits_str, ins=F402-1, P=101325.)
+            H401 = bst.HXutility('H'+unit_ID_digits_str, ins=V401-0, T=T_condenser, rigorous=True)
+            S404 = bst.PhaseSplitter('S'+unit_ID_digits_str, ins=H401-0, outs=(air_out, f'recycled_regeneration_fluid_{rf_ID}_from_dryer'))
+            S404-1-2-M401
+        
+        else:
+            RuntimeError('[{ID}] Regeneration fluid recovery modeling is not implemented for cases where user provides regeneration_fluid_composition_dict rather than regeneration_fluid_chemical_ID.')
+    
+    else:
+        if regeneration_fluid_chemical_ID:
+            A401 = bst.AdsorptionColumnTSA('A'+unit_ID_digits_str, 
+                                           ins=(liquid_feed, makeup_liquid_regeneration_fluid, air_in),
+                                           outs=(liquid_effluent, 
+                                                 recovered_adsorbate, 
+                                                 air_out),
+                                           adsorbate_ID=adsorbate_ID, 
+                                           regeneration_fluid={regeneration_fluid_chemical_ID:1.},
+                                           regeneration_velocity=regeneration_velocity, 
+                                           K=K,
+                                           target_recovery=target_recovery,
+                                           split = split,
+                                           drying_time = drying_time,
+                                           adsorbent = adsorbent,
+                                           void_fraction = void_fraction,
+                                           adsorbent_capacity = adsorbent_capacity,
+                                           )
+        else:
+            A401 = bst.AdsorptionColumnTSA('A'+unit_ID_digits_str, 
+                                           ins=(liquid_feed, makeup_liquid_regeneration_fluid, air_in),
+                                           outs=(liquid_effluent, 
+                                                 recovered_adsorbate, 
+                                                 air_out),
+                                           adsorbate_ID=adsorbate_ID, 
+                                           regeneration_fluid=regeneration_fluid_composition_dict,
+                                           regeneration_velocity=regeneration_velocity, 
+                                           K=K,
+                                           target_recovery=target_recovery,
+                                           split = split,
+                                           drying_time = drying_time,
+                                           adsorbent = adsorbent,
+                                           void_fraction = void_fraction,
+                                           adsorbent_capacity = adsorbent_capacity,
+                                           )
+
