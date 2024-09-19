@@ -49,7 +49,7 @@ from biosteam import System
 from thermosteam import Stream
 from biorefineries.HP import units, facilities
 from biorefineries.HP.process_areas import create_HP_fermentation_process,\
-                                           create_HP_separation_improved_process,\
+                                           create_HP_separation_improved_process_HP_product,\
                                            create_HP_to_acrylic_acid_upgrading_process
 from biorefineries.HP.lca import LCA
 from biorefineries.HP.models._process_specification import ProcessSpecification
@@ -100,7 +100,8 @@ tmo.settings.set_thermo(HP_chemicals)
 System.default_maxiter = 100
 # System.default_converge_method = 'wegstein'
 # feedstock_ID = 'Corn stover'
-feedstock_ID = 'Corn'
+# feedstock_ID = 'Corn'
+feedstock_ID = 'Glucose'
 
 # System.default_converge_method = 'fixed-point'
 # System.default_converge_method = 'aitken'
@@ -110,95 +111,28 @@ System.default_relative_molar_tolerance = 0.001 # supersedes absolute tolerance
 System.default_molar_tolerance = 0.1
 System.strict_convergence = True # True => throw exception if system does not converge; false => continue with unconverged system
 
-#### Load corn system ####
-def get_corn_system_upto_slurry():
-    # corn.load()
-    sys = corn.create_system()
-    sys.simulate()
-    f = sys.flowsheet
-    disconnect_outs_0_sink = [f.MX, f.P502, f.S1,
-                              f.P304, # exclude ammonia addition
-                              ]
-    # include_upstream_of = [f.MH612, f.X611,]
-    include_upstream_of = [f.P322]
-    unit_set = set()
-    for i in disconnect_outs_0_sink: i.outs[0].disconnect_sink()
-    for i in include_upstream_of: 
-        unit_set = unit_set.union(i.get_upstream_units())
-        unit_set.add(i)
-    unit_set.remove(f.E401)
-    
-    units_to_remove = list(f.E413.get_downstream_units().intersection(f.S1.get_upstream_units()))
-    for i in units_to_remove: 
-        try: unit_set.remove(i)
-        except: pass
-    
-    f.V310-0-2-f.V321
-    more_units_to_remove = [f.P407, f.E316, f.V317, f.P318,
-                            f.V303, f.P304, # exclude ammonia addition
-                            ]
-    for i in more_units_to_remove: 
-        try: unit_set.remove(i)
-        except: pass
-    
-    # # include this heat exchanger if including ammonia addition; slurry has V>1 in some cases, leading to evaporator (F301) issues
-    # H201 = bst.HXutility('H201', ins=f.P322-0, V=0., rigorous=True)
-    # @H201.add_specification(run=False)
-    # def H201_feed_vle_spec():
-    #     H201_feed = H201.ins[0]
-    #     H201_feed.vle(H=H201_feed.H, P=H201_feed.P)
-    #     H201._run()
-    # unit_set.add(H201)
-    
-    S201 = bst.SolidsCentrifuge('S201', ins=f.P322-0, outs=('insoluble_proteins', 'slurry_to_fermentation_process'),
-                                moisture_content=0.05,
-                                split={'InsolubleProtein':0.85},
-                                )
-    unit_set.add(S201)
-    
-    corn_system_upto_slurry = bst.System.from_units('corn_system_upto_slurry', list(unit_set))
-    for i in corn_system_upto_slurry.outs: i.disconnect_sink()
-    corn_system_upto_slurry.simulate(update_configuration=True)
-    corn_system_upto_slurry.diagram('cluster')
-    
-    return corn_system_upto_slurry
-
-corn_system_upto_slurry = get_corn_system_upto_slurry()
-
+#
 @SystemFactory(ID = 'helper_HP_sys')
 def create_HP_sys(ins, outs):
     u, s = flowsheet.unit, flowsheet.stream
     process_groups = []
     # %% Feedstock
+
+    feedstock = bst.Stream('glucose_feedstock', Glucose=1., Water=1., units='kmol/h')
+    feedstock.price = 0.7618 # $/kg # USDA 2015-2019 mean # https://www.ers.usda.gov/data-products/sugar-and-sweeteners-yearbook-tables/sugar-and-sweeteners-yearbook-tables/#World,%20U.S.,%20and%20Mexican%20Sugar%20and%20Corn%20Sweetener%20Prices
+    feedstock.F_mass = 200_000 # initial value; updated by spec.set_production_capacity
     
-    # Sugarcane juicing subprocess
     
-    u = corn_system_upto_slurry.flowsheet.unit
-    s = corn_system_upto_slurry.flowsheet.stream
-    
-    # u.U201.ins.append(u.M201-0)
-    
-    # u.M201-0-1-u.U201
-    
-    # sugarcane_juicing_sys.simulate(update_configuration=True)
-    
-    U101 = bst.Unit('U101', ins='', outs='')
+    U101 = bst.Unit('U101', ins=feedstock, outs='')
     @U101.add_specification(run=False)
     def U101_spec():
         U101.outs[0].copy_like(U101.ins[0])
     
-    feedstock = s.corn
-    feedstock_sink = feedstock.sink
-    U101-0-0-feedstock_sink
-    feedstock-0-U101
-    feedstock_sink.ins[0].price = 0.
     
-    feedstock.F_mass = 554171.74 # initial value; updated by spec.set_production_capacity
-    
-    # Update all prices to 2019$ using chemical indices
-    # sugarcane biorefinery base year is 2019
-    for corn_sys_stream in list(s):
-        corn_sys_stream.price *= chem_index[2019]/chem_index[2018]
+    # # Update all prices to 2019$ using chemical indices
+    # # sugarcane biorefinery base year is 2019
+    # for corn_sys_stream in list(s):
+    #     corn_sys_stream.price *= chem_index[2019]/chem_index[2018]
         
     # %% 
     
@@ -221,7 +155,7 @@ def create_HP_sys(ins, outs):
     makeup_MEA_A301 = Stream('makeup_MEA_A301', units='kg/hr', price=price['Monoethanolamine'])
     
     #%% Fermentation units
-    fermentation_sys = create_HP_fermentation_process(ins=(u.S201-1,
+    fermentation_sys = create_HP_fermentation_process(ins=(U101-0,
                                                            CSL,
                                                            fermentation_MgCl2,
                                                            fermentation_ZnSO4,
@@ -245,11 +179,12 @@ def create_HP_sys(ins, outs):
     
     separation_CEX_regeneration_fluid = Stream('separation_CEX_regeneration_fluid', units='kg/hr')
     separation_AEX_regeneration_fluid = Stream('separation_AEX_regeneration_fluid', units='kg/hr')
+    separation_base_neutralization = Stream('separation_base_neutralization', units='kg/hr')
     
     # =============================================================================
     # Separation units
     # =============================================================================
-    separation_sys = create_HP_separation_improved_process(
+    separation_sys = create_HP_separation_improved_process_HP_product(
                                                             ins=(
                                                            fermentation_sys-0,
                                                            separation_sulfuric_acid,
@@ -257,6 +192,7 @@ def create_HP_sys(ins, outs):
                                                            '',
                                                            separation_CEX_regeneration_fluid,
                                                            separation_AEX_regeneration_fluid,
+                                                           separation_base_neutralization,
                                                            ),
                                                             
                                                             fermentation_reactor=u.R302,
@@ -266,16 +202,16 @@ def create_HP_sys(ins, outs):
     # =============================================================================
     # Upgrading streams
     # =============================================================================
-    makeup_TiO2_catalyst = Stream('makeup_TiO2_catalyst', units='kg/hr', price=price['TiO2'])
+    # makeup_TiO2_catalyst = Stream('makeup_TiO2_catalyst', units='kg/hr', price=price['TiO2'])
     
     # =============================================================================
     # Upgrading units
     # =============================================================================
-    upgrading_sys = create_HP_to_acrylic_acid_upgrading_process(ins=(separation_sys-0, 
-                                                                     makeup_TiO2_catalyst,
-                                                                     )
-                                                                )
-    s.spent_TiO2_catalyst.price = 0. # spent_TiO2_catalyst is assumed to be sold at 0 $/kg
+    # upgrading_sys = create_HP_to_acrylic_acid_upgrading_process(ins=(separation_sys-0, 
+    #                                                                  makeup_TiO2_catalyst,
+    #                                                                  )
+    #                                                             )
+    # s.spent_TiO2_catalyst.price = 0. # spent_TiO2_catalyst is assumed to be sold at 0 $/kg
     
 
     #%%# !!!
@@ -303,7 +239,7 @@ def create_HP_sys(ins, outs):
     
     
     # AA product
-    AcrylicAcid = Stream('AcrylicAcid', units='kg/hr', price=price['AA'])
+    SodiumLactate = Stream('SodiumLactate', units='kg/hr', price=price['AA'])
     # Acetoin product
     Acetoin = Stream('Acetoin', units='kg/hr', price=price['Acetoin'])
     # Isobutyraldehyde product
@@ -312,6 +248,8 @@ def create_HP_sys(ins, outs):
     
     H2SO4_fresh = Stream('H2SO4_fresh', price=price['Sulfuric acid'])
     NaOH_fresh = Stream('NaOH_fresh', price=price['Caustics'])
+    
+    NaOH_fresh_neutralization_separation = Stream('NaOH_fresh_neutralization_separation', price=price['Caustics']*2.) # !!! update for mixing in dilute NaOH like with NaOH_fresh
     
     #%%
     system_makeup_water = Stream('system_makeup_water', price=price['Makeup water'])
@@ -344,12 +282,12 @@ def create_HP_sys(ins, outs):
     
 
     # 7-day storage time, similar to ethanol's in Humbird et al.
-    T620 = units.HPStorageTank('T620', ins=upgrading_sys-0, tau=7*24, V_wf=0.9,
+    T620 = units.HPStorageTank('T620', ins=separation_sys-0, tau=7*24, V_wf=0.9,
                                          vessel_type='Floating roof',
                                          vessel_material='Stainless steel')
    
-    T620.line = 'AcrylicAcidStorageTank'
-    T620_P = units.HPPump('T620_P', ins=T620-0, outs=AcrylicAcid)
+    T620.line = 'SodiumLactateStorageTank'
+    T620_P = units.HPPump('T620_P', ins=T620-0, outs=SodiumLactate)
     
     
     T607 = bst.units.StorageTank('T607', ins = ethanol_fresh, outs = separation_ethanol_regeneration_fluid)
@@ -370,6 +308,9 @@ def create_HP_sys(ins, outs):
     T612 = bst.units.StorageTank('T612', ins = NaOH_fresh, outs = separation_AEX_regeneration_fluid)
     T612.line = 'Caustics storage tank'
     
+    
+    T613 = bst.units.StorageTank('T613', ins = NaOH_fresh_neutralization_separation, outs = separation_base_neutralization)
+    T613.line = 'Caustics storage tank'
     
     ############################
     
@@ -395,13 +336,19 @@ def create_HP_sys(ins, outs):
     # Mix waste liquids for treatment
     M501 = bst.units.Mixer('M501', ins=(u.F301_P-0, 
                                         # separation_sys-4,
-                                        upgrading_sys-2, 
+                                        # upgrading_sys-2, 
                                         separation_sys-3,
                                         separation_sys-4,
                                         separation_sys-5,
                                         separation_sys-6,
+                                        separation_sys-7,
                                         # u.H201-0,
                                         ))
+    @M501.add_specification(run=False)
+    def M501_acid_base_removal_spec():
+        for i in M501.ins:
+            i.imol['NaOH','H2SO4'] = 0.
+        M501._run()
     # M501.citrate_acetate_dissolution_rxns = ParallelRxn([
     #     Rxn('SodiumAcetate + H2O -> AceticAcid + NaOH', 'SodiumAcetate',   1.-1e-5),
     #     Rxn('SodiumCitrate + H2O -> CitricAcid + 3NaOH ', 'SodiumCitrate',   1.-1e-5),
@@ -435,10 +382,10 @@ def create_HP_sys(ins, outs):
         
     # Mix solid wastes to boiler turbogenerator
     M510 = bst.units.Mixer('M510', ins=(
-                                        u.S201-0,
+                                        # u.S201-0,
                                         # u.U202-0,
                                         # u.C202-0,
-                                        u.MH103-1,
+                                        # u.MH103-1,
                                         u.S401-0,
                                         ),
                             outs='wastes_to_boiler_turbogenerator')
@@ -473,7 +420,7 @@ def create_HP_sys(ins, outs):
          # s.cooling_tower_makeup_water,
          # s.cooling_tower_chemicals,
          ],
-        feedstock=s.corn,
+        feedstock=s.glucose_feedstock,
         RO_water=wastewater_treatment_sys-2,
         recycle_process_water=MX-0,
         BT_area=700,
@@ -498,14 +445,14 @@ def create_HP_sys(ins, outs):
         HXN._installed_cost = 0.
     
     # # To simulate without HXN, simply uncomment the following 3 lines:
-    # HXN._cost = HXN_no_run_cost
-    # HXN.energy_balance_percent_error = 0.
-    # HXN.new_HXs = HXN.new_HX_utils = []
+    HXN._cost = HXN_no_run_cost
+    HXN.energy_balance_percent_error = 0.
+    HXN.new_HXs = HXN.new_HX_utils = []
     
 # %% System setup
 
-HP_sys = bst.System.from_units('HP_sys', 
-                               create_HP_sys().units + corn_system_upto_slurry.units)
+
+HP_sys = create_HP_sys()
 
 # HP_sys.subsystems[-1].relative_molar_tolerance = 0.005
 HP_sys.set_tolerance(mol=1e-3, rmol=1e-3, subsystems=True)
@@ -514,8 +461,8 @@ f = bst.main_flowsheet
 u = f.unit
 s = f.stream
 
-feedstock = s.corn
-AA = s.AcrylicAcid
+feedstock = s.glucose_feedstock
+AA = s.SodiumLactate
 get_flow_tpd = lambda: (feedstock.F_mass-feedstock.imass['H2O'])*24/907.185
 
 update_facility_IDs(HP_sys)
@@ -578,7 +525,7 @@ HP_lca = HPLCA(system=HP_sys,
                  feedstock=feedstock, 
                  feedstock_ID=feedstock_ID,
                  main_product=AA, 
-                 main_product_chemical_IDs=['AcrylicAcid',], 
+                 main_product_chemical_IDs=['SodiumLactate',], 
                  by_products=['CaSO4'], 
                  cooling_tower=u.CT801, 
                  chilled_water_processing_units=[u.CWP802, u.CWP803], 
@@ -590,18 +537,18 @@ HP_lca = HPLCA(system=HP_sys,
 #%% Define unit groups and their metrics
 
 feedstock_acquisition_group = bst.UnitGroup('feedstock acquisition', units=[u.U101])
-feedstock_juicing_group = f.corn_system_upto_slurry.to_unit_group('feedstock juicing')
+# feedstock_juicing_group = f.corn_system_upto_slurry.to_unit_group('feedstock juicing')
 fermentation_group = f.HP_fermentation_process.to_unit_group('fermentation')
-separation_group = f.HP_separation_improved_process.to_unit_group('separation')
-upgrading_group = f.HP_to_acrylic_acid_upgrading_process.to_unit_group('upgrading')
+separation_group = f.HP_separation_improved_process_HP_product.to_unit_group('separation')
+# upgrading_group = f.HP_to_acrylic_acid_upgrading_process.to_unit_group('upgrading')
 
 
 unit_groups = [
     feedstock_acquisition_group,
-    feedstock_juicing_group,
+    # feedstock_juicing_group,
     fermentation_group,
     separation_group,
-    upgrading_group,
+    # upgrading_group,
     ]
 
 unit_groups += get_more_unit_groups(system=HP_sys,
@@ -643,16 +590,15 @@ def get_AA_MPSP():
         HP_sys.simulate()
     for i in range(3):
         AA.price = HP_tea.solve_price(AA)
-    return AA.price*AA.F_mass/AA.imass['AcrylicAcid']
+    return AA.price*AA.F_mass/AA.imass['SodiumLactate']
 
 
 theoretical_max_g_HP_per_g_glucose = 2*HP_chemicals.HP.MW/HP_chemicals.Glucose.MW
 
 
 
-desired_annual_production = 134_000 # pure metric ton / y # satisfy 50% of 2019 US demand for acrylic acid
+desired_annual_production = 134_000 *  HP_chemicals.SodiumLactate.MW/HP_chemicals.HP.MW # pure metric ton / y # enough to satisfy 50% of 2019 US demand for acrylic acid
 
-# desired_annual_production = (23_802) * kg_SA_to_kg_KSA # pure metric ton / y # satisfy 50% of 2019 US demand for acrylic acid
 
 
 spec = ProcessSpecification(
@@ -716,19 +662,13 @@ HP_fermentation_process = f.HP_fermentation_process
 
 def M304_titer_obj_fn(water_to_sugar_mol_ratio):
     M304.water_to_sugar_mol_ratio = water_to_sugar_mol_ratio
-    call_all_specifications_or_run([M304, M304_H, S302, S303, R303, T301, R302, 
-                                    K301, V301, K302, V302,
-                                    ])
+    call_all_specifications_or_run(HP_fermentation_process.path)
     # HP_fermentation_process.run()
     return R302.effluent_titer - R302.titer_to_load
 
 def F301_titer_obj_fn(V):
     F301.V = V
-    call_all_specifications_or_run([F301, F301_P,
-                                    M304_P, 
-                                    M304, M304_H, S302, S303, R303, T301, R302, 
-                                    V301, K301,
-                                    ])
+    call_all_specifications_or_run(HP_fermentation_process.path)
     # HP_fermentation_process.run()
     return R302.effluent_titer - R302.titer_to_load
 
@@ -757,8 +697,7 @@ def load_titer_with_glucose(titer_to_load):
                          M304_ub, 
                          ytol=1e-3)
 
-    spec.titer_inhibitor_specification.check_sugar_concentration()
-    
+    if not feedstock_ID=='Glucose': spec.titer_inhibitor_specification.check_sugar_concentration()
 spec.load_spec_2 = load_titer_with_glucose
 
 #%% Load specifications
@@ -772,7 +711,7 @@ def spec_set_production_capacity(
                         TEA=None,
                         spec=spec,
                         product_stream=AA, 
-                        product_chemical_IDs=['AcrylicAcid',],
+                        product_chemical_IDs=['SodiumLactate',],
                         feedstock_stream=feedstock,
                         feedstock_F_mass_range=[5000, 2000_000], # wet-kg/h)
                         ):
@@ -791,6 +730,7 @@ def spec_set_production_capacity(
 spec.set_production_capacity = spec_set_production_capacity
     
 # %% Simulate and evaluate baseline
+per_kg_salt_to_per_kg_HP = HP_chemicals.SodiumLactate.MW/HP_chemicals.HP.MW
 
 production_capacity_is_fixed = True
 def simulate_and_print():
@@ -798,16 +738,19 @@ def simulate_and_print():
     # set_production_capacity(25000, 'analytical')
     print('\n---------- Simulation Results ----------')
     MPSP_AA = get_AA_MPSP()
-    print(f'MPSP is ${MPSP_AA:.3f}/kg AA')
+    print(f'MPSP is ${MPSP_AA:.3f}/kg sodium 3-hydroxypropionate')
+    print(f'MPSP is ${MPSP_AA*per_kg_salt_to_per_kg_HP:.3f}/kg 3-HP-eq.\n')
     GWP_AA, FEC_AA = HP_lca.GWP, HP_lca.FEC
-    print(f'GWP-100a is {GWP_AA:.3f} kg CO2-eq/kg AA')
-    print(f'FEC is {FEC_AA:.3f} MJ/kg AA')
+    print(f'GWP-100a is {GWP_AA:.3f} kg CO2-eq/kg sodium 3-hydroxypropionate')
+    print(f'GWP-100a is {GWP_AA*per_kg_salt_to_per_kg_HP:.3f} kg CO2-eq/kg 3-HP-eq.\n')
+    print(f'FEC is {FEC_AA:.3f} MJ/kg sodium 3-hydroxypropionate')
+    print(f'FEC is {FEC_AA*per_kg_salt_to_per_kg_HP:.3f} MJ/kg 3-HP-eq.\n')
     GWP_AA_without_electricity_credit, FEC_AA_without_electricity_credit =\
         GWP_AA - HP_lca.net_electricity_GWP, FEC_AA - HP_lca.net_electricity_FEC
-    print(f'GWP-100a without electricity credit is {GWP_AA_without_electricity_credit:.3f} kg CO2-eq/kg AA')
-    print(f'FEC without electricity credit is {FEC_AA_without_electricity_credit:.3f} MJ/kg AA')
-    # print(f'FEC is {get_FEC():.2f} MJ/kg AA or {get_FEC()/HP_LHV:.2f} MJ/MJ HP')
-    # print(f'SPED is {get_SPED():.2f} MJ/kg AA or {get_SPED()/HP_LHV:.2f} MJ/MJ HP')
+    print(f'GWP-100a without electricity credit is {GWP_AA_without_electricity_credit:.3f} kg CO2-eq/kg sodium 3-hydroxypropionate')
+    print(f'FEC without electricity credit is {FEC_AA_without_electricity_credit:.3f} MJ/kg sodium 3-hydroxypropionate')
+    # print(f'FEC is {get_FEC():.2f} MJ/kg sodium 3-hydroxypropionate or {get_FEC()/HP_LHV:.2f} MJ/MJ HP')
+    # print(f'SPED is {get_SPED():.2f} MJ/kg sodium 3-hydroxypropionate or {get_SPED()/HP_LHV:.2f} MJ/MJ HP')
     # print('--------------------\n')
 
 # %% Initial simulation
@@ -826,7 +769,7 @@ for i in range(2):
 def get_non_gaseous_waste_carbon_as_fraction_of_HP_GWP100():
     return sum([i.get_atomic_flow('C') for i in HP_sys.products if i.F_mol 
                 and ('l' in i.phases or 's' in i.phases or i.phase=='l') 
-                and (not i==AA)])/AA.imass['AcrylicAcid']/HP_lca.GWP
+                and (not i==AA)])/AA.imass['SodiumLactate']/HP_lca.GWP
 
 #%%
 
@@ -904,7 +847,7 @@ contourplots.stacked_bar_plot(dataframe=df_TEA_breakdown,
                          '#b6fcd5',
                          ],
                  hatch_patterns=('\\', '//', '|', 'x',),
-                 filename='AA_system_methanol_evap_neutralization' + '_TEA_breakdown_stacked_bar_plot',
+                 filename='AA_system_corn_improved_separations' + '_TEA_breakdown_stacked_bar_plot',
                  n_minor_ticks=4,
                  fig_height=5.5*1.1777*0.94*1.0975,
                  fig_width=10,
@@ -913,4 +856,5 @@ contourplots.stacked_bar_plot(dataframe=df_TEA_breakdown,
                  sig_figs_for_totals=3,
                  units_list=[i.units for i in unit_groups[0].metrics],
                  totals_label_text=r"$\bfsum:$",
+                 rotate_xticks=45.,
                  )

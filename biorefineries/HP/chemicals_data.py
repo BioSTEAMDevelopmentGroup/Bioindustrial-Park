@@ -140,6 +140,9 @@ CalciumLactate = chemical_database('CalciumLactate', phase='l',
 # Hf from Lange's Handbook of Chemistry, 15th edn., Table 6.3, PDF page 631
 CalciumAcetate = chemical_database('CalciumAcetate', phase='l', Hf=-1514.73e3)
 
+# Sodium 3-hydroxypropionate modeled as sodium lactate
+SodiumLactate = chemical_database('SodiumLactate', phase='l',)
+
 # Solubility of CalciumSuccinate is 3.2 g/L in water as Ca2+ based on 
 # Burgess and Drasdo, Polyhedron 1993, 12 (24), 2905–2911, which is 12.5 g/L as CaSA
 # Baseline CalciumSuccinate is ~14 g/L in fermentation broth, thus assumes all 

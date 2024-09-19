@@ -309,6 +309,7 @@ GWP_CFs = {
     'CSL': 1.55,
     'CH4': 0.33, # NA NG from shale and conventional recovery
     'Enzyme': 2.24,
+    'Cellulase': 2.24,
     'Lime': 1.29,
     'NaOH': 2.11,
     'H2SO4': 0.04344,
@@ -368,6 +369,7 @@ GWP_CFs['Corn stover'] = 0.10945 # see Table S4 of the SI of Bhagwat et al. 2021
 # GWP_CFs['Sugarcane'] = 0.12158 # ecoinvent 3.6, sugarcane production, RoW, IPCC 2013 GWP-100a
 GWP_CFs['Sugarcane'] = 0.044535 # GREET 2023, Sugarcane Production for Brazil Plant
 GWP_CFs['Corn'] = 0.2610 # GREET 2023, Corn Production for Biofuel Refinery
+GWP_CFs['Glucose'] = 1.2127 # ecoinvent 3.8 glucose production, GLO
 
 CFs['GWP_CFs'] = GWP_CFs
 CFs['GWP_CF_stream'] = GWP_CF_stream
@@ -381,7 +383,7 @@ FEC_CFs = {
     'CSL': 12.,
     'CH4': 50., # NA NG from shale and conventional recovery
     'Enzyme': 26.,
-    'Lime': 4.896,
+    'Cellulase': 2.24,
     'NaOH': 29.,
     'H2SO4': 0.56898,
     'Ethanol': 16.,
@@ -432,6 +434,7 @@ FEC_CFs['Corn stover'] = 1.68000 # see Table S4 in the SI of Bhagwat et al. 2021
 # FEC_CFs['Sugarcane'] = 0.37338 # ecoinvent 3.6, sugarcane production, RoW, IPCC 2013 GWP-100a
 FEC_CFs['Sugarcane'] = 0.28832 # GREET 2023, Sugarcane Production for Brazil Plant
 FEC_CFs['Corn'] = 1.684 # GREET 2023, Corn Production for Biofuel Refinery
+FEC_CFs['Glucose'] = 14.507 # ecoinvent 3.8 glucose production, GLO
 
 
 

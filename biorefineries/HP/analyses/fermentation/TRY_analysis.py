@@ -19,7 +19,7 @@ import numpy as np
 
 from biorefineries import HP
 # from biorefineries.HP.systems.system_sc_light_lle_vacuum_distillation import HP_tea, HP_lca, R302, spec, AA, simulate_and_print, get_AA_MPSP
-from biorefineries.HP.systems.system_corn_improved_separations import HP_tea, HP_lca, R302, spec, AA, simulate_and_print, get_AA_MPSP
+from biorefineries.HP.systems.system_glucose_improved_separations import HP_tea, HP_lca, R302, spec, AA, simulate_and_print, get_AA_MPSP
 
 from  matplotlib.colors import LinearSegmentedColormap
 import pandas as pd
@@ -56,7 +56,7 @@ HP_results_filepath = HP_filepath + '\\analyses\\results\\'
 
 #%% Load baseline
 
-# spec.reactor.neutralization = False # !!!
+spec.reactor.neutralization = False # !!! set neutralization here
 
 model = models.HP_model
 system = HP_sys = models.HP_sys
@@ -128,7 +128,7 @@ HP_metrics = [get_product_MPSP,
 
 # %% Generate 3-specification meshgrid and set specification loading functions
 
-steps = (60, 60, 1)
+steps = (40, 40, 1)
 
 # Yield, titer, productivity (rate)
 spec_1 = yields = np.linspace(0.05, 0.95, steps[0]) # yield
@@ -292,7 +292,7 @@ max_HXN_qbal_percent_error = 0.
 curr_no = 0
 total_no = len(yields)*len(titers)*len(productivities)
 
-print_status_every_n_simulations = 50
+print_status_every_n_simulations = 20
 
 for p in productivities:
     # data_1 = HP_data = spec.evaluate_across_specs(
@@ -324,10 +324,12 @@ for p in productivities:
                 d1_Metric6[-1].append(np.nan)
             else:
                 try:
-                    spec.load_specifications(spec_1=y, spec_2=t, spec_3=p)
-                    
+                    spec.load_specifications(spec.baseline_yield, spec.baseline_titer, spec.baseline_productivity)
+                    spec.set_production_capacity(desired_annual_production=spec.desired_annual_production)
+                    # for i in range(1):simulate_and_print()
+                    for i in range(1): system.simulate()
                     # spec.set_production_capacity(desired_annual_production=spec.desired_annual_production)
-                    
+                    spec.load_specifications(spec_1=y, spec_2=t, spec_3=p)
                     for i in range(1): system.simulate()
                     
                     d1_Metric1[-1].append(HP_metrics[0]())
@@ -523,7 +525,7 @@ if plot:
     # MPSP_w_levels, MPSP_w_ticks, MPSP_cbar_ticks = get_contour_info_from_metric_data(results_metric_1, lb=3)
     MPSP_w_levels = np.arange(0., 4.01, 0.05)
     MPSP_cbar_ticks = np.arange(0., 4.01, 0.4)
-    MPSP_w_ticks = [0.9, 1., 1.2, 2., 4.]
+    MPSP_w_ticks = [0.9, 1., 1.2, 1.3, 2., 2.5, 4.]
     # MPSP_w_levels = np.arange(0., 15.5, 0.5)
     
     contourplots.animated_contourplot(w_data_vs_x_y_at_multiple_z=results_metric_1, # shape = z * x * y # values of the metric you want to plot on the color axis; e.g., MPSP
@@ -584,7 +586,7 @@ if plot:
     # GWP_w_levels, GWP_w_ticks, GWP_cbar_ticks = get_contour_info_from_metric_data(results_metric_2,)
     GWP_w_levels = np.arange(0, 6.01, 0.1)
     GWP_cbar_ticks = np.arange(0, 6.01, 1.)
-    GWP_w_ticks = [0,1, 1.3, 2, 2.6, 3,4,6]
+    GWP_w_ticks = [0,1, 1.3, 1.6, 2, 2.6, 3,4,6]
     contourplots.animated_contourplot(w_data_vs_x_y_at_multiple_z=results_metric_2, # shape = z * x * y # values of the metric you want to plot on the color axis; e.g., GWP
                                     x_data=100*yields, # x axis values
                                     y_data=titers, # y axis values
@@ -625,7 +627,7 @@ if plot:
                                                           (5,18.),
                                                           (95,18.)),
                                     # zoom_data_scale=5,
-                                    text_boxes = {'>4.0': [(5,5), 'white']},
+                                    text_boxes = {'>6.0': [(5,5), 'white']},
                                     
                                     add_shapes = {
                                         # coords as tuple of tuples: (color, zorder),

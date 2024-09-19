@@ -88,8 +88,22 @@ def create_HP_fermentation_process(ins, outs,):
     F301 = bst.MultiEffectEvaporator('F301', ins=sugar_juice_or_slurry, outs=('F301_l', 'F301_g'),
                                             P = (101325, 73581, 50892, 32777, 20000), V = 0.1)
                                             # P = (101325, 73581, 50892, 32777, 20000), V = 0.001)
-    F301.V = 0.797 #for sugars concentration of 591.25 g/L (599.73 g/L after cooling to 30 C)
+    F301.V = 0.797 # initial value # updated in spec.load_titer
+    F301_design = F301._design
+    F301_cost = F301._cost
     
+    @F301.add_specification(run=False)
+    def F301_spec():
+        feed = F301.ins[0]
+        if feed.imass['Water']/feed.F_mass > 0.2:
+            F301._run()
+            F301._design = F301_design
+            F301._cost = F301_cost
+        else:
+            F301.outs[1].empty()
+            F301.outs[0].copy_like(feed)
+            F301._design = lambda:0
+            F301._cost = lambda:0
     
     F301_P = bst.units.Pump('F301_P', ins=F301-1, outs=F301_top_product, P=101325.)
    
@@ -764,7 +778,7 @@ def create_HP_separation_methanol_precipitation_neutralization_process(ins, outs
             S402.outs[1].mol = S402.ins[0].mol
             
 
-#%% Separation of HP with a potentially improved process 
+#%% Separation of HP with an improved process 
 # relative to 'HP_separation_methanol_precipitation_neutralization_process'
 
 @SystemFactory(ID = 'HP_separation_improved_process',
@@ -891,10 +905,17 @@ def create_HP_separation_improved_process(ins, outs, fermentation_reactor=None):
              ['FermMicrobe', 'Flocculant', 'Sucrose', 
               'Glucose', 'Xylitol', 'SuccinicAcid',
               'SolubleProtein', 'InsolubleProtein', 'Ash', 
-              'Fiber', 'TriOlein', 'CSL']})
+              'Fiber', 'TriOlein', 'CSL',
+              'GlucoseOligomer', 'Extract', 'Xylose',
+              'XyloseOligomer', 'MannoseOligomer', 'GalactoseOligomer',
+              'Arabinose', 'ArabinoseOligomer', 'SolubleLignin',
+              'Protein', 'Furfural', 'HMF',
+              'Glucan', 'Xylan', 'Arabinan', 
+              'Lignin', 'Cellulase', 'Mannan', 'Galactan',]})
     
     # partially adsorbed chemicals
-    split['HP'] = 66.94/71.45 # !!! from Singh Group's initial experimental data
+    # split['HP'] = 66.94/71.45 # !!! from Singh Group's initial experimental data
+    split['HP'] = 50.71/55.70 # !!! from Singh Group's second set of experimental data
     
     color_removal_adsorption_process = create_temperature_swing_adsorption_process(
                                          ins=(S402-1, adsorption_makeup_regeneration_fluid, ''),
@@ -945,7 +966,8 @@ def create_HP_separation_improved_process(ins, outs, fermentation_reactor=None):
              ['Gypsum', 'AmmoniumSulfate', 'ZincSulfate', 'CaO', 'MagnesiumChloride', 'NH3']})
     
     # partially adsorbed chemicals
-    split['HP'] = 62.20/66.94 # !!! from Singh Group's initial experimental data
+    # split['HP'] = 62.20/66.94 # !!! from Singh Group's initial experimental data
+    split['HP'] = 48.94/50.71 # !!! from Singh Group's second set of experimental data
 
     cation_exchange_process = create_temperature_swing_adsorption_process(
                                          ins=(color_removal_adsorption_process-0, M420-0, ''),
@@ -953,7 +975,7 @@ def create_HP_separation_improved_process(ins, outs, fermentation_reactor=None):
                                          ID='cation_exchange_process',
                                          split=split, 
                                          # regeneration_fluid_chemical_ID='Water',
-                                         regeneration_fluid_composition_dict={'Water':0.9825, 'H2SO4':0.0175}, # 7% HCl; we use equivalent mol-H+ of H2SO4 # https://www.dupont.com/content/dam/dupont/amer/us/en/water-solutions/public/documents/en/IER-AmberLite-Procedure-Cross-Regeneration-Cation-Resin-Sweeteners-TechFact-45-D02505-en.pdf
+                                         regeneration_fluid_composition_dict={'Water':0.9825, 'H2SO4':0.0175}, # 7% HCl; we model equivalent mol-H+ of H2SO4 # https://www.dupont.com/content/dam/dupont/amer/us/en/water-solutions/public/documents/en/IER-AmberLite-Procedure-Cross-Regeneration-Cation-Resin-Sweeteners-TechFact-45-D02505-en.pdf
                                          adsorbate_ID='MagnesiumChloride', 
                                          target_recovery=0.999,
                                          regeneration_velocity=1.8, # m/h # ~3 BV/h based on https://www.dupont.com/content/dam/dupont/amer/us/en/water-solutions/public/documents/en/IER-AmberLite-Procedure-Cross-Regeneration-Cation-Resin-Sweeteners-TechFact-45-D02505-en.pdf
@@ -987,10 +1009,11 @@ def create_HP_separation_improved_process(ins, outs, fermentation_reactor=None):
     
     # sharply split adsorbed chemicals
     split.update({i: 0. for i in 
-             ['H3PO4', 'H2SO4']})
+             ['H3PO4', 'H2SO4', 'AceticAcid']})
     
     # partially adsorbed chemicals
     split['HP'] = 51.71/62.20 # !!! from Singh Group's initial experimental data
+    split['HP'] = 43.84/48.94 # !!! from Singh Group's second set of experimental data
     
     anion_exchange_process = create_temperature_swing_adsorption_process(
                                          ins=(cation_exchange_process-0, M430-0, ''),
@@ -1017,7 +1040,7 @@ def create_HP_separation_improved_process(ins, outs, fermentation_reactor=None):
         ins0, ins1 = M430.ins
         makeup_regen_stream = M430.outs[0]
         ins0.imol['NaOH'] = makeup_regen_stream.imol['NaOH']
-        ins0.imass['Water'] = ins0.imass['NaOH'] # price is for 50 wt% NaOH
+        ins0.imass['Water'] = ins0.imass['NaOH'] # purchased stream is 50 wt% NaOH
         ins1.imol['Water'] = makeup_regen_stream.imol['Water'] - ins0.imol['Water']
         
     #########------------------------------------------------#########
@@ -1027,7 +1050,7 @@ def create_HP_separation_improved_process(ins, outs, fermentation_reactor=None):
     F403 = bst.units.MultiEffectEvaporator('F403', ins=anion_exchange_process-0, outs=('F403_l', 'F403_g'),
                                             P = (101325, 70000, 40000, 20000, 10000), V = 0.5)
     
-    target_HP_x = 0.30
+    target_HP_x = 0.08 # ~30 wt% HP
     def get_x(chem_ID, stream):
         return stream.imol[chem_ID]/sum(stream.imol['SuccinicAcid', 'AceticAcid', 'Furfural', 'HMF', 'HP', 'Water'])
     
@@ -1047,6 +1070,326 @@ def create_HP_separation_improved_process(ins, outs, fermentation_reactor=None):
     F403_P1 = bst.units.Pump('F403_P1', ins=F403-0, outs=HP_solution, P=101325.)    
     F403_P2 = bst.units.Pump('F403_P2', ins=F403-1, outs=F403_t, P=101325.)  
     
+
+#%% Separation of HP with an improved process 
+# relative to 'HP_separation_methanol_precipitation_neutralization_process'
+
+@SystemFactory(ID = 'HP_separation_improved_process_HP_product',
+               ins=[dict(ID='fermentation_broth', HP=1, Water=100),
+                    dict(ID='sulfuric_acid_separation', H2SO4=1.),
+                    dict(ID='adsorption_makeup_regeneration_fluid', Water=1.),
+                    dict(ID='CEX_makeup_regeneration_HCl', Water=1.),
+                    dict(ID='AEX_makeup_regeneration_NaOH', Water=1.),
+                    dict(ID='base_neutralization_separation', NaOH=1),
+               ],
+                outs=[
+                      dict(ID='dried_HP_salt', CalciumLactate=1),
+                      dict(ID='cell_mass', FermMicrobe=1, Water=1),
+                      dict(ID='gypsum', CaSO4=1, Water=1),
+                      dict(ID='F403_t', Water=1),
+                      dict(ID='color_impurities', Water=1),
+                      dict(ID='cation_impurities', Water=1),
+                      dict(ID='anion_impurities', Water=1),
+                      dict(ID='dryer_top_product', Water=1),
+                                ],
+                                               )
+def create_HP_separation_improved_process_HP_product(ins, outs, fermentation_reactor=None):
+    
+    fermentation_broth, sulfuric_acid_separation,\
+        adsorption_makeup_regeneration_fluid, CEX_makeup_regeneration_HCl, AEX_makeup_regeneration_NaOH,\
+            base_neutralization_separation = ins
+    
+    dried_HP_salt, cell_mass, gypsum, F403_t,\
+        color_impurities, cation_impurities, anion_impurities,\
+            dryer_top_product = outs
+    
+    f = bst.main_flowsheet
+    u, s = f.unit, f.stream
+    
+    # Remove solids from fermentation broth, modified from the pressure filter in Humbird et al.
+    S401_index = [splits_df.index[0]] + splits_df.index[2:].to_list()
+    S401_cell_mass_split = [splits_df['stream_571'][0]] + splits_df['stream_571'][2:].to_list()
+    S401_filtrate_split = [splits_df['stream_535'][0]] + splits_df['stream_535'][2:].to_list()
+    S401 = bst.units.SolidsCentrifuge('S401', ins=(fermentation_broth,), outs=(cell_mass, 'S401_l'),
+                                moisture_content=0.50,
+                                split=find_split(S401_index,
+                                                  S401_cell_mass_split,
+                                                  S401_filtrate_split,
+                                                  chemical_groups), solids =\
+                                    ['Xylan', 'Glucan', 'Lignin', 'FermMicrobe',\
+                                     'Ash', 'Arabinan', 'Galactan', 'Mannan'])
+    def fix_split(isplit, ID):
+        isplit['Glycerol', 'Hexanol', 'HP', 'AcrylicAcid', 'AceticAcid', 'AceticAcid'] = isplit[ID]
+                  
+    fix_split(S401.isplit, 'Glucose')
+    # NOTE: if there is not enough moisture content, it is impossible to pump
+    # the fluid into the centrifuge; in fact, the centrifuge would not be able
+    # to separate anything.
+    
+    R401 = units.AcidulationReactor('R401', ins = (S401-1, sulfuric_acid_separation),
+                                    outs = ('acidulated_broth'),
+                                    vessel_material='Stainless steel 316',
+                                    tau = 1.)
+    R401_design = R401._design
+    R401_cost = R401._cost
+    R401.bypass = True
+    @R401.add_specification(run=False)
+    def R401_bypass_spec():
+        feed = R401.ins[0]
+        if fermentation_reactor:
+            if not fermentation_reactor.neutralization:
+                R401._design = lambda: 0
+                R401._cost = lambda: 0
+                R401.ins[1].empty()
+            else:
+                R401._design = R401_design
+                R401._cost = R401_cost
+            R401._run()
+        
+        elif feed.imol['CalciumLactate'] > feed.imol['HP']:
+            R401._design = lambda: 0
+            R401._cost = lambda: 0
+            R401.ins[1].empty()
+            R401._run()
+        
+        else:
+            raise RuntimeError(f'[{R401.ID}] Neutralization and reacidulation requirement is not specified by the user.')
+            
+    R401_H = bst.units.HXutility('R401_H', ins = R401-0, T = 320, rigorous = False)
+    R401_P = bst.units.Pump('R401_P', ins=R401_H-0)
+    
+    S402_index = S401_index + ['Gypsum']
+    S402_gypsum_split = S401_cell_mass_split + [0.995]
+    S402_filtrate_split = S401_filtrate_split + [0.005]
+    S402 = units.GypsumFilter('S402', ins=R401_P-0,
+                              moisture_content=0.2,
+                              split=find_split(S402_index,
+                                               S402_gypsum_split,
+                                               S402_filtrate_split,
+                                               chemical_groups),
+                              outs=(gypsum, ''))
+    S402_design = S402._design
+    S402_cost = S402._cost
+    S402.bypass = True
+    @S402.add_specification()
+    def S402_bypass_spec():
+        feed = S402.ins[0]
+        if fermentation_reactor:
+            if not fermentation_reactor.neutralization:
+                S402._design = lambda: 0
+                S402._cost = lambda: 0
+                S402.outs[0].empty()
+            else:
+                S402._design = S402_design
+                S402._cost = S402_cost
+            S402._run()
+        
+        elif feed.imol['CalciumLactate'] > feed.imol['HP']:
+            S402._design = lambda: 0
+            S402._cost = lambda: 0
+            S402.outs[0].empty()
+            S402._run()
+        
+        else:
+            raise RuntimeError(f'[{S402.ID}] Neutralization and reacidulation requirement is not specified by the user.')
+            
+    #########------------Color Removal Adsorption------------#########
+    
+    # by default, chemicals pass unabsorbed
+    split = {i.ID: 1. for i in tmo.settings.chemicals}
+    
+    # sharply split adsorbed chemicals
+    split.update({i: 0. for i in 
+             ['FermMicrobe', 'Flocculant', 'Sucrose', 
+              'Glucose', 'Xylitol', 'SuccinicAcid',
+              'SolubleProtein', 'InsolubleProtein', 'Ash', 
+              'Fiber', 'TriOlein', 'CSL',
+              'GlucoseOligomer', 'Extract', 'Xylose',
+              'XyloseOligomer', 'MannoseOligomer', 'GalactoseOligomer',
+              'Arabinose', 'ArabinoseOligomer', 'SolubleLignin',
+              'Protein', 'Furfural', 'HMF',
+              'Glucan', 'Xylan', 'Arabinan', 
+              'Lignin', 'Cellulase', 'Mannan', 'Galactan',]})
+    
+    # partially adsorbed chemicals
+    # split['HP'] = 66.94/71.45 # !!! from Singh Group's initial experimental data
+    split['HP'] = 50.71/55.70 # !!! from Singh Group's second set of experimental data
+    
+    color_removal_adsorption_process = create_temperature_swing_adsorption_process(
+                                         ins=(S402-1, adsorption_makeup_regeneration_fluid, ''),
+                                         outs=('', color_impurities, ''),
+                                         ID='color_removal_adsorption_process',
+                                         split=split, 
+                                         # regeneration_fluid_chemical_ID='Ethanol',
+                                         regeneration_fluid_chemical_ID='Water',
+                                         adsorbate_ID='FermMicrobe', 
+                                         target_recovery=0.999,
+                                         regeneration_velocity=3.6, # m/h # 0.001 - 0.004 m/s from https://www.aiche.org/sites/default/files/docs/pages/adsorption_basics_part_1.pdf
+                                         K=2., #!!! update based on experimental data from Singh group
+                                         drying_time=0.,
+                                         adsorbent='Activated carbon',
+                                         void_fraction=0.35,
+                                         recover_regeneration_fluid=False,
+                                         # V_evaporator=0.8,
+                                         # T_condenser=12.+273.15,
+                                         unit_ID_digits=410,
+                                         )
+    u.A410.line = 'Adsorption'
+    #########------------------------------------------------#########
+    
+    bst.AdsorptionColumnTSA.adsorbent_cost.update(
+        {'Dowex G26 H2 form': 300., # !!! update
+         'Amberlite IRA-67 free base': 300., # !!! update
+         }
+        )
+    
+    bst.AdsorptionColumnTSA._default_equipment_lifetime.update(
+        {'Dowex G26 H2 form': 10., # !!! update
+         'Amberlite IRA-67 free base': 10., # !!! update
+         }
+        )
+    
+    #########------------Cation Exchange Process-------------#########
+    
+    M420 = bst.Mixer('M420', ins=(CEX_makeup_regeneration_HCl, ''), outs='CEX_makeup_regeneration_fluid')
+    @M420.add_specification(run=False)
+    def M420_no_run_spec():
+        pass
+    
+    # by default, chemicals pass unabsorbed
+    split = {i.ID: 1. for i in tmo.settings.chemicals}
+    
+    # sharply split adsorbed chemicals
+    split.update({i: 0. for i in 
+             ['Gypsum', 'AmmoniumSulfate', 'ZincSulfate', 'CaO', 'MagnesiumChloride', 'NH3']})
+    
+    # partially adsorbed chemicals
+    # split['HP'] = 62.20/66.94 # !!! from Singh Group's initial experimental data
+    split['HP'] = 48.94/50.71 # !!! from Singh Group's second set of experimental data
+
+    cation_exchange_process = create_temperature_swing_adsorption_process(
+                                         ins=(color_removal_adsorption_process-0, M420-0, ''),
+                                         outs=('', cation_impurities, ''),
+                                         ID='cation_exchange_process',
+                                         split=split, 
+                                         # regeneration_fluid_chemical_ID='Water',
+                                         regeneration_fluid_composition_dict={'Water':0.9825, 'H2SO4':0.0175}, # 7% HCl; we model equivalent mol-H+ of H2SO4 # https://www.dupont.com/content/dam/dupont/amer/us/en/water-solutions/public/documents/en/IER-AmberLite-Procedure-Cross-Regeneration-Cation-Resin-Sweeteners-TechFact-45-D02505-en.pdf
+                                         adsorbate_ID='MagnesiumChloride', 
+                                         target_recovery=0.999,
+                                         regeneration_velocity=1.8, # m/h # ~3 BV/h based on https://www.dupont.com/content/dam/dupont/amer/us/en/water-solutions/public/documents/en/IER-AmberLite-Procedure-Cross-Regeneration-Cation-Resin-Sweeteners-TechFact-45-D02505-en.pdf
+                                         K=2., #!!! update based on experimental data from Singh group
+                                         drying_time=0.,
+                                         adsorbent='Silica gel', # !!! update
+                                         void_fraction=0.35,
+                                         recover_regeneration_fluid=False,
+                                         unit_ID_digits=420,
+                                         )
+    A420 = u.A420
+    A420.line = 'Cation exchange'
+    @A420.add_specification(run=False)
+    def A420_M420_HCl_req_spec():
+        A420._run()
+        makeup_regen_stream = M420.outs[0]
+        M420.ins[0].imol['H2SO4'] = makeup_regen_stream.imol['H2SO4']
+        M420.ins[1].imol['Water'] = makeup_regen_stream.imol['Water']
+        
+    #########------------------------------------------------#########
+    
+    #########-------------Anion Exchange Process-------------#########
+    
+    M430 = bst.Mixer('M430', ins=(AEX_makeup_regeneration_NaOH, ''), outs='AEX_makeup_regeneration_fluid')
+    @M430.add_specification(run=False)
+    def M430_no_run_spec():
+        pass
+    
+    # by default, chemicals pass unabsorbed
+    split = {i.ID: 1. for i in tmo.settings.chemicals}
+    
+    # sharply split adsorbed chemicals
+    split.update({i: 0. for i in 
+             ['H3PO4', 'H2SO4', 'AceticAcid']})
+    
+    # partially adsorbed chemicals
+    split['HP'] = 51.71/62.20 # !!! from Singh Group's initial experimental data
+    split['HP'] = 43.84/48.94 # !!! from Singh Group's second set of experimental data
+    
+    anion_exchange_process = create_temperature_swing_adsorption_process(
+                                         ins=(cation_exchange_process-0, M430-0, ''),
+                                         outs=('', anion_impurities, ''),
+                                         ID='anion_exchange_process',
+                                         split=split, 
+                                         # regeneration_fluid_chemical_ID='Water',
+                                         regeneration_fluid_composition_dict={'Water':0.982, 'NaOH':0.018}, # 4% NaOH from https://www.dupont.com/content/dam/dupont/amer/us/en/water-solutions/public/documents/en/IER-AmberLite-Procedure-Cross-Regeneration-Anion-Resin-Sweeteners-TechFact-45-D02504-en.pdf
+                                         adsorbate_ID='H3PO4', 
+                                         target_recovery=0.999,
+                                         regeneration_velocity=1.8, # m/h # ~3 BV/h based on https://www.dupont.com/content/dam/dupont/amer/us/en/water-solutions/public/documents/en/IER-AmberLite-Procedure-Cross-Regeneration-Cation-Resin-Sweeteners-TechFact-45-D02505-en.pdf
+                                         K=2., #!!! update based on experimental data from Singh group
+                                         drying_time=0.,
+                                         adsorbent='Silica gel', # !!! update
+                                         void_fraction=0.35,
+                                         recover_regeneration_fluid=False,
+                                         unit_ID_digits=430,
+                                         )
+    A430 = u.A430
+    A430.line = 'Anion exchange'
+    @A430.add_specification(run=False)
+    def A430_M430_HCl_req_spec():
+        A430._run()
+        ins0, ins1 = M430.ins
+        makeup_regen_stream = M430.outs[0]
+        ins0.imol['NaOH'] = makeup_regen_stream.imol['NaOH']
+        ins0.imass['Water'] = ins0.imass['NaOH'] # purchased stream is 50 wt% NaOH
+        ins1.imol['Water'] = makeup_regen_stream.imol['Water'] - ins0.imol['Water']
+        
+    #########------------------------------------------------#########
+    
+    
+    M401 = bst.Mixer('M401', ins=(anion_exchange_process-0, base_neutralization_separation), outs='crude_3HP_salt')
+    M401.neutralization_rxns = ParallelRxn([
+    #   Reaction definition                                               Reactant  Conversion
+    Rxn('HP + NaOH -> SodiumLactate + H2O',  'HP',   1.-1e-9),
+        ])
+    
+    @M401.add_specification(run=False)
+    def M401_base_addition_spec():
+        broth, base = M401.ins
+        mixed, = M401.outs
+        base.imol['NaOH'] = broth.imol['HP']
+        mixed.mix_from([broth, base])
+        M401.neutralization_rxns(mixed)
+    
+    F403 = bst.units.MultiEffectEvaporator('F403', ins=M401-0, outs=('F403_l', 'F403_g'),
+                                            P = (101325, 70000, 40000, 20000, 10000), V = 0.5)
+    
+    target_HP_salt_x = 0.70
+    def get_x(chem_ID, stream):
+        return stream.imol[chem_ID]/sum(stream.imol['SuccinicAcid', 'AceticAcid', 'Furfural', 'HMF', 'HP', 'Water'])
+    
+    @F403.add_specification(run=False)
+    def F403_specification():
+        instream = F403.ins[0]
+        # ratio = target_water_x/get_x('Water', instream)
+        HP_salt_x = get_x('SodiumLactate', instream)
+        if HP_salt_x < target_HP_salt_x:
+            ratio = HP_salt_x/target_HP_salt_x
+            F403.V = 1. - ratio
+            F403._run()
+        else:
+            F403.V = 0.
+            F403._run()
+            
+    F403_P1 = bst.units.Pump('F403_P1', ins=F403-0, outs='concentrated_HP_salt', P=101325.)  
+    F403_P2 = bst.units.Pump('F403_P2', ins=F403-1, outs=F403_t, P=101325.)  
+    
+    F404 = bst.units.DrumDryer('F404', ins=F403_P1-0, outs=(dried_HP_salt, 'recycled_dodecanol_2'),
+                                            T=273.15 + 105., # 5 deg C above water boiling temperature
+                                            split={'Water':1},
+                                            moisture_content=0.,
+                                            )
+    V401 = bst.IsenthalpicValve('V401', ins=F404-1, P=101325.)
+    H401 = bst.HXutility('H401', ins=V401-0, T=30.+273.15, rigorous=True)
+    S404 = bst.PhaseSplitter('S404', ins=H401-0, outs=('waste_air', dryer_top_product))
+
 
 #%% Separation of HP by the following steps:
 #       (i) centrifuge out cell mass;
@@ -1421,7 +1764,7 @@ def create_HP_to_acrylic_acid_upgrading_process(ins, outs,):
         # curr_HP_wt_frac = get_mass_percent('HP', M402_ins_0)
         HP_wt = M402_ins_0.imass['HP']
         other_wt = M402_ins_0.F_mass - HP_wt
-        M402.ins[1].imass['Water'] = HP_wt/M402.HP_wt_frac - HP_wt - other_wt
+        M402.ins[1].imass['Water'] = max(0, HP_wt/M402.HP_wt_frac - HP_wt - other_wt)
         M402._run()
     
     
