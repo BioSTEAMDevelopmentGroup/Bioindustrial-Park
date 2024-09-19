@@ -129,6 +129,8 @@ class LCA:
         self.CT = self.cooling_tower = cooling_tower
         self.CWP_units = self.chilled_water_processing_units = chilled_water_processing_units
         
+        self.CO2_MW = self.chemicals.CO2.MW
+        
         system._LCA = self
     
     @property
@@ -146,7 +148,9 @@ class LCA:
     @property
     def carbon_balance_percent_error(self):
         total_C_in = sum([feed.get_atomic_flow('C') for feed in self.feeds])
-        total_C_out = self.main_product.get_atomic_flow('C') + sum([emission.get_atomic_flow('C') for emission in self.emissions])
+        total_C_out = self.main_product.get_atomic_flow('C') +\
+                      sum([i.get_atomic_flow('C') for i in self.by_products]) +\
+                      sum([emission.get_atomic_flow('C') for emission in self.emissions])
         return 100.*(total_C_out - total_C_in)/total_C_in
     
     # 100-year global warming potential (GWP100)
@@ -193,8 +197,8 @@ class LCA:
     # GWP from combustion of non-biogenic carbons
     @property
     def ng_combustion_GWP(self):
-        return (self.natural_gas.get_atomic_flow('C')) * self.chemicals.CO2.MW / self.main_product_kg_per_h
-                               # +ethanol_fresh.get_atomic_flow('C'))* chemicals.CO2.MW / self.main_product_kg_per_h
+        return (self.natural_gas.get_atomic_flow('C')) * self.CO2_MW / self.main_product_kg_per_h
+                               # +ethanol_fresh.get_atomic_flow('C'))* CO2_MW / self.main_product_kg_per_h
     
     @property
     def ng_GWP(self):
@@ -209,8 +213,9 @@ class LCA:
         return mass_flow *self.CFs['GWP_CFs'][self.feedstock_ID]/self.main_product_kg_per_h
     
     @property
-    def feedstock_CO2_capture(self):
-        return self.feedstock.get_atomic_flow('C')* self.chemicals.CO2.MW/self.main_product_kg_per_h
+    def feedstock_biogenic_carbon_flow(self):
+        return self.feedstock.get_atomic_flow('C')* self.CO2_MW/self.main_product_kg_per_h
+    
     @property
     def feedstock_GWP(self): 
         return self.FGHTP_GWP
@@ -218,7 +223,7 @@ class LCA:
     
     @property
     def emissions_GWP(self): 
-        return sum([stream.get_atomic_flow('C') for stream in self.emissions]) * self.chemicals.CO2.MW / self.main_product_kg_per_h
+        return sum([stream.get_atomic_flow('C') for stream in self.emissions]) * self.CO2_MW / self.main_product_kg_per_h
     
     # GWP from electricity acquisition
     @property
@@ -316,12 +321,12 @@ class LCA:
     @property
     def EOL_GWP(self): 
         return sum([i.get_atomic_flow('C') for i in [self.main_product] + self.by_products]) *\
-            self.chemicals.CO2.MW/self.main_product_kg_per_h
+            self.CO2_MW/self.main_product_kg_per_h
     
     @property
     def biogenic_emissions_GWP(self): # direct biogenic emissions
         return sum([i.get_atomic_flow('C') for i in self.input_biogenic_carbon_streams]) *\
-            self.chemicals.CO2.MW/self.main_product_kg_per_h
+            self.CO2_MW/self.main_product_kg_per_h
     
     @property
     def direct_emissions_GWP(self): # direct non-biogenic emissions
@@ -337,7 +342,7 @@ class LCA:
     @property
     def non_BT_direct_emissions_GWP(self): 
         return  self.direct_emissions_GWP - self.BT_direct_emissions_GWP 
-                            # - ( feedstock_CO2_capture  -  EOL_GWP )
+    
     #  direct_emissions_GWP(self): return  non_BT_direct_emissions_GWP + BT_direct_emissions_GWP 
     
     @property
