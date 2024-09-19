@@ -70,7 +70,7 @@ class LCA:
         system._TEA = self
         return self
 
-    def __init__(self, system, CFs, feedstock, main_product, main_product_chemical_IDs, by_products,
+    def __init__(self, system, CFs, feedstock, main_product, main_product_chemical_IDs, by_products=[],
                  cooling_tower=None, chilled_water_processing_units=None,
                  boiler=None, has_turbogenerator=None, feedstock_ID='Sugarcane',
                  # FU='1 kg', 
@@ -141,7 +141,7 @@ class LCA:
         
     @property
     def main_product_kg_per_h(self):
-        return self.main_product.imass[self.main_product_chemical_IDs[0]]
+        return sum([self.main_product.imass[i] for i in self.main_product_chemical_IDs])
     
     @property
     def carbon_balance_percent_error(self):
@@ -315,7 +315,8 @@ class LCA:
     
     @property
     def EOL_GWP(self): 
-        return self.main_product.get_atomic_flow('C') * self.chemicals.CO2.MW/self.main_product_kg_per_h
+        return sum([i.get_atomic_flow('C') for i in [self.main_product] + self.by_products]) *\
+            self.chemicals.CO2.MW/self.main_product_kg_per_h
     
     @property
     def biogenic_emissions_GWP(self): # direct biogenic emissions

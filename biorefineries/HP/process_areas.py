@@ -842,18 +842,11 @@ def create_HP_separation_improved_process(ins, outs, fermentation_reactor=None):
             if not fermentation_reactor.neutralization:
                 R401._design = lambda: 0
                 R401._cost = lambda: 0
-                R401.ins[1].empty()
+                R401.outs[0].copy_like(feed)
             else:
                 R401._design = R401_design
                 R401._cost = R401_cost
-            R401._run()
-        
-        elif feed.imol['CalciumLactate'] > feed.imol['HP']:
-            R401._design = lambda: 0
-            R401._cost = lambda: 0
-            R401.ins[1].empty()
-            R401._run()
-        
+                R401._run()
         else:
             raise RuntimeError(f'[{R401.ID}] Neutralization and reacidulation requirement is not specified by the user.')
             
@@ -873,7 +866,7 @@ def create_HP_separation_improved_process(ins, outs, fermentation_reactor=None):
     S402_design = S402._design
     S402_cost = S402._cost
     S402.bypass = True
-    @S402.add_specification()
+    @S402.add_specification(run=False)
     def S402_bypass_spec():
         feed = S402.ins[0]
         if fermentation_reactor:
@@ -881,17 +874,11 @@ def create_HP_separation_improved_process(ins, outs, fermentation_reactor=None):
                 S402._design = lambda: 0
                 S402._cost = lambda: 0
                 S402.outs[0].empty()
+                S402.outs[1].copy_like(feed)
             else:
                 S402._design = S402_design
                 S402._cost = S402_cost
-            S402._run()
-        
-        elif feed.imol['CalciumLactate'] > feed.imol['HP']:
-            S402._design = lambda: 0
-            S402._cost = lambda: 0
-            S402.outs[0].empty()
-            S402._run()
-        
+                S402._run()
         else:
             raise RuntimeError(f'[{S402.ID}] Neutralization and reacidulation requirement is not specified by the user.')
             

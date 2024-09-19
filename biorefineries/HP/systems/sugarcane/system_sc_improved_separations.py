@@ -530,15 +530,15 @@ HP_no_BT_tea = HP_tea
 HP_lca = HPLCA(system=HP_sys, 
                  CFs=CFs, 
                  feedstock=feedstock, 
-                 feedstock_ID='Sugarcane',
+                 feedstock_ID=feedstock_ID,
                  main_product=AA, 
                  main_product_chemical_IDs=['AcrylicAcid',], 
-                 by_products=['CaSO4'], 
+                 by_products=[s.gypsum], 
                  cooling_tower=u.CT801, 
                  chilled_water_processing_units=[u.CWP802, u.CWP803], 
                  boiler=u.BT701, has_turbogenerator=True,
-                 credit_feedstock_CO2_capture=True,
-                 add_EOL_GWP=True,
+                 add_EOL_GWP=True, # (True for cradle-to-grave LCA; False for cradle-to-gate)
+                 input_biogenic_carbon_streams=(feedstock, s.CSL_fresh), # any streams, including feedstock, for which CO2 fixing credit is non-zero and has not already been included in GWP impact CFs
                  )
 
 #%% Define unit groups and their metrics
