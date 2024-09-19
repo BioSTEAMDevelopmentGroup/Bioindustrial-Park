@@ -73,10 +73,12 @@ class LCA:
     def __init__(self, system, CFs, feedstock, main_product, main_product_chemical_IDs, by_products,
                  cooling_tower=None, chilled_water_processing_units=None,
                  boiler=None, has_turbogenerator=None, feedstock_ID='Sugarcane',
-                 FU='1 kg', demand_allocation_method='steam pool',
-                 credit_feedstock_CO2_capture=False, add_EOL_GWP=False,
-                 conc_CO2_sequestered_in_liquid_waste_streams = 3, # g/L
-                 feedstock_mass_FU_kind='wet'):
+                 # FU='1 kg', 
+                 # demand_allocation_method='steam pool',
+                 add_EOL_GWP=False,
+                 feedstock_mass_FU_kind='wet',
+                 input_biogenic_carbon_streams=[],
+                 ):
         
         #: [System] System being evaluated.
         self.system = system
@@ -85,7 +87,8 @@ class LCA:
         self.flowsheet = self.system.flowsheet
         self.streams = self.system.streams
         
-        self.credit_feedstock_CO2_capture = credit_feedstock_CO2_capture
+        self.input_biogenic_carbon_streams = input_biogenic_carbon_streams
+        
         self.add_EOL_GWP = add_EOL_GWP
         self.feedstock_mass_FU_kind = feedstock_mass_FU_kind
         
@@ -95,7 +98,7 @@ class LCA:
         # self.priced_emissions = [i for i in emissions if i.price]
         
         self.CFs = CFs
-        self.demand_allocation_method = demand_allocation_method
+        # self.demand_allocation_method = demand_allocation_method
         
         self._chemical_IDs = [chem.ID for chem in chemicals]
         
@@ -110,7 +113,6 @@ class LCA:
         self.main_product = main_product
         self.by_products = by_products
         
-        self.FU_factor = 1. if FU==1. else 1.
         # tmo.settings.set_thermo(chemicals)
         self.LCA_stream = Stream('LCA_stream', units='kg/hr')
         self.LCA_streams = [i for i in system.feeds if not i==feedstock]
@@ -126,8 +128,6 @@ class LCA:
         self.natural_gas = self.BT.natural_gas
         self.CT = self.cooling_tower = cooling_tower
         self.CWP_units = self.chilled_water_processing_units = chilled_water_processing_units
-        
-        # self.conc_CO2_sequestered_in_liquid_waste_streams = conc_CO2_sequestered_in_liquid_waste_streams
         
         system._LCA = self
     
@@ -213,7 +213,7 @@ class LCA:
         return self.feedstock.get_atomic_flow('C')* self.chemicals.CO2.MW/self.main_product_kg_per_h
     @property
     def feedstock_GWP(self): 
-        return self.FGHTP_GWP - int(self.credit_feedstock_CO2_capture)*self.feedstock_CO2_capture
+        return self.FGHTP_GWP
     #  feedstock_GWP(self): return  FGHTP_GWP()
     
     @property
@@ -318,8 +318,15 @@ class LCA:
         return self.main_product.get_atomic_flow('C') * self.chemicals.CO2.MW/self.main_product_kg_per_h
     
     @property
-    def direct_emissions_GWP(self): 
-        return  self.emissions_GWP  - (int(self.credit_feedstock_CO2_capture)*self.feedstock_CO2_capture  - int(self.add_EOL_GWP)*self.EOL_GWP )
+    def biogenic_emissions_GWP(self): # direct biogenic emissions
+        return sum([i.get_atomic_flow('C') for i in self.input_biogenic_carbon_streams]) *\
+            self.chemicals.CO2.MW/self.main_product_kg_per_h
+    
+    @property
+    def direct_emissions_GWP(self): # direct non-biogenic emissions
+        return  self.emissions_GWP -\
+            self.biogenic_emissions_GWP +\
+            int(self.add_EOL_GWP)*self.EOL_GWP
     
     @property
     def BT_direct_emissions_GWP(self): 
