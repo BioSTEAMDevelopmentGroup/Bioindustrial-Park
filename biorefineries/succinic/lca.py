@@ -1,491 +1,155 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-"""
-# Bioindustrial-Park: BioSTEAM's Premier Biorefinery Models and Results
-# Copyright (C) 2021-, Sarang Bhagwat <sarangb2@illinois.edu>
-#
-# This module is under the UIUC open-source license. See
+# This module is under the UIUC open-source license. See 
 # github.com/BioSTEAMDevelopmentGroup/biosteam/blob/master/LICENSE.txt
 # for license details.
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
 
-This module is a modified implementation of modules from the following:
-[1]	Bhagwat et al., Sustainable Production of Acrylic Acid via 3-Hydroxypropionic Acid from Lignocellulosic Biomass. ACS Sustainable Chem. Eng. 2021, 9 (49), 16659–16669. https://doi.org/10.1021/acssuschemeng.1c05441
-[2]	Li et al., Sustainable Lactic Acid Production from Lignocellulosic Biomass. ACS Sustainable Chem. Eng. 2021, 9 (3), 1341–1351. https://doi.org/10.1021/acssuschemeng.0c08055
-[3]	Cortes-Peña et al., BioSTEAM: A Fast and Flexible Platform for the Design, Simulation, and Techno-Economic Analysis of Biorefineries under Uncertainty. ACS Sustainable Chem. Eng. 2020, 8 (8), 3302–3310. https://doi.org/10.1021/acssuschemeng.9b07040
-
-@author: sarangbhagwat
-"""
-
-import pandas as pd
-import numpy as np
-import flexsolve as flx
-from copy import copy as copy_
-from numba import njit
-from math import floor
-from warnings import warn
-import thermosteam as tmo
-from thermosteam import Stream
+from biorefineries.lca.lca import LCA
 
 
-def get_unit_atomic_balance(unit, atom='C'):
-    return (sum([i.get_atomic_flow(atom) for i in unit.ins]), 
-            sum([i.get_atomic_flow(atom) for i in unit.outs]))
-
-def get_TEA_feeds(main_sys, BT_sys=None):
-    return set([i for i in main_sys.feeds if i.price]+ \
-        [i for i in BT_sys.feeds if i.price]) if BT_sys else \
-        set([i for i in main_sys.feeds if i.price])
-
-def get_TEA_products(main_sys, BT_sys=None):
-    return set([i for i in main_sys.products if i.price]+ \
-        [i for i in BT_sys.products if i.price]) if BT_sys else \
-        set([i for i in main_sys.products if i.price])
-
-
-class LCA:
-    """
-    Abstract LCA class for life-cycle environmental impact assessment.
-
-    """
- 
-    def __init_subclass__(cls, isabstract=False):
-        if isabstract: return
-        for method in ('_DPI', '_TDC', '_FCI', '_FOC'):
-            if not hasattr(cls, method):
-                import pdb
-                pdb.set_trace()
-                raise NotImplementedError(
-                    f"subclass must implement a '{method}' method unless the "
-                     "'isabstract' keyword argument is True"
-                )
-
-    @staticmethod
-    def like(system, other):
-        """Create an LCA object from `system` with the same settings as `other`."""
-        self = copy_(other)
-        self.units = sorted([i for i in system.units if i._design or i._cost], key=lambda x: x.line)
-        self.system = system
-        self.feeds = system.feeds
-        self.products = system.products
-        system._TEA = self
-        return self
-
-    def __init__(self, system, CFs, feedstock, main_product, main_product_chemical_IDs, by_products=[],
-                 cooling_tower=None, chilled_water_processing_units=None,
-                 boiler=None, has_turbogenerator=None, feedstock_ID='Sugarcane',
-                 # FU='1 kg', 
-                 # demand_allocation_method='steam pool',
-                 add_EOL_GWP=False,
-                 feedstock_mass_FU_kind='wet',
-                 input_biogenic_carbon_streams=[],
-                 ):
+class SuccinicLCA(LCA):
+    
+    GWP_key = 'GWP_100'
+    FEC_key = 'FEC'
+    
+    def __init__(self, 
+                 system,
+                 CFs,
+                 feedstock,  # Stream
+                 input_biogenic_carbon_streams, # List of Stream objects
+                 feedstock_ID, 
+                 boiler, # Boiler facility unit object
+                 main_product, # Stream
+                 main_product_chemical_IDs, # List of String objects
+                 by_products=[], # List of Stream objects
+                 feedstock_mass_kind='wet', 
+                 cooling_tower=None, 
+                 chilled_water_processing_units=[],
+                 has_turbogenerator=None, 
+                 functional_unit='1 kg', # '1 kg', '1 metric ton', '1 MJ (by LHV)', '1 MJ (by HHV)'
+                 add_EOL_GWP=True, # Boolean. Add end-of-life impacts of products (main and by-products) to total GWP.
+                 **kwargs):
         
-        #: [System] System being evaluated.
-        self.system = system
-        self.chemicals = chemicals = feedstock.chemicals
-        self.units = self.system.units
-        self.flowsheet = self.system.flowsheet
-        self.streams = self.system.streams
+        complex_feeds = {feedstock_ID: (feedstock, feedstock_mass_kind)}
         
-        self.input_biogenic_carbon_streams = input_biogenic_carbon_streams
-        
-        self.add_EOL_GWP = add_EOL_GWP
-        self.feedstock_mass_FU_kind = feedstock_mass_FU_kind
-        
+        LCA.__init__(self, 
+                     system=system,
+                     CFs=CFs,
+                     input_biogenic_carbon_streams=input_biogenic_carbon_streams,
+                     main_product=main_product, main_product_chemical_IDs=main_product_chemical_IDs,
+                     by_products=by_products,
+                     boiler=boiler,
+                     complex_feeds=complex_feeds,
+                     cooling_tower=cooling_tower,
+                     chilled_water_processing_units=chilled_water_processing_units,
+                     has_turbogenerator=has_turbogenerator,
+                     functional_unit=functional_unit,
+                     add_EOL_GWP=add_EOL_GWP,
+                     **kwargs)
         
         self.feedstock_ID = feedstock_ID
-        # self.priced_feeds = [i for i in feeds if i.price]
-        # self.priced_emissions = [i for i in emissions if i.price]
+        self.feedstock_mass_kind = feedstock_mass_kind
         
-        self.CFs = CFs
-        # self.demand_allocation_method = demand_allocation_method
-        
-        self._chemical_IDs = [chem.ID for chem in chemicals]
-        
-        self.GWP_CF_stream = CFs['GWP_CF_stream']
-        self.FEC_CF_stream = CFs['FEC_CF_stream']
-        
-        self.feedstock = feedstock
-        # self.main_product = tmo.Stream('LCA_main_product')
-        self.main_product_chemical_IDs = main_product_chemical_IDs
-        # for i in main_product_chemical_IDs:
-        #     self.main_product.imol[i] = main_product.imol[i]
-        self.main_product = main_product
-        self.by_products = by_products
-        
-        # tmo.settings.set_thermo(chemicals)
-        self.LCA_stream = Stream('LCA_stream', units='kg/hr')
-        self.LCA_streams = [i for i in system.feeds if not i==feedstock]
-        
-        self.chem_IDs = [i.ID for i in chemicals]
-        
-        if has_turbogenerator is None:
-            has_turbogenerator = boiler.power_utility.production > 0.
-        self.has_turbogenerator = has_turbogenerator
-        
-        
-        self.BT = self.boiler = boiler
-        self.natural_gas = self.BT.natural_gas
-        self.CT = self.cooling_tower = cooling_tower
-        self.CWP_units = self.chilled_water_processing_units = chilled_water_processing_units
-        
-        self.CO2_MW = self.chemicals.CO2.MW
-        
-        system._LCA = self
-    
-    @property
-    def emissions(self):
-        return [i for i in self.system.products if i not in [self.main_product]+self.by_products]
-    
-    @property
-    def feeds(self): 
-        return self.system.feeds
-        
-    @property
-    def main_product_kg_per_h(self):
-        return sum([self.main_product.imass[i] for i in self.main_product_chemical_IDs])
-    
-    @property
-    def carbon_balance_percent_error(self):
-        total_C_in = sum([feed.get_atomic_flow('C') for feed in self.feeds])
-        total_C_out = self.main_product.get_atomic_flow('C') +\
-                      sum([i.get_atomic_flow('C') for i in self.by_products]) +\
-                      sum([emission.get_atomic_flow('C') for emission in self.emissions])
-        return 100.*(total_C_out - total_C_in)/total_C_in
-    
-    # 100-year global warming potential (GWP100)
-    @property
-    def material_GWP_array(self):
-        # self.LCA_stream.mass = sum(i.mass for i in self.LCA_streams)
-        self.LCA_stream.mix_from(self.LCA_streams)
-        # chemical_GWP = self.LCA_stream.mass*CFs['self.GWP_CF_stream'].mass
-        chemical_GWP = [self.LCA_stream.imass[ID] * self.GWP_CF_stream.imass[ID] for ID in self.chem_IDs]
-        return chemical_GWP
-    
+    # 100-year global warming potential (GWP_100)
+
     @property
     def material_GWP(self): 
-        chemical_GWP = self.material_GWP_array
-        return sum(chemical_GWP)/self.main_product_kg_per_h
+        return self.get_material_impact(self.GWP_key)
 
     @property
     def material_GWP_breakdown(self):
-        # self.LCA_stream.mass = sum(i.mass for i in self.LCA_streams)
-        self.LCA_stream.mix_from(self.LCA_streams)
-        chemical_GWP_dict_full = {'H2SO4':0, 'CH4':0, 'CO2':0}
-        chemical_GWP_dict = {ID: self.LCA_stream.imass[ID] * self.GWP_CF_stream.imass[ID] / self.main_product_kg_per_h \
-                             for ID in self.chem_IDs if not self.LCA_stream.imass[ID] * self.GWP_CF_stream.imass[ID] == 0.}
-        chemical_GWP_dict_full.update(chemical_GWP_dict)
-        return chemical_GWP_dict_full
+        return self.get_material_impact_breakdown(self.GWP_key)
     
     @property
     def material_GWP_breakdown_fractional(self):
-        chemical_GWP_dict = self.material_GWP_breakdown
-        tot_material_GWP = self.material_GWP
-        for k,v in chemical_GWP_dict.items():
-            chemical_GWP_dict[k] /= tot_material_GWP
-        return chemical_GWP_dict
+        return self.get_material_impact_breakdown_as_fraction_of_material_impact(self.GWP_key)
     
     @property
     def material_GWP_breakdown_as_fraction_of_tot_GWP(self):
-        chemical_GWP_dict = self.material_GWP_breakdown
-        tot_GWP = self.GWP
-        for k,v in chemical_GWP_dict.items():
-            chemical_GWP_dict[k] /= tot_GWP
-        return chemical_GWP_dict
-    
-    
-    # GWP from combustion of non-biogenic carbons
-    @property
-    def ng_combustion_GWP(self):
-        return (self.natural_gas.get_atomic_flow('C')) * self.CO2_MW / self.main_product_kg_per_h
-                               # +ethanol_fresh.get_atomic_flow('C'))* CO2_MW / self.main_product_kg_per_h
-    
-    @property
-    def ng_GWP(self):
-        return self.CFs['GWP_CFs']['CH4']*self.natural_gas.F_mass/self.main_product_kg_per_h
+        return self.get_material_impact_breakdown_as_fraction_of_total_impact(self.GWP_key)
     
     @property
     def FGHTP_GWP(self):
-        if self.feedstock_mass_FU_kind=='dry':
-            mass_flow = self.feedstock.F_mass-self.feedstock.imass['H2O']
-        elif self.feedstock_mass_FU_kind=='wet':
-            mass_flow = self.feedstock.F_mass
-        return mass_flow *self.CFs['GWP_CFs'][self.feedstock_ID]/self.main_product_kg_per_h
-    
-    @property
-    def feedstock_biogenic_carbon_flow(self):
-        return self.feedstock.get_atomic_flow('C')* self.CO2_MW/self.main_product_kg_per_h
+        return self.get_complex_feed_impact_by_ID(self.GWP_key, self.feedstock_ID)
     
     @property
     def feedstock_GWP(self): 
         return self.FGHTP_GWP
-    #  feedstock_GWP(self): return  FGHTP_GWP()
     
     @property
-    def emissions_GWP(self): 
-        return sum([stream.get_atomic_flow('C') for stream in self.emissions]) * self.CO2_MW / self.main_product_kg_per_h
-    
-    # GWP from electricity acquisition
-    @property
-    def net_electricity(self):
-        # return self.BT.power_utility.rate + self.BT.electricity_demand
-        # return sum(i.power_utility.rate for i in self.system.units)
-        return self.system.power_utility.rate
-        
-    @property
-    def net_electricity_GWP(self):
-        return self.net_electricity*self.CFs['GWP_CFs']['Electricity'] \
-        / self.main_product_kg_per_h
-    
+    def net_electricity_GWP(self): 
+        return self.get_net_electricity_impact(self.GWP_key)
     
     @property
-    def BT_excess_steam_kJph_for_excess_electricity(self):
-        return - 3600.* self.net_electricity / self.BT.turbogenerator_efficiency # 3600 to convert kW to kJph
+    def natural_gas_GWP(self):
+        return self.get_natural_gas_impact(self.GWP_key)
     
-    @property
-    def electricity_demand(self): 
-        return sum([i.power_utility.consumption for i in self.system.units])
-        # return self.BT.electricity_demand # excludes BT's electricity use
-
-    
-    @property
-    def cooling_electricity_demand(self):
-        return self.CT.power_utility.rate + sum([i.power_utility.rate for i in self.CWP_units])
-    
-    @property
-    def BT_steam_kJph_heating(self):
-        return sum([i.duty for i in self.BT.steam_utilities])
-    
-    @property
-    def BT_steam_kJph_turbogen_for_electricity_consumption_only(self): 
-        BT = self.BT
-        return 3600.*BT.electricity_demand/BT.turbogenerator_efficiency # 3600 to convert kW to kJph
-    
-    @property
-    def BT_steam_kJph_total_excluding_excess(self): 
-        return self.BT_steam_kJph_heating + self.BT_steam_kJph_turbogen_for_electricity_consumption_only
-    
-    @property
-    def BT_steam_kJph_total(self):
-        return self.BT_steam_kJph_total_excluding_excess + self.BT_excess_steam_kJph_for_excess_electricity
-    @property
-    def steam_frac_heating(self): 
-        return self.BT_steam_kJph_heating/self.BT_steam_kJph_total_excluding_excess
-    
-    @property
-    def steam_frac_turbogen_for_electricity_consumption_only(self): 
-        return  self.BT_steam_kJph_turbogen_for_electricity_consumption_only / self.BT_steam_kJph_total_excluding_excess 
-    
-    @property
-    def steam_frac_cooling(self): 
-        return  self.steam_frac_turbogen_for_electricity_consumption_only * self.cooling_electricity_demand / self.electricity_demand 
-    
-    @property
-    def steam_frac_electricity_non_cooling(self):
-        return  self.steam_frac_turbogen_for_electricity_consumption_only * (1-(self.cooling_electricity_demand / self.electricity_demand))
-    
-    ##
-    @property
-    def actual_steam_frac_heating(self): 
-        return self.BT_steam_kJph_heating/self.BT_steam_kJph_total
-    
-    @property
-    def actual_steam_frac_turbogen_for_electricity_consumption_only(self): 
-        return  self.BT_steam_kJph_turbogen_for_electricity_consumption_only / self.BT_steam_kJph_total 
-    
-    @property
-    def actual_steam_frac_cooling(self): 
-        return  self.actual_steam_frac_turbogen_for_electricity_consumption_only * self.cooling_electricity_demand / self.electricity_demand 
-    
-    @property
-    def actual_steam_frac_electricity_non_cooling(self):
-        return  self.actual_steam_frac_turbogen_for_electricity_consumption_only * (1-(self.cooling_electricity_demand / self.electricity_demand))
-    
-    @property
-    def actual_steam_frac_excess(self): 
-        return  self.BT_excess_steam_kJph_for_excess_electricity / self.BT_steam_kJph_total 
-    ##
-    
-    @property
-    def non_cooling_electricity_demand(self): 
-        return  self.electricity_demand  -  self.cooling_electricity_demand 
-    
-    @property
-    def electricity_frac_cooling(self):
-        return self.cooling_electricity_demand/(self.electricity_demand)
-    
-    @property
-    def electricity_frac_non_cooling(self):
-        return self.non_cooling_electricity_demand/(self.electricity_demand)
-    
-    @property
-    def EOL_GWP(self): 
-        return sum([i.get_atomic_flow('C') for i in [self.main_product] + self.by_products]) *\
-            self.CO2_MW/self.main_product_kg_per_h
-    
-    @property
-    def biogenic_emissions_GWP(self): # direct biogenic emissions
-        return sum([i.get_atomic_flow('C') for i in self.input_biogenic_carbon_streams]) *\
-            self.CO2_MW/self.main_product_kg_per_h
-    
-    @property
-    def direct_emissions_GWP(self): # direct non-biogenic emissions
-        return  self.emissions_GWP -\
-            self.biogenic_emissions_GWP +\
-            int(self.add_EOL_GWP)*self.EOL_GWP
-    
-    @property
-    def BT_direct_emissions_GWP(self): 
-        return ((sum([i.get_atomic_flow('C') for i in self.BT.outs])*self.chemicals['CO2'].MW / self.main_product_kg_per_h)\
-        / self.emissions_GWP ) * self.direct_emissions_GWP 
-    
-    @property
-    def non_BT_direct_emissions_GWP(self): 
-        return  self.direct_emissions_GWP - self.BT_direct_emissions_GWP 
-    
-    #  direct_emissions_GWP(self): return  non_BT_direct_emissions_GWP + BT_direct_emissions_GWP 
-    
-    @property
-    def total_steam_GWP(self): 
-        return self.ng_GWP + self.BT_direct_emissions_GWP 
-    
-    @property
-    def heating_demand_GWP(self): 
-        return self.steam_frac_heating * self.total_steam_GWP 
-    
-    @property
-    def cooling_demand_GWP(self): 
-        return self.steam_frac_cooling * self.total_steam_GWP + max(0, self.electricity_frac_cooling * self.net_electricity_GWP)
-    
-    @property
-    def electricity_demand_non_cooling_GWP(self): 
-        return  self.steam_frac_electricity_non_cooling * self.total_steam_GWP + self.electricity_frac_non_cooling * self.net_electricity_GWP\
-            + min(0, + self.electricity_frac_cooling * self.net_electricity_GWP)
-    
-  
     @property
     def GWP(self): 
-        # return  self.FGHTP_GWP + self.material_GWP + self.ng_GWP +\ # BT natural gas stream is now visible, hence included in material_GWP
-        return  self.FGHTP_GWP + self.material_GWP +\
-                       self.net_electricity_GWP + self.direct_emissions_GWP 
-    
-    @property
-    def GWP_alternative(self): 
-        return  self.FGHTP_GWP + self.material_GWP +\
-                         self.non_BT_direct_emissions_GWP + self.heating_demand_GWP +\
-                             self.cooling_demand_GWP +\
-                             self.electricity_demand_non_cooling_GWP 
-                            
+        return self.get_total_impact(self.GWP_key)
+
     def GWP_by_ID(self, ID):
-        return self.LCA_stream.imass[ID] * self.GWP_CF_stream.imass[ID]/self.main_product_kg_per_h
-
-
+        if ID in self.complex_feeds.keys(): 
+            return self.get_complex_feed_impact_by_ID(self.GWP_key, ID)
+        elif ID in self.CFs[self.GWP_key].keys():
+            return self.get_material_impact_by_ID(self.GWP_key, ID)
+        else:
+            raise ValueError(f'{ID} is not a material or complex_feed with a given impact value in CFs.')
+ 
     
     # fossil energy consumption (FEC)
     
     @property
-    def material_FEC(self):
-        # chemical_FEC = self.LCA_stream.mass*CFs['FEC_CF_stream'].mass
-        chemical_FEC = self.material_FEC_array 
-        # feedstock_FEC = self.feedstock.F_mass*CFs['FEC_CFs']['Corn stover']
-        # return chemical_FEC.sum /main_product.F_mass
-        return sum(chemical_FEC)/self.main_product_kg_per_h
-    
-    @property
-    def material_FEC_array(self):
-        # self.LCA_stream.mass = sum(i.mass for i in self.LCA_streams)
-        self.LCA_stream.mix_from(self.LCA_streams)
-        # chemical_FEC = self.LCA_stream.mass*CFs['FEC_CF_stream'].mass
-        chemical_FEC = [self.LCA_stream.imass[ID] * self.FEC_CF_stream.imass[ID] for ID in self.chem_IDs]
-        # chemical_FEC = self.LCA_stream.mass[:] * self.FEC_CF_stream.mass[:]
-        # feedstock_FEC = self.feedstock.F_mass*CFs['FEC_CFs']['Corn stover']
-        return chemical_FEC
+    def material_FEC(self): 
+        return self.get_material_impact(self.FEC_key)
     
     @property
     def material_FEC_breakdown(self):
-        # self.LCA_stream.mass = sum(i.mass for i in self.LCA_streams)
-        self.LCA_stream.mix_from(self.LCA_streams)
-        FEC_CF_stream = self.FEC_CF_stream
-        chemical_FEC_dict_full = {'H2SO4':0, 'CH4':0, 'CO2':0}
-        chemical_FEC_dict = {ID: self.LCA_stream.imass[ID] * FEC_CF_stream.imass[ID] / self.main_product_kg_per_h \
-                              for ID in self.chem_IDs if not self.LCA_stream.imass[ID] * FEC_CF_stream.imass[ID] == 0.}
-        chemical_FEC_dict_full.update(chemical_FEC_dict)
-        return chemical_FEC_dict_full
+        return self.get_material_impact_breakdown(self.FEC_key)
     
     @property
     def material_FEC_breakdown_fractional(self):
-        chemical_FEC_dict = self.material_FEC_breakdown 
-        tot_material_FEC = self.material_FEC 
-        for k,v in chemical_FEC_dict.items():
-            chemical_FEC_dict[k] /= tot_material_FEC
-        return chemical_FEC_dict
+        return self.get_material_impact_breakdown_as_fraction_of_material_impact(self.FEC_key)
     
     @property
     def material_FEC_breakdown_as_fraction_of_tot_FEC(self):
-        chemical_FEC_dict = self.material_FEC_breakdown 
-        tot_FEC = self.FEC 
-        for k,v in chemical_FEC_dict.items():
-            chemical_FEC_dict[k] /= tot_FEC
-        return chemical_FEC_dict
+        return self.get_material_impact_breakdown_as_fraction_of_total_impact(self.FEC_key)
+    
+    @property
+    def feedstock_FEC(self):
+        return self.get_complex_feed_impact_by_ID(self.FEC_key, self.feedstock_ID)
     
     @property
     def net_electricity_FEC(self): 
-        return (self.net_electricity * self.CFs['FEC_CFs']['Electricity'])/self.main_product_kg_per_h
+        return self.get_net_electricity_impact(self.FEC_key)
     
     @property
-    def total_steam_FEC(self):
-        return self.ng_FEC 
+    def natural_gas_FEC(self):
+        return self.get_natural_gas_impact(self.FEC_key)
     
     @property
-    def heating_demand_FEC(self): 
-        return self.steam_frac_heating * self.total_steam_FEC 
-   
-    @property
-    def cooling_demand_FEC(self):
-        return self.steam_frac_cooling * self.total_steam_FEC  + \
-            max(0, self.electricity_frac_cooling * self.net_electricity_FEC)
+    def ng_FEC(self):
+        return self.natural_gas_FEC
     
-    @property
-    def electricity_demand_non_cooling_FEC(self):
-        return self.steam_frac_electricity_non_cooling * self.total_steam_FEC + \
-            self.electricity_frac_non_cooling * self.net_electricity_FEC + \
-                min(0, self.electricity_frac_cooling * self.net_electricity_FEC)
-    
-    @property
-    def feedstock_FEC(self): 
-        return (self.feedstock.F_mass)\
-            * self.CFs['FEC_CFs'][self.feedstock_ID]/self.main_product_kg_per_h
-
-
-    def FEC_by_ID(self, ID):
-        return self.LCA_stream.imass[ID] * self.FEC_CF_stream.imass[ID]/self.main_product_kg_per_h
-    
-    
-    @property
-    def ng_FEC(self): 
-        return self.CFs['FEC_CFs']['CH4']*self.natural_gas.F_mass/self.main_product_kg_per_h
-    
-    # Total FEC
     @property
     def FEC(self): 
-        # return self.material_FEC + self.net_electricity_FEC + self.feedstock_FEC + self.ng_FEC # BT natural gas stream is now visible, hence included in material_GWP
-        return self.material_FEC + self.net_electricity_FEC + self.feedstock_FEC
+        return self.get_total_impact(self.FEC_key)
     
-    @property
-    def FEC_alternative(self): 
-        return self.material_FEC + self.feedstock_FEC + self.heating_demand_FEC +\
-        self.cooling_demand_FEC + self.electricity_demand_non_cooling_FEC 
-
-
+    def FEC_by_ID(self, ID):
+        if ID in self.complex_feeds.keys(): 
+            return self.get_complex_feed_impact_by_ID(self.FEC_key, ID)
+        elif ID in self.CFs[self.FEC_key].keys():
+            return self.get_material_impact_by_ID(self.FEC_key, ID)
+        else:
+            raise ValueError(f'{ID} is not a material or complex_feed with a given impact value in CFs.')
     
-    def __repr__(self):
-        return f'{type(self).__name__}({self.system.ID}, ...)'
+     
     
-
-    def show(self):
-        """Prints information on unit."""
-        print(self._info())
-    _ipython_display_ = show
-
-
-
+     
+     
+    
+    
+    
+    

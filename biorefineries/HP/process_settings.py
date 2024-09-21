@@ -359,10 +359,10 @@ GWP_CF_stream = tmo.Stream('GWP_CF_stream', GWP_CF_array, units='kg/hr')
 # In kg CO2-eq/kWh
 GWP_CFs['Electricity'] = 0.48
 
-# From corn stover
-GWP_CFs['LacticAcid_GREET'] = 1.80
-# From ref [7], lactic acid production, RoW, TRACI global warming
-GWP_CFs['LacticAcid_fossil'] = 4.1787
+# # From corn stover
+# GWP_CFs['LacticAcid_GREET'] = 1.80
+# # From ref [7], lactic acid production, RoW, TRACI global warming
+# GWP_CFs['LacticAcid_fossil'] = 4.1787
 
 
 GWP_CFs['Corn stover'] = 0.10945 # see Table S4 of the SI of Bhagwat et al. 2021
@@ -371,8 +371,8 @@ GWP_CFs['Sugarcane'] = 0.044535 # GREET 2023, Sugarcane Production for Brazil Pl
 GWP_CFs['Corn'] = 0.2610 # GREET 2023, Corn Production for Biofuel Refinery
 GWP_CFs['Glucose'] = 1.2127 # ecoinvent 3.8 glucose production, GLO
 
-CFs['GWP_CFs'] = GWP_CFs
-CFs['GWP_CF_stream'] = GWP_CF_stream
+CFs['GWP_100'] = GWP_CFs
+# CFs['GWP_CF_stream'] = GWP_CF_stream
 # GWP_CFs['']
 # =============================================================================
 # Fossil energy consumption (FEC), in MJ/kg of material
@@ -420,15 +420,15 @@ FEC_CF_stream = tmo.Stream('FEC_CF_stream', FEC_CF_array, units='kg/hr')
 # FEC_CFs['FGHTP Sugarcane'] = 1.68000 # placeholder
 
 
-CFs['FEC_CFs'] = FEC_CFs
-CFs['FEC_CF_stream'] = FEC_CF_stream
+CFs['FEC'] = FEC_CFs
+# CFs['FEC_CF_stream'] = FEC_CF_stream
 # In MJ/kWh
 FEC_CFs['Electricity'] = 5.926
 # FEC_CFs['Electricity'] = 0.
 # From corn stover
 FEC_CFs['LacticAcid'] = 29.
-# From ref [7], lactic acid production, RoW, cumulative energy demand, fossil
-FEC_CFs['LacticAcid_fossil'] = 79.524
+# # From ref [7], lactic acid production, RoW, cumulative energy demand, fossil
+# FEC_CFs['LacticAcid_fossil'] = 79.524
 
 FEC_CFs['Corn stover'] = 1.68000 # see Table S4 in the SI of Bhagwat et al. 2021
 # FEC_CFs['Sugarcane'] = 0.37338 # ecoinvent 3.6, sugarcane production, RoW, IPCC 2013 GWP-100a

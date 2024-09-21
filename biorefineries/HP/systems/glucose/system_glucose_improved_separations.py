@@ -112,7 +112,7 @@ System.default_molar_tolerance = 0.1
 System.strict_convergence = True # True => throw exception if system does not converge; false => continue with unconverged system
 
 
-@SystemFactory(ID = 'helper_HP_sys')
+@SystemFactory(ID = 'HP_sys')
 def create_HP_sys(ins, outs):
     u, s = flowsheet.unit, flowsheet.stream
     process_groups = []
