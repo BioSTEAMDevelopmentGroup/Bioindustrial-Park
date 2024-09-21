@@ -51,7 +51,7 @@ from biorefineries.HP import units, facilities
 from biorefineries.HP.process_areas import create_HP_fermentation_process,\
                                            create_HP_separation_improved_process,\
                                            create_HP_to_acrylic_acid_upgrading_process
-from biorefineries.HP.lca import LCA
+from biorefineries.HP.lca import HPLCA
 from biorefineries.HP.models._process_specification import ProcessSpecification
 from biorefineries.HP.process_settings import price, CFs, chem_index
 from biorefineries.HP.utils import find_split, splits_df, baseline_feedflow
@@ -67,7 +67,6 @@ from biorefineries.cellulosic import create_facilities
 from biorefineries.sugarcane import create_juicing_system_up_to_clarification
 # from lactic.hx_network import HX_Network
 
-from biorefineries.succinic.lca import LCA as HPLCA
 from biorefineries.TAL._general_utils import call_all_specifications_or_run,\
                                                 get_more_unit_groups,\
                                                 add_metrics_to_unit_groups,\
