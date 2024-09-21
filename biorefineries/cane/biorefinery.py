@@ -129,7 +129,7 @@ area_names = {
     -1: ['Feedstock handling', 'Juicing', 'EtOH prod.', 'CH&P', 'Utilities', 
          'HXN', 'Storage', 'Wastewater treatment'],
     -2: ['Feedstock handling', 'Juicing', 'Pretreatment', 'EtOH prod.',
-         'Wastewater treatment', 'CH&P', 'Utilities', 'HXN', 'Storage'],
+         'Wastewater treatment', 'CH&P', 'Utilities', 'Storage', 'HXN'],
     -3: ['Feedstock handling', 'Juicing', 'EtOH prod.', 'CH&P', 'Utilities', 
          'HXN', 'Storage', 'Wastewater treatment'],
     1: ['Feedstock handling', 'Juicing', 'EtOH prod.', 'Oil ext.', 'Biod. prod.', 
@@ -469,19 +469,21 @@ class Biorefinery:
         if number not in cellulosic_configurations: BT.boiler_efficiency = 0.89
         
         ## Unit groups
-        areas = area_names[number]
-        rename_storage_units(cane_sys.units, (areas.index('Storage') + 1) * 100)
-        unit_groups = UnitGroup.group_by_area(cane_sys.units)
-        for i, j in zip(unit_groups, areas): i.name = j
-        for i in unit_groups: i.autofill_metrics(shorthand=True)
+        # TODO: Fix unit groups
+        # areas = area_names[number]
+        # rename_storage_units(cane_sys.units, (areas.index('Storage') + 1) * 100)
+        # unit_groups = UnitGroup.group_by_area(cane_sys.units)
+        # for i, j in zip(unit_groups, areas): i.name = j
+        # for i in unit_groups: i.autofill_metrics(shorthand=True)
         
-        for HXN_group in unit_groups:
-            if HXN_group.name == 'HXN':
-                HXN_group.filter_savings = False # Allow negative values in heat utilities
-                HXN = HXN_group.units[0]
-                try:
-                    assert isinstance(HXN, bst.HeatExchangerNetwork)
-                except: breakpoint()
+        # for HXN_group in unit_groups:
+        #     if HXN_group.name == 'HXN':
+        #         HXN_group.filter_savings = False # Allow negative values in heat utilities
+        #         HXN = HXN_group.units[0]
+        #         try:
+        #             assert isinstance(HXN, bst.HeatExchangerNetwork)
+        #         except: breakpoint()
+        HXN = flowsheet(bst.HeatExchangerNetwork)
         HXN.raise_energy_balance_error = False
         HXN.vle_quenched_streams = False
         
@@ -1651,7 +1653,7 @@ class Biorefinery:
         self.tea = tea
         self.model = model
         self.flowsheet = flowsheet
-        self.unit_groups = unit_groups
+        # self.unit_groups = unit_groups
         self.configuration = configuration
         self.composition_specification = composition_specification
         self.oil_extraction_specification = oil_extraction_specification
