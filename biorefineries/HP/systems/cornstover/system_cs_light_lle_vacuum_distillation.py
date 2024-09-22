@@ -53,7 +53,7 @@ from biorefineries.HP.process_areas import create_HP_fermentation_process,\
                                            create_HP_to_acrylic_acid_upgrading_process
 from biorefineries.HP.lca import HPLCA
 from biorefineries.HP.models._process_specification import ProcessSpecification
-from biorefineries.HP.process_settings import price, CFs, chem_index
+from biorefineries.HP.process_settings import price, CFs, chem_index, _GDP_2007_to_2010
 from biorefineries.HP.utils import find_split, splits_df, baseline_feedflow
 from biorefineries.HP.chemicals_data import HP_chemicals, chemical_groups, \
                                 soluble_organics, combustibles
@@ -149,9 +149,11 @@ def create_HP_sys(ins, outs):
     feedstock.F_mass = 554171.74 # initial value; updated by spec.set_production_capacity
     
     # Update all prices to 2019$ using chemical indices
-    # cornstover biorefinery base year is 2019
+    # cornstover biorefinery base year is 2007
     for cornstover_sys_stream in list(s):
-        cornstover_sys_stream.price *= chem_index[2019]/chem_index[2019]
+        cornstover_sys_stream.price *= _GDP_2007_to_2010 * chem_index[2019]/chem_index[2010]
+    
+    feedstock.price = price['Corn stover']
         
     # %% 
     

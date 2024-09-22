@@ -195,10 +195,12 @@ def create_HP_sys(ins, outs):
     feedstock.F_mass = 554171.74 # initial value; updated by spec.set_production_capacity
     
     # Update all prices to 2019$ using chemical indices
-    # sugarcane biorefinery base year is 2019
+    # corn biorefinery base year is 2018
     for corn_sys_stream in list(s):
         corn_sys_stream.price *= chem_index[2019]/chem_index[2018]
         
+    feedstock.price = price['Corn']
+    
     # %% 
     
     # =============================================================================
@@ -510,9 +512,9 @@ def create_HP_sys(ins, outs):
         HXN._installed_cost = 0.
     
     # # To simulate without HXN, simply uncomment the following 3 lines:
-    HXN._cost = HXN_no_run_cost
-    HXN.energy_balance_percent_error = 0.
-    HXN.new_HXs = HXN.new_HX_utils = []
+    # HXN._cost = HXN_no_run_cost
+    # HXN.energy_balance_percent_error = 0.
+    # HXN.new_HXs = HXN.new_HX_utils = []
     
 # %% System setup
 

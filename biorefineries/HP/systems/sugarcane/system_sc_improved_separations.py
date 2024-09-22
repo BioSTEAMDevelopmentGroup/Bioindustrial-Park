@@ -143,10 +143,12 @@ def create_HP_sys(ins, outs):
     feedstock.F_mass = 554171.74 # initial value; updated by spec.set_production_capacity
     
     # Update all prices to 2019$ using chemical indices
-    # sugarcane biorefinery base year is 2019
+    # sugarcane biorefinery base year is 2018
     for sugarcane_sys_stream in list(s):
-        sugarcane_sys_stream.price *= chem_index[2019]/chem_index[2019]
+        sugarcane_sys_stream.price *= chem_index[2019]/chem_index[2018]
         
+    feedstock.price = price['Sugarcane']
+    
     # %% 
     
     # =============================================================================
@@ -440,9 +442,9 @@ def create_HP_sys(ins, outs):
     
     HXN = bst.HeatExchangerNetwork('HXN1001',
                                                 ignored=[
-                                                        u.A410,
-                                                        u.A420,
-                                                        u.A430,
+                                                        # u.A410,
+                                                        # u.A420,
+                                                        # u.A430,
                                                         ],
                                               cache_network=False,
                                               )

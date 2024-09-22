@@ -33,6 +33,8 @@ _chemical_2017to2016 = 102.5 / 106.9
 _GDP_2008_to_2010 = 1.012 / 0.990
 _GDP_2007_to_2010 = 1.012 / 0.961
 
+_corn_bushel_to_kg = 25.402 # https://www.ers.usda.gov/webdocs/publications/41880/33132_ah697_002.pdf
+
 chem_index = { # Dictionary of chemical indices
                     2010: 82.2,
                     2011: 79.5,
@@ -201,6 +203,36 @@ ZnSO4_price = 580 / _kg_per_ton * _GDP_2007_to_2010 * chem_index[2016]/chem_inde
 # Dodecanol
 Dodecanol_price = 2.75 # 2500 - 3000 $/ metric ton # https://www.alibaba.com/product-detail/New-Arrival-Liquid-Lauryl-alcohol-Dodecanol_1600489291769.html?spm=a2700.galleryofferlist.normal_offer.6.267b13a0flS0fP
 
+
+#%% Feedstocks
+
+# Glucose / D-glucose / dextrose
+# $/lb # USDA 2015-2019 mean
+# https://www.ers.usda.gov/data-products/sugar-and-sweeteners-yearbook-tables/sugar-and-sweeteners-yearbook-tables/#World,%20U.S.,%20and%20Mexican%20Sugar%20and%20Corn%20Sweetener%20Prices
+glucose_price = 0.3798 * _lb_per_kg
+# in $/kg:
+# 2015-2019 mean: 37.98	
+# 2015-2019 5th percentile: 36.00 
+# 2015-2019 95th percentile: 39.5
+
+# Corn stover
+from biorefineries.lactic._process_settings import feedstock_price # in 2016$
+cornstover_price = feedstock_price
+
+# Corn
+# $/bushel # USDA 2015-2019 mean
+# https://www.nass.usda.gov/Charts_and_Maps/Agricultural_Prices/pricecn.php
+corn_price = 3.543 / _corn_bushel_to_kg
+# in $/kg:
+# 2015-2019 mean: 0.139
+# 2015-2019 5th percentile: 0.127
+# 2015-2019 95th percentile: 0.150
+
+# Sugarcane
+from biorefineries.cane.streams import sugarcane # in 2018$
+sugarcane_price = sugarcane['price']
+
+#%%
 # All prices initially in 2016$/kg
 price = {'AA': AA_price,
          'TiO2': TiO2_price,
@@ -245,6 +277,10 @@ price = {'AA': AA_price,
          'Monoethanolamine': MEA_price,
          'Magnesium chloride': MgCl2_price,
          'Zinc sulfate': ZnSO4_price,
+         'Glucose': glucose_price,
+         'Corn stover': cornstover_price,
+         'Corn': corn_price,
+         'Sugarcane': sugarcane_price,
          }
     
 
