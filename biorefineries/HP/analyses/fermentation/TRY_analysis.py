@@ -19,7 +19,7 @@ import numpy as np
 
 from biorefineries import HP
 # from biorefineries.HP.systems.system_sc_light_lle_vacuum_distillation import HP_tea, HP_lca, R302, spec, AA, simulate_and_print, get_AA_MPSP
-from biorefineries.HP.systems.system_glucose_improved_separations import HP_tea, HP_lca, R302, spec, AA, simulate_and_print, get_AA_MPSP
+from biorefineries.HP.systems.corn.system_corn_improved_separations import HP_tea, HP_lca, R302, spec, AA, simulate_and_print, get_AA_MPSP
 
 from  matplotlib.colors import LinearSegmentedColormap
 import pandas as pd
@@ -31,7 +31,7 @@ from math import log
 
 import os
 
-from biorefineries.HP.models import models_corn_improved_separations as models
+from biorefineries.HP.models.corn import models_corn_improved_separations as models
 
 chdir = os.chdir
 
@@ -63,20 +63,19 @@ system = HP_sys = models.HP_sys
 
 simulate_and_print()
 
-modes = [
-            '300L',
-         ]
+feedstock_tag = 'corn'
+product_tag = 'Acrylic'
 
+mode = '300L'
 
-parameter_distributions_filenames = [
-                                    'parameter-distributions_Acrylic_' + mode +'.xlsx' 
-                                    for mode in modes
-                                    ]
-mode = modes[0]
+dist_filename = f'parameter-distributions_{feedstock_tag}_{product_tag}_' + mode + '.xlsx'
 
+product_folder = 'acrylic_acid_product' if product_tag=='Acrylic' else 'HP_salt_product'
 
 parameter_distributions_filename = HP_filepath+\
-    '\\analyses\\full\\parameter_distributions\\'+parameter_distributions_filenames[0]
+    f'\\analyses\\full\\parameter_distributions\\{product_folder}\\'+dist_filename
+
+
 print(f'\n\nLoading parameter distributions ({mode}) ...')
 model.parameters = ()
 model.load_parameter_distributions(parameter_distributions_filename)
@@ -128,14 +127,12 @@ HP_metrics = [get_product_MPSP,
 
 # %% Generate 3-specification meshgrid and set specification loading functions
 
-steps = (40, 40, 1)
+steps = (20, 20, 1)
 
 # Yield, titer, productivity (rate)
 spec_1 = yields = np.linspace(0.05, 0.95, steps[0]) # yield
 spec_2 = titers = np.linspace(5., 
-                              200., # although sugar concentration limit of 600 g/L would allow as high as 230 g-HP/L, we set an upper limit of 100 g/L
-                                   # based on achieved (50-68 g/L using E.coli, Candida) and targeted (100 g/L) titers for adipic acid, another organic solid with low water solubility
-                                   # Skoog et al., 2018 ( https://doi.org/10.1016/j.biotechadv.2018.10.012 )
+                              200.,
                                 steps[1]) # titer
 
    
@@ -525,7 +522,7 @@ if plot:
     # MPSP_w_levels, MPSP_w_ticks, MPSP_cbar_ticks = get_contour_info_from_metric_data(results_metric_1, lb=3)
     MPSP_w_levels = np.arange(0., 4.01, 0.05)
     MPSP_cbar_ticks = np.arange(0., 4.01, 0.4)
-    MPSP_w_ticks = [0.9, 1., 1.2, 1.3, 2., 2.5, 4.]
+    MPSP_w_ticks = [0.9, 1., 1.1, 1.2, 2., 2.5, 4.]
     # MPSP_w_levels = np.arange(0., 15.5, 0.5)
     
     contourplots.animated_contourplot(w_data_vs_x_y_at_multiple_z=results_metric_1, # shape = z * x * y # values of the metric you want to plot on the color axis; e.g., MPSP
@@ -586,7 +583,7 @@ if plot:
     # GWP_w_levels, GWP_w_ticks, GWP_cbar_ticks = get_contour_info_from_metric_data(results_metric_2,)
     GWP_w_levels = np.arange(0, 6.01, 0.1)
     GWP_cbar_ticks = np.arange(0, 6.01, 1.)
-    GWP_w_ticks = [0,1, 1.3, 1.6, 2, 2.6, 3,4,6]
+    GWP_w_ticks = [0, 0.5, 1, 2,  3,4,6]
     contourplots.animated_contourplot(w_data_vs_x_y_at_multiple_z=results_metric_2, # shape = z * x * y # values of the metric you want to plot on the color axis; e.g., GWP
                                     x_data=100*yields, # x axis values
                                     y_data=titers, # y axis values

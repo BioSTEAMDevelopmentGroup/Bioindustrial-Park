@@ -23,7 +23,7 @@ print('\n\nLoading system ...')
 # from biorefineries
 # from biorefineries import HP
 from biorefineries import HP
-from biorefineries.HP.models import models_AA_hexanol as models
+from biorefineries.HP.models.corn import models_corn_improved_separations as models
 # models = HP.models
 # from . import models
 
@@ -51,7 +51,7 @@ get_adjusted_MSP = models.get_adjusted_MSP
 
 # %% 
 
-N_simulations_per_mode = 1000 # 6000
+N_simulations_per_mode = 200 # 6000
 
 percentiles = [0, 0.05, 0.1, 0.25, 0.5, 0.75, 0.9, 0.95, 1]
 
@@ -63,10 +63,13 @@ results_dict = {'Baseline':{'MPSP':{}, 'GWP100a':{}, 'FEC':{},
                 'Sensitivity':{'Spearman':{'MPSP':{}, 'GWP100a':{}, 'FEC':{}},
                                'p-val Spearman':{'MPSP':{}, 'GWP100a':{}, 'FEC':{}}},}
 
+feedstock_tag = 'corn'
+product_tag = 'Acrylic'
+
 modes =\
                  [
-                    'DASbox', 
-                    '10L',
+                    # 'DASbox', 
+                    # '10L',
                     '300L',
                     # 'E',
                     # 'B', 'F',
@@ -76,7 +79,7 @@ modes =\
 
 scenario_names = modes
                 
-parameter_distributions_filenames = ['parameter-distributions_Acrylic_' + i + '.xlsx' for i in modes]
+parameter_distributions_filenames = [f'parameter-distributions_{feedstock_tag}_{product_tag}_' + i + '.xlsx' for i in modes]
 
 
 
@@ -96,8 +99,10 @@ for i in range(len(modes)):
     # ##
     mode = modes[i]
     
+    product_folder = 'acrylic_acid_product' if product_tag=='Acrylic' else 'HP_salt_product'
+    
     parameter_distributions_filename = HP_filepath+\
-        '\\analyses\\full\\parameter_distributions\\'+parameter_distributions_filenames[i]
+        f'\\analyses\\full\\parameter_distributions\\{product_folder}\\'+parameter_distributions_filenames[i]
     print(f'\n\nLoading parameter distributions ({mode}) ...')
     model.parameters = ()
     model.load_parameter_distributions(parameter_distributions_filename)
@@ -130,28 +135,34 @@ for i in range(len(modes)):
     results_dict['Baseline']['GWP100a'][mode] = tot_GWP = lca.GWP
     results_dict['Baseline']['FEC'][mode] = tot_FEC = lca.FEC
     
+    materials_to_include_in_impact_breakdowns = {
+                            'CalciumDihydroxide': 'lime', 
+                            'H2SO4': 'sulfuric acid', 
+                            'TiO2': 'titanium dioxide catalyst', 
+                            'CSL': 'corn steep liquor',
+                            'CH4': 'natural gas',
+                            } # materials shown as distinct contributions in breakdown plot;
+                              # others, except feedstock, are lumped in 'other materials' for figure clarity
+    
     material_GWP_breakdown = lca.material_GWP_breakdown
 
     results_dict['Baseline']['GWP Breakdown'][mode] = {
         'feedstock*': lca.FGHTP_GWP,
-        'lime': material_GWP_breakdown['CalciumDihydroxide'],
-        'sulfuric acid': material_GWP_breakdown['H2SO4'],
-        'hexanol': material_GWP_breakdown['Hexanol'],
-        'titanium dioxide catalyst': material_GWP_breakdown['TiO2'],
-        'corn steep liquor': material_GWP_breakdown['CSL'],
-        'other materials': lca.material_GWP - (material_GWP_breakdown['CalciumDihydroxide'] +
-                                               material_GWP_breakdown['H2SO4'] +
-                                               material_GWP_breakdown['Hexanol'] +
-                                               material_GWP_breakdown['TiO2'] +
-                                               material_GWP_breakdown['CSL'] +
-                                               material_GWP_breakdown['CH4']
-                                               ),
-        # 'natural gas\n(for steam generation)': lca.ng_GWP,
-        'natural gas': material_GWP_breakdown['CH4'],
-        'net electricity': lca.net_electricity_GWP,
-        'direct non-biogenic\nemissions': lca.direct_emissions_GWP,
         }
-
+    sum_GWP_included_materials = 0.
+    for k,v in materials_to_include_in_impact_breakdowns.items():
+        results_dict['Baseline']['GWP Breakdown'][mode][v] = mat_GWP = material_GWP_breakdown[k]
+        sum_GWP_included_materials += mat_GWP
+    
+    results_dict['Baseline']['GWP Breakdown'][mode]['other materials'] = lca.material_GWP - sum_GWP_included_materials
+    
+    results_dict['Baseline']['GWP Breakdown'][mode].update(
+        {
+        'net electricity': lca.net_electricity_GWP,
+        'direct non-biogenic\nemissions': lca.direct_non_biogenic_emissions_GWP,
+        }
+    )
+    
     try:
         assert(round(tot_GWP,3)==round(sum([v for v in results_dict['Baseline']['GWP Breakdown'][mode].values()]), 3))
     except:
@@ -166,22 +177,19 @@ for i in range(len(modes)):
 
     results_dict['Baseline']['FEC Breakdown'][mode] = {
         'feedstock': lca.feedstock_FEC,
-        'lime': material_FEC_breakdown['CalciumDihydroxide'],
-        'sulfuric acid': material_GWP_breakdown['H2SO4'],
-        'hexanol': material_FEC_breakdown['Hexanol'],
-        'titanium dioxide catalyst': material_FEC_breakdown['TiO2'],
-        'corn steep liquor': material_FEC_breakdown['CSL'],
-        'other materials': lca.material_FEC - (material_FEC_breakdown['CalciumDihydroxide'] +
-                                               material_FEC_breakdown['H2SO4'] +
-                                               material_FEC_breakdown['Hexanol'] +
-                                               material_FEC_breakdown['TiO2'] +
-                                               material_FEC_breakdown['CSL'] +
-                                               material_FEC_breakdown['CH4']
-                                               ),
-        # 'natural gas\n(for steam generation)': lca.ng_GWP,
-        'natural gas': material_FEC_breakdown['CH4'],
+        }
+    sum_FEC_included_materials = 0.
+    for k,v in materials_to_include_in_impact_breakdowns.items():
+        results_dict['Baseline']['FEC Breakdown'][mode][v] = mat_FEC = material_FEC_breakdown[k]
+        sum_FEC_included_materials += mat_FEC
+    
+    results_dict['Baseline']['FEC Breakdown'][mode]['other materials'] = lca.material_FEC - sum_FEC_included_materials
+    
+    results_dict['Baseline']['FEC Breakdown'][mode].update(
+        {
         'net electricity': lca.net_electricity_FEC,
         }
+    )
     
     try:
         assert(round(tot_FEC,3)==round(sum([v for v in results_dict['Baseline']['FEC Breakdown'][mode].values()]), 3))
