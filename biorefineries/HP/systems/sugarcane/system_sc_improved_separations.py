@@ -74,6 +74,8 @@ from biorefineries.TAL._general_utils import call_all_specifications_or_run,\
                                                 TEA_breakdown,\
                                                 update_facility_IDs
                                                 
+from hxn._heat_exchanger_network import HeatExchangerNetwork
+                                                
 IQ_interpolation = flx.IQ_interpolation
 # # Do this to be able to show more streams in a diagram
 # bst.units.Mixer._graphics.edge_in *= 2
@@ -440,7 +442,7 @@ def create_HP_sys(ins, outs):
     BT.natural_gas_price = price['Natural gas']
     BT.ins[4].price = price['Lime']
     
-    HXN = bst.HeatExchangerNetwork('HXN1001',
+    HXN = HeatExchangerNetwork('HXN1001',
                                                 ignored=[
                                                         # u.A410,
                                                         # u.A420,
@@ -566,7 +568,7 @@ unit_groups += get_more_unit_groups(system=HP_sys,
                                         'cooling utility facilities',
                                         'other facilities',
                                         'heat exchanger network',
-                                        # 'natural gas (for steam generation)',
+                                        'natural gas (for steam generation)',
                                         # 'natural gas (for product drying)',
                                         # 'chilled brine',
                                         'fixed operating cost',
@@ -576,7 +578,7 @@ unit_groups += get_more_unit_groups(system=HP_sys,
                                         ]
                          )
 
-add_metrics_to_unit_groups(unit_groups=unit_groups, system=HP_sys, TEA=HP_tea, LCA=HP_lca)
+add_metrics_to_unit_groups(unit_groups=unit_groups, system=HP_sys, TEA=HP_tea, LCA=HP_lca, hxn_class=HeatExchangerNetwork)
 
 unit_groups_dict = {}
 for i in unit_groups:
@@ -842,7 +844,7 @@ contourplots.stacked_bar_plot(dataframe=df_TEA_breakdown,
                          # '#B97A57', 
                          '#D1C0E1', 
                          # '#F8858A', 
-                          # '#b00000', 
+                           '#b00000', 
                          # '#63C6CE', 
                          '#94948C', 
                          # '#7BBD84', 

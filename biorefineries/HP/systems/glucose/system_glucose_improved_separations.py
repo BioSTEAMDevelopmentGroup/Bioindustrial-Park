@@ -75,6 +75,8 @@ from biorefineries.TAL._general_utils import call_all_specifications_or_run,\
                                                 TEA_breakdown,\
                                                 update_facility_IDs
                                                 
+from hxn._heat_exchanger_network import HeatExchangerNetwork    
+                                            
 IQ_interpolation = flx.IQ_interpolation
 # # Do this to be able to show more streams in a diagram
 # bst.units.Mixer._graphics.edge_in *= 2
@@ -118,7 +120,7 @@ def create_HP_sys(ins, outs):
     # %% Feedstock
 
     feedstock = bst.Stream('glucose_feedstock', Glucose=1., Water=1., units='kmol/h')
-    feedstock.price = 0.7618 # $/kg # USDA 2015-2019 mean # https://www.ers.usda.gov/data-products/sugar-and-sweeteners-yearbook-tables/sugar-and-sweeteners-yearbook-tables/#World,%20U.S.,%20and%20Mexican%20Sugar%20and%20Corn%20Sweetener%20Prices
+    feedstock.price = price['Glucose']*0.909 # dextrose monohydrate stream is 90.9 wt% glucose
     feedstock.F_mass = 200_000 # initial value; updated by spec.set_production_capacity
     
     
@@ -132,7 +134,10 @@ def create_HP_sys(ins, outs):
     # # sugarcane biorefinery base year is 2019
     # for corn_sys_stream in list(s):
     #     corn_sys_stream.price *= chem_index[2019]/chem_index[2018]
-        
+    
+    #%% Feedstock juicing
+    M201 = bst.Mixer('M201', ins=(U101-0, ''), outs='') # bst.UnitGroup.get_material_cost uses bst.utils.get_inlet_origin; i.e., assumes source unit is a storage unit (i.e., attributes material cost to downstream unit) if len(source.ins) == len(source.outs) == 1 and 'processing' not in source.line.lower()
+
     # %% 
     
     # =============================================================================
@@ -154,7 +159,7 @@ def create_HP_sys(ins, outs):
     makeup_MEA_A301 = Stream('makeup_MEA_A301', units='kg/hr', price=price['Monoethanolamine'])
     
     #%% Fermentation units
-    fermentation_sys = create_HP_fermentation_process(ins=(U101-0,
+    fermentation_sys = create_HP_fermentation_process(ins=(M201-0,
                                                            CSL,
                                                            fermentation_MgCl2,
                                                            fermentation_ZnSO4,
@@ -425,7 +430,7 @@ def create_HP_sys(ins, outs):
     BT.natural_gas_price = price['Natural gas']
     BT.ins[4].price = price['Lime']
     
-    HXN = bst.HeatExchangerNetwork('HXN1001',
+    HXN = HeatExchangerNetwork('HXN1001',
                                                 ignored=[
                                                         ],
                                               cache_network=False,
@@ -527,7 +532,7 @@ HP_lca = HPLCA(system=HP_sys,
 #%% Define unit groups and their metrics
 
 feedstock_acquisition_group = bst.UnitGroup('feedstock acquisition', units=[u.U101])
-# feedstock_juicing_group = f.corn_system_upto_slurry.to_unit_group('feedstock juicing')
+feedstock_juicing_group = bst.UnitGroup('feedstock juicing', units=[u.M201])
 fermentation_group = f.HP_fermentation_process.to_unit_group('fermentation')
 separation_group = f.HP_separation_improved_process.to_unit_group('separation')
 upgrading_group = f.HP_to_acrylic_acid_upgrading_process.to_unit_group('upgrading')
@@ -535,7 +540,7 @@ upgrading_group = f.HP_to_acrylic_acid_upgrading_process.to_unit_group('upgradin
 
 unit_groups = [
     feedstock_acquisition_group,
-    # feedstock_juicing_group,
+    feedstock_juicing_group,
     fermentation_group,
     separation_group,
     upgrading_group,
@@ -548,7 +553,7 @@ unit_groups += get_more_unit_groups(system=HP_sys,
                                         'cooling utility facilities',
                                         'other facilities',
                                         'heat exchanger network',
-                                        # 'natural gas (for steam generation)',
+                                        'natural gas (for steam generation)',
                                         # 'natural gas (for product drying)',
                                         # 'chilled brine',
                                         'fixed operating cost',
@@ -558,7 +563,7 @@ unit_groups += get_more_unit_groups(system=HP_sys,
                                         ]
                          )
 
-add_metrics_to_unit_groups(unit_groups=unit_groups, system=HP_sys, TEA=HP_tea, LCA=HP_lca)
+add_metrics_to_unit_groups(unit_groups=unit_groups, system=HP_sys, TEA=HP_tea, LCA=HP_lca, hxn_class=HeatExchangerNetwork)
 
 unit_groups_dict = {}
 for i in unit_groups:
@@ -638,6 +643,7 @@ spec = ProcessSpecification(
     feedstock_mass = feedstock.F_mass,
     pretreatment_reactor = None)
 
+spec.titer_inhibitor_specification.max_sugar_concentration = 0. # set for glucose feedstock; not checked in load_titer_with_glucose except when yield is too low to achieve titer
 
 spec.load_spec_1 = spec.load_yield
 # spec.load_spec_2 = spec.load_titer
@@ -667,14 +673,18 @@ def load_titer_with_glucose(titer_to_load):
     # clear_units([V301, K301])
     # F301_lb, F301_ub = 1e-3, 1. - 1e-3
     F301_lb, F301_ub = 0., 1. - 1e-3
-    M304_lb, M304_ub = 0., 40000.  # for low-titer high-yield combinations, if infeasible, use a higher upper bound
+    M304_lb, M304_ub = 0., 100_000.  # for low-titer high-yield combinations, if infeasible, use a higher upper bound
     
     spec.spec_2 = titer_to_load
     R302.titer_to_load = titer_to_load
     F301_titer_obj_fn(F301_lb)
     
-    if M304_titer_obj_fn(M304_lb) < 0.: # if there is too low a conc even with no dilution
-        IQ_interpolation(F301_titer_obj_fn, F301_lb, F301_ub, ytol=1e-3)
+    if M304_titer_obj_fn(M304_lb) < 0.: # if there is too low a conc even with no dilution, that means the yield is too low
+        # IQ_interpolation(F301_titer_obj_fn, F301_lb, F301_ub, ytol=1e-3)
+        # pass
+        spec.titer_inhibitor_specification.check_sugar_concentration() # note this returns an infeasible sugar concentration error for smooth running purposes; 
+        # it is actually an infeasible yield-titer combination because at low yields too much glucose is broken down to produce water
+    
     # elif F301_titer_obj_fn(1e-4)>0: # if the slightest evaporation results in too high a conc
     elif M304_titer_obj_fn(M304_ub) > 0.:
         IQ_interpolation(M304_titer_obj_fn, 
@@ -689,6 +699,7 @@ def load_titer_with_glucose(titer_to_load):
                          ytol=1e-3)
 
     if not feedstock_ID=='Glucose': spec.titer_inhibitor_specification.check_sugar_concentration()
+    # spec.titer_inhibitor_specification.check_sugar_concentration()
     
 spec.load_spec_2 = load_titer_with_glucose
 
@@ -824,8 +835,8 @@ contourplots.stacked_bar_plot(dataframe=df_TEA_breakdown,
                          '#648496', 
                          # '#B97A57', 
                          '#D1C0E1', 
-                         # '#F8858A', 
-                          # '#b00000', 
+                          # '#F8858A', 
+                           '#b00000', 
                          # '#63C6CE', 
                          '#94948C', 
                          # '#7BBD84', 

@@ -850,8 +850,12 @@ def create_HP_separation_improved_process(ins, outs, fermentation_reactor=None):
         else:
             raise RuntimeError(f'[{R401.ID}] Neutralization and reacidulation requirement is not specified by the user.')
             
-    R401_H = bst.units.HXutility('R401_H', ins = R401-0, T = 320, rigorous = False)
+    R401_H = bst.units.HXutility('R401_H', ins = R401-0, T = 320, rigorous = True)
     R401_P = bst.units.Pump('R401_P', ins=R401_H-0)
+    @R401_P.add_specification(run=False)
+    def R401_P_phase_spec():
+        R401_P._run()
+        R401_P.outs[0].phase = 'l'
     
     S402_index = S401_index + ['Gypsum']
     S402_gypsum_split = S401_cell_mass_split + [0.995]

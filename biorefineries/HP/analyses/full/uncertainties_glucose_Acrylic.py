@@ -23,7 +23,8 @@ print('\n\nLoading system ...')
 # from biorefineries
 # from biorefineries import HP
 from biorefineries import HP
-from biorefineries.HP.models.corn import models_corn_improved_separations as models
+from biorefineries.HP.models.glucose import models_glucose_improved_separations as models
+from biorefineries.HP.process_settings import chem_index
 # models = HP.models
 # from . import models
 
@@ -51,7 +52,7 @@ get_adjusted_MSP = models.get_adjusted_MSP
 
 # %% 
 
-N_simulations_per_mode = 100 # 6000
+N_simulations_per_mode = 10 # 6000
 
 percentiles = [0, 0.05, 0.1, 0.25, 0.5, 0.75, 0.9, 0.95, 1]
 
@@ -63,13 +64,13 @@ results_dict = {'Baseline':{'MPSP':{}, 'GWP100a':{}, 'FEC':{},
                 'Sensitivity':{'Spearman':{'MPSP':{}, 'GWP100a':{}, 'FEC':{}},
                                'p-val Spearman':{'MPSP':{}, 'GWP100a':{}, 'FEC':{}}},}
 
-feedstock_tag = 'corn'
+feedstock_tag = 'glucose'
 product_tag = 'Acrylic'
 
 modes =\
                  [
                     # 'DASbox', 
-                    # '10L',
+                    # # '10L',
                     '300L',
                     # 'E',
                     # 'B', 'F',
@@ -366,6 +367,9 @@ market_range = np.array([
 
 
 # biobased_lit_MPSP_range = (1.08, 3.63)
+
+biobased_price = 2.688 * chem_index[2019] / chem_index[2015] # Taylor et al. 2015 report
+
 contourplots.box_and_whiskers_plot(uncertainty_data=MPSP_uncertainty, 
                           baseline_values=[results_dict['Baseline']['MPSP'][mode] for mode in modes],
                           baseline_marker_shapes=baseline_marker_shapes,
@@ -373,11 +377,17 @@ contourplots.box_and_whiskers_plot(uncertainty_data=MPSP_uncertainty,
                           baseline_marker_colors=baseline_marker_colors,
                           baseline_locations=[i+1 for i in range(len(modes))],
                           boxcolor="#A97802",
-                          ranges_for_comparison=[market_range,],
-                          ranges_for_comparison_colors=['#c0c1c2', 
+                          ranges_for_comparison=[
+                                                 market_range,
+                                                 # [biobased_price*0.995, biobased_price*1.005],
+                                                 ],
+                          ranges_for_comparison_colors=[
+                                                        '#c0c1c2', 
                                                         # '#646464',
+                                                        # '#c0c1c2', 
+                                                        
                                                         ],
-                          values_for_comparison=[],
+                          # values_for_comparison=[biobased_price],
                           n_minor_ticks=3,
                           show_x_ticks=True,
                           x_tick_labels=scenario_names,
@@ -440,7 +450,12 @@ contourplots.box_and_whiskers_plot(uncertainty_data=GWP_uncertainty,
 #%% FEC
 
 biobased_FECs = [26, 27.7, 32.7]
-fossilbased_FECs = [59.2, 60.8, 112, 124]
+# fossilbased_FECs = [59.2, 60.8, 112, 124]
+
+fossilbased_FECs = [
+                    49.013, # ecoinvent 3.8 (acrylic acid production, RoW)
+                    116. # GREET 2023 (acrylic acid from fossil energy)
+                    ]
 
 FEC_uncertainty = [results_dict['Uncertainty']['FEC'][mode]
                     for mode in modes
@@ -457,17 +472,19 @@ contourplots.box_and_whiskers_plot(uncertainty_data=FEC_uncertainty,
                           baseline_marker_colors=baseline_marker_colors,
                           baseline_locations=[i+1 for i in range(len(modes))],
                           boxcolor='#A100A1',
+                          ranges_for_comparison=[fossilbased_FECs],
+                          ranges_for_comparison_colors=['#c0c1c2'],
                           # ranges_for_comparison=[get_small_range(i, 0.061) for i in biobased_FECs+fossilbased_FECs],
                           # ranges_for_comparison_colors=['#c0c1c2' for i in range(len(biobased_FECs))] +\
                           #                               ['#646464' for i in range(len(fossilbased_FECs))],
                           # values_for_comparison=biobased_lit_FEC_values,
-                          n_minor_ticks=1,
+                          n_minor_ticks=4,
                           show_x_ticks=True,
                           x_tick_labels=scenario_names,
                           x_tick_wrap_width=6,
                           y_label=r"$\bfFEC$",
                           y_units=FEC_units,
-                          y_ticks=np.arange(-60, 60.1, 10),
+                          y_ticks=np.arange(-0, 150.1, 25),
                           save_file=True,
                           # fig_height=5.5,
                           # fig_width = 3.,

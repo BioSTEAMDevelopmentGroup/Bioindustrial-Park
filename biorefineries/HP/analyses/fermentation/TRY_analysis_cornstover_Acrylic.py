@@ -19,7 +19,11 @@ import numpy as np
 
 from biorefineries import HP
 # from biorefineries.HP.systems.system_sc_light_lle_vacuum_distillation import HP_tea, HP_lca, R302, spec, AA, simulate_and_print, get_AA_MPSP
-from biorefineries.HP.systems.corn.system_corn_improved_separations import HP_tea, HP_lca, R302, spec, AA, simulate_and_print, get_AA_MPSP
+from biorefineries.HP.systems.cornstover.system_cs_improved_separations import HP_tea, HP_lca, R302, spec, AA, simulate_and_print, get_AA_MPSP
+
+# from biorefineries.HP.systems.glucose.system_glucose_improved_separations import HP_tea, HP_lca, R302, spec, AA, simulate_and_print, get_AA_MPSP
+
+from biorefineries.HP.models.cornstover import models_cs_improved_separations as models
 
 from  matplotlib.colors import LinearSegmentedColormap
 import pandas as pd
@@ -31,7 +35,10 @@ from math import log
 
 import os
 
-from biorefineries.HP.models.corn import models_corn_improved_separations as models
+
+import biosteam as bst
+
+f = bst.main_flowsheet
 
 chdir = os.chdir
 
@@ -43,8 +50,7 @@ product = AA
 
 AA_market_range=np.array([1.40, 1.65]) 
 
-run_bugfix_barrage = models.run_bugfix_barrage
-
+                
 #%% Filepaths
 HP_filepath = HP.__file__.replace('\\__init__.py', '')
 
@@ -63,7 +69,7 @@ system = HP_sys = models.HP_sys
 
 simulate_and_print()
 
-feedstock_tag = 'corn'
+feedstock_tag = 'cornstover'
 product_tag = 'Acrylic'
 
 mode = '300L'
@@ -101,6 +107,60 @@ baseline_initial = model.metrics_at_baseline()
 print(get_AA_MPSP())
 simulate_and_print()
 
+#%% Bugfix barrage
+
+def reset_and_reload():
+    print('Resetting cache and emptying recycles ...')
+    system.reset_cache()
+    system.empty_recycles()
+    print('Loading and simulating with baseline specifications ...')
+    spec_1, spec_2, spec_3 = spec.spec_1, spec.spec_2, spec.spec_3
+    spec.load_specifications(spec.baseline_yield, spec.baseline_titer, spec.baseline_productivity)
+    spec.set_production_capacity(spec.desired_annual_production)
+    # system.simulate()
+    print('Loading and simulating with required specifications ...')
+    spec.load_specifications(spec_1=spec_1, spec_2=spec_2, spec_3=spec_3)
+    # spec.set_production_capacity(spec.desired_annual_production)
+    system.simulate()
+    
+def reset_and_switch_solver(solver_ID):
+    system.reset_cache()
+    system.empty_recycles()
+    system.converge_method = solver_ID
+    print(f"Trying {solver_ID} ...")
+    # spec.load_specifications(spec_1=spec.spec_1, spec_2=spec.spec_2, spec_3=spec.spec_3)
+    # spec.set_production_capacity(spec.desired_annual_production)
+    system.simulate()
+
+F403 = f.F403
+def run_bugfix_barrage():
+    try:
+        reset_and_reload()
+    except Exception as e:
+        print(str(e))
+        if 'length' in str(e).lower():
+            system.reset_cache()
+            system.empty_recycles()
+            F403.heat_utilities = []
+            F403._V_first_effect = 0.144444
+            F403.run()
+            F403._design()
+            F403.simulate()
+            system.simulate()
+        else:
+            try:
+                reset_and_switch_solver('fixedpoint')
+            except Exception as e:
+                print(str(e))
+                try:
+                    reset_and_switch_solver('aitken')
+                except Exception as e:
+                    print(str(e))
+                    # print(_yellow_text+"Bugfix barrage failed.\n"+_reset_text)
+                    print("Bugfix barrage failed.\n")
+                    # breakpoint()
+                    raise e
+                
 #%%
 # simulate_and_print()
 
@@ -117,17 +177,23 @@ get_product_recovery = lambda: sum([product.imol[i] for i in product_chemical_ID
 get_HP_AOC = lambda: HP_tea.AOC / 1e6 # million USD / y
 get_HP_TCI = lambda: HP_tea.TCI / 1e6 # million USD
 
+HXN = f.HXN1001
 HP_metrics = [get_product_MPSP, 
+              
                 lambda: HP_lca.GWP,
                 # lambda: HP_lca.GWP - HP_lca.net_electricity_GWP, 
+                
                 lambda: HP_lca.FEC, 
                 # lambda: HP_lca.FEC - HP_lca.net_electricity_FEC,
+                
+                # lambda: len(HXN.original_heat_utils), 
+                
                get_HP_AOC, get_HP_TCI, 
                get_product_purity]
 
 # %% Generate 3-specification meshgrid and set specification loading functions
 
-steps = (20, 20, 1)
+steps = (60, 60, 1)
 
 # Yield, titer, productivity (rate)
 spec_1 = yields = np.linspace(0.05, 0.95, steps[0]) # yield
@@ -251,7 +317,7 @@ def tickmarks(dmin, dmax, accuracy=50, N_points=5):
 
 #%%
 minute = '0' + str(dateTimeObj.minute) if len(str(dateTimeObj.minute))==1 else str(dateTimeObj.minute)
-file_to_save = f'_{steps}_steps_neutral={R302.neutralization}_'+'HP_TRY_%s.%s.%s-%s.%s'%(dateTimeObj.year, dateTimeObj.month, dateTimeObj.day, dateTimeObj.hour, minute)
+file_to_save = f'_{steps}_steps_cornstover_neutral={R302.neutralization}_'+'HP_TRY_%s.%s.%s-%s.%s'%(dateTimeObj.year, dateTimeObj.month, dateTimeObj.day, dateTimeObj.hour, minute)
 
 #%% Create meshgrid
 spec_1, spec_2 = np.meshgrid(spec_1, spec_2)
@@ -321,11 +387,11 @@ for p in productivities:
                 d1_Metric6[-1].append(np.nan)
             else:
                 try:
-                    spec.load_specifications(spec.baseline_yield, spec.baseline_titer, spec.baseline_productivity)
-                    spec.set_production_capacity(desired_annual_production=spec.desired_annual_production)
-                    # for i in range(1):simulate_and_print()
-                    for i in range(1): system.simulate()
-                    # spec.set_production_capacity(desired_annual_production=spec.desired_annual_production)
+                    # spec.load_specifications(spec.baseline_yield, spec.baseline_titer, spec.baseline_productivity)
+                    # # spec.set_production_capacity(desired_annual_production=spec.desired_annual_production)
+                    # # for i in range(1):simulate_and_print()
+                    # for i in range(1): system.simulate()
+                    
                     spec.load_specifications(spec_1=y, spec_2=t, spec_3=p)
                     for i in range(1): system.simulate()
                     
@@ -344,7 +410,7 @@ for p in productivities:
                     print('Error in model spec: %s'%str_e)
                     # breakpoint()
                     # raise e
-                    if 'sugar concentration' in str_e:
+                    if 'sugar concentration' in str_e or 'permeate moisture' in str_e:
                         # flowsheet('AcrylicAcid').F_mass /= 1000.
                         d1_Metric1[-1].append(np.nan)
                         d1_Metric2[-1].append(np.nan)
@@ -520,7 +586,7 @@ if plot:
     #%% MPSP
     
     # MPSP_w_levels, MPSP_w_ticks, MPSP_cbar_ticks = get_contour_info_from_metric_data(results_metric_1, lb=3)
-    MPSP_w_levels = np.arange(0., 4.01, 0.05)
+    MPSP_w_levels = np.arange(0., 4.01, 0.1)
     MPSP_cbar_ticks = np.arange(0., 4.01, 0.4)
     MPSP_w_ticks = [0.9, 1., 1.1, 1.2, 2., 2.5, 4.]
     # MPSP_w_levels = np.arange(0., 15.5, 0.5)
@@ -565,7 +631,7 @@ if plot:
                                     #     MPSP_w_ticks[5]: (45,28),
                                     #     },
                                     additional_points ={(73, 62.5):('D', 'w', 6)},
-                                    fill_bottom_with_cmap_over_color=True, # for TRY
+                                    # fill_bottom_with_cmap_over_color=True, # for TRY
                                     bottom_fill_bounds = ((0,0), 
                                                           (5,18.),
                                                           (95,18.)),
@@ -583,7 +649,7 @@ if plot:
     # GWP_w_levels, GWP_w_ticks, GWP_cbar_ticks = get_contour_info_from_metric_data(results_metric_2,)
     GWP_w_levels = np.arange(0, 6.01, 0.1)
     GWP_cbar_ticks = np.arange(0, 6.01, 1.)
-    GWP_w_ticks = [0, 0.5, 1, 2,  3,4,6]
+    GWP_w_ticks = [0, 0.7, 1, 1.5, 2,  3,4,6]
     contourplots.animated_contourplot(w_data_vs_x_y_at_multiple_z=results_metric_2, # shape = z * x * y # values of the metric you want to plot on the color axis; e.g., GWP
                                     x_data=100*yields, # x axis values
                                     y_data=titers, # y axis values

@@ -985,6 +985,8 @@ class BatchCoFermentation(BatchBioreactor):
         lime.imol['Lime'] = feed_seed_vol * self.lime_mol_per_L_loading 
         
         effluent.mix_from([effluent, air, CSL, magnesium_chloride, zinc_sulfate])
+        
+        effluent.phase = 'l'
         effluent.T = vapor.T = self.T
         
         self.sucrose_hydrolysis_rxns(effluent.mol)

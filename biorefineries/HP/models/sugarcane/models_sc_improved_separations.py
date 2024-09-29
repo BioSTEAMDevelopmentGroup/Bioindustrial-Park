@@ -19,7 +19,7 @@ from chaospy import distributions as shape
 # from biosteam import main_flowsheet as find
 from biosteam.evaluation import Model, Metric
 # from biosteam.evaluation.evaluation_tools import Setter
-from biorefineries.HP.systems.system_sc_improved_separations import HP_sys, HP_tea, HP_lca, u, s, unit_groups, unit_groups_dict, spec, price, TEA_breakdown, simulate_and_print, theoretical_max_g_HP_per_g_glucose, HP_chemicals
+from biorefineries.HP.systems.sugarcane.system_sc_improved_separations import HP_sys, HP_tea, HP_lca, u, s, unit_groups, unit_groups_dict, spec, price, TEA_breakdown, simulate_and_print, theoretical_max_g_HP_per_g_glucose, HP_chemicals
 
 from biorefineries.HP.models.model_utils import EasyInputModel, codify
 # get_annual_factor = lambda: HP_tea._annual_factor

@@ -19,7 +19,7 @@ from chaospy import distributions as shape
 # from biosteam import main_flowsheet as find
 from biosteam.evaluation import Model, Metric
 # from biosteam.evaluation.evaluation_tools import Setter
-from biorefineries.HP.systems.corn.system_corn_improved_separations import HP_sys, HP_tea, HP_lca, u, s, unit_groups, unit_groups_dict, spec, price, TEA_breakdown, simulate_and_print, theoretical_max_g_HP_per_g_glucose, HP_chemicals
+from biorefineries.HP.systems.corn.system_corn_improved_separations_HP_product import HP_sys, HP_tea, HP_lca, u, s, unit_groups, unit_groups_dict, spec, price, TEA_breakdown, simulate_and_print, theoretical_max_g_HP_per_g_glucose, HP_chemicals
 
 from biorefineries.HP.models.model_utils import EasyInputModel, codify
 # get_annual_factor = lambda: HP_tea._annual_factor
@@ -55,7 +55,7 @@ baseline_yield, baseline_titer, baseline_productivity =\
 # =============================================================================
 
 feedstock = s.corn
-product_stream = s.AcrylicAcid
+product_stream = s.SodiumLactate
 # CSL = s.CSL_fresh
 
 
@@ -76,14 +76,17 @@ def get_MSP():
 # Mass flow rate of HP stream
 get_yield = lambda: product_stream.F_mass*get_annual_factor()/1e6
 # Purity (%) of HP in the final product
-get_purity = lambda: product_stream.imass['AcrylicAcid']/product_stream.F_mass
+get_purity = lambda: product_stream.imass['SodiumLactate']/product_stream.F_mass
 # Adjust for purity
 get_adjusted_MSP = lambda: get_MSP() / get_purity()
 
+SodiumLactate_MW, HP_MW = HP_chemicals.SodiumLactate.MW, HP_chemicals.HP.MW
+
+get_adjusted_HP_MSP = lambda: get_adjusted_MSP() * SodiumLactate_MW / HP_MW
 
 get_adjusted_yield = lambda: get_yield() * get_purity()
 # Recovery (%) = recovered/amount in fermentation broth
-get_recovery = lambda: product_stream.imol['AcrylicAcid']\
+get_recovery = lambda: product_stream.imol['SodiumLactate']\
     /(R302.outs[1].imol['HP'])
 get_overall_TCI = lambda: HP_tea.TCI/1e6
 
@@ -109,7 +112,8 @@ get_electricity_credit = lambda: (excess_power()*get_electricity_price()*get_ann
 metrics = [Metric('Minimum selling price', get_MSP, '$/kg', 'Biorefinery'),
            Metric('Production rate', get_yield, '10^6 kg/yr', 'Biorefinery'),
            Metric('Product purity', get_purity, '%', 'Biorefinery'),
-           Metric('Adjusted minimum selling price', get_adjusted_MSP, '$/kg AA', 'Biorefinery'),
+           Metric('Adjusted minimum selling price', get_adjusted_MSP, '$/kg SodiumLactate', 'Biorefinery'),
+           Metric('Adjusted HP minimum selling price', get_adjusted_HP_MSP, '$/kg HP', 'Biorefinery'),
            Metric('Adjusted product yield', get_adjusted_yield, '10^6 kg/yr', 'Biorefinery'),
            Metric('Product recovery', get_recovery, '%', 'Biorefinery'),
            Metric('Total capital investment', get_overall_TCI, '10^6 $', 'Biorefinery'),
@@ -404,7 +408,7 @@ def model_specification():
         # breakpoint()
         # raise e
         if 'sugar concentration' in str_e:
-            # flowsheet('AcrylicAcid').F_mass /= 1000.
+            # flowsheet('SodiumLactate').F_mass /= 1000.
             raise e
         else:
             run_bugfix_barrage()
