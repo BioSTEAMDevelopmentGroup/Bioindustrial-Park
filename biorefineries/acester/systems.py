@@ -39,11 +39,11 @@ __all__ = (
     ID='acetyl_ester_sys',
     ins=[dict(ID='AcOH_media',  Water=100000, units='kg/hr'),
          dict(ID='AcEster_media',  Water=1000, units='kg/hr'),
-         dict(ID='H2', H2=100, price=2)],
+         dict(ID='H2', H2=100, P=101325e1, price=2)],
     outs=[dict(ID='dodecylacetate', price=3)],
     fthermo=create_acetate_ester_chemicals
 )
-def create_acetyl_ester_system(ins, outs):
+def create_acetyl_ester_system(ins, outs, carbon_capture=True, dewatering=True):
     AcOH_media, AcEster_media, H2 = ins
     dodecylacetate, = outs
     H2.register_alias('hydrogen')
@@ -66,22 +66,34 @@ def create_acetyl_ester_system(ins, outs):
         optimize_power=False,
         feed_gas_compositions={
             1: dict(H2=100, units='kg/hr'),
-            2: dict(CO2=99, N2=1, units='kg/hr'),
+            2: dict(CO2=99, O2=1, units='kg/hr'),
         },
         gas_substrates=('H2', 'CO2'),
         titer={'AceticAcid': 100},
         batch=False,
-        length_to_diameter=8,
+        length_to_diameter=12,
         V_max=3785, # TODO: Double check validity with lanzatech (typically V_max=500)
         theta=0.5,
         kW_per_m3=0.,
     )
+    for i in AcOH_production.gas_coolers: i.cool_only = True
     AcOH_production.productivity = 1 # g / L / h
     # AcOH_production.cellmass_coefficient = cellmass_coef
     @AcOH_production.add_specification(run=True)
     def adjust_performance():
         # titer = AcOH_production.titer['AceticAcid']
         # AcOH_production.titer['Cellmass'] = titer * AcOH_production.cellmass_coefficient
+        if not carbon_capture:
+            CO2_composition = AcOH_production.feed_gas_compositions[2] 
+            if CO2.isempty():
+                CO2_composition['CO2'] = 10
+                CO2_composition['N2'] = 88
+                CO2_composition['O2'] = 2
+            else:
+                CO2_composition['CO2'] = CO2.imass['CO2']
+                CO2_composition['N2'] = CO2.imass['N2']
+                CO2_composition['O2'] = CO2.imass['O2']
+                CO2_composition['H2O'] = CO2.imass['H2O']
         productivity = AcOH_production.productivity
         AcOH_production.tau = AcOH_production.titer['AceticAcid'] / productivity
     
@@ -93,14 +105,16 @@ def create_acetyl_ester_system(ins, outs):
         moisture_content=0.6,
         strict_moisture_content=False,
     )
+    if dewatering:
+        AcOH_separation = create_acetic_acid_separation_system(
+            ins=centrifuge_a-1, 
+            outs=('AcOH', 'wastewater'),
+        )
+        AcOH = AcOH_separation-0
+    else:
+        AcOH = centrifuge_a-1
     
-    
-    AcOH_separation = create_acetic_acid_separation_system(
-        ins=centrifuge_a-1, 
-        outs=('AcOH', 'wastewater'),
-    )
-    
-    mixer = bst.Mixer(ins=(AcEster_media, AcOH_separation-0))
+    mixer = bst.Mixer(ins=(AcEster_media, AcOH))
     rxn = bst.Rxn('AceticAcid -> DodecylAcetate + H2O + CO2', reactant='AceticAcid',
                   X=0.9, correct_atomic_balance=True) 
     growth = bst.Rxn('AceticAcid -> Cellmass + CO2 + H2O', reactant='AceticAcid',
@@ -113,10 +127,12 @@ def create_acetyl_ester_system(ins, outs):
     AcEster_production = bst.AeratedBioreactor(
         'AcEster_production',
         ins=(mixer-0, bst.Stream('air', phase='g')),
-        outs=('vent_2', 'effluent_2'), tau=100, V_max=500,
+        outs=('vent_2', 'effluent_2'), tau=100, 
+        V_max=3785,
+        # V_max=500,
         optimize_power=False,
         reactions=reactions,
-        length_to_diameter=4,
+        length_to_diameter=12,
     )
     AcEster_production.titer = 100
     AcEster_production.productivity = 1
@@ -208,9 +224,13 @@ def create_acetyl_ester_system(ins, outs):
     bottoms_pump = bst.Pump(ins=solvent_recovery-1, P=2 * 101325)
     distillate_pump = bst.Pump(ins=solvent_recovery-0, outs=solvent_recycle, P=2 * 101325)
     hx = bst.HXprocess(ins=[bottoms_pump-0, AcEster_separation-0], dT=15, outs=[dodecylacetate, heat_integration])
+    if dewatering:
+        ins = [centrifuge_a-0, centrifuge_b-1, 
+               AcOH_separation-1, AcEster_separation-1]
+    else:
+        ins = [centrifuge_a-0, centrifuge_b-1, AcEster_separation-1]
     wastewater_mixer = bst.Mixer(
-        ins=[centrifuge_a-0, centrifuge_b-1, 
-             AcOH_separation-1, AcEster_separation-1], 
+        ins=ins, 
         outs='wastewater'
     )
     units = bst.create_all_facilities(
@@ -220,22 +240,59 @@ def create_acetyl_ester_system(ins, outs):
     )
     for BT in units:
         if isinstance(BT, bst.BoilerTurbogenerator): break
-    # from systems we import the cryogenic carbon capture
-    thermo = bst.settings.thermo
-    cc_chemicals = create_cc_chemicals()
-    bst.settings.set_thermo(cc_chemicals)
-    CC = create_ccc_adaptive_sys(
-        ins=[BT.emissions, AcEster_production-0],
-        outs=['CO2', 'distillate', bst.Stream('biogenic_emissions', thermo=thermo)], 
-        CO2_target=CO2,
-        network_priority=bst.CoolingTower.network_priority - 1 # Should run after the turbogenerator
-    )
-    mixer = bst.Mixer(ins=CC-0, outs=CO2) # Interfaces property package
-    @mixer.add_specification
-    def do_not_run(): pass
-
-    bst.settings.set_thermo(thermo)
-    # bst.mark_disjunction(CC-0)
+    if carbon_capture:
+        thermo = bst.settings.thermo
+        cc_chemicals = create_cc_chemicals()
+        bst.settings.set_thermo(cc_chemicals)
+        CO2_dynamic, CO2_constant = BT.emissions, AcEster_production-0
+        CO2_concentrated, distillate, CO2_unused = bst.Stream('CO2'), bst.Stream('distillate'), bst.Stream('biogenic_emissions', thermo=thermo)
+        splitter_cc = bst.Splitter(
+            ins=[CO2_dynamic], 
+            outs=[bst.Stream('to_CC', thermo=CO2_dynamic.thermo),
+                  CO2_unused], 
+            split=0.5, 
+            thermo=CO2_dynamic.thermo
+        )
+        mixer_cc = bst.Mixer(ins=[splitter_cc-0, CO2_constant], outs=['to_CC'])
+        cc_chemicals = mixer_cc.chemicals
+        
+        @mixer_cc.add_specification(run=True)
+        def interface_chemicals():
+            IDs = cc_chemicals.IDs
+            for feed in mixer_cc.ins:
+                mol = feed.imol[IDs]
+                feed.empty()
+                feed.imol[IDs] = mol
+        
+        ccc = create_ccc_sys(
+            ins=[mixer_cc-0], outs=[CO2_concentrated, distillate], 
+            network_priority=bst.BoilerTurbogenerator.network_priority + 1 # Should run after the turbogenerator
+        )
+        
+        @ccc.add_bounded_numerical_specification(x0=0, x1=1)
+        def adjust_split(x):
+            splitter_cc.split[:] = x
+            for i in range(2):
+                for i in mixer_cc.system.facilities: 
+                    if isinstance(i, bst.BoilerTurbogenerator):
+                        splitter_cc.run()
+                        mixer_cc.run()
+                    i.simulate()
+            return CO2.imass['CO2'] - ccc.outs[0].imass['CO2']
+        
+        mixer = bst.Junction(upstream=ccc-0, downstream=CO2) # Interfaces property package
+        bst.settings.set_thermo(thermo)
+    else:
+        CO2_dynamic, CO2_constant = BT.emissions, AcEster_production-0
+        splitter = bst.Splitter(
+            ins=[CO2_dynamic], 
+            outs=['', 'CO2_unused'], 
+            split=0.5, 
+        )
+        mixer = bst.Mixer(ins=[splitter-0, CO2_constant], outs=[CO2])
+        @splitter.add_specification(run=True)
+        def adjust_split():
+            splitter.split[:] = (CO2.imass['CO2'] - CO2_constant.imass['CO2']) / CO2_dynamic.imass['CO2']  
     
 
 @bst.SystemFactory(
@@ -304,7 +361,7 @@ def create_acetic_acid_separation_system(
             outs=('extract', 'raffinate'),
             top_chemical='EthylAcetate',
             feed_stages=(0, -1),
-            N_stages=12,
+            N_stages=15,
             collapsed_init=False,
             use_cache=True,
         )
@@ -335,7 +392,7 @@ def create_acetic_acid_separation_system(
             ins=(extractor.extract),
             outs=('hot_extract'),
             rigorous=True,
-            V=0.5,
+            V=0,
         )
         HX.outs[0].phases = ('g', 'l')
         ED = bst.ShortcutColumn(
@@ -343,9 +400,9 @@ def create_acetic_acid_separation_system(
             ins=HX-0,
             outs=['extract_distillate', acetic_acid],
             LHK=('EthylAcetate', 'AceticAcid'),
-            Lr=0.9999,
-            Hr=0.9999,
-            k=1.4,
+            Lr=0.999,
+            Hr=0.999,
+            k=1.03,
             partial_condenser=False,
         )
         ED.check_LHK = False
@@ -379,9 +436,9 @@ def create_acetic_acid_separation_system(
             ins=mixer-0,
             outs=[distillate, wastewater],
             partial_condenser=False,
-            Lr=0.99,
-            Hr=0.99,
-            k=1.5,
+            Lr=0.999,
+            Hr=0.999,
+            k=1.03,
         )
     elif configuration == 1: # Based on https://www.dedietrich.com/en/recovery-acetic-acid-means-liquid-liquid-extraction
         solvent_mixer = bst.Mixer(ins=[ethyl_acetate, solvent_recycle], outs=solvent)
@@ -429,9 +486,9 @@ def create_acetic_acid_separation_system(
                 steam.imass['Water'] = feed.F_mass
             
         distillation = bst.MESHDistillation(
-            N_stages=10,
+            N_stages=15,
             ins=[hot_extract, stripper.vapor],
-            feed_stages=[5, 0],
+            feed_stages=[8, 0],
             outs=['', acetic_acid, 'distillate'],
             full_condenser=True,
             reflux=1.0,
@@ -512,42 +569,6 @@ def create_acetic_acid_separation_system(
         distillation.line = 'Distillation'
     else:
         raise ValueError(f'configuration {configuration!r} is not an option')
-        
-@bst.SystemFactory(
-    ID='carbon_capture_sys',
-    ins=['CO2_dynamic', 'CO2_constant'],
-    outs=['CO2_concentrated',
-          'distillate',
-          'CO2_unused'],
-)    
-def create_ccc_adaptive_sys(ins, outs, CO2_target):
-    CO2_dynamic, CO2_constant = ins
-    CO2_concentrated, distillate, CO2_unused = outs
-    splitter = bst.Splitter(
-        ins=[CO2_dynamic], 
-        outs=[bst.Stream('to_CC', thermo=CO2_dynamic.thermo),
-              CO2_unused], 
-        split=0.5, 
-        thermo=CO2_dynamic.thermo
-    )
-    @splitter.add_specification(run=True)
-    def adjust_recycle():
-        splitter.split[:] = (CO2_target.imol['CO2'] - CO2_constant.imol['CO2']) / CO2_dynamic.imol['CO2']
-    mixer_cc = bst.Mixer(ins=[splitter-0, CO2_constant], outs=['to_CC'])
-    cc_chemicals = mixer_cc.chemicals
-    
-    @mixer_cc.add_specification(run=True)
-    def interface_chemicals():
-        IDs = cc_chemicals.IDs
-        for feed in mixer_cc.ins:
-            mol = feed.imol[IDs]
-            feed.empty()
-            feed.imol[IDs] = mol
-        
-    create_ccc_sys(
-        ins=[mixer_cc-0], outs=[CO2_concentrated, distillate], 
-        mockup=True
-    )
        
 @bst.SystemFactory(
     ID='carbon_capture_sys',
@@ -564,55 +585,59 @@ def create_ccc_sys(ins, outs):
     flue_gas = ins[0]
     CO2_concentrated = outs[0]
     Destilate = outs[1]
-    Pf = 6e6
+    Pf = 8e6
     # first compression stage
-    K1 = bst.IsentropicCompressor('K100', ins=flue_gas,outs = ['s2'], P=0.4e6, vle=True) # in flue gas(1), out 2
-    Hx1 = bst.HXutility('HX100', ins = K1-0,outs = ['s3'], T = 29.85+273.15,
-                        rigorous =  True) # in 2, out 3
-    Fv1 = bst.Flash('F100', ins = Hx1-0, outs = ['s4', 's5'], T = 29.85+273.15 , P = K1.P) # in 3, out 4 and 5
+    K1 = bst.IsentropicCompressor('K100', ins=flue_gas, outs = ['s2'], P=Pf/6, vle=True) # in flue gas(1), out 2
+    H1 = bst.HXutilities(
+        ins = K1-0, T = 29.85+273.15, rigorous=True
+    )
+    Fv1 = bst.Flash(
+        'F100', ins = H1-0, outs = ['s4', 's5'],
+        Q=0, P = K1.P
+    ) # in 3, out 4 and 5
     
     # second compression stage
-    K2 = bst.IsentropicCompressor('K101', ins=Fv1-0, outs = ['s6'], P=2e6, vle=True) # in 4, out 6
-    recycle2 = bst.Stream('recycle18')
-    
-
-    recycle3 = bst.Stream('recycle19')
-    Hx2_1 = bst.HXprocess('HX106',ins = [K2-0, recycle2], outs = ['s7', recycle3]) # in 18 (recycle 2) and 6, out 19 (recycle 3) and 7
-    
-    # process of the recycle_19
-    K4 = bst.IsentropicTurbine('K103', ins=recycle3, outs = Destilate, P=0.11e6, vle=True) # in 19, out 20
-    
-    # Continue colding the stream
-    Hx2_2 = bst.HXutility('HX101', ins = Hx2_1-0, outs = ['s8'], T = 29.85+273.15,
-                           rigorous =  True) # in 7, out 8
-
-    Fv2 = bst.Flash('F101', ins = Hx2_2-0,outs = ['s9', 's10'] ,T = 29.85+273.15 , P = K2.P) # in 8, out 9 and 10
+    K2 = bst.IsentropicCompressor('K101', ins=Fv1-0, outs = ['s6'], P=Pf/3, vle=True) # in 4, out 6
+    recycle_2 = bst.Stream()
+    H2 = bst.HXutilities(
+        ins = recycle_2, T = 29.85+273.15, rigorous=True
+    )
+    Fv2 = bst.Flash(
+        'F101', 
+        ins = H2-0, outs = ['s9', 's10'],
+        Q=0, P=K2.P
+    ) # in 8, out 9 and 10
     
     # third compression stage
     K3 = bst.IsentropicCompressor('K102', ins=Fv2-0,outs = ['s10'], P=Pf, vle=True) # in 9, out 11 
-    Hx3_1 = bst.HXutility('HX102', ins = K3-0, outs = ['s12'], T = 29.85+273.15) # in 11, out 12  
+    Hx3_1 = bst.HXutilities('HX102', ins = K3-0, outs = ['s12'], T = 29.85+273.15) # in 11, out 12  
     # dehydration unit
     Sp_1 = bst.Splitter('Sp100', ins = Hx3_1-0, outs = ['s13', 's14'], split=1) # in 12, out 13 and 14
     Sp_1.isplit['H2O'] = 0
+    recycle_1 = bst.Stream()
+    Hx3_3 = bst.HXutilities(
+        'HX103', 
+        ins=recycle_1,
+        outs=['s16'], 
+        V=0.2, 
+        rigorous=True,
+        cool_only=True,
+    ) # in 15, out 16
     
-    recycle1 = bst.Stream('recycle17')
-    Hx3_2 = bst.HXprocess('HX105', ins = [Sp_1-0, recycle1], outs = ['s15', recycle2]) # in 12 and 17, out 15 and 18
-    # more cold
-    # Hx3_2.show()
-    Hx3_3 = bst.HXutility('HX103', ins = Hx3_2-0,outs = ['s16'], T = 260.53, rigorous = True) # in 15, out 16
-    
-    @Hx3_3.add_specification(run=True)
-    def adjust_temp():
-        Hx3_3.T = Hx3_2.outs[0].dew_point_at_P().T
-    
-    D1 = bst.ShortcutColumn('D100', ins = Hx3_3-0, outs = [recycle1, 's21'], P = Pf, LHK = ('O2', 'CO2'),
-                            y_top = 0.8, x_bot = 0.00416
-                            # Lr = 0.988717, Hr = 0.751599
-                            , k = 1.3)
+    D1 = bst.BinaryDistillation(
+        'D100', ins = Hx3_3-0, P = Pf, LHK = ('O2', 'CO2'),
+        y_top = 0.95, x_bot = 0.02, k=1.02
+    )
+                            # Lr = 0.995, Hr = 0.6, k = 1.3)
     D1.check_LHK = False
-    P1 = bst.Pump('P100', ins = D1-1, outs = ['s22'], P = 15e6)
-    Hx4_1 = bst.HXutility('HX108', ins = P1-0, outs = ['s23'], T = 20+273.15)
-    Hx4_2 = bst.HXutility('HX109', ins = Hx4_1-0, outs = CO2_concentrated, T = 30+273.15)
+    H1 = bst.HXprocess(ins = [D1-1, Sp_1-0], outs=['', ''])
+    H2 = bst.HXprocess(ins = [D1-0, H1-1], outs=['', recycle_1])
+    H3 = bst.HXprocess(ins = [H1-0, K2-0], outs=['', recycle_2])
+    K4 = bst.IsentropicTurbine('K103', ins=H2-0, outs = Destilate, P=6 * 101325, vle=True) # in 19, out 20
+    # P1 = bst.Pump('P100', ins = D1-1, outs = CO2_concentrated, P = 15e6)
+    # Hx4_1 = bst.HXutility('HX108', ins = P1-0, outs = ['s23'], T = 20+273.15)
+    
+    K5 = bst.IsentropicTurbine(ins=H3-0, outs = CO2_concentrated, P=6 * 101325, vle=True) # in 19, out 20
 
 if __name__ == "__main__":
     thermo = create_cc_chemicals()

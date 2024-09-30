@@ -63,7 +63,9 @@ class Biorefinery(bst.ProcessModel):
     
     def __init__(
             self,
-            simulate=True
+            simulate=True,
+            dewatering=True,
+            carbon_capture=True,
         ):
         bst.settings.set_thermo(create_acetate_ester_chemicals())
         bst.settings.chemicals.define_group(
@@ -76,8 +78,15 @@ class Biorefinery(bst.ProcessModel):
             wt=True,
         )
         load_process_settings()
-        system = create_acetyl_ester_system()
-        self.tea = create_tea(system)
+        system = create_acetyl_ester_system(
+            carbon_capture=carbon_capture,
+            dewatering=dewatering
+        )
+        self.tea = create_tea(
+            system,
+        )
+        self.tea.steam_power_depreciation = 'MACRS7'
+        self.tea.income_tax = 0.21
         self.load_system(system)
         model = bst.Model(system)
         parameter = model.parameter
@@ -178,53 +187,54 @@ class Biorefinery(bst.ProcessModel):
             original = self.AcOH_media.F_mass * self.AcOH_production.titer['AceticAcid'] * self.AcEster_production.reactions[0].product_yield('DodecylAcetate', basis='wt') / 1000
             self.system.rescale(self.AcOH_media, capacity / original)
         
-        optimized_parameter = model.optimized_parameter
-        
-        @optimized_parameter(bounds=[5, 20], baseline=12, name='extractor stages')
-        def set_stages(N):
-            N = int(N)
-            self.extractor.N_stages = N
-        
-        @optimized_parameter(bounds=[1, 2], baseline=1.5, name='solvent to feed ratio')
-        def set_solvent_to_feed(solvent_feed_ratio):
-            self.extractor.solvent_feed_ratio = solvent_feed_ratio
-        
-        @optimized_parameter(bounds=[1.01, 2.5], baseline=1.2, element=self.extract_distiller)
-        def extract_distiller_reflux(k):
-            self.extract_distiller.k = k
-        
-        @optimized_parameter(bounds=[90, 99.9], baseline=95, units='%', element=self.extract_distiller)
-        def extract_distiller_heavy_key_recovery(Hr):
-            self.extract_distiller.Hr = Hr / 100
-        
-        @optimized_parameter(bounds=[1.01, 2.5], baseline=1.2, element=self.raffinate_distiller)
-        def raffinate_distiller_reflux(k):
-            self.raffinate_distiller.k = k
-        
-        @optimized_parameter(bounds=[80, 99.9], baseline=99, units='%', element=self.raffinate_distiller)
-        def raffinate_distiller_light_key_recovery(Lr):
-            self.raffinate_distiller.Lr = Lr / 100
-        
-        @optimized_parameter(bounds=[80, 99.9], baseline=99, units='%', element=self.raffinate_distiller)
-        def raffinate_distiller_heavy_key_recovery(Hr):
-            self.raffinate_distiller.Hr = Hr / 100
-        
-        @optimized_parameter(bounds=[0, 1], baseline=0.5, element=self.extract_heater)
-        def extract_heater_vapor_fraction(V):
-            self.extract_heater.V = V
-        
-        @optimized_parameter(bounds=[2, 8], baseline=8, element='AcOH bioreactor', name='length to diameter')
-        def set_AcOH_bioreactor_length_to_diameter(length_to_diameter):
-            self.AcOH_production.length_to_diameter = length_to_diameter
-        
-        @optimized_parameter(bounds=[2, 6], baseline=4, element='AcEster bioreactor', name='length to diameter')
-        def set_AcEster_bioreactor_length_to_diameter(length_to_diameter):
-            self.AcEster_production.length_to_diameter = length_to_diameter
-        
-        optimal_values = [15, 1.5e+00, 1.02e+00, 9.99e01, 1.02e+00, 9.99e01, 9.99e01, 0]
-        for i, j in zip(model.optimized_parameters, optimal_values): 
-            i.baseline = j
-            i.setter(j)
+        if dewatering:
+            optimized_parameter = model.optimized_parameter
+            
+            @optimized_parameter(bounds=[5, 20], baseline=12, name='extractor stages')
+            def set_stages(N):
+                N = int(N)
+                self.extractor.N_stages = N
+            
+            @optimized_parameter(bounds=[1, 2], baseline=1.5, name='solvent to feed ratio')
+            def set_solvent_to_feed(solvent_feed_ratio):
+                self.extractor.solvent_feed_ratio = solvent_feed_ratio
+            
+            @optimized_parameter(bounds=[1.01, 2.5], baseline=1.2, element=self.extract_distiller)
+            def extract_distiller_reflux(k):
+                self.extract_distiller.k = k
+            
+            @optimized_parameter(bounds=[90, 99.9], baseline=95, units='%', element=self.extract_distiller)
+            def extract_distiller_heavy_key_recovery(Hr):
+                self.extract_distiller.Hr = Hr / 100
+            
+            @optimized_parameter(bounds=[1.01, 2.5], baseline=1.2, element=self.raffinate_distiller)
+            def raffinate_distiller_reflux(k):
+                self.raffinate_distiller.k = k
+            
+            @optimized_parameter(bounds=[80, 99.9], baseline=99, units='%', element=self.raffinate_distiller)
+            def raffinate_distiller_light_key_recovery(Lr):
+                self.raffinate_distiller.Lr = Lr / 100
+            
+            @optimized_parameter(bounds=[80, 99.9], baseline=99, units='%', element=self.raffinate_distiller)
+            def raffinate_distiller_heavy_key_recovery(Hr):
+                self.raffinate_distiller.Hr = Hr / 100
+            
+            @optimized_parameter(bounds=[0, 1], baseline=0.5, element=self.extract_heater)
+            def extract_heater_vapor_fraction(V):
+                self.extract_heater.V = V
+            
+            @optimized_parameter(bounds=[2, 12], baseline=8, element='AcOH bioreactor', name='length to diameter')
+            def set_AcOH_bioreactor_length_to_diameter(length_to_diameter):
+                self.AcOH_production.length_to_diameter = length_to_diameter
+            
+            @optimized_parameter(bounds=[2, 12], baseline=4, element='AcEster bioreactor', name='length to diameter')
+            def set_AcEster_bioreactor_length_to_diameter(length_to_diameter):
+                self.AcEster_production.length_to_diameter = length_to_diameter
+            
+            # optimal_values = [15, 1.5e+00, 1.02e+00, 9.99e01, 1.02e+00, 9.99e01, 9.99e01, 0]
+            # for i, j in zip(model.optimized_parameters, optimal_values): 
+            #     i.baseline = j
+            #     i.setter(j)
         # chemicals = bst.settings.chemicals
         # self.direct_nonbiogenic_emissions = lambda: (
         #     sum([i.get_atomic_flow('C') for i in self.system.products if i.phase == 'g'])
@@ -238,6 +248,7 @@ class Biorefinery(bst.ProcessModel):
         #     inventory=self.direct_nonbiogenic_emissions,
         #     CF=1.,
         # )
+        if not dewatering: self.ethyl_acetate = bst.MockStream('ethyl_acetate')
         self.BT.fuel.set_CF(GWPkey, CFs['Miscanthus'])
         self.BT.fuel.price = 0.08
         self.hydrogen.set_CF(GWPkey, CFs['H2'])
