@@ -39,7 +39,7 @@ from biorefineries.succinic.utils import find_split, splits_df, baseline_feedflo
 from biorefineries.succinic.chemicals_data import chems, chemical_groups, \
                                 soluble_organics, combustibles
 from biorefineries.succinic.tea import TemplateTEA as SuccinicTEA
-from biorefineries.succinic.lca import LCA as SuccinicLCA
+from biorefineries.succinic.lca import SuccinicLCA
 
 from biorefineries.succinic.crystallization_curvefit import Ct_given_C0
 
@@ -976,13 +976,14 @@ get_product_stream_MPSP()
 succinic_LCA = SuccinicLCA(system=succinic_sys, 
                  CFs=CFs, 
                  feedstock=sugarcane, 
+                 feedstock_ID='Sugarcane',
+                 input_biogenic_carbon_streams=[feedstock, s.CSL],
                  main_product=product_stream, 
                  main_product_chemical_IDs=['SuccinicAcid',], 
                  by_products=[], 
                  cooling_tower=u.CT801, 
                  chilled_water_processing_units=[u.CWP802,], 
                  boiler=u.BT701, has_turbogenerator=True,
-                 credit_feedstock_CO2_capture=True, 
                  add_EOL_GWP=True,
                  )
 

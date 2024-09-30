@@ -136,9 +136,9 @@ for m, u_i in metrics_labels_dict.items():
 
 # IPCC 2013 GWP100a
 metrics.append(Metric('Total GWP100a', lambda: succinic_LCA.GWP, 'kg-CO2-eq/kg', 'Biorefinery'))
-metrics.append(Metric('GWP100a - Heating demand', lambda: succinic_LCA.heating_demand_GWP, 'kg-CO2-eq/kg', 'Biorefinery'))
-metrics.append(Metric('GWP100a - Cooling demand', lambda: succinic_LCA.cooling_demand_GWP, 'kg-CO2-eq/kg', 'Biorefinery'))
-metrics.append(Metric('GWP100a - Electricity demand (non-cooling)', lambda: succinic_LCA.electricity_demand_non_cooling_GWP, 'kg-CO2-eq/kg', 'Biorefinery'))
+# metrics.append(Metric('GWP100a - Heating demand', lambda: succinic_LCA.heating_demand_GWP, 'kg-CO2-eq/kg', 'Biorefinery'))
+# metrics.append(Metric('GWP100a - Cooling demand', lambda: succinic_LCA.cooling_demand_GWP, 'kg-CO2-eq/kg', 'Biorefinery'))
+# metrics.append(Metric('GWP100a - Electricity demand (non-cooling)', lambda: succinic_LCA.electricity_demand_non_cooling_GWP, 'kg-CO2-eq/kg', 'Biorefinery'))
 
 metrics.append(Metric('GWP100a - Feedstock (FGHTP) ', lambda: succinic_LCA.FGHTP_GWP, 'kg-CO2-eq/kg', 'Biorefinery'))
 metrics.append(Metric('GWP100a - Materials (except feedstock and BT.natural_gas) ', lambda: succinic_LCA.material_GWP, 'kg-CO2-eq/kg', 'Biorefinery'))
@@ -157,9 +157,9 @@ metrics.append(Metric(f'GWP100a - Materials breakdown - H3PO4', lambda: succinic
 
 # FEC
 metrics.append(Metric('Total FEC', lambda: succinic_LCA.FEC, 'kg-CO2-eq/kg', 'Biorefinery'))
-metrics.append(Metric('FEC - Heating demand', lambda: succinic_LCA.heating_demand_FEC, 'kg-CO2-eq/kg', 'Biorefinery'))
-metrics.append(Metric('FEC - Cooling demand', lambda: succinic_LCA.cooling_demand_FEC, 'kg-CO2-eq/kg', 'Biorefinery'))
-metrics.append(Metric('FEC - Electricity demand (non-cooling)', lambda: succinic_LCA.electricity_demand_non_cooling_FEC, 'kg-CO2-eq/kg', 'Biorefinery'))
+# metrics.append(Metric('FEC - Heating demand', lambda: succinic_LCA.heating_demand_FEC, 'kg-CO2-eq/kg', 'Biorefinery'))
+# metrics.append(Metric('FEC - Cooling demand', lambda: succinic_LCA.cooling_demand_FEC, 'kg-CO2-eq/kg', 'Biorefinery'))
+# metrics.append(Metric('FEC - Electricity demand (non-cooling)', lambda: succinic_LCA.electricity_demand_non_cooling_FEC, 'kg-CO2-eq/kg', 'Biorefinery'))
 
 metrics.append(Metric('FEC - Feedstock (FGHTP) ', lambda: succinic_LCA.feedstock_FEC, 'kg-CO2-eq/kg', 'Biorefinery'))
 metrics.append(Metric('FEC - Materials (except feedstock and BT.natural_gas) ', lambda: succinic_LCA.material_FEC, 'kg-CO2-eq/kg', 'Biorefinery'))

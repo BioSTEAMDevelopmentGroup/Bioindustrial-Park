@@ -140,6 +140,9 @@ CalciumLactate = chemical_database('CalciumLactate', phase='l',
 # Hf from Lange's Handbook of Chemistry, 15th edn., Table 6.3, PDF page 631
 CalciumAcetate = chemical_database('CalciumAcetate', phase='l', Hf=-1514.73e3)
 
+# Sodium 3-hydroxypropionate modeled as sodium lactate
+SodiumLactate = chemical_database('SodiumLactate', phase='l',)
+
 # Solubility of CalciumSuccinate is 3.2 g/L in water as Ca2+ based on 
 # Burgess and Drasdo, Polyhedron 1993, 12 (24), 2905–2911, which is 12.5 g/L as CaSA
 # Baseline CalciumSuccinate is ~14 g/L in fermentation broth, thus assumes all 
@@ -307,8 +310,9 @@ Arabinan = chemical_copied('Arabinan', Xylan)
 # Holmes, Trans. Faraday Soc. 1962, 58 (0), 1916–1925, abstract
 # This is for auto-population of combustion reactions
 P4O10 = chemical_database('P4O10', phase='s', Hf=-713.2*_cal2joule)
-Ash = chemical_database('Ash', search_ID='CaO', phase='s', Hf=-151688*_cal2joule,
-                        HHV=0, LHV=0)
+# Ash = chemical_database('Ash', search_ID='CaO', phase='s', Hf=-151688*_cal2joule,
+#                         HHV=0, LHV=0)
+
 # This is to copy the solid state of Xylose,
 # cannot directly use Xylose as Xylose is locked at liquid state now
 Tar = chemical_copied('Tar', Xylose, phase_ref='s')
@@ -487,6 +491,7 @@ chems.append(cornstover_chems.Acetate)
 chems.append(cornstover_chems.AmmoniumSulfate)
 chems.append(cornstover_chems.AmmoniumAcetate)
 chems.append(cornstover_chems.Cellulase)
+chems.append(cornstover_chems.Ash)
 
 
 chems.append(corn_chems.Starch)

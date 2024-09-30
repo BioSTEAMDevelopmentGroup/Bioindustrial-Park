@@ -242,7 +242,7 @@ GWP_CFs = {
 GWP_CF_array = chems.kwarray(GWP_CFs)
 # In kg CO2-eq/kg of material
 GWP_CF_stream = tmo.Stream('GWP_CF_stream', GWP_CF_array, units='kg/hr')
-CFs['GWP_CF_stream'] = GWP_CF_stream
+# CFs['GWP_CF_stream'] = GWP_CF_stream
 
 GWP_CFs['Electricity'] = 0.4490 # kg CO2-eq/kWh GREET 2022 US Mix  # assume production==consumption, both in kg CO2-eq/kWh
 
@@ -254,7 +254,7 @@ GWP_CFs['Sugarcane'] = 0.12043 * 0.3/0.286 # ecoinvent 3.8 market for sugarcane,
 # GWP_CFs['Sugarcane'] = 0.02931 # GREET 2022
 
 
-CFs['GWP_CFs'] = GWP_CFs
+CFs['GWP_100'] = GWP_CFs
 
 # =============================================================================
 # Fossil energy consumption (FEC), in MJ/kg of material
@@ -283,7 +283,7 @@ FEC_CF_array = chems.kwarray(FEC_CFs)
 # In MJ/kg of material
 FEC_CF_stream = tmo.Stream('FEC_CF_stream', FEC_CF_array, units='kg/hr')
 
-CFs['FEC_CF_stream'] = FEC_CF_stream
+# CFs['FEC_CF_stream'] = FEC_CF_stream
 
 FEC_CFs['Electricity'] = 5.724 # MJ/kWh # GREET 2022 US Mix #assume production==consumption, both in MJ/kWh
 
@@ -292,7 +292,7 @@ FEC_CFs['Sugarcane'] = 	0.40192 * 0.3/0.286 # ecoinvent 3.8 market for sugarcane
 
 # FEC_CFs['Sugarcane'] = 	0.2265 # GREET 2022
 
-CFs['FEC_CFs'] = FEC_CFs
+CFs['FEC'] = FEC_CFs
 
 
 
