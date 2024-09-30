@@ -1,48 +1,39 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-# Bioindustrial-Park: BioSTEAM's Premier Biorefinery Models and Results
-# Copyright (C) 2023-, Sarang Bhagwat <sarangb2@illinois.edu>,
-#
-# This module is under the UIUC open-source license. See
-# github.com/BioSTEAMDevelopmentGroup/biosteam/blob/master/LICENSE.txt
-# for license details.
+"""
+Created on Sun Aug 23 12:11:15 2020
 
-'''
-References
-----------
-[1] Argonne National Laboratory. The Greenhouse gases, Regulated Emissions,
-    and Energy use in Transportation (GREET) Model https://greet.es.anl.gov/
-    (accessed Aug 25, 2020).
-[2] Roni et al., Herbaceous Feedstock 2018 State of Technology Report;
-    INL/EXT-18-51654-Rev000; Idaho National Lab. (INL), 2020.
-    https://doi.org/10.2172/1615147.
-[3] ecoinvent 3.6 https://www.ecoinvent.org/home.html (accessed Aug 26, 2020).
+Modified from the cornstover biorefinery constructed in Cortes-Peña et al., 2020,
+with modification of fermentation system for 2,3-Butanediol instead of the original ethanol
 
-'''
+[1] Cortes-Peña et al., BioSTEAM: A Fast and Flexible Platform for the Design, 
+    Simulation, and Techno-Economic Analysis of Biorefineries under Uncertainty. 
+    ACS Sustainable Chem. Eng. 2020, 8 (8), 3302–3310. 
+    https://doi.org/10.1021/acssuschemeng.9b07040.
 
-import biosteam as bst
+All units are explicitly defined here for transparency and easy reference
+
+@author: sarangbhagwat
+"""
 import thermosteam as tmo
-from biorefineries.TAL.chemicals_data import chems
-
-bst.CE = 607.5 # year 2019
-
+import biosteam as bst
+from biorefineries.oxalic.chemicals_data import oxalic_chemicals as chems
+tmo.settings.set_thermo(chems) 
 _kg_per_ton = 907.18474
 _lb_per_kg = 2.20462
 _liter_per_gallon = 3.78541
 _ft3_per_m3 = 35.3147
+_chemical_2011to2016 = 102.5 / 91.7
+_chemical_2020to2016 = 102.5 / 113.8 # average of Jan and Feb
+_chemical_2022to2016 = 102.5 / 145.3
+_chemical_2014to2016 = 102.5 / 105.3
+_chemical_2017to2016 = 102.5 / 106.9
 
-_GDP_2007_to_2016 = 1.114 / 0.961
-_GDP_2008_to_2016 = 1.114 / 0.990
+
 _GDP_2008_to_2010 = 1.012 / 0.990
 _GDP_2007_to_2010 = 1.012 / 0.961
 
-_chemical_2011to2016 = 102.5 / 91.7
-_chemical_2013to2016 = 102.5 / 101.3
-_chemical_2014to2016 = 102.5 / 105.3
-
-_chemical_2017to2016 = 102.5 / 106.9
-_chemical_2020to2016 = 102.5 / 113.8 # average of Jan and Feb
-_chemical_2022to2016 = 102.5 / 145.3
+_corn_bushel_to_kg = 25.402 # https://www.ers.usda.gov/webdocs/publications/41880/33132_ah697_002.pdf
 
 chem_index = { # Dictionary of chemical indices
                     2010: 82.2,
@@ -62,17 +53,16 @@ chem_index = { # Dictionary of chemical indices
 
 # From USD/dry-ton to USD/kg in 2016$, 20% moisture content
 # changed from Humbird et al., 2011 to Davis et al., 2018
-corn_stover_price = 71.26 / _kg_per_ton * 0.8 
+cornstover_price = 71.26 / _kg_per_ton * 0.8 
 
-# 2.2 is the average whole-sale ethanol price between 2010-2019 in 2016 $/gal
-# based on Annual Energy Outlook (AEO) from Energy Information Adiministration (EIA)
-# (https://www.eia.gov/outlooks/aeo/), which is $0.7328/gal and similar to the
-# 2.2/(2988/1e3) = $0.736/gal based on a density of 2988 g/gal from H2 Tools
-# Lower and upper bounds are $1.37/gal and $2.79/gal, or $0.460/kg and $0.978/kg
-_ethanol_V = chems.Ethanol.V('l', 298.15, 101325) # molar volume in m3/mol
-_ethanol_MW = chems.Ethanol.MW
-_ethanol_kg_2_gal = _liter_per_gallon/_ethanol_V*_ethanol_MW/1e6
-ethanol_price = 2.2 / _ethanol_kg_2_gal
+# 2.18 is the average whole-sale ethanol price between 2010-2019 in 2016 $/gal 	
+# based on Annual Energy Outlook (AEO) from Energy Information Adiministration (EIA)	
+# (https://www.eia.gov/outlooks/aeo/), which is $0.732/gal and similar to the 	
+# 2.18/(2988/1e3) = $0.730/gal based on a density of 2988 g/gal from H2 Tools	
+# Lower and upper bounds are $1.37/gal and $2.79/gal, or $0.460/kg and $0.978/kg	
+ethanol_V = chems.Ethanol.V('l', 298.15, 101325) # molar volume in m3/mol	
+ethanol_MW = chems.Ethanol.MW	
+ethanol_price = 2.18 / (_liter_per_gallon/chems.Ethanol.V('l', 298.15, 101325)*ethanol_MW/1e6)
 	
 
 # Dipotassium hydrogen phosphate (DPHP)
@@ -88,9 +78,9 @@ DPHP_price = 1.15
 # (https://h2tools.org/hyarc/calculator-tools/lower-and-higher-heating-values-fuels)	
 denaturant_price = 2.86 / 2.819
 
-# 1.41e6 is $/yr and 4279 in kg/hr from Table 33 of Davis et al., 2018 (TAL scenario)
+# 1.41e6 is $/yr and 4279 in kg/hr from Table 33 of Davis et al., 2018 (HP scenario)
 # 7880 is operating hours/yr on Page 10 of Davis et al., 2018,
-# cost is negative because it's a product stream
+# price is negative because it's a product stream
 ash_disposal_price = -1.41e6 / (4279*7880)
 
 # Assums no cost/credit for baseline, the same as ash disposal for the lower bound,	
@@ -109,7 +99,7 @@ ash_disposal_price = -1.41e6 / (4279*7880)
 # For the lower bound (i.e., negative selling price indicating cost), use price from
 # Aden et al., 2002: $0.0094/lb in 2000$ = 0.0094*1.114/0.802*2.20462 = $0.0288/kg
 # in 2016$
-gypsum_price = 0
+gypsum_price = 0.
 
 # Baseline from Davis et al., 2018, lower bound is 2015-2019 average of 	
 # hydrate lime in $/ton at plant from Mineral Commodity Summaries 2020.	
@@ -133,15 +123,20 @@ baghouse_bag_price = 466833 / 5 / (24*365*0.96)
 # $3.68/Mcf and $5.65/Mcf, or $0.198/kg and $0.304/kg
 CH4_V = chems.CH4.V(298.15, 101325) # molar volume in m3/mol
 CH4_MW = chems.CH4.MW
-natural_gas_price = 4.70/1e3*_ft3_per_m3*CH4_V * (1e3/CH4_MW) *\
-    chem_index[2019]/chem_index[2016]
+natural_gas_price = 4.70/1e3*_ft3_per_m3*CH4_V * (1e3/CH4_MW)
 
-# https://www.alibaba.com/product-detail/Tricalcium-Phosphate-Tricalcium-Phosphate-TCP-Tricalcium_60744013678.html?spm=a2700.galleryofferlist.0.0.42f16684C9iJhz&s=p
-TCP_price = 850 / _kg_per_ton # tricalcium (di)phosphate
+# https://www.rightpricechemicals.com/buy-amberlyst-15-ion-exchange-resin.html	
+# USD 383.13 for 2.5kg (largest available size order), accessed 06/11/2020
+amberlyst_15_price = 153.252 * _chemical_2020to2016
 
+# #https://www.alibaba.com/product-detail/Latest-promotion-price-Hot-selling-high_62503274885.html?spm=a2700.7724857.normalList.7.54351dad5oDzYH&s=p&fullFirstScreen=true
+# TiO2_price = 1.784
 
-# TAL_price = 1.88 # initial value
-SA_price = 1.88 # initial value
+#https://www.alibaba.com/product-detail/Titanium-Dioxide-Chinese-Tio2-Producer-Supply_1600082019592.html?spm=a2700.galleryofferlist.normal_offer.d_title.a3415562TmEgSy&s=p
+TiO2_price = 2130./_kg_per_ton
+
+# HP_price = 1.88 # initial value
+AA_price = 1.88 # initial value
 
 # Currently not in use
 # Methanol price from Goellner et al., production from natural gas (Case 3),
@@ -159,109 +154,118 @@ acetoin_price = 3. # assumed
 # IBA_price = 1.2
 IBA_price = 0. # assumed
 
-TAL_price = 4. # assumed; when solving for MPSP, this is merely the initial value and has no effect on results
 
-glucose_price = 236. /_kg_per_ton # refer to email: "sugar price from maravelias group"
+# https://www.alibaba.com/product-detail/Decyl-Alcohol-98-min_62002993466.html?spm=a2700.galleryofferlist.normal_offer.d_title.67b2ac2fnUEnUY
+Decanol_price = 1.25
 
-# https://www.alibaba.com/product-detail/Manufacturer-of-Hexyl-Alcohol-Hexanol-n_60403061175.html?spm=a2700.galleryofferlist.0.0.1021992cx1VYY8
-hexanol_price = 6.
+# https://www.alibaba.com/product-detail/Trioctylamine-CAS-NO-1116-76-3_60139027874.html?spm=a2700.galleryofferlist.normal_offer.d_title.2b9b3d2fWfzxb0
+TOA_price = 7.5
 
-# https://www.alibaba.com/product-detail/N-heptane-Heptane-Heptane-Heptane-Supply_62451341262.html?spm=a2700.galleryofferlist.0.0.2b407553zLGZvf&s=p
-heptane_price = 1900./_kg_per_ton
+# https://www.alibaba.com/product-detail/Methyl-Trioctyl-Ammonium-Chloride-Aliquat-336-_50039302076.html?spm=a2700.galleryofferlist.normal_offer.d_title.6f3340baJbm4l2
+AQ336_price = 1.115
 
-# Viswanathan et al. 2020
-toluene_price = 1.1
+# https://www.alibaba.com/product-detail/Factory-Supply-High-Purity-Industrial-Grade_1600155716170.html?spm=a2700.galleryofferlist.normal_offer.d_title.68217a2fOdbzfi
+Octanol_price = 1.05
 
-# assumed
-AuPd_price = 60000.
+# https://www.alibaba.com/product-detail/Best-price-high-quality-Butyl-Acetate_60659284944.html?spm=a2700.galleryofferlist.normal_offer.d_title.8a6f2e61vk4mhP
+Butyl_acetate_price = 0.75
 
-# https://www.alibaba.com/product-detail/Gas-Hydrogen-45kg-Lpg-Gas-Cylinder_62018626105.html?spm=a2700.galleryofferlist.0.0.e9ba7ce2O0TyvK
-hydrogen_price = 1.
+# https://www.alibaba.com/product-detail/1-hexanol-cas-111-27-3_1600063760860.html?spm=a2700.galleryofferlist.normal_offer.d_title.16b44add1yPF8c
+Hexanol_price = 500. /_kg_per_ton
 
-# https://www.energy.gov/eere/fuelcells/hydrogen-shot
-hydrogen_renewable_price = 5.
-# https://www.alibaba.com/product-detail/catalyst-raney-nickel-stainless-steel-square_60731133248.html?spm=a2700.galleryofferlist.0.0.2a583524IfakZZ
-RaneyNi_price = 30.
+# https://www.alibaba.com/product-detail/1-6-Hexanediol-99-5-1_1600163052618.html?spm=a2700.galleryofferlist.normal_offer.d_title.4f596babnJcGBc
+Hexanediol_price = 2.9
 
-NiSiO2_price = RaneyNi_price
+# https://www.alibaba.com/product-detail/Supply-Best-Price-98-1-8_1600152253896.html?spm=a2700.galleryofferlist.normal_offer.d_title.4ff91a18MzPO0F
+Octanediol_price = 6.5
 
-# https://www.alibaba.com/product-detail/Reagent-Grade-90-caustic-potash-potassium_62118969650.html?spm=a2700.galleryofferlist.0.0.28555ed4pKlEVC&s=p
-KOH_price = 1.6
+# https://web.archive.org/web/20161125084558/http://www.icis.com:80/chemicals/channel-info-chemicals-a-z/
+HCl_price = 0.937 * _GDP_2007_to_2010 * chem_index[2016]/chem_index[2010]
 
-# https://www.alibaba.com/product-detail/Hydrochloric-acid-HCl-7647-01-0_60439085052.html?spm=a2700.galleryofferlist.0.0.4fa42c515nP2GH
-HCl_price = 0.3
+# 365-380 2022$/MT according to https://www.chemanalyst.com/Pricing-data/liquid-carbon-dioxide-1090
+# Baseline: 0.263 2016$/kg
+# Uncertainty range: 0.257 - 0.268 2016$/kg
+liquid_CO2_price = 0.3725 * _chemical_2022to2016
 
-activated_carbon_price = 41. # $/ft^3 # Seader et al.
-
-
-PdC_price = 0.075*(2045./0.0311035) \
-      + (1-0.075)*0.45 # Pd : 2045 EIB (USD/troy-ounce) # https://apps.catalysts.basf.com/apps/eibprices/mp/ (accessed 6/3/2022)
-                       # activated carbon: $0.45/kg # https://www-sciencedirect-com.proxy2.library.illinois.edu/science/article/pii/S2590174522000411?via%3Dihub
-spent_PdC_price = 1. # assumed
-
-acetone_price = 0.63 * _GDP_2008_to_2016 * _lb_per_kg # average of range ($0.44 - $0.82 /lb) from https://web.archive.org/web/20161125084558/http://www.icis.com:80/chemicals/channel-info-chemicals-a-z/
-
-# Q1 2022 - Q4 2023 range from https://www.chemanalyst.com/Pricing-data/isopropyl-alcohol-31
-# as reported:
-# min: $1.225 /kg; max: 1.662/kg; mean: $1.387/kg
-# converted to 2019$ (reported * chem_index[2019]/chem_index[2022]): 
-# min: $0.944 /kg; max: 1.281/kg; mean: $1.069/kg
-isopropanol_price = 1.387 * chem_index[2019]/chem_index[2022]
-
-acetic_acid_price = 0.38 *_lb_per_kg * _GDP_2008_to_2010 * chem_index[2019]/chem_index[2010] # average of 2008$ range ($ 0.35 - 0.41 /lb) from # https://web.archive.org/web/20161125084558/http://www.icis.com:80/chemicals/channel-info-chemicals-a-z/
-sodium_acetate_price = acetic_acid_price # unused
-
-CSL_price = 0.0339 * _lb_per_kg * chem_index[2019]/chem_index[2016] # from lactic acid paper
+# Monoethanol amine
+# 1021.69 $/MT in Nov 2014 - 1855.65 $/MT in Oct 2017 range from https://www.intratec.us/chemical-markets/monoethanolamine-price
+# Baseline: 1.426 2016$/kg
+# Uncertainty range: 1.032 - 1.819 2016$/kg
+MEA_price = (1021.69*_chemical_2014to2016 + 1855.65*_chemical_2017to2016)/(2*1000)
 
 
-# $100/100kg Amberlyst 15 from bulk vendor ("VIP, 6-year, Enterprise Certified") listing https://www.chemicalbook.com/ProductDetail_EN_451808.htm
-# $1/kg Amberlyst 15 from bulk vendor ("VIP, 5-year, Enterprise Certified") listing https://www.chemicalbook.com/ProductDetail_EN_916657.htm
-amberlyst70_price = 30.
+# Magnesium chloride
+MgCl2_price = 0.1387 * _lb_per_kg * _GDP_2007_to_2010 * chem_index[2016]/chem_index[2010] # 0.1275 - 0.1500 $/lb in 2007$ # https://web.archive.org/web/20161125084558/http://www.icis.com:80/chemicals/channel-info-chemicals-a-z/
+# $0.349 - 0.411 / kg in 2019$
 
-# 2.0/kg from https://www.alibaba.com/product-detail/Desiccant-for-paints-and-varnishes-Acetylacetone_10000004008185.html?spm=a2700.galleryofferlist.normal_offer.d_price.e82458eazJeqeC
-acetylacetone_price = 2.0 # 2,4-pentanedione or acetylacetone
+# Zinc sulfate
+ZnSO4_price = 580 / _kg_per_ton * _GDP_2007_to_2010 * chem_index[2016]/chem_index[2010] # 480 - 680 $/ton in 2007$ # https://web.archive.org/web/20161125084558/http://www.icis.com:80/chemicals/channel-info-chemicals-a-z/
+
+# Dodecanol
+Dodecanol_price = 2.75 # 2500 - 3000 $/ metric ton # https://www.alibaba.com/product-detail/New-Arrival-Liquid-Lauryl-alcohol-Dodecanol_1600489291769.html?spm=a2700.galleryofferlist.normal_offer.6.267b13a0flS0fP
+
+# Diammonium sulfate (ammonium sulfate)
+# mean of 0.161 (range 0.154-0.167)	$/kg in 2007 $	
+# mean of 0.187 (range of 0.178-0.194) $/kg when converted to 2016$
+# mean of 0.200 (range of 0.190-0.208) $/kg when converted to 2016$
+# https://web.archive.org/web/20161125084558/http://www.icis.com:80/chemicals/channel-info-chemicals-a-z/
+diammonium_sulfate_price = 0.161 *  _GDP_2007_to_2010 * chem_index[2016]/chem_index[2010] 
 
 
-# 225 - 230 $/tonne in 2007 # https://web.archive.org/web/20161125084558/http://www.icis.com:80/chemicals/channel-info-chemicals-a-z/
-# 895.32 $/US ton in 2011 #  Humbird 2011 https://doi.org/10.2172/1013269
-DAP_price = 0.5*\
-            (0.2275 * _GDP_2007_to_2010 * chem_index[2019]/chem_index[2010]
-             +
-             0.89532 * chem_index[2019]/chem_index[2011])
+#%% Feedstocks
 
-# 390.09-789.25 USD / short ton in 2008; https://web.archive.org/web/20161125084558/http://www.icis.com:80/chemicals/channel-info-chemicals-a-z/            
-NaOH_price = ((390.09+789.25)/2.)/_kg_per_ton * _GDP_2008_to_2010 * chem_index[2019]/chem_index[2010]
+# # Glucose / D-glucose / dextrose - from USDA
+# # $/lb # USDA 2015-2019 mean
+# # https://www.ers.usda.gov/data-products/sugar-and-sweeteners-yearbook-tables/sugar-and-sweeteners-yearbook-tables/#World,%20U.S.,%20and%20Mexican%20Sugar%20and%20Corn%20Sweetener%20Prices
+# glucose_price = 0.3798 * _lb_per_kg
+# # in $/kg:
+# # 2015-2019 mean: 37.98	
+# # 2015-2019 5th percentile: 36.00 
+# # 2015-2019 95th percentile: 39.5
 
+# Glucose / D-glucose / dextrose - from review paper Cheng et al. 2019 # https://doi.org/10.1002/bbb.1976
+# $/kg in 2017$: 
+# 0.22 # https://doi.org/10.1016/j.indcrop.2005.08.004  
+# 0.26 # https://doi.org/10.22004/ag.econ.28658
+# 0.33 # https://doi.org/10.1002/bbb.1475
+# $/kg converted to 2019$:
+# 0.23 # https://doi.org/10.1016/j.indcrop.2005.08.004  
+# 0.27 # https://doi.org/10.22004/ag.econ.28658
+# 0.34 # https://doi.org/10.1002/bbb.1475
+# mean of 3 values in 2019$: 0.28
+# mean of 3 values in 2016$:
+glucose_price = ((0.22 + 0.26 + 0.33)/3) * chem_index[2016]/chem_index[2017]
 
-price = {'SA': SA_price,
-         'PD': acetylacetone_price, # 2,4-pentanedione or acetylacetone
-         'TCP': TCP_price,
-         'AuPd': AuPd_price,
+# Corn stover
+from biorefineries.lactic._process_settings import feedstock_price # in 2016$
+cornstover_price = feedstock_price
+
+# Corn
+# $/bushel # USDA 2015-2019 mean
+# https://www.nass.usda.gov/Charts_and_Maps/Agricultural_Prices/pricecn.php
+corn_price = 3.543 / _corn_bushel_to_kg
+# in $/kg:
+# 2015-2019 mean: 0.139
+# 2015-2019 5th percentile: 0.127
+# 2015-2019 95th percentile: 0.150
+
+# Sugarcane
+from biorefineries.cane.streams import sugarcane # in 2018$
+sugarcane_price = sugarcane['price']
+
+#%%
+# All prices initially in 2016$/kg
+price = {'AA': AA_price,
+         'TiO2': TiO2_price,
          'IBA': IBA_price,
-         'TAL': TAL_price,
-         'KOH': KOH_price,
-         'HCl': HCl_price,
-         'Hydrogen': hydrogen_price,
-         'Renewable hydrogen': hydrogen_renewable_price,
          'Acetoin': acetoin_price,
-         'RaneyNi': RaneyNi_price,
-         'Ni-SiO2': NiSiO2_price,
-         'Amberlyst-70': amberlyst70_price,
-         'PdC': PdC_price,
-         'Spent PdC': spent_PdC_price,
-         'Corn stover': corn_stover_price,
-         'Glucose': glucose_price,
-         'Hexanol': hexanol_price,
-         'Heptane': heptane_price,
-         'Toluene': toluene_price,
-         'Isopropanol': isopropanol_price,
-         'Acetone': acetone_price,
+         'Corn stover': cornstover_price,
          'Sulfuric acid': 0.0430 * _lb_per_kg,	
          # 0.1900 is for NH3	
          'AmmoniumHydroxide': 0.1900 * _lb_per_kg * 17.031/35.046,	
-         'CSL': CSL_price,
-         'Caustics': NaOH_price * 0.5, # 50 wt% NaOH/water mixture	
-         'Sodium hydroxide': NaOH_price,
+         'CSL': 0.0339 * _lb_per_kg,
+         'Caustics': 0.2384 * _lb_per_kg * 0.5, # 50 wt% NaOH/water mixture	
+         'Hydrochloric acid':HCl_price,
          'Boiler chems': 2.9772 * _lb_per_kg,	
          'Lime': lime_price,
          'Cooling tower chems': 1.7842 * _lb_per_kg,	
@@ -279,43 +283,78 @@ price = {'SA': SA_price,
          # Below currently not in use
          'Gypsum': gypsum_price,
          'Denaturant': denaturant_price,
-         'DAP': DAP_price,
-         'Activated carbon': activated_carbon_price,
-         'Sodium acetate': sodium_acetate_price,
-         'Acetic acid': acetic_acid_price,
+         'Amberlyst15': amberlyst_15_price,
+         'DAP': 0.1645 * _lb_per_kg,
+         'Decanol': Decanol_price,
+         'Dodecanol': Dodecanol_price,
+         'TOA': TOA_price,
+         'AQ336': AQ336_price,
+         'Octanol': Octanol_price,
+         'Butyl acetate': Butyl_acetate_price,
+         'Hexanol': Hexanol_price,
+         'Hexanediol': Hexanediol_price,
+         'Octanediol': Octanediol_price,
+         'Liquid carbon dioxide': liquid_CO2_price,
+         'Monoethanolamine': MEA_price,
+         'Magnesium chloride': MgCl2_price,
+         'Zinc sulfate': ZnSO4_price,
+         'Glucose': glucose_price,
+         'Corn stover': cornstover_price,
+         'Corn': corn_price,
+         'Sugarcane': sugarcane_price,
+         'Diammonium sulfate': diammonium_sulfate_price,
          }
     
-#!!! Round all prices to 4 *decimal places*
-for k in price.keys():
-    price[k] = round(price[k], 4)
 
-bst.PowerUtility.price = price['Electricity']
-
-_lps = bst.HeatUtility.get_heating_agent('low_pressure_steam')
-_mps = bst.HeatUtility.get_heating_agent('medium_pressure_steam')
-_hps = bst.HeatUtility.get_heating_agent('high_pressure_steam')
-_mps.T = 233 + 273.15
-_hps.T = 266 + 273.15
-
-_cooling = bst.HeatUtility.get_cooling_agent('cooling_water')
-_chilled = bst.HeatUtility.get_cooling_agent('chilled_water')
-_chilled_brine = bst.HeatUtility.get_cooling_agent('chilled_brine')
-
-_cooling.T = 28 + 273.15
-_cooling.T_limit = _cooling.T + 9
-# Side steam in CHP not a heat utility, thus will cause problem in TEA utility
-# cost calculation if price not set to 0 here, costs for regeneration of heating
-# and cooling utilities will be considered as CAPEX and OPEX of CHP and CT, respectively
-for i in (_lps, _mps, _hps, _cooling, _chilled, _chilled_brine):
-    i.heat_transfer_price = i.regeneration_price = 0
-    # if i == _cooling: continue
-    # i.heat_transfer_efficiency = 0.85
-
+# !!! All prices should first be set in 2016$/kg; they are then converted below to 2019$/kg
+for k,v in price.items():
+    price[k] = v *chem_index[2019]/chem_index[2016]
+    
+def load_process_settings():
+    import sys
+    if sys.version_info.major==3:
+        if sys.version_info.minor==6:
+            pass
+        elif sys.version_info.minor>6:
+            from biorefineries import cornstover as cs
+            cs.load_process_settings()
+            tmo.settings.set_thermo(chems)
+        else:
+            print('Fatal Error: Python version must be 3.6 (recommended) or higher (within the v3 release).')
+    else:
+        print('Fatal Error: Python version must be 3.6 (recommended) or higher (within the v3 release).')
+        
+    bst.CE = 541.7 # year 2016
+    bst.PowerUtility.price = price['Electricity']
+    
+    _lps = bst.HeatUtility.get_heating_agent('low_pressure_steam')
+    _mps = bst.HeatUtility.get_heating_agent('medium_pressure_steam')
+    _hps = bst.HeatUtility.get_heating_agent('high_pressure_steam')
+    _mps.T = 233 + 273.15
+    _hps.T = 266 + 273.15
+    
+    _cooling = bst.HeatUtility.get_cooling_agent('cooling_water')
+    _chilled = bst.HeatUtility.get_cooling_agent('chilled_water')
+    _cooling.regeneration_price = 0
+    _cooling.T = 28 + 273.15
+    _cooling.T_limit = _cooling.T + 9
+    
+    # Side steam in CHP not a heat utility, thus will cause problem in TEA utility
+    # cost calculation if price not set to 0 here, costs for regeneration of heating
+    # and cooling utilities will be considered as CAPEX and OPEX of CHP and CT, respectively
+    for i in (_lps, _mps, _hps, _cooling, _chilled):
+        i.heat_transfer_price = i.regeneration_price = 0
+        # if i == _cooling: continue
+        # i.heat_transfer_efficiency = 0.85
+    
+load_process_settings()
 
 # %%
 
 # =============================================================================
-# Characterization factors (CFs) for life cycle analysis (LCA), all from ref [1] if not noted otherwise
+# Characterization factors (CFs) for life cycle analysis (LCA), all from ref [5] 
+# if not noted, note that it is unclear if in-plant receiving and preprocessing
+# (~50% of the total impact per ref [6]) of feedstock is included in ref [5]
 # =============================================================================
 
 CFs = {}
@@ -324,107 +363,140 @@ CFs = {}
 # 100-year global warming potential (GWP) in kg CO2-eq/kg
 # =============================================================================
 GWP_CFs = {
-    'CH4': 0.40, # NA NG from shale and conventional recovery
+    'NH4OH': 2.64 * chems.NH3.MW/chems.NH4OH.MW,
     'CSL': 1.55,
-    'DAP': 1.6354, # ecoinvent 3.8 diammonium phosphate production, RoW
-    
-    # 'Enzyme': 2.24, 
-    'Ethanol': 1.44,
-    'Acetone': 2.5435, #  ecoinvent 3.8 market for acetone, liquid, RoW
-    
-    'H2SO4': 44.47/1e3,   
-    'Lime': 1.29 * 56.0774/74.093, # CaO to Ca(OH)2
-    'CaO': 1.29,
+    'CH4': 0.33, # NA NG from shale and conventional recovery
+    'Enzyme': 2.24,
+    'Cellulase': 2.24,
+    'Lime': 1.29,
     'NaOH': 2.11,
-    # 'NH4OH': 2.64 * 0.4860, # multiplied by chemicals.NH3.MW/chemicals.NH4OH.MW,   
-    # 'MEA': 3.4062, # ecoinvent 3.8 ethanolamine production, RoW [monoethanolamine]
+    'H2SO4': 0.04344,
+    'Ethanol': 1.44,
+    'MEA': 3.4062, # ecoinvent 3.8 ethanolamine production, RoW [monoethanolamine]
     'H3PO4': 1.3598, # ecoinvent 3.8 purification of wet-process phosphoric acid to industrial grade, product in 85% solution state, RoW # cradle-to-gate
     'CO2': 0.87104, # ecoinvent 3.8 carbon dioxide production, liquid, RoW
-    'H2': 2.3716, # ecoinvent 3.8 market for hydrogen, liquid, RoW
-    
-    'SodiumAcetate': 1., # !!! update
-    'AceticAcid': 1.6198, # market for acetic acid, without water, in 98% solution state, GLO
-    
-    'PD': (2*(58.080)*3.5917 + 102.089*2.5435)/(2*100.117), # Acetylacetone; based on GLO/RoW IPCC 2013 CFs of markets for precursors acetone and acetyl anhydride
-    # 'DiammoniumSulfate': 1.2901, # ecoinvent 3.8 market for ammonium sulfate, RoW
-    # 'MagnesiumSulfate': 1.0411, # ecoinvent 3.8 market for magnesium sulfate, GLO
-    
-    'NiSiO2':10., # !!! update
-    'Amberlyst70_':10., # !!! update
-    'H2':10., # !!! update
-    'Isopropanol':10., # !!! update
-    
+    'ZincSulfate': 0.76834, # ecoinvent 3.8 market for zinc monosulfate, RoW
+    'MagnesiumChloride': 0., # ecoinvent 3.8 market for magnesium chloride, from titanium sponge production
+    'Methanol': 0.66082, # ecoinvent 3.8 market for methanol, GLO
+    'Dodecanol':3.691, # ecoinvent 3.8 market for dodecanol, GLO
+    'AmmoniumSulfate': 1.2901, # ecoinvent 3.8 market for ammonium sulfate, RoW
     }
+H3PO4_GWP_CF = 2.5426
+KOH_GWP_CF = 2.299
+GWP_CFs['DPHP'] = 174.2*(H3PO4_GWP_CF/97.944 + 2*KOH_GWP_CF/56.106)
 
 
+
+# GWP_CFs['CaCO3'] = 10.30/1e3
+GWP_CFs['Gypsum'] = -4.20/1e3
+
+
+# from ecoinvent 3.6 IPCC 2013:
+# GWP_CFs['CalciumDihydroxide'] = 1.2105 * 56.0774 / 74.093 # /kg-quicklime converted to kg-slaked_lime assuming CF of 0 for water
+
+# from GREET 2020 GHG-100:
+GWP_CFs['CalciumDihydroxide'] = 1.29 * 56.0774 / 74.093 # /kg-quicklime converted to kg-slaked_lime assuming CF of 0 for water
+
+# from ecoinvent 3.7 IPCC 2013
+GWP_CFs['Hexanol'] = 0.87409 # currently set to CF of 1,1-dimethylcyclopentane to generic market for solvent, organic (per kg)
+
+GWP_CFs['TiO2'] = 7.8029 # ecoinvent 3.7.1, market for titanium dioxide [RoW] - IPCC 2013 GWP100a
 
 GWP_CF_array = chems.kwarray(GWP_CFs)
+
+
 # In kg CO2-eq/kg of material
+
+
 GWP_CF_stream = tmo.Stream('GWP_CF_stream', GWP_CF_array, units='kg/hr')
-CFs['GWP_CF_stream'] = GWP_CF_stream
-
-GWP_CFs['Electricity'] = 0.4490 # kg CO2-eq/kWh GREET 2022 US Mix  # assume production==consumption, both in kg CO2-eq/kWh
 
 
-GWP_CFs['Sugarcane'] = 0.12043 * 0.3/0.286 # ecoinvent 3.8 market for sugarcane, RoW
-# # adjusted from dry wt content of 28.6% (their assumption) to 30% (our assumption)
+# GWP_CFs['FGHTP Corn stover'] = 0.10945 # see Table S4 of the SI
+# GWP_CFs['FGHTP Sugarcane'] = 0.10945 # placeholder
 
 
-# GWP_CFs['Sugarcane'] = 0.02931 # GREET 2022
+# In kg CO2-eq/kWh
+GWP_CFs['Electricity'] = 0.48
+
+# # From corn stover
+# GWP_CFs['LacticAcid_GREET'] = 1.80
+# # From ref [7], lactic acid production, RoW, TRACI global warming
+# GWP_CFs['LacticAcid_fossil'] = 4.1787
 
 
-CFs['GWP_CFs'] = GWP_CFs
-
+GWP_CFs['Corn stover'] = 0.10945 # see Table S4 of the SI of Bhagwat et al. 2021
+# GWP_CFs['Sugarcane'] = 0.12158 # ecoinvent 3.6, sugarcane production, RoW, IPCC 2013 GWP-100a
+GWP_CFs['Sugarcane'] = 0.044535 # GREET 2023, Sugarcane Production for Brazil Plant
+GWP_CFs['Corn'] = 0.2610 # GREET 2023, Corn Production for Biofuel Refinery
+# GWP_CFs['Glucose'] = 1.2127 # ecoinvent 3.8 glucose production, GLO
+GWP_CFs['Glucose'] = 0.7539 * 0.909 # GREET 2023, Glucose (from corn; based on Fuel-Cycle Fossil Energy Use and Greenhouse Gas Emissions of Fuel Ethanol Produced from U.S. Midwest Corn)
+                                    # multiplied by 0.909 as feedstock dextrose monohydrate stream is 90.9 wt% glucose
+CFs['GWP_100'] = GWP_CFs
+# CFs['GWP_CF_stream'] = GWP_CF_stream
+# GWP_CFs['']
 # =============================================================================
 # Fossil energy consumption (FEC), in MJ/kg of material
 # =============================================================================
 
-
 FEC_CFs = {
-    'CH4': 50, # NA NG from shale and conventional recovery
-    'CSL': 12,
-    'DAP': 22.028, # ecoinvent 3.8 diammonium phosphate production, RoW
-    
-    'Ethanol': 16,
-    'Acetone': 66.852, #  ecoinvent 3.8 market for acetone, liquid, RoW
-    # 'Enzyme': 26,
-    
-    'H2SO4': 568.98/1e3,
-    'Lime': 4.896 * 56.0774/74.093, # CaO to Ca(OH)2
-    'CaO': 4.896, 
-    'NaOH': 29,
-    # 'NH4OH': 42 * 0.4860, # multiplied by chemicals.NH3.MW/chemicals.NH4OH.MW,
-    # 'MEA': 67.898, # ecoinvent 3.8 ethanolamine production, RoW [monoethanolamine]
+    'NH4OH': 42. * chems.NH3.MW/chems.NH4OH.MW,
+    'CSL': 12.,
+    'CH4': 50., # NA NG from shale and conventional recovery
+    'Enzyme': 26.,
+    'Cellulase': 2.24,
+    'NaOH': 29.,
+    'H2SO4': 0.56898,
+    'Ethanol': 16.,
+    'MEA': 67.898, # ecoinvent 3.8 ethanolamine production, RoW [monoethanolamine]
     'H3PO4': 16.538, # ecoinvent 3.8 purification of wet-process phosphoric acid to industrial grade, product in 85% solution state, RoW # cradle-to-gate
     'CO2': 7.4243, # ecoinvent 3.8 carbon dioxide production, liquid, RoW
-    'H2': 75.747, # ecoinvent 3.8 market for hydrogen, liquid, RoW
-
-    'SodiumAcetate': 1., # !!! update
-    'AceticAcid': 45.611, # market for acetic acid, without water, in 98% solution state, GLO
-    
-    'PD': (2*(58.080)*66.852 + 102.089*70.817)/(2*100.117), # Acetylacetone; based on GLO/RoW cumulative energy demand CFs of markets for precursors acetone and acetyl anhydride
-    
-    # 'DiammoniumSulfate': 15.166, # ecoinvent 3.8 market for ammonium sulfate, RoW
-    # 'MagnesiumSulfate': 13.805, # ecoinvent 3.8 market for magnesium sulfate, GLO
-    
-    'NiSiO2':10., # !!! update
-    'Amberlyst70_':10., # !!! update
-    'H2':10., # !!! update
-    'Isopropanol':10., # !!! update
-    
+    'ZincSulfate': 11.420, # ecoinvent 3.8 market for zinc monosulfate, RoW
+    'MagnesiumChloride': 0., # ecoinvent 3.8 market for magnesium chloride, from titanium sponge production
+    'Methanol': 34.713, # ecoinvent 3.8 market for methanol, GLO
+    'Dodecanol':47.553, # ecoinvent 3.8 market for dodecanol, GLO
+    'AmmoniumSulfate': 15.166, # ecoinvent 3.8 market for ammonium sulfate, RoW
     }
+H3PO4_FEC_CF = 39.542
+KOH_FEC_CF = 30.421
+FEC_CFs['DPHP'] = 174.2*(H3PO4_FEC_CF/97.944 + 2*KOH_FEC_CF/56.106)
+
+
+
+# FEC_CFs['CaCO3'] = 133.19/1e3
+FEC_CFs['Gypsum'] = -44.19/1e3
+
+
+# from ecoinvent 3.6 IPCC 2013:
+FEC_CFs['CalciumDihydroxide'] = 5.2339  * 56.0774 / 74.093 # /kg-quicklime converted to kg-slaked_lime assuming CF of 0 for water
+FEC_CFs['Hexanol'] = 64.652 # currently set to CF of 1,1-dimethylcyclopentane to generic market for solvent, organic (per kg)
+
+FEC_CFs['TiO2'] = 82.361 # ecoinvent 3.7.1, market for titanium dioxide [RoW] - CED fossil
 
 FEC_CF_array = chems.kwarray(FEC_CFs)
 # In MJ/kg of material
 FEC_CF_stream = tmo.Stream('FEC_CF_stream', FEC_CF_array, units='kg/hr')
 
-CFs['FEC_CF_stream'] = FEC_CF_stream
 
-FEC_CFs['Electricity'] = 5.724 # MJ/kWh # GREET 2022 US Mix #assume production==consumption, both in MJ/kWh
+# FEC_CFs['FGHTP Corn stover'] = 1.68000 # see Table S4 in the SI
+# FEC_CFs['FGHTP Sugarcane'] = 1.68000 # placeholder
 
-FEC_CFs['Sugarcane'] = 	0.40192 * 0.3/0.286 # ecoinvent 3.8 market for sugarcane, RoW
-# # adjusted from dry wt content of 28.6% (their assumption) to 30% (our assumption)
 
-# FEC_CFs['Sugarcane'] = 	0.2265 # GREET 2022
+CFs['FEC'] = FEC_CFs
+# CFs['FEC_CF_stream'] = FEC_CF_stream
+# In MJ/kWh
+FEC_CFs['Electricity'] = 5.926
+# FEC_CFs['Electricity'] = 0.
+# From corn stover
+FEC_CFs['LacticAcid'] = 29.
+# # From ref [7], lactic acid production, RoW, cumulative energy demand, fossil
+# FEC_CFs['LacticAcid_fossil'] = 79.524
 
-CFs['FEC_CFs'] = FEC_CFs
+FEC_CFs['Corn stover'] = 1.68000 # see Table S4 in the SI of Bhagwat et al. 2021
+# FEC_CFs['Sugarcane'] = 0.37338 # ecoinvent 3.6, sugarcane production, RoW, IPCC 2013 GWP-100a
+FEC_CFs['Sugarcane'] = 0.28832 # GREET 2023, Sugarcane Production for Brazil Plant
+FEC_CFs['Corn'] = 1.684 # GREET 2023, Corn Production for Biofuel Refinery
+# FEC_CFs['Glucose'] = 14.507 # ecoinvent 3.8 glucose production, GLO
+FEC_CFs['Glucose'] = 7.74 * 0.909 # GREET 2023, Glucose (from corn; based on Fuel-Cycle Fossil Energy Use and Greenhouse Gas Emissions of Fuel Ethanol Produced from U.S. Midwest Corn)
+                                  # multiplied by 0.909 as feedstock dextrose monohydrate stream is 90.9 wt% glucose
+
+
