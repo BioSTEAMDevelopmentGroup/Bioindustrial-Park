@@ -33,18 +33,30 @@ def sobol_file(name, extention='xlsx'):
     filename += '.' + extention
     return os.path.join(results_folder, filename)
 
-def monte_carlo_file(name, extention='xlsx'):
+def monte_carlo_file_name(name, carbon_capture, dewatering):
     filename = name + '_monte_carlo'
-    filename += '.' + extention
+    if carbon_capture:
+        filename += '_carbon_capture'
+    if dewatering:
+        filename += '_dewatering'
+    filename += '.' + 'xlsx'
     return os.path.join(results_folder, filename)
 
-def spearman_file(name):
+def spearman_file_name(name, N, carbon_capture, dewatering):
     filename = name + '_spearman'
+    if carbon_capture:
+        filename += '_carbon_capture'
+    if dewatering:
+        filename += '_dewatering'
     filename += '.xlsx'
     return os.path.join(results_folder, filename)
 
-def autoload_file_name(name):
-    filename = name
+def autoload_file_name(name, N, carbon_capture, dewatering):
+    filename = name + '_' + str(N)
+    if carbon_capture:
+        filename += '_carbon_capture'
+    if dewatering:
+        filename += '_dewatering'
     return os.path.join(results_folder, filename)
 
 def set_font(size=8, family='sans-serif', font='Arial'):
@@ -256,7 +268,7 @@ def plot_spearman_both(**kwargs):
     labels = ['TEA', 'LCA']
     br = ace.Biorefinery(simulate=False, **kwargs)
     rhos = []
-    file = spearman_file(br.name)
+    file = spearman_file_name(br.name)
     df = pd.read_excel(file, header=[0, 1], index_col=[0, 1])
     names = get_spearman_names(br.model.parameters)
     index = [i for i, j in enumerate(df.index) if j in names]
@@ -322,7 +334,7 @@ def plot_spearman(kind=None, **kwargs):
     else:
         raise ValueError(f"invalid kind '{kind}'")
     rhos = []
-    file = spearman_file(br.name)
+    file = spearman_file_name(br.name)
     df = pd.read_excel(file, header=[0, 1], index_col=[0, 1])
     rhos = df[metric.index]
     names = get_spearman_names(br.model.parameters)
@@ -342,15 +354,22 @@ def run_monte_carlo(
         autoload=True,
         sort=True,
         convergence_model=None,
-        **kwargs
+        dewatering=True,
+        carbon_capture=True
     ):
     filterwarnings('ignore')
-    br = ace.Biorefinery(simulate=False, **kwargs)
+    br = ace.Biorefinery(
+        simulate=False, 
+        carbon_capture=carbon_capture,
+        dewatering=dewatering,
+    )
     br.model.exception_hook = 'raise'
-    file = monte_carlo_file(br.name)
+    
     N_notify = min(int(N/10), 20)
     autosave = N_notify if autosave else False
-    autoload_file = autoload_file_name(br.name + str(N))
+    autoload_file = autoload_file_name(br.name, N, carbon_capture, dewatering)
+    spearman_file = spearman_file_name(br.name, N, carbon_capture, dewatering)
+    monte_carlo_file = monte_carlo_file_name(br.name, carbon_capture, dewatering)
     np.random.seed(1)
     samples = br.model.sample(N, rule)
     br.model.load_samples(samples, sort=sort)
@@ -366,14 +385,13 @@ def run_monte_carlo(
         file=autoload_file,
         convergence_model=convergence_model,
     )
-    br.model.table.to_excel(file)
+    br.model.table.to_excel(monte_carlo_file)
     br.model.table = br.model.table.dropna(how='all', axis=1)
     for i in br.model.metrics:
         if i.index not in br.model.table: br.model._metrics.remove(i)
     br.model.table = br.model.table.dropna(how='any', axis=0)
     rho, p = br.model.spearman_r(filter='omit nan')
-    file = spearman_file(br.name)
-    rho.to_excel(file)
+    rho.to_excel(spearman_file)
 
 def sobol_analysis():
     filterwarnings('ignore', category=bst.exceptions.DesignWarning)
@@ -439,25 +457,25 @@ def plot_sobol(names, categories, df, colors=None, hatches=None,
                                   legend, **legend_kwargs)
     return fig, axes
     
-def get_monte_carlo(name, features, cache={}):
+def get_monte_carlo(name, features, carbon_capture, dewatering, cache={}):
     index = [i.index for i in features]
-    key = name
+    key = (name, carbon_capture, dewatering)
     if key in cache:
         df = cache[key]
     else:
-        file = monte_carlo_file(key)
+        file = monte_carlo_file_name(name, carbon_capture, dewatering)
         cache[key] = df = pd.read_excel(file, header=[0, 1], index_col=[0])
         df = df[index]
     mc = df.dropna(how='all', axis=0)
     return mc
     
-def plot_kde():
+def plot_kde(carbon_capture, dewatering):
     set_font(size=12)
     set_figure_size(width='half', aspect_ratio=1.1)
     br = ace.Biorefinery(simulate=False)
     metrics = [br.GWP, br.MSP]
     Xi, Yi = metrics
-    df = get_monte_carlo(br.name, metrics)
+    df = get_monte_carlo(br.name, metrics, carbon_capture, dewatering)
     y = df[Yi.index].values
     x = df[Xi.index].values
     # x = x[y < 20]

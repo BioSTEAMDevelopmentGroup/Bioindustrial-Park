@@ -14,12 +14,13 @@ def create_cc_chemicals():
                                'AceticAcid', 'Ethanol', 'EthylAcetate',])
     bst.settings.set_thermo(chemicals)
         
-    mixture = bst.PRMixture.from_chemicals(chemicals)
+    # mixture = bst.PRMixture.from_chemicals(chemicals)
     bst.settings.set_thermo(
         chemicals,
         Gamma=bst.IdealActivityCoefficients,
-        mixture=mixture
+        # mixture=mixture
     )
+    bst.settings.mixture.include_excess_energies = True
     return bst.settings.thermo
 
 def create_acetate_ester_chemicals(yeast_includes_nitrogen=False):
