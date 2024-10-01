@@ -195,10 +195,12 @@ MEA_price = (1021.69*_chemical_2014to2016 + 1855.65*_chemical_2017to2016)/(2*100
 
 
 # Magnesium chloride
-MgCl2_price = 0.1387 * _lb_per_kg * _GDP_2007_to_2010 * chem_index[2016]/chem_index[2010] # 0.1275 - 0.1500 $/kg in 2007$ # https://web.archive.org/web/20161125084558/http://www.icis.com:80/chemicals/channel-info-chemicals-a-z/
+MgCl2_price = 0.1387 * _lb_per_kg * _GDP_2007_to_2010 * chem_index[2016]/chem_index[2010] # 0.1275 - 0.1500 $/lb in 2007$ # https://web.archive.org/web/20161125084558/http://www.icis.com:80/chemicals/channel-info-chemicals-a-z/
+# $0.380/kg ($0.349 - 0.411/kg) in 2019$
 
 # Zinc sulfate
 ZnSO4_price = 580 / _kg_per_ton * _GDP_2007_to_2010 * chem_index[2016]/chem_index[2010] # 480 - 680 $/ton in 2007$ # https://web.archive.org/web/20161125084558/http://www.icis.com:80/chemicals/channel-info-chemicals-a-z/
+# $0.380/kg ($0.349 - 0.411/kg) in 2019$
 
 # Dodecanol
 Dodecanol_price = 2.75 # 2500 - 3000 $/ metric ton # https://www.alibaba.com/product-detail/New-Arrival-Liquid-Lauryl-alcohol-Dodecanol_1600489291769.html?spm=a2700.galleryofferlist.normal_offer.6.267b13a0flS0fP
