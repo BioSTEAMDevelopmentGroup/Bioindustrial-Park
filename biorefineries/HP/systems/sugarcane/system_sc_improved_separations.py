@@ -91,7 +91,7 @@ bst.main_flowsheet.set_flowsheet(flowsheet)
 bst.units.ShortcutColumn.minimum_guess_distillate_recovery = 0
 
 # Baseline cost year is 2016
-bst.CE = 541.7
+bst.CE = bst.units.design_tools.CEPCI_by_year[2019]
 # _labor_2007to2016 = 22.71 / 19.55
 
 # Set default thermo object for the system
@@ -353,11 +353,21 @@ def create_HP_sys(ins, outs):
                                         separation_sys-6,
                                         ))
     
+    M501.ammonia_dissolution_rxns = ParallelRxn([
+        Rxn('NH3 + H2O -> NH4OH', 'NH3',   1.),
+        ])
+
+    #     Rxn('SodiumCitrate + H2O -> CitricAcid + 3NaOH ', 'SodiumCitrate',   1.-1e-5),
+    #     ])
+    
     @M501.add_specification(run=False)
-    def M501_acid_base_removal_spec():
-        for i in M501.ins:
-            i.imol['NaOH','H2SO4'] = 0.
+    def M501_spec():
         M501._run()
+        M501_outs_0 = M501.outs[0]
+        M501.ammonia_dissolution_rxns(M501_outs_0.mol[:])
+        water_to_add = M501_outs_0.imol['H2SO4', 'NaOH'].max()
+        M501_outs_0.imol['H2SO4', 'NaOH', 'NH4OH'] = 0.
+        M501_outs_0.imol['Water'] += water_to_add
     
     # M501.citrate_acetate_dissolution_rxns = ParallelRxn([
     #     Rxn('SodiumAcetate + H2O -> AceticAcid + NaOH', 'SodiumAcetate',   1.-1e-5),

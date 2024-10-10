@@ -637,7 +637,7 @@ if plot:
                                     # manual_clabels_regular = {
                                     #     MPSP_w_ticks[5]: (45,28),
                                     #     },
-                                    additional_points ={(73, 62.5):('D', 'w', 6)},
+                                    additional_points ={(73, 62.5):('o', 'w', 6)},
                                     # fill_bottom_with_cmap_over_color=True, # for TRY
                                     bottom_fill_bounds = ((0,0), 
                                                           (5,18.),
@@ -647,7 +647,7 @@ if plot:
                                     
                                     add_shapes = {
                                         # coords as tuple of tuples: (color, zorder),
-                                        ((0,0), (55,200), (1,200)): ('white', 2), # infeasible region smoothing
+                                        ((0,0), (61,200), (1,200)): ('white', 2), # infeasible region smoothing
                                         },
                                     units_on_newline = (False, False, False, False), # x,y,z,w
                                     units_opening_brackets = [" (",] * 4,
@@ -695,7 +695,7 @@ if plot:
                                     axis_tick_fontsize = axis_tick_fontsize,
                                     n_minor_ticks = 1,
                                     cbar_n_minor_ticks = 4,
-                                    # additional_points ={(73, 62.5):('D', 'w', 6)},
+                                    additional_points ={(73, 62.5):('o', 'w', 6)},
                                     fill_bottom_with_cmap_over_color=True, # for TRY
                                     bottom_fill_bounds = ((0,0), 
                                                           (5,18.),
@@ -705,7 +705,7 @@ if plot:
                                     
                                     add_shapes = {
                                         # coords as tuple of tuples: (color, zorder),
-                                        ((0,0), (55,200), (1,200)): ('white', 2), # infeasible region smoothing
+                                        ((0,0), (61,200), (1,200)): ('white', 2), # infeasible region smoothing
                                         },
                                     units_on_newline = (False, False, False, False), # x,y,z,w
                                     units_opening_brackets = [" (",] * 4,
@@ -720,7 +720,7 @@ if plot:
     # FEC_w_levels, FEC_w_ticks, FEC_cbar_ticks = get_contour_info_from_metric_data(results_metric_3,)
     FEC_w_levels = np.arange(-100, 101, 10)
     FEC_cbar_ticks = np.arange(-100, 101, 20)
-    FEC_w_ticks = [-100, -60, -30, 0, 30, 60, 100]
+    FEC_w_ticks = [-100, -60, -30, -10, 0, 30, 60, 100]
     # FEC_w_ticks = [40, 50, 70, 80, 100]
     contourplots.animated_contourplot(w_data_vs_x_y_at_multiple_z=results_metric_3, # shape = z * x * y # values of the metric you want to plot on the color axis; e.g., FEC
                                     x_data=100*yields, # x axis values
@@ -757,7 +757,7 @@ if plot:
                                     axis_tick_fontsize = axis_tick_fontsize,
                                     n_minor_ticks = 1,
                                     cbar_n_minor_ticks = 1,
-                                    additional_points ={(73, 62.5):('D', 'w', 6)},
+                                    additional_points ={(73, 62.5):('o', 'w', 6)},
                                     fill_bottom_with_cmap_over_color=True, # for TRY
                                     bottom_fill_bounds = ((0,0), 
                                                           (5,18.),
@@ -767,7 +767,7 @@ if plot:
                                     
                                     add_shapes = {
                                         # coords as tuple of tuples: (color, zorder),
-                                        ((0,0), (55,200), (1,200)): ('white', 2), # infeasible region smoothing
+                                        ((0,0), (61,200), (1,200)): ('white', 2), # infeasible region smoothing
                                         },
                                     units_on_newline = (False, False, False, False), # x,y,z,w
                                     units_opening_brackets = [" (",] * 4,

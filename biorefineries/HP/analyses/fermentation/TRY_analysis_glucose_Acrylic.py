@@ -70,7 +70,7 @@ HP_results_filepath = HP_filepath + '\\analyses\\results\\'
 
 #%% Load baseline
 
-spec.reactor.neutralization = False # !!! set neutralization here
+spec.reactor.neutralization = True # !!! set neutralization here
 
 model = models.HP_model
 system = HP_sys = models.HP_sys
@@ -124,8 +124,8 @@ def reset_and_reload():
     print('Loading and simulating with baseline specifications ...')
     spec_1, spec_2, spec_3 = spec.spec_1, spec.spec_2, spec.spec_3
     spec.load_specifications(spec.baseline_yield, spec.baseline_titer, spec.baseline_productivity)
-    spec.set_production_capacity(spec.desired_annual_production)
-    # system.simulate()
+    # spec.set_production_capacity(spec.desired_annual_production)
+    system.simulate()
     print('Loading and simulating with required specifications ...')
     spec.load_specifications(spec_1=spec_1, spec_2=spec_2, spec_3=spec_3)
     # spec.set_production_capacity(spec.desired_annual_production)
@@ -214,7 +214,7 @@ spec_2 = titers = np.linspace(5.,
 spec_3 = productivities =\
     np.array([
                 0.2*spec.baseline_productivity,
-               # 1.*spec.baseline_productivity,
+                # 1.*spec.baseline_productivity,
                 # 5.*spec.baseline_productivity,
               ])
 
@@ -333,7 +333,7 @@ def tickmarks(dmin, dmax, accuracy=50, N_points=5):
 
 #%%
 minute = '0' + str(dateTimeObj.minute) if len(str(dateTimeObj.minute))==1 else str(dateTimeObj.minute)
-file_to_save = f'_{steps}_steps_glucose_neutral={R302.neutralization}_'+'HP_TRY_%s.%s.%s-%s.%s'%(dateTimeObj.year, dateTimeObj.month, dateTimeObj.day, dateTimeObj.hour, minute)
+file_to_save = f'_{steps}_steps_glucose_neutral={R302.neutralization}_'+'HP_TRY_%s.%s.%s-%s.%s.%s'%(dateTimeObj.year, dateTimeObj.month, dateTimeObj.day, dateTimeObj.hour, minute, dateTimeObj.second)
 
 #%% Create meshgrid
 spec_1, spec_2 = np.meshgrid(spec_1, spec_2)
@@ -655,7 +655,7 @@ if plot:
                                     # manual_clabels_regular = {
                                     #     MPSP_w_ticks[5]: (45,28),
                                     #     },
-                                    additional_points ={(73, 62.5):('D', 'w', 6)},
+                                    # additional_points ={(73, 62.5):('D', 'w', 6)},
                                     fill_bottom_with_cmap_over_color=True, # for TRY
                                     bottom_fill_bounds = ((0,0), 
                                                           (5,60.),
