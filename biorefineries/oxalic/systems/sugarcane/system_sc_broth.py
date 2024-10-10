@@ -292,7 +292,7 @@ def create_oxalic_sys(ins, outs):
     T609.line = 'Magnesium chloride storage tank'
     
     T610 = bst.units.StorageTank('T610', ins = diammonium_sulfate_fresh, outs = fermentation_diammonium_sulfate)
-    T610.line = 'Zinc sulfate storage tank'
+    T610.line = 'Diammonium sulfate storage tank'
     
 
     ############################

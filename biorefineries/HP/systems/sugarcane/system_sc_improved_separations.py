@@ -344,6 +344,7 @@ def create_HP_sys(ins, outs):
     
     # Mix waste liquids for treatment
     M501 = bst.units.Mixer('M501', ins=(u.F301_P-0, 
+                                        fermentation_sys-3,
                                         upgrading_sys-2, 
                                         # u.H201-0,
                                         separation_sys-3,

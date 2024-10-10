@@ -193,7 +193,7 @@ HP_metrics = [get_product_MPSP,
 
 # %% Generate 3-specification meshgrid and set specification loading functions
 
-steps = (60, 60, 1)
+steps = (20, 20, 1)
 
 # Yield, titer, productivity (rate)
 spec_1 = yields = np.linspace(0.05, 0.95, steps[0]) # yield
@@ -219,27 +219,34 @@ x_units = r"$\mathrm{\%}$" + " " + r"$\mathrm{theoretical}$"
 x_ticks = [0, 10, 20, 30, 40, 50, 60, 70, 80, 90, 100]
 
 y_label = r"$\bfTiter$" # title of the y axis
-y_units =r"$\mathrm{g} \cdot \mathrm{L}^{-1}$"
+# y_units =r"$\mathrm{g} \cdot \mathrm{L}^{-1}$"
+y_units =r"$\mathrm{g/L}}$"
 y_ticks = [0, 20, 40, 60, 80, 100, 120, 140, 160, 180, 200]
 
 
 z_label = r"$\bfProductivity$" # title of the z axis
-z_units =  r"$\mathrm{g} \cdot \mathrm{L}^{-1}  \cdot \mathrm{h}^{-1}$"
+# z_units =  r"$\mathrm{g} \cdot \mathrm{L}^{-1}  \cdot \mathrm{h}^{-1}$"
+z_units =  r"$\mathrm{g/L/h}$"
 z_ticks = [0, 0.2, 0.4, 0.6, 0.8, 1.0, 1.2, 1.4, 1.6, 1.8, 2.0]
 
 # Metrics
 MPSP_w_label = r"$\bfMPSP$" # title of the color axis
-MPSP_units = r"$\mathrm{\$}\cdot\mathrm{kg}^{-1}$"
+# MPSP_units = r"$\mathrm{\$}\cdot\mathrm{kg}^{-1}$"
+MPSP_units = r"$\mathrm{\$/kg}$"
 
 # GWP_w_label = r"$\mathrm{\bfGWP}_{\bf100}$"
-GWP_w_label = r"$\mathrm{\bfCarbon}$" + " " + r"$\mathrm{\bfIntensity}$"
-GWP_units = r"$\mathrm{kg}$"+" "+ r"$\mathrm{CO}_{2}\mathrm{-eq.}\cdot\mathrm{kg}^{-1}$"
+# GWP_w_label = r"$\mathrm{\bfCarbon}$" + " " + r"$\mathrm{\bfIntensity}$"
+GWP_w_label = r"$\mathrm{\bfCI}$"
+# GWP_units = r"$\mathrm{kg}$"+" "+ r"$\mathrm{CO}_{2}\mathrm{-eq.}\cdot\mathrm{kg}^{-1}$"
+GWP_units = r"$\mathrm{kg}$"+" "+ r"$\mathrm{CO}_{2}\mathrm{-eq./kg}$"
 
 FEC_w_label = r"$\bfFEC$" # title of the color axis
-FEC_units = r"$\mathrm{MJ}\cdot\mathrm{kg}^{-1}$"
+# FEC_units = r"$\mathrm{MJ}\cdot\mathrm{kg}^{-1}$"
+FEC_units = r"$\mathrm{MJ/kg}$"
 
 AOC_w_label = r"$\bfAOC$" # title of the color axis
-AOC_units = r"$\mathrm{MM\$}\cdot\mathrm{y}^{-1}$"
+# AOC_units = r"$\mathrm{MM\$}\cdot\mathrm{y}^{-1}$"
+AOC_units = r"$\mathrm{MM\$/y}$"
 
 TCI_w_label = r"$\bfTCI$" # title of the color axis
 TCI_units = r"$\mathrm{MM\$}$"
@@ -378,7 +385,6 @@ for p in productivities:
             curr_no +=1
             error_message = None
             if titer_too_high_for_yield:
-                print(f'Titer {t} too high for yield {y}.')
                 d1_Metric1[-1].append(np.nan)
                 d1_Metric2[-1].append(np.nan)
                 d1_Metric3[-1].append(np.nan)
@@ -420,6 +426,7 @@ for p in productivities:
                         d1_Metric6[-1].append(np.nan)
                         error_message = str_e
                         titer_too_high_for_yield = True
+                        print(f'Titer {t} too high for yield {y}.')
                     else:
                         try:
                             run_bugfix_barrage()
@@ -636,20 +643,24 @@ if plot:
                                                           (5,18.),
                                                           (95,18.)),
                                     # zoom_data_scale=5,
-                                    text_boxes = {'>4.0': [(5,5), 'white']},
+                                    text_boxes = {'>4.00': [(5,5), 'white']},
                                     
                                     add_shapes = {
                                         # coords as tuple of tuples: (color, zorder),
                                         ((0,0), (55,200), (1,200)): ('white', 2), # infeasible region smoothing
-                                        }
+                                        },
+                                    units_on_newline = (False, False, False, False), # x,y,z,w
+                                    units_opening_brackets = [" (",] * 4,
+                                    units_closing_brackets = [")",] * 4,
+                                    label_over_color='white',
                                     )
     
     #%% GWP
     
     # GWP_w_levels, GWP_w_ticks, GWP_cbar_ticks = get_contour_info_from_metric_data(results_metric_2,)
-    GWP_w_levels = np.arange(0, 6.01, 0.1)
-    GWP_cbar_ticks = np.arange(0, 6.01, 1.)
-    GWP_w_ticks = [0, 0.7, 1, 1.5, 2,  3,4,6]
+    GWP_w_levels = np.arange(-4, 6.01, 0.2)
+    GWP_cbar_ticks = np.arange(-4, 6.01, 2.)
+    GWP_w_ticks = [-4, -3, -2, -1.5, 0, 0.7, 1, 1.5, 2,  3,4,6]
     contourplots.animated_contourplot(w_data_vs_x_y_at_multiple_z=results_metric_2, # shape = z * x * y # values of the metric you want to plot on the color axis; e.g., GWP
                                     x_data=100*yields, # x axis values
                                     y_data=titers, # y axis values
@@ -671,7 +682,7 @@ if plot:
                                     fmt_clabel = lambda cvalue: get_rounded_str(cvalue, 3),
                                     cmap=CABBI_green_colormap(), # can use 'viridis' or other default matplotlib colormaps
                                     cmap_over_color = colors.grey_dark.shade(8).RGBn,
-                                    extend_cmap='max',
+                                    extend_cmap='both',
                                     cbar_ticks=GWP_cbar_ticks,
                                     z_marker_color='g', # default matplotlib color names
                                     fps=fps, # animation frames (z values traversed) per second
@@ -690,12 +701,16 @@ if plot:
                                                           (5,18.),
                                                           (95,18.)),
                                     # zoom_data_scale=5,
-                                    text_boxes = {'>6.0': [(5,5), 'white']},
+                                    text_boxes = {'>6.00': [(5,5), 'white']},
                                     
                                     add_shapes = {
                                         # coords as tuple of tuples: (color, zorder),
                                         ((0,0), (55,200), (1,200)): ('white', 2), # infeasible region smoothing
-                                        }
+                                        },
+                                    units_on_newline = (False, False, False, False), # x,y,z,w
+                                    units_opening_brackets = [" (",] * 4,
+                                    units_closing_brackets = [")",] * 4,
+                                    label_over_color='white',
                                     
                                     )
     
@@ -748,12 +763,16 @@ if plot:
                                                           (5,18.),
                                                           (95,18.)),
                                     # zoom_data_scale=5,
-                                    text_boxes = {'>4.0': [(5,5), 'white']},
+                                    # text_boxes = {'>4.0': [(5,5), 'white']},
                                     
                                     add_shapes = {
                                         # coords as tuple of tuples: (color, zorder),
                                         ((0,0), (55,200), (1,200)): ('white', 2), # infeasible region smoothing
-                                        }
+                                        },
+                                    units_on_newline = (False, False, False, False), # x,y,z,w
+                                    units_opening_brackets = [" (",] * 4,
+                                    units_closing_brackets = [")",] * 4,
+                                    label_over_color='white',
                                     )
     
     #%% AOC

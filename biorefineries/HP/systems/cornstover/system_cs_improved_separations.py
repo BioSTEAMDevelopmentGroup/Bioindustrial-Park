@@ -64,6 +64,8 @@ import copy
 from biorefineries.cornstover import CellulosicEthanolTEA as HPTEA
 from biosteam import SystemFactory
 from biorefineries.cellulosic import create_facilities
+from biorefineries.cellulosic.units import Saccharification
+
 from biorefineries.cornstover import create_dilute_acid_pretreatment_system, create_saccharification_system
 # from biorefineries import corn
 # from lactic.hx_network import HX_Network
@@ -111,6 +113,15 @@ System.default_relative_molar_tolerance = 0.001 # supersedes absolute tolerance
 System.default_molar_tolerance = 0.1
 System.strict_convergence = True # True => throw exception if system does not converge; false => continue with unconverged system
 
+def get_cornstover_saccharification_system_full(ins=()):
+    sys_upto_presacch = create_saccharification_system(ins=ins)
+    sys_upto_presacch.simulate()
+    R305 = Saccharification('R305', ins=sys_upto_presacch-0)
+    cornstover_saccharification_sys = bst.System.from_units('cornstover_saccharification_sys', 
+                                                            sys_upto_presacch.units+[R305])
+    
+    return cornstover_saccharification_sys
+
 @SystemFactory(ID = 'helper_HP_sys')
 def create_HP_sys(ins, outs):
     u, s = flowsheet.unit, flowsheet.stream
@@ -120,7 +131,7 @@ def create_HP_sys(ins, outs):
     # Corn stover pretreatment and saccharification subprocesses
     cornstover_pretreatment_sys = create_dilute_acid_pretreatment_system('cornstover_pretreatment_sys')
     
-    cornstover_saccharification_sys = create_saccharification_system('cornstover_saccharification_sys',
+    cornstover_saccharification_sys = get_cornstover_saccharification_system_full(
                                                                      ins=(cornstover_pretreatment_sys-0))
     
     cornstover_pretreatment_sys.simulate(update_configuration=True)
@@ -180,7 +191,7 @@ def create_HP_sys(ins, outs):
     makeup_MEA_A301 = Stream('makeup_MEA_A301', units='kg/hr', price=price['Monoethanolamine'])
     
     #%% Fermentation units
-    fermentation_sys = create_HP_fermentation_process(ins=(cornstover_saccharification_sys-0,
+    fermentation_sys = create_HP_fermentation_process(ins=(u.R305-0,
                                                            CSL,
                                                            fermentation_MgCl2,
                                                            fermentation_ZnSO4,
@@ -355,12 +366,13 @@ def create_HP_sys(ins, outs):
     M501 = bst.units.Mixer('M501', ins=(
                                         u.H201-0,
                                         u.F301_P-0, 
+                                        fermentation_sys-3,
                                         # separation_sys-4,
-                                        upgrading_sys-2, 
                                         separation_sys-3,
                                         separation_sys-4,
                                         separation_sys-5,
                                         separation_sys-6,
+                                        upgrading_sys-2, 
                                         # u.H201-0,
                                         ))
     # M501.citrate_acetate_dissolution_rxns = ParallelRxn([

@@ -27,7 +27,7 @@ This module is a modified implementation of modules from the following:
 from biosteam import HeatUtility, Facility
 from biosteam.units.decorators import cost
 from thermosteam import Stream
-from biorefineries.make_a_biorefinery.utils import CEPCI
+from biorefineries.succinic.utils import CEPCI
 
 __all__ = ('CIP', 'ADP', 'CT', 'PWC',)
 

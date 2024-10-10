@@ -70,7 +70,7 @@ HP_results_filepath = HP_filepath + '\\analyses\\results\\'
 
 #%% Load baseline
 
-spec.reactor.neutralization = True # !!! set neutralization here
+spec.reactor.neutralization = False # !!! set neutralization here
 
 model = models.HP_model
 system = HP_sys = models.HP_sys
@@ -202,7 +202,7 @@ HP_metrics = [get_product_MPSP,
 
 # %% Generate 3-specification meshgrid and set specification loading functions
 
-steps = (20, 20, 1)
+steps = (60, 60, 1)
 
 # Yield, titer, productivity (rate)
 spec_1 = yields = np.linspace(0.05, 0.95, steps[0]) # yield
@@ -214,8 +214,8 @@ spec_2 = titers = np.linspace(5.,
 spec_3 = productivities =\
     np.array([
                 0.2*spec.baseline_productivity,
-              # 1.*spec.baseline_productivity,
-                5.*spec.baseline_productivity,
+               # 1.*spec.baseline_productivity,
+                # 5.*spec.baseline_productivity,
               ])
 
 
@@ -228,27 +228,34 @@ x_units = r"$\mathrm{\%}$" + " " + r"$\mathrm{theoretical}$"
 x_ticks = [0, 10, 20, 30, 40, 50, 60, 70, 80, 90, 100]
 
 y_label = r"$\bfTiter$" # title of the y axis
-y_units =r"$\mathrm{g} \cdot \mathrm{L}^{-1}$"
+# y_units =r"$\mathrm{g} \cdot \mathrm{L}^{-1}$"
+y_units =r"$\mathrm{g/L}}$"
 y_ticks = [0, 20, 40, 60, 80, 100, 120, 140, 160, 180, 200]
 
 
 z_label = r"$\bfProductivity$" # title of the z axis
-z_units =  r"$\mathrm{g} \cdot \mathrm{L}^{-1}  \cdot \mathrm{h}^{-1}$"
+# z_units =  r"$\mathrm{g} \cdot \mathrm{L}^{-1}  \cdot \mathrm{h}^{-1}$"
+z_units =  r"$\mathrm{g/L/h}$"
 z_ticks = [0, 0.2, 0.4, 0.6, 0.8, 1.0, 1.2, 1.4, 1.6, 1.8, 2.0]
 
 # Metrics
 MPSP_w_label = r"$\bfMPSP$" # title of the color axis
-MPSP_units = r"$\mathrm{\$}\cdot\mathrm{kg}^{-1}$"
+# MPSP_units = r"$\mathrm{\$}\cdot\mathrm{kg}^{-1}$"
+MPSP_units = r"$\mathrm{\$/kg}$"
 
 # GWP_w_label = r"$\mathrm{\bfGWP}_{\bf100}$"
-GWP_w_label = r"$\mathrm{\bfCarbon}$" + " " + r"$\mathrm{\bfIntensity}$"
-GWP_units = r"$\mathrm{kg}$"+" "+ r"$\mathrm{CO}_{2}\mathrm{-eq.}\cdot\mathrm{kg}^{-1}$"
+# GWP_w_label = r"$\mathrm{\bfCarbon}$" + " " + r"$\mathrm{\bfIntensity}$"
+GWP_w_label = r"$\mathrm{\bfCI}$"
+# GWP_units = r"$\mathrm{kg}$"+" "+ r"$\mathrm{CO}_{2}\mathrm{-eq.}\cdot\mathrm{kg}^{-1}$"
+GWP_units = r"$\mathrm{kg}$"+" "+ r"$\mathrm{CO}_{2}\mathrm{-eq./kg}$"
 
 FEC_w_label = r"$\bfFEC$" # title of the color axis
-FEC_units = r"$\mathrm{MJ}\cdot\mathrm{kg}^{-1}$"
+# FEC_units = r"$\mathrm{MJ}\cdot\mathrm{kg}^{-1}$"
+FEC_units = r"$\mathrm{MJ/kg}$"
 
 AOC_w_label = r"$\bfAOC$" # title of the color axis
-AOC_units = r"$\mathrm{MM\$}\cdot\mathrm{y}^{-1}$"
+# AOC_units = r"$\mathrm{MM\$}\cdot\mathrm{y}^{-1}$"
+AOC_units = r"$\mathrm{MM\$/y}$"
 
 TCI_w_label = r"$\bfTCI$" # title of the color axis
 TCI_units = r"$\mathrm{MM\$}$"
@@ -366,6 +373,8 @@ total_no = len(yields)*len(titers)*len(productivities)
 
 print_status_every_n_simulations = 20
 
+titers_mol_per_mol_total = [] # for fermentation generalizable insights work only
+
 for p in productivities:
     # data_1 = HP_data = spec.evaluate_across_specs(
     #         HP_sys, spec_1, spec_2, HP_metrics, [p])
@@ -383,11 +392,12 @@ for p in productivities:
         # spec.load_specifications(spec.baseline_yield, spec.baseline_titer, spec.baseline_productivity)
         # simulate_and_print()
         titer_too_high_for_yield = False
+        titers_mol_per_mol_total.append([])
         for t in titers:
             curr_no +=1
             error_message = None
+            titers_mol_per_mol_total[-1].append(broth.imol['HP']/broth.imol['HP', 'Water'].sum())
             if titer_too_high_for_yield:
-                print(f'Titer {t} too high for yield {y}.')
                 d1_Metric1[-1].append(np.nan)
                 d1_Metric2[-1].append(np.nan)
                 d1_Metric3[-1].append(np.nan)
@@ -429,6 +439,7 @@ for p in productivities:
                         d1_Metric6[-1].append(np.nan)
                         error_message = str_e
                         titer_too_high_for_yield = True
+                        print(f'Titer {t} too high for yield {y}.')
                     else:
                         try:
                             run_bugfix_barrage()
@@ -497,6 +508,10 @@ np.save(HP_results_filepath+'MPSP-'+file_to_save, results_metric_1)
 np.save(HP_results_filepath+'GWP-'+file_to_save, results_metric_2)
 np.save(HP_results_filepath+'FEC-'+file_to_save, results_metric_3)
 
+#%% Load generated numpy file
+results_metric_1 = np.load(HP_results_filepath+'MPSP-'+file_to_save+'.npy')
+results_metric_2 = np.load(HP_results_filepath+'GWP-'+file_to_save+'.npy')
+results_metric_3 = np.load(HP_results_filepath+'FEC-'+file_to_save+'.npy')
 
 #%% More plot utils
 
@@ -579,16 +594,16 @@ def get_contour_info_from_metric_data(
 #%% More plot stuff
 
 fps = 3
-axis_title_fonts={'size': {'x': 11, 'y':11, 'z':11, 'w':11},}
-default_fontsize = 11.
-clabel_fontsize = 9.5
-axis_tick_fontsize = 9.5
+axis_title_fonts={'size': {'x': 12, 'y':12, 'z':12, 'w':12},}
+default_fontsize = 12.
+clabel_fontsize = 10.5
+axis_tick_fontsize = 10.5
 keep_frames = True
 
 print('\nCreating and saving contour plots ...\n')
 
 #%% Plots
-plot = True
+plot = False
 
 if plot: 
     
@@ -640,7 +655,7 @@ if plot:
                                     # manual_clabels_regular = {
                                     #     MPSP_w_ticks[5]: (45,28),
                                     #     },
-                                    # additional_points ={(73, 62.5):('D', 'w', 6)},
+                                    additional_points ={(73, 62.5):('D', 'w', 6)},
                                     fill_bottom_with_cmap_over_color=True, # for TRY
                                     bottom_fill_bounds = ((0,0), 
                                                           (5,60.),
@@ -651,7 +666,11 @@ if plot:
                                     add_shapes = {
                                         # coords as tuple of tuples: (color, zorder),
                                         ((0,0), (20,200), (1,200)): ('white', 2), # infeasible region smoothing
-                                        }
+                                        },
+                                    units_on_newline = (False, False, False, False), # x,y,z,w
+                                    units_opening_brackets = [" (",] * 4,
+                                    units_closing_brackets = [")",] * 4,
+                                    label_over_color='white',
                                     )
     
     #%% GWP
@@ -708,8 +727,11 @@ if plot:
                                     add_shapes = {
                                         # coords as tuple of tuples: (color, zorder),
                                         ((0,0), (20,200), (1,200)): ('white', 2), # infeasible region smoothing
-                                        }
-                                    
+                                        },
+                                    units_on_newline = (False, False, False, False), # x,y,z,w
+                                    units_opening_brackets = [" (",] * 4,
+                                    units_closing_brackets = [")",] * 4,
+                                    label_over_color='white',
                                     )
     
     
@@ -769,7 +791,11 @@ if plot:
                                     add_shapes = {
                                         # coords as tuple of tuples: (color, zorder),
                                         ((0,0), (20,200), (1,200)): ('white', 2), # infeasible region smoothing
-                                        }
+                                        },
+                                    units_on_newline = (False, False, False, False), # x,y,z,w
+                                    units_opening_brackets = [" (",] * 4,
+                                    units_closing_brackets = [")",] * 4,
+                                    label_over_color='white',
                                     )
     
     #%% AOC
@@ -827,7 +853,11 @@ if plot:
                                     add_shapes = {
                                         # coords as tuple of tuples: (color, zorder),
                                         ((0,0), (20,200), (1,200)): ('white', 2), # infeasible region smoothing
-                                        }
+                                        },
+                                    units_on_newline = (False, False, False, False), # x,y,z,w
+                                    units_opening_brackets = [" (",] * 4,
+                                    units_closing_brackets = [")",] * 4,
+                                    label_over_color='white',
                                     )
     
     #%% TCI
@@ -889,7 +919,11 @@ if plot:
                                     add_shapes = {
                                         # coords as tuple of tuples: (color, zorder),
                                         ((0,0), (20,200), (1,200)): ('white', 2), # infeasible region smoothing
-                                        }
+                                        },
+                                    units_on_newline = (False, False, False, False), # x,y,z,w
+                                    units_opening_brackets = [" (",] * 4,
+                                    units_closing_brackets = [")",] * 4,
+                                    label_over_color='white',
                                     )
     
     #%% Purity
@@ -946,7 +980,11 @@ if plot:
                                     add_shapes = {
                                         # coords as tuple of tuples: (color, zorder),
                                         ((0,0), (20,200), (1,200)): ('white', 2), # infeasible region smoothing
-                                        }
+                                        },
+                                    units_on_newline = (False, False, False, False), # x,y,z,w
+                                    units_opening_brackets = [" (",] * 4,
+                                    units_closing_brackets = [")",] * 4,
+                                    label_over_color='white',
                                     )
     
     #%% Relative impact of yield and titer on MPSP

@@ -21,11 +21,11 @@ import contourplots
 import biosteam as bst
 print('\n\nLoading system ...')
 # from biorefineries
-# from biorefineries import HP
-from biorefineries import HP
-from biorefineries.HP.models.glucose import models_glucose_improved_separations as models
-from biorefineries.HP.process_settings import chem_index
-# models = HP.models
+# from biorefineries import oxalic
+from biorefineries import oxalic
+from biorefineries.oxalic.models.sugarcane import models_sc_broth as models
+from biorefineries.oxalic.process_settings import chem_index
+# models = oxalic.models
 # from . import models
 
 print('\nLoaded system.')
@@ -33,56 +33,49 @@ from datetime import datetime
 from biosteam.utils import TicToc
 import os
 
-from biorefineries.HP.analyses.full.plot_utils import plot_kde_formatted
+from biorefineries.oxalic.analyses.full.plot_utils import plot_kde_formatted
 from matplotlib.colors import hex2color
 
 chdir = os.chdir
-HP_filepath = HP.__file__.replace('\\__init__.py', '')
-HP_results_filepath = HP_filepath + '\\analyses\\results\\'
-model = models.HP_model
+oxalic_filepath = oxalic.__file__.replace('\\__init__.py', '')
+oxalic_results_filepath = oxalic_filepath + '\\analyses\\results\\'
+model = models.oxalic_model
+oxalic_chemicals = models.oxalic_chemicals
 
-system = HP_sys = models.HP_sys
+system = oxalic_sys = models.oxalic_sys
 spec = models.spec
 unit_groups = models.unit_groups
 
-tea = models.HP_tea
-lca = models.HP_lca
+tea = models.oxalic_tea
+lca = models.oxalic_lca
 get_adjusted_MSP = models.get_adjusted_MSP
 # per_kg_AA_to_per_kg_SA = models.per_kg_AA_to_per_kg_SA
 
 # %% 
 
-N_simulations_per_mode = 10 # 6000
+N_simulations_per_mode = 2000 # 6000
 
 percentiles = [0, 0.05, 0.1, 0.25, 0.5, 0.75, 0.9, 0.95, 1]
 
 notification_interval = 10
 
-results_dict = {'Baseline':{'MPSP':{}, 'GWP100a':{}, 'FEC':{}, 
+results_dict = {'Baseline':{'MPSP':{}, 'GWP100a':{}, 'FEC':{},
+                               'GWP100a no electricity credit':{},
+                               'FEC no electricity credit':{}, 
                             'GWP Breakdown':{}, 'FEC Breakdown':{},},
-                'Uncertainty':{'MPSP':{}, 'GWP100a':{}, 'FEC':{}},
+                'Uncertainty':{'MPSP':{}, 'GWP100a':{}, 'FEC':{},
+                               'GWP100a no electricity credit':{},
+                               'FEC no electricity credit':{},},
                 'Sensitivity':{'Spearman':{'MPSP':{}, 'GWP100a':{}, 'FEC':{}},
                                'p-val Spearman':{'MPSP':{}, 'GWP100a':{}, 'FEC':{}}},}
 
-feedstock_tag = 'glucose'
-product_tag = 'Acrylic'
 
-modes =\
-                 [
-                    # 'DASbox', 
-                    # # '10L',
-                    '300L',
-                    # 'E',
-                    # 'B', 'F',
-                    # 'C', 'G',
-                    # 'D', 'H'
-                 ]
+feedstock_tag = 'sugarcane'
+product_tag = 'oxalic-broth'
+
+modes = ['100mL']
 
 scenario_names = modes
-                
-parameter_distributions_filenames = [f'parameter-distributions_{feedstock_tag}_{product_tag}_' + i + '.xlsx' for i in modes]
-
-
 
 #%%
 
@@ -95,16 +88,20 @@ np.random.seed(3221) # 3221
 # def load_additional_params():
    
 for i in range(len(modes)):
-    # ## Change working directory to biorefineries\\HP
-    # chdir(HP.__file__.replace('\\__init__.py', ''))
+    # ## Change working directory to biorefineries\\oxalic
+    # chdir(oxalic.__file__.replace('\\__init__.py', ''))
     # ##
     mode = modes[i]
     
-    product_folder = 'acrylic_acid_product' if product_tag=='Acrylic' else 'HP_salt_product'
     
-    parameter_distributions_filename = HP_filepath+\
-        f'\\analyses\\full\\parameter_distributions\\{product_folder}\\'+parameter_distributions_filenames[i]
-    print(f'\n\nLoading parameter distributions ({mode}) ...')
+    dist_filename = f'parameter-distributions_{feedstock_tag}_{product_tag}_' + mode + '.xlsx'
+    
+    product_folder = 'oxalic_broth_product' if product_tag=='oxalic-broth' else None
+    
+    parameter_distributions_filename = oxalic_filepath+\
+        f'\\analyses\\full\\parameter_distributions\\{product_folder}\\'+dist_filename
+
+
     model.parameters = ()
     model.load_parameter_distributions(parameter_distributions_filename)
     
@@ -118,8 +115,8 @@ for i in range(len(modes)):
     model.load_samples(samples)
     print('\nLoaded samples.')
     
-    # ## Change working directory to biorefineries\\HP\\analyses\\results
-    # chdir(HP.__file__.replace('\\__init__.py', '')+'\\analyses\\results')
+    # ## Change working directory to biorefineries\\oxalic\\analyses\\results
+    # chdir(oxalic.__file__.replace('\\__init__.py', '')+'\\analyses\\results')
     # ##
     
     model.exception_hook = 'warn'
@@ -135,13 +132,14 @@ for i in range(len(modes)):
     results_dict['Baseline']['MPSP'][mode] = get_adjusted_MSP()
     results_dict['Baseline']['GWP100a'][mode] = tot_GWP = lca.GWP
     results_dict['Baseline']['FEC'][mode] = tot_FEC = lca.FEC
+    results_dict['Baseline']['GWP100a no electricity credit'][mode] = lca.GWP - lca.net_electricity_GWP
+    results_dict['Baseline']['FEC no electricity credit'][mode] = lca.FEC - lca.net_electricity_FEC
     
     materials_to_include_in_impact_breakdowns = {
                             'CalciumDihydroxide': 'lime', 
-                            'H2SO4': 'sulfuric acid', 
-                            'TiO2': 'titanium dioxide catalyst', 
                             'CSL': 'corn steep liquor',
-                            'CH4': 'natural gas\n(for steam generation)',
+                            # 'CH4': 'natural gas\n(for steam generation)',
+                            # 'AmmoniumSulfate': 'ammonium sulfate',
                             } # materials shown as distinct contributions in breakdown plot;
                               # others, except feedstock, are lumped in 'other materials' for figure clarity
     
@@ -223,7 +221,7 @@ for i in range(len(modes)):
     #%%
     dateTimeObj = datetime.now()
     minute = '0' + str(dateTimeObj.minute) if len(str(dateTimeObj.minute))==1 else str(dateTimeObj.minute)
-    file_to_save = HP_results_filepath\
+    file_to_save = oxalic_results_filepath\
         +'_' + product_tag + '_%s.%s.%s-%s.%s'%(dateTimeObj.year, dateTimeObj.month, dateTimeObj.day, dateTimeObj.hour, minute)\
         + '_' + str(modes) + '_' + feedstock_tag + '_' + str(N_simulations_per_mode) + 'sims'
     
@@ -300,6 +298,8 @@ for i in range(len(modes)):
     results_dict['Uncertainty']['MPSP'][mode] = model.table.Biorefinery['Adjusted minimum selling price [$/kg AA]']
     results_dict['Uncertainty']['GWP100a'][mode] = model.table.Biorefinery['Total gwp100a [kg-CO2-eq/kg]'] # GWP or gwp
     results_dict['Uncertainty']['FEC'][mode] = model.table.Biorefinery['Total FEC [MJ/kg]']
+    results_dict['Uncertainty']['GWP100a no electricity credit'][mode] = model.table.Biorefinery['Total gwp100a excl. net electricity [kg-CO2-eq/kg]'] # GWP or gwp
+    results_dict['Uncertainty']['FEC no electricity credit'][mode] = model.table.Biorefinery['Total FEC excl. net electricity [MJ/kg]']
     
     df_rho, df_p = model.spearman_r()
     
@@ -315,13 +315,15 @@ for i in range(len(modes)):
     
 #%% Clean up NaN values for plotting
 metrics = ['MPSP', 
-           # 'GWP100a', 
-           # 'FEC',
+            'GWP100a', 
+            'FEC',
+            'GWP100a no electricity credit', 
+            'FEC no electricity credit',
            ]
 tot_NaN_vals_dict = results_dict['Errors'] = {metric: {mode: 0 for mode in modes} for metric in metrics}
 for mode in modes:
     for metric in metrics:
-        median_val = np.median(results_dict['Uncertainty'][metric][mode])
+        median_val = np.median(results_dict['Uncertainty'][metric][mode][~np.isnan(results_dict['Uncertainty'][metric][mode])])
         # median_val = 1.5
         for i in range(len(results_dict['Uncertainty'][metric][mode])):
             if np.isnan(results_dict['Uncertainty'][metric][mode][i]):
@@ -337,12 +339,12 @@ FEC_units = r"$\mathrm{MJ}\cdot\mathrm{kg}^{-1}$"
 #%% Uncertainty
 def get_small_range(num, offset):
     return(num-offset, num+offset)
-baseline_marker_shapes=["s", "^", "D","s", "h", "h"]
+baseline_marker_shapes=["D", "D", "s", "^", "s", "h", "h"]
 baseline_marker_sizes=[6, 8, 6, 10]*2
 baseline_marker_colors = ['w', '#F8858A']*4
 #%% MPSP
 # modes = ['A',]
-file_to_save = HP_results_filepath+\
+file_to_save = oxalic_results_filepath+\
     '_' + feedstock_tag + '_' + product_tag + \
     '_%s.%s.%s-%s.%s'%(dateTimeObj.year, dateTimeObj.month, dateTimeObj.day, dateTimeObj.hour, minute)\
     + '_' + str(modes) + '_' + str(N_simulations_per_mode) + 'sims'
@@ -358,10 +360,10 @@ MPSP_uncertainty = [results_dict['Uncertainty']['MPSP'][mode]
 #                           6.50 * 1.3397087, # $6.50/kg-potassium-sorbate from https://www.alibaba.com/product-detail/Lifecare-Supply-Potassium-Sorbate-High-Quality_1600897125355.html?spm=a2700.galleryofferlist.p_offer.d_title.1bc15827eAs1TL&s=p
 #                           ]) 
 
-# HP_maximum_viable_market_range = SA_market_range / theoretical_max_g_AA_per_g_SA
+# oxalic_maximum_viable_market_range = SA_market_range / theoretical_max_g_AA_per_g_SA
 
 market_range = np.array([
-                          1.4, 1.65
+                          0.6, 2.8
                           ]) 
 
 
@@ -388,17 +390,17 @@ contourplots.box_and_whiskers_plot(uncertainty_data=MPSP_uncertainty,
                                                         
                                                         ],
                           # values_for_comparison=[biobased_price],
-                          n_minor_ticks=3,
+                          n_minor_ticks=4,
                           show_x_ticks=True,
                           x_tick_labels=scenario_names,
                           x_tick_wrap_width=14,
                           y_label=r"$\bfMPSP$",
                           y_units=MPSP_units,
-                          y_ticks=np.arange(0., 2.41, 0.4),
+                          y_ticks=np.arange(0., 4.01, 0.5),
                           save_file=True,
                           fig_height=5.5,
-                          fig_width = 5,
-                          box_width=0.4,
+                          fig_width = 2.5,
+                          box_width=0.9,
                           filename=file_to_save+'_uncertainty_MPSP',
                           dpi=600,)
 
@@ -408,35 +410,39 @@ contourplots.box_and_whiskers_plot(uncertainty_data=MPSP_uncertainty,
 #%% GWP100a
 
 fossilbased_GWPs = [
-                    2.2414 + lca.EOL_GWP, # ecoinvent 3.8 (acrylic acid production, RoW) cradle-to-gate + EOL
-                    5.9589 # GREET 2023 (acrylic acid from fossil energy) cradle-to-grave
-                    ]
+                9.8411 + 2*oxalic_chemicals.CO2.MW/oxalic_chemicals.OxalicAcid.MW, # ecoinvent 3.8 (oxalic acid production, RoW) cradle-to-gate + EOL
+                ]
 
 GWP_uncertainty = [results_dict['Uncertainty']['GWP100a'][mode] 
                     for mode in modes
                     ]
-
+GWP_uncertainty += [results_dict['Uncertainty']['GWP100a no electricity credit'][mode] 
+                    for mode in modes
+                    ]
 
 contourplots.box_and_whiskers_plot(uncertainty_data=GWP_uncertainty, 
-                          baseline_values=[results_dict['Baseline']['GWP100a'][mode] for mode in modes], 
-                          baseline_marker_shapes=baseline_marker_shapes,
+                           baseline_values=[results_dict['Baseline']['GWP100a'][mode] for mode in modes] + [results_dict['Baseline']['GWP100a no electricity credit'][mode] for mode in modes],
                           baseline_marker_sizes=baseline_marker_sizes,
                           baseline_marker_colors=baseline_marker_colors,
                           baseline_locations=[i+1 for i in range(len(modes))],
                           boxcolor='#607429',
                            # ranges_for_comparison=[get_small_range(i, 0.005) for i in fossilbased_GWPs],
                            # ranges_for_comparison_colors=['#c0c1c2' for i in range(len(fossilbased_GWPs))],
-                            ranges_for_comparison=[fossilbased_GWPs],
+                            ranges_for_comparison=[[fossilbased_GWPs[0]*0.98, 
+                                                   fossilbased_GWPs[0]*1.02]],
                             ranges_for_comparison_colors=['#c0c1c2'],
                           # values_for_comparison=fossilbased_GWPs,
                           n_minor_ticks=1,
                           show_x_ticks=True,
-                          x_tick_labels=scenario_names,
+                          x_tick_labels=[
+                                           'with electricity credit', 
+                                           'without electricity credit',
+                                         ],
                           x_tick_wrap_width=6,
                           # y_label=r"$\bfGWP-100a$",
-                          y_label=r"$\mathrm{\bfCarbon}$" + " " + r"$\mathrm{\bfIntensity}$",
+                          y_label=r"$\mathrm{\bfCI}$",
                           y_units=GWP_units,
-                          y_ticks=np.arange(0., 8.01, 1),
+                          y_ticks=np.arange(-6., 12.01, 2),
                           save_file=True,
                           # fig_height=5.5,
                           # fig_width = 3.,
@@ -472,7 +478,7 @@ contourplots.box_and_whiskers_plot(uncertainty_data=FEC_uncertainty,
                           baseline_marker_colors=baseline_marker_colors,
                           baseline_locations=[i+1 for i in range(len(modes))],
                           boxcolor='#A100A1',
-                          ranges_for_comparison=[fossilbased_FECs],
+                          # ranges_for_comparison=[fossilbased_FECs],
                           ranges_for_comparison_colors=['#c0c1c2'],
                           # ranges_for_comparison=[get_small_range(i, 0.061) for i in biobased_FECs+fossilbased_FECs],
                           # ranges_for_comparison_colors=['#c0c1c2' for i in range(len(biobased_FECs))] +\
@@ -538,7 +544,7 @@ for i in range(len(metrics)):
 
 
 contourplots.stacked_bar_plot(dataframe=df_TEA_breakdown, 
-                 y_ticks = [-40, -20, 0, 20, 40, 60, 80, 100],
+                 y_ticks = [-50, -25,  0, 25, 50, 75, 100],
                  y_label=r"$\bfCost$" + " " + r"$\bfand$" + " " +  r"$\bfUtility$" + " " +  r"$\bfBreakdown$", 
                  y_units = "%", 
                  colors=['#7BBD84', 
@@ -576,11 +582,9 @@ contourplots.stacked_bar_plot(dataframe=df_TEA_breakdown,
                  )
 
 
-#%%
-
 #%% LCA breakdown figures
 
-mode = '300L'
+mode = modes[0]
 
 # GWP
 temp_GWP_breakdown_dict = results_dict['Baseline']['GWP Breakdown'][mode]
@@ -602,15 +606,17 @@ df_GWP_breakdown = pd.DataFrame(GWP_breakdown_list,
 df_GWP_breakdown = df_GWP_breakdown.rename(columns={0: ''})
 contourplots.stacked_bar_plot(dataframe=df_GWP_breakdown, 
                   # y_ticks=[-60, -40, -20, 0, 20, 40, 60, 80, 100], 
-                  y_ticks = [0, 20, 40, 60, 80, 100],
+                  y_ticks = [-200, -150, -100, -50, 0, 50, 100],
                   # y_ticks=[-400, -300, -200, -100, 0, 100, 200, 300, 400], 
                   # y_ticks = []
                   # y_label=r"$\bfGWP-100a $" +" "+ r"$\bfBreakdown$",  
                   y_label =r"$\mathrm{\bfCarbon}$" + " " + r"$\mathrm{\bfIntensity}$" +" "+ r"$\bfBreakdown$",
                   y_units = "%", 
-                  colors=['#E1F8C0', '#8FAE3E', '#607429', 
+                  colors=['#E1F8C0', 
+                   '#8FAE3E', 
+                          '#607429', 
                           ],
-                  hatch_patterns=('\\', '//', '|', 'x', ),
+                  hatch_patterns=('\\', '//', 'x', '|',  ),
                   # '#94948C', '#734A8C', '#D1C0E1', '#648496', '#B97A57', '#F8858A', 'red', 'magenta'],
                   filename=file_to_save+'_'+mode+'_''AA_GWP_breakdown_stacked_bar_plot',
                   fig_width=2,
@@ -647,11 +653,11 @@ contourplots.stacked_bar_plot(dataframe=df_FEC_breakdown,
 
 #%% Spearman's rank order correlation coefficients - 1D
 from matplotlib import pyplot as plt
-chdir(HP_results_filepath)
+chdir(oxalic_results_filepath)
 plt.rcParams['font.sans-serif'] = "Arial Unicode"
 plt.rcParams['font.size'] = "7.5"
 
-file_to_save = HP_results_filepath+\
+file_to_save = oxalic_results_filepath+\
     '_AA_%s.%s.%s-%s.%s'%(dateTimeObj.year, dateTimeObj.month, dateTimeObj.day, dateTimeObj.hour, minute)\
     + '_' + str(modes) + '_' + str(N_simulations_per_mode) + 'sims'
 
@@ -659,7 +665,7 @@ bst_plots = bst.plots
 
 rho = r"$\mathrm{\rho}}$"
 
-mode = '300L'
+mode = modes[0]
 
 
 
@@ -707,11 +713,11 @@ fig[0].show()
 from matplotlib import pyplot as plt
 from matplotlib import colors
 
-chdir(HP_results_filepath)
+chdir(oxalic_results_filepath)
 plt.rcParams['font.sans-serif'] = "Arial Unicode"
 plt.rcParams['font.size'] = "7.5"
 
-file_to_save = HP_results_filepath+\
+file_to_save = oxalic_results_filepath+\
     '_AA_%s.%s.%s-%s.%s'%(dateTimeObj.year, dateTimeObj.month, dateTimeObj.day, dateTimeObj.hour, minute)\
     + '_' + str(modes) + '_' + str(N_simulations_per_mode) + 'sims'
 
@@ -719,7 +725,7 @@ bst_plots = bst.plots
 
 rho = r"$\mathrm{\rho}}$"
 
-mode = '300L'
+mode = modes[0]
 
 # def sort_dfs_by_index(dfs, 
 #                       key,
@@ -758,11 +764,11 @@ fig[0].show()
 from matplotlib import pyplot as plt
 from matplotlib import colors
 
-chdir(HP_results_filepath)
+chdir(oxalic_results_filepath)
 plt.rcParams['font.sans-serif'] = "Arial Unicode"
 plt.rcParams['font.size'] = "7.5"
 
-file_to_save = HP_results_filepath+\
+file_to_save = oxalic_results_filepath+\
     '_AA_%s.%s.%s-%s.%s'%(dateTimeObj.year, dateTimeObj.month, dateTimeObj.day, dateTimeObj.hour, minute)\
     + '_' + str(modes) + '_' + str(N_simulations_per_mode) + 'sims'
 
@@ -770,7 +776,7 @@ bst_plots = bst.plots
 
 rho = r"$\mathrm{\rho}}$"
 
-mode = '300L'
+mode = modes[0]
 
 
 
@@ -802,7 +808,7 @@ fig[0].show()
 #%% Sensitivity analysis take-aways
 #!!! TODO: make compatible with multiple modes
 
-file_to_save = HP_results_filepath+\
+file_to_save = oxalic_results_filepath+\
     'significant_parameters_from_sensitivity_analysis_AA_%s.%s.%s-%s.%s'%(dateTimeObj.year, dateTimeObj.month, dateTimeObj.day, dateTimeObj.hour, minute)\
     + '_' + str(modes) + '_' + str(N_simulations_per_mode) + 'sims'
     
@@ -861,7 +867,7 @@ for i in list(sig_sens_parameters_dict_of_dicts.keys()):
 writer.close()
 
 #%% Bivariate kernel density plots
-file_to_save = HP_results_filepath+\
+file_to_save = oxalic_results_filepath+\
     '_AA_%s.%s.%s-%s.%s'%(dateTimeObj.year, dateTimeObj.month, dateTimeObj.day, dateTimeObj.hour, minute)\
     + '_' + str(modes) + '_' + str(N_simulations_per_mode) + 'sims'
     

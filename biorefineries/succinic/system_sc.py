@@ -43,7 +43,7 @@ from biorefineries.succinic.lca import SuccinicLCA
 
 from biorefineries.succinic.crystallization_curvefit import Ct_given_C0
 
-from biorefineries.make_a_biorefinery.auto_waste_management import AutoWasteManagement
+# from biorefineries.make_a_biorefinery.auto_waste_management import AutoWasteManagement
 
 
 from biorefineries.cellulosic import create_facilities
@@ -70,6 +70,7 @@ bst.main_flowsheet.set_flowsheet(flowsheet)
 bst.units.ShortcutColumn.minimum_guess_distillate_recovery = 0
 
 # Baseline cost year is 2016
+
 bst.CE = 541.7
 
 # Set default thermo object for the system

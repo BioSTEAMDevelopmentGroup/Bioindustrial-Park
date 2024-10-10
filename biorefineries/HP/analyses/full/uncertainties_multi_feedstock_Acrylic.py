@@ -47,11 +47,11 @@ HP_results_filepath = HP_filepath + '\\analyses\\results\\'
 
 # %% 
 
-N_simulations_per_mode = 500 # 6000
+N_simulations_per_mode = 6000 # 6000
 
 percentiles = [0, 0.05, 0.1, 0.25, 0.5, 0.75, 0.9, 0.95, 1]
 
-notification_interval = 50
+notification_interval = 100
 
 results_dict = {'Baseline':{'MPSP':{}, 'GWP100a':{}, 'FEC':{}, 
                             'GWP Breakdown':{}, 'FEC Breakdown':{},},
@@ -362,9 +362,13 @@ for mode in modes:
 # %% Plots
 print('\n\nCreating and saving plots ...')
 
-MPSP_units = r"$\mathrm{\$}\cdot\mathrm{kg}^{-1}$"
-GWP_units = r"$\mathrm{kg}$"+" "+ r"$\mathrm{CO}_{2}\mathrm{-eq.}\cdot\mathrm{kg}^{-1}$"
-FEC_units = r"$\mathrm{MJ}\cdot\mathrm{kg}^{-1}$"
+# MPSP_units = r"$\mathrm{\$}\cdot\mathrm{kg}^{-1}$"
+# GWP_units = r"$\mathrm{kg}$"+" "+ r"$\mathrm{CO}_{2}\mathrm{-eq.}\cdot\mathrm{kg}^{-1}$"
+# FEC_units = r"$\mathrm{MJ}\cdot\mathrm{kg}^{-1}$"
+
+MPSP_units = r"$\mathrm{\$/kg}$"
+GWP_units = r"$\mathrm{kg}$"+" "+ r"$\mathrm{CO}_{2}\mathrm{-eq./kg}$"
+FEC_units = r"$\mathrm{MJ/kg}$"
 
 scenario_xtick_labels = [i.replace('L', '-L') for i in scenario_names]
 
@@ -374,6 +378,7 @@ def get_small_range(num, offset):
 baseline_marker_shapes=["s", "^", "D","p", "h", "8"]
 baseline_marker_sizes=[6, 8, 6, 10]*2
 baseline_marker_colors = ['w', '#F8858A']*4
+
 #%% MPSP
 # modes = ['A',]
 modename = mode = '300L \ndextrose'

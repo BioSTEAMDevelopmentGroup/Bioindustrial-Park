@@ -131,7 +131,7 @@ TAL_metrics = [get_product_MPSP,
 
 # %% Generate 3-specification meshgrid and set specification loading functions
 
-steps = (60, 60, 3)
+steps = (40, 40, 1)
 
 # Yield, titer, productivity (rate)
 spec_1 = yields = np.linspace(0.15, 0.99, steps[0]) # yield
@@ -146,9 +146,9 @@ spec_2 = titers = np.linspace(15.,
     
 spec_3 = productivities =\
     np.array([
-               0.2*spec.baseline_productivity,
+               # 0.2*spec.baseline_productivity,
               1.*spec.baseline_productivity,
-               5.*spec.baseline_productivity,
+               # 5.*spec.baseline_productivity,
               ])
 
 # spec_3 = productivities =\

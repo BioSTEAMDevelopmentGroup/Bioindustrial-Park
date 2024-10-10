@@ -21,7 +21,7 @@ from biorefineries import oxalic
 # from biorefineries.oxalic.systems.system_sc_light_lle_vacuum_distillation import oxalic_tea, oxalic_lca, R302, spec, AA, simulate_and_print, get_AA_MPSP
 # from biorefineries.oxalic.systems.corn.system_corn_improved_separations import oxalic_tea, oxalic_lca, R302, spec, AA, simulate_and_print, get_AA_MPSP
 
-from biorefineries.oxalic.systems.sugarcane.system_sc_broth import oxalic_tea, oxalic_lca, R302, spec, AA, simulate_and_print, get_AA_MPSP, theoretical_max_g_oxalic_per_g_glucose
+from biorefineries.oxalic.systems.sugarcane.system_sc_broth import oxalic_tea, oxalic_lca, R302, spec, AA, simulate_and_print, get_AA_MPSP, theoretical_max_g_oxalic_per_g_glucose, oxalic_chemicals
 
 from biorefineries.oxalic.models.sugarcane import models_sc_broth as models
 
@@ -51,7 +51,7 @@ product = AA
 AA_market_range=np.array([0.60, 2.80]) 
 
 fossilbased_GWPs = [
-                9.8411 + oxalic_lca.EOL_GWP, # ecoinvent 3.8 (oxalic acid production, RoW) cradle-to-gate + EOL
+                9.8411 + 2*oxalic_chemicals.CO2.MW/oxalic_chemicals.OxalicAcid.MW, # ecoinvent 3.8 (oxalic acid production, RoW) cradle-to-gate + EOL
                 ]
 fossilbased_FECs = [
                 172.91, # ecoinvent 3.8 (oxalic acid production, RoW)
