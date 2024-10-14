@@ -5,6 +5,7 @@ import biosteam as bst
 from math import inf
 from scipy.stats import gmean
 import numpy as np
+import flexsolve as flx
 from biorefineries.acester.chemicals import create_acetate_ester_chemicals, create_cc_chemicals
 
 __all__ = (
@@ -133,6 +134,7 @@ def create_acetyl_ester_system(ins, outs, carbon_capture=True, dewatering=True):
         optimize_power=False,
         reactions=reactions,
         length_to_diameter=12,
+        kW_per_m3=0.6
     )
     AcEster_production.titer = 100
     AcEster_production.productivity = 1
@@ -150,12 +152,12 @@ def create_acetyl_ester_system(ins, outs, carbon_capture=True, dewatering=True):
     
     @AcEster_production.add_specification(run=False)
     def adjust_reaction_time():
-        AcEster_production.tau = AcEster_production.titer / AcEster_production.productivity
         reactions = AcEster_production.reactions
         AcEster_production.run()
         vent, effluent = AcEster_production.outs
         effluent.imol['DodecylAcetate'] += vent.imol['DodecylAcetate']
         vent.imol['DodecylAcetate'] = 0
+        AcEster_production.tau = get_titer() / AcEster_production.productivity
         # reactions.X[1] = reactions.X[0] * 0.1
     
     def get_titer(): # g/L or kg/m3s
@@ -166,6 +168,8 @@ def create_acetyl_ester_system(ins, outs, carbon_capture=True, dewatering=True):
             return product_mass_flow / volumetric_flow_rate
         except:
             breakpoint()
+    
+    AcEster_production.get_titer = get_titer
     
     def get_dilution_water(water):
         AcEster_media.imass['Water'] = water
@@ -209,7 +213,9 @@ def create_acetyl_ester_system(ins, outs, carbon_capture=True, dewatering=True):
         extract, wastewater = AcEster_separation.outs
         wastewater.copy_flow(extract, ('Cellmass',), remove=True)
         
-    heat_integration = bst.Stream()
+    ideal_thermo = bst.settings.thermo.ideal()
+    dodecylacetate._thermo = ideal_thermo
+    heat_integration = bst.Stream(thermo=ideal_thermo)
     solvent_recovery = bst.ShortcutColumn(
         ins=heat_integration,
         outs=('', ''),
@@ -223,7 +229,10 @@ def create_acetyl_ester_system(ins, outs, carbon_capture=True, dewatering=True):
     solvent_recovery.check_LHK = False
     bottoms_pump = bst.Pump(ins=solvent_recovery-1, P=2 * 101325)
     distillate_pump = bst.Pump(ins=solvent_recovery-0, outs=solvent_recycle, P=2 * 101325)
-    hx = bst.HXprocess(ins=[bottoms_pump-0, AcEster_separation-0], dT=15, outs=[dodecylacetate, heat_integration])
+    hx = bst.HXprocess(
+        ins=[bottoms_pump-0, AcEster_separation-0], 
+        dT=10, outs=[dodecylacetate, heat_integration]
+    )
     if dewatering:
         ins = [centrifuge_a-0, centrifuge_b-1, 
                AcOH_separation-1, AcEster_separation-1]
@@ -585,7 +594,7 @@ def create_ccc_sys(ins, outs):
     flue_gas = ins[0]
     CO2_concentrated = outs[0]
     Destilate = outs[1]
-    Pf = 8e6
+    Pf = 7e6
     # first compression stage
     K1 = bst.IsentropicCompressor('K100', ins=flue_gas, outs = ['s2'], P=Pf/6, vle=True) # in flue gas(1), out 2
     H1 = bst.HXutilities(
@@ -609,26 +618,48 @@ def create_ccc_sys(ins, outs):
     ) # in 8, out 9 and 10
     
     # third compression stage
-    K3 = bst.IsentropicCompressor('K102', ins=Fv2-0,outs = ['s10'], P=Pf, vle=True) # in 9, out 11 
+    K3 = bst.IsentropicCompressor('K102', ins=Fv2-0, outs = ['s10'], P=Pf, vle=True) # in 9, out 11 
     Hx3_1 = bst.HXutilities('HX102', ins = K3-0, outs = ['s12'], T = 29.85+273.15) # in 11, out 12  
     # dehydration unit
     Sp_1 = bst.Splitter('Sp100', ins = Hx3_1-0, outs = ['s13', 's14'], split=1) # in 12, out 13 and 14
-    Sp_1.isplit['H2O'] = 0
+    Sp_1.isplit['H2O', 'EthylAcetate', 'AceticAcid', 'SO2'] = 0
     recycle_1 = bst.Stream()
     Hx3_3 = bst.HXutilities(
         'HX103', 
         ins=recycle_1,
         outs=['s16'], 
-        V=0.2, 
+        T=195, 
         rigorous=True,
         cool_only=True,
     ) # in 15, out 16
     
-    D1 = bst.BinaryDistillation(
+    D1 = bst.ShortcutColumn(
         'D100', ins = Hx3_3-0, P = Pf, LHK = ('O2', 'CO2'),
-        y_top = 0.95, x_bot = 0.02, k=1.02
+        Hr = 0.99, Lr = 0.99, k=1.25
     )
-                            # Lr = 0.995, Hr = 0.6, k = 1.3)
+    D1.check_LHK = False
+    
+    # def f_z_O2_objective(O2_recovery, z_O2_bot, z_CO2_top, N2, O2, CO2):
+    #     O2_top = O2 * O2_recovery
+    #     other_top = N2 + O2_top 
+    #     CO2_top = other_top * z_CO2_top / (1 - z_CO2_top)
+    #     CO2_recovery = 1 - CO2_top / CO2
+    #     if CO2_recovery > 1.0: CO2_recovery = 1.0
+    #     elif CO2_recovery < 0: CO2_recovery = 0
+    #     O2_bot = O2 - O2_top
+    #     CO2_bot = CO2 - CO2_top
+    #     return O2_bot / (O2_bot + CO2_bot) - z_O2_bot
+    
+    @D1.add_specification(run=False)
+    def adjust_recoveries():
+        N2, O2, CO2 = D1.ins[0].imass['N2', 'O2', 'CO2']
+        for i in (0.005, 0.01, 0.015, 0.02, 0.025, 0.03, 0.035, 0.04):
+            CO2_top = N2 * i
+            D1.Hr = 1 - CO2_top / CO2
+            CO2_bot = CO2 - CO2_top
+            D1.Lr = max(0.6, 1 - 0.01 * CO2_bot / O2)
+            D1._run()
+            if D1.outs[0].T > 172.04 + 5.1: break
     D1.check_LHK = False
     H1 = bst.HXprocess(ins = [D1-1, Sp_1-0], outs=['', ''])
     H2 = bst.HXprocess(ins = [D1-0, H1-1], outs=['', recycle_1])

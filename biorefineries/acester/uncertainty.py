@@ -3,7 +3,7 @@
 """
 import biorefineries.acester as ace
 from warnings import filterwarnings, warn
-from biosteam.utils import GG_colors, CABBI_colors
+from biosteam.utils import GG_colors, CABBI_colors, colors
 import biosteam as bst
 import numpy as np
 import pandas as pd
@@ -22,11 +22,16 @@ __all__ = ('run_monte_carlo',
            'plot_spearman_both',
            'sobol_analysis',
            'montecarlo_results',
+           'plot_kde_carbon_capture_comparison_no_dewatering',
+           'plot_kde_carbon_capture_comparison_dewatering',
+           'plot_kde_dewatering_comparison_carbon_capture',
+           'plot_kde_dewatering_comparison_no_carbon_capture',
            'get_optimized_parameters_table',
            'get_distribution_table')
 
 results_folder = os.path.join(os.path.dirname(__file__), 'results')
 images_folder = os.path.join(os.path.dirname(__file__), 'images')
+letter_color = colors.neutral.shade(25).RGBn
 
 def sobol_file(name, extention='xlsx'):
     filename = name + '_sobol'
@@ -42,7 +47,7 @@ def monte_carlo_file_name(name, carbon_capture, dewatering):
     filename += '.' + 'xlsx'
     return os.path.join(results_folder, filename)
 
-def spearman_file_name(name, N, carbon_capture, dewatering):
+def spearman_file_name(name, carbon_capture, dewatering):
     filename = name + '_spearman'
     if carbon_capture:
         filename += '_carbon_capture'
@@ -262,13 +267,13 @@ def get_optimized_parameters_table():
     table.index.name = '#'
     return table
 
-def plot_spearman_both(**kwargs):
+def plot_spearman_both(carbon_capture=True, dewatering=True, **kwargs):
     set_font(size=12)
     set_figure_size(aspect_ratio=1, width=6.6142 * 0.7)
     labels = ['TEA', 'LCA']
-    br = ace.Biorefinery(simulate=False, **kwargs)
+    br = ace.Biorefinery(simulate=False, carbon_capture=carbon_capture, dewatering=dewatering)
     rhos = []
-    file = spearman_file_name(br.name)
+    file = spearman_file_name(br.name, carbon_capture, dewatering)
     df = pd.read_excel(file, header=[0, 1], index_col=[0, 1])
     names = get_spearman_names(br.model.parameters)
     index = [i for i, j in enumerate(df.index) if j in names]
@@ -320,11 +325,15 @@ def plot_spearman_both(**kwargs):
         plt.savefig(file, dpi=900, transparent=True)
     return fig, ax
 
-def plot_spearman(kind=None, **kwargs):
+def plot_spearman(kind=None, carbon_capture=True, dewatering=True, **kwargs):
     set_font(size=10)
     set_figure_size(aspect_ratio=0.8)
     if kind is None: kind = 'TEA'
-    br = ace.Biorefinery(simulate=False, **kwargs)
+    br = ace.Biorefinery(
+        simulate=False, 
+        carbon_capture=carbon_capture, 
+        dewatering=dewatering,
+    )
     if kind == 'TEA':
         metric = br.MSP
         metric_name = metric.name
@@ -334,7 +343,7 @@ def plot_spearman(kind=None, **kwargs):
     else:
         raise ValueError(f"invalid kind '{kind}'")
     rhos = []
-    file = spearman_file_name(br.name)
+    file = spearman_file_name(br.name, carbon_capture, dewatering)
     df = pd.read_excel(file, header=[0, 1], index_col=[0, 1])
     rhos = df[metric.index]
     names = get_spearman_names(br.model.parameters)
@@ -368,7 +377,7 @@ def run_monte_carlo(
     N_notify = min(int(N/10), 20)
     autosave = N_notify if autosave else False
     autoload_file = autoload_file_name(br.name, N, carbon_capture, dewatering)
-    spearman_file = spearman_file_name(br.name, N, carbon_capture, dewatering)
+    spearman_file = spearman_file_name(br.name, carbon_capture, dewatering)
     monte_carlo_file = monte_carlo_file_name(br.name, carbon_capture, dewatering)
     np.random.seed(1)
     samples = br.model.sample(N, rule)
@@ -457,69 +466,328 @@ def plot_sobol(names, categories, df, colors=None, hatches=None,
                                   legend, **legend_kwargs)
     return fig, axes
     
-def get_monte_carlo(name, features, carbon_capture, dewatering, cache={}):
-    index = [i.index for i in features]
-    key = (name, carbon_capture, dewatering)
-    if key in cache:
-        df = cache[key]
+def get_monte_carlo(config, features, cache={}, dropna=True):
+    if isinstance(config, ace.ConfigurationKey):
+        key = (config.carbon_capture, config.dewatering)
+        if key in cache:
+            df = cache[key]
+        else:
+            file = monte_carlo_file_name(config.name, config.carbon_capture, config.dewatering)
+            cache[key] = df = pd.read_excel(file, header=[0, 1], index_col=[0])
+            df = df[features]    
+    elif isinstance(config, ace.ConfigurationComparison):
+        left = get_monte_carlo(config.left, features, dropna=False)
+        right = get_monte_carlo(config.right, features, dropna=False)
+        df = left - right
     else:
-        file = monte_carlo_file_name(name, carbon_capture, dewatering)
-        cache[key] = df = pd.read_excel(file, header=[0, 1], index_col=[0])
-        df = df[index]
-    mc = df.dropna(how='all', axis=0)
-    return mc
+        raise ValueError('invalid configuration')
+    if dropna: df = df.dropna(how='all', axis=0)
+    return df
+
+def plot_kde_carbon_capture_comparison_dewatering():
+    config = (
+        ace.ConfigurationKey(carbon_capture=True, dewatering=True)
+        - ace.ConfigurationKey(carbon_capture=False, dewatering=True)
+    )
+    _plot_kde(
+        config,
+        # yticks=[[-60, -40, -20, 0, 20, 40, 60]],
+        # xticks=[[-0.9, -0.6, -0.3, 0, 0.3, 0.6, 0.9],
+        #         [-0.9, -0.6, -0.3, 0, 0.3, 0.6, 0.9]],
+        top_right='No CC\nFavored()',
+        bottom_left='CC\nFavored()',
+        top_left='MSP\nTradeoff()',
+        bottom_right='GWP\nTradeoff()',
+        rotate_quadrants=2,
+        fs=10,
+    )
+    plt.subplots_adjust(
+        wspace=0,
+    )
+    for i in ('svg', 'png'):
+        file = os.path.join(images_folder, f'carbon_capture_comparison_dewatering_kde.{i}')
+        plt.savefig(file, dpi=900, transparent=True)
+
+def plot_kde_carbon_capture_comparison_no_dewatering():
+    config = (
+        ace.ConfigurationKey(carbon_capture=True, dewatering=False)
+        - ace.ConfigurationKey(carbon_capture=False, dewatering=False)
+    )
+    _plot_kde(
+        config,
+        # yticks=[[-60, -40, -20, 0, 20, 40, 60]],
+        # xticks=[[-0.9, -0.6, -0.3, 0, 0.3, 0.6, 0.9],
+        #         [-0.9, -0.6, -0.3, 0, 0.3, 0.6, 0.9]],
+        top_right='No CC\nFavored()',
+        bottom_left='CC\nFavored()',
+        top_left='MSP\nTradeoff()',
+        bottom_right='GWP\nTradeoff()',
+        rotate_quadrants=2,
+        fs=10,
+    )
+    plt.subplots_adjust(
+        wspace=0,
+    )
+    for i in ('svg', 'png'):
+        file = os.path.join(images_folder, f'carbon_capture_comparison_no_dewatering_kde.{i}')
+        plt.savefig(file, dpi=900, transparent=True)
+
+def plot_kde_dewatering_comparison_carbon_capture():
+    config = (
+        ace.ConfigurationKey(carbon_capture=True, dewatering=True)
+        - ace.ConfigurationKey(carbon_capture=True, dewatering=False)
+    )
+    _plot_kde(
+        config,
+        # yticks=[[-60, -40, -20, 0, 20, 40, 60]],
+        # xticks=[[-0.9, -0.6, -0.3, 0, 0.3, 0.6, 0.9],
+        #         [-0.9, -0.6, -0.3, 0, 0.3, 0.6, 0.9]],
+        top_right='No Dewatering\nFavored()',
+        bottom_left='Dewatering\nFavored()',
+        top_left='MSP\nTradeoff()',
+        bottom_right='GWP\nTradeoff()',
+        rotate_quadrants=2,
+        fs=10,
+    )
+    plt.subplots_adjust(
+        wspace=0,
+    )
+    for i in ('svg', 'png'):
+        file = os.path.join(images_folder, f'dewatering_comparison_cc_kde.{i}')
+        plt.savefig(file, dpi=900, transparent=True)
+
+def plot_kde_dewatering_comparison_no_carbon_capture():
+    config = (
+        ace.ConfigurationKey(carbon_capture=False, dewatering=True)
+        - ace.ConfigurationKey(carbon_capture=False, dewatering=False)
+    )
+    _plot_kde(
+        config,
+        yticks=[-4, -2, 0, 2, 4],
+        xticks=[0, 1, 2, 3, 4],
+        top_right='No Dewatering\nFavored()',
+        bottom_left='Dewatering\nFavored()',
+        top_left='MSP\nTradeoff()',
+        bottom_right='GWP\nTradeoff()',
+        rotate_quadrants=2,
+        fs=10,
+    )
+    plt.subplots_adjust(
+        wspace=0,
+    )
+    for i in ('svg', 'png'):
+        file = os.path.join(images_folder, f'dewatering_comparison_no_cc_kde.{i}')
+        plt.savefig(file, dpi=900, transparent=True)
+
+def plot_kde_carbon_capture_comparison():
+    left = (
+        ace.ConfigurationKey(carbon_capture=True, dewatering=True)
+        - ace.ConfigurationKey(carbon_capture=False, dewatering=True)
+    )
+    right = (
+        ace.ConfigurationKey(carbon_capture=True, dewatering=False)
+        - ace.ConfigurationKey(carbon_capture=False, dewatering=False)
+    )
+    plot_kde_2d_comparison(
+        (left, right),
+        # yticks=[[-60, -40, -20, 0, 20, 40, 60]],
+        # xticks=[[-0.9, -0.6, -0.3, 0, 0.3, 0.6, 0.9],
+        #         [-0.9, -0.6, -0.3, 0, 0.3, 0.6, 0.9]],
+        top_right='No CC\nFavored()',
+        bottom_left='CC\nFavored()',
+        top_left='MSP\nTradeoff()',
+        bottom_right='GWP\nTradeoff()',
+        rotate_quadrants=2,
+        titles=['(a) With dewatering', '(b) No dewatering'],
+        fs=10,
+    )
+    plt.subplots_adjust(
+        wspace=0,
+        
+    )
+    for i in ('svg', 'png'):
+        file = os.path.join(images_folder, f'carbon_capture_comparison_kde.{i}')
+        plt.savefig(file, dpi=900, transparent=True)
+   
+def plot_kde_dewatering_comparison():
+    left = (
+        ace.ConfigurationKey(carbon_capture=True, dewatering=True)
+        - ace.ConfigurationKey(carbon_capture=True, dewatering=True)
+    )
+    right = (
+        ace.ConfigurationKey(carbon_capture=False, dewatering=True)
+        - ace.ConfigurationKey(carbon_capture=False, dewatering=False)
+    )
+    plot_kde_2d_comparison(
+        (left, right),
+        # yticks=[[-60, -40, -20, 0, 20, 40, 60]],
+        # xticks=[[-0.9, -0.6, -0.3, 0, 0.3, 0.6, 0.9],
+        #         [-0.9, -0.6, -0.3, 0, 0.3, 0.6, 0.9]],
+        top_right='No CC\nFavored()',
+        bottom_left='CC\nFavored()',
+        top_left='MSP\nTradeoff()',
+        bottom_right='GWP\nTradeoff()',
+        rotate_quadrants=2,
+        titles=['(a) With CC', '(b) No CC'],
+        fs=10,
+    )
+    plt.subplots_adjust(
+        wspace=0,
+    )
+    for i in ('svg', 'png'):
+        file = os.path.join(images_folder, f'dewatering_comparison_kde.{i}')
+        plt.savefig(file, dpi=900, transparent=True)
+   
     
-def plot_kde(carbon_capture, dewatering):
-    set_font(size=12)
-    set_figure_size(width='half', aspect_ratio=1.1)
+# def plot_kde_comparison(
+#         config, metrics, xticks=None, yticks=None,
+#         xbox_kwargs=None, ybox_kwargs=None, top_left='',
+#         top_right='Tradeoff', bottom_left='Tradeoff',
+#         bottom_right='', fs=None, ticklabels=True, aspect_ratio=1.1,
+#         xlabel=None, ylabel=None
+#     ):
+#     set_font(size=fs or 8)
+#     set_figure_size(width='half', aspect_ratio=aspect_ratio)
+#     Xi, Yi = [i.index for i in metrics]
+#     df = get_monte_carlo(config, metrics)
+#     y = df[Yi].values
+#     x = df[Xi].values
+#     ax = bst.plots.plot_kde(
+#         y=y, x=x, xticks=xticks, yticks=yticks,
+#         xticklabels=ticklabels, yticklabels=ticklabels,
+#         xbox_kwargs=xbox_kwargs or dict(light=CABBI_colors.orange.RGBn, dark=CABBI_colors.orange.shade(60).RGBn),
+#         ybox_kwargs=ybox_kwargs or dict(light=CABBI_colors.blue.RGBn, dark=CABBI_colors.blue.shade(60).RGBn),
+#         aspect_ratio=1.2,
+#     )
+#     plt.sca(ax)
+#     plt.xlabel(xlabel.replace('\n', ' '))
+#     plt.ylabel(ylabel.replace('\n', ' '))
+#     bst.plots.plot_quadrants(data=[x, y], text=[top_left, top_right, bottom_left, bottom_right])
+#     plt.subplots_adjust(
+#         hspace=0.05, wspace=0.05,
+#         top=0.98, bottom=0.15,
+#         left=0.2, right=0.98,
+#     )
+    
+def plot_kde(carbon_capture, dewatering, *args, **kwargs):
+    fig, ax = _plot_kde(ace.ConfigurationKey(carbon_capture, dewatering), *args, fs=10, **kwargs)
+    for i in ('svg', 'png'):
+        file = os.path.join(images_folder, f'configuration_kde.{i}')
+        plt.savefig(file, transparent=True, dpi=900)
+
+def _plot_kde(config, xticks=None, yticks=None,
+             xbox_kwargs=None, ybox_kwargs=None, top_left='',
+             top_right=None, bottom_left=None,
+             bottom_right='', fs=None, ticklabels=True, aspect_ratio=1.1,
+             rotate_quadrants=0):
+    set_font(size=fs or 8)
+    set_figure_size(width='half', aspect_ratio=aspect_ratio)
     br = ace.Biorefinery(simulate=False)
-    metrics = [br.GWP, br.MSP]
-    Xi, Yi = metrics
-    df = get_monte_carlo(br.name, metrics, carbon_capture, dewatering)
-    y = df[Yi.index].values
-    x = df[Xi.index].values
-    # x = x[y < 20]
-    # y = y[y < 20]
-    yticks = None # [0, 0.2, 0.4, 0.6, 0.8, 1.0]
-    xticks = None # [0, 1, 2, 3, 4, 5]
+    metrics = [br.GWP.index, br.MSP.index]
+    Xi, Yi = [i for i in metrics]
+    df = get_monte_carlo(config, metrics)
+    y = df[Yi].values
+    x = df[Xi].values
     fig, ax = bst.plots.plot_kde(
         y=y, x=x, xticks=xticks, yticks=yticks,
-        xticklabels=True, yticklabels=True,
-        xbox_kwargs=dict(light=CABBI_colors.orange.RGBn, dark=CABBI_colors.orange.shade(60).RGBn),
-        ybox_kwargs=dict(light=CABBI_colors.blue.RGBn, dark=CABBI_colors.blue.shade(60).RGBn),
-        xbox_width=400,
-        aspect_ratio=1.1,
+        xticklabels=ticklabels, yticklabels=ticklabels,
+        xbox_kwargs=xbox_kwargs or dict(light=CABBI_colors.orange.RGBn, dark=CABBI_colors.orange.shade(60).RGBn),
+        ybox_kwargs=ybox_kwargs or dict(light=CABBI_colors.blue.RGBn, dark=CABBI_colors.blue.shade(60).RGBn),
+        aspect_ratio=1.2,
     )
     plt.sca(ax)
-    plt.ylabel('MSP $[\mathrm{USD} \cdot \mathrm{kg}^{\mathrm{-1}}]$')
-    plt.xlabel('Carbon intensity $[\mathrm{kgCO2e} \cdot \mathrm{kg}^{\mathrm{-1}}]$')
+    plt.ylabel(r'MSP $[\mathrm{USD} \cdot \mathrm{kg}^{\mathrm{-1}}]$')
+    plt.xlabel(r'Carbon intensity $[\mathrm{kgCO2e} \cdot \mathrm{kg}^{\mathrm{-1}}]$')
+    bst.plots.plot_quadrants(data=[x, y], text=[top_left, top_right, bottom_left, bottom_right], rotate=rotate_quadrants)
     plt.subplots_adjust(
         hspace=0.05, wspace=0.05,
         top=0.98, bottom=0.15,
         left=0.2, right=0.98,
     )
-    for i in ('svg', 'png'):
-        file = os.path.join(images_folder, f'kde.{i}')
-        plt.savefig(file, dpi=900, transparent=True)
+    return fig, ax
+
+def plot_kde_2d_comparison(
+        configs, xticks=None, yticks=None,
+        top_left='', top_right='', bottom_left='',
+        bottom_right='', xbox_kwargs=None, ybox_kwargs=None, titles=None,
+        fs=None, ticklabels=True, rotate_quadrants=0,
+        x_center=None, y_center=None, 
+        xlabel=None, ylabel=None, fst=None, revqlabel=None,
+        box_size=1, aspect_ratio=0.6
+    ):
+    if xlabel is None: xlabel = r'Carbon intensity $[\mathrm{kgCO2e} \cdot \mathrm{kg}^{\mathrm{-1}}]$'
+    if ylabel is None: ylabel = r'MSP $[\mathrm{USD} \cdot \mathrm{kg}^{\mathrm{-1}}]$'
+    set_font(size=fs or 8)
+    set_figure_size(aspect_ratio=aspect_ratio)
+    br = ace.Biorefinery(simulate=False)
+    metrics = [br.GWP.index, br.MSP.index]
+    Xi, Yi = [i for i in metrics]
+    dfs = [get_monte_carlo(i, metrics) for i in configs]
+    xs = np.array([[df[Xi].values for df in dfs]])
+    ys = np.array([[df[Yi].values for df in dfs]])
+    ticklabels = True if ticklabels else False
+    fig, axes = bst.plots.plot_kde_2d(
+        xs=xs, ys=ys,
+        xticks=xticks, yticks=yticks,
+        xticklabels=ticklabels, yticklabels=ticklabels,
+        xbox_kwargs=[xbox_kwargs or dict(light=CABBI_colors.orange.RGBn, dark=CABBI_colors.orange.shade(60).RGBn)],
+        ybox_kwargs=[ybox_kwargs or dict(light=CABBI_colors.blue.RGBn, dark=CABBI_colors.blue.shade(60).RGBn)],
+        aspect_ratio=box_size,
+    )
+    M, N = axes.shape
+    text = [top_left, top_right, bottom_left, bottom_right]
+    if revqlabel: 
+        Mrange = range(M-1, -1, -1)
+        Nrange = range(N-1, -1, -1)
+    else:
+        Mrange = range(M)
+        Nrange = range(N)
+    for i in Mrange:
+        for j in Nrange:
+            ax = axes[i, j]
+            plt.sca(ax)
+            if i == M - 1: plt.xlabel(xlabel)
+            if j == 0: plt.ylabel(ylabel)
+            df = dfs[j]
+            x = df[Xi]
+            y = df[Yi]
+            bst.plots.plot_quadrants(data=[x, y], x=x_center, y=y_center, 
+                                     text=text, rotate=rotate_quadrants)
+    plt.subplots_adjust(
+        hspace=0, wspace=0,
+        top=0.98, bottom=0.15,
+        left=0.1, right=0.98,
+    )
+    if titles:
+        plt.subplots_adjust(
+            top=0.90,
+        )
+        if fst is None: fst = 10
+        for ax, letter in zip(axes[0, :], titles):
+            plt.sca(ax)
+            ylb, yub = plt.ylim()
+            xlb, xub = plt.xlim()
+            plt.text((xlb + xub) * 0.5, ylb + (yub - ylb) * 1.17, letter, color=letter_color,
+                      horizontalalignment='center', verticalalignment='center',
+                      fontsize=fst, fontweight='bold')
+    return fig, axes
     
 def get_monte_carlo_key(index, dct, with_units=False):
     key = index[1] if with_units else index[1].split(' [')[0]
     if key in dct: key = f'{key}, {index[0]}'
     return key
     
-def montecarlo_results(metrics=None, derivative=None):
-    f = ace.Biorefinery(simulate=False)
+def montecarlo_results(carbon_capture, dewatering, metrics=None, derivative=None):
+    f = ace.Biorefinery(False, carbon_capture=carbon_capture, dewatering=dewatering)
     if metrics is None:
         metrics = [
-            f.MSP, f.GWP,
+            f.GWP.index, f.MSP.index
         ]
     results = {}
-    df = get_monte_carlo(f.name, metrics)
+    df = get_monte_carlo(f.config, metrics)
     results[f.name] = dct = {}
-    for metric in metrics:
-        index = metric.index
+    for index in metrics:
         data = df[index].values
-        if metric is f.MSP: data = data[data < 20]
         q05, q50, q95 = roundsigfigs(np.percentile(data, [5, 50, 95], axis=0), 3)
         key = get_monte_carlo_key(index, dct, False)
         if q50 < 0:

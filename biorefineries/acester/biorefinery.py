@@ -24,6 +24,8 @@ from inspect import signature
 
 __all__ = (
     'Biorefinery',
+    'ConfigurationKey',
+    'ConfigurationComparison',
 )
 
 # DO NOT DELETE:
@@ -39,6 +41,32 @@ V_ng = 1.473318463076884 # Natural gas volume at 60 F and 14.73 psi [m3 / kg]
 
 results_folder = os.path.join(os.path.dirname(__file__), 'results')
 
+class ConfigurationKey:
+    __slots__ = ('carbon_capture', 'dewatering')
+    name = 'AcEster'
+    
+    def __init__(self, carbon_capture, dewatering):
+        self.carbon_capture = carbon_capture
+        self.dewatering = dewatering
+        
+    def __sub__(self, other):
+        return ConfigurationComparison(self, other)
+        
+    def __repr__(self):
+        return f"ConfigurationKey(carbon_capture={self.carbon_capture}, dewatering={self.dewatering})"
+
+
+class ConfigurationComparison:
+    __slots__ = ('left', 'right')
+    
+    def __init__(self, left, right):
+        self.left = left
+        self.right = right
+        
+    def __repr__(self):
+        return f"ConfigurationComparison(left={self.left}, right={self.right})"
+
+
 class Biorefinery(bst.ProcessModel):
     """
     Examples
@@ -51,7 +79,7 @@ class Biorefinery(bst.ProcessModel):
     (7.30, 2.80, 438.53)
     
     """
-    name = 'AcEster'
+    name = ConfigurationKey.name
     
     def optimize(self):
         results = self.model.optimize(
@@ -61,12 +89,17 @@ class Biorefinery(bst.ProcessModel):
         for p, x in zip(self.model.optimized_parameters, results.x): p.setter(x)
         return results
     
-    def __init__(
-            self,
+    def __new__(
+            cls,
             simulate=True,
             dewatering=True,
             carbon_capture=True,
+            cache={},
         ):
+        key = (dewatering, carbon_capture)
+        if key in cache: return cache[key]
+        self = super().__new__(cls)
+        self.config = ConfigurationKey(carbon_capture, dewatering)
         bst.settings.set_thermo(create_acetate_ester_chemicals())
         bst.settings.chemicals.define_group(
             'Biomass', 
@@ -123,7 +156,7 @@ class Biorefinery(bst.ProcessModel):
         # def set_carbon_capture_cost(price):
         #     self.CC.b = 4.230769230769226 + price
         
-        @uniform(units='wt %', element='Boiler flue gas', baseline=5.5) 
+        @parameter(units='wt %', element='Boiler flue gas', baseline=5.5, bounds=(5, 10)) 
         def set_boiler_flue_gas_CO2_content(CO2_content):
             self.BT.CO2_emissions_concentration = CO2_content / 100
         
@@ -187,6 +220,11 @@ class Biorefinery(bst.ProcessModel):
             original = self.AcOH_media.F_mass * self.AcOH_production.titer['AceticAcid'] * self.AcEster_production.reactions[0].product_yield('DodecylAcetate', basis='wt') / 1000
             self.system.rescale(self.AcOH_media, capacity / original)
         
+        if carbon_capture:
+            self.AcOH_production.length_to_diameter = 8
+        else:
+            self.AcOH_production.length_to_diameter = 12
+            
         if dewatering:
             optimized_parameter = model.optimized_parameter
             
@@ -281,6 +319,8 @@ class Biorefinery(bst.ProcessModel):
             system.simulate()
             self.load_system(system)
         self.load_model(model)
+        cache[key] = self
+        return self
 
     def key_flows(self):
         def total(s):

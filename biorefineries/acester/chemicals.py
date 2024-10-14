@@ -12,12 +12,15 @@ __all__ = (
 def create_cc_chemicals():
     chemicals = bst.Chemicals(['N2', 'CO', 'H2', 'O2', 'CO2', 'CH4', 'Argon', 'H2O', 'SO2',
                                'AceticAcid', 'Ethanol', 'EthylAcetate',])
+    # CO2_Vliq = chemicals.CO2.V.l
+    # CO2_Vliq.hook = lambda T, P: CO2_Vliq(max(T, P)
     bst.settings.set_thermo(chemicals)
         
     # mixture = bst.PRMixture.from_chemicals(chemicals)
     bst.settings.set_thermo(
         chemicals,
         Gamma=bst.IdealActivityCoefficients,
+        # PCF=bst.IdealGasPoyintingCorrectionFactors
         # mixture=mixture
     )
     bst.settings.mixture.include_excess_energies = True
