@@ -47,25 +47,24 @@ from numba import njit
 from biosteam import main_flowsheet as F
 from biosteam import System
 from thermosteam import Stream
-from biorefineries.HP import units, facilities
-from biorefineries.HP.process_areas import create_HP_fermentation_process,\
-                                           create_HP_separation_improved_process,\
-                                           create_HP_to_acrylic_acid_upgrading_process
-from biorefineries.HP.lca import HPLCA
-from biorefineries.HP.models._process_specification import ProcessSpecification
-from biorefineries.HP.process_settings import price, CFs, chem_index
-from biorefineries.HP.utils import find_split, splits_df, baseline_feedflow
-from biorefineries.HP.chemicals_data import HP_chemicals, chemical_groups, \
+from biorefineries.oxalic import units, facilities
+from biorefineries.oxalic.process_areas import create_oxalic_fermentation_process,\
+                                           create_oxalic_separation_improved_process,\
+                                           create_oxalic_to_acrylic_acid_upgrading_process
+from biorefineries.oxalic.lca import OxalicLCA
+from biorefineries.oxalic.models._process_specification import ProcessSpecification
+from biorefineries.oxalic.process_settings import price, CFs, chem_index
+from biorefineries.oxalic.utils import find_split, splits_df, baseline_feedflow
+from biorefineries.oxalic.chemicals_data import oxalic_chemicals, chemical_groups, \
                                 soluble_organics, combustibles
-from biorefineries.HP.tea import HPTEA
+from biorefineries.oxalic.tea import OxalicTEA
 from biosteam.process_tools import UnitGroup
 import matplotlib.pyplot as plt
 import copy
-from biorefineries.cornstover import CellulosicEthanolTEA as HPTEA
+from biorefineries.cornstover import CellulosicEthanolTEA as OxalicTEA
 from biosteam import SystemFactory
 from biorefineries.cellulosic import create_facilities
-# from biorefineries.sugarcane import create_juicing_system_up_to_clarification
-# from biorefineries import corn
+from biorefineries.sugarcane import create_juicing_system_up_to_clarification
 # from lactic.hx_network import HX_Network
 
 from biorefineries.TAL._general_utils import call_all_specifications_or_run,\
@@ -75,8 +74,8 @@ from biorefineries.TAL._general_utils import call_all_specifications_or_run,\
                                                 TEA_breakdown,\
                                                 update_facility_IDs
                                                 
-from hxn._heat_exchanger_network import HeatExchangerNetwork    
-                                            
+from hxn._heat_exchanger_network import HeatExchangerNetwork
+                                                
 IQ_interpolation = flx.IQ_interpolation
 # # Do this to be able to show more streams in a diagram
 # bst.units.Mixer._graphics.edge_in *= 2
@@ -92,17 +91,16 @@ bst.main_flowsheet.set_flowsheet(flowsheet)
 bst.units.ShortcutColumn.minimum_guess_distillate_recovery = 0
 
 # Baseline cost year is 2016
-bst.CE = bst.units.design_tools.CEPCI_by_year[2019]
+bst.CE = 541.7
 # _labor_2007to2016 = 22.71 / 19.55
 
 # Set default thermo object for the system
-tmo.settings.set_thermo(HP_chemicals)
+tmo.settings.set_thermo(oxalic_chemicals)
 
-System.default_maxiter = 300
+System.default_maxiter = 100
 # System.default_converge_method = 'wegstein'
 # feedstock_ID = 'Corn stover'
-# feedstock_ID = 'Corn'
-feedstock_ID = 'Glucose'
+feedstock_ID = 'Sugarcane'
 
 # System.default_converge_method = 'fixed-point'
 # System.default_converge_method = 'aitken'
@@ -113,31 +111,46 @@ System.default_molar_tolerance = 0.1
 System.strict_convergence = True # True => throw exception if system does not converge; false => continue with unconverged system
 
 
-@SystemFactory(ID = 'HP_sys')
-def create_HP_sys(ins, outs):
+@SystemFactory(ID = 'oxalic_sys')
+def create_oxalic_sys(ins, outs):
     u, s = flowsheet.unit, flowsheet.stream
     process_groups = []
     # %% Feedstock
-
-    feedstock = bst.Stream('glucose_feedstock', Glucose=1., Water=1., units='kmol/h')
-    feedstock.price = price['Glucose']*0.909 # dextrose monohydrate stream is 90.9 wt% glucose
-    feedstock.F_mass = 200_000 # initial value; updated by spec.set_production_capacity
     
+    # Sugarcane juicing subprocess
+    sugarcane_juicing_sys = create_juicing_system_up_to_clarification()
     
-    U101 = bst.Unit('U101', ins=feedstock, outs='')
+    u = sugarcane_juicing_sys.flowsheet.unit
+    s = sugarcane_juicing_sys.flowsheet.stream
+    
+    u.U201.diagram()
+    sugarcane_juicing_sys.diagram('cluster')
+    # u.U201.ins.append(u.M201-0)
+    
+    # u.M201-0-1-u.U201
+    
+    # sugarcane_juicing_sys.simulate(update_configuration=True)
+    
+    U101 = bst.Unit('U101', ins='', outs='')
     @U101.add_specification(run=False)
     def U101_spec():
         U101.outs[0].copy_like(U101.ins[0])
     
+    feedstock = s.sugarcane
+    feedstock_sink = feedstock.sink
+    U101-0-0-feedstock_sink
+    feedstock-0-U101
+    feedstock_sink.ins[0].price = 0.
     
-    # # Update all prices to 2019$ using chemical indices
-    # # sugarcane biorefinery base year is 2019
-    # for corn_sys_stream in list(s):
-    #     corn_sys_stream.price *= chem_index[2019]/chem_index[2018]
+    feedstock.F_mass = 554171.74 # initial value; updated by spec.set_production_capacity
     
-    #%% Feedstock juicing
-    M201 = bst.Mixer('M201', ins=(U101-0, ''), outs='') # bst.UnitGroup.get_material_cost uses bst.utils.get_inlet_origin; i.e., assumes source unit is a storage unit (i.e., attributes material cost to downstream unit) if len(source.ins) == len(source.outs) == 1 and 'processing' not in source.line.lower()
-
+    # Update all prices to 2019$ using chemical indices
+    # sugarcane biorefinery base year is 2018
+    for sugarcane_sys_stream in list(s):
+        sugarcane_sys_stream.price *= chem_index[2019]/chem_index[2018]
+        
+    feedstock.price = price['Sugarcane']
+    
     # %% 
     
     # =============================================================================
@@ -148,7 +161,7 @@ def create_HP_sys(ins, outs):
     CSL = Stream('CSL', units='kg/hr')
     fermentation_MgCl2 = Stream('fermentation_MgCl2', units='kg/hr')
     fermentation_ZnSO4 = Stream('fermentation_ZnSO4', units='kg/hr')
-    # Lime for pH control or neutralization of produced acid
+    # Lime for neutralization of produced acid
     fermentation_lime = Stream('fermentation_lime', units='kg/hr')
     
     fresh_CO2_fermentation = Stream('fresh_CO2_fermentation', units='kg/hr',
@@ -159,7 +172,7 @@ def create_HP_sys(ins, outs):
     makeup_MEA_A301 = Stream('makeup_MEA_A301', units='kg/hr', price=price['Monoethanolamine'])
     
     #%% Fermentation units
-    fermentation_sys = create_HP_fermentation_process(ins=(M201-0,
+    fermentation_sys = create_oxalic_fermentation_process(ins=(u.C201-0,
                                                            CSL,
                                                            fermentation_MgCl2,
                                                            fermentation_ZnSO4,
@@ -167,7 +180,7 @@ def create_HP_sys(ins, outs):
                                                            fresh_CO2_fermentation,
                                                            makeup_MEA_A301),
                                                    )
-    u.R302.neutralization = False
+    
     
     # %% 
     # =============================================================================
@@ -187,7 +200,7 @@ def create_HP_sys(ins, outs):
     # =============================================================================
     # Separation units
     # =============================================================================
-    separation_sys = create_HP_separation_improved_process(
+    separation_sys = create_oxalic_separation_improved_process(
                                                             ins=(
                                                            fermentation_sys-0,
                                                            separation_sulfuric_acid,
@@ -209,7 +222,7 @@ def create_HP_sys(ins, outs):
     # =============================================================================
     # Upgrading units
     # =============================================================================
-    upgrading_sys = create_HP_to_acrylic_acid_upgrading_process(ins=(separation_sys-0, 
+    upgrading_sys = create_oxalic_to_acrylic_acid_upgrading_process(ins=(separation_sys-0, 
                                                                      makeup_TiO2_catalyst,
                                                                      )
                                                                 )
@@ -308,7 +321,6 @@ def create_HP_sys(ins, outs):
     T612 = bst.units.StorageTank('T612', ins = NaOH_fresh, outs = separation_AEX_regeneration_fluid)
     T612.line = 'Caustics storage tank'
     
-    
     ############################
     
     # %% 
@@ -332,31 +344,20 @@ def create_HP_sys(ins, outs):
     
     # Mix waste liquids for treatment
     M501 = bst.units.Mixer('M501', ins=(u.F301_P-0, 
-                                        fermentation_sys-3,
-                                        # separation_sys-4,
                                         upgrading_sys-2, 
+                                        # u.H201-0,
                                         separation_sys-3,
                                         separation_sys-4,
                                         separation_sys-5,
                                         separation_sys-6,
-                                        # u.H201-0,
                                         ))
-    M501.ammonia_dissolution_rxns = ParallelRxn([
-        Rxn('NH3 + H2O -> NH4OH', 'NH3',   1.),
-        ])
-
-    #     Rxn('SodiumCitrate + H2O -> CitricAcid + 3NaOH ', 'SodiumCitrate',   1.-1e-5),
-    #     ])
     
     @M501.add_specification(run=False)
-    def M501_spec():
+    def M501_acid_base_removal_spec():
+        for i in M501.ins:
+            i.imol['NaOH','H2SO4'] = 0.
         M501._run()
-        M501_outs_0 = M501.outs[0]
-        M501.ammonia_dissolution_rxns(M501_outs_0.mol[:])
-        water_to_add = M501_outs_0.imol['H2SO4', 'NaOH'].max()
-        M501_outs_0.imol['H2SO4', 'NaOH', 'NH4OH'] = 0.
-        M501_outs_0.imol['Water'] += water_to_add
-        
+    
     # M501.citrate_acetate_dissolution_rxns = ParallelRxn([
     #     Rxn('SodiumAcetate + H2O -> AceticAcid + NaOH', 'SodiumAcetate',   1.-1e-5),
     #     Rxn('SodiumCitrate + H2O -> CitricAcid + 3NaOH ', 'SodiumCitrate',   1.-1e-5),
@@ -390,10 +391,9 @@ def create_HP_sys(ins, outs):
         
     # Mix solid wastes to boiler turbogenerator
     M510 = bst.units.Mixer('M510', ins=(
-                                        # u.S201-0,
-                                        # u.U202-0,
-                                        # u.C202-0,
-                                        # u.MH103-1,
+                                        # u.S301-0,
+                                        u.U202-0,
+                                        u.C202-0,
                                         u.S401-0,
                                         ),
                             outs='wastes_to_boiler_turbogenerator')
@@ -428,7 +428,7 @@ def create_HP_sys(ins, outs):
          # s.cooling_tower_makeup_water,
          # s.cooling_tower_chemicals,
          ],
-        feedstock=s.glucose_feedstock,
+        feedstock=s.sugarcane,
         RO_water=wastewater_treatment_sys-2,
         recycle_process_water=MX-0,
         BT_area=700,
@@ -444,6 +444,9 @@ def create_HP_sys(ins, outs):
     
     HXN = HeatExchangerNetwork('HXN1001',
                                                 ignored=[
+                                                        # u.A410,
+                                                        # u.A420,
+                                                        # u.A430,
                                                         ],
                                               cache_network=False,
                                               )
@@ -459,21 +462,20 @@ def create_HP_sys(ins, outs):
     
 # %% System setup
 
-HP_sys = create_HP_sys()
-
-# HP_sys.subsystems[-1].relative_molar_tolerance = 0.005
-HP_sys.set_tolerance(mol=1e-3, rmol=1e-3, subsystems=True)
+oxalic_sys = create_oxalic_sys()
+# oxalic_sys.subsystems[-1].relative_molar_tolerance = 0.005
+oxalic_sys.set_tolerance(mol=1e-3, rmol=1e-3, subsystems=True)
 
 f = bst.main_flowsheet
 u = f.unit
 s = f.stream
 
-feedstock = s.glucose_feedstock
+feedstock = s.sugarcane
 AA = s.AcrylicAcid
 get_flow_tpd = lambda: (feedstock.F_mass-feedstock.imass['H2O'])*24/907.185
 
-update_facility_IDs(HP_sys)
-feeds = HP_sys.feeds
+update_facility_IDs(oxalic_sys)
+feeds = oxalic_sys.feeds
 
 products = [AA] # Don't include gypsum since we want to include carbon impurities in GWP calculation
 
@@ -497,8 +499,8 @@ globals().update(flowsheet.to_dict())
 
 # Income tax was changed from 0.35 to 0.21 based on Davis et al., 2018 (new legislation)
 
-HP_tea = HPTEA(system=HP_sys, IRR=0.10, duration=(2016, 2046),
-        depreciation='MACRS7', income_tax=0.21, operating_days=330.,
+oxalic_tea = OxalicTEA(system=oxalic_sys, IRR=0.10, duration=(2016, 2046),
+        depreciation='MACRS7', income_tax=0.21, operating_days=180,
         lang_factor=None, construction_schedule=(0.08, 0.60, 0.32),
         startup_months=3, startup_FOCfrac=1, startup_salesfrac=0.5,
         startup_VOCfrac=0.75, WC_over_FCI=0.05,
@@ -520,14 +522,15 @@ HP_tea = HPTEA(system=HP_sys, IRR=0.10, duration=(2016, 2046),
         labor_burden=0.90, property_insurance=0.007, maintenance=0.03,
         steam_power_depreciation='MACRS20', boiler_turbogenerator=u.BT701)
 
-HP_no_BT_tea = HP_tea
+
+oxalic_no_BT_tea = oxalic_tea
 
 #%%
 # =============================================================================
 # LCA
 # =============================================================================
 
-HP_lca = HPLCA(system=HP_sys, 
+oxalic_lca = OxalicLCA(system=oxalic_sys, 
                  CFs=CFs, 
                  feedstock=feedstock, 
                  feedstock_ID=feedstock_ID,
@@ -544,10 +547,10 @@ HP_lca = HPLCA(system=HP_sys,
 #%% Define unit groups and their metrics
 
 feedstock_acquisition_group = bst.UnitGroup('feedstock acquisition', units=[u.U101])
-feedstock_juicing_group = bst.UnitGroup('feedstock juicing', units=[u.M201])
-fermentation_group = f.HP_fermentation_process.to_unit_group('fermentation')
-separation_group = f.HP_separation_improved_process.to_unit_group('separation')
-upgrading_group = f.HP_to_acrylic_acid_upgrading_process.to_unit_group('upgrading')
+feedstock_juicing_group = f.juicing_sys.to_unit_group('feedstock juicing')
+fermentation_group = f.oxalic_fermentation_process.to_unit_group('fermentation')
+separation_group = f.oxalic_separation_improved_process.to_unit_group('separation')
+upgrading_group = f.oxalic_to_acrylic_acid_upgrading_process.to_unit_group('upgrading')
 
 
 unit_groups = [
@@ -558,7 +561,7 @@ unit_groups = [
     upgrading_group,
     ]
 
-unit_groups += get_more_unit_groups(system=HP_sys,
+unit_groups += get_more_unit_groups(system=oxalic_sys,
                          groups_to_get=['wastewater',
                                         'storage & other facilities',
                                         'boiler & turbogenerator',
@@ -575,7 +578,7 @@ unit_groups += get_more_unit_groups(system=HP_sys,
                                         ]
                          )
 
-add_metrics_to_unit_groups(unit_groups=unit_groups, system=HP_sys, TEA=HP_tea, LCA=HP_lca, hxn_class=HeatExchangerNetwork)
+add_metrics_to_unit_groups(unit_groups=unit_groups, system=oxalic_sys, TEA=oxalic_tea, LCA=oxalic_lca, hxn_class=HeatExchangerNetwork)
 
 unit_groups_dict = {}
 for i in unit_groups:
@@ -594,13 +597,13 @@ for i in cooling_facilities_unit_group.metrics:
 
 def get_AA_MPSP():
     for i in range(3):
-        HP_sys.simulate()
+        oxalic_sys.simulate()
     for i in range(3):
-        AA.price = HP_tea.solve_price(AA)
+        AA.price = oxalic_tea.solve_price(AA)
     return AA.price*AA.F_mass/AA.imass['AcrylicAcid']
 
 
-theoretical_max_g_HP_per_g_glucose = 2*HP_chemicals.HP.MW/HP_chemicals.Glucose.MW
+theoretical_max_g_oxalic_per_g_glucose = 2*oxalic_chemicals.OxalicAcid.MW/oxalic_chemicals.Glucose.MW
 
 
 
@@ -635,11 +638,11 @@ spec = ProcessSpecification(
     HXN = u.HXN1001,
     maximum_inhibitor_concentration = 1.,
     # pre_conversion_units = process_groups_dict['feedstock_group'].units + process_groups_dict['pretreatment_group'].units + [u.H301], # if the line below does not work (depends on BioSTEAM version)
-    # pre_conversion_units = HP_sys.split(u.M304.ins[0])[0],
+    # pre_conversion_units = oxalic_sys.split(u.M304.ins[0])[0],
     pre_conversion_units = [],
     
     # (ranges from Cao et al. 2022)
-    # baseline_yield = 0.0815/theoretical_max_g_HP_per_g_glucose, # mean of 0.074 and 0.089 g/g (range from Cao et al. 2022)
+    # baseline_yield = 0.0815/theoretical_max_g_oxalic_per_g_glucose, # mean of 0.074 and 0.089 g/g (range from Cao et al. 2022)
     # baseline_titer = 25.5, # mean of 23 and 28 g/L (range from Cao et al. 2022)
     # baseline_productivity = 0.215, # mean of 0.19 and 0.24 g/L/h (range from Cao et al. 2022)
     
@@ -655,7 +658,6 @@ spec = ProcessSpecification(
     feedstock_mass = feedstock.F_mass,
     pretreatment_reactor = None)
 
-spec.titer_inhibitor_specification.max_sugar_concentration = 0. # set for glucose feedstock; not checked in load_titer_with_glucose except when yield is too low to achieve titer
 
 spec.load_spec_1 = spec.load_yield
 # spec.load_spec_2 = spec.load_titer
@@ -667,36 +669,31 @@ def clear_units(units_to_clear):
             j.empty()
         i.simulate()
         
-HP_fermentation_process = f.HP_fermentation_process
+oxalic_fermentation_process = f.oxalic_fermentation_process
 
 def M304_titer_obj_fn(water_to_sugar_mol_ratio):
     M304.water_to_sugar_mol_ratio = water_to_sugar_mol_ratio
-    call_all_specifications_or_run(HP_fermentation_process.path)
-    # HP_fermentation_process.run()
+    call_all_specifications_or_run(oxalic_fermentation_process.path)
+    # oxalic_fermentation_process.run()
     return R302.effluent_titer - R302.titer_to_load
 
 def F301_titer_obj_fn(V):
     F301.V = V
-    call_all_specifications_or_run(HP_fermentation_process.path)
-    # HP_fermentation_process.run()
+    call_all_specifications_or_run(oxalic_fermentation_process.path)
+    oxalic_fermentation_process.run()
     return R302.effluent_titer - R302.titer_to_load
 
 def load_titer_with_glucose(titer_to_load):
     # clear_units([V301, K301])
-    # F301_lb, F301_ub = 1e-3, 1. - 1e-3
-    F301_lb, F301_ub = 0., 1. - 1e-3
-    M304_lb, M304_ub = 0., 100_000.  # for low-titer high-yield combinations, if infeasible, use a higher upper bound
+    F301_lb, F301_ub = 0., 0.8
+    M304_lb, M304_ub = 0., 40000.  # for low-titer high-yield combinations, if infeasible, use a higher upper bound
     
     spec.spec_2 = titer_to_load
     R302.titer_to_load = titer_to_load
     F301_titer_obj_fn(F301_lb)
     
-    if M304_titer_obj_fn(M304_lb) < 0.: # if there is too low a conc even with no dilution, that means the yield is too low
-        # IQ_interpolation(F301_titer_obj_fn, F301_lb, F301_ub, ytol=1e-3)
-        # pass
-        spec.titer_inhibitor_specification.check_sugar_concentration() # note this returns an infeasible sugar concentration error for smooth running purposes; 
-        # it is actually an infeasible yield-titer combination because at low yields too much glucose is broken down to produce water
-    
+    if M304_titer_obj_fn(M304_lb) < 0.: # if there is too low a conc even with no dilution
+        IQ_interpolation(F301_titer_obj_fn, F301_lb, F301_ub, ytol=1e-3)
     # elif F301_titer_obj_fn(1e-4)>0: # if the slightest evaporation results in too high a conc
     elif M304_titer_obj_fn(M304_ub) > 0.:
         IQ_interpolation(M304_titer_obj_fn, 
@@ -710,8 +707,7 @@ def load_titer_with_glucose(titer_to_load):
                          M304_ub, 
                          ytol=1e-3)
 
-    if not feedstock_ID=='Glucose': spec.titer_inhibitor_specification.check_sugar_concentration()
-    # spec.titer_inhibitor_specification.check_sugar_concentration()
+    spec.titer_inhibitor_specification.check_sugar_concentration()
     
 spec.load_spec_2 = load_titer_with_glucose
 
@@ -722,7 +718,7 @@ spec.load_spec_2 = load_titer_with_glucose
 def spec_set_production_capacity(
                         desired_annual_production=spec.desired_annual_production, # pure metric ton /y
                         method='analytical', # 'IQ_interpolation' or 'analytical'
-                        system=HP_sys,
+                        system=oxalic_sys,
                         TEA=None,
                         spec=spec,
                         product_stream=AA, 
@@ -753,15 +749,15 @@ def simulate_and_print():
     print('\n---------- Simulation Results ----------')
     MPSP_AA = get_AA_MPSP()
     print(f'MPSP is ${MPSP_AA:.3f}/kg AA')
-    GWP_AA, FEC_AA = HP_lca.GWP, HP_lca.FEC
+    GWP_AA, FEC_AA = oxalic_lca.GWP, oxalic_lca.FEC
     print(f'GWP-100a is {GWP_AA:.3f} kg CO2-eq/kg AA')
     print(f'FEC is {FEC_AA:.3f} MJ/kg AA')
     GWP_AA_without_electricity_credit, FEC_AA_without_electricity_credit =\
-        GWP_AA - HP_lca.net_electricity_GWP, FEC_AA - HP_lca.net_electricity_FEC
+        GWP_AA - oxalic_lca.net_electricity_GWP, FEC_AA - oxalic_lca.net_electricity_FEC
     print(f'GWP-100a without electricity credit is {GWP_AA_without_electricity_credit:.3f} kg CO2-eq/kg AA')
     print(f'FEC without electricity credit is {FEC_AA_without_electricity_credit:.3f} MJ/kg AA')
-    # print(f'FEC is {get_FEC():.2f} MJ/kg AA or {get_FEC()/HP_LHV:.2f} MJ/MJ HP')
-    # print(f'SPED is {get_SPED():.2f} MJ/kg AA or {get_SPED()/HP_LHV:.2f} MJ/MJ HP')
+    # print(f'FEC is {get_FEC():.2f} MJ/kg AA or {get_FEC()/oxalic_LHV:.2f} MJ/MJ HP')
+    # print(f'SPED is {get_SPED():.2f} MJ/kg AA or {get_SPED()/oxalic_LHV:.2f} MJ/MJ HP')
     # print('--------------------\n')
 
 # %% Initial simulation
@@ -777,10 +773,10 @@ for i in range(2):
 
 #%% Misc.
 
-def get_non_gaseous_waste_carbon_as_fraction_of_HP_GWP100():
-    return sum([i.get_atomic_flow('C') for i in HP_sys.products if i.F_mol 
+def get_non_gaseous_waste_carbon_as_fraction_of_oxalic_GWP100():
+    return sum([i.get_atomic_flow('C') for i in oxalic_sys.products if i.F_mol 
                 and ('l' in i.phases or 's' in i.phases or i.phase=='l') 
-                and (not i==AA)])/AA.imass['AcrylicAcid']/HP_lca.GWP
+                and (not i==AA)])/AA.imass['AcrylicAcid']/oxalic_lca.GWP
 
 #%%
 
@@ -789,7 +785,7 @@ simulate_and_print()
 # %% Diagram
 
 bst.LABEL_PATH_NUMBER_IN_DIAGRAMS = True
-HP_sys.diagram('cluster')
+oxalic_sys.diagram('cluster')
 
 #%% TEA breakdown
 
@@ -800,7 +796,7 @@ HP_sys.diagram('cluster')
 #%% TEA breakdown figure
 import contourplots
 
-system = HP_sys
+system = oxalic_sys
 
 ###### change operating cost unit labels $/h to MM$/y
 for i in unit_groups:
@@ -847,7 +843,7 @@ contourplots.stacked_bar_plot(dataframe=df_TEA_breakdown,
                          '#648496', 
                          # '#B97A57', 
                          '#D1C0E1', 
-                          # '#F8858A', 
+                         # '#F8858A', 
                            '#b00000', 
                          # '#63C6CE', 
                          '#94948C', 
@@ -858,7 +854,7 @@ contourplots.stacked_bar_plot(dataframe=df_TEA_breakdown,
                          '#b6fcd5',
                          ],
                  hatch_patterns=('\\', '//', '|', 'x',),
-                 filename='AA_system_corn_improved_separations' + '_TEA_breakdown_stacked_bar_plot',
+                 filename='AA_system_methanol_evap_neutralization' + '_TEA_breakdown_stacked_bar_plot',
                  n_minor_ticks=4,
                  fig_height=5.5*1.1777*0.94*1.0975,
                  fig_width=10,

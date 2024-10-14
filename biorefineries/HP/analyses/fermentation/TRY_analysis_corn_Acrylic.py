@@ -219,27 +219,34 @@ x_units = r"$\mathrm{\%}$" + " " + r"$\mathrm{theoretical}$"
 x_ticks = [0, 10, 20, 30, 40, 50, 60, 70, 80, 90, 100]
 
 y_label = r"$\bfTiter$" # title of the y axis
-y_units =r"$\mathrm{g} \cdot \mathrm{L}^{-1}$"
+# y_units =r"$\mathrm{g} \cdot \mathrm{L}^{-1}$"
+y_units =r"$\mathrm{g/L}}$"
 y_ticks = [0, 20, 40, 60, 80, 100, 120, 140, 160, 180, 200]
 
 
 z_label = r"$\bfProductivity$" # title of the z axis
-z_units =  r"$\mathrm{g} \cdot \mathrm{L}^{-1}  \cdot \mathrm{h}^{-1}$"
+# z_units =  r"$\mathrm{g} \cdot \mathrm{L}^{-1}  \cdot \mathrm{h}^{-1}$"
+z_units =  r"$\mathrm{g/L/h}$"
 z_ticks = [0, 0.2, 0.4, 0.6, 0.8, 1.0, 1.2, 1.4, 1.6, 1.8, 2.0]
 
 # Metrics
 MPSP_w_label = r"$\bfMPSP$" # title of the color axis
-MPSP_units = r"$\mathrm{\$}\cdot\mathrm{kg}^{-1}$"
+# MPSP_units = r"$\mathrm{\$}\cdot\mathrm{kg}^{-1}$"
+MPSP_units = r"$\mathrm{\$/kg}$"
 
 # GWP_w_label = r"$\mathrm{\bfGWP}_{\bf100}$"
-GWP_w_label = r"$\mathrm{\bfCarbon}$" + " " + r"$\mathrm{\bfIntensity}$"
-GWP_units = r"$\mathrm{kg}$"+" "+ r"$\mathrm{CO}_{2}\mathrm{-eq.}\cdot\mathrm{kg}^{-1}$"
+# GWP_w_label = r"$\mathrm{\bfCarbon}$" + " " + r"$\mathrm{\bfIntensity}$"
+GWP_w_label = r"$\mathrm{\bfCI}$"
+# GWP_units = r"$\mathrm{kg}$"+" "+ r"$\mathrm{CO}_{2}\mathrm{-eq.}\cdot\mathrm{kg}^{-1}$"
+GWP_units = r"$\mathrm{kg}$"+" "+ r"$\mathrm{CO}_{2}\mathrm{-eq./kg}$"
 
 FEC_w_label = r"$\bfFEC$" # title of the color axis
-FEC_units = r"$\mathrm{MJ}\cdot\mathrm{kg}^{-1}$"
+# FEC_units = r"$\mathrm{MJ}\cdot\mathrm{kg}^{-1}$"
+FEC_units = r"$\mathrm{MJ/kg}$"
 
 AOC_w_label = r"$\bfAOC$" # title of the color axis
-AOC_units = r"$\mathrm{MM\$}\cdot\mathrm{y}^{-1}$"
+# AOC_units = r"$\mathrm{MM\$}\cdot\mathrm{y}^{-1}$"
+AOC_units = r"$\mathrm{MM\$/y}$"
 
 TCI_w_label = r"$\bfTCI$" # title of the color axis
 TCI_units = r"$\mathrm{MM\$}$"
@@ -378,7 +385,6 @@ for p in productivities:
             curr_no +=1
             error_message = None
             if titer_too_high_for_yield:
-                print(f'Titer {t} too high for yield {y}.')
                 d1_Metric1[-1].append(np.nan)
                 d1_Metric2[-1].append(np.nan)
                 d1_Metric3[-1].append(np.nan)
@@ -420,6 +426,7 @@ for p in productivities:
                         d1_Metric6[-1].append(np.nan)
                         error_message = str_e
                         titer_too_high_for_yield = True
+                        print(f'Titer {t} too high for yield {y}.')
                     else:
                         try:
                             run_bugfix_barrage()
@@ -630,18 +637,22 @@ if plot:
                                     # manual_clabels_regular = {
                                     #     MPSP_w_ticks[5]: (45,28),
                                     #     },
-                                    additional_points ={(73, 62.5):('D', 'w', 6)},
+                                    additional_points ={(73, 62.5):('p', 'w', 6)},
                                     # fill_bottom_with_cmap_over_color=True, # for TRY
                                     bottom_fill_bounds = ((0,0), 
                                                           (5,18.),
                                                           (95,18.)),
                                     # zoom_data_scale=5,
-                                    text_boxes = {'>4.0': [(5,5), 'white']},
+                                    text_boxes = {'>4.00': [(5,5), 'white']},
                                     
                                     add_shapes = {
                                         # coords as tuple of tuples: (color, zorder),
-                                        ((0,0), (55,200), (1,200)): ('white', 2), # infeasible region smoothing
-                                        }
+                                        ((0,0), (51,200), (1,200)): ('white', 2), # infeasible region smoothing
+                                        },
+                                    units_on_newline = (False, False, False, False), # x,y,z,w
+                                    units_opening_brackets = [" (",] * 4,
+                                    units_closing_brackets = [")",] * 4,
+                                    label_over_color='white',
                                     )
     
     #%% GWP
@@ -684,18 +695,22 @@ if plot:
                                     axis_tick_fontsize = axis_tick_fontsize,
                                     n_minor_ticks = 1,
                                     cbar_n_minor_ticks = 4,
-                                    # additional_points ={(73, 62.5):('D', 'w', 6)},
+                                    additional_points ={(73, 62.5):('p', 'w', 6)},
                                     fill_bottom_with_cmap_over_color=True, # for TRY
                                     bottom_fill_bounds = ((0,0), 
                                                           (5,18.),
                                                           (95,18.)),
                                     # zoom_data_scale=5,
-                                    text_boxes = {'>6.0': [(5,5), 'white']},
+                                    text_boxes = {'>6.00': [(5,5), 'white']},
                                     
                                     add_shapes = {
                                         # coords as tuple of tuples: (color, zorder),
-                                        ((0,0), (55,200), (1,200)): ('white', 2), # infeasible region smoothing
-                                        }
+                                        ((0,0), (51,200), (1,200)): ('white', 2), # infeasible region smoothing
+                                        },
+                                    units_on_newline = (False, False, False, False), # x,y,z,w
+                                    units_opening_brackets = [" (",] * 4,
+                                    units_closing_brackets = [")",] * 4,
+                                    label_over_color='white',
                                     
                                     )
     
@@ -705,7 +720,7 @@ if plot:
     # FEC_w_levels, FEC_w_ticks, FEC_cbar_ticks = get_contour_info_from_metric_data(results_metric_3,)
     FEC_w_levels = np.arange(-100, 101, 10)
     FEC_cbar_ticks = np.arange(-100, 101, 20)
-    FEC_w_ticks = [-100, -60, -30, 0, 30, 60, 100]
+    FEC_w_ticks = [-100, -60, -30, 0, 10, 30, 60, 100]
     # FEC_w_ticks = [40, 50, 70, 80, 100]
     contourplots.animated_contourplot(w_data_vs_x_y_at_multiple_z=results_metric_3, # shape = z * x * y # values of the metric you want to plot on the color axis; e.g., FEC
                                     x_data=100*yields, # x axis values
@@ -742,18 +757,22 @@ if plot:
                                     axis_tick_fontsize = axis_tick_fontsize,
                                     n_minor_ticks = 1,
                                     cbar_n_minor_ticks = 1,
-                                    additional_points ={(73, 62.5):('D', 'w', 6)},
+                                    additional_points ={(73, 62.5):('p', 'w', 6)},
                                     fill_bottom_with_cmap_over_color=True, # for TRY
                                     bottom_fill_bounds = ((0,0), 
                                                           (5,18.),
                                                           (95,18.)),
                                     # zoom_data_scale=5,
-                                    text_boxes = {'>4.0': [(5,5), 'white']},
+                                    # text_boxes = {'>4.0': [(5,5), 'white']},
                                     
                                     add_shapes = {
                                         # coords as tuple of tuples: (color, zorder),
-                                        ((0,0), (55,200), (1,200)): ('white', 2), # infeasible region smoothing
-                                        }
+                                        ((0,0), (51,200), (1,200)): ('white', 2), # infeasible region smoothing
+                                        },
+                                    units_on_newline = (False, False, False, False), # x,y,z,w
+                                    units_opening_brackets = [" (",] * 4,
+                                    units_closing_brackets = [")",] * 4,
+                                    label_over_color='white',
                                     )
     
     #%% AOC

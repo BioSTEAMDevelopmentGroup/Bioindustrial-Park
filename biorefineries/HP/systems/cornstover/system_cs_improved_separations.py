@@ -64,6 +64,8 @@ import copy
 from biorefineries.cornstover import CellulosicEthanolTEA as HPTEA
 from biosteam import SystemFactory
 from biorefineries.cellulosic import create_facilities
+from biorefineries.cellulosic.units import Saccharification
+
 from biorefineries.cornstover import create_dilute_acid_pretreatment_system, create_saccharification_system
 # from biorefineries import corn
 # from lactic.hx_network import HX_Network
@@ -92,7 +94,7 @@ bst.main_flowsheet.set_flowsheet(flowsheet)
 bst.units.ShortcutColumn.minimum_guess_distillate_recovery = 0
 
 # Baseline cost year is 2016
-bst.CE = 541.7
+bst.CE = bst.units.design_tools.CEPCI_by_year[2019]
 # _labor_2007to2016 = 22.71 / 19.55
 
 # Set default thermo object for the system
@@ -111,6 +113,15 @@ System.default_relative_molar_tolerance = 0.001 # supersedes absolute tolerance
 System.default_molar_tolerance = 0.1
 System.strict_convergence = True # True => throw exception if system does not converge; false => continue with unconverged system
 
+def get_cornstover_saccharification_system_full(ins=()):
+    sys_upto_presacch = create_saccharification_system(ins=ins)
+    sys_upto_presacch.simulate()
+    R305 = Saccharification('R305', ins=sys_upto_presacch-0)
+    cornstover_saccharification_sys = bst.System.from_units('cornstover_saccharification_sys', 
+                                                            sys_upto_presacch.units+[R305])
+    
+    return cornstover_saccharification_sys
+
 @SystemFactory(ID = 'helper_HP_sys')
 def create_HP_sys(ins, outs):
     u, s = flowsheet.unit, flowsheet.stream
@@ -120,7 +131,7 @@ def create_HP_sys(ins, outs):
     # Corn stover pretreatment and saccharification subprocesses
     cornstover_pretreatment_sys = create_dilute_acid_pretreatment_system('cornstover_pretreatment_sys')
     
-    cornstover_saccharification_sys = create_saccharification_system('cornstover_saccharification_sys',
+    cornstover_saccharification_sys = get_cornstover_saccharification_system_full(
                                                                      ins=(cornstover_pretreatment_sys-0))
     
     cornstover_pretreatment_sys.simulate(update_configuration=True)
@@ -180,7 +191,7 @@ def create_HP_sys(ins, outs):
     makeup_MEA_A301 = Stream('makeup_MEA_A301', units='kg/hr', price=price['Monoethanolamine'])
     
     #%% Fermentation units
-    fermentation_sys = create_HP_fermentation_process(ins=(cornstover_saccharification_sys-0,
+    fermentation_sys = create_HP_fermentation_process(ins=(u.R305-0,
                                                            CSL,
                                                            fermentation_MgCl2,
                                                            fermentation_ZnSO4,
@@ -355,24 +366,32 @@ def create_HP_sys(ins, outs):
     M501 = bst.units.Mixer('M501', ins=(
                                         u.H201-0,
                                         u.F301_P-0, 
+                                        fermentation_sys-3,
                                         # separation_sys-4,
-                                        upgrading_sys-2, 
                                         separation_sys-3,
                                         separation_sys-4,
                                         separation_sys-5,
                                         separation_sys-6,
+                                        upgrading_sys-2, 
                                         # u.H201-0,
                                         ))
-    # M501.citrate_acetate_dissolution_rxns = ParallelRxn([
-    #     Rxn('SodiumAcetate + H2O -> AceticAcid + NaOH', 'SodiumAcetate',   1.-1e-5),
+    M501.ammonia_dissolution_rxns = ParallelRxn([
+        Rxn('NH3 + H2O -> NH4OH', 'NH3',   1.),
+        ])
+
     #     Rxn('SodiumCitrate + H2O -> CitricAcid + 3NaOH ', 'SodiumCitrate',   1.-1e-5),
     #     ])
     
-    # @M501.add_specification(run=False)
-    # def M501_citrate_acetate_dissolution_spec():
-    #     M501._run()
-    #     M501.citrate_acetate_dissolution_rxns(M501.outs[0].mol[:])
-        
+    @M501.add_specification(run=False)
+    def M501_spec():
+        M501._run()
+        M501_outs_0 = M501.outs[0]
+        M501.ammonia_dissolution_rxns(M501_outs_0.mol[:])
+        water_to_add = M501_outs_0.imol['H2SO4', 'NaOH'].max()
+        M501_outs_0.imol['H2SO4', 'NaOH', 'NH4OH'] = 0.
+        M501_outs_0.imol['Water'] += water_to_add
+    
+        # M501_outs_0.imol['H2SO4', 'CaCO3]
     # wastewater_treatment_sys = bst.create_wastewater_treatment_system(
     #     kind='conventional',
     #     ins=M501-0,

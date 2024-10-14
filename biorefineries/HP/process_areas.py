@@ -73,19 +73,32 @@ SeriesReaction = tmo.reaction.SeriesReaction
                       dict(ID='fermentation_liquid_effluent', HP=1, Water=99),
                       dict(ID='amine_absorption_vent', CO2=1),
                       dict(ID='F301_top_product', Water=1),
+                      dict(ID='pre_evaporator_vent', Water=1),
                                 ],
                                                )
 def create_HP_fermentation_process(ins, outs,):
     
     sugar_juice_or_slurry, CSL, magnesium_chloride, zinc_sulfate, fermentation_lime, fresh_CO2_fermentation, makeup_MEA_A301 = ins
-    fermentation_liquid_effluent, amine_absorption_vent, F301_top_product = outs
+    fermentation_liquid_effluent, amine_absorption_vent, F301_top_product, pre_evaporator_vent = outs
       
     
     # =============================================================================
     # Fermentation units
     # =============================================================================
-
-    F301 = bst.MultiEffectEvaporator('F301', ins=sugar_juice_or_slurry, outs=('F301_l', 'F301_g'),
+    U302 = bst.Unit('U302', ins=sugar_juice_or_slurry)
+    @U302.add_specification(run=False)
+    def U302_vle_spec():
+        U302_outs_0 = U302.outs[0]
+        U302_outs_0.copy_like(U302.ins[0])
+        U302_outs_0.vle(T=U302_outs_0.T, P=U302_outs_0.P)
+    
+    S301 = bst.PhaseSplitter('S301',  ins=U302-0, outs=('vented_stream', ''))
+    
+    H302 = bst.HXutility('H302',ins=S301-0,  V=0., rigorous=True)
+    
+    P303 = bst.Pump('P303', ins=H302-0, outs=pre_evaporator_vent)
+    
+    F301 = bst.MultiEffectEvaporator('F301', ins=S301-1, outs=('F301_l', 'F301_g'),
                                             P = (101325, 73581, 50892, 32777, 20000), V = 0.1)
                                             # P = (101325, 73581, 50892, 32777, 20000), V = 0.001)
     F301.V = 0.797 # initial value # updated in spec.load_titer
@@ -901,7 +914,7 @@ def create_HP_separation_improved_process(ins, outs, fermentation_reactor=None):
               'XyloseOligomer', 'MannoseOligomer', 'GalactoseOligomer',
               'Arabinose', 'ArabinoseOligomer', 'SolubleLignin',
               'Protein', 'Furfural', 'HMF',
-              'Glucan', 'Xylan', 'Arabinan', 
+              'Glucan', 'Xylan', 'Arabinan', 'Cellobiose',
               'Lignin', 'Cellulase', 'Mannan', 'Galactan',]})
     
     # partially adsorbed chemicals
@@ -1199,7 +1212,7 @@ def create_HP_separation_improved_process_HP_product(ins, outs, fermentation_rea
               'XyloseOligomer', 'MannoseOligomer', 'GalactoseOligomer',
               'Arabinose', 'ArabinoseOligomer', 'SolubleLignin',
               'Protein', 'Furfural', 'HMF',
-              'Glucan', 'Xylan', 'Arabinan', 
+              'Glucan', 'Xylan', 'Arabinan','Cellobiose', 
               'Lignin', 'Cellulase', 'Mannan', 'Galactan',]})
     
     # partially adsorbed chemicals

@@ -22,22 +22,21 @@ All units are explicitly defined here for transparency and easy reference
 import numpy as np
 import pandas as pd
 import thermosteam as tmo
-from biorefineries.TAL.chemicals_data import TAL_chemicals
+from biorefineries.oxalic.chemicals_data import oxalic_chemicals
 _kg_per_ton = 907.18474
 
 # Chemical Engineering Plant Cost Index from Chemical Engineering Magzine
 # (https://www.chemengonline.com/the-magazine/)
-#!!! BioSTEAM has it all: `bst.units.design_tools.CEPCI_by_year`
-# CEPCI = {1997: 386.5,
-#          1998: 389.5,
-#          2007: 525.4,
-#          2009: 521.9,
-#          2010: 550.8,
-#          2011: 585.7,
-#          2012: 584.6,
-#          2013: 567.3,
-#          2014: 576.1,
-#          2016: 541.7}
+CEPCI = {1997: 386.5,
+         1998: 389.5,
+         2007: 525.4,
+         2009: 521.9,
+         2010: 550.8,
+         2011: 585.7,
+         2012: 584.6,
+         2013: 567.3,
+         2014: 576.1,
+         2016: 541.7}
 
 # %% 
 
@@ -66,7 +65,7 @@ IDs = ('Ethanol', 'H2O', 'Glucose', 'Xylose', 'OtherSugars',
     'SugarOligomers', 'OrganicSolubleSolids', 'InorganicSolubleSolids', 'Ammonia', 'AceticAcid', 
     'SulfuricAcid', 'Furfurals', 'OtherOrganics', 'CO2', 'CH4',
     'O2', 'N2', 'COSOxNOxH2S', 'Glucan', 'Xylan', 
-    'OtherStructuralCarbohydrates', 'Acetate', 'Lignin', 'Protein', 'CellMass',
+    'OtherStructuralCarbohydrates', 'Lignin', 'Protein', 'CellMass',
     'OtherInsolubleSolids')
 
 streams = {}
@@ -75,55 +74,55 @@ streams['stream_535'] = (177, 329030, 502, 1022, 2094,
                          1552, 15808, 2513, 0, 0,
                          0, 513, 1348, 0, 0,
                          0, 0, 0, 25, 8,
-                         2, 0, 250, 69, 19,
+                         2, 250, 69, 19,
                          92)
 
 streams['stream_571'] = (6, 12797, 19, 49, 81,
                          60, 612, 97, 0, 0,
                          0, 19, 52, 0, 0,
                          1, 1, 0, 1230, 415,
-                         94, 0, 12226, 3376, 925,
+                         94, 12226, 3376, 925,
                          4489)
 
 streams['stream_611'] = (15, 356069, 42, 85, 175,
                          130, 2387, 110, 633, 5, 
                          0, 70, 113, 181, 3, 
                          1, 0, 300, 6, 2, 
-                         0, 0, 64, 18, 280,
+                         0, 64, 18, 280,
                          23)
 streams['stream_612'] = (1, 27158, 3, 7, 13,
                          10, 182, 8, 48, 0,
                          0, 5, 9, 14, 0,
                          0, 0, 23, 19, 6,
-                         1, 0, 186, 51, 813,
+                         1, 186, 51, 813,
                          68)
 
 streams['stream_616'] = (1, 109098, 3, 6, 13,
                          9, 187, 1068, 46, 0,
                          0, 5, 8, 14, 0, 
                          1, 1, 31, 1, 0,
-                         0, 0, 13, 3, 80, 
+                         0, 13, 3, 80, 
                          5)
 
 streams['stream_623'] = (0, 7708, 0, 0, 1,
                          1, 13, 75, 3, 0,
                          0, 0, 1, 1, 0,
                          0, 0, 2, 25, 8,
-                         2, 0, 250, 52, 1523,
+                         2, 250, 52, 1523,
                          92)
 
 streams['stream_624'] = (0, 381300, 0, 1, 1,
                          1, 79, 4828, 3, 0,
                          0, 0, 1, 6, 0,
                          3, 5, 44, 0, 0,
-                         0, 0, 0, 0, 0,
+                         0, 0, 0, 0,
                          0)
 
 streams['stream_625'] = (1, 2241169, 2, 3, 7,
                          6, 466, 28378, 16, 0,
                          0, 3, 7, 38, 0,
                          17, 32, 259, 194, 65,
-                         15, 0, 1925, 90, 19778,
+                         15, 1925, 90, 19778,
                          707)
 
 stream_626 = (0,) + (376324,) + (0,) * (len(IDs)-2)
@@ -133,7 +132,7 @@ streams['stream_627'] = (0, 4967, 0, 1, 1,
                          1, 79, 2828, 3, 0,
                          0, 0, 1, 3, 0,
                          0, 0, 44, 0, 0,
-                         0, 0, 0, 0, 0,
+                         0, 0, 0, 0,
                          0)
 
 splits_df = pd.DataFrame.from_dict(streams)
@@ -147,17 +146,16 @@ splits_df.index = IDs
 # =============================================================================
 
 def get_feedstock_flow(dry_composition, moisture_content, dry_flow):
-    dry_array = TAL_chemicals.kwarray(dry_composition)
+    dry_array = oxalic_chemicals.kwarray(dry_composition)
     wet_flow = dry_flow / (1-moisture_content)
-    moisture_array = TAL_chemicals.kwarray(dict(Water=moisture_content))
+    moisture_array = oxalic_chemicals.kwarray(dict(Water=moisture_content))
     feedstock_flow = wet_flow * (dry_array*(1-moisture_content)+moisture_array)
     return feedstock_flow
 
 dry_composition = dict(
-    Glucan=0.3505, Xylan=0.1953, Lignin=0.1576, Ash=0.0493, Acetate=0.0181,
+    Glucan=0.3505, Xylan=0.1953, Lignin=0.1576, Ash=0.0493, AceticAcid=0.0181,
     Protein=0.0310, Arabinan=0.0238, Galactan=0.0143, Mannan=0.0060, 
-    Sucrose=0.0077, Extract=0.1465, 
-    )
+    Sucrose=0.0077, Extract=0.1465, SuccinicAcid=0)
 
 moisture_content = 0.2
 dry_feedstock_flow = 2205 * _kg_per_ton / 24     

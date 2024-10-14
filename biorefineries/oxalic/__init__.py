@@ -1,48 +1,99 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+# BioSTEAM: The Biorefinery Simulation and Techno-Economic Analysis Modules
+# Copyright (C) 2020-2021, Yoel Cortes-Pena <yoelcortes@gmail.com>
 # Bioindustrial-Park: BioSTEAM's Premier Biorefinery Models and Results
-# Copyright (C) 2022-2023, Sarang Bhagwat <sarangb2@illinois.edu> (this biorefinery)
+# Copyright (C) 2020-2021, Sarang Bhagwat <sarangb2@illinois.edu>,
+# Yalin Li <yalinli2@illinois.edu>, and Yoel Cortes-Pena (yoelcortes@gmail.com)
 # 
 # This module is under the UIUC open-source license. See 
 # github.com/BioSTEAMDevelopmentGroup/biosteam/blob/master/LICENSE.txt
 # for license details.
-"""
-
-@author: sarangbhagwat
-
-Created on Sun Aug 23 12:11:15 2020
-
-This module is a modified implementation of modules from the following:
-[1]	Bhagwat et al., Sustainable Production of Acrylic Acid via 3-Hydroxypropionic Acid from Lignocellulosic Biomass. ACS Sustainable Chem. Eng. 2021, 9 (49), 16659–16669. https://doi.org/10.1021/acssuschemeng.1c05441
-[2]	Li et al., Sustainable Lactic Acid Production from Lignocellulosic Biomass. ACS Sustainable Chem. Eng. 2021, 9 (3), 1341–1351. https://doi.org/10.1021/acssuschemeng.0c08055
-[3]	Cortes-Peña et al., BioSTEAM: A Fast and Flexible Platform for the Design, Simulation, and Techno-Economic Analysis of Biorefineries under Uncertainty. ACS Sustainable Chem. Eng. 2020, 8 (8), 3302–3310. https://doi.org/10.1021/acssuschemeng.9b07040
-
-All units are explicitly defined here for transparency and easy reference.
-Naming conventions:
-    D = Distillation column
-    AC = Adsorption column
-    F = Flash tank or multiple-effect evaporator
-    H = Heat exchange
-    M = Mixer
-    P = Pump (including conveying belt)
-    R = Reactor
-    S = Splitter (including solid/liquid separator)
-    T = Tank or bin for storage
-    U = Other units
-Processes:
-    100: Feedstock preprocessing
-    200: Pretreatment
-    300: Conversion
-    400: Separation
-    500: Wastewater treatment
-    600: Storage
-    700: Co-heat and power
-    800: Cooling utility generation
-    900: Miscellaneous facilities
-    1000: Heat exchanger network
-
-"""
 
 
+# from biorefineries import PY37
+from warnings import filterwarnings
+from numpy import seterr
 
-__all__ = []
+filterwarnings('ignore')
+ig = seterr(invalid='ignore')
+
+from . import (
+    process_settings, 
+    chemicals_data, 
+    tea, 
+    units, 
+    facilities
+)
+from .chemicals_data import *
+from .process_settings import *
+from .tea import *
+from .units import *
+from .facilities import *
+
+# __all__ = [
+#     'system_light_lle_vacuum_distillation',
+#     'system_targeted_improvements',
+#     'system_sugarcane',
+#     'TRY_analysis',
+#     'test_solvents',
+#     'process_settings', 
+#     'chemicals_data', 
+#     'tea', 
+#     'lca',
+#     'units', 
+#     'facilities',
+# ]
+
+_system_loaded = False
+_chemicals_loaded = False
+
+_to_load_system = False
+
+if _to_load_system:
+    default_configuration = 'lignocellulosic'
+    
+    def load_system(configuration=None):
+        if not configuration in ('lignocellulosic', 'sugarcane'):
+            raise ValueError(f'configuration can only be "lignocellulosic" or "sugarcane", not "{configuration}".')
+        if not _chemicals_loaded: _load_chemicals()
+        _load_system(configuration)
+        dct = globals()
+        dct.update(flowsheet.to_dict())
+        # dct.update(flowsheet.system.__dir__())
+        # dct.update(flowsheet.stream.__dir__())
+        # dct.update(flowsheet.unit.__dir__())
+    
+    def _load_system(configuration=None):
+        load_process_settings()
+        if not configuration: configuration = default_configuration
+        if configuration == 'lignocellulosic':
+            _load_lignocellulosic_system()
+        elif configuration == 'sugarcane':
+            _load_sugarcane_system()
+        else:
+            raise ValueError("configuration must be either 'lignocellulosic' or 'sugarcane'; "
+                            f"not '{configuration}'")
+    
+    def _load_chemicals():
+        global chemicals
+        from .chemicals_data import HP_chemicals
+        chemicals = HP_chemicals
+        _chemicals_loaded = True
+    
+    def _load_lignocellulosic_system():
+        global system, HP_tea, flowsheet, _system_loaded, simulate_and_print
+        from .system_light_lle_vacuum_distillation import HP_tea, flowsheet, simulate_and_print
+        from .system_light_lle_vacuum_distillation import HP_sys as system
+        _system_loaded = True
+    
+    def _load_sugarcane_system():
+        global system, HP_tea, flowsheet, _system_loaded, simulate_and_print
+        from .system_sugarcane import HP_tea, flowsheet, simulate_and_print
+        from .system_sugarcane import HP_sys as system
+        _system_loaded = True
+    
+    
+    load_system('lignocellulosic')

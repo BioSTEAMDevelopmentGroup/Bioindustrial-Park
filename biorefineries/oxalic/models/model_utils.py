@@ -1,9 +1,13 @@
+#!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-"""
-Created on Thu Feb  2 17:16:45 2023
+# Bioindustrial-Park: BioSTEAM's Premier Biorefinery Models and Results
+# Copyright (C) 2021-, Sarang Bhagwat <sarangb2@illinois.edu>
+# 
+# This module is under the UIUC open-source license. See 
+# github.com/BioSTEAMDevelopmentGroup/biosteam/blob/master/LICENSE.txt
+# for license details.
 
-@author: sarangbhagwat
-"""
+
 from pandas import DataFrame, read_excel
 from chaospy import distributions as shape
 # from biorefineries.succinic.system_sc import succinic_tea, u, s
@@ -25,6 +29,15 @@ def replace_apostrophes(statement):
     statement = statement.replace('’', "'").replace('‘', "'").replace('“', '"').replace('”', '"')
     return statement
 
+def create_function(code, namespace_dict):
+    def wrapper_fn(statement):
+        def f(x):
+            namespace_dict['x'] = x
+            exec(codify(statement), namespace_dict)
+        return f
+    function = wrapper_fn(code)
+    return function
+
 #%%
 class EasyInputModel(Model):
     """
@@ -43,7 +56,6 @@ class EasyInputModel(Model):
         if type(df) is not DataFrame:
             df = read_excel(distributions)
             
-        create_function = self.create_function
         namespace_dict = self.namespace_dict
         param = self.parameter
         
@@ -55,14 +67,16 @@ class EasyInputModel(Model):
             baseline = row['Baseline']
             shape_data = row['Shape']
             lower, midpoint, upper = row['Lower'], row['Midpoint'], row['Upper']
-            load_statements = codify(row['Load Statements'])
+            load_statements = row['Load Statements']
             
             D = None
             if shape_data.lower() in ['triangular', 'triangle',]:
                 D = shape.Triangle(lower, midpoint, upper)
             elif shape_data.lower() in ['uniform',]:
+                if not str(midpoint)=='nan':
+                    raise ValueError(f"The parameter distribution for {name} ({element}) is 'Uniform' but was associated with a given midpoint value.")
                 D = shape.Uniform(lower, upper)
-            
+                
             param(name=name, 
                   setter=create_function(load_statements, namespace_dict), 
                   element=element, 
@@ -71,14 +85,7 @@ class EasyInputModel(Model):
                   baseline=baseline, 
                   distribution=D)
             
-    def create_function(self, code, namespace_dict):
-        def wrapper_fn(statement):
-            def f(x):
-                namespace_dict['x'] = x
-                exec(statement, namespace_dict)
-            return f
-        function = wrapper_fn(code)
-        return function
+    
     
 
     
