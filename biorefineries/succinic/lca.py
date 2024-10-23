@@ -119,7 +119,7 @@ class SuccinicLCA(LCA):
     
     @property
     def feedstock_FEC(self):
-        return self.get_complex_feed_impact_by_ID(self.FEC_key, self.feedstock_ID)
+        return self.get_complex_feed_impact_by_ID(self.FEC_key, self.feedstock_ID) / self.functional_quantity_per_h
     
     @property
     def net_electricity_FEC(self): 
