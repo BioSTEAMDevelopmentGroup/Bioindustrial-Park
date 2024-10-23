@@ -57,11 +57,11 @@ from biorefineries.HP.process_settings import price, CFs, chem_index
 from biorefineries.HP.utils import find_split, splits_df, baseline_feedflow
 from biorefineries.HP.chemicals_data import HP_chemicals, chemical_groups, \
                                 soluble_organics, combustibles
-from biorefineries.HP.tea import HPTEA
+# from biorefineries.HP.tea import HPTEA
 from biosteam.process_tools import UnitGroup
 import matplotlib.pyplot as plt
 import copy
-from biorefineries.cornstover import CellulosicEthanolTEA as HPTEA
+from biorefineries.tea import CellulosicEthanolTEA as HPTEA
 from biosteam import SystemFactory
 from biorefineries.cellulosic import create_facilities
 # from biorefineries.sugarcane import create_juicing_system_up_to_clarification
@@ -444,6 +444,7 @@ def create_HP_sys(ins, outs):
     
     HXN = HeatExchangerNetwork('HXN1001',
                                                 ignored=[
+                                                        u.F403,
                                                         ],
                                               cache_network=False,
                                               )
@@ -497,7 +498,7 @@ globals().update(flowsheet.to_dict())
 
 # Income tax was changed from 0.35 to 0.21 based on Davis et al., 2018 (new legislation)
 
-HP_tea = HPTEA(system=HP_sys, IRR=0.10, duration=(2016, 2046),
+HP_tea = HPTEA(system=HP_sys, IRR=0.10, duration=(2019, 2049),
         depreciation='MACRS7', income_tax=0.21, operating_days=330.,
         lang_factor=None, construction_schedule=(0.08, 0.60, 0.32),
         startup_months=3, startup_FOCfrac=1, startup_salesfrac=0.5,
@@ -869,3 +870,8 @@ contourplots.stacked_bar_plot(dataframe=df_TEA_breakdown,
                  totals_label_text=r"$\bfsum:$",
                  rotate_xticks=45.,
                  )
+#%%
+def get_non_gaseous_waste_carbon_as_fraction_of_AA_GWP100():
+    return sum([i.get_atomic_flow('C') for i in HP_sys.products if i.F_mol 
+                and ('l' in i.phases or 's' in i.phases or i.phase=='l') 
+                and (not i==AA)])/AA.imass['AcrylicAcid']/HP_lca.GWP

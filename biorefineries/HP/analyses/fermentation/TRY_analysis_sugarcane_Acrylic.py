@@ -62,7 +62,7 @@ HP_results_filepath = HP_filepath + '\\analyses\\results\\'
 
 #%% Load baseline
 
-spec.reactor.neutralization = False # !!! set neutralization here
+spec.reactor.neutralization = True # !!! set neutralization here
 
 model = models.HP_model
 system = HP_sys = models.HP_sys
@@ -172,8 +172,7 @@ product_chemical_IDs = ['AcrylicAcid',]
 get_product_MPSP = lambda: HP_tea.solve_price(product) / get_product_purity() # USD / pure-kg
 get_product_purity = lambda: sum([product.imass[i] for i in product_chemical_IDs])/product.F_mass
 get_production = lambda: sum([product.imass[i] for i in product_chemical_IDs])
-
-get_product_recovery = lambda: sum([product.imol[i] for i in product_chemical_IDs])/sum([broth.imol[i] for i in ['HP', 'CalciumLactate']])
+get_product_recovery = lambda: sum([product.imol[i] for i in product_chemical_IDs])/(broth.imol['HP'] + 2*broth.imol['CalciumLactate'])
 get_HP_AOC = lambda: HP_tea.AOC / 1e6 # million USD / y
 get_HP_TCI = lambda: HP_tea.TCI / 1e6 # million USD
 
@@ -193,7 +192,7 @@ HP_metrics = [get_product_MPSP,
 
 # %% Generate 3-specification meshgrid and set specification loading functions
 
-steps = (60, 60, 1)
+steps = (50, 50, 1)
 
 # Yield, titer, productivity (rate)
 spec_1 = yields = np.linspace(0.05, 0.95, steps[0]) # yield
@@ -585,8 +584,40 @@ keep_frames = True
 
 print('\nCreating and saving contour plots ...\n')
 
+#%%
+rm1, rm2, rm3 = results_metric_1.copy(), results_metric_2.copy(), results_metric_3.copy() 
+
+#%% Smoothing
+smoothing = False
+
+if smoothing:
+    for arr in [results_metric_1, results_metric_2, results_metric_3]:
+        for i in range(arr.shape[0]):
+            for j in range(arr.shape[1]):
+                for k in range(arr.shape[2]):
+                    if j>0 and k>0 and j<arr.shape[1]-1 and k<arr.shape[2]-1 :
+                        if np.isnan(arr[i,j,k]):
+                            manhattan_neighbors = np.array([
+                                         # arr[i][j-2][k],
+                                         # arr[i][j+2][k],
+                                         arr[i][j][k-1],
+                                         arr[i][j][k+1]
+                                         ])
+                            if not np.any(np.isnan(manhattan_neighbors)):
+                                arr[i,j,k] = np.mean(manhattan_neighbors)
+                        # else:
+                        #     manhattan_neighbors = np.array([
+                        #                  arr[i][j-1][k],
+                        #                  arr[i][j+1][k],
+                        #                  arr[i][j][k-1],
+                        #                  arr[i][j][k+1]
+                        #                  ])
+                        #     if not np.any(np.isnan(manhattan_neighbors)):
+                        #         if not round(arr[i,j,k]/np.mean(manhattan_neighbors),0)==1:
+                        #             print(i,j,k)
+                    
 #%% Plots
-plot = True
+plot = False
 
 if plot: 
     

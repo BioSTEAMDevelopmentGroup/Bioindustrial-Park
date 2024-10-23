@@ -51,9 +51,9 @@ chem_index = { # Dictionary of chemical indices
                     2022: 125.829,
                     }
 
-# From USD/dry-ton to USD/kg in 2016$, 20% moisture content
-# changed from Humbird et al., 2011 to Davis et al., 2018
-cornstover_price = 71.26 / _kg_per_ton * 0.8 
+# # From USD/dry-ton to USD/kg in 2016$, 20% moisture content
+# # changed from Humbird et al., 2011 to Davis et al., 2018
+# cornstover_price = 71.26 / _kg_per_ton * 0.8 
 
 # 2.18 is the average whole-sale ethanol price between 2010-2019 in 2016 $/gal 	
 # based on Annual Energy Outlook (AEO) from Energy Information Adiministration (EIA)	

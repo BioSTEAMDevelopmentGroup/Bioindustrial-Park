@@ -510,7 +510,7 @@ globals().update(flowsheet.to_dict())
 
 # Income tax was changed from 0.35 to 0.21 based on Davis et al., 2018 (new legislation)
 
-HP_tea = HPTEA(system=HP_sys, IRR=0.10, duration=(2016, 2046),
+HP_tea = HPTEA(system=HP_sys, IRR=0.10, duration=(2019, 2049),
         depreciation='MACRS7', income_tax=0.21, operating_days=180,
         lang_factor=None, construction_schedule=(0.08, 0.60, 0.32),
         startup_months=3, startup_FOCfrac=1, startup_salesfrac=0.5,

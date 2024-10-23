@@ -62,7 +62,7 @@ HP_results_filepath = HP_filepath + '\\analyses\\results\\'
 
 #%% Load baseline
 
-spec.reactor.neutralization = False # !!! set neutralization here
+spec.reactor.neutralization = True # !!! set neutralization here
 
 model = models.HP_model
 system = HP_sys = models.HP_sys
@@ -172,8 +172,7 @@ product_chemical_IDs = ['AcrylicAcid',]
 get_product_MPSP = lambda: HP_tea.solve_price(product) / get_product_purity() # USD / pure-kg
 get_product_purity = lambda: sum([product.imass[i] for i in product_chemical_IDs])/product.F_mass
 get_production = lambda: sum([product.imass[i] for i in product_chemical_IDs])
-
-get_product_recovery = lambda: sum([product.imol[i] for i in product_chemical_IDs])/sum([broth.imol[i] for i in ['HP', 'CalciumLactate']])
+get_product_recovery = lambda: sum([product.imol[i] for i in product_chemical_IDs])/(broth.imol['HP'] + 2*broth.imol['CalciumLactate'])
 get_HP_AOC = lambda: HP_tea.AOC / 1e6 # million USD / y
 get_HP_TCI = lambda: HP_tea.TCI / 1e6 # million USD
 
@@ -193,7 +192,7 @@ HP_metrics = [get_product_MPSP,
 
 # %% Generate 3-specification meshgrid and set specification loading functions
 
-steps = (20, 20, 1)
+steps = (50, 50, 1)
 
 # Yield, titer, productivity (rate)
 spec_1 = yields = np.linspace(0.05, 0.95, steps[0]) # yield
@@ -585,8 +584,40 @@ keep_frames = True
 
 print('\nCreating and saving contour plots ...\n')
 
+#%%
+rm1, rm2, rm3 = results_metric_1.copy(), results_metric_2.copy(), results_metric_3.copy() 
+
+#%% Smoothing
+smoothing = False
+
+if smoothing:
+    for arr in [results_metric_1, results_metric_2, results_metric_3]:
+        for i in range(arr.shape[0]):
+            for j in range(arr.shape[1]):
+                for k in range(arr.shape[2]):
+                    if j>0 and k>0 and j<arr.shape[1]-1 and k<arr.shape[2]-1 :
+                        if np.isnan(arr[i,j,k]):
+                            manhattan_neighbors = np.array([
+                                         # arr[i][j-2][k],
+                                         # arr[i][j+2][k],
+                                         arr[i][j][k-1],
+                                         arr[i][j][k+1]
+                                         ])
+                            if not np.any(np.isnan(manhattan_neighbors)):
+                                arr[i,j,k] = np.mean(manhattan_neighbors)
+                        # else:
+                        #     manhattan_neighbors = np.array([
+                        #                  arr[i][j-1][k],
+                        #                  arr[i][j+1][k],
+                        #                  arr[i][j][k-1],
+                        #                  arr[i][j][k+1]
+                        #                  ])
+                        #     if not np.any(np.isnan(manhattan_neighbors)):
+                        #         if not round(arr[i,j,k]/np.mean(manhattan_neighbors),0)==1:
+                        #             print(i,j,k)
+                    
 #%% Plots
-plot = True
+plot = False
 
 if plot: 
     
@@ -658,8 +689,8 @@ if plot:
     #%% GWP
     
     # GWP_w_levels, GWP_w_ticks, GWP_cbar_ticks = get_contour_info_from_metric_data(results_metric_2,)
-    GWP_w_levels = np.arange(-4, 6.01, 0.2)
-    GWP_cbar_ticks = np.arange(-4, 6.01, 2.)
+    GWP_w_levels = np.arange(0, 6.01, 0.1)
+    GWP_cbar_ticks = np.arange(0, 6.01, 1.)
     GWP_w_ticks = [-4, -3, -2, -1.5, 0, 0.7, 1, 1.5, 2,  3,4,6]
     contourplots.animated_contourplot(w_data_vs_x_y_at_multiple_z=results_metric_2, # shape = z * x * y # values of the metric you want to plot on the color axis; e.g., GWP
                                     x_data=100*yields, # x axis values
@@ -682,7 +713,7 @@ if plot:
                                     fmt_clabel = lambda cvalue: get_rounded_str(cvalue, 3),
                                     cmap=CABBI_green_colormap(), # can use 'viridis' or other default matplotlib colormaps
                                     cmap_over_color = colors.grey_dark.shade(8).RGBn,
-                                    extend_cmap='both',
+                                    extend_cmap='max',
                                     cbar_ticks=GWP_cbar_ticks,
                                     z_marker_color='g', # default matplotlib color names
                                     fps=fps, # animation frames (z values traversed) per second
@@ -694,7 +725,7 @@ if plot:
                                     default_fontsize = default_fontsize,
                                     axis_tick_fontsize = axis_tick_fontsize,
                                     n_minor_ticks = 1,
-                                    cbar_n_minor_ticks = 4,
+                                    cbar_n_minor_ticks = 9,
                                     additional_points ={(73, 62.5):('o', 'w', 6)},
                                     fill_bottom_with_cmap_over_color=True, # for TRY
                                     bottom_fill_bounds = ((0,0), 

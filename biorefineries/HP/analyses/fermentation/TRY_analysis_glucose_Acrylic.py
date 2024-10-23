@@ -70,7 +70,7 @@ HP_results_filepath = HP_filepath + '\\analyses\\results\\'
 
 #%% Load baseline
 
-spec.reactor.neutralization = True # !!! set neutralization here
+spec.reactor.neutralization = False # !!! set neutralization here
 
 model = models.HP_model
 system = HP_sys = models.HP_sys
@@ -150,6 +150,7 @@ def run_bugfix_barrage():
             # raise e
             system.reset_cache()
             system.empty_recycles()
+            print('Resetting and re-simulating F403 ...')
             F403.heat_utilities = []
             F403._V_first_effect = 0.144444
             F403.run()
@@ -181,8 +182,7 @@ product_chemical_IDs = ['AcrylicAcid',]
 get_product_MPSP = lambda: HP_tea.solve_price(product) / get_product_purity() # USD / pure-kg
 get_product_purity = lambda: sum([product.imass[i] for i in product_chemical_IDs])/product.F_mass
 get_production = lambda: sum([product.imass[i] for i in product_chemical_IDs])
-
-get_product_recovery = lambda: sum([product.imol[i] for i in product_chemical_IDs])/sum([broth.imol[i] for i in ['HP', 'CalciumLactate']])
+get_product_recovery = lambda: sum([product.imol[i] for i in product_chemical_IDs])/(broth.imol['HP'] + 2*broth.imol['CalciumLactate'])
 get_HP_AOC = lambda: HP_tea.AOC / 1e6 # million USD / y
 get_HP_TCI = lambda: HP_tea.TCI / 1e6 # million USD
 
@@ -198,23 +198,27 @@ HP_metrics = [get_product_MPSP,
                 # lambda: len(HXN.original_heat_utils), 
                 
                get_HP_AOC, get_HP_TCI, 
-               get_product_purity]
+               get_product_recovery]
 
 # %% Generate 3-specification meshgrid and set specification loading functions
 
-steps = (60, 60, 1)
+steps = (20, 20, 1)
 
 # Yield, titer, productivity (rate)
-spec_1 = yields = np.linspace(0.05, 0.95, steps[0]) # yield
-spec_2 = titers = np.linspace(5., 
+# spec_1 = yields = np.linspace(0.05, 0.95, steps[0]) # yield
+# spec_2 = titers = np.linspace(5, 
+#                               200.,
+#                                 steps[1]) # titer
+spec_1 = yields = np.linspace(0.2, 0.95, steps[0]) # yield
+spec_2 = titers = np.linspace(20, 
                               200.,
                                 steps[1]) # titer
 
-   
+
 spec_3 = productivities =\
     np.array([
-                0.2*spec.baseline_productivity,
-                # 1.*spec.baseline_productivity,
+                # 0.2*spec.baseline_productivity,
+                1.*spec.baseline_productivity,
                 # 5.*spec.baseline_productivity,
               ])
 
@@ -260,8 +264,8 @@ AOC_units = r"$\mathrm{MM\$/y}$"
 TCI_w_label = r"$\bfTCI$" # title of the color axis
 TCI_units = r"$\mathrm{MM\$}$"
 
-Purity_w_label = r"$\bfPurity$" # title of the color axis
-Purity_units = "wt " + r"$\mathrm{\%}$"
+Recovery_w_label = r"$\bfRecovery$" # title of the color axis
+Recovery_units = "wt " + r"$\mathrm{\%}$"
 
 #%% Colors
 
@@ -342,7 +346,7 @@ spec_1, spec_2 = np.meshgrid(spec_1, spec_2)
 # simulate_and_print()
 
 print('\n\nSimulating the initial point to avoid bugs ...')
-# spec.byproduct_yields_decrease_policy = 'simultaneous, from 0 product yield'
+spec.byproduct_yields_decrease_policy = 'simultaneous, from 0 product yield'
 spec.load_specifications(yields[0], titers[0], productivities[0])
 # spec.set_production_capacity(desired_annual_production=spec.desired_annual_production)
 # simulate_and_print()
@@ -489,7 +493,7 @@ for p in productivities:
     pd.DataFrame(d1_Metric3).to_csv(HP_results_filepath+'FEC-'+csv_file_to_save+'.csv')
     pd.DataFrame(d1_Metric4).to_csv(HP_results_filepath+'AOC-'+csv_file_to_save+'.csv')
     pd.DataFrame(d1_Metric5).to_csv(HP_results_filepath+'TCI-'+csv_file_to_save+'.csv')
-    pd.DataFrame(d1_Metric6).to_csv(HP_results_filepath+'Purity-'+csv_file_to_save+'.csv')
+    pd.DataFrame(d1_Metric6).to_csv(HP_results_filepath+'Recovery-'+csv_file_to_save+'.csv')
     
 
 #%% Report maximum HXN energy balance error
@@ -513,6 +517,8 @@ results_metric_1 = np.load(HP_results_filepath+'MPSP-'+file_to_save+'.npy')
 results_metric_2 = np.load(HP_results_filepath+'GWP-'+file_to_save+'.npy')
 results_metric_3 = np.load(HP_results_filepath+'FEC-'+file_to_save+'.npy')
 
+
+                    
 #%% More plot utils
 
 from math import floor, log
@@ -602,6 +608,38 @@ keep_frames = True
 
 print('\nCreating and saving contour plots ...\n')
 
+#%%
+rm1, rm2, rm3 = results_metric_1.copy(), results_metric_2.copy(), results_metric_3.copy() 
+
+#%% Smoothing
+smoothing = False
+
+if smoothing:
+    for arr in [results_metric_1, results_metric_2, results_metric_3]:
+        for i in range(arr.shape[0]):
+            for j in range(arr.shape[1]):
+                for k in range(arr.shape[2]):
+                    if j>0 and k>0 and j<arr.shape[1]-1 and k<arr.shape[2]-1 :
+                        if np.isnan(arr[i,j,k]):
+                            manhattan_neighbors = np.array([
+                                         # arr[i][j-2][k],
+                                         # arr[i][j+2][k],
+                                         arr[i][j][k-1],
+                                         arr[i][j][k+1]
+                                         ])
+                            if not np.any(np.isnan(manhattan_neighbors)):
+                                arr[i,j,k] = np.mean(manhattan_neighbors)
+                        # else:
+                        #     manhattan_neighbors = np.array([
+                        #                  arr[i][j-1][k],
+                        #                  arr[i][j+1][k],
+                        #                  arr[i][j][k-1],
+                        #                  arr[i][j][k+1]
+                        #                  ])
+                        #     if not np.any(np.isnan(manhattan_neighbors)):
+                        #         if not round(arr[i,j,k]/np.mean(manhattan_neighbors),0)==1:
+                        #             print(i,j,k)
+                    
 #%% Plots
 plot = False
 
@@ -659,7 +697,7 @@ if plot:
                                     fill_bottom_with_cmap_over_color=True, # for TRY
                                     bottom_fill_bounds = ((0,0), 
                                                           (5,60.),
-                                                          (95,60.)),
+                                                          (95,10.)),
                                     # zoom_data_scale=5,
                                     text_boxes = {'>4.00': [(5,5), 'white']},
                                     
@@ -926,16 +964,16 @@ if plot:
                                     label_over_color='white',
                                     )
     
-    #%% Purity
+    #%% Recovery
     
-    # Purity_w_levels, Purity_w_ticks, Purity_cbar_ticks = get_contour_info_from_metric_data(results_metric_6,)
-    Purity_w_levels = 100.*np.arange(0., 1.01, 0.025)
-    Purity_cbar_ticks = 100.*np.arange(0., 1.01, 0.1)
-    # Purity_cbar_ticks = np.arange(2, 8.1, 1.)
-    Purity_w_ticks = 100.*np.array([0.89, 0.90, 0.91, 0.92, 0.93, 0.94, 0.95])
-    # Purity_w_levels = np.arange(0., 15.5, 0.5)
+    # Recovery_w_levels, Recovery_w_ticks, Recovery_cbar_ticks = get_contour_info_from_metric_data(results_metric_6,)
+    Recovery_w_levels = 100.*np.arange(0., 1.01, 0.025)
+    Recovery_cbar_ticks = 100.*np.arange(0., 1.01, 0.1)
+    # Recovery_cbar_ticks = np.arange(2, 8.1, 1.)
+    Recovery_w_ticks = 100.*np.array([0.89, 0.90, 0.91, 0.92, 0.93, 0.94, 0.95])
+    # Recovery_w_levels = np.arange(0., 15.5, 0.5)
     
-    contourplots.animated_contourplot(w_data_vs_x_y_at_multiple_z=100.*np.array(results_metric_6), # shape = z * x * y # values of the metric you want to plot on the color axis; e.g., Purity
+    contourplots.animated_contourplot(w_data_vs_x_y_at_multiple_z=100.*np.array(results_metric_6), # shape = z * x * y # values of the metric you want to plot on the color axis; e.g., Recovery
                                     x_data=100*yields, # x axis values
                                     # x_data = yields/theoretical_max_g_HP_acid_per_g_glucose,
                                     y_data=titers, # y axis values
@@ -943,26 +981,26 @@ if plot:
                                     x_label=x_label, # title of the x axis
                                     y_label=y_label, # title of the y axis
                                     z_label=z_label, # title of the z axis
-                                    w_label=Purity_w_label, # title of the color axis
+                                    w_label=Recovery_w_label, # title of the color axis
                                     x_ticks=100*x_ticks,
                                     y_ticks=y_ticks,
                                     z_ticks=z_ticks,
-                                    w_levels=Purity_w_levels, # levels for unlabeled, filled contour areas (labeled and ticked only on color bar)
-                                    w_ticks=Purity_w_ticks, # labeled, lined contours; a subset of w_levels
+                                    w_levels=Recovery_w_levels, # levels for unlabeled, filled contour areas (labeled and ticked only on color bar)
+                                    w_ticks=Recovery_w_ticks, # labeled, lined contours; a subset of w_levels
                                     x_units=x_units,
                                     y_units=y_units,
                                     z_units=z_units,
-                                    w_units=Purity_units,
+                                    w_units=Recovery_units,
                                     # fmt_clabel=lambda cvalue: r"$\mathrm{\$}$"+" {:.1f} ".format(cvalue)+r"$\cdot\mathrm{kg}^{-1}$", # format of contour labels
                                     fmt_clabel = lambda cvalue: get_rounded_str(cvalue, 3),
                                     cmap=CABBI_green_colormap(), # can use 'viridis' or other default matplotlib colormaps
                                     cmap_over_color = colors.grey_dark.shade(8).RGBn,
                                     extend_cmap='neither',
-                                    cbar_ticks=Purity_cbar_ticks,
+                                    cbar_ticks=Recovery_cbar_ticks,
                                     z_marker_color='g', # default matplotlib color names
                                     fps=fps, # animation frames (z values traversed) per second
                                     n_loops='inf', # the number of times the animated contourplot should loop animation over z; infinite by default
-                                    animated_contourplot_filename='Purity_animated_contourplot_'+file_to_save, # file name to save animated contourplot as (no extensions)
+                                    animated_contourplot_filename='Recovery_animated_contourplot_'+file_to_save, # file name to save animated contourplot as (no extensions)
                                     keep_frames=keep_frames, # leaves frame PNG files undeleted after running; False by default
                                     axis_title_fonts=axis_title_fonts,
                                     clabel_fontsize = clabel_fontsize,
@@ -972,7 +1010,7 @@ if plot:
                                     n_minor_ticks = 1,
                                     cbar_n_minor_ticks = 4,
                                     additional_points ={(40.5, 35.9):('D', 'w', 6)},
-                                    # comparison_range=[Purity_w_levels[-2], Purity_w_levels[-1]],
+                                    # comparison_range=[Recovery_w_levels[-2], Recovery_w_levels[-1]],
                                     # comparison_range_hatch_pattern='////',
                                     bottom_fill_bounds = ((0,0), 
                                                           (5,60.),

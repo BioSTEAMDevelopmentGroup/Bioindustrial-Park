@@ -52,11 +52,11 @@ get_adjusted_MSP = models.get_adjusted_MSP
 
 # %% 
 
-N_simulations_per_mode = 100 # 6000
+N_simulations_per_mode = 6000 # 6000
 
 percentiles = [0, 0.05, 0.1, 0.25, 0.5, 0.75, 0.9, 0.95, 1]
 
-notification_interval = 10
+notification_interval = 20
 
 results_dict = {'Baseline':{'MPSP':{}, 'GWP100a':{}, 'FEC':{}, 
                             'GWP Breakdown':{}, 'FEC Breakdown':{},},
@@ -315,13 +315,13 @@ for i in range(len(modes)):
     
 #%% Clean up NaN values for plotting
 metrics = ['MPSP', 
-           # 'GWP100a', 
-           # 'FEC',
+            'GWP100a', 
+            'FEC',
            ]
 tot_NaN_vals_dict = results_dict['Errors'] = {metric: {mode: 0 for mode in modes} for metric in metrics}
 for mode in modes:
     for metric in metrics:
-        median_val = np.median(results_dict['Uncertainty'][metric][mode])
+        median_val = np.median(results_dict['Uncertainty'][metric][mode][~np.isnan(results_dict['Uncertainty'][metric][mode])])
         # median_val = 1.5
         for i in range(len(results_dict['Uncertainty'][metric][mode])):
             if np.isnan(results_dict['Uncertainty'][metric][mode][i]):
@@ -397,7 +397,7 @@ contourplots.box_and_whiskers_plot(uncertainty_data=MPSP_uncertainty,
                           y_ticks=np.arange(0., 2.41, 0.4),
                           save_file=True,
                           fig_height=5.5,
-                          fig_width = 5,
+                          fig_width = 2.3,
                           box_width=0.4,
                           filename=file_to_save+'_uncertainty_MPSP',
                           dpi=600,)
@@ -429,7 +429,7 @@ contourplots.box_and_whiskers_plot(uncertainty_data=GWP_uncertainty,
                             # ranges_for_comparison=[fossilbased_GWPs],
                             # ranges_for_comparison_colors=['#c0c1c2'],
                           # values_for_comparison=fossilbased_GWPs,
-                          n_minor_ticks=1,
+                          n_minor_ticks=3,
                           show_x_ticks=True,
                           x_tick_labels=scenario_names,
                           x_tick_wrap_width=6,
@@ -442,7 +442,7 @@ contourplots.box_and_whiskers_plot(uncertainty_data=GWP_uncertainty,
                           # fig_width = 3.,
                           # box_width=0.65,
                           fig_height=5.5,
-                          fig_width = 5,
+                          fig_width = 2.3,
                           box_width=0.4,
                           filename=file_to_save+'_uncertainty_GWP100a',
                           dpi=600,)
@@ -484,13 +484,13 @@ contourplots.box_and_whiskers_plot(uncertainty_data=FEC_uncertainty,
                           x_tick_wrap_width=6,
                           y_label=r"$\bfFEC$",
                           y_units=FEC_units,
-                          y_ticks=np.arange(-0, 150.1, 25),
+                          y_ticks=np.arange(0, 50, 10),
                           save_file=True,
                           # fig_height=5.5,
                           # fig_width = 3.,
                           # box_width=0.65,
                           fig_height=5.5,
-                          fig_width = 6,
+                          fig_width = 2.4,
                           box_width=0.3,
                           filename=file_to_save+'_uncertainty_FEC',
                           dpi=600,)
@@ -538,7 +538,7 @@ for i in range(len(metrics)):
 
 
 contourplots.stacked_bar_plot(dataframe=df_TEA_breakdown, 
-                 y_ticks = [-40, -20, 0, 20, 40, 60, 80, 100],
+                 y_ticks = [-20, 0, 20, 40, 60, 80, 100],
                  y_label=r"$\bfCost$" + " " + r"$\bfand$" + " " +  r"$\bfUtility$" + " " +  r"$\bfBreakdown$", 
                  y_units = "%", 
                  colors=['#7BBD84', 
@@ -564,7 +564,7 @@ contourplots.stacked_bar_plot(dataframe=df_TEA_breakdown,
                          ],
                  hatch_patterns=('\\', '//', '|', 'x',),
                  filename=file_to_save+'_'+mode+'_'+'AA_TEA_breakdown_stacked_bar_plot',
-                 n_minor_ticks=4,
+                 n_minor_ticks=3,
                  fig_height=5.5*1.1777*0.94*1.0975,
                  fig_width=10,
                  show_totals=True,

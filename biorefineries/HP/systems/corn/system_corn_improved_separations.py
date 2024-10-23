@@ -112,7 +112,7 @@ System.default_molar_tolerance = 0.1
 System.strict_convergence = True # True => throw exception if system does not converge; false => continue with unconverged system
 
 #### Load corn system ####
-def get_corn_system_upto_slurry():
+def get_corn_system_upto_slurry(ID='corn_system_upto_slurry'):
     # corn.load()
     sys = corn.create_system()
     sys.simulate()
@@ -157,7 +157,7 @@ def get_corn_system_upto_slurry():
                                 )
     unit_set.add(S201)
     
-    corn_system_upto_slurry = bst.System.from_units('corn_system_upto_slurry', list(unit_set))
+    corn_system_upto_slurry = bst.System.from_units(ID, list(unit_set))
     for i in corn_system_upto_slurry.outs: i.disconnect_sink()
     # f.HX101.rigorous=True
     corn_system_upto_slurry.simulate(update_configuration=True)
@@ -569,7 +569,7 @@ globals().update(flowsheet.to_dict())
 
 # Income tax was changed from 0.35 to 0.21 based on Davis et al., 2018 (new legislation)
 
-HP_tea = HPTEA(system=HP_sys, IRR=0.10, duration=(2016, 2046),
+HP_tea = HPTEA(system=HP_sys, IRR=0.10, duration=(2019, 2049),
         depreciation='MACRS7', income_tax=0.21, operating_days=330.,
         lang_factor=None, construction_schedule=(0.08, 0.60, 0.32),
         startup_months=3, startup_FOCfrac=1, startup_salesfrac=0.5,

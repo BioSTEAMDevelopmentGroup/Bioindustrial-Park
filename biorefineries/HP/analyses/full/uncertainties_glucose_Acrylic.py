@@ -538,7 +538,7 @@ for i in range(len(metrics)):
 
 
 contourplots.stacked_bar_plot(dataframe=df_TEA_breakdown, 
-                 y_ticks = [-40, -20, 0, 20, 40, 60, 80, 100],
+                 y_ticks = [-20, 0, 20, 40, 60, 80, 100],
                  y_label=r"$\bfCost$" + " " + r"$\bfand$" + " " +  r"$\bfUtility$" + " " +  r"$\bfBreakdown$", 
                  y_units = "%", 
                  colors=['#7BBD84', 
@@ -564,7 +564,7 @@ contourplots.stacked_bar_plot(dataframe=df_TEA_breakdown,
                          ],
                  hatch_patterns=('\\', '//', '|', 'x',),
                  filename=file_to_save+'_'+mode+'_'+'AA_TEA_breakdown_stacked_bar_plot',
-                 n_minor_ticks=4,
+                 n_minor_ticks=3,
                  fig_height=5.5*1.1777*0.94*1.0975,
                  fig_width=10,
                  show_totals=True,
@@ -614,7 +614,8 @@ contourplots.stacked_bar_plot(dataframe=df_GWP_breakdown,
                   # '#94948C', '#734A8C', '#D1C0E1', '#648496', '#B97A57', '#F8858A', 'red', 'magenta'],
                   filename=file_to_save+'_'+mode+'_''AA_GWP_breakdown_stacked_bar_plot',
                   fig_width=2,
-                  fig_height=5.5*1.1777*0.94)
+                  fig_height=5.5*1.1777*0.94,
+                  n_minor_ticks=3,)
 
 # FEC
 temp_FEC_breakdown_dict = results_dict['Baseline']['FEC Breakdown'][mode]
@@ -643,7 +644,8 @@ contourplots.stacked_bar_plot(dataframe=df_FEC_breakdown,
                   hatch_patterns=('\\', '//', '|', 'x',),
                   filename=file_to_save+'_'+mode+'_'+'AA_FEC_breakdown_stacked_bar_plot',
                   fig_width=2,
-                  fig_height=5.5*1.1777*0.94)
+                  fig_height=5.5*1.1777*0.94,
+                 n_minor_ticks=3,)
 
 #%% Spearman's rank order correlation coefficients - 1D
 from matplotlib import pyplot as plt
