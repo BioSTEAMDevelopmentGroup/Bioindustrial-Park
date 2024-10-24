@@ -202,27 +202,29 @@ HP_metrics = [get_product_MPSP,
 
 # %% Generate 3-specification meshgrid and set specification loading functions
 
-steps = (50, 50, 1)
+steps = (20, 20, 40)
 
 # Yield, titer, productivity (rate)
 # spec_1 = yields = np.linspace(0.05, 0.95, steps[0]) # yield
 # spec_2 = titers = np.linspace(5, 
 #                               200.,
 #                                 steps[1]) # titer
-spec_1 = yields = np.linspace(0.2, 0.95, steps[0]) # yield
-spec_2 = titers = np.linspace(20, 
+spec_1 = yields = np.linspace(0.05, 0.95, steps[0]) # yield
+spec_2 = titers = np.linspace(5., 
                               200.,
                                 steps[1]) # titer
 
 
+# spec_3 = productivities =\
+#     np.array([
+#                 # 0.2*spec.baseline_productivity,
+#                 # 1.*spec.baseline_productivity,
+#                 5.*spec.baseline_productivity,
+#               ])
+
 spec_3 = productivities =\
-    np.array([
-                # 0.2*spec.baseline_productivity,
-                1.*spec.baseline_productivity,
-                # 5.*spec.baseline_productivity,
-              ])
-
-
+    np.linspace(0.01, 2., steps[2])
+    
 #%% Plot stuff
 
 # Parameters analyzed across
@@ -232,34 +234,34 @@ x_units = r"$\mathrm{\%}$" + " " + r"$\mathrm{theoretical}$"
 x_ticks = [0, 10, 20, 30, 40, 50, 60, 70, 80, 90, 100]
 
 y_label = r"$\bfTiter$" # title of the y axis
-# y_units =r"$\mathrm{g} \cdot \mathrm{L}^{-1}$"
-y_units =r"$\mathrm{g/L}}$"
+y_units =r"$\mathrm{g} \cdot \mathrm{L}^{-1}$"
+# y_units =r"$\mathrm{g/L}}$"
 y_ticks = [0, 20, 40, 60, 80, 100, 120, 140, 160, 180, 200]
 
 
 z_label = r"$\bfProductivity$" # title of the z axis
-# z_units =  r"$\mathrm{g} \cdot \mathrm{L}^{-1}  \cdot \mathrm{h}^{-1}$"
-z_units =  r"$\mathrm{g/L/h}$"
+z_units =  r"$\mathrm{g} \cdot \mathrm{L}^{-1}  \cdot \mathrm{h}^{-1}$"
+# z_units =  r"$\mathrm{g/L/h}$"
 z_ticks = [0, 0.2, 0.4, 0.6, 0.8, 1.0, 1.2, 1.4, 1.6, 1.8, 2.0]
 
 # Metrics
 MPSP_w_label = r"$\bfMPSP$" # title of the color axis
-# MPSP_units = r"$\mathrm{\$}\cdot\mathrm{kg}^{-1}$"
-MPSP_units = r"$\mathrm{\$/kg}$"
+MPSP_units = r"$\mathrm{\$}\cdot\mathrm{kg}^{-1}$"
+# MPSP_units = r"$\mathrm{\$/kg}$"
 
 # GWP_w_label = r"$\mathrm{\bfGWP}_{\bf100}$"
 # GWP_w_label = r"$\mathrm{\bfCarbon}$" + " " + r"$\mathrm{\bfIntensity}$"
 GWP_w_label = r"$\mathrm{\bfCI}$"
-# GWP_units = r"$\mathrm{kg}$"+" "+ r"$\mathrm{CO}_{2}\mathrm{-eq.}\cdot\mathrm{kg}^{-1}$"
-GWP_units = r"$\mathrm{kg}$"+" "+ r"$\mathrm{CO}_{2}\mathrm{-eq./kg}$"
+GWP_units = r"$\mathrm{kg}$"+" "+ r"$\mathrm{CO}_{2}\mathrm{-eq.}\cdot\mathrm{kg}^{-1}$"
+# GWP_units = r"$\mathrm{kg}$"+" "+ r"$\mathrm{CO}_{2}\mathrm{-eq./kg}$"
 
 FEC_w_label = r"$\bfFEC$" # title of the color axis
-# FEC_units = r"$\mathrm{MJ}\cdot\mathrm{kg}^{-1}$"
-FEC_units = r"$\mathrm{MJ/kg}$"
+FEC_units = r"$\mathrm{MJ}\cdot\mathrm{kg}^{-1}$"
+# FEC_units = r"$\mathrm{MJ/kg}$"
 
 AOC_w_label = r"$\bfAOC$" # title of the color axis
-# AOC_units = r"$\mathrm{MM\$}\cdot\mathrm{y}^{-1}$"
-AOC_units = r"$\mathrm{MM\$/y}$"
+AOC_units = r"$\mathrm{MM\$}\cdot\mathrm{y}^{-1}$"
+# AOC_units = r"$\mathrm{MM\$/y}$"
 
 TCI_w_label = r"$\bfTCI$" # title of the color axis
 TCI_units = r"$\mathrm{MM\$}$"
@@ -641,7 +643,7 @@ if smoothing:
                         #             print(i,j,k)
                     
 #%% Plots
-plot = False
+plot = True
 
 if plot: 
     
@@ -650,7 +652,7 @@ if plot:
     # MPSP_w_levels, MPSP_w_ticks, MPSP_cbar_ticks = get_contour_info_from_metric_data(results_metric_1, lb=3)
     MPSP_w_levels = np.arange(0., 4.01, 0.1)
     MPSP_cbar_ticks = np.arange(0., 4.01, 0.4)
-    MPSP_w_ticks = [0.9, 1., 1.1, 1.2, 2., 2.4, 2.8, 4.]
+    MPSP_w_ticks = [0.9, 1., 1.2, 2., 2.5,  4.]
     # MPSP_w_levels = np.arange(0., 15.5, 0.5)
     
     
@@ -672,8 +674,8 @@ if plot:
                                     y_units=y_units,
                                     z_units=z_units,
                                     w_units=MPSP_units,
-                                    # fmt_clabel=lambda cvalue: r"$\mathrm{\$}$"+" {:.1f} ".format(cvalue)+r"$\cdot\mathrm{kg}^{-1}$", # format of contour labels
-                                    fmt_clabel = lambda cvalue: get_rounded_str(cvalue, 3),
+                                    fmt_clabel=lambda cvalue: r"$\mathrm{\$}$"+" {:.2f} ".format(cvalue)+r"$\cdot\mathrm{kg}^{-1}$", # format of contour labels
+                                    # fmt_clabel = lambda cvalue: get_rounded_str(cvalue, 3),
                                     cmap=CABBI_green_colormap(), # can use 'viridis' or other default matplotlib colormaps
                                     cmap_over_color = colors.grey_dark.shade(8).RGBn,
                                     extend_cmap='max',
@@ -699,16 +701,23 @@ if plot:
                                                           (5,60.),
                                                           (95,10.)),
                                     # zoom_data_scale=5,
-                                    text_boxes = {'>4.00': [(5,5), 'white']},
+                                    # text_boxes = {'>4.00': [(5,5), 'white']},
+                                    text_boxes = {">" + r"$\mathrm{\$}$"+" {:.2f} ".format(4.00)+r"$\cdot\mathrm{kg}^{-1}$": [(5,5), 'white']},
+                                    # add_shapes = {
+                                    #     # coords as tuple of tuples: (color, zorder),
+                                    #     ((0,0), (20,200), (1,200)): ('white', 2), # infeasible region smoothing
+                                    #     },
                                     
                                     add_shapes = {
                                         # coords as tuple of tuples: (color, zorder),
-                                        ((0,0), (20,200), (1,200)): ('white', 2), # infeasible region smoothing
+                                        ((0,0), (38,200), (1,200)): ('white', 2), # infeasible region smoothing
                                         },
+                                    
+                                    
                                     units_on_newline = (False, False, False, False), # x,y,z,w
-                                    units_opening_brackets = [" (",] * 4,
-                                    units_closing_brackets = [")",] * 4,
-                                    label_over_color='white',
+                                    units_opening_brackets = [" [",] * 4,
+                                    units_closing_brackets = ["]",] * 4,
+                                    # label_over_color='white',
                                     )
     
     #%% GWP
@@ -716,7 +725,7 @@ if plot:
     # GWP_w_levels, GWP_w_ticks, GWP_cbar_ticks = get_contour_info_from_metric_data(results_metric_2,)
     GWP_w_levels = np.arange(0, 12.01, 0.2)
     GWP_cbar_ticks = np.arange(0, 12.01, 2.)
-    GWP_w_ticks = [2.8, 3.2, 3.4, 3.8, 7.6, 10, 12]
+    GWP_w_ticks = [2.8, 3.4, 3.8, 7.6, 12]
     contourplots.animated_contourplot(w_data_vs_x_y_at_multiple_z=results_metric_2, # shape = z * x * y # values of the metric you want to plot on the color axis; e.g., GWP
                                     x_data=100*yields, # x axis values
                                     y_data=titers, # y axis values
@@ -762,14 +771,21 @@ if plot:
                                     # zoom_data_scale=5,
                                     text_boxes = {'>12.0': [(5,5), 'white']},
                                     
+                                    # add_shapes = {
+                                    #     # coords as tuple of tuples: (color, zorder),
+                                    #     ((0,0), (20,200), (1,200)): ('white', 2), # infeasible region smoothing
+                                    #     },
+                                    
+                                    
                                     add_shapes = {
                                         # coords as tuple of tuples: (color, zorder),
-                                        ((0,0), (20,200), (1,200)): ('white', 2), # infeasible region smoothing
+                                        ((0,0), (38,200), (1,200)): ('white', 2), # infeasible region smoothing
                                         },
+                                    
                                     units_on_newline = (False, False, False, False), # x,y,z,w
-                                    units_opening_brackets = [" (",] * 4,
-                                    units_closing_brackets = [")",] * 4,
-                                    label_over_color='white',
+                                    units_opening_brackets = [" [",] * 4,
+                                    units_closing_brackets = ["]",] * 4,
+                                    # label_over_color='white',
                                     )
     
     
@@ -826,22 +842,23 @@ if plot:
                                     # zoom_data_scale=5,
                                     text_boxes = {'>150': [(5,5), 'white']},
                                     
+                                    
                                     add_shapes = {
                                         # coords as tuple of tuples: (color, zorder),
-                                        ((0,0), (20,200), (1,200)): ('white', 2), # infeasible region smoothing
+                                        ((0,0), (38,200), (1,200)): ('white', 2), # infeasible region smoothing
                                         },
+                                    
                                     units_on_newline = (False, False, False, False), # x,y,z,w
-                                    units_opening_brackets = [" (",] * 4,
-                                    units_closing_brackets = [")",] * 4,
-                                    label_over_color='white',
+                                    units_opening_brackets = [" [",] * 4,
+                                    units_closing_brackets = ["]",] * 4,
                                     )
     
     #%% AOC
     
     # AOC_w_levels, AOC_w_ticks, AOC_cbar_ticks = get_contour_info_from_metric_data(results_metric_4,)
-    AOC_w_levels = np.arange(0, 151., 5.)
-    AOC_cbar_ticks = AOC_w_levels = np.arange(0, 151., 10.)
-    AOC_w_ticks = [0, 25, 30, 40, 50, 100, 150]
+    AOC_w_levels = np.arange(100, 251., 5.)
+    AOC_cbar_ticks = np.arange(100., 251., 25.)
+    AOC_w_ticks = [115, 125, 150, 250]
     # AOC_w_levels = np.arange(0., 15.5, 0.5)
     
     contourplots.animated_contourplot(w_data_vs_x_y_at_multiple_z=results_metric_4, # shape = z * x * y # values of the metric you want to plot on the color axis; e.g., AOC
@@ -862,8 +879,8 @@ if plot:
                                     y_units=y_units,
                                     z_units=z_units,
                                     w_units=AOC_units,
-                                    # fmt_clabel=lambda cvalue: r"$\mathrm{\$}$"+" {:.1f} ".format(cvalue)+r"$\cdot\mathrm{kg}^{-1}$", # format of contour labels
-                                    fmt_clabel = lambda cvalue: get_rounded_str(cvalue, 3),
+                                    fmt_clabel=lambda cvalue: "{:.0f} ".format(cvalue)+"MM"+r"$\mathrm{\$}$"+r"$\cdot\mathrm{y}^{-1}$",
+                                    # fmt_clabel = lambda cvalue: get_rounded_str(cvalue, 3),
                                     cmap=CABBI_green_colormap(), # can use 'viridis' or other default matplotlib colormaps
                                     cmap_over_color = colors.grey_dark.shade(8).RGBn,
                                     extend_cmap='max',
@@ -880,22 +897,23 @@ if plot:
                                     # comparison_range=HP_maximum_viable_market_range,
                                     n_minor_ticks = 1,
                                     cbar_n_minor_ticks = 4,
-                                    additional_points ={(73, 62.5):('D', 'w', 6)},
-                                    fill_bottom_with_cmap_over_color=True, # for TRY
-                                    bottom_fill_bounds = ((0,0), 
-                                                          (5,60.),
-                                                          (95,60.)),
+                                    # additional_points ={(73, 62.5):('D', 'w', 6)},
+                                    # fill_bottom_with_cmap_over_color=True, # for TRY
+                                    # bottom_fill_bounds = ((0,0), 
+                                    #                       (5,60.),
+                                    #                       (95,60.)),
                                     # zoom_data_scale=5,
-                                    text_boxes = {'>4.0': [(5,5), 'white']},
+                                    text_boxes = {">"+"{:.0f} ".format(250)+"MM"+r"$\mathrm{\$}$"+r"$\cdot\mathrm{y}^{-1}$": [(55,10), 'white']},
+                                    
                                     
                                     add_shapes = {
                                         # coords as tuple of tuples: (color, zorder),
-                                        ((0,0), (20,200), (1,200)): ('white', 2), # infeasible region smoothing
+                                        ((0,0), (29,200), (1,200)): ('white', 2), # infeasible region smoothing
                                         },
+                                    
                                     units_on_newline = (False, False, False, False), # x,y,z,w
-                                    units_opening_brackets = [" (",] * 4,
-                                    units_closing_brackets = [")",] * 4,
-                                    label_over_color='white',
+                                    units_opening_brackets = [" [",] * 4,
+                                    units_closing_brackets = ["]",] * 4,
                                     )
     
     #%% TCI
@@ -905,9 +923,9 @@ if plot:
     # TCI_cbar_ticks = np.arange(2, 8.1, 1.)
     
     # TCI_w_ticks = [150, 200, 300, 400,]
-    TCI_w_levels = np.arange(150, 401, 10)
-    TCI_cbar_ticks = [150, 200, 250, 300, 350, 400]
-    TCI_w_ticks = [150, 200, 220, 250, 300, 350, 400]
+    TCI_w_levels = np.arange(100, 401, 10)
+    TCI_cbar_ticks = [100, 150, 200, 250, 300, 350, 400]
+    TCI_w_ticks = [150, 200, 250, 300, 400]
     # TCI_w_levels = np.arange(0., 15.5, 0.5)
     
     contourplots.animated_contourplot(w_data_vs_x_y_at_multiple_z=results_metric_5, # shape = z * x * y # values of the metric you want to plot on the color axis; e.g., TCI
@@ -928,8 +946,8 @@ if plot:
                                     y_units=y_units,
                                     z_units=z_units,
                                     w_units=TCI_units,
-                                    # fmt_clabel=lambda cvalue: r"$\mathrm{\$}$"+" {:.1f} ".format(cvalue)+r"$\cdot\mathrm{kg}^{-1}$", # format of contour labels
-                                    fmt_clabel = lambda cvalue: get_rounded_str(cvalue, 3),
+                                    fmt_clabel=lambda cvalue: "{:.0f} ".format(cvalue)+"MM$", # format of contour labels
+                                    # fmt_clabel = lambda cvalue: get_rounded_str(cvalue, 3),
                                     cmap=CABBI_green_colormap(), # can use 'viridis' or other default matplotlib colormaps
                                     cmap_over_color = colors.grey_dark.shade(8).RGBn,
                                     extend_cmap='max',
@@ -946,22 +964,23 @@ if plot:
                                     # comparison_range=HP_maximum_viable_market_range,
                                     n_minor_ticks = 1,
                                     cbar_n_minor_ticks = 4,
-                                    additional_points ={(73, 62.5):('D', 'w', 6)},
-                                    fill_bottom_with_cmap_over_color=True, # for TRY
-                                    bottom_fill_bounds = ((0,0), 
-                                                          (5,60.),
-                                                          (95,60.)),
+                                    # additional_points ={(73, 62.5):('D', 'w', 6)},
+                                    # fill_bottom_with_cmap_over_color=True, # for TRY
+                                    # bottom_fill_bounds = ((0,0), 
+                                    #                       (5,60.),
+                                    #                       (95,60.)),
                                     # zoom_data_scale=5,
-                                    text_boxes = {'>4.0': [(5,5), 'white']},
+                                    text_boxes = {'>'+"{:.0f} ".format(400)+"MM$": [(65,10), 'white']},
+                                    
                                     
                                     add_shapes = {
                                         # coords as tuple of tuples: (color, zorder),
-                                        ((0,0), (20,200), (1,200)): ('white', 2), # infeasible region smoothing
+                                        ((0,0), (29,200), (1,200)): ('white', 2), # infeasible region smoothing
                                         },
+                                    
                                     units_on_newline = (False, False, False, False), # x,y,z,w
-                                    units_opening_brackets = [" (",] * 4,
-                                    units_closing_brackets = [")",] * 4,
-                                    label_over_color='white',
+                                    units_opening_brackets = [" [",] * 4,
+                                    units_closing_brackets = ["]",] * 4,
                                     )
     
     #%% Recovery
@@ -1105,3 +1124,4 @@ if plot:
                                         ((1,0), (47,100), (1,100)): ('white', 2), # infeasible region smoothing
                                         }
                                     )
+
