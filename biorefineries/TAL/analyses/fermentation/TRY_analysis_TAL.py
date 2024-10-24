@@ -138,7 +138,7 @@ spec_2 = titers = np.linspace(2.,
 # spec_3 = productivities =\
 #     np.linspace(0.05, 1.5, steps[2])
 
-which_fig = 'S4'
+which_fig = '5'
 
 #%%
 additional_points = {}
