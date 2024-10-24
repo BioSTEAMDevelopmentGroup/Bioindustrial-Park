@@ -257,13 +257,13 @@ plot_multiple_metrics(100*np.array(splits),
                       ylims_list=[
                                   (0,100),
                                   (5,10),
-                                  (6,16),
+                                  (0,12),
                                   (-60,60),
                                   ],
                       xticks=[0 + 10*i for i in range(0,11)],
                       yticks_list = [[0 + 10*i for i in range(0,11)],
                                  np.arange(4, 10.1, 0.5),
-                                 np.arange(6, 16.1, 1),
+                                 np.arange(0, 12.1, 1),
                                  np.arange(-60, 60.1, 10),
                                  ]
                       )

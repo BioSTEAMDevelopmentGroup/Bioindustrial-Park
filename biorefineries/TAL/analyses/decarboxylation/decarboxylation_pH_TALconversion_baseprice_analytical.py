@@ -589,9 +589,9 @@ contourplots.animated_contourplot(w_data_vs_x_y_at_multiple_z=results_metric_1, 
 #%% GWP
 
 # GWP_w_levels, GWP_w_ticks, GWP_cbar_ticks = get_contour_info_from_metric_data(results_metric_2,)
-GWP_w_levels = np.arange(0, 20.1, 0.5)
-GWP_cbar_ticks = np.arange(0, 20.1, 2.)
-GWP_w_ticks = [6.5, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 20]
+GWP_w_levels = np.arange(0, 14.1, 0.5)
+GWP_cbar_ticks = np.arange(0, 14.1, 2.)
+GWP_w_ticks = [0, 1, 2, 3, 4, 4.7, 5, 5.5, 6, 7, 8, 9, 10, 11, 12, 13, 14,]
 contourplots.animated_contourplot(w_data_vs_x_y_at_multiple_z=results_metric_2, # shape = z * x * y # values of the metric you want to plot on the color axis; e.g., GWP
                                 y_data=100*TAL_decarb_convs, # x axis values
                                 x_data=pHs, # y axis values
@@ -688,9 +688,9 @@ contourplots.animated_contourplot(w_data_vs_x_y_at_multiple_z=results_metric_3, 
 #%% GWP - no electricity offset
 
 # GWP_w_levels, GWP_w_ticks, GWP_cbar_ticks = get_contour_info_from_metric_data(results_metric_2,)
-GWP_w_levels = np.arange(0, 20.1, 0.5)
-GWP_cbar_ticks = np.arange(0, 20.1, 2.)
-GWP_w_ticks = [6.5, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 20]
+GWP_w_levels = np.arange(0, 14.1, 0.5)
+GWP_cbar_ticks = np.arange(0, 14.1, 2.)
+GWP_w_ticks = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14,]
 contourplots.animated_contourplot(w_data_vs_x_y_at_multiple_z=results_metric_4, # shape = z * x * y # values of the metric you want to plot on the color axis; e.g., GWP
                                 y_data=100*TAL_decarb_convs, # x axis values
                                 x_data=pHs, # y axis values

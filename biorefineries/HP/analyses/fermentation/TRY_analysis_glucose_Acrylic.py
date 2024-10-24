@@ -346,7 +346,7 @@ spec_1, spec_2 = np.meshgrid(spec_1, spec_2)
 # simulate_and_print()
 
 print('\n\nSimulating the initial point to avoid bugs ...')
-spec.byproduct_yields_decrease_policy = 'simultaneous, from 0 product yield'
+# spec.byproduct_yields_decrease_policy = 'simultaneous, from 0 product yield'
 spec.load_specifications(yields[0], titers[0], productivities[0])
 # spec.set_production_capacity(desired_annual_production=spec.desired_annual_production)
 # simulate_and_print()
