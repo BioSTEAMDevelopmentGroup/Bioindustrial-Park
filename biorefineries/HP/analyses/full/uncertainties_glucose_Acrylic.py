@@ -106,7 +106,7 @@ for i in range(len(modes)):
         f'\\analyses\\full\\parameter_distributions\\{product_folder}\\'+parameter_distributions_filenames[i]
     print(f'\n\nLoading parameter distributions ({mode}) ...')
     model.parameters = ()
-    model.load_parameter_distributions(parameter_distributions_filename)
+    model.load_parameter_distributions(parameter_distributions_filename, models.namespace_dict)
     
     # load_additional_params()
     print(f'\nLoaded parameter distributions ({mode}).')

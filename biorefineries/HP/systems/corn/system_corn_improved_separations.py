@@ -647,7 +647,7 @@ unit_groups += get_more_unit_groups(system=HP_sys,
                          )
 
 add_metrics_to_unit_groups(unit_groups=unit_groups, system=HP_sys, TEA=HP_tea, LCA=HP_lca,
-                           hxn_class=HeatExchangerNetwork)
+                           hxn_class=bst.HeatExchangerNetwork)
 
 unit_groups_dict = {}
 for i in unit_groups:

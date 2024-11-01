@@ -322,7 +322,7 @@ namespace_dict['PowerUtility'] = PowerUtility
 namespace_dict['theoretical_max_g_HP_per_g_glucose'] = theoretical_max_g_HP_per_g_glucose
 
 #%% 
-model = HP_model = Model(HP_sys, metrics, namespace_dict=namespace_dict)
+model = HP_model = Model(HP_sys, metrics)
     
 #%% Bugfix barrage
 baseline_spec = {'spec_1': spec.baseline_yield,

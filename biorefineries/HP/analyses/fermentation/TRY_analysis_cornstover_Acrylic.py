@@ -84,7 +84,7 @@ parameter_distributions_filename = HP_filepath+\
 
 print(f'\n\nLoading parameter distributions ({mode}) ...')
 model.parameters = ()
-model.load_parameter_distributions(parameter_distributions_filename)
+model.load_parameter_distributions(parameter_distributions_filename, models.namespace_dict)
 
 # load_additional_params()
 print(f'\nLoaded parameter distributions ({mode}).')
