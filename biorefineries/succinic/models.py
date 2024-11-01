@@ -25,14 +25,10 @@ This module is a modified implementation of modules from the following:
 
 # import numpy as np
 import biosteam as bst
-from chaospy import distributions as shape
 # from biosteam import main_flowsheet as find
 from biosteam.evaluation import Model, Metric
 # from biosteam.evaluation.evaluation_tools import Setter
 from biorefineries.succinic.system_sc import succinic_sys, succinic_tea, succinic_LCA, u, s, unit_groups, unit_groups_dict, spec, price, TEA_breakdown, theoretical_max_g_succinic_acid_per_g_glucose, simulate_and_print
-from biorefineries.succinic.model_utils import EasyInputModel
-# get_annual_factor = lambda: succinic_tea._annual_factor
-
 
 get_annual_factor = lambda: succinic_tea.operating_days*24 # hours per year
 
@@ -201,7 +197,7 @@ namespace_dict['theoretical_max_g_succinic_acid_per_g_glucose'] = theoretical_ma
 #%% 
 
 
-model = succinic_model = EasyInputModel(succinic_sys, metrics, namespace_dict=namespace_dict)
+model = succinic_model = Model(succinic_sys, metrics, namespace_dict=namespace_dict)
 
 
 #%% Bugfix barrage
