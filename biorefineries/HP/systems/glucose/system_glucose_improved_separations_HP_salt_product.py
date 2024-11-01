@@ -75,7 +75,6 @@ from biorefineries.TAL._general_utils import call_all_specifications_or_run,\
                                                 TEA_breakdown,\
                                                 update_facility_IDs
 
-from hxn._heat_exchanger_network import HeatExchangerNetwork
                                                 
 IQ_interpolation = flx.IQ_interpolation
 # # Do this to be able to show more streams in a diagram
@@ -452,7 +451,7 @@ def create_HP_sys(ins, outs):
     BT.natural_gas_price = price['Natural gas']
     BT.ins[4].price = price['Lime']
     
-    HXN = HeatExchangerNetwork('HXN1001',
+    HXN = bst.HeatExchangerNetwork('HXN1001',
                                                 ignored=[
                                                         ],
                                               cache_network=False,
