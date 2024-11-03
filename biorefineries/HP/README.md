@@ -201,11 +201,11 @@ GWP-100a without electricity credit is 4.772 kg CO2-eq/kg sodium 3-hydroxypropio
 FEC without electricity credit is 58.540 MJ/kg sodium 3-hydroxypropionate
 ```
 
-To reproduce results reported in [[1]](#1), go to the [[HP_sys branch](https://github.com/BioSTEAMDevelopmentGroup/Bioindustrial-Park/tree/HP_sys/BioSTEAM%202.x.x/biorefineries/HP)] and follow the setup instructions in the README.
+To reproduce results reported in [[1]](#1), go to the [HP_sys branch](https://github.com/BioSTEAMDevelopmentGroup/Bioindustrial-Park/tree/HP_sys/BioSTEAM%202.x.x/biorefineries/HP) and follow the setup instructions in the README.
 
 To reproduce results reported in [[2]](#2), simply do the following:
 
-(i) Clone the Bioindustrial-Park repository (this commit) and add the 'bioindustrial-park' folder to your PYTHONPATH.
+(i) Clone the Bioindustrial-Park repository [commit 94edb3164e01641da1cf62bca8da495d4f8b4d99](https://github.com/BioSTEAMDevelopmentGroup/Bioindustrial-Park/tree/94edb3164e01641da1cf62bca8da495d4f8b4d99/biorefineries/HP) and add the 'bioindustrial-park' folder to your PYTHONPATH.
 
 (ii) Clone the BioSTEAM repository [commit e2d3942dd1076a4516efc91ae194f9e558428551](https://github.com/BioSTEAMDevelopmentGroup/biosteam/tree/e2d3942dd1076a4516efc91ae194f9e558428551)
 and add the 'biosteam' folder to your PYTHONPATH.
@@ -219,7 +219,7 @@ pip install -r requirements.txt
 
 ## References
 <a id="1">[1]</a> 
-    Bhagwat, S. S.; Li, Y.; Cortés-Peña, Y. R.; Brace, E. C.; Martin, T. A.; Zhao, H.; Guest, J. S. Sustainable production of acrylic acid via 3-hydroxypropionic acid from lignocellulosic biomass. ACS Sustainable Chemistry & Engineering. 2021, 9 (49), 16659–16669. [[https://doi.org/10.1021/acssuschemeng.1c05441](https://doi.org/10.1021/acssuschemeng.1c05441)].
+    Bhagwat, S. S.; Li, Y.; Cortés-Peña, Y. R.; Brace, E. C.; Martin, T. A.; Zhao, H.; Guest, J. S. Sustainable production of acrylic acid via 3-hydroxypropionic acid from lignocellulosic biomass. ACS Sustainable Chemistry & Engineering. 2021, 9 (49), 16659–16669. [https://doi.org/10.1021/acssuschemeng.1c05441](https://doi.org/10.1021/acssuschemeng.1c05441).
 
 <a id="2">[2]</a> 
     Tan, S.I.\*; Mishra, S.M.\*; Bhagwat, S.S.\*; Martin, T.A.\*; Mahata, C.; Suthers, P.F.; Maranas, C.; Guest, J.S.; Singh, V.S.; Zhao, H. Financially viable 3-hydroxypropionic acid production using Issatchenkia orientalis at an industrially relevant scale. Submitted to Nature Biotechnology. *These authors contributed equally to this work.
