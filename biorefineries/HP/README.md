@@ -2,7 +2,10 @@
 
 This module contains biorefinery configurations for the production of 
 acrylic acid and sodium 3-hydroxypropionate (3-HP salt) via biologically produced 
-3-hydroxypropionic acid (3-HP) as discussed in [[1]](#1) and [[2]](#2).
+3-hydroxypropionic acid (3-HP) using dextrose monohydrate, corn, sugarcane, or
+corn stover as a feedstock as discussed in [[1]](#1) and [[2]](#2).
+
+![Simplified process scheme of a biorefinery producing acrylic acid via 3-HP from corn](https://github.com/BioSTEAMDevelopmentGroup/Bioindustrial-Park/blob/master/biorefineries/HP/images/HP_sys_corn_acrylic_simplified_process_scheme.png)
 
 Getting Started
 ---------------
