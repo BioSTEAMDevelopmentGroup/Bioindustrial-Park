@@ -850,7 +850,7 @@ def get_non_gaseous_waste_carbon_as_fraction_of_HP_GWP100():
 
 #%%
 
-simulate_and_print()
+# simulate_and_print()
 
 # %% Diagram
 
@@ -897,41 +897,42 @@ for i in range(len(metrics)):
 
 
 
-
-contourplots.stacked_bar_plot(dataframe=df_TEA_breakdown, 
-                 y_ticks = [-40, -20, 0, 20, 40, 60, 80, 100],
-                 y_label=r"$\bfCost$" + " " + r"$\bfand$" + " " +  r"$\bfUtility$" + " " +  r"$\bfBreakdown$", 
-                 y_units = "%", 
-                 colors=['#7BBD84', 
-                         '#E58835', 
-                         '#F7C652', 
-                         '#63C6CE', 
-                         '#F8858A', 
-                         '#94948C', 
-                         '#734A8C', 
-                         '#D1C0E1', 
-                         '#648496', 
-                         # '#B97A57', 
-                         '#D1C0E1', 
-                         # '#F8858A', 
-                           '#b00000', 
-                         # '#63C6CE', 
-                         '#94948C', 
-                         # '#7BBD84', 
-                         '#b6fcd5', 
-                         '#E58835', 
-                         # '#648496',
-                         '#b6fcd5',
-                         ],
-                 hatch_patterns=('\\', '//', '|', 'x',),
-                 filename='AA_system_corn_improved_separations' + '_TEA_breakdown_stacked_bar_plot',
-                 n_minor_ticks=4,
-                 fig_height=5.5*1.1777*0.94*1.0975,
-                 fig_width=10,
-                 show_totals=True,
-                 totals=totals,
-                 sig_figs_for_totals=3,
-                 units_list=[i.units for i in unit_groups[0].metrics],
-                 totals_label_text=r"$\bfsum:$",
-                 rotate_xticks=45.,
-                 )
+plot = False
+if plot: 
+    contourplots.stacked_bar_plot(dataframe=df_TEA_breakdown, 
+                     y_ticks = [-40, -20, 0, 20, 40, 60, 80, 100],
+                     y_label=r"$\bfCost$" + " " + r"$\bfand$" + " " +  r"$\bfUtility$" + " " +  r"$\bfBreakdown$", 
+                     y_units = "%", 
+                     colors=['#7BBD84', 
+                             '#E58835', 
+                             '#F7C652', 
+                             '#63C6CE', 
+                             '#F8858A', 
+                             '#94948C', 
+                             '#734A8C', 
+                             '#D1C0E1', 
+                             '#648496', 
+                             # '#B97A57', 
+                             '#D1C0E1', 
+                             # '#F8858A', 
+                               '#b00000', 
+                             # '#63C6CE', 
+                             '#94948C', 
+                             # '#7BBD84', 
+                             '#b6fcd5', 
+                             '#E58835', 
+                             # '#648496',
+                             '#b6fcd5',
+                             ],
+                     hatch_patterns=('\\', '//', '|', 'x',),
+                     filename='AA_system_corn_improved_separations' + '_TEA_breakdown_stacked_bar_plot',
+                     n_minor_ticks=4,
+                     fig_height=5.5*1.1777*0.94*1.0975,
+                     fig_width=10,
+                     show_totals=True,
+                     totals=totals,
+                     sig_figs_for_totals=3,
+                     units_list=[i.units for i in unit_groups[0].metrics],
+                     totals_label_text=r"$\bfsum:$",
+                     rotate_xticks=45.,
+                     )
