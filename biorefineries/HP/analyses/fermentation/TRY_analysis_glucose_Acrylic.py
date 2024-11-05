@@ -400,7 +400,6 @@ for p in productivities:
         for t in titers:
             curr_no +=1
             error_message = None
-            titers_mol_per_mol_total[-1].append(broth.imol['HP']/broth.imol['HP', 'Water'].sum())
             if titer_too_high_for_yield:
                 d1_Metric1[-1].append(np.nan)
                 d1_Metric2[-1].append(np.nan)
@@ -417,6 +416,8 @@ for p in productivities:
                     
                     spec.load_specifications(spec_1=y, spec_2=t, spec_3=p)
                     for i in range(1): system.simulate()
+                    
+                    titers_mol_per_mol_total[-1].append(broth.imol['HP']/broth.imol['HP', 'Water'].sum())
                     
                     d1_Metric1[-1].append(HP_metrics[0]())
                     d1_Metric2[-1].append(HP_metrics[1]())
