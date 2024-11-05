@@ -208,7 +208,7 @@ To reproduce results reported in [[1]](#1), go to the [HP_sys branch](https://gi
 
 To reproduce results reported in [[2]](#2), simply do the following:
 
-(i) Clone the Bioindustrial-Park repository (this commit) and add the 'bioindustrial-park' folder to your PYTHONPATH.
+(i) Clone the Bioindustrial-Park repository [commit b963238d5e0422a3b7d80611c68ebba50d73091e](https://github.com/BioSTEAMDevelopmentGroup/Bioindustrial-Park/tree/b963238d5e0422a3b7d80611c68ebba50d73091e/biorefineries/HP) and add the 'bioindustrial-park' folder to your PYTHONPATH.
 
 (ii) Clone the BioSTEAM repository [commit e2d3942dd1076a4516efc91ae194f9e558428551](https://github.com/BioSTEAMDevelopmentGroup/biosteam/tree/e2d3942dd1076a4516efc91ae194f9e558428551)
 and add the 'biosteam' folder to your PYTHONPATH.
