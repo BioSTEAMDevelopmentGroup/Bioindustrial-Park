@@ -81,7 +81,7 @@ parameter_distributions_filename = TAL_filepath+\
     '\\analyses\\full\\parameter_distributions\\'+parameter_distributions_filenames[0]
 print(f'\n\nLoading parameter distributions ({mode}) ...')
 model.parameters = ()
-model.load_parameter_distributions(parameter_distributions_filename)
+model.load_parameter_distributions(parameter_distributions_filename, models.namespace_dict)
 
 # load_additional_params()
 print(f'\nLoaded parameter distributions ({mode}).')
@@ -121,21 +121,15 @@ get_TAL_sugars_conc = lambda: sum(R302.outs[0].imass['Glucose', 'Xylose'])/R302.
 
 get_TAL_inhibitors_conc = lambda: 1000*sum(R302.outs[0].imass['AceticAcid', 'Furfural', 'HMF'])/R302.outs[0].F_vol
 
-TAL_metrics = [get_product_MPSP, 
-                # lambda: TAL_lca.GWP,
-                lambda: TAL_lca.GWP - TAL_lca.net_electricity_GWP, 
-                # lambda: TAL_lca.FEC, 
-                lambda: TAL_lca.FEC - TAL_lca.net_electricity_FEC,
-               get_TAL_AOC, get_TAL_TCI, 
-               get_product_purity]
+
 
 # %% Generate 3-specification meshgrid and set specification loading functions
 
-steps = (40, 40, 1)
+steps = (60, 60, 1)
 
 # Yield, titer, productivity (rate)
-spec_1 = yields = np.linspace(0.15, 0.99, steps[0]) # yield
-spec_2 = titers = np.linspace(15., 
+spec_1 = yields = np.linspace(0.01, 0.99, steps[0]) # yield
+spec_2 = titers = np.linspace(2., 
                               100., # although sugar concentration limit of 600 g/L would allow as high as 230 g-TAL/L, we set an upper limit of 100 g/L
                                    # based on achieved (50-68 g/L using E.coli, Candida) and targeted (100 g/L) titers for adipic acid, another organic solid with low water solubility
                                    # Skoog et al., 2018 ( https://doi.org/10.1016/j.biotechadv.2018.10.012 )
@@ -143,22 +137,73 @@ spec_2 = titers = np.linspace(15.,
 
 # spec_3 = productivities =\
 #     np.linspace(0.05, 1.5, steps[2])
+
+which_fig = '5'
+
+#%%
+additional_points = {}
+spec_3 = productivities = None
+TAL_metrics = None
+
+if which_fig is None: # if you want to run at your own productivities and use your own metrics
+    spec_3 = productivities =\
+        np.array([
+                    # 0.2*spec.baseline_productivity,
+                    1.*spec.baseline_productivity,
+                    # 5.*spec.baseline_productivity,
+                  ])
+    TAL_metrics = [get_product_MPSP, 
+                    lambda: TAL_lca.GWP,
+                    lambda: TAL_lca.FEC, 
+                   get_TAL_AOC, get_TAL_TCI, 
+                   get_product_purity]
+    additional_points = {(40.5, 35.9):('D', 'w', 6)}
+else:
+    if which_fig=='5':
+        spec_3 = productivities =\
+            np.array([
+                        1.*spec.baseline_productivity,
+                      ])
+        TAL_metrics = [get_product_MPSP, 
+                        lambda: TAL_lca.GWP,
+                        lambda: TAL_lca.FEC, 
+                       get_TAL_AOC, get_TAL_TCI, 
+                       get_product_purity]
+        additional_points = {(40.5, 35.9):('D', 'w', 6)}
+    elif which_fig=='S4':
+        spec_3 = productivities =\
+            np.array([
+                        0.2*spec.baseline_productivity,
+                      ])
+        TAL_metrics = [get_product_MPSP, 
+                        lambda: TAL_lca.GWP,
+                        lambda: TAL_lca.FEC, 
+                       get_TAL_AOC, get_TAL_TCI, 
+                       get_product_purity]
+    elif which_fig=='S5':
+        spec_3 = productivities =\
+            np.array([
+                        5.*spec.baseline_productivity,
+                      ])
+        TAL_metrics = [get_product_MPSP, 
+                        lambda: TAL_lca.GWP,
+                        lambda: TAL_lca.FEC, 
+                       get_TAL_AOC, get_TAL_TCI, 
+                       get_product_purity]
+    elif which_fig=='S11':
+        spec_3 = productivities =\
+            np.array([
+                        1.*spec.baseline_productivity,
+                      ])
+        TAL_metrics = [get_product_MPSP, 
+                        # lambda: TAL_lca.GWP,
+                        lambda: TAL_lca.GWP - TAL_lca.net_electricity_GWP, 
+                        # lambda: TAL_lca.FEC, 
+                        lambda: TAL_lca.FEC - TAL_lca.net_electricity_FEC,
+                       get_TAL_AOC, get_TAL_TCI, 
+                       get_product_purity]
+        additional_points = {(40.5, 35.9):('D', 'w', 6)}
     
-spec_3 = productivities =\
-    np.array([
-               # 0.2*spec.baseline_productivity,
-              1.*spec.baseline_productivity,
-               # 5.*spec.baseline_productivity,
-              ])
-
-# spec_3 = productivities =\
-#     np.array([0.25*spec.baseline_productivity, 0.5*spec.baseline_productivity, 
-#               spec.baseline_productivity, 
-#               2.*spec.baseline_productivity, 4.*spec.baseline_productivity])
-
-# spec_3 = productivities =\
-#     np.array([0.2*spec.baseline_productivity, spec.baseline_productivity, 5*spec.baseline_productivity,])
-
 #%% Plot stuff
 
 # Parameters analyzed across
@@ -266,8 +311,12 @@ def tickmarks(dmin, dmax, accuracy=50, N_points=5):
 
 #%%
 minute = '0' + str(dateTimeObj.minute) if len(str(dateTimeObj.minute))==1 else str(dateTimeObj.minute)
-file_to_save = f'_{steps}_steps_'+'TAL_TRY_%s.%s.%s-%s.%s'%(dateTimeObj.year, dateTimeObj.month, dateTimeObj.day, dateTimeObj.hour, minute)
-
+file_to_save = None
+if which_fig is None:
+    file_to_save = f'_{steps}_steps_'+'TAL_TRY_%s.%s.%s-%s.%s'%(dateTimeObj.year, dateTimeObj.month, dateTimeObj.day, dateTimeObj.hour, minute)
+else:
+    file_to_save = 'Fig_'+which_fig+'_%s.%s.%s-%s.%s'%(dateTimeObj.year, dateTimeObj.month, dateTimeObj.day, dateTimeObj.hour, minute)
+  
 #%% Create meshgrid
 spec_1, spec_2 = np.meshgrid(spec_1, spec_2)
 
@@ -275,7 +324,7 @@ spec_1, spec_2 = np.meshgrid(spec_1, spec_2)
 # simulate_and_print()
 
 print('\n\nSimulating the initial point to avoid bugs ...')
-spec.byproduct_yields_decrease_policy = 'simultaneous, from 0 product yield'
+# spec.byproduct_yields_decrease_policy = 'simultaneous, from 0 product yield'
 spec.load_specifications(yields[0], titers[0], productivities[0])
 # spec.set_production_capacity(desired_annual_production=spec.desired_annual_production)
 # simulate_and_print()
@@ -498,7 +547,7 @@ keep_frames = True
 print('\nCreating and saving contour plots ...\n')
 
 #%% Plots
-plot = False
+plot = True
 
 if plot: 
     
@@ -592,9 +641,9 @@ if plot:
     #%% GWP
     
     # GWP_w_levels, GWP_w_ticks, GWP_cbar_ticks = get_contour_info_from_metric_data(results_metric_2,)
-    GWP_w_levels = np.arange(0, 20.1, 0.5)
-    GWP_cbar_ticks = np.arange(0, 20.1, 2.)
-    GWP_w_ticks = [2, 3, 4, 6, 8, 10, 14, 20]
+    GWP_w_levels = np.arange(-2, 14.1, 0.5)
+    GWP_cbar_ticks = np.arange(-2, 14.1, 2.)
+    GWP_w_ticks = [0, 1, 2, 3, 4, 6, 8, 10, 14]
     contourplots.animated_contourplot(w_data_vs_x_y_at_multiple_z=results_metric_2, # shape = z * x * y # values of the metric you want to plot on the color axis; e.g., GWP
                                     x_data=100*yields, # x axis values
                                     y_data=titers, # y axis values
@@ -629,7 +678,7 @@ if plot:
                                     axis_tick_fontsize = axis_tick_fontsize,
                                     n_minor_ticks = 1,
                                     cbar_n_minor_ticks = 3,
-                                    additional_points ={(40.5, 35.9):('D', 'w', 6)},
+                                    additional_points = additional_points,
                                     
                                     # manual_clabels_regular = {
                                     #     # MPSP_w_ticks[0]: (80,300),
@@ -658,7 +707,7 @@ if plot:
                                                           (1,11.),
                                                           (99,11.)),
                                     # zoom_data_scale=5,
-                                    text_boxes = {'>20.0': [(80,5), 'white']},
+                                    text_boxes = {'>14.0': [(80,5), 'white']},
                                     
                                     add_shapes = {
                                         # coords as tuple of tuples: (color, zorder),
@@ -714,15 +763,15 @@ if plot:
                                     # comparison_range=[6.5, 7.5],
                                     # comparison_range=[FEC_w_levels[-2], FEC_w_levels[-1]],
                                     # comparison_range_hatch_pattern='////',
-                                    manual_clabels_regular = {
-                                        FEC_w_ticks[0]: (15,18),
-                                        FEC_w_ticks[1]: (32,50),
-                                        FEC_w_ticks[2]: (55,45),
-                                        FEC_w_ticks[3]: (55,30),
-                                        FEC_w_ticks[4]: (70,28),
-                                        FEC_w_ticks[5]: (80,20),
-                                        FEC_w_ticks[6]: (60,20),
-                                        },
+                                    # manual_clabels_regular = {
+                                    #     FEC_w_ticks[0]: (15,18),
+                                    #     FEC_w_ticks[1]: (32,50),
+                                    #     FEC_w_ticks[2]: (55,45),
+                                    #     FEC_w_ticks[3]: (55,30),
+                                    #     FEC_w_ticks[4]: (70,28),
+                                    #     FEC_w_ticks[5]: (80,20),
+                                    #     FEC_w_ticks[6]: (60,20),
+                                    #     },
                                     
                                     fill_bottom_with_cmap_over_color=False, # for TRY
                                     bottom_fill_bounds = ((0,0), 

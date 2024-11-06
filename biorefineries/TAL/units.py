@@ -824,18 +824,6 @@ class HydrogenationReactor(StirredTankReactor):
             'Ni-SiO2 catalyst': 1.}
     
     mcat_frac = 0.2 # fraction of catalyst by weight in relation to the reactant (TAL) # from Huber group
-    hydrogenation_rxns = ParallelRxn([
-            #   Reaction definition   Reactant   Conversion
-            Rxn('TAL + 2H2 -> HMTHP',         'TAL',   0.969), # conversion from Huber group experimental data
-            # Rxn('HMDHP + H2 -> HMTHP',         'HMDHP',   1.-1e-5)
-            ])
-    byproduct_formation_rxns  = ParallelRxn([
-            #   Reaction definition   Reactant   Conversion
-            Rxn('TAL + 3H2 -> DHL + H2O',         'TAL',   1.-1e-5), # conversion from Huber group experimental data
-            # Rxn('TAL + H2 -> HMDHP',         'TAL',   1-0.2125),  # conversion from Huber group experimental data
-            ])
-    
-    TAL_to_HMP_rxn = hydrogenation_rxns[0]
     
     spent_catalyst_replacements_per_year = 1. # number of times the entire catalyst_weight is replaced per year
     
@@ -855,6 +843,19 @@ class HydrogenationReactor(StirredTankReactor):
         # self.heat_exchanger = hx = HXutility(None, None, None, T=T) 
         self.NiSiO2_catalyst_price = NiSiO2_catalyst_price
         self.heat_exchanger.rigorous = rigorous_hx
+        self.hydrogenation_rxns = hydrogenation_rxns = ParallelRxn([
+                #   Reaction definition   Reactant   Conversion
+                Rxn('TAL + 2H2 -> HMTHP',         'TAL',   0.969), # conversion from Huber group experimental data
+                # Rxn('HMDHP + H2 -> HMTHP',         'HMDHP',   1.-1e-5)
+                ])
+        self.byproduct_formation_rxns  = ParallelRxn([
+                #   Reaction definition   Reactant   Conversion
+                Rxn('TAL + 3H2 -> DHL + H2O',         'TAL',   1.-1e-5), # conversion from Huber group experimental data
+                # Rxn('TAL + H2 -> HMDHP',         'TAL',   1-0.2125),  # conversion from Huber group experimental data
+                ])
+        
+        self.TAL_to_HMP_rxn = hydrogenation_rxns[0]
+        
     def _run(self):
         feed, recycle, reagent, recovered_catalyst, fresh_catalyst = self.ins
         vent, spent_catalyst, effluent = self.outs
@@ -947,16 +948,6 @@ class DehydrationReactor(StirredTankReactor):
     _F_BM_default = {**StirredTankReactor._F_BM_default,
             'Amberlyst-70 catalyst': 1}
     mcat_frac = 0.5 # fraction of catalyst by weight in relation to the reactant (HMTHP)
-    dehydration_rxns = ParallelRxn([
-            #   Reaction definition                                       Reactant   Conversion
-            Rxn('HMTHP -> PSA + H2O',         'HMTHP',   0.871) # conversion from Huber group experimental data
-                ])
-    byproduct_formation_rxns  = ParallelRxn([
-            #   Reaction definition   Reactant   Conversion
-            Rxn('HMTHP -> DHL + H2O',         'HMTHP',   1.-1e-5), # conversion from Huber group experimental data
-            # Rxn('TAL + H2 -> HMDHP',         'TAL',   1-0.2125),  # conversion from Huber group experimental data
-            ])
-    HMP_to_PSA_rxn = dehydration_rxns[0]
     
     spent_catalyst_replacements_per_year = 1. # number of times the entire catalyst_weight is replaced per year
     
@@ -974,7 +965,17 @@ class DehydrationReactor(StirredTankReactor):
         # self.heat_exchanger = hx = HXutility(None, None, None, T=T) 
         self.Amberlyst70_catalyst_price = Amberlyst70_catalyst_price
         self.heat_exchanger.rigorous = rigorous_hx
-    
+        self.dehydration_rxns = dehydration_rxns = ParallelRxn([
+                #   Reaction definition                                       Reactant   Conversion
+                Rxn('HMTHP -> PSA + H2O',         'HMTHP',   0.871) # conversion from Huber group experimental data
+                    ])
+        self.byproduct_formation_rxns  = ParallelRxn([
+                #   Reaction definition   Reactant   Conversion
+                Rxn('HMTHP -> DHL + H2O',         'HMTHP',   1.-1e-5), # conversion from Huber group experimental data
+                # Rxn('TAL + H2 -> HMDHP',         'TAL',   1-0.2125),  # conversion from Huber group experimental data
+                ])
+        self.HMP_to_PSA_rxn = dehydration_rxns[0]
+        
     def _run(self):
         feed, recycle, recovered_catalyst, fresh_catalyst = self.ins
         vent, spent_catalyst, effluent = self.outs
@@ -1049,22 +1050,7 @@ class RingOpeningHydrolysisReactor(StirredTankReactor):
     # _F_BM_default = {**StirredTankReactor._F_BM_default,
     #         'Heat exchangers': 3.,}
     
-    ring_opening_rxns = ParallelRxn([
-            #   Reaction definition                                       Reactant   Conversion
-            Rxn('PSA -> SA',         'PSA',   0.999) # conversion from Huber group
-                ])
-    
-    PSA_to_SA_rxn = ring_opening_rxns[0]
-    hydrolysis_rxns = ParallelRxn([
-            #   Reaction definition                                       Reactant   Conversion
-            Rxn('SA + KOH -> KSA + H2O',         'SA',   1.-1e-5) # assumed 
-                ])
-    SA_to_KSA_rxn = hydrolysis_rxns[0]
-    byproduct_formation_rxns = ParallelRxn([
-            #   Reaction definition                                       Reactant   Conversion
-            Rxn('PSA -> 0.2PolyPSA',         'PSA',   1.-1e-5) # assumed
-                ])
-    
+
     def _init(self,  
                  tau = 19., # from Huber group
                  T=130. + 273.15, # from Huber group
@@ -1075,7 +1061,23 @@ class RingOpeningHydrolysisReactor(StirredTankReactor):
                  **args):
         super()._init(T=T, tau=tau, P=P, batch=batch, vessel_material=vessel_material)
         self.heat_exchanger.rigorous = rigorous_hx
-    
+            
+        self.ring_opening_rxns = ring_opening_rxns = ParallelRxn([
+                #   Reaction definition                                       Reactant   Conversion
+                Rxn('PSA -> SA',         'PSA',   0.999) # conversion from Huber group
+                    ])
+        
+        self.PSA_to_SA_rxn = ring_opening_rxns[0]
+        self.hydrolysis_rxns = hydrolysis_rxns= ParallelRxn([
+                #   Reaction definition                                       Reactant   Conversion
+                Rxn('SA + KOH -> KSA + H2O',         'SA',   1.-1e-5) # assumed 
+                    ])
+        self.SA_to_KSA_rxn = hydrolysis_rxns[0]
+        self.byproduct_formation_rxns = ParallelRxn([
+                #   Reaction definition                                       Reactant   Conversion
+                Rxn('PSA -> 0.2PolyPSA',         'PSA',   1.-1e-5) # assumed
+                    ])
+        
     def _run(self):
         feed, recycle, reagent = self.ins
         vent, effluent = self.outs
@@ -1100,6 +1102,8 @@ class RingOpeningHydrolysisReactor(StirredTankReactor):
         effluent.T = self.T
         effluent.P = self.P
 
+        
+        
     def _design(self):
         super()._design()
     

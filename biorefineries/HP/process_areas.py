@@ -811,7 +811,6 @@ def create_HP_separation_methanol_precipitation_neutralization_process(ins, outs
                                 ],
                                                )
 def create_HP_separation_improved_process(ins, outs, fermentation_reactor=None):
-    
     fermentation_broth, sulfuric_acid_separation,\
         adsorption_makeup_regeneration_fluid, CEX_makeup_regeneration_HCl, AEX_makeup_regeneration_NaOH = ins
     
@@ -820,6 +819,9 @@ def create_HP_separation_improved_process(ins, outs, fermentation_reactor=None):
     
     f = bst.main_flowsheet
     u, s = f.unit, f.stream
+    
+    if not fermentation_reactor:
+        fermentation_reactor = u.R302
     
     # Remove solids from fermentation broth, modified from the pressure filter in Humbird et al.
     S401_index = [splits_df.index[0]] + splits_df.index[2:].to_list()
@@ -1053,7 +1055,8 @@ def create_HP_separation_improved_process(ins, outs, fermentation_reactor=None):
     
     F403 = bst.units.MultiEffectEvaporator('F403', ins=anion_exchange_process-0, outs=('F403_l', 'F403_g'),
                                             P = (101325, 70000, 40000, 20000, 10000), V = 0.5)
-    
+    # F403 = bst.Flash('F403', ins=anion_exchange_process-0, outs=('F403_g', 'F403_l'),
+    #                                         P = 80000, V = 0.5)
     target_HP_x = 0.08 # ~30 wt% HP
     def get_x(chem_ID, stream):
         return stream.imol[chem_ID]/sum(stream.imol['SuccinicAcid', 'AceticAcid', 'Furfural', 'HMF', 'HP', 'Water'])
@@ -1109,6 +1112,9 @@ def create_HP_separation_improved_process_HP_product(ins, outs, fermentation_rea
     
     f = bst.main_flowsheet
     u, s = f.unit, f.stream
+    
+    if not fermentation_reactor:
+        fermentation_reactor = u.R302
     
     # Remove solids from fermentation broth, modified from the pressure filter in Humbird et al.
     S401_index = [splits_df.index[0]] + splits_df.index[2:].to_list()
@@ -1365,7 +1371,7 @@ def create_HP_separation_improved_process_HP_product(ins, outs, fermentation_rea
     F403 = bst.units.MultiEffectEvaporator('F403', ins=M401-0, outs=('F403_l', 'F403_g'),
                                             P = (101325, 70000, 40000, 20000, 10000), V = 0.5)
     
-    target_HP_salt_x = 0.70
+    target_HP_salt_x = 0.01 # ~30 wt% HP
     def get_x(chem_ID, stream):
         return stream.imol[chem_ID]/sum(stream.imol['SuccinicAcid', 'AceticAcid', 'Furfural', 'HMF', 'HP', 'Water'])
     

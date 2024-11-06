@@ -132,7 +132,7 @@ for i in range(len(modes)):
         f'\\analyses\\full\\parameter_distributions\\{product_folder}\\'+helper_parameter_distributions_filename
     print(f'\n\nLoading parameter distributions ({mode} {feedstock_tag} {product_tag}) ...')
     model.parameters = ()
-    model.load_parameter_distributions(parameter_distributions_filename)
+    model.load_parameter_distributions(parameter_distributions_filename, models.namespace_dict)
     
     # load_additional_params()
     print(f'\nLoaded parameter distributions ({mode} {feedstock_tag} {product_tag}).')
@@ -476,7 +476,7 @@ contourplots.box_and_whiskers_plot(uncertainty_data=GWP_uncertainty,
                           # y_label=r"$\mathrm{\bfCarbon}$" + " " + r"$\mathrm{\bfIntensity}$",
                           y_label=r"$\bfCI$",
                           y_units=GWP_units,
-                          y_ticks=np.arange(-4, 8.01, 2),
+                          y_ticks=np.arange(-2, 8.01, 2),
                           save_file=True,
                           # fig_height=5.5,
                           # fig_width = 3.,

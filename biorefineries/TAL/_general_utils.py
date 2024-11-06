@@ -23,6 +23,7 @@ __all__ = {'call_all_specifications_or_run',
            'TEA_breakdown',
            'update_facility_IDs',
            'get_pH_polyprotic_acid_mixture',
+           'get_major_units_df'
            }
 
 #%% Estimate the pH of a mixture of polyprotic acids

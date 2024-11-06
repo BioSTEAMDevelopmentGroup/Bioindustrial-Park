@@ -57,7 +57,7 @@ from biorefineries.HP.process_settings import price, CFs, chem_index
 from biorefineries.HP.utils import find_split, splits_df, baseline_feedflow
 from biorefineries.HP.chemicals_data import HP_chemicals, chemical_groups, \
                                 soluble_organics, combustibles
-from biorefineries.HP.tea import HPTEA
+# from biorefineries.HP.tea import HPTEA
 from biosteam.process_tools import UnitGroup
 import matplotlib.pyplot as plt
 import copy
@@ -75,7 +75,6 @@ from biorefineries.TAL._general_utils import call_all_specifications_or_run,\
                                                 TEA_breakdown,\
                                                 update_facility_IDs
 
-from hxn._heat_exchanger_network import HeatExchangerNetwork
                                                 
 IQ_interpolation = flx.IQ_interpolation
 # # Do this to be able to show more streams in a diagram
@@ -113,7 +112,7 @@ System.default_molar_tolerance = 0.1
 System.strict_convergence = True # True => throw exception if system does not converge; false => continue with unconverged system
 
 #
-@SystemFactory(ID = 'helper_HP_sys')
+@SystemFactory(ID = 'HP_sys')
 def create_HP_sys(ins, outs):
     u, s = flowsheet.unit, flowsheet.stream
     process_groups = []
@@ -452,7 +451,7 @@ def create_HP_sys(ins, outs):
     BT.natural_gas_price = price['Natural gas']
     BT.ins[4].price = price['Lime']
     
-    HXN = HeatExchangerNetwork('HXN1001',
+    HXN = bst.HeatExchangerNetwork('HXN1001',
                                                 ignored=[
                                                         ],
                                               cache_network=False,
@@ -508,7 +507,7 @@ globals().update(flowsheet.to_dict())
 
 # Income tax was changed from 0.35 to 0.21 based on Davis et al., 2018 (new legislation)
 
-HP_tea = HPTEA(system=HP_sys, IRR=0.10, duration=(2016, 2046),
+HP_tea = HPTEA(system=HP_sys, IRR=0.10, duration=(2019, 2049),
         depreciation='MACRS7', income_tax=0.21, operating_days=330.,
         lang_factor=None, construction_schedule=(0.08, 0.60, 0.32),
         startup_months=3, startup_FOCfrac=1, startup_salesfrac=0.5,
@@ -586,7 +585,7 @@ unit_groups += get_more_unit_groups(system=HP_sys,
                                         ]
                          )
 
-add_metrics_to_unit_groups(unit_groups=unit_groups, system=HP_sys, TEA=HP_tea, LCA=HP_lca, hxn_class=HeatExchangerNetwork)
+add_metrics_to_unit_groups(unit_groups=unit_groups, system=HP_sys, TEA=HP_tea, LCA=HP_lca, hxn_class=bst.HeatExchangerNetwork)
 
 unit_groups_dict = {}
 for i in unit_groups:
@@ -791,7 +790,7 @@ def get_non_gaseous_waste_carbon_as_fraction_of_HP_GWP100():
 
 #%%
 
-simulate_and_print()
+# simulate_and_print()
 
 # %% Diagram
 
@@ -838,41 +837,42 @@ for i in range(len(metrics)):
 
 
 
-
-contourplots.stacked_bar_plot(dataframe=df_TEA_breakdown, 
-                 y_ticks = [-40, -20, 0, 20, 40, 60, 80, 100],
-                 y_label=r"$\bfCost$" + " " + r"$\bfand$" + " " +  r"$\bfUtility$" + " " +  r"$\bfBreakdown$", 
-                 y_units = "%", 
-                 colors=['#7BBD84', 
-                         '#E58835', 
-                         '#F7C652', 
-                         '#63C6CE', 
-                         '#F8858A', 
-                         '#94948C', 
-                         '#734A8C', 
-                         '#D1C0E1', 
-                         '#648496', 
-                         # '#B97A57', 
-                         '#D1C0E1', 
-                         # '#F8858A', 
-                           '#b00000', 
-                         # '#63C6CE', 
-                         '#94948C', 
-                         # '#7BBD84', 
-                         '#b6fcd5', 
-                         '#E58835', 
-                         # '#648496',
-                         '#b6fcd5',
-                         ],
-                 hatch_patterns=('\\', '//', '|', 'x',),
-                 filename='AA_system_corn_improved_separations' + '_TEA_breakdown_stacked_bar_plot',
-                 n_minor_ticks=4,
-                 fig_height=5.5*1.1777*0.94*1.0975,
-                 fig_width=10,
-                 show_totals=True,
-                 totals=totals,
-                 sig_figs_for_totals=3,
-                 units_list=[i.units for i in unit_groups[0].metrics],
-                 totals_label_text=r"$\bfsum:$",
-                 rotate_xticks=45.,
-                 )
+plot = False
+if plot: 
+    contourplots.stacked_bar_plot(dataframe=df_TEA_breakdown, 
+                     y_ticks = [-40, -20, 0, 20, 40, 60, 80, 100],
+                     y_label=r"$\bfCost$" + " " + r"$\bfand$" + " " +  r"$\bfUtility$" + " " +  r"$\bfBreakdown$", 
+                     y_units = "%", 
+                     colors=['#7BBD84', 
+                             '#E58835', 
+                             '#F7C652', 
+                             '#63C6CE', 
+                             '#F8858A', 
+                             '#94948C', 
+                             '#734A8C', 
+                             '#D1C0E1', 
+                             '#648496', 
+                             # '#B97A57', 
+                             '#D1C0E1', 
+                             # '#F8858A', 
+                               '#b00000', 
+                             # '#63C6CE', 
+                             '#94948C', 
+                             # '#7BBD84', 
+                             '#b6fcd5', 
+                             '#E58835', 
+                             # '#648496',
+                             '#b6fcd5',
+                             ],
+                     hatch_patterns=('\\', '//', '|', 'x',),
+                     filename='AA_system_corn_improved_separations' + '_TEA_breakdown_stacked_bar_plot',
+                     n_minor_ticks=4,
+                     fig_height=5.5*1.1777*0.94*1.0975,
+                     fig_width=10,
+                     show_totals=True,
+                     totals=totals,
+                     sig_figs_for_totals=3,
+                     units_list=[i.units for i in unit_groups[0].metrics],
+                     totals_label_text=r"$\bfsum:$",
+                     rotate_xticks=45.,
+                     )

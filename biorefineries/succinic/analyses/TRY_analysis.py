@@ -32,7 +32,7 @@ from matplotlib.ticker import AutoMinorLocator as AML
 # from biorefineries.succinic.system_sc import succinic_sys, succinic_tea, R302, spec, product_stream
 
 from biorefineries import succinic
-from biorefineries.succinic.models import model, succinic_sys, succinic_tea, succinic_LCA, R302, spec, product_stream, theoretical_max_g_succinic_acid_per_g_glucose
+from biorefineries.succinic.models import model, succinic_sys, succinic_tea, succinic_LCA, R302, spec, product_stream, theoretical_max_g_succinic_acid_per_g_glucose, namespace_dict
 from matplotlib import pyplot as plt
 from  matplotlib.colors import LinearSegmentedColormap
 import pandas as pd
@@ -71,7 +71,7 @@ mode = 'pilot_batch'
 succinic_filepath = succinic.__file__.replace('\\__init__.py', '')
 parameter_distributions_filename = succinic_filepath+'\\analyses\\parameter_distributions\\'+parameter_distributions_filenames[modes.index(mode)]
 model.parameters = ()
-model.load_parameter_distributions(parameter_distributions_filename)
+model.load_parameter_distributions(parameter_distributions_filename, namespace_dict)
 model.metrics_at_baseline()
 
 # ## Change working directory to biorefineries\\succinic\\analyses\\results

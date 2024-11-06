@@ -548,14 +548,14 @@ class ProcessSpecification(bst.process_tools.ReactorSpecification):
                              -regular_biomass_conversion/total_regular_byproduct_yield
                 c1, c2, c3 = -m1, -m2, -m3
                 
-                unit.glucose_to_succinic_acid_rxn.X = max(1e-6, m1*sugar_to_HP_conversion + c1)
-                unit.xylose_to_succinic_acid_rxn.X = max(1e-6, m1*sugar_to_HP_conversion + c1)
+                unit.glucose_to_succinic_acid_rxn.X = max(1e-6, m1*sugar_to_HP_conversion + c1 - 3e-6)
+                unit.xylose_to_succinic_acid_rxn.X = max(1e-6, m1*sugar_to_HP_conversion + c1 - 3e-6)
                 
-                unit.glucose_to_xylitol_rxn.X = max(1e-6, m2*sugar_to_HP_conversion + c2)
-                unit.xylose_to_xylitol_rxn.X = max(1e-6, m2*sugar_to_HP_conversion + c2)
+                unit.glucose_to_xylitol_rxn.X = max(1e-6, m2*sugar_to_HP_conversion + c2 - 3e-6)
+                unit.xylose_to_xylitol_rxn.X = max(1e-6, m2*sugar_to_HP_conversion + c2 - 3e-6)
                 
-                unit.glucose_to_biomass_rxn.X = max(1e-6, m3*sugar_to_HP_conversion + c3)
-                unit.xylose_to_biomass_rxn.X = max(1e-6, m3*sugar_to_HP_conversion + c3)
+                unit.glucose_to_biomass_rxn.X = max(1e-6, m3*sugar_to_HP_conversion + c3 - 3e-6)
+                unit.xylose_to_biomass_rxn.X = max(1e-6, m3*sugar_to_HP_conversion + c3 - 3e-6)
                 
     def load_productivity(self, productivity):
         """
