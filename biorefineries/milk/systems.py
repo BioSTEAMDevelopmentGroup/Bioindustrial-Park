@@ -37,17 +37,18 @@ __all__ = (
 
 @bst.SystemFactory(
     ID='full_sys',
-    ins=[dict(ID='acid_whey', AcidWhey=100000, units='kg/hr')],
+    ins=[dict(ID='feedstock', AcidWhey=100000, units='kg/hr')],
     outs=[dict(ID='dodecylacetate', price=3)],
     fthermo=create_chemicals
 )
-def create_system(ins, outs, product='Dodecanol'):
-    acid_whey, = ins
+def create_system(ins, outs, feed, product):
+    feedstock, = ins
     product_stream, = outs
-    acid_whey.register_alias('feedstock')
     product_stream.register_alias('product')
     reactions = []
     substrates = ['Lactose', 'Galactose']
+    feedstock.empty()
+    feedstock.imass[feed] = 100000
     for substrate in substrates:
         production = bst.Reaction(
             f'{substrate} -> {product} + H2O + CO2', reactant=substrate, 
@@ -69,7 +70,7 @@ def create_system(ins, outs, product='Dodecanol'):
     reaction = bst.ReactionSystem(*reactions)
     
     E1 = bst.MultiEffectEvaporator('E1',
-        ins=acid_whey, outs=('evaporated_feed', 'condensate'),
+        ins=feedstock, outs=('evaporated_feed', 'condensate'),
         V=0, V_definition='First-effect',
         P=(101325, 73581, 50892, 32777, 20000),
     )

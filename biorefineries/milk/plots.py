@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """
 """
-from biorefineries.acester import Biorefinery
+from biorefineries.milk import Biorefinery
 import numpy as np
 from matplotlib import pyplot as plt
 import biosteam as bst
@@ -9,9 +9,7 @@ import os
 
 __all__ = (
     'plot_MSP_across_capacity_price',
-    'plot_MSP_across_titer_productivity_AcOH',
-    'plot_MSP_across_yield_productivity_AcEster',
-    'plot_MSP_across_AcOH_titer_AcEster_yield',
+    'plot_MSP_across_yield_productivity',
 )
 
 results_folder = os.path.join(os.path.dirname(__file__), 'results')
@@ -56,129 +54,72 @@ def plot_MSP_across_capacity_price(load=True):
         fillcolor=None, styleaxiskw=dict(xtick0=False), label=True,
     )
 
-def MSP_GWP_at_AcOH_titer_productivity(titer, productivity, biorefinery):
-    biorefinery.set_AcOH_titer.setter(titer)
-    biorefinery.set_AcOH_productivity.setter(productivity)
-    biorefinery.system.simulate()
-    return np.array([biorefinery.MSP(), biorefinery.GWP()])
+def MSP_GWP_at_yield_productivity(yield_, productivity, biorefinery, titers):
+    biorefinery.set_yield.setter(yield_)
+    biorefinery.set_productivity.setter(productivity)
+    MSPs = np.zeros(len(titers))
+    for i, titer in enumerate(titers):
+        biorefinery.set_yield.setter(yield_)
+        biorefinery.set_titer.setter(titer)    
+        biorefinery.system.simulate()
+        MSPs[i] = biorefinery.MSP()
+    return MSPs
 
-def MSP_GWP_at_AcEster_yield_productivity(yield_, productivity, biorefinery):
-    biorefinery.set_AcEster_yield.setter(yield_)
-    biorefinery.set_AcEster_productivity.setter(productivity)
-    biorefinery.system.simulate()
-    return np.array([biorefinery.MSP(), biorefinery.GWP()])
+def set_figure_size(width=None, aspect_ratio=None, units=None): 
+    # units default to inch
+    # width defaults 6.614 inches
+    # aspect ratio defaults to 0.65
+    if aspect_ratio is None:
+        aspect_ratio = 0.65
+    if width is None:
+        width = 6.6142
+    elif width == 'half':
+        width = 6.6142 / 2
+    else:
+        if units is not None:
+            from thermosteam.units_of_measure import convert
+            width = convert(width, units, 'inch')
+    import matplotlib
+    params = matplotlib.rcParams
+    params['figure.figsize'] = (width, width * aspect_ratio)
 
-def MSP_GWP_at_AcOH_titer_AcEster_yield(titer, yield_, biorefinery):
-    biorefinery.set_AcOH_titer.setter(titer)
-    biorefinery.set_AcEster_yield.setter(yield_)
-    biorefinery.system.simulate()
-    return np.array([biorefinery.MSP(), biorefinery.GWP()])
-
-def plot_MSP_across_AcOH_titer_AcEster_yield(load=True):
+def plot_MSP_across_yield_productivity(load=True):
     bst.plots.set_font(size=11, family='sans-serif', font='Arial')
+    set_figure_size(aspect_ratio=0.3)
     biorefinery = Biorefinery(simulate=False)
-    xlim = np.array(biorefinery.set_AcOH_titer.bounds)
-    ylim = np.array(biorefinery.set_AcEster_yield.bounds)
+    xlim = np.array(biorefinery.set_yield.bounds)
+    ylim = np.array(biorefinery.set_productivity.bounds)
+    titers = np.array([10, 30, 60])
     X, Y, Z = bst.plots.generate_contour_data(
-        MSP_GWP_at_AcOH_titer_AcEster_yield,
-        file=os.path.join(results_folder, 'MSP_GWP_AcOH_titer_AcEster_yield.npy'),
-        load=load, save=True,
-        xlim=xlim, ylim=ylim,
-        args=(biorefinery,),
-        n=10,
-    )
-    # Plot contours
-    ylabel = 'AcEster Yield\n[% theoretical]'
-    yticks = [50, 60, 70, 80, 90]
-    xlabel = 'AcOH Titer [$\mathrm{g} \cdot \mathrm{L}^{\mathrm{-1}}$]'
-    xticks = [50, 60, 70, 80, 90]
-    metric_bars = [
-        bst.plots.MetricBar(
-            'MSP', '$[\mathrm{USD} \cdot \mathrm{kg}^{\mathrm{-1}}]$', plt.cm.get_cmap('viridis_r'), 
-            bst.plots.rounded_tickmarks_from_data(Z[..., 0], 5, 1, expand=0, p=0.5), 
-            15, 1, ylabelkwargs=dict(size=12),
-        ),
-        bst.plots.MetricBar(
-            'Carbon intensity', '$[\mathrm{kg} \cdot \mathrm{CO}_{\mathrm{2}}\mathrm{e} \cdot \mathrm{kg}^{\mathrm{-1}}]$', plt.cm.get_cmap('copper_r'), 
-            bst.plots.rounded_tickmarks_from_data(Z[..., 1], 5, 1, expand=0, p=0.5), 
-            10, 1, ylabelkwargs=dict(size=12),
-        )
-    ]
-    fig, axes, CSs, CB, other_axes = bst.plots.plot_contour_2d(
-        X, Y, Z, xlabel, ylabel, xticks, yticks, metric_bars,  
-        fillcolor=None, styleaxiskw=dict(xtick0=False), label=True,
-    )
-    plt.subplots_adjust(left=0.2, right=0.9, wspace=0.15, hspace=0.2, top=0.9, bottom=0.15)
-    for i in ('svg', 'png'):
-        file = os.path.join(images_folder, f'AcOH_titer_AcEster_yield_contours.{i}')
-        plt.savefig(file, dpi=900, transparent=True)
-
-def plot_MSP_across_titer_productivity_AcOH(load=True):
-    bst.plots.set_font(size=11, family='sans-serif', font='Arial')
-    biorefinery = Biorefinery(simulate=False)
-    xlim = np.array(biorefinery.set_AcOH_titer.bounds)
-    ylim = np.array(biorefinery.set_AcOH_productivity.bounds)
-    X, Y, Z = bst.plots.generate_contour_data(
-        MSP_GWP_at_AcOH_titer_productivity,
-        file=os.path.join(results_folder, 'MSP_GWP_titer_productivity_AcOH.npy'),
-        load=load, save=True,
-        xlim=xlim, ylim=ylim,
-        args=(biorefinery,),
-        n=10,
-    )
-    # Plot contours
-    ylabel = "AcOH Productivity\n[$\mathrm{g} \cdot \mathrm{L}^{\mathrm{-1}} \cdot \mathrm{h}^{\mathrm{-1}}$]"
-    xlabel = 'AcOH Titer [$\mathrm{g} \cdot \mathrm{L}^{\mathrm{-1}}$]'
-    yticks = [1, 1.4, 1.8, 2.2, 2.6, 3]
-    xticks = [10, 20, 40, 60, 80, 100]
-    metric_bars = [
-        bst.plots.MetricBar(
-            'MSP', '[$\mathrm{USD} \cdot \mathrm{kg}^{\mathrm{-1}}$]', plt.cm.get_cmap('viridis_r'), 
-            bst.plots.rounded_tickmarks_from_data(Z[..., 0], 5, 1, expand=0, p=0.5), 
-            10, 1, ylabelkwargs=dict(size=12),
-        ),
-        bst.plots.MetricBar(
-            'Carbon intensity', '[$\mathrm{kg} \cdot \mathrm{CO}_{\mathrm{2}}\mathrm{e} \cdot \mathrm{kg}^{\mathrm{-1}}$]', plt.cm.get_cmap('copper_r'), 
-            bst.plots.rounded_tickmarks_from_data(Z[..., 1], 5, 1, expand=0, p=0.5), 
-            10, 1, ylabelkwargs=dict(size=12),
-        )
-    ]
-    fig, axes, CSs, CB, other_axes = bst.plots.plot_contour_2d(
-        X, Y, Z, xlabel, ylabel, xticks, yticks, metric_bars,  
-        fillcolor=None, styleaxiskw=dict(xtick0=False), label=True,
-    )
-
-def plot_MSP_across_yield_productivity_AcEster(load=True):
-    bst.plots.set_font(size=11, family='sans-serif', font='Arial')
-    biorefinery = Biorefinery(simulate=False)
-    xlim = np.array(biorefinery.set_AcEster_yield.bounds)
-    ylim = np.array(biorefinery.set_AcEster_productivity.bounds)
-    X, Y, Z = bst.plots.generate_contour_data(
-        MSP_GWP_at_AcEster_yield_productivity,
+        MSP_GWP_at_yield_productivity,
         file=os.path.join(results_folder, 'MSP_GWP_titer_productivity_AcEster.npy'),
         load=load, save=True,
         xlim=xlim, ylim=ylim,
-        args=(biorefinery,),
+        args=(biorefinery, titers),
         n=10,
     )
     # Plot contours
-    ylabel = "AcEster Productivity\n[$\mathrm{g} \cdot \mathrm{L}^{\mathrm{-1}} \cdot \mathrm{h}^{\mathrm{-1}}$]"
-    xlabel = 'AcEster Yield [$\mathrm{g} \cdot \mathrm{L}^{\mathrm{-1}}$]'
-    yticks = [0.2, 0.5, 0.8, 1.1, 1.4, 1.7, 2.0]
-    xticks = [50, 60, 70, 80, 90]
+    ylabel = "Productivity\n[$\mathrm{g} \cdot \mathrm{L}^{\mathrm{-1}} \cdot \mathrm{h}^{\mathrm{-1}}$]"
+    xlabel = 'Yield [$\mathrm{g} \cdot \mathrm{L}^{\mathrm{-1}}$]'
+    yticks = [0.1, 0.4, 0.7, 1.0, 1.3]
+    xticks = [30, 45, 60, 75, 90]
     metric_bars = [
         bst.plots.MetricBar(
             'MSP', '[$\mathrm{USD} \cdot \mathrm{kg}^{\mathrm{-1}}$]', plt.cm.get_cmap('viridis_r'), 
-            bst.plots.rounded_tickmarks_from_data(Z[..., 0], 5, 1, expand=0, p=0.5), 
-            10, 1, ylabelkwargs=dict(size=12),
+            bst.plots.rounded_tickmarks_from_data(Z, 5, 1, expand=0, p=0.5), 
+            12, 1, ylabelkwargs=dict(size=12),
         ),
-        bst.plots.MetricBar(
-            'GWP', '[$\mathrm{kg} \cdot \mathrm{CO}_{\mathrm{2}}\mathrm{e} \cdot \mathrm{kg}^{\mathrm{-1}}$]', plt.cm.get_cmap('copper_r'), 
-            bst.plots.rounded_tickmarks_from_data(Z[..., 1], 5, 1, expand=0, p=0.5), 
-            10, 1, ylabelkwargs=dict(size=12),
-        )
+        # bst.plots.MetricBar(
+        #     'GWP', '[$\mathrm{kg} \cdot \mathrm{CO}_{\mathrm{2}}\mathrm{e} \cdot \mathrm{kg}^{\mathrm{-1}}$]', plt.cm.get_cmap('copper_r'), 
+        #     bst.plots.rounded_tickmarks_from_data(Z[..., 1], 5, 0.1, expand=0, p=0.05), 
+        #     15, 2, ylabelkwargs=dict(size=12),
+        # )
     ]
-    fig, axes, CSs, CB, other_axes = bst.plots.plot_contour_2d(
-        X, Y, Z, xlabel, ylabel, xticks, yticks, metric_bars,  
+    fig, axes, CSs, CB, other_axes = bst.plots.plot_contour_single_metric(
+        X, Y, Z[:, :, np.newaxis, :], xlabel, ylabel, xticks, yticks, metric_bars[0],  
         fillcolor=None, styleaxiskw=dict(xtick0=False), label=True,
     )
+    plt.subplots_adjust(hspace=0.2, wspace=0.2)
+    for i in ('svg', 'png'):
+        file = os.path.join(images_folder, f'MSP_across_yield_productivity.{i}')
+        plt.savefig(file, transparent=True, dpi=900)

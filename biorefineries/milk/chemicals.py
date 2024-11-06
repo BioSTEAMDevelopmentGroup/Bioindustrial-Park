@@ -46,6 +46,12 @@ def create_chemicals(yeast_includes_nitrogen=False):
     Water = bst.Chemical('Water')
     
     # Composition of Acid Whey Protein
+    Solids = bst.Chemical(
+        'Solids',
+        phase = 'l',
+        default=True,
+        search_db=False,
+    )
     Lactose = bst.Chemical(
         'Lactose',
         phase = 'l'
@@ -96,6 +102,7 @@ def create_chemicals(yeast_includes_nitrogen=False):
     chemicals = bst.Chemicals([
         Water, Lactose, Galactose, LacticAcid, Protein, CitricAcid, GlutaricAcid,
         Yeast, Ash,
+        Solids,
         'Dodecanol',
         'DodecylAcetate',        
         'DodecanoicAcid',
@@ -129,6 +136,12 @@ def create_chemicals(yeast_includes_nitrogen=False):
         'AcidWhey',
         [*acid_whey.keys()],
         [*acid_whey.values()],
+        wt=True,
+    )
+    chemicals.define_group(
+        'UFPermeate',
+        ['Protein', 'Lactose', 'Ash', 'LacticAcid', 'Solids', 'Water'],
+        [0.2, 4.4, 0.4, 0.6, 5, 89.4],
         wt=True,
     )
     chemicals.set_alias('Yeast', 'Cellmass')

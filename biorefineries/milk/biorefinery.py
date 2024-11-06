@@ -70,12 +70,13 @@ class Biorefinery(bst.ProcessModel):
     """
     Examples
     --------
-    >>> import biorefineries.milk
+    >>> from biorefineries import milk
     >>> br = milk.Biorefinery(simulate=False)
-    >>> br.system.simulate()
-    >>> br.system.diagram()
-    >>> (br.MSP(), br.GWP(), br.tea.TCI / 1e6)
-    (7.30, 2.80, 438.53)
+    >>> br.evaluate_scenario()
+    MSP [USD/kg]        2.27
+    GWP [kg*CO2e/kg]   0.218
+    TCI [MMUSD]         73.1
+    dtype: float64
     
     """
     
@@ -94,7 +95,7 @@ class Biorefinery(bst.ProcessModel):
         self.config = ConfigurationKey(*key)
         bst.settings.set_thermo(create_chemicals())
         load_process_settings()
-        system = create_system()
+        system = create_system(product=product, feed=feed)
         self.tea = create_tea(
             system,
         )
@@ -118,17 +119,17 @@ class Biorefinery(bst.ProcessModel):
             self.product.price = price
         
         @parameter(units='g/L', element=self.fermentation, 
-                   bounds=[40, 90], baseline=70)
+                   bounds=[10, 60], baseline=30)
         def set_titer(titer):
             self.fermentation.titer = titer
             
         @parameter(units='g/L/h', element=self.fermentation,
-                   bounds=[0.2, 2], baseline=1)
+                   bounds=[0.1, 1.3], baseline=1)
         def set_productivity(productivity):
             self.fermentation.productivity = productivity
         
         @parameter(units='% theoretical', name='yield', element=self.fermentation, 
-                   bounds=[40, 90], baseline=50)
+                   bounds=[30, 90], baseline=50)
         def set_yield(X):
             X = X / 100.
             for reaction_series in self.fermentation.reactions: reaction_series.X[0] = X
@@ -143,7 +144,7 @@ class Biorefinery(bst.ProcessModel):
         #            element='electricity', baseline=dist.mean_electricity_price)
         # def set_electricity_price(price): 
         #     bst.settings.electricity_price = price
-        
+        # Capacity based on U.S. production in 2015 - https://cen.acs.org/articles/95/i6/Acid-whey-waste-product-untapped.html
         @parameter(units='MT/yr', element=self.feedstock, bounds=[1e5, 1e6], baseline=5e5)
         def set_processing_capacity(processing_capacity):
             self.feedstock.F_mass = processing_capacity / system.operating_hours * 1000 # kg / hr
@@ -180,3 +181,26 @@ class Biorefinery(bst.ProcessModel):
         self.load_model(model)
         cache[key] = self
         return self
+
+    def evaluate_scenario(self,
+            hexane_price=None,
+            dodecylacetate_price=None,
+            titer=None,
+            productivity=None,
+            conversion=None,
+            processing_capacity=None,
+        ):
+        sample = self.model.get_baseline_sample()
+        values = [
+            hexane_price,
+            dodecylacetate_price,
+            titer,
+            productivity,
+            conversion,
+            processing_capacity,
+        ]
+        for n, value in enumerate(values):
+            if value is None: continue
+            sample.iloc[n] = value
+        return self.model(sample)['-']
+        
