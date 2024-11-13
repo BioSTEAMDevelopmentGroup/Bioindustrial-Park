@@ -46,7 +46,7 @@ def create_system(ins, outs, feed, product):
     product_stream, = outs
     product_stream.register_alias('product')
     reactions = []
-    substrates = ['Lactose', 'Galactose']
+    substrates = ['Lactose', 'Galactose', 'Glucose']
     feedstock.empty()
     feedstock.imass[feed] = 100000
     for substrate in substrates:
@@ -115,26 +115,25 @@ def create_system(ins, outs, feed, product):
         'fermentation',
         ins=(M1-0, bst.Stream('air', phase='g')),
         outs=('vent_2', 'effluent_2'), tau=100, 
-        V_max=3785,
-        # V_max=500,
-        optimize_power=False,
+        # V_max=3785,
+        V_max=500,
+        optimize_power=True,
         reactions=reaction,
-        length_to_diameter=12,
-        kW_per_m3=0.6
+        length_to_diameter=3,
     )
     fermentation.titer = 100
     fermentation.productivity = 1
     
     # TODO: Add homogenizer for cells. Maybe remove this centrifuge of MC is 0.8 or more.
     # https://pubs.acs.org/doi/suppl/10.1021/acs.iecr.2c03016/suppl_file/ie2c03016_si_001.pdf
-    centrifuge_b = bst.SolidsCentrifuge(
-        ins=fermentation-1, 
-        outs=('cellmass', ''),
-        split=1,
-        solids=('Cellmass', product),
-        moisture_content=0.8,
-        strict_moisture_content=False
-    )
+    # centrifuge_b = bst.SolidsCentrifuge(
+    #     ins=fermentation-1, 
+    #     outs=('cellmass', ''),
+    #     split=1,
+    #     solids=('Cellmass', product),
+    #     moisture_content=0.8,
+    #     strict_moisture_content=False
+    # )
     
     @fermentation.add_specification(run=False)
     def adjust_reaction_time():
@@ -146,9 +145,9 @@ def create_system(ins, outs, feed, product):
     
     fermentation.get_titer = get_titer
     solvent = 'Hexane'
-    solvent_ratio = 1
+    solvent_ratio = 0.1
     solvent_recycle = bst.Stream()
-    solvent_mixer = bst.Mixer('solvent_mixer', ins=[centrifuge_b-0, solvent_recycle, solvent.lower()])
+    solvent_mixer = bst.Mixer('solvent_mixer', ins=[fermentation-1, solvent_recycle, solvent.lower()])
     solvent_mixer.outs[-1].price = 0.73
     @solvent_mixer.add_specification
     def adjust_solvent():
@@ -170,7 +169,7 @@ def create_system(ins, outs, feed, product):
     def cells_to_wastewater():
         product_separation._run()
         extract, wastewater = product_separation.outs
-        wastewater.copy_flow(extract, ('Cellmass',), remove=True)
+        wastewater.copy_flow(extract, ('Cellmass', 'Protein', 'Ash', 'Lactose'), remove=True)
     
     ideal_thermo = bst.settings.thermo.ideal()
     product_stream._thermo = ideal_thermo
@@ -178,12 +177,12 @@ def create_system(ins, outs, feed, product):
     solvent_recovery = bst.ShortcutColumn(
         ins=heat_integration,
         outs=('', ''),
-        Lr=0.9999,
-        Hr=0.999,
+        Lr=0.99999,
+        Hr=0.99,
         partial_condenser=False,
         LHK=(solvent, product),
         k=1.5,
-        P=101325 * 0.05,
+        thermo=ideal_thermo,
     )
     solvent_recovery.check_LHK = False
     bottoms_pump = bst.Pump(ins=solvent_recovery-1, P=2 * 101325)

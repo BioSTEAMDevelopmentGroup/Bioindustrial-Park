@@ -138,10 +138,25 @@ def create_chemicals(yeast_includes_nitrogen=False):
         [*acid_whey.values()],
         wt=True,
     )
+    percent_solids = 0.30
+    solids = sum([0.2, 4.4, 0.4])
+    water_to_solids = (1 - percent_solids) / percent_solids
     chemicals.define_group(
         'UFPermeate',
-        ['Protein', 'Lactose', 'Ash', 'LacticAcid', 'Solids', 'Water'],
-        [0.2, 4.4, 0.4, 0.6, 5, 89.4],
+        ['Protein', 'Lactose', 'Ash', 'LacticAcid', 'Water'],
+        [0.2, 4.4, 0.4, 0.6, water_to_solids * solids - 0.6],
+        wt=True,
+    )
+    chemicals.define_group(
+        'SaccharifiedCornSlurry',
+        ['Protein', 'Glucose', 'Ash', 'Water', 'Cellulose'],
+        [2.77, 20.7, 0.425, 71.2, 3.65],
+        wt=True,
+    )
+    chemicals.define_group(
+        'GlucoseMedia',
+        ['Protein', 'Glucose', 'Ash', 'Water'],
+        [2.77, 20.7, 0.425, 71.2],
         wt=True,
     )
     chemicals.set_alias('Yeast', 'Cellmass')
