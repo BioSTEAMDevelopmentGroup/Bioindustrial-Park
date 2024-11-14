@@ -27,7 +27,6 @@ import flexsolve as flx
 import numpy as np
 
 from numba import njit
-from biosteam.process_tools import BoundedNumericalSpecification
 from biorefineries.succinic._process_specification import ProcessSpecification
 from biosteam import System
 from thermosteam import Stream
@@ -40,11 +39,11 @@ from biorefineries.succinic.utils import find_split, splits_df, baseline_feedflo
 from biorefineries.succinic.chemicals_data import chems, chemical_groups, \
                                 soluble_organics, combustibles
 from biorefineries.succinic.tea import TemplateTEA as SuccinicTEA
-from biorefineries.succinic.lca import LCA as SuccinicLCA
+from biorefineries.succinic.lca import SuccinicLCA
 
 from biorefineries.succinic.crystallization_curvefit import Ct_given_C0
 
-from biorefineries.make_a_biorefinery.auto_waste_management import AutoWasteManagement
+# from biorefineries.make_a_biorefinery.auto_waste_management import AutoWasteManagement
 
 
 from biorefineries.cellulosic import create_facilities
@@ -71,6 +70,7 @@ bst.main_flowsheet.set_flowsheet(flowsheet)
 bst.units.ShortcutColumn.minimum_guess_distillate_recovery = 0
 
 # Baseline cost year is 2016
+
 bst.CE = 541.7
 
 # Set default thermo object for the system
@@ -257,7 +257,7 @@ def create_succinic_sys(ins, outs):
         A301._run()
         K301.specifications[0]()
         R302.specifications[0]()
-        return R302.CO2_required
+        return R302.fresh_CO2_required
 
     @A301.add_specification(run=False)
     def A301_spec():
@@ -974,9 +974,19 @@ get_product_stream_MPSP()
 
 #%% LCA
 
-succinic_LCA = SuccinicLCA(succinic_sys, CFs, sugarcane, product_stream, ['SuccinicAcid',], 
-                           [], CT801, CWP802, BT701, True,
-                           credit_feedstock_CO2_capture=True, add_EOL_GWP=True)
+succinic_LCA = SuccinicLCA(system=succinic_sys, 
+                 CFs=CFs, 
+                 feedstock=sugarcane, 
+                 feedstock_ID='Sugarcane',
+                 input_biogenic_carbon_streams=[feedstock, s.CSL],
+                 main_product=product_stream, 
+                 main_product_chemical_IDs=['SuccinicAcid',], 
+                 by_products=[], 
+                 cooling_tower=u.CT801, 
+                 chilled_water_processing_units=[u.CWP802,], 
+                 boiler=u.BT701, has_turbogenerator=True,
+                 add_EOL_GWP=True,
+                 )
 
 #%% Simulate and print
 spec.load_specifications(spec.baseline_yield, spec.baseline_titer, spec.baseline_productivity)

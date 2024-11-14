@@ -1,19 +1,17 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
+# Bioindustrial-Park: BioSTEAM's Premier Biorefinery Models and Results
+# Copyright (C) 2021-, Sarang Bhagwat <sarangb2@illinois.edu>
+# 
+# This module is under the UIUC open-source license. See 
+# github.com/BioSTEAMDevelopmentGroup/biosteam/blob/master/LICENSE.txt
+# for license details.
 """
-Created on Sun Aug 23 12:11:15 2020
-
-Modified from the cornstover biorefinery constructed in Cortes-Peña et al., 2020,
-with modification of fermentation system for TAL instead of the original ethanol
-
-[1] Cortes-Peña et al., BioSTEAM: A Fast and Flexible Platform for the Design, 
-    Simulation, and Techno-Economic Analysis of Biorefineries under Uncertainty. 
-    ACS Sustainable Chem. Eng. 2020, 8 (8), 3302–3310. 
-    https://doi.org/10.1021/acssuschemeng.9b07040.
-
-@author: sarangbhagwat
+This module is a modified implementation of modules from the following:
+[1]	Bhagwat et al., Sustainable Production of Acrylic Acid via 3-Hydroxypropionic Acid from Lignocellulosic Biomass. ACS Sustainable Chem. Eng. 2021, 9 (49), 16659–16669. https://doi.org/10.1021/acssuschemeng.1c05441
+[2]	Li et al., Sustainable Lactic Acid Production from Lignocellulosic Biomass. ACS Sustainable Chem. Eng. 2021, 9 (3), 1341–1351. https://doi.org/10.1021/acssuschemeng.0c08055
+[3]	Cortes-Peña et al., BioSTEAM: A Fast and Flexible Platform for the Design, Simulation, and Techno-Economic Analysis of Biorefineries under Uncertainty. ACS Sustainable Chem. Eng. 2020, 8 (8), 3302–3310. https://doi.org/10.1021/acssuschemeng.9b07040
 """
-
 # %%  
 
 # =============================================================================
@@ -110,7 +108,7 @@ NaNO3 = chemical_database('NaNO3', phase='l', Hf=-118756*_cal2joule)
 # NIST https://webbook.nist.gov/cgi/cbook.cgi?ID=C7757826&Mask=2, accessed 04/07/2020
 Na2SO4 = chemical_database('Na2SO4', phase='l', Hf=-1356.38e3)
 # CaSO4 = chemical_database('CaSO4', phase='s', Hf=-342531*_cal2joule)
-# The default Perry 151 model has a crazy value, use another model instead
+# The default Perry 151 model gives an inordinately high value, use another model instead
 # CaSO4.Cn.move_up_model_priority('Constant', 0)
 # 
 
@@ -118,7 +116,6 @@ Na2SO4 = chemical_database('Na2SO4', phase='l', Hf=-1356.38e3)
 # Soluble organic salts
 # =============================================================================
 
-Acetate = chemical_database('Acetate', phase='l', Hf=-108992*_cal2joule)
 AmmoniumAcetate = chemical_database('AmmoniumAcetate', phase='l', 
                                          Hf=-154701*_cal2joule)
 
@@ -145,7 +142,8 @@ AmmoniumAcetate = chemical_database('AmmoniumAcetate', phase='l',
 # =============================================================================
 
 AceticAcid = chemical_database('AceticAcid')
-SodiumAcetate = chemical_database('SodiumAcetate')
+SodiumAcetate = chemical_database('SodiumAcetate', phase='l')
+SodiumCitrate = chemical_database('SodiumCitrate', phase='l')
 Glucose = chemical_database('Glucose', phase = 'l')
 
 CitricAcid = chemical_database('CitricAcid')
@@ -214,12 +212,15 @@ Furfural = chemical_database('Furfural')
 
 
 Ethanol = chemical_database('Ethanol')
+
 Acetone = chemical_database('Acetone')
+IPA = chemical_database(ID='IPA', search_ID='Isopropanol')
+
 Hexanol = chemical_database('Hexanol')
 # Heptane = chemical_database('Heptane')
 
 
-THF = chemical_database(ID='Tetrahydrofuran')
+THF = chemical_database(ID='THF', search_ID='Tetrahydrofuran')
 # Toluene = chemical_database('Toluene')
 # Tb from chemspider(chemenu database)
 # http://www.chemspider.com/Chemical-Structure.207215.html, accessed 04/07/2020
@@ -470,7 +471,7 @@ for i in Ethyl_3_5_dihydroxyhexanoate.get_missing_properties():
             pass
 Octanol = chemical_database('Octanol')
 # Esters - Octyl
-OctylyHexanoate = chemical_database(ID='Octyl hexanoate', search_ID='4887-30-3') # used for missing properties
+OctylyHexanoate = chemical_database(ID='Octylhexanoate', search_ID='4887-30-3') # used for missing properties
 
 OctylHydroxyHexanoate = chemical_defined('Octyl_5_hydroxyhexanoate', phase='l', formula='C14H28O3', 
                        # Hf=-233200*_cal2joule,
@@ -535,9 +536,9 @@ Xylan = chemical_defined('Xylan', phase='s', formula='C5H8O4', Hf=-182100*_cal2j
 Xylan.copy_models_from(Xylose, ['Cn'])
 Arabinan = chemical_copied('Arabinan', Xylan)
 
-Lignin = chemical_database('Lignin', phase='s')
-# Hf scaled based on vanillin
-Lignin.Hf = -108248*_cal2joule/tmo.Chemical('Vanillin').MW*Lignin.MW
+# Lignin = chemical_database('Lignin', phase='s')
+# # Hf scaled based on vanillin
+# Lignin.Hf = -108248*_cal2joule/tmo.Chemical('Vanillin').MW*Lignin.MW
 
 Alanine = chemical_database('Alanine', phase='s')
 
@@ -547,6 +548,9 @@ Alanine = chemical_database('Alanine', phase='s')
 
 # Holmes, Trans. Faraday Soc. 1962, 58 (0), 1916–1925, abstract
 # This is for auto-population of combustion reactions
+
+SodiumPhosphate = chemical_database('SodiumPhosphate', phase='l')
+
 P4O10 = chemical_database('P4O10', phase='s', Hf=-713.2*_cal2joule)
 Ash = chemical_database('Ash', search_ID='CaO', phase='s', Hf=-151688*_cal2joule,
                         HHV=0, LHV=0)
@@ -557,9 +561,9 @@ Tar = chemical_copied('Tar', Xylose, phase_ref='s')
 
 PdC = chemical_database('Pd', phase='s')
 
-NiSiO2 = chemical_database('NiSiO2', search_ID='Nickel on silica', phase='s') # modeled simply as nickel
+NiSiO2 = chemical_database('NiSiO2', search_ID='Nickel on silica', phase='s') # Ni-SiO2-Al2O3 # Raney Ni (Ni-Al2O3 alloy) CAS 12635-27-7 is not currently in the database
 
-Amberlyst70_ = chemical_copied('Amberlyst70_', NiSiO2)
+Amberlyst70_ = chemical_copied('Amberlyst70_', NiSiO2) # Amberlyst-70 # Amberlyst-15 CAS 39389-20-3 is not currently in the database
 # =============================================================================
 # Mixtures
 # =============================================================================
@@ -741,6 +745,7 @@ chems.append(sugarcane_chems.Hemicellulose)
 chems.append(sugarcane_chems.CaO)
 chems.append(sugarcane_chems.Solids)
 chems.append(sugarcane_chems.Flocculant)
+chems.append(sugarcane_chems.Lignin)
 
 chems.compile()
 tmo.settings.set_thermo(chems)
@@ -776,9 +781,15 @@ chems.set_synonym('P4O10', 'PhosphorusPentoxide')
 chems.set_synonym('Na2SO4', 'SodiumSulfate')
 chems.set_synonym('AmmoniumHydroxide', 'NH4OH')
 
-chems.set_synonym('Tetrahydrofuran', 'THF')
+chems.set_synonym('DAP', 'DiammoniumPhosphate')
+
+
+chems.set_synonym('AceticAcid', 'Acetate')
 
 chems.set_synonym('PD', 'Acetylacetone')
+
+chems.set_synonym('IPA', 'Isopropanol')
+
 # chems.set_synonym('Isobutyraldehyde', 'IBA')
 
 

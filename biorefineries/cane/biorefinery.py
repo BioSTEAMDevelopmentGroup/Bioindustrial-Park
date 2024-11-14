@@ -129,7 +129,7 @@ area_names = {
     -1: ['Feedstock handling', 'Juicing', 'EtOH prod.', 'CH&P', 'Utilities', 
          'HXN', 'Storage', 'Wastewater treatment'],
     -2: ['Feedstock handling', 'Juicing', 'Pretreatment', 'EtOH prod.',
-         'Wastewater treatment', 'CH&P', 'Utilities', 'HXN', 'Storage'],
+         'Wastewater treatment', 'CH&P', 'Utilities', 'Storage', 'HXN'],
     -3: ['Feedstock handling', 'Juicing', 'EtOH prod.', 'CH&P', 'Utilities', 
          'HXN', 'Storage', 'Wastewater treatment'],
     1: ['Feedstock handling', 'Juicing', 'EtOH prod.', 'Oil ext.', 'Biod. prod.', 
@@ -194,6 +194,7 @@ def exponential_val(x, nA): # A x ^ n
     return A * x ** n
 
 def YRCP2023():
+    bst.Model.default_convergence_model = 'linear regressor'
     Biorefinery.default_conversion_performance_distribution = 'longterm'
     Biorefinery.default_prices_correleted_to_crude_oil = True
     Biorefinery.default_oil_content_range = [1.8, 5.4]
@@ -232,13 +233,44 @@ class Biorefinery:
     
     cases = {
         'constant biomass yield',
+        'baseline fermentation performance',
+        'target fermentation performance',
     } # Special cases for Monte Carlo
     
     def constant_biomass_yield(self):
-        self.set_dry_biomass_yield.distribution = shape.Uniform(
+        bounds = (
             self.baseline_dry_biomass_yield, 
             self.baseline_dry_biomass_yield + 1e-6 # Work around for constant value
         )
+        self.set_dry_biomass_yield.baseline = self.baseline_dry_biomass_yield
+        self.set_dry_biomass_yield.bounds = bounds
+        self.set_dry_biomass_yield.distribution = shape.Uniform(*bounds)
+    
+    def baseline_fermentation_performance(self):
+        parameters = (
+            self.set_glucose_to_microbial_oil_yield,
+            self.set_xylose_to_microbial_oil_yield,
+            self.set_fermentation_microbial_oil_productivity,
+            self.set_fermentation_microbial_oil_titer,
+        )
+        for i in parameters:
+            lb = i.bounds[0]
+            i.baseline = lb
+            i.bounds = bounds = [lb, lb + 1e-6]
+            i.distribution = shape.Uniform(*bounds)
+            
+    def target_fermentation_performance(self):
+        parameters = (
+            self.set_glucose_to_microbial_oil_yield,
+            self.set_xylose_to_microbial_oil_yield,
+            self.set_fermentation_microbial_oil_productivity,
+            self.set_fermentation_microbial_oil_titer,
+        )
+        for i in parameters:
+            ub = i.bounds[1]
+            i.baseline = ub
+            i.bounds = bounds = [ub, ub + 1e-6]
+            i.distribution = shape.Uniform(*bounds)
     
     def update_feedstock(self):
         feedstock = self.feedstock
@@ -329,6 +361,11 @@ class Biorefinery:
                   self.set_fermentation_microbial_oil_productivity,
                   self.set_fermentation_microbial_oil_titer):
             i.setter(i.bounds[1])
+    
+    def market_competitive_biomass_yield(self):
+        self.ROI_target = 10
+        self.biodiesel.price = self.biomass_based_diesel.price = self.cellulosic_based_diesel.price = 0.75
+        return self.competitive_biomass_yield()
     
     def __new__(cls,
             name, chemicals=None,
@@ -432,19 +469,21 @@ class Biorefinery:
         if number not in cellulosic_configurations: BT.boiler_efficiency = 0.89
         
         ## Unit groups
-        areas = area_names[number]
-        rename_storage_units(cane_sys.units, (areas.index('Storage') + 1) * 100)
-        unit_groups = UnitGroup.group_by_area(cane_sys.units)
-        for i, j in zip(unit_groups, areas): i.name = j
-        for i in unit_groups: i.autofill_metrics(shorthand=True)
+        # TODO: Fix unit groups
+        # areas = area_names[number]
+        # rename_storage_units(cane_sys.units, (areas.index('Storage') + 1) * 100)
+        # unit_groups = UnitGroup.group_by_area(cane_sys.units)
+        # for i, j in zip(unit_groups, areas): i.name = j
+        # for i in unit_groups: i.autofill_metrics(shorthand=True)
         
-        for HXN_group in unit_groups:
-            if HXN_group.name == 'HXN':
-                HXN_group.filter_savings = False # Allow negative values in heat utilities
-                HXN = HXN_group.units[0]
-                try:
-                    assert isinstance(HXN, bst.HeatExchangerNetwork)
-                except: breakpoint()
+        # for HXN_group in unit_groups:
+        #     if HXN_group.name == 'HXN':
+        #         HXN_group.filter_savings = False # Allow negative values in heat utilities
+        #         HXN = HXN_group.units[0]
+        #         try:
+        #             assert isinstance(HXN, bst.HeatExchangerNetwork)
+        #         except: breakpoint()
+        HXN = flowsheet(bst.HeatExchangerNetwork)
         HXN.raise_energy_balance_error = False
         HXN.vle_quenched_streams = False
         
@@ -467,7 +506,7 @@ class Biorefinery:
                 # Returns energy consumption at given fraction processed (not sent to boiler).
                 splitter.split[:] = 1 - fraction_burned
                 cane_sys.simulate()
-                excess = BT._excess_electricity_without_natural_gas
+                excess = BT._excess_electricity_without_fuel
                 if fraction_burned == minimum_fraction_burned and excess > 0:
                     splitter.neglect_natural_gas_streams = False # No need to neglect
                     return 0 # No need to burn bagasse
@@ -637,6 +676,7 @@ class Biorefinery:
             
             RIN_splitter.define_credit('Ethanol RIN D5', RIN_splitter.outs[0])
             RIN_splitter.define_credit('Ethanol RIN D3', RIN_splitter.outs[1])
+            RIN_splitter._cost = lambda: None # Workaround to be included in TEA
             cane_sys.update_configuration([*cane_sys.units, RIN_splitter])
             assert RIN_splitter in cane_sys.units
         elif number in conventional_ethanol_configurations:
@@ -672,12 +712,14 @@ class Biorefinery:
                 
                 RIN_splitter.define_credit('Biodiesel RIN D4', RIN_splitter.outs[0])
                 RIN_splitter.define_credit('Biodiesel RIN D3', RIN_splitter.outs[1])
+                RIN_splitter._cost = lambda: None # Workaround to be included in TEA
                 cane_sys.update_configuration([*cane_sys.units, RIN_splitter])
                 assert RIN_splitter in cane_sys.units
             else:
                 # A biodiesel stream should already exist
                 s.biodiesel.register_alias('biomass_based_diesel')
                 source = s.biodiesel.source
+                source._has_cost = True # Workaround to be included in TEA
                 source.define_credit('Biodiesel RIN D4', s.biodiesel)
         
         ## Additional modifications for speed
@@ -1591,38 +1633,27 @@ class Biorefinery:
             p.setter(x)
         
         if number in cellulosic_ethanol_configurations:
-            set_baseline(set_sorghum_glucose_yield, 79)
-            set_baseline(set_sorghum_xylose_yield, 86)
-            set_baseline(set_cane_glucose_yield, 91.0)
-            set_baseline(set_cane_xylose_yield, 97.5)
-            set_baseline(set_glucose_to_ethanol_yield, 90)
-            set_baseline(set_xylose_to_ethanol_yield, 42)
-        set_baseline(set_cane_oil_content, self.default_baseline_oil_content)
-        set_baseline(set_bagasse_oil_recovery, 70)
-        set_baseline(set_juicing_oil_recovery, 60)
-        set_baseline(set_microbial_oil_recovery)
-        set_baseline(set_crude_oil_price) 
-        set_baseline(set_ethanol_price) 
-        set_baseline(set_biodiesel_price)
-        set_baseline(set_RIN_D3_price) 
-        set_baseline(set_RIN_D4_price) 
-        set_baseline(set_RIN_D5_price) 
-        set_baseline(set_crude_glycerol_price, dist.mean_glycerol_price)
-        set_baseline(set_natural_gas_price)
-        set_baseline(set_electricity_price)
+            set_sorghum_glucose_yield.baseline = 79
+            set_sorghum_xylose_yield.baseline = 86
+            set_cane_glucose_yield.baseline = 91.0
+            set_cane_xylose_yield.baseline = 97.5
+            set_glucose_to_ethanol_yield.baseline = 90
+            set_xylose_to_ethanol_yield.baseline = 42
+        set_cane_oil_content.baseline = self.default_baseline_oil_content
+        set_bagasse_oil_recovery.baseline = 70
+        set_juicing_oil_recovery.baseline = 60
+        set_crude_glycerol_price.baseline = dist.mean_glycerol_price
         if number in cellulosic_ethanol_configurations:
             get_stream('ethanol').price = 0.789
         if number > 0:
-            set_baseline(set_cane_PL_content, 10)
-            set_baseline(set_cane_FFA_content, 10)
-        
-        for i in model._parameters: setattr(self, i.setter.__name__, i)
+            set_cane_PL_content.baseline = 10
+            set_cane_FFA_content.baseline = 10
         for i in model._metrics: setattr(self, i.getter.__name__, i)
         self.sys = sys
         self.tea = tea
         self.model = model
         self.flowsheet = flowsheet
-        self.unit_groups = unit_groups
+        # self.unit_groups = unit_groups
         self.configuration = configuration
         self.composition_specification = composition_specification
         self.oil_extraction_specification = oil_extraction_specification
@@ -1632,12 +1663,15 @@ class Biorefinery:
         self.net_energy_target = None
         self.microbial_oil_analysis_disactivated = True
         self.__dict__.update(flowsheet.to_dict())
-        if feedstock_line: self.set_feedstock_line(feedstock_line)
-        if cache is not None: cache[key] = self
         
+        for i in model._parameters: 
+            setattr(self, i.setter.__name__, i)
         if case is not None:
             getattr(self, case)()
-        
+        if feedstock_line: self.set_feedstock_line(feedstock_line)
+        if cache is not None: cache[key] = self
+        for i in model._parameters:
+            i.setter(i.baseline)
         # Avoid erros in Monte Carlo of microbial oil production with huge cell
         # mass production
         if number in cellulosic_configurations:
@@ -1666,7 +1700,7 @@ class Biorefinery:
                 feedstock.price = tea.solve_price(feedstock)
         
         ## Tests
-        if feedstock_line is None:
+        if feedstock_line is None and case is None:
             try:
                 assert len(all_parameter_mockups) == len(model.parameters)
                 assert len(all_metric_mockups) == len(model.metrics)

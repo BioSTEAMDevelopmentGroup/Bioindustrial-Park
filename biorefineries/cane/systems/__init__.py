@@ -20,8 +20,6 @@ Biodiesel
 
 Fermentation
 ------------
-.. automodule:: biorefineries.cane.systems.fermentation.add_urea_MgSO4_nutrients
-.. automodule:: biorefineries.cane.systems.fermentation.add_urea_nutrient
 .. automodule:: biorefineries.cane.systems.fermentation.create_sucrose_fermentation_system
 
 Juicing
@@ -38,7 +36,7 @@ Bagasse
 
 Lipid extraction
 ----------------
-.. autofunction:: biorefineries.cane.systems.lipid_extraction.create_lipid_exctraction_system
+.. autofunction:: biorefineries.cane.systems.lipid_extraction.create_lipid_extraction_system
 .. autofunction:: biorefineries.cane.systems.lipid_extraction.create_post_fermentation_oil_separation_system
 
 Pretreatment

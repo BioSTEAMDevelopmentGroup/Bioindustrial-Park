@@ -66,17 +66,17 @@ CABBI_colors_x = (colors.CABBI_blue_light.tint(90).RGBn,
                   colors.CABBI_teal_green.shade(45).RGBn)
 
 diverging_colormaps = [
-    plt.cm.get_cmap('RdYlGn')
+    plt.get_cmap('RdYlGn')
 ]
 
 colormaps = [
-    plt.cm.get_cmap('viridis'),
-    plt.cm.get_cmap('copper_r'),
+    plt.get_cmap('viridis'),
+    plt.get_cmap('copper_r'),
     # LinearSegmentedColormap.from_list('CABBI', CABBI_colors, 25),
     # LinearSegmentedColormap.from_list('CABBI', CABBI_colors_x, 25),
-    plt.cm.get_cmap('inferno_r'),
-    plt.cm.get_cmap('copper_r'),
-    plt.cm.get_cmap('bone_r'),
+    plt.get_cmap('inferno_r'),
+    plt.get_cmap('copper_r'),
+    plt.get_cmap('bone_r'),
 ] * 2
 
 light_letter_color = colors.neutral.tint(98).RGBn
@@ -240,7 +240,7 @@ def plot_metrics_across_composition(
     if titles is None: titles = np.array(['60% moisture', '65% moisture', '70% moisture'])
     metric_bars = [
         MetricBar(MFPP.name, format_units(MFPP.units), colormaps[0], tickmarks(data[:, :, 0, :], 8, 1, expand=0, p=0.5), 10, 1),
-        MetricBar('Biod. prod.', format_units(BP.units), plt.cm.get_cmap('copper'), tickmarks(data[:, :, 1, :], 8, 1, expand=0, p=0.5), 10, 1),
+        MetricBar('Biod. prod.', format_units(BP.units), plt.get_cmap('copper'), tickmarks(data[:, :, 1, :], 8, 1, expand=0, p=0.5), 10, 1),
         # MetricBar(EP.name, format_units(EP.units), colormaps[2], tickmarks(data[:, :, 2, :], 5, 5, expand=0, p=5), 10, 1),
     ]
     fig, axes, CSs, CB = plot_contour_2d(

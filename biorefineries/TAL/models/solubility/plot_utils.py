@@ -1,18 +1,14 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 # Bioindustrial-Park: BioSTEAM's Premier Biorefinery Models and Results
-# Copyright (C) 2023-2024, Sarang Bhagwat <sarangb2@illinois.edu> (this biorefinery)
+# Copyright (C) 2021-, Sarang Bhagwat <sarangb2@illinois.edu>
 # 
 # This module is under the UIUC open-source license. See 
 # github.com/BioSTEAMDevelopmentGroup/biosteam/blob/master/LICENSE.txt
 # for license details.
-"""
-Created on Fri Aug 18 17:32:13 2023
-
-@author: sarangbhagwat
-"""
 
 from matplotlib import pyplot as plt
+from matplotlib.ticker import AutoMinorLocator
 import numpy as np
 
 def plot_solubility_model(experimental_Ts, experimental_solubilities, 
@@ -25,17 +21,19 @@ def plot_solubility_model(experimental_Ts, experimental_solubilities,
                           filename='solubility_plot.png',
                           ylabel=r"$\bfTAL$" +" " +r"$\bfSolubility$" +" " + r"$\bfin$" +" " + r"$\bfWater$",
                           xlabel=r"$\bfTemperature$",
-                          solubility_units= r"$\mathrm{g-TAL}\cdot\mathrm{L-water}^{-1}$",
+                          solubility_units= r"$\mathrm{g-TAL}\cdot\mathrm{L}^{-1}$",
                           temperature_units="\u00b0" + r"$\mathrm{C}$",
                           units_on_newline=(False, True), # (x, y)
                           legend_loc='center left',
                           fontname="Arial Unicode",
-                          fontsize="12",
+                          fontsize="14",
                           predicted_plot_color='black',
                           experimental_plot_color='#63C6CE', 
                           experimental_plot_marker='x',
                           dpi=600,
                           bbox_inches='tight',
+                          xlabel_fontsize=16,
+                          ylabel_fontsize=16,
                           ):
 
 
@@ -43,6 +41,8 @@ def plot_solubility_model(experimental_Ts, experimental_solubilities,
     plt.rcParams['font.size'] = fontsize
     
     model_solubilities = [get_TAL_solubility_in_water_gpL(T) for T in model_Ts]
+    
+    fig, ax = plt.subplots()
     
     plt.plot(model_Ts-273.15, model_solubilities, color=predicted_plot_color, 
              label='predicted', zorder=1)
@@ -56,9 +56,58 @@ def plot_solubility_model(experimental_Ts, experimental_solubilities,
     for i in range(len(units_opening_brackets)):
         if units_on_newline[i]:
             units_opening_brackets[i] = "\n[" 
-            
-    plt.xlabel(xlabel +" " + units_opening_brackets[0] + temperature_units + "]")
-    plt.ylabel(ylabel +" " + units_opening_brackets[1] + solubility_units + "]")
+    
+    plt.xlabel(xlabel +" " + units_opening_brackets[0] + temperature_units + "]", fontsize=xlabel_fontsize)
+    plt.ylabel(ylabel +" " + units_opening_brackets[1] + solubility_units + "]",  fontsize=ylabel_fontsize)
+    
+    
+    plt.tick_params(
+        axis='y',          # changes apply to the y-axis
+        which='both',      # both major and minor ticks are affected
+        direction='out',
+        # right=True,
+        width=0.65,
+        labelsize=fontsize,
+        # zorder=200,
+        )
+    
+    plt.tick_params(
+        axis='y',          
+        which='major',      
+        length=7,
+        )
+
+    plt.tick_params(
+        axis='y',          
+        which='minor',      
+        length=3.5,
+        )
+    
+    plt.tick_params(
+        axis='x',          # changes apply to the y-axis
+        which='both',      # both major and minor ticks are affected
+        direction='out',
+        # right=True,
+        width=0.65,
+        labelsize=fontsize,
+        # zorder=200,
+        )
+
+    plt.tick_params(
+        axis='x',          
+        which='major',      
+        length=7,
+        )
+
+    plt.tick_params(
+        axis='x',          
+        which='minor',      
+        length=3.5,
+        )
+    
+
+    ax.xaxis.set_minor_locator(AutoMinorLocator())
+    ax.yaxis.set_minor_locator(AutoMinorLocator())
     
     plt.xlim(xlim[0], xlim[1])
     plt.ylim(ylim[0], ylim[1])

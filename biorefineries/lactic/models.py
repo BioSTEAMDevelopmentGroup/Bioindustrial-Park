@@ -240,13 +240,13 @@ def create_model(flowsheet=None, kind='SSCF'):
     #     U101._cached_flow_rate = rate
 
     D = shape.Triangle(0.84, 0.9, 0.96)
-    @param(name='Plant uptime', element='TEA', kind='isolated', units='%',
+    @param(name='Plant uptime', element='TEA', kind='isolated', units='',
            baseline=0.9, distribution=D)
     def set_plant_uptime(uptime):
         lactic_tea.operating_days = 365 * uptime
 
     D = baseline_triangle(1, 0.25)
-    @param(name='TCI ratio', element='TEA', kind='isolated', units='% of baseline',
+    @param(name='TCI ratio', element='TEA', kind='isolated', units='fraction of baseline',
             baseline=1, distribution=D)
     def set_TCI_ratio(new_ratio):
         old_ratio = lactic_tea._TCI_ratio_cached
@@ -303,7 +303,7 @@ def create_model(flowsheet=None, kind='SSCF'):
     ##### Pretreatment parameters #####
     M203 = u.M203
     D = shape.Triangle(0.25, 0.3, 0.4)
-    @param(name='Pretreatment solids loading', element=M203, kind='coupled', units='%',
+    @param(name='Pretreatment solids loading', element=M203, kind='coupled', units='',
            baseline=0.3, distribution=D)
     def set_pretreatment_solids_loading(loading):
         M203.solids_loading = loading
@@ -317,13 +317,13 @@ def create_model(flowsheet=None, kind='SSCF'):
 
     R201 = u.R201
     D = shape.Triangle(0.06, 0.099, 0.12)
-    @param(name='Pretreatment glucan-to-glucose', element=R201, kind='coupled', units='%',
+    @param(name='Pretreatment glucan-to-glucose', element=R201, kind='coupled', units='',
            baseline=0.099, distribution=D)
     def set_R201_glucan_conversion(X):
         R201.reactions[0].X = X
 
     D = shape.Triangle(0.8, 0.9, 0.92)
-    @param(name='Pretreatment xylan-to-xylose', element=R201, kind='coupled', units='%',
+    @param(name='Pretreatment xylan-to-xylose', element=R201, kind='coupled', units='',
            baseline=0.9, distribution=D)
     def set_R201_xylan_conversion(X):
         R201.reactions[8].X = X
@@ -331,7 +331,7 @@ def create_model(flowsheet=None, kind='SSCF'):
     ##### Conversion parameters #####
     M301 = u.M301
     D = shape.Triangle(0.175, 0.2, 0.25)
-    @param(name='Enzymatic hydrolysis solids loading', element=M301, kind='coupled', units='%',
+    @param(name='Enzymatic hydrolysis solids loading', element=M301, kind='coupled', units='',
            baseline=0.2, distribution=D)
     def set_R301_solids_loading(loading):
         M301.solids_loading = loading
@@ -350,7 +350,7 @@ def create_model(flowsheet=None, kind='SSCF'):
         R301.tau_saccharification = tau
 
     D = shape.Triangle(0.75, 0.9, 0.948-1e-6)
-    @param(name='Enzymatic hydrolysis glucan-to-glucose', element=R301, kind='coupled', units='%',
+    @param(name='Enzymatic hydrolysis glucan-to-glucose', element=R301, kind='coupled', units='',
            baseline=0.9, distribution=D)
     def set_R301_glucan_conversion(X):
         R301.saccharification_rxns[2].X = X
@@ -365,7 +365,7 @@ def create_model(flowsheet=None, kind='SSCF'):
     R302 = u.R302
     # 1e-6 is to avoid generating tiny negative flow (e.g., 1e-14)
     D = shape.Triangle(0.9, 0.95, 1-1e-6)
-    @param(name='Seed train fermentation ratio', element=R302, kind='coupled', units='%',
+    @param(name='Seed train fermentation ratio', element=R302, kind='coupled', units='',
            baseline=0.95, distribution=D)
     def set_ferm_ratio(ratio):
         R302.ferm_ratio = ratio
@@ -394,7 +394,7 @@ def create_model(flowsheet=None, kind='SSCF'):
         R302_X[1] = R302_X[4] = min(R301_X[1]*R302.ferm_ratio, 1-1e-6-R302_X[0]-R302_X[2])
 
     D = shape.Triangle(0.05, 0.07, 0.1)
-    @param(name='Inoculum ratio', element=R301, kind='coupled', units='%',
+    @param(name='Inoculum ratio', element=R301, kind='coupled', units='',
            baseline=0.07, distribution=D)
     def set_inoculum_ratio(ratio):
         R301.inoculum_ratio = ratio
@@ -424,7 +424,7 @@ def create_model(flowsheet=None, kind='SSCF'):
 
     R403 = u.R403
     D = baseline_triangle(0.8, 0.1)
-    @param(name='Hydrolysis conversion', element=R403, kind='coupled', units='%',
+    @param(name='Hydrolysis conversion', element=R403, kind='coupled', units='',
            baseline=0.8, distribution=D)
     def set_R403_conversion_factor(X):
         R403.hydrolysis_rxns.X[:] = X
@@ -432,7 +432,7 @@ def create_model(flowsheet=None, kind='SSCF'):
     ##### Separation parameters #####
     BT = u.BT
     D = baseline_uniform(0.8, 0.1)
-    @param(name='boiler efficiency', element=BT, kind='coupled', units='%',
+    @param(name='boiler efficiency', element=BT, kind='coupled', units='',
            baseline=0.8, distribution=D)
     def set_boiler_efficiency(efficiency):
         BT.boiler_efficiency = efficiency

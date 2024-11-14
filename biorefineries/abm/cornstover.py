@@ -6,7 +6,7 @@ for evaluating multiple scenarios for the agent based model project.
 Examples
 --------
 >>> import numpy as np
->>> from biorefineries.cornstover.abm import ABM_TEA_model
+>>> from biorefineries.abm.cornstover import ABM_TEA_model
 >>> cornstover_price = [0.05159, 0.06] # Corn stover price [USD/kg]
 >>> miscanthus_price = [0.08, 0.09] # Miscanthus price [USD/kg]
 >>> ethanol_price = [0.80, 0.85] # Ethanol price [USD/kg]
@@ -176,7 +176,7 @@ def ABM_TEA_function(
 metrics = [
     bst.Metric('MESP', lambda:cs.cornstover_tea.solve_price(cs.ethanol), 'USD/kr'),    
     bst.Metric('MFPP', lambda:cs.cornstover_tea.solve_price(cs.cornstover), 'USD/kr'),
-    bst.Metric('IRR', cs.cornstover_tea.solve_IRR),
+    bst.Metric('IRR', cs.cornstover_tea.solve_IRR, element='Biorefinery'),
     bst.Metric('NPV', lambda:cs.cornstover_tea.NPV, 'USD'),
     bst.Metric('TCI', lambda:cs.cornstover_tea.TCI, 'USD'),
     bst.Metric('VOC', lambda:cs.cornstover_tea.VOC, 'USD/yr'),

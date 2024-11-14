@@ -14,7 +14,10 @@ from biosteam.units.design_tools import TankPurchaseCostAlgorithm
 from biosteam.utils import ExponentialFunctor
 from biosteam.units.decorators import cost
 from biorefineries.oleochemicals.chemicals_baseline import chems
+from typing import Optional
+
 bst.settings.set_thermo(chems, cache= True) 
+
 
 #########################################################################################################################################################################################################################                
 #FFA neutralisation tank for neutralizing free fatty acids in the crude oil feedstock
@@ -29,24 +32,69 @@ class FFA_neutralisation_tank(bst.units.tank.MixTank):
 class DihydroxylationReactor(bst.CSTR):
     _N_ins = 1
     _N_outs = 2
-    X_dih = 0.99 #There is no mention of methyl oleate in the dihydroxylated product oily phase indicating almost complete conversion[1] 
-  
+    _units = {'Total volume': 'm3'}
+    #Even though there is no mention of methyl oleate in the dihydroxylated product oily phase in [1] complete conversion can not be assumed.
+    #Dihydroxylation reaction conversion stated in [11] for oleic acid under H2O2 and tungstic acid as 86 wt.%
+     
+   #: Default maximum change in temperature for the heat exchanger loop.
+    dT_hx_loop_default: Optional[float] = 5
+   #: Default fraction of working volume over total volume.
+    V_wf_default: Optional[float] = 0.8
+    #: Default maximum volume of a reactor in m3.
+    V_max_default: Optional[float] = 355
+    #: Default length to diameter ratio.
+    length_to_diameter_default: Optional[float] = 3
+    #: Default power consumption for agitation [kW/m3].
+    kW_per_m3_default: Optional[float] = 0.985
+    #: Default cleaning and unloading time (hr).
+    tau_0_default: Optional[float]  = 3    
+    
 #Novovols's patent mentions that linoeleic and palmitoleic acid esters can be oxidatively cleaved,this would mean that they can also get dihydroxylated [3]
 #Methyl palmitate has no unsaturation, therefore doesn't participate in the reaction [1]
 #Methyl stearate has no unsaturation, therefore doesn't participate in the reaction  [1]
 #Modelled as a CSTR because CSTRs allow for better handling of viscous diol mixtures [1],[2]
+
+    def _init(self, T,P,tau,X_dih,
+                dT_hx_loop: Optional[float]=None,
+               V_wf: Optional[float]=None, 
+               V_max: Optional[float]=None,
+               length_to_diameter: Optional[float]=None, 
+               kW_per_m3: Optional[float]=None,
+               vessel_material: Optional[str]=None,
+               vessel_type: Optional[str]=None,
+               batch: Optional[bool]=None,
+               tau_0: Optional[float]=None,
+               adiabatic: Optional[bool]=None,
+          ):
+             if adiabatic is None: adiabatic = False
+             self.T = T
+             self.adiabatic = adiabatic
+             self.P = P
+             self.dT_hx_loop = self.dT_hx_loop_default if dT_hx_loop is None else abs(dT_hx_loop)
+             self.tau = tau
+             self.V_wf = self.V_wf_default if V_wf is None else V_wf
+             self.V_max = self.V_max_default if V_max is None else V_max
+             self.length_to_diameter = self.length_to_diameter_default if length_to_diameter is None else length_to_diameter
+             self.kW_per_m3 = self.kW_per_m3_default if kW_per_m3 is None else kW_per_m3
+             self.vessel_material = 'Stainless steel 316' if vessel_material is None else vessel_material
+             self.vessel_type = 'Vertical' if vessel_type is None else vessel_type
+             self.tau_0 = self.tau_0_default if tau_0 is None else tau_0
+             self.batch = batch
+             self.X_dih = X_dih      
+             self.load_auxiliaries()
     def _setup(self):
             super()._setup()  
-            Dihydroxylation_reaction = PRxn([Rxn('Methyl_oleate + Hydrogen_peroxide -> MDHSA ', 'Methyl_oleate', X = DihydroxylationReactor.X_dih),
-                                              Rxn('Methyl_linoleate + 2 Hydrogen_peroxide -> Tetrahydroxy_octadecanoate', 'Methyl_linoleate', X = DihydroxylationReactor.X_dih),
-                                              Rxn('Methyl_linolenate + 3 Hydrogen_peroxide -> Hexahydroxy_octadecanoate', 'Methyl_linolenate', X = DihydroxylationReactor.X_dih),
+            Dihydroxylation_reaction = PRxn([Rxn('Methyl_oleate + Hydrogen_peroxide -> MDHSA ', 'Methyl_oleate', X = self.X_dih),
+                                              Rxn('Methyl_linoleate + 2 Hydrogen_peroxide -> Tetrahydroxy_octadecanoate', 'Methyl_linoleate', X = self.X_dih),
+                                              Rxn('Methyl_linolenate + 3 Hydrogen_peroxide -> Hexahydroxy_octadecanoate', 'Methyl_linolenate', X = self.X_dih),
                                             ])     
             #During dihydroxylation, about (1-2%) of feedstock gets converted to epoxides.
             #Those epoxides yield diols or can decompose to form the products
             #Therefore, no epoxides were considered in the reaction system
             #Also a very small fraction of acetals are formed as well which was ignored in these reactions
             DihydroxylationReactor_rxnsys = RxnSys(Dihydroxylation_reaction)
-            self.reactions = DihydroxylationReactor_rxnsys                                
+            self.reactions = DihydroxylationReactor_rxnsys  
+                              
     def _run(self): 
             feed = self.ins[0]
             feed.P = self.P
@@ -57,56 +105,118 @@ class DihydroxylationReactor(bst.CSTR):
             effluent.P = self.P
             effluent.T = self.T
             #Almost 97-99% the water evaporates at the operating pressure[2]  
-            condensate.imol['Water'] = moles_water*0.97 
-            effluent.imol['Water'] = moles_water*0.03
+            condensate.imol['Water'] = moles_water*0.96
+            effluent.imol['Water'] = moles_water*(1-0.96)
             condensate.P = self.P
             condensate.T = self.T
             self.ins[0].imol['Water'] = moles_water
+            
+    def _design(self):
+        #Total volume is a neccessary design requirement for the Vaccuum system
+        self.design_results['Total volume'] = self.feed.F_vol * self.tau
+        super()._design()
+                        
             
 #########################################################################################################################################################################################################################
 
 class OxidativeCleavageReactor(bst.CSTR):
     _N_ins = 5
     _N_outs = 2
+       
+   #: Default maximum change in temperature for the heat exchanger loop.
+    dT_hx_loop_default: Optional[float] = 5
+   #: Default fraction of working volume over total volume.
+    V_wf_default: Optional[float] = 0.8
+    #: Default maximum volume of a reactor in m3.
+    V_max_default: Optional[float] = 355
+    #: Default length to diameter ratio.
+    length_to_diameter_default: Optional[float] = 3
+    #: Default power consumption for agitation [kW/m3].
+    kW_per_m3_default: Optional[float] = 0.985
+    #: Default cleaning and unloading time (hr).
+    tau_0_default: Optional[float]  = 3    
     
-    X_ox_rxn_1 = 0.7 #some unreacted MDHSA remains in the mixture, based on that the conversion can be between ~45% to 95% based on the [2]
-    X_oxidativecleavage = 0.9 #Since no information was provided on presence of intermediates like
-    #Nonanal and oxo-nonanoic, most of them were assumed to convert to azelaic and nonanoic acid
-    X_decarboxylation = 0.1 #Decarboxylation of intermediates is an unwanted side reaction, conversion based on complete conversion of nonanal and oxo-nonanoic acid 
-    X_side_rxn = 0.05 #Few unwanted esters get generated in small amounts [1]&[2], the actual conversion is uncertain
-    X_decomposition = 0.99 #Nearly all of hydrogen peroxide coming in from the dihydroxylation reactor gets decomposed in the presence of cobalt catalyst [4]
 
+    #Based on [11], diol formed from oleyl alcohol almost completely (99%) gets consumed in this reactor.
+    #Information on methyl oleate diol was not provided in [11]
+    #A conservative estimate of a total consumption of 98% was assumed
+    
+    #Series reaction conversion for MDHSA to Nonanal and Ox-nonanoic acid can be calculated from [2] as 95.4%
+    #Therfore, it was assumed almost of all the intermediate gets consumed in the paralell reactions(99%)
+    #Nonanal oxidative cleavage conversion and decarboxylation reaction can be calculated from experidemental data provided in [2]
+
+    # X_ox_rxn_1 = 0.90
+    # #some unreacted MDHSA remains in the mixture[2]
+    # X_oxidativecleavage = 0.96 [2] #Since no information was provided on presence of intermediates like
+    # #Nonanal and oxo-nonanoic, almost all of them were assumed to convert to azelaic and nonanoic acid
+    # X_decarboxylation = 0.99-X_oxidativecleavage
+    #Decarboxylation of intermediates is an unwanted side reaction, 
+    #conversion based on almost complete conversion of nonanal and oxo-nonanoic acid 
+    # X_side_rxn*4 = 1- (1-0.98)/(1-X_ox_rxn_1)#Few unwanted esters get generated in small amounts [1]&[2], the actual conversion is uncertain
+    # X_decomposition = 0.99 #Nearly all of hydrogen peroxide coming in from the dihydroxylation reactor gets decomposed in the presence of cobalt catalyst [4]
+    
+    def _init(self, T,P,tau,X_ox_rxn_1,X_oxidativecleavage,X_decomposition,total_consumption_of_diol,
+                dT_hx_loop: Optional[float]=None,
+               V_wf: Optional[float]=None, 
+               V_max: Optional[float]=None,
+               length_to_diameter: Optional[float]=None, 
+               kW_per_m3: Optional[float]=None,
+               vessel_material: Optional[str]=None,
+               vessel_type: Optional[str]=None,
+               batch: Optional[bool]=None,
+               tau_0: Optional[float]=None,
+               adiabatic: Optional[bool]=None):
+        
+             if adiabatic is None: adiabatic = False
+             self.T = T
+             self.adiabatic = adiabatic
+             self.P = P
+             self.dT_hx_loop = self.dT_hx_loop_default if dT_hx_loop is None else abs(dT_hx_loop)
+             self.tau = tau
+             self.V_wf = self.V_wf_default if V_wf is None else V_wf
+             self.V_max = self.V_max_default if V_max is None else V_max
+             self.length_to_diameter = self.length_to_diameter_default if length_to_diameter is None else length_to_diameter
+             self.kW_per_m3 = self.kW_per_m3_default if kW_per_m3 is None else kW_per_m3
+             self.vessel_material = 'Stainless steel 316' if vessel_material is None else vessel_material
+             self.vessel_type = 'Vertical' if vessel_type is None else vessel_type
+             self.tau_0 = self.tau_0_default if tau_0 is None else tau_0
+             self.batch = batch
+             self.X_ox_rxn_1 = X_ox_rxn_1
+             self.X_oxidativecleavage = X_oxidativecleavage
+             self.X_decomposition=X_decomposition
+             self.total_consumption_of_diol = total_consumption_of_diol
+             self.load_auxiliaries()
     def _setup(self):          
         super()._setup()    
         Product_formation = SRxn([#Reaction of MDHSA, the primary diol
-                                  Rxn('MDHSA + Oxygen  -> Nonanal + Methyl_oxo_nonanoicacid','MDHSA', X = OxidativeCleavageReactor.X_ox_rxn_1),
-                                  Rxn('Methyl_oxo_nonanoicacid + Oxygen -> Monomethyl_azelate','Methyl_oxo_nonanoicacid',X =OxidativeCleavageReactor.X_oxidativecleavage),
-                                  Rxn('Nonanal + Oxygen -> Pelargonic_acid','Nonanal',X = OxidativeCleavageReactor.X_oxidativecleavage),
+                                  Rxn('MDHSA + Oxygen  -> Nonanal + Methyl_oxo_nonanoicacid','MDHSA', X = self.X_ox_rxn_1),
                                   #Reaction of other diols
-                                  Rxn('Tetrahydroxy_octadecanoate +  3 Oxygen ->  Monomethyl_azelate + Malonic_acid + Hexanoic_acid', 'Tetrahydroxy_octadecanoate', X = OxidativeCleavageReactor.X_oxidativecleavage),
-                                  Rxn('Hexahydroxy_octadecanoate +  3 Oxygen ->  Monomethyl_azelate + 2 Malonic_acid + Propanoic_acid', 'Hexahydroxy_octadecanoate', X = OxidativeCleavageReactor.X_oxidativecleavage),
+                                  Rxn('Tetrahydroxy_octadecanoate +  3 Oxygen ->  Monomethyl_azelate + Malonic_acid + Hexanoic_acid', 'Tetrahydroxy_octadecanoate', X = self.X_oxidativecleavage),
+                                  Rxn('Hexahydroxy_octadecanoate +  3 Oxygen ->  Monomethyl_azelate + 2 Malonic_acid + Propanoic_acid', 'Hexahydroxy_octadecanoate', X =self.X_oxidativecleavage),
                                   ])    
-
-        Side_reaction = PRxn([#Decarboxylation reactions ([5])
-                              Rxn('Methyl_oxo_nonanoicacid + Oxygen -> Monomethyl_suberate + 1 CO2', 'Methyl_oxo_nonanoicacid', X = OxidativeCleavageReactor.X_decarboxylation),
-                              Rxn('Nonanal + Oxygen -> Methyl_caprylate + 1 CO2', 'Nonanal', X = OxidativeCleavageReactor.X_decarboxylation), 
+        Main_reactions = PRxn([Rxn('Methyl_oxo_nonanoicacid + Oxygen -> Monomethyl_azelate','Methyl_oxo_nonanoicacid',X =self.X_oxidativecleavage),
+                               Rxn('Nonanal + Oxygen -> Pelargonic_acid','Nonanal',X = self.X_oxidativecleavage),
+                                     
+#Decarboxylation reactions ([5])
+                              Rxn('Methyl_oxo_nonanoicacid + Oxygen -> Monomethyl_suberate + 1 CO2', 'Methyl_oxo_nonanoicacid', X = 0.99-self.X_oxidativecleavage),
+                              Rxn('Nonanal + Oxygen -> Methyl_caprylate + 1 CO2', 'Nonanal', X = 0.99-self.X_oxidativecleavage), 
                               #Esterification side reactions
-                              Rxn('MDHSA + Monomethyl_azelate-> Monoester_MDHSA_MMA + H2O', 'MDHSA', X =OxidativeCleavageReactor.X_side_rxn),
-                              Rxn('MDHSA + 2Monomethyl_azelate-> Diester_MDHSA_MMA + 2H2O', 'MDHSA', X = OxidativeCleavageReactor.X_side_rxn),
-                              Rxn('MDHSA + Pelargonic_acid -> Monoester_MDHSA_PA + 1H2O', 'MDHSA', X = OxidativeCleavageReactor.X_side_rxn),
-                              Rxn('MDHSA + 2Pelargonic_acid -> Diester_MDHSA_PA + 2H2O', 'MDHSA', X = OxidativeCleavageReactor.X_side_rxn),  
-                              Rxn('Hydrogen_peroxide -> Oxygen + H2O','Hydrogen_peroxide',X = OxidativeCleavageReactor.X_decomposition),
+                              Rxn('MDHSA + Monomethyl_azelate-> Monoester_MDHSA_MMA + H2O', 'MDHSA', X =(1-((1-self.total_consumption_of_diol)/(1-self.X_ox_rxn_1)))/4),
+                              Rxn('MDHSA + 2Monomethyl_azelate-> Diester_MDHSA_MMA + 2H2O', 'MDHSA', X =(1-((1-self.total_consumption_of_diol)/(1-self.X_ox_rxn_1)))/4),
+                              Rxn('MDHSA + Pelargonic_acid -> Monoester_MDHSA_PA + 1H2O', 'MDHSA', X =(1-((1-self.total_consumption_of_diol)/(1-self.X_ox_rxn_1)))/4),
+                              Rxn('MDHSA + 2Pelargonic_acid -> Diester_MDHSA_PA + 2H2O', 'MDHSA', X =(1-((1-self.total_consumption_of_diol)/(1-self.X_ox_rxn_1)))/4),
+                              Rxn('Hydrogen_peroxide -> Oxygen + H2O','Hydrogen_peroxide',X = self.X_decomposition),
                               ])
-        oxidative_cleavage_rxnsys = RxnSys(Product_formation, Side_reaction)
+        oxidative_cleavage_rxnsys = RxnSys(Product_formation,Main_reactions)
         self.reactions = oxidative_cleavage_rxnsys
             
     def _run(self):
-        feed,catalyst1,catalyst2,air,recycle, = self.ins
+        feed,s1,s2,s3,s4 = self.ins
         vent,effluent, = self.outs 
-        effluent.mix_from(self.ins)              
+        effluent.mix_from(self.ins)   
         self.reactions(effluent)
-        effluent.T = self.T
         effluent.P = self.P
+        effluent.T = self.T
         vent.empty()
         vent.phase = 'g'
         vent.copy_flow(effluent,('Carbon_dioxide','Oxygen','Nitrogen'),remove = True)
@@ -134,13 +244,12 @@ class Pressure_adjustment_valve(bst.Valve):
 class Sodium_hydroxide_tank(bst.units.tank.MixTank):
     def _run(self):
           effluent, = self.outs
-          precipitation_reaction_1 = PRxn([Rxn('Cobalt_acetate_tetrahydrate + 2 Sodium_hydroxide  -> 2 Sodium_acetate + Cobalt_hydroxide + 4H2O', 'Cobalt_acetate_tetrahydrate', X = 0.999),
+          self.precipitation_reaction_1 = PRxn([Rxn('Cobalt_acetate_tetrahydrate + 2 Sodium_hydroxide  -> 2 Sodium_acetate + Cobalt_hydroxide + 4H2O', 'Cobalt_acetate_tetrahydrate', X = 0.999),
                                            Rxn('Tungstic_acid + 2 Sodium_hydroxide  -> Sodium_tungstate + H2O', 'Tungstic_acid', X = 0.999)
                                           ])
                           
-          self.reactions = RxnSys(precipitation_reaction_1)
           effluent.mix_from(self.ins)
-          self.reactions(effluent)
+          self.precipitation_reaction_1(effluent)
           effluent.copy_like(effluent)
 
 class Acid_precipitation_tank(bst.units.tank.MixTank):
@@ -201,6 +310,7 @@ class HydrolysisReactor(bst.BatchBioreactor):
         self.conc_of_active_sites = conc_of_active_sites 
         self.Nmin = Nmin
         self.Nmax = Nmax
+        
     def _setup(self):          
         super()._setup()  
         Product_formation = PRxn([Rxn('Monomethyl_azelate + Water  -> Methanol + Azelaic_acid','Monomethyl_azelate', X = HydrolysisReactor.X_hydrolysis),
@@ -247,7 +357,8 @@ class HydrolysisReactor(bst.BatchBioreactor):
         #The solid flux capacity of the frame is between 2 to 5 Kg of resin/ second.m^2. [8]
         #This translates to 7200 Kg/ hr .m^2       
         self.design_results['Total_filter_area']= total_mass_of_resin/7200        
-        # the resin amount calculated has the units Kg/hr since it is based on incoming FAME flowrates           
+        # the resin amount calculated has the units Kg/hr since it is based on incoming FAME flowrates      
+        
 #########################################################################################################################################################################################################################          
 #This unit is to separate the methanol and water mixture produced as condensate in the hydrolysis unit
 #Patent [2] mentions continous methanol recovery from the condensate obtained in the hydrolysis unit
@@ -262,13 +373,13 @@ class Methanolseparationsystem(bst.Unit,isabstract = True):
                     thermo=None):
           Unit.__init__(self, ID, ins, outs, thermo)
           distillation_column1 = self.auxiliary('distillation_column1',
-                                                  bst.BinaryDistillation,
-                                                  LHK = ('Methanol',
-                                                  'Water'),
-                                                  Lr = 0.999, 
-                                                  Hr = 0.999,
-                                                  k = 2,
-                                                  P = 101325)
+                                                   bst.BinaryDistillation,
+                                                   LHK = ('Methanol',
+                                                   'Water'),
+                                                   Lr = 0.85, #TODO: sometimes this also crashes
+                                                   Hr = 0.85,
+                                                   k = 2,
+                                                   P = 20000)
           
           heat_exchanger1 = self.auxiliary('heat_exchanger1',
                                               bst.HXutility,
@@ -284,24 +395,30 @@ class Methanolseparationsystem(bst.Unit,isabstract = True):
     def _run(self):
             feed = self.ins[0]
             top,bottom, = self.outs
-            if  feed.imass['Methanol']/feed.F_mass < 0.32:
-                self.heat_exchanger1.ins[0].copy_like(feed)
-                self.heat_exchanger1._run()
-                bottom.copy_like(self.heat_exchanger1.outs[0])
-            else:
+            try:
                 self.distillation_column1.ins[0].copy_like(feed)
                 self.distillation_column1._run()
                 self.heat_exchanger1.ins[0].copy_like(self.distillation_column1.outs[0])
                 self.heat_exchanger1._run()
                 top.copy_like(self.heat_exchanger1.outs[0])
                 bottom.copy_like(self.distillation_column1.outs[1])    
+            except:
+                if  feed.imass['Methanol']/feed.F_mass < 0.70:#infeasible below this fraction
+                    self.heat_exchanger1.ins[0].copy_like(feed)
+                    self.heat_exchanger1._run()
+                    bottom.copy_like(self.heat_exchanger1.outs[0])
+                if feed.imass['Methanol']/feed.F_mass > 0.70:#infeasible above this fraction
+                    self.heat_exchanger1.ins[0].copy_like(feed)
+                    self.heat_exchanger1._run()
+                    top.copy_like(self.heat_exchanger1.outs[0]) #methanol is sent out directly as a product
+                    
     def _design(self):
             self.distillation_column1._design()
-            self.heat_exchanger1._design()    
+            self.heat_exchanger1._design()   
           
     def _cost(self):
             self.distillation_column1._cost()
-            self.heat_exchanger1._cost()                
+            self.heat_exchanger1._cost()              
                 
                 
 ##################################################################################################################################################################################################################
@@ -341,6 +458,7 @@ class SolidsFlaker(bst.Unit):
 
     def _run(self):
         feed, = self.ins
+        feed.phase = 'l'
         flakes, = self.outs
         flakes.copy_like(feed)
         flakes.T = self.T_out
@@ -365,7 +483,7 @@ bst.StorageTank.purchase_cost_algorithms["Solids handling bin"] = TankPurchaseCo
 
 ########################################################################################################################################################################################################################
 #References:
-#[1] IMPROVED PROCESS FOR THE PRODUCTION OF DERIVATIVES OF SATURATED CARBOXYLIC ACIDS,EP 1 926 699 B1    
+#[1]IMPROVED PROCESS FOR THE PRODUCTION OF DERIVATIVES OF SATURATED CARBOXYLIC ACIDS,EP 1 926 699 B1    
 #[2]CONTINUOUS PROCESS FOR THE PRODUCTION OF DERVATIVES OF SATURATED CARBOXYLIC ACDS,US 9.272,975 B2
 #[3]PROCESS FOR THE PREPARATION OF CARBOYLIC ACDS AND ESTERS THEREOF BY OXDATIVE CLEAWAGE OF UNSATURATED EATTY ACDS AND ESTERS, Patent number 5,714,623, 
 #[4]PROCESS FOR RECOVERING COBALT AND TUNGSTEN FROM REACTION LIQUORS
@@ -376,3 +494,6 @@ bst.StorageTank.purchase_cost_algorithms["Solids handling bin"] = TankPurchaseCo
 #[8]Rule of thumb
 #[9]https://patents.google.com/patent/US9248381B2/en
 #[10]Costing is based on volume. Ref: Warren Sieder   
+#[11]Double bond oxidative cleavage of monoenic fatty chains
+
+########################################################################################################################################################################################################################

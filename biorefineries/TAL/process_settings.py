@@ -1,20 +1,28 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
+# Bioindustrial-Park: BioSTEAM's Premier Biorefinery Models and Results
+# Copyright (C) 2021-, Sarang Bhagwat <sarangb2@illinois.edu>
+# 
+# This module is under the UIUC open-source license. See 
+# github.com/BioSTEAMDevelopmentGroup/biosteam/blob/master/LICENSE.txt
+# for license details.
 """
-Created on Sun Aug 23 12:11:15 2020
-
-Modified from the cornstover biorefinery constructed in Cortes-Peña et al., 2020,
-with modification of fermentation system for 2,3-Butanediol instead of the original ethanol
-
-[1] Cortes-Peña et al., BioSTEAM: A Fast and Flexible Platform for the Design, 
-    Simulation, and Techno-Economic Analysis of Biorefineries under Uncertainty. 
-    ACS Sustainable Chem. Eng. 2020, 8 (8), 3302–3310. 
-    https://doi.org/10.1021/acssuschemeng.9b07040.
-
-All units are explicitly defined here for transparency and easy reference
-
-@author: sarangbhagwat
+This module is a modified implementation of modules from the following:
+[i]	Bhagwat et al., Sustainable Production of Acrylic Acid via 3-Hydroxypropionic Acid from Lignocellulosic Biomass. ACS Sustainable Chem. Eng. 2021, 9 (49), 16659–16669. https://doi.org/10.1021/acssuschemeng.1c05441
+[ii]	Li et al., Sustainable Lactic Acid Production from Lignocellulosic Biomass. ACS Sustainable Chem. Eng. 2021, 9 (3), 1341–1351. https://doi.org/10.1021/acssuschemeng.0c08055
+[iii]	Cortes-Peña et al., BioSTEAM: A Fast and Flexible Platform for the Design, Simulation, and Techno-Economic Analysis of Biorefineries under Uncertainty. ACS Sustainable Chem. Eng. 2020, 8 (8), 3302–3310. https://doi.org/10.1021/acssuschemeng.9b07040
 """
+
+
+'''
+References
+----------
+[1] Argonne National Laboratory. The Greenhouse gases, Regulated Emissions,
+    and Energy use in Transportation (GREET) Model https://greet.es.anl.gov/
+    (accessed Aug 25, 2020).
+[2] ecoinvent 3.8 https://www.ecoinvent.org/ (accessed May 24, 2024).
+
+'''
 
 import biosteam as bst
 import thermosteam as tmo
@@ -26,6 +34,13 @@ _kg_per_ton = 907.18474
 _lb_per_kg = 2.20462
 _liter_per_gallon = 3.78541
 _ft3_per_m3 = 35.3147
+
+#### Method for converting to 2019$ ####
+# Where available, chemical indices are used (2010 - 2022 indices are available).
+# To convert from Y1 to Y2: price_Y2 = price_Y1 * chem_index[Y2]/chem_index[Y1]
+# For years prior to 2010, GDP indices are first used to convert from the given year to 2010,
+# following which chemical indices are used.
+# E.g., to convert from Y0 to Y2: price_Y2 = price_Y0 * GDP_index[Y1]/GDP_index[Y0] * chem_index[Y2]/chem_index[Y1]
 
 _GDP_2007_to_2016 = 1.114 / 0.961
 _GDP_2008_to_2016 = 1.114 / 0.990
@@ -62,9 +77,11 @@ corn_stover_price = 71.26 / _kg_per_ton * 0.8
 
 # 2.2 is the average whole-sale ethanol price between 2010-2019 in 2016 $/gal
 # based on Annual Energy Outlook (AEO) from Energy Information Adiministration (EIA)
-# (https://www.eia.gov/outlooks/aeo/), which is $0.7328/gal and similar to the
-# 2.2/(2988/1e3) = $0.736/gal based on a density of 2988 g/gal from H2 Tools
-# Lower and upper bounds are $1.37/gal and $2.79/gal, or $0.460/kg and $0.978/kg
+# (https://www.eia.gov/outlooks/aeo/), which is $0.7402/kg and similar to the
+# 2.2/(2988/1e3) = $0.736/kg based on a density of 2988 g/gal from H2 Tools
+# Lower and upper bounds are $1.37/gal and $2.79/gal, or $0.460/kg and $0.939/kg
+# _ethanol_kg_2_gal =  2.9721617599077566
+# price range in 2016$/kg: 
 _ethanol_V = chems.Ethanol.V('l', 298.15, 101325) # molar volume in m3/mol
 _ethanol_MW = chems.Ethanol.MW
 _ethanol_kg_2_gal = _liter_per_gallon/_ethanol_V*_ethanol_MW/1e6
@@ -74,7 +91,6 @@ ethanol_price = 2.2 / _ethanol_kg_2_gal
 # Dipotassium hydrogen phosphate (DPHP)
 # https://www.alibaba.com/product-detail/Food-Grade-Dipotassium-Dydrogen-Phosphate-Trihydrate_60842047866.html?spm=a2700.7724857.normalList.2.4ef2457e3gPbfv&s=p
 # DISREGARD: https://www.sigmaaldrich.com/catalog/product/mm/105104?lang=en&region=US
-
 DPHP_price = 1.15
 
 # 2.86 is the average motor gasoline price between 2010-2019 in 2016 $/gal	
@@ -132,10 +148,6 @@ CH4_MW = chems.CH4.MW
 natural_gas_price = 4.70/1e3*_ft3_per_m3*CH4_V * (1e3/CH4_MW) *\
     chem_index[2019]/chem_index[2016]
 
-# https://www.rightpricechemicals.com/buy-amberlyst-15-ion-exchange-resin.html	
-# USD 383.13 for 2.5kg (largest available size order), accessed 06/11/2020
-amberlyst_15_price = 153.252 * _chemical_2020to2016
-
 # https://www.alibaba.com/product-detail/Tricalcium-Phosphate-Tricalcium-Phosphate-TCP-Tricalcium_60744013678.html?spm=a2700.galleryofferlist.0.0.42f16684C9iJhz&s=p
 TCP_price = 850 / _kg_per_ton # tricalcium (di)phosphate
 
@@ -172,18 +184,41 @@ heptane_price = 1900./_kg_per_ton
 # Viswanathan et al. 2020
 toluene_price = 1.1
 
-# assumed
-AuPd_price = 60000.
+# search pages (all with 'trade assurance' and 'verified supplier' filters):
+    # https://www.alibaba.com/trade/search?spm=a2700.galleryofferlist.leftFilter.d_filter.6fbb7c9clLc8dv&fsb=y&IndexArea=product_en&assessmentCompany=true&keywords=hydrogen+gas&ta=y&tab=all&
+    # https://www.alibaba.com/trade/search?spm=a2700.galleryofferlist.leftFilter.d_filter.76512d31TN44FR&fsb=y&IndexArea=product_en&assessmentCompany=true&keywords=cas+1333-74-0&ta=y&tab=all&
+    # https://www.alibaba.com/trade/search?spm=a2700.galleryofferlist.leftFilter.d_filter.542c64bepOk1ZA&fsb=y&IndexArea=product_en&assessmentCompany=true&keywords=1333-74-0&ta=y&tab=all&
 
-# https://www.alibaba.com/product-detail/Gas-Hydrogen-45kg-Lpg-Gas-Cylinder_62018626105.html?spm=a2700.galleryofferlist.0.0.e9ba7ce2O0TyvK
+# vendor listing 1: https://www.alibaba.com/product-detail/Industrial-Grade-H2-Hydrogen-Gas-Cylinder_1600624231996.html?spm=a2700.galleryofferlist.normal_offer.d_title.577364beUs9l40
+# vendor listing 2 (same vendor): https://www.alibaba.com/product-detail/Promotion-Compressed-Hydrogen-Gas-With-Cylinder_1600948500210.html?spm=a2700.galleryofferlist.p_offer.d_title.253d7c9c5yZj8z&s=p
 hydrogen_price = 1.
 
 # https://www.energy.gov/eere/fuelcells/hydrogen-shot
 hydrogen_renewable_price = 5.
-# https://www.alibaba.com/product-detail/catalyst-raney-nickel-stainless-steel-square_60731133248.html?spm=a2700.galleryofferlist.0.0.2a583524IfakZZ
-RaneyNi_price = 30.
 
-NiSiO2_price = RaneyNi_price
+# Ni-Al2O3-SiO2 catalyst
+### --- 2024.06.03 search
+    ## Alibaba listings
+        # search pages: 
+            # Raney Nickel (Nickel-Alumina alloy): https://www.alibaba.com/trade/search?spm=a2700.galleryofferlist.leftFilter.d_filter.33fa26503Y6HGm&fsb=y&IndexArea=product_en&assessmentCompany=true&keywords=raney+nickel&ta=y&tab=all&
+            # Nickel: https://www.alibaba.com/trade/search?spm=a2700.galleryofferlist.leftFilter.d_filter.37af154aqb1xS5&fsb=y&IndexArea=product_en&assessmentCompany=true&keywords=7440-02-0&ta=y&tab=all&
+        # vendor listings:
+            # 1. https://www.alibaba.com/product-detail/Pure-99-99-99-Ni-Powdery_1600796014023.html?spm=a2700.galleryofferlist.normal_offer.d_title.b7d0154ab6qIRO
+                # Nickel: $35/kg
+            # 2. https://www.alibaba.com/product-detail/High-purity-nickel-powder-CAS-7440_1601043582452.html?spm=a2700.galleryofferlist.normal_offer.d_title.b7d0154ab6qIRO
+                # Nickel: $40/kg
+            # 3. https://www.alibaba.com/product-detail/Nickel-Alumina-modium-catalyst-cost-Price_62039092901.html?spm=a2700.galleryofferlist.normal_offer.d_title.31592650y6YlHm
+                # Raney Nickel: $5/kg
+            # 4. https://www.alibaba.com/product-detail/High-quality-customized-NiAl20-Raney-nickel_1601019811920.html?spm=a2700.galleryofferlist.normal_offer.d_title.31592650ztR5t4
+                # $50/kg
+            # 5. https://www.alibaba.com/product-detail/Customized-design-increase-specific-surface-area_1601019920484.html?spm=a2700.galleryofferlist.normal_offer.d_title.31592650ztR5t4
+                # $35/kg
+    ##
+### ---
+# Lowest = $5/kg
+# Highest = $50/kg
+# Mean = $33/kg
+NiSiO2_price = RaneyNi_price = 33.
 
 # https://www.alibaba.com/product-detail/Reagent-Grade-90-caustic-potash-potassium_62118969650.html?spm=a2700.galleryofferlist.0.0.28555ed4pKlEVC&s=p
 KOH_price = 1.6
@@ -201,11 +236,49 @@ spent_PdC_price = 1. # assumed
 
 acetone_price = 0.63 * _GDP_2008_to_2016 * _lb_per_kg # average of range ($0.44 - $0.82 /lb) from https://web.archive.org/web/20161125084558/http://www.icis.com:80/chemicals/channel-info-chemicals-a-z/
 
-acetic_acid_price = 1.135 * _GDP_2008_to_2010 * chem_index[2019]/chem_index[2010] # average of range ($ 0.772 - 1.499 /kg) from # https://web.archive.org/web/20161125084558/http://www.icis.com:80/chemicals/channel-info-chemicals-a-z/
+# Q1 2022 - Q4 2023 range from https://www.chemanalyst.com/Pricing-data/isopropyl-alcohol-31
+# as reported:
+# min: $1.225 /kg; max: 1.662/kg; mean: $1.387/kg
+# converted to 2019$ (reported * chem_index[2019]/chem_index[2022]): 
+# min: $0.944 /kg; max: 1.281/kg; mean: $1.069/kg
+isopropanol_price = 1.387 * chem_index[2019]/chem_index[2022]
+
+acetic_acid_price = 0.38 *_lb_per_kg * _GDP_2008_to_2010 * chem_index[2019]/chem_index[2010] # average of 2008$ range ($ 0.35 - 0.41 /lb) from # https://web.archive.org/web/20161125084558/http://www.icis.com:80/chemicals/channel-info-chemicals-a-z/
 sodium_acetate_price = acetic_acid_price # unused
 
 CSL_price = 0.0339 * _lb_per_kg * chem_index[2019]/chem_index[2016] # from lactic acid paper
-amberlyst70_price = 30. #!!!
+
+# Amberlyst 70 catalyst
+### --- 2024.06.03 search
+    ## Chemicalbook listings
+        # 1. $100/100kg Amberlyst 15 from bulk vendor ("VIP, 6-year, Enterprise Certified") listing https://www.chemicalbook.com/ProductDetail_EN_451808.htm
+        # 2. $1/kg Amberlyst 15 from bulk vendor ("VIP, 5-year, Enterprise Certified") listing https://www.chemicalbook.com/ProductDetail_EN_916657.htm
+    ##
+    ## Alibaba listings # search page: https://www.alibaba.com/trade/search?spm=a2700.galleryofferlist.leftFilter.d_filter.1b624164QCx1xc&fsb=y&IndexArea=product_en&assessmentCompany=true&keywords=amberlyst&ta=y&tab=all&
+        # 3. Amberlyst-15 https://www.alibaba.com/product-detail/Ion-exchange-resin-for-MTBE-equal_62529933735.html?spm=a2700.galleryofferlist.normal_offer.d_title.22a24164j8EA7y
+            # $1.5 /L
+            # 20 kg / 25 L
+            # => $1.875 / kg
+        # 4. Amberlyst DT https://www.alibaba.com/product-detail/High-Temperature-Resistance-Catalyst-Resin-equal_62530999330.html?spm=a2700.galleryofferlist.normal_offer.d_title.22a24164j8EA7y
+            # $2000/metric ton        
+            # => $2/kg
+        # 5. Amberlyst-15: https://www.alibaba.com/product-detail/Chinese-manufacturers-Ion-exchange-resin-for_1600848354148.html?spm=a2700.galleryofferlist.normal_offer.d_title.22a24164j8EA7y
+            # $1/kg
+        # 6. Amberlyst(R) 15: https://www.alibaba.com/product-detail/purity-99-AMBERLYST-R-15-with_1600342344644.html?spm=a2700.galleryofferlist.normal_offer.d_title.22a24164j8EA7y
+            # $1/kg
+        # 7. Amberlyst(R) 15: https://www.alibaba.com/product-detail/AMBERLYST-R-15-cas-9037-24_1600993084228.html?spm=a2700.galleryofferlist.normal_offer.d_title.22a24164j8EA7y
+            # $2100/metric ton
+            # => $2.1/kg
+        # 8. Amberlyst A45: https://www.alibaba.com/product-detail/High-Temperature-Resistance-Catalyst-Resin-equal_62530910597.html?spm=a2700.galleryofferlist.normal_offer.d_title.22a24164j8EA7y
+            # $1/kg
+        # 9. Amberlyst(R) 15: https://www.alibaba.com/product-detail/99-AMBERLYST-R-15-wet-type_1600267306406.html?spm=a2700.galleryofferlist.normal_offer.d_title.22a24164j8EA7y
+            # $2/kg
+    ##
+### ---
+# Lowest = $1/kg
+# Highest = $2.1/kg
+# Mean = $1.442/kg
+amberlyst70_price = 1.442
 
 # 2.0/kg from https://www.alibaba.com/product-detail/Desiccant-for-paints-and-varnishes-Acetylacetone_10000004008185.html?spm=a2700.galleryofferlist.normal_offer.d_price.e82458eazJeqeC
 acetylacetone_price = 2.0 # 2,4-pentanedione or acetylacetone
@@ -217,10 +290,18 @@ DAP_price = 0.5*\
             (0.2275 * _GDP_2007_to_2010 * chem_index[2019]/chem_index[2010]
              +
              0.89532 * chem_index[2019]/chem_index[2011])
+
+# 390.09-789.25 USD / short ton in 2008; https://web.archive.org/web/20161125084558/http://www.icis.com:80/chemicals/channel-info-chemicals-a-z/            
+NaOH_price = ((390.09+789.25)/2.)/_kg_per_ton * _GDP_2008_to_2010 * chem_index[2019]/chem_index[2010]
+
+# 1.55 - 1.7/lb # https://web.archive.org/web/20161125084558/http://www.icis.com:80/chemicals/channel-info-chemicals-a-z/
+# => $3.42 - 3.75 /kg in 2007$, mean of $3.58/kg in 2007$
+# => $4.25 - 4.66 /kg in 2019$, mean of $4.45/kg in 2019$
+THF_price = 3.58 * _GDP_2007_to_2010 * chem_index[2019]/chem_index[2010]
+
 price = {'SA': SA_price,
          'PD': acetylacetone_price, # 2,4-pentanedione or acetylacetone
          'TCP': TCP_price,
-         'AuPd': AuPd_price,
          'IBA': IBA_price,
          'TAL': TAL_price,
          'KOH': KOH_price,
@@ -238,12 +319,14 @@ price = {'SA': SA_price,
          'Hexanol': hexanol_price,
          'Heptane': heptane_price,
          'Toluene': toluene_price,
+         'Isopropanol': isopropanol_price,
          'Acetone': acetone_price,
          'Sulfuric acid': 0.0430 * _lb_per_kg,	
          # 0.1900 is for NH3	
          'AmmoniumHydroxide': 0.1900 * _lb_per_kg * 17.031/35.046,	
          'CSL': CSL_price,
-         'Caustics': 0.2384 * _lb_per_kg * 0.5, # 50 wt% NaOH/water mixture	
+         'Caustics': NaOH_price * 0.5, # 50 wt% NaOH/water mixture	
+         'Sodium hydroxide': NaOH_price,
          'Boiler chems': 2.9772 * _lb_per_kg,	
          'Lime': lime_price,
          'Cooling tower chems': 1.7842 * _lb_per_kg,	
@@ -261,11 +344,11 @@ price = {'SA': SA_price,
          # Below currently not in use
          'Gypsum': gypsum_price,
          'Denaturant': denaturant_price,
-         'Amberlyst15': amberlyst_15_price,
          'DAP': DAP_price,
          'Activated carbon': activated_carbon_price,
          'Sodium acetate': sodium_acetate_price,
          'Acetic acid': acetic_acid_price,
+         'Tetrahydrofuran': THF_price,
          }
     
 #!!! Round all prices to 4 *decimal places*
@@ -298,7 +381,7 @@ for i in (_lps, _mps, _hps, _cooling, _chilled, _chilled_brine):
 # %%
 
 # =============================================================================
-# Characterization factors (CFs) for life cycle analysis (LCA), all from ref [5] if not noted otherwise
+# Characterization factors (CFs) for life cycle analysis (LCA), all from ref [1] if not noted otherwise
 # =============================================================================
 
 CFs = {}
@@ -309,31 +392,34 @@ CFs = {}
 GWP_CFs = {
     'CH4': 0.40, # NA NG from shale and conventional recovery
     'CSL': 1.55,
-    'DAP': 1.6354, # ecoinvent 3.8 diammonium phosphate production, RoW
+    'DAP': 1.6354, # ecoinvent 3.8 [2] diammonium phosphate production, RoW
     
     # 'Enzyme': 2.24, 
     'Ethanol': 1.44,
-    'Acetone': 2.5435, #  ecoinvent 3.8 market for acetone, liquid, RoW
+    'Acetone': 2.5435, #  ecoinvent 3.8 [2] market for acetone, liquid, RoW
     
     'H2SO4': 44.47/1e3,   
     'Lime': 1.29 * 56.0774/74.093, # CaO to Ca(OH)2
     'CaO': 1.29,
     'NaOH': 2.11,
     # 'NH4OH': 2.64 * 0.4860, # multiplied by chemicals.NH3.MW/chemicals.NH4OH.MW,   
-    # 'MEA': 3.4062, # ecoinvent 3.8 ethanolamine production, RoW [monoethanolamine]
-    'H3PO4': 1.3598, # ecoinvent 3.8 purification of wet-process phosphoric acid to industrial grade, product in 85% solution state, RoW # cradle-to-gate
-    'CO2': 0.87104, # ecoinvent 3.8 carbon dioxide production, liquid, RoW
-    'H2': 2.3716, # ecoinvent 3.8 market for hydrogen, liquid, RoW
+    # 'MEA': 3.4062, # ecoinvent 3.8 [2] ethanolamine production, RoW [monoethanolamine]
+    'H3PO4': 1.3598, # ecoinvent 3.8 [2] purification of wet-process phosphoric acid to industrial grade, product in 85% solution state, RoW # cradle-to-gate
+    'CO2': 0.87104, # ecoinvent 3.8 [2] carbon dioxide production, liquid, RoW
+    'H2': 2.3716, # ecoinvent 3.8 [2] market for hydrogen, liquid, RoW
     
-    'SodiumAcetate': 1., # !!! update
     'AceticAcid': 1.6198, # market for acetic acid, without water, in 98% solution state, GLO
+    'SodiumAcetate': 1.6198*60.05196/82.033789, # adjusted acetic acid CF 
     
     'PD': (2*(58.080)*3.5917 + 102.089*2.5435)/(2*100.117), # Acetylacetone; based on GLO/RoW IPCC 2013 CFs of markets for precursors acetone and acetyl anhydride
-    # 'DiammoniumSulfate': 1.2901, # ecoinvent 3.8 market for ammonium sulfate, RoW
-    # 'MagnesiumSulfate': 1.0411, # ecoinvent 3.8 market for magnesium sulfate, GLO
+    # 'DiammoniumSulfate': 1.2901, # ecoinvent 3.8 [2] market for ammonium sulfate, RoW
+    # 'MagnesiumSulfate': 1.0411, # ecoinvent 3.8 [2] market for magnesium sulfate, GLO
     
-    'NiSiO2':10., # !!! update
-    'Amberlyst70_':10., # !!! update
+    'NiSiO2':18.711, # ecoinvent 3.8 [2] market for nickel, class 1
+    'Amberlyst70_':1.3803, # ecoinvent 3.8 [2] market for naphthalene sulfonic acid, GLO # Amberlyst-15 is 1,2-diethenylbenzene; 2-ethenylbenzene-1-sulfonic acid
+    'Isopropanol':2.3219, # ecoinvent 3.8 [2] market for isopropanol, RoW
+    'THF': 6.0475, # ecoinvent 3.8 [2] market for tetrahydrofuran, GLO
+    'KOH': 2.63, # ecoinvent 3.8 [2] market for potassium hydroxide, GLO
     }
 
 
@@ -341,19 +427,19 @@ GWP_CFs = {
 GWP_CF_array = chems.kwarray(GWP_CFs)
 # In kg CO2-eq/kg of material
 GWP_CF_stream = tmo.Stream('GWP_CF_stream', GWP_CF_array, units='kg/hr')
-CFs['GWP_CF_stream'] = GWP_CF_stream
+# CFs['GWP_CF_stream'] = GWP_CF_stream
 
 GWP_CFs['Electricity'] = 0.4490 # kg CO2-eq/kWh GREET 2022 US Mix  # assume production==consumption, both in kg CO2-eq/kWh
 
 
-GWP_CFs['Sugarcane'] = 0.12043 * 0.3/0.286 # ecoinvent 3.8 market for sugarcane, RoW
+GWP_CFs['Sugarcane'] = 0.12043 * 0.3/0.286 # ecoinvent 3.8 [2] market for sugarcane, RoW
 # # adjusted from dry wt content of 28.6% (their assumption) to 30% (our assumption)
 
 
 # GWP_CFs['Sugarcane'] = 0.02931 # GREET 2022
 
 
-CFs['GWP_CFs'] = GWP_CFs
+CFs['GWP_100'] = GWP_CFs
 
 # =============================================================================
 # Fossil energy consumption (FEC), in MJ/kg of material
@@ -363,10 +449,10 @@ CFs['GWP_CFs'] = GWP_CFs
 FEC_CFs = {
     'CH4': 50, # NA NG from shale and conventional recovery
     'CSL': 12,
-    'DAP': 22.028, # ecoinvent 3.8 diammonium phosphate production, RoW
+    'DAP': 22.028, # ecoinvent 3.8 [2] diammonium phosphate production, RoW
     
     'Ethanol': 16,
-    'Acetone': 66.852, #  ecoinvent 3.8 market for acetone, liquid, RoW
+    'Acetone': 66.852, #  ecoinvent 3.8 [2] market for acetone, liquid, RoW
     # 'Enzyme': 26,
     
     'H2SO4': 568.98/1e3,
@@ -374,35 +460,37 @@ FEC_CFs = {
     'CaO': 4.896, 
     'NaOH': 29,
     # 'NH4OH': 42 * 0.4860, # multiplied by chemicals.NH3.MW/chemicals.NH4OH.MW,
-    # 'MEA': 67.898, # ecoinvent 3.8 ethanolamine production, RoW [monoethanolamine]
-    'H3PO4': 16.538, # ecoinvent 3.8 purification of wet-process phosphoric acid to industrial grade, product in 85% solution state, RoW # cradle-to-gate
-    'CO2': 7.4243, # ecoinvent 3.8 carbon dioxide production, liquid, RoW
-    'H2': 75.747, # ecoinvent 3.8 market for hydrogen, liquid, RoW
+    # 'MEA': 67.898, # ecoinvent 3.8 [2] ethanolamine production, RoW [monoethanolamine]
+    'H3PO4': 16.538, # ecoinvent 3.8 [2] purification of wet-process phosphoric acid to industrial grade, product in 85% solution state, RoW # cradle-to-gate
+    'CO2': 7.4243, # ecoinvent 3.8 [2] carbon dioxide production, liquid, RoW
+    'H2': 75.747, # ecoinvent 3.8 [2] market for hydrogen, liquid, RoW
 
-    'SodiumAcetate': 1., # !!! update
     'AceticAcid': 45.611, # market for acetic acid, without water, in 98% solution state, GLO
+    'SodiumAcetate': 45.611*60.05196/82.033789, # adjusted acetic acid CF 
     
     'PD': (2*(58.080)*66.852 + 102.089*70.817)/(2*100.117), # Acetylacetone; based on GLO/RoW cumulative energy demand CFs of markets for precursors acetone and acetyl anhydride
     
-    # 'DiammoniumSulfate': 15.166, # ecoinvent 3.8 market for ammonium sulfate, RoW
-    # 'MagnesiumSulfate': 13.805, # ecoinvent 3.8 market for magnesium sulfate, GLO
+    # 'DiammoniumSulfate': 15.166, # ecoinvent 3.8 [2] market for ammonium sulfate, RoW
+    # 'MagnesiumSulfate': 13.805, # ecoinvent 3.8 [2] market for magnesium sulfate, GLO
     
-    'NiSiO2':10., # !!! update
-    'Amberlyst70_':10., # !!! update
-    
+    'NiSiO2':229.44	, # ecoinvent 3.8 [2] market for nickel, class 1
+    'Amberlyst70_':31.273, # ecoinvent 3.8 [2] market for naphthalene sulfonic acid, GLO # Amberlyst-15 is 1,2-diethenylbenzene; 2-ethenylbenzene-1-sulfonic acid
+    'Isopropanol':63.878, # ecoinvent 3.8 [2] market for isopropanol, RoW
+    'THF': 101.77, # ecoinvent 3.8 [2] market for tetrahydrofuran, GLO
+    'KOH': 33.33, # ecoinvent 3.8 [2] market for potassium hydroxide, GLO
     }
 
 FEC_CF_array = chems.kwarray(FEC_CFs)
 # In MJ/kg of material
 FEC_CF_stream = tmo.Stream('FEC_CF_stream', FEC_CF_array, units='kg/hr')
 
-CFs['FEC_CF_stream'] = FEC_CF_stream
+# CFs['FEC_CF_stream'] = FEC_CF_stream
 
 FEC_CFs['Electricity'] = 5.724 # MJ/kWh # GREET 2022 US Mix #assume production==consumption, both in MJ/kWh
 
-FEC_CFs['Sugarcane'] = 	0.40192 * 0.3/0.286 # ecoinvent 3.8 market for sugarcane, RoW
+FEC_CFs['Sugarcane'] = 	0.40192 * 0.3/0.286 # ecoinvent 3.8 [2] market for sugarcane, RoW
 # # adjusted from dry wt content of 28.6% (their assumption) to 30% (our assumption)
 
 # FEC_CFs['Sugarcane'] = 	0.2265 # GREET 2022
 
-CFs['FEC_CFs'] = FEC_CFs
+CFs['FEC'] = FEC_CFs

@@ -1,9 +1,11 @@
+#!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-"""
-Created on Fri Jul 31 13:57:09 2020
-
-@author: sarangbhagwat
-"""
+# Bioindustrial-Park: BioSTEAM's Premier Biorefinery Models and Results
+# Copyright (C) 2021-, Sarang Bhagwat <sarangb2@illinois.edu>
+# 
+# This module is under the UIUC open-source license. See 
+# github.com/BioSTEAMDevelopmentGroup/biosteam/blob/master/LICENSE.txt
+# for license details.
 
 # Run this cell first
 from warnings import filterwarnings
@@ -65,15 +67,16 @@ model = models.TAL_model
 system = TAL_sys = models.TAL_sys
 
 modes = [
-            # 'A',
-            'B',
+            'A',
          ]
 
+
 parameter_distributions_filenames = [
-                                    # 'parameter-distributions_A.xlsx',
-                                    'parameter-distributions_B.xlsx',
+                                    'parameter-distributions_TAL_' + mode +'.xlsx' 
+                                    for mode in modes
                                     ]
 mode = modes[0]
+
 
 
 parameter_distributions_filename = TAL_filepath+\
@@ -114,7 +117,21 @@ def load_annual_operating_days(op_days):
 
 def load_acetylacetone_price(acetylacetone_price):
     Acetylacetone_fresh.price = acetylacetone_price
-    
+
+#%% For this analysis, accept higher volumetric flow rates than allowed by 
+### clarifier design bounds 
+from biosteam.exceptions import DesignError
+
+C201 = u.C201
+C201_design = C201._design
+
+def C201_high_vol_flow_rate_design():
+    try:
+        C201_design()
+    except DesignError as de1:
+        C201.design_results['Material'] = 'Concrete'
+C201._design =  C201_high_vol_flow_rate_design
+
 #%%  Metrics
 broth = R302.outs[1]
 # SA_price_range = [6500, 7500]
@@ -140,7 +157,7 @@ TAL_metrics = [get_product_MPSP, lambda: TAL_lca.GWP, lambda: TAL_lca.FEC,
 steps = (60, 60, 1)
 
 # Yield, titer, productivity (rate)
-spec_1 = prod_caps = np.linspace(2000., 120000., steps[0])
+spec_1 = prod_caps = np.linspace(2000., 300000., steps[0])
 spec_2 = ann_op_days = np.linspace(6, 360, steps[1])
 
 
@@ -160,7 +177,7 @@ spec_3 = PD_prices =\
 
 x_label = r"$\bfTAL$"  +" "+ r"$\bfProduction$"  +" "+ r"$\bfCapacity$" # title of the x axis
 x_units = r"$\mathrm{10}^{3}$" + " " + r"$\mathrm{metric}$" + " " + r"$\mathrm{ton}\cdot\mathrm{y}^{-1}$"
-x_ticks = [0, 20, 40, 60, 80, 100, 120]
+x_ticks = [0, 50, 100, 150, 200, 250, 300]
 
 y_label = r"$\bfAnnual$"  +" "+ r"$\bfOperating$" +" "+ r"$\bfTime$"# title of the y axis
 y_units =r"$\mathrm{d}$"
@@ -515,15 +532,27 @@ keep_frames = True
 
 print('\nCreating and saving contour plots ...\n')
 
+#%%
+comparison_production_capacities = list(theoretical_max_g_TAL_per_g_SA*np.array([
+                    23802.2/1e3,
+                    # 27296.1/1e3,
+                    34554.6/1e3,
+                    # 39352.4/1e3,
+                    72345.8/1e3,
+                    104137.4/1e3,
+                    150000/1e3,
+                    260000/1e3
+                    ]))
 
 #%% MPSP
 
 # MPSP_w_levels, MPSP_w_ticks, MPSP_cbar_ticks = get_contour_info_from_metric_data(results_metric_1, lb=3)
-MPSP_w_levels = np.arange(2, 10.25, 0.25)
-MPSP_cbar_ticks = np.arange(2, 10.1, 1.)
+MPSP_w_levels = np.arange(0, 12.25, 0.25)
+MPSP_cbar_ticks = np.arange(0, 12.1, 1.)
 MPSP_w_ticks = [
                 # 2.75, 
-                2.5, 3., 3.5, 4.5, 10.]
+                2.,
+                2.5, 3., 3.5, 4.5, 10., 12.]
 # MPSP_w_levels = np.arange(0., 15.5, 0.5)
 
 contourplots.animated_contourplot(w_data_vs_x_y_at_multiple_z=results_metric_1, # shape = z * x * y # values of the metric you want to plot on the color axis; e.g., MPSP
@@ -549,7 +578,7 @@ contourplots.animated_contourplot(w_data_vs_x_y_at_multiple_z=results_metric_1, 
                                 cmap=CABBI_green_colormap(), # can use 'viridis' or other default matplotlib colormaps
                                 cmap_over_color = colors.grey_dark.shade(8).RGBn,
                                 contourplot_facecolor = colors.grey_dark.shade(8).RGBn,
-                                text_boxes = {'>10.0': [(5,10), 'white']},
+                                text_boxes = {'>12.0': [(200,15), 'white']},
                                 extend_cmap='max',
                                 cbar_ticks=MPSP_cbar_ticks,
                                 z_marker_color='g', # default matplotlib color names
@@ -568,30 +597,25 @@ contourplots.animated_contourplot(w_data_vs_x_y_at_multiple_z=results_metric_1, 
                                 # comparison_range_hatch_pattern='////',
                                 units_on_newline = (True, True, False, False), # x,y,z,w
                                 # manual_clabels_regular = {10.: (10,50)},
-                                manual_clabels_regular = {
-                                    # MPSP_w_ticks[0]: (80,300),
-                                    # MPSP_w_ticks[1]: (50,320),
-                                    # MPSP_w_ticks[2]: (25,310),
-                                    # MPSP_w_ticks[3]: (18,300),
-                                    # MPSP_w_ticks[4]: (10,50),
+                                
+                                # manual_clabels_regular = {
+                                #     # MPSP_w_ticks[0]: (80,300),
+                                #     # MPSP_w_ticks[1]: (50,320),
+                                #     # MPSP_w_ticks[2]: (25,310),
+                                #     # MPSP_w_ticks[3]: (18,300),
+                                #     # MPSP_w_ticks[4]: (10,50),
                                     
-                                    MPSP_w_ticks[0]: (100,300),
-                                    MPSP_w_ticks[1]: (60,240),
-                                    MPSP_w_ticks[2]: (59,140),
-                                    MPSP_w_ticks[3]: (10,50),
-                                    # MPSP_w_ticks[4]: (10,50),
-                                    },
+                                #     MPSP_w_ticks[0]: (100,300),
+                                #     MPSP_w_ticks[1]: (60,240),
+                                #     MPSP_w_ticks[2]: (59,140),
+                                #     MPSP_w_ticks[3]: (10,50),
+                                #     # MPSP_w_ticks[4]: (10,50),
+                                #     },
+                                
                                 manual_clabels_comparison_range = {TAL_maximum_viable_market_range[0]:(100,70), 
                                                                    TAL_maximum_viable_market_range[1]:(60,50)},
                                 additional_points ={(13385.197/1000, 180):('D', 'w', 6)},
-                                additional_vlines=list(theoretical_max_g_TAL_per_g_SA*np.array([
-                                                    23802.2/1e3,
-                                                    # 27296.1/1e3,
-                                                    34554.6/1e3,
-                                                    # 39352.4/1e3,
-                                                    72345.8/1e3,
-                                                    104137.4/1e3,
-                                                    ])),
+                                # additional_vlines=comparison_production_capacities,
                                 additional_vline_colors='white',
                                 additional_vline_linestyles='dashed',
                                 additional_vline_linewidths=0.5,
@@ -692,10 +716,10 @@ contourplots.animated_contourplot(w_data_vs_x_y_at_multiple_z=results_metric_3, 
 
 #%% AOC
 
-AOC_w_levels, AOC_w_ticks, AOC_cbar_ticks = get_contour_info_from_metric_data(results_metric_4,)
-# AOC_w_levels = np.arange(2, 8.1, 0.2)
-AOC_w_ticks = [20, 40, 60, 80, 100, 120, 140, 160, 200]
-AOC_cbar_ticks = np.arange(0., 200.1, 20.)
+# AOC_w_levels, AOC_w_ticks, AOC_cbar_ticks = get_contour_info_from_metric_data(results_metric_4,)
+AOC_w_levels = np.arange(0., 500.1, 10.)
+AOC_w_ticks = [20, 50, 100, 150, 200, 250, 300, 400, 500]
+AOC_cbar_ticks = np.arange(0., 500.1, 50.)
 # AOC_w_levels = np.arange(0., 15.5, 0.5)
 
 contourplots.animated_contourplot(w_data_vs_x_y_at_multiple_z=results_metric_4, # shape = z * x * y # values of the metric you want to plot on the color axis; e.g., AOC
@@ -718,6 +742,8 @@ contourplots.animated_contourplot(w_data_vs_x_y_at_multiple_z=results_metric_4, 
                                 w_units=AOC_units,
                                 # fmt_clabel=lambda cvalue: r"$\mathrm{\$}$"+" {:.1f} ".format(cvalue)+r"$\cdot\mathrm{kg}^{-1}$", # format of contour labels
                                 fmt_clabel =  lambda cvalue:  get_rounded_str(cvalue, 3),
+                                # fmt_clabel =  lambda cvalue: str(round(cvalue, 1)),
+                                # fmt_clabel =  lambda cvalue: int(round(cvalue, 0)),
                                 cmap=CABBI_green_colormap(), # can use 'viridis' or other default matplotlib colormaps
                                 cmap_over_color = colors.grey_dark.shade(8).RGBn,
                                 extend_cmap='max',
@@ -733,33 +759,39 @@ contourplots.animated_contourplot(w_data_vs_x_y_at_multiple_z=results_metric_4, 
                                 default_fontsize = default_fontsize,
                                 # comparison_range=TAL_maximum_viable_market_range,
                                 n_minor_ticks = 1,
-                                cbar_n_minor_ticks = 1,
+                                cbar_n_minor_ticks = 4,
                                 # comparison_range=[AOC_w_levels[-2], AOC_w_levels[-1]],
                                 # comparison_range_hatch_pattern='////',
                                 units_on_newline = (True, True, False, False), # x,y,z,wadditional_points ={(13385.197/1000, 180):('D', 'w', 6)},
-                                additional_vlines=list(theoretical_max_g_TAL_per_g_SA*np.array([
-                                                    23802.2/1e3,
-                                                    # 27296.1/1e3,
-                                                    34554.6/1e3,
-                                                    # 39352.4/1e3,
-                                                    72345.8/1e3,
-                                                    104137.4/1e3,
-                                                    ])),
+                                
+                                manual_clabels_regular = {
+                                    20:  (10,270), 
+                                    50:  (35,270), 
+                                    100:  (60, 60), 
+                                    150:  (100,90), 
+                                    200: (140,120), 
+                                    250: (175,120), 
+                                    300: (225,150),
+                                    400: (275,100),
+                                    500: (240,45),
+                                    },
+                                
+                                # additional_vlines=comparison_production_capacities,
                                 additional_vline_colors='white',
                                 additional_vline_linestyles='dashed',
                                 additional_vline_linewidths=0.5,
                                 additional_hlines=[],
                                 additional_hline_colors=[],
                                 additional_points ={(13385.197/1000, 180):('D', 'w', 6)},
-                                text_boxes = {'>200': [(98,30), 'white']},
+                                text_boxes = {'>500': [(250,20), 'white']},
                                 )
 
 #%% TCI
 
 # TCI_w_levels, TCI_w_ticks, TCI_cbar_ticks = get_contour_info_from_metric_data(results_metric_5,)
-TCI_w_levels = np.arange(0, 2000.1, 100)
-TCI_cbar_ticks = np.arange(0, 2000.1, 200)
-TCI_w_ticks = [200, 400, 600, 800, 1000, 1500, 2000]
+TCI_w_levels = np.arange(0, 5000.1, 100)
+TCI_cbar_ticks = np.arange(0, 5000.1, 500)
+TCI_w_ticks = [200, 500, 1000, 1500, 2000, 3000, 4000, 5000]
 # TCI_w_levels = np.arange(0., 15.5, 0.5)
 
 contourplots.animated_contourplot(w_data_vs_x_y_at_multiple_z=results_metric_5, # shape = z * x * y # values of the metric you want to plot on the color axis; e.g., TCI
@@ -797,25 +829,30 @@ contourplots.animated_contourplot(w_data_vs_x_y_at_multiple_z=results_metric_5, 
                                 default_fontsize = default_fontsize,
                                 # comparison_range=TAL_maximum_viable_market_range,
                                 n_minor_ticks = 1,
-                                cbar_n_minor_ticks = 1,
+                                cbar_n_minor_ticks = 4,
                                 # comparison_range=[TCI_w_levels[-2], TCI_w_levels[-1]],
                                 # comparison_range_hatch_pattern='////',
                                 units_on_newline = (True, True, False, False), # x,y,z,wadditional_points ={(13385.197/1000, 180):('D', 'w', 6)},
-                                additional_vlines=list(theoretical_max_g_TAL_per_g_SA*np.array([
-                                                    23802.2/1e3,
-                                                    # 27296.1/1e3,
-                                                    34554.6/1e3,
-                                                    # 39352.4/1e3,
-                                                    72345.8/1e3,
-                                                    104137.4/1e3,
-                                                    ])),
+                                # additional_vlines=comparison_production_capacities,
                                 additional_vline_colors='white',
                                 additional_vline_linestyles='dashed',
                                 additional_vline_linewidths=0.5,
                                 additional_hlines=[],
                                 additional_hline_colors=[],
                                 additional_points ={(13385.197/1000, 180):('D', 'w', 6)},
-                                text_boxes = {'>2000': [(90,30), 'white']},
+                                text_boxes = {'>5000': [(235,30), 'white']},
+                                
+                                manual_clabels_regular = {
+                                    200: (25, 270),
+                                    500: (25, 115),
+                                    1000: (85, 235),
+                                    1500: (130, 190),
+                                    2000: (215, 240),
+                                    3000: (215, 150),
+                                    4000: (230, 125),
+                                    5000: (260, 90),
+                                    },
+                                
                                 )
 
 #%% Purity

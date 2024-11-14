@@ -49,7 +49,7 @@ from warnings import warn
 from flexsolve import aitken_secant
 from biosteam import Unit
 from biosteam.units import Flash, HXutility, Mixer, MixTank, Pump, \
-    SolidsSeparator, StorageTank, LiquidsSplitSettler, Compressor
+    SolidsSeparator, StorageTank, LiquidsSplitSettler, Compressor, StirredTankReactor
 from biosteam.units.decorators import cost
 from thermosteam import Stream, MultiStream
 from biorefineries.succinic.process_settings import price
@@ -110,8 +110,8 @@ class SulfuricAcidAdditionTank(Unit):
     # Bseline is (18+4.1) mg/g dry biomass as in Humbird et al., 93% purity
     acid_loading = 22.1
 
-    def __init__(self, ID='', ins=None, outs=(), *, feedstock_dry_mass):
-        Unit.__init__(self, ID, ins, outs)
+    def _init(self, feedstock_dry_mass):
+        
         self.feedstock_dry_mass = feedstock_dry_mass
 
     def _run(self):
@@ -173,8 +173,8 @@ class SteamMixer(Unit):
     _N_ins = 2
     _N_outs = 1
     
-    def __init__(self, ID='', ins=None, outs=(), *, P):
-        Unit.__init__(self, ID, ins, outs)
+    def _init(self, P):
+        
         self.P = P
         
     @staticmethod
@@ -204,8 +204,8 @@ class PretreatmentReactorSystem(Unit):
     _N_outs = 2
     _graphics = Flash._graphics
     
-    def __init__(self, ID='', ins=None, outs=(), T=130+273.15):
-        Unit.__init__(self, ID, ins, outs)
+    def _init(self, ID='', ins=None, outs=(), T=130+273.15):
+        
         self._multistream = MultiStream(None)
         self.T = T
         vapor, liquid = self.outs
@@ -393,8 +393,8 @@ class Saccharification(Unit):
     
     # CSL_loading = 10 # kg/m3
     
-    def __init__(self, ID='', ins=None, outs=(), T=50+273.15):
-        Unit.__init__(self, ID, ins, outs)
+    def _init(self, ID='', ins=None, outs=(), T=50+273.15):
+        
         self.T = T
         
         # Based on Table 9 on Page 28 of Humbird et al.
@@ -460,7 +460,7 @@ class Saccharification(Unit):
 @cost(basis='Broth flow rate', ID='Surge tank pump', units='kg/hr',
       kW=93.2125, cost=26800, S=488719, CE=CEPCI[2009], n=0.8, BM=2.3)
 
-class CoFermentation(Reactor):
+class CoFermentation(StirredTankReactor):
     _N_ins = 9
     _N_outs = 2
     _units= {
@@ -504,14 +504,16 @@ class CoFermentation(Reactor):
     
     air_pressure = 3e7 # Pa
     
-    def __init__(self, ID='', ins=None, outs=(), thermo=None, *, T=30+273.15,
+    def _init(self, ID='', ins=None, outs=(), thermo=None, *, T=30+273.15,
                  P=101325, V_wf=0.4, length_to_diameter=0.6,
                  
                  kW_per_m3=0.02 * 0.7457 / 0.075, # including non-working volume # 0.02 HP for IBRL 75 L reactor
                  
                  mixing_intensity=None,
                  
-                 wall_thickness_factor=1,
+                 # wall_thickness_factor=1,
+                 
+                 
                  vessel_material='Stainless steel 316',
                  vessel_type='Vertical',
                  neutralization=True,
@@ -519,19 +521,25 @@ class CoFermentation(Reactor):
                  mode='batch', feed_freq=1,
                  pH_control=True,
                  base_neutralizes_product=True,
+                 tau=120, # initial value; updated by spec.load_productivity
                  # allow_dilution=False,
                  # allow_concentration=False,
                  # sugars=None,
                  ):
 
-        Unit.__init__(self, ID, ins, outs)
+        StirredTankReactor._init(self, P=P, tau=tau, V_wf=V_wf,
+        length_to_diameter=length_to_diameter, kW_per_m3=kW_per_m3,
+        # wall_thickness_factor=wall_thickness_factor,
+        vessel_material=vessel_material,
+        vessel_type=vessel_type)
+        
         self.T = T
         self.P = P
         self.V_wf = V_wf
         self.length_to_diameter = length_to_diameter
         self.mixing_intensity = mixing_intensity
         self.kW_per_m3 = kW_per_m3
-        self.wall_thickness_factor = wall_thickness_factor
+        # self.wall_thickness_factor = wall_thickness_factor
         self.vessel_material = vessel_material
         self.vessel_type = vessel_type
         self.neutralization = neutralization
@@ -659,15 +667,19 @@ class CoFermentation(Reactor):
         #     breakpoint()
         # self.fructose_to_glucose_rxns(effluent.mol)
         
-        self.CO2_required = CO2_required = (2 * self.glucose_to_succinic_acid_rxn.X * effluent.imol['Glucose']\
+        self.fresh_CO2_required = fresh_CO2_required = (2 * self.glucose_to_succinic_acid_rxn.X * effluent.imol['Glucose']\
             + 1.667 * self.xylose_to_succinic_acid_rxn.X * effluent.imol['Xylose'])\
             * self.CO2_safety_factor\
             - recycled_CO2.imol['CO2']
             
         
-        CO2.imol['CO2'] = max(0, CO2_required)
+        CO2.imol['CO2'] = max(0, fresh_CO2_required)
             
         effluent.mix_from([effluent, CO2, recycled_CO2])
+        
+        # # initially add excess CO2
+        # effluent.imol['CO2'] += (fresh_CO2_required + recycled_CO2.imol['CO2'])
+        
         # ss = Stream(None)
         # effluent.copy_like(feed)
         effluent.T = vapor.T = self.T
@@ -687,6 +699,9 @@ class CoFermentation(Reactor):
         effluent.imol['CO2'] = 0
         effluent.imol['O2'] = 0
         effluent.imass['CSL'] = 0
+        
+        # # remove excess CO2
+        # effluent.imol['CO2'] -= (fresh_CO2_required + recycled_CO2.imol['CO2'])
         
         base.empty()
         if self.neutralization:
@@ -923,8 +938,8 @@ class SeedTrain(Unit):
     
     # ferm_ratio is the ratio of conversion relative to the fermenter
     
-    def __init__(self, ID='', ins=None, outs=(), T=30+273.15, ferm_ratio=0.9):
-        Unit.__init__(self, ID, ins, outs)
+    def _init(self, ID='', ins=None, outs=(), T=30+273.15, ferm_ratio=0.9):
+        
         self.T = T
         self.ferm_ratio = ferm_ratio
         self.sucrose_hydrolysis_rxns = ParallelRxn([
@@ -1159,14 +1174,14 @@ class Reactor(Unit, PressureVessel, isabstract=True):
     # converted from ft3 to m3
     _V_max = pi/4*(20**2)*40/35.3147 
     
-    def __init__(self, ID='', ins=None, outs=(), *, 
+    def _init(self, 
                   P=101325, tau=0.5, V_wf=0.8,
                   length_to_diameter=2, kW_per_m3=0.985,
                   wall_thickness_factor=1,
                   vessel_material='Stainless steel 316',
                   vessel_type='Vertical'):
         
-        Unit.__init__(self, ID, ins, outs)
+        
         self.P = P
         self.tau = tau
         self.V_wf = V_wf
@@ -1284,8 +1299,8 @@ class Decantation(Unit):
         'Volume': 'm3',
         }
 
-    def __init__(self, ID='', ins=None, outs=(), forced_recovery=None, T=293.15):
-        Unit.__init__(self, ID, ins, outs)
+    def _init(self, ID='', ins=None, outs=(), forced_recovery=None, T=293.15):
+        
         self.forced_recovery = forced_recovery
         self.T = T
         
@@ -1443,7 +1458,7 @@ class GypsumFilter(SolidsSeparator):
 #     reactives = ('LacticAcid', 'Ethanol', 'H2O', 'EthylLactate',
 #                  'AceticAcid', 'EthylAcetate', 'SuccinicAcid', 'EthylSuccinate')
     
-#     def __init__(self, ID='', ins=None, outs=(), thermo=None, *, 
+#     def _init(self, ID='', ins=None, outs=(), thermo=None, *, 
 #                  T=351.15, P=101325, tau=None, tau_max=15, 
 #                  V_wf=0.8, length_to_diameter=2, kW_per_m3=0.985,
 #                  X1=None, X2=None, assumeX2equalsX1=True, allow_higher_T=False,
@@ -1451,7 +1466,7 @@ class GypsumFilter(SolidsSeparator):
 #                  vessel_material='Stainless steel 316',
 #                  vessel_type='Vertical'):
         
-#         Unit.__init__(self, ID, ins, outs)
+#         
         
 #         self.T = T
 #         self.P = P
@@ -1732,8 +1747,8 @@ class AnaerobicDigestion(Unit):
     _N_ins = 1	
     _N_outs = 3
     
-    def __init__(self, ID='', ins=None, outs=(), *, reactants, split=(), T=35+273.15):	
-        Unit.__init__(self, ID, ins, outs)	
+    def _init(self, reactants, split=(), T=35+273.15):	
+        	
         self.reactants = reactants	
         self.split = split	
         self.multi_stream = MultiStream(None)
@@ -1782,7 +1797,7 @@ class AnaerobicDigestion(Unit):
         self.heat_exchanger.simulate_as_auxiliary_exchanger(duty, wastewater)
         
 # class SuccinicAcidLiquidsSplitSettler():
-#     def __init__(self, ID='', ins=None, outs=(), *, part_coeffs = [], solvents = (), split = []):
+#     def _init(self, part_coeffs = [], solvents = (), split = []):
 #         self.part_coeffs = part_coeffs
         
 #     def run(self):
@@ -1820,8 +1835,8 @@ class AerobicDigestion(Unit):
     # streams 622, 630, 611, 632, 621, and 616  in Humbird et al.
     evaporation = 4350/(4379+356069+2252+2151522+109089)
     
-    def __init__(self, ID='', ins=None, outs=(), *, reactants, ratio=0):
-        Unit.__init__(self, ID, ins, outs)
+    def _init(self, reactants, ratio=0):
+        
         self.reactants = reactants
         self.ratio = ratio
         chems = self.chemicals
@@ -1977,9 +1992,9 @@ class SuccinicAcid_Separation(Unit):
 class SuccinicAcidCrystallizer(BatchCrystallizer):
     
     _SA_vol_per_mass = 0.0008252419812169215
-    def __init__(self, ID='', ins=None, outs=(), 
+    def _init(self, ID='', ins=None, outs=(), 
                  target_recovery=0.6,
-                 thermo=None,
+                 # thermo=None,
                  tau=6, N=None, V=None, T=305.15,
                  basis='water solubility',
                  output_dissolved_concentration_function=None,
@@ -1990,7 +2005,8 @@ class SuccinicAcidCrystallizer(BatchCrystallizer):
                  output_conc_multiplier=1.,
                  kW=0.00746):
         
-        BatchCrystallizer.__init__(self, ID, ins, outs, thermo,
+        BatchCrystallizer._init(self,
+                                # thermo,
                      tau, N, V, T,
                      Nmin, Nmax, vessel_material,
                      kW)

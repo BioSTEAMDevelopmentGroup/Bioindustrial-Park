@@ -1,0 +1,24 @@
+# python 3.9
+# biosteam commit e2d3942dd1076a4516efc91ae194f9e558428551
+thermosteam==0.42.2
+contourplots==0.3.4
+numpy==1.26.4
+pyglet==2.0.15
+pint==0.23
+scipy==1.13.1
+thermo==0.2.27
+colorpalette==0.3.3
+pandas==2.2.2
+matplotlib==3.5.2
+xlrd==2.0.1
+openpyxl==3.1.2
+free_properties==0.3.6
+flexsolve==0.5.7
+numba==0.59.1
+graphviz==0.20.3
+chaospy==4.3.15
+pyyaml==6.0.1
+# In your command prompt, simply navigate to the folder 
+# that this file (requirements.txt) is in, 
+# and run the following command:
+# pip install -r requirements.txt
