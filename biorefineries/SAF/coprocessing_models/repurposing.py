@@ -7,6 +7,7 @@ Created on Wed Jan 17 13:57:09 2024
 """
 
 import numpy as np
+import pandas as pd
 from chaospy import distributions as shape
 import biosteam as bst
 from biosteam.evaluation import Model, Metric
@@ -26,53 +27,8 @@ _kJpersec_to_kJhr = 3600
 __all__ = ('create_model')
 
 #%%
-
 sys = SAF_sys(material_storage=False, product_storage=False, WWTC=False, BoilerTurbo=False, hydrogenation_distillation=False,h2_purchase=False,opportunity_cost=True)
 
-# @sys.add_bounded_numerical_specification(x0=0, x1=0.3, xtol=1e-4, ytol=100)
-# def adjust_bagasse_to_boiler(fraction_burned):
-#     F.S102.split[:] = 1 - fraction_burned
-#     sys.simulate()
-#     excess = F.BT._excess_electricity_without_natural_gas
-#     if fraction_burned == 0 and excess > 0:
-#         return 0
-#     elif fraction_burned == 0.3 and excess < 0:
-#         return 0
-#     else:
-#         return excess
-
-BT_sys = bst.System('BT_sys', path=(F.BT,))
-
-preprocessing = bst.UnitGroup('Preprocessing_group', units = [i for i in sys.units if i.ID[1]=='1'])
-                                          
-pretreatment = bst.UnitGroup('Pretreatment_group', units = [i for i in sys.units if i.ID[1]=='2'])
-                                          
-fermentation = bst.UnitGroup('Fermentation_group', units = [i for i in sys.units if i.ID[1]=='3'])
-                                          
-upgrading = bst.UnitGroup('Upgrading_group', units = [i for i in sys.units if i.ID[1]=='4'])
-                                          
-wastewater_treatment = bst.UnitGroup('WWT_group', units = (F.WWT,))
-
-heat_exchange_network = bst.UnitGroup('HXN_group', units = (F.HXN,))
-
-boiler_turbogenerator = bst.UnitGroup('BT_group', units = (F.BT,)) 
-
-cooling_tower = bst.UnitGroup('CT_group', units = (F.CT,)) 
-
-facilities_no_hu = bst.UnitGroup('Facilities_no_hu_group', units = (F.CIP,)) 
-
-
-process_groups = [preprocessing, pretreatment, fermentation, upgrading,
-                  wastewater_treatment, 
-                  heat_exchange_network, 
-                  boiler_turbogenerator,
-                  cooling_tower, facilities_no_hu]
-
-process_groups_dict = {}
-for i in range(len(process_groups)):
-    group = process_groups[i]
-    process_groups_dict[group.name] = group    
-       
 load_preferences_and_process_settings(T='K',
                                       flow_units='kg/hr',
                                       N=100,
@@ -134,49 +90,52 @@ set_prices = set_price_of_streams()
 set_GWP = set_GWP_of_streams(indicator='GWP100')
 
 
-# For simplification 
-feedstock = F.feedstock
-ethanol_to_upgrading = F.ethanol_to_upgrading
-ethanol_to_sold = F.ethanol_to_sold
-jet_fuel = F.jet_fuel
-diesel = F.diesel
-gasoline = F.gasoline
-
-
-natural_gas = F.natural_gas
-BT = F.BT
-HXN = F.HXN
-
-get_annual_factor = lambda: tea_SAF.operating_days * 24
-
 ##### Functions to calculate all the metrics #####
 
 # 1. Product characteristics
+get_annual_factor = lambda: tea_SAF.operating_days * 24
 
 get_coprocessing_ratio = lambda: F.R404.ins[0].F_vol * 24 / 5595 # in m3; 5595 is capacity of diesel hydrotreater in PR 
 
-get_ethanol_yield = lambda: F.ethanol_to_upgrading.F_vol * _gal_per_m3 * get_annual_factor() / 1e6 # in MMGal (million gallon)
-get_jet_yield = lambda:  jet_fuel.F_vol * _gal_per_m3 * get_annual_factor() / 1e6
-get_diesel_yield = lambda:  diesel.F_vol * _gal_per_m3 * get_annual_factor() / 1e6
-get_gasoline_yield = lambda:  gasoline.F_vol * _gal_per_m3 * get_annual_factor() / 1e6
+get_ethanol_yield = lambda: F.ethanol_total.F_vol * _gal_per_m3 * get_annual_factor() / 1e6 # in MMGal (million gallon)
+get_feedstock_to_ethanol_conversion = lambda: F.ethanol_total.F_vol * _gal_per_m3 / (F.feedstock.F_mass * 0.8 / 1000) # gal/dry ton
+
+get_jet_yield = lambda:  F.jet_fuel.F_vol * _gal_per_m3 * get_annual_factor() / 1e6
+get_diesel_yield = lambda:  F.diesel.F_vol * _gal_per_m3 * get_annual_factor() / 1e6
+get_gasoline_yield = lambda:  F.gasoline.F_vol * _gal_per_m3 * get_annual_factor() / 1e6
 get_total_yield = lambda:  get_jet_yield() + get_diesel_yield() + get_gasoline_yield()
 get_jet_vol_ratio = lambda:  get_jet_yield() / get_total_yield() * 100
-get_jet_to_eth_ratio = lambda:  get_jet_yield() / get_ethanol_yield() * 100
 
-get_ethanol_energy = lambda:  F.ethanol_to_upgrading.LHV * _GGE_per_J * get_annual_factor() / 1000 # in MM GGE
-get_jet_energy = lambda:  jet_fuel.LHV * _GGE_per_J * get_annual_factor() / 1000
-get_diesel_energy = lambda:  diesel.LHV * _GGE_per_J * get_annual_factor() / 1000
-get_gasoline_energy = lambda:  gasoline.LHV * _GGE_per_J * get_annual_factor() / 1000
+get_ethanol_energy = lambda:  F.ethanol_total.LHV * _GGE_per_J * get_annual_factor() / 1000 # in MM GGE
+get_jet_energy = lambda:  F.jet_fuel.LHV * _GGE_per_J * get_annual_factor() / 1000
+get_diesel_energy = lambda:  F.diesel.LHV * _GGE_per_J * get_annual_factor() / 1000
+get_gasoline_energy = lambda: F.gasoline.LHV * _GGE_per_J * get_annual_factor() / 1000
 get_total_energy = lambda:  get_jet_energy() + get_diesel_energy() + get_gasoline_energy()
-get_total_energy_2 = lambda: get_jet_energy() + get_diesel_energy() + get_gasoline_energy() + get_excess_power() * 3600000 * _GGE_per_J / 1000 # including eletricity credit
 
-get_jet_energy_ratio = lambda: get_jet_energy() / get_total_energy()
-get_jet_energy_ratio_2 = lambda: get_jet_energy() / get_total_energy_2() 
-# get_diesel_energy_ratio = lambda: get_diesel_energy() / get_total_energy()
-# get_gasoline_energy_ratio = lambda: get_gasoline_energy() / get_total_energy()
+get_jet_energy_ratio = lambda: get_jet_energy()/ get_total_energy()
+get_diesel_energy_ratio = lambda: get_diesel_energy() / get_total_energy()
+get_gasoline_energy_ratio = lambda: get_gasoline_energy() / get_total_energy()
+
+get_eth_to_jet_volume_ratio = lambda:  get_jet_yield() / get_ethanol_yield() * 100
+get_eth_to_jet_energy_ratio = lambda: get_jet_energy() / get_ethanol_energy() * 100
+get_feedstock_to_jet_conversion = lambda: F.jet_fuel.F_vol * _gal_per_m3 / (F.feedstock.F_mass * 0.8 / 1000) # gal/dry ton
+
 
 
 # 2. TEA
+get_MPSP = lambda: tea_SAF.solve_price(F.jet_fuel)  # $/kg
+
+_jet_price_conversion_index_vol = lambda: _L_per_gal * F.jet_fuel.rho / 1000 # from $/kg to $/gal
+_jet_price_conversion_index_energy = lambda: F.jet_fuel.F_mass / F.jet_fuel.LHV * 1000000 # from $/kg to $/GJ
+
+get_MPSP_per_gallon = lambda: get_MPSP() * _jet_price_conversion_index_vol()
+get_jet_price_per_GJ = lambda: get_MPSP() * _jet_price_conversion_index_energy()
+
+kerosene_price_per_GJ = 2.95/0.1899  # price is $2.95/gal (2022-202405 average) from https://www.eia.gov/dnav/pet/hist/LeafHandler.ashx?n=PET&s=EER_EPJK_PF4_RGC_DPG&f=M; LHV of jet-kerosene is 5.670 million Btu per barrel = 0.189910053 GJ/gallon from https://www.eia.gov/totalenergy/data/monthly/pdf/sec12.pdf
+    
+get_NPV = lambda: tea_SAF.NPV
+solve_IRR = lambda: tea_SAF.solve_IRR()
+get_annual_sale = lambda: tea_SAF.sales / 1e6
 
 get_installed_cost = lambda: tea_SAF.installed_equipment_cost / 1e6
 get_installed_cost_OSBL = lambda: sum(i.installed_cost for i in tea_SAF.OSBL_units) / 1e6
@@ -188,23 +147,26 @@ get_TCI = lambda: tea_SAF.TCI / 1e6
 get_FOC = lambda: tea_SAF.FOC / 1e6
 get_VOC = lambda: tea_SAF.VOC / 1e6
 get_AOC = lambda: tea_SAF.AOC / 1e6 # Excludes electricity credit
+get_cost_service_facilities = lambda: tea_SAF._service_facilites_installed_cost(tea_SAF.installed_equipment_cost) / 1e6 
+get_cost_buildings = lambda: tea_SAF._building_cost(tea_SAF.purchase_cost) / 1e6 
+get_cost_yard_work = lambda: tea_SAF._yard_works(tea_SAF.installed_equipment_cost) / 1e6 
+get_cost_land = lambda: tea_SAF._land(tea_SAF.installed_equipment_cost) / 1e6 
+get_cost_piping = lambda: tea_SAF._ISBL_DPI(tea_SAF.installed_equipment_cost) / 1e6 *tea_SAF.additional_piping
+get_cost_other_indirect = lambda: tea_SAF._engineering_supervision_construction_contractor_legal_costs(tea_SAF.installed_equipment_cost) / 1e6 
+get_cost_contingency = lambda: tea_SAF._contingency(tea_SAF.installed_equipment_cost) / 1e6 
+get_cost_working_capital = lambda: tea_SAF.FCI * 0.05 / 1e6 
 
-get_MPSP = lambda: tea_SAF.solve_price(F.jet_fuel)  # $/kg
+get_material_cost = lambda: tea_SAF.material_cost / 1e6 #  Excludes electricity credit but includes the money spent on ash disposal
+get_cost_feedstock = lambda: F.feedstock.price * F.feedstock.F_mass * sys.operating_hours / 1e6
+get_cost_enzyme = lambda: F.enzyme_M301.price * F.enzyme_M301.F_mass * sys.operating_hours / 1e6
+get_cost_caustic = lambda: F.NaOH.price * (F.NaOH.F_mass + F.caustic.F_mass) * sys.operating_hours / 1e6
+get_cost_natural_gas = lambda: F.natural_gas.price * (F.natural_gas.F_mass + F.natural_gas_for_h2.F_mass) * sys.operating_hours / 1e6
+get_cost_makeup_water = lambda: F.system_makeup_water.price * F.system_makeup_water.F_mass * sys.operating_hours / 1e6 
+get_cost_hydrogen = lambda: F.hydrogen.price * F.hydrogen.F_mass * sys.operating_hours / 1e6
+get_cost_Syndol = lambda: F.Syndol_catalyst.price * F.Syndol_catalyst.F_mass * sys.operating_hours / 1e6
+get_cost_other_materials = lambda: get_material_cost() - get_cost_feedstock() - get_cost_enzyme() - get_cost_caustic() - get_cost_natural_gas()-\
+                                   get_cost_makeup_water() - get_cost_hydrogen() - get_cost_Syndol()
 
-_jet_price_conversion_index_vol = lambda: _L_per_gal * jet_fuel.rho / 1000 # from $/kg to $/gal
-_jet_price_conversion_index_energy = lambda: jet_fuel.F_mass / jet_fuel.LHV * 1000000 # from $/kg to $/GJ
-
-get_MPSP_per_gallon = lambda: get_MPSP() * _jet_price_conversion_index_vol()
-
-get_jet_price_per_GJ = lambda: get_MPSP() * _jet_price_conversion_index_energy()
-
-kerosene_price_per_GJ = 2.95/0.1899  # price is $2.95/gal (2022-202405 average) from https://www.eia.gov/dnav/pet/hist/LeafHandler.ashx?n=PET&s=EER_EPJK_PF4_RGC_DPG&f=M; LHV of jet-kerosene is 5.670 million Btu per barrel = 0.189910053 GJ/gallon from https://www.eia.gov/totalenergy/data/monthly/pdf/sec12.pdf
-    
-get_NPV = lambda: tea_SAF.NPV
-solve_IRR = lambda: tea_SAF.solve_IRR()
-
-get_material_cost = lambda: tea_SAF.material_cost / 1e6 #  Excludes electricity credit but includes the money spent on ash disposal 
-get_annual_sale = lambda: tea_SAF.sales / 1e6
 
 # Electricity 
 # BT.power_utility.production - BT.power_utility.consumption = -BT.power_utility.rate
@@ -213,12 +175,24 @@ get_excess_power = lambda: -sum(i.power_utility.rate for i in sys.units) * sys.o
 electricity_price = price['electricity']
 get_electricity_credit = lambda: get_excess_power() * electricity_price / 1e6
 
-# In per gal of jet
-get_cost_electricity_credit = lambda: get_excess_power() * electricity_price / jet_fuel_gal_per_year()
 
 
-
-metrics = [Metric('Coprocessing ratio', get_coprocessing_ratio, ''),
+metrics = [Metric('Coprocessing ratio', get_coprocessing_ratio, '100%'),
+           Metric('Ethanol yield', get_ethanol_yield, '10^6 Gal/yr'),
+           Metric('Ethanol conversion from feedstock', get_feedstock_to_ethanol_conversion, 'gal/dry ton'),
+           
+           Metric('Jet volume yield', get_jet_yield, '10^6 Gal/yr'),
+           Metric('Total volume yield', get_total_yield, '10^6 Gal/yr'),
+           Metric('Jet volume ratio', get_jet_vol_ratio, '%'),
+           Metric('Jet energy ratio', get_jet_energy_ratio, '%'),
+           Metric('Jet conversion from ethanol volume', get_eth_to_jet_volume_ratio, '%'), 
+           Metric('Jet conversion from ethanol energy', get_eth_to_jet_energy_ratio, '%'),
+           Metric('Jet conversion from feedstock', get_feedstock_to_jet_conversion, 'gal/dry ton'),
+           
+           Metric('Annual product sale', get_annual_sale, '10^6 $/yr'),
+           
+           Metric('Minimum selling price', get_MPSP_per_gallon, '$/gal'),
+           Metric('Price in energy', get_jet_price_per_GJ, '$/GJ'),
            Metric('Installed cost', get_installed_cost, '10^6 $'),
            Metric('Installed cost OSBL', get_installed_cost_OSBL, '10^6 $'),
            Metric('Installed cost ISBL', get_installed_cost_ISBL, '10^6 $'),
@@ -229,235 +203,283 @@ metrics = [Metric('Coprocessing ratio', get_coprocessing_ratio, ''),
            Metric('FOC', get_FOC, '10^6 $/yr'),
            Metric('VOC', get_VOC, '10^6 $/yr'),
            Metric('AOC', get_AOC, '10^6 $/yr'),
-           
-           Metric('Minimum selling price', get_MPSP_per_gallon, '$/gal'),
-           Metric('Jet volume yield', get_jet_yield, '10^6 Gal/yr'),
-           Metric('Total volume yield', get_total_yield, '10^6 Gal/yr'),
-           Metric('Jet volume ratio', get_jet_vol_ratio, '%'),
-           Metric('Jet energy ratio', get_jet_energy_ratio, '%'),
-           Metric('Jet volume ratio to ethanol', get_jet_to_eth_ratio, '%'),
+           Metric('Cost service facilities', get_cost_service_facilities, '10^6 $'),
+           Metric('Cost buildings', get_cost_buildings, '10^6 $'),
+           Metric('Cost yard work', get_cost_yard_work, '10^6 $'),
+           Metric('Cost land', get_cost_land, '10^6 $'),
+           Metric('Cost piping', get_cost_piping, '10^6 $'),
+           Metric('Cost other indirect', get_cost_other_indirect, '10^6 $'),
+           Metric('Cost contingency', get_cost_contingency, '10^6 $'),
+           Metric('Cost WC', get_cost_working_capital, '10^6 $'),
            
            Metric('Annual material cost', get_material_cost, '10^6 $/yr'),
-           Metric('Annual product sale', get_annual_sale, '10^6 $/yr'),
-           Metric('Annual electricity credit', get_electricity_credit, '10^6 $/yr'),
-           Metric('Electricity credit to jet', get_cost_electricity_credit, '$/gal'),]
+           Metric('Cost feedstock', get_cost_feedstock, '10^6 $/yr'),
+           Metric('Cost enzyme', get_cost_enzyme, '10^6 $/yr'),
+           Metric('Cost caustic', get_cost_caustic, '10^6 $/yr'),
+           Metric('Cost NG', get_cost_natural_gas, '10^6 $/yr'),
+           Metric('Cost makeup water', get_cost_makeup_water, '10^6 $/yr'),
+           Metric('Cost hydrogen', get_cost_hydrogen, '10^6 $/yr'),
+           Metric('Cost syndol', get_cost_Syndol, '10^6 $/yr'),
+           Metric('Cost other materials', get_cost_other_materials, '10^6 $/yr'),
+           
+           Metric('Annual electricity credit', get_electricity_credit, '10^6 $/yr'),]
+           
 
+preprocessing = bst.UnitGroup('Preprocessing_group', units = [i for i in F.preprocessing_sys.units])
+                                          
+pretreatment = bst.UnitGroup('Pretreatment_group', units = [i for i in F.pretreatment_sys.units])
+                                          
+fermentation = bst.UnitGroup('Fermentation_group', units = [i for i in F.fermentation_sys.units if i!= F.DAP_storage and i!= F.CSL_storage\
+                                                            and i!= F.ethanol_storage])
+                                          
+upgrading = bst.UnitGroup('Upgrading_group', units = [i for i in F.upgrading_sys.units if i!= F.jet_storage and i!= F.diesel_storage\
+                                                      and i!= F.gasoline_storage])
+                                          
+wastewater_treatment = bst.UnitGroup('WWT_group', units = (F.WWT,))
 
+# heat_exchange_network = bst.UnitGroup('HXN_group', units = (F.HXN,))
 
+boiler_turbogenerator = bst.UnitGroup('BT_group', units = (F.BT,)) 
 
+cooling_tower = bst.UnitGroup('CT_group', units = (F.CT,)) 
+
+facilities_no_hu_group = bst.UnitGroup('Facilities_no_hu_group', units = (F.CIP, F.CWP, F.PWC))
+                                                                          
+storage = bst.UnitGroup('Storage_group', units = (F.CSL_storage, F.DAP_storage,\
+                                                  F.ethanol_storage,\
+                                                  F.jet_storage, F.gasoline_storage,\
+                                                  F.diesel_storage))
+
+process_groups = [preprocessing, pretreatment, fermentation, upgrading,\
+                  wastewater_treatment,\
+                  # heat_exchange_network, 
+                  boiler_turbogenerator,\
+                  cooling_tower, facilities_no_hu_group, storage]
+
+process_groups_dict = {}
+for i in range(len(process_groups)):
+    group = process_groups[i]
+    process_groups_dict[group.name] = group
 
 # # Breakdowns by process groups
 # # index in per gallon jet fuel
-jet_fuel_gal_per_hr = lambda: jet_fuel.F_vol * _gal_per_m3
+jet_fuel_gal_per_hr = lambda: F.jet_fuel.F_vol * _gal_per_m3
 jet_fuel_gal_per_year = lambda: jet_fuel_gal_per_hr() * sys.operating_hours
 
-# def get_group_heating_demand(group):
-#     return sum([sum([hu.duty for hu in unit.heat_utilities if hu.duty>0 and hu.flow>0.]) for unit in group.units])
-# def get_group_cooling_demand(group):
-#     return sum([sum([hu.duty for hu in unit.heat_utilities if hu.duty<0 and hu.flow>0.]) for unit in group.units])
+def get_group_heating_demand(group):
+    return sum([sum([hu.duty for hu in unit.heat_utilities if hu.duty>0 and hu.flow>0.]) for unit in group.units])
+def get_group_cooling_demand(group):
+    return sum([sum([hu.duty for hu in unit.heat_utilities if hu.duty<0 and hu.flow>0.]) for unit in group.units])
 
-# # Heating duty in (kJ/hr)/1000/(gal/hr)=MJ/gal
-# metrics.extend((Metric('Total heating demand', 
-#                       lambda: 0.001*sum([sum([hu.duty for hu in unit.heat_utilities \
-#                                               if hu.duty>0 and hu.flow>0.]) for unit in \
-#                                          sys.units])/jet_fuel_gal_per_hr(),
-#                       'MJ/gal'),))
-# metrics.extend((Metric('Preprocessing_group-heating demand', 
-#                       lambda: 0.001*sum([sum([hu.duty for hu in unit.heat_utilities \
-#                                               if hu.duty>0 and hu.flow>0.]) for unit in \
-#                                          process_groups_dict['Preprocessing_group'].units])/jet_fuel_gal_per_hr(),
-#                       'MJ/gal'),))
-# metrics.extend((Metric('Pretreatment_group-heating demand', 
-#                       lambda: 0.001*sum([sum([hu.duty for hu in unit.heat_utilities \
-#                                               if hu.duty>0 and hu.flow>0.]) for unit in \
-#                                          process_groups_dict['Pretreatment_group'].units])/jet_fuel_gal_per_hr(),
-#                       'MJ/gal'),))
-# metrics.extend((Metric('Fermentation_group-heating demand', 
-#                       lambda: 0.001*sum([sum([hu.duty for hu in unit.heat_utilities \
-#                                               if hu.duty>0 and hu.flow>0.]) for unit in \
-#                                          process_groups_dict['Fermentation_group'].units])/jet_fuel_gal_per_hr(),
-#                       'MJ/gal'),))
-# metrics.extend((Metric('Upgrading_group-heating demand', 
-#                       lambda: 0.001*sum([sum([hu.duty for hu in unit.heat_utilities \
-#                                               if hu.duty>0 and hu.flow>0.]) for unit in \
-#                                          process_groups_dict['Upgrading_group'].units])/jet_fuel_gal_per_hr(),
-#                       'MJ/gal'),))
-# metrics.extend((Metric('WWT_group-heating demand', 
-#                       lambda: 0.001*sum([sum([hu.duty for hu in unit.heat_utilities \
-#                                               if hu.duty>0 and hu.flow>0.]) for unit in \
-#                                          process_groups_dict['WWT_group'].units])/jet_fuel_gal_per_hr(),
-#                       'MJ/gal'),))
+# Heating duty in (kJ/hr)/1000/(gal/hr)=MJ/gal
+metrics.extend((Metric('Total heating demand', 
+                      lambda: 0.001*sum([sum([hu.duty for hu in unit.heat_utilities \
+                                              if hu.duty>0 and hu.flow>0.]) for unit in \
+                                          sys.units])/jet_fuel_gal_per_hr(),
+                      'MJ/gal'),))
+metrics.extend((Metric('Preprocessing_group-heating demand', 
+                      lambda: 0.001*sum([sum([hu.duty for hu in unit.heat_utilities \
+                                              if hu.duty>0 and hu.flow>0.]) for unit in \
+                                          process_groups_dict['Preprocessing_group'].units])/jet_fuel_gal_per_hr(),
+                      'MJ/gal'),))
+metrics.extend((Metric('Pretreatment_group-heating demand', 
+                      lambda: 0.001*sum([sum([hu.duty for hu in unit.heat_utilities \
+                                              if hu.duty>0 and hu.flow>0.]) for unit in \
+                                          process_groups_dict['Pretreatment_group'].units])/jet_fuel_gal_per_hr(),
+                      'MJ/gal'),))
+metrics.extend((Metric('Fermentation_group-heating demand', 
+                      lambda: 0.001*sum([sum([hu.duty for hu in unit.heat_utilities \
+                                              if hu.duty>0 and hu.flow>0.]) for unit in \
+                                          process_groups_dict['Fermentation_group'].units])/jet_fuel_gal_per_hr(),
+                      'MJ/gal'),))
+metrics.extend((Metric('Upgrading_group-heating demand', 
+                      lambda: 0.001*sum([sum([hu.duty for hu in unit.heat_utilities \
+                                              if hu.duty>0 and hu.flow>0.]) for unit in \
+                                          process_groups_dict['Upgrading_group'].units])/jet_fuel_gal_per_hr(),
+                      'MJ/gal'),))
+metrics.extend((Metric('Dehydration-heating demand', 
+                      lambda: 0.001*sum([hu.duty for hu in F.R401.heat_utilities \
+                                              if hu.duty>0 and hu.flow>0.])/jet_fuel_gal_per_hr(),
+                      'MJ/gal'),))
+metrics.extend((Metric('WWT_group-heating demand', 
+                      lambda: 0.001*sum([sum([hu.duty for hu in unit.heat_utilities \
+                                              if hu.duty>0 and hu.flow>0.]) for unit in \
+                                          process_groups_dict['WWT_group'].units])/jet_fuel_gal_per_hr(),
+                      'MJ/gal'),))
 # metrics.extend((Metric('HXN_group-heating demand', 
 #                       lambda: 0.001*sum([sum([hu.duty for hu in unit.heat_utilities \
 #                                               if hu.duty<0 and hu.flow<0.]) for unit in \
-#                                          process_groups_dict['HXN_group'].units])/jet_fuel_gal_per_hr(),
+#                                           process_groups_dict['HXN_group'].units])/jet_fuel_gal_per_hr(),
 #                       'MJ/gal'),))
-# metrics.extend((Metric('BT_group-heating demand', 
+metrics.extend((Metric('BT_group-heating demand', 
+                      lambda: 0.001*sum([sum([hu.duty for hu in unit.heat_utilities \
+                                              if hu.duty>0 and hu.flow>0.]) for unit in \
+                                          process_groups_dict['BT_group'].units])/jet_fuel_gal_per_hr(),
+                      'MJ/gal'),))
+metrics.extend((Metric('CT_group-heating demand', 
+                      lambda: 0.001*sum([sum([hu.duty for hu in unit.heat_utilities \
+                                              if hu.duty>0 and hu.flow>0.]) for unit in \
+                                          process_groups_dict['CT_group'].units])/jet_fuel_gal_per_hr(),
+                      'MJ/gal'),))
+metrics.extend((Metric('Facilities_no_hu_group-heating demand', 
+                      lambda: 0.001*sum([sum([hu.duty for hu in unit.heat_utilities \
+                                              if hu.duty>0 and hu.flow>0.]) for unit in \
+                                          process_groups_dict['Facilities_no_hu_group'].units])/jet_fuel_gal_per_hr(),
+                      'MJ/gal'),))
+# metrics.extend((Metric('CCS-heating demand', 
 #                       lambda: 0.001*sum([sum([hu.duty for hu in unit.heat_utilities \
 #                                               if hu.duty>0 and hu.flow>0.]) for unit in \
-#                                          process_groups_dict['BT_group'].units])/jet_fuel_gal_per_hr(),
+#                                          process_groups_dict['CCS'].units])/jet_fuel_gal_per_hr(),
 #                       'MJ/gal'),))
-# metrics.extend((Metric('CT_group-heating demand', 
-#                       lambda: 0.001*sum([sum([hu.duty for hu in unit.heat_utilities \
-#                                               if hu.duty>0 and hu.flow>0.]) for unit in \
-#                                          process_groups_dict['CT_group'].units])/jet_fuel_gal_per_hr(),
-#                       'MJ/gal'),))
-# metrics.extend((Metric('Facilities_no_hu_group-heating demand', 
-#                       lambda: 0.001*sum([sum([hu.duty for hu in unit.heat_utilities \
-#                                               if hu.duty>0 and hu.flow>0.]) for unit in \
-#                                          process_groups_dict['Facilities_no_hu_group'].units])/jet_fuel_gal_per_hr(),
-#                       'MJ/gal'),))
-# # metrics.extend((Metric('CCS-heating demand', 
-# #                       lambda: 0.001*sum([sum([hu.duty for hu in unit.heat_utilities \
-# #                                               if hu.duty>0 and hu.flow>0.]) for unit in \
-# #                                          process_groups_dict['CCS'].units])/jet_fuel_gal_per_hr(),
-# #                       'MJ/gal'),))
 
 
     
-# # Cooling duty
-# metrics.extend((Metric('Total cooling demand', 
-#                       lambda: 0.001*sum([sum([hu.duty for hu in unit.heat_utilities \
-#                                               if hu.duty<0 and hu.flow>0.]) for unit in \
-#                                          sys.units])/jet_fuel_gal_per_hr(),
-#                       'MJ/gal'),))
-# metrics.extend((Metric('Preprocessing_group-cooling demand', 
-#                       lambda: 0.001*sum([sum([hu.duty for hu in unit.heat_utilities \
-#                                               if hu.duty<0 and hu.flow>0.]) for unit in \
-#                                          process_groups_dict['Preprocessing_group'].units])/jet_fuel_gal_per_hr(),
-#                       'MJ/gal'),))
-# metrics.extend((Metric('Pretreatment_group-cooling demand', 
-#                       lambda: 0.001*sum([sum([hu.duty for hu in unit.heat_utilities \
-#                                               if hu.duty<0 and hu.flow>0.]) for unit in \
-#                                          process_groups_dict['Pretreatment_group'].units])/jet_fuel_gal_per_hr(),
-#                       'MJ/gal'),))
-# metrics.extend((Metric('Fermentation_group-cooling demand', 
-#                       lambda: 0.001*sum([sum([hu.duty for hu in unit.heat_utilities \
-#                                               if hu.duty<0 and hu.flow>0.]) for unit in \
-#                                          process_groups_dict['Fermentation_group'].units])/jet_fuel_gal_per_hr(),
-#                       'MJ/gal'),))
-# metrics.extend((Metric('Upgrading_group-cooling demand', 
-#                       lambda: 0.001*sum([sum([hu.duty for hu in unit.heat_utilities \
-#                                               if hu.duty<0 and hu.flow>0.]) for unit in \
-#                                          process_groups_dict['Upgrading_group'].units])/jet_fuel_gal_per_hr(),
-#                       'MJ/gal'),))
-# metrics.extend((Metric('WWT_group-cooling demand', 
-#                       lambda: 0.001*sum([sum([hu.duty for hu in unit.heat_utilities \
-#                                               if hu.duty<0 and hu.flow>0.]) for unit in \
-#                                          process_groups_dict['WWT_group'].units])/jet_fuel_gal_per_hr(),
-#                       'MJ/gal'),))
+# Cooling duty
+metrics.extend((Metric('Total cooling demand', 
+                      lambda: 0.001*sum([sum([hu.duty for hu in unit.heat_utilities \
+                                              if hu.duty<0 and hu.flow>0.]) for unit in \
+                                          sys.units])/jet_fuel_gal_per_hr(),
+                      'MJ/gal'),))
+metrics.extend((Metric('Preprocessing_group-cooling demand', 
+                      lambda: 0.001*sum([sum([hu.duty for hu in unit.heat_utilities \
+                                              if hu.duty<0 and hu.flow>0.]) for unit in \
+                                          process_groups_dict['Preprocessing_group'].units])/jet_fuel_gal_per_hr(),
+                      'MJ/gal'),))
+metrics.extend((Metric('Pretreatment_group-cooling demand', 
+                      lambda: 0.001*sum([sum([hu.duty for hu in unit.heat_utilities \
+                                              if hu.duty<0 and hu.flow>0.]) for unit in \
+                                          process_groups_dict['Pretreatment_group'].units])/jet_fuel_gal_per_hr(),
+                      'MJ/gal'),))
+metrics.extend((Metric('Fermentation_group-cooling demand', 
+                      lambda: 0.001*sum([sum([hu.duty for hu in unit.heat_utilities \
+                                              if hu.duty<0 and hu.flow>0.]) for unit in \
+                                          process_groups_dict['Fermentation_group'].units])/jet_fuel_gal_per_hr(),
+                      'MJ/gal'),))
+metrics.extend((Metric('Upgrading_group-cooling demand', 
+                      lambda: 0.001*sum([sum([hu.duty for hu in unit.heat_utilities \
+                                              if hu.duty<0 and hu.flow>0.]) for unit in \
+                                          process_groups_dict['Upgrading_group'].units])/jet_fuel_gal_per_hr(),
+                      'MJ/gal'),))
+metrics.extend((Metric('WWT_group-cooling demand', 
+                      lambda: 0.001*sum([sum([hu.duty for hu in unit.heat_utilities \
+                                              if hu.duty<0 and hu.flow>0.]) for unit in \
+                                          process_groups_dict['WWT_group'].units])/jet_fuel_gal_per_hr(),
+                      'MJ/gal'),))
 # metrics.extend((Metric('HXN_group-cooling demand', 
 #                       lambda: 0.001*sum([sum([hu.duty for hu in unit.heat_utilities \
 #                                               if hu.duty>0 and hu.flow<0.]) for unit in \
-#                                          process_groups_dict['HXN_group'].units])/jet_fuel_gal_per_hr(),
+#                                           process_groups_dict['HXN_group'].units])/jet_fuel_gal_per_hr(),
 #                       'MJ/gal'),))
-# metrics.extend((Metric('BT_group-cooling demand', 
+metrics.extend((Metric('BT_group-cooling demand', 
+                      lambda: 0.001*sum([sum([hu.duty for hu in unit.heat_utilities \
+                                              if hu.duty<0 and hu.flow>0.]) for unit in \
+                                          process_groups_dict['BT_group'].units])/jet_fuel_gal_per_hr(),
+                      'MJ/gal'),))
+metrics.extend((Metric('CT_group-cooling demand', 
+                      lambda: 0.001*sum([sum([hu.duty for hu in unit.heat_utilities \
+                                              if hu.duty<0 and hu.flow>0.]) for unit in \
+                                          process_groups_dict['CT_group'].units])/jet_fuel_gal_per_hr(),
+                      'MJ/gal'),))
+metrics.extend((Metric('Facilities_no_hu_group-cooling demand', 
+                      lambda: 0.001*sum([sum([hu.duty for hu in unit.heat_utilities \
+                                              if hu.duty<0 and hu.flow>0.]) for unit in \
+                                          process_groups_dict['Facilities_no_hu_group'].units])/jet_fuel_gal_per_hr(),
+                      'MJ/gal'),))
+# metrics.extend((Metric('CCS-cooling demand', 
 #                       lambda: 0.001*sum([sum([hu.duty for hu in unit.heat_utilities \
 #                                               if hu.duty<0 and hu.flow>0.]) for unit in \
-#                                          process_groups_dict['BT_group'].units])/jet_fuel_gal_per_hr(),
+#                                          process_groups_dict['CCS'].units])/jet_fuel_gal_per_hr(),
 #                       'MJ/gal'),))
-# metrics.extend((Metric('CT_group-cooling demand', 
-#                       lambda: 0.001*sum([sum([hu.duty for hu in unit.heat_utilities \
-#                                               if hu.duty<0 and hu.flow>0.]) for unit in \
-#                                          process_groups_dict['CT_group'].units])/jet_fuel_gal_per_hr(),
-#                       'MJ/gal'),))
-# metrics.extend((Metric('Facilities_no_hu_group-cooling demand', 
-#                       lambda: 0.001*sum([sum([hu.duty for hu in unit.heat_utilities \
-#                                               if hu.duty<0 and hu.flow>0.]) for unit in \
-#                                          process_groups_dict['Facilities_no_hu_group'].units])/jet_fuel_gal_per_hr(),
-#                       'MJ/gal'),))
-# # metrics.extend((Metric('CCS-cooling demand', 
-# #                       lambda: 0.001*sum([sum([hu.duty for hu in unit.heat_utilities \
-# #                                               if hu.duty<0 and hu.flow>0.]) for unit in \
-# #                                          process_groups_dict['CCS'].units])/jet_fuel_gal_per_hr(),
-# #                       'MJ/gal'),))
     
     
-# # Installed equipment cost
-# metrics.extend((Metric('Preprocessing_group - installed equipment cost',
-#                        lambda:process_groups_dict['Preprocessing_group'].get_installed_cost(),
-#                        '10^6 $'),))
-# metrics.extend((Metric('Pretreatment_group - installed equipment cost',
-#                        lambda:process_groups_dict['Pretreatment_group'].get_installed_cost(),
-#                        '10^6 $'),))
-# metrics.extend((Metric('Fermentation_group - installed equipment cost',
-#                        lambda:process_groups_dict['Fermentation_group'].get_installed_cost(),
-#                        '10^6 $'),))
-# metrics.extend((Metric('Upgrading_group - installed equipment cost',
-#                        lambda:process_groups_dict['Upgrading_group'].get_installed_cost(),
-#                        '10^6 $'),))
-# metrics.extend((Metric('WWT_group - installed equipment cost',
-#                        lambda:process_groups_dict['WWT_group'].get_installed_cost(),
-#                        '10^6 $'),))
+# Installed equipment cost
+metrics.extend((Metric('Preprocessing_group - installed equipment cost',
+                        lambda:process_groups_dict['Preprocessing_group'].get_installed_cost(),
+                        '10^6 $'),))
+metrics.extend((Metric('Pretreatment_group - installed equipment cost',
+                        lambda:process_groups_dict['Pretreatment_group'].get_installed_cost(),
+                        '10^6 $'),))
+metrics.extend((Metric('Fermentation_group - installed equipment cost',
+                        lambda:process_groups_dict['Fermentation_group'].get_installed_cost(),
+                        '10^6 $'),))
+metrics.extend((Metric('Upgrading_group - installed equipment cost',
+                        lambda:process_groups_dict['Upgrading_group'].get_installed_cost(),
+                        '10^6 $'),))
+metrics.extend((Metric('WWT_group - installed equipment cost',
+                        lambda:process_groups_dict['WWT_group'].get_installed_cost(),
+                        '10^6 $'),))
 # metrics.extend((Metric('HXN_group - installed equipment cost',
-#                        lambda:process_groups_dict['HXN_group'].get_installed_cost(),
+#                         lambda:process_groups_dict['HXN_group'].get_installed_cost(),
+#                         '10^6 $'),))
+metrics.extend((Metric('BT_group - installed equipment cost',
+                        lambda:process_groups_dict['BT_group'].get_installed_cost(),
+                        '10^6 $'),))
+metrics.extend((Metric('CT_group - installed equipment cost',
+                        lambda:process_groups_dict['CT_group'].get_installed_cost(),
+                        '10^6 $'),))
+metrics.extend((Metric('Facilities_no_hu_group - installed equipment cost',
+                        lambda:process_groups_dict['Facilities_no_hu_group'].get_installed_cost(),
+                        '10^6 $'),))
+# metrics.extend((Metric('CCS-installed equipment cost', 
+#                       lambda: process_groups_dict['CCS'].get_installed_cost(),
 #                        '10^6 $'),))
-# metrics.extend((Metric('BT_group - installed equipment cost',
-#                        lambda:process_groups_dict['BT_group'].get_installed_cost(),
-#                        '10^6 $'),))
-# metrics.extend((Metric('CT_group - installed equipment cost',
-#                        lambda:process_groups_dict['CT_group'].get_installed_cost(),
-#                        '10^6 $'),))
-# metrics.extend((Metric('Facilities_no_hu_group - installed equipment cost',
-#                        lambda:process_groups_dict['Facilities_no_hu_group'].get_installed_cost(),
-#                        '10^6 $'),))
-# # metrics.extend((Metric('CCS-installed equipment cost', 
-# #                       lambda: process_groups_dict['CCS'].get_installed_cost(),
-# #                        '10^6 $'),))
+metrics.extend((Metric('Storage_group - installed equipment cost',
+                        lambda:process_groups_dict['Storage_group'].get_installed_cost(),
+                        '10^6 $'),))
 
 
-# # Power utility demand in MW/gal
-# metrics.extend((Metric('Preprocessing_group - power utility demand',
-#                        lambda:process_groups_dict['Preprocessing_group'].get_electricity_consumption()/jet_fuel_gal_per_hr(),
-#                        'MW/gal'),))
-# metrics.extend((Metric('Pretreatment_group - power utility demand',
-#                        lambda:process_groups_dict['Pretreatment_group'].get_electricity_consumption()/jet_fuel_gal_per_hr(),
-#                        'MW/gal'),))
-# metrics.extend((Metric('Fermentation_group - power utility demand',
-#                        lambda:process_groups_dict['Fermentation_group'].get_electricity_consumption()/jet_fuel_gal_per_hr(),
-#                        'MW/gal'),))
-# metrics.extend((Metric('Upgrading_group - power utility demand',
-#                        lambda:process_groups_dict['Upgrading_group'].get_electricity_consumption()/jet_fuel_gal_per_hr(),
-#                        'MW/gal'),))
-# metrics.extend((Metric('WWT_group - power utility demand',
-#                        lambda:process_groups_dict['WWT_group'].get_electricity_consumption()/jet_fuel_gal_per_hr(),
-#                        'MW/gal'),))
+# Power utility demand in MW/gal
+metrics.extend((Metric('Preprocessing_group - power utility demand',
+                        lambda:process_groups_dict['Preprocessing_group'].get_electricity_consumption()/jet_fuel_gal_per_hr(),
+                        'MW/gal'),))
+metrics.extend((Metric('Pretreatment_group - power utility demand',
+                        lambda:process_groups_dict['Pretreatment_group'].get_electricity_consumption()/jet_fuel_gal_per_hr(),
+                        'MW/gal'),))
+metrics.extend((Metric('Fermentation_group - power utility demand',
+                        lambda:process_groups_dict['Fermentation_group'].get_electricity_consumption()/jet_fuel_gal_per_hr(),
+                        'MW/gal'),))
+metrics.extend((Metric('Upgrading_group - power utility demand',
+                        lambda:process_groups_dict['Upgrading_group'].get_electricity_consumption()/jet_fuel_gal_per_hr(),
+                        'MW/gal'),))
+metrics.extend((Metric('WWT_group - power utility demand',
+                        lambda:process_groups_dict['WWT_group'].get_electricity_consumption()/jet_fuel_gal_per_hr(),
+                        'MW/gal'),))
 # metrics.extend((Metric('HXN_group - power utility demand',
-#                        lambda:process_groups_dict['HXN_group'].get_electricity_consumption()/jet_fuel_gal_per_hr(),
-#                        'MW/gal'),))
-# metrics.extend((Metric('BT_group - power utility demand',
-#                        lambda:process_groups_dict['BT_group'].get_electricity_consumption()/jet_fuel_gal_per_hr(),
-#                        'MW/gal'),))
-# metrics.extend((Metric('CT_group - power utility demand',
-#                        lambda:process_groups_dict['CT_group'].get_electricity_consumption()/jet_fuel_gal_per_hr(),
-#                        'MW/gal'),))
-# metrics.extend((Metric('Facilities_no_hu_group - power utility demand',
-#                        lambda:process_groups_dict['Facilities_no_hu_group'].get_electricity_consumption()/jet_fuel_gal_per_hr(),
+#                         lambda:process_groups_dict['HXN_group'].get_electricity_consumption()/jet_fuel_gal_per_hr(),
+#                         'MW/gal'),))
+metrics.extend((Metric('BT_group - power utility demand',
+                        lambda:process_groups_dict['BT_group'].get_electricity_consumption()/jet_fuel_gal_per_hr(),
+                        'MW/gal'),))
+metrics.extend((Metric('CT_group - power utility demand',
+                        lambda:process_groups_dict['CT_group'].get_electricity_consumption()/jet_fuel_gal_per_hr(),
+                        'MW/gal'),))
+metrics.extend((Metric('Facilities_no_hu_group - power utility demand',
+                        lambda:process_groups_dict['Facilities_no_hu_group'].get_electricity_consumption()/jet_fuel_gal_per_hr(),
+                        'MW/gal'),))  
+# metrics.extend((Metric('CCS - power utility demand',
+#                        lambda:process_groups_dict['CCS'].get_electricity_consumption()/jet_fuel_gal_per_hr(),
 #                        'MW/gal'),))  
-# # metrics.extend((Metric('CCS - power utility demand',
-# #                        lambda:process_groups_dict['CCS'].get_electricity_consumption()/jet_fuel_gal_per_hr(),
-# #                        'MW/gal'),))  
 
 
-# # Material cost
-# TEA_feeds = [i for i in sys.feeds if i.price]
-# # TEA_products = [i for i in sys.products if i.price]
+# Material cost
+TEA_feeds = [i for i in sys.feeds if i.price]
+# TEA_products = [i for i in sys.products if i.price]
 
-# def get_material_cost_breakdown():
-#     group_material_costs = {}
-#     for group in process_groups:
-#         group_material_costs[group.name] = 0
-#     counted_feeds =[]
-#     for feed in TEA_feeds:
-#         for group in process_groups:
-#             if group.name != 'Facilities_no_hu_group':
-#                 for unit in group.units:
-#                     for instream in unit.ins:
-#                         if instream.shares_flow_rate_with(feed) and not feed in counted_feeds:
-#                             group_material_costs[group.name] += feed.price*feed.F_mass/jet_fuel_gal_per_hr()
-#                             counted_feeds.append(feed)
-#     group_material_costs['BT_group'] += BT.natural_gas_price*BT.natural_gas.F_mass/jet_fuel_gal_per_hr()
-#     return group_material_costs
+def get_material_cost_breakdown():
+    group_material_costs = {}
+    for group in process_groups:
+        group_material_costs[group.name] = 0
+    counted_feeds =[]
+    for feed in TEA_feeds:
+        for group in process_groups:
+            if group.name != 'Facilities_no_hu_group':
+                for unit in group.units:
+                    for instream in unit.ins:
+                        if instream.shares_flow_rate_with(feed) and not feed in counted_feeds:
+                            group_material_costs[group.name] += feed.price*feed.F_mass/jet_fuel_gal_per_hr()
+                            counted_feeds.append(feed)
+    group_material_costs['BT_group'] += F.BT.natural_gas_price*F.BT.natural_gas.F_mass/jet_fuel_gal_per_hr()
+    return group_material_costs
 
 # def get_material_cost_breakdown_fractional():
 #     mcb_dict = get_material_cost_breakdown()
@@ -468,108 +490,111 @@ jet_fuel_gal_per_year = lambda: jet_fuel_gal_per_hr() * sys.operating_hours
 #     return mcbf_dict
 
 
-# metrics.extend((Metric('Preprocessing_group - material cost',
-#                        lambda:get_material_cost_breakdown()['Preprocessing_group'],
-#                        '$/gal'),))
+metrics.extend((Metric('Preprocessing_group - material cost',
+                        lambda:get_material_cost_breakdown()['Preprocessing_group'],
+                        '$/gal'),))
 
-# metrics.extend((Metric('Pretreatment_group - material cost',
-#                        lambda:get_material_cost_breakdown()['Pretreatment_group'],
-#                        '$/gal'),))
+metrics.extend((Metric('Pretreatment_group - material cost',
+                        lambda:get_material_cost_breakdown()['Pretreatment_group'],
+                        '$/gal'),))
 
-# metrics.extend((Metric('Fermentation_group - material cost',
-#                        lambda:get_material_cost_breakdown()['Fermentation_group'],
-#                        '$/gal'),))
+metrics.extend((Metric('Fermentation_group - material cost',
+                        lambda:get_material_cost_breakdown()['Fermentation_group'],
+                        '$/gal'),))
 
-# metrics.extend((Metric('Upgrading_group - material cost',
-#                        lambda:get_material_cost_breakdown()['Upgrading_group'],
-#                        '$/gal'),))
+metrics.extend((Metric('Upgrading_group - material cost',
+                        lambda:get_material_cost_breakdown()['Upgrading_group'],
+                        '$/gal'),))
 
-# metrics.extend((Metric('WWT_group - material cost',
-#                        lambda:get_material_cost_breakdown()['WWT_group'],
-#                        '$/gal'),))
+metrics.extend((Metric('WWT_group - material cost',
+                        lambda:get_material_cost_breakdown()['WWT_group'],
+                        '$/gal'),))
 
 # metrics.extend((Metric('HXN_group - material cost',
-#                        lambda:get_material_cost_breakdown()['HXN_group'],
-#                        '$/gal'),))
+#                         lambda:get_material_cost_breakdown()['HXN_group'],
+#                         '$/gal'),))
 
-# metrics.extend((Metric('BT_group - material cost',
-#                        lambda:get_material_cost_breakdown()['BT_group'],
-#                        '$/gal'),))
+metrics.extend((Metric('BT_group - material cost',
+                        lambda:get_material_cost_breakdown()['BT_group'],
+                        '$/gal'),))
 
-# metrics.extend((Metric('CT_group - material cost',
-#                        lambda:get_material_cost_breakdown()['CT_group'],
-#                        '$/gal'),))
+metrics.extend((Metric('CT_group - material cost',
+                        lambda:get_material_cost_breakdown()['CT_group'],
+                        '$/gal'),))
 
-# metrics.extend((Metric('Facilities_no_hu_group - material cost',
-#                        lambda:get_material_cost_breakdown()['Facilities_no_hu_group'],
+metrics.extend((Metric('Facilities_no_hu_group - material cost',
+                        lambda:get_material_cost_breakdown()['Facilities_no_hu_group'],
+                        '$/gal'),))
+# metrics.extend((Metric('CCS - material cost',
+#                        lambda:get_material_cost_breakdown()['CCS'],
 #                        '$/gal'),))
-# # metrics.extend((Metric('CCS - material cost',
-# #                        lambda:get_material_cost_breakdown()['CCS'],
-# #                        '$/gal'),))
 
 # 3. LCA
 # in g CO2 eq / MJ blend fuel
-_total_energy_per_hr = lambda: (jet_fuel.LHV + diesel.LHV + gasoline.LHV + ethanol_to_sold.LHV) / 1000 # from kJ to MJ
+_total_energy_per_hr = lambda: (F.jet_fuel.LHV + F.diesel.LHV + F.gasoline.LHV + F.ethanol_to_sold.LHV) / 1000 # from kJ to MJ
 _total_energy_per_year = lambda: _total_energy_per_hr() * sys.operating_hours
 
-_total_energy_per_hr_1 = lambda: (jet_fuel.LHV + diesel.LHV + gasoline.LHV + ethanol_to_sold.LHV + get_excess_power() * 3600) / 1000 # for energy allocation
-_total_energy_per_year_1 = lambda: _total_energy_per_hr_1() * sys.operating_hours
-
-_total_energy_to1 = lambda: _total_energy_per_year_1() / _total_energy_per_year()
-
-main_product = [jet_fuel]
-coproducts = [diesel, gasoline,ethanol_to_sold]
+main_product = [F.jet_fuel]
+coproducts = [F.diesel, F.gasoline, F.ethanol_to_sold]
 #impurities = [CH4_C2H6] # not counted here
 
 emissions = [i for i in F.stream if i.source and not i.sink and i not in main_product and i not in coproducts]
 
-
 # Carbon balance
-total_C_in = sum([feed.get_atomic_flow('C') for feed in sys.feeds])
-total_C_out = sum([i.get_atomic_flow('C') for i in emissions]) + sum([i.get_atomic_flow('C') for i in main_product]) +\
+total_C_in = lambda: sum([feed.get_atomic_flow('C') for feed in sys.feeds])
+total_C_out = lambda: sum([i.get_atomic_flow('C') for i in emissions]) + sum([i.get_atomic_flow('C') for i in main_product]) +\
               sum([i.get_atomic_flow('C') for i in coproducts]) 
-C_bal_error = (total_C_out - total_C_in)/total_C_in
+get_C_bal_error = lambda: (total_C_out() - total_C_in())/total_C_in()
 
-# Feedstock contribution
-get_GWP_feedstock_input = lambda: sys.get_material_impact(feedstock, key='GWP100') * 1000 / _total_energy_per_year()
+metrics.extend((Metric('Carbon error', get_C_bal_error, '100%', '-'),))
 
-# Non-biogenic emissions (ash)
-get_GWP_missions_waste = lambda: sys.get_material_impact(F.ash, key='GWP100') * 1000 / _total_energy_per_year() 
+# Material acquisition
+get_GWP_total_material_acquisition = lambda: sys.get_total_feeds_impact('GWP100') * 1000 / _total_energy_per_year()
 
-# Non-biogenic emissions (enzyme+CSL)
-get_GWP_emissions_C_source = lambda: (F.CSL.get_atomic_flow('C') + F.enzyme_M301.get_atomic_flow('C'))\
-                                  * SAF_chemicals.CO2.MW * 1000 / _total_energy_per_hr()         
+get_GWP_feedstock_acquisition = lambda: sys.get_material_impact(F.feedstock, key='GWP100') * 1000 / _total_energy_per_year()
+
+get_GWP_NG_acquisition = lambda: sys.get_material_impact(F.natural_gas, key='GWP100') * 1000 / _total_energy_per_year()
                                   
-# Displacement GWP (ethnol_to_sold displacement, gasoline, diesel)
-get_GWP_displacement = lambda: (sys.get_material_impact(F.ethanol_to_sold, key='GWP100') + sys.get_material_impact(F.gasoline, key='GWP100') + sys.get_material_impact(F.diesel, key='GWP100')) * 1000 / _total_energy_per_year() 
-                                  
-get_GWP_emissions_non_BT = lambda: get_GWP_missions_waste() + get_GWP_emissions_C_source()
+get_GWP_caustic_acquisition = lambda: (sys.get_material_impact(F.NaOH, key='GWP100') + sys.get_material_impact(F.caustic, key='GWP100')) * 1000 / _total_energy_per_year()
 
-# Non-biogenic missions (BT)
+get_GWP_h2_acquisition = lambda: sys.get_material_impact(F.hydrogen, key='GWP100') * 1000 / _total_energy_per_year()
+
+get_GWP_NG_for_hydrogen_acquisition = lambda: sys.get_material_impact(F.natural_gas_for_h2, key='GWP100') * 1000 / _total_energy_per_year()
+
+get_GWP_other_materials_acquisition = lambda: get_GWP_total_material_acquisition() - get_GWP_feedstock_acquisition() - get_GWP_NG_acquisition()
+
+# Emissions - nonbiogenic ash/spent catalyst (non-carbon)
+get_GWP_missions_waste = lambda: (sys.get_material_impact(F.ash, key='GWP100') + \
+                                  sys.get_material_impact(F.spent_catalyst_R401, key='GWP100') + \
+                                  sys.get_material_impact(F.spent_catalyst_R402, key='GWP100') + \
+                                  sys.get_material_impact(F.spent_catalyst_R403, key='GWP100') + \
+                                  sys.get_material_impact(F.spent_catalyst_R404, key='GWP100')) * 1000 / _total_energy_per_year()  
+    
+# Emissions - nonbiogenic BT
 get_GWP_emissions_BT = lambda: F.natural_gas.get_atomic_flow('C') * SAF_chemicals.CO2.MW * 1000 / _total_energy_per_hr()
 
-# Material contribution
-get_GWP_material_total = lambda: sys.get_total_feeds_impact('GWP100') * 1000 / _total_energy_per_year()
+# Emissions - biogenic
 
-get_GWP_NG = lambda: sys.get_material_impact(F.natural_gas, key='GWP100') * 1000 / _total_energy_per_year()
+# Total = Material acquisition + Emissions
+get_GWP_total = lambda: get_GWP_total_material_acquisition() + get_GWP_missions_waste() + get_GWP_emissions_BT()
 
-get_GWP_caustic = lambda: (sys.get_material_impact(F.NaOH, key='GWP100') + sys.get_material_impact(F.caustic, key='GWP100')) * 1000 / _total_energy_per_year()
+# Energy allocation
+get_GWP_jet_energy_allo = lambda: get_GWP_total() * F.jet_fuel.LHV / (F.jet_fuel.LHV + F.diesel.LHV + F.gasoline.LHV + F.ethanol_to_sold.LHV)
 
-get_GWP_other_materials = lambda: get_GWP_material_total()  - get_GWP_feedstock_input() - get_GWP_NG()
+# Displacement
+get_GWP_displacement = lambda: (sys.get_material_impact(F.ethanol_to_sold, key='GWP100') + \
+                                sys.get_material_impact(F.gasoline, key='GWP100') + \
+                                sys.get_material_impact(F.diesel, key='GWP100')) * 1000 / _total_energy_per_year() 
 
-# Total = emission + material
-get_GWP_total_displa = lambda: get_GWP_material_total() + get_GWP_emissions_BT() + get_GWP_emissions_non_BT() + get_GWP_displacement() # displacement method
+get_GWP_jet_displacement = lambda: get_GWP_total() + get_GWP_displacement()
 
-get_GWP_total_hydrid = lambda: get_GWP_material_total() + get_GWP_emissions_BT() + get_GWP_emissions_non_BT() # hybrid method
-
-get_GWP_total_energy_allocation = lambda: get_GWP_total_hydrid() / _total_energy_to1() # energy allocation method
 
 # Electricity (BT satisfies all electricity in system by buying natural gas if needed, no buying electricity)
 get_electricity_use_offset_total = lambda: sum(i.power_utility.rate for i in sys.units) # .= 0 per hour
 
 get_GWP_electricity_use_total = lambda: get_electricity_use_offset_total() * GWP_CFs['electricity'] * 1000 / _total_energy_per_hr() # . = 0
 
-get_electricity_demand_total = get_electricity_use = lambda: -BT.power_utility.rate # Outside BT + BT consumption 
+get_electricity_demand_total = get_electricity_use = lambda: -F.BT.power_utility.rate # Outside BT + BT consumption 
 
 get_electricity_demand_cooling = lambda: F.CT.power_utility.rate + F.CWP.power_utility.rate
 
@@ -579,11 +604,10 @@ get_electricity_demand_cooling_frac = lambda: get_electricity_demand_cooling() /
 
 get_electricity_demand_non_cooling_frac = lambda: get_electricity_demand_non_cooling() / get_electricity_demand_total()
 
-
 # Steam contribution
-get_steam_heating = lambda: sum([i.duty for i in BT.steam_utilities]) # in kJ/hr
+get_steam_heating = lambda: sum([i.duty for i in F.BT.steam_utilities]) # in kJ/hr
 
-get_steam_electricity = lambda: 3600. * BT.electricity_demand / BT.turbogenerator_efficiency # in kJ/hr
+get_steam_electricity = lambda: 3600. * F.BT.electricity_demand / F.BT.turbogenerator_efficiency # in kJ/hr
 
 get_steam_total = lambda: get_steam_heating() + get_steam_electricity()
 
@@ -596,8 +620,7 @@ get_steam_frac_cooling = lambda: get_steam_frac_electricity() * get_electricity_
 get_steam_frac_non_cooling = lambda: get_steam_frac_electricity() * get_electricity_demand_non_cooling_frac()
 
 # Steam GWP allocation
-
-get_GWP_steam_total = lambda: get_GWP_NG() + get_GWP_emissions_BT()
+get_GWP_steam_total = lambda: get_GWP_NG_acquisition() + get_GWP_emissions_BT()
 
 get_GWP_heating_demand = lambda: get_steam_frac_heating() * get_GWP_steam_total()
 
@@ -607,47 +630,27 @@ get_GWP_cooling_demand = lambda: get_steam_frac_cooling() * get_GWP_steam_total(
 get_GWP_electricity_non_cooling = lambda: get_steam_frac_non_cooling() * get_GWP_steam_total() + \
                                           get_electricity_demand_non_cooling_frac() * get_GWP_electricity_use_total()
 
-# GWP allocation (displacement method)
-get_GWP_electricity_credit = lambda: -get_excess_power() * GWP_CFs['electricity'] * 1000 / _total_energy_per_year()
-
-get_GWP_total_displa_with_eletricity_credit = lambda: get_GWP_total_displa() + get_GWP_electricity_credit()
-
-get_GWP_total_hydrid_with_eletricity_credit = lambda: get_GWP_total_hydrid() + get_GWP_electricity_credit()
-
-get_GWP_jet_displa = lambda: get_GWP_total_displa_with_eletricity_credit()
-
-get_GWP_jet_hybrid = lambda: get_GWP_total_hydrid_with_eletricity_credit() * get_jet_energy_ratio() # in g CO2-eq/MJ jet
-
-get_GWP_jet_energy = lambda: get_GWP_total_energy_allocation() * get_jet_energy_ratio_2()
-
-# get_GWP_diesel = lambda: get_GWP_total_hydrid_with_eletricity_credit() * get_diesel_energy_ratio() / 100
-
-# get_GWP_gasoline = lambda: get_GWP_total_hydrid_with_eletricity_credit() * get_gasoline_energy_ratio() / 100
-
-get_SAF_abatement_cost = lambda: (get_jet_price_per_GJ() - kerosene_price_per_GJ) / (89-get_GWP_jet_displa()) * 1000 # in $/tonne CO2
 
 
-metrics.extend((Metric('GWP - total', get_GWP_total_displa, 'g CO2-eq/MJ blend fuel', 'LCA'),))
+metrics.extend((Metric('GWP - feedstock', get_GWP_feedstock_acquisition, 'g CO2-eq/MJ blend fuel', 'LCA'),))
 
-metrics.extend((Metric('GWP - electricity credit', get_GWP_electricity_credit, 'g CO2-eq/MJ blend fuel', 'LCA'),))
+metrics.extend((Metric('GWP - NG', get_GWP_NG_acquisition, 'g CO2-eq/MJ blend fuel', 'LCA'),))
 
-metrics.extend((Metric('GWP - total-electricity credit', get_GWP_total_displa_with_eletricity_credit, 'g CO2-eq/MJ blend fuel', 'LCA'),))
+metrics.extend((Metric('GWP - other materials', get_GWP_other_materials_acquisition, 'g CO2-eq/MJ blend fuel', 'LCA'),))
 
-metrics.extend((Metric('GWP - feedstock', get_GWP_feedstock_input, 'g CO2-eq/MJ blend fuel', 'LCA'),))
+metrics.extend((Metric('GWP - caustic', get_GWP_caustic_acquisition, 'g CO2-eq/MJ blend fuel', 'LCA'),))
 
-metrics.extend((Metric('GWP - NG', get_GWP_NG, 'g CO2-eq/MJ blend fuel', 'LCA'),))
+metrics.extend((Metric('GWP - hydrogen', get_GWP_h2_acquisition, 'g CO2-eq/MJ blend fuel', 'LCA'),))
 
-metrics.extend((Metric('GWP - other materials', get_GWP_other_materials, 'g CO2-eq/MJ blend fuel', 'LCA'),))
-
-metrics.extend((Metric('GWP - caustic', get_GWP_caustic, 'g CO2-eq/MJ blend fuel', 'LCA'),))
-
-# metrics.extend((Metric('GWP - lime', get_GWP_lime, 'g CO2-eq/MJ blend fuel', 'LCA'),))
+metrics.extend((Metric('GWP - NG_for_h2', get_GWP_NG_for_hydrogen_acquisition, 'g CO2-eq/MJ blend fuel', 'LCA'),))
 
 metrics.extend((Metric('GWP - electricity', get_GWP_electricity_use_total, 'g CO2-eq/MJ blend fuel', 'LCA'),))
 
 metrics.extend((Metric('GWP - non biogenic emissions', get_GWP_emissions_BT, 'g CO2-eq/MJ blend fuel', 'LCA'),))
 
-metrics.extend((Metric('GWP - other non biogenic emissions', get_GWP_emissions_non_BT, 'g CO2-eq/MJ blend fuel', 'LCA'),))
+metrics.extend((Metric('GWP - waste emissions', get_GWP_missions_waste, 'g CO2-eq/MJ blend fuel', 'LCA'),))
+
+metrics.extend((Metric('GWP - total', get_GWP_total, 'g CO2-eq/MJ blend fuel', 'LCA'),))
 
 metrics.extend((Metric('GWP - heating_demand', get_GWP_heating_demand, 'g CO2-eq/MJ blend fuel', 'LCA'),))
 
@@ -655,24 +658,16 @@ metrics.extend((Metric('GWP - cooling_demand', get_GWP_cooling_demand, 'g CO2-eq
 
 metrics.extend((Metric('GWP - electricity non cooling', get_GWP_electricity_non_cooling, 'g CO2-eq/MJ blend fuel', 'LCA'),))
 
-metrics.extend((Metric('GWP - jet_displa', get_GWP_jet_displa, 'g CO2-eq/MJ jet fuel', 'LCA'),))
+metrics.extend((Metric('GWP - jet_energy', get_GWP_jet_energy_allo, 'g CO2-eq/MJ jet fuel', 'LCA'),))
 
-metrics.extend((Metric('GWP - jet_hybrid', get_GWP_jet_hybrid, 'g CO2-eq/MJ jet fuel', 'LCA'),))
-
-metrics.extend((Metric('GWP - jet_energy', get_GWP_jet_energy, 'g CO2-eq/MJ jet fuel', 'LCA'),))
+metrics.extend((Metric('GWP - jet_displa', get_GWP_jet_displacement, 'g CO2-eq/MJ jet fuel', 'LCA'),))
 
 metrics.extend((Metric('GWP - displacement', get_GWP_displacement, 'g CO2-eq/MJ', 'LCA'),))
 
-metrics.extend((Metric('GWP - SAF_abatement_cost', get_SAF_abatement_cost, '$/tonne CO2', 'LCA'),))
-
 #%%
 
-def create_model(system=sys,
-                 metrics=metrics,
-                 N=2000,
-                 rule='L',
-                 notify_runs=10,):
-    model = Model(sys,metrics,exception_hook='warn')
+def create_model():
+    model = Model(sys,metrics,exception_hook='raise')
     param = model.parameter
     
     # ============================================================================
@@ -680,18 +675,18 @@ def create_model(system=sys,
     # ============================================================================
     ###### Ethanol distribution ######
     S304 = F.S304
-    D = shape.Uniform(0.6,1.0)
+    D = shape.Triangle(0.8,0.9,1.0)
     @param(name='Ethanol split for SAF', element=S304, kind='coupled', units='%',
-            baseline=1.0, distribution=D)
+            baseline=0.9, distribution=D)
     def set_ethanol_split(split):
         S304.split = split
     
     
     
     ##### Financial parameters #####
-    D = shape.Triangle(1000000/24/0.8, 2000000/24/0.8, 3000000/24/0.8)
+    D = shape.Triangle(2000000/24/0.8*0.5, 2000000/24/0.8, 2000000/24/0.8*1.5)
     @param(name='Feedstock flow', element='feedstock', kind='coupled', units='kg/hr',
-            baseline=2000000/24/0.8, distribution=D)
+           baseline=2000000/24/0.8, distribution=D)
     def set_feedstock_flow(flow):
         F.feedstock.F_mass = flow
     
@@ -699,7 +694,7 @@ def create_model(system=sys,
     
     D = shape.Triangle(0.41/0.789*0.8, 0.41/0.789, 0.41/0.789*1.3)
     @param(name='Ethanol price', element='ethanol', kind='isolated', units='$/kg',
-            baseline=0.41/0.789, distribution=D)
+           baseline=0.41/0.789, distribution=D)
     def set_ethanol_price(price):
         F.ethanol_to_sold.price = price
         
@@ -741,6 +736,7 @@ def create_model(system=sys,
             baseline=natural_gas_price, distribution=D)
     def set_natural_gas_price(price): 
         F.natural_gas.price = price
+        F.natural_gas_for_h2.price = price
 
 
 
@@ -831,7 +827,7 @@ def create_model(system=sys,
     @param(name='H2 price', element='H2', kind='isolated', units='$/kg',
             baseline=H2_price, distribution=D)
     def set_hydrogen_price(price):
-        F.hydrogen.price = price
+        F.hydrogen.price = 0
 
 
 
@@ -849,7 +845,7 @@ def create_model(system=sys,
     @param(name='Diesel price', element='Diesel', kind='isolated', units='$/kg',
             baseline=diesel_price, distribution=D)
     def set_diesel_price(price):
-        diesel.price = price
+        F.diesel.price = price
 
 
 
@@ -858,7 +854,7 @@ def create_model(system=sys,
     @param(name='Gasoline price', element='Gasoline', kind='isolated', units='$/kg',
             baseline=gasoline_price, distribution=D)
     def set_gasoline_price(price):
-        gasoline.price = price
+        F.gasoline.price = price
 
 
 
@@ -973,6 +969,7 @@ def create_model(system=sys,
         R401.catalyst_lifetime = t
 
 
+
     D = shape.Uniform(0.988*0.9, 0.988)
     @param(name='1st oligomerization ethylene-to-C4H8', element=R402, kind='coupled', units='%',
             baseline=0.988, distribution=D)
@@ -1053,18 +1050,17 @@ def create_model(system=sys,
 
 
     ##### Facilities parameter #####
-    BT = F.BT
     D = shape.Uniform(0.8*(1-0.1), 0.8*(1+0.1))
-    @param(name='Boiler efficiency', element=BT, kind='coupled', units='',
+    @param(name='Boiler efficiency', element=F.BT, kind='coupled', units='',
             baseline=0.8, distribution=D)
     def set_boiler_efficiency(efficiency):
-        BT.boiler_efficiency = efficiency
+        F.BT.boiler_efficiency = efficiency
 
 
 
-    # # =============================================================================
-    # # LCA parameters
-    # # =============================================================================
+    # =============================================================================
+    # LCA parameters
+    # =============================================================================
     D = shape.Uniform(-0.18363*0.8, -0.10874*0.8)
     @param(name='Feedstock GWP', element='Feedstock', kind='isolated', units='kg CO2-eq/kg',
             baseline=-0.14315*0.8, distribution=D)
@@ -1110,6 +1106,7 @@ def create_model(system=sys,
             baseline=1.5624, distribution=D)
     def set_H2_GWP(X):
         F.hydrogen.characterization_factors['GWP100'] = X
+        F.hydrogen.characterization_factors['GWP100'] = 0
 
 
 
@@ -1118,25 +1115,70 @@ def create_model(system=sys,
             baseline=0.4, distribution=D)
     def set_natural_gas_GWP(X):
         F.natural_gas.characterization_factors['GWP100'] = X
+        F.natural_gas_for_h2.characterization_factors['GWP100'] = X
 
-    
-
-
-    
-    if N > 0:
-        rule=rule
-        np.random.seed(1234)
-        samples=model.sample(N, rule)
-        model.load_samples(samples)
-        model.evaluate(notify=notify_runs)
-        model.show()
-        model.table.to_excel('model_table_repurposing.xlsx')
-        df_rho,df_p = model.spearman_r()
-        df_rho.to_excel('df_rho_repurposing.xlsx')
-        df_p.to_excel('df_p_repurposing.xlsx')
-    else:
-        model.show()
     return model
+
+model = create_model()
+system = model._system
+
+def reset_and_reload():
+    print('Resetting cache and emptying recycles ...')
+    system.reset_cache()
+    system.empty_recycles()
+def reset_and_switch_solver(solver_ID):
+    system.reset_cache()
+    system.empty_recycles()
+    system.converge_method = solver_ID
+    print(f"Trying {solver_ID} ...")
+def run_bugfix_barrage():
+    try:
+        reset_and_reload()
+        system.simulate()
+    except Exception as e:
+        print(str(e))
+        try:
+            reset_and_switch_solver('fixedpoint')
+            system.simulate()
+        except Exception as e:
+            print(str(e))
+            try:
+                reset_and_switch_solver('aitken')
+                system.simulate()
+            except Exception as e:
+                print(str(e))
+                # print(_yellow_text+"Bugfix barrage failed.\n"+_reset_text)
+                print("Bugfix barrage failed.\n")
+                # breakpoint()
+                raise e
+def model_specification():
+    try:
+        system.simulate()
+    except Exception as e:
+        str_e = str(e).lower()
+        print('Error in model spec: %s'%str_e)
+        run_bugfix_barrage()
+
+def run_model(N = 2000, notify_runs = 10, model = model): 
+    np.random.seed(1234) 
+    rule = 'L' # For Latin-Hypercube sampling
+    samples = model.sample(N, rule)
+    model.load_samples(samples)
+    model._specification = model_specification
+    model.evaluate(notify = notify_runs) 
+    model.table.to_excel('model_table_repurposing.xlsx')
+    df_rho,df_p = model.spearman_r()
+    df_rho.to_excel('df_rho_repurposing.xlsx')
+    df_p.to_excel('df_p_repurposing.xlsx')
+    return model
+
+#%%
+run_model()
+pd.set_option('display.max_rows', None)
+pd.set_option('display.float_format', '{:.4f}'.format)
+print(model.metrics_at_baseline())
+
+ 
 
 #%%
 
@@ -1163,15 +1205,15 @@ def create_model(system=sys,
 
 # #%%
 
-# # CI Coutour data generating (can change to displacement, hybrid, energy)
-# y_data = S304_split = np.round(np.linspace(0.6,1,9),2)
+# CI Coutour data generating (can change to displacement, hybrid, energy)
+# y_data = S304_split = np.round(np.linspace(0.8,1,9),2)
 # x_data = feedflow_CI = np.round(np.linspace(-0.147,-0.087,13),3)
 # w_data = []
 # def CI_at_x_and_y_1(x,y):  
 #     F.S304.split = y
 #     F.feedstock.characterization_factors['GWP100']  = x
 #     sys.simulate()
-#     CI_jet = get_GWP_jet_energy()
+#     CI_jet = get_GWP_jet_displacement()
 #     return(CI_jet)
 
 # for j in y_data:

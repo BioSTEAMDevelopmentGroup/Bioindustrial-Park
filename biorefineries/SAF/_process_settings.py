@@ -220,8 +220,8 @@ compressed_CO2_price = -1*(0.022 + 0.03) # Transportation and storage price from
 price = {
     'feedstock': 0.0875*0.8,
     'water': water_price,
-    'H3PO4': H3PO4_price * _chemical_2021to2023,
-    'flocculant': flocculant_price, 
+    # 'H3PO4': H3PO4_price * _chemical_2021to2023,
+    # 'flocculant': flocculant_price, 
     'lime': lime_price * _chemical_2021to2023,  
     'enzyme': enzyme_price,
     'CSL': CSL_price, 
@@ -241,8 +241,8 @@ price = {
     'gasoline': gasoline_price,
     'jet fuel': jet_fuel_price,
     'diesel': diesel_price,
-    'MEA': MEA_price * 0.3, # 30% MEA
-    'compressed CO2': compressed_CO2_price,
+    # 'MEA': MEA_price * 0.3, # 30% MEA
+    # 'compressed CO2': compressed_CO2_price,
     'oc': 0.4/3.78/845*1000,
     'ethanol': 0.41/0.789, # $0.41/L is from https://www.icao.int/environmental-protection/Pages/SAF_RULESOFTHUMB.aspx
         }
@@ -259,8 +259,8 @@ price = {
 
 GWP_CFs = {
     'feedstock': -0.14315*0.8, # -154.61 gCO2 is dry miscanthus average CI of PADD2 from Xinxin's data
-    'H3PO4': 0.86829, # ecoinvent 3.8 market for phosphoric acid, RoW
-    'polymer': 3.1996, # ecoinvent 3.8 market for polyacrylamide-based anionic flocculants, GLO
+    # 'H3PO4': 0.86829, # ecoinvent 3.8 market for phosphoric acid, RoW
+    # 'polymer': 3.1996, # ecoinvent 3.8 market for polyacrylamide-based anionic flocculants, GLO
     'lime': 1.29,
     'lime_boiler':1.29,
     'enzyme_M301': 2.24,
@@ -273,10 +273,14 @@ GWP_CFs = {
     'electricity': 0.48, # in kg CO2-eq/kWh https://www.eia.gov/tools/faqs/faq.php?id=74&t=11
     'MEA': 3.4062, # ecoinvent 3.8 ethanolamine production, RoW [monoethanolamine]
     'ash':0.01, # from Production of Sustainable Aviation Fuels in Petroleum Refineries: Evaluation of New Bio-Refinery Concepts
-    'Syndol_catalyst':10+1, # production+disposal, assume prodution=10 based on similar chemicalss
-    'first_catalyst':10+1, # production+disposal, assume prodution=10 based on similar chemicalss
-    'second_catalyst':10+1, # production+disposal, assume prodution=10 based on similar chemicalss
-    'Como_catalyst':9.52+1, # production+disposal, from Production of Sustainable Aviation Fuels in Petroleum Refineries: Evaluation of New Bio-Refinery Concepts
+    'Syndol_catalyst':10, # production+disposal, assume prodution=10 based on similar chemicalss
+    'first_catalyst':10, # production+disposal, assume prodution=10 based on similar chemicalss
+    'second_catalyst':10, # production+disposal, assume prodution=10 based on similar chemicalss
+    'Como_catalyst':9.52, # production+disposal, from Production of Sustainable Aviation Fuels in Petroleum Refineries: Evaluation of New Bio-Refinery Concepts
+    'spent_catalyst_R401':1,
+    'spent_catalyst_R402':1,
+    'spent_catalyst_R403':1,
+    'spent_catalyst_R403':1,
     'natural_gas_for_h2':0.40,
     'ethanol_to_sold': -1.28*0.915, # ethanol is a co-product from https://ecoquery.ecoinvent.org/3.8/cutoff/dataset/5353/impact_assessment 91.5% is wt%
     'gasoline':-0.8415, # gasoline is a co-product; from GREET

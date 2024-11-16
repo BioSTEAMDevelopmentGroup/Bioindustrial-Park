@@ -13,7 +13,7 @@ from biorefineries.cornstover import CellulosicEthanolTEA
 
 
 
-__all__ = ('SAF_TEA', 'create_SAF_tea', 'ATJ_TEA', 'create_ATJ_tea', 'SAF_coprocessing_TEA', 'create_SAF_coprocessing_tea')
+__all__ = ('SAF_TEA', 'create_SAF_tea', 'SAF_coprocessing_TEA', 'create_SAF_coprocessing_tea')
 
 
 class SAF_TEA(CellulosicEthanolTEA):

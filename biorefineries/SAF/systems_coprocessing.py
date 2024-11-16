@@ -30,15 +30,13 @@ bst.main_flowsheet.set_flowsheet(F)
 @SystemFactory(
     ID='preprocessing_sys',
     ins=[dict(ID='feedstock')],
-    outs=[dict(ID='bagasse_to_pretreatment'),
-          dict(ID='bagasse_to_CHP'),])
+    outs=[dict(ID='bagasse_to_pretreatment')])
 def preprocessing_sys(ins,outs):
     feedstock = ins
-    bagasse_to_pretreatment, bagasse_to_CHP = outs
-    U101 = _units.FeedStockHandling('U101', ins=feedstock, outs='')
+    bagasse_to_pretreatment = outs
+    U101 = _units.FeedStockHandling('U101', ins=feedstock, outs=bagasse_to_pretreatment)
     U101.cost_items['System'].cost = 0
-    S102 = bst.Splitter('S102', ins=U101-0, outs=[bagasse_to_pretreatment,bagasse_to_CHP],split=1)
-
+    
 
 #%%
 
@@ -46,25 +44,25 @@ def preprocessing_sys(ins,outs):
     ID='pretreatment_sys',
     ins=[dict(ID='warm_process_water'),
          dict(ID='pretreatment_steam'),
-         dict(ID='feedstock_to_pretreatment')],
+         dict(ID='bagasse_to_pretreatment')],
     outs=[dict(ID='pretreatment_to_WWT'),
           dict(ID='pretreated_bagasse')])
 def pretreatment_sys(ins,outs):
-    warm_process_water,pretreatment_steam,feedstock_to_pretreatment = ins
+    warm_process_water,pretreatment_steam,bagasse_to_pretreatment = ins
     pretreatment_to_WWT,pretreated_bagasse = outs
     T_pretreatment_reactor = 130.+273.15
     
     P = pretreatment_steam.chemicals['H2O'].Psat(T_pretreatment_reactor + 25)
     
-    M201 = bst.SteamMixer('M201',ins=(feedstock_to_pretreatment,pretreatment_steam,warm_process_water),
+    M201 = bst.SteamMixer('M201',ins=(bagasse_to_pretreatment,pretreatment_steam,warm_process_water), outs='',
                           P=P,solids_loading=0.305)
-    R201 = _units.PretreatmentReactor('R201',ins=M201-0,T=T_pretreatment_reactor)
-    P201 = units.BlowdownDischargePump('P201',ins=R201-1)
-    F201 = units.PretreatmentFlash('F201', ins=P201-0,P=101325,Q=0)
-    M202 = bst.Mixer('M202',ins=(R201-0,F201-0))
+    R201 = _units.PretreatmentReactor('R201',ins=M201-0,outs=('',''),T=T_pretreatment_reactor)
+    P201 = units.BlowdownDischargePump('P201',ins=R201-1, outs='')
+    F201 = units.PretreatmentFlash('F201', ins=P201-0,outs=('',''),P=101325,Q=0)
+    M202 = bst.Mixer('M202',ins=(R201-0,F201-0),outs='')
     units.WasteVaporCondenser('H201',ins=M202-0,outs=pretreatment_to_WWT,V=0)
 
-    P202 = units.HydrolyzatePump('P202',ins=F201-1)
+    P202 = units.HydrolyzatePump('P202',ins=F201-1,outs='')
 
     U201 = bst.HammerMill('U201', ins=P202-0,outs=pretreated_bagasse)
 
@@ -73,13 +71,12 @@ def pretreatment_sys(ins,outs):
    
 @SystemFactory(
     ID='fermentation_sys',
-    ins=[dict(ID='pretreated_bagasse'),
-         # dict(ID='concentrated_juice'),
-         dict(ID='enzyme_M301'),
+    ins=[dict(ID='enzyme_M301'),
          dict(ID='water_M301'),
          dict(ID='CSL'),
          dict(ID='DAP'),
-         dict(ID='water_U301')],
+         dict(ID='water_U301'),
+         dict(ID='pretreated_bagasse'),],
     outs=[dict(ID='U301_vent'),
           dict(ID='U302_cell_mass'),
           dict(ID='U302_to_WWT'),
@@ -88,13 +85,13 @@ def pretreatment_sys(ins,outs):
           dict(ID='ethanol_to_sold'),])
           
 def fermentation_sys(ins,outs):
-    pretreated_bagasse,enzyme_M301,water_M301,CSL,DAP,water_U301 = ins
+    enzyme_M301,water_M301,CSL,DAP,water_U301,pretreated_bagasse = ins
     U301_vent,U302_cell_mass,U302_to_WWT,D302_to_WWT,ethanol_to_upgrading,ethanol_to_sold = outs
     
     M301 = _units.EnzymeHydrolysateMixer('M301',ins=(pretreated_bagasse,enzyme_M301,water_M301),outs='',
                                          enzyme_loading=20,solids_loading=0.2)
     
-    H301 = bst.HXutility('H301', ins=M301-0,T=48+273.15)
+    H301 = bst.HXutility('H301', ins=M301-0, outs='', T=48+273.15)
     
     DAP_storage = _units.DAPStorageTank('DAP_storage', ins=DAP, outs='')
     
@@ -138,7 +135,7 @@ def fermentation_sys(ins,outs):
     T302 = _units.BeerTank('T302', ins=M303-0,outs='')
 
     # Heat up crude beer by exchanging heat with stillage
-    H302 = bst.HXprocess('H302', ins=(T302-0,''),outs='',
+    H302 = bst.HXprocess('H302', ins=(T302-0,''),outs=('',''),
                          phase0='l',phase1='l',U=1.28)
 
     # Remove solids from fermentation broth, based on the pressure filter in ref [1]
@@ -189,7 +186,7 @@ def fermentation_sys(ins,outs):
    
     ethanol_storage = bst.StorageTank('ethanol_storage', ins=S301_H-0, outs='ethanol_total', tau=7*24)
     
-    S304 = bst.Splitter('S304', ins=ethanol_storage-0, outs=[ethanol_to_upgrading, ethanol_to_sold], split=0.9)
+    S304 = bst.Splitter('S304', ins=ethanol_storage-0, outs=[ethanol_to_upgrading, ethanol_to_sold], split=0.8)
     
     
 #%%
@@ -221,21 +218,21 @@ def upgrading_sys(ins,outs):
     NaOH,Syndol_catalyst,first_catalyst,second_catalyst,ethanol_to_upgrading,hydrogen,Como_catalyst,natural_gas_for_h2,oc = ins
     F401_to_WWT,D401_heavy_impurities,D402_top_product,CH4_C2H6,gasoline,jet_fuel,diesel,spent_catalyst_R401,spent_catalyst_R402,spent_catalyst_R403,spent_catalyst_R404 = outs
     
-    P401 = bst.Pump('P401',ins=ethanol_to_upgrading,P=4.5*101325)
-    M400 = bst.Mixer('M400', (P401-0,''))
-    H400 = bst.HXutility('H400',ins=M400-0,V=1,rigorous=True)
+    P401 = bst.Pump('P401',ins=ethanol_to_upgrading,outs='',P=4.5*101325)
+    M400 = bst.Mixer('M400', ins=(P401-0,''), outs='')
+    H400 = bst.HXutility('H400',ins=M400-0,outs='',V=1,rigorous=True)
 
     R401 = _units.AdiabaticFixedbedDehydrationReactor('R401', ins=(H400-0,Syndol_catalyst),outs=('',spent_catalyst_R401))
 
     # Depressurize to 1 bar before quenching
-    V401 = bst.IsenthalpicValve('V401', ins=R401-0,P=101325)
+    V401 = bst.IsenthalpicValve('V401', ins=R401-0,outs='', P=101325)
 
     # Simulate as a quench tower
     H402 = bst.HXutility('H402', ins=V401-0,T=20+273.15,outs='crude_ethylene',rigorous=True)
     S401 = bst.PhaseSplitter('S401', ins=H402-0,outs=('vapor','liquid'))
 
     # Recover ethylene from water in S401-1 and S402-1
-    M401 = bst.Mixer('M401',ins=(S401-1,''),rigorous=False)
+    M401 = bst.Mixer('M401',ins=(S401-1,''),outs='',rigorous=False)
     
     # Split flash setting based on eq.plot_vle_binary_phase_envelope(['Ethylene', 'Water'], P=101325) NO VACCUM (T cannot meet)
     F401 = bst.SplitFlash('F401', ins=M401-0, outs=('recovered_ethylene',F401_to_WWT), 
@@ -249,7 +246,7 @@ def upgrading_sys(ins,outs):
 
     # Pressurize to 27 bar before purification;
     # Based on Bioethylene Production from Ethanol: A Review and Techno-economical Evaluation
-    C401 = bst.MultistageCompressor('C401', ins=M402-0,n_stages=3,pr=3,vle=True)
+    C401 = bst.MultistageCompressor('C401', ins=M402-0,outs='', n_stages=3,pr=3,vle=True)
 
     # Condense water
     S402 = bst.PhaseSplitter('S402', ins=C401-0,outs=('vapor','liquid'))
@@ -259,7 +256,7 @@ def upgrading_sys(ins,outs):
     S402-1-1-M401
 
     # Remove CO2
-    U402 = _units.CausticTower('U402', ins=(S402-0, NaOH),P=27*101325)
+    U402 = _units.CausticTower('U402', ins=(S402-0, NaOH), outs='', P=27*101325)
 
     # Remove water and ethanol
     U403 = bst.MolecularSieve('U403', ins=U402-0,outs=('water_and_ethanol','dried_ethylene'),
@@ -270,7 +267,7 @@ def upgrading_sys(ins,outs):
    
     # Reduce temperature before cryogenic distillation low temperature + high pressure
     # Temperature is based on Bioethylene Production from Ethanol: A Review and Techno-economical Evaluation
-    H404 = bst.HXutility('H404',ins=U403-1,T=-22+273.15)
+    H404 = bst.HXutility('H404',ins=U403-1,outs='',T=-22+273.15)
 
     # Ethylene column by cryogenic distillation, remove heavy keys (Propylene,
     # Butadiene, Ethane, Diethyl ether, and Acetaldehyde) 
@@ -289,7 +286,7 @@ def upgrading_sys(ins,outs):
                                   Lr=0.99, Hr=0.999,
                                   k=1.2)
     
-    H405 = bst.HXutility('H405', ins=D402-1, T=10+273.15)
+    H405 = bst.HXutility('H405', ins=D402-1, outs='', T=10+273.15)
 
     # Ethylene purity is 100%, ignore impurity for simplification but considered in LCA
     S403 = bst.Splitter('S403', ins=H405-0, outs=('pure_ethylene',CH4_C2H6),
@@ -373,12 +370,14 @@ def SAF_sys(ins,outs,material_storage,product_storage,WWTC,BoilerTurbo,hydrogena
                                             Protein=0.0058,
                                             total_flow=2000000/24/0.8,
                                             price=price['feedstock'],
-                                            units='kg/hr',)))
+                                            units='kg/hr',)),
+                              outs=Stream('bagasse_to_pretreatment'))
 
     sys_2 = pretreatment_sys(ins = (Stream(ID='warm_process_water',
                                            T=368.15,
                                            Water=1,
                                            P=4.7*101325,
+                                           units='kg/hr',
                                            price=price['water']),
                                     Stream(ID='pretreatment_steam',
                                            phase='g',
@@ -386,13 +385,16 @@ def SAF_sys(ins,outs,material_storage,product_storage,WWTC,BoilerTurbo,hydrogena
                                            P=13*101325,
                                            Water=24534+3490,
                                            units='kg/hr'),
-                                    sys_1.outs[0]))
+                                    sys_1.outs[0]),
+                             outs=(Stream(ID='pretreatment_to_WWT'),
+                                   Stream(ID='pretreated_bagasse'),))
                                     
-    sys_3 = fermentation_sys(ins = (sys_2.outs[1],
-                                    Stream(ID='enzyme_M301',
+    sys_3 = fermentation_sys(ins = (Stream(ID='enzyme_M301',
+                                           Enzyme=1,
                                            units='kg/hr',
                                            price=price['enzyme']),
                                     Stream(ID='water_M301',
+                                           Water=1,
                                            units='kg/hr',
                                            price=price['water']),
                                     Stream(ID='CSL',
@@ -406,7 +408,8 @@ def SAF_sys(ins,outs,material_storage,product_storage,WWTC,BoilerTurbo,hydrogena
                                     Stream(ID='water_U301',
                                            Water=1,
                                            units='kg/hr',
-                                           price=price['water'])),
+                                           price=price['water']),
+                                    sys_2.outs[1],),
                               outs = (Stream(ID='U301_vent'),
                                       Stream(ID='U302_cell_mass'),
                                       Stream(ID='U302_to_WWT'),
@@ -435,8 +438,9 @@ def SAF_sys(ins,outs,material_storage,product_storage,WWTC,BoilerTurbo,hydrogena
                                         phase='s',
                                         units='kg/hr',
                                         price=price['Aluminosilicate catalyst']),
-                                 sys_3.outs[-2],
+                                 sys_3.outs[4],
                                  Stream(ID='hydrogen',
+                                        H2=1,
                                         phase='g',
                                         units='kg/hr',
                                         price=price['h2']),
@@ -451,6 +455,7 @@ def SAF_sys(ins,outs,material_storage,product_storage,WWTC,BoilerTurbo,hydrogena
                                         units='kg/hr',
                                         price=price['natural gas']),
                                  Stream(ID='oc',
+                                        Water=1,
                                         price=price['oc']),),
                           outs = (Stream(ID='F401_to_WWT'),
                                   Stream(ID='D401_heavy_impurities'),
@@ -513,8 +518,7 @@ def SAF_sys(ins,outs,material_storage,product_storage,WWTC,BoilerTurbo,hydrogena
     
     
     M901 = bst.Mixer('M901',
-                     ins=(F.bagasse_to_CHP,
-                          F.U302_cell_mass,
+                     ins=(F.U302_cell_mass,
                           F.D401_heavy_impurities,
                           F.sludge_from_wastewater_treatment), # WWT.outs[1]
                      outs='total_effluent_to_be_burned')  
@@ -525,8 +529,8 @@ def SAF_sys(ins,outs,material_storage,product_storage,WWTC,BoilerTurbo,hydrogena
                     outs='total_gas_to_be_burned')
 
     BT = bst.BoilerTurbogenerator('BT',
-                                  ins=(F.total_effluent_to_be_burned, # M901 outs[0]
-                                       F.total_gas_to_be_burned, # M902 outs[0]
+                                  ins=(M901-0, # M901 outs[0]
+                                       M902-0, # M902 outs[0]
                                        'boiler_makeup_water',
                                        natural_gas,
                                        lime_boiler,
@@ -548,7 +552,7 @@ def SAF_sys(ins,outs,material_storage,product_storage,WWTC,BoilerTurbo,hydrogena
     CT.ins[-1].price = price['cooling tower chems']
                                                          
     # All water used in the system, here only consider water usage
-    system_makeup_water_streams = (F.boiler_makeup_water,
+    system_makeup_water_streams = (BT.ins[2],
                                    CT.ins[1]) # Second ins of CT (cooling_tower_makeup_water)
                              
     system_process_water_streams = (F.warm_process_water,
@@ -571,7 +575,7 @@ def SAF_sys(ins,outs,material_storage,product_storage,WWTC,BoilerTurbo,hydrogena
 
     FWT = _units.FireWaterTank('FWT', ins=fire_water_in, outs='fire_water_out')
     
-    HXN = bst.HeatExchangerNetwork('HXN',cache_network=True)
+    # HXN = bst.HeatExchangerNetwork('HXN',cache_network=True)
     
     
     if material_storage == False:
