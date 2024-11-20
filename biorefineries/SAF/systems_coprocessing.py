@@ -186,7 +186,7 @@ def fermentation_sys(ins,outs):
    
     ethanol_storage = bst.StorageTank('ethanol_storage', ins=S301_H-0, outs='ethanol_total', tau=7*24)
     
-    S304 = bst.Splitter('S304', ins=ethanol_storage-0, outs=[ethanol_to_upgrading, ethanol_to_sold], split=0.8)
+    S304 = bst.Splitter('S304', ins=ethanol_storage-0, outs=[ethanol_to_upgrading, ethanol_to_sold], split=0.9)
     
     
 #%%
