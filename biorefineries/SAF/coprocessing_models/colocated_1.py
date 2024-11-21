@@ -116,8 +116,8 @@ get_jet_energy_ratio = lambda: get_jet_energy()/ get_total_energy()
 get_diesel_energy_ratio = lambda: get_diesel_energy() / get_total_energy()
 get_gasoline_energy_ratio = lambda: get_gasoline_energy() / get_total_energy()
 
-get_eth_to_jet_volume_ratio = lambda:  get_jet_yield() / get_ethanol_yield() * 100
-get_eth_to_jet_energy_ratio = lambda: get_jet_energy() / get_ethanol_energy() * 100
+get_eth_to_jet_volume_ratio = lambda:  get_jet_yield() / get_ethanol_yield() * 100 / np.array(F.S304.split)[0]
+get_eth_to_jet_energy_ratio = lambda: get_jet_energy() / get_ethanol_energy() * 100 / np.array(F.S304.split)[0]
 get_feedstock_to_jet_conversion = lambda: F.jet_fuel.F_vol * _gal_per_m3 / (F.feedstock.F_mass * 0.8 / 1000) # gal/dry ton
 
 
