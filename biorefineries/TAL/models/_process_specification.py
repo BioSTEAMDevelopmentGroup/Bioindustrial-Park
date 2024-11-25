@@ -425,8 +425,8 @@ class ProcessSpecification(bst.process_tools.ReactorSpecification):
             Yield in weight fraction of substrates converted to product 
             over theoretical maximum yield.  
         
-        Warnings
-        --------
+        Notes
+        -----
         At higher product yields (high enough to result in >100% conversion of sugars), to prevent >100% conversion of sugars:
         (a) first citrate and then cell mass yields are decreased (if spec.byproduct_yields_decrease_policy='sequential, when product yield too high'; default); OR 
         (b) both citrate and cell mass yields are decreased uniformly (if spec.byproduct_yields_decrease_policy='simultaneous, when product yield too high'); OR

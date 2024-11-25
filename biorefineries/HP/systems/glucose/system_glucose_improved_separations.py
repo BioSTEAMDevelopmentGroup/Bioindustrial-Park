@@ -681,10 +681,10 @@ def F301_titer_obj_fn(V):
     # HP_fermentation_process.run()
     return R302.effluent_titer - R302.titer_to_load
 
-def load_titer_with_glucose(titer_to_load):
+def load_titer_with_glucose(titer_to_load, set_F301_V=None):
     # clear_units([V301, K301])
-    # F301_lb, F301_ub = 1e-3, 1. - 1e-3
-    F301_lb, F301_ub = 0., 1. - 1e-3
+    F301_ub = 1. - 1e-3
+    F301_lb = 0. if set_F301_V is None else set_F301_V
     M304_lb, M304_ub = 0., 100_000.  # for low-titer high-yield combinations, if infeasible, use a higher upper bound
     
     spec.spec_2 = titer_to_load
@@ -709,10 +709,11 @@ def load_titer_with_glucose(titer_to_load):
                          M304_lb, 
                          M304_ub, 
                          ytol=1e-3)
-
-    if not feedstock_ID=='Glucose': spec.titer_inhibitor_specification.check_sugar_concentration()
+        
+    if not feedstock_ID=='Glucose' and (set_F301_V is None): spec.titer_inhibitor_specification.check_sugar_concentration()
     # spec.titer_inhibitor_specification.check_sugar_concentration()
-    
+
+
 spec.load_spec_2 = load_titer_with_glucose
 
 #%% Load specifications
