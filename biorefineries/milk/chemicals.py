@@ -107,6 +107,7 @@ def create_chemicals(yeast_includes_nitrogen=False):
         'DodecylAcetate',        
         'DodecanoicAcid',
         'Tetradecanol',
+        'Tripalmitate',
         'Ca(OH)2',
         'Hexane',
         *gases,
@@ -119,6 +120,7 @@ def create_chemicals(yeast_includes_nitrogen=False):
         if i.ID in IDs or i.CAS in CASs: continue
         chemicals.append(i)
     bst.settings.set_thermo(chemicals)
+    chemicals.set_alias('Tripalmitate', 'ButterFat')
     chemicals.define_group(
         'Minerals', mineral_names, mineral_weights, wt=True
     )
@@ -157,6 +159,29 @@ def create_chemicals(yeast_includes_nitrogen=False):
         'GlucoseMedia',
         ['Protein', 'Glucose', 'Ash', 'Water'],
         [2.77, 20.7, 0.425, 71.2],
+        wt=True,
+    )
+    chemicals.define_group( # Source: 
+        'GreekAW'
+        ['Protein', 'Lactose', 'Ash', 'LacticAcid', 'Solids', 'Water'],
+        [0.1, 3.8, 0.7, 0.6, 5.6, 89.2],
+        wt=True,
+    )
+    chemicals.define_group( # Source: 
+        'CottageAW'['Protein', 'Lactose', 'Ash', 'LacticAcid', 'Solids', 'Water'],
+        [1.2, 3.8, 0.7, 0.6, 6, 87.7],
+        wt=True,
+    )
+    chemicals.define_group( # Source: 
+        'WheyCream'
+        ['Protein', 'Lactose', 'Ash', 'LacticAcid', 'Solids', 'Water'],
+        [0.8, 3, 0.3, 0.1, 37.5, 57.8], #LacticAcid: 35-40
+        wt=True,
+    )
+    chemicals.define_group( # Source: 
+        'Buttermilk'
+        ['Protein', 'Lactose', 'Ash', 'LacticAcid', 'Solids', 'Water'],
+        [2, 4, 0.5, 0.1, 7, 86.4], #LacticAcid: 7+
         wt=True,
     )
     chemicals.set_alias('Yeast', 'Cellmass')
