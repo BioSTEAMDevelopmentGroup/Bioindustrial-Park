@@ -18,7 +18,8 @@ from biosteam.utils import  colors
 import numpy as np
 
 from biorefineries import TAL
-from biorefineries.TAL.systems.system_TAL_solubility_exploit_ethanol_sugarcane import TAL_tea, TAL_lca, R302, spec, TAL_product, simulate_and_print, theoretical_max_g_TAL_per_g_SA
+from biorefineries.TAL.systems.system_TAL_solubility_exploit_ethanol_sugarcane import TAL_tea, TAL_lca, R302, spec, TAL_product, simulate_and_print, theoretical_max_g_TAL_per_g_SA,\
+    F301, F301_P, M304
 
 from  matplotlib.colors import LinearSegmentedColormap
 import pandas as pd
@@ -121,15 +122,25 @@ get_TAL_sugars_conc = lambda: sum(R302.outs[0].imass['Glucose', 'Xylose'])/R302.
 
 get_TAL_inhibitors_conc = lambda: 1000*sum(R302.outs[0].imass['AceticAcid', 'Furfural', 'HMF'])/R302.outs[0].F_vol
 
+def get_F301_heat_utility_duty():
+    if F301.heat_utilities:
+        return abs(F301.heat_utilities[0].duty) + abs(F301.heat_utilities[1].duty)
+    else:
+        return 0
+
+get_sugar_conc_utility_demand_proxy = lambda: get_F301_heat_utility_duty() +\
+                                              3600*(F301_P.power_utility.consumption + M304.power_utility.consumption)
+
+get_sugar_conc_TCI = lambda: F301.installed_cost + F301_P.installed_cost + M304.installed_cost
 
 
 # %% Generate 3-specification meshgrid and set specification loading functions
 
-steps = (60, 60, 1)
+steps = (30, 30, 1)
 
 # Yield, titer, productivity (rate)
-spec_1 = yields = np.linspace(0.01, 0.99, steps[0]) # yield
-spec_2 = titers = np.linspace(2., 
+spec_1 = yields = np.linspace(0.1, 0.99, steps[0]) # yield
+spec_2 = titers = np.linspace(10., 
                               100., # although sugar concentration limit of 600 g/L would allow as high as 230 g-TAL/L, we set an upper limit of 100 g/L
                                    # based on achieved (50-68 g/L using E.coli, Candida) and targeted (100 g/L) titers for adipic acid, another organic solid with low water solubility
                                    # Skoog et al., 2018 ( https://doi.org/10.1016/j.biotechadv.2018.10.012 )
@@ -138,7 +149,7 @@ spec_2 = titers = np.linspace(2.,
 # spec_3 = productivities =\
 #     np.linspace(0.05, 1.5, steps[2])
 
-which_fig = '5'
+which_fig = 'insights'
 
 #%%
 additional_points = {}
@@ -203,6 +214,18 @@ else:
                        get_TAL_AOC, get_TAL_TCI, 
                        get_product_purity]
         additional_points = {(40.5, 35.9):('D', 'w', 6)}
+    elif which_fig=='insights':
+        spec_3 = productivities =\
+            np.array([
+                        1.*spec.baseline_productivity,
+                      ])
+        TAL_metrics = [get_product_MPSP, 
+                       # lambda: TAL_lca.GWP,
+                       # lambda: TAL_lca.FEC, 
+                       get_sugar_conc_utility_demand_proxy,
+                       get_sugar_conc_TCI,
+                       get_F301_heat_utility_duty,
+                       get_TAL_AOC, get_TAL_TCI,]
     
 #%% Plot stuff
 
@@ -355,6 +378,8 @@ total_no = len(yields)*len(titers)*len(productivities)
 
 print_status_every_n_simulations = 50
 
+titers_mol_per_mol_total = [] # for fermentation generalizable insights work only
+
 for p in productivities:
     # data_1 = TAL_data = spec.evaluate_across_specs(
     #         TAL_sys, spec_1, spec_2, TAL_metrics, [p])
@@ -369,6 +394,7 @@ for p in productivities:
         d1_Metric4.append([])
         d1_Metric5.append([])
         d1_Metric6.append([])
+        titers_mol_per_mol_total.append([])
         for t in titers:
             curr_no +=1
             error_message = None
@@ -378,6 +404,7 @@ for p in productivities:
                 # spec.set_production_capacity(desired_annual_production=spec.desired_annual_production)
                 
                 for i in range(3): system.simulate()
+                titers_mol_per_mol_total[-1].append(broth.imol['TAL']/broth.imol['TAL', 'Water'].sum())
                 
                 d1_Metric1[-1].append(TAL_metrics[0]())
                 d1_Metric2[-1].append(TAL_metrics[1]())
@@ -547,7 +574,7 @@ keep_frames = True
 print('\nCreating and saving contour plots ...\n')
 
 #%% Plots
-plot = True
+plot = False
 
 if plot: 
     

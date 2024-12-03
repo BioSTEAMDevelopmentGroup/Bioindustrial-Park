@@ -202,7 +202,7 @@ HP_metrics = [get_product_MPSP,
 
 # %% Generate 3-specification meshgrid and set specification loading functions
 
-steps = (50, 50, 1)
+steps = (20, 20, 1)
 
 # Yield, titer, productivity (rate)
 # spec_1 = yields = np.linspace(0.05, 0.95, steps[0]) # yield
@@ -417,7 +417,8 @@ for p in productivities:
                     spec.load_specifications(spec_1=y, spec_2=t, spec_3=p)
                     for i in range(1): system.simulate()
                     
-                    titers_mol_per_mol_total[-1].append(broth.imol['HP']/broth.imol['HP', 'Water'].sum())
+                    titers_mol_per_mol_total[-1].append((broth.imol['HP'] + 2*broth.imol['CalciumLactate'])/
+                                                        (broth.imol['HP', 'Water'].sum() + 2*broth.imol['CalciumLactate']))
                     
                     d1_Metric1[-1].append(HP_metrics[0]())
                     d1_Metric2[-1].append(HP_metrics[1]())

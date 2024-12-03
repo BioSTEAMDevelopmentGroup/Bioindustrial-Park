@@ -62,7 +62,7 @@ HP_results_filepath = HP_filepath + '\\analyses\\results\\'
 
 #%% Load baseline
 
-spec.reactor.neutralization = True # !!! set neutralization here
+spec.reactor.neutralization = False # !!! set neutralization here
 
 model = models.HP_model
 system = HP_sys = models.HP_sys
@@ -192,7 +192,7 @@ HP_metrics = [get_product_MPSP,
 
 # %% Generate 3-specification meshgrid and set specification loading functions
 
-steps = (50, 50, 1)
+steps = (20, 20, 1)
 
 # Yield, titer, productivity (rate)
 spec_1 = yields = np.linspace(0.05, 0.95, steps[0]) # yield

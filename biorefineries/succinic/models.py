@@ -197,7 +197,7 @@ namespace_dict['theoretical_max_g_succinic_acid_per_g_glucose'] = theoretical_ma
 #%% 
 
 
-model = succinic_model = Model(succinic_sys, metrics, namespace_dict=namespace_dict)
+model = succinic_model = Model(succinic_sys, metrics)
 
 
 #%% Bugfix barrage
