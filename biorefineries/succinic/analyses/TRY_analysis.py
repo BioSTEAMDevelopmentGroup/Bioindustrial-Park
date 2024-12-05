@@ -32,7 +32,7 @@ from matplotlib.ticker import AutoMinorLocator as AML
 # from biorefineries.succinic.system_sc import succinic_sys, succinic_tea, R302, spec, product_stream
 
 from biorefineries import succinic
-from biorefineries.succinic.models import model, namespace_dict, succinic_sys, succinic_tea, succinic_LCA, R302, spec, product_stream, theoretical_max_g_succinic_acid_per_g_glucose, namespace_dict
+from biorefineries.succinic.models import model, namespace_dict, succinic_sys, simulate_and_print, succinic_tea, succinic_LCA, R302, spec, product_stream, theoretical_max_g_succinic_acid_per_g_glucose, namespace_dict
 from matplotlib import pyplot as plt
 from  matplotlib.colors import LinearSegmentedColormap
 import pandas as pd
