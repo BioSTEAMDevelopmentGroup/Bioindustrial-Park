@@ -78,6 +78,7 @@ model.metrics_at_baseline()
 # chdir(succinic.__file__.replace('\\__init__.py', '')+'\\analyses\\results')
 # ##
 succinic_results_filepath = succinic_filepath + '\\analyses\\results\\'
+
 # %%Colors
 marketrange_shadecolor = (*colors.neutral.shade(50).RGBn, 0.3)
 
@@ -279,7 +280,7 @@ get_production = lambda: sum([product.imass[i] for i in product_chemical_IDs])
 get_succinic_VOC = lambda: succinic_tea.VOC / 1e6 # million USD / yr
 get_succinic_FCI = lambda: succinic_tea.FCI / 1e6 # million USD
 
-
+get_recovery = lambda: product.imass[product_chemical_IDs].sum()/R302.outs[0].imass[product_chemical_IDs].sum()
 
 # def rel_impact_fn(steps):
 #     rel_impact_yield_titer = None
@@ -357,11 +358,11 @@ get_product_GWP = lambda: succinic_LCA.GWP
 get_product_FEC = lambda: succinic_LCA.FEC
 # get_rel_impact_t_y = lambda: rel_impact_fn(steps)
 
-succinic_metrics = [get_product_MPSP, get_product_GWP, get_product_FEC]
+succinic_metrics = [get_product_MPSP, get_product_GWP, get_product_FEC, get_recovery]
 # succinic_metrics = [get_succinic_MPSP, get_GWP, get_FEC]
 
 # %% Generate 3-specification meshgrid and set specification loading functions
-steps = 20
+steps = 5
 
 # Neutralization
 spec.neutralization = False
@@ -383,7 +384,7 @@ spec_3_units = "$\mathrm{g} \cdot \mathrm{L}^{-1} \cdot \mathrm{hr}^{-1}$"
 
 spec_1, spec_2 = np.meshgrid(spec_1, spec_2)
 
-results_metric_1, results_metric_2, results_metric_3 = [], [], []
+results_metric_1, results_metric_2, results_metric_3, results_metric_4 = [], [], [], []
 
 # %% Run TRY analysis 
 for p in productivities:
@@ -401,6 +402,7 @@ for p in productivities:
     pd.DataFrame(data_1[:, :, 0, :][:,:,0]/907.185).to_csv(succinic_results_filepath+'MPSP-'+file_to_save+'.csv')
     pd.DataFrame(data_1[:, :, 1, :][:,:,0]).to_csv(succinic_results_filepath+'GWP-'+file_to_save+'.csv')
     pd.DataFrame(data_1[:, :, 2, :][:,:,0]*succinic_tea.operating_hours).to_csv(succinic_results_filepath+'FEC-'+file_to_save+'.csv')
+    pd.DataFrame(data_1[:, :, 3, :][:,:,0]*succinic_tea.operating_hours).to_csv(succinic_results_filepath+'recovery-'+file_to_save+'.csv')
     
     
     # %% Load previously saved data
@@ -415,10 +417,12 @@ for p in productivities:
     d1_Metric1 = data_1[:, :, 0, :]
     d1_Metric2 = data_1[:, :, 1, :]
     d1_Metric3 = data_1[:, :, 2, :]
+    d1_Metric4 = data_1[:, :, 3, :]
     
     d2_Metric1 = data_2[:, :, 0, :]
     d2_Metric2 = data_2[:, :, 1, :]
     d2_Metric3 = data_2[:, :, 2, :]
+    d2_Metric4 = data_2[:, :, 3, :]
     
     # %% Functions to make regions with total sugars > 150 g/L and total inhibitors > 1000 mg/L
     # also infeasible
@@ -487,6 +491,7 @@ for p in productivities:
     results_metric_1.append(data_1[:, :, 0, :][:,:,0]/907.185)
     results_metric_2.append(data_1[:, :, 1, :][:,:,0])
     results_metric_3.append(data_1[:, :, 2, :][:,:,0])
+    results_metric_4.append(data_1[:, :, 3, :][:,:,0])
 
 #%% Plot metrics vs titer, yield, and productivity
 plot = False

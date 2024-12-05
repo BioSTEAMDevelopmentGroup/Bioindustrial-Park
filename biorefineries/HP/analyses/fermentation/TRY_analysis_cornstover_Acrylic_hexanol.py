@@ -19,11 +19,11 @@ import numpy as np
 
 from biorefineries import HP
 # from biorefineries.HP.systems.system_sc_light_lle_vacuum_distillation import HP_tea, HP_lca, R302, spec, AA, simulate_and_print, get_AA_MPSP
-from biorefineries.HP.systems.cornstover.system_cs_improved_separations import HP_tea, HP_lca, R302, spec, AA, simulate_and_print, get_AA_MPSP
+from biorefineries.HP.systems.cornstover.system_cs_hexanol import HP_tea, HP_lca, R302, spec, AA, simulate_and_print, get_AA_MPSP
 
 # from biorefineries.HP.systems.glucose.system_glucose_improved_separations import HP_tea, HP_lca, R302, spec, AA, simulate_and_print, get_AA_MPSP
 
-from biorefineries.HP.models.cornstover import models_cs_improved_separations as models
+from biorefineries.HP.models.cornstover import models_cs_hexanol as models
 
 from  matplotlib.colors import LinearSegmentedColormap
 import pandas as pd
@@ -132,34 +132,34 @@ def reset_and_switch_solver(solver_ID):
     # spec.set_production_capacity(spec.desired_annual_production)
     system.simulate()
 
-F403 = f.F403
+# F403 = f.F403
 def run_bugfix_barrage():
     try:
         reset_and_reload()
     except Exception as e:
         print(str(e))
-        if 'length' in str(e).lower():
-            system.reset_cache()
-            system.empty_recycles()
-            F403.heat_utilities = []
-            F403._V_first_effect = 0.144444
-            F403.run()
-            F403._design()
-            F403.simulate()
-            system.simulate()
-        else:
+        # if 'length' in str(e).lower():
+        #     system.reset_cache()
+        #     system.empty_recycles()
+        #     # F403.heat_utilities = []
+        #     # F403._V_first_effect = 0.144444
+        #     # F403.run()
+        #     # F403._design()
+        #     # F403.simulate()
+        #     # system.simulate()
+        # else:
+        try:
+            reset_and_switch_solver('fixedpoint')
+        except Exception as e:
+            print(str(e))
             try:
-                reset_and_switch_solver('fixedpoint')
+                reset_and_switch_solver('aitken')
             except Exception as e:
                 print(str(e))
-                try:
-                    reset_and_switch_solver('aitken')
-                except Exception as e:
-                    print(str(e))
-                    # print(_yellow_text+"Bugfix barrage failed.\n"+_reset_text)
-                    print("Bugfix barrage failed.\n")
-                    # breakpoint()
-                    raise e
+                # print(_yellow_text+"Bugfix barrage failed.\n"+_reset_text)
+                print("Bugfix barrage failed.\n")
+                # breakpoint()
+                raise e
                 
 #%%
 # simulate_and_print()

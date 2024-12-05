@@ -19,11 +19,11 @@ import numpy as np
 
 from biorefineries import HP
 # from biorefineries.HP.systems.system_sc_light_lle_vacuum_distillation import HP_tea, HP_lca, R302, spec, AA, simulate_and_print, get_AA_MPSP
-from biorefineries.HP.systems.cornstover.system_cs_improved_separations import HP_tea, HP_lca, R302, spec, AA, simulate_and_print, get_AA_MPSP
+from biorefineries.HP.systems.corn.system_corn_hexanol import HP_tea, HP_lca, R302, spec, AA, simulate_and_print, get_AA_MPSP
 
 # from biorefineries.HP.systems.glucose.system_glucose_improved_separations import HP_tea, HP_lca, R302, spec, AA, simulate_and_print, get_AA_MPSP
 
-from biorefineries.HP.models.cornstover import models_cs_improved_separations as models
+from biorefineries.HP.models.corn import models_corn_hexanol as models
 
 from  matplotlib.colors import LinearSegmentedColormap
 import pandas as pd
@@ -69,7 +69,7 @@ system = HP_sys = models.HP_sys
 
 simulate_and_print()
 
-feedstock_tag = 'cornstover'
+feedstock_tag = 'corn'
 product_tag = 'Acrylic'
 
 mode = '300L'
@@ -132,35 +132,35 @@ def reset_and_switch_solver(solver_ID):
     # spec.set_production_capacity(spec.desired_annual_production)
     system.simulate()
 
-F403 = f.F403
+# F403 = f.F403
 def run_bugfix_barrage():
     try:
         reset_and_reload()
     except Exception as e:
         print(str(e))
-        if 'length' in str(e).lower():
-            system.reset_cache()
-            system.empty_recycles()
-            F403.heat_utilities = []
-            F403._V_first_effect = 0.144444
-            F403.run()
-            F403._design()
-            F403.simulate()
-            system.simulate()
-        else:
+        # if 'length' in str(e).lower():
+        #     system.reset_cache()
+        #     system.empty_recycles()
+        #     F403.heat_utilities = []
+        #     F403._V_first_effect = 0.144444
+        #     F403.run()
+        #     F403._design()
+        #     F403.simulate()
+        #     system.simulate()
+        # else:
+        try:
+            reset_and_switch_solver('fixedpoint')
+        except Exception as e:
+            print(str(e))
             try:
-                reset_and_switch_solver('fixedpoint')
+                reset_and_switch_solver('aitken')
             except Exception as e:
                 print(str(e))
-                try:
-                    reset_and_switch_solver('aitken')
-                except Exception as e:
-                    print(str(e))
-                    # print(_yellow_text+"Bugfix barrage failed.\n"+_reset_text)
-                    print("Bugfix barrage failed.\n")
-                    # breakpoint()
-                    raise e
-                
+                # print(_yellow_text+"Bugfix barrage failed.\n"+_reset_text)
+                print("Bugfix barrage failed.\n")
+                # breakpoint()
+                raise e
+            
 #%%
 # simulate_and_print()
 
@@ -326,7 +326,7 @@ def tickmarks(dmin, dmax, accuracy=50, N_points=5):
 
 #%%
 minute = '0' + str(dateTimeObj.minute) if len(str(dateTimeObj.minute))==1 else str(dateTimeObj.minute)
-file_to_save = f'_{steps}_steps_cornstover_neutral={R302.neutralization}_'+'HP_TRY_%s.%s.%s-%s.%s'%(dateTimeObj.year, dateTimeObj.month, dateTimeObj.day, dateTimeObj.hour, minute)
+file_to_save = f'_{steps}_steps_corn_neutral={R302.neutralization}_'+'HP_TRY_%s.%s.%s-%s.%s'%(dateTimeObj.year, dateTimeObj.month, dateTimeObj.day, dateTimeObj.hour, minute)
 
 #%% Create meshgrid
 spec_1, spec_2 = np.meshgrid(spec_1, spec_2)
@@ -418,8 +418,7 @@ for p in productivities:
                     print('Error in model spec: %s'%str_e)
                     # breakpoint()
                     # raise e
-                    if 'sugar concentration' in str_e or 'permeate moisture' in str_e\
-                        or 'opposite sign' in str_e:
+                    if 'sugar concentration' in str_e or 'opposite sign' in str_e:
                         # flowsheet('AcrylicAcid').F_mass /= 1000.
                         d1_Metric1[-1].append(np.nan)
                         d1_Metric2[-1].append(np.nan)
@@ -672,7 +671,7 @@ if plot:
                                     # manual_clabels_regular = {
                                     #     MPSP_w_ticks[5]: (45,28),
                                     #     },
-                                    additional_points ={(73, 62.5):('o', 'w', 6)},
+                                    additional_points ={(73, 62.5):('p', 'w', 6)},
                                     # fill_bottom_with_cmap_over_color=True, # for TRY
                                     bottom_fill_bounds = ((0,0), 
                                                           (5,18.),
@@ -682,7 +681,7 @@ if plot:
                                     
                                     add_shapes = {
                                         # coords as tuple of tuples: (color, zorder),
-                                        ((0,0), (61,200), (1,200)): ('white', 2), # infeasible region smoothing
+                                        ((0,0), (51,200), (1,200)): ('white', 2), # infeasible region smoothing
                                         },
                                     units_on_newline = (False, False, False, False), # x,y,z,w
                                     units_opening_brackets = [" (",] * 4,
@@ -695,7 +694,7 @@ if plot:
     # GWP_w_levels, GWP_w_ticks, GWP_cbar_ticks = get_contour_info_from_metric_data(results_metric_2,)
     GWP_w_levels = np.arange(0, 6.01, 0.1)
     GWP_cbar_ticks = np.arange(0, 6.01, 1.)
-    GWP_w_ticks = [-4, -3, -2, -1.5, 0, 0.7, 1, 1.5, 2,  3,4,6]
+    GWP_w_ticks = [0, 0.7, 1, 1.5, 2,  3,4,6]
     contourplots.animated_contourplot(w_data_vs_x_y_at_multiple_z=results_metric_2, # shape = z * x * y # values of the metric you want to plot on the color axis; e.g., GWP
                                     x_data=100*yields, # x axis values
                                     y_data=titers, # y axis values
@@ -729,8 +728,8 @@ if plot:
                                     default_fontsize = default_fontsize,
                                     axis_tick_fontsize = axis_tick_fontsize,
                                     n_minor_ticks = 1,
-                                    cbar_n_minor_ticks = 9,
-                                    additional_points ={(73, 62.5):('o', 'w', 6)},
+                                    cbar_n_minor_ticks = 4,
+                                    additional_points ={(73, 62.5):('p', 'w', 6)},
                                     fill_bottom_with_cmap_over_color=True, # for TRY
                                     bottom_fill_bounds = ((0,0), 
                                                           (5,18.),
@@ -740,7 +739,7 @@ if plot:
                                     
                                     add_shapes = {
                                         # coords as tuple of tuples: (color, zorder),
-                                        ((0,0), (61,200), (1,200)): ('white', 2), # infeasible region smoothing
+                                        ((0,0), (51,200), (1,200)): ('white', 2), # infeasible region smoothing
                                         },
                                     units_on_newline = (False, False, False, False), # x,y,z,w
                                     units_opening_brackets = [" (",] * 4,
@@ -755,7 +754,7 @@ if plot:
     # FEC_w_levels, FEC_w_ticks, FEC_cbar_ticks = get_contour_info_from_metric_data(results_metric_3,)
     FEC_w_levels = np.arange(-100, 101, 10)
     FEC_cbar_ticks = np.arange(-100, 101, 20)
-    FEC_w_ticks = [-100, -60, -30, -10, 0, 30, 60, 100]
+    FEC_w_ticks = [-100, -60, -30, 0, 10, 30, 60, 100]
     # FEC_w_ticks = [40, 50, 70, 80, 100]
     contourplots.animated_contourplot(w_data_vs_x_y_at_multiple_z=results_metric_3, # shape = z * x * y # values of the metric you want to plot on the color axis; e.g., FEC
                                     x_data=100*yields, # x axis values
@@ -792,7 +791,7 @@ if plot:
                                     axis_tick_fontsize = axis_tick_fontsize,
                                     n_minor_ticks = 1,
                                     cbar_n_minor_ticks = 1,
-                                    additional_points ={(73, 62.5):('o', 'w', 6)},
+                                    additional_points ={(73, 62.5):('p', 'w', 6)},
                                     fill_bottom_with_cmap_over_color=True, # for TRY
                                     bottom_fill_bounds = ((0,0), 
                                                           (5,18.),
@@ -802,7 +801,7 @@ if plot:
                                     
                                     add_shapes = {
                                         # coords as tuple of tuples: (color, zorder),
-                                        ((0,0), (61,200), (1,200)): ('white', 2), # infeasible region smoothing
+                                        ((0,0), (51,200), (1,200)): ('white', 2), # infeasible region smoothing
                                         },
                                     units_on_newline = (False, False, False, False), # x,y,z,w
                                     units_opening_brackets = [" (",] * 4,

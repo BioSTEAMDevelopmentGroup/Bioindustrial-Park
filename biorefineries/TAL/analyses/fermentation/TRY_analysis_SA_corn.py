@@ -122,6 +122,8 @@ get_TAL_sugars_conc = lambda: sum(R302.outs[0].imass['Glucose', 'Xylose'])/R302.
 
 get_TAL_inhibitors_conc = lambda: 1000*sum(R302.outs[0].imass['AceticAcid', 'Furfural', 'HMF'])/R302.outs[0].F_vol
 
+get_product_recovery_FGI = lambda: product.imass[i].sum()/broth.imass['TAL']
+
 def get_F301_heat_utility_duty():
     if F301.heat_utilities:
         return abs(F301.heat_utilities[0].duty) + abs(F301.heat_utilities[1].duty)
@@ -217,14 +219,14 @@ else:
     elif which_fig=='insights':
         spec_3 = productivities =\
             np.array([
-                        1.*spec.baseline_productivity,
+                        0.5*spec.baseline_productivity,
                       ])
         TAL_metrics = [get_product_MPSP, 
                         lambda: TAL_lca.GWP,
                         lambda: TAL_lca.FEC, 
                        # get_sugar_conc_utility_demand_proxy,
                        # get_sugar_conc_TCI,
-                       get_F301_heat_utility_duty,
+                       get_product_recovery_FGI,
                        get_TAL_AOC, get_TAL_TCI,]
     
 #%% Plot stuff
