@@ -408,7 +408,7 @@ GWP_CF_stream = tmo.Stream('GWP_CF_stream', GWP_CF_array, units='kg/hr')
 
 
 # In kg CO2-eq/kWh
-GWP_CFs['Electricity'] = 0.48
+GWP_CFs['Electricity'] = 0.4490 # kg CO2-eq/kWh GREET 2022 US Mix  # assume production==consumption, both in kg CO2-eq/kWh
 
 # # From corn stover
 # GWP_CFs['LacticAcid_GREET'] = 1.80
@@ -475,7 +475,8 @@ FEC_CF_stream = tmo.Stream('FEC_CF_stream', FEC_CF_array, units='kg/hr')
 CFs['FEC'] = FEC_CFs
 # CFs['FEC_CF_stream'] = FEC_CF_stream
 # In MJ/kWh
-FEC_CFs['Electricity'] = 5.926
+FEC_CFs['Electricity'] = 5.724 # MJ/kWh # GREET 2022 US Mix #assume production==consumption, both in MJ/kWh
+
 # FEC_CFs['Electricity'] = 0.
 # From corn stover
 FEC_CFs['LacticAcid'] = 29.

@@ -844,6 +844,7 @@ for i in range(2):
     spec_set_production_capacity(
                             desired_annual_production=spec.desired_annual_production, # pure metric ton /y
                             )
+HP_tea.labor_cost = 3212962*get_flow_tpd()/2205
 
 #%% Misc.
 

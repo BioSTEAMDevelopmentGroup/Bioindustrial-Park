@@ -18,7 +18,7 @@ from biosteam.utils import  colors
 import numpy as np
 
 from biorefineries import TAL
-from biorefineries.TAL.systems.system_TAL_solubility_exploit_ethanol_sugarcane import TAL_tea, TAL_lca, R302, spec, TAL_product, simulate_and_print, theoretical_max_g_TAL_per_g_SA,\
+from biorefineries.TAL.systems.system_TAL_solubility_exploit_ethanol_cornstover import TAL_tea, TAL_lca, R302, spec, TAL_product, simulate_and_print, theoretical_max_g_TAL_per_g_SA,\
     F301, F301_P, M304
 
 from  matplotlib.colors import LinearSegmentedColormap
@@ -31,7 +31,7 @@ from math import log
 
 import os
 
-from biorefineries.TAL.models import models_TAL_solubility_exploit as models
+from biorefineries.TAL.models import models_TAL_solubility_exploit_cornstover as models
 
 chdir = os.chdir
 
@@ -67,7 +67,7 @@ model = models.TAL_model
 system = TAL_sys = models.TAL_sys
 
 modes = [
-            'A',
+            'A_cornstover',
          ]
 
 
@@ -220,10 +220,10 @@ else:
                         1.*spec.baseline_productivity,
                       ])
         TAL_metrics = [get_product_MPSP, 
-                       # lambda: TAL_lca.GWP,
-                       # lambda: TAL_lca.FEC, 
-                       get_sugar_conc_utility_demand_proxy,
-                       get_sugar_conc_TCI,
+                        lambda: TAL_lca.GWP,
+                        lambda: TAL_lca.FEC, 
+                       # get_sugar_conc_utility_demand_proxy,
+                       # get_sugar_conc_TCI,
                        get_F301_heat_utility_duty,
                        get_TAL_AOC, get_TAL_TCI,]
     

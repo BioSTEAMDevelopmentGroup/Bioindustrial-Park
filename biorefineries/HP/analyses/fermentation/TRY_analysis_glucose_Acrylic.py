@@ -70,7 +70,7 @@ HP_results_filepath = HP_filepath + '\\analyses\\results\\'
 
 #%% Load baseline
 
-spec.reactor.neutralization = False # !!! set neutralization here
+spec.reactor.neutralization = True # !!! set neutralization here
 
 model = models.HP_model
 system = HP_sys = models.HP_sys
@@ -209,7 +209,7 @@ steps = (20, 20, 1)
 # spec_2 = titers = np.linspace(5, 
 #                               200.,
 #                                 steps[1]) # titer
-spec_1 = yields = np.linspace(0.2, 0.95, steps[0]) # yield
+spec_1 = yields = np.linspace(0.05, 0.95, steps[0]) # yield
 spec_2 = titers = np.linspace(20, 
                               200.,
                                 steps[1]) # titer
@@ -435,7 +435,7 @@ for p in productivities:
                     print('Error in model spec: %s'%str_e)
                     # breakpoint()
                     # raise e
-                    if 'sugar concentration' in str_e:
+                    if 'sugar concentration' in str_e or 'opposite sign' in str_e:
                         # flowsheet('AcrylicAcid').F_mass /= 1000.
                         d1_Metric1[-1].append(np.nan)
                         d1_Metric2[-1].append(np.nan)

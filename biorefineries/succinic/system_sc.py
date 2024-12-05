@@ -837,19 +837,21 @@ def F301_titer_obj_fn(V):
     R302.specifications[0]()
     return R302.effluent_titer - R302.titer_to_load
 
-def load_titer_with_glucose(titer_to_load):
+def load_titer_with_glucose(titer_to_load, set_F301_V = 0.8):
+    F301_lb = 1e-4 if set_F301_V is None else set_F301_V
+    F301_ub = 0.8
     spec.spec_2 = titer_to_load
     R302.titer_to_load = titer_to_load
-    F301_titer_obj_fn(1e-4)
+    F301_titer_obj_fn(F301_lb)
     if M304_titer_obj_fn(1e-4)<0: # if the slightest dilution results in too low a conc
-        IQ_interpolation(F301_titer_obj_fn, 1e-4, 0.8, ytol=1e-4)
+        IQ_interpolation(F301_titer_obj_fn, F301_lb, F301_ub, ytol=1e-4)
     # elif F301_titer_obj_fn(1e-4)>0: # if the slightest evaporation results in too high a conc
     else:
-        F301_titer_obj_fn(1e-4)
-        IQ_interpolation(M304_titer_obj_fn, 1e-4, 5000., ytol=1e-4)
+        F301_titer_obj_fn(F301_lb)
+        IQ_interpolation(M304_titer_obj_fn, 1e-4, 20000., ytol=1e-4)
     # else:
     #     raise RuntimeError('Unhandled load_titer case.')
-    spec.titer_inhibitor_specification.check_sugar_concentration()
+    if set_F301_V is None: spec.titer_inhibitor_specification.check_sugar_concentration()
 
 spec.load_spec_1 = spec.load_yield
 spec.load_spec_3 = spec.load_productivity
@@ -970,6 +972,8 @@ def simulate_and_print():
     print(f'FEC is {FEC:.3f} MJ/kg')
     print('----------------------------------------\n')
 
+get_product_stream_MPSP()
+succinic_tea.labor_cost=3212962*get_flow_dry_tpd()/2205
 get_product_stream_MPSP()
 
 #%% LCA

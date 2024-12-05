@@ -415,7 +415,7 @@ for p in productivities:
                     print('Error in model spec: %s'%str_e)
                     # breakpoint()
                     # raise e
-                    if 'sugar concentration' in str_e:
+                    if 'sugar concentration' in str_e or 'opposite sign' in str_e:
                         # flowsheet('AcrylicAcid').F_mass /= 1000.
                         d1_Metric1[-1].append(np.nan)
                         d1_Metric2[-1].append(np.nan)
