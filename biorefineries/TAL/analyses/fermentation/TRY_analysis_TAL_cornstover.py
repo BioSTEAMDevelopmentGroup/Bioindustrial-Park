@@ -67,7 +67,7 @@ model = models.TAL_model
 system = TAL_sys = models.TAL_sys
 
 modes = [
-            'A_cornstover',
+            'A_FGI_cornstover',
          ]
 
 

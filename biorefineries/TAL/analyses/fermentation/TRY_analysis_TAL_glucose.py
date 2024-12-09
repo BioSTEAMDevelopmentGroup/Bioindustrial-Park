@@ -67,7 +67,7 @@ model = models.TAL_model
 system = TAL_sys = models.TAL_sys
 
 modes = [
-            'A_glucose',
+            'A_FGI_glucose',
          ]
 
 

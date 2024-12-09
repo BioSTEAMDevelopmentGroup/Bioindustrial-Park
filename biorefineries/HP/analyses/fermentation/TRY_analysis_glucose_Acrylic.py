@@ -70,7 +70,7 @@ HP_results_filepath = HP_filepath + '\\analyses\\results\\'
 
 #%% Load baseline
 
-spec.reactor.neutralization = True # !!! set neutralization here
+spec.reactor.neutralization = False # !!! set neutralization here
 
 model = models.HP_model
 system = HP_sys = models.HP_sys
@@ -113,7 +113,7 @@ print('\n\nSimulating baseline ...')
 baseline_initial = model.metrics_at_baseline()
 
 print(get_AA_MPSP())
-simulate_and_print()
+# simulate_and_print()
 
 #%% Bugfix barrage
 
