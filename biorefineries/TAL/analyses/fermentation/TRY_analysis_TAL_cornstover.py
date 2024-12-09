@@ -102,6 +102,8 @@ model.exception_hook = 'warn'
 print('\n\nSimulating baseline ...')
 baseline_initial = model.metrics_at_baseline()
 
+simulate_and_print()
+
 #%%
 # simulate_and_print()
 
@@ -122,7 +124,7 @@ get_TAL_sugars_conc = lambda: sum(R302.outs[0].imass['Glucose', 'Xylose'])/R302.
 
 get_TAL_inhibitors_conc = lambda: 1000*sum(R302.outs[0].imass['AceticAcid', 'Furfural', 'HMF'])/R302.outs[0].F_vol
 
-get_product_recovery_FGI = lambda: product.imass[i].sum()/broth.imass['TAL']
+get_product_recovery_FGI = lambda: product.imass[product_chemical_IDs].sum()/broth.imass['TAL']
 
 def get_F301_heat_utility_duty():
     if F301.heat_utilities:
@@ -138,7 +140,7 @@ get_sugar_conc_TCI = lambda: F301.installed_cost + F301_P.installed_cost + M304.
 
 # %% Generate 3-specification meshgrid and set specification loading functions
 
-steps = (30, 30, 1)
+steps = (15, 15, 1)
 
 # Yield, titer, productivity (rate)
 spec_1 = yields = np.linspace(0.1, 0.99, steps[0]) # yield

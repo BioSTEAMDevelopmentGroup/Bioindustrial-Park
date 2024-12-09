@@ -604,7 +604,7 @@ theoretical_max_g_HP_per_g_glucose = 2*HP_chemicals.HP.MW/HP_chemicals.Glucose.M
 
 
 
-desired_annual_production = 134_000 # pure metric ton / y # satisfy 50% of 2019 US demand for acrylic acid
+desired_annual_production = 134_000*1.2 # pure metric ton / y # satisfy 50% of 2019 US demand for acrylic acid
 
 # desired_annual_production = (23_802) * kg_SA_to_kg_KSA # pure metric ton / y # satisfy 50% of 2019 US demand for acrylic acid
 

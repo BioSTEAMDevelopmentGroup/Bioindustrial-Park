@@ -62,7 +62,7 @@ HP_results_filepath = HP_filepath + '\\analyses\\results\\'
 
 #%% Load baseline
 
-spec.reactor.neutralization = False # !!! set neutralization here
+spec.reactor.neutralization = True # !!! set neutralization here
 
 model = models.HP_model
 system = HP_sys = models.HP_sys
@@ -177,7 +177,7 @@ get_HP_AOC = lambda: HP_tea.AOC / 1e6 # million USD / y
 get_HP_TCI = lambda: HP_tea.TCI / 1e6 # million USD
 
 get_mass_HP_eq_broth = lambda: broth.imass['HP'] + broth.imol['CalciumLactate']* 2. * 90.07794
-get_product_recover_FGI = lambda: product.imass[i].sum()/get_mass_HP_eq_broth()
+get_product_recover_FGI = lambda: product.imass[product_chemical_IDs].sum()/get_mass_HP_eq_broth()
 
 HXN = f.HXN1001
 HP_metrics = [get_product_MPSP, 

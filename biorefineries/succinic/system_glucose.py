@@ -34,7 +34,7 @@ from biosteam.process_tools import UnitGroup
 from biosteam import SystemFactory
 
 from biorefineries.succinic import units, facilities
-from biorefineries.succinic.process_settings import price, CFs, chem_index
+from biorefineries.succinic.process_settings import price, CFs, chem_index, _GDP_2007_to_2010
 from biorefineries.succinic.utils import find_split, splits_df, baseline_feedflow
 from biorefineries.succinic.chemicals_data import chems, chemical_groups, \
                                 soluble_organics, combustibles
@@ -47,10 +47,6 @@ from biorefineries.succinic.crystallization_curvefit import Ct_given_C0
 
 
 from biorefineries.cellulosic import create_facilities
-
-
-# from hxn._heat_exchanger_network import HeatExchangerNetwork
-from biorefineries.sugarcane import create_juicing_system_up_to_clarification
 
 from contourplots import stacked_bar_plot
 
@@ -76,8 +72,6 @@ bst.CE = 541.7
 # Set default thermo object for the system
 tmo.settings.set_thermo(chems)
 
-feedstock_ID = 'Sugarcane'
-
 # System settings
 System.default_converge_method = 'wegstein'
 # System.default_converge_method = 'fixed-point'
@@ -94,6 +88,8 @@ exp = math.exp
 def get_succinic_acid_solubility_gpL(T):
     return 29.098*exp(0.0396*(T-273.15))
 
+feedstock_ID = 'Glucose'
+
 # %% System
 @SystemFactory(ID = 'succinic_sys')
 def create_succinic_sys(ins, outs):
@@ -102,34 +98,31 @@ def create_succinic_sys(ins, outs):
     
     process_groups = []
     
-    # #%% Feedstock - Glucose
-    # feedstock = Stream('feedstock')
-    # feedstock.imass['Glucose'] = 29000.
-    # feedstock.imass['H2O'] = 500.
-    # feedstock.price = price['Glucose']*feedstock.imass['Glucose']/feedstock.F_mass
+    f = bst.main_flowsheet
+    u = f.unit
+    s = f.stream
     
-    # feedstock.F_mass = 50e3
+    # %% Feedstock
+
+    feedstock = bst.Stream('glucose_feedstock', Glucose=1., Water=1., units='kmol/h')
+    feedstock.price = price['Glucose']*0.909 # dextrose monohydrate stream is 90.9 wt% glucose
+    feedstock.F_mass = 200_000 # initial value; updated by spec.set_production_capacity
     
-    # U101 = units.FeedstockPreprocessing('U101', ins=feedstock)
     
-    # # Handling costs/utilities included in feedstock cost thus not considered here
-    # U101.cost_items['System'].cost = 0
-    # U101.cost_items['System'].kW = 0
+    U101 = bst.Unit('U101', ins=feedstock, outs='')
+    @U101.add_specification(run=False)
+    def U101_spec():
+        U101.outs[0].copy_like(U101.ins[0])
     
-    #%% Feedstock - Sugarcane
-    # Sugarcane juicing subprocess
-    sugarcane_juicing_sys = create_juicing_system_up_to_clarification()
-    u = sugarcane_juicing_sys.flowsheet.unit
-    s = sugarcane_juicing_sys.flowsheet.stream
-    feedstock = s.sugarcane
-    feedstock.F_mass = 96000. # to produce SA at 28,000 metric tonne / year at baseline
     
-    sugarcane_juicing_sys.flowsheet.diagram('thorough')
+    # # Update all prices to 2019$ using chemical indices
+    # # sugarcane biorefinery base year is 2019
+    # for corn_sys_stream in list(s):
+    #     corn_sys_stream.price *= chem_index[2019]/chem_index[2018]
     
-    # Update all prices to 2019$ using chemical indices
-    # sugarcane biorefinery base year is 2018
-    for sugarcane_sys_stream in list(s):
-        sugarcane_sys_stream.price *= chem_index[2019]/chem_index[2018]
+    #%% Feedstock juicing
+    M201 = bst.Mixer('M201', ins=(U101-0, ''), outs='') # bst.UnitGroup.get_material_cost uses bst.utils.get_inlet_origin; i.e., assumes source unit is a storage unit (i.e., attributes material cost to downstream unit) if len(source.ins) == len(source.outs) == 1 and 'processing' not in source.line.lower()
+
         
     # %% 
     
@@ -174,8 +167,21 @@ def create_succinic_sys(ins, outs):
     # =============================================================================
     
 
+    U302 = bst.Unit('U302', ins=M201-0,)
+    @U302.add_specification(run=False)
+    def U302_vle_spec():
+        U302_outs_0 = U302.outs[0]
+        U302_outs_0.copy_like(U302.ins[0])
+        U302_outs_0.vle(T=U302_outs_0.T, P=U302_outs_0.P)
     
-    F301 = bst.MultiEffectEvaporator('F301', ins=u.C201-0, outs=('F301_l', 'F301_g'),
+    S308 = bst.PhaseSplitter('S301',  ins=U302-0, outs=('vented_stream', ''))
+    
+    H302 = bst.HXutility('H302',ins=S308-0,  V=0., rigorous=True)
+    
+    P303 = bst.Pump('P303', ins=H302-0, outs='pre_evaporator_vent')
+    
+    
+    F301 = bst.MultiEffectEvaporator('F301', ins=S308-1, outs=('F301_l', 'F301_g'),
                                             P = (101325, 73581, 50892, 32777, 20000), V = 1e-4)
     
     # Cool hydrolysate down to fermentation temperature at 30°C
@@ -352,7 +358,29 @@ def create_succinic_sys(ins, outs):
     
     S401 = bst.SolidsCentrifuge('S401', ins=M401-0, 
                             outs=('S401_solid_waste', 'S401_1'),
-                            solids=['FermMicrobe'], split={'FermMicrobe':0.995})
+                            solids=['FermMicrobe',
+                                    'Extract',
+                                    'Lignin',
+                                    'Protein', 'Arabinose', 'Ash', 'AmmoniumSulfate',
+                                    'Glucan', 'Xylan', 'SolubleLignin',
+                                    'GlucoseOligomer', 'XyloseOligomer', 'Cellobiose'], 
+                            split={'FermMicrobe':0.995,
+                                   'Extract': 0.995, #!!! this assumption is purely to keep the same separation process as for the sugarcane->succinic biorefinery, 
+                                                     #    update if using this model in a study focused on cornstover -> succinic biorefineries
+                                   'Lignin': 0.995,  #!!! same as Extract
+                                   'Protein': 0.995, #!!! same as Extract
+                                   'Arabinose': 0.995, #!!! same as Extract
+                                   'Ash': 0.995,     #!!! same as Extract
+                                   'AmmoniumSulfate': 0.995, #!!! same as Extract
+                                   'Glucan': 0.995, #!!! same as Extract
+                                   'Xylan': 0.995, #!!! same as Extract
+                                   'SolubleLignin': 0.995, #!!! same as Extract
+                                   'GlucoseOligomer': 0.995, #!!! same as Extract
+                                   'XyloseOligomer': 0.995, #!!! same as Extract
+                                   'Cellobiose': 0.995, #!!! same as Extract
+                                   
+                                })
+    
     @S401.add_specification(run=False)
     def S401_succinic_acid_precipitation_spec():
         S401._run()
@@ -392,7 +420,6 @@ def create_succinic_sys(ins, outs):
         S405.isplit['Gypsum'] = 1.-1e-4
         S405.isplit['DiammoniumSulfate'] = 1.-1e-4 # Diammonium sulfate actually has high solubility in water
         S405.isplit['Water'] = 0.01
-        
         ## Controlling pH, so bypass only if neutralizing agent is NH4OH
         
         # S405.bypass = R302.neutralizing_agent in ['AmmoniumHydroxide', 'NH4OH']
@@ -419,7 +446,10 @@ def create_succinic_sys(ins, outs):
     def F401_obj_f(V):
         F401.V=V
         F401._run()
-        F401_l = F401.outs[0]
+        F401_l, F401_g = F401.outs
+        F401_l.imass['SuccinicAcid'] += F401_g.imass['SuccinicAcid']  #!!! this assumption is purely to keep the same separation process as for the sugarcane->succinic biorefinery, 
+                                                                      #    update if using this model in a study focused on cornstover -> succinic biorefineries
+        F401_g.imass['SuccinicAcid'] = 0.
         return F401_l.imass['SuccinicAcid']/F401_l.F_mass - F401.target_concentration
     
     F401.add_specification()
@@ -467,7 +497,10 @@ def create_succinic_sys(ins, outs):
     def F402_obj_f(V):
         F402.V=V
         F402._run()
-        F402_l = F402.outs[0]
+        F402_l, F402_g = F402.outs
+        F402_l.imass['SuccinicAcid'] += F402_g.imass['SuccinicAcid']  #!!! this assumption is purely to keep the same separation process as for the sugarcane->succinic biorefinery, 
+                                                                      #    update if using this model in a study focused on cornstover -> succinic biorefineries
+        F402_g.imass['SuccinicAcid'] = 0.
         return F402_l.imass['SuccinicAcid']/F402_l.F_mass - F402.target_concentration
     
     F402_P = bst.Pump('F402_P', ins=F402-0, P=101325.)
@@ -515,9 +548,12 @@ def create_succinic_sys(ins, outs):
     def F403_obj_f(V):
         F403.V=V
         F403._run()
-        F403_l = F403.outs[0]
+        F403_l, F403_g = F403.outs
+        F403_l.imass['SuccinicAcid'] += F403_g.imass['SuccinicAcid']  #!!! this assumption is purely to keep the same separation process as for the sugarcane->succinic biorefinery, 
+                                                                      #    update if using this model in a study focused on cornstover -> succinic biorefineries
+        F403_g.imass['SuccinicAcid'] = 0.
         return F403_l.imass['SuccinicAcid']/F403_l.F_mass - F403.target_concentration
-
+    
     F403_P = bst.Pump('F403_P', ins=F403-0, P=101325.)
 
     C403 = units.SuccinicAcidCrystallizer('C403', ins=F403_P-0, outs=('C403_0',), 
@@ -586,12 +622,19 @@ def create_succinic_sys(ins, outs):
     aerobic_caustic = Stream('aerobic_caustic', units='kg/hr', T=20+273.15, P=2*101325,
                               price=price['Caustics'])
     
+    # PWC streams
+    imbibition_water = Stream('imbibition_water', price=price['Makeup water'])
+    rvf_wash_water = Stream('rvf_wash_water', price=price['Makeup water'])
+    dilution_water = Stream('dilution_water', price=price['Makeup water'])
+    #
     # =============================================================================
     # Wastewater treatment units
     # =============================================================================
     
     # Mix waste liquids for treatment
     M501 = bst.units.Mixer('M501', ins=('',
+                                        # u.H201-0,
+                                        P303-0,
                                         F301-1,
                                         # F401-1,
                                         # F402-1,
@@ -614,8 +657,8 @@ def create_succinic_sys(ins, outs):
     M510 = bst.units.Mixer('M510', ins=('',
                                         # S301-0,
                                         S401-0,
-                                        u.U202-0,
-                                        u.C202-0,
+                                        # u.U202-0,
+                                        # u.C202-0,
                                         # S401-0, 
                                         # F401-0, D401-0,
                                         ), 
@@ -628,7 +671,7 @@ def create_succinic_sys(ins, outs):
         solids_to_boiler=M510-0,
         gas_to_boiler=wastewater_treatment_sys-0,
         process_water_streams=[
-         s.imbibition_water,
+           s.imbibition_water,
          s.rvf_wash_water,
          s.dilution_water,
          # s.makeup_water,
@@ -640,7 +683,7 @@ def create_succinic_sys(ins, outs):
          # s.cooling_tower_makeup_water,
          # s.cooling_tower_chemicals,
          ],
-        feedstock=s.sugarcane,
+        feedstock=s.glucose_feedstock,
         RO_water=wastewater_treatment_sys-2,
         recycle_process_water=MX-0,
         BT_area=700,
@@ -671,7 +714,8 @@ def create_succinic_sys(ins, outs):
     # Cooling tower chemicals
     # see CT initialization
     
-   
+    system_makeup_water = Stream('system_makeup_water', price=price['Makeup water'])
+    
     # =============================================================================
     # Facilities units
     # =============================================================================
@@ -720,7 +764,7 @@ def create_succinic_sys(ins, outs):
 succinic_sys = create_succinic_sys()
 u = flowsheet.unit
 s = flowsheet.stream
-feedstock = s.sugarcane
+feedstock = s.glucose_feedstock
 product_stream = s.SuccinicAcid
 
 feeds = succinic_sys.feeds
@@ -842,22 +886,32 @@ def F301_titer_obj_fn(V):
     R302.specifications[0]()
     return R302.effluent_titer - R302.titer_to_load
 
-def load_titer_with_glucose(titer_to_load, set_F301_V = 0.8):
-    F301_lb = 1e-4 if set_F301_V is None else set_F301_V
+
+def load_titer_with_glucose(titer_to_load, set_F301_V=0.8):
+    # clear_units([V301, K301])
     F301_ub = 0.8
+    F301_lb = 0. if set_F301_V is None else set_F301_V
+    M304_lb, M304_ub = 0., 100_000.  # for low-titer high-yield combinations, if infeasible, use a higher upper bound
+    
     spec.spec_2 = titer_to_load
     R302.titer_to_load = titer_to_load
     F301_titer_obj_fn(F301_lb)
-    if M304_titer_obj_fn(F301_lb)<0: # if the slightest dilution results in too low a conc
-        IQ_interpolation(F301_titer_obj_fn, F301_lb, F301_ub, ytol=1e-4)
+    
+    if M304_titer_obj_fn(M304_lb) < 0.: # if there is too low a conc even with no dilution
+        IQ_interpolation(F301_titer_obj_fn, F301_lb, F301_ub, ytol=1e-3)
     # elif F301_titer_obj_fn(1e-4)>0: # if the slightest evaporation results in too high a conc
+    elif M304_titer_obj_fn(M304_ub) > 0.:
+        IQ_interpolation(M304_titer_obj_fn, 
+                         M304_lb,
+                         M304_ub, 
+                         ytol=1e-3)
     else:
         F301_titer_obj_fn(F301_lb)
-        IQ_interpolation(M304_titer_obj_fn, 1e-4, 20000., ytol=1e-4)
-    # else:
-    #     raise RuntimeError('Unhandled load_titer case.')
-    if set_F301_V is None: spec.titer_inhibitor_specification.check_sugar_concentration()
-
+        IQ_interpolation(M304_titer_obj_fn, 
+                         M304_lb, 
+                         M304_ub, 
+                         ytol=1e-3)
+        
 spec.load_spec_1 = spec.load_yield
 spec.load_spec_3 = spec.load_productivity
 spec.load_spec_2 = load_titer_with_glucose
@@ -915,7 +969,7 @@ for i in unit_groups:
 for HXN_group in unit_groups:
     if HXN_group.name == 'heat exchanger network':
         HXN_group.filter_savings = False
-        assert isinstance(HXN_group.units[0], HeatExchangerNetwork)
+        # assert isinstance(HXN_group.units[0], HeatExchangerNetwork) #!!! Note groups aren't working for non-sugarcane succinic acid biorefineries, fix if needed
 
 
 unit_groups[-3].metrics[-1] = bst.evaluation.Metric('Material cost', 
@@ -985,7 +1039,7 @@ get_product_stream_MPSP()
 
 succinic_LCA = SuccinicLCA(system=succinic_sys, 
                  CFs=CFs, 
-                 feedstock=sugarcane, 
+                 feedstock=s.glucose_feedstock, 
                  feedstock_ID=feedstock_ID,
                  input_biogenic_carbon_streams=[feedstock, s.CSL],
                  main_product=product_stream, 
