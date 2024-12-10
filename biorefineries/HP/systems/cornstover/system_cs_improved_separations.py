@@ -64,8 +64,8 @@ import copy
 from biorefineries.cornstover import CellulosicEthanolTEA as HPTEA
 from biosteam import SystemFactory
 from biorefineries.cellulosic import create_facilities
-from biorefineries.cellulosic.units import Saccharification
 
+from biorefineries.cellulosic.units import Saccharification
 from biorefineries.cornstover import create_dilute_acid_pretreatment_system, create_saccharification_system
 # from biorefineries import corn
 # from lactic.hx_network import HX_Network
@@ -167,7 +167,7 @@ def create_HP_sys(ins, outs):
     for cornstover_sys_stream in list(s):
         cornstover_sys_stream.price *= _GDP_2007_to_2010 * chem_index[2019]/chem_index[2010]
     
-    feedstock.price = price['Corn stover']
+    feedstock.price = price['Corn stover'] * chem_index[2019]/chem_index[2016]
         
     # %% 
     
@@ -518,7 +518,6 @@ globals().update(flowsheet.to_dict())
 # TEA
 # =============================================================================
 
-
 # Income tax was changed from 0.35 to 0.21 based on Davis et al., 2018 (new legislation)
 
 HP_tea = HPTEA(system=HP_sys, IRR=0.10, duration=(2019, 2049),
@@ -704,11 +703,11 @@ def F301_titer_obj_fn(V):
     # HP_fermentation_process.run()
     return R302.effluent_titer - R302.titer_to_load
 
-def load_titer_with_glucose(titer_to_load):
+def load_titer_with_glucose(titer_to_load, set_F301_V=0.8):
     # clear_units([V301, K301])
-    # F301_lb, F301_ub = 1e-3, 1. - 1e-3
-    F301_lb, F301_ub = 0., 1. - 1e-3
-    M304_lb, M304_ub = 0., 40000.  # for low-titer high-yield combinations, if infeasible, use a higher upper bound
+    F301_ub = 0.8
+    F301_lb = 0. if set_F301_V is None else set_F301_V
+    M304_lb, M304_ub = 0., 100_000  # for low-titer high-yield combinations, if infeasible, use a higher upper bound
     
     spec.spec_2 = titer_to_load
     R302.titer_to_load = titer_to_load
@@ -729,7 +728,8 @@ def load_titer_with_glucose(titer_to_load):
                          M304_ub, 
                          ytol=1e-3)
 
-    spec.titer_inhibitor_specification.check_sugar_concentration()
+    if set_F301_V is None: spec.titer_inhibitor_specification.check_sugar_concentration()
+    
     
 spec.load_spec_2 = load_titer_with_glucose
 
@@ -793,6 +793,7 @@ for i in range(2):
                             desired_annual_production=spec.desired_annual_production, # pure metric ton /y
                             )
 
+HP_tea.labor_cost = 3212962*get_flow_tpd()/2205
 #%% Misc.
 
 def get_non_gaseous_waste_carbon_as_fraction_of_HP_GWP100():

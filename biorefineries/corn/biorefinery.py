@@ -11,13 +11,18 @@ from .tea import create_tea
 __all__ = ('Biorefinery',)
 
 class Biorefinery:
+    cache = {}
     
-    def __new__(cls, name=None, flowsheet_ID='corn',
-                chemicals=None, biorefinery_settings=None, cache=None):
+    def __new__(
+            cls, name=None, flowsheet_ID='corn',
+            chemicals=None, biorefinery_settings=None, 
+            cache=None, simulate=True,
+        ):
         flowsheet = bst.Flowsheet(flowsheet_ID)
         F.set_flowsheet(flowsheet)
         if name is None: name = 'conventional dry-grind'
-        if cache and name in cache:
+        if cache is None: cache = cls.cache
+        if name in cache:
             return cache[name]
         elif name != 'conventional dry-grind':
             raise ValueError(f"'{name}' is not available; "
@@ -29,14 +34,15 @@ class Biorefinery:
         settings.load_process_settings()
         self.flowsheet = flowsheet
         sys = self.system
-        sys.simulate()
+        if simulate: sys.simulate()
         tea = self.TEA
         if 'corn' in flowsheet.ID:
             self.corn_sys = sys
             self.corn_tea = tea
-        tea.IRR = tea.solve_IRR()
+        if simulate: tea.IRR = tea.solve_IRR()
         self.all_areas = bst.process_tools.UnitGroup('All Areas', sys.units)
         self.__dict__.update(flowsheet.to_dict())
+        cache[name] = self
         return self
     
     

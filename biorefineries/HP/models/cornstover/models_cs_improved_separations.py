@@ -19,7 +19,6 @@ import biosteam as bst
 from biosteam.evaluation import Model, Metric
 # from biosteam.evaluation.evaluation_tools import Setter
 from biorefineries.HP.systems.cornstover.system_cs_improved_separations import HP_sys, HP_tea, HP_lca, u, s, unit_groups, unit_groups_dict, spec, price, TEA_breakdown, simulate_and_print, theoretical_max_g_HP_per_g_glucose, HP_chemicals
-
 from biorefineries.HP.models.model_utils import codify
 # get_annual_factor = lambda: HP_tea._annual_factor
 
@@ -360,28 +359,28 @@ def run_bugfix_barrage():
         reset_and_reload()
     except Exception as e:
         print(str(e))
-        if 'length' in str(e).lower():
-            system.reset_cache()
-            system.empty_recycles()
-            F403.heat_utilities = []
-            F403._V_first_effect = 0.144444
-            F403.run()
-            F403._design()
-            F403.simulate()
-            spec.set_production_capacity(spec.desired_annual_production)
-        else:
+        # if 'length' in str(e).lower():
+        #     system.reset_cache()
+        #     system.empty_recycles()
+        #     F403.heat_utilities = []
+        #     F403._V_first_effect = 0.144444
+        #     F403.run()
+        #     F403._design()
+        #     F403.simulate()
+        #     spec.set_production_capacity(spec.desired_annual_production)
+    else:
+        try:
+            reset_and_switch_solver('fixedpoint')
+        except Exception as e:
+            print(str(e))
             try:
-                reset_and_switch_solver('fixedpoint')
+                reset_and_switch_solver('aitken')
             except Exception as e:
                 print(str(e))
-                try:
-                    reset_and_switch_solver('aitken')
-                except Exception as e:
-                    print(str(e))
-                    # print(_yellow_text+"Bugfix barrage failed.\n"+_reset_text)
-                    print("Bugfix barrage failed.\n")
-                    # breakpoint()
-                    raise e
+                # print(_yellow_text+"Bugfix barrage failed.\n"+_reset_text)
+                print("Bugfix barrage failed.\n")
+                # breakpoint()
+                raise e
 ###############################
 
 #%% Model specification

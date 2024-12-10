@@ -693,10 +693,11 @@ def F301_titer_obj_fn(V):
     HP_fermentation_process.run()
     return R302.effluent_titer - R302.titer_to_load
 
-def load_titer_with_glucose(titer_to_load):
+def load_titer_with_glucose(titer_to_load, set_F301_V=0.8):
     # clear_units([V301, K301])
-    F301_lb, F301_ub = 0., 0.8
-    M304_lb, M304_ub = 0., 40000.  # for low-titer high-yield combinations, if infeasible, use a higher upper bound
+    F301_ub = 0.8
+    F301_lb = 0. if set_F301_V is None else set_F301_V
+    M304_lb, M304_ub = 0., 100_000  # for low-titer high-yield combinations, if infeasible, use a higher upper bound
     
     spec.spec_2 = titer_to_load
     R302.titer_to_load = titer_to_load
@@ -717,7 +718,7 @@ def load_titer_with_glucose(titer_to_load):
                          M304_ub, 
                          ytol=1e-3)
 
-    spec.titer_inhibitor_specification.check_sugar_concentration()
+    if set_F301_V is None: spec.titer_inhibitor_specification.check_sugar_concentration()
     
 spec.load_spec_2 = load_titer_with_glucose
 
@@ -780,6 +781,7 @@ for i in range(2):
     spec_set_production_capacity(
                             desired_annual_production=spec.desired_annual_production, # pure metric ton /y
                             )
+HP_tea.labor_cost = 3212962*get_flow_tpd()/2205
 
 #%% Misc.
 

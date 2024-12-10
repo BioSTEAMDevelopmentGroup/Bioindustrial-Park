@@ -78,6 +78,14 @@ class Biorefinery(bst.ProcessModel):
     TCI [MMUSD]         73.1
     dtype: float64
     
+    >>> from biorefineries import milk
+    >>> br = milk.Biorefinery(simulate=False, feed='UFPermeate')
+    >>> br.evaluate_scenario()
+    MSP [USD/kg]         2.08
+    GWP [kg*CO2e/kg]   0.0435
+    TCI [MMUSD]          37.7
+    dtype: float64
+    
     """
     
     def __new__(
@@ -109,27 +117,56 @@ class Biorefinery(bst.ProcessModel):
             bounds = [0.8 * baseline, 1.2 * baseline]
             return parameter(*args, **kwargs, baseline=baseline, bounds=bounds)
         
+        if feed == 'UFPermeate':
+            baseline = 0.3 * 0.05 / 0.45359237 # aboud 0.11 USD per kg sugar
+            lb = 0.8 * baseline
+            ub = 1.2 * baseline
+        elif feed == 'AcidWhey':
+            # TODO: Update based on industry expert
+            baseline = 0.05 / 0.45359237
+            lb = 0.8 * baseline
+            ub = 1.2 * baseline
+        elif feed == 'SaccharifiedCornSlurry':
+            # https://scijournals.onlinelibrary.wiley.com/doi/epdf/10.1002/bbb.1976?saml_referrer
+            baseline = 0.33 # USD per kg sugar
+            baseline *= 0.21 # USD per kg slurry
+            lb = 0.8 * baseline
+            ub = 1.2 * baseline
+        elif feed == 'GlucoseMedia':
+            # https://tradingeconomics.com/commodity/sugar
+            baseline = 0.50 # USD per kg sugar
+            baseline *= 0.207 # USD per kg sugar
+            lb = 0.8 * baseline
+            ub = 1.2 * baseline
+        else:
+            raise ValueError('invalid feed')
+        
+        @parameter(units='USD/kg', element='feedstock', 
+                   baseline=baseline, bounds=[lb, ub]) 
+        def set_feedstock_price(price):
+            self.feedstock.price = price
+        
         @uniform(units='USD/kg', element='hexane', baseline=0.73) 
         def set_hexane_price(price):
             self.hexane.price = price
         
-        @parameter(units='USD/kg', element='dodecylacetate', bounds=[3, 6],
+        @parameter(units='USD/kg', element='product', bounds=[3, 6],
                    baseline=3) # https://www.alibaba.com/product-detail/Factory-direct-sale-DODECYL-ACETATE-CAS_1601041319372.html
         def set_product_price(price):
             self.product.price = price
         
         @parameter(units='g/L', element=self.fermentation, 
-                   bounds=[10, 60], baseline=30)
+                   bounds=[1, 10], baseline=5) # baseline is really 0.155, but this is infeasible
         def set_titer(titer):
             self.fermentation.titer = titer
             
         @parameter(units='g/L/h', element=self.fermentation,
-                   bounds=[0.1, 1.3], baseline=1)
+                   bounds=[0.1, 1], baseline=0.5) # baseline is really 0.002, but this is infeasible
         def set_productivity(productivity):
             self.fermentation.productivity = productivity
         
         @parameter(units='% theoretical', name='yield', element=self.fermentation, 
-                   bounds=[30, 90], baseline=50)
+                   bounds=[30, 60], baseline=35.2)
         def set_yield(X):
             X = X / 100.
             for reaction_series in self.fermentation.reactions: reaction_series.X[0] = X
@@ -144,8 +181,39 @@ class Biorefinery(bst.ProcessModel):
         #            element='electricity', baseline=dist.mean_electricity_price)
         # def set_electricity_price(price): 
         #     bst.settings.electricity_price = price
-        # Capacity based on U.S. production in 2015 - https://cen.acs.org/articles/95/i6/Acid-whey-waste-product-untapped.html
-        @parameter(units='MT/yr', element=self.feedstock, bounds=[1e5, 1e6], baseline=5e5)
+        
+        if feed == 'AcidWhey':
+            # Capacity based on U.S. production in 2015 - https://cen.acs.org/articles/95/i6/Acid-whey-waste-product-untapped.html
+            bounds=[1e5, 1e6]
+            baseline=5e5
+        else: # Everything the same as UFPermeate
+            # https://ehlenbachscheese.com/cheese-facts.php
+            # https://www.sciencedirect.com/topics/agricultural-and-biological-sciences/whey-permeate
+            ub = 0.90 * 500e6 / 1000
+            lb = ub / 10
+            bounds = [lb, ub]
+            baseline = 0.5 * (lb + ub)
+        # elif feed == 'UFPermeate':
+        #     # https://ehlenbachscheese.com/cheese-facts.php
+        #     # https://www.sciencedirect.com/topics/agricultural-and-biological-sciences/whey-permeate
+        #     ub = 0.90 * 500e6 / 1000
+        #     lb = ub / 10
+        #     bounds = [lb, ub]
+        #     baseline = 0.5 * (lb + ub)
+        # elif feed == 'SaccharifiedCornSlurry':
+        #     # TODO: Think about the validity of this assumption
+        #     # baseline = 1.20384e6
+        #     # ub = 1.20 * baseline
+        #     # lb = 0.80 * baseline
+        #     # bounds = [lb, ub]
+        #     ub = 0.90 * 500e6 / 1000
+        #     lb = ub / 10
+        #     bounds = [lb, ub]
+        #     baseline = 0.5 * (lb + ub)
+        # else:
+        #     raise ValueError('invalid feed')
+        
+        @parameter(units='MT/yr', element=self.feedstock, bounds=bounds, baseline=baseline)
         def set_processing_capacity(processing_capacity):
             self.feedstock.F_mass = processing_capacity / system.operating_hours * 1000 # kg / hr
             

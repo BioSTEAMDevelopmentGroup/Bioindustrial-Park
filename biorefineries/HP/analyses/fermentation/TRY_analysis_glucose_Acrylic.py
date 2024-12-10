@@ -80,7 +80,7 @@ simulate_and_print()
 feedstock_tag = 'glucose'
 product_tag = 'Acrylic'
 
-mode = '300L'
+mode = '300L_FGI'
 
 dist_filename = f'parameter-distributions_{feedstock_tag}_{product_tag}_' + mode + '.xlsx'
 
@@ -113,7 +113,7 @@ print('\n\nSimulating baseline ...')
 baseline_initial = model.metrics_at_baseline()
 
 print(get_AA_MPSP())
-simulate_and_print()
+# simulate_and_print()
 
 #%% Bugfix barrage
 
@@ -186,6 +186,9 @@ get_product_recovery = lambda: sum([product.imol[i] for i in product_chemical_ID
 get_HP_AOC = lambda: HP_tea.AOC / 1e6 # million USD / y
 get_HP_TCI = lambda: HP_tea.TCI / 1e6 # million USD
 
+get_mass_HP_eq_broth = lambda: broth.imass['HP'] + broth.imol['CalciumLactate']* 2. * 90.07794
+get_product_recover_FGI = lambda: product.imass[product_chemical_IDs].sum()/get_mass_HP_eq_broth()
+
 HXN = f.HXN1001
 HP_metrics = [get_product_MPSP, 
               
@@ -198,18 +201,18 @@ HP_metrics = [get_product_MPSP,
                 # lambda: len(HXN.original_heat_utils), 
                 
                get_HP_AOC, get_HP_TCI, 
-               get_product_recovery]
+               get_product_recover_FGI]
 
 # %% Generate 3-specification meshgrid and set specification loading functions
 
-steps = (50, 50, 1)
+steps = (20, 20, 1)
 
 # Yield, titer, productivity (rate)
 # spec_1 = yields = np.linspace(0.05, 0.95, steps[0]) # yield
 # spec_2 = titers = np.linspace(5, 
 #                               200.,
 #                                 steps[1]) # titer
-spec_1 = yields = np.linspace(0.2, 0.95, steps[0]) # yield
+spec_1 = yields = np.linspace(0.05, 0.95, steps[0]) # yield
 spec_2 = titers = np.linspace(20, 
                               200.,
                                 steps[1]) # titer
@@ -417,7 +420,8 @@ for p in productivities:
                     spec.load_specifications(spec_1=y, spec_2=t, spec_3=p)
                     for i in range(1): system.simulate()
                     
-                    titers_mol_per_mol_total[-1].append(broth.imol['HP']/broth.imol['HP', 'Water'].sum())
+                    titers_mol_per_mol_total[-1].append((broth.imol['HP'] + 2*broth.imol['CalciumLactate'])/
+                                                        (broth.imol['HP', 'Water'].sum() + 2*broth.imol['CalciumLactate']))
                     
                     d1_Metric1[-1].append(HP_metrics[0]())
                     d1_Metric2[-1].append(HP_metrics[1]())
@@ -434,7 +438,7 @@ for p in productivities:
                     print('Error in model spec: %s'%str_e)
                     # breakpoint()
                     # raise e
-                    if 'sugar concentration' in str_e:
+                    if 'sugar concentration' in str_e or 'opposite sign' in str_e:
                         # flowsheet('AcrylicAcid').F_mass /= 1000.
                         d1_Metric1[-1].append(np.nan)
                         d1_Metric2[-1].append(np.nan)

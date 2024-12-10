@@ -71,6 +71,8 @@ chem_index = { # Dictionary of chemical indices
                     2022: 125.829,
                     }
 
+_corn_bushel_to_kg = 25.402 # https://www.ers.usda.gov/webdocs/publications/41880/33132_ah697_002.pdf
+
 # From USD/dry-ton to USD/kg in 2016$, 20% moisture content
 # changed from Humbird et al., 2011 to Davis et al., 2018
 corn_stover_price = 71.26 / _kg_per_ton * 0.8 
@@ -173,8 +175,48 @@ IBA_price = 0. # assumed
 
 TAL_price = 4. # assumed; when solving for MPSP, this is merely the initial value and has no effect on results
 
-glucose_price = 236. /_kg_per_ton # refer to email: "sugar price from maravelias group"
+#%% Feedstocks
 
+# # Glucose / D-glucose / dextrose - from USDA
+# # $/lb # USDA 2015-2019 mean
+# # https://www.ers.usda.gov/data-products/sugar-and-sweeteners-yearbook-tables/sugar-and-sweeteners-yearbook-tables/#World,%20U.S.,%20and%20Mexican%20Sugar%20and%20Corn%20Sweetener%20Prices
+# glucose_price = 0.3798 * _lb_per_kg
+# # in $/kg:
+# # 2015-2019 mean: 37.98	
+# # 2015-2019 5th percentile: 36.00 
+# # 2015-2019 95th percentile: 39.5
+
+# Glucose / D-glucose / dextrose - from review paper Cheng et al. 2019 # https://doi.org/10.1002/bbb.1976
+# $/kg in 2017$: 
+# 0.22 # https://doi.org/10.1016/j.indcrop.2005.08.004  
+# 0.26 # https://doi.org/10.22004/ag.econ.28658
+# 0.33 # https://doi.org/10.1002/bbb.1475
+# $/kg converted to 2019$:
+# 0.23 # https://doi.org/10.1016/j.indcrop.2005.08.004  
+# 0.27 # https://doi.org/10.22004/ag.econ.28658
+# 0.34 # https://doi.org/10.1002/bbb.1475
+# mean of 3 values in 2019$: 0.28
+# mean of 3 values in 2016$:
+glucose_price = ((0.22 + 0.26 + 0.33)/3) * chem_index[2016]/chem_index[2017]
+
+# Corn stover
+from biorefineries.lactic._process_settings import feedstock_price # in 2016$
+cornstover_price = feedstock_price
+
+# Corn
+# $/bushel # USDA 2015-2019 mean
+# https://www.nass.usda.gov/Charts_and_Maps/Agricultural_Prices/pricecn.php
+corn_price = 3.543 / _corn_bushel_to_kg
+# in $/kg:
+# 2015-2019 mean: 0.139
+# 2015-2019 5th percentile: 0.127
+# 2015-2019 95th percentile: 0.150
+
+# Sugarcane
+from biorefineries.cane.streams import sugarcane # in 2018$
+sugarcane_price = sugarcane['price']
+
+#%%
 # https://www.alibaba.com/product-detail/Manufacturer-of-Hexyl-Alcohol-Hexanol-n_60403061175.html?spm=a2700.galleryofferlist.0.0.1021992cx1VYY8
 hexanol_price = 6.
 
@@ -314,8 +356,6 @@ price = {'SA': SA_price,
          'Amberlyst-70': amberlyst70_price,
          'PdC': PdC_price,
          'Spent PdC': spent_PdC_price,
-         'Corn stover': corn_stover_price,
-         'Glucose': glucose_price,
          'Hexanol': hexanol_price,
          'Heptane': heptane_price,
          'Toluene': toluene_price,
@@ -349,6 +389,10 @@ price = {'SA': SA_price,
          'Sodium acetate': sodium_acetate_price,
          'Acetic acid': acetic_acid_price,
          'Tetrahydrofuran': THF_price,
+         'Glucose': glucose_price,
+         'Corn stover': cornstover_price,
+         'Corn': corn_price,
+         'Sugarcane': sugarcane_price,
          }
     
 #!!! Round all prices to 4 *decimal places*
@@ -432,13 +476,13 @@ GWP_CF_stream = tmo.Stream('GWP_CF_stream', GWP_CF_array, units='kg/hr')
 GWP_CFs['Electricity'] = 0.4490 # kg CO2-eq/kWh GREET 2022 US Mix  # assume production==consumption, both in kg CO2-eq/kWh
 
 
-GWP_CFs['Sugarcane'] = 0.12043 * 0.3/0.286 # ecoinvent 3.8 [2] market for sugarcane, RoW
-# # adjusted from dry wt content of 28.6% (their assumption) to 30% (our assumption)
-
-
-# GWP_CFs['Sugarcane'] = 0.02931 # GREET 2022
-
-
+GWP_CFs['Corn stover'] = 0.10945 # see Table S4 of the SI of Bhagwat et al. 2021
+# GWP_CFs['Sugarcane'] = 0.12158 # ecoinvent 3.6, sugarcane production, RoW, IPCC 2013 GWP-100a
+GWP_CFs['Sugarcane'] = 0.044535 # GREET 2023, Sugarcane Production for Brazil Plant
+GWP_CFs['Corn'] = 0.2610 # GREET 2023, Corn Production for Biofuel Refinery
+# GWP_CFs['Glucose'] = 1.2127 # ecoinvent 3.8 glucose production, GLO
+GWP_CFs['Glucose'] = 0.7539 * 0.909 # GREET 2023, Glucose (from corn; based on Fuel-Cycle Fossil Energy Use and Greenhouse Gas Emissions of Fuel Ethanol Produced from U.S. Midwest Corn)
+                                    # multiplied by 0.909 as feedstock dextrose monohydrate stream is 90.9 wt% glucose
 CFs['GWP_100'] = GWP_CFs
 
 # =============================================================================
@@ -488,9 +532,12 @@ FEC_CF_stream = tmo.Stream('FEC_CF_stream', FEC_CF_array, units='kg/hr')
 
 FEC_CFs['Electricity'] = 5.724 # MJ/kWh # GREET 2022 US Mix #assume production==consumption, both in MJ/kWh
 
-FEC_CFs['Sugarcane'] = 	0.40192 * 0.3/0.286 # ecoinvent 3.8 [2] market for sugarcane, RoW
-# # adjusted from dry wt content of 28.6% (their assumption) to 30% (our assumption)
-
-# FEC_CFs['Sugarcane'] = 	0.2265 # GREET 2022
+FEC_CFs['Corn stover'] = 1.68000 # see Table S4 in the SI of Bhagwat et al. 2021
+# FEC_CFs['Sugarcane'] = 0.37338 # ecoinvent 3.6, sugarcane production, RoW, IPCC 2013 GWP-100a
+FEC_CFs['Sugarcane'] = 0.28832 # GREET 2023, Sugarcane Production for Brazil Plant
+FEC_CFs['Corn'] = 1.684 # GREET 2023, Corn Production for Biofuel Refinery
+# FEC_CFs['Glucose'] = 14.507 # ecoinvent 3.8 glucose production, GLO
+FEC_CFs['Glucose'] = 7.74 * 0.909 # GREET 2023, Glucose (from corn; based on Fuel-Cycle Fossil Energy Use and Greenhouse Gas Emissions of Fuel Ethanol Produced from U.S. Midwest Corn)
+                                  # multiplied by 0.909 as feedstock dextrose monohydrate stream is 90.9 wt% glucose
 
 CFs['FEC'] = FEC_CFs

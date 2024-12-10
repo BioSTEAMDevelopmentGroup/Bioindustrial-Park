@@ -54,15 +54,15 @@ def plot_MSP_across_capacity_price(load=True):
         fillcolor=None, styleaxiskw=dict(xtick0=False), label=True,
     )
 
-def MSP_GWP_at_yield_productivity(yield_, productivity, biorefinery, titers):
-    biorefinery.set_yield.setter(yield_)
-    biorefinery.set_productivity.setter(productivity)
-    MSPs = np.zeros(len(titers))
-    for i, titer in enumerate(titers):
-        biorefinery.set_yield.setter(yield_)
-        biorefinery.set_titer.setter(titer)    
-        biorefinery.system.simulate()
-        MSPs[i] = biorefinery.MSP()
+def MSP_GWP_at_yield_productivity(yield_, productivity, biorefineries, titers):
+    MSPs = np.zeros([len(biorefineries), len(titers)])
+    for i, biorefinery in enumerate(biorefineries):
+        for j, titer in enumerate(titers):
+            biorefinery.set_yield.setter(yield_)
+            biorefinery.set_titer.setter(titer)    
+            biorefinery.set_productivity.setter(productivity)
+            biorefinery.system.simulate()
+            MSPs[i, j] = biorefinery.MSP()
     return MSPs
 
 def set_figure_size(width=None, aspect_ratio=None, units=None): 
@@ -83,26 +83,27 @@ def set_figure_size(width=None, aspect_ratio=None, units=None):
     params = matplotlib.rcParams
     params['figure.figsize'] = (width, width * aspect_ratio)
 
-def plot_MSP_across_yield_productivity(load=True):
-    bst.plots.set_font(size=11, family='sans-serif', font='Arial')
-    set_figure_size(aspect_ratio=0.3)
-    biorefinery = Biorefinery(simulate=False)
+def plot_MSP_across_yield_productivity(load=True, feeds=('UFPermeate', 'GlucoseMedia')):
+    bst.plots.set_font(size=12, family='sans-serif', font='Arial')
+    set_figure_size(aspect_ratio=0.6)
+    biorefineries = [Biorefinery(simulate=False, feed=i) for i in feeds]
+    biorefinery = biorefineries[0]
     xlim = np.array(biorefinery.set_yield.bounds)
     ylim = np.array(biorefinery.set_productivity.bounds)
-    titers = np.array([10, 30, 60])
+    titers = np.array([1, 4, 16])
     X, Y, Z = bst.plots.generate_contour_data(
         MSP_GWP_at_yield_productivity,
-        file=os.path.join(results_folder, 'MSP_GWP_titer_productivity_AcEster.npy'),
+        file=os.path.join(results_folder, f'MSP_GWP_titer_productivity_AcEster_{'_'.join(feeds)}.npy'),
         load=load, save=True,
         xlim=xlim, ylim=ylim,
-        args=(biorefinery, titers),
-        n=10,
+        args=(biorefineries, titers),
+        n=15,
     )
     # Plot contours
-    ylabel = "Productivity\n[$\mathrm{g} \cdot \mathrm{L}^{\mathrm{-1}} \cdot \mathrm{h}^{\mathrm{-1}}$]"
-    xlabel = 'Yield [$\mathrm{g} \cdot \mathrm{L}^{\mathrm{-1}}$]'
-    yticks = [0.1, 0.4, 0.7, 1.0, 1.3]
-    xticks = [30, 45, 60, 75, 90]
+    ylabel = ["Productivity [$\mathrm{g} \cdot \mathrm{L}^{\mathrm{-1}} \cdot \mathrm{h}^{\mathrm{-1}}$]", '']
+    xlabel = ['', 'Yield [% theoretical]', '']
+    yticks = [0.1, 0.4, 0.7, 1.0]
+    xticks = [30, 40, 50, 60]
     metric_bars = [
         bst.plots.MetricBar(
             'MSP', '[$\mathrm{USD} \cdot \mathrm{kg}^{\mathrm{-1}}$]', plt.cm.get_cmap('viridis_r'), 
@@ -116,10 +117,10 @@ def plot_MSP_across_yield_productivity(load=True):
         # )
     ]
     fig, axes, CSs, CB, other_axes = bst.plots.plot_contour_single_metric(
-        X, Y, Z[:, :, np.newaxis, :], xlabel, ylabel, xticks, yticks, metric_bars[0],  
-        fillcolor=None, styleaxiskw=dict(xtick0=False), label=True,
+        X, Y, Z, xlabel, ylabel, xticks, yticks, metric_bars[0],  
+        fillcolor=None, label=True,
     )
-    plt.subplots_adjust(hspace=0.2, wspace=0.2)
+    plt.subplots_adjust(hspace=0.1, wspace=0.1, bottom=0.15)
     for i in ('svg', 'png'):
-        file = os.path.join(images_folder, f'MSP_across_yield_productivity.{i}')
+        file = os.path.join(images_folder, f'MSP_across_yield_productivity_{'_'.join(feeds)}.{i}')
         plt.savefig(file, transparent=True, dpi=900)

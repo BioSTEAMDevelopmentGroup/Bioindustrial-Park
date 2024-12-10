@@ -81,6 +81,12 @@ def create_HP_fermentation_process(ins, outs,):
     sugar_juice_or_slurry, CSL, magnesium_chloride, zinc_sulfate, fermentation_lime, fresh_CO2_fermentation, makeup_MEA_A301 = ins
     fermentation_liquid_effluent, amine_absorption_vent, F301_top_product, pre_evaporator_vent = outs
       
+    CSL.price = price['CSL']
+    magnesium_chloride.price = price['Magnesium chloride']
+    zinc_sulfate.price = price['Zinc sulfate']
+    fermentation_lime.price = price['Lime']
+    fresh_CO2_fermentation.price = price['Liquid carbon dioxide']
+    makeup_MEA_A301.price = price['Monoethanolamine']
     
     # =============================================================================
     # Fermentation units
@@ -317,6 +323,10 @@ def create_HP_separation_hexanol_extraction_process(ins, outs,):
     
     fermentation_broth, sulfuric_acid_separation, separation_hexanol = ins
     HP_solution, cell_mass, gypsum, F401_t, S404_raffinate = outs
+    
+    sulfuric_acid_separation.price = price['Sulfuric acid']
+    separation_hexanol.price = price['Hexanol']
+    gypsum.price = price['Gypsum']
     
     # Remove solids from fermentation broth, modified from the pressure filter in Humbird et al.
     S401_index = [splits_df.index[0]] + splits_df.index[2:].to_list()
@@ -817,6 +827,12 @@ def create_HP_separation_improved_process(ins, outs, fermentation_reactor=None):
     HP_solution, cell_mass, gypsum, F403_t,\
         color_impurities, cation_impurities, anion_impurities = outs
     
+    sulfuric_acid_separation.price = price['Sulfuric acid']
+    adsorption_makeup_regeneration_fluid.price = 0. # priced in PWC makeup_water
+    CEX_makeup_regeneration_HCl.price = price['Sulfuric acid']
+    AEX_makeup_regeneration_NaOH.price = price['Caustics']
+    gypsum.price = price['Gypsum']
+    
     f = bst.main_flowsheet
     u, s = f.unit, f.stream
     
@@ -1109,6 +1125,13 @@ def create_HP_separation_improved_process_HP_product(ins, outs, fermentation_rea
     dried_HP_salt, cell_mass, gypsum, F403_t,\
         color_impurities, cation_impurities, anion_impurities,\
             dryer_top_product = outs
+    
+    sulfuric_acid_separation.price = price['Sulfuric acid']
+    adsorption_makeup_regeneration_fluid.price = 0. # priced in PWC makeup_water
+    CEX_makeup_regeneration_HCl.price = price['Sulfuric acid']
+    AEX_makeup_regeneration_NaOH.price = price['Caustics']
+    base_neutralization_separation.price = price['Caustics']*2.
+    gypsum.price = price['Gypsum']
     
     f = bst.main_flowsheet
     u, s = f.unit, f.stream
