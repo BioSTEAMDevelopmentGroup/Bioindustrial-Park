@@ -1,10 +1,6 @@
 # -*- coding: utf-8 -*-
 """
 """
-
-__all__ = (
-        
-)
 import os
 import biosteam as bst
 import numpy as np
@@ -80,6 +76,7 @@ class Biorefinery(bst.ProcessModel):
     
     """
     name = ConfigurationKey.name
+    pseudo_optimal_design_decisions = {}
     
     def optimize(self):
         results = self.model.optimize(
@@ -221,58 +218,66 @@ class Biorefinery(bst.ProcessModel):
             self.system.rescale(self.AcOH_media, capacity / original)
         
         if carbon_capture:
-            self.AcOH_production.length_to_diameter = 8
+            baseline_length_to_diameter = 8
         else:
-            self.AcOH_production.length_to_diameter = 12
+            baseline_length_to_diameter = 12
+        
+        optimized_parameter = model.optimized_parameter
+        # if dewatering:
+        #     @optimized_parameter(bounds=[5, 20], baseline=12, name='extractor stages')
+        #     def set_stages(N):
+        #         N = int(N)
+        #         self.extractor.N_stages = N
             
-        if dewatering:
-            optimized_parameter = model.optimized_parameter
+        #     @optimized_parameter(bounds=[1, 2], baseline=1.5, name='solvent to feed ratio')
+        #     def set_solvent_to_feed(solvent_feed_ratio):
+        #         self.extractor.solvent_feed_ratio = solvent_feed_ratio
             
-            @optimized_parameter(bounds=[5, 20], baseline=12, name='extractor stages')
-            def set_stages(N):
-                N = int(N)
-                self.extractor.N_stages = N
+        #     @optimized_parameter(bounds=[1.01, 2.5], baseline=1.2, element=self.extract_distiller)
+        #     def extract_distiller_reflux(k):
+        #         self.extract_distiller.k = k
             
-            @optimized_parameter(bounds=[1, 2], baseline=1.5, name='solvent to feed ratio')
-            def set_solvent_to_feed(solvent_feed_ratio):
-                self.extractor.solvent_feed_ratio = solvent_feed_ratio
+        #     @optimized_parameter(bounds=[90, 99.9], baseline=95, units='%', element=self.extract_distiller)
+        #     def extract_distiller_heavy_key_recovery(Hr):
+        #         self.extract_distiller.Hr = Hr / 100
             
-            @optimized_parameter(bounds=[1.01, 2.5], baseline=1.2, element=self.extract_distiller)
-            def extract_distiller_reflux(k):
-                self.extract_distiller.k = k
+        #     @optimized_parameter(bounds=[1.01, 2.5], baseline=1.2, element=self.raffinate_distiller)
+        #     def raffinate_distiller_reflux(k):
+        #         self.raffinate_distiller.k = k
             
-            @optimized_parameter(bounds=[90, 99.9], baseline=95, units='%', element=self.extract_distiller)
-            def extract_distiller_heavy_key_recovery(Hr):
-                self.extract_distiller.Hr = Hr / 100
+        #     @optimized_parameter(bounds=[80, 99.9], baseline=99, units='%', element=self.raffinate_distiller)
+        #     def raffinate_distiller_light_key_recovery(Lr):
+        #         self.raffinate_distiller.Lr = Lr / 100
             
-            @optimized_parameter(bounds=[1.01, 2.5], baseline=1.2, element=self.raffinate_distiller)
-            def raffinate_distiller_reflux(k):
-                self.raffinate_distiller.k = k
+        #     @optimized_parameter(bounds=[80, 99.9], baseline=99, units='%', element=self.raffinate_distiller)
+        #     def raffinate_distiller_heavy_key_recovery(Hr):
+        #         self.raffinate_distiller.Hr = Hr / 100
             
-            @optimized_parameter(bounds=[80, 99.9], baseline=99, units='%', element=self.raffinate_distiller)
-            def raffinate_distiller_light_key_recovery(Lr):
-                self.raffinate_distiller.Lr = Lr / 100
-            
-            @optimized_parameter(bounds=[80, 99.9], baseline=99, units='%', element=self.raffinate_distiller)
-            def raffinate_distiller_heavy_key_recovery(Hr):
-                self.raffinate_distiller.Hr = Hr / 100
-            
-            @optimized_parameter(bounds=[0, 1], baseline=0.5, element=self.extract_heater)
-            def extract_heater_vapor_fraction(V):
-                self.extract_heater.V = V
-            
-            @optimized_parameter(bounds=[2, 12], baseline=8, element='AcOH bioreactor', name='length to diameter')
-            def set_AcOH_bioreactor_length_to_diameter(length_to_diameter):
-                self.AcOH_production.length_to_diameter = length_to_diameter
-            
-            @optimized_parameter(bounds=[2, 12], baseline=4, element='AcEster bioreactor', name='length to diameter')
-            def set_AcEster_bioreactor_length_to_diameter(length_to_diameter):
-                self.AcEster_production.length_to_diameter = length_to_diameter
-            
-            # optimal_values = [15, 1.5e+00, 1.02e+00, 9.99e01, 1.02e+00, 9.99e01, 9.99e01, 0]
-            # for i, j in zip(model.optimized_parameters, optimal_values): 
-            #     i.baseline = j
-            #     i.setter(j)
+        #     @optimized_parameter(bounds=[0, 1], baseline=0.5, element=self.extract_heater)
+        #     def extract_heater_vapor_fraction(V):
+        #         self.extract_heater.V = V
+        
+        @optimized_parameter(bounds=[2, 12], baseline=baseline_length_to_diameter, element='AcOH bioreactor', name='length to diameter')
+        def set_AcOH_bioreactor_length_to_diameter(length_to_diameter):
+            self.AcOH_production.length_to_diameter = length_to_diameter
+        
+        @optimized_parameter(bounds=[2, 12], baseline=baseline_length_to_diameter, element='AcEster bioreactor', name='length to diameter')
+        def set_AcEster_bioreactor_length_to_diameter(length_to_diameter):
+            self.AcEster_production.length_to_diameter = length_to_diameter
+        
+        @optimized_parameter(bounds=[0.2, 0.8], baseline=0.6, element='AcEster bioreactor', name='agitation power')
+        def set_AcEster_bioreactor_agitation_power(length_to_diameter):
+            self.AcEster_production.length_to_diameter = length_to_diameter
+        
+        if key in cls.pseudo_optimal_design_decisions:
+            optimal_values = cls.pseudo_optimal_design_decisions[key]
+            for i, j in zip(model.optimized_parameters, optimal_values): 
+                i.baseline = j
+                i.setter(j)
+        else:
+            cls.pseudo_optimal_design_decisions[key] = self.optimize()
+        
+        # All emissions are biogenic because we are using biomass
         # chemicals = bst.settings.chemicals
         # self.direct_nonbiogenic_emissions = lambda: (
         #     sum([i.get_atomic_flow('C') for i in self.system.products if i.phase == 'g'])
