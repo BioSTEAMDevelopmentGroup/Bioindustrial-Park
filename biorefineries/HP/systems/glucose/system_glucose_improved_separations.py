@@ -693,8 +693,8 @@ def load_titer_with_glucose(titer_to_load, set_F301_V=None):
     
     if M304_titer_obj_fn(M304_lb) < 0.: # if there is too low a conc even with no dilution, that means the yield is too low
         # IQ_interpolation(F301_titer_obj_fn, F301_lb, F301_ub, ytol=1e-3)
-        pass
-        # spec.titer_inhibitor_specification.check_sugar_concentration() # note this returns an infeasible sugar concentration error for smooth running purposes; 
+        # pass
+        spec.titer_inhibitor_specification.check_sugar_concentration() # note this returns an infeasible sugar concentration error for smooth running purposes; 
         # it is actually an infeasible yield-titer combination because at low yields too much glucose is broken down to produce water
     
     # elif F301_titer_obj_fn(1e-4)>0: # if the slightest evaporation results in too high a conc
