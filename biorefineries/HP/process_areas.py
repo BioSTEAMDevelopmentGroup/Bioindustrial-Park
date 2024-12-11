@@ -111,18 +111,18 @@ def create_HP_fermentation_process(ins, outs,):
     F301_design = F301._design
     F301_cost = F301._cost
     
-    # @F301.add_specification(run=False)
-    # def F301_spec():
-    #     feed = F301.ins[0]
-    #     if feed.imass['Water']/feed.F_mass > 0.2:
-    #         F301._run()
-    #         F301._design = F301_design
-    #         F301._cost = F301_cost
-    #     else:
-    #         F301.outs[1].empty()
-    #         F301.outs[0].copy_like(feed)
-    #         F301._design = lambda:0
-    #         F301._cost = lambda:0
+    @F301.add_specification(run=False)
+    def F301_spec():
+        feed = F301.ins[0]
+        if feed.imass['Water']/feed.F_mass > 0.2:
+            F301._run()
+            F301._design = F301_design
+            F301._cost = F301_cost
+        else:
+            F301.outs[1].empty()
+            F301.outs[0].copy_like(feed)
+            F301._design = lambda:0
+            F301._cost = lambda:0
     
     F301_P = bst.units.Pump('F301_P', ins=F301-1, outs=F301_top_product, P=101325.)
    
@@ -1067,10 +1067,10 @@ def create_HP_separation_improved_process(ins, outs, fermentation_reactor=None):
         
     #########------------------------------------------------#########
     
-    # H401 = bst.HXutility('H401', ins=anion_exchange_process-0)
+    H401 = bst.HXutility('H401', ins=anion_exchange_process-0, V=0., rigorous=True)
     
-    F403 = bst.units.MultiEffectEvaporator('F403', ins=anion_exchange_process-0, outs=('F403_l', 'F403_g'),
-                                            P = (101325*1.5, 70000, 60000, 50000, 40000), V = 0.5)
+    F403 = bst.units.MultiEffectEvaporator('F403', ins=H401-0, outs=('F403_l', 'F403_g'),
+                                            P = (101325*1.5, 70000, 40000, 20000, 10000), V = 0.5)
     # F403 = bst.Flash('F403', ins=anion_exchange_process-0, outs=('F403_g', 'F403_l'),
     #                                         P = 80000, V = 0.5)
     F403.target_HP_x = 0.08 # ~30 wt% HP
@@ -1079,6 +1079,8 @@ def create_HP_separation_improved_process(ins, outs, fermentation_reactor=None):
     
     @F403.add_specification(run=False)
     def F403_specification():
+        # try:
+        # F403.P = (101325, 70000, 60000, 50000, 40000)
         instream = F403.ins[0]
         target_HP_x = F403.target_HP_x
         # ratio = target_water_x/get_x('Water', instream)
@@ -1090,6 +1092,20 @@ def create_HP_separation_improved_process(ins, outs, fermentation_reactor=None):
         else:
             F403.V = 0.
             F403._run()
+        # except:
+        #     F403.P = (101325*1.1, 70000, 60000, 50000, 40000)
+        #     instream = F403.ins[0]
+        #     target_HP_x = F403.target_HP_x
+        #     # ratio = target_water_x/get_x('Water', instream)
+        #     HP_x = get_x('HP', instream)
+        #     if HP_x < target_HP_x:
+        #         ratio = HP_x/target_HP_x
+        #         F403.V = 1. - ratio
+        #         F403._run()
+        #     else:
+        #         F403.V = 0.
+        #         F403._run()
+            
             
     F403_P1 = bst.units.Pump('F403_P1', ins=F403-0, outs=HP_solution, P=101325.)    
     F403_P2 = bst.units.Pump('F403_P2', ins=F403-1, outs=F403_t, P=101325.)  
