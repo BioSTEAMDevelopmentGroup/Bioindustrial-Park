@@ -138,7 +138,8 @@ def run_bugfix_barrage():
         reset_and_reload()
     except Exception as e:
         print(str(e))
-        if 'length' in str(e).lower():
+        if 'length' in str(e).lower() or 'in subtract' in str(e).lower() or 'in log' in str(e).lower():
+            raise(e)
             system.reset_cache()
             system.empty_recycles()
             F403.heat_utilities = []
@@ -195,7 +196,7 @@ HP_metrics = [get_product_MPSP,
 
 # %% Generate 3-specification meshgrid and set specification loading functions
 
-steps = (20, 20, 1)
+steps = (50, 50, 1)
 
 # Yield, titer, productivity (rate)
 spec_1 = yields = np.linspace(0.05, 0.95, steps[0]) # yield

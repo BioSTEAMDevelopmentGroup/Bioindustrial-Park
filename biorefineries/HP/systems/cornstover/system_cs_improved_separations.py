@@ -389,7 +389,7 @@ def create_HP_sys(ins, outs):
         water_to_add = M501_outs_0.imol['H2SO4', 'NaOH'].max()
         M501_outs_0.imol['H2SO4', 'NaOH', 'NH4OH'] = 0.
         M501_outs_0.imol['Water'] += water_to_add
-    
+        M501.outs[0].phase = 'l'
         # M501_outs_0.imol['H2SO4', 'CaCO3]
     # wastewater_treatment_sys = bst.create_wastewater_treatment_system(
     #     kind='conventional',
