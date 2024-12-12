@@ -1067,9 +1067,9 @@ def create_HP_separation_improved_process(ins, outs, fermentation_reactor=None):
         
     #########------------------------------------------------#########
     
-    H401 = bst.HXutility('H401', ins=anion_exchange_process-0, V=0., rigorous=True)
+    # H401 = bst.HXutility('H401', ins=anion_exchange_process-0, V=0., rigorous=True)
     
-    F403 = bst.units.MultiEffectEvaporator('F403', ins=H401-0, outs=('F403_l', 'F403_g'),
+    F403 = bst.units.MultiEffectEvaporator('F403', ins=anion_exchange_process-0, outs=('F403_l', 'F403_g'),
                                             P = (101325*1.5, 70000, 40000, 20000, 10000), V = 0.5)
     # F403 = bst.Flash('F403', ins=anion_exchange_process-0, outs=('F403_g', 'F403_l'),
     #                                         P = 80000, V = 0.5)

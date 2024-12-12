@@ -80,7 +80,7 @@ simulate_and_print()
 feedstock_tag = 'glucose'
 product_tag = 'Acrylic'
 
-mode = '300L'
+mode = '300L_FGI'
 
 dist_filename = f'parameter-distributions_{feedstock_tag}_{product_tag}_' + mode + '.xlsx'
 

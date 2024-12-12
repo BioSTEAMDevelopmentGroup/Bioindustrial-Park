@@ -345,6 +345,7 @@ def create_HP_sys(ins, outs):
     M501 = bst.units.Mixer('M501', ins=(
                                         u.H201-0,
                                         u.F301_P-0, 
+                                        # u.P303-0,
                                         separation_sys-3,
                                         separation_sys-4,
                                         upgrading_sys-2, 
@@ -722,7 +723,6 @@ def load_titer_with_glucose(titer_to_load, set_F301_V=0.8):
                          ytol=1e-3)
 
     if set_F301_V is None: spec.titer_inhibitor_specification.check_sugar_concentration()
-    
     
     
 spec.load_spec_2 = load_titer_with_glucose

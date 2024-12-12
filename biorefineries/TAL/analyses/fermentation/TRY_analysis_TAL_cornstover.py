@@ -140,7 +140,7 @@ get_sugar_conc_TCI = lambda: F301.installed_cost + F301_P.installed_cost + M304.
 
 # %% Generate 3-specification meshgrid and set specification loading functions
 
-steps = (15, 15, 1)
+steps = (30, 30, 1)
 
 # Yield, titer, productivity (rate)
 spec_1 = yields = np.linspace(0.1, 0.99, steps[0]) # yield

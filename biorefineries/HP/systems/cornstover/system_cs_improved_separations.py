@@ -365,6 +365,7 @@ def create_HP_sys(ins, outs):
     M501 = bst.units.Mixer('M501', ins=(
                                         u.H201-0,
                                         u.F301_P-0, 
+                                        # u.P303-0,
                                         fermentation_sys-3,
                                         # separation_sys-4,
                                         separation_sys-3,

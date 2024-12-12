@@ -65,7 +65,7 @@ dateTimeObj = datetime.now()
 # ## Change working directory to biorefineries\\succinic
 # chdir(succinic.__file__.replace('\\__init__.py', ''))
 # ##
-mode = 'pilot-scale_batch_cornstover' 
+mode = 'pilot-scale_batch_cornstover_FGI' 
 filename = 'parameter-distributions_' + mode + '.xlsx'
 
 succinic_filepath = succinic.__file__.replace('\\__init__.py', '')
@@ -362,14 +362,14 @@ succinic_metrics = [get_product_MPSP, get_product_GWP, get_product_FEC, get_reco
 # succinic_metrics = [get_succinic_MPSP, get_GWP, get_FEC]
 
 # %% Generate 3-specification meshgrid and set specification loading functions
-steps = 5
+steps = 15
 
 # Neutralization
-spec.neutralization = True
+spec.neutralization = False
 
 # Yield, titer, productivity (rate)
-spec_1 = yields = np.linspace(0.2, 0.8, steps) # yield
-spec_2 = titers = np.linspace(20., 120., steps) # titer
+spec_1 = yields = np.linspace(0.1, 0.8, steps) # yield
+spec_2 = titers = np.linspace(10., 120., steps) # titer
 # spec_3 = productivities = np.linspace(0.1, 1.5, 6) # productivity
 spec_3 = productivities = [spec.baseline_productivity]
 

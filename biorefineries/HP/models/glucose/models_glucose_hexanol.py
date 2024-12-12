@@ -82,7 +82,7 @@ get_adjusted_MSP = lambda: get_MSP() / get_purity()
 get_adjusted_yield = lambda: get_yield() * get_purity()
 # Recovery (%) = recovered/amount in fermentation broth
 get_recovery = lambda: product_stream.imol['AcrylicAcid']\
-    /(R302.outs[1].imol['HP'])
+    /(R302.outs[1].imol['HP'] + 2*R302.outs[1].imol['CalciumLactate'])
 get_overall_TCI = lambda: HP_tea.TCI/1e6
 
 get_overall_installed_cost = lambda: HP_tea.installed_equipment_cost/1e6
