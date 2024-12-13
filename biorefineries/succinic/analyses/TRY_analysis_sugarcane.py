@@ -65,6 +65,7 @@ dateTimeObj = datetime.now()
 # ## Change working directory to biorefineries\\succinic
 # chdir(succinic.__file__.replace('\\__init__.py', ''))
 # ##
+# mode = 'pilot-scale_batch_sugarcane' 
 mode = 'pilot-scale_batch_sugarcane_FGI' 
 filename = 'parameter-distributions_' + mode + '.xlsx'
 

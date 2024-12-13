@@ -102,7 +102,7 @@ model.exception_hook = 'warn'
 print('\n\nSimulating baseline ...')
 baseline_initial = model.metrics_at_baseline()
 
-simulate_and_print()
+# simulate_and_print()
 
 #%%
 # simulate_and_print()
