@@ -67,7 +67,7 @@ bst.units.ShortcutColumn.minimum_guess_distillate_recovery = 0
 
 # Baseline cost year is 2016
 
-bst.CE = 541.7
+bst.CE = bst.units.design_tools.CEPCI_by_year[2019]
 
 # Set default thermo object for the system
 tmo.settings.set_thermo(chems)
@@ -450,7 +450,7 @@ def create_succinic_sys(ins, outs):
         F401_l.imass['SuccinicAcid'] += F401_g.imass['SuccinicAcid']  #!!! this assumption is purely to keep the same separation process as for the sugarcane->succinic biorefinery, 
                                                                       #    update if using this model in a study focused on cornstover -> succinic biorefineries
         F401_g.imass['SuccinicAcid'] = 0.
-        return F401_l.imass['SuccinicAcid']/F401_l.F_mass - F401.target_concentration
+        return F401_l.imass['SuccinicAcid']/F401_l.imass['SuccinicAcid','Water'].sum() - F401.target_concentration
     
     F401.add_specification()
     F401_P = bst.Pump('F401_P', ins=F401-0, P=101325.)
@@ -501,7 +501,7 @@ def create_succinic_sys(ins, outs):
         F402_l.imass['SuccinicAcid'] += F402_g.imass['SuccinicAcid']  #!!! this assumption is purely to keep the same separation process as for the sugarcane->succinic biorefinery, 
                                                                       #    update if using this model in a study focused on cornstover -> succinic biorefineries
         F402_g.imass['SuccinicAcid'] = 0.
-        return F402_l.imass['SuccinicAcid']/F402_l.F_mass - F402.target_concentration
+        return F402_l.imass['SuccinicAcid']/F402_l.imass['SuccinicAcid','Water'].sum() - F402.target_concentration
     
     F402_P = bst.Pump('F402_P', ins=F402-0, P=101325.)
     
@@ -552,7 +552,7 @@ def create_succinic_sys(ins, outs):
         F403_l.imass['SuccinicAcid'] += F403_g.imass['SuccinicAcid']  #!!! this assumption is purely to keep the same separation process as for the sugarcane->succinic biorefinery, 
                                                                       #    update if using this model in a study focused on cornstover -> succinic biorefineries
         F403_g.imass['SuccinicAcid'] = 0.
-        return F403_l.imass['SuccinicAcid']/F403_l.F_mass - F403.target_concentration
+        return F403_l.imass['SuccinicAcid']/F403_l.imass['SuccinicAcid','Water'].sum() - F403.target_concentration
     
     F403_P = bst.Pump('F403_P', ins=F403-0, P=101325.)
 
@@ -887,7 +887,7 @@ def F301_titer_obj_fn(V):
     return R302.effluent_titer - R302.titer_to_load
 
 
-def load_titer_with_glucose(titer_to_load, set_F301_V=0.8):
+def load_titer_with_glucose(titer_to_load, set_F301_V=None):
     # clear_units([V301, K301])
     F301_ub = 0.8
     F301_lb = 0. if set_F301_V is None else set_F301_V
@@ -898,7 +898,8 @@ def load_titer_with_glucose(titer_to_load, set_F301_V=0.8):
     F301_titer_obj_fn(F301_lb)
     
     if M304_titer_obj_fn(M304_lb) < 0.: # if there is too low a conc even with no dilution
-        IQ_interpolation(F301_titer_obj_fn, F301_lb, F301_ub, ytol=1e-3)
+        # IQ_interpolation(F301_titer_obj_fn, F301_lb, F301_ub, ytol=1e-3)
+        spec.titer_inhibitor_specification.check_sugar_concentration() 
     # elif F301_titer_obj_fn(1e-4)>0: # if the slightest evaporation results in too high a conc
     elif M304_titer_obj_fn(M304_ub) > 0.:
         IQ_interpolation(M304_titer_obj_fn, 
@@ -912,6 +913,8 @@ def load_titer_with_glucose(titer_to_load, set_F301_V=0.8):
                          M304_ub, 
                          ytol=1e-3)
         
+    if not feedstock_ID=='Glucose' and (set_F301_V is None): spec.titer_inhibitor_specification.check_sugar_concentration()
+    
 spec.load_spec_1 = spec.load_yield
 spec.load_spec_3 = spec.load_productivity
 spec.load_spec_2 = load_titer_with_glucose

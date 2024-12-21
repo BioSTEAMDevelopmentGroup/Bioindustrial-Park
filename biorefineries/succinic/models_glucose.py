@@ -152,7 +152,7 @@ metrics.append(Metric(f'GWP100a - Materials breakdown - CO2', lambda: succinic_L
 # metrics.append(Metric(f'GWP100a - Materials breakdown - H3PO4', lambda: succinic_LCA.material_GWP_breakdown['H3PO4'], 'kg-CO2-eq/kg', 'Biorefinery'))
 
 # FEC
-metrics.append(Metric('Total FEC', lambda: succinic_LCA.FEC, 'kg-CO2-eq/kg', 'Biorefinery'))
+metrics.append(Metric('Total FEC', lambda: succinic_LCA.FEC, 'MJ/kg', 'Biorefinery'))
 # metrics.append(Metric('FEC - Heating demand', lambda: succinic_LCA.heating_demand_FEC, 'kg-CO2-eq/kg', 'Biorefinery'))
 # metrics.append(Metric('FEC - Cooling demand', lambda: succinic_LCA.cooling_demand_FEC, 'kg-CO2-eq/kg', 'Biorefinery'))
 # metrics.append(Metric('FEC - Electricity demand (non-cooling)', lambda: succinic_LCA.electricity_demand_non_cooling_FEC, 'kg-CO2-eq/kg', 'Biorefinery'))

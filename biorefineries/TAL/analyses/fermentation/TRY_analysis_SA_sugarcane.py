@@ -31,7 +31,7 @@ from math import log
 
 import os
 
-from biorefineries.TAL.models import models_SA_solubility_exploit as models
+from biorefineries.TAL.models import models_SA_solubility_exploit_sugarcane as models
 
 chdir = os.chdir
 

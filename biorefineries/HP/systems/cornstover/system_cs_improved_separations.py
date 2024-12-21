@@ -365,6 +365,7 @@ def create_HP_sys(ins, outs):
     M501 = bst.units.Mixer('M501', ins=(
                                         u.H201-0,
                                         u.F301_P-0, 
+                                        # u.P303-0,
                                         fermentation_sys-3,
                                         # separation_sys-4,
                                         separation_sys-3,
@@ -385,10 +386,12 @@ def create_HP_sys(ins, outs):
     def M501_spec():
         M501._run()
         M501_outs_0 = M501.outs[0]
+        M501_outs_0.phase = 'l'
         M501.ammonia_dissolution_rxns(M501_outs_0.mol[:])
         water_to_add = M501_outs_0.imol['H2SO4', 'NaOH'].max()
         M501_outs_0.imol['H2SO4', 'NaOH', 'NH4OH'] = 0.
         M501_outs_0.imol['Water'] += water_to_add
+        M501_outs_0.phase = 'l'
     
         # M501_outs_0.imol['H2SO4', 'CaCO3]
     # wastewater_treatment_sys = bst.create_wastewater_treatment_system(

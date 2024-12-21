@@ -1067,19 +1067,22 @@ def create_HP_separation_improved_process(ins, outs, fermentation_reactor=None):
         
     #########------------------------------------------------#########
     
-    
+    # H401 = bst.HXutility('H401', ins=anion_exchange_process-0, V=0., rigorous=True)
     
     F403 = bst.units.MultiEffectEvaporator('F403', ins=anion_exchange_process-0, outs=('F403_l', 'F403_g'),
-                                            P = (101325, 70000, 40000, 20000, 10000), V = 0.5)
+                                            P = (101325*1.5, 70000, 40000, 20000, 10000), V = 0.5)
     # F403 = bst.Flash('F403', ins=anion_exchange_process-0, outs=('F403_g', 'F403_l'),
     #                                         P = 80000, V = 0.5)
-    target_HP_x = 0.08 # ~30 wt% HP
+    F403.target_HP_x = 0.08 # ~30 wt% HP
     def get_x(chem_ID, stream):
         return stream.imol[chem_ID]/sum(stream.imol['SuccinicAcid', 'AceticAcid', 'Furfural', 'HMF', 'HP', 'Water'])
     
     @F403.add_specification(run=False)
     def F403_specification():
+        # try:
+        # F403.P = (101325, 70000, 60000, 50000, 40000)
         instream = F403.ins[0]
+        target_HP_x = F403.target_HP_x
         # ratio = target_water_x/get_x('Water', instream)
         HP_x = get_x('HP', instream)
         if HP_x < target_HP_x:
@@ -1089,6 +1092,20 @@ def create_HP_separation_improved_process(ins, outs, fermentation_reactor=None):
         else:
             F403.V = 0.
             F403._run()
+        # except:
+        #     F403.P = (101325*1.1, 70000, 60000, 50000, 40000)
+        #     instream = F403.ins[0]
+        #     target_HP_x = F403.target_HP_x
+        #     # ratio = target_water_x/get_x('Water', instream)
+        #     HP_x = get_x('HP', instream)
+        #     if HP_x < target_HP_x:
+        #         ratio = HP_x/target_HP_x
+        #         F403.V = 1. - ratio
+        #         F403._run()
+        #     else:
+        #         F403.V = 0.
+        #         F403._run()
+            
             
     F403_P1 = bst.units.Pump('F403_P1', ins=F403-0, outs=HP_solution, P=101325.)    
     F403_P2 = bst.units.Pump('F403_P2', ins=F403-1, outs=F403_t, P=101325.)  

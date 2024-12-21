@@ -345,11 +345,30 @@ def create_HP_sys(ins, outs):
     M501 = bst.units.Mixer('M501', ins=(
                                         u.H201-0,
                                         u.F301_P-0, 
+                                        # u.P303-0,
                                         separation_sys-3,
                                         separation_sys-4,
                                         upgrading_sys-2, 
                                         # u.H201-0,
                                         ))
+    M501.ammonia_dissolution_rxns = ParallelRxn([
+        Rxn('NH3 + H2O -> NH4OH', 'NH3',   1.),
+        ])
+
+    #     Rxn('SodiumCitrate + H2O -> CitricAcid + 3NaOH ', 'SodiumCitrate',   1.-1e-5),
+    #     ])
+    
+    @M501.add_specification(run=False)
+    def M501_spec():
+        M501._run()
+        M501_outs_0 = M501.outs[0]
+        M501_outs_0.phase = 'l'
+        M501.ammonia_dissolution_rxns(M501_outs_0.mol[:])
+        water_to_add = M501_outs_0.imol['H2SO4', 'NaOH'].max()
+        M501_outs_0.imol['H2SO4', 'NaOH', 'NH4OH'] = 0.
+        M501_outs_0.imol['Water'] += water_to_add
+        M501_outs_0.phase = 'l'
+    
     # M501.citrate_acetate_dissolution_rxns = ParallelRxn([
     #     Rxn('SodiumAcetate + H2O -> AceticAcid + NaOH', 'SodiumAcetate',   1.-1e-5),
     #     Rxn('SodiumCitrate + H2O -> CitricAcid + 3NaOH ', 'SodiumCitrate',   1.-1e-5),
@@ -704,7 +723,6 @@ def load_titer_with_glucose(titer_to_load, set_F301_V=0.8):
                          ytol=1e-3)
 
     if set_F301_V is None: spec.titer_inhibitor_specification.check_sugar_concentration()
-    
     
     
 spec.load_spec_2 = load_titer_with_glucose
