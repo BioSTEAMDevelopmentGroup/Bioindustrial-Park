@@ -163,7 +163,7 @@ def _get_full_name(f):
 
 def get_distribution_table():
     from biorefineries.acester import Biorefinery
-    br = Biorefinery(simulate=False)
+    br = Biorefinery(simulate=False, carbon_capture=False, dewatering=False)
     name = 'name'
     full_name = 'full_name'
     parameters = {

@@ -299,9 +299,15 @@ def create_acetyl_ester_system(ins, outs, carbon_capture=True, dewatering=True):
             split=0.5, 
         )
         mixer = bst.Mixer(ins=[splitter-0, CO2_constant], outs=[CO2])
-        @splitter.add_specification(run=True)
+        @BT.add_specification
         def adjust_split():
-            splitter.split[:] = (CO2.imass['CO2'] - CO2_constant.imass['CO2']) / CO2_dynamic.imass['CO2']  
+            for i in range(2):
+                BT.simulate()
+                split = (CO2.imass['CO2'] - CO2_constant.imass['CO2']) / CO2_dynamic.imass['CO2']  
+                splitter.split[:] = split
+                splitter.run()
+                mixer.run()
+                AcOH_production.simulate()
     
 
 @bst.SystemFactory(

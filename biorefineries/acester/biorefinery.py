@@ -16,6 +16,7 @@ from biorefineries.cane.data import price_distributions_2023 as dist
 from biorefineries.tea import (
     create_cellulosic_ethanol_tea as create_tea
 )
+from warnings import catch_warnings
 from inspect import signature
 
 __all__ = (
@@ -44,6 +45,16 @@ class ConfigurationKey:
     def __init__(self, carbon_capture, dewatering):
         self.carbon_capture = carbon_capture
         self.dewatering = dewatering
+        
+    def __eq__(self, other):
+            return (
+                self.__class__ is other.__class__ and
+                self.carbon_capture == other.carbon_capture and
+                self.dewatering == other.dewatering 
+            )
+    
+    def __hash__(self):
+        return hash((ConfigurationKey, self.carbon_capture, self.dewatering))
         
     def __sub__(self, other):
         return ConfigurationComparison(self, other)
@@ -76,13 +87,17 @@ class Biorefinery(bst.ProcessModel):
     
     """
     name = ConfigurationKey.name
-    pseudo_optimal_design_decisions = {}
+    pseudo_optimal_design_decisions = {
+        ConfigurationKey(carbon_capture=False, dewatering=False): np.array([12. , 12. ,  0.6]),
+    }
     
     def optimize(self):
-        results = self.model.optimize(
-            self.MSP,  
-            convergence_model='linear regressor', 
-        )
+        with catch_warnings(action="ignore"):
+            results, convergence_model = self.model.optimize(
+                self.MSP,  
+                convergence_model='linear regressor', 
+                # method='differential evolution',
+            )
         for p, x in zip(self.model.optimized_parameters, results.x): p.setter(x)
         return results
     
@@ -93,10 +108,10 @@ class Biorefinery(bst.ProcessModel):
             carbon_capture=True,
             cache={},
         ):
-        key = (dewatering, carbon_capture)
-        if key in cache: return cache[key]
+        config = ConfigurationKey(carbon_capture, dewatering)
+        if config in cache: return cache[config]
         self = super().__new__(cls)
-        self.config = ConfigurationKey(carbon_capture, dewatering)
+        self.config = config
         bst.settings.set_thermo(create_acetate_ester_chemicals())
         bst.settings.chemicals.define_group(
             'Biomass', 
@@ -265,17 +280,9 @@ class Biorefinery(bst.ProcessModel):
         def set_AcEster_bioreactor_length_to_diameter(length_to_diameter):
             self.AcEster_production.length_to_diameter = length_to_diameter
         
-        @optimized_parameter(bounds=[0.2, 0.8], baseline=0.6, element='AcEster bioreactor', name='agitation power')
-        def set_AcEster_bioreactor_agitation_power(length_to_diameter):
-            self.AcEster_production.length_to_diameter = length_to_diameter
-        
-        if key in cls.pseudo_optimal_design_decisions:
-            optimal_values = cls.pseudo_optimal_design_decisions[key]
-            for i, j in zip(model.optimized_parameters, optimal_values): 
-                i.baseline = j
-                i.setter(j)
-        else:
-            cls.pseudo_optimal_design_decisions[key] = self.optimize()
+        @optimized_parameter(bounds=[0.2, 0.6], baseline=0.5, element='AcEster bioreactor', name='agitation power')
+        def set_AcEster_bioreactor_agitation_power(kW_per_m3):
+            self.AcEster_production.kW_per_m3 = kW_per_m3
         
         # All emissions are biogenic because we are using biomass
         # chemicals = bst.settings.chemicals
@@ -320,11 +327,18 @@ class Biorefinery(bst.ProcessModel):
         system.__class__.strict_convergence = False
         system.set_tolerance(rmol=1e-4, mol=1e-3, maxiter=50, 
                              method='wegstein', subsystems=True)
-        if simulate:
+        self.load_model(model)
+        if config in cls.pseudo_optimal_design_decisions:
+            optimal_values = cls.pseudo_optimal_design_decisions[config]
+            for i, j in zip(model.optimized_parameters, optimal_values): 
+                i.baseline = j
+                i.setter(j)
+        else:
+            cls.pseudo_optimal_design_decisions[config] = self.optimize().x
+        if simulate: 
             system.simulate()
             self.load_system(system)
-        self.load_model(model)
-        cache[key] = self
+        cache[config] = self
         return self
 
     def key_flows(self):
