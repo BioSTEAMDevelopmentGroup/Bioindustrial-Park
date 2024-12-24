@@ -647,6 +647,11 @@ def create_succinic_sys(ins, outs):
                                         # X401-1, S408-0,
                                         ))
     
+    @M501.add_specification(run=False)
+    def M501_spec():
+        for i in M501.ins: i.phase = 'l'
+        M501._run()
+    
     wastewater_treatment_sys = bst.create_wastewater_treatment_system(
         ins=M501-0,
         mockup=True,
@@ -664,6 +669,11 @@ def create_succinic_sys(ins, outs):
                                         ), 
                             outs='wastes_to_boiler_turbogenerator')
     
+    @M510.add_specification(run=False)
+    def M510_spec():
+        for i in M510.ins: i.phase = 'l'
+        M510._run()
+        
     MX = bst.Mixer(400, ['', ''])
     
     s = flowsheet.stream
