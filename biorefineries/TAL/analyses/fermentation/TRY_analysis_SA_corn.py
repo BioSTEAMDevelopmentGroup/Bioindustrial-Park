@@ -219,7 +219,7 @@ else:
     elif which_fig=='insights':
         spec_3 = productivities =\
             np.array([
-                        0.5*spec.baseline_productivity,
+                        5.*spec.baseline_productivity,
                       ])
         TAL_metrics = [get_product_MPSP, 
                         lambda: TAL_lca.GWP,

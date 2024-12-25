@@ -365,13 +365,13 @@ succinic_metrics = [get_product_MPSP, get_product_GWP, get_product_FEC, get_reco
 steps = 50
 
 # Neutralization
-spec.neutralization = True
+spec.neutralization = False
 
 # Yield, titer, productivity (rate)
 spec_1 = yields = np.linspace(0.038, 0.81, steps) # yield
 spec_2 = titers = np.linspace(10., 120., steps) # titer
 # spec_3 = productivities = np.linspace(0.1, 1.5, 6) # productivity
-spec_3 = productivities = [spec.baseline_productivity]
+spec_3 = productivities = [0.2*spec.baseline_productivity]
 
 # spec.load_spec_1 = spec.load_yield
 # spec.load_spec_2 = spec.load_titer

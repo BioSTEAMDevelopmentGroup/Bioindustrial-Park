@@ -62,7 +62,7 @@ HP_results_filepath = HP_filepath + '\\analyses\\results\\'
 
 #%% Load baseline
 
-spec.reactor.neutralization = True # !!! set neutralization here
+spec.reactor.neutralization = False # !!! set neutralization here
 
 model = models.HP_model
 system = HP_sys = models.HP_sys
@@ -72,7 +72,7 @@ get_AA_MPSP()
 feedstock_tag = 'sugarcane'
 product_tag = 'Acrylic'
 
-mode = '300L'
+mode = '300L_FGI'
 
 dist_filename = f'parameter-distributions_{feedstock_tag}_{product_tag}_' + mode + '.xlsx'
 
@@ -206,8 +206,8 @@ spec_2 = titers = np.linspace(10.,
    
 spec_3 = productivities =\
     np.array([
-               # 0.2*spec.baseline_productivity,
-              1.*spec.baseline_productivity,
+               0.2*spec.baseline_productivity,
+              # 1.*spec.baseline_productivity,
                # 5.*spec.baseline_productivity,
               ])
 
