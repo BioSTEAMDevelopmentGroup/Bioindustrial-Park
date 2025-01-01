@@ -37,6 +37,7 @@ def plot_multiple_metrics(x_axis_list, y_axis_list_of_lists,
                           ylims_list=[],
                           xticks=[0 + 10*i for i in range(0,11)],
                           yticks_list=[],
+                          plot_type='line',
                           save_fig=True,
                           filename='supernatant_recycling_fixed_decarboxylation_plot.png',
                           ylabels_list=[r"$\bfTAL$"+" " +r"$\bfRecovery$",
@@ -74,21 +75,32 @@ def plot_multiple_metrics(x_axis_list, y_axis_list_of_lists,
     plt.rcParams['font.sans-serif'] = fontname
     plt.rcParams['font.size'] = fontsize
     plt.xlim(xlim[0], xlim[1])
-    p1, = ax.plot(x_axis_list, y_axis_list_of_lists[0],
-             color=y_plotline_colors_list[0],
-         # label='predicted', 
-         zorder=1)
+    
+    p1 = None
+    if plot_type=='line':
+        p1, = ax.plot(x_axis_list, y_axis_list_of_lists[0],
+                 color=y_plotline_colors_list[0],
+             # label='predicted', 
+             zorder=1)
+    elif plot_type=='scatter':
+        p1 = ax.scatter(x_axis_list, y_axis_list_of_lists[0],
+                 color=y_plotline_colors_list[0],
+             # label='predicted', 
+             zorder=1)
+    else:
+        raise ValueError(f'Unknown plot_type {plot_type}.')
+        
     if ylims_list:
         ax.set_ylim(ylims_list[0])
-    ax.yaxis.label.set_color(p1.get_color())
+    ax.yaxis.label.set_color(y_plotline_colors_list[0])
     units_opening_brackets = ["[" , "[" ]
     for j in range(len(units_opening_brackets)):
         if units_on_newline:
             units_opening_brackets[j] = "\n[" 
             
     ax.set_ylabel(ylabels_list[0] +" " + units_opening_brackets[1] + y_axis_units_list[0] + "]")
-    ax.tick_params(axis='y', colors=p1.get_color(), direction='inout')
-    ax.spines['right'].set_color(p1.get_color())
+    ax.tick_params(axis='y', colors=y_plotline_colors_list[0], direction='inout')
+    ax.spines['right'].set_color(y_plotline_colors_list[0])
     
     ax.set_yticks(yticks_list[0])
     
@@ -96,15 +108,26 @@ def plot_multiple_metrics(x_axis_list, y_axis_list_of_lists,
     
     for i in range(1, len(y_axis_list_of_lists)):
         twini = ax.twinx()
-        pi, = twini.plot(x_axis_list, y_axis_list_of_lists[i],
-                     color=y_plotline_colors_list[i], 
-                 # label='predicted', 
-                 zorder=i+1)
-        twini.yaxis.label.set_color(pi.get_color())
-        twini.spines['right'].set_color(pi.get_color())
+        
+        pi = None
+        if plot_type=='line':
+            pi, = twini.plot(x_axis_list, y_axis_list_of_lists[i],
+                         color=y_plotline_colors_list[i], 
+                     # label='predicted', 
+                     zorder=i+1)
+        elif plot_type=='scatter':
+            pi = twini.scatter(x_axis_list, y_axis_list_of_lists[i],
+                         color=y_plotline_colors_list[i], 
+                     # label='predicted', 
+                     zorder=i+1)
+        else:
+            raise ValueError(f'Unknown plot_type {plot_type}.')
+            
+        twini.yaxis.label.set_color(y_plotline_colors_list[i])
+        twini.spines['right'].set_color(y_plotline_colors_list[i])
         
         twini.spines.right.set_position(("axes", 1 + 0.2*(i-1)))
-        twini.tick_params(axis='y', colors=pi.get_color(), direction='inout')
+        twini.tick_params(axis='y', colors=y_plotline_colors_list[i], direction='inout')
         
         units_opening_brackets = ["[" , "[" ]
         for j in range(len(units_opening_brackets)):

@@ -207,9 +207,9 @@ spec_2 = titers = np.linspace(10.,
    
 spec_3 = productivities =\
     np.array([
-               0.2*spec.baseline_productivity,
+               # 0.2*spec.baseline_productivity,
               # 1.*spec.baseline_productivity,
-               # 5.*spec.baseline_productivity,
+               5.*spec.baseline_productivity,
               ])
 
 
