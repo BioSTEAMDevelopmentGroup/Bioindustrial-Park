@@ -30,121 +30,6 @@ from math import log
 
 import os
 
-from biorefineries.TAL.models import models_TAL_solubility_exploit as models
-
-chdir = os.chdir
-
-dateTimeObj = datetime.now()
-
-ig = np.seterr(invalid='ignore')
-# bst.speed_up()
-
-product = TAL_product
-
-# search page for high end: https://www.alibaba.com/trade/search?spm=a2700.galleryofferlist.0.0.2a995827YzqZVg&fsb=y&IndexArea=product_en&assessmentCompany=true&keywords=590-00-1+sorbate&productTag=1200000228&ta=y&tab=all&
-SA_market_range=np.array([
-                          6.74, # 2019 global high end from Sorbic Acid Market, Transparency Market Research
-                          6.50 * 1.3397087, # $6.50/kg-potassium-sorbate from https://www.alibaba.com/product-detail/Lifecare-Supply-Potassium-Sorbate-High-Quality_1600897125355.html?spm=a2700.galleryofferlist.p_offer.d_title.1bc15827eAs1TL&s=p
-                          ]) 
-
-TAL_maximum_viable_market_range = SA_market_range / theoretical_max_g_TAL_per_g_SA
-
-# TAL_maximum_viable_market_range = np.array([5.99, 7.74])
-
-
-#%% Filepaths
-TAL_filepath = TAL.__file__.replace('\\__init__.py', '')
-
-# ## Change working directory to biorefineries\\TAL\\analyses\\results
-# chdir(TAL.__file__.replace('\\__init__.py', '')+'\\analyses\\results')
-# ##
-TAL_results_filepath = TAL_filepath + '\\analyses\\results\\'
-
-#%% Load baseline
-model = models.TAL_model
-system = TAL_sys = models.TAL_sys
-
-modes = [
-            'A',
-         ]
-
-
-parameter_distributions_filenames = [
-                                    'parameter-distributions_TAL_' + mode +'.xlsx' 
-                                    for mode in modes
-                                    ]
-mode = modes[0]
-
-
-parameter_distributions_filename = TAL_filepath+\
-    '\\analyses\\full\\parameter_distributions\\'+parameter_distributions_filenames[0]
-print(f'\n\nLoading parameter distributions ({mode}) ...')
-model.parameters = ()
-model.load_parameter_distributions(parameter_distributions_filename)
-
-# load_additional_params()
-print(f'\nLoaded parameter distributions ({mode}).')
-
-parameters = model.get_parameters()
-
-print('\n\nLoading samples ...')
-samples = model.sample(N=2000, rule='L')
-model.load_samples(samples)
-print('\nLoaded samples.')
-
-# ## Change working directory to biorefineries\\TAL\\analyses\\results
-# chdir(TAL.__file__.replace('\\__init__.py', '')+'\\analyses\\results')
-# ##
-
-model.exception_hook = 'warn'
-print('\n\nSimulating baseline ...')
-baseline_initial = model.metrics_at_baseline()
-
-#%%
-simulate_and_print()
-
-#%%  Metrics
-broth = R302.outs[1]
-# SA_price_range = [6500, 7500]
-
-product_chemical_IDs = ['TAL',]
-get_product_MPSP = lambda: TAL_tea.solve_price(product) / get_product_purity() # USD / pure-kg
-get_product_purity = lambda: sum([product.imass[i] for i in product_chemical_IDs])/product.F_mass
-get_production = lambda: sum([product.imass[i] for i in product_chemical_IDs])
-
-get_product_recovery = lambda: sum([product.imass[i] for i in product_chemical_IDs])/sum([broth.imass[i] for i in product_chemical_IDs])
-get_TAL_AOC = lambda: TAL_tea.AOC / 1e6 # million USD / y
-get_TAL_TCI = lambda: TAL_tea.TCI / 1e6 # million USD
-
-get_TAL_sugars_conc = lambda: sum(R302.outs[0].imass['Glucose', 'Xylose'])/R302.outs[0].F_vol
-
-get_TAL_inhibitors_conc = lambda: 1000*sum(R302.outs[0].imass['AceticAcid', 'Furfural', 'HMF'])/R302.outs[0].F_vol
-
-TAL_metrics = [get_product_MPSP, 
-                lambda: TAL_lca.GWP,
-                # lambda: TAL_lca.GWP - TAL_lca.net_electricity_GWP, 
-                lambda: TAL_lca.FEC, 
-                # lambda: TAL_lca.FEC - TAL_lca.net_electricity_FEC,
-               get_TAL_AOC, get_TAL_TCI, 
-               get_product_purity]
-
-#%%
-import biosteam as bst
-s,u = bst.main_flowsheet.stream, bst.main_flowsheet.unit
-
-#%%
-steps = 100
-splits = np.linspace(0., 0.95, steps)
-MPSPs, GWPs, FECs = [], [], []
-recoveries = []
-for spl in splits:
-    u.S403.split = spl
-    simulate_and_print()
-    MPSPs.append(get_product_MPSP())
-    GWPs.append(TAL_lca.GWP)
-    FECs.append(TAL_lca.FEC)
-    recoveries.append(get_product_recovery())
-
 #%%
 from matplotlib import pyplot as plt
 def plot_multiple_metrics(x_axis_list, y_axis_list_of_lists, 
@@ -152,6 +37,7 @@ def plot_multiple_metrics(x_axis_list, y_axis_list_of_lists,
                           ylims_list=[],
                           xticks=[0 + 10*i for i in range(0,11)],
                           yticks_list=[],
+                          plot_type='line',
                           save_fig=True,
                           filename='supernatant_recycling_fixed_decarboxylation_plot.png',
                           ylabels_list=[r"$\bfTAL$"+" " +r"$\bfRecovery$",
@@ -189,21 +75,32 @@ def plot_multiple_metrics(x_axis_list, y_axis_list_of_lists,
     plt.rcParams['font.sans-serif'] = fontname
     plt.rcParams['font.size'] = fontsize
     plt.xlim(xlim[0], xlim[1])
-    p1, = ax.plot(x_axis_list, y_axis_list_of_lists[0],
-             color=y_plotline_colors_list[0],
-         # label='predicted', 
-         zorder=1)
+    
+    p1 = None
+    if plot_type=='line':
+        p1, = ax.plot(x_axis_list, y_axis_list_of_lists[0],
+                 color=y_plotline_colors_list[0],
+             # label='predicted', 
+             zorder=1)
+    elif plot_type=='scatter':
+        p1 = ax.scatter(x_axis_list, y_axis_list_of_lists[0],
+                 color=y_plotline_colors_list[0],
+             # label='predicted', 
+             zorder=1)
+    else:
+        raise ValueError(f'Unknown plot_type {plot_type}.')
+        
     if ylims_list:
         ax.set_ylim(ylims_list[0])
-    ax.yaxis.label.set_color(p1.get_color())
+    ax.yaxis.label.set_color(y_plotline_colors_list[0])
     units_opening_brackets = ["[" , "[" ]
     for j in range(len(units_opening_brackets)):
         if units_on_newline:
             units_opening_brackets[j] = "\n[" 
             
     ax.set_ylabel(ylabels_list[0] +" " + units_opening_brackets[1] + y_axis_units_list[0] + "]")
-    ax.tick_params(axis='y', colors=p1.get_color(), direction='inout')
-    ax.spines['right'].set_color(p1.get_color())
+    ax.tick_params(axis='y', colors=y_plotline_colors_list[0], direction='inout')
+    ax.spines['right'].set_color(y_plotline_colors_list[0])
     
     ax.set_yticks(yticks_list[0])
     
@@ -211,15 +108,26 @@ def plot_multiple_metrics(x_axis_list, y_axis_list_of_lists,
     
     for i in range(1, len(y_axis_list_of_lists)):
         twini = ax.twinx()
-        pi, = twini.plot(x_axis_list, y_axis_list_of_lists[i],
-                     color=y_plotline_colors_list[i], 
-                 # label='predicted', 
-                 zorder=i+1)
-        twini.yaxis.label.set_color(pi.get_color())
-        twini.spines['right'].set_color(pi.get_color())
+        
+        pi = None
+        if plot_type=='line':
+            pi, = twini.plot(x_axis_list, y_axis_list_of_lists[i],
+                         color=y_plotline_colors_list[i], 
+                     # label='predicted', 
+                     zorder=i+1)
+        elif plot_type=='scatter':
+            pi = twini.scatter(x_axis_list, y_axis_list_of_lists[i],
+                         color=y_plotline_colors_list[i], 
+                     # label='predicted', 
+                     zorder=i+1)
+        else:
+            raise ValueError(f'Unknown plot_type {plot_type}.')
+            
+        twini.yaxis.label.set_color(y_plotline_colors_list[i])
+        twini.spines['right'].set_color(y_plotline_colors_list[i])
         
         twini.spines.right.set_position(("axes", 1 + 0.2*(i-1)))
-        twini.tick_params(axis='y', colors=pi.get_color(), direction='inout')
+        twini.tick_params(axis='y', colors=y_plotline_colors_list[i], direction='inout')
         
         units_opening_brackets = ["[" , "[" ]
         for j in range(len(units_opening_brackets)):
@@ -244,26 +152,151 @@ def plot_multiple_metrics(x_axis_list, y_axis_list_of_lists,
     
     plt.show()
     
+    
+
+
+#%% 
+simulate_and_plot = False
+
+if simulate_and_plot:
+    
+    #%% Filepaths from biorefineries.TAL.models import models_TAL_solubility_exploit as models
+
+    from biorefineries.TAL.models import models_TAL_solubility_exploit as models
+    chdir = os.chdir
+
+    dateTimeObj = datetime.now()
+
+    ig = np.seterr(invalid='ignore')
+    # bst.speed_up()
+
+    product = TAL_product
+
+    # search page for high end: https://www.alibaba.com/trade/search?spm=a2700.galleryofferlist.0.0.2a995827YzqZVg&fsb=y&IndexArea=product_en&assessmentCompany=true&keywords=590-00-1+sorbate&productTag=1200000228&ta=y&tab=all&
+    SA_market_range=np.array([
+                              6.74, # 2019 global high end from Sorbic Acid Market, Transparency Market Research
+                              6.50 * 1.3397087, # $6.50/kg-potassium-sorbate from https://www.alibaba.com/product-detail/Lifecare-Supply-Potassium-Sorbate-High-Quality_1600897125355.html?spm=a2700.galleryofferlist.p_offer.d_title.1bc15827eAs1TL&s=p
+                              ]) 
+
+    TAL_maximum_viable_market_range = SA_market_range / theoretical_max_g_TAL_per_g_SA
+
+    # TAL_maximum_viable_market_range = np.array([5.99, 7.74])
+
+    TAL_filepath = TAL.__file__.replace('\\__init__.py', '')
+
+    # ## Change working directory to biorefineries\\TAL\\analyses\\results
+    # chdir(TAL.__file__.replace('\\__init__.py', '')+'\\analyses\\results')
+    # ##
+    TAL_results_filepath = TAL_filepath + '\\analyses\\results\\'
+
+    model = models.TAL_model
+    system = TAL_sys = models.TAL_sys
+    
+    modes = [
+                'A',
+             ]
+    
+    
+    parameter_distributions_filenames = [
+                                        'parameter-distributions_TAL_' + mode +'.xlsx' 
+                                        for mode in modes
+                                        ]
+    mode = modes[0]
+    
+    
+    parameter_distributions_filename = TAL_filepath+\
+        '\\analyses\\full\\parameter_distributions\\'+parameter_distributions_filenames[0]
+    print(f'\n\nLoading parameter distributions ({mode}) ...')
+    model.parameters = ()
+    model.load_parameter_distributions(parameter_distributions_filename)
+    
+    # load_additional_params()
+    print(f'\nLoaded parameter distributions ({mode}).')
+    
+    parameters = model.get_parameters()
+    
+    print('\n\nLoading samples ...')
+    samples = model.sample(N=2000, rule='L')
+    model.load_samples(samples)
+    print('\nLoaded samples.')
+    
+    # ## Change working directory to biorefineries\\TAL\\analyses\\results
+    # chdir(TAL.__file__.replace('\\__init__.py', '')+'\\analyses\\results')
+    # ##
+    #%% Baseline
+    model.exception_hook = 'warn'
+    print('\n\nSimulating baseline ...')
+    baseline_initial = model.metrics_at_baseline()
+    
+    #%%
+    simulate_and_print()
+    
+    #%%  Metrics
+    broth = R302.outs[1]
+    # SA_price_range = [6500, 7500]
+    
+    product_chemical_IDs = ['TAL',]
+    get_product_MPSP = lambda: TAL_tea.solve_price(product) / get_product_purity() # USD / pure-kg
+    get_product_purity = lambda: sum([product.imass[i] for i in product_chemical_IDs])/product.F_mass
+    get_production = lambda: sum([product.imass[i] for i in product_chemical_IDs])
+    
+    get_product_recovery = lambda: sum([product.imass[i] for i in product_chemical_IDs])/sum([broth.imass[i] for i in product_chemical_IDs])
+    get_TAL_AOC = lambda: TAL_tea.AOC / 1e6 # million USD / y
+    get_TAL_TCI = lambda: TAL_tea.TCI / 1e6 # million USD
+    
+    get_TAL_sugars_conc = lambda: sum(R302.outs[0].imass['Glucose', 'Xylose'])/R302.outs[0].F_vol
+    
+    get_TAL_inhibitors_conc = lambda: 1000*sum(R302.outs[0].imass['AceticAcid', 'Furfural', 'HMF'])/R302.outs[0].F_vol
+    
+    TAL_metrics = [get_product_MPSP, 
+                    lambda: TAL_lca.GWP,
+                    # lambda: TAL_lca.GWP - TAL_lca.net_electricity_GWP, 
+                    lambda: TAL_lca.FEC, 
+                    # lambda: TAL_lca.FEC - TAL_lca.net_electricity_FEC,
+                   get_TAL_AOC, get_TAL_TCI, 
+                   get_product_purity]
+    
+    #%%
+    import biosteam as bst
+    s,u = bst.main_flowsheet.stream, bst.main_flowsheet.unit
+    
+    #%%
+    steps = 100
+    splits = np.linspace(0., 0.95, steps)
+    MPSPs, GWPs, FECs = [], [], []
+    recoveries = []
+    for spl in splits:
+        u.S403.split = spl
+        simulate_and_print()
+        MPSPs.append(get_product_MPSP())
+        GWPs.append(TAL_lca.GWP)
+        FECs.append(TAL_lca.FEC)
+        recoveries.append(get_product_recovery())
+
 #%%
-plot_multiple_metrics(100*np.array(splits),
-                      [
-                       100*np.array(recoveries), 
-                       MPSPs,
-                       GWPs, 
-                       FECs,
-                       ],
-                      
-                      xlim=(0,100), 
-                      ylims_list=[
-                                  (0,100),
-                                  (5,10),
-                                  (0,12),
-                                  (-60,60),
-                                  ],
-                      xticks=[0 + 10*i for i in range(0,11)],
-                      yticks_list = [[0 + 10*i for i in range(0,11)],
-                                 np.arange(4, 10.1, 0.5),
-                                 np.arange(0, 12.1, 1),
-                                 np.arange(-60, 60.1, 10),
-                                 ]
-                      )
+
+    plot_multiple_metrics(100*np.array(splits),
+                          [
+                           100*np.array(recoveries), 
+                           MPSPs,
+                           GWPs, 
+                           FECs,
+                           ],
+                          
+                          xlim=(0,100), 
+                          ylims_list=[
+                                      (0,100),
+                                      (5,10),
+                                      (0,12),
+                                      (-60,60),
+                                      ],
+                          xticks=[0 + 10*i for i in range(0,11)],
+                          yticks_list = [[0 + 10*i for i in range(0,11)],
+                                     np.arange(4, 10.1, 0.5),
+                                     np.arange(0, 12.1, 1),
+                                     np.arange(-60, 60.1, 10),
+                                     ]
+                          )
+    
+
+

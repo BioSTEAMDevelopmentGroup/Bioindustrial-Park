@@ -138,10 +138,10 @@ get_sugar_conc_TCI = lambda: F301.installed_cost + F301_P.installed_cost + M304.
 
 # %% Generate 3-specification meshgrid and set specification loading functions
 
-steps = (30, 30, 1)
+steps = (50, 50, 1)
 
 # Yield, titer, productivity (rate)
-spec_1 = yields = np.linspace(0.1, 0.99, steps[0]) # yield
+spec_1 = yields = np.linspace(0.05, 0.5724, steps[0]) # yield
 spec_2 = titers = np.linspace(10., 
                               100., # although sugar concentration limit of 600 g/L would allow as high as 230 g-TAL/L, we set an upper limit of 100 g/L
                                    # based on achieved (50-68 g/L using E.coli, Candida) and targeted (100 g/L) titers for adipic acid, another organic solid with low water solubility
@@ -219,7 +219,7 @@ else:
     elif which_fig=='insights':
         spec_3 = productivities =\
             np.array([
-                        0.5*spec.baseline_productivity,
+                        5.*spec.baseline_productivity,
                       ])
         TAL_metrics = [get_product_MPSP, 
                         lambda: TAL_lca.GWP,
@@ -348,9 +348,9 @@ spec_1, spec_2 = np.meshgrid(spec_1, spec_2)
 #%% Initial simulation
 # simulate_and_print()
 
-print('\n\nSimulating the initial point to avoid bugs ...')
+print('\n\nSimulating an initial point to avoid bugs ...')
 # spec.byproduct_yields_decrease_policy = 'simultaneous, from 0 product yield'
-spec.load_specifications(yields[0], titers[0], productivities[0])
+spec.load_specifications(yields[1], titers[0], productivities[0])
 # spec.set_production_capacity(desired_annual_production=spec.desired_annual_production)
 # simulate_and_print()
 for i in range(3): TAL_sys.simulate()

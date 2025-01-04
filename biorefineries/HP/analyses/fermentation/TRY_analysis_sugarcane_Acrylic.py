@@ -62,17 +62,17 @@ HP_results_filepath = HP_filepath + '\\analyses\\results\\'
 
 #%% Load baseline
 
-spec.reactor.neutralization = False # !!! set neutralization here
+spec.reactor.neutralization = True # !!! set neutralization here
 
 model = models.HP_model
 system = HP_sys = models.HP_sys
 
-simulate_and_print()
+get_AA_MPSP()
 
 feedstock_tag = 'sugarcane'
 product_tag = 'Acrylic'
 
-mode = '300L'
+mode = '300L_FGI'
 
 dist_filename = f'parameter-distributions_{feedstock_tag}_{product_tag}_' + mode + '.xlsx'
 
@@ -105,7 +105,7 @@ print('\n\nSimulating baseline ...')
 baseline_initial = model.metrics_at_baseline()
 
 print(get_AA_MPSP())
-simulate_and_print()
+get_AA_MPSP()
 
 #%% Bugfix barrage
 
@@ -162,7 +162,7 @@ def run_bugfix_barrage():
                     raise e
                 
 #%%
-# simulate_and_print()
+# get_AA_MPSP()
 
 #%%  Metrics
 broth = R302.outs[1]
@@ -195,11 +195,11 @@ HP_metrics = [get_product_MPSP,
 
 # %% Generate 3-specification meshgrid and set specification loading functions
 
-steps = (20, 20, 1)
+steps = (50, 50, 1)
 
 # Yield, titer, productivity (rate)
-spec_1 = yields = np.linspace(0.05, 0.95, steps[0]) # yield
-spec_2 = titers = np.linspace(5., 
+spec_1 = yields = np.linspace(0.05, 0.75, steps[0]) # yield
+spec_2 = titers = np.linspace(10., 
                               200.,
                                 steps[1]) # titer
 
@@ -207,8 +207,8 @@ spec_2 = titers = np.linspace(5.,
 spec_3 = productivities =\
     np.array([
                # 0.2*spec.baseline_productivity,
-              1.*spec.baseline_productivity,
-               # 5.*spec.baseline_productivity,
+              # 1.*spec.baseline_productivity,
+               5.*spec.baseline_productivity,
               ])
 
 
@@ -332,13 +332,13 @@ file_to_save = f'_{steps}_steps_sugarcane_neutral={R302.neutralization}_'+'HP_TR
 spec_1, spec_2 = np.meshgrid(spec_1, spec_2)
 
 #%% Initial simulation
-# simulate_and_print()
+# get_AA_MPSP()
 
 print('\n\nSimulating the initial point to avoid bugs ...')
 # spec.byproduct_yields_decrease_policy = 'simultaneous, from 0 product yield'
 spec.load_specifications(yields[0], titers[0], productivities[0])
 # spec.set_production_capacity(desired_annual_production=spec.desired_annual_production)
-# simulate_and_print()
+# get_AA_MPSP()
 for i in range(3): HP_sys.simulate()
 print(get_product_MPSP())
 
@@ -381,7 +381,7 @@ for p in productivities:
         d1_Metric5.append([])
         d1_Metric6.append([])
         # spec.load_specifications(spec.baseline_yield, spec.baseline_titer, spec.baseline_productivity)
-        # simulate_and_print()
+        # get_AA_MPSP()
         titer_too_high_for_yield = False
         for t in titers:
             curr_no +=1
@@ -397,7 +397,7 @@ for p in productivities:
                 try:
                     # spec.load_specifications(spec.baseline_yield, spec.baseline_titer, spec.baseline_productivity)
                     # # spec.set_production_capacity(desired_annual_production=spec.desired_annual_production)
-                    # # for i in range(1):simulate_and_print()
+                    # # for i in range(1):get_AA_MPSP()
                     # for i in range(1): system.simulate()
                     
                     spec.load_specifications(spec_1=y, spec_2=t, spec_3=p)

@@ -339,11 +339,17 @@ def create_HP_separation_hexanol_extraction_process(ins, outs,):
                                                   S401_filtrate_split,
                                                   chemical_groups), solids =\
                                     ['Xylan', 'Glucan', 'Lignin', 'FermMicrobe',\
-                                     'Ash', 'Arabinan', 'Galactan', 'Mannan'])
+                                     'Ash', 'Arabinan', 'Galactan', 'Mannan', 'Fiber', 'InsolubleProtein',])
     def fix_split(isplit, ID):
         isplit['Glycerol', 'Hexanol', 'HP', 'AcrylicAcid', 'AceticAcid', 'AceticAcid'] = isplit[ID]
                   
     fix_split(S401.isplit, 'Glucose')
+    
+    def fix_split_solids(isplit, ID):
+        isplit['Fiber', 'InsolubleProtein'] = isplit[ID]
+    
+    fix_split_solids(S401.isplit, 'Ash')
+    
     # NOTE: if there is not enough moisture content, it is impossible to pump
     # the fluid into the centrifuge; in fact, the centrifuge would not be able
     # to separate anything.
@@ -385,18 +391,22 @@ def create_HP_separation_hexanol_extraction_process(ins, outs,):
     M401_H = bst.units.HXutility('M401_H', ins = M401-0, T = 80. + 273.15, rigorous = False)
     
     F401 = bst.units.MultiEffectEvaporator('F401', ins=S402-1, outs=('F401_l', 'F401_g'),
-                                            P = (101325, 10000, 4000, 1500, 750), V = 0.1)
+                                            # P = (101325, 10000, 4000, 1500, 750), 
+                                            P = (101325, 70000, 50000, 30000, 20000), 
+                                            V = 0.1)
     
     F401_P2 = bst.units.Pump('F401_P2', ins=F401-1, outs=F401_t, P=101325.)  
     
     target_HP_x = 0.10
     def get_x(chem_ID, stream):
-        return stream.imol[chem_ID]/sum(stream.imol['SuccinicAcid', 'Xylitol', 'AceticAcid', 'Furfural', 'HMF', 'HP', 'Water'])
+        return stream.imol[chem_ID]/stream.imol['SuccinicAcid', 'Xylitol', 'AceticAcid', 'Furfural', 'HMF', 'HP', 'Water'].sum()
     
     @F401.add_specification(run=False)
     def F401_specification():
         instream = F401.ins[0]
         # ratio = target_water_x/get_x('Water', instream)
+        mol_Furfural_HMF = instream.imol['Furfural', 'HMF']
+        instream.imol['Furfural'] = 0. # causes negative flows at low titer
         HP_x = get_x('HP', instream)
         if HP_x < target_HP_x:
             ratio = HP_x/target_HP_x
@@ -405,7 +415,9 @@ def create_HP_separation_hexanol_extraction_process(ins, outs,):
         else:
             F401.V = 0.
             F401._run()
-    
+        instream.imol['Furfural', 'HMF'] = mol_Furfural_HMF
+        F401.outs[1].imol['Furfural', 'HMF'] = mol_Furfural_HMF
+        
     # F401.specification = F401_specification
     
     
@@ -618,11 +630,17 @@ def create_HP_separation_methanol_precipitation_neutralization_process(ins, outs
                                                   S401_filtrate_split,
                                                   chemical_groups), solids =\
                                     ['Xylan', 'Glucan', 'Lignin', 'FermMicrobe',\
-                                     'Ash', 'Arabinan', 'Galactan', 'Mannan'])
+                                     'Ash', 'Arabinan', 'Galactan', 'Mannan', 'Fiber', 'InsolubleProtein',])
     def fix_split(isplit, ID):
         isplit['Glycerol', 'Hexanol', 'HP', 'AcrylicAcid', 'AceticAcid', 'AceticAcid'] = isplit[ID]
                   
     fix_split(S401.isplit, 'Glucose')
+    
+    def fix_split_solids(isplit, ID):
+        isplit['Fiber', 'InsolubleProtein'] = isplit[ID]
+    
+    fix_split_solids(S401.isplit, 'Ash')
+    
     # NOTE: if there is not enough moisture content, it is impossible to pump
     # the fluid into the centrifuge; in fact, the centrifuge would not be able
     # to separate anything.
@@ -850,11 +868,17 @@ def create_HP_separation_improved_process(ins, outs, fermentation_reactor=None):
                                                   S401_filtrate_split,
                                                   chemical_groups), solids =\
                                     ['Xylan', 'Glucan', 'Lignin', 'FermMicrobe',\
-                                     'Ash', 'Arabinan', 'Galactan', 'Mannan'])
+                                     'Ash', 'Arabinan', 'Galactan', 'Mannan', 'Fiber', 'InsolubleProtein',])
     def fix_split(isplit, ID):
         isplit['Glycerol', 'Hexanol', 'HP', 'AcrylicAcid', 'AceticAcid', 'AceticAcid'] = isplit[ID]
                   
     fix_split(S401.isplit, 'Glucose')
+    
+    def fix_split_solids(isplit, ID):
+        isplit['Fiber', 'InsolubleProtein'] = isplit[ID]
+    
+    fix_split_solids(S401.isplit, 'Ash')
+    
     # NOTE: if there is not enough moisture content, it is impossible to pump
     # the fluid into the centrifuge; in fact, the centrifuge would not be able
     # to separate anything.
@@ -1167,11 +1191,17 @@ def create_HP_separation_improved_process_HP_product(ins, outs, fermentation_rea
                                                   S401_filtrate_split,
                                                   chemical_groups), solids =\
                                     ['Xylan', 'Glucan', 'Lignin', 'FermMicrobe',\
-                                     'Ash', 'Arabinan', 'Galactan', 'Mannan'])
+                                     'Ash', 'Arabinan', 'Galactan', 'Mannan', 'Fiber', 'InsolubleProtein',])
     def fix_split(isplit, ID):
         isplit['Glycerol', 'Hexanol', 'HP', 'AcrylicAcid', 'AceticAcid', 'AceticAcid'] = isplit[ID]
                   
     fix_split(S401.isplit, 'Glucose')
+    
+    def fix_split_solids(isplit, ID):
+        isplit['Fiber', 'InsolubleProtein'] = isplit[ID]
+    
+    fix_split_solids(S401.isplit, 'Ash')
+    
     # NOTE: if there is not enough moisture content, it is impossible to pump
     # the fluid into the centrifuge; in fact, the centrifuge would not be able
     # to separate anything.
@@ -1473,11 +1503,17 @@ def create_HP_separation_two_step_fractional_distillation_process(ins, outs,):
                                                   S401_filtrate_split,
                                                   chemical_groups), solids =\
                                     ['Xylan', 'Glucan', 'Lignin', 'FermMicrobe',\
-                                     'Ash', 'Arabinan', 'Galactan', 'Mannan'])
+                                     'Ash', 'Arabinan', 'Galactan', 'Mannan', 'Fiber', 'InsolubleProtein',])
     def fix_split(isplit, ID):
         isplit['Glycerol', 'Hexanol', 'HP', 'AcrylicAcid', 'AceticAcid', 'AceticAcid'] = isplit[ID]
                   
     fix_split(S401.isplit, 'Glucose')
+    
+    def fix_split_solids(isplit, ID):
+        isplit['Fiber', 'InsolubleProtein'] = isplit[ID]
+    
+    fix_split_solids(S401.isplit, 'Ash')
+    
     # NOTE: if there is not enough moisture content, it is impossible to pump
     # the fluid into the centrifuge; in fact, the centrifuge would not be able
     # to separate anything.
@@ -1626,11 +1662,17 @@ def create_HP_separation_fractional_distillation_process(ins, outs,):
                                                   S401_filtrate_split,
                                                   chemical_groups), solids =\
                                     ['Xylan', 'Glucan', 'Lignin', 'FermMicrobe',\
-                                     'Ash', 'Arabinan', 'Galactan', 'Mannan'])
+                                     'Ash', 'Arabinan', 'Galactan', 'Mannan', 'Fiber', 'InsolubleProtein',])
     def fix_split(isplit, ID):
         isplit['Glycerol', 'Hexanol', 'HP', 'AcrylicAcid', 'AceticAcid', 'AceticAcid'] = isplit[ID]
                   
     fix_split(S401.isplit, 'Glucose')
+    
+    def fix_split_solids(isplit, ID):
+        isplit['Fiber', 'InsolubleProtein'] = isplit[ID]
+    
+    fix_split_solids(S401.isplit, 'Ash')
+    
     # NOTE: if there is not enough moisture content, it is impossible to pump
     # the fluid into the centrifuge; in fact, the centrifuge would not be able
     # to separate anything.

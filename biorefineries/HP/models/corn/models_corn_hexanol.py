@@ -337,20 +337,20 @@ def reset_and_reload():
     print('Loading and simulating with baseline specifications ...')
     spec_1, spec_2, spec_3 = spec.spec_1, spec.spec_2, spec.spec_3
     spec.load_specifications(**baseline_spec)
-    spec.set_production_capacity(spec.desired_annual_production)
+    system.simulate()
     # system.simulate()
     print('Loading and simulating with required specifications ...')
     spec.load_specifications(spec_1=spec_1, spec_2=spec_2, spec_3=spec_3)
-    spec.set_production_capacity(spec.desired_annual_production)
+    system.simulate()
     # system.simulate()
-    
+
 def reset_and_switch_solver(solver_ID):
     system.reset_cache()
     system.empty_recycles()
     system.converge_method = solver_ID
     print(f"Trying {solver_ID} ...")
     # spec.load_specifications(spec_1=spec.spec_1, spec_2=spec.spec_2, spec_3=spec.spec_3)
-    spec.set_production_capacity(spec.desired_annual_production)
+    system.simulate()
     # system.simulate()
 
 # F403 = u.F403
@@ -367,7 +367,7 @@ def run_bugfix_barrage():
             # F403.run()
             # F403._design()
             # F403.simulate()
-            spec.set_production_capacity(spec.desired_annual_production)
+            system.simulate()
         else:
             try:
                 reset_and_switch_solver('fixedpoint')
@@ -391,7 +391,7 @@ def model_specification():
     try:
         for i in pre_fermenter_units_path: i.simulate()
         # spec.load_specifications(spec_1=spec.spec_1, spec_2=spec.spec_2, spec_3=spec.spec_3)
-        spec.set_production_capacity(spec.desired_annual_production)
+        system.simulate()
         # system.simulate()
         # model._system.simulate()
         

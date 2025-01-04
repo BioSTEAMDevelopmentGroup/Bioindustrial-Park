@@ -150,6 +150,8 @@ def create_HP_sys(ins, outs):
         
     feedstock.price = price['Sugarcane']
     
+    sugarcane_juicing_sys.simulate(update_configuration=True)
+    
     # %% 
     
     # =============================================================================
