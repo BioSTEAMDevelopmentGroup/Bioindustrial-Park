@@ -39,28 +39,32 @@ V_ng = 1.473318463076884 # Natural gas volume at 60 F and 14.73 psi [m3 / kg]
 results_folder = os.path.join(os.path.dirname(__file__), 'results')
 
 class ConfigurationKey:
-    __slots__ = ('carbon_capture', 'dewatering')
+    __slots__ = ('carbon_capture', 'dewatering', 'decoupled_growth', 'product')
     name = 'AcEster'
     
-    def __init__(self, carbon_capture, dewatering):
+    def __init__(self, carbon_capture, dewatering, decoupled_growth, product):
         self.carbon_capture = carbon_capture
         self.dewatering = dewatering
+        self.decoupled_growth = decoupled_growth
+        self.product = product
         
     def __eq__(self, other):
             return (
                 self.__class__ is other.__class__ and
                 self.carbon_capture == other.carbon_capture and
-                self.dewatering == other.dewatering 
+                self.dewatering == other.dewatering and
+                self.decoupled_growth == other.decoupled_growth and
+                self.product == other.product
             )
     
     def __hash__(self):
-        return hash((ConfigurationKey, self.carbon_capture, self.dewatering))
+        return hash((ConfigurationKey, self.carbon_capture, self.dewatering, self.decoupled_growth))
         
     def __sub__(self, other):
         return ConfigurationComparison(self, other)
         
     def __repr__(self):
-        return f"ConfigurationKey(carbon_capture={self.carbon_capture}, dewatering={self.dewatering})"
+        return f"ConfigurationKey(carbon_capture={self.carbon_capture}, dewatering={self.dewatering}, decoupled_growth={self.decoupled_growth}, product={self.product})"
 
 
 class ConfigurationComparison:
@@ -88,7 +92,14 @@ class Biorefinery(bst.ProcessModel):
     """
     name = ConfigurationKey.name
     pseudo_optimal_design_decisions = {
-        ConfigurationKey(carbon_capture=False, dewatering=False): np.array([12. , 12. ,  0.6]),
+        ConfigurationKey(
+            carbon_capture=False, dewatering=False,
+            decoupled_growth=False, product='Dodecanol'
+        ): np.array([12. , 12. ,  0.6]),
+        ConfigurationKey(
+            carbon_capture=False, dewatering=False,
+            decoupled_growth=True, product='Dodecanol'
+        ): np.array([12. , 12. ,  0.6]),
     }
     
     def optimize(self):
@@ -104,11 +115,13 @@ class Biorefinery(bst.ProcessModel):
     def __new__(
             cls,
             simulate=True,
-            dewatering=True,
-            carbon_capture=True,
+            decoupled_growth=True,
+            dewatering=False,
+            carbon_capture=False,
+            product='Dodecanol',
             cache={},
         ):
-        config = ConfigurationKey(carbon_capture, dewatering)
+        config = ConfigurationKey(carbon_capture, dewatering, decoupled_growth, product)
         if config in cache: return cache[config]
         self = super().__new__(cls)
         self.config = config
@@ -125,7 +138,9 @@ class Biorefinery(bst.ProcessModel):
         load_process_settings()
         system = create_acetyl_ester_system(
             carbon_capture=carbon_capture,
-            dewatering=dewatering
+            dewatering=dewatering,
+            decoupled_growth=decoupled_growth,
+            product=product,
         )
         self.tea = create_tea(
             system,
@@ -182,8 +197,8 @@ class Biorefinery(bst.ProcessModel):
         
         @parameter(units='USD/kg', element='dodecylacetate', bounds=[3, 6],
                    baseline=3) # https://www.alibaba.com/product-detail/Factory-direct-sale-DODECYL-ACETATE-CAS_1601041319372.html
-        def set_dodecylacetate_price(price):
-            self.dodecylacetate.price = price
+        def set_product_price(price):
+            self.product.price = price
         
         @parameter(units='USD/kg', element='H2', bounds=[3, 7],
                    baseline=4.5) # Natural gas 1.5 - 5; Electrolysis 3 - 7
@@ -201,7 +216,7 @@ class Biorefinery(bst.ProcessModel):
             self.AcOH_production.productivity = productivity
         
         @parameter(units='g/L', element=self.AcEster_production, 
-                   bounds=[40, 90], baseline=70)
+                   bounds=[10, 40], baseline=25)
         def set_AcEster_titer(titer):
             self.AcEster_production.titer = titer
             
@@ -211,7 +226,7 @@ class Biorefinery(bst.ProcessModel):
             self.AcEster_production.productivity = productivity
         
         @parameter(units='% theoretical', name='yield', element=self.AcEster_production, 
-                   bounds=[40, 90], baseline=50)
+                   bounds=[40, 70], baseline=55)
         def set_AcEster_yield(X):
             self.AcEster_production.reactions.X[0] = X / 100.
         
@@ -229,7 +244,7 @@ class Biorefinery(bst.ProcessModel):
         @parameter(units='MT/yr', element='AcEster', bounds=[5000, 50000], baseline=30000)
         def set_production_capacity(production_capacity):
             capacity = production_capacity / system.operating_hours * 1000 # kg / hr
-            original = self.AcOH_media.F_mass * self.AcOH_production.titer['AceticAcid'] * self.AcEster_production.reactions[0].product_yield('DodecylAcetate', basis='wt') / 1000
+            original = self.AcOH_media.F_mass * self.AcOH_production.titer['AceticAcid'] * self.AcEster_production.reactions[0].product_yield(product, basis='wt') / 1000
             self.system.rescale(self.AcOH_media, capacity / original)
         
         if carbon_capture:
