@@ -20,6 +20,7 @@ F = bst.Flowsheet('CO2_methane')
 bst.main_flowsheet.set_flowsheet(F)
 
 tmo.settings.set_thermo(chems, cache=True)
+#%% Whole system design is based on Design and simulation of a methanol production plant from CO2 hydrogenation
 
 water_stream = Stream('water_stream',
                       Water=1,
@@ -32,13 +33,6 @@ CO2_stream = Stream('CO2_stream',
                     phase='g',
                     total_flow=41000,
                     units='m3/hr')
-                      
-# H2_stream = Stream('H2_stream',
-#                    H2=1,
-#                    phase='g',
-#                    P=2500000,
-#                    total_flow=123000,
-#                    units='m3/hr')
 
 # CO2 compressing
 ks = [bst.units.IsentropicCompressor(P=3*101325), 
@@ -69,7 +63,7 @@ H1101 = units.HXprocess('H1101', ins=(M1102-0, ''), outs=('', ''))
 
 R1102 = _units.MeOH_SynthesisReactor('R1102', ins=H1101-0, outs='product')
 
-S1101 = units.Splitter('S1101', ins=R1102-0, outs=(1-H1101, ''), split=0.6)
+S1101 = units.Splitter('S1101', ins=R1102-0, outs=(1-H1101, ''), split=0.65)
 
 V1101 = units.IsenthalpicValve('V1101', ins=H1101-1, outs='', P=73.6*101325)
 
@@ -88,14 +82,18 @@ V1102 = units.IsenthalpicValve('V1102', ins=S1102-1, outs='', P=10*101325)
 
 V1103 = units.IsenthalpicValve('V1103', ins=V1102-0, outs='', P=1.2*101325)
 
-F1101 = units.Flash('F1101', ins=V1103-0, outs=('gas', ''), T=22+273.15, P=1.2*101325)
+F1101 = units.SplitFlash('F1101', ins=V1103-0, outs=('gas', ''), T=22+273.15, P=1.2*101325, split=dict(CO2=0.999,
+                                                                                                       H2=0.999))
 
-H1103 = units.HXprocess('H1103', ins=(F1101-1, S1101-1), outs=('', 1-M1103))
+H1103 = units.HXprocess('H1103', ins=(S1101-1, F1101-1), outs=(1-M1103, ''), T_lim0=79+273.15, T_lim1=79+273.15)
 
-D1101 = units.BinaryDistillation('D1101', ins=H1103-0, outs=('gas_MEOH', 'bottom_water'),
+D1101 = units.BinaryDistillation('D1101', ins=H1103-1, outs=('gas_MEOH', 'bottom_water'),
                                  LHK=('Methanol', 'Water'),
-                                 Lr=0.999, Hr=0.999, k=2,
+                                 Lr=0.9999, Hr=0.9999, k=2,
                                  is_divided=True)
 
 
 sys = bst.main_flowsheet.create_system('MeOH_sys')
+sys.maxiter = 600 # 200 will not lead to convergence
+sys.empty_recycles()
+sys.simulate()
