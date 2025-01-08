@@ -61,8 +61,22 @@ CO2 = chemical_database('CO2')
 
 CH3OH = chemical_database('Methanol')
 
+HCOOH = chemical_database('HCOOH')
+C18H39N = chemical_database('C18H39N') # amine
+C19H41NO2 = chemical_database('C19H41NO2')
 
-phase_change_chemicals = ['H2O', 'H2', 'CH4', 'CO', 'CO2', 'CH3OH']
+Triphenylphosphine = chemical_database('Triphenylphosphine', search_ID='603-35-0', phase='s') # surrogate model for DCPE
+
+DCPE = chemical_database('DCPE', search_ID='23743-26-2', phase='s') # FA catalyst; second component
+for i in DCPE.get_missing_properties():
+    if i == 'V':
+        try:
+            DCPE.copy_models_from(Triphenylphosphine, [i])
+        except:
+            pass
+
+phase_change_chemicals = ['H2O', 'H2', 'CH4', 'CO', 'CO2', 'CH3OH', 'HCOOH'
+                          'C18H39N', 'C19H41NO2']
 
 for chem in chems:
     if chem.ID in phase_change_chemicals: pass

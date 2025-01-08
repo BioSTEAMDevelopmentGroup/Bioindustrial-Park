@@ -20,15 +20,20 @@ F = bst.Flowsheet('CO2_methane')
 bst.main_flowsheet.set_flowsheet(F)
 
 tmo.settings.set_thermo(chems, cache=True)
-#%% Whole system design is based on Design and simulation of a methanol production plant from CO2 hydrogenation
 
-water_stream = Stream('water_stream',
+#%%
+# =============================================================================
+# 1. MeOH production; based on 
+# Design and simulation of a methanol production plant from CO2 hydrogenation
+# =============================================================================
+#add catalyst
+water_stream_1 = Stream('water_stream_1',
                       Water=1,
                       phase='l',
                       total_flow=10000,
                       units='kg/hr')
 
-CO2_stream = Stream('CO2_stream',
+CO2_stream_1 = Stream('CO2_stream_1',
                     CO2=1,
                     phase='g',
                     total_flow=41000,
@@ -41,12 +46,12 @@ ks = [bst.units.IsentropicCompressor(P=3*101325),
 
 hxs = [bst.units.HXutility(T=T) for T in [38+273.15, 38+273.15, 38+273.15]]\
 
-C1101 = units.MultistageCompressor('C1101', ins=CO2_stream, outs='', compressors=ks, hxs=hxs)
+C1101 = units.MultistageCompressor('C1101', ins=CO2_stream_1, outs='', compressors=ks, hxs=hxs)
 
 C1102 = units.IsentropicCompressor('C1102', ins=C1101-0, outs='', P=78*101325)
 
 # Water electrolysis
-R1101 = _units.Electrolyzer('R1101', ins=water_stream, outs=('hydrogen','oxygen'))
+R1101 = _units.Electrolyzer('R1101', ins=water_stream_1, outs=('hydrogen','oxygen'))
 @R1101.add_specification(run=True)
 def adjust_water_flow():
     C1101.run()
@@ -97,3 +102,62 @@ sys = bst.main_flowsheet.create_system('MeOH_sys')
 sys.maxiter = 600 # 200 will not lead to convergence
 sys.empty_recycles()
 sys.simulate()
+
+#%%
+# =============================================================================
+# Formic acid production; based on 
+# Techno-economic and environmental evaluation of CO2 utilisation for 
+# fuel production. Synthesis of methanol and formic acid
+# =============================================================================
+
+water_stream_2 = Stream('water_stream_2',
+                      Water=1,
+                      phase='l',
+                      total_flow=900,
+                      units='kg/hr')
+
+CO2_stream_2 = Stream('CO2_stream_2',
+                    CO2=1,
+                    phase='g',
+                    total_flow=41000, # to be determined
+                    units='m3/hr')
+
+amine_solution = Stream('amine_solution',
+                        C18H39N=1, # to be changes; recycled
+                        phase='l',
+                        total_flow=50,
+                        units='kmol/hr')
+
+FA_catalyst = Stream('FA_catalyst',
+                     DCPE=1,
+                     phase='s',
+                     total_flow=50,
+                     units='kmol/hr')
+
+polar_solution = Stream('polar_solution',
+                        CH3OH=1,
+                        phase='l',
+                        total_flow=50,
+                        units='kmol/hr')
+
+                     
+
+
+# Water electrolysis
+R1201 = _units.Electrolyzer('R1102', ins=water_stream_2, outs=('hydrogen_2','oxygen_2'))
+
+# H2 compressing
+C1201 = units.IsentropicCompressor('C1201', ins=R1201-0, outs='', P=105*101325)
+
+# CO2 compressing
+C1202 = units.MultistageCompressor('C1102', ins=CO2_stream_2, outs='', pr=2.55, n_stages=5, eta=0.75, vle=True)
+@C1202.add_specification(run=True)
+def adjust_CO2_flow():
+    R1201.run()
+    C1202.ins[0].F_mol = R1201.outs[0].F_mol # H2:CO2 = 1:1
+
+# HCOOH amine synthesis
+R1202 = _units.HCOOH_SynthesisReactor('R1202', ins=(C1202-0, C1201-0, amine_solution, polar_solution, FA_catalyst), 
+                                      outs=('gas', 'liquid', 'spent_FA_catalyst'))
+
+sys = bst.main_flowsheet.create_system('HCOOH_sys')

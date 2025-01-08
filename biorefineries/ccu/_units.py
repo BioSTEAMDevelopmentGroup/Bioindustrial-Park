@@ -63,7 +63,7 @@ class Electrolyzer(SanUnit):
     
 
 # =============================================================================
-# MeOH synthesis process
+# MeOH synthesis
 # =============================================================================
 
 # Reactor is modelled as an adiabatic ideal plug flow reactor (PFR)
@@ -129,4 +129,45 @@ class MeOH_SynthesisReactor(bst.units.design_tools.PressureVessel, bst.Unit):
         )
         self.purchase_costs['Catalyst'] = self.catalyst_price * D['Catalyst weight']
 
+# =============================================================================
+# Formic acid synthesis
+# =============================================================================
 
+# Reactor is modeled as a CSTR
+class HCOOH_SynthesisReactor(bst.CSTR):
+    # based on Process for preparing formic acid by reaction of carbon dioxide with hydrogen
+    _N_ins = 5
+    _N_outs = 3
+    T_default = 93+273.15
+    P_default = 5e6
+    tau_default = 10/60 # 10min-5hr; can be a variable later
+    
+    def _setup(self):
+        super()._setup()
+        self.reaction = bst.Reaction(
+            'CO2 + H2 + C18H39N -> C19H41NO2',   'H2',   0.19)
+    
+    def _run(self):
+        CO2, H2, amine_solution, polar_solution, fresh_catalyst = self.ins
+        vent, effluent, spent_catalyst = self.outs
+        effluent.mix_from([CO2, H2, amine_solution, polar_solution], energy_balance=False)
+        self.reaction(effluent)
+        effluent.T = vent.T = spent_catalyst.T = self.T
+        effluent.P = self.P
+        vent.phase = 'g'
+        vent.empty()
+        vent.receive_vent(effluent)
+        
+        # determine catalyst amount; Table 1.3 A12, 0.24 g / 100 g ins.liquid
+        ins_liquid_mass = amine_solution.F_mass + polar_solution.F_mass
+        
+        spent_catalyst.phase = 's'
+        spent_catalyst.imass['DCPE'] = fresh_catalyst.imass['DCPE'] = ins_liquid_mass * 0.0024
+        
+    def _design(self):
+        super()._design()
+        
+    def _cost(self):
+        super()._cost()
+        
+        
