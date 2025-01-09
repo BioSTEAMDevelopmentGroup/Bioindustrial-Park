@@ -24,8 +24,7 @@ from inspect import signature
 
 __all__ = (
     'Biorefinery',
-    'ConfigurationKey',
-    'ConfigurationComparison',
+    'Scenario',
 )
 
 # DO NOT DELETE:
@@ -40,30 +39,6 @@ __all__ = (
 V_ng = 1.473318463076884 # Natural gas volume at 60 F and 14.73 psi [m3 / kg]
 
 results_folder = os.path.join(os.path.dirname(__file__), 'results')
-
-class ConfigurationKey:
-    __slots__ = ('feed', 'product')
-    
-    def __init__(self, feed, product):
-        self.feed = feed
-        self.product = product
-        
-    def __sub__(self, other):
-        return ConfigurationComparison(self, other)
-        
-    def __repr__(self):
-        return f"ConfigurationKey({self.feed}, {self.product})"
-
-
-class ConfigurationComparison:
-    __slots__ = ('left', 'right')
-    
-    def __init__(self, left, right):
-        self.left = left
-        self.right = right
-        
-    def __repr__(self):
-        return f"ConfigurationComparison(left={self.left}, right={self.right})"
 
 
 class Biorefinery(bst.ProcessModel):
@@ -88,28 +63,24 @@ class Biorefinery(bst.ProcessModel):
     
     """
     
-    def __new__(
-            cls,
-            feed=None,
-            product=None,
-            simulate=True,
-            cache={},
-        ):
-        if feed is None: feed = 'AcidWhey'
-        if product is None: product = 'Dodecanol'
-        key = (feed, product)
-        if key in cache: return cache[key]
-        self = super().__new__(cls)
-        self.config = ConfigurationKey(*key)
+    class Scenario:
+        feed: str = 'AcidWhey'
+        product: str = 'Dodecanol'
+    
+    def create_system(self):
+        scenario = self.scenario
         bst.settings.set_thermo(create_chemicals())
         load_process_settings()
-        system = create_system(product=product, feed=feed)
+        system = create_system(product=scenario.product, feed=scenario.feed)
         self.tea = create_tea(
             system,
         )
         self.tea.income_tax = 0.21
-        self.load_system(system)
-        model = bst.Model(system)
+        return system
+        
+    def create_model(self):
+        scenario = self.scenario
+        model = bst.Model(self.system)
         parameter = model.parameter
         metric = model.metric
         
@@ -117,29 +88,30 @@ class Biorefinery(bst.ProcessModel):
             bounds = [0.8 * baseline, 1.2 * baseline]
             return parameter(*args, **kwargs, baseline=baseline, bounds=bounds)
         
-        if feed == 'UFPermeate':
-            baseline = 0.3 * 0.05 / 0.45359237 # aboud 0.11 USD per kg sugar
-            lb = 0.8 * baseline
-            ub = 1.2 * baseline
-        elif feed == 'AcidWhey':
-            # TODO: Update based on industry expert
-            baseline = 0.05 / 0.45359237
-            lb = 0.8 * baseline
-            ub = 1.2 * baseline
-        elif feed == 'SaccharifiedCornSlurry':
-            # https://scijournals.onlinelibrary.wiley.com/doi/epdf/10.1002/bbb.1976?saml_referrer
-            baseline = 0.33 # USD per kg sugar
-            baseline *= 0.21 # USD per kg slurry
-            lb = 0.8 * baseline
-            ub = 1.2 * baseline
-        elif feed == 'GlucoseMedia':
-            # https://tradingeconomics.com/commodity/sugar
-            baseline = 0.50 # USD per kg sugar
-            baseline *= 0.207 # USD per kg sugar
-            lb = 0.8 * baseline
-            ub = 1.2 * baseline
-        else:
-            raise ValueError('invalid feed')
+        match scenario.feed:
+            case 'UFPermeate':
+                baseline = 0.3 * 0.05 / 0.45359237 # aboud 0.11 USD per kg sugar
+                lb = 0.8 * baseline
+                ub = 1.2 * baseline
+            case 'AcidWhey':
+                # TODO: Update based on industry expert
+                baseline = 0.05 / 0.45359237
+                lb = 0.8 * baseline
+                ub = 1.2 * baseline
+            case 'SaccharifiedCornSlurry':
+                # https://scijournals.onlinelibrary.wiley.com/doi/epdf/10.1002/bbb.1976?saml_referrer
+                baseline = 0.33 # USD per kg sugar
+                baseline *= 0.21 # USD per kg slurry
+                lb = 0.8 * baseline
+                ub = 1.2 * baseline
+            case 'GlucoseMedia':
+                # https://tradingeconomics.com/commodity/sugar
+                baseline = 0.50 # USD per kg sugar
+                baseline *= 0.207 # USD per kg sugar
+                lb = 0.8 * baseline
+                ub = 1.2 * baseline
+            case _:
+                raise ValueError('invalid feed')
         
         @parameter(units='USD/kg', element='feedstock', 
                    baseline=baseline, bounds=[lb, ub]) 
@@ -182,7 +154,7 @@ class Biorefinery(bst.ProcessModel):
         # def set_electricity_price(price): 
         #     bst.settings.electricity_price = price
         
-        if feed == 'AcidWhey':
+        if scenario.feed == 'AcidWhey':
             # Capacity based on U.S. production in 2015 - https://cen.acs.org/articles/95/i6/Acid-whey-waste-product-untapped.html
             bounds=[1e5, 1e6]
             baseline=5e5
@@ -215,7 +187,7 @@ class Biorefinery(bst.ProcessModel):
         
         @parameter(units='MT/yr', element=self.feedstock, bounds=bounds, baseline=baseline)
         def set_processing_capacity(processing_capacity):
-            self.feedstock.F_mass = processing_capacity / system.operating_hours * 1000 # kg / hr
+            self.feedstock.F_mass = processing_capacity / self.system.operating_hours * 1000 # kg / hr
             
         self.BT.fuel.set_CF(GWPkey, CFs['Miscanthus'])
         self.BT.fuel.price = 0.08
@@ -240,17 +212,14 @@ class Biorefinery(bst.ProcessModel):
         for i in model.parameters:
             if i.distribution is None: i.distribution = cp.Uniform(*i.bounds)
         
-        system.__class__.strict_convergence = False
-        system.set_tolerance(rmol=1e-4, mol=1e-3, maxiter=50, 
-                             method='wegstein', subsystems=True)
-        if simulate:
-            system.simulate()
-            self.load_system(system)
-        self.load_model(model)
-        cache[key] = self
-        return self
+        self.system.__class__.strict_convergence = False
+        self.system.set_tolerance(
+            rmol=1e-4, mol=1e-3, maxiter=50, 
+            method='wegstein', subsystems=True
+        )
+        return model
 
-    def evaluate_scenario(self,
+    def evaluate_sample(self,
             hexane_price=None,
             dodecylacetate_price=None,
             titer=None,
@@ -270,5 +239,6 @@ class Biorefinery(bst.ProcessModel):
         for n, value in enumerate(values):
             if value is None: continue
             sample.iloc[n] = value
-        return self.model(sample)['-']
+        return self.model(sample)
         
+Scenario = Biorefinery.Scenario

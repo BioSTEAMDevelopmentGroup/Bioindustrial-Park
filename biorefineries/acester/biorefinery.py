@@ -21,8 +21,7 @@ from inspect import signature
 
 __all__ = (
     'Biorefinery',
-    'ConfigurationKey',
-    'ConfigurationComparison',
+    'Scenario',
 )
 
 # DO NOT DELETE:
@@ -38,45 +37,6 @@ V_ng = 1.473318463076884 # Natural gas volume at 60 F and 14.73 psi [m3 / kg]
 
 results_folder = os.path.join(os.path.dirname(__file__), 'results')
 
-class ConfigurationKey:
-    __slots__ = ('carbon_capture', 'dewatering', 'decoupled_growth', 'product')
-    name = 'AcEster'
-    
-    def __init__(self, carbon_capture, dewatering, decoupled_growth, product):
-        self.carbon_capture = carbon_capture
-        self.dewatering = dewatering
-        self.decoupled_growth = decoupled_growth
-        self.product = product
-        
-    def __eq__(self, other):
-            return (
-                self.__class__ is other.__class__ and
-                self.carbon_capture == other.carbon_capture and
-                self.dewatering == other.dewatering and
-                self.decoupled_growth == other.decoupled_growth and
-                self.product == other.product
-            )
-    
-    def __hash__(self):
-        return hash((ConfigurationKey, self.carbon_capture, self.dewatering, self.decoupled_growth))
-        
-    def __sub__(self, other):
-        return ConfigurationComparison(self, other)
-        
-    def __repr__(self):
-        return f"ConfigurationKey(carbon_capture={self.carbon_capture}, dewatering={self.dewatering}, decoupled_growth={self.decoupled_growth}, product={self.product})"
-
-
-class ConfigurationComparison:
-    __slots__ = ('left', 'right')
-    
-    def __init__(self, left, right):
-        self.left = left
-        self.right = right
-        
-    def __repr__(self):
-        return f"ConfigurationComparison(left={self.left}, right={self.right})"
-
 
 class Biorefinery(bst.ProcessModel):
     """
@@ -90,17 +50,38 @@ class Biorefinery(bst.ProcessModel):
     (7.30, 2.80, 438.53)
     
     """
-    name = ConfigurationKey.name
+    class Scenario:
+        product: str = 'Dodecanol'
+        carbon_capture: bool = False
+        dewatering: bool = False
+        decoupled_growth: bool = True
+        
+        @property
+        def name(self):
+            name = ''
+            for i, j in self.items():
+                if isinstance(j, bool):
+                    name += i
+                elif isinstance(j, str):
+                    name += j
+                else:
+                    raise NotImplementedError('unknown error')
+            return name
+    
     pseudo_optimal_design_decisions = {
-        ConfigurationKey(
+        Scenario(
             carbon_capture=False, dewatering=False,
             decoupled_growth=False, product='Dodecanol'
         ): np.array([12. , 12. ,  0.6]),
-        ConfigurationKey(
+        Scenario(
             carbon_capture=False, dewatering=False,
             decoupled_growth=True, product='Dodecanol'
         ): np.array([12. , 12. ,  0.6]),
     }
+    
+    @property
+    def name(self):
+        return self.scenario.name
     
     def optimize(self):
         with catch_warnings(action="ignore"):
@@ -112,19 +93,7 @@ class Biorefinery(bst.ProcessModel):
         for p, x in zip(self.model.optimized_parameters, results.x): p.setter(x)
         return results
     
-    def __new__(
-            cls,
-            simulate=True,
-            decoupled_growth=True,
-            dewatering=False,
-            carbon_capture=False,
-            product='Dodecanol',
-            cache={},
-        ):
-        config = ConfigurationKey(carbon_capture, dewatering, decoupled_growth, product)
-        if config in cache: return cache[config]
-        self = super().__new__(cls)
-        self.config = config
+    def create_system(self):
         bst.settings.set_thermo(create_acetate_ester_chemicals())
         bst.settings.chemicals.define_group(
             'Biomass', 
@@ -136,18 +105,26 @@ class Biorefinery(bst.ProcessModel):
             wt=True,
         )
         load_process_settings()
+        scenario = self.scenario
         system = create_acetyl_ester_system(
-            carbon_capture=carbon_capture,
-            dewatering=dewatering,
-            decoupled_growth=decoupled_growth,
-            product=product,
+            carbon_capture=scenario.carbon_capture,
+            dewatering=scenario.dewatering,
+            decoupled_growth=scenario.decoupled_growth,
+            product=scenario.product,
         )
         self.tea = create_tea(
             system,
         )
         self.tea.steam_power_depreciation = 'MACRS7'
         self.tea.income_tax = 0.21
-        self.load_system(system)
+        system.__class__.strict_convergence = False
+        system.set_tolerance(rmol=1e-4, mol=1e-3, maxiter=50, 
+                             method='wegstein', subsystems=True)
+        return system
+    
+    def create_model(self):
+        system = self.system
+        scenario = self.scenario
         model = bst.Model(system)
         parameter = model.parameter
         metric = model.metric
@@ -244,10 +221,10 @@ class Biorefinery(bst.ProcessModel):
         @parameter(units='MT/yr', element='AcEster', bounds=[5000, 50000], baseline=30000)
         def set_production_capacity(production_capacity):
             capacity = production_capacity / system.operating_hours * 1000 # kg / hr
-            original = self.AcOH_media.F_mass * self.AcOH_production.titer['AceticAcid'] * self.AcEster_production.reactions[0].product_yield(product, basis='wt') / 1000
+            original = self.AcOH_media.F_mass * self.AcOH_production.titer['AceticAcid'] * self.AcEster_production.reactions[0].product_yield(scenario.product, basis='wt') / 1000
             self.system.rescale(self.AcOH_media, capacity / original)
         
-        if carbon_capture:
+        if scenario.carbon_capture:
             baseline_length_to_diameter = 8
         else:
             baseline_length_to_diameter = 12
@@ -313,7 +290,7 @@ class Biorefinery(bst.ProcessModel):
         #     inventory=self.direct_nonbiogenic_emissions,
         #     CF=1.,
         # )
-        if not dewatering: self.ethyl_acetate = bst.MockStream('ethyl_acetate')
+        if not scenario.dewatering: self.ethyl_acetate = bst.MockStream('ethyl_acetate')
         self.BT.fuel.set_CF(GWPkey, CFs['Miscanthus'])
         self.BT.fuel.price = 0.08
         self.hydrogen.set_CF(GWPkey, CFs['H2'])
@@ -335,26 +312,16 @@ class Biorefinery(bst.ProcessModel):
         def TCI():
             return self.tea.TCI / 1e6
         
-        for i in model.parameters: i.setter(i.baseline)
         for i in model.parameters:
             if i.distribution is None: i.distribution = cp.Uniform(*i.bounds)
-        
-        system.__class__.strict_convergence = False
-        system.set_tolerance(rmol=1e-4, mol=1e-3, maxiter=50, 
-                             method='wegstein', subsystems=True)
-        self.load_model(model)
-        if config in cls.pseudo_optimal_design_decisions:
-            optimal_values = cls.pseudo_optimal_design_decisions[config]
+        if scenario in self.pseudo_optimal_design_decisions:
+            optimal_values = self.pseudo_optimal_design_decisions[scenario]
             for i, j in zip(model.optimized_parameters, optimal_values): 
                 i.baseline = j
                 i.setter(j)
         else:
-            cls.pseudo_optimal_design_decisions[config] = self.optimize().x
-        if simulate: 
-            system.simulate()
-            self.load_system(system)
-        cache[config] = self
-        return self
+            self.pseudo_optimal_design_decisions[scenario] = self.optimize().x
+        return model
 
     def key_flows(self):
         def total(s):
@@ -390,3 +357,5 @@ class Biorefinery(bst.ProcessModel):
             'Biogenic emissions': comps(self.biogenic_emissions),
             'Biomass': biomass(self.BT.fuel),
         }
+
+Scenario = Biorefinery.Scenario

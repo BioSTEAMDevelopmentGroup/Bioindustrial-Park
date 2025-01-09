@@ -38,30 +38,18 @@ def sobol_file(name, extention='xlsx'):
     filename += '.' + extention
     return os.path.join(results_folder, filename)
 
-def monte_carlo_file_name(name, carbon_capture, dewatering):
+def monte_carlo_file_name(name):
     filename = name + '_monte_carlo'
-    if carbon_capture:
-        filename += '_carbon_capture'
-    if dewatering:
-        filename += '_dewatering'
     filename += '.' + 'xlsx'
     return os.path.join(results_folder, filename)
 
-def spearman_file_name(name, carbon_capture, dewatering):
+def spearman_file_name(name):
     filename = name + '_spearman'
-    if carbon_capture:
-        filename += '_carbon_capture'
-    if dewatering:
-        filename += '_dewatering'
     filename += '.xlsx'
     return os.path.join(results_folder, filename)
 
-def autoload_file_name(name, N, carbon_capture, dewatering):
+def autoload_file_name(name, N):
     filename = name + '_' + str(N)
-    if carbon_capture:
-        filename += '_carbon_capture'
-    if dewatering:
-        filename += '_dewatering'
     return os.path.join(results_folder, filename)
 
 def set_font(size=8, family='sans-serif', font='Arial'):
@@ -376,9 +364,9 @@ def run_monte_carlo(
     
     N_notify = min(int(N/10), 20)
     autosave = N_notify if autosave else False
-    autoload_file = autoload_file_name(br.name, N, carbon_capture, dewatering)
-    spearman_file = spearman_file_name(br.name, carbon_capture, dewatering)
-    monte_carlo_file = monte_carlo_file_name(br.name, carbon_capture, dewatering)
+    autoload_file = autoload_file_name(br.name, N)
+    spearman_file = spearman_file_name(br.name)
+    monte_carlo_file = monte_carlo_file_name(br.name)
     np.random.seed(1)
     samples = br.model.sample(N, rule)
     br.model.load_samples(samples, sort=sort)
@@ -466,31 +454,31 @@ def plot_sobol(names, categories, df, colors=None, hatches=None,
                                   legend, **legend_kwargs)
     return fig, axes
     
-def get_monte_carlo(config, features, cache={}, dropna=True):
-    if isinstance(config, ace.ConfigurationKey):
-        key = (config.carbon_capture, config.dewatering)
+def get_monte_carlo(scenario, features, cache={}, dropna=True):
+    if isinstance(scenario, ace.Scenario):
+        key = (scenario.carbon_capture, scenario.dewatering)
         if key in cache:
             df = cache[key]
         else:
-            file = monte_carlo_file_name(config.name, config.carbon_capture, config.dewatering)
+            file = monte_carlo_file_name(scenario.name)
             cache[key] = df = pd.read_excel(file, header=[0, 1], index_col=[0])
             df = df[features]    
-    elif isinstance(config, ace.ConfigurationComparison):
-        left = get_monte_carlo(config.left, features, dropna=False)
-        right = get_monte_carlo(config.right, features, dropna=False)
+    elif isinstance(scenario, bst.ScenarioComparison):
+        left = get_monte_carlo(scenario.left, features, dropna=False)
+        right = get_monte_carlo(scenario.right, features, dropna=False)
         df = left - right
     else:
-        raise ValueError('invalid configuration')
+        raise ValueError('invalid scenariouration')
     if dropna: df = df.dropna(how='all', axis=0)
     return df
 
 def plot_kde_carbon_capture_comparison_dewatering():
-    config = (
-        ace.ConfigurationKey(carbon_capture=True, dewatering=True)
-        - ace.ConfigurationKey(carbon_capture=False, dewatering=True)
+    scenario = (
+        ace.Scenario(carbon_capture=True, dewatering=True)
+        - ace.Scenario(carbon_capture=False, dewatering=True)
     )
     _plot_kde(
-        config,
+        scenario,
         # yticks=[[-60, -40, -20, 0, 20, 40, 60]],
         # xticks=[[-0.9, -0.6, -0.3, 0, 0.3, 0.6, 0.9],
         #         [-0.9, -0.6, -0.3, 0, 0.3, 0.6, 0.9]],
@@ -509,12 +497,12 @@ def plot_kde_carbon_capture_comparison_dewatering():
         plt.savefig(file, dpi=900, transparent=True)
 
 def plot_kde_carbon_capture_comparison_no_dewatering():
-    config = (
-        ace.ConfigurationKey(carbon_capture=True, dewatering=False)
-        - ace.ConfigurationKey(carbon_capture=False, dewatering=False)
+    scenario = (
+        ace.Scenario(carbon_capture=True, dewatering=False)
+        - ace.Scenario(carbon_capture=False, dewatering=False)
     )
     _plot_kde(
-        config,
+        scenario,
         # yticks=[[-60, -40, -20, 0, 20, 40, 60]],
         # xticks=[[-0.9, -0.6, -0.3, 0, 0.3, 0.6, 0.9],
         #         [-0.9, -0.6, -0.3, 0, 0.3, 0.6, 0.9]],
@@ -533,12 +521,12 @@ def plot_kde_carbon_capture_comparison_no_dewatering():
         plt.savefig(file, dpi=900, transparent=True)
 
 def plot_kde_dewatering_comparison_carbon_capture():
-    config = (
-        ace.ConfigurationKey(carbon_capture=True, dewatering=True)
-        - ace.ConfigurationKey(carbon_capture=True, dewatering=False)
+    scenario = (
+        ace.Scenario(carbon_capture=True, dewatering=True)
+        - ace.Scenario(carbon_capture=True, dewatering=False)
     )
     _plot_kde(
-        config,
+        scenario,
         # yticks=[[-60, -40, -20, 0, 20, 40, 60]],
         # xticks=[[-0.9, -0.6, -0.3, 0, 0.3, 0.6, 0.9],
         #         [-0.9, -0.6, -0.3, 0, 0.3, 0.6, 0.9]],
@@ -557,12 +545,12 @@ def plot_kde_dewatering_comparison_carbon_capture():
         plt.savefig(file, dpi=900, transparent=True)
 
 def plot_kde_dewatering_comparison_no_carbon_capture():
-    config = (
-        ace.ConfigurationKey(carbon_capture=False, dewatering=True)
-        - ace.ConfigurationKey(carbon_capture=False, dewatering=False)
+    scenario = (
+        ace.Scenario(carbon_capture=False, dewatering=True)
+        - ace.Scenario(carbon_capture=False, dewatering=False)
     )
     _plot_kde(
-        config,
+        scenario,
         yticks=[-4, -2, 0, 2, 4],
         xticks=[0, 1, 2, 3, 4],
         top_right='No Dewatering\nFavored()',
@@ -581,12 +569,12 @@ def plot_kde_dewatering_comparison_no_carbon_capture():
 
 def plot_kde_carbon_capture_comparison():
     left = (
-        ace.ConfigurationKey(carbon_capture=True, dewatering=True)
-        - ace.ConfigurationKey(carbon_capture=False, dewatering=True)
+        ace.Scenario(carbon_capture=True, dewatering=True)
+        - ace.Scenario(carbon_capture=False, dewatering=True)
     )
     right = (
-        ace.ConfigurationKey(carbon_capture=True, dewatering=False)
-        - ace.ConfigurationKey(carbon_capture=False, dewatering=False)
+        ace.Scenario(carbon_capture=True, dewatering=False)
+        - ace.Scenario(carbon_capture=False, dewatering=False)
     )
     plot_kde_2d_comparison(
         (left, right),
@@ -611,12 +599,12 @@ def plot_kde_carbon_capture_comparison():
    
 def plot_kde_dewatering_comparison():
     left = (
-        ace.ConfigurationKey(carbon_capture=True, dewatering=True)
-        - ace.ConfigurationKey(carbon_capture=True, dewatering=True)
+        ace.Scenario(carbon_capture=True, dewatering=True)
+        - ace.Scenario(carbon_capture=True, dewatering=True)
     )
     right = (
-        ace.ConfigurationKey(carbon_capture=False, dewatering=True)
-        - ace.ConfigurationKey(carbon_capture=False, dewatering=False)
+        ace.Scenario(carbon_capture=False, dewatering=True)
+        - ace.Scenario(carbon_capture=False, dewatering=False)
     )
     plot_kde_2d_comparison(
         (left, right),
@@ -640,7 +628,7 @@ def plot_kde_dewatering_comparison():
    
     
 # def plot_kde_comparison(
-#         config, metrics, xticks=None, yticks=None,
+#         scenario, metrics, xticks=None, yticks=None,
 #         xbox_kwargs=None, ybox_kwargs=None, top_left='',
 #         top_right='Tradeoff', bottom_left='Tradeoff',
 #         bottom_right='', fs=None, ticklabels=True, aspect_ratio=1.1,
@@ -649,7 +637,7 @@ def plot_kde_dewatering_comparison():
 #     set_font(size=fs or 8)
 #     set_figure_size(width='half', aspect_ratio=aspect_ratio)
 #     Xi, Yi = [i.index for i in metrics]
-#     df = get_monte_carlo(config, metrics)
+#     df = get_monte_carlo(scenario, metrics)
 #     y = df[Yi].values
 #     x = df[Xi].values
 #     ax = bst.plots.plot_kde(
@@ -670,12 +658,12 @@ def plot_kde_dewatering_comparison():
 #     )
     
 def plot_kde(carbon_capture, dewatering, *args, **kwargs):
-    fig, ax = _plot_kde(ace.ConfigurationKey(carbon_capture, dewatering), *args, fs=10, **kwargs)
+    fig, ax = _plot_kde(ace.Scenario(carbon_capture, dewatering), *args, fs=10, **kwargs)
     for i in ('svg', 'png'):
-        file = os.path.join(images_folder, f'configuration_kde.{i}')
+        file = os.path.join(images_folder, f'scenariouration_kde.{i}')
         plt.savefig(file, transparent=True, dpi=900)
 
-def _plot_kde(config, xticks=None, yticks=None,
+def _plot_kde(scenario, xticks=None, yticks=None,
              xbox_kwargs=None, ybox_kwargs=None, top_left='',
              top_right=None, bottom_left=None,
              bottom_right='', fs=None, ticklabels=True, aspect_ratio=1.1,
@@ -685,7 +673,7 @@ def _plot_kde(config, xticks=None, yticks=None,
     br = ace.Biorefinery(simulate=False)
     metrics = [br.GWP.index, br.MSP.index]
     Xi, Yi = [i for i in metrics]
-    df = get_monte_carlo(config, metrics)
+    df = get_monte_carlo(scenario, metrics)
     y = df[Yi].values
     x = df[Xi].values
     fig, ax = bst.plots.plot_kde(
@@ -707,7 +695,7 @@ def _plot_kde(config, xticks=None, yticks=None,
     return fig, ax
 
 def plot_kde_2d_comparison(
-        configs, xticks=None, yticks=None,
+        scenarios, xticks=None, yticks=None,
         top_left='', top_right='', bottom_left='',
         bottom_right='', xbox_kwargs=None, ybox_kwargs=None, titles=None,
         fs=None, ticklabels=True, rotate_quadrants=0,
@@ -722,7 +710,7 @@ def plot_kde_2d_comparison(
     br = ace.Biorefinery(simulate=False)
     metrics = [br.GWP.index, br.MSP.index]
     Xi, Yi = [i for i in metrics]
-    dfs = [get_monte_carlo(i, metrics) for i in configs]
+    dfs = [get_monte_carlo(i, metrics) for i in scenarios]
     xs = np.array([[df[Xi].values for df in dfs]])
     ys = np.array([[df[Yi].values for df in dfs]])
     ticklabels = True if ticklabels else False
@@ -784,7 +772,7 @@ def montecarlo_results(carbon_capture, dewatering, metrics=None, derivative=None
             f.GWP.index, f.MSP.index
         ]
     results = {}
-    df = get_monte_carlo(f.config, metrics)
+    df = get_monte_carlo(f.scenario, metrics)
     results[f.name] = dct = {}
     for index in metrics:
         data = df[index].values
