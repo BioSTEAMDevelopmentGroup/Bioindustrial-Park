@@ -68,17 +68,6 @@ class Biorefinery(bst.ProcessModel):
                     raise NotImplementedError('unknown error')
             return name
     
-    pseudo_optimal_design_decisions = {
-        Scenario(
-            carbon_capture=False, dewatering=False,
-            decoupled_growth=False, product='Dodecanol'
-        ): np.array([12. , 12. ,  0.6]),
-        Scenario(
-            carbon_capture=False, dewatering=False,
-            decoupled_growth=True, product='Dodecanol'
-        ): np.array([12. , 12. ,  0.6]),
-    }
-    
     @property
     def name(self):
         return self.scenario.name
@@ -93,9 +82,11 @@ class Biorefinery(bst.ProcessModel):
         for p, x in zip(self.model.optimized_parameters, results.x): p.setter(x)
         return results
     
+    def create_thermo(self):
+        return create_acetate_ester_chemicals()
+    
     def create_system(self):
-        bst.settings.set_thermo(create_acetate_ester_chemicals())
-        bst.settings.chemicals.define_group(
+        self.chemicals.define_group(
             'Biomass', 
             ['Water', 'Extract', 'Acetate', 'Ash', 'Lignin', 
              'Protein', 'Glucan', 'Xylan', 'Arabinan', 'Galactan'],
@@ -359,3 +350,13 @@ class Biorefinery(bst.ProcessModel):
         }
 
 Scenario = Biorefinery.Scenario
+Biorefinery.pseudo_optimal_design_decisions = {
+    Scenario(
+        carbon_capture=False, dewatering=False,
+        decoupled_growth=False, product='Dodecanol'
+    ): np.array([12. , 12. ,  0.6]),
+    Scenario(
+        carbon_capture=False, dewatering=False,
+        decoupled_growth=True, product='Dodecanol'
+    ): np.array([12. , 12. ,  0.6]),
+}

@@ -54,11 +54,13 @@ def create_chemicals(yeast_includes_nitrogen=False):
     )
     Lactose = bst.Chemical(
         'Lactose',
-        phase = 'l'
+        phase = 'l',
+        default=True,
     )
     Galactose = bst.Chemical(
         'Galactose',
-        phase = 'l'
+        phase = 'l',
+        default=True,
     )
     LacticAcid = bst.Chemical(
         'LacticAcid',
@@ -162,24 +164,25 @@ def create_chemicals(yeast_includes_nitrogen=False):
         wt=True,
     )
     chemicals.define_group( # Source: 
-        'GreekAW'
+        'GreekAW',
         ['Protein', 'Lactose', 'Ash', 'LacticAcid', 'Solids', 'Water'],
         [0.1, 3.8, 0.7, 0.6, 5.6, 89.2],
         wt=True,
     )
     chemicals.define_group( # Source: 
-        'CottageAW'['Protein', 'Lactose', 'Ash', 'LacticAcid', 'Solids', 'Water'],
+        'CottageAW',
+        ['Protein', 'Lactose', 'Ash', 'LacticAcid', 'Solids', 'Water'],
         [1.2, 3.8, 0.7, 0.6, 6, 87.7],
         wt=True,
     )
     chemicals.define_group( # Source: 
-        'WheyCream'
+        'WheyCream',
         ['Protein', 'Lactose', 'Ash', 'LacticAcid', 'Solids', 'Water'],
         [0.8, 3, 0.3, 0.1, 37.5, 57.8], #LacticAcid: 35-40
         wt=True,
     )
     chemicals.define_group( # Source: 
-        'Buttermilk'
+        'Buttermilk',
         ['Protein', 'Lactose', 'Ash', 'LacticAcid', 'Solids', 'Water'],
         [2, 4, 0.5, 0.1, 7, 86.4], #LacticAcid: 7+
         wt=True,

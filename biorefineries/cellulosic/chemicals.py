@@ -44,9 +44,11 @@ __all__ = (
 # https://www.sciencedirect.com/science/article/pii/0032386182901252
 Cp_cellulosic = 1.364
 
-# Assume density is similar for most solids.
+# Assume density is similar for most solids, in agreement with Superpro models for sugarcane.
 rho = 1540 # kg/m3
 
+# Heats of formation for cellulosic components are from Humbird 2011 report: https://www.nrel.gov/docs/fy11osti/47764.pdf
+# They are originally found in calories, so we need to convert them to joule.
 cal2joule = 4.184
 
 # These defaults are used within system factories for pretreatment and fermentation.

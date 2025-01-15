@@ -47,7 +47,8 @@ class Biorefinery(bst.ProcessModel):
     --------
     >>> from biorefineries import milk
     >>> br = milk.Biorefinery(simulate=False)
-    >>> br.evaluate_scenario()
+    >>> scenario, result = br.baseline()
+    >>> result
     MSP [USD/kg]        2.27
     GWP [kg*CO2e/kg]   0.218
     TCI [MMUSD]         73.1
@@ -55,7 +56,8 @@ class Biorefinery(bst.ProcessModel):
     
     >>> from biorefineries import milk
     >>> br = milk.Biorefinery(simulate=False, feed='UFPermeate')
-    >>> br.evaluate_scenario()
+    >>> scenario, result = br.baseline()
+    >>> result
     MSP [USD/kg]         2.08
     GWP [kg*CO2e/kg]   0.0435
     TCI [MMUSD]          37.7
@@ -67,9 +69,11 @@ class Biorefinery(bst.ProcessModel):
         feed: str = 'AcidWhey'
         product: str = 'Dodecanol'
     
+    def create_thermo(self):
+        return create_chemicals()
+    
     def create_system(self):
         scenario = self.scenario
-        bst.settings.set_thermo(create_chemicals())
         load_process_settings()
         system = create_system(product=scenario.product, feed=scenario.feed)
         self.tea = create_tea(
@@ -95,7 +99,7 @@ class Biorefinery(bst.ProcessModel):
                 ub = 1.2 * baseline
             case 'AcidWhey':
                 # TODO: Update based on industry expert
-                baseline = 0.05 / 0.45359237
+                baseline = 0.055 * 0.05 / 0.45359237
                 lb = 0.8 * baseline
                 ub = 1.2 * baseline
             case 'SaccharifiedCornSlurry':
