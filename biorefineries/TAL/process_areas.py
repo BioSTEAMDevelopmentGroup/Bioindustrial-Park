@@ -1191,7 +1191,7 @@ def create_TAL_to_sorbic_acid_upgrading_process_THF_Ethanol(ins, outs,):
     KOH_hydrolysis.price = price['KOH']
     fresh_catalyst_R401.price = price['Ni-SiO2']
     fresh_catalyst_R402.price = price['Amberlyst-70']
-    Ethanol_upgrading_solvent.price = ['Ethanol']
+    Ethanol_upgrading_solvent.price = price['Ethanol']
     
     M405 = bst.Mixer('M405', ins=(solid_TAL, THF_upgrading_solvent, '', ''),
                      outs=('TAL_in_THF'))
