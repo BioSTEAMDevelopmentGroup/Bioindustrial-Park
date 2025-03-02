@@ -213,19 +213,18 @@ def create_cellulosic_fermentation_system(
         ins.remove(CSL)
         ins.remove(DAP)
     if kind is None: kind = 'IB'
-    SCF_keys = ('SCF', 'Saccharification and Co-Fermentation')
-    saccharification_sys = create_saccharification_system(
-        ins=[pretreated_biomass, cellulase, saccharification_water],
-        mockup=True,
-        solids_loading=solids_loading,
-        insoluble_solids_loading=insoluble_solids_loading,
-        nonsolids=nonsolids,
-        insoluble_solids=insoluble_solids,
-        Saccharification=(Saccharification or units.Saccharification if kind in SCF_keys else ContinuousPresaccharification or units.ContinuousPresaccharification),
-        saccharification_reactions=saccharification_reactions,
-    )
     if kind in ('IB', 'Integrated Bioprocess'):
         outs.remove(lignin)
+        saccharification_sys = create_saccharification_system(
+            ins=[pretreated_biomass, cellulase, saccharification_water],
+            mockup=True,
+            solids_loading=solids_loading,
+            insoluble_solids_loading=insoluble_solids_loading,
+            nonsolids=nonsolids,
+            insoluble_solids=insoluble_solids,
+            Saccharification=(ContinuousPresaccharification or units.ContinuousPresaccharification),
+            saccharification_reactions=saccharification_reactions,
+        )
         create_integrated_bioprocess_saccharification_and_cofermentation_system(
             ins=[saccharification_sys-0, DAP, CSL],
             outs=[vent, beer],
@@ -238,6 +237,7 @@ def create_cellulosic_fermentation_system(
             add_nutrients=add_nutrients,
         )
     elif kind in ('SSCF', 'Simultaneous Saccharification and Co-Fermentation'):
+        raise ValueError('SSCF configuration not yet implemented')
         outs.remove(lignin)
         create_simultaneous_saccharification_and_cofermentation_system(
             ins=[saccharification_sys-0, DAP, CSL],
@@ -248,7 +248,17 @@ def create_cellulosic_fermentation_system(
             cofermentation_reactions=cofermentation_reactions,
             add_nutrients=add_nutrients,
         )
-    elif kind in SCF_keys:
+    elif kind in ('SCF', 'Saccharification and Co-Fermentation'):
+        saccharification_sys = create_saccharification_system(
+            ins=[pretreated_biomass, cellulase, saccharification_water],
+            mockup=True,
+            solids_loading=solids_loading,
+            insoluble_solids_loading=insoluble_solids_loading,
+            nonsolids=nonsolids,
+            insoluble_solids=insoluble_solids,
+            Saccharification=(Saccharification or units.Saccharification),
+            saccharification_reactions=saccharification_reactions,
+        )
         T303 = bst.StorageTank('T303', saccharification_sys-0, tau=4)
         create_cofermentation_system(
             ins=[T303-0, DAP, CSL],

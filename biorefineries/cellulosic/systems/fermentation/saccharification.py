@@ -60,7 +60,6 @@ def create_saccharification_system(
             * 1.2 * (pretreated_biomass.imass['Glucan'])
         )
     
-    
     @M301.add_specification(run=True)
     def update_moisture_content():
         pretreated_biomass, cellulase, saccharification_water, *other = M301.ins
