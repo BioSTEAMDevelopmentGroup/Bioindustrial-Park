@@ -57,7 +57,7 @@ N2 = chemical_database('N2', phase='g', Hf=0)
 H2 = chemical_database('H2', Hf=0)
 CH4 = chemical_database('Methane')
 CO = chemical_database('CarbonMonoxide', Hf=-26400*_cal2joule)
-CO2 = chemical_database('CO2')
+CO2 = chemical_database('CO2', phase='g')
 
 CH3OH = chemical_database('Methanol')
 
@@ -75,7 +75,7 @@ for i in DCPE.get_missing_properties():
         except:
             pass
 
-phase_change_chemicals = ['H2O', 'H2', 'CH4', 'CO', 'CO2', 'CH3OH', 'HCOOH'
+phase_change_chemicals = ['H2O', 'H2', 'CH4', 'CH3OH', 'HCOOH'
                           'C18H39N', 'C19H41NO2']
 
 for chem in chems:

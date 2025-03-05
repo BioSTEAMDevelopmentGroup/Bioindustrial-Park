@@ -17,8 +17,12 @@ from thermosteam import MultiStream
 from biosteam.units.design_tools.geometry import cylinder_diameter_from_volume
 from qsdsan._sanunit import SanUnit
 
+from biorefineries.ccu._chemicals import chems
+
 Rxn = tmo.reaction.Reaction
 ParallelRxn = tmo.reaction.ParallelReaction
+
+tmo.settings.set_thermo(chems, cache=True)
 
 #%% 
 # =============================================================================
@@ -78,6 +82,7 @@ class MeOH_SynthesisReactor(bst.units.design_tools.PressureVessel, bst.Unit):
                      'Catalyst': 1.0} # Cu/ZnO/Al2O3
     
     def __init__(self, ID="", ins=None, outs=(),
+                 T=210+273.15,
                  P=7600000/6894.76,
                  vessel_material='Stainless steel 304',
                  vessel_type='Vertical',
@@ -88,6 +93,7 @@ class MeOH_SynthesisReactor(bst.units.design_tools.PressureVessel, bst.Unit):
                  porosity = 0.5,
                  **kwargs):
             bst.Unit.__init__(self, ID, ins, outs)
+            self.T = T
             self.P = P
             self.vessel_material = vessel_material # Vessel material
             self.vessel_type = vessel_type # 'Horizontal' or 'Vertical'
@@ -103,10 +109,13 @@ class MeOH_SynthesisReactor(bst.units.design_tools.PressureVessel, bst.Unit):
                 
     
     def _run(self):
-        feed, = self.ins
+        feed = self.ins[0]
         feed.phase = 'g'
-        effluent, = self.outs
+        feed.T = self.T
+        # breakpoint()
+        effluent = self.outs[0]
         effluent.copy_like(feed)
+        effluent.phase = 'g'
         self.reactions.adiabatic_reaction(effluent)
         
     def _design(self):
