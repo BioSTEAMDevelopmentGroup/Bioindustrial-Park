@@ -30,6 +30,78 @@ __all__ = (
 # formula_array = formula_array * whey_composition_by_mol
 # protein_formula = array_to_atoms(formula_array.sum(axis=1))
 
+def create_galacto_oligosaccharide_chemicals():
+    # Sample work
+    Water = bst.Chemical('Water')
+    CaSO4 = bst.Chemical('CaSO4', phase='s', default=True)
+    Lactose = bst.Chemical(
+        'Lactose',
+        phase = 'l',
+        default=True,
+    )
+    GalactoOligosaccharide = bst.Chemical(
+        'GalactoOligosaccharide',
+        formula='C12H20O10', # Same as lactose minus water
+        Hf=Lactose.Hf + 10366.8, # Based on C - O and H - O bond energies
+        rho=Lactose.rho(298.15, 101325),
+        Cp=Lactose.Cp(298.15),
+        phase='l',
+        default=True,
+        search_db=False,
+    )
+    Galactose = bst.Chemical(
+        'Galactose',
+        phase = 'l',
+        default=True,
+    )
+    LacticAcid = bst.Chemical(
+        'LacticAcid',
+        phase = 'l'
+    )
+    CitricAcid = bst.Chemical(
+        'CitricAcid',
+        phase = 'l'
+    )
+    GlutaricAcid = bst.Chemical(
+        'GlutaricAcid',
+        phase = 'l'
+    )
+    protein_formula = {
+        'H': 10.019566174405634,
+        'C': 4.974848530454082,
+        'N': 1.1787790508313507,
+        'O': 2.573004354214718,
+        'S': 0.03480161876387264
+    }
+    formula = {i: round(j, 2) for i, j in protein_formula.items()}
+    Protein = bst.Chemical(
+        'Protein',
+        search_db = False,
+        default = True,
+        atoms = formula,
+        phase='l'
+    )
+    Ash = bst.Chemical('Ash', default=True, phase='s', MW=1, search_db=False)
+    gases = [
+        bst.Chemical(i, phase='g') for i in 
+        ('N2', 'CO', 'H2', 'O2', 'CO2', 'CH4')
+    ]
+    chemicals = bst.Chemicals([
+        Water, Lactose, Galactose, LacticAcid, Protein,
+        CitricAcid, GlutaricAcid, Ash, GalactoOligosaccharide, CaSO4,
+        'Tripalmitate', 'H2SO4', bst.Chemical('CaCO3', phase='s'),
+        *gases,
+    ])
+    bst.settings.set_thermo(chemicals)
+    chemicals.set_alias('Tripalmitate', 'ButterFat')
+    chemicals.define_group( # Source: https://www.thinkusadairy.org/products/permeate-(dairy-product-solids)/permeate-categories/whey-permeate#:~:text=Whey%20permeate%20(also%20called%20dairy%20product%20solids%2C,pleasant%20dairy%20flavor%20make%20whey%20permeate%20formulator%2Dfriendly.
+        'DryWheyPermeate',
+        ['Protein', 'Lactose', 'ButterFat', 'Ash', 'Water'],
+        [3.5, 82, 0.1, 8.5 + 0.83 + 0.44 + 2.47 + 0.011, 4.5],
+        wt=True,
+    )
+    return chemicals
+
 def create_chemicals(yeast_includes_nitrogen=False):
     Yeast = bst.Chemical(
         'Yeast', 
@@ -165,26 +237,32 @@ def create_chemicals(yeast_includes_nitrogen=False):
     )
     chemicals.define_group( # Source: 
         'GreekAW',
-        ['Protein', 'Lactose', 'Ash', 'LacticAcid', 'Solids', 'Water'],
-        [0.1, 3.8, 0.7, 0.6, 5.6, 89.2],
+        ['Protein', 'Lactose', 'Ash', 'LacticAcid', 'Water'],
+        [0.1, 3.8, 0.7, 0.6, 89.2],
         wt=True,
     )
     chemicals.define_group( # Source: 
         'CottageAW',
-        ['Protein', 'Lactose', 'Ash', 'LacticAcid', 'Solids', 'Water'],
-        [1.2, 3.8, 0.7, 0.6, 6, 87.7],
+        ['Protein', 'Lactose', 'Ash', 'LacticAcid', 'Water'],
+        [1.2, 3.8, 0.7, 0.6, 87.7],
         wt=True,
     )
     chemicals.define_group( # Source: 
         'WheyCream',
-        ['Protein', 'Lactose', 'Ash', 'LacticAcid', 'Solids', 'Water'],
+        ['Protein', 'Lactose', 'Ash', 'LacticAcid', 'Water'],
         [0.8, 3, 0.3, 0.1, 37.5, 57.8], #LacticAcid: 35-40
         wt=True,
     )
     chemicals.define_group( # Source: 
         'Buttermilk',
-        ['Protein', 'Lactose', 'Ash', 'LacticAcid', 'Solids', 'Water'],
+        ['Protein', 'Lactose', 'Ash', 'LacticAcid', 'Water'],
         [2, 4, 0.5, 0.1, 7, 86.4], #LacticAcid: 7+
+        wt=True,
+    )
+    chemicals.define_group( # Source: https://www.thinkusadairy.org/products/permeate-(dairy-product-solids)/permeate-categories/whey-permeate#:~:text=Whey%20permeate%20(also%20called%20dairy%20product%20solids%2C,pleasant%20dairy%20flavor%20make%20whey%20permeate%20formulator%2Dfriendly.
+        'DriedWheyPermeate',
+        ['Protein', 'Lactose', 'ButterFat', 'Ash', 'LacticAcid', 'Water'],
+        [3.5, 82, 0.1, 8.5 + 0.83 + 0.44 + 2.47 + 0.011, 4.5],
         wt=True,
     )
     chemicals.set_alias('Yeast', 'Cellmass')

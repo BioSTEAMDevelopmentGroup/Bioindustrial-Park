@@ -45,6 +45,7 @@ def create_saccharification_system(
     M301.insoluble_solids_loading = insoluble_solids_loading
     M301.enzyme_loading = 0.02 # (20 g enzyme / 1000 g cellulose) 
     M301.enzyme_concentration = 0.05 # (50 g cellulase / 1000g cellulose mixture)
+    M301.loading_basis = lambda: 1.2 * (pretreated_biomass.imass['Glucan'])
     
     @M301.add_specification
     def update_cellulase_loading():
@@ -57,7 +58,7 @@ def create_saccharification_system(
         cellulase.imass['Water', 'Cellulase'] = (
             enzyme_over_cellulose
             * z_mass_cellulase_mixture
-            * 1.2 * (pretreated_biomass.imass['Glucan'])
+            * M301.loading_basis()
         )
     
     @M301.add_specification(run=True)

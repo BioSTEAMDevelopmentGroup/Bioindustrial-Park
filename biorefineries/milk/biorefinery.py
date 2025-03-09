@@ -10,19 +10,22 @@ import biosteam as bst
 import numpy as np
 import chaospy as cp
 from warnings import catch_warnings
-from .chemicals import create_chemicals
+from .chemicals import create_chemicals, create_galacto_oligosaccharide_chemicals
 from .process_settings import (
     load_process_settings, GWP as GWPkey,
     characterization_factors as CFs
 )
 from .systems import create_system
 from biorefineries.cane.data import price_distributions_2023 as dist
+from biorefineries import cellulosic
 from biorefineries.tea import (
-    create_cellulosic_ethanol_tea as create_tea
+    create_cellulosic_ethanol_tea as create_tea,
+    create_conventional_ethanol_tea as create_galacto_oligosaccharide_tea,
 )
 from inspect import signature
 
 __all__ = (
+    'GalactoOligoSaccharideProcess',
     'Biorefinery',
     'Scenario',
 )
@@ -40,6 +43,146 @@ V_ng = 1.473318463076884 # Natural gas volume at 60 F and 14.73 psi [m3 / kg]
 
 results_folder = os.path.join(os.path.dirname(__file__), 'results')
 
+class GalactoOligoSaccharideProcess(bst.ProcessModel):
+    """
+    Examples
+    --------
+    >>> from biorefineries import milk
+    >>> br = milk.GalactoOligoSaccharideProcess(simulate=False)
+    >>> scenario, result = br.baseline()
+    >>> result
+    
+    """
+    class Scenario:
+        processing_capacity: float = 30e9 * 0.06 * 0.453592e-3 / 100, '# Processing capacity [MT/y]' # 30 billion lb/yr of whey permeate * 0.06 % solids * 0.453592e-3 lb/MT * 1/100 supply available Initial estimate based on https://www.dairyfoods.com/articles/95527-its-time-to-rethink-whey-permeate
+        dry_whey_permeate_price: float = 0.23 * 0.453592e-3, '# Price of dry whey permeate [USD/MT]' # Initial estimate of 0.23 USD/lb based on the price of sugar https://tradingeconomics.com/commodity/sugar
+        H2SO4_price: float = 0.11, '# Price of H2SO4 [USD/kg]' # Defaults to 2021 93 w % H2SO4 price from https://catcost.chemcatbio.org/materials-library.
+        CaCO3_price: float = 0.43, '# Price of CaCO3 [USD/kg]' # Defaults to 2021 price from https://catcost.chemcatbio.org/materials-library.
+        CaSO4_price: float = 0, '# Price of CaSO4 [USD/kg]' # Defaults to 0 as a waste co-product.
+    
+    def create_thermo(self):
+        return create_galacto_oligosaccharide_chemicals()
+    
+    def create_system(self):
+        scenario = self.scenario
+        operating_hours = 330 * 24
+        dry_whey_permeate = bst.Stream(
+            'dry_whey_permeate', 
+            DryWheyPermeate=(
+                1000 * scenario.processing_capacity / operating_hours
+            ),
+            price=scenario.dry_whey_permeate_price
+        )
+        dry_whey_storage = bst.StorageTank(ins=dry_whey_permeate, tau=7*24)
+        sulfuric_acid = bst.Stream(
+            'sulfuric_acid', 
+            H2SO4=93,
+            Water=7,
+            price=scenario.H2SO4_price
+        )
+        tank = cellulosic.SulfuricAcidTank(ins=sulfuric_acid)
+        pump = bst.Pump(ins=tank-0, P=101325 * 10)
+        hx = bst.HXutility(ins=pump-0, T=400, V=0)
+        mixer = bst.Mixer(ins=[dry_whey_storage-0, hx-0])
+        @mixer.add_specification(run=True, impacted_units=[tank])
+        def adjust_flow_and_temperature(hx=hx):
+            # Adjust flow
+            z_target = 0.76 / 2
+            z_H2SO4 = sulfuric_acid.imass['H2SO4'] / sulfuric_acid.F_mass
+            flow_feed = dry_whey_permeate.F_mass
+            # z_H2SO4 * flow_acid + flow_feed = (flow_acid + flow_feed) * z_target
+            # flow_acid = ((flow_acid + flow_feed) * z_target - flow_feed) / z_H2SO4
+            # flow_acid - flow_acid * z_target / z_H2SO4 = (flow_feed * z_target - flow_feed) / z_H2SO4
+            # flow_acid * (1 - z_target / z_H2SO4) = (flow_feed * z_target - flow_feed) / z_H2SO4
+            flow_acid = flow_feed * (1 - z_target) / (z_H2SO4 - z_target)
+            sulfuric_acid.F_mass = flow_acid
+        
+            # Adjust temperature
+            outlet = sulfuric_acid + dry_whey_permeate
+            outlet.T = 70 + 273.15
+            H_final = outlet.H
+            H_feed = dry_whey_permeate.H
+            sulfuric_acid_feed = hx.outs[0]
+            sulfuric_acid_feed.H = H_final - H_feed
+            hx.T = sulfuric_acid_feed.T
+            
+        reactor = bst.SinglePhaseReactor(
+            ins=mixer-0, 
+            reaction=bst.Reaction('Lactose -> GalactoOligosaccharide + Water ', X=0.99, reactant='Lactose'),
+            T=70 + 273.15,
+            batch=False,
+            tau=20 / 60,
+        )
+        dilution_water = bst.Stream('dilution_water', Water=1)
+        pump = bst.Pump(ins=dilution_water, P=101325 * 10)
+        hx = bst.HXutility(ins=pump-0, T=300, V=0)
+        mixer = bst.Mixer(ins=[reactor-0, hx-0])
+        @mixer.add_specification(run=True, impacted_units=[pump])
+        def adjust_flow_and_temperature(hx=hx, feed=reactor-0):
+            flow_feed = feed.F_mass
+            z_target = 0.04
+            z_H2SO4 = feed.imass['H2SO4'] / flow_feed
+            # z_H2SO4 * flow_feed = (flow_water + flow_feed) * z_target
+            # - flow_water * z_target = flow_feed * z_target - z_H2SO4 * flow_feed
+            flow_water = flow_feed * (z_target - z_H2SO4) / (-z_target) 
+            if flow_water <= 0 :
+                dilution_water.empty()
+                return
+            dilution_water.F_mass = flow_water
+            
+            # Adjust temperature
+            outlet = feed + dilution_water
+            outlet.T = 25 + 273.15
+            H_final = outlet.H
+            H_feed = feed.H
+            dilution_water_feed = hx.outs[0]
+            dilution_water_feed.T = 290
+            if dilution_water_feed.H < H_final - H_feed:
+                dilution_water_feed.H = H_final - H_feed
+            hx.T = dilution_water_feed.T
+            
+        hx = bst.HXutility(ins=mixer-0, T=25 + 273, V=0)
+        calcium_carbonate = bst.Stream(
+            'calcium_carbonate', 
+            CaCO3=1,
+            price=scenario.CaCO3_price
+        )
+        calcium_carbonate_storage = bst.StorageTank(ins=calcium_carbonate, tau=7*24)
+        mixer = bst.Mixer(ins=[hx-0, calcium_carbonate_storage-0])
+        @mixer.add_specification(run=True, impacted_units=[calcium_carbonate_storage])
+        def adjust_neutralization(feed=reactor-0):
+            calcium_carbonate.imol['CaCO3'] = feed.imol['H2SO4']
+        
+        reactor = bst.SinglePhaseReactor(
+            ins=mixer-0, 
+            reaction=bst.Reaction('CaCO3 + H2SO4 -> CO2 + CaSO4 + H2O', X=1, reactant='H2SO4'),
+            T=25 + 273.15,
+            batch=False,
+            tau=30 / 60,
+        )
+        centrifuge = bst.SolidsCentrifuge(ins=reactor-0, moisture_content=0.5, split=dict(CaSO4=1))
+        calcium_sulfate = bst.Stream('calcium_sulfate', price=scenario.CaSO4_price)
+        calcium_sulfate_storage = bst.StorageTank(ins=centrifuge-0, outs=calcium_sulfate, tau=7*24)
+        dryer = bst.SprayDryer(ins=centrifuge-1, moisture_content=0.90)
+        product = bst.Stream('product')
+        product_storage = bst.StorageTank(ins=dryer-1, outs=product, tau=7*24)
+        
+    def create_model(self):
+        scenario = self.scenario
+        system = self.system
+        self.tea = create_galacto_oligosaccharide_tea(
+            system, lang_factor=5.03, # Solids/fluid processing plant
+        )
+        self.tea.income_tax = 0.21
+        model = bst.Model(system)
+        parameter = model.parameter
+        metric = model.metric
+        
+        @metric(units='USD/kg')
+        def MSP():
+            return self.tea.solve_price(self.product)
+        
+        return model
 
 class Biorefinery(bst.ProcessModel):
     """
