@@ -13,14 +13,14 @@ from biosteam import Flowsheet as F
 from biosteam import main_flowsheet
 from biosteam import units, Stream, SystemFactory
 from biosteam.process_tools import UnitGroup
-# from biorefineries.ccu._chemicals import chems
+from biorefineries.ccu._chemicals import chems
 from biorefineries.ccu import _units
 
 F = bst.Flowsheet('CO2_methane')
 bst.main_flowsheet.set_flowsheet(F)
 
-# bst.settings.set_thermo(chems)
-bst.settings.set_thermo(['CO2', 'H2', 'CH3OH', 'H2O', 'CO', 'O2'])
+bst.settings.set_thermo(chems)
+# bst.settings.set_thermo(['CO2', 'H2', 'CH3OH', 'H2O', 'CO', 'O2'])
 #%%
 # =============================================================================
 # 1. MeOH production; based on 
@@ -38,6 +38,10 @@ CO2_stream_1 = Stream('CO2_stream_1',
                     phase='g',
                     total_flow=41000,
                     units='m3/hr')
+
+catalyst_Cu_ZnO_Al2O3 = Stream('catalyst_MeOH',
+                               CaO=1,
+                               phase='s')
 
 # CO2 compressing
 ks = [bst.units.IsentropicCompressor(P=3*101325), 
@@ -66,7 +70,8 @@ M1102 = units.Mixer('M1102', ins=(M1101-0, ''), outs='')
 
 H1101 = units.HXprocess('H1101', ins=(M1102-0, ''), outs=('', ''))
 
-R1102 = _units.MeOH_SynthesisReactor('R1102', ins=H1101-0, outs='product')
+R1102 = _units.MeOH_SynthesisReactor('R1102', ins=(H1101-0, catalyst_Cu_ZnO_Al2O3),\
+                                     outs=('product', 'spent_catalyst'))
 
 S1101 = units.Splitter('S1101', ins=R1102-0, outs=(1-H1101, ''), split=0.65)
 
@@ -107,8 +112,8 @@ H1104 = units.HXutility('H1104', ins=C1105-0, outs='', T=40+273.15, rigorous=Tru
 S1104 = units.PhaseSplitter('S1104', ins=H1104-0, outs=('gas_final', 'MeOH'))
 
 sys = bst.main_flowsheet.create_system('MeOH_sys')
-sys.maxiter = 600 # 200 will not lead to convergence
-
+sys.prioritize_unit(M1102) # for recycle
+sys.maxiter = 600 
 sys.simulate()
 
 #%%
@@ -152,7 +157,7 @@ polar_solution = Stream('polar_solution',
 
 
 # Water electrolysis
-R1201 = _units.Electrolyzer('R1102', ins=water_stream_2, outs=('hydrogen_2','oxygen_2'))
+R1201 = _units.Electrolyzer('R1201', ins=water_stream_2, outs=('hydrogen_2','oxygen_2'))
 
 # H2 compressing
 C1201 = units.IsentropicCompressor('C1201', ins=R1201-0, outs='', P=105*101325)

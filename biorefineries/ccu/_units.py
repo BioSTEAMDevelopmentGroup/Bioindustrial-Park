@@ -72,7 +72,7 @@ class Electrolyzer(SanUnit):
 
 # Reactor is modelled as an adiabatic ideal plug flow reactor (PFR)
 class MeOH_SynthesisReactor(bst.units.design_tools.PressureVessel, bst.Unit):
-    _N_ins = _N_outs = 1
+    _N_ins = _N_outs = 2
     
     _units = {**bst.design_tools.PressureVessel._units,
               'Volume': 'ft^3',
@@ -109,24 +109,25 @@ class MeOH_SynthesisReactor(bst.units.design_tools.PressureVessel, bst.Unit):
                 
     
     def _run(self):
-        feed = self.ins[0]
+        feed, fresh_catalyst = self.ins
         feed.phase = 'g'
         feed.T = self.T
-        # breakpoint()
-        effluent = self.outs[0]
+        effluent, spent_catalyst = self.outs
         effluent.copy_like(feed)
         effluent.phase = 'g'
+        fresh_catalyst.imass['CaO'] = self.catalyst_weight = feed.F_mass / self.WHSV
         self.reactions.adiabatic_reaction(effluent)
+        spent_catalyst.copy_like(fresh_catalyst)
         
     def _design(self):
-        feed, = self.ins
-        effluent, = self.outs
+        feed, fresh_catalyst = self.ins
+        effluent, spent_catalyst = self.outs
         length_to_diameter = self.length_to_diameter
         P = effluent.get_property('P', 'psi')
         results = self.design_results
-        catalyst = feed.F_mass / self.WHSV
-        results['Catalyst weight'] = catalyst
-        results['Volume'] = volume = catalyst / self.catalyst_density / (1-self.porosity) * 35.3147 # to ft3
+        
+        results['Catalyst weight'] = self.catalyst_weight
+        results['Volume'] = volume = self.catalyst_weight / self.catalyst_density / (1-self.porosity) * 35.3147 # to ft3
         D = cylinder_diameter_from_volume(volume, length_to_diameter)
         L = length_to_diameter * D
         results.update(self._vessel_design(P, D, L))
