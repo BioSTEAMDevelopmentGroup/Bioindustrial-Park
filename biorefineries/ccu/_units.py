@@ -146,7 +146,7 @@ class MeOH_SynthesisReactor(bst.units.design_tools.PressureVessel, bst.Unit):
 # Reactor is modeled as a CSTR
 class HCOOH_SynthesisReactor(bst.CSTR):
     # based on Process for preparing formic acid by reaction of carbon dioxide with hydrogen
-    _N_ins = 5
+    _N_ins = 7
     _N_outs = 3
     T_default = 93+273.15
     P_default = 5e6
@@ -158,20 +158,23 @@ class HCOOH_SynthesisReactor(bst.CSTR):
             'CO2 + H2 + C18H39N -> C19H41NO2',   'H2',   0.19)
     
     def _run(self):
-        CO2, H2, amine_solution, polar_solution, fresh_catalyst = self.ins
+        CO2, H2, unreacted, amine_wcatalyst, amine_wcatalyst_2, MeOH, fresh_catalyst = self.ins
         vent, effluent, spent_catalyst = self.outs
-        effluent.mix_from([CO2, H2, amine_solution, polar_solution], energy_balance=False)
+        effluent.mix_from([CO2, H2, unreacted, amine_wcatalyst, amine_wcatalyst_2, MeOH], energy_balance=False)
         self.reaction(effluent)
         effluent.T = vent.T = spent_catalyst.T = self.T
-        effluent.P = self.P
+        effluent.P = spent_catalyst.P = self.P
+        
+        fresh_catalyst.P = CO2.P
+
         vent.phase = 'g'
         vent.empty()
         vent.receive_vent(effluent)
         
         # determine catalyst amount; Table 1.3 A12, 0.24 g / 100 g ins.liquid
-        ins_liquid_mass = amine_solution.F_mass + polar_solution.F_mass
+        ins_liquid_mass = unreacted.F_mass + amine_wcatalyst.F_mass + \
+            amine_wcatalyst_2.F_mass + MeOH.F_mass
         
-        spent_catalyst.phase = 's'
         spent_catalyst.imass['DCPE'] = fresh_catalyst.imass['DCPE'] = ins_liquid_mass * 0.0024
         
     def _design(self):
@@ -181,3 +184,34 @@ class HCOOH_SynthesisReactor(bst.CSTR):
         super()._cost()
         
         
+# Adduct decomposed reactor is modelled as an adiabatic ideal plug flow reactor (PFR); imaginary reactor with no cost
+class Adduct_DecomposedReactor(bst.units.design_tools.PressureVessel, bst.Unit):
+    _N_ins = _N_outs = 1
+    
+    _units = {**bst.design_tools.PressureVessel._units,
+              'Volume': 'ft^3',}
+              
+    _F_BM_default = {**bst.design_tools.PressureVessel._F_BM_default,}
+    
+    def __init__(self, ID="", ins=None, outs=(),
+                 T=180+273.15,
+                 P=0.25*101325/6894.76,
+                 vessel_material='Stainless steel 304',
+                 vessel_type='Vertical',
+                 **kwargs):
+            bst.Unit.__init__(self, ID, ins, outs)
+            self.T = T
+            self.P = P
+            self.vessel_material = vessel_material # Vessel material
+            self.vessel_type = vessel_type # 'Horizontal' or 'Vertical'
+            self.reactions = Rxn('C19H41NO2 -> C18H39N + HCOOH',       'C19H41NO2',      1.),
+                
+    def _run(self):
+        feed, = self.ins
+        feed.T = self.T
+        effluent, = self.outs
+        effluent.copy_like(feed)
+        self.reactions.adiabatic_reaction(effluent)
+
+    def _cost(self):
+        pass
