@@ -6,6 +6,7 @@ import numpy as np
 from matplotlib import pyplot as plt
 import biosteam as bst
 import os
+from biosteam.utils import CABBI_colors, colors
 
 __all__ = (
     'plot_MSP_across_capacity_price',

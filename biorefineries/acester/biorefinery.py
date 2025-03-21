@@ -55,11 +55,14 @@ class Biorefinery(bst.ProcessModel):
         carbon_capture: bool = False
         dewatering: bool = False
         decoupled_growth: bool = True
+        biomass: str = 'cornstover' # Alternatively 'miscanthus'
+        hydrogen_price: str = 'full range' # Alternatively 'min' or 'max'
         
         @property
         def name(self):
             name = ''
-            for i, j in self.items():
+            for i in self.__slots__:
+                j = getattr(self, i)
                 if isinstance(j, bool):
                     name += i
                 elif isinstance(j, str):
@@ -71,6 +74,42 @@ class Biorefinery(bst.ProcessModel):
     @property
     def name(self):
         return self.scenario.name
+    
+    @classmethod
+    def as_scenario(cls, scenario):
+        scenario, coupled_growth = scenario.split('-')
+        if coupled_growth == 'coupled':
+            coupled_growth = True
+        elif coupled_growth == 'decoupled':
+            coupled_growth = False
+        else:
+            raise ValueError("scenario must end with either 'coupled' or 'decoupled'")
+        match scenario:
+            case 'all':
+                hydrogen_price = 'full range'
+                return Scenario(
+                    product='Dodecanol',
+                    carbon_capture=False,
+                    dewatering=False,
+                    decoupled_growth=coupled_growth,
+                    biomass='cornstover',
+                    
+                )
+            case 'optimistic':
+                hydrogen_price = 'min'
+            case 'conservative':
+                hydrogen_price = 'max'
+            case _:
+                raise ValueError('invalid scenario')
+        return Scenario(
+            product='Dodecanol',
+            carbon_capture=False,
+            dewatering=False,
+            decoupled_growth=coupled_growth,
+            biomass='cornstover',
+            hydrogen_price=hydrogen_price,
+        )
+        
     
     def optimize(self):
         with catch_warnings(action="ignore"):
@@ -86,17 +125,47 @@ class Biorefinery(bst.ProcessModel):
         return create_acetate_ester_chemicals()
     
     def create_system(self):
-        self.chemicals.define_group(
-            'Biomass', 
-            ['Water', 'Extract', 'Acetate', 'Ash', 'Lignin', 
-             'Protein', 'Glucan', 'Xylan', 'Arabinan', 'Galactan'],
-            [0.2, 0.031964705882352916, 0.004917647058823527, 
-             0.015647058823529406, 0.1616, 0.008270588235294111, 
-             0.3472, 0.2048, 0.0136, 0.012],
-            wt=True,
-        )
-        load_process_settings()
         scenario = self.scenario
+        if scenario.biomass == 'miscanthus':
+            self.chemicals.define_group(
+                'Biomass', 
+                ['Water', 'Extract', 'Acetate', 'Ash', 'Lignin', 
+                 'Protein', 'Glucan', 'Xylan', 'Arabinan', 'Galactan'],
+                [0.2, 0.031964705882352916, 0.004917647058823527, 
+                 0.015647058823529406, 0.1616, 0.008270588235294111, 
+                 0.3472, 0.2048, 0.0136, 0.012],
+                wt=True,
+            )
+        elif scenario.biomass == 'cornstover':
+            self.chemicals.define_group(
+                'Biomass', 
+                ['Water',
+                 'Sucrose',
+                 'Extract',
+                 'Acetate',
+                 'Ash',
+                 'Lignin',
+                 'Protein',
+                 'Glucan',
+                 'Xylan',
+                 'Arabinan',
+                 'Mannan',
+                 'Galactan'],
+                [0.2022,
+                 0.0062,
+                 0.1185,
+                 0.0146,
+                 0.0399,
+                 0.1274,
+                 0.0251,
+                 0.283,
+                 0.1579,
+                 0.0192,
+                 0.0049,
+                 0.0012],
+                wt=True,
+            )
+        load_process_settings()
         system = create_acetyl_ester_system(
             carbon_capture=scenario.carbon_capture,
             dewatering=scenario.dewatering,
@@ -171,7 +240,7 @@ class Biorefinery(bst.ProcessModel):
         @parameter(units='USD/kg', element='H2', bounds=[3, 7],
                    baseline=4.5) # Natural gas 1.5 - 5; Electrolysis 3 - 7
         def set_H2_price(price):
-            self.H2.price = price
+            self.hydrogen.price = price
         
         @parameter(units='g/L', element=self.AcOH_production,
                    bounds=[50, 90], baseline=60)
@@ -209,7 +278,7 @@ class Biorefinery(bst.ProcessModel):
         # def set_electricity_price(price): 
         #     bst.settings.electricity_price = price
         
-        @parameter(units='MT/yr', element='AcEster', bounds=[5000, 50000], baseline=30000)
+        @parameter(units='MT/yr', element='AcEster', bounds=[20000, 50000], baseline=35000)
         def set_production_capacity(production_capacity):
             capacity = production_capacity / system.operating_hours * 1000 # kg / hr
             original = self.AcOH_media.F_mass * self.AcOH_production.titer['AceticAcid'] * self.AcEster_production.reactions[0].product_yield(scenario.product, basis='wt') / 1000
@@ -282,8 +351,24 @@ class Biorefinery(bst.ProcessModel):
         #     CF=1.,
         # )
         if not scenario.dewatering: self.ethyl_acetate = bst.MockStream('ethyl_acetate')
-        self.BT.fuel.set_CF(GWPkey, CFs['Miscanthus'])
-        self.BT.fuel.price = 0.08
+        key = scenario.biomass.capitalize()
+        self.BT.fuel.set_CF(GWPkey, CFs[key])
+        if key == 'Miscanthus':
+            price_ub = 59 / 907.185 * 0.8 # https://www.sciencedirect.com/science/article/pii/S096195340700205X
+            price_lb = 61.98 / 907.185 * 0.8 # https://farmdoc.illinois.edu/fast-tools/biomass-crop-budget-tool-miscanthus-and-switchgrass
+        elif key == 'Cornstover':
+            price_lb = 59 / 907.185 * 0.8 # Humbird NREL 2011 cellulosic ethanol
+            price_ub = 64.96 / 907.185 * 0.8 # https://www.extension.purdue.edu/extmedia/ec/re-3-w.pdf
+        else:
+            raise ValueError('invalid biomass')
+        self.BT.fuel.price = price_baseline = 0.5 * (price_lb + price_ub)
+        
+        @parameter(units='USD/MT', element='biomass', 
+                   bounds=[price_lb * 1000, price_ub * 1000], 
+                   baseline=price_baseline * 1000)
+        def set_biomass_price(price):
+            self.BT.fuel.price = price / 1000
+        
         self.hydrogen.set_CF(GWPkey, CFs['H2'])
         self.hexane.set_CF(GWPkey, CFs['Hexane'])
         self.ethyl_acetate.set_CF(GWPkey, CFs['Ethyl acetate'])
@@ -293,25 +378,59 @@ class Biorefinery(bst.ProcessModel):
             return self.tea.solve_price(self.product)
         
         @metric(units='kg*CO2e/kg')
-        def GWP():
+        def carbon_intensity():
             return (
                 self.system.get_net_impact(GWPkey)
                 / self.system.get_mass_flow(self.product)
             )
         
-        @metric(units='MMUSD')
+        @metric(units='10^6 USD')
         def TCI():
             return self.tea.TCI / 1e6
         
+        @metric(units='wt %')
+        def product_yield_to_biomass():
+            return self.product.F_mass / self.BT.fuel.F_mass
+        
+        @metric(units='% theoretical')
+        def product_yield_to_hydrogen():
+            return self.product.get_atomic_flow('H') / self.hydrogen.get_atomic_flow('H')
+        
+        @metric(units='10^3 MT/yr')
+        def biomass_burned(): # 825 MT / y for NREL's cornstover model
+            return self.BT.fuel.F_mass * self.system.operating_hours / 1e6
+        
+        @metric(units='10^3 MT/yr')
+        def hydrogen_consumption(): 
+            return self.hydrogen.F_mass * self.system.operating_hours / 1e6
+        
+        @metric(units='kWh/kg-H2')
+        def electricity_demand(): 
+            return self.system.get_electricity_production() / (self.product.F_mass * self.system.operating_hours)
+        
         for i in model.parameters:
             if i.distribution is None: i.distribution = cp.Uniform(*i.bounds)
-        if scenario in self.pseudo_optimal_design_decisions:
-            optimal_values = self.pseudo_optimal_design_decisions[scenario]
+        key = (scenario.carbon_capture, scenario.dewatering)
+        if key in self.pseudo_optimal_design_decisions:
+            optimal_values = self.pseudo_optimal_design_decisions[key]
             for i, j in zip(model.optimized_parameters, optimal_values): 
                 i.baseline = j
                 i.setter(j)
         else:
-            self.pseudo_optimal_design_decisions[scenario] = self.optimize().x
+            self.pseudo_optimal_design_decisions[key] = self.optimize().x
+        
+        match scenario.hydrogen_price:
+            case 'min':
+                set_H2_price.active = False
+                set_H2_price.baseline = set_H2_price.bounds[0]
+            case 'max':
+                set_H2_price.active = False
+                set_H2_price.baseline = set_H2_price.bounds[1]
+            case 'full range':
+                pass
+            case _:
+                raise ValueError('invalid hydrogen price')
+        
         return model
 
     def key_flows(self):
@@ -336,7 +455,7 @@ class Biorefinery(bst.ProcessModel):
             'Exhaust': comps(self.CC.outs[1], ['H2O', 'O2', 'N2']),
             'CO2': total(self.CO2),
             'Recycled CO2': comps(self.AcEster_production.outs[0], ['CO2', 'H2O', 'O2', 'N2']),
-            'H2': total(self.system.flowsheet.stream.H2),
+            'H2': total(self.system.flowsheet.stream.hydrogen),
             'Unreacted H2': comps(self.AcOH_production.outs[0], ['H2', 'CO2', 'H2O', 'O2', 'N2']),
             'Dilute AcOH': comps(self.AcOH_production.outs[1], ['AceticAcid', 'H2O']),
             'Ethyl acetate': total(self.ethyl_acetate),
@@ -351,12 +470,5 @@ class Biorefinery(bst.ProcessModel):
 
 Scenario = Biorefinery.Scenario
 Biorefinery.pseudo_optimal_design_decisions = {
-    Scenario(
-        carbon_capture=False, dewatering=False,
-        decoupled_growth=False, product='Dodecanol'
-    ): np.array([12. , 12. ,  0.6]),
-    Scenario(
-        carbon_capture=False, dewatering=False,
-        decoupled_growth=True, product='Dodecanol'
-    ): np.array([12. , 12. ,  0.6]),
+    (False, False): np.array([12. , 12. ,  0.6]),
 }

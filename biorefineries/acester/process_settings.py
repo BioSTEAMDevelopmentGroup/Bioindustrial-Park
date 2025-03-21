@@ -11,6 +11,7 @@ characterization_factors = {
     # 'Electricity': 0.38, # [kg*CO2*eq / kWhr] From GREET 2020; NG-Fired Simple-Cycle Gas Turbine CHP Plant
     # 'H2': 9.5012, # [kg*CO2*eq / kg] From GREET 2022; Compressed G.H2 produced from natural gas
     'H2': 1.8023, # [kg*CO2*eq / kg] From GREET 2022; Compressed G.H2 produced from PEM electrolysis (solar or wind)
+    'Cornstover': 0.03819, # [kg*CO2*eq / kg] From GREET 2023; Miscanthus for ethanol production
     'Miscanthus': 0.07606, # [kg*CO2*eq / kg] From GREET 2023; Miscanthus for ethanol production
     'Flue gas': -0.07134147183700712, # [kg*CO2*eq / kg] Assume C is displaced from flue gas
     'Natural gas': 0.33, # Natural gas from shell conventional recovery, GREET; includes non-biogenic emissions

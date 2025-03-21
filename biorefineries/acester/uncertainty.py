@@ -14,9 +14,12 @@ from matplotlib import pyplot as plt
 from SALib.analyze import sobol
 import matplotlib.patches as mpatches
 from colorpalette import Color
+from biorefineries import acester
+import seaborn as sns
 import yaml
 
 __all__ = ('run_monte_carlo', 
+           'run_all_monte_carlo',
            'plot_spearman', 
            'plot_kde',
            'plot_spearman_both',
@@ -52,31 +55,77 @@ def autoload_file_name(name, N):
     filename = name + '_' + str(N)
     return os.path.join(results_folder, filename)
 
-def set_font(size=8, family='sans-serif', font='Arial'):
-    import matplotlib
-    fontkwargs = {'size': size}
-    matplotlib.rc('font', **fontkwargs)
-    params = matplotlib.rcParams
-    params['font.' + family] = font
-    params['font.family'] = family
+def plot_monte_carlo():
+    bst.plots.set_font(size=10, family='sans-serif', font='Arial')
+    bst.plots.set_figure_size(aspect_ratio=1.05)
+    fig, axes = _plot_monte_carlo(
+    )
+    for ax, letter in zip(axes, 'ABCDEFGHIJ'):
+        plt.sca(ax)
+        ylb, yub = plt.ylim()
+        plt.text(7.8, ylb + (yub - ylb) * 0.92, letter, color=letter_color,
+                 horizontalalignment='center',verticalalignment='center',
+                 fontsize=10, fontweight='bold')
+    plt.subplots_adjust(left=0.12, right=0.95, wspace=0.40, top=0.98, bottom=0.2)
+    for i in ('svg', 'png'):
+        file = os.path.join(images_folder, f'montecarlo_absolute.{i}')
+        plt.savefig(file, transparent=True)
 
-def set_figure_size(width=None, aspect_ratio=None, units=None): 
-    # units default to inch
-    # width defaults 6.614 inches
-    # aspect ratio defaults to 0.65
-    if aspect_ratio is None:
-        aspect_ratio = 0.65
-    if width is None:
-        width = 6.6142
-    elif width == 'half':
-        width = 6.6142 / 2
-    else:
-        if units is not None:
-            from thermosteam.units_of_measure import convert
-            width = convert(width, units, 'inch')
-    import matplotlib
-    params = matplotlib.rcParams
-    params['figure.figsize'] = (width, width * aspect_ratio)
+def _plot_monte_carlo():
+    Biorefinery = acester.Biorefinery
+    scenario_names = ['all', 'optimistic', 'conservative']
+    model_pairs = [
+        (name, 
+         Biorefinery(name + '-coupled', simulate=False), 
+         Biorefinery(name + '-decoupled', simulate=False)) 
+        for name in scenario_names
+    ]
+    metrics = [
+        ['MSP', 'carbon_intensity'], 
+        ['TCI', 'electricity_demand'],
+        ['product_yield_to_hydrogen', 'product_yield_to_biomass'],
+        ['hydrogen_consumption', 'biomass_burned'],
+    ]
+    pm = acester.Biorefinery(simulate=False)
+    # Subplots
+    nrows = len(metrics)
+    ncols = len(metrics[0])
+    fig, axes_box = plt.subplots(ncols=ncols, nrows=nrows)
+    plt.subplots_adjust(wspace=0.45)
+    axes = axes_box.transpose()
+    axes = axes.flatten()
+    pm = model_pairs[0][0]
+    df = get_monte_carlo(pm, pm.MSP.index)
+    N = 3
+    nsamples = df.shape[0]
+    M = nsamples * len(scenario_names) * 2
+    for i in range(nrows):
+        for j in range(ncols):
+            metric = getattr(pm, metrics[i][j])
+            metric_index = metric.index
+            columns = ['subspace', 'coupled', metric.label(element=False).replace(' [', '\n[')]
+            data = np.zeros([M, N])
+            df = pd.DataFrame(
+                data=data, columns=columns
+            )
+            for i, (name, coupled, decoupled) in enumerate(model_pairs):
+                lower_index = 2*i*nsamples
+                medium_index = lower_index + nsamples
+                upper_index = medium_index + nsamples
+                rowslice = slice(lower_index, medium_index)
+                data[rowslice, metric] = get_monte_carlo(coupled.name, metric_index)
+                data[rowslice, 'coupled'] = True
+                rowslice = slice(medium_index, upper_index)
+                data[rowslice, metric] = get_monte_carlo(decoupled.name, metric_index)
+                data[rowslice, 'coupled'] = False
+                rowslice = slice(lower_index, upper_index)
+                data[rowslice, 'subspace'] = name
+            axis = axes_box[i, j]
+            plt.sca(axis)
+            sns.violinplot(data=df, x='subspace', y=metric, hue='coupled', split=True, gap=.1)
+    
+    fig.align_ylabels(axes)
+    return fig, axes
 
 def get_spearman_names(parameters):
     name = 'name'
@@ -256,8 +305,8 @@ def get_optimized_parameters_table():
     return table
 
 def plot_spearman_both(carbon_capture=True, dewatering=True, **kwargs):
-    set_font(size=12)
-    set_figure_size(aspect_ratio=1, width=6.6142 * 0.7)
+    bst.plots.set_font(size=12)
+    bst.plots.set_figure_size(aspect_ratio=1, width=6.6142 * 0.7)
     labels = ['TEA', 'LCA']
     br = ace.Biorefinery(simulate=False, carbon_capture=carbon_capture, dewatering=dewatering)
     rhos = []
@@ -314,8 +363,8 @@ def plot_spearman_both(carbon_capture=True, dewatering=True, **kwargs):
     return fig, ax
 
 def plot_spearman(kind=None, carbon_capture=True, dewatering=True, **kwargs):
-    set_font(size=10)
-    set_figure_size(aspect_ratio=0.8)
+    bst.plots.set_font(size=10)
+    bst.plots.set_figure_size(aspect_ratio=0.8)
     if kind is None: kind = 'TEA'
     br = ace.Biorefinery(
         simulate=False, 
@@ -344,8 +393,14 @@ def plot_spearman(kind=None, carbon_capture=True, dewatering=True, **kwargs):
                                          **kwargs)
     return fig, ax
 
+def run_all_monte_carlo():
+    for scenario in ['all', 'optimistic', 'conservative']:
+        for config in ['coupled', 'decoupled']:
+            run_monte_carlo(scenario=f'{scenario}-{config}')
+
 def run_monte_carlo(
-        N=2000, rule='L',
+        scenario,
+        N=10, rule='L',
         sample_cache={},
         autosave=True,
         autoload=True,
@@ -357,8 +412,7 @@ def run_monte_carlo(
     filterwarnings('ignore')
     br = ace.Biorefinery(
         simulate=False, 
-        carbon_capture=carbon_capture,
-        dewatering=dewatering,
+        scenario=scenario,
     )
     br.model.exception_hook = 'raise'
     
@@ -456,12 +510,11 @@ def plot_sobol(names, categories, df, colors=None, hatches=None,
     
 def get_monte_carlo(scenario, features, cache={}, dropna=True):
     if isinstance(scenario, ace.Scenario):
-        key = (scenario.carbon_capture, scenario.dewatering)
-        if key in cache:
-            df = cache[key]
+        if scenario in cache:
+            df = cache[scenario]
         else:
             file = monte_carlo_file_name(scenario.name)
-            cache[key] = df = pd.read_excel(file, header=[0, 1], index_col=[0])
+            cache[scenario] = df = pd.read_excel(file, header=[0, 1], index_col=[0])
             df = df[features]    
     elif isinstance(scenario, bst.ScenarioComparison):
         left = get_monte_carlo(scenario.left, features, dropna=False)
@@ -668,8 +721,8 @@ def _plot_kde(scenario, xticks=None, yticks=None,
              top_right=None, bottom_left=None,
              bottom_right='', fs=None, ticklabels=True, aspect_ratio=1.1,
              rotate_quadrants=0):
-    set_font(size=fs or 8)
-    set_figure_size(width='half', aspect_ratio=aspect_ratio)
+    bst.plots.set_font(size=fs or 8)
+    bst.plots.set_figure_size(width='half', aspect_ratio=aspect_ratio)
     br = ace.Biorefinery(simulate=False)
     metrics = [br.GWP.index, br.MSP.index]
     Xi, Yi = [i for i in metrics]
@@ -705,8 +758,8 @@ def plot_kde_2d_comparison(
     ):
     if xlabel is None: xlabel = r'Carbon intensity $[\mathrm{kgCO2e} \cdot \mathrm{kg}^{\mathrm{-1}}]$'
     if ylabel is None: ylabel = r'MSP $[\mathrm{USD} \cdot \mathrm{kg}^{\mathrm{-1}}]$'
-    set_font(size=fs or 8)
-    set_figure_size(aspect_ratio=aspect_ratio)
+    bst.plots.set_font(size=fs or 8)
+    bst.plots.set_figure_size(aspect_ratio=aspect_ratio)
     br = ace.Biorefinery(simulate=False)
     metrics = [br.GWP.index, br.MSP.index]
     Xi, Yi = [i for i in metrics]

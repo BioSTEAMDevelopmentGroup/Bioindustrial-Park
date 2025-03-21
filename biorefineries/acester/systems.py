@@ -41,7 +41,7 @@ __all__ = (
     ID='acetyl_ester_sys',
     ins=[dict(ID='AcOH_media',  Water=100000, units='kg/hr'),
          dict(ID='AcEster_media',  Water=1000, units='kg/hr'),
-         dict(ID='H2', H2=100, P=101325e1, price=2)],
+         dict(ID='hydrogen', H2=100, P=101325e1, price=2)],
     outs=[dict(ID='product', price=3)],
     fthermo=create_acetate_ester_chemicals
 )
@@ -128,15 +128,15 @@ def create_acetyl_ester_system(
     # Biomass yield from glucose (preliminary assumption is 67%).
     rxn = bst.Rxn(f'AceticAcid -> {product} + H2O + CO2', reactant='AceticAcid',
                   X=0.9, correct_atomic_balance=True) 
+    product_to_biomass = 0.7 # g product / g biomass required
     if decoupled_growth:
         maintenance = bst.Rxn(
             'AceticAcid + O2 -> H2O + CO2', reactant='AceticAcid',
             X=1. - 1e-6, correct_atomic_balance=True
         ) 
         growth = bst.Rxn('Glucose -> Cellmass + CO2 + H2O', reactant='Glucose',
-                         X=0.5, correct_atomic_balance=True) 
+                         X=1. - 1e-6, correct_atomic_balance=True) 
         seedtrain_reactions = growth
-        seedtrain_reactions.X = 1. - 1e-6
         bioreactor_reactions = bst.SeriesReaction([rxn, maintenance])
         # Assume sugar from cornstover dilute acid (2016 study by Engelberth). DOI: 10.1002/bbb.1976
         seedtrain_feed = bst.Stream(Water=90, Glucose=10, units='kg/hr', price=0.1 * 0.18)
@@ -152,7 +152,12 @@ def create_acetyl_ester_system(
         
         @mixer.add_specification(run=True)
         def adjust_feed():
-            glucose = 0.07 * AcOH.imass['AceticAcid']
+            glucose_to_substrate = (
+                rxn.product_yield(product, 'wt') # g product / g acetate
+                / product_to_biomass # g product / g biomass
+                / growth.product_yield('Cellmass', 'wt') # g biomass / g glucose
+            ) # g glucose / g acetate
+            glucose = AcOH.imass['AceticAcid'] * glucose_to_substrate
             seedtrain_feed.imass['Water', 'Glucose'] = [9 * glucose, glucose]
             seedtrain._run()
     else:
@@ -165,6 +170,15 @@ def create_acetyl_ester_system(
         seedtrain_reactions = growth
         bioreactor_reactions = bst.SeriesReaction([rxn, growth_maintenance])
         splitter = bst.Splitter(ins=mixer-0, split=0.07)
+        @splitter.add_specification(run=True)
+        def adjust_feed():
+            # 0.7 g product / g biomass required
+            seed_to_ferm_ratio = (
+                rxn.product_yield(product, 'wt') # g product / g acetate-ferm
+                / product_to_biomass # g product / g biomass
+                / growth.product_yield('Cellmass', 'wt') # g biomass / g acetate-seed
+            ) # g seed / g fermented
+            splitter.split[:] = 1 / (seed_to_ferm_ratio + 1)
         seedtrain = SeedTrain(
             ins=splitter-0,
             reactions=seedtrain_reactions,
