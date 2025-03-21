@@ -146,7 +146,9 @@ class LCA:
     @property
     def emissions(self):
         emissions = list(self.system.products)
-        for i in self.products: emissions.remove(i)
+        for i in self.products: 
+            if i in emissions:
+                emissions.remove(i)
         return emissions
     
     @property
