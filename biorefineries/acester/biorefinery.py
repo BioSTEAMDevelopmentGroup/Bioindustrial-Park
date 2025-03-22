@@ -54,7 +54,7 @@ class Biorefinery(bst.ProcessModel):
         product: str = 'Dodecanol'
         carbon_capture: bool = False
         dewatering: bool = False
-        decoupled_growth: bool = True
+        glucose_growth: bool = True
         biomass: str = 'cornstover' # Alternatively 'miscanthus'
         hydrogen_price: str = 'full range' # Alternatively 'min' or 'max'
         
@@ -77,11 +77,11 @@ class Biorefinery(bst.ProcessModel):
     
     @classmethod
     def as_scenario(cls, scenario):
-        scenario, coupled_growth = scenario.split('-')
-        if coupled_growth == 'coupled':
-            coupled_growth = True
-        elif coupled_growth == 'decoupled':
-            coupled_growth = False
+        scenario, glucose_growth = scenario.split('/')
+        if glucose_growth == 'glucose growth':
+            glucose_growth = True
+        elif glucose_growth == 'acetate growth':
+            glucose_growth = False
         else:
             raise ValueError("scenario must end with either 'coupled' or 'decoupled'")
         match scenario:
@@ -91,7 +91,7 @@ class Biorefinery(bst.ProcessModel):
                     product='Dodecanol',
                     carbon_capture=False,
                     dewatering=False,
-                    decoupled_growth=coupled_growth,
+                    glucose_growth=glucose_growth,
                     biomass='cornstover',
                     
                 )
@@ -105,7 +105,7 @@ class Biorefinery(bst.ProcessModel):
             product='Dodecanol',
             carbon_capture=False,
             dewatering=False,
-            decoupled_growth=coupled_growth,
+            glucose_growth=glucose_growth,
             biomass='cornstover',
             hydrogen_price=hydrogen_price,
         )
@@ -169,7 +169,7 @@ class Biorefinery(bst.ProcessModel):
         system = create_acetyl_ester_system(
             carbon_capture=scenario.carbon_capture,
             dewatering=scenario.dewatering,
-            decoupled_growth=scenario.decoupled_growth,
+            glucose_growth=scenario.glucose_growth,
             product=scenario.product,
         )
         self.tea = create_tea(

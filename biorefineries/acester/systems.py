@@ -47,7 +47,7 @@ __all__ = (
 )
 def create_acetyl_ester_system(
         ins, outs, 
-        decoupled_growth=True,
+        glucose_growth=True,
         carbon_capture=False, 
         dewatering=False, 
         product='Dodecanol',
@@ -129,21 +129,20 @@ def create_acetyl_ester_system(
     rxn = bst.Rxn(f'AceticAcid -> {product} + H2O + CO2', reactant='AceticAcid',
                   X=0.9, correct_atomic_balance=True) 
     product_to_biomass = 0.7 # g product / g biomass required
-    if decoupled_growth:
+    if glucose_growth:
         maintenance = bst.Rxn(
             'AceticAcid + O2 -> H2O + CO2', reactant='AceticAcid',
             X=1. - 1e-6, correct_atomic_balance=True
         ) 
         growth = bst.Rxn('Glucose -> Cellmass + CO2 + H2O', reactant='Glucose',
                          X=1. - 1e-6, correct_atomic_balance=True) 
-        seedtrain_reactions = growth
         bioreactor_reactions = bst.SeriesReaction([rxn, maintenance])
         # Assume sugar from cornstover dilute acid (2016 study by Engelberth). DOI: 10.1002/bbb.1976
         seedtrain_feed = bst.Stream(Water=90, Glucose=10, units='kg/hr', price=0.1 * 0.18)
         seedtrain_feed.set_CF('GWP', 52.9e-3)
         seedtrain = SeedTrain(
             ins=seedtrain_feed,
-            reactions=seedtrain_reactions,
+            reactions=growth,
         )
         mixer.ins.append(seedtrain-1)
         bioreactor_feed = mixer-0
@@ -163,12 +162,9 @@ def create_acetyl_ester_system(
     else:
         growth = bst.Rxn('AceticAcid -> Cellmass + CO2 + H2O', reactant='AceticAcid',
                          X=0.5, correct_atomic_balance=True) 
-        combustion = bst.Rxn('AceticAcid + O2 -> H2O + CO2', reactant='AceticAcid',
-                             X=0.5, correct_atomic_balance=True) 
-        growth_maintenance = growth + combustion
-        growth_maintenance.X = 1. - 1e-6
-        seedtrain_reactions = growth
-        bioreactor_reactions = bst.SeriesReaction([rxn, growth_maintenance])
+        maintenance = bst.Rxn('AceticAcid + O2 -> H2O + CO2', reactant='AceticAcid',
+                             X=1. - 1e-6, correct_atomic_balance=True) 
+        bioreactor_reactions = bst.SeriesReaction([rxn, maintenance])
         splitter = bst.Splitter(ins=mixer-0, split=0.07)
         @splitter.add_specification(run=True)
         def adjust_feed():
@@ -181,7 +177,7 @@ def create_acetyl_ester_system(
             splitter.split[:] = 1 / (seed_to_ferm_ratio + 1)
         seedtrain = SeedTrain(
             ins=splitter-0,
-            reactions=seedtrain_reactions,
+            reactions=growth,
         )
         seed_mixer = bst.Mixer(ins=[seedtrain-1, splitter-1])
         bioreactor_feed = seed_mixer-0

@@ -20,6 +20,7 @@ import yaml
 
 __all__ = ('run_monte_carlo', 
            'run_all_monte_carlo',
+           'plot_monte_carlo',
            'plot_spearman', 
            'plot_kde',
            'plot_spearman_both',
@@ -76,8 +77,8 @@ def _plot_monte_carlo():
     scenario_names = ['all', 'optimistic', 'conservative']
     model_pairs = [
         (name, 
-         Biorefinery(name + '-coupled', simulate=False), 
-         Biorefinery(name + '-decoupled', simulate=False)) 
+         Biorefinery(scenario=name + '-glucose growth', simulate=False), 
+         Biorefinery(scenario=name + '-acetate growth', simulate=False)) 
         for name in scenario_names
     ]
     metrics = [
@@ -94,8 +95,8 @@ def _plot_monte_carlo():
     plt.subplots_adjust(wspace=0.45)
     axes = axes_box.transpose()
     axes = axes.flatten()
-    pm = model_pairs[0][0]
-    df = get_monte_carlo(pm, pm.MSP.index)
+    pm = model_pairs[0][1]
+    df = get_monte_carlo(pm.scenario, pm.MSP.index)
     N = 3
     nsamples = df.shape[0]
     M = nsamples * len(scenario_names) * 2
@@ -103,26 +104,26 @@ def _plot_monte_carlo():
         for j in range(ncols):
             metric = getattr(pm, metrics[i][j])
             metric_index = metric.index
-            columns = ['subspace', 'coupled', metric.label(element=False).replace(' [', '\n[')]
+            columns = ['subspace', 'growth substrate', metric.label(element=False).replace(' [', '\n[')]
             data = np.zeros([M, N])
             df = pd.DataFrame(
                 data=data, columns=columns
             )
-            for i, (name, coupled, decoupled) in enumerate(model_pairs):
+            for i, (name, pm_glucose, pm_acetate) in enumerate(model_pairs):
                 lower_index = 2*i*nsamples
                 medium_index = lower_index + nsamples
                 upper_index = medium_index + nsamples
                 rowslice = slice(lower_index, medium_index)
-                data[rowslice, metric] = get_monte_carlo(coupled.name, metric_index)
-                data[rowslice, 'coupled'] = True
+                data[rowslice, metric] = get_monte_carlo(pm_glucose.scenario, metric_index)
+                data[rowslice, 'growth substrate'] = 'glucose'
                 rowslice = slice(medium_index, upper_index)
-                data[rowslice, metric] = get_monte_carlo(decoupled.name, metric_index)
-                data[rowslice, 'coupled'] = False
+                data[rowslice, metric] = get_monte_carlo(pm_acetate.scenario, metric_index)
+                data[rowslice, 'growth substrate'] = 'acetate'
                 rowslice = slice(lower_index, upper_index)
                 data[rowslice, 'subspace'] = name
             axis = axes_box[i, j]
             plt.sca(axis)
-            sns.violinplot(data=df, x='subspace', y=metric, hue='coupled', split=True, gap=.1)
+            sns.violinplot(data=df, x='subspace', y=metric, hue='growth substrate', split=True, gap=.1)
     
     fig.align_ylabels(axes)
     return fig, axes
@@ -395,7 +396,7 @@ def plot_spearman(kind=None, carbon_capture=True, dewatering=True, **kwargs):
 
 def run_all_monte_carlo():
     for scenario in ['all', 'optimistic', 'conservative']:
-        for config in ['coupled', 'decoupled']:
+        for config in ['glucose growth', 'acetate growth']:
             run_monte_carlo(scenario=f'{scenario}-{config}')
 
 def run_monte_carlo(
@@ -521,7 +522,7 @@ def get_monte_carlo(scenario, features, cache={}, dropna=True):
         right = get_monte_carlo(scenario.right, features, dropna=False)
         df = left - right
     else:
-        raise ValueError('invalid scenariouration')
+        raise ValueError('invalid scenario')
     if dropna: df = df.dropna(how='all', axis=0)
     return df
 

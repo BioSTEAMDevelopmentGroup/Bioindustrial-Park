@@ -11,7 +11,7 @@ setup(
     name='biorefineries',
     packages=['biorefineries'],
     license='MIT',
-    version='2.33.0',
+    version='2.34.0',
     description="Biorefinery models in BioSTEAM",
     long_description=open('README.rst', encoding='utf-8').read(),
     author='Yoel Cortes-Pena',
