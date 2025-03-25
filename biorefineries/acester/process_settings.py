@@ -27,6 +27,8 @@ def load_process_settings():
     # )
     settings.CEPCI = 816.0 # 2022
     # settings.electricity_price = 0.07
+    cw = settings.get_cooling_agent("cooling_water")
+    cw.set_property('T', 70, 'degF') # https://www.sciencedirect.com/topics/earth-and-planetary-sciences/cooling-tower
     hps = settings.get_heating_agent("high_pressure_steam")
     hps.heat_transfer_efficiency = 0.85
     # hps.regeneration_price = 0.08064

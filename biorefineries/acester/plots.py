@@ -11,8 +11,9 @@ from biosteam.utils import CABBI_colors, colors
 __all__ = (
     'plot_MSP_across_capacity_price',
     'plot_MSP_across_titer_productivity_AcOH',
-    'plot_MSP_across_yield_productivity_AcEster',
-    'plot_MSP_across_AcOH_titer_AcEster_yield',
+    'plot_MSP_across_yield_productivity_oleochemical',
+    'plot_MSP_across_AcOH_titer_oleochemical_yield',
+    'plot_MSP_across_oleochemical_yield',
 )
 
 results_folder = os.path.join(os.path.dirname(__file__), 'results')
@@ -63,45 +64,121 @@ def MSP_GWP_at_AcOH_titer_productivity(titer, productivity, biorefinery):
     biorefinery.system.simulate()
     return np.array([biorefinery.MSP(), biorefinery.GWP()])
 
-def MSP_GWP_at_AcEster_yield_productivity(yield_, productivity, biorefinery):
-    biorefinery.set_AcEster_yield.setter(yield_)
-    biorefinery.set_AcEster_productivity.setter(productivity)
-    biorefinery.system.simulate()
-    return np.array([biorefinery.MSP(), biorefinery.GWP()])
+def MSP_GWP_at_oleochemical_yield_productivity(yield_, productivity, biorefineries):
+    values = np.zeros([2, len(biorefineries)])
+    for i, biorefinery in enumerate(biorefineries):
+        biorefinery.set_oleochemical_production_phase_yield.setter(yield_)
+        biorefinery.set_oleochemical_productivity.setter(productivity)
+        biorefinery.system.simulate()
+        values[:, i] = [biorefinery.MSP(), biorefinery.carbon_intensity()]
+    return values
 
-def MSP_GWP_at_AcOH_titer_AcEster_yield(titer, yield_, biorefinery):
-    biorefinery.set_AcOH_titer.setter(titer)
-    biorefinery.set_AcEster_yield.setter(yield_)
-    biorefinery.system.simulate()
-    return np.array([biorefinery.MSP(), biorefinery.GWP()])
+def MSP_GWP_at_AcOH_titer_oleochemical_yield(titer, yield_, biorefineries):
+    values = np.zeros([2, len(biorefineries)])
+    for i, biorefinery in enumerate(biorefineries):
+        biorefinery.set_AcOH_titer.setter(titer)
+        biorefinery.set_oleochemical_production_phase_yield.setter(yield_)
+        biorefinery.system.simulate()
+        values[:, i] = [biorefinery.MSP(), biorefinery.carbon_intensity()]
+    return values
 
-def plot_MSP_across_AcOH_titer_AcEster_yield(load=True):
-    bst.plots.set_font(size=11, family='sans-serif', font='Arial')
-    biorefinery = Biorefinery(simulate=False)
-    xlim = np.array(biorefinery.set_AcOH_titer.bounds)
-    ylim = np.array(biorefinery.set_AcEster_yield.bounds)
+def MSP_GWP_at_oleochemical_yield(biomass, yield_, biorefineries):
+    values = np.zeros([2, len(biorefineries)])
+    for i, biorefinery in enumerate(biorefineries):
+        biorefinery.set_oleochemical_cell_demand.setter(biomass)
+        biorefinery.set_oleochemical_production_phase_yield.setter(yield_)
+        biorefinery.system.simulate()
+        values[:, i] = [biorefinery.MSP(), biorefinery.carbon_intensity()]
+    return values
+
+def plot_MSP_across_oleochemical_yield(load=True):
+    from warnings import filterwarnings
+    filterwarnings('ignore')
+    bst.plots.set_font(size=10, family='sans-serif', font='Arial')
+    biorefineries = [
+        Biorefinery(simulate=False, scenario=f'all fermentation-{i} growth')
+        for i in ('glucose', 'acetate')    
+    ]
+    br = biorefineries[0]
+    xlim = np.array(br.set_oleochemical_cell_demand.bounds)
+    ylim = np.array(br.set_oleochemical_production_phase_yield.bounds)
     X, Y, Z = bst.plots.generate_contour_data(
-        MSP_GWP_at_AcOH_titer_AcEster_yield,
-        file=os.path.join(results_folder, 'MSP_GWP_AcOH_titer_AcEster_yield.npy'),
+        MSP_GWP_at_oleochemical_yield,
+        file=os.path.join(results_folder, 'MSP_GWP_oleochemical_yield.npy'),
         load=load, save=True,
         xlim=xlim, ylim=ylim,
-        args=(biorefinery,),
-        n=10,
+        args=(biorefineries,),
+        n=4,
     )
+    # Z = np.swapaxes(Z, 2, 3)
     # Plot contours
-    ylabel = 'AcEster Yield\n[% theoretical]'
-    yticks = [50, 60, 70, 80, 90]
+    ylabel = 'Yield [% theoretical]'
+    yticks = [40, 50, 60, 70, 80, 90]
+    xlabel = br.set_oleochemical_cell_demand.label(element=False).replace('Cell demand', 'Specific yield')
+    xticks = [0.7, 1.4, 2.1, 2.8, 3.5]
+    metric_bars = [
+        bst.plots.MetricBar(
+            # '', '',
+            'Minimum selling price', '$[\mathrm{USD} \cdot \mathrm{kg}^{\mathrm{-1}}]$', 
+            plt.cm.get_cmap('viridis_r'), 
+            bst.plots.rounded_tickmarks_from_data(Z[:, :, 0, :], 5, 1, expand=0, p=1), 
+            15, 1, ylabelkwargs=dict(size=10), shrink=1.0,
+            title_position='horizontal',
+        ),
+        bst.plots.MetricBar(
+            # '', '',
+            'Carbon intensity', '$[\mathrm{kg} \cdot \mathrm{CO}_{\mathrm{2}}\mathrm{e} \cdot \mathrm{kg}^{\mathrm{-1}}]$',
+            plt.cm.get_cmap('copper_r'), 
+            bst.plots.rounded_tickmarks_from_data(Z[:, :, 1, :], 5, 1, expand=0, p=0.5), 
+            15, 1, ylabelkwargs=dict(size=10, labelpad=10),
+            title_position='horizontal',
+            shrink=1.0, 
+        )
+    ]
+    fig, axes, CSs, CB, other_axes = bst.plots.plot_contour_2d(
+        X, Y, Z, xlabel, ylabel, xticks, yticks, metric_bars,  
+        fillcolor=None, styleaxiskw=[dict(xtick0=True), dict(xtick0=False)], label=True,
+        contour_label_interval=3,
+    )
+    plt.subplots_adjust(left=0.12, right=0.9, wspace=0.15, hspace=0.15, top=0.9, bottom=0.13)
+    for i in ('svg', 'png'):
+        file = os.path.join(images_folder, f'oleochemical_yield_contours.{i}')
+        plt.savefig(file, dpi=900, transparent=True)
+
+def plot_MSP_across_AcOH_titer_oleochemical_yield(load=True):
+    from warnings import filterwarnings
+    filterwarnings('ignore')
+    bst.plots.set_font(size=11, family='sans-serif', font='Arial')
+    biorefineries = [
+        Biorefinery(simulate=False, scenario=f'all fermentation-{i} growth')
+        for i in ('glucose', 'acetate')    
+    ]
+    br = biorefineries[0]
+    xlim = np.array(br.set_AcOH_titer.bounds)
+    ylim = np.array(br.set_oleochemical_production_phase_yield.bounds)
+    X, Y, Z = bst.plots.generate_contour_data(
+        MSP_GWP_at_AcOH_titer_oleochemical_yield,
+        file=os.path.join(results_folder, 'MSP_GWP_AcOH_titer_oleochemical_yield.npy'),
+        load=load, save=True,
+        xlim=xlim, ylim=ylim,
+        args=(biorefineries,),
+        n=6,
+    )
+    # Z = np.swapaxes(Z, 2, 3)
+    # Plot contours
+    ylabel = 'oleochemical Yield\n[% theoretical]'
+    yticks = [40, 50, 60, 70, 80]
     xlabel = 'AcOH Titer [$\mathrm{g} \cdot \mathrm{L}^{\mathrm{-1}}$]'
-    xticks = [50, 60, 70, 80, 90]
+    xticks = [40, 50, 60, 70, 80]
     metric_bars = [
         bst.plots.MetricBar(
             'MSP', '$[\mathrm{USD} \cdot \mathrm{kg}^{\mathrm{-1}}]$', plt.cm.get_cmap('viridis_r'), 
-            bst.plots.rounded_tickmarks_from_data(Z[..., 0], 5, 1, expand=0, p=0.5), 
+            bst.plots.rounded_tickmarks_from_data(Z[:, :, 0, :], 5, 1, expand=0, p=0.5), 
             15, 1, ylabelkwargs=dict(size=12),
         ),
         bst.plots.MetricBar(
             'Carbon intensity', '$[\mathrm{kg} \cdot \mathrm{CO}_{\mathrm{2}}\mathrm{e} \cdot \mathrm{kg}^{\mathrm{-1}}]$', plt.cm.get_cmap('copper_r'), 
-            bst.plots.rounded_tickmarks_from_data(Z[..., 1], 5, 1, expand=0, p=0.5), 
+            bst.plots.rounded_tickmarks_from_data(Z[:, :, 1, :], 5, 1, expand=0, p=0.5), 
             10, 1, ylabelkwargs=dict(size=12),
         )
     ]
@@ -111,7 +188,7 @@ def plot_MSP_across_AcOH_titer_AcEster_yield(load=True):
     )
     plt.subplots_adjust(left=0.2, right=0.9, wspace=0.15, hspace=0.2, top=0.9, bottom=0.15)
     for i in ('svg', 'png'):
-        file = os.path.join(images_folder, f'AcOH_titer_AcEster_yield_contours.{i}')
+        file = os.path.join(images_folder, f'AcOH_titer_oleochemical_yield_contours.{i}')
         plt.savefig(file, dpi=900, transparent=True)
 
 def plot_MSP_across_titer_productivity_AcOH(load=True):
@@ -149,24 +226,28 @@ def plot_MSP_across_titer_productivity_AcOH(load=True):
         fillcolor=None, styleaxiskw=dict(xtick0=False), label=True,
     )
 
-def plot_MSP_across_yield_productivity_AcEster(load=True):
+def plot_MSP_across_yield_productivity_oleochemical(load=True):
     bst.plots.set_font(size=11, family='sans-serif', font='Arial')
-    biorefinery = Biorefinery(simulate=False)
-    xlim = np.array(biorefinery.set_AcEster_yield.bounds)
-    ylim = np.array(biorefinery.set_AcEster_productivity.bounds)
+    biorefineries = [
+        Biorefinery(simulate=False, scenario=f'all fermentation-{i} growth')
+        for i in ('glucose', 'acetate')    
+    ]
+    br = biorefineries[0]
+    xlim = np.array(br.set_oleochemical_production_phase_yield.bounds)
+    ylim = np.array(br.set_oleochemical_productivity.bounds)
     X, Y, Z = bst.plots.generate_contour_data(
-        MSP_GWP_at_AcEster_yield_productivity,
-        file=os.path.join(results_folder, 'MSP_GWP_titer_productivity_AcEster.npy'),
+        MSP_GWP_at_oleochemical_yield_productivity,
+        file=os.path.join(results_folder, 'MSP_GWP_titer_productivity_oleochemical.npy'),
         load=load, save=True,
         xlim=xlim, ylim=ylim,
-        args=(biorefinery,),
+        args=(biorefineries,),
         n=10,
     )
     # Plot contours
-    ylabel = "AcEster Productivity\n[$\mathrm{g} \cdot \mathrm{L}^{\mathrm{-1}} \cdot \mathrm{h}^{\mathrm{-1}}$]"
-    xlabel = 'AcEster Yield [$\mathrm{g} \cdot \mathrm{L}^{\mathrm{-1}}$]'
-    yticks = [0.2, 0.5, 0.8, 1.1, 1.4, 1.7, 2.0]
-    xticks = [50, 60, 70, 80, 90]
+    ylabel = "oleochemical Productivity\n[$\mathrm{g} \cdot \mathrm{L}^{\mathrm{-1}} \cdot \mathrm{h}^{\mathrm{-1}}$]"
+    xlabel = 'oleochemical Yield [$\mathrm{g} \cdot \mathrm{L}^{\mathrm{-1}}$]'
+    yticks = [0.2, 0.4, 0.6, 0.8, 1.0, 1.2]
+    xticks = [40, 50, 60, 70, 80]
     metric_bars = [
         bst.plots.MetricBar(
             'MSP', '[$\mathrm{USD} \cdot \mathrm{kg}^{\mathrm{-1}}$]', plt.cm.get_cmap('viridis_r'), 
@@ -174,7 +255,7 @@ def plot_MSP_across_yield_productivity_AcEster(load=True):
             10, 1, ylabelkwargs=dict(size=12),
         ),
         bst.plots.MetricBar(
-            'GWP', '[$\mathrm{kg} \cdot \mathrm{CO}_{\mathrm{2}}\mathrm{e} \cdot \mathrm{kg}^{\mathrm{-1}}$]', plt.cm.get_cmap('copper_r'), 
+            'Carbon intensity', '[$\mathrm{kg} \cdot \mathrm{CO}_{\mathrm{2}}\mathrm{e} \cdot \mathrm{kg}^{\mathrm{-1}}$]', plt.cm.get_cmap('copper_r'), 
             bst.plots.rounded_tickmarks_from_data(Z[..., 1], 5, 1, expand=0, p=0.5), 
             10, 1, ylabelkwargs=dict(size=12),
         )
@@ -183,3 +264,7 @@ def plot_MSP_across_yield_productivity_AcEster(load=True):
         X, Y, Z, xlabel, ylabel, xticks, yticks, metric_bars,  
         fillcolor=None, styleaxiskw=dict(xtick0=False), label=True,
     )
+    plt.subplots_adjust(left=0.2, right=0.9, wspace=0.15, hspace=0.2, top=0.9, bottom=0.15)
+    for i in ('svg', 'png'):
+        file = os.path.join(images_folder, f'oleochemical_yield_productivity_contours.{i}')
+        plt.savefig(file, dpi=900, transparent=True)

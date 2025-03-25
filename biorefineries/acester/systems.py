@@ -40,7 +40,7 @@ __all__ = (
 @bst.SystemFactory(
     ID='acetyl_ester_sys',
     ins=[dict(ID='AcOH_media',  Water=100000, units='kg/hr'),
-         dict(ID='AcEster_media',  Water=1000, units='kg/hr'),
+         dict(ID='oleochemical_media',  Water=1000, units='kg/hr'),
          dict(ID='hydrogen', H2=100, P=101325e1, price=2)],
     outs=[dict(ID='product', price=3)],
     fthermo=create_acetate_ester_chemicals
@@ -52,7 +52,7 @@ def create_acetyl_ester_system(
         dewatering=False, 
         product='Dodecanol',
     ):
-    AcOH_media, AcEster_media, H2 = ins
+    AcOH_media, oleochemical_media, H2 = ins
     dodecylacetate, = outs
     H2.register_alias('hydrogen')
     dodecylacetate.register_alias('product')
@@ -83,6 +83,7 @@ def create_acetyl_ester_system(
         V_max=3785, # TODO: Double check validity with lanzatech (typically V_max=500)
         theta=0.5,
         kW_per_m3=0.,
+        T=37 + 273.15,
     )
     for i in AcOH_production.gas_coolers: i.cool_only = True
     AcOH_production.productivity = 1 # g / L / h
@@ -122,13 +123,12 @@ def create_acetyl_ester_system(
     else:
         AcOH = centrifuge_a-1
     
-    mixer = bst.Mixer(ins=(AcEster_media, AcOH))
+    mixer = bst.Mixer(ins=(oleochemical_media, AcOH))
     # Parameters needed: 
     # Fraction of AcOH diverted to biomass production (preliminary assumption is 7%).
     # Biomass yield from glucose (preliminary assumption is 67%).
     rxn = bst.Rxn(f'AceticAcid -> {product} + H2O + CO2', reactant='AceticAcid',
                   X=0.9, correct_atomic_balance=True) 
-    product_to_biomass = 0.7 # g product / g biomass required
     if glucose_growth:
         maintenance = bst.Rxn(
             'AceticAcid + O2 -> H2O + CO2', reactant='AceticAcid',
@@ -136,13 +136,16 @@ def create_acetyl_ester_system(
         ) 
         growth = bst.Rxn('Glucose -> Cellmass + CO2 + H2O', reactant='Glucose',
                          X=1. - 1e-6, correct_atomic_balance=True) 
+        growth.product_yield('Cellmass', 'wt', 0.5 * (0.45 + 0.50))
         bioreactor_reactions = bst.SeriesReaction([rxn, maintenance])
+        seedtrain_reactions = bst.SeriesReaction([growth, maintenance])
         # Assume sugar from cornstover dilute acid (2016 study by Engelberth). DOI: 10.1002/bbb.1976
         seedtrain_feed = bst.Stream(Water=90, Glucose=10, units='kg/hr', price=0.1 * 0.18)
         seedtrain_feed.set_CF('GWP', 52.9e-3)
         seedtrain = SeedTrain(
+            T=37 + 273.15,
             ins=seedtrain_feed,
-            reactions=growth,
+            reactions=seedtrain_reactions,
         )
         mixer.ins.append(seedtrain-1)
         bioreactor_feed = mixer-0
@@ -153,7 +156,7 @@ def create_acetyl_ester_system(
         def adjust_feed():
             glucose_to_substrate = (
                 rxn.product_yield(product, 'wt') # g product / g acetate
-                / product_to_biomass # g product / g biomass
+                / oleochemical_production.cell_demand # g product / g biomass
                 / growth.product_yield('Cellmass', 'wt') # g biomass / g glucose
             ) # g glucose / g acetate
             glucose = AcOH.imass['AceticAcid'] * glucose_to_substrate
@@ -162,51 +165,56 @@ def create_acetyl_ester_system(
     else:
         growth = bst.Rxn('AceticAcid -> Cellmass + CO2 + H2O', reactant='AceticAcid',
                          X=0.5, correct_atomic_balance=True) 
+        growth.product_yield('Cellmass', 'wt', 0.34)
         maintenance = bst.Rxn('AceticAcid + O2 -> H2O + CO2', reactant='AceticAcid',
                              X=1. - 1e-6, correct_atomic_balance=True) 
         bioreactor_reactions = bst.SeriesReaction([rxn, maintenance])
-        splitter = bst.Splitter(ins=mixer-0, split=0.07)
-        @splitter.add_specification(run=True)
+        seedtrain_reactions = bst.SeriesReaction([growth, maintenance])
+        seed_splitter = bst.Splitter(ins=mixer-0, split=0.07)
+        @seed_splitter.add_specification(run=True)
         def adjust_feed():
             # 0.7 g product / g biomass required
             seed_to_ferm_ratio = (
                 rxn.product_yield(product, 'wt') # g product / g acetate-ferm
-                / product_to_biomass # g product / g biomass
+                / oleochemical_production.cell_demand # g product / g biomass
                 / growth.product_yield('Cellmass', 'wt') # g biomass / g acetate-seed
             ) # g seed / g fermented
-            splitter.split[:] = 1 / (seed_to_ferm_ratio + 1)
+            seed_splitter.split[:] = 1 - 1 / (seed_to_ferm_ratio + 1)
         seedtrain = SeedTrain(
-            ins=splitter-0,
-            reactions=growth,
+            ins=seed_splitter-0,
+            reactions=seedtrain_reactions,
+            T=37 + 273.15,
         )
-        seed_mixer = bst.Mixer(ins=[seedtrain-1, splitter-1])
+        seed_mixer = bst.Mixer(ins=[seedtrain-1, seed_splitter-1])
         bioreactor_feed = seed_mixer-0
-    AcEster_production = bst.AeratedBioreactor(
-        'AcEster_production',
+    oleochemical_production = bst.AeratedBioreactor(
+        'oleochemical_production',
         ins=(bioreactor_feed, bst.Stream('air', phase='g')),
         outs=('vent_2', 'effluent_2'), tau=100, 
         V_max=3785,
         # V_max=500,
+        T=37 + 273.15,
         optimize_power=False,
         reactions=bioreactor_reactions,
         length_to_diameter=12,
         kW_per_m3=0.6
     )
-    AcEster_production.titer = 100
-    AcEster_production.productivity = 1
+    oleochemical_production.cell_demand = 0.7 # g product / g biomass required
+    oleochemical_production.titer = 100
+    oleochemical_production.productivity = 1
     
-    @AcEster_production.add_specification(run=False)
+    @oleochemical_production.add_specification(run=False)
     def adjust_reaction_time():
-        reactions = AcEster_production.reactions
-        AcEster_production.run()
-        vent, effluent = AcEster_production.outs
+        reactions = oleochemical_production.reactions
+        oleochemical_production.run()
+        vent, effluent = oleochemical_production.outs
         effluent.imol[product] += vent.imol[product]
         vent.imol[product] = 0
-        AcEster_production.tau = get_titer() / AcEster_production.productivity
+        oleochemical_production.tau = get_titer() / oleochemical_production.productivity
         # reactions.X[1] = reactions.X[0] * 0.1
     
     def get_titer(): # g/L or kg/m3s
-        effluent = AcEster_production.outs[1]
+        effluent = oleochemical_production.outs[1]
         product_mass_flow = effluent.imass[product] # effluent.get_flow('kg / hr', 'lipid')
         volumetric_flow_rate = effluent.ivol['Water', product].sum() # effluent.get_total_flow('m3/hr')
         try:
@@ -214,27 +222,27 @@ def create_acetyl_ester_system(
         except:
             breakpoint()
     
-    AcEster_production.get_titer = get_titer
+    oleochemical_production.get_titer = get_titer
     
     def get_dilution_water(water):
-        AcEster_media.imass['Water'] = water
-        effluent = AcEster_production.outs[1]
-        mixer.run_until(AcEster_production, inclusive=True)
-        target = AcEster_production.titer
+        oleochemical_media.imass['Water'] = water
+        effluent = oleochemical_production.outs[1]
+        mixer.run_until(oleochemical_production, inclusive=True)
+        target = oleochemical_production.titer
         current = get_titer()
-        rho = AcEster_production.chemicals.Water.rho('l', T=AcEster_production.T, P=101325) # kg / m3
+        rho = oleochemical_production.chemicals.Water.rho('l', T=oleochemical_production.T, P=101325) # kg / m3
         value = water + (1./target - 1./current) * effluent.imass[product] * rho
         if value < 0: value = 0
         return value
     
     @mixer.add_specification(run=True)
     def adjust_titer():
-        AcEster_media.imass['Water'] = get_dilution_water(AcEster_media.imass['Water'])
+        oleochemical_media.imass['Water'] = get_dilution_water(oleochemical_media.imass['Water'])
     
     solvent = 'Hexane'
     solvent_ratio = 0.1
     solvent_recycle = bst.Stream()
-    solvent_mixer = bst.Mixer('solvent_mixer', ins=[AcEster_production-1, solvent_recycle, solvent.lower()])
+    solvent_mixer = bst.Mixer('solvent_mixer', ins=[oleochemical_production-1, solvent_recycle, solvent.lower()])
     solvent_mixer.outs[-1].price = 0.73
     @solvent_mixer.add_specification
     def adjust_solvent():
@@ -247,15 +255,15 @@ def create_acetyl_ester_system(
         fresh_solvent.imass[solvent] = max(0, required_solvent - recycled_solvent)
         solvent_mixer._run()
         
-    AcEster_separation = bst.MixerSettler(
+    oleochemical_separation = bst.MixerSettler(
         ins=solvent_mixer-0, 
         outs=('', 'wastewater'),
         top_chemical=solvent,
     )
-    @AcEster_separation.add_specification
+    @oleochemical_separation.add_specification
     def cells_to_wastewater():
-        AcEster_separation._run()
-        extract, wastewater = AcEster_separation.outs
+        oleochemical_separation._run()
+        extract, wastewater = oleochemical_separation.outs
         wastewater.copy_flow(extract, ('Cellmass',), remove=True)
         
     ideal_thermo = bst.settings.thermo.ideal()
@@ -275,15 +283,15 @@ def create_acetyl_ester_system(
     bottoms_pump = bst.Pump(ins=solvent_recovery-1, P=2 * 101325)
     distillate_pump = bst.Pump(ins=solvent_recovery-0, outs=solvent_recycle, P=2 * 101325)
     hx = bst.HXprocess(
-        ins=[bottoms_pump-0, AcEster_separation-0], 
+        ins=[bottoms_pump-0, oleochemical_separation-0], 
         dT=10, outs=[dodecylacetate, heat_integration]
     )
     if dewatering:
         ins = [centrifuge_a-0, 
                AcOH_separation-1, 
-               AcEster_separation-1]
+               oleochemical_separation-1]
     else:
-        ins = [centrifuge_a-0, AcEster_separation-1]
+        ins = [centrifuge_a-0, oleochemical_separation-1]
     wastewater_mixer = bst.Mixer(
         ins=ins, 
         outs='wastewater'
@@ -299,7 +307,7 @@ def create_acetyl_ester_system(
         thermo = bst.settings.thermo
         cc_chemicals = create_cc_chemicals()
         bst.settings.set_thermo(cc_chemicals)
-        CO2_dynamic, CO2_constant = BT.emissions, AcEster_production-0
+        CO2_dynamic, CO2_constant = BT.emissions, oleochemical_production-0
         CO2_concentrated, distillate, CO2_unused = bst.Stream('CO2'), bst.Stream('distillate'), bst.Stream('biogenic_emissions', thermo=thermo)
         splitter_cc = bst.Splitter(
             ins=[CO2_dynamic], 
@@ -338,22 +346,25 @@ def create_acetyl_ester_system(
         mixer = bst.Junction(upstream=ccc-0, downstream=CO2) # Interfaces property package
         bst.settings.set_thermo(thermo)
     else:
-        CO2_dynamic, CO2_constant = BT.emissions, AcEster_production-0
+        CO2_dynamic, CO2_constant = BT.emissions, oleochemical_production-0
         splitter = bst.Splitter(
             ins=[CO2_dynamic], 
             outs=['', 'CO2_unused'], 
             split=0.5, 
         )
         mixer = bst.Mixer(ins=[splitter-0, CO2_constant], outs=[CO2])
+        mixer.T = AcOH_production.T
         @BT.add_specification
         def adjust_split():
             for i in range(2):
-                BT.simulate()
+                for i in BT.system.facilities: i.simulate()
                 split = (CO2.imass['CO2'] - CO2_constant.imass['CO2']) / CO2_dynamic.imass['CO2']  
                 splitter.split[:] = split
                 splitter.run()
                 mixer.run()
+                if mixer.T: CO2.T = mixer.T # Assume it is cooled cheaply by blowers.
                 AcOH_production.simulate()
+            for i in BT.system.facilities: i.simulate()
     
 
 @bst.SystemFactory(

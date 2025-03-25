@@ -43,7 +43,7 @@ class Biorefinery(bst.ProcessModel):
     Examples
     --------
     >>> import biorefineries.acester as ace
-    >>> br = ace.Biorefinery(simulate=False)
+    >>> br = ace.Biorefinery(simulate=False, scenario='all fermentation-glucose growth')
     >>> br.system.simulate()
     >>> br.system.diagram()
     >>> (br.MSP(), br.GWP(), br.tea.TCI / 1e6)
@@ -51,25 +51,14 @@ class Biorefinery(bst.ProcessModel):
     
     """
     class Scenario:
+        name: str 
         product: str = 'Dodecanol'
         carbon_capture: bool = False
         dewatering: bool = False
         glucose_growth: bool = True
         biomass: str = 'cornstover' # Alternatively 'miscanthus'
-        hydrogen_price: str = 'full range' # Alternatively 'min' or 'max'
-        
-        @property
-        def name(self):
-            name = ''
-            for i in self.__slots__:
-                j = getattr(self, i)
-                if isinstance(j, bool):
-                    name += i
-                elif isinstance(j, str):
-                    name += j
-                else:
-                    raise NotImplementedError('unknown error')
-            return name
+        hydrogen_price: str = 'all' # Alternatively 'min' or 'max'
+        fermentation_performance: str = 'all' # Alternatively 'min' or 'max'
     
     @property
     def name(self):
@@ -77,28 +66,23 @@ class Biorefinery(bst.ProcessModel):
     
     @classmethod
     def as_scenario(cls, scenario):
-        scenario, glucose_growth = scenario.split('/')
+        fermentation, glucose_growth = scenario.split('-')
         if glucose_growth == 'glucose growth':
             glucose_growth = True
         elif glucose_growth == 'acetate growth':
             glucose_growth = False
         else:
-            raise ValueError("scenario must end with either 'coupled' or 'decoupled'")
-        match scenario:
-            case 'all':
-                hydrogen_price = 'full range'
-                return Scenario(
-                    product='Dodecanol',
-                    carbon_capture=False,
-                    dewatering=False,
-                    glucose_growth=glucose_growth,
-                    biomass='cornstover',
-                    
-                )
-            case 'optimistic':
+            raise ValueError("invalid scenario")
+        match fermentation:
+            case 'all fermentation':
                 hydrogen_price = 'min'
-            case 'conservative':
-                hydrogen_price = 'max'
+                fermentation_performance = 'all'
+            case 'conservative fermentation':
+                hydrogen_price = 'min'
+                fermentation_performance = 'min'
+            case 'optimistic fermentation':
+                hydrogen_price = 'min'
+                fermentation_performance = 'max'
             case _:
                 raise ValueError('invalid scenario')
         return Scenario(
@@ -108,8 +92,9 @@ class Biorefinery(bst.ProcessModel):
             glucose_growth=glucose_growth,
             biomass='cornstover',
             hydrogen_price=hydrogen_price,
+            fermentation_performance=fermentation_performance,
+            name=scenario,
         )
-        
     
     def optimize(self):
         with catch_warnings(action="ignore"):
@@ -210,7 +195,7 @@ class Biorefinery(bst.ProcessModel):
         #     for name in names:
         #         @parameter(element='KLa', bounds=fermentation_variables[name]) 
         #         def param(value):
-        #             setattr(self.AcEster_production, name, value)
+        #             setattr(self.oleochemical_production, name, value)
         
         def uniform(baseline, *args, **kwargs):
             bounds = [0.8 * baseline, 1.2 * baseline]
@@ -233,39 +218,44 @@ class Biorefinery(bst.ProcessModel):
             self.hexane.price = price
         
         @parameter(units='USD/kg', element='dodecylacetate', bounds=[3, 6],
-                   baseline=3) # https://www.alibaba.com/product-detail/Factory-direct-sale-DODECYL-ACETATE-CAS_1601041319372.html
+                   baseline=3, distribution='uniform') # https://www.alibaba.com/product-detail/Factory-direct-sale-DODECYL-ACETATE-CAS_1601041319372.html
         def set_product_price(price):
             self.product.price = price
         
         @parameter(units='USD/kg', element='H2', bounds=[3, 7],
-                   baseline=4.5) # Natural gas 1.5 - 5; Electrolysis 3 - 7
+                   baseline=3, distribution='uniform') # Natural gas 1.5 - 5; Electrolysis 3 - 7
         def set_H2_price(price):
             self.hydrogen.price = price
         
         @parameter(units='g/L', element=self.AcOH_production,
-                   bounds=[50, 90], baseline=60)
+                   bounds=[40, 80], baseline=60, distribution='uniform')
         def set_AcOH_titer(titer):
             self.AcOH_production.titer['AceticAcid'] = titer
         
         @parameter(units='g/L/h', element=self.AcOH_production,
-                   bounds=[1, 3], baseline=2.25)
+                   bounds=[1, 2], baseline=1.5, distribution='uniform')
         def set_AcOH_productivity(productivity):
             self.AcOH_production.productivity = productivity
         
-        @parameter(units='g/L', element=self.AcEster_production, 
-                   bounds=[10, 40], baseline=25)
-        def set_AcEster_titer(titer):
-            self.AcEster_production.titer = titer
+        @parameter(units='g/L', element=self.oleochemical_production, 
+                   bounds=[10, 50], baseline=30, distribution='uniform')
+        def set_oleochemical_titer(titer):
+            self.oleochemical_production.titer = titer
             
-        @parameter(units='g/L/h', element=self.AcEster_production,
-                   bounds=[0.2, 2], baseline=1)
-        def set_AcEster_productivity(productivity):
-            self.AcEster_production.productivity = productivity
+        @parameter(units='g/L/h', element=self.oleochemical_production,
+                   bounds=[0.1, 1.2], baseline=0.65, distribution='uniform')
+        def set_oleochemical_productivity(productivity):
+            self.oleochemical_production.productivity = productivity
         
-        @parameter(units='% theoretical', name='yield', element=self.AcEster_production, 
-                   bounds=[40, 70], baseline=55)
-        def set_AcEster_yield(X):
-            self.AcEster_production.reactions.X[0] = X / 100.
+        @parameter(units='% theoretical', name='production phase yield', element=self.oleochemical_production, 
+                   bounds=[40, 90], baseline=65, distribution='uniform')
+        def set_oleochemical_production_phase_yield(X):
+            self.oleochemical_production.reactions.X[0] = X / 100.
+        
+        @parameter(units='g_{' + scenario.product + '}/g_{cell}', element=self.oleochemical_production, 
+                   bounds=[0.7, 3.5], baseline=0.7, distribution='uniform')
+        def set_oleochemical_cell_demand(cell_demand):
+            self.oleochemical_production.cell_demand = cell_demand
         
         # https://www.eia.gov/energyexplained/natural-gas/prices.php
         # @parameter(distribution=dist.natural_gas_price_distribution, element='Natural gas', units='USD/m3',
@@ -278,11 +268,15 @@ class Biorefinery(bst.ProcessModel):
         # def set_electricity_price(price): 
         #     bst.settings.electricity_price = price
         
-        @parameter(units='MT/yr', element='AcEster', bounds=[20000, 50000], baseline=35000)
+        @parameter(units='MT/yr', element='oleochemical', bounds=[20000, 50000], baseline=35000)
         def set_production_capacity(production_capacity):
-            capacity = production_capacity / system.operating_hours * 1000 # kg / hr
-            original = self.AcOH_media.F_mass * self.AcOH_production.titer['AceticAcid'] * self.AcEster_production.reactions[0].product_yield(scenario.product, basis='wt') / 1000
-            self.system.rescale(self.AcOH_media, capacity / original)
+            self.production_capacity = production_capacity
+            
+        @system.add_specification(simulate=True)
+        def adjust_production_capacity():
+            capacity = self.production_capacity / system.operating_hours * 1000 # kg / hr
+            self.system.simulate()
+            self.system.rescale(self.AcOH_media, capacity / self.product.F_mass) 
         
         if scenario.carbon_capture:
             baseline_length_to_diameter = 8
@@ -328,13 +322,13 @@ class Biorefinery(bst.ProcessModel):
         def set_AcOH_bioreactor_length_to_diameter(length_to_diameter):
             self.AcOH_production.length_to_diameter = length_to_diameter
         
-        @optimized_parameter(bounds=[2, 12], baseline=baseline_length_to_diameter, element='AcEster bioreactor', name='length to diameter')
-        def set_AcEster_bioreactor_length_to_diameter(length_to_diameter):
-            self.AcEster_production.length_to_diameter = length_to_diameter
+        @optimized_parameter(bounds=[2, 12], baseline=baseline_length_to_diameter, element='oleochemical bioreactor', name='length to diameter')
+        def set_oleochemical_bioreactor_length_to_diameter(length_to_diameter):
+            self.oleochemical_production.length_to_diameter = length_to_diameter
         
-        @optimized_parameter(bounds=[0.2, 0.6], baseline=0.5, element='AcEster bioreactor', name='agitation power')
-        def set_AcEster_bioreactor_agitation_power(kW_per_m3):
-            self.AcEster_production.kW_per_m3 = kW_per_m3
+        @optimized_parameter(bounds=[0.2, 0.6], baseline=0.5, element='oleochemical bioreactor', name='agitation power')
+        def set_oleochemical_bioreactor_agitation_power(kW_per_m3):
+            self.oleochemical_production.kW_per_m3 = kW_per_m3
         
         # All emissions are biogenic because we are using biomass
         # chemicals = bst.settings.chemicals
@@ -426,7 +420,29 @@ class Biorefinery(bst.ProcessModel):
             case 'max':
                 set_H2_price.active = False
                 set_H2_price.baseline = set_H2_price.bounds[1]
-            case 'full range':
+            case 'all':
+                pass
+            case _:
+                raise ValueError('invalid hydrogen price')
+                
+        fermentation_parameters = (
+            set_oleochemical_production_phase_yield,
+            set_oleochemical_cell_demand,
+            set_oleochemical_productivity,
+            set_oleochemical_titer,
+            set_AcOH_productivity,
+            set_AcOH_titer,
+        )
+        match scenario.fermentation_performance:
+            case 'min':
+                for i in fermentation_parameters:
+                    i.active = False
+                    i.baseline = i.bounds[0]
+            case 'max':
+                for i in fermentation_parameters:
+                    i.active = False
+                    i.baseline = i.bounds[1]
+            case 'all':
                 pass
             case _:
                 raise ValueError('invalid hydrogen price')
@@ -454,7 +470,7 @@ class Biorefinery(bst.ProcessModel):
             'Flue gas': comps(self.emissions, ['CO2', 'H2O', 'O2', 'N2']),
             'Exhaust': comps(self.CC.outs[1], ['H2O', 'O2', 'N2']),
             'CO2': total(self.CO2),
-            'Recycled CO2': comps(self.AcEster_production.outs[0], ['CO2', 'H2O', 'O2', 'N2']),
+            'Recycled CO2': comps(self.oleochemical_production.outs[0], ['CO2', 'H2O', 'O2', 'N2']),
             'H2': total(self.system.flowsheet.stream.hydrogen),
             'Unreacted H2': comps(self.AcOH_production.outs[0], ['H2', 'CO2', 'H2O', 'O2', 'N2']),
             'Dilute AcOH': comps(self.AcOH_production.outs[1], ['AceticAcid', 'H2O']),
