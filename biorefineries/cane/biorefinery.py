@@ -523,13 +523,13 @@ class Biorefinery:
             cane_sys.add_specification(self.update_feedstock, simulate=True)
         
         if abs(number) in cellulosic_configurations:
-            prs = flowsheet(bst.PretreatmentReactorSystem)
-            saccharification = flowsheet(bst.Saccharification)
-            seed_train = flowsheet(bst.SeedTrain)
+            prs = flowsheet('PretreatmentReactorSystem')
+            saccharification = flowsheet('Saccharification')
+            seed_train = flowsheet('SeedTrain')
             try:
-                fermentor = flowsheet(bst.CoFermentation)
+                fermentor = flowsheet('CoFermentation')
             except:
-                fermentor = flowsheet(bst.AeratedBioreactor)
+                fermentor = flowsheet('AeratedBioreactor')
             self.pretreatment_rxnsys = tmo.ReactionSystem(
                 prs.reactions, saccharification.saccharification
             )
@@ -544,9 +544,9 @@ class Biorefinery:
             prs.reactions.X[10] = 0.0 # baseline
         else:
             try:
-                fermentor = flowsheet(bst.Fermentation)
+                fermentor = flowsheet('Fermentation')
             except:
-                fermentor = flowsheet(bst.AeratedBioreactor)
+                fermentor = flowsheet('AeratedBioreactor')
         self.fermentor = fermentor
         
         def set_glucose_yield(glucose_yield):
