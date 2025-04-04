@@ -77,8 +77,10 @@ capacities = [[0.0739,	0.088386667,	0.089676667,	0.091003333],
 [0.086242222,	0.089282222,	0.089877778,	0.091326667]]
 
 # Interpolate adsorption capacities and recoveries against time and temperature
-rec_interp = interp2d(ts, Ts, recoveries)
-cap_interp = interp2d(ts, Ts, capacities)
+# rec_interp = interp2d(ts, Ts, recoveries)
+# cap_interp = interp2d(ts, Ts, capacities)
+rec_interp = lambda: 0
+cap_interp = lambda: 0
 
 # Decarboxylation conversion against temperature
 
