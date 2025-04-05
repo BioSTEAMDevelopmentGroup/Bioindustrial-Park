@@ -17,6 +17,7 @@ from colorpalette import Color
 from biorefineries import acester
 import seaborn as sns
 import yaml
+from scipy import interpolate
 
 __all__ = ('run_monte_carlo', 
            'run_all_monte_carlo',
@@ -33,13 +34,15 @@ __all__ = ('run_monte_carlo',
            'plot_kde_dewatering_comparison_no_carbon_capture',
            'get_optimized_parameters_table',
            'plot_kde_CI_MSP',
-           'get_distribution_table')
+           'get_distribution_table',
+           'run_monte_carlo_across_yield',
+           'plot_monte_carlo_across_yield')
 
 results_folder = os.path.join(os.path.dirname(__file__), 'results')
 images_folder = os.path.join(os.path.dirname(__file__), 'images')
 letter_color = colors.neutral.shade(25).RGBn
 dodecanol_price_range = [2, 5] # [USD/kg] https://www.alibaba.com/product-detail/High-Quality-Detergent-Raw-Materials-1_1601399240724.html?spm=a2700.7724857.0.0.7a2e64d3IyXlCl
-dodecarnol_carbon_intensity = 2.834 + 0.6535 # Emissions (end of life) + refining (GREET diesel)
+dodecanol_carbon_intensity = 2.834 + 0.6535 # Emissions (end of life) + refining (GREET diesel)
 line_color = Color(fg='#8E9BB3').RGBn
 
 def sobol_file(name, extention='xlsx'):
@@ -802,7 +805,7 @@ def plot_kde_CI_MSP(scenarios=None):
         ]
     br = ace.Biorefinery(simulate=False, scenario=scenarios[0])
     market_price = 5 # USD / kg
-    carbon_intensity = dodecarnol_carbon_intensity
+    carbon_intensity = dodecanol_carbon_intensity
     metrics = [br.carbon_intensity.index, br.MSP.index]
     Xi, Yi = metrics
     ys = []
@@ -878,7 +881,7 @@ def opportunity_space(scenarios=None):
         ]
     br = ace.Biorefinery(simulate=False, scenario=scenarios[0])
     market_price = 5 # USD / kg
-    carbon_intensity = dodecarnol_carbon_intensity
+    carbon_intensity = dodecanol_carbon_intensity
     metrics = [br.carbon_intensity.index, br.MSP.index]
     Xi, Yi = metrics
     ys = []
@@ -1114,3 +1117,90 @@ def montecarlo_results(carbon_capture, dewatering, metrics=None, derivative=None
         else:
             dct[key] = f"{q50} [{q05}, {q95}]"
     return results
+
+def run_monte_carlo_across_yield(
+        scenario='all fermentation-glucose growth', N=10, rule='L',
+    ):
+    filterwarnings('ignore')
+    br = ace.Biorefinery(
+        simulate=False, 
+        scenario=scenario,
+    )
+    br.model.exception_hook = 'raise'
+    filename = f'{scenario}_monte_carlo_across_bioreactor_yield.xlsx'
+    file = os.path.join(results_folder, filename)
+    np.random.seed(1)
+    samples = br.model.sample(N, rule)
+    br.model.load_samples(samples)
+    br.model.evaluate_across_coordinate(
+        name='Bioreactor yield',
+        notify=int(N/10),
+        f_coordinate=br.set_oleochemical_bioreactor_yield,
+        coordinate=np.linspace(
+            *br.set_oleochemical_bioreactor_yield.bounds,
+            8
+        ),
+        notify_coordinate=True,
+        xlfile=file,
+    )
+
+def plot_monte_carlo_across_yield():
+    bst.plots.set_font(size=10, family='sans-serif', font='Arial')
+    bst.plots.set_figure_size(width='half', aspect_ratio=1)
+    scenario = 'all fermentation-glucose growth'
+    filename = f'{scenario}_monte_carlo_across_bioreactor_yield.xlsx'
+    file = os.path.join(results_folder, filename)
+    br = ace.Biorefinery(
+        simulate=False, 
+        scenario=scenario, 
+    )
+    df = pd.read_excel(file, sheet_name=br.MSP.short_description, index_col=0)
+    df = df.dropna()
+    bioreactor_yield = np.array(df.columns)
+    median_blue = GG_colors.blue.shade(40).RGBn
+    median_red = GG_colors.red.shade(40).RGBn
+    MSPs = bst.plots.plot_montecarlo_across_coordinate(
+        bioreactor_yield, df, 
+        fill_color=[*GG_colors.red.RGBn, 0.5],
+        median_color=median_red,
+        p5_color=[*GG_colors.red.shade(20).RGBn, 0.80],
+        smooth=2,
+    )
+    market_price = dodecanol_price_range[-1]
+    bst.plots.plot_horizontal_line(market_price, lw=2, ls='-', color=line_color, zorder=-200)
+    index = [0, 4]
+    f5, f95 = [interpolate.interp1d(MSPs[i], bioreactor_yield) for i in index]
+    lb = f5(5)
+    ub = f95(5)
+    ax = plt.gca()
+    ax.axvspan(lb, ub, alpha=0.3, color=line_color, zorder=-300)
+    plt.xlabel(br.set_oleochemical_bioreactor_yield.label(element=False).replace('production ', ''))
+    plt.ylabel(f"MSP [{format_units('USD/kg')}]")
+    plt.subplots_adjust(hspace=0.05, left=0.12, right=0.96, bottom=0.2, top=0.95)
+    # scenario = 'all fermentation-acetate growth'
+    # filename = f'{scenario}_monte_carlo_across_bioreactor_yield.xlsx'
+    # file = os.path.join(results_folder, filename)
+    # df = pd.read_excel(file, sheet_name=br.MSP.short_description, index_col=0)
+    # df = df.dropna()
+    # bioreactor_yield = np.array(df.columns)
+    # MSP = bst.plots.plot_montecarlo_across_coordinate(
+    #     bioreactor_yield, df, 
+    #     fill_color=[*GG_colors.blue.RGBn, 0.5],
+    #     median_color=median_blue,
+    #     p5_color=[*GG_colors.blue.shade(20).RGBn, 0.80],
+    #     smooth=0,
+    # )
+    plt.xlim(40, 90)
+    axes = bst.plots.style_axis(
+        xticks=[40, 50, 60, 70, 80, 90],
+        yticks=[3, 4, 5, 6, 7],
+        ytick0=True,
+        ytickf=True,
+    )
+    plt.sca(axes['twiny'])
+    plt.xlabel('')
+    plt.sca(axes['twinx'])
+    plt.xlabel('')
+    for i in ('svg', 'png'):
+        file = os.path.join(images_folder, f'monte_carlo_across_bioreactor_yield.{i}')
+        plt.savefig(file, dpi=900, transparent=True)

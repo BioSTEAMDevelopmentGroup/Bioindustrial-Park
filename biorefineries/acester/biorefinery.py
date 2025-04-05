@@ -59,6 +59,7 @@ class Biorefinery(bst.ProcessModel):
         biomass: str = 'cornstover' # Alternatively 'miscanthus'
         hydrogen_price: str = 'all' # Alternatively 'min' or 'max'
         fermentation_performance: str = 'all' # Alternatively 'min' or 'max'
+        production_capacity: str = 'baseline' # Alternatively 'all'
     
     @property
     def name(self):
@@ -73,15 +74,14 @@ class Biorefinery(bst.ProcessModel):
             glucose_growth = False
         else:
             raise ValueError("invalid scenario")
+        production_capacity = 'all'
+        hydrogen_price = 'min'
         match fermentation:
             case 'all fermentation':
-                hydrogen_price = 'min'
                 fermentation_performance = 'all'
             case 'conservative fermentation':
-                hydrogen_price = 'min'
                 fermentation_performance = 'min'
             case 'optimistic fermentation':
-                hydrogen_price = 'min'
                 fermentation_performance = 'max'
             case _:
                 raise ValueError('invalid scenario')
@@ -93,6 +93,7 @@ class Biorefinery(bst.ProcessModel):
             biomass='cornstover',
             hydrogen_price=hydrogen_price,
             fermentation_performance=fermentation_performance,
+            production_capacity=production_capacity,
             name=scenario,
         )
     
@@ -217,6 +218,12 @@ class Biorefinery(bst.ProcessModel):
         def set_hexane_price(price):
             self.hexane.price = price
         
+        # https://tradingeconomics.com/commodity/sugar
+        @parameter(units='USD/kg', element='glucose', bounds=[0.215, 0.611]) 
+        def set_glucose_price(price): # https://scijournals.onlinelibrary.wiley.com/doi/epdf/10.1002/bbb.1976?saml_referrer
+            if scenario.glucose_growth:
+                self.seedtrain_feed.price = price * 0.1
+        
         @parameter(units='USD/kg', element='dodecylacetate', bounds=[3, 6],
                    baseline=3, distribution='uniform') # https://www.alibaba.com/product-detail/Factory-direct-sale-DODECYL-ACETATE-CAS_1601041319372.html
         def set_product_price(price):
@@ -247,15 +254,15 @@ class Biorefinery(bst.ProcessModel):
         def set_oleochemical_productivity(productivity):
             self.oleochemical_production.productivity = productivity
         
-        @parameter(units='% theoretical', name='production phase yield', element=self.oleochemical_production, 
+        @parameter(units='% theoretical', name='bioreactor yield', element=self.oleochemical_production, 
                    bounds=[40, 90], baseline=65, distribution='uniform')
-        def set_oleochemical_production_phase_yield(X):
+        def set_oleochemical_bioreactor_yield(X):
             self.oleochemical_production.reactions.X[0] = X / 100.
         
         @parameter(units='g_{' + scenario.product + '}/g_{cell}', element=self.oleochemical_production, 
                    bounds=[0.7, 3.5], baseline=0.7, distribution='uniform')
-        def set_oleochemical_cell_demand(cell_demand):
-            self.oleochemical_production.cell_demand = cell_demand
+        def set_oleochemical_specific_yield(specific_yield):
+            self.oleochemical_production.specific_yield = specific_yield
         
         # https://www.eia.gov/energyexplained/natural-gas/prices.php
         # @parameter(distribution=dist.natural_gas_price_distribution, element='Natural gas', units='USD/m3',
@@ -271,6 +278,9 @@ class Biorefinery(bst.ProcessModel):
         @parameter(units='MT/yr', element='oleochemical', bounds=[20000, 50000], baseline=35000)
         def set_production_capacity(production_capacity):
             self.production_capacity = production_capacity
+            
+        if scenario.production_capacity == 'baseline':
+            set_production_capacity.active = False
             
         @system.add_specification(simulate=True)
         def adjust_production_capacity():
@@ -426,8 +436,8 @@ class Biorefinery(bst.ProcessModel):
                 raise ValueError('invalid hydrogen price')
                 
         fermentation_parameters = (
-            set_oleochemical_production_phase_yield,
-            set_oleochemical_cell_demand,
+            set_oleochemical_bioreactor_yield,
+            set_oleochemical_specific_yield,
             set_oleochemical_productivity,
             set_oleochemical_titer,
             set_AcOH_productivity,

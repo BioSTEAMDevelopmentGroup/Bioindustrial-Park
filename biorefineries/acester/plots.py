@@ -85,7 +85,7 @@ def MSP_GWP_at_AcOH_titer_oleochemical_yield(titer, yield_, biorefineries):
 def MSP_GWP_at_oleochemical_yield(biomass, yield_, biorefineries):
     values = np.zeros([2, len(biorefineries)])
     for i, biorefinery in enumerate(biorefineries):
-        biorefinery.set_oleochemical_cell_demand.setter(biomass)
+        biorefinery.set_oleochemical_specific_yield.setter(biomass)
         biorefinery.set_oleochemical_production_phase_yield.setter(yield_)
         biorefinery.system.simulate()
         values[:, i] = [biorefinery.MSP(), biorefinery.carbon_intensity()]
@@ -100,7 +100,7 @@ def plot_MSP_across_oleochemical_yield(load=True):
         for i in ('glucose', 'acetate')    
     ]
     br = biorefineries[0]
-    xlim = np.array(br.set_oleochemical_cell_demand.bounds)
+    xlim = np.array(br.set_oleochemical_specific_yield.bounds)
     ylim = np.array(br.set_oleochemical_production_phase_yield.bounds)
     X, Y, Z = bst.plots.generate_contour_data(
         MSP_GWP_at_oleochemical_yield,
@@ -112,9 +112,9 @@ def plot_MSP_across_oleochemical_yield(load=True):
     )
     # Z = np.swapaxes(Z, 2, 3)
     # Plot contours
-    ylabel = 'Yield [% theoretical]'
+    ylabel = 'Bioreactor yield [% theoretical]'
     yticks = [40, 50, 60, 70, 80, 90]
-    xlabel = br.set_oleochemical_cell_demand.label(element=False).replace('Cell demand', 'Specific yield')
+    xlabel = br.set_oleochemical_specific_yield.label(element=False)
     xticks = [0.7, 1.4, 2.1, 2.8, 3.5]
     metric_bars = [
         bst.plots.MetricBar(
@@ -166,7 +166,7 @@ def plot_MSP_across_AcOH_titer_oleochemical_yield(load=True):
     )
     # Z = np.swapaxes(Z, 2, 3)
     # Plot contours
-    ylabel = 'oleochemical Yield\n[% theoretical]'
+    ylabel = 'Oleochemical yield\n[% theoretical]'
     yticks = [40, 50, 60, 70, 80]
     xlabel = 'AcOH Titer [$\mathrm{g} \cdot \mathrm{L}^{\mathrm{-1}}$]'
     xticks = [40, 50, 60, 70, 80]

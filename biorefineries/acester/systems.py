@@ -139,9 +139,9 @@ def create_acetyl_ester_system(
         growth.product_yield('Cellmass', 'wt', 0.5 * (0.45 + 0.50))
         bioreactor_reactions = bst.SeriesReaction([rxn, maintenance])
         seedtrain_reactions = bst.SeriesReaction([growth, maintenance])
-        # Assume sugar from cornstover dilute acid (2016 study by Engelberth). DOI: 10.1002/bbb.1976
-        seedtrain_feed = bst.Stream(Water=90, Glucose=10, units='kg/hr', price=0.1 * 0.18)
-        seedtrain_feed.set_CF('GWP', 52.9e-3)
+        # Assume sugar from corn dry grind (2016 study by Engelberth). DOI: 10.1002/bbb.1976
+        seedtrain_feed = bst.Stream('seedtrain_feed', Water=90, Glucose=10, units='kg/hr', price=0.1 * 0.33)
+        seedtrain_feed.set_CF('GWP', 0.1 * 0.9375) # Sugar GREET 2023
         seedtrain = SeedTrain(
             T=37 + 273.15,
             ins=seedtrain_feed,
