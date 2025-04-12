@@ -579,14 +579,14 @@ class CoFermentation(StirredTankReactor):
         self.cofermentation_rxns = ParallelRxn([
         #      Reaction definition            Reactant    Conversion
         Rxn('Glucose + 2 CO2 -> 2 SuccinicAcid + O2',        'Glucose',   0.7), 
-        Rxn('Glucose -> 3 AceticAcid',               'Glucose',   1e-8),
-        Rxn('Glucose -> 2 Ethanol + 2 CO2',               'Glucose',   1e-8),
+        Rxn('Glucose -> 3 AceticAcid',               'Glucose',   0.),
+        Rxn('Glucose -> 2 Ethanol + 2 CO2',               'Glucose',   0.),
         Rxn('Glucose -> 6 FermMicrobe',       'Glucose',   0.186),
         Rxn('Glucose -> 2 PyruvicAcid',     'Glucose',    0.006),
         
         Rxn('Xylose + 1.667 CO2 -> 1.667 SuccinicAcid + 0.4165 O2',       'Xylose',    0.7),
-        Rxn('Xylose -> 2.5 AceticAcid',       'Xylose',    1e-8),
-        Rxn('Xylose -> 1.667 Ethanol + 1.667 CO2',       'Xylose',    1e-8),
+        Rxn('Xylose -> 2.5 AceticAcid',       'Xylose',    0.),
+        Rxn('Xylose -> 1.667 Ethanol + 1.667 CO2',       'Xylose',    0.),
         Rxn('Xylose -> 5 FermMicrobe',        'Xylose',    0.186),
         Rxn('3 Xylose -> 5 PyruvicAcid',    'Xylose',   0.006),
         
@@ -639,8 +639,8 @@ class CoFermentation(StirredTankReactor):
         self.glucose_to_succinic_acid_rxn = self.cofermentation_rxns[0]
         self.xylose_to_succinic_acid_rxn = self.cofermentation_rxns[5]
         
-        self.glucose_to_pyryuvic_acid_rxn = self.cofermentation_rxns[4]
-        self.xylose_to_pyryuvic_acid_rxn = self.cofermentation_rxns[9]
+        self.glucose_to_pyruvic_acid_rxn = self.cofermentation_rxns[4]
+        self.xylose_to_pyruvic_acid_rxn = self.cofermentation_rxns[9]
         
         self.glucose_to_acetic_acid_rxn = self.cofermentation_rxns[1]
         self.xylose_to_acetic_acid_rxn = self.cofermentation_rxns[6]

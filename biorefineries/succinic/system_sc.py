@@ -822,7 +822,9 @@ spec = ProcessSpecification(
     baseline_titer = 63.1,
     baseline_productivity = 0.6573,
     neutralization=False,
-
+    baseline_pyruvic_acid_yield = 0.006,
+    baseline_cell_mass_yield = 0.186,
+    
     feedstock_mass = feedstock.F_mass,
     pretreatment_reactor = None)
 
