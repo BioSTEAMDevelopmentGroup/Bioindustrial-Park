@@ -31,7 +31,8 @@ from math import log
 
 import os
 
-from biorefineries.TAL.models import models_TAL_solubility_exploit_sugarcane as models
+# from biorefineries.TAL.models import models_TAL_solubility_exploit_sugarcane as models
+from biorefineries.TAL.models import models_TAL_solubility_exploit as models
 
 chdir = os.chdir
 
@@ -139,11 +140,18 @@ get_sugar_conc_TCI = lambda: F301.installed_cost + F301_P.installed_cost + M304.
 
 # %% Generate 3-specification meshgrid and set specification loading functions
 
-steps = (50, 50, 1)
+steps = (60, 60, 1)
 
 # Yield, titer, productivity (rate)
-spec_1 = yields = np.linspace(0.05, 0.5724, steps[0]) # yield
-spec_2 = titers = np.linspace(10., 
+# spec_1 = yields = np.linspace(0.05, 0.5724, steps[0]) # yield
+# spec_2 = titers = np.linspace(10., 
+#                               100., # although sugar concentration limit of 600 g/L would allow as high as 230 g-TAL/L, we set an upper limit of 100 g/L
+#                                    # based on achieved (50-68 g/L using E.coli, Candida) and targeted (100 g/L) titers for adipic acid, another organic solid with low water solubility
+#                                    # Skoog et al., 2018 ( https://doi.org/10.1016/j.biotechadv.2018.10.012 )
+#                                 steps[1]) # titer
+
+spec_1 = yields = np.linspace(0.02, 0.99, steps[0]) # yield
+spec_2 = titers = np.linspace(2., 
                               100., # although sugar concentration limit of 600 g/L would allow as high as 230 g-TAL/L, we set an upper limit of 100 g/L
                                    # based on achieved (50-68 g/L using E.coli, Candida) and targeted (100 g/L) titers for adipic acid, another organic solid with low water solubility
                                    # Skoog et al., 2018 ( https://doi.org/10.1016/j.biotechadv.2018.10.012 )
@@ -152,7 +160,7 @@ spec_2 = titers = np.linspace(10.,
 # spec_3 = productivities =\
 #     np.linspace(0.05, 1.5, steps[2])
 
-which_fig = 'insights'
+which_fig = '5'
 
 #%%
 additional_points = {}
@@ -351,10 +359,12 @@ spec_1, spec_2 = np.meshgrid(spec_1, spec_2)
 
 print('\n\nSimulating the initial point to avoid bugs ...')
 # spec.byproduct_yields_decrease_policy = 'simultaneous, from 0 product yield'
+# spec.byproduct_yields_decrease_policy = 'simultaneous, when product yield too high'
+# spec.byproduct_yields_decrease_policy = 'sequential, when product yield too high'
 spec.load_specifications(yields[0], titers[0], productivities[0])
-# spec.set_production_capacity(desired_annual_production=spec.desired_annual_production)
+spec.set_production_capacity(desired_annual_production=spec.desired_annual_production)
 # simulate_and_print()
-for i in range(3): TAL_sys.simulate()
+# for i in range(3): TAL_sys.simulate()
 print(get_product_MPSP())
 
 # %% Run TRY analysis 
@@ -404,9 +414,9 @@ for p in productivities:
             try:
                 spec.load_specifications(spec_1=y, spec_2=t, spec_3=p)
                 
-                # spec.set_production_capacity(desired_annual_production=spec.desired_annual_production)
+                spec.set_production_capacity(desired_annual_production=spec.desired_annual_production)
                 
-                for i in range(3): system.simulate()
+                # for i in range(3): system.simulate()
                 titers_mol_per_mol_total[-1].append(broth.imol['TAL']/broth.imol['TAL', 'Water'].sum())
                 
                 d1_Metric1[-1].append(TAL_metrics[0]())
@@ -577,7 +587,7 @@ keep_frames = True
 print('\nCreating and saving contour plots ...\n')
 
 #%% Plots
-plot = False
+plot = True
 
 if plot: 
     

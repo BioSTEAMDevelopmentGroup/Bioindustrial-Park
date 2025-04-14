@@ -384,6 +384,7 @@ def create_TAL_separation_solubility_exploit_process(ins, outs,):
     
     @M401.add_specification(run=False)
     def M401_pH_loading_spec():
+        M401.outs[0].phases = ('l', 's')
         if M401.pH_to_load == 'unmodified':
             M401.mol_base_per_m3_broth = 0.
             M401.simulate_base_addition_and_acids_neutralization()
