@@ -105,7 +105,7 @@ print('\n\nSimulating baseline ...')
 baseline_initial = model.metrics_at_baseline()
 
 #%%
-# simulate_and_print()
+simulate_and_print()
 
 #%%  Metrics
 broth = R302.outs[1]
@@ -160,7 +160,7 @@ spec_2 = titers = np.linspace(2.,
 # spec_3 = productivities =\
 #     np.linspace(0.05, 1.5, steps[2])
 
-which_fig = '5'
+which_fig = 'S11'
 
 #%%
 additional_points = {}
@@ -359,12 +359,12 @@ spec_1, spec_2 = np.meshgrid(spec_1, spec_2)
 
 print('\n\nSimulating the initial point to avoid bugs ...')
 # spec.byproduct_yields_decrease_policy = 'simultaneous, from 0 product yield'
-# spec.byproduct_yields_decrease_policy = 'simultaneous, when product yield too high'
+spec.byproduct_yields_decrease_policy = 'simultaneous, when product yield too high'
 # spec.byproduct_yields_decrease_policy = 'sequential, when product yield too high'
 spec.load_specifications(yields[0], titers[0], productivities[0])
-spec.set_production_capacity(desired_annual_production=spec.desired_annual_production)
+# spec.set_production_capacity(desired_annual_production=spec.desired_annual_production)
 # simulate_and_print()
-# for i in range(3): TAL_sys.simulate()
+for i in range(3): TAL_sys.simulate()
 print(get_product_MPSP())
 
 # %% Run TRY analysis 
@@ -414,9 +414,9 @@ for p in productivities:
             try:
                 spec.load_specifications(spec_1=y, spec_2=t, spec_3=p)
                 
-                spec.set_production_capacity(desired_annual_production=spec.desired_annual_production)
+                # spec.set_production_capacity(desired_annual_production=spec.desired_annual_production)
                 
-                # for i in range(3): system.simulate()
+                for i in range(3): system.simulate()
                 titers_mol_per_mol_total[-1].append(broth.imol['TAL']/broth.imol['TAL', 'Water'].sum())
                 
                 d1_Metric1[-1].append(TAL_metrics[0]())
@@ -567,8 +567,14 @@ def get_contour_info_from_metric_data(
     w_ticks.sort()
     w_ticks_to_remove = []
     for i in range(len(w_ticks)-1):
-        if w_ticks[i]/w_ticks[i+1] > remove_w_ticks_if_greater_than_this_fraction_of_successor:
+        # try:
+        if w_ticks[i]==0:
+            pass
+        elif (not w_ticks[i]/abs(w_ticks[i]) == metric_data.min()/abs(metric_data.min())) or\
+           (w_ticks[i]/w_ticks[i+1] > remove_w_ticks_if_greater_than_this_fraction_of_successor):
             w_ticks_to_remove.append(w_ticks[i])
+        # except:
+        #     breakpoint()
     for j in w_ticks_to_remove:
         w_ticks.remove(j)
     
