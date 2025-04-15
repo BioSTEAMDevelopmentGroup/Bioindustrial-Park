@@ -51,11 +51,11 @@ get_adjusted_MSP = models.get_adjusted_MSP
 
 # %% 
 
-N_simulations_per_mode = 2000 # 2000
+N_simulations_per_mode = 10 # 2000
 
 percentiles = [0, 0.05, 0.1, 0.25, 0.5, 0.75, 0.9, 0.95, 1]
 
-notification_interval = 50
+notification_interval = 5
 
 results_dict = {'Baseline':{'MPSP':{}, 'GWP100a':{}, 'FEC':{}, 
                             'GWP Breakdown':{}, 'FEC Breakdown':{},},
@@ -63,15 +63,19 @@ results_dict = {'Baseline':{'MPSP':{}, 'GWP100a':{}, 'FEC':{},
                 'Sensitivity':{'Spearman':{'MPSP':{}, 'GWP100a':{}, 'FEC':{}}},}
 
 modes = [
-            'lab_batch',
-           'lab_fed-batch', 
-           'pilot_batch',
+           # 'lab_batch',
+           # 'lab_fed-batch', 
+           # 'pilot_batch',
+           'lab_fed-batch_2025_1',
+           'lab_fed-batch_2025_2',
          ]
 
 parameter_distributions_filenames = [
-                                    'parameter-distributions_lab-scale_batch.xlsx',
-                                    'parameter-distributions_lab-scale_fed-batch.xlsx',
-                                    'parameter-distributions_pilot-scale_batch.xlsx',
+                                    # 'parameter-distributions_lab-scale_batch.xlsx',
+                                    # 'parameter-distributions_lab-scale_fed-batch.xlsx',
+                                    # 'parameter-distributions_pilot-scale_batch.xlsx',
+                                    'parameter-distributions_lab-scale_fed-batch_2025_1.xlsx',
+                                    'parameter-distributions_lab-scale_fed-batch_2025_2.xlsx',
                                     ]
 
 #%%
@@ -264,25 +268,27 @@ GWP_units = r"$\mathrm{kg}$"+" "+ r"$\mathrm{CO}_{2}\mathrm{-eq.}\cdot\mathrm{kg
 FEC_units = r"$\mathrm{MJ}\cdot\mathrm{kg}^{-1}$"
 #%% Uncertainty
 
-scenario_name_labels = ['Lab. batch', 
-                        'Lab. fed-batch', 
-                        'Pilot batch']
+scenario_name_labels = ['Lab. fed-batch 1', 
+                        'Lab. fed-batch 2', 
+                        # 'Pilot batch',
+                        ]
 
 def get_small_range(num, offset):
     return(num-offset, num+offset)
 #%% MPSP
 MPSP_uncertainty = [results_dict['Uncertainty']['MPSP'][modes[0]],
                     results_dict['Uncertainty']['MPSP'][modes[1]],
-                    results_dict['Uncertainty']['MPSP'][modes[2]]]
+                    # results_dict['Uncertainty']['MPSP'][modes[2]],
+                    ]
 market_range = (2.53, 2.89)
 biobased_lit_MPSP_range = (1.08, 3.63)
 
 contourplots.box_and_whiskers_plot(uncertainty_data=MPSP_uncertainty, 
                           baseline_values=[results_dict['Baseline']['MPSP'][mode] for mode in modes],
-                          baseline_marker_shapes=["p", "s", "D"],
-                          baseline_marker_sizes=[10, 6, 6,],
-                          baseline_locations=[1,2,3],
-                          baseline_marker_colors=['w','w','w'],
+                          baseline_marker_shapes=["p", "D"],
+                          baseline_marker_sizes=[10, 6,],
+                          baseline_locations=[1,2,],
+                          baseline_marker_colors=['w','w',],
                           boxcolor="#A97802",
                           ranges_for_comparison=[biobased_lit_MPSP_range, market_range],
                           ranges_for_comparison_colors=['#c0c1c2', '#646464'],
@@ -314,10 +320,10 @@ GWP_uncertainty = [results_dict['Uncertainty']['GWP100a'][modes[0]],
 biobased_lit_GWP_values = [1, 2, 3] #!!!
 contourplots.box_and_whiskers_plot(uncertainty_data=GWP_uncertainty, 
                           baseline_values=[results_dict['Baseline']['GWP100a'][mode] for mode in modes], 
-                          baseline_marker_shapes=["p", "s", "D"],
-                          baseline_marker_sizes=[10, 6, 6,],
-                          baseline_locations=[1,2,3],
-                          baseline_marker_colors=['w','w','w'],
+                          baseline_marker_shapes=["p", "D"],
+                          baseline_marker_sizes=[10, 6,],
+                          baseline_locations=[1,2,],
+                          baseline_marker_colors=['w','w',],
                           boxcolor='#607429',
                           ranges_for_comparison=[get_small_range(i, 0.005) for i in biobased_GWPs+fossilbased_GWPs],
                           ranges_for_comparison_colors=['#c0c1c2' for i in range(len(biobased_GWPs))] +\

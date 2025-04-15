@@ -21,10 +21,12 @@ filterwarnings('ignore')
 from biorefineries import succinic
 succinic_filepath = succinic.__file__.replace('\\__init__.py', '')
 succinic_results_filepath = succinic_filepath + '\\analyses\\results\\'
-modes = ['lab_batch', 'lab_fed-batch', 'pilot_batch']
+modes = ['lab_batch', 'lab_fed-batch', 'pilot_batch', 'lab_fed-batch_2025_1', 'lab_fed-batch_2025_2']
 parameter_distributions_filenames = ['parameter-distributions_lab-scale_batch.xlsx',
                                     'parameter-distributions_lab-scale_fed-batch.xlsx',
                                     'parameter-distributions_pilot-scale_batch.xlsx',
+                                    'parameter-distributions_lab-scale_fed-batch_2025_1.xlsx',
+                                    'parameter-distributions_lab-scale_fed-batch_2025_2.xlsx',
                                     ]
 
 def load(mode='pilot_batch'):

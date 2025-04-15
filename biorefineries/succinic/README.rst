@@ -21,6 +21,9 @@ In an environment with Python v3.9.15, do the following:
 	    (ii) thermosteam==0.33.0
 	    (iii) contourplots==0.2.1
 	    (iv) numpy==1.23.5
+	    (v) chemicals==1.1.2
+	    (vi) fluids==1.0.22
+	    (vii) thermo==0.2.23
 
 Getting started
 ---------------
@@ -148,8 +151,8 @@ full Monte Carlo simulation (succinic.run_uncertainty_analysis)
 and titer-yield-productivity analysis for the fermentation performance space (succinic.run_TRY_analysis).
 The crystallization simulation model was fit to experimental data (crystallization_curvefit.py).
 
-Note that results used in the manuscript [1]_ were generated using biosteam==2.36.4,
-thermosteam==0.33.0, contourplots==0.2.1, numpy==1.23.5, and dependencies (this commit).
+Note that results used in the manuscripts [1]_ and [5]_ were generated using the packages listed in the Installation section 
+and dependencies (this commit).
 
 To reproduce the results, directly run the script of interest, and results will
 be saved as Excel files and figures in analyses/results.
@@ -172,4 +175,6 @@ References
     Simulation, and Techno-Economic Analysis of Biorefineries under Uncertainty. 
     ACS Sustainable Chem. Eng. 2020, 8 (8), 3302–3310. 
     `<https://doi.org/10.1021/acssuschemeng.9b07040>`_
+
+.. [5] Tran et al. Submitted 2025.
 
