@@ -51,11 +51,11 @@ get_adjusted_MSP = models.get_adjusted_MSP
 
 # %% 
 
-N_simulations_per_mode = 10 # 2000
+N_simulations_per_mode = 2000 # 2000
 
 percentiles = [0, 0.05, 0.1, 0.25, 0.5, 0.75, 0.9, 0.95, 1]
 
-notification_interval = 5
+notification_interval = 100
 
 results_dict = {'Baseline':{'MPSP':{}, 'GWP100a':{}, 'FEC':{}, 
                             'GWP Breakdown':{}, 'FEC Breakdown':{},},
@@ -179,7 +179,7 @@ for i in range(len(modes)):
         '_succinic_%s.%s.%s-%s.%s'%(dateTimeObj.year, dateTimeObj.month, dateTimeObj.day, dateTimeObj.hour, minute)\
         + '_' + str(N_simulations_per_mode) + 'sims'
     
-    baseline = baseline.append(baseline_end, ignore_index=True)
+    baseline = baseline._append(baseline_end, ignore_index=True)
     baseline.index = ('initial', 'end')
     baseline.to_excel(file_to_save+'_'+mode+'_0_baseline.xlsx')
     
@@ -314,7 +314,8 @@ fossilbased_GWPs = [3.27, 3.43, 10.3, 12.1]
 
 GWP_uncertainty = [results_dict['Uncertainty']['GWP100a'][modes[0]],
                     results_dict['Uncertainty']['GWP100a'][modes[1]],
-                    results_dict['Uncertainty']['GWP100a'][modes[2]]]
+                    # results_dict['Uncertainty']['GWP100a'][modes[2]],
+                    ]
 
 
 biobased_lit_GWP_values = [1, 2, 3] #!!!
@@ -351,16 +352,17 @@ fossilbased_FECs = [59.2, 60.8, 112, 124]
 
 FEC_uncertainty = [results_dict['Uncertainty']['FEC'][modes[0]],
                     results_dict['Uncertainty']['FEC'][modes[1]],
-                    results_dict['Uncertainty']['FEC'][modes[2]]]
+                    # results_dict['Uncertainty']['FEC'][modes[2]],
+                    ]
 
 
 biobased_lit_FEC_values = [1, 2, 3] #!!!
 contourplots.box_and_whiskers_plot(uncertainty_data=FEC_uncertainty, 
                           baseline_values=[results_dict['Baseline']['FEC'][mode] for mode in modes], 
-                          baseline_marker_shapes=["p", "s", "D"],
-                          baseline_marker_sizes=[10, 6, 6,],
-                          baseline_locations=[1,2,3],
-                          baseline_marker_colors=['w','w','w'],
+                          baseline_marker_shapes=["p", "D"],
+                          baseline_marker_sizes=[10, 6,],
+                          baseline_locations=[1,2,],
+                          baseline_marker_colors=['w','w',],
                           boxcolor='#A100A1',
                           ranges_for_comparison=[get_small_range(i, 0.061) for i in biobased_FECs+fossilbased_FECs],
                           ranges_for_comparison_colors=['#c0c1c2' for i in range(len(biobased_FECs))] +\
@@ -406,7 +408,7 @@ contourplots.stacked_bar_plot(dataframe=df_TEA_breakdown,
 
 #%% LCA breakdown figures
 # GWP
-temp_GWP_breakdown_dict = results_dict['Baseline']['GWP Breakdown'][modes[2]]
+temp_GWP_breakdown_dict = results_dict['Baseline']['GWP Breakdown'][modes[1]]
 GWP_breakdown_dict = {
                         # 'areas': list(temp_GWP_breakdown_dict.keys()), 
                       'contributions': [100*i for i in list(temp_GWP_breakdown_dict.values())]}
@@ -438,7 +440,7 @@ contourplots.stacked_bar_plot(dataframe=df_GWP_breakdown,
                  fig_height=5.5*1.1777*0.94)
 
 # FEC
-temp_FEC_breakdown_dict = results_dict['Baseline']['FEC Breakdown'][modes[2]]
+temp_FEC_breakdown_dict = results_dict['Baseline']['FEC Breakdown'][modes[1]]
 FEC_breakdown_dict = {
                         # 'areas': list(temp_FEC_breakdown_dict.keys()), 
                       'contributions': [100*i for i in list(temp_FEC_breakdown_dict.values())]}
