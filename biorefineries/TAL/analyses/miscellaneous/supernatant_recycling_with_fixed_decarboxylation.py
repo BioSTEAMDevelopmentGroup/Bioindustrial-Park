@@ -156,7 +156,7 @@ def plot_multiple_metrics(x_axis_list, y_axis_list_of_lists,
 
 
 #%% 
-simulate_and_plot = False
+simulate_and_plot = True
 
 if simulate_and_plot:
     
@@ -192,6 +192,8 @@ if simulate_and_plot:
     model = models.TAL_model
     system = TAL_sys = models.TAL_sys
     
+    system.flowsheet.M401.base_neutralizes_acids = False
+    
     modes = [
                 'A',
              ]
@@ -208,7 +210,7 @@ if simulate_and_plot:
         '\\analyses\\full\\parameter_distributions\\'+parameter_distributions_filenames[0]
     print(f'\n\nLoading parameter distributions ({mode}) ...')
     model.parameters = ()
-    model.load_parameter_distributions(parameter_distributions_filename)
+    model.load_parameter_distributions(parameter_distributions_filename, models.namespace_dict)
     
     # load_additional_params()
     print(f'\nLoaded parameter distributions ({mode}).')
@@ -286,15 +288,15 @@ if simulate_and_plot:
                           xlim=(0,100), 
                           ylims_list=[
                                       (0,100),
-                                      (5,10),
-                                      (0,12),
-                                      (-60,60),
+                                      (4,8),
+                                      (0,16),
+                                      (-20,90),
                                       ],
                           xticks=[0 + 10*i for i in range(0,11)],
                           yticks_list = [[0 + 10*i for i in range(0,11)],
-                                     np.arange(4, 10.1, 0.5),
-                                     np.arange(0, 12.1, 1),
-                                     np.arange(-60, 60.1, 10),
+                                     np.arange(4, 8.1, 0.5),
+                                     np.arange(0, 16.1, 2),
+                                     np.arange(-20, 90.1, 10),
                                      ]
                           )
     

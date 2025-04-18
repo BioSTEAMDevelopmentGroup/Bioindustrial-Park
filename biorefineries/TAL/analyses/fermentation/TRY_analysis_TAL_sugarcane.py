@@ -31,7 +31,8 @@ from math import log
 
 import os
 
-from biorefineries.TAL.models import models_TAL_solubility_exploit_sugarcane as models
+# from biorefineries.TAL.models import models_TAL_solubility_exploit_sugarcane as models
+from biorefineries.TAL.models import models_TAL_solubility_exploit as models
 
 chdir = os.chdir
 
@@ -67,7 +68,8 @@ model = models.TAL_model
 system = TAL_sys = models.TAL_sys
 
 modes = [
-            'A_FGI_sugarcane',
+            # 'A_FGI_sugarcane',
+            'A',
          ]
 
 
@@ -103,7 +105,7 @@ print('\n\nSimulating baseline ...')
 baseline_initial = model.metrics_at_baseline()
 
 #%%
-# simulate_and_print()
+simulate_and_print()
 
 #%%  Metrics
 broth = R302.outs[1]
@@ -138,11 +140,18 @@ get_sugar_conc_TCI = lambda: F301.installed_cost + F301_P.installed_cost + M304.
 
 # %% Generate 3-specification meshgrid and set specification loading functions
 
-steps = (50, 50, 1)
+steps = (60, 60, 1)
 
 # Yield, titer, productivity (rate)
-spec_1 = yields = np.linspace(0.05, 0.5724, steps[0]) # yield
-spec_2 = titers = np.linspace(10., 
+# spec_1 = yields = np.linspace(0.05, 0.5724, steps[0]) # yield
+# spec_2 = titers = np.linspace(10., 
+#                               100., # although sugar concentration limit of 600 g/L would allow as high as 230 g-TAL/L, we set an upper limit of 100 g/L
+#                                    # based on achieved (50-68 g/L using E.coli, Candida) and targeted (100 g/L) titers for adipic acid, another organic solid with low water solubility
+#                                    # Skoog et al., 2018 ( https://doi.org/10.1016/j.biotechadv.2018.10.012 )
+#                                 steps[1]) # titer
+
+spec_1 = yields = np.linspace(0.02, 0.99, steps[0]) # yield
+spec_2 = titers = np.linspace(2., 
                               100., # although sugar concentration limit of 600 g/L would allow as high as 230 g-TAL/L, we set an upper limit of 100 g/L
                                    # based on achieved (50-68 g/L using E.coli, Candida) and targeted (100 g/L) titers for adipic acid, another organic solid with low water solubility
                                    # Skoog et al., 2018 ( https://doi.org/10.1016/j.biotechadv.2018.10.012 )
@@ -151,7 +160,7 @@ spec_2 = titers = np.linspace(10.,
 # spec_3 = productivities =\
 #     np.linspace(0.05, 1.5, steps[2])
 
-which_fig = 'insights'
+which_fig = 'S11'
 
 #%%
 additional_points = {}
@@ -350,6 +359,8 @@ spec_1, spec_2 = np.meshgrid(spec_1, spec_2)
 
 print('\n\nSimulating the initial point to avoid bugs ...')
 # spec.byproduct_yields_decrease_policy = 'simultaneous, from 0 product yield'
+spec.byproduct_yields_decrease_policy = 'simultaneous, when product yield too high'
+# spec.byproduct_yields_decrease_policy = 'sequential, when product yield too high'
 spec.load_specifications(yields[0], titers[0], productivities[0])
 # spec.set_production_capacity(desired_annual_production=spec.desired_annual_production)
 # simulate_and_print()
@@ -556,8 +567,14 @@ def get_contour_info_from_metric_data(
     w_ticks.sort()
     w_ticks_to_remove = []
     for i in range(len(w_ticks)-1):
-        if w_ticks[i]/w_ticks[i+1] > remove_w_ticks_if_greater_than_this_fraction_of_successor:
+        # try:
+        if w_ticks[i]==0:
+            pass
+        elif (not w_ticks[i]/abs(w_ticks[i]) == metric_data.min()/abs(metric_data.min())) or\
+           (w_ticks[i]/w_ticks[i+1] > remove_w_ticks_if_greater_than_this_fraction_of_successor):
             w_ticks_to_remove.append(w_ticks[i])
+        # except:
+        #     breakpoint()
     for j in w_ticks_to_remove:
         w_ticks.remove(j)
     
@@ -576,7 +593,7 @@ keep_frames = True
 print('\nCreating and saving contour plots ...\n')
 
 #%% Plots
-plot = False
+plot = True
 
 if plot: 
     
