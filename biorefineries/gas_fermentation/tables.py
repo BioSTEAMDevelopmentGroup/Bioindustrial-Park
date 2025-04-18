@@ -8,7 +8,7 @@ import os
 import numpy as np
 import pandas as pd
 import biosteam as bst
-from biorefineries import acester as ace
+from biorefineries import gas_fermentation as Biorefinery
 from biorefineries.tea.cellulosic_ethanol_tea import foc_table, capex_table
 from thermosteam.utils import array_roundsigfigs
 
@@ -24,7 +24,7 @@ def save_system_reports():
     folder = os.path.dirname(__file__)
     folder = os.path.join(folder, 'results')
     for scenario in key_scenarios:
-        pm = ace.Biorefinery(scenario=scenario)
+        pm = Biorefinery(scenario=scenario)
         filename = f'{scenario}_detailed_report.xlsx'
         file = os.path.join(folder, filename)
         pm.system.save_report(file)
@@ -37,7 +37,7 @@ def save_detailed_expenditure_tables(sigfigs=3):
     writer = pd.ExcelWriter(file)
     product = 'product'
     process_models = [
-        ace.Biorefinery(scenario=i)
+        Biorefinery(scenario=i)
         for i in key_scenarios
     ]
     for pm in process_models: pm.product.price = pm.tea.solve_price(pm.product)
@@ -58,7 +58,7 @@ def save_detailed_expenditure_tables(sigfigs=3):
     return tables
     
 def save_detailed_life_cycle_tables(sigfigs=3):
-    process_models = [ace.Biorefinery(scenario=i) for i in key_scenarios]
+    process_models = [Biorefinery(scenario=i) for i in key_scenarios]
     systems = [i.system for i in process_models]
     folder = os.path.dirname(__file__)
     folder = os.path.join(folder, 'results')

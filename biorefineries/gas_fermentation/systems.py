@@ -6,11 +6,11 @@ from math import inf
 from scipy.stats import gmean
 import numpy as np
 import flexsolve as flx
-from biorefineries.acester.chemicals import create_acetate_ester_chemicals, create_cc_chemicals
+from biorefineries.gas_fermentation.chemicals import create_acetate_ester_chemicals, create_cc_chemicals
 from biorefineries.cellulosic.units import SeedTrain
 
 __all__ = (
-    'create_acetyl_ester_system',
+    'create_oleochemical_system',
     'create_acetic_acid_separation_system',
     'create_ccc_sys'
 )
@@ -39,20 +39,20 @@ __all__ = (
 
 @bst.SystemFactory(
     ID='acetyl_ester_sys',
-    ins=[dict(ID='AcOH_media',  Water=100000, units='kg/hr'),
-         dict(ID='oleochemical_media',  Water=1000, units='kg/hr'),
-         dict(ID='hydrogen', H2=100, P=101325e1, price=2)],
+    ins=[dict(ID='hydrogen', H2=100, P=101325e1, price=2)],
     outs=[dict(ID='product', price=3)],
     fthermo=create_acetate_ester_chemicals
 )
-def create_acetyl_ester_system(
+def create_oleochemical_system(
         ins, outs, 
         glucose_growth=True,
         carbon_capture=False, 
         dewatering=False, 
         product='Dodecanol',
     ):
-    AcOH_media, oleochemical_media, H2 = ins
+    AcOH_media = bst.Stream(ID='AcOH_media',  Water=100000, units='kg/hr')
+    oleochemical_media = bst.Stream(ID='oleochemical_media',  Water=0, units='kg/hr')
+    H2, = ins
     dodecylacetate, = outs
     H2.register_alias('hydrogen')
     dodecylacetate.register_alias('product')
@@ -302,7 +302,9 @@ def create_acetyl_ester_system(
         CHP_kwargs=dict(fuel_source='Biomass')
     )
     for BT in units:
-        if isinstance(BT, bst.BoilerTurbogenerator): break
+        if isinstance(BT, bst.BoilerTurbogenerator): 
+            ins.append(BT.fuel)
+            break
     if carbon_capture:
         thermo = bst.settings.thermo
         cc_chemicals = create_cc_chemicals()
@@ -362,6 +364,8 @@ def create_acetyl_ester_system(
                 splitter.split[:] = split
                 splitter.run()
                 mixer.run()
+                CO2.imass['Water'] = 0
+                CO2.imass['Water'] = 0.02 * CO2.F_mass # Assume 100% humidity (some water will condense)
                 if mixer.T: CO2.T = mixer.T # Assume it is cooled cheaply by blowers.
                 AcOH_production.simulate()
             for i in BT.system.facilities: i.simulate()
@@ -388,8 +392,8 @@ def create_acetic_acid_separation_system(
     
     Examples
     --------
-    >>> import biorefineries.acester as ace
-    >>> sys = ace.create_acetic_acid_separation_system()
+    >>> import biorefineries.gas_fermentation as create_acetic_acid_separation_system
+    >>> sys = create_acetic_acid_separation_system()
     >>> sys.simulate()
     >>> sys.show()
     System: acetic_acid_separation_sys

@@ -11,13 +11,14 @@ from .process_settings import (
     load_process_settings, GWP as GWPkey,
     characterization_factors as CFs
 )
-from .systems import create_acetyl_ester_system
+from .systems import create_oleochemical_system
 from biorefineries.cane.data import price_distributions_2023 as dist
 from biorefineries.tea import (
     create_cellulosic_ethanol_tea as create_tea
 )
 from warnings import catch_warnings
 from inspect import signature
+from chaospy import distributions as shape
 
 __all__ = (
     'Biorefinery',
@@ -42,8 +43,8 @@ class Biorefinery(bst.ProcessModel):
     """
     Examples
     --------
-    >>> import biorefineries.acester as ace
-    >>> br = ace.Biorefinery(simulate=False, scenario='all fermentation-glucose growth')
+    >>> from biorefineries.gas_fermentation import Biorefinery
+    >>> br = Biorefinery(simulate=False, scenario='all fermentation-glucose growth')
     >>> br.system.simulate()
     >>> br.system.diagram()
     >>> (br.MSP(), br.GWP(), br.tea.TCI / 1e6)
@@ -51,7 +52,7 @@ class Biorefinery(bst.ProcessModel):
     
     """
     class Scenario:
-        name: str 
+        name: str = 'all fermentation|glucose growth'
         product: str = 'Dodecanol'
         carbon_capture: bool = False
         dewatering: bool = False
@@ -67,7 +68,7 @@ class Biorefinery(bst.ProcessModel):
     
     @classmethod
     def as_scenario(cls, scenario):
-        fermentation, glucose_growth = scenario.split('-')
+        fermentation, glucose_growth = scenario.split('|')
         if glucose_growth == 'glucose growth':
             glucose_growth = True
         elif glucose_growth == 'acetate growth':
@@ -152,7 +153,7 @@ class Biorefinery(bst.ProcessModel):
                 wt=True,
             )
         load_process_settings()
-        system = create_acetyl_ester_system(
+        system = create_oleochemical_system(
             carbon_capture=scenario.carbon_capture,
             dewatering=scenario.dewatering,
             glucose_growth=scenario.glucose_growth,
@@ -206,9 +207,18 @@ class Biorefinery(bst.ProcessModel):
         # def set_carbon_capture_cost(price):
         #     self.CC.b = 4.230769230769226 + price
         
-        @parameter(units='wt %', element='Boiler flue gas', baseline=5.5, bounds=(5, 10)) 
-        def set_boiler_flue_gas_CO2_content(CO2_content):
-            self.BT.CO2_emissions_concentration = CO2_content / 100
+        # https://pmc.ncbi.nlm.nih.gov/articles/PMC3947793/
+        # https://www.capturemap.no/the-biogenic-co2-breakdown/
+        self.BT.CO2_emissions_concentration = 15.0 / 100 # 
+        
+        # @parameter(
+        #     units='wt %', element='Boiler flue gas', 
+        #     distribution=shape.Trunc(shape.Normal(6.3 * 1.55, 0.5 * 1.55), 5.3 * 1.55, 7.3 * 1.55), 
+        #     baseline=6.3 * 1.55, 
+        #     bounds=(5.3 * 1.55, 7.3 * 1.55)
+        # ) 
+        # def set_boiler_flue_gas_CO2_content(CO2_content):
+        #     self.BT.CO2_emissions_concentration = CO2_content / 100
         
         @uniform(units='USD/kg', element='EtAc', baseline=1.57) 
         def set_ethyl_acetate_price(price):
@@ -234,33 +244,33 @@ class Biorefinery(bst.ProcessModel):
         def set_H2_price(price):
             self.hydrogen.price = price
         
-        @parameter(units='g/L', element=self.AcOH_production,
-                   bounds=[40, 80], baseline=60, distribution='uniform')
+        @parameter(units='g/L', element='AcOH production',
+                   bounds=[40, 90], baseline=60, distribution='uniform')
         def set_AcOH_titer(titer):
             self.AcOH_production.titer['AceticAcid'] = titer
         
-        @parameter(units='g/L/h', element=self.AcOH_production,
+        @parameter(units='g/L/h', element='AcOH production',
                    bounds=[1, 2], baseline=1.5, distribution='uniform')
         def set_AcOH_productivity(productivity):
             self.AcOH_production.productivity = productivity
         
-        @parameter(units='g/L', element=self.oleochemical_production, 
+        @parameter(units='g/L', element='Oleochemical production', 
                    bounds=[10, 50], baseline=30, distribution='uniform')
         def set_oleochemical_titer(titer):
             self.oleochemical_production.titer = titer
             
-        @parameter(units='g/L/h', element=self.oleochemical_production,
-                   bounds=[0.1, 1.2], baseline=0.65, distribution='uniform')
+        @parameter(units='g/L/h', element='Oleochemical production',
+                   bounds=[0.1, 2.0], baseline=1.0, distribution='uniform')
         def set_oleochemical_productivity(productivity):
             self.oleochemical_production.productivity = productivity
         
-        @parameter(units='% theoretical', name='bioreactor yield', element=self.oleochemical_production, 
+        @parameter(units='% theoretical', name='bioreactor yield', element='Oleochemical production', 
                    bounds=[40, 90], baseline=65, distribution='uniform')
         def set_oleochemical_bioreactor_yield(X):
             self.oleochemical_production.reactions.X[0] = X / 100.
         
-        @parameter(units='g_{' + scenario.product + '}/g_{cell}', element=self.oleochemical_production, 
-                   bounds=[0.7, 3.5], baseline=0.7, distribution='uniform')
+        @parameter(units='g_{' + scenario.product + '}/g_{cell}', element='Oleochemical production', 
+                   bounds=[0.7, 7.0], baseline=3.5, distribution='uniform')
         def set_oleochemical_specific_yield(specific_yield):
             self.oleochemical_production.specific_yield = specific_yield
         
@@ -341,19 +351,17 @@ class Biorefinery(bst.ProcessModel):
             self.oleochemical_production.kW_per_m3 = kW_per_m3
         
         # All emissions are biogenic because we are using biomass
-        # chemicals = bst.settings.chemicals
-        # self.direct_nonbiogenic_emissions = lambda: (
-        #     sum([i.get_atomic_flow('C') for i in self.system.products if i.phase == 'g'])
-        #     * chemicals.CO2.MW * system.operating_hours
-        # )
-        
-        # self.system.define_process_impact(
-        #     key=GWPkey,
-        #     name='Direct non-biogenic emissions',
-        #     basis='kg',
-        #     inventory=self.direct_nonbiogenic_emissions,
-        #     CF=1.,
-        # )
+        chemicals = bst.settings.chemicals
+        self.credited_biogenic_intake = lambda: (
+            self.product.get_atomic_flow('C') * chemicals.CO2.MW * system.operating_hours
+        )
+        self.system.define_process_impact(
+            key=GWPkey,
+            name='Credited biogenic intake',
+            basis='kg',
+            inventory=self.credited_biogenic_intake,
+            CF=-1.,
+        )
         if not scenario.dewatering: self.ethyl_acetate = bst.MockStream('ethyl_acetate')
         key = scenario.biomass.capitalize()
         self.BT.fuel.set_CF(GWPkey, CFs[key])

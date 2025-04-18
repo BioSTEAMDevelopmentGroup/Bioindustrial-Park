@@ -155,6 +155,12 @@ class CellulosicEthanolTEA(TEA):
         return (FCI * self.property_insurance
                 + self._ISBL_DPI_cached * self.maintenance
                 + self.labor_cost * (1 + self.labor_burden))
+    
+    def CAPEX_table(self):
+        return capex_table(self)
+    
+    def FOC_table(self):
+        return foc_table(self)
 
 
 def create_cellulosic_ethanol_tea(sys, OSBL_units=None, cls=None):
@@ -199,48 +205,56 @@ def create_cellulosic_ethanol_tea(sys, OSBL_units=None, cls=None):
         boiler_turbogenerator=BT)
     return tea
 
-def capex_table(teas, names=None):
+def capex_table(teas, names=None, dataframe=True):
     if isinstance(teas, bst.TEA): teas = [teas]
-    capex = CAPEXTableBuilder()
+    if names is None: 
+        if len(teas) == 1:
+            names = None
+        else:
+            names = [i.system.ID for i in teas]
     tea, *_ = teas
+    capex = tea.Accounting('MM$', names=names)
     ISBL_installed_equipment_costs = np.array([i.ISBL_installed_equipment_cost / 1e6 for i in teas])
     OSBL_installed_equipment_costs = np.array([i.OSBL_installed_equipment_cost / 1e6 for i in teas])
-    capex.entry('ISBL installed equipment cost', ISBL_installed_equipment_costs)
-    capex.entry('OSBL installed equipment cost', OSBL_installed_equipment_costs)
+    capex.entry(('Direct costs', 'ISBL installed equipment cost'), ISBL_installed_equipment_costs)
+    capex.entry(('Direct costs', 'OSBL installed equipment cost'), OSBL_installed_equipment_costs)
     ISBL_factor_entry = lambda name, value: capex.entry(name, ISBL_installed_equipment_costs * value, f"{value:.1%} of ISBL")
-    ISBL_factor_entry('Warehouse', tea.warehouse)
-    ISBL_factor_entry('Site development', tea.site_development)
-    ISBL_factor_entry('Additional piping', tea.additional_piping)
+    ISBL_factor_entry(('Direct costs', 'Warehouse'), tea.warehouse)
+    ISBL_factor_entry(('Direct costs', 'Site development'), tea.site_development)
+    ISBL_factor_entry(('Direct costs', 'Additional piping'), tea.additional_piping)
     TDC = np.array(capex.total_costs)
-    capex.entry('Total direct cost (TDC)', TDC)
+    capex.entry(('Total direct cost (TDC)', ''), TDC)
     TDC_factor_entry = lambda name, value: capex.entry(name, TDC * value, f"{value:.1%} of TDC")
-    TDC_factor_entry('Proratable costs', tea.proratable_costs)
-    TDC_factor_entry('Field expenses', tea.field_expenses)
-    TDC_factor_entry('Construction', tea.construction)
-    TDC_factor_entry('Contingency', tea.contingency)
-    TDC_factor_entry('Other indirect costs (start-up, permits, etc.)', tea.other_indirect_costs)
+    TDC_factor_entry(('Indirect costs', 'Proratable costs'), tea.proratable_costs)
+    TDC_factor_entry(('Indirect costs', 'Field expenses'), tea.field_expenses)
+    TDC_factor_entry(('Indirect costs', 'Construction'), tea.construction)
+    TDC_factor_entry(('Indirect costs', 'Contingency'), tea.contingency)
+    TDC_factor_entry(('Indirect costs', 'Other (start-up, permits, etc.)'), tea.other_indirect_costs)
     TIC = np.array(capex.total_costs) - 2 * TDC
-    capex.entry('Total indirect cost', TIC)
+    capex.entry(('Total indirect cost (TIC)', ''), TIC)
     FCI = TDC + TIC
-    capex.entry('Fixed capital investment (FCI)', FCI)
+    capex.entry(('Fixed capital investment (FCI)', ''), FCI, 'TDC + TIC')
     working_capital = FCI * tea.WC_over_FCI
-    capex.entry('Working capital', working_capital, f"{tea.WC_over_FCI:.1%} of FCI")
+    capex.entry(('Working capital (WC)', ''), working_capital, f"{tea.WC_over_FCI:.1%} of FCI")
     TCI = FCI + working_capital
-    capex.entry('Total capital investment (TCI)', TCI)
-    if names is None: names = [i.system.ID for i in teas]
-    return capex.table(names)
+    capex.entry(('Total capital investment (TCI)', ''), TCI, 'FCI + WC')
+    return capex.table() if dataframe else capex
 
 voc_table = bst.report.voc_table
 
-def foc_table(teas, names=None):
+def foc_table(teas, names=None, dataframe=True):
     if isinstance(teas, bst.TEA): teas = [teas]
     tea, *_ = teas
-    foc = bst.report.FOCTableBuilder()
+    if names is None: 
+        if len(teas) == 1: 
+            names = None
+        else:
+            names = [i.system.ID for i in teas]
+    accounting = tea.Accounting('MM$ / yr', names=names)
     ISBL = np.array([i.ISBL_installed_equipment_cost / 1e6 for i in teas])
     labor_cost = np.array([i.labor_cost / 1e6 for i in teas])
-    foc.entry('Labor salary', labor_cost)
-    foc.entry('Labor burden', tea.labor_burden * labor_cost, '90% of labor salary')
-    foc.entry('Maintenance', tea.maintenance * ISBL, f'{tea.maintenance:.1%} of ISBL')
-    foc.entry('Property insurance', tea.property_insurance * ISBL, f'{tea.property_insurance:.1%} of ISBL')
-    if names is None: names = [i.system.ID for i in teas]
-    return foc.table(names)
+    accounting.entry('Labor salary', labor_cost)
+    accounting.entry('Labor burden', tea.labor_burden * labor_cost, '90% of labor salary')
+    accounting.entry('Maintenance', tea.maintenance * ISBL, f'{tea.maintenance:.1%} of ISBL')
+    accounting.entry('Property insurance', tea.property_insurance * ISBL, f'{tea.property_insurance:.1%} of ISBL')
+    return accounting.table() if dataframe else accounting

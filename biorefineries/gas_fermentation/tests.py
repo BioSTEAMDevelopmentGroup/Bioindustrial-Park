@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 
-from biorefineries.acester.systems import create_ccc_sys
+from biorefineries.gas_fermentation.systems import create_ccc_sys
 import numpy as np
 import biosteam as bst
 

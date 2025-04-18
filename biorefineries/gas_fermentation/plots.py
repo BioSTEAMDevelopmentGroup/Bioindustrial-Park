@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """
 """
-from biorefineries.acester import Biorefinery
+from biorefineries.gas_fermentation import Biorefinery
 import numpy as np
 from matplotlib import pyplot as plt
 import biosteam as bst

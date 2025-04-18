@@ -52,7 +52,7 @@ class Biorefinery:
         F.set_flowsheet(self.flowsheet)
         bst.settings.set_thermo(self.chemicals)
         load_process_settings()
-        sys = self.sys = create_cellulosic_ethanol_system(
+        sys = self.system = self.sys = create_cellulosic_ethanol_system(
             include_blowdown_recycle=include_blowdown_recycle
         )
         # Replace feedstock
