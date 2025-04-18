@@ -70,7 +70,7 @@ HP_results_filepath = HP_filepath + '\\analyses\\results\\'
 
 #%% Load baseline
 
-spec.reactor.neutralization = True # !!! set neutralization here
+spec.reactor.neutralization = False # !!! set neutralization here
 
 model = models.HP_model
 system = HP_sys = models.HP_sys
@@ -80,7 +80,7 @@ get_AA_MPSP()
 feedstock_tag = 'glucose'
 product_tag = 'Acrylic'
 
-mode = '300L_FGI'
+mode = '300L'
 
 dist_filename = f'parameter-distributions_{feedstock_tag}_{product_tag}_' + mode + '.xlsx'
 
