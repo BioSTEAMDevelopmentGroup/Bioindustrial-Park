@@ -70,7 +70,7 @@ HP_results_filepath = HP_filepath + '\\analyses\\results\\'
 
 #%% Load baseline
 
-spec.reactor.neutralization = False # !!! set neutralization here
+spec.reactor.neutralization = True # !!! set neutralization here
 
 model = models.HP_model
 system = HP_sys = models.HP_sys
@@ -209,8 +209,8 @@ steps = (50, 50, 1)
 # spec_2 = titers = np.linspace(5, 
 #                               200.,
 #                                 steps[1]) # titer
-spec_1 = yields = np.linspace(0.2, 0.95, steps[0]) # yield
-spec_2 = titers = np.linspace(20, 
+spec_1 = yields = np.linspace(0.05, 0.95, steps[0]) # yield
+spec_2 = titers = np.linspace(5., 
                               200.,
                                 steps[1]) # titer
 
@@ -218,8 +218,8 @@ spec_2 = titers = np.linspace(20,
 spec_3 = productivities =\
     np.array([
                 # 0.2*spec.baseline_productivity,
-                1.*spec.baseline_productivity,
-                # 5.*spec.baseline_productivity,
+                # 1.*spec.baseline_productivity,
+                5.*spec.baseline_productivity,
               ])
 
 
@@ -642,7 +642,7 @@ if smoothing:
                         #             print(i,j,k)
                     
 #%% Plots
-plot = False
+plot = True
 
 if plot: 
     

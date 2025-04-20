@@ -1371,7 +1371,7 @@ def create_HP_separation_improved_process_HP_product(ins, outs, fermentation_rea
     F403 = bst.units.MultiEffectEvaporator('F403', ins=M401-0, outs=('F403_l', 'F403_g'),
                                             P = (101325, 70000, 40000, 20000, 10000), V = 0.5)
     
-    target_HP_salt_x = 0.01 # ~30 wt% HP
+    target_HP_salt_x = 0.005 # ~30 wt% sodium 3-hydroxypropionate
     def get_x(chem_ID, stream):
         return stream.imol[chem_ID]/sum(stream.imol['SuccinicAcid', 'AceticAcid', 'Furfural', 'HMF', 'HP', 'Water'])
     

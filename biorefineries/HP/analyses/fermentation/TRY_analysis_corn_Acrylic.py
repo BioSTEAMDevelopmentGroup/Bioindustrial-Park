@@ -62,7 +62,7 @@ HP_results_filepath = HP_filepath + '\\analyses\\results\\'
 
 #%% Load baseline
 
-spec.reactor.neutralization = False # !!! set neutralization here
+spec.reactor.neutralization = True # !!! set neutralization here
 
 model = models.HP_model
 system = HP_sys = models.HP_sys
@@ -617,7 +617,7 @@ if smoothing:
                         #             print(i,j,k)
                     
 #%% Plots
-plot = False
+plot = True
 
 if plot: 
     

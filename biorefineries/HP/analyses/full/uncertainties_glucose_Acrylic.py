@@ -56,7 +56,7 @@ N_simulations_per_mode = 10 # 6000
 
 percentiles = [0, 0.05, 0.1, 0.25, 0.5, 0.75, 0.9, 0.95, 1]
 
-notification_interval = 10
+notification_interval = 500
 
 results_dict = {'Baseline':{'MPSP':{}, 'GWP100a':{}, 'FEC':{}, 
                             'GWP Breakdown':{}, 'FEC Breakdown':{},},

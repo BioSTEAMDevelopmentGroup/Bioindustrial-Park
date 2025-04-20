@@ -617,7 +617,7 @@ if smoothing:
                         #             print(i,j,k)
                     
 #%% Plots
-plot = False
+plot = True
 
 if plot: 
     

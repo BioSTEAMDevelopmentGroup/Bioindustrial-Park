@@ -406,8 +406,11 @@ def model_specification():
             # flowsheet('SodiumLactate').F_mass /= 1000.
             raise e
         else:
-            run_bugfix_barrage()
-            
+            try:
+                run_bugfix_barrage()
+            except:
+                breakpoint()
+                
 model.specification = model_specification
 
 

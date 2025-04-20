@@ -56,7 +56,7 @@ N_simulations_per_mode = 6000 # 6000
 
 percentiles = [0, 0.05, 0.1, 0.25, 0.5, 0.75, 0.9, 0.95, 1]
 
-notification_interval = 20
+notification_interval = 50
 
 results_dict = {'Baseline':{'MPSP':{}, 'GWP100a':{}, 'FEC':{}, 
                             'GWP Breakdown':{}, 'FEC Breakdown':{},},
@@ -484,7 +484,7 @@ contourplots.box_and_whiskers_plot(uncertainty_data=FEC_uncertainty,
                           x_tick_wrap_width=6,
                           y_label=r"$\bfFEC$",
                           y_units=FEC_units,
-                          y_ticks=np.arange(0, 50, 10),
+                          y_ticks=np.arange(0, 120, 20),
                           save_file=True,
                           # fig_height=5.5,
                           # fig_width = 3.,
@@ -538,7 +538,7 @@ for i in range(len(metrics)):
 
 
 contourplots.stacked_bar_plot(dataframe=df_TEA_breakdown, 
-                 y_ticks = [-20, 0, 20, 40, 60, 80, 100],
+                 y_ticks = [-75, -50, -25, 0, 25, 50, 75, 100],
                  y_label=r"$\bfCost$" + " " + r"$\bfand$" + " " +  r"$\bfUtility$" + " " +  r"$\bfBreakdown$", 
                  y_units = "%", 
                  colors=['#7BBD84', 
@@ -602,7 +602,7 @@ df_GWP_breakdown = pd.DataFrame(GWP_breakdown_list,
 df_GWP_breakdown = df_GWP_breakdown.rename(columns={0: ''})
 contourplots.stacked_bar_plot(dataframe=df_GWP_breakdown, 
                   # y_ticks=[-60, -40, -20, 0, 20, 40, 60, 80, 100], 
-                  y_ticks = [0, 20, 40, 60, 80, 100],
+                  y_ticks = [-20, 0, 20, 40, 60, 80, 100],
                   # y_ticks=[-400, -300, -200, -100, 0, 100, 200, 300, 400], 
                   # y_ticks = []
                   # y_label=r"$\bfGWP-100a $" +" "+ r"$\bfBreakdown$",  
@@ -633,7 +633,7 @@ df_FEC_breakdown = pd.DataFrame(FEC_breakdown_list,
 df_FEC_breakdown = df_FEC_breakdown.rename(columns={0: ''})
 contourplots.stacked_bar_plot(dataframe=df_FEC_breakdown, 
                   # y_ticks=[-200, -175, -150, -125, -100, -75, -50, -25, 0, 25, 50, 75, 100, 125, 150, 175], 
-                   y_ticks=[0, 20, 40, 60, 80, 100], 
+                   y_ticks=[-20, 0, 20, 40, 60, 80, 100], 
                   # y_ticks=[-150, -100, -50, 0, 50, 100], 
                   y_label=r"$\bfFEC$" +" "+ r"$\bfBreakdown$", 
                   y_units = "%", 
