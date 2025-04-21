@@ -1371,14 +1371,20 @@ def create_HP_separation_improved_process_HP_product(ins, outs, fermentation_rea
     F403 = bst.units.MultiEffectEvaporator('F403', ins=M401-0, outs=('F403_l', 'F403_g'),
                                             P = (101325, 70000, 40000, 20000, 10000), V = 0.5)
     
-    target_HP_salt_x = 0.005 # ~30 wt% sodium 3-hydroxypropionate
+    F403.target_HP_salt_x = 0.03
     def get_x(chem_ID, stream):
         return stream.imol[chem_ID]/sum(stream.imol['SuccinicAcid', 'AceticAcid', 'Furfural', 'HMF', 'HP', 'Water'])
     
     @F403.add_specification(run=False)
     def F403_specification():
+        target_HP_salt_x = F403.target_HP_salt_x
         instream = F403.ins[0]
         # ratio = target_water_x/get_x('Water', instream)
+        mol_NaOH = F403.ins[0].imol['NaOH']
+        F403.ins[0].imol['NaOH'] = 0.
+        mol_HP = F403.ins[0].imol['HP']
+        F403.ins[0].imol['HP'] = 0.
+        
         HP_salt_x = get_x('SodiumLactate', instream)
         if HP_salt_x < target_HP_salt_x:
             ratio = HP_salt_x/target_HP_salt_x
@@ -1387,7 +1393,10 @@ def create_HP_separation_improved_process_HP_product(ins, outs, fermentation_rea
         else:
             F403.V = 0.
             F403._run()
-            
+        
+        F403.outs[0].imol['NaOH'] = mol_NaOH
+        F403.outs[0].imol['HP'] = mol_HP
+        
     F403_P1 = bst.units.Pump('F403_P1', ins=F403-0, outs='concentrated_HP_salt', P=101325.)  
     F403_P2 = bst.units.Pump('F403_P2', ins=F403-1, outs=F403_t, P=101325.)  
     

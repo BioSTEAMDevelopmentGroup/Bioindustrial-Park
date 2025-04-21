@@ -171,46 +171,47 @@ evaluate_across_specs = np.vectorize(
 
 class ProcessSpecification(bst.process_tools.ReactorSpecification):
     
-    __slots__ = ('reactor',
-                 'substrates',
-                 'products',
-                 'spec_1',
-                 'spec_2',
-                 'spec_3',
-                 'substrates',
-                 'xylose_utilization_fraction',
-                 'load_spec_1',
-                 'load_spec_2',
-                 'load_spec_3',
-                 'feedstock',
-                 'dehydration_reactor', 
-                 'byproduct_streams',
-                 'feedstock_mass',
-                 'pretreatment_reactor',
-                 'titer_inhibitor_specification',
-                 'seed_train_system',
-                 'seed_train',
-                 'HXN',
-                 'maximum_inhibitor_concentration',
-                 'count',
-                 'count_exceptions',
-                 'total_iterations',
-                 'average_HXN_energy_balance_percent_error',
-                 'tolerable_HXN_energy_balance_percent_error',
-                 'HXN_intolerable_points',
-                 'exceptions_dict',
-                 'pre_conversion_units',
-                 'juicing_sys',
-                 'baseline_yield',
-                 'baseline_titer',
-                 'baseline_productivity',
-                 'HXN_new_HXs',
-                 'HXN_new_HX_utils',
-                 'HXN_Q_bal_percent_error_dict',
-                 'set_production_capacity',
-                 'desired_annual_production',
-                 'byproduct_yields_decrease_policy',
-                 )
+    # __slots__ = ('reactor',
+    #              'substrates',
+    #              'products',
+    #              'spec_1',
+    #              'spec_2',
+    #              'spec_3',
+    #              'substrates',
+    #              'xylose_utilization_fraction',
+    #              'load_spec_1',
+    #              'load_spec_2',
+    #              'load_spec_3',
+    #              'feedstock',
+    #              'dehydration_reactor', 
+    #              'byproduct_streams',
+    #              'feedstock_mass',
+    #              'pretreatment_reactor',
+    #              'titer_inhibitor_specification',
+    #              'seed_train_system',
+    #              'seed_train',
+    #              'HXN',
+    #              'maximum_inhibitor_concentration',
+    #              'count',
+    #              'count_exceptions',
+    #              'total_iterations',
+    #              'average_HXN_energy_balance_percent_error',
+    #              'tolerable_HXN_energy_balance_percent_error',
+    #              'HXN_intolerable_points',
+    #              'exceptions_dict',
+    #              'pre_conversion_units',
+    #              'juicing_sys',
+    #              'baseline_yield',
+    #              'baseline_titer',
+    #              'baseline_productivity',
+    #              'HXN_new_HXs',
+    #              'HXN_new_HX_utils',
+    #              'HXN_Q_bal_percent_error_dict',
+    #              'set_production_capacity',
+    #              'desired_annual_production',
+    #              'byproduct_yields_decrease_policy',
+    #              'coutilization_ratio',
+    #              )
     
     def __init__(self, evaporator, pump, mixer, heat_exchanger, seed_train_system, seed_train,
                  reactor, reaction_name, substrates, products,
@@ -222,7 +223,8 @@ class ProcessSpecification(bst.process_tools.ReactorSpecification):
                  feedstock_mass=104192.83224417375, pretreatment_reactor = None,
                   load_spec_1=None, load_spec_2=None, load_spec_3=None, set_production_capacity=None,
                   desired_annual_production=25000.,
-                  byproduct_yields_decrease_policy='sequential, when product yield too high',):
+                  byproduct_yields_decrease_policy='sequential, when product yield too high',
+                  coutilization_ratio=1.):
         self.substrates = substrates
         self.reactor = reactor #: [Unit] Reactor unit operation
         self.products = products #: tuple[str] Names of main products
@@ -251,6 +253,7 @@ class ProcessSpecification(bst.process_tools.ReactorSpecification):
         self.set_production_capacity = set_production_capacity
         self.desired_annual_production = desired_annual_production
         self.byproduct_yields_decrease_policy = byproduct_yields_decrease_policy
+        self.coutilization_ratio = coutilization_ratio
         
         self.count = 0 
         self.count_exceptions = 0
@@ -442,6 +445,8 @@ class ProcessSpecification(bst.process_tools.ReactorSpecification):
         
         self.spec_1 = yield_
         
+        coutilization_ratio = self.coutilization_ratio
+        
         for unit in [reactor, seed_train]:
             ferm_ratio = unit.ferm_ratio
             regular_biomass_conversion = unit.regular_biomass_conversion
@@ -449,43 +454,43 @@ class ProcessSpecification(bst.process_tools.ReactorSpecification):
             regular_xylitol_conversion = unit.regular_xylitol_conversion
             
             unit.glucose_to_HP_rxn.X = yield_ * ferm_ratio
-            unit.xylose_to_HP_rxn.X = yield_ * ferm_ratio
+            unit.xylose_to_HP_rxn.X = unit.glucose_to_HP_rxn.X * coutilization_ratio
             sugar_to_HP_conversion = get_sugar_to_HP_conversion(unit)
             
             # reset to regular cellular biomass yield
-            unit.glucose_to_biomass_rxn.X =\
-            unit.xylose_to_biomass_rxn.X =\
-                regular_biomass_conversion * ferm_ratio
+            unit.glucose_to_biomass_rxn.X = regular_biomass_conversion * ferm_ratio
+            unit.xylose_to_biomass_rxn.X = unit.glucose_to_biomass_rxn.X * coutilization_ratio
+    
             # reset to regular acetic acid yield
-            unit.glucose_to_succinic_acid_rxn.X =\
-            unit.xylose_to_succinic_acid_rxn.X =\
-                regular_succinic_acid_conversion * ferm_ratio
+            unit.glucose_to_succinic_acid_rxn.X = regular_succinic_acid_conversion * ferm_ratio
+            unit.xylose_to_succinic_acid_rxn.X = unit.glucose_to_succinic_acid_rxn.X * coutilization_ratio
+                
             # reset to regular glycerol yield
-            unit.glucose_to_xylitol_rxn.X =\
-            unit.xylose_to_xylitol_rxn.X =\
-                regular_xylitol_conversion * ferm_ratio
+            unit.glucose_to_xylitol_rxn.X = regular_xylitol_conversion * ferm_ratio
+            unit.xylose_to_xylitol_rxn.X = unit.glucose_to_xylitol_rxn.X * coutilization_ratio
+                
             
             if self.byproduct_yields_decrease_policy == 'sequential, when product yield too high':
                 if sugar_to_HP_conversion>=\
                     1. - regular_biomass_conversion - regular_succinic_acid_conversion - regular_xylitol_conversion:
                     # first decrease acetic acid production if needed
-                    unit.glucose_to_succinic_acid_rxn.X =\
-                    unit.xylose_to_succinic_acid_rxn.X =\
-                        max(1e-6, 1.-1e-6 - sugar_to_HP_conversion - regular_biomass_conversion - regular_xylitol_conversion)
+                    unit.glucose_to_succinic_acid_rxn.X = max(1e-6, 1.-1e-6 - sugar_to_HP_conversion - regular_biomass_conversion - regular_xylitol_conversion)
+                    unit.xylose_to_succinic_acid_rxn.X = unit.glucose_to_succinic_acid_rxn.X * coutilization_ratio
+                        
                         
                     sum_sugar_conversion = get_sugar_conversion(unit)
                     if sum_sugar_conversion>=1.:
                     # then decrease glycerol yield if needed
-                        unit.glucose_to_xylitol_rxn.X =\
-                        unit.xylose_to_xylitol_rxn.X =\
-                            max(1e-6, 1.-2e-6 - sugar_to_HP_conversion - regular_biomass_conversion)
+                        unit.glucose_to_xylitol_rxn.X = max(1e-6, 1.-2e-6 - sugar_to_HP_conversion - regular_biomass_conversion)
+                        unit.xylose_to_xylitol_rxn.X = unit.glucose_to_xylitol_rxn.X * coutilization_ratio
+                            
                             
                     sum_sugar_conversion = get_sugar_conversion(unit)
                     if sum_sugar_conversion>=1.:
                     # then decrease cellular biomass yield if needed
-                        unit.glucose_to_biomass_rxn.X =\
-                        unit.xylose_to_biomass_rxn.X =\
-                            max(1e-6, 1.-2e-6 - sugar_to_HP_conversion)
+                        unit.glucose_to_biomass_rxn.X = max(1e-6, 1.-2e-6 - sugar_to_HP_conversion)
+                        unit.xylose_to_biomass_rxn.X = unit.glucose_to_biomass_rxn.X * coutilization_ratio
+                            
                             
             elif self.byproduct_yields_decrease_policy == 'simultaneous, when product yield too high':
                 if sugar_to_HP_conversion>=\
