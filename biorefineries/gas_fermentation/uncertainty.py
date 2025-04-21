@@ -42,6 +42,7 @@ results_folder = os.path.join(os.path.dirname(__file__), 'results')
 images_folder = os.path.join(os.path.dirname(__file__), 'images')
 letter_color = colors.neutral.shade(25).RGBn
 dodecanol_price_range = [2, 5] # [USD/kg] https://www.alibaba.com/product-detail/High-Quality-Detergent-Raw-Materials-1_1601399240724.html?spm=a2700.7724857.0.0.7a2e64d3IyXlCl
+dodecanol_market_price = 5 # USD / kg
 dodecanol_carbon_intensity = 2.97 # Emissions (cradle-to-gate) DOI 10.1007/s11743-016-1867-y
 line_color = Color(fg='#8E9BB3').RGBn
 
@@ -173,10 +174,15 @@ def _plot_monte_carlo(box):
                   'acetate': GG_colors.blue.RGBn
               },
               **kwargs)
+            if i == 0:
+                if j == 0:
+                    bst.plots.plot_horizontal_line(dodecanol_market_price, lw=1, ls='--', color=line_color * 1.1)
+                elif j == 1:
+                    bst.plots.plot_horizontal_line(dodecanol_carbon_intensity, lw=1, ls='--', color=line_color * 1.1)
             values = data[:, metric_values_index]
             assert not np.isnan(np.array(values, dtype=float)).any()
             tickmarks = bst.plots.rounded_tickmarks_from_data(
-                values, N_ticks=5, lb_max=None if (values < 0).any() else 0,
+                values, N_ticks=5, lb_max=values.min() * 2 if (values < 0).any() else 0,
                 f=lambda x: roundsigfigs(x, sigfigs=2, index=1),
                 f_min=lambda x: np.min(x),
                 f_max=lambda x: np.max(x),
@@ -386,8 +392,8 @@ def get_optimized_parameters_table():
     table.index.name = '#'
     return table
 
-def plot_spearman_both(scenario='all fermentation|glucose growth', **kwargs):
-    bst.plots.set_font(size=10)
+def plot_spearman_both(scenario='all fermentation-glucose growth', **kwargs):
+    bst.plots.set_font(size=9)
     bst.plots.set_figure_size(aspect_ratio=0.55, width='full')
     labels = ['TEA', 'LCA']
     br = gasferm.Biorefinery(simulate=False, scenario=scenario)
@@ -422,7 +428,7 @@ def plot_spearman_both(scenario='all fermentation|glucose growth', **kwargs):
                                          color_wheel=color_wheel,
                                          name=metric_name,
                                          xlabel="Spearman's rank correlation coefficient",
-                                         cutoff=0.14,
+                                         cutoff=0.05,
                                          **kwargs)
     # legend_kwargs = {'loc': 'upper right'}
     # plt.legend(
@@ -441,12 +447,12 @@ def plot_spearman_both(scenario='all fermentation|glucose growth', **kwargs):
         left=0.45, right=0.9,
     )
     for i in ('svg', 'png'):
-        file = os.path.join(images_folder, f'spearman.{i}')
+        file = os.path.join(images_folder, f'spearman_{scenario}.{i}')
         plt.savefig(file, dpi=900, transparent=True)
     return fig, ax
 
 def plot_spearman(kind=None, carbon_capture=True, dewatering=True, **kwargs):
-    bst.plots.set_font(size=10)
+    bst.plots.set_font(size=9)
     bst.plots.set_figure_size(aspect_ratio=0.8)
     if kind is None: kind = 'TEA'
     br = gasferm.Biorefinery(
@@ -796,7 +802,7 @@ def plot_kde_dewatering_comparison():
 def plot_kde_CI_MSP(scenarios=None):
     from warnings import filterwarnings
     filterwarnings('ignore')
-    bst.plots.set_font(size=10)
+    bst.plots.set_font(size=9)
     bst.plots.set_figure_size(width='half', aspect_ratio=1)
     if scenarios is None:
         scenarios = [
@@ -804,8 +810,6 @@ def plot_kde_CI_MSP(scenarios=None):
             'all fermentation|acetate growth'
         ]
     br = gasferm.Biorefinery(simulate=False, scenario=scenarios[0])
-    market_price = 5 # USD / kg
-    carbon_intensity = dodecanol_carbon_intensity
     metrics = [br.carbon_intensity.index, br.MSP.index]
     Xi, Yi = metrics
     ys = []
@@ -855,8 +859,8 @@ def plot_kde_CI_MSP(scenarios=None):
     # else:
     #     description = ''
     # values = ' and '.join([f"{p:.0%}" for p in opportunity_space])
-    bst.plots.plot_horizontal_line(market_price, lw=1, ls='-', color=line_color * 1.1)
-    bst.plots.plot_vertical_line(carbon_intensity, lw=1, ls='-', color=line_color * 1.1)
+    bst.plots.plot_horizontal_line(dodecanol_market_price, lw=1, ls='-', color=line_color * 1.1)
+    bst.plots.plot_vertical_line(dodecanol_carbon_intensity, lw=1, ls='-', color=line_color * 1.1)
     # plt.text(xpos(xright), ypos(ybottom), values + description, color=line_color,
     #          horizontalalignment='right', verticalalignment='bottom',
     #          fontsize=10, fontweight='bold', zorder=10)
@@ -872,7 +876,7 @@ def plot_kde_CI_MSP(scenarios=None):
 def opportunity_space(scenarios=None):
     from warnings import filterwarnings
     filterwarnings('ignore')
-    bst.plots.set_font(size=10)
+    bst.plots.set_font(size=9)
     bst.plots.set_figure_size(width='half', aspect_ratio=1)
     if scenarios is None:
         scenarios = [
@@ -911,7 +915,7 @@ def opportunity_space(scenarios=None):
 def plot_kde_CI_MSP_1d(scenarios=None):
     from warnings import filterwarnings
     filterwarnings('ignore')
-    bst.plots.set_font(size=10)
+    bst.plots.set_font(size=9)
     bst.plots.set_figure_size(width='full', aspect_ratio=0.6)
     if scenarios is None:
         scenarios = [
@@ -1099,11 +1103,11 @@ def get_monte_carlo_key(index, dct, with_units=False):
     if key in dct: key = f'{key}, {index[0]}'
     return key
     
-def montecarlo_results(carbon_capture, dewatering, metrics=None, derivative=None):
-    f = gasferm.Biorefinery(False, carbon_capture=carbon_capture, dewatering=dewatering)
+def montecarlo_results(scenario, metrics=None):
+    f = gasferm.Biorefinery(scenario=scenario, simulate=False)
     if metrics is None:
         metrics = [
-            f.GWP.index, f.MSP.index
+            f.carbon_intensity.index, f.MSP.index
         ]
     results = {}
     df = get_monte_carlo(f.scenario, metrics)

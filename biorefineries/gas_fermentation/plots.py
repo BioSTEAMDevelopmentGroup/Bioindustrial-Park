@@ -14,6 +14,7 @@ __all__ = (
     'plot_MSP_across_yield_productivity_oleochemical',
     'plot_MSP_across_AcOH_titer_oleochemical_yield',
     'plot_MSP_across_oleochemical_yield',
+    'plot_impact_of_length_to_diameters',
 )
 
 results_folder = os.path.join(os.path.dirname(__file__), 'results')
@@ -57,6 +58,62 @@ def plot_MSP_across_capacity_price(load=True):
         X, Y / 1000, Z[:, :, None], xlabel, ylabel, xticks, yticks, metric_bar,  
         fillcolor=None, styleaxiskw=dict(xtick0=False), label=True,
     )
+
+def impact_of_length_to_diameters(h2w_AcOH, h2w_oleochemical, biorefinery):
+    biorefinery.set_AcOH_bioreactor_length_to_diameter.setter(h2w_AcOH)
+    biorefinery.set_oleochemical_bioreactor_length_to_diameter.setter(h2w_oleochemical)
+    biorefinery.system.simulate()
+    return np.array([biorefinery.MSP(), biorefinery.product_yield_to_hydrogen()])
+
+def plot_impact_of_length_to_diameters(load=True):
+    bst.plots.set_font(size=9, family='sans-serif', font='Arial')
+    biorefinery = Biorefinery(simulate=False)
+    biorefinery.last_capacity = None
+    xlim = np.array(biorefinery.set_AcOH_bioreactor_length_to_diameter.bounds)
+    ylim = np.array(biorefinery.set_oleochemical_bioreactor_length_to_diameter.bounds)
+    X, Y, Z = bst.plots.generate_contour_data(
+        impact_of_length_to_diameters,
+        file=os.path.join(results_folder, 'impact_of_length_to_diameter.npy'),
+        load=load, save=True,
+        xlim=xlim, ylim=ylim,
+        args=(biorefinery,),
+        n=10,
+    )
+    
+    # Plot contours
+    ylabel = biorefinery.set_oleochemical_bioreactor_length_to_diameter.label()
+    xlabel = biorefinery.set_AcOH_bioreactor_length_to_diameter.label()
+    yticks = [2, 4, 6, 8, 10, 12]
+    xticks = [2, 4, 6, 8, 10, 12]
+    metric_bars = [
+        bst.plots.MetricBar(
+            # '', '',
+            'Minimum selling price', '$[\mathrm{USD} \cdot \mathrm{kg}^{\mathrm{-1}}]$', 
+            plt.cm.get_cmap('viridis_r'), 
+            bst.plots.rounded_tickmarks_from_data(Z[:, :, 0,], 5, 1, expand=0, p=1), 
+            30, 1, ylabelkwargs=dict(size=10), shrink=1.0,
+            title_position='horizontal',
+        ),
+        bst.plots.MetricBar(
+            # '', '',
+            'Product yield from H$_2$', '[% theoretical]',
+            plt.cm.get_cmap('copper_r'), 
+            bst.plots.rounded_tickmarks_from_data(Z[:, :, 1], 5, 0.02, expand=0, p=0.02), 
+            30, 2, ylabelkwargs=dict(size=10, labelpad=10),
+            title_position='horizontal',
+            shrink=1.0, 
+        )
+    ]
+    Z = Z[:, :, :, None]
+    fig, axes, CSs, CB, other_axes = bst.plots.plot_contour_2d(
+        X, Y, Z, xlabel, ylabel, xticks, yticks, metric_bars,  
+        fillcolor=None, styleaxiskw=[dict(xtick0=True), dict(xtick0=False)], label=True,
+        contour_label_interval=3,
+    )
+    plt.subplots_adjust(left=0.12, right=0.9, wspace=0.15, hspace=0.15, top=0.9, bottom=0.13)
+    for i in ('svg', 'png'):
+        file = os.path.join(images_folder, f'impact_of_length_to_diameter.{i}')
+        plt.savefig(file, dpi=900, transparent=True)
 
 def MSP_GWP_at_AcOH_titer_productivity(titer, productivity, biorefinery):
     biorefinery.set_AcOH_titer.setter(titer)

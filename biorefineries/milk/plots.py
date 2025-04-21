@@ -8,51 +8,11 @@ import biosteam as bst
 import os
 
 __all__ = (
-    'plot_MSP_across_capacity_price',
     'plot_MSP_across_yield_productivity',
 )
 
 results_folder = os.path.join(os.path.dirname(__file__), 'results')
 images_folder = os.path.join(os.path.dirname(__file__), 'images')
-
-def MSP_at_capacity_price(price, capacity, biorefinery):
-    biorefinery.set_H2_price.setter(price)
-    biorefinery.set_capacity.setter(capacity)
-    if biorefinery.last_capacity != capacity:
-        biorefinery.system.simulate()
-        biorefinery.last_capacity = capacity
-    MSP = biorefinery.tea.solve_price(biorefinery.dodecylacetate)
-    return np.array([MSP])
-
-def plot_MSP_across_capacity_price(load=True):
-    bst.plots.set_font(size=12, family='sans-serif', font='Arial')
-    biorefinery = Biorefinery(simulate=False)
-    biorefinery.last_capacity = None
-    xlim = np.array(biorefinery.set_H2_price.bounds)
-    ylim = np.array(biorefinery.set_capacity.bounds)
-    X, Y, Z = bst.plots.generate_contour_data(
-        MSP_at_capacity_price,
-        file=os.path.join(results_folder, 'MSP_capacity_price.npy'),
-        load=load, save=True,
-        xlim=xlim, ylim=ylim,
-        args=(biorefinery,),
-        n=10,
-    )
-    
-    # Plot contours
-    ylabel = "Production [$\mathrm{10}^{3} \cdot \mathrm{MT} \cdot \mathrm{yr}^{\mathrm{-1}}$]"
-    xlabel = '$\mathrm{H}_\mathrm{2}$ Price [$\mathrm{USD} \cdot \mathrm{kg}^{\mathrm{-1}}$]'
-    yticks = [5, 10, 15, 20, 25, 30, 35, 40, 45, 50]
-    xticks = [1.5, 2, 2.5, 3, 3.5, 4, 4.5, 5]
-    metric_bar = bst.plots.MetricBar(
-        'MSP', '$\mathrm{USD} \cdot \mathrm{kg}^{\mathrm{-1}}$', plt.cm.get_cmap('viridis_r'), 
-        bst.plots.rounded_tickmarks_from_data(Z, 5, 1, expand=0, p=0.5), 
-        10, 1
-    )
-    fig, axes, CSs, CB, other_axes = bst.plots.plot_contour_single_metric(
-        X, Y / 1000, Z[:, :, None], xlabel, ylabel, xticks, yticks, metric_bar,  
-        fillcolor=None, styleaxiskw=dict(xtick0=False), label=True,
-    )
 
 def MSP_GWP_at_yield_productivity(yield_, productivity, biorefineries, titers):
     MSPs = np.zeros([len(biorefineries), len(titers)])

@@ -247,24 +247,24 @@ def create_chemicals(yeast_includes_nitrogen=False):
         [1.2, 3.8, 0.7, 0.6, 87.7],
         wt=True,
     )
-    chemicals.define_group( # Source: 
-        'WheyCream',
-        ['Protein', 'Lactose', 'Ash', 'LacticAcid', 'Water'],
-        [0.8, 3, 0.3, 0.1, 37.5, 57.8], #LacticAcid: 35-40
-        wt=True,
-    )
-    chemicals.define_group( # Source: 
-        'Buttermilk',
-        ['Protein', 'Lactose', 'Ash', 'LacticAcid', 'Water'],
-        [2, 4, 0.5, 0.1, 7, 86.4], #LacticAcid: 7+
-        wt=True,
-    )
-    chemicals.define_group( # Source: https://www.thinkusadairy.org/products/permeate-(dairy-product-solids)/permeate-categories/whey-permeate#:~:text=Whey%20permeate%20(also%20called%20dairy%20product%20solids%2C,pleasant%20dairy%20flavor%20make%20whey%20permeate%20formulator%2Dfriendly.
-        'DriedWheyPermeate',
-        ['Protein', 'Lactose', 'ButterFat', 'Ash', 'LacticAcid', 'Water'],
-        [3.5, 82, 0.1, 8.5 + 0.83 + 0.44 + 2.47 + 0.011, 4.5],
-        wt=True,
-    )
+    # chemicals.define_group( # Source: 
+    #     'WheyCream',
+    #     ['Protein', 'Lactose', 'Ash', 'LacticAcid', 'Water'],
+    #     [0.8, 3, 0.3, 0.1, 37.5, 57.8], #LacticAcid: 35-40
+    #     wt=True,
+    # )
+    # chemicals.define_group( # Source: 
+    #     'Buttermilk',
+    #     ['Protein', 'Lactose', 'Ash', 'LacticAcid', 'Water'],
+    #     [2, 4, 0.5, 0.1, 7, 86.4], #LacticAcid: 7+
+    #     wt=True,
+    # )
+    # chemicals.define_group( # Source: https://www.thinkusadairy.org/products/permeate-(dairy-product-solids)/permeate-categories/whey-permeate#:~:text=Whey%20permeate%20(also%20called%20dairy%20product%20solids%2C,pleasant%20dairy%20flavor%20make%20whey%20permeate%20formulator%2Dfriendly.
+    #     'DriedWheyPermeate',
+    #     ['Protein', 'Lactose', 'ButterFat', 'Ash', 'LacticAcid', 'Water'],
+    #     [3.5, 82, 0.1, 8.5 + 0.83 + 0.44 + 2.47 + 0.011, 4.5],
+    #     wt=True,
+    # )
     chemicals.set_alias('Yeast', 'Cellmass')
     return chemicals
 

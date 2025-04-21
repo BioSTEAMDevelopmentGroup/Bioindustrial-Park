@@ -53,9 +53,9 @@ def create_oleochemical_system(
     AcOH_media = bst.Stream(ID='AcOH_media',  Water=100000, units='kg/hr')
     oleochemical_media = bst.Stream(ID='oleochemical_media',  Water=0, units='kg/hr')
     H2, = ins
-    dodecylacetate, = outs
+    oleochemical_product, = outs
     H2.register_alias('hydrogen')
-    dodecylacetate.register_alias('product')
+    oleochemical_product.register_alias('product')
     CO2 = bst.Stream('CO2')
     rxn = bst.Rxn('H2 + CO2 -> AceticAcid + H2O',
                   reactant='CO2', correct_atomic_balance=True, X=1) 
@@ -267,7 +267,7 @@ def create_oleochemical_system(
         wastewater.copy_flow(extract, ('Cellmass',), remove=True)
         
     ideal_thermo = bst.settings.thermo.ideal()
-    dodecylacetate._thermo = ideal_thermo
+    oleochemical_product._thermo = ideal_thermo
     heat_integration = bst.Stream(thermo=ideal_thermo)
     solvent_recovery = bst.ShortcutColumn(
         ins=heat_integration,
@@ -277,14 +277,14 @@ def create_oleochemical_system(
         partial_condenser=False,
         LHK=(solvent, product),
         k=1.5,
-        P=101325 * 0.05,
+        P=101325 * 0.2,
     )
     solvent_recovery.check_LHK = False
     bottoms_pump = bst.Pump(ins=solvent_recovery-1, P=2 * 101325)
     distillate_pump = bst.Pump(ins=solvent_recovery-0, outs=solvent_recycle, P=2 * 101325)
     hx = bst.HXprocess(
         ins=[bottoms_pump-0, oleochemical_separation-0], 
-        dT=10, outs=[dodecylacetate, heat_integration]
+        dT=10, outs=[oleochemical_product, heat_integration]
     )
     if dewatering:
         ins = [centrifuge_a-0, 

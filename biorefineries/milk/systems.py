@@ -94,7 +94,7 @@ def create_system(ins, outs, feed, product):
         rho = effluent.chemicals.Water.rho('l', T=fermentation.outs[0].T, P=101325) # kg / m3
         return water + (1./target - 1./current) * effluent.imass[product] * rho
     
-    @E1.add_bounded_numerical_specification(x0=0, x1=0.2, ytol=1e-3, xtol=1e-6, maxiter=20)
+    @E1.add_bounded_numerical_specification(x0=0, x1=0.1, ytol=1e-3, xtol=1e-6, maxiter=20)
     def evaporation(V):
         E1.V = V
         # breakpoint()

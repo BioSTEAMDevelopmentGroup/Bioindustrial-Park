@@ -68,7 +68,10 @@ class Biorefinery(bst.ProcessModel):
     
     @classmethod
     def as_scenario(cls, scenario):
-        fermentation, glucose_growth = scenario.split('|')
+        try:
+            fermentation, glucose_growth = scenario.split('|')
+        except:
+            fermentation, glucose_growth = scenario.split('-')
         if glucose_growth == 'glucose growth':
             glucose_growth = True
         elif glucose_growth == 'acetate growth':

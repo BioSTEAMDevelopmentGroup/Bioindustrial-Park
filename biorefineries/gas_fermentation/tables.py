@@ -8,7 +8,7 @@ import os
 import numpy as np
 import pandas as pd
 import biosteam as bst
-from biorefineries import gas_fermentation as Biorefinery
+from biorefineries.gas_fermentation  import Biorefinery
 from biorefineries.tea.cellulosic_ethanol_tea import foc_table, capex_table
 from thermosteam.utils import array_roundsigfigs
 
@@ -16,6 +16,7 @@ __all__ = (
     'save_system_reports',
     'save_detailed_expenditure_tables',
     'save_detailed_life_cycle_tables',  
+    'save_distribution_table',
 )
 key_scenarios = ('all fermentation-glucose growth', 'all fermentation-acetate growth')
 names = ['glucose growth', 'acetate growth']
@@ -53,7 +54,7 @@ def save_detailed_expenditure_tables(sigfigs=3):
         if key == 'CAPEX': # Bug in pandas
             for i, col in enumerate(table):
                 table[col] = values[:, i]
-        table.to_excel(writer, key)
+        table.to_excel(writer, sheet_name=key)
     writer.close()
     return tables
     
@@ -67,8 +68,8 @@ def save_detailed_life_cycle_tables(sigfigs=3):
     writer = pd.ExcelWriter(file)
     streams = [i.product for i in process_models]
     tables = {
-        'Inventory': bst.report.lca_inventory_table(
-            systems, 'GWP', streams, system_names=names
+        'LCA breakdown': bst.report.lca_displacement_allocation_table(
+            systems, 'GWP', streams, 'dodecanol', names
         ),
     }
     index = ['Dodecanol [kg∙CO2e∙kWh-1]']
@@ -81,6 +82,19 @@ def save_detailed_life_cycle_tables(sigfigs=3):
     tables['Estimated environmental impact'] = df_gwp
     for key, table in tables.items(): 
         array_roundsigfigs(table.values, sigfigs=3, inplace=True)
-        table.to_excel(writer, key) 
+        table.to_excel(writer, sheet_name=key) 
     writer.close()
     return tables
+
+def save_distribution_table():
+    folder = os.path.dirname(__file__)
+    folder = os.path.join(folder, 'results')
+    filename = 'parameters.xlsx'
+    file = os.path.join(folder, filename)
+    br = Biorefinery(scenario=key_scenarios[0])
+    df_dct = br.model.get_distribution_summary()
+    table = df_dct['Uniform']
+    table['Baseline'] = [i.baseline for i in br.parameters]
+    assert len(df_dct) == 1
+    table.to_excel(file)
+    return table
