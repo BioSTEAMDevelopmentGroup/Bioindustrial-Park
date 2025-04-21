@@ -218,8 +218,8 @@ spec_2 = titers = np.linspace(5.,
 spec_3 = productivities =\
     np.array([
                 # 0.2*spec.baseline_productivity,
-                # 1.*spec.baseline_productivity,
-                5.*spec.baseline_productivity,
+                1.*spec.baseline_productivity,
+                # 5.*spec.baseline_productivity,
               ])
 
 
@@ -691,9 +691,9 @@ if plot:
                                     comparison_range=AA_market_range,
                                     n_minor_ticks = 1,
                                     cbar_n_minor_ticks = 3,
-                                    # manual_clabels_regular = {
-                                    #     MPSP_w_ticks[5]: (45,28),
-                                    #     },
+                                    manual_clabels_regular = {
+                                        MPSP_w_ticks[4]: (50,140),
+                                        },
                                     # additional_points ={(73, 62.5):('D', 'w', 6)},
                                     fill_bottom_with_cmap_over_color=True, # for TRY
                                     bottom_fill_bounds = ((0,0), 
@@ -755,6 +755,10 @@ if plot:
                                     
                                     n_minor_ticks = 1,
                                     cbar_n_minor_ticks = 9,
+                                    manual_clabels_regular = {
+                                        GWP_w_ticks[-2]: (15,80),
+                                        },
+                                    
                                     # additional_points ={(73, 62.5):('D', 'w', 6)},
                                     fill_bottom_with_cmap_over_color=True, # for TRY
                                     bottom_fill_bounds = ((0,0), 
@@ -771,6 +775,7 @@ if plot:
                                     units_opening_brackets = [" (",] * 4,
                                     units_closing_brackets = [")",] * 4,
                                     label_over_color='white',
+                                    label_over_location=(35,23),
                                     )
     
     
@@ -881,7 +886,7 @@ if plot:
                                     # comparison_range=HP_maximum_viable_market_range,
                                     n_minor_ticks = 1,
                                     cbar_n_minor_ticks = 4,
-                                    additional_points ={(73, 62.5):('D', 'w', 6)},
+                                    # additional_points ={(73, 62.5):('D', 'w', 6)},
                                     fill_bottom_with_cmap_over_color=True, # for TRY
                                     bottom_fill_bounds = ((0,0), 
                                                           (5,60.),
@@ -947,7 +952,7 @@ if plot:
                                     # comparison_range=HP_maximum_viable_market_range,
                                     n_minor_ticks = 1,
                                     cbar_n_minor_ticks = 4,
-                                    additional_points ={(73, 62.5):('D', 'w', 6)},
+                                    # additional_points ={(73, 62.5):('D', 'w', 6)},
                                     fill_bottom_with_cmap_over_color=True, # for TRY
                                     bottom_fill_bounds = ((0,0), 
                                                           (5,60.),
@@ -1010,7 +1015,7 @@ if plot:
                                     # comparison_range=HP_maximum_viable_market_range,
                                     n_minor_ticks = 1,
                                     cbar_n_minor_ticks = 4,
-                                    additional_points ={(40.5, 35.9):('D', 'w', 6)},
+                                    # additional_points ={(40.5, 35.9):('D', 'w', 6)},
                                     # comparison_range=[Recovery_w_levels[-2], Recovery_w_levels[-1]],
                                     # comparison_range_hatch_pattern='////',
                                     bottom_fill_bounds = ((0,0), 
@@ -1097,7 +1102,7 @@ if plot:
                                     # comparison_range=HP_maximum_viable_market_range,
                                     n_minor_ticks = 1,
                                     cbar_n_minor_ticks = 4,
-                                    additional_points ={(40.5, 35.9):('D', 'w', 6)},
+                                    # additional_points ={(40.5, 35.9):('D', 'w', 6)},
                                     # comparison_range=[Rel_impact_MPSP_w_levels[-2], Rel_impact_MPSP_w_levels[-1]],
                                     # comparison_range_hatch_pattern='////',
                                     
