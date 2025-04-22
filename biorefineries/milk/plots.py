@@ -60,13 +60,13 @@ def plot_MSP_across_yield_productivity(load=True, feeds=('UFPermeate', 'GlucoseM
         n=15,
     )
     # Plot contours
-    ylabel = ["Productivity [$\mathrm{g} \cdot \mathrm{L}^{\mathrm{-1}} \cdot \mathrm{h}^{\mathrm{-1}}$]", '']
-    xlabel = ['', 'Yield [% theoretical]', '']
+    ylabel = r"Productivity [g$\cdot$L$^{-1} \cdot$h$^{-1}$]"
+    xlabel = 'Yield [% theoretical]'
     yticks = [0.1, 0.4, 0.7, 1.0]
     xticks = [30, 40, 50, 60]
     metric_bars = [
         bst.plots.MetricBar(
-            'MSP', '[$\mathrm{USD} \cdot \mathrm{kg}^{\mathrm{-1}}$]', plt.cm.get_cmap('viridis_r'), 
+            'MSP', r'[$\mathrm{USD} \cdot \mathrm{kg}^{\mathrm{-1}}$]', plt.cm.get_cmap('viridis_r'), 
             bst.plots.rounded_tickmarks_from_data(Z, 5, 1, expand=0, p=0.5), 
             12, 1, ylabelkwargs=dict(size=12),
         ),
