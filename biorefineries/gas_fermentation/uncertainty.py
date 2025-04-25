@@ -1131,6 +1131,7 @@ def run_monte_carlo_across_yield(
         scenario=scenario,
     )
     br.model.exception_hook = 'raise'
+    scenario = scenario.replace('|', '-')
     filename = f'{scenario}_monte_carlo_across_bioreactor_yield.xlsx'
     file = os.path.join(results_folder, filename)
     np.random.seed(1)
@@ -1151,7 +1152,7 @@ def run_monte_carlo_across_yield(
 def plot_monte_carlo_across_yield():
     bst.plots.set_font(size=10, family='sans-serif', font='Arial')
     bst.plots.set_figure_size(width='half', aspect_ratio=1)
-    scenario = 'all fermentation|glucose growth'
+    scenario = 'all fermentation-glucose growth'
     filename = f'{scenario}_monte_carlo_across_bioreactor_yield.xlsx'
     file = os.path.join(results_folder, filename)
     br = gasferm.Biorefinery(

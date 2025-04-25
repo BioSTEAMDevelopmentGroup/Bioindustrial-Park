@@ -47,7 +47,7 @@ class Biorefinery(bst.ProcessModel):
     >>> br = Biorefinery(simulate=False, scenario='all fermentation-glucose growth')
     >>> br.system.simulate()
     >>> br.system.diagram()
-    >>> (br.MSP(), br.GWP(), br.tea.TCI / 1e6)
+    >>> (br.MSP(), br.carbon_intensity(), br.tea.TCI / 1e6)
     (7.30, 2.80, 438.53)
     
     """
@@ -57,10 +57,11 @@ class Biorefinery(bst.ProcessModel):
         carbon_capture: bool = False
         dewatering: bool = False
         glucose_growth: bool = True
-        biomass: str = 'cornstover' # Alternatively 'miscanthus'
-        hydrogen_price: str = 'all' # Alternatively 'min' or 'max'
+        carbon_source: str = 'BFG' # Alternatively 'biomass'
+        biomass: str = 'cornstover' # Either 'miscanthus' or 'cornstover'Al
+        hydrogen_price: str = 'min' # Alternatively 'min' or 'max'
         fermentation_performance: str = 'all' # Alternatively 'min' or 'max'
-        production_capacity: str = 'baseline' # Alternatively 'all'
+    
     
     @property
     def name(self):
@@ -78,7 +79,6 @@ class Biorefinery(bst.ProcessModel):
             glucose_growth = False
         else:
             raise ValueError("invalid scenario")
-        production_capacity = 'all'
         hydrogen_price = 'min'
         match fermentation:
             case 'all fermentation':
@@ -94,10 +94,10 @@ class Biorefinery(bst.ProcessModel):
             carbon_capture=False,
             dewatering=False,
             glucose_growth=glucose_growth,
+            carbon_source='BFG',
             biomass='cornstover',
             hydrogen_price=hydrogen_price,
             fermentation_performance=fermentation_performance,
-            production_capacity=production_capacity,
             name=scenario,
         )
     
@@ -155,12 +155,22 @@ class Biorefinery(bst.ProcessModel):
                  0.0012],
                 wt=True,
             )
+        if scenario.carbon_source == 'BFG':
+            # Composition
+            # https://www.researchgate.net/publication/342635556_Advanced_Packed-Bed_Ca-Cu_Looping_Process_for_the_CO2_Capture_From_Steel_Mill_Off-Gases
+            bfg = bst.Stream(CO=23, CO2=23, H2=4.5, N2=49.5, units='m3/hr', phase='g')
+            gases = 'CO', 'CO2', 'H2', 'N2'
+            gas_flows = bfg.imass[gases] 
+            self.chemicals.define_group(
+                'BFG', gases, gas_flows, wt=True
+            )
         load_process_settings()
         system = create_oleochemical_system(
             carbon_capture=scenario.carbon_capture,
             dewatering=scenario.dewatering,
             glucose_growth=scenario.glucose_growth,
             product=scenario.product,
+            carbon_source=scenario.carbon_source,
         )
         self.tea = create_tea(
             system,
@@ -205,23 +215,6 @@ class Biorefinery(bst.ProcessModel):
         def uniform(baseline, *args, **kwargs):
             bounds = [0.8 * baseline, 1.2 * baseline]
             return parameter(*args, **kwargs, baseline=baseline, bounds=bounds)
-        
-        # @uniform(units='USD/MT', element='Carbon capture', baseline=100) 
-        # def set_carbon_capture_cost(price):
-        #     self.CC.b = 4.230769230769226 + price
-        
-        # https://pmc.ncbi.nlm.nih.gov/articles/PMC3947793/
-        # https://www.capturemap.no/the-biogenic-co2-breakdown/
-        self.BT.CO2_emissions_concentration = 15.0 / 100 # 
-        
-        # @parameter(
-        #     units='wt %', element='Boiler flue gas', 
-        #     distribution=shape.Trunc(shape.Normal(6.3 * 1.55, 0.5 * 1.55), 5.3 * 1.55, 7.3 * 1.55), 
-        #     baseline=6.3 * 1.55, 
-        #     bounds=(5.3 * 1.55, 7.3 * 1.55)
-        # ) 
-        # def set_boiler_flue_gas_CO2_content(CO2_content):
-        #     self.BT.CO2_emissions_concentration = CO2_content / 100
         
         @uniform(units='USD/kg', element='EtAc', baseline=1.57) 
         def set_ethyl_acetate_price(price):
@@ -288,19 +281,47 @@ class Biorefinery(bst.ProcessModel):
         # def set_electricity_price(price): 
         #     bst.settings.electricity_price = price
         
-        @parameter(units='MT/yr', element='oleochemical', bounds=[20000, 50000], baseline=35000)
-        def set_production_capacity(production_capacity):
-            self.production_capacity = production_capacity
-            
-        if scenario.production_capacity == 'baseline':
-            set_production_capacity.active = False
-            
-        @system.add_specification(simulate=True)
-        def adjust_production_capacity():
-            capacity = self.production_capacity / system.operating_hours * 1000 # kg / hr
-            self.system.simulate()
-            self.system.rescale(self.AcOH_media, capacity / self.product.F_mass) 
+        # https://pmc.ncbi.nlm.nih.gov/articles/PMC3947793/
+        # https://www.capturemap.no/the-biogenic-co2-breakdown/
+        self.BT.CO2_emissions_concentration = 15.0 / 100 # 
         
+        if scenario.carbon_source == 'biomass':
+            @parameter(units='MT/yr', element='oleochemical', bounds=[20000, 50000], baseline=35000)
+            def set_production_capacity(production_capacity):
+                self.production_capacity = production_capacity
+                
+            # @uniform(units='USD/MT', element='Carbon capture', baseline=100) 
+            # def set_carbon_capture_cost(price):
+            #     self.CC.b = 4.230769230769226 + price
+            
+            # @parameter(
+            #     units='wt %', element='Boiler flue gas', 
+            #     distribution=shape.Trunc(shape.Normal(6.3 * 1.55, 0.5 * 1.55), 5.3 * 1.55, 7.3 * 1.55), 
+            #     baseline=6.3 * 1.55, 
+            #     bounds=(5.3 * 1.55, 7.3 * 1.55)
+            # ) 
+            # def set_boiler_flue_gas_CO2_content(CO2_content):
+            #     self.BT.CO2_emissions_concentration = CO2_content / 100
+            
+            @system.add_specification(simulate=True)
+            def adjust_production_capacity():
+                capacity = self.production_capacity / system.operating_hours * 1000 # kg / hr
+                self.system.simulate()
+                self.system.rescale(self.AcOH_media, capacity / self.product.F_mass) 
+        elif scenario.carbon_source == 'BFG':
+            total_pig_iron_produced_US = 22.3e6 # MT / yr
+            N_facilities_US = 12
+            BFG_per_ton_pig_iron = 2.5 # Blast furnace gas (2.5 to 3.5 BFG / steel by wt)
+            pig_iron_per_facility = total_pig_iron_produced_US / N_facilities_US # MT / yr
+            BFG_per_facility = pig_iron_per_facility * BFG_per_ton_pig_iron  
+            
+            @parameter(units='MT/yr', element='flue_gas',
+                       bounds=[BFG_per_facility / 30, BFG_per_facility / 15]) # Only a fraction is used to prevent TCI > 1 billion
+            def set_flue_gas_processing_capacity(processing_capacity):
+                self.flue_gas.imass[scenario.carbon_source] = processing_capacity / system.operating_hours * 1000 # kg / hr
+        else:
+            raise ValueError('invalid carbon source')
+            
         if scenario.carbon_capture:
             baseline_length_to_diameter = 8
         else:
@@ -353,29 +374,29 @@ class Biorefinery(bst.ProcessModel):
         def set_oleochemical_bioreactor_agitation_power(kW_per_m3):
             self.oleochemical_production.kW_per_m3 = kW_per_m3
         
-        # All emissions are biogenic because we are using biomass
+        if not scenario.dewatering: self.ethyl_acetate = bst.MockStream('ethyl_acetate')
+        
         chemicals = bst.settings.chemicals
-        self.credited_biogenic_intake = lambda: (
+        self.credited_carbon_intake = lambda: (
             self.product.get_atomic_flow('C') * chemicals.CO2.MW * system.operating_hours
         )
         self.system.define_process_impact(
             key=GWPkey,
-            name='Credited biogenic intake',
+            name='Credited carbon intake',
             basis='kg',
-            inventory=self.credited_biogenic_intake,
+            inventory=self.credited_carbon_intake,
             CF=-1.,
         )
-        if not scenario.dewatering: self.ethyl_acetate = bst.MockStream('ethyl_acetate')
-        key = scenario.biomass.capitalize()
-        self.BT.fuel.set_CF(GWPkey, CFs[key])
-        if key == 'Miscanthus':
+        key = scenario.biomass
+        self.BT.fuel.set_CF(GWPkey, CFs[key.capitalize()])
+        if key == 'miscanthus':
             price_ub = 59 / 907.185 * 0.8 # https://www.sciencedirect.com/science/article/pii/S096195340700205X
             price_lb = 61.98 / 907.185 * 0.8 # https://farmdoc.illinois.edu/fast-tools/biomass-crop-budget-tool-miscanthus-and-switchgrass
-        elif key == 'Cornstover':
+        elif key == 'cornstover':
             price_lb = 59 / 907.185 * 0.8 # Humbird NREL 2011 cellulosic ethanol
             price_ub = 64.96 / 907.185 * 0.8 # https://www.extension.purdue.edu/extmedia/ec/re-3-w.pdf
         else:
-            raise ValueError('invalid biomass')
+            raise ValueError('invalid carbon source')
         self.BT.fuel.price = price_baseline = 0.5 * (price_lb + price_ub)
         
         @parameter(units='USD/MT', element='biomass', 
@@ -383,6 +404,8 @@ class Biorefinery(bst.ProcessModel):
                    baseline=price_baseline * 1000)
         def set_biomass_price(price):
             self.BT.fuel.price = price / 1000
+        
+        # bst.settings.electricity_price = 0.060 # Maryland solar REC (renewable energy certificates) # https://escholarship.org/uc/item/80n4q8xc
         
         self.hydrogen.set_CF(GWPkey, CFs['H2'])
         self.hexane.set_CF(GWPkey, CFs['Hexane'])
@@ -504,7 +527,20 @@ class Biorefinery(bst.ProcessModel):
             'Biogenic emissions': comps(self.biogenic_emissions),
             'Biomass': biomass(self.BT.fuel),
         }
-
+    
+    def MSP_CI_vs_H2_over_C(self):
+        H2_over_Cs = [1.0, 1.5, 2.0]
+        CIs = []
+        MSPs = []
+        CC = []
+        for H2_over_C in H2_over_Cs:
+            self.AcOH_production.H2_over_C = H2_over_C
+            self.system.simulate()
+            CIs.append(self.carbon_intensity())
+            MSPs.append(self.MSP())
+            CC.append(self.credited_carbon_intake())
+        return CIs, MSPs, CC
+        
 Scenario = Biorefinery.Scenario
 Biorefinery.pseudo_optimal_design_decisions = {
     (False, False): np.array([12. , 12. ,  0.6]),

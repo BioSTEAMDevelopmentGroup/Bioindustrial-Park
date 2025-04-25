@@ -419,7 +419,7 @@ class Biorefinery:
         
         ## System
         if number in system_factories:
-            self.cane_sys = cane_sys = system_factories[number](operating_hours=24 * 200, WWT_kwargs=WWT_kwargs,
+            self.system = self.cane_sys = cane_sys = system_factories[number](operating_hours=24 * 200, WWT_kwargs=WWT_kwargs,
                                                                 **system_factory_options.get(number, {}), autorename=True)
             if remove_biodiesel_production:
                 unit = flowsheet(bst.BlendingTankWithSkimming)

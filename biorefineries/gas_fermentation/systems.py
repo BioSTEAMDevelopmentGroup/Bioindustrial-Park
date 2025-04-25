@@ -39,7 +39,7 @@ __all__ = (
 
 @bst.SystemFactory(
     ID='acetyl_ester_sys',
-    ins=[dict(ID='hydrogen', H2=100, P=101325e1, price=2)],
+    ins=[dict(ID='hydrogen', H2=100, P=101325e1, price=2, phase='g')],
     outs=[dict(ID='product', price=3)],
     fthermo=create_acetate_ester_chemicals
 )
@@ -49,6 +49,7 @@ def create_oleochemical_system(
         carbon_capture=False, 
         dewatering=False, 
         product='Dodecanol',
+        carbon_source='biomass',
     ):
     AcOH_media = bst.Stream(ID='AcOH_media',  Water=100000, units='kg/hr')
     oleochemical_media = bst.Stream(ID='oleochemical_media',  Water=0, units='kg/hr')
@@ -56,56 +57,104 @@ def create_oleochemical_system(
     oleochemical_product, = outs
     H2.register_alias('hydrogen')
     oleochemical_product.register_alias('product')
-    CO2 = bst.Stream('CO2')
-    rxn = bst.Rxn('H2 + CO2 -> AceticAcid + H2O',
-                  reactant='CO2', correct_atomic_balance=True, X=1) 
+    flue_gas = bst.Stream('flue_gas', phase='g')
     # TODO: Add cellmass recycle and small ammount of cellmass production (not 10%)
     # growth = bst.Rxn('H2 + CO2 -> Cellmass + H2O', reactant='CO2',
     #                  X=0.1, correct_atomic_balance=True) 
     # rxn += growth
     # rxn_by_mass = rxn.copy('wt')
     # cellmass_coef = rxn_by_mass.istoichiometry['Cellmass'] / rxn_by_mass.istoichiometry['AceticAcid']
-    brxn = rxn.backwards(reactant='AceticAcid')
-    AcOH_production = bst.GasFedBioreactor(
-        'AcOH_production',
-        ins=[AcOH_media, H2, CO2], 
-        outs=('vent_1', 'effluent_1'), tau=100, 
-        reactions=rxn, backward_reactions=brxn,
-        optimize_power=False,
-        feed_gas_compositions={
-            1: dict(H2=100, units='kg/hr'),
-            2: dict(CO2=99, O2=1, units='kg/hr'),
-        },
-        gas_substrates=('H2', 'CO2'),
-        titer={'AceticAcid': 100},
-        batch=False,
-        length_to_diameter=12,
-        V_max=3785, # TODO: Double check validity with lanzatech (typically V_max=500)
-        theta=0.5,
-        kW_per_m3=0.,
-        T=37 + 273.15,
-    )
+    if carbon_source == 'biomass':
+        rxn = bst.Rxn('H2 + CO2 -> AceticAcid + H2O',
+                      reactant='CO2', correct_atomic_balance=True, X=1) 
+        brxn = rxn.backwards(reactant='AceticAcid')
+        AcOH_production = bst.GasFedBioreactor(
+            'AcOH_production',
+            ins=[AcOH_media, H2, flue_gas], 
+            outs=('vent_1', 'effluent_1'), tau=100, 
+            reactions=rxn, backward_reactions=brxn,
+            optimize_power=False,
+            variable_gas_feeds=[1, 2],
+            gas_substrates=('H2', 'CO2'),
+            titer={'AceticAcid': 100},
+            batch=False,
+            length_to_diameter=12,
+            V_max=3785, # TODO: Double check validity with lanzatech (typically V_max=500)
+            theta=0.5,
+            kW_per_m3=0.,
+            T=37 + 273.15,
+        )
+        # AcOH_production.cellmass_coefficient = cellmass_coef
+        @AcOH_production.add_specification(run=True)
+        def adjust_performance():
+            # titer = AcOH_production.titer['AceticAcid']
+            # AcOH_production.titer['Cellmass'] = titer * AcOH_production.cellmass_coefficient
+            if flue_gas.isempty():
+                if carbon_capture:
+                    flue_gas.imass['CO2'] = 99
+                    flue_gas.imass['O2'] = 1
+                else:
+                    flue_gas.imass['CO2'] = 10
+                    flue_gas.imass['N2'] = 88
+                    flue_gas.imass['O2'] = 2
+            if H2.isempty():
+                H2.imol['H2'] = 100
+            productivity = AcOH_production.productivity
+            AcOH_production.tau = AcOH_production.titer['AceticAcid'] / productivity
+    else:
+        ins.append(flue_gas)
+        rxn = bst.RxnSys(
+            bst.Rxn(
+                'CO + H2O -> CO2 + H2',
+                reactant='CO', correct_atomic_balance=True, X=1
+            ),
+            bst.Rxn(
+                'H2 + CO2 -> AceticAcid + H2O',
+                reactant='CO2', correct_atomic_balance=True, X=1
+            ),
+        )
+        feed_gas = bst.Stream(phase='g')
+        AcOH_production = bst.GasFedBioreactor(
+            'AcOH_production',
+            ins=[AcOH_media, feed_gas], 
+            outs=('vent_1', 'effluent_1'), 
+            tau=100, 
+            reactions=rxn, 
+            optimize_power=False,
+            gas_substrates=('H2', 'CO2', 'CO'),
+            titer={'AceticAcid': 100},
+            batch=False,
+            length_to_diameter=12,
+            V_max=3785, # TODO: Double check validity with lanzatech (typically V_max=500)
+            theta=0.5,
+            kW_per_m3=0.,
+            T=37 + 273.15,
+        )
+        # AcOH_production.cellmass_coefficient = cellmass_coef
+        AcOH_production.H2_over_C = 4.1 # Initial guess
+        @AcOH_production.add_specification(run=True)
+        def adjust_productivity():
+            feed_gas_mixer.run()
+            # titer = AcOH_production.titer['AceticAcid']
+            # AcOH_production.titer['Cellmass'] = titer * AcOH_production.cellmass_coefficient
+            productivity = AcOH_production.productivity
+            AcOH_production.tau = AcOH_production.titer['AceticAcid'] / productivity
+            # H2.imol['H2'] = H2_mol = AcOH_production.H2_over_C * flue_gas.imol['CO2', 'CO'].sum()
+    
+        @AcOH_production.add_bounded_numerical_specification(
+            x=4.1, x0=0.5, x1=8, xtol=0.001, ytol=0.001
+        )
+        def adjust_H2_flow_to_meet_percent_loss(H2_over_C):
+            # titer = AcOH_production.titer['AceticAcid']
+            # AcOH_production.titer['Cellmass'] = titer * AcOH_production.cellmass_coefficient
+            AcOH_production.H2_over_C = H2_over_C
+            H2.imol['H2'] = H2_mol = H2_over_C * flue_gas.imol['CO2', 'CO'].sum()
+            AcOH_production.run()
+            error = AcOH_production.outs[0].imol['H2'] / H2_mol - 0.01
+            return error
+    
     for i in AcOH_production.gas_coolers: i.cool_only = True
     AcOH_production.productivity = 1 # g / L / h
-    # AcOH_production.cellmass_coefficient = cellmass_coef
-    @AcOH_production.add_specification(run=True)
-    def adjust_performance():
-        # titer = AcOH_production.titer['AceticAcid']
-        # AcOH_production.titer['Cellmass'] = titer * AcOH_production.cellmass_coefficient
-        if not carbon_capture:
-            CO2_composition = AcOH_production.feed_gas_compositions[2] 
-            if CO2.isempty():
-                CO2_composition['CO2'] = 10
-                CO2_composition['N2'] = 88
-                CO2_composition['O2'] = 2
-            else:
-                CO2_composition['CO2'] = CO2.imass['CO2']
-                CO2_composition['N2'] = CO2.imass['N2']
-                CO2_composition['O2'] = CO2.imass['O2']
-                CO2_composition['H2O'] = CO2.imass['H2O']
-        productivity = AcOH_production.productivity
-        AcOH_production.tau = AcOH_production.titer['AceticAcid'] / productivity
-    
     centrifuge_a = bst.SolidsCentrifuge(
         ins=AcOH_production-1, 
         outs=('cellmass', ''),
@@ -205,7 +254,7 @@ def create_oleochemical_system(
     
     @oleochemical_production.add_specification(run=False)
     def adjust_reaction_time():
-        reactions = oleochemical_production.reactions
+        oleochemical_production.tau = oleochemical_production.titer / oleochemical_production.productivity
         oleochemical_production.run()
         vent, effluent = oleochemical_production.outs
         effluent.imol[product] += vent.imol[product]
@@ -217,10 +266,8 @@ def create_oleochemical_system(
         effluent = oleochemical_production.outs[1]
         product_mass_flow = effluent.imass[product] # effluent.get_flow('kg / hr', 'lipid')
         volumetric_flow_rate = effluent.ivol['Water', product].sum() # effluent.get_total_flow('m3/hr')
-        try:
-            return product_mass_flow / volumetric_flow_rate
-        except:
-            breakpoint()
+        if volumetric_flow_rate == 0: return 0
+        return product_mass_flow / volumetric_flow_rate
     
     oleochemical_production.get_titer = get_titer
     
@@ -230,6 +277,7 @@ def create_oleochemical_system(
         mixer.run_until(oleochemical_production, inclusive=True)
         target = oleochemical_production.titer
         current = get_titer()
+        if current == 0: return 0
         rho = oleochemical_production.chemicals.Water.rho('l', T=oleochemical_production.T, P=101325) # kg / m3
         value = water + (1./target - 1./current) * effluent.imass[product] * rho
         if value < 0: value = 0
@@ -296,79 +344,94 @@ def create_oleochemical_system(
         ins=ins, 
         outs='wastewater'
     )
-    units = bst.create_all_facilities(
-        WWT_kwargs=dict(kind="high-rate"), 
-        HXN_kwargs=dict(force_ideal_thermo=True, cache_network=True),
-        CHP_kwargs=dict(fuel_source='Biomass')
-    )
-    for BT in units:
-        if isinstance(BT, bst.BoilerTurbogenerator): 
-            ins.append(BT.fuel)
-            break
-    if carbon_capture:
-        thermo = bst.settings.thermo
-        cc_chemicals = create_cc_chemicals()
-        bst.settings.set_thermo(cc_chemicals)
-        CO2_dynamic, CO2_constant = BT.emissions, oleochemical_production-0
-        CO2_concentrated, distillate, CO2_unused = bst.Stream('CO2'), bst.Stream('distillate'), bst.Stream('biogenic_emissions', thermo=thermo)
-        splitter_cc = bst.Splitter(
-            ins=[CO2_dynamic], 
-            outs=[bst.Stream('to_CC', thermo=CO2_dynamic.thermo),
-                  CO2_unused], 
-            split=0.5, 
-            thermo=CO2_dynamic.thermo
+    if carbon_source == 'biomass':
+        CO2 = flue_gas
+        units = bst.create_all_facilities(
+            WWT_kwargs=dict(kind="high-rate"), 
+            HXN_kwargs=dict(force_ideal_thermo=True, cache_network=True),
+            CHP_kwargs=dict(fuel_source='Biomass')
         )
-        mixer_cc = bst.Mixer(ins=[splitter_cc-0, CO2_constant], outs=['to_CC'])
-        cc_chemicals = mixer_cc.chemicals
-        
-        @mixer_cc.add_specification(run=True)
-        def interface_chemicals():
-            IDs = cc_chemicals.IDs
-            for feed in mixer_cc.ins:
-                mol = feed.imol[IDs]
-                feed.empty()
-                feed.imol[IDs] = mol
-        
-        ccc = create_ccc_sys(
-            ins=[mixer_cc-0], outs=[CO2_concentrated, distillate], 
-            network_priority=bst.BoilerTurbogenerator.network_priority + 1 # Should run after the turbogenerator
-        )
-        
-        @ccc.add_bounded_numerical_specification(x0=0, x1=1)
-        def adjust_split(x):
-            splitter_cc.split[:] = x
-            for i in range(2):
-                for i in mixer_cc.system.facilities: 
-                    if isinstance(i, bst.BoilerTurbogenerator):
-                        splitter_cc.run()
-                        mixer_cc.run()
-                    i.simulate()
-            return CO2.imass['CO2'] - ccc.outs[0].imass['CO2']
-        
-        mixer = bst.Junction(upstream=ccc-0, downstream=CO2) # Interfaces property package
-        bst.settings.set_thermo(thermo)
-    else:
-        CO2_dynamic, CO2_constant = BT.emissions, oleochemical_production-0
-        splitter = bst.Splitter(
-            ins=[CO2_dynamic], 
-            outs=['', 'CO2_unused'], 
-            split=0.5, 
-        )
-        mixer = bst.Mixer(ins=[splitter-0, CO2_constant], outs=[CO2])
-        mixer.T = AcOH_production.T
-        @BT.add_specification
-        def adjust_split():
-            for i in range(2):
+        for BT in units:
+            if isinstance(BT, bst.BoilerTurbogenerator): 
+                ins.append(BT.fuel)
+                break
+        if carbon_capture:
+            thermo = bst.settings.thermo
+            cc_chemicals = create_cc_chemicals()
+            bst.settings.set_thermo(cc_chemicals)
+            CO2_dynamic, CO2_constant = BT.emissions, oleochemical_production-0
+            CO2_concentrated, distillate, CO2_unused = bst.Stream('CO2'), bst.Stream('distillate'), bst.Stream('biogenic_emissions', thermo=thermo)
+            splitter_cc = bst.Splitter(
+                ins=[CO2_dynamic], 
+                outs=[bst.Stream('to_CC', thermo=CO2_dynamic.thermo),
+                      CO2_unused], 
+                split=0.5, 
+                thermo=CO2_dynamic.thermo
+            )
+            mixer_cc = bst.Mixer(ins=[splitter_cc-0, CO2_constant], outs=['to_CC'])
+            cc_chemicals = mixer_cc.chemicals
+            
+            @mixer_cc.add_specification(run=True)
+            def interface_chemicals():
+                IDs = cc_chemicals.IDs
+                for feed in mixer_cc.ins:
+                    mol = feed.imol[IDs]
+                    feed.empty()
+                    feed.imol[IDs] = mol
+            
+            ccc = create_ccc_sys(
+                ins=[mixer_cc-0], outs=[CO2_concentrated, distillate], 
+                network_priority=bst.BoilerTurbogenerator.network_priority + 1 # Should run after the turbogenerator
+            )
+            
+            @ccc.add_bounded_numerical_specification(x0=0, x1=1)
+            def adjust_split(x):
+                splitter_cc.split[:] = x
+                for i in range(2):
+                    for i in mixer_cc.system.facilities: 
+                        if isinstance(i, bst.BoilerTurbogenerator):
+                            splitter_cc.run()
+                            mixer_cc.run()
+                        i.simulate()
+                return CO2.imass['CO2'] - ccc.outs[0].imass['CO2']
+            
+            mixer = bst.Junction(upstream=ccc-0, downstream=CO2) # Interfaces property package
+            bst.settings.set_thermo(thermo)
+        else:
+            CO2_dynamic, CO2_constant = BT.emissions, oleochemical_production-0
+            splitter = bst.Splitter(
+                ins=[CO2_dynamic], 
+                outs=['', 'CO2_unused'], 
+                split=0.5, 
+            )
+            mixer = bst.Mixer(ins=[splitter-0, CO2_constant], outs=[CO2])
+            mixer.T = AcOH_production.T
+            @BT.add_specification
+            def adjust_split():
+                for i in range(2):
+                    for i in BT.system.facilities: i.simulate()
+                    split = (CO2.imass['CO2'] - CO2_constant.imass['CO2']) / CO2_dynamic.imass['CO2']  
+                    splitter.split[:] = split
+                    splitter.run()
+                    mixer.run()
+                    CO2.imass['Water'] = 0
+                    CO2.imass['Water'] = 0.02 * CO2.F_mass # Assume 100% humidity (some water will condense)
+                    if mixer.T: CO2.T = mixer.T # Assume it is cooled cheaply by blowers.
+                    AcOH_production.simulate()
                 for i in BT.system.facilities: i.simulate()
-                split = (CO2.imass['CO2'] - CO2_constant.imass['CO2']) / CO2_dynamic.imass['CO2']  
-                splitter.split[:] = split
-                splitter.run()
-                mixer.run()
-                CO2.imass['Water'] = 0
-                CO2.imass['Water'] = 0.02 * CO2.F_mass # Assume 100% humidity (some water will condense)
-                if mixer.T: CO2.T = mixer.T # Assume it is cooled cheaply by blowers.
-                AcOH_production.simulate()
-            for i in BT.system.facilities: i.simulate()
+    else:
+        units = bst.create_all_facilities(
+            WWT_kwargs=dict(kind="high-rate"), 
+            HXN_kwargs=dict(force_ideal_thermo=True, cache_network=True),
+            CHP_kwargs=dict(fuel_source='Biomass')
+        )
+        for BT in units:
+            if isinstance(BT, bst.BoilerTurbogenerator): 
+                ins.append(BT.fuel)
+                break
+        CO2_recycle = oleochemical_production-0
+        CO2_recycle.phase = 'g'
+        feed_gas_mixer = bst.Mixer(ins=[H2, flue_gas, CO2_recycle], outs=feed_gas)
     
 
 @bst.SystemFactory(

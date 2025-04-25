@@ -22,11 +22,12 @@ characterization_factors = {
 def load_process_settings():
     settings = bst.settings
     settings.define_impact_indicator(GWP, 'kg*CO2e')
-    # settings.set_electricity_CF(
-    #     GWP, characterization_factors['Electricity'],
-    # )
+    # for i in settings.heating_agents[:-1]:
+    #     settings.set_utility_agent_CF(
+    #         i.ID, GWP, 0.2958e-3, 'kJ' # [kg*CO2*eq / kJ] From GREET 2020; Natural gas, on-site
+    #     )
     settings.CEPCI = 816.0 # 2022
-    # settings.electricity_price = 0.07
+    bst.settings.electricity_price = 0.060 # Maryland solar REC (renewable energy certificates) # https://escholarship.org/uc/item/80n4q8xc
     cw = settings.get_cooling_agent("cooling_water")
     cw.set_property('T', 70, 'degF') # https://www.sciencedirect.com/topics/earth-and-planetary-sciences/cooling-tower
     hps = settings.get_heating_agent("high_pressure_steam")

@@ -72,7 +72,7 @@ def save_detailed_life_cycle_tables(sigfigs=3):
             systems, 'GWP', streams, 'dodecanol', names
         ),
     }
-    index = ['Dodecanol [kg∙CO2e∙kWh-1]']
+    index = ['Dodecanol [kg∙CO2e∙kg-1]']
     values = np.zeros([len(index), len(names)])
     for j, pm in enumerate(process_models):
         GWPs = [pm.carbon_intensity]
