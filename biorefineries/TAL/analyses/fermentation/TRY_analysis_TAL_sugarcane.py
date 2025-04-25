@@ -140,7 +140,7 @@ get_sugar_conc_TCI = lambda: F301.installed_cost + F301_P.installed_cost + M304.
 
 # %% Generate 3-specification meshgrid and set specification loading functions
 
-steps = (60, 60, 1)
+steps = (15, 15, 1)
 
 # Yield, titer, productivity (rate)
 # spec_1 = yields = np.linspace(0.05, 0.5724, steps[0]) # yield
@@ -359,7 +359,7 @@ spec_1, spec_2 = np.meshgrid(spec_1, spec_2)
 
 print('\n\nSimulating the initial point to avoid bugs ...')
 # spec.byproduct_yields_decrease_policy = 'simultaneous, from 0 product yield'
-spec.byproduct_yields_decrease_policy = 'simultaneous, when product yield too high'
+# spec.byproduct_yields_decrease_policy = 'simultaneous, when product yield too high'
 # spec.byproduct_yields_decrease_policy = 'sequential, when product yield too high'
 spec.load_specifications(yields[0], titers[0], productivities[0])
 # spec.set_production_capacity(desired_annual_production=spec.desired_annual_production)
