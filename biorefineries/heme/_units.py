@@ -21,11 +21,20 @@ import numpy as np
 import flexsolve as flx
 
 __all__ = (
+    ##### Upstream #####    
+    # Feedstock Preparation
+    ## glucose as beginning
+    
+    # Bioreactor Fermentaion
     'SeedTrain',
     'Fermentation',
+    'PSA',
 
-    'Flash',
+    ##### Downstream #####
+    # Cell Harvesting
 
+
+    # Purification
     'Centrifuge', 'Concentration','Filtration_Agarose',
     'Sedimentation','UltraFiltration_Desalt','SprayDring',
 
@@ -40,54 +49,87 @@ class SeedTrain(bst.SeedTrain):
     _N_ins = 2
     _N_outs = 1
     _graphics = bst.SeedTrain._graphics
+
+    V_max_default = 500
     
-    def __init__(self, ID='', ins=None, outs=(), thermo=None, *,
-                 vessel_material='Carbon steel', vessel_type='Vertical',
-                 wall_thickness_factor=1):
-        bst.SeedTrain.__init__(self, ID, ins, outs, thermo)
-        self.vessel_material = vessel_material
-        self.vessel_type = vessel_type
-        self.wall_thickness_factor = wall_thickness_factor
+    def _init(self, reactions=None, saccharification=False):
+        self.saccharification = saccharification
+        chemicals = self.chemicals
+        self.reactions = reactions or tmo.PRxn([
+    #   Reaction definition                   Reactant    Conversion
+    tmo.Rxn('Glucose -> 2 Ethanol + 2 CO2',       'Glucose',   0.90, chemicals, correct_mass_balance=True),
+    tmo.Rxn('Glucose -> Cellmass',                'Glucose',  0.05, chemicals, correct_mass_balance=True),
+        ])
+
+    def _setup(self):
+        super()._setup()
+        self.outs[0].phase = 'g'
+
+    def _run(self):
+        vent, effluent= self.outs
+        effluent.mix_from(self.ins, energy_balance=False)
+        self.reactions.force_reaction(effluent)
+        effluent.mol.remove_negatives()
+        effluent.T = self.T
+        vent.empty()
+        vent.copy_flow(effluent, ('CO2', 'O2', 'N2'), remove=True)
+
+class Fermentation(bst.AeratedBioReactor):
+    V_max_default = 500
+    def _init(
+            self, fermentation_reaction, cell_growth_reaction, 
+            dT_hx_loop=8,
+            Q_O2_consumption=-460240, 
+            # [kJ/kmol] equivalent to 110 kcal / mol 
+            # as in https://www.academia.edu/19636928/Bioreactor_Design_for_Chemical_Engineers
+            batch=True,
+            **kwargs,
+        ):
+        bst.AeratedBioreactor._init(self, reactions=None, batch=batch, dT_hx_loop=dT_hx_loop, 
+                                    Q_O2_consumption=Q_O2_consumption,
+                                    optimize_power=True, **kwargs)
+        chemicals = self.chemicals
     
-    def _design(self):
-        bst.SeedTrain._design(self)
-        self.design_results['Wall thickness'] *= self.wall_thickness_factor
-        self.design_results['Weight'] *= self.wall_thickness_factor
+        self.fermentation_reaction = fermentation_reaction
+        self.cell_growth_reaction = cell_growth_reaction
+
+        self.LegH_reaction = bst.SRxn([
+            bst.PRxn([
+                bst.Rxn('Glucose + FeSO4 + NH3 + O2 -> Heme_b + H2O + H2SO4', 'TAG', 0.90, chemicals,correct_mass_balance=True),
+                bst.Rxn('Glucose +  (NH4)2SO4 + O2 -> Protein + H2O + H2SO4', 'TAG', 0.90, chemicals,correct_mass_balance=True)]),
+            bst.Rxn('Heme_b + Protein -> Leghemoglobin', 'TAG', 0.95, chemicals,correct_mass_balance=True)
+        ])
     
-    def _cost(self):
-        bst.SeedTrain._cost(self)
-        
-
-# class SeedTrain(cellulosic.SeedTrain): pass
-
-
-# class SeedTrain(Unit):
-
-class Fermentation(bst.AeratedBioReactor): pass
+    def _run_vent(self, vent, effluent):
+        vent.copy_flow(effluent, ('CO2', 'O2', 'N2'), remove=True)
+        assert not effluent.imol['CO2', 'O2', 'N2'].any()
+    
+    def _run_reactions(self, effluent):
+        self.LegH_reaction.force_reaction(effluent)
+        if effluent.imol['H2O'] < 0.: effluent.imol['H2O'] = 0.
+        self.fermentation_reaction.force_reaction(effluent)
+        self.cell_growth_reaction.force_reaction(effluent) 
 
 # %%
-class Flash(bst.Flash): 
-    N_ins = 1
-    _N_outs = 2
-    _N_heat_utilities = 1
-    _graphics = bst.Flash._graphics
+class PSA(bst.Flash):
+    _units= {'Liquid flow': 'kg/hr'}
     
-    def __init__(self, ID='', ins=None, outs=(), thermo=None, *,
-                 P=101325, Q=0, Q_in=False,
-                 vessel_material='Carbon steel', vessel_type='Vertical',
-                 wall_thickness_factor=1):
-        bst.Flash.__init__(self, ID, ins, outs, thermo, P=P, Q=Q, Q_in=Q_in)
-        self.vessel_material = vessel_material
-        self.vessel_type = vessel_type
-        self.wall_thickness_factor = wall_thickness_factor
-    
+    def _run(self):
+        influent = self.ins[0]
+        vapor, liquid = self.outs
+        
+        ms = tmo.MultiStream('ms')
+        ms.copy_like(influent)
+        ms.vle(P=101325, H=ms.H)
+        
+        vapor.mol = ms.imol['g']
+        vapor.phase = 'g'
+        liquid.mol = ms.imol['l']
+        vapor.T = liquid.T = ms.T
+        vapor.P = liquid.P = ms.P
+        
     def _design(self):
-        bst.Flash._design(self)
-        self.design_results['Wall thickness'] *= self.wall_thickness_factor
-        self.design_results['Weight'] *= self.wall_thickness_factor
-    
-    def _cost(self):
-        bst.Flash._cost(self)
+        self.design_results['Liquid flow'] = self.outs[1].F_mass
 
 
 class CellDisruption(bst.Homogenizer): pass
@@ -95,52 +137,14 @@ class CellDisruption(bst.Homogenizer): pass
 
 # %%
 
-@cost('Flow rate', units='kg/hr', CE=CEPCI_by_year[2010], cost=100000, S=100000, n=0.6, kW=100)
-@copy_algorithm(bst.SolidLiquidsSplitCentrifuge, run=False)
-class Centrifuge(bst.Splitter):
-    _graphics = bst.SolidLiquidsSplitCentrifuge._graphics
-    def __init__(self, ID='', ins=None, outs=(), thermo=None, *,
-                 split=None,
-                 vessel_material='Carbon steel', vessel_type='Vertical',
-                 wall_thickness_factor=1):
-        bst.Splitter.__init__(self, ID, ins, outs, thermo, split=split)
-        self.vessel_material = vessel_material
-        self.vessel_type = vessel_type
-        self.wall_thickness_factor = wall_thickness_factor
-    
-    def _design(self):
-        bst.Splitter._design(self)
-        self.design_results['Wall thickness'] *= self.wall_thickness_factor
-        self.design_results['Weight'] *= self.wall_thickness_factor
-    
-    def _cost(self):
-        bst.Splitter._cost(self)
-        
-# class Centrifuge(bst.SpliSolidLiquidsSplitCentrifugetter): pass
+#@cost('Flow rate', units='kg/hr', CE=CEPCI_by_year[2010], cost=100000, S=100000, n=0.6, kW=100)
+#@copy_algorithm(bst.SolidLiquidsSplitCentrifuge, run=False)       
+class Centrifuge(bst.SpliSolidLiquidsSplitCentrifugetter): pass
 
 # %%
 class Evaporator(bst.MultiEffectEvaporator):
     _N_ins = 1
     _N_outs = 2
-    _N_heat_utilities = 0
-    _graphics = bst.MultiEffectEvaporator._graphics
-    
-    def __init__(self, ID='', ins=None, outs=(), thermo=None, *,
-                 P = (101325, 73580, 50892, 32777),
-                 vessel_material='Carbon steel', vessel_type='Vertical',
-                 wall_thickness_factor=1):
-        bst.MultiEffectEvaporator.__init__(self, ID, ins, outs, thermo, P=P)
-        self.vessel_material = vessel_material
-        self.vessel_type = vessel_type
-        self.wall_thickness_factor = wall_thickness_factor
-    
-    def _design(self):
-        bst.MultiEffectEvaporator._design(self)
-        self.design_results['Wall thickness'] *= self.wall_thickness_factor
-        self.design_results['Weight'] *= self.wall_thickness_factor
-    
-    def _cost(self):
-        bst.MultiEffectEvaporator._cost(self)
 
 # %%
 
