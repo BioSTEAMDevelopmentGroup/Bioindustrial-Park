@@ -36,7 +36,7 @@ def create_saccharification_system(
     slurry, = outs
     if nonsolids is None: nonsolids = c.default_nonsolids
     if insoluble_solids is None: insoluble_solids = c.default_insoluble_solids
-    if insoluble_solids_loading is None: insoluble_solids_loading = 10.3
+    if insoluble_solids_loading is None: insoluble_solids_loading = 0.103
     if solids_loading is None: solids_loading = 0.2
     if ignored is None: ignored = c.default_ignored
     M301 = units.EnzymeHydrolysateMixer('M301', (pretreated_biomass, cellulase, saccharification_water))

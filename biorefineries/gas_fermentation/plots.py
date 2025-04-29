@@ -124,7 +124,7 @@ def MSP_GWP_at_AcOH_titer_productivity(titer, productivity, biorefinery):
 def MSP_GWP_at_oleochemical_yield_productivity(yield_, productivity, biorefineries):
     values = np.zeros([2, len(biorefineries)])
     for i, biorefinery in enumerate(biorefineries):
-        biorefinery.set_oleochemical_production_phase_yield.setter(yield_)
+        biorefinery.set_oleochemical_bioreactor_yield.setter(yield_)
         biorefinery.set_oleochemical_productivity.setter(productivity)
         biorefinery.system.simulate()
         values[:, i] = [biorefinery.MSP(), biorefinery.carbon_intensity()]
@@ -134,7 +134,7 @@ def MSP_GWP_at_AcOH_titer_oleochemical_yield(titer, yield_, biorefineries):
     values = np.zeros([2, len(biorefineries)])
     for i, biorefinery in enumerate(biorefineries):
         biorefinery.set_AcOH_titer.setter(titer)
-        biorefinery.set_oleochemical_production_phase_yield.setter(yield_)
+        biorefinery.set_oleochemical_bioreactor_yield.setter(yield_)
         biorefinery.system.simulate()
         values[:, i] = [biorefinery.MSP(), biorefinery.carbon_intensity()]
     return values
@@ -143,7 +143,7 @@ def MSP_GWP_at_oleochemical_yield(biomass, yield_, biorefineries):
     values = np.zeros([2, len(biorefineries)])
     for i, biorefinery in enumerate(biorefineries):
         biorefinery.set_oleochemical_specific_yield.setter(biomass)
-        biorefinery.set_oleochemical_production_phase_yield.setter(yield_)
+        biorefinery.set_oleochemical_bioreactor_yield.setter(yield_)
         biorefinery.system.simulate()
         values[:, i] = [biorefinery.MSP(), biorefinery.carbon_intensity()]
     return values
@@ -158,14 +158,14 @@ def plot_MSP_across_oleochemical_yield(load=True):
     ]
     br = biorefineries[0]
     xlim = np.array(br.set_oleochemical_specific_yield.bounds)
-    ylim = np.array(br.set_oleochemical_production_phase_yield.bounds)
+    ylim = np.array(br.set_oleochemical_bioreactor_yield.bounds)
     X, Y, Z = bst.plots.generate_contour_data(
         MSP_GWP_at_oleochemical_yield,
         file=os.path.join(results_folder, 'MSP_GWP_oleochemical_yield.npy'),
         load=load, save=True,
         xlim=xlim, ylim=ylim,
         args=(biorefineries,),
-        n=4,
+        n=10,
     )
     # Z = np.swapaxes(Z, 2, 3)
     # Plot contours
@@ -179,7 +179,7 @@ def plot_MSP_across_oleochemical_yield(load=True):
             'Minimum selling price', '$[\mathrm{USD} \cdot \mathrm{kg}^{\mathrm{-1}}]$', 
             plt.cm.get_cmap('viridis_r'), 
             bst.plots.rounded_tickmarks_from_data(Z[:, :, 0, :], 5, 1, expand=0, p=1), 
-            15, 1, ylabelkwargs=dict(size=10), shrink=1.0,
+            20, 1, ylabelkwargs=dict(size=10), shrink=1.0,
             title_position='horizontal',
         ),
         bst.plots.MetricBar(
@@ -187,7 +187,7 @@ def plot_MSP_across_oleochemical_yield(load=True):
             'Carbon intensity', '$[\mathrm{kg} \cdot \mathrm{CO}_{\mathrm{2}}\mathrm{e} \cdot \mathrm{kg}^{\mathrm{-1}}]$',
             plt.cm.get_cmap('copper_r'), 
             bst.plots.rounded_tickmarks_from_data(Z[:, :, 1, :], 5, 1, expand=0, p=0.5), 
-            15, 1, ylabelkwargs=dict(size=10, labelpad=10),
+            20, 1, ylabelkwargs=dict(size=10, labelpad=10),
             title_position='horizontal',
             shrink=1.0, 
         )
@@ -195,9 +195,9 @@ def plot_MSP_across_oleochemical_yield(load=True):
     fig, axes, CSs, CB, other_axes = bst.plots.plot_contour_2d(
         X, Y, Z, xlabel, ylabel, xticks, yticks, metric_bars,  
         fillcolor=None, styleaxiskw=[dict(xtick0=True), dict(xtick0=False)], label=True,
-        contour_label_interval=3,
+        contour_label_interval=2,
     )
-    plt.subplots_adjust(left=0.12, right=0.9, wspace=0.15, hspace=0.15, top=0.9, bottom=0.13)
+    plt.subplots_adjust(left=0.12, right=0.85, wspace=0.15, hspace=0.15, top=0.9, bottom=0.13)
     for i in ('svg', 'png'):
         file = os.path.join(images_folder, f'oleochemical_yield_contours.{i}')
         plt.savefig(file, dpi=900, transparent=True)
@@ -212,7 +212,7 @@ def plot_MSP_across_AcOH_titer_oleochemical_yield(load=True):
     ]
     br = biorefineries[0]
     xlim = np.array(br.set_AcOH_titer.bounds)
-    ylim = np.array(br.set_oleochemical_production_phase_yield.bounds)
+    ylim = np.array(br.set_oleochemical_bioreactor_yield.bounds)
     X, Y, Z = bst.plots.generate_contour_data(
         MSP_GWP_at_AcOH_titer_oleochemical_yield,
         file=os.path.join(results_folder, 'MSP_GWP_AcOH_titer_oleochemical_yield.npy'),
@@ -290,7 +290,7 @@ def plot_MSP_across_yield_productivity_oleochemical(load=True):
         for i in ('glucose', 'acetate')    
     ]
     br = biorefineries[0]
-    xlim = np.array(br.set_oleochemical_production_phase_yield.bounds)
+    xlim = np.array(br.set_oleochemical_bioreactor_yield.bounds)
     ylim = np.array(br.set_oleochemical_productivity.bounds)
     X, Y, Z = bst.plots.generate_contour_data(
         MSP_GWP_at_oleochemical_yield_productivity,

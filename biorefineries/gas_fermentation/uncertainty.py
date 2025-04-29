@@ -18,6 +18,7 @@ from biorefineries import gas_fermentation
 import seaborn as sns
 import yaml
 from scipy import interpolate
+from chaospy import distributions as shape
 
 __all__ = ('run_monte_carlo', 
            'run_all_monte_carlo',
@@ -25,6 +26,7 @@ __all__ = ('run_monte_carlo',
            'plot_spearman', 
            'plot_kde',
            'plot_spearman_both',
+           'plot_spearman_scenarios',
            'sobol_analysis',
            'montecarlo_results',
            'opportunity_space',
@@ -97,7 +99,7 @@ def _plot_monte_carlo(box):
         ['MSP', 'carbon_intensity'], 
         ['TCI', 'electricity_demand'],
         # ['product_yield_to_hydrogen', 'product_yield_to_biomass'],
-        ['hydrogen_consumption', 'biomass_burned'],
+        ['hydrogen_consumption', 'production_capacity'],
     ]
     pm = model_pairs[0][1]
     # Subplots
@@ -222,15 +224,16 @@ def get_spearman_names(parameters):
     }
     
     def with_units(f, name, units=None):
-        name = name.replace('bioreactor ', '').replace('production capacity', 'production')
+        name = name.replace('bioreactor ', '').replace(' production', '').replace('oleochemical', 'oleochem.')
         d = f.distribution
         dname = type(d).__name__
         if units is None: units = f.units
+        units = units.replace('Dodecanol', 'prod.')
         if dname == 'Triangle':
-            distribution = ', '.join([format(j, '.3g')
+            distribution = ', '.join([format(j, '.2g')
                                       for j in d._repr.values()])
         elif dname == 'Uniform':
-            distribution = ' $-$ '.join([format(j, '.3g')
+            distribution = ' $-$ '.join([format(j, '.2g')
                                          for j in d._repr.values()])
         if units is None:
             return f"{name}\n[{distribution}]"
@@ -448,6 +451,84 @@ def plot_spearman_both(scenario='all fermentation-glucose growth', **kwargs):
     )
     for i in ('svg', 'png'):
         file = os.path.join(images_folder, f'spearman_{scenario}.{i}')
+        plt.savefig(file, dpi=900, transparent=True)
+    return fig, ax
+
+def plot_spearman_scenarios(
+        scenarios=('all fermentation-glucose growth', 
+                   'all fermentation-acetate growth'),
+        kind='TEA',
+        **kwargs
+    ):
+    bst.plots.set_font(size=9)
+    bst.plots.set_figure_size(aspect_ratio=1, width='half')
+    labels = ['glucose-fed seed', 'acetate-fed seed']
+    rhos = []
+    first = scenarios[0]
+    br = gasferm.Biorefinery(simulate=False, scenario=first)
+    br.set_flue_gas_processing_capacity.units = '10^5 MT/y'
+    br.set_flue_gas_processing_capacity.name = 'consumption'
+    bounds = np.array(1e-5) * br.set_flue_gas_processing_capacity.bounds
+    br.set_flue_gas_processing_capacity.distribution = shape.Uniform(*bounds)
+    # bounds = np.array(1e3) * br.set_glucose_price.bounds
+    # br.set_glucose_price.distribution = shape.Uniform(*bounds)
+    # br.set_glucose_price.units = 'cents/kg'
+    file = spearman_file_name(br.name)
+    df = pd.read_excel(file, header=[0, 1], index_col=[0, 1])
+    names = [*get_spearman_names(br.model.parameters).values()]
+    index = [i for i in range(len(df.index))]
+    for scenario in scenarios:
+        br = gasferm.Biorefinery(simulate=False, scenario=scenario)
+        file = spearman_file_name(br.name)
+        df = pd.read_excel(file, header=[0, 1], index_col=[0, 1])
+        if kind == 'TEA':
+            metric = br.MSP
+            metric_name = metric.name
+            values = df[metric.index]
+            br.set_product_price.element = 'dodecylacetate'
+            values[br.set_product_price.index] = 0
+        elif kind == 'LCA':
+            metric = br.carbon_intensity
+            metric_name = r'carbon intensity'
+            values = df[metric.index]
+            for i in br.model.parameters:
+                name = i.name.lower()
+                if 'price' in name or 'capacity' in name: 
+                    values[i.index] = 0
+        else:
+            raise ValueError(f"invalid kind '{kind}'")
+        values = values.iloc[index]
+        rhos.append(values)
+    color_wheel = [
+        GG_colors.red, GG_colors.blue
+    ]
+    # breakpoint()
+    label = metric.label()
+    label = label.replace('Carbon intensity', 'CI')
+    fig, ax = bst.plots.plot_spearman_2d(rhos, index=names,
+                                         color_wheel=color_wheel,
+                                         name=metric_name,
+                                         xlabel=r"Spearman's rank correlation" "\nwith " + label,
+                                         top=6,
+                                         **kwargs)
+    # legend_kwargs = {'loc': 'upper right'}
+    # plt.legend(
+    #     handles=[
+    #         mpatches.Patch(
+    #             color=color_wheel[i].RGBn, 
+    #             label=metric_names[i],
+    #         )
+    #         for i in range(len(labels))
+    #     ], 
+    #     **legend_kwargs,
+    # )
+    plt.subplots_adjust(
+        hspace=0.05, wspace=0.05,
+        top=0.98, bottom=0.16,
+        left=0.45, right=0.88,
+    )
+    for i in ('svg', 'png'):
+        file = os.path.join(images_folder, f'spearman_all_scenarios_{kind}.{i}')
         plt.savefig(file, dpi=900, transparent=True)
     return fig, ax
 

@@ -230,7 +230,7 @@ class Biorefinery(bst.ProcessModel):
             if scenario.glucose_growth:
                 self.seedtrain_feed.price = price * 0.1
         
-        @parameter(units='USD/kg', element='dodecylacetate', bounds=[3, 6],
+        @parameter(units='USD/kg', element='oleochemical', bounds=[3, 6],
                    baseline=3, distribution='uniform') # https://www.alibaba.com/product-detail/Factory-direct-sale-DODECYL-ACETATE-CAS_1601041319372.html
         def set_product_price(price):
             self.product.price = price
@@ -266,7 +266,7 @@ class Biorefinery(bst.ProcessModel):
             self.oleochemical_production.reactions.X[0] = X / 100.
         
         @parameter(units='g_{' + scenario.product + '}/g_{cell}', element='Oleochemical production', 
-                   bounds=[0.7, 7.0], baseline=3.5, distribution='uniform')
+                   bounds=[0.7, 3.5], baseline=0.7, distribution='uniform')
         def set_oleochemical_specific_yield(specific_yield):
             self.oleochemical_production.specific_yield = specific_yield
         
@@ -315,7 +315,7 @@ class Biorefinery(bst.ProcessModel):
             pig_iron_per_facility = total_pig_iron_produced_US / N_facilities_US # MT / yr
             BFG_per_facility = pig_iron_per_facility * BFG_per_ton_pig_iron  
             
-            @parameter(units='MT/yr', element='flue_gas',
+            @parameter(units='MT/yr', element='Flue gas',
                        bounds=[BFG_per_facility / 30, BFG_per_facility / 15]) # Only a fraction is used to prevent TCI > 1 billion
             def set_flue_gas_processing_capacity(processing_capacity):
                 self.flue_gas.imass[scenario.carbon_source] = processing_capacity / system.operating_hours * 1000 # kg / hr
@@ -428,7 +428,10 @@ class Biorefinery(bst.ProcessModel):
         
         @metric(units='wt %')
         def product_yield_to_biomass():
-            return self.product.F_mass / self.BT.fuel.F_mass
+            try: 
+                return self.product.F_mass / self.BT.fuel.F_mass
+            except:
+                return 0
         
         @metric(units='% theoretical')
         def product_yield_to_hydrogen():
@@ -445,6 +448,11 @@ class Biorefinery(bst.ProcessModel):
         @metric(units='kWh/kg-H2')
         def electricity_demand(): 
             return self.system.get_electricity_production() / (self.product.F_mass * self.system.operating_hours)
+        
+        if scenario.carbon_source != 'biomass':
+            @metric(units='MT/yr', element='oleochemical')
+            def production_capacity():
+                return self.system.get_mass_flow(self.product) / 1e3
         
         for i in model.parameters:
             if i.distribution is None: i.distribution = cp.Uniform(*i.bounds)
@@ -527,6 +535,17 @@ class Biorefinery(bst.ProcessModel):
             'Biogenic emissions': comps(self.biogenic_emissions),
             'Biomass': biomass(self.BT.fuel),
         }
+    
+    def MSP_CI_vs_specific_yield(self):
+        specific_yields = [0.7, 1.0, 1.5, 2.0, 2.5, 3, 3.5]
+        CIs = []
+        MSPs = []
+        for specific_yield in specific_yields:
+            self.oleochemical_production.specific_yield = specific_yield
+            self.system.simulate()
+            CIs.append(self.carbon_intensity())
+            MSPs.append(self.MSP())
+        return CIs, MSPs
     
     def MSP_CI_vs_H2_over_C(self):
         H2_over_Cs = [1.0, 1.5, 2.0]

@@ -205,7 +205,7 @@ def create_oleochemical_system(
         def adjust_feed():
             glucose_to_substrate = (
                 rxn.product_yield(product, 'wt') # g product / g acetate
-                / oleochemical_production.cell_demand # g product / g biomass
+                / oleochemical_production.specific_yield # g product / g biomass
                 / growth.product_yield('Cellmass', 'wt') # g biomass / g glucose
             ) # g glucose / g acetate
             glucose = AcOH.imass['AceticAcid'] * glucose_to_substrate
@@ -225,7 +225,7 @@ def create_oleochemical_system(
             # 0.7 g product / g biomass required
             seed_to_ferm_ratio = (
                 rxn.product_yield(product, 'wt') # g product / g acetate-ferm
-                / oleochemical_production.cell_demand # g product / g biomass
+                / oleochemical_production.specific_yield # g product / g biomass
                 / growth.product_yield('Cellmass', 'wt') # g biomass / g acetate-seed
             ) # g seed / g fermented
             seed_splitter.split[:] = 1 - 1 / (seed_to_ferm_ratio + 1)
@@ -248,7 +248,7 @@ def create_oleochemical_system(
         length_to_diameter=12,
         kW_per_m3=0.6
     )
-    oleochemical_production.cell_demand = 0.7 # g product / g biomass required
+    oleochemical_production.specific_yield = 0.7 # g product / g biomass required
     oleochemical_production.titer = 100
     oleochemical_production.productivity = 1
     
