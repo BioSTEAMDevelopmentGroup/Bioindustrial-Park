@@ -1,12 +1,13 @@
 # -*- coding: utf-8 -*-
 """
-Created on 2025-04-16 15:19:55
+Created on 2025-04-30 15:36:46
 
 @author: Dr. Ouwen Peng
 @title: Postdoctoral Researcher
 @institute: Illinois ARCS
 @email: ouwen.peng@iarcs-create.edu.sg
 """
+
 # %%
 import biosteam as bst
 import thermosteam as tmo
@@ -14,26 +15,9 @@ import numpy as np
 from biosteam.utils import chemical_cache
 
 __all__ = (
-    # 'create_culture_media',
-    # 'create_trace_metal_solution',
-    # 'create_antibiotics',
-    # 'create_feed1',
-    # 'create_feed2',
-    # 'create_leghemoglobin_chemicals',
-    'create_chemical_LegH',
+    'create_chemical_LegH'
 )
 _cal2joule = 4.184 # auom('cal').conversion_factor('J')
-
-chemical_groups = dict(
-    Culture_Media = ('Yeast', 'H2O', 'Glucose', 'FeSO4', 'KH2PO4', '(NH4)2HPO4', 'KOH', 'MgSO4', 'CitricAcid'),
-    Trace_Metal_Solution = ('H2O', 'HCl', 'CaCl2', 'ZnSO4', 'MnSO4', 'CoCl2', 'CuSO4', '(NH4)6Mo7O24', 'Na2B4O7'),
-    Feed1 = ('H2O', 'Glucose', 'MgSO4'),
-    Feed2 = ('H2O', 'Glucose', 'MgSO4', 'IPTG', '(NH4)2SO4', 'FeSO4', 'ZnSO4'),
-    Leghemoglobin = ('heme_b', 'Protein'),
-
-    Other_InsolubleSolids = ()
-)
-
 # %%
 #
 def create_chemical_LegH(set_thermo=True,yeast_includes_nitrogen=False):
@@ -47,6 +31,7 @@ def create_chemical_LegH(set_thermo=True,yeast_includes_nitrogen=False):
     # Culture Media
     ####
     add_chemical('H2O')
+    add_chemical('Glycine')
 
     add_chemical('H2SO4', phase='l')
     ##### Gases #####
@@ -60,7 +45,6 @@ def create_chemical_LegH(set_thermo=True,yeast_includes_nitrogen=False):
     NO2 = add_chemical('NO2', phase='g')
     H2S = add_chemical('H2S', phase='g', Hf=-4927*_cal2joule)
     SO2 = add_chemical('SO2', phase='g')
-
 
     ##### Soluble inorganics #####
     # culture_media
@@ -118,11 +102,11 @@ def create_chemical_LegH(set_thermo=True,yeast_includes_nitrogen=False):
     # Only protein: 144 amino acids Formula:C729H1166N200O219S2​
     # https://www.uniprot.org/uniprotkb/P02236/entry#sequences
     protein_formula = {
-        'H': 1166 / 729,
-        'C': 729 / 729,
-        'N': 200 / 729,
-        'O': 219 / 729,
-        'S': 2 / 729
+        'H': 1166 ,
+        'C': 729 ,
+        'N': 200 ,
+        'O': 219 ,
+        'S': 2 
     }
     formula = {i: round(j, 2) for i, j in protein_formula.items()}
     Protein = add_chemical(
@@ -133,12 +117,12 @@ def create_chemical_LegH(set_thermo=True,yeast_includes_nitrogen=False):
         phase='s'
     )
     Leghemoglobin_formula = {
-        'H': (1166+32) / 729,
-        'C': (729+34) / 729,
-        'N': (200 +4) / 729,
-        'O': (219+4) / 729,
-        'S': 2 / 729,
-        'Fe': 1 / 729
+        'H': (1166+32) ,
+        'C': (729+34) ,
+        'N': (200 +4) ,
+        'O': (219+4) ,
+        'S': 2 ,
+        'Fe': 1 
     }
     formula2 = {i: round(j, 2) for i, j in Leghemoglobin_formula.items()}
     Leghemoglobin = add_chemical(
@@ -161,51 +145,21 @@ def create_chemical_LegH(set_thermo=True,yeast_includes_nitrogen=False):
         [28, 72],
         wt=True
     )
+
+    # 16hour 150ml
     chems.define_group(
-        'Culture_Media',
-        ['Yeast', 'H2O', 'NaCl', 'Glucose', 'FeSO4', 'KH2PO4', '(NH4)2HPO4', 'KOH', 'MgSO4', 'CitricAcid'],
-        [5, 1000, 10, 20, 0.05, 10, 4, 5, 1, 1.3],
+        'Seed',
+        ['H2O','(NH4)2SO4','Glucose','MgSO4','KH2PO4'],
+        [98.15, 0.5, 1, 0.05, 0.3],
         wt=True
     )
 
+    # 1.5 L
     chems.define_group(
-        'Trace_Metal_Solution',
-        ['H2O', 'HCl', 'CaCl2', 'ZnSO4', 'MnSO4', 
-        'CoCl2', 'CuSO4', '(NH4)6Mo7O24', 'Na2B4O7'],
-        [1000, 5*0.3, 2, 2.3, 2, 0.25, 1, 0.3, 0.5],
-        wt=True,
+        'Culture',
+        ['Seed','Glycine','Glucose','FeSO4'],
+        [1000, 0.1, 60, 15.191],
+        wt=True
     )
-
-    chems.define_group(
-        'Antibiotics',
-        ['H2O', 'Ampicillin', 'Kanamycin', 'Streptomycin', 
-        'Chloramphenicol', 'IPTG'],
-        [1000, 0.05, 0.025, 0.05, 0.017, 0.01],
-        wt=True,
-    )
-
-    chems.define_group(
-        'Feed1',
-        ['H2O', 'Glucose', 'MgSO4'],
-        [1000, 800, 14],
-        wt=True,
-    )
-
-    chems.define_group(
-        'Feed2',
-        ['H2O', 'Glucose', 'MgSO4', 'IPTG', '(NH4)2SO4', 
-        'FeSO4', 'ZnSO4'],
-        [1000, 800, 14, 0.01, 5, 4, 4],
-        wt=True,
-    )
-    
-    # chems.define_group(
-    #     'Leghemoglobin',
-    #     ['Heme_b', 'Protein'],
-    #     np.array([1, 729]) / 729,
-    #     wt=True,
-    # )
-
-    
     if set_thermo: bst.settings.set_thermo(chems)
     return chems

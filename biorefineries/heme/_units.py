@@ -26,19 +26,19 @@ __all__ = (
     ## glucose as beginning
     
     # Bioreactor Fermentaion
-    'SeedTrain',
+    #'SeedTrain',
     'Fermentation',
-    'PSA',
+    #'PSA',
 
     ##### Downstream #####
     # Cell Harvesting
 
 
     # Purification
-    'Centrifuge', 'Concentration','Filtration_Agarose',
-    'Sedimentation','UltraFiltration_Desalt','SprayDring',
+    #'Centrifuge', 'Concentration','Filtration_Agarose',
+    #'Sedimentation','UltraFiltration_Desalt','SprayDring',
 
-    'ScrewPress','CellDisruption',
+    #'ScrewPress','CellDisruption',
 )
 
 
@@ -74,7 +74,11 @@ class SeedTrain(bst.SeedTrain):
         vent.empty()
         vent.copy_flow(effluent, ('CO2', 'O2', 'N2'), remove=True)
 
-class Fermentation(bst.AeratedBioReactor):
+class Fermentation(bst.AeratedBioreactor):
+    V_max_default = 500
+
+
+class cFermentation(bst.AeratedBioreactor):
     V_max_default = 500
     def _init(
             self, fermentation_reaction, cell_growth_reaction, 
@@ -132,95 +136,33 @@ class PSA(bst.Flash):
         self.design_results['Liquid flow'] = self.outs[1].F_mass
 
 
-class CellDisruption(bst.Homogenizer): pass
+# class CellDisruption(bst.Homogenizer): pass
 
 
-# %%
+# # %%
 
-#@cost('Flow rate', units='kg/hr', CE=CEPCI_by_year[2010], cost=100000, S=100000, n=0.6, kW=100)
-#@copy_algorithm(bst.SolidLiquidsSplitCentrifuge, run=False)       
-class Centrifuge(bst.SpliSolidLiquidsSplitCentrifugetter): pass
+# #@cost('Flow rate', units='kg/hr', CE=CEPCI_by_year[2010], cost=100000, S=100000, n=0.6, kW=100)
+# #@copy_algorithm(bst.SolidLiquidsSplitCentrifuge, run=False)       
+# class Centrifuge(bst.SpliSolidLiquidsSplitCentrifugetter): pass
 
-# %%
-class Evaporator(bst.MultiEffectEvaporator):
-    _N_ins = 1
-    _N_outs = 2
+# # %%
+# class Evaporator(bst.MultiEffectEvaporator): pass
 
-# %%
+# # %%
 
-class Concentration(bst.PressureFilter):
-    _N_ins = 1
-    _N_outs = 2
-    _N_heat_utilities = 0
-    _graphics = bst.PressureFilter._graphics
-    
-    def __init__(self, ID='', ins=None, outs=(), thermo=None, *,
-                 vessel_material='Carbon steel', vessel_type='Vertical',
-                 wall_thickness_factor=1):
-        bst.PressureFilter.__init__(self, ID, ins, outs, thermo)
-        self.vessel_material = vessel_material
-        self.vessel_type = vessel_type
-        self.wall_thickness_factor = wall_thickness_factor
-    
-    def _design(self):
-        bst.PressureFilter._design(self)
-        self.design_results['Wall thickness'] *= self.wall_thickness_factor
-        self.design_results['Weight'] *= self.wall_thickness_factor
-    
-    def _cost(self):
-        bst.PressureFilter._cost(self)
+# class Concentration(bst.PressureFilter): pass
         
-# class Filtration_Agarose(bst.PressureFilter): pass
+# # class Filtration_Agarose(bst.PressureFilter): pass
 
-# %%
+# # %%
 
-class Sedimentation(bst.Clarifier): pass
+# class Sedimentation(bst.Clarifier): pass
 
-class UltraFiltration_Desalt(bst.PressureFilter): pass
-# %%
-class SprayDring(bst.SprayDryer): 
-    N_ins = 1
-    _N_outs = 2
-    _N_heat_utilities = 1
-    _graphics = bst.SprayDryer._graphics
-    
-    def __init__(self, ID='', ins=None, outs=(), thermo=None, *,
-                 vessel_material='Carbon steel', vessel_type='Vertical',
-                 wall_thickness_factor=1):
-        bst.SprayDryer.__init__(self, ID, ins, outs, thermo)
-        self.vessel_material = vessel_material
-        self.vessel_type = vessel_type
-        self.wall_thickness_factor = wall_thickness_factor
-    
-    def _design(self):
-        bst.SprayDryer._design(self)
-        self.design_results['Wall thickness'] *= self.wall_thickness_factor
-        self.design_results['Weight'] *= self.wall_thickness_factor
-    
-    def _cost(self):
-        bst.SprayDryer._cost(self)
+# class UltraFiltration_Desalt(bst.PressureFilter): pass
+# # %%
+# class SprayDring(bst.SprayDryer): pass
 
-# %%
+# # %%
 
-class ScrewPress(bst.ScrewPress):     
-    N_ins = 1
-    _N_outs = 2
-    _N_heat_utilities = 0
-    _graphics = bst.ScrewPress._graphics
-    
-    def __init__(self, ID='', ins=None, outs=(), thermo=None, *,
-                 vessel_material='Carbon steel', vessel_type='Vertical',
-                 wall_thickness_factor=1):
-        bst.ScrewPress.__init__(self, ID, ins, outs, thermo)
-        self.vessel_material = vessel_material
-        self.vessel_type = vessel_type
-        self.wall_thickness_factor = wall_thickness_factor
-    
-    def _design(self):
-        bst.ScrewPress._design(self)
-        self.design_results['Wall thickness'] *= self.wall_thickness_factor
-        self.design_results['Weight'] *= self.wall_thickness_factor
-    
-    def _cost(self):
-        bst.ScrewPress._cost(self)
+# class ScrewPress(bst.ScrewPress): pass
         
