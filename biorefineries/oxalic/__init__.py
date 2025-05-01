@@ -13,87 +13,40 @@
 # for license details.
 
 
-# from biorefineries import PY37
 from warnings import filterwarnings
-from numpy import seterr
-
 filterwarnings('ignore')
-ig = seterr(invalid='ignore')
 
-from . import (
-    process_settings, 
-    chemicals_data, 
-    tea, 
-    units, 
-    facilities
-)
-from .chemicals_data import *
-from .process_settings import *
-from .tea import *
-from .units import *
-from .facilities import *
+from biorefineries import oxalic
+oxalic_filepath = oxalic.__file__.replace('\\__init__.py', '')
+oxalic_results_filepath = oxalic_filepath + '\\analyses\\results\\'
+parameter_distributions_filename = 'parameter-distributions_sugarcane_oxalic-broth_100mL.xlsx'
 
-# __all__ = [
-#     'system_light_lle_vacuum_distillation',
-#     'system_targeted_improvements',
-#     'system_sugarcane',
-#     'TRY_analysis',
-#     'test_solvents',
-#     'process_settings', 
-#     'chemicals_data', 
-#     'tea', 
-#     'lca',
-#     'units', 
-#     'facilities',
-# ]
+def load():
+    parameter_distributions_filepath = oxalic_filepath+'\\analyses\\full\\parameter_distributions\\oxalic_broth_product\\'+parameter_distributions_filename
+    from .models.sugarcane.models_sc_broth import model, simulate_and_print
+    model.parameters = ()
+    model.load_parameter_distributions(parameter_distributions_filepath)
+    
+    model.exception_hook = 'warn'
+    baseline_initial = model.metrics_at_baseline()
+    
+    globals().update({'simulate_and_print': simulate_and_print,
+                      'system': model.system,
+                       'flowsheet': model.system.flowsheet,
+                       'oxalic_tea': model.system.TEA,
+                       'chemicals': model.system.feeds[0].chemicals,
+                      })
 
-_system_loaded = False
-_chemicals_loaded = False
+def run_TRY_analysis():
+    from .analyses.fermentation import TRY_analysis_sugarcane_oxalic_broth
+    print('TRY analysis complete. See analyses/results for figures and raw data.')
+    
+def run_uncertainty_analysis():
+    from .analyses.full import uncertainties_sc_oxalic_broth
+    print('Uncertainty and sensitivity analyses complete. See analyses/results for figures and raw data.')
 
-_to_load_system = False
+def get_models():
+    from . import models
+    return models
 
-if _to_load_system:
-    default_configuration = 'lignocellulosic'
-    
-    def load_system(configuration=None):
-        if not configuration in ('lignocellulosic', 'sugarcane'):
-            raise ValueError(f'configuration can only be "lignocellulosic" or "sugarcane", not "{configuration}".')
-        if not _chemicals_loaded: _load_chemicals()
-        _load_system(configuration)
-        dct = globals()
-        dct.update(flowsheet.to_dict())
-        # dct.update(flowsheet.system.__dir__())
-        # dct.update(flowsheet.stream.__dir__())
-        # dct.update(flowsheet.unit.__dir__())
-    
-    def _load_system(configuration=None):
-        load_process_settings()
-        if not configuration: configuration = default_configuration
-        if configuration == 'lignocellulosic':
-            _load_lignocellulosic_system()
-        elif configuration == 'sugarcane':
-            _load_sugarcane_system()
-        else:
-            raise ValueError("configuration must be either 'lignocellulosic' or 'sugarcane'; "
-                            f"not '{configuration}'")
-    
-    def _load_chemicals():
-        global chemicals
-        from .chemicals_data import HP_chemicals
-        chemicals = HP_chemicals
-        _chemicals_loaded = True
-    
-    def _load_lignocellulosic_system():
-        global system, HP_tea, flowsheet, _system_loaded, simulate_and_print
-        from .system_light_lle_vacuum_distillation import HP_tea, flowsheet, simulate_and_print
-        from .system_light_lle_vacuum_distillation import HP_sys as system
-        _system_loaded = True
-    
-    def _load_sugarcane_system():
-        global system, HP_tea, flowsheet, _system_loaded, simulate_and_print
-        from .system_sugarcane import HP_tea, flowsheet, simulate_and_print
-        from .system_sugarcane import HP_sys as system
-        _system_loaded = True
-    
-    
-    load_system('lignocellulosic')
+__all__ = ['create_model', 'run_TRY_analysis', 'run_uncertainty_analysis', 'load', 'modes', 'parameter_distributions_filenames']
