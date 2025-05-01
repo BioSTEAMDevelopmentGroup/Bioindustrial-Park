@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-# !!! Package name and short description goes here.
+# Oxalic acid biorefineries.
 # Copyright (C) 2024-, Sarang Bhagwat <sarangb2@illinois.edu>
 # 
 # This module is under the UIUC open-source license. See 
@@ -9,6 +9,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
+#%%
 # Run this cell first
 from warnings import filterwarnings
 filterwarnings('ignore')
