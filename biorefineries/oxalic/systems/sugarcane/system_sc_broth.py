@@ -75,7 +75,7 @@ from biorefineries.TAL._general_utils import call_all_specifications_or_run,\
                                                 TEA_breakdown,\
                                                 update_facility_IDs
                                                 
-from hxn._heat_exchanger_network import HeatExchangerNetwork
+# from hxn._heat_exchanger_network import HeatExchangerNetwork
                                                 
 IQ_interpolation = flx.IQ_interpolation
 # # Do this to be able to show more streams in a diagram
@@ -98,7 +98,7 @@ bst.CE = 541.7
 # Set default thermo object for the system
 tmo.settings.set_thermo(oxalic_chemicals)
 
-System.default_maxiter = 100
+System.default_maxiter = 200
 # System.default_converge_method = 'wegstein'
 # feedstock_ID = 'Corn stover'
 feedstock_ID = 'Sugarcane'
@@ -275,7 +275,7 @@ def create_oxalic_sys(ins, outs):
                                          vessel_type='Floating roof',
                                          vessel_material='Stainless steel')
     T620_cost = T620._cost
-    T620.include_storage_costs = True
+    T620.include_storage_costs = False
     @T620.add_specification(run=False)
     def T620_no_cost_spec():
         T620._run()
@@ -411,7 +411,7 @@ def create_oxalic_sys(ins, outs):
     BT.natural_gas_price = price['Natural gas']
     BT.ins[4].price = price['Lime']
     
-    HXN = HeatExchangerNetwork('HXN1001',
+    HXN = bst.HeatExchangerNetwork('HXN1001',
                                                 ignored=[
                                                         # u.A410,
                                                         # u.A420,
@@ -547,7 +547,7 @@ unit_groups += get_more_unit_groups(system=oxalic_sys,
                                         ]
                          )
 
-add_metrics_to_unit_groups(unit_groups=unit_groups, system=oxalic_sys, TEA=oxalic_tea, LCA=oxalic_lca, hxn_class=HeatExchangerNetwork)
+add_metrics_to_unit_groups(unit_groups=unit_groups, system=oxalic_sys, TEA=oxalic_tea, LCA=oxalic_lca, hxn_class=bst.HeatExchangerNetwork)
 
 unit_groups_dict = {}
 for i in unit_groups:
@@ -576,7 +576,9 @@ theoretical_max_g_oxalic_per_g_glucose = 2*oxalic_chemicals.OxalicAcid.MW/oxalic
 
 
 
-desired_annual_production = 50_000 # pure metric ton / y 
+desired_annual_production = 1215000*(1+0.0415)**10*8/115 # pure metric ton / y; US 8000/global 115000; global 1215000 in 2022 CAGR 4.15% by 2032
+# https://www.ams.usda.gov/sites/default/files/media/OxalicAcidTR.pdf
+#https://www.chemanalyst.com/industry-report/oxalic-acid-market-2969#:~:text=The%20global%20Oxalic%20Acid%20market,the%20forecast%20period%20until%202032.
 
 # desired_annual_production = (23_802) * kg_SA_to_kg_KSA # pure metric ton / y # satisfy 50% of 2019 US demand for acrylic acid
 
@@ -592,7 +594,7 @@ spec = ProcessSpecification(
     reaction_name='fermentation_reaction', # pure metric ton / y
     substrates=('Xylose', 'Glucose'),
     products=('HP',),
-    
+    set_production_capacity = True,
     desired_annual_production = desired_annual_production, 
     
     spec_1=0.721, 
@@ -617,9 +619,9 @@ spec = ProcessSpecification(
     
     
     # !!! set baseline fermentation performance here
-    baseline_yield = 0.14/theoretical_max_g_oxalic_per_g_glucose,
-    baseline_titer = 33.226,
-    baseline_productivity = 0.1154,
+    baseline_yield = 0.16/theoretical_max_g_oxalic_per_g_glucose,
+    baseline_titer = 40.3,
+    baseline_productivity = 0.85,
     
     
     tolerable_HXN_energy_balance_percent_error = 0.01,
@@ -642,16 +644,16 @@ def clear_units(units_to_clear):
 oxalic_fermentation_process = f.oxalic_fermentation_process
 
 def M304_titer_obj_fn(water_to_sugar_mol_ratio):
-    M304.water_to_sugar_mol_ratio = water_to_sugar_mol_ratio
+    oxalic_sys.flowsheet.M304.water_to_sugar_mol_ratio = water_to_sugar_mol_ratio
     call_all_specifications_or_run(oxalic_fermentation_process.path)
     # oxalic_fermentation_process.run()
-    return R302.effluent_titer - R302.titer_to_load
+    return oxalic_sys.flowsheet.R302.effluent_titer - oxalic_sys.flowsheet.R302.titer_to_load
 
 def F301_titer_obj_fn(V):
-    F301.V = V
+    oxalic_sys.flowsheet.F301.V = V
     call_all_specifications_or_run(oxalic_fermentation_process.path)
     oxalic_fermentation_process.run()
-    return R302.effluent_titer - R302.titer_to_load
+    return oxalic_sys.flowsheet.R302.effluent_titer - oxalic_sys.flowsheet.R302.titer_to_load
 
 def load_titer_with_glucose(titer_to_load):
     # clear_units([V301, K301])
@@ -659,7 +661,7 @@ def load_titer_with_glucose(titer_to_load):
     M304_lb, M304_ub = 0., 40000.  # for low-titer high-yield combinations, if infeasible, use a higher upper bound
     
     spec.spec_2 = titer_to_load
-    R302.titer_to_load = titer_to_load
+    oxalic_sys.flowsheet.R302.titer_to_load = titer_to_load
     F301_titer_obj_fn(F301_lb)
     
     if M304_titer_obj_fn(M304_lb) < 0.: # if there is too low a conc even with no dilution

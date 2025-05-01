@@ -582,10 +582,10 @@ class Reactor(Unit, PressureVessel, isabstract=True):
 
 #%%        
 compute_HP_titer = lambda effluent: (effluent.imass['OxalicAcid'] +
-            effluent.imol['CalciumLactate']*2*oxalic_chemicals.HP.MW)/effluent.F_vol
+            effluent.imol['CalciumOxalate']*oxalic_chemicals.HP.MW)/effluent.F_vol
 
 compute_HP_mass = lambda effluent: effluent.imass['OxalicAcid'] +\
-            effluent.imol['CalciumLactate']*2*oxalic_chemicals.HP.MW
+            effluent.imol['CalciumOxalate']*oxalic_chemicals.HP.MW
 _316_over_304 = 1.2
 
 
@@ -866,9 +866,9 @@ class BatchCoFermentation(BatchBioreactor):
     
     air_m3_per_h_per_m3_reactor = 3.5*60/3 # 3.5 slpm for a 3L bioreactor; Markham et al. 2018 # used when aeration_rate_basis=='fixed rate basis'
     
-    DO_saturation_concentration_kg_per_m3 = 7.8e-3 # 7.8 mg/L at 28 degrees C # used when aeration_rate_basis=='DO saturation basis'
+    DO_saturation_concentration_kg_per_m3 = 7.55e-3 # 7.55 mg/L at 30 degrees C # used when aeration_rate_basis=='DO saturation basis'
     
-    DO_saturation_target_level = 0.5 # 50% saturation from Markham et al. 2018 # used when aeration_rate_basis=='DO saturation basis'
+    DO_saturation_target_level = 0.1 # 10% saturation from Markham et al. 2018 # used when aeration_rate_basis=='DO saturation basis'
     
     air_flow_rate_safety_factor_for_DO_saturation_basis = 2.
     
@@ -880,11 +880,11 @@ class BatchCoFermentation(BatchBioreactor):
     
     # autoselect_N  = True
     
-    lime_mol_per_L_loading = 0.12125 # if neutralization=True, this lime is added in addition to that required to neutralize all acids
+    lime_mol_per_mol_loading = 0.91 # 1.82 mol KOH is for 1 mol oxalic aicd
     
     def _init(self, 
                  #  
-                 T=28+273.15,
+                 T=30+273.15,
                  P=101325., 
                  tau=120, # initial value; updated by spec.load_productivity
                  V=3785.,
@@ -942,7 +942,7 @@ class BatchCoFermentation(BatchBioreactor):
         # Neutralization of lactic acid and acetic acid by lime (Ca(OH)2)
         self.neutralization_rxns = ParallelRxn([
         #   Reaction definition                                               Reactant  Conversion
-        Rxn('2 OxalicAcid + CalciumDihydroxide -> CalciumLactate + 2 H2O',  'OxalicAcid',   1.-1e-9), # !!! update if neutralization scenario is needed
+        Rxn('OxalicAcid + CalciumDihydroxide -> CalciumOxalate + 2 H2O',  'OxalicAcid',   1.-1e-9), # !!! update if neutralization scenario is needed
         Rxn('2 AceticAcid + CalciumDihydroxide -> CalciumAcetate + 2 H2O',  'AceticAcid',   1-1e-9),
             ])
 
@@ -981,7 +981,7 @@ class BatchCoFermentation(BatchBioreactor):
         magnesium_chloride.imass['MagnesiumChloride'] = feed_seed_vol * self.magnesium_chloride_loading 
         diammonium_sulfate.imass['AmmoniumSulfate'] = feed_seed_vol * self.diammonium_sulfate_loading 
         
-        lime.imol['Lime'] = feed_seed_vol * self.lime_mol_per_L_loading 
+        # lime.imol['Lime'] = feed_seed_vol * self.lime_mol_per_L_loading 
         
         effluent.mix_from([effluent, air, CSL, magnesium_chloride, diammonium_sulfate])
         
@@ -1039,12 +1039,12 @@ class BatchCoFermentation(BatchBioreactor):
         
         if self.neutralization:
             self.vessel_material= 'Stainless steel 316'
-            # Set feed lime mol to match rate of acids production, add 10% extra
-            lime.imol['Lime'] += (effluent.imol['OxalicAcid']/2/self.neutralization_rxns.X[0]) \
-                                + effluent.imol['SuccinicAcid']/self.neutralization_rxns.X[1]
-                               
-            effluent.imol['Lime'] = lime.imol['Lime']
-            self.neutralization_rxns(effluent)
+            # Set feed lime mol to match rate of acids production, observed ratio was 1.82 moles of KOH per mole of oxalic acid produced
+            lime.imol['Lime'] = effluent.imol['OxalicAcid'] * self.lime_mol_per_mol_loading
+            # self.neutralization_rxns[0](effluent)
+            effluent.imol['OxalicAcid'] -= lime.imol['Lime']
+            effluent.imol['CalciumOxalate'] += lime.imol['Lime']
+            effluent.imol['H2O'] += 2 * lime.imol['Lime']
             
         else:
             self.vessel_material= 'Stainless steel 316'
@@ -1122,7 +1122,7 @@ class AcidulationReactor(Reactor):
         Reactor._init(self, *args, **kwargs)
         self.acidulation_rxns = ParallelRxn([
             #   Reaction definition                                        Reactant        Conversion
-            Rxn('CalciumLactate + H2SO4 -> 2 HP + CaSO4',                 'CalciumLactate',       1.),
+            Rxn('CalciumOxalate + H2SO4 -> OxalicAcid + CaSO4',         'CalciumOxalate',       1.),
             Rxn('CalciumAcetate + H2SO4 -> 2 AceticAcid + CaSO4',         'CalciumAcetate',       1.),
             Rxn('CalciumDihydroxide + H2SO4 -> CaSO4 + 2 H2O',            'CalciumDihydroxide',   1.)
         ])
@@ -1145,7 +1145,7 @@ class AcidulationReactor(Reactor):
         acid.imass['H2O'] = acid.imass['H2SO4'] / 0.93 * 0.07 # 93% purity
         effluent.mix_from([feed, acid])
         # rxns.adiabatic_reaction(effluent)
-        rxns(effluent)
+        rxns[0](effluent)
         
 # Filter to separate gypsum from the acidified fermentation broth
 @cost(basis='Feed flow rate', ID='Hydroclone & rotary drum filter', units='kg/hr',

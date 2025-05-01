@@ -221,7 +221,7 @@ class ProcessSpecification(bst.process_tools.ReactorSpecification):
                  HXN_new_HXs={}, HXN_new_HX_utils={}, HXN_Q_bal_percent_error_dict = {},
                  feedstock_mass=104192.83224417375, pretreatment_reactor = None,
                   load_spec_1=None, load_spec_2=None, load_spec_3=None, set_production_capacity=None,
-                  desired_annual_production=25000.,
+                  desired_annual_production=126929.,
                   byproduct_yields_decrease_policy='sequential, when product yield too high',):
         self.substrates = substrates
         self.reactor = reactor #: [Unit] Reactor unit operation

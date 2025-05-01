@@ -138,6 +138,9 @@ Ethanol = chemical_database('Ethanol')
 CalciumLactate = chemical_database('CalciumLactate', phase='l',
                                    Hf=-1686.1e3)
 # Hf from Lange's Handbook of Chemistry, 15th edn., Table 6.3, PDF page 631
+CalciumOxalate = chemical_database('CalciumOxalate', phase='l', Hf=-1360.6e3)
+
+# Hf from Lange's Handbook of Chemistry, 15th edn., Table 6.3, PDF page 631
 CalciumAcetate = chemical_database('CalciumAcetate', phase='l', Hf=-1514.73e3)
 
 # Sodium 3-hydroxypropionate modeled as sodium lactate

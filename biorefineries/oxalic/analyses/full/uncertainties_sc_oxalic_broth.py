@@ -53,7 +53,7 @@ get_adjusted_MSP = models.get_adjusted_MSP
 
 # %% 
 
-N_simulations_per_mode = 2000 # 6000
+N_simulations_per_mode = 6000 # 6000
 
 percentiles = [0, 0.05, 0.1, 0.25, 0.5, 0.75, 0.9, 0.95, 1]
 
@@ -361,9 +361,10 @@ MPSP_uncertainty = [results_dict['Uncertainty']['MPSP'][mode]
 #                           ]) 
 
 # oxalic_maximum_viable_market_range = SA_market_range / theoretical_max_g_AA_per_g_SA
-
+# lower end from https://businessanalytiq.com/procurementanalytics/index/oxalic-acid-price-index/#:~:text=North%20America:US$0.67/KG,:US$0.44/KG%2C%20unchanged;
+# higher end from https://www.alibaba.com/product-detail/High-quality-Oxalic-acid-CAS-144_1600467879003.html?spm=a2700.7724857.0.0.737f3dddErELOM
 market_range = np.array([
-                          0.6, 2.8
+                          0.75, 3
                           ]) 
 
 
@@ -394,7 +395,7 @@ contourplots.box_and_whiskers_plot(uncertainty_data=MPSP_uncertainty,
                           show_x_ticks=True,
                           x_tick_labels=scenario_names,
                           x_tick_wrap_width=14,
-                          y_label=r"$\bfMPSP$",
+                          y_label=r"$\bfMSP$",
                           y_units=MPSP_units,
                           y_ticks=np.arange(0., 4.01, 0.5),
                           save_file=True,
@@ -882,7 +883,7 @@ plot_kde_formatted(
                     
                     
                     xticks = [i for i in range(0,9) if not i%1],
-                    yticks = [i for i in range(0,15) if not i%2],
+                    yticks = [i for i in range(-8,6) if not i%2],
                     
                     n_minor_ticks = 3,
                     
@@ -965,3 +966,5 @@ plot_kde_formatted(
 # #     # levels=[0.05*i for i in range(1,21)],
 # #     thresh=0.01,
 # #     )
+
+

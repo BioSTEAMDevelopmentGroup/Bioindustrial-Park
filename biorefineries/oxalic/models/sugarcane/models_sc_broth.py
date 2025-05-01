@@ -46,7 +46,7 @@ system_products = [i for i in oxalic_sys.products if i.price]
 baseline_yield, baseline_titer, baseline_productivity =\
     spec.baseline_yield, spec.baseline_titer, spec.baseline_productivity
 
-spec.reactor.neutralization = False
+spec.reactor.neutralization = True
 
 # %% 
 
@@ -106,6 +106,7 @@ get_electricity_price = lambda: bst.PowerUtility.price
 # Electricity credit is positive if getting revenue from excess electricity
 get_electricity_credit = lambda: (excess_power()*get_electricity_price()*get_annual_factor())/1e6
 
+get_T620_cost = lambda: oxalic_sys.flowsheet.T620.installed_cost/1e6
 metrics = [Metric('Minimum selling price', get_MSP, '$/kg', 'Biorefinery'),
            Metric('Production rate', get_yield, '10^6 kg/yr', 'Biorefinery'),
            Metric('Product purity', get_purity, '%', 'Biorefinery'),
@@ -119,6 +120,7 @@ metrics = [Metric('Minimum selling price', get_MSP, '$/kg', 'Biorefinery'),
            Metric('Annual operating cost (incl. electricity credit)', get_overall_AOC, '10^6 $/yr', 'Biorefinery'),
            Metric('Annual product sale (excl. electricity)', get_annual_sale, '10^6 $/yr', 'Biorefinery'),
            Metric('Fixed operating cost', get_overall_FOC, '10^6 $/yr', 'Biorefinery'),
+           Metric('OA storage cost', get_T620_cost, '10^6', 'Biorefinery')
            ]
 
 # To see if TEA converges well for each simulation
