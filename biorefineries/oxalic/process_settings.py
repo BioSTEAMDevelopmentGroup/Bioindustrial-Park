@@ -1,5 +1,13 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
+# Oxalic acid biorefineries.
+# Copyright (C) 2024-, Sarang Bhagwat <sarangb2@illinois.edu>, Wenjun Guo <wenjung2@illinois.edu>
+# 
+# This module is under the UIUC open-source license. See 
+# github.com/BioSTEAMDevelopmentGroup/biosteam/blob/master/LICENSE.txt
+# for license details.
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
 """
 Created on Sun Aug 23 12:11:15 2020
 
@@ -136,7 +144,7 @@ amberlyst_15_price = 153.252 * _chemical_2020to2016
 TiO2_price = 2130./_kg_per_ton
 
 # HP_price = 1.88 # initial value
-AA_price = 1.88 # initial value
+AA_price = 410/25/0.996*0.03 # 410$/25kg purity 0.996; https://hiseachem.en.made-in-china.com/product/HBwmuVWJhXUP/China-Use-for-Derusting-Hot-Sale-Ethanedioic-Acid-Oxalic-Acid-99-6-.html?pv_id=1ije1p06qa9&faw_id=1ije1sncqcac
 
 # Currently not in use
 # Methanol price from Goellner et al., production from natural gas (Case 3),
@@ -152,7 +160,7 @@ acetoin_price = 3. # assumed
 # Isobutyraldehyde product selling price
 # https://www.alibaba.com/product-detail/China-manufacture-Isobutyraldehyde-price_60837108075.html?spm=a2700.galleryofferlist.0.0.753369fcbZcNhe
 # IBA_price = 1.2
-IBA_price = 0. # assumed
+IBA_price = 3. # https://nmgrshg.en.made-in-china.com/product/VGsrKFCUSkcv/China-Chinese-Factories-Produce-Isobutyraldehyde.html?pv_id=1ije1abol2fa&faw_id=1ije1kpg10f7
 
 
 # https://www.alibaba.com/product-detail/Decyl-Alcohol-98-min_62002993466.html?spm=a2700.galleryofferlist.normal_offer.d_title.67b2ac2fnUEnUY

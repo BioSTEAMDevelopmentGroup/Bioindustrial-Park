@@ -18,7 +18,7 @@ from biosteam.utils import  colors
 import numpy as np
 
 from biorefineries import TAL
-from biorefineries.TAL.systems.system_TAL_solubility_exploit_ethanol_sugarcane import TAL_tea, TAL_lca, R302, spec, TAL_product, simulate_and_print, theoretical_max_g_TAL_per_g_SA,\
+from biorefineries.TAL.systems.system_TAL_solubility_exploit_ethanol_sugarcane import TAL_tea, TAL_lca, R302, spec, TAL_product, simulate_and_print, theoretical_max_g_TAL_per_g_SA, fermentation_group,\
     F301, F301_P, M304
 
 from  matplotlib.colors import LinearSegmentedColormap
