@@ -7,7 +7,7 @@ Created on Tue Dec 31 08:37:07 2024
 
 import thermosteam as tmo
 import biosteam as bst
-
+from thermosteam import Chemical, functional as fn
 
 #%% 
 # Constants
@@ -28,26 +28,56 @@ CO2 = tmo.Chemical('CO2')
 CH3OH = tmo.Chemical('CH3OH')
 HCOOH = tmo.Chemical('HCOOH')
 
-C18H39N = tmo.Chemical('C18H39N')
-C19H41NO2 = tmo.Chemical('C19H41NO2')
-
-# # For catalyst
+# For catalyst
 CaO = tmo.Chemical('CaO')
-# # RuH2PPh34 = tmo.Chemical('RuH2PPh34', search_ID='C72H66P4Ru') # Ru(Pn-(C₈H₁₇)₃)₄(H)₂ is currently not registered in tmo; using a similar one
-DCPE = tmo.Chemical('DCPE', search_ID='23743-26-2') # second component of FA catalyst
-TPP = tmo.Chemical('Triphenylphosphine', search_ID='603-35-0') # surrogate model for DCPE
 
-DCPE.copy_models_from(TPP, ['mu','Psat','Hvap', 'sigma',\
-                            'Cn', 'V'])  
 
-DCPE.Tb = 528.3 + 273.15
-DCPE.Tc = 94.5 + 273.15
-DCPE.Pt = 0.2736
-DCPE.Pc = 7.84e+06
-DCPE.Vc = 0.000554
-DCPE.Hf = 2.2194e+05
-DCPE.omega = 0.452
+C6H15N = tmo.Chemical('triethylamine')
 
+# C6H15N+HCOOH adduct modeling
+TREAHCOOH = tmo.Chemical.blank('TREAHCOOH', phase='l')
+TREAHCOOH.copy_models_from(C6H15N)
+TREAHCOOH.MW = 165.26
+TREAHCOOH.Tb = 800  # Set a fake high boiling point so that it never vaporizes during normal distillation or flash
+TREAHCOOH.Hf = -629e3  # Estimated
+TREAHCOOH.Psat.methods = []
+TREAHCOOH.Psat.tabulated = False
+
+# Prevent vaporization
+TREAHCOOH.Psat.methods = []
+TREAHCOOH.Psat.tabulated = False
+TREAHCOOH.Hvap.methods = []
+TREAHCOOH.Hvap.tabulated = False
+
+
+
+nBIM = tmo.Chemical('nBIM', search_ID='1-butylimidazole')
+
+# nBIM+HCOOH adduct modeling
+nBIMHCOOH = tmo.Chemical.blank('nBIMHCOOH', phase='l')
+nBIMHCOOH.copy_models_from(nBIM)
+nBIMHCOOH.MW = 170.22
+nBIMHCOOH.Tb = 800 # decomposes before boiling
+nBIMHCOOH.Pc = 3e6
+nBIMHCOOH.Hf = -625e3
+nBIMHCOOH.Psat.add_method(lambda T: 1e-10, name='const', Tmin=300, Tmax=800)
+
+phase_change_chemicals = ['CO2', 'H2O', 'HCOOH', '']
+
+
+for chem in chems:
+    if chem.ID in phase_change_chemicals: pass
+    elif chem.locked_state: pass
+    else: 
+        # Set phase_ref to avoid missing model errors
+        if chem.phase_ref == 'g':
+            chem.at_state('g')
+        if chem.phase_ref == 'l':
+            chem.at_state('l')
+        if chem.phase_ref == 's':
+            chem.at_state('s')
+            
+            
 chems.append(H2O)
 chems.append(O2)
 chems.append(N2)
@@ -58,13 +88,14 @@ chems.append(CO2)
 chems.append(CH3OH)
 chems.append(HCOOH)
 
-chems.append(C18H39N)
-chems.append(C19H41NO2)
-
 chems.append(CaO)
-# # chems.append(RuH2PPh34)
-chems.append(DCPE)
-chems.append(TPP)
+
+chems.append(C6H15N)
+chems.append(TREAHCOOH)
+chems.append(nBIM)
+chems.append(nBIMHCOOH)
 
 chems.compile()
+# chems.set_alias('4316-42-1', 'nBIM')
+
 tmo.settings.set_thermo(chems)

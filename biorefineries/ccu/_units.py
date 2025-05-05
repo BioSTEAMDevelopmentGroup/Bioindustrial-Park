@@ -7,12 +7,14 @@ Created on Mon Dec 23 14:17:48 2024
 
 
 import numpy as np
+from math import exp, pi, log, ceil
 import biosteam as bst
 import thermosteam as tmo
 from biosteam import Stream, Unit, BinaryDistillation
 from biosteam.units import HXutility, Mixer, SolidsSeparator, Compressor
 from biosteam.units.decorators import cost
 from biosteam.units.design_tools import size_batch
+from biosteam.exceptions import DesignError
 from thermosteam import MultiStream
 from biosteam.units.design_tools.geometry import cylinder_diameter_from_volume
 from qsdsan._sanunit import SanUnit
@@ -142,76 +144,188 @@ class MeOH_SynthesisReactor(bst.units.design_tools.PressureVessel, bst.Unit):
 # =============================================================================
 # Formic acid synthesis
 # =============================================================================
-
-# Reactor is modeled as a CSTR
-class HCOOH_SynthesisReactor(bst.CSTR):
-    # based on Process for preparing formic acid by reaction of carbon dioxide with hydrogen
-    _N_ins = 7
-    _N_outs = 3
-    T_default = 93+273.15
-    P_default = 5e6
-    tau_default = 10/60 # 10min-5hr; can be a variable later
+class Reactor(bst.units.design_tools.PressureVessel, bst.Unit, isabstract=True):
+    _N_ins = 2
+    _N_outs = 1
     
+    auxiliary_unit_names = ('heat_exchanger',)
+    
+    _units = {**bst.units.design_tools.PressureVessel._units,
+              'Total volume': 'm3',
+              'Reactor volume': 'm3',
+              'Single reactor volume': 'm3'}
+    
+    # For a single reactor, based on diameter and length from PressureVessel._bounds,
+    # converted from ft3 to m3
+    _V_max = pi/4*(20**2)*40/35.3147
+    
+    def __init__(self, ID="", ins=None, outs=(),
+                 P=12000000, T=120+273.15, bulk_density=0.5, # 0.5 g/ml = 0.5 kg/L
+                 length_to_diameter=3,
+                 wall_thickness_factor=1,
+                 vessel_material='Stainless steel 316',
+                 vessel_type='Vertical'):
+        bst.Unit.__init__(self, ID, ins, outs)
+        self.P = P
+        self.T = T
+        self.bulk_density = bulk_density
+        self.length_to_diameter = length_to_diameter
+        self.wall_thickness_factor = wall_thickness_factor
+        self.vessel_material = vessel_material
+        self.vessel_type = vessel_type
+        
+        heat_exchanger = self.auxiliary('heat exchanger',
+                                        bst.HXutility,
+                                        ins=bst.Stream(),
+                                        T=self.T)
     def _setup(self):
         super()._setup()
-        self.reaction = bst.Reaction(
-            'CO2 + H2 + C18H39N -> C19H41NO2',   'H2',   0.19)
+        self.heat_exchanger = self.auxiliary(
+            'heat_exchanger',
+            bst.HXutility,
+            ins=(bst.Stream(),),
+            T=self.T,
+        )
     
     def _run(self):
-        CO2, H2, unreacted, amine_wcatalyst, amine_wcatalyst_2, MeOH, fresh_catalyst = self.ins
-        vent, effluent, spent_catalyst = self.outs
-        effluent.mix_from([CO2, H2, unreacted, amine_wcatalyst, amine_wcatalyst_2, MeOH], energy_balance=False)
-        self.reaction(effluent)
-        effluent.T = vent.T = spent_catalyst.T = self.T
-        effluent.P = spent_catalyst.P = self.P
+        feed, recycle = self.ins
+        product, = self.outs
         
-        fresh_catalyst.P = CO2.P
-
-        vent.phase = 'g'
-        vent.empty()
-        vent.receive_vent(effluent)
+        # Reactor reaction
+        product.mix_from([feed, recycle], energy_balance=False)
+        self.reaction(product)
+        product.T = self.T
+        product.P = self.P
         
-        # determine catalyst amount; Table 1.3 A12, 0.24 g / 100 g ins.liquid
-        ins_liquid_mass = unreacted.F_mass + amine_wcatalyst.F_mass + \
-            amine_wcatalyst_2.F_mass + MeOH.F_mass
-        
-        spent_catalyst.imass['DCPE'] = fresh_catalyst.imass['DCPE'] = ins_liquid_mass * 0.0024
-        
+        # Send product to heat exchanger
+        self.heat_exchanger.ins[0].copy_like(product)
+        self.heat_exchanger._run()
+    
     def _design(self):
+        self.heat_exchanger._design()
+        
+        Design = self.design_results
+        catalyst_weight = self.catalyst_weight
+        V_total = catalyst_weight / self.bulk_density / 1000 # from L to m3
+        P = self.P * 0.000145038 # Pa to psi
+        length_to_diameter = self.length_to_diameter
+        wall_thickness_factor = self.wall_thickness_factor
+        
+        N = ceil(V_total/self._V_max)
+        if N == 0:
+            V_reactor = 0
+            D = 0
+            L = 0
+        else:
+            V_reactor = V_total / N
+            D = (4*V_reactor/pi/length_to_diameter)**(1/3)
+            D *= 3.28084 # convert from m to ft
+            L = D * length_to_diameter
+
+        Design['Total volume'] = V_total
+        Design['Single reactor volume'] = V_reactor
+        Design['Number of reactors'] = N
+        P, D, L = float(P), float(D), float(L)
+        Design.update(self._vessel_design(P, D, L))
+        if wall_thickness_factor == 1: pass
+        elif wall_thickness_factor < 1:
+            raise DesignError('wall_thickness_factor must be larger than 1')
+        else:
+              Design['Wall thickness'] *= wall_thickness_factor
+              # Weight is proportional to wall thickness in PressureVessel design
+              Design['Weight'] = round(Design['Weight']*wall_thickness_factor,2)
+
+    def _cost(self):
+        self.heat_exchanger._cost()
+        Design = self.design_results
+        baseline_purchase_costs = self.baseline_purchase_costs
+        
+        if Design['Total volume'] == 0:
+            for i, j in baseline_purchase_costs.items():
+                baseline_purchase_costs[i] = 0
+        
+        else:
+            baseline_purchase_costs.update(self._vessel_purchase_cost(
+                Design['Weight'], Design['Diameter'], Design['Length']))
+            for i, j in baseline_purchase_costs.items():
+                baseline_purchase_costs[i] *= Design['Number of reactors']
+    
+
+
+class HCOOH_SynthesisReactor(Reactor):
+    _N_ins = 3
+    _N_outs = 1
+    _F_BM_default = {**Reactor._F_BM_default}
+    
+    reaction = bst.Reaction(
+        'CO2 + H2 + C6H15N -> TREAHCOOH',   'CO2',   0.48)
+    
+    def __init__(self, ID="", ins=None, outs=(), **kwargs):
+        super().__init__(ID, ins, outs, **kwargs)
+        
+    def _run(self):
+        feed, makeup_TREA, recycled_TREA = self.ins
+        effluent, = self.outs
+        effluent.mix_from([feed, makeup_TREA, recycled_TREA], energy_balance=False)
+        self.reaction(effluent)
+        effluent.T = self.T
+        effluent.P = self.P
+        self.heat_exchanger.ins[0].copy_like(effluent)
+        self.heat_exchanger._run()
+    
+    def _design(self):
+        self.catalyst_weight = (self.ins[0].imass['CO2'] + self.ins[0].imass['H2'] +
+                                self.ins[1].imass['CO2'] + self.ins[1].imass['H2']) / 669 # 669.0 gform. gcat−1 d−1
         super()._design()
         
     def _cost(self):
         super()._cost()
-        
-        
-# Adduct decomposed reactor is modelled as an adiabatic ideal plug flow reactor (PFR); imaginary reactor with no cost
-class Adduct_DecomposedReactor(bst.units.design_tools.PressureVessel, bst.Unit):
-    _N_ins = _N_outs = 1
-    
-    _units = {**bst.design_tools.PressureVessel._units,
-              'Volume': 'ft^3',}
-              
-    _F_BM_default = {**bst.design_tools.PressureVessel._F_BM_default,}
-    
-    def __init__(self, ID="", ins=None, outs=(),
-                 T=180+273.15,
-                 P=0.25*101325/6894.76,
-                 vessel_material='Stainless steel 304',
-                 vessel_type='Vertical',
-                 **kwargs):
-            bst.Unit.__init__(self, ID, ins, outs)
-            self.T = T
-            self.P = P
-            self.vessel_material = vessel_material # Vessel material
-            self.vessel_type = vessel_type # 'Horizontal' or 'Vertical'
-            self.reactions = Rxn('C19H41NO2 -> C18H39N + HCOOH',       'C19H41NO2',      1.),
-                
-    def _run(self):
-        feed, = self.ins
-        feed.T = self.T
-        effluent, = self.outs
-        effluent.copy_like(feed)
-        self.reactions.adiabatic_reaction(effluent)
 
+
+        
+class Amine_Exchange_Reactor(bst.Unit):
+    _N_ins = 2 
+    _N_outs = 1 
+    
+    def _setup(self):
+        super()._setup()
+        self.reaction = bst.Reaction(
+            'TREAHCOOH + nBIM -> nBIMHCOOH + C6H15N',  'TREAHCOOH', 1.)
+    
+    def _run(self):
+        adduct, nBIM = self.ins
+        effluent, = self.outs
+        nBIM.imol['nBIM'] = adduct.imol['TREAHCOOH']
+        effluent.mix_from([adduct, nBIM], energy_balance=False)
+        self.reaction(effluent)
+    
+    def _design(self):
+        pass
+    
+    def _cost(self):
+        pass
+
+
+
+            
+
+class nBIM_Exchange_Reactor(bst.Unit):
+    _N_ins = 1 
+    _N_outs = 1 
+    
+    def _setup(self):
+        super()._setup()
+        self.reaction = bst.Reaction(
+            'nBIMHCOOH -> nBIM + HCOOH',  'nBIMHCOOH', 1.)
+    
+    def _run(self):
+        influent, = self.ins
+        effluent, = self.outs
+        effluent.copy_like(influent)
+        self.reaction(effluent)
+    
+    def _design(self):
+        pass
+    
     def _cost(self):
         pass
