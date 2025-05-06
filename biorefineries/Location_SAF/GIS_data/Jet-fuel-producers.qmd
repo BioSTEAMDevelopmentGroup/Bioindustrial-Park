@@ -1,0 +1,62 @@
+<!DOCTYPE qgis PUBLIC 'http://mrcc.com/qgis.dtd' 'SYSTEM'>
+<qgis version="3.32.3-Lima">
+  <identifier>Petroleum_Refineries_staging</identifier>
+  <parentidentifier></parentidentifier>
+  <language>ENG</language>
+  <type>dataset</type>
+  <title>Petroleum Refineries</title>
+  <abstract>The attribute data for this point dataset come from the U.S. Energy Information Administration, Refinery Capacity Report, Table 3, Capacity of Operable Petroleum Refineries by State report, which is sourced from U.S. Energy Information Administration, Form EIA-820, Annual Refinery Report. The geographic area the report covers is the 50 States, the District of Columbia, Puerto Rico, the U.S. Virgin Islands, Guam, and other U.S. possessions. 
+The facility location data represent the approximate location based on research of publicly available information from sources such as Federal agencies, company websites, and satellite images on public websites.
+
+These data identify and provide detailed information on petroleum refineries in the United States as of January 1, 2023.</abstract>
+  <keywords vocabulary="Search keys">
+    <keyword>refinery</keyword>
+    <keyword>petroleum</keyword>
+    <keyword>energy</keyword>
+    <keyword>crude oil</keyword>
+    <keyword>infrastructure</keyword>
+    <keyword>EIA</keyword>
+    <keyword>U.S.</keyword>
+  </keywords>
+  <keywords vocabulary="gmd:topicCategory">
+    <keyword>refinery, petroleum, energy, crude oil, infrastructure, EIA</keyword>
+  </keywords>
+  <links/>
+  <history>These data originate from the U.S. Energy Information Administration, Refinery Capacity Report, Table 3. Capacity of Operable Petroleum Refineries by State: http://www.eia.gov/petroleum/refinerycapacity/table3.pdf. In addition to the sources listed, accuracy for the locations of facilities shown on the map was improved through the use of publicly available sites such as company websites and satellite images from public websites. </history>
+  <dates>
+    <date value="2020-07-10T00:00:00" type="Published"/>
+  </dates>
+  <fees></fees>
+  <constraints type="Limitations of use">None (public use). Users are advised to thoroughly review the metadata to understand the appropriate use and limitations of the data. These data and related graphics, if available, are not legal documents and are not intended to be used as such. The information contained in these data is dynamic and may change over time. The U.S. Energy Information Administration gives no warranty, expressed or implied, as to the accuracy, reliability, or completeness of these data.
+</constraints>
+  <rights>U.S. Energy Information Administration and publicly available information.</rights>
+  <encoding></encoding>
+  <crs>
+    <spatialrefsys nativeFormat="Wkt">
+      <wkt>PROJCRS["WGS 84 / Pseudo-Mercator",BASEGEOGCRS["WGS 84",ENSEMBLE["World Geodetic System 1984 ensemble",MEMBER["World Geodetic System 1984 (Transit)"],MEMBER["World Geodetic System 1984 (G730)"],MEMBER["World Geodetic System 1984 (G873)"],MEMBER["World Geodetic System 1984 (G1150)"],MEMBER["World Geodetic System 1984 (G1674)"],MEMBER["World Geodetic System 1984 (G1762)"],ELLIPSOID["WGS 84",6378137,298.257223563,LENGTHUNIT["metre",1]],ENSEMBLEACCURACY[2.0]],PRIMEM["Greenwich",0,ANGLEUNIT["degree",0.0174532925199433]],ID["EPSG",4326]],CONVERSION["Popular Visualisation Pseudo-Mercator",METHOD["Popular Visualisation Pseudo Mercator",ID["EPSG",1024]],PARAMETER["Latitude of natural origin",0,ANGLEUNIT["degree",0.0174532925199433],ID["EPSG",8801]],PARAMETER["Longitude of natural origin",0,ANGLEUNIT["degree",0.0174532925199433],ID["EPSG",8802]],PARAMETER["False easting",0,LENGTHUNIT["metre",1],ID["EPSG",8806]],PARAMETER["False northing",0,LENGTHUNIT["metre",1],ID["EPSG",8807]]],CS[Cartesian,2],AXIS["easting (X)",east,ORDER[1],LENGTHUNIT["metre",1]],AXIS["northing (Y)",north,ORDER[2],LENGTHUNIT["metre",1]],USAGE[SCOPE["Web mapping and visualisation."],AREA["World between 85.06°S and 85.06°N."],BBOX[-85.06,-180,85.06,180]],ID["EPSG",3857]]</wkt>
+      <proj4>+proj=merc +a=6378137 +b=6378137 +lat_ts=0 +lon_0=0 +x_0=0 +y_0=0 +k=1 +units=m +nadgrids=@null +wktext +no_defs</proj4>
+      <srsid>3857</srsid>
+      <srid>3857</srid>
+      <authid>EPSG:3857</authid>
+      <description>WGS 84 / Pseudo-Mercator</description>
+      <projectionacronym>merc</projectionacronym>
+      <ellipsoidacronym>EPSG:7030</ellipsoidacronym>
+      <geographicflag>false</geographicflag>
+    </spatialrefsys>
+  </crs>
+  <extent>
+    <spatial minz="0" maxy="70.32483200000000068" miny="17.7085700000000017" maxx="-64.74876000000000431" crs="EPSG:3857" minx="-158.09139999999999304" dimensions="2" maxz="0"/>
+    <temporal>
+      <period>
+        <start>2020-07-10T05:00:00Z</start>
+        <end></end>
+      </period>
+    </temporal>
+    <temporal>
+      <period>
+        <start></start>
+        <end></end>
+      </period>
+    </temporal>
+  </extent>
+</qgis>
