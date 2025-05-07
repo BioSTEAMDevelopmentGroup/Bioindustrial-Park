@@ -38,12 +38,12 @@ CO2_stream_2 = Stream('CO2_stream_2',
                     
 makeup_TREA = Stream('makeup_TREA',
                      C6H15N=1,
-                     total_flow=50,
+                     total_flow=50, # will be recalculated by unit
                      units='kmol/hr')
 
 makeup_nBIM = Stream('makeup_nBIM',
                      nBIM=1,
-                     total_flow=50,
+                     total_flow=50, # will be recalculated by unit
                      units='kmol/hr')
               
               
@@ -69,11 +69,11 @@ def adjust_CO2_flow():
     R1201.run()
     C1202.ins[0].F_mol = R1201.outs[0].F_mol # H2:CO2 = 1:1
 
-M1201 = units.Mixer('M1201', ins=(C1203-0, C1201-0, ''), outs='')
+# M1201 = units.Mixer('M1201', ins=(C1203-0, C1201-0, ''), outs='')
 
-R1202 = _units.HCOOH_SynthesisReactor('R1202', ins=(M1201-0, makeup_TREA, ''), outs='')
+R1202 = _units.HCOOH_SynthesisReactor('R1202', ins=(C1203-0, C1201-0, '', makeup_TREA, ''), outs='')
 
-F1201 = units.SplitFlash('F1201', ins=R1202-0, outs=(2-M1201, 'adduct'), 
+F1201 = units.SplitFlash('F1201', ins=R1202-0, outs=(2-R1202, 'adduct'), 
                          split={'H2': 1.0,
                                 'CO2': 1.0,
                                 'triethylamine': 0.0,
@@ -86,13 +86,15 @@ F1202 = units.SplitFlash('F1202', ins=F1201-1, outs=('liquid', 'concen_adduct'),
                          P=20000,
                          T=373.15)
 
-R1203 = _units.Amine_Exchange_Reactor('R1203', ins=(F1202-1, makeup_nBIM), outs=('effluent'))
+R1203 = _units.Amine_Exchange_Reactor('R1203', ins=(F1202-1, makeup_nBIM, ''), outs=('effluent'))
                                       
-D1201 = units.BinaryDistillation('D1201', ins=R1203-0, outs=(2-R1202, 'BIM_adduct'),
+D1201 = units.BinaryDistillation('D1201', ins=R1203-0, outs=('', 'BIM_adduct'),
                                  LHK=('C6H15N', 'nBIMHCOOH'),
                                  y_top=0.99,
                                  x_bot=0.01,
                                  k=1.,)
+
+H1201 = units.HXutility('H1201', ins=D1201-0, outs=4-R1202, V=0)
 
 R1204 = _units.nBIM_Exchange_Reactor('R1204', ins=D1201-1, outs='')
 
@@ -100,10 +102,10 @@ S1201 = units.Splitter('S1201', ins=R1204-0, outs=('', ''),
                        split={'HCOOH': 1.0,
                               'nBIM': 1.0})
 
-D1202 = units.BinaryDistillation('D1202', ins=S1201-0, outs=('FA_distillate', 'to_R1203'),
+D1202 = units.BinaryDistillation('D1202', ins=S1201-0, outs=('FA_distillate', 2-R1203),
                                  LHK=('HCOOH', 'nBIM'),
-                                 y_top=0.3,
-                                 x_bot=0.7,
+                                 y_top=0.995,
+                                 x_bot=0.997,
                                  k=1.,
                                  P=35/760*101325)
 
