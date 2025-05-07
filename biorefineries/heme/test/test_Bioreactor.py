@@ -61,6 +61,8 @@ productivity = 0.1 # [g / L / h]
 LegH_yield = 0.18 # [by wt]
 Y_b = 0.43 # [by wt]
 
+
+
 # %%
 Production = bst.SRxn([
         bst.Rxn('8 Glucose + 4 NH3 + 1 FeSO4 + 10.5 O2 -> Heme_b + 1 H2SO4 + 37 H2O + 14 CO2',reactant = 'Glucose',X=0.1,check_atomic_balance=True),
@@ -120,7 +122,7 @@ AB1.design_results
 # %%
 AB1.purchase_costs
 # %%
-AB1.heat_utilities
+# AB1.heat_utilities
 
 # %%
 # %%

@@ -12,89 +12,86 @@ Created on 2025-04-30 15:36:46
 import biosteam as bst
 import thermosteam as tmo
 import numpy as np
-from biosteam.utils import chemical_cache
+from thermosteam.utils import chemical_cache
+from thermosteam import functional as fn
+import pandas as pd
 
 __all__ = (
-    'create_chemical_LegH'
+    'get_grouped_chemicals',
+    'create_LegH',
+    'create_chemicals_LegH',
 )
+
+# %% Constants
+
+# Heats of formation for cellulosic components are from Humbird 2011 report: https://www.nrel.gov/docs/fy11osti/47764.pdf
+# They are originally found in calories, so we need to convert them to joule.
 _cal2joule = 4.184 # auom('cal').conversion_factor('J')
-# %%
-#
-def create_chemical_LegH(set_thermo=True,yeast_includes_nitrogen=False):
-    
-    # create new chemical
+Cp_cellulosic = 1.364
+
+#: Default liquid chemicals for saccharification solids-loading specification
+default_nonsolids = ['Water', 'Ethanol', 'AceticAcid', 
+                    'H2SO4', 'NH3']
+
+chemical_groups = dict(
+    OtherSugars = ('Arabinose',
+                    'Mannose',
+                    'Galactose',
+                    'Cellobiose',
+                    'Sucrose'),
+    OrganicSolubleSolids = ('AmmoniumAcetate',
+                            'SolubleLignin',
+                            'Extract', 
+                            'LacticAcid', 
+                            'Cellulase'),
+    COxSOxNOxH2S = ('NO',
+                    'NO2',
+                    'SO2',
+                    'CO',
+                    'H2S'),  
+    Protein = ('Protein',
+                'Enzyme',
+                'DenaturedEnzyme'),
+    CellMass = ('WWTsludge',
+                'Z_mobilis',
+                'T_reesei'),                           
+)
+
+def get_grouped_chemicals(stream, units='kmol/hr'):
+    new_stream = tmo.Stream(stream.thermo)
+    new_stream.set_flow(stream.mol, units, stream.chemicals.IDs)
+    data = {group: new_stream.get_flow(units, IDs).sum() for group, IDs in chemical_groups.items()}
+    return pd.Series(data)
+
+
+# %% Chemical object and define functions
+
+@chemical_cache
+def create_LegH():
+    ####
     chems = bst.Chemicals([])
-    def add_chemical(ID, ref=None, **data):
-        chemical = bst.Chemical(ID, **data) if ref is None else ref.copy(ID, **data)
-        chems.append(chemical)
-        return chemical
-    # Culture Media
-    ####
-    add_chemical('H2O')
-    add_chemical('Glycine')
+    def add_chemical(ID, source=None, Cp=None, **data):
+        chemical = tmo.Chemical.blank(ID, **data)
+        if source: 
+            default_phase_ref = source.phase_ref
+            chemical.copy_models_from(source)
+        else:
+            default_phase_ref = 'l'
+        if not chemical.phase_ref:
+            chemical.phase_ref = default_phase_ref
+        chemical.at_state(chemical.phase_ref)
+        if Cp is not None: set_Cp(chemical, Cp)
+        chemical.default()
+        chems.append(chemical)    
 
-    add_chemical('H2SO4', phase='l')
-    ##### Gases #####
-    O2 = add_chemical('O2', phase='g', Hf=0)
-    N2 = add_chemical('N2', phase='g', Hf=0)
-    CH4 = add_chemical('CH4', phase='g')
-    CO = add_chemical('CO', search_ID='CarbonMonoxide', phase='g', Hf=-26400*_cal2joule)
-    CO2 = add_chemical('CO2', phase='g')
-    NH3 = add_chemical('NH3', phase='g', Hf=-10963*_cal2joule)
-    NO = add_chemical('NO', search_ID='NitricOxide', phase='g')
-    NO2 = add_chemical('NO2', phase='g')
-    H2S = add_chemical('H2S', phase='g', Hf=-4927*_cal2joule)
-    SO2 = add_chemical('SO2', phase='g')
+    def set_Cp(single_phase_chemical, Cp):
+        chem = single_phase_chemical
+        chem.Cn.add_model(Cp * chem.MW, top_priority=True)
+    
+    def set_rho(single_phase_chemical, rho):
+        V = fn.rho_to_V(rho, single_phase_chemical.MW)
+        single_phase_chemical.V.add_model(V, top_priority=True)   
 
-    ##### Soluble inorganics #####
-    # culture_media
-    FeSO4 = add_chemical('FeSO4', phase='l', default=True)
-    KH2PO4 = add_chemical('KH2PO4', phase='l', default=True)
-    NH4_2HPO4 = add_chemical('(NH4)2HPO4', phase='l', default=True)
-    MgSO4 = add_chemical('MgSO4', phase='l', default=True)
-    KOH = add_chemical('KOH', phase='l', default=True)
-    NaCl = add_chemical('NaCl', phase='l', default=True)
-    # trace_metal_solution
-    HCl = add_chemical('HCl', phase='l', default=True)
-    CaCl2 = add_chemical('CaCl2', phase='s', default=True)
-    ZnSO4 = add_chemical('ZnSO4', phase='s', default=True)
-    MnSO4 = add_chemical('MnSO4', phase='s', default=True)
-    CoCl2 = add_chemical('CoCl2', phase='s', default=True)
-    CuSO4 = add_chemical('CuSO4', phase='s', default=True)
-    NH4_6Mo7O24 = add_chemical('(NH4)6Mo7O24', search_ID='PubChem=61578', phase='s', default=True)
-    Na2B4O7 = add_chemical('Na2B4O7', phase='s', default=True)
-
-    # feed2
-    NH4_2SO4 = add_chemical('(NH4)2SO4', phase='s', default=True, Hf=-288994*_cal2joule)
-    # FeSO4
-    # ZnSO4
-
-    ##### Soluble organics #####
-    # culture_media & feed
-    CitricAcid = add_chemical('CitricAcid', phase='l', default=True)
-    Glucose = add_chemical('Glucose', phase='l', default=True)
-    IPTG = add_chemical('IPTG', phase='l', default=True)
-    #add_chemical('Tryptone', phase='l', default=True)
-    # antibiotics   
-    Ampicillin = add_chemical('Ampicillin', phase='l', default=True)
-    Kanamycin = add_chemical('Kanamycin', phase='l', default=True)
-    Streptomycin = add_chemical('Streptomycin', phase='l', default=True)
-    Chloramphenicol = add_chemical('Chloramphenicol', phase='l', default=True)
-
-    Yeast = add_chemical(
-        'Yeast',
-        phase='l',
-        formula='CH1.61O0.56N0.16' if yeast_includes_nitrogen else 'CH1.61O0.56',
-        rho=1540,
-        Cp=Glucose.Cp(298.15), # 1.54
-        default=True,
-        search_db=False,
-        aliases=['Cellmass'],
-    )
-    Yeast.Hf = Glucose.Hf / Glucose.MW * Yeast.MW 
-    # Same as glucose to ignore heats related to growth 
-
-    ####
     # heme molecule formula: C34H32FeN4O4
     # heme_b = add_chemical('heme')
     Heme_b = add_chemical('Heme_b', search_ID='PubChem=26945', phase='s', default=True)
@@ -132,11 +129,171 @@ def create_chemical_LegH(set_thermo=True,yeast_includes_nitrogen=False):
         atoms=formula2,
         phase='s'
     )
+    return chems
+
+@chemical_cache
+def create_chemicals_LegH():
+    ##############################################
+    ##### set function of create new chemical ####
+    ##############################################    
+    chems = bst.Chemicals([])
+
+    def add_chemical(ID, source=None, Cp=None, **data):
+        chemical = tmo.Chemical.blank(ID, **data)
+        if source: 
+            default_phase_ref = source.phase_ref
+            chemical.copy_models_from(source)
+        else:
+            default_phase_ref = 'l'
+        if not chemical.phase_ref:
+            chemical.phase_ref = default_phase_ref
+        chemical.at_state(chemical.phase_ref)
+        if Cp is not None: set_Cp(chemical, Cp)
+        chemical.default()
+        chems.append(chemical)
+
+    def append_chemical(ID, search_ID=None, **data):
+        chemical = tmo.Chemical(ID, search_ID=search_ID, **data)
+        try: chemical.at_state(phase=chemical.phase_ref)
+        except: pass
+        chemical.default()    
+        chems.append(chemical)
+    
+    def extend_chemical(IDs, **data):
+        for ID in IDs: append_chemical(ID, **data)
+    
+    def append_chemical_copy(ID, chemical):
+        new_chemical = chemical.copy(ID)
+        chems.append(new_chemical)
+    
+    def set_Cp(single_phase_chemical, Cp):
+        chem = single_phase_chemical
+        chem.Cn.add_model(Cp * chem.MW, top_priority=True)
+    
+    def set_rho(single_phase_chemical, rho):
+        V = fn.rho_to_V(rho, single_phase_chemical.MW)
+        single_phase_chemical.V.add_model(V, top_priority=True)   
+
+    def add_chemical(ID, ref=None, **data):
+        chemical = bst.Chemical(ID, **data) if ref is None else ref.copy(ID, **data)
+        chems.append(chemical)
+        return chemical
+    
+    #########################
+    #### Define Species #####
+    #########################
+
+    #### General Liquid #####
+    add_chemical('H2O')
+    add_chemical('H2SO4', phase='l')
+
+    #### Gases ####
+    add_chemical('O2', phase='g', Hf=0)
+    add_chemical('N2', phase='g', Hf=0)
+    add_chemical('CH4', phase='g')
+    add_chemical('CO', search_ID='CarbonMonoxide', phase='g', Hf=-26400*_cal2joule)
+    add_chemical('CO2', phase='g')
+    add_chemical('NH3', phase='g', Hf=-10963*_cal2joule)
+    add_chemical('NO', search_ID='NitricOxide', phase='g',formula='NO', Hf=82.05)
+    add_chemical('NO2', phase='g', formula='NO2', Hf=7925*_cal2joule)
+    add_chemical('H2S', phase='g', Hf=-4927*_cal2joule)
+    add_chemical('SO2', phase='g')
+
+    ##### Soluble inorganics #####
+    add_chemical('KOH', phase='l', default=True)
+    add_chemical('NaCl', phase='l', default=True)
+
+    add_chemical('(NH4)2SO4', phase='s', default=True, Hf=-288994*_cal2joule)
+    add_chemical('FeSO4', phase='l', default=True)
+    add_chemical('MgSO4', phase='l', default=True)
+
+    add_chemical('KH2PO4', phase='l', default=True)
+    add_chemical('(NH4)2HPO4', phase='l', default=True)
+    
+    # trace_metal_solution
+    add_chemical('HCl', phase='l', default=True)
+    add_chemical('CaCl2', phase='s', default=True)
+    add_chemical('ZnSO4', phase='s', default=True)
+    add_chemical('MnSO4', phase='s', default=True)
+    add_chemical('CoCl2', phase='s', default=True)
+    add_chemical('CuSO4', phase='s', default=True)
+    add_chemical('(NH4)6Mo7O24', search_ID='PubChem=61578', phase='s', default=True)
+    add_chemical('Na2B4O7', phase='s', default=True)
+
+    #### Main Organic ####
+    add_chemical('Glycine', phase='s')
+    add_chemical('CitricAcid', phase='l', default=True)
+    add_chemical('Glucose', phase='l', default=True)
+    add_chemical('Dextrose', phase='l', default=True)
+    add_chemical('IPTG', phase='l', default=True)
+    #add_chemical('Tryptone', phase='l', default=True)
+
+    # antibiotics   
+    add_chemical('Ampicillin', phase='l', default=True)
+    add_chemical('Kanamycin', phase='l', default=True)
+    add_chemical('Streptomycin', phase='l', default=True)
+    add_chemical('Chloramphenicol', phase='l', default=True)
+
+
+    #############
+    #### Bio ####
+    #############
+    Yeast = add_chemical(
+        'Yeast',
+        phase='l',
+        formula='CH1.61O0.56',#N0.16', #if yeast_includes_nitrogen else 'CH1.61O0.56',
+        rho=1540,
+        Cp=chems.Glucose.Cp(298.15), # 1.54
+        default=True,
+        search_db=False,
+        aliases=['Cellmass'],
+    )
+    Yeast.Hf = chems.Glucose.Hf / chems.Glucose.MW * Yeast.MW 
+    # Same as glucose to ignore heats related to growth 
+
+
+    add_chemical('Z_mobilis', formula="CH1.8O0.5N0.2",
+                                    Hf=-31169.39*_cal2joule)
+    add_chemical('T_reesei', formula="CH1.645O0.445N0.205S0.005",
+                Hf=-23200.01*_cal2joule)
+    add_chemical('Biomass', formula="CH1.64O0.39N0.23S0.0035",
+                Hf=-23200.01*_cal2joule)
+    add_chemical('Cellulose', formula="C6H10O5", # Glucose monomer minus water
+                Cp=Cp_cellulosic,
+                Hf=-233200.06*_cal2joule)
+    add_chemical('Protein', formula="CH1.57O0.31N0.29S0.007",
+                Hf=-17618*_cal2joule)
+    add_chemical('Enzyme', formula="CH1.59O0.42N0.24S0.01",
+                Hf=-17618*_cal2joule)
+    add_chemical('Glucan', formula='C6H10O5',
+                Cp=Cp_cellulosic,
+                Hf=-233200*_cal2joule,
+                phase='s')
+    add_chemical('Xylan', formula="C5H8O4",
+                Cp=Cp_cellulosic,
+                Hf=-182100*_cal2joule,
+                phase='s')
+    add_chemical('Xylitol', formula="C5H12O5",
+                Cp=Cp_cellulosic,
+                Hf=-243145*_cal2joule)
+    add_chemical('Cellobiose', formula="C12H22O11",
+                Cp=Cp_cellulosic,
+                Hf=-480900*_cal2joule)
+    add_chemical('CSL', 
+                formula='H2.8925O1.3275C1N0.0725S0.00175',
+                Hf=(chems.Protein.Hf/4
+                    + chems.Water.Hf/2
+                    + chems.LacticAcid.Hf/4))
+    append_chemical_copy('DenaturedEnzyme', chems.Enzyme)
+    append_chemical_copy('WWTsludge', chems.Biomass)
+    append_chemical_copy('Cellulase', chems.Enzyme)
 
     # Default missing properties of chemicals to those of water
     for chemical in chems: chemical.default()
 
+    #################
     ##### Group #####
+    #################
     chems.compile()
 
     chems.define_group(
@@ -161,5 +318,5 @@ def create_chemical_LegH(set_thermo=True,yeast_includes_nitrogen=False):
         [1000, 0.1, 60, 15.191],
         wt=True
     )
-    if set_thermo: bst.settings.set_thermo(chems)
+    if bst.set_thermo: bst.settings.set_thermo(chems)
     return chems
