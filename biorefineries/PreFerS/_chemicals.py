@@ -67,71 +67,6 @@ def get_grouped_chemicals(stream, units='kmol/hr'):
 # %% Chemical object and define functions
 
 @chemical_cache
-def create_LegH():
-    ####
-    chems = bst.Chemicals([])
-    def add_chemical(ID, source=None, Cp=None, **data):
-        chemical = tmo.Chemical.blank(ID, **data)
-        if source: 
-            default_phase_ref = source.phase_ref
-            chemical.copy_models_from(source)
-        else:
-            default_phase_ref = 'l'
-        if not chemical.phase_ref:
-            chemical.phase_ref = default_phase_ref
-        chemical.at_state(chemical.phase_ref)
-        if Cp is not None: set_Cp(chemical, Cp)
-        chemical.default()
-        chems.append(chemical)    
-
-    def set_Cp(single_phase_chemical, Cp):
-        chem = single_phase_chemical
-        chem.Cn.add_model(Cp * chem.MW, top_priority=True)
-    
-    def set_rho(single_phase_chemical, rho):
-        V = fn.rho_to_V(rho, single_phase_chemical.MW)
-        single_phase_chemical.V.add_model(V, top_priority=True)   
-
-    # heme molecule formula: C34H32FeN4O4
-    # heme_b = add_chemical('heme')
-    Heme_b = add_chemical('Heme_b', search_ID='PubChem=26945', phase='s', default=True)
-
-    # Only protein: 144 amino acids Formula:C729H1166N200O219S2​
-    # https://www.uniprot.org/uniprotkb/P02236/entry#sequences
-    protein_formula = {
-        'H': 1166 ,
-        'C': 729 ,
-        'N': 200 ,
-        'O': 219 ,
-        'S': 2 
-    }
-    formula = {i: round(j, 2) for i, j in protein_formula.items()}
-    Protein = add_chemical(
-        'Protein',
-        search_db=False,
-        default=True,
-        atoms=formula,
-        phase='s'
-    )
-    Leghemoglobin_formula = {
-        'H': (1166+32) ,
-        'C': (729+34) ,
-        'N': (200 +4) ,
-        'O': (219+4) ,
-        'S': 2 ,
-        'Fe': 1 
-    }
-    formula2 = {i: round(j, 2) for i, j in Leghemoglobin_formula.items()}
-    Leghemoglobin = add_chemical(
-        'Leghemoglobin',
-        search_db=False,
-        default=True,
-        atoms=formula2,
-        phase='s'
-    )
-    return chems
-
-@chemical_cache
 def create_chemicals_LegH():
     ##############################################
     ##### set function of create new chemical ####
@@ -223,10 +158,15 @@ def create_chemicals_LegH():
     #### Main Organic ####
     add_chemical('Glycine', phase='s')
     add_chemical('CitricAcid', phase='l', default=True)
+    add_chemical('AceticAcid', phase='l', default=True)
+    add_chemical('LacticAcid', phase='l', default=True)
     add_chemical('Glucose', phase='l', default=True)
     add_chemical('Dextrose', phase='l', default=True)
     add_chemical('IPTG', phase='l', default=True)
     #add_chemical('Tryptone', phase='l', default=True)
+    add_chemical('Ethanol', phase='l', default=True)
+    add_chemical('Glycerol', phase='l', default=True)
+    add_chemical('SuccinicAcid', phase='l')
 
     # antibiotics   
     add_chemical('Ampicillin', phase='l', default=True)
@@ -253,40 +193,90 @@ def create_chemicals_LegH():
 
 
     add_chemical('Z_mobilis', formula="CH1.8O0.5N0.2",
-                                    Hf=-31169.39*_cal2joule)
+                                    default=True, search_db=False,
+                                    Hf=-31169.39*_cal2joule, phase='s')
     add_chemical('T_reesei', formula="CH1.645O0.445N0.205S0.005",
-                Hf=-23200.01*_cal2joule)
+                default=True, search_db=False,
+                Hf=-23200.01*_cal2joule, phase='s')
     add_chemical('Biomass', formula="CH1.64O0.39N0.23S0.0035",
-                Hf=-23200.01*_cal2joule)
+                default=True, search_db=False,
+                Hf=-23200.01*_cal2joule, phase='s')
     add_chemical('Cellulose', formula="C6H10O5", # Glucose monomer minus water
                 Cp=Cp_cellulosic,
-                Hf=-233200.06*_cal2joule)
+                default=True, search_db=False,
+                Hf=-233200.06*_cal2joule,
+                phase='s')
     add_chemical('Protein', formula="CH1.57O0.31N0.29S0.007",
-                Hf=-17618*_cal2joule)
+                default=True, search_db=False,
+                Hf=-17618*_cal2joule, phase='s')
     add_chemical('Enzyme', formula="CH1.59O0.42N0.24S0.01",
-                Hf=-17618*_cal2joule)
+                default=True, search_db=False,
+                Hf=-17618*_cal2joule, phase='s')
     add_chemical('Glucan', formula='C6H10O5',
                 Cp=Cp_cellulosic,
+                default=True, search_db=False,
                 Hf=-233200*_cal2joule,
                 phase='s')
     add_chemical('Xylan', formula="C5H8O4",
                 Cp=Cp_cellulosic,
+                default=True, search_db=False,
                 Hf=-182100*_cal2joule,
                 phase='s')
     add_chemical('Xylitol', formula="C5H12O5",
                 Cp=Cp_cellulosic,
-                Hf=-243145*_cal2joule)
+                default=True, search_db=False,
+                Hf=-243145*_cal2joule, phase='s')
     add_chemical('Cellobiose', formula="C12H22O11",
                 Cp=Cp_cellulosic,
-                Hf=-480900*_cal2joule)
+                default=True, search_db=False,
+                Hf=-480900*_cal2joule, phase='s')
     add_chemical('CSL', 
                 formula='H2.8925O1.3275C1N0.0725S0.00175',
+                default=True, search_db=False,
                 Hf=(chems.Protein.Hf/4
-                    + chems.Water.Hf/2
-                    + chems.LacticAcid.Hf/4))
+                    + chems.H2O.Hf/2
+                    + chems.LacticAcid.Hf/4), phase='s')
     append_chemical_copy('DenaturedEnzyme', chems.Enzyme)
     append_chemical_copy('WWTsludge', chems.Biomass)
     append_chemical_copy('Cellulase', chems.Enzyme)
+
+    # heme molecule formula: C34H32FeN4O4
+    # heme_b = add_chemical('heme')
+    Heme_b = add_chemical('Heme_b', search_ID='PubChem=26945', phase='s', default=True)
+
+    # Only protein: 144 amino acids Formula:C729H1166N200O219S2​
+    # https://www.uniprot.org/uniprotkb/P02236/entry#sequences
+    protein_formula = {
+        'H': 1166 ,
+        'C': 729 ,
+        'N': 200 ,
+        'O': 219 ,
+        'S': 2 
+    }
+    formula = {i: round(j, 2) for i, j in protein_formula.items()}
+    Globin = add_chemical(
+        'Globin',
+        search_db=False,
+        default=True,
+        atoms=formula,
+        phase='s'
+    )
+    Leghemoglobin_formula = {
+        'H': (1166+32) ,
+        'C': (729+34) ,
+        'N': (200 +4) ,
+        'O': (219+4) ,
+        'S': 2 ,
+        'Fe': 1 
+    }
+    formula2 = {i: round(j, 2) for i, j in Leghemoglobin_formula.items()}
+    Leghemoglobin = add_chemical(
+        'Leghemoglobin',
+        search_db=False,
+        default=True,
+        atoms=formula2,
+        phase='s'
+    )
 
     # Default missing properties of chemicals to those of water
     for chemical in chems: chemical.default()
@@ -295,6 +285,11 @@ def create_chemicals_LegH():
     ##### Group #####
     #################
     chems.compile()
+    chems.set_synonym('H2SO4', 'SulfuricAcid')
+    chems.set_synonym('NH3', 'Ammonia')
+    chems.set_synonym('H2O', 'Water')
+    chems.set_synonym('Yeast','Cellmass')
+    chems.set_synonym('(NH4)2HPO4','DAP')
 
     chems.define_group(
         'air',
@@ -318,5 +313,23 @@ def create_chemicals_LegH():
         [1000, 0.1, 60, 15.191],
         wt=True
     )
-    if bst.set_thermo: bst.settings.set_thermo(chems)
+
+    # 18wt%NH3
+    chems.define_group(
+        '_18wtNH3',
+        ['NH3','H2O'],
+        [18,82],
+        wt=True
+    )
+
+    # air
+    chems.define_group(
+        'air',
+        ['O2','N2'],
+        [22,78],
+        wt=True
+    )
+
+
+    if bst.settings.set_thermo: bst.settings.set_thermo(chems)
     return chems

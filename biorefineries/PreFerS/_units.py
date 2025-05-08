@@ -34,7 +34,7 @@ __all__ = (
 
     # Bioreactor Fermentaion
     'SeedTrain',
-    'CoFermentation',
+    'AeratedFermentation',
     #'PSA',
 
     ##### Downstream #####
@@ -182,78 +182,38 @@ class SeedTrain(Unit):
             kW += N*x.kW*q
         self.power_utility(kW)
 
-class CoFermentation(bst.BatchBioreactor):
-    _N_ins = 1
-    _ins_size_is_fixed = False
-        
-    #: Unload and clean up time (hr)
-    tau_0 = 4
-    
-    def _init(self, tau=36, N=None, V=3785.4118, T=305.15, P=101325,
-                Nmin=2, Nmax=36, cofermentation=None, loss=None):
-        super()._init(tau, N, V, T, P, Nmin, Nmax)
-        self.P = P
+class AeratedFermentation(bst.AeratedBioreactor):
+    V_max_default = 500
+    def _init(
+            self, 
+            fermentation_reaction, 
+            cell_growth_reaction, 
+            respiration_reaction,
+            dT_hx_loop=8,
+            Q_O2_consumption=-460240, # [kJ/kmol] equivalent to 110 kcal / mol as in https://www.academia.edu/19636928/Bioreactor_Design_for_Chemical_Engineers
+            batch=True,
+            **kwargs,
+        ):
+        bst.AeratedBioreactor._init(self, batch=batch, dT_hx_loop=dT_hx_loop, 
+                                    Q_O2_consumption=Q_O2_consumption,
+                                    optimize_power=True, **kwargs)
         chemicals = self.chemicals
-        self.loss = loss or ParallelRxn([
-    #   Reaction definition               Reactant    Conversion
-    Rxn('Glucose -> 2 LacticAcid',       'Glucose',   0.0300, chemicals),
-    Rxn('3 Xylose -> 5 LacticAcid',      'Xylose',    0.0300, chemicals),
-    Rxn('3 Arabinose -> 5 LacticAcid',   'Arabinose', 0.0300, chemicals),
-    Rxn('Galactose -> 2 LacticAcid',     'Galactose', 0.0300, chemicals),
-    Rxn('Mannose -> 2 LacticAcid',       'Mannose',   0.0300, chemicals),
-        ])
-        if cofermentation is None:
-            self.cofermentation = ParallelRxn([
-        #   Reaction definition                                          Reactant    Conversion
-        Rxn('Glucose -> 2 Ethanol + 2 CO2',                             'Glucose',   0.9500, chemicals),
-        Rxn('Glucose + 0.047 CSL + 0.018 DAP -> 6 Z_mobilis + 2.4 H2O', 'Glucose',   0.0200, chemicals),
-        Rxn('Glucose + 2 H2O -> 2 Glycerol + O2',                       'Glucose',   0.0040, chemicals),
-        Rxn('Glucose + 2 CO2 -> 2 SuccinicAcid + O2',                   'Glucose',   0.0060, chemicals),
-        Rxn('3 Xylose -> 5 Ethanol + 5 CO2',                            'Xylose',    0.8500, chemicals),
-        Rxn('Xylose + 0.039 CSL + 0.015 DAP -> 5 Z_mobilis + 2 H2O',
-                                                                        'Xylose',    0.0190, chemicals),
-        Rxn('3 Xylose + 5 H2O -> 5 Glycerol + 2.5 O2',                  'Xylose',    0.0030, chemicals),
-        Rxn('Xylose + H2O -> Xylitol + 0.5 O2',                         'Xylose',    0.0460, chemicals),
-        Rxn('3 Xylose + 5 CO2 -> 5 SuccinicAcid + 2.5 O2',              'Xylose',    0.0090, chemicals),
-            ])
-            self.glucose_to_ethanol = self.cofermentation[0]
-            self.xylose_to_ethanol = self.cofermentation[4]
-            self.glucose_to_byproducts = self.cofermentation[1:4]
-            self.xylose_to_byproducts = self.cofermentation[5:]
-        else:
-            self.cofermentation = cofermentation
-        
-        if 'CSL' in self.chemicals:
-            self.CSL_to_constituents = Rxn(
-                'CSL -> 0.5 H2O + 0.25 LacticAcid + 0.25 Protein', 'CSL', 1.0000, chemicals, basis='wt',
-            )
-            self.CSL_to_constituents.basis = 'mol'
-        else:
-            self.CSL_to_constituents = None
-        
-        if all([i in self.chemicals for i in ('FFA', 'DAG', 'TAG', 'Glycerol')]):
-            self.oil_reaction = self.lipid_reaction = ParallelRxn([
-                Rxn('TAG + 3 Water -> 3FFA + Glycerol', 'TAG', 0.23, chemicals),
-                Rxn('TAG + Water -> FFA + DAG', 'TAG', 0.02, chemicals)
-            ])
-        else:
-            self.oil_reaction = self.lipid_reaction = None
-        
-    def _run(self):
-        feeds = self.ins
-        vent, effluent = self.outs
-        vent.P = effluent.P = self.P
-        vent.T = effluent.T = self.T
-        vent.phase = 'g'
-        effluent.mix_from(feeds, energy_balance=False)
-        if self.loss: self.loss(effluent)
-        if self.lipid_reaction: 
-            self.lipid_reaction.force_reaction(effluent)
-            effluent.empty_negative_flows()
-        self.cofermentation(effluent)
-        if self.CSL_to_constituents: self.CSL_to_constituents(effluent)
-        vent.empty()
-        vent.receive_vent(effluent, energy_balance=False)
+        # self.hydrolysis_reaction = Rxn('Sucrose + Water -> 2Glucose', 'Sucrose', 1.00, chemicals)
+        self.fermentation_reaction = fermentation_reaction
+        self.cell_growth_reaction = cell_growth_reaction
+        self.respiration_reaction = respiration_reaction
+    
+    def _run_vent(self, vent, effluent):
+        vent.copy_flow(effluent, ('CO2', 'O2', 'N2'), remove=True)
+        assert not effluent.imol['CO2', 'O2', 'N2'].any()
+    
+    def _run_reactions(self, effluent):
+        # self.hydrolysis_reaction.force_reaction(effluent)
+        # self.lipid_reaction.force_reaction(effluent)
+        if effluent.imol['H2O'] < 0.: effluent.imol['H2O'] = 0.
+        self.fermentation_reaction.force_reaction(effluent)
+        self.cell_growth_reaction.force_reaction(effluent)
+        self.respiration_reaction.force_reaction(effluent)
 
 # %%
 class PSA(bst.Flash):
