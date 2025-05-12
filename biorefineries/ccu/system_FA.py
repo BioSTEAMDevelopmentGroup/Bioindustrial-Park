@@ -52,7 +52,7 @@ makeup_nBIM = Stream('makeup_nBIM',
 R1201 = _units.Electrolyzer('R1201', ins=water_stream_2, outs=('hydrogen_2','oxygen_2'))
 
 # H2 compressing
-C1201 = units.IsentropicCompressor('C1201', ins=R1201-0, outs='', P=105*101325)
+C1201 = units.IsentropicCompressor('C1201', ins=R1201-0, outs='', P=12000000, vle=True)
 
 # CO2 compressing
 ks = [bst.units.IsentropicCompressor(P=3*101325), 
@@ -63,25 +63,20 @@ hxs = [bst.units.HXutility(T=T) for T in [38+273.15, 38+273.15, 38+273.15]]\
 
 C1202 = units.MultistageCompressor('C1202', ins=CO2_stream_2, outs='', compressors=ks, hxs=hxs)
 
-C1203 = units.IsentropicCompressor('C1203', ins=C1202-0, outs='', P=78*101325)
+C1203 = units.IsentropicCompressor('C1203', ins=C1202-0, outs='', P=12000000, vle=True)
 @C1202.add_specification(run=True)
 def adjust_CO2_flow():
     R1201.run()
     C1202.ins[0].F_mol = R1201.outs[0].F_mol # H2:CO2 = 1:1
 
-# M1201 = units.Mixer('M1201', ins=(C1203-0, C1201-0, ''), outs='')
 
 R1202 = _units.HCOOH_SynthesisReactor('R1202', ins=(C1203-0, C1201-0, '', makeup_TREA, ''), outs='')
 
-F1201 = units.SplitFlash('F1201', ins=R1202-0, outs=(2-R1202, 'adduct'), 
-                         split={'H2': 1.0,
-                                'CO2': 1.0,
-                                'triethylamine': 0.0,
-                                'TREAHCOOH': 0.0},  # TREAHCOOH stays in liquid
-                         P=101325,
-                         T=383.15)
+S1101 = units.PhaseSplitter('S1101', ins=R1202-0, outs=('unreacted_gas', ''))
 
-F1202 = units.SplitFlash('F1202', ins=F1201-1, outs=('liquid', 'concen_adduct'), 
+C1204 = units.IsothermalCompressor('C1204', ins=S1101-0, outs=2-R1202, P=12000000, vle=True)
+
+F1202 = units.SplitFlash('F1202', ins=S1101-1, outs=('liquid', 'concen_adduct'), 
                          split={'triethylamine': 1.0,}, 
                          P=20000,
                          T=373.15)

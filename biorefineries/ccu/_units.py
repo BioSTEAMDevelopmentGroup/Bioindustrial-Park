@@ -148,8 +148,6 @@ class Reactor(bst.units.design_tools.PressureVessel, bst.Unit, isabstract=True):
     _N_ins = 5
     _N_outs = 1
     
-    auxiliary_unit_names = ('heat_exchanger',)
-    
     _units = {**bst.units.design_tools.PressureVessel._units,
               'Total volume': 'm3',
               'Reactor volume': 'm3',
@@ -161,22 +159,8 @@ class Reactor(bst.units.design_tools.PressureVessel, bst.Unit, isabstract=True):
     
     def _setup(self):
         super()._setup()
-        self.heat_exchanger = self.auxiliary(
-            'heat_exchanger',
-            bst.HXutility,
-            ins=(bst.Stream(),),
-            T=self.T,)
-        self.compressor = self.auxiliary(
-            'compressor',
-            bst.IsentropicCompressor,
-            ins=bst.Stream(),
-            P=self.P)
-
         
     def _design(self):
-        self.heat_exchanger._design()
-        self.compressor._design()
-        
         Design = self.design_results
         Design['Catalyst_weight'] = catalyst_weight = self.catalyst_weight
         
@@ -209,10 +193,7 @@ class Reactor(bst.units.design_tools.PressureVessel, bst.Unit, isabstract=True):
               # Weight is proportional to wall thickness in PressureVessel design
               Design['Weight'] = round(Design['Weight']*wall_thickness_factor,2)
 
-    def _cost(self):
-        self.heat_exchanger._cost()
-        self.compressor._cost()
-        
+    def _cost(self):    
         Design = self.design_results
         baseline_purchase_costs = self.baseline_purchase_costs
         
@@ -231,7 +212,10 @@ class Reactor(bst.units.design_tools.PressureVessel, bst.Unit, isabstract=True):
 class HCOOH_SynthesisReactor(Reactor):
     _N_ins = 5
     _N_outs = 1
+    
     _F_BM_default = {**Reactor._F_BM_default}
+    
+    auxiliary_unit_names = ('heat_exchanger',)
     
     reaction = bst.Reaction(
         'CO2 + H2 + C6H15N -> TREAHCOOH',   'CO2',   0.48)
@@ -253,16 +237,12 @@ class HCOOH_SynthesisReactor(Reactor):
         self.wall_thickness_factor = wall_thickness_factor
         self.vessel_material = vessel_material
         self.vessel_type = vessel_type
-        
-        heat_exchanger = self.auxiliary('heat exchanger',
-                                        bst.HXutility,
-                                        ins=bst.Stream(),
-                                        T=self.T)
-        compressor = self.auxiliary('compressor',
-                                    bst.IsentropicCompressor,
-                                    ins=bst.Stream(),
-                                    P=self.P)
-        
+        self.heat_exchanger = self.auxiliary(
+            'heat_exchanger',
+            bst.HXutility,
+            ins=(bst.Stream(),),
+            T=self.T,)
+
     def _run(self):
         feed_CO2, feed_H2, recycled_gas, makeup_TREA, recycled_TREA = self.ins
         effluent, = self.outs
@@ -271,25 +251,31 @@ class HCOOH_SynthesisReactor(Reactor):
             makeup_TREA.imol['triethylamine'] = required_makeup_TREA
         else:
             makeup_TREA.imol['triethylamine'] = 0
-
-        effluent.mix_from([feed_CO2, feed_H2, recycled_gas, makeup_TREA, recycled_TREA])
-        self.heat_exchanger.ins[0].copy_like(effluent)
-        self.heat_exchanger._run()
-        self.compressor.ins[0].copy_like(effluent)
-        self.compressor._run()
-        self.reaction(effluent)
         
+        mixed = bst.Stream()
+        mixed.mix_from([feed_CO2, feed_H2, recycled_gas, makeup_TREA, recycled_TREA], conserve_phases=True)
+        
+        self.heat_exchanger.ins[0].copy_like(mixed)
+        self.heat_exchanger._run()
+        
+        heated = self.heat_exchanger.outs[0]
+        self.reaction(heated)
+        
+        effluent.copy_like(heated)
         effluent.T = self.T
         effluent.P = self.P
+        effluent.vle(T=effluent.T, P=effluent.P)
     
     def _design(self):
         self.catalyst_weight = (self.ins[0].imol['CO2'] +
                                 self.ins[1].imol['CO2'] +
                                 self.ins[2].imol['CO2'] ) * 0.48 * 46 / 669 * 24 # 669.0 gform. gcat−1 d−1
         super()._design()
+        self.heat_exchanger._design()
         
     def _cost(self):
         super()._cost()
+        self.heat_exchanger._cost()
 
 
         
