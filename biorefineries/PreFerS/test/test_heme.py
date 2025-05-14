@@ -39,32 +39,41 @@ compressor_isentropic_efficiency = 0.85
 V_max = 500 # [m3] 5 L * 1e5
 titer = 7.27 # [g / L]
 productivity = 7.27 / 72 # [g / L / h]
-LegH_yield = 17.27 * 5 * 1e5/1000/1300 # [by wt]
+LegH_yield = 7.27 * 5 / 1300 # [by wt]
 Y_b = 0.43 # [by wt]
 
 
 # %% Reactions
-conversion = productivity*V_max/(1.3*1e5/72)
+conversion = titer*5/(1300)
 
 fermentation_reaction = bst.PRxn([
-        bst.Rxn('8 Glucose + 4 NH3 + 1 FeSO4 + 10.5 O2 -> Heme_b + 1 H2SO4 + 37 H2O + 14 CO2',reactant = 'Glucose',X=conversion*0.05,check_atomic_balance=True),
-        bst.Rxn('Glucose + NH3 + H2SO4 + O2 -> Globin + H2O',reactant = 'Glucose', X= conversion*0.05,correct_atomic_balance=True),
-        bst.Rxn('Glucose + FeSO4 + NH3 + H2SO4 + O2 -> Leghemoglobin + H2O', reactant = 'Glucose', X=conversion,  correct_atomic_balance=True),
+        #           Reaction        Reactnat            Conversion           Check                  
+        bst.Rxn('8 Glucose + 4 NH3 + 1 FeSO4 + 10.5 O2 -> Heme_b + 1 H2SO4 + 37 H2O + 14 CO2',
+                                    reactant = 'Glucose',X=conversion*0.05,check_atomic_balance=True),
+        bst.Rxn('Glucose + (NH4)2SO4 + O2 -> Globin + NH3 + H2O',
+                                    reactant = 'Glucose', X= conversion*0.05,correct_atomic_balance=True),
+        bst.Rxn('Glucose + FeSO4 + (NH4)2SO4 + O2 -> Leghemoglobin + NH3 + H2O', 
+                                    reactant = 'Glucose', X=conversion,  correct_atomic_balance=True),
         ])
 fermentation_reaction[2].product_yield('Leghemoglobin', basis='wt', product_yield=LegH_yield)
 
-cell_growth_reaction = bst.Rxn(
-    'Glucose -> H2O + CO2 + Yeast', 'Glucose', 1,
+neutralization_reaction = bst.Rxn(
+    'H2SO4 + NH3 -> (NH4)2SO4', reactant = 'H2SO4', X=1,
     correct_atomic_balance=True
 )
-cell_growth_reaction.product_yield('Yeast', basis='wt', product_yield=Y_b)
+
+cell_growth_reaction = bst.Rxn(
+    'Glucose -> H2O + CO2 + Pichia_pastoris', 'Glucose', X=Y_b,
+    correct_atomic_balance=True
+)
+cell_growth_reaction.product_yield('Pichia_pastoris', basis='wt', product_yield=Y_b)
 
 respiration_reaction = bst.Rxn(
-    'Glucose + O2 -> CO2 + H2O', 'Glucose', 1. - cell_growth_reaction.X,
+    'Glucose + O2 -> CO2 + H2O', 'Glucose', 1. - cell_growth_reaction.X - fermentation_reaction[2].X,
     correct_atomic_balance=True
 )
 
-bst.settings.chemicals.set_alias('Yeast', 'cellmass')
+bst.settings.chemicals.set_alias('Pichia_pastoris', 'cellmass')
 
 RXN = bst.ReactionSystem(
     fermentation_reaction,
@@ -72,7 +81,7 @@ RXN = bst.ReactionSystem(
 )
 RXN.show()
 
-# %% Process
+# %% Upstream Process
 Mix1Out = bst.Stream('Mix1Out')
 SeedIn = bst.Stream('SeedIn', Seed=0.15*1e5/16, units='kg/hr', T=25+273.15)
 CultureIn = bst.Stream('CultureIn', Culture=1.5*1e5/16, units='kg/hr', T=25+273.15)
@@ -81,24 +90,28 @@ MX1 = bst.Mixer(
     ins=[SeedIn, CultureIn],
     outs=[Mix1Out],
 )
-# %%
 
 SeedOut = bst.Stream('SeedOut')
+vent1 = bst.Stream('vent1')
 ST1 = _units.SeedTrain(
     ins=[Mix1Out],
-    outs=['vent', SeedOut],
-    reactions=None,
+    outs=[vent1, SeedOut],
+    reactions=bst.PRxn([cell_growth_reaction, respiration_reaction]),
     saccharification=None,
     T=32+273.15,
 )
-# %%
+
+Y_b = 0.25 # [by wt]
+RXN.show()
+
 Glucose = bst.Stream('Glucose', Glucose=1.3*1e5/72, units='kg/hr', T=25+273.15)
-_18wtNH3 = bst.Stream('_18wtNH3', _18wtNH3=2000, units='kg/hr', T=25+273.15)
-effluent = bst.Stream('effluent')
+_18wtNH3 = bst.Stream('_18wtNH3', _18wtNH3=1000, units='kg/hr', T=25+273.15)
+vent2 = bst.Stream('vent2')
+AB1Out = bst.Stream('AB1Out')
 
 AB1 = _units.AeratedFermentation(
     ins=[SeedOut, Glucose, _18wtNH3, bst.Stream('FilteredAir', phase='g', P = 2 * 101325)],
-    outs=['vent', 'product'],
+    outs=[vent2, AB1Out],
     fermentation_reaction=fermentation_reaction,
     cell_growth_reaction=cell_growth_reaction,
     respiration_reaction=respiration_reaction,
@@ -122,10 +135,35 @@ def update_reaction_time_and_yield():
     AB1.tau = AB1.target_titer / AB1.target_productivity
     fermentation_reaction[2].product_yield('Leghemoglobin', basis='wt', product_yield=AB1.target_yield)
 
+# %% Downstream process
+
+PC1Out = bst.Stream('PC1Out')
+
+PC1 = _units.ProteinCentrifuge(
+    ins = AB1Out,
+    outs = ('cellmass', PC1Out),
+    moisture_content = 0.5,
+    split = (1, 0.99),
+    order = ('Glucose','cellmass'),
+    solids = ('Glucose','cellmass'),
+    centrifuge_type = 'reciprocating_pusher'
+)
+
+# ???
+Ev1Out = bst.Stream('Ev1Out')
+effluent1 = bst.Stream('effluent1')
+Ev1 = _units.Evaporator(
+    ins = PC1Out,
+    outs = (Ev1Out, effluent1),
+    P = (101325,73581, 50892, 32777, 20000),
+    V = 0.1,
+    V_definition = 'First-effect',
+) # ???
+
 # %%
 LegH_sys = bst.main_flowsheet.create_system('LegH_sys')
 LegH_sys.simulate()
-LegH_sys.diagram(format='html', kind='cluster', number=True)
+LegH_sys.diagram(format='html', number=True)
 LegH_sys.show()
 
 # %%

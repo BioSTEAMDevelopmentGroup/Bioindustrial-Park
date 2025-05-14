@@ -57,7 +57,9 @@ _hp2kW = 0.7457
 _Gcal2kJ = 4184e3
 
 # %% 
+####################
 ##### UpStream #####
+####################
 
 @cost('Flow rate', 'Pumps',
     S=43149, CE=522, cost=24800, n=0.8, kW=40, BM=2.3)
@@ -236,20 +238,20 @@ class PSA(bst.Flash):
     def _design(self):
         self.design_results['Liquid flow'] = self.outs[1].F_mass
 
+# %%
+######################
+##### Downstream #####
+######################
 
 # class CellDisruption(bst.Homogenizer): pass
 
+#@cost('Flow rate', units='kg/hr', CE=CEPCI_by_year[2010], cost=100000, S=100000, n=0.6, kW=100)
+#@copy_algorithm(bst.SolidLiquidsSplitCentrifuge, run=False)       
+#class Centrifuge(bst.SpliSolidLiquidsSplitCentrifugetter): pass
 
-# # %%
+class ProteinCentrifuge(bst.SolidsCentrifuge): pass
 
-# #@cost('Flow rate', units='kg/hr', CE=CEPCI_by_year[2010], cost=100000, S=100000, n=0.6, kW=100)
-# #@copy_algorithm(bst.SolidLiquidsSplitCentrifuge, run=False)       
-# class Centrifuge(bst.SpliSolidLiquidsSplitCentrifugetter): pass
-
-# # %%
-# class Evaporator(bst.MultiEffectEvaporator): pass
-
-# # %%
+class Evaporator(bst.MultiEffectEvaporator): pass
 
 # class Concentration(bst.PressureFilter): pass
         

@@ -15,7 +15,7 @@ import numpy as np
 from thermosteam.utils import chemical_cache
 from thermosteam import functional as fn
 import pandas as pd
-
+from fractions import Fraction
 __all__ = (
     'get_grouped_chemicals',
     'create_LegH',
@@ -186,11 +186,31 @@ def create_chemicals_LegH():
         Cp=chems.Glucose.Cp(298.15), # 1.54
         default=True,
         search_db=False,
-        aliases=['Cellmass'],
+        #aliases=['Cellmass'],
     )
     Yeast.Hf = chems.Glucose.Hf / chems.Glucose.MW * Yeast.MW 
     # Same as glucose to ignore heats related to growth 
 
+    # https://microbialcellfactories.biomedcentral.com/articles/10.1186/1475-2859-11-57/tables/2?utm_source=chatgpt.com
+    # Lange HC, Heijnen JJ: Statistical reconciliation of the elemental 
+    # and molecular biomass composition of Saccharomyces cerevisiae. 
+    # Biotechnol Bioeng. 2001, 75: 334-344. 10.1002/bit.10054.
+
+    # Szyperski T: Biosynthetically directed fractional 13C-labeling of proteinogenic amino acids.
+    # An efficient analytical tool to investigate intermediary metabolism. 
+    # Eur J Biochem. 1995, 232: 433-448. 10.1111/j.1432-1033.1995.tb20829.x.
+    Pichia_pastoris = add_chemical(
+        'Pichia_pastoris',
+        phase='l',
+        formula='CH1.761N0.143O0.636S0.0018',
+        rho=1540,
+        Cp=chems.Glucose.Cp(298.15), # 1.54
+        default=True,
+        search_db=False,
+        aliases=['Cellmass'],
+    )
+    Pichia_pastoris.Hf = chems.Glucose.Hf / chems.Glucose.MW * Pichia_pastoris.MW 
+    # Same as glucose to ignore heats related to growth 
 
     add_chemical('Z_mobilis', formula="CH1.8O0.5N0.2",
                                     default=True, search_db=False,
@@ -247,13 +267,20 @@ def create_chemicals_LegH():
     # Only protein: 144 amino acids Formula:C729H1166N200O219S2​
     # https://www.uniprot.org/uniprotkb/P02236/entry#sequences
     protein_formula = {
-        'H': 1166 ,
-        'C': 729 ,
-        'N': 200 ,
-        'O': 219 ,
-        'S': 2 
+        'H': 1166 / 729,
+        'C': 729 / 729,
+        'N': 200 / 729,
+        'O': 219 / 729,
+        'S': 2 / 729
     }
-    formula = {i: round(j, 2) for i, j in protein_formula.items()}
+    # protein_formula = {
+    #     'H': Fraction(1166,729) ,
+    #     'C': Fraction(729,729) ,
+    #     'N': Fraction(200,729) ,
+    #     'O': Fraction(219,729) ,
+    #     'S': Fraction(2,729)
+    # }
+    formula = {i: round(j, 6) for i, j in protein_formula.items()}
     Globin = add_chemical(
         'Globin',
         search_db=False,
@@ -262,14 +289,14 @@ def create_chemicals_LegH():
         phase='s'
     )
     Leghemoglobin_formula = {
-        'H': (1166+32) ,
-        'C': (729+34) ,
-        'N': (200 +4) ,
-        'O': (219+4) ,
-        'S': 2 ,
-        'Fe': 1 
+        'H': (1166+32) / (729+34),
+        'C': (729+34) / (729+34),
+        'N': (200 +4) / (729+34),
+        'O': (219+4) / (729+34),
+        'S': 2 / (729+34),
+        'Fe': 1 / (729+34)
     }
-    formula2 = {i: round(j, 2) for i, j in Leghemoglobin_formula.items()}
+    formula2 = {i: round(j, 6) for i, j in Leghemoglobin_formula.items()}
     Leghemoglobin = add_chemical(
         'Leghemoglobin',
         search_db=False,
@@ -288,7 +315,7 @@ def create_chemicals_LegH():
     chems.set_synonym('H2SO4', 'SulfuricAcid')
     chems.set_synonym('NH3', 'Ammonia')
     chems.set_synonym('H2O', 'Water')
-    chems.set_synonym('Yeast','Cellmass')
+    chems.set_synonym('Pichia_pastoris','cellmass')
     chems.set_synonym('(NH4)2HPO4','DAP')
 
     chems.define_group(
