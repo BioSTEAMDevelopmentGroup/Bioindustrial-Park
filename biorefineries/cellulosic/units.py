@@ -260,7 +260,7 @@ class SeedTrain(Unit):
     # #: Diammonium phosphate loading in g/L of fermentation broth
     # DAP = 0.67 
     
-    def _init(self, reactions=None, saccharification=None):
+    def _init(self, reactions=None, saccharification=None, T=None):
         chemicals = self.chemicals
         if reactions is None:
             self.reactions = ParallelRxn([
@@ -294,6 +294,7 @@ class SeedTrain(Unit):
             )
         else:
             self.saccharification = None
+        if T: self.T = T
     
     _setup = Unit._setup
     

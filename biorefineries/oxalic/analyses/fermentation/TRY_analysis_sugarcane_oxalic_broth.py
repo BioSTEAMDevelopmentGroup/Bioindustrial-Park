@@ -1,12 +1,15 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-# Bioindustrial-Park: BioSTEAM's Premier Biorefinery Models and Results
-# Copyright (C) 2021-, Sarang Bhagwat <sarangb2@illinois.edu>
+# Oxalic acid biorefineries.
+# Copyright (C) 2024-, Sarang Bhagwat <sarangb2@illinois.edu>
 # 
 # This module is under the UIUC open-source license. See 
 # github.com/BioSTEAMDevelopmentGroup/biosteam/blob/master/LICENSE.txt
 # for license details.
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
 
+#%%
 # Run this cell first
 from warnings import filterwarnings
 filterwarnings('ignore')
@@ -48,7 +51,7 @@ ig = np.seterr(invalid='ignore')
 
 product = AA
 
-AA_market_range=np.array([0.60, 2.80]) 
+AA_market_range=np.array([0.75, 3]) 
 
 fossilbased_GWPs = [
                 9.8411 + 2*oxalic_chemicals.CO2.MW/oxalic_chemicals.OxalicAcid.MW, # ecoinvent 3.8 (oxalic acid production, RoW) cradle-to-gate + EOL
@@ -68,7 +71,7 @@ oxalic_results_filepath = oxalic_filepath + '\\analyses\\results\\'
 
 #%% Load baseline
 
-spec.reactor.neutralization = False # !!! set neutralization here
+spec.reactor.neutralization = True # !!! set neutralization here
 
 model = models.oxalic_model
 system = oxalic_sys = models.oxalic_sys

@@ -174,6 +174,7 @@ class ProcessSpecification(bst.process_tools.ReactorSpecification):
                  reactor, reaction_name, substrates, products,
                  spec_1, spec_2, spec_3, xylose_utilization_fraction,
                  seed_train, neutralization,
+                 baseline_pyruvic_acid_yield, baseline_cell_mass_yield,
                  feedstock, dehydration_reactor, byproduct_streams, HXN, maximum_inhibitor_concentration=1.,
                  pre_conversion_units = None, juicing_sys=None, baseline_yield =0.49, baseline_titer = 54.8,
                  baseline_productivity=0.76, tolerable_HXN_energy_balance_percent_error=2., HXN_intolerable_points=[],
@@ -229,6 +230,10 @@ class ProcessSpecification(bst.process_tools.ReactorSpecification):
     
         self.flowsheet = flowsheet = bst.main_flowsheet
         self.system = flowsheet('succinic_sys')
+        
+        self.baseline_pyruvic_acid_yield = baseline_pyruvic_acid_yield
+        self.baseline_cell_mass_yield = baseline_cell_mass_yield
+        
     # @maximum_inhibitor_concentration.getter
     def get_maximum_inhibitor_concentration(self):
         return self.titer_inhibitor_specification.maximum_inhibitor_concentration
@@ -402,6 +407,27 @@ class ProcessSpecification(bst.process_tools.ReactorSpecification):
         self.spec_1 = reactor.glucose_to_succinic_acid_rxn.X = reactor.xylose_to_succinic_acid_rxn.X = yield_
         seed_train.glucose_to_succinic_acid_rxn.X = seed_train.xylose_to_succinic_acid_rxn.X = yield_ * seed_train.ferm_ratio
         
+        baseline_pyruvic_acid_yield = self.baseline_pyruvic_acid_yield 
+        baseline_cell_mass_yield = self.baseline_cell_mass_yield
+        
+        sum_glucose_conversion = yield_ + baseline_pyruvic_acid_yield + baseline_cell_mass_yield
+        
+        max_glucose_conversion = 1. - 1e-9
+        
+        diff = sum_glucose_conversion - max_glucose_conversion
+        
+        reduce_by_for_fp_error = 1e-9
+        
+        if diff > 0.:
+            pyruvic_acid_yield = reactor.glucose_to_pyruvic_acid_rxn.X =\
+                max(0, baseline_pyruvic_acid_yield - diff - reduce_by_for_fp_error)
+            if pyruvic_acid_yield==0:
+                cell_mass_yield = reactor.glucose_to_microbe_rxn.X =\
+                    max(0, baseline_cell_mass_yield - diff + baseline_pyruvic_acid_yield - reduce_by_for_fp_error)
+        else:
+            reactor.glucose_to_pyruvic_acid_rxn.X = baseline_pyruvic_acid_yield
+            reactor.glucose_to_microbe_rxn.X = baseline_cell_mass_yield
+            
         # rem_glucose = min(0.13, 1. - reactor.glucose_to_succinic_acid_rxn.X)
         # reactor.glucose_to_acetic_acid_rxn.X = (55./130.) * rem_glucose
         # reactor.glucose_to_glycerol_rxn.X = (25./130.) * rem_glucose

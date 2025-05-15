@@ -194,7 +194,6 @@ def exponential_val(x, nA): # A x ^ n
     return A * x ** n
 
 def YRCP2023():
-    bst.Model.default_convergence_model = 'linear regressor'
     Biorefinery.default_conversion_performance_distribution = 'longterm'
     Biorefinery.default_prices_correleted_to_crude_oil = True
     Biorefinery.default_oil_content_range = [1.8, 5.4]
@@ -420,7 +419,7 @@ class Biorefinery:
         
         ## System
         if number in system_factories:
-            self.cane_sys = cane_sys = system_factories[number](operating_hours=24 * 200, WWT_kwargs=WWT_kwargs,
+            self.system = self.cane_sys = cane_sys = system_factories[number](operating_hours=24 * 200, WWT_kwargs=WWT_kwargs,
                                                                 **system_factory_options.get(number, {}), autorename=True)
             if remove_biodiesel_production:
                 unit = flowsheet(bst.BlendingTankWithSkimming)
@@ -524,13 +523,13 @@ class Biorefinery:
             cane_sys.add_specification(self.update_feedstock, simulate=True)
         
         if abs(number) in cellulosic_configurations:
-            prs = flowsheet(bst.PretreatmentReactorSystem)
-            saccharification = flowsheet(bst.Saccharification)
-            seed_train = flowsheet(bst.SeedTrain)
+            prs = flowsheet('PretreatmentReactorSystem')
+            saccharification = flowsheet('Saccharification')
+            seed_train = flowsheet('SeedTrain')
             try:
-                fermentor = flowsheet(bst.CoFermentation)
+                fermentor = flowsheet('CoFermentation')
             except:
-                fermentor = flowsheet(bst.AeratedBioreactor)
+                fermentor = flowsheet('AeratedBioreactor')
             self.pretreatment_rxnsys = tmo.ReactionSystem(
                 prs.reactions, saccharification.saccharification
             )
@@ -545,9 +544,9 @@ class Biorefinery:
             prs.reactions.X[10] = 0.0 # baseline
         else:
             try:
-                fermentor = flowsheet(bst.Fermentation)
+                fermentor = flowsheet('Fermentation')
             except:
-                fermentor = flowsheet(bst.AeratedBioreactor)
+                fermentor = flowsheet('AeratedBioreactor')
         self.fermentor = fermentor
         
         def set_glucose_yield(glucose_yield):

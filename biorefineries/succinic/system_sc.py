@@ -34,7 +34,7 @@ from biosteam.process_tools import UnitGroup
 from biosteam import SystemFactory
 
 from biorefineries.succinic import units, facilities
-from biorefineries.succinic.process_settings import price, CFs
+from biorefineries.succinic.process_settings import price, CFs, chem_index
 from biorefineries.succinic.utils import find_split, splits_df, baseline_feedflow
 from biorefineries.succinic.chemicals_data import chems, chemical_groups, \
                                 soluble_organics, combustibles
@@ -71,12 +71,12 @@ bst.units.ShortcutColumn.minimum_guess_distillate_recovery = 0
 
 # Baseline cost year is 2016
 
-bst.CE = 541.7
+bst.CE = bst.units.design_tools.CEPCI_by_year[2019]
 
 # Set default thermo object for the system
 tmo.settings.set_thermo(chems)
 
-feedstock_ID = 'Corn stover'
+feedstock_ID = 'Sugarcane'
 
 # System settings
 System.default_converge_method = 'wegstein'
@@ -126,6 +126,11 @@ def create_succinic_sys(ins, outs):
     
     sugarcane_juicing_sys.flowsheet.diagram('thorough')
     
+    # Update all prices to 2019$ using chemical indices
+    # sugarcane biorefinery base year is 2018
+    for sugarcane_sys_stream in list(s):
+        sugarcane_sys_stream.price *= chem_index[2019]/chem_index[2018]
+        
     # %% 
     
     # =============================================================================
@@ -415,7 +420,7 @@ def create_succinic_sys(ins, outs):
         F401.V=V
         F401._run()
         F401_l = F401.outs[0]
-        return F401_l.imass['SuccinicAcid']/F401_l.F_mass - F401.target_concentration
+        return F401_l.imass['SuccinicAcid']/F401_l.imass['SuccinicAcid','Water'].sum() - F401.target_concentration
     
     F401.add_specification()
     F401_P = bst.Pump('F401_P', ins=F401-0, P=101325.)
@@ -463,7 +468,7 @@ def create_succinic_sys(ins, outs):
         F402.V=V
         F402._run()
         F402_l = F402.outs[0]
-        return F402_l.imass['SuccinicAcid']/F402_l.F_mass - F402.target_concentration
+        return F402_l.imass['SuccinicAcid']/F402_l.imass['SuccinicAcid','Water'].sum() - F402.target_concentration
     
     F402_P = bst.Pump('F402_P', ins=F402-0, P=101325.)
     
@@ -511,7 +516,7 @@ def create_succinic_sys(ins, outs):
         F403.V=V
         F403._run()
         F403_l = F403.outs[0]
-        return F403_l.imass['SuccinicAcid']/F403_l.F_mass - F403.target_concentration
+        return F403_l.imass['SuccinicAcid']/F403_l.imass['SuccinicAcid','Water'].sum() - F403.target_concentration
 
     F403_P = bst.Pump('F403_P', ins=F403-0, P=101325.)
 
@@ -599,6 +604,11 @@ def create_succinic_sys(ins, outs):
                                         # X401-1, S408-0,
                                         ))
     
+    @M501.add_specification(run=False)
+    def M501_spec():
+        for i in M501.ins: i.phase = 'l'
+        M501._run()
+    
     wastewater_treatment_sys = bst.create_wastewater_treatment_system(
         ins=M501-0,
         mockup=True,
@@ -616,6 +626,11 @@ def create_succinic_sys(ins, outs):
                                         ), 
                             outs='wastes_to_boiler_turbogenerator')
     
+    @M510.add_specification(run=False)
+    def M510_spec():
+        for i in M510.ins: i.phase = 'l'
+        M510._run()
+        
     MX = bst.Mixer(400, ['', ''])
     
     s = flowsheet.stream
@@ -687,7 +702,7 @@ def create_succinic_sys(ins, outs):
                              # tau=7.*24., V_wf=0.9,
                                           # vessel_type='Floating roof',
                                           # vessel_material='Stainless steel',
-                                          )   
+                                          )
     
     T603 = units.SulfuricAcidStorage('T602', ins=sulfuric_acid_acidulation,
                                      outs=sulfuric_acid_R401)
@@ -807,7 +822,9 @@ spec = ProcessSpecification(
     baseline_titer = 63.1,
     baseline_productivity = 0.6573,
     neutralization=False,
-
+    baseline_pyruvic_acid_yield = 0.006,
+    baseline_cell_mass_yield = 0.186,
+    
     feedstock_mass = feedstock.F_mass,
     pretreatment_reactor = None)
 
@@ -843,7 +860,7 @@ def load_titer_with_glucose(titer_to_load, set_F301_V = 0.8):
     spec.spec_2 = titer_to_load
     R302.titer_to_load = titer_to_load
     F301_titer_obj_fn(F301_lb)
-    if M304_titer_obj_fn(1e-4)<0: # if the slightest dilution results in too low a conc
+    if M304_titer_obj_fn(F301_lb)<0: # if the slightest dilution results in too low a conc
         IQ_interpolation(F301_titer_obj_fn, F301_lb, F301_ub, ytol=1e-4)
     # elif F301_titer_obj_fn(1e-4)>0: # if the slightest evaporation results in too high a conc
     else:
@@ -851,8 +868,9 @@ def load_titer_with_glucose(titer_to_load, set_F301_V = 0.8):
         IQ_interpolation(M304_titer_obj_fn, 1e-4, 20000., ytol=1e-4)
     # else:
     #     raise RuntimeError('Unhandled load_titer case.')
-    if set_F301_V is None: spec.titer_inhibitor_specification.check_sugar_concentration()
-
+    
+    if not feedstock_ID=='Glucose' and (set_F301_V is None): spec.titer_inhibitor_specification.check_sugar_concentration()
+    
 spec.load_spec_1 = spec.load_yield
 spec.load_spec_3 = spec.load_productivity
 spec.load_spec_2 = load_titer_with_glucose
@@ -981,7 +999,7 @@ get_product_stream_MPSP()
 succinic_LCA = SuccinicLCA(system=succinic_sys, 
                  CFs=CFs, 
                  feedstock=sugarcane, 
-                 feedstock_ID='Sugarcane',
+                 feedstock_ID=feedstock_ID,
                  input_biogenic_carbon_streams=[feedstock, s.CSL],
                  main_product=product_stream, 
                  main_product_chemical_IDs=['SuccinicAcid',], 

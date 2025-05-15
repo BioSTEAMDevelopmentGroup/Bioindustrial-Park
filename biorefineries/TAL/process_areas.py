@@ -47,8 +47,7 @@ from biorefineries.TAL.models.solubility.fit_TAL_solubility_in_water_one_paramet
 from biosteam import SystemFactory
 from flexsolve import IQ_interpolation
 from scipy.interpolate import interp1d, interp2d
-from biorefineries.TAL._general_utils import get_pH_polyprotic_acid_mixture, get_molarity
-
+from biorefineries.TAL.units import get_pH_stream, get_pH_given_base_addition, load_pH
 
 Rxn = tmo.reaction.Reaction
 ParallelRxn = tmo.reaction.ParallelReaction
@@ -77,8 +76,10 @@ capacities = [[0.0739,	0.088386667,	0.089676667,	0.091003333],
 [0.086242222,	0.089282222,	0.089877778,	0.091326667]]
 
 # Interpolate adsorption capacities and recoveries against time and temperature
-rec_interp = interp2d(ts, Ts, recoveries)
-cap_interp = interp2d(ts, Ts, capacities)
+# rec_interp = interp2d(ts, Ts, recoveries)
+# cap_interp = interp2d(ts, Ts, capacities)
+rec_interp = lambda: 0
+cap_interp = lambda: 0
 
 # Decarboxylation conversion against temperature
 
@@ -87,31 +88,7 @@ conversions_decarb = 0.01 * np.array([13.91875948, 18.4816961, 22.503871])
 decarb_conv_interp = interp1d(Ts_decarb, conversions_decarb)
 # 
 
-def get_pH_stream(stream):
-    if stream.imol['CitricAcid', 'H3PO4', 'AceticAcid'].sum() > 0.:
-        return get_pH_polyprotic_acid_mixture(stream,
-                                ['CitricAcid', 'H3PO4', 'AceticAcid'], 
-                                [[10**-3.13, 10**-4.76, 10**-6.40], 
-                                 [10**-2.16, 10**-7.21, 10**-12.32],
-                                 [10**-4.76]],
-                                'ideal')
-    else:
-        molarity_NaOH = get_molarity('NaOH', stream)
-        if molarity_NaOH == 0.: return 7.
-        else: return 14. + log(molarity_NaOH, 10.) # assume strong base completely dissociates in aqueous solution
 
-
-def get_pH_given_base_addition(mol_base_per_m3_broth, base_mixer):
-    base_mixer.mol_base_per_m3_broth = mol_base_per_m3_broth
-    base_mixer.simulate_base_addition_and_acids_neutralization()
-    return get_pH_stream(base_mixer.outs[0])
-
-def load_pH(pH, base_mixer):
-    obj_f_pH = lambda mol_base_per_m3_broth: get_pH_given_base_addition(mol_base_per_m3_broth=mol_base_per_m3_broth, 
-                                                                        base_mixer=base_mixer)\
-                                        - pH
-    IQ_interpolation(obj_f_pH, 0., 1., ytol=0.001)
-    
 #%% Fermentation
 
 @SystemFactory(ID = 'TAL_fermentation_process',
@@ -119,6 +96,7 @@ def load_pH(pH, base_mixer):
                     dict(ID='CSL', CSL=100),
                     dict(ID='Acetate_spiking', SodiumAcetate=100),
                     dict(ID='DAP', DAP=100),
+                    dict(ID='base_for_pH_control', NaOH=10)
                ],
                 outs=[dict(ID='F301_top_product', Water=20),
                       dict(ID='fermentation_liquid_effluent', TAL=1, Water=100),
@@ -129,12 +107,13 @@ def load_pH(pH, base_mixer):
                                                )
 def create_TAL_fermentation_process(ins, outs,):
     
-    sugar_juice_or_slurry, CSL, Acetate_spiking, DAP = ins
+    sugar_juice_or_slurry, CSL, Acetate_spiking, DAP, base_for_pH_control = ins
     F301_top_product, fermentation_liquid_effluent, fermentation_vent, seedtrain_vent, pre_evaporator_vent = outs
     
     CSL.price = price['CSL']
     Acetate_spiking.price = price['Acetic acid']
     DAP.price = price['DAP']
+    base_for_pH_control.price = price['Sodium hydroxide']
     
     # =============================================================================
     # Fermentation streams
@@ -194,7 +173,8 @@ def create_TAL_fermentation_process(ins, outs,):
         for i in S302.outs: i.phases = ('l',)
     # Cofermentation
     R302 = units.BatchCoFermentation('R302', 
-                                    ins=(S302-1, '', CSL, Acetate_spiking, DAP, ''),
+                                    ins=(S302-1, '', CSL, Acetate_spiking, DAP, '',
+                                         base_for_pH_control),
                                     outs=(fermentation_vent, fermentation_liquid_effluent),
                                     acetate_ID='AceticAcid',
                                     aeration_rate_basis='DO saturation basis',
@@ -404,6 +384,7 @@ def create_TAL_separation_solubility_exploit_process(ins, outs,):
     
     @M401.add_specification(run=False)
     def M401_pH_loading_spec():
+        M401.outs[0].phases = ('l', 's')
         if M401.pH_to_load == 'unmodified':
             M401.mol_base_per_m3_broth = 0.
             M401.simulate_base_addition_and_acids_neutralization()
@@ -1191,7 +1172,7 @@ def create_TAL_to_sorbic_acid_upgrading_process_THF_Ethanol(ins, outs,):
     KOH_hydrolysis.price = price['KOH']
     fresh_catalyst_R401.price = price['Ni-SiO2']
     fresh_catalyst_R402.price = price['Amberlyst-70']
-    Ethanol_upgrading_solvent.price = ['Ethanol']
+    Ethanol_upgrading_solvent.price = price['Ethanol']
     
     M405 = bst.Mixer('M405', ins=(solid_TAL, THF_upgrading_solvent, '', ''),
                      outs=('TAL_in_THF'))

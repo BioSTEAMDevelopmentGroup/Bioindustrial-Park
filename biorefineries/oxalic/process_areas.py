@@ -1,11 +1,13 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-# Bioindustrial-Park: BioSTEAM's Premier Biorefinery Models and Results
-# Copyright (C) 2021-, Sarang Bhagwat <sarangb2@illinois.edu>
+# Oxalic acid biorefineries.
+# Copyright (C) 2024-, Sarang Bhagwat <sarangb2@illinois.edu>, Wenjun Guo <wenjung2@illinois.edu>
 # 
 # This module is under the UIUC open-source license. See 
 # github.com/BioSTEAMDevelopmentGroup/biosteam/blob/master/LICENSE.txt
 # for license details.
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
 """
 All units are explicitly defined here for transparency and easy reference.
 Naming conventions:
@@ -145,7 +147,7 @@ def create_oxalic_fermentation_process(ins, outs,):
                                     ins=(S302-1, '', CSL, magnesium_chloride, zinc_sulfate, fermentation_lime, S303-1, '', ''),
                                     outs=('CO2_fermentation', fermentation_liquid_effluent),
                                     # vessel_material='Stainless steel 316',
-                                    neutralization=False)
+                                    neutralization=True)
     
     @R302.add_specification(run=False)
     def R302_spec(): # note: effluent always has 0 CSL
@@ -167,7 +169,7 @@ def create_oxalic_fermentation_process(ins, outs,):
                                     ins=(S302-0, '', '', '', '', '', '', '', ''),
                                     outs=('CO2_seedtrain', 'seed'),
                                     # vessel_material='Stainless steel 316',
-                                    neutralization=False,
+                                    neutralization=True,
                                     ferm_ratio=0.95)
     R303.line = 'Seed train'
     # R303.CO2_safety_factor = 0.

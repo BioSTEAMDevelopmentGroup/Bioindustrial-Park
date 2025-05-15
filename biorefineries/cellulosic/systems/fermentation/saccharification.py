@@ -36,7 +36,7 @@ def create_saccharification_system(
     slurry, = outs
     if nonsolids is None: nonsolids = c.default_nonsolids
     if insoluble_solids is None: insoluble_solids = c.default_insoluble_solids
-    if insoluble_solids_loading is None: insoluble_solids_loading = 10.3
+    if insoluble_solids_loading is None: insoluble_solids_loading = 0.103
     if solids_loading is None: solids_loading = 0.2
     if ignored is None: ignored = c.default_ignored
     M301 = units.EnzymeHydrolysateMixer('M301', (pretreated_biomass, cellulase, saccharification_water))
@@ -45,6 +45,7 @@ def create_saccharification_system(
     M301.insoluble_solids_loading = insoluble_solids_loading
     M301.enzyme_loading = 0.02 # (20 g enzyme / 1000 g cellulose) 
     M301.enzyme_concentration = 0.05 # (50 g cellulase / 1000g cellulose mixture)
+    M301.loading_basis = lambda: 1.2 * (pretreated_biomass.imass['Glucan'])
     
     @M301.add_specification
     def update_cellulase_loading():
@@ -57,9 +58,8 @@ def create_saccharification_system(
         cellulase.imass['Water', 'Cellulase'] = (
             enzyme_over_cellulose
             * z_mass_cellulase_mixture
-            * 1.2 * (pretreated_biomass.imass['Glucan'])
+            * M301.loading_basis()
         )
-    
     
     @M301.add_specification(run=True)
     def update_moisture_content():

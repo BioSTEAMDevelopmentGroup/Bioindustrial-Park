@@ -24,13 +24,17 @@ from flexsolve import aitken_secant
 from biosteam import Unit, BatchCrystallizer
 from biosteam.units import Flash, HXutility, Mixer, MixTank, Pump, \
     SolidsSeparator, StorageTank, LiquidsSplitSettler, \
-    BatchBioreactor, StirredTankReactor
+    BatchBioreactor, StirredTankReactor, LiquidsMixingTank
 from biosteam.units.decorators import cost
 from biosteam.units.design_tools import CEPCI_by_year as CEPCI
 from thermosteam import Stream, MultiStream
 from biorefineries.TAL.process_settings import price
 # from biorefineries.TAL.utils import CEPCI, baseline_feedflow, compute_extra_chemical, adjust_recycle
 from biorefineries.TAL.utils import baseline_feedflow, compute_extra_chemical, adjust_recycle
+
+from thermosteam import SeriesReaction
+from biorefineries.TAL._general_utils import get_pH_polyprotic_acid_mixture, get_molarity
+from flexsolve import IQ_interpolation
 
 _kg_per_ton = 907.18474
 _Gcal_2_kJ = 4.184 * 1e6 # (also MMkcal/hr)
@@ -41,6 +45,32 @@ compute_TAL_titer = lambda effluent: effluent.imass['TAL'] / effluent.F_vol
 
 compute_TAL_mass = lambda effluent: effluent.imass['TAL']
 
+#%% pH utils
+def get_pH_stream(stream):
+    if stream.imol['CitricAcid', 'H3PO4', 'AceticAcid'].sum() > 0.:
+        return get_pH_polyprotic_acid_mixture(stream,
+                                ['CitricAcid', 'H3PO4', 'AceticAcid'], 
+                                [[10**-3.13, 10**-4.76, 10**-6.40], 
+                                 [10**-2.16, 10**-7.21, 10**-12.32],
+                                 [10**-4.76]],
+                                'ideal')
+    else:
+        molarity_NaOH = get_molarity('NaOH', stream)
+        if molarity_NaOH == 0.: return 7.
+        else: return 14. + log(molarity_NaOH, 10.) # assume strong base completely dissociates in aqueous solution
+
+
+def get_pH_given_base_addition(mol_base_per_m3_broth, base_mixer):
+    base_mixer.mol_base_per_m3_broth = mol_base_per_m3_broth
+    base_mixer.simulate_base_addition_and_acids_neutralization()
+    return get_pH_stream(base_mixer.outs[0])
+
+def load_pH(pH, base_mixer):
+    obj_f_pH = lambda mol_base_per_m3_broth: get_pH_given_base_addition(mol_base_per_m3_broth=mol_base_per_m3_broth, 
+                                                                        base_mixer=base_mixer)\
+                                        - pH
+    IQ_interpolation(obj_f_pH, 0., 5., ytol=0.001)
+    
 #%% Reactor
 from biosteam.units.design_tools import PressureVessel
 from biosteam.exceptions import DesignError
@@ -201,7 +231,9 @@ class FeedstockPreprocessing(Unit):
 class BatchCoFermentation(BatchBioreactor):
     # Co-Fermentation time (hr)
     
-    _N_ins = 6
+    auxiliary_unit_names = ('base_mix_tank',)
+    
+    _N_ins = 7
     _N_outs = 2
     
     tau_cofermentation = 120 # initial value; updated by spec.load_productivity
@@ -312,8 +344,11 @@ class BatchCoFermentation(BatchBioreactor):
                  V=3785.,
                  acetate_ID='SodiumAcetate',
                  aeration_rate_basis='fixed rate basis', # 'fixed rate basis' or 'DO saturation basis'
+                 pH_to_load=6.5, # 'unmodified' or float value
                  ):
         BatchBioreactor._init(self,  T=T, P=P, tau=tau, V=V)
+        
+        self.pH_to_load = pH_to_load
         
         self.aeration_rate_basis = aeration_rate_basis
         
@@ -373,9 +408,135 @@ class BatchCoFermentation(BatchBioreactor):
         self.glucose_to_CO2_rxn = self.CO2_generation_rxns[0]
         self.xylose_to_CO2_rxn = self.CO2_generation_rxns[1]
         self.acetate_to_CO2_rxn = self.CO2_generation_rxns[2]
-
+        
+        self._initialize_base_mix_tank()
+    
+    def _initialize_base_mix_tank(self):
+        base_mix_tank =\
+        self.auxiliary('base_mix_tank',
+                       LiquidsMixingTank,
+                       ins=('broth_before_pH_control', # effluent broth
+                            # acetylacetone_decarboxylation_equilibrium, 
+                            # recycled_nonevaporated_supernatant,
+                            # 'recyled_top_prod_from_evaporating_supernatant',
+                            # '', '', '',
+                            self.ins[6], # base for pH control
+                            ), 
+                       outs=('pH_controlled_broth'),
+                       tau=1.,
+                       )
+        
+        base_mix_tank.mol_base_per_m3_broth = 0. # actually kmol-bsase/m3-broth, or mol-base/L-broth
+        base_mix_tank.base_neutralizes_acids = True
+        base_mix_tank.base_ID = 'NaOH'
+        
+        base_mix_tank.neutralization_rxns = SeriesReaction([
+            Rxn('H3PO4 + 3NaOH -> SodiumPhosphate + H2O', 'H3PO4',   1.-1e-5),
+            Rxn('CitricAcid + 3NaOH -> SodiumCitrate + H2O', 'CitricAcid',   1.-1e-5),
+            Rxn('AceticAcid + NaOH -> SodiumAcetate + H2O', 'AceticAcid',   1.-1e-5),
+            ])
+        
+        base_mix_tank.mol_base_per_m3_broth_needed_to_completely_neutralize_acids = 0.
+        
+        base_mix_tank.pH_to_load = self.pH_to_load
+        base_mix_tank.load_pH = lambda pH: load_pH(pH, base_mix_tank)
+        base_mix_tank.get_pH_maintained = lambda: get_pH_stream(base_mix_tank.outs[0])
+        
+        # @base_mix_tank.add_specification(run=False)
+        def base_mix_tank_simulate_base_addition_and_acids_neutralization():
+            base_mix_tank_ins_0 = base_mix_tank.ins[0]
+            base_mix_tank_in_base = base_mix_tank.ins[1]
+            base_mix_tank_in_base.empty()
+            base_mix_tank_in_base.imol[base_mix_tank.base_ID] = base_mix_tank.mol_base_per_m3_broth * base_mix_tank_ins_0.F_vol
+            
+            base_mix_tank.mol_base_per_m3_broth_needed_to_completely_neutralize_acids =\
+            min_base_req_to_completely_neutralize =\
+                (base_mix_tank_ins_0.imol['AceticAcid']
+                +3.* base_mix_tank_ins_0.imol['CitricAcid']
+                + 3.*base_mix_tank_ins_0.imol['H3PO4'])/base_mix_tank_ins_0.F_vol
+                                        
+            base_mix_tank._run()
+            
+            base_mix_tank_outs_0_l = base_mix_tank.outs[0]['l']
+            
+            
+            if base_mix_tank.base_neutralizes_acids:
+                if base_mix_tank.mol_base_per_m3_broth < min_base_req_to_completely_neutralize:
+                    
+                    # base_mix_tank.neutralization_rxns = SeriesReaction([
+                    #     Rxn('0.3333H3PO4 + NaOH -> 0.3333SodiumPhosphate + 0.3333H2O', 'NaOH',   1.-1e-5),
+                    #     Rxn('0.3333CitricAcid + NaOH -> 0.3333SodiumCitrate + 0.3333H2O', 'NaOH',   1.-1e-5),
+                    #     Rxn('AceticAcid + NaOH -> SodiumAcetate + H2O', 'NaOH',   1.-1e-5),
+                    #     ])
+                    
+                    if base_mix_tank_outs_0_l.imol['NaOH'] > 3.*base_mix_tank_outs_0_l.imol['H3PO4']:
+                        mol_H3PO4 = base_mix_tank_outs_0_l.imol['H3PO4']
+                        base_mix_tank_outs_0_l.imol['H3PO4'] = 0.
+                        base_mix_tank_outs_0_l.imol['NaOH'] -= 3.*mol_H3PO4
+                        base_mix_tank_outs_0_l.imol['SodiumPhosphate'] += mol_H3PO4
+                        base_mix_tank_outs_0_l.imol['H2O'] += mol_H3PO4
+                    else:
+                        mol_NaOH = base_mix_tank_outs_0_l.imol['NaOH']
+                        base_mix_tank_outs_0_l.imol['NaOH'] = 0.
+                        base_mix_tank_outs_0_l.imol['H3PO4'] -= 0.3333*mol_NaOH
+                        base_mix_tank_outs_0_l.imol['SodiumPhosphate'] += 0.3333*mol_NaOH
+                        base_mix_tank_outs_0_l.imol['H2O'] += 0.3333*mol_NaOH
+                        
+                        
+                    if base_mix_tank_outs_0_l.imol['NaOH'] > 3.*base_mix_tank_outs_0_l.imol['CitricAcid']:
+                        mol_CitricAcid = base_mix_tank_outs_0_l.imol['CitricAcid']
+                        base_mix_tank_outs_0_l.imol['CitricAcid'] = 0.
+                        base_mix_tank_outs_0_l.imol['NaOH'] -= 3.*mol_CitricAcid
+                        base_mix_tank_outs_0_l.imol['SodiumCitrate'] += mol_CitricAcid
+                        base_mix_tank_outs_0_l.imol['H2O'] += mol_CitricAcid
+                    else:
+                        mol_NaOH = base_mix_tank_outs_0_l.imol['NaOH']
+                        base_mix_tank_outs_0_l.imol['NaOH'] = 0.
+                        base_mix_tank_outs_0_l.imol['CitricAcid'] -= 0.3333*mol_NaOH
+                        base_mix_tank_outs_0_l.imol['SodiumCitrate'] += 0.3333*mol_NaOH
+                        base_mix_tank_outs_0_l.imol['H2O'] += 0.3333*mol_NaOH
+                        
+                        
+                    if base_mix_tank_outs_0_l.imol['NaOH'] > base_mix_tank_outs_0_l.imol['AceticAcid']:
+                        mol_AceticAcid = base_mix_tank_outs_0_l.imol['AceticAcid']
+                        base_mix_tank_outs_0_l.imol['AceticAcid'] = 0.
+                        base_mix_tank_outs_0_l.imol['NaOH'] -= mol_AceticAcid
+                        base_mix_tank_outs_0_l.imol['SodiumAcetate'] += mol_AceticAcid
+                        base_mix_tank_outs_0_l.imol['H2O'] += mol_AceticAcid
+                    else:
+                        mol_NaOH = base_mix_tank_outs_0_l.imol['NaOH']
+                        base_mix_tank_outs_0_l.imol['NaOH'] = 0.
+                        base_mix_tank_outs_0_l.imol['AceticAcid'] -= mol_NaOH
+                        base_mix_tank_outs_0_l.imol['SodiumAcetate'] += mol_NaOH
+                        base_mix_tank_outs_0_l.imol['H2O'] += mol_NaOH
+                    
+                else:
+                    base_mix_tank.neutralization_rxns = SeriesReaction([
+                        Rxn('H3PO4 + 3NaOH -> SodiumPhosphate + H2O', 'H3PO4',   1.),
+                        Rxn('CitricAcid + 3NaOH -> SodiumCitrate + H2O', 'CitricAcid',   1.),
+                        Rxn('AceticAcid + NaOH -> SodiumAcetate + H2O', 'AceticAcid',   1.),
+                        ])
+                    
+                    base_mix_tank.outs[0].phase='l'
+                    # base_mix_tank.neutralization_rxns.adiabatic_reaction(base_mix_tank.outs[0])
+                    base_mix_tank.neutralization_rxns(base_mix_tank.outs[0])
+            
+            base_mix_tank.outs[0].phase='l'
+        
+        base_mix_tank.simulate_base_addition_and_acids_neutralization = base_mix_tank_simulate_base_addition_and_acids_neutralization
+        
+        @base_mix_tank.add_specification(run=False)
+        def base_mix_tank_pH_loading_spec():
+            base_mix_tank.ins[0].copy_like(self.outs[1])
+            if base_mix_tank.pH_to_load == 'unmodified':
+                base_mix_tank.mol_base_per_m3_broth = 0.
+                base_mix_tank.simulate_base_addition_and_acids_neutralization()
+            else:
+                base_mix_tank.load_pH(base_mix_tank.pH_to_load)
+    
+    
     def _run(self):
-        feed, seed, CSL, Acetate_spiking, DAP, air = self.ins
+        feed, seed, CSL, Acetate_spiking, DAP, air, base_for_pH_control = self.ins
         for i in [CSL, Acetate_spiking, DAP, air]: i.empty()
         
         vapor, effluent = self.outs
@@ -444,12 +605,16 @@ class BatchCoFermentation(BatchBioreactor):
         
         # self.effluent_titer = compute_TAL_titer(effluent)
         # self.effluent = effluent
+        base_mix_tank = self.base_mix_tank
+        base_mix_tank.pH_to_load = self.pH_to_load
+        base_mix_tank.specifications[0]()
+        # base_mix_tank._run()
+        effluent.copy_like(base_mix_tank.outs[0])
         
     @property
     def effluent_titer(self):
         return compute_TAL_titer(self.effluent)
-
-
+    
 # class AeratedTALCoFermentation(AeratedBioreactor):
     
 # Seed train, 5 stages, 2 trains
