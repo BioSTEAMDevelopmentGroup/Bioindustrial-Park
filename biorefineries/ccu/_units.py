@@ -223,7 +223,7 @@ class HCOOH_SynthesisReactor(Reactor):
     def __init__(self, ID="", ins=None, outs=(),
                  P=12000000, T=120+273.15, # Park et.al
                  residence_time=0.5,
-                 liquid_volume_frac=0.2,
+                 liquid_volume_frac=0.2, # 0.05-0.25 from rules of thumb
                  length_to_diameter=3,
                  wall_thickness_factor=1,
                  vessel_material='Stainless steel 316',
