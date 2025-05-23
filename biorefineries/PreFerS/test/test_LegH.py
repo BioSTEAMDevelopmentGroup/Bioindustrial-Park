@@ -12,7 +12,7 @@ Created on 2025-05-06 18:26:54
 import biosteam as bst
 import thermosteam as tmo
 import numpy as np
-from biorefineries.PreFerS import _chemicals, _units,_streams
+from biorefineries.prefers import _chemicals, _units,_streams
 
 # %% Settings
 bst.nbtutorial()
@@ -138,7 +138,7 @@ def update_reaction_time_and_yield():
 # %% Downstream process
 
 PC1Out = bst.Stream('PC1Out')
-
+effluent1 = bst.Stream('effluent1')
 PC1 = _units.ProteinCentrifuge(
     ins = AB1Out,
     outs = ('cellmass', PC1Out),
@@ -151,19 +151,43 @@ PC1 = _units.ProteinCentrifuge(
 
 # ???
 Ev1Out = bst.Stream('Ev1Out')
-effluent1 = bst.Stream('effluent1')
+effluent2 = bst.Stream('effluent2')
 Ev1 = _units.Evaporator(
     ins = PC1Out,
-    outs = (Ev1Out, effluent1),
+    outs = (Ev1Out, effluent2),
     P = (101325,73581, 50892, 32777, 20000),
     V = 0.1,
     V_definition = 'First-effect',
 ) # ???
 
+# This refers to how much diafiltration buffer you use relative to the volume of your protein solution (the retentate) during constant volume diafiltration.
+
+# Recommended: 3 to 5 diavolumes.
+# 1 diavolume (DV) = Volume of diafiltration buffer added is equal to the volume of the protein solution being processed (the retentate volume, which is kept constant).
+# 3 DV will result in approximately 95% exchange of the original buffer/small solutes.
+# 5 DV will result in approximately 99.3% exchange.
+# For very thorough exchange (>99.9%): You might consider 6 to 7 diavolumes.
+# 10 DV is not recommended as it will result in a very low concentration of the protein solution and a very high volume of diafiltration buffer.
+# %%
+DF1Out = bst.Stream('DF1Out')
+WashingSolution1 = bst.Stream('WashingSolution1', DiaBuffer=Ev1Out.imass['H2O']*2, units='kg/hr', T=25+273.15)
+effluent3 = bst.Stream('effluent3')
+DF1 = _units.Diafiltration(
+    ins = (Ev1Out, WashingSolution1),
+    outs = (DF1Out, effluent3),
+    TargetProduct_ID = 'Leghemoglobin',
+    Salt_ID = _chemicals.chemical_groups['Salts'],
+    OtherLargeMolecules_ID = _chemicals.chemical_groups['OtherLargeMolecules'],
+    DefaultSolute_ID = _chemicals.chemical_groups['DefaultSolute'],
+)
+
+
+
+
 # %%
 LegH_sys = bst.main_flowsheet.create_system('LegH_sys')
 LegH_sys.simulate()
-LegH_sys.diagram(format='html', number=True)
+LegH_sys.diagram(kind=1,format='html',label=False)
 LegH_sys.show()
 
 # %%

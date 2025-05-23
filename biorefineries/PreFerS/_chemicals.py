@@ -34,6 +34,39 @@ default_nonsolids = ['Water', 'Ethanol', 'AceticAcid',
                     'H2SO4', 'NH3']
 
 chemical_groups = dict(
+    Salts = ('KOH',
+            'NaCl',
+            '(NH4)2SO4',
+            'FeSO4',
+            'MgSO4',
+            'KH2PO4',
+            '(NH4)2HPO4'),
+    
+    OtherLargeMolecules = ('Cellmass',
+                        'Yeast',
+                        'Pichia_pastoris',
+                        'Z_mobilis',
+                        'T_reesei',
+                        'Biomass',
+                        'Cellulose',
+                        'Glucan',
+                        'Xylan',
+                        'Xylitol',
+                        'Cellobiose',
+                        'CSL'
+                        'Globin',),
+
+    DefaultSolute = ('Glycine',
+                        'CitricAcid',
+                        'AceticAcid',
+                        'LacticAcid',
+                        'Glucose',
+                        'Dextrose',
+                        'IPTG',
+                        'Ethanol',
+                        'Glycerol',
+                        'SuccinicAcid'),
+
     OtherSugars = ('Arabinose',
                     'Mannose',
                     'Galactose',
@@ -52,9 +85,9 @@ chemical_groups = dict(
     Protein = ('Protein',
                 'Enzyme',
                 'DenaturedEnzyme'),
-    CellMass = ('WWTsludge',
-                'Z_mobilis',
-                'T_reesei'),                           
+    # Cellmass = ('WWTsludge',
+    #             'Z_mobilis',
+    #             'T_reesei'),                        
 )
 
 def get_grouped_chemicals(stream, units='kmol/hr'):
@@ -167,6 +200,7 @@ def create_chemicals_LegH():
     add_chemical('Ethanol', phase='l', default=True)
     add_chemical('Glycerol', phase='l', default=True)
     add_chemical('SuccinicAcid', phase='l')
+    add_chemical('EDTA', phase='l', default=True)
 
     # antibiotics   
     add_chemical('Ampicillin', phase='l', default=True)
@@ -302,7 +336,8 @@ def create_chemicals_LegH():
         search_db=False,
         default=True,
         atoms=formula2,
-        phase='s'
+        phase='s',
+        aliases=['LegH']
     )
 
     # Default missing properties of chemicals to those of water
@@ -317,6 +352,7 @@ def create_chemicals_LegH():
     chems.set_synonym('H2O', 'Water')
     chems.set_synonym('Pichia_pastoris','cellmass')
     chems.set_synonym('(NH4)2HPO4','DAP')
+    chems.set_synonym('Leghemoglobin','LegH')
 
     chems.define_group(
         'air',
@@ -357,6 +393,14 @@ def create_chemicals_LegH():
         wt=True
     )
 
+    chems.define_group(
+        'DiaBuffer',
+        ['H2O','(NH4)2HPO4','NaCl','EDTA'],
+        [1000, 0.25*bst.Chemical('(NH4)2HPO4', phase='l', default=True).MW, 
+        0.1*bst.Chemical('NaCl', phase='l', default=True).MW,
+        0.001*bst.Chemical('EDTA', phase='l', default=True).MW],
+        wt=True,
+    )
 
     if bst.settings.set_thermo: bst.settings.set_thermo(chems)
     return chems
