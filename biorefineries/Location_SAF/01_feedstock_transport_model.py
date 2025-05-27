@@ -13,10 +13,10 @@ Results from this model:
     - Sent ethanol flow to each jet producer
     
 To run model without uncertainty (only baseline values):
-    Line 468-476 (choose feedstock and number of candidate locations)
+    Line 478-479 (choose feedstock and number of candidate locations)
     
 To run model with uncertainty:
-    Line 881-917 (choose feedstock, number of candidate locations, and number of samples for uncertainty)
+    Line 918-924 (choose feedstock, number of candidate locations, and number of samples for uncertainty)
     This will save results as npy files that will be used in the Biorefinery and SAF models as inputs
     
 Next model to run: 02_ethanol_refinery_model
