@@ -7,12 +7,13 @@ Created on Tue May 13 10:46:05 2025
 
 Feedstock Transport model class
 
-This class can be used to get feedstock delivered price and CI, and ethanol delivered price and CI
+This class can be used to get feedstock delivered price and CI, and ethanol unit transport price and CI
 for a biorefinery supplying ethanol to existing petroleum refineries (up to blending_capacity_set (20% default) of their capacity)
 to produce SAF using switchgrass or miscanthus as feedstocks.
 
-This class is not able to run for a number of candidate locations different than 1000 for now (num_points), but its uncertainty can be run for N number of
-samples different than 1000 (it is not advised to go over that number because the computational time can be very long - around 12 hours for 1000 candidate sites and 1000 uncertain scenarios)
+Simplifications are made to calculate distances when the class runs for a number of candidate locations different than 1000 (num_points).
+
+For uncertainty, it is not advised to go over N=1000 samples because the computational time can be very long - (around 12 hours for 1000 candidate sites and 1000 uncertain scenarios)
 
 
 """
@@ -25,6 +26,8 @@ import ast
 import math
 import chaospy as cp
 from SALib.sample import latin
+import matplotlib.pyplot as plt
+from shapely.geometry import LineString
 
 class FeedstockTransportModel:
     
@@ -72,7 +75,7 @@ class FeedstockTransportModel:
         
         self.base_folder = base_folder
         self._set_default_paths()
-        self._load_all_data()
+        
         self.num_points = num_points
         self.feedstock = feedstock
         self.N = samples_for_uncertainty
@@ -88,6 +91,8 @@ class FeedstockTransportModel:
             print(f"[INFO] Biorefinery size set to {sizes_of_biorefineries} MMgal/year.")
         if blending_capacity_set != 0.2:
             print(f"[INFO] Blending capacity set to {blending_capacity_set*100:.1f}%.")
+        
+        self._load_all_data()
         
         self.results = {}  # store results from calculation for access later
         
@@ -105,6 +110,7 @@ class FeedstockTransportModel:
             'TF_mis': os.path.join(self.base_folder, 'TF_per_poss_locations_mis.xlsx'),
             'TF_ethanol_sw': os.path.join(self.base_folder, 'results_TF_ethanol_sw.xlsx'),
             'TF_ethanol_mis': os.path.join(self.base_folder, 'results_TF_ethanol_mis_complete.xlsx'),
+            'TF_per_state': os.path.join(self.base_folder, 'Tortuosity_per_state.xlsx'),
         }
 
     def update_path(self, key, new_path):
@@ -140,14 +146,26 @@ class FeedstockTransportModel:
         # Transport costs
         transport = gpd.read_file(self.paths['transport_costs']).to_crs('EPSG:5070')
         self.transport_costs = transport.rename(columns={'Tanker': 'Tanker_truck'})
+        
+        if self.num_points == 1000:
+            # Tortuosity Factors
+            self.mean_TF_sw = np.array(pd.read_excel(self.paths['TF_sw'])["Mean"])
+            self.mean_TF_mis = np.array(pd.read_excel(self.paths['TF_mis'])["Mean"])
+    
+            # Ethanol transport distances and tortuosities
+            self.real_dist_ethanol_sw, self.mean_TF_ethanol_sw = self._parse_ethanol_file(self.paths['TF_ethanol_sw'])
+            self.real_dist_ethanol_mis, self.mean_TF_ethanol_mis = self._parse_ethanol_file(self.paths['TF_ethanol_mis'])
+            self.calculate_eth_distance = False
+        else:
+            # Fill with default value but ensure correct shape
+            default_tortuosity = 1.25
+            self.mean_TF_sw = np.full((self.num_points,), default_tortuosity)
+            self.mean_TF_mis = np.full((self.num_points,), default_tortuosity)
+            self.mean_TF_ethanol_sw = np.full((self.num_points,), default_tortuosity)
+            self.mean_TF_ethanol_mis = np.full((self.num_points,), default_tortuosity)
+            self.calculate_eth_distance = True # calculate distances between points and jet producers
+            self.TF_per_state = pd.read_excel(self.paths['TF_per_state'])
 
-        # Tortuosity Factors
-        self.mean_TF_sw = np.array(pd.read_excel(self.paths['TF_sw'])["Mean"])
-        self.mean_TF_mis = np.array(pd.read_excel(self.paths['TF_mis'])["Mean"])
-
-        # Ethanol transport distances and tortuosities
-        self.real_dist_ethanol_sw, self.mean_TF_ethanol_sw = self._parse_ethanol_file(self.paths['TF_ethanol_sw'])
-        self.real_dist_ethanol_mis, self.mean_TF_ethanol_mis = self._parse_ethanol_file(self.paths['TF_ethanol_mis'])
 
     def _parse_ethanol_file(self, path):
         df = pd.read_excel(path)
@@ -255,7 +273,8 @@ class FeedstockTransportModel:
             
             mean_TF_ethanol = self.mean_TF_ethanol_sw
             
-            real_dist_ethanol = self.real_dist_ethanol_sw
+            if self.calculate_eth_distance == False:
+                real_dist_ethanol = self.real_dist_ethanol_sw
         
         elif self.feedstock == 'miscanthus':
             crop_data = self.mis_data
@@ -268,11 +287,15 @@ class FeedstockTransportModel:
             perc_95th_TF =perc_95th_TF[:, np.newaxis]
 
             mean_TF_ethanol = self.mean_TF_ethanol_mis
-            real_dist_ethanol = self.real_dist_ethanol_mis
+            
+            if self.calculate_eth_distance == False:
+                real_dist_ethanol = self.real_dist_ethanol_mis
             
         else:
             raise ValueError(f'Unsupported feedstock: {self.feedstock}')
-
+        
+        
+        
         feedstock_TF_D = []
         for i in range(num_points):
             list = [perc_5th_TF[i], Tortuosity_reshaped[i], perc_95th_TF[i]]
@@ -312,7 +335,33 @@ class FeedstockTransportModel:
         
         # Add  transportation costs
         possible_locations = gpd.sjoin(possible_locations, self.transport_costs[['Flat_bed', 'Tanker_truck', 'GHG_truck','geometry']], how='left', predicate='within')
+        
+        possible_locations_copy = possible_locations.copy()# Make a copy before modification
+        if 'index_right' in possible_locations_copy.columns:
+            possible_locations_copy = possible_locations_copy.drop(columns=['index_right'])
+
+        possible_locations_with_state = gpd.sjoin(possible_locations_copy, self.USA_rainfed, how="left", predicate='intersects') # Spatial join with state information
+
+        self.candidate_locations = possible_locations
+        
+        if self.num_points != 1000:
+            self.To_get_TF = possible_locations_with_state.merge(self.TF_per_state, left_on='NAME',right_on='State',  how='left')
+            if self.feedstock == 'switchgrass':
+                mean_TF = self.To_get_TF['Mean sw'].values
+                perc_5th_TF = np.array(self.To_get_TF["5th percentile sw"])
+                perc_5th_TF =perc_5th_TF[:, np.newaxis]
+                perc_95th_TF = np.array(self.To_get_TF["95th percentile sw"])
+                perc_95th_TF =perc_95th_TF[:, np.newaxis]
+            elif self.feedstock == 'miscanthus':
+                mean_TF = self.To_get_TF['Mean mis'].values
+                perc_5th_TF = np.array(self.To_get_TF["5th percentile mis"])
+                perc_5th_TF =perc_5th_TF[:, np.newaxis]
+                perc_95th_TF = np.array(self.To_get_TF["95th percentile mis"])
+                perc_95th_TF =perc_95th_TF[:, np.newaxis]
+                
+            Tortuosity_reshaped = mean_TF.reshape(-1, 1)
             
+                
         # Extract transportation costs for biomass in $/km/Mg and transportation costs for ethanol in $/km/Mg of ethanol
         # I need $/km for uncertainty so I multiply for capacity assumed, and then divide for the capacity considered with uncertainty
         # Different for both crops only because the probabilities are different so we might have different 1000 locations as candidates
@@ -442,7 +491,6 @@ class FeedstockTransportModel:
             for j in range(jet_indexes.shape[1]):
                 row_i.append((jet_indexes[i, j], sent_ethanol[i, j]))
             combined.append(row_i)
-        
 
         if self.sizes_of_biorefineries == 80 and self.blending_capacity_set == 0.2:
             real_dist_ethanol_array = np.zeros((num_points, 2))
@@ -455,6 +503,10 @@ class FeedstockTransportModel:
             dist_2_sorted_real = real_dist_ethanol_array/1000
         
         else:
+            Tortuosity_ethanol_reshaped = mean_TF_ethanol[:, np.newaxis] 
+            dist_2_sorted_real = dist_2_sorted * Tortuosity_ethanol_reshaped
+            
+        if self.num_points != 1000:
             Tortuosity_ethanol_reshaped = mean_TF_ethanol[:, np.newaxis] 
             dist_2_sorted_real = dist_2_sorted * Tortuosity_ethanol_reshaped
 
@@ -499,7 +551,9 @@ class FeedstockTransportModel:
         self.results['trans_cost_ethanol_km'] = trans_cost_ethanol_km
         self.results['trans_GHG'] = trans_GHG
         self.results['possible_locations'] = possible_locations        
-        self.results['jet_indexes'] = jet_indexes  
+        self.results['jet_indexes'] = jet_indexes
+        self.results['ethanol_transport_distances'] = dist_2_sorted_real
+
         
     # Functions to get the results from the above method (calculate_location_parameters)
     def get_feedstock_delivered_price(self):
@@ -565,9 +619,15 @@ class FeedstockTransportModel:
         return self.results.get('trans_GHG', None)
     
     def get_possible_locations(self):
+        """
+        Returns a gpd of candidate locations
+        """
         return self.results.get('possible_locations', None)
     
     def get_jet_indexes(self):
+        """
+        Returns the indexes of the jet producers being supplied by each candidate location
+        """
         return self.results.get('jet_indexes', None)
     
     ########## Function to calculate samples from distribution of uncertain parameters ########3
@@ -760,14 +820,20 @@ class FeedstockTransportModel:
                 mean_TF_ethanol = self.mean_TF_ethanol_sw
                 # no lo voy a variar en incertidumbre por ahora
                 
-                real_dist_ethanol = self.real_dist_ethanol_sw
-                ## UNCERTAINTY - +/- 10% a este valor
+                if self.num_points == 1000:
+                    real_dist_ethanol = self.real_dist_ethanol_sw
+                    ## UNCERTAINTY - +/- 10% a este valor
+                else:
+                    real_dist_ethanol = self.results.get('ethanol_transport_distances', None)
             
             elif feedstock == 'miscanthus':
                 crop_data = self.mis_data
                 mean_TF_ethanol = self.mean_TF_ethanol_mis
-                real_dist_ethanol = self.real_dist_ethanol_mis
-
+                
+                if self.num_points == 1000:
+                    real_dist_ethanol = self.real_dist_ethanol_mis
+                else:
+                    real_dist_ethanol = self.results.get('ethanol_transport_distances', None)
                    
             #  Yield in wet Mg/ha
             yield_crop = np.maximum(0, (np.array(crop_data.y_data) /0.8) + samples_from_yield_crop_D[sample]*3.5) # to transform from standard normal to N(Mean,3.5)
@@ -1066,6 +1132,161 @@ class FeedstockTransportModel:
         np.save(f'Sent_ethanol{name}.npy', self.uncertain_sent_ethanol)
         
         return self.uncertain_sent_ethanol
+    
+
+    def plot_candidate_locations(self, color_metric=None, cmap='viridis',
+                                 vmax=None, vmin=None, markersize = 10):
+        """
+        Plot candidate locations over the USA rainfed boundary, color-coded by a specified metric.
+    
+        Parameters:
+        -----------
+        color_metric : str or None
+            Column name in the associated GeoDataFrame (e.g., TF) to use for color-coding.
+            If None, plots the candidate locations as uniform markers.
+        cmap : str
+            Colormap to use for point coloring.
+        vmax : float, optional
+            Maximum value for colormap scaling.
+        vmin : float, optional
+            Minimum value for colormap scaling.
+        markersize : int, optional
+            Size of marker for points. Default is 10.
+        """
+        # Make sure candidate_locations and USA_rainfed exist
+        if not hasattr(self, 'candidate_locations') or not hasattr(self, 'USA_rainfed'):
+            print("Missing required data: 'candidate_locations' or 'USA_rainfed'")
+            return
+        gdf = self.candidate_locations.copy()
+        
+        # Define mapping from abbreviation to actual column name
+        metric_map = {
+        'TF': {'col': 'TF', 'unit': ''},
+        'fdp': {'col': 'feedstock_delivered_price', 'unit': 'USD/wet kg'},
+        'fdg': {'col': 'feedstock_delivered_GHG', 'unit': 'kg CO₂e/wet kg'},
+        'etc_Mg': {'col': 'ethanol_unit_transp_cost_each_jet', 'unit': 'USD/Mg ethanol'},
+        'etg_Mg': {'col': 'ethanol_unit_transp_GHG_each_jet', 'unit': 'kg CO₂e/Mg ethanol'},
+        'crop_yield': {'col': 'yield_crop', 'unit': 'wet Mg/ha'},
+        'crop_CI': {'col': 'GHG_crop', 'unit': 'kg CO₂e/ wet Mg'},
+        'tcb_km': {'col': 'trans_cost_biomass_km', 'unit': 'USD/km'},
+        'tce_km': {'col': 'trans_cost_ethanol_km', 'unit': 'USD/km'},
+        'transport_CI': {'col': 'trans_GHG', 'unit': 'kg CO₂e/km'}
+    }
+        
+        if color_metric is not None:
+            if color_metric == 'TF':
+                if self.num_points == 1000:
+                    if self.feedstock == 'switchgrass':
+                        gdf['TF'] = self.mean_TF_sw
+                    elif self.feedstock == 'miscanthus':
+                        gdf['TF'] = self.mean_TF_mis
+                elif hasattr(self, 'To_get_TF'):
+                    if self.feedstock == 'switchgrass':
+                        gdf['TF'] = self.To_get_TF['Mean sw'].values
+                    elif self.feedstock == 'miscanthus':
+                        gdf['TF'] = self.To_get_TF['Mean mis'].values
+                else:
+                    print("Missing GeoDataFrame 'To_get_TF' with the color metric")
+                    return
+        
+            elif color_metric in metric_map and hasattr(self, 'results'):
+                full_col = metric_map[color_metric]['col']
+                if full_col in self.results:
+                    gdf[full_col] = self.results[full_col]
+                else:
+                    print(f"Metric '{full_col}' not found in self.results.")
+                    return
+            else:
+                print(f"Unrecognized or unsupported color metric: {color_metric}")
+                return
+    
+        fig, ax = plt.subplots(figsize=(12, 8))
+        self.USA_rainfed.boundary.plot(ax=ax, edgecolor='black', linewidth=1)
+        
+        col_key = metric_map.get(color_metric, {'col': color_metric})['col']
+        unit = metric_map.get(color_metric, {'unit': ''})['unit']
+        
+        if color_metric is not None and col_key in gdf.columns:
+            gdf.plot(ax=ax, column=col_key, cmap=cmap,
+                     legend=True, markersize=markersize, vmin=vmin, vmax=vmax)
+            col_name = metric_map.get(color_metric, {'col': color_metric})['col']
+            ax.set_title(f"Candidate Locations Colored by {col_name} ({unit})", fontsize=14)
+        else:
+            gdf.plot(ax=ax, color='blue', markersize=markersize)
+            ax.set_title("Candidate Locations", fontsize=14)
+
+        
+        ax.axis('off')
+        plt.show()
+        
+    def plot_ethanol_supply(self, markersize=10, line_color='gray', line_alpha=0.5, figsize=(12, 8)):
+        """
+        Plot candidate locations and the jet producers they supply with connecting lines.
+    
+        Parameters:
+        -----------
+        markersize : int
+            Size of the candidate and jet producer markers.
+        line_color : str
+            Color of the connecting lines.
+        line_alpha : float
+            Transparency of the connecting lines.
+        figsize : tuple
+            Size of the figure.
+        """
+    
+        # Basic checks
+        if not hasattr(self, 'candidate_locations') or not hasattr(self, 'jet_producers'):
+            print("Missing required GeoDataFrames: 'candidate_locations' or 'jet_producers'")
+            return
+        if 'jet_indexes' not in self.results:
+            print("Missing 'jet_indexes' in results.")
+            return
+    
+        gdf_candidates = self.candidate_locations.copy()
+        gdf_jets = self.jet_producers.copy()
+        jet_indexes = self.results['jet_indexes']  # shape (n_candidates, 2)
+        sent_array = self.results['sent_ethanol']  # shape (n_candidates, 2)
+    
+        fig, ax = plt.subplots(figsize=figsize)
+    
+        # Optional: Plot USA rainfed background
+        if hasattr(self, 'USA_rainfed'):
+            self.USA_rainfed.boundary.plot(ax=ax, edgecolor='black', linewidth=1)
+    
+        # Plot candidate locations and jet producers
+        gdf_candidates.plot(ax=ax, color='blue', markersize=markersize, label='Candidate Locations')
+        gdf_jets.plot(ax=ax, color='red', markersize=markersize, label='Jet Producers')
+    
+        # Normalize sent ethanol to control linewidth scaling
+        max_sent = sent_array.max()
+        min_width = 0.5
+        max_width = 2
+    
+        for idx, candidate in enumerate(gdf_candidates.itertuples()):
+            candidate_point = candidate.geometry
+            connected_jet_ids = jet_indexes[idx]  # Should be array/list of 2 jet indexes
+    
+            for j, jet_id in enumerate(connected_jet_ids):
+                sent_amount = sent_array[idx, j]
+    
+                if sent_amount > 0 and 0 <= jet_id < len(gdf_jets):
+                    jet_point = gdf_jets.loc[jet_id].geometry
+                    line = LineString([candidate_point, jet_point])
+                    normalized_width = min_width + (sent_amount / max_sent) * (max_width - min_width)
+    
+                    gpd.GeoSeries([line]).plot(
+                        ax=ax,
+                        color=line_color,
+                        alpha=line_alpha,
+                        linewidth=normalized_width
+                    )
+    
+        ax.set_title("Candidate Locations and Connections to Supplied Jet Producers", fontsize=14)
+        ax.legend()
+        ax.axis('off')
+        plt.show()
+
 
 
 #%% Example of usage
@@ -1074,7 +1295,7 @@ class FeedstockTransportModel:
 # from Feedstock_Transport_Class import FeedstockTransportModel
 
 # Create an instance of the class with default file paths
-model = FeedstockTransportModel()
+# model = FeedstockTransportModel()
 
 
 # Example to update file
@@ -1115,7 +1336,10 @@ model = FeedstockTransportModel()
 # feedstock_delivered_price = model.get_feedstock_delivered_price()
 # ethanol_unit_transp_cost_each_jet = model.get_ethanol_unit_transp_cost_each_jet()
 # ethanol_unit_transp_GHG_each_jet = model.get_ethanol_unit_transp_GHG_each_jet()
-# sent_ethanol = model.get_sent_ethanol()
+# sent_ethanol = model.get_sent_ethanol() # amount of ethanol sent by each candidate location to each jet producer
+# candidate_locations = model.get_possible_locations()
+# jet_producers_supplied = model.get_jet_indexes() # indexes of jet producers being supplied by each candidate location
+
 
 # Example to run the model with uncertainty
 # model = FeedstockTransportModel(samples_for_uncertainty = 3)
@@ -1126,6 +1350,12 @@ model = FeedstockTransportModel()
 # uncertain_ethanol_transport_cost = model.get_uncertain_ethanol_transport_cost()
 # uncertain_ethanol_transport_GHG = model.get_uncertain_ethanol_transport_GHG()
 # uncertain_sent_ethanol = model.get_uncertain_sent_ethanol()
+
+# Example to plot candidate locations with metrics
+# model.plot_candidate_locations(color_metric = 'fdp') # for feedstock delivered price
+
+# Example to plot ethanol supplied
+# model1.plot_ethanol_supply()
 
 
 
