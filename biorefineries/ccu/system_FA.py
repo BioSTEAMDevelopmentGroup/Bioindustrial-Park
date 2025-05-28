@@ -74,7 +74,10 @@ R1202 = _units.HCOOH_SynthesisReactor('R1202', ins=(C1203-0, C1201-0, '', makeup
 
 S1101 = units.PhaseSplitter('S1101', ins=R1202-0, outs=('unreacted_gas', ''))
 
-C1204 = units.IsothermalCompressor('C1204', ins=S1101-0, outs=2-R1202, P=12000000, vle=True)
+S1102 = units.Splitter('S1102', ins=S1101-0, outs=('recycled_H2', 'purge_CO2'),\
+                       split={'H2': 1.0,})
+
+C1204 = units.IsothermalCompressor('C1204', ins=S1102-0, outs=2-R1202, P=12000000, vle=True)
 
 F1202 = units.SplitFlash('F1202', ins=S1101-1, outs=('liquid', 'concen_adduct'), 
                          split={'triethylamine': 1.0,}, 

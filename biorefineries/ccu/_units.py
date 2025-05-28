@@ -35,6 +35,10 @@ class Electrolyzer(SanUnit):
     _N_ins = 1
     _N_outs = 2
     
+    _F_BM_default = {'Stack': 2.3,
+                     'Mechanical BOP': 2.3,
+                     'Electrical BOP': 2.3,}
+    
     def __init__(self, ID="", ins=None, outs=(),
                  stack_lifetime=10,
                  renewable_electricity_price=0.03, # currently possible in U.S. markets with plentiful  wind
@@ -53,11 +57,13 @@ class Electrolyzer(SanUnit):
         oxygen.imol['O2'] = water.F_mol / 2
     
     def _cost(self): # based on https://www.osti.gov/biblio/2203367 P17
-        self.power_utility.rate = self.outs[0].imass['H2'] * 122000 * 24 / 50000 # base case 50 MTD / 122 MW
+        base_power_utility_rate = 122000 # 122 MW
+        self.power_utility.rate = base_power_utility_rate * self.outs[0].imass['H2'] * 24 / 50000 # base case produces H2 50 Metric tonnes per day
         # self.power_utility.cost = self.renewable_electricity_price * self.power_utility.rate
-        self.baseline_purchase_costs['Stack'] = self.power_utility.rate * 292 # process equipment, piping, valves, and  instrumentation including temperature, pressure, flow, and level indicators
-        self.baseline_purchase_costs['Mechanical BOP'] = self.power_utility.rate * 280
-        self.baseline_purchase_costs['Electrical BOP'] = self.power_utility.rate * 155 # for AC-> DC, transformer, power substation
+        self.baseline_purchase_costs['Stack'] = 292 * (self.power_utility.rate / base_power_utility_rate) ** 0.6  # process equipment, piping, valves, and  instrumentation including temperature, pressure, flow, and level indicators
+        self.baseline_purchase_costs['Mechanical BOP'] = 280 * (self.power_utility.rate / base_power_utility_rate) ** 0.6
+        self.baseline_purchase_costs['Electrical BOP'] = 155 * (self.power_utility.rate / base_power_utility_rate) ** 0.6 # for AC-> DC, transformer, power substation
+        
         self.add_OPEX = self._calculate_replacement_cost()
     
     def _calculate_replacement_cost(self):
@@ -218,7 +224,7 @@ class HCOOH_SynthesisReactor(Reactor):
     auxiliary_unit_names = ('heat_exchanger',)
     
     reaction = bst.Reaction(
-        'CO2 + H2 + C6H15N -> TREAHCOOH',   'CO2',   0.48)
+        'CO2 + H2 + C6H15N -> TREAHCOOH',   'CO2',   0.84) # No CO2 recycled; from Accelerating the net-zero economy with CO2-hydrogenated formic acid production
     
     def __init__(self, ID="", ins=None, outs=(),
                  P=12000000, T=120+273.15, # Park et.al
