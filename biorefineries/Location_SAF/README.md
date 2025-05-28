@@ -20,7 +20,7 @@ The model allows both deterministic and uncertainty-based analysis.
 •	Estimate ethanol transport costs and GHG emissions  
 •	Analyze ethanol supply allocation from candidate sites to jet fuel producers  
 •	Run uncertainty simulations  
-•	Plot spatial results  
+•	Plot spatial results   
  
 ## Model Assumptions and Limitations
 •	To replicate the results from Bianco *et al.*, run the model with 1000 candidate biorefinery locations and 1000 uncertainty samples.  
@@ -29,11 +29,17 @@ The model allows both deterministic and uncertainty-based analysis.
 •	All units are fixed and consistent with default settings; custom unit inputs are not automatically handled.  
  
 ## Customizing Spatial Scope
-If you'd like to use this model for a smaller geographic area (e.g., a single U.S. state), filter the latitude and longitude columns in:
-
-•	switchgrass_data.csv  
-•	miscanthus_data.csv  
- 
+If you'd like to use this model for a smaller geographic area (e.g., a single U.S. state), you can add a **bounding box** to the class initializer. The bounding box should be provided as coordinates in **EPSG:4326** format (latitude and longitude), specified as a tuple:  
+```python
+(min_lon, min_lat, max_lon, max_lat)  
+ ```
+For example:
+```python
+bbox_illinois = (-91.5131, 36.9703, -87.4948, 42.5083)
+model3 = FeedstockTransportModel(num_points = 2, bounding_box = bbox_illinois)
+model3.calculate_location_parameters()
+```  
+This will limit the spatial query and processing to data within the specified region.
 ## Example Usage
 ### 1. Import and initialize the model
 ```python
@@ -76,6 +82,10 @@ ethanol_flows = model.get_sent_ethanol()
 locations = model.get_possible_locations()
 jet_indexes = model.get_jet_indexes()
 ```
+*Note: ethanol_cost and ethanol_CI refers only to transportation values, to obtain the MSP and CI of ethanol (without transportation) refer to the file 02_ethanol_refinery_model.py  
+Note 2: feedstock delivered price/CI refers to feedstock breakeven price at farmgate + transportation to the biorefinery candidate location* 
+
+
 ### 5. Run model with uncertainty
 ```python
 model = FeedstockTransportModel(samples_for_uncertainty=3)
@@ -92,6 +102,9 @@ ethanol_flows_unc = model.get_uncertain_sent_ethanol()
 model.plot_candidate_locations(color_metric='fdp')  # FDP = feedstock delivered price
 model.plot_ethanol_supply()
 ```
+Plot candidate locations can be customizable to visualize a metric obtained from the calculate_location_parameters() method.
+
+Plot ethanol supply shows each candidate location with lines connecting it to the jet fuel producers they supply. Thickness of the lines represents the flow. 
 
 # Files to Reproduce the Workflow
 ## Feedstock Transport Model
@@ -193,3 +206,12 @@ evaluate_SAF(N=1000, notify_runs=10, model=model)
 *Note: If an error occurs during simulation, the model will still run, but the capital investment may be reported as zero. These samples should be discarded.
 To account for failed runs, simulate more than 1000 samples so you can filter out invalid ones.
 Always use the same sample set across all runs for consistency in comparison.*
+
+## Combine Ethanol with SAF - and Pareto front
+Implemented in 05_combine_ethanol_with_SAF.py
+
+This model generates the final SAF price and CI results, along with the Pareto Front; choose the feedstock in line 25, and run the file.
+
+Results are stored in dataframes:  
+•	df_CIs  
+•	df_price  
