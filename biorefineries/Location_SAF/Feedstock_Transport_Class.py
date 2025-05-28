@@ -50,7 +50,8 @@ class FeedstockTransportModel:
     def __init__(self, feedstock = 'switchgrass', base_folder=None, num_points = 1000,
                  samples_for_uncertainty = 1000,
                  sizes_of_biorefineries=80,  # MMgal/year
-                 blending_capacity_set=0.2): # Fraction (e.g. 0.2 = 20%)
+                 blending_capacity_set=0.2,# Fraction (e.g. 0.2 = 20%)
+                 bounding_box=None): # min_lon, min_lat, max_lon, max_lat) in EPSG:4326.
         """
         Parameters
         ----------
@@ -64,6 +65,8 @@ class FeedstockTransportModel:
             Size of biorefineries in MMgal/year (Million Gallons per year). Default is 80.
         blending_capacity_set : float
             Maximum share of jet fuel capacity that can be blended with ethanol. Default is 0.2.
+        bounding_box: tuple or list of (min_lon, min_lat, max_lon, max_lat) in EPSG:4326.
+            If None, all data is loaded. If provided, filters miscanthus and switchgrass data.
         
         """
         
@@ -85,6 +88,7 @@ class FeedstockTransportModel:
         
         self.sizes_of_biorefineries = sizes_of_biorefineries  # MM gal/year
         self.blending_capacity_set = blending_capacity_set
+        self.bounding_box = bounding_box
         
         # Notify users if default values change
         if sizes_of_biorefineries != 80:
@@ -129,19 +133,49 @@ class FeedstockTransportModel:
         self.jet_producers = gpd.read_file(self.paths['jet_producers']).to_crs('EPSG:5070')
         self.ethanol_plants = gpd.read_file(self.paths['ethanol_plants']).to_crs('EPSG:5070')
 
+        # Optional spatial filter in EPSG:4326
+        if self.bounding_box is not None:
+            from shapely.geometry import box
+            min_lon, min_lat, max_lon, max_lat = self.bounding_box
+            bbox_poly = box(min_lon, min_lat, max_lon, max_lat)
+            
+        # # Switchgrass yield
+        # sw_df = pd.read_csv(self.paths['switchgrass_data'])
+        # self.sw_data = gpd.GeoDataFrame(
+        #     sw_df, crs='EPSG:4326',
+        #     geometry=gpd.points_from_xy(sw_df['long'], sw_df['lat'])
+        # ).to_crs('EPSG:5070')
+        
         # Switchgrass yield
         sw_df = pd.read_csv(self.paths['switchgrass_data'])
-        self.sw_data = gpd.GeoDataFrame(
+        sw_gdf = gpd.GeoDataFrame(
             sw_df, crs='EPSG:4326',
             geometry=gpd.points_from_xy(sw_df['long'], sw_df['lat'])
-        ).to_crs('EPSG:5070')
+        )
+    
+        if self.bounding_box is not None:
+            sw_gdf = sw_gdf[sw_gdf.geometry.within(bbox_poly)]
+    
+        self.sw_data = sw_gdf.to_crs('EPSG:5070')
 
+        # # Miscanthus yield
+        # mis_df = pd.read_csv(self.paths['miscanthus_data'])
+        # self.mis_data = gpd.GeoDataFrame(
+        #     mis_df, crs='EPSG:4326',
+        #     geometry=gpd.points_from_xy(mis_df['long'], mis_df['lat'])
+        # ).to_crs('EPSG:5070')
+        
         # Miscanthus yield
         mis_df = pd.read_csv(self.paths['miscanthus_data'])
-        self.mis_data = gpd.GeoDataFrame(
+        mis_gdf = gpd.GeoDataFrame(
             mis_df, crs='EPSG:4326',
             geometry=gpd.points_from_xy(mis_df['long'], mis_df['lat'])
-        ).to_crs('EPSG:5070')
+        )
+    
+        if self.bounding_box is not None:
+            mis_gdf = mis_gdf[mis_gdf.geometry.within(bbox_poly)]
+    
+        self.mis_data = mis_gdf.to_crs('EPSG:5070')
 
         # Transport costs
         transport = gpd.read_file(self.paths['transport_costs']).to_crs('EPSG:5070')
@@ -317,6 +351,7 @@ class FeedstockTransportModel:
 
         area = cf['farm_area_ha'][0]
         size_farms = area * yield_crop * np.ones(num_points)[..., None] 
+        
         # yield in wet tons/ha * area in ha = total wet tons per farm
 
         probability_crop = yield_crop/np.sum(yield_crop)
@@ -326,12 +361,17 @@ class FeedstockTransportModel:
 
 
         np.random.seed(1) 
-        # Choose locations random, with higher probability for the ones with higher yields
-        chosen_ind = np.random.choice(np.arange(len(yield_crop)),num_points, replace = False, p = probability_crop)   
-        # This gives me the filtered yields for only the 1000 indices that were chosen before
-        # We are going to use these 1000 locations as possible locations for ethanol biorefineries
-        mask = crop_data.index.isin(chosen_ind)
-        possible_locations = crop_data[mask]
+        # # Choose locations random, with higher probability for the ones with higher yields
+        # chosen_ind = np.random.choice(np.arange(len(yield_crop)),num_points, replace = False, p = probability_crop)  
+        # print('chosen_ind', chosen_ind)
+        # # This gives me the filtered yields for only the 1000 indices that were chosen before
+        # # We are going to use these 1000 locations as possible locations for ethanol biorefineries
+        # mask = crop_data.index.isin(chosen_ind)
+        # possible_locations = crop_data[mask]
+        # print('possible_locations', possible_locations)
+        chosen_ind = np.random.choice(len(yield_crop), num_points, replace=False, p=probability_crop)
+        possible_locations = crop_data.iloc[chosen_ind]
+
         
         # Add  transportation costs
         possible_locations = gpd.sjoin(possible_locations, self.transport_costs[['Flat_bed', 'Tanker_truck', 'GHG_truck','geometry']], how='left', predicate='within')
@@ -382,11 +422,14 @@ class FeedstockTransportModel:
         # We are calculating here the distance matrix between possible locations of biorefineries and 
         # total farms (each point in the yield data) = dji
         dist_mat = possible_locations.geometry.apply(lambda g: crop_data.distance(g)) # distance in meters
+        
         # Transform to numpy array to perform operations faster
         dist = np.array(dist_mat)/1000 * Tortuosity_reshaped # /1000 to get values in km
         
+        
         # This part is to sort the farms from min distance to max in rows
         sorted_farms = np.argsort(dist, axis = 1) # same for both crops
+        
         
         # We order the farm sizes in the same way we ordered the farms (by minimum distance indices)
         farm_sizes_sorted = FeedstockTransportModel.sort_by_min_distance(size_farms, sorted_farms, num_points) 
@@ -860,11 +903,8 @@ class FeedstockTransportModel:
         
         
             np.random.seed(1) 
-            chosen_ind = np.random.choice(np.arange(len(yield_crop)),num_points, replace = False, p = probability_crop)   
-            # This gives me the filtered yields for only the 1000 indices that were chosen before
-            # We are going to use these 1000 locations as possible locations for ethanol biorefineries
-            mask = crop_data.index.isin(chosen_ind)
-            possible_locations = crop_data[mask] # In this case, possible_locations is the same for both crops (since the data is taken from the same points)
+            chosen_ind = np.random.choice(len(yield_crop), num_points, replace=False, p=probability_crop)
+            possible_locations = crop_data.iloc[chosen_ind]
             
             # Add  transportation costs
             possible_locations = gpd.sjoin(possible_locations, self.transport_costs[['Flat_bed', 'Tanker_truck', 'GHG_truck','geometry']], how='left', predicate='within')
@@ -890,6 +930,7 @@ class FeedstockTransportModel:
             
             # This part is to sort the farms from min distance to max in rows
             sorted_farms = np.argsort(dist, axis = 1) # same for both crops
+            
             
             # We order the farm sizes in the same way we ordered the farms (by minimum distance indices)
             farm_sizes_sorted = FeedstockTransportModel.sort_by_min_distance(size_farms, sorted_farms, num_points) 
@@ -1356,6 +1397,18 @@ class FeedstockTransportModel:
 
 # Example to plot ethanol supplied
 # model1.plot_ethanol_supply()
+
+# Example to use not in all rainfed region but only in one state (e.g. = Illinois)
+# Define bounding box for state
+# bbox_illinois = (-91.5131, 36.9703, -87.4948, 42.5083)
+# Run model with bounding box
+# model3 = FeedstockTransportModel(num_points = 2, bounding_box = bbox_illinois)
+# Calculate location parameters and uncertainty
+# model3.calculate_location_parameters()
+# model3.calculate_uncertainty()
+# get results and visualize plots same as before
+# model3.plot_candidate_locations()
+# model3.plot_ethanol_supply()
 
 
 
