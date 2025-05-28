@@ -481,13 +481,20 @@ class FeedstockTransportModel:
                     if jet_ref_sizes_cum[i][j]>= self.mass_of_biorefineries:
                         jet_ref_count[i] = j + (self.mass_of_biorefineries- jet_ref_sizes_cum[i][j-1])/(jet_ref_sizes_cum[i][j] - jet_ref_sizes_cum[i][j-1])
                         break
-        jet_ref_count_mat = np.zeros((num_points, num_points))
+        # Get the maximum number of jet refineries needed (integer part + 1)
+        max_jet_producers = int(np.ceil(np.max(jet_ref_count)))
+        # Create matrix sized appropriately: rows = num_points, columns = max_jet_producers
+        jet_ref_count_mat = np.zeros((num_points, max_jet_producers))
         for p, val in enumerate(jet_ref_count):
             integer_part = int(val)
             decimal_part = val - integer_part
-            jet_ref_count_mat[p, :integer_part] = 1 # Fill the row with 1s up to the integer part of the value
-            jet_ref_count_mat[p, integer_part] = decimal_part # Fill the rest of the row with the decimal part
-        
+            if integer_part < max_jet_producers:
+                jet_ref_count_mat[p, :integer_part] = 1  # Fully filled refineries
+                if integer_part < max_jet_producers:     # Add remaining fractional refinery
+                    jet_ref_count_mat[p, integer_part] = decimal_part
+            else:
+                # Edge case: val is exactly equal to max_jet_producers
+                jet_ref_count_mat[p, :max_jet_producers] = 1
         
         
         farm_cost_all_loc = np.array([np.mean(np.array((crop_data.iloc[sorted_farms[i][:farm_num[i]]]).Adjusted_Price)) for i in range(num_points)])
@@ -981,13 +988,21 @@ class FeedstockTransportModel:
                         if jet_ref_sizes_cum[i][j]>= self.mass_of_biorefineries:
                             jet_ref_count[i] = j + (self.mass_of_biorefineries- jet_ref_sizes_cum[i][j-1])/(jet_ref_sizes_cum[i][j] - jet_ref_sizes_cum[i][j-1])
                             break
-            jet_ref_count_mat = np.zeros((num_points, num_points))
+
+            # Get the maximum number of jet refineries needed (integer part + 1)
+            max_jet_producers = int(np.ceil(np.max(jet_ref_count)))
+            # Create matrix sized appropriately: rows = num_points, columns = max_jet_producers
+            jet_ref_count_mat = np.zeros((num_points, max_jet_producers))
             for p, val in enumerate(jet_ref_count):
                 integer_part = int(val)
                 decimal_part = val - integer_part
-                jet_ref_count_mat[p, :integer_part] = 1 # Fill the row with 1s up to the integer part of the value
-                jet_ref_count_mat[p, integer_part] = decimal_part # Fill the rest of the row with the decimal part
-            
+                if integer_part < max_jet_producers:
+                    jet_ref_count_mat[p, :integer_part] = 1  # Fully filled refineries
+                    if integer_part < max_jet_producers:     # Add remaining fractional refinery
+                        jet_ref_count_mat[p, integer_part] = decimal_part
+                else:
+                    # Edge case: val is exactly equal to max_jet_producers
+                    jet_ref_count_mat[p, :max_jet_producers] = 1
         
             farm_cost_all_loc = np.array([np.mean(np.array((crop_data.iloc[sorted_farms[i][:farm_num[i]]]).Adjusted_Price*0.8)) for i in range(num_points)])
             # mean cost of feedstock for all farms supplying to each possible location (1000,0)
@@ -1176,7 +1191,8 @@ class FeedstockTransportModel:
     
 
     def plot_candidate_locations(self, color_metric=None, cmap='viridis',
-                                 vmax=None, vmin=None, markersize = 10):
+                                 vmax=None, vmin=None, markersize = 30,
+                                 crop_map = False, save_fig = False):
         """
         Plot candidate locations over the USA rainfed boundary, color-coded by a specified metric.
     
@@ -1193,22 +1209,28 @@ class FeedstockTransportModel:
             Minimum value for colormap scaling.
         markersize : int, optional
             Size of marker for points. Default is 10.
+        crop_map : bool, optional
+            Whether to crop the plot to a bounding box. Default is False.
+        save_fig : bool, optional
+            If True, saves the figure in high resolution. Default is False.
         """
         # Make sure candidate_locations and USA_rainfed exist
         if not hasattr(self, 'candidate_locations') or not hasattr(self, 'USA_rainfed'):
             print("Missing required data: 'candidate_locations' or 'USA_rainfed'")
             return
-        gdf = self.candidate_locations.copy()
+        gdf = self.candidate_locations.copy().to_crs(epsg=4326)
+        rainfed = self.USA_rainfed.copy().to_crs(epsg=4326)
+        
+        if crop_map:
+            minx, miny, maxx, maxy = self.bounding_box
+            gdf = gdf.cx[minx:maxx, miny:maxy]
+            rainfed = rainfed.cx[minx:maxx, miny:maxy]
         
         # Define mapping from abbreviation to actual column name
         metric_map = {
         'TF': {'col': 'TF', 'unit': ''},
         'fdp': {'col': 'feedstock_delivered_price', 'unit': 'USD/wet kg'},
         'fdg': {'col': 'feedstock_delivered_GHG', 'unit': 'kg CO₂e/wet kg'},
-        'etc_Mg': {'col': 'ethanol_unit_transp_cost_each_jet', 'unit': 'USD/Mg ethanol'},
-        'etg_Mg': {'col': 'ethanol_unit_transp_GHG_each_jet', 'unit': 'kg CO₂e/Mg ethanol'},
-        'crop_yield': {'col': 'yield_crop', 'unit': 'wet Mg/ha'},
-        'crop_CI': {'col': 'GHG_crop', 'unit': 'kg CO₂e/ wet Mg'},
         'tcb_km': {'col': 'trans_cost_biomass_km', 'unit': 'USD/km'},
         'tce_km': {'col': 'trans_cost_ethanol_km', 'unit': 'USD/km'},
         'transport_CI': {'col': 'trans_GHG', 'unit': 'kg CO₂e/km'}
@@ -1242,7 +1264,7 @@ class FeedstockTransportModel:
                 return
     
         fig, ax = plt.subplots(figsize=(12, 8))
-        self.USA_rainfed.boundary.plot(ax=ax, edgecolor='black', linewidth=1)
+        rainfed.boundary.plot(ax=ax, edgecolor='black', linewidth=1)
         
         col_key = metric_map.get(color_metric, {'col': color_metric})['col']
         unit = metric_map.get(color_metric, {'unit': ''})['unit']
@@ -1253,14 +1275,20 @@ class FeedstockTransportModel:
             col_name = metric_map.get(color_metric, {'col': color_metric})['col']
             ax.set_title(f"Candidate Locations Colored by {col_name} ({unit})", fontsize=14)
         else:
-            gdf.plot(ax=ax, color='blue', markersize=markersize)
+            gdf.plot(ax=ax, color='teal', markersize=markersize)
             ax.set_title("Candidate Locations", fontsize=14)
 
         
         ax.axis('off')
+        if save_fig:
+            if color_metric is not None and col_key in gdf.columns:
+                plt.savefig(f"Candidate Locations Colored by {col_name} ({unit})", dpi= 1200, bbox_inches='tight', transparent = True)
+            else:
+                plt.savefig("Candidate Locations", dpi= 1200, bbox_inches='tight', transparent = True)
         plt.show()
         
-    def plot_ethanol_supply(self, markersize=10, line_color='gray', line_alpha=0.5, figsize=(12, 8)):
+    def plot_ethanol_supply(self, markersize=30, line_color='gray', line_alpha=0.5, figsize=(12, 8),
+                            save_fig = False):
         """
         Plot candidate locations and the jet producers they supply with connecting lines.
     
@@ -1274,6 +1302,8 @@ class FeedstockTransportModel:
             Transparency of the connecting lines.
         figsize : tuple
             Size of the figure.
+        save_fig : bool, optional
+            If True, saves the figure in high resolution. Default is False.
         """
     
         # Basic checks
@@ -1286,18 +1316,20 @@ class FeedstockTransportModel:
     
         gdf_candidates = self.candidate_locations.copy()
         gdf_jets = self.jet_producers.copy()
+        rainfed = self.USA_rainfed.copy()
         jet_indexes = self.results['jet_indexes']  # shape (n_candidates, 2)
         sent_array = self.results['sent_ethanol']  # shape (n_candidates, 2)
+        
     
         fig, ax = plt.subplots(figsize=figsize)
     
         # Optional: Plot USA rainfed background
         if hasattr(self, 'USA_rainfed'):
-            self.USA_rainfed.boundary.plot(ax=ax, edgecolor='black', linewidth=1)
+            rainfed.boundary.plot(ax=ax, edgecolor='black', linewidth=1)
     
         # Plot candidate locations and jet producers
-        gdf_candidates.plot(ax=ax, color='blue', markersize=markersize, label='Candidate Locations')
-        gdf_jets.plot(ax=ax, color='red', markersize=markersize, label='Jet Producers')
+        gdf_candidates.plot(ax=ax, color='#00a996', markersize=markersize, label='Candidate Locations')
+        gdf_jets.plot(ax=ax, color='tab:red', markersize=markersize, label='Jet Producers')
     
         # Normalize sent ethanol to control linewidth scaling
         max_sent = sent_array.max()
@@ -1326,6 +1358,8 @@ class FeedstockTransportModel:
         ax.set_title("Candidate Locations and Connections to Supplied Jet Producers", fontsize=14)
         ax.legend()
         ax.axis('off')
+        if save_fig:
+            plt.savefig('Ethanol_supply.png', dpi= 1200, bbox_inches='tight', transparent = True)
         plt.show()
 
 
