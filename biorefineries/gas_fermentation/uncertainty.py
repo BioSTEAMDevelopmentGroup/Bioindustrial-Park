@@ -20,25 +20,29 @@ import yaml
 from scipy import interpolate
 from chaospy import distributions as shape
 
-__all__ = ('run_monte_carlo', 
-           'run_all_monte_carlo',
-           'plot_monte_carlo',
-           'plot_spearman', 
-           'plot_kde',
-           'plot_spearman_both',
-           'plot_spearman_scenarios',
-           'sobol_analysis',
-           'montecarlo_results',
-           'opportunity_space',
-           'plot_kde_carbon_capture_comparison_no_dewatering',
-           'plot_kde_carbon_capture_comparison_dewatering',
-           'plot_kde_dewatering_comparison_carbon_capture',
-           'plot_kde_dewatering_comparison_no_carbon_capture',
-           'get_optimized_parameters_table',
-           'plot_kde_CI_MSP',
-           'get_distribution_table',
-           'run_monte_carlo_across_yield',
-           'plot_monte_carlo_across_yield')
+__all__ = (
+    'run_monte_carlo', 
+    'run_all_monte_carlo',
+    'plot_monte_carlo',
+    'plot_spearman', 
+    'plot_kde',
+    'plot_spearman_both',
+    'plot_spearman_scenarios',
+    'sobol_analysis',
+    'montecarlo_results',
+    'opportunity_space',
+    'plot_kde_carbon_capture_comparison_no_dewatering',
+    'plot_kde_carbon_capture_comparison_dewatering',
+    'plot_kde_dewatering_comparison_carbon_capture',
+    'plot_kde_dewatering_comparison_no_carbon_capture',
+    'get_optimized_parameters_table',
+    'plot_kde_CI_MSP',
+    'get_distribution_table',
+    'run_monte_carlo_across_yield',
+    'run_monte_carlo_across_H2_price',
+    'plot_monte_carlo_across_yield',
+    'plot_monte_carlo_across_H2_price',
+)
 
 results_folder = os.path.join(os.path.dirname(__file__), 'results')
 images_folder = os.path.join(os.path.dirname(__file__), 'images')
@@ -67,10 +71,10 @@ def autoload_file_name(name, N):
     filename = name.replace('|', '-') + '_' + str(N)
     return os.path.join(results_folder, filename)
 
-def plot_monte_carlo(box=False):
+def plot_monte_carlo(scenarios=None, box=False):
     bst.plots.set_font(size=10, family='sans-serif', font='Arial')
     bst.plots.set_figure_size(aspect_ratio=1.05)
-    fig, axes = _plot_monte_carlo(box)
+    fig, axes = _plot_monte_carlo(scenarios, box)
     # for ax, letter in zip(axes, 'ABCDEFGHIJ'):
     #     plt.sca(ax)
     #     ylb, yub = plt.ylim()
@@ -82,18 +86,21 @@ def plot_monte_carlo(box=False):
         file = os.path.join(images_folder, f'montecarlo_absolute.{i}')
         plt.savefig(file, transparent=True)
 
-def _plot_monte_carlo(box):
+def _plot_monte_carlo(scenarios=None, box=None):
     Biorefinery = gas_fermentation.Biorefinery
-    scenario_names = [
-        'all fermentation', 
-        # 'conservative fermentation', 
-        # 'optimistic fermentation'
-    ]
+    if scenarios is None:
+        scenarios = [
+            'all fermentation', 
+        ]
+    elif scenarios == 'all':
+        scenarios = [
+            'all', 
+        ]
     model_pairs = [
         (name, 
          Biorefinery(scenario=name + '-glucose growth', simulate=False), 
          Biorefinery(scenario=name + '-acetate growth', simulate=False)) 
-        for name in scenario_names
+        for name in scenarios
     ]
     metrics = [
         ['MSP', 'carbon_intensity'], 
@@ -111,13 +118,13 @@ def _plot_monte_carlo(box):
     axes = axes.flatten()
     pm = model_pairs[0][1]
     df = get_monte_carlo(pm.scenario, pm.MSP.index)
-    N_scenarios = len(scenario_names)
+    N_scenarios = len(scenarios)
     if N_scenarios > 1:
         N = 3
     else:
         N = 2
     nsamples = df.shape[0]
-    M = nsamples * len(scenario_names) * 2
+    M = nsamples * len(scenarios) * 2
     for i in range(nrows):
         for j in range(ncols):
             metric = getattr(pm, metrics[i][j])
@@ -224,7 +231,7 @@ def get_spearman_names(parameters):
     }
     
     def with_units(f, name, units=None):
-        name = name.replace('bioreactor ', '').replace(' production', '').replace('oleochemical', 'oleochem.')
+        name = name.replace('bioreactor ', '').replace(' production', '').replace('oleochemical', 'oleochem.').replace('h2', 'H$_2$')
         d = f.distribution
         dname = type(d).__name__
         if units is None: units = f.units
@@ -455,13 +462,32 @@ def plot_spearman_both(scenario='all fermentation-glucose growth', **kwargs):
     return fig, ax
 
 def plot_spearman_scenarios(
-        scenarios=('all fermentation-glucose growth', 
-                   'all fermentation-acetate growth'),
+        scenarios=None,
         kind='TEA',
+        full=True,
         **kwargs
     ):
+    if scenarios is None:
+        scenarios = [
+            'all fermentation|glucose growth', 
+            'all fermentation|acetate growth'
+        ]
+    elif scenarios == 'all':
+        scenarios = [
+            'all|glucose growth', 
+            'all|acetate growth'
+        ]
+    elif scenarios == 'all fermentation':
+        scenarios = [
+            'all fermentation|glucose growth', 
+            'all fermentation|acetate growth'
+        ]
     bst.plots.set_font(size=9)
-    bst.plots.set_figure_size(aspect_ratio=1, width='half')
+    if full:
+        bst.plots.set_figure_size(aspect_ratio=1.3, width='half')
+        # bst.plots.set_figure_size(width='full')
+    else:
+        bst.plots.set_figure_size(aspect_ratio=1, width='half')
     labels = ['glucose-fed seed', 'acetate-fed seed']
     rhos = []
     first = scenarios[0]
@@ -487,6 +513,7 @@ def plot_spearman_scenarios(
             values = df[metric.index]
             br.set_product_price.element = 'dodecylacetate'
             values[br.set_product_price.index] = 0
+            values[br.set_ethyl_acetate_price.index] = 0
         elif kind == 'LCA':
             metric = br.carbon_intensity
             metric_name = r'carbon intensity'
@@ -505,11 +532,15 @@ def plot_spearman_scenarios(
     # breakpoint()
     label = metric.label()
     label = label.replace('Carbon intensity', 'CI')
+    if full: 
+        top = 9
+    else:
+        top = 6
     fig, ax = bst.plots.plot_spearman_2d(rhos, index=names,
                                          color_wheel=color_wheel,
                                          name=metric_name,
                                          xlabel=r"Spearman's rank correlation" "\nwith " + label,
-                                         top=6,
+                                         top=top,
                                          **kwargs)
     # legend_kwargs = {'loc': 'upper right'}
     # plt.legend(
@@ -563,14 +594,28 @@ def plot_spearman(kind=None, carbon_capture=True, dewatering=True, **kwargs):
                                          **kwargs)
     return fig, ax
 
-def run_all_monte_carlo():
-    for scenario in ['all fermentation']:
-        for config in ['glucose growth', 'acetate growth']:
-            run_monte_carlo(scenario=f'{scenario}|{config}')
+def run_all_monte_carlo(scenarios=None):
+    if scenarios is None:
+        scenarios = [
+            'all fermentation|glucose growth', 
+            'all fermentation|acetate growth'
+        ]
+    elif scenarios == 'all':
+        scenarios = [
+            'all|glucose growth', 
+            'all|acetate growth'
+        ]
+    elif scenarios == 'all fermentation':
+        scenarios = [
+            'all fermentation|glucose growth', 
+            'all fermentation|acetate growth'
+        ]
+    for scenario in scenarios:
+        run_monte_carlo(scenario=scenario)
 
 def run_monte_carlo(
         scenario,
-        N=1000, rule='L',
+        N=5000, rule='L',
         sample_cache={},
         autosave=True,
         autoload=True,
@@ -884,8 +929,18 @@ def plot_kde_CI_MSP(scenarios=None):
     from warnings import filterwarnings
     filterwarnings('ignore')
     bst.plots.set_font(size=9)
-    bst.plots.set_figure_size(width='half', aspect_ratio=1)
+    bst.plots.set_figure_size(width='half', aspect_ratio=1.3)
     if scenarios is None:
+        scenarios = [
+            'all fermentation|glucose growth', 
+            'all fermentation|acetate growth'
+        ]
+    elif scenarios == 'all':
+        scenarios = [
+            'all|glucose growth', 
+            'all|acetate growth'
+        ]
+    elif scenarios == 'all fermentation':
         scenarios = [
             'all fermentation|glucose growth', 
             'all fermentation|acetate growth'
@@ -963,6 +1018,11 @@ def opportunity_space(scenarios=None):
         scenarios = [
             'all fermentation|glucose growth', 
             'all fermentation|acetate growth'
+        ]
+    elif scenarios == 'all':
+        scenarios = [
+            'all|glucose growth', 
+            'all|acetate growth'
         ]
     br = gasferm.Biorefinery(simulate=False, scenario=scenarios[0])
     market_price = 5 # USD / kg
@@ -1229,6 +1289,96 @@ def run_monte_carlo_across_yield(
         notify_coordinate=True,
         xlfile=file,
     )
+    
+def run_monte_carlo_across_H2_price(
+        scenario='baseline yield|glucose growth', N=100, rule='L',
+    ):
+    filterwarnings('ignore')
+    br = gasferm.Biorefinery(
+        simulate=False, 
+        scenario=scenario,
+    )
+    br.model.exception_hook = 'raise'
+    scenario = scenario.replace('|', '-')
+    filename = f'{scenario}_monte_carlo_across_H2_price.xlsx'
+    file = os.path.join(results_folder, filename)
+    np.random.seed(1)
+    samples = br.model.sample(N, rule)
+    br.model.load_samples(samples)
+    br.model.evaluate_across_coordinate(
+        name='Bioreactor yield',
+        notify=int(N/10),
+        f_coordinate=br.set_H2_price,
+        coordinate=np.linspace(
+            *br.set_H2_price.bounds,
+            10,
+        ),
+        notify_coordinate=True,
+        xlfile=file,
+    )
+
+def plot_monte_carlo_across_H2_price(scenario=None):
+    bst.plots.set_font(size=10, family='sans-serif', font='Arial')
+    bst.plots.set_figure_size(width='half', aspect_ratio=1)
+    if scenario is None: scenario = 'baseline yield-glucose growth'
+    filename = f'{scenario}_monte_carlo_across_H2_price.xlsx'
+    file = os.path.join(results_folder, filename)
+    br = gasferm.Biorefinery(
+        simulate=False, 
+        scenario=scenario, 
+    )
+    df = pd.read_excel(file, sheet_name=br.MSP.short_description, index_col=0)
+    df = df.dropna()
+    coordinate = np.array(df.columns)
+    median_blue = GG_colors.blue.shade(40).RGBn
+    median_red = GG_colors.red.shade(40).RGBn
+    MSPs = bst.plots.plot_montecarlo_across_coordinate(
+        coordinate, df, 
+        fill_color=[*GG_colors.red.RGBn, 0.5],
+        median_color=median_red,
+        p5_color=[*GG_colors.red.shade(20).RGBn, 0.80],
+        smooth=2,
+    )
+    market_price = dodecanol_price_range[-1]
+    bst.plots.plot_horizontal_line(market_price, lw=2, ls='-', color=line_color, zorder=-200)
+    median = interpolate.interp1d(MSPs[2], coordinate, fill_value='extrapolate')(5)
+    bst.plots.plot_vertical_line(median, lw=2, ls='--', color=line_color, zorder=-200)
+    # index = [0, 4]
+    # f5, f95 = [interpolate.interp1d(MSPs[i], coordinate, fill_value='extrapolate') for i in index]
+    # lb = f5(5)
+    # ub = f95(5)
+    # ax = plt.gca()
+    # ax.axvspan(lb, ub, alpha=0.3, color=line_color, zorder=-300)
+    plt.xlabel(br.set_H2_price.label(element=False))
+    plt.ylabel(f"MSP [{format_units('USD/kg')}]")
+    plt.subplots_adjust(hspace=0.05, left=0.12, right=0.96, bottom=0.2, top=0.95)
+    # scenario = 'all fermentation|acetate growth'
+    # filename = f'{scenario}_monte_carlo_across_bioreactor_yield.xlsx'
+    # file = os.path.join(results_folder, filename)
+    # df = pd.read_excel(file, sheet_name=br.MSP.short_description, index_col=0)
+    # df = df.dropna()
+    # bioreactor_yield = np.array(df.columns)
+    # MSP = bst.plots.plot_montecarlo_across_coordinate(
+    #     bioreactor_yield, df, 
+    #     fill_color=[*GG_colors.blue.RGBn, 0.5],
+    #     median_color=median_blue,
+    #     p5_color=[*GG_colors.blue.shade(20).RGBn, 0.80],
+    #     smooth=0,
+    # )
+    plt.xlim(2, 6)
+    axes = bst.plots.style_axis(
+        xticks=[2, 3, 4, 5, 6],
+        yticks=[2, 4, 5, 6, 8],
+        ytick0=True,
+        ytickf=True,
+    )
+    plt.sca(axes['twiny'])
+    plt.xlabel('')
+    plt.sca(axes['twinx'])
+    plt.xlabel('')
+    for i in ('svg', 'png'):
+        file = os.path.join(images_folder, f'monte_carlo_across_H2_price.{i}')
+        plt.savefig(file, dpi=900, transparent=True)
 
 def plot_monte_carlo_across_yield():
     bst.plots.set_font(size=10, family='sans-serif', font='Arial')

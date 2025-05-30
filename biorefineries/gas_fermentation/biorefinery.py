@@ -6,7 +6,7 @@ import biosteam as bst
 import numpy as np
 import chaospy as cp
 from warnings import catch_warnings
-from .chemicals import create_acetate_ester_chemicals
+from .property_package import create_acetate_ester_chemicals
 from .process_settings import (
     load_process_settings, GWP as GWPkey,
     characterization_factors as CFs
@@ -59,7 +59,7 @@ class Biorefinery(bst.ProcessModel):
         glucose_growth: bool = True
         carbon_source: str = 'BFG' # Alternatively 'biomass'
         biomass: str = 'cornstover' # Either 'miscanthus' or 'cornstover'Al
-        hydrogen_price: str = 'min' # Alternatively 'min' or 'max'
+        hydrogen_price: str = 'baseline' # Alternatively 'min', 'max', or all
         fermentation_performance: str = 'all' # Alternatively 'min' or 'max'
     
     
@@ -79,14 +79,17 @@ class Biorefinery(bst.ProcessModel):
             glucose_growth = False
         else:
             raise ValueError("invalid scenario")
-        hydrogen_price = 'min'
+        hydrogen_price = 'baseline'
         match fermentation:
+            case 'all':
+                fermentation_performance = 'all'
+                hydrogen_price = 'all'
             case 'all fermentation':
                 fermentation_performance = 'all'
-            case 'conservative fermentation':
-                fermentation_performance = 'min'
-            case 'optimistic fermentation':
-                fermentation_performance = 'max'
+            case 'baseline yield':
+                fermentation_performance = fermentation
+            case 'potential yield':
+                fermentation_performance = fermentation
             case _:
                 raise ValueError('invalid scenario')
         return Scenario(
@@ -235,7 +238,9 @@ class Biorefinery(bst.ProcessModel):
         def set_product_price(price):
             self.product.price = price
         
-        @parameter(units='USD/kg', element='H2', bounds=[3, 7],
+        # https://www.hydrogen.energy.gov/docs/hydrogenprogramlibraries/pdfs/20004-cost-electrolytic-hydrogen-production.pdf?Status=Master
+        # Actual cost of hydrogen between 4-6 USD/kg according to DOE
+        @parameter(units='USD/kg', element='H2', bounds=[2, 6],
                    baseline=3, distribution='uniform') # Natural gas 1.5 - 5; Electrolysis 3 - 7
         def set_H2_price(price):
             self.hydrogen.price = price
@@ -469,6 +474,8 @@ class Biorefinery(bst.ProcessModel):
             case 'min':
                 set_H2_price.active = False
                 set_H2_price.baseline = set_H2_price.bounds[0]
+            case 'baseline':
+                set_H2_price.active = False
             case 'max':
                 set_H2_price.active = False
                 set_H2_price.baseline = set_H2_price.bounds[1]
@@ -486,14 +493,14 @@ class Biorefinery(bst.ProcessModel):
             set_AcOH_titer,
         )
         match scenario.fermentation_performance:
-            case 'min':
-                for i in fermentation_parameters:
-                    i.active = False
-                    i.baseline = i.bounds[0]
-            case 'max':
-                for i in fermentation_parameters:
+            case 'potential yield':
+                for i in (set_oleochemical_bioreactor_yield,
+                          set_oleochemical_specific_yield):
                     i.active = False
                     i.baseline = i.bounds[1]
+            case 'baseline yield':
+                set_oleochemical_bioreactor_yield.active = False
+                set_oleochemical_specific_yield.active = False
             case 'all':
                 pass
             case _:

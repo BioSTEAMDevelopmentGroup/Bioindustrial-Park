@@ -2,7 +2,7 @@
 """
 """
 from .data import *
-from .chemicals import *
+from .property_package import *
 from .units import *
 from .systems import *
 from .biorefinery import *
@@ -11,7 +11,7 @@ from .uncertainty import *
 from .tables import *
 
 from . import data
-from . import chemicals 
+from . import property_package 
 from . import units 
 from . import systems 
 from . import biorefinery 
@@ -21,7 +21,7 @@ from . import tables
 
 __all__ = (
     *data.__all__,
-    *chemicals.__all__,
+    *property_package.__all__,
     *units.__all__,
     *systems.__all__,
     *biorefinery.__all__,

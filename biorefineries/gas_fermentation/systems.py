@@ -6,7 +6,7 @@ from math import inf
 from scipy.stats import gmean
 import numpy as np
 import flexsolve as flx
-from biorefineries.gas_fermentation.chemicals import create_acetate_ester_chemicals, create_cc_chemicals
+from biorefineries.gas_fermentation.property_package import create_acetate_ester_chemicals, create_cc_chemicals
 from biorefineries.cellulosic.units import SeedTrain
 
 __all__ = (

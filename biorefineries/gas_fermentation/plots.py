@@ -13,7 +13,7 @@ __all__ = (
     'plot_MSP_across_titer_productivity_AcOH',
     'plot_MSP_across_yield_productivity_oleochemical',
     'plot_MSP_across_AcOH_titer_oleochemical_yield',
-    'plot_MSP_across_oleochemical_yield',
+    'plot_MSP_across_oleochemical_yield_and_price',
     'plot_impact_of_length_to_diameters',
 )
 
@@ -139,29 +139,31 @@ def MSP_GWP_at_AcOH_titer_oleochemical_yield(titer, yield_, biorefineries):
         values[:, i] = [biorefinery.MSP(), biorefinery.carbon_intensity()]
     return values
 
-def MSP_GWP_at_oleochemical_yield(biomass, yield_, biorefineries):
-    values = np.zeros([2, len(biorefineries)])
+def MSP_GWP_at_oleochemical_yield_and_H2_price(H2_price, yield_, biorefineries):
+    values = np.zeros(len(biorefineries))
     for i, biorefinery in enumerate(biorefineries):
-        biorefinery.set_oleochemical_specific_yield.setter(biomass)
-        biorefinery.set_oleochemical_bioreactor_yield.setter(yield_)
-        biorefinery.system.simulate()
-        values[:, i] = [biorefinery.MSP(), biorefinery.carbon_intensity()]
+        biorefinery.set_H2_price.setter(H2_price)
+        if biorefinery.set_oleochemical_bioreactor_yield.last_value != yield_:
+            biorefinery.set_oleochemical_bioreactor_yield.setter(yield_)
+            biorefinery.system.simulate()
+        values[i] = biorefinery.MSP()
     return values
 
-def plot_MSP_across_oleochemical_yield(load=True):
+def plot_MSP_across_oleochemical_yield_and_price(load=True):
     from warnings import filterwarnings
     filterwarnings('ignore')
     bst.plots.set_font(size=10, family='sans-serif', font='Arial')
+    bst.plots.set_figure_size(aspect_ratio=0.55, width='full')
     biorefineries = [
         Biorefinery(simulate=False, scenario=f'all fermentation-{i} growth')
         for i in ('glucose', 'acetate')    
     ]
     br = biorefineries[0]
-    xlim = np.array(br.set_oleochemical_specific_yield.bounds)
+    xlim = np.array(br.set_H2_price.bounds)
     ylim = np.array(br.set_oleochemical_bioreactor_yield.bounds)
     X, Y, Z = bst.plots.generate_contour_data(
-        MSP_GWP_at_oleochemical_yield,
-        file=os.path.join(results_folder, 'MSP_GWP_oleochemical_yield.npy'),
+        MSP_GWP_at_oleochemical_yield_and_H2_price,
+        file=os.path.join(results_folder, 'MSP_GWP_oleochemical_yield_and_price.npy'),
         load=load, save=True,
         xlim=xlim, ylim=ylim,
         args=(biorefineries,),
@@ -169,33 +171,36 @@ def plot_MSP_across_oleochemical_yield(load=True):
     )
     # Z = np.swapaxes(Z, 2, 3)
     # Plot contours
-    ylabel = 'Bioreactor yield [% theoretical]'
+    ylabel = br.set_oleochemical_bioreactor_yield.label(element=False)
     yticks = [40, 50, 60, 70, 80, 90]
-    xlabel = br.set_oleochemical_specific_yield.label(element=False)
-    xticks = [0.7, 1.4, 2.1, 2.8, 3.5]
+    xlabel = 'H$_2$ price [USD$\cdot$kg$^{-1}$]'
+    xticks = [2, 3, 4, 5, 6]
     metric_bars = [
         bst.plots.MetricBar(
             # '', '',
             'Minimum selling price', '$[\mathrm{USD} \cdot \mathrm{kg}^{\mathrm{-1}}]$', 
             plt.cm.get_cmap('viridis_r'), 
-            bst.plots.rounded_tickmarks_from_data(Z[:, :, 0, :], 5, 1, expand=0, p=1), 
-            20, 1, ylabelkwargs=dict(size=10), shrink=1.0,
+            bst.plots.rounded_tickmarks_from_data(Z, 5, 1, expand=0, p=1), 
+            25, 1, ylabelkwargs=dict(size=10), shrink=1.0,
+            units_dlim=' ',
             title_position='horizontal',
+            forced_size=1.2,
         ),
-        bst.plots.MetricBar(
-            # '', '',
-            'Carbon intensity', '$[\mathrm{kg} \cdot \mathrm{CO}_{\mathrm{2}}\mathrm{e} \cdot \mathrm{kg}^{\mathrm{-1}}]$',
-            plt.cm.get_cmap('copper_r'), 
-            bst.plots.rounded_tickmarks_from_data(Z[:, :, 1, :], 5, 1, expand=0, p=0.5), 
-            20, 1, ylabelkwargs=dict(size=10, labelpad=10),
-            title_position='horizontal',
-            shrink=1.0, 
-        )
+        # bst.plots.MetricBar(
+        #     # '', '',
+        #     'Carbon intensity', '$[\mathrm{kg} \cdot \mathrm{CO}_{\mathrm{2}}\mathrm{e} \cdot \mathrm{kg}^{\mathrm{-1}}]$',
+        #     plt.cm.get_cmap('copper_r'), 
+        #     bst.plots.rounded_tickmarks_from_data(Z[:, :, 1, :], 5, 1, expand=0, p=0.5), 
+        #     20, 1, ylabelkwargs=dict(size=10, labelpad=10),
+        #     title_position='horizontal',
+        #     shrink=1.0, 
+        # )
     ]
     fig, axes, CSs, CB, other_axes = bst.plots.plot_contour_2d(
         X, Y, Z, xlabel, ylabel, xticks, yticks, metric_bars,  
-        fillcolor=None, styleaxiskw=[dict(xtick0=True), dict(xtick0=False)], label=True,
+        fillcolor=None, styleaxiskw=[dict(xtick0=True), dict(xtick0=True)], label=True,
         contour_label_interval=2,
+        highlight_levels=[5], highlight_color='r',
     )
     plt.subplots_adjust(left=0.12, right=0.85, wspace=0.15, hspace=0.15, top=0.9, bottom=0.13)
     for i in ('svg', 'png'):
