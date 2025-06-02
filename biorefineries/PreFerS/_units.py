@@ -540,9 +540,11 @@ class Diafiltration(bst.Unit):
                 continue
 
             current_retention = self.DefaultSolutes_Retention
-
-            if ID == self.TargetProduct_ID:
-                current_retention = self.TargetProduct_Retention
+            if self.TargetProduct_ID:
+                if isinstance(self.TargetProduct_ID, str) and ID == self.TargetProduct_ID:
+                    current_retention = self.TargetProduct_Retention
+                if isinstance(self.TargetProduct_ID, list) and ID in self.TargetProduct_ID:
+                    current_retention = self.TargetProduct_Retention
             elif self.Salt_ID:
                 if isinstance(self.Salt_ID, str) and ID == self.Salt_ID:
                     current_retention = self.Salt_Retention
