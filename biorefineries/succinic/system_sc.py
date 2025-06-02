@@ -556,10 +556,11 @@ def create_succinic_sys(ins, outs):
     M402 = bst.Mixer('M402', ins=(S402-0, S403-0, S404-0), outs=('mixed_wet_SuccinicAcid'))
     
     F404 = bst.DrumDryer('F404', ins=(M402-0, 'dryer_air_in', natural_gas_drying,),
-                         outs=('dry_solids', 'hot_air', 'dryer_emissions'),
-                         split={'SuccinicAcid': 1e-4,
+                        outs=('dry_solids', 'hot_air', 'dryer_emissions'),
+                        split={'SuccinicAcid': 1e-4,
                                     'FermMicrobe': 0.}
-                         )
+                        )
+    
     F404.ins[2].price = 0.2527 # set to be same as BT.natural_gas_price
     
     M403 = bst.LiquidsMixingTank('M403', ins=(F401-1, F402-1, F403-1), outs=('dilute_pyruvic_acid'))

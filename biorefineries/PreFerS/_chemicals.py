@@ -18,7 +18,6 @@ import pandas as pd
 from fractions import Fraction
 __all__ = (
     'get_grouped_chemicals',
-    'create_LegH',
     'create_chemicals_LegH',
 )
 
@@ -34,13 +33,36 @@ default_nonsolids = ['Water', 'Ethanol', 'AceticAcid',
                     'H2SO4', 'NH3']
 
 chemical_groups = dict(
+    LegHIngredients = ('Leghemoglobin',
+                    'Pichia_pastoris',
+                    'TrehaloseDH',
+                    'SodiumAscorbate',),
+    Addictive = ('Pichia_pastoris',
+                'Glycine',
+                'TrehaloseDH',
+                'SodiumAscorbate',),
+
+    BoundImpurities = ('Pichia_pastoris', 
+                    'Z_mobilis',
+                    'T_reesei',
+                    'Biomass',
+                    'Cellmass',
+                    'EDTA',
+                    'Glycine',
+                    'Globin',
+                    'heme_b',),
+
+    ElutionBuffer = ('NaCl',
+                    'KCl'),
+
     Salts = ('KOH',
             'NaCl',
             '(NH4)2SO4',
             'FeSO4',
             'MgSO4',
             'KH2PO4',
-            '(NH4)2HPO4'),
+            '(NH4)2HPO4',
+            'K2HPO4',),
     
     OtherLargeMolecules = ('Cellmass',
                         'Yeast',
@@ -56,7 +78,7 @@ chemical_groups = dict(
                         'CSL'
                         'Globin',),
 
-    DefaultSolute = ('Glycine',
+    DefaultSolutes = ('Glycine',
                         'CitricAcid',
                         'AceticAcid',
                         'LacticAcid',
@@ -170,12 +192,14 @@ def create_chemicals_LegH():
     ##### Soluble inorganics #####
     add_chemical('KOH', phase='l', default=True)
     add_chemical('NaCl', phase='l', default=True)
+    add_chemical('KCl', phase='l', default=True)
 
     add_chemical('(NH4)2SO4', phase='s', default=True, Hf=-288994*_cal2joule)
     add_chemical('FeSO4', phase='l', default=True)
     add_chemical('MgSO4', phase='l', default=True)
 
     add_chemical('KH2PO4', phase='l', default=True)
+    add_chemical('K2HPO4', phase='l', default=True)
     add_chemical('(NH4)2HPO4', phase='l', default=True)
     
     # trace_metal_solution
@@ -201,6 +225,9 @@ def create_chemicals_LegH():
     add_chemical('Glycerol', phase='l', default=True)
     add_chemical('SuccinicAcid', phase='l')
     add_chemical('EDTA', phase='l', default=True)
+    add_chemical('Trehalose', search_ID='PubChem=7427', phase='l', default=True)
+    add_chemical('TrehaloseDH', search_ID='6138-23-4', phase='l', default=True)
+    add_chemical('SodiumAscorbate', search_ID='134-03-2', phase='l', default=True)
 
     # antibiotics   
     add_chemical('Ampicillin', phase='l', default=True)
@@ -212,6 +239,7 @@ def create_chemicals_LegH():
     #############
     #### Bio ####
     #############
+
     Yeast = add_chemical(
         'Yeast',
         phase='l',
@@ -339,6 +367,8 @@ def create_chemicals_LegH():
         phase='s',
         aliases=['LegH']
     )
+    append_chemical_copy('LeghemoglobinIntre', Leghemoglobin)
+    append_chemical_copy('GlobinIntre', Globin)
 
     # Default missing properties of chemicals to those of water
     for chemical in chems: chemical.default()
@@ -399,6 +429,25 @@ def create_chemicals_LegH():
         [1000, 0.25*bst.Chemical('(NH4)2HPO4', phase='l', default=True).MW, 
         0.1*bst.Chemical('NaCl', phase='l', default=True).MW,
         0.001*bst.Chemical('EDTA', phase='l', default=True).MW],
+        wt=True,
+    )
+
+    chems.define_group(
+        'IEXBuffer',
+        ['H2O','(NH4)2HPO4','NaCl','KCl'],
+        [1000, 0.25*bst.Chemical('(NH4)2HPO4', phase='l', default=True).MW, 
+        0.4*bst.Chemical('NaCl', phase='l', default=True).MW,
+        0.1*bst.Chemical('KCl', phase='l', default=True).MW],
+        wt=True,
+    )
+
+    chems.define_group(
+        'NanoBuffer',
+        ['H2O','K2HPO4','KH2PO4','TrehaloseDH','SodiumAscorbate'],
+        [1000, 0.01*bst.Chemical('K2HPO4', phase='l', default=True).MW, 
+        0.01*bst.Chemical('KH2PO4', phase='l', default=True).MW,
+        0.25*bst.Chemical('TrehaloseDH',search_ID='6138-23-4', phase='l', default=True).MW,
+        0.005*bst.Chemical('SodiumAscorbate',search_ID='134-03-2', phase='l', default=True).MW],
         wt=True,
     )
 

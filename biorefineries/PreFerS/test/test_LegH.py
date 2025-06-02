@@ -134,32 +134,41 @@ AB1.target_yield = LegH_yield  # wt %
 def update_reaction_time_and_yield():
     AB1.tau = AB1.target_titer / AB1.target_productivity
     fermentation_reaction[2].product_yield('Leghemoglobin', basis='wt', product_yield=AB1.target_yield)
-
+LegH_sys = bst.main_flowsheet.create_system('LegH_sys')
+LegH_sys.simulate()
 # %% Downstream process
-
+CD1Out = bst.Stream('CD1Out')
+CD1 = _units.CellDisruption(
+    ins=AB1Out,
+    outs=CD1Out,
+)
+LegH_sys = bst.main_flowsheet.create_system('LegH_sys')
+LegH_sys.simulate()
+# %%
 PC1Out = bst.Stream('PC1Out')
 effluent1 = bst.Stream('effluent1')
 PC1 = _units.ProteinCentrifuge(
-    ins = AB1Out,
-    outs = ('cellmass', PC1Out),
+    ins = CD1Out,
+    outs = (effluent1, PC1Out),
     moisture_content = 0.5,
-    split = (1, 0.99),
-    order = ('Glucose','cellmass'),
-    solids = ('Glucose','cellmass'),
+    split = (1, 0.99, 1, 1),
+    order = ('Glucose','cellmass', 'LeghemoglobinIntre','GlobinIntre'),
+    solids = ('Glucose','cellmass', 'LeghemoglobinIntre','GlobinIntre'),
     centrifuge_type = 'reciprocating_pusher'
 )
 
 # ???
-Ev1Out = bst.Stream('Ev1Out')
+EV1Out = bst.Stream('EV1Out')
 effluent2 = bst.Stream('effluent2')
-Ev1 = _units.Evaporator(
+EV1 = _units.Evaporator(
     ins = PC1Out,
-    outs = (Ev1Out, effluent2),
-    P = (101325,73581, 50892, 32777, 20000),
+    outs = (EV1Out, effluent2),
+    P = (101325, 73581, 50892, 32777, 20000),
     V = 0.1,
     V_definition = 'First-effect',
 ) # ???
-
+LegH_sys = bst.main_flowsheet.create_system('LegH_sys')
+LegH_sys.simulate()
 # This refers to how much diafiltration buffer you use relative to the volume of your protein solution (the retentate) during constant volume diafiltration.
 
 # Recommended: 3 to 5 diavolumes.
@@ -168,21 +177,59 @@ Ev1 = _units.Evaporator(
 # 5 DV will result in approximately 99.3% exchange.
 # For very thorough exchange (>99.9%): You might consider 6 to 7 diavolumes.
 # 10 DV is not recommended as it will result in a very low concentration of the protein solution and a very high volume of diafiltration buffer.
+
 # %%
 DF1Out = bst.Stream('DF1Out')
-WashingSolution1 = bst.Stream('WashingSolution1', DiaBuffer=Ev1Out.imass['H2O']*2, units='kg/hr', T=25+273.15)
+WashingSolution1 = bst.Stream('WashingSolution1', DiaBuffer=EV1Out.imass['H2O']*4, units='kg/hr', T=25+273.15)
 effluent3 = bst.Stream('effluent3')
 DF1 = _units.Diafiltration(
-    ins = (Ev1Out, WashingSolution1),
+    ins = (EV1Out, WashingSolution1),
     outs = (DF1Out, effluent3),
     TargetProduct_ID = 'Leghemoglobin',
     Salt_ID = _chemicals.chemical_groups['Salts'],
     OtherLargeMolecules_ID = _chemicals.chemical_groups['OtherLargeMolecules'],
-    DefaultSolute_ID = _chemicals.chemical_groups['DefaultSolute'],
+    DefaultSolutes_ID = _chemicals.chemical_groups['DefaultSolutes'],
 )
 
+LegH_sys = bst.main_flowsheet.create_system('LegH_sys')
+LegH_sys.simulate()
 
+# %%
+IEX1Out = bst.Stream('IEX1Out')
+Elution = bst.Stream('Elution', IEXBuffer=DF1Out.imass['H2O']/2 ,units='kg/hr', T=25+273.15)
+effluent4 = bst.Stream('effluent4')
 
+IEX1 = _units.IonExchange(
+    ins = (DF1Out, Elution),
+    outs = (IEX1Out, effluent4),
+    TargetProduct_ID = 'Leghemoglobin',
+    BoundImpurity_ID=_chemicals.chemical_groups['BoundImpurities'],
+    ElutionBuffer_Defining_Component_ID =_chemicals.chemical_groups['ElutionBuffer'],
+)
+LegH_sys = bst.main_flowsheet.create_system('LegH_sys')
+LegH_sys.simulate()
+# %%
+NF1Out = bst.Stream('NF1Out')
+NFBuffer = bst.Stream('NFBuffer', NanoBuffer=IEX1Out.imass['H2O']*5, units='kg/hr', T=25+273.15)
+effluent5 = bst.Stream('effluent5')
+NF1 = _units.NanofiltrationDF(
+    ins = (IEX1Out, NFBuffer),
+    outs = (NF1Out, effluent5),
+    TargetProduct_ID = 'Leghemoglobin',
+    Salt_ID = _chemicals.chemical_groups['Salts'],
+    OtherSmallSolutes_ID = _chemicals.chemical_groups['DefaultSolutes'],
+)
+LegH_sys = bst.main_flowsheet.create_system('LegH_sys')
+LegH_sys.simulate()
+
+# %%
+SD1Out = bst.Stream('SD1Out')
+effluent6 = bst.Stream('effluent6')
+SD1 = bst.SprayDryer(
+    ins=NF1Out,
+    outs=(effluent6,SD1Out),
+    moisture_content=0.05,  # 5% moisture content in the final product
+)
 
 # %%
 LegH_sys = bst.main_flowsheet.create_system('LegH_sys')
