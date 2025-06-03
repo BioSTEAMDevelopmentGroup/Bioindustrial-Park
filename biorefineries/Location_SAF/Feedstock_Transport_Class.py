@@ -27,7 +27,7 @@ import math
 import chaospy as cp
 from SALib.sample import latin
 import matplotlib.pyplot as plt
-from shapely.geometry import LineString
+from shapely.geometry import LineString, Point
 
 class FeedstockTransportModel:
     
@@ -51,7 +51,9 @@ class FeedstockTransportModel:
                  samples_for_uncertainty = 1000,
                  sizes_of_biorefineries=80,  # MMgal/year
                  blending_capacity_set=0.2,# Fraction (e.g. 0.2 = 20%)
-                 bounding_box=None): # min_lon, min_lat, max_lon, max_lat) in EPSG:4326.
+                 bounding_box=None, # min_lon, min_lat, max_lon, max_lat) in EPSG:4326.
+                 seed = 1, # used to choose candidate locations at random
+                 refinery_locations = None): # (lat, lon) in EPSG:4326
         """
         Parameters
         ----------
@@ -64,10 +66,14 @@ class FeedstockTransportModel:
         sizes_of_biorefineries : float
             Size of biorefineries in MMgal/year (Million Gallons per year). Default is 80.
         blending_capacity_set : float
-            Maximum share of jet fuel capacity that can be blended with ethanol. Default is 0.2.
+            Maximum share of petroleum refinery capacity that can be derived for SAF production. Default is 0.2.
         bounding_box: tuple or list of (min_lon, min_lat, max_lon, max_lat) in EPSG:4326.
             If None, all data is loaded. If provided, filters miscanthus and switchgrass data.
-        
+        seed: int 
+            Seed used for the algorithm to choose candidate locations (with higher probability points with higher yields). Default = 1.
+        refinery_locations: tuple or list of (lat, lon) in EPSG: 4326
+            Candidate location to be analyzed. If provided, these locations will be analyzed as candidate refinery locations, num_points and seed will be ignored.
+            Default is None, default candidate locations are chosen at random based on locations with higher yields (with seed) and number of points desired (num_points).
         """
         
         if base_folder is None:
@@ -79,10 +85,17 @@ class FeedstockTransportModel:
         self.base_folder = base_folder
         self._set_default_paths()
         
-        self.num_points = num_points
         self.feedstock = feedstock
         self.N = samples_for_uncertainty
+        self.seed = seed
+        self.refinery_locations = refinery_locations
         
+        # Set num_points based on refinery_locations, if provided
+        if self.refinery_locations is not None:
+            self.num_points = len(self.refinery_locations)
+        else:
+            self.num_points = num_points
+       
         
         self.conversion_factors = self.default_conversion_factors.copy() # Instance-level copy to allow individual modification
         
@@ -290,6 +303,10 @@ class FeedstockTransportModel:
     ######################################################
     
     def calculate_location_parameters(self):
+        """
+        If model = FeedstockTransportClass()
+        Run model.results to see all results, or obtain each results by running model.get{result_name}() (e.g., model.get_feedstock_delivered_price())
+        """
         num_points = self.num_points
         cf = self.conversion_factors
         
@@ -332,8 +349,8 @@ class FeedstockTransportModel:
         
         feedstock_TF_D = []
         for i in range(num_points):
-            list = [perc_5th_TF[i], Tortuosity_reshaped[i], perc_95th_TF[i]]
-            list_of_floats = [float(arr.item()) for arr in list]
+            list_1 = [perc_5th_TF[i], Tortuosity_reshaped[i], perc_95th_TF[i]]
+            list_of_floats = [float(arr.item()) for arr in list_1]
             feedstock_TF_D.append(list_of_floats)
 
         # Extract yield (in dry Mg/ha) / 0.8 to get wet tons (assuming 20% moisture content)
@@ -359,18 +376,45 @@ class FeedstockTransportModel:
         # Demand of crop
         sizes_of_crop_demand = self.sizes_of_biorefineries * 1000000 / (crop_to_ethanol_gallon *0.8 ) # In wet tonnes of crop of demand
 
-
-        np.random.seed(1) 
-        # # Choose locations random, with higher probability for the ones with higher yields
-        # chosen_ind = np.random.choice(np.arange(len(yield_crop)),num_points, replace = False, p = probability_crop)  
-        # print('chosen_ind', chosen_ind)
-        # # This gives me the filtered yields for only the 1000 indices that were chosen before
-        # # We are going to use these 1000 locations as possible locations for ethanol biorefineries
-        # mask = crop_data.index.isin(chosen_ind)
-        # possible_locations = crop_data[mask]
-        # print('possible_locations', possible_locations)
-        chosen_ind = np.random.choice(len(yield_crop), num_points, replace=False, p=probability_crop)
-        possible_locations = crop_data.iloc[chosen_ind]
+        if self.refinery_locations is not None:
+            # Convert input list to GeoDataFrame in EPSG:4326
+            gdf_input = gpd.GeoDataFrame(geometry=[Point(lon, lat) for lat, lon in self.refinery_locations], crs='EPSG:4326')
+            
+            gdf_input_5070 = gdf_input.to_crs('EPSG:5070')# Transform to EPSG:5070
+            
+            if crop_data.crs != 'EPSG:5070':
+                crop_data = crop_data.to_crs('EPSG:5070') # Ensure crop_data is also in EPSG:5070
+            
+            from scipy.spatial import cKDTree # Find nearest crop_data point for each refinery location
+        
+            # Create arrays of coordinates
+            crop_coords = np.array(list(zip(crop_data.geometry.x, crop_data.geometry.y)))
+            refinery_coords = np.array(list(zip(gdf_input_5070.geometry.x, gdf_input_5070.geometry.y)))
+            
+            # Use KDTree for efficient nearest neighbor search
+            tree = cKDTree(crop_coords)
+            _, nearest_idx = tree.query(refinery_coords, k=1)
+        
+            # Get the rows from crop_data corresponding to nearest points
+            possible_locations = crop_data.iloc[nearest_idx]
+            self.num_points = len(possible_locations)
+        else:
+            # Original behavior: choose locations at random with yield-based probabilities
+            np.random.seed(self.seed)
+            chosen_ind = np.random.choice(len(yield_crop), self.num_points, replace=False, p=probability_crop)
+            possible_locations = crop_data.iloc[chosen_ind]
+            
+        # np.random.seed(self.seed) 
+        # # # Choose locations random, with higher probability for the ones with higher yields
+        # # chosen_ind = np.random.choice(np.arange(len(yield_crop)),num_points, replace = False, p = probability_crop)  
+        # # print('chosen_ind', chosen_ind)
+        # # # This gives me the filtered yields for only the 1000 indices that were chosen before
+        # # # We are going to use these 1000 locations as possible locations for ethanol biorefineries
+        # # mask = crop_data.index.isin(chosen_ind)
+        # # possible_locations = crop_data[mask]
+        # # print('possible_locations', possible_locations)
+        # chosen_ind = np.random.choice(len(yield_crop), num_points, replace=False, p=probability_crop)
+        # possible_locations = crop_data.iloc[chosen_ind]
 
         
         # Add  transportation costs
@@ -645,6 +689,11 @@ class FeedstockTransportModel:
         return self.results.get('sent_ethanol', None)
 
     def get_crop_to_ethanol_gallon(self):
+        """
+        Returns the value (float) of the conversion of crop to ethanol in gal ethanol/dry ton.
+        It should be the same as the default conversion factor for the desired crop.
+
+        """
         return self.results.get('crop_to_ethanol_gallon', None)
     
     def get_feedstock_TF_D(self):
@@ -670,13 +719,13 @@ class FeedstockTransportModel:
     
     def get_possible_locations(self):
         """
-        Returns a gpd of candidate locations
+        Returns a gpd of candidate locations.
         """
         return self.results.get('possible_locations', None)
     
     def get_jet_indexes(self):
         """
-        Returns the indexes of the jet producers being supplied by each candidate location
+        Returns the indexes of the jet producers being supplied by each candidate location.
         """
         return self.results.get('jet_indexes', None)
     
@@ -908,10 +957,37 @@ class FeedstockTransportModel:
             # Demand of crop
             sizes_of_crop_demand = self.sizes_of_biorefineries * 1000000 / (crop_to_ethanol_gallon *0.8 ) # In wet tonnes of crop of demand
         
-        
-            np.random.seed(1) 
-            chosen_ind = np.random.choice(len(yield_crop), num_points, replace=False, p=probability_crop)
-            possible_locations = crop_data.iloc[chosen_ind]
+            if self.refinery_locations is not None:
+                # Convert input list to GeoDataFrame in EPSG:4326
+                gdf_input = gpd.GeoDataFrame(geometry=[Point(lon, lat) for lat, lon in self.refinery_locations], crs='EPSG:4326')
+                
+                gdf_input_5070 = gdf_input.to_crs('EPSG:5070')# Transform to EPSG:5070
+                
+                if crop_data.crs != 'EPSG:5070':
+                    crop_data = crop_data.to_crs('EPSG:5070') # Ensure crop_data is also in EPSG:5070
+                
+                from scipy.spatial import cKDTree # Find nearest crop_data point for each refinery location
+            
+                # Create arrays of coordinates
+                crop_coords = np.array(list(zip(crop_data.geometry.x, crop_data.geometry.y)))
+                refinery_coords = np.array(list(zip(gdf_input_5070.geometry.x, gdf_input_5070.geometry.y)))
+                
+                # Use KDTree for efficient nearest neighbor search
+                tree = cKDTree(crop_coords)
+                _, nearest_idx = tree.query(refinery_coords, k=1)
+            
+                # Get the rows from crop_data corresponding to nearest points
+                possible_locations = crop_data.iloc[nearest_idx]
+                self.num_points = len(possible_locations)
+            else:
+                # Original behavior: choose locations at random with yield-based probabilities
+                np.random.seed(self.seed)
+                chosen_ind = np.random.choice(len(yield_crop), self.num_points, replace=False, p=probability_crop)
+                possible_locations = crop_data.iloc[chosen_ind]
+                
+            # np.random.seed(self.seed) 
+            # chosen_ind = np.random.choice(len(yield_crop), num_points, replace=False, p=probability_crop)
+            # possible_locations = crop_data.iloc[chosen_ind]
             
             # Add  transportation costs
             possible_locations = gpd.sjoin(possible_locations, self.transport_costs[['Flat_bed', 'Tanker_truck', 'GHG_truck','geometry']], how='left', predicate='within')
@@ -1264,7 +1340,7 @@ class FeedstockTransportModel:
                 return
     
         fig, ax = plt.subplots(figsize=(12, 8))
-        rainfed.boundary.plot(ax=ax, edgecolor='black', linewidth=1)
+        rainfed.boundary.plot(ax=ax, edgecolor='black', linewidth=1, alpha = 0.4)
         
         col_key = metric_map.get(color_metric, {'col': color_metric})['col']
         unit = metric_map.get(color_metric, {'unit': ''})['unit']
