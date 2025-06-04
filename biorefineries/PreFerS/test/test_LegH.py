@@ -93,7 +93,7 @@ MX1 = bst.Mixer(
 
 SeedOut = bst.Stream('SeedOut')
 vent1 = bst.Stream('vent1')
-ST1 = _units.SeedTrain(
+ST1 = _units.SeedTrain('ST1',
     ins=[Mix1Out],
     outs=[vent1, SeedOut],
     reactions=bst.PRxn([cell_growth_reaction, respiration_reaction]),
@@ -109,7 +109,7 @@ _18wtNH3 = bst.Stream('_18wtNH3', _18wtNH3=1000, units='kg/hr', T=25+273.15)
 vent2 = bst.Stream('vent2')
 AB1Out = bst.Stream('AB1Out')
 
-AB1 = _units.AeratedFermentation(
+AB1 = _units.AeratedFermentation('AB1',
     ins=[SeedOut, Glucose, _18wtNH3, bst.Stream('FilteredAir', phase='g', P = 2 * 101325)],
     outs=[vent2, AB1Out],
     fermentation_reaction=fermentation_reaction,
@@ -138,7 +138,7 @@ LegH_sys = bst.main_flowsheet.create_system('LegH_sys')
 LegH_sys.simulate()
 # %% Downstream process
 CD1Out = bst.Stream('CD1Out')
-CD1 = _units.CellDisruption(
+CD1 = _units.CellDisruption('CD1',
     ins=AB1Out,
     outs=CD1Out,
 )
@@ -147,7 +147,7 @@ LegH_sys.simulate()
 # %%
 PC1Out = bst.Stream('PC1Out')
 effluent1 = bst.Stream('effluent1')
-PC1 = _units.ProteinCentrifuge(
+PC1 = _units.ProteinCentrifuge('PC1',
     ins = CD1Out,
     outs = (effluent1, PC1Out),
     moisture_content = 0.5,
@@ -160,7 +160,7 @@ PC1 = _units.ProteinCentrifuge(
 # ???
 EV1Out = bst.Stream('EV1Out')
 effluent2 = bst.Stream('effluent2')
-EV1 = _units.Evaporator(
+EV1 = _units.Evaporator('EV1',
     ins = PC1Out,
     outs = (EV1Out, effluent2),
     P = (101325, 73581, 50892, 32777, 20000),
@@ -182,7 +182,7 @@ LegH_sys.simulate()
 DF1Out = bst.Stream('DF1Out')
 WashingSolution1 = bst.Stream('WashingSolution1', DiaBuffer=EV1Out.imass['H2O']*4, units='kg/hr', T=25+273.15)
 effluent3 = bst.Stream('effluent3')
-DF1 = _units.Diafiltration(
+DF1 = _units.Diafiltration( 'DF1',
     ins = (EV1Out, WashingSolution1),
     outs = (DF1Out, effluent3),
     TargetProduct_ID = 'Leghemoglobin',
@@ -199,7 +199,7 @@ IEX1Out = bst.Stream('IEX1Out')
 Elution = bst.Stream('Elution', IEXBuffer=DF1Out.imass['H2O']/2 ,units='kg/hr', T=25+273.15)
 effluent4 = bst.Stream('effluent4')
 
-IEX1 = _units.IonExchange(
+IEX1 = _units.IonExchange( 'IEX1',
     ins = (DF1Out, Elution),
     outs = (IEX1Out, effluent4),
     TargetProduct_ID = 'Leghemoglobin',
@@ -209,19 +209,40 @@ IEX1 = _units.IonExchange(
 LegH_sys = bst.main_flowsheet.create_system('LegH_sys')
 LegH_sys.simulate()
 # %%
+# NF1Out = bst.Stream('NF1Out')
+# NFBuffer = bst.Stream('NFBuffer', NanoBuffer=IEX1Out.imass['H2O']*5, units='kg/hr', T=25+273.15)
+# effluent5 = bst.Stream('effluent5')
+# NF1 = _units.NanofiltrationDF(
+#     ins = (IEX1Out, NFBuffer),
+#     outs = (NF1Out, effluent5),
+#     TargetProduct_ID = 'Leghemoglobin',
+#     Salt_ID = _chemicals.chemical_groups['Salts'],
+#     OtherSmallSolutes_ID = _chemicals.chemical_groups['DefaultSolutes'],
+# )
+# LegH_sys = bst.main_flowsheet.create_system('LegH_sys')
+# LegH_sys.simulate()
+# %%
 NF1Out = bst.Stream('NF1Out')
-NFBuffer = bst.Stream('NFBuffer', NanoBuffer=IEX1Out.imass['H2O']*5, units='kg/hr', T=25+273.15)
+NFBuffer = bst.Stream('NFBuffer', 
+                    NanoBuffer=1.1*0.05*1000*
+                    IEX1Out.imass['Leghemoglobin']/(0.25*bst.Chemical('TrehaloseDH',search_ID='6138-23-4', phase='l', default=True).MW),
+                    units='kg/hr', T=25+273.15)
 effluent5 = bst.Stream('effluent5')
-NF1 = _units.NanofiltrationDF(
+NF1 = _units.Diafiltration('NF1',
     ins = (IEX1Out, NFBuffer),
     outs = (NF1Out, effluent5),
     TargetProduct_ID = 'Leghemoglobin',
+    membrane_cost_USD_per_m2=10000, # Nanomembrane cost
     Salt_ID = _chemicals.chemical_groups['Salts'],
-    OtherSmallSolutes_ID = _chemicals.chemical_groups['DefaultSolutes'],
+    OtherLargeMolecules_ID = _chemicals.chemical_groups['OtherLargeMolecules'],
+    DefaultSolutes_ID = _chemicals.chemical_groups['DefaultSolutes'],
+    TargetProduct_Retention=0.995, Salt_Retention=0.1,
+    OtherLargeMolecules_Retention=0.99, DefaultSolutes_Retention=0.15,
+    FeedWater_Recovery_to_Permeate=0.2,
+    TMP_bar= 5
 )
 LegH_sys = bst.main_flowsheet.create_system('LegH_sys')
 LegH_sys.simulate()
-
 # %%
 SD1Out = bst.Stream('SD1Out')
 effluent6 = bst.Stream('effluent6')
@@ -234,7 +255,7 @@ SD1 = bst.SprayDryer(
 # %%
 LegH_sys = bst.main_flowsheet.create_system('LegH_sys')
 LegH_sys.simulate()
-LegH_sys.diagram(kind=1,format='html',label=False)
+LegH_sys.diagram(kind=0,format='html',label=False)
 LegH_sys.show()
 
 # %%

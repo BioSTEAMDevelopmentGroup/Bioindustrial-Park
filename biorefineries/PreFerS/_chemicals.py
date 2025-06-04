@@ -446,7 +446,7 @@ def create_chemicals_LegH():
         ['H2O','K2HPO4','KH2PO4','TrehaloseDH','SodiumAscorbate'],
         [1000, 0.01*bst.Chemical('K2HPO4', phase='l', default=True).MW, 
         0.01*bst.Chemical('KH2PO4', phase='l', default=True).MW,
-        0.25*bst.Chemical('TrehaloseDH',search_ID='6138-23-4', phase='l', default=True).MW,
+        0.25*bst.Chemical('TrehaloseDH',search_ID='6138-23-4', phase='l', default=True).MW,# 0.25
         0.005*bst.Chemical('SodiumAscorbate',search_ID='134-03-2', phase='l', default=True).MW],
         wt=True,
     )
