@@ -28,18 +28,6 @@ The model allows both deterministic and uncertainty-based analysis.
 •	For large-scale uncertainty analysis (N > 1000), expect high computational time (~12 hours for 1000 × 1000).  
 •	All units are fixed and consistent with default settings; custom unit inputs are not automatically handled.  
  
-## Customizing Spatial Scope
-If you'd like to use this model for a smaller geographic area (e.g., a single U.S. state), you can add a **bounding box** to the class initializer. The bounding box should be provided as coordinates in **EPSG:4326** format (latitude and longitude), specified as a tuple:  
-```python
-(min_lon, min_lat, max_lon, max_lat)  
- ```
-For example:
-```python
-bbox_illinois = (-91.5131, 36.9703, -87.4948, 42.5083)
-model3 = FeedstockTransportModel(num_points = 2, bounding_box = bbox_illinois)
-model3.calculate_location_parameters()
-```  
-This will limit the spatial query and processing to data within the specified region.
 ## Example Usage
 ### 1. Import and initialize the model
 ```python
@@ -53,15 +41,11 @@ model.update_path(key='switchgrass_data', new_path='path/to/switchgrass_data.csv
 Available keys:  
 •	'map_shapefile' – U.S. map shapefile  
 •	'rainfed_shapefile' – Rainfed states shapefile  
-•	'jet_producers' – Jet fuel producers file  
-•	'ethanol_plants' – Ethanol plants file  
-•	'switchgrass_data' – Switchgrass site data  
-•	'miscanthus_data' – Miscanthus site data  
-•	'transport_costs' – Cost shapefile  
-•	'TF_sw' – Tortuosity factors (switchgrass)  
-•	'TF_mis' – Tortuosity factors (miscanthus)  
-•	'TF_ethanol_sw' – Ethanol transport tortuosity (switchgrass)  
-•	'TF_ethanol_mis' – Ethanol transport tortuosity (miscanthus)  
+•	'jet_producers' – Jet fuel producers file (locations and capacities)  
+•	'switchgrass_data' – Switchgrass site data, yield, CI, and price    
+•	'miscanthus_data' – Miscanthus site data, yield, CI, and price    
+•	'transport_costs' – Transportation unit costs and CI by state shapefile    
+•	'TF_per_state' - Average tortuosity factors per state  
  
 ### 3. Inspect and modify conversion factors
 ```python
@@ -81,6 +65,8 @@ ethanol_CI = model.get_ethanol_unit_transp_GHG_each_jet()
 ethanol_flows = model.get_sent_ethanol()
 locations = model.get_possible_locations()
 jet_indexes = model.get_jet_indexes()
+
+results = model.results # saves all results
 ```
 *Note: ethanol_cost and ethanol_CI refers only to transportation values, to obtain the MSP and CI of ethanol (without transportation) refer to the file 02_ethanol_refinery_model.py  
 Note 2: feedstock delivered price/CI refers to feedstock breakeven price at farmgate + transportation to the biorefinery candidate location* 
@@ -105,6 +91,55 @@ model.plot_ethanol_supply()
 Plot candidate locations can be customizable to visualize a metric obtained from the calculate_location_parameters() method.
 
 Plot ethanol supply shows each candidate location with lines connecting it to the jet fuel producers they supply. Thickness of the lines represents the flow. 
+
+### 7. Customizing Spatial Scope
+If you'd like to use this model for a smaller geographic area (e.g., a single U.S. state), you can add a **bounding box** to the class initializer. The bounding box should be provided as coordinates in **EPSG:4326** format (latitude and longitude), specified as a tuple:  
+```python
+(min_lon, min_lat, max_lon, max_lat)  
+ ```
+For example:
+```python
+bbox_illinois = (-91.5131, 36.9703, -87.4948, 42.5083)
+model3 = FeedstockTransportModel(num_points = 2, bounding_box = bbox_illinois)
+model3.calculate_location_parameters()
+```  
+This will limit the spatial query and processing to data within the specified region.  
+
+### 8. Providing custom biorefinery locations
+By default, the model selects num_points candidate locations to evaluate as potential bioethanol refinery sites. Locations with higher crop yields are more likely to be chosen, using a random selection process based on a specified seed value (default is seed=1). Both num_points and seed can be customized when initializing the class.
+
+Alternatively, specific candidate locations can be manually provided as a list of (latitude, longitude) tuples using the EPSG:4326 coordinate reference system. When custom locations are supplied, they will override the default behavior, and the num_points and seed parameters will be ignored.
+
+**Warning**: If a location is provided outside the U.S. rainfed boundary (e.g., in California), the model will automatically substitute it with the nearest valid location within the rainfed region (e.g., in eastern Texas or the Midwest), which may be geographically distant.
+
+Example:
+```python
+refinery_locations = [
+    (40.6331, -89.3985),  # Central Illinois
+    (41.8780, -93.0977),  # Central Iowa
+    (39.7684, -86.1581),  # Indianapolis, Indiana
+    (38.6270, -90.1994),  # St. Louis, Missouri
+    (39.9612, -82.9988),  # Columbus, Ohio
+    (37.7749, -87.1133),  # Western Kentucky
+    (36.1627, -86.7816),  # Nashville, Tennessee
+    (32.7765, -79.9311),  # Charleston, South Carolina
+    (42.6526, -73.7562),  # Albany, New York
+    (40.4406, -79.9959),  # Pittsburgh, Pennsylvania
+]
+
+model1 = FeedstockTransportModel(feedstock = 'miscanthus', sizes_of_biorefineries = 40, refinery_locations = refinery_locations)
+
+model1.calculate_location_parameters()
+
+model1.plot_candidate_locations(markersize = 50, color_metric = 'fdp', save_fig = True)
+```
+![Feedstock Price Plot](images/Candidate_Locations_colored_by_feedstock_delivered_price.png)
+
+```python
+model1.plot_ethanol_supply(save_fig = True)
+```
+![Ethanol Supply Plot](images/Ethanol_supply.png)
+
 
 # Files to Reproduce the Workflow
 ## Feedstock Transport Model
