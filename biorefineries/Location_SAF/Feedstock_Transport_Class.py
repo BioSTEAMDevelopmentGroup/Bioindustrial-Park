@@ -1358,9 +1358,9 @@ class FeedstockTransportModel:
         ax.axis('off')
         if save_fig:
             if color_metric is not None and col_key in gdf.columns:
-                plt.savefig(f"Candidate Locations Colored by {col_name} ({unit})", dpi= 1200, bbox_inches='tight', transparent = True)
+                plt.savefig(f"Candidate_Locations_colored_by_{col_name}.png", dpi= 1200, bbox_inches='tight', transparent = True)
             else:
-                plt.savefig("Candidate Locations", dpi= 1200, bbox_inches='tight', transparent = True)
+                plt.savefig("Candidate Locations.png", dpi= 1200, bbox_inches='tight', transparent = True)
         plt.show()
         
     def plot_ethanol_supply(self, markersize=30, line_color='gray', line_alpha=0.5, figsize=(12, 8),
