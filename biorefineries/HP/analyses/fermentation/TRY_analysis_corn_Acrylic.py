@@ -72,7 +72,7 @@ get_AA_MPSP()
 feedstock_tag = 'corn'
 product_tag = 'Acrylic'
 
-mode = '300L'
+mode = '300L_FGI'
 
 dist_filename = f'parameter-distributions_{feedstock_tag}_{product_tag}_' + mode + '.xlsx'
 

@@ -366,7 +366,7 @@ succinic_metrics = [get_product_MPSP, get_product_GWP, get_product_FEC, get_reco
 steps = 50
 
 # Neutralization
-spec.neutralization = True
+spec.neutralization = False
 
 # Yield, titer, productivity (rate)
 spec_1 = yields = np.linspace(0.038, 0.81, steps) # yield
