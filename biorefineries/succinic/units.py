@@ -846,6 +846,9 @@ class CoFermentation(StirredTankReactor):
                     purchase_costs['Fermenter agitator'] *= _316_over_304
             # self.power_utility(self.kW_per_m3*(self.outs[0].F_vol*self.tau/self.V_wf))
             self.power_utility.consumption += float(self.kW_per_m3*(self.outs[0].F_vol*self.tau))
+            consumption = self.power_utility.consumption
+            if isinstance(consumption, np.ndarray):
+                self.power_utility.consumption = consumption[0]
         elif mode == 'continuous':
             if not self.neutralization:
                 self.vessel_material= 'Stainless steel 316'
