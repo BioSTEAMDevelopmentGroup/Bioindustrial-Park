@@ -51,16 +51,16 @@ def run_TRY_analysis(feedstock, neutralization, yields=None, titers=None, produc
     
     chdir = os.chdir
     
-    if feedstock is 'glucose':
+    if feedstock == 'glucose':
         from biorefineries.succinic.models_glucose import model, namespace_dict, succinic_sys, simulate_and_print, succinic_tea, succinic_LCA, R302, spec, product_stream, theoretical_max_g_succinic_acid_per_g_glucose, namespace_dict
     
-    elif feedstock is 'sugarcane':
+    elif feedstock == 'sugarcane':
         from biorefineries.succinic.models_sugarcane import model, namespace_dict, succinic_sys, simulate_and_print, succinic_tea, succinic_LCA, R302, spec, product_stream, theoretical_max_g_succinic_acid_per_g_glucose, namespace_dict
     
-    elif feedstock is 'corn':
+    elif feedstock == 'corn':
         from biorefineries.succinic.models_corn import model, namespace_dict, succinic_sys, simulate_and_print, succinic_tea, succinic_LCA, R302, spec, product_stream, theoretical_max_g_succinic_acid_per_g_glucose, namespace_dict
     
-    elif feedstock is 'cornstover':
+    elif feedstock == 'cornstover':
         from biorefineries.succinic.models_cornstover import model, namespace_dict, succinic_sys, simulate_and_print, succinic_tea, succinic_LCA, R302, spec, product_stream, theoretical_max_g_succinic_acid_per_g_glucose, namespace_dict
     
     

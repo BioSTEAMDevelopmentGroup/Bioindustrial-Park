@@ -31,22 +31,22 @@ def run_TRY_analysis(feedstock, yields=None, titers=None, productivities=None, r
     
     from biorefineries import TAL
     
-    if feedstock is 'glucose':
+    if feedstock == 'glucose':
         from biorefineries.TAL.systems.system_SA_solubility_exploit_ethanol_glucose import TAL_tea, TAL_lca, R302, spec, KSA_product, simulate_and_print, theoretical_max_g_TAL_per_g_SA,\
             F301, F301_P, M304
         from biorefineries.TAL.models import models_SA_solubility_exploit_glucose as models
     
-    elif feedstock is 'sugarcane':
+    elif feedstock == 'sugarcane':
         from biorefineries.TAL.systems.system_SA_solubility_exploit_ethanol_sugarcane import TAL_tea, TAL_lca, R302, spec, KSA_product, simulate_and_print, theoretical_max_g_TAL_per_g_SA,\
             F301, F301_P, M304
         from biorefineries.TAL.models import models_SA_solubility_exploit_sugarcane as models
     
-    elif feedstock is 'corn':
+    elif feedstock == 'corn':
         from biorefineries.TAL.systems.system_SA_solubility_exploit_ethanol_corn import TAL_tea, TAL_lca, R302, spec, KSA_product, simulate_and_print, theoretical_max_g_TAL_per_g_SA,\
             F301, F301_P, M304
         from biorefineries.TAL.models import models_SA_solubility_exploit_corn as models
     
-    elif feedstock is 'cornstover':
+    elif feedstock == 'cornstover':
         from biorefineries.TAL.systems.system_SA_solubility_exploit_ethanol_cornstover import TAL_tea, TAL_lca, R302, spec, KSA_product, simulate_and_print, theoretical_max_g_TAL_per_g_SA,\
             F301, F301_P, M304
         from biorefineries.TAL.models import models_SA_solubility_exploit_cornstover as models
