@@ -610,7 +610,7 @@ def run_TRY_analysis(feedstock, neutralization, yields=None, titers=None, produc
     rm1, rm2, rm3 = results_metric_1.copy(), results_metric_2.copy(), results_metric_3.copy() 
     
     #%% Smoothing
-    smoothing = False
+    smoothing = True
     
     if smoothing:
         for arr in [results_metric_1, results_metric_2, results_metric_3]:

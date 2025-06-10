@@ -208,7 +208,7 @@ spec_3 = productivities =\
     np.array([
                # 0.2*spec.baseline_productivity,
               # 1.*spec.baseline_productivity,
-               5.*spec.baseline_productivity,
+               spec.baseline_productivity,
               ])
 
 

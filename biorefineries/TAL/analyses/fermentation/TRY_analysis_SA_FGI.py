@@ -500,6 +500,9 @@ def run_TRY_analysis(feedstock, yields=None, titers=None, productivities=None, r
     results_metric_1 = np.array(results_metric_1)
     results_metric_2 = np.array(results_metric_2)
     results_metric_3 = np.array(results_metric_3)
+    results_metric_4 = np.array(results_metric_4)
+    results_metric_5 = np.array(results_metric_5)
+    results_metric_6 = np.array(results_metric_6)
     
     #%% Save generated numpy file
     np.save(TAL_results_filepath+'MPSP-'+file_to_save, results_metric_1)
@@ -595,6 +598,56 @@ def run_TRY_analysis(feedstock, yields=None, titers=None, productivities=None, r
     keep_frames = True
     
     print('\nCreating and saving contour plots ...\n')
+    
+    #%% Smoothing
+    smoothing = True
+
+    if smoothing:
+        for arr in [results_metric_1, results_metric_2, results_metric_3, results_metric_4, results_metric_5, results_metric_6]:
+            for i in range(arr.shape[0]):
+                for j in range(arr.shape[1]):
+                    for k in range(arr.shape[2]):
+                        if j>0 and k>0 and j<arr.shape[1]-1 and k<arr.shape[2]-1 :
+                            if np.isnan(arr[i,j,k]):
+                                manhattan_neighbors = np.array([
+                                             arr[i][j-1][k],
+                                             arr[i][j+1][k],
+                                             # arr[i][j][k-1],
+                                             # arr[i][j][k+1]
+                                             ])
+                                if not np.any(np.isnan(manhattan_neighbors)):
+                                    arr[i,j,k] = np.mean(manhattan_neighbors)
+                            if np.isnan(arr[i,j,k]):
+                                manhattan_neighbors = np.array([
+                                             # arr[i][j-1][k],
+                                             # arr[i][j+1][k],
+                                             arr[i][j][k-1],
+                                             arr[i][j][k+1]
+                                             ])
+                                if not np.any(np.isnan(manhattan_neighbors)):
+                                    arr[i,j,k] = np.mean(manhattan_neighbors)
+                            
+                            if np.isnan(arr[i,j,k]):
+                                manhattan_neighbors = np.array([
+                                             arr[i][j-1][k],
+                                             arr[i][j+1][k],
+                                             # arr[i][j][k-1],
+                                             # arr[i][j][k+1]
+                                             ])
+                                if not np.any(np.isnan(manhattan_neighbors)):
+                                    arr[i,j,k] = np.mean(manhattan_neighbors)
+                            if np.isnan(arr[i,j,k]):
+                                manhattan_neighbors = np.array([
+                                             # arr[i][j-1][k],
+                                             # arr[i][j+1][k],
+                                             arr[i][j][k-1],
+                                             arr[i][j][k+1]
+                                             ])
+                                if not np.any(np.isnan(manhattan_neighbors)):
+                                    arr[i,j,k] = np.mean(manhattan_neighbors)
+                            
+
+    
     
     #%% Plots
     if plot: 
