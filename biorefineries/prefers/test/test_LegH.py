@@ -196,8 +196,8 @@ def update_WashingSolution1():
     EV1Out = EV1.outs[0]
     WashingSolution1.imass['DiaBuffer'] = EV1Out.imass['H2O']*4
 
-LegH_sys = bst.main_flowsheet.create_system('LegH_sys')
-LegH_sys.simulate()
+# LegH_sys = bst.main_flowsheet.create_system('LegH_sys')
+# LegH_sys.simulate()
 
 # %%
 IEX1Out = bst.Stream('IEX1Out')
