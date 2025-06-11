@@ -15,9 +15,9 @@ import numpy as np
 from biorefineries.prefers import _chemicals, _units
 
 # %% Settings
-bst.nbtutorial()
-_chemicals.__all__
-_units.__all__
+# bst.nbtutorial()
+# _chemicals.__all__
+# _units.__all__
 bst.settings.set_thermo(_chemicals.create_chemicals_LegH(), skip_checks=True)
 bst.preferences.N=50
 
@@ -165,8 +165,8 @@ EV1 = _units.Evaporator('EV1',
     V = 0.1,
     V_definition = 'First-effect',
 ) # ???
-LegH_sys = bst.main_flowsheet.create_system('LegH_sys')
-LegH_sys.simulate()
+# LegH_sys = bst.main_flowsheet.create_system('LegH_sys')
+# LegH_sys.simulate()
 # This refers to how much diafiltration buffer you use relative to the volume of your protein solution (the retentate) during constant volume diafiltration.
 
 # Recommended: 3 to 5 diavolumes.
@@ -178,7 +178,8 @@ LegH_sys.simulate()
 
 # %%
 DF1Out = bst.Stream('DF1Out')
-WashingSolution1 = bst.Stream('WashingSolution1', DiaBuffer=EV1Out.imass['H2O']*4, units='kg/hr', T=25+273.15)
+WashingSolution1 = bst.Stream('WashingSolution1', units='kg/hr', T=25+273.15)
+# WashingSolution1 = bst.Stream('WashingSolution1', DiaBuffer=EV1Out.imass['H2O']*4, units='kg/hr', T=25+273.15)
 effluent3 = bst.Stream('effluent3')
 DF1 = _units.Diafiltration( 'DF1',
     ins = (EV1Out, WashingSolution1),
@@ -189,12 +190,19 @@ DF1 = _units.Diafiltration( 'DF1',
     DefaultSolutes_ID = _chemicals.chemical_groups['DefaultSolutes'],
 )
 
-# LegH_sys = bst.main_flowsheet.create_system('LegH_sys')
-# LegH_sys.simulate()
+@DF1.add_specification(run=True)
+def update_WashingSolution1():
+    WashingSolution1 = DF1.ins[1]
+    EV1Out = EV1.outs[0]
+    WashingSolution1.imass['DiaBuffer'] = EV1Out.imass['H2O']*4
+
+LegH_sys = bst.main_flowsheet.create_system('LegH_sys')
+LegH_sys.simulate()
 
 # %%
 IEX1Out = bst.Stream('IEX1Out')
-Elution = bst.Stream('Elution', IEXBuffer=DF1Out.imass['H2O']/2 ,units='kg/hr', T=25+273.15)
+Elution = bst.Stream('Elution', units='kg/hr', T=25+273.15)
+# Elution = bst.Stream('Elution', IEXBuffer=DF1Out.imass['H2O']/2 ,units='kg/hr', T=25+273.15)
 effluent4 = bst.Stream('effluent4')
 
 IEX1 = _units.IonExchange( 'IEX1',
@@ -204,6 +212,13 @@ IEX1 = _units.IonExchange( 'IEX1',
     BoundImpurity_ID=_chemicals.chemical_groups['BoundImpurities'],
     ElutionBuffer_Defining_Component_ID =_chemicals.chemical_groups['ElutionBuffer'],
 )
+
+@IEX1.add_specification(run=True)
+def update_Elution():
+    Elution = IEX1.ins[1]
+    DF1Out = DF1.outs[0]
+    Elution.imass['IEXBuffer'] = DF1Out.imass['H2O']/2
+
 # LegH_sys = bst.main_flowsheet.create_system('LegH_sys')
 # LegH_sys.simulate()
 # %%
@@ -221,10 +236,11 @@ IEX1 = _units.IonExchange( 'IEX1',
 # LegH_sys.simulate()
 # %%
 NF1Out = bst.Stream('NF1Out')
-NFBuffer = bst.Stream('NFBuffer', 
-                    NanoBuffer=1.1*0.05*1000*
-                    IEX1Out.imass['Leghemoglobin']/(0.25*bst.Chemical('TrehaloseDH',search_ID='6138-23-4', phase='l', default=True).MW),
-                    units='kg/hr', T=25+273.15)
+NFBuffer = bst.Stream('NFBuffer', units='kg/hr', T=25+273.15)
+# NFBuffer = bst.Stream('NFBuffer', 
+#                     NanoBuffer=1.1*0.05*1000*
+#                     IEX1Out.imass['Leghemoglobin']/(0.25*bst.Chemical('TrehaloseDH',search_ID='6138-23-4', phase='l', default=True).MW),
+#                     units='kg/hr', T=25+273.15)
 effluent5 = bst.Stream('effluent5')
 NF1 = _units.Diafiltration('NF1',
     ins = (IEX1Out, NFBuffer),
@@ -239,6 +255,13 @@ NF1 = _units.Diafiltration('NF1',
     FeedWater_Recovery_to_Permeate=0.2,
     TMP_bar= 5
 )
+
+@NF1.add_specification(run=True)
+def update_NFBuffer():
+    NFBuffer = NF1.ins[1]
+    IEX1Out = IEX1.outs[0]
+    NFBuffer.imass['NanoBuffer']=1.1*0.05*1000*IEX1Out.imass['Leghemoglobin']/(0.25*bst.Chemical('TrehaloseDH',search_ID='6138-23-4', phase='l', default=True).MW),
+
 # LegH_sys = bst.main_flowsheet.create_system('LegH_sys')
 # LegH_sys.simulate()
 # %%

@@ -17,9 +17,9 @@ from biorefineries.prefers import _chemicals as c, _units as u ,_streams as s
 
 
 # %% Settings
-bst.nbtutorial()
-c.__all__
-u.__all__
+# bst.nbtutorial()
+# c.__all__
+# u.__all__
 bst.settings.set_thermo(c.create_chemicals_LegH(), skip_checks=True)
 bst.preferences.N=50
 
@@ -171,6 +171,8 @@ def create_LegH_system(
         V = 0.1,
         V_definition = 'First-effect',
     )
+    LegH_sys = bst.main_flowsheet.create_system('LegH_sys')
+    LegH_sys.simulate()    
 
     DF1 = u.Diafiltration(
         'DF1',
@@ -181,6 +183,8 @@ def create_LegH_system(
         OtherLargeMolecules_ID = c.chemical_groups['OtherLargeMolecules'],
         DefaultSolutes_ID = c.chemical_groups['DefaultSolutes'],
     )
+    # LegH_sys = bst.main_flowsheet.create_system('LegH_sys')
+    # LegH_sys.simulate()
 
     IEX1 = u.IonExchange(
         'IEX1',
@@ -207,6 +211,7 @@ def create_LegH_system(
     )
 
     SD1 = bst.SprayDryer(
+        'SD1',
         ins=NF1-0,
         outs=(effluent6, LegH_Ingredients),
         moisture_content=0.05,  # 5% moisture content in the final product
@@ -217,6 +222,10 @@ def create_LegH_system(
 if __name__ == '__main__':
     # Create the LegH system
     LegH_sys = create_LegH_system()
+    sys = LegH_sys
+    f = sys.flowsheet
+    u = f.unit
+    SD1 = u.SD1
     
     # Simulate the system
     LegH_sys.simulate()
@@ -229,3 +238,5 @@ if __name__ == '__main__':
     
     # Print the mass of Leghemoglobin produced
     print(LegH_sys.LegH_Ingredients.F_mass)
+
+
