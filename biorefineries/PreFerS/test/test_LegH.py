@@ -12,13 +12,12 @@ Created on 2025-05-06 18:26:54
 import biosteam as bst
 import thermosteam as tmo
 import numpy as np
-from biorefineries.prefers import _chemicals, _units,_streams
+from biorefineries.prefers import _chemicals, _units
 
 # %% Settings
 bst.nbtutorial()
 _chemicals.__all__
 _units.__all__
-_streams
 bst.settings.set_thermo(_chemicals.create_chemicals_LegH(), skip_checks=True)
 bst.preferences.N=50
 
@@ -38,22 +37,21 @@ compressor_isentropic_efficiency = 0.85
 
 V_max = 500 # [m3] 5 L * 1e5
 titer = 7.27 # [g / L]
-productivity = 7.27 / 72 # [g / L / h]
-LegH_yield = 7.27 * 5 / 1300 # [by wt]
+productivity = titer / 72 # [g / L / h]
+LegH_yield = titer * 5 / 1300 # [by wt]
 Y_b = 0.43 # [by wt]
 
 
 # %% Reactions
-conversion = titer*5/(1300)
 
 fermentation_reaction = bst.PRxn([
         #           Reaction        Reactnat            Conversion           Check                  
         bst.Rxn('8 Glucose + 4 NH3 + 1 FeSO4 + 10.5 O2 -> Heme_b + 1 H2SO4 + 37 H2O + 14 CO2',
-                                    reactant = 'Glucose',X=conversion*0.05,check_atomic_balance=True),
+                                    reactant = 'Glucose',X=LegH_yield*0.05,check_atomic_balance=True),
         bst.Rxn('Glucose + (NH4)2SO4 + O2 -> Globin + NH3 + H2O',
-                                    reactant = 'Glucose', X= conversion*0.05,correct_atomic_balance=True),
+                                    reactant = 'Glucose', X= LegH_yield*0.05,correct_atomic_balance=True),
         bst.Rxn('Glucose + FeSO4 + (NH4)2SO4 + O2 -> Leghemoglobin + NH3 + H2O', 
-                                    reactant = 'Glucose', X=conversion,  correct_atomic_balance=True),
+                                    reactant = 'Glucose', X=LegH_yield,  correct_atomic_balance=True),
         ])
 fermentation_reaction[2].product_yield('Leghemoglobin', basis='wt', product_yield=LegH_yield)
 
@@ -105,12 +103,12 @@ Y_b = 0.25 # [by wt]
 RXN.show()
 
 Glucose = bst.Stream('Glucose', Glucose=1.3*1e5/72, units='kg/hr', T=25+273.15)
-_18wtNH3 = bst.Stream('_18wtNH3', _18wtNH3=1000, units='kg/hr', T=25+273.15)
+NH3_18wt = bst.Stream('NH3_18wt', NH3_18wt=1000, units='kg/hr', T=25+273.15)
 vent2 = bst.Stream('vent2')
 AB1Out = bst.Stream('AB1Out')
 
 AB1 = _units.AeratedFermentation('AB1',
-    ins=[SeedOut, Glucose, _18wtNH3, bst.Stream('FilteredAir', phase='g', P = 2 * 101325)],
+    ins=[SeedOut, Glucose, NH3_18wt, bst.Stream('FilteredAir', phase='g', P = 2 * 101325)],
     outs=[vent2, AB1Out],
     fermentation_reaction=fermentation_reaction,
     cell_growth_reaction=cell_growth_reaction,
@@ -134,16 +132,16 @@ AB1.target_yield = LegH_yield  # wt %
 def update_reaction_time_and_yield():
     AB1.tau = AB1.target_titer / AB1.target_productivity
     fermentation_reaction[2].product_yield('Leghemoglobin', basis='wt', product_yield=AB1.target_yield)
-LegH_sys = bst.main_flowsheet.create_system('LegH_sys')
-LegH_sys.simulate()
+# LegH_sys = bst.main_flowsheet.create_system('LegH_sys')
+# LegH_sys.simulate()
 # %% Downstream process
 CD1Out = bst.Stream('CD1Out')
 CD1 = _units.CellDisruption('CD1',
     ins=AB1Out,
     outs=CD1Out,
 )
-LegH_sys = bst.main_flowsheet.create_system('LegH_sys')
-LegH_sys.simulate()
+# LegH_sys = bst.main_flowsheet.create_system('LegH_sys')
+# LegH_sys.simulate()
 # %%
 PC1Out = bst.Stream('PC1Out')
 effluent1 = bst.Stream('effluent1')
@@ -191,8 +189,8 @@ DF1 = _units.Diafiltration( 'DF1',
     DefaultSolutes_ID = _chemicals.chemical_groups['DefaultSolutes'],
 )
 
-LegH_sys = bst.main_flowsheet.create_system('LegH_sys')
-LegH_sys.simulate()
+# LegH_sys = bst.main_flowsheet.create_system('LegH_sys')
+# LegH_sys.simulate()
 
 # %%
 IEX1Out = bst.Stream('IEX1Out')
@@ -206,8 +204,8 @@ IEX1 = _units.IonExchange( 'IEX1',
     BoundImpurity_ID=_chemicals.chemical_groups['BoundImpurities'],
     ElutionBuffer_Defining_Component_ID =_chemicals.chemical_groups['ElutionBuffer'],
 )
-LegH_sys = bst.main_flowsheet.create_system('LegH_sys')
-LegH_sys.simulate()
+# LegH_sys = bst.main_flowsheet.create_system('LegH_sys')
+# LegH_sys.simulate()
 # %%
 # NF1Out = bst.Stream('NF1Out')
 # NFBuffer = bst.Stream('NFBuffer', NanoBuffer=IEX1Out.imass['H2O']*5, units='kg/hr', T=25+273.15)
@@ -241,8 +239,8 @@ NF1 = _units.Diafiltration('NF1',
     FeedWater_Recovery_to_Permeate=0.2,
     TMP_bar= 5
 )
-LegH_sys = bst.main_flowsheet.create_system('LegH_sys')
-LegH_sys.simulate()
+# LegH_sys = bst.main_flowsheet.create_system('LegH_sys')
+# LegH_sys.simulate()
 # %%
 SD1Out = bst.Stream('SD1Out')
 effluent6 = bst.Stream('effluent6')

@@ -194,9 +194,9 @@ def create_chemicals_LegH():
     add_chemical('NaCl', phase='l', default=True)
     add_chemical('KCl', phase='l', default=True)
 
-    add_chemical('(NH4)2SO4', phase='s', default=True, Hf=-288994*_cal2joule)
+    add_chemical('(NH4)2SO4', phase='s', default=True, Hf=-288994*_cal2joule,aliases=['AmmoniumSulfate'])
     add_chemical('FeSO4', phase='l', default=True)
-    add_chemical('MgSO4', phase='l', default=True)
+    add_chemical('MgSO4', phase='l', default=True) # 0.0001 $/kg
 
     add_chemical('KH2PO4', phase='l', default=True)
     add_chemical('K2HPO4', phase='l', default=True)
@@ -409,7 +409,7 @@ def create_chemicals_LegH():
 
     # 18wt%NH3
     chems.define_group(
-        '_18wtNH3',
+        'NH3_18wt',
         ['NH3','H2O'],
         [18,82],
         wt=True
