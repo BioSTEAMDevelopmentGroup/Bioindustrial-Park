@@ -1050,6 +1050,9 @@ class IonExchange(bst.Unit):
             'column_hardware_cost_exponent': 'unitless', 
             'resin_lifetime_years': 'years'}
     # --- Default Values for Parameters ---
+
+    _default_water_recovery = 0.15 # 15% recovery of feed water into product stream
+
     _default_water_ID = 'H2O' # Using your preferred ID for water
     _default_TargetProduct_ID = 'Leghemoglobin' # As per your context
 
@@ -1069,93 +1072,82 @@ class IonExchange(bst.Unit):
     _default_ElutionBuffer_Defining_Component_IDs_tuple = ('NaCl', 'KCl') # Example elution salts
 
     def __init__(self, ID='', ins=None, outs=(), thermo=None, *,
+                water_recovery=None,
                 water_ID=None,
                 TargetProduct_ID=None,
                 TargetProduct_Yield=None,
-                BoundImpurity_ID=None, # Expects a tuple of chemical IDs
+                BoundImpurity_ID=None,
                 BoundImpurity_Removal_Efficiency=None,
                 NonBinding_Solutes_Carryover_to_Product=None,
-                ElutionBuffer_Defining_Component_ID=None, # Expects a tuple
-                 **kwargs):
+                ElutionBuffer_Defining_Component_ID=None,
+                **kwargs):
         super().__init__(ID, ins, outs, thermo, **kwargs)
 
-        # Set operational parameters
+        # --- Initialize the new water recovery attribute ---
+        self.water_recovery = water_recovery if water_recovery is not None else self._default_water_recovery
+
+        # Set other operational parameters
         self.water_ID = water_ID if water_ID is not None else self._default_water_ID
         self.TargetProduct_ID = TargetProduct_ID if TargetProduct_ID is not None else self._default_TargetProduct_ID
         self.TargetProduct_Yield = TargetProduct_Yield if TargetProduct_Yield is not None else self._default_TargetProduct_Yield
-
         self.BoundImpurity_ID = BoundImpurity_ID if BoundImpurity_ID is not None else self._default_BoundImpurity_ID
         self.BoundImpurity_Removal_Efficiency = BoundImpurity_Removal_Efficiency if BoundImpurity_Removal_Efficiency is not None else self._default_BoundImpurity_Removal_Efficiency
-        
         self.NonBinding_Solutes_Carryover_to_Product = NonBinding_Solutes_Carryover_to_Product if NonBinding_Solutes_Carryover_to_Product is not None else self._default_NonBinding_Solutes_Carryover_to_Product
         self.ElutionBuffer_Defining_Component_ID = ElutionBuffer_Defining_Component_ID if ElutionBuffer_Defining_Component_ID is not None else self._default_ElutionBuffer_Defining_Component_ID
 
     def _run(self):
         feed = self.ins[0]
-        elution_buffer_profile = self.ins[1] # Defines the matrix of the product stream
+        elution_buffer_profile = self.ins[1]
         product_stream = self.outs[0]
         waste_stream = self.outs[1]
 
-        # Initialize output streams' temperatures
-        product_stream.T = elution_buffer_profile.T # Product is in elution buffer
-        waste_stream.T = feed.T                   # Waste derives from feed temperature
-
-        # Product stream starts with the exact composition and mass of the elution_buffer_profile stream.
-        # Solutes from the feed will be added to this.
+        # Initialize output streams
+        product_stream.T = elution_buffer_profile.T
+        waste_stream.T = feed.T
         product_stream.mass = elution_buffer_profile.mass.copy()
-        
-        # Waste stream starts empty and will collect components from the feed that don't go to product.
         waste_stream.empty()
 
-        # Process components from the original feed stream
-        for chem in self.chemicals: # Iterate over all chemicals in the system
-            ID = chem.ID
-            feed_mass_component = feed.imass[ID] # iMass of this chemical in the input feed
+        # --- Updated Water Balance Logic ---
+        # Partition water from the feed based on the recovery ratio
+        feed_water_mass = feed.imass[self.water_ID]
+        water_to_product = feed_water_mass * self.water_recovery
+        water_to_waste = feed_water_mass - water_to_product
 
-            # If component is negligible in feed, it won't contribute from feed.
-            # Its presence in product is already set if it was in elution_buffer_profile.
-            # Ensure it's initialized (likely to 0) in waste if not already handled.
-            if feed_mass_component <= 1e-12:
-                if waste_stream.imass[ID] < 0: waste_stream.imass[ID] = 0.0 # Should be 0 from empty()
+        product_stream.imass[self.water_ID] += water_to_product
+        waste_stream.imass[self.water_ID] += water_to_waste
+
+        # Process all other components from the feed stream
+        for chem in self.chemicals:
+            ID = chem.ID
+            # Skip water as it's already handled
+            if ID == self.water_ID:
                 continue
 
-            if ID == self.TargetProduct_ID and self.TargetProduct_ID:
-                mass_to_product = feed_mass_component * self.TargetProduct_Yield
-                product_stream.imass[ID] += mass_to_product # Add recovered product
-                waste_stream.imass[ID] = feed_mass_component - mass_to_product
-            
-            elif ID == self.water_ID:
-                # Water from the original feed stream goes to the waste stream.
-                # The product stream's water content is defined by the elution_buffer_profile.
-                waste_stream.imass[ID] = feed_mass_component
+            feed_mass_component = feed.imass[ID]
 
-            elif self.ElutionBuffer_Defining_Component_ID and \
-                ID in self.ElutionBuffer_Defining_Component_ID:
-                # If a defining component of the elution buffer (e.g., NaCl) was also in the feed,
-                # that portion from the feed is assumed to go to the waste stream.
-                # The concentration of this component in the product_stream is dictated solely
-                # by the elution_buffer_profile stream.
+            if feed_mass_component <= 1e-12:
+                continue
+
+            # Route components based on their type
+            if ID == self.TargetProduct_ID:
+                mass_to_product = feed_mass_component * self.TargetProduct_Yield
+                product_stream.imass[ID] += mass_to_product
+                waste_stream.imass[ID] = feed_mass_component - mass_to_product
+
+            elif self.ElutionBuffer_Defining_Component_ID and ID in self.ElutionBuffer_Defining_Component_ID:
+                # Elution components from the feed go to waste
                 waste_stream.imass[ID] = feed_mass_component
 
             elif self.BoundImpurity_ID and ID in self.BoundImpurity_ID:
-                # These are impurities targeted for removal
                 mass_removed_to_waste = feed_mass_component * self.BoundImpurity_Removal_Efficiency
                 waste_stream.imass[ID] = mass_removed_to_waste
-                # The remainder (not removed) carries over to the product stream
                 product_stream.imass[ID] += (feed_mass_component - mass_removed_to_waste)
 
-            else: 
-                # For all other solutes present in the feed (not target, not water, 
-                # not elution buffer defining components, not specified bound impurities)
+            else:
+                # Partition all other non-binding solutes
                 mass_to_product = feed_mass_component * self.NonBinding_Solutes_Carryover_to_Product
                 product_stream.imass[ID] += mass_to_product
                 waste_stream.imass[ID] = feed_mass_component - mass_to_product
-        
-        # Ensure all chemical amounts are non-negative after all additions/subtractions
-        for chem_obj in self.chemicals:
-            idx = chem_obj.ID
-            if product_stream.imass[idx] < 0: product_stream.imass[idx] = 0.0
-            if waste_stream.imass[idx] < 0: waste_stream.imass[idx] = 0.0
 
 
     def _design(self):

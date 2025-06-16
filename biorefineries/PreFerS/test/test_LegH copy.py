@@ -165,7 +165,8 @@ EV1 = _units.Evaporator('EV1',
     V = 0.1,
     V_definition = 'First-effect',
 ) # ???
-
+# LegH_sys = bst.main_flowsheet.create_system('LegH_sys')
+# LegH_sys.simulate()
 # This refers to how much diafiltration buffer you use relative to the volume of your protein solution (the retentate) during constant volume diafiltration.
 
 # Recommended: 3 to 5 diavolumes.
@@ -177,10 +178,10 @@ EV1 = _units.Evaporator('EV1',
 
 # %%
 DF1Out = bst.Stream('DF1Out')
-#WashingSolution1 = bst.Stream('WashingSolution1', DiaBuffer=EV1Out.imass['H2O']*4, units='kg/hr', T=25+273.15)
+WashingSolution1 = bst.Stream('WashingSolution1', DiaBuffer=EV1Out.imass['H2O']*4, units='kg/hr', T=25+273.15)
 effluent3 = bst.Stream('effluent3')
 DF1 = _units.Diafiltration( 'DF1',
-    ins = (EV1Out, bst.Stream('WashingSolution1', DiaBuffer=EV1Out.imass['H2O']*4, units='kg/hr', T=25+273.15)),
+    ins = (EV1Out, WashingSolution1),
     outs = (DF1Out, effluent3),
     TargetProduct_ID = 'Leghemoglobin',
     Salt_ID = _chemicals.chemical_groups['Salts'],
@@ -193,11 +194,11 @@ DF1 = _units.Diafiltration( 'DF1',
 
 # %%
 IEX1Out = bst.Stream('IEX1Out')
-# Elution = bst.Stream('Elution', IEXBuffer=DF1Out.imass['H2O']/2 ,units='kg/hr', T=25+273.15)
+Elution = bst.Stream('Elution', IEXBuffer=DF1Out.imass['H2O']/2 ,units='kg/hr', T=25+273.15)
 effluent4 = bst.Stream('effluent4')
 
 IEX1 = _units.IonExchange( 'IEX1',
-    ins = (DF1Out, bst.Stream('Elution', IEXBuffer=DF1Out.imass['H2O']/2 ,units='kg/hr', T=25+273.15)),
+    ins = (DF1Out, Elution),
     outs = (IEX1Out, effluent4),
     TargetProduct_ID = 'Leghemoglobin',
     BoundImpurity_ID=_chemicals.chemical_groups['BoundImpurities'],
@@ -220,16 +221,13 @@ IEX1 = _units.IonExchange( 'IEX1',
 # LegH_sys.simulate()
 # %%
 NF1Out = bst.Stream('NF1Out')
-# NFBuffer = bst.Stream('NFBuffer', 
-#                     NanoBuffer=1.1*0.05*1000*
-#                     IEX1Out.imass['Leghemoglobin']/(0.25*bst.Chemical('TrehaloseDH',search_ID='6138-23-4', phase='l', default=True).MW),
-#                     units='kg/hr', T=25+273.15)
-effluent5 = bst.Stream('effluent5')
-NF1 = _units.Diafiltration('NF1',
-    ins = (IEX1Out, bst.Stream('NFBuffer', 
+NFBuffer = bst.Stream('NFBuffer', 
                     NanoBuffer=1.1*0.05*1000*
                     IEX1Out.imass['Leghemoglobin']/(0.25*bst.Chemical('TrehaloseDH',search_ID='6138-23-4', phase='l', default=True).MW),
-                    units='kg/hr', T=25+273.15)),
+                    units='kg/hr', T=25+273.15)
+effluent5 = bst.Stream('effluent5')
+NF1 = _units.Diafiltration('NF1',
+    ins = (IEX1Out, NFBuffer),
     outs = (NF1Out, effluent5),
     TargetProduct_ID = 'Leghemoglobin',
     membrane_cost_USD_per_m2=10000, # Nanomembrane cost

@@ -31,7 +31,7 @@ __all__ = (
 @bst.SystemFactory(
     ID='LegH_sys',
     ins=[s.SeedIn, s.CultureIn, s.Glucose, s.NH3_18wt,
-        s.WashingSolution, s.Elution, s.NFBuffer],
+        ],
     outs=[s.LegH_Ingredients, s.vent1, s.vent2, s.effluent1, s.effluent2,
         s.effluent3, s.effluent4, s.effluent5, s.effluent6], # Added s.effluent6
     fthermo=c.create_chemicals_LegH, # Pass the function itself
@@ -47,7 +47,7 @@ def create_LegH_system(
     This system is based on the process flow and parameters from test_LegH.py.
     """
     # Unpack input streams
-    SeedIn, CultureIn, Glucose, NH3_18wt, WashingSolution, Elution, NFBuffer = ins
+    SeedIn, CultureIn, Glucose, NH3_18wt,  = ins
     
     # Unpack output streams
     (LegH_Ingredients, vent1, vent2, effluent1, effluent2, 
@@ -174,17 +174,17 @@ def create_LegH_system(
 
     DF1 = u.Diafiltration(
         'DF1',
-        ins = (EV1-0, WashingSolution),
+        ins = (EV1-0, bst.Stream('WashingSolution', DiaBuffer=(EV1-0).imass['H2O']*4, units='kg/hr', T=25+273.15)),
         outs = ('DF1Out',effluent3),
         TargetProduct_ID = 'Leghemoglobin',
         Salt_ID = c.chemical_groups['Salts'],
         OtherLargeMolecules_ID = c.chemical_groups['OtherLargeMolecules'],
         DefaultSolutes_ID = c.chemical_groups['DefaultSolutes'],
     )
-
+    
     IEX1 = u.IonExchange(
         'IEX1',
-        ins = (DF1-0, Elution),
+        ins = (DF1-0, bst.Stream('Elution', IEXBuffer=(DF1-0).imass['H2O']/2, units='kg/hr', T=25+273.15)),
         outs = ('IEX1Out',effluent4),
         TargetProduct_ID = 'Leghemoglobin',
         BoundImpurity_ID=c.chemical_groups['BoundImpurities'],
@@ -193,7 +193,10 @@ def create_LegH_system(
 
     NF1 = u.Diafiltration(
         'NF1',
-        ins = (IEX1-0, NFBuffer),
+        ins = (IEX1-0, bst.Stream('NFBuffer', 
+                    NanoBuffer=1.1*0.05*1000*
+                    (IEX1-0).imass['Leghemoglobin']/(0.25*bst.Chemical('TrehaloseDH',search_ID='6138-23-4', phase='l', default=True).MW),
+                    units='kg/hr', T=25+273.15)),
         outs = ('NF1Out',effluent5),
         TargetProduct_ID = 'Leghemoglobin',
         membrane_cost_USD_per_m2=10000, # Nanomembrane cost
@@ -212,7 +215,11 @@ def create_LegH_system(
         moisture_content=0.05,  # 5% moisture content in the final product
     )
 
-    return LegH_Ingredients, vent1, vent2, effluent1, effluent2, effluent3, effluent4, effluent5, effluent6
+    WashingSolution = (1-DF1)
+    Elution = (1-IEX1)
+    NFBuffer = (1-NF1)
+
+    return LegH_Ingredients, vent1, vent2, effluent1, effluent2, effluent3, effluent4, effluent5, effluent6, WashingSolution, Elution, NFBuffer
 
 if __name__ == '__main__':
     # Create the LegH system
@@ -226,6 +233,7 @@ if __name__ == '__main__':
     
     # Generate a process diagram
     LegH_sys.diagram(format='html')
+
+    LegH_sys.LegH_Ingredients.show()
     
-    # Print the mass of Leghemoglobin produced
-    print(LegH_sys.LegH_Ingredients.F_mass)
+    
