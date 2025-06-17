@@ -360,11 +360,12 @@ class FeedstockTransportModel:
         # Extract Breakeven price of feedstock at farm gate in $/dry Mg * 0.8 to get wet tons (assuming 20% moisture content)
         Price_crop = np.array(crop_data.Farm_price) * 0.8
 
-        # Calculate Farm costs per ton of feedstock 
-        inflation_rate = 0.0319
-        years = 2023-2016
+        # Adjustments for inflation were already considered in the source file
+        # # Calculate Farm costs per ton of feedstock 
+        # inflation_rate = 0.0319
+        # years = 2023-2016
         
-        crop_data['Adjusted_Price'] = (crop_data['Farm_price']*0.8) * (1 + inflation_rate) ** years # in $/ wet Mg
+        crop_data['Adjusted_Price'] = (crop_data['Farm_price']*0.8) #* (1 + inflation_rate) ** years # in $/ wet Mg
 
         area = cf['farm_area_ha'][0]
         size_farms = area * yield_crop * np.ones(num_points)[..., None] 
@@ -630,7 +631,12 @@ class FeedstockTransportModel:
         ethanol_unit_transp_GHG_each_jet = np.zeros((num_points, np.max(jet_ref_num)))
         for i in range(num_points):    
             ethanol_unit_transp_GHG_each_jet[i][:jet_ref_num[i]] = ethanol_transp_GHG_each_jet[i][:jet_ref_num[i]]/ sent_ethanol[i][:jet_ref_num[i]] # in kgCO2e/Mg ethanol
-    
+        
+        distances_farm_bio = [dist_sorted[i][:farm_num[i]] for i in range(num_points)]
+        #mean_distances_bio = [np.mean(distances_farm_bio[i]) for i in range(num_points)]
+        mean_distances_bio = [np.average(distances_farm_bio[i], weights = farm_sizes_sorted[i][:farm_num[i]]) for i in range(num_points)]
+
+        
         self.results['feedstock_delivered_price'] = feedstock_delivered_price
         self.results['feedstock_delivered_GHG'] = feedstock_delivered_GHG
         self.results['ethanol_unit_transp_cost_each_jet'] = ethanol_unit_transp_cost_each_jet
@@ -647,6 +653,7 @@ class FeedstockTransportModel:
         self.results['possible_locations'] = possible_locations        
         self.results['jet_indexes'] = jet_indexes
         self.results['ethanol_transport_distances'] = dist_2_sorted_real
+        self.results['farm_to_bio_mean_distances'] = mean_distances_bio
 
         
     # Functions to get the results from the above method (calculate_location_parameters)
@@ -941,12 +948,13 @@ class FeedstockTransportModel:
             # Breakeven price of feedstock at farm gate in $/wet Mg 
             Price_crop = (np.array(crop_data.Farm_price) * 0.8) * samples_from_Price_crop_D[sample]
         
-            # Calculate Farm costs per ton of feedstock 
-            inflation_rate = 0.0319
-            years = 2023-2016
+            # Adjustments for inflation were already considered in the source file        
+            # # Calculate Farm costs per ton of feedstock 
+            # inflation_rate = 0.0319
+            # years = 2023-2016
             
             
-            crop_data['Adjusted_Price'] = (crop_data['Farm_price']) * (1 + inflation_rate) ** years # in $/ wet Mg
+            crop_data['Adjusted_Price'] = (crop_data['Farm_price']) #* (1 + inflation_rate) ** years # in $/ wet Mg
         
         
             size_farms = area * yield_crop * np.ones(num_points)[..., None] 
@@ -1437,6 +1445,64 @@ class FeedstockTransportModel:
         if save_fig:
             plt.savefig('Ethanol_supply.png', dpi= 1200, bbox_inches='tight', transparent = True)
         plt.show()
+        
+    def assign_states_to_locations(self, state_gdf, state_col='NAME'):
+        """
+        Assigns state names to candidate and jet producer locations via spatial join.
+    
+        Parameters:
+        -----------
+        state_gdf : GeoDataFrame
+            GeoDataFrame of U.S. states (polygons) with a column like 'NAME' or 'STATE'.
+        state_col : str
+            The column name in state_gdf with the state names.
+        """
+        # Drop conflicting columns if they exist
+        for gdf in [self.candidate_locations, self.jet_producers]:
+            gdf.drop(columns=[col for col in ['index_left', 'index_right'] if col in gdf.columns], inplace=True)
+    
+        # Join state name to candidate locations
+        self.candidate_locations = gpd.sjoin(
+            self.candidate_locations,
+            state_gdf[[state_col, 'geometry']],
+            how='left',
+            predicate='within'
+        ).rename(columns={state_col: 'state'})
+    
+        # Join state name to jet producers
+        self.jet_producers = gpd.sjoin(
+            self.jet_producers,
+            state_gdf[[state_col, 'geometry']],
+            how='left',
+            predicate='within'
+        ).rename(columns={state_col: 'state'})
+
+    def count_same_state_connections(self):
+        """
+        Count how many candidate locations are in the same state
+        as the jet producers they supply.
+        """
+        gdf_candidates = self.candidate_locations
+        gdf_jets = self.jet_producers
+        jet_indexes = self.results['jet_indexes']  # shape (n_candidates, 2)
+    
+        same_state_count = 0
+        total_links = 0
+    
+        for idx, candidate in enumerate(gdf_candidates.itertuples()):
+            candidate_state = candidate.state
+            connected_jet_ids = jet_indexes[idx]
+    
+            for jet_id in connected_jet_ids:
+                if 0 <= jet_id < len(gdf_jets):
+                    jet_state = gdf_jets.loc[jet_id].state
+                    total_links += 1
+                    if candidate_state == jet_state:
+                        same_state_count += 1
+    
+        print(f"Same-state connections: {same_state_count} / {total_links}")
+        return same_state_count, total_links
+
 
 
 

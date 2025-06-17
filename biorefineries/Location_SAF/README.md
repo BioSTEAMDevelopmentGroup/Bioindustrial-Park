@@ -167,18 +167,19 @@ To run this model:
 •	Define the **feedstock** in **line 26** of the script (only 'switchgrass' or 'miscanthus' supported), then run the file. 
 •	In the console, **set the feedstock price**, e.g.:  
 ```python
-tea.feedstock.price = 0.1 # test values: 0, 1, 0.098
+tea.feedstock.price = 0.1 # test values: 0, 1, 0.098 [USD/wet kg]
 ```  
 •	In the console, **set the feedstock carbon intensity (CI)**, e.g.:  
 ```python
-F.switchgrass.set_CF('GWP100', -0.19) # test values: 0, 0.13 and  -0.19
+F.switchgrass.set_CF('GWP100', -0.19) # test values: 0, 0.13 and  -0.19 [kgCO2e/wet kg]
 ```  
 •	Then, **run the uncertainty evaluation**:
 ```python
 evaluate_SS('cellulosic', N=1000, notify_runs = 0)
 ```
 *Note: The refinery name is always 'cellulosic', but the feedstock (switchgrass or miscanthus) should be defined above.
-N is the number of samples for uncertainty analysis.*
+N is the number of samples for uncertainty analysis.*  
+*Note 2: Price in BioSTEAM needs to be in USD/wet kg, and CI in kgCO2e/wet kg*
 
 From the results of this model, we generated two key files:  
 •	ethanol_price_for_python  
@@ -228,15 +229,16 @@ These capacities correspond to results from 01_feedstock_transport_model.py (bas
 2. Define **ethanol price** and **CI**:  
 To replicate results from Bianco, *et al.*, for each size (capacity), run the model using **two ethanol prices** (0, 2.5), and **two ethanol CIs** (-0.19, 0). To set this values, write in the console:
 ```python
-ethanol.price = 1 
-F.ethanol.characterization_factors['GWP100'] = 0.809
+ethanol.price = 1 # [USD/kg]
+F.ethanol.characterization_factors['GWP100'] = 0.809 # [kgCO2e/kg]
 ```
-*Note: only for the first size, three values were used to test for linearity (0, 1, and 2.5 for price, and -1.08, 0, and 0.809 for CI)*
+*Note: only for the first size, three values were used to test for linearity (0, 1, and 2.5 for price, and -1.08, 0, and 0.809 for CI)*  
+*Note 2: Price in BioSTEAM needs to be in USD/kg, and CI in kgCO2e/kg*  
 
 3. **Run the model**
 ```python
 model = create_states_model()
-evaluate_SAF(N=1000, notify_runs=10, model=model)
+evaluate_SAF(N=1000, notify_runs=100, model=model)
 ```
 *Note: If an error occurs during simulation, the model will still run, but the capital investment may be reported as zero. These samples should be discarded.
 To account for failed runs, simulate more than 1000 samples so you can filter out invalid ones.
