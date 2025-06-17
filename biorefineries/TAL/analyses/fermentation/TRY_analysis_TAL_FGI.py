@@ -169,7 +169,7 @@ def run_TRY_analysis(feedstock, yields=None, titers=None, productivities=None, r
     # Yield, titer, productivity (rate)
     
     if not yields:
-        yields = np.linspace(0.05, 0.5724, steps[0])
+        yields = np.linspace(0.053, 0.5724, steps[0])
     
     spec_1 = yields  # yield
     
@@ -510,9 +510,6 @@ def run_TRY_analysis(feedstock, yields=None, titers=None, productivities=None, r
     results_metric_1 = np.array(results_metric_1)
     results_metric_2 = np.array(results_metric_2)
     results_metric_3 = np.array(results_metric_3)
-    results_metric_4 = np.array(results_metric_4)
-    results_metric_5 = np.array(results_metric_5)
-    results_metric_6 = np.array(results_metric_6)
     
     #%% Save generated numpy file
     np.save(TAL_results_filepath+'MPSP-'+file_to_save, results_metric_1)
@@ -602,7 +599,7 @@ def run_TRY_analysis(feedstock, yields=None, titers=None, productivities=None, r
     smoothing = True
 
     if smoothing:
-        for arr in [results_metric_1, results_metric_2, results_metric_3, results_metric_4, results_metric_5, results_metric_6]:
+        for arr in [results_metric_1, results_metric_2, results_metric_3]:
             for i in range(arr.shape[0]):
                 for j in range(arr.shape[1]):
                     for k in range(arr.shape[2]):
