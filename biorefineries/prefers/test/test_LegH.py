@@ -165,12 +165,6 @@ EV1 = _units.Evaporator('EV1',
     V = 0.1,
     V_definition = 'First-effect',
 ) # ???
-<<<<<<< HEAD:biorefineries/PreFerS/test/test_LegH.py
-
-=======
-# LegH_sys = bst.main_flowsheet.create_system('LegH_sys')
-# LegH_sys.simulate()
->>>>>>> 063a6733ed72160421762c0f00ae9f4fdd1849b1:biorefineries/prefers/test/test_LegH.py
 # This refers to how much diafiltration buffer you use relative to the volume of your protein solution (the retentate) during constant volume diafiltration.
 
 # Recommended: 3 to 5 diavolumes.
@@ -182,12 +176,7 @@ EV1 = _units.Evaporator('EV1',
 
 # %%
 DF1Out = bst.Stream('DF1Out')
-<<<<<<< HEAD:biorefineries/PreFerS/test/test_LegH.py
 #WashingSolution1 = bst.Stream('WashingSolution1', DiaBuffer=EV1Out.imass['H2O']*4, units='kg/hr', T=25+273.15)
-=======
-WashingSolution1 = bst.Stream('WashingSolution1', units='kg/hr', T=25+273.15)
-# WashingSolution1 = bst.Stream('WashingSolution1', DiaBuffer=EV1Out.imass['H2O']*4, units='kg/hr', T=25+273.15)
->>>>>>> 063a6733ed72160421762c0f00ae9f4fdd1849b1:biorefineries/prefers/test/test_LegH.py
 effluent3 = bst.Stream('effluent3')
 DF1 = _units.Diafiltration( 'DF1',
     ins = (EV1Out, bst.Stream('WashingSolution1', DiaBuffer=EV1Out.imass['H2O']*4, units='kg/hr', T=25+273.15)),
@@ -209,10 +198,7 @@ def update_WashingSolution1():
 
 # %%
 IEX1Out = bst.Stream('IEX1Out')
-<<<<<<< HEAD:biorefineries/PreFerS/test/test_LegH.py
-=======
 Elution = bst.Stream('Elution', units='kg/hr', T=25+273.15)
->>>>>>> 063a6733ed72160421762c0f00ae9f4fdd1849b1:biorefineries/prefers/test/test_LegH.py
 # Elution = bst.Stream('Elution', IEXBuffer=DF1Out.imass['H2O']/2 ,units='kg/hr', T=25+273.15)
 effluent4 = bst.Stream('effluent4')
 
@@ -247,10 +233,6 @@ def update_Elution():
 # LegH_sys.simulate()
 # %%
 NF1Out = bst.Stream('NF1Out')
-<<<<<<< HEAD:biorefineries/PreFerS/test/test_LegH.py
-=======
-NFBuffer = bst.Stream('NFBuffer', units='kg/hr', T=25+273.15)
->>>>>>> 063a6733ed72160421762c0f00ae9f4fdd1849b1:biorefineries/prefers/test/test_LegH.py
 # NFBuffer = bst.Stream('NFBuffer', 
 #                     NanoBuffer=1.1*0.05*1000*
 #                     IEX1Out.imass['Leghemoglobin']/(0.25*bst.Chemical('TrehaloseDH',search_ID='6138-23-4', phase='l', default=True).MW),
