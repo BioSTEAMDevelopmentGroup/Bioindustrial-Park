@@ -17,7 +17,7 @@ SeedIn = stream_kwargs('SeedIn', Seed=0.15*1e5/16, units='kg/hr', T=25+273.15)
 CultureIn = stream_kwargs('CultureIn', Culture=1.5*1e5/16, units='kg/hr', T=25+273.15)
 
 Glucose = stream_kwargs('Glucose', Glucose=1.3*1e5/72, units='kg/hr', T=25+273.15, price=0.6*1.3*1e5/72)
-NH3_18wt = stream_kwargs('NH3_18wt', _18wtNH3=1000, units='kg/hr', T=25+273.15)
+NH3_18wt = stream_kwargs('NH3_18wt', NH3_18wt=1000, units='kg/hr', T=25+273.15)
 
 WashingSolution = stream_kwargs('WashingSolution', DiaBuffer=1, units='kg/hr', T=25+273.15)
 Elution = stream_kwargs('Elution', IEXBuffer=1 , units='kg/hr', T=25+273.15)

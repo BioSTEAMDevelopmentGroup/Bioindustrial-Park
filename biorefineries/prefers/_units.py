@@ -192,6 +192,7 @@ class AeratedFermentation(bst.AeratedBioreactor):
             fermentation_reaction, 
             cell_growth_reaction, 
             respiration_reaction,
+            neutralization_reaction,
             dT_hx_loop=8,
             Q_O2_consumption=-460240, # [kJ/kmol] equivalent to 110 kcal / mol as in https://www.academia.edu/19636928/Bioreactor_Design_for_Chemical_Engineers
             batch=True,
@@ -205,7 +206,8 @@ class AeratedFermentation(bst.AeratedBioreactor):
         self.fermentation_reaction = fermentation_reaction
         self.cell_growth_reaction = cell_growth_reaction
         self.respiration_reaction = respiration_reaction
-    
+        self.neutralization_reaction = neutralization_reaction
+
     def _run_vent(self, vent, effluent):
         vent.copy_flow(effluent, ('CO2', 'O2', 'N2'), remove=True)
         assert not effluent.imol['CO2', 'O2', 'N2'].any()
@@ -217,6 +219,7 @@ class AeratedFermentation(bst.AeratedBioreactor):
         self.fermentation_reaction.force_reaction(effluent)
         self.cell_growth_reaction.force_reaction(effluent)
         self.respiration_reaction.force_reaction(effluent)
+        self.neutralization_reaction.force_reaction(effluent)
 
 class PSA(bst.Flash):
     _units= {'Liquid flow': 'kg/hr'}

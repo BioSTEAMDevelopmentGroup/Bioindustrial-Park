@@ -27,7 +27,6 @@ bst.preferences.N=50
 __all__ = (
     'create_LegH_system',
 )
-
 @bst.SystemFactory(
     ID='LegH_sys',
     ins=[s.SeedIn, s.CultureIn, s.Glucose, s.NH3_18wt,
@@ -73,6 +72,7 @@ def create_LegH_system(
     """
     Reactions
     """
+    
     fermentation_reaction = bst.PRxn([
         #           Reaction        Reactnat            Conversion           Check                  "
         bst.Rxn('8 Glucose + 4 NH3 + 1 FeSO4 + 10.5 O2 -> Heme_b + 1 H2SO4 + 37 H2O + 14 CO2',
@@ -119,7 +119,7 @@ def create_LegH_system(
         saccharification=None,
         T=32+273.15,
     )
-    ST1.simulate()
+    
     AB1 = u.AeratedFermentation(
         'AB1',
         ins=[ST1-1, Glucose, NH3_18wt, bst.Stream('FilteredAir', phase='g', P = 2 * 101325)],
@@ -127,7 +127,8 @@ def create_LegH_system(
         fermentation_reaction=fermentation_reaction,
         cell_growth_reaction=cell_growth_reaction,
         respiration_reaction=respiration_reaction,
-        design='Stirred tank', method=method,
+        neutralization_reaction=neutralization_reaction,
+        design='Stirred tank', method=method,theta_O2=theta_O2,
         V_max=V_max, Q_O2_consumption=Q_O2_consumption,
         dT_hx_loop=dT_hx_loop, T=T_operation,
         batch=True, reactions=RXN,
@@ -235,8 +236,6 @@ if __name__ == '__main__':
     LegH_sys.simulate()
     LegH_sys.diagram(format='html')
     LegH_sys.show()
-    f.LegH_Ingredients.show()
-    
+    f.LegH_Ingredients.show(composition=True, flow='kg/hr')
 
-    
-    
+# %%
