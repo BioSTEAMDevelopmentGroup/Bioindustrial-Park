@@ -11,7 +11,7 @@ from .process_settings import (
     load_process_settings, GWP as GWPkey,
     characterization_factors as CFs
 )
-from .systems import create_oleochemical_system
+from .systems import create_hydrogen_oleochemical_system, create_substrate_oleochemical_system
 from biorefineries.cane.data import price_distributions_2023 as dist
 from biorefineries.tea import (
     create_cellulosic_ethanol_tea as create_tea
@@ -22,7 +22,7 @@ from chaospy import distributions as shape
 
 __all__ = (
     'Biorefinery',
-    'Scenario',
+    'TRYBiorefinery',
 )
 
 # DO NOT DELETE:
@@ -59,9 +59,8 @@ class Biorefinery(bst.ProcessModel):
         glucose_growth: bool = True
         carbon_source: str = 'BFG' # Alternatively 'biomass'
         biomass: str = 'cornstover' # Either 'miscanthus' or 'cornstover'Al
-        hydrogen_price: str = 'baseline' # Alternatively 'min', 'max', or all
+        hydrogen_price: str = 'all' # Alternatively 'min', 'max', or 'baseline'
         fermentation_performance: str = 'all' # Alternatively 'min' or 'max'
-    
     
     @property
     def name(self):
@@ -79,12 +78,9 @@ class Biorefinery(bst.ProcessModel):
             glucose_growth = False
         else:
             raise ValueError("invalid scenario")
-        hydrogen_price = 'baseline'
+        hydrogen_price = 'all'
         match fermentation:
-            case 'all':
-                fermentation_performance = 'all'
-                hydrogen_price = 'all'
-            case 'all fermentation':
+            case 'all' | 'all fermentation':
                 fermentation_performance = 'all'
             case 'baseline yield':
                 fermentation_performance = fermentation
@@ -92,7 +88,7 @@ class Biorefinery(bst.ProcessModel):
                 fermentation_performance = fermentation
             case _:
                 raise ValueError('invalid scenario')
-        return Scenario(
+        return cls.Scenario(
             product='Dodecanol',
             carbon_capture=False,
             dewatering=False,
@@ -168,7 +164,7 @@ class Biorefinery(bst.ProcessModel):
                 'BFG', gases, gas_flows, wt=True
             )
         load_process_settings()
-        system = create_oleochemical_system(
+        system = create_hydrogen_oleochemical_system(
             carbon_capture=scenario.carbon_capture,
             dewatering=scenario.dewatering,
             glucose_growth=scenario.glucose_growth,
@@ -231,7 +227,7 @@ class Biorefinery(bst.ProcessModel):
         @parameter(units='USD/kg', element='glucose', bounds=[0.215, 0.611]) 
         def set_glucose_price(price): # https://scijournals.onlinelibrary.wiley.com/doi/epdf/10.1002/bbb.1976?saml_referrer
             if scenario.glucose_growth:
-                self.seedtrain_feed.price = price * 0.1
+                self.seedtrain_feed.price = price * 0.12
         
         @parameter(units='USD/kg', element='oleochemical', bounds=[3, 6],
                    baseline=3, distribution='uniform') # https://www.alibaba.com/product-detail/Factory-direct-sale-DODECYL-ACETATE-CAS_1601041319372.html
@@ -256,7 +252,7 @@ class Biorefinery(bst.ProcessModel):
             self.AcOH_production.productivity = productivity
         
         @parameter(units='g/L', element='Oleochemical production', 
-                   bounds=[10, 50], baseline=30, distribution='uniform')
+                   bounds=[1, 10], baseline=5, distribution='uniform')
         def set_oleochemical_titer(titer):
             self.oleochemical_production.titer = titer
             
@@ -266,12 +262,12 @@ class Biorefinery(bst.ProcessModel):
             self.oleochemical_production.productivity = productivity
         
         @parameter(units='% theoretical', name='bioreactor yield', element='Oleochemical production', 
-                   bounds=[40, 90], baseline=65, distribution='uniform')
+                   bounds=[35, 85], baseline=36, distribution='uniform')
         def set_oleochemical_bioreactor_yield(X):
             self.oleochemical_production.reactions.X[0] = X / 100.
         
         @parameter(units='g_{' + scenario.product + '}/g_{cell}', element='Oleochemical production', 
-                   bounds=[0.7, 3.5], baseline=0.7, distribution='uniform')
+                   bounds=[0.45, 2.7], baseline=1.57, distribution='uniform')
         def set_oleochemical_specific_yield(specific_yield):
             self.oleochemical_production.specific_yield = specific_yield
         
@@ -452,16 +448,16 @@ class Biorefinery(bst.ProcessModel):
         
         @metric(units='kWh/kg-H2')
         def electricity_demand(): 
-            return self.system.get_electricity_production() / (self.product.F_mass * self.system.operating_hours)
+            return self.system.get_electricity_consumption() / (self.product.F_mass * self.system.operating_hours)
         
         if scenario.carbon_source != 'biomass':
-            @metric(units='MT/yr', element='oleochemical')
+            @metric(units='10^3 MT/yr', element='oleochemical')
             def production_capacity():
                 return self.system.get_mass_flow(self.product) / 1e3
         
         for i in model.parameters:
             if i.distribution is None: i.distribution = cp.Uniform(*i.bounds)
-        key = (scenario.carbon_capture, scenario.dewatering)
+        key = scenario.carbon_capture
         if key in self.pseudo_optimal_design_decisions:
             optimal_values = self.pseudo_optimal_design_decisions[key]
             for i, j in zip(model.optimized_parameters, optimal_values): 
@@ -543,6 +539,30 @@ class Biorefinery(bst.ProcessModel):
             'Biomass': biomass(self.BT.fuel),
         }
     
+    def H2_price_breakeven_configurations(self):
+        if self.scenario.glucose_growth:
+            br_glucose = self
+            if hasattr(self, 'acetate_growth_biorefinery'):
+                br_acetate = self.acetate_growth_biorefinery
+            else:
+                self.acetate_growth_biorefinery = br_acetate = type(self)(scenario=self.scenario, glucose_growth=False)
+        else:
+            br_acetate = self
+            if hasattr(self, 'glucose_growth_biorefinery'):
+                br_glucose = self.glucose_growth_biorefinery
+            else:
+                self.glucose_growth_biorefinery = br_glucose = type(self)(scenario=self.scenario, glucose_growth=True)
+        
+        H2 = br_acetate.hydrogen.F_mass
+        product = br_acetate.product.F_mass
+        contribution = H2 / product
+        original_price = br_acetate.hydrogen.price
+        br_acetate.hydrogen.price = 0
+        MSP_acetate = br_acetate.MSP()
+        br_acetate.hydrogen.price = original_price
+        MSP_glucose = br_glucose.MSP()
+        return (MSP_glucose - MSP_acetate) / contribution
+    
     def MSP_CI_vs_specific_yield(self):
         specific_yields = [0.7, 1.0, 1.5, 2.0, 2.5, 3, 3.5]
         CIs = []
@@ -567,7 +587,191 @@ class Biorefinery(bst.ProcessModel):
             CC.append(self.credited_carbon_intake())
         return CIs, MSPs, CC
         
-Scenario = Biorefinery.Scenario
 Biorefinery.pseudo_optimal_design_decisions = {
-    (False, False): np.array([12. , 12. ,  0.6]),
+    False: np.array([12. , 12. ,  0.6]),
 }
+
+
+class TRYBiorefinery(bst.ProcessModel):
+    
+    class Scenario:
+        name: str = 'H2|Dodecanol'
+        substrate: str = 'H2' # Either H2, Glucose, Corn
+        product: str = 'Dodecanol'
+        glucose_growth: bool = False
+        
+    @property
+    def name(self):
+        return self.scenario.name
+    
+    @classmethod
+    def as_scenario(cls, scenario):
+        try:
+            substrate, product = scenario.split('|')
+        except:
+            substrate, product = scenario.split('-')
+        return cls.Scenario(
+            substrate=substrate,
+            product=product,
+            glucose_growth=False,
+            name=scenario,
+        )
+    
+    def create_thermo(self):
+        return create_acetate_ester_chemicals()
+    
+    def create_system(self):
+        scenario = self.scenario
+        self.chemicals.define_group(
+            'Biomass', 
+            ['Water',
+             'Sucrose',
+             'Extract',
+             'Acetate',
+             'Ash',
+             'Lignin',
+             'Protein',
+             'Glucan',
+             'Xylan',
+             'Arabinan',
+             'Mannan',
+             'Galactan'],
+            [0.2022,
+             0.0062,
+             0.1185,
+             0.0146,
+             0.0399,
+             0.1274,
+             0.0251,
+             0.283,
+             0.1579,
+             0.0192,
+             0.0049,
+             0.0012],
+            wt=True,
+        )
+        match scenario.substrate:
+            case 'H2':
+                br = Biorefinery(glucose_growth=scenario.glucose_growth) # H2 to oleochemical; baseline biorefinery
+                br.set_AcOH_titer(90)
+                br.set_oleochemical_specific_yield(2.7)
+                br.set_H2_price(2)
+                system = br.system
+            case 'Glucose' | 'Corn':
+                system = create_substrate_oleochemical_system(
+                    specific_yield=2.7, 
+                    substrate='Glucose',
+                    product=scenario.product,
+                    glucose_growth=scenario.glucose_growth,
+                    facilities=True,
+                )
+                if scenario.substrate == 'Corn':
+                    from biorefineries import corn
+                    corn.load()
+                    corn.corn.set_CF('GWP', 0.2610) # GREET 2023
+                    corn.E316.disconnect(join_ends=True)
+                    corn.E401.disconnect(join_ends=True)
+                    corn.MH103.outs[1].price = 1e-9
+                    corn.S1.disconnect()
+                    @corn.E402.add_specification
+                    def remove_components():
+                        corn.E402.run()
+                        IDs = ('Water', 'Glucose')
+                        slurry = corn.E402.outs[0]
+                        mol = slurry.imol[IDs]
+                        slurry.empty()
+                        slurry.imol[IDs] = mol
+                    new_units = [i for i in corn.system.units[:31] if i not in (corn.V403, corn.P404)]
+                    self.slurry = system.ins[1] = new_units[-1].outs[0]
+                    bst.settings.set_thermo(system.ins[0].thermo)
+                    system = bst.System.from_units(units=[*new_units, *system.units])
+                elif scenario.substrate == 'Glucose':
+                    self.feedstock = feedstock = system.ins[1]
+                    feedstock.empty()
+                    glucose = 2.84e+04
+                    feedstock.imass['Water', 'Glucose'] = [9 * glucose, glucose]
+                    self.feedstock = feedstock
+                    feedstock.set_CF('GWP', 0.1 * 0.9375) # Sugar GREET 2023
+                    feedstock.price = 0.413 * 0.10
+                    feedstock.ID = 'feedstock'
+                # system.diagram(kind='cluster', number=True)
+        load_process_settings()
+        self.tea = create_tea(
+            system,
+        )
+        self.tea.steam_power_depreciation = 'MACRS7'
+        self.tea.income_tax = 0.21
+        system.__class__.strict_convergence = False
+        system.set_tolerance(rmol=1e-4, mol=1e-3, maxiter=50, 
+                             method='wegstein', subsystems=True)
+        return system
+    
+    def create_model(self):
+        system = self.system
+        scenario = self.scenario
+        model = bst.Model(system)
+        parameter = model.parameter
+        metric = model.metric
+        
+        def uniform(baseline, *args, **kwargs):
+            bounds = [0.8 * baseline, 1.2 * baseline]
+            return parameter(*args, **kwargs, baseline=baseline, bounds=bounds)
+        
+        # https://tradingeconomics.com/commodity/sugar
+        @parameter(units='USD/kg', element='glucose', bounds=[0.215, 0.611]) 
+        def set_glucose_price(price): # https://scijournals.onlinelibrary.wiley.com/doi/epdf/10.1002/bbb.1976?saml_referrer
+            if scenario.glucose_growth:
+                self.seedtrain_feed.price = price * 0.12
+            if scenario.substrate == 'Glucose':
+                self.feedstock.price = 0.1 * price
+        
+        @parameter(units='USD/kg', element='oleochemical', bounds=[3, 6],
+                   baseline=3, distribution='uniform') # https://www.alibaba.com/product-detail/Factory-direct-sale-DODECYL-ACETATE-CAS_1601041319372.html
+        def set_product_price(price):
+            self.product.price = price
+        
+        @parameter(units='g/L', element='Oleochemical production', 
+                   bounds=[1, 10], baseline=5, distribution='uniform')
+        def set_oleochemical_titer(titer):
+            self.oleochemical_production.titer = titer
+            
+        @parameter(units='g/L/h', element='Oleochemical production',
+                   bounds=[0.1, 1.0], baseline=1.0, distribution='uniform')
+        def set_oleochemical_productivity(productivity):
+            self.oleochemical_production.productivity = productivity
+        
+        # Start from optimistic 40% for this conceptual analysis
+        @parameter(units='% theoretical', name='bioreactor yield', element='Oleochemical production', 
+                   bounds=[40, 85], baseline=40, distribution='uniform')
+        def set_oleochemical_bioreactor_yield(X):
+            self.oleochemical_production.reactions.X[0] = X / 100.
+        
+        @metric(units='USD/kg')
+        def MSP():
+            return self.tea.solve_price(self.product)
+        
+        chemicals = bst.settings.chemicals
+        self.credited_carbon_intake = lambda: (
+            self.product.get_atomic_flow('C') * chemicals.CO2.MW * system.operating_hours
+        )
+        if scenario.substrate != 'H2':
+            self.system.define_process_impact(
+                key=GWPkey,
+                name='Credited carbon intake',
+                basis='kg',
+                inventory=self.credited_carbon_intake,
+                CF=-1.,
+            )
+        self.BT.fuel.set_CF(GWPkey, CFs['Cornstover'])
+        if hasattr(self, 'hydrogen'): self.hydrogen.set_CF(GWPkey, CFs['H2'])
+        if hasattr(self, 'hexane'): self.hexane.set_CF(GWPkey, CFs['Hexane'])
+        if hasattr(self, 'ethyl_acetate'): self.ethyl_acetate.set_CF(GWPkey, CFs['Ethyl acetate'])
+
+        @metric(units='kg*CO2e/kg')
+        def carbon_intensity():
+            return (
+                self.system.get_net_impact(GWPkey)
+                / self.system.get_mass_flow(self.product)
+            )
+        
+        return model

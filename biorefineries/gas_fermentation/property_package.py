@@ -3,6 +3,7 @@
 """
 import biosteam as bst
 from biorefineries import cellulosic
+from biosteam.wastewater.high_rate.utils import append_wwt_chemicals
 
 __all__ = (
     'create_acetate_ester_chemicals',
@@ -57,5 +58,5 @@ def create_acetate_ester_chemicals(yeast_includes_nitrogen=False):
     for i in cellulosic.create_cellulosic_ethanol_chemicals():
         if i.ID in IDs or i.CAS in CASs: continue
         chemicals.append(i)
-    return chemicals
+    return append_wwt_chemicals(chemicals, set_thermo=False)
 

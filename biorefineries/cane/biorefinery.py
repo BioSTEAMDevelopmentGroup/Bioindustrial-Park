@@ -1708,7 +1708,8 @@ class Biorefinery:
                 for mockup, real in zip(all_metric_mockups, model.metrics):
                     assert mockup.index == real.index
             except:
-                breakpoint()
+                from warnings import warn
+                warn('parameter/mectric mockups do not match', RuntimeWarning)
         return self
     
     def oil_recovery(self):

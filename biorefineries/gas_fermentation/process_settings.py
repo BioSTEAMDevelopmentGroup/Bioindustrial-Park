@@ -9,7 +9,7 @@ __all__ = (
 GWP = 'GWP'
 characterization_factors = {
     # 'Electricity': 0.38, # [kg*CO2*eq / kWhr] From GREET 2020; NG-Fired Simple-Cycle Gas Turbine CHP Plant
-    # 'H2': 9.5012, # [kg*CO2*eq / kg] From GREET 2022; Compressed G.H2 produced from natural gas
+    # https://www2.gov.bc.ca/assets/gov/business/natural-resource-industries/reports/carbon_intensity_of_hydrogen_production_methods.pdf
     'H2': 1.8023, # [kg*CO2*eq / kg] From GREET 2022; Compressed G.H2 produced from PEM electrolysis (solar or wind)
     'Cornstover': 0.03819, # [kg*CO2*eq / kg] From GREET 2023; Miscanthus for ethanol production
     'Miscanthus': 0.07606, # [kg*CO2*eq / kg] From GREET 2023; Miscanthus for ethanol production
@@ -28,6 +28,7 @@ def load_process_settings():
     #     )
     settings.CEPCI = 816.0 # 2022
     bst.settings.electricity_price = 0.060 # Maryland solar REC (renewable energy certificates) # https://escholarship.org/uc/item/80n4q8xc
+    bst.PowerUtility.set_CF('GWP', 0)
     cw = settings.get_cooling_agent("cooling_water")
     cw.set_property('T', 70, 'degF') # https://www.sciencedirect.com/topics/earth-and-planetary-sciences/cooling-tower
     hps = settings.get_heating_agent("high_pressure_steam")

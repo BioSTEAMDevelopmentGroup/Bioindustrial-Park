@@ -89,10 +89,8 @@ def plot_monte_carlo(scenarios=None, box=False):
 def _plot_monte_carlo(scenarios=None, box=None):
     Biorefinery = gas_fermentation.Biorefinery
     if scenarios is None:
-        scenarios = [
-            'all fermentation', 
-        ]
-    elif scenarios == 'all':
+        scenarios = 'all'
+    if scenarios == 'all':
         scenarios = [
             'all', 
         ]
@@ -104,7 +102,7 @@ def _plot_monte_carlo(scenarios=None, box=None):
     ]
     metrics = [
         ['MSP', 'carbon_intensity'], 
-        ['TCI', 'electricity_demand'],
+        ['TCI', 'product_yield_to_hydrogen'],
         # ['product_yield_to_hydrogen', 'product_yield_to_biomass'],
         ['hydrogen_consumption', 'production_capacity'],
     ]
@@ -464,15 +462,12 @@ def plot_spearman_both(scenario='all fermentation-glucose growth', **kwargs):
 def plot_spearman_scenarios(
         scenarios=None,
         kind='TEA',
-        full=True,
+        full=None,
         **kwargs
     ):
     if scenarios is None:
-        scenarios = [
-            'all fermentation|glucose growth', 
-            'all fermentation|acetate growth'
-        ]
-    elif scenarios == 'all':
+        scenarios = 'all'
+    if scenarios == 'all':
         scenarios = [
             'all|glucose growth', 
             'all|acetate growth'
@@ -484,7 +479,7 @@ def plot_spearman_scenarios(
         ]
     bst.plots.set_font(size=9)
     if full:
-        bst.plots.set_figure_size(aspect_ratio=1.3, width='half')
+        bst.plots.set_figure_size(aspect_ratio=4, width='half')
         # bst.plots.set_figure_size(width='full')
     else:
         bst.plots.set_figure_size(aspect_ratio=1, width='half')
@@ -514,6 +509,7 @@ def plot_spearman_scenarios(
             br.set_product_price.element = 'dodecylacetate'
             values[br.set_product_price.index] = 0
             values[br.set_ethyl_acetate_price.index] = 0
+            full = True
         elif kind == 'LCA':
             metric = br.carbon_intensity
             metric_name = r'carbon intensity'
@@ -522,6 +518,7 @@ def plot_spearman_scenarios(
                 name = i.name.lower()
                 if 'price' in name or 'capacity' in name: 
                     values[i.index] = 0
+            full = False
         else:
             raise ValueError(f"invalid kind '{kind}'")
         values = values.iloc[index]
@@ -533,7 +530,7 @@ def plot_spearman_scenarios(
     label = metric.label()
     label = label.replace('Carbon intensity', 'CI')
     if full: 
-        top = 9
+        top = 8
     else:
         top = 6
     fig, ax = bst.plots.plot_spearman_2d(rhos, index=names,
@@ -556,7 +553,7 @@ def plot_spearman_scenarios(
     plt.subplots_adjust(
         hspace=0.05, wspace=0.05,
         top=0.98, bottom=0.16,
-        left=0.45, right=0.88,
+        left=0.47, right=0.86,
     )
     for i in ('svg', 'png'):
         file = os.path.join(images_folder, f'spearman_all_scenarios_{kind}.{i}')
@@ -595,12 +592,8 @@ def plot_spearman(kind=None, carbon_capture=True, dewatering=True, **kwargs):
     return fig, ax
 
 def run_all_monte_carlo(scenarios=None):
-    if scenarios is None:
-        scenarios = [
-            'all fermentation|glucose growth', 
-            'all fermentation|acetate growth'
-        ]
-    elif scenarios == 'all':
+    if scenarios is None: scenarios = 'all'
+    if scenarios == 'all':
         scenarios = [
             'all|glucose growth', 
             'all|acetate growth'
@@ -615,7 +608,7 @@ def run_all_monte_carlo(scenarios=None):
 
 def run_monte_carlo(
         scenario,
-        N=5000, rule='L',
+        N=10000, rule='L',
         sample_cache={},
         autosave=True,
         autoload=True,
@@ -724,13 +717,16 @@ def plot_sobol(names, categories, df, colors=None, hatches=None,
     return fig, axes
     
 def get_monte_carlo(scenario, features, cache={}, dropna=True):
-    if isinstance(scenario, gasferm.Scenario):
+    if isinstance(scenario, gasferm.Biorefinery.Scenario):
         if scenario in cache:
             df = cache[scenario]
         else:
             file = monte_carlo_file_name(scenario.name)
             cache[scenario] = df = pd.read_excel(file, header=[0, 1], index_col=[0])
-        df = df[features]    
+        try: 
+            df = df[features]    
+        except:
+            breakpoint()
     elif isinstance(scenario, bst.ScenarioComparison):
         left = get_monte_carlo(scenario.left, features, dropna=False)
         right = get_monte_carlo(scenario.right, features, dropna=False)
@@ -931,11 +927,8 @@ def plot_kde_CI_MSP(scenarios=None):
     bst.plots.set_font(size=9)
     bst.plots.set_figure_size(width='half', aspect_ratio=1.3)
     if scenarios is None:
-        scenarios = [
-            'all fermentation|glucose growth', 
-            'all fermentation|acetate growth'
-        ]
-    elif scenarios == 'all':
+        scenarios = 'all'
+    if scenarios == 'all':
         scenarios = [
             'all|glucose growth', 
             'all|acetate growth'
@@ -972,7 +965,7 @@ def plot_kde_CI_MSP(scenarios=None):
         xticklabels=True, yticklabels=True,
         # xbox_kwargs=dict(light=CABBI_colors.orange.RGBn, dark=CABBI_colors.orange.shade(60).RGBn),
         # ybox_kwargs=dict(light=CABBI_colors.blue.RGBn, dark=CABBI_colors.blue.shade(60).RGBn),
-        xlabel=r'Carbon intensity $[\mathrm{gCO2e} \cdot \mathrm{L}^{\mathrm{-1}}]$',
+        xlabel=r'Carbon intensity $[\mathrm{kg} \cdot \mathrm{CO2e} \cdot \mathrm{L}^{\mathrm{-1}}]$',
         # xlabel='TCI $[10^6 \cdot \mathrm{USD}]$',
         ylabel=r'MSP $[\mathrm{USD} \cdot \mathrm{kg}^{\mathrm{-1}}]$',
         xbox_width=400,
@@ -1015,11 +1008,8 @@ def opportunity_space(scenarios=None):
     bst.plots.set_font(size=9)
     bst.plots.set_figure_size(width='half', aspect_ratio=1)
     if scenarios is None:
-        scenarios = [
-            'all fermentation|glucose growth', 
-            'all fermentation|acetate growth'
-        ]
-    elif scenarios == 'all':
+        scenarios = 'all'
+    if scenarios == 'all':
         scenarios = [
             'all|glucose growth', 
             'all|acetate growth'
@@ -1246,10 +1236,18 @@ def get_monte_carlo_key(index, dct, with_units=False):
     
 def montecarlo_results(scenario, metrics=None):
     f = gasferm.Biorefinery(scenario=scenario, simulate=False)
-    if metrics is None:
+    if isinstance(metrics, str): 
+        metrics = [getattr(f, metrics)] 
+    elif metrics is None:
         metrics = [
-            f.carbon_intensity.index, f.MSP.index
+            f.carbon_intensity, f.MSP,
         ]
+    else:
+        metrics = [
+            (getattr(f, i) if isinstance(i, str) else i) 
+            for i in metrics
+        ]
+    metrics = [i.index for i in metrics]
     results = {}
     df = get_monte_carlo(f.scenario, metrics)
     results[f.name] = dct = {}
@@ -1257,10 +1255,7 @@ def montecarlo_results(scenario, metrics=None):
         data = df[index].values
         q05, q50, q95 = roundsigfigs(np.percentile(data, [5, 50, 95], axis=0), 3)
         key = get_monte_carlo_key(index, dct, False)
-        if q50 < 0:
-            dct[key] = f"{-q50} [{-q95}, {-q05}] -negative-"
-        else:
-            dct[key] = f"{q50} [{q05}, {q95}]"
+        dct[key] = f"{q50} [{q05}, {q95}]"
     return results
 
 def run_monte_carlo_across_yield(
