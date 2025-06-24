@@ -25,10 +25,13 @@ This module is a modified implementation of modules from the following:
 import thermosteam as tmo
 from thermosteam import functional as fn
 from biorefineries.sugarcane import chemicals as sugarcane_chems
-from biorefineries.cornstover import chemicals as cornstover_chems
-from biorefineries import corn
+from biorefineries.cornstover import create_chemicals as cs_create_chemicals
+from biorefineries.corn import create_chemicals as corn_create_chemicals
 
-corn_chems = corn.chemicals.create_chemicals()
+cornstover_chems = cs_create_chemicals()
+
+corn_chems = corn_create_chemicals()
+
 # from biorefineries import sugarcane as sc
 __all__ = ('SA_chemicals', 'chemical_groups', 'soluble_organics', 'combustibles')
 
@@ -684,7 +687,7 @@ chems.set_synonym('ButylSorbate', 'Butylsorbate')
 chems.set_synonym('H2O', 'Water')
 chems.set_synonym('H2SO4', 'SulfuricAcid')
 chems.set_synonym('NH3', 'Ammonia')
-chems.set_synonym('DiammoniumSulfate', 'NH4SO4')
+# chems.set_synonym('DiammoniumSulfate', 'NH4SO4')
 # chems.set_synonym('Denaturant', 'Octane')
 chems.set_synonym('CO2', 'CarbonDioxide')
 chems.set_synonym('CarbonMonoxide', 'CO')

@@ -21,10 +21,13 @@ This module is a modified implementation of modules from the following:
 import thermosteam as tmo
 from thermosteam import functional as fn
 from biorefineries.sugarcane import chemicals as sugarcane_chems
-from biorefineries.cornstover import chemicals as cornstover_chems
-from biorefineries import corn
+from biorefineries.cornstover import create_chemicals as cs_create_chemicals
+from biorefineries.corn import create_chemicals as corn_create_chemicals
 
-corn_chems = corn.chemicals.create_chemicals()
+cornstover_chems = cs_create_chemicals()
+
+corn_chems = corn_create_chemicals()
+
 # from biorefineries import sugarcane as sc
 __all__ = ('TAL_chemicals', 'chemical_groups', 'soluble_organics', 'combustibles')
 

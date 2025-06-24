@@ -787,7 +787,7 @@ def simulate_and_print():
 
 # %% Initial simulation
 
-for i in range(2): get_AA_MPSP()
+# for i in range(2): get_AA_MPSP()
 
 spec.load_specifications(spec.baseline_yield, spec.baseline_titer, spec.baseline_productivity)
 

@@ -888,7 +888,7 @@ spec = ProcessSpecification(
     spec_1=0.7,
     spec_2=100.,
     spec_3=1.0,
-    xylose_utilization_fraction = 0.80,
+    xylose_utilization_fraction = 1.,
     feedstock = feedstock,
     dehydration_reactor = None,
     byproduct_streams = [],
@@ -903,7 +903,11 @@ spec = ProcessSpecification(
     baseline_yield = 0.4733/theoretical_max_g_succinic_acid_per_g_glucose, # 36.1% of theoretical maximum
     baseline_titer = 63.1,
     baseline_productivity = 0.6573,
+    
     neutralization=False,
+    baseline_pyruvic_acid_yield = 0.006,
+    baseline_cell_mass_yield = 0.186,
+    
 
     feedstock_mass = feedstock.F_mass,
     pretreatment_reactor = None)
