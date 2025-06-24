@@ -108,7 +108,9 @@ class CellulosicEthanolTEA(TEA):
         depreciation_array = self._get_depreciation_array()
         N_depreciation_years = depreciation_array.size
         if N_depreciation_years > years:
-            raise RuntimeError('depreciation schedule is longer than plant lifetime')
+            dummy = depreciation_array[:years]
+            dummy[-1] = depreciation_array[years-1:].sum()
+            depreciation_array = dummy
         system = self.system
         BT = self.boiler_turbogenerator
         if BT is None:
@@ -117,11 +119,12 @@ class CellulosicEthanolTEA(TEA):
             if isinstance(system, bst.AgileSystem): BT = system.unit_capital_costs[BT]
             BT_TDC = BT.installed_cost 
             D[start:start + N_depreciation_years] = (TDC - BT_TDC) * depreciation_array
-            
             depreciation_array = self._steam_power_depreciation_array
             N_depreciation_years = depreciation_array.size
             if N_depreciation_years > years:
-                raise RuntimeError('steam power depreciation schedule is longer than plant lifetime')
+                dummy = depreciation_array[:years]
+                dummy[-1] = depreciation_array[years-1:].sum()
+                depreciation_array = dummy
             D[start:start + N_depreciation_years] += BT_TDC * depreciation_array
     
     def _ISBL_DPI(self, installed_equipment_cost):
