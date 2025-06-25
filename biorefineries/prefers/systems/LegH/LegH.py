@@ -17,9 +17,9 @@ from biorefineries.prefers import _chemicals as c, _units as u ,_streams as s
 
 
 # %% Settings
-bst.nbtutorial()
-c.__all__
-u.__all__
+# bst.nbtutorial()
+# c.__all__
+# u.__all__
 bst.settings.set_thermo(c.create_chemicals_LegH(), skip_checks=True)
 bst.preferences.N=50
 
