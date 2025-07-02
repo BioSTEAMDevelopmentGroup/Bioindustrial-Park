@@ -8,9 +8,10 @@ Created on 2025-07-02 15:20:03
 @email: ouwen.peng@iarcs-create.edu.sg
 """
 
+from biorefineries.corn import tea
 import biosteam as bst
 import numpy as np
-bst.nbtutorial()
+# bst.nbtutorial()
 
 class LegHTEA(bst.TEA):
 
@@ -72,5 +73,5 @@ if __name__ == '__main__':
         property_insurance=0.005, supplies=0.02, maintenance=0.03,
         administration=0.04
     )
-
     legH_tea.show()  # Display the TEA summary
+    legH_tea.get_cashflow_table()

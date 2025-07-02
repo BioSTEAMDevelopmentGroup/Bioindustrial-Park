@@ -172,8 +172,9 @@ def create_LegH_system(
         V = 0.1,
         V_definition = 'First-effect',
     )
+
     LegH_sys = bst.main_flowsheet.create_system('LegH_sys')
-    LegH_sys.simulate()    
+    LegH_sys.simulate()
 
     DF1 = u.Diafiltration(
         'DF1',
@@ -184,16 +185,19 @@ def create_LegH_system(
         OtherLargeMolecules_ID = c.chemical_groups['OtherLargeMolecules'],
         DefaultSolutes_ID = c.chemical_groups['DefaultSolutes'],
     )
-    
+    LegH_sys = bst.main_flowsheet.create_system('LegH_sys')
+    LegH_sys.simulate()
     IEX1 = u.IonExchange(
         'IEX1',
-        ins = (DF1-0, bst.Stream('Elution', IEXBuffer=(DF1-0).imass['H2O']/2, units='kg/hr', T=25+273.15)),
+        ins = (DF1-0, 
+            bst.Stream('Elution', IEXBuffer=(DF1-0).imass['H2O']/2, units='kg/hr', T=25+273.15)),
         outs = ('IEX1Out',effluent4),
         TargetProduct_ID = 'Leghemoglobin',
         BoundImpurity_ID=c.chemical_groups['BoundImpurities'],
         ElutionBuffer_Defining_Component_ID =c.chemical_groups['ElutionBuffer'],
     )
-
+    LegH_sys = bst.main_flowsheet.create_system('LegH_sys')
+    LegH_sys.simulate()
     NF1 = u.Diafiltration(
         'NF1',
         ins = (IEX1-0, bst.Stream('NFBuffer', 
@@ -211,14 +215,17 @@ def create_LegH_system(
         FeedWater_Recovery_to_Permeate=0.2,
         TMP_bar= 5
     )
-
+    LegH_sys = bst.main_flowsheet.create_system('LegH_sys')
+    LegH_sys.simulate()
     SD1 = bst.SprayDryer(
         'SD1',
         ins=NF1-0,
         outs=(effluent6, LegH_Ingredients),
         moisture_content=0.05,  # 5% moisture content in the final product
     )
-
+    LegH_sys = bst.main_flowsheet.create_system('LegH_sys')
+    LegH_sys.simulate()
+    
     WashingSolution = (1-DF1)
     Elution = (1-IEX1)
     NFBuffer = (1-NF1)
@@ -233,6 +240,7 @@ if __name__ == '__main__':
     u = f.unit
     SD1 = u.SD1
 
+    LegH_sys.simulate()
     LegH_sys.simulate()
     LegH_sys.diagram(format='html')
     LegH_sys.show()
