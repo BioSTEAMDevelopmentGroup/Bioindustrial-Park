@@ -24,7 +24,7 @@ Elution = stream_kwargs('Elution', IEXBuffer=1 , units='kg/hr', T=25+273.15,pric
 NFBuffer = stream_kwargs('NFBuffer', NanoBuffer=1, units='kg/hr', T=25+273.15,price=0.6*1.3*1e5/72)
 
 # %% Out
-LegH_Ingredients = stream_kwargs('LegH_Ingredients')
+LegH_Ingredients = stream_kwargs('LegH_Ingredients',units='kg/hr', T=25+273.15, price=100)
 vent1 = stream_kwargs('vent1')
 vent2 = stream_kwargs('vent2')
 effluent1 = stream_kwargs('effluent1')

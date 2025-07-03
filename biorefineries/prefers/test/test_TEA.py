@@ -58,7 +58,7 @@ class LegHTEA(bst.TEA):
         return (FCI*(self.property_tax + self.property_insurance
                     + self.maintenance + self.administration)
                 + self.labor_cost*(1+self.fringe_benefits+self.supplies))
-
+#
 if __name__ == '__main__':
     import biosteam as bst
     from biorefineries.prefers.systems.LegH.LegH import create_LegH_system
@@ -75,3 +75,17 @@ if __name__ == '__main__':
     )
     legH_tea.show()  # Display the TEA summary
     legH_tea.get_cashflow_table()
+    # %% Production costs
+    products = legH_sys.flowsheet('LegH_Ingredients')
+    # %%
+    costs = legH_tea.production_costs(products)# USD/yr
+    np.round(costs / 1e6) # million USD / yr
+
+    # %%
+    feed = legH_sys.flowsheet('Glucose')
+    price = legH_tea.solve_price(feed) # USD/kg
+    round(price, 5)
+    # %%
+    legH_tea.IRR = legH_tea.solve_IRR()
+    legH_tea.show()
+# %%
