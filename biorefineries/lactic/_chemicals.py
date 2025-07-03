@@ -248,7 +248,9 @@ def create_chemicals(set_thermo=True):
     # Holmes, Trans. Faraday Soc. 1962, 58 (0), 1916–1925, abstract
     # This is for auto-population of combustion reactions
     add_chemical('P4O10', phase='s', Hf=-713.2*_cal2joule)
-    add_chemical('Ash', search_ID='CaO', phase='s', Hf=-151688*_cal2joule, HHV=0, LHV=0)
+    CaO = Chemical('CaO', phase='s', Hf=-151688*_cal2joule, HHV=0, LHV=0)
+    chems.append(CaO.copy(ID='Ash'))
+    
     # This is to copy the solid state of Xylose
     Tar = add_chemical('Tar', Xylose, phase_ref='s')
     Glucose.at_state('l')
