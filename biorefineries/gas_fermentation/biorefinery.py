@@ -182,6 +182,7 @@ class Biorefinery(bst.ProcessModel):
         return system
     
     def create_model(self):
+        if not hasattr(self, 'BT'): self.BT = self.B
         system = self.system
         scenario = self.scenario
         model = bst.Model(system)
