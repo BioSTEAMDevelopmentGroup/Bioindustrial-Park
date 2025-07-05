@@ -19,7 +19,10 @@
 import numpy as np
 import pandas as pd
 import biosteam as bst
-from biosteam.utils import TicToc
+try:
+    from biosteam.utils import Timer as TicToc
+except:
+    from biosteam.utils import TicToc
 from biosteam.plots import plot_montecarlo_across_coordinate
 from biorefineries import lactic
 
