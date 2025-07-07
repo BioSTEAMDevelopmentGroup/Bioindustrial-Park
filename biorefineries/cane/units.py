@@ -84,25 +84,22 @@ class CoFermentation(CoFermentation):
 class AeratedCoFermentation(bst.AeratedBioreactor): # For microbial oil production
     V_max_default = 500
     def _init(
-            self, cofermentation, theta_O2=0.5, 
+            self, cofermentation, 
             dT_hx_loop=8,
             Q_O2_consumption=-460240, # [kJ/kmol] equivalent to 110 kcal / mol as in https://www.academia.edu/19636928/Bioreactor_Design_for_Chemical_Engineers
             batch=True,
             **kwargs,
         ):
-        bst.StirredTankReactor._init(self, batch=batch, dT_hx_loop=dT_hx_loop, **kwargs)
+        bst.AeratedBioreactor._init(self, reactions=None, batch=batch, dT_hx_loop=dT_hx_loop, 
+                                    Q_O2_consumption=Q_O2_consumption,
+                                    optimize_power=True, **kwargs)
         chemicals = self.chemicals
-        self.theta_O2 = theta_O2
         self.hydrolysis_reaction = Rxn('Sucrose + Water -> 2Glucose', 'Sucrose', 1.00, chemicals)
         self.cofermentation = cofermentation
         self.lipid_reaction = self.oil_reaction = PRxn([
             Rxn('TAG + 3Water -> 3FFA + Glycerol', 'TAG', 0.23, chemicals),
             Rxn('TAG + Water -> FFA + DAG', 'TAG', 0.02, chemicals)
         ])
-        self.Q_O2_consumption = Q_O2_consumption
-        self.optimize_power = True
-        self.kLa = bst.units.design_tools.aeration.kLa_stirred_Riet
-        self.kLa_kwargs = {'coefficients': "Van't Riet"}
     
     def _run_vent(self, vent, effluent):
         vent.copy_flow(effluent, ('CO2', 'O2', 'N2'), remove=True)
@@ -117,15 +114,16 @@ class AeratedCoFermentation(bst.AeratedBioreactor): # For microbial oil producti
 class AeratedFermentation(bst.AeratedBioreactor): # For microbial oil production
     V_max_default = 500
     def _init(
-            self, fermentation_reaction, cell_growth_reaction, theta_O2=0.5,
+            self, fermentation_reaction, cell_growth_reaction, 
             dT_hx_loop=8,
             Q_O2_consumption=-460240, # [kJ/kmol] equivalent to 110 kcal / mol as in https://www.academia.edu/19636928/Bioreactor_Design_for_Chemical_Engineers
             batch=True,
             **kwargs,
         ):
-        bst.StirredTankReactor._init(self, batch=batch, dT_hx_loop=dT_hx_loop, **kwargs)
+        bst.AeratedBioreactor._init(self, reactions=None, batch=batch, dT_hx_loop=dT_hx_loop, 
+                                    Q_O2_consumption=Q_O2_consumption,
+                                    optimize_power=True, **kwargs)
         chemicals = self.chemicals
-        self.theta_O2 = theta_O2
         self.hydrolysis_reaction = Rxn('Sucrose + Water -> 2Glucose', 'Sucrose', 1.00, chemicals)
         self.fermentation_reaction = fermentation_reaction
         self.cell_growth_reaction = cell_growth_reaction
@@ -133,10 +131,6 @@ class AeratedFermentation(bst.AeratedBioreactor): # For microbial oil production
             Rxn('TAG + 3Water -> 3FFA + Glycerol', 'TAG', 0.23, chemicals),
             Rxn('TAG + Water -> FFA + DAG', 'TAG', 0.02, chemicals)
         ])
-        self.Q_O2_consumption = Q_O2_consumption
-        self.optimize_power = True
-        self.kLa = bst.units.design_tools.aeration.kLa_stirred_Riet
-        self.kLa_kwargs = {'coefficients': "Van't Riet"}
     
     def _run_vent(self, vent, effluent):
         vent.copy_flow(effluent, ('CO2', 'O2', 'N2'), remove=True)

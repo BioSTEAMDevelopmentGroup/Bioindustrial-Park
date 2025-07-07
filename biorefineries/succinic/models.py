@@ -25,14 +25,10 @@ This module is a modified implementation of modules from the following:
 
 # import numpy as np
 import biosteam as bst
-from chaospy import distributions as shape
 # from biosteam import main_flowsheet as find
 from biosteam.evaluation import Model, Metric
 # from biosteam.evaluation.evaluation_tools import Setter
 from biorefineries.succinic.system_sc import succinic_sys, succinic_tea, succinic_LCA, u, s, unit_groups, unit_groups_dict, spec, price, TEA_breakdown, theoretical_max_g_succinic_acid_per_g_glucose, simulate_and_print
-from biorefineries.succinic.model_utils import EasyInputModel
-# get_annual_factor = lambda: succinic_tea._annual_factor
-
 
 get_annual_factor = lambda: succinic_tea.operating_days*24 # hours per year
 
@@ -136,9 +132,9 @@ for m, u_i in metrics_labels_dict.items():
 
 # IPCC 2013 GWP100a
 metrics.append(Metric('Total GWP100a', lambda: succinic_LCA.GWP, 'kg-CO2-eq/kg', 'Biorefinery'))
-metrics.append(Metric('GWP100a - Heating demand', lambda: succinic_LCA.heating_demand_GWP, 'kg-CO2-eq/kg', 'Biorefinery'))
-metrics.append(Metric('GWP100a - Cooling demand', lambda: succinic_LCA.cooling_demand_GWP, 'kg-CO2-eq/kg', 'Biorefinery'))
-metrics.append(Metric('GWP100a - Electricity demand (non-cooling)', lambda: succinic_LCA.electricity_demand_non_cooling_GWP, 'kg-CO2-eq/kg', 'Biorefinery'))
+# metrics.append(Metric('GWP100a - Heating demand', lambda: succinic_LCA.heating_demand_GWP, 'kg-CO2-eq/kg', 'Biorefinery'))
+# metrics.append(Metric('GWP100a - Cooling demand', lambda: succinic_LCA.cooling_demand_GWP, 'kg-CO2-eq/kg', 'Biorefinery'))
+# metrics.append(Metric('GWP100a - Electricity demand (non-cooling)', lambda: succinic_LCA.electricity_demand_non_cooling_GWP, 'kg-CO2-eq/kg', 'Biorefinery'))
 
 metrics.append(Metric('GWP100a - Feedstock (FGHTP) ', lambda: succinic_LCA.FGHTP_GWP, 'kg-CO2-eq/kg', 'Biorefinery'))
 metrics.append(Metric('GWP100a - Materials (except feedstock and BT.natural_gas) ', lambda: succinic_LCA.material_GWP, 'kg-CO2-eq/kg', 'Biorefinery'))
@@ -157,9 +153,9 @@ metrics.append(Metric(f'GWP100a - Materials breakdown - H3PO4', lambda: succinic
 
 # FEC
 metrics.append(Metric('Total FEC', lambda: succinic_LCA.FEC, 'kg-CO2-eq/kg', 'Biorefinery'))
-metrics.append(Metric('FEC - Heating demand', lambda: succinic_LCA.heating_demand_FEC, 'kg-CO2-eq/kg', 'Biorefinery'))
-metrics.append(Metric('FEC - Cooling demand', lambda: succinic_LCA.cooling_demand_FEC, 'kg-CO2-eq/kg', 'Biorefinery'))
-metrics.append(Metric('FEC - Electricity demand (non-cooling)', lambda: succinic_LCA.electricity_demand_non_cooling_FEC, 'kg-CO2-eq/kg', 'Biorefinery'))
+# metrics.append(Metric('FEC - Heating demand', lambda: succinic_LCA.heating_demand_FEC, 'kg-CO2-eq/kg', 'Biorefinery'))
+# metrics.append(Metric('FEC - Cooling demand', lambda: succinic_LCA.cooling_demand_FEC, 'kg-CO2-eq/kg', 'Biorefinery'))
+# metrics.append(Metric('FEC - Electricity demand (non-cooling)', lambda: succinic_LCA.electricity_demand_non_cooling_FEC, 'kg-CO2-eq/kg', 'Biorefinery'))
 
 metrics.append(Metric('FEC - Feedstock (FGHTP) ', lambda: succinic_LCA.feedstock_FEC, 'kg-CO2-eq/kg', 'Biorefinery'))
 metrics.append(Metric('FEC - Materials (except feedstock and BT.natural_gas) ', lambda: succinic_LCA.material_FEC, 'kg-CO2-eq/kg', 'Biorefinery'))
@@ -201,7 +197,7 @@ namespace_dict['theoretical_max_g_succinic_acid_per_g_glucose'] = theoretical_ma
 #%% 
 
 
-model = succinic_model = EasyInputModel(succinic_sys, metrics, namespace_dict=namespace_dict)
+model = succinic_model = Model(succinic_sys, metrics)
 
 
 #%% Bugfix barrage

@@ -21,6 +21,13 @@ This module is a modified implementation of modules from the following:
 import thermosteam as tmo
 from thermosteam import functional as fn
 from biorefineries.sugarcane import chemicals as sugarcane_chems
+from biorefineries.cornstover import create_chemicals as cs_create_chemicals
+from biorefineries.corn import create_chemicals as corn_create_chemicals
+
+cornstover_chems = cs_create_chemicals()
+
+corn_chems = corn_create_chemicals()
+
 # from biorefineries import sugarcane as sc
 __all__ = ('TAL_chemicals', 'chemical_groups', 'soluble_organics', 'combustibles')
 
@@ -102,8 +109,8 @@ KCl = chemical_database('KCl', phase = 's')
 AmmoniumHydroxide = chemical_database('AmmoniumHydroxide', phase='l', Hf=-336.719e3)
 CalciumDihydroxide = chemical_database('CalciumDihydroxide',
                                         phase='s', Hf=-235522*_cal2joule)
-AmmoniumSulfate = chemical_database('AmmoniumSulfate', phase='l',
-                                    Hf=-288994*_cal2joule)
+# AmmoniumSulfate = chemical_database('AmmoniumSulfate', phase='l',
+#                                     Hf=-288994*_cal2joule)
 NaNO3 = chemical_database('NaNO3', phase='l', Hf=-118756*_cal2joule)
 # NIST https://webbook.nist.gov/cgi/cbook.cgi?ID=C7757826&Mask=2, accessed 04/07/2020
 Na2SO4 = chemical_database('Na2SO4', phase='l', Hf=-1356.38e3)
@@ -116,8 +123,8 @@ Na2SO4 = chemical_database('Na2SO4', phase='l', Hf=-1356.38e3)
 # Soluble organic salts
 # =============================================================================
 
-AmmoniumAcetate = chemical_database('AmmoniumAcetate', phase='l', 
-                                         Hf=-154701*_cal2joule)
+# AmmoniumAcetate = chemical_database('AmmoniumAcetate', phase='l', 
+#                                          Hf=-154701*_cal2joule)
 
 # Hf from a Ph.D. dissertation (Lactic Acid Production from Agribusiness Waste Starch
 # Fermentation with Lactobacillus Amylophilus and Its Cradle-To-Gate Life 
@@ -552,8 +559,8 @@ Alanine = chemical_database('Alanine', phase='s')
 SodiumPhosphate = chemical_database('SodiumPhosphate', phase='l')
 
 P4O10 = chemical_database('P4O10', phase='s', Hf=-713.2*_cal2joule)
-Ash = chemical_database('Ash', search_ID='CaO', phase='s', Hf=-151688*_cal2joule,
-                        HHV=0, LHV=0)
+# Ash = chemical_database('Ash', search_ID='CaO', phase='s', Hf=-151688*_cal2joule,
+#                         HHV=0, LHV=0)
 CaSO4 = chemical_database('CaSO4')
 # This is to copy the solid state of Xylose,
 # cannot directly use Xylose as Xylose is locked at liquid state now
@@ -739,6 +746,7 @@ for chemical in chems: chemical.default()
 # Though set_thermo will first compile the Chemicals object,
 # compile beforehand is easier to debug because of the helpful error message
 
+
 chems.append(sugarcane_chems.H3PO4)
 chems.append(sugarcane_chems.Cellulose)
 chems.append(sugarcane_chems.Hemicellulose)
@@ -746,6 +754,22 @@ chems.append(sugarcane_chems.CaO)
 chems.append(sugarcane_chems.Solids)
 chems.append(sugarcane_chems.Flocculant)
 chems.append(sugarcane_chems.Lignin)
+
+chems.append(cornstover_chems.Acetate)
+chems.append(cornstover_chems.AmmoniumSulfate)
+chems.append(cornstover_chems.AmmoniumAcetate)
+chems.append(cornstover_chems.Cellulase)
+chems.append(cornstover_chems.Ash)
+
+
+chems.append(corn_chems.Starch)
+chems.append(corn_chems.Fiber)
+chems.append(corn_chems.SolubleProtein)
+chems.append(corn_chems.InsolubleProtein)
+chems.append(corn_chems.Oil)
+chems.append(corn_chems.Yeast)
+chems.append(corn_chems.Octane)
+
 
 chems.compile()
 tmo.settings.set_thermo(chems)
@@ -784,7 +808,7 @@ chems.set_synonym('AmmoniumHydroxide', 'NH4OH')
 chems.set_synonym('DAP', 'DiammoniumPhosphate')
 
 
-chems.set_synonym('AceticAcid', 'Acetate')
+# chems.set_synonym('AceticAcid', 'Acetate')
 
 chems.set_synonym('PD', 'Acetylacetone')
 

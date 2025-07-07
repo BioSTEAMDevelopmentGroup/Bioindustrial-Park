@@ -209,6 +209,7 @@ class ProcessSpecification(bst.process_tools.ReactorSpecification):
                  'HXN_Q_bal_percent_error_dict',
                  'set_production_capacity',
                  'desired_annual_production',
+                 'byproduct_yields_decrease_policy',
                  )
     
     def __init__(self, evaporator, pump, mixer, heat_exchanger, seed_train_system, seed_train,
@@ -220,7 +221,8 @@ class ProcessSpecification(bst.process_tools.ReactorSpecification):
                  HXN_new_HXs={}, HXN_new_HX_utils={}, HXN_Q_bal_percent_error_dict = {},
                  feedstock_mass=104192.83224417375, pretreatment_reactor = None,
                   load_spec_1=None, load_spec_2=None, load_spec_3=None, set_production_capacity=None,
-                  desired_annual_production=25000.,):
+                  desired_annual_production=25000.,
+                  byproduct_yields_decrease_policy='sequential, when product yield too high',):
         self.substrates = substrates
         self.reactor = reactor #: [Unit] Reactor unit operation
         self.products = products #: tuple[str] Names of main products
@@ -248,6 +250,7 @@ class ProcessSpecification(bst.process_tools.ReactorSpecification):
         self.HXN_Q_bal_percent_error_dict = HXN_Q_bal_percent_error_dict
         self.set_production_capacity = set_production_capacity
         self.desired_annual_production = desired_annual_production
+        self.byproduct_yields_decrease_policy = byproduct_yields_decrease_policy
         
         self.count = 0 
         self.count_exceptions = 0
@@ -422,10 +425,14 @@ class ProcessSpecification(bst.process_tools.ReactorSpecification):
             Yield in weight fraction of substrates converted to product 
             over theoretical maximum yield.  
         
-        Warnings
-        --------
-        At higher yields, to prevent >100% conversion of sugars, 
-        first citrate and then cell mass yields are decreased.
+        Notes
+        -----
+        At higher product yields (high enough to result in >100% conversion of sugars), to prevent >100% conversion of sugars:
+        (a) first citrate and then cell mass yields are decreased (if spec.byproduct_yields_decrease_policy='sequential, when product yield too high'; default); OR 
+        (b) both citrate and cell mass yields are decreased uniformly (if spec.byproduct_yields_decrease_policy='simultaneous, when product yield too high'); OR
+        (c) can set byproduct yields to uniformly decrease from the very lowest product yield instead (if spec.byproduct_yields_decrease_policy=
+        'simultaneous, from 0 product yield'; i.e., from product yield of 0 to 100%, with the increased coproduct yields at 0% mirroring the decrease 
+        from the point of the product yield being too high to being 100%).
         
         """
         reactor = self.reactor
@@ -453,54 +460,73 @@ class ProcessSpecification(bst.process_tools.ReactorSpecification):
             unit.xylose_to_CitricAcid_rxn.X =\
                 regular_citric_acid_conversion * unit.ferm_ratio
             
-            if sugar_to_TAL_conversion>=\
-                1. - regular_microbe_conversion - regular_citric_acid_conversion:
-                # first decrease citric acid production if needed
-                unit.glucose_to_CitricAcid_rxn.X =\
-                unit.xylose_to_CitricAcid_rxn.X =\
-                    max(1e-6, 1.-1e-6 - sugar_to_TAL_conversion - regular_microbe_conversion)
-                    
-                sum_sugar_conversion = get_sugar_conversion(unit)
-                if sum_sugar_conversion>=1.:
-                # then decrease cell mass yield if needed
-                    unit.glucose_to_microbe_rxn.X =\
-                    unit.xylose_to_microbe_rxn.X =\
-                        max(1e-6, 1.-2e-6 - sugar_to_TAL_conversion)
-                    
-            # else:
-            #     # reset to regular citric acid and cell mass yields
-            #     unit.glucose_to_microbe_rxn.X =\
-            #     unit.xylose_to_microbe_rxn.X =\
-            #         regular_microbe_conversion * unit.ferm_ratio
-                    
-            #     unit.glucose_to_CitricAcid_rxn.X =\
-            #     unit.xylose_to_CitricAcid_rxn.X =\
-            #         regular_citric_acid_conversion * unit.ferm_ratio
+            if self.byproduct_yields_decrease_policy == 'sequential, when product yield too high':
+                if sugar_to_TAL_conversion>=\
+                    1. - regular_microbe_conversion - regular_citric_acid_conversion:
+                    # first decrease citric acid production if needed
+                    unit.glucose_to_CitricAcid_rxn.X =\
+                    unit.xylose_to_CitricAcid_rxn.X =\
+                        max(1e-6, 1.-1e-6 - sugar_to_TAL_conversion - regular_microbe_conversion)
+                        
+                    sum_sugar_conversion = get_sugar_conversion(unit)
+                    if sum_sugar_conversion>=1.:
+                    # then decrease cell mass yield if needed
+                        unit.glucose_to_microbe_rxn.X =\
+                        unit.xylose_to_microbe_rxn.X =\
+                            max(1e-6, 1.-2e-6 - sugar_to_TAL_conversion)
+            elif self.byproduct_yields_decrease_policy == 'simultaneous, when product yield too high':
+                if sugar_to_TAL_conversion>=\
+                    1. - regular_microbe_conversion - regular_citric_acid_conversion:
+                    sum_sugar_conversion = get_sugar_conversion(unit)
+                    if sum_sugar_conversion>=1.:
+                    # decrease both citrate and microbe yields
+                        tot_yield_decrease_needed = sum_sugar_conversion - 1. + 2e-6
+                        
+                        ### if yield decrease is to be equal for all coproducts
+                        # n_coproducts = 2. # citrate, microbe
+                        # indiv_yield_decrease_needed = tot_yield_decrease_needed/n_coproducts
+                        # unit.glucose_to_CitricAcid_rxn.X -= indiv_yield_decrease_needed
+                        # unit.xylose_to_CitricAcid_rxn.X -= indiv_yield_decrease_needed
+                        # unit.glucose_to_microbe_rxn.X -= indiv_yield_decrease_needed
+                        # unit.xylose_to_microbe_rxn.X -= indiv_yield_decrease_needed
+                        ###
+                        
+                        ### if yield decrease is to be by a ratio such that all coproducts approach 0 yield together
+                        citrate_yield_decrease_needed = tot_yield_decrease_needed * regular_citric_acid_conversion/(regular_citric_acid_conversion+regular_microbe_conversion)
+                        microbe_yield_decrease_needed = tot_yield_decrease_needed - citrate_yield_decrease_needed
+                        unit.glucose_to_CitricAcid_rxn.X -= citrate_yield_decrease_needed
+                        unit.xylose_to_CitricAcid_rxn.X -= citrate_yield_decrease_needed
+                        unit.glucose_to_microbe_rxn.X -= microbe_yield_decrease_needed
+                        unit.xylose_to_microbe_rxn.X -= microbe_yield_decrease_needed
+                        ###
+                        
+                        unit.glucose_to_CitricAcid_rxn.X = max(1e-6, unit.glucose_to_CitricAcid_rxn.X)
+                        unit.xylose_to_CitricAcid_rxn.X = max(1e-6, unit.xylose_to_CitricAcid_rxn.X)
+                        unit.glucose_to_microbe_rxn.X = max(1e-6, unit.glucose_to_microbe_rxn.X)
+                        unit.xylose_to_microbe_rxn.X = max(1e-6, unit.xylose_to_microbe_rxn.X)
+                        
+                        ### (continued) if yield decrease is to be by a ratio such that all coproducts approach 0 yield together
+                        # if unit.glucose_to_CitricAcid_rxn.X == unit.xylose_to_CitricAcid_rxn.X == 1e-6:
+                        #     # citrate yield is already minimum
+                        #     unit.glucose_to_microbe_rxn.X -= indiv_yield_decrease_needed
+                        #     unit.xylose_to_microbe_rxn.X -= indiv_yield_decrease_needed
+                        #     unit.glucose_to_microbe_rxn.X = max(1e-6, unit.glucose_to_microbe_rxn.X)
+                        #     unit.xylose_to_microbe_rxn.X = max(1e-6, unit.xylose_to_microbe_rxn.X)
+                        ###
+                        
+                        # citrate_yield_decrease_needed = tot_yield_decrease_needed * regular_citric_acid_conversion/regular_microbe_conversion
+                        # microbe_yield_decrease_needed = tot_yield_decrease_needed - citrate_yield_decrease_needed
+                        
+            elif self.byproduct_yields_decrease_policy == 'simultaneous, from 0 product yield':
+                total_regular_byproduct_yield = regular_citric_acid_conversion + regular_microbe_conversion
+                m1, m2 = -regular_citric_acid_conversion/total_regular_byproduct_yield,\
+                         -regular_microbe_conversion/total_regular_byproduct_yield
+                c1, c2 = -m1, -m2
+                unit.glucose_to_CitricAcid_rxn.X = max(1e-6, m1*sugar_to_TAL_conversion + c1)
+                unit.xylose_to_CitricAcid_rxn.X = max(1e-6, m1*sugar_to_TAL_conversion + c1)
+                unit.glucose_to_microbe_rxn.X = max(1e-6, m2*sugar_to_TAL_conversion + c2)
+                unit.xylose_to_microbe_rxn.X = max(1e-6, m2*sugar_to_TAL_conversion + c2)
                 
-            
-        # rem_glucose = min(0.13, 1. - reactor.glucose_to_TAL_rxn.X)
-        # reactor.glucose_to_acetic_acid_rxn.X = (55./130.) * rem_glucose
-        # reactor.glucose_to_glycerol_rxn.X = (25./130.) * rem_glucose
-        # reactor.glucose_to_biomass_rxn.X = (50./130.) * rem_glucose
-        
-        # rem_xylose = min(0.13, 1. - reactor.xylose_to_TAL_rxn.X)
-        # reactor.xylose_to_acetic_acid_rxn.X = (55./130.) * rem_xylose
-        # reactor.xylose_to_glycerol_rxn.X = (25./130.) * rem_xylose
-        # reactor.xylose_to_biomass_rxn.X = (50./130.) * rem_xylose
-        
-        # reactor.xylose_to_TAL_rxn.X = yield_
-        
-        # TODO: Update
-        # rem_glucose = min(0.08, (1. - reactor.glucose_to_biomass_rxn.X) - reactor.glucose_to_TAL_rxn.X)
-        # reactor.glucose_to_acetic_acid_rxn.X = (40./80.) * rem_glucose
-        # reactor.glucose_to_glycerol_rxn.X = (40./80.) * rem_glucose
-        # # reactor.glucose_to_biomass_rxn.X = (50./130.) * rem_glucose
-        
-        # rem_xylose = min(0.08, (1. - reactor.xylose_to_biomass_rxn.X) - reactor.xylose_to_TAL_rxn.X)
-        # reactor.xylose_to_acetic_acid_rxn.X = (40./80.) * rem_xylose
-        # reactor.xylose_to_glycerol_rxn.X = (40./80.) * rem_xylose
-        # # reactor.xylose_to_biomass_rxn.X = (50./130.) * rem_glucose
-        
     def load_productivity(self, productivity):
         """
         Load productivity specification.

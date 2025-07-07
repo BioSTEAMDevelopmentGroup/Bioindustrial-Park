@@ -8,6 +8,7 @@ from biorefineries.biodiesel.streams import *
 
 bagasse = stream_kwargs('bagasse')
 bagasse_pellets = stream_kwargs('bagasse_pellets')
+filter_cake = stream_kwargs('filter_cake')
 sugarcane = stream_kwargs('sugarcane',
     Water=0.7,
     Glucose=0.01208,

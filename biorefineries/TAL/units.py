@@ -1,3 +1,4 @@
+
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 # Bioindustrial-Park: BioSTEAM's Premier Biorefinery Models and Results
@@ -23,13 +24,17 @@ from flexsolve import aitken_secant
 from biosteam import Unit, BatchCrystallizer
 from biosteam.units import Flash, HXutility, Mixer, MixTank, Pump, \
     SolidsSeparator, StorageTank, LiquidsSplitSettler, \
-    BatchBioreactor, StirredTankReactor
+    BatchBioreactor, StirredTankReactor, LiquidsMixingTank
 from biosteam.units.decorators import cost
 from biosteam.units.design_tools import CEPCI_by_year as CEPCI
 from thermosteam import Stream, MultiStream
 from biorefineries.TAL.process_settings import price
 # from biorefineries.TAL.utils import CEPCI, baseline_feedflow, compute_extra_chemical, adjust_recycle
 from biorefineries.TAL.utils import baseline_feedflow, compute_extra_chemical, adjust_recycle
+
+from thermosteam import SeriesReaction
+from biorefineries.TAL._general_utils import get_pH_polyprotic_acid_mixture, get_molarity
+from flexsolve import IQ_interpolation
 
 _kg_per_ton = 907.18474
 _Gcal_2_kJ = 4.184 * 1e6 # (also MMkcal/hr)
@@ -40,6 +45,32 @@ compute_TAL_titer = lambda effluent: effluent.imass['TAL'] / effluent.F_vol
 
 compute_TAL_mass = lambda effluent: effluent.imass['TAL']
 
+#%% pH utils
+def get_pH_stream(stream):
+    if stream.imol['CitricAcid', 'H3PO4', 'AceticAcid'].sum() > 0.:
+        return get_pH_polyprotic_acid_mixture(stream,
+                                ['CitricAcid', 'H3PO4', 'AceticAcid'], 
+                                [[10**-3.13, 10**-4.76, 10**-6.40], 
+                                 [10**-2.16, 10**-7.21, 10**-12.32],
+                                 [10**-4.76]],
+                                'ideal')
+    else:
+        molarity_NaOH = get_molarity('NaOH', stream)
+        if molarity_NaOH == 0.: return 7.
+        else: return 14. + log(molarity_NaOH, 10.) # assume strong base completely dissociates in aqueous solution
+
+
+def get_pH_given_base_addition(mol_base_per_m3_broth, base_mixer):
+    base_mixer.mol_base_per_m3_broth = mol_base_per_m3_broth
+    base_mixer.simulate_base_addition_and_acids_neutralization()
+    return get_pH_stream(base_mixer.outs[0])
+
+def load_pH(pH, base_mixer):
+    obj_f_pH = lambda mol_base_per_m3_broth: get_pH_given_base_addition(mol_base_per_m3_broth=mol_base_per_m3_broth, 
+                                                                        base_mixer=base_mixer)\
+                                        - pH
+    IQ_interpolation(obj_f_pH, 0., 5., ytol=0.001)
+    
 #%% Reactor
 from biosteam.units.design_tools import PressureVessel
 from biosteam.exceptions import DesignError
@@ -200,7 +231,9 @@ class FeedstockPreprocessing(Unit):
 class BatchCoFermentation(BatchBioreactor):
     # Co-Fermentation time (hr)
     
-    _N_ins = 6
+    auxiliary_unit_names = ('base_mix_tank',)
+    
+    _N_ins = 7
     _N_outs = 2
     
     tau_cofermentation = 120 # initial value; updated by spec.load_productivity
@@ -311,8 +344,11 @@ class BatchCoFermentation(BatchBioreactor):
                  V=3785.,
                  acetate_ID='SodiumAcetate',
                  aeration_rate_basis='fixed rate basis', # 'fixed rate basis' or 'DO saturation basis'
+                 pH_to_load=6.5, # 'unmodified' or float value
                  ):
         BatchBioreactor._init(self,  T=T, P=P, tau=tau, V=V)
+        
+        self.pH_to_load = pH_to_load
         
         self.aeration_rate_basis = aeration_rate_basis
         
@@ -325,19 +361,19 @@ class BatchCoFermentation(BatchBioreactor):
         self.cofermentation_rxns = ParallelRxn([
         #      Reaction definition            Reactant    Conversion
         Rxn('Glucose -> 0.666667 TAL + 2 CO2',        'Glucose',   0.19), 
-        Rxn('Glucose -> 0.3 VitaminA',               'Glucose',   1e-8), # retinol
+        Rxn('Glucose -> 0.3 VitaminA',               'Glucose',   0.), # retinol
         Rxn('Glucose + O2 -> CitricAcid + H2O',               'Glucose',  self.regular_citric_acid_conversion), # 2H+ excluded # from Markham et al.; 16 g/L citrate from 180 g/L glucose
         Rxn('Glucose -> 6 FermMicrobe',       'Glucose',   self.regular_microbe_conversion),
         
         Rxn('Xylose -> 0.555583 TAL + 1.3334 CO2',       'Xylose',    0.19),
-        Rxn('Xylose -> 0.25 VitaminA',       'Xylose',    1e-8),
+        Rxn('Xylose -> 0.25 VitaminA',       'Xylose',    0.),
         Rxn('Xylose -> 0.8333 CitricAcid + H2O',               'Xylose',  self.regular_citric_acid_conversion),
         Rxn('Xylose -> 5 FermMicrobe',        'Xylose',    self.regular_microbe_conversion),
         
         Rxn('AceticAcid -> 0.333333 TAL + 3H2O',       'AceticAcid',    0.19),
-        Rxn('AceticAcid -> 0.1 VitaminA',       'AceticAcid',    1e-8),
-        Rxn('AceticAcid -> 0.0714 VitaminD2',       'AceticAcid',    1e-8),
-        Rxn('AceticAcid -> 2 FermMicrobe',        'AceticAcid',    1e-8),
+        Rxn('AceticAcid -> 0.1 VitaminA',       'AceticAcid',    0.),
+        Rxn('AceticAcid -> 0.0714 VitaminD2',       'AceticAcid',    0.),
+        Rxn('AceticAcid -> 2 FermMicrobe',        'AceticAcid',    0.),
         
         ])
         
@@ -372,9 +408,135 @@ class BatchCoFermentation(BatchBioreactor):
         self.glucose_to_CO2_rxn = self.CO2_generation_rxns[0]
         self.xylose_to_CO2_rxn = self.CO2_generation_rxns[1]
         self.acetate_to_CO2_rxn = self.CO2_generation_rxns[2]
-
+        
+        self._initialize_base_mix_tank()
+    
+    def _initialize_base_mix_tank(self):
+        base_mix_tank =\
+        self.auxiliary('base_mix_tank',
+                       LiquidsMixingTank,
+                       ins=('broth_before_pH_control', # effluent broth
+                            # acetylacetone_decarboxylation_equilibrium, 
+                            # recycled_nonevaporated_supernatant,
+                            # 'recyled_top_prod_from_evaporating_supernatant',
+                            # '', '', '',
+                            self.ins[6], # base for pH control
+                            ), 
+                       outs=('pH_controlled_broth'),
+                       tau=1.,
+                       )
+        
+        base_mix_tank.mol_base_per_m3_broth = 0. # actually kmol-bsase/m3-broth, or mol-base/L-broth
+        base_mix_tank.base_neutralizes_acids = True
+        base_mix_tank.base_ID = 'NaOH'
+        
+        base_mix_tank.neutralization_rxns = SeriesReaction([
+            Rxn('H3PO4 + 3NaOH -> SodiumPhosphate + H2O', 'H3PO4',   1.-1e-5),
+            Rxn('CitricAcid + 3NaOH -> SodiumCitrate + H2O', 'CitricAcid',   1.-1e-5),
+            Rxn('AceticAcid + NaOH -> SodiumAcetate + H2O', 'AceticAcid',   1.-1e-5),
+            ])
+        
+        base_mix_tank.mol_base_per_m3_broth_needed_to_completely_neutralize_acids = 0.
+        
+        base_mix_tank.pH_to_load = self.pH_to_load
+        base_mix_tank.load_pH = lambda pH: load_pH(pH, base_mix_tank)
+        base_mix_tank.get_pH_maintained = lambda: get_pH_stream(base_mix_tank.outs[0])
+        
+        # @base_mix_tank.add_specification(run=False)
+        def base_mix_tank_simulate_base_addition_and_acids_neutralization():
+            base_mix_tank_ins_0 = base_mix_tank.ins[0]
+            base_mix_tank_in_base = base_mix_tank.ins[1]
+            base_mix_tank_in_base.empty()
+            base_mix_tank_in_base.imol[base_mix_tank.base_ID] = base_mix_tank.mol_base_per_m3_broth * base_mix_tank_ins_0.F_vol
+            
+            base_mix_tank.mol_base_per_m3_broth_needed_to_completely_neutralize_acids =\
+            min_base_req_to_completely_neutralize =\
+                (base_mix_tank_ins_0.imol['AceticAcid']
+                +3.* base_mix_tank_ins_0.imol['CitricAcid']
+                + 3.*base_mix_tank_ins_0.imol['H3PO4'])/base_mix_tank_ins_0.F_vol
+                                        
+            base_mix_tank._run()
+            
+            base_mix_tank_outs_0_l = base_mix_tank.outs[0]['l']
+            
+            
+            if base_mix_tank.base_neutralizes_acids:
+                if base_mix_tank.mol_base_per_m3_broth < min_base_req_to_completely_neutralize:
+                    
+                    # base_mix_tank.neutralization_rxns = SeriesReaction([
+                    #     Rxn('0.3333H3PO4 + NaOH -> 0.3333SodiumPhosphate + 0.3333H2O', 'NaOH',   1.-1e-5),
+                    #     Rxn('0.3333CitricAcid + NaOH -> 0.3333SodiumCitrate + 0.3333H2O', 'NaOH',   1.-1e-5),
+                    #     Rxn('AceticAcid + NaOH -> SodiumAcetate + H2O', 'NaOH',   1.-1e-5),
+                    #     ])
+                    
+                    if base_mix_tank_outs_0_l.imol['NaOH'] > 3.*base_mix_tank_outs_0_l.imol['H3PO4']:
+                        mol_H3PO4 = base_mix_tank_outs_0_l.imol['H3PO4']
+                        base_mix_tank_outs_0_l.imol['H3PO4'] = 0.
+                        base_mix_tank_outs_0_l.imol['NaOH'] -= 3.*mol_H3PO4
+                        base_mix_tank_outs_0_l.imol['SodiumPhosphate'] += mol_H3PO4
+                        base_mix_tank_outs_0_l.imol['H2O'] += mol_H3PO4
+                    else:
+                        mol_NaOH = base_mix_tank_outs_0_l.imol['NaOH']
+                        base_mix_tank_outs_0_l.imol['NaOH'] = 0.
+                        base_mix_tank_outs_0_l.imol['H3PO4'] -= 0.3333*mol_NaOH
+                        base_mix_tank_outs_0_l.imol['SodiumPhosphate'] += 0.3333*mol_NaOH
+                        base_mix_tank_outs_0_l.imol['H2O'] += 0.3333*mol_NaOH
+                        
+                        
+                    if base_mix_tank_outs_0_l.imol['NaOH'] > 3.*base_mix_tank_outs_0_l.imol['CitricAcid']:
+                        mol_CitricAcid = base_mix_tank_outs_0_l.imol['CitricAcid']
+                        base_mix_tank_outs_0_l.imol['CitricAcid'] = 0.
+                        base_mix_tank_outs_0_l.imol['NaOH'] -= 3.*mol_CitricAcid
+                        base_mix_tank_outs_0_l.imol['SodiumCitrate'] += mol_CitricAcid
+                        base_mix_tank_outs_0_l.imol['H2O'] += mol_CitricAcid
+                    else:
+                        mol_NaOH = base_mix_tank_outs_0_l.imol['NaOH']
+                        base_mix_tank_outs_0_l.imol['NaOH'] = 0.
+                        base_mix_tank_outs_0_l.imol['CitricAcid'] -= 0.3333*mol_NaOH
+                        base_mix_tank_outs_0_l.imol['SodiumCitrate'] += 0.3333*mol_NaOH
+                        base_mix_tank_outs_0_l.imol['H2O'] += 0.3333*mol_NaOH
+                        
+                        
+                    if base_mix_tank_outs_0_l.imol['NaOH'] > base_mix_tank_outs_0_l.imol['AceticAcid']:
+                        mol_AceticAcid = base_mix_tank_outs_0_l.imol['AceticAcid']
+                        base_mix_tank_outs_0_l.imol['AceticAcid'] = 0.
+                        base_mix_tank_outs_0_l.imol['NaOH'] -= mol_AceticAcid
+                        base_mix_tank_outs_0_l.imol['SodiumAcetate'] += mol_AceticAcid
+                        base_mix_tank_outs_0_l.imol['H2O'] += mol_AceticAcid
+                    else:
+                        mol_NaOH = base_mix_tank_outs_0_l.imol['NaOH']
+                        base_mix_tank_outs_0_l.imol['NaOH'] = 0.
+                        base_mix_tank_outs_0_l.imol['AceticAcid'] -= mol_NaOH
+                        base_mix_tank_outs_0_l.imol['SodiumAcetate'] += mol_NaOH
+                        base_mix_tank_outs_0_l.imol['H2O'] += mol_NaOH
+                    
+                else:
+                    base_mix_tank.neutralization_rxns = SeriesReaction([
+                        Rxn('H3PO4 + 3NaOH -> SodiumPhosphate + H2O', 'H3PO4',   1.),
+                        Rxn('CitricAcid + 3NaOH -> SodiumCitrate + H2O', 'CitricAcid',   1.),
+                        Rxn('AceticAcid + NaOH -> SodiumAcetate + H2O', 'AceticAcid',   1.),
+                        ])
+                    
+                    base_mix_tank.outs[0].phase='l'
+                    # base_mix_tank.neutralization_rxns.adiabatic_reaction(base_mix_tank.outs[0])
+                    base_mix_tank.neutralization_rxns(base_mix_tank.outs[0])
+            
+            base_mix_tank.outs[0].phase='l'
+        
+        base_mix_tank.simulate_base_addition_and_acids_neutralization = base_mix_tank_simulate_base_addition_and_acids_neutralization
+        
+        @base_mix_tank.add_specification(run=False)
+        def base_mix_tank_pH_loading_spec():
+            base_mix_tank.ins[0].copy_like(self.outs[1])
+            if base_mix_tank.pH_to_load == 'unmodified':
+                base_mix_tank.mol_base_per_m3_broth = 0.
+                base_mix_tank.simulate_base_addition_and_acids_neutralization()
+            else:
+                base_mix_tank.load_pH(base_mix_tank.pH_to_load)
+    
+    
     def _run(self):
-        feed, seed, CSL, Acetate_spiking, DAP, air = self.ins
+        feed, seed, CSL, Acetate_spiking, DAP, air, base_for_pH_control = self.ins
         for i in [CSL, Acetate_spiking, DAP, air]: i.empty()
         
         vapor, effluent = self.outs
@@ -443,12 +605,16 @@ class BatchCoFermentation(BatchBioreactor):
         
         # self.effluent_titer = compute_TAL_titer(effluent)
         # self.effluent = effluent
+        base_mix_tank = self.base_mix_tank
+        base_mix_tank.pH_to_load = self.pH_to_load
+        base_mix_tank.specifications[0]()
+        # base_mix_tank._run()
+        effluent.copy_like(base_mix_tank.outs[0])
         
     @property
     def effluent_titer(self):
         return compute_TAL_titer(self.effluent)
-
-
+    
 # class AeratedTALCoFermentation(AeratedBioreactor):
     
 # Seed train, 5 stages, 2 trains
@@ -498,19 +664,19 @@ class SeedTrain(Unit):
         self.cofermentation_rxns = ParallelRxn([
         #      Reaction definition            Reactant    Conversion
         Rxn('Glucose -> 0.666667 TAL + 2 CO2',        'Glucose',   0.19), 
-        Rxn('Glucose -> 0.3 VitaminA',               'Glucose',   1e-8), # retinol
+        Rxn('Glucose -> 0.3 VitaminA',               'Glucose',   0.), # retinol
         Rxn('Glucose -> CitricAcid + H2O',               'Glucose',  self.regular_citric_acid_conversion), # 2H+ excluded # from Markham et al.; 16 g/L citrate from 180 g/L glucose
         Rxn('Glucose -> 6 FermMicrobe',       'Glucose',   self.regular_microbe_conversion),
         
         Rxn('Xylose -> 0.555583 TAL + 1.3334 CO2',       'Xylose',    0.19),
-        Rxn('Xylose -> 0.25 VitaminA',       'Xylose',    1e-8),
+        Rxn('Xylose -> 0.25 VitaminA',       'Xylose',    0.),
         Rxn('Xylose -> 0.8333 CitricAcid + H2O',               'Xylose',  self.regular_citric_acid_conversion),
         Rxn('Xylose -> 5 FermMicrobe',        'Xylose',    self.regular_microbe_conversion),
         
         Rxn('AceticAcid -> 0.333333 TAL + 2CO2 + 6H2O',       'AceticAcid',    0.19),
-        Rxn('AceticAcid -> 0.1 VitaminA',       'AceticAcid',    1e-8),
-        Rxn('AceticAcid -> 0.0714 VitaminD2',       'AceticAcid',    1e-8),
-        Rxn('AceticAcid -> 2 FermMicrobe',        'AceticAcid',    1e-8),
+        Rxn('AceticAcid -> 0.1 VitaminA',       'AceticAcid',    0.),
+        Rxn('AceticAcid -> 0.0714 VitaminD2',       'AceticAcid',    0.),
+        Rxn('AceticAcid -> 2 FermMicrobe',        'AceticAcid',    0.),
         
         ])
         
@@ -823,20 +989,10 @@ class HydrogenationReactor(StirredTankReactor):
             'Ni-SiO2 catalyst': 1.}
     
     mcat_frac = 0.2 # fraction of catalyst by weight in relation to the reactant (TAL) # from Huber group
-    hydrogenation_rxns = ParallelRxn([
-            #   Reaction definition   Reactant   Conversion
-            Rxn('TAL + 2H2 -> HMTHP',         'TAL',   0.969), # conversion from Huber group experimental data
-            # Rxn('HMDHP + H2 -> HMTHP',         'HMDHP',   1.-1e-5)
-            ])
-    byproduct_formation_rxns  = ParallelRxn([
-            #   Reaction definition   Reactant   Conversion
-            Rxn('TAL + 3H2 -> DHL + H2O',         'TAL',   1.-1e-5), # conversion from Huber group experimental data
-            # Rxn('TAL + H2 -> HMDHP',         'TAL',   1-0.2125),  # conversion from Huber group experimental data
-            ])
-    
-    TAL_to_HMP_rxn = hydrogenation_rxns[0]
     
     spent_catalyst_replacements_per_year = 1. # number of times the entire catalyst_weight is replaced per year
+    
+    catalyst_weight = 0. # updated in _run
     
     def _init(self,  
                  tau = 9.4, # from Huber group
@@ -852,6 +1008,19 @@ class HydrogenationReactor(StirredTankReactor):
         # self.heat_exchanger = hx = HXutility(None, None, None, T=T) 
         self.NiSiO2_catalyst_price = NiSiO2_catalyst_price
         self.heat_exchanger.rigorous = rigorous_hx
+        self.hydrogenation_rxns = hydrogenation_rxns = ParallelRxn([
+                #   Reaction definition   Reactant   Conversion
+                Rxn('TAL + 2H2 -> HMTHP',         'TAL',   0.969), # conversion from Huber group experimental data
+                # Rxn('HMDHP + H2 -> HMTHP',         'HMDHP',   1.-1e-5)
+                ])
+        self.byproduct_formation_rxns  = ParallelRxn([
+                #   Reaction definition   Reactant   Conversion
+                Rxn('TAL + 3H2 -> DHL + H2O',         'TAL',   1.-1e-5), # conversion from Huber group experimental data
+                # Rxn('TAL + H2 -> HMDHP',         'TAL',   1-0.2125),  # conversion from Huber group experimental data
+                ])
+        
+        self.TAL_to_HMP_rxn = hydrogenation_rxns[0]
+        
     def _run(self):
         feed, recycle, reagent, recovered_catalyst, fresh_catalyst = self.ins
         vent, spent_catalyst, effluent = self.outs
@@ -881,10 +1050,10 @@ class HydrogenationReactor(StirredTankReactor):
         effluent.imol['H2'] = 0.
         
         # 
-        req_cat_mass_flow = cat_weight/tau
         current_cat_mass_flow = recovered_catalyst.imass['NiSiO2']
         spent_catalyst_mass_flow = self.spent_catalyst_replacements_per_year*cat_weight/self.TEA_operating_hours # kg/h
         current_cat_mass_flow-=spent_catalyst_mass_flow
+        req_cat_mass_flow = min(spent_catalyst_mass_flow, cat_weight/tau)
         
         spent_catalyst.phase = 's'
         spent_catalyst.imass['NiSiO2'] = spent_catalyst_mass_flow
@@ -944,16 +1113,6 @@ class DehydrationReactor(StirredTankReactor):
     _F_BM_default = {**StirredTankReactor._F_BM_default,
             'Amberlyst-70 catalyst': 1}
     mcat_frac = 0.5 # fraction of catalyst by weight in relation to the reactant (HMTHP)
-    dehydration_rxns = ParallelRxn([
-            #   Reaction definition                                       Reactant   Conversion
-            Rxn('HMTHP -> PSA + H2O',         'HMTHP',   0.871) # conversion from Huber group experimental data
-                ])
-    byproduct_formation_rxns  = ParallelRxn([
-            #   Reaction definition   Reactant   Conversion
-            Rxn('HMTHP -> DHL + H2O',         'HMTHP',   1.-1e-5), # conversion from Huber group experimental data
-            # Rxn('TAL + H2 -> HMDHP',         'TAL',   1-0.2125),  # conversion from Huber group experimental data
-            ])
-    HMP_to_PSA_rxn = dehydration_rxns[0]
     
     spent_catalyst_replacements_per_year = 1. # number of times the entire catalyst_weight is replaced per year
     
@@ -971,7 +1130,17 @@ class DehydrationReactor(StirredTankReactor):
         # self.heat_exchanger = hx = HXutility(None, None, None, T=T) 
         self.Amberlyst70_catalyst_price = Amberlyst70_catalyst_price
         self.heat_exchanger.rigorous = rigorous_hx
-    
+        self.dehydration_rxns = dehydration_rxns = ParallelRxn([
+                #   Reaction definition                                       Reactant   Conversion
+                Rxn('HMTHP -> PSA + H2O',         'HMTHP',   0.871) # conversion from Huber group experimental data
+                    ])
+        self.byproduct_formation_rxns  = ParallelRxn([
+                #   Reaction definition   Reactant   Conversion
+                Rxn('HMTHP -> DHL + H2O',         'HMTHP',   1.-1e-5), # conversion from Huber group experimental data
+                # Rxn('TAL + H2 -> HMDHP',         'TAL',   1-0.2125),  # conversion from Huber group experimental data
+                ])
+        self.HMP_to_PSA_rxn = dehydration_rxns[0]
+        
     def _run(self):
         feed, recycle, recovered_catalyst, fresh_catalyst = self.ins
         vent, spent_catalyst, effluent = self.outs
@@ -1046,22 +1215,7 @@ class RingOpeningHydrolysisReactor(StirredTankReactor):
     # _F_BM_default = {**StirredTankReactor._F_BM_default,
     #         'Heat exchangers': 3.,}
     
-    ring_opening_rxns = ParallelRxn([
-            #   Reaction definition                                       Reactant   Conversion
-            Rxn('PSA -> SA',         'PSA',   0.999) # conversion from Huber group
-                ])
-    
-    PSA_to_SA_rxn = ring_opening_rxns[0]
-    hydrolysis_rxns = ParallelRxn([
-            #   Reaction definition                                       Reactant   Conversion
-            Rxn('SA + KOH -> KSA + H2O',         'SA',   1.-1e-5) # assumed 
-                ])
-    SA_to_KSA_rxn = hydrolysis_rxns[0]
-    byproduct_formation_rxns = ParallelRxn([
-            #   Reaction definition                                       Reactant   Conversion
-            Rxn('PSA -> 0.2PolyPSA',         'PSA',   1.-1e-5) # assumed
-                ])
-    
+
     def _init(self,  
                  tau = 19., # from Huber group
                  T=130. + 273.15, # from Huber group
@@ -1072,7 +1226,23 @@ class RingOpeningHydrolysisReactor(StirredTankReactor):
                  **args):
         super()._init(T=T, tau=tau, P=P, batch=batch, vessel_material=vessel_material)
         self.heat_exchanger.rigorous = rigorous_hx
-    
+            
+        self.ring_opening_rxns = ring_opening_rxns = ParallelRxn([
+                #   Reaction definition                                       Reactant   Conversion
+                Rxn('PSA -> SA',         'PSA',   0.999) # conversion from Huber group
+                    ])
+        
+        self.PSA_to_SA_rxn = ring_opening_rxns[0]
+        self.hydrolysis_rxns = hydrolysis_rxns= ParallelRxn([
+                #   Reaction definition                                       Reactant   Conversion
+                Rxn('SA + KOH -> KSA + H2O',         'SA',   1.-1e-5) # assumed 
+                    ])
+        self.SA_to_KSA_rxn = hydrolysis_rxns[0]
+        self.byproduct_formation_rxns = ParallelRxn([
+                #   Reaction definition                                       Reactant   Conversion
+                Rxn('PSA -> 0.2PolyPSA',         'PSA',   1.-1e-5) # assumed
+                    ])
+        
     def _run(self):
         feed, recycle, reagent = self.ins
         vent, effluent = self.outs
@@ -1097,6 +1267,8 @@ class RingOpeningHydrolysisReactor(StirredTankReactor):
         effluent.T = self.T
         effluent.P = self.P
 
+        
+        
     def _design(self):
         super()._design()
     

@@ -1,15 +1,27 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+# Oxalic acid biorefineries.
+# Copyright (C) 2024-, Sarang Bhagwat <sarangb2@illinois.edu>
+# 
+# This module is under the UIUC open-source license. See 
+# github.com/BioSTEAMDevelopmentGroup/biosteam/blob/master/LICENSE.txt
+# for license details.
+#!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-Created on Fri Jul 31 12:00:51 2020
-@author: sarangbhagwat
+This module is a modified implementation of modules from the following:
+[1]	Bhagwat et al., Sustainable Production of Acrylic Acid via 3-Hydroxypropionic Acid from Lignocellulosic Biomass. ACS Sustainable Chem. Eng. 2021, 9 (49), 16659–16669. https://doi.org/10.1021/acssuschemeng.1c05441
+[2]	Li et al., Sustainable Lactic Acid Production from Lignocellulosic Biomass. ACS Sustainable Chem. Eng. 2021, 9 (3), 1341–1351. https://doi.org/10.1021/acssuschemeng.0c08055
+[3]	Cortes-Peña et al., BioSTEAM: A Fast and Flexible Platform for the Design, Simulation, and Techno-Economic Analysis of Biorefineries under Uncertainty. ACS Sustainable Chem. Eng. 2020, 8 (8), 3302–3310. https://doi.org/10.1021/acssuschemeng.9b07040
 """
+
 
 import biosteam as bst
 import flexsolve as flx
 import numpy as np
 from biosteam.exceptions import InfeasibleRegion
-from biorefineries.TAL.units import compute_TAL_titer, compute_TAL_mass
-from winsound import Beep
+from biorefineries.HP.units import compute_HP_titer, compute_HP_mass
+# from winsound import Beep
 
 _red_highlight_white_text = '\033[1;47;41m'
 _yellow_text = '\033[1;33m'
@@ -137,7 +149,7 @@ def evaluate_across_specs(spec, system,
                         # if spec.set_production_capacity: spec.set_production_capacity(desired_annual_production=spec.desired_annual_production)
                         return get_metrics()
                     except:
-                        Beep(640, 500)
+                        # Beep(640, 500)
                         import pdb
                         pdb.set_trace()
                 except: pass
@@ -199,6 +211,7 @@ class ProcessSpecification(bst.process_tools.ReactorSpecification):
                  'HXN_Q_bal_percent_error_dict',
                  'set_production_capacity',
                  'desired_annual_production',
+                 'byproduct_yields_decrease_policy',
                  )
     
     def __init__(self, evaporator, pump, mixer, heat_exchanger, seed_train_system, seed_train,
@@ -210,7 +223,8 @@ class ProcessSpecification(bst.process_tools.ReactorSpecification):
                  HXN_new_HXs={}, HXN_new_HX_utils={}, HXN_Q_bal_percent_error_dict = {},
                  feedstock_mass=104192.83224417375, pretreatment_reactor = None,
                   load_spec_1=None, load_spec_2=None, load_spec_3=None, set_production_capacity=None,
-                  desired_annual_production=25000.,):
+                  desired_annual_production=126929.,
+                  byproduct_yields_decrease_policy='sequential, when product yield too high',):
         self.substrates = substrates
         self.reactor = reactor #: [Unit] Reactor unit operation
         self.products = products #: tuple[str] Names of main products
@@ -238,6 +252,7 @@ class ProcessSpecification(bst.process_tools.ReactorSpecification):
         self.HXN_Q_bal_percent_error_dict = HXN_Q_bal_percent_error_dict
         self.set_production_capacity = set_production_capacity
         self.desired_annual_production = desired_annual_production
+        self.byproduct_yields_decrease_policy = byproduct_yields_decrease_policy
         
         self.count = 0 
         self.count_exceptions = 0
@@ -393,14 +408,14 @@ class ProcessSpecification(bst.process_tools.ReactorSpecification):
         """[Stream] Reactor effluent."""
         return self.reactor.outs[0]
     
-    def get_sugar_to_TAL_conversion(self, unit):
-        return unit.glucose_to_TAL_rxn.X
+    def get_sugar_to_HP_conversion(self, unit):
+        return unit.glucose_to_HP_rxn.X
     
     def get_sugar_conversion(self, unit):
-        return self.get_sugar_to_TAL_conversion(unit) +\
-            unit.glucose_to_microbe_rxn.X +\
-            unit.glucose_to_CitricAcid_rxn.X +\
-            unit.glucose_to_VitaminA_rxn.X
+        return self.get_sugar_to_HP_conversion(unit) +\
+            unit.glucose_to_biomass_rxn.X +\
+            unit.glucose_to_succinic_acid_rxn.X +\
+            unit.glucose_to_xylitol_rxn.X
     
     def load_yield(self, yield_):
         """
@@ -414,83 +429,136 @@ class ProcessSpecification(bst.process_tools.ReactorSpecification):
         
         Warnings
         --------
-        At higher yields, to prevent >100% conversion of sugars, 
-        first citrate and then cell mass yields are decreased.
+        At higher product yields (high enough to result in >100% conversion of sugars), to prevent >100% conversion of sugars:
+        (a) first citrate and then cell mass yields are decreased (if spec.byproduct_yields_decrease_policy='sequential, when product yield too high'; default); OR 
+        (b) both citrate and cell mass yields are decreased uniformly (if spec.byproduct_yields_decrease_policy='simultaneous, when product yield too high'); OR
+        (c) can set byproduct yields to uniformly decrease from the very lowest product yield instead (if spec.byproduct_yields_decrease_policy=
+        'simultaneous, from 0 product yield'; i.e., from product yield of 0 to 100%, with the increased coproduct yields at 0% mirroring the decrease 
+        from the point of the product yield being too high to being 100%).
         
         """
         reactor = self.reactor
         seed_train = self.seed_train
         get_sugar_conversion = self.get_sugar_conversion
-        get_sugar_to_TAL_conversion = self.get_sugar_to_TAL_conversion
+        get_sugar_to_HP_conversion = self.get_sugar_to_HP_conversion
         
-        self.spec_1 = reactor.glucose_to_TAL_rxn.X = reactor.acetate_to_TAL_rxn.X = yield_
-        seed_train.glucose_to_TAL_rxn.X = seed_train.acetate_to_TAL_rxn.X = yield_ * seed_train.ferm_ratio
+        self.spec_1 = yield_
         
         for unit in [reactor, seed_train]:
-            regular_microbe_conversion = unit.regular_microbe_conversion
-            regular_citric_acid_conversion = unit.regular_citric_acid_conversion
+            ferm_ratio = unit.ferm_ratio
+            regular_biomass_conversion = unit.regular_biomass_conversion
+            regular_succinic_acid_conversion = unit.regular_succinic_acid_conversion
+            regular_xylitol_conversion = unit.regular_xylitol_conversion
             
-            unit.xylose_to_TAL_rxn.X = yield_ * unit.ferm_ratio
-            unit.acetate_to_TAL_rxn.X = yield_ * unit.ferm_ratio
-            sugar_to_TAL_conversion = get_sugar_to_TAL_conversion(unit)
+            unit.glucose_to_HP_rxn.X = yield_ * ferm_ratio
+            unit.xylose_to_HP_rxn.X = yield_ * ferm_ratio
+            sugar_to_HP_conversion = get_sugar_to_HP_conversion(unit)
             
-            # reset to regular cell mass yield
-            unit.glucose_to_microbe_rxn.X =\
-            unit.xylose_to_microbe_rxn.X =\
-                regular_microbe_conversion * unit.ferm_ratio
-            # reset to regular citric acid yield
-            unit.glucose_to_CitricAcid_rxn.X =\
-            unit.xylose_to_CitricAcid_rxn.X =\
-                regular_citric_acid_conversion * unit.ferm_ratio
+            # reset to regular cellular biomass yield
+            unit.glucose_to_biomass_rxn.X =\
+            unit.xylose_to_biomass_rxn.X =\
+                regular_biomass_conversion * ferm_ratio
+            # reset to regular acetic acid yield
+            unit.glucose_to_succinic_acid_rxn.X =\
+            unit.xylose_to_succinic_acid_rxn.X =\
+                regular_succinic_acid_conversion * ferm_ratio
+            # reset to regular glycerol yield
+            unit.glucose_to_xylitol_rxn.X =\
+            unit.xylose_to_xylitol_rxn.X =\
+                regular_xylitol_conversion * ferm_ratio
             
-            if sugar_to_TAL_conversion>=\
-                1. - regular_microbe_conversion - regular_citric_acid_conversion:
-                # first decrease citric acid production if needed
-                unit.glucose_to_CitricAcid_rxn.X =\
-                unit.xylose_to_CitricAcid_rxn.X =\
-                    max(1e-6, 1.-1e-6 - sugar_to_TAL_conversion - regular_microbe_conversion)
-                    
-                sum_sugar_conversion = get_sugar_conversion(unit)
-                if sum_sugar_conversion>=1.:
-                # then decrease cell mass yield if needed
-                    unit.glucose_to_microbe_rxn.X =\
-                    unit.xylose_to_microbe_rxn.X =\
-                        max(1e-6, 1.-2e-6 - sugar_to_TAL_conversion)
-                    
-            # else:
-            #     # reset to regular citric acid and cell mass yields
-            #     unit.glucose_to_microbe_rxn.X =\
-            #     unit.xylose_to_microbe_rxn.X =\
-            #         regular_microbe_conversion * unit.ferm_ratio
-                    
-            #     unit.glucose_to_CitricAcid_rxn.X =\
-            #     unit.xylose_to_CitricAcid_rxn.X =\
-            #         regular_citric_acid_conversion * unit.ferm_ratio
+            if self.byproduct_yields_decrease_policy == 'sequential, when product yield too high':
+                if sugar_to_HP_conversion>=\
+                    1. - regular_biomass_conversion - regular_succinic_acid_conversion - regular_xylitol_conversion:
+                    # first decrease acetic acid production if needed
+                    unit.glucose_to_succinic_acid_rxn.X =\
+                    unit.xylose_to_succinic_acid_rxn.X =\
+                        max(1e-6, 1.-1e-6 - sugar_to_HP_conversion - regular_biomass_conversion - regular_xylitol_conversion)
+                        
+                    sum_sugar_conversion = get_sugar_conversion(unit)
+                    if sum_sugar_conversion>=1.:
+                    # then decrease glycerol yield if needed
+                        unit.glucose_to_xylitol_rxn.X =\
+                        unit.xylose_to_xylitol_rxn.X =\
+                            max(1e-6, 1.-2e-6 - sugar_to_HP_conversion - regular_biomass_conversion)
+                            
+                    sum_sugar_conversion = get_sugar_conversion(unit)
+                    if sum_sugar_conversion>=1.:
+                    # then decrease cellular biomass yield if needed
+                        unit.glucose_to_biomass_rxn.X =\
+                        unit.xylose_to_biomass_rxn.X =\
+                            max(1e-6, 1.-2e-6 - sugar_to_HP_conversion)
+                            
+            elif self.byproduct_yields_decrease_policy == 'simultaneous, when product yield too high':
+                if sugar_to_HP_conversion>=\
+                    1. - regular_biomass_conversion - regular_succinic_acid_conversion - regular_xylitol_conversion:
+                    sum_sugar_conversion = get_sugar_conversion(unit)
+                    if sum_sugar_conversion>=1.:
+                    # decrease both acetic_acid and biomass yields
+                        tot_yield_decrease_needed = sum_sugar_conversion - 1. + 2e-6
+                        
+                        ### if yield decrease is to be equal for all coproducts
+                        # n_coproducts = 2. # acetic_acid, biomass
+                        # indiv_yield_decrease_needed = tot_yield_decrease_needed/n_coproducts
+                        # unit.glucose_to_succinic_acid_rxn.X -= indiv_yield_decrease_needed
+                        # unit.xylose_to_succinic_acid_rxn.X -= indiv_yield_decrease_needed
+                        # unit.glucose_to_biomass_rxn.X -= indiv_yield_decrease_needed
+                        # unit.xylose_to_biomass_rxn.X -= indiv_yield_decrease_needed
+                        ###
+                        
+                        inverse_denominator = 1/(regular_succinic_acid_conversion+regular_biomass_conversion+regular_xylitol_conversion)
+                        ### if yield decrease is to be by a ratio such that all coproducts approach 0 yield together
+                        succinic_acid_yield_decrease_needed = tot_yield_decrease_needed * regular_succinic_acid_conversion * inverse_denominator
+                        xylitol_yield_decrease_needed = tot_yield_decrease_needed * regular_xylitol_conversion * inverse_denominator
+                        biomass_yield_decrease_needed = tot_yield_decrease_needed - succinic_acid_yield_decrease_needed - xylitol_yield_decrease_needed
+                        
+                        unit.glucose_to_succinic_acid_rxn.X -= succinic_acid_yield_decrease_needed
+                        unit.xylose_to_succinic_acid_rxn.X -= succinic_acid_yield_decrease_needed
+                        
+                        unit.glucose_to_xylitol_rxn.X -= xylitol_yield_decrease_needed
+                        unit.xylose_to_xylitol_rxn.X -= xylitol_yield_decrease_needed
+                        
+                        unit.glucose_to_biomass_rxn.X -= biomass_yield_decrease_needed
+                        unit.xylose_to_biomass_rxn.X -= biomass_yield_decrease_needed
+                        ###
+                        
+                        unit.glucose_to_succinic_acid_rxn.X = max(1e-6, unit.glucose_to_succinic_acid_rxn.X)
+                        unit.xylose_to_succinic_acid_rxn.X = max(1e-6, unit.xylose_to_succinic_acid_rxn.X)
+                        
+                        unit.glucose_to_xylitol_rxn.X = max(1e-6, unit.glucose_to_xylitol_rxn.X)
+                        unit.xylose_to_xylitol_rxn.X = max(1e-6, unit.glucose_to_xylitol_rxn.X)
+                        
+                        unit.glucose_to_biomass_rxn.X = max(1e-6, unit.glucose_to_biomass_rxn.X)
+                        unit.xylose_to_biomass_rxn.X = max(1e-6, unit.xylose_to_biomass_rxn.X)
+                        
+                        ### (continued) if yield decrease is to be by a ratio such that all coproducts approach 0 yield together
+                        # if unit.glucose_to_succinic_acid_rxn.X == unit.xylose_to_succinic_acid_rxn.X == 1e-6:
+                        #     # acetic_acid yield is already minimum
+                        #     unit.glucose_to_biomass_rxn.X -= indiv_yield_decrease_needed
+                        #     unit.xylose_to_biomass_rxn.X -= indiv_yield_decrease_needed
+                        #     unit.glucose_to_biomass_rxn.X = max(1e-6, unit.glucose_to_biomass_rxn.X)
+                        #     unit.xylose_to_biomass_rxn.X = max(1e-6, unit.xylose_to_biomass_rxn.X)
+                        ###
+                        
+                        # succinic_acid_yield_decrease_needed = tot_yield_decrease_needed * regular_succinic_acid_conversion/regular_biomass_conversion
+                        # biomass_yield_decrease_needed = tot_yield_decrease_needed - succinic_acid_yield_decrease_needed
+                        
+            elif self.byproduct_yields_decrease_policy == 'simultaneous, from 0 product yield':
+                total_regular_byproduct_yield = regular_succinic_acid_conversion + regular_xylitol_conversion + regular_biomass_conversion
+                m1, m2, m3 = -regular_succinic_acid_conversion/total_regular_byproduct_yield,\
+                             -regular_xylitol_conversion/total_regular_byproduct_yield,\
+                             -regular_biomass_conversion/total_regular_byproduct_yield
+                c1, c2, c3 = -m1, -m2, -m3
                 
-            
-        # rem_glucose = min(0.13, 1. - reactor.glucose_to_TAL_rxn.X)
-        # reactor.glucose_to_acetic_acid_rxn.X = (55./130.) * rem_glucose
-        # reactor.glucose_to_glycerol_rxn.X = (25./130.) * rem_glucose
-        # reactor.glucose_to_biomass_rxn.X = (50./130.) * rem_glucose
-        
-        # rem_xylose = min(0.13, 1. - reactor.xylose_to_TAL_rxn.X)
-        # reactor.xylose_to_acetic_acid_rxn.X = (55./130.) * rem_xylose
-        # reactor.xylose_to_glycerol_rxn.X = (25./130.) * rem_xylose
-        # reactor.xylose_to_biomass_rxn.X = (50./130.) * rem_xylose
-        
-        # reactor.xylose_to_TAL_rxn.X = yield_
-        
-        # TODO: Update
-        # rem_glucose = min(0.08, (1. - reactor.glucose_to_biomass_rxn.X) - reactor.glucose_to_TAL_rxn.X)
-        # reactor.glucose_to_acetic_acid_rxn.X = (40./80.) * rem_glucose
-        # reactor.glucose_to_glycerol_rxn.X = (40./80.) * rem_glucose
-        # # reactor.glucose_to_biomass_rxn.X = (50./130.) * rem_glucose
-        
-        # rem_xylose = min(0.08, (1. - reactor.xylose_to_biomass_rxn.X) - reactor.xylose_to_TAL_rxn.X)
-        # reactor.xylose_to_acetic_acid_rxn.X = (40./80.) * rem_xylose
-        # reactor.xylose_to_glycerol_rxn.X = (40./80.) * rem_xylose
-        # # reactor.xylose_to_biomass_rxn.X = (50./130.) * rem_glucose
-        
+                unit.glucose_to_succinic_acid_rxn.X = max(1e-6, m1*sugar_to_HP_conversion + c1)
+                unit.xylose_to_succinic_acid_rxn.X = max(1e-6, m1*sugar_to_HP_conversion + c1)
+                
+                unit.glucose_to_xylitol_rxn.X = max(1e-6, m2*sugar_to_HP_conversion + c2)
+                unit.xylose_to_xylitol_rxn.X = max(1e-6, m2*sugar_to_HP_conversion + c2)
+                
+                unit.glucose_to_biomass_rxn.X = max(1e-6, m3*sugar_to_HP_conversion + c3)
+                unit.xylose_to_biomass_rxn.X = max(1e-6, m3*sugar_to_HP_conversion + c3)
+                
     def load_productivity(self, productivity):
         """
         Load productivity specification.
@@ -561,10 +629,10 @@ class ProcessSpecification(bst.process_tools.ReactorSpecification):
     
     def load_dehydration_conversion(self, conversion):
         dr = self.dehydration_reactor
-        self.spec_1 = dr.TAL_to_MEK_rxn.X = conversion
-        dr.TAL_to_IBA_rxn.X = 0.5 * conversion # original conversions are 0.52 and 0.26, maintain ratio
-        if dr.TAL_to_MEK_rxn.X + dr.TAL_to_IBA_rxn.X > 0.999:
-            dr.TAL_to_IBA_rxn.X = 0.999 - conversion
+        self.spec_1 = dr.HP_to_MEK_rxn.X = conversion
+        dr.HP_to_IBA_rxn.X = 0.5 * conversion # original conversions are 0.52 and 0.26, maintain ratio
+        if dr.HP_to_MEK_rxn.X + dr.HP_to_IBA_rxn.X > 0.999:
+            dr.HP_to_IBA_rxn.X = 0.999 - conversion
         
     def load_byproducts_price(self, price):
         for byproduct in self.byproduct_streams:
@@ -653,7 +721,7 @@ class TiterAndInhibitorsSpecification:
     def __init__(self, evaporator, pump, mixer, heat_exchanger, seed_train_system, reactor, 
                  target_titer, product,
                  maximum_inhibitor_concentration=1.,
-                 products=('TAL',),
+                 products=('HP',),
                  sugars = ('Glucose', 'Xylose', 'Arabinose', 'Sucrose'),
                  inhibitors = ('AceticAcid', 'HMF', 'Furfural'),):
         self.evaporator = evaporator
@@ -672,7 +740,7 @@ class TiterAndInhibitorsSpecification:
             # Assumes acid tolerant strains can tolerate all present acetic acid
         self.target_titer = target_titer
         self.maximum_inhibitor_concentration = maximum_inhibitor_concentration
-        self.get_products_mass = compute_TAL_mass
+        self.get_products_mass = compute_HP_mass
         self.seed_train_system = seed_train_system
         
     @property
@@ -698,7 +766,7 @@ class TiterAndInhibitorsSpecification:
     def calculate_titer(self):
         # product = self.product
         # return product.imass[self.products].sum() / product.F_vol
-        # return compute_TAL_titer(self.product)
+        # return compute_HP_titer(self.product)
         return self.reactor.effluent_titer
     
     def calculate_inhibitors(self): # g / L

@@ -25,6 +25,13 @@ This module is a modified implementation of modules from the following:
 import thermosteam as tmo
 from thermosteam import functional as fn
 from biorefineries.sugarcane import chemicals as sugarcane_chems
+from biorefineries.cornstover import create_chemicals as cs_create_chemicals
+from biorefineries.corn import create_chemicals as corn_create_chemicals
+
+cornstover_chems = cs_create_chemicals()
+
+corn_chems = corn_create_chemicals()
+
 # from biorefineries import sugarcane as sc
 __all__ = ('SA_chemicals', 'chemical_groups', 'soluble_organics', 'combustibles')
 
@@ -124,9 +131,9 @@ CaSO4.Cn.move_up_model_priority('LASTOVKA_S', 0)
 # =============================================================================
 
 Ethanol = chemical_database('Ethanol')
-Acetate = chemical_database('Acetate', phase='l', Hf=-108992*_cal2joule)
-AmmoniumAcetate = chemical_database('AmmoniumAcetate', phase='l', 
-                                         Hf=-154701*_cal2joule)
+# Acetate = chemical_database('Acetate', phase='l', Hf=-108992*_cal2joule)
+# AmmoniumAcetate = chemical_database('AmmoniumAcetate', phase='l', 
+#                                          Hf=-154701*_cal2joule)
 
 DiammoniumSuccinate = chemical_database('DiammoniumSuccinate', phase='l', 
                                         )
@@ -418,9 +425,9 @@ Xylan = chemical_defined('Xylan', phase='s', formula='C5H8O4', Hf=-182100*_cal2j
 Xylan.copy_models_from(Xylose, ['Cn'])
 Arabinan = chemical_copied('Arabinan', Xylan)
 
-Lignin = chemical_database('Lignin', phase='s')
+# Lignin = chemical_database('Lignin', phase='s')
 # Hf scaled based on vanillin
-Lignin.Hf = -108248*_cal2joule/tmo.Chemical('Vanillin').MW*Lignin.MW
+# Lignin.Hf = -108248*_cal2joule/tmo.Chemical('Vanillin').MW*Lignin.MW
 
 # =============================================================================
 # Insoluble inorganics
@@ -429,8 +436,8 @@ Lignin.Hf = -108248*_cal2joule/tmo.Chemical('Vanillin').MW*Lignin.MW
 # Holmes, Trans. Faraday Soc. 1962, 58 (0), 1916–1925, abstract
 # This is for auto-population of combustion reactions
 P4O10 = chemical_database('P4O10', phase='s', Hf=-713.2*_cal2joule)
-Ash = chemical_database('Ash', search_ID='CaO', phase='s', Hf=-151688*_cal2joule,
-                        HHV=0, LHV=0)
+# Ash = chemical_database('Ash', search_ID='CaO', phase='s', Hf=-151688*_cal2joule,
+#                         HHV=0, LHV=0)
 # CaSO4 = chemical_database('CaSO4')
 # This is to copy the solid state of Xylose,
 # cannot directly use Xylose as Xylose is locked at liquid state now
@@ -613,12 +620,30 @@ for chemical in chems: chemical.default()
 # Though set_thermo will first compile the Chemicals object,
 # compile beforehand is easier to debug because of the helpful error message
 
+
+
 chems.append(sugarcane_chems.H3PO4)
 chems.append(sugarcane_chems.Cellulose)
 chems.append(sugarcane_chems.Hemicellulose)
 chems.append(sugarcane_chems.CaO)
 chems.append(sugarcane_chems.Solids)
 chems.append(sugarcane_chems.Flocculant)
+chems.append(sugarcane_chems.Lignin)
+
+chems.append(cornstover_chems.Acetate)
+chems.append(cornstover_chems.AmmoniumSulfate)
+chems.append(cornstover_chems.AmmoniumAcetate)
+chems.append(cornstover_chems.Cellulase)
+chems.append(cornstover_chems.Ash)
+
+
+chems.append(corn_chems.Starch)
+chems.append(corn_chems.Fiber)
+chems.append(corn_chems.SolubleProtein)
+chems.append(corn_chems.InsolubleProtein)
+chems.append(corn_chems.Oil)
+chems.append(corn_chems.Yeast)
+chems.append(corn_chems.Octane)
 
 chems.append(tmo.Chemical(ID='CO2_compressible', search_ID='CO2'))
 
@@ -662,7 +687,7 @@ chems.set_synonym('ButylSorbate', 'Butylsorbate')
 chems.set_synonym('H2O', 'Water')
 chems.set_synonym('H2SO4', 'SulfuricAcid')
 chems.set_synonym('NH3', 'Ammonia')
-chems.set_synonym('DiammoniumSulfate', 'NH4SO4')
+# chems.set_synonym('DiammoniumSulfate', 'NH4SO4')
 # chems.set_synonym('Denaturant', 'Octane')
 chems.set_synonym('CO2', 'CarbonDioxide')
 chems.set_synonym('CarbonMonoxide', 'CO')

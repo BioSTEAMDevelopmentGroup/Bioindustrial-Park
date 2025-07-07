@@ -88,52 +88,52 @@ MF38 = 0.38
 MF90 = 0.90
 MF52 = 0.52
 
-@cost('Flow rate', units='kg/hr', CE=CE2007, cost=MF38 * 120800, S=46350.72, kW=97, n=0.6)
+@cost('Flow rate', units='kg/hr', CE=CE2007, cost=MF38 * 120800, S=46350.72, kW=97, n=0.6, BM=4)
 class GrainHandling(bst.Unit): pass
 
 CornStorage = tank_factory('CornStorage', 
     CE=CE2007, cost=MF38 * 979300., S=185400, tau=259.2, n=1.0, V_wf=0.9, V_max=3e5, 
-    V_units='m3'
+    V_units='m3', BM=4
 )
 
-@cost('Flow rate', units='kg/hr', CE=CE2007, cost=60300., S=45350., n=0.6, ub=7.2e5)
+@cost('Flow rate', units='kg/hr', CE=CE2007, cost=60300., S=45350., n=0.6, ub=7.2e5, BM=4)
 class CleaningSystem(bst.Splitter): pass
     
 
-@cost('Flow rate', units='kg/hr', CE=CE2007, cost=MF38 * 98200., S=46211.33, n=0.6, ub=720000., kW=314.237)
+@cost('Flow rate', units='kg/hr', CE=CE2007, cost=MF38 * 98200., S=46211.33, n=0.6, ub=720000., kW=314.237, BM=4)
 class HammerMill(bst.Unit): pass
 
 
 MilledCornSurgeTank = tank_factory('MilledCornSurgeTank', 
-    CE=CE2007, cost=MF38 * 32500., S=76.90, tau=2.0, n=0.6, V_wf=0.9, V_max=200., V_units='m3'
+    CE=CE2007, cost=MF38 * 32500., S=76.90, tau=2.0, n=0.6, V_wf=0.9, V_max=200., V_units='m3', BM=4
 )
 
 MilledCornHopper = tank_factory('MilledCornHopper', 
-    CE=CE2007, cost=50700., S=100.93, tau=2.0, n=0.6, V_wf=0.9, V_max=1e3, V_units='m3'
+    CE=CE2007, cost=50700., S=100.93, tau=2.0, n=0.6, V_wf=0.9, V_max=1e3, V_units='m3', BM=4
 )
 
 MilledCornWeighTank = tank_factory('MilledCornWeighTank',
-    CE=CE2007, cost=MF38 * 43600., S=76.90, tau=2.0, n=0.6, V_wf=0.9, V_max=20e3, V_units='m3'
+    CE=CE2007, cost=MF38 * 43600., S=76.90, tau=2.0, n=0.6, V_wf=0.9, V_max=20e3, V_units='m3', BM=4
 )
 
 LimeHopper = tank_factory('LimeHopper', 
-    CE=CE2007, cost=9100., S=4.02, tau=46.3, n=0.6, V_wf=0.75, V_max=100., V_units='m3'
+    CE=CE2007, cost=9100., S=4.02, tau=46.3, n=0.6, V_wf=0.75, V_max=100., V_units='m3', BM=4
 )
 
 AmmoniaTank = tank_factory('AmmoniaTank', 
-    CE=CE2007, cost=MF38 * 28400., S=8.77, tau=100., n=0.6, V_wf=0.90, V_max=100., V_units='m3'
+    CE=CE2007, cost=MF38 * 28400., S=8.77, tau=100., n=0.6, V_wf=0.90, V_max=100., V_units='m3', BM=4
 )
 
 AlphaAmylaseTank = tank_factory('AlphaAmylaseTank', 
-    CE=CE2007, cost=49700., S=12.77, tau=336., n=0.6, V_wf=0.90, V_max=100., V_units='m3'
+    CE=CE2007, cost=49700., S=12.77, tau=336., n=0.6, V_wf=0.90, V_max=100., V_units='m3', BM=4
 )
 
 SlurryMixTank = tank_factory('SlurryMixTank', mixing=True,
-    CE=CE2007, cost=133300., S=45.29, tau=0.25, n=0.6, V_wf=0.65, V_max=80., kW_per_m3=1.1607597, V_units='m3',
+    CE=CE2007, cost=133300., S=45.29, tau=0.25, n=0.6, V_wf=0.65, V_max=80., kW_per_m3=1.1607597, V_units='m3', BM=4
 )
 
 
-@cost('Flow rate', units='kg/hr', CE=CE2007, cost=14000, n=0.6, S=150347)
+@cost('Flow rate', units='kg/hr', CE=CE2007, cost=14000, n=0.6, S=150347, BM=4)
 class JetCooker(bst.Unit):
     """
     ins : stream sequence
@@ -174,31 +174,31 @@ class JetCooker(bst.Unit):
         effluent.P = steam.P / 2.
 
 CookedSlurrySurgeTank = tank_factory('CookedSlurrySurgeTank',
-    CE=CE2007, cost=MF90 * 173700., S=14.16, tau=0.25, n=0.6, V_wf=0.90, V_max=100., V_units='m3',
+    CE=CE2007, cost=MF90 * 173700., S=14.16, tau=0.25, n=0.6, V_wf=0.90, V_max=100., V_units='m3', BM=4
 )
 
 GlucoAmylaseTank = tank_factory('AlphaAmylaseTank', 
-    CE=CE2007, cost=84200., S=17.57, tau=336., n=0.6, V_wf=0.90, V_max=100., V_units='m3'
+    CE=CE2007, cost=84200., S=17.57, tau=336., n=0.6, V_wf=0.90, V_max=100., V_units='m3', BM=4
 )
 
 SulfuricAcidTank = tank_factory('AlphaAmylaseTank', 
-    CE=CE2007, cost=MF38 * 19300., S=18.87, tau=336., n=0.6, V_wf=0.90, V_max=283.17, V_units='m3'
+    CE=CE2007, cost=MF38 * 19300., S=18.87, tau=336., n=0.6, V_wf=0.90, V_max=283.17, V_units='m3', BM=4
 )
 
 Saccharification = tank_factory('AlphaAmylaseTank', kW_per_m3=0.036, mixing=True,
-    CE=CE2007, cost=MF90 * 102700., S=52.10, tau=1./3., n=0.6, V_wf=0.90, V_min=20., V_max=610., V_units='m3'
+    CE=CE2007, cost=MF90 * 102700., S=52.10, tau=1./3., n=0.6, V_wf=0.90, V_min=20., V_max=610., V_units='m3', BM=4
 )
 
 YeastTank = tank_factory('YeastTank', kW_per_m3=0.5,
-    CE=CE2007, cost=114700., S=2.97, tau=40., n=0.6, V_wf=0.90, V_max=80., V_units='m3'
+    CE=CE2007, cost=114700., S=2.97, tau=40., n=0.6, V_wf=0.90, V_max=80., V_units='m3', BM=4
 )
 
-@cost('Flow rate', S=24158., n=0.6, units='kg/hr', CE=CE2007, kW=13.1, cost=55700.)
+@cost('Flow rate', S=24158., n=0.6, units='kg/hr', CE=CE2007, kW=13.1, cost=55700., BM=4)
 class WetDDGSConveyor(bst.Unit): pass
 
 LiquefactionTank = tank_factory('LiquefactionTank', 
     CE=CE2007, cost=160900., S=141.3, tau=0.9, n=0.6, V_wf=0.90, V_max=500., kW_per_m3=0.6,
-    mixing=True,
+    BM=4, mixing=True,
 )
 
 class Liquefaction(LiquefactionTank):
@@ -331,7 +331,7 @@ SSF = SimultaneousSaccharificationFermentation
 class DDGSCentrifuge(bst.Splitter): pass
     
 
-@cost('Flow rate', units='kg/hr', CE=CE2007, cost=122800, S=15303.5346, kW=37.3, n=0.6)
+@cost('Flow rate', units='kg/hr', CE=CE2007, cost=122800, S=15303.5346, kW=37.3, n=0.6, BM=4)
 class DDGSHandling(bst.Unit): pass
 
 

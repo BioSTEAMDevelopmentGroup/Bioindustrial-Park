@@ -102,14 +102,14 @@ def create_juicing_system_without_treatment(ins, outs, pellet_bagasse=None,
 @SystemFactory(
     ID='juicing_sys',
     ins=[s.sugarcane, s.H3PO4, s.lime, s.polymer],
-    outs=[s.clarified_juice, s.bagasse]
+    outs=[s.clarified_juice, s.bagasse, s.filter_cake]
 )
 def create_juicing_system_up_to_clarification(ins, outs, pellet_bagasse=None,
                                               dry_bagasse=None):
     
     ### Streams ###
     sugarcane, H3PO4, lime, polymer = ins
-    clarified_juice, bagasse = outs
+    clarified_juice, bagasse, filter_cake = outs
     
     rvf_wash_water = bst.Stream('rvf_wash_water',
                                 Water=16770, units='kg/hr',
@@ -164,7 +164,7 @@ def create_juicing_system_up_to_clarification(ins, outs, pellet_bagasse=None,
                                       Water=0.522))
     
     # Remove solids as filter cake
-    C202 = bst.RVF('C202', (C201-1, rvf_wash_water), ('filter_cake', ''),
+    C202 = bst.RVF('C202', (C201-1, rvf_wash_water), (filter_cake, ''),
                      moisture_content=0.80,
                      split=dict(Ash=0.85,
                                 CaO=0.85,

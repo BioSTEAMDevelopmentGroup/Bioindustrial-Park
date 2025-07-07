@@ -32,7 +32,7 @@ from matplotlib.ticker import AutoMinorLocator as AML
 # from biorefineries.succinic.system_sc import succinic_sys, succinic_tea, R302, spec, product_stream
 
 from biorefineries import succinic
-from biorefineries.succinic.models import model, succinic_sys, succinic_tea, succinic_LCA, R302, spec, product_stream, theoretical_max_g_succinic_acid_per_g_glucose
+from biorefineries.succinic.models import model, namespace_dict, succinic_sys, simulate_and_print, succinic_tea, succinic_LCA, R302, spec, product_stream, theoretical_max_g_succinic_acid_per_g_glucose, namespace_dict
 from matplotlib import pyplot as plt
 from  matplotlib.colors import LinearSegmentedColormap
 import pandas as pd
@@ -71,13 +71,14 @@ mode = 'pilot_batch'
 succinic_filepath = succinic.__file__.replace('\\__init__.py', '')
 parameter_distributions_filename = succinic_filepath+'\\analyses\\parameter_distributions\\'+parameter_distributions_filenames[modes.index(mode)]
 model.parameters = ()
-model.load_parameter_distributions(parameter_distributions_filename)
+model.load_parameter_distributions(parameter_distributions_filename, namespace_dict)
 model.metrics_at_baseline()
 
 # ## Change working directory to biorefineries\\succinic\\analyses\\results
 # chdir(succinic.__file__.replace('\\__init__.py', '')+'\\analyses\\results')
 # ##
 succinic_results_filepath = succinic_filepath + '\\analyses\\results\\'
+
 # %%Colors
 marketrange_shadecolor = (*colors.neutral.shade(50).RGBn, 0.3)
 
@@ -279,7 +280,7 @@ get_production = lambda: sum([product.imass[i] for i in product_chemical_IDs])
 get_succinic_VOC = lambda: succinic_tea.VOC / 1e6 # million USD / yr
 get_succinic_FCI = lambda: succinic_tea.FCI / 1e6 # million USD
 
-
+get_recovery = lambda: product.imass[product_chemical_IDs].sum()/R302.outs[0].imass[product_chemical_IDs].sum()
 
 # def rel_impact_fn(steps):
 #     rel_impact_yield_titer = None
@@ -357,11 +358,11 @@ get_product_GWP = lambda: succinic_LCA.GWP
 get_product_FEC = lambda: succinic_LCA.FEC
 # get_rel_impact_t_y = lambda: rel_impact_fn(steps)
 
-succinic_metrics = [get_product_MPSP, get_product_GWP, get_product_FEC]
+succinic_metrics = [get_product_MPSP, get_product_GWP, get_product_FEC, get_recovery]
 # succinic_metrics = [get_succinic_MPSP, get_GWP, get_FEC]
 
 # %% Generate 3-specification meshgrid and set specification loading functions
-steps = 20
+steps = 5
 
 # Neutralization
 spec.neutralization = False
@@ -383,7 +384,7 @@ spec_3_units = "$\mathrm{g} \cdot \mathrm{L}^{-1} \cdot \mathrm{hr}^{-1}$"
 
 spec_1, spec_2 = np.meshgrid(spec_1, spec_2)
 
-results_metric_1, results_metric_2, results_metric_3 = [], [], []
+results_metric_1, results_metric_2, results_metric_3, results_metric_4 = [], [], [], []
 
 # %% Run TRY analysis 
 for p in productivities:
@@ -401,6 +402,7 @@ for p in productivities:
     pd.DataFrame(data_1[:, :, 0, :][:,:,0]/907.185).to_csv(succinic_results_filepath+'MPSP-'+file_to_save+'.csv')
     pd.DataFrame(data_1[:, :, 1, :][:,:,0]).to_csv(succinic_results_filepath+'GWP-'+file_to_save+'.csv')
     pd.DataFrame(data_1[:, :, 2, :][:,:,0]*succinic_tea.operating_hours).to_csv(succinic_results_filepath+'FEC-'+file_to_save+'.csv')
+    pd.DataFrame(data_1[:, :, 3, :][:,:,0]*succinic_tea.operating_hours).to_csv(succinic_results_filepath+'recovery-'+file_to_save+'.csv')
     
     
     # %% Load previously saved data
@@ -415,10 +417,12 @@ for p in productivities:
     d1_Metric1 = data_1[:, :, 0, :]
     d1_Metric2 = data_1[:, :, 1, :]
     d1_Metric3 = data_1[:, :, 2, :]
+    d1_Metric4 = data_1[:, :, 3, :]
     
     d2_Metric1 = data_2[:, :, 0, :]
     d2_Metric2 = data_2[:, :, 1, :]
     d2_Metric3 = data_2[:, :, 2, :]
+    d2_Metric4 = data_2[:, :, 3, :]
     
     # %% Functions to make regions with total sugars > 150 g/L and total inhibitors > 1000 mg/L
     # also infeasible
@@ -487,110 +491,113 @@ for p in productivities:
     results_metric_1.append(data_1[:, :, 0, :][:,:,0]/907.185)
     results_metric_2.append(data_1[:, :, 1, :][:,:,0])
     results_metric_3.append(data_1[:, :, 2, :][:,:,0])
+    results_metric_4.append(data_1[:, :, 3, :][:,:,0])
 
 #%% Plot metrics vs titer, yield, and productivity
-
-import contourplots
-
-chdir(succinic_results_filepath)
-
-MPSP_units = r"$\mathrm{\$}\cdot\mathrm{kg}^{-1}$"
-GWP_units = r"$\mathrm{kg}$"+" "+ r"$\mathrm{CO}_{2}\mathrm{-eq.}\cdot\mathrm{kg}^{-1}$"
-FEC_units = r"$\mathrm{MJ}\cdot\mathrm{kg}^{-1}$"
-
-# yields = np.linspace(0.4, 0.9, steps) # x axis values
-# titers = np.linspace(40., 120., steps) # y axis values
-# productivities = np.arange(0.1, 2.1, 0.1) # z axis values
-# MPSPs = results_metric_1 # too big to show here; shape = z * x * y # color (or w) axis values
-
-#%% MPSP
-contourplots.animated_contourplot(w_data_vs_x_y_at_multiple_z=results_metric_1, # shape = z * x * y # values of the metric you want to plot on the color axis; e.g., MPSP
-                                x_data=100*yields, # x axis values
-                                # x_data = yields/theoretical_max_g_succinic_acid_per_g_glucose,
-                                y_data=titers, # y axis values
-                                z_data=productivities, # z axis values
-                                x_label=r"$\bfYield$", # title of the x axis
-                                y_label=r"$\bfTiter$", # title of the y axis
-                                z_label=r"$\bfProductivity$", # title of the z axis
-                                w_label=r"$\bfMPSP$", # title of the color axis
-                                x_ticks=[20, 30, 40, 50, 60, 70, 80],
-                                y_ticks=[20, 40, 60, 80, 100, 120],
-                                z_ticks=np.arange(0.0, 2.5, 0.5),
-                                w_levels=np.arange(0.8, 2.3, 0.1), # levels for unlabeled, filled contour areas (labeled and ticked only on color bar)
-                                w_ticks=np.array([1.0, 1.1, 1.2, 1.3,  1.5, 1.8, 2.2,]), # labeled, lined contours; a subset of w_levels
-                                x_units=r"$\mathrm{\% theoretical}$",
-                                # x_units=r"$\mathrm{g} \cdot \mathrm{g}$" + " " + r"$\mathrm{glucose}$" + " " + r"$\mathrm{eq.}^{-1}$",
-                                y_units=r"$\mathrm{g} \cdot \mathrm{L}^{-1}$",
-                                z_units=r"$\mathrm{g} \cdot \mathrm{L}^{-1}  \cdot \mathrm{h}^{-1}$",
-                                w_units=MPSP_units,
-                                fmt_clabel=lambda cvalue: "{:.2f}".format(cvalue), # format of contour labels
-                                cmap=CABBI_green_colormap(), # can use 'viridis' or other default matplotlib colormaps
-                                cbar_ticks=np.arange(0.8, 2.3, 0.2),
-                                z_marker_color='g', # default matplotlib color names
-                                axis_title_fonts={'size': {'x': 14, 'y':14, 'z':14, 'w':14},},
-                                fps=3, # animation frames (z values traversed) per second
-                                n_loops='inf', # the number of times the animated contourplot should loop animation over z; infinite by default
-                                animated_contourplot_filename='MPSP_animated_contourplot_'+file_to_save, # file name to save animated contourplot as (no extensions)
-                                keep_frames=False, # leaves frame PNG files undeleted after running; False by default
-                                )
-
-#%% GWP
-contourplots.animated_contourplot(w_data_vs_x_y_at_multiple_z=results_metric_2, # shape = z * x * y # values of the metric you want to plot on the color axis; e.g., MPSP
-                                x_data=100*yields, # x axis values
-                                y_data=titers, # y axis values
-                                z_data=productivities, # z axis values
-                                x_label=r"$\bfYield$", # title of the x axis
-                                y_label=r"$\bfTiter$", # title of the y axis
-                                z_label=r"$\bfProductivity$", # title of the z axis
-                                w_label=r"$\mathrm{\bfGWP}_{\bf100}$", # title of the color axis
-                                x_ticks=[20, 30, 40, 50, 60, 70, 80],
-                                y_ticks=[20, 40, 60, 80, 100, 120],
-                                z_ticks=np.arange(0.0, 2.5, 0.5),
-                                w_levels=np.arange(0., 5.25, 0.25), # levels for unlabeled, filled contour areas (labeled and ticked only on color bar)
-                                w_ticks=np.array([1.5, 2, 3, 5,]), # labeled, lined contours; a subset of w_levels
-                                x_units=r"$\mathrm{\% theoretical}$",
-                                # x_units=r"$\mathrm{g} \cdot \mathrm{g}$" + " " + r"$\mathrm{glucose}$" + " " + r"$\mathrm{eq.}^{-1}$",
-                                y_units=r"$\mathrm{g} \cdot \mathrm{L}^{-1}$",
-                                z_units=r"$\mathrm{g} \cdot \mathrm{L}^{-1}  \cdot \mathrm{h}^{-1}$",
-                                w_units=GWP_units,
-                                fmt_clabel=lambda cvalue: "{:.2f}".format(cvalue), # format of contour labels
-                                cmap=CABBI_green_colormap(), # can use 'viridis' or other default matplotlib colormaps
-                                cbar_ticks=np.arange(0.0, 6., 1.),
-                                z_marker_color='g', # default matplotlib color names
-                                axis_title_fonts={'size': {'x': 14, 'y':14, 'z':14, 'w':14},},
-                                fps=3, # animation frames (z values traversed) per second
-                                n_loops='inf', # the number of times the animated contourplot should loop animation over z; infinite by default
-                                animated_contourplot_filename='GWP_animated_contourplot_'+file_to_save, # file name to save animated contourplot as (no extensions)
-                                keep_frames=False, # leaves frame PNG files undeleted after running; False by default
-                                )
-
-
-#%% FEC
-contourplots.animated_contourplot(w_data_vs_x_y_at_multiple_z=results_metric_3, # shape = z * x * y # values of the metric you want to plot on the color axis; e.g., MPSP
-                                x_data=100*yields, # x axis values
-                                y_data=titers, # y axis values
-                                z_data=productivities, # z axis values
-                                x_label=r"$\bfYield$", # title of the x axis
-                                y_label=r"$\bfTiter$", # title of the y axis
-                                z_label=r"$\bfProductivity$", # title of the z axis
-                                w_label=r"$\bfFEC$", # title of the color axis
-                                x_ticks=[20, 30, 40, 50, 60, 70, 80],
-                                y_ticks=[20, 40, 60, 80, 100, 120],
-                                z_ticks=np.arange(0.0, 2.5, 0.5),
-                                w_levels=np.arange(-30, 100, 10), # levels for unlabeled, filled contour areas (labeled and ticked only on color bar)
-                                w_ticks=np.array([-20, -10, 0, 10, 20, 50, 90]), # labeled, lined contours; a subset of w_levels
-                                x_units=r"$\mathrm{\% theoretical}$",
-                                # x_units=r"$\mathrm{g} \cdot \mathrm{g}$" + " " + r"$\mathrm{glucose}$" + " " + r"$\mathrm{eq.}^{-1}$",
-                                y_units=r"$\mathrm{g} \cdot \mathrm{L}^{-1}$",
-                                z_units=r"$\mathrm{g} \cdot \mathrm{L}^{-1}  \cdot \mathrm{h}^{-1}$",
-                                w_units=FEC_units,
-                                fmt_clabel=lambda cvalue: "{:.0f}".format(cvalue), # format of contour labels
-                                cmap=CABBI_green_colormap(), # can use 'viridis' or other default matplotlib colormaps
-                                cbar_ticks=np.arange(-30, 100, 30),
-                                z_marker_color='g', # default matplotlib color names
-                                axis_title_fonts={'size': {'x': 14, 'y':14, 'z':14, 'w':14},},
-                                fps=3, # animation frames (z values traversed) per second
-                                n_loops='inf', # the number of times the animated contourplot should loop animation over z; infinite by default
-                                animated_contourplot_filename='FEC_animated_contourplot_'+file_to_save, # file name to save animated contourplot as (no extensions)
-                                keep_frames=False, # leaves frame PNG files undeleted after running; False by default
-                                )
+plot = False
+if plot:
+    
+    import contourplots
+    
+    chdir(succinic_results_filepath)
+    
+    MPSP_units = r"$\mathrm{\$}\cdot\mathrm{kg}^{-1}$"
+    GWP_units = r"$\mathrm{kg}$"+" "+ r"$\mathrm{CO}_{2}\mathrm{-eq.}\cdot\mathrm{kg}^{-1}$"
+    FEC_units = r"$\mathrm{MJ}\cdot\mathrm{kg}^{-1}$"
+    
+    # yields = np.linspace(0.4, 0.9, steps) # x axis values
+    # titers = np.linspace(40., 120., steps) # y axis values
+    # productivities = np.arange(0.1, 2.1, 0.1) # z axis values
+    # MPSPs = results_metric_1 # too big to show here; shape = z * x * y # color (or w) axis values
+    
+    #%% MPSP
+    contourplots.animated_contourplot(w_data_vs_x_y_at_multiple_z=results_metric_1, # shape = z * x * y # values of the metric you want to plot on the color axis; e.g., MPSP
+                                    x_data=100*yields, # x axis values
+                                    # x_data = yields/theoretical_max_g_succinic_acid_per_g_glucose,
+                                    y_data=titers, # y axis values
+                                    z_data=productivities, # z axis values
+                                    x_label=r"$\bfYield$", # title of the x axis
+                                    y_label=r"$\bfTiter$", # title of the y axis
+                                    z_label=r"$\bfProductivity$", # title of the z axis
+                                    w_label=r"$\bfMPSP$", # title of the color axis
+                                    x_ticks=[20, 30, 40, 50, 60, 70, 80],
+                                    y_ticks=[20, 40, 60, 80, 100, 120],
+                                    z_ticks=np.arange(0.0, 2.5, 0.5),
+                                    w_levels=np.arange(0.8, 2.3, 0.1), # levels for unlabeled, filled contour areas (labeled and ticked only on color bar)
+                                    w_ticks=np.array([1.0, 1.1, 1.2, 1.3,  1.5, 1.8, 2.2,]), # labeled, lined contours; a subset of w_levels
+                                    x_units=r"$\mathrm{\% theoretical}$",
+                                    # x_units=r"$\mathrm{g} \cdot \mathrm{g}$" + " " + r"$\mathrm{glucose}$" + " " + r"$\mathrm{eq.}^{-1}$",
+                                    y_units=r"$\mathrm{g} \cdot \mathrm{L}^{-1}$",
+                                    z_units=r"$\mathrm{g} \cdot \mathrm{L}^{-1}  \cdot \mathrm{h}^{-1}$",
+                                    w_units=MPSP_units,
+                                    fmt_clabel=lambda cvalue: "{:.2f}".format(cvalue), # format of contour labels
+                                    cmap=CABBI_green_colormap(), # can use 'viridis' or other default matplotlib colormaps
+                                    cbar_ticks=np.arange(0.8, 2.3, 0.2),
+                                    z_marker_color='g', # default matplotlib color names
+                                    axis_title_fonts={'size': {'x': 14, 'y':14, 'z':14, 'w':14},},
+                                    fps=3, # animation frames (z values traversed) per second
+                                    n_loops='inf', # the number of times the animated contourplot should loop animation over z; infinite by default
+                                    animated_contourplot_filename='MPSP_animated_contourplot_'+file_to_save, # file name to save animated contourplot as (no extensions)
+                                    keep_frames=False, # leaves frame PNG files undeleted after running; False by default
+                                    )
+    
+    #%% GWP
+    contourplots.animated_contourplot(w_data_vs_x_y_at_multiple_z=results_metric_2, # shape = z * x * y # values of the metric you want to plot on the color axis; e.g., MPSP
+                                    x_data=100*yields, # x axis values
+                                    y_data=titers, # y axis values
+                                    z_data=productivities, # z axis values
+                                    x_label=r"$\bfYield$", # title of the x axis
+                                    y_label=r"$\bfTiter$", # title of the y axis
+                                    z_label=r"$\bfProductivity$", # title of the z axis
+                                    w_label=r"$\mathrm{\bfGWP}_{\bf100}$", # title of the color axis
+                                    x_ticks=[20, 30, 40, 50, 60, 70, 80],
+                                    y_ticks=[20, 40, 60, 80, 100, 120],
+                                    z_ticks=np.arange(0.0, 2.5, 0.5),
+                                    w_levels=np.arange(0., 5.25, 0.25), # levels for unlabeled, filled contour areas (labeled and ticked only on color bar)
+                                    w_ticks=np.array([1.5, 2, 3, 5,]), # labeled, lined contours; a subset of w_levels
+                                    x_units=r"$\mathrm{\% theoretical}$",
+                                    # x_units=r"$\mathrm{g} \cdot \mathrm{g}$" + " " + r"$\mathrm{glucose}$" + " " + r"$\mathrm{eq.}^{-1}$",
+                                    y_units=r"$\mathrm{g} \cdot \mathrm{L}^{-1}$",
+                                    z_units=r"$\mathrm{g} \cdot \mathrm{L}^{-1}  \cdot \mathrm{h}^{-1}$",
+                                    w_units=GWP_units,
+                                    fmt_clabel=lambda cvalue: "{:.2f}".format(cvalue), # format of contour labels
+                                    cmap=CABBI_green_colormap(), # can use 'viridis' or other default matplotlib colormaps
+                                    cbar_ticks=np.arange(0.0, 6., 1.),
+                                    z_marker_color='g', # default matplotlib color names
+                                    axis_title_fonts={'size': {'x': 14, 'y':14, 'z':14, 'w':14},},
+                                    fps=3, # animation frames (z values traversed) per second
+                                    n_loops='inf', # the number of times the animated contourplot should loop animation over z; infinite by default
+                                    animated_contourplot_filename='GWP_animated_contourplot_'+file_to_save, # file name to save animated contourplot as (no extensions)
+                                    keep_frames=False, # leaves frame PNG files undeleted after running; False by default
+                                    )
+    
+    
+    #%% FEC
+    contourplots.animated_contourplot(w_data_vs_x_y_at_multiple_z=results_metric_3, # shape = z * x * y # values of the metric you want to plot on the color axis; e.g., MPSP
+                                    x_data=100*yields, # x axis values
+                                    y_data=titers, # y axis values
+                                    z_data=productivities, # z axis values
+                                    x_label=r"$\bfYield$", # title of the x axis
+                                    y_label=r"$\bfTiter$", # title of the y axis
+                                    z_label=r"$\bfProductivity$", # title of the z axis
+                                    w_label=r"$\bfFEC$", # title of the color axis
+                                    x_ticks=[20, 30, 40, 50, 60, 70, 80],
+                                    y_ticks=[20, 40, 60, 80, 100, 120],
+                                    z_ticks=np.arange(0.0, 2.5, 0.5),
+                                    w_levels=np.arange(-30, 100, 10), # levels for unlabeled, filled contour areas (labeled and ticked only on color bar)
+                                    w_ticks=np.array([-20, -10, 0, 10, 20, 50, 90]), # labeled, lined contours; a subset of w_levels
+                                    x_units=r"$\mathrm{\% theoretical}$",
+                                    # x_units=r"$\mathrm{g} \cdot \mathrm{g}$" + " " + r"$\mathrm{glucose}$" + " " + r"$\mathrm{eq.}^{-1}$",
+                                    y_units=r"$\mathrm{g} \cdot \mathrm{L}^{-1}$",
+                                    z_units=r"$\mathrm{g} \cdot \mathrm{L}^{-1}  \cdot \mathrm{h}^{-1}$",
+                                    w_units=FEC_units,
+                                    fmt_clabel=lambda cvalue: "{:.0f}".format(cvalue), # format of contour labels
+                                    cmap=CABBI_green_colormap(), # can use 'viridis' or other default matplotlib colormaps
+                                    cbar_ticks=np.arange(-30, 100, 30),
+                                    z_marker_color='g', # default matplotlib color names
+                                    axis_title_fonts={'size': {'x': 14, 'y':14, 'z':14, 'w':14},},
+                                    fps=3, # animation frames (z values traversed) per second
+                                    n_loops='inf', # the number of times the animated contourplot should loop animation over z; infinite by default
+                                    animated_contourplot_filename='FEC_animated_contourplot_'+file_to_save, # file name to save animated contourplot as (no extensions)
+                                    keep_frames=False, # leaves frame PNG files undeleted after running; False by default
+                                    )

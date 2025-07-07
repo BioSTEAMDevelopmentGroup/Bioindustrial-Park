@@ -1,99 +1,49 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-#!/usr/bin/env python3
-# -*- coding: utf-8 -*-
-# BioSTEAM: The Biorefinery Simulation and Techno-Economic Analysis Modules
-# Copyright (C) 2020-2021, Yoel Cortes-Pena <yoelcortes@gmail.com>
 # Bioindustrial-Park: BioSTEAM's Premier Biorefinery Models and Results
-# Copyright (C) 2020-2021, Sarang Bhagwat <sarangb2@illinois.edu>,
-# Yalin Li <yalinli2@illinois.edu>, and Yoel Cortes-Pena (yoelcortes@gmail.com)
+# Copyright (C) 2021-, Sarang Bhagwat <sarangb2@illinois.edu>
 # 
 # This module is under the UIUC open-source license. See 
 # github.com/BioSTEAMDevelopmentGroup/biosteam/blob/master/LICENSE.txt
 # for license details.
+"""
+All units are explicitly defined here for transparency and easy reference.
+Naming conventions:
+    D = Distillation column
+    C = Crystallization
+    AC = Adsorption column
+    F = Flash tank or multiple-effect evaporator
+    H = Heat exchange
+    M = Mixer
+    P = Pump (including conveying belt)
+    R = Reactor
+    S = Splitter (including solid/liquid separator)
+    T = Tank or bin for storage
+    U = Other units
+Processes:
+    100: Feedstock preprocessing
+    200: Feedstock pretreatment and juicing
+    300: Conversion
+    400: Separation
+    500: Wastewater treatment
+    600: Storage
+    700: Co-heat and power
+    800: Cooling utility generation
+    900: Miscellaneous facilities
+    1000: Heat exchanger network
 
+"""
 
-# from biorefineries import PY37
-from warnings import filterwarnings
-from numpy import seterr
+#%%
+from .models import load
 
-filterwarnings('ignore')
-ig = seterr(invalid='ignore')
+__all__ = ['load_model']
 
-from . import (
-    process_settings, 
-    chemicals_data, 
-    tea, 
-    units, 
-    facilities
-)
-from .chemicals_data import *
-from .process_settings import *
-from .tea import *
-from .units import *
-from .facilities import *
-
-# __all__ = [
-#     'system_light_lle_vacuum_distillation',
-#     'system_targeted_improvements',
-#     'system_sugarcane',
-#     'TRY_analysis',
-#     'test_solvents',
-#     'process_settings', 
-#     'chemicals_data', 
-#     'tea', 
-#     'lca',
-#     'units', 
-#     'facilities',
-# ]
-
-_system_loaded = False
-_chemicals_loaded = False
-
-_to_load_system = False
-
-if _to_load_system:
-    default_configuration = 'lignocellulosic'
-    
-    def load_system(configuration=None):
-        if not configuration in ('lignocellulosic', 'sugarcane'):
-            raise ValueError(f'configuration can only be "lignocellulosic" or "sugarcane", not "{configuration}".')
-        if not _chemicals_loaded: _load_chemicals()
-        _load_system(configuration)
-        dct = globals()
-        dct.update(flowsheet.to_dict())
-        # dct.update(flowsheet.system.__dir__())
-        # dct.update(flowsheet.stream.__dir__())
-        # dct.update(flowsheet.unit.__dir__())
-    
-    def _load_system(configuration=None):
-        load_process_settings()
-        if not configuration: configuration = default_configuration
-        if configuration == 'lignocellulosic':
-            _load_lignocellulosic_system()
-        elif configuration == 'sugarcane':
-            _load_sugarcane_system()
-        else:
-            raise ValueError("configuration must be either 'lignocellulosic' or 'sugarcane'; "
-                            f"not '{configuration}'")
-    
-    def _load_chemicals():
-        global chemicals
-        from .chemicals_data import HP_chemicals
-        chemicals = HP_chemicals
-        _chemicals_loaded = True
-    
-    def _load_lignocellulosic_system():
-        global system, HP_tea, flowsheet, _system_loaded, simulate_and_print
-        from .system_light_lle_vacuum_distillation import HP_tea, flowsheet, simulate_and_print
-        from .system_light_lle_vacuum_distillation import HP_sys as system
-        _system_loaded = True
-    
-    def _load_sugarcane_system():
-        global system, HP_tea, flowsheet, _system_loaded, simulate_and_print
-        from .system_sugarcane import HP_tea, flowsheet, simulate_and_print
-        from .system_sugarcane import HP_sys as system
-        _system_loaded = True
-    
-    
-    load_system('lignocellulosic')
+def load_model(feedstock, product, fermentation_performance):
+    model, system, spec, tea, lca, get_adjusted_MSP, simulate_and_print, TEA_breakdown, unit_groups_dict =\
+        load.load_HP_model(feedstock, product, fermentation_performance)
+    globals().update({
+        'system':system, 'spec':spec, 'tea':tea, 'lca':lca, 'get_adjusted_MSP':get_adjusted_MSP,
+        'simulate_and_print':simulate_and_print, 'TEA_breakdown':TEA_breakdown,
+        'unit_groups_dict': unit_groups_dict,
+        })

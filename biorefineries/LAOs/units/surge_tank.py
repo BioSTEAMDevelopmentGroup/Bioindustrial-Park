@@ -11,7 +11,6 @@ __all__ = ('SurgeTank',)
 
 class SurgeTank(bst.StorageTank):
     _N_outs = 2
-    _stream_link_options = bst.Unit._stream_link_options
     
     def _run(self):
         vent, effluent = self.outs

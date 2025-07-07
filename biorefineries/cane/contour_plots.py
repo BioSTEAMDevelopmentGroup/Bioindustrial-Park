@@ -501,8 +501,12 @@ def _plot_metrics_across_biomass_yield_TOC(
             )
         for i in axes.flat: 
             if hasattr(i, '_cached_ytwin'):
-                plt.sca(i); plt.xlim(xlim)
-                plt.sca(i._cached_ytwin); plt.xlim(xlim)
+                plt.sca(i)
+                plt.xlim(xlim)
+                plt.ylim(ylim)
+                plt.sca(i._cached_ytwin)
+                plt.xlim(xlim)
+                plt.ylim(ylim)
         boxc = colors.neutral.shade(50).RGBn
         txtbox = dict(boxstyle='round', facecolor=boxc, 
                       edgecolor=boxc, pad=0.25, clip_on=False)
@@ -534,11 +538,11 @@ def _plot_metrics_across_biomass_yield_TOC(
                     if name == '1580': continue
                     elif name == '1566': name = 'prototype'
                     if name == 'Target': 
-                        text = f"Target oilcane:\n{value:.1f} {units}"
+                        text = f"Target oilcane"
                     elif name == 'WT':
-                        text = f"{feedstock}:\n{value:.1f} {units}"
+                        text = f"{feedstock}"
                     else:
-                        text = f"{feedstock} {name}:\n{value:.1f} {units}"
+                        text = f"{feedstock}"
                     plt.text(
                         x, y, text, c=color.tint(15).RGBn,
                         bbox=txtbox, verticalalignment=verticalalignment,

@@ -85,7 +85,7 @@ parameter_distributions_filename = TAL_filepath+\
     '\\analyses\\full\\parameter_distributions\\'+parameter_distributions_filenames[0]
 print(f'\n\nLoading parameter distributions ({mode}) ...')
 model.parameters = ()
-model.load_parameter_distributions(parameter_distributions_filename)
+model.load_parameter_distributions(parameter_distributions_filename, models.namespace_dict)
 
 # load_additional_params()
 print(f'\nLoaded parameter distributions ({mode}).')
@@ -158,7 +158,7 @@ steps = (60, 60, 1)
 
 # Yield, titer, productivity (rate)
 spec_1 = TAL_decarb_convs = np.linspace(0., 0.5, steps[0]) # yield
-spec_2 = pHs = np.linspace(M401.get_pH_maintained(), 12., steps[1]) # titer
+spec_2 = pHs = np.linspace(M401.get_pH_maintained(), 13., steps[1]) # titer
 
 
 # spec_3 = base_prices =\
@@ -181,7 +181,9 @@ y_ticks = [0, 10, 20, 30, 40, 50]
 
 x_label = r"$\bfpH$"  +" "+ r"$\bfMaintained$" # title of the y axis
 x_units =r"$\mathrm{mol} \cdot \mathrm{m}^{-3}$"
-x_ticks = [2., 4., 6., 8., 10., 12.]
+x_ticks = [
+           # 2., 4., 
+           6., 7., 8., 9., 10., 11., 12., 13.]
 
 
 z_label = r"$\bfSodium$"  +" "+ r"$\bfHydroxide$"  +" "+ r"$\bfPrice$"# # title of the z axis
@@ -589,9 +591,9 @@ contourplots.animated_contourplot(w_data_vs_x_y_at_multiple_z=results_metric_1, 
 #%% GWP
 
 # GWP_w_levels, GWP_w_ticks, GWP_cbar_ticks = get_contour_info_from_metric_data(results_metric_2,)
-GWP_w_levels = np.arange(0, 20.1, 0.5)
-GWP_cbar_ticks = np.arange(0, 20.1, 2.)
-GWP_w_ticks = [6.5, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 20]
+GWP_w_levels = np.arange(0, 14.1, 0.5)
+GWP_cbar_ticks = np.arange(0, 14.1, 2.)
+GWP_w_ticks = [0, 1, 2, 3, 4, 4.7, 5, 5.5, 6, 7, 8, 9, 10, 11, 12, 13, 14,]
 contourplots.animated_contourplot(w_data_vs_x_y_at_multiple_z=results_metric_2, # shape = z * x * y # values of the metric you want to plot on the color axis; e.g., GWP
                                 y_data=100*TAL_decarb_convs, # x axis values
                                 x_data=pHs, # y axis values
@@ -688,9 +690,9 @@ contourplots.animated_contourplot(w_data_vs_x_y_at_multiple_z=results_metric_3, 
 #%% GWP - no electricity offset
 
 # GWP_w_levels, GWP_w_ticks, GWP_cbar_ticks = get_contour_info_from_metric_data(results_metric_2,)
-GWP_w_levels = np.arange(0, 20.1, 0.5)
-GWP_cbar_ticks = np.arange(0, 20.1, 2.)
-GWP_w_ticks = [6.5, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 20]
+GWP_w_levels = np.arange(0, 14.1, 0.5)
+GWP_cbar_ticks = np.arange(0, 14.1, 2.)
+GWP_w_ticks = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14,]
 contourplots.animated_contourplot(w_data_vs_x_y_at_multiple_z=results_metric_4, # shape = z * x * y # values of the metric you want to plot on the color axis; e.g., GWP
                                 y_data=100*TAL_decarb_convs, # x axis values
                                 x_data=pHs, # y axis values
@@ -835,9 +837,9 @@ contourplots.animated_contourplot(w_data_vs_x_y_at_multiple_z=results_metric_6, 
 
 #%% Base added
 
-base_added_w_levels =  np.arange(0., 15.01, 0.5)
-base_added_cbar_ticks = np.arange(0., 15.01, 1.)
-base_added_w_ticks = [1., 5., 10., 10.5, 11.]
+base_added_w_levels =  np.arange(0., 4.01, 0.1)
+base_added_cbar_ticks = np.arange(0., 4.01, 0.2)
+base_added_w_ticks = [0., 0.1, 0.5, 1., 3.]
 
 contourplots.animated_contourplot(w_data_vs_x_y_at_multiple_z=results_metric_7, # shape = z * x * y # values of the metric you want to plot on the color axis; e.g., M401_addition
                                 y_data=100*TAL_decarb_convs, # x axis values

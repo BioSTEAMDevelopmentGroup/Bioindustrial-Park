@@ -5,6 +5,8 @@
 
 Fermentation
 ------------
+.. automodule:: biorefineries.cellulosic.systems.fermentation.add_urea_MgSO4_nutrients
+.. automodule:: biorefineries.cellulosic.systems.fermentation.add_urea_nutrient
 .. automodule:: biorefineries.cellulosic.systems.fermentation
 
 Pretreatment

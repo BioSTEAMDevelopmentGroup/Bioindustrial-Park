@@ -94,7 +94,7 @@ for i in range(len(modes)):
         '\\analyses\\parameter_distributions\\'+parameter_distributions_filenames[i]
     print(f'\n\nLoading parameter distributions ({mode}) ...')
     model.parameters = ()
-    model.load_parameter_distributions(parameter_distributions_filename)
+    model.load_parameter_distributions(parameter_distributions_filename, models.namespace_dict)
     print(f'\nLoaded parameter distributions ({mode}).')
     
     parameters = model.get_parameters()

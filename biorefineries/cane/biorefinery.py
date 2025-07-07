@@ -129,7 +129,7 @@ area_names = {
     -1: ['Feedstock handling', 'Juicing', 'EtOH prod.', 'CH&P', 'Utilities', 
          'HXN', 'Storage', 'Wastewater treatment'],
     -2: ['Feedstock handling', 'Juicing', 'Pretreatment', 'EtOH prod.',
-         'Wastewater treatment', 'CH&P', 'Utilities', 'HXN', 'Storage'],
+         'Wastewater treatment', 'CH&P', 'Utilities', 'Storage', 'HXN'],
     -3: ['Feedstock handling', 'Juicing', 'EtOH prod.', 'CH&P', 'Utilities', 
          'HXN', 'Storage', 'Wastewater treatment'],
     1: ['Feedstock handling', 'Juicing', 'EtOH prod.', 'Oil ext.', 'Biod. prod.', 
@@ -194,7 +194,6 @@ def exponential_val(x, nA): # A x ^ n
     return A * x ** n
 
 def YRCP2023():
-    bst.Model.default_convergence_model = 'linear regressor'
     Biorefinery.default_conversion_performance_distribution = 'longterm'
     Biorefinery.default_prices_correleted_to_crude_oil = True
     Biorefinery.default_oil_content_range = [1.8, 5.4]
@@ -420,7 +419,7 @@ class Biorefinery:
         
         ## System
         if number in system_factories:
-            self.cane_sys = cane_sys = system_factories[number](operating_hours=24 * 200, WWT_kwargs=WWT_kwargs,
+            self.system = self.cane_sys = cane_sys = system_factories[number](operating_hours=24 * 200, WWT_kwargs=WWT_kwargs,
                                                                 **system_factory_options.get(number, {}), autorename=True)
             if remove_biodiesel_production:
                 unit = flowsheet(bst.BlendingTankWithSkimming)
@@ -469,19 +468,21 @@ class Biorefinery:
         if number not in cellulosic_configurations: BT.boiler_efficiency = 0.89
         
         ## Unit groups
-        areas = area_names[number]
-        rename_storage_units(cane_sys.units, (areas.index('Storage') + 1) * 100)
-        unit_groups = UnitGroup.group_by_area(cane_sys.units)
-        for i, j in zip(unit_groups, areas): i.name = j
-        for i in unit_groups: i.autofill_metrics(shorthand=True)
+        # TODO: Fix unit groups
+        # areas = area_names[number]
+        # rename_storage_units(cane_sys.units, (areas.index('Storage') + 1) * 100)
+        # unit_groups = UnitGroup.group_by_area(cane_sys.units)
+        # for i, j in zip(unit_groups, areas): i.name = j
+        # for i in unit_groups: i.autofill_metrics(shorthand=True)
         
-        for HXN_group in unit_groups:
-            if HXN_group.name == 'HXN':
-                HXN_group.filter_savings = False # Allow negative values in heat utilities
-                HXN = HXN_group.units[0]
-                try:
-                    assert isinstance(HXN, bst.HeatExchangerNetwork)
-                except: breakpoint()
+        # for HXN_group in unit_groups:
+        #     if HXN_group.name == 'HXN':
+        #         HXN_group.filter_savings = False # Allow negative values in heat utilities
+        #         HXN = HXN_group.units[0]
+        #         try:
+        #             assert isinstance(HXN, bst.HeatExchangerNetwork)
+        #         except: breakpoint()
+        HXN = flowsheet(bst.HeatExchangerNetwork)
         HXN.raise_energy_balance_error = False
         HXN.vle_quenched_streams = False
         
@@ -522,13 +523,13 @@ class Biorefinery:
             cane_sys.add_specification(self.update_feedstock, simulate=True)
         
         if abs(number) in cellulosic_configurations:
-            prs = flowsheet(bst.PretreatmentReactorSystem)
-            saccharification = flowsheet(bst.Saccharification)
-            seed_train = flowsheet(bst.SeedTrain)
+            prs = flowsheet('PretreatmentReactorSystem')
+            saccharification = flowsheet('Saccharification')
+            seed_train = flowsheet('SeedTrain')
             try:
-                fermentor = flowsheet(bst.CoFermentation)
+                fermentor = flowsheet('CoFermentation')
             except:
-                fermentor = flowsheet(bst.AeratedBioreactor)
+                fermentor = flowsheet('AeratedBioreactor')
             self.pretreatment_rxnsys = tmo.ReactionSystem(
                 prs.reactions, saccharification.saccharification
             )
@@ -543,9 +544,9 @@ class Biorefinery:
             prs.reactions.X[10] = 0.0 # baseline
         else:
             try:
-                fermentor = flowsheet(bst.Fermentation)
+                fermentor = flowsheet('Fermentation')
             except:
-                fermentor = flowsheet(bst.AeratedBioreactor)
+                fermentor = flowsheet('AeratedBioreactor')
         self.fermentor = fermentor
         
         def set_glucose_yield(glucose_yield):
@@ -1651,7 +1652,7 @@ class Biorefinery:
         self.tea = tea
         self.model = model
         self.flowsheet = flowsheet
-        self.unit_groups = unit_groups
+        # self.unit_groups = unit_groups
         self.configuration = configuration
         self.composition_specification = composition_specification
         self.oil_extraction_specification = oil_extraction_specification
@@ -1707,7 +1708,8 @@ class Biorefinery:
                 for mockup, real in zip(all_metric_mockups, model.metrics):
                     assert mockup.index == real.index
             except:
-                breakpoint()
+                from warnings import warn
+                warn('parameter/mectric mockups do not match', RuntimeWarning)
         return self
     
     def oil_recovery(self):

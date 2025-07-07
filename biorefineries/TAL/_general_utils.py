@@ -23,6 +23,7 @@ __all__ = {'call_all_specifications_or_run',
            'TEA_breakdown',
            'update_facility_IDs',
            'get_pH_polyprotic_acid_mixture',
+           'get_major_units_df'
            }
 
 #%% Estimate the pH of a mixture of polyprotic acids
@@ -73,17 +74,17 @@ def get_pH_polyprotic_acid_mixture(stream, acid_IDs=[], Kas=[], activities='idea
 
 #%% For a given list of units, call all specifications of each unit or run each unit (in the presented order)
 def call_all_specifications_or_run(units_to_run):
-    if units_to_run.__class__ == list:
+    if units_to_run.__class__ in (list, tuple):
         for unit_to_run in units_to_run:
             if unit_to_run.specifications: 
                 [i() for i in unit_to_run.specifications]
             else:
-                unit_to_run._run()
+                unit_to_run.run()
     else:
         if units_to_run.specifications: 
             [i() for i in units_to_run.specifications]
         else:
-            units_to_run._run()
+            units_to_run.run()
 
 #%% Get some more unit groups for a given system
 def get_more_unit_groups(system,

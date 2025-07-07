@@ -1,48 +1,48 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-# Bioindustrial-Park: BioSTEAM's Premier Biorefinery Models and Results
-# Copyright (C) 2022-2023, Sarang Bhagwat <sarangb2@illinois.edu> (this biorefinery)
+# Oxalic acid biorefineries.
+# Copyright (C) 2024-, Sarang Bhagwat <sarangb2@illinois.edu>, Wenjun Guo <wenjung2@illinois.edu>
 # 
 # This module is under the UIUC open-source license. See 
 # github.com/BioSTEAMDevelopmentGroup/biosteam/blob/master/LICENSE.txt
 # for license details.
-"""
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
 
-@author: sarangbhagwat
+from warnings import filterwarnings
+filterwarnings('ignore')
 
-Created on Sun Aug 23 12:11:15 2020
+from biorefineries import oxalic
+oxalic_filepath = oxalic.__file__.replace('\\__init__.py', '')
+oxalic_results_filepath = oxalic_filepath + '\\analyses\\results\\'
+parameter_distributions_filename = 'parameter-distributions_sugarcane_oxalic-broth_100mL.xlsx'
 
-This module is a modified implementation of modules from the following:
-[1]	Bhagwat et al., Sustainable Production of Acrylic Acid via 3-Hydroxypropionic Acid from Lignocellulosic Biomass. ACS Sustainable Chem. Eng. 2021, 9 (49), 16659–16669. https://doi.org/10.1021/acssuschemeng.1c05441
-[2]	Li et al., Sustainable Lactic Acid Production from Lignocellulosic Biomass. ACS Sustainable Chem. Eng. 2021, 9 (3), 1341–1351. https://doi.org/10.1021/acssuschemeng.0c08055
-[3]	Cortes-Peña et al., BioSTEAM: A Fast and Flexible Platform for the Design, Simulation, and Techno-Economic Analysis of Biorefineries under Uncertainty. ACS Sustainable Chem. Eng. 2020, 8 (8), 3302–3310. https://doi.org/10.1021/acssuschemeng.9b07040
+def load():
+    parameter_distributions_filepath = oxalic_filepath+'\\analyses\\full\\parameter_distributions\\oxalic_broth_product\\'+parameter_distributions_filename
+    from .models.sugarcane.models_sc_broth import model, simulate_and_print
+    model.parameters = ()
+    model.load_parameter_distributions(parameter_distributions_filepath)
+    
+    model.exception_hook = 'warn'
+    baseline_initial = model.metrics_at_baseline()
+    
+    globals().update({'simulate_and_print': simulate_and_print,
+                      'system': model.system,
+                       'flowsheet': model.system.flowsheet,
+                       'oxalic_tea': model.system.TEA,
+                       'chemicals': model.system.feeds[0].chemicals,
+                      })
 
-All units are explicitly defined here for transparency and easy reference.
-Naming conventions:
-    D = Distillation column
-    AC = Adsorption column
-    F = Flash tank or multiple-effect evaporator
-    H = Heat exchange
-    M = Mixer
-    P = Pump (including conveying belt)
-    R = Reactor
-    S = Splitter (including solid/liquid separator)
-    T = Tank or bin for storage
-    U = Other units
-Processes:
-    100: Feedstock preprocessing
-    200: Pretreatment
-    300: Conversion
-    400: Separation
-    500: Wastewater treatment
-    600: Storage
-    700: Co-heat and power
-    800: Cooling utility generation
-    900: Miscellaneous facilities
-    1000: Heat exchanger network
+def run_TRY_analysis():
+    from .analyses.fermentation import TRY_analysis_sugarcane_oxalic_broth
+    print('TRY analysis complete. See analyses/results for figures and raw data.')
+    
+def run_uncertainty_analysis():
+    from .analyses.full import uncertainties_sc_oxalic_broth
+    print('Uncertainty and sensitivity analyses complete. See analyses/results for figures and raw data.')
 
-"""
+def get_models():
+    from . import models
+    return models
 
-
-
-__all__ = []
+__all__ = ['create_model', 'run_TRY_analysis', 'run_uncertainty_analysis', 'load', 'modes', 'parameter_distributions_filenames']

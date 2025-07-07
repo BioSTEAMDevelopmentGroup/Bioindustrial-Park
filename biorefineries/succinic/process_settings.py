@@ -46,7 +46,8 @@ _lb_per_kg = 2.20462
 _liter_per_gallon = 3.78541
 _ft3_per_m3 = 35.3147
 
-_GDP_2007_to_2016 = 1.114 / 0.961
+_corn_bushel_to_kg = 25.402 # https://www.ers.usda.gov/webdocs/publications/41880/33132_ah697_002.pdf
+
 _chemical_2011to2016 = 102.5 / 91.7
 _chemical_2013to2016 = 102.5 / 101.3
 _chemical_2014to2016 = 102.5 / 105.3
@@ -55,8 +56,75 @@ _chemical_2017to2016 = 102.5 / 106.9
 _chemical_2020to2016 = 102.5 / 113.8 # average of Jan and Feb
 _chemical_2022to2016 = 102.5 / 145.3
 
-# From sugarcane biorefinery
-feedstock_price = 0.03455
+_GDP_2007_to_2016 = 1.114 / 0.961
+_GDP_2008_to_2016 = 1.114 / 0.990
+_GDP_2008_to_2010 = 1.012 / 0.990
+_GDP_2007_to_2010 = 1.012 / 0.961
+
+_chemical_2011to2016 = 102.5 / 91.7
+_chemical_2013to2016 = 102.5 / 101.3
+_chemical_2014to2016 = 102.5 / 105.3
+
+_chemical_2017to2016 = 102.5 / 106.9
+_chemical_2020to2016 = 102.5 / 113.8 # average of Jan and Feb
+_chemical_2022to2016 = 102.5 / 145.3
+
+chem_index = { # Dictionary of chemical indices
+                    2010: 82.2,
+                    2011: 79.5,
+                    2012: 83.7,
+                    2013: 87.9,
+                    2014: 91.3,
+                    2015: 93.1,
+                    2016: 88.8,
+                    2017: 92.7,
+                    2018: 93.3,
+                    2019: 97.0, # the TEA year for the 2023 TAL production study
+                    2020: 100.2,
+                    2021: 112.0,
+                    2022: 125.829,
+                    }
+#%% Feedstocks
+
+# # Glucose / D-glucose / dextrose - from USDA
+# # $/lb # USDA 2015-2019 mean
+# # https://www.ers.usda.gov/data-products/sugar-and-sweeteners-yearbook-tables/sugar-and-sweeteners-yearbook-tables/#World,%20U.S.,%20and%20Mexican%20Sugar%20and%20Corn%20Sweetener%20Prices
+# glucose_price = 0.3798 * _lb_per_kg
+# # in $/kg:
+# # 2015-2019 mean: 37.98	
+# # 2015-2019 5th percentile: 36.00 
+# # 2015-2019 95th percentile: 39.5
+
+# Glucose / D-glucose / dextrose - from review paper Cheng et al. 2019 # https://doi.org/10.1002/bbb.1976
+# $/kg in 2017$: 
+# 0.22 # https://doi.org/10.1016/j.indcrop.2005.08.004  
+# 0.26 # https://doi.org/10.22004/ag.econ.28658
+# 0.33 # https://doi.org/10.1002/bbb.1475
+# $/kg converted to 2019$:
+# 0.23 # https://doi.org/10.1016/j.indcrop.2005.08.004  
+# 0.27 # https://doi.org/10.22004/ag.econ.28658
+# 0.34 # https://doi.org/10.1002/bbb.1475
+# mean of 3 values in 2019$: 0.28
+# mean of 3 values in 2016$:
+glucose_price = ((0.22 + 0.26 + 0.33)/3) * chem_index[2016]/chem_index[2017]
+
+# Corn stover
+from biorefineries.lactic._process_settings import feedstock_price # in 2016$
+cornstover_price = feedstock_price
+
+# Corn
+# $/bushel # USDA 2015-2019 mean
+# https://www.nass.usda.gov/Charts_and_Maps/Agricultural_Prices/pricecn.php
+corn_price = 3.543 / _corn_bushel_to_kg
+# in $/kg:
+# 2015-2019 mean: 0.139
+# 2015-2019 5th percentile: 0.127
+# 2015-2019 95th percentile: 0.150
+
+# Sugarcane
+from biorefineries.cane.streams import sugarcane # in 2018$
+sugarcane_price = sugarcane['price']
+
 
 # 2.2 is the average whole-sale ethanol price between 2010-2019 in 2016 $/gal
 # based on Annual Energy Outlook (AEO) from Energy Information Adiministration (EIA)
@@ -153,7 +221,7 @@ magnesium_sulfate_price = 0.436 * _GDP_2007_to_2016
 
 # All in 2016$/kg
 price = {
-         'Feedstock': feedstock_price,
+         # 'Feedstock': feedstock_price,
          'Sulfuric acid': 0.0430 * _lb_per_kg,	
          # 0.1900 is for NH3	
          'AmmoniumHydroxide': 0.1900 * _lb_per_kg * 17.031/35.046,	
@@ -178,7 +246,10 @@ price = {
          'Denaturant': denaturant_price,
          'Diammonium sulfate': diammonium_sulfate_price,
          'Magnesium sulfate': magnesium_sulfate_price,
-         
+         'Glucose': glucose_price,
+         'Corn stover': cornstover_price,
+         'Corn': corn_price,
+         'Sugarcane': sugarcane_price,
          }
     
 #!!! Round all prices to 4 *decimal places*
@@ -242,19 +313,24 @@ GWP_CFs = {
 GWP_CF_array = chems.kwarray(GWP_CFs)
 # In kg CO2-eq/kg of material
 GWP_CF_stream = tmo.Stream('GWP_CF_stream', GWP_CF_array, units='kg/hr')
-CFs['GWP_CF_stream'] = GWP_CF_stream
+# CFs['GWP_CF_stream'] = GWP_CF_stream
 
 GWP_CFs['Electricity'] = 0.4490 # kg CO2-eq/kWh GREET 2022 US Mix  # assume production==consumption, both in kg CO2-eq/kWh
 
 
-GWP_CFs['Sugarcane'] = 0.12043 * 0.3/0.286 # ecoinvent 3.8 market for sugarcane, RoW
-# # adjusted from dry wt content of 28.6% (their assumption) to 30% (our assumption)
-
+GWP_CFs['Corn stover'] = 0.10945 # see Table S4 of the SI of Bhagwat et al. 2021
+# GWP_CFs['Sugarcane'] = 0.12158 # ecoinvent 3.6, sugarcane production, RoW, IPCC 2013 GWP-100a
+GWP_CFs['Sugarcane'] = 0.044535 # GREET 2023, Sugarcane Production for Brazil Plant
+GWP_CFs['Corn'] = 0.2610 # GREET 2023, Corn Production for Biofuel Refinery
+# GWP_CFs['Glucose'] = 1.2127 # ecoinvent 3.8 glucose production, GLO
+GWP_CFs['Glucose'] = 0.7539 * 0.909 # GREET 2023, Glucose (from corn; based on Fuel-Cycle Fossil Energy Use and Greenhouse Gas Emissions of Fuel Ethanol Produced from U.S. Midwest Corn)
+                                    # multiplied by 0.909 as feedstock dextrose monohydrate stream is 90.9 wt% glucose
+CFs['GWP_100'] = GWP_CFs
 
 # GWP_CFs['Sugarcane'] = 0.02931 # GREET 2022
 
 
-CFs['GWP_CFs'] = GWP_CFs
+CFs['GWP_100'] = GWP_CFs
 
 # =============================================================================
 # Fossil energy consumption (FEC), in MJ/kg of material
@@ -283,16 +359,18 @@ FEC_CF_array = chems.kwarray(FEC_CFs)
 # In MJ/kg of material
 FEC_CF_stream = tmo.Stream('FEC_CF_stream', FEC_CF_array, units='kg/hr')
 
-CFs['FEC_CF_stream'] = FEC_CF_stream
+# CFs['FEC_CF_stream'] = FEC_CF_stream
 
 FEC_CFs['Electricity'] = 5.724 # MJ/kWh # GREET 2022 US Mix #assume production==consumption, both in MJ/kWh
 
-FEC_CFs['Sugarcane'] = 	0.40192 * 0.3/0.286 # ecoinvent 3.8 market for sugarcane, RoW
-# # adjusted from dry wt content of 28.6% (their assumption) to 30% (our assumption)
-
-# FEC_CFs['Sugarcane'] = 	0.2265 # GREET 2022
-
-CFs['FEC_CFs'] = FEC_CFs
+FEC_CFs['Corn stover'] = 1.68000 # see Table S4 in the SI of Bhagwat et al. 2021
+# FEC_CFs['Sugarcane'] = 0.37338 # ecoinvent 3.6, sugarcane production, RoW, IPCC 2013 GWP-100a
+FEC_CFs['Sugarcane'] = 0.28832 # GREET 2023, Sugarcane Production for Brazil Plant
+FEC_CFs['Corn'] = 1.684 # GREET 2023, Corn Production for Biofuel Refinery
+# FEC_CFs['Glucose'] = 14.507 # ecoinvent 3.8 glucose production, GLO
+FEC_CFs['Glucose'] = 7.74 * 0.909 # GREET 2023, Glucose (from corn; based on Fuel-Cycle Fossil Energy Use and Greenhouse Gas Emissions of Fuel Ethanol Produced from U.S. Midwest Corn)
+         
+CFs['FEC'] = FEC_CFs
 
 
 

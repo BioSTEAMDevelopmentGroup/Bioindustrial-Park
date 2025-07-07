@@ -21,17 +21,23 @@ filterwarnings('ignore')
 from biorefineries import succinic
 succinic_filepath = succinic.__file__.replace('\\__init__.py', '')
 succinic_results_filepath = succinic_filepath + '\\analyses\\results\\'
-modes = ['lab_batch', 'lab_fed-batch', 'pilot_batch']
+modes = ['lab_batch', 'lab_fed-batch', 'pilot_batch', 'pilot_batch_upgraded_glucose']
 parameter_distributions_filenames = ['parameter-distributions_lab-scale_batch.xlsx',
                                     'parameter-distributions_lab-scale_fed-batch.xlsx',
                                     'parameter-distributions_pilot-scale_batch.xlsx',
+                                    'parameter-distributions_pilot-scale_batch_upgraded_glucose.xlsx',
                                     ]
 
 def load(mode='pilot_batch'):
-    parameter_distributions_filename = succinic_filepath+'\\analyses\\parameter_distributions\\'+parameter_distributions_filenames[modes.index(mode)]
-    from .models import model, simulate_and_print
+    parameter_distributions_filename = None
+    if mode=='pilot_batch':
+        parameter_distributions_filename = succinic_filepath+'\\analyses\\parameter_distributions\\'+parameter_distributions_filenames[modes.index(mode)]
+        from .models import model, simulate_and_print, namespace_dict, spec
+    elif mode=='pilot_batch_upgraded_glucose':
+        parameter_distributions_filename = succinic_filepath+'\\analyses\\parameter_distributions\\'+parameter_distributions_filenames[modes.index(mode)]
+        from .models_glucose import model, simulate_and_print, namespace_dict, spec
     model.parameters = ()
-    model.load_parameter_distributions(parameter_distributions_filename)
+    model.load_parameter_distributions(parameter_distributions_filename, namespace_dict)
  
     model.exception_hook = 'warn'
     baseline_initial = model.metrics_at_baseline()
@@ -41,7 +47,9 @@ def load(mode='pilot_batch'):
                        'flowsheet': model.system.flowsheet,
                        'succinic_tea': model.system.TEA,
                        'chemicals': model.system.feeds[0].chemicals,
+                       'spec': spec,
                       })
+    
 def run_TRY_analysis():
     from .analyses import TRY_analysis
     print('TRY analysis complete. See analyses/results for figures and raw data.')

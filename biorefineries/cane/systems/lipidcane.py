@@ -48,10 +48,10 @@ def create_juicing_and_lipid_extraction_system(ins, outs, pellet_bagasse=None):
     juicing_sys = create_juicing_system_up_to_clarification(
         pellet_bagasse=pellet_bagasse,
         ins=[lipidcane, H3PO4, lime, polymer], 
-        outs=['', bagasse],
+        outs=['', bagasse, ''],
         mockup=True,
     )
-    clarified_juice, bagasse = juicing_sys.outs
+    clarified_juice, bagasse, _ = juicing_sys.outs
     u = f.unit
     u.U201.isplit['Lipid'] = 0.10 # Crushing mill
     u.S201.isplit['Lipid'] = 1.00 # Fiber screener 
