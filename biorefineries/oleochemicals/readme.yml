@@ -1,0 +1,16 @@
+# .readthedocs.yml
+# The biorefinery named oleochemicals is available within BioIndustrial-Park which is a repository for
+ # complete biorefinery models and results generated with BioSTEAM. 
+ # All biorefinery models are in the biorefineries package, as an installable package for
+  # complete biorefinery models in BioSTEAM.
+# 1) The oleochemicals biorefinery was designed using BioSTEAM (version 2.83.3) and ThermoSTEAM (version 0.38.2). 
+# 1) pip install biosteam version == 2.83.3
+# 2) pip install thermosteam version == 0.38.2
+# 3) $ git clone version 3 manuscript · BioSTEAMDevelopmentGroup/Bioindustrial-Park@74b66dc · GitHub 
+# 2) The biorefinery contains several modules each with a designated purpose described in Table S13. 
+# 3) Please use the BioIndustrial Park repository to accessing the following data
+# 1) To access the samples and results for all the uncertainty analysis
+# 2) To access the sensitivity analysis results please use the folder
+# 3) To access the uncertainty analysis results for varying IRR [%]
+# 4) To access the results for MSPs at different feedstock compositions
+# 5) To access the files for MSPs at varying TAG [%]

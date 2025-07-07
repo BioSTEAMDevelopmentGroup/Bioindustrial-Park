@@ -5,10 +5,7 @@ Created on Sat Aug 20 21:47:53 2022
 
 import thermosteam as tmo
 from thermosteam import functional as fn
-# from thermo import TDependentProperty
-from biorefineries.oleochemicals import tag_properties
-from tag_properties import TAG_Hf
-from tag_properties import *
+from biorefineries.oleochemicals.tag_properties import *
 
 #chems is a list of all the chemicals used in the azelaic acid production process
 chems = tmo.Chemicals([
@@ -19,12 +16,12 @@ chems = tmo.Chemicals([
                      search_ID = '122-32-7',
                      Hf = TAG_Hf(name = 'C18_unsaturated',double_bonds = 1),
                      phase_ref = 'l' ),
-        tmo.Chemical('LnLnLn', #Trilinolenein
-                     search_ID = '537-40-6',
+        tmo.Chemical('LnLnLn', #Trilinolenin 
+                     search_ID = '14465-68-0',
                      Hf = TAG_Hf(name = 'C18_unsaturated',double_bonds = 3),
                      phase = 'l'),
-        tmo.Chemical('LLL',#Trilinolein
-                      search_ID = '7049-66-3',#Based on reference search in CAS Finder
+        tmo.Chemical('LLL',#Trilinolein 
+                      search_ID = ' 537-40-6',#Based on reference search in CAS Finder
                       search_db = False,
                       formula = 'C54H96O6',#Based on reference search in CAS Finder
                       Hf = TAG_Hf(name = 'C18_unsaturated',double_bonds = 2),
@@ -93,6 +90,7 @@ chems = tmo.Chemicals([
 #Product 2 
 #Tetrahydroxlated product of methyl linoleate (properties were obtained from DWSIM [4])
         tmo.Chemical('Tetrahydroxy_octadecanoate',
+                     formula = 'C19H38O6',
                       search_ID = '61117-79-1', #Reaxys [5]
                       search_db = False, 
                       MW = 362.51,#Reaxys [5]
@@ -103,7 +101,7 @@ chems = tmo.Chemicals([
 #Product 3
 #Hexahydroxlated product of methyl linolenate (properties were obtained from DWSIM [4]) 
         tmo.Chemical.blank('Hexahydroxy_octadecanoate',#Structure obtained from Reaxys
-                            MW = 394.51,#Reaxys [5]
+                           MW = 394.51,#Reaxys [5]
                             Tb = 1261.05,#DWSIM
                             formula = 'C19H38O8',
                             Hf = -508800.0,#Assumed to be same as Linolenic acid created above
@@ -125,7 +123,6 @@ chems = tmo.Chemicals([
         tmo.Chemical('Adipic_acid'),
         tmo.Chemical('Pelargonic_acid'),
         tmo.Chemical('Propanoic_acid'),
-        tmo.Chemical('Methyl_caprylate',search_ID = '111-11-5'),
         tmo.Chemical('Nonanal'),
         tmo.Chemical('Methyl_oxo_nonanoicacid',search_ID = '1931-63-1'),   
 #Possible monoester of MDHSA with Pelargonic acid        
@@ -393,7 +390,7 @@ chems.Tungstic_acid.copy_models_from(chems.Chromic_acid,['Hvap','Psat','V'])
 chems.Sodium_tungstate.copy_models_from(chems.Chromic_acid,['Hvap','Psat'])
 chems.Calcium_tungstate.copy_models_from(chems.Chromic_acid,['Hvap','Psat','Cn'])
 
-#TODO; could not find better assumptions
+
 #set phase = s
 chems.Calcium_hydroxide.copy_models_from(tmo.Chemical('NaOH'),['Psat'])
 chems.Calcium_chloride.copy_models_from(tmo.Chemical('NaOH'),['Psat'])
@@ -508,6 +505,7 @@ chems.set_synonym('HCl2','Liquid_HCl')
 chems.set_synonym('CaSO4', 'Gypsum')
 chems.set_synonym('Calcium_oxide', 'Lime')
 chems.set_synonym('Citric_acid', 'CitricAcid')
+chems.set_synonym('Caprylic_acid','Octanoic_acid')
 
 ###References###
 #[1] DOI: 10.1021/ie100160v

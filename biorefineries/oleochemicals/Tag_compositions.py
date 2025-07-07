@@ -49,7 +49,17 @@ high_oleic_vari_adjusted =  { #High oleic soybean varieties
                                    'SSS': 3.24,
                                    'OOO': 85.55, 
                                    'LLL': 5.74,
-                                   'LnLnLn':0.16}}
+                                   'LnLnLn':0.16},
+                           'Feedstock 1': {'PPP': 4,
+                                           'SSS': 2,
+                                           'OOO': 83, 
+                                           'LLL': 5,
+                                           'LnLnLn': 4},
+                           'Feedstock 2': {'PPP': 4,
+                                           'SSS': 2,
+                                           'OOO': 84,
+                                           'LLL': 3,
+                                           'LnLnLn': 4}}
 
 #Refs:
 #[1] https://www.sciencedirect.com/science/article/pii/B9780128229125000071#bbb0195   
