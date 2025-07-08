@@ -12,7 +12,7 @@ biorefineries.egg-info
 dist
 MANIFEST
 .coverage
-#.coveralls.yml
+.coveralls.yml
 htmlcov
 _build
 .cache
@@ -33,7 +33,7 @@ docs/_templates/*
 
 # Data/results #
 ################
-#*.xlsx
+*.xlsx
 *.png
 *.jpeg
 #*.svg
