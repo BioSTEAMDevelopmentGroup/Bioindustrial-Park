@@ -8,6 +8,7 @@ Created on 2025-06-04 14:26:14
 @email: ouwen.peng@iarcs-create.edu.sg
 """
 
+#from biorefineries.animal_bedding import _system
 import biosteam as bst
 from thermosteam import Stream
 
@@ -25,13 +26,203 @@ bst.preferences.N=50
 
 # %%
 __all__ = (
+    # 'create_LegH_Pretreatment_system',
+    # 'create_LegH_Conversion_system',
+    # 'create_LegH_CellRemoval_Concentration_system',
+    # 'create_LegH_Purification_system',
     'create_LegH_system',
 )
+
+# @bst.SystemFactory(
+#     ID='LegH_Conversion_sys',
+#     ins=[s.SeedIn, s.CultureIn, s.Glucose, s.NH3_18wt],
+#     outs=[s.LegH_1, s.vent1, s.vent2,],
+#     fthermo=c.create_chemicals_LegH,
+# )
+# def create_LegH_Conversion_system(
+#         ins, outs,
+#         # reactions_passed=None, # Placeholder if reactions were to be passed externally
+#         # One could add more configurable parameters here:
+#         # V_max_fermenter=500, target_titer=7.27, etc.
+#     ):
+#     """
+#     Creates the LegH (Leghemoglobin) conversion system.
+#     This system is based on the process flow and parameters from test_LegH.py.
+#     """
+#     # Unpack input streams
+#     SeedIn, CultureIn, Glucose, NH3_18wt = ins
+
+#     # Unpack output streams
+#     LegH_1, vent1, vent2 = outs
+
+#     """
+#     Fermentation Parameter
+#     """
+#     theta_O2 = 0.5 # Dissolved oxygen concentration [% saturation]
+#     agitation_power = 0.985 # [kW / m3]
+#     design = 'Stirred tank' # Reactor type
+#     method = "Riet" # Name of method
+#     T_operation = 273.15 + 32 # [K]
+#     Q_O2_consumption = -110 * 4184 # [kJ/kmol]
+#     dT_hx_loop = 8 # [degC]
+#     cooler_pressure_drop = 20684 # [Pa]
+#     compressor_isentropic_efficiency = 0.85
+#     V_max = 500 # [m3]
+#     titer = 7.27 # [g / L]
+#     productivity = titer / 72 # [g / L / h]
+#     LegH_yield = titer * 5 / 1300 # [by wt]
+#     Y_b = 0.43 # [by wt]
+
+#     """
+#     Reactions
+#     """
+    
+#     fermentation_reaction = bst.PRxn([
+#         #           Reaction        Reactnat            Conversion           Check                  "
+#         bst.Rxn('8 Glucose + 4 NH3 + 1 FeSO4 + 10.5 O2 -> Heme_b + 1 H2SO4 + 37 H2O + 14 CO2',
+#                                     reactant = 'Glucose',X=LegH_yield*0.05,check_atomic_balance=True),
+#         bst.Rxn('Glucose + (NH4)2SO4 + O2 -> Globin + NH3 + H2O',
+#                                     reactant = 'Glucose', X= LegH_yield*0.05,correct_atomic_balance=True),
+#         bst.Rxn('Glucose + FeSO4 + (NH4)2SO4 + O2 -> Leghemoglobin + NH3 + H2O', 
+#                                     reactant = 'Glucose', X=LegH_yield,  correct_atomic_balance=True),
+#         ])
+#     fermentation_reaction[2].product_yield('Leghemoglobin', basis='wt', product_yield=LegH_yield)
+
+#     neutralization_reaction = bst.Rxn(
+#         'H2SO4 + NH3 -> (NH4)2SO4', reactant = 'H2SO4', X=1,
+#         correct_atomic_balance=True
+#     )
+
+#     cell_growth_reaction = bst.Rxn(
+#         'Glucose -> H2O + CO2 + Pichia_pastoris', 'Glucose', X=Y_b,
+#         correct_atomic_balance=True
+#     )
+#     cell_growth_reaction.product_yield('Pichia_pastoris', basis='wt', product_yield=Y_b)
+
+#     respiration_reaction = bst.Rxn(
+#         'Glucose + O2 -> CO2 + H2O', 'Glucose', 1. - cell_growth_reaction.X - fermentation_reaction[2].X,
+#         correct_atomic_balance=True
+#     )
+
+#     bst.settings.chemicals.set_alias('Pichia_pastoris', 'cellmass')
+#     RXN = bst.ReactionSystem(
+#         fermentation_reaction,
+#         bst.PRxn([cell_growth_reaction, respiration_reaction])
+#     )
+#     RXN.show()
+#     """
+#     Seed Train
+#     """
+#     M101= bst.Mixer(ins=[SeedIn,CultureIn])
+#     R101 = u.SeedTrain(
+#         'R101',
+#         ins=[M101-0],
+#         outs=[vent1, 'SeedOut'],
+#         reactions=bst.PRxn([cell_growth_reaction, respiration_reaction]),
+#         saccharification=None,
+#         T=32+273.15,
+#     )
+    
+#     R102 = u.AeratedFermentation(
+#         'R102',
+#         ins=[R101-1, Glucose, NH3_18wt, bst.Stream('FilteredAir', phase='g', P = 2 * 101325)],
+#         outs=[vent2, LegH_1],
+#         fermentation_reaction=fermentation_reaction,
+#         cell_growth_reaction=cell_growth_reaction,
+#         respiration_reaction=respiration_reaction,
+#         neutralization_reaction=neutralization_reaction,
+#         design='Stirred tank', method=method,theta_O2=theta_O2,
+#         V_max=V_max, Q_O2_consumption=Q_O2_consumption,
+#         dT_hx_loop=dT_hx_loop, T=T_operation,
+#         batch=True, reactions=RXN,
+#         kW_per_m3=agitation_power,
+#         tau=titer/productivity,
+#         cooler_pressure_drop=cooler_pressure_drop,
+#         compressor_isentropic_efficiency=compressor_isentropic_efficiency,
+#         P=1 * 101325,#optimize_power=True,
+#     )
+#     R102.target_titer = titer # g / L
+#     R102.target_productivity = productivity # g / L / h
+#     R102.target_yield = LegH_yield  # wt %
+
+#     @R102.add_specification(run=True)
+#     def update_reaction_time_and_yield():
+#         R102.tau = R102.target_titer / R102.target_productivity
+#         fermentation_reaction[2].product_yield('Leghemoglobin', basis='wt', product_yield=R102.target_yield)
+
+#     return LegH_1, vent1, vent2
+
+
+# @bst.SystemFactory(
+#     ID='LegH_CellRemoval_Concentration_sys',
+#     ins=[s.LegH_1],
+#     outs=[s.LegH_2, s.effluent1, s.effluent2,],
+#     fthermo=c.create_chemicals_LegH, 
+# )
+# def create_LegH_CellRemoval_Concentration_system(
+#         ins, outs,
+#         # reactions_passed=None, # Placeholder if reactions were to be passed externally
+#         # One could add more configurable parameters here:
+#         # V_max_fermenter=500, target_titer=7.27, etc.
+#     ):
+#     """
+#     Creates the LegH (Leghemoglobin) cell removal system.
+#     This system is based on the process flow and parameters from test_LegH.py.
+#     """
+#     # Unpack input streams
+#     LegH_1 = ins
+
+#     # Unpack output streams
+#     LegH_2, effluent1, effluent2 = outs
+
+    
+#     U201 = u.CellDisruption(
+#         'U201',
+#         ins=LegH_1,
+#         outs='U201Out',
+#     )
+
+#     C201 = u.ProteinCentrifuge(
+#         'C201',
+#         ins = U201-0,
+#         outs = (effluent1, 'C201Out'),
+#         moisture_content = 0.5,
+#         split = (1, 0.99, 1, 1),
+#         order = ('Glucose','cellmass', 'LeghemoglobinIntre','GlobinIntre'),
+#     )
+
+#     E201 = u.Evaporator(
+#         'E201',
+#         ins = C201-1,
+#         outs = ('E201Out',effluent2),
+#         P = (101325, 73581, 50892, 32777, 20000),
+#         V = 0.1,
+#         V_definition = 'First-effect',
+#     )
+
+#     return LegH_2, effluent1, effluent2
+
+# @bst.SystemFactory(
+#     ID='LegH_Purification_sys',
+#     ins=[s.SeedIn, s.WashingSolution, s.Elution, s.NFBuffer
+#         ],
+#     outs=[s.LegH_3, s.effluent3, s.effluent4, s.effluent5, s.effluent6], 
+#     fthermo=c.create_chemicals_LegH,
+# )
+# def create_LegH_Purification_system(
+#     ins, outs,
+#     # reactions_passed=None, # Placeholder if reactions were to be passed externally
+#     # One could add more configurable parameters here:
+#     # V_max_fermenter=500, target_titer=7.27, etc.
+# ):
+#     pass
+
+
 @bst.SystemFactory(
     ID='LegH_sys',
     ins=[s.SeedIn, s.CultureIn, s.Glucose, s.NH3_18wt,
         ],
-    outs=[s.LegH_Ingredients, s.vent1, s.vent2, s.effluent1, s.effluent2,
+    outs=[s.LegH_3, s.vent1, s.vent2, s.effluent1, s.effluent2,
         s.effluent3, s.effluent4, s.effluent5, s.effluent6], # Added s.effluent6
     fthermo=c.create_chemicals_LegH, # Pass the function itself
 )
@@ -46,10 +237,10 @@ def create_LegH_system(
     This system is based on the process flow and parameters from test_LegH.py.
     """
     # Unpack input streams
-    SeedIn, CultureIn, Glucose, NH3_18wt,  = ins
-    
+    SeedIn, CultureIn, Glucose, NH3_18wt= ins
+
     # Unpack output streams
-    (LegH_Ingredients, vent1, vent2, effluent1, effluent2, 
+    (LegH_3, vent1, vent2, effluent1, effluent2, 
     effluent3, effluent4, effluent5, effluent6) = outs
     """
     Fermentation Parameter
@@ -220,7 +411,7 @@ def create_LegH_system(
     SD1 = bst.SprayDryer(
         'SD1',
         ins=NF1-0,
-        outs=(effluent6, LegH_Ingredients),
+        outs=(effluent6, LegH_3),
         moisture_content=0.05,  # 5% moisture content in the final product
     )
     LegH_sys = bst.main_flowsheet.create_system('LegH_sys')
@@ -230,7 +421,7 @@ def create_LegH_system(
     Elution = (1-IEX1)
     NFBuffer = (1-NF1)
 
-    return LegH_Ingredients, vent1, vent2, effluent1, effluent2, effluent3, effluent4, effluent5, effluent6, WashingSolution, Elution, NFBuffer
+    return LegH_3, vent1, vent2, effluent1, effluent2, effluent3, effluent4, effluent5, effluent6, WashingSolution, Elution, NFBuffer
 
 if __name__ == '__main__':
     # Create the LegH system
@@ -244,6 +435,6 @@ if __name__ == '__main__':
     LegH_sys.simulate()
     LegH_sys.diagram(format='html')
     LegH_sys.show()
-    f.LegH_Ingredients.show(composition=True, flow='kg/hr')
+    f.LegH_3.show(composition=True, flow='kg/hr')
 
 # %%
