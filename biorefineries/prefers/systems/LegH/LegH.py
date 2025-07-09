@@ -22,10 +22,10 @@ bst.settings.set_thermo(c.create_chemicals_LegH(), skip_checks=True)
 bst.preferences.classic_mode()
 # %%
 __all__ = (
-    'create_LegH_Pretreatment_system',
-    'create_LegH_Conversion_system',
-    'create_LegH_CellRemoval_Concentration_system',
-    'create_LegH_Purification_system',
+    # 'create_LegH_Pretreatment_system',
+    # 'create_LegH_Conversion_system',
+    # 'create_LegH_CellRemoval_Concentration_system',
+    # 'create_LegH_Purification_system',
     'create_LegH_system',
 )
 

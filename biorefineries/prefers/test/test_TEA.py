@@ -76,7 +76,7 @@ if __name__ == '__main__':
     legH_tea.show()  # Display the TEA summary
     legH_tea.get_cashflow_table()
     # %% Production costs
-    products = legH_sys.flowsheet('LegH_Ingredients')
+    products = legH_sys.flowsheet('LegH_3')
     # %%
     costs = legH_tea.production_costs(products)# USD/yr
     np.round(costs / 1e6) # million USD / yr
