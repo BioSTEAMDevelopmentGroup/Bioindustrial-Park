@@ -44,11 +44,37 @@ class Biorefinery(bst.ProcessModel):
     Examples
     --------
     >>> from biorefineries.gas_fermentation import Biorefinery
-    >>> br = Biorefinery(simulate=False, scenario='all fermentation-glucose growth')
+    >>> br = Biorefinery(simulate=False, scenario='glucose growth')
     >>> br.system.simulate()
-    >>> br.system.diagram()
-    >>> (br.MSP(), br.carbon_intensity(), br.tea.TCI / 1e6)
-    (7.30, 2.80, 438.53)
+    >>> assumptions, results = br.baseline()
+    >>> br.system.diagram() # View diagram
+    >>> print(assumptions)
+    EtAc                     Price [USD/kg]                                1.57
+    hexane                   Price [USD/kg]                                0.73
+    glucose                  Price [USD/kg]                               0.413
+    oleochemical             Price [USD/kg]                                   3
+    H2                       Price [USD/kg]                                   3
+    AcOH production          Titer [g/L]                                     60
+                             Productivity [g/L/h]                           1.5
+    Oleochemical production  Titer [g/L]                                      5
+                             Productivity [g/L/h]                             1
+                             Bioreactor yield [% theoretical]                36
+                             Specific yield [g_{Dodecanol}/g_{cell}]       1.57
+    Flue gas                 Processing capacity [MT/yr]               2.32e+05
+    biomass                  Price [USD/MT]                                54.7
+    dtype: float64
+    
+    >>> print(results)
+    -             MSP [USD/kg]                                    7.43
+                  Carbon intensity [kg*CO2e/kg]                   2.26
+                  TCI [10^6 USD]                                   646
+                  Product yield to biomass [wt %]                0.675
+                  Product yield to hydrogen [% theoretical]       0.14
+                  Biomass burned [10^3 MT/yr]                     80.7
+                  Hydrogen consumption [10^3 MT/yr]               54.6
+                  Electricity demand [kWh/kg-H2]                  13.7
+    oleochemical  Production capacity [10^3 MT/yr]            5.45e+04
+    dtype: float64
     
     """
     class Scenario:
@@ -68,10 +94,14 @@ class Biorefinery(bst.ProcessModel):
     
     @classmethod
     def as_scenario(cls, scenario):
-        try:
+        if '|' in scenario:
             fermentation, glucose_growth = scenario.split('|')
-        except:
+        elif '-' in scenario:
             fermentation, glucose_growth = scenario.split('-')
+        else:
+            fermentation = 'all fermentation'
+            glucose_growth = scenario
+            scenario = 'all fermentation|glucose growth'
         if glucose_growth == 'glucose growth':
             glucose_growth = True
         elif glucose_growth == 'acetate growth':
