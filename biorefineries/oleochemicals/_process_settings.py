@@ -50,7 +50,7 @@ def load_preferences_and_process_settings(T,flow_units,N,P_units,CE,
 
 #Feedstock type can be either HoySoy or HoSun
 def set_price_of_all_streams(feedstock_type): 
-    joule_to_megajoule = 1.0E-6
+    kjoule_to_megajoule = 1/1000
     #Feedstock stream                    
     if feedstock_type == 'HoSun':
           print('see')
@@ -58,7 +58,7 @@ def set_price_of_all_streams(feedstock_type):
     else: F.crude_vegetable_oil.price = prices_per_stream['crude_vegetable_Hoysoy']
     for i in [ #streams defined inside the system
               F.stream.polystyrene_based_catalyst,
-              F.stream.Liquid_HCl,
+              F.stream.conc_HCl_for_resin_wash,
               #streams which are a part of the imported lipidcane transesterification unit
               F.stream.NaOH,
               F.catalyst,
@@ -84,20 +84,12 @@ def set_price_of_all_streams(feedstock_type):
                     j.price = prices_per_stream[j.ID]
             for k in i.outs:
                 if k.ID in prices_per_stream.keys():
-                    if k.ID != 'fatty_acid_blend':
-                        k.price = prices_per_stream[k.ID]    
-                    else:
-                        if feedstock_type == 'HoSun':
-                            k.price = k.LHV *joule_to_megajoule*prices_per_stream['fatty_acid_blend']['HoSun']
-                        else:
-                            k.price = k.LHV *joule_to_megajoule*prices_per_stream['fatty_acid_blend']['HoySoy']
-    
-                    
+                    k.price = prices_per_stream[k.ID]    
+                  
 
 def set_environmental_impact_of_all_streams(indicator,feedstock_type):
     #Feedstock stream                    
     if feedstock_type == 'HoSun':
-          print('see')
           F.crude_vegetable_oil.characterization_factors[indicator] = GWP_per_stream['crude_vegetable_HoSun']
     else: F.crude_vegetable_oil.characterization_factors[indicator] = GWP_per_stream['crude_vegetable_Hoysoy']
     for i in [F.crude_HO_oil_to_biodiesel,
@@ -112,30 +104,29 @@ def set_environmental_impact_of_all_streams(indicator,feedstock_type):
                 F.PWT701,
                 F.WWT901
               ]:
-        for j in i.ins:
-            if j.ID in GWP_per_stream.keys():                
+        for j in i.ins:                            
+            if j.ID in GWP_per_stream.keys(): 
                 j.characterization_factors[indicator]= GWP_per_stream[j.ID]            
         for k in i.outs:
             if k.ID in GWP_per_stream.keys():                
                 k.characterization_factors[indicator] = GWP_per_stream[k.ID]
     for i in [ #streams defined inside the system
               F.stream.polystyrene_based_catalyst,
-              F.stream.Liquid_HCl,
+              F.stream.conc_HCl_for_resin_wash,
               #streams which are a part of the imported lipidcane transesterification unit
               F.stream.NaOH,
               F.stream.methanol,
               F.stream.catalyst,
               F.stream.HCl]:
         i.characterization_factors[indicator] = GWP_per_stream[i.ID]  
-       
-
+ 
 
 #Techno-economic analysis
 def tea_azelaic_baseline(system,WC_over_FCI,operating_days,payrate,IRR):
     tea_azelaic_baseline = TEA_baseline(lang_factor=None,
     system = system,    
     IRR=IRR,  
-    duration=(2022, 2052), #assumption, 30 years
+    duration=(2023, 2053), #assumption, 30 years
     depreciation='MACRS7',#MARCS used in [1] was not available in Biosteam 
     income_tax=0.29+0.05,  #First value denotes federal corporate income tax for Illinois, second value denotes 
     #state income tax for Illinois [2],[3]

@@ -16,8 +16,6 @@ __all__ = ('prices_per_Kg',
            'GWP_per_stream'
            )
 
-#TODO: ask about heat transfer regen price
-
 #%% Data for prices of materials and utility
 
 #Freds Producers price index was used to update the prices of chemicals to 2023 prices[1]
@@ -58,17 +56,12 @@ prices_per_Kg = {
         #2021 prices to 2023
         'HCl' : 0.13*ratio_2023from2021, # Catcost materials library [2]
         'Sodium_hydroxide': 0.915*ratio_2023from2021,#2021 price, Catcost materials library [2]
-        'Citric_acid': 3.26*ratio_2023from2021,#Ranges [$/kg] between 1.60 - 4.93, 2021 price [2]
         'Hydrogen_peroxide': 1.505*ratio_2023from2021,#Based on 50% of hydrogen peroxide, range [$/kg] 1.21 - 1.80 [2]
         'Calcium_chloride': 0.83*ratio_2023from2021,#Based on 94-97% pure flakes,ranges [$/kg] 0.47 to 1.19 [2]             
-        'Heptane':0.684*ratio_2023from2021,# [2]
+        'Heptane':0.85*ratio_2023from2021,# [2]
         'Methanol':0.792*ratio_2023from2021,#[2]
         'Resin': 106, #2023 price, [3]      
         'Sodium_methoxide': 2.93*ratio_2023from2016,# [4]
-        'biodiesel_sold_as_product': 1.35, #[37],[38] based on general biodiesel prices and mass of biodiesel
-        'Oleic acid_1': 1.62*ratio_2023from2021,
-        'Oleic acid_2': 1.60*ratio_2023from2021,
-        'Price of ozone1': 1.03*ratio_2023from1984 #[39]
         }
 
 #feedstock prices
@@ -93,61 +86,97 @@ feedstock_prices_per_Kg = {'HoSun_oil': commodity_sunflower_oil_pricing['2022_20
                            'HoySoy_oil': (rbd_soybean_oil_pricing['2023_2024']+premium_value_23)/pounds_to_kg
                                 }
 
-#lower heating value of veg oil derived fatty acid blends
-LHV_of_high_oleic_soybean_oil_biodiesel = 37.7 #MJ/kg #[36]
-LHV_of_sunflower_oil_biodiesel = 38.49 #MJ/kg
-
-product_prices_per_kg = {        
-        'C5_C9_fraction': 2.00*ratio_2023from2018,#2018 price for caproic acid (major component),1500–2500 USD/ton [13]
-        'Crude_glycerol': 0.16*ratio_2023from2022,#Prices based on [14]
-        'Crude_methanol':0.792*ratio_2023from2021,#[2]
-        }
-
-
 
 #Bulk prices for several chemicals were not available
 #Laboratory prices for lab quantities were upgraded to bulk prices using correlation provided by [15]
 #The correlation uses a bulk quantity of 60lbs (30 kgs) for estimating the bulk price [15]
 
+
 def convert_lab_price_to_bulk_price(
-                                    lab_quantity_in_kg = np.array([]), 
-                                    lab_price_per_kg = np.array([]),
-                                    bulk_quantity_in_kg = 30, #used by the paper [15]
-                                    bulk_coeff = -0.75 #as mentioned in the paper [15]
-                                    ):
-    bulk_price = np.array([(lab_price_per_kg[i]*(bulk_quantity_in_kg/lab_quantity_in_kg[i])**(bulk_coeff))for i in range(len(lab_quantity_in_kg))])
-    return np.average(bulk_price)
+    lab_quantity_in_kg=np.array([]), 
+    lab_price_per_kg=np.array([]),
+    bulk_quantity_in_kg=30,  # as used in paper [15]
+    bulk_coeff=-0.75         # scaling exponent from paper [15]
+):
+    """
+    Convert lab-scale price to bulk price using power-law scaling.
 
+    Parameters:
+    - lab_quantity_in_kg (np.array): Quantities at which lab prices are reported (kg).
+    - lab_price_per_kg (np.array): Prices at lab scale ($/kg).
+    - bulk_quantity_in_kg (float): Target bulk scale quantity in kg (default: 30).
+    - bulk_coeff (float): Scaling coefficient (default: -0.75 from [15]).
+
+    Returns:
+    - float: Average bulk price across all inputs ($/kg).
+    """
+    if len(lab_quantity_in_kg) != len(lab_price_per_kg):
+        raise ValueError("Input arrays must be of the same length.")
+    if np.any(lab_quantity_in_kg == 0):
+        raise ValueError("Lab quantity cannot be zero to avoid division by zero.")
+
+    scale_factors = (bulk_quantity_in_kg / lab_quantity_in_kg) ** bulk_coeff
+    bulk_prices = lab_price_per_kg * scale_factors
+    return np.average(bulk_prices)
+
+
+# Corrected and referenced bulk price estimation
 correlation_based_bulk_prices = {
-        #2023 prices
-        #catalysts
-        'Cobalt_acetate': convert_lab_price_to_bulk_price(lab_quantity_in_kg= np.array([0.5,
-                                                                                        0.5,
-                                                                                       ]),
-                                                          lab_price_per_kg = np.array([379.58,#[16] GFS chemicals
-                                                                                       735.42,#[17] BEantown chemicals
-                                                                                       ]),
-                                                          bulk_quantity_in_kg = 30, bulk_coeff = -0.75),
-        
-        
-        'Tungstic_acid': convert_lab_price_to_bulk_price(lab_quantity_in_kg= np.array([0.5,
-                                                                                        0.5,
-                                                                                        ]),
-                                                          lab_price_per_kg = np.array([682.00,#[18] Sigma aldrich
-                                                                                       838.00]),#[18] Sigma aldrich
-                                                          bulk_quantity_in_kg = 30, bulk_coeff = -0.75),
-        #products
-        'Pelargonic_acid':convert_lab_price_to_bulk_price(lab_quantity_in_kg= np.array([0.906]),#[18] Sigma aldrich
-                                                          lab_price_per_kg = np.array([74.06 #[18] Sigma aldrich
-                                                                                       ]),
-                                                          bulk_quantity_in_kg = 30, bulk_coeff = -0.75),
-        #products
-        'Azelaic_acid': convert_lab_price_to_bulk_price(lab_quantity_in_kg= np.array([2,1,1]),#[18] Sigma aldrich
-                                                          lab_price_per_kg = np.array([77.00,224.00,112.00 #[18] Sigma aldrich
-                                                                                       ]),
-                                                          bulk_quantity_in_kg = 30, bulk_coeff = -0.75)}
+    # -----------------------
+    # Catalysts
+    # -----------------------
 
-    
+    # Cobalt acetate tetrahydrate (98–99.999% purity)
+    # Sources: [16] GFS Chemicals, [17] Beantown Chemicals, [18] Sigma-Aldrich
+    'Cobalt_acetate': convert_lab_price_to_bulk_price(
+        lab_quantity_in_kg=np.array([0.5, 0.5, 0.5]),
+        lab_price_per_kg=np.array([379.58, 735.42, 227.92]),  # $/kg from [16], [17], [18]
+        bulk_quantity_in_kg=30,  # [15]
+        bulk_coeff=-0.75         # [15]
+    ),
+
+    # Tungstic acid
+    # Source: [18] Sigma-Aldrich
+    'Tungstic_acid': convert_lab_price_to_bulk_price(
+        lab_quantity_in_kg=np.array([0.5, 0.5]),
+        lab_price_per_kg=np.array([682.00, 838.00]),  # $/kg from [18]
+        bulk_quantity_in_kg=30,
+        bulk_coeff=-0.75
+    ),
+
+    # -----------------------
+    # Products
+    # -----------------------
+
+    # Pelargonic acid (technical/synthesis grade)
+    # Source: [18] Sigma-Aldrich
+    'Pelargonic_acid': convert_lab_price_to_bulk_price(
+        lab_quantity_in_kg=np.array([0.906]),
+        lab_price_per_kg=np.array([74.06]),  # $/kg from [18]
+        bulk_quantity_in_kg=30,
+        bulk_coeff=-0.75
+    ),
+
+    # Azelaic acid (technical/synthesis grade)
+    # Source: [18] Sigma-Aldrich
+    'Azelaic_acid': convert_lab_price_to_bulk_price(
+        lab_quantity_in_kg=np.array([2, 1, 1]),
+        lab_price_per_kg=np.array([77.00, 224.00, 112.00]),  # $/kg from [18]
+        bulk_quantity_in_kg=30,
+        bulk_coeff=-0.75
+    )
+}
+average_aa_price = 0.5*(correlation_based_bulk_prices['Azelaic_acid'] + 6.67*ratio_2023from2021*3/2)
+# 6.67 comes from Cat cost of sebacic acid [2], the fact that azelaic acid price 
+# is 3/2 comes from [41]
+product_prices_per_kg = {        
+        'C5_C9_fraction': 2.00*ratio_2023from2018,#2018 price for caproic acid (major component),1500–2500 USD/ton [13]
+        'Crude_glycerol': 0.16*ratio_2023from2022,#Prices based on [14]
+        'Crude_methanol':0.792*ratio_2023from2021,#[2]
+        'fatty_acid_blend':1.93*ratio_2023from2021,#[2] biodiesel price from 2021
+        'Azelaic_acid':average_aa_price
+        }
+
     
 #unit conversions
 lb_to_kg = 0.453
@@ -169,7 +198,7 @@ utility_prices = {
         'Boiler_chems':1.216/(55*boiler_chem_density*lb_to_kg), #2023 price,Based on [23],55 gal drum costs 609$
         'Lime_boiler':0.11*ratio_2023from2021,#2021 price based on average of all lime values provided in [2]
         'Electricity':np.mean(average_electricity_prices_2017_to_2022)*ratio_utility_2023from2017_2022_period_mean/cents_to_dollar,#Industrial retail electricity price provided by EIA for 2017-2022 period[24]
-        'Ash_disposal_price':-0.0318,#Biosteam default price
+        'Ash_disposal_cost':-0.0318,#Biosteam default price
         'Heat_transfer_price': 0,
         'brine_disposal': -round(550/160.3,2) #density of the stream at baseline,
         #In practise the disposal cost varies from 10 to 1,000 $/m3 [32]
@@ -179,40 +208,35 @@ utility_prices = {
 prices_per_stream = { #input prices
                       'crude_vegetable_Hosun': feedstock_prices_per_Kg['HoSun_oil'],
                       'crude_vegetable_Hoysoy':feedstock_prices_per_Kg['HoySoy_oil'],
-                      'base_for_saponification_of_FFA':prices_per_Kg['Sodium_hydroxide'],
-                      'citricacid_for_degumming':prices_per_Kg['Citric_acid'],
                       'fresh_HP':prices_per_Kg['Hydrogen_peroxide'],
                       'fresh_tungsten_catalyst':correlation_based_bulk_prices['Tungstic_acid'],
                       'fresh_cobalt_catalyst_stream':correlation_based_bulk_prices['Cobalt_acetate'],
-                      'sodium_hydroxide_for_cat_sep':prices_per_Kg['Sodium_hydroxide'],
+                      'sodium_hydroxide_stream':prices_per_Kg['Sodium_hydroxide'],
                       'calcium_chloride_for_cat_sep':prices_per_Kg['Calcium_chloride'],
                       'conc_hydrochloric_acid': prices_per_Kg['HCl'],
                       'solvent_for_extraction':prices_per_Kg['Heptane'],
                       'polystyrene_based_catalyst':prices_per_Kg['Resin'],
-                      'Liquid_HCl':prices_per_Kg['HCl'],
+                      'conc_HCl_for_resin_wash':prices_per_Kg['HCl'],
                       'NaOH':prices_per_Kg['Sodium_hydroxide'],
                       'methanol':prices_per_Kg['Methanol'],
                       'catalyst':0.25*prices_per_Kg['Sodium_methoxide'] + 0.75*prices_per_Kg['Methanol'],
                       'HCl': prices_per_Kg['HCl'],
-                      'biodiesel_sold_as_product': prices_per_Kg['biodiesel_sold_as_product'],
                       
                       #product prices
                       'crude_glycerol':product_prices_per_kg['Crude_glycerol'],
                       'recovered_C5_to_C9_MCA_fraction':product_prices_per_kg['C5_C9_fraction'],
                       'pelargonic_acid_rich_fraction':correlation_based_bulk_prices['Pelargonic_acid'],
-                      'fatty_acid_blend':{'HoySoy':0.88*ratio_2023from2021/LHV_of_high_oleic_soybean_oil_biodiesel,#2021 price for biodiesel as Matricia uses the complex heavy tail mixture for production of biofuels[2]
-                                          'HoSun':0.88*ratio_2023from2021/LHV_of_sunflower_oil_biodiesel,#2021 price for biodiesel as Matricia uses the complex heavy tail mixture for production of biofuels[2]
-                                          },
-                      'azelaic_acid_product_stream':correlation_based_bulk_prices['Azelaic_acid'],
+                      'fatty_acid_blend':1.93*ratio_2023from2021,#[2] biodiesel price from 2021
+                      'azelaic_acid_product_stream':product_prices_per_kg['Azelaic_acid'],
+                          
                       'crude_methanol':product_prices_per_kg['Crude_methanol'],
-                      # 'malonic_acid_stream':correlation_based_bulk_prices['Malonic_acid'],
                       
                       #utility prices
                       'natural_gas': utility_prices['Natural_gas_price'],
                       'lime_boiler':utility_prices['Lime_boiler'],
                       'boiler_chems':utility_prices['Boiler_chems'],
                       'system_makeup_water':utility_prices['System_makeup_water'],
-                      'ash_disposal':utility_prices['Ash_disposal_price'],
+                      'ash_disposal':utility_prices['Ash_disposal_cost'],
                       'cooling_tower_chemicals':utility_prices['Cooling_tower_chemicals'],
                       'brine_from_wastewater_treatment': utility_prices['brine_disposal']
                       }
@@ -223,54 +247,61 @@ lbsperMWh_to_KgsperKWh = 4.53592e-4
 
 GWP_factors_per_Kg = {  #inputs
                         'HoSun_oil':0.76, #Based on GWP of sunflower oil (incl. iLUC and biogenic CO2 uptake) [25]                                               
-                        'HoySoy_oil': 0.485,#Based on GWP of commodity soybean oil as it is same for HO variety (excluding CO2 capture), obtained value from GREET [35],[26]
-                        'Citric_acid': 1.4821,#GHG-100 GREET 2022 [26]
-                        'Hydrogen_peroxide':1.0813, #GHG-100 GREET 2022 [26]
+                        'HoySoy_oil': 0.48,#Based on GWP of commodity soybean oil as it is same for HO variety (excluding CO2 capture), obtained value from GREET [35],[26]*                      
+                        'Hydrogen_peroxide':1.06*0.5, #GHG-100 GREET 2023 [26]*
                         'Tungstic_acid':68.5,#Value based on midpoint results available for tungsten carbide[27]
-                        'Cobalt_acetate':8.8913, #Value based on cobalt nitrate [26]
-                        'HCl':2.0486, #Value based on conc HCl production in the U.S. GREET[26]
-                        'Resin': 0.1324, #Value for GHG-100 high impact polystyrene GREET [26]
-                        'Sodium_hydroxide':0.3602, #GHG-100 value for sodium hydroxide, GREET 2022 [26]
+                        'Cobalt_acetate':8.59, #Value based on cobalt nitrate greet 2023 [26]*
+                        'HCl':0.35*1.99, #Value based on conc HCl production in the U.S. GREET[26]*
+                        'Resin': 3.06, #Value for GHG-100 high impact polystyrene GREET 2023 [26]*
+                        'Sodium_hydroxide':2.05, #GHG-100 value for sodium hydroxide, GREET 2023 [26]*
                         'Sodium methoxide': 1.85, #Ecoinvent, production of sodium methoxide, RoW [28]
-                        'Calcium chloride':0.017,#Based on calcium nitrate, GREET 2022 [26]
-                        'Heptane':6.4337e-1,#Ecoinvent,heptane to generic market for solvent, organic [28]
-                        'Methanol':2.5154, #Methanol from coal,GREET 2022[28],
+                        'Calcium chloride':1.61,#Based on calcium nitrate, GREET 2023 [26]*
+                        'Heptane':0.8, #GREET 2023, [26]*, n-hexane production from n_hexane is the name of the pathway
+                        'Methanol': 1.14,#GREET 2023 [26]*, methanol from natural gas with hydrogen as a co-product
+                        'Glycerol':4.2879 ##glycerine production, from epichlorohydrin, RoW (Ecoinvent),
+                        
                         }
 Utility_GWP_factors =   {                      
                         #utilities
                         'Electricity': round(852.3*lbsperMWh_to_KgsperKWh,2), #Based on NAtional US average for electricty CO2 emissions [30]
                         'System_makeup_water':0.00035559,#Tap water production through conventional treatment [28]
-                        'Natural_gas': 0.3983, #Based on GREET 2022, NA NG from Shale and Conventional Recovery [26]
-                        'Cooling_tower_chemicals':0.2574, #Based on sodium bicarbonate which is a common corrosion inhibitor [26].
+                        'Natural_gas': 0.38, #Based on GREET 2023, NA NG from Shale and Conventional Recovery [26]*
+                        'Cooling_tower_chemicals':0.56, #Based on sodium bicarbonate which is a common corrosion inhibitor [26]* GREET 2023.
                         # Data for other cooling tower chemicals such as pH controllers and anti-scalants not found.
-                        'Boiler_chems':1.5568, #Based on the production of sulfite which is commonly used as an oxygen scavenger in the boiler [26]
-                        # Data for other boiler chemicals (neutralising amines) not found.
-                        'Lime_boiler':1.2844, #Based on lime production from lime stone [26]
+                        'Boiler_chems':2.05, #Based on the production of sodium hydroxide, [26]*
+                        'Lime_boiler':1.28, #Based on lime production from lime stone [26]*
+                        'Ash_disposal':0
                         }                                     
                                                                                                                      
 
 GWP_per_stream = { #input factors
                       'crude_vegetable_HoSun': GWP_factors_per_Kg['HoSun_oil'],
                       'crude_vegetable_Hoysoy':GWP_factors_per_Kg['HoySoy_oil'],
-                      'base_for_saponification_of_FFA':GWP_factors_per_Kg['Sodium_hydroxide'],
-                      'citricacid_for_degumming':GWP_factors_per_Kg['Citric_acid'],
                       'fresh_HP':GWP_factors_per_Kg['Hydrogen_peroxide'],
                       'fresh_tungsten_catalyst':GWP_factors_per_Kg['Tungstic_acid'],
                       'fresh_cobalt_catalyst_stream':GWP_factors_per_Kg['Cobalt_acetate'],
-                      'sodium_hydroxide_for_cat_sep':GWP_factors_per_Kg['Sodium_hydroxide'],
+                      'sodium_hydroxide_stream':GWP_factors_per_Kg['Sodium_hydroxide'],
                       'calcium_chloride_for_cat_sep':GWP_factors_per_Kg['Calcium chloride'],
                       'conc_hydrochloric_acid': GWP_factors_per_Kg['HCl'],
                       'solvent_for_extraction':GWP_factors_per_Kg['Heptane'],
                       'polystyrene_based_catalyst':GWP_factors_per_Kg['Resin'],
-                      'Liquid_HCl':GWP_factors_per_Kg['HCl'],
-                      
+                      'conc_HCl_for_resin_wash':GWP_factors_per_Kg['HCl'],
+
+                      'crude_glycerol':GWP_factors_per_Kg['Glycerol'],                      
+#C5-C9 is a mixture of multiple monocarboxylic acids
+#caproic acid 3.3 kg CO2-Eq/kg ecoinvent (fatty acid prod from coconut oil )and also from https://doi.org/10.1016/j.jece.2024.113924
+#caprylic acid 2.8 - ecoinvent (fatty acid prod from palm oil) based on info from https://gapki.id/en/news/2024/10/18/getting-deeper-into-caprylic-acid-from-palm-oil/
+#suberic acid is not easy to find
+                      'recovered_C5_to_C9_MCA_fraction': 2.8*18.5/100 + 3.3*42.4/100 + 5.47*11.24/100,
+                      'pelargonic_acid_rich_fraction': 11.24,#Ecoinvent 2.6, glyphosate value [28]
+                      'fatty_acid_blend': 0.57, #tallow biodiesel GREET 2023 [26]*, 
+                      'crude_methanol':GWP_factors_per_Kg['Methanol'],                 
                       'NaOH':GWP_factors_per_Kg['Sodium_hydroxide'],
                       'methanol':GWP_factors_per_Kg['Methanol'],
                       'catalyst':0.25*GWP_factors_per_Kg['Sodium methoxide'] + 0.75*GWP_factors_per_Kg['Methanol'],
                       'HCl': GWP_factors_per_Kg['HCl'],                                           
                       #utility factors
                       'ash_disposal':0,
-                          #TODO: 3.5141e+0,[28]
                       'cooling_tower_evaporation':0,
                       'natural_gas': Utility_GWP_factors['Natural_gas'],
                       'lime_boiler':Utility_GWP_factors['Lime_boiler'],
@@ -278,32 +309,65 @@ GWP_per_stream = { #input factors
                       'system_makeup_water':Utility_GWP_factors['System_makeup_water'],
                       'cooling_tower_chemicals':Utility_GWP_factors['Cooling_tower_chemicals'],
                       'brine_from_wastewater_treatment':0,
-                      #TODO:0.0013,#sodium brine in U.S [26]
                       }
 
 
 #%% Uncertainity analysis distributions
 #Distributions for prices obtained from bulk correlations
 #Catalyst prices
-bulk_coeff_lower = -0.80
-bulk_coeff_upper = -0.70
-Tungstic_acid_upper_bound =  convert_lab_price_to_bulk_price(lab_quantity_in_kg= np.array([0.5,0.5,]),#[18] Sigma aldrich
-                                                  lab_price_per_kg = np.array([682.00,838.00]),
-                                                  bulk_quantity_in_kg = 30, bulk_coeff =bulk_coeff_upper)
-Tungstic_acid_lower_bound =  convert_lab_price_to_bulk_price(lab_quantity_in_kg= np.array([0.5,0.5,]),#[18] Sigma aldrich
-                                                  lab_price_per_kg = np.array([682.00,838.00]),
-                                                  bulk_quantity_in_kg = 30, bulk_coeff = bulk_coeff_lower)
+bulk_coeff_lower = -0.85
+bulk_coeff_upper = -0.65
+Tungstic_acid_upper_bound =  convert_lab_price_to_bulk_price(
+                             lab_quantity_in_kg=np.array([0.5, 0.5]),
+                             lab_price_per_kg=np.array([682.00, 838.00]),  # $/kg from [18]
+                             bulk_quantity_in_kg=30,
+                             bulk_coeff=bulk_coeff_upper)
 
-Cobalt_acetate_upper_bound = convert_lab_price_to_bulk_price(lab_quantity_in_kg= np.array([0.5,0.5]),
-                                                  lab_price_per_kg = np.array([379.58,#[16] GFS chemicals
-                                                                               735.42,#[17] BEantown chemicals
-                                                                               ]),
-                                                  bulk_quantity_in_kg = 30, bulk_coeff = bulk_coeff_upper)
-Cobalt_acetate_lower_bound = convert_lab_price_to_bulk_price(lab_quantity_in_kg= np.array([0.5,0.5]),
-                                                  lab_price_per_kg = np.array([379.58,#[16] GFS chemicals
-                                                                               735.42,#[17] BEantown chemicals
-                                                                               ]),
-                                                  bulk_quantity_in_kg = 30, bulk_coeff = bulk_coeff_lower)
+Tungstic_acid_lower_bound =  convert_lab_price_to_bulk_price(
+                             lab_quantity_in_kg=np.array([0.5, 0.5]),
+                             lab_price_per_kg=np.array([682.00, 838.00]),  # $/kg from [18]
+                             bulk_quantity_in_kg=30,
+                             bulk_coeff=bulk_coeff_lower)
+Cobalt_acetate_upper_bound = convert_lab_price_to_bulk_price(
+                                 lab_quantity_in_kg=np.array([0.5, 0.5, 0.5]),
+                                 lab_price_per_kg=np.array([379.58, 735.42, 227.92]),  # $/kg from [16], [17], [18]
+                                 bulk_quantity_in_kg=30,  # [15]
+                                 bulk_coeff=bulk_coeff_upper       # [15]
+                             )
+                                                  
+Cobalt_acetate_lower_bound = convert_lab_price_to_bulk_price(
+                                 lab_quantity_in_kg=np.array([0.5, 0.5, 0.5]),
+                                 lab_price_per_kg=np.array([379.58, 735.42, 227.92]),  # $/kg from [16], [17], [18]
+                                 bulk_quantity_in_kg=30,  # [15]
+                                 bulk_coeff=bulk_coeff_lower        # [15]
+                             )
+
+PA_upper_bound = convert_lab_price_to_bulk_price(
+    lab_quantity_in_kg=np.array([0.906]),
+    lab_price_per_kg=np.array([74.06]),  # $/kg from [18]
+    bulk_quantity_in_kg=30,
+    bulk_coeff=-0.65
+)
+
+PA_lower_bound = convert_lab_price_to_bulk_price(
+    lab_quantity_in_kg=np.array([0.906]),
+    lab_price_per_kg=np.array([74.06]),  # $/kg from [18]
+    bulk_quantity_in_kg=30,
+    bulk_coeff=-0.85
+)
+
+AA_upper_bound = convert_lab_price_to_bulk_price(
+    lab_quantity_in_kg=np.array([2, 1, 1]),
+    lab_price_per_kg=np.array([77.00, 224.00, 112.00]),  # $/kg from [18]
+    bulk_quantity_in_kg=30,
+    bulk_coeff=-0.65
+)
+AA_lower_bound = convert_lab_price_to_bulk_price(
+    lab_quantity_in_kg=np.array([2, 1, 1]),
+    lab_price_per_kg=np.array([77.00, 224.00, 112.00]),  # $/kg from [18]
+    bulk_quantity_in_kg=30,
+    bulk_coeff=-0.85
+)
 
 #for uniform distributions 10%, 25% and 50% ranges were used
 #10% was used for distributions where the sources for prices/environmental factors were reliable (ICIS chemical database,US soybean export council, GREET, ecoinvent)
@@ -315,32 +379,45 @@ Upper_bound_factor_25_per = 1.25
 Lower_bound_factor_50_per = 0.5
 Upper_bound_factor_50_per = 1.5
 
-
+#TODO: include naoh and hcl in uncertainity analysis
 isolated_para_dists = {#Crude vegetable oil was priced based on the ratio of 10-year historical
                        #feedstock and oil price, along with an assumption of 2$ premium recieved by high oleic farmers
                        #over regular soybean feedstock
-                       'Crude oil price' : {'HoySoy_oil':chaospy.Uniform(feedstock_prices_per_Kg['HoySoy_oil']*Lower_bound_factor_25_per, feedstock_prices_per_Kg['HoySoy_oil']*Upper_bound_factor_25_per)},
-                       'Tungstic acid price': chaospy.Uniform(Tungstic_acid_lower_bound,Tungstic_acid_upper_bound),
-                       'Cobalt acetate price':chaospy.Uniform(Cobalt_acetate_lower_bound,Cobalt_acetate_upper_bound),
-                       'Heptane solvent price':chaospy.Uniform(prices_per_Kg['Heptane']*Lower_bound_factor_10_per,prices_per_Kg['Heptane']*Upper_bound_factor_10_per),
+                       'Crude oil cost' : {'HoySoy_oil':chaospy.Uniform(feedstock_prices_per_Kg['HoySoy_oil']*Lower_bound_factor_25_per, feedstock_prices_per_Kg['HoySoy_oil']*Upper_bound_factor_25_per)},
+                       'Methanol':chaospy.Uniform(prices_per_Kg['Methanol']*Lower_bound_factor_10_per,prices_per_Kg['Methanol']*Upper_bound_factor_10_per),
+                       'Methanol product':chaospy.Uniform(prices_per_Kg['Methanol']*Lower_bound_factor_10_per,prices_per_Kg['Methanol']*Upper_bound_factor_10_per),                       
+                       'Catalyst_for_trans':chaospy.Uniform(prices_per_stream['catalyst']*Lower_bound_factor_10_per,prices_per_stream['catalyst']*Upper_bound_factor_10_per),
+                       'NaOH':chaospy.Uniform(prices_per_Kg['Sodium_hydroxide']*Lower_bound_factor_10_per,prices_per_Kg['Sodium_hydroxide']*Upper_bound_factor_10_per),                                              
+                       'NaOH for cat':chaospy.Uniform(prices_per_Kg['Sodium_hydroxide']*Lower_bound_factor_10_per,prices_per_Kg['Sodium_hydroxide']*Upper_bound_factor_10_per),                                              
+
                        
-                       'Hydrogen peroxide price':chaospy.Uniform(prices_per_Kg['Hydrogen_peroxide']*Lower_bound_factor_25_per,prices_per_Kg['Hydrogen_peroxide']*Upper_bound_factor_25_per),
                        
-                       'Citric acid price':chaospy.Uniform(prices_per_Kg['Citric_acid']*Lower_bound_factor_10_per,prices_per_Kg['Citric_acid']*Upper_bound_factor_10_per),
+                       'Tungstic acid cost': chaospy.Uniform(Tungstic_acid_lower_bound,Tungstic_acid_upper_bound),
+                       'Cobalt acetate cost':chaospy.Uniform(Cobalt_acetate_lower_bound,Cobalt_acetate_upper_bound),
+                       'Heptane solvent cost':chaospy.Uniform(prices_per_Kg['Heptane']*Lower_bound_factor_50_per,prices_per_Kg['Heptane']*Upper_bound_factor_50_per),
                        
-                       'Conc HCl price': chaospy.Uniform(prices_per_Kg['HCl']*Lower_bound_factor_10_per,prices_per_Kg['HCl']*Upper_bound_factor_10_per),
+                       'Hydrogen peroxide cost':chaospy.Uniform(prices_per_Kg['Hydrogen_peroxide']*Lower_bound_factor_25_per,prices_per_Kg['Hydrogen_peroxide']*Upper_bound_factor_25_per),
+                      
+                       'Conc HCl': chaospy.Uniform(prices_per_Kg['HCl']*Lower_bound_factor_10_per,prices_per_Kg['HCl']*Upper_bound_factor_10_per),
+                       'Conc HCl cat': chaospy.Uniform(prices_per_Kg['HCl']*Lower_bound_factor_10_per,prices_per_Kg['HCl']*Upper_bound_factor_10_per),
+                       'Conc HCl resin': chaospy.Uniform(prices_per_Kg['HCl']*Lower_bound_factor_10_per,prices_per_Kg['HCl']*Upper_bound_factor_10_per),
                        
-                       'Calcium chloride price':chaospy.Uniform(prices_per_Kg['Calcium_chloride']*Lower_bound_factor_10_per,prices_per_Kg['Calcium_chloride']*Upper_bound_factor_10_per),
+                       'Calcium chloride cost':chaospy.Uniform(prices_per_Kg['Calcium_chloride']*Lower_bound_factor_10_per,prices_per_Kg['Calcium_chloride']*Upper_bound_factor_10_per),
                        
-                       'Hydrolysis resin price':chaospy.Uniform(prices_per_Kg['Resin']*Lower_bound_factor_50_per,prices_per_Kg['Resin']*Upper_bound_factor_50_per),
+                       'Hydrolysis resin cost':chaospy.Uniform(prices_per_Kg['Resin']*Lower_bound_factor_50_per,prices_per_Kg['Resin']*Upper_bound_factor_50_per),
                        'Crude glycerol price': chaospy.Triangle(100*ratio_2023from2022/1000,160*ratio_2023from2022/1000,220*ratio_2023from2022/1000),#Based on historical crude glycerol prices provided in [14]
-                       'Pelargonic acid price':chaospy.Uniform(correlation_based_bulk_prices['Pelargonic_acid']*Lower_bound_factor_25_per,correlation_based_bulk_prices['Pelargonic_acid']*Upper_bound_factor_25_per),
-                       'C5_C9 fraction price':chaospy.Uniform(product_prices_per_kg['C5_C9_fraction']*Lower_bound_factor_25_per,product_prices_per_kg['C5_C9_fraction']*Upper_bound_factor_25_per),
+                       'Pelargonic acid price':chaospy.Uniform(PA_lower_bound,PA_upper_bound),
+                       'C5_C9 fraction price':chaospy.Uniform(product_prices_per_kg['C5_C9_fraction']*Lower_bound_factor_50_per,product_prices_per_kg['C5_C9_fraction']*Upper_bound_factor_50_per),
+                       'fatty_acid_blend_price':chaospy.Uniform(product_prices_per_kg['fatty_acid_blend']*Lower_bound_factor_50_per,product_prices_per_kg['fatty_acid_blend']*Upper_bound_factor_50_per),
+                       'Azelaic acid price': chaospy.Uniform(6.67*ratio_2023from2021,correlation_based_bulk_prices['Azelaic_acid']),
+                                                             #Utility prices
+                       'Natural gas cost':chaospy.Uniform(utility_prices['Natural_gas_price']*Lower_bound_factor_10_per,utility_prices['Natural_gas_price']*Upper_bound_factor_10_per),
+                       'Electricity cost':chaospy.Uniform(utility_prices['Electricity']*Lower_bound_factor_10_per,utility_prices['Electricity']*Upper_bound_factor_10_per),
+                       'Ash_disposal_cost':chaospy.Uniform(utility_prices['Ash_disposal_cost']*Upper_bound_factor_25_per,utility_prices['Ash_disposal_cost']*Lower_bound_factor_25_per),
+                       'Cooling_tower_chemicals':chaospy.Uniform(utility_prices['Cooling_tower_chemicals']*Lower_bound_factor_25_per,utility_prices['Cooling_tower_chemicals']*Upper_bound_factor_25_per),
+                       'Lime_boiler':chaospy.Uniform(utility_prices['Lime_boiler']*Lower_bound_factor_25_per,utility_prices['Lime_boiler']*Upper_bound_factor_25_per),
                        
-                       #Utility prices
-                       'Natural gas price':chaospy.Uniform(utility_prices['Natural_gas_price']*Lower_bound_factor_10_per,utility_prices['Natural_gas_price']*Upper_bound_factor_10_per),
-                       'Electricity price':chaospy.Triangle( lower = 0.0583,midpoint = 0.0637,upper = 0.069),#Based on historical prices provided in [14]
-                       'Ash_disposal_price':chaospy.Uniform(utility_prices['Ash_disposal_price']*Lower_bound_factor_50_per,utility_prices['Ash_disposal_price']*Upper_bound_factor_50_per)}
+                       }
 
 #Limits obtained from literature
 #Tungstic acid mole fraction wrt the unsaturations can be 
@@ -365,26 +442,25 @@ Ox_time_upper = 10
 
 #Oxidative cleavage reactions
 #Oxidative cleavage reaction primary
-Oxcp_lower_bound = 0.80#TODO: random
-Oxcp_upper_bound = 0.98#TODO: random
+Oxcp_lower_bound = 0.70#TODO: random
+Oxcp_upper_bound = 0.99#TODO: random
 
 #Oxidative cleavage reaction of intermediates to form azelaic acid and pelargonic acid
-Ox_lower_bound = 0.80 #TODO: random
-Ox_upper_bound = 0.98 #TODO: random
+Ox_lower_bound = 0.70 #TODO: random
+Ox_upper_bound = 0.99 #TODO: random
 
 #Dihydroxylation reaction conversion
 Dih_lower_bound = 0.70 #Lowest reported
-Dih_upper_bound = 0.99 #Highest reported
+Dih_upper_bound = 0.99#Highest reported
 
 #Ranges for mimimum and maximum catalyst reuse were not available and were assumed
-#TODO: find ranges 
 TA_reuse_lower = 1
-TA_reuse_upper = 10
+TA_reuse_upper = 20
 CA_reuse_lower = 1
-CA_reuse_upper = 10
+CA_reuse_upper = 20
 
 #Turbogen efficiency and boiler efficiencies were varied uniformly based on ranges available in literature
-Turbogen_eff_lower = 0.80 #[33] #TODO:random 
+Turbogen_eff_lower = 0.70 #[33] 
 Turbogen_eff_upper = 0.90 #[33]
 Boiler_eff_lower = 0.75 #[34]
 Boiler_eff_upper = 0.85 #[34]
@@ -395,6 +471,9 @@ Hp_conc_upper = 0.70#[31]
 
 Oil_compo_lower = 72
 Oil_compo_upper = 85
+
+Decarb_low = 0.1
+Decarb_high = 0.99
 
 
 coupled_para_dist = {'Tungstic acid moles': chaospy.Triangle(TA_moles_lower_bound,TA_moles_mid_point,TA_moles_upper_bound),
@@ -408,24 +487,40 @@ coupled_para_dist = {'Tungstic acid moles': chaospy.Triangle(TA_moles_lower_boun
                      'Boiler efficiency':chaospy.Uniform(Boiler_eff_lower,Boiler_eff_upper),
                      'Tungstic acid reusability':chaospy.Uniform(TA_reuse_lower,TA_reuse_upper),
                      'Cobalt acetate reusability':chaospy.Uniform(CA_reuse_lower,CA_reuse_upper),
-                     'HP_concentration':chaospy.Uniform(Hp_conc_lower,Hp_conc_upper),
-                     'Crude_oil_composition':chaospy.Uniform(Oil_compo_lower,Oil_compo_upper)
-                     }
+                      'Decarboxylation reaction':chaospy.Uniform(Decarb_low, Decarb_high),
+                       }
 
 environmental_facs_dist = {'Oil_GWP':{'HoSun_oil':chaospy.Uniform(Lower_bound_factor_25_per*GWP_factors_per_Kg['HoSun_oil'],Upper_bound_factor_25_per*GWP_factors_per_Kg['HoSun_oil']),
                                       'HoySoy_oil':chaospy.Uniform(Lower_bound_factor_25_per*GWP_factors_per_Kg['HoySoy_oil'],Upper_bound_factor_25_per*GWP_factors_per_Kg['HoySoy_oil'])},
-                           'Tungstic_acid':chaospy.Uniform(Lower_bound_factor_25_per*GWP_factors_per_Kg['Tungstic_acid'],Upper_bound_factor_25_per*GWP_factors_per_Kg['Tungstic_acid']),
-                           'Cobalt_acetate':chaospy.Uniform(Lower_bound_factor_25_per*GWP_factors_per_Kg['Cobalt_acetate'],Upper_bound_factor_25_per*GWP_factors_per_Kg['Cobalt_acetate']),
+                           'Catalyst_for_trans':chaospy.Uniform(Lower_bound_factor_25_per*GWP_per_stream['catalyst'],Upper_bound_factor_25_per*GWP_per_stream['catalyst']),
+                           'Tungstic_acid':chaospy.Uniform(Lower_bound_factor_50_per*GWP_factors_per_Kg['Tungstic_acid'],Upper_bound_factor_50_per*GWP_factors_per_Kg['Tungstic_acid']),
+                           'Cobalt_acetate':chaospy.Uniform(Lower_bound_factor_50_per*GWP_factors_per_Kg['Cobalt_acetate'],Upper_bound_factor_50_per*GWP_factors_per_Kg['Cobalt_acetate']),
                            'HCl':chaospy.Uniform(Lower_bound_factor_25_per*GWP_factors_per_Kg['HCl'],Upper_bound_factor_25_per*GWP_factors_per_Kg['HCl']),
-                           'Resin':chaospy.Uniform(Lower_bound_factor_25_per*GWP_factors_per_Kg['Resin'],Upper_bound_factor_25_per*GWP_factors_per_Kg['Resin']),
+                           'HCl cat':chaospy.Uniform(Lower_bound_factor_25_per*GWP_factors_per_Kg['HCl'],Upper_bound_factor_25_per*GWP_factors_per_Kg['HCl']),
+                           'HCl resin':chaospy.Uniform(Lower_bound_factor_25_per*GWP_factors_per_Kg['HCl'],Upper_bound_factor_25_per*GWP_factors_per_Kg['HCl']),
+                        
+                           
+                          
+                            'Resin':chaospy.Uniform(Lower_bound_factor_50_per*GWP_factors_per_Kg['Resin'],Upper_bound_factor_50_per*GWP_factors_per_Kg['Resin']),
                            'Sodium methoxide':chaospy.Uniform(Lower_bound_factor_25_per*GWP_factors_per_Kg['Sodium methoxide'],Upper_bound_factor_25_per*GWP_factors_per_Kg['Sodium methoxide']),
-                           'Heptane':chaospy.Uniform(Lower_bound_factor_25_per*GWP_factors_per_Kg['Heptane'],Upper_bound_factor_25_per*GWP_factors_per_Kg['Heptane']),
+                           'Heptane':chaospy.Uniform(Lower_bound_factor_50_per*GWP_factors_per_Kg['Heptane'],Upper_bound_factor_50_per*GWP_factors_per_Kg['Heptane']),
                            'Cooling_tower_chemicals': chaospy.Uniform(Lower_bound_factor_25_per*Utility_GWP_factors['Cooling_tower_chemicals'],Upper_bound_factor_25_per*Utility_GWP_factors['Cooling_tower_chemicals']),
                            'Boiler_chems':chaospy.Uniform(Lower_bound_factor_25_per*Utility_GWP_factors['Boiler_chems'],Upper_bound_factor_25_per*Utility_GWP_factors['Boiler_chems']),
                            'Lime_boiler':chaospy.Uniform(Lower_bound_factor_25_per*Utility_GWP_factors['Lime_boiler'],Upper_bound_factor_25_per*Utility_GWP_factors['Lime_boiler']),
+                           'ash_disposal':chaospy.Uniform(Lower_bound_factor_25_per*Utility_GWP_factors['Ash_disposal'],Upper_bound_factor_25_per*Utility_GWP_factors['Ash_disposal']),
                            'Electricity':chaospy.Uniform(Lower_bound_factor_25_per*Utility_GWP_factors['Electricity'],Upper_bound_factor_25_per*Utility_GWP_factors['Electricity']),
-                           'Hydrogen peroxide':chaospy.Uniform(Lower_bound_factor_25_per*GWP_factors_per_Kg['Hydrogen_peroxide'],Upper_bound_factor_25_per*GWP_factors_per_Kg['Hydrogen_peroxide']),
-}
+                           'Hydrogen peroxide':chaospy.Uniform(Lower_bound_factor_25_per*GWP_factors_per_Kg['Hydrogen_peroxide']/2,Upper_bound_factor_25_per*GWP_factors_per_Kg['Hydrogen_peroxide']/2),
+                           'Sodium_hydroxide':chaospy.Uniform(Lower_bound_factor_25_per*GWP_per_stream['NaOH'],Upper_bound_factor_25_per*GWP_per_stream['NaOH']),
+                           'Sodium_hydroxide cat':chaospy.Uniform(Lower_bound_factor_25_per*GWP_per_stream['NaOH'],Upper_bound_factor_25_per*GWP_per_stream['NaOH']),                          
+                           'Methanol':chaospy.Uniform(Lower_bound_factor_25_per*GWP_per_stream['methanol'],Upper_bound_factor_25_per*GWP_per_stream['methanol']),
+                           'Methanol product':chaospy.Uniform(Lower_bound_factor_25_per*GWP_per_stream['methanol'],Upper_bound_factor_25_per*GWP_per_stream['methanol']),                          
+                           'Glycerol': chaospy.Uniform(Lower_bound_factor_25_per*GWP_per_stream['crude_glycerol'],Upper_bound_factor_25_per*GWP_per_stream['crude_glycerol']),
+                           'Calcium_chloride':chaospy.Uniform(Lower_bound_factor_50_per*GWP_per_stream['calcium_chloride_for_cat_sep'],Upper_bound_factor_50_per*GWP_per_stream['calcium_chloride_for_cat_sep']),
+                           'Pelargonic_acid':chaospy.Uniform(Lower_bound_factor_50_per*GWP_per_stream['pelargonic_acid_rich_fraction'],Upper_bound_factor_50_per*GWP_per_stream['pelargonic_acid_rich_fraction']),
+                           'C5_C9_MCA':chaospy.Uniform(Lower_bound_factor_50_per*GWP_per_stream['recovered_C5_to_C9_MCA_fraction'],Upper_bound_factor_50_per*GWP_per_stream['recovered_C5_to_C9_MCA_fraction']),
+                           'fatty_acid_blend':chaospy.Uniform(Lower_bound_factor_50_per*GWP_per_stream['fatty_acid_blend'],Upper_bound_factor_50_per*GWP_per_stream['fatty_acid_blend']),
+                           'Natural gas':chaospy.Uniform(Lower_bound_factor_25_per*Utility_GWP_factors['Natural_gas'],Upper_bound_factor_25_per*Utility_GWP_factors['Natural_gas']),
+                           }
                             
 #%%
 #References:
@@ -454,6 +549,7 @@ environmental_facs_dist = {'Oil_GWP':{'HoSun_oil':chaospy.Uniform(Lower_bound_fa
 #[24]https://www.eia.gov/electricity/data/browser/#/topic/7?agg=0,1&geo=g&endsec=vg&linechart=ELEC.PRICE.US-ALL.A~ELEC.PRICE.US-RES.A~ELEC.PRICE.US-COM.A~ELEC.PRICE.US-IND.A&columnchart=ELEC.PRICE.US-ALL.A~ELEC.PRICE.US-RES.A~ELEC.PRICE.US-COM.A~ELEC.PRICE.US-IND.A&map=ELEC.PRICE.US-ALL.A&freq=A&start=2011&end=2022&ctype=linechart&ltype=pin&rtype=s&maptype=0&rse=0&pin=
 #[25]http://dx.doi.org/10.1016/j.jclepro.2014.10.011                           
 #[26]GREET 2022
+#[26]* GREEET 2023
 #[27]Ref: http://dx.doi.org/10.1016/j.jclepro.2017.02.184
 #[28]Ecoinvent
 #[29]https://doi.org/10.1021/acssuschemeng.2c05764
@@ -469,3 +565,4 @@ environmental_facs_dist = {'Oil_GWP':{'HoSun_oil':chaospy.Uniform(Lower_bound_fa
 #[38]https://afdc.energy.gov/fuels/prices.html
 #[39]https://fred.stlouisfed.org/series/PCU325325
 #[40]Large-Scale Production and Application of Highly Concentrated Ozone HANS-PETER KLEIN, BBC Brown Boveri & Cie., CH-8050, Z0rich, Switzerland
+#[41]An evaluation of sebacic acid and azelaic acid as thickeners in lithium complex greases

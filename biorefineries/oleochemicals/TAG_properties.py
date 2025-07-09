@@ -71,27 +71,3 @@ def LLL_Vl_model(T):
 
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-#Fitting data for MMA based on ChemSep
-# Ts = [i + 273.15 for i in  (148, 159, 120, 185.5, )]
-# Psats = [i / 760 * 101325 for i in (1, 3, 0.03, 11, )]
-# res, stats = TDependentProperty.fit_data_to_model(Ts=Ts, data=Psats, model='Antoine', do_statistics=True, multiple_tries=True, model_kwargs={'base': 10.0})
-# method = 'ANTOINE_POLING'
-# chems['Monomethyl_azelate'].Psat.ANTOINE_POLING_coefs = res['A'], res['B'], res['C']
-# chems['Monomethyl_azelate'].Psat.all_methods.add(method)
-# chems['Monomethyl_azelate'].Psat.method = method
-# chems['Monomethyl_azelate'].Psat.T_limits[method] = (100, chems['Monomethyl_azelate'].Psat.Tc)
-#Chemical compound generator DWSIM
-
-
