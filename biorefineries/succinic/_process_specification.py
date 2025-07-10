@@ -42,7 +42,7 @@ _kg_per_ton = 907.18474
 
 def evaluate_across_specs(spec, system,
             spec_1, spec_2, metrics, spec_3,
-            print_every_n_iter=500):
+            print_every_n_iter=50):
     spec.count += 1
     if skip_infeasible_titers and last_infeasible_simulation:
         yield_, titer = last_infeasible_simulation
