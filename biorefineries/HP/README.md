@@ -206,19 +206,7 @@ FEC without electricity credit is 58.540 MJ/kg sodium 3-hydroxypropionate
 
 To reproduce results reported in [[1]](#1), go to the [HP_sys branch](https://github.com/BioSTEAMDevelopmentGroup/Bioindustrial-Park/tree/HP_sys/BioSTEAM%202.x.x/biorefineries/HP) and follow the setup instructions in the README.
 
-To reproduce results reported in [[2]](#2), simply do the following:
-
-(i) Clone the Bioindustrial-Park repository [commit b963238d5e0422a3b7d80611c68ebba50d73091e](https://github.com/BioSTEAMDevelopmentGroup/Bioindustrial-Park/tree/b963238d5e0422a3b7d80611c68ebba50d73091e/biorefineries/HP) and add the 'bioindustrial-park' folder to your PYTHONPATH.
-
-(ii) Clone the BioSTEAM repository [commit e2d3942dd1076a4516efc91ae194f9e558428551](https://github.com/BioSTEAMDevelopmentGroup/biosteam/tree/e2d3942dd1076a4516efc91ae194f9e558428551)
-and add the 'biosteam' folder to your PYTHONPATH.
-
-(iii) Navigate to your local filepath bioindustrial-park/biorefineries/HP
-     in your command prompt, and use:
-
-```python
-pip install -r requirements.txt
-```
+To reproduce results reported in [[2]](#2), go to the [[HP_2025_no_FGI branch](https://github.com/BioSTEAMDevelopmentGroup/Bioindustrial-Park/tree/HP_2025_no_FGI/biorefineries/HP) and follow the setup instructions in the README.
 
 ## References
 <a id="1">[1]</a> 
