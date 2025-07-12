@@ -49,7 +49,7 @@ def evaluate_uncertainties(kind='SSCF', seed=None, N_simulation=1000,
 
     # Initiate a timer
     timer = TicToc('timer')
-    timer.tic()
+    timer.start()
 
     # Set seed to make sure each time the same set of random numbers will be used
     if seed:
@@ -201,6 +201,6 @@ def evaluate_uncertainties(kind='SSCF', seed=None, N_simulation=1000,
             one_p_df.to_excel(writer, sheet_name='One-parameter')
             model.table.to_excel(writer, sheet_name='Raw data')
 
-evaluate_uncertainties(kind='SSCF', seed=None, N_simulation=10, sampling_rule='L',
+evaluate_uncertainties(kind='SHF', seed=None, N_simulation=10, sampling_rule='L',
                         percentiles = [0, 0.05, 0.25, 0.5, 0.75, 0.95, 1],
                         if_plot=True, report_name='1_full_evaluation.xlsx')

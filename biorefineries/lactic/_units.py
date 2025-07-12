@@ -1204,9 +1204,9 @@ class Esterification(Reactor):
         super()._cost()
         
         hx = self.heat_exchanger
-        hx.ins[0].mix_from(self.outs)
-        hx.outs[0].copy_like(self.outs[0])
-        hx.ins[0].mol -= self.outs[1].mol # exclude the discarded wastewater
+        # It does not matter if a fraction of the stream is discarded, it does not affect the energy balance.
+        hx.ins[0].mix_from(self.ins)
+        hx.outs[0].mix_from(self.outs)
         hx.simulate_as_auxiliary_exchanger(ins=hx.ins, outs=hx.outs)
         
         self.baseline_purchase_costs['Amberlyst-15 catalyst'] = self.mcat * self.catalyst_price
