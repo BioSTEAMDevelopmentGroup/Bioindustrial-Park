@@ -41,7 +41,11 @@ def create_model(flowsheet=None, kind='SSCF'):
         load_process_settings()
         lactic_sys = create_system(kind=kind)
         flowsheet = lactic_sys.flowsheet
-    else: lactic_sys = flowsheet.system.lactic_sys
+    else: 
+        if isinstance(flowsheet, str):
+            lactic_sys = bst.F.flowsheet[flowsheet].lactic_sys
+        else:
+            lactic_sys = flowsheet.system.lactic_sys
     lactic_sys.simulate() # need this to initialize some settings
     s = flowsheet.stream
     u = flowsheet.unit

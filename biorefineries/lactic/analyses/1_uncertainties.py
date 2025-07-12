@@ -39,8 +39,9 @@ def evaluate_uncertainties(kind='SSCF', seed=None, N_simulation=1000,
     flowsheet = bst.main_flowsheet
     simulate_get_MPSP = funcs['simulate_get_MPSP']
     simulate_get_MPSP()
-    model_dct = lactic.create_model(kind)
-    model = model_dct['model']
+    # TODO: create model now returns a Model object (not a dictionary).
+    # Need to update code to use the correct indices.
+    model = lactic.create_model(flowsheet=flowsheet, kind=kind)
 
     # =============================================================================
     # Evaluate and organize results for Monte Carlo analysis
