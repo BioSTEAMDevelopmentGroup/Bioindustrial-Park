@@ -464,14 +464,17 @@ def create_LegH_system(
         FeedWater_Recovery_to_Permeate=0.2,
         TMP_bar= 5
     )
+    
     LegH_sys = bst.main_flowsheet.create_system('LegH_sys')
     LegH_sys.simulate()
+
     SD1 = bst.SprayDryer(
         'SD1',
         ins=NF1-0,
         outs=(effluent6, LegH_3),
         moisture_content=0.05,  # 5% moisture content in the final product
     )
+
     LegH_sys = bst.main_flowsheet.create_system('LegH_sys')
     LegH_sys.simulate()
     
