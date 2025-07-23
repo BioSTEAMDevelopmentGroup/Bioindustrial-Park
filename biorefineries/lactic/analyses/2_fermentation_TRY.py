@@ -20,14 +20,11 @@ import numpy as np
 import pandas as pd
 import biosteam as bst
 from warnings import warn
-from biosteam.utils import TicToc
-from biorefineries.lactic import load_system, \
-    SSCF_flowsheet, SSCF_funcs, SHF_flowsheet, SHF_funcs
+from biosteam.utils import Timer
+from biorefineries.lactic import load, create_funcs
 from biorefineries.lactic._chemicals import sugars
 from biorefineries.lactic.utils import set_yield
 
-load_system('SSCF')
-load_system('SHF')
 
 
 # %%
@@ -39,8 +36,8 @@ load_system('SHF')
 # =============================================================================
 
 # Initiate a timer
-timer = TicToc('timer')
-timer.tic()
+timer = Timer('timer')
+timer.start()
 run_number = 0
 sugar_concs = [[], []]
 lactics = {'target yield': [],
@@ -77,16 +74,9 @@ def update_productivity(R301, R302, productivity):
         unit._cost()
 
 def simulate_log_results(kind):
-    kind = kind.upper()
-    if 'SSCF' in kind:
-        flowsheet = SSCF_flowsheet
-        funcs = SSCF_funcs
-    elif 'SHF' in kind:
-        flowsheet = SHF_flowsheet
-        funcs = SHF_funcs
-    bst.main_flowsheet.set_flowsheet(flowsheet)
-    load_system(kind)
-
+    load(kind)
+    flowsheet = bst.main_flowsheet
+    funcs = create_funcs(flowsheet=flowsheet)
     R301 = flowsheet.unit.R301
     R302 = flowsheet.unit.R302
     lactic_acid = flowsheet.stream.lactic_acid
@@ -148,13 +138,8 @@ def save_data_clear():
     return df
 
 def run_TRY(yield_range, kind, mode, feed_freq, if_resistant, titer_range):
-    bst.speed_up()
-    if 'SSCF' in str(kind).upper():
-        flowsheet = SSCF_flowsheet
-    elif 'SHF' in str(kind).upper():
-        flowsheet = SHF_flowsheet
-    bst.main_flowsheet.set_flowsheet(flowsheet)
-
+    load(kind)
+    flowsheet = bst.main_flowsheet
     u = flowsheet.unit
     R301 = u.R301
     R302 = u.R302
@@ -211,20 +196,20 @@ run_TRY(yield_range=yield_range, kind='SSCF', mode='batch', feed_freq=1,
 SSCF_reg_b = save_data_clear()
 SSCF_reg_b.to_excel('SSCF_reg_batch.xlsx')
 
-# Change this for fed-batch mode
-# for i in (1, 3, 5, 10):
-for i in (1,):
-    print(f'\n---------- SHF Regular Strain Batch Feed {i+1} Times ----------')
-    run_TRY(yield_range=yield_range, kind='SHF', mode='batch', feed_freq=i+1,
-            if_resistant=False, titer_range=titer_range)
-    SHF_reg_b = save_data_clear()
-    SHF_reg_b.to_excel(f'SHF_reg_batch{i+1}.xlsx')
+# # Change this for fed-batch mode
+# # for i in (1, 3, 5, 10):
+# for i in (1,):
+#     print(f'\n---------- SHF Regular Strain Batch Feed {i+1} Times ----------')
+#     run_TRY(yield_range=yield_range, kind='SHF', mode='batch', feed_freq=i+1,
+#             if_resistant=False, titer_range=titer_range)
+#     SHF_reg_b = save_data_clear()
+#     SHF_reg_b.to_excel(f'SHF_reg_batch{i+1}.xlsx')
 
-print('\n---------- SHF Regular Strain Continuous ----------')
-run_TRY(yield_range=yield_range, kind='SHF', mode='continuous', feed_freq=1,
-        if_resistant=False, titer_range=titer_range)
-SHF_reg_c = save_data_clear()
-SHF_reg_c.to_excel('SHF_reg_continuous.xlsx')
+# print('\n---------- SHF Regular Strain Continuous ----------')
+# run_TRY(yield_range=yield_range, kind='SHF', mode='continuous', feed_freq=1,
+#         if_resistant=False, titer_range=titer_range)
+# SHF_reg_c = save_data_clear()
+# SHF_reg_c.to_excel('SHF_reg_continuous.xlsx')
 
 
 # %%
@@ -239,17 +224,17 @@ run_TRY(yield_range=yield_range, kind='SSCF', mode='batch', feed_freq=1,
 SSCF_reg_b = save_data_clear()
 SSCF_reg_b.to_excel('SSCF_reg_batch.xlsx')
 
-# Change this for fed-batch mode
-# for i in (1, 3, 5, 10):
-for i in (1,):
-    print(f'\n---------- SHF Regular Strain Batch Feed {i} Times ----------')
-    run_TRY(yield_range=yield_range, kind='SHF', mode='batch', feed_freq=i,
-            if_resistant=True, titer_range=titer_range)
-    SHF_reg_b = save_data_clear()
-    SHF_reg_b.to_excel(f'SHF_reg_batch{i+1}.xlsx')
+# # Change this for fed-batch mode
+# # for i in (1, 3, 5, 10):
+# for i in (1,):
+#     print(f'\n---------- SHF Regular Strain Batch Feed {i} Times ----------')
+#     run_TRY(yield_range=yield_range, kind='SHF', mode='batch', feed_freq=i,
+#             if_resistant=True, titer_range=titer_range)
+#     SHF_reg_b = save_data_clear()
+#     SHF_reg_b.to_excel(f'SHF_reg_batch{i+1}.xlsx')
 
-print('\n---------- SHF Regular Strain Continuous ----------')
-run_TRY(yield_range=yield_range, kind='SHF', mode='continuous', feed_freq=1,
-        if_resistant=True, titer_range=titer_range)
-SHF_reg_c = save_data_clear()
-SHF_reg_c.to_excel('SHF_reg_continuous.xlsx')
+# print('\n---------- SHF Regular Strain Continuous ----------')
+# run_TRY(yield_range=yield_range, kind='SHF', mode='continuous', feed_freq=1,
+#         if_resistant=True, titer_range=titer_range)
+# SHF_reg_c = save_data_clear()
+# SHF_reg_c.to_excel('SHF_reg_continuous.xlsx')
