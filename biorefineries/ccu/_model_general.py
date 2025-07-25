@@ -18,8 +18,8 @@ from _process_settings import price, CFs, load_preferences_and_process_settings
 from _tea import EtOH_TEA
 from _lca import create_CCU_lca
 from biorefineries.cellulosic.systems import create_cellulosic_ethanol_system
-import EtOH as EtOH
-from EtOH.system_EtOH_MeOH import create_full_MeOH_system, system_hydrogen_purchased
+# import EtOH as EtOH
+from system_EtOH_MeOH import create_full_MeOH_system, system_hydrogen_purchased
 from warnings import filterwarnings; filterwarnings('ignore')
 
 available_systems = ['sys_ethanol', 'sys_MeOH_water_eletrolyzer', 'sys_MeOH_hydrogen_green', 'sys_MeOH_hydrogen_blue', 'sys_MeOH_hydrogen_gray']
@@ -31,7 +31,8 @@ system_element_mapping = {available_systems[0]: {'A', 'A1'},
                           available_systems[4]: {'A', 'A1', 'B', 'C4'},}
 
 # Sarang, please refer to this system
-system = create_full_MeOH_system(water_eletrolyzer=True)
+system = create_full_MeOH_system(water_electrolyzer=True)
+
 #%%
 def create_model(system_name):
     if system_name == available_systems[0]:
