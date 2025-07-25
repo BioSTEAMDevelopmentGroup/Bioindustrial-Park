@@ -259,5 +259,5 @@ def foc_table(teas, names=None, dataframe=True):
     accounting.entry('Labor salary', labor_cost)
     accounting.entry('Labor burden', tea.labor_burden * labor_cost, '90% of labor salary')
     accounting.entry('Maintenance', tea.maintenance * ISBL, f'{tea.maintenance:.1%} of ISBL')
-    accounting.entry('Property insurance', tea.property_insurance * ISBL, f'{tea.property_insurance:.1%} of ISBL')
+    accounting.entry('Property insurance', tea.property_insurance * tea.FCI, f'{tea.property_insurance:.1%} of FCI')
     return accounting.table() if dataframe else accounting
