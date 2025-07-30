@@ -57,8 +57,9 @@ class Biorefinery(bst.ProcessModel):
             if e_CF: bst.PowerUtility.characterization_factors['GWP'] = e_CF
             for ID, CF in GWP_CFs.items(): getattr(self, ID).characterization_factors['GWP'] = CF
         ethanol = self.ethanol
-        ethanol.price = self.tea.solve_price(ethanol)
-        self.ethanol_price_gal = ethanol.price * ethanol_density_kggal
+        if not ethanol.isempty(): 
+            ethanol.price = self.tea.solve_price(ethanol)
+            self.ethanol_price_gal = ethanol.price * ethanol_density_kggal
         return self
 
     def create_thermo(self):
