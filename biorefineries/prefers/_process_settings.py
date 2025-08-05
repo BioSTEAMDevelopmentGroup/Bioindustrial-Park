@@ -26,3 +26,7 @@ def load_process_settings():
     steam_utility.P = 44e5
     settings.get_agent('cooling_water').regeneration_price = 0
     settings.get_agent('chilled_water').heat_transfer_price = 0
+
+Water_price = 0.0015  # $/kg
+PotassiumHydroxide_price = 0.5  # $/kg
+SodiumHydroxide_price = 0.5  # $/kg
