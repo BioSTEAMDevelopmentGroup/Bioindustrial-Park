@@ -24,7 +24,7 @@ References
 from biosteam import stream_kwargs
 
 microalgae_feed = stream_kwargs('microalgae', 
-                                Microalgae=8000, 
+                                Microalgae=5000, 
                                 units='kg/hr',
                                 price = 0.15  # this is a baseline value for TEA (cost for cultivation, harvesting and trasporting)
 )

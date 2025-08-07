@@ -38,12 +38,12 @@ from .tea import create_tea
 from .streams import microalgae_feed
 import warnings
 # Filter out specific warnings
-warnings.filterwarnings("ignore", message="phase equilibrium solution results in negative flow rates")
-warnings.filterwarnings("ignore", message=".*has no defined Dortmund groups.*")
-warnings.filterwarnings("ignore", message=".*has been replaced in registry")
-warnings.filterwarnings("ignore", category=bst.exceptions.CostWarning)
-warnings.filterwarnings("ignore", message=".*moisture.*is smaller than the desired.*")
-warnings.filterwarnings("ignore", message=".*moisture of influent.*is smaller than the desired.*")
+# warnings.filterwarnings("ignore", message="phase equilibrium solution results in negative flow rates")
+# warnings.filterwarnings("ignore", message=".*has no defined Dortmund groups.*")
+# warnings.filterwarnings("ignore", message=".*has been replaced in registry")
+# warnings.filterwarnings("ignore", category=bst.exceptions.CostWarning)
+# warnings.filterwarnings("ignore", message=".*moisture.*is smaller than the desired.*")
+# warnings.filterwarnings("ignore", message=".*moisture of influent.*is smaller than the desired.*")
 
 # ------------------------------------------------------------------
 # Utility: labor cost scaling with plant size
@@ -61,7 +61,7 @@ def compute_labor_cost(dry_tpd: float,
 # Set up the main flowsheet and thermodynamic environment
 bst.settings.set_thermo(chems)
 main_flowsheet.clear()
-flowsheet = bst.Flowsheet('MCCA')
+flowsheet = bst.Flowsheet('MCCA_ethanol')
 bst.main_flowsheet.set_flowsheet(flowsheet)
 
 # System settings
@@ -72,7 +72,7 @@ bst.System.default_relative_molar_tolerance = 1e-1 # supersedes absolute toleran
 bst.System.strict_convergence = False # True => throw exception if system does not converge; False => continue with unconverged system
 
 @SystemFactory(
-    ID='Microalgae_MCCA_production',
+    ID='Microalgae_MCCA_production_ethanol',
     ins=[dict(microalgae_feed, thermo=chems)],
     outs=[
           #dict(ID='butanol_product', thermo=chems), 
@@ -81,7 +81,7 @@ bst.System.strict_convergence = False # True => throw exception if system does n
           dict(ID='heptanoic_acid_product', thermo=chems), 
           dict(ID='caprylic_acid_product', thermo=chems)]
     )
-def create_microalgae_MCCA_production_sys(ins, outs):
+def create_microalgae_MCCA_production_sys_ethanol(ins, outs):
     # Set the thermodynamic package explicitly
     tmo.settings.set_thermo(chems)
     
@@ -127,11 +127,14 @@ def create_microalgae_MCCA_production_sys(ins, outs):
     naoh2_mass = microalgae_mass * 0.02 # pH 5.5
     total_naoh_mass = naoh1_mass + naoh2_mass
     naoh = Stream('naoh', NaOH=total_naoh_mass, units='kg/hr', price=price['NaOH'])
-    # Yeast addition in MCCA fermentation
-    yeast_mass = microalgae_mass * 5 / 75
-    fresh_yeast = Stream('fresh_yeast', Yeast=yeast_mass, units='kg/hr', price=price['Yeast'])
-    yeast_recycle = Stream('yeast_recycle', Yeast=0, units='kg/hr')
-    yeast_feed = bst.Stream() 
+    # Ethanol addition in MCCA fermentation
+    # Accroding to the litterature, the dosgae of ethanol COD (2.09/g) would be ~2.0 times to microalgae COD (1.3475/g).
+    # Therefore, the etanol mass is 1.28 times of microalgae mass
+    # https://www.sciencedirect.com/science/article/pii/S0043135419309923?via%3Dihub
+    # https://www.sciencedirect.com/science/article/pii/S0045653521029465?via%3Dihub
+    
+    ethanol_mass = microalgae_mass * 1.28
+    ethanol = Stream('ethanol', ethanol=ethanol_mass, units='kg/hr', price=price['Ethanol'])
     # OleylAlcohol for extraction
     fresh_oleylalcohol = Stream('fresh_oleylalcohol', OleylAlcohol=200, units='kg/hr', price=price['OleylAlcohol'])
     oleylalcohol_recycle = Stream('oleylalcohol_recycle', OleylAlcohol=50, units='kg/hr')
@@ -181,19 +184,9 @@ def create_microalgae_MCCA_production_sys(ins, outs):
     # Area 3: Fermentation for MCCA production
     # =====================
     H301 = HXutility('H301', P208-0, T=37+273.15)
-    
-    # Yeast mixing for fresh and recycle
-    M301 = Mixer('M301', [fresh_yeast, yeast_recycle], yeast_feed)
-    @M301.add_specification(run=True)
-    def adjust_fresh_yeast():
-        total_yeast_needed = yeast_mass  
-        recycle = yeast_recycle.imass['Yeast']
-        fresh = max(total_yeast_needed - recycle, total_yeast_needed * 0.05)  # 5% fresh yeast supply
-        fresh_yeast.imass['Yeast'] = fresh
-    
-    T301 = StorageTank('T301', yeast_feed)
+    T301 = StorageTank('T301', ethanol)
     P301 = Pump('P301', T301-0)
-    R301 = MCCAFermentation('R301', [H301-0, P301-0], ['', '', '', yeast_recycle], microalgae_mass_flow=microalgae_mass, titer = 2.003)
+    R301 = MCCAFermentation('R301', [H301-0, P301-0], microalgae_mass_flow=microalgae_mass, titer = 2.003)
 
     # Add C6 yield factor specification
     @R301.add_specification(run=True)
@@ -347,20 +340,19 @@ def create_microalgae_MCCA_production_sys(ins, outs):
         process_ID='6'  # Use process ID 6 for unit numbering
     )
 
-
 # ==========================================
 # TEA Analysis
 # ==========================================
 # Create system and TEA objects at module level for import
 u = flowsheet.unit
 s = flowsheet.stream
-microalgae_mcca_sys = create_microalgae_MCCA_production_sys()
-microalgae_mcca_sys.simulate()
+microalgae_mcca_sys_ethanol = create_microalgae_MCCA_production_sys_ethanol()
+microalgae_mcca_sys_ethanol.simulate()
 
 # TEA analysis
 # Dry biomass feed rate in ton per day (t/d)
 dry_tpd = u.U101.ins[0].F_mass * 24 / 1000  # kg/h -> t/d
-microalgae_tea = create_tea(system=microalgae_mcca_sys, IRR=0.10, duration=(2024, 2045),
+microalgae_tea_ethanol = create_tea(system=microalgae_mcca_sys_ethanol, IRR=0.10, duration=(2024, 2045),
     depreciation='MACRS7', income_tax=0.21, 
         operating_days=330,
     lang_factor= None, construction_schedule=(0.08, 0.60, 0.32),
@@ -376,35 +368,35 @@ microalgae_tea = create_tea(system=microalgae_mcca_sys, IRR=0.10, duration=(2024
     steam_power_depreciation='MACRS20')
 
 if __name__ == '__main__':
-    microalgae_mcca_sys.diagram('cluster', format='png')
-    microalgae_mcca_sys.print()
+    microalgae_mcca_sys_ethanol.diagram('cluster', format='png')
+    microalgae_mcca_sys_ethanol.print()
     print("\n===== Techno-Economic Analysis (TEA) Main Results =====")
     # Use the system's main product stream directly for price calculation
     caproic_acid_product = s.caproic_acid_product
     if caproic_acid_product is not None:
         if caproic_acid_product.price is None or caproic_acid_product.price == 0:
             caproic_acid_product.price = 4.5
-        price = microalgae_tea.solve_price(caproic_acid_product)
+        price = microalgae_tea_ethanol.solve_price(caproic_acid_product)
         print(f"Caproic Acid Minimum Selling Price: {price:.2f} $/kg")
         if caproic_acid_product.F_mass > 0 and caproic_acid_product.price > 0:
-            print("Caproic Acid Unit Production Cost:", microalgae_tea.production_costs([caproic_acid_product]))
-    print("NPV:", microalgae_tea.NPV)
-    print("TCI:", microalgae_tea.TCI)
-    print("FCI:", microalgae_tea.FCI)
-    print("DPI:", microalgae_tea.DPI)
-    print("TDC:", microalgae_tea.TDC)
-    print("FOC:", microalgae_tea.FOC)
-    print("VOC:", microalgae_tea.VOC)
-    print("AOC:", microalgae_tea.AOC)
-    print("ROI:", microalgae_tea.ROI)
-    print("PBP:", microalgae_tea.PBP)
-    print("Annual Depreciation:", microalgae_tea.annual_depreciation)
-    print("Sales:", microalgae_tea.sales)
-    print("Material Cost:", microalgae_tea.material_cost)
-    print("Utility Cost:", microalgae_tea.utility_cost)
-    print("CAPEX Table:\n", microalgae_tea.CAPEX_table())
-    print("FOC Table:\n", microalgae_tea.FOC_table())
-    print("Cashflow Table:\n", microalgae_tea.get_cashflow_table())
+            print("Caproic Acid Unit Production Cost:", microalgae_tea_ethanol.production_costs([caproic_acid_product]))
+    print("NPV:", microalgae_tea_ethanol.NPV)
+    print("TCI:", microalgae_tea_ethanol.TCI)
+    print("FCI:", microalgae_tea_ethanol.FCI)
+    print("DPI:", microalgae_tea_ethanol.DPI)
+    print("TDC:", microalgae_tea_ethanol.TDC)
+    print("FOC:", microalgae_tea_ethanol.FOC)
+    print("VOC:", microalgae_tea_ethanol.VOC)
+    print("AOC:", microalgae_tea_ethanol.AOC)
+    print("ROI:", microalgae_tea_ethanol.ROI)
+    print("PBP:", microalgae_tea_ethanol.PBP)
+    print("Annual Depreciation:", microalgae_tea_ethanol.annual_depreciation)
+    print("Sales:", microalgae_tea_ethanol.sales)
+    print("Material Cost:", microalgae_tea_ethanol.material_cost)
+    print("Utility Cost:", microalgae_tea_ethanol.utility_cost)
+    print("CAPEX Table:\n", microalgae_tea_ethanol.CAPEX_table())
+    print("FOC Table:\n", microalgae_tea_ethanol.FOC_table())
+    print("Cashflow Table:\n", microalgae_tea_ethanol.get_cashflow_table())
     
     # Quick check: product flows in each units
     # print("\n===== Stream Mass Flows for Each Unit (kg/hr) =====")

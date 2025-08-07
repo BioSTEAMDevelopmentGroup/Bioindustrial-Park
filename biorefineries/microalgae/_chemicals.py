@@ -192,6 +192,7 @@ Benzene = chemical_database('Benzene', phase='l')
 Chloroform = chemical_database('Chloroform', phase='l')
 Dichloromethane = chemical_database('Dichloromethane', phase='l')
 Octanol = chemical_database('Octanol', phase= 'l')
+OleylAlcohol = chemical_database('OleylAlcohol', phase= 'l')
 
 # Ionic liquid extractants
 TOA = chemical_database('TOA', search_ID='tri-n-octylamine')
@@ -234,7 +235,7 @@ WWTsludge = chemical_defined('WWTsludge', phase='s', formula='CH1.66O0.33N0.22',
 # Base enzyme
 BaseEnzyme = chemical_defined('BaseEnzyme', 
                              phase='s', 
-                             MW=110, 
+                             formula='CH1.57O0.31N0.29S0.007',
                              Hf=-17618*_cal2joule,
                              HHV=0,  
                              LHV=0)
@@ -283,7 +284,7 @@ CoolingTowerChems = chemical_copied('CoolingTowerChems', BaghouseBag)
 Microalgae = chemical_defined(
     'Microalgae',
     phase='s',
-    formula='C2.8H0.4O1.5N0.3',  # comsuption from microalgal biomass componets https://www.sciencedirect.com/science/article/pii/S0196890419313184?via%3Dihub             
+    formula='C3.2H0.4O1.5N0.3',  # comsuption from microalgal biomass componets https://www.sciencedirect.com/science/article/pii/S0196890419313184?via%3Dihub             
     Hf=-2138000,                
 )
 

@@ -24,8 +24,7 @@ import numpy as np
 import biosteam as bst
 import math
 from biosteam import Unit
-from biosteam.exceptions import DesignError
-from biosteam.units.design_tools import pressure_vessel_material_factors as factors
+from biosteam.units.design_tools import pressure_vessel_material_factors
 from biosteam.units.decorators import cost
 from biosteam.units import HXutility, Mixer, MixTank, Pump, StorageTank, StirredTankReactor
 from thermosteam import Stream
@@ -46,7 +45,6 @@ def find_split(*tuples):
         total = flow0 + flow1
         split[ID] = flow0 / total if total else 0
     return split
-
 
 Rxn = tmo.reaction.Reaction
 ParallelRxn = tmo.reaction.ParallelReaction
@@ -78,7 +76,6 @@ splits = [
 
 tmo.settings.set_thermo(chems)
 
-
 # %% 
 # =========================
 # Microalgae Crushing 
@@ -86,7 +83,6 @@ tmo.settings.set_thermo(chems)
 @cost(basis='Flow rate', ID='System', units='kg/hr',
       kW=511.3205, cost=13329690, S=94697, CE=CEPCI[2009], n=0.6, BM=1.7)
 class FeedstockPreprocessing(Unit):
-    # 2205 U.S. ton/day (2000 metric tonne/day) as in Humbird et al.
     _baseline_flow_rate = baseline_feedflow.sum()
     _cached_flow_rate = 2205
     _N_ins = 1
@@ -141,7 +137,7 @@ class SulfuricAcidMixer(Unit):
 
 # Pretreatment reactor
 @cost(basis='Dry flow rate', ID='Pretreatment reactor', units='kg/hr',
-      kW=512, cost=1981240, S=83333, CE=CEPCI[2009], n=0.6, BM=1.5)
+      kW=5120, cost=19812400, S=83333, CE=CEPCI[2009], n=0.6, BM=1.5)
 class AcidPretreatmentReactor(Unit):
     _N_ins = 1  
     _N_outs = 1 
@@ -290,27 +286,22 @@ class Saccharification(Unit):
 
 ## MCCA Fermentation
 @cost(basis='Fermenter size', ID='Fermenter', units='kg',
-      cost=5128000, S=(42607+443391+948+116)*(60+36),
+      kW=100, cost=5128000, S=(42607+443391+948+116)*(60+36),
       CE=CEPCI[2009], n=0.7, BM=1.5)
 @cost(basis='Fermenter size', ID='Fermenter agitator', units='kg',
-      # Scaling basis based on sum of all streams into fermenter
-      # (304, 306, 311, and 312 in ref [1])
-      # and total residence time (batch hydrolysis and fermentation)
-        # kW=268.452, 
-        kW=0, # overwritten; power utility calculated separately based on batch IBRL power per unit volume
+      kW=10,
       cost=630000, 
       S=(42607+443391+948+116)*(60+36),
       CE=CEPCI[2009], n=0.7, BM=1.5)
 
 class MCCAFermentation(StirredTankReactor):
     _N_ins = 5  
-    _N_outs = 3 
+    _N_outs = 4 
 
     auxiliary_unit_names = ('heat_exchanger',)
     _units= {
         **Reactor._units,
         'Fermenter size': 'kg',
-        'Recirculation flow rate': 'kg/hr',
         'Broth flow rate': 'kg/hr',
         }
     
@@ -334,7 +325,7 @@ class MCCAFermentation(StirredTankReactor):
                  base_neutralizes_product=True,
                  tau = tau_cofermentation,
                  microalgae_mass_flow: float | None = None,  # kg/hr basis of original algae for yield calc
-                 titer: float = 60.0,  # g/L - 默认浓度为60 g/L
+                 titer: float = 2.003,  # g/L
                  # allow_dilution=False,
                  # allow_concentration=False,
                  # sugars=None
@@ -359,14 +350,13 @@ class MCCAFermentation(StirredTankReactor):
         self.neutralization = neutralization
         self.neutralizing_agent = neutralizing_agent
         self.tau = tau 
+ 
         #self.allow_dilution = allow_dilution
         #self.allow_concentration = allow_concentration
         #self.sugars = sugars or tuple(i.ID for i in self.chemicals.sugars)
 
         # Store optional explicit biomass flow for yield calculations
         self.microalgae_mass_flow = microalgae_mass_flow
-        
-        # 添加titer参数
         self.titer = titer
         
         ID = self.ID
@@ -425,41 +415,35 @@ class MCCAFermentation(StirredTankReactor):
 
     def _run(self):
         substrate, yeast_seed, FermMicrobe, lime, n2 = self.ins
-        broth, gas, fermentation_waste = self.outs
+        broth, gas, fermentation_waste, yeast_recycle = self.outs 
         broth.mix_from(self.ins)
         broth.T = self.T
         broth.P = self.P
         # Determine basis biomass mass (kg/hr)
         microalgae_mass = self.microalgae_mass_flow
-        
-        # 获取产率因子和浓度
         caproic_acid_yield_factor = getattr(self, 'caproic_acid_yield_factor', 1.0)
-        titer = getattr(self, 'titer', 60.0)  # g/L
+        titer = getattr(self, 'titer', 2.003)  # g/L
         
-        # 计算浓度对产率的影响 - 非线性关系
-        # 当浓度过高时，会抑制产率
-        # 基准浓度设为60 g/L，此时无抑制
-        base_titer = 60.0  # g/L
+        base_titer = 2.003  
+        inhibition_titer = 10.0  
         
-        # 计算抑制系数 (产物抑制模型)
-        # 高于基准浓度时，产率降低；低于时，产率略有提高
         if titer > base_titer:
-            # 产物抑制模型：exp(-k*(titer-base_titer))
-            inhibition_factor = np.exp(-0.01 * (titer - base_titer))
+            if titer <= inhibition_titer:
+                inhibition_factor = 1.0 - 0.05 * (titer - base_titer) / (inhibition_titer - base_titer)
+            else:
+                inhibition_factor = 0.95 * np.exp(-0.1 * (titer - inhibition_titer))
         else:
-            # 低浓度时略有提高，但提高有限
-            inhibition_factor = 1.0 + 0.005 * (base_titer - titer)
-        
-        # 应用抑制效应到产率因子
+            inhibition_factor = 1.0 + 0.01 * (base_titer - titer)
+     
         effective_yield_factor = caproic_acid_yield_factor * inhibition_factor
         
         base_yields = {
-            'Ethanol': 0.018,
+            'Ethanol': 0.01,
             'Butanol': 0.004,
-            'AceticAcid': 0.10,
+            'AceticAcid': 0.1,
             'PropionicAcid': 0.009,
-            'ButyricAcid': 0.2,
-            'ValericAcid': 0.012,
+            'ButyricAcid': 0.18,
+            'ValericAcid': 0.01,
             'CaproicAcid': 0.27,
             'HeptanoicAcid': 0.006,
             'CaprylicAcid': 0.04
@@ -468,19 +452,15 @@ class MCCAFermentation(StirredTankReactor):
         total_base_yield = sum(base_yields.values())
         base_caproic_yield = base_yields['CaproicAcid']
         
-        # 使用有效产率因子计算新产率
         new_caproic_yield = base_caproic_yield * effective_yield_factor
         delta_caproic = new_caproic_yield - base_caproic_yield
         total_other_base_yield = total_base_yield - base_caproic_yield
         
-        # 计算发酵液体积 (L) - 用于实现目标浓度
-        # 假设发酵液密度为1 kg/L
-        target_caproic_mass = microalgae_mass * new_caproic_yield  # kg/hr
-        target_volume_L = target_caproic_mass * 1000 / titer  # 转换为L
-        
-        # 调整产品质量以匹配目标浓度
+        target_caproic_mass = microalgae_mass * new_caproic_yield  
+        target_volume_L = target_caproic_mass * 1000 / titer  
+                
         if abs(delta_caproic) > 1e-6 and total_other_base_yield > 1e-6:
-            adjustment_factor = (total_other_base_yield - delta_caproic) / total_other_base_yield           
+            adjustment_factor = max(0.1, (total_other_base_yield - delta_caproic) / total_other_base_yield)
             for compound, base_yield in base_yields.items():
                 if compound == 'CaproicAcid':
                     broth.imass[compound] = target_caproic_mass
@@ -493,29 +473,245 @@ class MCCAFermentation(StirredTankReactor):
                 else:
                     broth.imass[compound] = microalgae_mass * base_yield
                     
-        # 确保总水量与目标体积一致
-        total_water_needed = max(target_volume_L - broth.F_vol, 0)  # L
-        broth.imass['Water'] = total_water_needed  # 假设密度为1 kg/L
-        
-        # 气体产物
+        current_volume = broth.F_vol  # L
+        if current_volume > 0 and titer >= 5.0: 
+            water_adjustment = max(0, target_volume_L - current_volume)  
+            max_water = microalgae_mass * 10  
+            water_adjustment = min(water_adjustment, max_water)
+            broth.imass['Water'] += water_adjustment  
         gas.copy_like(n2)
-        gas.imass['H2'] = microalgae_mass * 0.001
-        gas.imass['CH4'] = microalgae_mass * 0.002
-
+        gas.imass['H2'] = microalgae_mass * 0.1
+        
+        # yeast recycle for simulating membrane bioreactor
+        yeast_recovery_rate = 0.95
+        total_yeast_in_broth = broth.imass['Yeast']
+        if total_yeast_in_broth > 0:
+            recoverable_yeast = total_yeast_in_broth * yeast_recovery_rate
+            yeast_recycle.empty()
+            yeast_recycle.imass['Yeast'] = recoverable_yeast
+            yeast_recycle.T = self.T
+            yeast_recycle.P = self.P
+            broth.imass['Yeast'] = total_yeast_in_broth - recoverable_yeast
+        else:
+            yeast_recycle.empty()
+        
+        fermentation_waste.empty()
 
     def _design(self):
         Design = self.design_results
         Design['Fermenter size'] = self.outs[0].F_mass * self.tau
-        Design['Recirculation flow rate'] = self.F_mass_in
         Design['Broth flow rate'] = self.outs[0].F_mass
+        duty = 50 * self.F_mass_in  # Heat duty
+        self.add_heat_utility(duty, self.T)
+
+
+@cost(basis='Fermenter size', ID='Fermenter', units='kg',
+      kW=100, cost=5128000, S=(42607+443391+948+116)*(60+36),
+      CE=CEPCI[2009], n=0.7, BM=1.5)
+@cost(basis='Fermenter size', ID='Fermenter agitator', units='kg',
+      kW=10,
+      cost=630000, 
+      S=(42607+443391+948+116)*(60+36),
+      CE=CEPCI[2009], n=0.7, BM=1.5)
+class MCCAFermentation_no_yeast(StirredTankReactor):
+    _N_ins = 4  
+    _N_outs = 3
+
+    auxiliary_unit_names = ('heat_exchanger',)
+    _units= {
+        **Reactor._units,
+        'Fermenter size': 'kg',
+        'Broth flow rate': 'kg/hr',
+        }
+    
+    tau_batch_turnaround = 12 # in hr, seedmentaiton time
+    tau_cofermentation = 15 * 24 # in hr, 15 d
+    mol_NH4OH_per_acid_pH_control = 0.2988 # from IBRL batch run
+    mol_lime_per_acid_pH_control = 0.2988/2 # mol NH4OH / 2
+    pH = 5.0
+
+    def __init__(self, ID='', ins=None, outs=(), thermo=None, *, T=37+273.15,
+                 P=101325, V_wf=0.8, length_to_diameter=0.6,
+                 kW_per_m3=0.02 * 0.7457 / 0.075, # ref from succinic projects
+                 mixing_intensity=300,
+                 #wall_thickness_factor=1,
+                 vessel_material='Stainless steel 304',
+                 vessel_type='Vertical',
+                 neutralization=True,
+                 neutralizing_agent='Lime',
+                 mode='batch', feed_freq=1,
+                 pH_control=True,
+                 base_neutralizes_product=True,
+                 tau = tau_cofermentation,
+                 microalgae_mass_flow: float | None = None,  # kg/hr basis of original algae for yield calc
+                 titer: float = 1.208,  # g/L
+                 # allow_dilution=False,
+                 # allow_concentration=False,
+                 # sugars=None
+                 ):
+
+        StirredTankReactor.__init__(self, ID, ins, outs)
+        
+        self.T = T
+        self.P = P
+        self.V_wf = V_wf
+        self.length_to_diameter = length_to_diameter
+        self.mixing_intensity = mixing_intensity
+        self.kW_per_m3 = kW_per_m3
+        #self.wall_thickness_factor = wall_thickness_factor
+        self.vessel_material = vessel_material
+        self.vessel_type = vessel_type
+        self.neutralization = neutralization
+        self.mode = mode
+        self.feed_freq = feed_freq
+        self.pH_control=pH_control
+        self.base_neutralizes_product = base_neutralizes_product
+        self.neutralization = neutralization
+        self.neutralizing_agent = neutralizing_agent
+        self.tau = tau 
+ 
+        #self.allow_dilution = allow_dilution
+        #self.allow_concentration = allow_concentration
+        #self.sugars = sugars or tuple(i.ID for i in self.chemicals.sugars)
+
+        # Store optional explicit biomass flow for yield calculations
+        self.microalgae_mass_flow = microalgae_mass_flow
+        self.titer = titer
+        
+        ID = self.ID
+        self._mixed_feed = Stream(f'{ID}_mixed_feed')
+        self._tot_feed = Stream(f'{ID}_tot_feed')
+        # Before reaction, after reaction, with last feed
+        self._single_feed0 = Stream(f'{ID}_single_feed0')
+        self._single_feed1 = Stream(f'{ID}_single_feed1')
+        self._last = Stream(f'{ID}_last')
+        self._init = Stream(f'{ID}_init')
+        hx_in = Stream(f'{ID}_hx_in')
+        hx_out = Stream(f'{ID}_hx_out')
+        # Add '.' in ID for auxiliary units
+        self.heat_exchanger = HXutility(ID=f'.{ID}_hx', ins=hx_in, outs=hx_out, T=T)
+        
+        # the reaction is simplified for simulation
+        #self.mcca_rxns = ParallelRxn([
+        #Rxn('Protein -> AceticAcid', 'Protein', 0.1),
+        #Rxn('Protein -> PropionicAcid', 'Protein', 0.1),
+        #Rxn('Protein -> ButyricAcid', 'Protein', 0.1),
+        #Rxn('Protein -> CaproicAcid', 'Protein', 0.1),
+        #Rxn('Glucose -> Ethanol', 'Glucose', 0.018),
+        #Rxn('Glucose -> Butanol', 'Glucose', 0.0022),
+        #Rxn('Glucose -> AceticAcid', 'Glucose', 0.10094),
+        #Rxn('Glucose -> PropionicAcid', 'Glucose', 0.00977),
+        #Rxn('Glucose -> ValericAcid', 'Glucose', 0.012),
+        #Rxn('Glucose -> HeptanoicAcid', 'Glucose', 0.004),
+        #Rxn('Glucose -> ButyricAcid', 'Glucose', 0.122),
+        #Rxn('Glucose -> CaproicAcid', 'Glucose', 0.134),
+        #Rxn('Glucose -> CaprylicAcid', 'Glucose', 0.008),
+        #])        
+        
+        # This is a Siplified Neutralization, because we don't want to affect the products yield
+        self.lime_neutralization_rxns = ParallelRxn([
+        #   Reaction definition                                               Reactant  Conversion
+        Rxn('H2SO4 + Lime -> CaSO4 + 2 H2O',  'H2SO4',   1)
+            ])
+
+        self.lime_pH_control_rxns = ParallelRxn([
+        #   Reaction definition                                               Reactant  Conversion
+        Rxn('H2SO4 + Lime -> CaSO4 + 2 H2O',  'H2SO4',   1)
+            ])
+              
+ 
+        # self.mcca_rxns = ParallelRxn([
+        #     Rxn('Glucose -> 2 Ethanol + 2 CO2', 'Glucose', 0.7),
+        #     Rxn('Glucose -> 2 AceticAcid + 2 CO2 + 2 H2', 'Glucose', 0.2),
+        #     Rxn('Glucose -> 2 PropionicAcid + 2 CO2 + 2 H2', 'Glucose', 0.1),
+        #     Rxn('5 PropionicAcid + 6 Ethanol -> 5 ValericAcid + AceticAcid + 4 H2O + 2 H2', 'PropionicAcid', 0.7),
+        #     Rxn('5 ValericAcid + 6 Ethanol -> 5 HeptanoicAcid + AceticAcid + 4 H2O + 2 H2', 'ValericAcid', 0.7),
+        #     Rxn('ButyricAcid + Ethanol -> AceticAcid + Butanol', 'ButyricAcid', 0.1),
+        #     Rxn('4 AceticAcid + 6 Ethanol -> 5 ButyricAcid  + 4 H2O + 2 H2', 'AceticAcid', 0.7),
+        #     Rxn('5 ButyricAcid + 6 Ethanol -> 5 CaproicAcid + AceticAcid + 4 H2O + 2 H2', 'ButyricAcid', 0.7),
+        #     Rxn('5 CaproicAcid + 6 Ethanol -> 5 CaprylicAcid + AceticAcid + 4 H2O + 2 H2', 'CaproicAcid', 0.2),
+        # ])
+
+    def _run(self):
+        substrate, FermMicrobe, lime, n2 = self.ins
+        broth, gas, fermentation_waste= self.outs 
+        broth.mix_from(self.ins)
+        broth.T = self.T
+        broth.P = self.P
+        # Determine basis biomass mass (kg/hr)
+        microalgae_mass = self.microalgae_mass_flow
+        caproic_acid_yield_factor = getattr(self, 'caproic_acid_yield_factor', 1.0)
+        titer = getattr(self, 'titer', 1.208)  # g/L
+        
+        base_titer = 1.208  
+        inhibition_titer = 10.0  
+        
+        if titer > base_titer:
+            if titer <= inhibition_titer:
+                inhibition_factor = 1.0 - 0.05 * (titer - base_titer) / (inhibition_titer - base_titer)
+            else:
+                inhibition_factor = 0.95 * np.exp(-0.1 * (titer - inhibition_titer))
+        else:
+            inhibition_factor = 1.0 + 0.01 * (base_titer - titer)
+     
+        effective_yield_factor = caproic_acid_yield_factor * inhibition_factor
+        
+        base_yields = {
+            'Ethanol': 0.01,
+            'Butanol': 0.002,
+            'AceticAcid': 0.1,
+            'PropionicAcid': 0.009,
+            'ButyricAcid': 0.086,
+            'ValericAcid': 0.01,
+            'CaproicAcid': 0.08,
+            'HeptanoicAcid': 0.004,
+            'CaprylicAcid': 0.005
+        }
+        
+        total_base_yield = sum(base_yields.values())
+        base_caproic_yield = base_yields['CaproicAcid']
+        
+        new_caproic_yield = base_caproic_yield * effective_yield_factor
+        delta_caproic = new_caproic_yield - base_caproic_yield
+        total_other_base_yield = total_base_yield - base_caproic_yield
+        
+        target_caproic_mass = microalgae_mass * new_caproic_yield  
+        target_volume_L = target_caproic_mass * 1000 / titer  
+                
+        if abs(delta_caproic) > 1e-6 and total_other_base_yield > 1e-6:
+            adjustment_factor = max(0.1, (total_other_base_yield - delta_caproic) / total_other_base_yield)
+            for compound, base_yield in base_yields.items():
+                if compound == 'CaproicAcid':
+                    broth.imass[compound] = target_caproic_mass
+                else:
+                    broth.imass[compound] = microalgae_mass * base_yield * adjustment_factor
+        else:
+            for compound, base_yield in base_yields.items():
+                if compound == 'CaproicAcid':
+                    broth.imass[compound] = target_caproic_mass
+                else:
+                    broth.imass[compound] = microalgae_mass * base_yield
+                    
+        current_volume = broth.F_vol  
+        if current_volume > 0 and titer >= 5.0: 
+            water_adjustment = max(0, target_volume_L - current_volume)  
+            max_water = microalgae_mass * 10  
+            water_adjustment = min(water_adjustment, max_water)
+            broth.imass['Water'] += water_adjustment  
+        gas.copy_like(n2)
+        gas.imass['H2'] = microalgae_mass * 0.1
+
+    def _design(self):
+        Design = self.design_results
+        Design['Fermenter size'] = self.outs[0].F_mass * self.tau
+        Design['Broth flow rate'] = self.outs[0].F_mass
+        duty = 50 * self.F_mass_in  # Heat duty
+        self.add_heat_utility(duty, self.T)
 
 # %% 
 # =========================
 # Solid-Liquid Separation
 # =========================
-@cost(basis='Flow rate', ID='Filtrate discharge pump', units='kg/hr',
-      # Power not specified, based on filtrate tank discharge pump
-      kW=55.9275, cost=13040, S=31815, CE=CEPCI[2010], n=0.8, BM=2.3)
 @cost(basis='Flow rate', ID='Filtrate tank', units='kg/hr',
       cost=103000, S=31815, CE=CEPCI[2010], n=0.7, BM=2.0)
 @cost(basis='Flow rate', ID='Flitrate tank agitator', units='kg/hr',
@@ -543,67 +739,6 @@ class SolidLiquidSeparation(Unit):
         residue.P = feed.P
 
 
-
-# %% 
-# =========================
-# Distillation Units
-# =========================
-@cost(basis='Flow rate', ID='Butanol Distillation', units='kg/hr', cost=2400000, S=10000, CE=CEPCI[2019], n=0.6, BM=2.5)
-class ButanolDistillation(bst.units.BinaryDistillation):
-    def __init__(self, ID, ins=None, outs=()):
-        super().__init__(
-            ID, ins=ins, outs=outs,
-            LHK=('Butanol', 'Octanol'),
-            Lr=0.99, Hr=0.99, k=1.2,
-            partial_condenser=False,
-            is_divided=True
-        )
-
-@cost(basis='Flow rate', ID='Butyric Acid Distillation', units='kg/hr', cost=2400000, S=10000, CE=CEPCI[2019], n=0.6, BM=2.5)
-class ButyricAcidDistillation(bst.units.BinaryDistillation):
-    def __init__(self, ID, ins=None, outs=()):
-        super().__init__(
-            ID, ins=ins, outs=outs,
-            LHK=('ButyricAcid', 'Octanol'),
-            Lr=0.99, Hr=0.99, k=1.2,
-            partial_condenser=False,
-            is_divided=True
-        )
-
-@cost(basis='Flow rate', ID='Caproic Acid Distillation', units='kg/hr', cost=2400000, S=10000, CE=CEPCI[2019], n=0.6, BM=2.5)
-class CaproicAcidDistillation(bst.units.BinaryDistillation):
-    def __init__(self, ID, ins=None, outs=()):
-        super().__init__(
-            ID, ins=ins, outs=outs,
-            LHK=('CaproicAcid', 'Octanol'),
-            Lr=0.99, Hr=0.99, k=1.2,
-            partial_condenser=False,
-            is_divided=True
-        )
-
-@cost(basis='Flow rate', ID='Heptanoic Acid Distillation', units='kg/hr', cost=2400000, S=10000, CE=CEPCI[2019], n=0.6, BM=2.5)
-class HeptanoicAcidDistillation(bst.units.BinaryDistillation):
-    def __init__(self, ID, ins=None, outs=()):
-        super().__init__(
-            ID, ins=ins, outs=outs,
-            LHK=('HeptanoicAcid', 'Octanol'),
-            Lr=0.99, Hr=0.99, k=1.2,
-            partial_condenser=False,
-            is_divided=True
-        )
-
-@cost(basis='Flow rate', ID='Caprylic Acid Distillation', units='kg/hr', cost=2400000, S=10000, CE=CEPCI[2019], n=0.6, BM=2.5)
-class CaprylicAcidDistillation(bst.units.BinaryDistillation):
-    def __init__(self, ID, ins=None, outs=()):
-        super().__init__(
-            ID, ins=ins, outs=outs,
-            LHK=('CaprylicAcid', 'Octanol'),
-            Lr=0.99, Hr=0.99, k=1.2,
-            partial_condenser=False,
-            is_divided=True,
-            product_specification_format='Recovery'
-        )
-
 # %% 
 # =========================
 # Other Units
@@ -625,29 +760,13 @@ class NeutralizationTank(Unit):
 
 
 
-@cost('Flow rate', 'Anaerobic Digestion Reactor', units= 'kg/hr', kW=4.4, S=339151,
+@cost('Flow rate', 'Anaerobic Digestion Reactor', units= 'kg/hr', kW=100, S=339151,
       cost=8000000, CE=CEPCI[2010], n=0.7, BM=1.8)
 class AnaerobicDigestion(bst.Unit):
-    def __init__(self, ID='', ins=None, outs=(), *, tau=15*24, microalgae_mass: float|None=None, **kwargs):
-        super().__init__(ID, ins, outs, **kwargs)
-        self.tau = tau
-        self.microalgae_mass = microalgae_mass
+
     _N_ins = 1
     _N_outs = 3
-    
-    #: Working volume fraction (filled tank to total tank volume)
-    V_wf = 0.8
-    
-    #: Number of reactors
-    N_reactors = 0
-    
-    #: Number of transfer pumps
-    N_transfer_pumps = 1
-    
-    #: Number of recirculation pumps
-    N_recirculation_pumps = 0
-    T = 37 + 273.15
-
+   
     degrade_IDs = [
         'AceticAcid', 'PropionicAcid', 'ButyricAcid', 'ValericAcid',
         'CaproicAcid', 'HeptanoicAcid', 'CaprylicAcid',
@@ -656,16 +775,28 @@ class AnaerobicDigestion(bst.Unit):
     ]
     inorganic_IDs = ['Ash', 'H2SO4', 'Na2SO4', 'AmmoniumSulfate', 'H2O']
 
+    def __init__(self, ID='', ins=None, outs=(), *, tau=15*24, microalgae_mass: float|None=None, **kwargs):
+        super().__init__(ID, ins, outs, **kwargs)
+        self.tau = tau 
+        self.microalgae_mass = microalgae_mass 
+        self.T = 37 + 273.15 
+        
+    V_wf = 0.8
+    
+    N_reactors = 0
+    
+    N_transfer_pumps = 1
+    
+    N_recirculation_pumps = 0
+
     def _run(self):
         feed = self.ins[0]
         biogas, waste, sludge = self.outs
         if self.microalgae_mass is None:
             raise ValueError('microalgae_mass must be supplied when instantiating AnaerobicDigestion.')
         microalgae_mass = self.microalgae_mass
-        # 100ml H2, 100 mL CH4 per 1g microalgae
-        # 1 mol CH4 = 22.4L = 22400ml，1 mol H2 = 22.4L = 22400ml
-        H2_mol = microalgae_mass * 100 / 22400  # 单位：g * ml/g / ml/mol = mol
-        CH4_mol = microalgae_mass * 200 / 22400
+        H2_mol = microalgae_mass * 0.015
+        CH4_mol = microalgae_mass * 0.015
         biogas.empty()
         biogas.imol['H2'] = H2_mol
         biogas.imol['CH4'] = CH4_mol
@@ -675,8 +806,8 @@ class AnaerobicDigestion(bst.Unit):
         sludge.empty()
         for ID in self.degrade_IDs:
             amount = feed.imass[ID]
-            waste.imass[ID] = amount * 0.02  # 2% into wastewater, 98% remove rate
-            sludge.imass[ID] = amount * 0.25  # 40% into sludge
+            waste.imass[ID] = amount * 0.05  # 5% into wastewater
+            sludge.imass[ID] = amount * 0.25 # 25% into sludge
         for ID in self.inorganic_IDs:
             amount = feed.imass[ID]
             waste.imass[ID] = amount * 0.95
@@ -686,15 +817,15 @@ class AnaerobicDigestion(bst.Unit):
         sludge.imass['Microalgae'] = 0
         waste.phase = 'l'
         waste.T = sludge.T = self.T
+        
+    def _design(self):
+        Design = self.design_results
+        Design['Flow rate'] = sum([s.F_mass for s in self.outs])  # kg/hr
+        duty = 800 * self.microalgae_mass  # Heat duty
+        self.add_heat_utility(duty, self.T)
 
 
 
 
-__all__ = (
-    'FeedstockPreprocessing', 'AcidPretreatmentReactor', 'GlucoamylaseHydrolysis',
-    'AlphaAmylaseHydrolysis', 'SolidLiquidSeparation', 'MCCAFermentation',
-    'MembraneExtraction', 'OctanolExtraction', 'MultiStageDistillation',
-    'NeutralizationTank'
-)
 
 
