@@ -1,7 +1,45 @@
+# -*- coding: utf-8 -*-
+"""
+Created on 2025-08-06 20:26:01
+
+@author: Dr. Ouwen Peng
+@title: Postdoctoral Researcher
+@institute: Illinois ARCS
+@email: ouwen.peng@iarcs-create.edu.sg
+"""
+# %%
+import pubchempy as pcp
+from chemprice import PriceCollector
 import pandas as pd
 import numpy as np
-import pubchempy as pcp
+import biosteam as bst
 
+pc = PriceCollector()
+pc.setMolportApiKey('57fde93d-e1d0-4618-9edb-48a03ff1234a')
+pc.setMolportUsername('ouwenp@illinois.edu')
+pc.setMolportPassword('03Mar25%np')
+
+pc.status()
+
+pc.check()
+
+# %%
+#----------------------------------------------------------------
+def get_smiles(list_of_names):
+    smiles = []
+    for name in list_of_names:
+        try:
+            compound = pcp.get_compounds(name, 'name')[0]
+            smiles.append(compound.smiles)
+        except Exception:
+            try:
+                compound = bst.Chemical(name)
+                smiles.append(compound.smiles)
+            except Exception as e:
+                print(f"Error retrieving SMILES for {name}: {e}")
+                smiles.append(None)
+    return smiles
+#----------------------------------------------------------------
 def get_price_range(df: pd.DataFrame) -> pd.DataFrame:
     """
     Processes a DataFrame of chemical prices to extract statistical information.
@@ -124,9 +162,9 @@ def get_price_range(df: pd.DataFrame) -> pd.DataFrame:
         processed_data.append({
             'Chemical Name': chemical_name,
             'Source': group['Source'].iloc[0],
-            'input SMILES': group['input SMILES'].iloc[0],
+            'Input SMILES': group['Input SMILES'].iloc[0],
             'SMILES': smiles,
-            'Supplier Name': ', '.join(filtered_group['Supplier NAME'].unique()),
+            'Supplier Name': ', '.join(filtered_group['Supplier Name'].unique()),
             'lower purity': lower_purity,
             'upper purity': upper_purity,
             'lower Amount': filtered_group['Amount'].min(),
@@ -138,32 +176,22 @@ def get_price_range(df: pd.DataFrame) -> pd.DataFrame:
             '75% Price': price_stats.get(0.75),
             '90% Price': price_stats.get(0.9),
             'Unit': f"USD/{base_unit_str}",
-            'Last Updated Date Exact': f"{filtered_group['Last Update Date Exact'].min()} - {filtered_group['Last Update Date Exact'].max()}"
+            'Last Update Date Exact': f"{filtered_group['Last Update Date Exact'].min()} - {filtered_group['Last Update Date Exact'].max()}"
         })
 
     return pd.DataFrame(processed_data)
 
-# --- Example Usage ---
-if __name__ == '__main__':
-    # Create a sample DataFrame to demonstrate the function's usage
-    data = {
-        'Source': ['VendorA', 'VendorB', 'VendorC', 'VendorA', 'VendorB', 'VendorC', 'VendorA', 'VendorB', 'VendorD'],
-        'input SMILES': ['CCO', 'CCO', 'CCO', 'C', 'C', 'C', 'CNC', 'CNC', 'CCO'],
-        'SMILES': ['CCO', 'CCO', 'CCO', 'C', 'C', 'C', 'CNC', 'CNC', 'CCO'],
-        'Supplier NAME': ['SupplierX', 'SupplierY', 'SupplierZ', 'SupplierX', 'SupplierY', 'SupplierZ', 'SupplierX', 'SupplierY', 'SupplierW'],
-        'Purity': ['99%', '>98%', '99.5%', '95%', '96%', '97%', '>99%', '98-99.9%', 'N/A'],
-        'Amount': [50, 150, 0.2, 5, 10, 15, 0.5, 1, 250], # Changed 200 to 0.2kg
-        'Measure': ['g', 'g', 'kg', 'kg', 'kg', 'kg', 'L', 'L', 'g'], # Changed g to kg
-        'Price_USD': [10, 25, 30, 500, 950, 1400, 120, 220, 40.50],
-        'Last Update Date Exact': ['2023-01-15', '2023-02-20', '2023-03-10', '2023-01-20', '2023-02-25', '2023-03-15', '2023-04-01', '2023-04-05', '2023-05-01']
-    }
-    sample_df = pd.DataFrame(data)
+if __name__ == "__main__":
+    # Example usage
+    names = ['Glucose',]
+    smiles_list = get_smiles(names)
+    
+    # Collect prices for the SMILES
+    all_prices = pc.collect(smiles_list)
+    all_prices.to_excel('all_prices_test.xlsx', index=False)
 
-    # Process the sample DataFrame
-    processed_df = get_price_range(sample_df)
-
-    # Display the resulting DataFrame
-    print("Original DataFrame:")
-    print(sample_df)
-    print("\nProcessed DataFrame:")
-    print(processed_df)
+    # Process the collected prices
+    processed_df = get_price_range(all_prices)
+    
+    # Display the processed DataFrame
+    processed_df.to_excel('processed_prices_test.xlsx', index=False)
