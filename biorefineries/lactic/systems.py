@@ -38,9 +38,7 @@ def create_system(ID='lactic_sys', kind='SSCF', feedstock='feedstock',
                   flowsheet=None, return_groups=False,
                   cell_mass_split=None, gypsum_split=None,
                   AD_split=None, MB_split=None):
-    try: bst.settings.get_chemicals()
-    except: create_chemicals()
-    kind = kind.upper()
+     
     flowsheet = flowsheet or bst.main_flowsheet
     s = flowsheet.stream
     u = flowsheet.unit
