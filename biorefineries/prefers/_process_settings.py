@@ -25,7 +25,7 @@ price = {
     'H2O': 0.2/1e3,  # $/kg 0.15 to 0.5 /1e3
     'NH3': 0.46,  # $/kg 0.45 to 0.65
     'NH4OH': 0.4, # $/kg 0.3 to 0.5
-    'NH3_25wt': 0.4,  # $/kg 0.3 to 0.5
+    'NH3_25wt': 0.46,  # $/kg 0.3 to 0.5
     'NH4SO4': 0.3,  # $/kg 0.15 to 0.45
     'Glucose': 0.52,  # $/kg 0.5 to 0.9
     'MgSO4': 0.4,  # $/kg 0.3 to 0.6
@@ -35,6 +35,7 @@ price = {
     'NaCl': 0.2,  # $/kg 0.1 to 0.25
     'EDTA': 2.43,  # $/kg 2 to 4
     'K2HPO4': 1.6,  # $/kg 1.3 to 2.2
+    'Glycine': 2.0,  # $/kg 1.5 to 2.5
     'TrehaloseDH': 16,  # $/kg 15 to 40
     'SodiumAscorbate': 6.4,  # $/kg 5 to 10
     'Glycerol': 0.45,  # $/kg 0.3 to 0.7
@@ -61,6 +62,7 @@ FEC_CFs = {
     'H2SO4': 568.98/1e3,
     'NaOH': 29,
     'NH4OH': 42 * 0.4860, # chemicals.NH3.MW/chemicals.NH4OH.MW,
+    'NH3_25wt': 42 * 0.25,
     }
 
 

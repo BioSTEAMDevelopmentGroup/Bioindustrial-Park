@@ -20,11 +20,11 @@ LegH_yield = titer * 5 / 1300 # [by wt]
 
 
 # %% In
-SeedIn = stream_kwargs('SeedIn', Seed=0.15*1e5/16, units='kg/hr', T=25+273.15)
-CultureIn = stream_kwargs('CultureIn', Culture=1.5*1e5/16, units='kg/hr', T=25+273.15)
+SeedIn = stream_kwargs('SeedIn', Seed=2*0.15*1e5/16, units='kg/hr', T=25+273.15)
+CultureIn = stream_kwargs('CultureIn', Culture=2*1.5*1e5/16, units='kg/hr', T=25+273.15)
 
-Glucose = stream_kwargs('Glucose', Glucose=1.3*1e5/72, units='kg/hr', T=25+273.15)
-NH3_25wt = stream_kwargs('NH3_25wt', NH3_25wt=1000, units='kg/hr', T=25+273.15, price=price['NH3_25wt'])
+Glucose = stream_kwargs('Glucose', Glucose=2*1.3*1e5/72, units='kg/hr', T=25+273.15)
+NH3_25wt = stream_kwargs('NH3_25wt', NH3_25wt=2*100, units='kg/hr', T=25+273.15)#, price=price['NH3_25wt'])
 
 BufferA = stream_kwargs('BufferA', BufferA=1, units='kg/hr', T=25+273.15)
 BufferB = stream_kwargs('BufferB', BufferB=1 , units='kg/hr', T=25+273.15)
@@ -33,7 +33,7 @@ BufferC = stream_kwargs('BufferC', BufferC=1, units='kg/hr', T=25+273.15)
 # %% Out
 LegH_1 = stream_kwargs('LegH_1')
 LegH_2 = stream_kwargs('LegH_2')
-LegH_3 = stream_kwargs('LegH_3',units='kg/hr', T=25+273.15, price = 200)
+LegH_3 = stream_kwargs('LegH_3',units='kg/hr', T=25+273.15, price = 150)
 vent1 = stream_kwargs('vent1')
 vent2 = stream_kwargs('vent2')
 effluent1 = stream_kwargs('effluent1')
@@ -101,7 +101,7 @@ def update_all_input_stream_prices():
     """Update prices for all input streams"""
     # FIX: Check if streams exist and are proper objects
     try:
-        input_streams = create_stream([SeedIn, CultureIn, Glucose, #NH3_25wt, 
+        input_streams = create_stream([SeedIn, CultureIn, Glucose, NH3_25wt, 
                         BufferA, BufferB, BufferC])
         
         for stream in input_streams:

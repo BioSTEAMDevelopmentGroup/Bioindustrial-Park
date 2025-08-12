@@ -186,7 +186,7 @@ class SeedTrain(Unit):
         self.power_utility(kW)
 
 class AeratedFermentation(bst.AeratedBioreactor):
-    V_max_default = 500
+    # V_max_default = 500
     def _init(
             self, 
             fermentation_reaction, 
@@ -203,6 +203,7 @@ class AeratedFermentation(bst.AeratedBioreactor):
                                     optimize_power=True, **kwargs)
         chemicals = self.chemicals
         # self.hydrolysis_reaction = Rxn('Sucrose + Water -> 2Glucose', 'Sucrose', 1.00, chemicals)
+        self.V_max_default = 500
         self.fermentation_reaction = fermentation_reaction
         self.cell_growth_reaction = cell_growth_reaction
         self.respiration_reaction = respiration_reaction
@@ -269,6 +270,12 @@ class CellDisruption(Unit):
     _N_outs = 1
 
     _graphics = bst.Pump._graphics
+    
+    # Bare-module factors for equipment cost estimation
+    _F_BM_default = {
+        'High-Pressure Pump': 1.89,      # Typical bare-module factor for high-pressure pumps
+        'High-Pressure Valve': 1.35,     # Typical bare-module factor for high-pressure valves
+    }
 
     def __init__(self, ID='', 
                 ins=None, outs=(),
@@ -286,23 +293,23 @@ class CellDisruption(Unit):
         self.Parameters = Parameters
 
         # Set default parameters based on the cell disruption method
-        if self.cell_disruption_method is 'HighPressure':
+        if self.cell_disruption_method == 'HighPressure':
             self.Parameters = Parameters if Parameters is not None else {
                 'P High': 150e5,  # High pressure in Pascals
                 'P Low': 101325,  # Low pressure in Pascals (atmospheric)
             }
 
-        elif self.cell_disruption_method is 'BallMilling':
+        elif self.cell_disruption_method == 'BallMilling':
             self.Parameters = Parameters if Parameters is not None else {
                 'Flow rate': 100e-3,  # Flow rate in m^3/s
                 'Media': 'Water',
             }
-        elif self.cell_disruption_method is 'Sonication':
+        elif self.cell_disruption_method == 'Sonication':
             self.Parameters = Parameters if Parameters is not None else {
                 'Frequency': 20e3,  # Sonication frequency in Hz
                 'Amplitude': 100e-6,  # Sonication amplitude in meters
             }
-        elif self.cell_disruption_method is 'Enzymatic':
+        elif self.cell_disruption_method == 'Enzymatic':
             self.Parameters = Parameters if Parameters is not None else {
                 'Enzyme': 'Cellulase',
                 'Concentration': 1e-3,  # Enzyme concentration in kg/m^3
@@ -356,8 +363,8 @@ class CellDisruption(Unit):
         """ Cost the cell disruption unit based on the method and parameters. """
         # --- Aggregate Purchase Costs ---
         # To avoid confusion, we prefix the keys.
-        self.purchase_costs['High-Pressure Pump'] = self.pump.purchase_cost
-        self.purchase_costs['High-Pressure Valve'] = self.valve.purchase_cost
+        self.baseline_purchase_costs['High-Pressure Pump'] = self.pump.purchase_cost
+        self.baseline_purchase_costs['High-Pressure Valve'] = self.valve.purchase_cost
 
         # --- Aggregate Utility Costs ---
         # The main cost is the electricity for the pump.
@@ -441,8 +448,16 @@ class Diafiltration(bst.Unit):
         `module_cost_factor` is valid.
         Defaults to 500.
     """
-    _N_ins = 2  # Feed and Wash Solution
-    _N_outs = 2 # Permeate and Retentate
+    
+    _N_ins = 2
+    _N_outs = 2
+    
+    # Bare-module factors for equipment cost estimation
+    _F_BM_default = {
+        'Membrane System': 1.65,          # Typical bare-module factor for membrane modules
+        'Membrane replacement': 1.0,      # Operating cost item (no installation factor)
+        'Pump': 1.89,                     # Typical bare-module factor for centrifugal pumps
+    }
 
     water_ID = 'H2O'
     _default_TargetProduct_ID = 'TargetProduct'
@@ -644,9 +659,9 @@ class Diafiltration(bst.Unit):
             base_purchase_cost = self.module_cost_factor * (area_m2 ** self.module_cost_exponent)
             # Adjust cost from base_CEPCI to current BioSTEAM CEPCI (bst.CE)
             current_purchase_cost = base_purchase_cost * (bst.CE / self.base_CEPCI)
-            self.purchase_costs['Membrane System'] = current_purchase_cost
+            self.baseline_purchase_costs['Membrane System'] = current_purchase_cost
         else:
-            self.purchase_costs['Membrane System'] = 0.0
+            self.baseline_purchase_costs['Membrane System'] = 0.0
 
         # --- Annual Operating Cost (OPEX) for Membrane Replacement ---
         # This is added to `add_OPEX` for the TEA.
@@ -654,11 +669,11 @@ class Diafiltration(bst.Unit):
             self.membrane_cost_USD_per_m2 > 0 and
             area_m2 > 0):
             annual_replacement_cost = (area_m2 * self.membrane_cost_USD_per_m2) / self.membrane_lifetime_years
-            self.purchase_costs['Membrane replacement'] = annual_replacement_cost
+            self.baseline_purchase_costs['Membrane replacement'] = annual_replacement_cost
         else:
-            self.purchase_costs['Membrane replacement'] = 0.0
+            self.baseline_purchase_costs['Membrane replacement'] = 0.0
         #self.power_utility.cost = self.power_utility.rate * bst.annual_hours * bst.electricity_cost_per_kWh
-        self.purchase_costs['Pump'] = self.pump.purchase_cost
+        self.baseline_purchase_costs['Pump'] = self.pump.purchase_cost
         # Tank costs are not included here.
 
 
@@ -666,6 +681,13 @@ class IonExchange(bst.Unit):
 
     _N_ins = 2  # Feed (conditioned) and Elution Buffer Profile
     _N_outs = 2 # Product (in elution buffer) and Waste Stream
+    
+    # Bare-module factors for equipment cost estimation
+    _F_BM_default = {
+        'IEX Resin': 1.0,                 # Resin is typically purchased without installation factor
+        'IEX Column Hardware': 2.6,       # Typical bare-module factor for pressure vessels/columns
+    }
+    
     _units = {'resin_DBC_g_L': 'g/L', 
             'load_safety_factor': 'unitless',
             'operating_pressure_bar': 'bar', 
@@ -819,8 +841,8 @@ class IonExchange(bst.Unit):
             cost_per_L_resin = 1500 # $/L (highly variable based on resin type)
             column_hardware_factor = 0.6 # Hardware cost as a fraction of resin cost
             
-            self.purchase_costs['IEX Resin'] = resin_volume_L * cost_per_L_resin
-            self.purchase_costs['IEX Column Hardware'] = self.purchase_costs['IEX Resin'] * column_hardware_factor
+            self.baseline_purchase_costs['IEX Resin'] = resin_volume_L * cost_per_L_resin
+            self.baseline_purchase_costs['IEX Column Hardware'] = self.baseline_purchase_costs['IEX Resin'] * column_hardware_factor
 
 
 

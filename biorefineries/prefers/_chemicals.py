@@ -194,7 +194,7 @@ def create_chemicals_LegH():
     add_chemical('NaCl', phase='l', default=True)
     add_chemical('KCl', phase='l', default=True)
 
-    add_chemical('(NH4)2SO4', phase='s', default=True, Hf=-288994*_cal2joule,aliases=['AmmoniumSulfate'])
+    add_chemical('(NH4)2SO4', phase='l', default=True, Hf=-288994*_cal2joule,aliases=['AmmoniumSulfate'])
     add_chemical('FeSO4', phase='l', default=True)
     add_chemical('MgSO4', phase='l', default=True) # 0.0001 $/kg
 
@@ -204,30 +204,30 @@ def create_chemicals_LegH():
     
     # trace_metal_solution
     add_chemical('HCl', phase='l', default=True)
-    add_chemical('CaCl2', phase='s', default=True)
-    add_chemical('ZnSO4', phase='s', default=True)
-    add_chemical('MnSO4', phase='s', default=True)
-    add_chemical('CoCl2', phase='s', default=True)
-    add_chemical('CuSO4', phase='s', default=True)
-    add_chemical('(NH4)6Mo7O24', search_ID='PubChem=61578', phase='s', default=True)
-    add_chemical('Na2B4O7', phase='s', default=True)
+    add_chemical('CaCl2', phase='l', default=True)
+    add_chemical('ZnSO4', phase='l', default=True)
+    add_chemical('MnSO4', phase='l', default=True)
+    add_chemical('CoCl2', phase='l', default=True)
+    add_chemical('CuSO4', phase='l', default=True)
+    add_chemical('(NH4)6Mo7O24', search_ID='PubChem=61578', phase='l', default=True)
+    add_chemical('Na2B4O7', phase='l', default=True)
 
     #### Main Organic ####
     add_chemical('Glycine', phase='s')
     add_chemical('CitricAcid', phase='l', default=True)
     add_chemical('AceticAcid', phase='l', default=True)
     add_chemical('LacticAcid', phase='l', default=True)
-    add_chemical('Glucose', phase='l', default=True)
+    add_chemical('Glucose', phase='s', default=True)
     add_chemical('Dextrose', phase='l', default=True)
     add_chemical('IPTG', phase='l', default=True)
     #add_chemical('Tryptone', phase='l', default=True)
     add_chemical('Ethanol', phase='l', default=True)
-    add_chemical('Glycerol', phase='l', default=True)
-    add_chemical('SuccinicAcid', phase='l')
-    add_chemical('EDTA', phase='l', default=True)
-    add_chemical('Trehalose', search_ID='PubChem=7427', phase='l', default=True)
-    add_chemical('TrehaloseDH', search_ID='6138-23-4', phase='l', default=True)
-    add_chemical('SodiumAscorbate', search_ID='134-03-2', phase='l', default=True)
+    add_chemical('Glycerol', phase='s', default=True)
+    add_chemical('SuccinicAcid', phase='s', default=True)
+    add_chemical('EDTA', phase='s', default=True)
+    add_chemical('Trehalose', search_ID='PubChem=7427', phase='s', default=True)
+    add_chemical('TrehaloseDH', search_ID='6138-23-4', phase='s', default=True)
+    add_chemical('SodiumAscorbate', search_ID='134-03-2', phase='s', default=True)
 
     # antibiotics   
     add_chemical('Ampicillin', phase='l', default=True)
@@ -242,7 +242,7 @@ def create_chemicals_LegH():
 
     Yeast = add_chemical(
         'Yeast',
-        phase='l',
+        phase='s',
         formula='CH1.61O0.56',#N0.16', #if yeast_includes_nitrogen else 'CH1.61O0.56',
         rho=1540,
         Cp=chems.Glucose.Cp(298.15), # 1.54
@@ -263,7 +263,7 @@ def create_chemicals_LegH():
     # Eur J Biochem. 1995, 232: 433-448. 10.1111/j.1432-1033.1995.tb20829.x.
     Pichia_pastoris = add_chemical(
         'Pichia_pastoris',
-        phase='l',
+        phase='s',
         formula='CH1.761N0.143O0.636S0.0018',
         rho=1540,
         Cp=chems.Glucose.Cp(298.15), # 1.54

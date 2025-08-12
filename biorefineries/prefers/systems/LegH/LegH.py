@@ -417,7 +417,7 @@ def create_LegH_system(
         'PC1',
         ins = CD1-0,
         outs = (effluent1, 'PC1Out'),
-        moisture_content = 0.5,
+        moisture_content = 0.3,
         split = (1, 0.99, 1, 1),
         order = ('Glucose','cellmass', 'LeghemoglobinIntre','GlobinIntre'),
     )
