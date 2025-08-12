@@ -373,19 +373,19 @@ def create_LegH_system(
     """
     Upstream Process
     """
-    M1= bst.Mixer(ins=[SeedIn,CultureIn])
-    ST1 = u.SeedTrain(
-        'ST1',
-        ins=[M1-0],
+    M301 = bst.Mixer(ins=[SeedIn,CultureIn])
+    R301 = u.SeedTrain(
+        'R301',
+        ins=[M301-0],
         outs=[vent1, 'SeedOut'],
         reactions=bst.PRxn([cell_growth_reaction, respiration_reaction1]),
         saccharification=None,
         T=32+273.15,
     )
     
-    AB1 = u.AeratedFermentation(
+    R302 = u.AeratedFermentation(
         'AB1',
-        ins=[ST1-1, Glucose, NH3_25wt, bst.Stream('FilteredAir', phase='g', P = 2 * 101325)],
+        ins=[R301-1, Glucose, NH3_25wt, bst.Stream('FilteredAir', phase='g', P = 2 * 101325)],
         outs=[vent2, 'AB1Out'],
         fermentation_reaction=fermentation_reaction,
         cell_growth_reaction=cell_growth_reaction,
@@ -401,36 +401,36 @@ def create_LegH_system(
         compressor_isentropic_efficiency=compressor_isentropic_efficiency,
         P=1 * 101325,#optimize_power=True,
     )
-    AB1.target_titer = titer # g / L
-    AB1.target_productivity = productivity # g / L / h
-    AB1.target_yield = LegH_yield  # wt %
+    R302.target_titer = titer # g / L
+    R302.target_productivity = productivity # g / L / h
+    R302.target_yield = LegH_yield  # wt %
 
-    @AB1.add_specification(run=True)
+    @R302.add_specification(run=True)
     def update_reaction_time_and_yield():
-        AB1.tau = AB1.target_titer / AB1.target_productivity
-        fermentation_reaction[2].product_yield('Leghemoglobin', basis='wt', product_yield=AB1.target_yield)
+        R302.tau = R302.target_titer / R302.target_productivity
+        fermentation_reaction[2].product_yield('Leghemoglobin', basis='wt', product_yield=R302.target_yield)
     """
     Downstream process
     """
-    CD1 = u.CellDisruption(
-        'CD1',
-        ins=AB1-1,
+    S401 = u.CellDisruption(
+        'S401',
+        ins=R302-1,
         outs='CD1Out',
     )
 
-    PC1 = u.ProteinCentrifuge(
-        'PC1',
-        ins = CD1-0,
-        outs = (effluent1, 'PC1Out'),
+    S402 = u.ProteinCentrifuge(
+        'S402',
+        ins = S401-0,
+        outs = (effluent1, 'S402Out'),
         moisture_content = 0.3,
         split = (1, 0.99, 1, 1),
         order = ('Glucose','cellmass', 'LeghemoglobinIntre','GlobinIntre'),
     )
 
-    EV1 = u.Evaporator(
-        'EV1',
-        ins = PC1-1,
-        outs = ('EV1Out',effluent2),
+    E401 = u.Evaporator(
+        'E401',
+        ins = S402-1,
+        outs = ('EE401Out',effluent2),
         P = (101325, 73581, 50892),# 32777, 20000),  # Reduced to 3 effects to increase vessel size
         V = 0.3,  # Increased vapor fraction to create larger vessels
         V_definition = 'Overall',  # Changed to overall for better load distribution
@@ -439,10 +439,10 @@ def create_LegH_system(
     LegH_sys = bst.main_flowsheet.create_system('LegH_sys')
     LegH_sys.simulate()
 
-    DF1 = u.Diafiltration(
-        'DF1',
-        ins = (EV1-0, bst.Stream('BufferA', BufferA=(EV1-0).imass['H2O']*4, units='kg/hr', T=25+273.15)),
-        outs = ('DF1Out',effluent3),
+    U401 = u.Diafiltration(
+        'U401',
+        ins = (E401-0, bst.Stream('BufferA', BufferA=(E401-0).imass['H2O']*4, units='kg/hr', T=25+273.15)),
+        outs = ('U401Out',effluent3),
         TargetProduct_ID = 'Leghemoglobin',
         Salt_ID = c.chemical_groups['Salts'],
         OtherLargeMolecules_ID = c.chemical_groups['OtherLargeMolecules'],
@@ -450,24 +450,24 @@ def create_LegH_system(
     )
     LegH_sys = bst.main_flowsheet.create_system('LegH_sys')
     LegH_sys.simulate()
-    IEX1 = u.IonExchange(
-        'IEX1',
-        ins = (DF1-0, 
-            bst.Stream('BufferB', BufferB=(DF1-0).imass['H2O']/2, units='kg/hr', T=25+273.15)),
-        outs = ('IEX1Out',effluent4),
+    U402 = u.IonExchange(
+        'U402',
+        ins = (U401-0, 
+            bst.Stream('BufferB', BufferB=(U401-0).imass['H2O']/2, units='kg/hr', T=25+273.15)),
+        outs = ('U402Out',effluent4),
         TargetProduct_ID = 'Leghemoglobin',
         BoundImpurity_ID=c.chemical_groups['BoundImpurities'],
         ElutionBuffer_Defining_Component_ID =c.chemical_groups['ElutionBuffer'],
     )
     LegH_sys = bst.main_flowsheet.create_system('LegH_sys')
     LegH_sys.simulate()
-    NF1 = u.Diafiltration(
-        'NF1',
-        ins = (IEX1-0, bst.Stream('BufferC', 
+    U403 = u.Diafiltration(
+        'U403',
+        ins = (U402-0, bst.Stream('BufferC', 
                     BufferC=1.1*0.05*1000*
-                    (IEX1-0).imass['Leghemoglobin']/(0.25*bst.Chemical('TrehaloseDH',search_ID='6138-23-4', phase='l', default=True).MW),
+                    (U402-0).imass['Leghemoglobin']/(0.25*bst.Chemical('TrehaloseDH',search_ID='6138-23-4', phase='l', default=True).MW),
                     units='kg/hr', T=25+273.15)),
-        outs = ('NF1Out',effluent5),
+        outs = ('U403Out',effluent5),
         TargetProduct_ID = 'Leghemoglobin',
         membrane_cost_USD_per_m2=10000, # Nanomembrane cost
         Salt_ID = c.chemical_groups['Salts'],
@@ -482,9 +482,9 @@ def create_LegH_system(
     LegH_sys = bst.main_flowsheet.create_system('LegH_sys')
     LegH_sys.simulate()
 
-    SD1 = bst.SprayDryer(
-        'SD1',
-        ins=NF1-0,
+    S403 = bst.SprayDryer(
+        'S403',
+        ins=U403-0,
         outs=(effluent6, LegH_3),
         moisture_content=0.05,  # 5% moisture content in the final product
     )
@@ -492,9 +492,9 @@ def create_LegH_system(
     LegH_sys = bst.main_flowsheet.create_system('LegH_sys')
     LegH_sys.simulate()
     
-    BufferA = (1-DF1)
-    BufferB = (1-IEX1)
-    BufferC = (1-NF1)
+    BufferA = (1-U401)
+    BufferB = (1-U402)
+    BufferC = (1-U403)
 
     return LegH_3, vent1, vent2, effluent1, effluent2, effluent3, effluent4, effluent5, effluent6, BufferA, BufferB, BufferC
 

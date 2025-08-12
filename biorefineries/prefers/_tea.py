@@ -23,7 +23,7 @@ class LegHTEA(bst.TEA):
         # so these parameters are 0 by default
         super().__init__(system, IRR, duration, depreciation, income_tax,
                         operating_days, lang_factor, construction_schedule,
-                        startup_months=0, startup_FOCfrac=0, startup_VOCfrac=0,
+                        startup_months=12, startup_FOCfrac=0, startup_VOCfrac=0,
                         startup_salesfrac=0, finance_interest=0, finance_years=0,
                         finance_fraction=0, WC_over_FCI=WC_over_FCI)
         self.labor_cost = labor_cost
@@ -73,38 +73,39 @@ if __name__ == '__main__':
         property_insurance=0.005, supplies=0.02, maintenance=0.03,
         administration=0.04
     )
+    products = legH_sys.flowsheet('LegH_3')
     legH_tea.show()  # Display the TEA summary
     legH_tea.get_cashflow_table()
     # %% Production costs
-    products = legH_sys.flowsheet('LegH_3')
-    # %%
-    costs = legH_tea.production_costs(products)# USD/yr
-    np.round(costs / 1e6) # million USD / yr
+    
+    # # %%
+    # costs = legH_tea.production_costs(products)# USD/yr
+    # np.round(costs / 1e6) # million USD / yr
 
-    # %%
-    # Debug: Print system feeds and products to understand structure
-    print("System feeds:")
-    for i, feed in enumerate(legH_sys.feeds):
-        print(f"  {i}: {feed.ID} ({feed})")
-    print("\nSystem products:")
-    for i, product in enumerate(legH_sys.products):
-        print(f"  {i}: {product.ID} ({product})")
+    # # %%
+    # # Debug: Print system feeds and products to understand structure
+    # print("System feeds:")
+    # for i, feed in enumerate(legH_sys.feeds):
+    #     print(f"  {i}: {feed.ID} ({feed})")
+    # print("\nSystem products:")
+    # for i, product in enumerate(legH_sys.products):
+    #     print(f"  {i}: {product.ID} ({product})")
     
-    # Alternative approach: Find the Glucose feed by name
-    glucose_feed = None
-    for feed in legH_sys.feeds:
-        if feed.ID == 'Glucose':
-            glucose_feed = feed
-            break
+    # # Alternative approach: Find the Glucose feed by name
+    # glucose_feed = None
+    # for feed in legH_sys.feeds:
+    #     if feed.ID == 'Glucose':
+    #         glucose_feed = feed
+    #         break
     
-    if glucose_feed is None:
-        # If not found by ID, try to access from system inputs by index
-        # The Glucose stream is the 3rd input (index 2) in the system inputs
-        glucose_feed = legH_sys.feeds[2]  # Index 2 corresponds to s.Glucose
+    # if glucose_feed is None:
+    #     # If not found by ID, try to access from system inputs by index
+    #     # The Glucose stream is the 3rd input (index 2) in the system inputs
+    #     glucose_feed = legH_sys.feeds[2]  # Index 2 corresponds to s.Glucose
     
-    price = legH_tea.solve_price(glucose_feed) # USD/kg
-    print(f"\nGlucose price: ${round(price, 5)}/kg")
-    # %%
-    legH_tea.IRR = legH_tea.solve_IRR()
-    legH_tea.show()
+    # price = legH_tea.solve_price(glucose_feed) # USD/kg
+    # print(f"\nGlucose price: ${round(price, 5)}/kg")
+    # # %%
+    # legH_tea.IRR = legH_tea.solve_IRR()
+    # legH_tea.show()
 # %%
