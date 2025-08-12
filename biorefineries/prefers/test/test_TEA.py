@@ -82,9 +82,28 @@ if __name__ == '__main__':
     np.round(costs / 1e6) # million USD / yr
 
     # %%
-    feed = legH_sys.flowsheet('Glucose')
-    price = legH_tea.solve_price(feed) # USD/kg
-    round(price, 5)
+    # Debug: Print system feeds and products to understand structure
+    print("System feeds:")
+    for i, feed in enumerate(legH_sys.feeds):
+        print(f"  {i}: {feed.ID} ({feed})")
+    print("\nSystem products:")
+    for i, product in enumerate(legH_sys.products):
+        print(f"  {i}: {product.ID} ({product})")
+    
+    # Alternative approach: Find the Glucose feed by name
+    glucose_feed = None
+    for feed in legH_sys.feeds:
+        if feed.ID == 'Glucose':
+            glucose_feed = feed
+            break
+    
+    if glucose_feed is None:
+        # If not found by ID, try to access from system inputs by index
+        # The Glucose stream is the 3rd input (index 2) in the system inputs
+        glucose_feed = legH_sys.feeds[2]  # Index 2 corresponds to s.Glucose
+    
+    price = legH_tea.solve_price(glucose_feed) # USD/kg
+    print(f"\nGlucose price: ${round(price, 5)}/kg")
     # %%
     legH_tea.IRR = legH_tea.solve_IRR()
     legH_tea.show()

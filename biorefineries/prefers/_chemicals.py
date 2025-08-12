@@ -409,9 +409,9 @@ def create_chemicals_LegH():
 
     # 18wt%NH3
     chems.define_group(
-        'NH3_18wt',
+        'NH3_25wt',
         ['NH3','H2O'],
-        [18,82],
+        [25,75],
         wt=True
     )
 
@@ -424,7 +424,7 @@ def create_chemicals_LegH():
     )
 
     chems.define_group(
-        'DiaBuffer',
+        'BufferA',
         ['H2O','(NH4)2HPO4','NaCl','EDTA'],
         [1000, 0.25*bst.Chemical('(NH4)2HPO4', phase='l', default=True).MW, 
         0.1*bst.Chemical('NaCl', phase='l', default=True).MW,
@@ -433,20 +433,20 @@ def create_chemicals_LegH():
     )
 
     chems.define_group(
-        'IEXBuffer',
+        'BufferB',
         ['H2O','(NH4)2HPO4','NaCl','KCl'],
         [1000, 0.25*bst.Chemical('(NH4)2HPO4', phase='l', default=True).MW, 
-        0.4*bst.Chemical('NaCl', phase='l', default=True).MW,
+        0.9*bst.Chemical('NaCl', phase='l', default=True).MW,
         0.1*bst.Chemical('KCl', phase='l', default=True).MW],
         wt=True,
     )
 
     chems.define_group(
-        'NanoBuffer',
+        'BufferC',
         ['H2O','K2HPO4','KH2PO4','TrehaloseDH','SodiumAscorbate'],
         [1000, 0.01*bst.Chemical('K2HPO4', phase='l', default=True).MW, 
         0.01*bst.Chemical('KH2PO4', phase='l', default=True).MW,
-        0.25*bst.Chemical('TrehaloseDH',search_ID='6138-23-4', phase='l', default=True).MW,# 0.25
+        5,#0.25*bst.Chemical('TrehaloseDH',search_ID='6138-23-4', phase='l', default=True).MW,# 0.25
         0.005*bst.Chemical('SodiumAscorbate',search_ID='134-03-2', phase='l', default=True).MW],
         wt=True,
     )

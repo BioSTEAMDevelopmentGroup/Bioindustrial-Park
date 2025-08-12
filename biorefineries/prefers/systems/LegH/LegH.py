@@ -15,7 +15,7 @@ from thermosteam import Stream
 import thermosteam as tmo
 import numpy as np
 from biorefineries.prefers import _chemicals as c, _units as u ,_streams as s
-
+from biorefineries.prefers._process_settings import price  # ADD THIS IMPORT
 
 # %% Settings
 bst.settings.set_thermo(c.create_chemicals_LegH(), skip_checks=True)
@@ -28,6 +28,7 @@ __all__ = (
     # 'create_LegH_Purification_system',
     'create_LegH_system',
 )
+# %%
 
 # @bst.SystemFactory(
 #     ID='LegH_Conversion_sys',
@@ -276,12 +277,14 @@ __all__ = (
 #     return LegH_3, effluent3, effluent4, effluent5, effluent6, WashingSolution, Elution, NFBuffer
 
 
+
+
 @bst.SystemFactory(
     ID='LegH_sys',
-    ins=[s.SeedIn, s.CultureIn, s.Glucose, s.NH3_18wt,
+    ins=[s.SeedIn, s.CultureIn, s.Glucose, s.NH3_25wt,
         ],
     outs=[s.LegH_3, s.vent1, s.vent2, s.effluent1, s.effluent2,
-        s.effluent3, s.effluent4, s.effluent5, s.effluent6], # Added s.effluent6
+        s.effluent3, s.effluent4, s.effluent5, s.effluent6],
     fthermo=c.create_chemicals_LegH, # Pass the function itself
 )
 def create_LegH_system(
@@ -294,8 +297,14 @@ def create_LegH_system(
     Creates the LegH (Leghemoglobin) production system.
     This system is based on the process flow and parameters from test_LegH.py.
     """
+    
+    # Update all input stream prices before simulation
+    # NOW update stream prices (after they're properly created)
+
+    s.update_all_input_stream_prices()
+
     # Unpack input streams
-    SeedIn, CultureIn, Glucose, NH3_18wt= ins
+    SeedIn, CultureIn, Glucose, NH3_25wt = ins
 
     # Unpack output streams
     (LegH_3, vent1, vent2, effluent1, effluent2, 
@@ -371,7 +380,7 @@ def create_LegH_system(
     
     AB1 = u.AeratedFermentation(
         'AB1',
-        ins=[ST1-1, Glucose, NH3_18wt, bst.Stream('FilteredAir', phase='g', P = 2 * 101325)],
+        ins=[ST1-1, Glucose, NH3_25wt, bst.Stream('FilteredAir', phase='g', P = 2 * 101325)],
         outs=[vent2, 'AB1Out'],
         fermentation_reaction=fermentation_reaction,
         cell_growth_reaction=cell_growth_reaction,
@@ -427,7 +436,7 @@ def create_LegH_system(
 
     DF1 = u.Diafiltration(
         'DF1',
-        ins = (EV1-0, bst.Stream('WashingSolution', DiaBuffer=(EV1-0).imass['H2O']*4, units='kg/hr', T=25+273.15)),
+        ins = (EV1-0, bst.Stream('BufferA', BufferA=(EV1-0).imass['H2O']*4, units='kg/hr', T=25+273.15)),
         outs = ('DF1Out',effluent3),
         TargetProduct_ID = 'Leghemoglobin',
         Salt_ID = c.chemical_groups['Salts'],
@@ -439,7 +448,7 @@ def create_LegH_system(
     IEX1 = u.IonExchange(
         'IEX1',
         ins = (DF1-0, 
-            bst.Stream('Elution', IEXBuffer=(DF1-0).imass['H2O']/2, units='kg/hr', T=25+273.15)),
+            bst.Stream('BufferB', BufferB=(DF1-0).imass['H2O']/2, units='kg/hr', T=25+273.15)),
         outs = ('IEX1Out',effluent4),
         TargetProduct_ID = 'Leghemoglobin',
         BoundImpurity_ID=c.chemical_groups['BoundImpurities'],
@@ -449,8 +458,8 @@ def create_LegH_system(
     LegH_sys.simulate()
     NF1 = u.Diafiltration(
         'NF1',
-        ins = (IEX1-0, bst.Stream('NFBuffer', 
-                    NanoBuffer=1.1*0.05*1000*
+        ins = (IEX1-0, bst.Stream('BufferC', 
+                    BufferC=1.1*0.05*1000*
                     (IEX1-0).imass['Leghemoglobin']/(0.25*bst.Chemical('TrehaloseDH',search_ID='6138-23-4', phase='l', default=True).MW),
                     units='kg/hr', T=25+273.15)),
         outs = ('NF1Out',effluent5),
@@ -478,11 +487,11 @@ def create_LegH_system(
     LegH_sys = bst.main_flowsheet.create_system('LegH_sys')
     LegH_sys.simulate()
     
-    WashingSolution = (1-DF1)
-    Elution = (1-IEX1)
-    NFBuffer = (1-NF1)
+    BufferA = (1-DF1)
+    BufferB = (1-IEX1)
+    BufferC = (1-NF1)
 
-    return LegH_3, vent1, vent2, effluent1, effluent2, effluent3, effluent4, effluent5, effluent6, WashingSolution, Elution, NFBuffer
+    return LegH_3, vent1, vent2, effluent1, effluent2, effluent3, effluent4, effluent5, effluent6, BufferA, BufferB, BufferC
 
 if __name__ == '__main__':
     # # Create the LegH system
@@ -495,8 +504,11 @@ if __name__ == '__main__':
     LegH_sys.simulate()
     LegH_sys.diagram(format='html')
     LegH_sys.show()
-    f.LegH_3.show(composition=True, flow='kg/hr')
-
-    # sys2 = create_LegH_Conversion_system()
+    # Check stream prices
+    print(f"\nStream Prices:")
+    print(f"SeedIn price: ${f.SeedIn.price:.4f}/kg")
+    print(f"CultureIn price: ${f.CultureIn.price:.4f}/kg")
+    print(f"Glucose price: ${f.Glucose.price:.4f}/kg")
+    print(f"NH3_25wt price: ${f.NH3_25wt.price:.4f}/kg")
 
 # %%
