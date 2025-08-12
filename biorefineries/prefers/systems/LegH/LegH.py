@@ -321,7 +321,7 @@ def create_LegH_system(
     dT_hx_loop = 8 # [degC]
     cooler_pressure_drop = 20684 # [Pa]
     compressor_isentropic_efficiency = 0.85
-    V_max = 500 # [m3]
+    V_max = 100 # [m3] #here cause pressure vessel design problem
     titer = 7.27 # [g / L]
     productivity = titer / 72 # [g / L / h]
     LegH_yield = titer * 5 / 1300 # [by wt]
@@ -333,11 +333,11 @@ def create_LegH_system(
     
     fermentation_reaction = bst.PRxn([
         #           Reaction        Reactnat            Conversion           Check                  "
-        bst.Rxn('8 Glucose + 4 NH3 + 1 FeSO4 + 10.5 O2 -> Heme_b + 1 H2SO4 + 37 H2O + 14 CO2',
+        bst.Rxn('8 Glucose + 6 NH3 + 1 FeSO4 + 10.5 O2 -> Heme_b + 1 (NH4)2SO4 + 37 H2O + 14 CO2',
                                     reactant = 'Glucose',X=LegH_yield*0.05,check_atomic_balance=True),
-        bst.Rxn('Glucose + (NH4)2SO4 + O2 -> Globin + NH3 + H2O',
+        bst.Rxn('Glucose + (NH4)2SO4 + NH3 -> Globin + CO2 + H2O',
                                     reactant = 'Glucose', X= LegH_yield*0.05,correct_atomic_balance=True),
-        bst.Rxn('Glucose + FeSO4 + (NH4)2SO4 + O2 -> Leghemoglobin + NH3 + H2O', 
+        bst.Rxn('Glucose + FeSO4 + (NH4)2SO4 + NH3 -> Leghemoglobin + CO2  + H2O',
                                     reactant = 'Glucose', X=LegH_yield,  correct_atomic_balance=True),
         ])
     fermentation_reaction[2].product_yield('Leghemoglobin', basis='wt', product_yield=LegH_yield)
@@ -353,7 +353,12 @@ def create_LegH_system(
     )
     cell_growth_reaction.product_yield('Pichia_pastoris', basis='wt', product_yield=Y_b)
 
-    respiration_reaction = bst.Rxn(
+    respiration_reaction1 = bst.Rxn(
+        'Glucose + O2 -> CO2 + H2O', 'Glucose', 1. - cell_growth_reaction.X,
+        correct_atomic_balance=True
+    )
+
+    respiration_reaction2 = bst.Rxn(
         'Glucose + O2 -> CO2 + H2O', 'Glucose', 1. - cell_growth_reaction.X - fermentation_reaction[2].X,
         correct_atomic_balance=True
     )
@@ -361,7 +366,7 @@ def create_LegH_system(
     bst.settings.chemicals.set_alias('Pichia_pastoris', 'cellmass')
     RXN = bst.ReactionSystem(
         fermentation_reaction,
-        bst.PRxn([cell_growth_reaction, respiration_reaction])
+        bst.PRxn([cell_growth_reaction, respiration_reaction2])
     )
     RXN.show()
 
@@ -373,7 +378,7 @@ def create_LegH_system(
         'ST1',
         ins=[M1-0],
         outs=[vent1, 'SeedOut'],
-        reactions=bst.PRxn([cell_growth_reaction, respiration_reaction]),
+        reactions=bst.PRxn([cell_growth_reaction, respiration_reaction1]),
         saccharification=None,
         T=32+273.15,
     )
@@ -384,7 +389,7 @@ def create_LegH_system(
         outs=[vent2, 'AB1Out'],
         fermentation_reaction=fermentation_reaction,
         cell_growth_reaction=cell_growth_reaction,
-        respiration_reaction=respiration_reaction,
+        respiration_reaction=respiration_reaction2,
         neutralization_reaction=neutralization_reaction,
         design='Stirred tank', method=method,theta_O2=theta_O2,
         V_max=V_max, Q_O2_consumption=Q_O2_consumption,
@@ -426,9 +431,9 @@ def create_LegH_system(
         'EV1',
         ins = PC1-1,
         outs = ('EV1Out',effluent2),
-        P = (101325, 73581, 50892, 32777, 20000),
-        V = 0.1,
-        V_definition = 'First-effect',
+        P = (101325, 73581, 50892),# 32777, 20000),  # Reduced to 3 effects to increase vessel size
+        V = 0.3,  # Increased vapor fraction to create larger vessels
+        V_definition = 'Overall',  # Changed to overall for better load distribution
     )
 
     LegH_sys = bst.main_flowsheet.create_system('LegH_sys')
