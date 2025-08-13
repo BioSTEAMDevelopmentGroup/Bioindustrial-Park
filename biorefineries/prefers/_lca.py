@@ -166,4 +166,15 @@ if __name__ == '__main__':
     legH_sys = create_LegH_system()
 
     legH_lca = LegHLCA(
-        system
+        system=legH_sys,
+        CFs=legH_sys.CFs,
+        feedstock=legH_sys.feedstock,
+        input_biogenic_carbon_streams=legH_sys.input_biogenic_carbon_streams,
+        feedstock_ID=legH_sys.feedstock_ID,
+        boiler=legH_sys.boiler,
+        main_product=legH_sys.main_product,
+        main_product_chemical_IDs=legH_sys.main_product_chemical_IDs,
+        by_products=legH_sys.by_products,
+        cooling_tower=legH_sys.cooling_tower,
+        functional_unit=legH_sys.functional_unit,
+    )

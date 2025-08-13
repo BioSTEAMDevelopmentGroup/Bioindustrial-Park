@@ -44,6 +44,12 @@ price = {
     'Low pressure steam': 0.30626,  # $/kg
     'Cooling water': 0,  # $/kg
 }
+# %%
+# =============================================================================
+# Characterization factors (CFs) for life cycle analysis (LCA), all from ref [5] if not noted otherwise
+# =============================================================================
+
+CFs = {}
 
 
 # %% Characterization factors (CFs) for GWP and FEC
