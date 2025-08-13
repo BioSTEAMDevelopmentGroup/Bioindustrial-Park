@@ -31,6 +31,7 @@ BufferB = stream_kwargs('BufferB', BufferB=1 , units='kg/hr', T=25+273.15)
 BufferC = stream_kwargs('BufferC', BufferC=1, units='kg/hr', T=25+273.15)
 
 # %% Out
+
 LegH_1 = stream_kwargs('LegH_1')
 LegH_2 = stream_kwargs('LegH_2')
 LegH_3 = stream_kwargs('LegH_3',units='kg/hr', T=25+273.15, price = 100)
@@ -42,8 +43,6 @@ effluent3 = stream_kwargs('effluent3')
 effluent4 = stream_kwargs('effluent4')
 effluent5 = stream_kwargs('effluent5')
 effluent6 = stream_kwargs('effluent6')
-
-
 
 # %%
 # Add missing pricing functions directly here since they're not in your _streams2.py
