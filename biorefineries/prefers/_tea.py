@@ -59,13 +59,15 @@ class LegHTEA(bst.TEA):
                     + self.maintenance + self.administration)
                 + self.labor_cost*(1+self.fringe_benefits+self.supplies))
 #
+
+# %%
 if __name__ == '__main__':
     import biosteam as bst
     from biorefineries.prefers.systems.LegH.LegH import create_LegH_system
     from biorefineries.prefers._process_settings import load_process_settings
     load_process_settings()
     legH_sys = create_LegH_system()
-
+    legH_sys.simulate()  # Simulate the system to ensure all units are ready
     legH_tea = LegHTEA(
         system=legH_sys, IRR=0.1, duration=(2025, 2045), depreciation='MACRS7',
         income_tax=0.21, operating_days=365, lang_factor=3.0,

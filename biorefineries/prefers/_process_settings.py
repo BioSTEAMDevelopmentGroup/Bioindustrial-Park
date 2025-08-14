@@ -10,7 +10,7 @@ Created on 2025-07-07 14:55:35
 
 import biosteam as bst
 
-__all__ = ('load_process_settings','price','set_GWPCF','set_FECCF')
+__all__ = ('load_process_settings','price','set_GWPCF','set_FECCF','GWP_CFs','FEC_CFs')
 
 # %% Prices
 
@@ -49,17 +49,17 @@ price = {
 # Characterization factors (CFs) for life cycle analysis (LCA), all from ref [5] if not noted otherwise
 # =============================================================================
 
-CFs = {}
-
-
-# %% Characterization factors (CFs) for GWP and FEC
-
+# Individual characterization factor dictionaries for each impact category
 ##### 100-year global warming potential (GWP) in kg CO2-eq/kg unless noted otherwise #####
 GWP_CFs = {
     'Electricity': (0.48, 0.48),
-    'H2SO4':44.47/1e3,
+    'H2SO4': 44.47/1e3,
     'NaOH': 2.11,
     'NH3': 2.64,
+    'CH4': 1.0,  # Natural gas combustion CF (placeholder - update with actual value)
+    'CO2': 1.0,  # Direct CO2 emissions
+    # Add more chemicals as needed for your specific biorefinery
+    'CalciumDihydroxide': 0.75,  # Example CF (update with actual value)
 }
 
 ##### Fossil energy consumption (FEC), in MJ/kg of material unless noted otherwise #####
@@ -69,7 +69,32 @@ FEC_CFs = {
     'NaOH': 29,
     'NH4OH': 42 * 0.4860, # chemicals.NH3.MW/chemicals.NH4OH.MW,
     'NH3_25wt': 42 * 0.25,
-    }
+    'CH4': 55.5,  # Natural gas FEC (placeholder - update with actual value)
+    # Add more chemicals as needed
+}
+
+# # Consolidated CFs dictionary in the format expected by BioSTEAM LCA module
+# # Format: {<impact_category>: {<chemical_ID_or_stream_name>: <CF_value>}}
+# CFs = {
+#     'GWP_100': {
+#         # Extract single values from tuples for electricity, use first value
+#         'Electricity': GWP_CFs['Electricity'][0] if isinstance(GWP_CFs['Electricity'], tuple) else GWP_CFs['Electricity'],
+#         # Add all other GWP characterization factors
+#         **{k: v for k, v in GWP_CFs.items() if k != 'Electricity'},
+#         # Placeholder for complex feeds (feedstock streams) - to be updated per biorefinery
+#         # 'Glucose': 0.0,  # kg CO2-eq per kg wet feedstock (uncomment and update as needed)
+#         # 'Corn': 0.0,     # kg CO2-eq per kg wet feedstock (uncomment and update as needed)
+#     },
+#     'FEC': {
+#         # Extract single values from tuples for electricity
+#         'Electricity': FEC_CFs['Electricity'][0] if isinstance(FEC_CFs['Electricity'], tuple) else FEC_CFs['Electricity'],
+#         # Add all other FEC characterization factors
+#         **{k: v for k, v in FEC_CFs.items() if k != 'Electricity'},
+#         # Placeholder for complex feeds (feedstock streams) - to be updated per biorefinery
+#         # 'Glucose': 0.0,  # MJ per kg wet feedstock (uncomment and update as needed)
+#         # 'Corn': 0.0,     # MJ per kg wet feedstock (uncomment and update as needed)
+#     },
+# }
 
 
 # %% Process settings
