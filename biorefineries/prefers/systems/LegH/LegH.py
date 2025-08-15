@@ -24,7 +24,7 @@ bst.preferences.classic_mode()
 __all__ = (
     # 'create_LegH_Pretreatment_system',
     # 'create_LegH_Conversion_system',
-    # 'create_LegH_CellRemoval_Concentration_system',
+    # 'create_LegH_Concentration_system',
     # 'create_LegH_Purification_system',
     'create_LegH_system',
 )
@@ -155,7 +155,7 @@ __all__ = (
 #     outs=[s.LegH_2, s.effluent1, s.effluent2,],
 #     fthermo=c.create_chemicals_LegH, 
 # )
-# def create_LegH_CellRemoval_Concentration_system(
+# def create_LegH_Concentration_system(
 #         ins, outs,
 #         # reactions_passed=None, # Placeholder if reactions were to be passed externally
 #         # One could add more configurable parameters here:
@@ -498,13 +498,13 @@ def create_LegH_system(
 
     return LegH_3, vent1, vent2, effluent1, effluent2, effluent3, effluent4, effluent5, effluent6, BufferA, BufferB, BufferC
 
+# %%
 if __name__ == '__main__':
     # # Create the LegH system
     LegH_sys = create_LegH_system()
     sys = LegH_sys
     f = sys.flowsheet
     u = f.unit
-    SD1 = u.SD1
 
     LegH_sys.simulate()
     LegH_sys.diagram(format='html')

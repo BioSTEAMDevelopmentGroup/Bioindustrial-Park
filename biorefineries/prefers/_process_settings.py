@@ -73,28 +73,28 @@ FEC_CFs = {
     # Add more chemicals as needed
 }
 
-# # Consolidated CFs dictionary in the format expected by BioSTEAM LCA module
-# # Format: {<impact_category>: {<chemical_ID_or_stream_name>: <CF_value>}}
-# CFs = {
-#     'GWP_100': {
-#         # Extract single values from tuples for electricity, use first value
-#         'Electricity': GWP_CFs['Electricity'][0] if isinstance(GWP_CFs['Electricity'], tuple) else GWP_CFs['Electricity'],
-#         # Add all other GWP characterization factors
-#         **{k: v for k, v in GWP_CFs.items() if k != 'Electricity'},
-#         # Placeholder for complex feeds (feedstock streams) - to be updated per biorefinery
-#         # 'Glucose': 0.0,  # kg CO2-eq per kg wet feedstock (uncomment and update as needed)
-#         # 'Corn': 0.0,     # kg CO2-eq per kg wet feedstock (uncomment and update as needed)
-#     },
-#     'FEC': {
-#         # Extract single values from tuples for electricity
-#         'Electricity': FEC_CFs['Electricity'][0] if isinstance(FEC_CFs['Electricity'], tuple) else FEC_CFs['Electricity'],
-#         # Add all other FEC characterization factors
-#         **{k: v for k, v in FEC_CFs.items() if k != 'Electricity'},
-#         # Placeholder for complex feeds (feedstock streams) - to be updated per biorefinery
-#         # 'Glucose': 0.0,  # MJ per kg wet feedstock (uncomment and update as needed)
-#         # 'Corn': 0.0,     # MJ per kg wet feedstock (uncomment and update as needed)
-#     },
-# }
+# Consolidated CFs dictionary in the format expected by BioSTEAM LCA module
+# Format: {<impact_category>: {<chemical_ID_or_stream_name>: <CF_value>}}
+CFs = {
+    'GWP_100': {
+        # Extract single values from tuples for electricity, use first value
+        'Electricity': GWP_CFs['Electricity'][0] if isinstance(GWP_CFs['Electricity'], tuple) else GWP_CFs['Electricity'],
+        # Add all other GWP characterization factors
+        **{k: v for k, v in GWP_CFs.items() if k != 'Electricity'},
+        # Placeholder for complex feeds (feedstock streams) - to be updated per biorefinery
+        # 'Glucose': 0.0,  # kg CO2-eq per kg wet feedstock (uncomment and update as needed)
+        # 'Corn': 0.0,     # kg CO2-eq per kg wet feedstock (uncomment and update as needed)
+    },
+    'FEC': {
+        # Extract single values from tuples for electricity
+        'Electricity': FEC_CFs['Electricity'][0] if isinstance(FEC_CFs['Electricity'], tuple) else FEC_CFs['Electricity'],
+        # Add all other FEC characterization factors
+        **{k: v for k, v in FEC_CFs.items() if k != 'Electricity'},
+        # Placeholder for complex feeds (feedstock streams) - to be updated per biorefinery
+        # 'Glucose': 0.0,  # MJ per kg wet feedstock (uncomment and update as needed)
+        # 'Corn': 0.0,     # MJ per kg wet feedstock (uncomment and update as needed)
+    },
+}
 
 
 # %% Process settings

@@ -17,8 +17,6 @@ Created on 2025-08-13 21:14:29
 # -*- coding: utf-8 -*-
 
 from biorefineries.lca.lca import LCA
-from biorefineries.prefers._process_settings import 
-
 
 class LegHLCA(LCA):
     
@@ -162,19 +160,32 @@ class LegHLCA(LCA):
 if __name__ == '__main__':
     import biosteam as bst
     from biorefineries.prefers.systems.LegH.LegH import create_LegH_system
-
+    import biorefineries.prefers._process_settings as ps
     legH_sys = create_LegH_system()
+    legH_sys.simulate()  # Simulate the system to ensure all units are ready
+    legH_sys.operating_hours = 8000  # Set operating hours to 8760 hours/year
+    ps.load_process_settings()
+    
+    # 4. Create dummy boiler (if no real boiler exists)
+    class DummyBT:
+        class DummyPower:
+            production = 0.0
+        power_utility = DummyPower()
+        electricity_demand = 0.0
+        steam_utilities = ()
+        natural_gas = bst.Stream('natural_gas')
+        turbogenerator_efficiency = 0.85
 
     legH_lca = LegHLCA(
         system=legH_sys,
-        CFs=legH_sys.CFs,
-        feedstock=legH_sys.feedstock,
-        input_biogenic_carbon_streams=legH_sys.input_biogenic_carbon_streams,
-        feedstock_ID=legH_sys.feedstock_ID,
-        boiler=legH_sys.boiler,
-        main_product=legH_sys.main_product,
-        main_product_chemical_IDs=legH_sys.main_product_chemical_IDs,
-        by_products=legH_sys.by_products,
-        cooling_tower=legH_sys.cooling_tower,
-        functional_unit=legH_sys.functional_unit,
+        CFs=ps.CFs,
+        feedstock=legH_sys.feeds,
+        input_biogenic_carbon_streams=None,
+        feedstock_ID=legH_sys.feeds[2].available_chemicals[0].CAS,
+        boiler=DummyBT(),
+        main_product=legH_sys.products[8],
+        main_product_chemical_IDs=legH_sys.products[8].available_chemicals[15].CAS,
+        by_products=None,
+        cooling_tower=legH_sys.units[2],
+        functional_unit='1 kg',
     )
