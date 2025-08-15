@@ -232,7 +232,7 @@ def create_HP_sys(ins, outs):
                                                            fresh_CO2_fermentation,
                                                            makeup_MEA_A301),
                                                    )
-    u.R302.neutralization = False
+    u.R302.neutralization = True
     
     # %% 
     # =============================================================================
