@@ -384,7 +384,7 @@ def create_LegH_system(
     )
     
     R302 = u.AeratedFermentation(
-        'AB1',
+        'R302',
         ins=[R301-1, Glucose, NH3_25wt, bst.Stream('FilteredAir', phase='g', P = 2 * 101325)],
         outs=[vent2, 'AB1Out'],
         fermentation_reaction=fermentation_reaction,
