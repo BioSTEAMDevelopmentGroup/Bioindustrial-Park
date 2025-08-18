@@ -507,13 +507,13 @@ if __name__ == '__main__':
     u = f.unit
 
     LegH_sys.simulate()
-    LegH_sys.diagram(format='html')
-    LegH_sys.show()
-    # Check stream prices
-    print(f"\nStream Prices:")
-    print(f"SeedIn price: ${f.SeedIn.price:.4f}/kg")
-    print(f"CultureIn price: ${f.CultureIn.price:.4f}/kg")
-    print(f"Glucose price: ${f.Glucose.price:.4f}/kg")
-    print(f"NH3_25wt price: ${f.NH3_25wt.price:.4f}/kg")
+    LegH_sys.diagram(format='svg',display=True,)
+    # LegH_sys.show()
+    # # Check stream prices
+    # print(f"\nStream Prices:")
+    # print(f"SeedIn price: ${f.SeedIn.price:.4f}/kg")
+    # print(f"CultureIn price: ${f.CultureIn.price:.4f}/kg")
+    # print(f"Glucose price: ${f.Glucose.price:.4f}/kg")
+    # print(f"NH3_25wt price: ${f.NH3_25wt.price:.4f}/kg")
 
 # %%
