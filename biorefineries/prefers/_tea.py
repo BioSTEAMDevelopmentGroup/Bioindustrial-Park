@@ -65,6 +65,7 @@ if __name__ == '__main__':
     import biosteam as bst
     from biorefineries.prefers.systems.LegH.LegH import create_LegH_system
     from biorefineries.prefers._process_settings import load_process_settings
+    from biosteam import settings
     load_process_settings()
     legH_sys = create_LegH_system()
     legH_sys.simulate()  # Simulate the system to ensure all units are ready
