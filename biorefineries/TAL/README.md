@@ -233,9 +233,9 @@ FEC without electricity credit is 123.571 MJ/kg KSA
 
 To reproduce results reported in [[1]](#1) or [[2]](#2), simply do the following:
 
-(i) Clone the Bioindustrial-Park repository [commit edfb4445c0e60de959766c3793ac6a7e545d8039](https://github.com/BioSTEAMDevelopmentGroup/Bioindustrial-Park/tree/edfb4445c0e60de959766c3793ac6a7e545d8039/biorefineries/TAL) and add the 'bioindustrial-park' folder to your PYTHONPATH.
+(i) Clone the Bioindustrial-Park repository [commit 982bbedaee592b5e5744a1ce5bb4d46f45681620](https://github.com/BioSTEAMDevelopmentGroup/Bioindustrial-Park/tree/982bbedaee592b5e5744a1ce5bb4d46f45681620/biorefineries/TAL) and add the 'bioindustrial-park' folder to your PYTHONPATH.
 
-(i) Clone the BioSTEAM repository [commit 2252866a05699c2d0a5c08ac360c947fed815903](https://github.com/BioSTEAMDevelopmentGroup/biosteam/tree/2252866a05699c2d0a5c08ac360c947fed815903)
+(i) Clone the BioSTEAM repository [commit e2d3942dd1076a4516efc91ae194f9e558428551](https://github.com/BioSTEAMDevelopmentGroup/biosteam/tree/e2d3942dd1076a4516efc91ae194f9e558428551)
 and add the 'biosteam' folder to your PYTHONPATH.
 
 (ii) Navigate to your local filepath bioindustrial-park/biorefineries/TAL
