@@ -45,7 +45,7 @@ system_products = [i for i in HP_sys.products if i.price]
 baseline_yield, baseline_titer, baseline_productivity =\
     spec.baseline_yield, spec.baseline_titer, spec.baseline_productivity
 
-spec.reactor.neutralization = False
+# spec.reactor.neutralization = False
 
 # %% 
 
