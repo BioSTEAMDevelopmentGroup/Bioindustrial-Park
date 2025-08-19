@@ -14,7 +14,7 @@ __all__ = (
     'plot_MSP_across_titer_productivity_AcOH',
     'plot_MSP_across_yield_productivity_oleochemical',
     'plot_MSP_across_AcOH_titer_oleochemical_yield',
-    'plot_MSP_across_oleochemical_price_and_yield',
+    'plot_MSP_across_price_and_yield',
     'plot_impact_of_length_to_diameters',
     'plot_MSP_across_oleochemical_yields',
     'plot_MSP_GWP_across_titer_yield_substrates',
@@ -142,15 +142,37 @@ def MSP_GWP_at_AcOH_titer_oleochemical_yield(titer, yield_, biorefineries):
         values[:, i] = [biorefinery.MSP(), biorefinery.carbon_intensity()]
     return values
 
-def MSP_at_oleochemical_H2_price_and_yield(H2_price, yield_, biorefineries):
+def metric_at_price_and_other(
+        price, other, system, metric,
+        price_param, other_param,
+    ):
+    price_param.setter(price)
+    if other_param.last_value != other:
+        other_param.setter(other)
+        system.simulate()
+    return metric()
+
+def metric_at_parameters(
+        value_A, value_B, system, metric,
+        param_A, param_B,
+    ):
+    param_A.setter(value_A)
+    param_B.setter(value_B)
+    system.simulate()
+    return metric()
+
+def metric_at_parameters_across_biorefineries(
+        value_A, value_B, biorefineries, metric,
+        param_A, param_B,
+    ):
     values = np.zeros(len(biorefineries))
-    for i, biorefinery in enumerate(biorefineries):
-        biorefinery.set_H2_price.setter(H2_price)
-        if biorefinery.set_oleochemical_bioreactor_yield.last_value != yield_:
-            biorefinery.set_oleochemical_bioreactor_yield(yield_)
-            biorefinery.system.simulate()
-        values[i] = biorefinery.MSP()
-        # if yield_ > 35: breakpoint()
+    for i, br in enumerate(biorefineries):
+        values[i] = metric_at_parameters(
+            br.system,
+            getattr(br, metric),
+            getattr(br, param_A),
+            getattr(br, param_B),
+        )
     return values
 
 def MSP_at_oleochemical_yields(specific_yield, yield_, biorefineries):
@@ -162,58 +184,45 @@ def MSP_at_oleochemical_yields(specific_yield, yield_, biorefineries):
         values[i] = biorefinery.MSP()
     return values
 
-def plot_MSP_across_oleochemical_price_and_yield(load=True):
+def plot_MSP_across_price_and_yield(load=True, scenario=None):
     from warnings import filterwarnings
     filterwarnings('ignore')
     bst.plots.set_font(size=10, family='sans-serif', font='Arial')
-    bst.plots.set_figure_size(aspect_ratio=0.55, width='full')
-    biorefineries = [
-        Biorefinery(simulate=False, scenario=f'all fermentation-{i} growth')
-        for i in ('glucose', 'acetate')    
-    ]
-    for br in biorefineries: 
-        br.set_oleochemical_specific_yield(1.57)
-        br.system.simulate()
-    br = biorefineries[0]    
+    bst.plots.set_figure_size(aspect_ratio=1.1, width='half')
+    scenario = 'acetate/glucose-seed'
+    br = Biorefinery(simulate=False, scenario=scenario)
+    baseline = br.set_oleochemical_specific_yield.baseline
+    br.set_oleochemical_specific_yield(baseline)
+    br.system.simulate()
     xlim = np.array(br.set_H2_price.bounds)
     ylim = np.array(br.set_oleochemical_bioreactor_yield.bounds)
     X, Y, Z = bst.plots.generate_contour_data(
-        MSP_at_oleochemical_H2_price_and_yield,
-        file=os.path.join(results_folder, 'MSP_GWP_oleochemical_price_and_yield.npy'),
+        metric_at_price_and_other,
+        file=os.path.join(results_folder, 'MSP_H2_price_and_yield.npy'),
         load=load, save=True,
         xlim=xlim, ylim=ylim,
-        args=(biorefineries,),
+        args=(br.system, 
+              br.MSP, 
+              br.set_H2_price, 
+              br.set_oleochemical_bioreactor_yield),
         n=10,
     )
-    # Z = np.swapaxes(Z, 2, 3)
     # Plot contours
     ylabel = br.set_oleochemical_bioreactor_yield.label(element=False)
     yticks = [35, 45, 55, 65, 75, 85]
     xlabel = 'H$_2$ price [USD$\cdot$kg$^{-1}$]'
     xticks = [2, 3, 4, 5, 6]
-    metric_bars = [
-        bst.plots.MetricBar(
-            # '', '',
-            'Minimum selling price', '$[\mathrm{USD} \cdot \mathrm{kg}^{\mathrm{-1}}]$', 
-            plt.cm.get_cmap('viridis_r'), 
-            bst.plots.rounded_tickmarks_from_data(Z, 5, 1, expand=0, p=1), 
-            25, 1, ylabelkwargs=dict(size=10), shrink=1.0,
-            units_dlim=' ',
-            title_position='horizontal',
-            forced_size=1.2,
-        ),
-        # bst.plots.MetricBar(
-        #     # '', '',
-        #     'Carbon intensity', '$[\mathrm{kg} \cdot \mathrm{CO}_{\mathrm{2}}\mathrm{e} \cdot \mathrm{kg}^{\mathrm{-1}}]$',
-        #     plt.cm.get_cmap('copper_r'), 
-        #     bst.plots.rounded_tickmarks_from_data(Z[:, :, 1, :], 5, 1, expand=0, p=0.5), 
-        #     20, 1, ylabelkwargs=dict(size=10, labelpad=10),
-        #     title_position='horizontal',
-        #     shrink=1.0, 
-        # )
-    ]
-    fig, axes, CSs, CB, other_axes = bst.plots.plot_contour_2d(
-        X, Y, Z, xlabel, ylabel, xticks, yticks, metric_bars,  
+    metric_bar = bst.plots.MetricBar(
+        'Minimum selling price', '$[\mathrm{USD} \cdot \mathrm{kg}^{\mathrm{-1}}]$', 
+        plt.cm.get_cmap('viridis_r'), 
+        bst.plots.rounded_tickmarks_from_data(Z, 5, 1, expand=0, p=1), 
+        25, 1, ylabelkwargs=dict(size=10), shrink=1.0,
+        units_dlim=' ',
+        title_position='horizontal',
+        forced_size=1.2,
+    )
+    fig, axes, CSs, CB, other_axes = bst.plots.plot_contours_single_metric(
+        X, Y, Z, xlabel, ylabel, xticks, yticks, metric_bar,  
         fillcolor=None, styleaxiskw=[dict(xtick0=True), dict(xtick0=True)], label=True,
         contour_label_interval=2,
         highlight_levels=[5], highlight_color='r',

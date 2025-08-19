@@ -26,15 +26,10 @@ __all__ = (
     'plot_monte_carlo',
     'plot_spearman', 
     'plot_kde',
-    'plot_spearman_both',
     'plot_spearman_scenarios',
     'sobol_analysis',
     'montecarlo_results',
     'opportunity_space',
-    'plot_kde_carbon_capture_comparison_no_dewatering',
-    'plot_kde_carbon_capture_comparison_dewatering',
-    'plot_kde_dewatering_comparison_carbon_capture',
-    'plot_kde_dewatering_comparison_no_carbon_capture',
     'get_optimized_parameters_table',
     'plot_kde_CI_MSP',
     'get_distribution_table',
@@ -53,34 +48,28 @@ dodecanol_carbon_intensity = 2.97 # Emissions (cradle-to-gate) DOI 10.1007/s1174
 line_color = Color(fg='#8E9BB3').RGBn
 
 def sobol_file(name, extention='xlsx'):
-    filename = name.replace('|', '-') + '_sobol'
+    filename = name.replace('/', '_') + '_sobol'
     filename += '.' + extention
     return os.path.join(results_folder, filename)
 
 def monte_carlo_file_name(name):
-    filename = name.replace('|', '-') + '_monte_carlo'
+    filename = name.replace('/', '_') + '_monte_carlo'
     filename += '.' + 'xlsx'
     return os.path.join(results_folder, filename)
 
 def spearman_file_name(name):
-    filename = name.replace('|', '-') + '_spearman'
+    filename = name.replace('/', '_') + '_spearman'
     filename += '.xlsx'
     return os.path.join(results_folder, filename)
 
 def autoload_file_name(name, N):
-    filename = name.replace('|', '-') + '_' + str(N)
+    filename = name.replace('/', '_') + '_' + str(N)
     return os.path.join(results_folder, filename)
 
 def plot_monte_carlo(scenarios=None, box=False):
     bst.plots.set_font(size=10, family='sans-serif', font='Arial')
     bst.plots.set_figure_size(aspect_ratio=1.05)
     fig, axes = _plot_monte_carlo(scenarios, box)
-    # for ax, letter in zip(axes, 'ABCDEFGHIJ'):
-    #     plt.sca(ax)
-    #     ylb, yub = plt.ylim()
-    #     plt.text(7.8, ylb + (yub - ylb) * 0.92, letter, color=letter_color,
-    #              horizontalalignment='center',verticalalignment='center',
-    #              fontsize=10, fontweight='bold')
     plt.subplots_adjust(left=0.12, right=0.95, wspace=0.40, top=0.98, bottom=0.2)
     for i in ('svg', 'png'):
         file = os.path.join(images_folder, f'montecarlo_absolute.{i}')
@@ -88,25 +77,16 @@ def plot_monte_carlo(scenarios=None, box=False):
 
 def _plot_monte_carlo(scenarios=None, box=None):
     Biorefinery = gas_fermentation.Biorefinery
-    if scenarios is None:
-        scenarios = 'all'
-    if scenarios == 'all':
-        scenarios = [
-            'all', 
-        ]
-    model_pairs = [
-        (name, 
-         Biorefinery(scenario=name + '-glucose growth', simulate=False), 
-         Biorefinery(scenario=name + '-acetate growth', simulate=False)) 
+    scenarios = ('acetate', 'glucose', 'acetate/glucose-seed')
+    models = [
+        Biorefinery(scenario=name, simulate=False)
         for name in scenarios
     ]
     metrics = [
         ['MSP', 'carbon_intensity'], 
-        ['TCI', 'product_yield_to_hydrogen'],
-        # ['product_yield_to_hydrogen', 'product_yield_to_biomass'],
-        ['hydrogen_consumption', 'production_capacity'],
+        ['TCI', 'production_capacity'],
+        ['hydrogen_consumption', 'glucose_consumption'],
     ]
-    pm = model_pairs[0][1]
     # Subplots
     nrows = len(metrics)
     ncols = len(metrics[0])
@@ -114,15 +94,11 @@ def _plot_monte_carlo(scenarios=None, box=None):
     plt.subplots_adjust(wspace=0.45)
     axes = axes_box.transpose()
     axes = axes.flatten()
-    pm = model_pairs[0][1]
+    pm = models[0]
     df = get_monte_carlo(pm.scenario, pm.MSP.index)
     N_scenarios = len(scenarios)
-    if N_scenarios > 1:
-        N = 3
-    else:
-        N = 2
     nsamples = df.shape[0]
-    M = nsamples * len(scenarios) * 2
+    M = nsamples * len(scenarios)
     for i in range(nrows):
         for j in range(ncols):
             metric = getattr(pm, metrics[i][j])
@@ -132,53 +108,37 @@ def _plot_monte_carlo(scenarios=None, box=None):
             metric_name = metric_name.replace('Hydrogen', 'H$_2$')
             metric_name = metric_name.replace('-H2}', r'} \cdot \mathrm{H}_2')
             metric_name = metric_name.replace('yield', '')
-            if N == 3:
-                columns = ['subspace', 'growth substrate', metric_name]
-                growth_substrate_index = 1
-                metric_values_index = 2
-            elif N == 2:
-                columns = ['growth substrate', metric_name]
-                growth_substrate_index = 0
-                metric_values_index = 1
-            data = np.zeros([M, N], dtype=object)
+            columns = ['substrate', metric_name]
+            substrate_index = 0
+            values_index = 1
+            data = np.zeros([M, 2], dtype=object)
             df = pd.DataFrame(
                 data=data, columns=columns
             )
             lower_index = 0
-            for name, pm_glucose, pm_acetate in model_pairs:
-                medium_index = lower_index + nsamples
-                upper_index = medium_index + nsamples
-                rowslice = slice(lower_index, medium_index)
-                data[rowslice, metric_values_index] = gl = get_monte_carlo(pm_glucose.scenario, metric_index)
-                data[rowslice, growth_substrate_index] = 'glucose'
-                rowslice = slice(medium_index, upper_index)
-                data[rowslice, metric_values_index] = ac = get_monte_carlo(pm_acetate.scenario, metric_index)
-                data[rowslice, growth_substrate_index] = 'acetate'
-                if N == 3:
-                    rowslice = slice(lower_index, upper_index)
-                    data[rowslice, 0] = name.split(' ')[0]
-                # diff = ac - gl
-                # print(diff.max(), diff.min())
+            for pm in models:
+                upper_index = lower_index + nsamples
+                rowslice = slice(lower_index, upper_index)
+                data[rowslice, values_index] = get_monte_carlo(pm.scenario, metric_index)
+                data[rowslice, substrate_index] = pm.scenario
                 lower_index = upper_index
             axis = axes_box[i, j]
             plt.sca(axis)
-            if N == 3:
-                kwargs = dict(x='subspace')
-            else:
-                kwargs = {}
+            kwargs = {}
             if box:
                 f = sns.boxplot
             else:
-                kwargs['split'] = True
+                kwargs['split'] = False
                 kwargs['inner'] = 'quart'
                 f = sns.violinplot
             f(legend=False, ax=axis,
               data=df, y=metric_name,
-              hue='growth substrate', 
+              hue='substrate', 
               gap=.1, 
               palette={
                   'glucose': GG_colors.red.RGBn,
-                  'acetate': GG_colors.blue.RGBn
+                  'acetate': GG_colors.blue.RGBn,
+                  'acetate/glucose-seed': GG_colors.yellow.RGBn,
               },
               **kwargs)
             if i == 0:
@@ -186,7 +146,7 @@ def _plot_monte_carlo(scenarios=None, box=None):
                     bst.plots.plot_horizontal_line(dodecanol_market_price, lw=1, ls='--', color=line_color * 1.1)
                 elif j == 1:
                     bst.plots.plot_horizontal_line(dodecanol_carbon_intensity, lw=1, ls='--', color=line_color * 1.1)
-            values = data[:, metric_values_index]
+            values = data[:, values_index]
             assert not np.isnan(np.array(values, dtype=float)).any()
             tickmarks = bst.plots.rounded_tickmarks_from_data(
                 values, N_ticks=5, lb_max=values.min() * 2 if (values < 0).any() else 0,
@@ -400,65 +360,6 @@ def get_optimized_parameters_table():
     table.index.name = '#'
     return table
 
-def plot_spearman_both(scenario='all fermentation-glucose growth', **kwargs):
-    bst.plots.set_font(size=9)
-    bst.plots.set_figure_size(aspect_ratio=0.55, width='full')
-    labels = ['TEA', 'LCA']
-    br = gasferm.Biorefinery(simulate=False, scenario=scenario)
-    rhos = []
-    file = spearman_file_name(br.name)
-    df = pd.read_excel(file, header=[0, 1], index_col=[0, 1])
-    names = get_spearman_names(br.model.parameters)
-    index = [i for i, j in enumerate(df.index) if j in names]
-    names = [names[i] for i in df.index if i in names]
-    metric_names = []
-    for label in labels:
-        if label == 'TEA':
-            metric = br.MSP
-            metric_name = metric.name
-            values = df[metric.index]
-        elif label == 'LCA':
-            metric = br.carbon_intensity
-            metric_name = r'carbon intensity'
-            values = df[metric.index]
-            for i in br.model.parameters:
-                name = i.name.lower()
-                if 'price' in name or 'capacity' in name: 
-                    values[i.index] = 0
-        else:
-            raise ValueError(f"invalid label '{label}'")
-        values = values.iloc[index]
-        rhos.append(values)
-        metric_names.append(metric_name)
-    color_wheel = [Color(fg='#0c72b9'), Color(fg='#d34249')]
-    # breakpoint()
-    fig, ax = bst.plots.plot_spearman_2d(rhos, index=names,
-                                         color_wheel=color_wheel,
-                                         name=metric_name,
-                                         xlabel="Spearman's rank correlation coefficient",
-                                         cutoff=0.05,
-                                         **kwargs)
-    # legend_kwargs = {'loc': 'upper right'}
-    # plt.legend(
-    #     handles=[
-    #         mpatches.Patch(
-    #             color=color_wheel[i].RGBn, 
-    #             label=metric_names[i],
-    #         )
-    #         for i in range(len(labels))
-    #     ], 
-    #     **legend_kwargs,
-    # )
-    plt.subplots_adjust(
-        hspace=0.05, wspace=0.05,
-        top=0.98, bottom=0.15,
-        left=0.45, right=0.9,
-    )
-    for i in ('svg', 'png'):
-        file = os.path.join(images_folder, f'spearman_{scenario}.{i}')
-        plt.savefig(file, dpi=900, transparent=True)
-    return fig, ax
-
 def plot_spearman_scenarios(
         scenarios=None,
         kind='TEA',
@@ -466,24 +367,13 @@ def plot_spearman_scenarios(
         **kwargs
     ):
     if scenarios is None:
-        scenarios = 'all'
-    if scenarios == 'all':
-        scenarios = [
-            'all|glucose growth', 
-            'all|acetate growth'
-        ]
-    elif scenarios == 'all fermentation':
-        scenarios = [
-            'all fermentation|glucose growth', 
-            'all fermentation|acetate growth'
-        ]
+        scenarios = ['acetate', 'acetate/glucose-seed', 'glucose']
     bst.plots.set_font(size=9)
     if full:
         bst.plots.set_figure_size(aspect_ratio=4, width='half')
         # bst.plots.set_figure_size(width='full')
     else:
         bst.plots.set_figure_size(aspect_ratio=1, width='half')
-    labels = ['glucose-fed seed', 'acetate-fed seed']
     rhos = []
     first = scenarios[0]
     br = gasferm.Biorefinery(simulate=False, scenario=first)
@@ -524,7 +414,7 @@ def plot_spearman_scenarios(
         values = values.iloc[index]
         rhos.append(values)
     color_wheel = [
-        GG_colors.red, GG_colors.blue
+        GG_colors.blue, GG_colors.red, GG_colors.yellow,
     ]
     # breakpoint()
     label = metric.label()
@@ -539,17 +429,6 @@ def plot_spearman_scenarios(
                                          xlabel=r"Spearman's rank correlation" "\nwith " + label,
                                          top=top,
                                          **kwargs)
-    # legend_kwargs = {'loc': 'upper right'}
-    # plt.legend(
-    #     handles=[
-    #         mpatches.Patch(
-    #             color=color_wheel[i].RGBn, 
-    #             label=metric_names[i],
-    #         )
-    #         for i in range(len(labels))
-    #     ], 
-    #     **legend_kwargs,
-    # )
     plt.subplots_adjust(
         hspace=0.05, wspace=0.05,
         top=0.98, bottom=0.16,
@@ -592,17 +471,7 @@ def plot_spearman(kind=None, carbon_capture=True, dewatering=True, **kwargs):
     return fig, ax
 
 def run_all_monte_carlo(scenarios=None):
-    if scenarios is None: scenarios = 'all'
-    if scenarios == 'all':
-        scenarios = [
-            'all|glucose growth', 
-            'all|acetate growth'
-        ]
-    elif scenarios == 'all fermentation':
-        scenarios = [
-            'all fermentation|glucose growth', 
-            'all fermentation|acetate growth'
-        ]
+    if scenarios is None: scenarios = ['glucose', 'acetate', 'acetate/glucose-seed']
     for scenario in scenarios:
         run_monte_carlo(scenario=scenario)
 
@@ -759,167 +628,6 @@ def plot_kde_carbon_capture_comparison_dewatering():
     for i in ('svg', 'png'):
         file = os.path.join(images_folder, f'carbon_capture_comparison_dewatering_kde.{i}')
         plt.savefig(file, dpi=900, transparent=True)
-
-def plot_kde_carbon_capture_comparison_no_dewatering():
-    scenario = (
-        gasferm.Scenario(carbon_capture=True, dewatering=False)
-        - gasferm.Scenario(carbon_capture=False, dewatering=False)
-    )
-    _plot_kde(
-        scenario,
-        # yticks=[[-60, -40, -20, 0, 20, 40, 60]],
-        # xticks=[[-0.9, -0.6, -0.3, 0, 0.3, 0.6, 0.9],
-        #         [-0.9, -0.6, -0.3, 0, 0.3, 0.6, 0.9]],
-        top_right='No CC\nFavored()',
-        bottom_left='CC\nFavored()',
-        top_left='MSP\nTradeoff()',
-        bottom_right='GWP\nTradeoff()',
-        rotate_quadrants=2,
-        fs=10,
-    )
-    plt.subplots_adjust(
-        wspace=0,
-    )
-    for i in ('svg', 'png'):
-        file = os.path.join(images_folder, f'carbon_capture_comparison_no_dewatering_kde.{i}')
-        plt.savefig(file, dpi=900, transparent=True)
-
-def plot_kde_dewatering_comparison_carbon_capture():
-    scenario = (
-        gasferm.Scenario(carbon_capture=True, dewatering=True)
-        - gasferm.Scenario(carbon_capture=True, dewatering=False)
-    )
-    _plot_kde(
-        scenario,
-        # yticks=[[-60, -40, -20, 0, 20, 40, 60]],
-        # xticks=[[-0.9, -0.6, -0.3, 0, 0.3, 0.6, 0.9],
-        #         [-0.9, -0.6, -0.3, 0, 0.3, 0.6, 0.9]],
-        top_right='No Dewatering\nFavored()',
-        bottom_left='Dewatering\nFavored()',
-        top_left='MSP\nTradeoff()',
-        bottom_right='GWP\nTradeoff()',
-        rotate_quadrants=2,
-        fs=10,
-    )
-    plt.subplots_adjust(
-        wspace=0,
-    )
-    for i in ('svg', 'png'):
-        file = os.path.join(images_folder, f'dewatering_comparison_cc_kde.{i}')
-        plt.savefig(file, dpi=900, transparent=True)
-
-def plot_kde_dewatering_comparison_no_carbon_capture():
-    scenario = (
-        gasferm.Scenario(carbon_capture=False, dewatering=True)
-        - gasferm.Scenario(carbon_capture=False, dewatering=False)
-    )
-    _plot_kde(
-        scenario,
-        yticks=[-4, -2, 0, 2, 4],
-        xticks=[0, 1, 2, 3, 4],
-        top_right='No Dewatering\nFavored()',
-        bottom_left='Dewatering\nFavored()',
-        top_left='MSP\nTradeoff()',
-        bottom_right='GWP\nTradeoff()',
-        rotate_quadrants=2,
-        fs=10,
-    )
-    plt.subplots_adjust(
-        wspace=0,
-    )
-    for i in ('svg', 'png'):
-        file = os.path.join(images_folder, f'dewatering_comparison_no_cc_kde.{i}')
-        plt.savefig(file, dpi=900, transparent=True)
-
-def plot_kde_carbon_capture_comparison():
-    left = (
-        gasferm.Scenario(carbon_capture=True, dewatering=True)
-        - gasferm.Scenario(carbon_capture=False, dewatering=True)
-    )
-    right = (
-        gasferm.Scenario(carbon_capture=True, dewatering=False)
-        - gasferm.Scenario(carbon_capture=False, dewatering=False)
-    )
-    plot_kde_2d_comparison(
-        (left, right),
-        # yticks=[[-60, -40, -20, 0, 20, 40, 60]],
-        # xticks=[[-0.9, -0.6, -0.3, 0, 0.3, 0.6, 0.9],
-        #         [-0.9, -0.6, -0.3, 0, 0.3, 0.6, 0.9]],
-        top_right='No CC\nFavored()',
-        bottom_left='CC\nFavored()',
-        top_left='MSP\nTradeoff()',
-        bottom_right='GWP\nTradeoff()',
-        rotate_quadrants=2,
-        titles=['(a) With dewatering', '(b) No dewatering'],
-        fs=10,
-    )
-    plt.subplots_adjust(
-        wspace=0,
-        
-    )
-    for i in ('svg', 'png'):
-        file = os.path.join(images_folder, f'carbon_capture_comparison_kde.{i}')
-        plt.savefig(file, dpi=900, transparent=True)
-   
-def plot_kde_dewatering_comparison():
-    left = (
-        gasferm.Scenario(carbon_capture=True, dewatering=True)
-        - gasferm.Scenario(carbon_capture=True, dewatering=True)
-    )
-    right = (
-        gasferm.Scenario(carbon_capture=False, dewatering=True)
-        - gasferm.Scenario(carbon_capture=False, dewatering=False)
-    )
-    plot_kde_2d_comparison(
-        (left, right),
-        # yticks=[[-60, -40, -20, 0, 20, 40, 60]],
-        # xticks=[[-0.9, -0.6, -0.3, 0, 0.3, 0.6, 0.9],
-        #         [-0.9, -0.6, -0.3, 0, 0.3, 0.6, 0.9]],
-        top_right='No CC\nFavored()',
-        bottom_left='CC\nFavored()',
-        top_left='MSP\nTradeoff()',
-        bottom_right='GWP\nTradeoff()',
-        rotate_quadrants=2,
-        titles=['(a) With CC', '(b) No CC'],
-        fs=10,
-    )
-    plt.subplots_adjust(
-        wspace=0,
-    )
-    for i in ('svg', 'png'):
-        file = os.path.join(images_folder, f'dewatering_comparison_kde.{i}')
-        plt.savefig(file, dpi=900, transparent=True)
-   
-    
-# def plot_kde_comparison(
-#         scenario, metrics, xticks=None, yticks=None,
-#         xbox_kwargs=None, ybox_kwargs=None, top_left='',
-#         top_right='Tradeoff', bottom_left='Tradeoff',
-#         bottom_right='', fs=None, ticklabels=True, aspect_ratio=1.1,
-#         xlabel=None, ylabel=None
-#     ):
-#     set_font(size=fs or 8)
-#     set_figure_size(width='half', aspect_ratio=aspect_ratio)
-#     Xi, Yi = [i.index for i in metrics]
-#     df = get_monte_carlo(scenario, metrics)
-#     y = df[Yi].values
-#     x = df[Xi].values
-#     ax = bst.plots.plot_kde(
-#         y=y, x=x, xticks=xticks, yticks=yticks,
-#         xticklabels=ticklabels, yticklabels=ticklabels,
-#         xbox_kwargs=xbox_kwargs or dict(light=CABBI_colors.orange.RGBn, dark=CABBI_colors.orange.shade(60).RGBn),
-#         ybox_kwargs=ybox_kwargs or dict(light=CABBI_colors.blue.RGBn, dark=CABBI_colors.blue.shade(60).RGBn),
-#         aspect_ratio=1.2,
-#     )
-#     plt.sca(ax)
-#     plt.xlabel(xlabel.replace('\n', ' '))
-#     plt.ylabel(ylabel.replace('\n', ' '))
-#     bst.plots.plot_quadrants(data=[x, y], text=[top_left, top_right, bottom_left, bottom_right])
-#     plt.subplots_adjust(
-#         hspace=0.05, wspace=0.05,
-#         top=0.98, bottom=0.15,
-#         left=0.2, right=0.98,
-#     )
     
 def plot_kde_CI_MSP(scenarios=None):
     from warnings import filterwarnings
@@ -927,17 +635,7 @@ def plot_kde_CI_MSP(scenarios=None):
     bst.plots.set_font(size=9)
     bst.plots.set_figure_size(width='half', aspect_ratio=1.3)
     if scenarios is None:
-        scenarios = 'all'
-    if scenarios == 'all':
-        scenarios = [
-            'all|glucose growth', 
-            'all|acetate growth'
-        ]
-    elif scenarios == 'all fermentation':
-        scenarios = [
-            'all fermentation|glucose growth', 
-            'all fermentation|acetate growth'
-        ]
+        scenarios = ['acetate', 'acetate/glucose-seed', 'glucose']
     br = gasferm.Biorefinery(simulate=False, scenario=scenarios[0])
     metrics = [br.carbon_intensity.index, br.MSP.index]
     Xi, Yi = metrics
@@ -1008,12 +706,7 @@ def opportunity_space(scenarios=None):
     bst.plots.set_font(size=9)
     bst.plots.set_figure_size(width='half', aspect_ratio=1)
     if scenarios is None:
-        scenarios = 'all'
-    if scenarios == 'all':
-        scenarios = [
-            'all|glucose growth', 
-            'all|acetate growth'
-        ]
+        scenarios = ['acetate', 'acetate/glucose-seed', 'glucose']
     br = gasferm.Biorefinery(simulate=False, scenario=scenarios[0])
     market_price = 5 # USD / kg
     carbon_intensity = dodecanol_carbon_intensity
@@ -1043,88 +736,7 @@ def opportunity_space(scenarios=None):
         'environment': opportunity_space_environment, 
     }
     
-def plot_kde_CI_MSP_1d(scenarios=None):
-    from warnings import filterwarnings
-    filterwarnings('ignore')
-    bst.plots.set_font(size=9)
-    bst.plots.set_figure_size(width='full', aspect_ratio=0.6)
-    if scenarios is None:
-        scenarios = [
-            ['all fermentation|glucose growth', 'all fermentation|acetate growth'],
-            ['conservative fermentation|glucose growth', 'conservative fermentation|acetate growth'],
-            ['optimistic fermentation|glucose growth', 'optimistic fermentation|acetate growth'],
-        ]
-    br = gasferm.Biorefinery(simulate=False, scenario=scenarios[0][0])
-    market_price = 5 # USD / kg
-    metrics = [br.carbon_intensity.index, br.MSP.index]
-    Xi, Yi = metrics
-    y2d = []
-    x2d = []
-    opportunity_space_2d = []
-    for row in scenarios:
-        opportunity_space_1d = []
-        opportunity_space_2d.append(opportunity_space_1d)
-        y1d = []
-        x1d = []
-        y2d.append(y1d)
-        x2d.append(x1d)
-        for scenario in row:
-            scenario = gasferm.Biorefinery.as_scenario(scenario)
-            df = get_monte_carlo(scenario, metrics)
-            y = df[Yi].values
-            y1d.append(y)
-            x1d.append(df[Xi].values)
-            opportunity_space_1d.append(
-                (y <= market_price).sum() / y.size
-            )
-    # yticks = [-2.6, -1.3, 0, 1.3, 2.6]
-    # yticks = [-2, -1, 0, 1, 2, 3, 4]
-    # xticks = [0, 400, 800, 1200, 1600]
-    # breakpoint()
-    # xticks = [0, 12, 24, 36, 48]
-    xticks = None
-    yticks = None
-    fig, axes = bst.plots.plot_kde_1d(
-        ys=y2d, xs=x2d, xticks=xticks, yticks=yticks,
-        xticklabels=True, yticklabels=True,
-        # xbox_kwargs=dict(light=CABBI_colors.orange.RGBn, dark=CABBI_colors.orange.shade(60).RGBn),
-        # ybox_kwargs=dict(light=CABBI_colors.blue.RGBn, dark=CABBI_colors.blue.shade(60).RGBn),
-        xlabel=r'Carbon intensity $[\mathrm{gCO2e} \cdot \mathrm{L}^{\mathrm{-1}}]$',
-        # xlabel='TCI $[10^6 \cdot \mathrm{USD}]$',
-        ylabel=r'MSP $[\mathrm{USD} \cdot \mathrm{kg}^{\mathrm{-1}}]$',
-        xbox_width=400,
-        aspect_ratio=1.1,
-        kde=False
-    )
-    xlb, xub = plt.xlim()
-    ylb, yub = plt.ylim()
-    xpos = lambda x: xlb + (xub - xlb) * x
-    ypos = lambda y: ylb + (yub - ylb) * y
-    # xleft = 0.02
-    xright = 0.98
-    # ytop = 0.94
-    ybottom = 0.02
-    first = True
-    for ax, ps in zip(axes[0], np.transpose(opportunity_space_2d)):
-        if first: 
-            description = ' under\nmarket price'
-            first = False
-        else:
-            description = ''
-        plt.sca(ax)
-        values = ' and '.join([f"{p:.0%}" for p in ps])
-        bst.plots.plot_horizontal_line(market_price, lw=2, ls='-', color=line_color)
-        plt.text(xpos(xright), ypos(ybottom), values + description, color=line_color,
-                 horizontalalignment='right', verticalalignment='bottom',
-                 fontsize=10, fontweight='bold', zorder=10)
-    plt.subplots_adjust(
-        hspace=0, wspace=0,
-        top=0.9, bottom=0.12,
-        left=0.15, right=0.98,
-    )
-    for i in ('svg', 'png'):
-        file = os.path.join(images_folder, f"MSP_CI_kde_1d.{i}")
-        plt.savefig(file, dpi=900, transparent=True)
+
 
 def plot_kde(scenario='all fermentation|glucose growth', *args, **kwargs):
     fig, ax = _plot_kde(scenario, *args, fs=10, **kwargs)
@@ -1435,3 +1047,246 @@ def plot_monte_carlo_across_yield():
     for i in ('svg', 'png'):
         file = os.path.join(images_folder, f'monte_carlo_across_bioreactor_yield.{i}')
         plt.savefig(file, dpi=900, transparent=True)
+   
+# def plot_kde_carbon_capture_comparison_no_dewatering():
+#     scenario = (
+#         gasferm.Scenario(carbon_capture=True, dewatering=False)
+#         - gasferm.Scenario(carbon_capture=False, dewatering=False)
+#     )
+#     _plot_kde(
+#         scenario,
+#         # yticks=[[-60, -40, -20, 0, 20, 40, 60]],
+#         # xticks=[[-0.9, -0.6, -0.3, 0, 0.3, 0.6, 0.9],
+#         #         [-0.9, -0.6, -0.3, 0, 0.3, 0.6, 0.9]],
+#         top_right='No CC\nFavored()',
+#         bottom_left='CC\nFavored()',
+#         top_left='MSP\nTradeoff()',
+#         bottom_right='GWP\nTradeoff()',
+#         rotate_quadrants=2,
+#         fs=10,
+#     )
+#     plt.subplots_adjust(
+#         wspace=0,
+#     )
+#     for i in ('svg', 'png'):
+#         file = os.path.join(images_folder, f'carbon_capture_comparison_no_dewatering_kde.{i}')
+#         plt.savefig(file, dpi=900, transparent=True)
+
+# def plot_kde_dewatering_comparison_carbon_capture():
+#     scenario = (
+#         gasferm.Scenario(carbon_capture=True, dewatering=True)
+#         - gasferm.Scenario(carbon_capture=True, dewatering=False)
+#     )
+#     _plot_kde(
+#         scenario,
+#         # yticks=[[-60, -40, -20, 0, 20, 40, 60]],
+#         # xticks=[[-0.9, -0.6, -0.3, 0, 0.3, 0.6, 0.9],
+#         #         [-0.9, -0.6, -0.3, 0, 0.3, 0.6, 0.9]],
+#         top_right='No Dewatering\nFavored()',
+#         bottom_left='Dewatering\nFavored()',
+#         top_left='MSP\nTradeoff()',
+#         bottom_right='GWP\nTradeoff()',
+#         rotate_quadrants=2,
+#         fs=10,
+#     )
+#     plt.subplots_adjust(
+#         wspace=0,
+#     )
+#     for i in ('svg', 'png'):
+#         file = os.path.join(images_folder, f'dewatering_comparison_cc_kde.{i}')
+#         plt.savefig(file, dpi=900, transparent=True)
+
+# def plot_kde_dewatering_comparison_no_carbon_capture():
+#     scenario = (
+#         gasferm.Scenario(carbon_capture=False, dewatering=True)
+#         - gasferm.Scenario(carbon_capture=False, dewatering=False)
+#     )
+#     _plot_kde(
+#         scenario,
+#         yticks=[-4, -2, 0, 2, 4],
+#         xticks=[0, 1, 2, 3, 4],
+#         top_right='No Dewatering\nFavored()',
+#         bottom_left='Dewatering\nFavored()',
+#         top_left='MSP\nTradeoff()',
+#         bottom_right='GWP\nTradeoff()',
+#         rotate_quadrants=2,
+#         fs=10,
+#     )
+#     plt.subplots_adjust(
+#         wspace=0,
+#     )
+#     for i in ('svg', 'png'):
+#         file = os.path.join(images_folder, f'dewatering_comparison_no_cc_kde.{i}')
+#         plt.savefig(file, dpi=900, transparent=True)
+
+# def plot_kde_carbon_capture_comparison():
+#     left = (
+#         gasferm.Scenario(carbon_capture=True, dewatering=True)
+#         - gasferm.Scenario(carbon_capture=False, dewatering=True)
+#     )
+#     right = (
+#         gasferm.Scenario(carbon_capture=True, dewatering=False)
+#         - gasferm.Scenario(carbon_capture=False, dewatering=False)
+#     )
+#     plot_kde_2d_comparison(
+#         (left, right),
+#         # yticks=[[-60, -40, -20, 0, 20, 40, 60]],
+#         # xticks=[[-0.9, -0.6, -0.3, 0, 0.3, 0.6, 0.9],
+#         #         [-0.9, -0.6, -0.3, 0, 0.3, 0.6, 0.9]],
+#         top_right='No CC\nFavored()',
+#         bottom_left='CC\nFavored()',
+#         top_left='MSP\nTradeoff()',
+#         bottom_right='GWP\nTradeoff()',
+#         rotate_quadrants=2,
+#         titles=['(a) With dewatering', '(b) No dewatering'],
+#         fs=10,
+#     )
+#     plt.subplots_adjust(
+#         wspace=0,
+        
+#     )
+#     for i in ('svg', 'png'):
+#         file = os.path.join(images_folder, f'carbon_capture_comparison_kde.{i}')
+#         plt.savefig(file, dpi=900, transparent=True)
+   
+# def plot_kde_dewatering_comparison():
+#     left = (
+#         gasferm.Scenario(carbon_capture=True, dewatering=True)
+#         - gasferm.Scenario(carbon_capture=True, dewatering=True)
+#     )
+#     right = (
+#         gasferm.Scenario(carbon_capture=False, dewatering=True)
+#         - gasferm.Scenario(carbon_capture=False, dewatering=False)
+#     )
+#     plot_kde_2d_comparison(
+#         (left, right),
+#         # yticks=[[-60, -40, -20, 0, 20, 40, 60]],
+#         # xticks=[[-0.9, -0.6, -0.3, 0, 0.3, 0.6, 0.9],
+#         #         [-0.9, -0.6, -0.3, 0, 0.3, 0.6, 0.9]],
+#         top_right='No CC\nFavored()',
+#         bottom_left='CC\nFavored()',
+#         top_left='MSP\nTradeoff()',
+#         bottom_right='GWP\nTradeoff()',
+#         rotate_quadrants=2,
+#         titles=['(a) With CC', '(b) No CC'],
+#         fs=10,
+#     )
+#     plt.subplots_adjust(
+#         wspace=0,
+#     )
+#     for i in ('svg', 'png'):
+#         file = os.path.join(images_folder, f'dewatering_comparison_kde.{i}')
+#         plt.savefig(file, dpi=900, transparent=True)
+    
+# def plot_kde_comparison(
+#         scenario, metrics, xticks=None, yticks=None,
+#         xbox_kwargs=None, ybox_kwargs=None, top_left='',
+#         top_right='Tradeoff', bottom_left='Tradeoff',
+#         bottom_right='', fs=None, ticklabels=True, aspect_ratio=1.1,
+#         xlabel=None, ylabel=None
+#     ):
+#     set_font(size=fs or 8)
+#     set_figure_size(width='half', aspect_ratio=aspect_ratio)
+#     Xi, Yi = [i.index for i in metrics]
+#     df = get_monte_carlo(scenario, metrics)
+#     y = df[Yi].values
+#     x = df[Xi].values
+#     ax = bst.plots.plot_kde(
+#         y=y, x=x, xticks=xticks, yticks=yticks,
+#         xticklabels=ticklabels, yticklabels=ticklabels,
+#         xbox_kwargs=xbox_kwargs or dict(light=CABBI_colors.orange.RGBn, dark=CABBI_colors.orange.shade(60).RGBn),
+#         ybox_kwargs=ybox_kwargs or dict(light=CABBI_colors.blue.RGBn, dark=CABBI_colors.blue.shade(60).RGBn),
+#         aspect_ratio=1.2,
+#     )
+#     plt.sca(ax)
+#     plt.xlabel(xlabel.replace('\n', ' '))
+#     plt.ylabel(ylabel.replace('\n', ' '))
+#     bst.plots.plot_quadrants(data=[x, y], text=[top_left, top_right, bottom_left, bottom_right])
+#     plt.subplots_adjust(
+#         hspace=0.05, wspace=0.05,
+#         top=0.98, bottom=0.15,
+#         left=0.2, right=0.98,
+#     )
+        
+# def plot_kde_CI_MSP_1d(scenarios=None):
+#     from warnings import filterwarnings
+#     filterwarnings('ignore')
+#     bst.plots.set_font(size=9)
+#     bst.plots.set_figure_size(width='full', aspect_ratio=0.6)
+#     if scenarios is None:
+#         scenarios = [
+#             ['all fermentation|glucose growth', 'all fermentation|acetate growth'],
+#             ['conservative fermentation|glucose growth', 'conservative fermentation|acetate growth'],
+#             ['optimistic fermentation|glucose growth', 'optimistic fermentation|acetate growth'],
+#         ]
+#     br = gasferm.Biorefinery(simulate=False, scenario=scenarios[0][0])
+#     market_price = 5 # USD / kg
+#     metrics = [br.carbon_intensity.index, br.MSP.index]
+#     Xi, Yi = metrics
+#     y2d = []
+#     x2d = []
+#     opportunity_space_2d = []
+#     for row in scenarios:
+#         opportunity_space_1d = []
+#         opportunity_space_2d.append(opportunity_space_1d)
+#         y1d = []
+#         x1d = []
+#         y2d.append(y1d)
+#         x2d.append(x1d)
+#         for scenario in row:
+#             scenario = gasferm.Biorefinery.as_scenario(scenario)
+#             df = get_monte_carlo(scenario, metrics)
+#             y = df[Yi].values
+#             y1d.append(y)
+#             x1d.append(df[Xi].values)
+#             opportunity_space_1d.append(
+#                 (y <= market_price).sum() / y.size
+#             )
+#     # yticks = [-2.6, -1.3, 0, 1.3, 2.6]
+#     # yticks = [-2, -1, 0, 1, 2, 3, 4]
+#     # xticks = [0, 400, 800, 1200, 1600]
+#     # breakpoint()
+#     # xticks = [0, 12, 24, 36, 48]
+#     xticks = None
+#     yticks = None
+#     fig, axes = bst.plots.plot_kde_1d(
+#         ys=y2d, xs=x2d, xticks=xticks, yticks=yticks,
+#         xticklabels=True, yticklabels=True,
+#         # xbox_kwargs=dict(light=CABBI_colors.orange.RGBn, dark=CABBI_colors.orange.shade(60).RGBn),
+#         # ybox_kwargs=dict(light=CABBI_colors.blue.RGBn, dark=CABBI_colors.blue.shade(60).RGBn),
+#         xlabel=r'Carbon intensity $[\mathrm{gCO2e} \cdot \mathrm{L}^{\mathrm{-1}}]$',
+#         # xlabel='TCI $[10^6 \cdot \mathrm{USD}]$',
+#         ylabel=r'MSP $[\mathrm{USD} \cdot \mathrm{kg}^{\mathrm{-1}}]$',
+#         xbox_width=400,
+#         aspect_ratio=1.1,
+#         kde=False
+#     )
+#     xlb, xub = plt.xlim()
+#     ylb, yub = plt.ylim()
+#     xpos = lambda x: xlb + (xub - xlb) * x
+#     ypos = lambda y: ylb + (yub - ylb) * y
+#     # xleft = 0.02
+#     xright = 0.98
+#     # ytop = 0.94
+#     ybottom = 0.02
+#     first = True
+#     for ax, ps in zip(axes[0], np.transpose(opportunity_space_2d)):
+#         if first: 
+#             description = ' under\nmarket price'
+#             first = False
+#         else:
+#             description = ''
+#         plt.sca(ax)
+#         values = ' and '.join([f"{p:.0%}" for p in ps])
+#         bst.plots.plot_horizontal_line(market_price, lw=2, ls='-', color=line_color)
+#         plt.text(xpos(xright), ypos(ybottom), values + description, color=line_color,
+#                  horizontalalignment='right', verticalalignment='bottom',
+#                  fontsize=10, fontweight='bold', zorder=10)
+#     plt.subplots_adjust(
+#         hspace=0, wspace=0,
+#         top=0.9, bottom=0.12,
+#         left=0.15, right=0.98,
+#     )
+#     for i in ('svg', 'png'):
+#         file = os.path.join(images_folder, f"MSP_CI_kde_1d.{i}")
+#         plt.savefig(file, dpi=900, transparent=True)

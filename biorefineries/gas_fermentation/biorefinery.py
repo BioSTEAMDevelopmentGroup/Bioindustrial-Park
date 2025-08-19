@@ -78,7 +78,7 @@ class Biorefinery(bst.ProcessModel):
     
     """
     class Scenario:
-        name: str = 'all fermentation|glucose growth'
+        name: str = 'acetate/glucose-seed'
         substrate: str = 'flue gas' # Either flue gas or glucose
         product: str = 'Dodecanol'
         carbon_capture: bool = False
@@ -97,11 +97,12 @@ class Biorefinery(bst.ProcessModel):
     def as_scenario(cls, scenario):
         if scenario == 'acetate':
             substrate = 'flue gas'
+            glucose_growth = False
         elif scenario == 'glucose':
             substrate = 'glucose'
-        elif scenario in ('acetate/glucose-seed', 'acetate glucose-seed'):
-            scenario = 'acetate glucose-seed'
-            substrate = 'acetate'
+            glucose_growth = True
+        elif scenario == 'acetate/glucose-seed':
+            substrate = 'flue gas'
             glucose_growth = True
         else:
             raise ValueError("invalid scenario")
@@ -193,11 +194,12 @@ class Biorefinery(bst.ProcessModel):
         elif scenario.substrate == 'glucose':
             system = create_substrate_oleochemical_system(
                 specific_yield=2.7, 
-                substrate='Glucose',
+                substrate='glucose',
                 product=scenario.product,
                 glucose_growth=scenario.glucose_growth,
                 facilities=True,
             )
+            system.flowsheet.emissions.ID = 'flue_gas'
             self.feedstock = feedstock = system.ins[1]
             feedstock.empty()
             glucose = 2.84e+04
@@ -449,8 +451,8 @@ class Biorefinery(bst.ProcessModel):
             self.BT.fuel.price = price / 1000
         
         # bst.settings.electricity_price = 0.060 # Maryland solar REC (renewable energy certificates) # https://escholarship.org/uc/item/80n4q8xc
-        
-        self.hydrogen.set_CF(GWPkey, CFs['H2'])
+        if 'acetate' in scenario.substrate:
+            self.hydrogen.set_CF(GWPkey, CFs['H2'])
         self.hexane.set_CF(GWPkey, CFs['Hexane'])
         self.ethyl_acetate.set_CF(GWPkey, CFs['Ethyl acetate'])
         
@@ -482,6 +484,16 @@ class Biorefinery(bst.ProcessModel):
         def hydrogen_consumption(): 
             if scenario.substrate == 'glucose': return 0
             return self.hydrogen.F_mass * self.system.operating_hours / 1e6
+        
+        @metric(units='10^3 MT/yr')
+        def glucose_consumption(): 
+            if scenario.substrate == 'glucose':
+                glucose = self.feedstock.imass['Glucose'] + self.seedtrain_feed.imass['Glucose']
+            elif scenario.glucose_growth:
+                glucose = self.seedtrain_feed.imass['Glucose']
+            else:
+                return 0
+            return glucose * self.system.operating_hours / 1e6
         
         @metric(units='kWh/kg-H2')
         def electricity_demand(): 
