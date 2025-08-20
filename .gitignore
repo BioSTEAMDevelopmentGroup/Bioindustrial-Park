@@ -33,7 +33,7 @@ docs/_templates/*
 
 # Data/results #
 ################
-*.xlsx
+#*.xlsx
 *.png
 *.jpeg
 #*.svg
