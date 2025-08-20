@@ -44,37 +44,38 @@ from biosteam.plots import *
 from thermosteam.utils.colors import *
 import contourplots 
 # 1. Load Excel file, skip the first row (header=1 means second row is the header)
-df = pd.read_excel('model_table_2000_w_aa_price_frac_lca.xlsx', sheet_name=0, header=1)
-mpsp_values = df["MPSP [$/kg]"].dropna().tolist()
-contourplots.box_and_whiskers_plot(uncertainty_data= mpsp_values,
-                                   baseline_values = [azelaic_acid_tea.solve_price(azelaic_acid)],
-                                        y_ticks = [3,6,9,12,15],
-                                        # ranges_for_comparison=[(7,12)],
-                                        boxcolor=colors.brown_tint.RGBn,
-                                        height_ratios = [1, 10],
-                                        fig_height=17,
-                                        fig_width = 8,
-                                        # font_size= 20,
-                                        box_width = 0.5,
-                                        # ranges_for_comparison_colors = colors.CABBI_orange.RGBn
-                                        dpi = 1000 )
-ci_disp = df['Net CI displacement 1 [kg CO2-eq/kg]']
-ci_mass = df['Mass AA LCA [kg CO2-eq/kg]'].tolist()
-ci_economic = df['Economic allocation LCA [kg CO2-eq/kg]']
+df = pd.read_excel('C:/Users/lavan/gglk_code/Bioindustrial-Park/biorefineries/oleochemicals/uncertainty analysis 2000/model_table_2000_w_aa_price_frac_lca.xlsx', sheet_name=0, header=1)
+# mpsp_values = df["MPSP [$/kg]"].dropna().tolist()
+# contourplots.box_and_whiskers_plot(uncertainty_data= mpsp_values,
+#                                    baseline_values = [azelaic_acid_tea.solve_price(azelaic_acid)],
+#                                         y_ticks = [3,6,9,12,15],
+#                                         # ranges_for_comparison=[(7,12)],
+#                                         boxcolor=colors.brown_tint.RGBn,
+#                                         height_ratios = [1, 10],
+#                                         fig_height=17,
+#                                         fig_width = 6,
+#                                         # font_size= 20,
+#                                         box_width = 0.5,
+#                                         # ranges_for_comparison_colors = colors.CABBI_orange.RGBn
+#                                         dpi = 1000 )
+ci_disp = df['Net CI displacement 1 [kg CO2-eq/kg]'].dropna().tolist()
+ci_mass = df['Mass AA LCA [kg CO2-eq/kg]'].dropna().tolist()
+ci_economic = df['Economic allocation LCA [kg CO2-eq/kg]'].dropna().tolist()
 contourplots.box_and_whiskers_plot(uncertainty_data= [ci_disp,ci_mass,ci_economic],
-                                   baseline_values = [get_net_GWP_displacement(),
-                                                      get_mass_aa_fraction(),
+                                    baseline_values = [get_net_GWP_displacement(),
+                                                      mass_aa_fraction(),
                                                       get_economic_based_AA_GWP()],
-                                   baseline_locations = [1,2,3],
+                                    baseline_locations = [1,2,3],
                                         y_ticks = [-8,-4,0,4,8,12],
                                         # ranges_for_comparison=[(7,12)],
                                         boxcolor=[guest_group_colors['Green'],
                                                   colors.orange.RGBn,
                                                   guest_group_colors['Blue']],
-                                        x_tick_labels = ['','',''],
+                                        x_tick_labels = ['Displacement','Mass\nallocation','Economic\nallocation'],
+                                        show_x_ticks = True,
                                         height_ratios = [1, 10],
                                         fig_height=17,
-                                        fig_width = 15,
+                                        fig_width = 17,
                                         # font_size= 20,
                                         box_width = 0.6,
                                         # ranges_for_comparison_colors = colors.CABBI_orange.RGBn
@@ -186,9 +187,10 @@ def stacked_plot_across_units(unit_groups = aa_baseline_groups):
     'C5-C9 MCA fraction and \npelargonic acid recovery': colors.red_tint.RGBn,   
     'methanol, fatty acid blend, \nand azelaic acid recovery':colors.yellow_shade.RGBn,
         # guest_group_colors['Yellow'],
-    'boilerturbogenerator': colors.neutral_tint.RGBn,
-    'wastewater treatment': colors.grey_shade.RGBn,
-    'other facilities*': colors.CABBI_grey.RGBn,
+    'boilerturbogenerator': guest_group_colors['Dark Orange'],
+        # colors.green_shade.RGBn,
+    'wastewater treatment': guest_group_colors['Dark Blue'],
+    'other facilities*': guest_group_colors['Dark Orange'],
     }
 
     hatch_patterns = {
@@ -198,7 +200,7 @@ def stacked_plot_across_units(unit_groups = aa_baseline_groups):
      'catalyst recovery':None,
      'C5-C9 MCA fraction and \npelargonic acid recovery':'\\',
      'methanol, fatty acid blend, \nand azelaic acid recovery':None,
-     'boilerturbogenerator': '/',
+     'boilerturbogenerator': None,
      'wastewater treatment':None,
      'other facilities*':'\/',
          }
@@ -209,152 +211,192 @@ def stacked_plot_across_units(unit_groups = aa_baseline_groups):
                      co_product_colors= None,
                      greyscale_legend=False,
                     hatch_patterns = hatch_patterns,
-                    linewidth = 3,
-                    given_font_size = 54,
-                    hatch_linewidth=3.0,
-                    tick_length_major=40,
-                    tick_length_minor=20,
-                     fig_width=24,
-                     fig_height=14)
+                    linewidth = 3/2,
+                    given_font_size = 26,
+                    hatch_linewidth=3/2,
+                    tick_length_major=40/2,
+                    tick_length_minor=20/2,
+                     fig_width=13,
+                     fig_height=6.5)
                      
-#%% CI stacked plot    
+# %% CI stacked plot — inputs scaled to 100%, co-product offsets relative to inputs
+
+import numpy as np
 import pandas as pd
 from biosteam.plots import *
 from thermosteam.utils.colors import *
 import contourplots
-guest_group_colors = {
-    'Light Green': np.array([0.631, 0.820, 0.651]),
-    'Medium Green':np.array([0.812, 0.910, 0.824]),
-    'Green': np.array([121/255, 191/255, 130/255]),
-    'Blue': np.array([96/255, 193/255, 207/255]),
-    'Grey': np.array([144/255, 145/255, 142/255]),
-    'Red': np.array([237/255, 88/255, 111/255]),
-    'Purple': np.array([162/255, 128/255, 185/255]),
-    'Orange': np.array([249/255, 143/255, 96/255]),
-    'Yellow': np.array([243/255, 195/255, 84/255]),
-    'Dark Green': np.array([77/255, 126/255, 83/255]),
-    'Dark Blue': np.array([53/255, 118/255, 127/255]),
-    'Dark Grey': np.array([78/255, 78/255, 78/255]),
-    'Dark Red': np.array([156/255, 75/255, 80/255]),
-    'Dark Purple': np.array([76/255, 56/255, 90/255]),
-    'Dark Orange': np.array([167/255, 95/255, 62/255]),
-    'Dark Yellow': np.array([171/255, 137/255, 55/255]),
-}
-feedstock = get_feedstock_GWP()
-materials = get_other_materials_impact()
-ng = get_ng_GWP()
-electricity = net_electricity_purchased_GWP()
-direct = get_total_direct_emissions_GWP()
-displacement_total = -get_net_GWP_displacement() #adding sign since we know it is negative
-# Co-product credits (displacement)
-PA = aa_baseline.get_material_impact(F.pelargonic_acid_rich_fraction, 'GWP100') / aa_baseline.get_mass_flow(azelaic_acid)
-FA = aa_baseline.get_material_impact(F.fatty_acid_blend, 'GWP100') / aa_baseline.get_mass_flow(azelaic_acid)    
-MCA = aa_baseline.get_material_impact(F.recovered_C5_to_C9_MCA_fraction, 'GWP100') / aa_baseline.get_mass_flow(azelaic_acid)
-CG = aa_baseline.get_material_impact(F.crude_glycerol, 'GWP100') / aa_baseline.get_mass_flow(azelaic_acid)
-M = aa_baseline.get_material_impact(F.crude_methanol, 'GWP100') / aa_baseline.get_mass_flow(azelaic_acid)    
-sum_other_disp = FA + MCA + CG + M
-displacement_fractions = [
-    feedstock * 100 / displacement_total,
-    materials * 100 / displacement_total,
-    ng * 100 / displacement_total,
-    electricity * 100 / displacement_total,
-    direct * 100 / displacement_total,
-    -sum_other_disp* 100 / displacement_total,
-    -PA * 100 / displacement_total
+
+# ---------------------------
+# 1) Absolute burdens per FU (positive)
+# ---------------------------
+abs_feedstock   = float(get_feedstock_GWP())
+abs_materials   = float(get_other_materials_impact())
+abs_natgas      = float(get_ng_GWP())
+abs_electricity = float(net_electricity_purchased_GWP())
+abs_direct      = float(get_total_direct_emissions_GWP())
+
+burdens_abs = np.array([abs_feedstock, abs_materials, abs_natgas, abs_electricity, abs_direct], dtype=float)
+burdens_sum = float(np.nansum(burdens_abs))
+if burdens_sum == 0:
+    raise ValueError("Total burdens are zero; cannot normalize to 100%.")
+
+# Scale factor to map burdens to 100%
+scale_to_pct = 100.0 / burdens_sum
+
+# Inputs on a 100% scale
+inputs_pct = burdens_abs * scale_to_pct  # feedstock, other materials, NG, electricity, direct
+
+# ---------------------------
+# 2) Co-product terms per FU (positive magnitudes in ABSOLUTE units)
+#    We'll convert them to % using the SAME scale_to_pct
+# ---------------------------
+
+# Displacement credits (per FU of AA)
+pa_disp_abs  = aa_baseline.get_material_impact(F.pelargonic_acid_rich_fraction, 'GWP100') / aa_baseline.get_mass_flow(azelaic_acid)
+fa_disp_abs  = aa_baseline.get_material_impact(F.fatty_acid_blend, 'GWP100')              / aa_baseline.get_mass_flow(azelaic_acid)
+mca_disp_abs = aa_baseline.get_material_impact(F.recovered_C5_to_C9_MCA_fraction, 'GWP100') / aa_baseline.get_mass_flow(azelaic_acid)
+gly_disp_abs = aa_baseline.get_material_impact(F.crude_glycerol, 'GWP100')                / aa_baseline.get_mass_flow(azelaic_acid)
+meoh_disp_abs= aa_baseline.get_material_impact(F.crude_methanol, 'GWP100')                / aa_baseline.get_mass_flow(azelaic_acid)
+other_disp_abs = fa_disp_abs + mca_disp_abs + gly_disp_abs + meoh_disp_abs
+
+# Mass allocation shares per FU (absolute)
+mass_c5_c9_abs = aa_baseline.get_mass_flow(recovered_C5_to_C9_MCA_fraction) * get_system_GWP() / get_total_product_mass()
+mass_pa_abs    = aa_baseline.get_mass_flow(pelargonic_acid_rich_fraction)   * get_system_GWP() / get_total_product_mass()
+mass_gly_abs   = aa_baseline.get_mass_flow(crude_glycerol)                  * get_system_GWP() / get_total_product_mass()
+mass_fa_abs    = aa_baseline.get_mass_flow(fatty_acid_blend)                * get_system_GWP() / get_total_product_mass()
+mass_meoh_abs  = aa_baseline.get_mass_flow(crude_methanol)                  * get_system_GWP() / get_total_product_mass()
+mass_other_abs = mass_c5_c9_abs + mass_gly_abs + mass_fa_abs + mass_meoh_abs
+mass_aa_fraction = aa_baseline.get_mass_flow(azelaic_acid)                  * get_system_GWP() / get_total_product_mass()
+
+# Economic allocation shares per FU (absolute)
+econ_c5_c9_abs = aa_baseline.get_market_value(recovered_C5_to_C9_MCA_fraction) * get_system_GWP() / get_total_product_market_value()
+econ_pa_abs    = aa_baseline.get_market_value(pelargonic_acid_rich_fraction)   * get_system_GWP() / get_total_product_market_value()
+econ_gly_abs   = aa_baseline.get_market_value(crude_glycerol)                  * get_system_GWP() / get_total_product_market_value()
+econ_fa_abs    = aa_baseline.get_market_value(fatty_acid_blend)                * get_system_GWP() / get_total_product_market_value()
+econ_meoh_abs  = aa_baseline.get_market_value(crude_methanol)                  * get_system_GWP() / get_total_product_market_value()
+econ_other_abs = econ_c5_c9_abs + econ_gly_abs + econ_fa_abs + econ_meoh_abs
+economic_aa_fraction = aa_baseline.get_market_value(azelaic_acid)              * get_system_GWP() / get_total_product_market_value()
+
+# ---------------------------
+# 3) Convert outputs to % offsets RELATIVE to inputs (negative bars)
+# ---------------------------
+disp_offsets_pct = -np.array([other_disp_abs, pa_disp_abs]) * scale_to_pct
+mass_offsets_pct = -np.array([mass_other_abs, mass_pa_abs]) * scale_to_pct
+econ_offsets_pct = -np.array([econ_other_abs, econ_pa_abs]) * scale_to_pct
+
+# ---------------------------
+# 4) Assemble DataFrame for plotting (percent units)
+# ---------------------------
+index_rows = [
+    'feedstock', 'other materials', 'natural gas', 'electricity purchased', 'direct emissions',
+    'other co-products', 'pelargonic acid'
 ]
 
+col_inputs_pct = inputs_pct  # length 5
+col_disp = np.r_[col_inputs_pct, disp_offsets_pct]
+col_mass = np.r_[col_inputs_pct, mass_offsets_pct]
+col_econ = np.r_[col_inputs_pct, econ_offsets_pct]
 
-# Mass allocation
-mass_C5_C9_fraction = aa_baseline.get_mass_flow(recovered_C5_to_C9_MCA_fraction)*get_system_GWP()/get_total_product_mass()
-mass_pa_fraction = aa_baseline.get_mass_flow(pelargonic_acid_rich_fraction)*get_system_GWP()/get_total_product_mass()
-mass_glycerol_fraction = aa_baseline.get_mass_flow(crude_glycerol)*get_system_GWP()/get_total_product_mass() 
-mass_fa_fraction = aa_baseline.get_mass_flow(fatty_acid_blend)*get_system_GWP()/get_total_product_mass()
-mass_methanol_fraction = aa_baseline.get_mass_flow(crude_methanol)*get_system_GWP()/get_total_product_mass()
-sum_mass_others =  mass_C5_C9_fraction+mass_glycerol_fraction+mass_fa_fraction+mass_methanol_fraction
-mass_aa_fraction = aa_baseline.get_mass_flow(azelaic_acid)*get_system_GWP()/get_total_product_mass()
-mass_fractions = [
-                feedstock * 100 / mass_aa_fraction,
-                materials * 100 / mass_aa_fraction,
-                ng * 100 / mass_aa_fraction,
-                electricity * 100 / mass_aa_fraction,
-                direct * 100 / mass_aa_fraction,
-                -mass_pa_fraction*100/mass_aa_fraction,                                                        
-                -sum_mass_others*100/mass_aa_fraction,
-                  ]
-# Economic allocation
-economic_C5_C9_fraction = aa_baseline.get_market_value(recovered_C5_to_C9_MCA_fraction)*get_system_GWP()/get_total_product_market_value()
-economic_pa_fraction = aa_baseline.get_market_value(pelargonic_acid_rich_fraction)*get_system_GWP()/get_total_product_market_value()
-economic_glycerol_fraction = aa_baseline.get_market_value(crude_glycerol)*get_system_GWP()/get_total_product_market_value() 
-economic_fa_fraction = aa_baseline.get_market_value(fatty_acid_blend)*get_system_GWP()/get_total_product_market_value()          
-economic_methanol_fraction = aa_baseline.get_market_value(crude_methanol)*get_system_GWP()/get_total_product_market_value()          
-sum_economic_others = economic_C5_C9_fraction+economic_glycerol_fraction+economic_fa_fraction+economic_methanol_fraction 
-economic_pa_fraction = economic_pa_fraction
-economic_aa_fraction = aa_baseline.get_market_value(azelaic_acid)*get_system_GWP()/get_total_product_market_value()
-economic_fractions = [
-                feedstock * 100 / economic_aa_fraction,
-                materials * 100 / economic_aa_fraction,
-                ng * 100 / economic_aa_fraction,
-                electricity * 100 / economic_aa_fraction,
-                direct * 100 / economic_aa_fraction,
-                -economic_pa_fraction*100/economic_aa_fraction,                                                        
-                -sum_economic_others*100/economic_aa_fraction,
-                  ]
-# Create DataFrame
-index_disp = ['feedstock', 'other materials', 'natural gas', 'electricity purchased', 'direct emissions', 'other co-products', 'pelargonic acid']
-index_mass = ['feedstock', 'other materials', 'natural gas', 'electricity purchased', 'direct emissions', 'other co-products', 'pelargonic acid']
-index_econ = ['feedstock', 'other materials', 'natural gas', 'electricity purchased', 'direct emissions', 'other co-products', 'pelargonic acid']
+df_all = pd.DataFrame(
+    {'Displacement': col_disp, 'Mass\nallocation': col_mass, 'Economic\nallocation': col_econ},
+    index=index_rows
+)
 
-df_disp = pd.DataFrame({'Displacement': displacement_fractions}, index=index_disp)
-df_mass = pd.DataFrame({'Mass\nallocation': mass_fractions}, index=index_mass)
-df_econ = pd.DataFrame({'Economic\nallocation': economic_fractions}, index=index_econ)
+# ---------------------------
+# 5) Y-axis ticks (percent). Inputs sum to 100; extend below for credits.
+# ---------------------------
+total_credit_disp = -df_all.loc['other co-products', 'Displacement'] - df_all.loc['pelargonic acid', 'Displacement']
+total_credit_mass = -df_all.loc['other co-products', 'Mass\nallocation'] - df_all.loc['pelargonic acid', 'Mass\nallocation']
+total_credit_econ = -df_all.loc['other co-products', 'Economic\nallocation'] - df_all.loc['pelargonic acid', 'Economic\nallocation']
+max_credit = float(np.nanmax([total_credit_disp, total_credit_mass, total_credit_econ]))
 
-df_all = df_disp.join(df_mass, how='outer').join(df_econ, how='outer')
-df_all_scaled = df_all/20
-#plotting the GWP stacked plot                  
-evenly_spaced_list = np.linspace(-100, 100, num=6, dtype=int).tolist()
+y_ticks =np.arange(-120, 160, 40).tolist()
 
+# ---------------------------
+# 6) Colors / hatches (simple, consistent)
+# ---------------------------
 co_product_colors = {
-    ('pelargonic acid', 'Displacement'): guest_group_colors['Green'],
+    ('pelargonic acid', 'Displacement'): np.array([121/255, 191/255, 130/255]),
     ('pelargonic acid', 'Mass\nallocation'): colors.orange.RGBn,
-    ('pelargonic acid', 'Economic\nallocation'): guest_group_colors['Blue'],
-    ('other co-products', 'Displacement'):guest_group_colors['Green'],
+    ('pelargonic acid', 'Economic\nallocation'): np.array([96/255, 193/255, 207/255]),
+    ('other co-products', 'Displacement'): np.array([121/255, 191/255, 130/255]),
     ('other co-products', 'Mass\nallocation'): colors.orange.RGBn,
-    ('other co-products', 'Economic\nallocation'): guest_group_colors['Blue'],
+    ('other co-products', 'Economic\nallocation'): np.array([96/255, 193/255, 207/255]),
 }
 
 colors_here = {
     'feedstock': colors.purple_tint.RGBn,
-    'other materials':  colors.purple.RGBn,
-    'natural gas':colors.purple_dark.RGBn,
-    'electricity purchased':colors.purple_tint.RGBn,  
-    'direct emissions':  colors.purple_tint.RGBn,
-            #        # changed
+    'other materials': colors.purple.RGBn,
+    'natural gas': colors.purple_dark.RGBn,
+    'electricity purchased': colors.purple_tint.RGBn,
+    'direct emissions': colors.purple_tint.RGBn,
 }
 
 hatch_patterns = {
     'feedstock': '|',
     'other materials': '\\',
     'natural gas': None,
-    'electricity purchased': '',        # changed
-    'direct emissions': '\/',             # changed
+    'electricity purchased': '',
+    'direct emissions': '\/',
     'pelargonic acid': '/',
     'other co-products': '.'
 }
 
+# ---------------------------
+# 7) Plot (percent scale; inputs sum to 100)
+# ---------------------------
 contourplots.stacked_bar_plot_full_CI(
-    dataframe=df_all_scaled,  # your DataFrame with lowercase index
+    dataframe=df_all,
     colors=colors_here,
     co_product_colors=co_product_colors,
     hatch_patterns=hatch_patterns,
-    y_ticks=evenly_spaced_list,
-    linewidth = 3,
-    given_font_size = 50,
+    y_ticks=y_ticks,
+    linewidth=3,
+    given_font_size=50,
     hatch_linewidth=3.0,
     tick_length_major=40,
     tick_length_minor=20,
-    greyscale_legend = True,
+    greyscale_legend=True,
     fig_width=16,
-    fig_height=14)
+    fig_height=14
+)
+
+# ---------------------------
+# 8) Verification — reconvert % back to absolutes and match baselines
+# ---------------------------
+# recover absolutes from % using the SAME scale_to_pct
+inputs_abs_recon = df_all.loc[['feedstock','other materials','natural gas','electricity purchased','direct emissions']] / scale_to_pct
+abs_burden_sum_recon = inputs_abs_recon.sum(axis=0)  # identical across columns
+
+disp_other_abs_recon = -df_all.loc['other co-products', 'Displacement']       / scale_to_pct
+disp_pa_abs_recon    = -df_all.loc['pelargonic acid',   'Displacement']       / scale_to_pct
+mass_other_abs_recon = -df_all.loc['other co-products', 'Mass\nallocation']   / scale_to_pct
+mass_pa_abs_recon    = -df_all.loc['pelargonic acid',   'Mass\nallocation']   / scale_to_pct
+econ_other_abs_recon = -df_all.loc['other co-products', 'Economic\nallocation']/ scale_to_pct
+econ_pa_abs_recon    = -df_all.loc['pelargonic acid',   'Economic\nallocation']/ scale_to_pct
+
+reconstructed_disp_net   = abs_burden_sum_recon['Displacement']        - (disp_other_abs_recon + disp_pa_abs_recon)
+reconstructed_mass_share = abs_burden_sum_recon['Mass\nallocation']    - (mass_other_abs_recon + mass_pa_abs_recon)
+reconstructed_econ_share = abs_burden_sum_recon['Economic\nallocation']- (econ_other_abs_recon + econ_pa_abs_recon)
+
+target_disp_net  = get_net_GWP_displacement()
+target_mass_share= mass_aa_fraction
+target_econ_share= economic_aa_fraction
+
+results = pd.DataFrame({
+    "Reconstructed": [reconstructed_disp_net, reconstructed_mass_share, reconstructed_econ_share],
+    "Target":        [target_disp_net,        target_mass_share,        target_econ_share],
+}, index=["Displacement net GWP", "Mass allocation AA share", "Economic allocation AA share"])
+results["Abs Error"] = results["Reconstructed"] - results["Target"]
+results["Rel Error"] = results["Abs Error"] / results["Target"]
+results["OK?"] = [
+    bool(np.isclose(results.iloc[0,0], results.iloc[0,1], rtol=1e-8, atol=1e-10)),
+    bool(np.isclose(results.iloc[1,0], results.iloc[1,1], rtol=1e-8, atol=1e-10)),
+    bool(np.isclose(results.iloc[2,0], results.iloc[2,1], rtol=1e-8, atol=1e-10)),
+]
+
+print(results.to_string(float_format=lambda x: f"{x:.6g}"))
 
 #%% Sensitivity plots
 def MPSP_sensitivity_plot():
@@ -516,8 +558,8 @@ def GWP_sensitivity_plot_economic():
 import numpy as np
 
 # Define the ranges
-x_data = np.linspace(0.86, 0.99, 14)  #X_dih
-y_data = np.linspace(0.93, 0.99, 7)
+x_data = np.linspace(0.86, 0.99, 14)  # X_dih
+y_data = np.linspace(0.93, 0.99, 7)   # X_ox_rxn_1
 
 # Initialize results container
 w_data = []
@@ -526,28 +568,43 @@ w_data = []
 def value_at_x_and_y(x, y):
     aa_baseline.empty_recycles()
     aa_baseline.reset_cache()
-    F.crude_vegetable_oil.price = 1.6
+    F.crude_vegetable_oil.price = 2.70
     F.unit.R200.X_dih = x
     F.unit.R300.X_ox_rxn_1 = y
     
     try:
         aa_baseline.simulate()
-        value  =  get_MPSP()
-        return value 
+        value = round(get_MPSP(), 3)
+        return value
     except:
-        return np.nan  # Use np.nan instead of 0 for better plotting
+        return np.nan  # better than 0 for plotting
+
 
 # Loop through grid
 for y in y_data:
     row = []
+    prev_val = None
     for x in x_data:
         value = value_at_x_and_y(x, y)
-        print(f"X_dih = {x:.2f}, X_ox_rxn_1 = {y:.2f} --> CI = {value}")
+        
+        # Re-run if anomaly (current > previous in same row)
+        if prev_val is not None:
+            attempts = 0
+            while value > prev_val and attempts < 7:  # avoid infinite loop
+                print(f"Retrying at X_dih={x:.2f}, X_ox_rxn_1={y:.2f} (value {value} > prev {prev_val})")
+                aa_baseline.reset_cache()
+                aa_baseline.empty_recycles()
+                value = value_at_x_and_y(x, y)
+                attempts += 1
+        
+        print(f"X_dih = {x:.2f}, X_ox_rxn_1 = {y:.2f} --> value_generated = {value}")
         row.append(value)
+        prev_val = value
     w_data.append(row)
 
 # Convert to NumPy array for heatmapping
 w_array = np.array(w_data)
+
 
 #%% Plot contour plot
 import numpy as np
@@ -561,26 +618,60 @@ y_data = np.linspace(0.93, 0.99, 7)
 
 z_data = [1,]
 # Call to function
+# w_data = CI_economic_160_lower_price =  [
+#     [5.298, 5.236, 5.173, 5.114, 5.045, 4.989, 4.938, 4.878, 4.824, 4.782, 4.721, 4.678, 4.631, 4.569],
+#     [5.224, 5.163, 5.099, 5.039, 4.976, 4.920, 4.865, 4.810, 4.753, 4.704, 4.660, 4.612, 4.559, 4.514],
+#     [5.146, 5.087, 5.024, 4.959, 4.903, 4.842, 4.788, 4.733, 4.694, 4.642, 4.593, 4.545, 4.492, 4.461],
+#     [5.073, 5.010, 4.956, 4.890, 4.834, 4.774, 4.722, 4.670, 4.624, 4.574, 4.526, 4.488, 4.442, 4.397],
+#     [5.000, 4.938, 4.877, 4.813, 4.764, 4.710, 4.656, 4.605, 4.560, 4.508, 4.470, 4.418, 4.372, 4.335],
+#     [4.950, 4.875, 4.818, 4.766, 4.669, 4.650, 4.584, 4.533, 4.488, 4.456, 4.396, 4.357, 4.312, 4.273],
+#     [4.911, 4.831, 4.772, 4.711, 4.663, 4.593, 4.536, 4.501, 4.438, 4.402, 4.354, 4.307, 4.250, 4.208]
+# ]
 
-w_data = MSP_96 =[[7.981055223575872, 7.864195157542529, 7.765550939236605, 7.671649871450974, 7.571862670053206, 7.481611762499759, 7.395722480967968, 7.312032729350422, 7.227811356823886, 7.144806077316674, 7.045380824331508, 6.988371756801099, 6.914586032968447, 6.840414847251515],
- [7.832526361496674, 7.743258806747542, 7.649226104262449, 7.5568887769017605, 7.458982831987938, 7.369809038262039, 7.28560694955789, 7.201986143739212, 7.1206905534001095, 7.042438010778438, 6.946596552383828, 6.889021083917847, 6.812461291083942, 6.73771995838279],
- [7.719274931646763, 7.630307692156533, 7.537340998413375, 7.4378752607887995, 7.350475577265298, 7.263032790710171, 7.179790147749486, 7.097385548959307, 7.020606933647218, 6.941962103268388, 6.8379837934693715, 6.775218864824552, 6.720193250600199, 6.647342118665781],
- [7.611052969000396, 7.523282638295047, 7.428420591020182, 7.330501283205667, 7.2445191837445195, 7.158446098425314, 7.075094606838913, 6.995538621000895, 6.91966244917014, 6.842210288674641, 6.735411072355477, 6.687518417616904, 6.623696241770276, 6.551935399472475],
- [7.500099369890578, 7.414588227060508, 7.317594311486582, 7.228405279447448, 7.143739381233147, 7.05862226631095, 6.976665778827683, 6.895130315631108, 6.8205994204141245, 6.739941690248985, 6.660419386620822, 6.604312420186705, 6.530578102208284, 6.4616217700693355],
- [7.390769812187133, 7.302513034783678, 7.206704315327397, 7.125863923976665, 7.043536078876767, 6.957817359132263, 6.875639558648244, 6.794578073366679, 6.721162915398627, 6.653548315732953, 6.580984360728862, 6.509421926156616, 6.431501239370244, 6.366183086949615],
- [7.334006181874754, 7.2802084516355645, 7.1661731136783615, 7.079690863939635, 6.982336956793593, 6.896523450997458, 6.810567160868227, 6.7357600548565655, 6.65235740438199, 6.578128356840881, 6.512736298370799, 6.43176350372215, 6.362597679228499, 6.2949575037080665]]
 
+import numpy as np
+import matplotlib as mpl
+
+vmin = 4.2
+# float(np.nanmin(w_data))-0.1
+vmax = 5.4
+# float(np.nanmax(w_data))+0.1
+
+# pick 5 bands (=> 6 edges)
+n_bands = 6
+
+# 1) band edges (nice 1-decimal labels)
+w_levels = np.linspace(vmin, vmax, n_bands + 1)   # positions
+cbar_ticks = w_levels                              # positions on cbar
+cbar_labels = [f"{t:.1f}" for t in cbar_ticks]     # 1-decimal labels
+
+# 2) discrete colormap exactly matching bands
+base = CABBI_green_colormap()                      # your custom cmap
+cmap = mpl.colors.ListedColormap(base(np.linspace(0, 1, n_bands)))
+norm = mpl.colors.BoundaryNorm(w_levels, ncolors=cmap.N, extend='neither')
+
+# 3) contour lines: use only *interior* band edges (stable for 5 bands)
+w_ticks = w_levels[1:-1]                           # lines at internal boundaries
+fmt_clabel = lambda v: f"{v:.2f}"                  # 1-decimal labels
+
+# --- in your drawing code ---
+# im = ax.contourf(X, Y, Z, levels=w_levels, cmap=cmap, norm=norm)
+# cl = ax.contour (X, Y, Z, levels=w_ticks, colors='black', linewidths=w_tick_width)
+# ax.clabel(cl, w_ticks, fmt=fmt_clabel, fontsize=clabel_fontsize)
+
+# cbar = plt.colorbar(mpl.cm.ScalarMappable(norm=norm, cmap=cmap), cax=cax, ticks=cbar_ticks)
+# cbar.ax.set_yticklabels(cbar_labels)
 
 contourplots.animated_contourplot(
     w_data_vs_x_y_at_multiple_z=[w_data],  # shape = [z * x * y]
     x_data=x_data,
     y_data=y_data,
     z_data=z_data,
-    x_label="dihydroxylation",
+    x_label="Dihydroxylation",
     include_axis_labels = True,
-    y_label="oxidative cleavage",
+    y_label="Oxidative cleavage",
     z_label=" ",
-    w_label=
+    w_label= 
     "MSP [$·kg⁻¹]",
     # "CI\n[kg CO₂-eq·kg⁻¹]",
     x_ticks= np.linspace(0.86, 0.99, num=6),
@@ -589,29 +680,28 @@ contourplots.animated_contourplot(
     
     y_ticks= [0.93,0.94,0.95, 0.96,0.97, 0.98, 0.99],
     z_ticks=z_data,
-    w_levels=
-    # [round(i,2) for i in np.linspace(5.26,6.61,num = 7)],    
+    w_levels=w_levels,
     # [round(i,4) for i in np.linspace(4.520338895464722,5.632695415241322,num=7)],
     # [round(i,2) for i in np.linspace(5.181396262984121,6.5081581355353615,num=7)],
     # [round(i,2) for i in  np.linspace(3.96,5.01,8)],
-    [round(i,3,) for i in  np.linspace(6.29,7.9999,7)],
-    # [round(i,2) for i in np.linspace(4.22,5.34,5)],
-    # [round(i,2) for i in  np.linspace(5.823649160199181,6.783,6)],    
-    # [round(i,1) for i in  np.linspace(-2.04,-0.6,8)],
+    # [round(i,3,) for i in  np.linspace(6.29,7.9999,7)],
+    # [round(i,3) for i in np.linspace(4.22,5.33,6)],
+    # [round(i,2) for i in  np.linspace(5.82,6.78,7)],    
+    # [round(i,2) for i in  np.linspace(-1.89,-0.63,7)],
     
-    # [round(i,2) for i in  np.linspace(3.22,3.28,4)],
-    w_ticks= 
-    # [round(i,2) for i in np.linspace(5.26,6.61,num = 7)],    
+    # [round(i,2) for i in  np.linspace(3.21,3.28,8)],
+    w_ticks=  w_ticks,
+   
     # [round(i,4) for i in np.linspace(4.520338895464722,5.632695415241322,num=7)],
-    # [round(i,2) for i in  np.linspace(5.823649160199181,6.783,6)],
+    # [round(i,2) for i in  np.linspace(5.82,6.78,7)],   
     # [round(i,2) for i in  np.linspace(3.96,5.01,8)],
-    [round(i,3) for i in  np.linspace(6.29,7.9999,7)],
+    # [round(i,3,) for i in  np.linspace(6.29,7.9999,7)],
     # [round(i,2) for i in np.arange(4.58,5.70,0.2],
-    # [round(i,2) for i in np.linspace(4.22,5.34,5)],
+    # [round(i,3) for i in np.linspace(4.22,5.33,6)],
     # [round(i,3) for i in  np.linspace(2.49018,2.66372,6)],   
-    # [round(i,1) for i in  np.linspace(-2.04,-0.6,8)],
+    # [round(i,2) for i in  np.linspace(-1.89,-0.63,7)],
     
-    # [round(i,2) for i in  np.linspace(3.22,3.28,4)],
+    # [round(i,2) for i in  np.linspace(3.21,3.28,8)],
     # [round(i,2) for i in  np.linspace(5.326579567618295,6.559448181707804,8)],
     x_units="mol·mol⁻¹",  # or "%", if you multiply x/y by 100
     y_units="mol·mol⁻¹",
@@ -621,20 +711,22 @@ contourplots.animated_contourplot(
     # '$·kg⁻¹',
     round_xticks_to=2,
     round_yticks_to=2,
-    fmt_clabel=lambda cvalue: "{:.1f}".format(cvalue),
+    fmt_clabel=lambda cvalue: "     ",
+    # {:.0f}".format(cvalue),
     clabel_fontsize = 18,
     default_fontsize = 18,
-    cmap= CABBI_green_colormap(),
-    # 'summer',
-    cbar_ticks= 
-        # [round(i,3) for i in np.linspace(5.26,6.61,num = 6)],
+    cmap= cmap,
+    cbar_ticks= cbar_ticks,
+   
+     # np.linspace(5.244,6.67,num = 5)],
         # [round(i,3) for i in np.linspace(5.181396262984121,6.5,num=7)],
-        # [round(i,2) for i in  np.linspace(5.823649160199181,6.783,6)],
-        # 
-    # [round(i,2) for i in np.linspace(4.22,5.34,5)],
+        # [round(i,2) for i in  np.linspace(-1.89,-0.63,7)],
+        # [round(i,3) for i in  np.linspace(6.29,7.9999,7)],
+        
+    # [round(i,3) for i in np.linspace(4.22,5.33,6)],
         # [round(i,3) for i in np.arange(4.38603174006138,5.3,0.2)],
         # [round(i,2) for i in  np.linspace(3.96,5.01,8)],
-        [round(i,3) for i in  np.linspace(6.29,7.9999,7)],
+        # [round(i,3) for i in  np.linspace(6.29,7.9999,7)],
         # [round(i,3) for i in np.linspace(4.57776,5.70601,7)],
         # [round(i,4) for i in  np.linspace(2.49018,2.66372,6)],   
         # [round(i,1) for i in  np.linspace(-2.04,-0.62,8)],
@@ -642,14 +734,28 @@ contourplots.animated_contourplot(
     # [round(i,2) for i in  np.linspace(5.326579567618295,6.559448181707804,8)],
         
     # [round(i,4) for i in np.linspace(4.520338895464722,5.632695415241322,num=7)],
-    manual_cbar_tick_labels  =
+    # [round(i,2) for i in  np.linspace(3.21,3.28,8)],
+    
+    # [round(i,2) for i in  np.linspace(5.82,6.78,7)],   
+
+    manual_cbar_tick_labels  =cbar_labels ,
+    
+        # [round(i,1) for i in  np.linspace(6.29,7.9999,7)],
+      
+    # [round(i,1) for i in  np.linspace(-1.89,-0.63,7)],
+            # [round(i,1) for i in np.linspace(5.24,6.62,num = 7)],
+    
+    # [i for i in [5.2,5.5,5.8,6.1,6.4,6.7]],
     # [round(i,2) for i in  np.linspace(-3.825505317768835,-2.574,6)],
     # [round(i,2) for i in np.linspace(4.520338895464722,5.632695415241322,num=7)],
    # [round(i,3) for i in  np.linspace(-3.825505317768835,-2.5735286958133816,8)],
     # [round(i,2) for i in  np.linspace(2.4738498492142282,2.649505307119087,7)],
-    [round(i,2) for i in  np.linspace(6.29,7.98,7)],
+    # [round(i,1) for i in  np.linspace(6.29,7.98,9)],
+    # [round(i,1) for i in np.linspace(4.22,5.33,6)],
     
-    # [round(i,2) for i in  np.linspace(3.22,3.28,4)],
+    # [round(i,2) for i in  np.linspace(3.21,3.28,8)],
+    
+    # [round(i,1) for i in  np.linspace(5.82,6.78,7)],   
     z_marker_color='g',
     # axis_title_fonts={'size': {'x': 9, 'y': 9, 'z': 7, 'w': 9}},
     fps=3,
@@ -658,9 +764,9 @@ contourplots.animated_contourplot(
     # additional_points = {
     # (0.86, 0.93): ('d', 'white', 10)},
     n_loops='inf',
-    animated_contourplot_filename='CI_mass_contourplot_',
+    animated_contourplot_filename='MSP_baselinefpp_contourplot_',
     keep_frames=True,
-    gaussian_filter_smoothing = True,
+    # gaussian_filter_smoothing = True,
     # gaussian_filter_smoothing_sigma=0.3,
     tick_length_major = 25,
     cbar_n_minor_ticks = 4,
@@ -811,7 +917,7 @@ for i, var in enumerate(variables):
     ax.set_ylim(6, 7.2)
 
     # Y-axis formatting
-    ax.set_yticklabels([f'{yt:.1f}' for yt in ax.get_yticks()], fontsize=default_fontsize)
+    ax.set_yticklabels([f'{yt:.2f}' for yt in ax.get_yticks()], fontsize=default_fontsize)
     ax.set_ylabel(r'MSP [\$·kg$^{-1}$]', fontsize=default_fontsize, labelpad=10)
     ax.set_xlabel('')
 
@@ -1718,3 +1824,71 @@ ax.legend(
 plt.tight_layout()
 plt.show()
 fig.savefig('MPSP_vs_FeedFlow_Annual_Capacity.svg', format='svg', bbox_inches='tight')
+
+#%%code to generate absolute LCA values
+import pandas as pd
+from pathlib import Path
+
+# ---- CONFIG ----
+excel_path = Path(r"C:\Users\lavan\OneDrive\Desktop\LCA_results_only.xlsx")
+output_path = Path(r"C:\Users\lavan\OneDrive\Desktop\LCA_results_with_abs.xlsx")
+
+# Excel row indices (1-based). We need:
+# - header row = 2  (for column names)
+# - multiplier row = 4 (values in A/B/C used for the multiplications)
+HEADER_ROW_EXCEL = 2
+MULTIPLIER_ROW_EXCEL = 4
+
+# ---- LOAD RAW (no header) ----
+raw = pd.read_excel(excel_path, header=None)
+
+# ---- Set column names from Excel row 2 ----
+header_idx = HEADER_ROW_EXCEL - 1  # convert to 0-based
+cols = raw.iloc[header_idx].astype(str).str.strip().tolist()
+df = raw.copy()
+df.columns = cols
+
+# ---- Determine pandas index for "start at row 4" and multiplier row ----
+# When we don't drop rows, the DataFrame keeps original row positions.
+# Excel row N -> pandas index (N - 1)
+start_row = MULTIPLIER_ROW_EXCEL - 1
+mult_row = MULTIPLIER_ROW_EXCEL - 1
+
+# ---- Column positions by Excel letter (0-based) ----
+# A,B,C are 0,1,2; D–J -> 3:10; K–Q -> 10:17; R–X -> 17:24
+col_A_name = df.columns[0]
+col_B_name = df.columns[1]
+col_C_name = df.columns[2]
+
+cols_D_to_J = df.columns[3:10]
+cols_K_to_Q = df.columns[10:17]
+cols_R_to_X = df.columns[17:24]
+
+# ---- Get multipliers from Excel row 4 (pandas index 'mult_row') ----
+a_val = pd.to_numeric(df.loc[mult_row, col_A_name], errors='coerce')
+b_val = pd.to_numeric(df.loc[mult_row, col_B_name], errors='coerce')
+c_val = pd.to_numeric(df.loc[mult_row, col_C_name], errors='coerce')
+
+# ---- Helper to create _abs columns safely (numeric from row 4 down only) ----
+def make_abs_block(target_cols, multiplier_value, divisor=5):
+    for col in target_cols:
+        new_col = f"{col}_abs"
+        # initialize column with NaN
+        df[new_col] = pd.NA
+        # numeric source values for the range we compute
+        src = pd.to_numeric(df.loc[start_row:, col], errors='coerce')
+        df.loc[start_row:, new_col] = src * multiplier_value / divisor
+
+# ---- Apply the three blocks ----
+# D–J: multiply by C(row 4) and divide by 5
+make_abs_block(cols_D_to_J, c_val, divisor=-5)
+
+# K–Q: multiply by A(row 4) and divide by 5
+make_abs_block(cols_K_to_Q, a_val, divisor=5)
+
+# R–X: multiply by B(row 4) and divide by 5
+make_abs_block(cols_R_to_X, b_val, divisor=5)
+
+# ---- Save ----
+df.to_excel(output_path, index=False)
+print(f"Saved: {output_path}")
