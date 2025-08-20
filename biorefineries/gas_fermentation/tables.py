@@ -98,3 +98,9 @@ def save_distribution_table():
     assert len(df_dct) == 1
     table.to_excel(file)
     return table
+
+if __name__ == '__main__':
+    save_system_reports()
+    save_detailed_expenditure_tables()
+    save_detailed_life_cycle_tables()
+    save_distribution_table()

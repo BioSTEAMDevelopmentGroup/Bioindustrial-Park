@@ -256,8 +256,9 @@ def foc_table(teas, names=None, dataframe=True):
     accounting = tea.Accounting('MM$ / yr', names=names)
     ISBL = np.array([i.ISBL_installed_equipment_cost / 1e6 for i in teas])
     labor_cost = np.array([i.labor_cost / 1e6 for i in teas])
+    FCI = np.array([i.FCI / 1e6 for i in teas])
     accounting.entry('Labor salary', labor_cost)
     accounting.entry('Labor burden', tea.labor_burden * labor_cost, '90% of labor salary')
     accounting.entry('Maintenance', tea.maintenance * ISBL, f'{tea.maintenance:.1%} of ISBL')
-    accounting.entry('Property insurance', tea.property_insurance * ISBL, f'{tea.property_insurance:.1%} of ISBL')
+    accounting.entry('Property insurance', tea.property_insurance * FCI, f'{tea.property_insurance:.1%} of FCI')
     return accounting.table() if dataframe else accounting

@@ -41,7 +41,11 @@ def create_model(flowsheet=None, kind='SSCF'):
         load_process_settings()
         lactic_sys = create_system(kind=kind)
         flowsheet = lactic_sys.flowsheet
-    else: lactic_sys = flowsheet.system.lactic_sys
+    else: 
+        if isinstance(flowsheet, str):
+            lactic_sys = bst.F.flowsheet[flowsheet].lactic_sys
+        else:
+            lactic_sys = flowsheet.system.lactic_sys
     lactic_sys.simulate() # need this to initialize some settings
     s = flowsheet.stream
     u = flowsheet.unit
@@ -343,17 +347,19 @@ def create_model(flowsheet=None, kind='SSCF'):
         M301.enzyme_loading = loading
 
     # Enzymatic hydrolysis
+    R = u.R300 if kind == 'SHF' else u.R301
     D = shape.Triangle(0, 24, 56)
     @param(name='Enzymatic hydrolysis time', element=R301, kind='coupled', units='hr',
            baseline=24, distribution=D)
     def set_R301_saccharification_time(tau):
-        R301.tau_saccharification = tau
+        R.tau_saccharification = tau
 
     D = shape.Triangle(0.75, 0.9, 0.948-1e-6)
     @param(name='Enzymatic hydrolysis glucan-to-glucose', element=R301, kind='coupled', units='',
            baseline=0.9, distribution=D)
     def set_R301_glucan_conversion(X):
-        R301.saccharification_rxns[2].X = X
+        R.saccharification_rxns[2].X = X
+
 
     # Fermentation
     D = shape.Triangle(5, 10, 15)

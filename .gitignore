@@ -12,7 +12,7 @@ biorefineries.egg-info
 dist
 MANIFEST
 .coverage
-#.coveralls.yml
+.coveralls.yml
 htmlcov
 _build
 .cache
