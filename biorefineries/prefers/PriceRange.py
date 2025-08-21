@@ -183,7 +183,7 @@ def get_price_range(df: pd.DataFrame) -> pd.DataFrame:
 
 if __name__ == "__main__":
     # Example usage
-    names = ['Glucose',]
+    names = ['Glucose','2-butanol', 'Aspirin']
     smiles_list = get_smiles(names)
     
     # Collect prices for the SMILES
