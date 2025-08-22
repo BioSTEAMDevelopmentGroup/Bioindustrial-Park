@@ -96,12 +96,13 @@ def create_stream(stream_list):
         streams.append(s)
     return streams
 
-def update_all_input_stream_prices():
+def update_all_input_stream_prices(streamlist):
     """Update prices for all input streams"""
     # FIX: Check if streams exist and are proper objects
     try:
-        input_streams = create_stream([SeedIn, CultureIn, Glucose, NH3_25wt, 
-                        BufferA, BufferB, BufferC])
+        input_streams = streamlist
+        # input_streams = create_stream([SeedIn, CultureIn, Glucose, NH3_25wt, 
+        #                 BufferA, BufferB, BufferC])
         
         for stream in input_streams:
             # FIX: Verify each stream is a proper Stream object
