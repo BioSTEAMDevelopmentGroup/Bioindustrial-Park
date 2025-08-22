@@ -381,6 +381,303 @@ class ProteinCentrifuge(bst.SolidsCentrifuge): pass
 class Evaporator(bst.MultiEffectEvaporator): pass
 
 
+# class Diafiltration(bst.Unit):
+#     """
+#     Diafiltration unit for separation of solutes based on size, typically
+#     retaining larger molecules (like proteins) while allowing smaller ones
+#     (like salts and water) to pass through the permeate. Includes continuous
+#     addition of wash solution (diafiltration buffer).
+
+#     Parameters
+#     ----------
+#     ins : Sequence[Stream]
+#         [0] Feed stream to be processed.
+#         [1] Wash solution (diafiltration buffer).
+#     outs : Sequence[Stream]
+#         [0] Permeate stream (water, salts, smaller molecules).
+#         [1] Retentate stream (concentrated target product).
+#     TargetProduct_ID : str, optional
+#         Chemical ID of the target product to be retained.
+#         Defaults to 'TargetProduct'.
+#     Salt_ID : str or list[str], optional
+#         Chemical ID(s) for salts that are mostly permeated.
+#         Defaults to 'Salt'.
+#     OtherLargeMolecules_ID : str or list[str], optional
+#         Chemical ID(s) for other large molecules that are mostly retained.
+#         Defaults to 'OtherLargeMolecules'.
+#     TargetProduct_Retention : float, optional
+#         Fraction of the target product retained in the retentate.
+#         Defaults to 0.98.
+#     Salt_Retention : float, optional
+#         Fraction of salt(s) retained in the retentate.
+#         Defaults to 0.05.
+#     OtherLargeMolecules_Retention : float, optional
+#         Fraction of other large molecules retained in the retentate.
+#         Defaults to 0.99.
+#     DefaultSolutes_Retention : float, optional
+#         Fraction of any other solutes (not specified above) retained.
+#         Defaults to 0.05.
+#     FeedWater_Recovery_to_Permeate : float, optional
+#         Fraction of water from the initial feed stream that is recovered in the permeate.
+#         The rest of the water (including all wash water) is balanced.
+#         Defaults to 0.75.
+#     membrane_flux_LMH : float, optional
+#         Average design membrane flux in Liters per square meter per hour (LMH).
+#         Defaults to 50.0.
+#     TMP_bar : float, optional
+#         Transmembrane pressure in bar. Used for pump power calculation.
+#         Defaults to 2.0.
+#     pump_efficiency : float, optional
+#         Efficiency of the pump(s) for the diafiltration system.
+#         Defaults to 0.75.
+#     membrane_cost_USD_per_m2 : float, optional
+#         Replacement cost of membranes in USD per square meter.
+#         Defaults to 200.0.
+#     membrane_lifetime_years : float, optional
+#         Expected lifetime of the membranes in years.
+#         Defaults to 2.0.
+#     module_cost_factor : float, optional
+#         Cost factor for membrane system purchase cost calculation.
+#         Assumes Cost = factor * (Area_m2 ** exponent).
+#         Defaults to 2500.0 (USD for a base CEPCI).
+#     module_cost_exponent : float, optional
+#         Exponent for membrane system purchase cost calculation based on area.
+#         Defaults to 0.7.
+#     base_CEPCI : float, optional
+#         The Chemical Engineering Plant Cost Index (CEPCI) for which the
+#         `module_cost_factor` is valid.
+#         Defaults to 500.
+#     """
+    
+#     _N_ins = 2
+#     _N_outs = 2
+    
+#     # Bare-module factors for equipment cost estimation
+#     _F_BM_default = {
+#         'Membrane System': 1.65,          # Typical bare-module factor for membrane modules
+#         'Membrane replacement': 1.0,      # Operating cost item (no installation factor)
+#         'Pump': 1.89,                     # Typical bare-module factor for centrifugal pumps
+#     }
+
+#     water_ID = 'H2O'
+#     _default_TargetProduct_ID = 'TargetProduct'
+#     _default_Salt_ID = 'Salt'
+#     _default_OtherLargeMolecules_ID = 'OtherLargeMolecules'
+
+#     _default_TargetProduct_Retention = 0.98
+#     _default_Salt_Retention = 0.05
+#     _default_OtherLargeMolecules_Retention = 0.99
+#     _default_DefaultSolutes_Retention = 0.08
+#     _default_FeedWater_Recovery_to_Permeate = 0.75
+
+#     _default_membrane_flux_LMH = 50.0
+#     _default_TMP_bar = 2.0
+#     _default_membrane_cost_USD_per_m2 = 200.0
+#     _default_membrane_lifetime_years = 2.0
+#     _default_module_cost_factor = 2500.0 # e.g., USD for CEPCI=500
+#     _default_module_cost_exponent = 0.7
+#     _default_base_CEPCI = 500.0
+
+#     _units = {
+#         'Membrane Area': 'm2',
+#         'TargetProduct_Retention': '%',
+#         'Salt_Retention': '%',
+#         'OtherLargeMolecules_Retention': '%',
+#         'DefaultSolutes_Retention': '%',
+#         'FeedWater_Recovery_to_Permeate': '%',
+#         'membrane_flux_LMH': 'LMH',
+#         'TMP_bar': 'bar',
+#         'pump_efficiency': '%',
+#         'membrane_cost_USD_per_m2': '$/m2',
+#         'membrane_lifetime_years': 'years',
+#         'module_cost_factor': '$/m2^exponent',
+#         'module_cost_exponent': '',
+#         'base_CEPCI': '',
+#     }
+    
+#     def __init__(self, ID='', ins=None, outs=None, thermo=None,
+#                 TargetProduct_ID=None, Salt_ID=None, OtherLargeMolecules_ID=None,
+#                 TargetProduct_Retention=None, Salt_Retention=None,
+#                 OtherLargeMolecules_Retention=None, DefaultSolutes_Retention=None,
+#                 FeedWater_Recovery_to_Permeate=None,
+#                 membrane_flux_LMH=None, TMP_bar=None,
+#                 membrane_cost_USD_per_m2=None, membrane_lifetime_years=None,
+#                 module_cost_factor=None, module_cost_exponent=None, base_CEPCI=None,
+#                  **kwargs):
+#         super().__init__(ID, ins, outs, thermo)
+
+#         self.TargetProduct_ID = TargetProduct_ID if TargetProduct_ID is not None else self._default_TargetProduct_ID
+#         self.Salt_ID = Salt_ID if Salt_ID is not None else self._default_Salt_ID
+#         self.OtherLargeMolecules_ID = OtherLargeMolecules_ID if OtherLargeMolecules_ID is not None else self._default_OtherLargeMolecules_ID
+
+#         self.TargetProduct_Retention = TargetProduct_Retention if TargetProduct_Retention is not None else self._default_TargetProduct_Retention
+#         self.Salt_Retention = Salt_Retention if Salt_Retention is not None else self._default_Salt_Retention
+#         self.OtherLargeMolecules_Retention = OtherLargeMolecules_Retention if OtherLargeMolecules_Retention is not None else self._default_OtherLargeMolecules_Retention
+#         self.DefaultSolutes_Retention = DefaultSolutes_Retention if DefaultSolutes_Retention is not None else self._default_DefaultSolutes_Retention
+#         self.FeedWater_Recovery_to_Permeate = FeedWater_Recovery_to_Permeate if FeedWater_Recovery_to_Permeate is not None else self._default_FeedWater_Recovery_to_Permeate
+
+#         self.membrane_flux_LMH = membrane_flux_LMH if membrane_flux_LMH is not None else self._default_membrane_flux_LMH
+#         self.TMP_bar = TMP_bar if TMP_bar is not None else self._default_TMP_bar
+#         self.membrane_cost_USD_per_m2 = membrane_cost_USD_per_m2 if membrane_cost_USD_per_m2 is not None else self._default_membrane_cost_USD_per_m2
+#         self.membrane_lifetime_years = membrane_lifetime_years if membrane_lifetime_years is not None else self._default_membrane_lifetime_years
+#         self.module_cost_factor = module_cost_factor if module_cost_factor is not None else self._default_module_cost_factor
+#         self.module_cost_exponent = module_cost_exponent if module_cost_exponent is not None else self._default_module_cost_exponent
+#         self.base_CEPCI = base_CEPCI if base_CEPCI is not None else self._default_base_CEPCI
+        
+#         self.power_utility = bst.PowerUtility()
+
+#     def _run(self):
+#         feed, wash_solution = self.ins
+#         retentate, permeate = self.outs
+
+#         # Assume isothermal operation and outlet pressures equal to feed pressure
+#         # Actual pressure drop for pumping is handled by TMP_bar in _design
+#         retentate.T = permeate.T = feed.T
+#         retentate.P = permeate.P = feed.P # This is outlet P, TMP is an internal driving force
+
+#         permeate.empty()
+#         retentate.empty()
+
+#         # --- Water Balance ---
+#         feed_water_mass = feed.imass[self.water_ID]
+#         wash_water_mass = wash_solution.imass[self.water_ID]
+#         total_incoming_water = feed_water_mass + wash_water_mass
+
+#         retentate_water_from_feed = feed_water_mass * (1.0 - self.FeedWater_Recovery_to_Permeate)
+#         retentate.imass[self.water_ID] = max(0.0, retentate_water_from_feed)
+        
+#         permeate_water_total = total_incoming_water - retentate.imass[self.water_ID]
+#         permeate.imass[self.water_ID] = max(0.0, permeate_water_total)
+
+#         # Ensure overall water balance due to max(0,...) or floating point precision
+#         current_total_water_out = permeate.imass[self.water_ID] + retentate.imass[self.water_ID]
+#         if abs(current_total_water_out - total_incoming_water) > 1e-9: # Tolerance
+#             if total_incoming_water >= retentate.imass[self.water_ID]:
+#                 permeate.imass[self.water_ID] = total_incoming_water - retentate.imass[self.water_ID]
+#             else: # This case should ideally not be reached with the logic above
+#                 retentate.imass[self.water_ID] = total_incoming_water
+#                 permeate.imass[self.water_ID] = 0.0
+
+#         # --- Solute Balance ---
+#         for chem in self.chemicals:
+#             ID = chem.ID
+#             if ID == self.water_ID:
+#                 continue
+
+#             mass_in_feed = feed.imass[ID]
+#             mass_in_wash = wash_solution.imass[ID] # Solutes might be in wash solution
+#             total_mass_in = mass_in_feed + mass_in_wash
+
+#             if total_mass_in <= 1e-12: # Effectively zero
+#                 retentate.imass[ID] = 0.0
+#                 permeate.imass[ID] = 0.0
+#                 continue
+
+#             current_retention = self.DefaultSolutes_Retention
+#             if self.TargetProduct_ID:
+#                 if isinstance(self.TargetProduct_ID, str) and ID == self.TargetProduct_ID:
+#                     current_retention = self.TargetProduct_Retention
+#                 if isinstance(self.TargetProduct_ID, list) and ID in self.TargetProduct_ID:
+#                     current_retention = self.TargetProduct_Retention
+#             elif self.Salt_ID:
+#                 if isinstance(self.Salt_ID, str) and ID == self.Salt_ID:
+#                     current_retention = self.Salt_Retention
+#                 elif isinstance(self.Salt_ID, list) and ID in self.Salt_ID: # Handles list of salt IDs
+#                     current_retention = self.Salt_Retention
+#             elif self.OtherLargeMolecules_ID:
+#                 if isinstance(self.OtherLargeMolecules_ID, str) and ID == self.OtherLargeMolecules_ID:
+#                     current_retention = self.OtherLargeMolecules_Retention
+#                 elif isinstance(self.OtherLargeMolecules_ID, list) and ID in self.OtherLargeMolecules_ID: # Handles list
+#                     current_retention = self.OtherLargeMolecules_Retention
+            
+#             retentate_mass_solute = total_mass_in * current_retention
+#             retentate.imass[ID] = max(0.0, retentate_mass_solute)
+            
+#             permeate_mass_solute = total_mass_in - retentate.imass[ID] # Permeate by difference for mass balance
+#             permeate.imass[ID] = max(0.0, permeate_mass_solute)
+            
+#             # Final check for solute mass balance due to max(0,...) or floating point nuances
+#             current_total_solute_out = retentate.imass[ID] + permeate.imass[ID]
+#             mass_balance_error = current_total_solute_out - total_mass_in
+#             # Check relative and absolute error
+#             if abs(mass_balance_error) > (1e-9 * abs(total_mass_in) + 1e-12):
+#                 permeate.imass[ID] -= mass_balance_error # Adjust permeate
+#                 if permeate.imass[ID] < 0:
+#                     retentate.imass[ID] += permeate.imass[ID] # Add deficit to retentate
+#                     permeate.imass[ID] = 0.0
+#                     if retentate.imass[ID] < 0: # Should not happen if total_mass_in >=0
+#                         retentate.imass[ID] = 0.0
+#                         # Consider logging a warning here if mass is lost.
+#                         # print(f"Warning: Mass balance issue for {ID} in {self.ID}. Input: {total_mass_in:.2e}, Output: {current_total_solute_out - mass_balance_error:.2e}")
+
+#     def _design(self):
+#         Design = self.design_results
+#         # --- Membrane Area Calculation ---
+#         permeate_stream = self.outs[0]
+#         # Calculate permeate volumetric flow rate (L/hr)
+#         # F_mass (kg/hr) / rho (kg/m^3) -> m^3/hr. Then * 1000 for L/hr.
+#         if permeate_stream.isempty() or permeate_stream.rho == 0:
+#             permeate_vol_L_per_hr = 0.0
+#         else:
+#             permeate_vol_L_per_hr = (permeate_stream.F_mass / permeate_stream.rho) * 1000.0
+            
+#         if self.membrane_flux_LMH > 0 and permeate_vol_L_per_hr > 0:
+#             membrane_area_m2 = permeate_vol_L_per_hr / self.membrane_flux_LMH
+#         else:
+#             membrane_area_m2 = 0.0
+#         Design['Membrane Area'] = membrane_area_m2
+#         # Design['TargetProduct_Retention'] = self.TargetProduct_Retention * 100.0
+#         # Design['Salt_Retention'] = self.Salt_Retention * 100.0
+#         # Design['OtherLargeMolecules_Retention'] = self.OtherLargeMolecules_Retention * 100.0
+#         # Design['DefaultSolutes_Retention'] = self.DefaultSolutes_Retention * 100.0
+#         # Design['FeedWater_Recovery_to_Permeate'] = self.FeedWater_Recovery_to_Permeate * 100.0
+#         Design['membrane_flux_LMH'] = self.membrane_flux_LMH
+#         Design['TMP_bar'] = self.TMP_bar
+#         Design['membrane_cost_USD_per_m2'] = self.membrane_cost_USD_per_m2
+#         Design['membrane_lifetime_years'] = self.membrane_lifetime_years
+#         # Design['module_cost_factor'] = self.module_cost_factor
+#         # Design['module_cost_exponent'] = self.module_cost_exponent
+#         # Design['base_CEPCI'] = self.base_CEPCI
+
+#         # --- Pump Power Calculation ---
+#         # Total volumetric flow to be pumped (feed + wash solution) in m^3/hr
+#         internal_stream = self.ins[0].copy()
+#         self.pump = bst.Pump(None, None, P=self.TMP_bar * 1e5)
+#         self.pump.ins[0] = internal_stream
+#         self.pump.simulate()
+#         self.pump._design()  # Design the pump to get its cost
+#         self.power_utility = self.pump.power_utility  # Use the pump's power utility
+#         Design['pump_efficiency'] = self.pump.design_results['Efficiency'] * 100.0 
+
+#     def _cost(self):
+#         super()._cost()  # Call parent cost method to initialize purchase_costs and add_OPEX
+#         # --- Capital Cost (Purchase Cost) ---
+#         area_m2 = self.design_results.get('Membrane Area', 0.0)
+
+#         if area_m2 > 0 and self.module_cost_factor > 0 and self.base_CEPCI > 0:
+#             # Calculate base purchase cost using the power law
+#             base_purchase_cost = self.module_cost_factor * (area_m2 ** self.module_cost_exponent)
+#             # Adjust cost from base_CEPCI to current BioSTEAM CEPCI (bst.CE)
+#             current_purchase_cost = base_purchase_cost * (bst.CE / self.base_CEPCI)
+#             self.baseline_purchase_costs['Membrane System'] = current_purchase_cost
+#         else:
+#             self.baseline_purchase_costs['Membrane System'] = 0.0
+
+#         # --- Annual Operating Cost (OPEX) for Membrane Replacement ---
+#         # This is added to `add_OPEX` for the TEA.
+#         if (self.membrane_lifetime_years > 0 and
+#             self.membrane_cost_USD_per_m2 > 0 and
+#             area_m2 > 0):
+#             annual_replacement_cost = (area_m2 * self.membrane_cost_USD_per_m2) / self.membrane_lifetime_years
+#             self.baseline_purchase_costs['Membrane replacement'] = annual_replacement_cost
+#         else:
+#             self.baseline_purchase_costs['Membrane replacement'] = 0.0
+#         #self.power_utility.cost = self.power_utility.rate * bst.annual_hours * bst.electricity_cost_per_kWh
+#         self.baseline_purchase_costs['Pump'] = self.pump.purchase_cost
+#         # Tank costs are not included here.
+
+
+
 class Diafiltration(bst.Unit):
     """
     Diafiltration unit for separation of solutes based on size, typically
@@ -394,8 +691,8 @@ class Diafiltration(bst.Unit):
         [0] Feed stream to be processed.
         [1] Wash solution (diafiltration buffer).
     outs : Sequence[Stream]
-        [0] Permeate stream (water, salts, smaller molecules).
-        [1] Retentate stream (concentrated target product).
+        [0] Retentate stream (concentrated target product).
+        [1] Permeate stream (water, salts, smaller molecules).
     TargetProduct_ID : str, optional
         Chemical ID of the target product to be retained.
         Defaults to 'TargetProduct'.
@@ -473,7 +770,7 @@ class Diafiltration(bst.Unit):
     _default_membrane_flux_LMH = 50.0
     _default_TMP_bar = 2.0
     _default_membrane_cost_USD_per_m2 = 200.0
-    _default_membrane_lifetime_years = 2.0
+    _default_membrane_lifetime_years = 1.0
     _default_module_cost_factor = 2500.0 # e.g., USD for CEPCI=500
     _default_module_cost_exponent = 0.7
     _default_base_CEPCI = 500.0
@@ -530,15 +827,15 @@ class Diafiltration(bst.Unit):
         feed, wash_solution = self.ins
         retentate, permeate = self.outs
 
-        # Assume isothermal operation and outlet pressures equal to feed pressure
-        # Actual pressure drop for pumping is handled by TMP_bar in _design
+        # Assume isothermal operation
         retentate.T = permeate.T = feed.T
-        retentate.P = permeate.P = feed.P # This is outlet P, TMP is an internal driving force
+        retentate.P = permeate.P = feed.P
 
         permeate.empty()
-        retentate.empty()
+        retentate.copy_like(feed) # Start with feed composition in retentate
 
         # --- Water Balance ---
+        # This part of your logic is kept, as it defines the final retentate volume.
         feed_water_mass = feed.imass[self.water_ID]
         wash_water_mass = wash_solution.imass[self.water_ID]
         total_incoming_water = feed_water_mass + wash_water_mass
@@ -546,74 +843,70 @@ class Diafiltration(bst.Unit):
         retentate_water_from_feed = feed_water_mass * (1.0 - self.FeedWater_Recovery_to_Permeate)
         retentate.imass[self.water_ID] = max(0.0, retentate_water_from_feed)
         
-        permeate_water_total = total_incoming_water - retentate.imass[self.water_ID]
-        permeate.imass[self.water_ID] = max(0.0, permeate_water_total)
-
-        # Ensure overall water balance due to max(0,...) or floating point precision
-        current_total_water_out = permeate.imass[self.water_ID] + retentate.imass[self.water_ID]
-        if abs(current_total_water_out - total_incoming_water) > 1e-9: # Tolerance
-            if total_incoming_water >= retentate.imass[self.water_ID]:
-                permeate.imass[self.water_ID] = total_incoming_water - retentate.imass[self.water_ID]
-            else: # This case should ideally not be reached with the logic above
-                retentate.imass[self.water_ID] = total_incoming_water
-                permeate.imass[self.water_ID] = 0.0
+        permeate.imass[self.water_ID] = total_incoming_water - retentate.imass[self.water_ID]
+        if permeate.imass[self.water_ID] < 0: # Safety check
+            permeate.imass[self.water_ID] = 0.0
+            retentate.imass[self.water_ID] = total_incoming_water
 
         # --- Solute Balance ---
+        # Create dictionaries for easier lookup of retention values
+        retention_map = {}
+        # Ensure IDs are in lists for consistent processing
+        target_ids = self.TargetProduct_ID if isinstance(self.TargetProduct_ID, list) else [self.TargetProduct_ID]
+        large_mol_ids = self.OtherLargeMolecules_ID if isinstance(self.OtherLargeMolecules_ID, list) else [self.OtherLargeMolecules_ID]
+        salt_ids = self.Salt_ID if isinstance(self.Salt_ID, list) else [self.Salt_ID]
+
+        for chem_id in target_ids: retention_map[chem_id] = self.TargetProduct_Retention
+        for chem_id in large_mol_ids: retention_map[chem_id] = self.OtherLargeMolecules_Retention
+        for chem_id in salt_ids: retention_map[chem_id] = self.Salt_Retention
+
         for chem in self.chemicals:
             ID = chem.ID
             if ID == self.water_ID:
                 continue
 
-            mass_in_feed = feed.imass[ID]
-            mass_in_wash = wash_solution.imass[ID] # Solutes might be in wash solution
-            total_mass_in = mass_in_feed + mass_in_wash
+            total_mass_in = feed.imass[ID] + wash_solution.imass[ID]
+            if total_mass_in < 1e-12: continue
 
-            if total_mass_in <= 1e-12: # Effectively zero
-                retentate.imass[ID] = 0.0
+            # Get the retention for the current chemical, or use the default
+            current_retention = retention_map.get(ID, self.DefaultSolutes_Retention)
+
+            # --- NEW LOGIC: Differentiate between retained and permeable species ---
+            # We use a threshold (e.g., 0.5) to decide the model chemistry.
+            # High retention means the species is mostly retained (e.g., protein, cells).
+            if current_retention > 0.5:
+                # MODEL 1: RETAINED SPECIES
+                # The final amount is a fraction of the total input.
+                retentate.imass[ID] = total_mass_in * current_retention
+                permeate.imass[ID] = total_mass_in - retentate.imass[ID]
+            else:
+                # MODEL 2: PERMEABLE SPECIES (BUFFER EXCHANGE)
+                # The final concentration in the retentate matches the wash buffer.
+                wash_water = wash_solution.imass[self.water_ID]
+                if wash_water > 1e-9:
+                    # Concentration in wash buffer (per kg of water)
+                    conc_in_wash = wash_solution.imass[ID] / wash_water
+                    # Set retentate mass based on this concentration and the retentate's water content
+                    retentate.imass[ID] = conc_in_wash * retentate.imass[self.water_ID]
+                else:
+                    # If wash solution has no water, this solute can't be in the retentate liquid phase
+                    retentate.imass[ID] = 0.0
+
+                # Permeate is the remainder to ensure mass balance
+                permeate.imass[ID] = total_mass_in - retentate.imass[ID]
+
+            # Final safety check to prevent negative mass flows
+            if permeate.imass[ID] < 0:
+                retentate.imass[ID] += permeate.imass[ID] # Adjust retentate
                 permeate.imass[ID] = 0.0
-                continue
-
-            current_retention = self.DefaultSolutes_Retention
-            if self.TargetProduct_ID:
-                if isinstance(self.TargetProduct_ID, str) and ID == self.TargetProduct_ID:
-                    current_retention = self.TargetProduct_Retention
-                if isinstance(self.TargetProduct_ID, list) and ID in self.TargetProduct_ID:
-                    current_retention = self.TargetProduct_Retention
-            elif self.Salt_ID:
-                if isinstance(self.Salt_ID, str) and ID == self.Salt_ID:
-                    current_retention = self.Salt_Retention
-                elif isinstance(self.Salt_ID, list) and ID in self.Salt_ID: # Handles list of salt IDs
-                    current_retention = self.Salt_Retention
-            elif self.OtherLargeMolecules_ID:
-                if isinstance(self.OtherLargeMolecules_ID, str) and ID == self.OtherLargeMolecules_ID:
-                    current_retention = self.OtherLargeMolecules_Retention
-                elif isinstance(self.OtherLargeMolecules_ID, list) and ID in self.OtherLargeMolecules_ID: # Handles list
-                    current_retention = self.OtherLargeMolecules_Retention
-            
-            retentate_mass_solute = total_mass_in * current_retention
-            retentate.imass[ID] = max(0.0, retentate_mass_solute)
-            
-            permeate_mass_solute = total_mass_in - retentate.imass[ID] # Permeate by difference for mass balance
-            permeate.imass[ID] = max(0.0, permeate_mass_solute)
-            
-            # Final check for solute mass balance due to max(0,...) or floating point nuances
-            current_total_solute_out = retentate.imass[ID] + permeate.imass[ID]
-            mass_balance_error = current_total_solute_out - total_mass_in
-            # Check relative and absolute error
-            if abs(mass_balance_error) > (1e-9 * abs(total_mass_in) + 1e-12):
-                permeate.imass[ID] -= mass_balance_error # Adjust permeate
-                if permeate.imass[ID] < 0:
-                    retentate.imass[ID] += permeate.imass[ID] # Add deficit to retentate
-                    permeate.imass[ID] = 0.0
-                    if retentate.imass[ID] < 0: # Should not happen if total_mass_in >=0
-                        retentate.imass[ID] = 0.0
-                        # Consider logging a warning here if mass is lost.
-                        # print(f"Warning: Mass balance issue for {ID} in {self.ID}. Input: {total_mass_in:.2e}, Output: {current_total_solute_out - mass_balance_error:.2e}")
+            if retentate.imass[ID] < 0:
+                permeate.imass[ID] += retentate.imass[ID] # Adjust permeate
+                retentate.imass[ID] = 0.0
 
     def _design(self):
         Design = self.design_results
         # --- Membrane Area Calculation ---
-        permeate_stream = self.outs[0]
+        permeate_stream = self.outs[1]
         # Calculate permeate volumetric flow rate (L/hr)
         # F_mass (kg/hr) / rho (kg/m^3) -> m^3/hr. Then * 1000 for L/hr.
         if permeate_stream.isempty() or permeate_stream.rho == 0:
@@ -634,20 +927,20 @@ class Diafiltration(bst.Unit):
         Design['membrane_flux_LMH'] = self.membrane_flux_LMH
         Design['TMP_bar'] = self.TMP_bar
         Design['membrane_cost_USD_per_m2'] = self.membrane_cost_USD_per_m2
-        # Design['membrane_lifetime_years'] = self.membrane_lifetime_years
+        Design['membrane_lifetime_years'] = self.membrane_lifetime_years
         # Design['module_cost_factor'] = self.module_cost_factor
         # Design['module_cost_exponent'] = self.module_cost_exponent
         # Design['base_CEPCI'] = self.base_CEPCI
 
         # --- Pump Power Calculation ---
         # Total volumetric flow to be pumped (feed + wash solution) in m^3/hr
-        internal_stream = self.ins[0].copy()
+        internal_stream = self.ins[0].copy() + self.ins[1].copy()
         self.pump = bst.Pump(None, None, P=self.TMP_bar * 1e5)
         self.pump.ins[0] = internal_stream
         self.pump.simulate()
         self.pump._design()  # Design the pump to get its cost
-        self.power_utility = self.pump.power_utility  # Use the pump's power utility
-        Design['pump_efficiency'] = self.pump.design_results['Efficiency'] * 100.0 
+        self.power_utility = self.pump.power_utility + self.Membrane_replacement # Use the pump's power utility
+        Design['pump_efficiency'] = self.pump.design_results['Efficiency'] * 100.0
 
     def _cost(self):
         super()._cost()  # Call parent cost method to initialize purchase_costs and add_OPEX
@@ -675,6 +968,7 @@ class Diafiltration(bst.Unit):
         #self.power_utility.cost = self.power_utility.rate * bst.annual_hours * bst.electricity_cost_per_kWh
         self.baseline_purchase_costs['Pump'] = self.pump.purchase_cost
         # Tank costs are not included here.
+
 
 
 class IonExchange(bst.Unit): 

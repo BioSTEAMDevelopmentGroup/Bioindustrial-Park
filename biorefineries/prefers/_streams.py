@@ -24,7 +24,7 @@ SeedIn = stream_kwargs('SeedIn', Seed=m*0.15*1e5/16, units='kg/hr', T=25+273.15)
 CultureIn = stream_kwargs('CultureIn', Culture=m*1.5*1e5/16, units='kg/hr', T=25+273.15)
 
 Glucose = stream_kwargs('Glucose', Glucose=m*1.3*1e5/72, units='kg/hr', T=25+273.15)
-NH3_25wt = stream_kwargs('NH3_25wt', NH3_25wt=m*100, units='kg/hr', T=25+273.15)#, price=price['NH3_25wt'])
+NH3_25wt = stream_kwargs('NH3_25wt', NH3_25wt=m*350, units='kg/hr', T=25+273.15)#, price=price['NH3_25wt'])
 
 BufferA = stream_kwargs('BufferA', BufferA=1, units='kg/hr', T=25+273.15)
 BufferB = stream_kwargs('BufferB', BufferB=1 , units='kg/hr', T=25+273.15)

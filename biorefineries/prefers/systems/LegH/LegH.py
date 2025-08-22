@@ -20,7 +20,7 @@ from biorefineries.prefers._process_settings import price  # ADD THIS IMPORT
 # %% Settings
 bst.settings.set_thermo(c.create_chemicals_LegH(), skip_checks=True)
 bst.preferences.classic_mode()
-bst.preferences.N=50
+
 # %%
 __all__ = (
     'create_LegH_system',
@@ -30,7 +30,7 @@ __all__ = (
     ID='LegH_sys',
     ins=[s.SeedIn, s.CultureIn, s.Glucose, s.NH3_25wt,s.BufferA, s.BufferB, s.BufferC
         ],
-    outs=[s.LegH_3, s.vent1, s.vent2, s.effluent1, s.effluent2,
+    outs=[s.LegH_3, s.vent1, s.vent2, s.effluent1, #s.effluent2,
         s.effluent3, s.effluent4, s.effluent5, s.effluent6],
     fthermo=c.create_chemicals_LegH, # Pass the function itself
 )
@@ -44,7 +44,7 @@ def create_LegH_system(
     Creates the LegH (Leghemoglobin) production system.
     This system is based on the process flow and parameters from test_LegH.py.
     """
-    
+    bst.preferences.N=50
     # Update all input stream prices before system creation to avoid conflicts
     # This is now done at the module level in _streams.py to prevent ID conflicts
     
@@ -54,7 +54,7 @@ def create_LegH_system(
     SeedIn, CultureIn, Glucose, NH3_25wt, BufferA, BufferB, BufferC = ins
 
     # Unpack output streams
-    (LegH_3, vent1, vent2, effluent1, effluent2, 
+    (LegH_3, vent1, vent2, effluent1, #effluent2, 
     effluent3, effluent4, effluent5, effluent6) = outs
     """
     Fermentation Parameter
@@ -78,36 +78,45 @@ def create_LegH_system(
     Reactions
     """
     
+    # fermentation_reaction = bst.PRxn([
+    #     #           Reaction        Reactnat            Conversion           Check                  "
+    #     bst.Rxn('8 Glucose + 6 NH3 + 1 FeSO4 + 10.5 O2 -> Heme_b + 1 (NH4)2SO4 + 37 H2O + 14 CO2',
+    #                                 reactant = 'Glucose',X=LegH_yield*0.05,check_atomic_balance=True),
+    #     bst.Rxn('Glucose + (NH4)2SO4 + NH3 -> Globin + CO2 + H2O',
+    #                                 reactant = 'Glucose', X= LegH_yield*0.05,correct_atomic_balance=True),
+    #     bst.Rxn('Glucose + FeSO4 + (NH4)2SO4 + NH3 -> Leghemoglobin + CO2  + H2O',
+    #                                 reactant = 'Glucose', X=LegH_yield,  correct_atomic_balance=True),
+    #     ])
     fermentation_reaction = bst.PRxn([
         #           Reaction        Reactnat            Conversion           Check                  "
-        bst.Rxn('8 Glucose + 6 NH3 + 1 FeSO4 + 10.5 O2 -> Heme_b + 1 (NH4)2SO4 + 37 H2O + 14 CO2',
+        bst.Rxn('1 Glucose + 1.05882 NH3 + 0.17647 FeSO4  -> 0.17647 Heme_b + 0.617647 O2 + 0.17647 (NH4)2SO4 + 4.05882 H2O',
                                     reactant = 'Glucose',X=LegH_yield*0.05,check_atomic_balance=True),
-        bst.Rxn('Glucose + (NH4)2SO4 + NH3 -> Globin + CO2 + H2O',
-                                    reactant = 'Glucose', X= LegH_yield*0.05,correct_atomic_balance=True),
-        bst.Rxn('Glucose + FeSO4 + (NH4)2SO4 + NH3 -> Leghemoglobin + CO2  + H2O',
-                                    reactant = 'Glucose', X=LegH_yield,  correct_atomic_balance=True),
+        bst.Rxn('Glucose + 0.01646 (NH4)2SO4 + 1.61317 NH3 -> 6 Globin + 0.28807 O2 + 3.68724 H2O',
+                                    reactant = 'Glucose', X= LegH_yield*0.05,check_atomic_balance=True),
+        bst.Rxn('Glucose + 0.00786 FeSO4 + 0.00786 (NH4)2SO4 + 1.58847 NH3 -> 6 Leghemoglobin + 0.30275 O2  + 3.70380 H2O',
+                                    reactant = 'Glucose', X=LegH_yield,  check_atomic_balance=True),
         ])
     fermentation_reaction[2].product_yield('Leghemoglobin', basis='wt', product_yield=LegH_yield)
 
     neutralization_reaction = bst.Rxn(
-        'H2SO4 + NH3 -> (NH4)2SO4', reactant = 'H2SO4', X=1,
-        correct_atomic_balance=True
+        'H2SO4 + 2 NH3 -> (NH4)2SO4', reactant = 'H2SO4', X=1,
+        check_atomic_balance=True
     )
 
     cell_growth_reaction = bst.Rxn(
-        'Glucose -> H2O + CO2 + Pichia_pastoris', 'Glucose', X=Y_b,
+        'Glucose + 0.8364 NH3 + 0.0108 (NH4)2SO4 -> 2.01 H2O + 0.106 O2 + 6 Pichia_pastoris', 'Glucose', X=Y_b,
         correct_atomic_balance=True
     )
     cell_growth_reaction.product_yield('Pichia_pastoris', basis='wt', product_yield=Y_b)
 
     respiration_reaction1 = bst.Rxn(
-        'Glucose + O2 -> CO2 + H2O', 'Glucose', 1. - cell_growth_reaction.X,
-        correct_atomic_balance=True
+        'Glucose + 6 O2 -> 6 CO2 + 6 H2O', 'Glucose', 1. - cell_growth_reaction.X,
+        check_atomic_balance=True
     )
 
     respiration_reaction2 = bst.Rxn(
-        'Glucose + O2 -> CO2 + H2O', 'Glucose', 1. - cell_growth_reaction.X - fermentation_reaction[2].X,
-        correct_atomic_balance=True
+        'Glucose + 6 O2 -> 6 CO2 + 6 H2O', 'Glucose', 1. - cell_growth_reaction.X - fermentation_reaction[2].X,
+        check_atomic_balance=True
     )
 
     bst.settings.chemicals.set_alias('Pichia_pastoris', 'cellmass')
@@ -170,24 +179,24 @@ def create_LegH_system(
         'S402',
         ins = S401-0,
         outs = (effluent1, 'S402Out'),
-        moisture_content = 0.3,
-        split = (1, 0.99, 1, 1),
+        moisture_content = 0.05,  # 5% moisture content in the final product
+        split = (0, 0.99999, 1, 1),
         order = ('Glucose','cellmass', 'LeghemoglobinIntre','GlobinIntre'),
     )
-
-    E401 = u.Evaporator(
-        'E401',
-        ins = S402-1,
-        outs = ('E401Out',effluent2),
-        P = (101325, 73581, 50892),# 32777, 20000),  # Reduced to 3 effects to increase vessel size
-        V = 0.3,  # Increased vapor fraction to create larger vessels
-        V_definition = 'Overall',  # Changed to overall for better load distribution
-    )
-    E401.add_specification(run=True)
+    S402.add_specification(run=True)
+    # E401 = u.Evaporator(
+    #     'E401',
+    #     ins = S402-1,
+    #     outs = ('E401Out',effluent2),
+    #     P = (101325, 73581, 50892, 32777, 20000),  # Reduced to 3 effects to increase vessel size
+    #     V = 0.1,  # Increased vapor fraction to create larger vessels
+    #     V_definition = 'First-effect',  # Changed to overall for better load distribution
+    # )
+    # E401.add_specification(run=True)
 
     U401 = u.Diafiltration(
         'U401',
-        ins = (E401-0, BufferA),
+        ins = (S402-1, BufferA),
                #bst.Stream('BufferA', BufferA=(E401-0).imass['H2O']*4, units='kg/hr', T=25+273.15)),
         outs = ('U401Out',effluent3),
         TargetProduct_ID = 'Leghemoglobin',
@@ -197,7 +206,7 @@ def create_LegH_system(
     )
     @U401.add_specification(run=True)
     def update_BufferA():
-        BufferA.imass['H2O'] = (E401-0).imass['H2O']*4
+        BufferA.imass['H2O'] = (S402-1).imass['H2O']*8#4
         BufferA.T = 25+273.15
 
 
@@ -212,7 +221,7 @@ def create_LegH_system(
     )
     @U402.add_specification(run=True)
     def update_BufferB():
-        BufferB.imass['H2O'] = (U401-0).imass['H2O']/2
+        BufferB.imass['H2O'] = (U401-0).imass['H2O']*5#/2
         BufferB.T = 25+273.15
 
 
@@ -236,7 +245,7 @@ def create_LegH_system(
     )
     @U403.add_specification(run=True)
     def update_BufferC():
-        BufferC.imass['H2O'] = 1.1*0.05*1000*(U402-0).imass['Leghemoglobin']/(0.25*bst.Chemical('TrehaloseDH',search_ID='6138-23-4', phase='l', default=True).MW)
+        BufferC.imass['H2O'] = 4*1.1*0.05*1000*(U402-0).imass['Leghemoglobin']/(0.25*bst.Chemical('TrehaloseDH',search_ID='6138-23-4', phase='l', default=True).MW)
         BufferC.T = 25+273.15
 
 
@@ -246,17 +255,11 @@ def create_LegH_system(
         outs=(effluent6, LegH_3),
         moisture_content=0.05,  # 5% moisture content in the final product
     )
-
-    # LegH_sys = bst.main_flowsheet.create_system('LegH_sys')
-    # LegH_sys.simulate()
     
-    # BufferA = (1-U401)
-    # BufferB = (1-U402)
-    # BufferC = (1-U403)
     s.update_all_input_stream_prices(streamlist=[SeedIn, CultureIn, Glucose, NH3_25wt, BufferA, BufferB, BufferC])
 
-    return LegH_3, vent1, vent2, effluent1, effluent2, effluent3, effluent4, effluent5, effluent6, BufferA, BufferB, BufferC
-
+    return LegH_3, vent1, vent2, effluent1, effluent3, effluent4, effluent5, effluent6, BufferA, BufferB, BufferC
+#effluent2
 # %%
 if __name__ == '__main__':
     # # Create the LegH system
@@ -266,13 +269,8 @@ if __name__ == '__main__':
     u = f.unit
 
     LegH_sys.simulate()
-    LegH_sys.diagram(format='svg',display=True,)
-    # LegH_sys.show()
-    # # Check stream prices
-    # print(f"\nStream Prices:")
-    # print(f"SeedIn price: ${f.SeedIn.price:.4f}/kg")
-    # print(f"CultureIn price: ${f.CultureIn.price:.4f}/kg")
-    # print(f"Glucose price: ${f.Glucose.price:.4f}/kg")
-    # print(f"NH3_25wt price: ${f.NH3_25wt.price:.4f}/kg")
+    LegH_sys.show()
+    LegH_sys.diagram(format='html',display=True,)
+    
 
 # %%
