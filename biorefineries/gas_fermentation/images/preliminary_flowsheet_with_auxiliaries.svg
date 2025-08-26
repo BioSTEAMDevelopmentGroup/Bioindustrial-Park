@@ -1,0 +1,1038 @@
+<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="2928pt" height="645pt" viewBox="0.00 0.00 2928.45 644.95">
+<g id="graph0" class="graph" transform="scale(1 1) rotate(0) translate(4 640.95)">
+<polygon fill="#ffffff" fill-opacity="0.666667" stroke="transparent" points="-4,4 -4,-640.95 2924.45,-640.95 2924.45,4 -4,4"/>
+<!-- R1
+Gas fed bioreactor&#45;&gt;R1
+Recirculation pump
+Auxiliary
+1 of 26 -->
+<g id="edge1" class="edge">
+<title>R1
+Gas fed bioreactor:c-&gt;R1
+Recirculation pump
+Auxiliary
+1 of 26:c</title>
+<path fill="none" stroke="#4e4e4e" stroke-width="2.2" d="M247.33,-354.66C289.24,-364.51 343.46,-377.26 387.37,-387.58"/>
+<polygon fill="#4e4e4e" stroke="#4e4e4e" stroke-width="2.2" points="386.61,-391 397.15,-389.88 388.21,-384.18 386.61,-391"/>
+</g>
+<!-- R1
+Gas fed bioreactor&#45;&gt;S1
+Molecular sieves -->
+<g id="edge12" class="edge">
+<title>R1
+Gas fed bioreactor:c-&gt;S1
+Molecular sieves:w</title>
+<path fill="none" stroke="#4e4e4e" stroke-width="1.6" d="M185.33,-317.45C195.82,-276.72 224.64,-191.57 283.83,-182.7"/>
+<polygon fill="#4e4e4e" stroke="#4e4e4e" stroke-width="1.6" points="284.28,-186.18 294,-181.95 283.77,-179.2 284.28,-186.18"/>
+<g id="a_edge12-label"><a xlink:title="Temperature: 305.15 K
+Pressure: 101325 Pa
+Gas flow: 2.62e+03 kmol/hr">
+<text text-anchor="middle" x="270.5" y="-196.75" font-family="Arial" font-size="14.00" fill="#4e4e4e"> vent</text>
+</a>
+</g>
+</g>
+<!-- R1
+Mixers[0]
+Auxiliary&#45;&gt;R1
+Compressors[0]
+Auxiliary -->
+<g id="edge14" class="edge">
+<title>R1
+Mixers[0]
+Auxiliary:e-&gt;R1
+Compressors[0]
+Auxiliary:c</title>
+<path fill="none" stroke="#4e4e4e" d="M886.37,-74.95C888.61,-74.95 890.88,-74.95 893.16,-74.95"/>
+<polygon fill="#4e4e4e" stroke="#4e4e4e" points="893.29,-78.45 903.29,-74.95 893.29,-71.45 893.29,-78.45"/>
+</g>
+<!-- R1
+Mixers[1]
+Auxiliary&#45;&gt;R1
+Compressors[1]
+Auxiliary -->
+<g id="edge16" class="edge">
+<title>R1
+Mixers[1]
+Auxiliary:e-&gt;R1
+Compressors[1]
+Auxiliary:c</title>
+<path fill="none" stroke="#4e4e4e" stroke-width="1.6" d="M2196.37,-204.95C2203.75,-204.95 2211.4,-204.91 2219.08,-204.83"/>
+<polygon fill="#4e4e4e" stroke="#4e4e4e" stroke-width="1.6" points="2219.22,-208.33 2229.18,-204.72 2219.14,-201.33 2219.22,-208.33"/>
+</g>
+<!-- R1
+Sparger
+Auxiliary&#45;&gt;R1
+Gas fed bioreactor -->
+<g id="edge9" class="edge">
+<title>R1
+Sparger
+Auxiliary:e-&gt;R1
+Gas fed bioreactor:c</title>
+<path fill="none" stroke="#4e4e4e" stroke-width="2.2" d="M2794.29,-199.95C2796.37,-199.95 2794.2,-273.04 2793.29,-274.91 2745.02,-373.85 2651.85,-332.78 2600.12,-429.95 2580.21,-467.35 2608.65,-485.94 2592.12,-524.95 2566.35,-585.78 2560.47,-636.95 2494.41,-636.95 465.53,-636.95 465.53,-636.95 465.53,-636.95 319.25,-636.95 224.9,-447.11 192.77,-370.48"/>
+<polygon fill="#4e4e4e" stroke="#4e4e4e" stroke-width="2.2" points="195.86,-368.78 188.82,-360.87 189.39,-371.45 195.86,-368.78"/>
+</g>
+<!-- R1
+Compressors[0]
+Auxiliary&#45;&gt;R1
+Gas coolers[0]
+Auxiliary -->
+<g id="edge18" class="edge">
+<title>R1
+Compressors[0]
+Auxiliary:c-&gt;R1
+Gas coolers[0]
+Auxiliary:c</title>
+<path fill="none" stroke="#4e4e4e" d="M1063.69,-74.95C1168.95,-74.95 1353.68,-74.95 1457.26,-74.95"/>
+<polygon fill="#4e4e4e" stroke="#4e4e4e" points="1457.33,-78.45 1467.33,-74.95 1457.33,-71.45 1457.33,-78.45"/>
+</g>
+<!-- R1
+Compressors[1]
+Auxiliary&#45;&gt;R1
+Gas coolers[1]
+Auxiliary -->
+<g id="edge19" class="edge">
+<title>R1
+Compressors[1]
+Auxiliary:c-&gt;R1
+Gas coolers[1]
+Auxiliary:c</title>
+<path fill="none" stroke="#4e4e4e" stroke-width="1.6" d="M2389.78,-201.65C2398.65,-201.5 2407.68,-201.35 2416.51,-201.21"/>
+<polygon fill="#4e4e4e" stroke="#4e4e4e" stroke-width="1.6" points="2416.83,-204.7 2426.77,-201.04 2416.71,-197.7 2416.83,-204.7"/>
+</g>
+<!-- R1
+Gas coolers[0]
+Auxiliary&#45;&gt;R1
+Sparger
+Auxiliary -->
+<g id="edge17" class="edge">
+<title>R1
+Gas coolers[0]
+Auxiliary:c-&gt;R1
+Sparger
+Auxiliary:c</title>
+<path fill="none" stroke="#4e4e4e" d="M1600.64,-74.95C1647.09,-74.95 1710.9,-74.95 1767.06,-74.95 1767.06,-74.95 1767.06,-74.95 2494.41,-74.95 2549.82,-74.95 2602.62,-109.67 2640.16,-142.51"/>
+<polygon fill="#4e4e4e" stroke="#4e4e4e" points="2638.16,-145.41 2647.94,-149.47 2642.83,-140.19 2638.16,-145.41"/>
+</g>
+<!-- R1
+Gas coolers[1]
+Auxiliary&#45;&gt;R1
+Sparger
+Auxiliary -->
+<g id="edge29" class="edge">
+<title>R1
+Gas coolers[1]
+Auxiliary:c-&gt;R1
+Sparger
+Auxiliary:c</title>
+<path fill="none" stroke="#4e4e4e" stroke-width="1.6" d="M2559.91,-199.95C2585.05,-199.95 2613.54,-199.95 2637.87,-199.95"/>
+<polygon fill="#4e4e4e" stroke="#4e4e4e" stroke-width="1.6" points="2638.02,-203.45 2648.02,-199.95 2638.02,-196.45 2638.02,-203.45"/>
+</g>
+<!-- R1
+Heat exchanger
+Auxiliary
+1 of 26&#45;&gt;R1
+Gas fed bioreactor -->
+<g id="edge10" class="edge">
+<title>R1
+Heat exchanger
+Auxiliary
+1 of 26:c-&gt;R1
+Gas fed bioreactor:c</title>
+<path fill="none" stroke="#4e4e4e" stroke-width="2.2" d="M912.76,-300.6C763.36,-308.43 413.32,-326.76 257.58,-334.92"/>
+<polygon fill="#4e4e4e" stroke="#4e4e4e" stroke-width="2.2" points="256.96,-331.44 247.15,-335.46 257.32,-338.43 256.96,-331.44"/>
+</g>
+<!-- R1
+Recirculation pump
+Auxiliary
+1 of 26&#45;&gt;R1
+Splitter
+Auxiliary
+1 of 26 -->
+<g id="edge21" class="edge">
+<title>R1
+Recirculation pump
+Auxiliary
+1 of 26:c-&gt;R1
+Splitter
+Auxiliary
+1 of 26:w</title>
+<path fill="none" stroke="#4e4e4e" stroke-width="2.2" d="M535.69,-423.22C575.2,-431.84 626.35,-440.69 673.68,-441.83"/>
+<polygon fill="#4e4e4e" stroke="#4e4e4e" stroke-width="2.2" points="673.68,-445.33 683.72,-441.95 673.76,-438.33 673.68,-445.33"/>
+</g>
+<!-- R1
+Splitter
+Auxiliary
+1 of 26&#45;&gt;R1
+Heat exchanger
+Auxiliary
+1 of 26 -->
+<g id="edge20" class="edge">
+<title>R1
+Splitter
+Auxiliary
+1 of 26:c-&gt;R1
+Heat exchanger
+Auxiliary
+1 of 26:c</title>
+<path fill="none" stroke="#4e4e4e" stroke-width="2.2" d="M830.06,-407.59C856.21,-388.61 889.08,-364.76 917.59,-344.06"/>
+<polygon fill="#4e4e4e" stroke="#4e4e4e" stroke-width="2.2" points="919.86,-346.74 925.89,-338.03 915.74,-341.08 919.86,-346.74"/>
+</g>
+<!-- R1
+Splitter
+Auxiliary
+1 of 26&#45;&gt;x26 -->
+<g id="edge31" class="edge">
+<title>R1
+Splitter
+Auxiliary
+1 of 26:c-&gt;x26:c</title>
+<path fill="none" stroke="#4e4e4e" d="M830.06,-440.53C866.76,-439.43 916.68,-437.93 949.24,-436.95"/>
+<polygon fill="#4e4e4e" stroke="#4e4e4e" points="949.68,-440.44 959.57,-436.64 949.47,-433.44 949.68,-440.44"/>
+</g>
+<!-- x26&#45;&gt;S2
+Adsorption/LLE -->
+<g id="edge5" class="edge">
+<title>x26:c-&gt;S2
+Adsorption/LLE:w</title>
+<path fill="none" stroke="#4e4e4e" stroke-width="2.2" d="M1004.27,-425.3C1020.86,-415.95 1044.79,-401.44 1063.61,-385.95 1094.67,-360.38 1088.99,-321.4 1121.39,-314.89"/>
+<polygon fill="#4e4e4e" stroke="#4e4e4e" stroke-width="2.2" points="1121.97,-318.35 1131.61,-313.95 1121.33,-311.38 1121.97,-318.35"/>
+<g id="a_edge5-label"><a xlink:title="Temperature: 305.15 K
+Pressure: 101325 Pa
+Liquid flow: 6.05e+03 kmol/hr">
+<text text-anchor="middle" x="1097.61" y="-380.75" font-family="Arial" font-size="14.00" fill="#4e4e4e"> product</text>
+</a>
+</g>
+</g>
+<!-- S1
+Molecular sieves&#45;&gt;R1
+Mixers[0]
+Auxiliary -->
+<g id="edge3" class="edge">
+<title>S1
+Molecular sieves:c-&gt;R1
+Mixers[0]
+Auxiliary:c</title>
+<path fill="none" stroke="#4e4e4e" d="M553.11,-152.72C605.81,-134.71 672.11,-112.06 719.55,-95.85"/>
+<polygon fill="#4e4e4e" stroke="#4e4e4e" points="720.74,-99.14 729.07,-92.6 718.47,-92.52 720.74,-99.14"/>
+<g id="a_edge3-label"><a xlink:title="Temperature: 305.15 K
+Pressure: 101325 Pa
+Gas flow: 1.07e+03 kmol/hr">
+<text text-anchor="middle" x="658.07" y="-122.75" font-family="Arial" font-size="14.00" fill="#4e4e4e"> s2</text>
+</a>
+</g>
+</g>
+<!-- S1
+Molecular sieves&#45;&gt;83248481977 -->
+<g id="edge32" class="edge">
+<title>S1
+Molecular sieves:c-&gt;83248481977:w</title>
+<path fill="none" stroke="#4e4e4e" stroke-width="1.6" d="M553.08,-186.62C615.36,-189.62 701.74,-192.95 777.72,-192.95"/>
+<g id="a_edge32-label"><a xlink:title="Temperature: 305.15 K
+Pressure: 101325 Pa
+Gas flow: 1.55e+03 kmol/hr">
+<text text-anchor="middle" x="658.07" y="-195.75" font-family="Arial" font-size="14.00" fill="#4e4e4e"> s3</text>
+</a>
+</g>
+</g>
+<!-- S2
+Adsorption/LLE&#45;&gt;M1
+Mixer -->
+<g id="edge30" class="edge">
+<title>S2
+Adsorption/LLE:c-&gt;M1
+Mixer:c</title>
+<path fill="none" stroke="#4e4e4e" d="M1377.74,-327.4C1439.05,-337.74 1525.25,-352.62 1600.64,-366.95 1611.31,-368.98 1622.77,-371.28 1633.53,-373.48"/>
+<polygon fill="#4e4e4e" stroke="#4e4e4e" points="1633.08,-376.96 1643.58,-375.56 1634.5,-370.11 1633.08,-376.96"/>
+<g id="a_edge30-label"><a xlink:title="Temperature: 305.15 K
+Pressure: 101325 Pa
+Liquid flow: 225 kmol/hr">
+<text text-anchor="middle" x="1534.17" y="-370.75" font-family="Arial" font-size="14.00" fill="#4e4e4e"> s4</text>
+</a>
+</g>
+</g>
+<!-- S2
+Adsorption/LLE&#45;&gt;83248481999 -->
+<g id="edge33" class="edge">
+<title>S2
+Adsorption/LLE:c-&gt;83248481999:w</title>
+<path fill="none" stroke="#4e4e4e" stroke-width="2.2" d="M1377.71,-298.58C1406.06,-293.89 1438.19,-289.34 1467.71,-286.95 1559.69,-279.51 1583.06,-285.95 1675.35,-285.95"/>
+<g id="a_edge33-label"><a xlink:title="Temperature: 305.15 K
+Pressure: 101325 Pa
+Liquid flow: 5.83e+03 kmol/hr">
+<text text-anchor="middle" x="1534.17" y="-290.75" font-family="Arial" font-size="14.00" fill="#4e4e4e"> wastewater</text>
+</a>
+</g>
+</g>
+<!-- M1
+Mixer&#45;&gt;R2
+Aerated bioreactor -->
+<g id="edge23" class="edge">
+<title>M1
+Mixer:e-&gt;R2
+Aerated bioreactor:c</title>
+<path fill="none" stroke="#4e4e4e" stroke-width="1.6" d="M1750.06,-382.95C1758.4,-382.95 1767.12,-382.95 1775.8,-382.95"/>
+<polygon fill="#4e4e4e" stroke="#4e4e4e" stroke-width="1.6" points="1775.95,-386.45 1785.95,-382.95 1775.95,-379.45 1775.95,-386.45"/>
+<g id="a_edge23-label"><a xlink:title="Temperature: 299.48 K
+Pressure: 101325 Pa
+Liquid flow: 1.72e+03 kmol/hr">
+<text text-anchor="middle" x="1768.06" y="-386.75" font-family="Arial" font-size="14.00" fill="#4e4e4e"> s5</text>
+</a>
+</g>
+</g>
+<!-- R2
+Aerated bioreactor&#45;&gt;R1
+Mixers[1]
+Auxiliary -->
+<g id="edge4" class="edge">
+<title>R2
+Aerated bioreactor:c-&gt;R1
+Mixers[1]
+Auxiliary:c</title>
+<path fill="none" stroke="#4e4e4e" stroke-width="1.6" d="M1867.9,-361.4C1881.44,-341.53 1903.56,-312.16 1928.06,-291.95 1958.64,-266.73 1997.68,-245.56 2029.84,-230.42"/>
+<polygon fill="#4e4e4e" stroke="#4e4e4e" stroke-width="1.6" points="2031.54,-233.49 2039.15,-226.11 2028.61,-227.14 2031.54,-233.49"/>
+<g id="a_edge4-label"><a xlink:title="Temperature: 305.15 K
+Pressure: 101325 Pa
+Gas flow: 650 kmol/hr">
+<text text-anchor="middle" x="1953.56" y="-295.75" font-family="Arial" font-size="14.00" fill="#4e4e4e"> s1</text>
+</a>
+</g>
+</g>
+<!-- R2
+Aerated bioreactor&#45;&gt;R2
+Recirculation pump
+Auxiliary
+1 of 10 -->
+<g id="edge2" class="edge">
+<title>R2
+Aerated bioreactor:c-&gt;R2
+Recirculation pump
+Auxiliary
+1 of 10:c</title>
+<path fill="none" stroke="#4e4e4e" stroke-width="2.2" d="M1920.3,-401.15C1948.92,-409.01 1982.63,-418.27 2012.47,-426.46"/>
+<polygon fill="#4e4e4e" stroke="#4e4e4e" stroke-width="2.2" points="2011.87,-429.93 2022.44,-429.2 2013.72,-423.18 2011.87,-429.93"/>
+</g>
+<!-- R2
+Compressor
+Auxiliary&#45;&gt;R2
+Air cooler
+Auxiliary -->
+<g id="edge25" class="edge">
+<title>R2
+Compressor
+Auxiliary:c-&gt;R2
+Air cooler
+Auxiliary:c</title>
+<path fill="none" stroke="#4e4e4e" d="M1357.98,-515.95C1432.15,-515.95 1555.72,-515.95 1625.74,-515.95"/>
+<polygon fill="#4e4e4e" stroke="#4e4e4e" points="1626.09,-519.45 1636.09,-515.95 1626.09,-512.45 1626.09,-519.45"/>
+</g>
+<!-- R2
+Air cooler
+Auxiliary&#45;&gt;R2
+Aerated bioreactor -->
+<g id="edge7" class="edge">
+<title>R2
+Air cooler
+Auxiliary:c-&gt;R2
+Aerated bioreactor:c</title>
+<path fill="none" stroke="#4e4e4e" d="M1713.87,-489.99C1743.31,-467.19 1786.02,-434.1 1816.16,-410.76"/>
+<polygon fill="#4e4e4e" stroke="#4e4e4e" points="1818.54,-413.35 1824.3,-404.46 1814.25,-407.81 1818.54,-413.35"/>
+</g>
+<!-- R2
+Heat exchanger
+Auxiliary
+1 of 10&#45;&gt;R2
+Aerated bioreactor -->
+<g id="edge8" class="edge">
+<title>R2
+Heat exchanger
+Auxiliary
+1 of 10:c-&gt;R2
+Aerated bioreactor:c</title>
+<path fill="none" stroke="#4e4e4e" stroke-width="2.2" d="M2422.37,-372.08C2416.73,-372.03 2411.12,-371.98 2405.7,-371.95 2320.22,-371.46 2298.84,-370.65 2213.37,-371.95 2115.83,-373.45 2003.44,-377.22 1930.71,-379.93"/>
+<polygon fill="#4e4e4e" stroke="#4e4e4e" stroke-width="2.2" points="1930.13,-376.45 1920.27,-380.32 1930.4,-383.44 1930.13,-376.45"/>
+</g>
+<!-- R2
+Recirculation pump
+Auxiliary
+1 of 10&#45;&gt;R2
+Splitter
+Auxiliary
+1 of 10 -->
+<g id="edge27" class="edge">
+<title>R2
+Recirculation pump
+Auxiliary
+1 of 10:c-&gt;R2
+Splitter
+Auxiliary
+1 of 10:w</title>
+<path fill="none" stroke="#4e4e4e" stroke-width="2.2" d="M2160.79,-477.24C2174.36,-481.3 2188.83,-484.47 2203.06,-485.55"/>
+<polygon fill="#4e4e4e" stroke="#4e4e4e" stroke-width="2.2" points="2203.24,-489.06 2213.37,-485.95 2203.51,-482.07 2203.24,-489.06"/>
+</g>
+<!-- R2
+Splitter
+Auxiliary
+1 of 10&#45;&gt;R2
+Heat exchanger
+Auxiliary
+1 of 10 -->
+<g id="edge26" class="edge">
+<title>R2
+Splitter
+Auxiliary
+1 of 10:c-&gt;R2
+Heat exchanger
+Auxiliary
+1 of 10:c</title>
+<path fill="none" stroke="#4e4e4e" stroke-width="2.2" d="M2357.84,-456.56C2378.1,-443.97 2402.14,-429.04 2424.26,-415.29"/>
+<polygon fill="#4e4e4e" stroke="#4e4e4e" stroke-width="2.2" points="2426.31,-418.14 2432.95,-409.89 2422.61,-412.2 2426.31,-418.14"/>
+</g>
+<!-- R2
+Splitter
+Auxiliary
+1 of 10&#45;&gt;x10 -->
+<g id="edge34" class="edge">
+<title>R2
+Splitter
+Auxiliary
+1 of 10:c-&gt;x10:c</title>
+<path fill="none" stroke="#4e4e4e" d="M2357.84,-489.86C2389.76,-492.49 2431.08,-495.9 2459.46,-498.24"/>
+<polygon fill="#4e4e4e" stroke="#4e4e4e" points="2459.41,-501.74 2469.66,-499.08 2459.98,-494.77 2459.41,-501.74"/>
+</g>
+<!-- x10&#45;&gt;S3
+LLE -->
+<g id="edge6" class="edge">
+<title>x10:c-&gt;S3
+LLE:w</title>
+<path fill="none" stroke="#4e4e4e" stroke-width="1.6" d="M2517.18,-500.95C2542.6,-500.95 2585.24,-500.95 2624,-500.95"/>
+<polygon fill="#4e4e4e" stroke="#4e4e4e" stroke-width="1.6" points="2624.29,-504.45 2634.29,-500.95 2624.29,-497.45 2624.29,-504.45"/>
+<g id="a_edge6-label"><a xlink:title="Temperature: 305.15 K
+Pressure: 101325 Pa
+Liquid flow: 1.68e+03 kmol/hr">
+<text text-anchor="middle" x="2582.12" y="-504.75" font-family="Arial" font-size="14.00" fill="#4e4e4e"> s6</text>
+</a>
+</g>
+</g>
+<!-- S3
+LLE&#45;&gt;83248481713 -->
+<g id="edge28" class="edge">
+<title>S3
+LLE:c-&gt;83248481713:w</title>
+<path fill="none" stroke="#4e4e4e" d="M2726.85,-507.31C2767.94,-515.57 2844.73,-528.95 2910.95,-528.95"/>
+<g id="a_edge28-label"><a xlink:title="Temperature: 305.15 K
+Pressure: 101325 Pa
+Liquid flow: 14.9 kmol/hr">
+<text text-anchor="middle" x="2850.95" y="-531.75" font-family="Arial" font-size="14.00" fill="#4e4e4e"> dodecylacetate</text>
+</a>
+</g>
+</g>
+<!-- S3
+LLE&#45;&gt;83248482131 -->
+<g id="edge35" class="edge">
+<title>S3
+LLE:c-&gt;83248482131:w</title>
+<path fill="none" stroke="#4e4e4e" stroke-width="1.6" d="M2726.85,-494.6C2767.94,-486.34 2844.73,-472.95 2910.95,-472.95"/>
+<g id="a_edge35-label"><a xlink:title="Temperature: 305.15 K
+Pressure: 101325 Pa
+Liquid flow: 1.66e+03 kmol/hr">
+<text text-anchor="middle" x="2850.95" y="-484.75" font-family="Arial" font-size="14.00" fill="#4e4e4e"> wastewater</text>
+</a>
+</g>
+</g>
+<!-- 83248481636&#45;&gt;R1
+Gas fed bioreactor -->
+<g id="edge11" class="edge">
+<title>83248481636:e-&gt;R1
+Gas fed bioreactor:c</title>
+<path fill="none" stroke="#4e4e4e" stroke-width="2.2" d="M11,-338.95C44.15,-338.95 80.99,-338.95 111.66,-338.95"/>
+<g id="a_edge11-label"><a xlink:title="Temperature: 298.15 K
+Pressure: 101325 Pa
+Liquid flow: 5.55e+03 kmol/hr">
+<text text-anchor="middle" x="61.5" y="-342.75" font-family="Arial" font-size="14.00" fill="#4e4e4e"> AcOH media</text>
+</a>
+</g>
+</g>
+<!-- 83248481856&#45;&gt;R1
+Mixers[0]
+Auxiliary -->
+<g id="edge13" class="edge">
+<title>83248481856:e-&gt;R1
+Mixers[0]
+Auxiliary:c</title>
+<path fill="none" stroke="#4e4e4e" d="M473.53,-74.95C560.44,-74.95 582.16,-73.56 669.07,-73.95 688.74,-74.04 710.37,-74.22 729.3,-74.4"/>
+<g id="a_edge13-label"><a xlink:title="Temperature: 298.15 K
+Pressure: 101325 Pa
+Gas flow: 663 kmol/hr">
+<text text-anchor="middle" x="658.07" y="-77.75" font-family="Arial" font-size="14.00" fill="#4e4e4e"> H2</text>
+</a>
+</g>
+</g>
+<!-- 83248481911&#45;&gt;R1
+Mixers[1]
+Auxiliary -->
+<g id="edge15" class="edge">
+<title>83248481911:e-&gt;R1
+Mixers[1]
+Auxiliary:c</title>
+<path fill="none" stroke="#4e4e4e" stroke-width="1.6" d="M1860.06,-204.95C1921.53,-204.95 1992.21,-204.95 2038.96,-204.95"/>
+<g id="a_edge15-label"><a xlink:title="Temperature: 298.15 K
+Pressure: 101325 Pa
+Gas flow: 1.23e+03 kmol/hr">
+<text text-anchor="middle" x="1953.56" y="-208.75" font-family="Arial" font-size="14.00" fill="#4e4e4e"> fluegas</text>
+</a>
+</g>
+</g>
+<!-- 83248481647&#45;&gt;M1
+Mixer -->
+<g id="edge22" class="edge">
+<title>83248481647:e-&gt;M1
+Mixer:c</title>
+<path fill="none" stroke="#4e4e4e" stroke-width="1.6" d="M1302.66,-408.95C1428.51,-408.95 1577.52,-394.25 1643.7,-386.96"/>
+<g id="a_edge22-label"><a xlink:title="Temperature: 298.15 K
+Pressure: 101325 Pa
+Liquid flow: 1.5e+03 kmol/hr">
+<text text-anchor="middle" x="1534.17" y="-405.75" font-family="Arial" font-size="14.00" fill="#4e4e4e"> AcEster media</text>
+</a>
+</g>
+</g>
+<!-- 83248482098&#45;&gt;R2
+Compressor
+Auxiliary -->
+<g id="edge24" class="edge">
+<title>83248482098:e-&gt;R2
+Compressor
+Auxiliary:c</title>
+<path fill="none" stroke="#4e4e4e" d="M990.49,-515.95C1074.58,-515.95 1171.76,-515.95 1233.2,-515.95"/>
+<g id="a_edge24-label"><a xlink:title="Temperature: 305.15 K
+Pressure: 101325 Pa
+Gas flow: 539 kmol/hr">
+<text text-anchor="middle" x="1097.61" y="-519.75" font-family="Arial" font-size="14.00" fill="#4e4e4e"> air</text>
+</a>
+</g>
+</g>
+<!-- R1
+Gas fed bioreactor -->
+<g id="node1" class="node">
+<title>R1
+Gas fed bioreactor</title>
+<g id="a_node1"><a xlink:title="Electricity consumption: 6.67e+03 kW
+Cooling duty: -5.18e+04 MJ/hr
+Utility cost: 781 USD/hr
+Purchase cost: 17,031,460 USD
+Installed equipment cost: 37,051,714 USD">
+<defs>
+<linearGradient id="l_0" gradientUnits="userSpaceOnUse" x1="112" y1="-338.95" x2="247" y2="-338.95">
+<stop offset="0" style="stop-color:white;stop-opacity:1.;"/>
+<stop offset="1" style="stop-color:#cdcdcd;stop-opacity:1.;"/>
+</linearGradient>
+</defs>
+<polygon fill="url(#l_0)" stroke="#4e4e4e" points="247,-360.45 112,-360.45 112,-317.45 247,-317.45 247,-360.45"/>
+<text text-anchor="middle" x="179.5" y="-342.75" font-family="Arial" font-size="14.00">R1</text>
+<text text-anchor="middle" x="179.5" y="-327.75" font-family="Arial" font-size="14.00">Gas fed bioreactor</text>
+</a>
+</g>
+</g>
+<!-- R1
+Mixers[0]
+Auxiliary -->
+<g id="node2" class="node">
+<title>R1
+Mixers[0]
+Auxiliary</title>
+<g id="a_node2"><a xlink:title="No capital costs or utilities">
+<defs>
+<linearGradient id="l_1" gradientUnits="userSpaceOnUse" x1="729.32" y1="-74.95" x2="886.52" y2="-74.95">
+<stop offset="0" style="stop-color:white;stop-opacity:1.;"/>
+<stop offset="1" style="stop-color:#cdcdcd;stop-opacity:1.;"/>
+</linearGradient>
+</defs>
+<polygon fill="url(#l_1)" stroke="#4e4e4e" points="886.52,-74.95 729.32,-149.86 729.32,-0.05 886.52,-74.95"/>
+<text text-anchor="middle" x="781.72" y="-86.25" font-family="Arial" font-size="14.00">R1</text>
+<text text-anchor="middle" x="781.72" y="-71.25" font-family="Arial" font-size="14.00">Mixers[0]</text>
+<text text-anchor="middle" x="781.72" y="-56.25" font-family="Arial" font-size="14.00">Auxiliary</text>
+</a>
+</g>
+</g>
+<!-- R1
+Mixers[1]
+Auxiliary -->
+<g id="node3" class="node">
+<title>R1
+Mixers[1]
+Auxiliary</title>
+<g id="a_node3"><a xlink:title="No capital costs or utilities">
+<defs>
+<linearGradient id="l_2" gradientUnits="userSpaceOnUse" x1="2039.31" y1="-204.95" x2="2196.52" y2="-204.95">
+<stop offset="0" style="stop-color:white;stop-opacity:1.;"/>
+<stop offset="1" style="stop-color:#cdcdcd;stop-opacity:1.;"/>
+</linearGradient>
+</defs>
+<polygon fill="url(#l_2)" stroke="#4e4e4e" points="2196.52,-204.95 2039.31,-279.86 2039.31,-130.05 2196.52,-204.95"/>
+<text text-anchor="middle" x="2091.71" y="-216.25" font-family="Arial" font-size="14.00">R1</text>
+<text text-anchor="middle" x="2091.71" y="-201.25" font-family="Arial" font-size="14.00">Mixers[1]</text>
+<text text-anchor="middle" x="2091.71" y="-186.25" font-family="Arial" font-size="14.00">Auxiliary</text>
+</a>
+</g>
+</g>
+<!-- R1
+Sparger
+Auxiliary -->
+<g id="node4" class="node">
+<title>R1
+Sparger
+Auxiliary</title>
+<g id="a_node4"><a xlink:title="No capital costs or utilities">
+<defs>
+<linearGradient id="l_3" gradientUnits="userSpaceOnUse" x1="2648.12" y1="-199.95" x2="2792.62" y2="-199.95">
+<stop offset="0" style="stop-color:white;stop-opacity:1.;"/>
+<stop offset="1" style="stop-color:#cdcdcd;stop-opacity:1.;"/>
+</linearGradient>
+</defs>
+<polygon fill="url(#l_3)" stroke="#4e4e4e" points="2792.62,-199.95 2648.12,-274.86 2648.12,-125.05 2792.62,-199.95"/>
+<text text-anchor="middle" x="2696.29" y="-211.25" font-family="Arial" font-size="14.00">R1</text>
+<text text-anchor="middle" x="2696.29" y="-196.25" font-family="Arial" font-size="14.00">Sparger</text>
+<text text-anchor="middle" x="2696.29" y="-181.25" font-family="Arial" font-size="14.00">Auxiliary</text>
+</a>
+</g>
+</g>
+<!-- R1
+Compressors[0]
+Auxiliary -->
+<g id="node5" class="node">
+<title>R1
+Compressors[0]
+Auxiliary</title>
+<g id="a_node5"><a xlink:title="Electricity consumption: 1.74e+03 kW
+Utility cost: 136 USD/hr
+Purchase cost: 1,276,109 USD
+Installed equipment cost: 2,743,636 USD">
+<defs>
+<linearGradient id="l_4" gradientUnits="userSpaceOnUse" x1="903.25" y1="-74.95" x2="1063.73" y2="-74.95">
+<stop offset="0" style="stop-color:white;stop-opacity:1.;"/>
+<stop offset="1" style="stop-color:#cdcdcd;stop-opacity:1.;"/>
+</linearGradient>
+</defs>
+<polygon fill="url(#l_4)" stroke="#4e4e4e" points="1063.73,-43.42 1063.73,-106.49 903.25,-128.95 903.25,-20.95 1063.73,-43.42"/>
+<text text-anchor="middle" x="983.49" y="-86.25" font-family="Arial" font-size="14.00">R1</text>
+<text text-anchor="middle" x="983.49" y="-71.25" font-family="Arial" font-size="14.00">Compressors[0]</text>
+<text text-anchor="middle" x="983.49" y="-56.25" font-family="Arial" font-size="14.00">Auxiliary</text>
+</a>
+</g>
+</g>
+<!-- R1
+Compressors[1]
+Auxiliary -->
+<g id="node6" class="node">
+<title>R1
+Compressors[1]
+Auxiliary</title>
+<g id="a_node6"><a xlink:title="Electricity consumption: 1.86e+03 kW
+Utility cost: 145 USD/hr
+Purchase cost: 1,336,392 USD
+Installed equipment cost: 2,873,243 USD">
+<defs>
+<linearGradient id="l_5" gradientUnits="userSpaceOnUse" x1="2229.3" y1="-202.95" x2="2389.77" y2="-202.95">
+<stop offset="0" style="stop-color:white;stop-opacity:1.;"/>
+<stop offset="1" style="stop-color:#cdcdcd;stop-opacity:1.;"/>
+</linearGradient>
+</defs>
+<polygon fill="url(#l_5)" stroke="#4e4e4e" points="2389.77,-171.42 2389.77,-234.49 2229.3,-256.95 2229.3,-148.95 2389.77,-171.42"/>
+<text text-anchor="middle" x="2309.53" y="-214.25" font-family="Arial" font-size="14.00">R1</text>
+<text text-anchor="middle" x="2309.53" y="-199.25" font-family="Arial" font-size="14.00">Compressors[1]</text>
+<text text-anchor="middle" x="2309.53" y="-184.25" font-family="Arial" font-size="14.00">Auxiliary</text>
+</a>
+</g>
+</g>
+<!-- R1
+Gas coolers[0]
+Auxiliary -->
+<g id="node7" class="node">
+<title>R1
+Gas coolers[0]
+Auxiliary</title>
+<g id="a_node7"><a xlink:title="Cooling duty: -4.88e+03 MJ/hr
+Utility cost: 24.4 USD/hr
+Purchase cost: 24,553 USD
+Installed equipment cost: 78,626 USD">
+<ellipse fill="#60c1cf" stroke="transparent" cx="1534.17" cy="-74.95" rx="66.44" ry="66.44"/>
+<text text-anchor="middle" x="1534.17" y="-86.25" font-family="Arial" font-size="14.00" fill="white">R1</text>
+<text text-anchor="middle" x="1534.17" y="-71.25" font-family="Arial" font-size="14.00" fill="white">Gas coolers[0]</text>
+<text text-anchor="middle" x="1534.17" y="-56.25" font-family="Arial" font-size="14.00" fill="white">Auxiliary</text>
+</a>
+</g>
+</g>
+<!-- R1
+Gas coolers[1]
+Auxiliary -->
+<g id="node8" class="node">
+<title>R1
+Gas coolers[1]
+Auxiliary</title>
+<g id="a_node8"><a xlink:title="Cooling duty: -5.08e+03 MJ/hr
+Utility cost: 25.4 USD/hr
+Purchase cost: 25,265 USD
+Installed equipment cost: 80,906 USD">
+<ellipse fill="#60c1cf" stroke="transparent" cx="2493.41" cy="-199.95" rx="66.44" ry="66.44"/>
+<text text-anchor="middle" x="2493.41" y="-211.25" font-family="Arial" font-size="14.00" fill="white">R1</text>
+<text text-anchor="middle" x="2493.41" y="-196.25" font-family="Arial" font-size="14.00" fill="white">Gas coolers[1]</text>
+<text text-anchor="middle" x="2493.41" y="-181.25" font-family="Arial" font-size="14.00" fill="white">Auxiliary</text>
+</a>
+</g>
+</g>
+<!-- R1
+Heat exchanger
+Auxiliary
+1 of 26 -->
+<g id="node9" class="node">
+<title>R1
+Heat exchanger
+Auxiliary
+1 of 26</title>
+<g id="a_node9"><a xlink:title="Cooling duty: -1.61e+03 MJ/hr
+Utility cost: 8.05 USD/hr
+Purchase cost: 28,797 USD
+Installed equipment cost: 92,461 USD">
+<ellipse fill="#60c1cf" stroke="transparent" cx="983.49" cy="-296.95" rx="70.92" ry="70.92"/>
+<text text-anchor="middle" x="983.49" y="-315.75" font-family="Arial" font-size="14.00" fill="white">R1</text>
+<text text-anchor="middle" x="983.49" y="-300.75" font-family="Arial" font-size="14.00" fill="white">Heat exchanger</text>
+<text text-anchor="middle" x="983.49" y="-285.75" font-family="Arial" font-size="14.00" fill="white">Auxiliary</text>
+<text text-anchor="middle" x="983.49" y="-270.75" font-family="Arial" font-size="14.00" fill="white">1 of 26</text>
+</a>
+</g>
+</g>
+<!-- R1
+Recirculation pump
+Auxiliary
+1 of 26 -->
+<g id="node10" class="node">
+<title>R1
+Recirculation pump
+Auxiliary
+1 of 26</title>
+<g id="a_node10"><a xlink:title="Electricity consumption: 4.12 kW
+Utility cost: 0.322 USD/hr
+Purchase cost: 5,485 USD
+Installed equipment cost: 18,100 USD">
+<defs>
+<linearGradient id="l_6" gradientUnits="userSpaceOnUse" x1="397.53" y1="-405.95" x2="535.53" y2="-405.95">
+<stop offset="0" style="stop-color:white;stop-opacity:1.;"/>
+<stop offset="1" style="stop-color:#cdcdcd;stop-opacity:1.;"/>
+</linearGradient>
+</defs>
+<polygon fill="url(#l_6)" stroke="#4e4e4e" points="535.53,-439.95 397.53,-439.95 397.53,-371.95 535.53,-371.95 535.53,-439.95"/>
+<text text-anchor="middle" x="466.53" y="-424.75" font-family="Arial" font-size="14.00">R1</text>
+<text text-anchor="middle" x="466.53" y="-409.75" font-family="Arial" font-size="14.00">Recirculation pump</text>
+<text text-anchor="middle" x="466.53" y="-394.75" font-family="Arial" font-size="14.00">Auxiliary</text>
+<text text-anchor="middle" x="466.53" y="-379.75" font-family="Arial" font-size="14.00">1 of 26</text>
+</a>
+</g>
+</g>
+<!-- R1
+Splitter
+Auxiliary
+1 of 26 -->
+<g id="node11" class="node">
+<title>R1
+Splitter
+Auxiliary
+1 of 26</title>
+<g id="a_node11"><a xlink:title="No capital costs or utilities">
+<defs>
+<linearGradient id="l_7" gradientUnits="userSpaceOnUse" x1="685.39" y1="-441.95" x2="829.89" y2="-441.95">
+<stop offset="0" style="stop-color:white;stop-opacity:1.;"/>
+<stop offset="1" style="stop-color:#cdcdcd;stop-opacity:1.;"/>
+</linearGradient>
+</defs>
+<polygon fill="url(#l_7)" stroke="#4e4e4e" points="685.39,-441.95 829.89,-345.62 829.89,-538.29 685.39,-441.95"/>
+<text text-anchor="middle" x="781.72" y="-460.75" font-family="Arial" font-size="14.00">R1</text>
+<text text-anchor="middle" x="781.72" y="-445.75" font-family="Arial" font-size="14.00">Splitter</text>
+<text text-anchor="middle" x="781.72" y="-430.75" font-family="Arial" font-size="14.00">Auxiliary</text>
+<text text-anchor="middle" x="781.72" y="-415.75" font-family="Arial" font-size="14.00">1 of 26</text>
+</a>
+</g>
+</g>
+<!-- x26 -->
+<g id="node12" class="node">
+<title>x26</title>
+<g id="a_node12"><a xlink:title="Scaler">
+<defs>
+<linearGradient id="l_8" gradientUnits="userSpaceOnUse" x1="959.65" y1="-435.95" x2="1007.33" y2="-435.95">
+<stop offset="0" style="stop-color:white;stop-opacity:1.;"/>
+<stop offset="1" style="stop-color:#cdcdcd;stop-opacity:1.;"/>
+</linearGradient>
+</defs>
+<ellipse fill="url(#l_8)" stroke="#4e4e4e" cx="983.49" cy="-435.95" rx="23.84" ry="21.5"/>
+<text text-anchor="middle" x="983.49" y="-432.25" font-family="Arial" font-size="14.00">x26</text>
+</a>
+</g>
+</g>
+<!-- S1
+Molecular sieves -->
+<g id="node13" class="node">
+<title>S1
+Molecular sieves</title>
+<g id="a_node13"><a xlink:title="No capital costs or utilities">
+<defs>
+<linearGradient id="l_9" gradientUnits="userSpaceOnUse" x1="293.97" y1="-181.95" x2="552.82" y2="-181.95">
+<stop offset="0" style="stop-color:white;stop-opacity:1.;"/>
+<stop offset="1" style="stop-color:#cdcdcd;stop-opacity:1.;"/>
+</linearGradient>
+</defs>
+<polygon fill="url(#l_9)" stroke="#4e4e4e" points="293.97,-181.95 552.82,-127.97 552.82,-235.93 293.97,-181.95"/>
+<text text-anchor="middle" x="466.53" y="-185.75" font-family="Arial" font-size="14.00">S1</text>
+<text text-anchor="middle" x="466.53" y="-170.75" font-family="Arial" font-size="14.00">Molecular sieves</text>
+</a>
+</g>
+</g>
+<!-- S2
+Adsorption/LLE -->
+<g id="node14" class="node">
+<title>S2
+Adsorption/LLE</title>
+<g id="a_node14"><a xlink:title="No capital costs or utilities">
+<defs>
+<linearGradient id="l_10" gradientUnits="userSpaceOnUse" x1="1131.56" y1="-313.95" x2="1377.71" y2="-313.95">
+<stop offset="0" style="stop-color:white;stop-opacity:1.;"/>
+<stop offset="1" style="stop-color:#cdcdcd;stop-opacity:1.;"/>
+</linearGradient>
+</defs>
+<polygon fill="url(#l_10)" stroke="#4e4e4e" points="1131.56,-313.95 1377.71,-259.97 1377.71,-367.93 1131.56,-313.95"/>
+<text text-anchor="middle" x="1295.66" y="-317.75" font-family="Arial" font-size="14.00">S2</text>
+<text text-anchor="middle" x="1295.66" y="-302.75" font-family="Arial" font-size="14.00">Adsorption/LLE</text>
+</a>
+</g>
+</g>
+<!-- M1
+Mixer -->
+<g id="node15" class="node">
+<title>M1
+Mixer</title>
+<g id="a_node15"><a xlink:title="No capital costs or utilities">
+<defs>
+<linearGradient id="l_11" gradientUnits="userSpaceOnUse" x1="1643.89" y1="-382.95" x2="1750.27" y2="-382.95">
+<stop offset="0" style="stop-color:white;stop-opacity:1.;"/>
+<stop offset="1" style="stop-color:#cdcdcd;stop-opacity:1.;"/>
+</linearGradient>
+</defs>
+<polygon fill="url(#l_11)" stroke="#4e4e4e" points="1750.27,-382.95 1643.89,-436.93 1643.89,-328.97 1750.27,-382.95"/>
+<text text-anchor="middle" x="1679.35" y="-386.75" font-family="Arial" font-size="14.00">M1</text>
+<text text-anchor="middle" x="1679.35" y="-371.75" font-family="Arial" font-size="14.00">Mixer</text>
+</a>
+</g>
+</g>
+<!-- R2
+Aerated bioreactor -->
+<g id="node16" class="node">
+<title>R2
+Aerated bioreactor</title>
+<g id="a_node16"><a xlink:title="Electricity consumption: 901 kW
+Cooling duty: -1.42e+04 MJ/hr
+Utility cost: 142 USD/hr
+Purchase cost: 5,547,123 USD
+Installed equipment cost: 12,484,921 USD">
+<defs>
+<linearGradient id="l_12" gradientUnits="userSpaceOnUse" x1="1786.06" y1="-382.95" x2="1920.06" y2="-382.95">
+<stop offset="0" style="stop-color:white;stop-opacity:1.;"/>
+<stop offset="1" style="stop-color:#cdcdcd;stop-opacity:1.;"/>
+</linearGradient>
+</defs>
+<polygon fill="url(#l_12)" stroke="#4e4e4e" points="1920.06,-404.45 1786.06,-404.45 1786.06,-361.45 1920.06,-361.45 1920.06,-404.45"/>
+<text text-anchor="middle" x="1853.06" y="-386.75" font-family="Arial" font-size="14.00">R2</text>
+<text text-anchor="middle" x="1853.06" y="-371.75" font-family="Arial" font-size="14.00">Aerated bioreactor</text>
+</a>
+</g>
+</g>
+<!-- R2
+Compressor
+Auxiliary -->
+<g id="node17" class="node">
+<title>R2
+Compressor
+Auxiliary</title>
+<g id="a_node17"><a xlink:title="Electricity consumption: 545 kW
+Utility cost: 42.6 USD/hr
+Purchase cost: 454,479 USD
+Installed equipment cost: 977,131 USD">
+<defs>
+<linearGradient id="l_13" gradientUnits="userSpaceOnUse" x1="1233.2" y1="-515.95" x2="1358.11" y2="-515.95">
+<stop offset="0" style="stop-color:white;stop-opacity:1.;"/>
+<stop offset="1" style="stop-color:#cdcdcd;stop-opacity:1.;"/>
+</linearGradient>
+</defs>
+<polygon fill="url(#l_13)" stroke="#4e4e4e" points="1358.11,-484.42 1358.11,-547.49 1233.2,-569.95 1233.2,-461.95 1358.11,-484.42"/>
+<text text-anchor="middle" x="1295.66" y="-527.25" font-family="Arial" font-size="14.00">R2</text>
+<text text-anchor="middle" x="1295.66" y="-512.25" font-family="Arial" font-size="14.00">Compressor</text>
+<text text-anchor="middle" x="1295.66" y="-497.25" font-family="Arial" font-size="14.00">Auxiliary</text>
+</a>
+</g>
+</g>
+<!-- R2
+Air cooler
+Auxiliary -->
+<g id="node18" class="node">
+<title>R2
+Air cooler
+Auxiliary</title>
+<g id="a_node18"><a xlink:title="Cooling duty: -1.57e+03 MJ/hr
+Utility cost: 7.85 USD/hr
+Purchase cost: 20,356 USD
+Installed equipment cost: 65,184 USD">
+<ellipse fill="#60c1cf" stroke="transparent" cx="1679.35" cy="-515.95" rx="43.27" ry="43.27"/>
+<text text-anchor="middle" x="1679.35" y="-527.25" font-family="Arial" font-size="14.00" fill="white">R2</text>
+<text text-anchor="middle" x="1679.35" y="-512.25" font-family="Arial" font-size="14.00" fill="white">Air cooler</text>
+<text text-anchor="middle" x="1679.35" y="-497.25" font-family="Arial" font-size="14.00" fill="white">Auxiliary</text>
+</a>
+</g>
+</g>
+<!-- R2
+Heat exchanger
+Auxiliary
+1 of 10 -->
+<g id="node19" class="node">
+<title>R2
+Heat exchanger
+Auxiliary
+1 of 10</title>
+<g id="a_node19"><a xlink:title="Cooling duty: -1.26e+03 MJ/hr
+Utility cost: 6.32 USD/hr
+Purchase cost: 26,536 USD
+Installed equipment cost: 85,200 USD">
+<ellipse fill="#60c1cf" stroke="transparent" cx="2493.41" cy="-372.95" rx="70.92" ry="70.92"/>
+<text text-anchor="middle" x="2493.41" y="-391.75" font-family="Arial" font-size="14.00" fill="white">R2</text>
+<text text-anchor="middle" x="2493.41" y="-376.75" font-family="Arial" font-size="14.00" fill="white">Heat exchanger</text>
+<text text-anchor="middle" x="2493.41" y="-361.75" font-family="Arial" font-size="14.00" fill="white">Auxiliary</text>
+<text text-anchor="middle" x="2493.41" y="-346.75" font-family="Arial" font-size="14.00" fill="white">1 of 10</text>
+</a>
+</g>
+</g>
+<!-- R2
+Recirculation pump
+Auxiliary
+1 of 10 -->
+<g id="node20" class="node">
+<title>R2
+Recirculation pump
+Auxiliary
+1 of 10</title>
+<g id="a_node20"><a xlink:title="Electricity consumption: 3.46 kW
+Utility cost: 0.271 USD/hr
+Purchase cost: 5,273 USD
+Installed equipment cost: 17,402 USD">
+<defs>
+<linearGradient id="l_14" gradientUnits="userSpaceOnUse" x1="2022.71" y1="-447.95" x2="2160.71" y2="-447.95">
+<stop offset="0" style="stop-color:white;stop-opacity:1.;"/>
+<stop offset="1" style="stop-color:#cdcdcd;stop-opacity:1.;"/>
+</linearGradient>
+</defs>
+<polygon fill="url(#l_14)" stroke="#4e4e4e" points="2160.71,-481.95 2022.71,-481.95 2022.71,-413.95 2160.71,-413.95 2160.71,-481.95"/>
+<text text-anchor="middle" x="2091.71" y="-466.75" font-family="Arial" font-size="14.00">R2</text>
+<text text-anchor="middle" x="2091.71" y="-451.75" font-family="Arial" font-size="14.00">Recirculation pump</text>
+<text text-anchor="middle" x="2091.71" y="-436.75" font-family="Arial" font-size="14.00">Auxiliary</text>
+<text text-anchor="middle" x="2091.71" y="-421.75" font-family="Arial" font-size="14.00">1 of 10</text>
+</a>
+</g>
+</g>
+<!-- R2
+Splitter
+Auxiliary
+1 of 10 -->
+<g id="node21" class="node">
+<title>R2
+Splitter
+Auxiliary
+1 of 10</title>
+<g id="a_node21"><a xlink:title="No capital costs or utilities">
+<defs>
+<linearGradient id="l_15" gradientUnits="userSpaceOnUse" x1="2213.2" y1="-485.95" x2="2357.7" y2="-485.95">
+<stop offset="0" style="stop-color:white;stop-opacity:1.;"/>
+<stop offset="1" style="stop-color:#cdcdcd;stop-opacity:1.;"/>
+</linearGradient>
+</defs>
+<polygon fill="url(#l_15)" stroke="#4e4e4e" points="2213.2,-485.95 2357.7,-389.62 2357.7,-582.29 2213.2,-485.95"/>
+<text text-anchor="middle" x="2309.53" y="-504.75" font-family="Arial" font-size="14.00">R2</text>
+<text text-anchor="middle" x="2309.53" y="-489.75" font-family="Arial" font-size="14.00">Splitter</text>
+<text text-anchor="middle" x="2309.53" y="-474.75" font-family="Arial" font-size="14.00">Auxiliary</text>
+<text text-anchor="middle" x="2309.53" y="-459.75" font-family="Arial" font-size="14.00">1 of 10</text>
+</a>
+</g>
+</g>
+<!-- x10 -->
+<g id="node22" class="node">
+<title>x10</title>
+<g id="a_node22"><a xlink:title="Scaler">
+<defs>
+<linearGradient id="l_16" gradientUnits="userSpaceOnUse" x1="2469.57" y1="-500.95" x2="2517.25" y2="-500.95">
+<stop offset="0" style="stop-color:white;stop-opacity:1.;"/>
+<stop offset="1" style="stop-color:#cdcdcd;stop-opacity:1.;"/>
+</linearGradient>
+</defs>
+<ellipse fill="url(#l_16)" stroke="#4e4e4e" cx="2493.41" cy="-500.95" rx="23.84" ry="21.5"/>
+<text text-anchor="middle" x="2493.41" y="-497.25" font-family="Arial" font-size="14.00">x10</text>
+</a>
+</g>
+</g>
+<!-- S3
+LLE -->
+<g id="node23" class="node">
+<title>S3
+LLE</title>
+<g id="a_node23"><a xlink:title="No capital costs or utilities">
+<defs>
+<linearGradient id="l_17" gradientUnits="userSpaceOnUse" x1="2635.66" y1="-500.95" x2="2726.6" y2="-500.95">
+<stop offset="0" style="stop-color:white;stop-opacity:1.;"/>
+<stop offset="1" style="stop-color:#cdcdcd;stop-opacity:1.;"/>
+</linearGradient>
+</defs>
+<polygon fill="url(#l_17)" stroke="#4e4e4e" points="2635.66,-500.95 2726.6,-446.97 2726.6,-554.93 2635.66,-500.95"/>
+<text text-anchor="middle" x="2696.29" y="-504.75" font-family="Arial" font-size="14.00">S3</text>
+<text text-anchor="middle" x="2696.29" y="-489.75" font-family="Arial" font-size="14.00">LLE</text>
+</a>
+</g>
+</g>
+<!-- 83248481636 -->
+<g id="node24" class="node">
+<title>83248481636</title>
+<polygon fill="#f98f60" stroke="#4e4e4e" points="5.5,-344.45 0,-338.95 5.5,-333.45 11,-338.95 5.5,-344.45"/>
+</g>
+<!-- 83248481856 -->
+<g id="node25" class="node">
+<title>83248481856</title>
+<polygon fill="#f98f60" stroke="#4e4e4e" points="466.53,-80.45 461.03,-74.95 466.53,-69.45 472.03,-74.95 466.53,-80.45"/>
+</g>
+<!-- 83248481911 -->
+<g id="node26" class="node">
+<title>83248481911</title>
+<polygon fill="#f98f60" stroke="#4e4e4e" points="1853.06,-210.45 1847.56,-204.95 1853.06,-199.45 1858.56,-204.95 1853.06,-210.45"/>
+</g>
+<!-- 83248481647 -->
+<g id="node27" class="node">
+<title>83248481647</title>
+<polygon fill="#f98f60" stroke="#4e4e4e" points="1295.66,-414.45 1290.16,-408.95 1295.66,-403.45 1301.16,-408.95 1295.66,-414.45"/>
+</g>
+<!-- 83248482098 -->
+<g id="node28" class="node">
+<title>83248482098</title>
+<polygon fill="#f98f60" stroke="#4e4e4e" points="983.49,-521.45 977.99,-515.95 983.49,-510.45 988.99,-515.95 983.49,-521.45"/>
+</g>
+<!-- 83248481713 -->
+<g id="node29" class="node">
+<title>83248481713</title>
+<polygon fill="#f98f60" stroke="#4e4e4e" points="2920.45,-528.95 2912.2,-535.95 2912.2,-521.95 2920.45,-528.95"/>
+</g>
+<!-- 83248481977 -->
+<g id="node30" class="node">
+<title>83248481977</title>
+<polygon fill="#f98f60" stroke="#4e4e4e" points="787.22,-192.95 778.97,-199.95 778.97,-185.95 787.22,-192.95"/>
+</g>
+<!-- 83248481999 -->
+<g id="node31" class="node">
+<title>83248481999</title>
+<polygon fill="#f98f60" stroke="#4e4e4e" points="1684.85,-285.95 1676.6,-292.95 1676.6,-278.95 1684.85,-285.95"/>
+</g>
+<!-- 83248482131 -->
+<g id="node32" class="node">
+<title>83248482131</title>
+<polygon fill="#f98f60" stroke="#4e4e4e" points="2920.45,-472.95 2912.2,-479.95 2912.2,-465.95 2920.45,-472.95"/>
+</g>
+</g>
+</svg>

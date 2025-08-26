@@ -58,7 +58,7 @@ def create_system(flowsheet=None, biorefinery_settings=None):
         'price': aa_price,
         'characterization_factors': {'GWP': aa_CF},
         'units': 'kg/hr',
-        }
+    }
 
     alpha_amylase = bst.Stream('alpha_amylase',
                                SolubleProtein=0.00082,

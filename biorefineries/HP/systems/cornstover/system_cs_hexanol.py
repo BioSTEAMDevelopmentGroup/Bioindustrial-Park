@@ -200,6 +200,8 @@ def create_HP_sys(ins, outs):
                                                            makeup_MEA_A301),
                                                    )
     
+    u.R302.neutralization = False
+    
     # %% 
     # =============================================================================
     # Separation streams
@@ -658,7 +660,7 @@ spec = ProcessSpecification(
     # !!! set baseline fermentation performance here
     baseline_yield = 0.73, 
     baseline_titer = 62.5, 
-    baseline_productivity = 0.3255, 
+    baseline_productivity = 0.28, 
     
     
     tolerable_HXN_energy_balance_percent_error = 0.01,

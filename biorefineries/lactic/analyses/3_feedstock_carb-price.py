@@ -16,12 +16,10 @@
 # Setup
 # =============================================================================
 
-import numpy as np
-import pandas as pd
-from biosteam.utils import TicToc
-from biorefineries.lactic import load_system, \
-    SSCF_flowsheet, SSCF_funcs, SHF_flowsheet, SHF_funcs
-from biorefineries.lactic.utils import _feedstock_factor
+import numpy as np, pandas as pd, biosteam as bst
+from biosteam.utils import Timer
+from biorefineries.lactic import load, create_funcs
+from biorefineries.lactic.utils import feedstock_factor
 
 
 # %%
@@ -57,8 +55,8 @@ prices = np.arange(0, 210, 10)
 # =============================================================================
 
 # Initiate a timer
-timer = TicToc('timer')
-timer.tic()
+timer = Timer('timer')
+timer.start()
 
 TEA_set_carbs = []
 TEA_actual_carbs = []
@@ -74,9 +72,10 @@ GWPs = []
 FECs = []
 
 # Configuration 2
-load_system('SHF')
+load('SHF')
 carb_contents1 = np.arange(0.25, 0.59, 0.01)
 carb_contents1 = carb_contents1.tolist() + [0.589]
+SHF_flowsheet = bst.main_flowsheet
 R301 = SHF_flowsheet.unit.R301
 R301.allow_dilution = False
 R301.allow_concentration = True
@@ -96,6 +95,7 @@ for i in carb_contents1:
     lactic_sys.simulate()
     LCA_titers.append(R301.effluent_titer)
     LCA_yields.append(R301.lactic_yield)
+    SHF_funcs = create_funcs(flowsheet=SHF_flowsheet)
     GWPs.append(SHF_funcs['get_GWP']())
     FECs.append(SHF_funcs['get_FEC']())
     for j in prices:
@@ -104,7 +104,7 @@ for i in carb_contents1:
         TEA_prices.append(j)
         TEA_titers.append(R301.effluent_titer)
         TEA_yields.append(R301.lactic_yield)
-        feedstock.price = j / _feedstock_factor
+        feedstock.price = j / feedstock_factor
         lactic_acid.price = 0
         for m in range(3):
             MPSP = lactic_acid.price = lactic_tea.solve_price(lactic_acid)
@@ -112,8 +112,9 @@ for i in carb_contents1:
         NPVs.append(lactic_tea.NPV)
 
 # Then concentration needed to get to the baseline titer
-load_system('SSCF')
+load('SSCF')
 carb_contents2 = np.arange(0.59, 0.701, 0.01).tolist()
+SSCF_flowsheet = bst.main_flowsheet
 R301 = SSCF_flowsheet.unit.R301
 R301.allow_dilution = True
 R301.allow_concentration = False
@@ -132,6 +133,7 @@ for i in carb_contents2:
     lactic_sys.simulate()
     LCA_titers.append(R301.effluent_titer)
     LCA_yields.append(R301.lactic_yield)
+    SSCF_funcs = create_funcs(flowsheet=SSCF_flowsheet)
     GWPs.append(SSCF_funcs['get_GWP']())
     FECs.append(SSCF_funcs['get_FEC']())
     for j in prices:
@@ -140,7 +142,7 @@ for i in carb_contents2:
         TEA_prices.append(j)
         TEA_titers.append(R301.effluent_titer)
         TEA_yields.append(R301.lactic_yield)
-        feedstock.price = j / _feedstock_factor
+        feedstock.price = j / feedstock_factor
         lactic_acid.price = 0
         for m in range(3):
             MPSP = lactic_acid.price = lactic_tea.solve_price(lactic_acid)

@@ -362,7 +362,7 @@ succinic_metrics = [get_product_MPSP, get_product_GWP, get_product_FEC, get_reco
 # succinic_metrics = [get_succinic_MPSP, get_GWP, get_FEC]
 
 # %% Generate 3-specification meshgrid and set specification loading functions
-steps = 50
+steps = 5
 
 # Neutralization
 spec.neutralization = True
@@ -371,7 +371,7 @@ spec.neutralization = True
 spec_1 = yields = np.linspace(0.038, 0.81, steps) # yield
 spec_2 = titers = np.linspace(10., 120., steps) # titer
 # spec_3 = productivities = np.linspace(0.1, 1.5, 6) # productivity
-spec_3 = productivities = [5.*spec.baseline_productivity]
+spec_3 = productivities = [spec.baseline_productivity]
 
 # spec.load_spec_1 = spec.load_yield
 # spec.load_spec_2 = spec.load_titer
@@ -520,8 +520,8 @@ if plot:
                                     y_label=r"$\bfTiter$", # title of the y axis
                                     z_label=r"$\bfProductivity$", # title of the z axis
                                     w_label=r"$\bfMPSP$", # title of the color axis
-                                    x_ticks=[20, 30, 40, 50, 60, 70, 80],
-                                    y_ticks=[20, 40, 60, 80, 100, 120],
+                                    x_ticks=[0, 10, 20, 30, 40, 50, 60, 70, 80],
+                                    y_ticks=[0, 20, 40, 60, 80, 100, 120],
                                     z_ticks=np.arange(0.0, 2.5, 0.5),
                                     w_levels=np.arange(0.8, 2.3, 0.1), # levels for unlabeled, filled contour areas (labeled and ticked only on color bar)
                                     w_ticks=np.array([1.0, 1.1, 1.2, 1.3,  1.5, 1.8, 2.2,]), # labeled, lined contours; a subset of w_levels
@@ -538,7 +538,7 @@ if plot:
                                     fps=3, # animation frames (z values traversed) per second
                                     n_loops='inf', # the number of times the animated contourplot should loop animation over z; infinite by default
                                     animated_contourplot_filename='MPSP_animated_contourplot_'+file_to_save, # file name to save animated contourplot as (no extensions)
-                                    keep_frames=False, # leaves frame PNG files undeleted after running; False by default
+                                    keep_frames=True, # leaves frame PNG files undeleted after running; False by default
                                     )
     
     #%% GWP

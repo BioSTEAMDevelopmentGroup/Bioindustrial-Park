@@ -7,9 +7,9 @@ Process flowsheet
 .. figure:: ./images/system_diagram.png
 
 
-This biorefinery is developed for Tran, Mishra, Bhagwat et al. [1]_ for the production of 
-succinic acid from sugarcane. It includes juicing, fermentation, 
-and separation processes. Part of the script is adopted from [2]_, [3]_, and [4]_.
+These biorefineries were developed to support studies by Tran, Mishra, Bhagwat et al. [1]_ and Tran et al. [3]_ for the production of 
+succinic acid from sugarcane. They include juicing, fermentation, 
+and separation processes. Part of the script is adopted from [2]_.
 
 Installation
 ------------
@@ -143,7 +143,7 @@ Processes:
     
 Analyses
 --------
-Multiple analysis modules were used to evaluate biorefineries for [1]_, including
+Multiple analysis modules were used to evaluate biorefineries for [1]_ and [3]_, including
 full Monte Carlo simulation (succinic.run_uncertainty_analysis)
 and titer-yield-productivity analysis for the fermentation performance space (succinic.run_TRY_analysis).
 The crystallization simulation model was fit to experimental data (crystallization_curvefit.py).
@@ -151,25 +151,22 @@ The crystallization simulation model was fit to experimental data (crystallizati
 Note that results used in the manuscript [1]_ were generated using biosteam==2.36.4,
 thermosteam==0.33.0, contourplots==0.2.1, numpy==1.23.5, and dependencies (`commit 616b812 <https://github.com/BioSTEAMDevelopmentGroup/Bioindustrial-Park/tree/616b8122863e966aa2f97e2ef7b0e85544731392/biorefineries/succinic>`_).
 
+Note that results used in the manuscript [3]_ were generated using biosteam==2.46.1,
+thermosteam==0.45.0, contourplots==0.2.1, numpy==1.26.4, and dependencies (`this branch <https://github.com/BioSTEAMDevelopmentGroup/Bioindustrial-Park/tree/succinic_2025_no_FGI/biorefineries/succinic>`_).
+
 To reproduce the results, directly run the script of interest, and results will
 be saved as Excel files and figures in analyses/results.
 
 
 References
 ----------
-.. [1] Tran, Mishra, Bhagwat et al., An End-to-end Pipeline for Succinic Acid Production at an Industrially Relevant Scale using Issatchenkia orientalis. 
-    Nat. Commun. 2023. Submitted May 3, 2023.
 
-.. [2] Bhagwat et al., Sustainable Production of Acrylic Acid via 3-Hydroxypropionic Acid from Lignocellulosic Biomass. 
-    ACS Sustainable Chem. Eng. 2021, 9 (49) 16659–16669.
+.. [1] Tran, V. G.\ :sup:`*`; Mishra, S.\ :sup:`*`; Bhagwat, S. S.\ :sup:`*`; Shafaei, S.; Shen, Y.; Allen, J. L.; Crosly, B. A.; Tan, S.; Fatma, Z.; Rabinowitz, J. D.; Guest, J. S.; Singh, V. S.; Zhao, H. An end-to-end pipeline for succinic acid production at an industrially relevant scale using Issatchenkia orientalis. Nature Communications. 2023, 14 (1), 6152. \ :sup:`*` These authors contributed equally to this work.
+    `<https://doi.org/10.1038/s41467-023-41616-9>`_
+
+.. [2] Bhagwat, S. S.; Li, Y.; Cortés-Peña, Y. R.; Brace, E. C.; Martin, T. A.; Zhao, H.; Guest, J. S. Sustainable production of acrylic acid via 3-hydroxypropionic acid from lignocellulosic biomass. ACS Sustainable Chemistry & Engineering. 2021, 9 (49), 16659–16669.
     `<https://doi.org/10.1021/acssuschemeng.1c05441>`_
-
-.. [3] Li et al., Sustainable Lactic Acid Production from Lignocellulosic Biomass.
-    ACS Sustainable Chem. Eng. 2021, 9 (3), 1341–1351. 
-    `<https://doi.org/10.1021/acssuschemeng.0c08055>`_
      
-.. [4] Cortes-Peña et al., BioSTEAM: A Fast and Flexible Platform for the Design,
-    Simulation, and Techno-Economic Analysis of Biorefineries under Uncertainty. 
-    ACS Sustainable Chem. Eng. 2020, 8 (8), 3302–3310. 
+.. [3] Tran, V. G.; Tan, S.; Xu, H; Weilandt, D.R.; Li, X.; Bhagwat, S. S.; Zhu, Z.; Guest, J. S.; Rabinowitz, J.D.; Zhao, H. Decompartmentalization of the yeast mitochondrial metabolism to improve chemical production in Issatchenkia orientalis. Nature Communications. Accepted June 25, 2025.
     `<https://doi.org/10.1021/acssuschemeng.9b07040>`_
 

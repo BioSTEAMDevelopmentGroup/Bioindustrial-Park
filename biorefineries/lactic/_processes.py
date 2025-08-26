@@ -388,7 +388,7 @@ def create_separation_process(feed, cell_mass_split, gypsum_split,
                                     kW_per_m3=0.0985, wall_thickness_factor=1.5,
                                     vessel_material='Stainless steel 316',
                                     vessel_type='Vertical')
-    R401_P = bst.units.Pump('R401_P', ins=R401-0)
+    R401_P = bst.units.Pump('R401_P', ins=R401-0, P=101325)
 
 
     S402 = units.GypsumFilter('S402', ins=R401_P-0,
@@ -416,7 +416,7 @@ def create_separation_process(feed, cell_mass_split, gypsum_split,
 
     # Condense waste vapor for recycling
     F401_H = bst.units.HXutility('F401_H', ins=F401-0, V=0, rigorous=True)
-    F401_P = bst.units.Pump('F401_P', ins=F401-1)
+    F401_P = bst.units.Pump('F401_P', ins=F401-1, P=101325)
 
     # Separate out persisting water and more volatile components to
     # improve conversion of downstream esterification
@@ -428,7 +428,7 @@ def create_separation_process(feed, cell_mass_split, gypsum_split,
                                         Lr=0.99, Hr=0.5, k=1.2,
                                         vessel_material='Stainless steel 316')
     D401_H = bst.units.HXutility('D401_H', ins=D401-0, V=0, rigorous=True)
-    D401_P = bst.units.Pump('D401_P', ins=D401-1)
+    D401_P = bst.units.Pump('D401_P', ins=D401-1, P=101325)
 
     # LA + EtOH --> EtLA + H2O
     # R402.ins[0] is volatile-removed fermentation broth, ~50% w/w conc. LA feed,

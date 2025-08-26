@@ -13,8 +13,6 @@ import pandas as pd
 __all__ = (
     'ConventionalEthanolTEA', 
     'create_conventional_ethanol_tea', 
-    'capex_table', 
-    'foc_table'
 )
 
 class ConventionalEthanolTEA(bst.TEA):
@@ -97,6 +95,33 @@ class ConventionalEthanolTEA(bst.TEA):
         return (FCI*(self.property_tax + self.property_insurance
                      + self.maintenance + self.administration)
                 + self.labor_cost*(1+self.fringe_benefits+self.supplies))
+    
+    def CAPEX_table(self):
+        purchase_cost = self.purchase_cost /1e6
+        lang_factor = self.lang_factor
+        FCI = lang_factor * purchase_cost
+        working_capital = FCI * self.WC_over_FCI
+        TCI = FCI + working_capital
+        accounting = self.Accounting(units='MM$')
+        accounting.entry('Purchase cost', purchase_cost)
+        accounting.entry('Fixed capital investment (FCI)', FCI, f"Purchase cost x {lang_factor}")
+        accounting.entry('Working capital',  working_capital, f"{self.WC_over_FCI:.1%} of FCI")
+        accounting.entry('Total capital investment (TCI)',  TCI, "Working capital + FCI")
+        return accounting.table()
+    
+    def FOC_table(self):
+        accounting = self.Accounting(units='MM$ / yr')
+        FCI = self.FCI / 1e6
+        labor_cost = self.labor_cost / 1e6
+        labor_burden = self.fringe_benefits + self.supplies
+        accounting.entry('Labor salary', labor_cost)
+        accounting.entry('Labor burden', labor_cost * labor_burden, f'{labor_burden:.0%} of labor salary')
+        accounting.entry('Maintenance', self.maintenance * FCI, f'{self.maintenance:.0%} of FCI')
+        accounting.entry('Administration', self.administration * FCI, f'{self.administration:.1%} of FCI')
+        accounting.entry('Property tax', self.property_tax * FCI, f'{self.property_tax:.1%} of FCI')
+        accounting.entry('Property insurance', self.property_insurance * FCI, f'{self.property_insurance:.1%} of FCI')
+        return accounting.table()
+        
 
 def create_conventional_ethanol_tea(
         system, cls=ConventionalEthanolTEA, IRR=0.15,
@@ -116,34 +141,3 @@ def create_conventional_ethanol_tea(
         property_tax=property_tax, property_insurance=property_insurance,
         supplies=supplies, maintenance=maintenance, administration=administration
     )
-
-def capex_table(tea):
-    purchase_cost = tea.purchase_cost /1e6
-    lang_factor = tea.lang_factor
-    FCI = lang_factor * purchase_cost
-    working_capital = FCI * tea.WC_over_FCI
-    TCI = FCI + working_capital
-    index = ('Purchase cost',
-             'Fixed capital investment', 
-             'Working capital', 
-             'Total capital investment')
-    data = [
-        ['', purchase_cost],
-        [f"Purchase cost x {lang_factor}", FCI],
-        [f"{tea.WC_over_FCI:.1%} of FCI", working_capital],
-        ['', TCI],
-    ]
-    return pd.DataFrame(data, index=index, columns=['Notes', 'Cost [MM$]'])
-
-def foc_table(tea):
-    foc = bst.report.FOCTableBuilder()
-    FCI = tea.FCI / 1e6
-    labor_cost = tea.labor_cost / 1e6
-    labor_burden = tea.fringe_benefits + tea.supplies
-    foc.entry('Labor salary', labor_cost)
-    foc.entry('Labor burden', labor_cost * labor_burden, f'{labor_burden:.0%} of labor salary')
-    foc.entry('Maintenance', tea.maintenance * FCI, f'{tea.maintenance:.0%} of FCI')
-    foc.entry('Administration', tea.administration * FCI, f'{tea.administration:.1%} of FCI')
-    foc.entry('Property tax', tea.property_tax * FCI, f'{tea.property_tax:.1%} of FCI')
-    foc.entry('Property insurance', tea.property_insurance * FCI, f'{tea.property_insurance:.1%} of FCI')
-    return foc.table()

@@ -1,5 +1,13 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
+# Oxalic acid biorefineries.
+# Copyright (C) 2024-, Sarang Bhagwat <sarangb2@illinois.edu>, Wenjun Guo <wenjung2@illinois.edu>
+# 
+# This module is under the UIUC open-source license. See 
+# github.com/BioSTEAMDevelopmentGroup/biosteam/blob/master/LICENSE.txt
+# for license details.
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
 """
 Created on Sun Aug 23 12:11:15 2020
 
@@ -137,6 +145,9 @@ Ethanol = chemical_database('Ethanol')
 # which was also cited by other studies, but the origianl source cannot be found online
 CalciumLactate = chemical_database('CalciumLactate', phase='l',
                                    Hf=-1686.1e3)
+# Hf from Lange's Handbook of Chemistry, 15th edn., Table 6.3, PDF page 631
+CalciumOxalate = chemical_database('CalciumOxalate', phase='l', Hf=-1360.6e3)
+
 # Hf from Lange's Handbook of Chemistry, 15th edn., Table 6.3, PDF page 631
 CalciumAcetate = chemical_database('CalciumAcetate', phase='l', Hf=-1514.73e3)
 

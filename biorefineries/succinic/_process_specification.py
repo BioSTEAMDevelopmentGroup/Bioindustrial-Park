@@ -41,7 +41,8 @@ error = False
 _kg_per_ton = 907.18474
 
 def evaluate_across_specs(spec, system,
-            spec_1, spec_2, metrics, spec_3):
+            spec_1, spec_2, metrics, spec_3,
+            print_every_n_iter=50):
     spec.count += 1
     if skip_infeasible_titers and last_infeasible_simulation:
         yield_, titer = last_infeasible_simulation
@@ -94,7 +95,8 @@ def evaluate_across_specs(spec, system,
         HXN = spec.HXN
         HXN_Q_bal_percent_error = HXN.energy_balance_percent_error
         tolerable_HXN_energy_balance_percent_error = spec.tolerable_HXN_energy_balance_percent_error
-        print(f"HXN Q_balance off by {format(HXN_Q_bal_percent_error,'.2f')} %.\n")
+        if (spec.count-1)%print_every_n_iter==0:
+            print(f"HXN Q_balance off by {format(HXN_Q_bal_percent_error,'.2f')} %.\n")
         spec.HXN_Q_bal_percent_error_dict[str((spec_1, spec_2, spec_3))] = HXN_Q_bal_percent_error
         if abs(HXN_Q_bal_percent_error) >= tolerable_HXN_energy_balance_percent_error:
             # Beep(320, 500)
@@ -108,12 +110,16 @@ def evaluate_across_specs(spec, system,
     
     def get_metrics():
         if HXN_Q_bal_OK():
-            return spec.evaluate_across_productivity(metrics, spec_3)
+            data = spec.evaluate_across_productivity(metrics, spec_3)
+            if (spec.count-1)%print_every_n_iter==0:
+                print(data)
+            return data
         else:
             return np.nan*np.ones([len(metrics), len(spec_3)])
     
-    print(f"\n\n----------\n{spec.count} / {spec.total_iterations}\n")
-    print(f"yield = {format(100*float(spec_1),'.1f')} % theo.,  titer = {format(float(spec_2),'.2f')} g\u00b7L\u207b\u00b9,  prod. = {format(float(spec_3),'.2f')} g\u00b7L\u207b\u00b9\u00b7h\u207b\u00b9\n")
+    if (spec.count-1)%print_every_n_iter==0:
+        print(f"\n\n----------\n{spec.count} / {spec.total_iterations}\n")
+        print(f"yield = {format(100*float(spec_1),'.1f')} % theo.,  titer = {format(float(spec_2),'.2f')} g\u00b7L\u207b\u00b9,  prod. = {format(float(spec_3),'.2f')} g\u00b7L\u207b\u00b9\u00b7h\u207b\u00b9\n")
     try:
         spec.load_specifications(spec_1=spec_1, spec_2=spec_2)
         system.simulate()
@@ -145,7 +151,8 @@ def evaluate_across_specs(spec, system,
                         system.simulate()
                         return get_metrics()
                     except:
-                        Beep(640, 500)
+                        # Beep(640, 500)
+                        pass
                         # import pdb
                         # pdb.set_trace()
                 except: pass
@@ -155,7 +162,10 @@ def evaluate_across_specs(spec, system,
                 return np.nan*np.ones([len(metrics), len(spec_3)])
         else:
             return np.nan*np.ones([len(metrics), len(spec_3)])
-    return spec.evaluate_across_productivity(metrics, spec_3)
+    data = spec.evaluate_across_productivity(metrics, spec_3)
+    if (spec.count-1)%print_every_n_iter==0:
+        print(data)
+    return data
     
 
 
@@ -320,7 +330,6 @@ class ProcessSpecification(bst.process_tools.ReactorSpecification):
             self.load_spec_3(spec_3[i])
             # self.reactor._summary()
             data[:, i] = [j() for j in metrics]
-        print(data)
         return data
 
     def evaluate_across_specs(self, system, 
@@ -418,15 +427,21 @@ class ProcessSpecification(bst.process_tools.ReactorSpecification):
         
         reduce_by_for_fp_error = 1e-9
         
+        xuf = self.xylose_utilization_fraction
         if diff > 0.:
             pyruvic_acid_yield = reactor.glucose_to_pyruvic_acid_rxn.X =\
                 max(0, baseline_pyruvic_acid_yield - diff - reduce_by_for_fp_error)
+            reactor.xylose_to_pyruvic_acid_rxn.X = xuf*pyruvic_acid_yield
+            
             if pyruvic_acid_yield==0:
                 cell_mass_yield = reactor.glucose_to_microbe_rxn.X =\
                     max(0, baseline_cell_mass_yield - diff + baseline_pyruvic_acid_yield - reduce_by_for_fp_error)
+                reactor.glucose_to_microbe_rxn.X = xuf*cell_mass_yield
         else:
             reactor.glucose_to_pyruvic_acid_rxn.X = baseline_pyruvic_acid_yield
             reactor.glucose_to_microbe_rxn.X = baseline_cell_mass_yield
+            reactor.xylose_to_pyruvic_acid_rxn.X = xuf*baseline_pyruvic_acid_yield
+            reactor.xylose_to_microbe_rxn.X = xuf*baseline_cell_mass_yield
             
         # rem_glucose = min(0.13, 1. - reactor.glucose_to_succinic_acid_rxn.X)
         # reactor.glucose_to_acetic_acid_rxn.X = (55./130.) * rem_glucose

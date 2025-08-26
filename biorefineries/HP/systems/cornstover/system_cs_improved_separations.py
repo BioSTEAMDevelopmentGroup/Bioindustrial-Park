@@ -673,7 +673,7 @@ spec = ProcessSpecification(
     # !!! set baseline fermentation performance here
     baseline_yield = 0.73, 
     baseline_titer = 62.5, 
-    baseline_productivity = 0.3255, 
+    baseline_productivity = 0.28, 
     
     
     tolerable_HXN_energy_balance_percent_error = 0.01,
@@ -787,7 +787,7 @@ def simulate_and_print():
 
 # %% Initial simulation
 
-for i in range(2): get_AA_MPSP()
+# for i in range(2): get_AA_MPSP()
 
 spec.load_specifications(spec.baseline_yield, spec.baseline_titer, spec.baseline_productivity)
 

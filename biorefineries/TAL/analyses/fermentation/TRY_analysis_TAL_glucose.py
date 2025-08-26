@@ -219,7 +219,7 @@ else:
     elif which_fig=='insights':
         spec_3 = productivities =\
             np.array([
-                        5.*spec.baseline_productivity,
+                        spec.baseline_productivity,
                       ])
         TAL_metrics = [get_product_MPSP, 
                         lambda: TAL_lca.GWP,
@@ -382,6 +382,8 @@ print_status_every_n_simulations = 50
 
 titers_mol_per_mol_total = [] # for fermentation generalizable insights work only
 
+errors_dict = {}
+
 for p in productivities:
     # data_1 = TAL_data = spec.evaluate_across_specs(
     #         TAL_sys, spec_1, spec_2, TAL_metrics, [p])
@@ -426,7 +428,8 @@ for p in productivities:
                 d1_Metric5[-1].append(np.nan)
                 d1_Metric6[-1].append(np.nan)
                 error_message = str(e1)
-            
+                errors_dict[str(e1)] = (y, t, p)
+                
             except ValueError as e1:
                 d1_Metric1[-1].append(np.nan)
                 d1_Metric2[-1].append(np.nan)
@@ -435,6 +438,7 @@ for p in productivities:
                 d1_Metric5[-1].append(np.nan)
                 d1_Metric6[-1].append(np.nan)
                 error_message = str(e1)
+                errors_dict[str(e1)] = (y, t, p)
             
             if curr_no%print_status_every_n_simulations==0 or (error_message and not 'sugar' in error_message and not 'opposite sign' in error_message):
                 print_status(curr_no, total_no,
@@ -479,6 +483,9 @@ chdir(TAL_results_filepath)
 results_metric_1 = np.array(results_metric_1)
 results_metric_2 = np.array(results_metric_2)
 results_metric_3 = np.array(results_metric_3)
+results_metric_4 = np.array(results_metric_4)
+results_metric_5 = np.array(results_metric_5)
+results_metric_6 = np.array(results_metric_6)
 
 #%% Save generated numpy file
 np.save(TAL_results_filepath+'MPSP-'+file_to_save, results_metric_1)
@@ -575,8 +582,91 @@ keep_frames = True
 
 print('\nCreating and saving contour plots ...\n')
 
+#%% Smoothing
+smoothing = True
+
+if smoothing:
+    for arr in [results_metric_1, results_metric_2, results_metric_3, results_metric_4, results_metric_5, results_metric_6]:
+        for i in range(arr.shape[0]):
+            for j in range(arr.shape[1]):
+                for k in range(arr.shape[2]):
+                    if j>0 and k>0 and j<arr.shape[1]-1 and k<arr.shape[2]-1 :
+                        if np.isnan(arr[i,j,k]):
+                            manhattan_neighbors = np.array([
+                                         arr[i][j-1][k],
+                                         arr[i][j+1][k],
+                                         # arr[i][j][k-1],
+                                         # arr[i][j][k+1]
+                                         ])
+                            if not np.any(np.isnan(manhattan_neighbors)):
+                                arr[i,j,k] = np.mean(manhattan_neighbors)
+                        if np.isnan(arr[i,j,k]):
+                            manhattan_neighbors = np.array([
+                                         # arr[i][j-1][k],
+                                         # arr[i][j+1][k],
+                                         arr[i][j][k-1],
+                                         arr[i][j][k+1]
+                                         ])
+                            if not np.any(np.isnan(manhattan_neighbors)):
+                                arr[i,j,k] = np.mean(manhattan_neighbors)
+                        
+                        # try:
+                        #     if np.isnan(arr[i,j,k]):
+                        #         manhattan_neighbors = np.array([
+                        #                      arr[i][j-2][k],
+                        #                      arr[i][j+2][k],
+                        #                      # arr[i][j][k-1],
+                        #                      # arr[i][j][k+1]
+                        #                      ])
+                        #         if not np.any(np.isnan(manhattan_neighbors)):
+                        #             arr[i,j,k] = np.mean(manhattan_neighbors)
+                        # except:
+                        #     pass
+                        
+                        # try:
+                        #     if np.isnan(arr[i,j,k]):
+                        #         manhattan_neighbors = np.array([
+                        #                      # arr[i][j-2][k],
+                        #                      # arr[i][j+2][k],
+                        #                      arr[i][j][k-2],
+                        #                      arr[i][j][k+2]
+                        #                      ])
+                        #         if not np.any(np.isnan(manhattan_neighbors)):
+                        #             arr[i,j,k] = np.mean(manhattan_neighbors)
+                        # except:
+                        #     pass
+                        if np.isnan(arr[i,j,k]):
+                            manhattan_neighbors = np.array([
+                                         arr[i][j-1][k],
+                                         arr[i][j+1][k],
+                                         # arr[i][j][k-1],
+                                         # arr[i][j][k+1]
+                                         ])
+                            if not np.any(np.isnan(manhattan_neighbors)):
+                                arr[i,j,k] = np.mean(manhattan_neighbors)
+                        if np.isnan(arr[i,j,k]):
+                            manhattan_neighbors = np.array([
+                                         # arr[i][j-1][k],
+                                         # arr[i][j+1][k],
+                                         arr[i][j][k-1],
+                                         arr[i][j][k+1]
+                                         ])
+                            if not np.any(np.isnan(manhattan_neighbors)):
+                                arr[i,j,k] = np.mean(manhattan_neighbors)
+                        
+                        # else:
+                        #     manhattan_neighbors = np.array([
+                        #                  arr[i][j-1][k],
+                        #                  arr[i][j+1][k],
+                        #                  arr[i][j][k-1],
+                        #                  arr[i][j][k+1]
+                        #                  ])
+                        #     if not np.any(np.isnan(manhattan_neighbors)):
+                        #         if not round(arr[i,j,k]/np.mean(manhattan_neighbors),0)==1:
+                        #             print(i,j,k)
+                    
 #%% Plots
-plot = False
+plot = True
 
 if plot: 
     
@@ -589,7 +679,7 @@ if plot:
     # MPSP_w_levels = np.arange(0., 15.5, 0.5)
     
     contourplots.animated_contourplot(w_data_vs_x_y_at_multiple_z=results_metric_1, # shape = z * x * y # values of the metric you want to plot on the color axis; e.g., MPSP
-                                    x_data=100*yields, # x axis values
+                                    x_data=0.4666697750838162*yields, # x axis values
                                     # x_data = yields/theoretical_max_g_TAL_acid_per_g_glucose,
                                     y_data=titers, # y axis values
                                     z_data=productivities, # z axis values
@@ -597,7 +687,7 @@ if plot:
                                     y_label=y_label, # title of the y axis
                                     z_label=z_label, # title of the z axis
                                     w_label=MPSP_w_label, # title of the color axis
-                                    x_ticks=100*x_ticks,
+                                    x_ticks=1e-2*0.4666697750838162*np.array(x_ticks)[:7],
                                     y_ticks=y_ticks,
                                     z_ticks=z_ticks,
                                     w_levels=MPSP_w_levels, # levels for unlabeled, filled contour areas (labeled and ticked only on color bar)

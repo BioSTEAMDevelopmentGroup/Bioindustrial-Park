@@ -18,7 +18,7 @@ from biosteam.utils import  colors
 import numpy as np
 
 from biorefineries import TAL
-from biorefineries.TAL.systems.system_TAL_solubility_exploit_ethanol_sugarcane import TAL_tea, TAL_lca, R302, spec, TAL_product, simulate_and_print, theoretical_max_g_TAL_per_g_SA,\
+from biorefineries.TAL.systems.system_TAL_solubility_exploit_ethanol_sugarcane import TAL_tea, TAL_lca, R302, spec, TAL_product, simulate_and_print, theoretical_max_g_TAL_per_g_SA, fermentation_group,\
     F301, F301_P, M304
 
 from  matplotlib.colors import LinearSegmentedColormap
@@ -68,8 +68,13 @@ model = models.TAL_model
 system = TAL_sys = models.TAL_sys
 
 modes = [
+<<<<<<< HEAD
             # 'A_FGI_sugarcane',
             'A',
+=======
+            'A_FGI_sugarcane',
+            # 'A',
+>>>>>>> origin/master
          ]
 
 
@@ -140,6 +145,7 @@ get_sugar_conc_TCI = lambda: F301.installed_cost + F301_P.installed_cost + M304.
 
 # %% Generate 3-specification meshgrid and set specification loading functions
 
+<<<<<<< HEAD
 steps = (60, 60, 1)
 
 # Yield, titer, productivity (rate)
@@ -152,6 +158,13 @@ steps = (60, 60, 1)
 
 spec_1 = yields = np.linspace(0.02, 0.99, steps[0]) # yield
 spec_2 = titers = np.linspace(2., 
+=======
+steps = (50, 50, 1)
+
+# Yield, titer, productivity (rate)
+spec_1 = yields = np.linspace(0.05, 0.5724, steps[0]) # yield
+spec_2 = titers = np.linspace(10., 
+>>>>>>> origin/master
                               100., # although sugar concentration limit of 600 g/L would allow as high as 230 g-TAL/L, we set an upper limit of 100 g/L
                                    # based on achieved (50-68 g/L using E.coli, Candida) and targeted (100 g/L) titers for adipic acid, another organic solid with low water solubility
                                    # Skoog et al., 2018 ( https://doi.org/10.1016/j.biotechadv.2018.10.012 )
@@ -160,7 +173,11 @@ spec_2 = titers = np.linspace(2.,
 # spec_3 = productivities =\
 #     np.linspace(0.05, 1.5, steps[2])
 
+<<<<<<< HEAD
 which_fig = 'S11'
+=======
+which_fig = 'insights'
+>>>>>>> origin/master
 
 #%%
 additional_points = {}
@@ -359,7 +376,11 @@ spec_1, spec_2 = np.meshgrid(spec_1, spec_2)
 
 print('\n\nSimulating the initial point to avoid bugs ...')
 # spec.byproduct_yields_decrease_policy = 'simultaneous, from 0 product yield'
+<<<<<<< HEAD
 spec.byproduct_yields_decrease_policy = 'simultaneous, when product yield too high'
+=======
+# spec.byproduct_yields_decrease_policy = 'simultaneous, when product yield too high'
+>>>>>>> origin/master
 # spec.byproduct_yields_decrease_policy = 'sequential, when product yield too high'
 spec.load_specifications(yields[0], titers[0], productivities[0])
 # spec.set_production_capacity(desired_annual_production=spec.desired_annual_production)
@@ -593,7 +614,11 @@ keep_frames = True
 print('\nCreating and saving contour plots ...\n')
 
 #%% Plots
+<<<<<<< HEAD
 plot = True
+=======
+plot = False
+>>>>>>> origin/master
 
 if plot: 
     

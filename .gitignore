@@ -36,7 +36,7 @@ docs/_templates/*
 *.xlsx
 *.png
 *.jpeg
-*.svg
+#*.svg
 *.npy
 *.csv
 *.jpg

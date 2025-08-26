@@ -1,11 +1,13 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-# Bioindustrial-Park: BioSTEAM's Premier Biorefinery Models and Results
-# Copyright (C) 2021-, Sarang Bhagwat <sarangb2@illinois.edu>
+# Oxalic acid biorefineries.
+# Copyright (C) 2024-, Sarang Bhagwat <sarangb2@illinois.edu>
 # 
 # This module is under the UIUC open-source license. See 
 # github.com/BioSTEAMDevelopmentGroup/biosteam/blob/master/LICENSE.txt
 # for license details.
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
 """
 This module is a modified implementation of modules from the following:
 [1]	Bhagwat et al., Sustainable Production of Acrylic Acid via 3-Hydroxypropionic Acid from Lignocellulosic Biomass. ACS Sustainable Chem. Eng. 2021, 9 (49), 16659–16669. https://doi.org/10.1021/acssuschemeng.1c05441
@@ -221,7 +223,7 @@ class ProcessSpecification(bst.process_tools.ReactorSpecification):
                  HXN_new_HXs={}, HXN_new_HX_utils={}, HXN_Q_bal_percent_error_dict = {},
                  feedstock_mass=104192.83224417375, pretreatment_reactor = None,
                   load_spec_1=None, load_spec_2=None, load_spec_3=None, set_production_capacity=None,
-                  desired_annual_production=25000.,
+                  desired_annual_production=126929.,
                   byproduct_yields_decrease_policy='sequential, when product yield too high',):
         self.substrates = substrates
         self.reactor = reactor #: [Unit] Reactor unit operation
