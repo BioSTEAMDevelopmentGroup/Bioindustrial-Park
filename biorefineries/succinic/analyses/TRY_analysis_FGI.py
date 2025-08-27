@@ -383,7 +383,7 @@ def run_TRY_analysis(feedstock, neutralization, yields=None, titers=None, produc
     spec.neutralization = neutralization
     
     if not yields:
-        yields = np.linspace(0.038, 0.81, steps)
+        yields = np.linspace(0.038, 0.805, steps)
     if not titers:
         titers = np.linspace(10., 120., steps)
     if not productivities:
