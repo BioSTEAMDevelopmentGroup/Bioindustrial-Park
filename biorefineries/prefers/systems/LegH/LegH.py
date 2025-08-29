@@ -129,7 +129,7 @@ def create_LegH_system(
     """
     Upstream Process
     """
-    M301 = bst.Mixer(ins=[SeedIn,CultureIn])
+    M301 = bst.Mixer('M301', ins=[SeedIn,CultureIn], outs='M301Out')
     R301 = u.SeedTrain(
         'R301',
         ins=[M301-0],
@@ -139,10 +139,12 @@ def create_LegH_system(
         T=32+273.15,
     )
     R301.add_specification(run=True)
-    
+
+    M302 = bst.Mixer('M302', ins=[R301-1, Glucose, NH3_25wt], outs='M302Out')
+
     R302 = u.AeratedFermentation(
         'R302',
-        ins=[R301-1, Glucose, NH3_25wt, bst.Stream('FilteredAir', phase='g', P = 2 * 101325)],
+        ins=[M302-0, bst.Stream('FilteredAir', phase='g', P = 2 * 101325)],
         outs=[vent2, 'R302Out'],
         fermentation_reaction=fermentation_reaction,
         cell_growth_reaction=cell_growth_reaction,
@@ -179,8 +181,8 @@ def create_LegH_system(
         'S402',
         ins = S401-0,
         outs = (effluent1, 'S402Out'),
-        moisture_content = 0.05,  # 5% moisture content in the final product
-        split = (0, 0.99999, 1, 1),
+        moisture_content = 0.20,  # 20% moisture content in the final product
+        split = (0, 0.2, 1, 1),
         order = ('Glucose','cellmass', 'LeghemoglobinIntre','GlobinIntre'),
     )
     S402.add_specification(run=True)
@@ -199,10 +201,9 @@ def create_LegH_system(
         ins = (S402-1, BufferA),
                #bst.Stream('BufferA', BufferA=(E401-0).imass['H2O']*4, units='kg/hr', T=25+273.15)),
         outs = ('U401Out',effluent3),
-        TargetProduct_ID = 'Leghemoglobin',
+        TargetProduct_ID = 'Leghemoglobin''',
         Salt_ID = c.chemical_groups['Salts'],
         OtherLargeMolecules_ID = c.chemical_groups['OtherLargeMolecules'],
-        DefaultSolutes_ID = c.chemical_groups['DefaultSolutes'],
     )
     @U401.add_specification(run=True)
     def update_BufferA():
@@ -215,9 +216,9 @@ def create_LegH_system(
         ins = (U401-0,BufferB,) ,
             #bst.Stream('BufferB', BufferB=(U401-0).imass['H2O']/2, units='kg/hr', T=25+273.15)),
         outs = ('U402Out',effluent4),
-        TargetProduct_ID = 'Leghemoglobin',
-        BoundImpurity_ID=c.chemical_groups['BoundImpurities'],
-        ElutionBuffer_Defining_Component_ID =c.chemical_groups['ElutionBuffer'],
+        TargetProduct_IDs = c.chemical_groups['LegHIngredients'],
+        BoundImpurity_IDs=c.chemical_groups['BoundImpurities'],
+        #ElutionBuffer_Defining_Component_ID =c.chemical_groups['ElutionBuffer'],
     )
     @U402.add_specification(run=True)
     def update_BufferB():
@@ -234,18 +235,17 @@ def create_LegH_system(
             #         units='kg/hr', T=25+273.15)),
         outs = ('U403Out',effluent5),
         TargetProduct_ID = 'Leghemoglobin',
-        membrane_cost_USD_per_m2=10000, # Nanomembrane cost
+        membrane_cost_USD_per_m2=1000, # Nanomembrane cost
         Salt_ID = c.chemical_groups['Salts'],
         OtherLargeMolecules_ID = c.chemical_groups['OtherLargeMolecules'],
-        DefaultSolutes_ID = c.chemical_groups['DefaultSolutes'],
         TargetProduct_Retention=0.995, Salt_Retention=0.1,
-        OtherLargeMolecules_Retention=0.99, DefaultSolutes_Retention=0.15,
+        OtherLargeMolecules_Retention=0.995, DefaultSolutes_Retention=0.15,
         FeedWater_Recovery_to_Permeate=0.2,
         TMP_bar= 5
     )
     @U403.add_specification(run=True)
     def update_BufferC():
-        BufferC.imass['H2O'] = 4*1.1*0.05*1000*(U402-0).imass['Leghemoglobin']/(0.25*bst.Chemical('TrehaloseDH',search_ID='6138-23-4', phase='l', default=True).MW)
+        BufferC.imass['H2O'] = 4*1.1*0.20*1000*(U402-0).imass['Leghemoglobin']/(0.25*bst.Chemical('TrehaloseDH',search_ID='6138-23-4', phase='l', default=True).MW)
         BufferC.T = 25+273.15
 
 
@@ -253,7 +253,7 @@ def create_LegH_system(
         'S403',
         ins=U403-0,
         outs=(effluent6, LegH_3),
-        moisture_content=0.05,  # 5% moisture content in the final product
+        moisture_content=0.9,  # 90% moisture content in the final product
     )
     
     s.update_all_input_stream_prices(streamlist=[SeedIn, CultureIn, Glucose, NH3_25wt, BufferA, BufferB, BufferC])
@@ -263,6 +263,7 @@ def create_LegH_system(
 # %%
 if __name__ == '__main__':
     # # Create the LegH system
+    bst.preferences.N=50
     LegH_sys = create_LegH_system()
     sys = LegH_sys
     f = sys.flowsheet
@@ -271,6 +272,6 @@ if __name__ == '__main__':
     LegH_sys.simulate()
     LegH_sys.show()
     LegH_sys.diagram(format='html',display=True,)
-    
+
 
 # %%
