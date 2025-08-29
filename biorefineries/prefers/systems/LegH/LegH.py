@@ -250,7 +250,7 @@ def create_LegH_system(
 
 
     S403 = bst.SprayDryer(
-        'S403',
+        'S403', 
         ins=U403-0,
         outs=(effluent6, LegH_3),
         moisture_content=0.9,  # 90% moisture content in the final product
