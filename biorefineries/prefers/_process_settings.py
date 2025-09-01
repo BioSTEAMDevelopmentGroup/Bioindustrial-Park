@@ -26,18 +26,19 @@ price = {
     'NH3': 0.46,  # $/kg 0.45 to 0.65
     'NH4OH': 0.4, # $/kg 0.3 to 0.5
     'NH3_25wt': 0.46,  # $/kg 0.3 to 0.5
-    'NH4SO4': 0.3,  # $/kg 0.15 to 0.45
-    'Glucose': 0.52,  # $/kg 0.5 to 0.9
-    'MgSO4': 0.4,  # $/kg 0.3 to 0.6
-    'KH2PO4': 1.4,  # $/kg 1.2 to 2
-    'FeSO4': 0.45,  # $/kg 0.4 to 0.8
-    'NH42HPO4': 0.5,  # $/kg 0.4 to 0.7
-    'NaCl': 0.2,  # $/kg 0.1 to 0.25
+    'NH4SO4': 0.16,  # $/kg 0.15 to 0.45
+    'Glucose': 0.42,  # $/kg 0.5 to 0.9
+    'MgSO4': 0.175,  # $/kg 0.3 to 0.6
+    'KH2PO4': 1.31,  # $/kg 1.2 to 2
+    'FeSO4': 0.055,  # $/kg 0.4 to 0.8
+    'NH42HPO4': 0.569,  # $/kg 0.4 to 0.7
+    'NaCl': 0.078,  # $/kg 0.1 to 0.25
+    'KCl': 0.23,  # $/kg 0.1 to 0.25
     'EDTA': 2.43,  # $/kg 2 to 4
-    'K2HPO4': 1.6,  # $/kg 1.3 to 2.2
-    'Glycine': 2.0,  # $/kg 1.5 to 2.5
-    'TrehaloseDH': 16,  # $/kg 15 to 40
-    'SodiumAscorbate': 6.4,  # $/kg 5 to 10
+    'K2HPO4': 1.7,  # $/kg 1.3 to 2.2
+    'Glycine': 1.75,  # $/kg 1.5 to 2.5
+    'TrehaloseDH': 1.5,  # $/kg 15 to 40
+    'SodiumAscorbate': 4.35,  # $/kg 5 to 10
     'Glycerol': 0.45,  # $/kg 0.3 to 0.7
     'sugar': 0.45,  # $/kg
     'Electricity': 0.065,  # $/kWh 0.035 to 0.25

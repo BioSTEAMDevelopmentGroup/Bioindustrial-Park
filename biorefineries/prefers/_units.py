@@ -218,7 +218,7 @@ class AeratedFermentation(bst.AeratedBioreactor):
         self.respiration_reaction.force_reaction(effluent)
         self.neutralization_reaction.force_reaction(effluent)
 
-class PSA(bst.Flash):
+class PSA(bst.Flash): 
     _units= {'Liquid flow': 'kg/hr'}
     
     def _run(self):
@@ -340,9 +340,6 @@ class CellDisruption(bst.Unit):
 
 
 class ProteinCentrifuge(bst.SolidsCentrifuge): pass
-
-
-class Evaporator(bst.MultiEffectEvaporator): pass
 
 
 class Diafiltration(bst.Unit):
