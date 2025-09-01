@@ -189,6 +189,9 @@ class Biorefinery(bst.ProcessModel):
                 product=scenario.product,
                 carbon_source=scenario.carbon_source,
             )
+            areas = ('Acetate prod.',
+                     'Oleochem prod',
+                     'Facilities')
         elif scenario.carbon_source == 'glucose':
             system = create_substrate_oleochemical_system(
                 specific_yield=2.7, 
@@ -206,6 +209,10 @@ class Biorefinery(bst.ProcessModel):
             feedstock.set_CF('GWP', 0.1 * 0.9375) # Sugar GREET 2023
             feedstock.price = 0.413 * 0.10
             feedstock.ID = 'feedstock'
+            areas = ('Oleochem prod',
+                     'Facilities')
+        self.unit_groups = unit_groups = bst.UnitGroup.group_by_area(system.units)
+        for i, j in zip(unit_groups, areas): i.name = j
         self.tea = create_tea(
             system,
         )
@@ -267,8 +274,8 @@ class Biorefinery(bst.ProcessModel):
             if scenario.carbon_source == 'glucose':
                 self.feedstock.price = price * 0.10
         
-        @parameter(units='USD/kg', element='oleochemical', bounds=[3, 6],
-                   baseline=3, distribution='uniform') # https://www.alibaba.com/product-detail/Factory-direct-sale-DODECYL-ACETATE-CAS_1601041319372.html
+        @parameter(units='USD/kg', element='oleochemical', bounds=[3, 8],
+                   baseline=5, distribution='uniform') # https://www.alibaba.com/product-detail/Factory-direct-sale-DODECYL-ACETATE-CAS_1601041319372.html
         def set_product_price(price):
             self.product.price = price
         
@@ -432,7 +439,10 @@ class Biorefinery(bst.ProcessModel):
             CF=-1.,
         )
         key = scenario.biomass
-        self.BT.fuel.set_CF(GWPkey, CFs[key.capitalize()])
+        try:
+            self.BT.fuel.set_CF(GWPkey, CFs[key.capitalize()])
+        except:
+            breakpoint()
         if key == 'miscanthus':
             price_ub = 59 / 907.185 * 0.8 # https://www.sciencedirect.com/science/article/pii/S096195340700205X
             price_lb = 61.98 / 907.185 * 0.8 # https://farmdoc.illinois.edu/fast-tools/biomass-crop-budget-tool-miscanthus-and-switchgrass
@@ -587,24 +597,33 @@ class Biorefinery(bst.ProcessModel):
             'Biomass': biomass(self.BT.fuel),
         }
     
+    def MSP_contributions(self):
+        total_cost = self.MSP() * self.product.F_mass * self.tea.operating_hours
+        cost = self.tea.total_production_cost(self.product)
+        f = cost / total_cost
+        return {
+            'OPEX': f,
+            'CAPEX': 1 - f,
+        }
+    
     def to_experimental_conditions(self):
         if 'acetate' in self.scenario.name:
             # -Titer = 600 mg/L alcohols (dodecanol)
-            # -Yield = 0.11 g alcohols (dodecanol) / g acetate
+            # -Yield = 0.11 g alcohols (dodecanol) / g acetate (0.265 max)
             # -Specific yield = 0.49 g alcohols / g biomass
             # -Productivity = 0.01 g alcohols / L / h, or 0.008 g alcohols / gDCW/h
             self.set_oleochemical_titer.setter(0.6)
-            self.set_oleochemical_bioreactor_yield.setter(11)
+            self.set_oleochemical_bioreactor_yield.setter(42)
             self.set_oleochemical_specific_yield.setter(0.49)
             self.set_oleochemical_productivity.setter(0.01)
             self.system.simulate()
         elif self.scenario.name == 'glucose':
             # -Titer = 1,551 mg/L
-            # -Yield = 0.126 g alcohols / g glucose
+            # -Yield = 0.126 g alcohols / g glucose (0.32 max)
             # -Specific yield = 1.5 g alcohol / gDCW
             # -Productivity = 0.016 g alcohol / gDCW / h 
-            self.set_oleochemical_titer.setter(1.551)
-            self.set_oleochemical_bioreactor_yield.setter(12.6)
+            self.set_oleochemical_titer.setter(1.55)
+            self.set_oleochemical_bioreactor_yield.setter(39)
             self.set_oleochemical_specific_yield.setter(1.5)
             self.set_oleochemical_productivity.setter(0.016)
             self.system.simulate()

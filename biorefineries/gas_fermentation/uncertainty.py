@@ -637,7 +637,7 @@ def get_monte_carlo(scenario, features, cache={}, dropna=True):
     if dropna: df = df.dropna(how='all', axis=0)
     return df
 
-def plot_kde_CI_MSP(scenarios=None, experimental=False):
+def plot_kde_CI_MSP(scenarios=None):
     from warnings import filterwarnings
     filterwarnings('ignore')
     bst.plots.set_font(size=9)
@@ -651,22 +651,11 @@ def plot_kde_CI_MSP(scenarios=None, experimental=False):
     xs = []
     # opportunity_space = []
     for scenario in scenarios:
-        if experimental:
-            df = get_monte_carlo(scenario, metrics)
-            y = df[Yi].values
-            x = df[Xi].values
-            br = gasferm.Biorefinery(scenario, simulate=False)
-            br.to_experimental_conditions()
-            y = np.append(y, br.MSP())
-            x = np.append(x, br.carbon_intensity())
-            ys.append(y)
-            xs.append(x)
-        else:
-            scenario = gasferm.Biorefinery.as_scenario(scenario)
-            df = get_monte_carlo(scenario, metrics)
-            y = df[Yi].values
-            ys.append(y)
-            xs.append(df[Xi].values)
+        scenario = gasferm.Biorefinery.as_scenario(scenario)
+        df = get_monte_carlo(scenario, metrics)
+        y = df[Yi].values
+        ys.append(y)
+        xs.append(df[Xi].values)
         # opportunity_space.append(
         #     (y <= market_price).sum() / y.size
         # )
@@ -676,7 +665,7 @@ def plot_kde_CI_MSP(scenarios=None, experimental=False):
     # breakpoint()
     # xticks = [0, 12, 24, 36, 48]
     xticks = [-5, 0, 5, 10, 15]
-    yticks = None
+    yticks = [0, 4, 8, 12, 16, 20, 24, 28]
     color_wheel = GG_colors.wheel(keys=['red', 'blue', 'yellow'])
     fig, axes = bst.plots.plot_kde_1d(
         ys=[ys], xs=[xs], xticks=xticks, yticks=yticks,
@@ -690,6 +679,13 @@ def plot_kde_CI_MSP(scenarios=None, experimental=False):
         aspect_ratio=1.1,
         kde=True
     )
+    for color, scenario in zip(color_wheel, scenarios):
+        br = gasferm.Biorefinery(scenario, simulate=False)
+        br.to_experimental_conditions()
+        y = br.MSP()
+        x = br.carbon_intensity()
+        plt.scatter(x, y, c=color.RGBn, marker='*', s=50, zorder=1000)
+    
     # xlb, xub = plt.xlim()
     # ylb, yub = plt.ylim()
     # xpos = lambda x: xlb + (xub - xlb) * x

@@ -21,11 +21,109 @@ __all__ = (
     'plot_MSP_GWP_across_titer_yield_substrates',
     'plot_CI_across_yield_and_titer',
     'plot_experimental',
+    'plot_bars',
 )
 
 line_color = Color(fg='#8E9BB3').RGBn
 results_folder = os.path.join(os.path.dirname(__file__), 'results')
 images_folder = os.path.join(os.path.dirname(__file__), 'images')
+
+def plot_bars(experimental=False):
+    import numpy as np
+    import pandas as pd
+    import biosteam as bst
+    import seaborn as sns
+    import matplotlib.pyplot as plt
+    from warnings import filterwarnings
+    filterwarnings('ignore')
+    sns.set(style='ticks')
+    bst.set_figure_size(aspect_ratio=0.6, width='full')
+    bst.set_font(size=10)
+    fig, (CAPEX_ax, OPEX_ax) = plt.subplots(1, 2)
+    scenario_names = ('acetate', 'acetate/glucose-seed', 'glucose')
+    process_models = [
+        Biorefinery(scenario=name, simulate=True) 
+        for name in scenario_names
+    ]
+    scenario_names = ('acetate', 'acetate &\nglucose-seed', 'glucose')
+    for pm in process_models:
+        if experimental: pm.to_experimental_conditions()
+        for group in pm.unit_groups: 
+            try:
+                group.autofill_metrics(
+                    shorthand=False, 
+                    installed_cost=True,
+                    cooling_duty=False,
+                    heating_duty=False,
+                    electricity_consumption=False,
+                    electricity_production=False,
+                    material_cost=False
+                )
+            except:
+                pass
+    CAPEX = pd.concat([
+        bst.UnitGroup.df_from_groups(pm.unit_groups)
+        for pm in process_models
+    ], axis=1)
+    CAPEX.loc['Indirect costs'] = [(i.tea.TCI - i.tea.DPI) /1e6 for i in process_models]
+    CAPEX.loc['Other'] = [i.tea.TCI / 1e6 for i in process_models] - CAPEX.sum()
+    CAPEX = CAPEX.sort_index(key=lambda x:[-abs(sum(CAPEX.loc[i])) for i in x])
+    CAPEX.columns = scenario_names
+    plt.sca(CAPEX_ax)
+    CAPEX.T.plot.bar(stacked=True, rot=0, ax=CAPEX_ax, fontsize=10)
+    plt.ylabel(r'CAPEX [$10^6\cdot$USD]', fontsize=10)
+    ax = plt.gca()
+    ax.tick_params(axis='x', which='major', length=6,
+                   direction="inout")
+    ax.tick_params(axis='y', which='major', length=6,
+                   direction="inout")
+    ax.get_legend().remove()
+    ax.spines[['right', 'top']].set_visible(False)
+    # ax.legend(bbox_to_anchor=(1.05, 1.05))
+    # ax.legend(
+    #     loc='upper center', bbox_to_anchor=(0.5, 1.05),
+    #     ncol=3, fancybox=True
+    # )
+    VOC_table = bst.report.voc_table(
+        [i.system for i in process_models], 
+        system_names=scenario_names,
+        product_IDs=[]
+    )
+    VOC_table = VOC_table.drop('Price [$/MT]', axis=1)
+    materials = VOC_table.loc['Raw materials']
+    ash_disposal_cost = -VOC_table.loc['Co-products & credits', 'Ash disposal']
+    materials.loc['Glucose'] = materials.loc['Feedstock'] + materials.loc['Seedtrain feed']
+    materials = materials.drop('Seedtrain feed')
+    materials = materials.drop('Feedstock')
+    key_raw_materials = ['Glucose', 'Hydrogen']
+    OPEX = materials.loc[key_raw_materials]
+    # breakpoint()
+    OPEX.loc['Other'] = ash_disposal_cost + materials.sum() - OPEX.sum() + [i.tea.FOC/1e6 for i in process_models]
+    products = VOC_table.loc['Co-products & credits'].drop('Ash disposal', axis=0)
+    OPEX_and_revenue = pd.concat([-OPEX, products])
+    OPEX_and_revenue = OPEX_and_revenue.sort_index(key=lambda x:[-abs(sum(OPEX_and_revenue.loc[i])) for i in x])
+    OPEX_and_revenue.columns = scenario_names
+    # print(OPEX_and_revenue)
+    plt.sca(OPEX_ax)
+    OPEX_and_revenue.T.plot.bar(stacked=True, rot=0, ax=OPEX_ax, fontsize=10)
+    plt.axhline(y=0, color='darkgray', linestyle='--')
+    plt.ylabel(r'OPEX & Revenue [$10^6\cdot$USD$\cdot$yr$^{-1}$]', fontsize=10)
+    ax = plt.gca()
+    ax.tick_params(axis='x', which='major', length=6,
+                   direction="inout")
+    ax.tick_params(axis='y', which='major', length=6,
+                   direction="inout")
+    ax.get_legend().remove()
+    ax.spines[['right', 'top']].set_visible(False)
+    # ax.legend(bbox_to_anchor=(1.05, 1.05))
+    # ax.legend(
+    #     loc='upper center', bbox_to_anchor=(0.5, 1.05),
+    #     ncol=3, fancybox=True
+    # )
+    plt.subplots_adjust(wspace=0.5, hspace=0.9, right=0.95, bottom=0.2, top=0.95)
+    for i in ('svg', 'png'):
+        file = os.path.join(images_folder, f'bars.{i}')
+        plt.savefig(file, dpi=900, transparent=True)
 
 def plot_experimental():
     import numpy as np
@@ -278,16 +376,20 @@ def plot_MSP_across_price_and_yield(load=True, scenario=None):
     filterwarnings('ignore')
     bst.plots.set_font(size=10, family='sans-serif', font='Arial')
     bst.plots.set_figure_size(aspect_ratio=0.9, width='half')
-    scenario = 'acetate/glucose-seed'
+    if scenario is None: scenario = 'acetate/glucose-seed'
     br = Biorefinery(simulate=False, scenario=scenario)
+    scenario = scenario.replace('/', '_')
     baseline = br.set_oleochemical_specific_yield.baseline
     br.set_oleochemical_specific_yield(baseline)
     br.system.simulate()
     xlim = np.array(br.set_H2_price.bounds)
-    ylim = np.array(br.set_oleochemical_bioreactor_yield.bounds)
+    if scenario == 'acetate':
+        ylim = np.array([35, 99])
+    else:
+        ylim = np.array(br.set_oleochemical_bioreactor_yield.bounds)
     X, Y, Z = bst.plots.generate_contour_data(
         metric_at_price_and_other,
-        file=os.path.join(results_folder, 'MSP_H2_price_yield.npy'),
+        file=os.path.join(results_folder, 'MSP_H2_price_yield_{scenario}.npy'),
         load=load, save=True,
         xlim=xlim, ylim=ylim,
         args=(br.system, 
@@ -298,7 +400,10 @@ def plot_MSP_across_price_and_yield(load=True, scenario=None):
     )
     # Plot contours
     ylabel = br.set_oleochemical_bioreactor_yield.label(element=False)
-    yticks = [35, 45, 55, 65, 75, 85]
+    if scenario == 'acetate':
+        yticks = [35, 45, 55, 65, 75, 85, 95, 99]
+    else:
+        yticks = [35, 45, 55, 65, 75, 85]
     xlabel = r'H$_2$ price [USD$\cdot$kg$^{-1}$]'
     xticks = [2, 3, 4, 5, 6]
     metric_bar = bst.plots.MetricBar(
@@ -318,7 +423,7 @@ def plot_MSP_across_price_and_yield(load=True, scenario=None):
     )
     plt.subplots_adjust(left=0.10, right=0.85, wspace=0.15, hspace=0.15, top=0.9, bottom=0.13)
     for i in ('svg', 'png'):
-        file = os.path.join(images_folder, f'oleochemical_yield_price_contours.{i}')
+        file = os.path.join(images_folder, f'oleochemical_yield_price_contours_{scenario}.{i}')
         plt.savefig(file, dpi=900, transparent=True)
 
 def plot_MSP_across_yield_and_titer(load=True, scenario=None):
