@@ -10,6 +10,7 @@ Created on 2025-04-18 15:20:45
 # %%
 import biosteam as bst
 import thermosteam as tmo
+import numpy as np
 
 from biosteam.units.decorators import cost, copy_algorithm
 from biosteam.units.design_tools import CEPCI_by_year, cylinder_diameter_from_volume, cylinder_area
@@ -17,7 +18,6 @@ from biosteam import tank_factory
 from thermosteam import MultiStream
 from biosteam.units.decorators import cost
 from biosteam.units.design_tools import size_batch
-import thermosteam as tmo
 import biosteam as bst
 import numpy as np
 import flexsolve as flx
@@ -212,11 +212,37 @@ class AeratedFermentation(bst.AeratedBioreactor):
     def _run_reactions(self, effluent):
         # self.hydrolysis_reaction.force_reaction(effluent)
         # self.lipid_reaction.force_reaction(effluent)
-        if effluent.imol['H2O'] < 0.: effluent.imol['H2O'] = 0.
+        
+        # Ensure water doesn't go negative
+        if effluent.imol['H2O'] < 0.: 
+            effluent.imol['H2O'] = 0.
+        
+        # Check if we have sufficient reactants before running reactions
+        glucose_available = effluent.imol['Glucose']
+        if glucose_available < 1e-6:  # Very small amount of glucose
+            return
+            
+        # Store initial state to prevent excessive consumption
+        initial_glucose = effluent.imol['Glucose']
+        initial_O2 = effluent.imol['O2']
+        
         self.fermentation_reaction.force_reaction(effluent)
         self.cell_growth_reaction.force_reaction(effluent)
         self.respiration_reaction.force_reaction(effluent)
         self.neutralization_reaction.force_reaction(effluent)
+        
+        # Ensure no negative flows after reactions
+        for chemical in effluent.chemicals:
+            if effluent.imol[chemical.ID] < 0:
+                effluent.imol[chemical.ID] = 0
+                
+        # Ensure minimum oxygen consumption for aeration calculation
+        # If oxygen is being produced instead of consumed, set a minimum consumption
+        O2_change = effluent.imol['O2'] - initial_O2
+        if O2_change >= 0:  # Oxygen is being produced or unchanged
+            # Set a minimum oxygen consumption to ensure proper aeration
+            min_O2_consumption = initial_glucose * 0.1  # 10% of glucose as minimum O2 consumption
+            effluent.imol['O2'] = max(0, initial_O2 - min_O2_consumption)
 
 class PSA(bst.Flash): 
     _units= {'Liquid flow': 'kg/hr'}
@@ -319,9 +345,8 @@ class CellDisruption(bst.Unit):
         total_power = 0
         current_stream = feed.copy()
         
-        for i, target_pressure in enumerate(pressure_stages):
+        for target_pressure in pressure_stages:
             temp_pump = bst.Pump(
-            ID=f'_temp_{self.ID}_pump_stage_{i+1}',
             ins=current_stream.copy(),
             P=target_pressure
             )

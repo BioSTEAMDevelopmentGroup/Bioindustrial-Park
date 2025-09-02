@@ -68,7 +68,7 @@ def create_LegH_system(
     dT_hx_loop = 8 # [degC]
     cooler_pressure_drop = 20684 # [Pa]
     compressor_isentropic_efficiency = 0.85
-    V_max = 100 # [m3] #here cause pressure vessel design problem
+    V_max = 150 # [m3] #here cause pressure vessel design problem
     titer = 7.27 # [g / L]
     productivity = titer / 72 # [g / L / h]
     LegH_yield = titer * 5 / 1300 # [by wt]
@@ -186,6 +186,8 @@ def create_LegH_system(
         order = ('Glucose','cellmass', 'LeghemoglobinIntre','GlobinIntre'),
     )
     S402.add_specification(run=True)
+    
+
     # E401 = u.Evaporator(
     #     'E401',
     #     ins = S402-1,
