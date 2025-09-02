@@ -243,6 +243,9 @@ class PSA(bst.Flash):
 ##### Downstream #####
 ######################
 
+
+# https://www.alibaba.com/product-detail/1000L-2000L-SUS-High-Shear-Maquina_1601244807309.html?spm=a2700.galleryofferlist.topad_classic.d_title.358b13a0lSlmVy&priceId=fa9c440338e5471698929aa241dc50fa
+# 1000L 7000 USD single price
 class CellDisruption(bst.Unit):
     """
     Cell disruption unit using high-pressure homogenization.
@@ -303,34 +306,59 @@ class CellDisruption(bst.Unit):
         # --- Create temporary, local unit operations for calculation ---
         # This is the key: they are not attached to `self`.
         
-        # 1. Simulate the pump to find power consumption
-        temp_pump = bst.Pump(
-            ID=f'_{self.ID}_pump', 
-            ins=feed.copy(), # Use a copy to avoid altering the main feed stream
-            P=self.P_high
-        )
-        temp_pump.simulate()
+        # 1. Multi-stage pump system to achieve high pressure
+        # Calculate number of stages needed (typical compression ratio ~3-5 per stage)
+        compression_ratio_per_stage = 4.0
+        n_stages = max(1, int(np.ceil(np.log(self.P_high / feed.P) / np.log(compression_ratio_per_stage))))
         
-        # 2. Simulate the valve to find the thermal effect (e.g., cooling)
-        temp_valve = bst.Flash(
-            ID=f'_{self.ID}_valve',
-            ins=temp_pump.outs[0],
-            P=self.P_low, 
-            V=0 # Specify liquid outlet
-        )
-        temp_valve.simulate()
+        # Create pressure stages
+        pressure_stages = [feed.P * (compression_ratio_per_stage ** i) for i in range(1, n_stages + 1)]
+        pressure_stages[-1] = self.P_high  # Ensure final pressure is exact
+        
+        # Create and simulate multi-stage pumps
+        total_power = 0
+        current_stream = feed.copy()
+        
+        for i, target_pressure in enumerate(pressure_stages):
+            temp_pump = bst.Pump(
+            ID=f'_temp_{self.ID}_pump_stage_{i+1}',
+            ins=current_stream.copy(),
+            P=target_pressure
+            )
+            temp_pump.simulate()
+            total_power += temp_pump.power_utility.rate
+            current_stream = temp_pump.outs[0].copy()
+        
+        # Store total power consumption
+        self.power_utility.rate = total_power
+        
+        # # 2. Simulate the valve to find the thermal effect (e.g., cooling)
+        # temp_valve = bst.Flash(
+        #     ID=f'_{self.ID}_valve',
+        #     ins=temp_pump.outs[0],
+        #     P=self.P_low, 
+        #     V=0 # Specify liquid outlet
+        # )
+        # temp_valve.simulate()
 
-        # --- Capture the results for the main CellDisruption unit ---
-        self.power_utility.rate = temp_pump.power_utility.rate
-        self.heat_utilities = temp_valve.heat_utilities
+        # # --- Capture the results for the main CellDisruption unit ---
+        # #self.power_utility.rate = temp_pump.power_utility.rate
+        # self.heat_utilities = temp_valve.heat_utilities
         
-        # Update the outlet stream's temperature to the final calculated temperature
-        self.outs[0].T = temp_valve.outs[0].T
+        # # Update the outlet stream's temperature to the final calculated temperature
+        # self.outs[0].T = temp_valve.outs[0].T
         
-        # --- Costing based on the calculated power ---
-        power_kW = self.power_utility.rate
-        purchase_cost = 20000 * (power_kW / 10)**0.6 if power_kW > 0 else 0
-        
+        # # --- Costing based on the calculated power ---
+        # power_kW = self.power_utility.rate
+        # Inguva, P., Grasselli, S. & Heng, P. W. S. High pressure homogenization – 
+        # An update on its usage and understanding. Chemical Engineering Research and Design 202, 284–302 (2024).
+        dP = (self.P_high - self.P_low)/1e5
+        power_kW = feed.F_vol * 1000 * dP / (3600 * 0.85 * 1000)  # Assuming 85% efficiency
+        #self.power_utility.rate = power_kW
+
+        # purchase_cost = 20000 * (power_kW / 10)**0.64 if power_kW > 0 else 0
+        purchase_cost = 90000 * (feed.F_vol/100)**0.5 * (dP/1000)**1.5
+
         self.design_results['Power (kW)'] = power_kW
         self.design_results['Purchase cost (USD)'] = purchase_cost
         

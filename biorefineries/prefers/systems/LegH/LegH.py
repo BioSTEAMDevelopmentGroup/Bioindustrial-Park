@@ -201,9 +201,10 @@ def create_LegH_system(
         ins = (S402-1, BufferA),
                #bst.Stream('BufferA', BufferA=(E401-0).imass['H2O']*4, units='kg/hr', T=25+273.15)),
         outs = ('U401Out',effluent3),
-        TargetProduct_ID = 'Leghemoglobin''',
+        TargetProduct_ID = 'Leghemoglobin',
         Salt_ID = c.chemical_groups['Salts'],
         OtherLargeMolecules_ID = c.chemical_groups['OtherLargeMolecules'],
+        TMP_bar =5
     )
     @U401.add_specification(run=True)
     def update_BufferA():
@@ -241,7 +242,7 @@ def create_LegH_system(
         TargetProduct_Retention=0.995, Salt_Retention=0.1,
         OtherLargeMolecules_Retention=0.995, DefaultSolutes_Retention=0.15,
         FeedWater_Recovery_to_Permeate=0.2,
-        TMP_bar= 5
+        TMP_bar= 20
     )
     @U403.add_specification(run=True)
     def update_BufferC():
