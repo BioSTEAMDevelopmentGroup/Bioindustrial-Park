@@ -706,7 +706,7 @@ class IonExchange(bst.Unit):
 
         # Pump logic remains the same
         internal_stream = self.ins[0].copy()
-        self.pump = bst.Pump(None, P=2.0 * 1e5)
+        self.pump = bst.Pump(None, P=4.0 * 1e5)
         self.pump.ins[0] = internal_stream
         self.pump.simulate()
         self.pump._design()
