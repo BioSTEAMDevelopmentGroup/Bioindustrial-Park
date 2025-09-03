@@ -231,18 +231,18 @@ class AeratedFermentation(bst.AeratedBioreactor):
         self.respiration_reaction.force_reaction(effluent)
         self.neutralization_reaction.force_reaction(effluent)
         
-        # Ensure no negative flows after reactions
-        for chemical in effluent.chemicals:
-            if effluent.imol[chemical.ID] < 0:
-                effluent.imol[chemical.ID] = 0
+        # # Ensure no negative flows after reactions
+        # for chemical in effluent.chemicals:
+        #     if effluent.imol[chemical.ID] < 0:
+        #         effluent.imol[chemical.ID] = 0
                 
-        # Ensure minimum oxygen consumption for aeration calculation
-        # If oxygen is being produced instead of consumed, set a minimum consumption
-        O2_change = effluent.imol['O2'] - initial_O2
-        if O2_change >= 0:  # Oxygen is being produced or unchanged
-            # Set a minimum oxygen consumption to ensure proper aeration
-            min_O2_consumption = initial_glucose * 0.1  # 10% of glucose as minimum O2 consumption
-            effluent.imol['O2'] = max(0, initial_O2 - min_O2_consumption)
+        # # Ensure minimum oxygen consumption for aeration calculation
+        # # If oxygen is being produced instead of consumed, set a minimum consumption
+        # O2_change = effluent.imol['O2'] - initial_O2
+        # if O2_change >= 0:  # Oxygen is being produced or unchanged
+        #     # Set a minimum oxygen consumption to ensure proper aeration
+        #     min_O2_consumption = initial_glucose * 0.1  # 10% of glucose as minimum O2 consumption
+        #     effluent.imol['O2'] = max(0, initial_O2 - min_O2_consumption)
 
 class PSA(bst.Flash): 
     _units= {'Liquid flow': 'kg/hr'}

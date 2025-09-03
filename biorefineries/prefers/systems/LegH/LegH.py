@@ -110,12 +110,12 @@ def create_LegH_system(
     cell_growth_reaction.product_yield('Pichia_pastoris', basis='wt', product_yield=Y_b)
 
     respiration_reaction1 = bst.Rxn(
-        'Glucose + 6 O2 -> 6 CO2 + 6 H2O', 'Glucose', 1. - cell_growth_reaction.X,
+        'Glucose + 6 O2 -> 6 CO2 + 6 H2O', 'Glucose', 1 - cell_growth_reaction.X,
         check_atomic_balance=True
     )
 
     respiration_reaction2 = bst.Rxn(
-        'Glucose + 6 O2 -> 6 CO2 + 6 H2O', 'Glucose', 1. - cell_growth_reaction.X - fermentation_reaction[2].X,
+        'Glucose + 6 O2 -> 6 CO2 + 6 H2O', 'Glucose', 1 - cell_growth_reaction.X - fermentation_reaction[2].X,
         check_atomic_balance=True
     )
 
