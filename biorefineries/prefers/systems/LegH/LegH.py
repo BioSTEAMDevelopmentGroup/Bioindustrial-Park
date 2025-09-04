@@ -71,9 +71,9 @@ def create_LegH_system(
     V_max = 150 # [m3] #here cause pressure vessel design problem
     titer = 7.27 # [g / L]
     productivity = titer / 72 # [g / L / h]
-    LegH_yield = titer * 5 / 1300 # [by wt]
-    Y_b = 0.43 # [by wt]
-
+    Y_p = titer * 5 / 1300 # [by wt] 3 wt%
+    Y_b = 0.43 # [by wt] 
+    LegH_yield = Y_p/0.517
     """
     Reactions
     """
@@ -104,18 +104,18 @@ def create_LegH_system(
     )
 
     cell_growth_reaction = bst.Rxn(
-        'Glucose + 0.8364 NH3 + 0.0108 (NH4)2SO4 -> 2.01 H2O + 0.106 O2 + 6 Pichia_pastoris', 'Glucose', X=Y_b,
+        'Glucose + 0.8364 NH3 + 0.0108 (NH4)2SO4 -> 2.01 H2O + 0.106 O2 + 6 Pichia_pastoris', 'Glucose', X=(1-LegH_yield*1.1)*Y_b,
         correct_atomic_balance=True
     )
-    cell_growth_reaction.product_yield('Pichia_pastoris', basis='wt', product_yield=Y_b)
+    cell_growth_reaction.product_yield('Pichia_pastoris', basis='wt', product_yield=(1-LegH_yield*1.1)*Y_b)
 
     respiration_reaction1 = bst.Rxn(
-        'Glucose + 6 O2 -> 6 CO2 + 6 H2O', 'Glucose', 1 - cell_growth_reaction.X,
+        'Glucose + 6 O2 -> 6 CO2 + 6 H2O', 'Glucose', 1 - Y_b,
         check_atomic_balance=True
     )
 
     respiration_reaction2 = bst.Rxn(
-        'Glucose + 6 O2 -> 6 CO2 + 6 H2O', 'Glucose', 1 - cell_growth_reaction.X - fermentation_reaction[2].X,
+        'Glucose + 6 O2 -> 6 CO2 + 6 H2O', 'Glucose', 1 - cell_growth_reaction.X - fermentation_reaction[2].X * 1.1,
         check_atomic_balance=True
     )
 
