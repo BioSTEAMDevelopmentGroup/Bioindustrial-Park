@@ -78,8 +78,13 @@ if __name__ == '__main__':
         administration=0.04
     )
     products = legH_sys.flowsheet('LegH_3')
-    # legH_tea.show()  # Display the TEA summary
+    # %%
+    legH_tea.show()  # Display the TEA summary
+    # %%
     legH_tea.get_cashflow_table()
+    # %%
+    cost=legH_tea.solve_price(products) # USD/kg
+    print(f"\nLegH price: ${round(cost, 5)}/kg")
     # %% Production costs
     
     # # %%

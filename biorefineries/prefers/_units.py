@@ -410,7 +410,7 @@ class Diafiltration(bst.Unit):
     # --- All default values, _F_BM_default, and _units remain the same ---
     _F_BM_default = {
         'Membrane System': 1.65,
-        'Membrane replacement': 1.0,
+        'Membrane replacement': 1.65,#1.0,
         'Pump': 1.89,
     }
     water_ID = 'H2O'
@@ -422,13 +422,18 @@ class Diafiltration(bst.Unit):
     _default_OtherLargeMolecules_Retention = 0.98
     _default_DefaultSolutes_Retention = 0.08
     _default_FeedWater_Recovery_to_Permeate = 0.75
-    _default_membrane_flux_LMH = 50.0
-    _default_TMP_bar = 2.0
-    _default_membrane_cost_USD_per_m2 = 200.0
+    _default_membrane_flux_LMH = 40.0 # ultra: 20~80, nano: 10~40
+    _default_TMP_bar1 = 2.0 # ultra: 2~4, nano: 10 ~25
+    _default_TMP_bar2 = 2.0 # ultra: 1.5~3, nano: 3~6
+    _default_membrane_cost_USD_per_m2 = 200.0 
+    # food ultra: 50-250, nano: 70~300
+    # for pharm: ultra: 1500~3000, nano: 2500~4500
     _default_membrane_lifetime_years = 1.0
     _default_module_cost_factor = 2500.0
     _default_module_cost_exponent = 0.7
     _default_base_CEPCI = 500.0
+    _default_reciculation_ratio = 10.0  # Recirculation ratio to reduce fouling 5~20
+    _default_equipment_lifetime_years = 20.0  # Typical equipment lifetime for CAPEX calculation
     _units = {
         'Membrane Area': 'm2',
         'TargetProduct_Retention': '%',
@@ -437,10 +442,12 @@ class Diafiltration(bst.Unit):
         'DefaultSolutes_Retention': '%',
         'FeedWater_Recovery_to_Permeate': '%',
         'membrane_flux_LMH': 'LMH',
-        'TMP_bar': 'bar',
+        'TMP_bar1': 'bar',
+        'TMP_bar2': 'bar',
         'pump_efficiency': '%',
         'membrane_cost_USD_per_m2': '$/m2',
         'membrane_lifetime_years': 'years',
+        'equipment_lifetime_years': 'years',
         'module_cost_factor': '$/m2^exponent',
         'module_cost_exponent': '0.6',
         'base_CEPCI': '500',
@@ -451,9 +458,11 @@ class Diafiltration(bst.Unit):
                  TargetProduct_Retention=None, Salt_Retention=None,
                  OtherLargeMolecules_Retention=None, DefaultSolutes_Retention=None,
                  FeedWater_Recovery_to_Permeate=None,
-                 membrane_flux_LMH=None, TMP_bar=None,
+                 membrane_flux_LMH=None, TMP_bar1=None, TMP_bar2=None,
                  membrane_cost_USD_per_m2=None, membrane_lifetime_years=None,
+                 equipment_lifetime_years=None,
                  module_cost_factor=None, module_cost_exponent=None, base_CEPCI=None,
+                 reciculation_ratio=None,
                  **kwargs):
         super().__init__(ID, ins, outs, thermo)
         # --- All __init__ logic remains the same ---
@@ -466,12 +475,15 @@ class Diafiltration(bst.Unit):
         self.DefaultSolutes_Retention = DefaultSolutes_Retention if DefaultSolutes_Retention is not None else self._default_DefaultSolutes_Retention
         self.FeedWater_Recovery_to_Permeate = FeedWater_Recovery_to_Permeate if FeedWater_Recovery_to_Permeate is not None else self._default_FeedWater_Recovery_to_Permeate
         self.membrane_flux_LMH = membrane_flux_LMH if membrane_flux_LMH is not None else self._default_membrane_flux_LMH
-        self.TMP_bar = TMP_bar if TMP_bar is not None else self._default_TMP_bar
+        self.TMP_bar1 = TMP_bar1 if TMP_bar1 is not None else self._default_TMP_bar1
+        self.TMP_bar2 = TMP_bar2 if TMP_bar2 is not None else self._default_TMP_bar2
         self.membrane_cost_USD_per_m2 = membrane_cost_USD_per_m2 if membrane_cost_USD_per_m2 is not None else self._default_membrane_cost_USD_per_m2
         self.membrane_lifetime_years = membrane_lifetime_years if membrane_lifetime_years is not None else self._default_membrane_lifetime_years
+        self.equipment_lifetime_years = equipment_lifetime_years if equipment_lifetime_years is not None else self._default_equipment_lifetime_years
         self.module_cost_factor = module_cost_factor if module_cost_factor is not None else self._default_module_cost_factor
         self.module_cost_exponent = module_cost_exponent if module_cost_exponent is not None else self._default_module_cost_exponent
         self.base_CEPCI = base_CEPCI if base_CEPCI is not None else self._default_base_CEPCI
+        self.reciculation_ratio = reciculation_ratio if reciculation_ratio is not None else self._default_reciculation_ratio
         self.power_utility = bst.PowerUtility()
 
     def _run(self):
@@ -578,26 +590,33 @@ class Diafiltration(bst.Unit):
         if permeate_stream.isempty() or permeate_stream.rho == 0:
             permeate_vol_L_per_hr = 0.0
         else:
-            permeate_vol_L_per_hr = (permeate_stream.F_mass / permeate_stream.rho) * 1000.0
+            permeate_vol_L_per_hr = permeate_stream.F_vol *1000 #(permeate_stream.F_mass / permeate_stream.rho) 
         if self.membrane_flux_LMH > 0 and permeate_vol_L_per_hr > 0:
             membrane_area_m2 = permeate_vol_L_per_hr / self.membrane_flux_LMH
         else:
             membrane_area_m2 = 0.0
         Design['Membrane Area'] = membrane_area_m2
         Design['membrane_flux_LMH'] = self.membrane_flux_LMH
-        Design['TMP_bar'] = self.TMP_bar
+        Design['TMP_bar1'] = self.TMP_bar1
+        Design['TMP_bar2'] = self.TMP_bar2
         Design['membrane_cost_USD_per_m2'] = self.membrane_cost_USD_per_m2
         Design['membrane_lifetime_years'] = self.membrane_lifetime_years
+        Design['equipment_lifetime_years'] = self.equipment_lifetime_years
         internal_stream = self.ins[0].copy() + self.ins[1].copy()
-        self.pump = bst.Pump(None, None, P=self.TMP_bar * 1e5)
-        self.pump.ins[0] = internal_stream
-        self.pump.simulate()
-        self.pump._design()
-        self.power_utility = self.pump.power_utility
-        Design['pump_efficiency'] = self.pump.design_results['Efficiency'] * 100.0
+        self.pump1 = bst.Pump(None, None, P=self.TMP_bar1 * 1e5)
+        self.pump1.ins[0] = internal_stream
+        self.pump1.simulate()
+        self.pump1._design()
+        self.pump2 = bst.Pump(None, None, P=self.TMP_bar2 * 1e5)
+        self.pump2.ins[0] = internal_stream * self.reciculation_ratio 
+        self.pump2.simulate()
+        self.pump2._design()
+        Design['pump1_efficiency'] = 0.85 * 100.0
+        Design['pump2_efficiency'] = 0.85 * 100.0
+        self.power_utility.rate = self.pump1.power_utility.rate / (Design['pump1_efficiency']/100) + self.pump2.power_utility.rate / (Design['pump2_efficiency']/100)
 
     def _cost(self):
-        # --- No changes to _cost method ---
+        # --- MODIFIED: Properly calculate total membrane replacement cost over equipment lifetime ---
         area_m2 = self.design_results.get('Membrane Area', 0.0)
         if area_m2 > 0 and self.module_cost_factor > 0 and self.base_CEPCI > 0:
             base_purchase_cost = self.module_cost_factor * (area_m2 ** self.module_cost_exponent)
@@ -605,14 +624,24 @@ class Diafiltration(bst.Unit):
             self.baseline_purchase_costs['Membrane System'] = current_purchase_cost
         else:
             self.baseline_purchase_costs['Membrane System'] = 0.0
+            
+        # Calculate total membrane replacement cost over equipment lifetime
         if (self.membrane_lifetime_years > 0 and
             self.membrane_cost_USD_per_m2 > 0 and
-            area_m2 > 0):
-            annual_replacement_cost = (area_m2 * self.membrane_cost_USD_per_m2) / self.membrane_lifetime_years
-            self.baseline_purchase_costs['Membrane replacement'] = annual_replacement_cost
+            area_m2 > 0 and
+            self.equipment_lifetime_years > 0):
+            
+            # Calculate number of membrane replacements over equipment lifetime
+            num_replacements = self.equipment_lifetime_years / self.membrane_lifetime_years
+            
+            # Total membrane replacement cost over equipment lifetime
+            total_replacement_cost = num_replacements * area_m2 * self.membrane_cost_USD_per_m2
+            
+            self.baseline_purchase_costs['Membrane replacement'] = total_replacement_cost
         else:
             self.baseline_purchase_costs['Membrane replacement'] = 0.0
-        self.baseline_purchase_costs['Pump'] = self.pump.purchase_cost
+            
+        self.baseline_purchase_costs['Pump'] = self.pump1.purchase_cost + self.pump2.purchase_cost # Assume 2 pumps for operation feed & recirculation
 
 
 class IonExchange(bst.Unit):
@@ -628,7 +657,7 @@ class IonExchange(bst.Unit):
     
     _F_BM_default = {
         'IEX Column': 2.5,
-        'IEX Resin replacement': 1.0,
+        'IEX Resin replacement': 2.5, #1.0,
         'Pump': 1.89,
     }
 
@@ -640,6 +669,7 @@ class IonExchange(bst.Unit):
         'resin_DBC_g_L': 'g/L',
         'resin_cost_USD_per_L': 'USD/L',
         'resin_lifetime_years': 'years',
+        'equipment_lifetime_years': 'years',
     }
 
     def __init__(self, ID='', ins=None, outs=(), thermo=None, *,
@@ -649,10 +679,16 @@ class IonExchange(bst.Unit):
                  BoundImpurity_IDs=('Heme_b','Chitin','Globin','Mannoprotein','Glucan'),
                  BoundImpurity_Removal=0.97,
                  NonBinding_Carryover=0.04,
-                 resin_DBC_g_L=50.0,
+                 resin_DBC_g_L=50.0, # 30~120
                  load_safety_factor=0.8,
-                 resin_cost_USD_per_L=1500.0,
+                 resin_cost_USD_per_L=7,#1500.0, 
+                    # strong acid cation resin: 2~5
+                    # weak acid cation resin: 3 ~ 6
+                    # strong base anion resin: 7~15
+                    # weak base anion resin: 5~10
+                 # 4000~10000
                  resin_lifetime_years=1.0,
+                 equipment_lifetime_years=20.0,
                  column_hardware_cost_factor=3000.0,
                  column_hardware_cost_exponent=0.6,
                  base_CEPCI=500.0,
@@ -673,6 +709,7 @@ class IonExchange(bst.Unit):
         self.load_safety_factor = load_safety_factor
         self.resin_cost_USD_per_L = resin_cost_USD_per_L
         self.resin_lifetime_years = resin_lifetime_years
+        self.equipment_lifetime_years = equipment_lifetime_years
         self.column_hardware_cost_factor = column_hardware_cost_factor
         self.column_hardware_cost_exponent = column_hardware_cost_exponent
         self.base_CEPCI = base_CEPCI
@@ -728,17 +765,19 @@ class IonExchange(bst.Unit):
         Design['TargetProduct_Yield'] = self.TargetProduct_Yield * 100
         Design['BoundImpurity_Removal'] = self.BoundImpurity_Removal * 100
         Design['NonBinding_Carryover'] = self.NonBinding_Carryover * 100
+        Design['resin_lifetime_years'] = self.resin_lifetime_years
+        Design['equipment_lifetime_years'] = self.equipment_lifetime_years
 
         # Pump logic remains the same
-        internal_stream = self.ins[0].copy()
-        self.pump = bst.Pump(None, P=4.0 * 1e5)
+        internal_stream = self.ins[0].copy() + self.ins[1].copy() # * 15 # consider 15 CV times the elution buffer for cleaning
+        self.pump = bst.Pump(None, P= 4.0 * 1e5) # assume 4 bar pressure drop
         self.pump.ins[0] = internal_stream
         self.pump.simulate()
         self.pump._design()
         self.power_utility.rate = self.pump.power_utility.rate
 
     def _cost(self):
-        # No changes needed here, as it correctly uses the resin volume from _design
+        # MODIFIED: Calculate total resin replacement cost over equipment lifetime
         Costs = self.baseline_purchase_costs
         Design = self.design_results
         resin_volume_L = Design.get('Resin Volume', 0.0)
@@ -749,10 +788,19 @@ class IonExchange(bst.Unit):
         else:
             Costs['IEX Column'] = 0.0
 
-        if self.resin_lifetime_years > 0 and self.resin_cost_USD_per_L > 0:
-            total_resin_cost = resin_volume_L * self.resin_cost_USD_per_L
-            annual_cost = total_resin_cost / self.resin_lifetime_years
-            Costs['IEX Resin replacement'] = annual_cost
+        # Calculate total resin replacement cost over equipment lifetime
+        if (self.resin_lifetime_years > 0 and 
+            self.resin_cost_USD_per_L > 0 and 
+            resin_volume_L > 0 and 
+            self.equipment_lifetime_years > 0):
+            
+            # Calculate number of resin replacements over equipment lifetime
+            num_replacements = self.equipment_lifetime_years / self.resin_lifetime_years
+            
+            # Total resin replacement cost over equipment lifetime
+            total_replacement_cost = num_replacements * resin_volume_L * self.resin_cost_USD_per_L
+            
+            Costs['IEX Resin replacement'] = total_replacement_cost
         else:
             Costs['IEX Resin replacement'] = 0.0
             

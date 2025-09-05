@@ -68,12 +68,12 @@ def create_LegH_system(
     dT_hx_loop = 8 # [degC]
     cooler_pressure_drop = 20684 # [Pa]
     compressor_isentropic_efficiency = 0.85
-    V_max = 150 # [m3] #here cause pressure vessel design problem
+    V_max = 100 # [m3] #here cause pressure vessel design problem
     titer = 7.27 # [g / L]
     productivity = titer / 72 # [g / L / h]
     Y_p = titer * 5 / 1300 # [by wt] 3 wt%
     Y_b = 0.43 # [by wt] 
-    LegH_yield = Y_p/0.517
+    LegH_yield = Y_p/0.517 # yield based on glucose utilized for product formation
     """
     Reactions
     """
@@ -206,11 +206,12 @@ def create_LegH_system(
         TargetProduct_ID = 'Leghemoglobin',
         Salt_ID = c.chemical_groups['Salts'],
         OtherLargeMolecules_ID = c.chemical_groups['OtherLargeMolecules'],
-        TMP_bar =5
+        TMP_bar1 = 3 ,#2~4
+        TMP_bar2 = 2 ,#1.5~3
     )
     @U401.add_specification(run=True)
     def update_BufferA():
-        BufferA.imass['H2O'] = (S402-1).imass['H2O']*8#4
+        BufferA.imass['H2O'] = (S402-1).imass['H2O']*2#4
         BufferA.T = 25+273.15
 
 
@@ -225,7 +226,7 @@ def create_LegH_system(
     )
     @U402.add_specification(run=True)
     def update_BufferB():
-        BufferB.imass['H2O'] = (U401-0).imass['H2O']*5#/2
+        BufferB.imass['H2O'] = (U401-0).imass['H2O']*15#/2
         BufferB.T = 25+273.15
 
 
@@ -244,11 +245,13 @@ def create_LegH_system(
         TargetProduct_Retention=0.995, Salt_Retention=0.1,
         OtherLargeMolecules_Retention=0.995, DefaultSolutes_Retention=0.15,
         FeedWater_Recovery_to_Permeate=0.2,
-        TMP_bar= 20
+        TMP_bar1= 15 ,# 10-25
+        TMP_bar2= 4  ,# 3-6
+        membrane_flux_LMH=25, # 10-40
     )
     @U403.add_specification(run=True)
     def update_BufferC():
-        BufferC.imass['H2O'] = 4*1.1*0.20*1000*(U402-0).imass['Leghemoglobin']/(0.25*bst.Chemical('TrehaloseDH',search_ID='6138-23-4', phase='l', default=True).MW)
+        BufferC.imass['H2O'] = 2 *1.1*0.20*1000*(U402-0).imass['Leghemoglobin']/(0.25*bst.Chemical('TrehaloseDH',search_ID='6138-23-4', phase='l', default=True).MW)
         BufferC.T = 25+273.15
 
 
@@ -271,10 +274,12 @@ if __name__ == '__main__':
     sys = LegH_sys
     f = sys.flowsheet
     u = f.unit
-
+    ss = f.stream
     LegH_sys.simulate()
     LegH_sys.show()
     LegH_sys.diagram(format='html',display=True,)
+    # %%
+    ss.LegH_3.imass['Leghemoglobin']/ss.LegH_3.F_mass*100
 
 
 # %%

@@ -275,10 +275,23 @@ def create_chemicals_LegH():
         Cp=chems.Glucose.Cp(298.15), # 1.54
         default=True,
         search_db=False,
-        aliases=['Cellmass'],
+        # aliases=['Cellmass'],
     )
     Pichia_pastoris.Hf = chems.Glucose.Hf / chems.Glucose.MW * Pichia_pastoris.MW 
     # Same as glucose to ignore heats related to growth 
+
+    K_marxianus = add_chemical(
+        'K_marxianus',
+        phase='s',
+        formula = 'CH1.78O0.66N0.158P0.009S0.0035K0.0015',
+        rho=1540,
+        Cp=chems.Glucose.Cp(298.15), # 1.54
+        default=True,
+        search_db=False,
+        # aliases=['Cellmass'],
+    )
+    K_marxianus.Hf = chems.Glucose.Hf / chems.Glucose.MW * K_marxianus.MW
+    # Same as glucose to ignore heats related to growth
 
     add_chemical('Glucan', phase='s')
     add_chemical('Mannoprotein', formula="CH1.57O0.31N0.29S0.007",

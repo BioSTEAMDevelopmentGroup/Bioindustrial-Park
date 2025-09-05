@@ -18,7 +18,7 @@ titer = 7.27 # [g / L]
 productivity = titer / 72 # [g / L / h]
 LegH_yield = titer * 5 / 1300 # [by wt]
 
-m=2
+m=2.5 # scale up factor based on 1.5e5 kg/yr
 # %% In
 SeedIn = stream_kwargs('SeedIn', Seed=m*0.15*1e5/16, units='kg/hr', T=25+273.15)
 CultureIn = stream_kwargs('CultureIn', Culture=m*1.5*1e5/16, units='kg/hr', T=25+273.15)
@@ -34,7 +34,7 @@ BufferC = stream_kwargs('BufferC', BufferC=1, units='kg/hr', T=25+273.15)
 
 LegH_1 = stream_kwargs('LegH_1')
 LegH_2 = stream_kwargs('LegH_2')
-LegH_3 = stream_kwargs('LegH_3',units='kg/hr', T=25+273.15, price = 50)
+LegH_3 = stream_kwargs('LegH_3',units='kg/hr', T=25+273.15, price = 10)
 vent1 = stream_kwargs('vent1')
 vent2 = stream_kwargs('vent2')
 effluent1 = stream_kwargs('effluent1')
