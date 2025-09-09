@@ -287,7 +287,7 @@ class CellDisruption(bst.Unit):
     }
 
     def __init__(self, ID='', ins=None, outs=(), 
-                 cell_disruption_efficiency=0.85,
+                 cell_disruption_efficiency=0.55, # 50~60% typical as soluble ,others are debris
                  component_fractions=None,
                  P_high=150e5, P_low=101325):
         super().__init__(ID, ins, outs)
@@ -300,6 +300,8 @@ class CellDisruption(bst.Unit):
             self.component_fractions = {
                 'Mannoprotein': 0.40, 'Glucan': 0.50, 'OleicAcid': 0.06,
                 'Chitin': 0.03, 'RNA': 0.01,
+                # 'Mannoprotein': 0.40, 'Glucan': 0.50/6, 'OleicAcid': 0.06/18,
+                # 'Chitin': 0.03/8, 'RNA': 0.01/4,
             }
         else:
             self.component_fractions = component_fractions
@@ -323,7 +325,20 @@ class CellDisruption(bst.Unit):
 
         # The final temperature will be determined by the valve simulation in _design
         # For now, we set pressure and leave temperature as is.
-        outlet.P = self.P_low
+        pumpout = bst.Stream('')
+        pumpout.copy_like(outlet)
+        pumpout.P = self.P_high
+        temp_valve = bst.IsenthalpicValve(
+            ID='valve',
+            ins=pumpout,
+            P=self.P_low, 
+            vle=False,
+        )
+        temp_valve.simulate()
+        outlet.copy_like(temp_valve.outs[0])
+
+        # outlet.P= self.P_low
+
     
     def _design(self):
         """Design the homogenizer, calculating power and thermal effects."""
@@ -357,18 +372,18 @@ class CellDisruption(bst.Unit):
         # Store total power consumption
         self.power_utility.rate = total_power
         
-        # # 2. Simulate the valve to find the thermal effect (e.g., cooling)
-        # temp_valve = bst.Flash(
-        #     ID=f'_{self.ID}_valve',
-        #     ins=temp_pump.outs[0],
-        #     P=self.P_low, 
-        #     V=0 # Specify liquid outlet
-        # )
-        # temp_valve.simulate()
+        # 2. Simulate the valve to find the thermal effect (e.g., cooling)
+        temp_valve = bst.IsenthalpicValve(
+            ID=f'_{self.ID}_valve',
+            ins=temp_pump.outs[0],
+            P=self.P_low, 
+            vle=False,
+        )
+        temp_valve.simulate()
 
-        # # --- Capture the results for the main CellDisruption unit ---
-        # #self.power_utility.rate = temp_pump.power_utility.rate
-        # self.heat_utilities = temp_valve.heat_utilities
+        # --- Capture the results for the main CellDisruption unit ---
+        #self.power_utility.rate = temp_pump.power_utility.rate
+        self.heat_utilities = temp_valve.heat_utilities
         
         # # Update the outlet stream's temperature to the final calculated temperature
         # self.outs[0].T = temp_valve.outs[0].T
@@ -378,11 +393,11 @@ class CellDisruption(bst.Unit):
         # Inguva, P., Grasselli, S. & Heng, P. W. S. High pressure homogenization – 
         # An update on its usage and understanding. Chemical Engineering Research and Design 202, 284–302 (2024).
         dP = (self.P_high - self.P_low)/1e5
-        power_kW = feed.F_vol * 1000 * dP / (3600 * 0.85 * 1000)  # Assuming 85% efficiency
+        power_kW = (feed.F_vol * 1000) * dP / (36000 * 0.85)  # Assuming 85% efficiency
         #self.power_utility.rate = power_kW
 
         # purchase_cost = 20000 * (power_kW / 10)**0.64 if power_kW > 0 else 0
-        purchase_cost = 90000 * (feed.F_vol/100)**0.5 * (dP/1000)**1.5
+        purchase_cost = 90000 * (feed.F_vol*1000)**0.5 * (dP/1000)**1.5
 
         self.design_results['Power (kW)'] = power_kW
         self.design_results['Purchase cost (USD)'] = purchase_cost

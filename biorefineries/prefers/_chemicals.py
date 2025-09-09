@@ -240,6 +240,10 @@ def create_chemicals_LegH():
     add_chemical('Kanamycin', phase='l', default=True)
     add_chemical('Streptomycin', phase='l', default=True)
     add_chemical('Chloramphenicol', phase='l', default=True)
+    
+
+    # ash=add_chemical('ash',MW=1.,search_db=False) # Dummy chemical for ash
+    # ash.Cn.add_model(0.09 * 4.184 * ash.MW)  # Heat capacity model
 
 
     #############
@@ -472,13 +476,21 @@ def create_chemicals_LegH():
         wt=True,
     )
 
+    # chems.define_group(
+    #     'BufferC',
+    #     ['H2O','K2HPO4','KH2PO4','TrehaloseDH','SodiumAscorbate'],
+    #     [1000, 0.01*bst.Chemical('K2HPO4', phase='l', default=True).MW, 
+    #     0.01*bst.Chemical('KH2PO4', phase='l', default=True).MW,
+    #     5,#0.25*bst.Chemical('TrehaloseDH',search_ID='6138-23-4', phase='l', default=True).MW,# 0.25
+    #     0.005*bst.Chemical('SodiumAscorbate',search_ID='134-03-2', phase='l', default=True).MW],
+    #     wt=True,
+    # )
+
     chems.define_group(
         'BufferC',
-        ['H2O','K2HPO4','KH2PO4','TrehaloseDH','SodiumAscorbate'],
+        ['H2O','K2HPO4','KH2PO4'],
         [1000, 0.01*bst.Chemical('K2HPO4', phase='l', default=True).MW, 
-        0.01*bst.Chemical('KH2PO4', phase='l', default=True).MW,
-        5,#0.25*bst.Chemical('TrehaloseDH',search_ID='6138-23-4', phase='l', default=True).MW,# 0.25
-        0.005*bst.Chemical('SodiumAscorbate',search_ID='134-03-2', phase='l', default=True).MW],
+        0.01*bst.Chemical('KH2PO4', phase='l', default=True).MW],
         wt=True,
     )
 

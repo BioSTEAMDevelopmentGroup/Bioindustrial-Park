@@ -11,7 +11,7 @@ Created on 2025-06-04 14:26:14
 #from biorefineries.animal_bedding import _system
 import biosteam as bst
 from thermosteam import Stream
-
+from biosteam import F
 import thermosteam as tmo
 import numpy as np
 from biorefineries.prefers import _chemicals as c, _units as u ,_streams as s
@@ -30,12 +30,13 @@ __all__ = (
     ID='LegH_sys',
     ins=[s.SeedIn, s.CultureIn, s.Glucose, s.NH3_25wt,s.BufferA, s.BufferB, s.BufferC
         ],
-    outs=[s.LegH_3, s.vent1, s.vent2, s.effluent1, #s.effluent2,
-        s.effluent3, s.effluent4, s.effluent5, s.effluent6],
+    outs=[s.LegH_3, s.vent1, s.vent2, s.effluent1, s.effluent2,
+        s.effluent3, s.effluent4, s.effluent5,],
     fthermo=c.create_chemicals_LegH, # Pass the function itself
 )
 def create_LegH_system(
         ins, outs,
+        use_area_convention=False,
         # reactions_passed=None, # Placeholder if reactions were to be passed externally
         # One could add more configurable parameters here:
         # V_max_fermenter=500, target_titer=7.27, etc.
@@ -54,8 +55,7 @@ def create_LegH_system(
     SeedIn, CultureIn, Glucose, NH3_25wt, BufferA, BufferB, BufferC = ins
 
     # Unpack output streams
-    (LegH_3, vent1, vent2, effluent1, #effluent2, 
-    effluent3, effluent4, effluent5, effluent6) = outs
+    (LegH_3, vent1, vent2, effluent1, effluent2, effluent3, effluent4, effluent5) = outs
     """
     Fermentation Parameter
     """
@@ -73,7 +73,7 @@ def create_LegH_system(
     productivity = titer / 72 # [g / L / h]
     Y_p = titer * 5 / 1300 # [by wt] 3 wt%
     Y_b = 0.43 # [by wt] 
-    LegH_yield = Y_p/0.517 # yield based on glucose utilized for product formation
+    LegH_yield = Y_p#/0.517 # yield based on glucose utilized for product formation
     """
     Reactions
     """
@@ -130,6 +130,7 @@ def create_LegH_system(
     Upstream Process
     """
     M301 = bst.Mixer('M301', ins=[SeedIn,CultureIn], outs='M301Out')
+
     R301 = u.SeedTrain(
         'R301',
         ins=[M301-0],
@@ -140,11 +141,21 @@ def create_LegH_system(
     )
     R301.add_specification(run=True)
 
-    M302 = bst.Mixer('M302', ins=[R301-1, Glucose, NH3_25wt], outs='M302Out')
+
+    M302 = bst.MixTank('M302', ins=[Glucose,'Water'], outs='M302Out', tau=16)
+    
+    @M302.add_specification(run=True)
+    def update_water_content():
+        M302.ins[1].imass['H2O'] = Glucose.imass['Glucose']/2
+        M302.ins[1].T = 25+273.15
+    
+    T301 = bst.StorageTank('T301', ins=M302-0, outs='T301Out',tau=16*4+72)
+
+    T302 = bst.StorageTank('T302', ins=NH3_25wt, outs='T302Out',tau=16*5+72)
 
     R302 = u.AeratedFermentation(
         'R302',
-        ins=[M302-0, bst.Stream('FilteredAir', phase='g', P = 2 * 101325)],
+        ins=[R301-1, T301-0, T302-0, bst.Stream('FilteredAir', phase='g', P=2 * 101325)],
         outs=[vent2, 'R302Out'],
         fermentation_reaction=fermentation_reaction,
         cell_growth_reaction=cell_growth_reaction,
@@ -182,7 +193,7 @@ def create_LegH_system(
         ins = S401-0,
         outs = (effluent1, 'S402Out'),
         moisture_content = 0.20,  # 20% moisture content in the final product
-        split = (0, 0.2, 1, 1),
+        split = (0, 0.995, 1, 1),
         order = ('Glucose','cellmass', 'LeghemoglobinIntre','GlobinIntre'),
     )
     S402.add_specification(run=True)
@@ -202,7 +213,7 @@ def create_LegH_system(
         'U401',
         ins = (S402-1, BufferA),
                #bst.Stream('BufferA', BufferA=(E401-0).imass['H2O']*4, units='kg/hr', T=25+273.15)),
-        outs = ('U401Out',effluent3),
+        outs = ('U401Out',effluent2),
         TargetProduct_ID = 'Leghemoglobin',
         Salt_ID = c.chemical_groups['Salts'],
         OtherLargeMolecules_ID = c.chemical_groups['OtherLargeMolecules'],
@@ -211,7 +222,7 @@ def create_LegH_system(
     )
     @U401.add_specification(run=True)
     def update_BufferA():
-        BufferA.imass['H2O'] = (S402-1).imass['H2O']*2#4
+        BufferA.imass['H2O'] = (S402-1).imass['H2O']*2
         BufferA.T = 25+273.15
 
 
@@ -219,7 +230,7 @@ def create_LegH_system(
         'U402',
         ins = (U401-0,BufferB,) ,
             #bst.Stream('BufferB', BufferB=(U401-0).imass['H2O']/2, units='kg/hr', T=25+273.15)),
-        outs = ('U402Out',effluent4),
+        outs = ('U402Out',effluent3),
         TargetProduct_IDs = c.chemical_groups['LegHIngredients'],
         BoundImpurity_IDs=c.chemical_groups['BoundImpurities'],
         #ElutionBuffer_Defining_Component_ID =c.chemical_groups['ElutionBuffer'],
@@ -237,7 +248,7 @@ def create_LegH_system(
             #         BufferC=1.1*0.05*1000*
             #         (U402-0).imass['Leghemoglobin']/(0.25*bst.Chemical('TrehaloseDH',search_ID='6138-23-4', phase='l', default=True).MW),
             #         units='kg/hr', T=25+273.15)),
-        outs = ('U403Out',effluent5),
+        outs = ('U403Out',effluent4),
         TargetProduct_ID = 'Leghemoglobin',
         membrane_cost_USD_per_m2=1000, # Nanomembrane cost
         Salt_ID = c.chemical_groups['Salts'],
@@ -251,21 +262,67 @@ def create_LegH_system(
     )
     @U403.add_specification(run=True)
     def update_BufferC():
-        BufferC.imass['H2O'] = 2 *1.1*0.20*1000*(U402-0).imass['Leghemoglobin']/(0.25*bst.Chemical('TrehaloseDH',search_ID='6138-23-4', phase='l', default=True).MW)
+        BufferC.imass['H2O'] = (U402-0).imass['H2O']*2
         BufferC.T = 25+273.15
+
+
+    # @U403.add_specification(run=True)
+    # def update_BufferC():
+    #     BufferC.imass['H2O'] = 2 *1.1*0.20*1000*(U402-0).imass['Leghemoglobin']/(0.25*bst.Chemical('TrehaloseDH',search_ID='6138-23-4', phase='l', default=True).MW)
+    #     BufferC.T = 25+273.15
 
 
     S403 = bst.SprayDryer(
         'S403', 
         ins=U403-0,
-        outs=(effluent6, LegH_3),
+        outs=(effluent5, 'S403Out'),
         moisture_content=0.9,  # 90% moisture content in the final product
     )
-    
+    S403.add_specification(run=True)
+
+    H401 = bst.HXutility(
+        'H401',
+        ins=S403-1,
+        outs=LegH_3,
+        T=0+273.15,  # Cool to 0°C
+        cool_only=True,
+    )
+
+    # # ### Facilities ###
+    CT = bst.CoolingTower(500 if use_area_convention else 'CT')
+    CWP = bst.ChilledWaterPackage(500 if use_area_convention else 'CWP')
+    # BT = bst.BoilerTurbogenerator(400 if use_area_convention else 'BT',
+    #     (S402-0, '', 'boiler_makeup_water', 'natural_gas', '', ''),
+    #     outs=('emissions', 'rejected_water_and_blowdown', 'ash_disposal'),
+    #     boiler_efficiency=0.80,
+    #     turbogenerator_efficiency=0.85 
+    # )
+    makeup_water_streams = (F.cooling_tower_makeup_water,)
+                            #F.boiler_makeup_water)
+    process_water_streams = (F.Water,
+                             #F.imbibition_water,
+                             #F.rvf_wash_water,
+                             *makeup_water_streams)
+
+    makeup_water = bst.Stream('makeup_water', price=0.000254)
+
+    PWC = bst.ProcessWaterCenter(500 if use_area_convention else 'PWC',
+        ins=('recycled_RO_water', makeup_water, 'recycled_process_water', 'makeup_process_water'),
+        outs=('RO_water', 'process_water', 'excess_water'),
+        makeup_water_streams=makeup_water_streams,
+        process_water_streams=process_water_streams,
+        reverse_osmosis_water_price=0.000254,  # USD/kg
+        process_water_price=0.000135,  # USD/kg
+    )
+
+
+    # HXN = bst.HeatExchangerNetwork(600 if use_area_convention else 'HXN')
+
+
     s.update_all_input_stream_prices(streamlist=[SeedIn, CultureIn, Glucose, NH3_25wt, BufferA, BufferB, BufferC])
 
-    return LegH_3, vent1, vent2, effluent1, effluent3, effluent4, effluent5, effluent6, BufferA, BufferB, BufferC
-#effluent2
+    return LegH_3, vent1, vent2, effluent1, effluent2, effluent3, effluent4, effluent5, BufferA, BufferB, BufferC
+
 # %%
 if __name__ == '__main__':
     # # Create the LegH system

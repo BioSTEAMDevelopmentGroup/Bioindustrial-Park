@@ -34,7 +34,7 @@ BufferC = stream_kwargs('BufferC', BufferC=1, units='kg/hr', T=25+273.15)
 
 LegH_1 = stream_kwargs('LegH_1')
 LegH_2 = stream_kwargs('LegH_2')
-LegH_3 = stream_kwargs('LegH_3',units='kg/hr', T=25+273.15, price = 10)
+LegH_3 = stream_kwargs('LegH_3',units='kg/hr', T=25+273.15, price = 25)
 vent1 = stream_kwargs('vent1')
 vent2 = stream_kwargs('vent2')
 effluent1 = stream_kwargs('effluent1')
