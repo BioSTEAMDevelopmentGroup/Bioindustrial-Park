@@ -402,37 +402,42 @@ print(results.to_string(float_format=lambda x: f"{x:.6g}"))
 def MPSP_sensitivity_plot():
             bst.plots.plot_spearman_1d(
                 rhos = (
-                    0,      #tungstic acid reuse
-                    # 0,      #boiler efficiency
-                    0.09,   # water for extraction
-                   -0.11,   # OD conversion
-                   -0.24,   # IP conversion
-                   -0.50,   # DI conversion
-                   -0.34,   # DH conversion
-                       0,   # pelargonic acid CI
-                       0,   # glycerol CI
-                       0,   # feedstock CI           
-                       0,     # azelaic acid price
-                   -0.26,   # fatty acid blend price,
-                   -0.42,   # pelargonic acid unit price
-                    0.4     # feedstock unit cost
+                    0,     # tungstic acid reuse
+                    0,     # boiler efficiency
+                    0.1,   # water for extraction
+                    0,      #'diol split ratio',
+                   -0.1,   # OD conversion
+                   -0.3,   # IP conversion
+                   -0.5,   # DI conversion
+                   -0.4,   # DH conversion
+                       0,  # pelargonic acid CI
+                       0,  # fatty acid blend CI
+                       0,  # fatty acid blend CI
+                       0,  # glycerol CI
+                       0,  # feedstock CI           
+                       0,  # azelaic acid price
+                   -0.3,   # fatty acid blend price,
+                   -0.4,   # pelargonic acid unit price
+                    0.4    # feedstock unit cost
                 ),
                 index = [
                     'tungstic acid reuse',
-                    # 'boiler efficiency',
+                    'boiler efficiency',
                     'water ratio',
+                    'diol split ratio',
                     'OD conversion',
                     'IP conversion',
                     'DI conversion',
                     'D conversion',
                     'pelargonic acid CI',
+                    'fatty acid blend CI',
                     'glycerol CI',
+                    'hydrogen peroxide CI',
                     'feedstock CI',
                     'azelaic acid price',
                     'fatty acid blend price',
                     'pelargonic acid unit price',
-                    'feedstock unit cost'
-                ],
+                    'feedstock unit cost'],
 xlabel= 'MSP',
 color = colors.brown_tint.RGBn,
  # np.array([0.7255,0.4784,0.3412]),
@@ -442,15 +447,18 @@ def GWP_sensitivity_plot_displacement():
             bst.plots.plot_spearman_1d(
                 rhos = (
                     0,      #tungstic acid reuse
-                    # 0,      #boiler efficiency
+                    0,      #boiler efficiency
                     0,      # water for extraction
-                    0,      # OD conversion
+                    0,      #diol split ratio
+                   -0.1,      # OD conversion
                     0,      # IP conversion
-                   -0.29,   # DI conversion
-                   -0.21,   # D conversion
-                   -0.88,   # pelargonic acid CI
+                   -0.3,   # DI conversion
+                   -0.2,   # D conversion
+                   -0.9,   # pelargonic acid CI
+                   -0.1,   # fatty acid blend CI
                     0,      # glycerol CI
-                    0,      # feedstock CI
+                    0,       #hydrogen peroxide CI
+                    0.1,      # feedstock CI
                     0,        # azelaic acid price                           
                     0,      # fatty acid blend price,
                     0,      # pelargonic acid unit price
@@ -458,20 +466,22 @@ def GWP_sensitivity_plot_displacement():
                 ),
                 index = [
                     'tungstic acid reuse',
-                    # 'boiler efficiency',
+                    'boiler efficiency',
                     'water ratio',
+                    'diol split ratio',
                     'OD conversion',
                     'IP conversion',
                     'DI conversion',
-                    'DH conversion',
+                    'D conversion',
                     'pelargonic acid CI',
+                    'fatty acid blend CI',
                     'glycerol CI',
+                    'hydrogen peroxide CI',
                     'feedstock CI',
                     'azelaic acid price',
                     'fatty acid blend price',
                     'pelargonic acid unit price',
-                    'feedstock unit cost'
-                ],
+                    'feedstock unit cost'],
 xlabel= 'displacement',
 color = guest_group_colors['Light Green'],
 # np.array([0.475,0.749,0.510]),
@@ -480,16 +490,19 @@ edgecolors = 'black', sort = False, w = 0.7)
 def GWP_sensitivity_plot_mass():
     bst.plots.plot_spearman_1d(
         rhos = (
-           -0.13,   #tungstic acid reuse
-            # 0,      #boiler efficiency
-            0.15,   # water for extraction
-            0,      # OD conversion
-           -0.41,   # IP conversion
-           -0.62,   # DI conversion
-           -0.35,   # D conversion
+            -0.2,   #tungstic acid reuse
+            -0.1,      #boiler efficiency
+            0.3,   # water for extraction
+            0.2,    #diol split ratio
+            0.3,      # OD conversion
+           -0.2,   # IP conversion
+           -0.3,   # DI conversion
+            0,   # D conversion
             0,      # pelargonic acid CI
+            0,        #'fatty acid blend CI',
             0,      # glycerol CI
-            0.40,   # feedstock CI              
+            0.1,    #hydrogen peroxide CI
+            0.7,   # feedstock CI              
             0,      # azelaic acid price       
             0,      # fatty acid blend price,
             0,      # pelargonic acid unit price
@@ -497,14 +510,17 @@ def GWP_sensitivity_plot_mass():
         ),
         index = [
             'tungstic acid reuse',
-            # 'boiler efficiency',
+            'boiler efficiency',
             'water ratio',
+            'diol split ratio',
             'OD conversion',
             'IP conversion',
             'DI conversion',
             'DH conversion',
             'pelargonic acid CI',
+            'fatty acid blend CI',
             'glycerol CI',
+            'hydrogen peroxide CI',
             'feedstock CI',
             'azelaic acid price',
             'fatty acid blend price',
@@ -519,35 +535,41 @@ def GWP_sensitivity_plot_economic():
    bst.plots.plot_spearman_1d(
        rhos = (
            0,      #tungstic acid reuse
-           # 0,      #boiler efficiency
+            0,      #boiler efficiency
            0,      # water for extraction
-          -0.10,      # OD conversion
-          -0.31,      # IP conversion
-          -0.67,      # DI conversion
-          -0.47,      # D conversion
+           0,      #diol split ratio
+           0.0,      # OD conversion
+          -0.2,      # IP conversion
+          -0.5,      # DI conversion
+          -0.4,      # D conversion
            0,         # pelargonic acid CI
+           0,         # fatty acud blend CI  
            0,         # glycerol CI
-           0.12,      # feedstock CI                           
-          -0.5,       #azelaic acid price
-          -0.17,      # fatty acid blend price,
-          -0.27,      # pelargonic acid unit price
+           0,       #hydrogen peroxide CI
+           0,      # feedstock CI                            
+           0.5,       #azelaic acid price
+          -0.3,      # fatty acid blend price,
+          -0.3,      # pelargonic acid unit price
            0          # feedstock unit cost
        ),
-       index = [
-           'tungstic acid reuse',
-           # 'boiler efficiency',
-           'water ratio',
-           'OD conversion',
-           'IP conversion',
-           'DI conversion',
-           'DH conversion',
-           'pelargonic acid CI',
-           'glycerol CI',
-           'feedstock CI',
-           'azelaic acid price',
-           'fatty acid blend price',
-           'pelargonic acid unit price',
-           'feedstock unit cost'],
+        index = [
+            'tungstic acid reuse',
+            'boiler efficiency',
+            'water ratio',
+            'diol split ratio',
+            'OD conversion',
+            'IP conversion',
+            'DI conversion',
+            'D conversion',
+            'pelargonic acid CI',
+            'fatty acid blend CI',
+            'glycerol CI',
+            'hydrogen peroxide CI',
+            'feedstock CI',
+            'azelaic acid price',
+            'fatty acid blend price',
+            'pelargonic acid unit price',
+            'feedstock unit cost'],
        xlabel= 'economic',
        color = guest_group_colors['Blue'],
        # CABBI_colors.teal.RGBn,
