@@ -127,7 +127,7 @@ def get_grouped_chemicals(stream, units='kmol/hr'):
 
 # %% Chemical object and define functions
 
-@chemical_cache
+#@chemical_cache
 def create_chemicals_LegH():
     ##############################################
     ##### set function of create new chemical ####
