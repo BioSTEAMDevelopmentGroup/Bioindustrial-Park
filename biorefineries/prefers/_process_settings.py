@@ -30,6 +30,9 @@ price = {
     'Glucose': 0.42,  # $/kg 0.5 to 0.9
     'MgSO4': 0.175,  # $/kg 0.3 to 0.6
     'KH2PO4': 1.31,  # $/kg 1.2 to 2
+    'NaH2PO4': 1.31,  # $/kg 1.2 to 2
+    'Na2HPO4': 1.7,  # $/kg 1.3 to 2.2
+    'K2HPO4': 1.7,  # $/kg 1.3 to 2.2
     'FeSO4': 0.055,  # $/kg 0.4 to 0.8
     'NH42HPO4': 0.569,  # $/kg 0.4 to 0.7
     'NaCl': 0.078,  # $/kg 0.1 to 0.25

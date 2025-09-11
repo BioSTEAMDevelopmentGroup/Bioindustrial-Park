@@ -80,7 +80,7 @@ chemical_groups = dict(
                         'CSL',
                         'Globin',
                         'Mannoprotein',
-                        'Chitin'),
+                        'Chitin',),
 
     # DefaultSolutes = ('Glycine',
     #                     'CitricAcid',
@@ -197,6 +197,7 @@ def create_chemicals_LegH():
 
     ##### Soluble inorganics #####
     add_chemical('KOH', phase='l', default=True)
+    add_chemical('NaOH', phase='l', default=True)
     add_chemical('NaCl', phase='l', default=True)
     add_chemical('KCl', phase='l', default=True)
 
@@ -206,6 +207,8 @@ def create_chemicals_LegH():
 
     add_chemical('KH2PO4', phase='l', default=True)
     add_chemical('K2HPO4', phase='l', default=True)
+    add_chemical('NaH2PO4', phase='l', default=True)
+    add_chemical('Na2HPO4', phase='l', default=True)
     add_chemical('(NH4)2HPO4', phase='l', default=True)
     
     # trace_metal_solution
@@ -458,19 +461,36 @@ def create_chemicals_LegH():
         wt=True
     )
 
+    # chems.define_group(
+    #     'BufferA',
+    #     ['H2O','(NH4)2HPO4','NaCl','EDTA'],
+    #     [1000, 0.25*bst.Chemical('(NH4)2HPO4', phase='l', default=True).MW, 
+    #     0.1*bst.Chemical('NaCl', phase='l', default=True).MW,
+    #     0.001*bst.Chemical('EDTA', phase='l', default=True).MW],
+    #     wt=True,
+    # )
     chems.define_group(
         'BufferA',
-        ['H2O','(NH4)2HPO4','NaCl','EDTA'],
-        [1000, 0.25*bst.Chemical('(NH4)2HPO4', phase='l', default=True).MW, 
+        ['KH2PO4','NaCl','EDTA'],
+        [0.25*bst.Chemical('KH2PO4', phase='l', default=True).MW, 
         0.1*bst.Chemical('NaCl', phase='l', default=True).MW,
         0.001*bst.Chemical('EDTA', phase='l', default=True).MW],
         wt=True,
     )
 
+    # chems.define_group(
+    #     'BufferB',
+    #     ['H2O','(NH4)2HPO4','NaCl','KCl'],
+    #     [1000, 0.25*bst.Chemical('(NH4)2HPO4', phase='l', default=True).MW, 
+    #     0.9*bst.Chemical('NaCl', phase='l', default=True).MW,
+    #     0.1*bst.Chemical('KCl', phase='l', default=True).MW],
+    #     wt=True,
+    # )
+
     chems.define_group(
         'BufferB',
-        ['H2O','(NH4)2HPO4','NaCl','KCl'],
-        [1000, 0.25*bst.Chemical('(NH4)2HPO4', phase='l', default=True).MW, 
+        ['KH2PO4','NaCl','KCl'],
+        [0.25*bst.Chemical('KH2PO4', phase='l', default=True).MW, 
         0.9*bst.Chemical('NaCl', phase='l', default=True).MW,
         0.1*bst.Chemical('KCl', phase='l', default=True).MW],
         wt=True,
@@ -486,11 +506,19 @@ def create_chemicals_LegH():
     #     wt=True,
     # )
 
+    # chems.define_group(
+    #     'BufferC',
+    #     ['H2O','K2HPO4','KH2PO4'],
+    #     [1000, 0.01*bst.Chemical('K2HPO4', phase='l', default=True).MW, 
+    #     0.01*bst.Chemical('KH2PO4', phase='l', default=True).MW],
+    #     wt=True,
+    # )
+
     chems.define_group(
         'BufferC',
-        ['H2O','K2HPO4','KH2PO4'],
-        [1000, 0.01*bst.Chemical('K2HPO4', phase='l', default=True).MW, 
-        0.01*bst.Chemical('KH2PO4', phase='l', default=True).MW],
+        ['Na2HPO4','NaH2PO4'],
+        [0.01*bst.Chemical('Na2HPO4', phase='l', default=True).MW, 
+        0.01*bst.Chemical('NaH2PO4', phase='l', default=True).MW],
         wt=True,
     )
 
