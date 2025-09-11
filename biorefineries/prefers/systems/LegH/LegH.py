@@ -274,7 +274,7 @@ def create_LegH_system(
         ins = (U402-0, M403-0),
         outs = ('U403Out',effluent4),
         TargetProduct_ID = 'Leghemoglobin',
-        membrane_cost_USD_per_m2=1000, # Nanomembrane cost
+        membrane_cost_USD_per_m2=200, # Nanomembrane cost
         Salt_ID = c.chemical_groups['Salts'],
         OtherLargeMolecules_ID = c.chemical_groups['OtherLargeMolecules'],
         TargetProduct_Retention=0.995, Salt_Retention=0.001,

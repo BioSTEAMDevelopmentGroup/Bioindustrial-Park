@@ -440,7 +440,7 @@ class Diafiltration(bst.Unit):
     _default_membrane_flux_LMH = 40.0 # ultra: 20~80, nano: 10~40
     _default_TMP_bar1 = 2.0 # ultra: 2~4, nano: 10 ~25
     _default_TMP_bar2 = 2.0 # ultra: 1.5~3, nano: 3~6
-    _default_membrane_cost_USD_per_m2 = 200.0 
+    _default_membrane_cost_USD_per_m2 = 100.0 
     # food ultra: 50-250, nano: 70~300
     # for pharm: ultra: 1500~3000, nano: 2500~4500
     _default_membrane_lifetime_years = 1.0
@@ -912,7 +912,12 @@ class IonExchangeCycle(bst.Unit):
                  NonBinding_Carryover=0.04,
                  
                  # Costing parameters
-                 resin_cost_USD_per_L=1500.0,
+                 resin_cost_USD_per_L=7,#1500.0,
+                 # strong acid cation resin: 2~5
+                    # weak acid cation resin: 3 ~ 6
+                    # strong base anion resin: 7~15
+                    # weak base anion resin: 5~10
+                 # 4000~10000
                  resin_lifetime_years=1.0,
                  column_hardware_cost_factor=3000.0,
                  column_hardware_cost_exponent=0.6
