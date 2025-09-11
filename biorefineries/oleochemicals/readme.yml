@@ -20,7 +20,7 @@ git clone https://github.com/BioSTEAMDevelopmentGroup/Bioindustrial-Park.git
 cd Bioindustrial-Park
 
 # Checkout the exact commit used for the manuscript
-git checkout 1a8b66f3a0da1a04af626988535a04791606e106
+git checkout 1e155b3ec6a9ebdda136cfa589e2b798692a5390
 
 ## Biorefinery Modules and Data Availability
 
