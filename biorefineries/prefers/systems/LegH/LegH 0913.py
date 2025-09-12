@@ -31,7 +31,7 @@ __all__ = (
     ins=[s.SeedIn, s.CultureIn, s.Glucose, s.NH3_25wt,s.DfUltraBuffer, s.IXEquilibriumBuffer, s.IXElutionBuffer
          ,s.IXRegenerationSolution, s.DfNanoBuffer],
     outs=[s.LegH_3, s.vent1, s.vent2, s.effluent1, s.effluent2,
-        s.effluent3, s.effluent4,],
+        s.effluent3, s.effluent4, s.effluent5,],
     fthermo=c.create_chemicals_LegH, # Pass the function itself
 )
 def create_LegH_system(
@@ -55,7 +55,7 @@ def create_LegH_system(
     SeedIn, CultureIn, Glucose, NH3_25wt, DfUltraBuffer, IXEquilibriumBuffer, IXElutionBuffer, IXRegenerationSolution, DfNanoBuffer = ins
 
     # Unpack output streams
-    (LegH_3, vent1, vent2, effluent1, effluent2, effluent3, effluent4, ) = outs
+    (LegH_3, vent1, vent2, effluent1, effluent2, effluent3, effluent4, effluent5) = outs
     """
     Fermentation Parameter
     """
@@ -142,7 +142,7 @@ def create_LegH_system(
     R301.add_specification(run=True)
 
 
-    M302 = bst.MixTank('M302', ins=[Glucose,''], outs='M302Out', tau=16)
+    M302 = bst.MixTank('M302', ins=[Glucose,'Water'], outs='M302Out', tau=16)
     
     @M302.add_specification(run=True)
     def update_water_content():
@@ -179,9 +179,6 @@ def create_LegH_system(
     def update_reaction_time_and_yield():
         R302.tau = R302.target_titer / R302.target_productivity
         fermentation_reaction[2].product_yield('Leghemoglobin', basis='wt', product_yield=R302.target_yield)
-
-
-
     """
     Downstream process
     """
@@ -194,15 +191,12 @@ def create_LegH_system(
     S402 = u.ProteinCentrifuge(
         'S402',
         ins = S401-0,
-        outs = ('', 'S402Out'),
+        outs = (effluent1, 'S402Out'),
         moisture_content = 0.20,  # 20% moisture content in the final product
         split = (0, 0.995, 1, 1),
         order = ('Glucose','cellmass', 'LeghemoglobinIntre','GlobinIntre'),
     )
     S402.add_specification(run=True)
-
-    #S403 = bst.SolidsSeparator('S403', ins=S402-0, outs=(effluent1, 'S403Out'), split=(1) , moisture_content=0.01)
-    S403 = bst.ScrewPress('S403', ins=S402-0, outs=(effluent1, 'S403Out'), split=(1) , moisture_content=0.01)
     
     # E401 = u.Evaporator(
     #     'E401',
@@ -224,7 +218,7 @@ def create_LegH_system(
     U401 = u.Diafiltration(
         'U401',
         ins = (S402-1, M401-0),
-        outs = ('U401Out',''),
+        outs = ('U401Out',effluent2),
         TargetProduct_ID = 'Leghemoglobin',
         Salt_ID = c.chemical_groups['Salts'],
         OtherLargeMolecules_ID = c.chemical_groups['OtherLargeMolecules'],
@@ -232,10 +226,6 @@ def create_LegH_system(
         TMP_bar2 = 2 ,#1.5~3
     )
     U401.add_specification(run=True)
-
-    #S404 = bst.SolidsSeparator('S404', ins=U401-1, outs=(effluent2, 'S404Out'), split=(1) , moisture_content=0.01)
-
-    S404 = u.ReverseOsmosis('S404', ins=U401-1, outs=('S404Out',effluent2))
 
     M402 = bst.MixTank('M402', ins=(IXEquilibriumBuffer,''), 
                     outs='M402Out', tau=1)
@@ -247,7 +237,7 @@ def create_LegH_system(
     U402 = u.IonExchangeCycle(
         'U402',
         ins = (U401-0,M402-0,M403-0,M404-0),
-        outs = ('U402Out',''),
+        outs = ('U402Out',effluent3),
         TargetProduct_IDs = c.chemical_groups['LegHIngredients'],
         BoundImpurity_IDs=c.chemical_groups['BoundImpurities'],
     )    
@@ -265,9 +255,6 @@ def create_LegH_system(
         M404.ins[1].imass['H2O'] = (U401-0).imass['H2O']*U402.regeneration_CV
         M404.ins[0].imol['NaOH'] = ((U401-0).imass['H2O']*U402.regeneration_CV)*(0.25)/1000
 
-    #S405 = bst.SolidsSeparator('S405', ins=U402-1, outs=(effluent3, 'S405Out'), split=(1) , moisture_content=0.01)
-    S405 = u.ReverseOsmosis('S405', ins=U402-1, outs=('S405Out',effluent3))
-
     M405 = bst.MixTank('M405', ins=(DfNanoBuffer,''), 
                     outs='M405Out', tau=1)
     @M405.add_specification(run=True)
@@ -278,7 +265,7 @@ def create_LegH_system(
     U403 = u.Diafiltration(
         'U403',
         ins = (U402-0, M405-0),
-        outs = ('U403Out',''),
+        outs = ('U403Out',effluent4),
         TargetProduct_ID = 'Leghemoglobin',
         membrane_cost_USD_per_m2=200, # Nanomembrane cost
         Salt_ID = c.chemical_groups['Salts'],
@@ -292,20 +279,17 @@ def create_LegH_system(
     )
     U403.add_specification(run=True)
 
-    #S406 = bst.SolidsSeparator('S406', ins=U403-1, outs=(effluent4, 'S406Out'), split=(1) , moisture_content=0.01)
-    S406 = u.ReverseOsmosis('S406', ins=U403-1, outs=('S406Out',effluent4))
-
-    S408 = bst.SprayDryer(
-        'S408', 
+    S403 = bst.SprayDryer(
+        'S403', 
         ins=U403-0,
-        outs=('', 'S408Out'),
+        outs=(effluent5, 'S403Out'),
         moisture_content=0.9,  # 90% moisture content in the final product
     )
-    S408.add_specification(run=True)
+    S403.add_specification(run=True)
 
     H401 = bst.HXutility(
         'H401',
-        ins=S408-1,
+        ins=S403-1,
         outs=LegH_3,
         T=0+273.15,  # Cool to 0°C
         cool_only=True,
@@ -314,7 +298,7 @@ def create_LegH_system(
     # # ### Facilities ###
     CT = bst.CoolingTower(500 if use_area_convention else 'CT')
     CWP = bst.ChilledWaterPackage(500 if use_area_convention else 'CWP')
-
+    
     #ADP = bst.AirDistributionPackage(500 if use_area_convention else 'ADP')
 
     # BT = bst.BoilerTurbogenerator(400 if use_area_convention else 'BT',
@@ -354,7 +338,7 @@ def create_LegH_system(
 
     s.update_all_input_stream_prices(streamlist=[SeedIn, CultureIn, Glucose, NH3_25wt, DfUltraBuffer, IXEquilibriumBuffer, IXElutionBuffer, IXRegenerationSolution, DfNanoBuffer])
 
-    return LegH_3, vent1, vent2, effluent1, effluent2, effluent3, effluent4, DfUltraBuffer, IXEquilibriumBuffer, IXElutionBuffer, IXRegenerationSolution, DfNanoBuffer
+    return LegH_3, vent1, vent2, effluent1, effluent2, effluent3, effluent4, effluent5, DfUltraBuffer, IXEquilibriumBuffer, IXElutionBuffer, IXRegenerationSolution, DfNanoBuffer
 
 # %%
 if __name__ == '__main__':

@@ -29,9 +29,10 @@ price = {
     'NH4SO4': 0.16,  # $/kg 0.15 to 0.45
     'Glucose': 0.42,  # $/kg 0.5 to 0.9
     'MgSO4': 0.175,  # $/kg 0.3 to 0.6
+    'NaOH': 0.28,  # $/kg 0.13 to 0.4
     'KH2PO4': 1.31,  # $/kg 1.2 to 2
-    'NaH2PO4': 1.31,  # $/kg 1.2 to 2
-    'Na2HPO4': 1.7,  # $/kg 1.3 to 2.2
+    'NaH2PO4': 0.73,  # $/kg 0.5 to 0.82
+    'Na2HPO4': 0.55,  # $/kg 0.35 to 0.65
     'K2HPO4': 1.7,  # $/kg 1.3 to 2.2
     'FeSO4': 0.055,  # $/kg 0.4 to 0.8
     'NH42HPO4': 0.569,  # $/kg 0.4 to 0.7

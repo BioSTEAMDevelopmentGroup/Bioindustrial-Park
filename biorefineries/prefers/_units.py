@@ -410,6 +410,16 @@ class CellDisruption(bst.Unit):
 class ProteinCentrifuge(bst.SolidsCentrifuge): pass
 
 
+# Membrane separation processes. Perry's Chemical Engineer's Handbook 7th Edition. 
+
+@cost('Annual flow rate', 'Membranes and maintenance', S=1., units='m3/yr',
+      cost=0.13, n=1., BM=1., CE=bst.units.design_tools.CEPCI_by_year[1996],
+      annual=True)
+@cost('Flow rate', 'Nanofiltration', kW=18000, S=0.25, units='m3/s',
+      cost=17300, n=0.6, BM=1., CE=bst.units.design_tools.CEPCI_by_year[1996])
+class ReverseOsmosis(bst.wastewater.conventional.ReverseOsmosis):
+    pass
+
 class Diafiltration(bst.Unit):
     """
     Diafiltration unit for separation of solutes based on size, typically
@@ -791,7 +801,7 @@ class IonExchange(bst.Unit):
         Design['equipment_lifetime_years'] = self.equipment_lifetime_years
 
         # Pump logic remains the same
-        internal_stream = self.ins[0].copy() + self.ins[1].copy() # * 15 # consider 15 CV times the elution buffer for cleaning
+        internal_stream = self.ins[0].copy() + self.ins[1].copy() + self.ins[2].copy() + self.ins[3].copy()  # * 15 # consider 15 CV times the elution buffer for cleaning
         self.pump = bst.Pump(None, P= 4.0 * 1e5) # assume 4 bar pressure drop
         self.pump.ins[0] = internal_stream
         self.pump.simulate()

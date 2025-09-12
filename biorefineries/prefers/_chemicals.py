@@ -445,7 +445,7 @@ def create_chemicals_LegH():
         wt=True
     )
 
-    # 18wt%NH3
+    # 25wt%NH3
     chems.define_group(
         'NH3_25wt',
         ['NH3','H2O'],
@@ -470,7 +470,7 @@ def create_chemicals_LegH():
     #     wt=True,
     # )
     chems.define_group(
-        'BufferA',
+        'DfUltraBuffer',
         ['KH2PO4','NaCl','EDTA'],
         [0.25*bst.Chemical('KH2PO4', phase='l', default=True).MW, 
         0.1*bst.Chemical('NaCl', phase='l', default=True).MW,
@@ -486,15 +486,31 @@ def create_chemicals_LegH():
     #     0.1*bst.Chemical('KCl', phase='l', default=True).MW],
     #     wt=True,
     # )
-
     chems.define_group(
-        'BufferB',
+        'IXEquilibriumBuffer',
+        ['KH2PO4','NaCl','EDTA'],
+        [0.25*bst.Chemical('KH2PO4', phase='l', default=True).MW, 
+        0.1*bst.Chemical('NaCl', phase='l', default=True).MW,
+        0.001*bst.Chemical('EDTA', phase='l', default=True).MW],
+        wt=True,
+    )
+    chems.define_group(
+        'IXElutionBuffer',
         ['KH2PO4','NaCl','KCl'],
         [0.25*bst.Chemical('KH2PO4', phase='l', default=True).MW, 
         0.9*bst.Chemical('NaCl', phase='l', default=True).MW,
         0.1*bst.Chemical('KCl', phase='l', default=True).MW],
         wt=True,
     )
+
+    # chems.define_group(
+    #     'IXRegenerationSolution',
+    #     ['KH2PO4','NaCl','KCl'],
+    #     [0.25*bst.Chemical('KH2PO4', phase='l', default=True).MW, 
+    #     0.9*bst.Chemical('NaCl', phase='l', default=True).MW,
+    #     0.1*bst.Chemical('KCl', phase='l', default=True).MW],
+    #     wt=True,
+    # )
 
     # chems.define_group(
     #     'BufferC',
@@ -515,7 +531,7 @@ def create_chemicals_LegH():
     # )
 
     chems.define_group(
-        'BufferC',
+        'DfNanoBuffer',
         ['Na2HPO4','NaH2PO4'],
         [0.01*bst.Chemical('Na2HPO4', phase='l', default=True).MW, 
         0.01*bst.Chemical('NaH2PO4', phase='l', default=True).MW],
