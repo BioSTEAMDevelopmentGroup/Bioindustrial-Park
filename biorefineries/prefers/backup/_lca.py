@@ -156,7 +156,7 @@ class LegHLCA(LCA):
     
     
     
-    
+# %% 
 if __name__ == '__main__':
     import biosteam as bst
     from biorefineries.prefers.systems.LegH.LegH import create_LegH_system
@@ -183,9 +183,11 @@ if __name__ == '__main__':
         input_biogenic_carbon_streams=None,
         feedstock_ID=legH_sys.feeds[2].available_chemicals[0].CAS,
         boiler=DummyBT(),
-        main_product=legH_sys.products[8],
-        main_product_chemical_IDs=legH_sys.products[8].available_chemicals[15].CAS,
+        main_product=legH_sys.products[3],
+        main_product_chemical_IDs=legH_sys.products[3].available_chemicals[15].CAS,
         by_products=None,
-        cooling_tower=legH_sys.units[2],
+        cooling_tower=legH_sys.units[23],
         functional_unit='1 kg',
     )
+
+# %%

@@ -412,9 +412,9 @@ class ProteinCentrifuge(bst.SolidsCentrifuge): pass
 
 # Membrane separation processes. Perry's Chemical Engineer's Handbook 7th Edition. 
 
-@cost('Annual flow rate', 'Membranes and maintenance', S=1., units='m3/yr',
-      cost=0.13, n=1., BM=1., CE=bst.units.design_tools.CEPCI_by_year[1996],
-      annual=True)
+# @cost('Annual flow rate', 'Membranes and maintenance', S=1., units='m3/yr',
+#       cost=0.13, n=1., BM=1., CE=bst.units.design_tools.CEPCI_by_year[1996],
+#       annual=True)
 @cost('Flow rate', 'Nanofiltration', kW=18000, S=0.25, units='m3/s',
       cost=17300, n=0.6, BM=1., CE=bst.units.design_tools.CEPCI_by_year[1996])
 class ReverseOsmosis(bst.wastewater.conventional.ReverseOsmosis):

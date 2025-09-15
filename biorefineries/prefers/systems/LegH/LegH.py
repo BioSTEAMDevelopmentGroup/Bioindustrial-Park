@@ -323,30 +323,29 @@ def create_LegH_system(
     #     boiler_efficiency=0.80,
     #     turbogenerator_efficiency=0.85 
     # )
-    # makeup_water_streams = (F.cooling_tower_makeup_water,
-    #                         F.M401.ins[1],
-    #                         F.M402.ins[1],
-    #                         F.M403.ins[1],
-    #                         F.Water,
-    #                         )#F.imbibition_water,
-    #                         #F.boiler_makeup_water)
-    # process_water_streams = (F.effluent1,
-    #                         F.effluent2,
-    #                         F.effluent3,
-    #                         F.effluent4,
-    #                         F.effluent5,)
-    #                          #*makeup_water_streams)
+    makeup_water_streams = (F.cooling_tower_makeup_water,
+                            # F.M401.ins[1],
+                            # F.M402.ins[1],
+                            # F.M403.ins[1],
+                            # F.Water,
+                            )#F.imbibition_water,
+                            #F.boiler_makeup_water)
+    process_water_streams = (F.S403.outs[1],
+                            F.S404.outs[1],
+                            F.S405.outs[1],
+                            F.S406.outs[1],
+                            *makeup_water_streams)
 
-    # makeup_water = bst.Stream('makeup_water', price=0.000254)
+    makeup_water = bst.Stream('makeup_water', price=0.000254)
 
-    # PWC = bst.ProcessWaterCenter(500 if use_area_convention else 'PWC',
-    #     ins=('recycled_RO_water', makeup_water, 'recycled_process_water', 'makeup_process_water'),
-    #     outs=('RO_water', 'process_water', 'excess_water'),
-    #     makeup_water_streams=makeup_water_streams,
-    #     process_water_streams=process_water_streams,
-    #     reverse_osmosis_water_price=0.000254,  # USD/kg
-    #     process_water_price=0.000135,  # USD/kg
-    # )
+    PWC = bst.ProcessWaterCenter(500 if use_area_convention else 'PWC',
+        ins=('recycled_RO_water', makeup_water, 'recycled_process_water', 'makeup_process_water'),
+        outs=('RO_water', 'process_water', 'excess_water'),
+        makeup_water_streams=makeup_water_streams,
+        process_water_streams=process_water_streams,
+        reverse_osmosis_water_price=0.000254,  # USD/kg
+        process_water_price=0.000135,  # USD/kg
+    )
 
 
     # HXN = bst.HeatExchangerNetwork(600 if use_area_convention else 'HXN')
