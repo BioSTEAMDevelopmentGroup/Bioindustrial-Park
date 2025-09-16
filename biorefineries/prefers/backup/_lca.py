@@ -164,7 +164,6 @@ if __name__ == '__main__':
     legH_sys = create_LegH_system()
     legH_sys.simulate()  # Simulate the system to ensure all units are ready
     legH_sys.operating_hours = 8000  # Set operating hours to 8760 hours/year
-    ps.load_process_settings()
     
     # 4. Create dummy boiler (if no real boiler exists)
     class DummyBT:
@@ -178,7 +177,7 @@ if __name__ == '__main__':
 
     legH_lca = LegHLCA(
         system=legH_sys,
-        CFs=ps.CFs,
+        CFs=ps.GWP_CFs,
         feedstock=legH_sys.feeds,
         input_biogenic_carbon_streams=None,
         feedstock_ID=legH_sys.feeds[2].available_chemicals[0].CAS,

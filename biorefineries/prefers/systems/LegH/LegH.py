@@ -9,7 +9,9 @@ Created on 2025-06-04 14:26:14
 """
 
 #from biorefineries.animal_bedding import _system
+from biorefineries.prefers._process_settings import set_GWPCF, GWP_CFs,set_GWPCF_Multi,load_process_settings
 import biosteam as bst
+from pint import set_application_registry
 from thermosteam import Stream
 from biosteam import F
 import thermosteam as tmo
@@ -56,6 +58,16 @@ def create_LegH_system(
 
     # Unpack output streams
     (LegH_3, vent1, vent2, effluent1, effluent2, effluent3, effluent4, ) = outs
+    
+    set_GWPCF(Glucose, 'Glucose')
+    set_GWPCF(NH3_25wt, 'Ammonia_SEA',dilution=0.25)
+    set_GWPCF_Multi(DfUltraBuffer, ['KH2PO4','NaCl'], [0.8472, 0.1455])
+    set_GWPCF_Multi(IXEquilibriumBuffer, ['KH2PO4','NaCl'], [0.8472, 0.1455])
+    set_GWPCF_Multi(IXElutionBuffer, ['KH2PO4','NaCl','KCl'], [0.3616,0.5911, 0.0792])
+    set_GWPCF(IXRegenerationSolution, 'NaOH')
+    set_GWPCF_Multi(DfNanoBuffer, ['Na2HPO4','NaH2PO4'], [0.5420, 0.4580])
+
+
     """
     Fermentation Parameter
     """
@@ -140,8 +152,7 @@ def create_LegH_system(
         T=32+273.15,
     )
     R301.add_specification(run=True)
-
-
+    
     M302 = bst.MixTank('M302', ins=[Glucose,''], outs='M302Out', tau=16)
     
     @M302.add_specification(run=True)
@@ -179,7 +190,6 @@ def create_LegH_system(
     def update_reaction_time_and_yield():
         R302.tau = R302.target_titer / R302.target_productivity
         fermentation_reaction[2].product_yield('Leghemoglobin', basis='wt', product_yield=R302.target_yield)
-
 
 
     """
@@ -346,11 +356,8 @@ def create_LegH_system(
         reverse_osmosis_water_price=0.000254,  # USD/kg
         process_water_price=0.000135,  # USD/kg
     )
-
-
     # HXN = bst.HeatExchangerNetwork(600 if use_area_convention else 'HXN')
-
-
+    load_process_settings()  # Load process settings to update prices and CFs
     s.update_all_input_stream_prices(streamlist=[SeedIn, CultureIn, Glucose, NH3_25wt, DfUltraBuffer, IXEquilibriumBuffer, IXElutionBuffer, IXRegenerationSolution, DfNanoBuffer])
 
     return LegH_3, vent1, vent2, effluent1, effluent2, effluent3, effluent4, DfUltraBuffer, IXEquilibriumBuffer, IXElutionBuffer, IXRegenerationSolution, DfNanoBuffer
@@ -364,11 +371,23 @@ if __name__ == '__main__':
     f = sys.flowsheet
     u = f.unit
     ss = f.stream
+    sys.operating_hours = 8000
     LegH_sys.simulate()
     LegH_sys.show()
     LegH_sys.diagram(format='html',display=True,)
     # %%
     ss.LegH_3.imass['Leghemoglobin']/ss.LegH_3.F_mass*100
-
+    # %%
+    r1 = bst.report.lca_inventory_table(
+        systems=[sys],
+        key='GWP',
+        items=[ss.LegH_3], # For including products without characterization factors
+    )
+    # %%
+    r2 = bst.report.lca_displacement_allocation_table(
+        systems=[sys],
+        key='GWP',
+        items=[ss.LegH_3], # For dividing yearly impact by ethanol production
+    )
 
 # %%
