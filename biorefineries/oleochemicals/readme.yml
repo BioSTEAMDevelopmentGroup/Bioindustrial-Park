@@ -8,7 +8,7 @@ The oleochemicals biorefinery can be downloaded using the below steps
   2) pip install thermosteam == 0.38.2
   3) git clone https://github.com/BioSTEAMDevelopmentGroup/Bioindustrial-Park.git
   4) cd Bioindustrial-Park
-  5) git checkout fcb3d0a4e2c03829a6bb650f4da68f00d4650b4a
+  5) git checkout a02f8de8af02b31e4c650e42ddccf107ccf15487
 
 Please use the supporting information provided with the manuscript to acess the below results
 1) To access the samples and results for all uncertainty and sensitivity analyses
