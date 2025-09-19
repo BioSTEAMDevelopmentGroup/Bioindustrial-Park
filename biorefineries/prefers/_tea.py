@@ -84,8 +84,48 @@ if __name__ == '__main__':
     legH_tea.get_cashflow_table()
     # %%
     cost=legH_tea.solve_price(products) # USD/kg
-    print(f"\nLegH price: ${round(cost, 5)}/kg")
-    # %% Production costs
+    print(f"\nLegH price: ${round(cost, 5)}/kg")   
+    # %%
+    from biorefineries.prefers import _table as tb
+    df1 = tb.all_cost_table(legH_tea)
+    print(df1)
+    # %%
+    df2=bst.report.voc_table(legH_sys,'LegH_3')
+    print(df2)
+    # %%
+    df3 = bst.report.unit_reaction_tables(legH_sys.units)
+    print(df3)
+    # %%
+    df4 = bst.report.unit_result_tables(legH_sys.units)
+    print(df4)
+    # %%
+    df5 = bst.report.heat_utility_tables(legH_sys.units)
+    print(df5)
+    # %%
+    df6 = bst.report.power_utility_table(legH_sys.units)
+    print(df6)
+    # %%
+    df7 = bst.report.other_utilities_table(legH_sys.units)
+    print(df7)
+
+# %% Purchased equipment costs
+    # print('Purchased Costs:')
+    # for i in legH_tea.units:
+    #     #if i in legH_tea.units: continue
+    #     val = i.purchase_cost
+    #     print(i.ID, ', ', val)
+    # print('Installed Costs:')
+    # for i in legH_tea.units:
+    #     #if i in legH_tea.units: continue
+    #     val = i.installed_cost
+    #     print(i.ID, ', ', val)
+    # for i in legH_tea.units:
+    #     #if i in legH_tea.units: continue
+    #     val = i.installed_cost
+    #     print(i.ID, ', ', val)
+    #     # if val or i.ID=='M':
+    #     #     print(i.ID, ', ', val)
+# %% Production costs
     
     # # %%
     # costs = legH_tea.production_costs(products)# USD/yr

@@ -842,20 +842,679 @@ class IonExchange(bst.Unit):
         Costs['Pump'] = self.pump.purchase_cost
 
 
+# class IonExchangeCycle1(bst.Unit):
+#     """
+#     Simulates a complete Ion Exchange (IEX) chromatography cycle as a 
+#     steady-state equivalent unit operation.
+
+#     This unit models the loading of a feed stream, binding of target products, 
+#     and subsequent washing, elution, and regeneration steps. It calculates the 
+#     required volumes of all buffers and chemicals based on the column size, 
+#     which is determined by the feed rate and target product concentration.
+
+#     Parameters
+#     ----------
+#     ins :
+#         [0] Feed: The process stream containing the target product and impurities.
+#         [1] Equilibration/Wash Buffer (Buffer A): Low-salt buffer.
+#         [2] Elution Buffer (Buffer B): High-salt buffer to elute the product.
+#         [3] Regeneration Solution: e.g., NaOH or high molar NaCl.
+#     outs :
+#         [0] Product: Concentrated target product in elution buffer.
+#         [1] Waste: Combined stream from flow-through, wash, and regeneration.
+    
+#     cycle_time_hr : float
+#         Total duration of one complete IEX cycle (loading to regeneration), in hours.
+#     equilibration_CV : float
+#         Volume of equilibration buffer used, in multiples of Column Volumes (CV).
+#     wash_CV : float
+#         Volume of wash buffer used, in multiples of Column Volumes (CV).
+#     elution_CV : float
+#         Volume of elution buffer used, in multiples of Column Volumes (CV).
+#     regeneration_CV : float
+#         Volume of regeneration solution used, in multiples of Column Volumes (CV).
+#     resin_DBC_g_L : float
+#         Dynamic Binding Capacity of the resin in grams of product per liter of resin.
+#     load_safety_factor : float
+#         Safety factor for column loading, typically < 1.0 (e.g., 0.8 means column is 
+#         loaded to 80% of its DBC).
+#     TargetProduct_IDs : tuple[str]
+#         IDs of the chemical(s) to be captured and eluted as product.
+#     TargetProduct_Yield : float
+#         Fraction of the target product in the feed that is recovered in the product stream.
+#     BoundImpurity_IDs : tuple[str]
+#         IDs of impurities that also bind to the resin but are mostly removed.
+#     BoundImpurity_Removal : float
+#         Fraction of bound impurities in the feed that are sent to the waste stream.
+#     NonBinding_Carryover : float
+#         Fraction of non-binding components that ends up in the product stream.
+    
+#     # ... other costing parameters ...
+#     """
+#     _N_ins = 4
+#     _N_outs = 2
+
+#     _F_BM_default = {
+#         'IEX Column Hardware': 2.5,
+#         'IEX Resin': 1.5, #1.0,
+#         'Pump': 1.89,
+#     }
+#     # Auxiliary units for costing
+#     _auxiliary_unit_names = ('pump',)
+
+#     def __init__(self, ID='', ins=None, outs=(), thermo=None, *,
+#                  # Cycle parameters - keeping all CV values
+#                  cycle_time_hr=4.0,
+#                  equilibration_CV=5.0,
+#                  wash_CV=5.0,
+#                  elution_CV=3.0,
+#                  regeneration_CV=5.0,
+                 
+#                  # Sizing and separation parameters
+#                  resin_DBC_g_L=50.0,
+#                  load_safety_factor=0.8,
+#                  TargetProduct_IDs=('Leghemoglobin',),
+#                  TargetProduct_Yield=0.95,
+#                  BoundImpurity_IDs=('Heme_b',),
+#                  BoundImpurity_Removal=0.97,
+#                  NonBinding_Carryover=0.04,
+                 
+#                  # Costing parameters
+#                  resin_cost_USD_per_L=7,#1500.0,
+#                  # strong acid cation resin: 2~5
+#                     # weak acid cation resin: 3 ~ 6
+#                     # strong base anion resin: 7~15
+#                     # weak base anion resin: 5~10
+#                  # 4000~10000
+#                  resin_lifetime_years=1.0,
+#                  column_hardware_cost_factor=3000.0,
+#                  column_hardware_cost_exponent=0.6
+#                 ):
+#         bst.Unit.__init__(self, ID, ins, outs, thermo)
+
+#         # Operating parameters - preserving all CV values for external use
+#         self.cycle_time_hr = cycle_time_hr
+#         self.equilibration_CV = equilibration_CV
+#         self.wash_CV = wash_CV
+#         self.elution_CV = elution_CV
+#         self.regeneration_CV = regeneration_CV
+
+#         # Separation parameters
+#         self.resin_DBC_g_L = resin_DBC_g_L
+#         self.load_safety_factor = load_safety_factor
+#         if isinstance(TargetProduct_IDs, str): self.TargetProduct_IDs = (TargetProduct_IDs,)
+#         else: self.TargetProduct_IDs = tuple(TargetProduct_IDs)
+#         self.TargetProduct_Yield = TargetProduct_Yield
+#         self.BoundImpurity_IDs = tuple(BoundImpurity_IDs)
+#         self.BoundImpurity_Removal = BoundImpurity_Removal
+#         self.NonBinding_Carryover = NonBinding_Carryover
+        
+#         # Costing
+#         self.resin_cost_USD_per_L = resin_cost_USD_per_L
+#         self.resin_lifetime_years = resin_lifetime_years
+#         self.column_hardware_cost_factor = column_hardware_cost_factor
+#         self.column_hardware_cost_exponent = column_hardware_cost_exponent
+        
+#         # Initialize internal pump for power calculation
+#         self.pump = bst.Pump(None, P=4 * 1e5) # Assume 4 bar pressure drop
+        
+#     def _run(self):
+#         # Unpack streams
+#         feed, buffer_A, buffer_B, regen_sol = self.ins
+#         product, waste = self.outs
+        
+#         # Simply copy streams without volume modifications - volumes are set externally
+#         product.copy_like(buffer_B)
+#         waste.copy_like(feed)
+#         waste.mass += buffer_A.mass + regen_sol.mass
+        
+#         # Process each component in the feed for ion exchange separation
+#         for chem in self.chemicals:
+#             solute_in_feed = feed.imass[chem.ID]
+#             if solute_in_feed < 1e-12: 
+#                 continue
+
+#             if chem.ID in self.TargetProduct_IDs:
+#                 # Target products: mostly go to product, remainder to waste
+#                 to_product = solute_in_feed * self.TargetProduct_Yield
+#                 to_waste = solute_in_feed - to_product
+#             elif chem.ID in self.BoundImpurity_IDs:
+#                 # Bound impurities: mostly removed to waste, some carryover to product
+#                 to_waste = solute_in_feed * self.BoundImpurity_Removal
+#                 to_product = solute_in_feed - to_waste
+#             else: 
+#                 # Non-binding components: mostly to waste, some carryover to product
+#                 to_product = solute_in_feed * self.NonBinding_Carryover
+#                 to_waste = solute_in_feed - to_product
+            
+#             product.imass[chem.ID] += to_product
+#             waste.imass[chem.ID] -= solute_in_feed - to_waste  # Remove from feed portion in waste
+        
+#         # Set temperatures
+#         product.T = buffer_B.T
+#         waste.T = feed.T
+        
+#     def _design(self):
+#         D = self.design_results
+        
+#         # Calculate resin volume based on target product loading for design record
+#         target_mass_per_cycle_kg = sum(self.ins[0].imass[ID] for ID in self.TargetProduct_IDs) * self.cycle_time_hr
+#         effective_DBC = self.resin_DBC_g_L * self.load_safety_factor
+#         if effective_DBC > 0 and target_mass_per_cycle_kg > 0:
+#             resin_volume_L = (target_mass_per_cycle_kg * 1000) / effective_DBC
+#         else:
+#             resin_volume_L = 1.0  # Minimum volume for costing
+            
+#         D['Resin Volume (CV)'] = resin_volume_L
+#         D['Cycle time (hr)'] = self.cycle_time_hr
+#         D['Target Product Yield'] = self.TargetProduct_Yield * 100  # Convert to percentage
+#         D['Bound Impurity Removal'] = self.BoundImpurity_Removal * 100  # Convert to percentage
+        
+#         # Store CV values in design results for external access
+#         D['Equilibration CV'] = self.equilibration_CV
+#         D['Wash CV'] = self.wash_CV
+#         D['Elution CV'] = self.elution_CV
+#         D['Regeneration CV'] = self.regeneration_CV
+        
+#         # Cost the pump based on total liquid processed
+#         total_flow_stream = self.ins[0].copy()
+#         for s in self.ins[1:]:
+#             total_flow_stream.mass += s.mass
+        
+#         if total_flow_stream.F_mass > 0:
+#             self.pump.ins[0] = total_flow_stream
+#             self.pump.simulate()
+#             self.pump._design()
+#             self.power_utility.rate = self.pump.power_utility.rate
+    
+#     def _cost(self):
+#         C = self.baseline_purchase_costs
+#         D = self.design_results
+        
+#         resin_volume_L = D.get('Resin Volume (CV)', 0.0)
+        
+#         # Cost of the column hardware
+#         if resin_volume_L > 0:
+#             hw_cost = self.column_hardware_cost_factor * (resin_volume_L ** self.column_hardware_cost_exponent)
+#             C['IEX Column Hardware'] = bst.CE/500 * hw_cost # Adjust for CEPCI
+#         else:
+#             C['IEX Column Hardware'] = 0.0
+            
+#         # Cost of the resin (initial fill + replacements)
+#         if self.resin_lifetime_years > 0 and resin_volume_L > 0:
+#             # Number of times resin is replaced over the plant lifetime (default 20 years)
+#             plant_lifetime = getattr(self, 'F_construction', 20)  # Default to 20 years if not available
+#             replacements = plant_lifetime / self.resin_lifetime_years
+#             resin_cost = self.resin_cost_USD_per_L * resin_volume_L * replacements
+#             C['IEX Resin'] = resin_cost
+#         else:
+#             C['IEX Resin'] = 0.0
+            
+#         # Cost of the pump
+#         self.pump._cost()
+#         C['Pump'] = self.pump.purchase_cost
+
+# class IonExchangeCycle(bst.Unit):
+#     """
+#     Simulates a complete Ion Exchange (IEX) chromatography cycle as a
+#     steady-state equivalent unit operation.
+
+#     This unit models the loading, washing, elution, and regeneration steps.
+#     It separates the feed into three output streams: a concentrated product
+#     stream and two distinct waste streams (unbound components and regeneration).
+#     The required column size and buffer/chemical volumes are calculated based
+#     on the feed rate and target product concentration.
+
+#     Parameters
+#     ----------
+#     ins :
+#         [0] Feed: The process stream containing the target product and impurities.
+#         [1] Equilibration/Wash Buffer (Buffer A): Low-salt buffer.
+#         [2] Elution Buffer (Buffer B): High-salt buffer to elute the product.
+#         [3] Regeneration Solution: e.g., NaOH or high molar NaCl.
+#     outs :
+#         [0] Product: Concentrated target product in elution buffer.
+#         [1] Waste_Unbound: Combined stream from feed flow-through and wash steps.
+#         [2] Waste_Regeneration: Waste from the column regeneration step.
+
+#     cycle_time_hr : float
+#         Total duration of one complete IEX cycle (loading to regeneration), in hours.
+#     equilibration_CV : float
+#         Volume of equilibration buffer used, in multiples of Column Volumes (CV).
+#     wash_CV : float
+#         Volume of wash buffer used, in multiples of Column Volumes (CV).
+#     elution_CV : float
+#         Volume of elution buffer used, in multiples of Column Volumes (CV).
+#     regeneration_CV : float
+#         Volume of regeneration solution used, in multiples of Column Volumes (CV).
+#     resin_DBC_g_L : float
+#         Dynamic Binding Capacity of the resin in grams of product per liter of resin.
+#     load_safety_factor : float
+#         Safety factor for column loading, typically < 1.0 (e.g., 0.8 means column is
+#         loaded to 80% of its DBC).
+#     TargetProduct_IDs : tuple[str]
+#         IDs of the chemical(s) to be captured and eluted as product.
+#     TargetProduct_Yield : float
+#         Fraction of the target product in the feed that is recovered in the product stream.
+#     BoundImpurity_IDs : tuple[str]
+#         IDs of impurities that also bind to the resin but are removed during regeneration.
+#     BoundImpurity_Removal : float
+#         Fraction of bound impurities in the feed that are sent to the regeneration waste stream.
+#     NonBinding_Carryover : float
+#         Fraction of non-binding components that ends up in the product stream (due to void volume).
+
+#     # ... other costing parameters ...
+#     """
+#     # Changed to 3 outputs: Product, Waste (Unbound), Waste (Regeneration)
+#     _N_ins = 4
+#     _N_outs = 3
+
+#     _F_BM_default = {
+#         'IEX Column Hardware': 2.5,
+#         'IEX Resin': 1.5,
+#         'Pump': 1.89,
+#     }
+#     _auxiliary_unit_names = ('pump',)
+
+#     def __init__(self, ID='', ins=None, outs=(), thermo=None, *,
+#                  # Cycle parameters
+#                  cycle_time_hr=4.0,
+#                  equilibration_CV=5.0,
+#                  wash_CV=5.0,
+#                  elution_CV=3.0,
+#                  regeneration_CV=5.0,
+                 
+#                  # Sizing and separation parameters
+#                  resin_DBC_g_L=50.0,
+#                  load_safety_factor=0.8,
+#                  TargetProduct_IDs=('Leghemoglobin',),
+#                  TargetProduct_Yield=0.95,
+#                  BoundImpurity_IDs=('Heme_b',),
+#                  BoundImpurity_Removal=0.97,
+#                  NonBinding_Carryover=0.04,
+                 
+#                  # Costing parameters
+#                  resin_cost_USD_per_L=7.0,
+#                  resin_lifetime_years=1.0,
+#                  column_hardware_cost_factor=3000.0,
+#                  column_hardware_cost_exponent=0.6
+#                 ):
+#         bst.Unit.__init__(self, ID, ins, outs, thermo)
+
+#         # Operating parameters
+#         self.cycle_time_hr = cycle_time_hr
+#         self.equilibration_CV = equilibration_CV
+#         self.wash_CV = wash_CV
+#         self.elution_CV = elution_CV
+#         self.regeneration_CV = regeneration_CV
+
+#         # Separation parameters
+#         self.resin_DBC_g_L = resin_DBC_g_L
+#         self.load_safety_factor = load_safety_factor
+#         if isinstance(TargetProduct_IDs, str): self.TargetProduct_IDs = (TargetProduct_IDs,)
+#         else: self.TargetProduct_IDs = tuple(TargetProduct_IDs)
+#         self.TargetProduct_Yield = TargetProduct_Yield
+#         self.BoundImpurity_IDs = tuple(BoundImpurity_IDs)
+#         self.BoundImpurity_Removal = BoundImpurity_Removal
+#         self.NonBinding_Carryover = NonBinding_Carryover
+        
+#         # Costing
+#         self.resin_cost_USD_per_L = resin_cost_USD_per_L
+#         self.resin_lifetime_years = resin_lifetime_years
+#         self.column_hardware_cost_factor = column_hardware_cost_factor
+#         self.column_hardware_cost_exponent = column_hardware_cost_exponent
+        
+#         # Initialize internal pump for power calculation
+#         self.pump = bst.Pump(None, P=4 * 1e5) # Assume 4 bar pressure drop
+
+#     def _run(self):
+#         # Unpack streams
+#         feed, buffer_A, buffer_B, regen_sol = self.ins
+#         product, waste_unbound, waste_regeneration = self.outs
+        
+#         # Initialize output streams
+#         # Product stream is composed of elution buffer + eluted solutes
+#         product.copy_like(buffer_B)
+#         # Unbound waste is composed of feed flow-through + wash buffer + solutes
+#         waste_unbound.copy_like(feed)
+#         waste_unbound.mass += buffer_A.mass # Add equilibration/wash buffer
+#         # Regeneration waste is composed of regeneration solution + stripped solutes
+#         waste_regeneration.copy_like(regen_sol)
+        
+#         # Separate solutes from the feed stream
+#         for chem_ID in self.chemicals.IDs:
+#             solute_in_feed = feed.imass[chem_ID]
+#             if solute_in_feed < 1e-12: 
+#                 continue
+
+#             if chem_ID in self.TargetProduct_IDs:
+#                 # Target product is split between the product stream and unbound waste (yield loss)
+#                 to_product = solute_in_feed * self.TargetProduct_Yield
+#                 to_waste_unbound = solute_in_feed - to_product
+                
+#                 product.imass[chem_ID] += to_product
+#                 # The mass is already in waste_unbound via copy_like(feed), so we just subtract what went to product
+#                 waste_unbound.imass[chem_ID] -= to_product
+            
+#             elif chem_ID in self.BoundImpurity_IDs:
+#                 # Bound impurities are split between regeneration waste and product (co-elution)
+#                 to_waste_regen = solute_in_feed * self.BoundImpurity_Removal
+#                 to_product = solute_in_feed - to_waste_regen
+                
+#                 waste_regeneration.imass[chem_ID] += to_waste_regen
+#                 product.imass[chem_ID] += to_product
+#                 # This impurity was not in the original waste_unbound, so remove it completely
+#                 waste_unbound.imass[chem_ID] -= solute_in_feed
+
+#             else: # Non-binding components
+#                 # Non-binding components are split between unbound waste and product (carryover)
+#                 to_product = solute_in_feed * self.NonBinding_Carryover
+#                 to_waste_unbound = solute_in_feed - to_product
+                
+#                 product.imass[chem_ID] += to_product
+#                 # Adjust the mass in waste_unbound
+#                 waste_unbound.imass[chem_ID] -= to_product
+        
+#         # Set output temperatures based on the primary liquid source for each stream
+#         product.T = buffer_B.T
+#         waste_unbound.T = feed.T  # Assume wash buffer is at feed temperature
+#         waste_regeneration.T = regen_sol.T
+        
+#     def _design(self):
+#         # This method does not need changes, as the sizing logic remains the same.
+#         D = self.design_results
+        
+#         target_mass_per_cycle_kg = sum(self.ins[0].imass[ID] for ID in self.TargetProduct_IDs) * self.cycle_time_hr
+#         effective_DBC = self.resin_DBC_g_L * self.load_safety_factor
+#         if effective_DBC > 0 and target_mass_per_cycle_kg > 0:
+#             resin_volume_L = (target_mass_per_cycle_kg * 1000) / effective_DBC
+#         else:
+#             resin_volume_L = 1.0
+            
+#         D['Resin Volume (CV)'] = resin_volume_L
+#         D['Cycle time (hr)'] = self.cycle_time_hr
+#         D['Target Product Yield'] = self.TargetProduct_Yield * 100
+#         D['Bound Impurity Removal'] = self.BoundImpurity_Removal * 100
+        
+#         D['Equilibration CV'] = self.equilibration_CV
+#         D['Wash CV'] = self.wash_CV
+#         D['Elution CV'] = self.elution_CV
+#         D['Regeneration CV'] = self.regeneration_CV
+        
+#         total_flow_stream = self.ins[0].copy()
+#         for s in self.ins[1:]:
+#             total_flow_stream.mass += s.mass
+        
+#         if total_flow_stream.F_mass > 0:
+#             self.pump.ins[0] = total_flow_stream
+#             self.pump._simulate()
+#             self.pump._design()
+#             self.power_utility.rate = self.pump.power_utility.rate
+    
+#     def _cost(self):
+#         # This method also does not need changes.
+#         C = self.baseline_purchase_costs
+#         D = self.design_results
+        
+#         resin_volume_L = D.get('Resin Volume (CV)', 0.0)
+        
+#         if resin_volume_L > 0:
+#             hw_cost = self.column_hardware_cost_factor * (resin_volume_L ** self.column_hardware_cost_exponent)
+#             C['IEX Column Hardware'] = bst.CE/500 * hw_cost
+#         else:
+#             C['IEX Column Hardware'] = 0.0
+            
+#         if self.resin_lifetime_years > 0 and resin_volume_L > 0:
+#             plant_lifetime = bst.settings.get_plant_lifetime()
+#             replacements = plant_lifetime / self.resin_lifetime_years
+#             resin_cost = self.resin_cost_USD_per_L * resin_volume_L * replacements
+#             C['IEX Resin'] = resin_cost
+#         else:
+#             C['IEX Resin'] = 0.0
+            
+#         self.pump._cost()
+#         C['Pump'] = self.pump.purchase_cost
+
+# class IonExchangeCycle(bst.Unit):
+#     """
+#     Simulates a complete Ion Exchange (IEX) chromatography cycle as a
+#     steady-state equivalent unit operation.
+
+#     This unit models the loading of a feed stream, binding of target products,
+#     and subsequent washing, elution, and regeneration steps. It calculates the
+#     required volumes of all buffers and chemicals based on the column size,
+#     which is determined by the feed rate and target product concentration.
+
+#     Parameters
+#     ----------
+#     ins :
+#         [0] Feed: The process stream containing the target product and impurities.
+#         [1] Equilibration/Wash Buffer (Buffer A): Low-salt buffer.
+#         [2] Elution Buffer (Buffer B): High-salt buffer to elute the product.
+#         [3] Regeneration Solution: e.g., NaOH or high molar NaCl.
+#     outs :
+#         [0] Product: Concentrated target product in elution buffer.
+#         [1] Waste_Flowthrough_Wash: Combined stream from non-binding components and wash steps.
+#         [2] Waste_Regeneration: Waste from stripping the column during regeneration.
+
+#     cycle_time_hr : float
+#         Total duration of one complete IEX cycle (loading to regeneration), in hours.
+#     equilibration_CV : float
+#         Volume of equilibration buffer used, in multiples of Column Volumes (CV).
+#     wash_CV : float
+#         Volume of wash buffer used, in multiples of Column Volumes (CV).
+#     elution_CV : float
+#         Volume of elution buffer used, in multiples of Column Volumes (CV).
+#     regeneration_CV : float
+#         Volume of regeneration solution used, in multiples of Column Volumes (CV).
+#     resin_DBC_g_L : float
+#         Dynamic Binding Capacity of the resin in grams of product per liter of resin.
+#     load_safety_factor : float
+#         Safety factor for column loading, typically < 1.0 (e.g., 0.8 means column is
+#         loaded to 80% of its DBC).
+#     TargetProduct_IDs : tuple[str]
+#         IDs of the chemical(s) to be captured and eluted as product.
+#     TargetProduct_Yield : float
+#         Fraction of the target product in the feed that is recovered in the product stream.
+#     BoundImpurity_IDs : tuple[str]
+#         IDs of impurities that also bind to the resin but are mostly removed during regeneration.
+#     BoundImpurity_Removal : float
+#         Fraction of bound impurities in the feed that are sent to the regeneration waste stream.
+#     NonBinding_Carryover : float
+#         Fraction of non-binding components that ends up in the product stream.
+
+#     # ... other costing parameters ...
+#     """
+#     _N_ins = 4
+#     _N_outs = 3 # Changed to reflect the new waste stream separation
+
+#     _F_BM_default = {
+#         'IEX Column Hardware': 2.5,
+#         'IEX Resin': 1.5,
+#         'Pump': 1.89,
+#     }
+#     # Auxiliary units for costing
+#     _auxiliary_unit_names = ('pump',)
+
+#     def __init__(self, ID='', ins=None, outs=(), thermo=None, *,
+#                  # Cycle parameters
+#                  cycle_time_hr=4.0,
+#                  equilibration_CV=5.0,
+#                  wash_CV=5.0,
+#                  elution_CV=3.0,
+#                  regeneration_CV=5.0,
+
+#                  # Sizing and separation parameters
+#                  resin_DBC_g_L=50.0,
+#                  load_safety_factor=0.8,
+#                  TargetProduct_IDs=('Leghemoglobin',),
+#                  TargetProduct_Yield=0.95,
+#                  BoundImpurity_IDs=('Heme_b',),
+#                  BoundImpurity_Removal=0.97,
+#                  NonBinding_Carryover=0.04,
+
+#                  # Costing parameters
+#                  resin_cost_USD_per_L=7,
+#                  resin_lifetime_years=1.0,
+#                  column_hardware_cost_factor=3000.0,
+#                  column_hardware_cost_exponent=0.6
+#                 ):
+#         bst.Unit.__init__(self, ID, ins, outs, thermo)
+
+#         # Operating parameters
+#         self.cycle_time_hr = cycle_time_hr
+#         self.equilibration_CV = equilibration_CV
+#         self.wash_CV = wash_CV
+#         self.elution_CV = elution_CV
+#         self.regeneration_CV = regeneration_CV
+
+#         # Separation parameters
+#         self.resin_DBC_g_L = resin_DBC_g_L
+#         self.load_safety_factor = load_safety_factor
+#         if isinstance(TargetProduct_IDs, str): self.TargetProduct_IDs = (TargetProduct_IDs,)
+#         else: self.TargetProduct_IDs = tuple(TargetProduct_IDs)
+#         self.TargetProduct_Yield = TargetProduct_Yield
+#         self.BoundImpurity_IDs = tuple(BoundImpurity_IDs)
+#         self.BoundImpurity_Removal = BoundImpurity_Removal
+#         self.NonBinding_Carryover = NonBinding_Carryover
+
+#         # Costing
+#         self.resin_cost_USD_per_L = resin_cost_USD_per_L
+#         self.resin_lifetime_years = resin_lifetime_years
+#         self.column_hardware_cost_factor = column_hardware_cost_factor
+#         self.column_hardware_cost_exponent = column_hardware_cost_exponent
+
+#         # Initialize internal pump for power calculation
+#         self.pump = bst.Pump(None, P=4 * 1e5) # Assume 4 bar pressure drop
+
+#     def _run(self):
+#         # Unpack streams
+#         feed, buffer_A, buffer_B, regen_sol = self.ins
+#         product, waste_ft_wash, waste_regen = self.outs
+
+#         # Initialize output streams
+#         # Product is primarily the elution buffer
+#         product.copy_like(buffer_B)
+#         # Flow-through/wash waste is a mix of feed liquid and wash buffer
+#         waste_ft_wash.mix_from([feed, buffer_A])
+#         # Regeneration waste is primarily the regeneration solution
+#         waste_regen.copy_like(regen_sol)
+
+#         # Separate solutes from the feed stream
+#         for chem in self.chemicals:
+#             solute_in_feed = feed.imass[chem.ID]
+#             if solute_in_feed < 1e-12:
+#                 continue
+
+#             if chem.ID in self.TargetProduct_IDs:
+#                 # Target product binds and is then eluted
+#                 to_product = solute_in_feed * self.TargetProduct_Yield
+#                 # Unbound or lost product goes to the flow-through/wash waste
+#                 to_wash_waste = solute_in_feed - to_product
+
+#                 product.imass[chem.ID] += to_product
+#                 # This amount was already copied from feed, so no change needed for wash_waste
+#                 # We just need to ensure it's removed from the overall wash_waste balance later.
+#                 # Let's adjust by removing what went to product.
+#                 waste_ft_wash.imass[chem.ID] -= to_product
+
+#             elif chem.ID in self.BoundImpurity_IDs:
+#                 # Bound impurities bind and are removed during regeneration
+#                 to_regen_waste = solute_in_feed * self.BoundImpurity_Removal
+#                 # The remainder elutes with the product
+#                 to_product = solute_in_feed - to_regen_waste
+
+#                 waste_regen.imass[chem.ID] += to_regen_waste
+#                 product.imass[chem.ID] += to_product
+#                 # Since the entire impurity amount binds, it's fully removed from the flow-through
+#                 waste_ft_wash.imass[chem.ID] -= solute_in_feed
+
+#             else: # Non-binding components
+#                 # Most goes to flow-through/wash waste, but some carries over to product
+#                 to_product = solute_in_feed * self.NonBinding_Carryover
+#                 to_wash_waste = solute_in_feed - to_product
+
+#                 product.imass[chem.ID] += to_product
+#                 # Adjust the flow-through stream by removing the carry-over amount
+#                 waste_ft_wash.imass[chem.ID] -= to_product
+
+#         # Set output stream temperatures
+#         product.T = buffer_B.T
+#         waste_ft_wash.T = feed.T # Assumes feed temperature dominates this mixture
+#         waste_regen.T = regen_sol.T
+
+#     def _design(self):
+#         D = self.design_results
+
+#         # Calculate resin volume based on target product loading
+#         target_mass_per_cycle_kg = sum(self.ins[0].imass[ID] for ID in self.TargetProduct_IDs) * self.cycle_time_hr
+#         effective_DBC = self.resin_DBC_g_L * self.load_safety_factor
+#         if effective_DBC > 0 and target_mass_per_cycle_kg > 0:
+#             resin_volume_L = (target_mass_per_cycle_kg * 1000) / effective_DBC
+#         else:
+#             resin_volume_L = 1.0  # Minimum volume for costing
+
+#         D['Resin Volume (CV)'] = resin_volume_L
+#         D['Cycle time (hr)'] = self.cycle_time_hr
+#         D['Target Product Yield'] = self.TargetProduct_Yield * 100
+#         D['Bound Impurity Removal'] = self.BoundImpurity_Removal * 100
+
+#         # Store CV values in design results for external access
+#         D['Equilibration CV'] = self.equilibration_CV
+#         D['Wash CV'] = self.wash_CV
+#         D['Elution CV'] = self.elution_CV
+#         D['Regeneration CV'] = self.regeneration_CV
+
+#         # Cost the pump based on total liquid processed
+#         total_flow_stream = self.ins[0].copy()
+#         for s in self.ins[1:]:
+#             total_flow_stream.mass += s.mass
+
+#         if total_flow_stream.F_mass > 0:
+#             self.pump.ins[0] = total_flow_stream
+#             self.pump.simulate()
+#             self.pump._design()
+#             self.power_utility.rate = self.pump.power_utility.rate
+
+#     def _cost(self):
+#         C = self.baseline_purchase_costs
+#         D = self.design_results
+
+#         resin_volume_L = D.get('Resin Volume (CV)', 0.0)
+
+#         # Cost of the column hardware
+#         if resin_volume_L > 0:
+#             hw_cost = self.column_hardware_cost_factor * (resin_volume_L ** self.column_hardware_cost_exponent)
+#             C['IEX Column Hardware'] = bst.CE/500 * hw_cost
+#         else:
+#             C['IEX Column Hardware'] = 0.0
+
+#         # Cost of the resin
+#         if self.resin_lifetime_years > 0 and resin_volume_L > 0:
+#             plant_lifetime = getattr(self.system, 'lifetime', 30) # Get lifetime from system, default to 30
+#             replacements = plant_lifetime / self.resin_lifetime_years
+#             resin_cost = self.resin_cost_USD_per_L * resin_volume_L * replacements
+#             C['IEX Resin'] = resin_cost
+#         else:
+#             C['IEX Resin'] = 0.0
+
+#         # Cost of the pump
+#         self.pump._cost()
+#         C['Pump'] = self.pump.purchase_cost
 
 
 import flexsolve as flx
 from biosteam import main_flowsheet as F
-
 class IonExchangeCycle(bst.Unit):
     """
-    Simulates a complete Ion Exchange (IEX) chromatography cycle as a 
+    Simulates a complete Ion Exchange (IEX) chromatography cycle as a
     steady-state equivalent unit operation.
 
-    This unit models the loading of a feed stream, binding of target products, 
-    and subsequent washing, elution, and regeneration steps. It calculates the 
-    required volumes of all buffers and chemicals based on the column size, 
+    This unit models the loading of a feed stream, binding of target products,
+    and subsequent washing, elution, and regeneration steps. It calculates the
+    required volumes of all buffers and chemicals based on the column size,
     which is determined by the feed rate and target product concentration.
+    The waste streams are separated by cycle phase for downstream processing.
 
     Parameters
     ----------
@@ -866,8 +1525,10 @@ class IonExchangeCycle(bst.Unit):
         [3] Regeneration Solution: e.g., NaOH or high molar NaCl.
     outs :
         [0] Product: Concentrated target product in elution buffer.
-        [1] Waste: Combined stream from flow-through, wash, and regeneration.
-    
+        [1] FlowthroughWaste: Unbound components from the feed stream.
+        [2] WashWaste: Spent equilibration and wash buffer.
+        [3] RegenerationWaste: Spent regeneration solution with stripped impurities.
+
     cycle_time_hr : float
         Total duration of one complete IEX cycle (loading to regeneration), in hours.
     equilibration_CV : float
@@ -881,7 +1542,7 @@ class IonExchangeCycle(bst.Unit):
     resin_DBC_g_L : float
         Dynamic Binding Capacity of the resin in grams of product per liter of resin.
     load_safety_factor : float
-        Safety factor for column loading, typically < 1.0 (e.g., 0.8 means column is 
+        Safety factor for column loading, typically < 1.0 (e.g., 0.8 means column is
         loaded to 80% of its DBC).
     TargetProduct_IDs : tuple[str]
         IDs of the chemical(s) to be captured and eluted as product.
@@ -893,28 +1554,28 @@ class IonExchangeCycle(bst.Unit):
         Fraction of bound impurities in the feed that are sent to the waste stream.
     NonBinding_Carryover : float
         Fraction of non-binding components that ends up in the product stream.
-    
+
     # ... other costing parameters ...
     """
     _N_ins = 4
-    _N_outs = 2
+    _N_outs = 4 # Changed from 2 to 4
 
     _F_BM_default = {
         'IEX Column Hardware': 2.5,
-        'IEX Resin': 1.5, #1.0,
+        'IEX Resin': 1.5,
         'Pump': 1.89,
     }
     # Auxiliary units for costing
     _auxiliary_unit_names = ('pump',)
 
     def __init__(self, ID='', ins=None, outs=(), thermo=None, *,
-                 # Cycle parameters - keeping all CV values
+                 # Cycle parameters
                  cycle_time_hr=4.0,
                  equilibration_CV=5.0,
                  wash_CV=5.0,
                  elution_CV=3.0,
                  regeneration_CV=5.0,
-                 
+
                  # Sizing and separation parameters
                  resin_DBC_g_L=50.0,
                  load_safety_factor=0.8,
@@ -923,21 +1584,16 @@ class IonExchangeCycle(bst.Unit):
                  BoundImpurity_IDs=('Heme_b',),
                  BoundImpurity_Removal=0.97,
                  NonBinding_Carryover=0.04,
-                 
+
                  # Costing parameters
-                 resin_cost_USD_per_L=7,#1500.0,
-                 # strong acid cation resin: 2~5
-                    # weak acid cation resin: 3 ~ 6
-                    # strong base anion resin: 7~15
-                    # weak base anion resin: 5~10
-                 # 4000~10000
+                 resin_cost_USD_per_L=7.0,
                  resin_lifetime_years=1.0,
                  column_hardware_cost_factor=3000.0,
                  column_hardware_cost_exponent=0.6
                 ):
         bst.Unit.__init__(self, ID, ins, outs, thermo)
 
-        # Operating parameters - preserving all CV values for external use
+        # Operating parameters
         self.cycle_time_hr = cycle_time_hr
         self.equilibration_CV = equilibration_CV
         self.wash_CV = wash_CV
@@ -953,112 +1609,137 @@ class IonExchangeCycle(bst.Unit):
         self.BoundImpurity_IDs = tuple(BoundImpurity_IDs)
         self.BoundImpurity_Removal = BoundImpurity_Removal
         self.NonBinding_Carryover = NonBinding_Carryover
-        
+
         # Costing
         self.resin_cost_USD_per_L = resin_cost_USD_per_L
         self.resin_lifetime_years = resin_lifetime_years
         self.column_hardware_cost_factor = column_hardware_cost_factor
         self.column_hardware_cost_exponent = column_hardware_cost_exponent
-        
+
         # Initialize internal pump for power calculation
         self.pump = bst.Pump(None, P=4 * 1e5) # Assume 4 bar pressure drop
-        
+
     def _run(self):
         # Unpack streams
         feed, buffer_A, buffer_B, regen_sol = self.ins
-        product, waste = self.outs
-        
-        # Simply copy streams without volume modifications - volumes are set externally
+        product, ft_waste, wash_waste, regen_waste = self.outs
+
+        # --- Initialize Output Streams ---
+        # The product stream is primarily elution buffer
         product.copy_like(buffer_B)
-        waste.copy_like(feed)
-        waste.mass += buffer_A.mass + regen_sol.mass
-        
-        # Process each component in the feed for ion exchange separation
+        # The flowthrough waste initially contains everything from the feed
+        ft_waste.copy_like(feed)
+        # The wash waste is simply the spent wash buffer
+        wash_waste.copy_like(buffer_A)
+        # The regeneration waste is primarily the regeneration solution
+        regen_waste.copy_like(regen_sol)
+
+        # Create sets for faster checking
+        target_ids = set(self.TargetProduct_IDs)
+        bound_impurity_ids = set(self.BoundImpurity_IDs)
+
+        # --- Distribute Solutes from the Feed Stream ---
+        # Iterate over all components in the feed and assign them to the correct output
         for chem in self.chemicals:
             solute_in_feed = feed.imass[chem.ID]
-            if solute_in_feed < 1e-12: 
+            if solute_in_feed < 1e-12:
                 continue
 
-            if chem.ID in self.TargetProduct_IDs:
-                # Target products: mostly go to product, remainder to waste
+            if chem.ID in target_ids:
+                # Target product binds, then elutes or is stripped in regeneration
                 to_product = solute_in_feed * self.TargetProduct_Yield
-                to_waste = solute_in_feed - to_product
-            elif chem.ID in self.BoundImpurity_IDs:
-                # Bound impurities: mostly removed to waste, some carryover to product
-                to_waste = solute_in_feed * self.BoundImpurity_Removal
-                to_product = solute_in_feed - to_waste
-            else: 
-                # Non-binding components: mostly to waste, some carryover to product
-                to_product = solute_in_feed * self.NonBinding_Carryover
-                to_waste = solute_in_feed - to_product
-            
-            product.imass[chem.ID] += to_product
-            waste.imass[chem.ID] -= solute_in_feed - to_waste  # Remove from feed portion in waste
-        
-        # Set temperatures
+                to_regen = solute_in_feed - to_product
+
+                product.imass[chem.ID] += to_product
+                regen_waste.imass[chem.ID] += to_regen
+                # Remove the entire component from flowthrough, as it binds
+                ft_waste.imass[chem.ID] = 0
+
+            elif chem.ID in bound_impurity_ids:
+                # Bound impurities bind, then are mostly stripped in regeneration
+                to_regen = solute_in_feed * self.BoundImpurity_Removal
+                to_product = solute_in_feed - to_regen
+
+                product.imass[chem.ID] += to_product
+                regen_waste.imass[chem.ID] += to_regen
+                # Remove the entire component from flowthrough, as it binds
+                ft_waste.imass[chem.ID] = 0
+
+            else:
+                # Non-binding components mostly go to flowthrough, with some carryover
+                # This applies to water, salts in the feed, and other impurities
+                carryover_to_product = solute_in_feed * self.NonBinding_Carryover
+                
+                product.imass[chem.ID] += carryover_to_product
+                # The rest remains in the flowthrough, so we subtract the carryover part
+                ft_waste.imass[chem.ID] -= carryover_to_product
+
+        # --- Set Final Stream Temperatures ---
         product.T = buffer_B.T
-        waste.T = feed.T
-        
+        ft_waste.T = feed.T
+        wash_waste.T = buffer_A.T
+        regen_waste.T = regen_sol.T
+
     def _design(self):
+        # This method remains unchanged, as it is based on inputs.
         D = self.design_results
-        
-        # Calculate resin volume based on target product loading for design record
+
+        # Calculate resin volume based on target product loading
         target_mass_per_cycle_kg = sum(self.ins[0].imass[ID] for ID in self.TargetProduct_IDs) * self.cycle_time_hr
         effective_DBC = self.resin_DBC_g_L * self.load_safety_factor
         if effective_DBC > 0 and target_mass_per_cycle_kg > 0:
             resin_volume_L = (target_mass_per_cycle_kg * 1000) / effective_DBC
         else:
             resin_volume_L = 1.0  # Minimum volume for costing
-            
+
         D['Resin Volume (CV)'] = resin_volume_L
         D['Cycle time (hr)'] = self.cycle_time_hr
-        D['Target Product Yield'] = self.TargetProduct_Yield * 100  # Convert to percentage
-        D['Bound Impurity Removal'] = self.BoundImpurity_Removal * 100  # Convert to percentage
-        
-        # Store CV values in design results for external access
+        D['Target Product Yield'] = self.TargetProduct_Yield * 100
+        D['Bound Impurity Removal'] = self.BoundImpurity_Removal * 100
+
+        # Store CV values in design results
         D['Equilibration CV'] = self.equilibration_CV
         D['Wash CV'] = self.wash_CV
         D['Elution CV'] = self.elution_CV
         D['Regeneration CV'] = self.regeneration_CV
-        
+
         # Cost the pump based on total liquid processed
         total_flow_stream = self.ins[0].copy()
         for s in self.ins[1:]:
             total_flow_stream.mass += s.mass
-        
+
         if total_flow_stream.F_mass > 0:
             self.pump.ins[0] = total_flow_stream
             self.pump.simulate()
             self.pump._design()
             self.power_utility.rate = self.pump.power_utility.rate
-    
+
     def _cost(self):
+        # This method remains unchanged.
         C = self.baseline_purchase_costs
         D = self.design_results
-        
+
         resin_volume_L = D.get('Resin Volume (CV)', 0.0)
-        
+
         # Cost of the column hardware
         if resin_volume_L > 0:
             hw_cost = self.column_hardware_cost_factor * (resin_volume_L ** self.column_hardware_cost_exponent)
-            C['IEX Column Hardware'] = bst.CE/500 * hw_cost # Adjust for CEPCI
+            C['IEX Column Hardware'] = bst.CE / 500 * hw_cost
         else:
             C['IEX Column Hardware'] = 0.0
-            
+
         # Cost of the resin (initial fill + replacements)
         if self.resin_lifetime_years > 0 and resin_volume_L > 0:
-            # Number of times resin is replaced over the plant lifetime (default 20 years)
-            plant_lifetime = getattr(self, 'F_construction', 20)  # Default to 20 years if not available
+            plant_lifetime = getattr(F.stream, 'plant_life', 20)
             replacements = plant_lifetime / self.resin_lifetime_years
             resin_cost = self.resin_cost_USD_per_L * resin_volume_L * replacements
             C['IEX Resin'] = resin_cost
         else:
             C['IEX Resin'] = 0.0
-            
+
         # Cost of the pump
         self.pump._cost()
         C['Pump'] = self.pump.purchase_cost
-
 
 
 class SprayDryer(bst.SprayDryer):pass
