@@ -244,6 +244,7 @@ class AeratedFermentation(bst.AeratedBioreactor):
         #     min_O2_consumption = initial_glucose * 0.1  # 10% of glucose as minimum O2 consumption
         #     effluent.imol['O2'] = max(0, initial_O2 - min_O2_consumption)
 
+
 class PSA(bst.Flash): 
     _units= {'Liquid flow': 'kg/hr'}
     

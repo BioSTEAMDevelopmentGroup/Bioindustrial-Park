@@ -81,7 +81,7 @@ def create_LegH_system(
     dT_hx_loop = 8 # [degC]
     cooler_pressure_drop = 20684 # [Pa]
     compressor_isentropic_efficiency = 0.85
-    V_max = 100 # [m3] #here cause pressure vessel design problem
+    V_max = 500 # [m3] #here cause pressure vessel design problem
     titer = 7.27 # [g / L]
     productivity = titer / 72 # [g / L / h]
     Y_p = titer * 5 / 1300 # [by wt] 3 wt%
