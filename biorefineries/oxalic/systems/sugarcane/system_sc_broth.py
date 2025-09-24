@@ -619,9 +619,9 @@ spec = ProcessSpecification(
     
     
     # !!! set baseline fermentation performance here
-    baseline_yield = 0.16/theoretical_max_g_oxalic_per_g_glucose,
-    baseline_titer = 40.3,
-    baseline_productivity = 0.85,
+    baseline_yield = 0.2/theoretical_max_g_oxalic_per_g_glucose,
+    baseline_titer = 28.23,
+    baseline_productivity = 0.24,
     
     
     tolerable_HXN_energy_balance_percent_error = 0.01,
