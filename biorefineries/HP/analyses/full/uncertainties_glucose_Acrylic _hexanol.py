@@ -23,7 +23,7 @@ print('\n\nLoading system ...')
 # from biorefineries
 # from biorefineries import HP
 from biorefineries import HP
-from biorefineries.HP.models.glucose import models_glucose_improved_separations as models
+from biorefineries.HP.models.glucose import models_glucose_hexanol as models
 from biorefineries.HP.process_settings import chem_index
 # models = HP.models
 # from . import models
@@ -142,6 +142,7 @@ for i in range(len(modes)):
                             'TiO2': 'titanium dioxide catalyst', 
                             'CSL': 'corn steep liquor',
                             'CH4': 'natural gas\n(for steam generation)',
+                            'Hexanol': 'hexanol',
                             } # materials shown as distinct contributions in breakdown plot;
                               # others, except feedstock, are lumped in 'other materials' for figure clarity
     

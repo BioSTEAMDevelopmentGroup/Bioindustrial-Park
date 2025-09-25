@@ -50,6 +50,15 @@ product = AA
 
 AA_market_range=np.array([1.40, 1.65]) 
 
+fossilbased_GWPs = [
+                2.2414 + HP_lca.EOL_GWP, # ecoinvent 3.8 (acrylic acid production, RoW) cradle-to-gate + EOL
+                5.9589 # GREET 2023 (acrylic acid from fossil energy) cradle-to-grave
+                ]
+fossilbased_FECs = [
+                49.013, # ecoinvent 3.8 (acrylic acid production, RoW)
+                116. # GREET 2023 (acrylic acid from fossil energy)
+                ]
+
                 
 #%% Filepaths
 HP_filepath = HP.__file__.replace('\\__init__.py', '')
@@ -62,7 +71,7 @@ HP_results_filepath = HP_filepath + '\\analyses\\results\\'
 
 #%% Load baseline
 
-spec.reactor.neutralization = False # !!! set neutralization here
+spec.reactor.neutralization = True # !!! set neutralization here
 
 model = models.HP_model
 system = HP_sys = models.HP_sys
@@ -72,7 +81,13 @@ get_AA_MPSP()
 feedstock_tag = 'sugarcane'
 product_tag = 'Acrylic'
 
-mode = '300L_FGI'
+
+# mode = '300L_FGI' # !!! remember to switch if running FGI analyses
+
+mode = 'DASbox'
+
+if mode == 'DASbox':
+    spec.baseline_productivity = 0.548
 
 dist_filename = f'parameter-distributions_{feedstock_tag}_{product_tag}_' + mode + '.xlsx'
 
@@ -198,17 +213,22 @@ HP_metrics = [get_product_MPSP,
 steps = (50, 50, 1)
 
 # Yield, titer, productivity (rate)
-spec_1 = yields = np.linspace(0.05, 0.75, steps[0]) # yield
-spec_2 = titers = np.linspace(10., 
+# spec_1 = yields = np.linspace(0.05, 0.75, steps[0]) # yield
+# spec_2 = titers = np.linspace(5, 
+#                               200.,
+#                                 steps[1]) # titer
+# spec_1 = yields = np.linspace(0.05, 0.75, steps[0]) # yield # !!! for FGI
+spec_1 = yields = np.linspace(0.05, 0.95, steps[0]) # yield
+spec_2 = titers = np.linspace(10, 
                               200.,
                                 steps[1]) # titer
 
-   
+
 spec_3 = productivities =\
     np.array([
-               # 0.2*spec.baseline_productivity,
-              # 1.*spec.baseline_productivity,
-               5.*spec.baseline_productivity,
+                # 0.2*spec.baseline_productivity,
+                1.*spec.baseline_productivity, # !!!
+                # 5.*spec.baseline_productivity,
               ])
 
 
@@ -620,7 +640,7 @@ if smoothing:
                         #             print(i,j,k)
                     
 #%% Plots
-plot = False
+plot = True
 
 if plot: 
     
@@ -671,17 +691,17 @@ if plot:
                                     # manual_clabels_regular = {
                                     #     MPSP_w_ticks[5]: (45,28),
                                     #     },
-                                    additional_points ={(73, 62.5):('h', 'w', 6)},
+                                    # additional_points ={(73, 62.5):('D', 'w', 6)},
                                     # fill_bottom_with_cmap_over_color=True, # for TRY
-                                    bottom_fill_bounds = ((0,0), 
-                                                          (5,18.),
-                                                          (95,18.)),
-                                    # zoom_data_scale=5,
-                                    text_boxes = {'>4.00': [(5,5), 'white']},
+                                    # bottom_fill_bounds = ((0,0), 
+                                    #                       (5,25.),
+                                    #                       (95,10.)),
+                                    # # zoom_data_scale=5,
+                                    # text_boxes = {'>4.00': [(5,5), 'white']},
                                     
                                     add_shapes = {
                                         # coords as tuple of tuples: (color, zorder),
-                                        ((0,0), (48,200), (1,200)): ('white', 2), # infeasible region smoothing
+                                        ((0,0), (38,200), (1,200)): ('white', 2), # infeasible region smoothing
                                         },
                                     units_on_newline = (False, False, False, False), # x,y,z,w
                                     units_opening_brackets = [" (",] * 4,
@@ -692,9 +712,10 @@ if plot:
     #%% GWP
     
     # GWP_w_levels, GWP_w_ticks, GWP_cbar_ticks = get_contour_info_from_metric_data(results_metric_2,)
-    GWP_w_levels = np.arange(-4, 6.01, 0.2)
-    GWP_cbar_ticks = np.arange(-4, 6.01, 2.)
-    GWP_w_ticks = [-4, -3, -2, -1., 0, 1,2,  3,4,6]
+    # GWP_w_levels, GWP_w_ticks, GWP_cbar_ticks = get_contour_info_from_metric_data(results_metric_2,)
+    GWP_w_levels = np.arange(0, 12.01, 0.2)
+    GWP_cbar_ticks = np.arange(0, 12.01, 2.)
+    GWP_w_ticks = [-0.5, 0, 1, 2, 3, 12]
     contourplots.animated_contourplot(w_data_vs_x_y_at_multiple_z=results_metric_2, # shape = z * x * y # values of the metric you want to plot on the color axis; e.g., GWP
                                     x_data=100*yields, # x axis values
                                     y_data=titers, # y axis values
@@ -727,19 +748,22 @@ if plot:
                                     clabel_fontsize = clabel_fontsize,
                                     default_fontsize = default_fontsize,
                                     axis_tick_fontsize = axis_tick_fontsize,
+                                    
+                                    comparison_range=fossilbased_GWPs,
+                                    
                                     n_minor_ticks = 1,
                                     cbar_n_minor_ticks = 4,
-                                    additional_points ={(73, 62.5):('h', 'w', 6)},
+                                    # additional_points ={(73, 62.5):('p', 'w', 6)},
                                     # fill_bottom_with_cmap_over_color=True, # for TRY
                                     # bottom_fill_bounds = ((0,0), 
-                                    #                       (5,18.),
-                                    #                       (95,18.)),
+                                    #                       (5,25.),
+                                    #                       (95,10.)),
                                     # zoom_data_scale=5,
-                                    text_boxes = {'>6.00': [(60,5), 'white']},
+                                    # text_boxes = {'>12.0': [(5,5), 'white']},
                                     
                                     add_shapes = {
                                         # coords as tuple of tuples: (color, zorder),
-                                        ((0,0), (48,200), (1,200)): ('white', 2), # infeasible region smoothing
+                                        ((0,0), (38,200), (1,200)): ('white', 2), # infeasible region smoothing
                                         },
                                     units_on_newline = (False, False, False, False), # x,y,z,w
                                     units_opening_brackets = [" (",] * 4,
@@ -754,7 +778,7 @@ if plot:
     # FEC_w_levels, FEC_w_ticks, FEC_cbar_ticks = get_contour_info_from_metric_data(results_metric_3,)
     FEC_w_levels = np.arange(-100, 101, 10)
     FEC_cbar_ticks = np.arange(-100, 101, 20)
-    FEC_w_ticks = [-100, -60, -30, 0, 30, 60, 100]
+    FEC_w_ticks = [-100, -60, -10, 0, 15, 30, 60, 100]
     # FEC_w_ticks = [40, 50, 70, 80, 100]
     contourplots.animated_contourplot(w_data_vs_x_y_at_multiple_z=results_metric_3, # shape = z * x * y # values of the metric you want to plot on the color axis; e.g., FEC
                                     x_data=100*yields, # x axis values
@@ -791,7 +815,7 @@ if plot:
                                     axis_tick_fontsize = axis_tick_fontsize,
                                     n_minor_ticks = 1,
                                     cbar_n_minor_ticks = 1,
-                                    additional_points ={(73, 62.5):('h', 'w', 6)},
+                                    # additional_points ={(73, 62.5):('h', 'w', 6)},
                                     # fill_bottom_with_cmap_over_color=True, # for TRY
                                     # bottom_fill_bounds = ((0,0), 
                                     #                       (5,18.),

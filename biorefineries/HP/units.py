@@ -877,7 +877,7 @@ class BatchCoFermentation(BatchBioreactor):
     tau_0 = 3
     
     #: [float] Fraction of filled tank to total tank volume.
-    V_wf = 0.5 # !!!
+    V_wf = 100/300 # DASbox working volume fraction
     
     # autoselect_N  = True
     
