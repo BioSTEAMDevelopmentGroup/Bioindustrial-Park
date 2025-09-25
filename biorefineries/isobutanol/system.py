@@ -4,15 +4,15 @@ Created on Tue Sep 23 23:27:48 2025
 
 @author: saran
 """
-
+import numpy as np
 import biosteam as bst
 import thermosteam as tmo
-from biorefineries import corn
 
+from biorefineries import corn
 from biorefineries.isobutanol import units
 
 
-# __all__ = ('corn_EtOH_IBO_sys',)
+__all__ = ('corn_EtOH_IBO_sys',)
 
 corn_chems_compiled = corn.chemicals.create_chemicals()
 chems = [c for c in corn_chems_compiled]
@@ -159,6 +159,14 @@ M403-0-0-f.V601
 #%% Add storage for isobutanol product
 V514 = bst.StorageTank('V514', ins=H401-0, outs=('isobutanol'), tau=7*24)
 
+V514.isobutanol_price = 1.43
+
+@V514.add_specification(run=False)
+def V514_update_IBO_price():
+    V514._run()
+    ibo = V514.outs[0]
+    ibo.price = V514.isobutanol_price * ibo.imass['Isobutanol']/ibo.F_mass
+    
 #%% Create corn to ethanol + isobutanol system
 
 recovery_units = [S404,
@@ -181,7 +189,7 @@ f.makeup_isopentyl_acetate.price = 3.2 # https://www.alibaba.com/product-detail/
 
 #%% Create TEA object
 
-corn_EtOH_IBO_sys_tea = corn.tea.create_tea(corn_EtOH_IBO_sys)
+corn_EtOH_IBO_sys._TEA = corn_EtOH_IBO_sys_tea = corn.tea.create_tea(corn_EtOH_IBO_sys)
 
 #%% Simulate and solve TEA
 corn_EtOH_IBO_sys.simulate()
