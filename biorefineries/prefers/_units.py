@@ -529,10 +529,16 @@ class Diafiltration(bst.Unit):
     def _run(self):
         feed, wash_solution = self.ins
         retentate, permeate = self.outs
-
-        # Temperature and pressure logic remains the same
-        retentate.T = permeate.T = feed.T
-        retentate.P = permeate.P = feed.P
+        
+        _mixed_stream = bst.Stream()
+        _mixed_stream.mol = feed.mol + wash_solution.mol
+        _mixed_stream.H = feed.H + wash_solution.H
+        
+        # Assign the correct temperature and pressure
+        retentate.T = permeate.T = _mixed_stream.T
+        retentate.P = permeate.P = _mixed_stream.P
+        # retentate.T = permeate.T = feed.T
+        # retentate.P = permeate.P = feed.P
 
         permeate.empty()
         retentate.empty() # Start with empty streams for clarity
@@ -1709,6 +1715,7 @@ class IonExchangeCycle(bst.Unit):
                 ft_waste.imass[chem.ID] -= carryover_to_product
 
         # --- Set Final Stream Temperatures ---
+    
         product.T = buffer_B.T
         ft_waste.T = feed.T
         wash_waste.T = buffer_A.T

@@ -142,28 +142,28 @@ def create_LegH_system(
     """
     Upstream Process
     """
-    M30 = bst.MixTank('M30', ins=[SeedIn1,'Water0'], outs='M30Out', tau=16)
-    @M30.add_specification(run=True)
+    M301 = bst.MixTank('M301', ins=[SeedIn1,'Water1'], outs='M301Out', tau=16)
+    @M301.add_specification(run=True)
     def update_seed1_inputs():
         target_stream = bst.Stream(**s.SeedSolution1)
         SeedIn1.imass['Seed'] = target_stream.imass['Seed']
-        M30.ins[1].imass['H2O'] = target_stream.imass['H2O']
-        M30.ins[1].T = 25+273.15
+        M301.ins[1].imass['H2O'] = target_stream.imass['H2O']
+        M301.ins[1].T = 25+273.15
     
-    M31 = bst.MixTank('M31', ins=[SeedIn2,CultureIn,'Water00'], outs='M31Out', tau=16)
-    @M31.add_specification(run=True)
+    M302 = bst.MixTank('M302', ins=[SeedIn2,CultureIn,'Water2'], outs='M302Out', tau=16)
+    @M302.add_specification(run=True)
     def update_culture_inputs():
         target_stream = bst.Stream(**s.SeedSolution2)
         SeedIn2.imass['Seed'] = target_stream.imass['Seed']
-        M31.ins[2].imass['H2O'] = target_stream.imass['H2O']
-        M31.ins[2].T = 25+273.15
+        M302.ins[2].imass['H2O'] = target_stream.imass['H2O']
+        M302.ins[2].T = 25+273.15
         CultureIn.imass['Culture'] = target_stream.imass['SeedSolution']*(0.1+60+0.15191)/1000
 
-    M301 = bst.Mixer('M301', ins=[M30-0, M31-0], outs='M301Out')
+    M303 = bst.Mixer('M303', ins=[M301-0, M302-0], outs='M303Out')
 
     R301 = u.SeedTrain(
         'R301',
-        ins=[M301-0],
+        ins=[M303-0],
         outs=[vent1, 'R301Out'],
         reactions=bst.PRxn([cell_growth_reaction, respiration_reaction1]),
         saccharification=None,
@@ -171,14 +171,14 @@ def create_LegH_system(
     )
     R301.add_specification(run=True)
     
-    M302 = bst.MixTank('M302', ins=[Glucose,'Water1'], outs='M302Out', tau=16)
+    M304 = bst.MixTank('M304', ins=[Glucose,'Water3'], outs='M304Out', tau=16)
     
-    @M302.add_specification(run=True)
+    @M304.add_specification(run=True)
     def update_water_content():
-        M302.ins[1].imass['H2O'] = Glucose.imass['Glucose']/2
-        M302.ins[1].T = 25+273.15
+        M304.ins[1].imass['H2O'] = Glucose.imass['Glucose']/2
+        M304.ins[1].T = 25+273.15
     
-    T301 = bst.StorageTank('T301', ins=M302-0, outs='T301Out',tau=16*4+72)
+    T301 = bst.StorageTank('T301', ins=M304-0, outs='T301Out',tau=16*4+72)
 
     T302 = bst.StorageTank('T302', ins=NH3_25wt, outs='T302Out',tau=16*5+72)
 
@@ -244,16 +244,24 @@ def create_LegH_system(
     # )
     # E401.add_specification(run=True)
 
-    M401 = bst.MixTank('M401', ins=(DfUltraBuffer, 'Water2'), 
+    M401 = bst.MixTank('M401', ins=(DfUltraBuffer, 'Water4'), 
                     outs='M401Out', tau=1) 
     @M401.add_specification(run=True)
     def update_DfUltraBuffer_initial():
         M401.ins[1].imass['H2O'] = (S402-1).imass['H2O']*4
         M401.ins[0].imol['DfUltraBuffer'] = ((S402-1).imass['H2O']*4)*(0.025+0.01+0.001)/1000
 
+    H401 = bst.HXutility(
+        'H401',
+        ins=M401-0,
+        outs='H401Out',
+        T=5+273.15,  # Cool to 5°C
+        cool_only=True,
+    )
+
     U401 = u.Diafiltration(
         'U401',
-        ins = (S404-1, M401-0),
+        ins = (S404-1, H401-0),
         outs = ('U401Out','PermeateWasteUltra'),
         TargetProduct_ID = 'Leghemoglobin',
         Salt_ID = c.chemical_groups['Salts'],
@@ -266,16 +274,38 @@ def create_LegH_system(
     #S404 = bst.SolidsSeparator('S404', ins=U401-1, outs=(effluent2, 'S404Out'), split=(1) , moisture_content=0.01)
     #S405 = u.ReverseOsmosis('S405', ins=U401-1, outs=('S405Out',effluent2))
 
-    M402 = bst.MixTank('M402', ins=(IXEquilibriumBuffer,'Water3'), 
+    M402 = bst.MixTank('M402', ins=(IXEquilibriumBuffer,'Water5'), 
                     outs='M402Out', tau=1)
-    M403 = bst.MixTank('M403', ins=(IXElutionBuffer,'Water4'),
+    M403 = bst.MixTank('M403', ins=(IXElutionBuffer,'Water6'),
                     outs='M403Out', tau=1)
-    M404 = bst.MixTank('M404', ins=(IXRegenerationSolution,'Water5'), 
+    M404 = bst.MixTank('M404', ins=(IXRegenerationSolution,'Water7'), 
                     outs='M404Out', tau=1)
+
+    H402 = bst.HXutility(
+        'H402',
+        ins=M402-0,
+        outs='H402Out',
+        T=5+273.15,  # Cool to 5°C
+        cool_only=True,
+    )
+    H403 = bst.HXutility(
+        'H403',
+        ins=M403-0,
+        outs='H403Out',
+        T=5+273.15,  # Cool to 5°C
+        cool_only=True,
+    )
+    H404 = bst.HXutility(
+        'H404', 
+        ins=M404-0,
+        outs='H404Out',
+        T=5+273.15,  # Cool to 5°C
+        cool_only=True,
+    )
 
     U402 = u.IonExchangeCycle(
         'U402',
-        ins = (U401-0,M402-0,M403-0,M404-0),
+        ins = (U401-0, H402-0, H403-0, H404-0),
         outs = ('U402Out','FlowthroughWaste','WashWaste',effluent2),#'RegenerationWaste'),
         TargetProduct_IDs = c.chemical_groups['LegHIngredients'],
         BoundImpurity_IDs=c.chemical_groups['BoundImpurities'],
@@ -297,16 +327,24 @@ def create_LegH_system(
     #S405 = bst.SolidsSeparator('S405', ins=U402-1, outs=(effluent3, 'S405Out'), split=(1) , moisture_content=0.01)
     #S406 = u.ReverseOsmosis('S406', ins=U402-1, outs=('S406Out',effluent3))
 
-    M405 = bst.MixTank('M405', ins=(DfNanoBuffer,'Water6'), 
+    M405 = bst.MixTank('M405', ins=(DfNanoBuffer,'Water8'), 
                     outs='M405Out', tau=1)
     @M405.add_specification(run=True)
     def update_DfNanoBuffer_initial():
         M405.ins[1].imass['H2O'] = (U402-0).imass['H2O']*2
         M405.ins[0].imol['DfNanoBuffer'] = ((U402-0).imass['H2O']*2)*(0.01+0.01)/1000
 
+    H405 = bst.HXutility(
+        'H405',
+        ins=M405-0,
+        outs='H405Out',
+        T=5+273.15,  # Cool to 5°C
+        cool_only=True,
+    )
+
     U403 = u.Diafiltration(
         'U403',
-        ins = (U402-0, M405-0),
+        ins = (U402-0, H405-0),
         outs = ('U403Out','PermeateWasteNano'),
         TargetProduct_ID = 'Leghemoglobin',
         membrane_cost_USD_per_m2=250, # Nanomembrane cost
@@ -339,8 +377,8 @@ def create_LegH_system(
 
     # effluent2 to neutralization and then to biological treatment
 
-    H401 = bst.HXutility(
-        'H401',
+    H406 = bst.HXutility(
+        'H406',
         ins=S408-1,
         outs=LegH_3,
         T=0+273.15,  # Cool to 0°C
@@ -362,7 +400,7 @@ def create_LegH_system(
     makeup_water_streams = (F.cooling_tower_makeup_water,
                             F.Water1, F.Water2,
                             F.Water3, F.Water4,
-                            F.Water5, F.Water6,F.CultureIn
+                            F.Water5, F.Water6,F.Water7,F.Water8
                             )#F.imbibition_water,
                             #F.boiler_makeup_water)
     process_water_streams = (F.S405.outs[1],
