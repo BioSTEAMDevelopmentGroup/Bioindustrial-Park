@@ -219,7 +219,7 @@ if __name__ == '__main__':
     legH_sys = create_LegH_system()
     legH_sys.simulate()  # Simulate the system to ensure all units are ready
     legH_tea = PreFerSTEA(
-        system=legH_sys, IRR=0.18, duration=(2025, 2045), depreciation='IRAS6',
+        system=legH_sys, IRR=0.18, duration=(2024, 2044), depreciation='IRAS6',
         income_tax=0.17, operating_days=333, lang_factor=None,
         construction_schedule=(0.15, 0.60, 0.25), WC_over_FCI=0.15,
         labor_cost=3e6, fringe_benefits=0.17, property_tax=0.005,

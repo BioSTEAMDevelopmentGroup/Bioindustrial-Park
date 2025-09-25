@@ -454,11 +454,22 @@ class Diafiltration(bst.Unit):
     _default_membrane_flux_LMH = 40.0 # ultra: 20~80, nano: 10~40
     _default_TMP_bar1 = 2.0 # ultra: 2~4, nano: 10 ~25
     _default_TMP_bar2 = 2.0 # ultra: 1.5~3, nano: 3~6
-    _default_membrane_cost_USD_per_m2 = 100.0 
+    _default_membrane_cost_USD_per_m2 = 150.0
+    # Industry	Membrane Type	Approximate Value Range (USD/m²)
+    # Food & Beverage	Ultrafiltration	$100 - $400
+    #                   Nanofiltration	$150 - $500
+    # Pharmaceutical	Ultrafiltration	$1,200 - $3,500+
+    #                   Nanofiltration	$2,000 - $5,000+
+    # https://www.biopharminternational.com/view/economic-analysis-single-use-tangential-flow-filtration-biopharmaceutical-applications
+
+
     # food ultra: 50-250, nano: 70~300
     # for pharm: ultra: 1500~3000, nano: 2500~4500
-    _default_membrane_lifetime_years = 1.0
-    _default_module_cost_factor = 2500.0
+    # Membrane Type	Industrial / Water	Food & Beverage	Biopharmaceutical (TFF Cassettes)
+    # Ultrafiltration (UF)	$80 - $350	$250 - $900	$1,500 - $5,000+
+    # Nanofiltration (NF)	$100 - $400	$300 - $1,200	$2,000 - $7,000+
+    _default_membrane_lifetime_years = 2.0 #1~3
+    _default_module_cost_factor = 25000.0
     _default_module_cost_exponent = 0.7
     _default_base_CEPCI = 500.0
     _default_reciculation_ratio = 10.0  # Recirculation ratio to reduce fouling 5~20
@@ -673,174 +684,171 @@ class Diafiltration(bst.Unit):
         self.baseline_purchase_costs['Pump'] = self.pump1.purchase_cost + self.pump2.purchase_cost # Assume 2 pumps for operation feed & recirculation
 
 
-class IonExchange(bst.Unit):
-    """
-    Simulates an Ion Exchange (IEX) chromatography column for protein purification.
-    The unit models the binding of one or more target products and impurities 
-    from a feed stream onto a resin, followed by elution into a separate elution buffer.
-    Parameters
-    ----------
-    ins :
-        [0] Feed stream
-        [1] Wash buffer (e.g., equilibration buffer, low salt)
-        [2] Elution buffer (high salt)
-    outs :
-        [0] Product stream (in elution buffer)
-        [1] Waste stream (flowthrough from feed and wash)
-    """
-    _N_ins = 3
-    _N_outs = 2
+# class IonExchange(bst.Unit):
+#     """
+#     Simulates an Ion Exchange (IEX) chromatography column for protein purification.
+#     The unit models the binding of one or more target products and impurities 
+#     from a feed stream onto a resin, followed by elution into a separate elution buffer.
+#     Parameters
+#     ----------
+#     ins :
+#         [0] Feed stream
+#         [1] Wash buffer (e.g., equilibration buffer, low salt)
+#         [2] Elution buffer (high salt)
+#     outs :
+#         [0] Product stream (in elution buffer)
+#         [1] Waste stream (flowthrough from feed and wash)
+#     """
+#     _N_ins = 3
+#     _N_outs = 2
     
-    _F_BM_default = {
-        'IEX Column': 2.5,
-        'IEX Resin replacement': 2.5, #1.0,
-        'Pump': 1.89,
-    }
+#     _F_BM_default = {
+#         'IEX Column': 2.5,
+#         'IEX Resin replacement': 2.5, #1.0,
+#         'Pump': 1.89,
+#     }
 
-    _units = {
-        'Resin Volume': 'L',
-        'TargetProduct_Yield': '%',
-        'BoundImpurity_Removal': '%',
-        'NonBinding_Carryover': '%',
-        'resin_DBC_g_L': 'g/L',
-        'resin_cost_USD_per_L': 'USD/L',
-        'resin_lifetime_years': 'years',
-        'equipment_lifetime_years': 'years',
-    }
+#     _units = {
+#         'Resin Volume': 'L',
+#         'TargetProduct_Yield': '%',
+#         'BoundImpurity_Removal': '%',
+#         'NonBinding_Carryover': '%',
+#         'resin_DBC_g_L': 'g/L',
+#         'resin_cost_USD_per_L': 'USD/L',
+#         'resin_lifetime_years': 'years',
+#         'equipment_lifetime_years': 'years',
+#     }
 
-    def __init__(self, ID='', ins=None, outs=(), thermo=None, *,
-                 # MODIFIED: Now accepts a string, list, or tuple of IDs
-                 TargetProduct_IDs=('Leghemoglobin'),
-                 TargetProduct_Yield=0.95,
-                 BoundImpurity_IDs=('Heme_b','Chitin','Globin','Mannoprotein','Glucan'),
-                 BoundImpurity_Removal=0.97,
-                 NonBinding_Carryover=0.04,
-                 resin_DBC_g_L=50.0, # 30~120
-                 load_safety_factor=0.8,
-                 resin_cost_USD_per_L=7,#1500.0, 
-                    # strong acid cation resin: 2~5
-                    # weak acid cation resin: 3 ~ 6
-                    # strong base anion resin: 7~15
-                    # weak base anion resin: 5~10
-                 # 4000~10000
-                 resin_lifetime_years=1.0,
-                 equipment_lifetime_years=20.0,
-                 column_hardware_cost_factor=3000.0,
-                 column_hardware_cost_exponent=0.6,
-                 base_CEPCI=500.0,
-                 **kwargs):
-        super().__init__(ID, ins, outs, thermo, **kwargs)
+#     def __init__(self, ID='', ins=None, outs=(), thermo=None, *,
+#                  # MODIFIED: Now accepts a string, list, or tuple of IDs
+#                  TargetProduct_IDs=('Leghemoglobin'),
+#                  TargetProduct_Yield=0.95,
+#                  BoundImpurity_IDs=('Heme_b','Chitin','Globin','Mannoprotein','Glucan'),
+#                  BoundImpurity_Removal=0.97,
+#                  NonBinding_Carryover=0.04,
+#                  resin_DBC_g_L=50.0, # 30~120
+#                  load_safety_factor=0.8,
+#                  resin_cost_USD_per_L=7,#1500.0, 
 
-        # MODIFIED: Ensure TargetProduct_IDs is always a tuple for consistency
-        if isinstance(TargetProduct_IDs, str):
-            self.TargetProduct_IDs = (TargetProduct_IDs,)
-        else:
-            self.TargetProduct_IDs = tuple(TargetProduct_IDs)
+#                  # 4000~10000
+#                  resin_lifetime_years=1.0,
+#                  equipment_lifetime_years=20.0,
+#                  column_hardware_cost_factor=3000.0,
+#                  column_hardware_cost_exponent=0.6,
+#                  base_CEPCI=500.0,
+#                  **kwargs):
+#         super().__init__(ID, ins, outs, thermo, **kwargs)
+
+#         # MODIFIED: Ensure TargetProduct_IDs is always a tuple for consistency
+#         if isinstance(TargetProduct_IDs, str):
+#             self.TargetProduct_IDs = (TargetProduct_IDs,)
+#         else:
+#             self.TargetProduct_IDs = tuple(TargetProduct_IDs)
             
-        self.TargetProduct_Yield = TargetProduct_Yield
-        self.BoundImpurity_IDs = BoundImpurity_IDs
-        self.BoundImpurity_Removal = BoundImpurity_Removal
-        self.NonBinding_Carryover = NonBinding_Carryover
-        self.resin_DBC_g_L = resin_DBC_g_L
-        self.load_safety_factor = load_safety_factor
-        self.resin_cost_USD_per_L = resin_cost_USD_per_L
-        self.resin_lifetime_years = resin_lifetime_years
-        self.equipment_lifetime_years = equipment_lifetime_years
-        self.column_hardware_cost_factor = column_hardware_cost_factor
-        self.column_hardware_cost_exponent = column_hardware_cost_exponent
-        self.base_CEPCI = base_CEPCI
-        self.power_utility = bst.PowerUtility()
+#         self.TargetProduct_Yield = TargetProduct_Yield
+#         self.BoundImpurity_IDs = BoundImpurity_IDs
+#         self.BoundImpurity_Removal = BoundImpurity_Removal
+#         self.NonBinding_Carryover = NonBinding_Carryover
+#         self.resin_DBC_g_L = resin_DBC_g_L
+#         self.load_safety_factor = load_safety_factor
+#         self.resin_cost_USD_per_L = resin_cost_USD_per_L
+#         self.resin_lifetime_years = resin_lifetime_years
+#         self.equipment_lifetime_years = equipment_lifetime_years
+#         self.column_hardware_cost_factor = column_hardware_cost_factor
+#         self.column_hardware_cost_exponent = column_hardware_cost_exponent
+#         self.base_CEPCI = base_CEPCI
+#         self.power_utility = bst.PowerUtility()
 
-    def _run(self):
-        feed, elution_buffer = self.ins
-        product, waste = self.outs
+#     def _run(self):
+#         feed, elution_buffer = self.ins
+#         product, waste = self.outs
 
-        product.copy_like(elution_buffer)
-        waste.copy_like(feed)
+#         product.copy_like(elution_buffer)
+#         waste.copy_like(feed)
         
-        # MODIFIED: Streamlined logic into a single loop
-        for chem_ID in feed.chemicals.IDs:
-            if feed.imass[chem_ID] < 1e-12:
-                continue
+#         # MODIFIED: Streamlined logic into a single loop
+#         for chem_ID in feed.chemicals.IDs:
+#             if feed.imass[chem_ID] < 1e-12:
+#                 continue
             
-            solute_in_feed = feed.imass[chem_ID]
+#             solute_in_feed = feed.imass[chem_ID]
 
-            if chem_ID in self.TargetProduct_IDs:
-                # Handle target products
-                solute_to_product = solute_in_feed * self.TargetProduct_Yield
-                product.imass[chem_ID] += solute_to_product
-                waste.imass[chem_ID] -= solute_to_product
-            elif chem_ID in self.BoundImpurity_IDs:
-                # Handle bound impurities
-                solute_to_product = solute_in_feed * (1.0 - self.BoundImpurity_Removal)
-                product.imass[chem_ID] += solute_to_product
-                waste.imass[chem_ID] -= solute_to_product
-            else:
-                # Handle all other non-binding solutes
-                solute_to_product = solute_in_feed * self.NonBinding_Carryover
-                product.imass[chem_ID] += solute_to_product
-                waste.imass[chem_ID] -= solute_to_product
+#             if chem_ID in self.TargetProduct_IDs:
+#                 # Handle target products
+#                 solute_to_product = solute_in_feed * self.TargetProduct_Yield
+#                 product.imass[chem_ID] += solute_to_product
+#                 waste.imass[chem_ID] -= solute_to_product
+#             elif chem_ID in self.BoundImpurity_IDs:
+#                 # Handle bound impurities
+#                 solute_to_product = solute_in_feed * (1.0 - self.BoundImpurity_Removal)
+#                 product.imass[chem_ID] += solute_to_product
+#                 waste.imass[chem_ID] -= solute_to_product
+#             else:
+#                 # Handle all other non-binding solutes
+#                 solute_to_product = solute_in_feed * self.NonBinding_Carryover
+#                 product.imass[chem_ID] += solute_to_product
+#                 waste.imass[chem_ID] -= solute_to_product
         
-        product.T = elution_buffer.T
-        waste.T = feed.T
+#         product.T = elution_buffer.T
+#         waste.T = feed.T
 
-    def _design(self):
-        Design = self.design_results
+#     def _design(self):
+#         Design = self.design_results
         
-        # MODIFIED: Sum the mass of ALL target products for sizing
-        total_target_mass_kg_hr = sum(self.ins[0].imass[ID] for ID in self.TargetProduct_IDs)
-        target_mass_g_hr = total_target_mass_kg_hr * 1000.0
+#         # MODIFIED: Sum the mass of ALL target products for sizing
+#         total_target_mass_kg_hr = sum(self.ins[0].imass[ID] for ID in self.TargetProduct_IDs)
+#         target_mass_g_hr = total_target_mass_kg_hr * 1000.0
         
-        if self.resin_DBC_g_L > 0 and self.load_safety_factor > 0:
-            effective_DBC = self.resin_DBC_g_L * self.load_safety_factor
-            resin_volume_L = target_mass_g_hr / effective_DBC if effective_DBC > 0 else 0.0
-        else:
-            resin_volume_L = 0.0
+#         if self.resin_DBC_g_L > 0 and self.load_safety_factor > 0:
+#             effective_DBC = self.resin_DBC_g_L * self.load_safety_factor
+#             resin_volume_L = target_mass_g_hr / effective_DBC if effective_DBC > 0 else 0.0
+#         else:
+#             resin_volume_L = 0.0
         
-        Design['Resin Volume'] = resin_volume_L
-        Design['TargetProduct_Yield'] = self.TargetProduct_Yield * 100
-        Design['BoundImpurity_Removal'] = self.BoundImpurity_Removal * 100
-        Design['NonBinding_Carryover'] = self.NonBinding_Carryover * 100
-        Design['resin_lifetime_years'] = self.resin_lifetime_years
-        Design['equipment_lifetime_years'] = self.equipment_lifetime_years
+#         Design['Resin Volume'] = resin_volume_L
+#         Design['TargetProduct_Yield'] = self.TargetProduct_Yield * 100
+#         Design['BoundImpurity_Removal'] = self.BoundImpurity_Removal * 100
+#         Design['NonBinding_Carryover'] = self.NonBinding_Carryover * 100
+#         Design['resin_lifetime_years'] = self.resin_lifetime_years
+#         Design['equipment_lifetime_years'] = self.equipment_lifetime_years
 
-        # Pump logic remains the same
-        internal_stream = self.ins[0].copy() + self.ins[1].copy() + self.ins[2].copy() + self.ins[3].copy()  # * 15 # consider 15 CV times the elution buffer for cleaning
-        self.pump = bst.Pump(None, P= 4.0 * 1e5) # assume 4 bar pressure drop
-        self.pump.ins[0] = internal_stream
-        self.pump.simulate()
-        self.pump._design()
-        self.power_utility.rate = self.pump.power_utility.rate
+#         # Pump logic remains the same
+#         internal_stream = self.ins[0].copy() + self.ins[1].copy() + self.ins[2].copy() + self.ins[3].copy()  # * 15 # consider 15 CV times the elution buffer for cleaning
+#         self.pump = bst.Pump(None, P= 4.0 * 1e5) # assume 4 bar pressure drop
+#         self.pump.ins[0] = internal_stream
+#         self.pump.simulate()
+#         self.pump._design()
+#         self.power_utility.rate = self.pump.power_utility.rate
 
-    def _cost(self):
-        # MODIFIED: Calculate total resin replacement cost over equipment lifetime
-        Costs = self.baseline_purchase_costs
-        Design = self.design_results
-        resin_volume_L = Design.get('Resin Volume', 0.0)
+#     def _cost(self):
+#         # MODIFIED: Calculate total resin replacement cost over equipment lifetime
+#         Costs = self.baseline_purchase_costs
+#         Design = self.design_results
+#         resin_volume_L = Design.get('Resin Volume', 0.0)
         
-        if resin_volume_L > 0:
-            base_cost = self.column_hardware_cost_factor * (resin_volume_L ** self.column_hardware_cost_exponent)
-            Costs['IEX Column'] = base_cost * (bst.CE / self.base_CEPCI)
-        else:
-            Costs['IEX Column'] = 0.0
+#         if resin_volume_L > 0:
+#             base_cost = self.column_hardware_cost_factor * (resin_volume_L ** self.column_hardware_cost_exponent)
+#             Costs['IEX Column'] = base_cost * (bst.CE / self.base_CEPCI)
+#         else:
+#             Costs['IEX Column'] = 0.0
 
-        # Calculate total resin replacement cost over equipment lifetime
-        if (self.resin_lifetime_years > 0 and 
-            self.resin_cost_USD_per_L > 0 and 
-            resin_volume_L > 0 and 
-            self.equipment_lifetime_years > 0):
+#         # Calculate total resin replacement cost over equipment lifetime
+#         if (self.resin_lifetime_years > 0 and 
+#             self.resin_cost_USD_per_L > 0 and 
+#             resin_volume_L > 0 and 
+#             self.equipment_lifetime_years > 0):
             
-            # Calculate number of resin replacements over equipment lifetime
-            num_replacements = self.equipment_lifetime_years / self.resin_lifetime_years
+#             # Calculate number of resin replacements over equipment lifetime
+#             num_replacements = self.equipment_lifetime_years / self.resin_lifetime_years
             
-            # Total resin replacement cost over equipment lifetime
-            total_replacement_cost = num_replacements * resin_volume_L * self.resin_cost_USD_per_L
+#             # Total resin replacement cost over equipment lifetime
+#             total_replacement_cost = num_replacements * resin_volume_L * self.resin_cost_USD_per_L
             
-            Costs['IEX Resin replacement'] = total_replacement_cost
-        else:
-            Costs['IEX Resin replacement'] = 0.0
+#             Costs['IEX Resin replacement'] = total_replacement_cost
+#         else:
+#             Costs['IEX Resin replacement'] = 0.0
             
-        Costs['Pump'] = self.pump.purchase_cost
+#         Costs['Pump'] = self.pump.purchase_cost
 
 
 # class IonExchangeCycle1(bst.Unit):
@@ -1587,9 +1595,34 @@ class IonExchangeCycle(bst.Unit):
                  NonBinding_Carryover=0.04,
 
                  # Costing parameters
-                 resin_cost_USD_per_L=7.0,
-                 resin_lifetime_years=1.0,
-                 column_hardware_cost_factor=3000.0,
+                 resin_cost_USD_per_L=30.0,
+                # water treatment
+                    # strong acid cation resin: 2~5
+                    # weak acid cation resin: 3 ~ 6
+                    # strong base anion resin: 7~15
+                    # weak base anion resin: 5~10
+                # for food tech/beverage/nutrition
+                # https://lanxess.com/en/products-and-brands/brands/lewatit/industries/food-and-beverage#:~:text=Ion%20exchange%20resins%20for%20the,and%20food%20and%20drink%20additives.
+                # https://www.purolite.com/index/bioprocessing/ion-exchange-chromatography#:~:text=Purolite%20Praesto%20resins%20are%20manufactured,over%20a%20wide%20pH%20range.
+                # https://waterfilter.net.au/products/softening-resin-lewatit-s1567#:~:text=Ask%20a%20Question,a%20recurring%20or%20deferred%20purchase.
+                    # strong acid cation resin: 10~50
+                    # weak acid cation resin: 15 ~ 60
+                    # strong base anion resin: 30~100
+                    # weak base anion resin: 25~80
+                # https://www.cytivalifesciences.com/en/us/shop/chromatography/resins/ion-exchange?sort=NameAsc&chunk=1
+                #DuPont (FilmTec™) 
+                # Suez Water Technologies & Solutions (formerly GE Water & Process Technologies)
+                # Synder Filtration
+                # Pall Corporation
+                # Sartorius Stedim Biotech
+                # Merck Millipore
+                # Koch Separation Solutions
+                # Toray Industries, Inc.
+                # Asahi Kasei
+                # Pentair
+
+                 resin_lifetime_years=5.0, # 1~10 years
+                 column_hardware_cost_factor=30000.0,
                  column_hardware_cost_exponent=0.6
                 ):
         bst.Unit.__init__(self, ID, ins, outs, thermo)

@@ -20,11 +20,15 @@ LegH_yield = titer * 5 / 1300 # [by wt]
 
 m=2 # scale up factor based on 1.5e5 kg/yr
 # %% In
-SeedIn = stream_kwargs('SeedIn', Seed=m*0.15*1e5/16, units='kg/hr', T=25+273.15)
-CultureIn = stream_kwargs('CultureIn', Culture=m*1.5*1e5/16, units='kg/hr', T=25+273.15)
+SeedIn1 = stream_kwargs('SeedIn1', Seed=1, units='kg/hr', T=25+273.15)
+SeedIn2 = stream_kwargs('SeedIn2', Seed=1, units='kg/hr', T=25+273.15)
+CultureIn = stream_kwargs('CultureIn', Culture=1, units='kg/hr', T=25+273.15)
+SeedSolution1 = stream_kwargs('SeedSolution1', SeedSolution=m*0.15*1e5/16, units='kg/hr', T=25+273.15)
+SeedSolution2 = stream_kwargs('SeedSolution2', SeedSolution=m*1.5*1e5/16, units='kg/hr', T=25+273.15)
+CultureSolution = stream_kwargs('CultureSolution', CultureSolution=m*1.5*1e5/16, units='kg/hr', T=25+273.15)
 
 Glucose = stream_kwargs('Glucose', Glucose=m*1.3*1e5/72, units='kg/hr', T=25+273.15)
-NH3_25wt = stream_kwargs('NH3_25wt', NH3_25wt=m*350, units='kg/hr', T=25+273.15)#, price=price['NH3_25wt'])
+NH3_25wt = stream_kwargs('NH3_25wt', NH3_25wt=m*300, units='kg/hr', T=25+273.15)#, price=price['NH3_25wt'])
 
 DfUltraBuffer = stream_kwargs('DfUltraBuffer', DfUltraBuffer=1, units='kg/hr', T=25+273.15)
 IXEquilibriumBuffer = stream_kwargs('IXEquilibriumBuffer', IXEquilibriumBuffer=1, units='kg/hr', T=25+273.15)

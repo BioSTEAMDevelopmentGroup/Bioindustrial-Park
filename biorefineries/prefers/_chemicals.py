@@ -431,17 +431,31 @@ def create_chemicals_LegH():
 
     # 16hour 150ml
     chems.define_group(
-        'Seed',
+        'SeedSolution',
         ['H2O','(NH4)2SO4','Glucose','MgSO4','KH2PO4'],
         [98.15, 0.5, 1, 0.05, 0.3],
+        wt=True
+    )
+    
+    chems.define_group(
+        'Seed',
+        ['(NH4)2SO4','Glucose','MgSO4','KH2PO4'],
+        [0.5, 1, 0.05, 0.3],
         wt=True
     )
 
     # 1.5 L
     chems.define_group(
+        'CultureSolution',
+        ['SeedSolution','Glycine','Glucose','FeSO4'],
+        [1000, 0.1, 60, 0.15191],
+        wt=True
+    )
+
+    chems.define_group(
         'Culture',
-        ['Seed','Glycine','Glucose','FeSO4'],
-        [1000, 0.1, 60, 15.191],
+        ['Glycine','Glucose','FeSO4'],
+        [0.1, 60, 0.15191],
         wt=True
     )
 
@@ -472,8 +486,8 @@ def create_chemicals_LegH():
     chems.define_group(
         'DfUltraBuffer',
         ['KH2PO4','NaCl','EDTA'],
-        [0.25*bst.Chemical('KH2PO4', phase='l', default=True).MW, 
-        0.1*bst.Chemical('NaCl', phase='l', default=True).MW,
+        [0.025*bst.Chemical('KH2PO4', phase='l', default=True).MW, 
+        0.01*bst.Chemical('NaCl', phase='l', default=True).MW,
         0.001*bst.Chemical('EDTA', phase='l', default=True).MW],
         wt=True,
     )
@@ -489,17 +503,17 @@ def create_chemicals_LegH():
     chems.define_group(
         'IXEquilibriumBuffer',
         ['KH2PO4','NaCl','EDTA'],
-        [0.25*bst.Chemical('KH2PO4', phase='l', default=True).MW, 
-        0.1*bst.Chemical('NaCl', phase='l', default=True).MW,
+        [0.025*bst.Chemical('KH2PO4', phase='l', default=True).MW, 
+        0.01*bst.Chemical('NaCl', phase='l', default=True).MW,
         0.001*bst.Chemical('EDTA', phase='l', default=True).MW],
         wt=True,
     )
     chems.define_group(
         'IXElutionBuffer',
         ['KH2PO4','NaCl','KCl'],
-        [0.25*bst.Chemical('KH2PO4', phase='l', default=True).MW, 
-        0.9*bst.Chemical('NaCl', phase='l', default=True).MW,
-        0.1*bst.Chemical('KCl', phase='l', default=True).MW],
+        [0.025*bst.Chemical('KH2PO4', phase='l', default=True).MW, 
+        1.0*bst.Chemical('NaCl', phase='l', default=True).MW,
+        0.01*bst.Chemical('KCl', phase='l', default=True).MW],
         wt=True,
     )
 

@@ -150,7 +150,7 @@ def set_GWPCF_Multi(obj, names=[], dilutions=None):
 def load_process_settings():
     settings = bst.settings
     bst.process_tools.default_utilities()
-    settings.CEPCI = 607.5 # 2019
+    settings.CEPCI = 798.8 # 2024
     settings.electricity_price = 0.065 
     steam_utility = settings.get_agent('low_pressure_steam')
     steam_utility.heat_transfer_efficiency = 0.9
