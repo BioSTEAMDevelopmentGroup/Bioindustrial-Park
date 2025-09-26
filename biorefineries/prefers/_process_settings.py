@@ -21,6 +21,7 @@ __all__ = ('load_process_settings','price','set_GWPCF','set_FECCF','GWP_CFs','FE
 
 price = {
     'H2O': 0.2/1e3,  # $/kg 0.15 to 0.5 /1e3
+    'H2SO4': 0.12,  # $/kg 0.1 to 0.3
     'NH3': 0.46,  # $/kg 0.45 to 0.65
     'NH4OH': 0.4, # $/kg 0.3 to 0.5
     'NH3_25wt': 0.46,  # $/kg 0.3 to 0.5

@@ -159,7 +159,7 @@ def create_LegH_system(
         M302.ins[2].T = 25+273.15
         CultureIn.imass['Culture'] = target_stream.imass['SeedSolution']*(0.1+60+0.15191)/1000
 
-    M303 = bst.Mixer('M303', ins=[M301-0, M302-0], outs='M303Out')
+    M303 = u.SeedHoldTank('M303', ins=[M301-0, M302-0], outs='M303Out')
 
     R301 = u.SeedTrain(
         'R301',
@@ -180,7 +180,7 @@ def create_LegH_system(
     
     T301 = bst.StorageTank('T301', ins=M304-0, outs='T301Out',tau=16*4+72)
 
-    T302 = bst.StorageTank('T302', ins=NH3_25wt, outs='T302Out',tau=16*5+72)
+    T302 = u.AmmoniaStorageTank('T302', ins=NH3_25wt, outs='T302Out')
 
     R302 = u.AeratedFermentation(
         'R302',
@@ -306,7 +306,7 @@ def create_LegH_system(
     U402 = u.IonExchangeCycle(
         'U402',
         ins = (U401-0, H402-0, H403-0, H404-0),
-        outs = ('U402Out','FlowthroughWaste','WashWaste',effluent2),#'RegenerationWaste'),
+        outs = ('U402Out','FlowthroughWaste','WashWaste','RegenerationWaste'),
         TargetProduct_IDs = c.chemical_groups['LegHIngredients'],
         BoundImpurity_IDs=c.chemical_groups['BoundImpurities'],
     )    
@@ -370,12 +370,25 @@ def create_LegH_system(
     )
     S408.add_specification(run=True)
 
-    M406 = bst.MixTank('M406', ins=(S403-1,U401-1,U402-1,U402-2,U403-1), 
-                    outs='M406Out', tau=1)
+    M501 = bst.MixTank('M501', ins=(S403-1,U401-1,U402-1,U402-2,U403-1), 
+                    outs='M501Out', tau=1)
+    M501.add_specification(run=True)
 
-    S405 = u.ReverseOsmosis('S405', ins=M406-0, outs=('S405Out', effluent1))
+    T501 = u.SulfuricAcidStorageTank('T501', 
+                        ins=bst.Stream('SulfuricAcid', H2SO4=0.98,H2O=0.02, 
+                        units='kg/hr', price=price['H2SO4']), 
+                        outs='T501Out')
+    @T501.add_specification(run=True)
+    def update_acid_flowrate():
+        T501.ins[0].imol['H2SO4'] = U402.outs[3].imol['NaOH']/2*1.001
+        T501.ins[0].T = 25+273.15
 
+    M502 = bst.NeutralizationTank2('M502', ins=(U402-3,T501-0), outs=effluent2)
+
+    S501 = u.ReverseOsmosis('S501', ins=M501-0, outs=('RO_treated_water', effluent1))
     # effluent2 to neutralization and then to biological treatment
+
+
 
     H406 = bst.HXutility(
         'H406',
@@ -391,19 +404,20 @@ def create_LegH_system(
 
     #ADP = bst.AirDistributionPackage(500 if use_area_convention else 'ADP')
 
-    # BT = bst.BoilerTurbogenerator(400 if use_area_convention else 'BT',
-    #     (S402-0, '', 'boiler_makeup_water', 'natural_gas', '', ''),
-    #     outs=('emissions', 'rejected_water_and_blowdown', 'ash_disposal'),
-    #     boiler_efficiency=0.80,
-    #     turbogenerator_efficiency=0.85 
-    # )
+    BT = bst.BoilerTurbogenerator(400 if use_area_convention else 'BT',
+        (S403-0, 'gas_to_boiler', 'boiler_makeup_water', 'natural_gas', 'lime_boiler', 'boiler_chems'),
+        outs=('emissions', 'rejected_water_and_blowdown', 'ash_disposal'),
+        boiler_efficiency=0.80,
+        turbogenerator_efficiency=0.85 
+    )
+
     makeup_water_streams = (F.cooling_tower_makeup_water,
                             F.Water1, F.Water2,
                             F.Water3, F.Water4,
-                            F.Water5, F.Water6,F.Water7,F.Water8
-                            )#F.imbibition_water,
-                            #F.boiler_makeup_water)
-    process_water_streams = (F.S405.outs[1],
+                            F.Water5, F.Water6,
+                            F.Water7, F.Water8,
+                            F.boiler_makeup_water)
+    process_water_streams = (F.S501.outs[1],
                             F.EvaporatedWater,
                             *makeup_water_streams)
 

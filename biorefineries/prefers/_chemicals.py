@@ -204,6 +204,8 @@ def create_chemicals_LegH():
     add_chemical('(NH4)2SO4', phase='l', default=True, Hf=-288994*_cal2joule,aliases=['AmmoniumSulfate'])
     add_chemical('FeSO4', phase='l', default=True)
     add_chemical('MgSO4', phase='l', default=True) # 0.0001 $/kg
+    add_chemical('Na2SO4', phase='l', default=True)
+    add_chemical('NaHSO4', phase='l', default=True)
 
     add_chemical('KH2PO4', phase='l', default=True)
     add_chemical('K2HPO4', phase='l', default=True)
@@ -244,10 +246,30 @@ def create_chemicals_LegH():
     add_chemical('Streptomycin', phase='l', default=True)
     add_chemical('Chloramphenicol', phase='l', default=True)
     
+    CaSO4 = add_chemical('CaSO4', phase='s', default=True)
+    CaO = add_chemical('CaO', phase='s', default=True)
+    soluble_solids = [CaO]
+    Ash=add_chemical('Ash',MW=1.,search_db=False) # Dummy chemical for ash
+    P4010 = add_chemical('P4O10',phase = 'l',Hf=-582000*_cal2joule) # For phosphate precipitation
+    insoluble_solids = [Ash, P4010]
 
-    # ash=add_chemical('ash',MW=1.,search_db=False) # Dummy chemical for ash
-    # ash.Cn.add_model(0.09 * 4.184 * ash.MW)  # Heat capacity model
+    for chemical in insoluble_solids:
+        V = fn.rho_to_V(rho=1540, MW=chemical.MW)
+        try: chemical.V.s.add_model(V, top_priority=True)
+        except: pass
+    for chemical in soluble_solids:
+        V = fn.rho_to_V(rho=1e5, MW=chemical.MW)
+        try: chemical.V.add_model(V, top_priority=True)
+        except: pass
 
+    Ash.Cn.s.add_method(0.09 * 4.184 * Ash.MW) # Heat capacity model
+    
+    # Add missing thermodynamic properties for ash
+    Ash.Psat.add_method(1e-10)
+    Ash.Tb = 3000  # High boiling point for solid
+    Ash.Hvap.add_method(0)
+
+    Ash.get_missing_properties()
 
     #############
     #### Bio ####
