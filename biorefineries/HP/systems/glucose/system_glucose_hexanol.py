@@ -164,7 +164,7 @@ def create_HP_sys(ins, outs):
                                                            fresh_CO2_fermentation,
                                                            makeup_MEA_A301),
                                                    )
-    u.R302.neutralization = False
+    u.R302.neutralization = False #!!!
     
     # %% 
     # =============================================================================
@@ -540,7 +540,7 @@ unit_groups += get_more_unit_groups(system=HP_sys,
                                         'cooling utility facilities',
                                         'other facilities',
                                         'heat exchanger network',
-                                        # 'natural gas (for steam generation)',
+                                        'natural gas (for steam generation)',
                                         # 'natural gas (for product drying)',
                                         # 'chilled brine',
                                         'fixed operating cost',
@@ -550,7 +550,7 @@ unit_groups += get_more_unit_groups(system=HP_sys,
                                         ]
                          )
 
-add_metrics_to_unit_groups(unit_groups=unit_groups, system=HP_sys, TEA=HP_tea, LCA=HP_lca)
+add_metrics_to_unit_groups(unit_groups=unit_groups, system=HP_sys, TEA=HP_tea, LCA=HP_lca, hxn_class=bst.HeatExchangerNetwork)
 
 unit_groups_dict = {}
 for i in unit_groups:
