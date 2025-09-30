@@ -383,7 +383,7 @@ def create_LegH_system(
         T501.ins[0].imol['H2SO4'] = U402.outs[3].imol['NaOH']/2*1.001
         T501.ins[0].T = 25+273.15
 
-    M502 = bst.NeutralizationTank2('M502', ins=(U402-3,T501-0), outs=effluent2)
+    M502 = bst.NeutralizationTank1('M502', ins=(U402-3,T501-0), outs=effluent2, T=20+273.15)
 
     S501 = u.ReverseOsmosis('S501', ins=M501-0, outs=('RO_treated_water', effluent1))
     # effluent2 to neutralization and then to biological treatment
@@ -408,7 +408,8 @@ def create_LegH_system(
         (S403-0, 'gas_to_boiler', 'boiler_makeup_water', 'natural_gas', 'lime_boiler', 'boiler_chems'),
         outs=('emissions', 'rejected_water_and_blowdown', 'ash_disposal'),
         boiler_efficiency=0.80,
-        turbogenerator_efficiency=0.85 
+        turbogenerator_efficiency=0.85,
+        satisfy_system_electricity_demand=False,
     )
 
     makeup_water_streams = (F.cooling_tower_makeup_water,

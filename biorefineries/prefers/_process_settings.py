@@ -21,7 +21,7 @@ __all__ = ('load_process_settings','price','set_GWPCF','set_FECCF','GWP_CFs','FE
 
 price = {
     'H2O': 0.2/1e3,  # $/kg 0.15 to 0.5 /1e3
-    'H2SO4': 0.12,  # $/kg 0.1 to 0.3
+    'H2SO4': 0.05,  # $/kg 0.027 to 0.129
     'NH3': 0.46,  # $/kg 0.45 to 0.65
     'NH4OH': 0.4, # $/kg 0.3 to 0.5
     'NH3_25wt': 0.46,  # $/kg 0.3 to 0.5
@@ -44,9 +44,10 @@ price = {
     'SodiumAscorbate': 4.35,  # $/kg 5 to 10
     'Glycerol': 0.45,  # $/kg 0.3 to 0.7
     'sugar': 0.45,  # $/kg
+    'ElectricitySG': 0.03,  # $/kWh https://www.spgroup.com.sg/our-services/utilities/tariff-information
     'Electricity': 0.065,  # $/kWh 0.035 to 0.25
-    'Low pressure steam': 0.30626,  # $/kg
-    'Cooling water': 0,  # $/kg
+    # 'Low pressure steam': 0.30626,  # $/kg
+    # 'Cooling water': 0,  # $/kg
 }
 # %%
 # =============================================================================
@@ -59,10 +60,10 @@ GWP_CFs = {
     'ElectricitySG': (0.55, 0.55), # from ecoinvent 3.11 cutoff, electricity 0.543 to 0.553
     'Electricity': (0.55, 0.55), # from ecoinvent 3.11 cutoff, electricity, GLO
     'Glucose': 1.61, # from ecoinvent 3.11 cutoff, market for glucose, GLO
+    'SulfuricAcid': 0.165, # from ecoinvent 3.11 cutoff, market for sulfuric acid, RoW
     'Sugar_Cane': 0.835, # from ecoinvent 3.11 cutoff, market for sugar, GLO
     'Sugar_Beet': 0.564, # from ecoinvent 3.11 cutoff, market for sugar, GLO
     'IronSulfate': 0.278, # from ecoinvent 3.11 cutoff, market for iron sulfate , RoW
-    'AmmoniumSulfate': 0.179, # from ecoinvent 3.11 cutoff, market for ammonium sulfate, RoW
     'MagnesiumSulfate': 0.884, # from ecoinvent 3.11 cutoff, market for magnesium sulfate, GLO
     'Ammonia_SEA': 2.84, # from ecoinvent 3.11 cutoff, market for ammonia, SEA
     'Ammonia_CN': 5.07, # from ecoinvent 3.11 cutoff, market for ammonia, CN
@@ -152,15 +153,31 @@ def load_process_settings():
     settings = bst.settings
     bst.process_tools.default_utilities()
     settings.CEPCI = 798.8 # 2024
+
+    # settings.electricity_price = 0.07
+    hps = settings.get_heating_agent("high_pressure_steam")
+    hps.heat_transfer_efficiency = 0.85
+    # hps.regeneration_price = 0.08064
+    hps.T = 529.2
+    hps.P = 44e5
+    mps = settings.get_heating_agent("medium_pressure_steam")
+    mps.heat_transfer_efficiency = 0.90
+    # mps.regeneration_price = 0.07974
+    mps.T = 480.3
+    mps.P = 18e5
+    lps = settings.get_heating_agent("low_pressure_steam")
+    lps.heat_transfer_efficiency = 0.95
+    # lps.regeneration_price = 0.06768
+    lps.T = 428.6
+    lps.P = 55e4
+
+    cw = settings.get_cooling_agent('cooling_water')
+    cw.T = 28 + 273.15
+    cw.T_limit = cw.T + 9
+    cw.regeneration_price = 0
+    settings.get_cooling_agent('chilled_water').heat_transfer_price = 0
     settings.electricity_price = 0.065 
-    steam_utility = settings.get_agent('low_pressure_steam')
-    steam_utility.heat_transfer_efficiency = 0.9
-    steam_utility.regeneration_price = 0.30626
-    steam_utility.T = 529.2
-    steam_utility.P = 44e5
-    settings.get_agent('cooling_water').regeneration_price = 0
-    settings.get_agent('chilled_water').heat_transfer_price = 0
-    bst.PowerUtility.price = price['Electricity']
-    set_GWPCF(bst.PowerUtility, 'Electricity')
+    bst.PowerUtility.price = price['ElectricitySG']
+    set_GWPCF(bst.PowerUtility, 'ElectricitySG')
     #set_FECCF(bst.PowerUtility, 'Electricity')
     bst.settings.define_impact_indicator(key='GWP', units='kg*CO2e')

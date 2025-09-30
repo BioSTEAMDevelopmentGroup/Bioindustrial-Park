@@ -180,7 +180,10 @@ class PreFerSTEA(bst.TEA):
     def CAPEX_table(self):
         purchase_cost = self.purchase_cost /1e6
         lang_factor = self.lang_factor
-        FCI = lang_factor * purchase_cost
+        if lang_factor is None:
+            FCI = purchase_cost
+        else:
+            FCI = lang_factor * purchase_cost
         working_capital = FCI * self.WC_over_FCI
         TCI = FCI + working_capital
         accounting = self.Accounting(units='MM$')
@@ -232,8 +235,8 @@ if __name__ == '__main__':
     # %%
     legH_tea.get_cashflow_table()
     # %%
-    cost=legH_tea.solve_price(products) # USD/kg
-    print(f"\nLegH price: ${round(cost, 5)}/kg")   
+    price=legH_tea.solve_price(products) # USD/kg
+    print(f"\nLegH price: ${round(price, 5)}/kg")   
     # %%
     from biorefineries.prefers import _table as tb
     df1 = tb.all_cost_table(legH_tea)

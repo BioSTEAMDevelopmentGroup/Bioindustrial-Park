@@ -9,6 +9,7 @@ Created on 2025-04-18 15:20:45
 """
 # %%
 import biosteam as bst
+from matplotlib.pyplot import cool
 import thermosteam as tmo
 import numpy as np
 
@@ -1220,101 +1221,4 @@ class NeutralizationTank1(bst.Unit):
 
 
 
-class NeutralizationTank2(bst.Unit):
-    """
-    Neutralization tank implemented as a combination of MixTank + Cooler.
-    Uses the same reactions as NeutralizationTank1 but leverages existing 
-    biosteam unit designs and costs.
-    """
-    _N_ins = 2
-    _N_outs = 1
-    
-    # Use auxiliary units for costing
-    _auxiliary_unit_names = ('mixtank', 'cooler')
-    
-    def __init__(self, ID='', ins=None, outs=(), thermo=None, T=None, reactions=None, 
-                 residence_time=2.0):
-        super().__init__(ID, ins, outs, thermo)
-        self.T = T or 298.15  # Default temperature if not specified
-        self.residence_time = residence_time  # hours
-        
-        # Initialize reactions after thermo is available
-        if reactions is None:
-            chemicals = self.chemicals
-            self.reaction1 = bst.Rxn(
-                'H2SO4 + 2 NaOH -> Na2SO4 + 2 H2O', reactant='NaOH', X=1, chemicals=chemicals
-            )
-            self.reaction2 = bst.Rxn(
-                'H2SO4 + Na2SO4 -> 2 NaHSO4', reactant='H2SO4', X=1, chemicals=chemicals
-            )
-            self.reactions = bst.SRxn([self.reaction1, self.reaction2])
-        else:
-            self.reactions = reactions
-        
-        # Initialize auxiliary units
-        self.mixtank = bst.MixTank(None, None, tau=self.residence_time)
-        self.cooler = bst.HXutility(None, None, T=self.T)
 
-    def _run(self):
-        feed1, feed2 = self.ins
-        out, = self.outs
-        
-        # Mix the two inlet streams
-        out.mix_from(self.ins)
-        
-        # Store initial enthalpy before reaction
-        H_before = out.H
-        
-        # Run reactions if specified
-        if self.reactions:
-            if hasattr(self.reactions, '__iter__'):
-                # Multiple reactions
-                for reaction in self.reactions:
-                    reaction(out)
-            else:
-                # Single reaction
-                self.reactions(out)
-        
-        # Calculate heat of reaction
-        H_after_reaction = out.H
-        heat_of_reaction = H_after_reaction - H_before
-        
-        # Cool to target temperature using auxiliary cooler
-        self.cooler.ins[0] = out.copy()
-        self.cooler.T = self.T
-        self.cooler.simulate()
-        
-        # Update outlet stream
-        out.copy_like(self.cooler.outs[0])
-        out.T = self.T
-
-    def _design(self):
-        # Design the auxiliary mixtank
-        self.mixtank.ins[0] = bst.Stream()
-        self.mixtank.ins[0].mix_from(self.ins)
-        self.mixtank.tau = self.residence_time
-        self.mixtank.simulate()
-        self.mixtank._design()
-        
-        # Design the auxiliary cooler
-        temp_stream = bst.Stream()
-        temp_stream.copy_like(self.outs[0])
-        self.cooler.ins[0] = temp_stream
-        self.cooler.T = self.T
-        self.cooler.simulate()
-        self.cooler._design()
-        
-        # Set power utility from mixtank (agitator)
-        self.power_utility.rate = self.mixtank.power_utility.rate
-        
-        # Set heat utilities from cooler
-        self.heat_utilities = self.cooler.heat_utilities
-
-    def _cost(self):
-        # Cost the auxiliary units
-        self.mixtank._cost()
-        self.cooler._cost()
-        
-        # Transfer costs to this unit
-        self.baseline_purchase_costs['MixTank'] = self.mixtank.purchase_cost
-        self.baseline_purchase_costs['Cooler'] = self.cooler.purchase_cost
