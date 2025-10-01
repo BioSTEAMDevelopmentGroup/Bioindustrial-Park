@@ -13,7 +13,7 @@ import biosteam as bst
 from biosteam.evaluation import Model, Metric
 from biosteam.evaluation.evaluation_tools.parameter import Setter
 from biorefineries.SAF._chemicals import SAF_chemicals
-from biorefineries.SAF.systems_coprocessing import SAF_sys, F
+from biorefineries.SAF.systems_coprocessing_swg import SAF_sys, F
 from biorefineries.SAF._tea import create_SAF_coprocessing_tea
 from biorefineries.SAF._process_settings import price, GWP_CFs, load_preferences_and_process_settings
 from warnings import warn
@@ -43,7 +43,7 @@ sys.set_tolerance(rmol=1e-6, mol=1e-5, maxiter=400)
 tea_SAF = create_SAF_coprocessing_tea(sys=sys,steam_distribution=0.031, water_supply_cooling_pumping=0.057, 
                                       water_distribution=0.025, electric_substation_and_distribution=0.0,
                                       gas_supply_and_distribution=0.009, comminication=0.006, safety_installation=0.013,
-                                      building=0.29, yard_works=0.12, contingency_new=0.37, land=0.06, labor_cost=4525740,
+                                      building=0.29, yard_works=0, contingency_new=0.37, land=0.06, labor_cost=4525740,
                                       sanitary_waste_disposal=0.013)
 
 sys.operating_hours = tea_SAF.operating_days * 24
@@ -156,8 +156,14 @@ get_cost_other_indirect = lambda: tea_SAF._engineering_supervision_construction_
 get_cost_contingency = lambda: tea_SAF._contingency(tea_SAF.installed_equipment_cost) / 1e6 
 get_cost_working_capital = lambda: tea_SAF.FCI * 0.05 / 1e6 
 
+get_cost_hydrotreater = lambda: F.R404.installed_cost / 1e6
+get_cost_distillation = lambda: (F.D404.installed_cost + F.D405.installed_cost) / 1e6
+get_cost_WWT = lambda: F.WWT.installed_cost / 1e6
+get_cost_BT = lambda: F.BT.installed_cost / 1e6
+
 get_material_cost = lambda: tea_SAF.material_cost / 1e6 #  Excludes electricity credit but includes the money spent on ash disposal
 get_cost_feedstock = lambda: F.feedstock.price * F.feedstock.F_mass * sys.operating_hours / 1e6
+get_cost_feedstock_transport = lambda: F.tc.price * F.tc.F_mass * sys.operating_hours / 1e6
 get_cost_enzyme = lambda: F.enzyme_M301.price * F.enzyme_M301.F_mass * sys.operating_hours / 1e6
 get_cost_caustic = lambda: F.NaOH.price * (F.NaOH.F_mass + F.caustic.F_mass) * sys.operating_hours / 1e6
 get_cost_natural_gas = lambda: F.natural_gas.price * (F.natural_gas.F_mass + F.natural_gas_for_h2.F_mass) * sys.operating_hours / 1e6
@@ -212,8 +218,14 @@ metrics = [Metric('Coprocessing ratio', get_coprocessing_ratio, '100%'),
            Metric('Cost contingency', get_cost_contingency, '10^6 $'),
            Metric('Cost WC', get_cost_working_capital, '10^6 $'),
            
+           Metric('Cost hydrotreater', get_cost_hydrotreater, '10^6 $'),
+           Metric('Cost distillation', get_cost_distillation, '10^6 $'),
+           Metric('Cost WWT', get_cost_WWT, '10^6 $'),
+           Metric('Cost BT', get_cost_BT, '10^6 $'),
+           
            Metric('Annual material cost', get_material_cost, '10^6 $/yr'),
            Metric('Cost feedstock', get_cost_feedstock, '10^6 $/yr'),
+           Metric('Cost feedstock transport', get_cost_feedstock_transport, '10^6 $/yr'),
            Metric('Cost enzyme', get_cost_enzyme, '10^6 $/yr'),
            Metric('Cost caustic', get_cost_caustic, '10^6 $/yr'),
            Metric('Cost NG', get_cost_natural_gas, '10^6 $/yr'),
@@ -553,6 +565,8 @@ get_GWP_total_material_acquisition = lambda: sys.get_total_feeds_impact('GWP100'
 
 get_GWP_feedstock_acquisition = lambda: sys.get_material_impact(F.feedstock, key='GWP100') * 1000 / _total_energy_per_year()
 
+get_GWP_feedstock_transport = lambda: F.feedstock.F_mass * 0.051 * 288.48 * sys.operating_hours / _total_energy_per_year()
+
 get_GWP_NG_acquisition = lambda: sys.get_material_impact(F.natural_gas, key='GWP100') * 1000 / _total_energy_per_year()
                                   
 get_GWP_caustic_acquisition = lambda: (sys.get_material_impact(F.NaOH, key='GWP100') + sys.get_material_impact(F.caustic, key='GWP100')) * 1000 / _total_energy_per_year()
@@ -576,7 +590,7 @@ get_GWP_emissions_BT = lambda: F.natural_gas.get_atomic_flow('C') * SAF_chemical
 # Emissions - biogenic
 
 # Total = Material acquisition + Emissions
-get_GWP_total = lambda: get_GWP_total_material_acquisition() + get_GWP_missions_waste() + get_GWP_emissions_BT()
+get_GWP_total = lambda: get_GWP_total_material_acquisition() + get_GWP_missions_waste() + get_GWP_emissions_BT() + get_GWP_feedstock_transport()
 
 # Energy allocation
 get_GWP_jet_energy_allo = lambda: get_GWP_total() * F.jet_fuel.LHV / (F.jet_fuel.LHV + F.diesel.LHV + F.gasoline.LHV + F.ethanol_to_sold.LHV)
@@ -633,6 +647,8 @@ get_GWP_electricity_non_cooling = lambda: get_steam_frac_non_cooling() * get_GWP
 
 
 metrics.extend((Metric('GWP - feedstock', get_GWP_feedstock_acquisition, 'g CO2-eq/MJ blend fuel', 'LCA'),))
+
+metrics.extend((Metric('GWP - feedstock transportation', get_GWP_feedstock_transport, 'g CO2-eq/MJ blend fuel', 'LCA'),))
 
 metrics.extend((Metric('GWP - NG', get_GWP_NG_acquisition, 'g CO2-eq/MJ blend fuel', 'LCA'),))
 
@@ -739,14 +755,19 @@ def create_model():
 
 
 
-    feedstock = F.feedstock
-    moisture = F.feedstock.imass['Water'] / F.feedstock.F_mass
-    D = shape.Triangle(75, 87.5, 100)
-    @param(name='Feedstock unit price', element='Feedstock', kind='isolated', units='$/dry-ton',
-            baseline=87.5, distribution=D)
-    def set_feedstock_price(price):
-        F.feedstock.price = price * (1-moisture) / 1000 # in $/kg
+    # feedstock = F.feedstock
+    # D = shape.Triangle(0.105*0.75*1.24, 0.105*1.24, 0.105*1.25*1.24) # from 2016$ to 2023$
+    # @param(name='Feedstock unit price', element='Feedstock', kind='isolated', units='$/dry ton',
+    #         baseline=0.105*1.24, distribution=D)
+    # def set_feedstock_price(price):
+    #     F.feedstock.price = price * 0.8 # in $/kg; from $2016 to $2023
 
+    feedstock = F.feedstock
+    D = shape.Triangle(0.092*0.75*1.24, 0.092*1.24, 0.092*1.25*1.24) # from 2016$ to 2023$
+    @param(name='Feedstock unit price', element='Feedstock', kind='isolated', units='$/dry ton',
+            baseline=0.092*1.24, distribution=D)
+    def set_feedstock_price(price):
+        F.feedstock.price = price * 0.8 # in $/kg; from $2016 to $2023
 
 
     ash_disposal_price = price['ash disposal']
@@ -1060,13 +1081,18 @@ def create_model():
     # =============================================================================
     # LCA parameters
     # =============================================================================
-    D = shape.Uniform(-0.18363*0.8, -0.10874*0.8)
-    @param(name='Feedstock GWP', element='Feedstock', kind='isolated', units='kg CO2-eq/kg',
-            baseline=-0.14315*0.8, distribution=D)
+    # D = shape.Triangle(-0.139*1.25, -0.139, -0.139*0.75)
+    # @param(name='Feedstock GWP', element='Feedstock', kind='isolated', units='kg CO2-eq/dry kg',
+    #         baseline=-0.139, distribution=D)
+    # def set_feedstock_GWP(X):
+    #     feedstock.characterization_factors['GWP100'] = X * 0.8
+
+    D = shape.Triangle(-0.0587*1.25, -0.0587, -0.0587*0.75)
+    @param(name='Feedstock GWP', element='Feedstock', kind='isolated', units='kg CO2-eq/dry kg',
+            baseline=-0.0587, distribution=D)
     def set_feedstock_GWP(X):
-        feedstock.characterization_factors['GWP100'] = X
-
-
+        feedstock.characterization_factors['GWP100'] = X * 0.8
+        
 
     D = shape.Uniform(2.24*(1-0.5), 2.24*(1+0.5))
     @param(name='Enzyme GWP', element='Enzyme', kind='isolated', units='kg CO2-eq/kg',
@@ -1100,7 +1126,7 @@ def create_model():
         
 
 
-    D = shape.Uniform(1.5624*(1-0.5), 1.5624*(1+0.5))
+    D = shape.Triangle(1.5624*(1-0.25), 1.5624, 1.5624*(1+0.25))
     @param(name='H2 GWP', element='H2', kind='isolated', units='kg CO2-eq/kg',
             baseline=1.5624, distribution=D)
     def set_H2_GWP(X):
@@ -1163,10 +1189,10 @@ def run_model(N = 2000, notify_runs = 10, model = model):
     model.load_samples(samples)
     model._specification = model_specification
     model.evaluate(notify = notify_runs) 
-    model.table.to_excel('model_table_colocated.xlsx')
+    model.table.to_excel('model_table_colocated_swg.xlsx')
     df_rho,df_p = model.spearman_r()
-    df_rho.to_excel('df_rho_colocated.xlsx')
-    df_p.to_excel('df_p_colocated.xlsx')
+    df_rho.to_excel('df_rho_colocated_swg.xlsx')
+    df_p.to_excel('df_p_colocated_swg.xlsx')
     return model
 
 #%%

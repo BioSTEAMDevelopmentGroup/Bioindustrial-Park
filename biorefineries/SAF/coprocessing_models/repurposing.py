@@ -13,7 +13,7 @@ import biosteam as bst
 from biosteam.evaluation import Model, Metric
 from biosteam.evaluation.evaluation_tools.parameter import Setter
 from biorefineries.SAF._chemicals import SAF_chemicals
-from biorefineries.SAF.systems_coprocessing import SAF_sys, F
+from biorefineries.SAF.systems_coprocessing_swg import SAF_sys, F
 from biorefineries.SAF._tea import create_SAF_coprocessing_tea
 from biorefineries.SAF._process_settings import price, GWP_CFs, load_preferences_and_process_settings
 from warnings import warn
@@ -156,8 +156,14 @@ get_cost_other_indirect = lambda: tea_SAF._engineering_supervision_construction_
 get_cost_contingency = lambda: tea_SAF._contingency(tea_SAF.installed_equipment_cost) / 1e6 
 get_cost_working_capital = lambda: tea_SAF.FCI * 0.05 / 1e6 
 
+get_cost_hydrotreater = lambda: F.R404.installed_cost / 1e6
+get_cost_distillation = lambda: (F.D404.installed_cost + F.D405.installed_cost) / 1e6
+get_cost_WWT = lambda: F.WWT.installed_cost / 1e6
+get_cost_BT = lambda: F.BT.installed_cost / 1e6
+
 get_material_cost = lambda: tea_SAF.material_cost / 1e6 #  Excludes electricity credit but includes the money spent on ash disposal
 get_cost_feedstock = lambda: F.feedstock.price * F.feedstock.F_mass * sys.operating_hours / 1e6
+get_cost_feedstock_transport = lambda: F.tc.price * F.tc.F_mass * sys.operating_hours / 1e6
 get_cost_enzyme = lambda: F.enzyme_M301.price * F.enzyme_M301.F_mass * sys.operating_hours / 1e6
 get_cost_caustic = lambda: F.NaOH.price * (F.NaOH.F_mass + F.caustic.F_mass) * sys.operating_hours / 1e6
 get_cost_natural_gas = lambda: F.natural_gas.price * (F.natural_gas.F_mass + F.natural_gas_for_h2.F_mass) * sys.operating_hours / 1e6
@@ -166,7 +172,7 @@ get_cost_hydrogen = lambda: F.hydrogen.price * F.hydrogen.F_mass * sys.operating
 get_cost_Syndol = lambda: F.Syndol_catalyst.price * F.Syndol_catalyst.F_mass * sys.operating_hours / 1e6
 get_cost_other_materials = lambda: get_material_cost() - get_cost_feedstock() - get_cost_enzyme() - get_cost_caustic() - get_cost_natural_gas()-\
                                    get_cost_makeup_water() - get_cost_hydrogen() - get_cost_Syndol()
-
+get_cost_oc = lambda: F.oc.price * F.oc.F_mass * sys.operating_hours / 1e6
 
 # Electricity 
 # BT.power_utility.production - BT.power_utility.consumption = -BT.power_utility.rate
@@ -212,8 +218,14 @@ metrics = [Metric('Coprocessing ratio', get_coprocessing_ratio, '100%'),
            Metric('Cost contingency', get_cost_contingency, '10^6 $'),
            Metric('Cost WC', get_cost_working_capital, '10^6 $'),
            
+           Metric('Cost hydrotreater', get_cost_hydrotreater, '10^6 $'),
+           Metric('Cost distillation', get_cost_distillation, '10^6 $'),
+           Metric('Cost WWT', get_cost_WWT, '10^6 $'),
+           Metric('Cost BT', get_cost_BT, '10^6 $'),
+           
            Metric('Annual material cost', get_material_cost, '10^6 $/yr'),
            Metric('Cost feedstock', get_cost_feedstock, '10^6 $/yr'),
+           Metric('Cost feedstock transport', get_cost_feedstock_transport, '10^6 $/yr'),
            Metric('Cost enzyme', get_cost_enzyme, '10^6 $/yr'),
            Metric('Cost caustic', get_cost_caustic, '10^6 $/yr'),
            Metric('Cost NG', get_cost_natural_gas, '10^6 $/yr'),
@@ -221,6 +233,7 @@ metrics = [Metric('Coprocessing ratio', get_coprocessing_ratio, '100%'),
            Metric('Cost hydrogen', get_cost_hydrogen, '10^6 $/yr'),
            Metric('Cost syndol', get_cost_Syndol, '10^6 $/yr'),
            Metric('Cost other materials', get_cost_other_materials, '10^6 $/yr'),
+           Metric('Cost opportunity cost', get_cost_oc, '10^6 $/yr'),
            
            Metric('Annual electricity credit', get_electricity_credit, '10^6 $/yr'),]
            
@@ -553,6 +566,8 @@ get_GWP_total_material_acquisition = lambda: sys.get_total_feeds_impact('GWP100'
 
 get_GWP_feedstock_acquisition = lambda: sys.get_material_impact(F.feedstock, key='GWP100') * 1000 / _total_energy_per_year()
 
+get_GWP_feedstock_transport = lambda: F.feedstock.F_mass * 0.051 * 288.48 * sys.operating_hours / _total_energy_per_year()
+
 get_GWP_NG_acquisition = lambda: sys.get_material_impact(F.natural_gas, key='GWP100') * 1000 / _total_energy_per_year()
                                   
 get_GWP_caustic_acquisition = lambda: (sys.get_material_impact(F.NaOH, key='GWP100') + sys.get_material_impact(F.caustic, key='GWP100')) * 1000 / _total_energy_per_year()
@@ -576,7 +591,7 @@ get_GWP_emissions_BT = lambda: F.natural_gas.get_atomic_flow('C') * SAF_chemical
 # Emissions - biogenic
 
 # Total = Material acquisition + Emissions
-get_GWP_total = lambda: get_GWP_total_material_acquisition() + get_GWP_missions_waste() + get_GWP_emissions_BT()
+get_GWP_total = lambda: get_GWP_total_material_acquisition() + get_GWP_missions_waste() + get_GWP_emissions_BT() + get_GWP_feedstock_transport()
 
 # Energy allocation
 get_GWP_jet_energy_allo = lambda: get_GWP_total() * F.jet_fuel.LHV / (F.jet_fuel.LHV + F.diesel.LHV + F.gasoline.LHV + F.ethanol_to_sold.LHV)
@@ -634,6 +649,8 @@ get_GWP_electricity_non_cooling = lambda: get_steam_frac_non_cooling() * get_GWP
 
 metrics.extend((Metric('GWP - feedstock', get_GWP_feedstock_acquisition, 'g CO2-eq/MJ blend fuel', 'LCA'),))
 
+metrics.extend((Metric('GWP - feedstock transportation', get_GWP_feedstock_transport, 'g CO2-eq/MJ blend fuel', 'LCA'),))
+
 metrics.extend((Metric('GWP - NG', get_GWP_NG_acquisition, 'g CO2-eq/MJ blend fuel', 'LCA'),))
 
 metrics.extend((Metric('GWP - other materials', get_GWP_other_materials_acquisition, 'g CO2-eq/MJ blend fuel', 'LCA'),))
@@ -689,6 +706,7 @@ def create_model():
            baseline=2000000/24/0.8, distribution=D)
     def set_feedstock_flow(flow):
         F.feedstock.F_mass = flow
+
     
     
     
@@ -740,15 +758,20 @@ def create_model():
 
 
 
+    # feedstock = F.feedstock
+    # D = shape.Triangle(0.105*0.75*1.24, 0.105*1.24, 0.105*1.25*1.24) # from 2016$ to 2023$
+    # @param(name='Feedstock unit price', element='Feedstock', kind='isolated', units='$/dry ton',
+    #         baseline=0.105*1.24, distribution=D)
+    # def set_feedstock_price(price):
+    #     F.feedstock.price = price * 0.8 # in $/kg; from $2016 to $2023
+
     feedstock = F.feedstock
-    moisture = F.feedstock.imass['Water'] / F.feedstock.F_mass
-    D = shape.Triangle(75, 87.5, 100)
-    @param(name='Feedstock unit price', element='Feedstock', kind='isolated', units='$/dry-ton',
-            baseline=87.5, distribution=D)
+    D = shape.Triangle(0.092*0.75*1.24, 0.092*1.24, 0.092*1.25*1.24) # from 2016$ to 2023$
+    @param(name='Feedstock unit price', element='Feedstock', kind='isolated', units='$/dry ton',
+            baseline=0.092*1.24, distribution=D)
     def set_feedstock_price(price):
-        F.feedstock.price = price * (1-moisture) / 1000 # in $/kg
-
-
+        F.feedstock.price = price * 0.8 # in $/kg; from $2016 to $2023
+        
 
     ash_disposal_price = price['ash disposal']
     D = shape.Triangle(ash_disposal_price*1.5, ash_disposal_price, ash_disposal_price*0.5)
@@ -1061,13 +1084,18 @@ def create_model():
     # =============================================================================
     # LCA parameters
     # =============================================================================
-    D = shape.Uniform(-0.18363*0.8, -0.10874*0.8)
-    @param(name='Feedstock GWP', element='Feedstock', kind='isolated', units='kg CO2-eq/kg',
-            baseline=-0.14315*0.8, distribution=D)
+    # D = shape.Triangle(-0.139*1.25, -0.139, -0.139*0.75)
+    # @param(name='Feedstock GWP', element='Feedstock', kind='isolated', units='kg CO2-eq/dry kg',
+    #         baseline=-0.139, distribution=D)
+    # def set_feedstock_GWP(X):
+    #     feedstock.characterization_factors['GWP100'] = X * 0.8
+
+    D = shape.Triangle(-0.0587*1.25, -0.0587, -0.0587*0.75)
+    @param(name='Feedstock GWP', element='Feedstock', kind='isolated', units='kg CO2-eq/dry kg',
+            baseline=-0.0587, distribution=D)
     def set_feedstock_GWP(X):
-        feedstock.characterization_factors['GWP100'] = X
-
-
+        feedstock.characterization_factors['GWP100'] = X * 0.8
+        
 
     D = shape.Uniform(2.24*(1-0.5), 2.24*(1+0.5))
     @param(name='Enzyme GWP', element='Enzyme', kind='isolated', units='kg CO2-eq/kg',
@@ -1101,7 +1129,7 @@ def create_model():
         
 
 
-    D = shape.Uniform(1.5624*(1-0.5), 1.5624*(1+0.5))
+    D = shape.Triangle(1.5624*(1-0.25), 1.5624, 1.5624*(1+0.25))
     @param(name='H2 GWP', element='H2', kind='isolated', units='kg CO2-eq/kg',
             baseline=1.5624, distribution=D)
     def set_H2_GWP(X):
@@ -1166,10 +1194,10 @@ def run_model(N = 2000, notify_runs = 10, model = model):
     model.load_samples(samples)
     model._specification = model_specification
     model.evaluate(notify = notify_runs) 
-    model.table.to_excel('model_table_repurposing.xlsx')
+    model.table.to_excel('model_table_repurposing_swg.xlsx')
     df_rho,df_p = model.spearman_r()
-    df_rho.to_excel('df_rho_repurposing.xlsx')
-    df_p.to_excel('df_p_repurposing.xlsx')
+    df_rho.to_excel('df_rho_repurposing_swg.xlsx')
+    df_p.to_excel('df_p_repurposing_swg.xlsx')
     return model
 
 #%%
@@ -1206,25 +1234,25 @@ print(model.metrics_at_baseline())
 # #%%
 
 # CI Coutour data generating (can change to displacement, hybrid, energy)
-# y_data = S304_split = np.round(np.linspace(0.8,1,9),2)
-# x_data = feedflow_CI = np.round(np.linspace(-0.147,-0.087,13),3)
-# w_data = []
-# def CI_at_x_and_y_1(x,y):  
-#     F.S304.split = y
-#     F.feedstock.characterization_factors['GWP100']  = x
-#     sys.simulate()
-#     CI_jet = get_GWP_jet_displacement()
-#     return(CI_jet)
+y_data = S304_split = np.round(np.linspace(0.8,1,11),3)
+x_data = feedflow_CI = np.round(np.linspace(-0.182,-0.103,11),3)
+w_data = []
+def CI_at_x_and_y_1(x,y):  
+    F.S304.split = y
+    F.feedstock.characterization_factors['GWP100']  = x
+    sys.simulate()
+    CI_jet = get_GWP_jet_displacement()
+    return(CI_jet)
 
-# for j in y_data:
-#     w_data.append([])
-#     for i in x_data:
-#         try:
-#             print(j, i, CI_at_x_and_y_1(i,j))
-#             w_data[-1].append(CI_at_x_and_y_1(i,j))        
-#         except:
-#             print('Needs_interpolation')
-#             w_data[-1].append(0)
+for j in y_data:
+    w_data.append([])
+    for i in x_data:
+        try:
+            print(j, i, CI_at_x_and_y_1(i,j))
+            w_data[-1].append(CI_at_x_and_y_1(i,j))        
+        except:
+            print('Needs_interpolation')
+            w_data[-1].append(0)
 
 # #%%
 

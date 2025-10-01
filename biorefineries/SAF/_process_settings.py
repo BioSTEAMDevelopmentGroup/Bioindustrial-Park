@@ -245,6 +245,7 @@ price = {
     # 'compressed CO2': compressed_CO2_price,
     'oc': 0.4/3.78/845*1000,
     'ethanol': 0.41/0.789, # $0.41/L is from https://www.icao.int/environmental-protection/Pages/SAF_RULESOFTHUMB.aspx
+    'tc': 0.0001*288.48
         }
 
 

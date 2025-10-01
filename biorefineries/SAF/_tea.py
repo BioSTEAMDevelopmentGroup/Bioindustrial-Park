@@ -124,13 +124,21 @@ class SAF_Coprocessing_TEA(TEA):
         self.sanitary_waste_disposal = sanitary_waste_disposal
         self.ESCCL = ESCCL
     
-    
-    
+    @property
+    def TCI(self) -> float:
+        """Total capital investment [USD]."""
+        base_value = (1. + self.WC_over_FCI)*self.FCI
+        if self.land == 0:
+            value = base_value + 88300000
+        else:
+            value = base_value
+        return value
     
     @property
     def DPI(self) -> float:
         """Direct permanent investment [USD]."""
         return self._DPI(self.installed_equipment_cost, self.purchase_cost)
+     
     @property
     def TDC(self) -> float:
         """Total depreciable capital [USD]."""
@@ -247,8 +255,7 @@ class SAF_Coprocessing_TEA(TEA):
         return self._engineering_supervision_construction_contractor_legal_costs(installed_equipment_cost) + self._contingency(installed_equipment_cost)
     
     def _FCI(self, TDC): # Fixed Capital Investment
-        self._FCI_cached = FCI = TDC 
-        # + self._nondepreciable_indirect_costs(self._DPI_cached)
+        self._FCI_cached = FCI = TDC
         return FCI
     
     def _FOC(self, FCI): # Fixed Operating Costs
