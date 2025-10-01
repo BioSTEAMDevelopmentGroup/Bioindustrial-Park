@@ -463,7 +463,7 @@ if __name__ == '__main__':
     r2 = bst.report.lca_displacement_allocation_table(
         systems=[sys],
         key='GWP',
-        items=[ss.LegH_3], # For dividing yearly impact by ethanol production
+        items=[ss.LegH_3], # For dividing yearly impact by leghemoglobin production
     )
 
 # %%
