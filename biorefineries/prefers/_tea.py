@@ -244,20 +244,22 @@ if __name__ == '__main__':
     # %%
     df2=bst.report.voc_table(legH_sys,'LegH_3')
     print(df2)
-    # # %%
-    # df3 = bst.report.unit_reaction_tables(legH_sys.units)
-    # print(df3)
-    # # %%
-    # df4 = bst.report.unit_result_tables(legH_sys.units)
-    # print(df4)
-    # # %%
-    # df5 = bst.report.heat_utility_tables(legH_sys.units)
-    # print(df5)     # %%
-    # df6 = bst.report.power_utility_table(legH_sys.units)
-    # print(df6)
     # %%
-    # df7 = bst.report.other_utilities_table(legH_sys.units)
-    # print(df7)
+    df3 = bst.report.unit_reaction_tables(legH_sys.units)
+    #print(df3)
+    # %%
+    df4 = bst.report.unit_result_tables(legH_sys.units)
+    #print(df4)
+    # %%
+    df5 = bst.report.heat_utility_tables(legH_sys.units)
+    #print(df5)     # %%
+    df6 = bst.report.power_utility_table(legH_sys.units)
+    #print(df6)
+    #%%
+    df7 = bst.report.other_utilities_table(legH_sys.units)
+    #print(df7)
+    # %%
+    df8 = legH_tea.FOC_table()
 
 # %% Purchased equipment costs
     # print('Purchased Costs:')
