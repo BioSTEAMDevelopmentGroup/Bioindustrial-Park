@@ -460,7 +460,7 @@ if __name__ == '__main__':
         key='GWP',
         items=[ss.LegH_3], # For including products without characterization factors
     )
-    r1.to_excel('LegH_LCA_inventory.xlsx',index=True)
+    #r1.to_excel('LegH_LCA_inventory.xlsx',index=True)
     # %%
     r2 = bst.report.lca_displacement_allocation_table(
         systems=[sys],
@@ -468,6 +468,6 @@ if __name__ == '__main__':
         items=[ss.LegH_3], # For dividing yearly impact by ethanol production
     )
     
-    r2.to_excel('LegH_LCA_displacement_allocation.xlsx',index=True)
+    #r2.to_excel('LegH_LCA_displacement_allocation.xlsx',index=True)
 
 # %%

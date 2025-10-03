@@ -234,18 +234,18 @@ if __name__ == '__main__':
     legH_tea.show()  # Display the TEA summary
     # %%
     legH_tea.get_cashflow_table()
-    legH_tea.get_cashflow_table().to_excel('LegH_cashflow_table.xlsx',index=True)
+    #legH_tea.get_cashflow_table().to_excel('LegH_cashflow_table.xlsx',index=True)
     # %%
     price=legH_tea.solve_price(products) # USD/kg
     print(f"\nLegH price: ${round(price, 5)}/kg")   
     # %%
     from biorefineries.prefers import _table as tb
     df1 = tb.all_cost_table(legH_tea)
-    df1.to_excel('LegH_cost_table.xlsx',index=True)
+    #df1.to_excel('LegH_cost_table.xlsx',index=True)
     print(df1)
     # %%
     df2=bst.report.voc_table(legH_sys,'LegH_3')
-    df2.to_excel('LegH_voc_table.xlsx',index=True)
+    #df2.to_excel('LegH_voc_table.xlsx',index=True)
     print(df2)
     # # %%
     df3 = bst.report.unit_reaction_tables(legH_sys.units)
@@ -261,12 +261,21 @@ if __name__ == '__main__':
     print(df5)
     # %%
     df6 = bst.report.power_utility_table(legH_sys.units)
-    df6.to_excel('LegH_power_utility_table.xlsx',index=True)
+    #df6.to_excel('LegH_power_utility_table.xlsx',index=True)
     print(df6)
     # %%
     df7 = bst.report.other_utilities_table(legH_sys.units)
     #df7.to_excel('LegH_other_utility_table.xlsx',index=True)
     print(df7)
+
+    # %%
+    df8 = legH_tea.CAPEX_table()
+    #df8.to_excel('LegH_CAPEX_table.xlsx',index=True)
+    print(df8)
+    # %%
+    df9 = legH_tea.FOC_table()
+    #df9.to_excel('LegH_FOC_table.xlsx',index=True)
+    print(df9)
 
 # %% Purchased equipment costs
     # print('Purchased Costs:')
