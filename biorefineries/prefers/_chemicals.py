@@ -62,9 +62,16 @@ chemical_groups = dict(
             'FeSO4',
             'MgSO4',
             'KH2PO4',
+            'K2HJPO4',
             '(NH4)2HPO4',
             'K2HPO4',
-            'NH3',),
+            'NH3',
+            'Na2SO4',
+            'NaHSO4',
+            'NaOH',
+            'NaH2PO4',
+            'Na2HPO4',
+            ),
     
     OtherLargeMolecules = (#'Cellmass',
                         'Yeast',
@@ -204,8 +211,11 @@ def create_chemicals_LegH():
     add_chemical('(NH4)2SO4', phase='l', default=True, Hf=-288994*_cal2joule,aliases=['AmmoniumSulfate'])
     add_chemical('FeSO4', phase='l', default=True)
     add_chemical('MgSO4', phase='l', default=True) # 0.0001 $/kg
-    add_chemical('Na2SO4', phase='l', default=True)
-    add_chemical('NaHSO4', phase='l', default=True)
+    Na2SO4 = add_chemical('Na2SO4', phase='l', default=True)
+    Na2SO4.V.add_model(fn.rho_to_V(rho=2664, MW=Na2SO4.MW), top_priority=True)  # Density of solid Na2SO4
+    
+    NaHSO4 = add_chemical('NaHSO4', phase='l', default=True)
+    NaHSO4.V.add_model(fn.rho_to_V(rho=2435, MW=NaHSO4.MW), top_priority=True)  # Density of solid NaHSO4
 
     add_chemical('KH2PO4', phase='l', default=True)
     add_chemical('K2HPO4', phase='l', default=True)

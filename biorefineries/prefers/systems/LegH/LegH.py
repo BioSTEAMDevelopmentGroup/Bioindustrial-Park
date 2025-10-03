@@ -32,8 +32,7 @@ __all__ = (
     ID='LegH_sys',
     ins=[s.SeedIn1, s.SeedIn2, s.CultureIn, s.Glucose, s.NH3_25wt,s.DfUltraBuffer, s.IXEquilibriumBuffer, s.IXElutionBuffer
          ,s.IXRegenerationSolution, s.DfNanoBuffer],
-    outs=[s.LegH_3, s.vent1, s.vent2, s.effluent1, s.effluent2,
-        # s.effluent3, s.effluent4,  # Commented out as they are no longer used
+    outs=[s.LegH_3, s.vent1, s.vent2, s.effluent1, s.effluent2, s.effluent3,
     ],
     fthermo=c.create_chemicals_LegH, # Pass the function itself
 )
@@ -58,7 +57,7 @@ def create_LegH_system(
     SeedIn1, SeedIn2, CultureIn, Glucose, NH3_25wt, DfUltraBuffer, IXEquilibriumBuffer, IXElutionBuffer, IXRegenerationSolution, DfNanoBuffer = ins
 
     # Unpack output streams
-    (LegH_3, vent1, vent2, effluent1, effluent2, ) = outs
+    (LegH_3, vent1, vent2, effluent1, effluent2, effluent3) = outs
     
     set_GWPCF(Glucose, 'Glucose')
     set_GWPCF(NH3_25wt, 'Ammonia_SEA',dilution=0.25)
@@ -68,7 +67,7 @@ def create_LegH_system(
     set_GWPCF(IXRegenerationSolution, 'NaOH')
     set_GWPCF_Multi(DfNanoBuffer, ['Na2HPO4','NaH2PO4'], [0.5420, 0.4580])
 
-
+    load_process_settings()  # Load process settings to update prices and CFs
     """
     Fermentation Parameter
     """
@@ -383,12 +382,14 @@ def create_LegH_system(
         T501.ins[0].imol['H2SO4'] = U402.outs[3].imol['NaOH']/2*1.001
         T501.ins[0].T = 25+273.15
 
-    M502 = bst.NeutralizationTank1('M502', ins=(U402-3,T501-0), outs=effluent2, T=20+273.15)
+    M502 = bst.NeutralizationTank1('M502', ins=(U402-3,T501-0), outs='M502Out', T=20+273.15)
 
-    S501 = u.ReverseOsmosis('S501', ins=M501-0, outs=('RO_treated_water', effluent1))
+    S501 = u.ReverseOsmosis('S501', ins=M501-0, outs=('RO_treated_water1', effluent1))
     # effluent2 to neutralization and then to biological treatment
 
+    S502 = bst.Splitter('S502', ins=M502-0, outs=('SaltWaste', effluent2), split=[0.99,0.99,0.99], order=['H2O','Na2SO4','NaHSO4'])
 
+    S503 = u.ReverseOsmosis('S503', ins=S502-0, outs=('RO_treated_water2', effluent3))
 
     H406 = bst.HXutility(
         'H406',
@@ -433,10 +434,10 @@ def create_LegH_system(
         process_water_price=0.000135,  # USD/kg
     )
     # HXN = bst.HeatExchangerNetwork(600 if use_area_convention else 'HXN')
-    load_process_settings()  # Load process settings to update prices and CFs
+    # load_process_settings()  # Load process settings to update prices and CFs
     s.update_all_input_stream_prices(streamlist=[SeedIn1, SeedIn2, CultureIn, Glucose, NH3_25wt, DfUltraBuffer, IXEquilibriumBuffer, IXElutionBuffer, IXRegenerationSolution, DfNanoBuffer])
 
-    return LegH_3, vent1, vent2, effluent1, effluent2, DfUltraBuffer, IXEquilibriumBuffer, IXElutionBuffer, IXRegenerationSolution, DfNanoBuffer
+    return LegH_3, vent1, vent2, effluent1, effluent2,effluent3, DfUltraBuffer, IXEquilibriumBuffer, IXElutionBuffer, IXRegenerationSolution, DfNanoBuffer
 
 # %%
 if __name__ == '__main__':

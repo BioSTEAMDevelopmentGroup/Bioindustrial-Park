@@ -11,6 +11,7 @@ Created on 2025-05-07 18:26:22
 from biosteam import stream_kwargs
 from biorefineries.prefers._process_settings import price  # ADD THIS IMPORT
 import biosteam as bst
+from httpx import stream
 import numpy as np  # ADD THIS IMPORT
 LegH={}
 
@@ -40,15 +41,13 @@ DfNanoBuffer = stream_kwargs('DfNanoBuffer', DfNanoBuffer=1, units='kg/hr', T=25
 
 LegH_1 = stream_kwargs('LegH_1')
 LegH_2 = stream_kwargs('LegH_2')
-LegH_3 = stream_kwargs('LegH_3',units='kg/hr', T=25+273.15, price = 13.21216)#25)
+LegH_3 = stream_kwargs('LegH_3',units='kg/hr', T=25+273.15, price = 20)
 vent1 = stream_kwargs('vent1')
 vent2 = stream_kwargs('vent2')
 effluent1 = stream_kwargs('effluent1')
-effluent2 = stream_kwargs('effluent2')
+effluent2 = stream_kwargs('effluent2', units='kg/hr', price=-0.33)  # organic waste remove
 effluent3 = stream_kwargs('effluent3')
-effluent4 = stream_kwargs('effluent4')
-effluent5 = stream_kwargs('effluent5')
-effluent6 = stream_kwargs('effluent6')
+
 
 # %%
 # Add missing pricing functions directly here since they're not in your _streams2.py

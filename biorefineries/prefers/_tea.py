@@ -225,7 +225,7 @@ if __name__ == '__main__':
         system=legH_sys, IRR=0.18, duration=(2024, 2044), depreciation='IRAS6',
         income_tax=0.17, operating_days=333, lang_factor=None,
         construction_schedule=(0.15, 0.60, 0.25), WC_over_FCI=0.15,
-        labor_cost=3e6, fringe_benefits=0.17, property_tax=0.005,
+        labor_cost=10*6e4, fringe_benefits=0.17+0.07, property_tax=0.005,
         property_insurance=0.005, supplies=0.02, maintenance=0.03,
         administration=0.05
     )
@@ -245,19 +245,20 @@ if __name__ == '__main__':
     df2=bst.report.voc_table(legH_sys,'LegH_3')
     print(df2)
     # # %%
-    # df3 = bst.report.unit_reaction_tables(legH_sys.units)
-    # print(df3)
-    # # %%
-    # df4 = bst.report.unit_result_tables(legH_sys.units)
-    # print(df4)
-    # # %%
-    # df5 = bst.report.heat_utility_tables(legH_sys.units)
-    # print(df5)     # %%
-    # df6 = bst.report.power_utility_table(legH_sys.units)
-    # print(df6)
+    df3 = bst.report.unit_reaction_tables(legH_sys.units)
+    print(df3)
     # %%
-    # df7 = bst.report.other_utilities_table(legH_sys.units)
-    # print(df7)
+    df4 = bst.report.unit_result_tables(legH_sys.units)
+    print(df4)
+    # %%
+    df5 = bst.report.heat_utility_tables(legH_sys.units)
+    print(df5)
+    # %%
+    df6 = bst.report.power_utility_table(legH_sys.units)
+    print(df6)
+    # %%
+    df7 = bst.report.other_utilities_table(legH_sys.units)
+    print(df7)
 
 # %% Purchased equipment costs
     # print('Purchased Costs:')

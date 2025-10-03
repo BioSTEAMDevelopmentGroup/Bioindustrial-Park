@@ -479,7 +479,7 @@ class ReverseOsmosis(bst.Unit):
         feed.copy_like(self.ins[0])
         
         # Record basic operating parameters
-        Design['Flow rate'] = feed.F_vol  # m3/hr
+        Design['Flow rate'] = feed.ivol['H2O']  # m3/hr
         Design['Water recovery'] = self.water_recovery * 100  # %
         Design['Pump Pressure'] = self.operating_pressure_bar  # bar
         Design['Membrane flux'] = self.membrane_flux  # L/m2/hr
@@ -488,7 +488,8 @@ class ReverseOsmosis(bst.Unit):
         Design['Membrane cost per m2'] = self.membrane_cost_per_m2  # USD/m2
 
         # Calculate membrane area based on flux and flow rate
-        flow_rate_L_hr = feed.F_vol * 1000  # convert m3/hr to L/hr
+        # flow_rate_L_hr = feed.F_vol * 1000  # convert m3/hr to L/hr
+        flow_rate_L_hr = feed.ivol['H2O'] * 1000  # convert m3/hr to L/hr
         if self.membrane_flux > 0:
             membrane_area_m2 = flow_rate_L_hr / self.membrane_flux
         else:

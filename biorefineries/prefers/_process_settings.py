@@ -153,29 +153,29 @@ def load_process_settings():
     settings = bst.settings
     bst.process_tools.default_utilities()
     settings.CEPCI = 798.8 # 2024
-
+    # Table 17.1 Cost Sheet Outlinea Seider et al. 5th edition
     # settings.electricity_price = 0.07
     hps = settings.get_heating_agent("high_pressure_steam")
     hps.heat_transfer_efficiency = 0.85
-    # hps.regeneration_price = 0.08064
+    hps.regeneration_price = 17.6/1e3/18.01528#0.08064
     hps.T = 529.2
     hps.P = 44e5
     mps = settings.get_heating_agent("medium_pressure_steam")
     mps.heat_transfer_efficiency = 0.90
-    # mps.regeneration_price = 0.07974
+    mps.regeneration_price = 15.3/1e3/18.01528#0.07974
     mps.T = 480.3
     mps.P = 18e5
     lps = settings.get_heating_agent("low_pressure_steam")
     lps.heat_transfer_efficiency = 0.95
-    # lps.regeneration_price = 0.06768
+    lps.regeneration_price = 13.2/1e3/18.01528 #0.06768
     lps.T = 428.6
     lps.P = 55e4
 
     cw = settings.get_cooling_agent('cooling_water')
     cw.T = 28 + 273.15
     cw.T_limit = cw.T + 9
-    cw.regeneration_price = 0
-    settings.get_cooling_agent('chilled_water').heat_transfer_price = 0
+    cw.regeneration_price = 0.027/1e3/18.01528 #assuming 0.027 $/m3 to $/kmol
+    settings.get_cooling_agent('chilled_water').heat_transfer_price = 5.0/1e6 # 5 $/GJ
     settings.electricity_price = 0.065 
     bst.PowerUtility.price = price['ElectricitySG']
     set_GWPCF(bst.PowerUtility, 'ElectricitySG')
