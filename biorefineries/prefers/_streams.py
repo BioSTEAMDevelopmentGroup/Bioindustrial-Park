@@ -41,7 +41,7 @@ DfNanoBuffer = stream_kwargs('DfNanoBuffer', DfNanoBuffer=1, units='kg/hr', T=25
 
 LegH_1 = stream_kwargs('LegH_1')
 LegH_2 = stream_kwargs('LegH_2')
-LegH_3 = stream_kwargs('LegH_3',units='kg/hr', T=25+273.15, price = 20)
+LegH_3 = stream_kwargs('LegH_3',units='kg/hr', T=25+273.15, price = 20)#11.006028727167918)
 vent1 = stream_kwargs('vent1')
 vent2 = stream_kwargs('vent2')
 effluent1 = stream_kwargs('effluent1')
