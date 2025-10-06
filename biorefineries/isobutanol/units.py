@@ -63,6 +63,7 @@ class SimultaneousSaccharificationFermentationEthanolIsobutanol(bst.BatchBioreac
     
     def __init__(self, ID='', ins=None, outs=(), thermo=None, *, 
                  tau=60.,  N=None, V=None, T=305.15, P=101325., Nmin=2, Nmax=36,
+                 nsk_reaction_sys=None, nsk_t_span=(0, 7*24*3600.0), glucose_depletion=0.99,
                  yield_ethanol=0.80, yield_isobutanol=0.15, V_wf=0.83):
         bst.BatchBioreactor.__init__(self, ID, ins, outs, thermo,
             tau=tau, N=N, V=V, T=T, P=P, Nmin=Nmin, Nmax=Nmax
@@ -72,17 +73,33 @@ class SimultaneousSaccharificationFermentationEthanolIsobutanol(bst.BatchBioreac
                                              )
         self.growth = tmo.Rxn('Glucose -> Yeast',  'Glucose', 1.0)
         self.V_wf = V_wf
-    
+        self.nsk_reaction_sys = nsk_reaction_sys
+        self.nsk_t_span = nsk_t_span
+        self.glucose_depletion = glucose_depletion
+        
     def _run(self):
         vent, effluent = self.outs
         effluent.mix_from(self.ins)
-        self.fermentation_reactions(effluent)
-        self.growth(effluent)
-        effluent.imass['Yeast'] += effluent.imass['NH3']
-        effluent.imol['NH3'] = 0.
+        self.mixed_feed = mixed_feed = effluent.copy()
+        nsk_reaction_sys = self.nsk_reaction_sys
+        if nsk_reaction_sys is not None:
+            nsk_all_sp_IDs = nsk_reaction_sys.species_system.all_sp_IDs
+            F_vol = mixed_feed.F_vol
+            feed_concentrations = np.array([mixed_feed.imol[ID] for ID in nsk_all_sp_IDs])/F_vol
+            # breakpoint()
+            eff_concentrations = self.get_effluent_flows(feed_concentrations=feed_concentrations)
+            for ID, conc in zip(nsk_all_sp_IDs, eff_concentrations):
+                effluent.imol[ID] = conc*F_vol
+            # breakpoint()
+            # !!! make ammonia yeast-dependent
+        else:
+            self.fermentation_reactions(effluent)
+            self.growth(effluent)
+            effluent.imass['Yeast'] += effluent.imass['NH3']
+            effluent.imol['NH3'] = 0.
         vent.empty()
         vent.receive_vent(effluent)
-        
+    
     @property
     def Hnet(self):
         # X = self.fermentation_reactions.X
@@ -91,7 +108,23 @@ class SimultaneousSaccharificationFermentationEthanolIsobutanol(bst.BatchBioreac
         # return self.reaction.dH * glucose + self.growth.dH * (1 - X) + self.H_out - self.H_in
         # return np.sum([i.dH for i in fermentation_reactions]) * glucose + np.sum([self.growth.dH * (1 - i.X) + self.H_out - self.H_in for i in fermentation_reactions])
         return np.sum(fermentation_reactions[0].dH) * glucose + np.sum([self.growth.dH * (1 - i.X) + self.H_out - self.H_in for i in fermentation_reactions]) #!!! reactions[0]
-
+    
+    def get_effluent_flows(self, feed_concentrations):
+        rxn_sys = self.nsk_reaction_sys
+        sp_sys = rxn_sys.species_system
+        sp_sys.concentrations = feed_concentrations
+        rxn_sys.solve(t_span=self.nsk_t_span,
+                      sp_conc_for_events={'Glucose':(1.0-self.glucose_depletion)*sp_sys.concentration('Glucose')},
+                      method='BDF',
+                      save_events_df=True,)   
+        if rxn_sys._solution['t_events']:
+            tau_s = rxn_sys._solution['t_events'][0]
+            self.tau = tau_s/3600.0
+            return rxn_sys.C_at_t(tau_s)
+        else:
+            self.tau = self.nsk_t_span[1]/3600.0
+            return sp_sys.concentrations
+    
 SSFEtOHIBO = SimultaneousSaccharificationFermentationEthanolIsobutanol
 
 #%%
