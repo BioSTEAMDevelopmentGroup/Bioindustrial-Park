@@ -60,6 +60,9 @@ def create_LegH_system(
     (LegH_3, vent1, vent2, effluent1, effluent2, effluent3) = outs
     
     set_GWPCF(Glucose, 'Glucose')
+    set_GWPCF_Multi(SeedIn1, ['AmmoniumSulfate','Glucose','MagnesiumSulfate','KH2PO4'],[0.5/(0.5+1+0.05+0.3), 1/(0.5+1+0.05+0.3), 0.05/(0.5+1+0.05+0.3), 0.3/(0.5+1+0.05+0.3)])
+    set_GWPCF_Multi(SeedIn2, ['AmmoniumSulfate','Glucose','MagnesiumSulfate','KH2PO4'],[0.5/(0.5+1+0.05+0.3), 1/(0.5+1+0.05+0.3), 0.05/(0.5+1+0.05+0.3), 0.3/(0.5+1+0.05+0.3)])
+    set_GWPCF_Multi(CultureIn, ['Glycine','Glucose','IronSulfate'],[0.1/(0.1+60+0.15191), 60/(0.1+60+0.15191), 0.15191/(0.1+60+0.15191)])
     set_GWPCF(NH3_25wt, 'Ammonia_SEA',dilution=0.25)
     set_GWPCF_Multi(DfUltraBuffer, ['KH2PO4','NaCl'], [0.8472, 0.1455])
     set_GWPCF_Multi(IXEquilibriumBuffer, ['KH2PO4','NaCl'], [0.8472, 0.1455])

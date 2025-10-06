@@ -11,6 +11,7 @@ Created on 2025-07-02 15:20:03
 from biorefineries.corn import tea
 import biosteam as bst
 import numpy as np
+import pandas as pd
 from biorefineries.tea.conventional_ethanol_tea import *
 # bst.nbtutorial()
 from numba import njit
@@ -259,6 +260,10 @@ if __name__ == '__main__':
     df5 = bst.report.heat_utility_tables(legH_sys.units)
     #df5.to_excel('LegH_heat_utility_table.xlsx',index=True)
     print(df5)
+    # assemble df5[0], df5[1], df5[2] to a new dataframe as df55
+    # and then save it to an excel file
+    df55 = pd.concat([df5[0], df5[1], df5[2]], axis=0, ignore_index=True)
+    #df55.to_excel('LegH_heat_utility_table_combined.xlsx',index=True)
     # %%
     df6 = bst.report.power_utility_table(legH_sys.units)
     #df6.to_excel('LegH_power_utility_table.xlsx',index=True)
@@ -267,7 +272,8 @@ if __name__ == '__main__':
     df7 = bst.report.other_utilities_table(legH_sys.units)
     #df7.to_excel('LegH_other_utility_table.xlsx',index=True)
     print(df7)
-
+    # df77 = pd.concat([df6, df7], axis=0, ignore_index=True)
+    #df77.to_excel('LegH_all_utility_table.xlsx',index=True)
     # %%
     df8 = legH_tea.CAPEX_table()
     #df8.to_excel('LegH_CAPEX_table.xlsx',index=True)

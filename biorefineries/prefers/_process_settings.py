@@ -69,6 +69,7 @@ GWP_CFs = {
     'Ammonia_CN': 5.07, # from ecoinvent 3.11 cutoff, market for ammonia, CN
     'Ammonia_US': 2.70, # from ecoinvent 3.11 cutoff, market for ammonia, US
     'AmmoniumSulfate': 0.857, # from ecoinvent 3.11 cutoff, market for ammonium sulfate, RoW
+    'Glycine': 5.55, # from ecoinvent 3.11 cutoff, market for glycine, GLO
     'NaCl': 0.268, # from ecoinvent 3.11 cutoff, market for sodium chloride powder, GLO
     'Na2HPO4': 2.29, # from ecoinvent 3.11 cutoff, market for disodium phosphate, GLO
     'NaH2PO4': 2.85, # from ecoinvent 3.11 cutoff, market for monosodium phosphate, RoW
