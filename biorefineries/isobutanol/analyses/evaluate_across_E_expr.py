@@ -52,7 +52,7 @@ for E_per_C in E_per_Cs:
   
         
 #%%
-plt.plot(E_per_Cs/(MW_C5H7O2N_by_5 / MW_Yeast), MPSPs)
+plt.plot(E_per_Cs[1:]/(MW_C5H7O2N_by_5 / MW_Yeast), MPSPs[1:])
 plt.xlabel('Enzyme expression [#molecules/cell]')
 plt.ylabel('Ethanol MPSP [$/kg]')
 # plt.plot(k_inhibs_ethanol[:len(MPSPs)], MPSPs)

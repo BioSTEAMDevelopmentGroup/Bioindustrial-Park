@@ -58,21 +58,21 @@ rxn_sys = V405.nsk_reaction_sys
 def simulate(n=1):
     for i in range(n): sys.simulate()
 
-def load_E_per_C_ethanol(val):
-    rxn_sys.reactions[1].E_per_C = val * MW_C5H7O2N_by_5 / MW_Yeast
+def load_spec_3(val):
+    rxn_sys.reactions[1].reaction.rate_params['E_per_C'] = val * MW_C5H7O2N_by_5 / MW_Yeast
     
-def load_umax(val):
-    rxn_sys.reactions[0].reaction.rate_params['umax'] = val / 3600.0
+def load_spec_1(val):
+    rxn_sys.reactions[1].reaction.rate_params['kcat'] = val
 
-def load_k_inhib_ethanol(val):
-    rxn_sys.reactions[0].reaction.rate_params['k_inhibs'][0] = val
+def load_spec_2(val):
+    rxn_sys.reactions[1].reaction.rate_params['KM'] = val
     
 
-steps = (1, 30, 30)
-# E_per_Cs_ethanol = np.linspace(494_000/2, 494_000*2, steps[0])
-E_per_Cs_ethanol = np.array([494_000*5])
-umaxes = np.linspace(0.02, 3.0, steps[1])
-k_inhibs_ethanol = np.linspace(0.0, 20, steps[2])
+steps = (1, 5, 5)
+# spec_3_vector = np.linspace(494_000/2, 494_000*2, steps[0])
+spec_3_vector = np.array([494_000])
+spec_1_vector = np.linspace(1, 500, steps[1])
+spec_2_vector = np.linspace(0.01, 4, steps[2])
 
 
 # isobutanol_maximum_viable_market_range = np.array([5.99, 7.74])
@@ -94,18 +94,18 @@ isobutanol_results_filepath = isobutanol_filepath + '\\analyses\\results\\'
 
 # Parameters analyzed across
 
-x_label = r"$\bfMax. specific growth rate$" # title of the x axis
-x_units =r"$\mathrm{M} \cdot \mathrm{h}^{-1}$"
-x_ticks = [0, 1, 2, 3]
+x_label = r"$\bfk_{cat}$" # title of the x axis
+x_units =r"$\mathrm{s}^{-1}$"
+x_ticks = [0, 100, 200, 300, 400, 500]
 
-y_label = r"$\bfk_inhib_ethanol$" # title of the y axis
-y_units =r"$\mathrm{L} \cdot \mathrm{mol}^{-1}$"
-y_ticks = [0, 5, 10, 15, 20]
+y_label = r"$\bfK_M$" # title of the y axis
+y_units =r"$\mathrm{M}$"
+y_ticks = [0, 1, 2, 3, 4]
 
 
-z_label = r"$\bfCytosolic ADH$" # title of the z axis
+z_label = r"$\bfCystolic ADH$" # title of the z axis
 z_units =  r"$\mathrm{molecules} \cdot \mathrm{yeast-cell}^{-1}$"
-z_ticks = [0, 500_000, 1000_000, 1500_000, 2000_000, 2500_000]
+z_ticks = [200_000, 400_000, 600_000, 800_000, 1000_000]
 
 # Metrics
 MPSP_w_label = r"$\bfMPSP$" # title of the color axis
@@ -221,8 +221,8 @@ file_to_save = f'_{steps}_steps_'+'isobutanol_TRY_%s.%s.%s-%s.%s'%(dateTimeObj.y
 # simulate_and_print()
 
 # print('\n\nSimulating the initial point to avoid bugs ...')
-# # spec.byproduct_umaxes_decrease_policy = 'simultaneous, from 0 product yield'
-# spec.load_specifications(umaxes[0], k_inhibs_ethanol[0], E_per_Cs_ethanol[0])
+# # spec.byproduct_spec_1_vector_decrease_policy = 'simultaneous, from 0 product yield'
+# spec.load_specifications(spec_1_vector[0], spec_2_vector[0], spec_3_vector[0])
 # # spec.set_production_capacity(desired_annual_production=spec.desired_annual_production)
 # # simulate_and_print()
 # for i in range(3): isobutanol_sys.simulate()
@@ -276,22 +276,22 @@ def print_status(curr_no, total_no, s1, s2, s3, HXN_qbal_error, results=None, ex
 max_HXN_qbal_percent_error = 0.
 
 curr_no = 0
-total_no = len(E_per_Cs_ethanol)*len(umaxes)*len(k_inhibs_ethanol)
+total_no = len(spec_3_vector)*len(spec_1_vector)*len(spec_2_vector)
 
 print_status_every_n_simulations = 10
 
-k_inhibs_ethanol_mol_per_mol_total = [] # for fermentation generalizable insights work only
+spec_2_vector_mol_per_mol_total = [] # for fermentation generalizable insights work only
 
 errors_dict = {}
 
-for E_per_C_ethanol in E_per_Cs_ethanol:
+for spec_3 in spec_3_vector:
     # data_1 = isobutanol_data = spec.evaluate_across_specs(
-    #         isobutanol_sys, spec_1, spec_2, isobutanol_metrics, [p])
+    #         isobutanol_sys, spec_3, spec_2, isobutanol_metrics, [p])
     
     d1_Metric1, d1_Metric2, d1_Metric3 = [], [], []
     d1_Metric4, d1_Metric5, d1_Metric6 = [], [], []
     
-    for umax in umaxes:
+    for spec_1 in spec_1_vector:
         d1_Metric1.append([])
         d1_Metric2.append([])
         d1_Metric3.append([])
@@ -299,14 +299,14 @@ for E_per_C_ethanol in E_per_Cs_ethanol:
         d1_Metric5.append([])
         d1_Metric6.append([])
         
-        for k_inhib_ethanol in k_inhibs_ethanol:
+        for spec_2 in spec_2_vector:
             curr_no +=1
             error_message = None
             try:
                 S404.split = 0.999
-                load_E_per_C_ethanol(E_per_C_ethanol)
-                load_umax(umax)
-                load_k_inhib_ethanol(k_inhib_ethanol)
+                load_spec_3(spec_3)
+                load_spec_1(spec_1)
+                load_spec_2(spec_2)
                 simulate(1)
                 d1_Metric1[-1].append(isobutanol_metrics[0]())
                 d1_Metric2[-1].append(isobutanol_metrics[1]())
@@ -316,9 +316,9 @@ for E_per_C_ethanol in E_per_Cs_ethanol:
                 d1_Metric6[-1].append(isobutanol_metrics[5]())
                 
                 S404.split = 0.001
-                load_E_per_C_ethanol(E_per_C_ethanol)
-                load_umax(umax)
-                load_k_inhib_ethanol(k_inhib_ethanol)
+                load_spec_3(spec_3)
+                load_spec_1(spec_1)
+                load_spec_2(spec_2)
                 simulate(1)
                 MPSP_alt = isobutanol_metrics[0]()
                 if MPSP_alt<d1_Metric1[-1][-1]:
@@ -340,7 +340,7 @@ for E_per_C_ethanol in E_per_Cs_ethanol:
                 d1_Metric5[-1].append(np.nan)
                 d1_Metric6[-1].append(np.nan)
                 error_message = str(e1)
-                errors_dict[str(e1)] = (E_per_C_ethanol, umax, k_inhib_ethanol)
+                errors_dict[str(e1)] = (spec_3, spec_1, spec_2)
                 
             except ValueError as e1:
                 d1_Metric1[-1].append(np.nan)
@@ -350,11 +350,11 @@ for E_per_C_ethanol in E_per_Cs_ethanol:
                 d1_Metric5[-1].append(np.nan)
                 d1_Metric6[-1].append(np.nan)
                 error_message = str(e1)
-                errors_dict[str(e1)] = (E_per_C_ethanol, umax, k_inhib_ethanol)
+                errors_dict[str(e1)] = (spec_3, spec_1, spec_2)
             
-            if curr_no%print_status_every_n_simulations==0 or error_message:
+            if curr_no%print_status_every_n_simulations==0 or (error_message and not 'sugar' in error_message and not 'opposite sign' in error_message):
                 print_status(curr_no, total_no,
-                             E_per_C_ethanol, umax, k_inhib_ethanol, 
+                             spec_3, spec_1, spec_2, 
                              results=[d1_Metric1[-1][-1], d1_Metric2[-1][-1], d1_Metric3[-1][-1],
                                       d1_Metric4[-1][-1], d1_Metric5[-1][-1], d1_Metric6[-1][-1],],
                              HXN_qbal_error=HXN.energy_balance_percent_error,
@@ -376,7 +376,7 @@ for E_per_C_ethanol in E_per_Cs_ethanol:
 
     # %% Save generated data
     
-    csv_file_to_save = file_to_save + f'_prod_{E_per_C_ethanol}'
+    csv_file_to_save = file_to_save + f'_prod_{spec_3}'
     pd.DataFrame(d1_Metric1).to_csv(isobutanol_results_filepath+'MPSP-ethanol-'+csv_file_to_save+'.csv')
     pd.DataFrame(d1_Metric2).to_csv(isobutanol_results_filepath+'MPSP-isobutanol-'+csv_file_to_save+'.csv')
     pd.DataFrame(d1_Metric3).to_csv(isobutanol_results_filepath+'TCI-'+csv_file_to_save+'.csv')
@@ -585,16 +585,16 @@ if plot:
     #%% MPSP
     
     # MPSP_w_levels, MPSP_w_ticks, MPSP_cbar_ticks = get_contour_info_from_metric_data(results_metric_1, lb=3)
-    MPSP_w_levels = np.arange(0.6, 2.01, 0.02)
-    MPSP_cbar_ticks = np.arange(0.6, 2.05, 0.2)
+    MPSP_w_levels = np.arange(0.5, 1.01, 0.025)
+    MPSP_cbar_ticks = np.arange(0.5, 1.05, 0.25)
     MPSP_w_ticks = []
     # MPSP_w_levels = np.arange(0., 15.5, 0.5)
     
     contourplots.animated_contourplot(w_data_vs_x_y_at_multiple_z=results_metric_1, # shape = z * x * y # values of the metric you want to plot on the color axis; e.g., MPSP
-                                    x_data=umaxes, # x axis values
-                                    # x_data = umaxes/theoretical_max_g_isobutanol_acid_per_g_glucose,
-                                    y_data=k_inhibs_ethanol, # y axis values
-                                    z_data=E_per_Cs_ethanol, # z axis values
+                                    x_data=spec_1_vector, # x axis values
+                                    # x_data = spec_1_vector/theoretical_max_g_isobutanol_acid_per_g_glucose,
+                                    y_data=spec_2_vector, # y axis values
+                                    z_data=spec_3_vector, # z axis values
                                     x_label=x_label, # title of the x axis
                                     y_label=y_label, # title of the y axis
                                     z_label=z_label, # title of the z axis
@@ -657,11 +657,11 @@ if plot:
                                     
                                     # contourplot_facecolor = colors.grey_dark.shade(8).RGBn,
                                     fill_bottom_with_cmap_over_color=False, # for TRY
-                                    bottom_fill_bounds = ((0,0), 
-                                                          (1,11.),
-                                                          (99,11.)),
+                                    # bottom_fill_bounds = ((0,0), 
+                                    #                       (1,11.),
+                                    #                       (99,11.)),
                                     # zoom_data_scale=5,
-                                    text_boxes = {'>12.0': [(5,5), 'white']},
+                                    # text_boxes = {'>12.0': [(5,5), 'white']},
                                     
                                     # add_shapes = {
                                     #     # coords as tuple of tuples: (color, zorder),
@@ -676,9 +676,9 @@ if plot:
     GWP_cbar_ticks = np.arange(-2, 14.1, 2.)
     GWP_w_ticks = [0, 1, 2, 3, 4, 6, 8, 10, 14]
     contourplots.animated_contourplot(w_data_vs_x_y_at_multiple_z=results_metric_2, # shape = z * x * y # values of the metric you want to plot on the color axis; e.g., GWP
-                                    x_data=umaxes, # x axis values
-                                    y_data=k_inhibs_ethanol, # y axis values
-                                    z_data=E_per_Cs_ethanol, # z axis values
+                                    x_data=spec_1_vector, # x axis values
+                                    y_data=spec_2_vector, # y axis values
+                                    z_data=spec_3_vector, # z axis values
                                     x_label=x_label, # title of the x axis
                                     y_label=y_label, # title of the y axis
                                     z_label=z_label, # title of the z axis
@@ -756,9 +756,9 @@ if plot:
     FEC_w_ticks = [-100, -60, -30, 0, 30, 60, 100]
     # FEC_w_ticks = [40, 50, 70, 80, 100]
     contourplots.animated_contourplot(w_data_vs_x_y_at_multiple_z=results_metric_3, # shape = z * x * y # values of the metric you want to plot on the color axis; e.g., FEC
-                                    x_data=umaxes, # x axis values
-                                    y_data=k_inhibs_ethanol, # y axis values
-                                    z_data=E_per_Cs_ethanol, # z axis values
+                                    x_data=spec_1_vector, # x axis values
+                                    y_data=spec_2_vector, # y axis values
+                                    z_data=spec_3_vector, # z axis values
                                     x_label=x_label, # title of the x axis
                                     y_label=y_label, # title of the y axis
                                     z_label=z_label, # title of the z axis
@@ -832,10 +832,10 @@ if plot:
     # AOC_w_levels = np.arange(0., 15.5, 0.5)
     
     contourplots.animated_contourplot(w_data_vs_x_y_at_multiple_z=results_metric_4, # shape = z * x * y # values of the metric you want to plot on the color axis; e.g., AOC
-                                    x_data=umaxes, # x axis values
-                                    # x_data = umaxes/theoretical_max_g_isobutanol_acid_per_g_glucose,
-                                    y_data=k_inhibs_ethanol, # y axis values
-                                    z_data=E_per_Cs_ethanol, # z axis values
+                                    x_data=spec_1_vector, # x axis values
+                                    # x_data = spec_1_vector/theoretical_max_g_isobutanol_acid_per_g_glucose,
+                                    y_data=spec_2_vector, # y axis values
+                                    z_data=spec_3_vector, # z axis values
                                     x_label=x_label, # title of the x axis
                                     y_label=y_label, # title of the y axis
                                     z_label=z_label, # title of the z axis
@@ -897,10 +897,10 @@ if plot:
     # TCI_w_levels = np.arange(0., 15.5, 0.5)
     
     contourplots.animated_contourplot(w_data_vs_x_y_at_multiple_z=results_metric_3/1e6, # shape = z * x * y # values of the metric you want to plot on the color axis; e.g., TCI
-                                    x_data=umaxes, # x axis values
-                                    # x_data = umaxes/theoretical_max_g_isobutanol_acid_per_g_glucose,
-                                    y_data=k_inhibs_ethanol, # y axis values
-                                    z_data=E_per_Cs_ethanol, # z axis values
+                                    x_data=spec_1_vector, # x axis values
+                                    # x_data = spec_1_vector/theoretical_max_g_isobutanol_acid_per_g_glucose,
+                                    y_data=spec_2_vector, # y axis values
+                                    z_data=spec_3_vector, # z axis values
                                     x_label=x_label, # title of the x axis
                                     y_label=y_label, # title of the y axis
                                     z_label=z_label, # title of the z axis
@@ -959,10 +959,10 @@ if plot:
     # Purity_w_levels = np.arange(0., 15.5, 0.5)
     
     contourplots.animated_contourplot(w_data_vs_x_y_at_multiple_z=100.*np.array(results_metric_6), # shape = z * x * y # values of the metric you want to plot on the color axis; e.g., Purity
-                                    x_data=umaxes, # x axis values
-                                    # x_data = umaxes/theoretical_max_g_isobutanol_acid_per_g_glucose,
-                                    y_data=k_inhibs_ethanol, # y axis values
-                                    z_data=E_per_Cs_ethanol, # z axis values
+                                    x_data=spec_1_vector, # x axis values
+                                    # x_data = spec_1_vector/theoretical_max_g_isobutanol_acid_per_g_glucose,
+                                    y_data=spec_2_vector, # y axis values
+                                    z_data=spec_3_vector, # z axis values
                                     x_label=x_label, # title of the x axis
                                     y_label=y_label, # title of the y axis
                                     z_label=z_label, # title of the z axis
@@ -1040,10 +1040,10 @@ if plot:
     # Rel_impact_MPSP_w_levels = np.arange(0., 15.5, 0.5)
     
     contourplots.animated_contourplot(w_data_vs_x_y_at_multiple_z=np.array([rel_impact]), # shape = z * x * y # values of the metric you want to plot on the color axis; e.g., Rel_impact_MPSP
-                                    x_data=umaxes, # x axis values
-                                    # x_data = umaxes/theoretical_max_g_isobutanol_acid_per_g_glucose,
-                                    y_data=k_inhibs_ethanol, # y axis values
-                                    z_data=[E_per_Cs_ethanol[0]], # z axis values
+                                    x_data=spec_1_vector, # x axis values
+                                    # x_data = spec_1_vector/theoretical_max_g_isobutanol_acid_per_g_glucose,
+                                    y_data=spec_2_vector, # y axis values
+                                    z_data=[spec_3_vector[0]], # z axis values
                                     x_label=x_label, # title of the x axis
                                     y_label=y_label, # title of the y axis
                                     z_label=z_label, # title of the z axis

@@ -18,9 +18,9 @@ f = sys.flowsheet
 
 S404, V405 = f.S404, f.V405
 
-steps = 20
+steps = 100
 # E_per_Cs = np.linspace(494_000/2, 494_000*2, steps) * MW_C5H7O2N_by_5 / MW_Yeast
-umaxes = np.linspace(1e-6, 1e-3, steps)
+umaxes = np.linspace(2e-6, 0.333e-3, steps)
 MPSPs = []
 TCIs = []
 
@@ -38,7 +38,7 @@ for umax in umaxes:
     f.isobutanol.price = 1.43 * f.isobutanol.imass['Isobutanol']/f.isobutanol.F_mass
     res_A = sys.TEA.solve_price(f.ethanol)*f.ethanol.F_mass/f.ethanol.imass['Ethanol'], sys.TEA.TCI
     
-    S404.split = 0.01
+    # S404.split = 0.01
     sys.simulate()
     f.isobutanol.price = 1.43 * f.isobutanol.imass['Isobutanol']/f.isobutanol.F_mass
     res_B = sys.TEA.solve_price(f.ethanol)*f.ethanol.F_mass/f.ethanol.imass['Ethanol'], sys.TEA.TCI
