@@ -13,16 +13,16 @@ Choose feedstock in line 25
 #%% Import packages
 import numpy as np
 import pandas as pd
-from scipy.optimize import curve_fit
+#from scipy.optimize import curve_fit
 import time
-import matplotlib.pyplot as plt
-import geopandas as gpd
+#import matplotlib.pyplot as plt
+#import geopandas as gpd
 import os
 
 #%% Load necessary arrays
 
 #choose feedstock
-feedstock = 'miscanthus' # or switchgrass
+feedstock = 'switchgrass' # or switchgrass
 
 if feedstock == 'switchgrass':
     name = ''
@@ -175,7 +175,7 @@ sum_weights = np.sum(sent_ethanol_no_uncertainty, axis=1)
 # Compute the weighted average prices
 # Avoid division by zero by using np.where to handle cases where sum_weights is zero
 jet_prices_average = np.where(sum_weights != 0, sum_weighted_prices / sum_weights, 0)
-
+np.save(f'jet_price_ave{name}.npy', jet_prices_average)
 
 def calculate_stats_uncertainty(array):
     array_data = array
@@ -205,7 +205,7 @@ df_price = df_sorted
 
 #%% Load arrays for CI calculations
 
-ethanol_unit_transp_GHG_each_jet = np.load(f'Ethanol_transport_GHG{name}.npy') # in kgCO2eq/Mg ethanol
+ethanol_unit_transp_GHG_each_jet = np.load(f'Ethanol_transport_CI{name}.npy') # in kgCO2eq/Mg ethanol
 ethanol_GHG_kgCO2_per_kg = np.load(f'ethanol_GHG_kgCO2_per_kg{name}.npy') # in kgCO2e/kg ethanol
 
 #%%
@@ -331,6 +331,7 @@ sum_weights = np.sum(sent_ethanol_no_uncertainty, axis=1)
 # Avoid division by zero by using np.where to handle cases where sum_weights is zero
 jet_CIs_average = np.where(sum_weights != 0, sum_weighted_CIs / sum_weights, 0)
 
+np.save(f'jet_CI_ave{name}.npy', jet_CIs_average)
 
 jet_CIs_stats = calculate_stats_uncertainty(jet_CIs_average)
 

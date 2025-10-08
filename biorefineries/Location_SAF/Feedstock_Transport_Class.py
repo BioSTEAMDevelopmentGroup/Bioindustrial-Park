@@ -23,11 +23,12 @@ import pandas as pd
 import geopandas as gpd
 import numpy as np
 import ast
-import math
+#import math
 import chaospy as cp
 from SALib.sample import latin
 import matplotlib.pyplot as plt
 from shapely.geometry import LineString, Point
+from scipy.spatial import distance
 
 class FeedstockTransportModel:
     
@@ -43,7 +44,7 @@ class FeedstockTransportModel:
         'truck_capacity': (20, 'Mg/trip'),
         'tanker_capacity': (26.88, 'Mg/trip'),
         'farm_area_ha': (4 * 4 * 100 * 0.2, 'ha'),  # 4x4 km² → ha → 20% used
-        'mis_to_ethanol_gallon': (111.47, 'gal ethanol/dry ton'),
+        'mis_to_ethanol_gallon': (111.47, 'gal ethanol/dry ton'),#114
         'sw_to_ethanol_gallon': (99.45, 'gal ethanol/dry ton'),
     }
     
@@ -53,7 +54,8 @@ class FeedstockTransportModel:
                  blending_capacity_set=0.2,# Fraction (e.g. 0.2 = 20%)
                  bounding_box=None, # min_lon, min_lat, max_lon, max_lat) in EPSG:4326.
                  seed = 1, # used to choose candidate locations at random
-                 refinery_locations = None): # (lat, lon) in EPSG:4326
+                 refinery_locations = None,
+                 roundtrip = True): # (lat, lon) in EPSG:4326
         """
         Parameters
         ----------
@@ -74,6 +76,8 @@ class FeedstockTransportModel:
         refinery_locations: tuple or list of (lat, lon) in EPSG: 4326
             Candidate location to be analyzed. If provided, these locations will be analyzed as candidate refinery locations, num_points and seed will be ignored.
             Default is None, default candidate locations are chosen at random based on locations with higher yields (with seed) and number of points desired (num_points).
+        roundtrip: bool
+            Defines if transportation costs will be considered for one-way distance (False) or round trip (double distance) (True). Default = True.
         """
         
         if base_folder is None:
@@ -102,6 +106,8 @@ class FeedstockTransportModel:
         self.sizes_of_biorefineries = sizes_of_biorefineries  # MM gal/year
         self.blending_capacity_set = blending_capacity_set
         self.bounding_box = bounding_box
+        self.roundtrip = 2 if roundtrip else 1
+
         
         # Notify users if default values change
         if sizes_of_biorefineries != 80:
@@ -210,8 +216,11 @@ class FeedstockTransportModel:
             self.mean_TF_mis = np.full((self.num_points,), default_tortuosity)
             self.mean_TF_ethanol_sw = np.full((self.num_points,), default_tortuosity)
             self.mean_TF_ethanol_mis = np.full((self.num_points,), default_tortuosity)
-            self.calculate_eth_distance = True # calculate distances between points and jet producers
             self.TF_per_state = pd.read_excel(self.paths['TF_per_state'])
+            if self.seed == 1:
+                self.calculate_eth_distance = False
+            else:
+                self.calculate_eth_distance = True # calculate distances between points and jet producers
 
 
     def _parse_ethanol_file(self, path):
@@ -366,7 +375,8 @@ class FeedstockTransportModel:
         # years = 2023-2016
         
         crop_data['Adjusted_Price'] = (crop_data['Farm_price']*0.8) #* (1 + inflation_rate) ** years # in $/ wet Mg
-
+        
+    
         area = cf['farm_area_ha'][0]
         size_farms = area * yield_crop * np.ones(num_points)[..., None] 
         
@@ -382,7 +392,7 @@ class FeedstockTransportModel:
             gdf_input = gpd.GeoDataFrame(geometry=[Point(lon, lat) for lat, lon in self.refinery_locations], crs='EPSG:4326')
             
             gdf_input_5070 = gdf_input.to_crs('EPSG:5070')# Transform to EPSG:5070
-            
+                
             if crop_data.crs != 'EPSG:5070':
                 crop_data = crop_data.to_crs('EPSG:5070') # Ensure crop_data is also in EPSG:5070
             
@@ -426,6 +436,11 @@ class FeedstockTransportModel:
             possible_locations_copy = possible_locations_copy.drop(columns=['index_right'])
 
         possible_locations_with_state = gpd.sjoin(possible_locations_copy, self.USA_rainfed, how="left", predicate='intersects') # Spatial join with state information
+
+        ##### sort by siteid
+        possible_locations_with_state = possible_locations_with_state.sort_values(by="siteid").reset_index(drop=True)
+        possible_locations = possible_locations.sort_values(by="siteid").reset_index(drop=True)
+
 
         self.candidate_locations = possible_locations
         
@@ -492,14 +507,14 @@ class FeedstockTransportModel:
         dist_2_sorted = FeedstockTransportModel.sort_by_min_distance(dist_2, sorted_jet_ref, num_points)
         
         # This code calculates the number of farms required to fill the biorefinery demand in tonnes of feedstock
-        farm_num=np.array([np.sum(farm_sizes_cum[i]<sizes_of_crop_demand) for i in range(num_points)]) 
+        farm_num = np.sum(farm_sizes_cum < sizes_of_crop_demand, axis=1)
 
         # We calculate our metric for the transportation of feedstock from the farms to the ethanol biorefinery
-        # The transportation is given in total $
-        cost_transp_farm_to_bio = FeedstockTransportModel.calculate_feedstock_transport_totals(dist_sorted, farm_num, farm_sizes_sorted, trans_cost_biomass, self.num_points) 
+        # The transportation is given in total $ (doubled if roundtrip = True)
+        cost_transp_farm_to_bio = FeedstockTransportModel.calculate_feedstock_transport_totals(dist_sorted, farm_num, farm_sizes_sorted, trans_cost_biomass, self.num_points) *self.roundtrip 
         
-        # GHG emissions from farm to bio (transportation)
-        GHG_transp_farm_to_bio = FeedstockTransportModel.calculate_feedstock_transport_totals(dist_sorted, farm_num, farm_sizes_sorted, trans_GHG_truck, self.num_points) 
+        # GHG emissions from farm to bio (transportation) (doubled if roundtrip = True)
+        GHG_transp_farm_to_bio = FeedstockTransportModel.calculate_feedstock_transport_totals(dist_sorted, farm_num, farm_sizes_sorted, trans_GHG_truck, self.num_points) *self.roundtrip
 
         self.calculate_capacity_of_jet_producers(jet_producers_gpd = self.jet_producers)
         size_jet_ref = self.Capacity_jet_producers * self.blending_capacity_set * np.ones(num_points)[..., None] # Same for all feedstocks
@@ -512,43 +527,67 @@ class FeedstockTransportModel:
         
         self.calculate_mass_of_biorefineries()
         # This code calculates the number of jet refineries required to deliver all the biorefinery production
-        jet_ref_num=np.array([np.sum(jet_ref_sizes_cum[i]<self.mass_of_biorefineries) for i in range(num_points)]) +1 
+        jet_ref_num = np.sum(jet_ref_sizes_cum < self.mass_of_biorefineries, axis=1) + 1  
         
-        # This code calculates the number of jet refineries required to deliver all the biorefinery production
-        jet_ref_count = np.zeros(num_points)# Initialize an empty array to store the number of jet_refs needed for each row
-        for i in range(num_points):# Iterate over each row
-            for j in range(54):
-                if j == 0:
-                    if jet_ref_sizes_cum[i][j]>= self.mass_of_biorefineries:
-                        jet_ref_count[i] = self.mass_of_biorefineries/jet_ref_sizes_cum[i][j] 
-                        break
-                else:
-                    if jet_ref_sizes_cum[i][j]>= self.mass_of_biorefineries:
-                        jet_ref_count[i] = j + (self.mass_of_biorefineries- jet_ref_sizes_cum[i][j-1])/(jet_ref_sizes_cum[i][j] - jet_ref_sizes_cum[i][j-1])
-                        break
-        # Get the maximum number of jet refineries needed (integer part + 1)
-        max_jet_producers = int(np.ceil(np.max(jet_ref_count)))
-        # Create matrix sized appropriately: rows = num_points, columns = max_jet_producers
-        jet_ref_count_mat = np.zeros((num_points, max_jet_producers))
-        for p, val in enumerate(jet_ref_count):
-            integer_part = int(val)
-            decimal_part = val - integer_part
-            if integer_part < max_jet_producers:
-                jet_ref_count_mat[p, :integer_part] = 1  # Fully filled refineries
-                if integer_part < max_jet_producers:     # Add remaining fractional refinery
-                    jet_ref_count_mat[p, integer_part] = decimal_part
-            else:
-                # Edge case: val is exactly equal to max_jet_producers
-                jet_ref_count_mat[p, :max_jet_producers] = 1
+        ## This code calculates the number of jet refineries required to deliver all the biorefinery production jet_ref_count
+        P, J = jet_ref_sizes_cum.shape
+        rows = np.arange(P)
+         
+        # mask where cumulative >= mass
+        mask = jet_ref_sizes_cum >= self.mass_of_biorefineries  # (P, J)
+        has = mask.any(axis=1)                              # (P,) rows that eventually reach mass
+        first_idx = np.where(has, mask.argmax(axis=1), J-1) # (P,), safe fallback to last column
+         
+        cur = jet_ref_sizes_cum[rows, first_idx]
+        prev = np.zeros_like(cur, dtype=float)
+        prev_mask = first_idx > 0
+        if prev_mask.any():
+            prev[prev_mask] = jet_ref_sizes_cum[rows[prev_mask], first_idx[prev_mask]-1]
+         
+         # compute jet_ref_count: when first_idx == 0 use mass/cur, else the fractional formula
+        jet_ref_count = np.where(first_idx == 0, self.mass_of_biorefineries / cur, 
+                                 first_idx + (self.mass_of_biorefineries - prev) / (cur - prev))
         
         
-        farm_cost_all_loc = np.array([np.mean(np.array((crop_data.iloc[sorted_farms[i][:farm_num[i]]]).Adjusted_Price)) for i in range(num_points)])
-        # mean cost of feedstock for all farms supplying to each possible location (1000,0)
+        ##
+        int_parts = jet_ref_count.astype(int)          # (P,) # Fully filled refineries
+        decimals = jet_ref_count - int_parts           # (P,)
+        cols = np.arange(J)                            # (J,)
         
-        # do the same for CI 
-        farm_GHG_all_loc = np.array([np.mean(np.array((crop_data.iloc[sorted_farms[i][:farm_num[i]]]).Net_CI*0.8)) for i in range(num_points)])
+        # matrix of 1s where column index < integer part
+        jet_ref_count_mat = (cols < int_parts[:, None]).astype(float)  # (P, J) # Create matrix sized appropriately: rows = num_points, columns = max_jet_producers
+        
+        # add decimal part at column int_parts (if within bounds) # Add remaining fractional refinery
+        rows = np.arange(P)
+        valid = int_parts < J
+        jet_ref_count_mat[rows[valid], int_parts[valid]] += decimals[valid]
+        ##
+        
+                
+        
+        ###------ Farm cost all locations
+        # get the price array indexed by sorted_farms
+        prices_by_sorted = crop_data['Adjusted_Price'].values[sorted_farms]   # 
+        
+        P, num_farms = prices_by_sorted.shape
+        # boolean mask selecting first farm_num elements per row
+        col_idx = np.arange(num_farms)
+        mask = col_idx[None, :] < farm_num[:, None]  # (P, num_farms)
+        # sum & divide by farm_num (guard zero)
+        sum_prices = (prices_by_sorted * mask).sum(axis=1)
+        farm_cost_all_loc = np.where(farm_num > 0, sum_prices / farm_num, 0.0) # mean cost of feedstock for all farms supplying to each possible location (1000,0)
+
+        ###------
+        
+
+        ###------ Farm CI all locations
+        # get the price array indexed by sorted_farms
+        CI_by_sorted = crop_data['Net_CI'].values[sorted_farms] *0.8  # 
+        sum_CI = (CI_by_sorted * mask).sum(axis=1)
+        farm_GHG_all_loc = np.where(farm_num > 0, sum_CI / farm_num, 0.0) # mean GHG of feedstock for all farms supplying to each possible location (1000,0)
         # in kgCO2e/wet ton crop
-        # mean GHG of feedstock for all farms supplying to each possible location (1000,0)
+        ###------
+        
         
         # Already calculated GHG from farm to bio
         # GHG_transp_farm_to_bio.shape # in total kgCO2e
@@ -566,26 +605,50 @@ class FeedstockTransportModel:
         # farm GHG in kgCO2e/ton crop / 1000 kg/ton + transport GHG in total kgCO2e /total kg crop
         feedstock_delivered_GHG = farm_GHG_all_loc/1000 + GHG_transp_farm_to_bio/kg_crop # in kgCO2e/ wet kg crop
         
-        # sizes_jet_1: sizes of jet producers we deliver in ton ethanol /year (10% of their total capacity)
-        sizes_jet_1 = np.zeros((num_points, np.max(jet_ref_num)))
-        for i in range(num_points):
-            sizes_jet_1[i][:jet_ref_num[i]] = jet_ref_sizes_sorted[i][:jet_ref_num[i]]
+            
+        ###-------sizes_jet_1: sizes of jet producers we deliver in ton ethanol /year (blending_capacity_set of their total capacity)
+        max_jets = np.max(jet_ref_num)  # J max columns
+        jet_ref_num_clipped = np.minimum(jet_ref_num, max_jets)
+        cols = np.arange(max_jets)
+        mask_j = cols[None, :] < jet_ref_num_clipped[:, None]
+        sizes_to_use = jet_ref_sizes_sorted[:, :max_jets]
+        sizes_jet_1 = sizes_to_use * mask_j
+        ###---------
             
         # sent_ethanol: actual amount of ethanol sent to jet producers (last one might be less than what it can receive)
         sent_ethanol = sizes_jet_1.copy()
-        for i in range(num_points):    
-            sent_ethanol[i][jet_ref_num[i]-1] = sizes_jet_1[i][jet_ref_num[i]-1]* jet_ref_count_mat[i][jet_ref_num[i]-1]
-        # jet_indexes: to know which jet producer we supply to
-        jet_indexes = np.zeros((num_points, np.max(jet_ref_num)))
-        for i in range(num_points):
-            jet_indexes[i][:jet_ref_num[i]] = sorted_jet_ref[i][:math.ceil(jet_ref_count[i])]
+        rows = np.arange(P)
+        last_idx = jet_ref_num - 1
+        valid = last_idx >= 0
+        sent_ethanol[rows[valid], last_idx[valid]] = (
+            sizes_jet_1[rows[valid], last_idx[valid]] * jet_ref_count_mat[rows[valid], last_idx[valid]]
+        )
+
+        
+        # jet_indexes: to know which jet producer we supply to                
+        P, J = sorted_jet_ref.shape # P = num_points
+        K = np.max(jet_ref_num)  # only keep up to needed jets
+        k = np.ceil(jet_ref_count).astype(int)  # how many jet indices to take per row (ceil to be safe)
+        # build mask of shape (P, K)
+        cols_jet = np.arange(K)
+        mask_k = cols_jet[None, :] < k[:, None]
+
+        jet_indexes = sorted_jet_ref[:, :K] * mask_k # take only first K jet refs from each row and apply mask
+        
+        
         # Now we combine the jet_indexes with the sent_ethanol to get tuples with which jet producer is being supplied and quantity
-        combined = []
-        for i in range(jet_indexes.shape[0]):
-            row_i = []
-            for j in range(jet_indexes.shape[1]):
-                row_i.append((jet_indexes[i, j], sent_ethanol[i, j]))
-            combined.append(row_i)
+        # combined = []
+        # for i in range(jet_indexes.shape[0]):
+        #     row_i = []
+        #     for j in range(jet_indexes.shape[1]):
+        #         row_i.append((jet_indexes[i, j], sent_ethanol[i, j]))
+        #     combined.append(row_i)
+        # #Keep jet indexes and sent ethanol as separate arrays
+        # combined[i,j] = (jet_indexes[i,j], sent_ethanol[i,j]) #can be done later if needed
+        # combined_indexes = jet_indexes.copy()          # shape (P,K)
+        # combined_quantities = sent_ethanol.copy()     # shape (P,K)
+        # combined = np.stack([combined_indexes, combined_quantities], axis=-1)
+
 
         if self.sizes_of_biorefineries == 80 and self.blending_capacity_set == 0.2:
             real_dist_ethanol_array = np.zeros((num_points, 2))
@@ -605,32 +668,53 @@ class FeedstockTransportModel:
             Tortuosity_ethanol_reshaped = mean_TF_ethanol[:, np.newaxis] 
             dist_2_sorted_real = dist_2_sorted * Tortuosity_ethanol_reshaped
 
-
+        #--------
         # ethanol_transp_cost_each_jet: in total $/year to each jet producer
-        ethanol_transp_cost_each_jet = np.zeros((num_points, np.max(jet_ref_num)))
         # This is in total $/year to each jet producer
-        for i in range(num_points):
-            ethanol_transp_cost_each_jet[i][:jet_ref_num[i]] = dist_2_sorted_real[i][:jet_ref_num[i]]*jet_ref_sizes_sorted[i][:jet_ref_num[i]]*jet_ref_count_mat[i][:jet_ref_num[i]] *trans_cost_ethanol[i]
+
+        # slice all inputs to only first K jets
+        dist_2_cap   = dist_2_sorted_real[:, :K]
+        sizes_cap    = jet_ref_sizes_sorted[:, :K]
+        count_cap    = jet_ref_count_mat[:, :K]
+
+        # broadcast and multiply
+        ethanol_transp_cost_each_jet = (dist_2_cap * sizes_cap * count_cap * trans_cost_ethanol[:, None]) * self.roundtrip
         
+        # mask out beyond jet_ref_num
+        cols = np.arange(K)
+        mask = cols[None, :] < jet_ref_num[:, None]
+        ethanol_transp_cost_each_jet *= mask
+
+        
+
+        #----------
+        
+        
+    
+        # ethanol_transp_GHG_each_jet: in total kgCO2e/year to each jet producer
+        ethanol_transp_GHG_each_jet = (dist_2_cap * sizes_cap * count_cap * trans_GHG_tanker[:, None]) * self.roundtrip
+        ethanol_transp_GHG_each_jet *= mask # This is in total kgCO2e/year
+        #----------
         
         # ethanol_unit_transp_cost_each_jet: in $/Mg ethanol for each jet producer
-        ethanol_unit_transp_cost_each_jet = np.zeros((num_points, np.max(jet_ref_num)))
-        for i in range(num_points):    
-            ethanol_unit_transp_cost_each_jet[i][:jet_ref_num[i]] = ethanol_transp_cost_each_jet[i][:jet_ref_num[i]]/ sent_ethanol[i][:jet_ref_num[i]] # in $/Mg ethanol
-        
-        
-        # ethanol_transp_GHG_each_jet: in total kgCO2e/year to each jet producer
-        ethanol_transp_GHG_each_jet = np.zeros((num_points, np.max(jet_ref_num)))
-        for i in range(num_points):
-            ethanol_transp_GHG_each_jet[i][:jet_ref_num[i]] = dist_2_sorted_real[i][:jet_ref_num[i]]*jet_ref_sizes_sorted[i][:jet_ref_num[i]]*jet_ref_count_mat[i][:jet_ref_num[i]] *trans_GHG_tanker[i]
-        # This is in total kgCO2e/year
+        ethanol_unit_transp_cost_each_jet = np.zeros_like(ethanol_transp_cost_each_jet)
+        np.divide(
+            ethanol_transp_cost_each_jet,
+            sent_ethanol,
+            out=ethanol_unit_transp_cost_each_jet,
+            where=sent_ethanol > 0
+        )
         
         
         # ethanol_unit_transp_GHG_each_jet: in kgCO2e/Mg ethanol for each jet producer
         # Ethanol transport GHG to each SAF producer delivered
-        ethanol_unit_transp_GHG_each_jet = np.zeros((num_points, np.max(jet_ref_num)))
-        for i in range(num_points):    
-            ethanol_unit_transp_GHG_each_jet[i][:jet_ref_num[i]] = ethanol_transp_GHG_each_jet[i][:jet_ref_num[i]]/ sent_ethanol[i][:jet_ref_num[i]] # in kgCO2e/Mg ethanol
+        ethanol_unit_transp_GHG_each_jet = np.zeros_like(ethanol_transp_GHG_each_jet)
+        np.divide(
+            ethanol_transp_GHG_each_jet,
+            sent_ethanol,
+            out=ethanol_unit_transp_GHG_each_jet,
+            where=sent_ethanol > 0)
+        
         
         distances_farm_bio = [dist_sorted[i][:farm_num[i]] for i in range(num_points)]
         #mean_distances_bio = [np.mean(distances_farm_bio[i]) for i in range(num_points)]
@@ -654,6 +738,7 @@ class FeedstockTransportModel:
         self.results['jet_indexes'] = jet_indexes
         self.results['ethanol_transport_distances'] = dist_2_sorted_real
         self.results['farm_to_bio_mean_distances'] = mean_distances_bio
+        
 
         
     # Functions to get the results from the above method (calculate_location_parameters)
@@ -904,12 +989,108 @@ class FeedstockTransportModel:
                                                                                                trans_GHG=trans_GHG)
                                                                                
         #create lists of metrics
-        feedstock_delivered_price_list =[]
-        feedstock_delivered_GHG_list = []
-        ethanol_unit_transport_cost_each_jet_list = []
-        ethanol_unit_transport_GHG_each_jet_list = []
-        sent_ethanol_list = []
+        # feedstock_delivered_price_list =[]
+        # feedstock_delivered_GHG_list = []
+        # ethanol_unit_transport_cost_each_jet_list = []
+        # ethanol_unit_transport_GHG_each_jet_list = []
+        # sent_ethanol_list = []
+        
+        self.uncertain_feedstock_delivered_price = np.zeros((N, num_points))  # assuming feedstock_delivered_price is (num_points,)
+        self.uncertain_feedstock_delivered_GHG = np.zeros((N, num_points))
+        self.uncertain_feedstock_transport_price = np.zeros((N, num_points))
+        self.uncertain_feedstock_transport_CI = np.zeros((N, num_points))
+        self.uncertain_ethanol_unit_transp_cost_each_jet = np.zeros((N,) + ethanol_unit_transp_cost_each_jet.shape)
+        self.uncertain_ethanol_unit_transp_GHG_each_jet = np.zeros_like(self.uncertain_ethanol_unit_transp_cost_each_jet)
+        self.uncertain_sent_ethanol = np.zeros_like(self.uncertain_ethanol_unit_transp_cost_each_jet)
 
+        
+        
+        if feedstock == 'switchgrass':
+            crop_data = self.sw_data
+
+            
+            mean_TF_ethanol = self.mean_TF_ethanol_sw
+            # no lo voy a variar en incertidumbre por ahora
+            
+            if self.num_points == 1000 and self.seed == 1:
+                real_dist_ethanol = self.real_dist_ethanol_sw
+                ## UNCERTAINTY - +/- 10% a este valor
+            else:
+                real_dist_ethanol = self.results.get('ethanol_transport_distances', None)
+        
+        elif feedstock == 'miscanthus':
+            crop_data = self.mis_data
+            mean_TF_ethanol = self.mean_TF_ethanol_mis
+            
+            if self.num_points == 1000 and self.seed == 1:
+                real_dist_ethanol = self.real_dist_ethanol_mis
+            else:
+                real_dist_ethanol = self.results.get('ethanol_transport_distances', None)
+                #
+        crop_data['Adjusted_Price'] = (crop_data['Farm_price'])*0.8 #* (1 + inflation_rate) ** years # in $/ wet Mg
+        
+        probability_crop = yield_crop/np.sum(yield_crop)
+        
+        if self.refinery_locations is not None:
+            # Convert input list to GeoDataFrame in EPSG:4326
+            gdf_input = gpd.GeoDataFrame(geometry=[Point(lon, lat) for lat, lon in self.refinery_locations], crs='EPSG:4326')
+            
+            gdf_input_5070 = gdf_input.to_crs('EPSG:5070')# Transform to EPSG:5070
+            
+            if crop_data.crs != 'EPSG:5070':
+                crop_data = crop_data.to_crs('EPSG:5070') # Ensure crop_data is also in EPSG:5070
+            
+            from scipy.spatial import cKDTree # Find nearest crop_data point for each refinery location
+        
+            # Create arrays of coordinates
+            crop_coords = np.array(list(zip(crop_data.geometry.x, crop_data.geometry.y)))
+            refinery_coords = np.array(list(zip(gdf_input_5070.geometry.x, gdf_input_5070.geometry.y)))
+            
+            # Use KDTree for efficient nearest neighbor search
+            tree = cKDTree(crop_coords)
+            _, nearest_idx = tree.query(refinery_coords, k=1)
+        
+            # Get the rows from crop_data corresponding to nearest points
+            possible_locations = crop_data.iloc[nearest_idx]
+            self.num_points = len(possible_locations)
+        else:
+            # Original behavior: choose locations at random with yield-based probabilities
+            np.random.seed(self.seed)
+            chosen_ind = np.random.choice(len(yield_crop), self.num_points, replace=False, p=probability_crop)
+            possible_locations = crop_data.iloc[chosen_ind]
+        
+        # Add  transportation costs
+        possible_locations = gpd.sjoin(possible_locations, self.transport_costs[['Flat_bed', 'Tanker_truck', 'GHG_truck','geometry']], how='left', predicate='within')
+        
+        ##### sort by siteid
+        possible_locations = possible_locations.sort_values(by="siteid").reset_index(drop=True)
+
+        
+        # Crop coordinates
+        crop_coords = np.array(list(zip(crop_data.geometry.x, crop_data.geometry.y)))  # (M,2)
+        # Possible biorefinery locations
+        ref_coords = np.array(list(zip(possible_locations.geometry.x, possible_locations.geometry.y)))  # (P,2)
+        # Jet producers coordinates
+        jet_coords = np.array(list(zip(self.jet_producers.geometry.x, self.jet_producers.geometry.y)))  # (J,2)
+        
+        # Distance from crops to possible biorefineries (meters)
+        dist_mat = distance.cdist(ref_coords, crop_coords)  # (P, M)
+        # We are calculating here the distance matrix between possible locations of biorefineries and 
+        # total farms (each point in the yield data) = dji
+        #dist_mat = possible_locations.geometry.apply(lambda g: crop_data.distance(g)) # distance in meters, same for both crops
+        
+        # Distance from biorefineries to jet producers (meters → km)
+        dist_2 = distance.cdist(ref_coords, jet_coords)/1000  # (P, J)
+        # This calculates the distance matrix between the possible locations of ethanol biorefineries
+        #dist_2 = np.array(possible_locations.geometry.apply(lambda g: self.jet_producers.distance(g)))/1000 # divided by 1000 to get values in km
+        
+        
+        # This part is to sort the jet_producers from min distance to max in rows 
+        # This gives me indices
+        sorted_jet_ref = np.argsort(dist_2, axis = 1)
+        # We rearrange the distance matrix to respect the indices of sorted jet_fuel_refineries
+        dist_2_sorted = FeedstockTransportModel.sort_by_min_distance(dist_2, sorted_jet_ref, num_points)
+        
         for sample in range(N): 
             
             # define samples for the variables that don't vary by possible location
@@ -919,27 +1100,6 @@ class FeedstockTransportModel:
             crop_to_ethanol_gallon = df_samples['ethanol conversion rate'][sample]
             Tortuosity_reshaped = samples_from_TF_D[sample][:, np.newaxis]
             
-            if feedstock == 'switchgrass':
-                crop_data = self.sw_data
-
-                
-                mean_TF_ethanol = self.mean_TF_ethanol_sw
-                # no lo voy a variar en incertidumbre por ahora
-                
-                if self.num_points == 1000:
-                    real_dist_ethanol = self.real_dist_ethanol_sw
-                    ## UNCERTAINTY - +/- 10% a este valor
-                else:
-                    real_dist_ethanol = self.results.get('ethanol_transport_distances', None)
-            
-            elif feedstock == 'miscanthus':
-                crop_data = self.mis_data
-                mean_TF_ethanol = self.mean_TF_ethanol_mis
-                
-                if self.num_points == 1000:
-                    real_dist_ethanol = self.real_dist_ethanol_mis
-                else:
-                    real_dist_ethanol = self.results.get('ethanol_transport_distances', None)
                    
             #  Yield in wet Mg/ha
             yield_crop = np.maximum(0, (np.array(crop_data.y_data) /0.8) + samples_from_yield_crop_D[sample]*3.5) # to transform from standard normal to N(Mean,3.5)
@@ -947,59 +1107,17 @@ class FeedstockTransportModel:
             GHG_crop = (np.array(crop_data.Net_CI) * 0.8) + samples_from_GHG_crop_D[sample]*78
             # Breakeven price of feedstock at farm gate in $/wet Mg 
             Price_crop = (np.array(crop_data.Farm_price) * 0.8) * samples_from_Price_crop_D[sample]
-        
-            # Adjustments for inflation were already considered in the source file        
-            # # Calculate Farm costs per ton of feedstock 
-            # inflation_rate = 0.0319
-            # years = 2023-2016
             
             
-            crop_data['Adjusted_Price'] = (crop_data['Farm_price']) #* (1 + inflation_rate) ** years # in $/ wet Mg
         
         
             size_farms = area * yield_crop * np.ones(num_points)[..., None] 
             # yield in wet tons/ha * area in ha = total wet tons per farm
-        
-            probability_crop = yield_crop/np.sum(yield_crop)
+            
         
             # Demand of crop
             sizes_of_crop_demand = self.sizes_of_biorefineries * 1000000 / (crop_to_ethanol_gallon *0.8 ) # In wet tonnes of crop of demand
         
-            if self.refinery_locations is not None:
-                # Convert input list to GeoDataFrame in EPSG:4326
-                gdf_input = gpd.GeoDataFrame(geometry=[Point(lon, lat) for lat, lon in self.refinery_locations], crs='EPSG:4326')
-                
-                gdf_input_5070 = gdf_input.to_crs('EPSG:5070')# Transform to EPSG:5070
-                
-                if crop_data.crs != 'EPSG:5070':
-                    crop_data = crop_data.to_crs('EPSG:5070') # Ensure crop_data is also in EPSG:5070
-                
-                from scipy.spatial import cKDTree # Find nearest crop_data point for each refinery location
-            
-                # Create arrays of coordinates
-                crop_coords = np.array(list(zip(crop_data.geometry.x, crop_data.geometry.y)))
-                refinery_coords = np.array(list(zip(gdf_input_5070.geometry.x, gdf_input_5070.geometry.y)))
-                
-                # Use KDTree for efficient nearest neighbor search
-                tree = cKDTree(crop_coords)
-                _, nearest_idx = tree.query(refinery_coords, k=1)
-            
-                # Get the rows from crop_data corresponding to nearest points
-                possible_locations = crop_data.iloc[nearest_idx]
-                self.num_points = len(possible_locations)
-            else:
-                # Original behavior: choose locations at random with yield-based probabilities
-                np.random.seed(self.seed)
-                chosen_ind = np.random.choice(len(yield_crop), self.num_points, replace=False, p=probability_crop)
-                possible_locations = crop_data.iloc[chosen_ind]
-                
-            # np.random.seed(self.seed) 
-            # chosen_ind = np.random.choice(len(yield_crop), num_points, replace=False, p=probability_crop)
-            # possible_locations = crop_data.iloc[chosen_ind]
-            
-            # Add  transportation costs
-            possible_locations = gpd.sjoin(possible_locations, self.transport_costs[['Flat_bed', 'Tanker_truck', 'GHG_truck','geometry']], how='left', predicate='within')
-                
 
             trans_cost_biomass_km = samples_from_trans_cost_biomass[sample]
             trans_cost_biomass = trans_cost_biomass_km/truck_capacity # $/km/Mg 
@@ -1013,15 +1131,11 @@ class FeedstockTransportModel:
             trans_GHG_truck = trans_GHG/truck_capacity #kgCO2e/km/Mg
             trans_GHG_tanker = trans_GHG/tanker_capacity #kgCO2e/km/Mg
             
-            # We are calculating here the distance matrix between possible locations of biorefineries and 
-            # total farms (each point in the yield data) = dji
-            dist_mat = possible_locations.geometry.apply(lambda g: crop_data.distance(g)) # distance in meters, same for both crops
             # Transform to numpy array to perform operations faster
             dist = np.array(dist_mat)/1000 * Tortuosity_reshaped # /1000 to get values in km
             
             # This part is to sort the farms from min distance to max in rows
             sorted_farms = np.argsort(dist, axis = 1) # same for both crops
-            
             
             # We order the farm sizes in the same way we ordered the farms (by minimum distance indices)
             farm_sizes_sorted = FeedstockTransportModel.sort_by_min_distance(size_farms, sorted_farms, num_points) 
@@ -1031,23 +1145,17 @@ class FeedstockTransportModel:
             # We rearrange the distance matrix to respect the indices of sorted farms
             dist_sorted = FeedstockTransportModel.sort_by_min_distance(dist, sorted_farms, num_points)
             
-            # This calculates the distance matrix between the possible locations of ethanol biorefineries
-            dist_2 = np.array(possible_locations.geometry.apply(lambda g: self.jet_producers.distance(g)))/1000 # divided by 1000 to get values in km
-            # This part is to sort the jet_producers from min distance to max in rows 
-            # This gives me indices
-            sorted_jet_ref = np.argsort(dist_2, axis = 1)
-            # We rearrange the distance matrix to respect the indices of sorted jet_fuel_refineries
-            dist_2_sorted = FeedstockTransportModel.sort_by_min_distance(dist_2, sorted_jet_ref, num_points)
             
             # This code calculates the number of farms required to fill the biorefinery demand in tonnes of feedstock
-            farm_num=np.array([np.sum(farm_sizes_cum[i]<sizes_of_crop_demand) for i in range(num_points)]) 
+            farm_num = np.sum(farm_sizes_cum < sizes_of_crop_demand, axis=1)
+
             
             # We calculate our metric for the transportation of feedstock from the farms to the ethanol biorefinery
             # The transportation is given in total $
-            cost_transp_farm_to_bio = FeedstockTransportModel.calculate_feedstock_transport_totals(dist_sorted, farm_num, farm_sizes_sorted, trans_cost_biomass, num_points) 
+            cost_transp_farm_to_bio = FeedstockTransportModel.calculate_feedstock_transport_totals(dist_sorted, farm_num, farm_sizes_sorted, trans_cost_biomass, num_points) * self.roundtrip
             
             # GHG emissions from farm to bio (transportation)
-            GHG_transp_farm_to_bio = FeedstockTransportModel.calculate_feedstock_transport_totals(dist_sorted, farm_num, farm_sizes_sorted, trans_GHG_truck, num_points) 
+            GHG_transp_farm_to_bio = FeedstockTransportModel.calculate_feedstock_transport_totals(dist_sorted, farm_num, farm_sizes_sorted, trans_GHG_truck, num_points) * self.roundtrip
         
             size_jet_ref = self.Capacity_jet_producers * self.blending_capacity_set * np.ones(num_points)[..., None] # Same for all feedstocks
             
@@ -1058,43 +1166,68 @@ class FeedstockTransportModel:
             jet_ref_sizes_cum = np.cumsum(jet_ref_sizes_sorted, axis = 1) # Same for all feedstocks
             
             # This code calculates the number of jet refineries required to deliver all the biorefinery production
-            jet_ref_num=np.array([np.sum(jet_ref_sizes_cum[i]<self.mass_of_biorefineries) for i in range(num_points)]) +1 
+            jet_ref_num = np.sum(jet_ref_sizes_cum < self.mass_of_biorefineries, axis=1) + 1  
             
-            # This code calculates the number of jet refineries required to deliver all the biorefinery production
-            jet_ref_count = np.zeros(num_points)# Initialize an empty array to store the number of jet_refs needed for each row
-            for i in range(num_points):# Iterate over each row
-                for j in range(54):
-                    if j == 0:
-                        if jet_ref_sizes_cum[i][j]>= self.mass_of_biorefineries:
-                            jet_ref_count[i] = self.mass_of_biorefineries/jet_ref_sizes_cum[i][j] 
-                            break
-                    else:
-                        if jet_ref_sizes_cum[i][j]>= self.mass_of_biorefineries:
-                            jet_ref_count[i] = j + (self.mass_of_biorefineries- jet_ref_sizes_cum[i][j-1])/(jet_ref_sizes_cum[i][j] - jet_ref_sizes_cum[i][j-1])
-                            break
+            ##-------- 
+            #This code calculates the number of jet refineries required to deliver all the biorefinery production jet_ref_count
+            P, J = jet_ref_sizes_cum.shape
+            rows = np.arange(P)
+             
+            # mask where cumulative >= mass
+            mask = jet_ref_sizes_cum >= self.mass_of_biorefineries  # (P, J)
+            has = mask.any(axis=1)                              # (P,) rows that eventually reach mass
+            first_idx = np.where(has, mask.argmax(axis=1), J-1) # (P,), safe fallback to last column
+             
+            cur = jet_ref_sizes_cum[rows, first_idx]
+            prev = np.zeros_like(cur, dtype=float)
+            prev_mask = first_idx > 0
+            if prev_mask.any():
+                prev[prev_mask] = jet_ref_sizes_cum[rows[prev_mask], first_idx[prev_mask]-1]
+             
+             # compute jet_ref_count: when first_idx == 0 use mass/cur, else the fractional formula
+            jet_ref_count = np.where(first_idx == 0, self.mass_of_biorefineries / cur, 
+                                     first_idx + (self.mass_of_biorefineries - prev) / (cur - prev))
+            
+            ##--------
 
-            # Get the maximum number of jet refineries needed (integer part + 1)
-            max_jet_producers = int(np.ceil(np.max(jet_ref_count)))
-            # Create matrix sized appropriately: rows = num_points, columns = max_jet_producers
-            jet_ref_count_mat = np.zeros((num_points, max_jet_producers))
-            for p, val in enumerate(jet_ref_count):
-                integer_part = int(val)
-                decimal_part = val - integer_part
-                if integer_part < max_jet_producers:
-                    jet_ref_count_mat[p, :integer_part] = 1  # Fully filled refineries
-                    if integer_part < max_jet_producers:     # Add remaining fractional refinery
-                        jet_ref_count_mat[p, integer_part] = decimal_part
-                else:
-                    # Edge case: val is exactly equal to max_jet_producers
-                    jet_ref_count_mat[p, :max_jet_producers] = 1
-        
-            farm_cost_all_loc = np.array([np.mean(np.array((crop_data.iloc[sorted_farms[i][:farm_num[i]]]).Adjusted_Price*0.8)) for i in range(num_points)])
-            # mean cost of feedstock for all farms supplying to each possible location (1000,0)
+
+            ##---------
+            int_parts = jet_ref_count.astype(int)          # (P,) # Fully filled refineries
+            decimals = jet_ref_count - int_parts           # (P,)
+            cols = np.arange(J)                            # (J,)
             
-            # do the same for CI 
-            farm_GHG_all_loc = np.array([np.mean(np.array((crop_data.iloc[sorted_farms[i][:farm_num[i]]]).Net_CI*0.8)) for i in range(num_points)])
+            # matrix of 1s where column index < integer part
+            jet_ref_count_mat = (cols < int_parts[:, None]).astype(float)  # (P, J) # Create matrix sized appropriately: rows = num_points, columns = max_jet_producers
+            
+            # add decimal part at column int_parts (if within bounds) # Add remaining fractional refinery
+            rows = np.arange(P)
+            valid = int_parts < J
+            jet_ref_count_mat[rows[valid], int_parts[valid]] += decimals[valid]
+            ##----------
+            
+        
+            ###------ Farm cost all locations
+            # get the price array indexed by sorted_farms
+            prices_by_sorted = crop_data['Adjusted_Price'].values[sorted_farms]   # 
+            
+            P, num_farms = prices_by_sorted.shape
+            # boolean mask selecting first farm_num elements per row
+            col_idx = np.arange(num_farms)
+            mask = col_idx[None, :] < farm_num[:, None]  # (P, num_farms)
+            # sum & divide by farm_num (guard zero)
+            sum_prices = (prices_by_sorted * mask).sum(axis=1)
+            farm_cost_all_loc = np.where(farm_num > 0, sum_prices / farm_num, 0.0) # mean cost of feedstock for all farms supplying to each possible location (1000,0)
+
+            ###------
+            
+            
+            ###------ Farm CI all locations
+            # get the price array indexed by sorted_farms
+            CI_by_sorted = crop_data['Net_CI'].values[sorted_farms] *0.8  # 
+            sum_CI = (CI_by_sorted * mask).sum(axis=1)
+            farm_GHG_all_loc = np.where(farm_num > 0, sum_CI / farm_num, 0.0) # mean GHG of feedstock for all farms supplying to each possible location (1000,0)
             # in kgCO2e/wet ton crop
-            # mean GHG of feedstock for all farms supplying to each possible location (1000,0)
+            ###------
             
             # Already calculated GHG from farm to bio
             # GHG_transp_farm_to_bio.shape # in total kgCO2e
@@ -1107,31 +1240,48 @@ class FeedstockTransportModel:
             
             # Feedstock delivered price (biosteam assumes price of feedstock includes transportation)
             # farm cost in $/ton / 1000 kg/ton + transport cost in total $ / total kg of crop
-            feedstock_delivered_price = farm_cost_all_loc/1000 + cost_transp_farm_to_bio/kg_crop # in $/ wet kg
+            feedstock_transport_price = cost_transp_farm_to_bio/kg_crop # in $/ wet kg
+            feedstock_delivered_price = farm_cost_all_loc/1000 + feedstock_transport_price # in $/ wet kg
             
             # farm GHG in kgCO2e/ton crop / 1000 kg/ton + transport GHG in total kgCO2e /total kg crop
-            feedstock_delivered_GHG = farm_GHG_all_loc/1000 + GHG_transp_farm_to_bio/kg_crop # in kgCO2e/ wet kg crop
+            feedstock_transport_CI = GHG_transp_farm_to_bio/kg_crop # in kgCO2e/ wet kg crop
+            feedstock_delivered_GHG = farm_GHG_all_loc/1000 + feedstock_transport_CI # in kgCO2e/ wet kg crop
             
-            # sizes_jet_1: sizes of jet producers we deliver in ton ethanol /year (10% of their total capacity)
-            sizes_jet_1 = np.zeros((num_points, np.max(jet_ref_num)))
-            for i in range(num_points):
-                sizes_jet_1[i][:jet_ref_num[i]] = jet_ref_sizes_sorted[i][:jet_ref_num[i]]
-                
+            ###-------sizes_jet_1: sizes of jet producers we deliver in ton ethanol /year (blending_capacity_set of their total capacity)
+            max_jets = np.max(jet_ref_num)  # J max columns
+            jet_ref_num_clipped = np.minimum(jet_ref_num, max_jets)
+            cols = np.arange(max_jets)
+            mask_j = cols[None, :] < jet_ref_num_clipped[:, None]
+            sizes_to_use = jet_ref_sizes_sorted[:, :max_jets]
+            sizes_jet_1 = sizes_to_use * mask_j
+            ###---------
+
             # sent_ethanol: actual amount of ethanol sent to jet producers (last one might be less than what it can receive)
             sent_ethanol = sizes_jet_1.copy()
-            for i in range(num_points):    
-                sent_ethanol[i][jet_ref_num[i]-1] = sizes_jet_1[i][jet_ref_num[i]-1]* jet_ref_count_mat[i][jet_ref_num[i]-1]
-            # jet_indexes: to know which jet producer we supply to
-            jet_indexes = np.zeros((num_points, np.max(jet_ref_num)))
-            for i in range(num_points):
-                jet_indexes[i][:jet_ref_num[i]] = sorted_jet_ref[i][:math.ceil(jet_ref_count[i])]
+            rows = np.arange(P)
+            last_idx = jet_ref_num - 1
+            valid = last_idx >= 0
+            sent_ethanol[rows[valid], last_idx[valid]] = (
+                sizes_jet_1[rows[valid], last_idx[valid]] * jet_ref_count_mat[rows[valid], last_idx[valid]]
+            )
+            
+            # jet_indexes: to know which jet producer we supply to                
+            P, J = sorted_jet_ref.shape # P = num_points
+            K = np.max(jet_ref_num)  # only keep up to needed jets
+            #k = np.ceil(jet_ref_count).astype(int)  # how many jet indices to take per row (ceil to be safe)
+            # build mask of shape (P, K)
+            #cols_jet = np.arange(K)
+            #mask_k = cols_jet[None, :] < k[:, None]
+
+            #jet_indexes = sorted_jet_ref[:, :K] * mask_k # take only first K jet refs from each row and apply mask
+            
             # Now we combine the jet_indexes with the sent_ethanol to get tuples with which jet producer is being supplied and quantity
-            combined = []
-            for i in range(jet_indexes.shape[0]):
-                row_i = []
-                for j in range(jet_indexes.shape[1]):
-                    row_i.append((jet_indexes[i, j], sent_ethanol[i, j]))
-                combined.append(row_i)
+            # combined = []
+            # for i in range(jet_indexes.shape[0]):
+            #     row_i = []
+            #     for j in range(jet_indexes.shape[1]):
+            #         row_i.append((jet_indexes[i, j], sent_ethanol[i, j]))
+            #     combined.append(row_i)
         
             if self.sizes_of_biorefineries == 80 and self.blending_capacity_set == 0.2:
                 real_dist_ethanol_array = np.zeros((num_points, 2))
@@ -1141,6 +1291,7 @@ class FeedstockTransportModel:
                             real_dist_ethanol_array[i][j] = real_dist_ethanol[i][j]
                         except:
                             real_dist_ethanol_array[i][j] = 0
+               
 
                 dist_2_sorted_real = real_dist_ethanol_array/1000 * samples_from_dist_factor_ethanol_D[sample][:, np.newaxis]
             
@@ -1150,43 +1301,67 @@ class FeedstockTransportModel:
                 dist_2_sorted_real = dist_2_sorted * Tortuosity_ethanol_reshaped * samples_from_dist_factor_ethanol_D[sample][:, np.newaxis]
         
         
+            #--------
             # ethanol_transp_cost_each_jet: in total $/year to each jet producer
-            ethanol_transp_cost_each_jet = np.zeros((num_points, np.max(jet_ref_num)))
             # This is in total $/year to each jet producer
-            for i in range(num_points):
-                ethanol_transp_cost_each_jet[i][:jet_ref_num[i]] = dist_2_sorted_real[i][:jet_ref_num[i]]*jet_ref_sizes_sorted[i][:jet_ref_num[i]]*jet_ref_count_mat[i][:jet_ref_num[i]] *trans_cost_ethanol[i]
             
+            # ethanol_transp_cost_each_jet = np.zeros((P, J))
+            # for i in range(num_points):
+            #     ethanol_transp_cost_each_jet[i][:jet_ref_num[i]] = dist_2_sorted_real[i][:jet_ref_num[i]] * jet_ref_sizes_sorted[i][:jet_ref_num[i]] * jet_ref_count_mat[i][:jet_ref_num[i]] * trans_cost_ethanol[i]* self.roundtrip
+
+            # slice all inputs to only first K jets
+            dist_2_cap   = dist_2_sorted_real[:, :K]
+            sizes_cap    = jet_ref_sizes_sorted[:, :K]
+            count_cap    = jet_ref_count_mat[:, :K]
+            # broadcast and multiply
+            ethanol_transp_cost_each_jet = (dist_2_cap * sizes_cap * count_cap * trans_cost_ethanol[:, None])* self.roundtrip
+            # mask out beyond jet_ref_num
+            cols = np.arange(K)
+            mask = cols[None, :] < jet_ref_num[:, None]
+            ethanol_transp_cost_each_jet *= mask
+            #----------
             
-            # ethanol_unit_transp_cost_each_jet: in $/Mg ethanol for each jet producer
-            ethanol_unit_transp_cost_each_jet = np.zeros((num_points, np.max(jet_ref_num)))
-            for i in range(num_points):    
-                ethanol_unit_transp_cost_each_jet[i][:jet_ref_num[i]] = ethanol_transp_cost_each_jet[i][:jet_ref_num[i]]/ sent_ethanol[i][:jet_ref_num[i]] # in $/Mg ethanol
             
             
             # ethanol_transp_GHG_each_jet: in total kgCO2e/year to each jet producer
-            ethanol_transp_GHG_each_jet = np.zeros((num_points, np.max(jet_ref_num)))
-            for i in range(num_points):
-                ethanol_transp_GHG_each_jet[i][:jet_ref_num[i]] = dist_2_sorted_real[i][:jet_ref_num[i]]*jet_ref_sizes_sorted[i][:jet_ref_num[i]]*jet_ref_count_mat[i][:jet_ref_num[i]] *trans_GHG_tanker[i]
-            # This is in total kgCO2e/year
+            ethanol_transp_GHG_each_jet = (dist_2_cap * sizes_cap * count_cap * trans_GHG_tanker[:, None])* self.roundtrip
+            ethanol_transp_GHG_each_jet *= mask # This is in total kgCO2e/year
+            #----------
+            
+            # ethanol_unit_transp_cost_each_jet: in $/Mg ethanol for each jet producer
+            ethanol_unit_transp_cost_each_jet = np.zeros_like(ethanol_transp_cost_each_jet)
+            np.divide(
+                ethanol_transp_cost_each_jet,
+                sent_ethanol,
+                out=ethanol_unit_transp_cost_each_jet,
+                where=sent_ethanol > 0
+            )
             
             
             # ethanol_unit_transp_GHG_each_jet: in kgCO2e/Mg ethanol for each jet producer
             # Ethanol transport GHG to each SAF producer delivered
-            ethanol_unit_transp_GHG_each_jet = np.zeros((num_points, np.max(jet_ref_num)))
-            for i in range(num_points):    
-                ethanol_unit_transp_GHG_each_jet[i][:jet_ref_num[i]] = ethanol_transp_GHG_each_jet[i][:jet_ref_num[i]]/ sent_ethanol[i][:jet_ref_num[i]] # in kgCO2e/Mg ethanol
-        
-            feedstock_delivered_price_list.append(feedstock_delivered_price)
-            feedstock_delivered_GHG_list.append(feedstock_delivered_GHG)
-            ethanol_unit_transport_cost_each_jet_list.append(ethanol_unit_transp_cost_each_jet)
-            ethanol_unit_transport_GHG_each_jet_list.append(ethanol_unit_transp_GHG_each_jet)
-            sent_ethanol_list.append(sent_ethanol)
+            ethanol_unit_transp_GHG_each_jet = np.zeros_like(ethanol_transp_GHG_each_jet)
+            np.divide(
+                ethanol_transp_GHG_each_jet,
+                sent_ethanol,
+                out=ethanol_unit_transp_GHG_each_jet,
+                where=sent_ethanol > 0)
             
-        self.uncertain_feedstock_delivered_price = np.array(feedstock_delivered_price_list)
-        self.uncertain_feedstock_delivered_GHG = np.array(feedstock_delivered_GHG_list)
-        self.uncertain_ethanol_unit_transport_cost_each_jet = np.array(ethanol_unit_transport_cost_each_jet_list)
-        self.uncertain_ethanol_unit_transport_GHG_each_jet = np.array(ethanol_unit_transport_GHG_each_jet_list)
-        self.uncertain_sent_ethanol = np.array(sent_ethanol_list)
+            
+            self.uncertain_feedstock_delivered_price[sample, :] = feedstock_delivered_price
+            self.uncertain_feedstock_transport_price[sample, :] = feedstock_transport_price
+            self.uncertain_feedstock_transport_CI[sample, :] = feedstock_transport_CI
+            self.uncertain_feedstock_delivered_GHG[sample, :] = feedstock_delivered_GHG
+            self.uncertain_ethanol_unit_transp_cost_each_jet[sample, :, :] = ethanol_unit_transp_cost_each_jet
+            self.uncertain_ethanol_unit_transp_GHG_each_jet[sample, :, :] = ethanol_unit_transp_GHG_each_jet
+            self.uncertain_sent_ethanol[sample, :, :] = sent_ethanol
+
+            
+        # self.uncertain_feedstock_delivered_price = np.array(feedstock_delivered_price_list)
+        # self.uncertain_feedstock_delivered_GHG = np.array(feedstock_delivered_GHG_list)
+        # self.uncertain_ethanol_unit_transport_cost_each_jet = np.array(ethanol_unit_transport_cost_each_jet_list)
+        # self.uncertain_ethanol_unit_transport_GHG_each_jet = np.array(ethanol_unit_transport_GHG_each_jet_list)
+        # self.uncertain_sent_ethanol = np.array(sent_ethanol_list)
     
     def get_uncertain_feedstock_delivered_price(self):
         """
@@ -1222,6 +1397,30 @@ class FeedstockTransportModel:
         
         return self.uncertain_feedstock_delivered_GHG
     
+    def get_uncertain_feedstock_transport_price(self):
+
+        # Save array to a .npy file
+        if self.feedstock == 'switchgrass':
+            name = ''
+        else: 
+            name = '_mis'
+        
+        np.save(f'Feedstock_transport_price{name}.npy', self.uncertain_feedstock_transport_price)
+        
+        return self.uncertain_feedstock_transport_price
+    
+    def get_uncertain_feedstock_transport_CI(self):
+
+        # Save array to a .npy file
+        if self.feedstock == 'switchgrass':
+            name = ''
+        else: 
+            name = '_mis'
+        
+        np.save(f'Feedstock_transport_CI{name}.npy', self.uncertain_feedstock_transport_CI)
+        
+        return self.uncertain_feedstock_transport_CI
+    
     def get_uncertain_ethanol_transport_cost(self):
         """
         Returns an array shape (num_samples, num_points, num jet producers supplied) of the ethanol transport unit cost for each point (candidate location) to each jet fuel producer
@@ -1235,9 +1434,9 @@ class FeedstockTransportModel:
         else: 
             name = '_mis'
         
-        np.save(f'Ethanol_transport_cost{name}.npy', self.uncertain_ethanol_unit_transport_cost_each_jet)
+        np.save(f'Ethanol_transport_cost{name}.npy', self.uncertain_ethanol_unit_transp_cost_each_jet)
         
-        return self.uncertain_ethanol_unit_transport_cost_each_jet
+        return self.uncertain_ethanol_unit_transp_cost_each_jet
     
     def get_uncertain_ethanol_transport_GHG(self):
         """
@@ -1252,9 +1451,9 @@ class FeedstockTransportModel:
         else: 
             name = '_mis'
         
-        np.save(f'Ethanol_transport_cost{name}.npy', self.uncertain_ethanol_unit_transport_GHG_each_jet)
+        np.save(f'Ethanol_transport_CI{name}.npy', self.uncertain_ethanol_unit_transp_GHG_each_jet)
         
-        return self.uncertain_ethanol_unit_transport_GHG_each_jet
+        return self.uncertain_ethanol_unit_transp_GHG_each_jet
     
     def get_uncertain_sent_ethanol(self):
         """
@@ -1269,7 +1468,7 @@ class FeedstockTransportModel:
         else: 
             name = '_mis'
         
-        np.save(f'Sent_ethanol{name}.npy', self.uncertain_sent_ethanol)
+        np.save(f'uncertain_sent_ethanol{name}.npy', self.uncertain_sent_ethanol)
         
         return self.uncertain_sent_ethanol
     

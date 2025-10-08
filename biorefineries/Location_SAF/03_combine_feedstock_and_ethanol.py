@@ -16,21 +16,21 @@ for all candidate locations, with uncertainty.
 import pandas as pd
 import geopandas as gpd
 import numpy as np
-from scipy.spatial.distance import cdist
-import libpysal as ps
-import matplotlib.pyplot as plt
-from pyproj import Transformer
-import math
-import matplotlib as mpl
+#from scipy.spatial.distance import cdist
+#import libpysal as ps
+#import matplotlib.pyplot as plt
+#from pyproj import Transformer
+#import math
+#import matplotlib as mpl
 import os
-import ast
-from scipy.optimize import curve_fit
+#import ast
+#from scipy.optimize import curve_fit
 
 #%% Load results from previos model files
 
 # load existing arrays for chosen feedstock
 
-feedstock = 'miscanthus'
+feedstock = 'switchgrass'
 
 if feedstock == 'switchgrass':
     name = ''
@@ -143,7 +143,7 @@ np.save(f'ethanol_delivered_price_each_jet{name}.npy', ethanol_delivered_price_e
 
 # load arrays
 feedstock_delivered_GHG = np.load(f'Feedstock_GHG{name}.npy') # in kgCO2eq/ wet kg crop 
-ethanol_unit_transp_GHG_each_jet = np.load(f'Ethanol_transport_GHG{name}.npy') # in kgCO2eq/Mg ethanol
+ethanol_unit_transp_GHG_each_jet = np.load(f'Ethanol_transport_CI{name}.npy') # in kgCO2eq/Mg ethanol
 
 #%% Combine with ethanol CI equations
 
@@ -224,6 +224,7 @@ np.save(f'ethanol_GHG_kgCO2_per_kg{name}.npy', ethanol_GHG_kgCO2_per_kg)
 
 ethanol_delivered_GHG = ethanol_GHG_kgCO2_per_kg + weighted_average_GHG_kg # in kgCO2 eq/ kg ethanol
 
-#%%
+#%% Save weighted average results
 
-
+np.save(f'ethanol_delivered_price{name}.npy', ethanol_delivered_price) 
+np.save(f'ethanol_delivered_CI{name}.npy', ethanol_delivered_GHG) 
