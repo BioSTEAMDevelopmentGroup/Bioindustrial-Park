@@ -41,8 +41,7 @@ class PreFerSTEA(bst.TEA):
     def __init__(self, system, IRR, duration, depreciation, income_tax,
                 operating_days, lang_factor, construction_schedule, WC_over_FCI,
                 labor_cost, fringe_benefits, property_tax,
-                property_insurance, supplies, maintenance, administration,
-                target_production_kg_hr=None):
+                property_insurance, supplies, maintenance, administration):
         # Huang et. al. does not take into account financing or startup
         # so these parameters are 0 by default
         super().__init__(system, IRR, duration, depreciation, income_tax,
@@ -57,9 +56,6 @@ class PreFerSTEA(bst.TEA):
         self.supplies= supplies
         self.maintenance = maintenance
         self.administration = administration
-        
-        # Store target production rate
-        self._target_production_kg_hr = target_production_kg_hr
 
     depreciation_schedules: dict[tuple[str, int], NDArray[float]] = {
 
@@ -211,66 +207,6 @@ class PreFerSTEA(bst.TEA):
         accounting.entry('Property insurance', np.array(self.property_insurance * FCI), f'{self.property_insurance:.1%} of FCI')
         return accounting.table()
     
-    def set_production_rate(self, target_production_kg_hr):
-        """
-        Set the target production rate and adjust system inputs accordingly.
-        
-        Parameters
-        ----------
-        target_production_kg_hr : float
-            Target production rate in kg/hr for LegH_3 stream
-            
-        Returns
-        -------
-        float
-            Achieved production rate [kg/hr]
-        """
-        # Import the function from LegH module
-        from biorefineries.prefers.systems.LegH.LegH import set_production_rate
-        
-        self._target_production_kg_hr = target_production_kg_hr
-        
-        # Call the design specification function
-        achieved_production = set_production_rate(self.system, target_production_kg_hr)
-        
-        return achieved_production
-    
-    def check_product_specifications(self):
-        """
-        Check if the product stream meets all specifications.
-        
-        Returns
-        -------
-        bool
-            True if all specifications are met
-            
-        Raises
-        ------
-        ValueError
-            If any specification is not met
-        """
-        # Import the function from LegH module
-        from biorefineries.prefers.systems.LegH.LegH import check_legH_specifications
-        
-        # Get the product stream (LegH_3)
-        product_stream = self.system.flowsheet.stream.LegH_3
-        
-        # Check specifications
-        return check_legH_specifications(product_stream)
-    
-    @property
-    def target_production_kg_hr(self):
-        """Target production rate in kg/hr"""
-        return self._target_production_kg_hr
-    
-    @target_production_kg_hr.setter
-    def target_production_kg_hr(self, value):
-        """Set target production rate and adjust system"""
-        if value is not None:
-            self.set_production_rate(value)
-        else:
-            self._target_production_kg_hr = None
-    
     # S-curve 0.10, 0.6, 0.3
     # Food tech 0.15，0.60， 0.25
     # Pharmaceutical 0.25, 0.50, 0.25
@@ -283,176 +219,118 @@ if __name__ == '__main__':
     from biorefineries.prefers.systems.LegH.LegH import create_LegH_system
     from biorefineries.prefers._process_settings import load_process_settings
     from biosteam import settings
-    
-    print("="*85)
-    print("LEGHEMOGLOBIN TEA - WITH DESIGN SPECIFICATION")
-    print("="*85)
-    
-    # Load process settings
     load_process_settings()
-    
-    # Create system
-    print("\n1. Creating LegH system...")
     legH_sys = create_LegH_system()
-    legH_sys.operating_hours = 8000
     
-    # Define target production rate
-    TARGET_PRODUCTION = 275  # kg/hr
-    
-    print(f"\n2. Running baseline simulation...")
-    legH_sys.simulate()
-    baseline_production = legH_sys.flowsheet.stream.LegH_3.F_mass
-    print(f"   Baseline production: {baseline_production:.2f} kg/hr")
-    
-    # Create TEA object WITH target production rate
-    print(f"\n3. Creating TEA with target production = {TARGET_PRODUCTION} kg/hr...")
+    legH_sys.simulate()  # Simulate the system to ensure all units are ready
     legH_tea = PreFerSTEA(
-        system=legH_sys, 
-        IRR=0.18, 
-        duration=(2024, 2044), 
-        depreciation='IRAS6',
-        income_tax=0.17, 
-        operating_days=333, 
-        lang_factor=None,
-        construction_schedule=(0.15, 0.60, 0.25), 
-        WC_over_FCI=0.15,
-        labor_cost=10*6e4, 
-        fringe_benefits=0.17+0.07, 
-        property_tax=0.005,
-        property_insurance=0.005, 
-        supplies=0.02, 
-        maintenance=0.03,
-        administration=0.05,
-        target_production_kg_hr=TARGET_PRODUCTION  # SET PRODUCTION RATE HERE
+        system=legH_sys, IRR=0.18, duration=(2024, 2044), depreciation='IRAS6',
+        income_tax=0.17, operating_days=333, lang_factor=None,
+        construction_schedule=(0.15, 0.60, 0.25), WC_over_FCI=0.15,
+        labor_cost=10*6e4, fringe_benefits=0.17+0.07, property_tax=0.005,
+        property_insurance=0.005, supplies=0.02, maintenance=0.03,
+        administration=0.05
     )
-    
-    # Set production rate using the TEA method
-    print(f"\n4. Adjusting system to target production rate...")
-    achieved_production = legH_tea.set_production_rate(TARGET_PRODUCTION)
-    
-    # Verify specifications
-    print(f"\n5. Checking product specifications...")
-    try:
-        legH_tea.check_product_specifications()
-        print("   ✓ All specifications met!")
-    except ValueError as e:
-        print(f"   ✗ Specification check failed: {e}")
-    
-    # Get product stream
-    products = legH_sys.flowsheet.stream.LegH_3
-    
-    print(f"\n{'='*85}")
-    print("TEA RESULTS")
-    print(f"{'='*85}")
-    
-    # Calculate annual production
-    annual_production_kg = products.F_mass * legH_sys.operating_hours
-    annual_production_MT = annual_production_kg / 1000
-    
-    print(f"\nProduction Summary:")
-    print(f"  Hourly production:  {products.F_mass:.2f} kg/hr")
-    print(f"  Annual production:  {annual_production_MT:.2f} metric tons/year")
-    print(f"  Operating hours:    {legH_sys.operating_hours} hr/year")
-    
+    products = legH_sys.flowsheet('LegH_3')
     # %%
-    print(f"\n{'='*85}")
     legH_tea.show()  # Display the TEA summary
-    
     # %%
-    print(f"\n{'='*85}")
-    print("CASH FLOW TABLE")
-    print(f"{'='*85}")
-    cashflow_table = legH_tea.get_cashflow_table()
-    print(cashflow_table)
-    #cashflow_table.to_excel('LegH_cashflow_table.xlsx',index=True)
-    
+    legH_tea.get_cashflow_table()
+    #legH_tea.get_cashflow_table().to_excel('LegH_cashflow_table.xlsx',index=True)
     # %%
-    print(f"\n{'='*85}")
-    print("MINIMUM SELLING PRICE")
-    print(f"{'='*85}")
-    price = legH_tea.solve_price(products) # USD/kg
-    print(f"  LegH MPSP: ${price:.4f}/kg")
-    print(f"  LegH MPSP: ${price*1000:.2f}/metric ton")
-    annual_revenue = price * annual_production_kg
-    print(f"  Annual revenue (at MPSP): ${annual_revenue/1e6:.2f} million")
-    
+    price=legH_tea.solve_price(products) # USD/kg
+    print(f"\nLegH price: ${round(price, 5)}/kg")   
     # %%
-    print(f"\n{'='*85}")
-    print("COST BREAKDOWN TABLES")
-    print(f"{'='*85}")
-    
     from biorefineries.prefers import _table as tb
-    
-    print("\nAll Cost Table:")
     df1 = tb.all_cost_table(legH_tea)
-    print(df1)
     #df1.to_excel('LegH_cost_table.xlsx',index=True)
-    
+    print(df1)
     # %%
-    print("\nVariable Operating Costs:")
-    df2 = bst.report.voc_table(legH_sys, 'LegH_3')
-    print(df2)
+    df2=bst.report.voc_table(legH_sys,'LegH_3')
     #df2.to_excel('LegH_voc_table.xlsx',index=True)
-    
-    # %%
-    print("\nCAPEX Breakdown:")
-    df8 = legH_tea.CAPEX_table()
-    print(df8)
-    #df8.to_excel('LegH_CAPEX_table.xlsx',index=True)
-    
-    # %%
-    print("\nFixed Operating Costs:")
-    df9 = legH_tea.FOC_table()
-    print(df9)
-    #df9.to_excel('LegH_FOC_table.xlsx',index=True)
-    
-    # %%
-    print(f"\n{'='*85}")
-    print("UNIT OPERATION TABLES")
-    print(f"{'='*85}")
-    
-    print("\nReaction Tables:")
+    print(df2)
+    # # %%
     df3 = bst.report.unit_reaction_tables(legH_sys.units)
-    print(df3)
     #df3.to_excel('LegH_reaction_table.xlsx',index=True)
-    
+    print(df3)
     # %%
-    print("\nUnit Results:")
     df4 = bst.report.unit_result_tables(legH_sys.units)
-    print(df4)
     #df4.to_excel('LegH_result_table.xlsx',index=True)
-    
+    print(df4)
     # %%
-    print(f"\n{'='*85}")
-    print("UTILITY TABLES")
-    print(f"{'='*85}")
-    
-    print("\nHeat Utilities:")
     df5 = bst.report.heat_utility_tables(legH_sys.units)
-    print(df5[0])  # Heating
-    print(df5[1])  # Cooling
-    print(df5[2])  # Summary
+    #df5.to_excel('LegH_heat_utility_table.xlsx',index=True)
+    print(df5)
+    # assemble df5[0], df5[1], df5[2] to a new dataframe as df55
+    # and then save it to an excel file
     df55 = pd.concat([df5[0], df5[1], df5[2]], axis=0, ignore_index=True)
     #df55.to_excel('LegH_heat_utility_table_combined.xlsx',index=True)
-    
     # %%
-    print("\nPower Utilities:")
     df6 = bst.report.power_utility_table(legH_sys.units)
-    print(df6)
     #df6.to_excel('LegH_power_utility_table.xlsx',index=True)
-    
+    print(df6)
     # %%
-    print("\nOther Utilities:")
     df7 = bst.report.other_utilities_table(legH_sys.units)
-    print(df7)
     #df7.to_excel('LegH_other_utility_table.xlsx',index=True)
-    
-    print(f"\n{'='*85}")
-    print("TEA ANALYSIS COMPLETE")
-    print(f"{'='*85}")
-    print(f"Target Production:   {TARGET_PRODUCTION:.2f} kg/hr")
-    print(f"Achieved Production: {products.F_mass:.2f} kg/hr")
-    print(f"LegH MPSP:          ${price:.4f}/kg")
-    print(f"{'='*85}\n")
+    print(df7)
+    # df77 = pd.concat([df6, df7], axis=0, ignore_index=True)
+    #df77.to_excel('LegH_all_utility_table.xlsx',index=True)
+    # %%
+    df8 = legH_tea.CAPEX_table()
+    #df8.to_excel('LegH_CAPEX_table.xlsx',index=True)
+    print(df8)
+    # %%
+    df9 = legH_tea.FOC_table()
+    #df9.to_excel('LegH_FOC_table.xlsx',index=True)
+    print(df9)
 
+# %% Purchased equipment costs
+    # print('Purchased Costs:')
+    # for i in legH_tea.units:
+    #     #if i in legH_tea.units: continue
+    #     val = i.purchase_cost
+    #     print(i.ID, ', ', val)
+    # print('Installed Costs:')
+    # for i in legH_tea.units:
+    #     #if i in legH_tea.units: continue
+    #     val = i.installed_cost
+    #     print(i.ID, ', ', val)
+    # for i in legH_tea.units:
+    #     #if i in legH_tea.units: continue
+    #     val = i.installed_cost
+    #     print(i.ID, ', ', val)
+    #     # if val or i.ID=='M':
+    #     #     print(i.ID, ', ', val)
+# %% Production costs
+    
+    # # %%
+    # costs = legH_tea.production_costs(products)# USD/yr
+    # np.round(costs / 1e6) # million USD / yr
+
+    # # %%
+    # # Debug: Print system feeds and products to understand structure
+    # print("System feeds:")
+    # for i, feed in enumerate(legH_sys.feeds):
+    #     print(f"  {i}: {feed.ID} ({feed})")
+    # print("\nSystem products:")
+    # for i, product in enumerate(legH_sys.products):
+    #     print(f"  {i}: {product.ID} ({product})")
+    
+    # # Alternative approach: Find the Glucose feed by name
+    # glucose_feed = None
+    # for feed in legH_sys.feeds:
+    #     if feed.ID == 'Glucose':
+    #         glucose_feed = feed
+    #         break
+    
+    # if glucose_feed is None:
+    #     # If not found by ID, try to access from system inputs by index
+    #     # The Glucose stream is the 3rd input (index 2) in the system inputs
+    #     glucose_feed = legH_sys.feeds[2]  # Index 2 corresponds to s.Glucose
+    
+    # price = legH_tea.solve_price(glucose_feed) # USD/kg
+    # print(f"\nGlucose price: ${round(price, 5)}/kg")
+    # # %%
+    # legH_tea.IRR = legH_tea.solve_IRR()
+    # legH_tea.show()
 # %%
