@@ -9,7 +9,7 @@ import biosteam as bst
 import thermosteam as tmo
 
 from biorefineries import corn
-from biorefineries.isobutanol import units
+from biorefineries.isobutanol import units, lumped_yeast_glucose_ethanol_isobutanol
 
 
 __all__ = ('corn_EtOH_IBO_sys',)
@@ -45,7 +45,9 @@ parameters = settings.process_parameters
 #%%
 V405_old = f.V405
 
-V405_new = units.SSFEtOHIBO('V405', (f.E402-0, f.P404-0), outs=('CO2', ''), V=1.9e3)
+V405_new = units.SSFEtOHIBO('V405', (f.E402-0, f.P404-0), outs=('CO2', ''), V=1.9e3,
+                            nsk_reaction_sys=lumped_yeast_glucose_ethanol_isobutanol.rxn_sys,
+                            )
 V405_new-0-1-f.V409
 V405_new-1-0-f.P406
 
