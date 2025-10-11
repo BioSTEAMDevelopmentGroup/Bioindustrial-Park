@@ -8,7 +8,7 @@ import biosteam as bst
 
 #%%
 def load_preferences_and_process_settings(T,flow_units,N,P_units,CE,
-                                          indicator,electricity_price,
+                                          indicator,
                                           electricity_EI):
     bst.preferences.T = T
     bst.preferences.flow = flow_units
@@ -19,10 +19,7 @@ def load_preferences_and_process_settings(T,flow_units,N,P_units,CE,
     bst.preferences.save()
     bst.settings.CEPCI = CE  
     bst.settings.define_impact_indicator(key=indicator, units='kg*CO2e')
-    bst.settings.electricity_price = electricity_price
+    # bst.settings.electricity_price = electricity_price
     bst.settings.set_electricity_CF(indicator,electricity_EI, basis='kWhr', units='kg*CO2e')
     
-    bst.settings.get_agent('cooling_water').regeneration_price = 0
-    bst.settings.get_agent('chilled_water').heat_transfer_price = 0
-    bst.settings.get_agent('chilled_brine').heat_transfer_price = 0
-    bst.settings.get_agent('propane').heat_transfer_price = 0
+    # bst.settings.get_agent('chilled_brine').heat_transfer_price = 0
