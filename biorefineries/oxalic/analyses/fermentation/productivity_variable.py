@@ -1,9 +1,18 @@
+#!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-"""
-Created on Thu Sep 25 11:53:45 2025
+# Oxalic acid biorefineries.
+# Copyright (C) 2024-, Sarang Bhagwat <sarangb2@illinois.edu>, Wenjun Guo <wenjung2@illinois.edu>
+# 
+# This module is under the UIUC open-source license. See 
+# github.com/BioSTEAMDevelopmentGroup/biosteam/blob/master/LICENSE.txt
+# for license details.
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
 
-@author: IGB
 """
+This file is to generate results for varying productivities under the certain titer, yield, and feedstock price.
+"""
+
 #%%
 # Run this cell first
 from warnings import filterwarnings
