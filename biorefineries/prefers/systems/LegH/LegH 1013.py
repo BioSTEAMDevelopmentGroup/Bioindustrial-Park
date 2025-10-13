@@ -354,7 +354,7 @@ def create_LegH_system(
         OtherLargeMolecules_ID = c.chemical_groups['OtherLargeMolecules'],
         TargetProduct_Retention=0.995, Salt_Retention=0.001,
         OtherLargeMolecules_Retention=0.995, DefaultSolutes_Retention=0.015,
-        FeedWater_Recovery_to_Permeate=0.75,
+        FeedWater_Recovery_to_Permeate=0.2,
         TMP_bar1= 15 ,# 10-25
         TMP_bar2= 4  ,# 3-6
         membrane_flux_LMH=25, # 10-40
@@ -364,141 +364,15 @@ def create_LegH_system(
     #S406 = bst.SolidsSeparator('S406', ins=U403-1, outs=(effluent4, 'S406Out'), split=(1) , moisture_content=0.01)
     #S407 = u.ReverseOsmosis('S407', ins=U403-1, outs=('S407Out',effluent4))
 
-    U404 = u.Ultrafiltration(
-        'U404',
-        ins = (U403-0),
-        outs = ( 'U404Out', 'PermeateWater'),
-        TargetProduct_ID = 'Leghemoglobin',
-        Salt_ID = c.chemical_groups['Salts'],
-        OtherLargeMolecules_ID = c.chemical_groups['OtherLargeMolecules'],
-        TMP_bar = 3,
-        FeedWater_Recovery_to_Permeate = 0.75,  # Initial value, will be adjusted by spec
-        )
-    
-    # Target specifications from check_legH_specifications
-    U404.target_total_solids_percent = 12.0  # Target: 0-24%, aim for middle-low range
-    U404.target_legh_percent = 7.5  # Target: 6-9%, aim for middle
-    
-    @U404.add_specification(run=False)
-    def U404_adjust_water_recovery():
-        """
-        Dynamically adjust water recovery to achieve target total solids content
-        while maintaining product specifications.
-        """
-        import flexsolve as flx
-        import warnings
-        
-        feed_stream = U404.ins[0]
-        product_stream = U404.outs[0]
-        
-        # Safety check: ensure feed has content
-        if feed_stream.F_mass <= 0:
-            U404._run()
-            return
-        
-        # Calculate initial solids content in feed
-        feed_total_mass = feed_stream.F_mass
-        feed_water_mass = feed_stream.imass['H2O']
-        feed_solids_mass = feed_total_mass - feed_water_mass
-        
-        if feed_solids_mass <= 0:
-            print(f"   [{U404.ID}] Warning: No solids in feed stream")
-            U404._run()
-            return
-        
-        # Define objective function: adjust recovery to hit target solids %
-        def calculate_total_solids_error(water_recovery):
-            """
-            Calculate error between actual and target total solids percentage.
-            
-            Parameters
-            ----------
-            water_recovery : float
-                Fraction of water removed to permeate (0-0.95)
-            
-            Returns
-            -------
-            float
-                Error = (actual_solids% - target_solids%) [%]
-            """
-            # Ensure water recovery is within reasonable bounds
-            water_recovery = max(0.05, min(0.95, water_recovery))
-            
-            # Set recovery and run unit (warnings suppressed by outer context)
-            U404.FeedWater_Recovery_to_Permeate = water_recovery
-            U404._run()
-            
-            # Calculate total solids percentage in retentate (product)
-            product_total_mass = product_stream.F_mass
-            
-            if product_total_mass <= 0:
-                return 100.0  # Large error if no product
-            
-            product_water_mass = product_stream.imass['H2O']
-            product_solids_mass = product_total_mass - product_water_mass
-            
-            actual_solids_percent = (product_solids_mass / product_total_mass) * 100
-            
-            return actual_solids_percent - U404.target_total_solids_percent
-        
-        try:
-            # Suppress warnings during optimization
-            with warnings.catch_warnings():
-                warnings.simplefilter("ignore")
-                
-                # Use IQ_interpolation to find optimal water recovery
-                optimal_recovery = flx.IQ_interpolation(
-                    f=calculate_total_solids_error,
-                    x0=0.10,  # Minimum recovery (keep more water)
-                    x1=0.95,  # Maximum recovery (remove more water)
-                    x=U404.FeedWater_Recovery_to_Permeate,  # Initial guess
-                    xtol=0.001,  # 1% tolerance on recovery
-                    ytol=0.05,   # 0.05% tolerance on solids content
-                    maxiter=50,
-                )
-        
-            # Set optimal recovery and run final time (warnings enabled)
-            U404.FeedWater_Recovery_to_Permeate = optimal_recovery
-            U404._run()
-            
-            # Verify final product specifications
-            product_total_mass = product_stream.F_mass
-            product_water_mass = product_stream.imass['H2O']
-            product_solids_mass = product_total_mass - product_water_mass
-            product_legh_mass = product_stream.imass['Leghemoglobin']
-            
-            actual_solids_percent = (product_solids_mass / product_total_mass) * 100
-            actual_legh_percent = (product_legh_mass / product_total_mass) * 100
-            
-            # Print results
-            print(f"   [{U404.ID}] Optimized water recovery: {optimal_recovery:.3f}")
-            print(f"   [{U404.ID}] Total solids: {actual_solids_percent:.2f}% "
-                  f"(target: {U404.target_total_solids_percent:.2f}%)")
-            print(f"   [{U404.ID}] Leghemoglobin: {actual_legh_percent:.2f}% "
-                  f"(target: {U404.target_legh_percent:.2f}%)")
-            
-            # Warning if specifications are not met
-            if actual_solids_percent > 24.0:
-                print(f"   [{U404.ID}] WARNING: Total solids {actual_solids_percent:.2f}% "
-                      f"exceeds maximum 24%")
-            if actual_legh_percent < 6.0 or actual_legh_percent > 9.0:
-                print(f"   [{U404.ID}] WARNING: Leghemoglobin {actual_legh_percent:.2f}% "
-                      f"outside target range 6-9%")
-        
-        except Exception as e:
-            print(f"   [{U404.ID}] Specification optimization failed: {e}")
-            print(f"   [{U404.ID}] Using default recovery: {U404.FeedWater_Recovery_to_Permeate:.3f}")
-            U404._run()
+    S408 = bst.SprayDryer(
+        'S408', 
+        ins=U403-0,
+        outs=('EvaporatedWater', 'S408Out'),
+        moisture_content=0.9,  # 90% moisture content in the final product
+    )
+    S408.add_specification(run=True)
 
-    # S408 = bst.SprayDryer(
-    #     'S408', 
-    #     ins=U403-0,
-    #     outs=('EvaporatedWater', 'S408Out'),
-    #     moisture_content=0.90,  # 90% moisture content in the final product
-    # )
-    # S408.add_specification(run=True)
-
-    M501 = bst.MixTank('M501', ins=(S403-1,U401-1,U402-1,U402-2,U403-1,U404-1), 
+    M501 = bst.MixTank('M501', ins=(S403-1,U401-1,U402-1,U402-2,U403-1), 
                     outs='M501Out', tau=1)
     M501.add_specification(run=True)
 
@@ -522,7 +396,7 @@ def create_LegH_system(
 
     H406 = bst.HXutility(
         'H406',
-        ins=U404-0,
+        ins=S408-1,
         outs=LegH_3,
         T=0+273.15,  # Cool to 0°C
         cool_only=True,
@@ -548,7 +422,8 @@ def create_LegH_system(
                             F.Water5, F.Water6,
                             F.Water7, F.Water8,
                             F.boiler_makeup_water)
-    process_water_streams = (F.S501.outs[1],F.S503.outs[1],
+    process_water_streams = (F.S501.outs[1],
+                            F.EvaporatedWater,
                             *makeup_water_streams)
 
     makeup_water = bst.Stream('makeup_water', price=0.000254)
@@ -587,7 +462,6 @@ def set_production_rate(system, target_production_rate_kg_hr):
         Achieved production rate [kg/hr]
     """
     import flexsolve as flx
-    import warnings
     
     # Get product stream
     product_stream = system.flowsheet.stream.LegH_3
@@ -607,11 +481,7 @@ def set_production_rate(system, target_production_rate_kg_hr):
     print(f"Baseline input streams stored: {len(baseline_flows)} streams")
     
     # Run initial simulation to get baseline
-    print("Running initial simulation to establish baseline...")
-    with warnings.catch_warnings():
-        warnings.simplefilter("ignore")
-        system.simulate()
-    
+    system.simulate()
     initial_production = product_stream.F_mass
     
     if initial_production <= 0:
@@ -623,7 +493,7 @@ def set_production_rate(system, target_production_rate_kg_hr):
     print(f"  Initial production: {initial_production:.2f} kg/hr")
     print(f"  Target production:  {target_production_rate_kg_hr:.2f} kg/hr")
     print(f"  Initial scaling guess: {initial_guess:.4f}x")
-    print(f"  Search bounds: 0.1x to 5.0x baseline")
+    print(f"  Search bounds: 0.1x to 10.0x baseline")
     
     # Iteration tracking
     iteration = [0]
@@ -650,17 +520,16 @@ def set_production_rate(system, target_production_rate_kg_hr):
             for stream, baseline_flow in baseline_flows.items():
                 stream.F_mass = baseline_flow * scaling_factor
             
-            # Simulate system with scaled inputs (warnings suppressed by outer context)
+            # Simulate system with scaled inputs
             system.simulate()
             
             # Get achieved production rate
             achieved_rate = product_stream.F_mass
             error = achieved_rate - target_production_rate_kg_hr
             
-            # Print progress (only every 5 iterations to reduce clutter)
-            if iteration[0] % 5 == 0 or abs(error) < 1.0:
-                print(f"    Iteration {iteration[0]}: scale={scaling_factor:.4f}x, "
-                      f"production={achieved_rate:.2f} kg/hr, error={error:.4f} kg/hr")
+            # Print progress
+            print(f"    Iteration {iteration[0]}: scale={scaling_factor:.4f}x, "
+                  f"production={achieved_rate:.2f} kg/hr, error={error:.4f} kg/hr")
             
             return error
             
@@ -670,32 +539,24 @@ def set_production_rate(system, target_production_rate_kg_hr):
             return 1e6 if scaling_factor > initial_guess else -1e6
     
     try:
-        print(f"\nSolving for optimal scaling factor (intermediate warnings suppressed)...")
+        print(f"\nSolving for optimal scaling factor using flexsolve.IQ_interpolation...")
         
-        # Suppress all warnings during the iterative solving process
-        with warnings.catch_warnings():
-            warnings.simplefilter("ignore")
-            
-            # Use flexsolve directly (not as a system specification)
-            scaling_factor = flx.IQ_interpolation(
-                f=objective_function,
-                x0=0.1,              # Lower bound
-                x1=5.0,              # Upper bound
-                x=initial_guess,     # Initial guess
-                xtol=0.0001,         # Tolerance on scaling factor
-                ytol=0.01,           # Tolerance on production rate [kg/hr]
-                maxiter=100,
-                checkbounds=True,
-                checkiter=True,
-            )
+        # Use flexsolve directly (not as a system specification)
+        scaling_factor = flx.IQ_interpolation(
+            f=objective_function,
+            x0=0.1,              # Lower bound
+            x1=10.0,             # Upper bound
+            x=initial_guess,     # Initial guess
+            xtol=0.001,          # Tolerance on scaling factor
+            ytol=1.0,            # Tolerance on production rate [kg/hr]
+            maxiter=100,
+            checkbounds=True,
+            checkiter=True,
+        )
         
-        # After solver converges, run final simulation WITHOUT suppressing warnings
-        # This allows any persistent issues to be displayed
-        print(f"\nSolver converged. Running final validation simulation...")
+        # Final simulation with converged scaling factor
         for stream, baseline_flow in baseline_flows.items():
             stream.F_mass = baseline_flow * scaling_factor
-        
-        # Final simulation with warnings enabled
         system.simulate()
         
         achieved_rate = product_stream.F_mass
@@ -720,7 +581,7 @@ def set_production_rate(system, target_production_rate_kg_hr):
         for stream, baseline_flow in baseline_flows.items():
             stream.F_mass = baseline_flow
         
-        # Run one final simulation with baseline flows (warnings enabled)
+        # Run one final simulation with baseline flows
         try:
             system.simulate()
             print(f"  System restored to baseline: {product_stream.F_mass:.2f} kg/hr")
@@ -728,6 +589,7 @@ def set_production_rate(system, target_production_rate_kg_hr):
             print(f"  Warning: Could not restore baseline simulation: {restore_error}")
         
         raise ValueError(f"Could not achieve target production rate of {target_production_rate_kg_hr:.2f} kg/hr: {e}")
+
 
 
 def check_legH_specifications(product_stream):
@@ -854,9 +716,9 @@ def check_legH_specifications(product_stream):
 if __name__ == '__main__':
     # Set preferences
     bst.preferences.N = 50
-    nn=1
+    
     # Define target production rate
-    TARGET_PRODUCTION = 275 * nn # kg/hr
+    TARGET_PRODUCTION = 500 # kg/hr
     
     print("="*85)
     print("LEGHEMOGLOBIN PRODUCTION SYSTEM - DESIGN SPECIFICATION MODE")

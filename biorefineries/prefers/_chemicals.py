@@ -42,14 +42,11 @@ chemical_groups = dict(
                 'TrehaloseDH',
                 'SodiumAscorbate',),
 
+    # Negtive
     BoundImpurities = (
                     'EDTA',
                     'Glycine',
-                    'Heme_b',
-                    'Chitin',
                     'RNA',
-                    'Glucan',
-                    'Globin',
                     'Mannoprotein',
                     'OleicAcid'),
 
@@ -58,11 +55,12 @@ chemical_groups = dict(
 
     Salts = ('KOH',
             'NaCl',
+            'KCl',
             '(NH4)2SO4',
             'FeSO4',
             'MgSO4',
             'KH2PO4',
-            'K2HJPO4',
+            'K2HPO4',
             '(NH4)2HPO4',
             'K2HPO4',
             'NH3',
@@ -87,7 +85,9 @@ chemical_groups = dict(
                         'CSL',
                         'Globin',
                         'Mannoprotein',
-                        'Chitin',),
+                        'Chitin',
+                        'OleicAcid',
+                        'RNA'),
 
     # DefaultSolutes = ('Glycine',
     #                     'CitricAcid',

@@ -800,6 +800,187 @@ class Diafiltration(bst.Unit):
             
         self.baseline_purchase_costs['Pump'] = self.pump1.purchase_cost + self.pump2.purchase_cost # Assume 2 pumps for operation feed & recirculation
 
+class Ultrafiltration(bst.Unit):
+    """
+    Single-pass ultrafiltration unit with one feed stream.
+    Retains the Diafiltration retention logic but removes diafiltration buffer
+    and circulation pump handling.
+    """
+    _N_ins = 1
+    _N_outs = 2
+
+    _F_BM_default = {
+        'Membrane System': 1.65,
+        'Membrane replacement': 1.65,
+        'Pump': 1.89,
+    }
+    water_ID = Diafiltration.water_ID
+    _default_TargetProduct_ID = Diafiltration._default_TargetProduct_ID
+    _default_Salt_ID = Diafiltration._default_Salt_ID
+    _default_OtherLargeMolecules_ID = Diafiltration._default_OtherLargeMolecules_ID
+    _default_TargetProduct_Retention = Diafiltration._default_TargetProduct_Retention
+    _default_Salt_Retention = Diafiltration._default_Salt_Retention
+    _default_OtherLargeMolecules_Retention = Diafiltration._default_OtherLargeMolecules_Retention
+    _default_DefaultSolutes_Retention = Diafiltration._default_DefaultSolutes_Retention
+    _default_FeedWater_Recovery_to_Permeate = Diafiltration._default_FeedWater_Recovery_to_Permeate
+    _default_membrane_flux_LMH = Diafiltration._default_membrane_flux_LMH
+    _default_TMP_bar = Diafiltration._default_TMP_bar1
+    _default_membrane_cost_USD_per_m2 = Diafiltration._default_membrane_cost_USD_per_m2
+    _default_membrane_lifetime_years = Diafiltration._default_membrane_lifetime_years
+    _default_module_cost_factor = Diafiltration._default_module_cost_factor
+    _default_module_cost_exponent = Diafiltration._default_module_cost_exponent
+    _default_base_CEPCI = Diafiltration._default_base_CEPCI
+    _default_equipment_lifetime_years = Diafiltration._default_equipment_lifetime_years
+
+    _units = Diafiltration._units
+
+    def __init__(self, ID='', ins=None, outs=None, thermo=None,
+                 TargetProduct_ID=None, Salt_ID=None, OtherLargeMolecules_ID=None,
+                 TargetProduct_Retention=None, Salt_Retention=None,
+                 OtherLargeMolecules_Retention=None, DefaultSolutes_Retention=None,
+                 FeedWater_Recovery_to_Permeate=None,
+                 membrane_flux_LMH=None, TMP_bar=None,
+                 membrane_cost_USD_per_m2=None, membrane_lifetime_years=None,
+                 equipment_lifetime_years=None,
+                 module_cost_factor=None, module_cost_exponent=None, base_CEPCI=None,
+                 **kwargs):
+        super().__init__(ID, ins, outs, thermo, **kwargs)
+        self.TargetProduct_ID = TargetProduct_ID if TargetProduct_ID is not None else self._default_TargetProduct_ID
+        self.Salt_ID = Salt_ID if Salt_ID is not None else self._default_Salt_ID
+        self.OtherLargeMolecules_ID = OtherLargeMolecules_ID if OtherLargeMolecules_ID is not None else self._default_OtherLargeMolecules_ID
+        self.TargetProduct_Retention = TargetProduct_Retention if TargetProduct_Retention is not None else self._default_TargetProduct_Retention
+        #self.Salt_Retention = Salt_Retention if Salt_Retention is not None else self._default_Salt_Retention
+        self.OtherLargeMolecules_Retention = OtherLargeMolecules_Retention if OtherLargeMolecules_Retention is not None else self._default_OtherLargeMolecules_Retention
+        self.DefaultSolutes_Retention = DefaultSolutes_Retention if DefaultSolutes_Retention is not None else self._default_DefaultSolutes_Retention
+        self.FeedWater_Recovery_to_Permeate = FeedWater_Recovery_to_Permeate if FeedWater_Recovery_to_Permeate is not None else self._default_FeedWater_Recovery_to_Permeate
+        self.Salt_Retention = 1 - self.FeedWater_Recovery_to_Permeate
+        self.membrane_flux_LMH = membrane_flux_LMH if membrane_flux_LMH is not None else self._default_membrane_flux_LMH
+        self.TMP_bar = TMP_bar if TMP_bar is not None else self._default_TMP_bar
+        self.membrane_cost_USD_per_m2 = membrane_cost_USD_per_m2 if membrane_cost_USD_per_m2 is not None else self._default_membrane_cost_USD_per_m2
+        self.membrane_lifetime_years = membrane_lifetime_years if membrane_lifetime_years is not None else self._default_membrane_lifetime_years
+        self.equipment_lifetime_years = equipment_lifetime_years if equipment_lifetime_years is not None else self._default_equipment_lifetime_years
+        self.module_cost_factor = module_cost_factor if module_cost_factor is not None else self._default_module_cost_factor
+        self.module_cost_exponent = module_cost_exponent if module_cost_exponent is not None else self._default_module_cost_exponent
+        self.base_CEPCI = base_CEPCI if base_CEPCI is not None else self._default_base_CEPCI
+        self.power_utility = bst.PowerUtility()
+
+    def _run(self):
+        feed, = self.ins
+        retentate, permeate = self.outs
+
+        retentate.T = permeate.T = feed.T
+        retentate.P = permeate.P = feed.P
+
+        permeate.empty()
+        retentate.empty()
+
+        feed_water_mass = feed.imass[self.water_ID]
+        retentate_water = feed_water_mass * (1.0 - self.FeedWater_Recovery_to_Permeate)
+        retentate.imass[self.water_ID] = max(0.0, retentate_water)
+        permeate.imass[self.water_ID] = max(0.0, feed_water_mass - retentate.imass[self.water_ID])
+
+        import warnings as _warnings
+        available_ids = {chem.ID for chem in self.chemicals}
+
+        def _to_id_list(x):
+            if x is None:
+                return []
+            if isinstance(x, (list, tuple, set)):
+                return [i for i in x if i is not None]
+            return [x]
+
+        retention_map = {}
+        attr_map = (
+            (_to_id_list(self.TargetProduct_ID), self.TargetProduct_Retention, "TargetProduct"),
+            (_to_id_list(self.OtherLargeMolecules_ID), self.OtherLargeMolecules_Retention, "OtherLargeMolecules"),
+            (_to_id_list(self.Salt_ID), self.Salt_Retention, "Salt"),
+        )
+        for ids, retention, label in attr_map:
+            missing = []
+            for chem_id in ids:
+                if chem_id in available_ids:
+                    retention_map[chem_id] = retention
+                else:
+                    missing.append(chem_id)
+            if missing:
+                _warnings.warn(
+                    f"Ultrafiltration: {label} IDs not found in thermo chemicals and will use default retention: {missing}",
+                    RuntimeWarning,
+                )
+
+        for chem in self.chemicals:
+            ID = chem.ID
+            if ID == self.water_ID:
+                continue
+            mass_in = feed.imass[ID]
+            if mass_in < 1e-12:
+                continue
+
+            current_retention = retention_map.get(ID, self.DefaultSolutes_Retention)
+            retentate_mass = mass_in * current_retention
+            permeate_mass = mass_in - retentate_mass
+
+            retentate.imass[ID] = max(0.0, retentate_mass)
+            permeate.imass[ID] = max(0.0, permeate_mass)
+
+            if permeate.imass[ID] < 0:
+                retentate.imass[ID] += permeate.imass[ID]
+                permeate.imass[ID] = 0.0
+            if retentate.imass[ID] < 0:
+                permeate.imass[ID] += retentate.imass[ID]
+                retentate.imass[ID] = 0.0
+
+    def _design(self):
+        Design = self.design_results
+        permeate_stream = self.outs[1]
+        if permeate_stream.isempty() or permeate_stream.rho == 0:
+            permeate_vol_L_per_hr = 0.0
+        else:
+            permeate_vol_L_per_hr = permeate_stream.F_vol * 1000.0
+
+        membrane_area_m2 = permeate_vol_L_per_hr / self.membrane_flux_LMH if (self.membrane_flux_LMH > 0 and permeate_vol_L_per_hr > 0) else 0.0
+        Design['Membrane Area'] = membrane_area_m2
+        Design['membrane_flux_LMH'] = self.membrane_flux_LMH
+        Design['TMP_bar'] = self.TMP_bar
+        Design['membrane_cost_USD_per_m2'] = self.membrane_cost_USD_per_m2
+        Design['membrane_lifetime_years'] = self.membrane_lifetime_years
+        Design['equipment_lifetime_years'] = self.equipment_lifetime_years
+
+        self.feed_pump = bst.Pump(None, None, P=self.TMP_bar * 1e5)
+        self.feed_pump.ins[0] = self.ins[0].copy()
+        self.feed_pump.simulate()
+        self.feed_pump._design()
+        Design['pump_efficiency'] = 0.85 * 100.0
+        self.power_utility.rate = self.feed_pump.power_utility.rate
+    
+    def _cost(self):
+        # --- MODIFIED: Properly calculate total membrane replacement cost over equipment lifetime ---
+        area_m2 = self.design_results.get('Membrane Area', 0.0)
+        if area_m2 > 0 and self.module_cost_factor > 0 and self.base_CEPCI > 0:
+            base_purchase_cost = self.module_cost_factor * (area_m2 ** self.module_cost_exponent)
+            current_purchase_cost = base_purchase_cost * (bst.CE / self.base_CEPCI)
+            self.baseline_purchase_costs['Membrane System'] = current_purchase_cost
+        else:
+            self.baseline_purchase_costs['Membrane System'] = 0.0
+            
+        # Calculate total membrane replacement cost over equipment lifetime
+        if (self.membrane_lifetime_years > 0 and
+            self.membrane_cost_USD_per_m2 > 0 and
+            area_m2 > 0 and
+            self.equipment_lifetime_years > 0):
+            
+            # Calculate number of membrane replacements over equipment lifetime
+            num_replacements = self.equipment_lifetime_years / self.membrane_lifetime_years
+            
+            # Total membrane replacement cost over equipment lifetime
+            total_replacement_cost = num_replacements * area_m2 * self.membrane_cost_USD_per_m2
+            
+            self.baseline_purchase_costs['Membrane replacement'] = total_replacement_cost
+        else:
+            self.baseline_purchase_costs['Membrane replacement'] = 0.0
+            
+        self.baseline_purchase_costs['Pump'] = self.feed_pump.purchase_cost
+    
 
 import flexsolve as flx
 from biosteam import main_flowsheet as F

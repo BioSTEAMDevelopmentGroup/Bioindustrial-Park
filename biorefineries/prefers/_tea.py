@@ -297,7 +297,7 @@ if __name__ == '__main__':
     legH_sys.operating_hours = 8000
     
     # Define target production rate
-    TARGET_PRODUCTION = 275  # kg/hr
+    TARGET_PRODUCTION = 275 * 1  # kg/hr
     
     print(f"\n2. Running baseline simulation...")
     legH_sys.simulate()
