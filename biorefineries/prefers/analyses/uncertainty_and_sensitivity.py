@@ -458,7 +458,7 @@ if __name__ == '__main__':
     tci_idx = ('PreFerS', 'TCI [10^6 $]')
     aoc_idx = ('PreFerS', 'AOC [10^6 $/yr]')
     gwp_idx = ('PreFerS', 'GWP [kg CO2-eq/kg]')
-    
+
     # =============================================================================
     # SPEARMAN'S RANK CORRELATION (Using NO SCALE data)
     # =============================================================================
@@ -472,72 +472,177 @@ if __name__ == '__main__':
     param_data = results_no_scale[param_indices]
     metric_data = results_no_scale[metric_indices]
     
-    df_rho = pd.DataFrame(index=pd.MultiIndex.from_tuples(param_indices), 
-                          columns=pd.MultiIndex.from_tuples(metric_indices))
-    df_p = pd.DataFrame(index=pd.MultiIndex.from_tuples(param_indices), 
-                        columns=pd.MultiIndex.from_tuples(metric_indices))
+    # =============================================================================
+    # FILTER OUT FIXED PARAMETERS (e.g., production scale when fixed)
+    # =============================================================================
+    
+    print("\nChecking for fixed parameters...")
+    variable_param_indices = []
+    fixed_param_indices = []
     
     for param_idx in param_indices:
-        for metric_idx in metric_indices:
-            rho, p_val = spearmanr(param_data[param_idx], metric_data[metric_idx])
-            df_rho.at[param_idx, metric_idx] = rho
-            df_p.at[param_idx, metric_idx] = p_val
+        param_values = param_data[param_idx]
+        # Check if parameter varies (more than 1 unique value, considering floating point tolerance)
+        unique_count = param_values.nunique()
+        std_dev = param_values.std()
+        
+        # Consider parameter as fixed if:
+        # 1. Only 1 unique value, OR
+        # 2. Standard deviation is extremely small (< 1e-10)
+        if unique_count == 1 or std_dev < 1e-10:
+            fixed_param_indices.append(param_idx)
+            print(f"  ⚠️  Fixed parameter detected: {param_idx}")
+            print(f"      Value: {param_values.iloc[0]:.6f}, Std: {std_dev:.2e}")
+        else:
+            variable_param_indices.append(param_idx)
+            print(f"  ✓ Variable parameter: {param_idx}")
+            print(f"      Range: [{param_values.min():.4f}, {param_values.max():.4f}], Std: {std_dev:.4f}")
     
-    print("\nSpearman's Correlation Coefficients (ρ):")
-    print(df_rho)
+    print(f"\nSummary:")
+    print(f"  Variable parameters: {len(variable_param_indices)}")
+    print(f"  Fixed parameters: {len(fixed_param_indices)}")
     
-    msp_rho = df_rho[msp_idx]
-    tci_rho = df_rho[tci_idx]
-    aoc_rho = df_rho[aoc_idx]
-    gwp_rho = df_rho[gwp_idx]
-    
-    parameter_descriptions = [p.element_name + ': ' + p.name for p in model.parameters]
-    
-    # Generate individual Spearman plots
-    print("\nGenerating Spearman correlation plots...")
-    
-    for metric_name, rho_series, color in [
-        ('MSP', msp_rho, '#A97802'),
-        ('TCI', tci_rho, '#607429'),
-        ('AOC', aoc_rho, '#A100A1'),
-        ('GWP', gwp_rho, '#E74C3C'),
-    ]:
+    if len(variable_param_indices) == 0:
+        print("\n⚠️  WARNING: No variable parameters found! Skipping Spearman analysis.")
+    else:
+        # =============================================================================
+        # CALCULATE SPEARMAN CORRELATION (ONLY FOR VARIABLE PARAMETERS)
+        # =============================================================================
+        
+        # Use only variable parameters
+        param_data_variable = results_no_scale[variable_param_indices]
+        
+        df_rho = pd.DataFrame(index=pd.MultiIndex.from_tuples(variable_param_indices), 
+                              columns=pd.MultiIndex.from_tuples(metric_indices))
+        df_p = pd.DataFrame(index=pd.MultiIndex.from_tuples(variable_param_indices), 
+                            columns=pd.MultiIndex.from_tuples(metric_indices))
+        
+        for param_idx in variable_param_indices:
+            for metric_idx in metric_indices:
+                try:
+                    rho, p_val = spearmanr(param_data_variable[param_idx], metric_data[metric_idx])
+                    df_rho.at[param_idx, metric_idx] = rho
+                    df_p.at[param_idx, metric_idx] = p_val
+                except Exception as e:
+                    print(f"  Warning: Failed to calculate Spearman for {param_idx} vs {metric_idx}: {e}")
+                    df_rho.at[param_idx, metric_idx] = np.nan
+                    df_p.at[param_idx, metric_idx] = np.nan
+        
+        print("\nSpearman's Correlation Coefficients (ρ) for Variable Parameters:")
+        print(df_rho)
+        
+        # Extract correlations for key metrics
+        msp_rho = df_rho[msp_idx]
+        tci_rho = df_rho[tci_idx]
+        aoc_rho = df_rho[aoc_idx]
+        gwp_rho = df_rho[gwp_idx]
+        
+        # Create parameter descriptions (ONLY for variable parameters)
+        parameter_descriptions = []
+        for param_idx in variable_param_indices:
+            # Find the parameter object
+            param_obj = next((p for p in model.parameters if p.index == param_idx), None)
+            if param_obj:
+                parameter_descriptions.append(param_obj.element_name + ': ' + param_obj.name)
+            else:
+                parameter_descriptions.append(str(param_idx))
+        
+        # =============================================================================
+        # GENERATE SPEARMAN PLOTS
+        # =============================================================================
+        
+        print("\nGenerating Spearman correlation plots...")
+        
+        # Individual 1D Spearman plots
+        for metric_name, rho_series, color in [
+            ('MSP', msp_rho, '#A97802'),
+            ('TCI', tci_rho, '#607429'),
+            ('AOC', aoc_rho, '#A100A1'),
+            ('GWP', gwp_rho, '#E74C3C'),
+        ]:
+            try:
+                # Remove NaN values
+                rho_series_clean = rho_series.dropna()
+                
+                if len(rho_series_clean) == 0:
+                    print(f"  ⚠️  No valid correlations for {metric_name}, skipping plot")
+                    continue
+                
+                # Get corresponding descriptions for non-NaN entries
+                valid_indices = [i for i, idx in enumerate(variable_param_indices) 
+                               if idx in rho_series_clean.index]
+                descriptions_clean = [parameter_descriptions[i] for i in valid_indices]
+                
+                fig, ax = bst.plots.plot_spearman_1d(
+                    rho_series_clean,
+                    index=descriptions_clean,
+                    name=metric_name,
+                    color=color,
+                    sort=True,
+                )
+                plt.tight_layout()
+                plt.savefig(f'LegH_spearman_{metric_name}_{timestamp}.png', dpi=300, bbox_inches='tight')
+                print(f"  ✓ Saved {metric_name} Spearman plot ({len(rho_series_clean)} parameters)")
+                plt.close()
+            except Exception as e:
+                print(f"  ⚠️  Failed {metric_name} Spearman plot: {e}")
+        
+        # Combined 2D Spearman plot
         try:
-            fig, ax = bst.plots.plot_spearman_1d(
-                rho_series,
-                index=parameter_descriptions,
-                name=metric_name,
-                color=color,
-                sort=True,
-            )
-            plt.tight_layout()
-            plt.savefig(f'LegH_spearman_{metric_name}_{timestamp}.png', dpi=300, bbox_inches='tight')
-            print(f"  ✓ Saved {metric_name} Spearman plot")
-            plt.close()
+            # Check if we have enough variable parameters
+            if len(variable_param_indices) < 2:
+                print(f"  ⚠️  Too few variable parameters ({len(variable_param_indices)}) for 2D Spearman plot")
+            else:
+                # Remove NaN values from all series
+                msp_rho_clean = msp_rho.dropna()
+                tci_rho_clean = tci_rho.dropna()
+                aoc_rho_clean = aoc_rho.dropna()
+                gwp_rho_clean = gwp_rho.dropna()
+                
+                # Find common indices (parameters with valid correlations for all metrics)
+                common_indices = (set(msp_rho_clean.index) & 
+                                set(tci_rho_clean.index) & 
+                                set(aoc_rho_clean.index) & 
+                                set(gwp_rho_clean.index))
+                
+                if len(common_indices) < 2:
+                    print(f"  ⚠️  Too few parameters with valid correlations ({len(common_indices)}) for 2D Spearman plot")
+                else:
+                    # Reorder to match common indices
+                    common_indices = sorted(list(common_indices), 
+                                          key=lambda x: variable_param_indices.index(x))
+                    
+                    msp_rho_final = msp_rho_clean[common_indices]
+                    tci_rho_final = tci_rho_clean[common_indices]
+                    aoc_rho_final = aoc_rho_clean[common_indices]
+                    gwp_rho_final = gwp_rho_clean[common_indices]
+                    
+                    # Get corresponding descriptions
+                    valid_indices = [i for i, idx in enumerate(variable_param_indices) 
+                                   if idx in common_indices]
+                    descriptions_final = [parameter_descriptions[i] for i in valid_indices]
+                    
+                    fig_2d, ax_2d = bst.plots.plot_spearman_2d(
+                        rhos=[msp_rho_final, tci_rho_final, aoc_rho_final, gwp_rho_final],
+                        index=descriptions_final,
+                        color_wheel=(
+                            mcolors.to_rgb('#A97802'),
+                            mcolors.to_rgb('#607429'),
+                            mcolors.to_rgb('#A100A1'),
+                            mcolors.to_rgb('#E74C3C'),
+                        ),
+                        sort=True,
+                    )
+                    fig_2d.set_figwidth(10)
+                    fig_2d.set_figheight(max(6, len(common_indices) * 0.5))  # Adjust height based on parameters
+                    plt.tight_layout()
+                    plt.savefig(f'LegH_spearman_2D_{timestamp}.png', dpi=300, bbox_inches='tight')
+                    print(f"  ✓ Saved combined 2D Spearman plot ({len(common_indices)} parameters)")
+                    plt.close()
         except Exception as e:
-            print(f"  ⚠️  Failed {metric_name} Spearman plot: {e}")
-    
-    # Combined 2D Spearman plot
-    try:
-        fig_2d, ax_2d = bst.plots.plot_spearman_2d(
-            rhos=[msp_rho, tci_rho, aoc_rho, gwp_rho],
-            index=parameter_descriptions,
-            color_wheel=(
-                mcolors.to_rgb('#A97802'),
-                mcolors.to_rgb('#607429'),
-                mcolors.to_rgb('#A100A1'),
-                mcolors.to_rgb('#E74C3C'),
-            ),
-            sort=True,
-        )
-        fig_2d.set_figwidth(10)
-        fig_2d.set_figheight(12)
-        plt.tight_layout()
-        plt.savefig(f'LegH_spearman_2D_{timestamp}.png', dpi=300, bbox_inches='tight')
-        print(f"  ✓ Saved combined 2D Spearman plot")
-        plt.close()
-    except Exception as e:
-        print(f"  ⚠️  Failed 2D Spearman plot: {e}")
+            print(f"  ⚠️  Failed 2D Spearman plot: {e}")
+            import traceback
+            traceback.print_exc()
     
     # =============================================================================
     # KDE PLOTS (Using BOTH scenarios)
