@@ -2,7 +2,12 @@
 """
 Created on 2025-01-XX
 
-Uncertainty and Sensitivity Analysis for LegH Biorefinery - PARALLELIZED WITH ROBUST SAMPLING
+Uncertainty and Sensitivity Analysis for LegHemoglobin Production - COMPREHENSIVE ANALYSIS
+
+Strategy:
+1. Monte Carlo WITHOUT Production Scale → Spearman correlations, KDE plots, contour plots
+2. Monte Carlo WITH Production Scale → Scale effects analysis
+3. Single-Point Sensitivity WITH ALL parameters → Tornado diagrams
 
 @author: Dr. Ouwen Peng
 @title: Postdoctoral Researcher
@@ -16,9 +21,10 @@ filterwarnings('ignore')
 import numpy as np
 import pandas as pd
 import biosteam as bst
-from biorefineries.prefers.models import create_model
+from biorefineries.prefers._models import create_model
 import matplotlib.pyplot as plt
 import matplotlib.colors as mcolors
+import seaborn as sns
 import thermosteam as tmo
 from datetime import datetime
 import multiprocessing as mp
@@ -28,149 +34,138 @@ from functools import partial
 # Worker Function for Parallel Execution
 # =============================================================================
 
-def evaluate_single_sample(sample_index_and_data, baseline_production_kg_hr):
+def evaluate_single_sample(sample_index_and_data, baseline_production_kg_hr, exclude_production_scale=False):
     """
     Worker function to evaluate a single Monte Carlo sample.
-    This function runs in a separate process.
     
     Parameters
     ----------
     sample_index_and_data : tuple
         (index, sample_array) where sample_array contains parameter values
     baseline_production_kg_hr : float
-        Baseline production rate for system initialization
-    
-    Returns
-    -------
-    tuple
-        (index, parameter_values_dict, metric_values_dict, is_valid)
+        Baseline production rate
+    exclude_production_scale : bool
+        If True, fix production scale to baseline
     """
     index, sample = sample_index_and_data
     
     try:
-        # Create a fresh model for this worker process
         model = create_model(baseline_production_kg_hr=baseline_production_kg_hr)
+        
+        # Dictionary to store ACTUAL parameter values used in simulation
+        param_values = {}
         
         # Apply the sample to the model parameters
         for i, param in enumerate(model.parameters):
-            param.setter(sample[i])
+            # Check if this is the production scale parameter
+            is_production_scale = 'production scale' in param.name.lower()
+            
+            if exclude_production_scale and is_production_scale:
+                # Use fixed baseline value
+                param.setter(baseline_production_kg_hr)
+                param_values[param.index] = baseline_production_kg_hr  # ← FIXED: Store actual value
+            else:
+                # Use sampled value
+                param.setter(sample[i])
+                param_values[param.index] = sample[i]  # ← Store sampled value
         
-        # Simulate the system
         model.system.simulate()
         
-        # Collect parameter values
-        param_values = {param.index: sample[i] for i, param in enumerate(model.parameters)}
-        
-        # Collect metric values
+        # param_values now contains ACTUAL values used (not sample array)
         metric_values = {metric.index: metric() for metric in model.metrics}
         
-        # Validate that all metrics are finite
         is_valid = all(np.isfinite(v) for v in metric_values.values())
         
         return (index, param_values, metric_values, is_valid)
         
     except Exception as e:
-        # Return invalid result with NaN values
-        param_values = {param.index: sample[i] for i, param in enumerate(model.parameters)}
+        # On error, still need to report what values were SUPPOSED to be used
+        param_values = {}
+        for i, param in enumerate(model.parameters):
+            is_production_scale = 'production scale' in param.name.lower()
+            if exclude_production_scale and is_production_scale:
+                param_values[param.index] = baseline_production_kg_hr
+            else:
+                param_values[param.index] = sample[i]
+        
         metric_values = {metric.index: np.nan for metric in model.metrics}
         return (index, param_values, metric_values, False)
 
 
 # =============================================================================
-# Main Execution Block (Must be protected by if __name__ == '__main__')
+# Robust Parallel Monte Carlo Function
 # =============================================================================
 
-if __name__ == '__main__':
-    # Protect multiprocessing code to ensure cross-platform compatibility
-    mp.freeze_support()  # Required for Windows
+def run_monte_carlo(model, N_target, baseline_production_kg_hr, exclude_production_scale=False, 
+                   batch_size=100, scenario_name=""):
+    """
+    Run robust parallel Monte Carlo simulation.
     
-    # Set random seed for reproducibility
-    np.random.seed(1234)
-    
-    # Get timestamp for file naming
-    now = datetime.now()
-    timestamp = now.strftime('%Y.%m.%d-%H.%M')
-    
-    # Create model with baseline production
-    print("="*80)
-    print("LEGHEMOGLOBIN BIOREFINERY - UNCERTAINTY & SENSITIVITY ANALYSIS")
-    print("="*80)
-    print("\nCreating model...")
-    
-    baseline_production_kg_hr = 275
-    model = create_model(baseline_production_kg_hr=baseline_production_kg_hr)
-    
-    # Display model structure
-    print("\nModel Parameters:")
-    model.show()
-    
-    # Set sample size
-    N_target = 1000  # Number of VALID samples we want
-    batch_size = 100  # Process samples in batches
-    
-    print(f"\nTarget: {N_target} valid samples")
-    print("Using robust sampling strategy with automatic retry for failed simulations...")
-    
-    # Evaluate baseline (serial, only once)
-    print("\nEvaluating baseline scenario...")
-    baseline = model.metrics_at_baseline()
-    print("\nBaseline Metrics:")
-    for name, value in baseline.items():
-        print(f"  {name}: {value:.4f}")
-    
-    # =============================================================================
-    # ROBUST PARALLEL MONTE CARLO SIMULATION
-    # =============================================================================
-    
+    Parameters
+    ----------
+    model : biosteam.Model
+        The model to evaluate
+    N_target : int
+        Target number of valid samples
+    baseline_production_kg_hr : float
+        Baseline production rate
+    exclude_production_scale : bool
+        If True, fix production scale to baseline
+    batch_size : int
+        Number of samples per batch
+    scenario_name : str
+        Description of the scenario for logging
+        
+    Returns
+    -------
+    results_table : pd.DataFrame
+        Table of parameter and metric values
+    simulation_stats : dict
+        Statistics about the simulation
+    """
     print(f"\n{'='*80}")
-    print(f"RUNNING ROBUST PARALLEL MONTE CARLO SIMULATION")
+    print(f"RUNNING MONTE CARLO: {scenario_name}")
     print(f"{'='*80}")
     
-    # Determine number of CPU cores to use
+    if exclude_production_scale:
+        print(f"Production scale FIXED at {baseline_production_kg_hr} kg/hr")
+    else:
+        print(f"Production scale VARYING (baseline: {baseline_production_kg_hr} kg/hr)")
+    
+    # Determine number of CPU cores
     n_cores = mp.cpu_count()
-    n_workers = max(1, n_cores - 1)  # Leave one core free
-    print(f"\nSystem has {n_cores} CPU cores")
-    print(f"Using {n_workers} parallel workers")
+    n_workers = max(1, n_cores - 1)
+    print(f"\nUsing {n_workers} parallel workers (of {n_cores} cores)")
     
     # Storage for valid results
     valid_results = []
     total_attempts = 0
     
-    # Create partial function with baseline_production_kg_hr fixed
     worker_func = partial(evaluate_single_sample, 
-                         baseline_production_kg_hr=baseline_production_kg_hr)
+                         baseline_production_kg_hr=baseline_production_kg_hr,
+                         exclude_production_scale=exclude_production_scale)
     
     # Robust sampling loop
     while len(valid_results) < N_target:
-        # Calculate how many more valid samples we need
         remaining = N_target - len(valid_results)
-        
-        # Generate batch of samples (with 20% buffer for failed simulations)
         batch_to_generate = min(batch_size, int(remaining * 1.2) + 10)
         
         print(f"\n--- Batch {len(valid_results)//batch_size + 1} ---")
         print(f"Generating {batch_to_generate} samples...")
         
-        # Sample parameters using Latin Hypercube sampling
-        # Use different seed for each batch to ensure diversity
+        # Sample parameters
         batch_samples = model.sample(batch_to_generate, rule='L')
         
-        # Prepare sample data for parallel processing
         sample_data = [(total_attempts + i, batch_samples[i]) 
                       for i in range(batch_to_generate)]
         
-        # Create multiprocessing pool and execute in parallel
         with mp.Pool(processes=n_workers) as pool:
             batch_results = []
-            
-            # Process samples in parallel
             for result in pool.imap_unordered(worker_func, sample_data):
                 batch_results.append(result)
-            
             pool.close()
             pool.join()
         
-        # Filter valid results from this batch
         batch_valid_count = 0
         batch_invalid_count = 0
         
@@ -178,625 +173,1092 @@ if __name__ == '__main__':
             total_attempts += 1
             
             if is_valid:
-                # Store valid result with sequential index
                 valid_results.append((len(valid_results), param_vals, metric_vals))
                 batch_valid_count += 1
             else:
                 batch_invalid_count += 1
         
-        # Progress update
         success_rate = (len(valid_results) / total_attempts * 100) if total_attempts > 0 else 0
         print(f"  Batch results: {batch_valid_count} valid, {batch_invalid_count} invalid")
-        print(f"  Collected {len(valid_results)} / {N_target} valid samples " +
-              f"after {total_attempts} attempts ({success_rate:.1f}% success rate)")
+        print(f"  Progress: {len(valid_results)}/{N_target} valid samples " +
+              f"({success_rate:.1f}% success rate)")
         
-        # Safety check: if success rate is too low, warn user
         if total_attempts > 100 and success_rate < 50:
-            print(f"\n⚠️  WARNING: Success rate is low ({success_rate:.1f}%). " +
-                  "This may indicate systematic issues with parameter ranges.")
+            print(f"\n⚠️  WARNING: Low success rate ({success_rate:.1f}%)")
     
-    print(f"\n✓ Robust Monte Carlo simulation complete!")
-    print(f"  Valid samples collected: {len(valid_results)}")
-    print(f"  Total simulation attempts: {total_attempts}")
-    print(f"  Overall success rate: {len(valid_results)/total_attempts*100:.1f}%")
+    print(f"\n✓ Monte Carlo simulation complete!")
+    print(f"  Valid samples: {len(valid_results)}")
+    print(f"  Total attempts: {total_attempts}")
+    print(f"  Success rate: {len(valid_results)/total_attempts*100:.1f}%")
     
-    # =============================================================================
-    # RECONSTRUCT RESULTS TABLE FROM VALID SAMPLES ONLY
-    # =============================================================================
-    
-    print(f"\nReconstructing results table from valid samples...")
-    
-    # Build results table structure
+    # Reconstruct results table
     param_indices = [param.index for param in model.parameters]
     metric_indices = [metric.index for metric in model.metrics]
     all_indices = param_indices + metric_indices
     
-    # Create DataFrame from valid results only
     data = []
     for idx, param_vals, metric_vals in valid_results:
         row = {}
-        row.update(param_vals)
+        row.update(param_vals)  # ← Now contains ACTUAL values used
         row.update(metric_vals)
         data.append(row)
     
     results_table = pd.DataFrame(data, columns=all_indices)
     
-    print(f"  Results table shape: {results_table.shape}")
-    print(f"  All {len(results_table)} samples are guaranteed to be valid (no NaN/inf)")
+    # VERIFICATION STEP: Check if production scale is actually fixed
+    if exclude_production_scale:
+        production_scale_idx = ('Design', 'Production scale [kg/hr]')
+        if production_scale_idx in results_table.columns:
+            scale_values = results_table[production_scale_idx]
+            unique_scales = scale_values.nunique()
+            print(f"\n  Verification: Production scale has {unique_scales} unique value(s)")
+            if unique_scales == 1:
+                print(f"  ✓ Production scale correctly fixed at {scale_values.iloc[0]:.2f} kg/hr")
+            else:
+                print(f"  ⚠️  WARNING: Production scale varies despite exclude_production_scale=True!")
+                print(f"     Range: {scale_values.min():.2f} - {scale_values.max():.2f} kg/hr")
     
-    # Verify no NaN or inf values remain
-    has_nan = results_table.isnull().any().any()
-    has_inf = np.isinf(results_table.select_dtypes(include=[np.number])).any().any()
-    
-    if has_nan or has_inf:
-        print("\n⚠️  WARNING: Unexpected NaN or inf values detected in final table!")
-    else:
-        print("  ✓ Verification passed: No NaN or inf values in results table")
-    
-    # Save results to Excel
-    output_file = f'legH_uncertainty_analysis_{timestamp}_{N_target}sims_parallel_robust.xlsx'
-    print(f"\nSaving results to {output_file}...")
-    results_table.to_excel(output_file)
-    
-    # Save simulation statistics
-    stats_data = {
-        'Metric': ['Target valid samples', 'Actual valid samples', 'Total attempts', 
-                   'Success rate (%)', 'Failed simulations'],
-        'Value': [N_target, len(valid_results), total_attempts,
-                 f"{len(valid_results)/total_attempts*100:.2f}",
-                 total_attempts - len(valid_results)]
+    simulation_stats = {
+        'n_valid': len(valid_results),
+        'n_attempts': total_attempts,
+        'success_rate': len(valid_results)/total_attempts*100,
+        'exclude_production_scale': exclude_production_scale
     }
-    stats_df = pd.DataFrame(stats_data)
     
-    with pd.ExcelWriter(output_file, mode='a', engine='openpyxl') as writer:
-        stats_df.to_excel(writer, sheet_name='Simulation Statistics', index=False)
+    return results_table, simulation_stats
+
+
+# =============================================================================
+# Contour Plot Generation Function
+# =============================================================================
+
+def generate_2d_contour_plots(results_table, param_indices, metric_indices, timestamp):
+    """Generate 2D contour plots showing joint impact of fermentation parameters."""
+    print("\n" + "="*80)
+    print("GENERATING 2D CONTOUR PLOTS")
+    print("="*80)
+    
+    # Find parameter indices
+    titer_idx = next((idx for idx in param_indices if 'titer' in str(idx).lower()), None)
+    yield_idx = next((idx for idx in param_indices if 'yield' in str(idx).lower()), None)
+    productivity_idx = next((idx for idx in param_indices if 'productivity' in str(idx).lower()), None)
+    
+    # Find metric indices
+    msp_idx = next((idx for idx in metric_indices if 'MSP' in str(idx)), None)
+    gwp_idx = next((idx for idx in metric_indices if 'GWP' in str(idx)), None)
+    legh_content_idx = next((idx for idx in metric_indices if 'Leghemoglobin content' in str(idx)), None)
+    protein_purity_idx = next((idx for idx in metric_indices if 'Protein purity' in str(idx)), None)
+    
+    if not all([titer_idx, yield_idx, productivity_idx]):
+        print("  ⚠️  Could not find all fermentation parameters")
+        return
+    
+    # Define plot configurations
+    plot_configs = [
+        # MSP contours
+        {'x': titer_idx, 'y': yield_idx, 'z': msp_idx, 
+         'xlabel': 'Titer [g/L]', 'ylabel': 'Yield [%]', 'zlabel': 'MSP [$/kg]',
+         'title': 'MSP_vs_Titer_and_Yield', 'cmap': 'YlOrRd'},
+        
+        {'x': titer_idx, 'y': productivity_idx, 'z': msp_idx,
+         'xlabel': 'Titer [g/L]', 'ylabel': 'Productivity [g/L/hr]', 'zlabel': 'MSP [$/kg]',
+         'title': 'MSP_vs_Titer_and_Productivity', 'cmap': 'YlOrRd'},
+        
+        {'x': yield_idx, 'y': productivity_idx, 'z': msp_idx,
+         'xlabel': 'Yield [%]', 'ylabel': 'Productivity [g/L/hr]', 'zlabel': 'MSP [$/kg]',
+         'title': 'MSP_vs_Yield_and_Productivity', 'cmap': 'YlOrRd'},
+        
+        # GWP contours
+        {'x': titer_idx, 'y': yield_idx, 'z': gwp_idx,
+         'xlabel': 'Titer [g/L]', 'ylabel': 'Yield [%]', 'zlabel': 'GWP [kg CO2-eq/kg]',
+         'title': 'GWP_vs_Titer_and_Yield', 'cmap': 'RdYlGn_r'},
+        
+        {'x': titer_idx, 'y': productivity_idx, 'z': gwp_idx,
+         'xlabel': 'Titer [g/L]', 'ylabel': 'Productivity [g/L/hr]', 'zlabel': 'GWP [kg CO2-eq/kg]',
+         'title': 'GWP_vs_Titer_and_Productivity', 'cmap': 'RdYlGn_r'},
+        
+        {'x': yield_idx, 'y': productivity_idx, 'z': gwp_idx,
+         'xlabel': 'Yield [%]', 'ylabel': 'Productivity [g/L/hr]', 'zlabel': 'GWP [kg CO2-eq/kg]',
+         'title': 'GWP_vs_Yield_and_Productivity', 'cmap': 'RdYlGn_r'},
+        
+        # Product quality contours
+        {'x': titer_idx, 'y': yield_idx, 'z': legh_content_idx,
+         'xlabel': 'Titer [g/L]', 'ylabel': 'Yield [%]', 'zlabel': 'Leghemoglobin Content [%]',
+         'title': 'LegH_Content_vs_Titer_and_Yield', 'cmap': 'viridis'},
+        
+        {'x': titer_idx, 'y': yield_idx, 'z': protein_purity_idx,
+         'xlabel': 'Titer [g/L]', 'ylabel': 'Yield [%]', 'zlabel': 'Protein Purity [%]',
+         'title': 'Protein_Purity_vs_Titer_and_Yield', 'cmap': 'plasma'},
+    ]
+    
+    # Generate each contour plot
+    for i, config in enumerate(plot_configs, 1):
+        if config['z'] is None:
+            print(f"  Skipping plot {i}/{len(plot_configs)}: metric not found")
+            continue
+        
+        try:
+            print(f"  Generating plot {i}/{len(plot_configs)}: {config['title']}")
+            
+            # Extract data
+            x_data = results_table[config['x']].values
+            y_data = results_table[config['y']].values
+            z_data = results_table[config['z']].values
+            
+            # Remove NaN/inf values
+            mask = np.isfinite(x_data) & np.isfinite(y_data) & np.isfinite(z_data)
+            x_data = x_data[mask]
+            y_data = y_data[mask]
+            z_data = z_data[mask]
+            
+            if len(x_data) < 10:
+                print(f"    ⚠️  Insufficient valid data ({len(x_data)} points)")
+                continue
+            
+            # Create figure
+            fig, ax = plt.subplots(figsize=(10, 8))
+            
+            # Create grid
+            xi = np.linspace(x_data.min(), x_data.max(), 50)
+            yi = np.linspace(y_data.min(), y_data.max(), 50)
+            
+            # Interpolate z values
+            from scipy.interpolate import griddata
+            zi = griddata((x_data, y_data), z_data, (xi[None, :], yi[:, None]), method='cubic')
+            
+            # Plot filled contours
+            contourf = ax.contourf(xi, yi, zi, levels=15, cmap=config['cmap'], alpha=0.8)
+            
+            # Add contour lines
+            contour = ax.contour(xi, yi, zi, levels=10, colors='black', linewidths=0.5, alpha=0.4)
+            ax.clabel(contour, inline=True, fontsize=8)
+            
+            # Add colorbar
+            cbar = plt.colorbar(contourf, ax=ax)
+            cbar.set_label(config['zlabel'], rotation=270, labelpad=20)
+            
+            # Scatter plot of actual data points
+            ax.scatter(x_data, y_data, c=z_data, s=10, 
+                      cmap=config['cmap'], edgecolors='black', 
+                      linewidths=0.3, alpha=0.5)
+            
+            # Labels and title
+            ax.set_xlabel(config['xlabel'])
+            ax.set_ylabel(config['ylabel'])
+            ax.set_title(config['title'].replace('_', ' '))
+            ax.grid(True, alpha=0.3)
+            
+            # Save figure
+            filename = f"LegH_contour_{config['title']}_{timestamp}.png"
+            plt.tight_layout()
+            plt.savefig(filename, dpi=300, bbox_inches='tight')
+            print(f"    ✓ Saved: {filename}")
+            plt.close()
+            
+        except Exception as e:
+            print(f"    ⚠️  Failed: {e}")
+            plt.close()
+    
+    print(f"\n✓ Contour plot generation complete")
+
+
+# =============================================================================
+# Main Execution Block
+# =============================================================================
+
+if __name__ == '__main__':
+    mp.freeze_support()
+    np.random.seed(1234)
+    
+    now = datetime.now()
+    timestamp = now.strftime('%Y.%m.%d-%H.%M')
+    
+    print("="*80)
+    print("LEGHEMOGLOBIN PRODUCTION - COMPREHENSIVE UNCERTAINTY & SENSITIVITY ANALYSIS")
+    print("PreFerS (Precision Fermentation System)")
+    print("="*80)
+    print("\nAnalysis Strategy:")
+    print("  1. Monte Carlo WITHOUT Production Scale → Spearman, KDE, Contours")
+    print("  2. Monte Carlo WITH Production Scale → Scale effects")
+    print("  3. Single-Point Sensitivity → Tornado diagrams")
+    print("="*80)
     
     # =============================================================================
-    # Spearman's Rank Correlation Analysis
+    # CONFIGURATION PARAMETERS
+    # =============================================================================
+    baseline_production_kg_hr = 275      # Baseline production rate [kg/hr]
+    N_target = 100000                      # Number of valid samples per scenario
+    batch_size = 20000                     # Number of samples per batch
+    
+    print(f"\nConfiguration:")
+    print(f"  Baseline production: {baseline_production_kg_hr} kg/hr")
+    print(f"  Target samples: {N_target} per scenario")
+    print(f"  Batch size: {batch_size} samples per batch")
+    print("="*80)
+    
+    # Create model
+    print("\nCreating model...")
+    model = create_model(baseline_production_kg_hr=baseline_production_kg_hr)
+    
+    print("\nModel Parameters:")
+    model.show()
+    
+    # Evaluate baseline
+    print("\nEvaluating baseline scenario...")
+    baseline = model.metrics_at_baseline()
+    print("\nBaseline Metrics:")
+    for name, value in baseline.items():
+        if 'GWP' in str(name):
+            print(f"  {name}: {value:.6f}")
+        else:
+            print(f"  {name}: {value:.4f}")
+    
+    # =============================================================================
+    # SCENARIO 1: MONTE CARLO WITHOUT PRODUCTION SCALE
+    # =============================================================================
+    
+    results_no_scale, stats_no_scale = run_monte_carlo(
+        model=model,
+        N_target=N_target,
+        baseline_production_kg_hr=baseline_production_kg_hr,
+        exclude_production_scale=True,
+        batch_size=batch_size,  # ← USE CONFIGURED BATCH SIZE
+        scenario_name="Fermentation Parameters Only (Fixed Scale)"
+    )
+    
+    # Save results
+    file_no_scale = f'LegH_MC_no_scale_{timestamp}_{N_target}sims.xlsx'
+    print(f"\nSaving results to {file_no_scale}...")
+    results_no_scale.to_excel(file_no_scale)
+    
+    # =============================================================================
+    # SCENARIO 2: MONTE CARLO WITH PRODUCTION SCALE
+    # =============================================================================
+    
+    results_with_scale, stats_with_scale = run_monte_carlo(
+        model=model,
+        N_target=N_target,
+        baseline_production_kg_hr=baseline_production_kg_hr,
+        exclude_production_scale=False,
+        batch_size=batch_size,  # ← USE CONFIGURED BATCH SIZE
+        scenario_name="All Parameters Including Production Scale"
+    )
+    
+    # Save results
+    file_with_scale = f'LegH_MC_with_scale_{timestamp}_{N_target}sims.xlsx'
+    print(f"\nSaving results to {file_with_scale}...")
+    results_with_scale.to_excel(file_with_scale)
+    
+    # Get indices (use model from first scenario)
+    param_indices = [param.index for param in model.parameters]
+    metric_indices = [metric.index for metric in model.metrics]
+    
+    # Get key metric indices
+    msp_idx = ('PreFerS', 'MSP [$/kg]')
+    tci_idx = ('PreFerS', 'TCI [10^6 $]')
+    aoc_idx = ('PreFerS', 'AOC [10^6 $/yr]')
+    gwp_idx = ('PreFerS', 'GWP [kg CO2-eq/kg]')
+    
+    # =============================================================================
+    # SPEARMAN'S RANK CORRELATION (Using NO SCALE data)
     # =============================================================================
     
     print("\n" + "="*80)
-    print("SPEARMAN'S RANK CORRELATION ANALYSIS")
+    print("SPEARMAN'S RANK CORRELATION (Fermentation Parameters Only)")
     print("="*80)
     
-    # Calculate Spearman's rank correlation
-    print("\nCalculating Spearman's rank correlation...")
-    
-    # No need to clean the table since all samples are already valid
-    param_data = results_table[param_indices]
-    metric_data = results_table[metric_indices]
-    
-    # Calculate Spearman correlation manually
     from scipy.stats import spearmanr
-
-    # Initialize with proper MultiIndex
+    
+    param_data = results_no_scale[param_indices]
+    metric_data = results_no_scale[metric_indices]
+    
     df_rho = pd.DataFrame(index=pd.MultiIndex.from_tuples(param_indices), 
                           columns=pd.MultiIndex.from_tuples(metric_indices))
     df_p = pd.DataFrame(index=pd.MultiIndex.from_tuples(param_indices), 
                         columns=pd.MultiIndex.from_tuples(metric_indices))
-
+    
     for param_idx in param_indices:
         for metric_idx in metric_indices:
             rho, p_val = spearmanr(param_data[param_idx], metric_data[metric_idx])
             df_rho.at[param_idx, metric_idx] = rho
             df_p.at[param_idx, metric_idx] = p_val
-
+    
     print("\nSpearman's Correlation Coefficients (ρ):")
     print(df_rho)
-    print("\nP-values:")
-    print(df_p)
     
-    # Get metric indices
-    msp_index = ('Biorefinery', 'MSP [$/kg]')
-    tci_index = ('Biorefinery', 'TCI [10^6 $]')
-    aoc_index = ('Biorefinery', 'AOC [10^6 $/yr]')
-    production_index = ('Biorefinery', 'Actual production [kg/hr]')
+    msp_rho = df_rho[msp_idx]
+    tci_rho = df_rho[tci_idx]
+    aoc_rho = df_rho[aoc_idx]
+    gwp_rho = df_rho[gwp_idx]
     
-    # Extract correlation values for each metric
-    msp_rho = df_rho[msp_index]
-    tci_rho = df_rho[tci_index]
-    aoc_rho = df_rho[aoc_index]
-    
-    # IMPORTANT: Verify that correlations contain both positive and negative values
-    print(f"\nMSP Spearman correlation values:")
-    print(f"  Min: {msp_rho.min():.4f}")
-    print(f"  Max: {msp_rho.max():.4f}")
-    print(f"  Number of negative values: {(msp_rho < 0).sum()}")
-    print(f"  Number of positive values: {(msp_rho > 0).sum()}")
-    
-    # Create parameter descriptions for plots
     parameter_descriptions = [p.element_name + ': ' + p.name for p in model.parameters]
     
-    # Plot 1D Spearman correlation for MSP
+    # Generate individual Spearman plots
     print("\nGenerating Spearman correlation plots...")
     
-    fig_msp, ax_msp = bst.plots.plot_spearman_1d(
-        msp_rho,
-        index=parameter_descriptions,
-        name='MSP [$/kg]',
-        color='#A97802',
-        sort=True,
-    )
-    plt.tight_layout()
-    plt.savefig(f'legH_spearman_MSP_{timestamp}.png', dpi=300, bbox_inches='tight')
-    print(f"Saved MSP Spearman plot to 'legH_spearman_MSP_{timestamp}.png'")
-    plt.close()
+    for metric_name, rho_series, color in [
+        ('MSP', msp_rho, '#A97802'),
+        ('TCI', tci_rho, '#607429'),
+        ('AOC', aoc_rho, '#A100A1'),
+        ('GWP', gwp_rho, '#E74C3C'),
+    ]:
+        try:
+            fig, ax = bst.plots.plot_spearman_1d(
+                rho_series,
+                index=parameter_descriptions,
+                name=metric_name,
+                color=color,
+                sort=True,
+            )
+            plt.tight_layout()
+            plt.savefig(f'LegH_spearman_{metric_name}_{timestamp}.png', dpi=300, bbox_inches='tight')
+            print(f"  ✓ Saved {metric_name} Spearman plot")
+            plt.close()
+        except Exception as e:
+            print(f"  ⚠️  Failed {metric_name} Spearman plot: {e}")
     
-    # Plot 1D Spearman correlation for TCI
-    fig_tci, ax_tci = bst.plots.plot_spearman_1d(
-        tci_rho,
-        index=parameter_descriptions,
-        name='TCI [10^6 $]',
-        color='#607429',
-        sort=True,
-    )
-    plt.tight_layout()
-    plt.savefig(f'legH_spearman_TCI_{timestamp}.png', dpi=300, bbox_inches='tight')
-    print(f"Saved TCI Spearman plot to 'legH_spearman_TCI_{timestamp}.png'")
-    plt.close()
-    
-    # Plot 1D Spearman correlation for AOC
-    fig_aoc, ax_aoc = bst.plots.plot_spearman_1d(
-        aoc_rho,
-        index=parameter_descriptions,
-        name='AOC [10^6 $/yr]',
-        color='#A100A1',
-        sort=True,
-    )
-    plt.tight_layout()
-    plt.savefig(f'legH_spearman_AOC_{timestamp}.png', dpi=300, bbox_inches='tight')
-    print(f"Saved AOC Spearman plot to 'legH_spearman_AOC_{timestamp}.png'")
-    plt.close()
-    
-    # Plot 2D Spearman correlation (all three metrics)
-    print("\nGenerating 2D Spearman correlation plot...")
-    
-    fig_2d, ax_2d = bst.plots.plot_spearman_2d(
-        [msp_rho, tci_rho, aoc_rho],
-        index=parameter_descriptions,
-        color_wheel=(
-            mcolors.to_rgb('#A97802'),  # MSP
-            mcolors.to_rgb('#607429'),  # TCI
-            mcolors.to_rgb('#A100A1'),  # AOC
-        ),
-        sort=True,
-    )
-    fig_2d.set_figwidth(8)
-    fig_2d.set_figheight(10)
-    plt.tight_layout()
-    plt.savefig(f'legH_spearman_2D_{timestamp}.png', dpi=300, bbox_inches='tight')
-    print(f"Saved 2D Spearman plot to 'legH_spearman_2D_{timestamp}.png'")
-    plt.close()
-    
-    # =============================================================================
-    # Monte Carlo Box Plots
-    # =============================================================================
-    
-    print("\n" + "="*80)
-    print("MONTE CARLO UNCERTAINTY BOX PLOTS")
-    print("="*80)
-    
-    # Extract metric values (no need to clean since all data is valid)
-    msp_values = results_table[msp_index]
-    tci_values = results_table[tci_index]
-    aoc_values = results_table[aoc_index]
-    
-    print(f"\nAll {len(msp_values)} samples are valid (no cleaning required)")
-    
-    # Define standard colors (hex strings)
-    msp_light_hex = "#ffd580"
-    msp_dark_hex = "#a97802"
-    tci_light_hex = "#b4d7a8"
-    tci_dark_hex = "#607429"
-    aoc_light_hex = "#e6b3e6"
-    aoc_dark_hex = "#a100a1"
-    
-    # Convert to RGB tuples for plotting
-    msp_light_color = mcolors.to_rgb(msp_light_hex)
-    msp_dark_color = mcolors.to_rgb(msp_dark_hex)
-    tci_light_color = mcolors.to_rgb(tci_light_hex)
-    tci_dark_color = mcolors.to_rgb(tci_dark_hex)
-    aoc_light_color = mcolors.to_rgb(aoc_light_hex)
-    aoc_dark_color = mcolors.to_rgb(aoc_dark_hex)
-    
-    # Monte Carlo plots
-    fig_box, axes_box = plt.subplots(1, 3, figsize=(15, 5))
-    plt.sca(axes_box[0])
-    bst.plots.plot_montecarlo(
-        msp_values.values,
-        light_color=msp_light_color,
-        dark_color=msp_dark_color,
-        positions=[1],
-    )
-    plt.sca(axes_box[1])
-    bst.plots.plot_montecarlo(
-        tci_values.values,
-        light_color=tci_light_color,
-        dark_color=tci_dark_color,
-        positions=[1],
-    )
-    plt.sca(axes_box[2])
-    bst.plots.plot_montecarlo(
-        aoc_values.values,
-        light_color=aoc_light_color,
-        dark_color=aoc_dark_color,
-        positions=[1],
-    )
-
-    axes_box[0].set_ylabel('MSP [$/kg]')
-    axes_box[0].set_xticks([])
-    axes_box[0].set_title('Minimum Selling Price')
-
-    axes_box[1].set_ylabel('TCI [10^6 $]')
-    axes_box[1].set_xticks([])
-    axes_box[1].set_title('Total Capital Investment')
-
-    axes_box[2].set_ylabel('AOC [10^6 $/yr]')
-    axes_box[2].set_xticks([])
-    axes_box[2].set_title('Annual Operating Cost')
-
-    plt.tight_layout()
-    plt.savefig(f'legH_montecarlo_boxes_{timestamp}.png', dpi=300, bbox_inches='tight')
-    print(f"Saved Monte Carlo box plots to 'legH_montecarlo_boxes_{timestamp}.png'")
-    plt.close()
-    
-    # =============================================================================
-    # KDE (Kernel Density Estimation) Plots
-    # =============================================================================
-    
-    print("\n" + "="*80)
-    print("KERNEL DENSITY ESTIMATION (KDE) PLOTS")
-    print("="*80)
-    
-    # 1D KDE plot for MSP
-    fig_kde1d, ax_kde1d = plt.subplots(figsize=(10, 6))
-    ax_kde1d.hist(msp_values, bins=50, density=True, alpha=0.7, 
-                  edgecolor='black', color='#FFD580')
-    ax_kde1d.set_xlabel('MSP [$/kg]')
-    ax_kde1d.set_ylabel('Probability Density')
-    ax_kde1d.set_title('Distribution of Minimum Selling Price')
-    
-    # Add baseline line
-    ax_kde1d.axvline(baseline[msp_index], color='r', linestyle='--', linewidth=2, 
-                     label=f'Baseline: ${baseline[msp_index]:.4f}/kg')
-    ax_kde1d.legend()
-    
-    plt.tight_layout()
-    plt.savefig(f'legH_msp_distribution_{timestamp}.png', dpi=300, bbox_inches='tight')
-    print(f"Saved MSP distribution plot to 'legH_msp_distribution_{timestamp}.png'")
-    plt.close()
-    
-    # 2D KDE plot (MSP vs TCI)
-    print("\nGenerating 2D KDE plot (MSP vs TCI)...")
-    
+    # Combined 2D Spearman plot
     try:
-        format_units = tmo.units_of_measure.format_units
-        ylabel = f"MSP [{format_units('$/kg')}]"
-        xlabel = f"TCI [{format_units('10^6 $')}]"
-        
-        fig_kde2d, ax_kde2d, axes_kde2d = bst.plots.plot_kde(
-            y=msp_values.values,
-            x=tci_values.values,
-            ylabel=ylabel,
-            xlabel=xlabel,
-            aspect_ratio=1.1,
+        fig_2d, ax_2d = bst.plots.plot_spearman_2d(
+            rhos=[msp_rho, tci_rho, aoc_rho, gwp_rho],
+            index=parameter_descriptions,
+            color_wheel=(
+                mcolors.to_rgb('#A97802'),
+                mcolors.to_rgb('#607429'),
+                mcolors.to_rgb('#A100A1'),
+                mcolors.to_rgb('#E74C3C'),
+            ),
+            sort=True,
         )
-        plt.savefig(f'legH_kde_MSP_vs_TCI_{timestamp}.png', dpi=300, bbox_inches='tight')
-        print(f"Saved 2D KDE plot to 'legH_kde_MSP_vs_TCI_{timestamp}.png'")
+        fig_2d.set_figwidth(10)
+        fig_2d.set_figheight(12)
+        plt.tight_layout()
+        plt.savefig(f'LegH_spearman_2D_{timestamp}.png', dpi=300, bbox_inches='tight')
+        print(f"  ✓ Saved combined 2D Spearman plot")
         plt.close()
     except Exception as e:
-        print(f"WARNING: 2D KDE plot failed: {e}")
-        print("  Creating scatter plot as fallback...")
+        print(f"  ⚠️  Failed 2D Spearman plot: {e}")
+    
+    # =============================================================================
+    # KDE PLOTS (Using BOTH scenarios)
+    # =============================================================================
+    
+    print("\n" + "="*80)
+    print("KERNEL DENSITY ESTIMATE (KDE) PLOTS")
+    print("="*80)
+    
+    msp_values_no_scale = results_no_scale[msp_idx]
+    gwp_values_no_scale = results_no_scale[gwp_idx]
+    
+    msp_values_with_scale = results_with_scale[msp_idx]
+    gwp_values_with_scale = results_with_scale[gwp_idx]
+    
+    sns.set_style("whitegrid")
+    
+    # =============================================================================
+    # 1D KDE PLOTS (Individual distributions)
+    # =============================================================================
+    
+    # KDE for MSP (No Scale)
+    print("\nGenerating 1D KDE plots...")
+    print("  MSP distribution (fixed scale)...")
+    fig_msp_1d, ax_msp_1d = plt.subplots(figsize=(10, 6))
+    sns.kdeplot(data=msp_values_no_scale, fill=True, color='#A97802', alpha=0.6, ax=ax_msp_1d, label='Fixed Scale')
+    ax_msp_1d.axvline(baseline[msp_idx], color='red', linestyle='--', linewidth=2, 
+                   label=f'Baseline: ${baseline[msp_idx]:.4f}/kg')
+    ax_msp_1d.axvline(msp_values_no_scale.median(), color='blue', linestyle='--', linewidth=2,
+                   label=f'Median: ${msp_values_no_scale.median():.4f}/kg')
+    ax_msp_1d.set_xlabel('Minimum Selling Price [$/kg]')
+    ax_msp_1d.set_ylabel('Probability Density')
+    ax_msp_1d.set_title('Distribution of MSP (Fixed Production Scale)')
+    ax_msp_1d.legend()
+    ax_msp_1d.grid(True, alpha=0.3)
+    plt.tight_layout()
+    plt.savefig(f'LegH_kde_1D_MSP_no_scale_{timestamp}.png', dpi=300, bbox_inches='tight')
+    print(f"    ✓ Saved")
+    plt.close()
+    
+    # KDE for GWP (No Scale)
+    print("  GWP distribution (fixed scale)...")
+    fig_gwp_1d, ax_gwp_1d = plt.subplots(figsize=(10, 6))
+    sns.kdeplot(data=gwp_values_no_scale, fill=True, color='#E74C3C', alpha=0.6, ax=ax_gwp_1d, label='Fixed Scale')
+    ax_gwp_1d.axvline(baseline[gwp_idx], color='red', linestyle='--', linewidth=2,
+                   label=f'Baseline: {baseline[gwp_idx]:.4f} kg CO2-eq/kg')
+    ax_gwp_1d.axvline(gwp_values_no_scale.median(), color='blue', linestyle='--', linewidth=2,
+                   label=f'Median: {gwp_values_no_scale.median():.4f} kg CO2-eq/kg')
+    ax_gwp_1d.set_xlabel('Global Warming Potential [kg CO2-eq/kg]')
+    ax_gwp_1d.set_ylabel('Probability Density')
+    ax_gwp_1d.set_title('Distribution of GWP (Fixed Production Scale)')
+    ax_gwp_1d.legend()
+    ax_gwp_1d.grid(True, alpha=0.3)
+    plt.tight_layout()
+    plt.savefig(f'LegH_kde_1D_GWP_no_scale_{timestamp}.png', dpi=300, bbox_inches='tight')
+    print(f"    ✓ Saved")
+    plt.close()
+    
+    # =============================================================================
+    # 2D KDE PLOTS (Joint distributions - BioSTEAM tutorial style)
+    # =============================================================================
+    
+    print("\n  Generating comprehensive 2D KDE plots (joint GWP-MSP distributions)...")
+    
+    # Plot 1: Fixed Production Scale (No Scale variation)
+    print("    Plot 1: Fixed production scale scenario...")
+    try:
+        fig_kde_2d_no_scale, ax_kde_no_scale = plt.subplots(figsize=(10, 8))
         
-        # Fallback: simple scatter plot without KDE
-        fig_scatter, ax_scatter = plt.subplots(figsize=(10, 8))
-        ax_scatter.scatter(tci_values, msp_values, alpha=0.5, c='#A97802',
-                          edgecolors='black', linewidth=0.5)
-        ax_scatter.set_xlabel(xlabel)
-        ax_scatter.set_ylabel(ylabel)
-        ax_scatter.set_title('MSP vs TCI (Scatter Plot)')
-        ax_scatter.grid(True, alpha=0.3)
+        # Extract data
+        x_no_scale = gwp_values_no_scale.values
+        y_no_scale = msp_values_no_scale.values
+        
+        # Remove NaN/inf
+        mask_no_scale = np.isfinite(x_no_scale) & np.isfinite(y_no_scale)
+        x_no_scale = x_no_scale[mask_no_scale]
+        y_no_scale = y_no_scale[mask_no_scale]
+        
+        # Create 2D KDE contour plot
+        sns.kdeplot(
+            x=x_no_scale, 
+            y=y_no_scale, 
+            ax=ax_kde_no_scale,
+            fill=True,
+            levels=10,
+            cmap='YlOrRd',
+            alpha=0.6,
+            thresh=0.05,
+        )
+        
+        # Add scatter points (subsample for clarity)
+        subsample_idx = np.random.choice(len(x_no_scale), size=min(500, len(x_no_scale)), replace=False)
+        ax_kde_no_scale.scatter(
+            x_no_scale[subsample_idx], 
+            y_no_scale[subsample_idx],
+            c='#A97802',
+            s=10,
+            alpha=0.3,
+            edgecolors='black',
+            linewidths=0.3,
+            label='Monte Carlo samples'
+        )
+        
+        # Add baseline point
+        ax_kde_no_scale.scatter(
+            baseline[gwp_idx], 
+            baseline[msp_idx],
+            c='red',
+            s=200,
+            marker='*',
+            edgecolors='black',
+            linewidths=1.5,
+            label='Baseline',
+            zorder=10
+        )
+        
+        # Add median point
+        ax_kde_no_scale.scatter(
+            gwp_values_no_scale.median(), 
+            msp_values_no_scale.median(),
+            c='blue',
+            s=150,
+            marker='D',
+            edgecolors='black',
+            linewidths=1.5,
+            label='Median',
+            zorder=10
+        )
+        
+        # Labels and formatting
+        ax_kde_no_scale.set_xlabel('Global Warming Potential [kg CO2-eq/kg]', fontsize=12)
+        ax_kde_no_scale.set_ylabel('Minimum Selling Price [$/kg]', fontsize=12)
+        ax_kde_no_scale.set_title('Joint Distribution: GWP vs MSP\n(Fixed Production Scale)', 
+                                  fontsize=14, fontweight='bold')
+        ax_kde_no_scale.legend(loc='upper right', fontsize=10)
+        ax_kde_no_scale.grid(True, alpha=0.3)
+        
+        # Add statistics box
+        stats_text = (
+            f'Statistics (n={len(x_no_scale)}):\n'
+            f'GWP: {gwp_values_no_scale.mean():.3f} ± {gwp_values_no_scale.std():.3f}\n'
+            f'MSP: ${msp_values_no_scale.mean():.3f} ± ${msp_values_no_scale.std():.3f}'
+        )
+        ax_kde_no_scale.text(
+            0.02, 0.98, stats_text,
+            transform=ax_kde_no_scale.transAxes,
+            fontsize=9,
+            verticalalignment='top',
+            bbox=dict(boxstyle='round', facecolor='wheat', alpha=0.5)
+        )
+        
         plt.tight_layout()
-        plt.savefig(f'legH_scatter_MSP_vs_TCI_{timestamp}.png', dpi=300, bbox_inches='tight')
-        print(f"Saved scatter plot to 'legH_scatter_MSP_vs_TCI_{timestamp}.png'")
+        plt.savefig(f'LegH_kde_2D_GWP_MSP_no_scale_{timestamp}.png', dpi=300, bbox_inches='tight')
+        print(f"      ✓ Saved: LegH_kde_2D_GWP_MSP_no_scale_{timestamp}.png")
+        plt.close()
+        
+    except Exception as e:
+        print(f"      ⚠️  Failed: {e}")
         plt.close()
     
+    # Plot 2: Variable Production Scale
+    print("    Plot 2: Variable production scale scenario...")
+    try:
+        fig_kde_2d_with_scale, ax_kde_with_scale = plt.subplots(figsize=(10, 8))
+        
+        # Extract data
+        x_with_scale = gwp_values_with_scale.values
+        y_with_scale = msp_values_with_scale.values
+        
+        # Remove NaN/inf
+        mask_with_scale = np.isfinite(x_with_scale) & np.isfinite(y_with_scale)
+        x_with_scale = x_with_scale[mask_with_scale]
+        y_with_scale = y_with_scale[mask_with_scale]
+        
+        # Create 2D KDE contour plot
+        sns.kdeplot(
+            x=x_with_scale, 
+            y=y_with_scale, 
+            ax=ax_kde_with_scale,
+            fill=True,
+            levels=10,
+            cmap='RdPu',
+            alpha=0.6,
+            thresh=0.05,
+        )
+        
+        # Add scatter points (subsample for clarity)
+        subsample_idx = np.random.choice(len(x_with_scale), size=min(500, len(x_with_scale)), replace=False)
+        ax_kde_with_scale.scatter(
+            x_with_scale[subsample_idx], 
+            y_with_scale[subsample_idx],
+            c='#9B59B6',
+            s=10,
+            alpha=0.3,
+            edgecolors='black',
+            linewidths=0.3,
+            label='Monte Carlo samples'
+        )
+        
+        # Add baseline point
+        ax_kde_with_scale.scatter(
+            baseline[gwp_idx], 
+            baseline[msp_idx],
+            c='red',
+            s=200,
+            marker='*',
+            edgecolors='black',
+            linewidths=1.5,
+            label='Baseline',
+            zorder=10
+        )
+        
+        # Add median point
+        ax_kde_with_scale.scatter(
+            gwp_values_with_scale.median(), 
+            msp_values_with_scale.median(),
+            c='blue',
+            s=150,
+            marker='D',
+            edgecolors='black',
+            linewidths=1.5,
+            label='Median',
+            zorder=10
+        )
+        
+        # Labels and formatting
+        ax_kde_with_scale.set_xlabel('Global Warming Potential [kg CO2-eq/kg]', fontsize=12)
+        ax_kde_with_scale.set_ylabel('Minimum Selling Price [$/kg]', fontsize=12)
+        ax_kde_with_scale.set_title('Joint Distribution: GWP vs MSP\n(Variable Production Scale)', 
+                                    fontsize=14, fontweight='bold')
+        ax_kde_with_scale.legend(loc='upper right', fontsize=10)
+        ax_kde_with_scale.grid(True, alpha=0.3)
+        
+        # Add statistics box
+        stats_text = (
+            f'Statistics (n={len(x_with_scale)}):\n'
+            f'GWP: {gwp_values_with_scale.mean():.3f} ± {gwp_values_with_scale.std():.3f}\n'
+            f'MSP: ${msp_values_with_scale.mean():.3f} ± ${msp_values_with_scale.std():.3f}'
+        )
+        ax_kde_with_scale.text(
+            0.02, 0.98, stats_text,
+            transform=ax_kde_with_scale.transAxes,
+            fontsize=9,
+            verticalalignment='top',
+            bbox=dict(boxstyle='round', facecolor='wheat', alpha=0.5)
+        )
+        
+        plt.tight_layout()
+        plt.savefig(f'LegH_kde_2D_GWP_MSP_with_scale_{timestamp}.png', dpi=300, bbox_inches='tight')
+        print(f"      ✓ Saved: LegH_kde_2D_GWP_MSP_with_scale_{timestamp}.png")
+        plt.close()
+        
+    except Exception as e:
+        print(f"      ⚠️  Failed: {e}")
+        plt.close()
+    
+    # Plot 3: Comparison overlay (both scenarios on same plot)
+    print("    Plot 3: Comparison of both scenarios...")
+    try:
+        fig_kde_2d_compare, ax_kde_compare = plt.subplots(figsize=(12, 9))
+        
+        # Plot No Scale scenario (red/orange)
+        sns.kdeplot(
+            x=x_no_scale, 
+            y=y_no_scale, 
+            ax=ax_kde_compare,
+            fill=False,
+            levels=5,
+            color='#E67E22',
+            linewidths=2,
+            alpha=0.8,
+            label='Fixed Scale'
+        )
+        
+        # Plot With Scale scenario (purple)
+        sns.kdeplot(
+            x=x_with_scale, 
+            y=y_with_scale, 
+            ax=ax_kde_compare,
+            fill=False,
+            levels=5,
+            color='#9B59B6',
+            linewidths=2,
+            alpha=0.8,
+            linestyles='--',
+            label='Variable Scale'
+        )
+        
+        # Add scatter points for both (smaller samples)
+        subsample_no = np.random.choice(len(x_no_scale), size=min(200, len(x_no_scale)), replace=False)
+        subsample_with = np.random.choice(len(x_with_scale), size=min(200, len(x_with_scale)), replace=False)
+        
+        ax_kde_compare.scatter(
+            x_no_scale[subsample_no], 
+            y_no_scale[subsample_no],
+            c='#E67E22',
+            s=15,
+            alpha=0.3,
+            edgecolors='black',
+            linewidths=0.2,
+        )
+        
+        ax_kde_compare.scatter(
+            x_with_scale[subsample_with], 
+            y_with_scale[subsample_with],
+            c='#9B59B6',
+            s=15,
+            alpha=0.3,
+            edgecolors='black',
+            linewidths=0.2,
+            marker='s'
+        )
+        
+        # Add baseline point
+        ax_kde_compare.scatter(
+            baseline[gwp_idx], 
+            baseline[msp_idx],
+            c='red',
+            s=250,
+            marker='*',
+            edgecolors='black',
+            linewidths=2,
+            label='Baseline',
+            zorder=10
+        )
+        
+        # Labels and formatting
+        ax_kde_compare.set_xlabel('Global Warming Potential [kg CO2-eq/kg]', fontsize=12)
+        ax_kde_compare.set_ylabel('Minimum Selling Price [$/kg]', fontsize=12)
+        ax_kde_compare.set_title('Comparison: Impact of Production Scale Variation on GWP-MSP Space', 
+                                 fontsize=14, fontweight='bold')
+        ax_kde_compare.legend(loc='upper right', fontsize=10)
+        ax_kde_compare.grid(True, alpha=0.3)
+        
+        # Add comparison statistics box
+        stats_text = (
+            f'Fixed Scale (n={len(x_no_scale)}):\n'
+            f'  GWP: {gwp_values_no_scale.mean():.3f} ± {gwp_values_no_scale.std():.3f}\n'
+            f'  MSP: ${msp_values_no_scale.mean():.3f} ± ${msp_values_no_scale.std():.3f}\n\n'
+            f'Variable Scale (n={len(x_with_scale)}):\n'
+            f'  GWP: {gwp_values_with_scale.mean():.3f} ± {gwp_values_with_scale.std():.3f}\n'
+            f'  MSP: ${msp_values_with_scale.mean():.3f} ± ${msp_values_with_scale.std():.3f}'
+        )
+        ax_kde_compare.text(
+            0.02, 0.98, stats_text,
+            transform=ax_kde_compare.transAxes,
+            fontsize=8,
+            verticalalignment='top',
+            bbox=dict(boxstyle='round', facecolor='wheat', alpha=0.7)
+        )
+        
+        plt.tight_layout()
+        plt.savefig(f'LegH_kde_2D_GWP_MSP_comparison_{timestamp}.png', dpi=300, bbox_inches='tight')
+        print(f"      ✓ Saved: LegH_kde_2D_GWP_MSP_comparison_{timestamp}.png")
+        plt.close()
+        
+    except Exception as e:
+        print(f"      ⚠️  Failed: {e}")
+        plt.close()
+    
+    print(f"\n✓ KDE plot generation complete")
+    print(f"  Generated 5 plots:")
+    print(f"    - 2 × 1D KDE (MSP, GWP)")
+    print(f"    - 3 × 2D KDE (No Scale, With Scale, Comparison)")
+    
     # =============================================================================
-    # CRITICAL FIX: Reset Model to Baseline Before Single-Point Sensitivity
+    # 2D CONTOUR PLOTS (Using NO SCALE data)
+    # =============================================================================
+    
+    generate_2d_contour_plots(results_no_scale, param_indices, metric_indices, timestamp)
+    
+    # =============================================================================
+    # PRODUCTION SCALE EFFECTS ANALYSIS
     # =============================================================================
     
     print("\n" + "="*80)
-    print("RESETTING MODEL TO BASELINE STATE")
+    print("PRODUCTION SCALE EFFECTS ANALYSIS")
     print("="*80)
     
-    print("\n⚠️  After Monte Carlo evaluation, the system is in a random state.")
-    print("Resetting model to ensure clean baseline for single-point sensitivity analysis...")
+    production_scale_idx = ('Design', 'Production scale [kg/hr]')
     
-    # Re-create the model from scratch to get a clean baseline state
+    if production_scale_idx in results_with_scale.columns:
+        scale_values = results_with_scale[production_scale_idx]
+        msp_vs_scale = results_with_scale[msp_idx]
+        tci_vs_scale = results_with_scale[tci_idx]
+        gwp_vs_scale = results_with_scale[gwp_idx]
+        aoc_vs_scale = results_with_scale[aoc_idx]
+        
+        # =============================================================================
+        # Plot 1: Scatter plots (existing)
+        # =============================================================================
+        fig_scale, axes_scale = plt.subplots(1, 2, figsize=(14, 6))
+        
+        # MSP vs Scale
+        axes_scale[0].scatter(scale_values, msp_vs_scale, alpha=0.5, c='#A97802', s=20)
+        axes_scale[0].set_xlabel('Production Scale [kg/hr]')
+        axes_scale[0].set_ylabel('MSP [$/kg]')
+        axes_scale[0].set_title('MSP vs Production Scale')
+        axes_scale[0].grid(True, alpha=0.3)
+        
+        # TCI vs Scale
+        axes_scale[1].scatter(scale_values, tci_vs_scale, alpha=0.5, c='#607429', s=20)
+        axes_scale[1].set_xlabel('Production Scale [kg/hr]')
+        axes_scale[1].set_ylabel('TCI [10^6 $]')
+        axes_scale[1].set_title('TCI vs Production Scale')
+        axes_scale[1].grid(True, alpha=0.3)
+        
+        plt.tight_layout()
+        plt.savefig(f'LegH_scale_effects_scatter_{timestamp}.png', dpi=300, bbox_inches='tight')
+        print(f"  ✓ Saved scale effects scatter plot")
+        plt.close()
+        
+        # =============================================================================
+        # Plot 2: Percentile band plots (NEW)
+        # =============================================================================
+        print("\n  Generating percentile band plots...")
+        
+        # Bin the data by production scale
+        n_bins = 20
+        scale_min = scale_values.min()
+        scale_max = scale_values.max()
+        scale_bins = np.linspace(scale_min, scale_max, n_bins + 1)
+        scale_centers = (scale_bins[:-1] + scale_bins[1:]) / 2
+        
+        # Function to calculate percentiles per bin
+        def calculate_percentiles_by_bin(x_values, y_values, bins):
+            """Calculate percentiles of y for each x bin."""
+            bin_indices = np.digitize(x_values, bins) - 1
+            
+            p05_list = []
+            p25_list = []
+            p50_list = []
+            p75_list = []
+            p95_list = []
+            valid_centers = []
+            
+            for i in range(len(bins) - 1):
+                mask = bin_indices == i
+                if mask.sum() > 0:
+                    y_in_bin = y_values[mask]
+                    if len(y_in_bin) >= 3:  # Need at least 3 points
+                        p05_list.append(np.percentile(y_in_bin, 5))
+                        p25_list.append(np.percentile(y_in_bin, 25))
+                        p50_list.append(np.percentile(y_in_bin, 50))
+                        p75_list.append(np.percentile(y_in_bin, 75))
+                        p95_list.append(np.percentile(y_in_bin, 95))
+                        valid_centers.append((bins[i] + bins[i+1]) / 2)
+            
+            return (np.array(valid_centers), 
+                    np.array(p05_list), np.array(p25_list), 
+                    np.array(p50_list), 
+                    np.array(p75_list), np.array(p95_list))
+        
+        # Calculate percentiles for each metric
+        scale_clean = scale_values.values
+        msp_clean = msp_vs_scale.values
+        tci_clean = tci_vs_scale.values
+        gwp_clean = gwp_vs_scale.values
+        aoc_clean = aoc_vs_scale.values
+        
+        # Remove NaN values
+        mask = (np.isfinite(scale_clean) & np.isfinite(msp_clean) & 
+                np.isfinite(tci_clean) & np.isfinite(gwp_clean) & np.isfinite(aoc_clean))
+        scale_clean = scale_clean[mask]
+        msp_clean = msp_clean[mask]
+        tci_clean = tci_clean[mask]
+        gwp_clean = gwp_clean[mask]
+        aoc_clean = aoc_clean[mask]
+        
+        # Calculate percentiles
+        scale_c_msp, p05_msp, p25_msp, p50_msp, p75_msp, p95_msp = calculate_percentiles_by_bin(
+            scale_clean, msp_clean, scale_bins)
+        
+        scale_c_tci, p05_tci, p25_tci, p50_tci, p75_tci, p95_tci = calculate_percentiles_by_bin(
+            scale_clean, tci_clean, scale_bins)
+        
+        scale_c_gwp, p05_gwp, p25_gwp, p50_gwp, p75_gwp, p95_gwp = calculate_percentiles_by_bin(
+            scale_clean, gwp_clean, scale_bins)
+        
+        scale_c_aoc, p05_aoc, p25_aoc, p50_aoc, p75_aoc, p95_aoc = calculate_percentiles_by_bin(
+            scale_clean, aoc_clean, scale_bins)
+        
+        # Create 2x2 subplot for percentile bands
+        fig_bands, axes_bands = plt.subplots(2, 2, figsize=(16, 12))
+        
+        # Plot configurations
+        plot_configs = [
+            {
+                'ax': axes_bands[0, 0],
+                'scale': scale_c_msp,
+                'p05': p05_msp, 'p25': p25_msp, 'p50': p50_msp, 'p75': p75_msp, 'p95': p95_msp,
+                'baseline_val': baseline[msp_idx],
+                'ylabel': 'MSP [$/kg]',
+                'title': 'Minimum Selling Price vs Production Scale',
+                'color': '#A97802'
+            },
+            {
+                'ax': axes_bands[0, 1],
+                'scale': scale_c_tci,
+                'p05': p05_tci, 'p25': p25_tci, 'p50': p50_tci, 'p75': p75_tci, 'p95': p95_tci,
+                'baseline_val': baseline[tci_idx],
+                'ylabel': 'TCI [10^6 $]',
+                'title': 'Total Capital Investment vs Production Scale',
+                'color': '#607429'
+            },
+            {
+                'ax': axes_bands[1, 0],
+                'scale': scale_c_gwp,
+                'p05': p05_gwp, 'p25': p25_gwp, 'p50': p50_gwp, 'p75': p75_gwp, 'p95': p95_gwp,
+                'baseline_val': baseline[gwp_idx],
+                'ylabel': 'GWP [kg CO2-eq/kg]',
+                'title': 'Global Warming Potential vs Production Scale',
+                'color': '#E74C3C'
+            },
+            {
+                'ax': axes_bands[1, 1],
+                'scale': scale_c_aoc,
+                'p05': p05_aoc, 'p25': p25_aoc, 'p50': p50_aoc, 'p75': p75_aoc, 'p95': p95_aoc,
+                'baseline_val': baseline[aoc_idx],
+                'ylabel': 'AOC [10^6 $/yr]',
+                'title': 'Annual Operating Cost vs Production Scale',
+                'color': '#A100A1'
+            }
+        ]
+        
+        for config in plot_configs:
+            ax = config['ax']
+            scale_x = config['scale']
+            
+            # Plot 25-75 percentile band (semi-transparent)
+            ax.fill_between(scale_x, config['p25'], config['p75'],
+                           color=config['color'], alpha=0.3, 
+                           label='25th-75th percentile')
+            
+            # Plot 5-95 percentile lines (boundary lines)
+            ax.plot(scale_x, config['p05'], '--', 
+                   color=config['color'], linewidth=1.5, alpha=0.7,
+                   label='5th percentile')
+            ax.plot(scale_x, config['p95'], '--', 
+                   color=config['color'], linewidth=1.5, alpha=0.7,
+                   label='95th percentile')
+            
+            # Plot median line (50th percentile)
+            ax.plot(scale_x, config['p50'], '-', 
+                   color=config['color'], linewidth=2.5, alpha=0.9,
+                   label='Median (50th percentile)')
+            
+            # Plot baseline as horizontal line
+            ax.axhline(y=config['baseline_val'], color='red', 
+                      linestyle='-.', linewidth=2,
+                      label=f'Baseline ({config["baseline_val"]:.4g})')
+            
+            # Formatting
+            ax.set_xlabel('Production Scale [kg/hr]', fontsize=11)
+            ax.set_ylabel(config['ylabel'], fontsize=11)
+            ax.set_title(config['title'], fontsize=12, fontweight='bold')
+            ax.grid(True, alpha=0.3, linestyle=':')
+            ax.legend(loc='best', fontsize=9, framealpha=0.9)
+            
+            # Add minor ticks
+            from matplotlib.ticker import AutoMinorLocator
+            ax.xaxis.set_minor_locator(AutoMinorLocator(5))
+            ax.yaxis.set_minor_locator(AutoMinorLocator(5))
+        
+        plt.suptitle('Scale Effects with Uncertainty Bands\n(Monte Carlo Results)', 
+                    fontsize=14, fontweight='bold', y=0.995)
+        plt.tight_layout()
+        plt.savefig(f'LegH_scale_effects_percentile_bands_{timestamp}.png', 
+                   dpi=300, bbox_inches='tight')
+        print(f"  ✓ Saved scale effects percentile band plot")
+        plt.close()
+        
+        # =============================================================================
+        # Print scale statistics
+        # =============================================================================
+        print(f"\nProduction Scale Statistics:")
+        print(f"  Range: {scale_values.min():.1f} - {scale_values.max():.1f} kg/hr")
+        print(f"  Mean: {scale_values.mean():.1f} kg/hr")
+        print(f"  Median: {scale_values.median():.1f} kg/hr")
+        
+        print(f"\nMSP vs Scale:")
+        print(f"  At min scale ({scale_values.min():.1f} kg/hr): ${msp_vs_scale[scale_values.idxmin()]:.4f}/kg")
+        print(f"  At max scale ({scale_values.max():.1f} kg/hr): ${msp_vs_scale[scale_values.idxmax()]:.4f}/kg")
+        print(f"  Median MSP: ${msp_vs_scale.median():.4f}/kg")
+        
+        print(f"\nGWP vs Scale:")
+        print(f"  At min scale: {gwp_vs_scale[scale_values.idxmin()]:.4f} kg CO2-eq/kg")
+        print(f"  At max scale: {gwp_vs_scale[scale_values.idxmax()]:.4f} kg CO2-eq/kg")
+        print(f"  Median GWP: {gwp_vs_scale.median():.4f} kg CO2-eq/kg")
+    
+    # =============================================================================
+    # SINGLE-POINT SENSITIVITY (ALL PARAMETERS)
+    # =============================================================================
+    
+    print("\n" + "="*80)
+    print("SINGLE-POINT SENSITIVITY ANALYSIS (ALL PARAMETERS)")
+    print("="*80)
+    
+    # Reset model
     model = create_model(baseline_production_kg_hr=baseline_production_kg_hr)
     
-    # Verify baseline is correct
-    baseline_verification = model.metrics_at_baseline()
-    print("\n✓ Model reset complete. Verified baseline metrics:")
-    for name, value in baseline_verification.items():
-        print(f"  {name}: {value:.4f}")
-    
-    # =============================================================================
-    # Single-Point Sensitivity Analysis (WITH ROBUST ERROR HANDLING)
-    # =============================================================================
-    
-    print("\n" + "="*80)
-    print("SINGLE-POINT SENSITIVITY ANALYSIS")
-    print("="*80)
-    
-    print("\nPerforming single-point sensitivity analysis...")
-    print("Note: This may take a few minutes as each parameter bound is evaluated...")
+    print("\nRunning single-point sensitivity...")
+    print("This evaluates each parameter at its lower and upper bounds individually.")
     
     try:
         baseline_sp, lower_sp, upper_sp = model.single_point_sensitivity()
         
-        print("\nBASELINE VALUES:")
-        print(baseline_sp)
-        print("\nLOWER BOUND VALUES:")
-        print(lower_sp)
-        print("\nUPPER BOUND VALUES:")
-        print(upper_sp)
+        print("  ✓ Single-point sensitivity complete")
         
-        # Check for NaN values in single-point sensitivity results
-        has_nan_baseline = baseline_sp.isnull().any()
-        has_nan_lower = lower_sp.isnull().any().any() if isinstance(lower_sp, pd.DataFrame) else lower_sp.isnull().any()
-        has_nan_upper = upper_sp.isnull().any().any() if isinstance(upper_sp, pd.DataFrame) else upper_sp.isnull().any()
+        # Check for NaN values
+        has_nan = (baseline_sp.isnull().any() or 
+                  lower_sp.isnull().any().any() or 
+                  upper_sp.isnull().any().any())
         
-        if has_nan_baseline or has_nan_lower or has_nan_upper:
-            print("\n⚠️  WARNING: Some single-point sensitivity simulations failed (NaN detected)")
-            print("This typically occurs when parameter bounds cause the system to fail.")
-            print("Plotting only parameters with valid results...")
-            
-            # Filter out parameters that caused failures
-            valid_params_mask = ~(lower_sp[msp_index].isnull() | upper_sp[msp_index].isnull())
-            
-            if valid_params_mask.sum() == 0:
-                print("\n❌ ERROR: All single-point sensitivity simulations failed!")
-                print("Skipping single-point sensitivity plots.")
-                print("\nPossible causes:")
-                print("  1. Parameter bounds may be too extreme")
-                print("  2. System constraints may be violated at bounds")
-                print("  3. Model may have convergence issues at boundary conditions")
-                baseline_sp = None
-                lower_sp = None
-                upper_sp = None
-            else:
-                print(f"\nValid parameters for sensitivity analysis: {valid_params_mask.sum()}/{len(valid_params_mask)}")
-                
-                # Create filtered data
-                baseline_sp_filtered = baseline_sp[valid_params_mask]
-                lower_sp_filtered = lower_sp.loc[valid_params_mask, :]
-                upper_sp_filtered = upper_sp.loc[valid_params_mask, :]
-                
-                # Create filtered index
-                index_sp = [p.describe(distribution=False) for p in model.parameters]
-                index_sp_filtered = [idx for idx, valid in zip(index_sp, valid_params_mask) if valid]
-                
-                # Plot single-point sensitivity for MSP (filtered)
-                print("\nGenerating single-point sensitivity plots for valid parameters...")
-                
-                fig_sp_msp, ax_sp_msp = bst.plots.plot_single_point_sensitivity(
-                    baseline_sp_filtered[msp_index],
-                    lower_sp_filtered[msp_index],
-                    upper_sp_filtered[msp_index],
-                    name='MSP [$/kg]',
-                    index=index_sp_filtered,
-                    sort=True,
-                )
-                plt.tight_layout()
-                plt.savefig(f'legH_single_point_sensitivity_MSP_{timestamp}.png', 
-                            dpi=300, bbox_inches='tight')
-                print(f"Saved single-point sensitivity plot for MSP (filtered)")
-                plt.close()
-                
-                # Plot single-point sensitivity for TCI (filtered)
-                valid_tci_mask = ~(lower_sp_filtered[tci_index].isnull() | upper_sp_filtered[tci_index].isnull())
-                if valid_tci_mask.sum() > 0:
-                    fig_sp_tci, ax_sp_tci = bst.plots.plot_single_point_sensitivity(
-                        baseline_sp_filtered[tci_index][valid_tci_mask],
-                        lower_sp_filtered[tci_index][valid_tci_mask],
-                        upper_sp_filtered[tci_index][valid_tci_mask],
-                        name='TCI [10^6 $]',
-                        index=[idx for idx, valid in zip(index_sp_filtered, valid_tci_mask) if valid],
-                        sort=True,
-                    )
-                    plt.tight_layout()
-                    plt.savefig(f'legH_single_point_sensitivity_TCI_{timestamp}.png', 
-                                dpi=300, bbox_inches='tight')
-                    print(f"Saved single-point sensitivity plot for TCI (filtered)")
-                    plt.close()
-                else:
-                    print("⚠️  Skipping TCI single-point plot: no valid data")
-        else:
-            # All results are valid - proceed normally
-            print("  ✓ All single-point sensitivity simulations successful")
-            
-            # Create index for plotting (without distribution info)
+        if not has_nan:
             index_sp = [p.describe(distribution=False) for p in model.parameters]
             
-            # Plot single-point sensitivity for MSP
-            fig_sp_msp, ax_sp_msp = bst.plots.plot_single_point_sensitivity(
-                baseline_sp[msp_index],
-                lower_sp[msp_index],
-                upper_sp[msp_index],
+            # Plot tornado diagram for MSP
+            fig_sp, ax_sp = bst.plots.plot_single_point_sensitivity(
+                baseline_sp[msp_idx],
+                lower_sp[msp_idx],
+                upper_sp[msp_idx],
                 name='MSP [$/kg]',
                 index=index_sp,
                 sort=True,
             )
             plt.tight_layout()
-            plt.savefig(f'legH_single_point_sensitivity_MSP_{timestamp}.png', 
-                        dpi=300, bbox_inches='tight')
-            print("Saved single-point sensitivity plot for MSP")
+            plt.savefig(f'LegH_tornado_MSP_{timestamp}.png', dpi=300, bbox_inches='tight')
+            print(f"  ✓ Saved MSP tornado diagram")
             plt.close()
             
-            # Plot single-point sensitivity for TCI
-            fig_sp_tci, ax_sp_tci = bst.plots.plot_single_point_sensitivity(
-                baseline_sp[tci_index],
-                lower_sp[tci_index],
-                upper_sp[tci_index],
-                name='TCI [10^6 $]',
+            # Plot tornado diagram for GWP
+            fig_sp_gwp, ax_sp_gwp = bst.plots.plot_single_point_sensitivity(
+                baseline_sp[gwp_idx],
+                lower_sp[gwp_idx],
+                upper_sp[gwp_idx],
+                name='GWP [kg CO2-eq/kg]',
                 index=index_sp,
                 sort=True,
             )
             plt.tight_layout()
-            plt.savefig(f'legH_single_point_sensitivity_TCI_{timestamp}.png', 
-                        dpi=300, bbox_inches='tight')
-            print("Saved single-point sensitivity plot for TCI")
+            plt.savefig(f'LegH_tornado_GWP_{timestamp}.png', dpi=300, bbox_inches='tight')
+            print(f"  ✓ Saved GWP tornado diagram")
             plt.close()
+        else:
+            print("  ⚠️  Some single-point simulations failed (NaN detected)")
     
     except Exception as e:
-        print(f"\n❌ ERROR in single-point sensitivity analysis: {e}")
-        print("Skipping single-point sensitivity plots.")
-        import traceback
-        print("\nFull error traceback:")
-        traceback.print_exc()
-        baseline_sp = None
-        lower_sp = None
-        upper_sp = None
+        print(f"  ⚠️  Single-point sensitivity failed: {e}")
     
     # =============================================================================
-    # Summary Statistics and Reports (CONTINUES AS BEFORE)
-    # =============================================================================
-    
-    print("\n" + "="*80)
-    print("SUMMARY STATISTICS")
-    print("="*80)
-    
-    print(f"\nNumber of valid simulations: {len(results_table)}")
-    
-    print(f"\nMSP Statistics:")
-    print(f"  Mean:   ${msp_values.mean():.4f}/kg")
-    print(f"  Median: ${msp_values.median():.4f}/kg")
-    print(f"  Std:    ${msp_values.std():.4f}/kg")
-    print(f"  Min:    ${msp_values.min():.4f}/kg")
-    print(f"  Max:    ${msp_values.max():.4f}/kg")
-    print(f"  5th percentile:  ${np.percentile(msp_values, 5):.4f}/kg")
-    print(f"  95th percentile: ${np.percentile(msp_values, 95):.4f}/kg")
-    
-    print(f"\nTCI Statistics:")
-    print(f"  Mean:   ${tci_values.mean():.2f} million")
-    print(f"  Median: ${tci_values.median():.2f} million")
-    print(f"  Std:    ${tci_values.std():.2f} million")
-    print(f"  Min:    ${tci_values.min():.2f} million")
-    print(f"  Max:    ${tci_values.max():.2f} million")
-    print(f"  5th percentile:  ${np.percentile(tci_values, 5):.2f} million")
-    print(f"  95th percentile: ${np.percentile(tci_values, 95):.2f} million")
-    
-    print(f"\nAOC Statistics:")
-    print(f"  Mean:   ${aoc_values.mean():.2f} million/yr")
-    print(f"  Median: ${aoc_values.median():.2f} million/yr")
-    print(f"  Std:    ${aoc_values.std():.2f} million/yr")
-    print(f"  Min:    ${aoc_values.min():.2f} million/yr")
-    print(f"  Max:    ${aoc_values.max():.2f} million/yr")
-    print(f"  5th percentile:  ${np.percentile(aoc_values, 5):.2f} million/yr")
-    print(f"  95th percentile: ${np.percentile(aoc_values, 95):.2f} million/yr")
-    
-    print("\nMost Influential Parameters for MSP (by absolute Spearman ρ):")
-    sorted_params = msp_rho.abs().sort_values(ascending=False)
-    for i, (param_name, abs_rho) in enumerate(sorted_params.items(), 1):
-        actual_rho = msp_rho[param_name]
-        direction = "↑ increases" if actual_rho > 0 else "↓ decreases"
-        print(f"  {i}. {param_name}")
-        print(f"      ρ = {actual_rho:+.4f} ({direction} MSP)")
-    
-    # =============================================================================
-    # Save Comprehensive Excel Report (WITH NULL CHECK)
+    # SAVE COMPREHENSIVE EXCEL REPORT
     # =============================================================================
     
     print("\n" + "="*80)
     print("SAVING COMPREHENSIVE EXCEL REPORT")
     print("="*80)
     
-    comprehensive_output = f'legH_comprehensive_analysis_{timestamp}_{N_target}sims_robust.xlsx'
-    print(f"\nSaving comprehensive results to {comprehensive_output}...")
+    comprehensive_file = f'LegH_comprehensive_{timestamp}.xlsx'
+    print(f"\nSaving to {comprehensive_file}...")
     
-    with pd.ExcelWriter(comprehensive_output) as writer:
-        # Raw data
-        results_table.to_excel(writer, sheet_name='Raw Monte Carlo Data')
+    with pd.ExcelWriter(comprehensive_file) as writer:
+        # Monte Carlo data
+        results_no_scale.to_excel(writer, sheet_name='MC_No_Scale')
+        results_with_scale.to_excel(writer, sheet_name='MC_With_Scale')
         
         # Spearman correlation
-        df_rho.to_excel(writer, sheet_name='Spearman rho')
-        df_p.to_excel(writer, sheet_name='Spearman p-values')
+        df_rho.to_excel(writer, sheet_name='Spearman_rho')
+        df_p.to_excel(writer, sheet_name='Spearman_p')
         
-        # Single-point sensitivity (only if available)
-        if baseline_sp is not None:
+        # Single-point sensitivity (if available)
+        if 'baseline_sp' in locals() and not has_nan:
             try:
-                baseline_sp.to_excel(writer, sheet_name='SP Baseline')
-                lower_sp.to_excel(writer, sheet_name='SP Lower Bound')
-                upper_sp.to_excel(writer, sheet_name='SP Upper Bound')
-            except Exception as e:
-                print(f"Warning: Could not save single-point sensitivity data: {e}")
+                baseline_sp.to_excel(writer, sheet_name='SP_Baseline')
+                lower_sp.to_excel(writer, sheet_name='SP_Lower')
+                upper_sp.to_excel(writer, sheet_name='SP_Upper')
+            except:
+                pass
         
         # Summary statistics
-        summary_stats = pd.DataFrame({
-            'MSP [$/kg]': [
-                msp_values.mean(), msp_values.median(), msp_values.std(),
-                msp_values.min(), msp_values.max(),
-                np.percentile(msp_values, 5), np.percentile(msp_values, 95)
-            ],
-            'TCI [10^6 $]': [
-                tci_values.mean(), tci_values.median(), tci_values.std(),
-                tci_values.min(), tci_values.max(),
-                np.percentile(tci_values, 5), np.percentile(tci_values, 95)
-            ],
-            'AOC [10^6 $/yr]': [
-                aoc_values.mean(), aoc_values.median(), aoc_values.std(),
-                aoc_values.min(), aoc_values.max(),
-                np.percentile(aoc_values, 5), np.percentile(aoc_values, 95)
-            ]
-        }, index=['Mean', 'Median', 'Std Dev', 'Min', 'Max', '5th %ile', '95th %ile'])
-        summary_stats.to_excel(writer, sheet_name='Summary Statistics')
+        summary_data = {
+            'Metric': ['MSP', 'TCI', 'AOC', 'GWP'],
+            'Baseline': [baseline[msp_idx], baseline[tci_idx], baseline[aoc_idx], baseline[gwp_idx]],
+            'Mean (No Scale)': [msp_values_no_scale.mean(), results_no_scale[tci_idx].mean(), 
+                               results_no_scale[aoc_idx].mean(), gwp_values_no_scale.mean()],
+            'Std (No Scale)': [msp_values_no_scale.std(), results_no_scale[tci_idx].std(), 
+                              results_no_scale[aoc_idx].std(), gwp_values_no_scale.std()],
+            '5th %ile': [np.percentile(msp_values_no_scale, 5), np.percentile(results_no_scale[tci_idx], 5),
+                        np.percentile(results_no_scale[aoc_idx], 5), np.percentile(gwp_values_no_scale, 5)],
+            '95th %ile': [np.percentile(msp_values_no_scale, 95), np.percentile(results_no_scale[tci_idx], 95),
+                         np.percentile(results_no_scale[aoc_idx], 95), np.percentile(gwp_values_no_scale, 95)],
+        }
+        summary_df = pd.DataFrame(summary_data)
+        summary_df.to_excel(writer, sheet_name='Summary', index=False)
         
         # Simulation statistics
-        stats_df.to_excel(writer, sheet_name='Simulation Statistics', index=False)
-        
-        # Spearman interpretation for MSP
-        spearman_summary = []
-        for param_name in msp_rho.index:
-            rho = msp_rho[param_name]
-            p_val = df_p[msp_index][param_name]
-            significance = "Significant (p<0.05)" if p_val < 0.05 else "Not significant"
-            direction = "Positive" if rho > 0 else "Negative"
-            spearman_summary.append({
-                'Parameter': param_name,
-                'Spearman ρ (MSP)': rho,
-                'P-value': p_val,
-                'Significance': significance,
-                'Direction': direction,
-                'Interpretation': f"{'Increasing' if rho > 0 else 'Decreasing'} this parameter {'increases' if rho > 0 else 'decreases'} MSP"
-            })
-        
-        spearman_df = pd.DataFrame(spearman_summary)
-        spearman_df = spearman_df.sort_values('Spearman ρ (MSP)', key=abs, ascending=False)
-        spearman_df.to_excel(writer, sheet_name='Spearman Interpretation', index=False)
+        stats_data = {
+            'Scenario': ['No Production Scale', 'With Production Scale'],
+            'Valid Samples': [stats_no_scale['n_valid'], stats_with_scale['n_valid']],
+            'Total Attempts': [stats_no_scale['n_attempts'], stats_with_scale['n_attempts']],
+            'Success Rate (%)': [stats_no_scale['success_rate'], stats_with_scale['success_rate']],
+        }
+        stats_df = pd.DataFrame(stats_data)
+        stats_df.to_excel(writer, sheet_name='Simulation_Stats', index=False)
     
-    print(f"Saved comprehensive analysis to: {comprehensive_output}")
+    print(f"  ✓ Saved comprehensive report")
     
     # =============================================================================
-    # Final Summary
+    # FINAL SUMMARY
     # =============================================================================
     
     print("\n" + "="*80)
-    print("ROBUST PARALLEL ANALYSIS COMPLETE!")
+    print("COMPREHENSIVE ANALYSIS COMPLETE!")
     print("="*80)
-    print(f"\nSimulation Statistics:")
-    print(f"  Target valid samples:     {N_target}")
-    print(f"  Actual valid samples:     {len(valid_results)}")
-    print(f"  Total simulation attempts: {total_attempts}")
-    print(f"  Success rate:             {len(valid_results)/total_attempts*100:.2f}%")
-    print(f"  Failed simulations:       {total_attempts - len(valid_results)}")
-    print(f"\nFiles generated:")
-    print(f"  1. Raw data: {output_file}")
-    print(f"  2. Comprehensive report: {comprehensive_output}")
-    print(f"  3. MSP Spearman plot: legH_spearman_MSP_{timestamp}.png")
-    print(f"  4. TCI Spearman plot: legH_spearman_TCI_{timestamp}.png")
-    print(f"  5. AOC Spearman plot: legH_spearman_AOC_{timestamp}.png")
-    print(f"  6. 2D Spearman plot: legH_spearman_2D_{timestamp}.png")
-    print(f"  7. Monte Carlo box plots: legH_montecarlo_boxes_{timestamp}.png")
-    print(f"\nParallel execution used {n_workers} CPU cores")
-    print("="*80)
+    print(f"\nFiles Generated:")
+    print(f"  1. MC without scale: {file_no_scale}")
+    print(f"  2. MC with scale: {file_with_scale}")
+    print(f"  3. Comprehensive report: {comprehensive_file}")
+    print(f"  4. Spearman plots: LegH_spearman_*_{timestamp}.png (5 plots)")
+    print(f"  5. KDE plots: LegH_kde_*_{timestamp}.png (5 plots)")
+    print(f"  6. Contour plots: LegH_contour_*_{timestamp}.png (8 plots)")
+    print(f"  7. Scale effects: LegH_scale_effects_{timestamp}.png")
+    print(f"  8. Tornado diagrams: LegH_tornado_*_{timestamp}.png (2 plots)")
+    print("\n" + "="*80)

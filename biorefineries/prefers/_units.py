@@ -1061,7 +1061,7 @@ class IonExchangeCycle(bst.Unit):
                  TargetProduct_IDs=('Leghemoglobin',),
                  TargetProduct_Yield=0.95,
                  BoundImpurity_IDs=('Heme_b',),
-                 BoundImpurity_Removal=0.97,
+                 BoundImpurity_Removal=0.93,
                  NonBinding_Carryover=0.04,
 
                  # Costing parameters

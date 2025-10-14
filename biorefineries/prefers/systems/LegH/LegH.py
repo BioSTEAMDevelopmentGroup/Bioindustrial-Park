@@ -9,7 +9,9 @@ Created on 2025-06-04 14:26:14
 """
 
 #from biorefineries.animal_bedding import _system
+from ast import Yield
 from biorefineries.prefers._process_settings import set_GWPCF, GWP_CFs,set_GWPCF_Multi,load_process_settings
+from biorefineries.prefers.systems import LegH
 import biosteam as bst
 from pint import set_application_registry
 from thermosteam import Stream
@@ -84,11 +86,15 @@ def create_LegH_system(
     cooler_pressure_drop = 20684 # [Pa]
     compressor_isentropic_efficiency = 0.85
     V_max = 500 # [m3] #here cause pressure vessel design problem
-    titer = 7.27 # [g / L]
-    productivity = titer / 72 # [g / L / h]
-    Y_p = titer * 5 / 1300 # [by wt] 3 wt%
+    titer_LegH = 7.27 # [g / L]
+    productivity_LegH = 7.27 / 72 # [g / L / h]
+    Y_p = 7.27 * 5 / 1300 # [by wt] 3 wt%
     Y_b = 0.43 # [by wt] 
-    LegH_yield = Y_p#/0.517 # yield based on glucose utilized for product formation
+    yield_LegH = Y_p#/0.517 # yield based on glucose utilized for product formation
+    titer_HemeB = 0.06632 # [g / L]
+    productvitiy_HemeB = 0.06632 / 72
+
+
     """
     Reactions
     """
@@ -105,13 +111,13 @@ def create_LegH_system(
     fermentation_reaction = bst.PRxn([
         #           Reaction        Reactnat            Conversion           Check                  "
         bst.Rxn('1 Glucose + 1.05882 NH3 + 0.17647 FeSO4  -> 0.17647 Heme_b + 0.617647 O2 + 0.17647 (NH4)2SO4 + 4.05882 H2O',
-                                    reactant = 'Glucose',X=LegH_yield*0.01,check_atomic_balance=True),
+                                    reactant = 'Glucose',X=yield_LegH*0.01,check_atomic_balance=True),
         bst.Rxn('Glucose + 0.01646 (NH4)2SO4 + 1.61317 NH3 -> 6 Globin + 0.28807 O2 + 3.68724 H2O',
-                                    reactant = 'Glucose', X= LegH_yield*0.04,check_atomic_balance=True),
+                                    reactant = 'Glucose', X= yield_LegH*0.04,check_atomic_balance=True),
         bst.Rxn('Glucose + 0.00786 FeSO4 + 0.00786 (NH4)2SO4 + 1.58847 NH3 -> 6 Leghemoglobin + 0.30275 O2  + 3.70380 H2O',
-                                    reactant = 'Glucose', X=LegH_yield,  check_atomic_balance=True),
+                                    reactant = 'Glucose', X=yield_LegH,  check_atomic_balance=True),
         ])
-    fermentation_reaction[2].product_yield('Leghemoglobin', basis='wt', product_yield=LegH_yield)
+    fermentation_reaction[2].product_yield('Leghemoglobin', basis='wt', product_yield=yield_LegH)
 
     neutralization_reaction = bst.Rxn(
         'H2SO4 + 2 NH3 -> (NH4)2SO4', reactant = 'NH3', X=1,
@@ -119,10 +125,10 @@ def create_LegH_system(
     )
 
     cell_growth_reaction = bst.Rxn(
-        'Glucose + 0.8364 NH3 + 0.0108 (NH4)2SO4 -> 2.01 H2O + 0.106 O2 + 6 Pichia_pastoris', 'Glucose', X=(1-LegH_yield*1.1)*Y_b,
+        'Glucose + 0.8364 NH3 + 0.0108 (NH4)2SO4 -> 2.01 H2O + 0.106 O2 + 6 Pichia_pastoris', 'Glucose', X=(1-yield_LegH*1.1)*Y_b,
         correct_atomic_balance=True
     )
-    cell_growth_reaction.product_yield('Pichia_pastoris', basis='wt', product_yield=(1-LegH_yield*1.1)*Y_b)
+    cell_growth_reaction.product_yield('Pichia_pastoris', basis='wt', product_yield=(1-yield_LegH*1.1)*Y_b)
 
     respiration_reaction1 = bst.Rxn(
         'Glucose + 6 O2 -> 6 CO2 + 6 H2O', 'Glucose', 1 - Y_b,
@@ -197,14 +203,14 @@ def create_LegH_system(
         dT_hx_loop=dT_hx_loop, T=T_operation,
         batch=True, reactions=RXN,
         kW_per_m3=agitation_power,
-        tau=titer/productivity,
+        tau=titer_LegH/productivity_LegH,
         cooler_pressure_drop=cooler_pressure_drop,
         compressor_isentropic_efficiency=compressor_isentropic_efficiency,
         P=1 * 101325,#optimize_power=True,
     )
-    R302.target_titer = titer # g / L
-    R302.target_productivity = productivity # g / L / h
-    R302.target_yield = LegH_yield  # wt %
+    R302.target_titer = titer_LegH # g / L
+    R302.target_productivity = productivity_LegH # g / L / h
+    R302.target_yield = yield_LegH  # wt %
 
     @R302.add_specification(run=True)
     def update_reaction_time_and_yield():
@@ -730,7 +736,7 @@ def set_production_rate(system, target_production_rate_kg_hr):
         raise ValueError(f"Could not achieve target production rate of {target_production_rate_kg_hr:.2f} kg/hr: {e}")
 
 
-def check_legH_specifications(product_stream):
+def check_LegH_specifications(product_stream):
     """
     Verify that LegH_3 product stream meets composition and purity specifications.
     
@@ -903,7 +909,7 @@ if __name__ == '__main__':
     # Check product specifications
     print(f"\n4. Verifying product specifications...")
     try:
-        check_legH_specifications(ss.LegH_3)
+        check_LegH_specifications(ss.LegH_3)
     except ValueError as e:
         print(f"\n   SPECIFICATION CHECK FAILED: {e}")
         print("   System may require process parameter adjustments to meet specifications.")
