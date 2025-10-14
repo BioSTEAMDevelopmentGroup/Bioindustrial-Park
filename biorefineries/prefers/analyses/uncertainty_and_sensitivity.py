@@ -233,9 +233,9 @@ def run_monte_carlo(model, N_target, baseline_production_kg_hr, exclude_producti
 # =============================================================================
 
 def generate_2d_contour_plots(results_table, param_indices, metric_indices, timestamp):
-    """Generate 2D contour plots showing joint impact of fermentation parameters."""
+    """Generate 2D scatter plots with color-coded z-values showing joint impact of fermentation parameters."""
     print("\n" + "="*80)
-    print("GENERATING 2D CONTOUR PLOTS")
+    print("GENERATING 2D SCATTER PLOTS WITH COLOR-CODED METRICS")
     print("="*80)
     
     # Find parameter indices
@@ -255,43 +255,43 @@ def generate_2d_contour_plots(results_table, param_indices, metric_indices, time
     
     # Define plot configurations
     plot_configs = [
-        # MSP contours
+        # MSP scatter plots
         {'x': titer_idx, 'y': yield_idx, 'z': msp_idx, 
          'xlabel': 'Titer [g/L]', 'ylabel': 'Yield [%]', 'zlabel': 'MSP [$/kg]',
-         'title': 'MSP_vs_Titer_and_Yield', 'cmap': 'YlOrRd'},
+         'title': 'MSP_vs_Titer_and_Yield', 'cmap': 'YlOrRd', 'reverse_cmap': False},
         
         {'x': titer_idx, 'y': productivity_idx, 'z': msp_idx,
          'xlabel': 'Titer [g/L]', 'ylabel': 'Productivity [g/L/hr]', 'zlabel': 'MSP [$/kg]',
-         'title': 'MSP_vs_Titer_and_Productivity', 'cmap': 'YlOrRd'},
+         'title': 'MSP_vs_Titer_and_Productivity', 'cmap': 'YlOrRd', 'reverse_cmap': False},
         
         {'x': yield_idx, 'y': productivity_idx, 'z': msp_idx,
          'xlabel': 'Yield [%]', 'ylabel': 'Productivity [g/L/hr]', 'zlabel': 'MSP [$/kg]',
-         'title': 'MSP_vs_Yield_and_Productivity', 'cmap': 'YlOrRd'},
+         'title': 'MSP_vs_Yield_and_Productivity', 'cmap': 'YlOrRd', 'reverse_cmap': False},
         
-        # GWP contours
+        # GWP scatter plots
         {'x': titer_idx, 'y': yield_idx, 'z': gwp_idx,
          'xlabel': 'Titer [g/L]', 'ylabel': 'Yield [%]', 'zlabel': 'GWP [kg CO2-eq/kg]',
-         'title': 'GWP_vs_Titer_and_Yield', 'cmap': 'RdYlGn_r'},
+         'title': 'GWP_vs_Titer_and_Yield', 'cmap': 'RdYlGn', 'reverse_cmap': True},
         
         {'x': titer_idx, 'y': productivity_idx, 'z': gwp_idx,
          'xlabel': 'Titer [g/L]', 'ylabel': 'Productivity [g/L/hr]', 'zlabel': 'GWP [kg CO2-eq/kg]',
-         'title': 'GWP_vs_Titer_and_Productivity', 'cmap': 'RdYlGn_r'},
+         'title': 'GWP_vs_Titer_and_Productivity', 'cmap': 'RdYlGn', 'reverse_cmap': True},
         
         {'x': yield_idx, 'y': productivity_idx, 'z': gwp_idx,
          'xlabel': 'Yield [%]', 'ylabel': 'Productivity [g/L/hr]', 'zlabel': 'GWP [kg CO2-eq/kg]',
-         'title': 'GWP_vs_Yield_and_Productivity', 'cmap': 'RdYlGn_r'},
+         'title': 'GWP_vs_Yield_and_Productivity', 'cmap': 'RdYlGn', 'reverse_cmap': True},
         
-        # Product quality contours
+        # Product quality scatter plots
         {'x': titer_idx, 'y': yield_idx, 'z': legh_content_idx,
          'xlabel': 'Titer [g/L]', 'ylabel': 'Yield [%]', 'zlabel': 'Leghemoglobin Content [%]',
-         'title': 'LegH_Content_vs_Titer_and_Yield', 'cmap': 'viridis'},
+         'title': 'LegH_Content_vs_Titer_and_Yield', 'cmap': 'viridis', 'reverse_cmap': False},
         
         {'x': titer_idx, 'y': yield_idx, 'z': protein_purity_idx,
          'xlabel': 'Titer [g/L]', 'ylabel': 'Yield [%]', 'zlabel': 'Protein Purity [%]',
-         'title': 'Protein_Purity_vs_Titer_and_Yield', 'cmap': 'plasma'},
+         'title': 'Protein_Purity_vs_Titer_and_Yield', 'cmap': 'plasma', 'reverse_cmap': False},
     ]
     
-    # Generate each contour plot
+    # Generate each scatter plot
     for i, config in enumerate(plot_configs, 1):
         if config['z'] is None:
             print(f"  Skipping plot {i}/{len(plot_configs)}: metric not found")
@@ -315,51 +315,85 @@ def generate_2d_contour_plots(results_table, param_indices, metric_indices, time
                 print(f"    ⚠️  Insufficient valid data ({len(x_data)} points)")
                 continue
             
-            # Create figure
+            # Create figure with appropriate size
             fig, ax = plt.subplots(figsize=(10, 8))
             
-            # Create grid
-            xi = np.linspace(x_data.min(), x_data.max(), 50)
-            yi = np.linspace(y_data.min(), y_data.max(), 50)
+            # Reverse colormap if needed (for GWP where lower is better)
+            cmap = config['cmap'] + '_r' if config['reverse_cmap'] else config['cmap']
             
-            # Interpolate z values
-            from scipy.interpolate import griddata
-            zi = griddata((x_data, y_data), z_data, (xi[None, :], yi[:, None]), method='cubic')
-            
-            # Plot filled contours
-            contourf = ax.contourf(xi, yi, zi, levels=15, cmap=config['cmap'], alpha=0.8)
-            
-            # Add contour lines
-            contour = ax.contour(xi, yi, zi, levels=10, colors='black', linewidths=0.5, alpha=0.4)
-            ax.clabel(contour, inline=True, fontsize=8)
+            # Create scatter plot with color-coded z-values
+            scatter = ax.scatter(
+                x_data, 
+                y_data, 
+                c=z_data,
+                s=30,  # Slightly larger points for visibility
+                cmap=cmap,
+                alpha=0.7,
+                edgecolors='black',
+                linewidths=0.3,
+                marker='o'
+            )
             
             # Add colorbar
-            cbar = plt.colorbar(contourf, ax=ax)
-            cbar.set_label(config['zlabel'], rotation=270, labelpad=20)
+            cbar = plt.colorbar(scatter, ax=ax, pad=0.02)
+            cbar.set_label(config['zlabel'], rotation=270, labelpad=25, fontsize=11)
+            cbar.ax.tick_params(labelsize=10)
             
-            # Scatter plot of actual data points
-            ax.scatter(x_data, y_data, c=z_data, s=10, 
-                      cmap=config['cmap'], edgecolors='black', 
-                      linewidths=0.3, alpha=0.5)
+            # Add statistics text box
+            stats_text = (
+                f'Statistics (n={len(x_data):,}):\n'
+                f'{config["zlabel"].split("[")[0].strip()}:\n'
+                f'  Mean: {z_data.mean():.4f}\n'
+                f'  Median: {np.median(z_data):.4f}\n'
+                f'  Std: {z_data.std():.4f}\n'
+                f'  Range: [{z_data.min():.4f}, {z_data.max():.4f}]'
+            )
+            ax.text(
+                0.02, 0.98, stats_text,
+                transform=ax.transAxes,
+                fontsize=9,
+                verticalalignment='top',
+                bbox=dict(boxstyle='round', facecolor='white', alpha=0.8, edgecolor='gray'),
+                family='monospace'
+            )
             
             # Labels and title
-            ax.set_xlabel(config['xlabel'])
-            ax.set_ylabel(config['ylabel'])
-            ax.set_title(config['title'].replace('_', ' '))
-            ax.grid(True, alpha=0.3)
+            ax.set_xlabel(config['xlabel'], fontsize=12, fontweight='bold')
+            ax.set_ylabel(config['ylabel'], fontsize=12, fontweight='bold')
+            ax.set_title(config['title'].replace('_', ' '), fontsize=14, fontweight='bold', pad=15)
+            
+            # Grid
+            ax.grid(True, alpha=0.3, linestyle='--', linewidth=0.5)
+            ax.set_axisbelow(True)
+            
+            # Add minor ticks for better readability
+            from matplotlib.ticker import AutoMinorLocator
+            ax.xaxis.set_minor_locator(AutoMinorLocator(5))
+            ax.yaxis.set_minor_locator(AutoMinorLocator(5))
+            ax.tick_params(which='both', direction='in', top=True, right=True)
+            ax.tick_params(which='major', length=6, width=1.2)
+            ax.tick_params(which='minor', length=3, width=0.8)
+            
+            # Adjust layout to prevent label cutoff
+            plt.tight_layout()
             
             # Save figure
-            filename = f"LegH_contour_{config['title']}_{timestamp}.png"
-            plt.tight_layout()
-            plt.savefig(filename, dpi=300, bbox_inches='tight')
+            filename = f"LegH_scatter_{config['title']}_{timestamp}.png"
+            plt.savefig(filename, dpi=300, bbox_inches='tight', facecolor='white')
             print(f"    ✓ Saved: {filename}")
+            print(f"       Data range: {config['xlabel']} [{x_data.min():.2f}, {x_data.max():.2f}], "
+                  f"{config['ylabel']} [{y_data.min():.2f}, {y_data.max():.2f}]")
+            print(f"       {config['zlabel']} range: [{z_data.min():.4f}, {z_data.max():.4f}]")
             plt.close()
             
         except Exception as e:
             print(f"    ⚠️  Failed: {e}")
+            import traceback
+            traceback.print_exc()
             plt.close()
     
-    print(f"\n✓ Contour plot generation complete")
+    print(f"\n✓ Scatter plot generation complete")
+    print(f"  Generated {len([c for c in plot_configs if c['z'] is not None])} color-coded scatter plots")
 
 
 # =============================================================================
@@ -390,6 +424,7 @@ if __name__ == '__main__':
     N_target = 100000                      # Number of valid samples per scenario
     batch_size = 20000                     # Number of samples per batch
     
+# %%    
     print(f"\nConfiguration:")
     print(f"  Baseline production: {baseline_production_kg_hr} kg/hr")
     print(f"  Target samples: {N_target} per scenario")
