@@ -190,6 +190,7 @@ def create_LegH_system(
 
     T302 = u.AmmoniaStorageTank('T302', ins=NH3_25wt, outs='T302Out')
 
+    # checking more details...
     R302 = u.AeratedFermentation(
         'R302',
         ins=[R301-1, T301-0, T302-0, bst.Stream('FilteredAir', phase='g', P=2 * 101325)],
