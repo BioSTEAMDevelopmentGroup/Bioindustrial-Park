@@ -134,7 +134,7 @@ def run_monte_carlo(model, N_target, baseline_production_kg_hr, exclude_producti
     
     # Determine number of CPU cores
     n_cores = mp.cpu_count()
-    n_workers = max(1, n_cores - 1)
+    n_workers = max(1, n_cores - 2)
     print(f"\nUsing {n_workers} parallel workers (of {n_cores} cores)")
     
     # Storage for valid results
@@ -421,10 +421,10 @@ if __name__ == '__main__':
     # CONFIGURATION PARAMETERS
     # =============================================================================
     baseline_production_kg_hr = 275      # Baseline production rate [kg/hr]
-    N_target = 100000                      # Number of valid samples per scenario
-    batch_size = 20000                     # Number of samples per batch
+    N_target = 120000                      # Number of valid samples per scenario
+    batch_size = 30000                     # Number of samples per batch max 30000
     
-# %%    
+    # %%    
     print(f"\nConfiguration:")
     print(f"  Baseline production: {baseline_production_kg_hr} kg/hr")
     print(f"  Target samples: {N_target} per scenario")
@@ -448,6 +448,7 @@ if __name__ == '__main__':
         else:
             print(f"  {name}: {value:.4f}")
     
+    # %%
     # =============================================================================
     # SCENARIO 1: MONTE CARLO WITHOUT PRODUCTION SCALE
     # =============================================================================
@@ -465,7 +466,8 @@ if __name__ == '__main__':
     file_no_scale = f'LegH_MC_no_scale_{timestamp}_{N_target}sims.xlsx'
     print(f"\nSaving results to {file_no_scale}...")
     results_no_scale.to_excel(file_no_scale)
-    
+
+    # %%
     # =============================================================================
     # SCENARIO 2: MONTE CARLO WITH PRODUCTION SCALE
     # =============================================================================
@@ -494,6 +496,7 @@ if __name__ == '__main__':
     aoc_idx = ('PreFerS', 'AOC [10^6 $/yr]')
     gwp_idx = ('PreFerS', 'GWP [kg CO2-eq/kg]')
 
+    # %%
     # =============================================================================
     # SPEARMAN'S RANK CORRELATION (Using NO SCALE data)
     # =============================================================================
