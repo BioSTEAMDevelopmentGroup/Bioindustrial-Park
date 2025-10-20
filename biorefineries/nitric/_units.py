@@ -30,53 +30,75 @@ class PowerUnit(bst.Unit): # only simulates the purchase cost
         product_out.copy_like(product_in)
     
     def _design(self):
-        self.add_power_utility(self.power)
+        # self.add_power_utility(self.power)
+        self.power_utility(self.power)
         
     def _cost(self):
         self.purchase_costs['Power unit'] = self.power * 1000 * self.cost_per_power
 
 
 
-class PlasmaReactor(bst.StirredTankReactor):
+# class PlasmaReactor(bst.StirredTankReactor):
     
+#     _N_ins = 2
+#     _N_outs = 2
+    
+#     T_default = 17+273.15
+#     P_default = 101325
+    
+#     def _init(self, ID='', ins=None, outs=(), thermo=None, *, 
+#               tau=None,
+#               batch=True,
+#               vessel_material='Stainless steel 316',
+#               HNO3_scale=None, # kg/day
+#               concentration=None, # 4778 NO3 mg/L=4.778g/L=4.778kg/m3
+#               electricity_consumption=None, # 15 MJ per mol N fixed
+#               electricity_to_heat_ratio=None, # assumed
+#               air_scale_ratio=None,
+#               **args):
+#         super()._init(tau=tau, batch=batch, vessel_material=vessel_material)
+#         self.HNO3_scale = HNO3_scale
+#         self.concentration = concentration
+#         self.electricity_consumption = electricity_consumption
+#         self.electricity_to_heat_ratio = electricity_to_heat_ratio
+#         self.air_scale_ratio = air_scale_ratio
+    
+#     def _run(self):
+#         effluent = self.outs[1]
+        
+#         effluent.mix_from(self.ins)
+#         effluent.imass['N2'] = 0
+#         effluent.imass['O2'] = 0
+#         effluent.imass['HNO3'] = self.HNO3_scale / 24
+        
+#         self.power = effluent.imol['HNO3'] * 1000 * self.electricity_consumption / 3.6 # mol * MJ/mol, in kW
+        
+#         effluent.T = self.T
+#         effluent.P = self.P
+    
+#     def _get_duty(self):
+#         self.heat_by_electricity = -self.effluent.imol['HNO3'] * 1e6 * self.electricity_consumption * self.electricity_to_heat_ratio # kJ
+#         return self.heat_by_electricity
+
+
+
+class PlasmaReactor(bst.Unit):
     _N_ins = 2
     _N_outs = 2
     
-    T_default = 17+273.15
-    P_default = 101325
-    
-    def _init(self, ID='', ins=None, outs=(), thermo=None, *, 
-              tau=None,
-              batch=True,
-              vessel_material='Stainless steel 316',
-              HNO3_scale=None, # kg/day
-              concentration=None, # 4778 NO3 mg/L=4.778g/L=4.778kg/m3
-              electricity_consumption=None, # 15 MJ per mol N fixed
-              electricity_to_heat_ratio=None, # assumed
-              air_scale_ratio=None,
-              **args):
-        super()._init(tau=tau, batch=batch, vessel_material=vessel_material)
+    def _init(self, ID='', ins=None, outs=(), thermo=None, HNO3_scale=None, concentration=None,
+              electricity_consumption=None,
+              cost_per_power=None, exponential_factor=None):
+        super()._init()
         self.HNO3_scale = HNO3_scale
         self.concentration = concentration
         self.electricity_consumption = electricity_consumption
-        self.electricity_to_heat_ratio = electricity_to_heat_ratio
-        self.air_scale_ratio = air_scale_ratio
+        self.exponential_factor = exponential_factor
     
     def _run(self):
         effluent = self.outs[1]
-        
-        effluent.mix_from(self.ins)
-        effluent.imass['N2'] = 0
-        effluent.imass['O2'] = 0
         effluent.imass['HNO3'] = self.HNO3_scale / 24
-        
         self.power = effluent.imol['HNO3'] * 1000 * self.electricity_consumption / 3.6 # mol * MJ/mol, in kW
         
-        effluent.T = self.T
-        effluent.P = self.P
-    
-    def _get_duty(self):
-        self.heat_by_electricity = -self.effluent.imol['HNO3'] * 1e6 * self.electricity_consumption * self.electricity_to_heat_ratio # kJ
-        return self.heat_by_electricity
-    
-    
+    def _cost(self):
+        self.purchase_costs['Reactor'] = 7691 * (self.power / 5.6)**self.exponential_factor

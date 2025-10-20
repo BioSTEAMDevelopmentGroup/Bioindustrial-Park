@@ -20,10 +20,14 @@ water_in = bst.Stream('water_in', H2O=1, units='kg/hr', phase='l')
 C101 = bst.IsothermalCompressor('C101', ins=air_in, outs='', P=9.3*101325,
                                 eta=0.7, compressor_type='reciprocating')
     
-R101 = _units.PlasmaReactor('R101', ins=(C101-0, water_in), outs=('vent', ''), 
-                            tau=24, HNO3_scale=1000, concentration=4.778/62*63,
-                            electricity_consumption=15, electricity_to_heat_ratio=0.4,
-                            air_scale_ratio=1)
+# R101 = _units.PlasmaReactor('R101', ins=(C101-0, water_in), outs=('vent', ''), 
+#                             tau=24, HNO3_scale=10000, concentration=4.778/62*63,
+#                             electricity_consumption=0.2, electricity_to_heat_ratio=0.4,
+#                             air_scale_ratio=1)
+
+R101 = _units.PlasmaReactor('R101', ins=(C101-0, water_in), outs=('vent', ''),
+                            HNO3_scale=10000, concentration=4.778/62*63,
+                            electricity_consumption=0.2, exponential_factor=0.9)
                             
 @R101.add_specification(run=True)
 def adjust_water_flow():
@@ -40,8 +44,8 @@ def adjust_U101_power():
 def adjust_air_flow():
     air_in = C101.ins[0]
     U101.simulate()
-    air_in.ivol['N2'] = 0.79 * U101.power / 10 * 0.025 * 60 * R101.air_scale_ratio # scaled by power; 25 lpm for 10 kW
-    air_in.ivol['O2'] = 0.21 * U101.power / 10 * 0.025 * 60 * R101.air_scale_ratio # scaled by power; 25 lpm for 10 kW
+    air_in.ivol['N2'] = 0.79 * U101.power / 10 * 0.025 * 60  # scaled by power; 25 lpm for 10 kW
+    air_in.ivol['O2'] = 0.21 * U101.power / 10 * 0.025 * 60  # scaled by power; 25 lpm for 10 kW
 
 sys_plasma = bst.main_flowsheet.create_system('sys_plasma')
 

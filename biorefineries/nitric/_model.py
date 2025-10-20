@@ -24,7 +24,7 @@ load_preferences_and_process_settings(T='K',
                                       flow_units='kg/hr',
                                       N=100,
                                       P_units='Pa',
-                                      CE=798,# Average 2023 https://toweringskills.com/financial-analysis/cost-indices/
+                                      CE=596,# 2020
                                       indicator='GWP100',
                                       electricity_EI=0.48,
                                       )
@@ -32,7 +32,7 @@ load_preferences_and_process_settings(T='K',
                                       
 sys_plasma.set_tolerance(rmol=1e-6, mol=1e-5, maxiter=400)
 
-tea_plasma = create_plasma_tea(sys=sys_plasma)
+tea_plasma = create_plasma_tea(sys=sys_plasma, IRR=0)
 
 sys_plasma.operating_hours = tea_plasma.operating_days * 24
 
@@ -41,11 +41,11 @@ u = sys_plasma.flowsheet.unit
 
 #%% Setting price and GWP value
 
-s.water_in.price = 15.21/3785.41 # $15.21/1000 gal; combined water (6.64) and wwt (8.57) cost; https://www.epa.gov/watersense/data-and-information-used-watersense
+s.water_in.price = 9/3785.41 # $15.21/1000 gal; combined water (6.64) and wwt (8.57) cost; https://www.epa.gov/watersense/data-and-information-used-watersense
 s.water_in.set_CF(key='GWP100', value=4.76e-4) # water supply; ecoinvent 3.8 cutoff; ultrafiltration trmt
 
+s.product.price = 0.8447540367077416
 electricity_price = bst.PowerUtility.price
-electricity_CI = bst.settings.get_electricity_CF(key='GWP100')
 
 cooling_agent_price = bst.settings.get_agent('chilled_brine').heat_transfer_price
 
@@ -93,10 +93,13 @@ get_installed_cost_U101 = lambda: u.U101.installed_cost / 1e6
 
 get_installed_cost_R101 = lambda: u.R101.installed_cost / 1e6
 
+get_installed_cost_R101_per_power = lambda: u.R101.installed_cost / u.U101.net_power / 1000 # $/W
+
 get_installed_cost_C101 = lambda: u.C101.installed_cost / 1e6
 
 metrics.append(Metric('U101 cost', get_installed_cost_U101, '10^6$', 'Biorefinery'),)
 metrics.append(Metric('R101 cost', get_installed_cost_R101, '10^6$', 'Biorefinery'),)
+metrics.append(Metric('R101 cost per power', get_installed_cost_R101_per_power, '$/W', 'Biorefinery'),)
 metrics.append(Metric('C101 cost', get_installed_cost_C101, '10^6$', 'Biorefinery'),)
 
 
@@ -138,12 +141,15 @@ get_material_impact = lambda: sys_plasma.get_total_feeds_impact('GWP100') / get_
 
 get_water_impact = lambda: sys_plasma.get_material_impact(s.water_in, 'GWP100') / get_HNO3_yield()
 
-get_electricity_impact = lambda: sys_plasma.get_electricity_consumption() * electricity_CI[0] / get_HNO3_yield()
+get_electricity_impact = lambda: sys_plasma.get_electricity_consumption() * bst.settings.get_electricity_CF('GWP100')[0]/ get_HNO3_yield()
 
-
+get_total_impact = lambda: get_material_impact() + get_electricity_impact()
+    
+    
 metrics.append(Metric('Total material impact', get_material_impact, 'kg CO2e/kg', 'LCA'),)
 metrics.append(Metric('Water impact', get_water_impact, 'kg CO2e/kg', 'LCA'),)
 metrics.append(Metric('Electricity impact', get_electricity_impact, 'kg CO2e/kg', 'LCA'),)
+metrics.append(Metric('Total impact', get_total_impact, 'kg CO2e/kg', 'LCA'),)
 
 
 #%% 
@@ -154,15 +160,29 @@ def create_model():
     # ============================================================================
     # TEA parameters
     # ============================================================================
-    D = shape.Triangle(1000*0.7, 1000, 1000*1.3)
+    D = shape.Triangle(1000, 10000, 600000)
     @param(name='HNO3 capacity', element='R101', kind='coupled', units='kg/day',
-            baseline=1000, distribution=D)
+            baseline=10000, distribution=D)
     def set_capacity(X):
         u.R101.HNO3_scale = X
         
+    
+    D = shape.Triangle(0.6, 1, 1.4) # From correction paper
+    @param(name='Power unit cost', element='U101', kind='isolated', units='$/W',
+            baseline=1, distribution=D)
+    def set_power_unit_cost(X):
+        u.U101.cost_per_power = X
+        
+        
+    D = shape.Triangle(0.8, 0.9, 1.0) # From correction paper
+    @param(name='Reactor scaling factor', element='R101', kind='isolated', units='',
+            baseline=0.9, distribution=D)
+    def set_reactor_unit_cost(X):
+        u.R101.exponential_factor = X
+        
         
     D = shape.Triangle(0.84, 0.9, 0.96)
-    @param(name='Plant uptime', element='TEA', kind='isolated', units='%',
+    @param(name='Plant uptime', element='TEA', kind='coupled', units='',
             baseline=0.9, distribution=D)
     def set_operating_days(uptime):
         tea_plasma.operating_days = 365. * uptime
@@ -181,45 +201,53 @@ def create_model():
         tea_plasma._TCI_ratio_cached = new_ratio
         
         
-    D = shape.Triangle(0.0583, 0.0637, 0.069) # From historical price
+    # D = shape.Triangle(0.0583, 0.0637, 0.069) # From historical price
+    D = shape.Triangle(0, 0.03, 0.055) # From correction paper
     @param(name='Electricity price', element='Electricity', kind='isolated', units='$/kWh',
-            baseline=0.0637, distribution=D)
+            baseline=0.03, distribution=D)
     def set_electricity_price(price): 
         bst.PowerUtility.price = price
         
         
-    D = shape.Triangle(15.21/3785.41*0.7, 15.21/3785.41, 15.21/3785.41*1.3)
+    D = shape.Triangle(9/3785.41*0.7, 9/3785.41, 9/3785.41*1.3)
     @param(name='Water price', element='Water', kind='isolated', units='$/kg',
-            baseline=15.21/3785.41, distribution=D)
+            baseline=9/3785.41, distribution=D)
     def set_water_price(price): 
         s.water_in.price = price
         
         
-    D = shape.Triangle(8.145e-06*0.7, 8.145e-06, 8.145e-06*1.3)
-    @param(name='Cooling agent price', element='Cooling agent', kind='isolated', units='$/kJ',
-            baseline=8.145e-06, distribution=D)
-    def set_cooling_agent_price(price): 
-        bst.settings.get_agent('chilled_brine').heat_transfer_price = price
+    # D = shape.Triangle(8.145e-06*0.7, 8.145e-06, 8.145e-06*1.3)
+    # @param(name='Cooling agent price', element='Cooling agent', kind='isolated', units='$/kJ',
+    #         baseline=8.145e-06, distribution=D)
+    # def set_cooling_agent_price(price): 
+    #     bst.settings.get_agent('chilled_brine').heat_transfer_price = price
     
     
     # ============================================================================
     # LCA parameters
     # ============================================================================
-    D = shape.Triangle(0.48*0.7, 0.48, 0.48*1.3)
+    D = shape.Uniform(0., 0.48)
     @param(name='Electricity GWP', element='Electricity', kind='isolated', units='kg CO2-eq/kWh',
-            baseline=0.48, distribution=D)
+            baseline=0., distribution=D)
     def set_electricity_GWP(X):
-        load_preferences_and_process_settings.electricity_EI = X
+        bst.settings.set_electricity_CF('GWP100', X, basis='kWhr', units='kg*CO2e')
+        
+        
+    D = shape.Triangle(3.16e-4, 4.76e-4, 5.64e-4)
+    @param(name='Water GWP', element='Water', kind='isolated', units='kg CO2-eq/kg',
+            baseline=4.76e-4, distribution=D)
+    def set_water_GWP(X):
+        s.water_in.characterization_factors['GWP100'] = X
     
     
     # ============================================================================
     # Process parameters
     # ============================================================================
-    D = shape.Triangle(24*0.8, 24, 24*1.2)
-    @param(name='R101 reaction time', element='R101', kind='coupled', units='hr',
-            baseline=24, distribution=D)
-    def set_R101_tau(X):
-        u.R101.tau = X
+    # D = shape.Triangle(24*0.8, 24, 24*1.2)
+    # @param(name='R101 reaction time', element='R101', kind='coupled', units='hr',
+    #         baseline=24, distribution=D)
+    # def set_R101_tau(X):
+    #     u.R101.tau = X
         
     
     D = shape.Triangle(4.778/62*63*0.8, 4.778/62*63, 4.778/62*63*1.2)
@@ -229,27 +257,26 @@ def create_model():
         u.R101.concentration = X
         
         
-    D = shape.Triangle(15*0.5, 15, 15*1.5)
+    D = shape.Triangle(15*0.8, 15, 15*1.2)
     @param(name='R101 electricity consumption', element='R101', kind='coupled', units='MJ/mol N',
             baseline=15, distribution=D)
     def set_R101_electricity_consumption(X):
         u.R101.electricity_consumption = X
         
     
-    D = shape.Triangle(0.2, 0.4, 0.6)
-    @param(name='R101 electricity to heat ratio', element='R101', kind='coupled', units='',
-            baseline=0.4, distribution=D)
-    def set_R101_electricity_to_heat_ratio(X):
-        u.R101.electricity_to_heat_ratio = X
+    # D = shape.Triangle(0.2, 0.4, 0.6)
+    # @param(name='R101 electricity to heat ratio', element='R101', kind='coupled', units='',
+    #         baseline=0.4, distribution=D)
+    # def set_R101_electricity_to_heat_ratio(X):
+    #     u.R101.electricity_to_heat_ratio = X
         
     
-    D = shape.Triangle(0.8, 1, 1.2)
-    @param(name='R101 electricity to heat ratio', element='R101', kind='coupled', units='',
-            baseline=1, distribution=D)
-    def set_R101_air_scale_ratio(X):
-        u.R101.air_scale_ratio = X
+    # D = shape.Triangle(0.8, 1, 1.2)
+    # @param(name='R101 air scale ratio', element='R101', kind='coupled', units='',
+    #         baseline=1, distribution=D)
+    # def set_R101_air_scale_ratio(X):
+    #     u.R101.air_scale_ratio = X
     
-        
         
     return model
 
@@ -292,7 +319,7 @@ def model_specification():
         str_e = str(e).lower()
         print('Error in model spec: %s'%str_e)
         run_bugfix_barrage()
-        
+
 #%%
 
 from datetime import datetime
@@ -308,7 +335,7 @@ dateTimeObj = datetime.now()
 minute = '0' + str(dateTimeObj.minute) if len(str(dateTimeObj.minute))==1 else str(dateTimeObj.minute)
     
 
-def run_model(N = 1000, notify_runs = 10, model = model): 
+def run_model(N = 10000, notify_runs = 10, model = model): 
     np.random.seed(1234) 
     rule = 'L' # For Latin-Hypercube sampling
     samples = model.sample(N, rule)
@@ -331,5 +358,37 @@ run_model()
 pd.set_option('display.max_rows', None)
 pd.set_option('display.float_format', '{:.4f}'.format)
 print(model.metrics_at_baseline())
+
+#%%
+# scale = np.linspace(1000, 600000)
+scale =  np.array([10000])
+
+electricity_consumption_i = np.array([0.2, 2.4, 15])
+
+electricity_price_i = np.array([0, 0.03, 0.055])
+
+for i in electricity_consumption_i:
+    u.R101.electricity_consumption = i
+    for j in electricity_price_i:
+        bst.PowerUtility.price = j
+        for k in scale:
+            u.R101.HNO3_scale = k
+            for m in range(3):
+                sys_plasma.simulate()
+            msp = tea_plasma.solve_price(s.product)
+            TCI = tea_plasma.TCI/1000000
+            R101_cost = u.R101.installed_cost/1000000
+            U101_cost = u.U101.installed_cost/1000000
+            C101_cost_ratio = u.C101.installed_cost/tea_plasma.TCI
+            AOC = tea_plasma.AOC/1000000
+            water_cost = sys_plasma.material_cost/1000000
+            electricity_cost = sys_plasma.get_electricity_consumption() * j/1000000
+            utility_cost = sum([i.cost for i in sys_plasma.heat_utilities])*7884/1000000
+            print(f"{i:3f} {j:3f} {k:3f} {msp:3f} {TCI:3f} {R101_cost:3f} {U101_cost:3f} {C101_cost_ratio:3f} {AOC:3f} {water_cost:3f} {electricity_cost:3f} {utility_cost:3f} ")
+
+        
+        
+    
+        
 
    
