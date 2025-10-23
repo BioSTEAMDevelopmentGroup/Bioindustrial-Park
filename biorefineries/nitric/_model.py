@@ -363,30 +363,50 @@ print(model.metrics_at_baseline())
 # scale = np.linspace(1000, 600000)
 scale =  np.array([10000])
 
-electricity_consumption_i = np.array([0.2, 2.4, 15])
+electricity_consumption = np.array([0.2, 2.4, 15])
 
 electricity_price_i = np.array([0, 0.03, 0.055])
 
-for i in electricity_consumption_i:
-    u.R101.electricity_consumption = i
-    for j in electricity_price_i:
-        bst.PowerUtility.price = j
-        for k in scale:
-            u.R101.HNO3_scale = k
-            for m in range(3):
-                sys_plasma.simulate()
-            msp = tea_plasma.solve_price(s.product)
-            TCI = tea_plasma.TCI/1000000
-            R101_cost = u.R101.installed_cost/1000000
-            U101_cost = u.U101.installed_cost/1000000
-            C101_cost_ratio = u.C101.installed_cost/tea_plasma.TCI
-            AOC = tea_plasma.AOC/1000000
-            water_cost = sys_plasma.material_cost/1000000
-            electricity_cost = sys_plasma.get_electricity_consumption() * j/1000000
-            utility_cost = sum([i.cost for i in sys_plasma.heat_utilities])*7884/1000000
-            print(f"{i:3f} {j:3f} {k:3f} {msp:3f} {TCI:3f} {R101_cost:3f} {U101_cost:3f} {C101_cost_ratio:3f} {AOC:3f} {water_cost:3f} {electricity_cost:3f} {utility_cost:3f} ")
+water_price = np.linspace(0, 9/3785.41)
 
-        
+# for i in electricity_consumption_i:
+#     u.R101.electricity_consumption = i
+#     for j in electricity_price_i:
+#         bst.PowerUtility.price = j
+#         for k in scale:
+#             u.R101.HNO3_scale = k
+#             for m in range(3):
+#                 sys_plasma.simulate()
+#             msp = tea_plasma.solve_price(s.product)
+#             TCI = tea_plasma.TCI/1000000
+#             R101_cost = u.R101.installed_cost/1000000
+#             U101_cost = u.U101.installed_cost/1000000
+#             C101_cost_ratio = u.C101.installed_cost/tea_plasma.TCI
+#             AOC = tea_plasma.AOC/1000000
+#             water_cost = sys_plasma.material_cost/1000000
+#             electricity_cost = sys_plasma.get_electricity_consumption() * j/1000000
+#             utility_cost = sum([i.cost for i in sys_plasma.heat_utilities])*7884/1000000
+#             print(f"{i:3f} {j:3f} {k:3f} {msp:3f} {TCI:3f} {R101_cost:3f} {U101_cost:3f} {C101_cost_ratio:3f} {AOC:3f} {water_cost:3f} {electricity_cost:3f} {utility_cost:3f} ")
+
+# cost vs. electricity price & water price
+u.R101.electricity_consumption = 2.4
+for j in electricity_price_i:
+    bst.PowerUtility.price = j
+    for k in water_price:
+        s.water_in.price = k
+        for m in range(3):
+            sys_plasma.simulate()
+        msp = tea_plasma.solve_price(s.product)
+        TCI = tea_plasma.TCI/1000000
+        R101_cost = u.R101.installed_cost/1000000
+        U101_cost = u.U101.installed_cost/1000000
+        C101_cost = u.C101.installed_cost/1000000
+        AOC = tea_plasma.AOC/1000000
+        water_cost = sys_plasma.material_cost/1000000
+        electricity_cost = sys_plasma.get_electricity_consumption() * j/1000000
+        utility_cost = sum([i.cost for i in sys_plasma.heat_utilities])*7884/1000000
+        print(f"{j:3f} {k:3f} {msp:3f} {TCI:3f} {R101_cost:3f} {U101_cost:3f} {C101_cost:3f} {AOC:3f} {water_cost:3f} {electricity_cost:3f} {utility_cost:3f} ")
+
         
     
         
