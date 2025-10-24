@@ -18,6 +18,20 @@ from biorefineries.nitric._process_settings import load_preferences_and_process_
 from warnings import warn
 from warnings import filterwarnings; filterwarnings('ignore')
 
+#%% for files saving
+
+from datetime import datetime
+
+from biorefineries import nitric
+
+filepath = nitric.__file__.replace('\\__init__.py', '')
+
+results_filepath = filepath + '\\results\\'
+    
+dateTimeObj = datetime.now()
+    
+minute = '0' + str(dateTimeObj.minute) if len(str(dateTimeObj.minute))==1 else str(dateTimeObj.minute)
+
 #%%
 
 load_preferences_and_process_settings(T='K',
@@ -250,16 +264,16 @@ def create_model():
     #     u.R101.tau = X
         
     
-    D = shape.Triangle(4.778/62*63*0.8, 4.778/62*63, 4.778/62*63*1.2)
+    D = shape.Uniform(4.778/62*63, 4.778/62*63*2)
     @param(name='R101 product concentration', element='R101', kind='coupled', units='kg/m3',
             baseline=4.778/62*63, distribution=D)
     def set_R101_concentration(X):
         u.R101.concentration = X
         
         
-    D = shape.Triangle(15*0.8, 15, 15*1.2)
+    D = shape.Triangle(2.4*0.7, 2.4, 2.4*1.3)
     @param(name='R101 electricity consumption', element='R101', kind='coupled', units='MJ/mol N',
-            baseline=15, distribution=D)
+            baseline=2.4, distribution=D)
     def set_R101_electricity_consumption(X):
         u.R101.electricity_consumption = X
         
@@ -321,20 +335,6 @@ def model_specification():
         run_bugfix_barrage()
 
 #%%
-
-from datetime import datetime
-
-from biorefineries import nitric
-
-filepath = nitric.__file__.replace('\\__init__.py', '')
-
-results_filepath = filepath + '\\results\\'
-    
-dateTimeObj = datetime.now()
-    
-minute = '0' + str(dateTimeObj.minute) if len(str(dateTimeObj.minute))==1 else str(dateTimeObj.minute)
-    
-
 def run_model(N = 10000, notify_runs = 10, model = model): 
     np.random.seed(1234) 
     rule = 'L' # For Latin-Hypercube sampling
@@ -353,42 +353,65 @@ def run_model(N = 10000, notify_runs = 10, model = model):
         df_rho.to_excel(writer, sheet_name='rho')
         df_p.to_excel(writer, sheet_name='p')
 
-#%%
 run_model()
 pd.set_option('display.max_rows', None)
 pd.set_option('display.float_format', '{:.4f}'.format)
 print(model.metrics_at_baseline())
 
-#%%
-# scale = np.linspace(1000, 600000)
-scale =  np.array([10000])
+#%% MSP vs scale
+scale = list(range(150, 600000, 100))
+# scale =  np.array([10000])
 
-electricity_consumption = np.array([0.2, 2.4, 15])
+electricity_consumption = np.array([0.2, 2.4])
 
 electricity_price_i = np.array([0, 0.03, 0.055])
 
 water_price = np.linspace(0, 9/3785.41)
 
-# for i in electricity_consumption_i:
-#     u.R101.electricity_consumption = i
-#     for j in electricity_price_i:
-#         bst.PowerUtility.price = j
-#         for k in scale:
-#             u.R101.HNO3_scale = k
-#             for m in range(3):
-#                 sys_plasma.simulate()
-#             msp = tea_plasma.solve_price(s.product)
-#             TCI = tea_plasma.TCI/1000000
-#             R101_cost = u.R101.installed_cost/1000000
-#             U101_cost = u.U101.installed_cost/1000000
-#             C101_cost_ratio = u.C101.installed_cost/tea_plasma.TCI
-#             AOC = tea_plasma.AOC/1000000
-#             water_cost = sys_plasma.material_cost/1000000
-#             electricity_cost = sys_plasma.get_electricity_consumption() * j/1000000
-#             utility_cost = sum([i.cost for i in sys_plasma.heat_utilities])*7884/1000000
-#             print(f"{i:3f} {j:3f} {k:3f} {msp:3f} {TCI:3f} {R101_cost:3f} {U101_cost:3f} {C101_cost_ratio:3f} {AOC:3f} {water_cost:3f} {electricity_cost:3f} {utility_cost:3f} ")
+results_1 = []
+for i in electricity_consumption:
+    u.R101.electricity_consumption = i
+    for j in electricity_price_i:
+        bst.PowerUtility.price = j
+        for k in scale:
+            u.R101.HNO3_scale = k
+            for m in range(3):
+                sys_plasma.simulate()
+            msp = tea_plasma.solve_price(s.product)
+            TCI = tea_plasma.TCI/1000000
+            R101_cost = u.R101.installed_cost/1000000
+            U101_cost = u.U101.installed_cost/1000000
+            C101_cost = u.C101.installed_cost/1000000
+            AOC = tea_plasma.AOC/1000000
+            water_cost = sys_plasma.material_cost/1000000
+            electricity_cost = sys_plasma.get_electricity_consumption() * j/1000000
+            utility_cost = sum([i.cost for i in sys_plasma.heat_utilities])*7884/1000000
+            results_1.append({
+                'electricity_consumption': i,
+                'electricity_price': j,
+                'HNO3_scale': k,
+                'MSP': msp,
+                'TCI': TCI,
+                'R101_cost': R101_cost,
+                'U101_cost': U101_cost,
+                'C101_cost': C101_cost,
+                'AOC': AOC,
+                'water_cost': water_cost,
+                'electricity_cost': electricity_cost,
+                'utility_cost': utility_cost
+            })
+df_1 = pd.DataFrame(results_1)
+
+file_to_save = results_filepath\
+    +'_' + '_%s.%s.%s-%s.%s'%(dateTimeObj.year, dateTimeObj.month, dateTimeObj.day, dateTimeObj.hour, minute)
+    
+with pd.ExcelWriter(file_to_save+'_'+'_2_MSP_scale.xlsx') as writer:
+    df_1.to_excel(writer)
+
+#%% contour plots
 
 # cost vs. electricity price & water price
+results_2 = []
 u.R101.electricity_consumption = 2.4
 for j in electricity_price_i:
     bst.PowerUtility.price = j
@@ -405,7 +428,28 @@ for j in electricity_price_i:
         water_cost = sys_plasma.material_cost/1000000
         electricity_cost = sys_plasma.get_electricity_consumption() * j/1000000
         utility_cost = sum([i.cost for i in sys_plasma.heat_utilities])*7884/1000000
-        print(f"{j:3f} {k:3f} {msp:3f} {TCI:3f} {R101_cost:3f} {U101_cost:3f} {C101_cost:3f} {AOC:3f} {water_cost:3f} {electricity_cost:3f} {utility_cost:3f} ")
+        results_2.append({
+            'electricity_consumption': i,
+            'electricity_price': j,
+            'HNO3_scale': k,
+            'MSP': msp,
+            'TCI': TCI,
+            'R101_cost': R101_cost,
+            'U101_cost': U101_cost,
+            'C101_cost': C101_cost,
+            'AOC': AOC,
+            'water_cost': water_cost,
+            'electricity_cost': electricity_cost,
+            'utility_cost': utility_cost
+        })
+        
+df_2 = pd.DataFrame(results_2)
+
+file_to_save = results_filepath\
+    +'_' + '_%s.%s.%s-%s.%s'%(dateTimeObj.year, dateTimeObj.month, dateTimeObj.day, dateTimeObj.hour, minute)
+    
+with pd.ExcelWriter(file_to_save+'_'+'_3_contour.xlsx') as writer:
+    df_2.to_excel(writer)
 
         
     
