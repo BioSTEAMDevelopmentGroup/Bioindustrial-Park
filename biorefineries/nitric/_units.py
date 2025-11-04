@@ -7,6 +7,7 @@ Created on Tue Sep 30 13:48:06 2025
 
 import biosteam as bst
 import thermosteam as tmo
+from biosteam.units.decorators import cost
 
 Rxn = tmo.reaction.Reaction
 ParallelRxn = tmo.reaction.ParallelReaction
@@ -14,7 +15,7 @@ ParallelRxn = tmo.reaction.ParallelReaction
 CEPCI = bst.design_tools.CEPCI_by_year
 
 #%%
-class PowerUnit(bst.Unit): # only simulates the purchase cost
+class PowerUnit(bst.Unit): # only simulates the power
     _N_ins = 1
     _N_outs = 1
     
@@ -81,24 +82,31 @@ class PowerUnit(bst.Unit): # only simulates the purchase cost
 #         return self.heat_by_electricity
 
 
-
 class PlasmaReactor(bst.Unit):
     _N_ins = 2
     _N_outs = 2
     
+    # _F_BM_default = {'Plasma setup': 2.}
+    
     def _init(self, ID='', ins=None, outs=(), thermo=None, HNO3_scale=None, concentration=None,
               electricity_consumption=None,
-              cost_per_power=None, exponential_factor=None):
+              cost_per_power=None, heat_by_electricity=None):
         super()._init()
         self.HNO3_scale = HNO3_scale
         self.concentration = concentration
         self.electricity_consumption = electricity_consumption
-        self.exponential_factor = exponential_factor
+        self.cost_per_power = cost_per_power
+        self.heat_by_electricity = heat_by_electricity
     
     def _run(self):
         effluent = self.outs[1]
         effluent.imass['HNO3'] = self.HNO3_scale / 24
         self.power = effluent.imol['HNO3'] * 1000 * self.electricity_consumption / 3.6 # mol * MJ/mol, in kW
+    
+    def _design(self):
+        q = -self.outs[1].imol['HNO3'] * 1e6 * self.electricity_consumption * self.heat_by_electricity # kJ
+        self.add_heat_utility(q, T_in=17+273.15, T_out=10+273.15)
+            
         
     def _cost(self):
-        self.purchase_costs['Reactor'] = 7691 * (self.power / 5.6)**self.exponential_factor
+        self.purchase_costs['Plasma setup'] = self.power * 1000 * self.cost_per_power
