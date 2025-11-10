@@ -362,32 +362,41 @@ electricity_consumption = np.array([0.2, 2.4])
 
 electricity_price_i = np.array([0.029, 0.041, 0.056])
 
-u.R101.concentration = 0.005
+concentration_1 = np.array([0.005, 0.15])
+
+power_unit_cost_1 = np.array([0.8, 1.0, 1.2])
 
 results_1 = []
 for i in electricity_consumption:
     u.R101.electricity_consumption = i
     for j in electricity_price_i:
         bst.PowerUtility.price = j
-        for k in scale:
-            u.R101.HNO3_scale = k
-            for m in range(3):
-                sys_plasma.simulate()
-            
-            results_1.append({
-                'electricity_consumption': i,
-                'electricity_price': j,
-                'HNO3_scale': k,
-                'Cost': get_cost(),
-                'power unit': get_U101_cost_contribution(),
-                'plama reactor': get_R101_cost_contribution(),
-                'compressor': get_C101_cost_contribution(),
-                'electricity (reactor)': get_electricity_U101_cost_contribution(),
-                'electricity (compressor)': get_electricity_C101_cost_contribution(),
-                'cooling utility (reactor)': get_cooling_R101_cost_contribution(),
-                'cooling utility (compressor)': get_cooling_C101_cost_contribution(),
-                'water': get_water_cost_contribution(),
-            })
+        for m in concentration_1:
+            u.R101.concentration = m
+            for n in power_unit_cost_1:
+                u.R101.power_unit_cost = n
+                # for k in scale:
+                #     u.R101.HNO3_scale = k
+                for p in range(3):
+                    sys_plasma.simulate()
+                    
+                    results_1.append({
+                        'electricity_consumption': i,
+                        'electricity_price': j,
+                        'concentration': m,
+                        'power_unit_cost': n,
+                        # 'HNO3_scale': k,
+                        'Cost': get_cost(),
+                        'power unit': get_U101_cost_contribution(),
+                        'plama reactor': get_R101_cost_contribution(),
+                        'compressor': get_C101_cost_contribution(),
+                        'electricity (reactor)': get_electricity_U101_cost_contribution(),
+                        'electricity (compressor)': get_electricity_C101_cost_contribution(),
+                        'cooling utility (reactor)': get_cooling_R101_cost_contribution(),
+                        'cooling utility (compressor)': get_cooling_C101_cost_contribution(),
+                        'water': get_water_cost_contribution(),
+                    })
+        
 df_1 = pd.DataFrame(results_1)
 
 file_to_save_1 = results_filepath\
@@ -405,7 +414,7 @@ minute = '0' + str(dateTimeObj.minute) if len(str(dateTimeObj.minute))==1 else s
 
 scale_2 = np.array([10000])
 
-electricity_consumption = np.array([0.2, 2.4])
+electricity_consumption = np.array([0.2, 2.4, 15])
 
 electricity_price_i = np.array([0.029, 0.041, 0.056])
 
@@ -535,5 +544,43 @@ file_to_save = results_filepath\
 with pd.ExcelWriter(file_to_save+'_'+'_4_contour.xlsx') as writer:
     df_4.to_excel(writer)
         
+#%% Waterfall plot
 
-   
+dateTimeObj = datetime.now()
+    
+minute = '0' + str(dateTimeObj.minute) if len(str(dateTimeObj.minute))==1 else str(dateTimeObj.minute)
+
+bst.PowerUtility.price = electricity_price_5 = np.array([0.041])
+s.water_in.price = water_price_5 = np.array([9/3785.41])
+
+electricity_consumption_5 = np.array([0.2, 2.4]) 
+
+concentration_5 = np.array([0.005, 0.15])
+
+power_unit_cost = np.array([0.8, 1.0])
+
+results_5 = []
+for k in electricity_consumption_5:
+    u.R101.electricity_consumption = k
+    for i in concentration_5:
+        u.R101.concentration = i
+        for j in power_unit_cost:
+            u.U101.cost_per_power = j
+            for m in range(3):
+                sys_plasma.simulate()
+            
+            results_5.append({
+                'electricity_consumption': k,
+                'concentration': i,
+                'cost_per_power': j,
+                'cost': get_cost(),})
+
+            
+
+df_5 = pd.DataFrame(results_5)
+
+file_to_save = results_filepath\
+    +'_' + '_%s.%s.%s-%s.%s'%(dateTimeObj.year, dateTimeObj.month, dateTimeObj.day, dateTimeObj.hour, minute)
+    
+with pd.ExcelWriter(file_to_save+'_'+'_5_waterfall.xlsx') as writer:
+    df_5.to_excel(writer)
