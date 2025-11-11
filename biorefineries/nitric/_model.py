@@ -40,7 +40,7 @@ load_preferences_and_process_settings(T='K',
                                       P_units='Pa',
                                       CE=798,# 2023; https://toweringskills.com/financial-analysis/cost-indices/
                                       indicator='GWP100',
-                                      electricity_EI=0.,
+                                      electricity_EI=0.0192,
                                       )
                                       
                                       
@@ -584,3 +584,27 @@ file_to_save = results_filepath\
     
 with pd.ExcelWriter(file_to_save+'_'+'_5_waterfall.xlsx') as writer:
     df_5.to_excel(writer)
+
+
+#%% LCA
+
+electricity_consumption_6 = np.array([0.2, 2.4, 15])
+results_6 = []
+
+for k in electricity_consumption_6:
+    u.R101.electricity_consumption = k
+    for m in range(3):
+        sys_plasma.simulate()
+    results_6.append({
+        'electricity_consumption': k,
+        'water impact': get_water_impact(),
+        'electricity impact': get_electricity_impact(),
+        'total impact': get_total_impact()
+        })
+df_6 = pd.DataFrame(results_6)
+
+file_to_save = results_filepath\
+    +'_' + '_%s.%s.%s-%s.%s'%(dateTimeObj.year, dateTimeObj.month, dateTimeObj.day, dateTimeObj.hour, minute)
+    
+with pd.ExcelWriter(file_to_save+'_'+'_6_LCA.xlsx') as writer:
+    df_6.to_excel(writer)

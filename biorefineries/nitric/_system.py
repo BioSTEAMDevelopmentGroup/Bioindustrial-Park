@@ -26,8 +26,8 @@ C101 = bst.IsothermalCompressor('C101', ins=air_in, outs='', P=9.3*101325,
 #                             air_scale_ratio=1)
 
 R101 = _units.PlasmaReactor('R101', ins=(C101-0, water_in), outs=('vent', ''),
-                            HNO3_scale=10000, concentration=0.05, # in weight
-                            electricity_consumption=2.4, cost_per_power=0.9, 
+                            HNO3_scale=10000, concentration=0.005, # in weight
+                            electricity_consumption=15, cost_per_power=0.9, 
                             heat_by_electricity=0.4)
                             
 @R101.add_specification(run=True)
