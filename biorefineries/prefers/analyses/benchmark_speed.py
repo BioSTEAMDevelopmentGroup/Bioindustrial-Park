@@ -5,9 +5,15 @@ Benchmark Script: Serial vs Parallel Monte Carlo Simulation
 Compares execution time between single-core and multi-core Monte Carlo simulations
 for LegHemoglobin production uncertainty analysis.
 
-Author: Dr. Ouwen Peng
-Institute: Illinois ARCS
+Created on 2025-11-17 10:15:26
+
+@author: Dr. Ouwen Peng
+@title: Postdoctoral Researcher
+@institute: Illinois ARCS
+@email: ouwen.peng@iarcs-create.edu.sg
 """
+
+
 
 import time
 import os
@@ -201,7 +207,7 @@ if __name__ == '__main__':
     mp.freeze_support()
     
     # Configuration
-    N_SAMPLES = 1000  # Number of samples for benchmark
+    N_SAMPLES = 5000  # Number of samples for benchmark
     BASELINE_PRODUCTION = 275  # kg/hr
     
     print("="*80)

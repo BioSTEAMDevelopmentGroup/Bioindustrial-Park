@@ -1,6 +1,5 @@
 # -*- coding: utf-8 -*-
 """
-Created on 2025-01-XX
 
 Uncertainty and Sensitivity Analysis for LegHemoglobin Production - COMPREHENSIVE ANALYSIS
 
@@ -9,11 +8,17 @@ Strategy:
 2. Monte Carlo WITH Production Scale → Scale effects analysis
 3. Single-Point Sensitivity WITH ALL parameters → Tornado diagrams
 
+
+Created on 2025-11-17 10:16:04
+
 @author: Dr. Ouwen Peng
 @title: Postdoctoral Researcher
 @institute: Illinois ARCS
 @email: ouwen.peng@iarcs-create.edu.sg
 """
+
+
+
 
 from warnings import filterwarnings
 filterwarnings('ignore')
