@@ -637,11 +637,15 @@ def get_monte_carlo(scenario, features, cache={}, dropna=True):
     if dropna: df = df.dropna(how='all', axis=0)
     return df
 
-def plot_kde_CI_MSP(scenarios=None):
+def plot_kde_CI_MSP(scenarios=None, short=False):
     from warnings import filterwarnings
     filterwarnings('ignore')
     bst.plots.set_font(size=9)
-    bst.plots.set_figure_size(width='half', aspect_ratio=1.25)
+    if short:
+        aspect_ratio = 1.0
+    else:
+        aspect_ratio = 1.25
+    bst.plots.set_figure_size(width='half', aspect_ratio=aspect_ratio)
     if scenarios is None:
         scenarios = ['acetate/glucose-seed', 'acetate', 'glucose']
     br = gasferm.Biorefinery(simulate=False, scenario=scenarios[0])
@@ -676,7 +680,7 @@ def plot_kde_CI_MSP(scenarios=None):
         xlabel=r'Carbon intensity $[\mathrm{kg} \cdot \mathrm{CO2e} \cdot \mathrm{L}^{\mathrm{-1}}]$',
         # xlabel='TCI $[10^6 \cdot \mathrm{USD}]$',
         ylabel=r'MSP $[\mathrm{USD} \cdot \mathrm{kg}^{\mathrm{-1}}]$',
-        aspect_ratio=1.1,
+        aspect_ratio=1 if short else 1.1,
         kde=True
     )
     for color, scenario in zip(color_wheel, scenarios):
@@ -707,11 +711,18 @@ def plot_kde_CI_MSP(scenarios=None):
     # plt.text(xpos(xright), ypos(ybottom), values + description, color=line_color,
     #          horizontalalignment='right', verticalalignment='bottom',
     #          fontsize=10, fontweight='bold', zorder=10)
-    plt.subplots_adjust(
-        hspace=0, wspace=0,
-        top=0.95, bottom=0.12,
-        left=0.18, right=0.98,
-    )
+    if short:
+        plt.subplots_adjust(
+            hspace=0, wspace=0,
+            top=0.95, bottom=0.14,
+            left=0.18, right=0.98,
+        )
+    else:
+        plt.subplots_adjust(
+            hspace=0, wspace=0,
+            top=0.95, bottom=0.12,
+            left=0.18, right=0.98,
+        )
     for i in ('svg', 'png'):
         file = os.path.join(images_folder, f"MSP_CI_kde.{i}")
         plt.savefig(file, dpi=900, transparent=True)
