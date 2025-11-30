@@ -391,7 +391,10 @@ def model_specification():
     try:
         for i in pre_fermenter_units_path: i.simulate()
         # spec.load_specifications(spec_1=spec.spec_1, spec_2=spec.spec_2, spec_3=spec.spec_3)
-        system.simulate()
+        
+        spec.set_production_capacity(spec.desired_annual_production) # !!! not for FGI
+        # system.simulate() # !!! for FGI
+        
         # system.simulate()
         # model._system.simulate()
         

@@ -17,7 +17,7 @@ from biorefineries.oleochemicals.system_simulate import azelaic_acid_tea,aa_base
 import biosteam as bst
 from biosteam import report
 from biosteam import settings
-# from model_samples import sample_list_1999
+from pathlib import Path
 
 #unit conversions
 KJpersec_to_KJhr = 3600 
@@ -684,14 +684,46 @@ all_metrics = [
     Metric('Electricity – CW701 fraction', CW701_elec_fraction, '%', 'Utility'),
     ]
 
+def _slice_rows_from_excel(xlsx_path, sheet_name, row_indices, header_rows=3):
+    """
+    Return a NumPy array of samples for the given row(s).
+    
+    Parameters
+    ----------
+    row_indices : int or list[int]
+        - If int → run a single Excel row (e.g. 77).
+        - If list[int] → run multiple Excel rows (e.g. [4, 77, 100]).
+    
+    header_rows : int
+        Number of non-data rows at the top (default=3 → data starts at Excel row 4).
+    """
+    df = pd.read_excel(xlsx_path, sheet_name=sheet_name, header=None)
+    
+    # Normalize row_indices into a list
+    if isinstance(row_indices, int):
+        row_indices = [row_indices]
+    
+    # Convert Excel row numbers to pandas iloc indices
+    adjusted = [r - 1 for r in row_indices]  # Excel rows are 1-based
+    return df.iloc[adjusted].to_numpy()
+
+
 def conduct_uncertainity_analysis(system = aa_baseline, #name of the system
                                   metrics = all_metrics, #list of Metric objects
-                                  number_of_runs = 3, #number of 
+                                  number_of_runs = 100, #number of 
                                   exception_hook = 'warn',#raise/warn
                                   rule = 'L', #for For Latin-Hypercube sampling
                                   notify_runs = 10, #runs after which you are notified 
                                   indicator = 'GWP100',
-                                  feedstock_type = 'HoySoy_oil' #can also provide 'HoSun_oil
+                                  feedstock_type = 'HoySoy_oil', #can also provide 'HoSun_oil
+                                  xlsx_path = r"C:/Users/lavan/gglk_code/Bioindustrial-Park/biorefineries/oleochemicals/model_table_10000_w_aa_price_frac_lca.xlsx",
+                                  sheet_name = "Sheet1",
+                                  batch_id = 1,
+                                  batch_size = 1000,
+                                  row_indices = None,
+                                  header_rows = 3,          # <-- set to 3 to make batch 1 = Excel rows 4–1003 (inclusive)
+                                  outdir = "C:/Users/lavan/gglk_code/Bioindustrial-Park/biorefineries/oleochemicals/batch_wise_uncertainty_analysis"
+                                                              
                                  ):
     model = Model(aa_baseline,metrics = all_metrics,
                   exception_hook= exception_hook,
@@ -1216,102 +1248,126 @@ def conduct_uncertainity_analysis(system = aa_baseline, #name of the system
     def set_cta(cycles_of_reuse):
         F.unit.M200.specifications[0].args[1] = cycles_of_reuse
         
-        
-    if number_of_runs > 0:
-        rule = rule
-        np.random.seed(1234) # For consistent results
-        samples = model.sample(number_of_runs,rule)
-        model.load_samples(samples)
-        model.evaluate(notify=notify_runs) 
-        model.table.to_excel(f'model_table_{number_of_runs}_w_aa_price_frac_lca.xlsx')
-        df_rho, df_p = model.spearman_r()
-        df_rho.to_excel(f'df_rho_{number_of_runs}_w_aa_price_and_frac_lca.xlsx')
-        df_p.to_excel(f'df_p_{number_of_runs}_w_aa_price_and_frac_lca.xlsx')
+    # --- Use pre-generated samples from Excel for this batch ---
+    samples = _slice_rows_from_excel(xlsx_path, "Sheet1", row_indices=row_indices, header_rows=3)
+
+    # Sanity check: columns in Excel must match the number of model parameters
+    n_params = len(model.parameters)
+    if samples.shape[1] != n_params:
+        raise ValueError(f"Excel has {samples.shape[1]} columns but model expects {n_params} parameters "
+                         f"(order must match model.parameters).")    
+
+    rule = rule
+    np.random.seed(1234) # For consistent results
+    model.load_samples(samples)                 # shape: (1000, n_params)
+    model.evaluate(notify=notify_runs)
+    # Save with batch tag
+    if type(row_indices) == int:
+        row_tag = f"rows{row_indices}"
     else:
-        model.show()
+        row_tag = f"rows{row_indices[0]}-{row_indices[-1]}"
+
+    btag = f"batch_{batch_id:02d}"
+    outdir = Path(outdir)
+    outdir.mkdir(parents=True, exist_ok=True)
+    table = model.table.copy()
+
+    if isinstance(table.columns, pd.MultiIndex):
+        # Convert MultiIndex to single-level string names
+        table.columns = (
+            table.columns
+            .to_flat_index()
+            .map(lambda tup: " | ".join(str(x) for x in tup if x not in (None, "", " ")))
+        )
+    
+    table.to_excel(outdir / f"model_table_{btag}_{row_tag}.xlsx", index=False)
+
+    # df_rho, df_p = model.spearman_r()
+    # df_rho.to_excel(outdir / f"df_rho_{btag}_{row_tag}.xlsx", index=True)
+    # df_p.to_excel(outdir / f"df_p_{btag}_{row_tag}.xlsx", index=True)
     return model
-#%% spearmans rho
-import pandas as pd
-import numpy as np
-from scipy.stats import spearmanr
 
-# 1. Load Excel
-df = pd.read_excel('C:/Users/lavan/gglk_code/Bioindustrial-Park/biorefineries/oleochemicals/uncertainty_and_sensitivity_analysis_2000/uncertainty_analysis_results_2000.xlsx', sheet_name=0, header=1)
+# #%% spearmans rho
+# import pandas as pd
+# import numpy as np
+# from scipy.stats import spearmanr
 
-# 2. Select parameter and metric columns
-param_df = df.iloc[:, 1:60].copy()
-metric_df = df.iloc[:, 60:157].copy()
+# # 1. Load Excel
+# df = pd.read_excel('C:/Users/lavan/gglk_code/Bioindustrial-Park/biorefineries/oleochemicals/uncertainty_and_sensitivity_analysis_2000/uncertainty_analysis_results_2000.xlsx', sheet_name=0, header=1)
 
-# 3. Force numeric types
-param_df = param_df.apply(pd.to_numeric, errors='coerce')
-metric_df = metric_df.apply(pd.to_numeric, errors='coerce')
+# # 2. Select parameter and metric columns
+# param_df = df.iloc[:, 1:60].copy()
+# metric_df = df.iloc[:, 60:157].copy()
 
-# # 4. Drop rows with NaNs
-combined = pd.concat([param_df, metric_df], axis=1).dropna()
+# # 3. Force numeric types
+# param_df = param_df.apply(pd.to_numeric, errors='coerce')
+# metric_df = metric_df.apply(pd.to_numeric, errors='coerce')
+
+# # # 4. Drop rows with NaNs
+# combined = pd.concat([param_df, metric_df], axis=1).dropna()
 
 
-# Count rows before dropping NaNs
-initial_row_count = df.shape[0]
-final_row_count = combined.shape[0]
-rows_dropped = initial_row_count - final_row_count
+# # Count rows before dropping NaNs
+# initial_row_count = df.shape[0]
+# final_row_count = combined.shape[0]
+# rows_dropped = initial_row_count - final_row_count
 
-print(f"🧹 Dropped {rows_dropped} rows with missing values (from {initial_row_count} to {final_row_count})")
+# print(f"🧹 Dropped {rows_dropped} rows with missing values (from {initial_row_count} to {final_row_count})")
 
-# 5. Split again
-param_data = combined.iloc[:, :param_df.shape[1]]
-metric_data = combined.iloc[:, param_df.shape[1]:]
+# # 5. Split again
+# param_data = combined.iloc[:, :param_df.shape[1]]
+# metric_data = combined.iloc[:, param_df.shape[1]:]
 
-# 6. Identify and print constant columns
-param_const = param_data.columns[param_data.nunique() <= 1].tolist()
-metric_const = metric_data.columns[metric_data.nunique() <= 1].tolist()
+# # 6. Identify and print constant columns
+# param_const = param_data.columns[param_data.nunique() <= 1].tolist()
+# metric_const = metric_data.columns[metric_data.nunique() <= 1].tolist()
 
-print(f"Dropping {len(param_const)} constant parameter columns:", param_const)
-print(f"Dropping {len(metric_const)} constant metric columns:", metric_const)
+# print(f"Dropping {len(param_const)} constant parameter columns:", param_const)
+# print(f"Dropping {len(metric_const)} constant metric columns:", metric_const)
 
-# 7. Drop constant columns
-param_data = param_data.drop(columns=param_const)
-metric_data = metric_data.drop(columns=metric_const)
+# # 7. Drop constant columns
+# param_data = param_data.drop(columns=param_const)
+# metric_data = metric_data.drop(columns=metric_const)
 
-# 8. Compute Spearman correlation
-try:
-    rho_matrix, pval_matrix = spearmanr(param_data, metric_data, axis=0)
+# # 8. Compute Spearman correlation
+# try:
+#     rho_matrix, pval_matrix = spearmanr(param_data, metric_data, axis=0)
 
-    # Extract dimensions
-    n_param = param_data.shape[1]
-    n_metric = metric_data.shape[1]
+#     # Extract dimensions
+#     n_param = param_data.shape[1]
+#     n_metric = metric_data.shape[1]
 
-    # Extract cross-correlation matrices
-    rho_cross = rho_matrix[:n_param, n_param:]
-    pval_cross = pval_matrix[:n_param, n_param:]
+#     # Extract cross-correlation matrices
+#     rho_cross = rho_matrix[:n_param, n_param:]
+#     pval_cross = pval_matrix[:n_param, n_param:]
 
-    # Wrap in DataFrames
-    rho_df = pd.DataFrame(rho_cross, index=param_data.columns, columns=metric_data.columns)
-    pval_df = pd.DataFrame(pval_cross, index=param_data.columns, columns=metric_data.columns)
+#     # Wrap in DataFrames
+#     rho_df = pd.DataFrame(rho_cross, index=param_data.columns, columns=metric_data.columns)
+#     pval_df = pd.DataFrame(pval_cross, index=param_data.columns, columns=metric_data.columns)
 
-    # Export to Excel
-    output_file = 'spearman_results.xlsx'
-    with pd.ExcelWriter(output_file, engine='openpyxl') as writer:
-        rho_df.to_excel(writer, sheet_name='Spearman_rho')
-        pval_df.to_excel(writer, sheet_name='Spearman_pval')
+#     # Export to Excel
+#     output_file = 'spearman_results.xlsx'
+#     with pd.ExcelWriter(output_file, engine='openpyxl') as writer:
+#         rho_df.to_excel(writer, sheet_name='Spearman_rho')
+#         pval_df.to_excel(writer, sheet_name='Spearman_pval')
 
-    print(f"\n✅ Spearman correlation exported to '{output_file}'")
+#     print(f"\n✅ Spearman correlation exported to '{output_file}'")
 
-except FloatingPointError:
-    print("❌ Still encountered a floating-point error during correlation.")
+# except FloatingPointError:
+#     print("❌ Still encountered a floating-point error during correlation.")
 
-# #%%
-# #Explaination on LCA methods below
-# #EOL is always included in cradle to grave
-# # If the feedstock CF does not include that biogenic CO₂ was reabsorbed by the crop, then:
-# # You must subtract the amount of fixed carbon from your process to correct for this.
-# # Otherwise, you'd overestimate the GWP, because it would include carbon that was never fossil-derived.
-# # You would base this subtraction on atomic carbon flow (e.g., how much C is in the oil).
-
-# # If the feedstock CF does not include:
-# # iLUC = indirect land use change
-# # SOC = soil organic carbon losses/gains
-# # Then you should:
-# # Add uncertainty (e.g., ±X%) to the CF to reflect the possible unaccounted emissions or sequestration.
-# # This is commonly done when relying on partial or optimistic LCA models that ignore landscape-level effects.
-# #cradle to gate will be a higher number since EOL is not included
-# #gate to gate will not be able let you do a fair comparision between fossil fuel and bioproducts
+# # #%%
+# # #Explaination on LCA methods below
+# # #EOL is always included in cradle to grave
+# # # If the feedstock CF does not include that biogenic CO₂ was reabsorbed by the crop, then:
+# # # You must subtract the amount of fixed carbon from your process to correct for this.
+# # # Otherwise, you'd overestimate the GWP, because it would include carbon that was never fossil-derived.
+# # # You would base this subtraction on atomic carbon flow (e.g., how much C is in the oil).
+# # # If the feedstock CF does not include:
+# # # iLUC = indirect land use change
+# # # SOC = soil organic carbon losses/gains
+# # # Then you should:
+# # # Add uncertainty (e.g., ±X%) to the CF to reflect the possible unaccounted emissions or sequestration.
+# # # This is commonly done when relying on partial or optimistic LCA models that ignore landscape-level effects.
+# # #cradle to gate will be a higher number since EOL is not included
+# # #gate to gate will not be able let you do a fair comparision between fossil fuel and bioproducts

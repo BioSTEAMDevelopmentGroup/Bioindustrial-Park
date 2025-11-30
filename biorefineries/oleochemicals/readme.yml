@@ -1,17 +1,19 @@
-# The biorefinery named oleochemicals is available within BioIndustrial-Park which is a repository for
-# complete biorefinery models and results generated with BioSTEAM. 
+# .readthedocs.yml
+The biorefinery named oleochemicals is available within BioIndustrial-Park which is a repository for 
+complete biorefinery models and results generated with BioSTEAM. 
+All biorefinery models are in the biorefineries package, as an installable package for complete biorefinery models in BioSTEAM.
+The biorefinery contains several modules each with a designated purpose described in Table S13 in supporting Information 1. 
+The oleochemicals biorefinery can be downloaded using the below steps
+  1) pip install biosteam == 2.38.3
+  2) pip install thermosteam == 0.38.2
+  3) git clone https://github.com/BioSTEAMDevelopmentGroup/Bioindustrial-Park.git
+  4) cd Bioindustrial-Park
+  5) git checkout a02f8de8af02b31e4c650e42ddccf107ccf15487
 
-# The oleochemicals biorefinery was designed using BioSTEAM (version 2.83.3) and ThermoSTEAM (version 0.38.2). 
-# 1) pip install biosteam version == 2.83.3
-# 2) pip install thermosteam version == 0.38.2
-# 3) $ git clone version 3 manuscript · BioSTEAMDevelopmentGroup/Bioindustrial-Park@74b66dc · GitHub 
+Please use the supporting information provided with the manuscript to acess the below results
+1) To access the samples and results for all uncertainty and sensitivity analyses
+2) To access the uncertainty analysis results for varying IRR (%)
+3) To access the results for MSPs at different feedstock compositions
+4) To access the files containing MSPs at varying TAG (%)
 
-# The biorefinery contains several modules each with a designated purpose described in Table S13 in the Supplementary Information - A provided with the Manuscript.
-#-Please use the BioIndustrial Park repository to accessing the following data available in the folders.
-#-Samples and results for all the uncertainty analysis under folder name uncertainty_and_sensitivity_analysis_2000
-#-Results for sensitivity analysis under folder name uncertainty_and_sensitivity_analysis_2000
-#-To access uncertainty analysis results for varying IRR [%] under folder name MSP_vs_IRR_data
-#-To access results for MSPs at different feedstock compositions and feedstock flow under folder name feedstock_flow_versus_MSP
-#-To access files for MSPs at varying TAG [%] under folder name feedstock_composition_heatmap_data
-#-To access partition coefficient data for LLE extraction of azelaic acid under folder name partition_coeff
-#-To access data for contour plots at for MSP and CI at baseline and MSP at feedstock purchase price of 1.60 $/kg and 2.70 $/kg under folder name contourplot_data
+To run the biorefinery and perform simulations, please use the guidance provided in the tutorials in https://biosteam.readthedocs.io/en/latest/index.html
