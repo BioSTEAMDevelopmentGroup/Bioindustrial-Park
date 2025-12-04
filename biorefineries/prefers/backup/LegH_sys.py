@@ -14,7 +14,7 @@ Created on 2025-08-15 18:45:02
 import biosteam as bst
 # Assuming you have these custom modules set up
 from biorefineries.prefers import _chemicals as c
-from biorefineries.prefers import _streams as s
+from biorefineries.prefers.systems.LegH import _streams as s
 from biorefineries.prefers.systems.LegH. _processes import (
     create_LegH_conversion_process,
     create_LegH_concentration_process,

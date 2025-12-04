@@ -12,13 +12,14 @@ Created on 2025-06-04 14:26:14
 from ast import Yield
 from biorefineries.prefers._process_settings import set_GWPCF, GWP_CFs,set_GWPCF_Multi,load_process_settings
 from biorefineries.prefers.systems import LegH
+from biorefineries.prefers.systems.LegH import _streams as s
 import biosteam as bst
 from pint import set_application_registry
 from thermosteam import Stream
 from biosteam import F
 import thermosteam as tmo
 import numpy as np
-from biorefineries.prefers import _chemicals as c, _units as u ,_streams as s
+from biorefineries.prefers import _chemicals as c, _units as u
 from biorefineries.prefers._process_settings import price  # ADD THIS IMPORT
 
 # %% Settings
@@ -88,7 +89,7 @@ def create_LegH_system(
     V_max = 500 # [m3] #here cause pressure vessel design problem
     titer_LegH = 7.27 # [g / L]
     productivity_LegH = 7.27 / 72 # [g / L / h]
-    Y_p = 7.27 * 5 / 1300 # [by wt] 3 wt%
+    Y_p = 7.27 * 4 / 1300 # [by wt] 3 wt%
     Y_b = 0.43 # [by wt] 
     yield_LegH = Y_p#/0.517 # yield based on glucose utilized for product formation
     titer_HemeB = 0.06632 # [g / L]
@@ -940,7 +941,7 @@ if __name__ == '__main__':
     try:
         r1 = bst.report.lca_inventory_table(
             systems=[sys],
-            key='GWP',
+            keys='GWP',
             items=[ss.LegH_3],
         )
         print("   LCA Inventory Table generated")

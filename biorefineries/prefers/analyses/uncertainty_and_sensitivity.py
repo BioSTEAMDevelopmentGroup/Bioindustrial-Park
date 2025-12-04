@@ -18,8 +18,6 @@ Created on 2025-11-17 10:16:04
 """
 
 
-
-
 from warnings import filterwarnings
 filterwarnings('ignore')
 

@@ -10,13 +10,14 @@ Created on 2025-06-04 14:26:14
 
 #from biorefineries.animal_bedding import _system
 from biorefineries.prefers._process_settings import set_GWPCF, GWP_CFs,set_GWPCF_Multi,load_process_settings
+from biorefineries.prefers.systems.LegH import _streams as s
 import biosteam as bst
 from pint import set_application_registry
 from thermosteam import Stream
 from biosteam import F
 import thermosteam as tmo
 import numpy as np
-from biorefineries.prefers import _chemicals as c, _units as u ,_streams as s
+from biorefineries.prefers import _chemicals as c, _units as u
 from biorefineries.prefers._process_settings import price  # ADD THIS IMPORT
 
 # %% Settings
@@ -442,35 +443,375 @@ def create_LegH_system(
 
     return LegH_3, vent1, vent2, effluent1, effluent2,effluent3, DfUltraBuffer, IXEquilibriumBuffer, IXElutionBuffer, IXRegenerationSolution, DfNanoBuffer
 
+# %% Design Specification Functions
+
+
+def set_production_rate(system, target_production_rate_kg_hr):
+    """
+    Adjust system inputs to achieve target LegH_3 production rate using a global scaling factor.
+    
+    Parameters
+    ----------
+    system : biosteam.System
+        The LegH production system
+    target_production_rate_kg_hr : float
+        Target mass flow rate for LegH_3 stream [kg/hr]
+    
+    Returns
+    -------
+    float
+        Achieved production rate [kg/hr]
+    """
+    import flexsolve as flx
+    
+    # Get product stream
+    product_stream = system.flowsheet.stream.LegH_3
+    
+    # Store baseline flow rates for all input streams
+    baseline_flows = {}
+    for stream in system.ins:
+        if stream.F_mass > 0:
+            baseline_flows[stream] = stream.F_mass
+    
+    if not baseline_flows:
+        raise ValueError("No input streams with positive flow rates found")
+    
+    print(f"\n{'='*60}")
+    print(f"Setting Production Rate to {target_production_rate_kg_hr:.2f} kg/hr")
+    print(f"{'='*60}")
+    print(f"Baseline input streams stored: {len(baseline_flows)} streams")
+    
+    # Run initial simulation to get baseline
+    system.simulate()
+    initial_production = product_stream.F_mass
+    
+    if initial_production <= 0:
+        raise ValueError("Initial production rate is zero. Cannot scale system.")
+    
+    # Calculate initial scaling factor guess
+    initial_guess = target_production_rate_kg_hr / initial_production
+    
+    print(f"  Initial production: {initial_production:.2f} kg/hr")
+    print(f"  Target production:  {target_production_rate_kg_hr:.2f} kg/hr")
+    print(f"  Initial scaling guess: {initial_guess:.4f}x")
+    print(f"  Search bounds: 0.1x to 10.0x baseline")
+    
+    # Iteration tracking
+    iteration = [0]
+    
+    # Define objective function that scales inputs, simulates, and returns error
+    def objective_function(scaling_factor):
+        """
+        Scale all input streams, simulate system, return production error.
+        
+        Parameters
+        ----------
+        scaling_factor : float
+            Global scaling factor for all inputs
+            
+        Returns
+        -------
+        float
+            Error = (achieved_production - target_production) [kg/hr]
+        """
+        iteration[0] += 1
+        
+        try:
+            # Scale all input streams
+            for stream, baseline_flow in baseline_flows.items():
+                stream.F_mass = baseline_flow * scaling_factor
+            
+            # Simulate system with scaled inputs
+            system.simulate()
+            
+            # Get achieved production rate
+            achieved_rate = product_stream.F_mass
+            error = achieved_rate - target_production_rate_kg_hr
+            
+            # Print progress
+            print(f"    Iteration {iteration[0]}: scale={scaling_factor:.4f}x, "
+                  f"production={achieved_rate:.2f} kg/hr, error={error:.4f} kg/hr")
+            
+            return error
+            
+        except Exception as e:
+            print(f"    Iteration {iteration[0]} FAILED at scale={scaling_factor:.4f}x: {e}")
+            # Return large error to guide solver away from infeasible region
+            return 1e6 if scaling_factor > initial_guess else -1e6
+    
+    try:
+        print(f"\nSolving for optimal scaling factor using flexsolve.IQ_interpolation...")
+        
+        # Use flexsolve directly (not as a system specification)
+        scaling_factor = flx.IQ_interpolation(
+            f=objective_function,
+            x0=0.1,              # Lower bound
+            x1=10.0,             # Upper bound
+            x=initial_guess,     # Initial guess
+            xtol=0.001,          # Tolerance on scaling factor
+            ytol=1.0,            # Tolerance on production rate [kg/hr]
+            maxiter=100,
+            checkbounds=True,
+            checkiter=True,
+        )
+        
+        # Final simulation with converged scaling factor
+        for stream, baseline_flow in baseline_flows.items():
+            stream.F_mass = baseline_flow * scaling_factor
+        system.simulate()
+        
+        achieved_rate = product_stream.F_mass
+        
+        print(f"\n✓ Successfully achieved production rate:")
+        print(f"  Target:          {target_production_rate_kg_hr:.2f} kg/hr")
+        print(f"  Achieved:        {achieved_rate:.2f} kg/hr")
+        print(f"  Scaling factor:  {scaling_factor:.4f}x")
+        print(f"  Error:           {abs(achieved_rate - target_production_rate_kg_hr):.4f} kg/hr")
+        print(f"  Total iterations: {iteration[0]}")
+        print(f"{'='*60}\n")
+        
+        return achieved_rate
+        
+    except Exception as e:
+        print(f"\n✗ Failed to achieve target production rate: {e}")
+        print(f"  Error type: {type(e).__name__}")
+        print(f"  Total iterations attempted: {iteration[0]}")
+        
+        # Restore baseline flows
+        print(f"\n  Restoring baseline input flows...")
+        for stream, baseline_flow in baseline_flows.items():
+            stream.F_mass = baseline_flow
+        
+        # Run one final simulation with baseline flows
+        try:
+            system.simulate()
+            print(f"  System restored to baseline: {product_stream.F_mass:.2f} kg/hr")
+        except Exception as restore_error:
+            print(f"  Warning: Could not restore baseline simulation: {restore_error}")
+        
+        raise ValueError(f"Could not achieve target production rate of {target_production_rate_kg_hr:.2f} kg/hr: {e}")
+
+
+
+def check_legH_specifications(product_stream):
+    """
+    Verify that LegH_3 product stream meets composition and purity specifications.
+    
+    Parameters
+    ----------
+    product_stream : thermosteam.Stream
+        The LegH_3 product stream to check
+    
+    Raises
+    ------
+    ValueError
+        If any specification is not met
+    """
+    print(f"\n{'='*60}")
+    print(f"Product Specification Check: {product_stream.ID}")
+    print(f"{'='*60}")
+    
+    # Get total mass
+    total_mass = product_stream.F_mass
+    
+    if total_mass <= 0:
+        raise ValueError("Product stream has zero mass flow")
+    
+    # Helper function to safely get mass of chemicals
+    def get_chemical_mass(chemical_id):
+        """Safely get mass of a chemical, return 0 if not present"""
+        try:
+            return product_stream.imass[chemical_id]
+        except:
+            return 0
+    
+    # Calculate mass fractions (as percentages)
+    def get_mass_percent(chemical_ids):
+        """Get total mass percent for list of chemicals"""
+        if isinstance(chemical_ids, str):
+            chemical_ids = [chemical_ids]
+        total = sum(get_chemical_mass(chem) for chem in chemical_ids)
+        return total / total_mass * 100
+    
+    # Define specifications
+    specs = {
+        'Fat (OleicAcid)': {
+            'chemicals': ['OleicAcid'],
+            'target': (0, 2),
+            'actual': None
+        },
+        'Carbohydrates': {
+            'chemicals': ['Glucan', 'Glucose', 'Chitin'],
+            'target': (0, 4),
+            'actual': None
+        },
+        'Product (Leghemoglobin)': {
+            'chemicals': ['Leghemoglobin'],
+            'target': (6, 9),
+            'actual': None
+        },
+        'Total Solids': {
+            'chemicals': [chem for chem in product_stream.chemicals.IDs if chem != 'H2O'],
+            'target': (0, 24),
+            'actual': None
+        }
+    }
+    
+    # Calculate actual values
+    for spec_name, spec_data in specs.items():
+        spec_data['actual'] = get_mass_percent(spec_data['chemicals'])
+    
+    # Calculate protein purity
+    legh_mass = get_chemical_mass('Leghemoglobin')
+    globin_mass = get_chemical_mass('Globin')
+    mannoprotein_mass = get_chemical_mass('Mannoprotein')
+    total_protein_mass = legh_mass + globin_mass + mannoprotein_mass
+    
+    protein_purity = (legh_mass / total_protein_mass * 100) if total_protein_mass > 0 else 0
+    
+    # Print results
+    all_passed = True
+    
+    print(f"\n{'Specification':<30} {'Target Range':<25} {'Actual':<15} {'Status'}")
+    print(f"{'-'*85}")
+    
+    for spec_name, spec_data in specs.items():
+        min_val, max_val = spec_data['target']
+        actual = spec_data['actual']
+        passed = min_val <= actual <= max_val
+        
+        status = '✓ PASS' if passed else '✗ FAIL'
+        target_str = f"{min_val:.1f}% - {max_val:.1f}%"
+        print(f"{spec_name:<30} {target_str:<25} {actual:>6.2f}%{'':<7} {status}")
+        
+        if not passed:
+            all_passed = False
+    
+    # Check protein purity
+    purity_passed = protein_purity >= 65.0
+    status = '✓ PASS' if purity_passed else '✗ FAIL'
+    print(f"{'Protein Purity':<30} {'>= 65.0%':<25} {protein_purity:>6.2f}%{'':<7} {status}")
+    
+    if not purity_passed:
+        all_passed = False
+    
+    print(f"{'='*85}")
+    
+    # Additional info
+    print(f"\nProduct Stream Summary:")
+    print(f"  Total Flow Rate: {total_mass:.2f} kg/hr")
+    print(f"  Water Content:   {get_mass_percent('H2O'):.2f}%")
+    print(f"  Leghemoglobin:   {legh_mass:.4f} kg/hr ({get_mass_percent('Leghemoglobin'):.2f}%)")
+    
+    if not all_passed:
+        print(f"\n{'='*85}")
+        raise ValueError("Product does not meet one or more specifications. See details above.")
+    
+    print(f"\n✓ All specifications met!")
+    print(f"{'='*85}\n")
+    
+    return True
+
+
 # %%
 if __name__ == '__main__':
-    # # Create the LegH system
-    bst.preferences.N=50
+    # Set preferences
+    bst.preferences.N = 50
+    
+    # Define target production rate
+    TARGET_PRODUCTION = 500 # kg/hr
+    
+    print("="*85)
+    print("LEGHEMOGLOBIN PRODUCTION SYSTEM - DESIGN SPECIFICATION MODE")
+    print("="*85)
+    
+    # Create the LegH system
+    print("\n1. Creating system...")
     LegH_sys = create_LegH_system()
     sys = LegH_sys
     f = sys.flowsheet
     u = f.unit
     ss = f.stream
     sys.operating_hours = 8000
-    LegH_sys.simulate()
-    LegH_sys.show()
-    LegH_sys.diagram(format='html',display=True,)
-    # %%
-    ss.LegH_3.imass['Leghemoglobin']/ss.LegH_3.F_mass*100
-    # %%
-    r1 = bst.report.lca_inventory_table(
-        systems=[sys],
-        key='GWP',
-        items=[ss.LegH_3], # For including products without characterization factors
-    )
-    #r1.to_excel('LegH_LCA_inventory.xlsx',index=True)
-    # %%
-    r2 = bst.report.lca_displacement_allocation_table(
-        systems=[sys],
-        key='GWP',
-        items=[ss.LegH_3], # For dividing yearly impact by ethanol production
-    )
     
-    #r2.to_excel('LegH_LCA_displacement_allocation.xlsx',index=True)
-
-# %%
+    # Run initial baseline simulation
+    print("\n2. Running baseline simulation...")
+    try:
+        LegH_sys.simulate()
+        baseline_production = ss.LegH_3.F_mass
+        print(f"   Baseline production rate: {baseline_production:.2f} kg/hr")
+    except Exception as e:
+        print(f"   Baseline simulation failed: {e}")
+        raise
+    
+    # Set production rate to target using design specification
+    print(f"\n3. Applying design specification: TARGET_PRODUCTION = {TARGET_PRODUCTION} kg/hr")
+    try:
+        achieved_production = set_production_rate(LegH_sys, TARGET_PRODUCTION)
+        
+        # Verify production rate is maintained
+        LegH_sys.simulate()
+        final_production = ss.LegH_3.F_mass
+        
+        if abs(final_production - TARGET_PRODUCTION) > 1.0:  # Allow 1 kg/hr tolerance
+            print(f"\n   WARNING: Production rate drifted after final simulation!")
+            print(f"   Target:  {TARGET_PRODUCTION:.2f} kg/hr")
+            print(f"   Actual:  {final_production:.2f} kg/hr")
+            
+    except Exception as e:
+        print(f"\n   Could not achieve target production: {e}")
+        print("   Continuing with baseline production rate...")
+        achieved_production = ss.LegH_3.F_mass
+    
+    # Check product specifications
+    print(f"\n4. Verifying product specifications...")
+    try:
+        check_legH_specifications(ss.LegH_3)
+    except ValueError as e:
+        print(f"\n   SPECIFICATION CHECK FAILED: {e}")
+        print("   System may require process parameter adjustments to meet specifications.")
+    
+    # Display system results
+    print(f"\n5. System Summary")
+    print("="*85)
+    LegH_sys.show()
+    
+    # Calculate key metrics
+    legh_purity = ss.LegH_3.imass['Leghemoglobin'] / ss.LegH_3.F_mass * 100
+    print(f"\n{'='*85}")
+    print("KEY PERFORMANCE INDICATORS")
+    print(f"{'='*85}")
+    print(f"  Product Stream:           {ss.LegH_3.ID}")
+    print(f"  Production Rate:          {ss.LegH_3.F_mass:.2f} kg/hr")
+    print(f"  Leghemoglobin Content:    {legh_purity:.2f}%")
+    print(f"  Annual Production:        {ss.LegH_3.F_mass * sys.operating_hours / 1000:.2f} metric tons/year")
+    print(f"{'='*85}\n")
+    
+    # Generate system diagram
+    print(f"\n6. Generating system diagram...")
+    LegH_sys.diagram(format='html', display=True)
+    
+    # LCA analysis
+    print(f"\n7. Performing LCA analysis...")
+    try:
+        r1 = bst.report.lca_inventory_table(
+            systems=[sys],
+            key='GWP',
+            items=[ss.LegH_3],
+        )
+        print("   LCA Inventory Table generated")
+        
+        r2 = bst.report.lca_displacement_allocation_table(
+            systems=[sys],
+            key='GWP',
+            items=[ss.LegH_3],
+        )
+        print("   LCA Displacement Allocation Table generated")
+    except Exception as e:
+        print(f"   LCA analysis failed: {e}")
+    
+    print(f"\n{'='*85}")
+    print("SIMULATION COMPLETE")
+    print(f"Target Production:   {TARGET_PRODUCTION:.2f} kg/hr")
+    print(f"Achieved Production: {ss.LegH_3.F_mass:.2f} kg/hr")
+    print(f"{'='*85}\n")

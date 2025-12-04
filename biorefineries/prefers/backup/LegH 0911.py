@@ -9,12 +9,13 @@ Created on 2025-06-04 14:26:14
 """
 
 #from biorefineries.animal_bedding import _system
+from biorefineries.prefers.systems.LegH import _streams as s
 import biosteam as bst
 from thermosteam import Stream
 from biosteam import F
 import thermosteam as tmo
 import numpy as np
-from biorefineries.prefers import _chemicals as c, _units as u ,_streams as s
+from biorefineries.prefers import _chemicals as c, _units as u
 from biorefineries.prefers._process_settings import price  # ADD THIS IMPORT
 
 # %% Settings
