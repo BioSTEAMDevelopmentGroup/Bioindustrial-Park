@@ -336,12 +336,11 @@ class LCA:
         CFs[impact_category][key] = value
         
         # update _CF_streams
-        for k, v in CFs[impact_category].items():
-            if not key in list(complex_feeds.keys()) + ['Electricity']:
-                try: 
-                    _CF_streams[impact_category].imass[k] = v
-                except:
-                    pass # assume other complex_feed IDs exist in CFs.keys()
+        if not key in list(complex_feeds.keys()) + ['Electricity']:
+            try: 
+                _CF_streams[impact_category].imass[key] = value
+            except:
+                pass # assume other complex_feed IDs exist in CFs.keys()
     
     ######
     
