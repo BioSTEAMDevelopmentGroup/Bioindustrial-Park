@@ -19,10 +19,6 @@ from . import units
 
 __all__ = ('create_system',)
 
-import warnings
-import numpy as np
-warnings.filterwarnings("error", category=np.ComplexWarning)
-
 def create_system(flowsheet=None, biorefinery_settings=None):
     settings = biorefinery_settings or BiorefinerySettings()
     system_ID = settings.system_ID

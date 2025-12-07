@@ -327,6 +327,21 @@ class LCA:
     def actual_steam_frac_excess(self): 
         return  self.BT_excess_steam_kJph_for_excess_electricity / self.BT_steam_kJph_total 
     
+    def change_CF(self, impact_category, key, value):
+        CFs = self.CFs
+        _CF_streams = self._CF_streams
+        complex_feeds = self.complex_feeds
+        
+        # update CFs dict
+        CFs[impact_category][key] = value
+        
+        # update _CF_streams
+        if not key in list(complex_feeds.keys()) + ['Electricity']:
+            try: 
+                _CF_streams[impact_category].imass[key] = value
+            except:
+                pass # assume other complex_feed IDs exist in CFs.keys()
+    
     ######
     
     def __repr__(self):

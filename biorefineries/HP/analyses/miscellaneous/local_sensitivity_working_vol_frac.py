@@ -234,7 +234,18 @@ def plot_multiple_metrics(x_axis_list, y_axis_list_of_lists,
     for j in range(len(units_opening_brackets)):
         if units_on_newline:
             units_opening_brackets[j] = "\n[" 
-            
+    
+    dict_df_data = {
+        xlabel +" " + units_opening_brackets[0] + x_axis_units + "]": x_axis_list
+        }
+    for yi in range(len(y_axis_list_of_lists)):
+        dict_df_data[ylabels_list[yi] +" " + units_opening_brackets[1] + y_axis_units_list[yi] + "]"] =\
+            y_axis_list_of_lists[yi]
+        
+    df_to_save = pd.DataFrame.from_dict(data=dict_df_data)
+    
+    df_to_save.to_csv(filename.replace(".png", ".csv"))
+    
     ax.set_ylabel(ylabels_list[0] +" " + units_opening_brackets[1] + y_axis_units_list[0] + "]")
     ax.tick_params(axis='y', colors=p1.get_color(), which='both', direction='inout')
     ax.spines['right'].set_color(p1.get_color())
