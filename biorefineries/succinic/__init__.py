@@ -26,9 +26,10 @@ parameter_distributions_filenames = ['parameter-distributions_lab-scale_batch.xl
                                     'parameter-distributions_lab-scale_fed-batch.xlsx',
                                     'parameter-distributions_pilot-scale_batch.xlsx',
                                     'parameter-distributions_pilot-scale_batch_upgraded_glucose.xlsx',
+                                    'parameter-distributions_pilot_batch_upgraded_glucose.xlsx'
                                     ]
 
-def load(mode='pilot_batch'):
+def load(mode='pilot_batch', machine='PC'):
     parameter_distributions_filename = None
     if mode=='pilot_batch':
         parameter_distributions_filename = succinic_filepath+'\\analyses\\parameter_distributions\\'+parameter_distributions_filenames[modes.index(mode)]
@@ -36,6 +37,10 @@ def load(mode='pilot_batch'):
     elif mode=='pilot_batch_upgraded_glucose':
         parameter_distributions_filename = succinic_filepath+'\\analyses\\parameter_distributions\\'+parameter_distributions_filenames[modes.index(mode)]
         from .models_glucose import model, simulate_and_print, namespace_dict, spec
+    if machine.lower() in ('mac', 'macbook'):
+        parameter_distributions_filename = parameter_distributions_filename.replace('__init__.py\\', '')
+        parameter_distributions_filename = parameter_distributions_filename.replace('\\', '/')
+        
     model.parameters = ()
     model.load_parameter_distributions(parameter_distributions_filename, namespace_dict)
  

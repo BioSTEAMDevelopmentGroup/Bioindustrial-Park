@@ -101,7 +101,7 @@ NaOH.copy_models_from(H2O, ['mu'])
 KOH = chemical_database('KOH', phase = 's')
 
 KCl = chemical_database('KCl', phase = 's')
-# Nutrients 
+# Nutrients for upgraded_sytstem
 MagnesiumChlorideHexahydrate = chemical_database('MagnesiumChlorideHexahydrate', search_ID='Magnesium chloride hexahydrate') 
 # Assuming solid phase
 

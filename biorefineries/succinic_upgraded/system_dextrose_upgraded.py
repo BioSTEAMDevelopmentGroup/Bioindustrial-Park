@@ -478,7 +478,7 @@ u_1.PWC904.ID = 'PWC904'
 # since f1.system is now a System object, not a registry
 BT = u_1.BT701  
 
-
+# as many old units are not updated as new units
 
 BT.natural_gas_price = 0.2527
 BT.ins[4].price = price['Lime']
