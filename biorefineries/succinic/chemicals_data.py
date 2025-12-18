@@ -1,27 +1,17 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-# Bioindustrial-Park: BioSTEAM's Premier Biorefinery Models and Results
-# Copyright (C) 2021-, Sarang Bhagwat <sarangb2@illinois.edu>
-#
-# This module is under the UIUC open-source license. See
-# github.com/BioSTEAMDevelopmentGroup/biosteam/blob/master/LICENSE.txt
-# for license details.
+Created on Mon Apr 28 18:06:53 2025
 
-This module is a modified implementation of modules from the following:
-[1]	Bhagwat et al., Sustainable Production of Acrylic Acid via 3-Hydroxypropionic Acid from Lignocellulosic Biomass. ACS Sustainable Chem. Eng. 2021, 9 (49), 16659–16669. https://doi.org/10.1021/acssuschemeng.1c05441
-[2]	Li et al., Sustainable Lactic Acid Production from Lignocellulosic Biomass. ACS Sustainable Chem. Eng. 2021, 9 (3), 1341–1351. https://doi.org/10.1021/acssuschemeng.0c08055
-[3]	Cortes-Peña et al., BioSTEAM: A Fast and Flexible Platform for the Design, Simulation, and Techno-Economic Analysis of Biorefineries under Uncertainty. ACS Sustainable Chem. Eng. 2020, 8 (8), 3302–3310. https://doi.org/10.1021/acssuschemeng.9b07040
-
-@author: sarangbhagwat
+@author: princyk2
 """
+
 
 # %%  
 
 # =============================================================================
 # Setup
 # =============================================================================
-
 import thermosteam as tmo
 from thermosteam import functional as fn
 from biorefineries.sugarcane import chemicals as sugarcane_chems
@@ -31,6 +21,7 @@ from biorefineries.corn import create_chemicals as corn_create_chemicals
 cornstover_chems = cs_create_chemicals()
 
 corn_chems = corn_create_chemicals()
+
 
 # from biorefineries import sugarcane as sc
 __all__ = ('SA_chemicals', 'chemical_groups', 'soluble_organics', 'combustibles')
@@ -106,13 +97,20 @@ H2SO4 = chemical_database('H2SO4', phase='l')
 HCl = chemical_copied('HCl', H2SO4) # HCl giving errors; doesn't change things much for TAL SA biorefinery
 HNO3 = chemical_database('HNO3', phase='l', Hf=-41406*_cal2joule)
 NaOH = chemical_database('NaOH', phase='l')
+NaOH.copy_models_from(H2O, ['mu']) 
 KOH = chemical_database('KOH', phase = 's')
 
 KCl = chemical_database('KCl', phase = 's')
+# Nutrients 
+MagnesiumChlorideHexahydrate = chemical_database('MagnesiumChlorideHexahydrate', search_ID='Magnesium chloride hexahydrate') 
+# Assuming solid phase
+
+# Zinc Sulfate Heptahydrate (using chemical_database with common properties)
+ZincSulfateHeptahydrate = chemical_database('Zinc Sulfate Heptahydrate', search_ID='Zinc sulfate heptahydrate') 
 # Arggone National Lab active thermochemical tables, accessed 04/07/2020
 # https://atct.anl.gov/Thermochemical%20Data/version%201.118/species/?species_number=928
 AmmoniumHydroxide = chemical_database('AmmoniumHydroxide', phase='l', Hf=-336.719e3)
-CalciumDihydroxide = chemical_database('CalciumDihydroxide',
+Lime = chemical_database('CalciumDihydroxide',
                                         phase='s', Hf=-235522*_cal2joule)
 DiammoniumSulfate = chemical_database('DiammoniumSulfate', phase='l',
                                     Hf=-288994*_cal2joule)
@@ -138,6 +136,7 @@ Ethanol = chemical_database('Ethanol')
 DiammoniumSuccinate = chemical_database('DiammoniumSuccinate', phase='l', 
                                         )
                                          # Hf=-154701*_cal2joule)
+                                         
 
 # Hf from a Ph.D. dissertation (Lactic Acid Production from Agribusiness Waste Starch
 # Fermentation with Lactobacillus Amylophilus and Its Cradle-To-Gate Life 
@@ -148,6 +147,7 @@ DiammoniumSuccinate = chemical_database('DiammoniumSuccinate', phase='l',
 # which was also cited by other studies, but the origianl source cannot be found online
 CalciumLactate = chemical_database('CalciumLactate', phase='l',
                                     Hf=-1686.1e3)
+Aminoacid=chemical_database('l-phenylalanine')
 # # Hf from Lange's Handbook of Chemistry, 15th edn., Table 6.3, PDF page 631
 CalciumAcetate = chemical_database('CalciumAcetate', phase='l', Hf=-1514.73e3)
 
@@ -156,6 +156,7 @@ CalciumAcetate = chemical_database('CalciumAcetate', phase='l', Hf=-1514.73e3)
 # # Baseline CalciumSuccinate is ~14 g/L in fermentation broth, thus assumes all 
 # # CalciumSuccinate in liquid phase
 CalciumSuccinate = chemical_database('CalciumSuccinate', phase='l')
+
 
 # =============================================================================
 # Soluble organics
@@ -424,6 +425,9 @@ MEA = chemical_database(ID='MEA', search_ID='Monoethanolamine')
 Xylan = chemical_defined('Xylan', phase='s', formula='C5H8O4', Hf=-182100*_cal2joule)
 Xylan.copy_models_from(Xylose, ['Cn'])
 Arabinan = chemical_copied('Arabinan', Xylan)
+# activated carbon for centrifugation
+
+ActivatedCarbon=chemical_database('ActivatedCarbon', search_ID = 'carbon', phase='s')
 
 # Lignin = chemical_database('Lignin', phase='s')
 # Hf scaled based on vanillin
@@ -498,11 +502,11 @@ chemical_groups = dict(
                             'LacticAcid', 'CalciumLactate', 'CalciumAcetate',
                             # 'EthylLactate', 'EthylAcetate', 
                             'SuccinicAcid',
-                            'CalciumSuccinate', 
+                            'CalciumSuccinate', 'l-phenylalanine', #'l_phenylalanine'
                             ),
                             # 'EthylSuccinate', 
                             # 'Methanol', 'MethylLactate', 'MethylAcetate'),
-    InorganicSolubleSolids = ('DiammoniumSulfate', 'NaOH', 'HNO3', 'NaNO3',
+    InorganicSolubleSolids = ('MagnesiumChlorideHexahydrate', 'NaOH', 'HNO3', 'NaNO3',
                               # 'DAP',
                               'BoilerChems', 'Na2SO4', 'AmmoniumHydroxide'),
     Furfurals = ('Furfural', 'HMF'),
@@ -517,7 +521,7 @@ chemical_groups = dict(
     # P4O10 will be generated in the system as no P-containing chemicals 
     # are included in "combustibles"
     OtherInsolubleSolids = ('Tar', 'Ash', 'CalciumDihydroxide', 'P4O10',
-                            'BaghouseBag', 'CoolingTowerChems'),
+                            'BaghouseBag', 'CoolingTowerChems','carbon'),
     OtherStructuralCarbohydrates = ('Glucan', 'Xylan', 'Lignin', 'Arabinan', 
                                     'Mannan', 'Galactan'),
     SeparatelyListedOrganics = ('Ethanol', 'Glucose', 'Xylose', 'AceticAcid',
@@ -687,7 +691,7 @@ chems.set_synonym('ButylSorbate', 'Butylsorbate')
 chems.set_synonym('H2O', 'Water')
 chems.set_synonym('H2SO4', 'SulfuricAcid')
 chems.set_synonym('NH3', 'Ammonia')
-# chems.set_synonym('DiammoniumSulfate', 'NH4SO4')
+chems.set_synonym('DiammoniumSulfate', 'NH4SO4')
 # chems.set_synonym('Denaturant', 'Octane')
 chems.set_synonym('CO2', 'CarbonDioxide')
 chems.set_synonym('CarbonMonoxide', 'CO')
@@ -711,3 +715,5 @@ chems.define_group(
 
 # from TAL.utils import get_chemical_properties	
 # get_chemical_properties(chems, 400, 101325, output=True)
+# Magnesium Chloride Hexahydrate (using chemical_database with common properties)
+

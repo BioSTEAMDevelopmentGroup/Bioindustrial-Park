@@ -21,7 +21,7 @@ import flexsolve as flx
 import numpy as np
 from biosteam.exceptions import InfeasibleRegion
 from biorefineries.succinic.units import compute_succinic_acid_titer, compute_succinic_acid_mass
-from winsound import Beep
+# from winsound import Beep
 
 _red_highlight_white_text = '\033[1;47;41m'
 _yellow_text = '\033[1;33m'
@@ -239,8 +239,16 @@ class ProcessSpecification(bst.process_tools.ReactorSpecification):
                  target_titer=100, product=reactor.outs[0], maximum_inhibitor_concentration=maximum_inhibitor_concentration)
     
         self.flowsheet = flowsheet = bst.main_flowsheet
-        self.system = flowsheet('succinic_sys')
-        
+        # Try to find the system - check for both 'succinic_sys_new' and 'succinic_sys'
+        try:
+            self.system = flowsheet('succinic_sys_new')
+        except LookupError:
+            try:
+                self.system = flowsheet('succinic_sys')
+            except LookupError:
+                raise LookupError("Neither succinic_sys nor succinic_sys_new is registered in the flowsheet.")
+    
+            
         self.baseline_pyruvic_acid_yield = baseline_pyruvic_acid_yield
         self.baseline_cell_mass_yield = baseline_cell_mass_yield
         
