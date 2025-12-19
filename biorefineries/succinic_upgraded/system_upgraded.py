@@ -423,6 +423,7 @@ u_1 = f1.unit
 s_1 = f1.stream
 feedstock = s_1.glucose_feedstock
 # Product stream should be the output of T601_P (pump after storage tank)
+
 product_stream = u_1.T601_P.outs[0]
 # 
 # Register the product stream with ID 'SuccinicAcid' in the flowsheet for easy access
