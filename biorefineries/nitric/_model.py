@@ -587,19 +587,24 @@ with pd.ExcelWriter(file_to_save+'_'+'_5_waterfall.xlsx') as writer:
 
 #%% LCA
 
+concentration_6 = np.array([0.005, 0.15])
 electricity_consumption_6 = np.array([0.2, 2.4, 15])
 results_6 = []
 
-for k in electricity_consumption_6:
-    u.R101.electricity_consumption = k
-    for m in range(3):
-        sys_plasma.simulate()
-    results_6.append({
-        'electricity_consumption': k,
-        'water impact': get_water_impact(),
-        'electricity impact': get_electricity_impact(),
-        'total impact': get_total_impact()
-        })
+for q in concentration_6:
+    u.R101.concentration = q
+    for k in electricity_consumption_6:
+        u.R101.electricity_consumption = k
+        for m in range(3):
+            sys_plasma.simulate()
+        results_6.append({
+            'concentration': q,
+            'electricity_consumption': k,
+            'water impact': get_water_impact(),
+            'electricity impact': get_electricity_impact(),
+            'total impact': get_total_impact()
+            })
+
 df_6 = pd.DataFrame(results_6)
 
 file_to_save = results_filepath\
