@@ -69,6 +69,10 @@ class LCA:
         
         self.complex_feeds = complex_feeds
         
+        for k in complex_feeds.keys:
+            if k in [i.ID for i in chemicals]:
+                raise ValueError('Complex feed key {k} cannot be the same as an existing chemical {k}.')
+                
         kg_product_per_h_fn = lambda: self.main_product.imass[self.main_product_chemical_IDs].sum()
         MJ_LHV_product_per_h_fn = lambda: self.main_product.LHV
         MJ_HHV_product_per_h_fn = lambda: self.main_product.HHV
@@ -216,8 +220,6 @@ class LCA:
             tot_impact += self.direct_non_biogenic_emissions_GWP
         return tot_impact
 
-    
-    #####
     def get_material_impact_breakdown(self, impact_category):
         chemical_impact_dict = {'H2SO4':0, 'NaOH':0, 'CalciumDihydroxide':0, 'CH4':0, 'CO2':0}
         LCA_stream = self.LCA_stream
@@ -306,7 +308,6 @@ class LCA:
     def steam_frac_electricity_non_cooling(self):
         return  self.steam_frac_turbogen_for_electricity_consumption_only * (1-(self.cooling_electricity_demand / self.electricity_demand))
     
-    ##
     @property
     def actual_steam_frac_heating(self): 
         return self.BT_steam_kJph_heating/self.BT_steam_kJph_total
@@ -332,15 +333,15 @@ class LCA:
         _CF_streams = self._CF_streams
         complex_feeds = self.complex_feeds
         
-        # update CFs dict
-        CFs[impact_category][key] = value
-        
-        # update _CF_streams
-        if not key in list(complex_feeds.keys()) + ['Electricity']:
-            try: 
+        if key in CFs[impact_category].keys():
+            # update CFs dict
+            CFs[impact_category][key] = value
+            
+            # update _CF_streams, if key is a Chemical ID
+            if not key in list(complex_feeds.keys()) + ['Electricity']:
                 _CF_streams[impact_category].imass[key] = value
-            except:
-                pass # assume other complex_feed IDs exist in CFs.keys()
+        else:
+            raise ValueError('Provided key {key} not in CFs.keys().')
     
     ######
     
