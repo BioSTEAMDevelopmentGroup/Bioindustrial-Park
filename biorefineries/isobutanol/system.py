@@ -48,9 +48,10 @@ parameters = settings.process_parameters
 ## Splitter
 S301 = bst.Splitter('S301', ins=f.E402-0,
                     outs = ('fermentation_initial_feed', 'fermentation_spike'),
-                    split = 0.8) # split = inoculum ratio
+                    split = 0.8, # initial value, updated in FeedStrategySpecification object
+                    )
 
-## Initial feed evaporator and mixer
+## Initial feed evaporator, pumps, mixer, and hx
 F301 = bst.MultiEffectEvaporator('F301', ins=S301-0, outs=('F301_l', 'F301_g'),
                                         P = (101325, 73581, 50892, 32777, 20000), V = 0.1)
 F301.V = 0.8 # initial value, updated in FeedStrategySpecification object
@@ -74,7 +75,7 @@ F301_P0 = bst.units.Pump('F301_P0', ins=F301-0, outs='', P=101325.)
 F301_P1 = bst.units.Pump('F301_P1', ins=F301-1, outs='', P=101325.)
 
 M301 = bst.units.Mixer('M301', ins=(F301_P0-0, 'dilution_water'))
-M301.water_to_sugar_mol_ratio = 5. # initial value
+M301.water_to_sugar_mol_ratio = 5. # initial value, updated in FeedStrategySpecification object
 
 @M301.add_specification(run=False)
 def adjust_M301_water():
@@ -82,9 +83,9 @@ def adjust_M301_water():
     M301_ins_1.imol['Water'] = M301.water_to_sugar_mol_ratio * M301.ins[0].imol[V405_new.sugar_IDs].sum()
     M301._run()
     
-H301 = bst.units.HXutility('H301', ins=M301-0, T=30+273.15, rigorous=True)
+H301 = bst.units.HXutility('H301', ins=M301-0, T=32+273.15, rigorous=True)
 
-## Spike evaporator and mixer
+## Spike evaporator, pumps, mixer, and hx
 F302 = bst.MultiEffectEvaporator('F302', ins=S301-1, outs=('F302_l', 'F302_g'),
                                         P = (101325, 73581, 50892, 32777, 20000), V = 0.1)
 F302.V = 0.8 # initial value, updated in FeedStrategySpecification object
@@ -116,7 +117,7 @@ def adjust_M302_water():
     M302_ins_1.imol['Water'] = M302.water_to_sugar_mol_ratio * M302.ins[0].imol[V405_new.sugar_IDs].sum()
     M302._run()
     
-H302 = bst.units.HXutility('H302', ins=M302-0, T=30+273.15, rigorous=True)
+H302 = bst.units.HXutility('H302', ins=M302-0, T=32+273.15, rigorous=True)
 
 #%%
 V405_old = f.V405
@@ -158,6 +159,10 @@ def correct_saccharification_feed_flows():
     gluco_amylase.F_mass = parameters['saccharification_gluco_amylase_loading'] * mash_dry_flow
 
 # V405_new.simulate()
+
+#%%
+
+f.S1.outs[0].disconnect_sink()
 
 #%%
 corn_EtOH_IBO_sys_no_IBO_recovery = bst.System.from_units('corn_EtOH_IBO_sys_no_IBO_recovery', 
@@ -246,11 +251,11 @@ S403 = bst.units.Splitter('S403', ins=S402-0, outs=('S403_recycle', 'S403_purge'
 
 S403-0-1-M402
 
-H401 = bst.HXutility('H401', ins=S402-1, T=273.15+25)
+H401 = bst.HXutility('H401', ins=S402-1, T=273.15+25, rigorous=True)
 
 #%% add HX to cool and reconnect to DDGS units
 
-H402 = bst.HXutility('H402', ins=S401-1, T=360.15)
+H402 = bst.HXutility('H402', ins=S401-1, T=360.15, rigorous=True)
 
 M403 = bst.Mixer('M403', ins=(S404-1, H402-0), outs='mixed_stream_to_DDGS_recovery')
 
@@ -301,7 +306,8 @@ recovery_units = [S404,
                   M403, H402, 
                   V514]
 
-HXN = bst.HeatExchangerNetwork()
+HXN = bst.HeatExchangerNetwork(ignored=keep_non_rigorous)
+
 
 corn_EtOH_IBO_sys = bst.System.from_units('corn_EtOH_IBO_sys', 
                                           units = [i for i in corn_EtOH_IBO_sys_no_IBO_recovery.units + recovery_units + [HXN]
@@ -328,10 +334,10 @@ fbs_spec = nsk.units.FedBatchStrategySpecification(
     splitter=S301,
     feed_evaporator=F301,
     feed_mixer=M301,
-    other_feed_units=[H301, F301_P0],
+    feed_units_sequential=[F301, F301_P0, F301_P1, M301, H301],
+    spike_units_sequential=[F302, F302_P0, F302_P1, M302, H302],
     spike_evaporator=F302,
     spike_mixer=M302,
-    other_spike_units=[H302, F302_P0],
     sugar_IDs=['Glucose',]
     )
 
