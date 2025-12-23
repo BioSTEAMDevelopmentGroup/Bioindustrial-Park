@@ -288,7 +288,8 @@ class CellDisruption(bst.Unit):
         'High-Pressure Homogenizer': 3.5, 
     }
 
-    def __init__(self, ID='', ins=None, outs=(), 
+    def __init__(self, ID='', ins=None, outs=(),
+                 Cell_ID='Pichia_pastoris', 
                  cell_disruption_efficiency=0.55, # 50~60% typical as soluble ,others are debris
                  component_fractions=None,
                  P_high=150e5, P_low=101325):
@@ -297,6 +298,7 @@ class CellDisruption(bst.Unit):
         self.cell_disruption_efficiency = cell_disruption_efficiency
         self.P_high = P_high
         self.P_low = P_low
+        self.Cell_ID= Cell_ID
         
         if component_fractions is None:
             self.component_fractions = {
@@ -318,13 +320,31 @@ class CellDisruption(bst.Unit):
         outlet = self.outs[0]
         outlet.copy_like(feed)
         
-        disrupted_mass = feed.imass['Pichia_pastoris'] * self.cell_disruption_efficiency
+        disrupted_mass = feed.imass[self.Cell_ID] * self.cell_disruption_efficiency
         
-        outlet.imass['Pichia_pastoris'] -= disrupted_mass
+        outlet.imass[self.Cell_ID] -= disrupted_mass
         
         for component, fraction in self.component_fractions.items():
             outlet.imass[component] += fraction * disrupted_mass
 
+
+        # Convert intracellular molecules to extracellular form based on disruption efficiency
+        for chem in self.chemicals:
+            chem_id = chem.ID
+            if chem_id.endswith('_In'):
+                # Get the extracellular molecule name by removing '_In' suffix
+                extracellular_id = chem_id[:-3]
+                if extracellular_id in self.chemicals:
+                    # Calculate mass released from disrupted cells
+                    intracellular_mass = feed.imass[chem_id]
+                    released_mass = intracellular_mass * self.cell_disruption_efficiency
+                    
+                    # Transfer released mass to extracellular form
+                    outlet.imass[extracellular_id] += released_mass
+                    # Remaining intracellular mass stays in undisrupted cells
+                    outlet.imass[chem_id] = intracellular_mass - released_mass
+                    
+        
         # The final temperature will be determined by the valve simulation in _design
         # For now, we set pressure and leave temperature as is.
         pumpout = bst.Stream('')
@@ -409,8 +429,7 @@ class CellDisruption(bst.Unit):
         self.baseline_purchase_costs['High-Pressure Homogenizer'] = self.design_results['Purchase cost (USD)']
 
 
-class ProteinCentrifuge(bst.SolidsCentrifuge): pass
-
+class Centrifuge(bst.SolidsCentrifuge):pass
 
 class ReverseOsmosis(bst.Unit):
     """
@@ -1246,6 +1265,8 @@ class IonExchangeCycle(bst.Unit):
         self.pump._cost()
         C['Pump'] = self.pump.purchase_cost
 
+
+class ResinAdsorption(IonExchangeCycle): pass
 
 class SprayDryer(bst.SprayDryer):pass
 

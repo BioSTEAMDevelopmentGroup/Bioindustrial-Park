@@ -11,18 +11,35 @@ Created on 2025-05-07 18:26:22
 from biosteam import stream_kwargs
 from biorefineries.prefers._process_settings import price  # ADD THIS IMPORT
 import biosteam as bst
+from biosteam.units import Fermentation
 from httpx import stream
-import numpy as np  # ADD THIS IMPORT
+import numpy as np
+from sympy import Trace  # ADD THIS IMPORT
 LegH={}
 
-titer = 7.27 # [g / L]
-productivity = titer / 72 # [g / L / h]
+
+productivity = 4.2/1000 # [g / L / h]
+tau = 162 # [h]
+titer = productivity * tau # [g / L]
+# OD600 180
+# 1 OD600 = 0.35 g/L dry cell weight
 LegH_yield = titer * 5 / 1300 # [by wt]
+
+# 72 hours growth + 108 hours fermentation
 
 m=2/5 # scale up factor based on 1.5e5 kg/yr
 # %% In
 TraceMetalSolution = stream_kwargs('TraceMetalSolution', TraceMetalSolution=1, units='kg/hr', T=25+273.15)
 VitaminCSolution = stream_kwargs('VitaminCSolution', VitaminC=1, units='kg/hr', T=25+273.15)
+YPD = stream_kwargs('YPD', YPD_Medium=1, units='kg/hr', T=25+273.15)
+YPD_Medium = stream_kwargs('YPD_Medium', YPD_Medium=1, units='kg/hr', T=25+273.15)
+Supplemented = stream_kwargs('Supplemented', Supplemented=1, units='kg/hr', T=25+273.15)
+Fermentation_Medium = stream_kwargs('Supplemented_Medium', Fermentation_Medium=1, units='kg/hr', T=25+273.15)
+Feed1st = stream_kwargs('Feed1st', Fermentation_Medium=1, units='kg/hr', T=25+273.15)
+Feed2nd = stream_kwargs('Feed2nd', Fermentation_Medium=1, units='kg/hr', T=25+273.15)
+Feed1st_Solution = stream_kwargs('Feed1st_Solution', Fermentation_Medium=1, units='kg/hr', T=25+273.15)
+Feed2nd_Solution = stream_kwargs('Feed2nd_Solution', Fermentation_Medium=1, units='kg/hr', T=25+273.15)
+
 SeedIn1 = stream_kwargs('SeedIn1', Seed=1, units='kg/hr', T=25+273.15)
 SeedIn2 = stream_kwargs('SeedIn2', Seed=1, units='kg/hr', T=25+273.15)
 CultureIn = stream_kwargs('CultureIn', Culture=1, units='kg/hr', T=25+273.15)

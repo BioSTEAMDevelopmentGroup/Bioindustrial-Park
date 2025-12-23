@@ -10,11 +10,13 @@ Created on 2025-12-04 13:25:17
 
 #from biorefineries.animal_bedding import _system
 from ast import Yield
+from math import tau
 from biorefineries.prefers._process_settings import set_GWPCF, GWP_CFs,set_GWPCF_Multi,load_process_settings
 from biorefineries.prefers.systems import LegH
 from biorefineries.prefers.systems.LegH import _streams as s
 import biosteam as bst
 from pint import set_application_registry
+from regex import P
 from thermosteam import Stream
 from biosteam import F
 import thermosteam as tmo
@@ -23,7 +25,7 @@ from biorefineries.prefers import _chemicals as c, _units as u
 from biorefineries.prefers._process_settings import price  # ADD THIS IMPORT
 
 # %% Settings
-bst.settings.set_thermo(c.create_chemicals_LegH(), skip_checks=True)
+bst.settings.set_thermo(c.create_chemicals_Hemodextrin(), skip_checks=True)
 bst.preferences.classic_mode()
 
 # %%
@@ -33,11 +35,11 @@ __all__ = (
 # %%
 @bst.SystemFactory(
     ID='Heme_sys',
-    ins=[s.SeedIn1, s.SeedIn2, s.CultureIn, s.Glucose, s.NH3_25wt,s.DfUltraBuffer, s.IXEquilibriumBuffer, s.IXElutionBuffer
+    ins=[s.TraceMetalSolution, s.VitaminCSolution, s.YPD, s.Supplemented, s.Feed1st, s.Feed2nd, s.NH3_25wt,s.DfUltraBuffer, s.IXEquilibriumBuffer, s.IXElutionBuffer
         ,s.IXRegenerationSolution, s.DfNanoBuffer],
-    outs=[s.Heme_3, s.vent1, s.vent2, s.effluent1, s.effluent2, s.effluent3
+    outs=[s.Hemodextrin, s.vent1, s.vent2, s.effluent1, s.effluent2, s.effluent3
     ],
-    fthermo=c.create_chemicals_LegH, # Pass the function itself
+    fthermo=c.create_chemicals_Hemodextrin, # Pass the function itself
 )
 def create_Heme_system(
         ins, outs,
@@ -58,29 +60,76 @@ def create_Heme_system(
     # Unpack output streams
     (Heme_3, vent1, vent2, effluent1, effluent2, effluent3) = outs    
     
+    ## LCA Settings ##
+    
     load_process_settings()  # Load process settings to update prices and CFs
     """
     Fermentation Parameter
     """
-    theta_O2 = 0.5 # Dissolved oxygen concentration [% saturation]
+    theta_O2 = 0.45 # Dissolved oxygen concentration [% saturation] >= 40%
     agitation_power = 0.985 # [kW / m3]
     design = 'Stirred tank' # Reactor type
     method = "Riet" # Name of method
-    T_operation = 273.15 + 32 # [K]
+    T_operation = 273.15 + 30 # [K]
     Q_O2_consumption = -110 * 4184 # [kJ/kmol]
     dT_hx_loop = 8 # [degC]
     cooler_pressure_drop = 20684 # [Pa]
     compressor_isentropic_efficiency = 0.85
     V_max = 500 # [m3] #here cause pressure vessel design problem
-    titer_HemeB = 0.248 # [g / L]
-    productivity_HemeB = 0.248 / 144 # [g / L / h]
-    Y_p = 0.248 / 400 # [by wt] 3 wt%
-    Y_b = 0.43 # [by wt] 
-    yield_HemeB = Y_p#/0.517 # yield based on glucose utilized for product formation
+
+    # OD600 180
+    # 1 OD600 = 0.35 g/L dry cell weight
+    # first 10 hour, 10 g/L/h
+    Glucose_Utilization = 0.5614 # [by wt] based on glucose fed
+    # 72 hours growth + 90 hours fermentation
+    # 1st    
+    tau1= 72 # [h] growth time
+    P_Heme_1st = 1e-6 # [g / L / h]
+    P_pp_1st = 1e-6 # [g / L / h]
+    P_ComsuptionG1 = 500 * (0.5/3) / tau1 # [g / L / h] glucose consumption rate
+    P_cell_growth_rate1 = 150 * 0.35 / tau1 # [g / L / h] cell growth rate
+    Y_Heme1 = P_Heme_1st / P_ComsuptionG1 # product yield on glucose
+    Y_pp1 = P_pp_1st / P_ComsuptionG1 # proph
+    Y_b1 = P_cell_growth_rate1 / P_ComsuptionG1 # biomass yield on glucose
+    Y_r1 = 1 - Y_Heme1 - Y_pp1 - Y_b1 # respiration yield on glucose
+    
+    # 2nd
+    tau2= 90 # [h] fermentation time
+    P_Heme_2nd = 4.2 # [g / L / h]
+    P_pp_2nd = 0.7 # [g / L / h]
+    P_ComsuptionG2 = 800 * (0.5/3) / tau2 # [g / L / h] glucose consumption rate
+    P_cell_growth_rate2 = 50 * 0.35 / tau2 # [g / L / h] cell growth rate
+    Y_Heme2 = P_Heme_2nd / P_ComsuptionG2 # product yield on glucose
+    Y_pp2 = P_pp_2nd / P_ComsuptionG2 # proph
+    Y_b2 = P_cell_growth_rate2 / P_ComsuptionG2 # biomass yield on glucose
+    Y_r2 = 1 - Y_Heme2 - Y_pp2 - Y_b2 # respiration yield on glucose
+    
+    # Overall
+    tau = tau1 + tau2 # [h] total time
+    P_Heme = (P_Heme_1st*tau1 + P_Heme_2nd*tau2) / tau # [g / L / h]
+    P_pp = (P_pp_1st*tau1 + P_pp_2nd*tau2) / tau # [g / L / h]
+    P_ComsuptionG = (P_ComsuptionG1*tau1 + P_ComsuptionG2*tau2) / tau # [g / L / h]
+    P_cell_growth_rate = (P_cell_growth_rate1*tau1 + P_cell_growth_rate2*tau2) / tau # [g / L / h]
+    Y_Heme = (P_Heme_1st*tau1 + P_Heme_2nd*tau2) / (P_ComsuptionG1*tau1 + P_ComsuptionG2*tau2)
+    Y_pp = (P_pp_1st*tau1 + P_pp_2nd*tau2) / (P_ComsuptionG1*tau1 + P_ComsuptionG2*tau2)
+    Y_b = (P_cell_growth_rate1*tau1 + P_cell_growth_rate2*tau2) / (P_ComsuptionG1*tau1 + P_ComsuptionG2*tau2)
+    Y_r = 1 - Y_Heme - Y_pp - Y_b # respiration yield on glucose    
+
 
     """
     Reactions
     """
+    fermentation_reaction = bst.PRxn([
+        #           Reaction        Reactnat            Conversion           Check                  "
+        bst.Rxn('1 Glucose + 1.05882 NH3 + 0.17647 FeSO4  -> 0.17647 Heme_b + 0.617647 O2 + 0.17647 (NH4)2SO4 + 4.05882 H2O',
+                                    reactant = 'Glucose',X=Y_Heme*0.09,check_atomic_balance=True),
+        bst.Rxn('1 Glucose + 1.05882 NH3 + 0.17647 FeSO4  -> 0.17647 Heme_b_Intra + 0.617647 O2 + 0.17647 (NH4)2SO4 + 4.05882 H2O',
+                                    reactant = 'Glucose', X= Y_Heme*0.09,check_atomic_balance=True),
+        ])
+
+    
+    
+    
     fermentation_reaction = bst.PRxn([
         #           Reaction        Reactnat            Conversion           Check                  "
         bst.Rxn('1 Glucose + 1.05882 NH3 + 0.17647 FeSO4  -> 0.17647 Heme_b + 0.617647 O2 + 0.17647 (NH4)2SO4 + 4.05882 H2O',

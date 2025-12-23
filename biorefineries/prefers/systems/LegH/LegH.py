@@ -200,7 +200,7 @@ def create_LegH_system(
         cell_growth_reaction=cell_growth_reaction,
         respiration_reaction=respiration_reaction2,
         neutralization_reaction=neutralization_reaction,
-        design='Stirred tank', method=method,theta_O2=theta_O2,
+        design=design, method=method,theta_O2=theta_O2,
         V_max=V_max, Q_O2_consumption=Q_O2_consumption,
         dT_hx_loop=dT_hx_loop, T=T_operation,
         batch=True, reactions=RXN,
@@ -229,13 +229,13 @@ def create_LegH_system(
         outs='DisruptedBroth',
     )
 
-    S402 = u.ProteinCentrifuge(
+    S402 = u.Centrifuge(
         'S402',
         ins = S401-0,
         outs = ('Deposit', 'Supernatant'),
         moisture_content = 0.20,  # 20% moisture content in the final product
         split = (0, 0.995, 1, 1),
-        order = ('Glucose','cellmass', 'LeghemoglobinIntre','GlobinIntre'),
+        order = ('Glucose','cellmass', 'Leghemoglobin_In','Globin_In'),
     )
     S402.add_specification(run=True)
 
