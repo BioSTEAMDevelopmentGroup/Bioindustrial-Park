@@ -146,7 +146,8 @@ V405_new = nsk.units.NSKFermentation('V405',
                                                              '[s_acetate]': 'AceticAcid',
                                                              # '[s_acetald]': 'Acetaldehyde',
                                                              },
-                                 track_vars = ['y_EtOH_glu', 
+                                 track_vars = ['y_EtOH_glu_added', 
+                                               'y_EtOH_glu_consumed',
                                                # 'tot_mass_glu', 
                                                'prod_EtOH'],
                                  f_reset_kinetic_reaction_system=reset_kinetic_reaction_system,
@@ -154,7 +155,7 @@ V405_new = nsk.units.NSKFermentation('V405',
                                  tau_max=3*24,
                                  sugar_IDs=('Glucose',),
                                  # tau_update_policy=None,
-                                 tau_update_policy=('max', 'y_EtOH_glu'),
+                                 tau_update_policy=('max', 'y_EtOH_glu_added'),
                                  perform_hydrolysis=False)
 
 V405_new-0-1-f.V409
@@ -449,7 +450,7 @@ def plot_results():
     plt.show()
     
 #%% Simulate and solve TEA
-load_simulate_get_EtOH_MPSP(target_conc_sugars=100,
+load_simulate_get_EtOH_MPSP(target_conc_sugars=175,
     threshold_conc_sugars=0,
     conc_sugars_feed_spike=600,
     tau_max=72,
@@ -460,10 +461,10 @@ load_simulate_get_EtOH_MPSP(target_conc_sugars=100,
     )
 
 #%%
-conc_sugars_feed_spikes = np.linspace(150, 810, 30)
+conc_sugars_feed_spikes = np.linspace(200, 810, 20)
 MPSPs = []
 for c in conc_sugars_feed_spikes:
-    MPSPs.append(load_simulate_get_EtOH_MPSP(target_conc_sugars=100,
+    MPSPs.append(load_simulate_get_EtOH_MPSP(target_conc_sugars=175,
     threshold_conc_sugars=10,
     conc_sugars_feed_spike=c,
     tau_max=72,
