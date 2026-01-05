@@ -8,6 +8,7 @@ import nskinetics as nsk
 import biosteam as bst
 import thermosteam as tmo
 import numpy as np
+from matplotlib import pyplot as plt
 from biorefineries import corn
 from biorefineries.isobutanol import units
 from nskinetics.examples.s_cerevisiae_ferm_fb_inhib_mod_ibo import te_r, reset_kinetic_reaction_system
@@ -61,7 +62,8 @@ F301_cost = F301._cost
 @F301.add_specification(run=False)
 def F301_spec():
     feed = F301.ins[0]
-    if feed.F_mol and feed.imass['Water']/feed.F_mass > 0.2:
+    if feed.F_mol:
+        # and feed.imass['Water']/feed.F_mass > 0.2:
         F301._run()
         F301._design = F301_design
         F301._cost = F301_cost
@@ -142,14 +144,17 @@ V405_new = nsk.units.NSKFermentation('V405',
                                                              '[s_EtOH]': 'Ethanol',
                                                              '[s_IBO]': 'Isobutanol',
                                                              '[s_acetate]': 'AceticAcid',
-                                                             '[s_acetald]': 'Acetaldehyde',
+                                                             # '[s_acetald]': 'Acetaldehyde',
                                                              },
+                                 track_vars = ['y_EtOH_glu', 
+                                               # 'tot_mass_glu', 
+                                               'prod_EtOH'],
                                  f_reset_kinetic_reaction_system=reset_kinetic_reaction_system,
                                  tau=3*24,
                                  tau_max=3*24,
                                  sugar_IDs=('Glucose',),
                                  # tau_update_policy=None,
-                                 tau_update_policy=('max', '[s_EtOH]'),
+                                 tau_update_policy=('max', 'y_EtOH_glu'),
                                  perform_hydrolysis=False)
 
 V405_new-0-1-f.V409
@@ -399,18 +404,61 @@ threshold_conc_sugars=10,
 conc_sugars_feed_spike=600,
 tau_max=72)
 
+corn_EtOH_IBO_sys.simulate()
+
+#%%
+def load_simulate_get_EtOH_MPSP(target_conc_sugars=100,
+    threshold_conc_sugars=10,
+    conc_sugars_feed_spike=300,
+    tau_max=72,
+    max_n_glu_spikes=15,
+    n_sims=3,
+    n_tea_solves=3,
+    plot=False,
+    ):
+    
+    r.max_n_glu_spikes = max_n_glu_spikes
+    ethanol = f.ethanol
+    
+    for i in range(n_sims):
+        fbs_spec.load_specifications(target_conc_sugars=target_conc_sugars,
+        threshold_conc_sugars=threshold_conc_sugars,
+        conc_sugars_feed_spike=conc_sugars_feed_spike,
+        tau_max=tau_max)
+        
+        corn_EtOH_IBO_sys.simulate()
+        
+    for i in range(n_tea_solves):
+        ethanol.price = corn_EtOH_IBO_sys_tea.solve_price(ethanol) * ethanol.F_mass/ethanol.imass['Ethanol']
+
+    if plot:
+        V405_new.kinetic_reaction_system._te.plot()
+    
+    return ethanol.price
 
 #%% Simulate and solve TEA
+load_simulate_get_EtOH_MPSP(target_conc_sugars=100,
+    threshold_conc_sugars=0,
+    conc_sugars_feed_spike=600,
+    tau_max=72,
+    max_n_glu_spikes=3,
+    n_sims=3,
+    n_tea_solves=3,
+    plot=True,
+    )
 
-r.max_n_glu_spikes = 15
-for i in range(3):
-    fbs_spec.load_specifications(target_conc_sugars=100,
-    threshold_conc_sugars=90,
-    conc_sugars_feed_spike=500,
-    tau_max=72)
-    
-    corn_EtOH_IBO_sys.simulate()
-    
-    print(corn_EtOH_IBO_sys_tea.solve_price(f.ethanol))
+#%%
+conc_sugars_feed_spikes = np.linspace(150, 810, 30)
+MPSPs = []
+for c in conc_sugars_feed_spikes:
+    MPSPs.append(load_simulate_get_EtOH_MPSP(target_conc_sugars=100,
+    threshold_conc_sugars=10,
+    conc_sugars_feed_spike=c,
+    tau_max=72,
+    max_n_glu_spikes=15,
+    n_sims=3,
+    n_tea_solves=3,
+    plot=True,
+    ))
 
-V405_new.kinetic_reaction_system._te.plot()
+plt.plot(conc_sugars_feed_spikes, MPSPs)
