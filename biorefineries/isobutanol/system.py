@@ -432,10 +432,22 @@ def load_simulate_get_EtOH_MPSP(target_conc_sugars=100,
         ethanol.price = corn_EtOH_IBO_sys_tea.solve_price(ethanol) * ethanol.F_mass/ethanol.imass['Ethanol']
 
     if plot:
-        V405_new.kinetic_reaction_system._te.plot()
+        plot_results()
     
     return ethanol.price
 
+def plot_results():
+    # for i in V405_new.map_chemicals_nsk_to_bst.keys():
+    plt.plot(V405_new.results_dict['time'], V405_new.results_dict['[x]'], label='cell mass')
+    plt.plot(V405_new.results_dict['time'], V405_new.results_dict['[s_glu]'], label='glucose')
+    plt.plot(V405_new.results_dict['time'], V405_new.results_dict['[s_EtOH]'], label='ethanol')
+    plt.plot(V405_new.results_dict['time'], V405_new.results_dict['[s_acetate]'], label='acetate')
+    plt.plot(V405_new.results_dict['time'], V405_new.results_dict['[s_IBO]'], label='isobutanol')
+    plt.legend()
+    plt.xlabel('Time [h]')
+    plt.ylabel('Concentration [g/L]')
+    plt.show()
+    
 #%% Simulate and solve TEA
 load_simulate_get_EtOH_MPSP(target_conc_sugars=100,
     threshold_conc_sugars=0,
@@ -462,3 +474,6 @@ for c in conc_sugars_feed_spikes:
     ))
 
 plt.plot(conc_sugars_feed_spikes, MPSPs)
+plt.xlabel('Glucose spike feed concentration [g/L]')
+plt.ylabel('MPSP [$/kg]')
+plt.show()
