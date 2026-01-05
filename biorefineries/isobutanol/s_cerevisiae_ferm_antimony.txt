@@ -1,0 +1,324 @@
+// Created by libAntimony v3.0.0
+model *lei2001()
+
+  // Compartments and Species:
+  compartment env, cell;
+  species s_glu in env, s_pyr in env, s_acetate in env, s_acetald in env;
+  species s_EtOH in env, x in env, $a in env, $AcDH in env, $CO2 in env, $Red in env;
+  species $S_f in env;
+
+  // Assignment Rules:
+  a := x*X_a;
+  AcDH := x*X_AcDH;
+  qO2 := (1000/32)*((0.178*r1 + 0.908*r2 + 0.363*r4 + 1.066*r5 - 0.363*r6) + 0.063*r7 + 0.214*r8)/(x*env);
+  qCO2 := (1000/44.01)*(1.499*r2 + 0.5*r3 + 1.466*r5 + 0.127*r7 + 0.325*r8)/(x*env);
+
+  // Rate Rules:
+  X_a' = ((0.732*r7 + 0.619*r8)*(1 - X_a) - r9 - r10)/(x*env);
+  X_AcDH' = (r9 - r11 - (0.732*r7 + 0.619*r8)*X_AcDH)/(x*env);
+
+  // Reactions:
+  r1: s_glu => 0.978 s_pyr + 0.178 $Red; (k_1l*s_glu/(s_glu + K_1l) + k_1h*s_glu/(s_glu + K_1h) + k_1e*s_acetald*s_glu/(s_glu*(K_1i*s_acetald + 1) + K_1e))*x*X_a*env;
+  r2: s_pyr => 1.499 $CO2 + 0.908 $Red; (k_2*s_pyr/((s_pyr + K_2)*(K_2i*s_glu + 1)))*x*X_a*env;
+  r4: s_acetald => 1.363 s_acetate + 0.363 $Red; (k_4*s_acetald/(s_acetald + K_4))*x*X_a*X_AcDH*env;
+  r5: s_acetate => 1.446 $CO2 + 1.066 $Red; (k_5*s_acetate/(s_acetate + K_5) + k_5e*s_acetate/((s_acetate + K_5e)*(1 + K_5i*s_glu)))*x*X_a*env;
+  r6: s_acetald + 0.363 $Red -> 1.045 s_EtOH; (k_6*(s_acetald - k_6r*s_EtOH)/(s_acetald + K_6 + K_6e*s_EtOH))*x*X_a*env;
+  r7: s_glu => 0.732 x + 0.127 $CO2 + 0.063 $Red; (k_7*s_glu/(s_glu + K_7))*x*X_a*env;
+  r8: s_acetate => 0.619 x + 0.325 $CO2 + 0.214 $Red; (k_8*s_acetate/((s_acetate + K_5e)*(1 + K_5i*s_glu)))*x*X_a*env;
+  r3: s_pyr => 0.5 s_acetald + 0.33 $CO2; (k_3*s_pyr^4/(s_pyr^4 + K_3))*x*X_a*env;
+  r9: $a => $AcDH; ((k_9*s_glu/(s_glu + K_9) + k_9e*s_EtOH/(s_EtOH + K_9e))/(K_9i*s_glu + 1) + k_9c*s_glu/(s_glu + K_9))*X_a*x*env;
+  r10: $a => ; (k_10*s_glu/(s_glu + K_10) + k_10e*s_EtOH/(s_EtOH + K_10e))*X_a*x*env;
+  r11: $AcDH => ; k_11*X_AcDH*x*env;
+  s_glu_in: $S_f => s_glu; S_f*D*env;
+  s_glu_out: s_glu => ; s_glu*D*env;
+  s_pyr_out: s_pyr => ; s_pyr*D*env;
+  s_acetate_out: s_acetate => ; s_acetate*D*env;
+  s_acetald_out: s_acetald => ; s_acetald*D*env;
+  s_EtOH_out: s_EtOH => ; s_EtOH*D*env;
+  a_out: $a => ; a*D*env;
+  x_out: x => ; x*D*env;
+  AcDH_out: $AcDH => ; AcDH*D*env;
+
+  // Species initializations:
+  s_glu = 100/env;
+  s_pyr = 0;
+  s_acetate = 0;
+  s_acetald = 0;
+  s_EtOH = 0;
+  x = 2/env;
+  CO2 = 0;
+  Red = 0;
+  S_f = 15;
+
+  // Compartment initializations:
+  env = 1;
+  cell = 1;
+
+  // Variable initializations:
+  X_a = 0.1;
+  X_a has dimensionless;
+  X_AcDH = 0.0075;
+  X_AcDH has dimensionless;
+  qO2 has mmole_per_g_per_h;
+  qCO2 has mmole_per_g_per_h;
+  k_1h = 0.584;
+  k_1h has g_per_l_per_h;
+  K_1h = 0.0116;
+  K_1h has g_per_l;
+  k_1l = 1.43;
+  k_1l has g_per_l_per_h;
+  K_1l = 0.94;
+  K_1l has g_per_l;
+  k_1e = 47.1;
+  k_1e has g_per_l_per_h;
+  K_1e = 0.12;
+  K_1e has g_per_l;
+  K_1i = 14.2;
+  K_1i has l_per_g;
+  k_2 = 0.501;
+  k_2 has g_per_l_per_h;
+  K_2 = 2e-05;
+  K_2 has g_per_l;
+  K_2i = 0.101;
+  K_2i has l_per_g;
+  k_3 = 5.81;
+  k_3 has g_per_l_per_h;
+  K_3 = 5e-07;
+  K_3 has g_per_l;
+  k_4 = 4.8;
+  k_4 has g_per_l_per_h;
+  K_4 = 0.000264;
+  K_4 has g_per_l;
+  k_5 = 0.0104;
+  k_5 has g_per_l_per_h;
+  K_5 = 0.0102;
+  K_5 has g_per_l;
+  k_5e = 0.775;
+  k_5e has g_per_l_per_h;
+  K_5e = 0.1;
+  K_5e has g_per_l;
+  K_5i = 440;
+  K_5i has l_per_g;
+  k_6 = 2.82;
+  k_6 has g_per_l_per_h;
+  K_6 = 0.034;
+  K_6 has g_per_l;
+  k_6r = 0.0125;
+  k_6r has dimensionless;
+  K_6e = 0.057;
+  K_6e has g_per_l;
+  k_7 = 1.203;
+  k_7 has g_per_l_per_h;
+  K_7 = 0.0101;
+  K_7 has g_per_l;
+  k_8 = 0.589;
+  k_8 has g_per_l_per_h;
+  k_9 = 0.008;
+  k_9 has g_per_l_per_h;
+  K_9 = 1e-06;
+  K_9 has g_per_l;
+  k_9e = 0.0751;
+  k_9e has g_per_l_per_h;
+  K_9e = 13;
+  K_9e has g_per_l;
+  K_9i = 25;
+  K_9i has l_per_g;
+  k_9c = 0.00399;
+  k_9c has g_per_l_per_h;
+  k_10 = 0.392;
+  k_10 has g_per_l_per_h;
+  K_10 = 0.0023;
+  K_10 has g_per_l;
+  k_10e = 0.00339;
+  k_10e has g_per_l_per_h;
+  K_10e = 0.0018;
+  K_10e has g_per_l;
+  k_11 = 0.02;
+  k_11 has g_per_l_per_h;
+  D = 0;
+  D has per_h;
+
+  // Other declarations:
+  var X_a, X_AcDH, qO2, qCO2;
+  const env, cell, k_1h, K_1h, k_1l, K_1l, k_1e, K_1e, K_1i, k_2, K_2, K_2i;
+  const k_3, K_3, k_4, K_4, k_5, K_5, k_5e, K_5e, K_5i, k_6, K_6, k_6r, K_6e;
+  const k_7, K_7, k_8, k_9, K_9, k_9e, K_9e, K_9i, k_9c, k_10, K_10, k_10e;
+  const K_10e, k_11, D;
+
+  // Unit definitions:
+  unit substance = gram;
+  unit time_unit = 3600 second;
+  unit volume = litre;
+  unit per_h = 1 / 3600 second;
+  unit g_per_l = gram / litre;
+  unit l_per_g = litre / gram;
+  unit g_per_l_per_h = gram / (litre * 3600 second);
+  unit mmole_per_g_per_h = 1e-3 mole / (3600 second * gram);
+
+  // Display Names:
+  substance is "gram";
+  time_unit is "hours";
+  volume is "liter";
+  per_h is "per hour";
+  g_per_l is "gram  per liter";
+  l_per_g is "liter  per gram";
+  g_per_l_per_h is "gram  per liter per hour";
+  mmole_per_g_per_h is "mmole per gram BM per hour";
+  env is "environment";
+  s_glu is "Glucose";
+  s_pyr is "Pyruvate";
+  s_acetate is "Acetate";
+  s_acetald is "Acetaldehyde";
+  s_EtOH is "EtOH";
+  x is "BM";
+  a is "BM(active)";
+  AcDH is "BM(AcDH)";
+  Red is "Red. Equ. (NADH)";
+  S_f is "Glucose(feed)";
+  r1 is "glycolysis";
+  r2 is "TCA (pyruvate)";
+  r4 is "Acetald. dehydrogenase";
+  r5 is "TCA (acetate)";
+  r6 is "ADH";
+  r7 is "BM growth (gluc)";
+  r8 is "BM growth (acetate)";
+  r3 is "Pyruvate Dehydrogenase";
+  r9 is "Acdh production";
+  r10 is "active BM degradation";
+  r11 is "Acdh degradation";
+  D is "Dilutionrate";
+  s_glu_in is "Glucose inflow";
+  s_glu_out is "Glucose outflow";
+  s_pyr_out is "Pyruvate outflow";
+  s_acetate_out is "Acetate outflow";
+  s_acetald_out is "Acetaldehyde outflow";
+  s_EtOH_out is "EtOH outflow";
+  a_out is "active BM outflow";
+  x_out is "BM outflow";
+  AcDH_out is "AcDH BM outflow";
+
+  // SBO terms:
+  env.sboTerm = 290
+  cell.sboTerm = 290
+  s_glu.sboTerm = 247
+  s_pyr.sboTerm = 247
+  s_acetate.sboTerm = 247
+  s_acetald.sboTerm = 247
+  s_EtOH.sboTerm = 247
+  x.sboTerm = 240
+  a.sboTerm = 241
+  AcDH.sboTerm = 241
+  CO2.sboTerm = 247
+  Red.sboTerm = 247
+  S_f.sboTerm = 247
+  r1.sboTerm = 205
+  r2.sboTerm = 205
+  r4.sboTerm = 200
+  r5.sboTerm = 205
+  r6.sboTerm = 200
+  r7.sboTerm = 205
+  r8.sboTerm = 205
+  r3.sboTerm = 200
+  r9.sboTerm = 184
+  r10.sboTerm = 179
+  r11.sboTerm = 179
+  s_glu_in.sboTerm = 185
+  s_glu_out.sboTerm = 185
+  s_pyr_out.sboTerm = 185
+  s_acetate_out.sboTerm = 185
+  s_acetald_out.sboTerm = 185
+  s_EtOH_out.sboTerm = 185
+  a_out.sboTerm = 185
+  x_out.sboTerm = 185
+  AcDH_out.sboTerm = 185
+
+  // CV terms:
+  env biological_system "http://identifiers.org/go/GO:0005576"
+  cell identity "http://identifiers.org/go/GO:0005623"
+  s_glu identity "http://identifiers.org/chebi/CHEBI:17234",
+                 "http://identifiers.org/kegg.compound/C00293"
+  s_pyr identity "http://identifiers.org/chebi/CHEBI:15361",
+                 "http://identifiers.org/kegg.compound/C00022"
+  s_acetate identity "http://identifiers.org/chebi/CHEBI:40480",
+                     "http://identifiers.org/kegg.compound/C00033"
+  s_acetald identity "http://identifiers.org/chebi/CHEBI:15343",
+                     "http://identifiers.org/kegg.compound/C00084"
+  s_EtOH identity "http://identifiers.org/chebi/CHEBI:16236",
+                  "http://identifiers.org/kegg.compound/C00469"
+  CO2 identity "http://identifiers.org/chebi/CHEBI:16526",
+               "http://identifiers.org/kegg.compound/C00011"
+  Red identity "http://identifiers.org/chebi/CHEBI:16908",
+               "http://identifiers.org/kegg.compound/C00004"
+  S_f version "http://identifiers.org/chebi/CHEBI:17234",
+              "http://identifiers.org/kegg.compound/C00293"
+  r1 identity "http://identifiers.org/go/GO:0006096"
+  r2 identity "http://identifiers.org/go/GO:0006099"
+  r4 biological_system "http://identifiers.org/ec-code/1.2.1.3",
+                       "http://identifiers.org/kegg.reaction/R00710",
+                       "http://identifiers.org/go/GO:0004029"
+  r5 identity "http://identifiers.org/go/GO:0006099"
+  r6 version "http://identifiers.org/kegg.reaction/R00754"
+  r6 biological_system "http://identifiers.org/ec-code/1.1.1.1",
+                       "http://identifiers.org/go/GO:0004022"
+  r7 biological_system "http://identifiers.org/go/GO:0008283",
+                       "http://identifiers.org/go/GO:0016049"
+  r8 biological_system "http://identifiers.org/go/GO:0016049",
+                       "http://identifiers.org/go/GO:0008283"
+  r3 version "http://identifiers.org/ec-code/1.2.4.1",
+             "http://identifiers.org/ec-code/2.3.1.12"
+  r3 biological_system "http://identifiers.org/kegg.reaction/R00209",
+                       "http://identifiers.org/go/GO:0004738"
+  r9 biological_system "http://identifiers.org/go/GO:0006412"
+  r10 biological_system "http://identifiers.org/go/GO:0009056"
+  r11 biological_system "http://identifiers.org/go/GO:0030163"
+
+  model model_source "http://identifiers.org/biomodels.db/MODEL1003250000"
+  model model_source "http://identifiers.org/biomodels.db/BIOMD0000000245"
+  model publication "http://identifiers.org/pubmed/11434967"
+  model taxon "http://identifiers.org/taxonomy/4932"
+  model version "http://identifiers.org/kegg.pathway/sce00020",
+                "http://identifiers.org/kegg.pathway/sce00010"
+  model version "http://identifiers.org/go/GO:0006006",
+                "http://identifiers.org/go/GO:0006099"
+  model property "http://identifiers.org/mamo/MAMO_0000046"
+  model created "2010-03-25T02:28:31Z"
+  model modified "2010-06-03T10:40:01Z"
+  model creator1.givenName "Lukas"
+  model creator1.familyName "Endler"
+  model creator1.organization "EMBL-EBI"
+  model creator1.email "lukas@ebi.ac.uk"
+
+  // Notes:
+  model notes ```
+This the model from the article: 
+**A biochemically structured model for Saccharomyces cerevisiae.** 
+Lei F, Rotbøll M, Jørgensen SB. *J Biotechnol.* 2001 Jul
+12;88(3):205-21. 	 PMID: [11434967](http://www.ncbi.nlm.nih.gov/pubmed/11434967) ,DOI: [10.1016/S0168-1656(01)00269-3](http://dx.doi.org/10.1016/S0168-1656(01)00269-3)
+
+**Abstract:** 
+A biochemically structured model for the aerobic growth of Saccharomyces
+cerevisiae on glucose and ethanol is presented. The model focuses on the pyruvate
+and acetaldehyde branch points where overflow metabolism occurs when the growth changes
+from oxidative to oxido-reductive. The model is designed to describe the onset of
+aerobic alcoholic fermentation during steady-state as well as under dynamical conditions,
+by triggering an increase in the glycolytic flux using a key signalling component
+which is assumed to be closely related to acetaldehyde. An investigation of the modelled
+process dynamics in a continuous cultivation revealed multiple steady states in a
+region of dilution rates around the transition between oxidative and oxido-reductive
+growth. A bifurcation analysis using the two external variables, the dilution rate,
+D, and the inlet concentration of glucose, S(f), as parameters, showed that a fold
+bifurcation occurs close to the critical dilution rate resulting in multiple steady-states.
+The region of dilution rates within which multiple steady states may occur depends
+strongly on the substrate feed concentration. Consequently a single steady state
+may prevail at low feed concentrations, whereas multiple steady states may occur
+over a relatively wide range of dilution rates at higher feed concentrations. 
+
+
+This model originates from BioModels Database: A Database of Annotated Published
+Models. It is copyright (c) 2005-2010 The BioModels Team. 
+For more information see the [terms of use](http://www.ebi.ac.uk/biomodels/legal.html) . 
+To cite BioModels Database, please use [Le Novère N., Bornstein B., Broicher A., Courtot M., Donizelli M., Dharuri H., Li L., Sauro H., Schilstra M., Shapiro B., Snoep J.L., Hucka M. (2006) BioModels Database: A Free, Centralized Database of Curated, Published, Quantitative Kinetic Models of Biochemical and Cellular Systems Nucleic Acids Res., 34: D689-D691.](http://www.pubmedcentral.nih.gov/articlerender.fcgi?tool=pubmed&pubmedid=16381960)
+```
+end
+
+lei2001 is "Lei2001_Yeast_Aerobic_Metabolism"
