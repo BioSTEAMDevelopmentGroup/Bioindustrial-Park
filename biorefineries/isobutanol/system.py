@@ -13,6 +13,8 @@ from biorefineries import corn
 from biorefineries.isobutanol import units
 from nskinetics.examples.s_cerevisiae_ferm_fb_inhib_mod_ibo import te_r, reset_kinetic_reaction_system
 
+MultiEffectEvaporator = bst.MultiEffectEvaporator
+
 __all__ = ('corn_EtOH_IBO_sys',)
 
 corn_chems_compiled = corn.chemicals.create_chemicals()
@@ -54,7 +56,8 @@ S301 = bst.Splitter('S301', ins=f.E402-0,
 
 ## Initial feed evaporator, pumps, mixer, and hx
 F301 = bst.MultiEffectEvaporator('F301', ins=S301-0, outs=('F301_l', 'F301_g'),
-                                        P = (101325, 73581, 50892, 32777, 20000), V = 0.1)
+                                        P = (101325, 73581, 50892, 32777, 20000), V = 0.1,
+                                        flash=False)
 F301.V = 0.8 # initial value, updated in FeedStrategySpecification object
 F301_design = F301._design
 F301_cost = F301._cost
@@ -89,7 +92,8 @@ H301 = bst.units.HXutility('H301', ins=M301-0, outs=('glucose_initial_feed',), T
 
 ## Spike evaporator, pumps, mixer, and hx
 F302 = bst.MultiEffectEvaporator('F302', ins=S301-1, outs=('F302_l', 'F302_g'),
-                                        P = (101325, 73581, 50892, 32777, 20000), V = 0.1)
+                                        P = (101325, 73581, 50892, 32777, 20000), V = 0.1,
+                                        flash=False)
 F302.V = 0.8 # initial value, updated in FeedStrategySpecification object
 F302_design = F302._design
 F302_cost = F302._cost
@@ -108,6 +112,13 @@ def F302_spec():
         F302._design = lambda:0
         F302._cost = lambda:0
 
+def F302_design_extended():
+    try:
+        F302_design()
+    except:
+        F302._V_overall(F302._V_first_effect)
+        F302_design()
+        
 F302_P0 = bst.units.Pump('F302_P0', ins=F302-0, outs='', P=101325.)
 F302_P1 = bst.units.Pump('F302_P1', ins=F302-1, outs='', P=101325.)
 
@@ -400,24 +411,40 @@ r = V405_new.kinetic_reaction_system._te
 corn_EtOH_IBO_sys.simulate()
 print(corn_EtOH_IBO_sys_tea.solve_price(f.ethanol))
 
-fbs_spec.load_specifications(target_conc_sugars=100,
-threshold_conc_sugars=10,
-conc_sugars_feed_spike=600,
-tau_max=72)
 
 corn_EtOH_IBO_sys.simulate()
 
+baseline_spec = {'target_conc_sugars': 100,
+                 'threshold_conc_sugars': 10,
+                 'conc_sugars_feed_spike': 600,
+                 'tau_max': 72}
+
+fbs_spec.load_specifications(**baseline_spec)
+
 #%%
-def load_simulate_get_EtOH_MPSP(target_conc_sugars=100,
-    threshold_conc_sugars=10,
-    conc_sugars_feed_spike=300,
-    tau_max=72,
+
+def load_simulate_get_EtOH_MPSP(target_conc_sugars=None,
+    threshold_conc_sugars=None,
+    conc_sugars_feed_spike=None,
+    tau_max=None,
     max_n_glu_spikes=15,
     n_sims=3,
     n_tea_solves=3,
     plot=False,
     ):
     
+    if target_conc_sugars is None:
+        target_conc_sugars = fbs_spec.target_conc_sugars
+    
+    if threshold_conc_sugars is None:
+        threshold_conc_sugars = fbs_spec.threshold_conc_sugars
+    
+    if conc_sugars_feed_spike is None:
+        conc_sugars_feed_spike = fbs_spec.conc_sugars_feed_spike
+    
+    if tau_max is None:
+        tau_max = fbs_spec.tau_max
+        
     r.max_n_glu_spikes = max_n_glu_spikes
     ethanol = f.ethanol
     
@@ -430,12 +457,12 @@ def load_simulate_get_EtOH_MPSP(target_conc_sugars=100,
         corn_EtOH_IBO_sys.simulate()
         
     for i in range(n_tea_solves):
-        ethanol.price = corn_EtOH_IBO_sys_tea.solve_price(ethanol) * ethanol.F_mass/ethanol.imass['Ethanol']
+        ethanol.price = corn_EtOH_IBO_sys_tea.solve_price(ethanol)
 
     if plot:
         plot_results()
     
-    return ethanol.price
+    return ethanol.price * ethanol.F_mass/ethanol.imass['Ethanol']
 
 def plot_results():
     # for i in V405_new.map_chemicals_nsk_to_bst.keys():
@@ -448,31 +475,106 @@ def plot_results():
     plt.xlabel('Time [h]')
     plt.ylabel('Concentration [g/L]')
     plt.show()
+
+def reset_and_reload():
+    print('Resetting cache and emptying recycles ...')
+    corn_EtOH_IBO_sys.reset_cache()
+    corn_EtOH_IBO_sys.empty_recycles()
+    print('Loading and simulating with baseline specifications ...')
+    curr_spec = {i: fbs_spec.__getattribute__(i) for i in baseline_spec.keys()}
+    load_simulate_get_EtOH_MPSP(**baseline_spec)
+    print('Loading and simulating with required specifications ...')
+    load_simulate_get_EtOH_MPSP(**curr_spec)
+    
+def reset_and_switch_solver(solver_ID):
+    corn_EtOH_IBO_sys.reset_cache()
+    corn_EtOH_IBO_sys.empty_recycles()
+    corn_EtOH_IBO_sys.converge_method = solver_ID
+    print(f"Trying {solver_ID} ...")
+    load_simulate_get_EtOH_MPSP()
+
+# F403 = u.F403
+def run_bugfix_barrage():
+    try:
+        reset_and_reload()
+    except Exception as e:
+        print(str(e))
+        if 'length' in str(e).lower():
+            try:
+                corn_EtOH_IBO_sys.reset_cache()
+                corn_EtOH_IBO_sys.empty_recycles()
+                load_simulate_get_EtOH_MPSP()
+            except:
+                print(str(e))
+                raise e
+        
+        elif 'invalid value encountered' in str(e).lower():
+            print('\n\n\n\n\n\n\n\nAAAAAAAAAAAAAAAA\n\n\n\n\n\n\n')
+            try:
+                for i in corn_EtOH_IBO_sys.units:
+                    if isinstance(i, MultiEffectEvaporator):
+                        for j in i.evaporators:
+                            try:
+                                j.outs[0].T = j.T
+                                j.outs[1].T = j.T
+                            except:
+                                pass
+                load_simulate_get_EtOH_MPSP()
+                
+            except:
+                print(str(e))
+                raise e
+                
+        else:
+            try:
+                reset_and_switch_solver('fixedpoint')
+            except Exception as e:
+                print(str(e))
+                try:
+                    reset_and_switch_solver('aitken')
+                except Exception as e:
+                    print(str(e))
+                    print("Bugfix barrage failed.\n")
+                    breakpoint()
+                    raise e
+
+#%%
+def model_specification(**kwargs):
+    try:
+        load_simulate_get_EtOH_MPSP(**kwargs)
+    except Exception as e:
+        str_e = str(e).lower()
+        print('Error in model spec: %s'%str_e)
+        # raise e
+        if 'sugar concentration' in str_e:
+            # flowsheet('AcrylicAcid').F_mass /= 1000.
+            raise e
+        else:
+            run_bugfix_barrage()
     
 #%% Simulate and solve TEA
-load_simulate_get_EtOH_MPSP(target_conc_sugars=175,
-    threshold_conc_sugars=0,
-    conc_sugars_feed_spike=600,
-    tau_max=72,
-    max_n_glu_spikes=3,
+load_simulate_get_EtOH_MPSP(**baseline_spec,
+    max_n_glu_spikes=15,
     n_sims=3,
     n_tea_solves=3,
     plot=True,
     )
 
 #%%
-conc_sugars_feed_spikes = np.linspace(200, 810, 20)
+conc_sugars_feed_spikes = np.linspace(150, 900, 30)
 MPSPs = []
+ethanol = f.ethanol
 for c in conc_sugars_feed_spikes:
-    MPSPs.append(load_simulate_get_EtOH_MPSP(target_conc_sugars=175,
-    threshold_conc_sugars=10,
-    conc_sugars_feed_spike=c,
-    tau_max=72,
+    curr_spec = {k:v for k,v in baseline_spec.items()}
+    curr_spec.update({'conc_sugars_feed_spike':c,})
+    model_specification(
+    **curr_spec,
     max_n_glu_spikes=15,
     n_sims=3,
     n_tea_solves=3,
     plot=True,
-    ))
+    )
+    MPSPs.append(ethanol.price * ethanol.F_mass/ethanol.imass['Ethanol'])
 
 plt.plot(conc_sugars_feed_spikes, MPSPs)
 plt.xlabel('Glucose spike feed concentration [g/L]')
