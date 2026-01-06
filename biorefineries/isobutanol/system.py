@@ -508,22 +508,22 @@ def run_bugfix_barrage():
                 print(str(e))
                 raise e
         
-        elif 'invalid value encountered' in str(e).lower():
-            print('\n\n\n\n\n\n\n\nAAAAAAAAAAAAAAAA\n\n\n\n\n\n\n')
-            try:
-                for i in corn_EtOH_IBO_sys.units:
-                    if isinstance(i, MultiEffectEvaporator):
-                        for j in i.evaporators:
-                            try:
-                                j.outs[0].T = j.T
-                                j.outs[1].T = j.T
-                            except:
-                                pass
-                load_simulate_get_EtOH_MPSP()
+        # elif 'invalid value encountered' in str(e).lower():
+        #     print('\n\n\n\n\n\n\n\nAAAAAAAAAAAAAAAA\n\n\n\n\n\n\n')
+        #     try:
+        #         for i in corn_EtOH_IBO_sys.units:
+        #             if isinstance(i, MultiEffectEvaporator):
+        #                 for j in i.evaporators:
+        #                     try:
+        #                         j.outs[0].T = j.T
+        #                         j.outs[1].T = j.T
+        #                     except:
+        #                         pass
+        #         load_simulate_get_EtOH_MPSP()
                 
-            except:
-                print(str(e))
-                raise e
+        #     except:
+        #         print(str(e))
+        #         raise e
                 
         else:
             try:
@@ -561,12 +561,34 @@ load_simulate_get_EtOH_MPSP(**baseline_spec,
     )
 
 #%%
-conc_sugars_feed_spikes = np.linspace(150, 900, 30)
+# conc_sugars_feed_spikes = np.linspace(150, 600, 20)
+# MPSPs = []
+# ethanol = f.ethanol
+# for c in conc_sugars_feed_spikes:
+#     curr_spec = {k:v for k,v in baseline_spec.items()}
+#     curr_spec.update({'conc_sugars_feed_spike':c,})
+#     model_specification(
+#     **curr_spec,
+#     max_n_glu_spikes=15,
+#     n_sims=3,
+#     n_tea_solves=3,
+#     plot=True,
+#     )
+#     MPSPs.append(ethanol.price * ethanol.F_mass/ethanol.imass['Ethanol'])
+
+# plt.plot(conc_sugars_feed_spikes, MPSPs)
+# plt.xlabel('Glucose spike feed concentration [g/L]')
+# plt.ylabel('MPSP [$/kg]')
+# plt.show()
+
+#%%
+target_conc_sugarses = np.linspace(100, 300, 20)
 MPSPs = []
+taus = []
 ethanol = f.ethanol
-for c in conc_sugars_feed_spikes:
+for c in target_conc_sugarses:
     curr_spec = {k:v for k,v in baseline_spec.items()}
-    curr_spec.update({'conc_sugars_feed_spike':c,})
+    curr_spec.update({'target_conc_sugars':c,})
     model_specification(
     **curr_spec,
     max_n_glu_spikes=15,
@@ -575,8 +597,9 @@ for c in conc_sugars_feed_spikes:
     plot=True,
     )
     MPSPs.append(ethanol.price * ethanol.F_mass/ethanol.imass['Ethanol'])
-
-plt.plot(conc_sugars_feed_spikes, MPSPs)
-plt.xlabel('Glucose spike feed concentration [g/L]')
+    taus.append(V405_new.tau)
+    
+plt.plot(target_conc_sugarses, MPSPs)
+plt.xlabel('Target glucose concentration [g/L]')
 plt.ylabel('MPSP [$/kg]')
 plt.show()
