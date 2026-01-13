@@ -570,9 +570,13 @@ def model_specification(**kwargs):
             run_bugfix_barrage(**curr_spec)
 
 
-def optimize_tau_for_MPSP(**kwargs):
+def optimize_tau_for_MPSP(threshold_s_EtOH=5, **kwargs):
     original_run_type = V406.run_type
     V406.run_type = 'index saved results by tau'
+    results = V406.results_dict
+    where_greq_threshold = np.where(V406.results_dict['[s_EtOH]']>=5)[0]
+    taus = results['time']
+    bounds_tau = (taus[where_greq_threshold[0]], taus[where_greq_threshold[-1]])
     def f(x):
         V406.tau = x[0]
         try:
@@ -581,12 +585,15 @@ def optimize_tau_for_MPSP(**kwargs):
             return get_purity_adj_price(ethanol, ['Ethanol'])
         except:
             return np.inf
-    res = differential_evolution(f, bounds=((10, V406.tau_max),), tol=1e-3)
+    res = differential_evolution(f, bounds=(bounds_tau,), atol=1e-2)
     V406.run_type = original_run_type
     return res.x[0]
     
 
-def optimize_max_n_glu_spikes_for_MPSP(bounds=(0, 10), optimize_tau=True, show_progress=False):
+def optimize_max_n_glu_spikes_for_MPSP(bounds=(0, 10), 
+                                       optimize_tau=True, 
+                                       show_progress=False, 
+                                       threshold_s_EtOH=5):
     curr_spec = {k: v for k,v in fbs_spec.baseline_specifications.items()}
     original_run_type = V406.run_type
     V406.run_type = 'simulate kinetics'
@@ -597,7 +604,7 @@ def optimize_max_n_glu_spikes_for_MPSP(bounds=(0, 10), optimize_tau=True, show_p
         curr_curr_spec.update({'max_n_glu_spikes':max_n_glu_spikes,})
         model_specification(**curr_curr_spec)
         if optimize_tau: 
-            tau = optimize_tau_for_MPSP()
+            tau = optimize_tau_for_MPSP(threshold_s_EtOH=threshold_s_EtOH)
         opt_MPSP = get_purity_adj_price(ethanol, ['Ethanol'])
         results.append((fbs_spec.current_specifications, 
                         V406.tau,
