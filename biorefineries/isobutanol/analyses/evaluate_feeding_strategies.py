@@ -263,7 +263,7 @@ for s3 in spec_3:
                     n_tea_solves=3,
                     plot=False,
                     )
-                optimize_max_n_glu_spikes(show_progress=True, optimize_tau=False)
+                optimize_max_n_glu_spikes(obj='MPSP', show_progress=True, optimize_tau=False)
                 
                 assert s1<s2
                 for k, v in list(results.items()): 
