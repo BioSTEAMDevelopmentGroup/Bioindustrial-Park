@@ -41,7 +41,7 @@ baseline_spec = isobutanol.system.baseline_spec
 tea = corn_EtOH_IBO_sys_tea = isobutanol.system.corn_EtOH_IBO_sys_tea
 fbs_spec = isobutanol.system.fbs_spec
 optimize_tau_for_MPSP = isobutanol.system.optimize_tau_for_MPSP
-optimize_max_n_glu_spikes_for_MPSP = isobutanol.system.optimize_max_n_glu_spikes_for_MPSP
+optimize_max_n_glu_spikes = isobutanol.system.optimize_max_n_glu_spikes
 
 f = system.flowsheet
 
@@ -263,7 +263,7 @@ for s3 in spec_3:
                     n_tea_solves=3,
                     plot=False,
                     )
-                optimize_max_n_glu_spikes_for_MPSP(show_progress=True, optimize_tau=False)
+                optimize_max_n_glu_spikes(show_progress=True, optimize_tau=False)
                 
                 assert s1<s2
                 for k, v in list(results.items()): 

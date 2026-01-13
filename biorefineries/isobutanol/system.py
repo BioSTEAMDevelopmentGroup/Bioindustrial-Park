@@ -601,22 +601,31 @@ def optimize_tau_for_MPSP(threshold_s_EtOH=5, **kwargs):
     return res.x[0]
     
 
-def optimize_max_n_glu_spikes_for_MPSP(bounds=(0, 10), 
+def optimize_max_n_glu_spikes(bounds=(0, 10), 
                                        optimize_tau=True, 
                                        show_progress=False, 
-                                       threshold_s_EtOH=5,):
+                                       threshold_s_EtOH=5,
+                                       obj='y_EtOH_glu_added'):
     curr_spec = {k: v for k,v in fbs_spec.current_specifications.items()}
     original_run_type = V406.run_type
     V406.run_type = 'simulate kinetics'
     r = V406.kinetic_reaction_system._te
     results = []
+    V406_results_dict_keys = list(V406.results_dict.keys())
+    if obj in V406_results_dict_keys:
+        V406.tau_update_policy=('max', obj)
     for max_n_glu_spikes in range(bounds[0], bounds[1]+1):
         curr_curr_spec = {k:v for k,v in curr_spec.items()}
         curr_curr_spec.update({'max_n_glu_spikes':max_n_glu_spikes,})
         model_specification(**curr_curr_spec)
         if optimize_tau: 
             tau = optimize_tau_for_MPSP(threshold_s_EtOH=threshold_s_EtOH)
-        opt_obj = get_purity_adj_price(ethanol, ['Ethanol'])
+        if obj=='MPSP':
+            opt_obj = get_purity_adj_price(ethanol, ['Ethanol'])
+        elif obj in V406_results_dict_keys:
+            opt_obj = V406.results_specific_tau_dict[obj]
+        else:
+            raise ValueError(f"obj '{obj}' is not a valid objective.")
         results.append((fbs_spec.current_specifications, 
                         V406.tau,
                         V406.results_specific_tau_dict['curr_n_glu_spikes'], # num spikes at selected tau
@@ -626,7 +635,10 @@ def optimize_max_n_glu_spikes_for_MPSP(bounds=(0, 10),
         if len(results)>1 and results[-1][3]==results[-2][3]: # if this iteration resulted in the same number of glucose spikes at tau_max as the last one (i.e., increasing the max number won't make a difference), break
             break
         
-    results.sort(key=lambda x: x[4], reverse=False) # sort by MPSP
+    if obj=='MPSP':
+        results.sort(key=lambda x: x[4], reverse=False) # sort by obj, ascending
+    else:
+        results.sort(key=lambda x: x[4], reverse=True) # sort by obj, descending
     opt_curr_spec, opt_tau, opt_curr_n_glu_spikes, opt_curr_n_glu_spikes_at_tau_max, opt_obj = results[0]
     V406.run_type = original_run_type
     model_specification(**opt_curr_spec)
@@ -654,4 +666,4 @@ if simulate_baseline:
         )
     # print(get_purity_adj_price(ethanol, ['Ethanol']))
     
-# optimize_max_n_glu_spikes_for_MPSP(baseline_spec)
+# optimize_max_n_glu_spikes(baseline_spec)
