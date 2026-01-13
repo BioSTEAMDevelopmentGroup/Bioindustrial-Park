@@ -1,9 +1,12 @@
+#!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-"""
-Created on Wed Sep 24 13:08:23 2025
+# Bioindustrial-Park: BioSTEAM's Premier Biorefinery Models and Results
+# Copyright (C) 2021-, Sarang Bhagwat <sarangb2@illinois.edu>
+# 
+# This module is under the UIUC open-source license. See 
+# github.com/BioSTEAMDevelopmentGroup/biosteam/blob/master/LICENSE.txt
+# for license details.
 
-@author: saran
-"""
 import numpy as np
 import biosteam as bst
 import thermosteam as tmo

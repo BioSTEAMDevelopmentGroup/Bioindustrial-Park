@@ -1,9 +1,12 @@
+#!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-"""
-Created on Tue Sep 23 23:27:48 2025
+# Bioindustrial-Park: BioSTEAM's Premier Biorefinery Models and Results
+# Copyright (C) 2021-, Sarang Bhagwat <sarangb2@illinois.edu>
+# 
+# This module is under the UIUC open-source license. See 
+# github.com/BioSTEAMDevelopmentGroup/biosteam/blob/master/LICENSE.txt
+# for license details.
 
-@author: saran
-"""
 import nskinetics as nsk
 import biosteam as bst
 import thermosteam as tmo
@@ -12,6 +15,10 @@ from matplotlib import pyplot as plt
 from biorefineries import corn
 from biorefineries.isobutanol import units
 from nskinetics.examples.s_cerevisiae_ferm_fb_inhib_mod_ibo import te_r, reset_kinetic_reaction_system
+from scipy.optimize import differential_evolution
+
+from warnings import filterwarnings
+filterwarnings('ignore')
 
 MultiEffectEvaporator = bst.MultiEffectEvaporator
 
@@ -85,7 +92,7 @@ M301.water_to_sugar_mol_ratio = 5. # initial value, updated in FeedStrategySpeci
 @M301.add_specification(run=False)
 def adjust_M301_water():
     M301_ins_1 = M301.ins[1]
-    M301_ins_1.imol['Water'] = M301.water_to_sugar_mol_ratio * M301.ins[0].imol[V405_new.sugar_IDs].sum()
+    M301_ins_1.imol['Water'] = M301.water_to_sugar_mol_ratio * M301.ins[0].imol[V406.sugar_IDs].sum()
     M301._run()
     
 H301 = bst.units.HXutility('H301', ins=M301-0, outs=('glucose_initial_feed',), T=32+273.15, rigorous=True)
@@ -128,7 +135,7 @@ M302.water_to_sugar_mol_ratio = 5. # initial value
 @M302.add_specification(run=False)
 def adjust_M302_water():
     M302_ins_1 = M302.ins[1]
-    M302_ins_1.imol['Water'] = M302.water_to_sugar_mol_ratio * M302.ins[0].imol[V405_new.sugar_IDs].sum()
+    M302_ins_1.imol['Water'] = M302.water_to_sugar_mol_ratio * M302.ins[0].imol[V406.sugar_IDs].sum()
     M302._run()
     
 H302 = bst.units.HXutility('H302', ins=M302-0, outs=('glucose_spike_feed',), T=32+273.15, rigorous=True)
@@ -136,7 +143,7 @@ H302 = bst.units.HXutility('H302', ins=M302-0, outs=('glucose_spike_feed',), T=3
 #%%
 V405_old = f.V405
 
-# V405_new = units.SSFEtOHIBO(ID='V405', ins=(f.E402-0, f.P404-0), outs=('CO2', ''), V=1.9e3,
+# V406 = units.SSFEtOHIBO(ID='V405', ins=(f.E402-0, f.P404-0), outs=('CO2', ''), V=1.9e3,
 #                             kinetic_reaction_system=te_r,
 #                             n_simulation_steps=1000,
 #                             f_reset_kinetic_reaction_system=reset_kinetic_reaction_system,
@@ -146,7 +153,7 @@ V405_old = f.V405
 #                                                         's_IBO': 'Isobutanol'}
 #                             )
 
-V405_new = nsk.units.NSKFermentation('V405', 
+V406 = nsk.units.NSKFermentation('V406', 
                                  ins=(H301-0, f.P404-0, H302-0), 
                                  kinetic_reaction_system=te_r,
                                  n_simulation_steps=2000,
@@ -159,30 +166,33 @@ V405_new = nsk.units.NSKFermentation('V405',
                                                              },
                                  track_vars = ['y_EtOH_glu_added', 
                                                'y_EtOH_glu_consumed',
+                                               'curr_n_glu_spikes',
                                                # 'tot_mass_glu', 
-                                               'prod_EtOH'],
+                                               'prod_EtOH',
+                                               'curr_tot_vol_glu_feed_added',
+                                               'curr_env',],
                                  f_reset_kinetic_reaction_system=reset_kinetic_reaction_system,
                                  tau=3*24,
                                  tau_max=3*24,
                                  sugar_IDs=('Glucose',),
                                  # tau_update_policy=None,
-                                 tau_update_policy=('max', 'y_EtOH_glu_added'),
+                                 tau_update_policy=('max', '[s_EtOH]'),
                                  perform_hydrolysis=False)
 
-V405_new-0-1-f.V409
-V405_new-1-0-f.P406
+V406-0-1-f.V409
+V406-1-0-f.P406
 
 yeast = f.yeast
 gluco_amylase = f.gluco_amylase
-@V405_new.add_specification(run=True)
+@V406.add_specification(run=True)
 def correct_saccharification_feed_flows():
-    mash = V405_new.ins[0]
+    mash = V406.ins[0]
     mash_flow = mash.F_mass
     mash_dry_flow = mash_flow - mash.imass['Water']
     yeast.F_mass = parameters['yeast_loading'] * mash_flow
     gluco_amylase.F_mass = parameters['saccharification_gluco_amylase_loading'] * mash_dry_flow
 
-# V405_new.simulate()
+# V406.simulate()
 
 #%%
 
@@ -195,7 +205,7 @@ corn_EtOH_IBO_sys_no_IBO_recovery = bst.System.from_units('corn_EtOH_IBO_sys_no_
                                                   + [S301,
                                                      F301, F301_P0, F301_P1, M301, H301,
                                                      F302, F302_P0, F302_P1, M302, H302,
-                                                     V405_new])
+                                                     V406])
 corn_EtOH_IBO_sys_no_IBO_recovery.simulate()
 
 #%% Add isobutanol recovery system - stage 1/2
@@ -371,7 +381,7 @@ recovery_units = [S404,
                   M403, H402, 
                   V514]
 
-HXN = bst.HeatExchangerNetwork(ignored=keep_non_rigorous)
+HXN = bst.HeatExchangerNetwork('HXN1001', ignored=keep_non_rigorous)
 
 
 corn_EtOH_IBO_sys = bst.System.from_units('corn_EtOH_IBO_sys', 
@@ -388,14 +398,22 @@ f.makeup_isopentyl_acetate.price = 3.2 # https://www.alibaba.com/product-detail/
 
 corn_EtOH_IBO_sys._TEA = corn_EtOH_IBO_sys_tea = corn.tea.create_tea(corn_EtOH_IBO_sys)
 
-#%%
+#%% Set baseline specifications
 
+baseline_spec = {'target_conc_sugars': 100,
+                 'threshold_conc_sugars': 10,
+                 'conc_sugars_feed_spike': 600,
+                 'tau_max': 10*24,
+                 'max_n_glu_spikes': 10,}
+
+#% Create fed-batch strategy specification object
 fbs_spec = nsk.units.FedBatchStrategySpecification(
     target_conc_sugars=100,
     threshold_conc_sugars=10,
     conc_sugars_feed_spike=600,
     tau_max=72,
-    fermentation_reactor=V405_new,
+    max_n_glu_spikes=10,
+    fermentation_reactor=V406,
     splitter=S301,
     feed_evaporator=F301,
     feed_mixer=M301,
@@ -403,31 +421,20 @@ fbs_spec = nsk.units.FedBatchStrategySpecification(
     spike_units_sequential=[F302, F302_P0, F302_P1, M302, H302],
     spike_evaporator=F302,
     spike_mixer=M302,
-    sugar_IDs=['Glucose',]
+    sugar_IDs=['Glucose',],
+    baseline_specifications=baseline_spec,
     )
 
-#%% Initialize simulation and TEA
-r = V405_new.kinetic_reaction_system._te
-corn_EtOH_IBO_sys.simulate()
-print(corn_EtOH_IBO_sys_tea.solve_price(f.ethanol))
-
-
-corn_EtOH_IBO_sys.simulate()
-
-baseline_spec = {'target_conc_sugars': 100,
-                 'threshold_conc_sugars': 10,
-                 'conc_sugars_feed_spike': 600,
-                 'tau_max': 72}
-
-fbs_spec.load_specifications(**baseline_spec)
-
 #%%
+
+def get_purity_adj_price(stream, chem_IDs):
+    return stream.price * stream.F_mass/sum([stream.imass[ID] for ID in chem_IDs])
 
 def load_simulate_get_EtOH_MPSP(target_conc_sugars=None,
     threshold_conc_sugars=None,
     conc_sugars_feed_spike=None,
     tau_max=None,
-    max_n_glu_spikes=15,
+    max_n_glu_spikes=None,
     n_sims=3,
     n_tea_solves=3,
     plot=False,
@@ -444,15 +451,18 @@ def load_simulate_get_EtOH_MPSP(target_conc_sugars=None,
     
     if tau_max is None:
         tau_max = fbs_spec.tau_max
+    
+    if max_n_glu_spikes is None:
+        max_n_glu_spikes = fbs_spec.max_n_glu_spikes
         
-    r.max_n_glu_spikes = max_n_glu_spikes
     ethanol = f.ethanol
     
     for i in range(n_sims):
         fbs_spec.load_specifications(target_conc_sugars=target_conc_sugars,
         threshold_conc_sugars=threshold_conc_sugars,
         conc_sugars_feed_spike=conc_sugars_feed_spike,
-        tau_max=tau_max)
+        tau_max=tau_max,
+        max_n_glu_spikes=max_n_glu_spikes)
         
         corn_EtOH_IBO_sys.simulate()
         
@@ -462,47 +472,51 @@ def load_simulate_get_EtOH_MPSP(target_conc_sugars=None,
     if plot:
         plot_results()
     
-    return ethanol.price * ethanol.F_mass/ethanol.imass['Ethanol']
+    return get_purity_adj_price(ethanol, ['Ethanol'])
 
 def plot_results():
-    # for i in V405_new.map_chemicals_nsk_to_bst.keys():
-    plt.plot(V405_new.results_dict['time'], V405_new.results_dict['[x]'], label='cell mass')
-    plt.plot(V405_new.results_dict['time'], V405_new.results_dict['[s_glu]'], label='glucose')
-    plt.plot(V405_new.results_dict['time'], V405_new.results_dict['[s_EtOH]'], label='ethanol')
-    plt.plot(V405_new.results_dict['time'], V405_new.results_dict['[s_acetate]'], label='acetate')
-    plt.plot(V405_new.results_dict['time'], V405_new.results_dict['[s_IBO]'], label='isobutanol')
+    # for i in V406.map_chemicals_nsk_to_bst.keys():
+    plt.plot(V406.results_dict['time'], V406.results_dict['[x]'], label='cell mass')
+    plt.plot(V406.results_dict['time'], V406.results_dict['[s_glu]'], label='glucose')
+    plt.plot(V406.results_dict['time'], V406.results_dict['[s_EtOH]'], label='ethanol')
+    plt.plot(V406.results_dict['time'], V406.results_dict['[s_acetate]'], label='acetate')
+    plt.plot(V406.results_dict['time'], V406.results_dict['[s_IBO]'], label='isobutanol')
     plt.legend()
     plt.xlabel('Time [h]')
     plt.ylabel('Concentration [g/L]')
     plt.show()
 
-def reset_and_reload():
+def reset_and_reload(**curr_spec):
     print('Resetting cache and emptying recycles ...')
     corn_EtOH_IBO_sys.reset_cache()
     corn_EtOH_IBO_sys.empty_recycles()
     print('Loading and simulating with baseline specifications ...')
-    curr_spec = {i: fbs_spec.__getattribute__(i) for i in baseline_spec.keys()}
-    load_simulate_get_EtOH_MPSP(**baseline_spec)
+    # curr_spec = {i: fbs_spec.__getattribute__(i) for i in baseline_spec.keys()}
+    corn_EtOH_IBO_sys.simulate()
+    load_simulate_get_EtOH_MPSP(**fbs_spec.baseline_specifications)
     print('Loading and simulating with required specifications ...')
+    # load_simulate_get_EtOH_MPSP(**curr_spec)
     load_simulate_get_EtOH_MPSP(**curr_spec)
     
-def reset_and_switch_solver(solver_ID):
+def reset_and_switch_solver(solver_ID, **curr_spec):
     corn_EtOH_IBO_sys.reset_cache()
     corn_EtOH_IBO_sys.empty_recycles()
     corn_EtOH_IBO_sys.converge_method = solver_ID
     print(f"Trying {solver_ID} ...")
-    load_simulate_get_EtOH_MPSP()
+    corn_EtOH_IBO_sys.simulate()
+    load_simulate_get_EtOH_MPSP(**curr_spec)
 
 # F403 = u.F403
-def run_bugfix_barrage():
+def run_bugfix_barrage(**curr_spec):
     try:
-        reset_and_reload()
+        reset_and_reload(**curr_spec)
     except Exception as e:
         print(str(e))
         if 'length' in str(e).lower():
             try:
                 corn_EtOH_IBO_sys.reset_cache()
                 corn_EtOH_IBO_sys.empty_recycles()
+                corn_EtOH_IBO_sys.simulate()
                 load_simulate_get_EtOH_MPSP()
             except:
                 print(str(e))
@@ -527,79 +541,98 @@ def run_bugfix_barrage():
                 
         else:
             try:
-                reset_and_switch_solver('fixedpoint')
+                reset_and_switch_solver('fixedpoint', **curr_spec)
             except Exception as e:
                 print(str(e))
                 try:
-                    reset_and_switch_solver('aitken')
+                    reset_and_switch_solver('aitken', **curr_spec)
                 except Exception as e:
                     print(str(e))
                     print("Bugfix barrage failed.\n")
-                    breakpoint()
+                    # breakpoint()
                     raise e
+
 
 #%%
 def model_specification(**kwargs):
+    curr_spec = {k: v for k,v in fbs_spec.current_specifications.items()}
+    curr_spec.update(kwargs)
     try:
-        load_simulate_get_EtOH_MPSP(**kwargs)
+        load_simulate_get_EtOH_MPSP(**curr_spec)
     except Exception as e:
         str_e = str(e).lower()
         print('Error in model spec: %s'%str_e)
         # raise e
-        if 'sugar concentration' in str_e:
+        if 'specifications do not meet required condition' in str_e:
             # flowsheet('AcrylicAcid').F_mass /= 1000.
             raise e
         else:
-            run_bugfix_barrage()
+            run_bugfix_barrage(**curr_spec)
+
+
+def optimize_tau_for_MPSP(**kwargs):
+    original_run_type = V406.run_type
+    V406.run_type = 'index saved results by tau'
+    def f(x):
+        V406.tau = x[0]
+        try:
+            # corn_EtOH_IBO_sys.simulate()
+            model_specification(**kwargs)
+            return get_purity_adj_price(ethanol, ['Ethanol'])
+        except:
+            return np.inf
+    res = differential_evolution(f, bounds=((10, V406.tau_max),), tol=1e-3)
+    V406.run_type = original_run_type
+    return res.x[0]
     
-#%% Simulate and solve TEA
-load_simulate_get_EtOH_MPSP(**baseline_spec,
-    max_n_glu_spikes=15,
-    n_sims=3,
-    n_tea_solves=3,
-    plot=True,
-    )
 
-#%%
-# conc_sugars_feed_spikes = np.linspace(150, 600, 20)
-# MPSPs = []
-# ethanol = f.ethanol
-# for c in conc_sugars_feed_spikes:
-#     curr_spec = {k:v for k,v in baseline_spec.items()}
-#     curr_spec.update({'conc_sugars_feed_spike':c,})
-#     model_specification(
-#     **curr_spec,
-#     max_n_glu_spikes=15,
-#     n_sims=3,
-#     n_tea_solves=3,
-#     plot=True,
-#     )
-#     MPSPs.append(ethanol.price * ethanol.F_mass/ethanol.imass['Ethanol'])
+def optimize_max_n_glu_spikes_for_MPSP(bounds=(0, 10), optimize_tau=True, show_progress=False):
+    curr_spec = {k: v for k,v in fbs_spec.baseline_specifications.items()}
+    original_run_type = V406.run_type
+    V406.run_type = 'simulate kinetics'
+    r = V406.kinetic_reaction_system._te
+    results = []
+    for max_n_glu_spikes in range(bounds[0], bounds[1]+1):
+        curr_curr_spec = {k:v for k,v in curr_spec.items()}
+        curr_curr_spec.update({'max_n_glu_spikes':max_n_glu_spikes,})
+        model_specification(**curr_curr_spec)
+        if optimize_tau: 
+            tau = optimize_tau_for_MPSP()
+        opt_MPSP = get_purity_adj_price(ethanol, ['Ethanol'])
+        results.append((fbs_spec.current_specifications, 
+                        V406.tau,
+                        V406.results_specific_tau_dict['curr_n_glu_spikes'], # num spikes at selected tau
+                        V406.results_dict['curr_n_glu_spikes'][-1], # num spikes at tau_max
+                        opt_MPSP))
+        if show_progress: print(results[-1])
+        if len(results)>1 and results[-1][3]==results[-2][3]: # if this iteration resulted in the same number of glucose spikes at tau_max as the last one (i.e., increasing the max number won't make a difference), break
+            break
+        
+    results.sort(key=lambda x: x[4], reverse=False) # sort by MPSP
+    opt_curr_spec, opt_tau, opt_curr_n_glu_spikes, opt_curr_n_glu_spikes_at_tau_max, opt_MPSP = results[0]
+    V406.run_type = original_run_type
+    model_specification(**opt_curr_spec)
+    if show_progress: 
+        print('optimum :', results[0])
+        plt.scatter([i[0]['max_n_glu_spikes'] for i in results], [i[4] for i in results])
+    return opt_curr_spec['max_n_glu_spikes']
 
-# plt.plot(conc_sugars_feed_spikes, MPSPs)
-# plt.xlabel('Glucose spike feed concentration [g/L]')
-# plt.ylabel('MPSP [$/kg]')
-# plt.show()
 
-#%%
-target_conc_sugarses = np.linspace(100, 300, 20)
-MPSPs = []
-taus = []
+#%% Initialize 
+r = V406.kinetic_reaction_system._te
+corn_EtOH_IBO_sys.simulate()
+
+#%% Baseline -- simulate and solve TEA
+
 ethanol = f.ethanol
-for c in target_conc_sugarses:
-    curr_spec = {k:v for k,v in baseline_spec.items()}
-    curr_spec.update({'target_conc_sugars':c,})
-    model_specification(
-    **curr_spec,
-    max_n_glu_spikes=15,
-    n_sims=3,
-    n_tea_solves=3,
-    plot=True,
-    )
-    MPSPs.append(ethanol.price * ethanol.F_mass/ethanol.imass['Ethanol'])
-    taus.append(V405_new.tau)
+
+simulate_baseline = True
+if simulate_baseline:
+    model_specification(**fbs_spec.baseline_specifications,
+        n_sims=3,
+        n_tea_solves=3,
+        plot=True,
+        )
+    # print(get_purity_adj_price(ethanol, ['Ethanol']))
     
-plt.plot(target_conc_sugarses, MPSPs)
-plt.xlabel('Target glucose concentration [g/L]')
-plt.ylabel('MPSP [$/kg]')
-plt.show()
+# optimize_max_n_glu_spikes_for_MPSP(baseline_spec)
