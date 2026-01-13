@@ -176,7 +176,8 @@ V406 = nsk.units.NSKFermentation('V406',
                                  tau_max=3*24,
                                  sugar_IDs=('Glucose',),
                                  # tau_update_policy=None,
-                                 tau_update_policy=('max', '[s_EtOH]'),
+                                 # tau_update_policy=('max', '[s_EtOH]'),
+                                 tau_update_policy=('max', 'y_EtOH_glu_added'),
                                  perform_hydrolysis=False)
 
 V406-0-1-f.V409
@@ -470,11 +471,11 @@ def load_simulate_get_EtOH_MPSP(target_conc_sugars=None,
         ethanol.price = corn_EtOH_IBO_sys_tea.solve_price(ethanol)
 
     if plot:
-        plot_results()
+        plot_kinetic_results()
     
     return get_purity_adj_price(ethanol, ['Ethanol'])
 
-def plot_results():
+def plot_kinetic_results():
     # for i in V406.map_chemicals_nsk_to_bst.keys():
     plt.plot(V406.results_dict['time'], V406.results_dict['[x]'], label='cell mass')
     plt.plot(V406.results_dict['time'], V406.results_dict['[s_glu]'], label='glucose')
@@ -563,7 +564,17 @@ def model_specification(**kwargs):
         str_e = str(e).lower()
         print('Error in model spec: %s'%str_e)
         # raise e
-        if 'specifications do not meet required condition' in str_e:
+        if 'cv_err_failure' in str_e:
+            print('Re-running fermentation unit ...')
+            i = 0
+            success = False
+            while i<20 and not success:
+                try:
+                    V406.simulate()
+                    success = True
+                except:
+                    i += 1
+        elif 'specifications do not meet required condition' in str_e:
             # flowsheet('AcrylicAcid').F_mass /= 1000.
             raise e
         else:
@@ -593,8 +604,8 @@ def optimize_tau_for_MPSP(threshold_s_EtOH=5, **kwargs):
 def optimize_max_n_glu_spikes_for_MPSP(bounds=(0, 10), 
                                        optimize_tau=True, 
                                        show_progress=False, 
-                                       threshold_s_EtOH=5):
-    curr_spec = {k: v for k,v in fbs_spec.baseline_specifications.items()}
+                                       threshold_s_EtOH=5,):
+    curr_spec = {k: v for k,v in fbs_spec.current_specifications.items()}
     original_run_type = V406.run_type
     V406.run_type = 'simulate kinetics'
     r = V406.kinetic_reaction_system._te
@@ -605,23 +616,24 @@ def optimize_max_n_glu_spikes_for_MPSP(bounds=(0, 10),
         model_specification(**curr_curr_spec)
         if optimize_tau: 
             tau = optimize_tau_for_MPSP(threshold_s_EtOH=threshold_s_EtOH)
-        opt_MPSP = get_purity_adj_price(ethanol, ['Ethanol'])
+        opt_obj = get_purity_adj_price(ethanol, ['Ethanol'])
         results.append((fbs_spec.current_specifications, 
                         V406.tau,
                         V406.results_specific_tau_dict['curr_n_glu_spikes'], # num spikes at selected tau
                         V406.results_dict['curr_n_glu_spikes'][-1], # num spikes at tau_max
-                        opt_MPSP))
+                        opt_obj))
         if show_progress: print(results[-1])
         if len(results)>1 and results[-1][3]==results[-2][3]: # if this iteration resulted in the same number of glucose spikes at tau_max as the last one (i.e., increasing the max number won't make a difference), break
             break
         
     results.sort(key=lambda x: x[4], reverse=False) # sort by MPSP
-    opt_curr_spec, opt_tau, opt_curr_n_glu_spikes, opt_curr_n_glu_spikes_at_tau_max, opt_MPSP = results[0]
+    opt_curr_spec, opt_tau, opt_curr_n_glu_spikes, opt_curr_n_glu_spikes_at_tau_max, opt_obj = results[0]
     V406.run_type = original_run_type
     model_specification(**opt_curr_spec)
     if show_progress: 
         print('optimum :', results[0])
         plt.scatter([i[0]['max_n_glu_spikes'] for i in results], [i[4] for i in results])
+        plt.show()
     return opt_curr_spec['max_n_glu_spikes']
 
 

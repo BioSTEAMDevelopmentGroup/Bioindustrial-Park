@@ -224,7 +224,7 @@ model_specification(**curr_spec,
     plot=True,
     )
 
-# %% Run TRY analysis 
+# %% Run analysis 
 
 def print_status(curr_no, total_no, s1, s2, s3, HXN_qbal_error, results=None, exception_str=None,):
     print('\n\n')
@@ -263,7 +263,7 @@ for s3 in spec_3:
                     n_tea_solves=3,
                     plot=False,
                     )
-                optimize_max_n_glu_spikes_for_MPSP()
+                optimize_max_n_glu_spikes_for_MPSP(show_progress=True, optimize_tau=False)
                 
                 assert s1<s2
                 for k, v in list(results.items()): 

@@ -19,6 +19,7 @@ tea = corn_EtOH_IBO_sys_tea = isobutanol.system.corn_EtOH_IBO_sys_tea
 fbs_spec = isobutanol.system.fbs_spec
 optimize_tau_for_MPSP = isobutanol.system.optimize_tau_for_MPSP
 optimize_max_n_glu_spikes_for_MPSP = isobutanol.system.optimize_max_n_glu_spikes_for_MPSP
+plot_kinetic_results = isobutanol.system.optimize_max_n_glu_spikes_for_MPSP
 
 f = system.flowsheet
 V406 = f.V406
@@ -52,16 +53,14 @@ final_n_glu_spikes = []
 titers = []
 ethanol = f.ethanol
 for c in target_conc_sugarses:
-    curr_spec = {k:v for k,v in baseline_spec.items()}
-    curr_spec.update({'target_conc_sugars':c,})
     model_specification(
-    **curr_spec,
+    target_conc_sugars=c,
     n_sims=3,
     n_tea_solves=3,
     plot=True,
     )
     # optimize_tau_for_MPSP(**curr_spec)
-    optimize_max_n_glu_spikes_for_MPSP(curr_spec=curr_spec, optimize_tau=True)
+    optimize_max_n_glu_spikes_for_MPSP(optimize_tau=False, show_progress=True)
     MPSPs.append(ethanol.price * ethanol.F_mass/ethanol.imass['Ethanol'])
     taus.append(V406.tau)
     max_yields.append(V406.results_specific_tau_dict['y_EtOH_glu_added'])
@@ -105,21 +104,29 @@ plt.ylabel('Titer [g/L]')
 plt.show()
 
 # %%
-threshold_conc_sugarses = np.linspace(0, 80, 20)
+threshold_conc_sugarses = np.linspace(1, 80, 5)
 MPSPs = []
 taus = []
 max_yields = []
 final_n_glu_spikes = []
 ethanol = f.ethanol
 for c in threshold_conc_sugarses:
-    curr_spec = {k:v for k,v in baseline_spec.items()}
-    curr_spec.update({'threshold_conc_sugars':c,})
     model_specification(
-    **curr_spec,
+    threshold_conc_sugars=c,
     n_sims=3,
     n_tea_solves=3,
     plot=False,
     )
+    optimize_max_n_glu_spikes_for_MPSP(optimize_tau=False, show_progress=True)
+    plt.plot(V406.results_dict['time'], V406.results_dict['[x]'], label='cell mass')
+    plt.plot(V406.results_dict['time'], V406.results_dict['[s_glu]'], label='glucose')
+    plt.plot(V406.results_dict['time'], V406.results_dict['[s_EtOH]'], label='ethanol')
+    plt.plot(V406.results_dict['time'], V406.results_dict['[s_acetate]'], label='acetate')
+    plt.plot(V406.results_dict['time'], V406.results_dict['[s_IBO]'], label='isobutanol')
+    plt.legend()
+    plt.xlabel('Time [h]')
+    plt.ylabel('Concentration [g/L]')
+    plt.show()
     MPSPs.append(ethanol.price * ethanol.F_mass/ethanol.imass['Ethanol'])
     taus.append(V406.tau)
     max_yields.append(V406.results_specific_tau_dict['y_EtOH_glu_added'])
