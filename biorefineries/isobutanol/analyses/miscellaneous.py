@@ -60,7 +60,7 @@ for c in target_conc_sugarses:
     plot=True,
     )
     # optimize_tau_for_MPSP(**curr_spec)
-    optimize_max_n_glu_spikes(obj='MPSP', optimize_tau=False, show_progress=True)
+    optimize_max_n_glu_spikes(obj='y_EtOH_glu_added', optimize_tau=False, show_progress=True)
     MPSPs.append(ethanol.price * ethanol.F_mass/ethanol.imass['Ethanol'])
     taus.append(V406.tau)
     max_yields.append(V406.results_specific_tau_dict['y_EtOH_glu_added'])

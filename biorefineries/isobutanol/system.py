@@ -565,15 +565,18 @@ def model_specification(**kwargs):
         print('Error in model spec: %s'%str_e)
         # raise e
         if 'cv_err_failure' in str_e:
-            print('Re-running fermentation unit ...')
-            i = 0
-            success = False
-            while i<20 and not success:
-                try:
-                    V406.simulate()
-                    success = True
-                except:
-                    i += 1
+            try:
+                print('Re-running fermentation unit ...')
+                i = 0
+                success = False
+                while i<20 and not success:
+                    try:
+                        V406.simulate()
+                        success = True
+                    except:
+                        i += 1
+            except:
+                raise e
         elif 'specifications do not meet required condition' in str_e:
             # flowsheet('AcrylicAcid').F_mass /= 1000.
             raise e
@@ -606,35 +609,44 @@ def optimize_max_n_glu_spikes(bounds=(0, 10),
                                        show_progress=False, 
                                        threshold_s_EtOH=5,
                                        obj='y_EtOH_glu_added'):
-    curr_spec = {k: v for k,v in fbs_spec.current_specifications.items()}
+    # curr_spec = {k: v for k,v in fbs_spec.current_specifications.items()}
     original_run_type = V406.run_type
     V406.run_type = 'simulate kinetics'
-    r = V406.kinetic_reaction_system._te
+    # r = V406.kinetic_reaction_system._te
     results = []
     V406_results_dict_keys = list(V406.results_dict.keys())
     if obj in V406_results_dict_keys:
         V406.tau_update_policy=('max', obj)
     for max_n_glu_spikes in range(bounds[0], bounds[1]+1):
-        curr_curr_spec = {k:v for k,v in curr_spec.items()}
-        curr_curr_spec.update({'max_n_glu_spikes':max_n_glu_spikes,})
-        model_specification(**curr_curr_spec)
+        opt_obj = {}
         if optimize_tau: 
             tau = optimize_tau_for_MPSP(threshold_s_EtOH=threshold_s_EtOH)
         if obj=='MPSP':
-            opt_obj = get_purity_adj_price(ethanol, ['Ethanol'])
+            model_specification(max_n_glu_spikes=max_n_glu_spikes)
+            opt_obj[obj] = get_purity_adj_price(ethanol, ['Ethanol'])
         elif obj in V406_results_dict_keys:
-            opt_obj = V406.results_specific_tau_dict[obj]
+            i = 0
+            success = False
+            while i<20 and not success:
+                try:
+                    fbs_spec.load_specifications(max_n_glu_spikes=max_n_glu_spikes)
+                    V406.simulate()
+                    opt_obj[obj] = V406.results_specific_tau_dict[obj]
+                    success = True
+                except:
+                    i+=1
         else:
             raise ValueError(f"obj '{obj}' is not a valid objective.")
+            
         results.append((fbs_spec.current_specifications, 
                         V406.tau,
                         V406.results_specific_tau_dict['curr_n_glu_spikes'], # num spikes at selected tau
                         V406.results_dict['curr_n_glu_spikes'][-1], # num spikes at tau_max
-                        opt_obj))
+                        opt_obj[obj]))
         if show_progress: print(results[-1])
         if len(results)>1 and results[-1][3]==results[-2][3]: # if this iteration resulted in the same number of glucose spikes at tau_max as the last one (i.e., increasing the max number won't make a difference), break
             break
-        
+    
     if obj=='MPSP':
         results.sort(key=lambda x: x[4], reverse=False) # sort by obj, ascending
     else:

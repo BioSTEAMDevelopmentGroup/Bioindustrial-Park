@@ -105,7 +105,7 @@ results = {i: [] for i in range(len(metrics))}
 
 # %% Generate 3-specification meshgrid and set specification loading functions
 
-steps = (10, 10, 1)
+steps = (30, 30, 1)
 
 spec_1 = threshold_conc_sugarses = np.linspace(0., 500., steps[0])
 
@@ -263,7 +263,9 @@ for s3 in spec_3:
                     n_tea_solves=3,
                     plot=False,
                     )
-                optimize_max_n_glu_spikes(obj='MPSP', show_progress=True, optimize_tau=False)
+                optimize_max_n_glu_spikes(obj='y_EtOH_glu_added', 
+                                          optimize_tau=False,
+                                          show_progress=False,)
                 
                 assert s1<s2
                 for k, v in list(results.items()): 
@@ -277,7 +279,8 @@ for s3 in spec_3:
                 print('Error in model spec: %s'%str_e)
                 for v in list(results.values()): v[-1][-1].append(np.nan)
                 error_message = str_e
-            
+                # if not 'specifications do not meet required conditions' in str_e:
+                #     raise e
             if curr_no%print_status_every_n_simulations==0 or error_message:
                 print_status(curr_no, total_no,
                              s1, s2, s3, 
@@ -427,8 +430,8 @@ if plot:
     #%% MPSP
     
     # MPSP_w_levels, MPSP_w_ticks, MPSP_cbar_ticks = get_contour_info_from_metric_data(results_metric_1, lb=3)
-    MPSP_w_levels = np.arange(0.75, 1.51, 0.025)
-    MPSP_cbar_ticks = np.arange(0.75, 1.51, 0.25)
+    MPSP_w_levels = np.arange(0.6, 1.51, 0.025)
+    MPSP_cbar_ticks = np.arange(0.6, 1.51, 0.1)
     MPSP_w_ticks = [0.7, 0.8, 0.9]
     # MPSP_w_levels = np.arange(0., 15.5, 0.5)
     
