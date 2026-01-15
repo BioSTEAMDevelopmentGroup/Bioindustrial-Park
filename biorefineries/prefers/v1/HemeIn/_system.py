@@ -13,8 +13,8 @@ from ast import Yield
 from math import tau
 import re
 from altair import Y
-from biorefineries.prefers.process_settings import set_GWPCF, GWP_CFs, set_GWPCF_Multi, load_process_settings
-from biorefineries.prefers.HemeIn import streams as s
+from biorefineries.prefers.v1._process_settings import set_GWPCF, GWP_CFs, set_GWPCF_Multi, load_process_settings
+from biorefineries.prefers.v1.HemeIn import _streams as s
 import biosteam as bst
 from docutils import Component
 from pint import set_application_registry
@@ -23,9 +23,9 @@ from thermosteam import Stream
 from biosteam import F
 import thermosteam as tmo
 import numpy as np
-from biorefineries.prefers.HemeIn import chemicals as c
-from biorefineries.prefers import units as u
-from biorefineries.prefers.process_settings import price
+from biorefineries.prefers.v1.HemeIn import _chemicals as c
+from biorefineries.prefers.v1 import _units as u
+from biorefineries.prefers.v1._process_settings import price
 
 # %% Settings
 bst.settings.set_thermo(c.create_chemicals_Hemodextrin(), skip_checks=True)

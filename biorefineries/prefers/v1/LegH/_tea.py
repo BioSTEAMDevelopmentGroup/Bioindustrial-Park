@@ -8,7 +8,8 @@ Created on 2025-07-02 15:20:03
 @email: ouwen.peng@iarcs-create.edu.sg
 """
 
-from biorefineries.corn import tea
+# NOTE: Removed conflicting import that overwrites thermodynamics
+# from biorefineries.corn import tea
 import biosteam as bst
 import numpy as np
 import pandas as pd
@@ -226,7 +227,7 @@ class PreFerSTEA(bst.TEA):
             Achieved production rate [kg/hr]
         """
         # Import the function from LegH module
-        from biorefineries.prefers.systems.LegH.LegH import set_production_rate
+        from biorefineries.prefers.v1.LegH._system import set_production_rate
         
         self._target_production_kg_hr = target_production_kg_hr
         
@@ -250,7 +251,7 @@ class PreFerSTEA(bst.TEA):
             If any specification is not met
         """
         # Import the function from LegH module
-        from biorefineries.prefers.systems.LegH.LegH import check_LegH_specifications
+        from biorefineries.prefers.v1.LegH._system import check_LegH_specifications
         
         # Get the product stream (LegH_3)
         product_stream = self.system.flowsheet.stream.LegH_3
@@ -279,19 +280,25 @@ class PreFerSTEA(bst.TEA):
 
 # %%
 if __name__ == '__main__':
+# %%
     import biosteam as bst
-    from biorefineries.prefers.systems.LegH.LegH import create_LegH_system
-    from biorefineries.prefers._process_settings import load_process_settings
+    from biorefineries.prefers.v1.LegH._system import create_LegH_system
+    from biorefineries.prefers.v1.LegH._chemicals import create_chemicals_LegH
+    from biorefineries.prefers.v1._process_settings import load_process_settings
     from biosteam import settings
     
     print("="*85)
     print("LEGHEMOGLOBIN TEA - WITH DESIGN SPECIFICATION")
     print("="*85)
     
-    # Load process settings
+    # 1. FORCE the correct thermodynamics FIRST (before any system creation)
+    print("\n0. Setting LegH thermodynamics...")
+    bst.settings.set_thermo(create_chemicals_LegH(), skip_checks=True)
+    
+    # 2. Load process settings
     load_process_settings()
     
-    # Create system
+    # 3. Create system
     print("\n1. Creating LegH system...")
     LegH_sys = create_LegH_system()
     LegH_sys.operating_hours = 8000
@@ -381,11 +388,11 @@ if __name__ == '__main__':
     print("COST BREAKDOWN TABLES")
     print(f"{'='*85}")
     
-    from biorefineries.prefers import _table as tb
+    # from biorefineries.prefers import _table as tb
     
     print("\nAll Cost Table:")
-    df1 = tb.all_cost_table(LegH_tea)
-    print(df1)
+    # df1 = tb.all_cost_table(LegH_tea)
+    # print(df1)
     #df1.to_excel('LegH_cost_table.xlsx',index=True)
     
     # %%

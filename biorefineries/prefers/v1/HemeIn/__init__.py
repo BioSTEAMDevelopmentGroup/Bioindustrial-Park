@@ -13,9 +13,9 @@ Modules:
 @institute: Illinois ARCS
 """
 
-from .chemicals import create_chemicals_Hemodextrin, chemical_groups
-from .system import create_Heme_system
-from .streams import *
+from ._chemicals import create_chemicals_Hemodextrin, chemical_groups
+from ._system import create_Heme_system
+from ._streams import *
 
 __all__ = (
     'create_chemicals_Hemodextrin',

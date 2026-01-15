@@ -10,17 +10,17 @@ Created on 2025-06-04 14:26:14
 
 #from biorefineries.animal_bedding import _system
 from ast import Yield
-from biorefineries.prefers.process_settings import set_GWPCF, GWP_CFs, set_GWPCF_Multi, load_process_settings
-from biorefineries.prefers.LegH import streams as s
+from biorefineries.prefers.v1._process_settings import set_GWPCF, GWP_CFs, set_GWPCF_Multi, load_process_settings
+from biorefineries.prefers.v1.LegH import _streams as s
 import biosteam as bst
 from pint import set_application_registry
 from thermosteam import Stream
 from biosteam import F
 import thermosteam as tmo
 import numpy as np
-from biorefineries.prefers.LegH import chemicals as c
-from biorefineries.prefers import units as u
-from biorefineries.prefers.process_settings import price
+from biorefineries.prefers.v1.LegH import _chemicals as c
+from biorefineries.prefers.v1 import _units as u
+from biorefineries.prefers.v1._process_settings import price
 
 # %% Settings
 bst.settings.set_thermo(c.create_chemicals_LegH(), skip_checks=True)

@@ -8,13 +8,13 @@ This codebase implements the "Process Evaluation and Feedstock Engineering for R
 
 ## Directory Map
 
-| Directory                | Description                                                                                  |
-| :----------------------- | :------------------------------------------------------------------------------------------- |
-| `v1/LegH/`               | **Leghemoglobin Module**. Contains `system.py` (flowsheet), `chemicals.py`, and `tea.py`.    |
-| `v1/HemeIn/`             | **HemeIn Module**. Protein-free Heme B production logic.                                     |
-| `v1/units.py`            | **Process Library**. Shared library of custom Unit Operations (SeedTrain, Disruption, etc.). |
-| `v1/process_settings.py` | **Data Interface**. Global Truth for Utility Prices and LCA Factors.                         |
-| `v1/docs/`               | This documentation.                                                                          |
+| Directory                 | Description                                                                                  |
+| :------------------------ | :------------------------------------------------------------------------------------------- |
+| `v1/LegH/`                | **Leghemoglobin Module**. Contains `_system.py` (flowsheet), `_chemicals.py`, and `_tea.py`. |
+| `v1/HemeIn/`              | **HemeIn Module**. Protein-free Heme B production logic.                                     |
+| `v1/_units.py`            | **Process Library**. Shared library of custom Unit Operations (SeedTrain, Disruption, etc.). |
+| `v1/_process_settings.py` | **Data Interface**. Global Truth for Utility Prices and LCA Factors.                         |
+| `v1/docs/`                | This documentation.                                                                          |
 
 ## Quick Start
 
@@ -22,14 +22,14 @@ This codebase implements the "Process Evaluation and Feedstock Engineering for R
 To execute the Leghemoglobin simulation and see the results:
 
 ```bash
-python v1/LegH/system.py
+python v1/LegH/_system.py
 ```
 
 ### 2. Run the HemeIn Flowsheet
 To execute the HemeIn simulation:
 
 ```bash
-python v1/HemeIn/system.py
+python v1/HemeIn/_system.py
 ```
 
 ### 3. Understanding the Output

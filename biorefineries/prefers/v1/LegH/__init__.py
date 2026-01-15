@@ -15,10 +15,10 @@ Modules:
 @institute: Illinois ARCS
 """
 
-from .chemicals import create_chemicals_LegH, chemical_groups
-from .system import create_LegH_system, set_production_rate, check_LegH_specifications
-from .streams import *
-from .tea import PreFerSTEA
+from ._chemicals import create_chemicals_LegH, chemical_groups
+from ._system import create_LegH_system, set_production_rate, check_LegH_specifications
+from ._streams import *
+from ._tea import PreFerSTEA
 
 __all__ = (
     'create_chemicals_LegH',
