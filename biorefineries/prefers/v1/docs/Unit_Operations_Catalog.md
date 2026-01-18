@@ -117,87 +117,49 @@ When `component_fractions=None`, disrupted cell mass splits into:
 
 ---
 
-## 4. ReverseOsmosis
+## 4. ReverseOsmosis (RO2)
 
-**Class:** `ReverseOsmosis(bst.Unit)`  
-**Description:** Reverse osmosis unit for water recovery from brine based on fractional water recovery.
+**Class:** `ReverseOsmosis` (alias to `RO2`)  
+**Description:** Reverse osmosis unit for water recovery with literature-validated parameters.
+**Detailed Specification:** [ReverseOsmosis_spec.md](./units/ReverseOsmosis_spec.md)
 
-### 4.1 Design Parameters (Defaults)
+### 4.1 Summary of Validated Parameters
 
-| Parameter                 | Default Value | Unit    | Description                         |
-| :------------------------ | :------------ | :------ | :---------------------------------- |
-| `water_recovery`          | 0.987         | -       | Fraction of water recovered (98.7%) |
-| `membrane_flux`           | 40            | L/m²/hr | Membrane flux rate                  |
-| `membrane_cost_per_m2`    | 300           | $/m²    | Membrane cost                       |
-| `membrane_lifetime_years` | 3             | years   | Membrane replacement cycle          |
-| `plant_lifetime_years`    | 20            | years   | Total plant lifetime                |
-| `operating_pressure_bar`  | 30            | bar     | Operating pressure                  |
+| Parameter | Default | Unit | Status |
+| :--- | :--- | :--- | :--- |
+| `water_recovery` | 0.85 | - | 75-95% (Ind. Std.) |
+| `membrane_flux` | 40 | LMH | Validated |
+| `operating_pressure` | 25 | bar | Conservative |
+| `specific_energy` | 3.0 | kWh/m³ | New Metric |
 
-### 4.2 Sizing Logic
-
-* **Membrane Area:** `(F_vol × 1000) / membrane_flux`
-* **Power:** Calculated via internal `bst.Pump` at operating pressure
-
-### 4.3 Costing Model
-
-* **Pump:** Standard `bst.Pump` costing
-* **Membrane Replacement (OPEX):**
-  ```
-  Cost = (plant_lifetime / membrane_lifetime) × Area × cost_per_m2
-  ```
-* **Bare Module Factors:**
-  - Pump: 2.3
-  - Membrane replacement: 1.65
-  - Hardware: 2.0
+> For full design basis, equations, and references, see the [Detailed Specification](./units/ReverseOsmosis_spec.md).
 
 ---
+
 
 ## 5. Diafiltration
 
 **Class:** `Diafiltration(bst.Unit)`  
-**Description:** Diafiltration unit for size-based separation, retaining large molecules (proteins) while allowing smaller ones (salts, water) through the permeate.
+**Description:** Verified Diafiltration unit for size-based separation and buffer exchange.
+**Detailed Specification:** [Diafiltration_spec.md](./units/Diafiltration_spec.md)
 
-### 5.1 Design Parameters (Defaults)
+### 5.1 Factory Presets (`Diafiltration.from_preset(name, ...)`)
 
-| Parameter                        | Default Value | Unit    | Description                               |
-| :------------------------------- | :------------ | :------ | :---------------------------------------- |
-| `TargetProduct_Retention`        | 0.98          | -       | Retention of target product (98%)         |
-| `Salt_Retention`                 | 0.05          | -       | Retention of salts (5%)                   |
-| `OtherLargeMolecules_Retention`  | 0.98          | -       | Retention of other large molecules        |
-| `DefaultSolutes_Retention`       | 0.08          | -       | Default retention for unlisted solutes    |
-| `FeedWater_Recovery_to_Permeate` | 0.75          | -       | Feed water going to permeate (75%)        |
-| `membrane_flux_LMH`              | 40.0          | L/m²/hr | Membrane flux (Ultra: 20-80, Nano: 10-40) |
-| `TMP_bar1`                       | 2.0           | bar     | Transmembrane pressure (feed pump)        |
-| `TMP_bar2`                       | 2.0           | bar     | Transmembrane pressure (recirc pump)      |
-| `membrane_cost_USD_per_m2`       | 150.0         | $/m²    | Membrane cost                             |
-| `membrane_lifetime_years`        | 2.0           | years   | Membrane replacement cycle                |
-| `equipment_lifetime_years`       | 20.0          | years   | Equipment lifetime                        |
-| `module_cost_factor`             | 25,000        | $       | Base module cost factor                   |
-| `module_cost_exponent`           | 0.7           | -       | Scale exponent                            |
-| `base_CEPCI`                     | 500.0         | -       | Base CE index for cost adjustment         |
-| `recirculation_ratio`            | 10.0          | -       | Recirculation ratio (5-20 typical)        |
+| Preset | Application | Flux (LMH) | Pressure (bar) | Cost ($/m²) | Life (yr) |
+| :--- | :--- | :--- | :--- | :--- | :--- |
+| `'UF'` | Protein Concentration (Ultrafiltration) | 50.0 | 2.0 | 150 | 3.0 |
+| `'NF'` | Buffer Exchange / Fine Separation (Nanofiltration) | 25.0 | 8.0 | 250 | 2.0 |
 
-### 5.2 Sizing Logic
+### 5.2 Summary of Validated Parameters
 
-* **Membrane Area:** `permeate_vol_L_hr / membrane_flux_LMH`
-* **Pump Efficiency:** 85%
-* **Power:** Sum of feed pump and recirculation pump power
+| Parameter | Default | Unit | Description |
+| :--- | :--- | :--- | :--- |
+| `membrane_flux_LMH` | 40.0 | LMH | Permeate flux (Validated) |
+| `membrane_cost_USD_per_m2` | 150.0 | $/m² | Membrane replacement cost |
+| `membrane_lifetime_years` | 2.0 | years | Replacement frequency |
+| `TargetProduct_Retention` | 0.99 | - | Product retention efficiency |
 
-### 5.3 Costing Model
-
-* **Membrane System (CAPEX):**
-  ```
-  Cost = module_cost_factor × Area^module_cost_exponent × (CE / base_CEPCI)
-  ```
-* **Membrane Replacement:**
-  ```
-  Cost = (equipment_lifetime / membrane_lifetime) × Area × cost_per_m2
-  ```
-* **Pumps:** `pump1.cost + pump2.cost`
-* **Bare Module Factors:**
-  - Membrane System: 1.65
-  - Membrane replacement: 1.65
-  - Pump: 1.89
+> See [Detailed Specification](./units/Diafiltration_spec.md) for full design basis.
 
 ---
 
@@ -206,7 +168,11 @@ When `component_fractions=None`, disrupted cell mass splits into:
 **Class:** `Ultrafiltration(bst.Unit)`  
 **Description:** Single-pass ultrafiltration unit. Inherits retention logic from Diafiltration but without diafiltration buffer stream.
 
-### 6.1 Design Parameters
+### 6.1 Factory Presets
+
+Inherits presets from `Diafiltration`. Use `Ultrafiltration.from_preset('UF', ...)` or `('NF', ...)`.
+
+### 6.2 Design Parameters
 
 Inherits all defaults from `Diafiltration`, with:
 
@@ -214,7 +180,7 @@ Inherits all defaults from `Diafiltration`, with:
 | :-------- | :------------ | :--- | :---------------------------------- |
 | `TMP_bar` | 2.0           | bar  | Single TMP value (no recirculation) |
 
-### 6.2 Sizing & Costing
+### 6.3 Sizing & Costing
 
 * Same as Diafiltration, but with single feed pump only
 
@@ -370,4 +336,77 @@ Inherits all defaults from `Diafiltration`, with:
 
 ---
 
-*Last Updated: 2026-01-15*
+## 12. VacuumPSA
+
+**Class:** `VacuumPSA(bst.Unit)`  
+**Description:** Vacuum Pressure Swing Adsorption (VPSA) unit for gas separation. Designed for separating H₂, CO, and C₂H₄ from syngas using zeolite 13X columns with cyclic adsorption/desorption.
+
+### 12.1 Design Parameters (Defaults)
+
+| Parameter                | Default Value | Unit   | Description                                           |
+| :----------------------- | :------------ | :----- | :---------------------------------------------------- |
+| `P_ads`                  | 6×10⁵         | Pa     | Adsorption pressure (6 bar)                           |
+| `P_des`                  | 1×10⁴         | Pa     | Desorption pressure (0.1 bar vacuum)                  |
+| `cycle_time`             | 600           | s      | Total cycle time                                      |
+| `N_beds`                 | 2             | -      | Number of adsorbent beds                              |
+| `adsorbent_loading`      | 2.0           | mol/kg | Adsorbent capacity                                    |
+| `adsorbent_bulk_density` | 650           | kg/m³  | Bulk density of zeolite 13X                           |
+| `vacuum_efficiency`      | 0.70          | -      | Vacuum pump efficiency                                |
+| `adsorbent_cost`         | 5.0           | $/kg   | Cost of adsorbent material                            |
+
+### 12.2 Default Split Factors
+
+Based on Zeolite 13X selectivity:
+* **Product (H₂-rich):** 95% H₂, 30% CO, 20% C₂H₄, 10% CO₂, 85% N₂
+* **Purge (CO/C₂H₄-rich):** Remainder
+
+### 12.3 Sizing Logic
+
+* **Adsorbent Mass:** 
+  ```
+  m_ads = (F_mol_feed × cycle_time) / loading
+  ```
+* **Bed Volume:** `m_ads / bulk_density`
+* **Vacuum Power:**
+  ```
+  Power = F_purge × R × T × ln(P_ads/P_des) / efficiency
+  ```
+
+### 12.4 Costing Model
+
+Uses power-law scaling:
+
+| Equipment         | Base Cost ($) | Base Size | Exponent (n) | BM Factor |
+| :---------------- | :------------ | :-------- | :----------- | :-------- |
+| Pressure Vessels  | 50,000        | 10 m³     | 0.6          | 2.5       |
+| Vacuum Pump       | 30,000        | 100 kW    | 0.7          | 1.8       |
+| Adsorbent         | -             | -         | 1.0 (Linear) | 1.0       |
+| Piping & Valves   | 15% of Vessels| -         | 1.0          | 1.0       |
+
+---
+
+## 13. Filtration
+
+**Class:** `Filtration(bst.Unit)`  
+**Description:** Continuous Rotary Drum Vacuum Filter (RDVF) for high-volume solid-liquid separation.
+**Detailed Specification:** [Filtration_spec.md](./units/Filtration_spec.md)
+
+### 13.1 Factory Presets (`Filtration.from_preset(name, ...)`)
+
+| Preset | Application | Loading (kg/m²/hr) | Pressure (bar) | Cost ($/m²) | Life (yr) |
+| :--- | :--- | :--- | :--- | :--- | :--- |
+| `'MF'` | Cell Mass / Primary Clarification (Microfiltration) | 30.0 | 1.5 | 80 | 4.0 |
+| `'UF'` | Virus Removal / Fine Separation (Ultrafiltration) | 15.0 | 3.0 | 150 | 2.5 |
+
+### 13.2 Summary of Validated Parameters
+
+| Parameter | Default | Unit | Description |
+| :--- | :--- | :--- | :--- |
+| `solids_loading` | 20.0 | kg/m²/hr | Filter surface loading |
+| `cake_moisture_content` | 0.20 | - | Residual moisture (20%) |
+| `solid_capture_efficiency` | 0.99 | - | Solids capture (99%) |
+| `power_per_m2` | 1.0 | kW/m² | Vacuum/drive power |
+
+---
+
+*Last Updated: 2026-01-18*

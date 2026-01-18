@@ -229,13 +229,11 @@ def create_LegH_system(
         outs='DisruptedBroth',
     )
 
-    S402 = u.Centrifuge(
+    S402 = u.Filtration.from_preset(
+        'MF', 
         'S402',
         ins = S401-0,
         outs = ('Deposit', 'Supernatant'),
-        moisture_content = 0.20,  # 20% moisture content in the final product
-        split = (0, 0.995, 1, 1),
-        order = ('Glucose','cellmass', 'Leghemoglobin_In','Globin_In'),
     )
     S402.add_specification(run=True)
 
@@ -269,15 +267,14 @@ def create_LegH_system(
         cool_only=True,
     )
 
-    U401 = u.Diafiltration(
+    U401 = u.Diafiltration.from_preset(
+        'UF',
         'U401',
         ins = (S404-1, H401-0),
         outs = ('U401Out','PermeateWasteUltra'),
         TargetProduct_ID = 'Leghemoglobin',
         Salt_ID = c.chemical_groups['Salts'],
         OtherLargeMolecules_ID = c.chemical_groups['OtherLargeMolecules'],
-        TMP_bar1 = 3 ,#2~4
-        TMP_bar2 = 2 ,#1.5~3
     )
     U401.add_specification(run=True)
 
@@ -352,20 +349,14 @@ def create_LegH_system(
         cool_only=True,
     )
 
-    U403 = u.Diafiltration(
+    U403 = u.Diafiltration.from_preset(
+        'NF',
         'U403',
         ins = (U402-0, H405-0),
         outs = ('U403Out','PermeateWasteNano'),
         TargetProduct_ID = 'Leghemoglobin',
-        membrane_cost_USD_per_m2=250, # Nanomembrane cost
         Salt_ID = c.chemical_groups['Salts'],
         OtherLargeMolecules_ID = c.chemical_groups['OtherLargeMolecules'],
-        TargetProduct_Retention=0.995, Salt_Retention=0.001,
-        OtherLargeMolecules_Retention=0.995, DefaultSolutes_Retention=0.015,
-        FeedWater_Recovery_to_Permeate=0.75,
-        TMP_bar1= 15 ,# 10-25
-        TMP_bar2= 4  ,# 3-6
-        membrane_flux_LMH=25, # 10-40
     )
     U403.add_specification(run=True)
 
