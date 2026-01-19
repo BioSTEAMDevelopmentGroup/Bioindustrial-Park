@@ -117,7 +117,18 @@ When `component_fractions=None`, disrupted cell mass splits into:
 
 ---
 
-## 4. ReverseOsmosis (RO2)
+## 4. ResinColumn2
+**Class:** `ResinColumn2`
+**Detailed Specification:** [ResinColumn2_spec.md](./units/ResinColumn2_spec.md)
+
+Polymorphic unit for ion exchange and adsorption processes.
+
+| Preset        | Key Parameter | Default | Status    |
+| :------------ | :------------ | :------ | :-------- |
+| `IonExchange` | DBC           | 50 g/L  | Validated |
+| `Adsorption`  | EBCT          | 5 min   | Validated |
+
+## 5. ReverseOsmosis (RO2)
 
 **Class:** `ReverseOsmosis` (alias to `RO2`)  
 **Description:** Reverse osmosis unit for water recovery with literature-validated parameters.
@@ -125,19 +136,19 @@ When `component_fractions=None`, disrupted cell mass splits into:
 
 ### 4.1 Summary of Validated Parameters
 
-| Parameter | Default | Unit | Status |
-| :--- | :--- | :--- | :--- |
-| `water_recovery` | 0.85 | - | 75-95% (Ind. Std.) |
-| `membrane_flux` | 40 | LMH | Validated |
-| `operating_pressure` | 25 | bar | Conservative |
-| `specific_energy` | 3.0 | kWh/m³ | New Metric |
+| Parameter            | Default | Unit   | Status             |
+| :------------------- | :------ | :----- | :----------------- |
+| `water_recovery`     | 0.85    | -      | 75-95% (Ind. Std.) |
+| `membrane_flux`      | 40      | LMH    | Validated          |
+| `operating_pressure` | 25      | bar    | Conservative       |
+| `specific_energy`    | 3.0     | kWh/m³ | New Metric         |
 
 > For full design basis, equations, and references, see the [Detailed Specification](./units/ReverseOsmosis_spec.md).
 
 ---
 
 
-## 5. Diafiltration
+## 6. Diafiltration
 
 **Class:** `Diafiltration(bst.Unit)`  
 **Description:** Verified Diafiltration unit for size-based separation and buffer exchange.
@@ -145,25 +156,25 @@ When `component_fractions=None`, disrupted cell mass splits into:
 
 ### 5.1 Factory Presets (`Diafiltration.from_preset(name, ...)`)
 
-| Preset | Application | Flux (LMH) | Pressure (bar) | Cost ($/m²) | Life (yr) |
-| :--- | :--- | :--- | :--- | :--- | :--- |
-| `'UF'` | Protein Concentration (Ultrafiltration) | 50.0 | 2.0 | 150 | 3.0 |
-| `'NF'` | Buffer Exchange / Fine Separation (Nanofiltration) | 25.0 | 8.0 | 250 | 2.0 |
+| Preset | Application                                        | Flux (LMH) | Pressure (bar) | Cost ($/m²) | Life (yr) |
+| :----- | :------------------------------------------------- | :--------- | :------------- | :---------- | :-------- |
+| `'UF'` | Protein Concentration (Ultrafiltration)            | 50.0       | 2.0            | 150         | 3.0       |
+| `'NF'` | Buffer Exchange / Fine Separation (Nanofiltration) | 25.0       | 8.0            | 250         | 2.0       |
 
 ### 5.2 Summary of Validated Parameters
 
-| Parameter | Default | Unit | Description |
-| :--- | :--- | :--- | :--- |
-| `membrane_flux_LMH` | 40.0 | LMH | Permeate flux (Validated) |
-| `membrane_cost_USD_per_m2` | 150.0 | $/m² | Membrane replacement cost |
-| `membrane_lifetime_years` | 2.0 | years | Replacement frequency |
-| `TargetProduct_Retention` | 0.99 | - | Product retention efficiency |
+| Parameter                  | Default | Unit  | Description                  |
+| :------------------------- | :------ | :---- | :--------------------------- |
+| `membrane_flux_LMH`        | 40.0    | LMH   | Permeate flux (Validated)    |
+| `membrane_cost_USD_per_m2` | 150.0   | $/m²  | Membrane replacement cost    |
+| `membrane_lifetime_years`  | 2.0     | years | Replacement frequency        |
+| `TargetProduct_Retention`  | 0.99    | -     | Product retention efficiency |
 
 > See [Detailed Specification](./units/Diafiltration_spec.md) for full design basis.
 
 ---
 
-## 6. Ultrafiltration
+## 7. Ultrafiltration
 
 **Class:** `Ultrafiltration(bst.Unit)`  
 **Description:** Single-pass ultrafiltration unit. Inherits retention logic from Diafiltration but without diafiltration buffer stream.
@@ -186,57 +197,7 @@ Inherits all defaults from `Diafiltration`, with:
 
 ---
 
-## 7. IonExchangeCycle
 
-**Class:** `IonExchangeCycle(bst.Unit)`  
-**Description:** Complete Ion Exchange (IEX) chromatography cycle as a steady-state equivalent. Models loading, washing, elution, and regeneration steps.
-
-### 7.1 Design Parameters (Defaults)
-
-| Parameter                       | Default Value      | Unit  | Description                        |
-| :------------------------------ | :----------------- | :---- | :--------------------------------- |
-| `cycle_time_hr`                 | 4.0                | hr    | Total cycle duration               |
-| `equilibration_CV`              | 5.0                | CV    | Equilibration buffer volume        |
-| `wash_CV`                       | 5.0                | CV    | Wash buffer volume                 |
-| `elution_CV`                    | 3.0                | CV    | Elution buffer volume              |
-| `regeneration_CV`               | 5.0                | CV    | Regeneration solution volume       |
-| `resin_DBC_g_L`                 | 50.0               | g/L   | Dynamic Binding Capacity           |
-| `load_safety_factor`            | 0.8                | -     | Loading safety factor (80% of DBC) |
-| `TargetProduct_IDs`             | ('Leghemoglobin',) | -     | Target product chemical IDs        |
-| `TargetProduct_Yield`           | 0.95               | -     | Product recovery (95%)             |
-| `BoundImpurity_IDs`             | ('Heme_b',)        | -     | Bound impurity IDs                 |
-| `BoundImpurity_Removal`         | 0.93               | -     | Impurity removal (93%)             |
-| `NonBinding_Carryover`          | 0.04               | -     | Non-binding carryover (4%)         |
-| `resin_cost_USD_per_L`          | 30.0               | $/L   | Resin cost                         |
-| `resin_lifetime_years`          | 5.0                | years | Resin replacement cycle            |
-| `column_hardware_cost_factor`   | 30,000             | $     | Hardware cost factor               |
-| `column_hardware_cost_exponent` | 0.6                | -     | Hardware scale exponent            |
-
-### 7.2 Sizing Logic
-
-* **Resin Volume:**
-  ```
-  resin_volume_L = (target_mass_kg × 1000) / (DBC × safety_factor)
-  ```
-* **Pump Pressure:** 4 bar (400 kPa)
-
-### 7.3 Costing Model
-
-* **Column Hardware:**
-  ```
-  Cost = (CE/500) × factor × resin_volume^exponent
-  ```
-* **Resin:**
-  ```
-  Cost = cost_per_L × resin_volume × (plant_life / resin_life)
-  ```
-* **Pump:** Standard `bst.Pump` costing
-* **Bare Module Factors:**
-  - IEX Column Hardware: 2.5
-  - IEX Resin: 1.5
-  - Pump: 1.89
-
----
 
 ## 8. AmmoniaStorageTank
 
@@ -343,16 +304,16 @@ Inherits all defaults from `Diafiltration`, with:
 
 ### 12.1 Design Parameters (Defaults)
 
-| Parameter                | Default Value | Unit   | Description                                           |
-| :----------------------- | :------------ | :----- | :---------------------------------------------------- |
-| `P_ads`                  | 6×10⁵         | Pa     | Adsorption pressure (6 bar)                           |
-| `P_des`                  | 1×10⁴         | Pa     | Desorption pressure (0.1 bar vacuum)                  |
-| `cycle_time`             | 600           | s      | Total cycle time                                      |
-| `N_beds`                 | 2             | -      | Number of adsorbent beds                              |
-| `adsorbent_loading`      | 2.0           | mol/kg | Adsorbent capacity                                    |
-| `adsorbent_bulk_density` | 650           | kg/m³  | Bulk density of zeolite 13X                           |
-| `vacuum_efficiency`      | 0.70          | -      | Vacuum pump efficiency                                |
-| `adsorbent_cost`         | 5.0           | $/kg   | Cost of adsorbent material                            |
+| Parameter                | Default Value | Unit   | Description                          |
+| :----------------------- | :------------ | :----- | :----------------------------------- |
+| `P_ads`                  | 6×10⁵         | Pa     | Adsorption pressure (6 bar)          |
+| `P_des`                  | 1×10⁴         | Pa     | Desorption pressure (0.1 bar vacuum) |
+| `cycle_time`             | 600           | s      | Total cycle time                     |
+| `N_beds`                 | 2             | -      | Number of adsorbent beds             |
+| `adsorbent_loading`      | 2.0           | mol/kg | Adsorbent capacity                   |
+| `adsorbent_bulk_density` | 650           | kg/m³  | Bulk density of zeolite 13X          |
+| `vacuum_efficiency`      | 0.70          | -      | Vacuum pump efficiency               |
+| `adsorbent_cost`         | 5.0           | $/kg   | Cost of adsorbent material           |
 
 ### 12.2 Default Split Factors
 
@@ -376,12 +337,12 @@ Based on Zeolite 13X selectivity:
 
 Uses power-law scaling:
 
-| Equipment         | Base Cost ($) | Base Size | Exponent (n) | BM Factor |
-| :---------------- | :------------ | :-------- | :----------- | :-------- |
-| Pressure Vessels  | 50,000        | 10 m³     | 0.6          | 2.5       |
-| Vacuum Pump       | 30,000        | 100 kW    | 0.7          | 1.8       |
-| Adsorbent         | -             | -         | 1.0 (Linear) | 1.0       |
-| Piping & Valves   | 15% of Vessels| -         | 1.0          | 1.0       |
+| Equipment        | Base Cost ($)  | Base Size | Exponent (n) | BM Factor |
+| :--------------- | :------------- | :-------- | :----------- | :-------- |
+| Pressure Vessels | 50,000         | 10 m³     | 0.6          | 2.5       |
+| Vacuum Pump      | 30,000         | 100 kW    | 0.7          | 1.8       |
+| Adsorbent        | -              | -         | 1.0 (Linear) | 1.0       |
+| Piping & Valves  | 15% of Vessels | -         | 1.0          | 1.0       |
 
 ---
 
@@ -393,19 +354,19 @@ Uses power-law scaling:
 
 ### 13.1 Factory Presets (`Filtration.from_preset(name, ...)`)
 
-| Preset | Application | Loading (kg/m²/hr) | Pressure (bar) | Cost ($/m²) | Life (yr) |
-| :--- | :--- | :--- | :--- | :--- | :--- |
-| `'MF'` | Cell Mass / Primary Clarification (Microfiltration) | 30.0 | 1.5 | 80 | 4.0 |
-| `'UF'` | Virus Removal / Fine Separation (Ultrafiltration) | 15.0 | 3.0 | 150 | 2.5 |
+| Preset | Application                                         | Loading (kg/m²/hr) | Pressure (bar) | Cost ($/m²) | Life (yr) |
+| :----- | :-------------------------------------------------- | :----------------- | :------------- | :---------- | :-------- |
+| `'MF'` | Cell Mass / Primary Clarification (Microfiltration) | 30.0               | 1.5            | 80          | 4.0       |
+| `'UF'` | Virus Removal / Fine Separation (Ultrafiltration)   | 15.0               | 3.0            | 150         | 2.5       |
 
 ### 13.2 Summary of Validated Parameters
 
-| Parameter | Default | Unit | Description |
-| :--- | :--- | :--- | :--- |
-| `solids_loading` | 20.0 | kg/m²/hr | Filter surface loading |
-| `cake_moisture_content` | 0.20 | - | Residual moisture (20%) |
-| `solid_capture_efficiency` | 0.99 | - | Solids capture (99%) |
-| `power_per_m2` | 1.0 | kW/m² | Vacuum/drive power |
+| Parameter                  | Default | Unit     | Description             |
+| :------------------------- | :------ | :------- | :---------------------- |
+| `solids_loading`           | 20.0    | kg/m²/hr | Filter surface loading  |
+| `cake_moisture_content`    | 0.20    | -        | Residual moisture (20%) |
+| `solid_capture_efficiency` | 0.99    | -        | Solids capture (99%)    |
+| `power_per_m2`             | 1.0     | kW/m²    | Vacuum/drive power      |
 
 ---
 

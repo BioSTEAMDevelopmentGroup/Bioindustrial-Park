@@ -29,6 +29,8 @@ bst.preferences.classic_mode()
 # %%
 __all__ = (
     'create_LegHb_system',
+    'set_production_rate',
+    'check_LegHb_specifications',
 )
 # %%
 @bst.SystemFactory(
@@ -310,10 +312,11 @@ def create_LegHb_system(
         cool_only=True,
     )
 
-    U402 = u.IonExchangeCycle(
+    U402 = u.ResinColumn2(
         'U402',
         ins = (U401-0, H402-0, H403-0, H404-0),
         outs = ('U402Out','FlowthroughWaste','WashWaste','RegenerationWaste'),
+        preset='IonExchange',
         TargetProduct_IDs = c.chemical_groups['LegHbIngredients'],
         BoundImpurity_IDs=c.chemical_groups['BoundImpurities'],
     )    
@@ -378,11 +381,15 @@ def create_LegHb_system(
     U404.target_total_solids_percent = 12.0  # Target: 0-24%, aim for middle-low range
     U404.target_legh_percent = 7.5  # Target: 6-9%, aim for middle
     
-    @U404.add_specification(run=False)
+    @U404.add_specification(run=True)
     def U404_adjust_water_recovery():
         """
-        Dynamically adjust water recovery to achieve target total solids content
-        while maintaining product specifications.
+        Dynamically adjust water recovery to achieve target Leghemoglobin content percentage.
+        
+        The goal is to concentrate the product by removing water until LegHb reaches
+        the target percentage (6-9%, default target 7.5%).
+        
+        Key fix: Salt_Retention must be updated together with FeedWater_Recovery_to_Permeate.
         """
         import flexsolve as flx
         import warnings
@@ -395,98 +402,66 @@ def create_LegHb_system(
             U404._run()
             return
         
-        # Calculate initial solids content in feed
-        feed_total_mass = feed_stream.F_mass
-        feed_water_mass = feed_stream.imass['H2O']
-        feed_solids_mass = feed_total_mass - feed_water_mass
-        
-        if feed_solids_mass <= 0:
-            print(f"   [{U404.ID}] Warning: No solids in feed stream")
+        # Check if LegHb exists in feed
+        feed_legh = feed_stream.imass['Leghemoglobin']
+        if feed_legh <= 0:
             U404._run()
             return
         
-        # Define objective function: adjust recovery to hit target solids %
-        def calculate_total_solids_error(water_recovery):
+        # Helper to set water recovery AND sync Salt_Retention
+        def set_water_recovery(recovery):
+            """Set water recovery and sync Salt_Retention accordingly."""
+            recovery = max(0.05, min(0.99, recovery))  # Allow up to 99% water removal
+            U404.FeedWater_Recovery_to_Permeate = recovery
+            # Salt retention should be HIGH so salts stay with product
+            # When we remove water, we want to keep everything else
+            U404.Salt_Retention = 0.95  # Keep most salts in retentate
+        
+        # Define objective function: adjust recovery to hit target LegHb %
+        def calculate_legh_error(water_recovery):
             """
-            Calculate error between actual and target total solids percentage.
-            
-            Parameters
-            ----------
-            water_recovery : float
-                Fraction of water removed to permeate (0-0.95)
-            
-            Returns
-            -------
-            float
-                Error = (actual_solids% - target_solids%) [%]
+            Calculate error between actual and target LegHb percentage.
+            Positive error means we need MORE water removal (product too dilute).
+            Negative error means we removed too much water.
             """
-            # Ensure water recovery is within reasonable bounds
-            water_recovery = max(0.05, min(0.95, water_recovery))
-            
-            # Set recovery and run unit (warnings suppressed by outer context)
-            U404.FeedWater_Recovery_to_Permeate = water_recovery
+            set_water_recovery(water_recovery)
             U404._run()
             
-            # Calculate total solids percentage in retentate (product)
+            # Calculate LegHb percentage in retentate (product)
             product_total_mass = product_stream.F_mass
             
             if product_total_mass <= 0:
-                return 100.0  # Large error if no product
+                return -100.0  # Error: no product
             
-            product_water_mass = product_stream.imass['H2O']
-            product_solids_mass = product_total_mass - product_water_mass
+            product_legh_mass = product_stream.imass['Leghemoglobin']
+            actual_legh_percent = (product_legh_mass / product_total_mass) * 100
             
-            actual_solids_percent = (product_solids_mass / product_total_mass) * 100
-            
-            return actual_solids_percent - U404.target_total_solids_percent
+            # Return error: positive if we need more concentration
+            return actual_legh_percent - U404.target_legh_percent
         
         try:
-            # Suppress warnings during optimization
             with warnings.catch_warnings():
                 warnings.simplefilter("ignore")
                 
                 # Use IQ_interpolation to find optimal water recovery
+                # Note: higher recovery = more water removed = higher concentration
                 optimal_recovery = flx.IQ_interpolation(
-                    f=calculate_total_solids_error,
-                    x0=0.10,  # Minimum recovery (keep more water)
-                    x1=0.95,  # Maximum recovery (remove more water)
-                    x=U404.FeedWater_Recovery_to_Permeate,  # Initial guess
-                    xtol=0.001,  # 1% tolerance on recovery
-                    ytol=0.05,   # 0.05% tolerance on solids content
+                    f=calculate_legh_error,
+                    x0=0.50,  # Start at 50% water removal
+                    x1=0.99,  # Up to 99% water removal
+                    x=0.90,   # Initial guess: aggressive water removal
+                    xtol=0.001,
+                    ytol=0.1,  # 0.1% tolerance on LegHb content
                     maxiter=50,
                 )
         
-            # Set optimal recovery and run final time (warnings enabled)
-            U404.FeedWater_Recovery_to_Permeate = optimal_recovery
+            # Set optimal recovery and run final time
+            set_water_recovery(optimal_recovery)
             U404._run()
             
-            # Verify final product specifications
-            product_total_mass = product_stream.F_mass
-            product_water_mass = product_stream.imass['H2O']
-            product_solids_mass = product_total_mass - product_water_mass
-            product_legh_mass = product_stream.imass['Leghemoglobin']
-            
-            actual_solids_percent = (product_solids_mass / product_total_mass) * 100
-            actual_legh_percent = (product_legh_mass / product_total_mass) * 100
-            
-            # Print results
-            print(f"   [{U404.ID}] Optimized water recovery: {optimal_recovery:.3f}")
-            print(f"   [{U404.ID}] Total solids: {actual_solids_percent:.2f}% "
-                  f"(target: {U404.target_total_solids_percent:.2f}%)")
-            print(f"   [{U404.ID}] Leghemoglobin: {actual_legh_percent:.2f}% "
-                  f"(target: {U404.target_legh_percent:.2f}%)")
-            
-            # Warning if specifications are not met
-            if actual_solids_percent > 24.0:
-                print(f"   [{U404.ID}] WARNING: Total solids {actual_solids_percent:.2f}% "
-                      f"exceeds maximum 24%")
-            if actual_legh_percent < 6.0 or actual_legh_percent > 9.0:
-                print(f"   [{U404.ID}] WARNING: Leghemoglobin {actual_legh_percent:.2f}% "
-                      f"outside target range 6-9%")
-        
         except Exception as e:
-            print(f"   [{U404.ID}] Specification optimization failed: {e}")
-            print(f"   [{U404.ID}] Using default recovery: {U404.FeedWater_Recovery_to_Permeate:.3f}")
+            # Fallback: use aggressive recovery
+            set_water_recovery(0.90)
             U404._run()
 
     # S408 = bst.SprayDryer(

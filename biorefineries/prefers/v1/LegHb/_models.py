@@ -10,7 +10,7 @@ Created on 2025-01-XX
 
 import biosteam as bst
 from chaospy import distributions as shape
-from biorefineries.prefers.v1.LegHb._system import create_LegHb_system, set_production_rate
+from biorefineries.prefers.v1.LegHb.system import create_LegHb_system, set_production_rate
 from biorefineries.prefers.v1.LegHb._tea import PreFerSTEA
 from biorefineries.prefers.v1._process_settings import load_process_settings
 

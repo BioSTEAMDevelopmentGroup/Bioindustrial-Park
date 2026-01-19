@@ -1,6 +1,7 @@
 # HemDx Process Module
 
-**Directory:** `v1/HemDx/`
+**Source:** `v1/HemDx/system/_config1.py`  
+**System ID:** `HemDx_config1`
 
 ## Process Overview
 Produces **Protein-Free Hemedextrin (Heme B)** using *Corynebacterium glutamicum*.

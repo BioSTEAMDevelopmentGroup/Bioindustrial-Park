@@ -14,7 +14,7 @@ Modules:
 """
 
 from ._chemicals import create_chemicals_Hemodextrin, chemical_groups
-from ._system import create_Heme_system
+from .system import create_Heme_system
 from ._streams import *
 
 __all__ = (

@@ -8,7 +8,7 @@ import os
 # Ensure local path is in sys.path
 sys.path.append('c:/Programming/PreFerS/Bioindustrial-Park')
 
-from biorefineries.prefers.v1.LegHb._system import create_LegHb_system
+from biorefineries.prefers.v1.LegHb.system import create_LegHb_system
 from biorefineries.prefers.v1.LegHb import _streams as s
 from biorefineries.prefers.v1.LegHb import _chemicals as c
 

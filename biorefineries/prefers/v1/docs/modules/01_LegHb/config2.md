@@ -1,7 +1,7 @@
-# LegHemoglobin Process Flow (`LegHb`)
+# LegHemoglobin Process Flow (`LegHb`) - Config 2
 
-**Source:** `v1/LegHb/_system.py`  
-**System ID:** `LegHb_sys`
+**Source:** `v1/LegHb/system/_config2.py`  
+**System ID:** `LegHb_config2`
 
 This module defines the complete production process for LegHemoglobin, including upstream fermentation, downstream purification, and facility support systems.
 

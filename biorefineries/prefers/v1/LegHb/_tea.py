@@ -227,7 +227,7 @@ class PreFerSTEA(bst.TEA):
             Achieved production rate [kg/hr]
         """
         # Import the function from LegHb module
-        from biorefineries.prefers.v1.LegHb._system import set_production_rate
+        from biorefineries.prefers.v1.LegHb.system import set_production_rate
         
         self._target_production_kg_hr = target_production_kg_hr
         
@@ -251,7 +251,7 @@ class PreFerSTEA(bst.TEA):
             If any specification is not met
         """
         # Import the function from LegHb module
-        from biorefineries.prefers.v1.LegHb._system import check_LegHb_specifications
+        from biorefineries.prefers.v1.LegHb.system import check_LegHb_specifications
         
         # Get the product stream (LegHb_3)
         product_stream = self.system.flowsheet.stream.LegHb_3
@@ -282,7 +282,7 @@ class PreFerSTEA(bst.TEA):
 if __name__ == '__main__':
 # %%
     import biosteam as bst
-    from biorefineries.prefers.v1.LegHb._system import create_LegHb_system
+    from biorefineries.prefers.v1.LegHb.system import create_LegHb_system
     from biorefineries.prefers.v1.LegHb._chemicals import create_chemicals_LegHb
     from biorefineries.prefers.v1._process_settings import load_process_settings
     from biosteam import settings

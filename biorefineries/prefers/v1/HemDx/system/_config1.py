@@ -340,10 +340,11 @@ def create_Heme_system(
         heat_only=True,
     )
     
-    U401 = u.ResinAdsorption(
+    U401 = u.ResinColumn2(
         'U401',
         ins = (S401-1, H401-0, H402-0, H403-0),
         outs = ('ExtraProduct','FlowthroughWaste','WashWaste','RegenerationWaste'),
+        preset='IonExchange',
         TargetProduct_IDs = ('Heme_b','ProtoporphyrinIX'),
         TargetProduct_Yield=0.98,
         BoundImpurity_IDs=(c.chemical_groups['Salts'],'Glucose','Glycine','Ethanol'),
