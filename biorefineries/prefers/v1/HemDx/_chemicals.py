@@ -22,7 +22,7 @@ from fractions import Fraction
 from traitlets import default
 __all__ = (
     'get_grouped_chemicals',
-    'create_chemicals_LegH',
+    'create_chemicals_LegHb',
 )
 
 # %% Constants
@@ -37,7 +37,7 @@ default_nonsolids = ['Water', 'Ethanol', 'AceticAcid',
                     'H2SO4', 'NH3']
 
 chemical_groups = dict(
-    LegHIngredients = ('Leghemoglobin',
+    LegHbIngredients = ('Leghemoglobin',
                     'TrehaloseDH',
                     'SodiumAscorbate',
                     ),
@@ -141,7 +141,7 @@ def get_grouped_chemicals(stream, units='kmol/hr'):
 
 # %%
 #@chemical_cache
-def create_chemicals_LegH():
+def create_chemicals_LegHb():
     ##############################################
     ##### set function of create new chemical ####
     ##############################################    
@@ -441,7 +441,7 @@ def create_chemicals_LegH():
         default=True,
         atoms=formula2,
         phase='s',
-        aliases=['LegH']
+        aliases=['LegHb']
     )
     append_chemical_copy('Leghemoglobin_In', Leghemoglobin)
     append_chemical_copy('Globin_In', Globin)
@@ -458,7 +458,7 @@ def create_chemicals_LegH():
     chems.set_synonym('H2O', 'Water')
     chems.set_synonym('Pichia_pastoris','cellmass')
     chems.set_synonym('(NH4)2HPO4','DAP')
-    chems.set_synonym('Leghemoglobin','LegH')
+    chems.set_synonym('Leghemoglobin','LegHb')
     chems.set_synonym('Ethanol','EtOH')
     TMS = np.array([5*0.33, 2, 2.2, 1.5, 0.25, 0.5, 0.23, 0.47])*np.array([0.37,1,0.5614,0.6264,0.54557,0.6392,0.9417,0.5276])
     TMS_list = TMS.tolist()
@@ -949,7 +949,7 @@ def create_chemicals_Hemodextrin():
     # chems.set_synonym('Saccharomyces_cerevisiae','cellmass')
     # chems.set_synonym('Saccharomyces_cerevisiae','S_cerevisiae')
     chems.set_synonym('(NH4)2HPO4','DAP')
-    #chems.set_synonym('Leghemoglobin','LegH')
+    #chems.set_synonym('Leghemoglobin','LegHb')
     chems.set_synonym('Heme_b','Heme')
     chems.set_synonym('Ethanol','EtOH')
 
@@ -1478,7 +1478,7 @@ def create_chemicals_Hemodextrin():
 #     chems.set_synonym('Saccharomyces_cerevisiae','cellmass')
 #     chems.set_synonym('Saccharomyces_cerevisiae','S_cerevisiae')
 #     chems.set_synonym('(NH4)2HPO4','DAP')
-#     chems.set_synonym('Leghemoglobin','LegH')
+#     chems.set_synonym('Leghemoglobin','LegHb')
 #     chems.set_synonym('Heme_b','Heme')
 
 #     TMS = np.array([5*0.33, 2, 2.2, 1.5, 0.25, 0.5, 0.23, 0.47])*np.array([0.37,1,0.5614,0.6264,0.54557,0.6392,0.9417,0.5276])

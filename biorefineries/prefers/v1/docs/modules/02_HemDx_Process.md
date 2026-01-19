@@ -1,11 +1,11 @@
-# HemeIn Process Module
+# HemDx Process Module
 
-**Directory:** `v1/HemeIn/`
+**Directory:** `v1/HemDx/`
 
 ## Process Overview
 Produces **Protein-Free Hemedextrin (Heme B)** using *Corynebacterium glutamicum*.
 
-## Process Differences (vs LegH)
+## Process Differences (vs LegHb)
 This is NOT a clone. It contains unique biology and downstream logic.
 
 1.  **Biology**:
@@ -30,6 +30,6 @@ This is NOT a clone. It contains unique biology and downstream logic.
     *   RNA: 0.10
 
 ### U401 Resin Adsorption
-*Custom unit `units.ResinAdsorption` (Verified in `HemeIn/system.py`)*
+*Custom unit `units.ResinAdsorption` (Verified in `HemDx/system.py`)*
 *   **Target Yield**: 98%.
 *   **Impurity Removal**: 99.9%.

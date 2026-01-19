@@ -10,15 +10,15 @@ Created on 2025-01-XX
 
 import biosteam as bst
 from chaospy import distributions as shape
-from biorefineries.prefers.v1.LegH._system import create_LegH_system, set_production_rate
-from biorefineries.prefers.v1.LegH._tea import PreFerSTEA
+from biorefineries.prefers.v1.LegHb._system import create_LegHb_system, set_production_rate
+from biorefineries.prefers.v1.LegHb._tea import PreFerSTEA
 from biorefineries.prefers.v1._process_settings import load_process_settings
 
 __all__ = ('create_model',)
 
 def create_model(baseline_production_kg_hr=275):
     """
-    Create a Model object for uncertainty and sensitivity analysis of the LegH production facility.
+    Create a Model object for uncertainty and sensitivity analysis of the LegHb production facility.
     
     Parameters
     ----------
@@ -32,15 +32,15 @@ def create_model(baseline_production_kg_hr=275):
     """
     # Load process settings and create system
     load_process_settings()
-    LegH_sys = create_LegH_system()
+    LegHb_sys = create_LegHb_system()
     
     # Set baseline production rate using design specification
     print(f"Setting baseline production rate to {baseline_production_kg_hr} kg/hr...")
-    set_production_rate(LegH_sys, baseline_production_kg_hr)
+    set_production_rate(LegHb_sys, baseline_production_kg_hr)
     
     # Create TEA object
-    LegH_tea = PreFerSTEA(
-        system=LegH_sys, 
+    LegHb_tea = PreFerSTEA(
+        system=LegHb_sys, 
         IRR=0.18, 
         duration=(2024, 2044), 
         depreciation='IRAS6',
@@ -59,13 +59,13 @@ def create_model(baseline_production_kg_hr=275):
     )
     
     # Get references to key units and streams
-    f = LegH_sys.flowsheet
+    f = LegHb_sys.flowsheet
     R302 = f.unit.R302  # Fermentation unit
     glucose = f.stream.Glucose  # Glucose feedstock stream
-    LegH_product = f.stream.LegH_3  # Main product stream
+    LegHb_product = f.stream.LegHb_3  # Main product stream
     
     # Create model
-    model = bst.Model(LegH_sys)
+    model = bst.Model(LegHb_sys)
     param = model.parameter
     metric = model.metric
     
@@ -87,7 +87,7 @@ def create_model(baseline_production_kg_hr=275):
     )
     def set_target_production(production_rate_kg_hr):
         """Set target production rate and resize entire plant using design specification."""
-        achieved_rate = set_production_rate(LegH_sys, production_rate_kg_hr)
+        achieved_rate = set_production_rate(LegHb_sys, production_rate_kg_hr)
         
         if abs(achieved_rate - production_rate_kg_hr) > 1.0:
             print(f"Warning: Target production {production_rate_kg_hr:.2f} kg/hr, "
@@ -199,18 +199,18 @@ def create_model(baseline_production_kg_hr=275):
     
     @metric(name='MSP', units='$/kg', element='PreFerS')
     def get_MSP():
-        """Calculate minimum selling price of LegH product."""
-        return LegH_tea.solve_price(LegH_product)
+        """Calculate minimum selling price of LegHb product."""
+        return LegHb_tea.solve_price(LegHb_product)
     
     @metric(name='TCI', units='10^6 $', element='PreFerS')
     def get_TCI():
         """Calculate total capital investment."""
-        return LegH_tea.TCI / 1e6
+        return LegHb_tea.TCI / 1e6
     
     @metric(name='AOC', units='10^6 $/yr', element='PreFerS')
     def get_AOC():
         """Calculate annual operating cost."""
-        return LegH_tea.AOC / 1e6
+        return LegHb_tea.AOC / 1e6
     
     @metric(name='GWP', units='kg CO2-eq/kg', element='PreFerS')
     def get_GWP():
@@ -225,7 +225,7 @@ def create_model(baseline_production_kg_hr=275):
         Returns
         -------
         float
-            GWP in kg CO2-eq per kg of LegH product
+            GWP in kg CO2-eq per kg of LegHb product
         """
         try:
             # Generate LCA displacement allocation table
@@ -235,9 +235,9 @@ def create_model(baseline_production_kg_hr=275):
             # - Process impacts (if any)
             # - Byproduct credits (displacement)
             lca_table = bst.report.lca_displacement_allocation_table(
-                systems=[LegH_sys],
+                systems=[LegHb_sys],
                 key='GWP',
-                items=[LegH_product],
+                items=[LegHb_product],
             )
             
             # The table structure has:
@@ -255,10 +255,10 @@ def create_model(baseline_production_kg_hr=275):
             return float('nan')
     
     @metric(name='Leghemoglobin content', units='%', element='PreFerS')
-    def get_LegH_content():
+    def get_LegHb_content():
         """Calculate leghemoglobin mass percent in final product."""
-        if LegH_product.F_mass > 0:
-            return LegH_product.imass['Leghemoglobin'] / LegH_product.F_mass * 100
+        if LegHb_product.F_mass > 0:
+            return LegHb_product.imass['Leghemoglobin'] / LegHb_product.F_mass * 100
         else:
             return float('nan')
     
@@ -267,29 +267,29 @@ def create_model(baseline_production_kg_hr=275):
         """Calculate leghemoglobin purity relative to total protein."""
         # Define protein group
         protein_IDs = ['Leghemoglobin', 'Globin', 'Mannoprotein']
-        total_protein = sum(LegH_product.imass[pid] for pid in protein_IDs if pid in LegH_product.chemicals.IDs)
+        total_protein = sum(LegHb_product.imass[pid] for pid in protein_IDs if pid in LegHb_product.chemicals.IDs)
         
         if total_protein > 0:
-            return LegH_product.imass['Leghemoglobin'] / total_protein * 100
+            return LegHb_product.imass['Leghemoglobin'] / total_protein * 100
         else:
             return float('nan')
     
     @metric(name='Actual production', units='kg/hr', element='PreFerS')
     def get_actual_production():
         """Verify actual achieved production rate."""
-        return LegH_product.F_mass
+        return LegHb_product.F_mass
     
     @metric(name='Annual production', units='MT/yr', element='PreFerS')
     def get_annual_production():
         """Calculate annual production in metric tons per year."""
-        return LegH_product.F_mass * LegH_sys.operating_hours / 1000
+        return LegHb_product.F_mass * LegHb_sys.operating_hours / 1000
     
     @metric(name='Specific CAPEX', units='$/kg/yr', element='PreFerS')
     def get_specific_capex():
         """Calculate capital investment per unit annual capacity."""
-        annual_capacity = LegH_product.F_mass * LegH_sys.operating_hours  # kg/yr
+        annual_capacity = LegHb_product.F_mass * LegHb_sys.operating_hours  # kg/yr
         if annual_capacity > 0:
-            return LegH_tea.TCI / annual_capacity
+            return LegHb_tea.TCI / annual_capacity
         else:
             return float('nan')
     
@@ -344,14 +344,14 @@ def verify_model_integration():
     try:
         # Get system and product
         sys = model.system
-        LegH_product = sys.flowsheet.stream.LegH_3
+        LegHb_product = sys.flowsheet.stream.LegHb_3
         
         # Generate LCA tables
         print("\n   Generating LCA inventory table...")
         lca_inventory = bst.report.lca_inventory_table(
             systems=[sys],
             key='GWP',
-            items=[LegH_product],
+            items=[LegHb_product],
         )
         print(f"   LCA inventory table shape: {lca_inventory.shape}")
         
@@ -359,7 +359,7 @@ def verify_model_integration():
         lca_displacement = bst.report.lca_displacement_allocation_table(
             systems=[sys],
             key='GWP',
-            items=[LegH_product],
+            items=[LegHb_product],
         )
         print(f"   LCA displacement table shape: {lca_displacement.shape}")
         

@@ -13,11 +13,11 @@ from biorefineries.prefers.v1._process_settings import price  # ADD THIS IMPORT
 import biosteam as bst
 from httpx import stream
 import numpy as np  # ADD THIS IMPORT
-LegH={}
+LegHb={}
 
 titer = 7.27 # [g / L]
 productivity = titer / 72 # [g / L / h]
-LegH_yield = titer * 5 / 1300 # [by wt]
+LegHb_yield = titer * 5 / 1300 # [by wt]
 
 m=2/5 # scale up factor based on 1.5e5 kg/yr
 # %% In
@@ -41,9 +41,9 @@ DfNanoBuffer = stream_kwargs('DfNanoBuffer', DfNanoBuffer=1, units='kg/hr', T=25
 
 # %% Out
 
-LegH_1 = stream_kwargs('LegH_1')
-LegH_2 = stream_kwargs('LegH_2')
-LegH_3 = stream_kwargs('LegH_3',units='kg/hr', T=25+273.15, price = 20)#11.006028727167918)
+LegHb_1 = stream_kwargs('LegHb_1')
+LegHb_2 = stream_kwargs('LegHb_2')
+LegHb_3 = stream_kwargs('LegHb_3',units='kg/hr', T=25+273.15, price = 20)#11.006028727167918)
 vent1 = stream_kwargs('vent1')
 vent2 = stream_kwargs('vent2')
 effluent1 = stream_kwargs('effluent1')

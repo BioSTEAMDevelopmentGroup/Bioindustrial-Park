@@ -1,8 +1,8 @@
 # -*- coding: utf-8 -*-
 """
-HemeIn Subpackage - Hemodextrin (Heme) Production
+HemDx Subpackage - Hemodextrin (Heme) Production
 
-This subpackage contains all modules specific to the HemeIn (Hemodextrin) production process.
+This subpackage contains all modules specific to the HemDx (Hemodextrin) production process.
 
 Modules:
     - chemicals: Chemical species definitions for Hemodextrin process

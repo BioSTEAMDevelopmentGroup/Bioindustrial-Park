@@ -287,7 +287,7 @@ def generate_2d_contour_plots(results_table, param_indices, metric_indices, time
         # Product quality scatter plots
         {'x': titer_idx, 'y': yield_idx, 'z': legh_content_idx,
          'xlabel': 'Titer [g/L]', 'ylabel': 'Yield [%]', 'zlabel': 'Leghemoglobin Content [%]',
-         'title': 'LegH_Content_vs_Titer_and_Yield', 'cmap': 'viridis', 'reverse_cmap': False},
+         'title': 'LegHb_Content_vs_Titer_and_Yield', 'cmap': 'viridis', 'reverse_cmap': False},
         
         {'x': titer_idx, 'y': yield_idx, 'z': protein_purity_idx,
          'xlabel': 'Titer [g/L]', 'ylabel': 'Yield [%]', 'zlabel': 'Protein Purity [%]',
@@ -381,7 +381,7 @@ def generate_2d_contour_plots(results_table, param_indices, metric_indices, time
             plt.tight_layout()
             
             # Save figure
-            filename = f"LegH_scatter_{config['title']}_{timestamp}.png"
+            filename = f"LegHb_scatter_{config['title']}_{timestamp}.png"
             plt.savefig(filename, dpi=300, bbox_inches='tight', facecolor='white')
             print(f"    ✓ Saved: {filename}")
             print(f"       Data range: {config['xlabel']} [{x_data.min():.2f}, {x_data.max():.2f}], "
@@ -466,7 +466,7 @@ if __name__ == '__main__':
     )
     
     # Save results
-    file_no_scale = f'LegH_MC_no_scale_{timestamp}_{N_target}sims.xlsx'
+    file_no_scale = f'LegHb_MC_no_scale_{timestamp}_{N_target}sims.xlsx'
     print(f"\nSaving results to {file_no_scale}...")
     results_no_scale.to_excel(file_no_scale)
 
@@ -485,7 +485,7 @@ if __name__ == '__main__':
     )
     
     # Save results
-    file_with_scale = f'LegH_MC_with_scale_{timestamp}_{N_target}sims.xlsx'
+    file_with_scale = f'LegHb_MC_with_scale_{timestamp}_{N_target}sims.xlsx'
     print(f"\nSaving results to {file_with_scale}...")
     results_with_scale.to_excel(file_with_scale)
     
@@ -622,7 +622,7 @@ if __name__ == '__main__':
                     sort=True,
                 )
                 plt.tight_layout()
-                plt.savefig(f'LegH_spearman_{metric_name}_{timestamp}.png', dpi=300, bbox_inches='tight')
+                plt.savefig(f'LegHb_spearman_{metric_name}_{timestamp}.png', dpi=300, bbox_inches='tight')
                 print(f"  ✓ Saved {metric_name} Spearman plot ({len(rho_series_clean)} parameters)")
                 plt.close()
             except Exception as e:
@@ -677,7 +677,7 @@ if __name__ == '__main__':
                     fig_2d.set_figwidth(10)
                     fig_2d.set_figheight(max(6, len(common_indices) * 0.5))  # Adjust height based on parameters
                     plt.tight_layout()
-                    plt.savefig(f'LegH_spearman_2D_{timestamp}.png', dpi=300, bbox_inches='tight')
+                    plt.savefig(f'LegHb_spearman_2D_{timestamp}.png', dpi=300, bbox_inches='tight')
                     print(f"  ✓ Saved combined 2D Spearman plot ({len(common_indices)} parameters)")
                     plt.close()
         except Exception as e:
@@ -720,7 +720,7 @@ if __name__ == '__main__':
     ax_msp_1d.legend()
     ax_msp_1d.grid(True, alpha=0.3)
     plt.tight_layout()
-    plt.savefig(f'LegH_kde_1D_MSP_no_scale_{timestamp}.png', dpi=300, bbox_inches='tight')
+    plt.savefig(f'LegHb_kde_1D_MSP_no_scale_{timestamp}.png', dpi=300, bbox_inches='tight')
     print(f"    ✓ Saved")
     plt.close()
     
@@ -738,7 +738,7 @@ if __name__ == '__main__':
     ax_gwp_1d.legend()
     ax_gwp_1d.grid(True, alpha=0.3)
     plt.tight_layout()
-    plt.savefig(f'LegH_kde_1D_GWP_no_scale_{timestamp}.png', dpi=300, bbox_inches='tight')
+    plt.savefig(f'LegHb_kde_1D_GWP_no_scale_{timestamp}.png', dpi=300, bbox_inches='tight')
     print(f"    ✓ Saved")
     plt.close()
     
@@ -836,8 +836,8 @@ if __name__ == '__main__':
         )
         
         plt.tight_layout()
-        plt.savefig(f'LegH_kde_2D_GWP_MSP_no_scale_{timestamp}.png', dpi=300, bbox_inches='tight')
-        print(f"      ✓ Saved: LegH_kde_2D_GWP_MSP_no_scale_{timestamp}.png")
+        plt.savefig(f'LegHb_kde_2D_GWP_MSP_no_scale_{timestamp}.png', dpi=300, bbox_inches='tight')
+        print(f"      ✓ Saved: LegHb_kde_2D_GWP_MSP_no_scale_{timestamp}.png")
         plt.close()
         
     except Exception as e:
@@ -932,8 +932,8 @@ if __name__ == '__main__':
         )
         
         plt.tight_layout()
-        plt.savefig(f'LegH_kde_2D_GWP_MSP_with_scale_{timestamp}.png', dpi=300, bbox_inches='tight')
-        print(f"      ✓ Saved: LegH_kde_2D_GWP_MSP_with_scale_{timestamp}.png")
+        plt.savefig(f'LegHb_kde_2D_GWP_MSP_with_scale_{timestamp}.png', dpi=300, bbox_inches='tight')
+        print(f"      ✓ Saved: LegHb_kde_2D_GWP_MSP_with_scale_{timestamp}.png")
         plt.close()
         
     except Exception as e:
@@ -1036,8 +1036,8 @@ if __name__ == '__main__':
         )
         
         plt.tight_layout()
-        plt.savefig(f'LegH_kde_2D_GWP_MSP_comparison_{timestamp}.png', dpi=300, bbox_inches='tight')
-        print(f"      ✓ Saved: LegH_kde_2D_GWP_MSP_comparison_{timestamp}.png")
+        plt.savefig(f'LegHb_kde_2D_GWP_MSP_comparison_{timestamp}.png', dpi=300, bbox_inches='tight')
+        print(f"      ✓ Saved: LegHb_kde_2D_GWP_MSP_comparison_{timestamp}.png")
         plt.close()
         
     except Exception as e:
@@ -1092,7 +1092,7 @@ if __name__ == '__main__':
         axes_scale[1].grid(True, alpha=0.3)
         
         plt.tight_layout()
-        plt.savefig(f'LegH_scale_effects_scatter_{timestamp}.png', dpi=300, bbox_inches='tight')
+        plt.savefig(f'LegHb_scale_effects_scatter_{timestamp}.png', dpi=300, bbox_inches='tight')
         print(f"  ✓ Saved scale effects scatter plot")
         plt.close()
         
@@ -1251,7 +1251,7 @@ if __name__ == '__main__':
         plt.suptitle('Scale Effects with Uncertainty Bands\n(Monte Carlo Results)', 
                     fontsize=14, fontweight='bold', y=0.995)
         plt.tight_layout()
-        plt.savefig(f'LegH_scale_effects_percentile_bands_{timestamp}.png', 
+        plt.savefig(f'LegHb_scale_effects_percentile_bands_{timestamp}.png', 
                    dpi=300, bbox_inches='tight')
         print(f"  ✓ Saved scale effects percentile band plot")
         plt.close()
@@ -1311,7 +1311,7 @@ if __name__ == '__main__':
                 sort=True,
             )
             plt.tight_layout()
-            plt.savefig(f'LegH_tornado_MSP_{timestamp}.png', dpi=300, bbox_inches='tight')
+            plt.savefig(f'LegHb_tornado_MSP_{timestamp}.png', dpi=300, bbox_inches='tight')
             print(f"  ✓ Saved MSP tornado diagram")
             plt.close()
             
@@ -1325,7 +1325,7 @@ if __name__ == '__main__':
                 sort=True,
             )
             plt.tight_layout()
-            plt.savefig(f'LegH_tornado_GWP_{timestamp}.png', dpi=300, bbox_inches='tight')
+            plt.savefig(f'LegHb_tornado_GWP_{timestamp}.png', dpi=300, bbox_inches='tight')
             print(f"  ✓ Saved GWP tornado diagram")
             plt.close()
         else:
@@ -1342,7 +1342,7 @@ if __name__ == '__main__':
     print("SAVING COMPREHENSIVE EXCEL REPORT")
     print("="*80)
     
-    comprehensive_file = f'LegH_comprehensive_{timestamp}.xlsx'
+    comprehensive_file = f'LegHb_comprehensive_{timestamp}.xlsx'
     print(f"\nSaving to {comprehensive_file}...")
     
     with pd.ExcelWriter(comprehensive_file) as writer:
@@ -1402,9 +1402,9 @@ if __name__ == '__main__':
     print(f"  1. MC without scale: {file_no_scale}")
     print(f"  2. MC with scale: {file_with_scale}")
     print(f"  3. Comprehensive report: {comprehensive_file}")
-    print(f"  4. Spearman plots: LegH_spearman_*_{timestamp}.png (5 plots)")
-    print(f"  5. KDE plots: LegH_kde_*_{timestamp}.png (5 plots)")
-    print(f"  6. Contour plots: LegH_contour_*_{timestamp}.png (8 plots)")
-    print(f"  7. Scale effects: LegH_scale_effects_{timestamp}.png")
-    print(f"  8. Tornado diagrams: LegH_tornado_*_{timestamp}.png (2 plots)")
+    print(f"  4. Spearman plots: LegHb_spearman_*_{timestamp}.png (5 plots)")
+    print(f"  5. KDE plots: LegHb_kde_*_{timestamp}.png (5 plots)")
+    print(f"  6. Contour plots: LegHb_contour_*_{timestamp}.png (8 plots)")
+    print(f"  7. Scale effects: LegHb_scale_effects_{timestamp}.png")
+    print(f"  8. Tornado diagrams: LegHb_tornado_*_{timestamp}.png (2 plots)")
     print("\n" + "="*80)

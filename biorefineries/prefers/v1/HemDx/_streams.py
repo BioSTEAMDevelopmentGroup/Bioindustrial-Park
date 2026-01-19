@@ -15,7 +15,7 @@ from biosteam.units import Fermentation
 from httpx import stream
 import numpy as np
 from sympy import Trace  # ADD THIS IMPORT
-LegH={}
+LegHb={}
 
 
 productivity = 4.2/1000 # [g / L / h]
@@ -23,7 +23,7 @@ tau = 162 # [h]
 titer = productivity * tau # [g / L]
 # OD600 180
 # 1 OD600 = 0.35 g/L dry cell weight
-LegH_yield = titer * 5 / 1300 # [by wt]
+LegHb_yield = titer * 5 / 1300 # [by wt]
 
 # 72 hours growth + 108 hours fermentation
 
@@ -58,9 +58,9 @@ DfNanoBuffer = stream_kwargs('DfNanoBuffer', DfNanoBuffer=1, units='kg/hr', T=25
 
 # %% Out
 
-LegH_1 = stream_kwargs('LegH_1')
-LegH_2 = stream_kwargs('LegH_2')
-LegH_3 = stream_kwargs('LegH_3',units='kg/hr', T=25+273.15, price = 20)#11.006028727167918)
+LegHb_1 = stream_kwargs('LegHb_1')
+LegHb_2 = stream_kwargs('LegHb_2')
+LegHb_3 = stream_kwargs('LegHb_3',units='kg/hr', T=25+273.15, price = 20)#11.006028727167918)
 vent1 = stream_kwargs('vent1')
 vent2 = stream_kwargs('vent2')
 effluent1 = stream_kwargs('effluent1')

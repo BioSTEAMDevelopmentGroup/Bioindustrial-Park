@@ -1,6 +1,6 @@
-# Uncertainty & Sensitivity Analysis (`LegH`)
+# Uncertainty & Sensitivity Analysis (`LegHb`)
 
-**Directory:** `v1/LegH/analyses/`  
+**Directory:** `v1/LegHb/analyses/`  
 **Main Script:** `uncertainty_and_sensitivity.py`
 
 This module provides comprehensive tools for quantifying risk and parameter sensitivity in the LegHemoglobin biorefinery.
@@ -32,21 +32,21 @@ The model (`bst.Model`) samples from defined distributions (Uniform, Triangular,
 The analysis tracks the following Key Performance Indicators (KPIs):
 
 *   **Economic:**
-    *   `MSP`: Minimum Selling Price [$/kg LegH]
+    *   `MSP`: Minimum Selling Price [$/kg LegHb]
     *   `TCI`: Total Capital Investment [$ Million]
     *   `AOC`: Annual Operating Cost [$ Million/yr]
 *   **Environmental:**
-    *   `GWP`: Global Warming Potential [kg CO2-eq/kg LegH]
+    *   `GWP`: Global Warming Potential [kg CO2-eq/kg LegHb]
 *   **Technical:**
-    *   `LegH Content`: Final product purity [%]
+    *   `LegHb Content`: Final product purity [%]
 
 ## 4. Outputs
 
 Running `uncertainty_and_sensitivity.py` generates:
 
 1.  **Excel Datasets:**
-    *   `LegH_MC_no_scale_*.xlsx`: Results with fixed scale.
-    *   `LegH_MC_with_scale_*.xlsx`: Results with variable scale.
+    *   `LegHb_MC_no_scale_*.xlsx`: Results with fixed scale.
+    *   `LegHb_MC_with_scale_*.xlsx`: Results with variable scale.
 
 2.  **Visualizations:**
     *   **Scatter Plots (2D):** Color-coded scatter plots (e.g., MSP vs Titer/Yield).

@@ -1,8 +1,8 @@
 # -*- coding: utf-8 -*-
 """
-LegH Analyses Subpackage
+LegHb Analyses Subpackage
 
-Contains uncertainty and sensitivity analysis scripts for LegH production.
+Contains uncertainty and sensitivity analysis scripts for LegHb production.
 
 Scripts:
     - uncertainty_and_sensitivity.py: Comprehensive Monte Carlo analysis

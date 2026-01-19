@@ -8,16 +8,16 @@ import os
 # Ensure local path is in sys.path
 sys.path.append('c:/Programming/PreFerS/Bioindustrial-Park')
 
-from biorefineries.prefers.v1.LegH._system import create_LegH_system
-from biorefineries.prefers.v1.LegH import _streams as s
-from biorefineries.prefers.v1.LegH import _chemicals as c
+from biorefineries.prefers.v1.LegHb._system import create_LegHb_system
+from biorefineries.prefers.v1.LegHb import _streams as s
+from biorefineries.prefers.v1.LegHb import _chemicals as c
 
 def verify():
-    print("Initializing LegH System...")
+    print("Initializing LegHb System...")
     
     # Debug: Direct creation
-    print("Testing create_chemicals_LegH()...")
-    chems = c.create_chemicals_LegH()
+    print("Testing create_chemicals_LegHb()...")
+    chems = c.create_chemicals_LegHb()
     print("Directly created chemicals count:", len(chems))
     if 'Globin' in chems.IDs:
         print("DEBUG: Globin IS in created chemicals.")
@@ -50,12 +50,12 @@ def verify():
     input_streams = [bst.Stream(**kwargs) for kwargs in input_stream_kwargs]
     
     # Create system
-    results = create_LegH_system(
+    results = create_LegHb_system(
         ins=input_streams,
         outs=outs
     )
     
-    sys_obj = bst.main_flowsheet.system.LegH_sys
+    sys_obj = bst.main_flowsheet.system.LegHb_sys
     
     print("Running Simulation...")
     try:

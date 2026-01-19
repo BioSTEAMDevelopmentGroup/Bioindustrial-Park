@@ -8,7 +8,7 @@ import functools
 print = functools.partial(print, flush=True)
 
 # 1. Import the unit class FIRST (before setting thermo)
-# This prevents submodule imports (like LegH) from overwriting our thermo settings later
+# This prevents submodule imports (like LegHb) from overwriting our thermo settings later
 try:
     from biorefineries.prefers.v1._units import VacuumPSA
 except ImportError:

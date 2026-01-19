@@ -4,7 +4,7 @@ Here is the **Living Documentation Suite** for the **PREFERS v1** codebase. This
 
 # PREFERS v1: Living Documentation Suite
 
-**Version:** 1.0 (LegH Production / HemeIn Dev)  
+**Version:** 1.0 (LegHb Production / HemDx Dev)  
 **Framework:** Python 3.12 (BioSTEAM, Thermosteam, ChaosPy)  
 **Context:** Bioindustrial Park / Precision Fermentation
 
@@ -22,7 +22,7 @@ Unlike static spreadsheet models, PREFERS utilizes **BioSTEAM** to perform rigor
 2.  **Singapore-Specific Economics:** A custom TEA module (`PreFerSTEA`) implements Singaporean tax structures and IRAS (Inland Revenue Authority of Singapore) depreciation schedules.
 3.  **Design-Spec Driven Scaling:** Automated "goal-seeking" algorithms resize the entire facility to meet specific production targets (e.g., 275 kg/hr) rather than just calculating the output of a fixed size.
 4.  **Stochastic Uncertainty Analysis:** A Monte Carlo simulation engine (`models.py`) quantifies financial and operational risks by varying parameters like titer, yield, and electricity prices.
-5.  **Modular Product Architecture:** A "Plug-and-play" structure allows distinct products (`LegH`, `HemeIn`) to share common unit operations (`units.py`) while maintaining isolated chemical and process logic.
+5.  **Modular Product Architecture:** A "Plug-and-play" structure allows distinct products (`LegHb`, `HemDx`) to share common unit operations (`units.py`) while maintaining isolated chemical and process logic.
 
 ### High-Level Workflow
 ```mermaid
@@ -56,7 +56,7 @@ The system follows a **Package-Subpackage** pattern to ensure separation of conc
 *   **`prefers/v1/` (Root Package)**: The production environment.
     *   `process_settings.py`: **Single Source of Truth** for global parameters (Prices, GWP Factors, Utility definitions).
     *   `units.py`: **Shared Library**. Contains agnostic `bst.Unit` subclasses (e.g., `CellDisruption`, `Diafiltration`) usable by any project.
-*   **`prefers/v1/LegH/` (Product Subpackage)**: Encapsulated logic for Leghemoglobin.
+*   **`prefers/v1/LegHb/` (Product Subpackage)**: Encapsulated logic for Leghemoglobin.
     *   `chemicals.py`: Defines process-specific species (Leghemoglobin, *Pichia pastoris*, buffers).
     *   `system.py`: **The Assembler**. Connects units into a graph and defines control loops via `@bst.SystemFactory`.
     *   `tea.py`: **The Financial Model**. Subclasses `bst.TEA` to override depreciation/tax logic.
@@ -67,11 +67,11 @@ The system follows a **Package-Subpackage** pattern to ensure separation of conc
 #### 1. The "System Factory" Pattern
 Instead of monolithic scripts, processes are wrapped in `@bst.SystemFactory`.
 *   **Benefit:** Allows the simulation to be instantiated multiple times with different configurations (e.g., for uncertainty analysis) without reloading the Python interpreter.
-*   **Implementation:** `create_LegH_system(ins, outs)` acts as a constructor, building the flowsheet graph dynamically upon call.
+*   **Implementation:** `create_LegHb_system(ins, outs)` acts as a constructor, building the flowsheet graph dynamically upon call.
 
 #### 2. Design Specification Loop (The Supervisor)
-PREFERS implements a Supervisor Loop (seen in `set_production_rate` inside `LegH/system.py`) to handle inverse problems.
-*   **Objective:** Hit a precise target (e.g., 275 kg/hr of LegH product).
+PREFERS implements a Supervisor Loop (seen in `set_production_rate` inside `LegHb/system.py`) to handle inverse problems.
+*   **Objective:** Hit a precise target (e.g., 275 kg/hr of LegHb product).
 *   **Actuator:** A global scaling factor applied to all input streams.
 *   **Solver:** Uses `flexsolve.IQ_interpolation` to iteratively adjust the scaling factor until `abs(actual - target) < tolerance`.
 *   **Robustness:** Includes `Try/Except` blocks to restore baseline flows if the solver diverges, preventing simulation crashes.
@@ -105,7 +105,7 @@ The system exports data at three levels:
     *   **Metric:** Total GWP per kg product.
 
 ### Product Specification Contract
-The `check_LegH_specifications` function in `LegH/system.py` defines the quality contract for the final product stream (`LegH_3`).
+The `check_LegHb_specifications` function in `LegHb/system.py` defines the quality contract for the final product stream (`LegHb_3`).
 
 | Parameter           | Target Range | Logic                                 |
 | :------------------ | :----------- | :------------------------------------ |
@@ -113,7 +113,7 @@ The `check_LegH_specifications` function in `LegH/system.py` defines the quality
 | **Carbohydrates**   | 0 - 4%       | Sum of Glucan, Glucose, Chitin        |
 | **Leghemoglobin**   | 6 - 9%       | Active ingredient concentration       |
 | **Total Solids**    | 0 - 24%      | Total mass minus water                |
-| **Protein Purity**  | >= 65%       | LegH / (LegH + Globin + Mannoprotein) |
+| **Protein Purity**  | >= 65%       | LegHb / (LegHb + Globin + Mannoprotein) |
 
 ---
 
@@ -146,7 +146,7 @@ This section details the custom Unit Operations found in `units.py`.
 *   **Function:** Membrane separation for purification and concentration.
 *   **Algorithm:** Uses separation factors (`TargetProduct_Retention`, `Salt_Retention`) to split solutes between retentate and permeate.
 *   **Costing:** Calculates membrane area based on `membrane_flux_LMH`. Includes separate OPEX for membrane replacement based on `membrane_lifetime_years`.
-*   **Advanced Logic:** `U404` in `LegH/system.py` contains an embedded optimization loop (`U404_adjust_water_recovery`) that dynamically alters water removal to hit a specific solids concentration target (e.g., 12%).
+*   **Advanced Logic:** `U404` in `LegHb/system.py` contains an embedded optimization loop (`U404_adjust_water_recovery`) that dynamically alters water removal to hit a specific solids concentration target (e.g., 12%).
 
 ### 5. IonExchangeCycle
 *   **Type:** `bst.Unit` (Steady-state approximation)
