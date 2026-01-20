@@ -23,8 +23,10 @@ from biorefineries.prefers.v1 import _units as u
 from biorefineries.prefers.v1._process_settings import price
 
 # %% Settings
-bst.settings.set_thermo(c.create_chemicals_LegHb(), skip_checks=True)
+LEGHB_THERMO = c.create_chemicals_LegHb()
+bst.settings.set_thermo(LEGHB_THERMO, skip_checks=True)
 bst.preferences.classic_mode()
+SHOW_RXN = False
 
 # %%
 __all__ = (
@@ -39,7 +41,7 @@ __all__ = (
          ,s.IXRegenerationSolution, s.DfNanoBuffer],
     outs=[s.LegHb_3, s.vent1, s.vent2, s.effluent1, s.effluent2, s.effluent3,
     ],
-    fthermo=c.create_chemicals_LegHb, # Pass the function itself
+    fthermo=lambda chemicals=None: LEGHB_THERMO,  # Force use of cached thermo instance
 )
 def create_LegHb_system(
         ins, outs,
@@ -148,7 +150,8 @@ def create_LegHb_system(
         fermentation_reaction,
         bst.PRxn([cell_growth_reaction, respiration_reaction2])
     )
-    RXN.show()
+    if SHOW_RXN:
+        RXN.show()
 
     """
     Upstream Process
@@ -552,7 +555,7 @@ def create_LegHb_system(
 # %% Design Specification Functions
 
 
-def set_production_rate(system, target_production_rate_kg_hr):
+def set_production_rate(system, target_production_rate_kg_hr, verbose=True):
     """
     Adjust system inputs to achieve target LegHb_3 production rate using a global scaling factor.
     
@@ -571,6 +574,8 @@ def set_production_rate(system, target_production_rate_kg_hr):
     import flexsolve as flx
     import warnings
     
+    log = print if verbose else (lambda *args, **kwargs: None)
+
     # Get product stream
     product_stream = system.flowsheet.stream.LegHb_3
     
@@ -583,13 +588,13 @@ def set_production_rate(system, target_production_rate_kg_hr):
     if not baseline_flows:
         raise ValueError("No input streams with positive flow rates found")
     
-    print(f"\n{'='*60}")
-    print(f"Setting Production Rate to {target_production_rate_kg_hr:.2f} kg/hr")
-    print(f"{'='*60}")
-    print(f"Baseline input streams stored: {len(baseline_flows)} streams")
+    log(f"\n{'='*60}")
+    log(f"Setting Production Rate to {target_production_rate_kg_hr:.2f} kg/hr")
+    log(f"{'='*60}")
+    log(f"Baseline input streams stored: {len(baseline_flows)} streams")
     
     # Run initial simulation to get baseline
-    print("Running initial simulation to establish baseline...")
+    log("Running initial simulation to establish baseline...")
     with warnings.catch_warnings():
         warnings.simplefilter("ignore")
         system.simulate()
@@ -602,10 +607,9 @@ def set_production_rate(system, target_production_rate_kg_hr):
     # Calculate initial scaling factor guess
     initial_guess = target_production_rate_kg_hr / initial_production
     
-    print(f"  Initial production: {initial_production:.2f} kg/hr")
-    print(f"  Target production:  {target_production_rate_kg_hr:.2f} kg/hr")
-    print(f"  Initial scaling guess: {initial_guess:.4f}x")
-    print(f"  Search bounds: 0.1x to 5.0x baseline")
+    log(f"  Initial production: {initial_production:.2f} kg/hr")
+    log(f"  Target production:  {target_production_rate_kg_hr:.2f} kg/hr")
+    log(f"  Initial scaling guess: {initial_guess:.4f}x")
     
     # Iteration tracking
     iteration = [0]
@@ -641,39 +645,56 @@ def set_production_rate(system, target_production_rate_kg_hr):
             
             # Print progress (only every 5 iterations to reduce clutter)
             if iteration[0] % 5 == 0 or abs(error) < 1.0:
-                print(f"    Iteration {iteration[0]}: scale={scaling_factor:.4f}x, "
-                      f"production={achieved_rate:.2f} kg/hr, error={error:.4f} kg/hr")
+                log(f"    Iteration {iteration[0]}: scale={scaling_factor:.4f}x, "
+                    f"production={achieved_rate:.2f} kg/hr, error={error:.4f} kg/hr")
             
             return error
             
         except Exception as e:
-            print(f"    Iteration {iteration[0]} FAILED at scale={scaling_factor:.4f}x: {e}")
+            log(f"    Iteration {iteration[0]} FAILED at scale={scaling_factor:.4f}x: {e}")
             # Return large error to guide solver away from infeasible region
             return 1e6 if scaling_factor > initial_guess else -1e6
     
     try:
-        print(f"\nSolving for optimal scaling factor (intermediate warnings suppressed)...")
+        log(f"\nSolving for optimal scaling factor (intermediate warnings suppressed)...")
         
         # Suppress all warnings during the iterative solving process
         with warnings.catch_warnings():
             warnings.simplefilter("ignore")
             
+            # Build robust brackets around the initial guess
+            x0 = max(0.01, initial_guess * 0.1)
+            x1 = max(5.0, initial_guess * 2.0)
+            y0 = objective_function(x0)
+            y1 = objective_function(x1)
+            expand_iter = 0
+            while y0 * y1 > 0 and expand_iter < 8:
+                expand_iter += 1
+                # Expand toward the side with larger absolute error
+                if abs(y1) <= abs(y0):
+                    x0 = max(0.01, x0 / 2.0)
+                    y0 = objective_function(x0)
+                else:
+                    x1 *= 2.0
+                    y1 = objective_function(x1)
+            log(f"  Search bounds: {x0:.4f}x to {x1:.4f}x (bracket {'OK' if y0*y1 <= 0 else 'NOT FOUND'})")
+
             # Use flexsolve directly (not as a system specification)
             scaling_factor = flx.IQ_interpolation(
                 f=objective_function,
-                x0=0.1,              # Lower bound
-                x1=5.0,              # Upper bound
+                x0=x0,               # Lower bound
+                x1=x1,               # Upper bound
                 x=initial_guess,     # Initial guess
                 xtol=0.0001,         # Tolerance on scaling factor
                 ytol=0.01,           # Tolerance on production rate [kg/hr]
                 maxiter=100,
-                checkbounds=True,
+                checkbounds=(y0 * y1 <= 0),
                 checkiter=True,
             )
         
         # After solver converges, run final simulation WITHOUT suppressing warnings
         # This allows any persistent issues to be displayed
-        print(f"\nSolver converged. Running final validation simulation...")
+        log(f"\nSolver converged. Running final validation simulation...")
         for stream, baseline_flow in baseline_flows.items():
             stream.F_mass = baseline_flow * scaling_factor
         
@@ -682,32 +703,32 @@ def set_production_rate(system, target_production_rate_kg_hr):
         
         achieved_rate = product_stream.F_mass
         
-        print(f"\n✓ Successfully achieved production rate:")
-        print(f"  Target:          {target_production_rate_kg_hr:.2f} kg/hr")
-        print(f"  Achieved:        {achieved_rate:.2f} kg/hr")
-        print(f"  Scaling factor:  {scaling_factor:.4f}x")
-        print(f"  Error:           {abs(achieved_rate - target_production_rate_kg_hr):.4f} kg/hr")
-        print(f"  Total iterations: {iteration[0]}")
-        print(f"{'='*60}\n")
+        log(f"\n✓ Successfully achieved production rate:")
+        log(f"  Target:          {target_production_rate_kg_hr:.2f} kg/hr")
+        log(f"  Achieved:        {achieved_rate:.2f} kg/hr")
+        log(f"  Scaling factor:  {scaling_factor:.4f}x")
+        log(f"  Error:           {abs(achieved_rate - target_production_rate_kg_hr):.4f} kg/hr")
+        log(f"  Total iterations: {iteration[0]}")
+        log(f"{'='*60}\n")
         
         return achieved_rate
         
     except Exception as e:
-        print(f"\n✗ Failed to achieve target production rate: {e}")
-        print(f"  Error type: {type(e).__name__}")
-        print(f"  Total iterations attempted: {iteration[0]}")
+        log(f"\n✗ Failed to achieve target production rate: {e}")
+        log(f"  Error type: {type(e).__name__}")
+        log(f"  Total iterations attempted: {iteration[0]}")
         
         # Restore baseline flows
-        print(f"\n  Restoring baseline input flows...")
+        log(f"\n  Restoring baseline input flows...")
         for stream, baseline_flow in baseline_flows.items():
             stream.F_mass = baseline_flow
         
         # Run one final simulation with baseline flows (warnings enabled)
         try:
             system.simulate()
-            print(f"  System restored to baseline: {product_stream.F_mass:.2f} kg/hr")
+            log(f"  System restored to baseline: {product_stream.F_mass:.2f} kg/hr")
         except Exception as restore_error:
-            print(f"  Warning: Could not restore baseline simulation: {restore_error}")
+            log(f"  Warning: Could not restore baseline simulation: {restore_error}")
         
         raise ValueError(f"Could not achieve target production rate of {target_production_rate_kg_hr:.2f} kg/hr: {e}")
 

@@ -21,10 +21,11 @@ Created on 2025-11-17 10:16:04
 from warnings import filterwarnings
 filterwarnings('ignore')
 
+import os
 import numpy as np
 import pandas as pd
 import biosteam as bst
-from ..models import create_model
+from .._models import create_model
 import matplotlib.pyplot as plt
 import matplotlib.colors as mcolors
 import seaborn as sns
@@ -53,7 +54,7 @@ def evaluate_single_sample(sample_index_and_data, baseline_production_kg_hr, exc
     index, sample = sample_index_and_data
     
     try:
-        model = create_model(baseline_production_kg_hr=baseline_production_kg_hr)
+        model = create_model(baseline_production_kg_hr=baseline_production_kg_hr, verbose=False)
         
         # Dictionary to store ACTUAL parameter values used in simulation
         param_values = {}
@@ -381,7 +382,7 @@ def generate_2d_contour_plots(results_table, param_indices, metric_indices, time
             plt.tight_layout()
             
             # Save figure
-            filename = f"LegHb_scatter_{config['title']}_{timestamp}.png"
+            filename = os.path.join(RESULTS_DIR, f"LegHb_scatter_{config['title']}_{timestamp}.png")
             plt.savefig(filename, dpi=300, bbox_inches='tight', facecolor='white')
             print(f"    ✓ Saved: {filename}")
             print(f"       Data range: {config['xlabel']} [{x_data.min():.2f}, {x_data.max():.2f}], "
@@ -410,6 +411,12 @@ if __name__ == '__main__':
     now = datetime.now()
     timestamp = now.strftime('%Y.%m.%d-%H.%M')
     
+    # Create results directory under the script's location
+    SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+    RESULTS_DIR = os.path.join(SCRIPT_DIR, f"results_{now.strftime('%Y%m%d_%H%M')}")
+    os.makedirs(RESULTS_DIR, exist_ok=True)
+    print(f"Results will be saved to: {RESULTS_DIR}")
+    
     print("="*80)
     print("LEGHEMOGLOBIN PRODUCTION - COMPREHENSIVE UNCERTAINTY & SENSITIVITY ANALYSIS")
     print("PreFerS (Precision Fermentation System)")
@@ -424,8 +431,8 @@ if __name__ == '__main__':
     # CONFIGURATION PARAMETERS
     # =============================================================================
     baseline_production_kg_hr = 275      # Baseline production rate [kg/hr]
-    N_target = 120000                      # Number of valid samples per scenario
-    batch_size = 30000                     # Number of samples per batch max 30000
+    N_target = 100                      # Number of valid samples per scenario
+    batch_size = 100                     # Number of samples per batch max 30000
     
     # %%    
     print(f"\nConfiguration:")
@@ -466,7 +473,7 @@ if __name__ == '__main__':
     )
     
     # Save results
-    file_no_scale = f'LegHb_MC_no_scale_{timestamp}_{N_target}sims.xlsx'
+    file_no_scale = os.path.join(RESULTS_DIR, f'LegHb_MC_no_scale_{timestamp}_{N_target}sims.xlsx')
     print(f"\nSaving results to {file_no_scale}...")
     results_no_scale.to_excel(file_no_scale)
 
@@ -485,7 +492,7 @@ if __name__ == '__main__':
     )
     
     # Save results
-    file_with_scale = f'LegHb_MC_with_scale_{timestamp}_{N_target}sims.xlsx'
+    file_with_scale = os.path.join(RESULTS_DIR, f'LegHb_MC_with_scale_{timestamp}_{N_target}sims.xlsx')
     print(f"\nSaving results to {file_with_scale}...")
     results_with_scale.to_excel(file_with_scale)
     
@@ -622,7 +629,7 @@ if __name__ == '__main__':
                     sort=True,
                 )
                 plt.tight_layout()
-                plt.savefig(f'LegHb_spearman_{metric_name}_{timestamp}.png', dpi=300, bbox_inches='tight')
+                plt.savefig(os.path.join(RESULTS_DIR, f'LegHb_spearman_{metric_name}_{timestamp}.png'), dpi=300, bbox_inches='tight')
                 print(f"  ✓ Saved {metric_name} Spearman plot ({len(rho_series_clean)} parameters)")
                 plt.close()
             except Exception as e:
@@ -677,7 +684,7 @@ if __name__ == '__main__':
                     fig_2d.set_figwidth(10)
                     fig_2d.set_figheight(max(6, len(common_indices) * 0.5))  # Adjust height based on parameters
                     plt.tight_layout()
-                    plt.savefig(f'LegHb_spearman_2D_{timestamp}.png', dpi=300, bbox_inches='tight')
+                    plt.savefig(os.path.join(RESULTS_DIR, f'LegHb_spearman_2D_{timestamp}.png'), dpi=300, bbox_inches='tight')
                     print(f"  ✓ Saved combined 2D Spearman plot ({len(common_indices)} parameters)")
                     plt.close()
         except Exception as e:
@@ -720,7 +727,7 @@ if __name__ == '__main__':
     ax_msp_1d.legend()
     ax_msp_1d.grid(True, alpha=0.3)
     plt.tight_layout()
-    plt.savefig(f'LegHb_kde_1D_MSP_no_scale_{timestamp}.png', dpi=300, bbox_inches='tight')
+    plt.savefig(os.path.join(RESULTS_DIR, f'LegHb_kde_1D_MSP_no_scale_{timestamp}.png'), dpi=300, bbox_inches='tight')
     print(f"    ✓ Saved")
     plt.close()
     
@@ -738,7 +745,7 @@ if __name__ == '__main__':
     ax_gwp_1d.legend()
     ax_gwp_1d.grid(True, alpha=0.3)
     plt.tight_layout()
-    plt.savefig(f'LegHb_kde_1D_GWP_no_scale_{timestamp}.png', dpi=300, bbox_inches='tight')
+    plt.savefig(os.path.join(RESULTS_DIR, f'LegHb_kde_1D_GWP_no_scale_{timestamp}.png'), dpi=300, bbox_inches='tight')
     print(f"    ✓ Saved")
     plt.close()
     
@@ -836,8 +843,8 @@ if __name__ == '__main__':
         )
         
         plt.tight_layout()
-        plt.savefig(f'LegHb_kde_2D_GWP_MSP_no_scale_{timestamp}.png', dpi=300, bbox_inches='tight')
-        print(f"      ✓ Saved: LegHb_kde_2D_GWP_MSP_no_scale_{timestamp}.png")
+        plt.savefig(os.path.join(RESULTS_DIR, f'LegHb_kde_2D_GWP_MSP_no_scale_{timestamp}.png'), dpi=300, bbox_inches='tight')
+        print(f"      ✓ Saved: {os.path.join(RESULTS_DIR, f'LegHb_kde_2D_GWP_MSP_no_scale_{timestamp}.png')}")
         plt.close()
         
     except Exception as e:
@@ -932,8 +939,8 @@ if __name__ == '__main__':
         )
         
         plt.tight_layout()
-        plt.savefig(f'LegHb_kde_2D_GWP_MSP_with_scale_{timestamp}.png', dpi=300, bbox_inches='tight')
-        print(f"      ✓ Saved: LegHb_kde_2D_GWP_MSP_with_scale_{timestamp}.png")
+        plt.savefig(os.path.join(RESULTS_DIR, f'LegHb_kde_2D_GWP_MSP_with_scale_{timestamp}.png'), dpi=300, bbox_inches='tight')
+        print(f"      ✓ Saved: {os.path.join(RESULTS_DIR, f'LegHb_kde_2D_GWP_MSP_with_scale_{timestamp}.png')}")
         plt.close()
         
     except Exception as e:
@@ -1036,8 +1043,8 @@ if __name__ == '__main__':
         )
         
         plt.tight_layout()
-        plt.savefig(f'LegHb_kde_2D_GWP_MSP_comparison_{timestamp}.png', dpi=300, bbox_inches='tight')
-        print(f"      ✓ Saved: LegHb_kde_2D_GWP_MSP_comparison_{timestamp}.png")
+        plt.savefig(os.path.join(RESULTS_DIR, f'LegHb_kde_2D_GWP_MSP_comparison_{timestamp}.png'), dpi=300, bbox_inches='tight')
+        print(f"      ✓ Saved: {os.path.join(RESULTS_DIR, f'LegHb_kde_2D_GWP_MSP_comparison_{timestamp}.png')}")
         plt.close()
         
     except Exception as e:
@@ -1092,7 +1099,7 @@ if __name__ == '__main__':
         axes_scale[1].grid(True, alpha=0.3)
         
         plt.tight_layout()
-        plt.savefig(f'LegHb_scale_effects_scatter_{timestamp}.png', dpi=300, bbox_inches='tight')
+        plt.savefig(os.path.join(RESULTS_DIR, f'LegHb_scale_effects_scatter_{timestamp}.png'), dpi=300, bbox_inches='tight')
         print(f"  ✓ Saved scale effects scatter plot")
         plt.close()
         
@@ -1251,7 +1258,7 @@ if __name__ == '__main__':
         plt.suptitle('Scale Effects with Uncertainty Bands\n(Monte Carlo Results)', 
                     fontsize=14, fontweight='bold', y=0.995)
         plt.tight_layout()
-        plt.savefig(f'LegHb_scale_effects_percentile_bands_{timestamp}.png', 
+        plt.savefig(os.path.join(RESULTS_DIR, f'LegHb_scale_effects_percentile_bands_{timestamp}.png'), 
                    dpi=300, bbox_inches='tight')
         print(f"  ✓ Saved scale effects percentile band plot")
         plt.close()
@@ -1311,7 +1318,7 @@ if __name__ == '__main__':
                 sort=True,
             )
             plt.tight_layout()
-            plt.savefig(f'LegHb_tornado_MSP_{timestamp}.png', dpi=300, bbox_inches='tight')
+            plt.savefig(os.path.join(RESULTS_DIR, f'LegHb_tornado_MSP_{timestamp}.png'), dpi=300, bbox_inches='tight')
             print(f"  ✓ Saved MSP tornado diagram")
             plt.close()
             
@@ -1325,7 +1332,7 @@ if __name__ == '__main__':
                 sort=True,
             )
             plt.tight_layout()
-            plt.savefig(f'LegHb_tornado_GWP_{timestamp}.png', dpi=300, bbox_inches='tight')
+            plt.savefig(os.path.join(RESULTS_DIR, f'LegHb_tornado_GWP_{timestamp}.png'), dpi=300, bbox_inches='tight')
             print(f"  ✓ Saved GWP tornado diagram")
             plt.close()
         else:
@@ -1342,7 +1349,7 @@ if __name__ == '__main__':
     print("SAVING COMPREHENSIVE EXCEL REPORT")
     print("="*80)
     
-    comprehensive_file = f'LegHb_comprehensive_{timestamp}.xlsx'
+    comprehensive_file = os.path.join(RESULTS_DIR, f'LegHb_comprehensive_{timestamp}.xlsx')
     print(f"\nSaving to {comprehensive_file}...")
     
     with pd.ExcelWriter(comprehensive_file) as writer:

@@ -27,7 +27,7 @@ from warnings import filterwarnings
 filterwarnings('ignore')
 
 # Import model creation function
-from ..models import create_model
+from .._models import create_model
 
 
 # =============================================================================
@@ -55,7 +55,7 @@ def evaluate_single_sample_quiet(sample_index_and_data, baseline_production_kg_h
     try:
         # Redirect stdout to suppress simulation output
         with contextlib.redirect_stdout(open(os.devnull, 'w')):
-            model = create_model(baseline_production_kg_hr=baseline_production_kg_hr)
+            model = create_model(baseline_production_kg_hr=baseline_production_kg_hr, verbose=False)
             
             # Apply sample to parameters
             param_values = {}
@@ -104,7 +104,7 @@ def benchmark_serial(N_samples, baseline_production_kg_hr=275):
     print(f"\n[Serial Benchmark] Starting with {N_samples} samples...")
     
     # Create model
-    model = create_model(baseline_production_kg_hr=baseline_production_kg_hr)
+    model = create_model(baseline_production_kg_hr=baseline_production_kg_hr, verbose=True)
     
     # Generate samples
     np.random.seed(1234)
@@ -162,7 +162,7 @@ def benchmark_parallel(N_samples, baseline_production_kg_hr=275):
     print(f"\n[Parallel Benchmark] Starting with {N_samples} samples ({n_workers} workers)...")
     
     # Create model
-    model = create_model(baseline_production_kg_hr=baseline_production_kg_hr)
+    model = create_model(baseline_production_kg_hr=baseline_production_kg_hr, verbose=True)
     
     # Generate samples
     np.random.seed(1234)
@@ -207,7 +207,7 @@ if __name__ == '__main__':
     mp.freeze_support()
     
     # Configuration
-    N_SAMPLES = 5000  # Number of samples for benchmark
+    N_SAMPLES = 50  # Number of samples for benchmark
     BASELINE_PRODUCTION = 275  # kg/hr
     
     print("="*80)

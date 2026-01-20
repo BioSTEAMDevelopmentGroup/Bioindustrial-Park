@@ -12,6 +12,7 @@ Extracted from the original _chemicals.py for the LegHb (Leghemoglobin) process.
 
 # %%
 import biosteam as bst
+from warnings import filterwarnings
 from networkx import density
 import thermosteam as tmo
 import numpy as np
@@ -21,6 +22,9 @@ import pandas as pd
 from fractions import Fraction
 
 from traitlets import default
+
+# Suppress repeated cached-chemical warnings in parallel workflows
+filterwarnings('ignore', message='cached chemical returned*')
 
 __all__ = (
     'get_grouped_chemicals',
@@ -127,7 +131,7 @@ def get_grouped_chemicals(stream, units='kmol/hr'):
 
 
 # %%
-#@chemical_cache
+@chemical_cache
 def create_chemicals_LegHb():
     ##############################################
     ##### set function of create new chemical ####

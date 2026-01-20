@@ -16,7 +16,7 @@ from biorefineries.prefers.v1._process_settings import load_process_settings
 
 __all__ = ('create_model',)
 
-def create_model(baseline_production_kg_hr=275):
+def create_model(baseline_production_kg_hr=275, verbose=True):
     """
     Create a Model object for uncertainty and sensitivity analysis of the LegHb production facility.
     
@@ -35,8 +35,9 @@ def create_model(baseline_production_kg_hr=275):
     LegHb_sys = create_LegHb_system()
     
     # Set baseline production rate using design specification
-    print(f"Setting baseline production rate to {baseline_production_kg_hr} kg/hr...")
-    set_production_rate(LegHb_sys, baseline_production_kg_hr)
+    if verbose:
+        print(f"Setting baseline production rate to {baseline_production_kg_hr} kg/hr...")
+    set_production_rate(LegHb_sys, baseline_production_kg_hr, verbose=verbose)
     
     # Create TEA object
     LegHb_tea = PreFerSTEA(
@@ -87,7 +88,7 @@ def create_model(baseline_production_kg_hr=275):
     )
     def set_target_production(production_rate_kg_hr):
         """Set target production rate and resize entire plant using design specification."""
-        achieved_rate = set_production_rate(LegHb_sys, production_rate_kg_hr)
+        achieved_rate = set_production_rate(LegHb_sys, production_rate_kg_hr, verbose=False)
         
         if abs(achieved_rate - production_rate_kg_hr) > 1.0:
             print(f"Warning: Target production {production_rate_kg_hr:.2f} kg/hr, "

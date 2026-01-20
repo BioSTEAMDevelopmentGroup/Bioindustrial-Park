@@ -11,8 +11,12 @@ Created on 2025-05-07 18:26:22
 from biosteam import stream_kwargs
 from biorefineries.prefers.v1._process_settings import price  # ADD THIS IMPORT
 import biosteam as bst
+from biorefineries.prefers.v1.LegHb import _chemicals as c
 from httpx import stream
 import numpy as np  # ADD THIS IMPORT
+
+# Ensure LegHb-specific chemicals are active for stream creation
+bst.settings.set_thermo(c.create_chemicals_LegHb(), skip_checks=True)
 LegHb={}
 
 titer = 7.27 # [g / L]
@@ -103,7 +107,7 @@ def create_stream(stream_list):
         streams.append(s)
     return streams
 
-def update_all_input_stream_prices(streamlist):
+def update_all_input_stream_prices(streamlist, verbose=False):
     """Update prices for all input streams"""
     # FIX: Check if streams exist and are proper objects
     try:
@@ -116,7 +120,8 @@ def update_all_input_stream_prices(streamlist):
             if hasattr(stream, 'imass') and hasattr(stream, 'ID'):
                 old_price = getattr(stream, 'price', 0)
                 new_price = set_stream_price_from_components(stream)
-                print(f"{stream.ID}: ${old_price:.4f}/kg → ${new_price:.4f}/kg")
+                if verbose:
+                    print(f"{stream.ID}: ${old_price:.4f}/kg → ${new_price:.4f}/kg")
             else:
                 print(f"Warning: Stream {stream} is not properly initialized")
     except Exception as e:
