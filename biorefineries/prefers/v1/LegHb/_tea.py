@@ -280,9 +280,9 @@ class PreFerSTEA(bst.TEA):
 
 # %%
 if __name__ == '__main__':
-# %%
+
     import biosteam as bst
-    from biorefineries.prefers.v1.LegHb.system import create_LegHb_system
+    from biorefineries.prefers.v1.LegHb.system._config2 import create_LegHb_system
     from biorefineries.prefers.v1.LegHb._chemicals import create_chemicals_LegHb
     from biorefineries.prefers.v1._process_settings import load_process_settings
     from biosteam import settings
@@ -302,9 +302,10 @@ if __name__ == '__main__':
     print("\n1. Creating LegHb system...")
     LegHb_sys = create_LegHb_system()
     LegHb_sys.operating_hours = 8000
-    
+    # multiple production rate
+    n=1
     # Define target production rate
-    TARGET_PRODUCTION = 275 * 1  # kg/hr
+    TARGET_PRODUCTION = 275 * n  # kg/hr
     
     print(f"\n2. Running baseline simulation...")
     LegHb_sys.simulate()
