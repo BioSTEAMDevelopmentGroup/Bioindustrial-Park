@@ -226,181 +226,206 @@ def create_LegHb_system(
 
 
     """
-    Downstream process
+    Downstream process - Intracellular LegHb Recovery
+    
+    Process flow per approved design specification:
+    1. Biomass Harvest (Disk Stack Centrifuge) - Separate cells from spent media
+    2. Cell Disruption (High-Pressure Homogenizer) - Release intracellular LegHb
+    3. Lysate Clarification (Centrifuge + Depth Filtration) - Remove cell debris
+    4. UF/DF Purification - Concentrate protein and remove small impurities  
+    5. Thermal Stabilization (HTST Pasteurization) - Microbial safety
+    6. Final Formulation & Cooling - Product stabilization
     """
-    S400 = u.Filtration.from_preset(
-        'MF', 
-        'S400',
-        ins = R302-1,
-        outs = ('Deposit', 'Supernatant'),
+    
+    # =========================================================================
+    # STEP 1: Biomass Harvest (Primary Separation)
+    # =========================================================================
+    # Disk Stack Centrifuge to densify biomass to 40-50% WCW
+    # Separates cells from spent fermentation media
+    
+    C401 = bst.SolidsCentrifuge(
+        'C401',
+        ins=R302-1,  # Fermentation broth
+        outs=('CellCream', 'SpentMedia'),
+        split={'cellmass': 0.98,  # High cell capture
+               'Leghemoglobin_In': 0.98,  # Intracellular product stays with cells
+               'Globin_In': 0.98,
+               'Heme_b': 0.98,
+               'Glucan': 0.95,
+               'Mannoprotein': 0.95,
+               'Chitin': 0.95,
+               'OleicAcid': 0.90,
+               'RNA': 0.90,
+               },  # Majority of cells to cream
+        moisture_content=0.55,  # ~45% dry solids = 55% moisture
     )
-    S400.add_specification(run=True)
+    
+    # Wash buffer preparation for cell wash (1-2 diavolumes)
+    M401 = bst.MixTank('M401', ins=(DfUltraBuffer, 'WashWater'), 
+                    outs='WashBufferOut', tau=0.5)
+    
+    @M401.add_specification(run=True)
+    def update_wash_buffer():
+        # 1.5 diavolumes of wash buffer
+        M401.ins[1].imass['H2O'] = C401.outs[0].F_mass * 1.5
+        M401.ins[0].imol['DfUltraBuffer'] = M401.ins[1].imass['H2O'] * (0.025+0.01+0.001)/1000
+    
+    # Cool wash buffer before use
+    H401_wash = bst.HXutility(
+        'H401_wash',
+        ins=M401-0,
+        outs='ColdWashBuffer',
+        T=10+273.15,  # Cool to 10°C
+        cool_only=True,
+    )
+    
+    # Cell wash mixer - combines cell cream with wash buffer
+    M402_wash = bst.MixTank('M402_wash', ins=(C401-0, H401_wash-0), 
+                            outs='WashedCellSlurry', tau=0.25)
+    
+    # Second centrifuge for washed cell separation
+    C402 = bst.SolidsCentrifuge(
+        'C402', 
+        ins=M402_wash-0,
+        outs=('WashedCellCream', 'WashEffluent'),
+        split={'cellmass': 0.98,
+               'Leghemoglobin_In': 0.98,
+               'Globin_In': 0.98,
+               'Heme_b': 0.98,
+               'Glucan': 0.95,
+               'Mannoprotein': 0.95,
+               },
+        moisture_content=0.55,
+    )
+    
+    # =========================================================================
+    # STEP 2: Cell Disruption (High-Pressure Homogenization)
+    # =========================================================================
+    # Multi-pass HPH at 800-1200 bar to achieve >90% cell lysis
+    # Pressure generates ~2.5°C per 100 bar - requires cooling
     
     S401 = u.CellDisruption(
         'S401',
-        ins=S400-0,
-        outs='DisruptedBroth',
+        ins=C402-0,  # Washed cell cream (not raw broth)
+        outs='CrudeHomogenate',
+        P_high=1000e5,  # 1000 bar = 100 MPa (spec: 800-1200 bar)
+        cell_disruption_efficiency=0.90,  # >90% lysis per spec
     )
-
-    S402 = u.Filtration.from_preset(
-        'MF', 
-        'S402',
-        ins = S401-0,
-        outs = ('Deposit', 'Supernatant'),
-    )
-    S402.add_specification(run=True)
-
-    #S403 = bst.SolidsSeparator('S403', ins=S402-0, outs=(effluent1, 'S403Out'), split=(1) , moisture_content=0.01)
-    S403 = bst.ScrewPress('S403', ins=S402-0, outs=('CellMassWaste', 'S403Out'), split=(0.999) , moisture_content=0.01)
     
-    S404 = bst.Splitter('S404', ins=S402-1, outs=('ResidualCellMass', 'S404Out'), split=(0.999) , order=('cellmass',))
-
-    # E401 = u.Evaporator(
-    #     'E401',
-    #     ins = S402-1,
-    #     outs = ('E401Out',effluent2),
-    #     P = (101325, 73581, 50892, 32777, 20000),  # Reduced to 3 effects to increase vessel size
-    #     V = 0.1,  # Increased vapor fraction to create larger vessels
-    #     V_definition = 'First-effect',  # Changed to overall for better load distribution
-    # )
-    # E401.add_specification(run=True)
-
-    M401 = bst.MixTank('M401', ins=(DfUltraBuffer, 'Water4'), 
-                    outs='M401Out', tau=1) 
-    @M401.add_specification(run=True)
-    def update_DfUltraBuffer_initial():
-        M401.ins[1].imass['H2O'] = (S402-1).imass['H2O']*4
-        M401.ins[0].imol['DfUltraBuffer'] = ((S402-1).imass['H2O']*4)*(0.025+0.01+0.001)/1000
-
+    # Immediate post-valve cooling to prevent LegHb denaturation
     H401 = bst.HXutility(
         'H401',
-        ins=M401-0,
-        outs='H401Out',
-        T=5+273.15,  # Cool to 5°C
+        ins=S401-0,
+        outs='CooledHomogenate',
+        T=15+273.15,  # Return to <15°C per spec
         cool_only=True,
     )
-
+    
+    # =========================================================================
+    # STEP 3: Lysate Clarification (Debris Removal)
+    # =========================================================================
+    # High-speed centrifugation followed by depth filtration
+    # Goal: Remove cell wall ghosts, nucleic acids, lipids
+    
+    # Primary clarification - high-speed centrifuge for bulk solids
+    S402 = bst.SolidsCentrifuge(
+        'S402',
+        ins=H401-0,  # Cooled homogenate
+        outs=('CellDebris', 'CrudeLysate'),
+        split={'cellmass': 0.95,  # Undisrupted cells to debris
+               'Glucan': 0.90,     # Cell wall components
+               'Chitin': 0.85,
+               'OleicAcid': 0.70,  # Lipids partially removed
+               'RNA': 0.50,        # Partially pelleted
+               'Leghemoglobin': 0.02,  # Minimal loss of product
+               'Globin': 0.02,
+               'Mannoprotein': 0.30,
+               },
+        moisture_content=0.20,  # Relatively dry sludge
+    )
+    
+    # Secondary clarification - depth filtration (series: 30µm → 5µm → 0.5µm)
+    # Modeled as MF to remove colloidal haze
+    S403 = u.Filtration.from_preset(
+        'MF',
+        'S403',
+        ins=S402-1,  # Crude lysate
+        outs=('FilterCake', 'ClarifiedLysate'),
+        solid_capture_efficiency=0.95,  # Capture remaining debris
+        cake_moisture_content=0.30,
+    )
+    S403.add_specification(run=True)
+    
+    # Debris disposal via screw press for volume reduction
+    S404 = bst.ScrewPress(
+        'S404', 
+        ins=(S402-0, S403-0),  # Combined debris streams
+        outs=('DehydratedDebris', 'PressLiquor'),
+        split=0.999, 
+        moisture_content=0.20
+    )
+    
+    # =========================================================================
+    # STEP 4: Ultrafiltration & Diafiltration (UF/DF Purification)
+    # =========================================================================
+    # TFF with 3-10 kDa MWCO membrane
+    # LegH monomer is ~16 kDa - high retention expected
+    # VCF 5-10X, DF 5-7 diavolumes
+    
+    # DF buffer preparation with antioxidant
+    M403 = bst.MixTank('M403', ins=(DfUltraBuffer, 'DFBufferWater'), 
+                    outs='DFBufferOut', tau=0.5)
+    
+    @M403.add_specification(run=True)
+    def update_df_buffer():
+        # 6 diavolumes of DF buffer (middle of 5-7 range)
+        feed_water = S403.outs[1].imass['H2O']
+        M403.ins[1].imass['H2O'] = feed_water * 6
+        M403.ins[0].imol['DfUltraBuffer'] = M403.ins[1].imass['H2O'] * (0.025+0.01+0.001)/1000
+    
+    # Cool DF buffer
+    H402 = bst.HXutility(
+        'H402',
+        ins=M403-0,
+        outs='ColdDFBuffer',
+        T=5+273.15,  # Cold operation to preserve protein
+        cool_only=True,
+    )
+    
+    # UF/DF unit - combines concentration and buffer exchange
     U401 = u.Diafiltration.from_preset(
         'UF',
         'U401',
-        ins = (S404-1, H401-0),
-        outs = ('U401Out','PermeateWasteUltra'),
-        TargetProduct_ID = 'Leghemoglobin',
-        Salt_ID = c.chemical_groups['Salts'],
-        OtherLargeMolecules_ID = c.chemical_groups['OtherLargeMolecules'],
+        ins=(S403-1, H402-0),  # Clarified lysate + DF buffer
+        outs=('UFConcentrate', 'UFPermeate'),
+        TargetProduct_ID='Leghemoglobin',
+        Salt_ID=c.chemical_groups['Salts'],
+        OtherLargeMolecules_ID=c.chemical_groups['OtherLargeMolecules'],
+        TargetProduct_Retention=0.99,  # High LegH retention
+        Salt_Retention=0.05,  # Salts wash through
     )
     U401.add_specification(run=True)
-
-    #S404 = bst.SolidsSeparator('S404', ins=U401-1, outs=(effluent2, 'S404Out'), split=(1) , moisture_content=0.01)
-    #S405 = u.ReverseOsmosis('S405', ins=U401-1, outs=('S405Out',effluent2))
-
-    M402 = bst.MixTank('M402', ins=(IXEquilibriumBuffer,'Water5'), 
-                    outs='M402Out', tau=1)
-    M403 = bst.MixTank('M403', ins=(IXElutionBuffer,'Water6'),
-                    outs='M403Out', tau=1)
-    M404 = bst.MixTank('M404', ins=(IXRegenerationSolution,'Water7'), 
-                    outs='M404Out', tau=1)
-
-    H402 = bst.HXutility(
-        'H402',
-        ins=M402-0,
-        outs='H402Out',
-        T=5+273.15,  # Cool to 5°C
-        cool_only=True,
-    )
-    H403 = bst.HXutility(
-        'H403',
-        ins=M403-0,
-        outs='H403Out',
-        T=5+273.15,  # Cool to 5°C
-        cool_only=True,
-    )
-    H404 = bst.HXutility(
-        'H404', 
-        ins=M404-0,
-        outs='H404Out',
-        T=5+273.15,  # Cool to 5°C
-        cool_only=True,
-    )
-
-    U402 = u.ResinColumn2(
-        'U402',
-        ins = (U401-0, H402-0, H403-0, H404-0),
-        outs = ('U402Out','FlowthroughWaste','WashWaste','RegenerationWaste'),
-        preset='IonExchange',
-        TargetProduct_IDs = c.chemical_groups['LegHbIngredients'],
-        BoundImpurity_IDs=c.chemical_groups['BoundImpurities'],
-    )    
-
-    @M402.add_specification(run=True)
-    def update_IXEquilibriumBuffer_initial():
-        M402.ins[1].imass['H2O'] = (U401-0).imass['H2O']*U402.wash_CV
-        M402.ins[0].imol['IXEquilibriumBuffer'] = ((U401-0).imass['H2O']*U402.wash_CV)*(0.025+0.01+0.001)/1000
-    @M403.add_specification(run=True)
-    def update_IXElutionBuffer_initial():
-        M403.ins[1].imass['H2O'] = (U401-0).imass['H2O']*U402.elution_CV
-        M403.ins[0].imol['IXElutionBuffer'] = ((U401-0).imass['H2O']*U402.elution_CV)*(0.025+1+0.1)/1000
-    @M404.add_specification(run=True)
-    def update_IXRegenerationSolution_initial():
-        M404.ins[1].imass['H2O'] = (U401-0).imass['H2O']*U402.regeneration_CV
-        M404.ins[0].imol['NaOH'] = ((U401-0).imass['H2O']*U402.regeneration_CV)*(0.5)/1000
-
-    #S405 = bst.SolidsSeparator('S405', ins=U402-1, outs=(effluent3, 'S405Out'), split=(1) , moisture_content=0.01)
-    #S406 = u.ReverseOsmosis('S406', ins=U402-1, outs=('S406Out',effluent3))
-
-    M405 = bst.MixTank('M405', ins=(DfNanoBuffer,'Water8'), 
-                    outs='M405Out', tau=1)
-    @M405.add_specification(run=True)
-    def update_DfNanoBuffer_initial():
-        M405.ins[1].imass['H2O'] = (U402-0).imass['H2O']*2
-        M405.ins[0].imol['DfNanoBuffer'] = ((U402-0).imass['H2O']*2)*(0.01+0.01)/1000
-
-    H405 = bst.HXutility(
-        'H405',
-        ins=M405-0,
-        outs='H405Out',
-        T=5+273.15,  # Cool to 5°C
-        cool_only=True,
-    )
-
-    U403 = u.Diafiltration.from_preset(
-        'NF',
-        'U403',
-        ins = (U402-0, H405-0),
-        outs = ('U403Out','PermeateWasteNano'),
-        TargetProduct_ID = 'Leghemoglobin',
-        Salt_ID = c.chemical_groups['Salts'],
-        OtherLargeMolecules_ID = c.chemical_groups['OtherLargeMolecules'],
-    )
-    U403.add_specification(run=True)
-
-    #S406 = bst.SolidsSeparator('S406', ins=U403-1, outs=(effluent4, 'S406Out'), split=(1) , moisture_content=0.01)
-    #S407 = u.ReverseOsmosis('S407', ins=U403-1, outs=('S407Out',effluent4))
-
+    
+    # Final concentration to target protein content
     U404 = u.Ultrafiltration(
         'U404',
-        ins = (U403-0),
-        outs = ( 'U404Out', 'PermeateWater'),
-        TargetProduct_ID = 'Leghemoglobin',
-        Salt_ID = c.chemical_groups['Salts'],
-        OtherLargeMolecules_ID = c.chemical_groups['OtherLargeMolecules'],
-        TMP_bar = 3,
-        FeedWater_Recovery_to_Permeate = 0.75,  # Initial value, will be adjusted by spec
-        )
+        ins=U401-0,
+        outs=('ConcentratedLegH', 'ConcentrationPermeate'),
+        TargetProduct_ID='Leghemoglobin',
+        Salt_ID=c.chemical_groups['Salts'],
+        OtherLargeMolecules_ID=c.chemical_groups['OtherLargeMolecules'],
+        TMP_bar=3,
+        FeedWater_Recovery_to_Permeate=0.75,
+    )
     
-    # Target specifications from check_legH_specifications
-    U404.target_total_solids_percent = 12.0  # Target: 0-24%, aim for middle-low range
-    U404.target_legh_percent = 7.5  # Target: 6-9%, aim for middle
+    # Target: 6-10% LegH content in final product
+    U404.target_total_solids_percent = 12.0
+    U404.target_legh_percent = 7.5  # Middle of 6-9% range
     
     @U404.add_specification(run=True)
     def U404_adjust_water_recovery():
         """
-        Dynamically adjust water recovery to achieve target Leghemoglobin content percentage.
-        
-        The goal is to concentrate the product by removing water until LegHb reaches
-        the target percentage (6-9%, default target 7.5%).
-        
-        Key fix: Salt_Retention must be updated together with FeedWater_Recovery_to_Permeate.
+        Dynamically adjust water recovery to achieve target Leghemoglobin content.
         """
         import flexsolve as flx
         import warnings
@@ -408,149 +433,175 @@ def create_LegHb_system(
         feed_stream = U404.ins[0]
         product_stream = U404.outs[0]
         
-        # Safety check: ensure feed has content
         if feed_stream.F_mass <= 0:
             U404._run()
             return
         
-        # Check if LegHb exists in feed
         feed_legh = feed_stream.imass['Leghemoglobin']
         if feed_legh <= 0:
             U404._run()
             return
         
-        # Helper to set water recovery AND sync Salt_Retention
         def set_water_recovery(recovery):
-            """Set water recovery and sync Salt_Retention accordingly."""
-            recovery = max(0.05, min(0.99, recovery))  # Allow up to 99% water removal
+            recovery = max(0.05, min(0.99, recovery))
             U404.FeedWater_Recovery_to_Permeate = recovery
-            # Salt retention should be HIGH so salts stay with product
-            # When we remove water, we want to keep everything else
-            U404.Salt_Retention = 0.95  # Keep most salts in retentate
+            U404.Salt_Retention = 0.95
         
-        # Define objective function: adjust recovery to hit target LegHb %
         def calculate_legh_error(water_recovery):
-            """
-            Calculate error between actual and target LegHb percentage.
-            Positive error means we need MORE water removal (product too dilute).
-            Negative error means we removed too much water.
-            """
             set_water_recovery(water_recovery)
             U404._run()
-            
-            # Calculate LegHb percentage in retentate (product)
             product_total_mass = product_stream.F_mass
-            
             if product_total_mass <= 0:
-                return -100.0  # Error: no product
-            
+                return -100.0
             product_legh_mass = product_stream.imass['Leghemoglobin']
             actual_legh_percent = (product_legh_mass / product_total_mass) * 100
-            
-            # Return error: positive if we need more concentration
             return actual_legh_percent - U404.target_legh_percent
         
         try:
             with warnings.catch_warnings():
                 warnings.simplefilter("ignore")
-                
-                # Use IQ_interpolation to find optimal water recovery
-                # Note: higher recovery = more water removed = higher concentration
                 optimal_recovery = flx.IQ_interpolation(
                     f=calculate_legh_error,
-                    x0=0.50,  # Start at 50% water removal
-                    x1=0.99,  # Up to 99% water removal
-                    x=0.90,   # Initial guess: aggressive water removal
-                    xtol=0.001,
-                    ytol=0.1,  # 0.1% tolerance on LegHb content
-                    maxiter=50,
+                    x0=0.50, x1=0.99, x=0.90,
+                    xtol=0.001, ytol=0.1, maxiter=50,
                 )
-        
-            # Set optimal recovery and run final time
             set_water_recovery(optimal_recovery)
             U404._run()
-            
-        except Exception as e:
-            # Fallback: use aggressive recovery
+        except Exception:
             set_water_recovery(0.90)
             U404._run()
-
-    # S408 = bst.SprayDryer(
-    #     'S408', 
-    #     ins=U403-0,
-    #     outs=('EvaporatedWater', 'S408Out'),
-    #     moisture_content=0.90,  # 90% moisture content in the final product
-    # )
-    # S408.add_specification(run=True)
-
-    M501 = bst.MixTank('M501', ins=(S403-1,U401-1,U402-1,U402-2,U403-1,U404-1), 
-                    outs='M501Out', tau=1)
-    M501.add_specification(run=True)
-
-    T501 = u.SulfuricAcidStorageTank('T501', 
-                        ins=bst.Stream('SulfuricAcid', H2SO4=0.98,H2O=0.02, 
-                        units='kg/hr', price=price['H2SO4']), 
-                        outs='T501Out')
-    @T501.add_specification(run=True)
-    def update_acid_flowrate():
-        T501.ins[0].imol['H2SO4'] = U402.outs[3].imol['NaOH']/2*1.001
-        T501.ins[0].T = 25+273.15
-
-    M502 = bst.NeutralizationTank1('M502', ins=(U402-3,T501-0), outs='M502Out', T=20+273.15)
-
-    S501 = u.ReverseOsmosis('S501', ins=M501-0, outs=('RO_treated_water1', effluent1))
-    # effluent2 to neutralization and then to biological treatment
-
-    S502 = bst.Splitter('S502', ins=M502-0, outs=('SaltWaste', effluent2), split=[0.99,0.99,0.99], order=['H2O','Na2SO4','NaHSO4'])
-
-    S503 = u.ReverseOsmosis('S503', ins=S502-0, outs=('RO_treated_water2', effluent3))
-
+    
+    # =========================================================================
+    # STEP 5: Thermal Stabilization (HTST Pasteurization)
+    # =========================================================================
+    # 70-75°C for 15-45 seconds
+    # Inactivates pathogens, precipitates unstable host proteins
+    # LegH (stable heme-protein) remains soluble
+    
+    # Heat to pasteurization temperature
+    H403 = bst.HXutility(
+        'H403',
+        ins=U404-0,
+        outs='HeatedConcentrate',
+        T=72+273.15,  # 72°C (middle of 70-75°C range)
+        heat_only=True,
+    )
+    
+    # Hold time tank (~30 seconds = 0.0083 hours)
+    T401 = bst.MixTank(
+        'T401', 
+        ins=H403-0, 
+        outs='PasteurizedConcentrate', 
+        tau=30/3600  # 30 second hold time
+    )
+    
+    # =========================================================================
+    # STEP 6: Final Formulation & Cooling
+    # =========================================================================
+    # Add antioxidant and rapid chill to <4°C
+    
+    # Antioxidant stream (SodiumAscorbate) 
+    # Use existing SodiumAscorbate chemical from _chemicals.py
+    AntioxidantStream = bst.Stream(
+        'AntioxidantStream', 
+        SodiumAscorbate=0.1,  # Initial value, adjusted by spec
+        H2O=1.0,
+        units='kg/hr',
+        price=price.get('SodiumAscorbate', 5.0)  # Default price if not defined
+    )
+    
+    # Formulation mixer
+    M404 = bst.MixTank(
+        'M404', 
+        ins=(T401-0, AntioxidantStream), 
+        outs='FormulatedProduct',
+        tau=0.1
+    )
+    
+    @M404.add_specification(run=True)
+    def update_antioxidant():
+        # Target 0.1% w/w sodium ascorbate in final product
+        product_mass = T401.outs[0].F_mass
+        AntioxidantStream.imass['SodiumAscorbate'] = product_mass * 0.001
+        AntioxidantStream.imass['H2O'] = AntioxidantStream.imass['SodiumAscorbate'] * 9  # 10% solution
+    
+    # Final rapid cooling to <4°C
     H406 = bst.HXutility(
         'H406',
-        ins=U404-0,
+        ins=M404-0,
         outs=LegHb_3,
-        T=0+273.15,  # Cool to 0°C
+        T=4+273.15,  # 4°C per spec (not 0°C as before)
         cool_only=True,
     )
-
-    # # ### Facilities ###
+    
+    # =========================================================================
+    # WASTEWATER TREATMENT & WATER RECOVERY
+    # =========================================================================
+    # Collect permeate streams for RO treatment and recycle
+    
+    M501 = bst.MixTank(
+        'M501', 
+        ins=(S404-1, C401-1, C402-1, U401-1, U404-1),  # All liquid waste streams
+        outs='CombinedWastewater', 
+        tau=1
+    )
+    M501.add_specification(run=True)
+    
+    # RO treatment for water recovery
+    S501 = u.ReverseOsmosis('S501', ins=M501-0, outs=('RO_treated_water1', effluent1))
+    
+    # Note: IXEquilibriumBuffer, IXElutionBuffer, IXRegenerationSolution, DfNanoBuffer
+    # are no longer used in this design but kept in factory signature for compatibility
+    # They can be set to zero flow in the calling code if desired
+    
+    # Minimal waste streams for unused IX buffers (redirect to effluent)
+    # These streams exist but have zero flow - kept for backwards compatibility
+    M502_compat = bst.Mixer('M502_compat', 
+                            ins=(IXEquilibriumBuffer, IXElutionBuffer, IXRegenerationSolution, DfNanoBuffer),
+                            outs=effluent2)
+    
+    # Second RO for any overflow (placeholder for future expansion)
+    S503_feed = bst.Stream('S503_feed', H2O=0.001, units='kg/hr')  # Minimal flow
+    S503 = u.ReverseOsmosis('S503', ins=S503_feed, outs=('RO_treated_water2', effluent3))
+    
+    # =========================================================================
+    # FACILITIES
+    # =========================================================================
     CT = bst.CoolingTower(500 if use_area_convention else 'CT')
     CWP = bst.ChilledWaterPackage(500 if use_area_convention else 'CWP')
-
-    #ADP = bst.AirDistributionPackage(500 if use_area_convention else 'ADP')
-
+    
     BT = bst.BoilerTurbogenerator(400 if use_area_convention else 'BT',
-        (S403-0, 'gas_to_boiler', 'boiler_makeup_water', 'natural_gas', 'lime_boiler', 'boiler_chems'),
+        (S404-0, 'gas_to_boiler', 'boiler_makeup_water', 'natural_gas', 'lime_boiler', 'boiler_chems'),
         outs=('emissions', 'rejected_water_and_blowdown', 'ash_disposal'),
         boiler_efficiency=0.80,
         turbogenerator_efficiency=0.85,
         satisfy_system_electricity_demand=False,
     )
-
+    
     makeup_water_streams = (F.cooling_tower_makeup_water,
                             F.Water1, F.Water2,
-                            F.Water3, F.Water4,
-                            F.Water5, F.Water6,
-                            F.Water7, F.Water8,
+                            F.Water3, F.WashWater,
+                            F.DFBufferWater,
                             F.boiler_makeup_water)
-    process_water_streams = (F.S501.outs[1],F.S503.outs[1],
+    process_water_streams = (F.S501.outs[1],
                             *makeup_water_streams)
-
+    
     makeup_water = bst.Stream('makeup_water', price=0.000254)
-
+    
     PWC = bst.ProcessWaterCenter(500 if use_area_convention else 'PWC',
         ins=('recycled_RO_water', makeup_water, 'recycled_process_water', 'makeup_process_water'),
         outs=('RO_water', 'process_water', 'excess_water'),
         makeup_water_streams=makeup_water_streams,
         process_water_streams=process_water_streams,
-        reverse_osmosis_water_price=0.000254,  # USD/kg
-        process_water_price=0.000135,  # USD/kg
+        reverse_osmosis_water_price=0.000254,
+        process_water_price=0.000135,
     )
-    # HXN = bst.HeatExchangerNetwork(600 if use_area_convention else 'HXN')
-    # load_process_settings()  # Load process settings to update prices and CFs
-    s.update_all_input_stream_prices(streamlist=[SeedIn1, SeedIn2, CultureIn, Glucose, NH3_25wt, DfUltraBuffer, IXEquilibriumBuffer, IXElutionBuffer, IXRegenerationSolution, DfNanoBuffer])
+    
+    # Update input stream prices (only used streams)
+    s.update_all_input_stream_prices(streamlist=[SeedIn1, SeedIn2, CultureIn, Glucose, NH3_25wt, DfUltraBuffer])
 
-    return LegHb_3, vent1, vent2, effluent1, effluent2,effluent3, DfUltraBuffer, IXEquilibriumBuffer, IXElutionBuffer, IXRegenerationSolution, DfNanoBuffer
+    return LegHb_3, vent1, vent2, effluent1, effluent2, effluent3, DfUltraBuffer, IXEquilibriumBuffer, IXElutionBuffer, IXRegenerationSolution, DfNanoBuffer
+
 
 # %% Design Specification Functions
 
