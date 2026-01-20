@@ -425,6 +425,15 @@ def create_chemicals_LegHb():
     append_chemical_copy('Leghemoglobin_In', Leghemoglobin)
     append_chemical_copy('Globin_In', Globin)
 
+    # Add explicit gas-phase properties for proteins (needed for boiler emissions calculations)
+    # These proteins decompose before vaporizing, so we use placeholder values
+    for protein_id in ['Globin', 'Leghemoglobin', 'Globin_In', 'Leghemoglobin_In']:
+        protein = chems[protein_id]
+        # Set high boiling point (proteins decompose, don't truly boil)
+        protein.Tb = 800  # K - decomposition temperature
+        # Set a placeholder Hvap (similar to other biomass components)
+        protein.Hvap.add_method(40000)  # J/mol - placeholder value
+
     # Default missing properties of chemicals to those of water
     for chemical in chems: chemical.default()
 

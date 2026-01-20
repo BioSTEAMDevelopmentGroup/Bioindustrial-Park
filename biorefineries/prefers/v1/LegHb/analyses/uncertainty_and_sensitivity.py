@@ -38,7 +38,7 @@ from functools import partial
 # Worker Function for Parallel Execution
 # =============================================================================
 
-def evaluate_single_sample(sample_index_and_data, baseline_production_kg_hr, exclude_production_scale=False):
+def evaluate_single_sample(sample_index_and_data, baseline_production_kg_hr, exclude_production_scale=False, config='config1'):
     """
     Worker function to evaluate a single Monte Carlo sample.
     
@@ -50,11 +50,13 @@ def evaluate_single_sample(sample_index_and_data, baseline_production_kg_hr, exc
         Baseline production rate
     exclude_production_scale : bool
         If True, fix production scale to baseline
+    config : str, optional
+        Process configuration to use. Default is 'config1'.
     """
     index, sample = sample_index_and_data
     
     try:
-        model = create_model(baseline_production_kg_hr=baseline_production_kg_hr, verbose=False)
+        model = create_model(baseline_production_kg_hr=baseline_production_kg_hr, config=config, verbose=False)
         
         # Dictionary to store ACTUAL parameter values used in simulation
         param_values = {}
@@ -101,7 +103,7 @@ def evaluate_single_sample(sample_index_and_data, baseline_production_kg_hr, exc
 # =============================================================================
 
 def run_monte_carlo(model, N_target, baseline_production_kg_hr, exclude_production_scale=False, 
-                   batch_size=100, scenario_name=""):
+                   batch_size=100, scenario_name="", config='config1'):
     """
     Run robust parallel Monte Carlo simulation.
     
@@ -119,6 +121,8 @@ def run_monte_carlo(model, N_target, baseline_production_kg_hr, exclude_producti
         Number of samples per batch
     scenario_name : str
         Description of the scenario for logging
+    config : str, optional
+        Process configuration to use. Default is 'config1'.
         
     Returns
     -------
@@ -147,7 +151,8 @@ def run_monte_carlo(model, N_target, baseline_production_kg_hr, exclude_producti
     
     worker_func = partial(evaluate_single_sample, 
                          baseline_production_kg_hr=baseline_production_kg_hr,
-                         exclude_production_scale=exclude_production_scale)
+                         exclude_production_scale=exclude_production_scale,
+                         config=config)
     
     # Robust sampling loop
     while len(valid_results) < N_target:
@@ -405,21 +410,37 @@ def generate_2d_contour_plots(results_table, param_indices, metric_indices, time
 # =============================================================================
 
 if __name__ == '__main__':
+    import argparse
+    from biorefineries.prefers.v1.LegHb.system import get_available_configs
+    
     mp.freeze_support()
     np.random.seed(1234)
+    
+    # Parse command line arguments for config selection
+    parser = argparse.ArgumentParser(description='LegHemoglobin Uncertainty Analysis')
+    parser.add_argument('--config', type=str, default='config1',
+                        choices=get_available_configs(),
+                        help='Process configuration to use (default: config1)')
+    parser.add_argument('--production', type=float, default=275,
+                        help='Baseline production rate in kg/hr (default: 275)')
+    parser.add_argument('--samples', type=int, default=100,
+                        help='Number of Monte Carlo samples (default: 100)')
+    args, _ = parser.parse_known_args()
+    
+    CONFIG = args.config
     
     now = datetime.now()
     timestamp = now.strftime('%Y.%m.%d-%H.%M')
     
     # Create results directory under the script's location
     SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
-    RESULTS_DIR = os.path.join(SCRIPT_DIR, f"results_{now.strftime('%Y%m%d_%H%M')}")
+    RESULTS_DIR = os.path.join(SCRIPT_DIR, f"results_{CONFIG}_{now.strftime('%Y%m%d_%H%M')}")
     os.makedirs(RESULTS_DIR, exist_ok=True)
     print(f"Results will be saved to: {RESULTS_DIR}")
     
     print("="*80)
-    print("LEGHEMOGLOBIN PRODUCTION - COMPREHENSIVE UNCERTAINTY & SENSITIVITY ANALYSIS")
-    print("PreFerS (Precision Fermentation System)")
+    print(f"LEGHEMOGLOBIN PRODUCTION - COMPREHENSIVE UNCERTAINTY & SENSITIVITY ANALYSIS")
+    print(f"PreFerS (Precision Fermentation System) - CONFIG: {CONFIG.upper()}")
     print("="*80)
     print("\nAnalysis Strategy:")
     print("  1. Monte Carlo WITHOUT Production Scale → Spearman, KDE, Contours")
@@ -430,20 +451,21 @@ if __name__ == '__main__':
     # =============================================================================
     # CONFIGURATION PARAMETERS
     # =============================================================================
-    baseline_production_kg_hr = 275      # Baseline production rate [kg/hr]
-    N_target = 100                      # Number of valid samples per scenario
-    batch_size = 100                     # Number of samples per batch max 30000
+    baseline_production_kg_hr = args.production  # Baseline production rate [kg/hr]
+    N_target = args.samples                      # Number of valid samples per scenario
+    batch_size = 100                             # Number of samples per batch max 30000
     
     # %%    
     print(f"\nConfiguration:")
+    print(f"  Process config: {CONFIG}")
     print(f"  Baseline production: {baseline_production_kg_hr} kg/hr")
     print(f"  Target samples: {N_target} per scenario")
     print(f"  Batch size: {batch_size} samples per batch")
     print("="*80)
     
-    # Create model
-    print("\nCreating model...")
-    model = create_model(baseline_production_kg_hr=baseline_production_kg_hr)
+    # Create model with selected configuration
+    print(f"\nCreating model (config={CONFIG})...")
+    model = create_model(baseline_production_kg_hr=baseline_production_kg_hr, config=CONFIG)
     
     print("\nModel Parameters:")
     model.show()
@@ -469,7 +491,8 @@ if __name__ == '__main__':
         baseline_production_kg_hr=baseline_production_kg_hr,
         exclude_production_scale=True,
         batch_size=batch_size,  # ← USE CONFIGURED BATCH SIZE
-        scenario_name="Fermentation Parameters Only (Fixed Scale)"
+        scenario_name="Fermentation Parameters Only (Fixed Scale)",
+        config=CONFIG
     )
     
     # Save results
@@ -488,7 +511,8 @@ if __name__ == '__main__':
         baseline_production_kg_hr=baseline_production_kg_hr,
         exclude_production_scale=False,
         batch_size=batch_size,  # ← USE CONFIGURED BATCH SIZE
-        scenario_name="All Parameters Including Production Scale"
+        scenario_name="All Parameters Including Production Scale",
+        config=CONFIG
     )
     
     # Save results

@@ -281,14 +281,27 @@ class PreFerSTEA(bst.TEA):
 # %%
 if __name__ == '__main__':
 
+    import argparse
     import biosteam as bst
-    from biorefineries.prefers.v1.LegHb.system._config2 import create_LegHb_system
+    from biorefineries.prefers.v1.LegHb.system import create_LegHb_system, get_available_configs
     from biorefineries.prefers.v1.LegHb._chemicals import create_chemicals_LegHb
     from biorefineries.prefers.v1._process_settings import load_process_settings
     from biosteam import settings
     
+    # Parse command line arguments for config selection
+    parser = argparse.ArgumentParser(description='LegHemoglobin TEA Analysis')
+    parser.add_argument('--config', type=str, default='config1',
+                        choices=get_available_configs(),
+                        help='Process configuration to use (default: config1)')
+    parser.add_argument('--production', type=float, default=275,
+                        help='Target production rate in kg/hr (default: 275)')
+    args, _ = parser.parse_known_args()
+    
+    CONFIG = args.config
+    TARGET_PRODUCTION = args.production
+    
     print("="*85)
-    print("LEGHEMOGLOBIN TEA - WITH DESIGN SPECIFICATION")
+    print(f"LEGHEMOGLOBIN TEA - WITH DESIGN SPECIFICATION (CONFIG: {CONFIG.upper()})")
     print("="*85)
     
     # 1. FORCE the correct thermodynamics FIRST (before any system creation)
@@ -298,14 +311,14 @@ if __name__ == '__main__':
     # 2. Load process settings
     load_process_settings()
     
-    # 3. Create system
-    print("\n1. Creating LegHb system...")
-    LegHb_sys = create_LegHb_system()
+    # 3. Create system with selected configuration
+    print(f"\n1. Creating LegHb system (config={CONFIG})...")
+    LegHb_sys = create_LegHb_system(config=CONFIG)
     LegHb_sys.operating_hours = 8000
     # multiple production rate
     n=1
     # Define target production rate
-    TARGET_PRODUCTION = 275 * n  # kg/hr
+    TARGET_PRODUCTION = TARGET_PRODUCTION * n  # kg/hr
     
     print(f"\n2. Running baseline simulation...")
     LegHb_sys.simulate()

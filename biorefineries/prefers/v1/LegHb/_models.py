@@ -16,7 +16,7 @@ from biorefineries.prefers.v1._process_settings import load_process_settings
 
 __all__ = ('create_model',)
 
-def create_model(baseline_production_kg_hr=275, verbose=True):
+def create_model(baseline_production_kg_hr=275, config='config1', verbose=True):
     """
     Create a Model object for uncertainty and sensitivity analysis of the LegHb production facility.
     
@@ -24,6 +24,11 @@ def create_model(baseline_production_kg_hr=275, verbose=True):
     ----------
     baseline_production_kg_hr : float, optional
         Baseline target production rate [kg/hr]. Default is 275 kg/hr.
+    config : str, optional
+        Process configuration to use: 'config1' (food-grade) or 'config2' (research-grade).
+        Default is 'config1'.
+    verbose : bool, optional
+        Print progress messages. Default True.
     
     Returns
     -------
@@ -32,12 +37,12 @@ def create_model(baseline_production_kg_hr=275, verbose=True):
     """
     # Load process settings and create system
     load_process_settings()
-    LegHb_sys = create_LegHb_system()
+    LegHb_sys = create_LegHb_system(config=config)
     
     # Set baseline production rate using design specification
     if verbose:
-        print(f"Setting baseline production rate to {baseline_production_kg_hr} kg/hr...")
-    set_production_rate(LegHb_sys, baseline_production_kg_hr, verbose=verbose)
+        print(f"Setting baseline production rate to {baseline_production_kg_hr} kg/hr (config={config})...")
+    set_production_rate(LegHb_sys, baseline_production_kg_hr, config=config, verbose=verbose)
     
     # Create TEA object
     LegHb_tea = PreFerSTEA(

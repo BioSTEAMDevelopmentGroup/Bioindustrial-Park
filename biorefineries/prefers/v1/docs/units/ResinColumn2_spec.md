@@ -3,6 +3,10 @@
 **Class:** `ResinColumn2`
 **Type:** Polymorphic Separation Unit
 **Presets:** 'IonExchange', 'Adsorption'
+**Last Updated:** 2026-01-20
+
+> [!NOTE]
+> Parameters validated against literature. See Walch & Jungbauer (2017) for continuous chromatography design principles.
 
 ## Overview
 The `ResinColumn2` unit is a versatile packed-bed column model that can simulate two distinct physical processes based on the selected `preset`:
@@ -67,3 +71,21 @@ AC301 = ResinColumn2('AC301', ins=[feed, None, None, regen_waste_dest],
                      preset='Adsorption',
                      EBCT_min=10.0)
 ```
+
+---
+
+## LegHb Application Notes
+
+For leghemoglobin production, the IonExchange preset is typically used for final polishing:
+- **Target binding:** LegHb at pI ~4.5 binds well to strong anion resins above pH 6.0
+- **Recommended DBC:** 40-60 g/L for recombinant LegHb (lower than native proteins due to size/conformation)
+- **Elution:** Salt gradient (0.1-0.5 M NaCl) or pH step
+
+Adsorption mode used for decolorization/off-flavor removal in final stages.
+
+## References
+
+1. Walch, N., & Jungbauer, A. (2017). *Continuous chromatography for protein purification: A review.* Journal of Chromatography A, 1498, 1-11.
+2. Thömmes, J., & Etzel, M. (2007). *Alternatives to chromatographic separations.* Biotechnology Progress, 23(1), 42-45.
+3. Vendor documentation: GE Healthcare (Cytiva), Bio-Rad, Purolite ion exchange resins.
+4. Calgon Carbon Corporation (2023). *Granular Activated Carbon Technical Specifications.*

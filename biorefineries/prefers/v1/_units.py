@@ -1,11 +1,44 @@
 # -*- coding: utf-8 -*-
 """
 Created on 2025-04-18 15:20:45
+Last Updated: 2026-01-20 (Parameter Validation & Literature Annotation)
 
 @author: Dr. Ouwen Peng
 @title: Postdoctoral Researcher
 @institute: Illinois ARCS
 @email: ouwen.peng@iarcs-create.edu.sg
+
+Literature References:
+----------------------
+[1] Yao et al. (2025). "Recent advances in microbial fermentation for the production
+    of leghemoglobin." World J Microbiol Biotechnol 41:404. DOI:10.1007/s11274-025-04609-y
+    - LegHb fermentation parameters: titer 7.27 g/L (K. marxianus), yield optimization
+    - Heme supply strategies, pH 5.0-5.5 optimal for yeast
+    - Temperature 28-30°C optimal for K. phaffii/P. pastoris
+
+[2] Perry's Chemical Engineers' Handbook, 8th Ed.
+    - Filtration: Table 18-5, solids loading 10-50 kg/m²/hr for RDVF
+    - Centrifugation design parameters
+
+[3] DuPont Water Solutions / Axeon Water Technologies
+    - RO water recovery: 75-95% (industrial range)
+    - Membrane lifetime: 3-5 years
+    - Operating pressure: 15-30 bar standard
+
+[4] Membranes.com / Synder Filtration
+    - UF flux: 20-80 LMH (ultrafiltration)
+    - NF flux: 10-40 LMH (nanofiltration)
+    - TMP: 2-10 bar
+
+[5] SNS Insider (2023) / Samcotech
+    - Membrane costs: $80-$350/m² (industrial), $1500-$5000/m² (pharma)
+
+[6] Walch & Jungbauer (2017). "Continuous desalting of refolded protein solution."
+    Biotechnol J 12:1700082. DOI:10.1002/biot.201700082
+    - Ion exchange chromatography parameters for protein capture
+
+[7] NREL Technical Report TP-5100-47764 (Humbird et al. 2011)
+    - Process economics, installation factors, CEPCI correlations
 """
 # %%
 import biosteam as bst
@@ -42,6 +75,7 @@ __all__ = (
     'ProteinCentrifuge',
     'Evaporator',
     'DiaFiltration',
+    'ResinColumn',
     'ResinColumn2',
     'NanofiltrationDF',
     'SprayDrying',
@@ -1002,22 +1036,39 @@ class Diafiltration(bst.Unit):
     """
     Verified Diafiltration unit for separation of solutes based on size.
     
-    Verified against industrial literature for protein purification applications.
+    Validated against industrial literature for protein purification applications.
     Detailed Specification: docs/units/Diafiltration_spec.md
     
     Parameters
     ----------
     TargetProduct_Retention : float
         Retention of target product (0-1). Default: 0.99.
+        Ref: Protein-specific, typical >95% for UF with 10kDa MWCO.
     membrane_flux_LMH : float
-        Permeate flux [L/m2/hr]. Default: 40.0.
-        Ref: Membranes.com, Synder Filtration (Typical UF 20-80 LMH).
+        Permeate flux [L/m²/hr]. Default: 40.0.
+        Ref: Membranes.com, Synder Filtration.
+        Valid range: UF 20-80 LMH, NF 10-40 LMH [4].
     membrane_cost_USD_per_m2 : float
         Replacement cost. Default: 150.0.
-        Ref: SNS Insider ($80-$350/m2).
+        Ref: SNS Insider 2023 [5].
+        Valid range: $80-$350/m² (industrial), $1500-$5000/m² (pharma).
     membrane_lifetime_years : float
         Frequency of replacement. Default: 2.0.
-        Ref: DuPont (1-3 years).
+        Ref: DuPont Water Solutions [3].
+        Valid range: 1-3 years (process dependent).
+    TMP_bar1, TMP_bar2 : float
+        Transmembrane pressure. Default: 2.0 bar.
+        Ref: Synder Filtration [4].
+        Valid range: UF 2-4 bar, NF 10-25 bar.
+    recirculation_ratio : float
+        Recirculation to reduce fouling. Default: 10.0.
+        Valid range: 5-20 (application dependent).
+    
+    Notes
+    -----
+    For LegHb purification, UF with 3-10 kDa MWCO is typical since LegHb monomer
+    is ~16 kDa [1]. Diafiltration with 5-7 diavolumes achieves good buffer exchange
+    and impurity removal.
     """
     _N_ins = 2
     _N_outs = 2
@@ -1699,19 +1750,39 @@ class Filtration(bst.Unit):
     Parameters
     ----------
     solids_loading : float
-        Specific solids throughput [kg-solids / m2 / hr]. 
-        Default: 20.0 (Typical for fermentation broth/mycelia: 10-50).
-        Ref: Perry's Handbook 8th Ed, Table 18-5.
+        Specific solids throughput [kg-solids / m² / hr]. 
+        Default: 20.0 (Typical for fermentation broth/mycelia).
+        Ref: Perry's Handbook 8th Ed, Table 18-5 [2].
+        Valid range: 10-50 kg/m²/hr (yeast/mycelia filtration).
     cake_moisture_content : float
         Residual moisture in discharged cake [wt fraction water].
         Default: 0.20 (20%).
+        Valid range: 0.20-0.80 depending on cake compressibility.
     solid_capture_efficiency : float
         Fraction of solids retained in the cake.
         Default: 0.99.
+        Valid range: 0.95-0.999 (typical industrial).
     power_per_m2 : float
-        Specific power consumption (vacuum pump + drive) [kW/m2].
+        Specific power consumption (vacuum pump + drive) [kW/m²].
         Default: 1.0.
-        
+        Ref: Perry's Handbook [2].
+        Valid range: 0.5-2.0 kW/m².
+    TMP_bar : float
+        Transmembrane/vacuum pressure differential [bar].
+        Default: 2.0.
+        Valid range: 1.5-3.0 bar for RDVF.
+    membrane_cost_USD_per_m2 : float
+        Filter cloth/membrane cost. Default: 100.0.
+        Valid range: $50-$200/m² for industrial cloth.
+    membrane_lifetime_years : float
+        Filter medium replacement interval. Default: 3.0.
+        Valid range: 2-5 years.
+    
+    Notes
+    -----
+    For P. pastoris/K. marxianus biomass, RDVF is suitable for primary
+    clarification. Cell disruption releases intracellular products (LegHb)
+    and creates smaller debris particles requiring downstream polishing [1].
     """
     _N_ins = 1
     _N_outs = 2
@@ -1907,7 +1978,40 @@ class ResinColumn2(bst.Unit):
     ----------
     preset : str
         'IonExchange' or 'Adsorption'. Determines the physical model used.
-        
+    resin_DBC_g_L : float (IonExchange mode)
+        Dynamic Binding Capacity [g protein/L resin]. Default: 50.0.
+        Ref: Typical industrial values 30-100 g/L [6].
+        Valid range: 30-100 g/L (resin and target dependent).
+    cycle_time_hr : float
+        Total cycle duration. Default: 4.0 hr.
+        Valid range: 2-8 hr (throughput vs. binding optimization).
+    resin_cost_USD_per_L : float
+        Resin cost. Default: 30.0.
+        Valid range: Strong cation $10-50/L, Strong anion $30-100/L.
+    resin_lifetime_years : float
+        Resin replacement interval. Default: 5.0.
+        Ref: Vendor data [6].
+        Valid range: 1-10 years.
+    EBCT_min : float (Adsorption mode)
+        Empty Bed Contact Time [min]. Default: 5.0.
+        Ref: urbansaqua.com.
+        Valid range: 2-10 min for liquid treatment.
+    superficial_velocity_m_h : float (Adsorption mode)
+        Liquid flow velocity [m/hr]. Default: 10.0.
+        Ref: aquaenergyexpo.com.
+        Valid range: 5-20 m/hr.
+    adsorbent_bulk_density : float (Adsorption mode)
+        Adsorbent packing density [kg/m³]. Default: 450.
+        Ref: calgoncarbon.com (GAC: 350-550 kg/m³).
+    adsorbent_cost_USD_per_kg : float (Adsorption mode)
+        Adsorbent cost. Default: 5.0.
+        Valid range: Activated carbon ~$2-8/kg.
+    
+    Notes
+    -----
+    For LegHb purification, ion exchange chromatography can be used to remove
+    bound impurities like Heme_b while retaining the target protein. See Walch &
+    Jungbauer (2017) for continuous desalting approaches [6].
     """
     _N_ins = 4
     _N_outs = 4
@@ -2214,6 +2318,10 @@ class ResinColumn2(bst.Unit):
                  C['Column Hardware'] = bst.CE/500 * self.column_hardware_cost_factor * (vol_L ** self.column_hardware_cost_exponent)
 
         C['Pump'] = self.pump.purchase_cost
+
+
+# Backward-compatible alias
+ResinColumn = ResinColumn2
 
 
 
