@@ -392,7 +392,7 @@ def create_area_400_recovery(broth_in, DfUltraBuffer_wash):
         Dictionary of area units and output streams
     """
     # Primary harvest centrifuge
-    C401 = bst.SolidsCentrifuge(
+    C401 = u.Centrifuge(
         'C401',
         ins=broth_in,
         outs=('CellCream', 'SpentMedia'),
@@ -433,7 +433,7 @@ def create_area_400_recovery(broth_in, DfUltraBuffer_wash):
                             outs='WashedCellSlurry', tau=0.25)
     
     # Second centrifuge for washed cells
-    C402 = bst.SolidsCentrifuge(
+    C402 = u.Centrifuge(
         'C402',
         ins=M402_wash-0,
         outs=('WashedCellCream', 'WashEffluent'),

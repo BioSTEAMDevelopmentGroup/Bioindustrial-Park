@@ -51,6 +51,7 @@ from biosteam.units.design_tools import CEPCI_by_year, cylinder_diameter_from_vo
 from biosteam import tank_factory
 from thermosteam import MultiStream
 from biosteam.units.decorators import cost
+from biosteam.exceptions import lb_warning
 from biosteam.units.design_tools import size_batch
 import biosteam as bst
 import numpy as np
@@ -636,22 +637,35 @@ class CellDisruption(bst.Unit):
         # This is the key: they are not attached to `self`.
         
         # 1. Multi-stage pump system to achieve high pressure
-        # Calculate number of stages needed (typical compression ratio ~3-5 per stage)
-        compression_ratio_per_stage = 4.0
-        n_stages = max(1, int(np.ceil(np.log(self.P_high / feed.P) / np.log(compression_ratio_per_stage))))
-        
-        # Create pressure stages
-        pressure_stages = [feed.P * (compression_ratio_per_stage ** i) for i in range(1, n_stages + 1)]
-        pressure_stages[-1] = self.P_high  # Ensure final pressure is exact
-        
-        # Create and simulate multi-stage pumps
-        total_power = 0
+        # Goal: use the least number of pumps while keeping per-stage head within
+        # a practical centrifugal range to avoid pump-type warnings.
+        # Typical industrial centrifugal pumps handle <= 8,000 ft head per stage.
+        # This algorithm maximizes per-stage pressure rise under both head and
+        # compression-ratio constraints.
+        max_head_ft = 8000.0
+        max_pressure_ratio = 4.0
+        g = 9.80665  # m/s^2
+        rho = max(feed.rho, 1e-6)  # kg/m3, prevent divide-by-zero
+        max_deltaP_by_head = max_head_ft * 0.3048 * rho * g  # Pa
+
+        total_power = 0.0
         current_stream = feed.copy()
-        
+        current_P = max(feed.P, 101325.0)
+        target_P = self.P_high
+
+        pressure_stages = []
+        while current_P < target_P:
+            max_deltaP_by_ratio = current_P * (max_pressure_ratio - 1.0)
+            deltaP = min(max_deltaP_by_head, max_deltaP_by_ratio, target_P - current_P)
+            next_P = current_P + max(deltaP, 1.0)
+            pressure_stages.append(next_P)
+            current_P = next_P
+
         for target_pressure in pressure_stages:
             temp_pump = bst.Pump(
-            ins=current_stream.copy(),
-            P=target_pressure
+                ID=None,
+                ins=current_stream.copy(),
+                P=target_pressure,
             )
             temp_pump.simulate()
             total_power += temp_pump.power_utility.rate
@@ -695,7 +709,45 @@ class CellDisruption(bst.Unit):
         self.baseline_purchase_costs['High-Pressure Homogenizer'] = self.design_results['Purchase cost (USD)']
 
 
-class Centrifuge(bst.SolidsCentrifuge):pass
+class Centrifuge(bst.SolidsCentrifuge):
+        """
+        Centrifuge with expanded solids-loading range for small-scale operation.
+
+        Notes
+        -----
+        - BioSTEAM default bounds are 1-20 (reciprocating pusher) and 2-40 (scroll
+            solid bowl) ton/hr. For pilot-scale operations (0.1-2 ton/hr), we allow
+            extrapolation of the Humbird/Seider correlation to avoid over-warning
+            while keeping the same cost exponent.
+        - Cost scaling remains consistent with BioSTEAM (Humbird et al. 2011; Seider
+            et al. 2017), but the lower bound is extended for small solids loading.
+        """
+        solids_loading_range = {
+                'reciprocating_pusher': (0.1, 20),
+                'scroll_solid_bowl': (0.1, 40),
+        }
+
+        #: Minimum solids loading used for cost extrapolation (ton/hr)
+        min_solids_loading_cost = 0.1
+
+        def _design(self):
+                solids, centrifuge_type = self._solids, self.centrifuge_type
+                ts = sum([s.imass[solids].sum() for s in self.ins if not s.isempty()])
+                ts *= 0.0011023  # To short tons (2000 lbs/hr)
+                self.design_results['Solids loading'] = ts
+                lb, ub = self.solids_loading_range[centrifuge_type]
+                if ts < lb:
+                    lb_warning(self, 'Solids loading', ts, 'ton/hr', lb)
+                self.design_results['Number of centrifuges'] = int(np.ceil(ts/ub)) if ub else 1
+
+                # Extrapolate cost down to min_solids_loading_cost
+                ts_cost = max(ts, self.min_solids_loading_cost)
+                cost = 68040 * (ts_cost**0.5) if centrifuge_type else 170100 * (ts_cost**0.3)
+                cost *= bst.CE / 567
+                self.baseline_purchase_costs['Centrifuges'] = cost
+                self.F_BM['Centrifuges'] = 2.03
+                self.design_results['Flow rate'] = F_vol_in = self.F_vol_in
+                self.power_utility(F_vol_in * self.kWhr_per_m3)
 
 class ReverseOsmosis(bst.Unit):
     """
