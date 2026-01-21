@@ -8,14 +8,15 @@ This codebase implements the "Process Evaluation and Feedstock Engineering for R
 
 ## Directory Map
 
-| Directory                 | Description                                                                                                   |
-| :------------------------ | :------------------------------------------------------------------------------------------------------------ |
-| `v1/LegHb/`                | **Leghemoglobin Module**. Contains `system/` (flowsheet configs), `_chemicals.py`, `_tea.py`, `_models.py`, and `analyses/`. |
-| `v1/LegHb/system/`         | System configurations: `_config1.py` (food-grade HTST), `_config2.py` (research-grade with IX). |
-| `v1/LegHb/analyses/`       | Uncertainty and sensitivity analysis scripts. |
-| `v1/HemDx/`              | **HemDx Module**. Protein-free Heme B production logic.                                                      |
-| `v1/_units.py`            | **Process Library**. Shared library of custom Unit Operations (SeedTrain, Disruption, Ultrafiltration, etc.). |
-| `v1/_process_settings.py` | **Data Interface**. Global Truth for Utility Prices and LCA Factors.                                          |
+| Directory                 | Description                                                                                                                  |
+| :------------------------ | :--------------------------------------------------------------------------------------------------------------------------- |
+| `v1/LegHb/`               | **Leghemoglobin Module**. Contains `system/` (flowsheet configs), `_chemicals.py`, `_tea.py`, `_models.py`, and `analyses/`. |
+| `v1/LegHb/system/`        | System configurations: `_config1.py` (food-grade HTST), `_config2.py` (research-grade with IX).                              |
+| `v1/LegHb/analyses/`      | Uncertainty and sensitivity analysis scripts.                                                                                |
+| `v1/HemDx/`               | **HemDx Module**. Protein-free Heme B production logic.                                                                      |
+| `v1/_units.py`            | **Process Library**. Shared library of custom Unit Operations (SeedTrain, Disruption, Ultrafiltration, etc.).                |
+| `v1/_process_settings.py` | **Data Interface**. Global Truth for Utility Prices and LCA Factors.                                                         |
+| `v1/utils/`               | **Utilities & Plotting**. Plotting styles, helper functions, and file I/O.                                                   |
 
 ## Documentation Index
 
@@ -28,6 +29,7 @@ This codebase implements the "Process Evaluation and Feedstock Engineering for R
 4.  [Unit Operations Catalog](Unit_Operations_Catalog.md) - Design parameters, sizing logic, and costing models for all custom units
 5.  [System Architecture](System_Architecture.md) - High-level system design
 6.  [Data Interface](Data_Interface.md) - Process settings and LCA factors
+7.  [Utilities & Plotting](../utils/README.md) - Plotting suite and helper functions
 
 ## Quick Start
 
@@ -60,20 +62,29 @@ Optional arguments for config selection:
 python v1/LegHb/_tea.py --config config2 --production 500
 ```
 
-### 4. Run Uncertainty Analysis
-To perform Monte Carlo simulations:
+### 4. Run Uncertainty & Sensitivity Analysis
+The UA/SA workflow is split into data generation and plotting:
 
 ```bash
-python v1/LegHb/analyses/uncertainty_and_sensitivity.py
+# Generate cold data (baseline + Monte Carlo + sensitivity)
+python v1/LegHb/analyses/gen_data.py --config config1 --samples 500
+
+# Generate figures from saved data
+python v1/LegHb/analyses/gen_figures.py --results-dir v1/LegHb/analyses/results_config1_YYYYMMDD_HHMM
+```
+
+Optional one-shot wrapper:
+```bash
+python v1/LegHb/analyses/UA_SA.py --config config1 --samples 500
 ```
 
 ## Configuration Comparison
 
-| Feature | Config 1 (Food-Grade) | Config 2 (Research-Grade) |
-|---------|----------------------|---------------------------|
-| Primary Separation | Biomass harvest + cell wash | Direct cell disruption |
-| Chromatography | None | Ion Exchange (ResinColumn2) |
-| Polishing | HTST Pasteurization (72°C) | Nanofiltration DF |
-| Final Formulation | Antioxidant + dilution | Direct concentration |
-| Product Temperature | 4°C | 0°C |
-| Debris Handling | Disposal | Boiler feed |
+| Feature             | Config 1 (Food-Grade)       | Config 2 (Research-Grade)   |
+| ------------------- | --------------------------- | --------------------------- |
+| Primary Separation  | Biomass harvest + cell wash | Direct cell disruption      |
+| Chromatography      | None                        | Ion Exchange (ResinColumn2) |
+| Polishing           | HTST Pasteurization (72°C)  | Nanofiltration DF           |
+| Final Formulation   | Antioxidant + dilution      | Direct concentration        |
+| Product Temperature | 4°C                         | 0°C                         |
+| Debris Handling     | Disposal                    | Boiler feed                 |

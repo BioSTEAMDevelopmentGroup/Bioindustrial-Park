@@ -74,9 +74,9 @@ __all__ = (
     'CellDisruption',
     'ProteinCentrifuge',
     'Evaporator',
-    'DiaFiltration',
+    'Diafiltration',
     'ResinColumn',
-    'ResinColumn2',
+    'ReverseOsmosis',
     'NanofiltrationDF',
     'SprayDrying',
 )
@@ -617,7 +617,7 @@ class CellDisruption(bst.Unit):
         pumpout.copy_like(outlet)
         pumpout.P = self.P_high
         temp_valve = bst.IsenthalpicValve(
-            ID='valve',
+            ID=None,
             ins=pumpout,
             P=self.P_low, 
             vle=False,
@@ -662,7 +662,7 @@ class CellDisruption(bst.Unit):
         
         # 2. Simulate the valve to find the thermal effect (e.g., cooling)
         temp_valve = bst.IsenthalpicValve(
-            ID=f'_{self.ID}_valve',
+            ID=None,
             ins=temp_pump.outs[0],
             P=self.P_low, 
             vle=False,
@@ -697,136 +697,7 @@ class CellDisruption(bst.Unit):
 
 class Centrifuge(bst.SolidsCentrifuge):pass
 
-class ReverseOsmosis_Legacy(bst.Unit):
-    """
-    [DEPRECATED] Legacy reverse osmosis unit. Use RO2 instead.
-    
-    Create a reverse osmosis unit operation for recovering water from brine.
-    The model is based on a fraction of water recovered.
-    
-    .. deprecated::
-        This class has unrealistic default parameters (98.7% water recovery).
-        Use :class:`RO2` for literature-validated parameters.
-    
-    Parameters
-    ----------
-    ins : 
-        Inlet fluid to be split.
-    outs : 
-        * [0] Filtered water
-        * [1] Brine
-    water_recovery : float, optional
-        Water recovered to 0th stream. Defaults to 0.987
-    
-    """
-    _N_ins = 1
-    _N_outs = 2
-    
-    _F_BM_default = {
-        'Pump': 2.3,
-        'Membrane replacement': 1.65,
-        'Hardware': 2.0,
-    }
-
-    _units = {
-        'Flow rate': 'm3/hr',
-        'Power': 'kW',
-        'Pump Pressure': 'bar',
-        'Water recovery': '%',
-        'Membrane Area': 'm2',
-        'Membrane flux': 'L/m2/hr',
-        'Membrane lifetime': 'years',
-        'Plant lifetime': 'years',
-        'Membrane cost per m2': 'USD/m2',
-    }
-
-    def _init(self, water_recovery=0.987, membrane_flux=40, membrane_cost_per_m2=300, 
-                membrane_lifetime_years=3, plant_lifetime_years=20, operating_pressure_bar=30):
-        self.water_recovery = water_recovery
-        self.membrane_flux = membrane_flux  # L/m2/hr
-        self.membrane_cost_per_m2 = membrane_cost_per_m2  # USD/m2
-        self.membrane_lifetime_years = membrane_lifetime_years
-        self.plant_lifetime_years = plant_lifetime_years
-        self.operating_pressure_bar = operating_pressure_bar
-    
-    @property
-    def RO_treated_water(self):
-        return self.outs[0]
-    
-    def _run(self):
-        feed, = self.ins
-        water, brine = self.outs
-        water.copy_thermal_condition(feed)
-        brine.copy_like(feed)
-        water_index = self.chemicals.index('H2O')
-        water_flow = brine.mol[water_index]
-        water_recovered = self.water_recovery * water_flow
-        water.mol[water_index] = water_recovered
-        brine.mol[water_index] = water_flow - water_recovered
-
-    def _design(self):
-        Design = self.design_results
-        feed = bst.Stream()
-        feed.copy_like(self.ins[0])
-        
-        # Record basic operating parameters
-        Design['Flow rate'] = feed.F_vol  # m3/hr
-        Design['Water recovery'] = self.water_recovery * 100  # %
-        Design['Pump Pressure'] = self.operating_pressure_bar  # bar
-        Design['Membrane flux'] = self.membrane_flux  # L/m2/hr
-        Design['Membrane lifetime'] = self.membrane_lifetime_years  # years
-        Design['Plant lifetime'] = self.plant_lifetime_years  # years
-        Design['Membrane cost per m2'] = self.membrane_cost_per_m2  # USD/m2
-
-        # Calculate membrane area based on flux and flow rate
-        flow_rate_L_hr = feed.F_vol * 1000  # convert m3/hr to L/hr
-        #flow_rate_L_hr = feed.ivol['H2O'] * 1000  # convert m3/hr to L/hr
-        if self.membrane_flux > 0:
-            membrane_area_m2 = flow_rate_L_hr / self.membrane_flux
-        else:
-            membrane_area_m2 = 0.0
-        Design['Membrane Area'] = membrane_area_m2  # m2
-
-        # Create temporary pump for power calculation
-        self.pump = bst.Pump(
-            ins=feed,
-            outs=(),
-            P=self.operating_pressure_bar * 1e5  # Convert bar to Pa
-        )
-        self.pump.simulate()
-        self.pump._design()
-        
-        # Record power consumption
-        power_kW = self.pump.power_utility.rate
-        Design['Power'] = power_kW  # kW
-        self.power_utility.rate = power_kW
-
-    def _cost(self):
-        C = self.baseline_purchase_costs
-        D = self.design_results
-        
-        # Cost the pump
-        if hasattr(self, 'pump') and self.pump:
-            self.pump._cost()
-            C['Pump'] = self.pump.purchase_cost
-        else:
-            C['Pump'] = 0.0
-        
-        # Cost membrane replacement based on membrane area
-        membrane_area = D.get('Membrane Area', 0.0)
-        if membrane_area > 0 and self.membrane_lifetime_years > 0:
-            # Calculate total membrane replacement cost over plant lifetime
-            num_replacements = self.plant_lifetime_years / self.membrane_lifetime_years
-            total_membrane_cost = membrane_area * self.membrane_cost_per_m2 * num_replacements
-            C['Membrane replacement'] = total_membrane_cost
-        else:
-            C['Membrane replacement'] = 0.0
-        
-        # Cost other hardware based on flow rate
-        feed_flow_rate = D.get('Flow rate', 0.0)  # m3/hr
-
-
-class RO2(bst.Unit):
+class ReverseOsmosis(bst.Unit):
     """
     Reverse Osmosis unit with literature-validated parameters.
     
@@ -1026,10 +897,6 @@ class RO2(bst.Unit):
             C['Hardware'] = base_cost * (membrane_area / base_area) ** exponent
         else:
             C['Hardware'] = 0.0
-
-
-# Alias for backward compatibility - ReverseOsmosis now points to the validated RO2 class
-ReverseOsmosis = RO2
 
 
 class Diafiltration(bst.Unit):
@@ -1390,188 +1257,6 @@ class Diafiltration(bst.Unit):
             self.baseline_purchase_costs['Membrane replacement'] = 0.0
             
         self.baseline_purchase_costs['Pump'] = self.pump1.purchase_cost + self.pump2.purchase_cost # Assume 2 pumps for operation feed & recirculation
-
-class Ultrafiltration(bst.Unit):
-    """
-    Single-pass ultrafiltration unit with one feed stream.
-    Retains the Diafiltration retention logic but removes diafiltration buffer
-    and circulation pump handling.
-    """
-    _N_ins = 1
-    _N_outs = 2
-
-    _F_BM_default = {
-        'Membrane System': 1.65,
-        'Membrane replacement': 1.65,
-        'Pump': 1.89,
-    }
-    water_ID = Diafiltration.water_ID
-    _default_TargetProduct_ID = Diafiltration._default_TargetProduct_ID
-    _default_Salt_ID = Diafiltration._default_Salt_ID
-    _default_OtherLargeMolecules_ID = Diafiltration._default_OtherLargeMolecules_ID
-    _default_TargetProduct_Retention = Diafiltration._default_TargetProduct_Retention
-    _default_Salt_Retention = Diafiltration._default_Salt_Retention
-    _default_OtherLargeMolecules_Retention = Diafiltration._default_OtherLargeMolecules_Retention
-    _default_DefaultSolutes_Retention = Diafiltration._default_DefaultSolutes_Retention
-    _default_FeedWater_Recovery_to_Permeate = Diafiltration._default_FeedWater_Recovery_to_Permeate
-    _default_membrane_flux_LMH = Diafiltration._default_membrane_flux_LMH
-    _default_TMP_bar = Diafiltration._default_TMP_bar1
-    _default_membrane_cost_USD_per_m2 = Diafiltration._default_membrane_cost_USD_per_m2
-    _default_membrane_lifetime_years = Diafiltration._default_membrane_lifetime_years
-    _default_module_cost_factor = Diafiltration._default_module_cost_factor
-    _default_module_cost_exponent = Diafiltration._default_module_cost_exponent
-    _default_base_CEPCI = Diafiltration._default_base_CEPCI
-    _default_equipment_lifetime_years = Diafiltration._default_equipment_lifetime_years
-
-    _units = Diafiltration._units
-
-    def __init__(self, ID='', ins=None, outs=None, thermo=None,
-                 TargetProduct_ID=None, Salt_ID=None, OtherLargeMolecules_ID=None,
-                 TargetProduct_Retention=None, Salt_Retention=None,
-                 OtherLargeMolecules_Retention=None, DefaultSolutes_Retention=None,
-                 FeedWater_Recovery_to_Permeate=None,
-                 membrane_flux_LMH=None, TMP_bar=None,
-                 membrane_cost_USD_per_m2=None, membrane_lifetime_years=None,
-                 equipment_lifetime_years=None,
-                 module_cost_factor=None, module_cost_exponent=None, base_CEPCI=None,
-                 **kwargs):
-        super().__init__(ID, ins, outs, thermo, **kwargs)
-        self.TargetProduct_ID = TargetProduct_ID if TargetProduct_ID is not None else self._default_TargetProduct_ID
-        self.Salt_ID = Salt_ID if Salt_ID is not None else self._default_Salt_ID
-        self.OtherLargeMolecules_ID = OtherLargeMolecules_ID if OtherLargeMolecules_ID is not None else self._default_OtherLargeMolecules_ID
-        self.TargetProduct_Retention = TargetProduct_Retention if TargetProduct_Retention is not None else self._default_TargetProduct_Retention
-        #self.Salt_Retention = Salt_Retention if Salt_Retention is not None else self._default_Salt_Retention
-        self.OtherLargeMolecules_Retention = OtherLargeMolecules_Retention if OtherLargeMolecules_Retention is not None else self._default_OtherLargeMolecules_Retention
-        self.DefaultSolutes_Retention = DefaultSolutes_Retention if DefaultSolutes_Retention is not None else self._default_DefaultSolutes_Retention
-        self.FeedWater_Recovery_to_Permeate = FeedWater_Recovery_to_Permeate if FeedWater_Recovery_to_Permeate is not None else self._default_FeedWater_Recovery_to_Permeate
-        self.Salt_Retention = 1 - self.FeedWater_Recovery_to_Permeate
-        self.membrane_flux_LMH = membrane_flux_LMH if membrane_flux_LMH is not None else self._default_membrane_flux_LMH
-        self.TMP_bar = TMP_bar if TMP_bar is not None else self._default_TMP_bar
-        self.membrane_cost_USD_per_m2 = membrane_cost_USD_per_m2 if membrane_cost_USD_per_m2 is not None else self._default_membrane_cost_USD_per_m2
-        self.membrane_lifetime_years = membrane_lifetime_years if membrane_lifetime_years is not None else self._default_membrane_lifetime_years
-        self.equipment_lifetime_years = equipment_lifetime_years if equipment_lifetime_years is not None else self._default_equipment_lifetime_years
-        self.module_cost_factor = module_cost_factor if module_cost_factor is not None else self._default_module_cost_factor
-        self.module_cost_exponent = module_cost_exponent if module_cost_exponent is not None else self._default_module_cost_exponent
-        self.base_CEPCI = base_CEPCI if base_CEPCI is not None else self._default_base_CEPCI
-        self.power_utility = bst.PowerUtility()
-
-    def _run(self):
-        feed, = self.ins
-        retentate, permeate = self.outs
-
-        retentate.T = permeate.T = feed.T
-        retentate.P = permeate.P = feed.P
-
-        permeate.empty()
-        retentate.empty()
-
-        feed_water_mass = feed.imass[self.water_ID]
-        retentate_water = feed_water_mass * (1.0 - self.FeedWater_Recovery_to_Permeate)
-        retentate.imass[self.water_ID] = max(0.0, retentate_water)
-        permeate.imass[self.water_ID] = max(0.0, feed_water_mass - retentate.imass[self.water_ID])
-
-        import warnings as _warnings
-        available_ids = {chem.ID for chem in self.chemicals}
-
-        def _to_id_list(x):
-            if x is None:
-                return []
-            if isinstance(x, (list, tuple, set)):
-                return [i for i in x if i is not None]
-            return [x]
-
-        retention_map = {}
-        attr_map = (
-            (_to_id_list(self.TargetProduct_ID), self.TargetProduct_Retention, "TargetProduct"),
-            (_to_id_list(self.OtherLargeMolecules_ID), self.OtherLargeMolecules_Retention, "OtherLargeMolecules"),
-            (_to_id_list(self.Salt_ID), self.Salt_Retention, "Salt"),
-        )
-        for ids, retention, label in attr_map:
-            missing = []
-            for chem_id in ids:
-                if chem_id in available_ids:
-                    retention_map[chem_id] = retention
-                else:
-                    missing.append(chem_id)
-            if missing:
-                _warnings.warn(
-                    f"Ultrafiltration: {label} IDs not found in thermo chemicals and will use default retention: {missing}",
-                    RuntimeWarning,
-                )
-
-        for chem in self.chemicals:
-            ID = chem.ID
-            if ID == self.water_ID:
-                continue
-            mass_in = feed.imass[ID]
-            if mass_in < 1e-12:
-                continue
-
-            current_retention = retention_map.get(ID, self.DefaultSolutes_Retention)
-            retentate_mass = mass_in * current_retention
-            permeate_mass = mass_in - retentate_mass
-
-            retentate.imass[ID] = max(0.0, retentate_mass)
-            permeate.imass[ID] = max(0.0, permeate_mass)
-
-            if permeate.imass[ID] < 0:
-                retentate.imass[ID] += permeate.imass[ID]
-                permeate.imass[ID] = 0.0
-            if retentate.imass[ID] < 0:
-                permeate.imass[ID] += retentate.imass[ID]
-                retentate.imass[ID] = 0.0
-
-    def _design(self):
-        Design = self.design_results
-        permeate_stream = self.outs[1]
-        if permeate_stream.isempty() or permeate_stream.rho == 0:
-            permeate_vol_L_per_hr = 0.0
-        else:
-            permeate_vol_L_per_hr = permeate_stream.F_vol * 1000.0
-
-        membrane_area_m2 = permeate_vol_L_per_hr / self.membrane_flux_LMH if (self.membrane_flux_LMH > 0 and permeate_vol_L_per_hr > 0) else 0.0
-        Design['Membrane Area'] = membrane_area_m2
-        Design['membrane_flux_LMH'] = self.membrane_flux_LMH
-        Design['TMP_bar'] = self.TMP_bar
-        Design['membrane_cost_USD_per_m2'] = self.membrane_cost_USD_per_m2
-        Design['membrane_lifetime_years'] = self.membrane_lifetime_years
-        Design['equipment_lifetime_years'] = self.equipment_lifetime_years
-
-        self.feed_pump = bst.Pump(None, None, P=self.TMP_bar * 1e5)
-        self.feed_pump.ins[0] = self.ins[0].copy()
-        self.feed_pump.simulate()
-        self.feed_pump._design()
-        Design['pump_efficiency'] = 0.85 * 100.0
-        self.power_utility.rate = self.feed_pump.power_utility.rate
-    
-    def _cost(self):
-        # --- MODIFIED: Properly calculate total membrane replacement cost over equipment lifetime ---
-        area_m2 = self.design_results.get('Membrane Area', 0.0)
-        if area_m2 > 0 and self.module_cost_factor > 0 and self.base_CEPCI > 0:
-            base_purchase_cost = self.module_cost_factor * (area_m2 ** self.module_cost_exponent)
-            current_purchase_cost = base_purchase_cost * (bst.CE / self.base_CEPCI)
-            self.baseline_purchase_costs['Membrane System'] = current_purchase_cost
-        else:
-            self.baseline_purchase_costs['Membrane System'] = 0.0
-            
-        # Calculate total membrane replacement cost over equipment lifetime
-        if (self.membrane_lifetime_years > 0 and
-            self.membrane_cost_USD_per_m2 > 0 and
-            area_m2 > 0 and
-            self.equipment_lifetime_years > 0):
-            
-            # Calculate number of membrane replacements over equipment lifetime
-            num_replacements = self.equipment_lifetime_years / self.membrane_lifetime_years
-            
-            # Total membrane replacement cost over equipment lifetime
-            total_replacement_cost = num_replacements * area_m2 * self.membrane_cost_USD_per_m2
-            
-            self.baseline_purchase_costs['Membrane replacement'] = total_replacement_cost
-        else:
-            self.baseline_purchase_costs['Membrane replacement'] = 0.0
-            
-        self.baseline_purchase_costs['Pump'] = self.feed_pump.purchase_cost
-    
 
 import flexsolve as flx
 from biosteam import main_flowsheet as F
@@ -1963,7 +1648,7 @@ class Filtration(bst.Unit):
 ##### New Units ##########
 ##########################
 
-class ResinColumn2(bst.Unit):
+class ResinColumn(bst.Unit):
     """
     Polymorphic unit supporting both Ion Exchange (chromatography) and Adsorption 
     (e.g., activated carbon, resin adsorption) modes.
@@ -2318,10 +2003,6 @@ class ResinColumn2(bst.Unit):
                  C['Column Hardware'] = bst.CE/500 * self.column_hardware_cost_factor * (vol_L ** self.column_hardware_cost_exponent)
 
         C['Pump'] = self.pump.purchase_cost
-
-
-# Backward-compatible alias
-ResinColumn = ResinColumn2
 
 
 

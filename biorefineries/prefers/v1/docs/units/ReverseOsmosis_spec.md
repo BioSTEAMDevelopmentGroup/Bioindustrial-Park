@@ -1,9 +1,9 @@
-# ReverseOsmosis (RO2) Unit Documentation
+# ReverseOsmosis Unit Documentation
 
 Reverse Osmosis unit with literature-validated parameters for biorefinery wastewater treatment.
 
 > [!NOTE]
-> As of v1.1, `ReverseOsmosis` is an alias to `RO2`. The legacy implementation is available as `ReverseOsmosis_Legacy` but is deprecated.
+> The legacy implementation has been removed in Phase 0 refactoring. `ReverseOsmosis` now uses validated industrial parameters.
 
 ---
 

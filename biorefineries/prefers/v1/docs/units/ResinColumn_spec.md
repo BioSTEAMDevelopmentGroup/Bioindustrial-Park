@@ -1,6 +1,6 @@
-# ResinColumn2 Specification
+# ResinColumn Specification
 
-**Class:** `ResinColumn2`
+**Class:** `ResinColumn`
 **Type:** Polymorphic Separation Unit
 **Presets:** 'IonExchange', 'Adsorption'
 **Last Updated:** 2026-01-20

@@ -126,7 +126,7 @@ def set_style(style_name='whitegrid', font_scale=1.0):
     
     Examples
     --------
-    >>> from prefers.v1.plot import style
+    >>> from prefers.v1.utils import style
     >>> style.set_style()
     >>> # All subsequent plots use PreFerS styling
     """

@@ -5,7 +5,7 @@ Academic-quality, brand-aligned visualization module for PreFerS biorefinery TEA
 ## Quick Start
 
 ```python
-from biorefineries.prefers.v1.plot import style, plots, utils
+from biorefineries.prefers.v1.utils import style, plots, utils
 
 # Style is automatically applied on import
 # Or explicitly call:
@@ -41,7 +41,7 @@ high_color = style.get_color('high')   # Emerald
 
 ```python
 import pandas as pd
-from biorefineries.prefers.v1.plot import plots, utils
+from biorefineries.prefers.v1.utils import plots, utils
 
 data = pd.DataFrame({
     'Parameter': ['Titer [g/L]', 'Yield [%]', 'Productivity [g/L/hr]'],
@@ -60,7 +60,7 @@ utils.save_figure(fig, 'tornado_msp', output_dir, formats=('png', 'pdf'))
 ```python
 import numpy as np
 import pandas as pd
-from biorefineries.prefers.v1.plot import plots
+from biorefineries.prefers.v1.utils import plots
 
 mc_results = pd.DataFrame({'MSP': np.random.normal(100, 15, 1000)})
 fig, ax = plots.plot_monte_carlo_dist(mc_results, 'MSP', units='$/kg', baseline=95)
@@ -68,16 +68,16 @@ fig, ax = plots.plot_monte_carlo_dist(mc_results, 'MSP', units='$/kg', baseline=
 
 ## Available Functions
 
-| Function                             | Description                                          |
-| ------------------------------------ | ---------------------------------------------------- |
-| `plots.plot_tornado()`               | Sensitivity analysis tornado chart                   |
-| `plots.plot_monte_carlo_dist()`      | KDE + histogram uncertainty distribution             |
-| `plots.plot_spearman_heatmap()`      | Correlation matrix heatmap                           |
-| `plots.plot_stacked_contributions()` | Cost/GWP breakdown by section                        |
-| `plots.plot_2d_kde()`                | Joint distribution contour plot                      |
-| `plots.plot_joint_marginal()`        | **NEW** Bivariate joint plot with marginal boxplots  |
-| `plots.plot_scale_effects()`         | Percentile bands vs production scale                 |
-| `plots.plot_colored_scatter()`       | Scatter with color-coded z-values                    |
+| Function                             | Description                                         |
+| ------------------------------------ | --------------------------------------------------- |
+| `plots.plot_tornado()`               | Sensitivity analysis tornado chart                  |
+| `plots.plot_monte_carlo_dist()`      | KDE + histogram uncertainty distribution            |
+| `plots.plot_spearman_heatmap()`      | Correlation matrix heatmap                          |
+| `plots.plot_stacked_contributions()` | Cost/GWP breakdown by section                       |
+| `plots.plot_2d_kde()`                | Joint distribution contour plot                     |
+| `plots.plot_joint_marginal()`        | **NEW** Bivariate joint plot with marginal boxplots |
+| `plots.plot_scale_effects()`         | Percentile bands vs production scale                |
+| `plots.plot_colored_scatter()`       | Scatter with color-coded z-values                   |
 
 ## Example: Joint Marginal Plot (Bivariate with Boxplots)
 
@@ -85,7 +85,7 @@ The joint marginal plot creates a bivariate scatter plot with KDE contours in th
 and box-and-whisker plots on the margins showing the IQR, median, and outliers.
 
 ```python
-from biorefineries.prefers.v1.plot import plots, utils
+from biorefineries.prefers.v1.utils import plots, utils
 
 # Assume mc_results is a DataFrame from Monte Carlo simulation
 g = plots.plot_joint_marginal(
@@ -110,13 +110,13 @@ for Y marginal.*
 
 ## Utility Functions
 
-| Function                     | Description                                      |
-| ---------------------------- | ------------------------------------------------ |
-| `utils.get_analysis_dirs()`  | Create standardized `analyses/data/` and `analyses/figure/` directories |
-| `utils.get_output_dir()`     | Create timestamped output directory              |
-| `utils.save_figure()`        | Save figure with consistent settings             |
-| `utils.save_table()`         | Save DataFrame as Excel/CSV                      |
-| `utils.get_timestamp()`      | Get formatted timestamp string                   |
+| Function                    | Description                                                             |
+| --------------------------- | ----------------------------------------------------------------------- |
+| `utils.get_analysis_dirs()` | Create standardized `analyses/data/` and `analyses/figure/` directories |
+| `utils.get_output_dir()`    | Create timestamped output directory                                     |
+| `utils.save_figure()`       | Save figure with consistent settings                                    |
+| `utils.save_table()`        | Save DataFrame as Excel/CSV                                             |
+| `utils.get_timestamp()`     | Get formatted timestamp string                                          |
 
 ## Colormaps
 

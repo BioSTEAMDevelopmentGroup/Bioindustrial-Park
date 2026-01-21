@@ -38,6 +38,7 @@ Glucose = stream_kwargs('Glucose', Glucose=m*1.3*1e5/72, units='kg/hr', T=25+273
 NH3_25wt = stream_kwargs('NH3_25wt', NH3_25wt=m*300, units='kg/hr', T=25+273.15)#, price=price['NH3_25wt'])
 
 DfUltraBuffer = stream_kwargs('DfUltraBuffer', DfUltraBuffer=1, units='kg/hr', T=25+273.15)
+DfUltraBuffer_wash = stream_kwargs('DfUltraBuffer_wash', DfUltraBuffer=1, units='kg/hr', T=25+273.15)
 IXEquilibriumBuffer = stream_kwargs('IXEquilibriumBuffer', IXEquilibriumBuffer=1, units='kg/hr', T=25+273.15)
 IXElutionBuffer = stream_kwargs('IXElutionBuffer', IXElutionBuffer=1, units='kg/hr', T=25+273.15)
 IXRegenerationSolution = stream_kwargs('IXRegenerationSolution', NaOH =1, units='kg/hr', T=25+273.15)

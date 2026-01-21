@@ -117,9 +117,9 @@ When `component_fractions=None`, disrupted cell mass splits into:
 
 ---
 
-## 4. ResinColumn2
-**Class:** `ResinColumn2`
-**Detailed Specification:** [ResinColumn2_spec.md](./units/ResinColumn2_spec.md)
+## 4. ResinColumn
+**Class:** `ResinColumn`
+**Detailed Specification:** [ResinColumn_spec.md](./units/ResinColumn_spec.md)
 
 Polymorphic unit for ion exchange and adsorption processes.
 
@@ -128,9 +128,9 @@ Polymorphic unit for ion exchange and adsorption processes.
 | `IonExchange` | DBC           | 50 g/L  | Validated |
 | `Adsorption`  | EBCT          | 5 min   | Validated |
 
-## 5. ReverseOsmosis (RO2)
+## 5. ReverseOsmosis
 
-**Class:** `ReverseOsmosis` (alias to `RO2`)  
+**Class:** `ReverseOsmosis`  
 **Description:** Reverse osmosis unit for water recovery with literature-validated parameters.
 **Detailed Specification:** [ReverseOsmosis_spec.md](./units/ReverseOsmosis_spec.md)
 
@@ -196,8 +196,6 @@ Inherits all defaults from `Diafiltration`, with:
 * Same as Diafiltration, but with single feed pump only
 
 ---
-
-
 
 ## 8. AmmoniaStorageTank
 

@@ -499,7 +499,7 @@ def plot_joint_marginal(data, x_col, y_col, x_label=None, y_label=None,
     
     Examples
     --------
-    >>> from biorefineries.prefers.v1.plot import plots
+    >>> from biorefineries.prefers.v1.utils import plots
     >>> g = plots.plot_joint_marginal(
     ...     mc_results, 
     ...     x_col=('PreFerS', 'GWP [kg CO2-eq/kg]'),

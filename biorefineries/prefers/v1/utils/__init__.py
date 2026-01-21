@@ -7,7 +7,7 @@ Academic-quality plotting module for PreFerS biorefinery models.
 Provides branding-aligned styles, colormaps, and reusable plot functions.
 
 Usage:
-    from biorefineries.prefers.v1.plot import style, plots, utils
+    from biorefineries.prefers.v1.utils import style, plots, utils
     
     # Apply PreFerS style to all plots
     style.set_style()

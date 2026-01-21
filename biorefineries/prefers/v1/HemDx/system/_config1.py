@@ -28,8 +28,13 @@ from biorefineries.prefers.v1 import _units as u
 from biorefineries.prefers.v1._process_settings import price
 
 # %% Settings
-bst.settings.set_thermo(c.create_chemicals_Hemodextrin(), skip_checks=True)
+HEMDX_THERMO = c.create_chemicals_Hemodextrin()
+bst.settings.set_thermo(HEMDX_THERMO, skip_checks=True)
 bst.preferences.classic_mode()
+try:
+    bst.settings.chemicals.set_alias('Heme_b', 'Heme_b_In')
+except ValueError:
+    pass
 
 # %%
 __all__ = (
@@ -41,7 +46,7 @@ __all__ = (
     ins=[s.SeedIn1, s.SeedIn2, s.CultureIn, s.Glucose,s.NH3_25wt,],
     outs=[s.vent1, s.vent2,
     ],
-    fthermo=c.create_chemicals_Hemodextrin, # Pass the function itself
+    fthermo=lambda chemicals=None: HEMDX_THERMO,
 )
 def create_Heme_system(
         ins, outs,
@@ -61,6 +66,9 @@ def create_Heme_system(
 
     # Unpack output streams
     (vent1, vent2) = outs    
+    
+    # Ensure HemDx chemicals are active for reaction definitions
+    bst.settings.set_thermo(HEMDX_THERMO, skip_checks=True)
     
     ## LCA Settings ##
     
@@ -313,9 +321,9 @@ def create_Heme_system(
     
     M401 = bst.MixTank('M401', ins=('','Water5'), 
                     outs='RAEquilibrium', tau=1)
-    M402 = bst.MixTank('M402', ins=('','Water6'),
+    M402 = bst.MixTank('M402', ins=('', 'Water6'),
                     outs='RAElution', tau=1)
-    M403 = bst.MixTank('M403', ins=('','Water6'),
+    M403 = bst.MixTank('M403', ins=('', 'Water6_regen'),
                     outs='RARegeneration', tau=1)
     
     H401 = bst.HXutility(

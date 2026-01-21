@@ -1,0 +1,12 @@
+{
+  "baseline_metrics_csv": "baseline_metrics.csv",
+  "baseline_metrics_xlsx": "baseline_metrics.xlsx",
+  "baseline_metrics_json": "baseline_metrics.json",
+  "monte_carlo_results_pickle": "monte_carlo_results.pkl",
+  "monte_carlo_results_csv": "monte_carlo_results.csv",
+  "monte_carlo_results_xlsx": "monte_carlo_results.xlsx",
+  "column_map_json": "column_map.json",
+  "tornado_sensitivity_csv": "tornado_sensitivity.csv",
+  "tornado_sensitivity_xlsx": "tornado_sensitivity.xlsx",
+  "analysis_metadata_json": "analysis_metadata.json"
+}
