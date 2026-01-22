@@ -94,13 +94,11 @@ def create_LegHb_system(
     cooler_pressure_drop = 20684 # [Pa]
     compressor_isentropic_efficiency = 0.85
     V_max = 500 # [m3] #here cause pressure vessel design problem
-    titer_LegHb = 7.27 # [g / L]
-    productivity_LegHb = 7.27 / 72 # [g / L / h]
-    Y_p = 7.27 * 4 / 1300 # [by wt] 3 wt%
-    Y_b = 0.43 # [by wt] 
+    titer_LegHb = 5 #7.27 # [g / L]
+    productivity_LegHb = 5 / 72 #7.27 / 72 # [g / L / h]
+    Y_p = 5 * 4 / 600 #7.27 * 4 / 1300 # [by wt] 3 wt%
+    Y_b = 0.53 # [by wt] 
     yield_LegHb = Y_p#/0.517 # yield based on glucose utilized for product formation
-    titer_HemeB = 0.06632 # [g / L]
-    productvitiy_HemeB = 0.06632 / 72
 
 
     """
@@ -119,9 +117,9 @@ def create_LegHb_system(
     fermentation_reaction = bst.PRxn([
         #           Reaction        Reactnat            Conversion           Check                  "
         bst.Rxn('1 Glucose + 1.05882 NH3 + 0.17647 FeSO4  -> 0.17647 Heme_b + 0.617647 O2 + 0.17647 (NH4)2SO4 + 4.05882 H2O',
-                                    reactant = 'Glucose',X=yield_LegHb*0.01,check_atomic_balance=True),
+                                    reactant = 'Glucose',X=yield_LegHb*(0.00786/0.17647),check_atomic_balance=True),
         bst.Rxn('Glucose + 0.01646 (NH4)2SO4 + 1.61317 NH3 -> 6 Globin + 0.28807 O2 + 3.68724 H2O',
-                                    reactant = 'Glucose', X= yield_LegHb*0.04,check_atomic_balance=True),
+                                    reactant = 'Glucose', X= yield_LegHb*0.07,check_atomic_balance=True),
         bst.Rxn('Glucose + 0.00786 FeSO4 + 0.00786 (NH4)2SO4 + 1.58847 NH3 -> 6 Leghemoglobin + 0.30275 O2  + 3.70380 H2O',
                                     reactant = 'Glucose', X=yield_LegHb,  check_atomic_balance=True),
         ])
@@ -645,7 +643,7 @@ def create_LegHb_system(
 
     #ADP = bst.AirDistributionPackage(500 if use_area_convention else 'ADP')
 
-    BT = bst.BoilerTurbogenerator(400 if use_area_convention else 'BT',
+    BT = u.BoilerTurbogenerator(400 if use_area_convention else 'BT',
         (S403-0, 'gas_to_boiler', 'boiler_makeup_water', 'natural_gas', 'lime_boiler', 'boiler_chems'),
         outs=('emissions', 'rejected_water_and_blowdown', 'ash_disposal'),
         boiler_efficiency=0.80,

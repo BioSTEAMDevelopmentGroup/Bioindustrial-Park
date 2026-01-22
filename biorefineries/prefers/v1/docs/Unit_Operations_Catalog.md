@@ -197,7 +197,15 @@ Inherits all defaults from `Diafiltration`, with:
 
 ---
 
-## 8. AmmoniaStorageTank
+## 8. BoilerTurbogenerator
+
+**Class:** `BoilerTurbogenerator(bst.BoilerTurbogenerator)`  
+**Description:** Prefers-local subclass with guarded emissions enthalpy update to handle robust combustion/energy balance when large biomolecules lack complete vapor-phase thermo.  
+**Detailed Specification:** [BoilerTurbogenerator_spec.md](./units/BoilerTurbogenerator_spec.md)
+
+---
+
+## 9. AmmoniaStorageTank
 
 **Class:** `AmmoniaStorageTank(bst.StorageTank)`  
 **Description:** Storage tank for ammonia solution with decorator-based costing.

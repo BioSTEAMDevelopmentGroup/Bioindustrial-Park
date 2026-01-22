@@ -134,6 +134,8 @@ Same as Config 1:
 
 **Process Water Streams:** RO permeates (S501, S503) plus makeup streams
 
+**BT Note:** Uses prefers-local `BoilerTurbogenerator` with guarded emissions enthalpy update and glucose-based thermo fallbacks for large biomolecules.
+
 ## 5. Exported Functions
 
 ### `create_LegHb_system(ins, outs, use_area_convention=False)`

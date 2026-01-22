@@ -188,16 +188,42 @@ def create_chemicals_LegHb():
     add_chemical('H2SO4', phase='l')
 
     #### Gases ####
-    add_chemical('O2', phase='g', Hf=0)
-    add_chemical('N2', phase='g', Hf=0)
-    add_chemical('CH4', phase='g')
-    add_chemical('CO', search_ID='CarbonMonoxide', phase='g', Hf=-26400*_cal2joule)
-    add_chemical('CO2', phase='g')
-    add_chemical('NH3', phase='g', Hf=-10963*_cal2joule)
-    add_chemical('NO', search_ID='NitricOxide', phase='g',formula='NO', Hf=82.05)
-    add_chemical('NO2', phase='g', formula='NO2', Hf=7925*_cal2joule)
-    add_chemical('H2S', phase='g', Hf=-4927*_cal2joule)
-    add_chemical('SO2', phase='g')
+    append_chemical('O2', phase='g', Hf=0)
+    append_chemical('N2', phase='g', Hf=0)
+    append_chemical('CH4', phase='g')
+    append_chemical('CO', search_ID='CarbonMonoxide', phase='g', Hf=-26400*_cal2joule)
+    append_chemical('CO2', phase='g')
+    append_chemical('NH3', phase='g', Hf=-10963*_cal2joule)
+    append_chemical('NO', search_ID='NitricOxide', phase='g', formula='NO', Hf=82.05)
+    append_chemical('NO2', phase='g', formula='NO2', Hf=7925*_cal2joule)
+    append_chemical('H2S', phase='g', Hf=-4927*_cal2joule)
+    append_chemical('SO2', phase='g')
+
+    # Ensure gas species include full phase models (liquid Cp/Hvap) for BT enthalpy
+    def _copy_phase_models_from_reference(ID, search_ID=None):
+        try:
+            ref = tmo.Chemical(search_ID or ID)
+        except Exception:
+            return
+        try:
+            chem = chems[ID]
+        except Exception:
+            return
+        chem.copy_models_from(ref)
+
+    for gas_id, search_id in (
+        ('O2', None),
+        ('N2', None),
+        ('CH4', None),
+        ('CO', 'CarbonMonoxide'),
+        ('CO2', None),
+        ('NH3', None),
+        ('NO', 'NitricOxide'),
+        ('NO2', None),
+        ('H2S', None),
+        ('SO2', None),
+    ):
+        _copy_phase_models_from_reference(gas_id, search_id)
 
     ##### Soluble inorganics #####
     add_chemical('KOH', phase='l', default=True)
@@ -425,6 +451,49 @@ def create_chemicals_LegHb():
     append_chemical_copy('Leghemoglobin_In', Leghemoglobin)
     append_chemical_copy('Globin_In', Globin)
 
+    # Copy Glucose thermodynamic models for robust fallback properties
+    def _copy_glucose_models(chem):
+        if chem is None:
+            return
+        try:
+            chem.copy_models_from(chems.Glucose)
+        except Exception:
+            pass
+
+    for chem_id in (
+        'Pichia_pastoris',
+        'Yeast',
+        'K_marxianus',
+        'Z_mobilis',
+        'T_reesei',
+        'Biomass',
+        'Glucan',
+        'Mannoprotein',
+        'Chitin',
+        'RNA',
+        'Protein',
+        'Enzyme',
+        'DenaturedEnzyme',
+        'Cellulose',
+        'Xylan',
+        'Xylitol',
+        'Cellobiose',
+        'CSL',
+        'WWTsludge',
+        'Cellulase',
+        'Globin',
+        'Leghemoglobin',
+        'Globin_In',
+        'Leghemoglobin_In',
+    ):
+        _copy_glucose_models(chems[chem_id])
+
+    # Use Protein heating values for globin/leghemoglobin so BT combustion works
+    for chem_id in ('Globin', 'Leghemoglobin', 'Globin_In', 'Leghemoglobin_In'):
+        chem = chems[chem_id]
+        chem.HHV = chems.Protein.HHV
+        chem.LHV = chems.Protein.LHV
+
     # Add explicit gas-phase properties for proteins (needed for boiler emissions calculations)
     # These proteins decompose before vaporizing, so we use placeholder values
     for protein_id in ['Globin', 'Leghemoglobin', 'Globin_In', 'Leghemoglobin_In']:
@@ -433,6 +502,118 @@ def create_chemicals_LegHb():
         protein.Tb = 800  # K - decomposition temperature
         # Set a placeholder Hvap (similar to other biomass components)
         protein.Hvap.add_method(40000)  # J/mol - placeholder value
+
+    # Fallback thermo for nonvolatile solids used in BT fuel streams
+    def _ensure_nonvolatile_thermo(chem, Tb=800.0, Hvap=40000.0, Psat=1e-10, rho=1540.0):
+        if chem is None: 
+            return
+        if not chem.Tb:
+            chem.Tb = Tb
+        try:
+            chem.Hvap(chem.Tb)
+        except Exception:
+            chem.Hvap.add_method(Hvap)
+        try:
+            chem.Psat(chem.Tb)
+        except Exception:
+            chem.Psat.add_method(Psat)
+        try:
+            chem.V.s.add_model(fn.rho_to_V(rho=rho, MW=chem.MW), top_priority=True)
+        except Exception:
+            pass
+
+    def _get_chem(chemicals, chem_id):
+        try:
+            return chemicals[chem_id]
+        except Exception:
+            return None
+
+    for chem_id in (
+        'Pichia_pastoris',
+        'Yeast',
+        'K_marxianus',
+        'Z_mobilis',
+        'T_reesei',
+        'Biomass',
+        'Glucan',
+        'Mannoprotein',
+        'Chitin',
+        'RNA',
+        'Protein',
+        'Enzyme',
+        'DenaturedEnzyme',
+        'Cellulose',
+        'Xylan',
+        'Xylitol',
+        'Cellobiose',
+        'CSL',
+        'WWTsludge',
+        'Cellulase',
+        'Globin',
+        'Leghemoglobin',
+        'Globin_In',
+        'Leghemoglobin_In',
+    ):
+        _ensure_nonvolatile_thermo(_get_chem(chems, chem_id))
+
+    def _ensure_vaporization_props(chem, Tb=800.0, Hvap=40000.0):
+        if chem is None:
+            return
+        if not chem.Tb:
+            chem.Tb = Tb
+        try:
+            hvap = chem.Hvap(chem.Tb)
+        except Exception:
+            hvap = None
+        if hvap is None:
+            chem.Hvap.add_method(Hvap)
+
+    # Ensure all chemicals have usable Hvap for BT enthalpy calculations
+    for chem in chems:
+        _ensure_vaporization_props(chem)
+
+    def _ensure_heat_capacity_models(chem, Cp_fallback=75.3):
+        if chem is None:
+            return
+        if hasattr(chem.Cn, 'l') and hasattr(chem.Cn, 'g'):
+            try:
+                Cp_l = chem.Cn.l(298.15)
+            except Exception:
+                Cp_l = None
+            if Cp_l is None:
+                try:
+                    Cp_val = chem.Cn.g(298.15)
+                except Exception:
+                    Cp_val = None
+                if Cp_val is None:
+                    Cp_val = Cp_fallback
+                try:
+                    chem.Cn.l.add_model(Cp_val, top_priority=True)
+                except Exception:
+                    pass
+            try:
+                Cp_g = chem.Cn.g(298.15)
+            except Exception:
+                Cp_g = None
+            if Cp_g is None:
+                try:
+                    chem.Cn.g.add_model(Cp_fallback, top_priority=True)
+                except Exception:
+                    pass
+        else:
+            try:
+                Cp_val = chem.Cn(298.15)
+            except Exception:
+                Cp_val = None
+            if Cp_val is None:
+                try:
+                    chem.Cn.add_model(Cp_fallback, top_priority=True)
+                except Exception:
+                    pass
+
+    # Ensure gas/liquid heat capacity models exist for enthalpy calculations
+    for chem in chems:
+        _ensure_heat_capacity_models(chem)
 
     # Default missing properties of chemicals to those of water
     for chemical in chems: chemical.default()

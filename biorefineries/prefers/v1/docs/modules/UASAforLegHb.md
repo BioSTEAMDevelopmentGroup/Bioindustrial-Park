@@ -37,6 +37,15 @@ The analysis supports **two main scenarios** with flexible configuration:
 3. **Orchestrator** (`UA_SA.py`)
     - Optional convenience wrapper for running data and figures in sequence
 
+### Utility Modules Used
+
+The plotting and reporting helpers are centralized in `v1/utils/` and are used by `gen_data.py` and `gen_figures.py`:
+
+- `utils/plot_utils.py`: common chart builders and styling
+- `utils/sankey_utils.py`: Sankey preparation and export
+- `utils/style.py`: global matplotlib style settings
+- `utils/plots.py`: composite plotting helpers
+
 ### Core Functions
 
 #### `evaluate_single_sample(sample_index_and_data, baseline_production_kg_hr, exclude_production_scale=False, config='config1')`

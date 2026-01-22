@@ -80,6 +80,7 @@ __all__ = (
     'ReverseOsmosis',
     'NanofiltrationDF',
     'SprayDrying',
+    'BoilerTurbogenerator',
 )
 
 Rxn = tmo.reaction.Reaction
@@ -96,6 +97,157 @@ _Gcal2kJ = 4184e3
 ####################
 ##### UpStream #####
 ####################
+
+class BoilerTurbogenerator(bst.BoilerTurbogenerator):
+    """BoilerTurbogenerator with guarded emissions enthalpy update."""
+
+    def _design(self):
+        B_eff = self.boiler_efficiency
+        TG_eff = self.turbogenerator_efficiency
+        steam_demand = self.steam_demand
+        Design = self.design_results
+        chemicals = self.chemicals
+        self._load_utility_agents()
+        mol_steam = sum([i.flow for i in self.steam_utilities])
+        feed_solids, feed_gas, makeup_water, fuel, lime, chems, oxygen_rich_gas = self.ins
+        oxygen_rich_gas.empty()
+        if self.fuel_source == 'CH4':
+            fuel.phase = 'g'
+            fuel.set_property('T', 60, 'degF')
+            fuel.set_property('P', 14.73, 'psi')
+        emissions, blowdown_water, ash_disposal = self.outs
+        if not lime.price:
+            lime.price = 0.19937504680689402
+        if not chems.price:
+            chems.price = 4.995862254032183
+        H_steam = sum([i.duty for i in self.steam_utilities])
+        side_steam = self.side_steam
+        if side_steam: 
+            H_steam += side_steam.H
+            mol_steam += side_steam.F_mol
+        steam_demand.imol['7732-18-5'] = mol_steam 
+        self.combustion_reactions = combustion_rxns = chemicals.get_combustion_reactions()
+        non_empty_feeds = [i for i in (feed_solids, feed_gas) if not i.isempty()]
+        boiler_efficiency_basis = self.boiler_efficiency_basis
+        fuel_source = self.fuel_source
+        def calculate_excess_electricity_at_natual_gas_flow(fuel_flow):
+            if fuel_flow:
+                fuel_flow = abs(fuel_flow)
+                fuel.imol[fuel_source] = fuel_flow
+            else:
+                fuel.empty()
+            if boiler_efficiency_basis == 'LHV':
+                H_combustion = fuel.LHV
+                for feed in non_empty_feeds: H_combustion += feed.LHV
+            elif boiler_efficiency_basis == 'HHV':
+                H_combustion = fuel.HHV
+                for feed in non_empty_feeds: H_combustion += feed.HHV
+            else:
+                raise ValueError(
+                    f"invalid boiler efficiency basis {boiler_efficiency_basis}; "
+                    f"valid values include 'LHV', or 'HHV'"
+                )
+            self.H_content = H_content = B_eff * H_combustion 
+            self.H_loss_to_emissions = H_combustion - H_content
+            H_electricity = H_content - H_steam # Heat available for the turbogenerator
+            electricity = H_electricity * TG_eff  # Electricity produced
+            self.cooling_duty = electricity - H_electricity
+            Design['Work'] = work = electricity / 3600
+            duty_over_mol = 39000 # kJ / mol-superheated steam 
+            self.total_steam = H_content / duty_over_mol #: [float] Total steam produced by the boiler (kmol/hr)
+            Design['Flow rate'] = flow_rate = self.total_steam * 18.01528
+            
+            if self.satisfy_system_electricity_demand:
+                boiler = self.cost_items['Boiler']
+                rate_boiler = boiler.kW * flow_rate / boiler.S
+                return work - self.electricity_demand - rate_boiler
+            else:
+                return work
+        
+        self._excess_electricity_without_fuel = excess_electricity = calculate_excess_electricity_at_natual_gas_flow(0)
+        if excess_electricity < 0:
+            f = calculate_excess_electricity_at_natual_gas_flow
+            lb = 0.
+            fuel.imol[fuel_source] = 1
+            ub = - excess_electricity * 3600 / fuel.LHV
+            while f(ub) < 0.: 
+                lb = ub
+                ub *= 2
+            flx.IQ_interpolation(f, lb, ub, xtol=1, ytol=1)
+        
+        if self.cooling_duty > 0.: 
+            # In the event that no electricity is produced and the solver
+            # solution for natural gas is slightly below the requirement for steam
+            # (this would lead to a positive duty).
+            self.cooling_duty = 0.
+            Design['Work'] = 0.
+        
+        emissions.T = 298.15 # Will be updated later with the energy balance
+        emissions.P = 101325
+        emissions.phase = 'g'
+        emissions_mol = emissions.mol
+        emissions_mol[:] = fuel.mol
+        for feed in non_empty_feeds: emissions_mol[:] += feed.mol
+        combustion_rxns.force_reaction(emissions_mol)
+        O2_consumption = -emissions.imol['O2']
+        oxygen_rich_gas.reset_flow(**self.oxygen_rich_gas_composition)
+        z_O2 = oxygen_rich_gas.imol['O2'] / oxygen_rich_gas.F_mol
+        oxygen_rich_gas.F_mol = O2_consumption / z_O2
+        emissions_mol += oxygen_rich_gas.mol
+        F_emissions = emissions.F_mass
+        z_CO2 = emissions.imass['CO2'] / F_emissions
+        z_CO2_target = self.CO2_emissions_concentration
+        if z_CO2 > z_CO2_target:
+            F_emissions_new = z_CO2 * F_emissions / z_CO2_target
+            dF_emissions = F_emissions_new - F_emissions
+            oxygen_rich_gas.F_mass = F_mass_O2_new = oxygen_rich_gas.F_mass + dF_emissions
+            emissions_mol += oxygen_rich_gas.mol * (dF_emissions / F_mass_O2_new)
+        try:
+            H_base = emissions.H
+        except Exception:
+            H_base = 0.0
+        emissions._property_cache['H'] = H_base + self.H_loss_to_emissions
+        hu_cooling = bst.HeatUtility()
+        hu_cooling(self.cooling_duty, steam_demand.T)
+        hus_heating = bst.HeatUtility.sum_by_agent(self.steam_utilities)
+        for hu in hus_heating: hu.reverse()
+        self.heat_utilities = [*hus_heating, hu_cooling]
+        water_index = chemicals.index('7732-18-5')
+        makeup_water.mol[water_index] = blowdown_water.mol[water_index] = (
+                self.total_steam * self.boiler_blowdown * 1 / (1 - self.RO_rejection)   
+        )
+        ash_IDs = [i.ID for i in self.chemicals if not i.formula]
+        emissions_mol = emissions.mol
+        SO2_produced = 0
+        if 'SO2' in chemicals:
+            SO2_produced += emissions.imol['SO2']
+        if 'CaSO4' in chemicals:
+            SO2_produced += emissions.imol['CaSO4']
+            ash_IDs.append('CaSO4')
+        if SO2_produced: 
+            rxn, ID_lime = self._get_desulfurization_rxn_and_coreactant()
+            # FGD lime scaled based on SO2 generated,	
+            # 20% stoichiometric excess based on P52 of ref [1]
+            rxn.force_reaction(emissions)
+            lime.imol[ID_lime] = lime_mol = SO2_produced * 1.2
+            emissions_mol.remove_negatives()
+        else:
+            lime.empty()
+        # About 0.4536 kg/hr of boiler chemicals are needed per 234484 kg/hr steam produced
+        chems.imol['Ash'] = boiler_chems = 1.9345e-06 * Design['Flow rate']
+        ash_disposal.empty()
+        ash_disposal.copy_flow(emissions, IDs=tuple(ash_IDs), remove=True)
+        ash_disposal.imol['Ash'] += boiler_chems
+        dry_ash = ash_disposal.F_mass
+        moisture = min(emissions.imass['Water'], dry_ash * 0.3) # ~20% moisture
+        ash_disposal.imass['Water'] = moisture
+        emissions.imass['Water'] -= moisture
+        Design['Ash disposal'] = dry_ash + moisture
+        if SO2_produced:
+            if ID_lime == 'Ca(OH)2': # Ca(OH)2
+                lime.imol['Water'] = 4 * lime_mol # Its a slurry
+            else: # CaO
+                lime.imol['Water'] = 5 * lime_mol
 
 @cost('Flow rate', 'Pumps',
     S=43149, CE=522, cost=24800, n=0.8, kW=40, BM=2.3)

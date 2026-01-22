@@ -18,7 +18,7 @@ __all__ = ('load_process_settings','price','set_GWPCF','set_FECCF','GWP_CFs','FE
 # Prices for techno-economic analysis (TEA), all in $/kg (electricity in $/kWh)
 # and from ref [1] if not noted
 # =============================================================================
-
+factor = 1/907.18474 # ton/hr to kg/hr
 price = {
     'H2O': 0.2/1e3,  # $/kg 0.15 to 0.5 /1e3
     'H2SO4': 0.05,  # $/kg 0.027 to 0.129
@@ -48,6 +48,11 @@ price = {
     'Electricity': 0.065,  # $/kWh 0.035 to 0.25
     # 'Low pressure steam': 0.30626,  # $/kg
     # 'Cooling water': 0,  # $/kg
+    'Boiler chems': 4532.17 * factor,
+    'lime boiler': 180.87 * factor,
+    'Cooling tower chemicals': 2716.1 * factor,
+    'Makeup water': 0.2e-3, # checked with Ola
+    'Ash disposal': -28.86 * factor,
 }
 # %%
 # =============================================================================
@@ -177,7 +182,7 @@ def load_process_settings():
     cw.T_limit = cw.T + 9
     cw.regeneration_price = 0.027/1e3/18.01528 #assuming 0.027 $/m3 to $/kmol
     settings.get_cooling_agent('chilled_water').heat_transfer_price = 5.0/1e6 # 5 $/GJ
-    settings.electricity_price = 0.065 
+    settings.electricity_price = price['ElectricitySG']#0.065 
     bst.PowerUtility.price = price['ElectricitySG']
     set_GWPCF(bst.PowerUtility, 'ElectricitySG')
     #set_FECCF(bst.PowerUtility, 'Electricity')

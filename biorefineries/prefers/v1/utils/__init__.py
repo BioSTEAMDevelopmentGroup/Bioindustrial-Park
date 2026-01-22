@@ -22,8 +22,11 @@ Usage:
 from . import style
 from . import plots
 from . import utils
+from . import sankey_utils
+from . import plot_utils
+from . import diagram_utils
 
 # Apply style on import for convenience
 style.set_style()
 
-__all__ = ['style', 'plots', 'utils']
+__all__ = ['style', 'plots', 'utils', 'sankey_utils', 'plot_utils', 'diagram_utils']

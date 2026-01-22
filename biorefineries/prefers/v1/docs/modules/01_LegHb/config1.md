@@ -255,7 +255,7 @@ Purpose: Provide utilities and manage wastewater.
 | CWP | ChilledWaterPackage | Chilled water for process cooling |
 | PWC | ProcessWaterCenter | Water recycling and makeup management |
 
-**Note:** Debris stream routes to disposal, not boiler, due to protein thermodynamic property limitations.
+**Note:** Debris stream routes to the boiler via the prefers-local `BoilerTurbogenerator` subclass with guarded emissions enthalpy updates and glucose-based thermo fallbacks for large biomolecules.
 
 ---
 

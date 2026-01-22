@@ -16,7 +16,8 @@ from biorefineries.prefers.v1._process_settings import load_process_settings
 
 __all__ = ('create_model',)
 
-def create_model(baseline_production_kg_hr=275, config='config1', verbose=True):
+def create_model(baseline_production_kg_hr=150,#275
+                 , config='config1', verbose=True):
     """
     Create a Model object for uncertainty and sensitivity analysis of the LegHb production facility.
     
@@ -93,7 +94,7 @@ def create_model(baseline_production_kg_hr=275, config='config1', verbose=True):
     )
     def set_target_production(production_rate_kg_hr):
         """Set target production rate and resize entire plant using design specification."""
-        achieved_rate = set_production_rate(LegHb_sys, production_rate_kg_hr, verbose=False)
+        achieved_rate = set_production_rate(LegHb_sys, production_rate_kg_hr, config=config, verbose=False)
         
         if abs(achieved_rate - production_rate_kg_hr) > 1.0:
             print(f"Warning: Target production {production_rate_kg_hr:.2f} kg/hr, "
@@ -102,9 +103,9 @@ def create_model(baseline_production_kg_hr=275, config='config1', verbose=True):
     # =============================================================================
     # PARAMETER 2: Fermentation Titer
     # =============================================================================
-    baseline_titer = R302.target_titer  # Current titer (7.27 g/L)
-    lb_titer = baseline_titer * 0.8  # -20% (5.8 g/L)
-    ub_titer = baseline_titer * 1.2  # +20% (8.7 g/L)
+    baseline_titer = R302.target_titer  # Current titer 5 (7.27 g/L)
+    lb_titer = baseline_titer * 0.5  # -50% 2.5 (5.8 g/L)
+    ub_titer = baseline_titer * 2.0  # +100% 7.5 (8.7 g/L)
     
     @param(
         name='Fermentation titer', 
@@ -183,8 +184,8 @@ def create_model(baseline_production_kg_hr=275, config='config1', verbose=True):
     # PARAMETER 6: Electricity Price
     # =============================================================================
     baseline_electricity_price = bst.PowerUtility.price  # Current price (0.03 $/kWh)
-    lb_electricity = baseline_electricity_price * 0.7  # -30%
-    ub_electricity = baseline_electricity_price * 1.3  # +30%
+    lb_electricity = baseline_electricity_price * 0.5  # -50%
+    ub_electricity = baseline_electricity_price * 2.0  # +100%
     
     @param(
         name='Electricity price', 
