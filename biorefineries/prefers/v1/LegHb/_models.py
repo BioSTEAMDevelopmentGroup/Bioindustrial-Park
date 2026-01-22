@@ -15,9 +15,8 @@ from biorefineries.prefers.v1.LegHb._tea import PreFerSTEA
 from biorefineries.prefers.v1._process_settings import load_process_settings
 
 __all__ = ('create_model',)
-
-def create_model(baseline_production_kg_hr=150,#275
-                 , config='config1', verbose=True):
+p=275
+def create_model(baseline_production_kg_hr=p, config='config1', verbose=True):
     """
     Create a Model object for uncertainty and sensitivity analysis of the LegHb production facility.
     

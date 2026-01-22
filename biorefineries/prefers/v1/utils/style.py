@@ -89,6 +89,15 @@ def _register_colormaps():
         [PREFERS_COLORS[2], '#FFFFFF', PREFERS_COLORS[8]],
         N=256
     )
+
+    # Cloud Density (White -> Orange -> Blue -> Navy)
+    # "more dense, color more blue, more marginal, more orange"
+    # We start with White for background/zero density
+    prefers_density = mcolors.LinearSegmentedColormap.from_list(
+        "PreFerS_density",
+        ['#FFFFFF', PREFERS_COLORS[8], PREFERS_COLORS[2], PREFERS_COLORS[0]],
+        N=256
+    )
     
     # Register colormaps
     try:
@@ -96,14 +105,15 @@ def _register_colormaps():
         colormaps.register(cmap=prefers_div, name='PreFerS_diverging')
         colormaps.register(cmap=prefers_positive, name='PreFerS_positive')
         colormaps.register(cmap=prefers_corr, name='PreFerS_correlation')
+        colormaps.register(cmap=prefers_density, name='PreFerS_density')
     except ValueError:
         # Already registered, ignore
         pass
     
-    return prefers_seq, prefers_div, prefers_positive, prefers_corr
+    return prefers_seq, prefers_div, prefers_positive, prefers_corr, prefers_density
 
 # Register on module load
-PREFERS_CMAP, DIVERGING_CMAP, POSITIVE_CMAP, CORRELATION_CMAP = _register_colormaps()
+PREFERS_CMAP, DIVERGING_CMAP, POSITIVE_CMAP, CORRELATION_CMAP, DENSITY_CMAP = _register_colormaps()
 
 
 # =============================================================================

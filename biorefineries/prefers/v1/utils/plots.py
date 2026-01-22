@@ -298,7 +298,7 @@ def plot_stacked_contributions(contributions_df, metric_name="MESP",
 # =============================================================================
 
 def plot_2d_kde(x_data, y_data, xlabel, ylabel, title="Joint Distribution",
-                figsize=(9, 7), fill=True, levels=10, cmap=None):
+                figsize=(9, 7), fill=True, levels=20, cmap=None):
     """
     Generate 2D KDE contour plot for joint distributions.
     
@@ -317,13 +317,13 @@ def plot_2d_kde(x_data, y_data, xlabel, ylabel, title="Joint Distribution",
     levels : int
         Number of contour levels.
     cmap : str or Colormap, optional
-        Colormap. Default: PreFerS_positive.
+        Colormap. Default: PreFerS_density.
     
     Returns
     -------
     fig, ax : matplotlib figure and axes
     """
-    cmap = cmap or 'PreFerS_positive'
+    cmap = cmap or 'PreFerS_density'
     
     # Clean data
     mask = np.isfinite(x_data) & np.isfinite(y_data)
@@ -333,15 +333,15 @@ def plot_2d_kde(x_data, y_data, xlabel, ylabel, title="Joint Distribution",
     fig, ax = plt.subplots(figsize=figsize)
     
     if fill:
+        # "Cloud with gradient color" - no points
         sns.kdeplot(x=x_clean, y=y_clean, fill=True, levels=levels,
-                    cmap=cmap, alpha=0.7, ax=ax)
+                    cmap=cmap, alpha=1.0, thresh=0.01, ax=ax)
+    else:
+        # Fallback to lines if fill is False (though user requested fill)
+        sns.kdeplot(x=x_clean, y=y_clean, levels=levels, 
+                    cmap=cmap, linewidths=1.0, ax=ax)
     
-    sns.kdeplot(x=x_clean, y=y_clean, levels=levels, 
-                color=style.get_color('navy'), linewidths=1.0, ax=ax)
-    
-    # Add scatter for context
-    ax.scatter(x_clean, y_clean, s=8, alpha=0.3, color=style.get_color('navy'),
-               edgecolors='none', zorder=1)
+    # Removed scatter overlay as requested ("no point")
     
     ax.set_xlabel(xlabel, fontweight='bold')
     ax.set_ylabel(ylabel, fontweight='bold')
@@ -454,81 +454,68 @@ def plot_scale_effects(scale_values, metric_values, baseline_val,
 def plot_joint_marginal(data, x_col, y_col, x_label=None, y_label=None,
                         scatter_color=None, kde_color=None, 
                         x_box_color=None, y_box_color=None,
-                        height=7, ratio=4, alpha=0.6):
+                        height=7, ratio=5, alpha=0.6):
     """
-    Creates a Joint Plot: A central scatter plot with marginal boxplots 
+    Creates a Joint Plot: A central KDE plot with marginal boxplots 
     on the top and right axes to show distributions (p25, p75, outliers).
     
     This is a Bivariate Joint Plot with Marginal Boxplots. The central 
-    visualization is a Scatter Plot overlaid with Kernel Density Estimation 
-    (KDE) contours to reveal data concentration. The top and right margins 
-    feature aligned Box-and-Whisker plots to explicitly display the 
-    interquartile range (IQR), median, and outliers for both variables.
+    visualization is filled Kernel Density Estimation (KDE) contours 
+    (cloud with gradient) to reveal data concentration. The top and right 
+    margins feature aligned Box-and-Whisker plots.
     
     Parameters
     ----------
     data : pd.DataFrame
         The Monte Carlo simulation results.
     x_col : str or tuple
-        Column name for X-axis (e.g., 'GWP' or ('PreFerS', 'GWP [kg CO2-eq/kg]')).
+        Column name for X-axis.
     y_col : str or tuple
-        Column name for Y-axis (e.g., 'MSP' or ('PreFerS', 'MSP [$/kg]')).
+        Column name for Y-axis.
     x_label : str, optional
-        Custom label for X axis. If None, uses x_col.
+        Custom label for X axis.
     y_label : str, optional
-        Custom label for Y axis. If None, uses y_col.
+        Custom label for Y axis.
     scatter_color : str, optional
-        Color for scatter points. Default: Deep Navy (#191538).
+        Unused in cloud mode.
     kde_color : str, optional
-        Color for KDE contours. Default: Cerulean (#2C80C4).
+        Colormap name. Default: PreFerS_density.
     x_box_color : str, optional
-        Color for X-axis (top) boxplot. Default: Leaf Green (#8BC53F).
+        Color for X-axis (top) boxplot.
     y_box_color : str, optional
-        Color for Y-axis (right) boxplot. Default: Gold (#F5CA0C).
+        Color for Y-axis (right) boxplot.
     height : float
-        Height of the figure (width will be slightly larger due to marginals).
+        Height of the figure.
     ratio : float
-        Ratio of joint plot to marginal plot sizes.
+        Ratio of joint plot to marginal plot sizes. Default 5 (smaller marginals).
     alpha : float
-        Transparency for scatter points.
+        Transparency.
     
     Returns
     -------
     g : sns.JointGrid
         The seaborn JointGrid object.
-    
-    Examples
-    --------
-    >>> from biorefineries.prefers.v1.utils import plots
-    >>> g = plots.plot_joint_marginal(
-    ...     mc_results, 
-    ...     x_col=('PreFerS', 'GWP [kg CO2-eq/kg]'),
-    ...     y_col=('PreFerS', 'MSP [$/kg]'),
-    ...     x_label='GWP [kg CO₂-eq/kg]',
-    ...     y_label='MSP [$/kg]'
-    ... )
     """
     # Set default colors from PreFerS palette
-    scatter_color = scatter_color or style.PREFERS_COLORS[0]   # Deep Navy
-    kde_color = kde_color or style.PREFERS_COLORS[2]           # Cerulean
+    kde_color = kde_color or 'PreFerS_density' # Cloud gradient
     x_box_color = x_box_color or style.PREFERS_COLORS[5]       # Leaf Green
     y_box_color = y_box_color or style.PREFERS_COLORS[7]       # Gold
     
     # Create the JointGrid
     g = sns.JointGrid(data=data, x=x_col, y=y_col, height=height, ratio=ratio)
     
-    # Central Plot: Scatter with density contour for heavy overlap
-    # Use slight transparency (alpha) to visualize density in the scatter
-    g.plot_joint(sns.scatterplot, color=scatter_color, alpha=alpha, s=50, edgecolor="w")
-    g.plot_joint(sns.kdeplot, color=kde_color, levels=5, alpha=0.5)
+    # Central Plot: KDE Cloud (no scatter)
+    # "Cloud with gradient color" - more dense=blue, marginal=orange
+    g.plot_joint(sns.kdeplot, fill=True, cmap=kde_color, levels=100, thresh=0.01)
 
     # Marginal Plots: Boxplots to show p25, p75, median
+    # "box is too large" -> reduced width
     # Top marginal (X distribution)
     sns.boxplot(data=data, x=x_col, ax=g.ax_marg_x, color=x_box_color, 
-                flierprops={"marker": "x", "markersize": 4})
+                flierprops={"marker": "x", "markersize": 3}, width=0.5, linewidth=0.8)
     # Right marginal (Y distribution)
     sns.boxplot(data=data, y=y_col, ax=g.ax_marg_y, color=y_box_color, 
-                flierprops={"marker": "x", "markersize": 4})
+                flierprops={"marker": "x", "markersize": 3}, width=0.5, linewidth=0.8)
 
     # Clean up labels
     g.ax_joint.set_xlabel(x_label if x_label else str(x_col), fontweight='bold')

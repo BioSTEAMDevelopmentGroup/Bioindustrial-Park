@@ -31,7 +31,7 @@ def parse_arguments():
     parser.add_argument('--config', type=str, default='config1',
                         choices=get_available_configs(),
                         help='Process configuration (default: config1)')
-    parser.add_argument('--production', type=float, default=275,
+    parser.add_argument('--production', type=float, default=150,
                         help='Baseline production rate in kg/hr (default: 275)')
     parser.add_argument('--timestamp', type=str, default=None,
                         help='Custom timestamp (YYYYMMDD_HHMM). Defaults to current time.')
