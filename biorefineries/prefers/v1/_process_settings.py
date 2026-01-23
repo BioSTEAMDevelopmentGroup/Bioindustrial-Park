@@ -83,6 +83,8 @@ GWP_CFs = {
     'KCl': 0.494, # from ecoinvent 3.11 cutoff, market for potassium chloride, RoW
     'NaOH': 1.41, # from ecoinvent 3.11 cutoff, market for sodium hydroxide, Row
     'CO2': 1.0,  # Direct CO2 emissions
+    'ash_disposal': 0.00783,  # bottom ash, MSWI, biowaste kg Global (GLO)
+    'AscorbicAcid':2.57, # from ecoinvent 3.11 cutoff, market for ascorbic acid, GLO
 }
 
 # ##### Fossil energy consumption (FEC), in MJ/kg of material unless noted otherwise #####

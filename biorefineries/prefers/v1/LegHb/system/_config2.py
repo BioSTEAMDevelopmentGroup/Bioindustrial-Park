@@ -32,109 +32,69 @@ __all__ = (
     'create_LegHb_system',
     'set_production_rate',
     'check_LegHb_specifications',
+    # Modular area builders
+    'get_fermentation_parameters',
+    'create_fermentation_reactions',
+    'create_area_200_media_prep',
+    'create_area_300_conversion',
+    'create_area_400_recovery',
+    'create_area_500_purification',
+    'create_area_600_formulation',
+    'create_area_900_facilities',
 )
 # %%
-@bst.SystemFactory(
-    ID='LegHb_sys',
-    ins=[s.SeedIn1, s.SeedIn2, s.CultureIn, s.Glucose, s.NH3_25wt,s.DfUltraBuffer, s.IXEquilibriumBuffer, s.IXElutionBuffer
-         ,s.IXRegenerationSolution, s.DfNanoBuffer],
-    outs=[s.LegHb_3, s.vent1, s.vent2, s.effluent1, s.effluent2, s.effluent3,
-    ],
-    fthermo=lambda chemicals=None: LEGHB_THERMO,
-)
-def create_LegHb_system(
-        ins, outs,
-        use_area_convention=False,
-        # reactions_passed=None, # Placeholder if reactions were to be passed externally
-        # One could add more configurable parameters here:
-        # V_max_fermenter=500, target_titer=7.27, etc.
-    ):
+def get_fermentation_parameters():
     """
-    Creates the LegHb (Leghemoglobin) production system.
-    This system is based on the process flow and parameters from test_LegHb.py.
+    Return fermentation parameters for Config 2.
     """
-    bst.preferences.N=50
-    # Update all input stream prices before system creation to avoid conflicts
-    # This is now done at the module level in _streams.py to prevent ID conflicts
-    
-    # Uncomment the line below if you need to update prices dynamically:
-    #s.update_all_input_stream_prices()
-    # Unpack input streams
-    SeedIn1, SeedIn2, CultureIn, Glucose, NH3_25wt, DfUltraBuffer, IXEquilibriumBuffer, IXElutionBuffer, IXRegenerationSolution, DfNanoBuffer = ins
-
-    # Unpack output streams
-    (LegHb_3, vent1, vent2, effluent1, effluent2, effluent3) = outs
-
-    # Use cached LegHb thermo for reaction parsing
-    bst.settings.set_thermo(LEGHB_THERMO, skip_checks=True)
-    
-    
-    set_GWPCF(Glucose, 'Glucose')
-    set_GWPCF_Multi(SeedIn1, ['AmmoniumSulfate','Glucose','MagnesiumSulfate','KH2PO4'],[0.5/(0.5+1+0.05+0.3), 1/(0.5+1+0.05+0.3), 0.05/(0.5+1+0.05+0.3), 0.3/(0.5+1+0.05+0.3)])
-    set_GWPCF_Multi(SeedIn2, ['AmmoniumSulfate','Glucose','MagnesiumSulfate','KH2PO4'],[0.5/(0.5+1+0.05+0.3), 1/(0.5+1+0.05+0.3), 0.05/(0.5+1+0.05+0.3), 0.3/(0.5+1+0.05+0.3)])
-    set_GWPCF_Multi(CultureIn, ['Glycine','Glucose','IronSulfate'],[0.1/(0.1+60+0.15191), 60/(0.1+60+0.15191), 0.15191/(0.1+60+0.15191)])
-    set_GWPCF(NH3_25wt, 'Ammonia_SEA',dilution=0.25)
-    set_GWPCF_Multi(DfUltraBuffer, ['KH2PO4','NaCl'], [0.8472, 0.1455])
-    set_GWPCF_Multi(IXEquilibriumBuffer, ['KH2PO4','NaCl'], [0.8472, 0.1455])
-    set_GWPCF_Multi(IXElutionBuffer, ['KH2PO4','NaCl','KCl'], [0.3616,0.5911, 0.0792])
-    set_GWPCF(IXRegenerationSolution, 'NaOH')
-    set_GWPCF_Multi(DfNanoBuffer, ['Na2HPO4','NaH2PO4'], [0.5420, 0.4580])
-
-    load_process_settings()  # Load process settings to update prices and CFs
-    """
-    Fermentation Parameter
-    """
-    theta_O2 = 0.5 # Dissolved oxygen concentration [% saturation]
-    agitation_power = 0.985 # [kW / m3]
-    design = 'Stirred tank' # Reactor type
-    method = "Riet" # Name of method
-    T_operation = 273.15 + 32 # [K]
-    Q_O2_consumption = -110 * 4184 # [kJ/kmol]
-    dT_hx_loop = 8 # [degC]
-    cooler_pressure_drop = 20684 # [Pa]
-    compressor_isentropic_efficiency = 0.85
-    V_max = 500 # [m3] #here cause pressure vessel design problem
-    titer_LegHb = 5 #7.27 # [g / L]
-    productivity_LegHb = 5 / 72 #7.27 / 72 # [g / L / h]
-    Y_p = 5 * 4 / 600 #7.27 * 4 / 1300 # [by wt] 3 wt%
-    Y_b = 0.53 # [by wt] 
-    yield_LegHb = Y_p#/0.517 # yield based on glucose utilized for product formation
+    return {
+        'theta_O2': 0.5,
+        'agitation_power': 0.985,
+        'design': 'Stirred tank',
+        'method': 'Riet',
+        'T_operation': 273.15 + 32,
+        'Q_O2_consumption': -110 * 4184,
+        'dT_hx_loop': 8,
+        'cooler_pressure_drop': 20684,
+        'compressor_isentropic_efficiency': 0.85,
+        'V_max': 500,
+        'titer_LegHb': 5,
+        'productivity_LegHb': 5 / 72,
+        'Y_p': 5 * 4 / 600,
+        'Y_b': 0.53,
+    }
 
 
+def create_fermentation_reactions(params=None):
     """
-    Reactions
+    Create reaction systems for LegHb fermentation (Config 2).
     """
-    
-    # fermentation_reaction = bst.PRxn([
-    #     #           Reaction        Reactnat            Conversion           Check                  "
-    #     bst.Rxn('8 Glucose + 6 NH3 + 1 FeSO4 + 10.5 O2 -> Heme_b + 1 (NH4)2SO4 + 37 H2O + 14 CO2',
-    #                                 reactant = 'Glucose',X=LegHb_yield*0.05,check_atomic_balance=True),
-    #     bst.Rxn('Glucose + (NH4)2SO4 + NH3 -> Globin + CO2 + H2O',
-    #                                 reactant = 'Glucose', X= LegHb_yield*0.05,correct_atomic_balance=True),
-    #     bst.Rxn('Glucose + FeSO4 + (NH4)2SO4 + NH3 -> Leghemoglobin + CO2  + H2O',
-    #                                 reactant = 'Glucose', X=LegHb_yield,  correct_atomic_balance=True),
-    #     ])
+    if params is None:
+        params = get_fermentation_parameters()
+
+    yield_LegHb = params['Y_p']
+    Y_b = params['Y_b']
+
     fermentation_reaction = bst.PRxn([
-        #           Reaction        Reactnat            Conversion           Check                  "
-        bst.Rxn('1 Glucose + 1.05882 NH3 + 0.17647 FeSO4  -> 0.17647 Heme_b + 0.617647 O2 + 0.17647 (NH4)2SO4 + 4.05882 H2O',
-                                    reactant = 'Glucose',X=yield_LegHb*(0.00786/0.17647),check_atomic_balance=True),
-        bst.Rxn('Glucose + 0.01646 (NH4)2SO4 + 1.61317 NH3 -> 6 Globin + 0.28807 O2 + 3.68724 H2O',
-                                    reactant = 'Glucose', X= yield_LegHb*0.07,check_atomic_balance=True),
-        bst.Rxn('Glucose + 0.00786 FeSO4 + 0.00786 (NH4)2SO4 + 1.58847 NH3 -> 6 Leghemoglobin + 0.30275 O2  + 3.70380 H2O',
-                                    reactant = 'Glucose', X=yield_LegHb,  check_atomic_balance=True),
-        ])
-    fermentation_reaction[2].product_yield('Leghemoglobin', basis='wt', product_yield=yield_LegHb)
+        bst.Rxn('1 Glucose + 0.70588 NH3 + 0.17647 FeSO4  -> 0.17647 Heme_b + 0.617647 O2 + 0.17647 H2SO4 + 4.05882 H2O',
+                reactant='Glucose', X=yield_LegHb*(0.00786/0.17647)*(1/0.93-1), check_atomic_balance=True),
+        bst.Rxn('1 Glucose + 0.01646 (NH4)2SO4 + 1.61317 NH3 -> 6 Globin_In + 0.28807 O2 + 3.68724 H2O',
+                reactant='Glucose', X=yield_LegHb*(1/0.93-1), check_atomic_balance=True),
+        bst.Rxn('1 Glucose + 0.00786 FeSO4 + 0.00786 (NH4)2SO4 + 1.58847 NH3 -> 6 Leghemoglobin_In + 0.30275 O2  + 3.70380 H2O',
+                reactant='Glucose', X=yield_LegHb, check_atomic_balance=True),
+    ])
+    fermentation_reaction[2].product_yield('Leghemoglobin_In', basis='wt', product_yield=yield_LegHb)
 
     neutralization_reaction = bst.Rxn(
-        'H2SO4 + 2 NH3 -> (NH4)2SO4', reactant = 'NH3', X=1,
+        'H2SO4 + 2 NH3 -> (NH4)2SO4', reactant='NH3', X=1,
         check_atomic_balance=True
     )
 
     cell_growth_reaction = bst.Rxn(
-        'Glucose + 0.8364 NH3 + 0.0108 (NH4)2SO4 -> 2.01 H2O + 0.106 O2 + 6 Pichia_pastoris', 'Glucose', X=(1-yield_LegHb*1.1)*Y_b,
+        'Glucose + 0.8364 NH3 + 0.0108 (NH4)2SO4 -> 2.01 H2O + 0.106 O2 + 6 Pichia_pastoris', 'Glucose', X=Y_b,
         correct_atomic_balance=True
     )
-    cell_growth_reaction.product_yield('Pichia_pastoris', basis='wt', product_yield=(1-yield_LegHb*1.1)*Y_b)
+    cell_growth_reaction.product_yield('Pichia_pastoris', basis='wt', product_yield=1 - Y_b)
 
     respiration_reaction1 = bst.Rxn(
         'Glucose + 6 O2 -> 6 CO2 + 6 H2O', 'Glucose', 1 - Y_b,
@@ -151,448 +111,424 @@ def create_LegHb_system(
         fermentation_reaction,
         bst.PRxn([cell_growth_reaction, respiration_reaction2])
     )
-    RXN.show()
 
-    # Ensure alias is set for splitter specifications
-    try:
-        bst.settings.chemicals.set_alias('Pichia_pastoris', 'cellmass')
-    except ValueError:
-        pass
+    return {
+        'fermentation_reaction': fermentation_reaction,
+        'neutralization_reaction': neutralization_reaction,
+        'cell_growth_reaction': cell_growth_reaction,
+        'respiration_reaction1': respiration_reaction1,
+        'respiration_reaction2': respiration_reaction2,
+        'RXN': RXN,
+    }
 
-    # =========================================================================
-    # AREA 200: MEDIA PREPARATION
-    # =========================================================================
+
+def create_area_200_media_prep(SeedIn1, SeedIn2, CultureIn, Glucose, NH3_25wt):
     """
-    Media Preparation Area
-    
-    Purpose: Prepare all feed solutions for fermentation
-    
-    Units:
-    - M301: Seed solution 1 preparation
-    - M302: Seed solution 2 + culture media preparation
-    - M303: Seed hold tank
-    - M304: Glucose solution preparation
-    - T301: Glucose storage tank
-    - T302: Ammonia storage tank
+    Area 200: Media Preparation (Config 2).
     """
-    
-    M301 = bst.MixTank('M301', ins=[SeedIn1,'Water1'], outs='M301Out', tau=16)
+    M301 = bst.MixTank('M301', ins=[SeedIn1, 'Water1'], outs='M301Out', tau=16)
+
     @M301.add_specification(run=True)
     def update_seed1_inputs():
         target_stream = bst.Stream(**{**s.SeedSolution1, 'ID': None})
         SeedIn1.imass['Seed'] = target_stream.imass['Seed']
         M301.ins[1].imass['H2O'] = target_stream.imass['H2O']
-        M301.ins[1].T = 25+273.15
-    
-    M302 = bst.MixTank('M302', ins=[SeedIn2,CultureIn,'Water2'], outs='M302Out', tau=16)
+        M301.ins[1].T = 25 + 273.15
+
+    M302 = bst.MixTank('M302', ins=[SeedIn2, CultureIn, 'Water2'], outs='M302Out', tau=16)
+
     @M302.add_specification(run=True)
     def update_culture_inputs():
         target_stream = bst.Stream(**{**s.SeedSolution2, 'ID': None})
         SeedIn2.imass['Seed'] = target_stream.imass['Seed']
         M302.ins[2].imass['H2O'] = target_stream.imass['H2O']
-        M302.ins[2].T = 25+273.15
-        CultureIn.imass['Culture'] = target_stream.imass['SeedSolution']*(0.1+60+0.15191)/1000
+        M302.ins[2].T = 25 + 273.15
+        CultureIn.imass['Culture'] = target_stream.imass['SeedSolution'] * (0.1 + 60 + 0.15191) / 1000
 
     M303 = u.SeedHoldTank('M303', ins=[M301-0, M302-0], outs='M303Out')
 
-    # =========================================================================
-    # AREA 300: FERMENTATION / CONVERSION
-    # =========================================================================
-    """
-    Fermentation/Conversion Area
-    
-    Purpose: Convert glucose to LegHb through microbial fermentation
-    
-    Units:
-    - R301: Seed train bioreactor
-    - R302: Main aerobic fermentation vessel (500 m³ max)
-    
-    Target: 7.27 g/L LegHb titer [Yao et al. 2025]
-    """
-    
-    R301 = u.SeedTrain(
-        'R301',
-        ins=[M303-0],
-        outs=[vent1, 'R301Out'],
-        reactions=bst.PRxn([cell_growth_reaction, respiration_reaction1]),
-        saccharification=None,
-        T=32+273.15,
-    )
-    R301.add_specification(run=True)
-    
-    M304 = bst.MixTank('M304', ins=[Glucose,'Water3'], outs='M304Out', tau=16)
-    
+    M304 = bst.MixTank('M304', ins=[Glucose, 'Water3'], outs='M304Out', tau=16)
+
     @M304.add_specification(run=True)
     def update_water_content():
-        M304.ins[1].imass['H2O'] = Glucose.imass['Glucose']/2
-        M304.ins[1].T = 25+273.15
-    
-    T301 = bst.StorageTank('T301', ins=M304-0, outs='T301Out',tau=16*4+72)
+        M304.ins[1].imass['H2O'] = Glucose.imass['Glucose'] / 2
+        M304.ins[1].T = 25 + 273.15
+
+    T301 = bst.StorageTank('T301', ins=M304-0, outs='T301Out', tau=16*4+72)
 
     T302 = u.AmmoniaStorageTank('T302', ins=NH3_25wt, outs='T302Out')
 
-    # checking more details...
+    return {
+        'units': [M301, M302, M303, M304, T301, T302],
+        'seed_out': M303.outs[0],
+        'glucose_out': T301.outs[0],
+        'ammonia_out': T302.outs[0],
+        'M301': M301, 'M302': M302, 'M303': M303,
+        'M304': M304, 'T301': T301, 'T302': T302,
+    }
+
+
+def create_area_300_conversion(seed_in, glucose_in, ammonia_in, vent1, vent2, reactions, params=None):
+    """
+    Area 300: Fermentation / Conversion (Config 2).
+    """
+    if params is None:
+        params = get_fermentation_parameters()
+
+    fermentation_reaction = reactions['fermentation_reaction']
+    cell_growth_reaction = reactions['cell_growth_reaction']
+    respiration_reaction1 = reactions['respiration_reaction1']
+    respiration_reaction2 = reactions['respiration_reaction2']
+    neutralization_reaction = reactions['neutralization_reaction']
+    RXN = reactions['RXN']
+
+    R301 = u.SeedTrain(
+        'R301',
+        ins=[seed_in],
+        outs=[vent1, 'R301Out'],
+        reactions=bst.PRxn([cell_growth_reaction, respiration_reaction1]),
+        saccharification=None,
+        T=32 + 273.15,
+    )
+    R301.add_specification(run=True)
+
     R302 = u.AeratedFermentation(
         'R302',
-        ins=[R301-1, T301-0, T302-0, bst.Stream('FilteredAir', phase='g', P=2 * 101325)],
+        ins=[R301-1, glucose_in, ammonia_in, bst.Stream('FilteredAir', phase='g', P=2 * 101325)],
         outs=[vent2, 'Broth'],
         fermentation_reaction=fermentation_reaction,
         cell_growth_reaction=cell_growth_reaction,
         respiration_reaction=respiration_reaction2,
         neutralization_reaction=neutralization_reaction,
-        design=design, method=method,theta_O2=theta_O2,
-        V_max=V_max, Q_O2_consumption=Q_O2_consumption,
-        dT_hx_loop=dT_hx_loop, T=T_operation,
-        batch=True, reactions=RXN,
-        kW_per_m3=agitation_power,
-        tau=titer_LegHb/productivity_LegHb,
-        cooler_pressure_drop=cooler_pressure_drop,
-        compressor_isentropic_efficiency=compressor_isentropic_efficiency,
-        P=1 * 101325,#optimize_power=True,
+        design=params['design'],
+        method=params['method'],
+        theta_O2=params['theta_O2'],
+        V_max=params['V_max'],
+        Q_O2_consumption=params['Q_O2_consumption'],
+        dT_hx_loop=params['dT_hx_loop'],
+        T=params['T_operation'],
+        batch=True,
+        reactions=RXN,
+        kW_per_m3=params['agitation_power'],
+        tau=params['titer_LegHb'] / params['productivity_LegHb'],
+        cooler_pressure_drop=params['cooler_pressure_drop'],
+        compressor_isentropic_efficiency=params['compressor_isentropic_efficiency'],
+        P=1 * 101325,
     )
-    R302.target_titer = titer_LegHb # g / L
-    R302.target_productivity = productivity_LegHb # g / L / h
-    R302.target_yield = yield_LegHb  # wt %
+    R302.target_titer = params['titer_LegHb']
+    R302.target_productivity = params['productivity_LegHb']
+    R302.target_yield = params['Y_p']
 
     @R302.add_specification(run=True)
     def update_reaction_time_and_yield():
         R302.tau = R302.target_titer / R302.target_productivity
-        fermentation_reaction[2].product_yield('Leghemoglobin', basis='wt', product_yield=R302.target_yield)
+        fermentation_reaction[2].product_yield('Leghemoglobin_In', basis='wt', product_yield=R302.target_yield)
+
+    return {
+        'units': [R301, R302],
+        'broth_out': R302.outs[1],
+        'R301': R301, 'R302': R302,
+    }
 
 
-    # =========================================================================
-    # AREA 400: RECOVERY (CELL DISRUPTION & CLARIFICATION)
-    # =========================================================================
+def create_area_400_recovery(broth_in, DfUltraBuffer_wash):
     """
-    Recovery Area - Intracellular LegHb Extraction
-    
-    Purpose: Release and clarify intracellular LegHb from yeast cells
-    
-    Units:
-    - S401: Cell disruption
-    - S402: Microfiltration
-    - S403: Screw press for debris
-    - S404: Splitter for residual cell mass
+    Area 400: Recovery (Config 2 - aligned with Config 1 recovery train).
     """
-    
+    C401 = u.Centrifuge(
+        'C401',
+        ins=broth_in,
+        outs=('CellCream', 'SpentMedia'),
+        split={
+            'cellmass': 0.999,
+            'Leghemoglobin_In': 0.999,
+            'Globin_In': 0.999,
+            'Heme_b': 0.85,
+            'Glucan': 0.99,
+            'Mannoprotein': 0.99,
+            'Chitin': 0.99,
+            'OleicAcid': 0.99,
+            'RNA': 0.99,
+        },
+        moisture_content=0.55,
+    )
+
+    M401 = bst.MixTank('M401', ins=(DfUltraBuffer_wash, 'WashWater'), outs='WashBufferOut', tau=0.5)
+
+    @M401.add_specification(run=True)
+    def update_wash_buffer():
+        M401.ins[1].imass['H2O'] = C401.outs[0].F_mass * 1.5
+        M401.ins[0].imol['DfUltraBuffer'] = M401.ins[1].imass['H2O'] * (0.025 + 0.01 + 0.001) / 1000
+
+    H402 = bst.HXutility(
+        'H402',
+        ins=M401-0,
+        outs='ColdWashBuffer',
+        T=10 + 273.15,
+        cool_only=True,
+    )
+
+    M402 = bst.MixTank('M402', ins=(C401-0, H402-0), outs='WashedCellSlurry', tau=0.25)
+
+    C402 = u.Centrifuge(
+        'C402',
+        ins=M402-0,
+        outs=('WashedCellCream', 'WashEffluent'),
+        split={
+            'cellmass': 0.999,
+            'Leghemoglobin_In': 0.999,
+            'Globin_In': 0.999,
+            'Heme_b': 0.85,
+            'Glucan': 0.99,
+            'Mannoprotein': 0.99,
+        },
+        moisture_content=0.55,
+    )
+
     S401 = u.CellDisruption(
         'S401',
-        ins=R302-1,
-        outs='DisruptedBroth',
+        ins=C402-0,
+        outs='CrudeHomogenate',
+        P_high=1000e5,
+        cell_disruption_efficiency=0.90,
     )
-
-    S402 = u.Filtration.from_preset(
-        'MF', 
-        'S402',
-        ins = S401-0,
-        outs = ('Deposit', 'Supernatant'),
-    )
-    S402.add_specification(run=True)
-
-    #S403 = bst.SolidsSeparator('S403', ins=S402-0, outs=(effluent1, 'S403Out'), split=(1) , moisture_content=0.01)
-    S403 = bst.ScrewPress('S403', ins=S402-0, outs=('CellMassWaste', 'S403Out'), split=(0.999) , moisture_content=0.01)
-    
-    S404 = bst.Splitter('S404', ins=S402-1, outs=('ResidualCellMass', 'S404Out'), split=(0.999) , order=('cellmass',))
-
-    # E401 = u.Evaporator(
-    #     'E401',
-    #     ins = S402-1,
-    #     outs = ('E401Out',effluent2),
-    #     P = (101325, 73581, 50892, 32777, 20000),  # Reduced to 3 effects to increase vessel size
-    #     V = 0.1,  # Increased vapor fraction to create larger vessels
-    #     V_definition = 'First-effect',  # Changed to overall for better load distribution
-    # )
-    # E401.add_specification(run=True)
-
-    # =========================================================================
-    # AREA 500: PURIFICATION (UF/DF + ION EXCHANGE)
-    # =========================================================================
-    """
-    Purification Area - Membrane Separation & Chromatography
-    
-    Purpose: Purify LegHb using diafiltration and ion exchange
-    
-    Process Flow (Config2 pathway):
-    1. UF/DF Stage 1 (U401): Initial concentration + buffer exchange
-    2. Ion Exchange (U402/ResinColumn): Selective LegHb binding/elution
-    3. UF/DF Stage 2 (U404): Final concentration
-    
-    Units:
-    - M401, H401: DF buffer preparation
-    - U401: Primary UF/DF
-    - M402, M403, M404, M405, H402, H403, H404: IX buffer conditioning
-    - U402: Ion exchange column (ResinColumn)
-    - U403, U404: Post-IX concentration
-    
-    Config2 Specific: Adds ResinColumn (U402) for higher purity
-    """
-
-    M401 = bst.MixTank('M401', ins=(DfUltraBuffer, 'Water4'), 
-                    outs='M401Out', tau=1) 
-    @M401.add_specification(run=True)
-    def update_DfUltraBuffer_initial():
-        M401.ins[1].imass['H2O'] = (S402-1).imass['H2O']*4
-        M401.ins[0].imol['DfUltraBuffer'] = ((S402-1).imass['H2O']*4)*(0.025+0.01+0.001)/1000
 
     H401 = bst.HXutility(
         'H401',
-        ins=M401-0,
-        outs='H401Out',
-        T=5+273.15,  # Cool to 5°C
+        ins=S401-0,
+        outs='CooledHomogenate',
+        T=15 + 273.15,
         cool_only=True,
     )
+
+    S402 = bst.SolidsCentrifuge(
+        'S402',
+        ins=H401-0,
+        outs=('CellDebris', 'CrudeLysate'),
+        split={
+            'cellmass': 0.98,
+            'Glucan': 0.98,
+            'Chitin': 0.98,
+            'OleicAcid': 0.98,
+            'RNA': 0.85,
+            'Leghemoglobin': 0.02,
+            'Globin': 0.05,
+            'Mannoprotein': 0.98,
+        },
+        moisture_content=0.20,
+    )
+
+    S403 = u.Filtration.from_preset(
+        'MF',
+        'S403',
+        ins=S402-1,
+        outs=('FilterCake', 'ClarifiedLysate'),
+        solid_capture_efficiency=0.95,
+        cake_moisture_content=0.30,
+    )
+    S403.add_specification(run=True)
+
+    S404 = bst.ScrewPress(
+        'S404',
+        ins=(S402-0, S403-0),
+        outs=('DehydratedDebris', 'PressLiquor'),
+        split=0.999,
+        moisture_content=0.001,
+    )
+
+    return {
+        'units': [C401, M401, H402, M402, C402, S401, H401, S402, S403, S404],
+        'clarified_lysate': S403.outs[1],
+        'spent_media': C401.outs[1],
+        'wash_effluent': C402.outs[1],
+        'dehydrated_debris': S404.outs[0],
+        'press_liquor': S404.outs[1],
+        'C401': C401, 'M401': M401, 'H402': H402,
+        'M402': M402, 'C402': C402, 'S401': S401,
+        'H401': H401, 'S402': S402, 'S403': S403, 'S404': S404,
+    }
+
+
+def create_area_500_purification(clarified_lysate, DfUltraBuffer, IXEquilibriumBuffer, IXElutionBuffer, IXRegenerationSolution, DfNanoBuffer):
+    """
+    Area 500: UF/DF -> IEX -> DF (Config 2).
+    """
+    M401 = bst.MixTank('M401', ins=(DfUltraBuffer, 'Water4'), outs='M401Out', tau=1)
+
+    @M401.add_specification(run=True)
+    def update_DfUltraBuffer_initial():
+        M401.ins[1].imass['H2O'] = clarified_lysate.imass['H2O'] * 4
+        M401.ins[0].imol['DfUltraBuffer'] = (clarified_lysate.imass['H2O'] * 4) * (0.025 + 0.01 + 0.001) / 1000
+
+    H401 = bst.HXutility('H401', ins=M401-0, outs='H401Out', T=5 + 273.15, cool_only=True)
 
     U401 = u.Diafiltration.from_preset(
         'UF',
         'U401',
-        ins = (S404-1, H401-0),
-        outs = ('U401Out','PermeateWasteUltra'),
-        TargetProduct_ID = 'Leghemoglobin',
-        Salt_ID = c.chemical_groups['Salts'],
-        OtherLargeMolecules_ID = c.chemical_groups['OtherLargeMolecules'],
+        ins=(clarified_lysate, H401-0),
+        outs=('U401Out', 'PermeateWasteUltra'),
+        TargetProduct_ID='Leghemoglobin',
+        Salt_ID=c.chemical_groups['Salts'],
+        OtherLargeMolecules_ID=c.chemical_groups['OtherLargeMolecules'],
     )
     U401.add_specification(run=True)
 
-    #S404 = bst.SolidsSeparator('S404', ins=U401-1, outs=(effluent2, 'S404Out'), split=(1) , moisture_content=0.01)
-    #S405 = u.ReverseOsmosis('S405', ins=U401-1, outs=('S405Out',effluent2))
+    M402 = bst.MixTank('M402', ins=(IXEquilibriumBuffer, 'Water5'), outs='M402Out', tau=1)
+    M403 = bst.MixTank('M403', ins=(IXElutionBuffer, 'Water6'), outs='M403Out', tau=1)
+    M404 = bst.MixTank('M404', ins=(IXRegenerationSolution, 'Water7'), outs='M404Out', tau=1)
 
-    M402 = bst.MixTank('M402', ins=(IXEquilibriumBuffer,'Water5'), 
-                    outs='M402Out', tau=1)
-    M403 = bst.MixTank('M403', ins=(IXElutionBuffer,'Water6'),
-                    outs='M403Out', tau=1)
-    M404 = bst.MixTank('M404', ins=(IXRegenerationSolution,'Water7'), 
-                    outs='M404Out', tau=1)
-
-    H402 = bst.HXutility(
-        'H402',
-        ins=M402-0,
-        outs='H402Out',
-        T=5+273.15,  # Cool to 5°C
-        cool_only=True,
-    )
-    H403 = bst.HXutility(
-        'H403',
-        ins=M403-0,
-        outs='H403Out',
-        T=5+273.15,  # Cool to 5°C
-        cool_only=True,
-    )
-    H404 = bst.HXutility(
-        'H404', 
-        ins=M404-0,
-        outs='H404Out',
-        T=5+273.15,  # Cool to 5°C
-        cool_only=True,
-    )
+    H402 = bst.HXutility('H402', ins=M402-0, outs='H402Out', T=5 + 273.15, cool_only=True)
+    H403 = bst.HXutility('H403', ins=M403-0, outs='H403Out', T=5 + 273.15, cool_only=True)
+    H404 = bst.HXutility('H404', ins=M404-0, outs='H404Out', T=5 + 273.15, cool_only=True)
 
     U402 = u.ResinColumn(
         'U402',
-        ins = (U401-0, H402-0, H403-0, H404-0),
-        outs = ('U402Out','FlowthroughWaste','WashWaste','RegenerationWaste'),
+        ins=(U401-0, H402-0, H403-0, H404-0),
+        outs=('U402Out', 'FlowthroughWaste', 'WashWaste', 'RegenerationWaste'),
         preset='IonExchange',
-        TargetProduct_IDs = c.chemical_groups['LegHbIngredients'],
+        TargetProduct_IDs=c.chemical_groups['LegHbIngredients'],
         BoundImpurity_IDs=c.chemical_groups['BoundImpurities'],
-    )    
+    )
 
     @M402.add_specification(run=True)
     def update_IXEquilibriumBuffer_initial():
-        M402.ins[1].imass['H2O'] = (U401-0).imass['H2O']*U402.wash_CV
-        M402.ins[0].imol['IXEquilibriumBuffer'] = ((U401-0).imass['H2O']*U402.wash_CV)*(0.025+0.01+0.001)/1000
+        M402.ins[1].imass['H2O'] = (U401-0).imass['H2O'] * U402.wash_CV
+        M402.ins[0].imol['IXEquilibriumBuffer'] = ((U401-0).imass['H2O'] * U402.wash_CV) * (0.025 + 0.01 + 0.001) / 1000
+
     @M403.add_specification(run=True)
     def update_IXElutionBuffer_initial():
-        M403.ins[1].imass['H2O'] = (U401-0).imass['H2O']*U402.elution_CV
-        M403.ins[0].imol['IXElutionBuffer'] = ((U401-0).imass['H2O']*U402.elution_CV)*(0.025+1+0.1)/1000
+        M403.ins[1].imass['H2O'] = (U401-0).imass['H2O'] * U402.elution_CV
+        M403.ins[0].imol['IXElutionBuffer'] = ((U401-0).imass['H2O'] * U402.elution_CV) * (0.025 + 1 + 0.1) / 1000
+
     @M404.add_specification(run=True)
     def update_IXRegenerationSolution_initial():
-        M404.ins[1].imass['H2O'] = (U401-0).imass['H2O']*U402.regeneration_CV
-        M404.ins[0].imol['NaOH'] = ((U401-0).imass['H2O']*U402.regeneration_CV)*(0.5)/1000
+        M404.ins[1].imass['H2O'] = (U401-0).imass['H2O'] * U402.regeneration_CV
+        M404.ins[0].imol['NaOH'] = ((U401-0).imass['H2O'] * U402.regeneration_CV) * (0.5) / 1000
 
-    #S405 = bst.SolidsSeparator('S405', ins=U402-1, outs=(effluent3, 'S405Out'), split=(1) , moisture_content=0.01)
-    #S406 = u.ReverseOsmosis('S406', ins=U402-1, outs=('S406Out',effluent3))
+    M405 = bst.MixTank('M405', ins=(DfNanoBuffer, 'Water8'), outs='M405Out', tau=1)
 
-    M405 = bst.MixTank('M405', ins=(DfNanoBuffer,'Water8'), 
-                    outs='M405Out', tau=1)
     @M405.add_specification(run=True)
     def update_DfNanoBuffer_initial():
-        M405.ins[1].imass['H2O'] = (U402-0).imass['H2O']*2
-        M405.ins[0].imol['DfNanoBuffer'] = ((U402-0).imass['H2O']*2)*(0.01+0.01)/1000
+        M405.ins[1].imass['H2O'] = (U402-0).imass['H2O'] * 2
+        M405.ins[0].imol['DfNanoBuffer'] = ((U402-0).imass['H2O'] * 2) * (0.01 + 0.01) / 1000
 
-    H405 = bst.HXutility(
-        'H405',
-        ins=M405-0,
-        outs='H405Out',
-        T=5+273.15,  # Cool to 5°C
-        cool_only=True,
-    )
+    H405 = bst.HXutility('H405', ins=M405-0, outs='H405Out', T=5 + 273.15, cool_only=True)
 
     U403 = u.Diafiltration.from_preset(
         'NF',
         'U403',
-        ins = (U402-0, H405-0),
-        outs = ('U403Out','PermeateWasteNano'),
-        TargetProduct_ID = 'Leghemoglobin',
-        Salt_ID = c.chemical_groups['Salts'],
-        OtherLargeMolecules_ID = c.chemical_groups['OtherLargeMolecules'],
+        ins=(U402-0, H405-0),
+        outs=('U403Out', 'PermeateWasteNano'),
+        TargetProduct_ID='Leghemoglobin',
+        Salt_ID=c.chemical_groups['Salts'],
+        OtherLargeMolecules_ID=c.chemical_groups['OtherLargeMolecules'],
     )
     U403.add_specification(run=True)
 
-    #S406 = bst.SolidsSeparator('S406', ins=U403-1, outs=(effluent4, 'S406Out'), split=(1) , moisture_content=0.01)
-    #S407 = u.ReverseOsmosis('S407', ins=U403-1, outs=('S407Out',effluent4))
-
     U404 = u.Diafiltration(
         'U404',
-        ins = (U403-0, bst.Stream('U404_buffer', H2O=0.001)),  # Minimal buffer for DF interface
-        outs = ( 'U404Out', 'PermeateWater'),
-        TargetProduct_ID = 'Leghemoglobin',
-        Salt_ID = c.chemical_groups['Salts'],
-        OtherLargeMolecules_ID = c.chemical_groups['OtherLargeMolecules'],
-        TMP_bar1 = 3,
-        FeedWater_Recovery_to_Permeate = 0.75,  # Initial value, will be adjusted by spec
-        )
-    
-    # Target specifications from check_legH_specifications
-    U404.target_total_solids_percent = 12.0  # Target: 0-24%, aim for middle-low range
-    U404.target_legh_percent = 7.5  # Target: 6-9%, aim for middle
-    
+        ins=(U403-0, bst.Stream('U404_buffer', H2O=0.001)),
+        outs=('U404Out', 'PermeateWater'),
+        TargetProduct_ID='Leghemoglobin',
+        Salt_ID=c.chemical_groups['Salts'],
+        OtherLargeMolecules_ID=c.chemical_groups['OtherLargeMolecules'],
+        TMP_bar1=3,
+        FeedWater_Recovery_to_Permeate=0.75,
+    )
+
+    U404.target_total_solids_percent = 12.0
+    U404.target_legh_percent = 7.5
+
     @U404.add_specification(run=True)
     def U404_adjust_water_recovery():
-        """
-        Dynamically adjust water recovery to achieve target Leghemoglobin content percentage.
-        
-        The goal is to concentrate the product by removing water until LegHb reaches
-        the target percentage (6-9%, default target 7.5%).
-        
-        Key fix: Salt_Retention must be updated together with FeedWater_Recovery_to_Permeate.
-        """
         import flexsolve as flx
         import warnings
-        
+
         feed_stream = U404.ins[0]
         product_stream = U404.outs[0]
-        
-        # Safety check: ensure feed has content
+
         if feed_stream.F_mass <= 0:
             U404._run()
             return
-        
-        # Check if LegHb exists in feed
+
         feed_legh = feed_stream.imass['Leghemoglobin']
         if feed_legh <= 0:
             U404._run()
             return
-        
-        # Helper to set water recovery AND sync Salt_Retention
+
         def set_water_recovery(recovery):
-            """Set water recovery and sync Salt_Retention accordingly."""
-            recovery = max(0.05, min(0.99, recovery))  # Allow up to 99% water removal
+            recovery = max(0.05, min(0.99, recovery))
             U404.FeedWater_Recovery_to_Permeate = recovery
-            # Reduce salt retention to wash salts out and improve LegHb percentage
             U404.Salt_Retention = 0.05
-        
-        # Define objective function: adjust recovery to hit target LegHb %
+
         def calculate_legh_error(water_recovery):
-            """
-            Calculate error between actual and target LegHb percentage.
-            Positive error means we need MORE water removal (product too dilute).
-            Negative error means we removed too much water.
-            """
             set_water_recovery(water_recovery)
             U404._run()
-            
-            # Calculate LegHb percentage in retentate (product)
             product_total_mass = product_stream.F_mass
-            
             if product_total_mass <= 0:
-                return -100.0  # Error: no product
-            
+                return -100.0
             product_legh_mass = product_stream.imass['Leghemoglobin']
             actual_legh_percent = (product_legh_mass / product_total_mass) * 100
-            
-            # Return error: positive if we need more concentration
             return actual_legh_percent - U404.target_legh_percent
-        
+
         try:
             with warnings.catch_warnings():
                 warnings.simplefilter("ignore")
-                
-                # Use IQ_interpolation to find optimal water recovery
-                # Note: higher recovery = more water removed = higher concentration
                 optimal_recovery = flx.IQ_interpolation(
                     f=calculate_legh_error,
-                    x0=0.50,  # Start at 50% water removal
-                    x1=0.99,  # Up to 99% water removal
-                    x=0.90,   # Initial guess: aggressive water removal
+                    x0=0.50,
+                    x1=0.99,
+                    x=0.90,
                     xtol=0.001,
-                    ytol=0.1,  # 0.1% tolerance on LegHb content
+                    ytol=0.1,
                     maxiter=50,
                 )
-        
-            # Set optimal recovery and run final time
+
             set_water_recovery(optimal_recovery)
             U404._run()
-            
-        except Exception as e:
-            # Fallback: use aggressive recovery
+
+        except Exception:
             set_water_recovery(0.90)
             U404._run()
 
-    # S408 = bst.SprayDryer(
-    #     'S408', 
-    #     ins=U403-0,
-    #     outs=('EvaporatedWater', 'S408Out'),
-    #     moisture_content=0.90,  # 90% moisture content in the final product
-    # )
-    # S408.add_specification(run=True)
+    T501 = u.SulfuricAcidStorageTank(
+        'T501',
+        ins=bst.Stream('SulfuricAcid', H2SO4=0.98, H2O=0.02, units='kg/hr', price=price['H2SO4']),
+        outs='T501Out',
+    )
 
-    M501 = bst.MixTank('M501', ins=(S403-1,U401-1,U402-1,U402-2,U403-1,U404-1), 
-                    outs='M501Out', tau=1)
-    M501.add_specification(run=True)
-
-    T501 = u.SulfuricAcidStorageTank('T501', 
-                        ins=bst.Stream('SulfuricAcid', H2SO4=0.98,H2O=0.02, 
-                        units='kg/hr', price=price['H2SO4']), 
-                        outs='T501Out')
     @T501.add_specification(run=True)
     def update_acid_flowrate():
-        T501.ins[0].imol['H2SO4'] = U402.outs[3].imol['NaOH']/2*1.001
-        T501.ins[0].T = 25+273.15
+        T501.ins[0].imol['H2SO4'] = U402.outs[3].imol['NaOH'] / 2 * 1.001
+        T501.ins[0].T = 25 + 273.15
 
-    M502 = bst.NeutralizationTank1('M502', ins=(U402-3,T501-0), outs='M502Out', T=20+273.15)
+    M502 = bst.NeutralizationTank1('M502', ins=(U402-3, T501-0), outs='M502Out', T=20 + 273.15)
 
-    S501 = u.ReverseOsmosis('S501', ins=M501-0, outs=('RO_treated_water1', effluent1))
-    # effluent2 to neutralization and then to biological treatment
+    return {
+        'units': [M401, H401, U401, M402, M403, M404, H402, H403, H404, U402, M405, H405, U403, U404, T501, M502],
+        'concentrated_product': U404.outs[0],
+        'uf_permeate': U401.outs[1],
+        'ix_flowthrough': U402.outs[1],
+        'ix_wash': U402.outs[2],
+        'ix_regen_waste': U402.outs[3],
+        'nf_permeate': U403.outs[1],
+        'final_permeate': U404.outs[1],
+        'neutralized_regen_waste': M502.outs[0],
+        'M401': M401, 'H401': H401, 'U401': U401,
+        'M402': M402, 'M403': M403, 'M404': M404,
+        'H402': H402, 'H403': H403, 'H404': H404,
+        'U402': U402, 'M405': M405, 'H405': H405,
+        'U403': U403, 'U404': U404, 'T501': T501, 'M502': M502,
+    }
 
-    S502 = bst.Splitter('S502', ins=M502-0, outs=('SaltWaste', effluent2), split=[0.99,0.99,0.99], order=['H2O','Na2SO4','NaHSO4'])
 
-    S503 = u.ReverseOsmosis('S503', ins=S502-0, outs=('RO_treated_water2', effluent3))
-
-    # =========================================================================
-    # AREA 600: FORMULATION (FINAL PRODUCT COOLING)
-    # =========================================================================
+def create_area_600_formulation(concentrated_product, LegHb_3):
     """
-    Formulation Area - Final Product Preparation
-    
-    Purpose: Achieve final product temperature specification
-    
-    Units:
-    - H406: Final cooler (0°C for storage stability)
-    
-    Output:
-    - LegHb_3: Final product stream (meets all specifications)
+    Area 600: Final formulation / cooling (Config 2).
     """
+    DilutionWater = bst.Stream('DilutionWater', H2O=1.0, units='kg/hr')
 
-    DilutionWater = bst.Stream(
-        'DilutionWater',
-        H2O=1.0,
-        units='kg/hr',
-    )
-
-    M406 = bst.MixTank(
-        'M406',
-        ins=(U404-0, DilutionWater),
-        outs='FormulatedProduct',
-        tau=0.1,
-    )
+    M406 = bst.MixTank('M406', ins=(concentrated_product, DilutionWater), outs='FormulatedProduct', tau=0.1)
     M406.target_legh_percent = 7.5
     M406.max_total_solids_percent = 24.0
 
@@ -612,69 +548,200 @@ def create_LegHb_system(
             required_water = max(target_total - feed.F_mass, 0)
         M406.ins[1].imass['H2O'] = required_water
 
-    H406 = bst.HXutility(
-        'H406',
-        ins=M406-0,
-        outs=LegHb_3,
-        T=0+273.15,  # Cool to 0°C
-        cool_only=True,
+    H406 = bst.HXutility('H406', ins=M406-0, outs=LegHb_3, T=0 + 273.15, cool_only=True)
+
+    return {
+        'units': [M406, H406],
+        'product': H406.outs[0],
+        'M406': M406, 'H406': H406,
+        'DilutionWater': DilutionWater,
+    }
+
+
+def create_area_900_facilities(area_400, area_500, effluent1, effluent2, effluent3, use_area_convention=False):
+    """
+    Area 900: Facilities & utilities (Config 2).
+    """
+    M905 = bst.MixTank(
+        'M905',
+        ins=(
+            area_400['press_liquor'],
+            area_400['spent_media'],
+            area_400['wash_effluent'],
+            area_500['uf_permeate'],
+            area_500['ix_flowthrough'],
+            area_500['ix_wash'],
+            area_500['nf_permeate'],
+            area_500['final_permeate'],
+        ),
+        outs='WWTCombined',
+        tau=1,
     )
 
-    # =========================================================================
-    # AREA 900: FACILITIES & UTILITIES
-    # =========================================================================
-    """
-    Facilities Area - Utility Systems & Wastewater Treatment
-    
-    Purpose: Provide utilities and manage wastewater
-    
-    Units:
-    - M501: Wastewater collection
-    - S501: RO treatment
-    - CT: Cooling tower
-    - CWP: Chilled water package
-    - BT: Boiler turbogenerator
-    - PWC: Process water center
-    """
-    
-    # # ### Facilities ###
+    @M905.add_specification(run=True)
+    def update_wwt_neutralization():
+        out = M905.outs[0]
+        h2so4 = out.imol['H2SO4']
+        if h2so4 > 0:
+            out.imol['Na2SO4'] += h2so4
+            out.imol['H2O'] += 2 * h2so4
+            out.imol['H2SO4'] = 0
+
+    S904 = bst.Splitter('S904', ins=M905-0, outs=('WWTFeed', 'AcidWaste'), split=1)
+
+    @S904.add_specification(run=True)
+    def route_acid_to_disposal():
+        S904.isplit['H2SO4'] = 0.0
+
+    wastewater_treatment_sys = bst.create_wastewater_treatment_system(
+        ins=[S904-0],
+        outs=('biogas', 'sludge', 'RO_treated_water', effluent1),
+        mockup=True,
+        area=500,
+    )
+    biogas, sludge, treated_water, waste_brine = wastewater_treatment_sys.outs
+
+    M904 = bst.Mixer('M904', ins=(area_500['neutralized_regen_waste'], S904-1), outs=effluent2)
+
+    S902 = bst.Splitter('S902', ins=sludge, outs=('SludgeToBoiler', 'SludgePurge'), split=1)
+    S903 = bst.Splitter('S903', ins=biogas, outs=('BiogasToBoiler', effluent3), split=1)
+
     CT = bst.CoolingTower(500 if use_area_convention else 'CT')
     CWP = bst.ChilledWaterPackage(500 if use_area_convention else 'CWP')
 
-    #ADP = bst.AirDistributionPackage(500 if use_area_convention else 'ADP')
+    M903 = bst.Mixer('M903', ins=(area_400['dehydrated_debris'], S902-0), outs='SolidsToBoiler')
 
     BT = u.BoilerTurbogenerator(400 if use_area_convention else 'BT',
-        (S403-0, 'gas_to_boiler', 'boiler_makeup_water', 'natural_gas', 'lime_boiler', 'boiler_chems'),
+        (M903-0, S903-0, 'boiler_makeup_water', 'natural_gas', 'lime_boiler', 'boiler_chems'),
         outs=('emissions', 'rejected_water_and_blowdown', 'ash_disposal'),
         boiler_efficiency=0.80,
         turbogenerator_efficiency=0.85,
         satisfy_system_electricity_demand=False,
     )
 
-    makeup_water_streams = (F.cooling_tower_makeup_water,
-                            F.Water1, F.Water2,
-                            F.Water3, F.Water4,
-                            F.Water5, F.Water6,
-                            F.Water7, F.Water8,
-                            F.boiler_makeup_water)
-    process_water_streams = (F.S501.outs[1],F.S503.outs[1],
-                            *makeup_water_streams)
+    makeup_water_streams = (
+        F.cooling_tower_makeup_water,
+        F.Water1, F.Water2,
+        F.Water3, F.Water4,
+        F.Water5, F.Water6,
+        F.Water7, F.Water8,
+        F.boiler_makeup_water,
+    )
+    process_water_streams = (
+        treated_water,
+        *makeup_water_streams,
+    )
 
     makeup_water = bst.Stream('makeup_water', price=0.000254)
 
     PWC = bst.ProcessWaterCenter(500 if use_area_convention else 'PWC',
-        ins=('recycled_RO_water', makeup_water, 'recycled_process_water', 'makeup_process_water'),
+        ins=(treated_water, makeup_water, 'recycled_process_water', 'makeup_process_water'),
         outs=('RO_water', 'process_water', 'excess_water'),
         makeup_water_streams=makeup_water_streams,
         process_water_streams=process_water_streams,
-        reverse_osmosis_water_price=0.000254,  # USD/kg
-        process_water_price=0.000135,  # USD/kg
+        reverse_osmosis_water_price=0.000254,
+        process_water_price=0.000135,
     )
-    # HXN = bst.HeatExchangerNetwork(600 if use_area_convention else 'HXN')
-    # load_process_settings()  # Load process settings to update prices and CFs
-    s.update_all_input_stream_prices(streamlist=[SeedIn1, SeedIn2, CultureIn, Glucose, NH3_25wt, DfUltraBuffer, IXEquilibriumBuffer, IXElutionBuffer, IXRegenerationSolution, DfNanoBuffer])
 
-    return LegHb_3, vent1, vent2, effluent1, effluent2,effluent3, DfUltraBuffer, IXEquilibriumBuffer, IXElutionBuffer, IXRegenerationSolution, DfNanoBuffer
+    return {
+        'units': [M905, S904, M904, S902, S903, M903, CT, CWP, BT, PWC],
+        'effluent': effluent1,
+        'wastewater_treatment_sys': wastewater_treatment_sys,
+        'M905': M905, 'S904': S904, 'M904': M904,
+        'S902': S902, 'S903': S903,
+        'M903': M903, 'CT': CT, 'CWP': CWP, 'BT': BT, 'PWC': PWC,
+    }
+
+@bst.SystemFactory(
+    ID='LegHb_sys',
+    ins=[s.SeedIn1, s.SeedIn2, s.CultureIn, s.Glucose, s.NH3_25wt,s.DfUltraBuffer, s.IXEquilibriumBuffer, s.IXElutionBuffer
+         ,s.IXRegenerationSolution, s.DfNanoBuffer],
+    outs=[s.LegHb_3, s.vent1, s.vent2, s.effluent1, s.effluent2, s.effluent3,
+    ],
+    fthermo=lambda chemicals=None: LEGHB_THERMO,
+)
+def create_LegHb_system(
+        ins, outs,
+        use_area_convention=False,
+        # reactions_passed=None, # Placeholder if reactions were to be passed externally
+        # One could add more configurable parameters here:
+        # V_max_fermenter=500, target_titer=7.27, etc.
+    ):
+    """
+    Creates the LegHb (Leghemoglobin) production system.
+    This system is based on the process flow and parameters from test_LegHb.py.
+    """
+    bst.preferences.N = 50
+
+    SeedIn1, SeedIn2, CultureIn, Glucose, NH3_25wt, DfUltraBuffer, IXEquilibriumBuffer, IXElutionBuffer, IXRegenerationSolution, DfNanoBuffer = ins
+    LegHb_3, vent1, vent2, effluent1, effluent2, effluent3 = outs
+
+    bst.settings.set_thermo(LEGHB_THERMO, skip_checks=True)
+
+    set_GWPCF(Glucose, 'Glucose')
+    set_GWPCF_Multi(SeedIn1, ['AmmoniumSulfate', 'Glucose', 'MagnesiumSulfate', 'KH2PO4'],
+                   [0.5/(0.5+1+0.05+0.3), 1/(0.5+1+0.05+0.3), 0.05/(0.5+1+0.05+0.3), 0.3/(0.5+1+0.05+0.3)])
+    set_GWPCF_Multi(SeedIn2, ['AmmoniumSulfate', 'Glucose', 'MagnesiumSulfate', 'KH2PO4'],
+                   [0.5/(0.5+1+0.05+0.3), 1/(0.5+1+0.05+0.3), 0.05/(0.5+1+0.05+0.3), 0.3/(0.5+1+0.05+0.3)])
+    set_GWPCF_Multi(CultureIn, ['Glycine', 'Glucose', 'IronSulfate'],
+                   [0.1/(0.1+60+0.15191), 60/(0.1+60+0.15191), 0.15191/(0.1+60+0.15191)])
+    set_GWPCF(NH3_25wt, 'Ammonia_SEA', dilution=0.25)
+    set_GWPCF_Multi(DfUltraBuffer, ['KH2PO4', 'NaCl'], [0.8472, 0.1455])
+    set_GWPCF_Multi(IXEquilibriumBuffer, ['KH2PO4', 'NaCl'], [0.8472, 0.1455])
+    set_GWPCF_Multi(IXElutionBuffer, ['KH2PO4', 'NaCl', 'KCl'], [0.3616, 0.5911, 0.0792])
+    set_GWPCF(IXRegenerationSolution, 'NaOH')
+    set_GWPCF_Multi(DfNanoBuffer, ['Na2HPO4', 'NaH2PO4'], [0.5420, 0.4580])
+
+    load_process_settings()
+
+    params = get_fermentation_parameters()
+    reactions = create_fermentation_reactions(params)
+
+    area_200 = create_area_200_media_prep(SeedIn1, SeedIn2, CultureIn, Glucose, NH3_25wt)
+
+    area_300 = create_area_300_conversion(
+        seed_in=area_200['seed_out'],
+        glucose_in=area_200['glucose_out'],
+        ammonia_in=area_200['ammonia_out'],
+        vent1=vent1,
+        vent2=vent2,
+        reactions=reactions,
+        params=params,
+    )
+
+    area_400 = create_area_400_recovery(
+        broth_in=area_300['broth_out'],
+        DfUltraBuffer_wash=DfUltraBuffer,
+    )
+
+    area_500 = create_area_500_purification(
+        clarified_lysate=area_400['clarified_lysate'],
+        DfUltraBuffer=DfUltraBuffer,
+        IXEquilibriumBuffer=IXEquilibriumBuffer,
+        IXElutionBuffer=IXElutionBuffer,
+        IXRegenerationSolution=IXRegenerationSolution,
+        DfNanoBuffer=DfNanoBuffer,
+    )
+
+    area_600 = create_area_600_formulation(
+        concentrated_product=area_500['concentrated_product'],
+        LegHb_3=LegHb_3,
+    )
+
+    area_900 = create_area_900_facilities(
+        area_400=area_400,
+        area_500=area_500,
+        effluent1=effluent1,
+        effluent2=effluent2,
+        effluent3=effluent3,
+        use_area_convention=use_area_convention,
+    )
+
+    s.update_all_input_stream_prices(
+        streamlist=[SeedIn1, SeedIn2, CultureIn, Glucose, NH3_25wt, DfUltraBuffer, IXEquilibriumBuffer, IXElutionBuffer, IXRegenerationSolution, DfNanoBuffer]
+    )
+
+    return LegHb_3, vent1, vent2, effluent1, effluent2, effluent3, DfUltraBuffer, IXEquilibriumBuffer, IXElutionBuffer, IXRegenerationSolution, DfNanoBuffer
 
 # %% Design Specification Functions
 
@@ -1046,12 +1113,13 @@ if __name__ == '__main__':
             items=[ss.LegHb_3],
         )
         print("   LCA Inventory Table generated")
-        
+        print(r1)
         r2 = bst.report.lca_displacement_allocation_table(
             systems=[sys],
             key='GWP',
             items=[ss.LegHb_3],
         )
+        print(r2)
         print("   LCA Displacement Allocation Table generated")
     except Exception as e:
         print(f"   LCA analysis failed: {e}")

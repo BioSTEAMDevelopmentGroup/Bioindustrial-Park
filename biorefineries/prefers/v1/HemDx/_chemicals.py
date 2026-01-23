@@ -1106,6 +1106,24 @@ def create_chemicals_Hemodextrin():
                 Hf=-17618*_cal2joule, phase='s')
     add_chemical('VitaminC', search_ID='AscorbicAcid', phase='s', default=True)
     
+    # # 13.45340232
+    # HemoDextrin_formula = {
+    #     'H': 1271.7/ (729+34),
+    #     'C': 42 / 42,
+    #     'N': 4 / 42,
+    #     'O': (4+35) / 42,
+    #     'Fe': 1 / (+13.45340232*42)
+    # }
+    # formula = {i: round(j, 6) for i, j in HemoDextrin_formula.items()}
+    # HemoDextrin = add_chemical(
+    #     'HemoDextrin',
+    #     search_db=False,
+    #     default=True,
+    #     atoms=formula,
+    #     phase='s',
+    #     aliases=['HemDx']
+    # )
+    
     YeastExtract = add_chemical(
         'YeastExtract',
         phase='s',
@@ -1815,3 +1833,5 @@ def create_chemicals_Hemodextrin():
 #     return chems
 
 
+
+# %%

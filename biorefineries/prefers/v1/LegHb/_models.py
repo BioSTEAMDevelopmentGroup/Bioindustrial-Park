@@ -335,13 +335,18 @@ def verify_model_integration():
     
     # Test productivity change
     print("\n   Testing productivity parameter...")
-    model.set_parameters(fermentation_productivity=0.15)  # 50% increase
-    model.evaluate()
+    # Find parameter by name and set value
+    prod_param = [p for p in model.parameters if p.name == 'Fermentation productivity'][0]
+    prod_param.setter(0.15)  # 50% increase
+    model.system.simulate()
+    print(f"   New GWP: {model.metrics[3].get():.4f} kg CO2-eq/kg (Expected change)")
     
     # Test yield change
     print("\n   Testing substrate yield parameter...")
-    model.set_parameters(substrate_yield=75)  # 75% yield
-    model.evaluate()
+    yield_param = [p for p in model.parameters if p.name == 'Substrate yield'][0]
+    yield_param.setter(45)  # 45% yield
+    model.system.simulate()
+    print(f"   New GWP: {model.metrics[3].get():.4f} kg CO2-eq/kg (Expected change)")
     
     print("\n5. All parameters tested successfully!")
     
@@ -356,7 +361,6 @@ def verify_model_integration():
         print("\n   Generating LCA inventory table...")
         lca_inventory = bst.report.lca_inventory_table(
             systems=[sys],
-            key='GWP',
             items=[LegHb_product],
         )
         print(f"   LCA inventory table shape: {lca_inventory.shape}")
@@ -373,17 +377,21 @@ def verify_model_integration():
         total_gwp = lca_displacement.loc[('Total', ''), lca_displacement.columns[-1]]
         print(f"\n   Total GWP from table: {total_gwp:.6f} kg CO2-eq/kg")
         
-        # Compare with metric function
-        metric_gwp = baseline[('PreFerS', 'GWP [kg CO2-eq/kg]')]
-        print(f"   GWP from metric:      {metric_gwp:.6f} kg CO2-eq/kg")
+        # Compare with CURRENT metric function (bypass cache)
+        # Note: model.metrics[3] is GWP
+        metric_gwp = model.metrics[3].getter()
+        print(f"   GWP from metric (now):{metric_gwp:.6f} kg CO2-eq/kg")
+        
+        baseline_gwp = baseline[('PreFerS', 'GWP [kg CO2-eq/kg]')]
+        print(f"   (vs Baseline GWP:     {baseline_gwp:.6f} kg CO2-eq/kg)")
         
         if abs(total_gwp - metric_gwp) < 1e-6:
-            print("\n   ✓ GWP calculation verified!")
+            print("\n   [OK] GWP calculation verified (Table matches Metric)!")
         else:
-            print(f"\n   ⚠️  GWP mismatch: table={total_gwp:.6f}, metric={metric_gwp:.6f}")
+            print(f"\n   [WARN] GWP mismatch: table={total_gwp:.6f}, metric={metric_gwp:.6f}")
         
     except Exception as e:
-        print(f"\n   ✗ LCA verification failed: {e}")
+        print(f"\n   [FAIL] LCA verification failed: {e}")
         import traceback
         traceback.print_exc()
     

@@ -1,0 +1,42 @@
+_config1.py – Fixing Record (2026-01-23)
+
+Goal
+- Verify that _config1.py runs successfully after refactoring:
+  - Renamed U504→U502, M502→M501, H502→H501 in Area 500
+  - Renamed M501→M901, S501→S901 in Area 900
+  - Replaced Diafiltration with Filtration.from_preset('UF')
+
+Key Fixes Applied
+1) Unit Renaming in Area 500
+   - Renamed M502→M501, H502→H501 for sequential numbering starting from x01
+   - Renamed U504→U502 for sequential numbering
+
+2) Unit Renaming in Area 900
+   - Renamed M501→M901, S501→S901 to avoid conflict with Area 500 units
+   - Area 900 now uses 9xx numbering convention
+
+3) Attempted Diafiltration→Filtration switch (reverted)
+   - Tried using Filtration.from_preset('UF') but Filtration class is RDVF for solids
+   - Reverted to Diafiltration.from_preset('UF') which is correct for protein concentration
+
+Run Configuration Observed
+- Python: C:\Users\owenp\.conda\envs\BioSTEAMML\python.exe
+- Script: c:\Programming\PREFERS\Bioindustrial-Park\biorefineries\prefers\v1\LegHb\system\_config1.py
+
+Outcome
+- [SUCCESS] Full execution completed after 3 iterations.
+
+Generated Outputs
+- System diagram HTML generated
+
+Terminal Output (summary)
+- All specifications met!
+- Production Rate: 275.00 kg/hr
+- Leghemoglobin Content: 7.43%
+- Protein Purity: 82.51%
+- Annual Production: 2200.00 metric tons/year
+
+Notes
+- This is part of a larger refactoring task affecting both config1 and config2
+- Filtration class (RDVF) is NOT appropriate for protein concentration - use Diafiltration
+- User's intent to avoid Diafiltration may need clarification

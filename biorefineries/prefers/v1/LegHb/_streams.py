@@ -35,10 +35,12 @@ SeedSolution2 = stream_kwargs('SeedSolution2', SeedSolution=m*1.5*1e5/16, units=
 CultureSolution = stream_kwargs('CultureSolution', CultureSolution=m*1.5*1e5/16, units='kg/hr', T=25+273.15)
 
 Glucose = stream_kwargs('Glucose', Glucose=m*1.3*1e5/72, units='kg/hr', T=25+273.15)
-NH3_25wt = stream_kwargs('NH3_25wt', NH3_25wt=m*300, units='kg/hr', T=25+273.15)#, price=price['NH3_25wt'])
+NH3_25wt = stream_kwargs('NH3_25wt', NH3_25wt=m*370, units='kg/hr', T=25+273.15)#, price=price['NH3_25wt'])
 
-DfUltraBuffer = stream_kwargs('DfUltraBuffer', DfUltraBuffer=1, units='kg/hr', T=25+273.15)
-DfUltraBuffer_wash = stream_kwargs('DfUltraBuffer_wash', DfUltraBuffer=1, units='kg/hr', T=25+273.15)
+
+DfUltraBuffer = stream_kwargs('DfUltraBuffer', DfUltraBuffer=m*1e5/16, units='kg/hr', T=25+273.15)
+DfUltraBuffer1 = stream_kwargs('DfUltraBuffer1', DfUltraBuffer=1, units='kg/hr', T=25+273.15)
+DfUltraBuffer2 = stream_kwargs('DfUltraBuffer2', DfUltraBuffer=1, units='kg/hr', T=25+273.15)
 IXEquilibriumBuffer = stream_kwargs('IXEquilibriumBuffer', IXEquilibriumBuffer=1, units='kg/hr', T=25+273.15)
 IXElutionBuffer = stream_kwargs('IXElutionBuffer', IXElutionBuffer=1, units='kg/hr', T=25+273.15)
 IXRegenerationSolution = stream_kwargs('IXRegenerationSolution', NaOH =1, units='kg/hr', T=25+273.15)
@@ -54,7 +56,9 @@ vent2 = stream_kwargs('vent2')
 effluent1 = stream_kwargs('effluent1')
 effluent2 = stream_kwargs('effluent2', units='kg/hr', price=-0.33)  # organic waste remove
 effluent3 = stream_kwargs('effluent3')
-
+emissions = stream_kwargs('emissions')
+ash_disposal = stream_kwargs('ash_disposal', units='kg/hr')
+AntioxidantStream = stream_kwargs('AntioxidantStream', SodiumAscorbate=0.1, H2O=1.0, units='kg/hr', price=price.get('SodiumAscorbate', 5.0))
 
 # %%
 # Add missing pricing functions directly here since they're not in your _streams2.py
