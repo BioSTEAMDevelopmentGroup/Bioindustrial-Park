@@ -46,11 +46,11 @@ V406 = f.V406
 
 # %%
 target_conc_sugarses = np.linspace(100, 500, 10)
-MPSPs = []
-taus = []
-max_yields = []
-final_n_glu_spikes = []
-titers = []
+MPSPs = np.array([])
+taus = np.array([])
+max_yields = np.array([])
+final_n_glu_spikes = np.array([])
+titers = np.array([])
 ethanol = f.ethanol
 for c in target_conc_sugarses:
     model_specification(
@@ -61,11 +61,13 @@ for c in target_conc_sugarses:
     )
     # optimize_tau_for_MPSP(**curr_spec)
     optimize_max_n_glu_spikes(obj='y_EtOH_glu_added', optimize_tau=False, show_progress=True)
-    MPSPs.append(ethanol.price * ethanol.F_mass/ethanol.imass['Ethanol'])
-    taus.append(V406.tau)
-    max_yields.append(V406.results_specific_tau_dict['y_EtOH_glu_added'])
-    final_n_glu_spikes.append(V406.results_specific_tau_dict['curr_n_glu_spikes'])
-    titers.append(V406.results_specific_tau_dict['[s_EtOH]'])
+    
+    MPSPs = np.append(MPSPs, ethanol.price * ethanol.F_mass/ethanol.imass['Ethanol'])
+    taus = np.append(taus, V406.tau)
+    max_yields = np.append(max_yields, V406.results_specific_tau_dict['y_EtOH_glu_added'])
+    final_n_glu_spikes = np.append(final_n_glu_spikes, V406.results_specific_tau_dict['curr_n_glu_spikes'])
+    titers = np.append(titers, V406.results_specific_tau_dict['[s_EtOH]'])
+    
     # plt.plot(V406.results_dict['time'], V406.results_dict['y_EtOH_glu_added'])
     # plt.xlabel(f'Time [h]; target conc={c}')
     # plt.ylabel('Yield [g Ethanol produced / g Glucose added]')
