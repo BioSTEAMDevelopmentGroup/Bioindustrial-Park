@@ -512,7 +512,7 @@ def run_bugfix_barrage(**curr_spec):
                 corn_EtOH_IBO_sys.reset_cache()
                 corn_EtOH_IBO_sys.empty_recycles()
                 corn_EtOH_IBO_sys.simulate()
-                load_simulate_get_EtOH_MPSP()
+                load_simulate_get_EtOH_MPSP(**curr_spec)
             except:
                 print(str(e))
                 raise e
@@ -569,7 +569,18 @@ def model_specification(**kwargs):
                         success = True
                     except Exception as e:
                         i += 1
-                        if i>=20: raise e
+                        if i>=20:
+                            try:
+                                r.setIntegrator('rk4')
+                                print('Changing integrator to rk4 ...')
+                                print('Re-running fermentation unit ...')
+                                V406.simulate()
+                                success = True
+                            except Exception as e:
+                                raise e
+                            finally:
+                                print('Changing integrator back to cvode ...')
+                                r.setIntegrator('cvode')
             except Exception as e:
                 raise e
         elif 'specifications do not meet required condition' in str_e:

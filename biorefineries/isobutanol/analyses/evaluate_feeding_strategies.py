@@ -52,6 +52,8 @@ dateTimeObj = datetime.now()
 ig = np.seterr(invalid='ignore')
 
 ferm_reactor = f.V406
+r = ferm_reactor.kinetic_reaction_system._te
+
 HXN = f.HXN1001
 
 product = f.ethanol
@@ -67,8 +69,6 @@ isobutanol_filepath = isobutanol.__file__.replace('\\__init__.py', '')
 # ##
 isobutanol_results_filepath = isobutanol_filepath + '\\analyses\\results\\'
 
-
-#%% Load baseline
 
 #%% Baseline -- simulate and solve TEA
 model_specification(**baseline_spec,
@@ -232,6 +232,7 @@ def print_status(curr_no, total_no, s1, s2, s3, HXN_qbal_error, results=None, ex
     print('\n\n')
     print(f'{curr_no}/{total_no}')
     print('\n')
+    print(f'integrator: {r.integrator.name}')
     print(s1, s2, s3)
     print('\n')
     print(f'HXN Qbal error = {round(HXN_qbal_error, 2)} %.')
@@ -245,6 +246,8 @@ curr_no = 0
 total_no = len(spec_1)*len(spec_2)*len(spec_3)
 
 print_status_every_n_simulations = 1
+
+errors_dict = {}
 
 for s3 in spec_3:
     for v in list(results.values()): v.append([])
@@ -281,8 +284,9 @@ for s3 in spec_3:
                 print('Error in model spec: %s'%str_e)
                 for v in list(results.values()): v[-1][-1].append(np.nan)
                 error_message = str_e
-                # if not 'specifications do not meet required conditions' in str_e:
-                #     raise e
+                if not 'specifications do not meet required' in str_e:
+                    errors_dict[(s1, s2, s3)] = str_e
+                    
             if curr_no%print_status_every_n_simulations==0 or error_message:
                 print_status(curr_no, total_no,
                              s1, s2, s3, 
