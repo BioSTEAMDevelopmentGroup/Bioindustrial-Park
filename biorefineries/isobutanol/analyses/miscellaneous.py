@@ -18,8 +18,7 @@ baseline_spec = isobutanol.system.baseline_spec
 tea = corn_EtOH_IBO_sys_tea = isobutanol.system.corn_EtOH_IBO_sys_tea
 fbs_spec = isobutanol.system.fbs_spec
 optimize_tau_for_MPSP = isobutanol.system.optimize_tau_for_MPSP
-optimize_max_n_glu_spikes = isobutanol.system.optimize_max_n_glu_spikes
-plot_kinetic_results = isobutanol.system.optimize_max_n_glu_spikes
+plot_kinetic_results = isobutanol.system.plot_kinetic_results
 
 f = system.flowsheet
 V406 = f.V406
@@ -60,7 +59,7 @@ for c in target_conc_sugarses:
     plot=True,
     )
     # optimize_tau_for_MPSP(**curr_spec)
-    optimize_max_n_glu_spikes(obj='y_EtOH_glu_added', optimize_tau=False, show_progress=True)
+    # optimize_max_n_glu_spikes(obj='y_EtOH_glu_added', optimize_tau=False, show_progress=True)
     
     MPSPs = np.append(MPSPs, ethanol.price * ethanol.F_mass/ethanol.imass['Ethanol'])
     taus = np.append(taus, V406.tau)

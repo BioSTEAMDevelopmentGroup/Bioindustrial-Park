@@ -41,7 +41,7 @@ baseline_spec = isobutanol.system.baseline_spec
 tea = corn_EtOH_IBO_sys_tea = isobutanol.system.corn_EtOH_IBO_sys_tea
 fbs_spec = isobutanol.system.fbs_spec
 optimize_tau_for_MPSP = isobutanol.system.optimize_tau_for_MPSP
-optimize_max_n_glu_spikes = isobutanol.system.optimize_max_n_glu_spikes
+# optimize_max_n_glu_spikes = isobutanol.system.optimize_max_n_glu_spikes
 
 f = system.flowsheet
 
@@ -90,6 +90,8 @@ get_yield_nsk = lambda: ferm_reactor.results_specific_tau_dict['y_EtOH_glu_added
 get_titer_nsk = lambda: ferm_reactor.results_specific_tau_dict['[s_EtOH]']
 get_prod_nsk = lambda: ferm_reactor.results_specific_tau_dict['prod_EtOH']
 
+get_curr_n_glu_spikes = lambda: ferm_reactor.results_specific_tau_dict['curr_n_glu_spikes']
+
 get_tau = lambda: ferm_reactor.tau
 
 metrics = [get_product_MPSP, 
@@ -98,14 +100,14 @@ metrics = [get_product_MPSP,
             get_yield_nsk,
             get_titer_nsk,
             get_prod_nsk,
-            get_tau,]
+            get_curr_n_glu_spikes,]
 
 #%%
 results = {i: [] for i in range(len(metrics))}
 
 # %% Generate 3-specification meshgrid and set specification loading functions
 
-steps = (30, 30, 1)
+steps = (20, 20, 1)
 
 spec_1 = threshold_conc_sugarses = np.linspace(0., 500., steps[0])
 
@@ -263,9 +265,9 @@ for s3 in spec_3:
                     n_tea_solves=3,
                     plot=False,
                     )
-                optimize_max_n_glu_spikes(obj='y_EtOH_glu_added', 
-                                          optimize_tau=False,
-                                          show_progress=False,)
+                # optimize_max_n_glu_spikes(obj='y_EtOH_glu_added', 
+                #                           optimize_tau=False,
+                #                           show_progress=False,)
                 
                 assert s1<s2
                 for k, v in list(results.items()): 
