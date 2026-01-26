@@ -243,20 +243,20 @@ Purpose: Provide utilities and manage wastewater.
 
 Wastewater is routed to BioSTEAM’s wastewater treatment system rather than direct RO. This avoids combining high-phosphate and large-molecule streams before biological treatment.
 
-| Unit/System ID               | Type                              | Description                               |
-| ---------------------------- | --------------------------------- | ----------------------------------------- |
-| wastewater_treatment_sys     | create_wastewater_treatment_system | Centralized WWT (biological + RO)         |
-| (commented) M901, S901       | MixTank + ReverseOsmosis          | Legacy direct-RO path (kept as comments)  |
+| Unit/System ID           | Type                               | Description                              |
+| ------------------------ | ---------------------------------- | ---------------------------------------- |
+| wastewater_treatment_sys | create_wastewater_treatment_system | Centralized WWT (biological + RO)        |
+| (commented) M901, S901   | MixTank + ReverseOsmosis           | Legacy direct-RO path (kept as comments) |
 
 ### Utility Systems
 
-| Unit ID | Type                 | Description                                        |
-| ------- | -------------------- | -------------------------------------------------- |
-| CT      | CoolingTower         | Cooling water system                               |
-| CWP     | ChilledWaterPackage  | Chilled water for process cooling                  |
-| M902    | Mixer                | Combines dehydrated debris with WWT sludge         |
-| BT      | BoilerTurbogenerator | Biomass + biogas combustion and power              |
-| PWC     | ProcessWaterCenter   | Water recycling and makeup management (WWT RO)     |
+| Unit ID | Type                 | Description                                    |
+| ------- | -------------------- | ---------------------------------------------- |
+| CT      | CoolingTower         | Cooling water system                           |
+| CWP     | ChilledWaterPackage  | Chilled water for process cooling              |
+| M902    | Mixer                | Combines dehydrated debris with WWT sludge     |
+| BT      | BoilerTurbogenerator | Biomass + biogas combustion and power          |
+| PWC     | ProcessWaterCenter   | Water recycling and makeup management (WWT RO) |
 
 **Note:** Debris stream routes to the boiler via the prefers-local `BoilerTurbogenerator` subclass with guarded emissions enthalpy updates and glucose-based thermo fallbacks for large biomolecules.
 
@@ -298,6 +298,12 @@ Verifies LegHb_3 product stream meets composition specifications:
 - Leghemoglobin: 6-9%
 - Total Solids: 0-24%
 - Protein Purity: ≥65%
+
+### Heme Equivalent Reporting
+For comparison with Heme-rich products (e.g. HemDx), the system reports:
+- **Heme Equivalent Yield**: Mass flow of Heme B prosthetic group contained within the Leghemoglobin product.
+  - Calculation: `LegHb_moles / 763 * MW_Heme_B` (accounting for C1-normalized LegHb definition)
+
 
 ---
 

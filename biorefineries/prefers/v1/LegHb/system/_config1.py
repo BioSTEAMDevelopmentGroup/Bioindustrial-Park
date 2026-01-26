@@ -1200,7 +1200,19 @@ def check_LegHb_specifications(product_stream):
     
     if not purity_passed:
         all_passed = False
-    
+        
+    # Calculate Heme Equivalent (LegHb contains 1 heme group per 763 carbons/normalized units)
+    # Note: Leghemoglobin chemical is defined normalized to C=1 (MW ~22).
+    # Real LegHb has 763 Carbons. Stoichiometry is 1 Heme per 763 mols of chem.
+    legh_mol = product_stream.imol['Leghemoglobin']
+    try:
+        heme_mw = product_stream.chemicals.Heme_b.MW
+        heme_equiv_mass_kg = (legh_mol / 763.0) * heme_mw
+        equiv_wt = heme_equiv_mass_kg / product_stream.F_mass * 100 if product_stream.F_mass > 0 else 0
+        print(f"{'Heme Equivalent':<30} {'(Info)':<25} {equiv_wt:>6.2f}%{'':<7} [INFO]")
+    except AttributeError:
+        print(f"{'Heme Equivalent':<30} {'(Info)':<25} {'N/A':>6}     [WARN] Heme_b not in chemicals")
+
     print(f"{'='*85}")
     
     print(f"\nProduct Stream Summary:")
@@ -1275,6 +1287,16 @@ if __name__ == '__main__':
     LegHb_sys.show()
     
     legh_purity = ss.LegHb_3.imass['Leghemoglobin'] / ss.LegHb_3.F_mass * 100
+    
+    # Calculate Heme Equivalent for Main Report
+    legh_mol = ss.LegHb_3.imol['Leghemoglobin']
+    heme_equiv_mass = 0
+    try:
+        heme_mw = LEGHB_THERMO.Heme_b.MW
+        heme_equiv_mass = (legh_mol / 763.0) * heme_mw
+    except:
+        pass
+
     print(f"\n{'='*85}")
     print("KEY PERFORMANCE INDICATORS")
     print(f"{'='*85}")
@@ -1282,6 +1304,7 @@ if __name__ == '__main__':
     print(f"  Production Rate:          {ss.LegHb_3.F_mass:.2f} kg/hr")
     print(f"  Leghemoglobin Content:    {legh_purity:.2f}%")
     print(f"  Annual Production:        {ss.LegHb_3.F_mass * sys.operating_hours / 1000:.2f} metric tons/year")
+    print(f"  Yield (Heme eq):          {heme_equiv_mass:.4f} kg/hr")
     print(f"{'='*85}\n")
     
     print(f"\n6. Generating system diagram...")

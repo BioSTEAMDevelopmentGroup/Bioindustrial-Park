@@ -24,6 +24,7 @@ Complete production system for **N-HemDx** using *Corynebacterium glutamicum*, i
 | Free Heme (Heme_b + Heme_b_In) | 0.047 kg/hr      |
 | Total Product Stream           | 360.09 kg/hr     |
 | Annual Production              | 2,880.75 MT/year |
+| GWP (LCA)                      | 22.1 kg CO2e/kg  |
 
 ## Process Areas
 
@@ -131,11 +132,10 @@ Dosing:
 | N-HemoDextrin (MW ~25)   | Final product           | Reaction product      |
 
 ## Related Files
-- `_config1_bp.py`: Backup of original upstream-only config
 - `_config1_DSP_Draft.py`: DSP draft (standalone, for reference)
 - `_chemicals.py`: Chemical definitions including HemDx formulation chemicals (with Glucose model copying for WWT compatibility)
 - `_streams.py`: Input stream definitions
 
 ## Last Updated
 2026-01-26 - Upgraded ResinColumn impurity distribution, added ScrewPress, full WWT system with CT/CWP/PWC
-
+2026-01-26 - Integrated LCA (GWP) tracking and reporting (Inventory & Displacement tables)

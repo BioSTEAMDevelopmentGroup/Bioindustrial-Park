@@ -81,6 +81,7 @@ __all__ = (
     'NanofiltrationDF',
     'SprayDrying',
     'BoilerTurbogenerator',
+    'HemDxCSTR',
 )
 
 Rxn = tmo.reaction.Reaction
@@ -2257,3 +2258,24 @@ class ResinColumn(bst.Unit):
 
 
 
+
+class HemDxCSTR(bst.CSTR):
+    """
+    Continuous Stirred Tank Reactor for HemDx formulation.
+    Specialized to skip energy balance for robust convergence in formulation 
+    where heats of reaction are negligible or temperature is controlled.
+    """
+    _N_ins = 1
+    _N_outs = 1
+
+    def _init(self, reactions=None, **kwargs):
+        super()._init(**kwargs)
+        self.reactions = reactions
+
+    def _run(self):
+        out, = self.outs
+        out.mix_from(self.ins, energy_balance=False)
+        if self.reactions:
+            self.reactions(out)
+        out.T = self.T
+        out.P = 101325 if self.P is None else self.P
