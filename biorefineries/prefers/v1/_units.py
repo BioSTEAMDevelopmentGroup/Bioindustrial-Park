@@ -1923,9 +1923,9 @@ class ResinColumn(bst.Unit):
         },
         'Adsorption': {
             'mode': 'Adsorption',
-            'EBCT_min': 5.0,
-            'superficial_velocity_m_h': 10.0,
-            'adsorbent_bulk_density': 450.0, 
+            'EBCT_min': 5.0, # Ref: urbansaqua.com (5-30 min)
+            'superficial_velocity_m_h': 10.0, # Ref: aquaenergyexpo.com (5-20 m/h)
+            'adsorbent_bulk_density': 450.0, # Ref: calgoncarbon.com (350-550 kg/m3)
             'adsorbent_cost_USD_per_kg': 5.0,
             'adsorbent_lifetime_years': 3.0,
         }
@@ -1976,11 +1976,15 @@ class ResinColumn(bst.Unit):
                  column_hardware_cost_exponent=0.6,
                  
                  # Adsorption Specific
-                 EBCT_min=5.0,
-                 superficial_velocity_m_h=10.0,
-                 adsorbent_bulk_density=450.0,
+                 EBCT_min=5.0, # Ref: urbansaqua.com
+                 superficial_velocity_m_h=10.0, # Ref: aquaenergyexpo.com
+                 adsorbent_bulk_density=450.0, # Ref: calgoncarbon.com
                  adsorbent_cost_USD_per_kg=5.0,
-                 adsorbent_lifetime_years=3.0
+                 adsorbent_lifetime_years=3.0,
+                 # Adsorption separation parameters (realistic impurity distribution)
+                 NonTarget_Removal=0.99,  # 99% of non-targets to flowthrough
+                 Wash_Impurity_Carryover=0.02,  # 2% of organics leak to wash
+                 Regen_Impurity_Carryover=0.01,  # 1% of organics leak to regen
                  ):
         bst.Unit.__init__(self, ID, ins, outs, thermo)
         self.preset = preset
@@ -2011,6 +2015,10 @@ class ResinColumn(bst.Unit):
         self.adsorbent_bulk_density = adsorbent_bulk_density
         self.adsorbent_cost_USD_per_kg = adsorbent_cost_USD_per_kg
         self.adsorbent_lifetime_years = adsorbent_lifetime_years
+        # Adsorption separation parameters
+        self.NonTarget_Removal = NonTarget_Removal
+        self.Wash_Impurity_Carryover = Wash_Impurity_Carryover
+        self.Regen_Impurity_Carryover = Regen_Impurity_Carryover
         
         # Components
         # Initialize with dummy streams to avoid MissingStream errors during costing
@@ -2071,46 +2079,83 @@ class ResinColumn(bst.Unit):
         regen_waste.T = regen_sol.T
 
     def _run_adsorption(self):
-        # Adsorption Mode:
-        # Feed -> [Adsorbent Bed] -> Treated Product (Out[0])
-        # Spent Adsorbent / Regenerant Waste -> Out[2]
+        """
+        Adsorption Mode (Hydrophobic Capture + Elution):
         
+        Process Description:
+        - Feed passes through resin; hydrophobic targets bind (adsorb).
+        - Hydrophilic/non-binding solutes (salts, sugars) mostly flow through to waste.
+        - Small amounts of organics leak to wash and regeneration streams (realistic behavior).
+        - Elution releases adsorbed targets into the eluate (product stream).
+        - Regeneration is a separate cleaning step.
+        
+        Stream Mapping:
+        - ins[0] (Feed)  -> outs[0] (Flowthrough / Waste)
+        - ins[1] (Wash)  -> outs[3] (ResinWash)
+        - ins[2] (Elute) -> outs[1] (Eluate / Product)
+        - ins[3] (Regen) -> outs[2] (Regen waste)
+        
+        Mass Balance (updated for realistic impurity distribution):
+        - Flowthrough = Feed * NonTarget_Removal (for non-targets)
+        - ResinWash = Wash_In + Feed * Wash_Impurity_Carryover
+        - Eluate = Elute_In + Adsorbed_Targets + trace impurities
+        - RegenWaste = Regen_In + Feed * Regen_Impurity_Carryover
+        """
         feed = self.ins[0]
-        treated = self.outs[0]
-        waste = self.outs[2] # Use regen waste port for spent contaminants
+        wash_in = self.ins[1]
+        elute_in = self.ins[2]
+        regen_in = self.ins[3]
         
-        # Unused ports match feed T/P to not break simulation
-        self.outs[1].empty() # Flowthrough waste unused
-        self.outs[1].T = feed.T
-        self.outs[3].empty() # Wash waste unused
-        self.outs[3].T = feed.T
+        treated = self.outs[0]      # Flowthrough / Waste
+        eluate = self.outs[1]       # Elution stream / Product
+        regen_out = self.outs[2]    # Regeneration waste (separate)
+        wash_out = self.outs[3]     # Spent Wash Buffer
         
+        # 1. Initialize streams
         treated.copy_like(feed)
-        waste.empty()
-        waste.T = feed.T
-        waste.P = feed.P
+        eluate.copy_like(elute_in)
+        regen_out.copy_like(regen_in)
+        wash_out.copy_like(wash_in)
         
-        target_ids = set(self.TargetProduct_IDs) # Things to REMOVE (Adsorb)
+        treated.T = feed.T
+        treated.P = feed.P
+        eluate.T = elute_in.T
+        eluate.P = elute_in.P
+        regen_out.T = regen_in.T
+        regen_out.P = regen_in.P
+        wash_out.T = wash_in.T
+        wash_out.P = wash_in.P
+        
+        # 2. Perform Adsorption (Separation)
+        target_ids = set(self.TargetProduct_IDs)
         
         for chem in self.chemicals:
             mass_in = feed.imass[chem.ID]
-            if mass_in < 1e-12: continue
+            if mass_in < 1e-12:
+                continue
             
             if chem.ID in target_ids:
-                # Target is ADSORBED (Removed from stream)
-                # Yield here means "Removal Efficiency" from the perspective of REMOVAL
-                # If Yield = 0.95, it means 95% is REMOVED (into waste/carbon)
-                
+                # Target is adsorbed, then eluted
                 removed = mass_in * self.TargetProduct_Yield
                 remaining = mass_in - removed
-                
                 treated.imass[chem.ID] = remaining
-                waste.imass[chem.ID] += removed
+                eluate.imass[chem.ID] += removed
             else:
-                # Pass through non-targets (assuming they are the main product solvent/etc)
-                pass
+                # Non-targets: Distribute across streams (realistic behavior like IonExchange)
+                # Most go to flowthrough, small amounts leak to wash/regen/eluate
+                to_flowthrough = mass_in * self.NonTarget_Removal
+                to_wash = mass_in * self.Wash_Impurity_Carryover
+                to_regen = mass_in * self.Regen_Impurity_Carryover
+                # Remaining trace goes to eluate (ensures mass balance closure)
+                to_eluate = mass_in - to_flowthrough - to_wash - to_regen
+                
+                treated.imass[chem.ID] = to_flowthrough
+                wash_out.imass[chem.ID] += max(0, to_wash)
+                regen_out.imass[chem.ID] += max(0, to_regen)
+                eluate.imass[chem.ID] += max(0, to_eluate)
                 
     def _design(self):
+
         if self.preset == 'IonExchange':
             self._design_ion_exchange()
         elif self.preset == 'Adsorption':

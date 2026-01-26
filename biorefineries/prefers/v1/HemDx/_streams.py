@@ -51,9 +51,18 @@ Glucose = stream_kwargs('Glucose', Glucose=m*1.3*1e5/72, units='kg/hr', T=25+273
 NH3_25wt = stream_kwargs('NH3_25wt', NH3_25wt=m*300, units='kg/hr', T=25+273.15)#, price=price['NH3_25wt'])
 
 DfUltraBuffer = stream_kwargs('DfUltraBuffer', DfUltraBuffer=1, units='kg/hr', T=25+273.15)
+NaCl_wash = stream_kwargs('NaCl_wash', NaCl=1, units='kg/hr', T=25+273.15)
+NaOH_elute = stream_kwargs('NaOH_elute', NaOH=1, units='kg/hr', T=25+273.15)
+Ethanol_regen = stream_kwargs('Ethanol_regen', Ethanol=1, units='kg/hr', T=25+273.15)
+DFBufferSolute = stream_kwargs('DFBufferSolute', DfUltraBuffer=1, units='kg/hr', T=25+273.15)
+GammaCyclodextrinFeed = stream_kwargs('GammaCyclodextrinFeed', GammaCyclodextrin=1, units='kg/hr', T=25+273.15)
+NicotinamideFeed = stream_kwargs('NicotinamideFeed', Nicotinamide=1, units='kg/hr', T=25+273.15)
+AdsorbWash = stream_kwargs('AdsorbWash', H2O=1, units='kg/hr', T=25+273.15)
+AdsorbElute = stream_kwargs('AdsorbElute', H2O=1, units='kg/hr', T=25+273.15)
+AdsorbRegen = stream_kwargs('AdsorbRegen', H2O=1, units='kg/hr', T=25+273.15)
 IXEquilibriumBuffer = stream_kwargs('IXEquilibriumBuffer', IXEquilibriumBuffer=1, units='kg/hr', T=25+273.15)
 IXElutionBuffer = stream_kwargs('IXElutionBuffer', IXElutionBuffer=1, units='kg/hr', T=25+273.15)
-IXRegenerationSolution = stream_kwargs('IXRegenerationSolution', NaOH =1, units='kg/hr', T=25+273.15)
+IXRegenerationSolution = stream_kwargs('IXRegenerationSolution', NaOH=1, units='kg/hr', T=25+273.15)
 DfNanoBuffer = stream_kwargs('DfNanoBuffer', DfNanoBuffer=1, units='kg/hr', T=25+273.15)
 
 # %% Out

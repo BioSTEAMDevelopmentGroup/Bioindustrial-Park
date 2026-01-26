@@ -182,11 +182,25 @@ def save_sankey_figure(sankey_data, figure_dir, filename='sankey_baseline'):
             line=dict(color='black', width=0.5),
             label=sankey_data.get('nodes', []),
         ),
-        link=dict(
-            source=sankey_data.get('links', {}).get('source', []),
-            target=sankey_data.get('links', {}).get('target', []),
-            value=sankey_data.get('links', {}).get('value', []),
-            label=sankey_data.get('links', {}).get('label', []),
+                cost_breakdown_file = metadata.get('cost_breakdown_steps_csv', 'cost_breakdown_steps.csv')
+                cost_breakdown_path = os.path.join(dirs['data'], cost_breakdown_file)
+                breakdown_summary = metadata.get('breakdown_summary_xlsx', 'Breakdown_Summary.xlsx')
+                breakdown_summary_path = os.path.join(dirs['data'], breakdown_summary)
+                step_costs = None
+
+                if os.path.isfile(cost_breakdown_path):
+                    cost_df = pd.read_csv(cost_breakdown_path)
+                    step_costs = {row['Step']: row['Installed cost [$]'] for _, row in cost_df.iterrows()}
+                elif os.path.isfile(breakdown_summary_path):
+                    try:
+                        capital_df = pd.read_excel(breakdown_summary_path, sheet_name='Total Capital')
+                        step_costs = {
+                            row['Name']: row['Cost (USD)']
+                            for _, row in capital_df.iterrows()
+                            if row.get('Name')
+                        }
+                    except Exception:
+                        step_costs = None
         ),
     )])
 
@@ -199,7 +213,7 @@ def save_sankey_figure(sankey_data, figure_dir, filename='sankey_baseline'):
     try:
         png_path = os.path.join(figure_dir, f"{filename}.png")
         fig.write_image(png_path)
-        print(f"  ✓ Saved: {png_path}")
+                    print("  [!] Cost breakdown data not found; skipping economic summary.")
     except Exception:
         pass
 

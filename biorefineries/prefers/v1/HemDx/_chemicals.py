@@ -41,6 +41,13 @@ chemical_groups = dict(
                     'TrehaloseDH',
                     'SodiumAscorbate',
                     ),
+    # N-HemDx Formulation Components
+    HemDxFormulation = ('Heme_b',
+                    'GammaCyclodextrin',
+                    'Nicotinamide',
+                    'HemoDextrin',
+                    'N-HemoDextrin',
+                    ),
     Addictive = ('Pichia_pastoris',
                 'Glycine',
                 'TrehaloseDH',
@@ -1098,31 +1105,56 @@ def create_chemicals_Hemodextrin():
     Cyclodextrin = add_chemical('Cyclodextrin',formula='C42H70O35',
                 default=True, search_db=False, Tm=774, phase='s')
     #Cyclodextrin.V.add_model(fn.rho_to_V(rho=1580, MW=Cyclodextrin.MW), top_priority=True)
+    
+    # γ-Cyclodextrin (8 glucose units, MW ~1297.12 g/mol) - Required for N-HemDx formulation
+    # Ref: PubChem CID 5287407
+    GammaCyclodextrin = add_chemical('GammaCyclodextrin', formula='C48H80O40',
+                default=True, search_db=False, Tm=540, phase='s', aliases=['GammaCD', 'g-CD'])
+    
+
     # add_chemical('Tryptone', formula="CH1.6O0.31N0.25S0.006",#CH1.551O0.331N0.239S0.0057
     #             default=True, search_db=False,
     #             Hf=-17618*_cal2joule, phase='s')
     add_chemical('Peptone', formula="CH1.85O0.50N0.23S0.004",#CH1.556O0.362N0.321S0.0025
                 default=True, search_db=False,
                 Hf=-17618*_cal2joule, phase='s')
+    # C6H8O6
     add_chemical('VitaminC', search_ID='AscorbicAcid', phase='s', default=True)
     
-    # # 13.45340232
-    # HemoDextrin_formula = {
-    #     'H': 1271.7/ (729+34),
-    #     'C': 42 / 42,
-    #     'N': 4 / 42,
-    #     'O': (4+35) / 42,
-    #     'Fe': 1 / (+13.45340232*42)
-    # }
-    # formula = {i: round(j, 6) for i, j in HemoDextrin_formula.items()}
-    # HemoDextrin = add_chemical(
-    #     'HemoDextrin',
-    #     search_db=False,
-    #     default=True,
-    #     atoms=formula,
-    #     phase='s',
-    #     aliases=['HemDx']
-    # )
+    # 13.45340232
+    HemoDextrin_formula = {
+        'H': (32+13.45340232*80)/ (34+13.45340232*48),
+        'C': (34+13.45340232*42) / (34+13.45340232*48),
+        'N': 4 / (34+13.45340232*48),
+        'O': (4+13.45340232*40) /(34+13.45340232*48),
+        'Fe': 1 / (34+13.45340232*48)
+    }
+    formula = {i: round(j, 6) for i, j in HemoDextrin_formula.items()}
+    HemoDextrin = add_chemical(
+        'HemoDextrin',
+        search_db=False,
+        default=True,
+        atoms=formula,
+        phase='s',
+        aliases=['HemDx']
+    )
+    # 1
+    N_HemoDextrin_formula = {
+        'H': (32+13.45340232*80+8)/ (34+13.45340232*48+6),
+        'C': (34+13.45340232*42+6) / (34+13.45340232*48+6),
+        'N': 4 / (34+13.45340232*48+6),
+        'O': (4+13.45340232*40+6) /(34+13.45340232*48+6),
+        'Fe': 1 / (34+13.45340232*48+6)
+    }
+    formula2 = {i: round(j, 6) for i, j in N_HemoDextrin_formula.items()}
+    N_HemoDextrin = add_chemical(
+        'N-HemoDextrin',
+        search_db=False,
+        default=True,
+        atoms=formula2,
+        phase='s',
+        aliases=['N-HemDx']
+    )
     
     YeastExtract = add_chemical(
         'YeastExtract',
@@ -1140,6 +1172,186 @@ def create_chemicals_Hemodextrin():
     # hemin molecule formula: C34H32ClFeN4O4
     #Hemin = add_chemical('Hemin', search_ID='PubChem=16129778', phase='s', default=True)
     
+    # =========================================================================
+    # THERMODYNAMIC MODEL COPYING (Required for bst.create_wastewater_treatment_system)
+    # Copy Glucose thermodynamic models for robust fallback properties
+    # Following LegHb _chemicals.py pattern
+    # =========================================================================
+    def _copy_glucose_models(chem):
+        if chem is None:
+            return
+        try:
+            chem.copy_models_from(chems.Glucose)
+        except Exception:
+            pass
+
+    # Apply to all bio chemicals and HemDx-specific chemicals
+    for chem_id in (
+        # Bio chemicals
+        'Yeast',
+        'Pichia_pastoris',
+        'K_marxianus',
+        'Bacillus_subtilis',
+        'Saccharomyces_cerevisiae',
+        'Corynebacterium_glutamicum',
+        'Z_mobilis',
+        'T_reesei',
+        'Biomass',
+        'Glucan',
+        'Mannoprotein',
+        'Chitin',
+        'RNA',
+        'Protein',
+        'Enzyme',
+        'DenaturedEnzyme',
+        'Cellulose',
+        'Xylan',
+        'Xylitol',
+        'Cellobiose',
+        'CSL',
+        'WWTsludge',
+        'Cellulase',
+        'Peptone',
+        'YeastExtract',
+        # HemDx-specific chemicals (CRITICAL for WWT system)
+        'Heme_b',
+        'Heme_b_In',
+        'ProtoporphyrinIX',
+        'ProtoporphyrinIX_In',
+        'Cyclodextrin',
+        'GammaCyclodextrin',
+        'HemoDextrin',
+        'N-HemoDextrin',
+        'Nicotinamide',
+    ):
+        try:
+            _copy_glucose_models(chems[chem_id])
+        except Exception:
+            pass
+
+    # Fallback thermo for nonvolatile solids used in BT/WWT fuel streams
+    def _ensure_nonvolatile_thermo(chem, Tb=800.0, Hvap=40000.0, Psat=1e-10, rho=1540.0):
+        if chem is None: 
+            return
+        if not chem.Tb:
+            chem.Tb = Tb
+        try:
+            chem.Hvap(chem.Tb)
+        except Exception:
+            chem.Hvap.add_method(Hvap)
+        try:
+            chem.Psat(chem.Tb)
+        except Exception:
+            chem.Psat.add_method(Psat)
+        try:
+            chem.V.s.add_model(fn.rho_to_V(rho=rho, MW=chem.MW), top_priority=True)
+        except Exception:
+            pass
+
+    def _get_chem(chemicals, chem_id):
+        try:
+            return chemicals[chem_id]
+        except Exception:
+            return None
+
+    # Apply nonvolatile thermo to all bio and HemDx chemicals
+    for chem_id in (
+        'Yeast',
+        'Pichia_pastoris',
+        'K_marxianus',
+        'Bacillus_subtilis',
+        'Saccharomyces_cerevisiae',
+        'Corynebacterium_glutamicum',
+        'Z_mobilis',
+        'T_reesei',
+        'Biomass',
+        'Glucan',
+        'Mannoprotein',
+        'Chitin',
+        'RNA',
+        'Protein',
+        'Enzyme',
+        'DenaturedEnzyme',
+        'Cellulose',
+        'Xylan',
+        'Xylitol',
+        'Cellobiose',
+        'CSL',
+        'WWTsludge',
+        'Cellulase',
+        'Peptone',
+        'YeastExtract',
+        # HemDx-specific chemicals
+        'Heme_b',
+        'Heme_b_In',
+        'ProtoporphyrinIX',
+        'ProtoporphyrinIX_In',
+        'Cyclodextrin',
+        'GammaCyclodextrin',
+        'HemoDextrin',
+        'N-HemoDextrin',
+        'Nicotinamide',
+    ):
+        _ensure_nonvolatile_thermo(_get_chem(chems, chem_id))
+
+    def _ensure_vaporization_props(chem, Tb=800.0, Hvap=40000.0):
+        if chem is None:
+            return
+        if not chem.Tb:
+            chem.Tb = Tb
+        try:
+            hvap = chem.Hvap(chem.Tb)
+        except Exception:
+            hvap = None
+        if hvap is None:
+            chem.Hvap.add_method(Hvap)
+
+    # Ensure all chemicals have usable Hvap for enthalpy calculations
+    for chem in chems:
+        _ensure_vaporization_props(chem)
+
+    def _ensure_heat_capacity_models(chem, Cp_fallback=75.3):
+        if chem is None:
+            return
+        if hasattr(chem.Cn, 'l') and hasattr(chem.Cn, 'g'):
+            try:
+                Cp_l = chem.Cn.l(298.15)
+            except Exception:
+                Cp_l = None
+            if Cp_l is None:
+                try:
+                    Cp_val = chem.Cn.g(298.15)
+                except Exception:
+                    Cp_val = None
+                if Cp_val is None:
+                    Cp_val = Cp_fallback
+                try:
+                    chem.Cn.l.add_model(Cp_val, top_priority=True)
+                except Exception:
+                    pass
+            try:
+                Cp_g = chem.Cn.g(298.15)
+            except Exception:
+                Cp_g = None
+            if Cp_g is None:
+                try:
+                    chem.Cn.g.add_model(Cp_fallback, top_priority=True)
+                except Exception:
+                    pass
+        else:
+            try:
+                Cp_val = chem.Cn(298.15)
+            except Exception:
+                Cp_val = None
+            if Cp_val is None:
+                try:
+                    chem.Cn.add_model(Cp_fallback, top_priority=True)
+                except Exception:
+                    pass
+
+    # Ensure gas/liquid heat capacity models exist for enthalpy calculations
+    for chem in chems:
+        _ensure_heat_capacity_models(chem)
     
     # Default missing properties of chemicals to those of water
     for chemical in chems: chemical.default()

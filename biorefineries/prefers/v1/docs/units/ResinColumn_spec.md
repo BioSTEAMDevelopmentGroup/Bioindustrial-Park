@@ -9,7 +9,7 @@
 > Parameters validated against literature. See Walch & Jungbauer (2017) for continuous chromatography design principles.
 
 ## Overview
-The `ResinColumn2` unit is a versatile packed-bed column model that can simulate two distinct physical processes based on the selected `preset`:
+The `ResinColumn` unit is a versatile packed-bed column model that can simulate two distinct physical processes based on the selected `preset`:
 
 1.  **Ion Exchange (Chromatography):** Models a bind-and-elute cycle where a target molecule binds to the resin and is subsequently eluted. Key design parameter is Dynamic Binding Capacity (DBC).
 2.  **Adsorption (e.g., Activated Carbon):** Models a flow-through or capture process where contaminants are removed from the stream. Key design parameter is Empty Bed Contact Time (EBCT).
@@ -40,8 +40,8 @@ $$ Cost_{resin} = V_{resin} \times Cost_{per\_L} $$
 
 ## 2. Adsorption Preset
 
-**Process:** Flow-Through / Capture
-**Key Physics:** Bed volume is calculated based on the required Empty Bed Contact Time (EBCT) to achieve separation. Column dimensions are constrained by superficial velocity.
+**Process:** Hydrophobic Capture + Elution
+**Key Physics:** Hydrophobic targets bind to the resin; hydrophilic solutes (salts, sugars) pass through. Elution releases bound targets into the eluate product. Bed volume is calculated based on Empty Bed Contact Time (EBCT), with column dimensions constrained by superficial velocity.
 
 ### Validated Parameters
 
@@ -53,6 +53,19 @@ $$ Cost_{resin} = V_{resin} \times Cost_{per\_L} $$
 | `adsorbent_cost_USD_per_kg` | 5.0     | $/kg  | Market Data          | Activated Carbon: ~$2-8/kg              |
 | `adsorbent_lifetime_years`  | 3.0     | yr    | Operation Experience | Depends on regeneration frequency       |
 
+### Stream Mapping & Mass Balance
+
+- ins[0] (Feed)  → outs[0] (Flowthrough / Waste)
+- ins[1] (Wash)  → outs[3] (ResinWash)
+- ins[2] (Elute) → outs[1] (Eluate / Product)
+- ins[3] (Regen) → outs[2] (Regen waste)
+
+**Mass balance:**
+- Flowthrough $=$ Feed $-$ Adsorbed
+- Eluate $=$ Elute $+$ Adsorbed
+- ResinWash $=$ Wash
+- RegenWaste $=$ Regen
+
 ### Equations
 $$ V_{bed} = Q_{vol} \times EBCT $$
 $$ A_{min} = \frac{Q_{vol}}{v_{superficial}} $$
@@ -62,14 +75,16 @@ $$ Mass_{adsorbent} = V_{bed} \times \rho_{bulk} $$
 
 ```python
 # Ion Exchange Mode
-R201 = ResinColumn2('R201', ins=[feed, buffer_A, buffer_B, regen], 
-                    preset='IonExchange',
-                    resin_DBC_g_L=60)
+R201 = ResinColumn('R201', ins=[feed, buffer_A, buffer_B, regen], 
+                   preset='IonExchange',
+                   resin_DBC_g_L=60)
 
-# Adsorption Mode (e.g. Carbon Filter)
-AC301 = ResinColumn2('AC301', ins=[feed, None, None, regen_waste_dest],
-                     preset='Adsorption',
-                     EBCT_min=10.0)
+# Adsorption Mode (e.g. Hydrophobic capture)
+AC301 = ResinColumn('AC301', ins=[feed, wash, elute, regen],
+                    preset='Adsorption',
+                    TargetProduct_IDs=('Heme_b',),
+                    TargetProduct_Yield=0.99,
+                    EBCT_min=10.0)
 ```
 
 ---

@@ -17,8 +17,9 @@ import numpy as np
 import pandas as pd
 
 from biorefineries.prefers.v1.LegHb._models import create_model
+from biorefineries.prefers.v1.LegHb._tea import PreFerSTEA
 from biorefineries.prefers.v1.LegHb.system import get_available_configs
-from biorefineries.prefers.v1.utils import utils
+from biorefineries.prefers.v1.utils import utils, report_generator
 from biorefineries.prefers.v1.utils import sankey_utils
 
 
@@ -145,6 +146,35 @@ def generate_baseline(config='config1', baseline_production_kg_hr=275, timestamp
         verbose=True,
     )
 
+    print("\nGenerating TEA/LCA breakdown summary...")
+    tea = PreFerSTEA(
+        system=model.system,
+        IRR=0.18,
+        duration=(2024, 2044),
+        depreciation='IRAS6',
+        income_tax=0.17,
+        operating_days=333,
+        lang_factor=None,
+        construction_schedule=(0.15, 0.60, 0.25),
+        WC_over_FCI=0.15,
+        labor_cost=10*6e4,
+        fringe_benefits=0.17+0.07,
+        property_tax=0.005,
+        property_insurance=0.005,
+        supplies=0.02,
+        maintenance=0.03,
+        administration=0.05,
+    )
+    generator = report_generator.ProcessReportGenerator(
+        system=model.system,
+        tea=tea,
+        product_stream=model.system.flowsheet.stream.LegHb_3,
+        config=config,
+        timestamp=dirs.get('timestamp'),
+        base_dir=dirs['base'],
+    )
+    generator.generate()
+
     print("\nEvaluating baseline metrics...")
     baseline_metrics = model.metrics_at_baseline()
 
@@ -227,6 +257,7 @@ def generate_baseline(config='config1', baseline_production_kg_hr=275, timestamp
     metadata['baseline_streams_xlsx'] = os.path.basename(streams_xlsx)
     metadata['baseline_unit_design_csv'] = os.path.basename(units_csv)
     metadata['baseline_unit_design_xlsx'] = os.path.basename(units_xlsx)
+    metadata['breakdown_summary_xlsx'] = 'Breakdown_Summary.xlsx'
 
     metadata_file = os.path.join(dirs['data'], 'analysis_metadata.json')
     with open(metadata_file, 'w', encoding='utf-8') as f:
