@@ -604,7 +604,7 @@ def plot_scale_effects(scale_values, metric_values, baseline_val,
 # =============================================================================
 
 def plot_colored_scatter(x_data, y_data, z_data, xlabel, ylabel, zlabel,
-                         title="", cmap='viridis', figsize=(10, 8), reverse_cmap=False):
+                         title="", cmap='PreFerS', figsize=(10, 8), reverse_cmap=False):
     """
     Generate scatter plot with color-coded third variable.
     """
@@ -726,7 +726,7 @@ def generate_figures(config='config1', timestamp=None, results_dir=None):
         fig1, ax1 = plots.plot_spearman_heatmap(
             rho_display.T, 
             figsize=(12, 6),
-            cmap='viridis' # Match scatter plots (Spectrum)
+            cmap='PreFerS' # Match scatter plots (Spectrum)
         )
         ax1.set_title('Spearman Rank Correlation: Parameters vs Metrics', fontweight='bold')
         utils.save_figure(fig1, 'spearman_heatmap', dirs['figure'], formats=('png', 'pdf'))
