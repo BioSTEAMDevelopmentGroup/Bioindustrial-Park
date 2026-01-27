@@ -1,33 +1,41 @@
-# BoilerTurbogenerator (Prefers-local)
+# BoilerTurbogenerator Unit Specification
 
-**Source:** `v1/_units.py`  
+**Class:** `BoilerTurbogenerator`
 **Base Class:** `bst.BoilerTurbogenerator`
+**Source:** `v1/_units.py`
 
 ## Purpose
+Combined Heat and Power (CHP) unit that burns biomass residues and supplementary natural gas to generate steam and electricity. 
 
-Provides steam and electricity from cell-mass and residue streams while safely handling incomplete thermodynamic data for large biomolecules (e.g., proteins).
+## Design Basis
 
-## Prefers-local Enhancements
+1. **Efficiency**:
+   - Boiler Efficiency ($\eta_B$): 0.80 (LHV basis).
+   - Turbogenerator Efficiency ($\eta_{TG}$): 0.85 (Enthalpy-to-Work).
+2. **Emissions Control**:
+   - **SO2 Scrubbing**: Uses Lime ($Ca(OH)_2$ or $CaO$) with 20% stoichiometric excess if SO2 is present.
+   - **NOx/Particulates**: Modeled via standard emission factors (derived from composition).
+   - **Ammonia**: Routed to emissions (thermal destruction assumed or accounted in balance).
+3. **Steam Balance**:
+   - Satisfies process steam demand first.
+   - Excess heat generates electricity.
+   - If process steam > biomass heat, natural gas is supplemented.
 
-1. **Guarded emissions enthalpy update**
-   - Wraps the emissions enthalpy calculation and caches the enthalpy directly when property evaluation fails.
-   - Prevents failures from missing or non-physical vaporization properties.
+## Logic Flow
 
-2. **Thermo fallbacks for large biomolecules**
-   - Glucose model copy for robust fallback properties (e.g., Tb, Hvap, Psat, Cp, V).
-   - Protein-derived heating values for globin/leghemoglobin.
-   - Nonvolatile solid and vaporization fallbacks for boiler feed components.
+1. **Fuel Evaluation**:
+   - Calculates LHV/HHV of all feed solids and gas.
+   - Determines if supplementary CH4 is needed.
+2. **Combustion**:
+   - complete combustion assumed.
+   - Enthalpy of emissions updated with `Guarded` logic (robust to missing thermo params).
+3. **Electricity**:
+   - $Work = (H_{combustion} \cdot \eta_B - H_{steam,process}) \cdot \eta_{TG}$
+   - Handles "Electricity Demand" satisfaction mode (optional).
 
-## Usage
+## Cost Model
 
-In process configs, use the prefers-local class:
-
-```
-from biorefineries.prefers.v1 import _units as u
-BT = u.BoilerTurbogenerator(...)
-```
-
-## Notes
-
-- This class is required for robust BT simulation in the LegHb configs where protein-rich debris is routed to the boiler.
-- The base BioSTEAM implementation remains unchanged.
+Standard NREL/BioSTEAM scaling:
+- **Boiler**: Scaled on steam flow.
+- **Turbogenerator**: Scaled on Work output (kW).
+- **Baghouse/Scrubber**: Included in Boiler factor or separate (param dependent).

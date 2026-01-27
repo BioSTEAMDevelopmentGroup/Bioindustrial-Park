@@ -99,6 +99,20 @@ def _register_colormaps():
         N=256
     )
     
+    # Blue Gradient (Light -> Navy) for Fixed Scale
+    prefers_blue = mcolors.LinearSegmentedColormap.from_list(
+        "PreFerS_blue",
+        ['#FFFFFF', '#D1E5F0', PREFERS_COLORS[2], PREFERS_COLORS[1], PREFERS_COLORS[0]],
+        N=256
+    )
+
+    # Orange Gradient (Light -> Orange) for Variable Scale
+    prefers_orange = mcolors.LinearSegmentedColormap.from_list(
+        "PreFerS_orange",
+        ['#FFFFFF', '#FFF3CD', PREFERS_COLORS[7], PREFERS_COLORS[8], '#C05600'],
+        N=256
+    )
+    
     # Register colormaps
     try:
         colormaps.register(cmap=prefers_seq, name='PreFerS')
@@ -106,6 +120,8 @@ def _register_colormaps():
         colormaps.register(cmap=prefers_positive, name='PreFerS_positive')
         colormaps.register(cmap=prefers_corr, name='PreFerS_correlation')
         colormaps.register(cmap=prefers_density, name='PreFerS_density')
+        colormaps.register(cmap=prefers_blue, name='PreFerS_blue')
+        colormaps.register(cmap=prefers_orange, name='PreFerS_orange')
     except ValueError:
         # Already registered, ignore
         pass
@@ -235,7 +251,69 @@ def get_palette(n_colors=None, as_cmap=False):
     if n_colors is None:
         return sns.color_palette(PREFERS_COLORS)
     
-    return sns.color_palette(PREFERS_COLORS, n_colors=n_colors)
+    if n_colors <= len(PREFERS_COLORS):
+        return sns.color_palette(PREFERS_COLORS, n_colors=n_colors)
+    
+    # Interpolate for larger palettes using the sequential colormap
+    return sns.color_palette('PreFerS', n_colors=n_colors)
+
+
+def adjust_lightness(color, amount=0.5):
+    """
+    Adjust the lightness of a color.
+    
+    Parameters
+    ----------
+    color : str or tuple
+        Input color (hex or RGB).
+    amount : float
+        0 to 1 makes it darker, >1 makes it lighter. 
+        e.g., 1.2 = 20% lighter, 0.8 = 20% darker.
+        
+    Returns
+    -------
+    tuple
+        Adjusted RGB tuple.
+    """
+    import matplotlib.colors as mc
+    import colorsys
+    try:
+        c = mc.cnames[color]
+    except:
+        c = color
+    c = colorsys.rgb_to_hls(*mc.to_rgb(c))
+    return colorsys.hls_to_rgb(c[0], max(0, min(1, amount * c[1])), c[2])
+
+
+def get_spectrum_palette(n=10, brightness=1.0, as_cmap=False):
+    """
+    Get a continuous spectrum palette derived from PreFerS brand colors.
+    
+    Parameters
+    ----------
+    n : int
+        Number of colors.
+    brightness : float
+        Brightness multiplier (1.0 = original, >1 lighter, <1 darker).
+    as_cmap : bool
+        Return as matplotlib colormap.
+        
+    Returns
+    -------
+    list or Colormap
+    """
+    # Get base colors from the sequential map
+    base_cmap = colormaps.get_cmap('PreFerS')
+    colors = [base_cmap(i / (n - 1)) for i in range(n)]
+    
+    # Adjust brightness if needed
+    if brightness != 1.0:
+        colors = [adjust_lightness(c, brightness) for c in colors]
+        
+    if as_cmap:
+        return mcolors.LinearSegmentedColormap.from_list(f"PreFerS_adjust_{brightness}", colors)
+    
+    return sns.color_palette(colors)
 
 
 def get_color(name):

@@ -25,106 +25,138 @@ from . import style
 # =============================================================================
 
 def plot_tornado(sensitivity_df, baseline, metric_name="MESP ($/kg)", 
-                 low_color=None, high_color=None, figsize=None):
+                 categories=None, figsize=None):
     """
-    Generate a Guest-Group style Tornado plot for sensitivity analysis.
+    Generate a Guest-Group style Tornado plot with categorical coloring
+    and value annotations.
     
     Parameters
     ----------
     sensitivity_df : pd.DataFrame
-        DataFrame with columns ['Parameter', 'Low', 'High'] where:
-        - 'Parameter': Parameter name
-        - 'Low': Metric value when parameter is at low bound
-        - 'High': Metric value when parameter is at high bound
+        DataFrame with columns ['Parameter', 'Low', 'High'].
     baseline : float
-        Baseline metric value (center line).
+        Baseline metric value.
     metric_name : str
-        Label for the x-axis metric.
-    low_color : str, optional
-        Color for low-value bars. Default: Indigo.
-    high_color : str, optional
-        Color for high-value bars. Default: Emerald.
-    figsize : tuple, optional
-        Figure size. Default scales with number of parameters.
-    
-    Returns
-    -------
-    fig, ax : matplotlib figure and axes
-    
-    Examples
-    --------
-    >>> data = pd.DataFrame({
-    ...     'Parameter': ['Titer', 'Yield', 'Productivity'],
-    ...     'Low': [120, 95, 105],
-    ...     'High': [85, 110, 98]
-    ... })
-    >>> fig, ax = plot_tornado(data, baseline=100, metric_name="MSP [$/kg]")
+        Label for x-axis.
+    categories : dict or None
+        Dictionary mapping parameter names to categories (strings).
+        If provided, bars are colored by category.
+    figsize : tuple
+        Figure size.
     """
     df = sensitivity_df.copy()
-    
-    # Colors
-    low_color = low_color or style.get_color('low')
-    high_color = high_color or style.get_color('high')
     
     # Calculate offset from baseline
     df['Low_diff'] = df['Low'] - baseline
     df['High_diff'] = df['High'] - baseline
     df['Abs_impact'] = abs(df['High'] - df['Low'])
     
-    # Sort by absolute impact (largest at top)
+    # Sort by absolute impact
     df = df.sort_values('Abs_impact', ascending=True).reset_index(drop=True)
     
+    # Determine colors
+    if categories:
+        # Get unique categories and assign colors from palette
+        unique_cats = sorted(list(set(categories.values())))
+        # Use first 5-6 distinct colors (Navy, Indigo, Cerulean, Teal, Emerald, Leaf)
+        cat_colors = dict(zip(unique_cats, style.PREFERS_COLORS[:len(unique_cats)]))
+        
+        # Add 'Other' if needed
+        if 'Other' not in cat_colors:
+             cat_colors['Other'] = style.PREFERS_COLORS[-1] # Orange
+             
+        df['Color'] = df['Parameter'].apply(lambda x: cat_colors.get(categories.get(x, 'Other'), 'gray'))
+        legend_elements = [plt.Rectangle((0,0),1,1, color=c, label=l) for l,c in cat_colors.items()]
+    else:
+        # Default single color style if no categories provided
+        df['Color'] = style.get_color('indigo') # Default color
+        legend_elements = None
+
     # Figure size
     if figsize is None:
-        figsize = (9, max(4, len(df) * 0.45 + 1.5))
+        figsize = (10, max(5, len(df) * 0.5 + 2))
     
     fig, ax = plt.subplots(figsize=figsize)
-    
     y_pos = np.arange(len(df))
     
-    # Plot bars - need to handle positive/negative correctly
+    # Plot bars
     for i, row in df.iterrows():
-        # Low parameter bar
-        if row['Low_diff'] < 0:
-            ax.barh(i, row['Low_diff'], left=baseline, color=low_color, 
-                    alpha=0.85, edgecolor='white', linewidth=0.5)
-        else:
-            ax.barh(i, row['Low_diff'], left=baseline, color=low_color, 
-                    alpha=0.85, edgecolor='white', linewidth=0.5)
+        # Because it's a tornado, we want the bar to span from Low to High
+        # But centered around baseline? No, usually Low to High relative to axis.
+        # We'll plot relative to baseline for visual clarity (center 0)
+        # Or plot absolute values? 
+        # "Boundary" tornado typically plots deviations.
+        # Let's use simple barh from Low to High?
+        # NO, Tornado usually aligns the BASELINE vertically.
         
-        # High parameter bar
-        if row['High_diff'] < 0:
-            ax.barh(i, row['High_diff'], left=baseline, color=high_color, 
-                    alpha=0.85, edgecolor='white', linewidth=0.5)
+        c = row['Color']
+        
+        # Plot left side (from baseline to Low/High min)
+        # Using deviations
+        left_val = min(row['Low_diff'], row['High_diff'])
+        right_val = max(row['Low_diff'], row['High_diff'])
+        
+        # Bar: coordinates (left, bottom), width, height
+        # standard barh: y, width, left=0
+        
+        # We draw the full range bar
+        # Left edge: baseline + left_val
+        # Width: right_val - left_val
+        
+        ax.barh(i, right_val - left_val, left=baseline + left_val, 
+                color=c, alpha=0.8, edgecolor='black', linewidth=0.5, height=0.6)
+
+        # Annotations (L | B | H)
+        # Labels: Low, Base, High
+        # Format string
+        fmt = "{:.2f}"
+        l_txt = fmt.format(row['Low'])
+        b_txt = fmt.format(baseline)
+        h_txt = fmt.format(row['High'])
+        
+        # Position annotations
+        # Determine if Low was left or right (inverse correlation vs direct)
+        if row['Low'] < row['High']:
+             # Direct: Low is Left, High is Right
+             annot = f"L: {l_txt} | B: {b_txt} | H: {h_txt}"
         else:
-            ax.barh(i, row['High_diff'], left=baseline, color=high_color, 
-                    alpha=0.85, edgecolor='white', linewidth=0.5)
-    
+             # Inverse: High is Left, Low is Right
+             annot = f"H: {h_txt} | B: {b_txt} | L: {l_txt}"
+        
+        # Place text at the end of the bar (right side) + padding
+        # Use axis transform or data coordinates? Data coordinates.
+        # Max pos extent
+        max_extent = baseline + right_val
+        
+        ax.text(max_extent * 1.02 if max_extent > 0 else max_extent + (max_extent*0.02), 
+                i, annot, va='center', ha='left', fontsize=8, color='#333333')
+
     # Center baseline line
-    ax.axvline(baseline, color=style.get_color('navy'), linestyle='--', 
-               linewidth=1.5, zorder=5)
-    ax.text(baseline, len(df) + 0.3, f'Baseline: {baseline:.2f}', 
-            ha='center', va='bottom', fontsize=9, fontweight='bold',
-            color=style.get_color('navy'))
+    ax.axvline(baseline, color='black', linestyle='--', linewidth=1.0)
+    ax.text(baseline, len(df), f'Baseline: {baseline:.2f}', 
+            ha='center', va='bottom', fontsize=10, fontweight='bold')
     
-    # Labels
+    # Axis configuration
     ax.set_yticks(y_pos)
     ax.set_yticklabels(df['Parameter'])
     ax.set_xlabel(metric_name, fontweight='bold')
-    ax.set_title(f'Sensitivity Analysis: {metric_name}', fontweight='bold', pad=15)
+    ax.set_title(f'Sensitivity Analysis: {metric_name}', fontweight='bold', pad=20)
     
     # Legend
-    ax.barh([], [], color=low_color, label='Low Parameter Value', alpha=0.85)
-    ax.barh([], [], color=high_color, label='High Parameter Value', alpha=0.85)
-    ax.legend(loc='lower right', framealpha=0.95)
+    if legend_elements:
+        ax.legend(handles=legend_elements, loc='upper right', bbox_to_anchor=(1, 1), 
+                  fontsize=9, title='Category')
     
-    # Minor ticks
-    ax.xaxis.set_minor_locator(AutoMinorLocator(5))
-    ax.tick_params(which='both', direction='in', top=True, right=True)
+    # Limits
+    # X limits need to accommodate text
+    xmin, xmax = ax.get_xlim()
+    # Add simpler padding
+    range_span = xmax - xmin
+    ax.set_xlim(xmin, xmax + (range_span * 0.25)) # Extra space for text
     
-    ax.set_ylim(-0.5, len(df) + 0.5)
+    ax.set_ylim(-0.8, len(df) + 0.8)
+    
     plt.tight_layout()
-    
     return fig, ax
 
 
@@ -454,7 +486,8 @@ def plot_scale_effects(scale_values, metric_values, baseline_val,
 def plot_joint_marginal(data, x_col, y_col, x_label=None, y_label=None,
                         scatter_color=None, kde_color=None, 
                         x_box_color=None, y_box_color=None,
-                        height=7, ratio=5, alpha=0.6):
+                        height=7, ratio=5, alpha=0.6,
+                        baseline_point=None, median_point=None):
     """
     Creates a Joint Plot: A central KDE plot with marginal boxplots 
     on the top and right axes to show distributions (p25, p75, outliers).
@@ -490,6 +523,10 @@ def plot_joint_marginal(data, x_col, y_col, x_label=None, y_label=None,
         Ratio of joint plot to marginal plot sizes. Default 5 (smaller marginals).
     alpha : float
         Transparency.
+    baseline_point : tuple, optional
+        (x, y) coordinates for baseline marker.
+    median_point : tuple, optional
+        (x, y) coordinates for median marker.
     
     Returns
     -------
@@ -525,8 +562,26 @@ def plot_joint_marginal(data, x_col, y_col, x_label=None, y_label=None,
     g.ax_joint.grid(True, linestyle='--', alpha=0.5)
     
     # Add minor ticks
+    # Add minor ticks
     g.ax_joint.xaxis.set_minor_locator(AutoMinorLocator(5))
     g.ax_joint.yaxis.set_minor_locator(AutoMinorLocator(5))
+
+    # Add Annotations (Baseline/Median)
+    if baseline_point is not None:
+        g.ax_joint.scatter(baseline_point[0], baseline_point[1],
+                           c=style.get_color('baseline'), s=200, marker='*',
+                           edgecolors='black', linewidths=1.5,
+                           label='Baseline', zorder=10)
+                           
+    if median_point is not None:
+        g.ax_joint.scatter(median_point[0], median_point[1],
+                           c=style.get_color('median'), s=150, marker='D',
+                           edgecolors='black', linewidths=1.5,
+                           label='Median', zorder=10)
+
+    # Add legend if markers were added
+    if baseline_point is not None or median_point is not None:
+        g.ax_joint.legend(loc='upper right', framealpha=0.9, fontsize=10)
 
     return g
 

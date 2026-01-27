@@ -885,10 +885,16 @@ def create_LegHb_system(ins, outs, use_area_convention=False):
         Output streams (LegHb_3, vent1, vent2, effluent1, emissions, ash_disposal, DfUltraBuffer1, DfUltraBuffer, AntioxidantStream)
     """
     bst.preferences.N = 50
+    try:
+        bst.settings.solver.maxiter = 500
+        bst.settings.solver.molar_tolerance = 0.01
+    except:
+        pass
     
     # Unpack streams
     SeedIn1, SeedIn2, CultureIn, Glucose, NH3_25wt, DfUltraBuffer1, DfUltraBuffer2, AntioxidantStream = ins
     LegHb_3, vent1, vent2, effluent1, emissions, ash_disposal = outs
+
     
     # Set GWP characterization factors
     set_GWPCF(Glucose, 'Glucose')
@@ -1067,9 +1073,9 @@ def set_production_rate(system, target_production_rate_kg_hr, verbose=True):
                 x0=x0,
                 x1=x1,
                 x=initial_guess,
-                xtol=0.0001,
-                ytol=0.01,
-                maxiter=100,
+                xtol=0.001,
+                ytol=0.1,
+                maxiter=200,
                 checkbounds=(y0 * y1 <= 0),
                 checkiter=True,
             )
@@ -1236,7 +1242,7 @@ def check_LegHb_specifications(product_stream):
 if __name__ == '__main__':
     bst.preferences.N = 50
     nn = 1
-    TARGET_PRODUCTION = 275 * nn
+    TARGET_PRODUCTION = 150 * nn
     
     print("="*85)
     print("LEGHEMOGLOBIN PRODUCTION SYSTEM - MODULAR DESIGN")

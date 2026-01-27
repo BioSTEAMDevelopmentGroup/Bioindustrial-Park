@@ -33,7 +33,7 @@ def parse_arguments():
                         choices=get_available_configs(),
                         help='Process configuration (default: config1)')
     parser.add_argument('--production', type=float, default=150,
-                        help='Baseline production rate in kg/hr (default: 275)')
+                        help='Baseline production rate in kg/hr (default: 150)')
     parser.add_argument('--timestamp', type=str, default=None,
                         help='Custom timestamp (YYYYMMDD_HHMM). Defaults to current time.')
     parser.add_argument('--results-dir', type=str, default=None,
@@ -94,7 +94,6 @@ def _stream_summary(system):
             'Source': getattr(stream.source, 'ID', None) if stream.source else None,
             'Sink': getattr(stream.sink, 'ID', None) if stream.sink else None,
             'Mass flow [kg/hr]': stream.F_mass,
-            'Vol flow [m3/hr]': stream.F_vol,
             'Temperature [K]': stream.T,
             'Pressure [Pa]': stream.P,
             'Enthalpy [kJ/hr]': stream.H,

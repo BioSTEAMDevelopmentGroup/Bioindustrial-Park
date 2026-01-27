@@ -1,0 +1,58 @@
+{
+  "nodes": [
+    "Inputs",
+    "Media Preparation",
+    "Conversion",
+    "Purification",
+    "Formulation",
+    "Outputs",
+    "Recovery",
+    "Facilities",
+    "Other"
+  ],
+  "links": {
+    "source": [
+      0,
+      1,
+      3,
+      4,
+      6,
+      3,
+      3,
+      7
+    ],
+    "target": [
+      1,
+      2,
+      4,
+      5,
+      7,
+      8,
+      7,
+      8
+    ],
+    "value": [
+      3308381064.5628734,
+      3492982508.1994276,
+      9334993.908384325,
+      3541071.9918321674,
+      2236827854.36798,
+      77906122.71730585,
+      541296.7912150827,
+      2410369859.786743
+    ],
+    "label": [
+      "3308381064.56 kJ/hr",
+      "3492982508.20 kJ/hr",
+      "9334993.91 kJ/hr",
+      "3541071.99 kJ/hr",
+      "2236827854.37 kJ/hr",
+      "77906122.72 kJ/hr",
+      "541296.79 kJ/hr",
+      "2410369859.79 kJ/hr"
+    ]
+  },
+  "flow_property": "energy",
+  "units": "kJ/hr",
+  "title": "LegHb Sankey (Energy Flow)"
+}

@@ -13,6 +13,15 @@ import argparse
 import json
 import multiprocessing as mp
 import os
+
+# Force each worker to use only 1 thread. 
+# This prevents them from fighting and causing the "Hang/Timeout".
+os.environ["OMP_NUM_THREADS"] = "1"
+os.environ["MKL_NUM_THREADS"] = "1"
+os.environ["OPENBLAS_NUM_THREADS"] = "1"
+os.environ["VECLIB_MAXIMUM_THREADS"] = "1"
+os.environ["NUMEXPR_NUM_THREADS"] = "1"
+
 from functools import partial
 
 import numpy as np
@@ -37,12 +46,12 @@ def parse_arguments():
     parser.add_argument('--config', type=str, default='config1',
                         choices=get_available_configs(),
                         help='Process configuration (default: config1)')
-    parser.add_argument('--production', type=float, default=275,
-                        help='Baseline production rate in kg/hr (default: 275)')
-    parser.add_argument('--samples', type=int, default=120000,
+    parser.add_argument('--production', type=float, default=150,
+                        help='Baseline production rate in kg/hr (default: 150)')
+    parser.add_argument('--samples', type=int, default=100000,
                         help='Target number of valid samples per scenario')
-    parser.add_argument('--batch-size', type=int, default=30000,
-                        help='Samples per batch (default: 30000)')
+    parser.add_argument('--batch-size', type=int, default=10000,
+                        help='Samples per batch (default: 10000)')
     parser.add_argument('--cores', type=int, default=None,
                         help='Number of worker processes (default: max-2)')
     parser.add_argument('--no-multiprocessing', action='store_true',

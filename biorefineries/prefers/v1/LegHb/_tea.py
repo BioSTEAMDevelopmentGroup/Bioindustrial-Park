@@ -293,8 +293,8 @@ if __name__ == '__main__':
     parser.add_argument('--config', type=str, default='config1',
                         choices=get_available_configs(),
                         help='Process configuration to use (default: config1)')
-    parser.add_argument('--production', type=float, default=275,
-                        help='Target production rate in kg/hr (default: 275)')
+    parser.add_argument('--production', type=float, default=150,
+                        help='Target production rate in kg/hr (default: 150)')
     args, _ = parser.parse_known_args()
     
     CONFIG = args.config

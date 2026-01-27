@@ -303,12 +303,29 @@ Inherits all defaults from `Diafiltration`, with:
 
 ---
 
-## 12. VacuumPSA
+
+## 12. Centrifuge
+
+**Class:** `Centrifuge(bst.SolidsCentrifuge)`  
+**Description:** Centrifuge with extended lower bounds for pilot-scale operation.
+**Detailed Specification:** [Centrifuge_spec.md](./units/Centrifuge_spec.md)
+
+### 12.1 Costing Model
+
+Uses `bst.SolidsCentrifuge` model but extrapolates cost below 1-2 ton/hr loading:
+* **Minimum loading for cost:** 0.1 ton/hr
+* **Scaling:**
+  - Reciprocating Pusher: $(S/S_{base})^{0.5}$
+  - Scroll Solid Bowl: $(S/S_{base})^{0.3}$
+
+---
+
+## 13. VacuumPSA
 
 **Class:** `VacuumPSA(bst.Unit)`  
 **Description:** Vacuum Pressure Swing Adsorption (VPSA) unit for gas separation. Designed for separating H₂, CO, and C₂H₄ from syngas using zeolite 13X columns with cyclic adsorption/desorption.
 
-### 12.1 Design Parameters (Defaults)
+### 13.1 Design Parameters (Defaults)
 
 | Parameter                | Default Value | Unit   | Description                          |
 | :----------------------- | :------------ | :----- | :----------------------------------- |
@@ -321,13 +338,13 @@ Inherits all defaults from `Diafiltration`, with:
 | `vacuum_efficiency`      | 0.70          | -      | Vacuum pump efficiency               |
 | `adsorbent_cost`         | 5.0           | $/kg   | Cost of adsorbent material           |
 
-### 12.2 Default Split Factors
+### 13.2 Default Split Factors
 
 Based on Zeolite 13X selectivity:
 * **Product (H₂-rich):** 95% H₂, 30% CO, 20% C₂H₄, 10% CO₂, 85% N₂
 * **Purge (CO/C₂H₄-rich):** Remainder
 
-### 12.3 Sizing Logic
+### 13.3 Sizing Logic
 
 * **Adsorbent Mass:** 
   ```
@@ -339,7 +356,7 @@ Based on Zeolite 13X selectivity:
   Power = F_purge × R × T × ln(P_ads/P_des) / efficiency
   ```
 
-### 12.4 Costing Model
+### 13.4 Costing Model
 
 Uses power-law scaling:
 
@@ -352,20 +369,20 @@ Uses power-law scaling:
 
 ---
 
-## 13. Filtration
+## 14. Filtration
 
 **Class:** `Filtration(bst.Unit)`  
 **Description:** Continuous Rotary Drum Vacuum Filter (RDVF) for high-volume solid-liquid separation.
 **Detailed Specification:** [Filtration_spec.md](./units/Filtration_spec.md)
 
-### 13.1 Factory Presets (`Filtration.from_preset(name, ...)`)
+### 14.1 Factory Presets (`Filtration.from_preset(name, ...)`)
 
 | Preset | Application                                         | Loading (kg/m²/hr) | Pressure (bar) | Cost ($/m²) | Life (yr) |
 | :----- | :-------------------------------------------------- | :----------------- | :------------- | :---------- | :-------- |
 | `'MF'` | Cell Mass / Primary Clarification (Microfiltration) | 30.0               | 1.5            | 80          | 4.0       |
 | `'UF'` | Virus Removal / Fine Separation (Ultrafiltration)   | 15.0               | 3.0            | 150         | 2.5       |
 
-### 13.2 Summary of Validated Parameters
+### 14.2 Summary of Validated Parameters
 
 | Parameter                  | Default | Unit     | Description             |
 | :------------------------- | :------ | :------- | :---------------------- |
@@ -376,4 +393,4 @@ Uses power-law scaling:
 
 ---
 
-*Last Updated: 2026-01-18*
+*Last Updated: 2026-01-27*
