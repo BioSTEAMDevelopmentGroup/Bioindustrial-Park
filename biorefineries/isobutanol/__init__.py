@@ -10,15 +10,18 @@
 from . import (
     system, 
     units,
+    utils,
     )
 
 __all__ = [
             *system.__all__,
-           *units.__all__,
+            *units.__all__,
+            *utils.__all__,
 ]
 
 from .units import *
 from .system import *
+from .utils import *
 
 # def load(*args, **kwargs):
 #     br = Biorefinery(*args, **kwargs)
