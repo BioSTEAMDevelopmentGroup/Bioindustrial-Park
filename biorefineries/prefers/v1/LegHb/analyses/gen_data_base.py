@@ -17,7 +17,7 @@ import numpy as np
 import pandas as pd
 
 from biorefineries.prefers.v1.LegHb._models import create_model
-from biorefineries.prefers.v1.LegHb._tea import PreFerSTEA
+from biorefineries.prefers.v1.LegHb._tea_config1 import PreFerSTEA
 from biorefineries.prefers.v1.LegHb.system import get_available_configs
 from biorefineries.prefers.v1.utils import utils, report_generator
 from biorefineries.prefers.v1.utils import sankey_utils

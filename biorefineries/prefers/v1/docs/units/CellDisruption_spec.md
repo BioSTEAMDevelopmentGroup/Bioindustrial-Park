@@ -15,7 +15,7 @@ Releases intracellular products (LegHb, Heme) by lysing yeast cells under high p
    - Default Efficiency: 0.55 (0.90 typically used in config).
 2. **Pressure Dynamics**:
    - Simulates multi-stage pumping to reach `P_high` (e.g., 1000 bar).
-   - Limits per-stage compression ratio (<4.0) and head (<8000 ft) to model realistic pump constraints.
+   - Limits per-stage compression ratio (<4.0) and head (<3000 ft) to conservatively model realistic pump constraints and prevent BioSTEAM warnings.
 3. **Thermal Effect**:
    - Modeled via `bst.IsenthalpicValve` from `P_high` to `P_low`.
    - Captures temperature rise due to energy dissipation (Joule-Thomson effect).

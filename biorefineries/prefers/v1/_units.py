@@ -793,9 +793,10 @@ class CellDisruption(bst.Unit):
         # Goal: use the least number of pumps while keeping per-stage head within
         # a practical centrifugal range to avoid pump-type warnings.
         # Typical industrial centrifugal pumps handle <= 8,000 ft head per stage.
-        # This algorithm maximizes per-stage pressure rise under both head and
-        # compression-ratio constraints.
-        max_head_ft = 8000.0
+        # However, to be conservative and avoid any BioSTEAM warnings, we use 3000 ft.
+        # This implementation details does not affect total power/cost as those
+        # are calculated based on total dP.
+        max_head_ft = 3000.0
         max_pressure_ratio = 4.0
         g = 9.80665  # m/s^2
         rho = max(feed.rho, 1e-6)  # kg/m3, prevent divide-by-zero
@@ -808,9 +809,21 @@ class CellDisruption(bst.Unit):
 
         pressure_stages = []
         while current_P < target_P:
+            if np.isclose(current_P, target_P): break
+            # Constraint 1: Compression ratio (P_out / P_in <= 4)
+            # P_out - P_in <= P_in * (4 - 1)
             max_deltaP_by_ratio = current_P * (max_pressure_ratio - 1.0)
+            
+            # Constraint 2: Head limit 
             deltaP = min(max_deltaP_by_head, max_deltaP_by_ratio, target_P - current_P)
-            next_P = current_P + max(deltaP, 1.0)
+            
+            # Ensure at least some progress to avoid infinite loop
+            next_P = current_P + max(deltaP, 1000.0) 
+            
+            # If we are very close to target, just finish
+            if next_P >= target_P * 0.999:
+                 next_P = target_P
+                 
             pressure_stages.append(next_P)
             current_P = next_P
 

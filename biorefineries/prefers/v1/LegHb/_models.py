@@ -10,13 +10,13 @@ Created on 2025-01-XX
 
 import biosteam as bst
 from chaospy import distributions as shape
-from biorefineries.prefers.v1.LegHb.system import create_LegHb_system, set_production_rate
-from biorefineries.prefers.v1.LegHb._tea import PreFerSTEA
+from biorefineries.prefers.v1.LegHb.system import create_LegHb_system, set_production_rate, optimize_NH3_loading
+from biorefineries.prefers.v1.LegHb._tea_config1 import PreFerSTEA
 from biorefineries.prefers.v1._process_settings import load_process_settings
 
 __all__ = ('create_model',)
-p=275
-def create_model(baseline_production_kg_hr=p, config='config1', verbose=True):
+#p=150
+def create_model(baseline_production_kg_hr=150, config='config1', verbose=True):
     """
     Create a Model object for uncertainty and sensitivity analysis of the LegHb production facility.
     
@@ -42,7 +42,12 @@ def create_model(baseline_production_kg_hr=p, config='config1', verbose=True):
     # Set baseline production rate using design specification
     if verbose:
         print(f"Setting baseline production rate to {baseline_production_kg_hr} kg/hr (config={config})...")
+    
+    # 2026-01-28 FIX: Explicitly set operating hours and optimize NH3 BEFORE scaling
+    LegHb_sys.operating_hours = 8000
+    optimize_NH3_loading(LegHb_sys, verbose=False)
     set_production_rate(LegHb_sys, baseline_production_kg_hr, config=config, verbose=verbose)
+    optimize_NH3_loading(LegHb_sys, verbose=False) # Optimize again after scaling
     
     # Create TEA object
     LegHb_tea = PreFerSTEA(
@@ -71,7 +76,7 @@ def create_model(baseline_production_kg_hr=p, config='config1', verbose=True):
     LegHb_product = f.stream.LegHb_3  # Main product stream
     
     # Create model
-    model = bst.Model(LegHb_sys)
+    model = bst.Model(LegHb_sys, specification=lambda: optimize_NH3_loading(LegHb_sys, verbose=False))
     param = model.parameter
     metric = model.metric
     
@@ -142,7 +147,7 @@ def create_model(baseline_production_kg_hr=p, config='config1', verbose=True):
     # =============================================================================
     # PARAMETER 4: Substrate Yield (NEW)
     # =============================================================================
-    baseline_yield = R302.target_yield  # Current yield
+    baseline_yield = R302.target_yield  # Current yield ~0.03
     lb_yield = baseline_yield * 0.75  # -25%
     ub_yield = baseline_yield * 1.5   # +50%
     
@@ -235,25 +240,15 @@ def create_model(baseline_production_kg_hr=p, config='config1', verbose=True):
         """
         try:
             # Generate LCA displacement allocation table
-            # This table calculates impacts based on:
-            # - Material inputs (feeds)
-            # - Energy consumption (heating, cooling, electricity)
-            # - Process impacts (if any)
-            # - Byproduct credits (displacement)
             lca_table = bst.report.lca_displacement_allocation_table(
                 systems=[LegHb_sys],
                 key='GWP',
                 items=[LegHb_product],
             )
             
-            # The table structure has:
-            # - Index: Multi-level with categories (Inputs, Outputs, Process impacts, Total)
-            # - Columns: ['Characterization factor [kg CO2-eq/kg]', 'System GWP [kg CO2-eq/kg*product]']
-            
             # Extract total GWP from the 'Total' row
             # The last column contains GWP per kg product
             total_gwp = lca_table.loc[('Total', ''), lca_table.columns[-1]]
-            
             return total_gwp
             
         except Exception as e:
@@ -314,7 +309,7 @@ def verify_model_integration():
     
     # Create model
     print("\n1. Creating model...")
-    model = create_model(baseline_production_kg_hr=275)
+    model = create_model(baseline_production_kg_hr=150)
     
     # Display model structure
     print("\n2. Model structure:")
@@ -344,7 +339,7 @@ def verify_model_integration():
     # Test yield change
     print("\n   Testing substrate yield parameter...")
     yield_param = [p for p in model.parameters if p.name == 'Substrate yield'][0]
-    yield_param.setter(45)  # 45% yield
+    yield_param.setter(4)  # 4% yield
     model.system.simulate()
     print(f"   New GWP: {model.metrics[3].get():.4f} kg CO2-eq/kg (Expected change)")
     

@@ -56,6 +56,9 @@ __all__ = (
     'create_area_600_concentration',
     'create_area_700_formulation',
     'create_area_900_facilities',
+    'set_production_rate',
+    'optimize_NH3_loading',
+    'check_HemDx_specifications',
 )
 
 # =============================================================================
@@ -193,43 +196,45 @@ def create_area_200_media_prep(SeedIn1, SeedIn2, CultureIn, Glucose, NH3_25wt):
         pass
 
     M201 = bst.MixTank('M201', ins=[SeedIn1,'Water1'], outs='M201Out', tau=16)
+    # Pre-calculate reference values for Seed1 to avoid re-registering stream in loop
+    ref_stream1 = bst.Stream(**{**s.SeedSolution1, 'ID': 'RefSeed1'})
+    ref_seed1_val = ref_stream1.imass['Seed']
+    ref_water1_val = ref_stream1.imass['H2O']
+
     @M201.add_specification(run=True)
     def update_seed1_inputs():
         # Force SeedIn1 to target (from global dict or reference)
-        ref_stream = bst.Stream(**{**s.SeedSolution1, 'ID': 'RefSeed1'})
-        ref_seed = ref_stream.imass['Seed']
-        ref_water = ref_stream.imass['H2O']
-        
-        target = seed_targets.get(SeedIn1, ref_seed)
+        target = seed_targets.get(SeedIn1, ref_seed1_val)
         
         SeedIn1.imass['Seed'] = target
         
-        if ref_seed > 0:
-            ratio = ref_water / ref_seed
+        if ref_seed1_val > 0:
+            ratio = ref_water1_val / ref_seed1_val
             M201.ins[1].imass['H2O'] = target * ratio
         
         M201.ins[1].T = 25+273.15
     
     M202 = bst.MixTank('M202', ins=[SeedIn2,CultureIn,'Water2'], outs='M202Out', tau=16)
+    # Pre-calculate reference values for Seed2 to avoid re-registering stream in loop
+    ref_stream2 = bst.Stream(**{**s.SeedSolution2, 'ID': 'RefSeed2'})
+    ref_seed2_val = ref_stream2.imass['Seed']
+    ref_water2_val = ref_stream2.imass['H2O']
+    ref_total2_val = ref_stream2.F_mass
+
     @M202.add_specification(run=True)
     def update_culture_inputs():
-        ref_stream = bst.Stream(**{**s.SeedSolution2, 'ID': 'RefSeed2'})
-        ref_seed = ref_stream.imass['Seed']
-        ref_water = ref_stream.imass['H2O']
-        ref_total = ref_stream.F_mass
-        
-        target = seed_targets.get(SeedIn2, ref_seed)
+        target = seed_targets.get(SeedIn2, ref_seed2_val)
         SeedIn2.imass['Seed'] = target
         
-        if ref_seed > 0:
-            ratio_water = ref_water / ref_seed
+        if ref_seed2_val > 0:
+            ratio_water = ref_water2_val / ref_seed2_val
             M202.ins[2].imass['H2O'] = target * ratio_water # Water2
             
             # CultureIn logic
             ratio_culture = (0.1 + 60 + 0.15191) / 1000
             
             # Predict current total solution mass
-            current_total_mass_est = target * (ref_total / ref_seed)
+            current_total_mass_est = target * (ref_total2_val / ref_seed2_val)
             CultureIn.imass['Culture'] = current_total_mass_est * ratio_culture
         
         M202.ins[2].T = 25+273.15
@@ -642,11 +647,14 @@ def create_area_800_final_product(crude_product, product_out, AntioxidantStream)
 # =============================================================================
 def create_area_900_facilities(waste_streams, dehydrated_debris, ProcessWaste, emissions, ash_disposal):
     
-    # Add Supplemental NH3 for WWTP biology (since fermentation effluent is nitrogen-depleted)
-    SupplementalNH3 = bst.Stream('SupplementalNH3', NH3=0.5, units='kg/hr', price=0.25)
+    # Add Supplemental NH4SO4 for WWTP biology (since fermentation effluent is nitrogen-depleted)
+    SupplementalNH4SO4 = bst.Stream('SupplementalNH4SO4', units='kg/hr', price=0)
+    SupplementalFeSO4 = bst.Stream('SupplementalFeSO4', FeSO4=50, units='kg/hr', price=0)
+    SupplementalNH4SO4.imass['(NH4)2SO4'] = 50 
+    SupplementalNH4SO4.imass['NH3'] = 0.5  
     
     wastewater_treatment_sys = bst.create_wastewater_treatment_system(
-        ins=[*waste_streams, SupplementalNH3],
+        ins=[*waste_streams, SupplementalNH4SO4, SupplementalFeSO4],
         outs=('biogas', 'sludge', 'RO_treated_water', ProcessWaste),
         mockup=True,
         area=500,
@@ -1018,7 +1026,7 @@ def set_production_rate(system, target_production_rate_kg_hr, verbose=True):
     ],
     outs=[
         s.vent1, s.vent2,
-        dict(ID='NHemDx_Product'),
+        s.NHemDx_Product,
         dict(ID='ProcessWaste'),
         dict(ID='emissions'),
         dict(ID='ash_disposal'),
@@ -1196,5 +1204,3 @@ if __name__ == '__main__':
     print(f"Target Production:   {TARGET_PRODUCTION:.2f} kg/hr")
     print(f"Achieved Production: {ss.NHemDx_Product.F_mass:.2f} kg/hr")
     print(f"{'='*85}\n")
-    u.R301.show()
-    u.R302.show()

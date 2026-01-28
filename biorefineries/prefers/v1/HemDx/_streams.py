@@ -75,6 +75,8 @@ vent2 = stream_kwargs('vent2')
 effluent1 = stream_kwargs('effluent1')
 effluent2 = stream_kwargs('effluent2', units='kg/hr', price=-0.33)  # organic waste remove
 effluent3 = stream_kwargs('effluent3')
+NHemDx_Product = stream_kwargs('NHemDx_Product', units='kg/hr', T=25+273.15, price=20)#  20 for pharmaceutical grade
+
 
 
 # %%

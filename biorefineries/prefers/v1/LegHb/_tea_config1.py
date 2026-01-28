@@ -18,54 +18,40 @@ from biorefineries.tea.conventional_ethanol_tea import *
 from numba import njit
 from numpy import ndarray as NDArray
 from biorefineries.prefers.v1._tea import PreFerSTEA as PreFerSTEA_Base
+import flexsolve as flx
+import warnings
+# Import seed_targets to update the global registry used by unit specs
+from biorefineries.prefers.v1.LegHb.system._config1 import seed_targets
 
 class PreFerSTEA(PreFerSTEA_Base):
     
-    def set_production_rate(self, target_production_kg_hr):
+    def optimize_NH3_loading(self, verbose=True):
+        """
+        Optimizes NH3_25wt flow rate and S202 split ratio to meet fermentation demand.
+        Delegates to system module implementation.
+        """
+        from biorefineries.prefers.v1.LegHb.system import optimize_NH3_loading
+        optimize_NH3_loading(self.system, verbose=verbose)
+
+    def set_production_rate(self, target_production_kg_hr, verbose=True):
         """
         Set the target production rate and adjust system inputs accordingly.
-        
-        Parameters
-        ----------
-        target_production_kg_hr : float
-            Target production rate in kg/hr for LegHb_3 stream
-            
-        Returns
-        -------
-        float
-            Achieved production rate [kg/hr]
+        Delegates to system module implementation.
         """
-        # Import the function from LegHb module
         from biorefineries.prefers.v1.LegHb.system import set_production_rate
         
         self._target_production_kg_hr = target_production_kg_hr
-        
-        # Call the design specification function
-        achieved_production = set_production_rate(self.system, target_production_kg_hr)
-        
-        return achieved_production
+        return set_production_rate(self.system, target_production_kg_hr, verbose=verbose)
     
     def check_product_specifications(self):
         """
         Check if the product stream meets all specifications.
-        
-        Returns
-        -------
-        bool
-            True if all specifications are met
-            
-        Raises
-        ------
-        ValueError
-            If any specification is not met
         """
-        # Import the function from LegHb module
         from biorefineries.prefers.v1.LegHb.system import check_LegHb_specifications
         
         # Get the product stream (LegHb_3)
         product_stream = self.system.flowsheet.stream.LegHb_3
         
-        # Check specifications
         return check_LegHb_specifications(product_stream)
     
     @property

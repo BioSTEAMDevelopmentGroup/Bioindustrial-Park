@@ -20,21 +20,25 @@ Usage:
 from ._config1 import create_LegHb_system as create_LegHb_system_config1
 from ._config1 import set_production_rate as set_production_rate_config1
 from ._config1 import check_LegHb_specifications
+from ._config1 import optimize_NH3_loading as optimize_NH3_loading_config1
 
 # Try to import config2, but don't fail if it doesn't exist
 try:
     from ._config2 import create_LegHb_system as create_LegHb_system_config2
     from ._config2 import set_production_rate as set_production_rate_config2
+    from ._config2 import optimize_NH3_loading as optimize_NH3_loading_config2
     _CONFIG2_AVAILABLE = True
 except ImportError:
     _CONFIG2_AVAILABLE = False
     create_LegHb_system_config2 = None
     set_production_rate_config2 = None
+    optimize_NH3_loading_config2 = None
 
 __all__ = [
     'create_LegHb_system',
     'set_production_rate',
     'check_LegHb_specifications',
+    'optimize_NH3_loading',
     'get_available_configs',
 ]
 
@@ -129,3 +133,34 @@ def set_production_rate(system, target_production_kg_hr, config=None, verbose=Tr
     else:
         # Fallback to config1's function
         return set_production_rate_config1(system, target_production_kg_hr, verbose=verbose)
+
+
+def optimize_NH3_loading(system, config=None, verbose=True):
+    """
+    Optimize NH3 loading for a LegHemoglobin system.
+    
+    Parameters
+    ----------
+    system : System
+        The BioSTEAM system to optimize.
+    config : str, optional
+        Configuration that was used to create the system.
+        If None, uses default (config1).
+    verbose : bool, optional
+        Print progress messages. Default True.
+    """
+    if config is None:
+        config = _DEFAULT_CONFIG
+    
+    config = config.lower().replace('-', '').replace('_', '')
+    
+    if config == 'config1':
+        return optimize_NH3_loading_config1(system, verbose=verbose)
+    elif config == 'config2':
+        if not _CONFIG2_AVAILABLE:
+            raise ImportError("Configuration 'config2' is not available.")
+        return optimize_NH3_loading_config2(system, verbose=verbose)
+    else:
+        # Fallback to config1's function
+        return optimize_NH3_loading_config1(system, verbose=verbose)
+
