@@ -53,6 +53,8 @@ f = corn_EtOH_sys.flowsheet
 
 parameters = settings.process_parameters
 
+parameters['NH3_per_Yeast'] = 0.1097 # 0.16*14/(12 + 1.6 + 0.56*16 + 0.16*14) *17/14
+
 #%% Add splitter and feed & spike evaporators, mixers, and heat exchangers
 
 ## Splitter
@@ -186,6 +188,8 @@ V406-1-0-f.P406
 
 yeast = f.yeast
 gluco_amylase = f.gluco_amylase
+ammonia = f.ammonia
+
 @V406.add_specification(run=True)
 def correct_saccharification_feed_flows():
     mash = V406.ins[0]
@@ -193,7 +197,12 @@ def correct_saccharification_feed_flows():
     mash_dry_flow = mash_flow - mash.imass['Water']
     yeast.F_mass = parameters['yeast_loading'] * mash_flow
     gluco_amylase.F_mass = parameters['saccharification_gluco_amylase_loading'] * mash_dry_flow
-
+    
+    # V406.simulate()
+    
+    effluent = V406.outs[1]
+    ammonia.imass['NH3'] = parameters['NH3_per_Yeast'] * effluent.imass['Yeast']
+    
 # V406.simulate()
 
 #%%
