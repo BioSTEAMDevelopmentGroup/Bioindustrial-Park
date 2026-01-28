@@ -118,7 +118,7 @@ for c in threshold_conc_sugarses:
     n_tea_solves=3,
     plot=False,
     )
-    optimize_max_n_glu_spikes(obj='MPSP', optimize_tau=False, show_progress=True)
+    # optimize_max_n_glu_spikes(obj='MPSP', optimize_tau=False, show_progress=True)
     plt.plot(V406.results_dict['time'], V406.results_dict['[x]'], label='cell mass')
     plt.plot(V406.results_dict['time'], V406.results_dict['[s_glu]'], label='glucose')
     plt.plot(V406.results_dict['time'], V406.results_dict['[s_EtOH]'], label='ethanol')

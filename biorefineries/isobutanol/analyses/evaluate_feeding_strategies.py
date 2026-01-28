@@ -232,7 +232,7 @@ def print_status(curr_no, total_no, s1, s2, s3, HXN_qbal_error, results=None, ex
     print('\n\n')
     print(f'{curr_no}/{total_no}')
     print('\n')
-    print(f'integrator: {r.integrator.name}')
+    print(f'integrator: {r.integrator.getName()}')
     print(s1, s2, s3)
     print('\n')
     print(f'HXN Qbal error = {round(HXN_qbal_error, 2)} %.')
@@ -252,9 +252,9 @@ errors_dict = {}
 for s3 in spec_3:
     for v in list(results.values()): v.append([])
     
-    for s1 in spec_1:
+    for s2 in spec_2:
         for v in list(results.values()): v[-1].append([])
-        for s2 in spec_2:
+        for s1 in spec_1:
             curr_no +=1
             error_message = None
             try:
@@ -296,7 +296,8 @@ for s3 in spec_3:
 
     # Convert last 2D list to array and transpose
     for k in results.keys(): 
-        results[k][-1] = np.array(results[k][-1]).transpose()
+        # results[k][-1] = np.array(results[k][-1]).transpose()
+        results[k][-1] = np.array(results[k][-1])
 
     # Save generated data
     for k, v in results.items():
