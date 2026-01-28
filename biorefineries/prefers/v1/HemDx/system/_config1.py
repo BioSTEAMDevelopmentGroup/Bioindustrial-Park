@@ -29,10 +29,15 @@ import thermosteam as tmo
 import numpy as np
 from biorefineries.prefers.v1.HemDx import _chemicals as c
 from biorefineries.prefers.v1 import _units as u
-from biorefineries.prefers.v1._process_settings import price
+from biorefineries.prefers.v1 import _process_settings
+from biorefineries.prefers.v1.HemDx import _streams as s
+import numpy as np
+
+# Global registry for seed scaling targets
+seed_targets = {}
 
 # =============================================================================
-# MODULE INITIALIZATION
+# AREA 100: FEEDING
 # =============================================================================
 HEMDX_THERMO = c.create_chemicals_Hemodextrin()
 bst.settings.set_thermo(HEMDX_THERMO, skip_checks=True)
@@ -107,31 +112,41 @@ def create_fermentation_reactions(params=None):
     SF = params['SF']
     
     fermentation_reaction = bst.PRxn([
-        bst.Rxn('1 Glucose + 1.05882 NH3 + 0.17647 FeSO4  -> 0.17647 Heme_b + 0.617647 O2 + 0.17647 (NH4)2SO4 + 4.05882 H2O',
+        bst.Rxn('1 Glucose + 0.70588 NH3 + 0.17647 FeSO4  -> 0.17647 Heme_b + 0.617647 O2 + 0.17647 H2SO4 + 4.05882 H2O',
                 reactant='Glucose', X=Y_Heme*SF, check_atomic_balance=True),
-        bst.Rxn('1 Glucose + 1.05882 NH3 + 0.17647 FeSO4  -> 0.17647 Heme_b_In + 0.617647 O2 + 0.17647 (NH4)2SO4 + 4.05882 H2O',
+        bst.Rxn('1 Glucose + 0.70588 NH3 + 0.17647 FeSO4  -> 0.17647 Heme_b_In + 0.617647 O2 + 0.17647 H2SO4 + 4.05882 H2O',
                 reactant='Glucose', X=Y_Heme*(1-SF), check_atomic_balance=True),
         bst.Rxn('1 Glucose + 0.70588 NH3  -> 0.17647 ProtoporphyrinIX + 0.618 O2 + 4.06 H2O',
                 reactant='Glucose', X=Y_pp*SF, correct_atomic_balance=True),
         bst.Rxn('1 Glucose + 0.70588 NH3 -> 0.17647 ProtoporphyrinIX_In + 0.618 O2 + 4.06 H2O',
                 reactant='Glucose', X=Y_pp*(1-SF), correct_atomic_balance=True),
-    ])
+    ]) 
     fermentation_reaction[0].product_yield('Heme_b', basis='wt', product_yield=Y_Heme*SF)
     fermentation_reaction[1].product_yield('Heme_b_In', basis='wt', product_yield=Y_Heme*(1-SF))
     fermentation_reaction[2].product_yield('ProtoporphyrinIX', basis='wt', product_yield=Y_pp*SF)
     fermentation_reaction[3].product_yield('ProtoporphyrinIX_In', basis='wt', product_yield=Y_pp*(1-SF))
 
     neutralization_reaction = bst.Rxn(
-        'H2SO4 + 2 NH3 -> (NH4)2SO4', reactant='H2SO4', X=1,
+        'H2SO4 + 2 NH3 -> (NH4)2SO4', reactant='H2SO4', X=0.99,
         check_atomic_balance=True
     )
     
-    cell_growth_reactionCG = bst.Rxn(
-        'Glucose + 1.32 NH3 + 1.32 H2O-> 6 Corynebacterium_glutamicum + 2.37 O2', 'Glucose', X=Y_b,
+    cell_growth_reactionCG1 = bst.Rxn(
+        'Glucose + 1.32 NH3 + 1.32 H2O-> 6 Corynebacterium_glutamicum + 2.37 O2', 'Glucose', X=Y_b*2,
         correct_atomic_balance=True
     )
-    cell_growth_reactionCG.product_yield('Corynebacterium_glutamicum', basis='wt', product_yield=Y_b)
+    cell_growth_reactionCG1.product_yield('Corynebacterium_glutamicum', basis='wt', product_yield=Y_b*2)
     
+    respiration_reactionGC1 = bst.Rxn(
+        'Glucose + 6 O2 -> 6 CO2 + 6 H2O', 'Glucose',X = 1 - Y_b*2,
+        check_atomic_balance=True
+    )
+    
+    cell_growth_reactionCG2 = bst.Rxn(
+        'Glucose + 1.32 NH3 + 1.32 H2O-> 6 Corynebacterium_glutamicum + 2.37 O2', 'Glucose', X=Y_b*2,
+        correct_atomic_balance=True
+    )
+    cell_growth_reactionCG2.product_yield('Corynebacterium_glutamicum', basis='wt', product_yield=Y_b*2)
     respiration_reactionGC2 = bst.Rxn(
         'Glucose + 6 O2 -> 6 CO2 + 6 H2O', 'Glucose', (1 - Y_b - Y_pp - Y_Heme)*0.95,
         check_atomic_balance=True
@@ -144,12 +159,14 @@ def create_fermentation_reactions(params=None):
     
     RXN = bst.ReactionSystem(
         fermentation_reaction,
-        bst.PRxn([cell_growth_reactionCG, respiration_reactionGC2, respiration_reactionGC3]),
+        bst.PRxn([cell_growth_reactionCG2, respiration_reactionGC2, respiration_reactionGC3]),
     )
     
     return {
         'fermentation_reaction': fermentation_reaction,
-        'cell_growth_reactionCG': cell_growth_reactionCG,
+        'cell_growth_reactionCG1': cell_growth_reactionCG1,
+        'cell_growth_reactionCG2': cell_growth_reactionCG2,
+        'respiration_reactionGC1': respiration_reactionGC1,
         'respiration_reactionGC2': respiration_reactionGC2,
         'respiration_reactionGC3': respiration_reactionGC3,
         'neutralization_reaction': neutralization_reaction,
@@ -162,24 +179,65 @@ def create_fermentation_reactions(params=None):
 # AREA 200: MEDIA PREPARATION
 # =============================================================================
 def create_area_200_media_prep(SeedIn1, SeedIn2, CultureIn, Glucose, NH3_25wt):
+    # Initialize streams to reference values (run once during creation)
+    try:
+        SeedIn1.imass['Seed'] = s.SeedSolution1['Seed']
+        SeedIn2.imass['Seed'] = s.SeedSolution2['Seed']
+        
+        tmp = bst.Stream(ID='tmp_init_h', **s.SeedSolution2)
+        ref_seed2_total = tmp.F_mass
+        ratio_culture = (0.1 + 60 + 0.15191) / 1000
+        CultureIn.imass['Culture'] = ref_seed2_total * ratio_culture
+        tmp.empty()
+    except:
+        pass
+
     M201 = bst.MixTank('M201', ins=[SeedIn1,'Water1'], outs='M201Out', tau=16)
     @M201.add_specification(run=True)
     def update_seed1_inputs():
-        target_stream = bst.Stream(**s.SeedSolution1)
-        SeedIn1.imass['Seed'] = target_stream.imass['Seed']
-        M201.ins[1].imass['H2O'] = target_stream.imass['H2O']
+        # Force SeedIn1 to target (from global dict or reference)
+        ref_stream = bst.Stream(**{**s.SeedSolution1, 'ID': 'RefSeed1'})
+        ref_seed = ref_stream.imass['Seed']
+        ref_water = ref_stream.imass['H2O']
+        
+        target = seed_targets.get(SeedIn1, ref_seed)
+        
+        SeedIn1.imass['Seed'] = target
+        
+        if ref_seed > 0:
+            ratio = ref_water / ref_seed
+            M201.ins[1].imass['H2O'] = target * ratio
+        
         M201.ins[1].T = 25+273.15
     
     M202 = bst.MixTank('M202', ins=[SeedIn2,CultureIn,'Water2'], outs='M202Out', tau=16)
     @M202.add_specification(run=True)
     def update_culture_inputs():
-        target_stream = bst.Stream(**s.SeedSolution2)
-        SeedIn2.imass['Seed'] = target_stream.imass['Seed']
-        M202.ins[2].imass['H2O'] = target_stream.imass['H2O']
+        ref_stream = bst.Stream(**{**s.SeedSolution2, 'ID': 'RefSeed2'})
+        ref_seed = ref_stream.imass['Seed']
+        ref_water = ref_stream.imass['H2O']
+        ref_total = ref_stream.F_mass
+        
+        target = seed_targets.get(SeedIn2, ref_seed)
+        SeedIn2.imass['Seed'] = target
+        
+        if ref_seed > 0:
+            ratio_water = ref_water / ref_seed
+            M202.ins[2].imass['H2O'] = target * ratio_water # Water2
+            
+            # CultureIn logic
+            ratio_culture = (0.1 + 60 + 0.15191) / 1000
+            
+            # Predict current total solution mass
+            current_total_mass_est = target * (ref_total / ref_seed)
+            CultureIn.imass['Culture'] = current_total_mass_est * ratio_culture
+        
         M202.ins[2].T = 25+273.15
-        CultureIn.imass['Culture'] = target_stream.imass['SeedSolution']*(0.1+60+0.15191)/1000
 
-    M203 = u.SeedHoldTank('M203', ins=[M201-0, M202-0], outs='M203Out')
+    T202 = u.AmmoniaStorageTank('T202', ins=NH3_25wt, outs='T202Out')
+    S202 = bst.Splitter('S202', ins=T202-0, outs=('NH3_Seed', 'NH3_Fer'), split=0.04)
+
+    M203 = u.SeedHoldTank('M203', ins=[M201-0, M202-0, S202-0], outs='M203Out')
     
     M204 = bst.MixTank('M204', ins=[Glucose,'Water3'], outs='M204Out', tau=16)
     @M204.add_specification(run=True)
@@ -188,12 +246,11 @@ def create_area_200_media_prep(SeedIn1, SeedIn2, CultureIn, Glucose, NH3_25wt):
         M204.ins[1].T = 25+273.15
     
     T201 = bst.StorageTank('T201', ins=M204-0, outs='T201Out', tau=16*4+72)
-    T202 = u.AmmoniaStorageTank('T202', ins=NH3_25wt, outs='T202Out')
     
     return {
         'M203_out': M203-0,
         'T201_out': T201-0,
-        'T202_out': T202-0
+        'T202_out': S202-1
     }
 
 # =============================================================================
@@ -204,7 +261,7 @@ def create_area_300_conversion(seed_in, glucose_in, ammonia_in, vent1, vent2, rx
         'R301',
         ins=[seed_in],
         outs=[vent1, 'R301Out'],
-        reactions=bst.PRxn([rxns['cell_growth_reactionCG'], rxns['respiration_reactionGC2'], rxns['respiration_reactionGC3']]),
+        reactions=bst.PRxn([rxns['cell_growth_reactionCG1'], rxns['respiration_reactionGC1'],]),
         saccharification=None,
         T=32+273.15,
     )
@@ -215,8 +272,8 @@ def create_area_300_conversion(seed_in, glucose_in, ammonia_in, vent1, vent2, rx
         ins=[R301-1, glucose_in, ammonia_in, bst.Stream('FilteredAir', phase='g', P=2 * 101325)],
         outs=[vent2, 'Broth'],
         fermentation_reaction=rxns['fermentation_reaction'],
-        cell_growth_reaction=rxns['cell_growth_reactionCG'],
-        respiration_reaction=rxns['respiration_reactionGC2'],
+        cell_growth_reaction=rxns['cell_growth_reactionCG2'],
+        respiration_reaction=bst.PRxn([rxns['respiration_reactionGC2'], rxns['respiration_reactionGC3']]),
         neutralization_reaction=rxns['neutralization_reaction'],
         design=params['design'], method=params['method'], theta_O2=params['theta_O2'],
         V_max=params['V_max'], Q_O2_consumption=params['Q_O2_consumption'],
@@ -252,7 +309,7 @@ def create_area_300_conversion(seed_in, glucose_in, ammonia_in, vent1, vent2, rx
 # =============================================================================
 # AREA 400: RECOVERY
 # =============================================================================
-def create_area_400_recovery(broth_in):
+def create_area_400_recovery(broth_in, DfUltraBuffer2):
     # S401: Primary Centrifuge
     centrifuge_order = ('Corynebacterium_glutamicum', 'Heme_b_In', 'ProtoporphyrinIX_In')
     S401 = u.Centrifuge(
@@ -291,8 +348,7 @@ def create_area_400_recovery(broth_in):
     S404.add_specification(run=True)
 
     # Cell cream washing & disruption
-    DfUltraBuffer = bst.Stream(**s.DfUltraBuffer)
-    M401 = bst.MixTank('M401', ins=(DfUltraBuffer, 'WashWater'), outs='WashBufferOut', tau=0.5)
+    M401 = bst.MixTank('M401', ins=(DfUltraBuffer2, 'Water4'), outs='WashBufferOut', tau=0.5)
 
     @M401.add_specification(run=True)
     def update_wash_buffer():
@@ -405,15 +461,15 @@ def create_area_500_purification(lysate_in, NaCl_wash, NaOH_elute, Ethanol_regen
 # =============================================================================
 # AREA 600: CONCENTRATION
 # =============================================================================
-def create_area_600_concentration(eluate_in, DFBufferSolute):
-    M601 = bst.MixTank('M601', ins=(DFBufferSolute, 'DFBufferWater'), outs='DFBuffer', tau=0.5)
+def create_area_600_concentration(eluate_in, DfUltraBuffer1):
+    M601 = bst.MixTank('M601', ins=(DfUltraBuffer1, 'Water8'), outs='DFBuffer', tau=0.5)
     
     U601 = u.Diafiltration.from_preset(
         'NF', 'U601',
         ins=(eluate_in, M601-0),
         outs=('ConcentratedHeme', 'NFPermeate'),
         TargetProduct_ID=('Heme_b', 'Heme_b_In', 'ProtoporphyrinIX', 'ProtoporphyrinIX_In'),
-        Salt_ID=('NaCl', 'NaOH', 'Ethanol'),
+        Salt_ID=('NaCl', 'NaOH', 'Ethanol','K2SO4','MgSO4','FeSO4','(NH4)2SO4','KH2PO4'),
         TargetProduct_Retention=0.98, Salt_Retention=0.10, concentration_factor=5.0,
     )
     
@@ -435,7 +491,7 @@ def create_area_600_concentration(eluate_in, DFBufferSolute):
 # AREA 700: FORMULATION
 # =============================================================================
 def create_area_700_formulation(heme_concentrate, GammaCyclodextrinFeed, NicotinamideFeed):
-    M701 = bst.MixTank('M701', ins=(GammaCyclodextrinFeed, 'Water8'), outs='GammaCDSolution', tau=0.5)
+    M701 = bst.MixTank('M701', ins=(GammaCyclodextrinFeed, 'Water9'), outs='GammaCDSolution', tau=0.5)
     M702 = bst.Mixer('M702', ins=(heme_concentrate, M701-0), outs='HemeWithCD')
     
     encapsulation_rxn = bst.Rxn(
@@ -452,7 +508,7 @@ def create_area_700_formulation(heme_concentrate, GammaCyclodextrinFeed, Nicotin
     )
     hemdx_rxns = bst.ReactionSystem(encapsulation_rxn, encapsulation_rxn_in, coordination_rxn)
     
-    M703 = bst.MixTank('M703', ins=(NicotinamideFeed, 'Water9'), outs='NicotinamideSolution', tau=0.5)
+    M703 = bst.MixTank('M703', ins=(NicotinamideFeed, 'Water10'), outs='NicotinamideSolution', tau=0.5)
     M704 = bst.Mixer('M704', ins=(M702-0, M703-0), outs='HemeDxWithNic')
 
     R702 = u.HemDxCSTR(
@@ -482,26 +538,26 @@ def create_area_700_formulation(heme_concentrate, GammaCyclodextrinFeed, Nicotin
 # =============================================================================
 # AREA 800: FINAL PRODUCT
 # =============================================================================
-def create_area_800_final_product(crude_product, product_out):
+def create_area_800_final_product(crude_product, product_out, AntioxidantStream):
     """
     Area 800: Finalization
     
     Processing:
         1. U801: Diafiltration to remove excess salts/nicotinamide and concentrate
-        2. M801: Formulation buffer addition (if needed for concentration adj)
-        3. H802: Pasteurization (HTST)
-        4. T801: Final product storage
+        2. H802: Pasteurization (HTST)
+        3. M802: Formulation with Antioxidant
+        4. H803: Final Cooling
+        5. T801: Final product storage
     """
     # U801: Diafiltration (Concentration & Purification)
     # Remove excess Nicotinamide, salts, and Cyclodextrin
-    M801 = bst.Mixer('M801', ins=(crude_product, 'FormulationBuffer'))
     
     U801 = u.Diafiltration.from_preset(
         'UF', 'U801',
-        ins=(M801-0, 'FinalDFWater'),
+        ins=(crude_product, 'Water11'),
         outs=('ConcentratedFinal', 'FinalPermeate'),
-        TargetProduct_ID=('N-HemoDextrin', 'HemoDextrin'),
-        Salt_ID=('Nicotinamide', 'GammaCyclodextrin', 'Sodium', 'Chloride', 'Ethanol'),
+        TargetProduct_ID=('N-HemoDextrin', 'HemoDextrin','Nicotinamide', 'GammaCyclodextrin'),
+        Salt_ID=('NaCl', 'NaOH', 'Ethanol','K2SO4','MgSO4','FeSO4','(NH4)2SO4','KH2PO4'),
         TargetProduct_Retention=0.99,
         Salt_Retention=0.10,
         concentration_factor=2.0, # Initial guess, controlled by spec
@@ -559,9 +615,11 @@ def create_area_800_final_product(crude_product, product_out):
         heat_only=True
     )
     
+    M802 = bst.MixTank('M802', ins=(H802-0, AntioxidantStream, 'Water12'), outs='PreCooledProduct', tau=0.5)
+
     H803 = bst.HXutility(
         'H803',
-        ins=H802-0,
+        ins=M802-0,
         outs='CooledProduct',
         T=4+273.15,
         cool_only=True
@@ -584,8 +642,11 @@ def create_area_800_final_product(crude_product, product_out):
 # =============================================================================
 def create_area_900_facilities(waste_streams, dehydrated_debris, ProcessWaste, emissions, ash_disposal):
     
+    # Add Supplemental NH3 for WWTP biology (since fermentation effluent is nitrogen-depleted)
+    SupplementalNH3 = bst.Stream('SupplementalNH3', NH3=0.5, units='kg/hr', price=0.25)
+    
     wastewater_treatment_sys = bst.create_wastewater_treatment_system(
-        ins=waste_streams,
+        ins=[*waste_streams, SupplementalNH3],
         outs=('biogas', 'sludge', 'RO_treated_water', ProcessWaste),
         mockup=True,
         area=500,
@@ -613,9 +674,9 @@ def create_area_900_facilities(waste_streams, dehydrated_debris, ProcessWaste, e
     F = bst.main_flowsheet
     makeup_water_streams = (
         F.cooling_tower_makeup_water,
+        F.Water1, F.Water2, F.Water3, F.Water4,
         F.Water5, F.Water6, F.Water7,
-        F.Water8, F.Water9,
-        F.DFBufferWater,
+        F.Water8, F.Water9, F.Water10, F.Water11, F.Water12,
         F.boiler_makeup_water,
     )
     process_water_streams = (
@@ -716,38 +777,234 @@ def check_HemDx_specifications(product_stream):
         return False
     return True
 
-def set_production_rate(sys, target_rate):
+def optimize_NH3_loading(system, verbose=True):
     """
-    Iteratively adjust system capacity to match target production rate.
-    Adjusts: Glucose feed flow (which cascades to others via specs).
+    Optimizes NH3_25wt flow rate (X) and S202 split ratio (Y) to meet fermentation demand
+    ensuring residual NH3 < 1e-4 kmol/hr in both seed and main fermenters.
     """
-    # Find Glucose stream
-    glucose = next(i for i in sys.ins if i.ID == 'Glucose')
-    product = next(i for i in sys.outs if i.ID == 'NHemDx_Product')
+    log = print if verbose else (lambda *args, **kwargs: None)
+    log(f"\n{'='*60}")
+    log("Optimizing NH3 Loading (pH Control Strategy)")
+    log(f"{'='*60}")
     
-    print(f"\nAuto-adjusting production to {target_rate} kg/hr...")
+    u = system.flowsheet.unit
+    s = system.flowsheet.stream
     
-    # Run optimization
-    # Use simple feedback loop for speed/robustness vs heavy solver
-    for i in range(5):
-        sys.simulate()
-        current_rate = product.F_mass
-        error = target_rate - current_rate
-        print(f"  Iter {i+1}: Glucose={glucose.F_mass:.2f}, Product={current_rate:.2f} (Target {target_rate})")
+    # Retrieve units and streams
+    try:
+        S202 = u.S202
+        R301 = u.R301
+        R302 = u.R302
+        NH3_source = s.NH3_25wt
+        Broth = u.R302.outs[1] # Broth
+    except AttributeError as e:
+        log(f"[WARN] Could not find necessary units/streams for optimization: {e}")
+        return
+
+    # Step 1: Supply excess ammonia to determine max demand
+    # Store initial state
+    initial_flow = NH3_source.F_mass
+    initial_split = S202.split[0]
+    
+    # Set excess
+    # Use a safely large value to ensure it's always excess even at scale
+    excess_flow = initial_flow * 20 if initial_flow > 1e-6 else 1000 
+    NH3_source.F_mass = excess_flow
+    S202.split[:] = 0.5 # 50/50 split
+    
+    system.simulate()
+    
+    # Step 2: Calculate Demand
+    # Consumption = In - Out.
+    def get_NH3_consumption(reactor):
+        nh3_in = sum(i.imol['NH3'] for i in reactor.ins)
+        nh3_out = sum(o.imol['NH3'] for o in reactor.outs)
+        return nh3_in - nh3_out
+
+    consumed_R301 = get_NH3_consumption(R301)
+    consumed_R302 = get_NH3_consumption(R302)
+    
+    log(f"  R301 NH3 Consumption: {consumed_R301:.4f} kmol/hr")
+    log(f"  R302 NH3 Consumption: {consumed_R302:.4f} kmol/hr")
+    
+    # Step 3: Back-calculate required Feed
+    # Add a small safety margin (1e-5 kmol/hr) to prevent zero-nitrogen causing WWTP failure
+    # while staying well below the 1e-4 constraint.
+    # REV: Reverted to 0 margin, will handle WWTP nutrient via direct dosing.
+    total_NH3_demand = consumed_R301 + consumed_R302
+    
+    if total_NH3_demand <= 0:
+        log("  [WARN] Zero Ammonia demand detected.")
+        return
+
+    # Calculate required source flow
+    # NH3_25wt composition
+    nh3_mol_frac = NH3_source.imol['NH3'] / NH3_source.F_mol
+    
+    # Scale F_mass based on current NH3 flow
+    current_NH3_flow_mol = NH3_source.imol['NH3']
+    scaling_factor = total_NH3_demand / current_NH3_flow_mol * 1.001
+    new_F_mass = NH3_source.F_mass * scaling_factor
+    
+    # Set Flow Rate 'X'
+    NH3_source.F_mass = new_F_mass
+    
+    # Set Split 'Y'
+    split_seed = consumed_R301 / total_NH3_demand
+    S202.split[:] = split_seed 
+    
+    log(f"  Optimized Total Flow (X): {new_F_mass:.2f} kg/hr")
+    log(f"  Optimized Split Ratio (Y): {split_seed:.4f} (to Seed)")
+    
+    # Step 4: Verify
+    system.simulate()
+    
+    r_NH3_R301 = R301.outs[1].imol['NH3'] # R301Out
+    r_NH3_R302 = R302.outs[1].imol['NH3'] # Broth
+    
+    log(f"  Residual NH3 R301: {r_NH3_R301:.2e} kmol/hr")
+    log(f"  Residual NH3 R302: {r_NH3_R302:.2e} kmol/hr")
+
+def set_production_rate(system, target_production_rate_kg_hr, verbose=True):
+    """
+    Adjust system inputs to achieve target production rate.
+    Uses flexsolve for robust convergence and resets system state between iterations.
+    """
+    import flexsolve as flx
+    import warnings
+    
+    log = print if verbose else (lambda *args, **kwargs: None)
+    
+    # Identify product stream
+    try:
+        product_stream = system.flowsheet.stream.NHemDx_Product
+    except AttributeError:
+        # Fallback to searching outs
+        product_stream = next(s for s in system.outs if 'Product' in s.ID or 'LegHb' in s.ID)
+
+    baseline_flows = {}
+    for stream in system.ins:
+        if stream.F_mass > 0:
+            baseline_flows[stream] = stream.F_mass
+    
+    if not baseline_flows:
+        raise ValueError("No input streams with positive flow rates found")
+    
+    log(f"\n{'='*60}")
+    log(f"Setting Production Rate to {target_production_rate_kg_hr:.2f} kg/hr")
+    log(f"{'='*60}")
+    
+    log("Running initial simulation to establish baseline...")
+    try:
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore")
+            system.simulate()
+    except Exception as e:
+        log(f"  [WARN] Baseline simulation failed: {e}")
+        log("  Proceeding with initialized flow rates as baseline.")
+    
+    initial_production = product_stream.F_mass
+    
+    if initial_production <= 0:
+        raise ValueError("Initial production rate is zero. Cannot scale system.")
+    
+    initial_guess = target_production_rate_kg_hr / initial_production
+    
+    log(f"  Initial production: {initial_production:.2f} kg/hr")
+    log(f"  Target production:  {target_production_rate_kg_hr:.2f} kg/hr")
+    log(f"  Initial scaling guess: {initial_guess:.4f}x")
+    
+    iteration = [0]
+    
+    def objective_function(scaling_factor):
+        iteration[0] += 1
+        try:
+            # Skip explicit stream clearing
+            
+            for stream, baseline_flow in baseline_flows.items():
+                target = baseline_flow * scaling_factor
+                stream.F_mass = target
+                if 'Seed' in stream.ID:
+                     if 'Seed' in stream.available_chemicals and stream.imass['Seed'] > 0:
+                         seed_targets[stream] = stream.imass['Seed']
+                     else:
+                         seed_targets[stream] = target
+            
+            # Optimize NH3 Loading at this scale
+            optimize_NH3_loading(system, verbose=False)
+            
+            system.simulate()
+            achieved_rate = product_stream.F_mass
+            error = achieved_rate - target_production_rate_kg_hr
+            
+            if iteration[0] % 5 == 0 or abs(error) < 1.0:
+                log(f"    Iteration {iteration[0]}: scale={scaling_factor:.4f}x, "
+                    f"production={achieved_rate:.2f} kg/hr, error={error:.4f} kg/hr")
+            return error
+        except Exception as e:
+            log(f"    Iteration {iteration[0]} FAILED at scale={scaling_factor:.4f}x: {e}")
+            return 1e6 if scaling_factor > initial_guess else -1e6
+    
+    try:
+        log(f"\nSolving for optimal scaling factor...")
         
-        if abs(error) < 1.0: 
-            print("  Converged.")
-            break
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore")
+            
+            x0 = max(0.01, initial_guess * 0.1)
+            x1 = max(10.0, initial_guess * 3.0)
+            y0 = objective_function(x0)
+            y1 = objective_function(x1)
+            
+            # Bound expansion logic
+            expand_iter = 0
+            while y0 * y1 > 0 and expand_iter < 8:
+                expand_iter += 1
+                if abs(y1) <= abs(y0):
+                    x0 = max(0.01, x0 / 2.0)
+                    y0 = objective_function(x0)
+                else:
+                    x1 *= 2.0
+                    y1 = objective_function(x1)
+            
+            scaling_factor = flx.IQ_interpolation(
+                f=objective_function, x0=x0, x1=x1, x=initial_guess,
+                xtol=0.001, ytol=0.1, maxiter=50,
+                checkbounds=(y0 * y1 <= 0), checkiter=True,
+            )
         
-        # Correction factor (dampened)
-        factor = target_rate / current_rate if current_rate > 0 else 1.1
-        # Limit jump to 2x or 0.5x to avoid instability
-        factor = max(0.5, min(2.0, factor))
-        glucose.F_mass *= factor
+        log(f"\nSolver converged. Running final validation simulation...")
         
-    final_rate = product.F_mass
-    print(f"Set Glucose flow to {glucose.F_mass:.2f} kg/hr -> Product: {final_rate:.2f} kg/hr")
-    return final_rate
+        # Skip clearing streams
+
+        for stream, baseline_flow in baseline_flows.items():
+            target = baseline_flow * scaling_factor
+            stream.F_mass = target
+            if 'Seed' in stream.ID:
+                 if 'Seed' in stream.available_chemicals and stream.imass['Seed'] > 0:
+                     seed_targets[stream] = stream.imass['Seed']
+                 else:
+                     seed_targets[stream] = target
+        
+        # Optimize NH3 Loading for final verification
+        optimize_NH3_loading(system, verbose=False)
+        
+        system.simulate()
+        achieved_rate = product_stream.F_mass
+        
+        log(f"\n[OK] Successfully achieved production rate:")
+        log(f"  Target:          {target_production_rate_kg_hr:.2f} kg/hr")
+        log(f"  Achieved:        {achieved_rate:.2f} kg/hr")
+        log(f"  Scaling factor:  {scaling_factor:.4f}x")
+        
+        return achieved_rate
+        
+    except Exception as e:
+        log(f"\n[FAIL] Failed to achieve target production rate: {e}")
+        # Restore baseline
+        for stream, baseline_flow in baseline_flows.items():
+            stream.F_mass = baseline_flow
+        return initial_production
 
 # =============================================================================
 # SYSTEM FACTORY
@@ -756,8 +1013,8 @@ def set_production_rate(sys, target_rate):
     ID='NHemDx_sys',
     ins=[
         s.SeedIn1, s.SeedIn2, s.CultureIn, s.Glucose, s.NH3_25wt,
-        s.NaCl_wash, s.NaOH_elute, s.Ethanol_regen, s.DFBufferSolute,
-        s.GammaCyclodextrinFeed, s.NicotinamideFeed,
+        s.NaCl_wash, s.NaOH_elute, s.Ethanol_regen, s.DfUltraBuffer1, s.DfUltraBuffer2,
+        s.GammaCyclodextrinFeed, s.NicotinamideFeed, s.AntioxidantStream
     ],
     outs=[
         s.vent1, s.vent2,
@@ -771,8 +1028,8 @@ def set_production_rate(sys, target_rate):
 def create_NHemDx_system(ins, outs, use_area_convention=False):
     bst.preferences.N = 50
     (SeedIn1, SeedIn2, CultureIn, Glucose, NH3_25wt,
-     NaCl_wash, NaOH_elute, Ethanol_regen, DFBufferSolute,
-     GammaCyclodextrinFeed, NicotinamideFeed) = ins
+     NaCl_wash, NaOH_elute, Ethanol_regen, DfUltraBuffer1, DfUltraBuffer2,
+     GammaCyclodextrinFeed, NicotinamideFeed, AntioxidantStream) = ins
     (vent1, vent2, NHemDx_Product, ProcessWaste, emissions, ash_disposal) = outs
 
     bst.settings.set_thermo(HEMDX_THERMO, skip_checks=True)
@@ -781,22 +1038,24 @@ def create_NHemDx_system(ins, outs, use_area_convention=False):
     # Set GWP characterization factors
     # Knowns from LegHb/Process Settings
     set_GWPCF(Glucose, 'Glucose')
-    set_GWPCF(NH3_25wt, 'Ammonia_US') # Assume US for now
+    set_GWPCF(NH3_25wt, 'Ammonia_SEA', dilution=0.25)
     set_GWPCF(NaCl_wash, 'NaCl')
     set_GWPCF(NaOH_elute, 'NaOH')
     set_GWPCF(ash_disposal, 'ash_disposal')
+    set_GWPCF(Ethanol_regen, 'Ethanol')
+    set_GWPCF(GammaCyclodextrinFeed, 'GammaCyclodextrin')
+    set_GWPCF(NicotinamideFeed, 'Nicotinamide')
+    set_GWPCF(AntioxidantStream, 'AscorbicAcid', dilution=0.1)
+    set_GWPCF_Multi(SeedIn1, ['AmmoniumSulfate', 'Glucose', 'MagnesiumSulfate', 'KH2PO4'],
+                   [0.5/(0.5+1+0.05+0.3), 1/(0.5+1+0.05+0.3), 0.05/(0.5+1+0.05+0.3), 0.3/(0.5+1+0.05+0.3)])
+    set_GWPCF_Multi(SeedIn2, ['AmmoniumSulfate', 'Glucose', 'MagnesiumSulfate', 'KH2PO4'],
+                   [0.5/(0.5+1+0.05+0.3), 1/(0.5+1+0.05+0.3), 0.05/(0.5+1+0.05+0.3), 0.3/(0.5+1+0.05+0.3)])
+    set_GWPCF_Multi(CultureIn, ['Glycine', 'Glucose', 'IronSulfate'],
+                   [0.1/(0.1+60+0.15191), 60/(0.1+60+0.15191), 0.15191/(0.1+60+0.15191)])
+    set_GWPCF_Multi(DfUltraBuffer1, ['KH2PO4', 'NaCl'], [0.8472, 0.1455])
+    set_GWPCF_Multi(DfUltraBuffer2, ['KH2PO4', 'NaCl'], [0.8472, 0.1455])
     
-    # Placeholder for unknowns (0.5 as requested)
-    # Ethanol, DFBuffer, Cyclodextrin, Nicotinamide
-    for s_unknown in [Ethanol_regen, DFBufferSolute, GammaCyclodextrinFeed, NicotinamideFeed]:
-        s_unknown.characterization_factors['GWP'] = 0.5 # assumed temporarily
-        
-    # Complex feeds (Seed/Culture) - similar to LegHb but simplified/placeholder if composition varies
-    # Or use set_GWPCF_Multi if we know composition. 
-    # For now, default to placeholder or simple estimate
-    SeedIn1.characterization_factors['GWP'] = 0.5 # assumed temporarily
-    SeedIn2.characterization_factors['GWP'] = 0.5 # assumed temporarily
-    CultureIn.characterization_factors['GWP'] = 0.5 # assumed temporarily
+
 
     # Create Reactions
     params = get_fermentation_parameters()
@@ -808,44 +1067,51 @@ def create_NHemDx_system(ins, outs, use_area_convention=False):
     # Area 300
     broth = create_area_300_conversion(A200['M203_out'], A200['T201_out'], A200['T202_out'], vent1, vent2, rxns, params)
     
-    # Area 400
-    A400 = create_area_400_recovery(broth)
+    # Area 400: Recovery
+    area_400 = create_area_400_recovery(broth, DfUltraBuffer2)
     
-    # Area 500
-    A500 = create_area_500_purification(A400['CombinedLysate'], NaCl_wash, NaOH_elute, Ethanol_regen)
+    # Area 500: Purification
+    area_500 = create_area_500_purification(
+        lysate_in=area_400['CombinedLysate'],
+        NaCl_wash=NaCl_wash,
+        NaOH_elute=NaOH_elute,
+        Ethanol_regen=Ethanol_regen,
+    )
     
-    # Area 600
-    A600 = create_area_600_concentration(A500['ResinEluate'], DFBufferSolute)
+    # Area 600: Concentration
+    area_600 = create_area_600_concentration(area_500['ResinEluate'], DfUltraBuffer1)
     
-    # Area 700
-    crude_product = create_area_700_formulation(A600['HemeConcentrate'], GammaCyclodextrinFeed, NicotinamideFeed)
+    # Area 700: Formulation
+    area_700 = create_area_700_formulation(area_600['HemeConcentrate'], GammaCyclodextrinFeed, NicotinamideFeed)
     
-    # Area 800
-    # Area 800
-    A800 = create_area_800_final_product(crude_product, NHemDx_Product)
+    # Area 800: Final Product
+    area_800 = create_area_800_final_product(area_700, NHemDx_Product, AntioxidantStream)
     
-    # Area 900
-    waste_streams = [
-        A500['ResinFlowthrough'],
-        A500['ResinRegenWaste'],
-        A500['ResinWash'],
-        A600['NFPermeate'],
-        A400['WashEffluent'],
-        A400['PressLiquor'],
-        A800['FinalPermeate'], # New waste stream
-    ]
-    
+    # Area 900: Facilities
     create_area_900_facilities(
-        waste_streams,
-        A400['DehydratedDebris'],
-        ProcessWaste,
-        emissions,
-        ash_disposal
+        waste_streams=(
+            # area_300 is just a stream
+            area_400['PressLiquor'], area_400['WashEffluent'],
+            area_500['ResinFlowthrough'], area_500['ResinRegenWaste'], area_500['ResinWash'],
+            area_600['NFPermeate'],
+            area_800['FinalPermeate'],
+        ),
+        dehydrated_debris=area_400['DehydratedDebris'],
+        ProcessWaste=ProcessWaste,
+        emissions=emissions,
+        ash_disposal=ash_disposal
+    )
+    
+    # Update input stream prices
+    s.update_all_input_stream_prices(
+        streamlist=[SeedIn1, SeedIn2, CultureIn, Glucose, NH3_25wt, DfUltraBuffer1, DfUltraBuffer2, GammaCyclodextrinFeed, NicotinamideFeed, AntioxidantStream]
     )
 
+    return NHemDx_Product, vent1, vent2, ProcessWaste, emissions, ash_disposal, DfUltraBuffer1, DfUltraBuffer2, AntioxidantStream
+    
 if __name__ == '__main__':
     bst.preferences.N = 50
-    TARGET_PRODUCTION = 275  # kg/hr
+    TARGET_PRODUCTION = 150  # kg/hr
     
     print("="*85)
     print("N-HemDx FULL PRODUCTION SYSTEM - Upstream + DSP Integration")
@@ -855,26 +1121,35 @@ if __name__ == '__main__':
     NHemDx_sys = create_NHemDx_system()
     sys = NHemDx_sys
     sys.operating_hours = 8000
+    f = sys.flowsheet
+    u = f.unit
+    ss = f.stream
     
-    print("\n2. Setting production rate...")
+    print("\n2. Running baseline simulation...")
+    try:
+        sys.simulate()
+        baseline_production = ss.NHemDx_Product.F_mass
+        print(f"   Baseline production rate: {baseline_production:.2f} kg/hr")
+    except Exception as e:
+        print(f"   Baseline simulation failed: {e}")
+        raise    
+    
+    print("\n3. Setting production rate...")
     try:
         set_production_rate(sys, TARGET_PRODUCTION)
     except Exception as e:
         print(f"   Production rate setting error: {e}")
 
-    print(f"\n3. System Summary")
+    print(f"\n4. System Summary")
     print("="*85)
     sys.show()    
     
-    print("\n" + "="*85)
-    print("SIMULATION COMPLETE")
-    print("="*85)
+    print("\n5. Product Analysis:")
+    product = ss.NHemDx_Product
     
-    sys.diagram(format='html')
-    
-    print("\n4. Product Analysis:")
-    product = sys.flowsheet.stream.NHemDx_Product
-    
+    print(f"\n6. Generating system diagram...")
+    sys.diagram(format='html', display=True)
+
     # Run QA Compliance Check
     check_HemDx_specifications(product)
 
@@ -897,7 +1172,7 @@ if __name__ == '__main__':
     print(f"  Yield (Heme eq):     {heme_equiv_mass:.4f} kg/hr")
     print(f"{'='*85}\n")
     
-    print(f"\n5. Performing LCA analysis...")
+    print(f"\n6. Performing LCA analysis...")
     try:
         r1 = bst.report.lca_inventory_table(
             systems=[sys],
@@ -918,5 +1193,8 @@ if __name__ == '__main__':
 
     print(f"\n{'='*85}")
     print("SIMULATION COMPLETE")
+    print(f"Target Production:   {TARGET_PRODUCTION:.2f} kg/hr")
+    print(f"Achieved Production: {ss.NHemDx_Product.F_mass:.2f} kg/hr")
     print(f"{'='*85}\n")
-
+    u.R301.show()
+    u.R302.show()

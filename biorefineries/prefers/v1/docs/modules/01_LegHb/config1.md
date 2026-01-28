@@ -45,6 +45,7 @@ Purpose: Prepare all feed solutions for fermentation.
 | M204    | MixTank            | Glucose solution preparation (50% dilution)              |
 | T201    | StorageTank        | Glucose storage tank (96 hours residence)                |
 | T202    | AmmoniaStorageTank | Ammonia storage tank (25 wt% aqueous ammonia)            |
+| S202    | Splitter           | Splits Ammonia between seed train and main fermenter     |
 
 ### Outputs
 
@@ -84,6 +85,11 @@ Purpose: Convert glucose to LegHb through microbial fermentation.
 
 ### Control Specifications
 
+- **Ammonia Optimization (`optimize_NH3_loading`):**
+  - Calculates exact NH3 demand for R301 (Biomass growth) and R302 (Production).
+  - Optimizes `NH3_25wt` flow rate and `S202` split ratio to match demand.
+  - **Constraint:** Residual ammonia in broth < 1e-4 kmol/hr (negligible).
+
 - **R302 Specification (`update_reaction_time_and_yield`):**
   - Calculates residence time (`tau`): `target_titer / target_productivity`
   - Updates reaction product yield based on `target_yield`
@@ -98,7 +104,7 @@ Purpose: Convert glucose to LegHb through microbial fermentation.
 
 ## Area 400: Recovery (Biomass Harvest & Cell Disruption)
 
-**Function:** `create_area_400_recovery(broth_in, DfUltraBuffer_wash)`
+**Function:** `create_area_400_recovery(broth_in, DfUltraBuffer2)`
 
 Purpose: Release and clarify intracellular LegHb from yeast cells.
 
@@ -107,7 +113,7 @@ Purpose: Release and clarify intracellular LegHb from yeast cells.
 | Unit ID | Type             | Description                                                 |
 | ------- | ---------------- | ----------------------------------------------------------- |
 | C401    | SolidsCentrifuge | Disk stack centrifuge densifying biomass to ~45% dry solids |
-| M401    | MixTank          | Wash buffer preparation (1.5 diavolumes)                    |
+| M401    | MixTank          | Wash buffer preparation (DfUltraBuffer2 + Water4)           |
 | H402    | HXutility        | Cool wash buffer to 10°C                                    |
 | M402    | MixTank          | Cell wash mixer                                             |
 | C402    | SolidsCentrifuge | Washed cell separation                                      |
@@ -150,18 +156,18 @@ Purpose: Release and clarify intracellular LegHb from yeast cells.
 
 ## Area 500: Purification (UF/DF Membrane Separation)
 
-**Function:** `create_area_500_purification(clarified_lysate, DfUltraBuffer)`
+**Function:** `create_area_500_purification(clarified_lysate, DfUltraBuffer1)`
 
 Purpose: Concentrate LegHb and remove impurities using tangential flow filtration.
 
 ### Unit Operations
 
-| Unit ID | Type                      | Description                          |
-| ------- | ------------------------- | ------------------------------------ |
-| M501    | MixTank                   | DF buffer preparation (6 diavolumes) |
-| H501    | HXutility                 | Cool DF buffer to 5°C                |
-| U501    | Diafiltration (UF preset) | TFF with 3-10 kDa MWCO membrane      |
-| U502    | Diafiltration             | Final concentration step             |
+| Unit ID | Type                      | Description                                     |
+| ------- | ------------------------- | ----------------------------------------------- |
+| M501    | MixTank                   | DF buffer preparation (DfUltraBuffer1 + Water5) |
+| H501    | HXutility                 | Cool DF buffer to 5°C                           |
+| U501    | Diafiltration (UF preset) | TFF with 3-10 kDa MWCO membrane                 |
+| U502    | Diafiltration             | Final concentration step                        |
 
 ### Process Parameters
 
@@ -287,7 +293,7 @@ Factory function creating the complete production system using modular Process A
 ```python
 set_production_rate(system, target_production_rate_kg_hr, verbose=True)
 ```
-Adjusts system inputs to achieve target LegHb_3 production rate using global scaling factor with flexsolve IQ_interpolation.
+Adjusts system inputs to achieve target LegHb_3 production rate using global scaling factor with flexsolve IQ_interpolation. Iteratively calls `optimize_NH3_loading` to ensure feasible nitrogen balance at every scale.
 
 ```python
 check_LegHb_specifications(product_stream)
@@ -311,6 +317,7 @@ For comparison with Heme-rich products (e.g. HemDx), the system reports:
 
 | Date       | Version | Description                                                            |
 | ---------- | ------- | ---------------------------------------------------------------------- |
+| 2026-01-28 | 2.3     | Added Ammonia optimization (Splitter S202 + pH control logic)          |
 | 2026-01-23 | 2.2     | Replaced direct RO with BioSTEAM wastewater treatment system           |
 | 2026-01-23 | 2.1     | Unit renaming: Area 500 (M501,H501,U501,U502), Area 900 (M901,S901,BT) |
 | 2026-01-21 | 2.0     | Modular refactoring into Process Areas                                 |

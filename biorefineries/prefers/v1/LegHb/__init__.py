@@ -18,7 +18,7 @@ Modules:
 from ._chemicals import create_chemicals_LegHb, chemical_groups
 from .system import create_LegHb_system, set_production_rate, check_LegHb_specifications
 from ._streams import *
-from ._tea import PreFerSTEA
+from ._tea_config1 import PreFerSTEA
 
 __all__ = (
     'create_chemicals_LegHb',

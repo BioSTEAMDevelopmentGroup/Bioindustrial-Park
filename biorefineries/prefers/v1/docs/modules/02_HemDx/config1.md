@@ -31,6 +31,7 @@ Complete production system for **N-HemDx** using *Corynebacterium glutamicum*, i
 ### Area 200: Media Preparation
 - M201-M204: Seed and glucose solution mixing
 - T201-T202: Storage tanks (glucose, ammonia)
+  - **S202**: Ammonia Splitter (Seed/Fermentation split control)
 - R301: Seed train
 
 ### Area 300: Conversion (Fermentation)
@@ -39,12 +40,13 @@ Complete production system for **N-HemDx** using *Corynebacterium glutamicum*, i
   - Operating Temp: 30°C
   - DO Setpoint: 45%
   - Secretion Fraction (SF): 45% extracellular
+  - **Ammonia Optimization**: Exact stoichiometric loading for < 1e-4 kmol/hr residual NH3.
 
 ### Area 400: Clarification & Cell Disruption (Split-Stream)
 - **S401**: Primary Centrifuge → Supernatant + CellCream
 - **S404**: Microfiltration (MF preset) → FilteredSupernatant
 - **Cell Cream Processing (LegHb sequence)**
-  - **M401**: Wash buffer preparation
+  - **M401**: Wash buffer preparation (DfUltraBuffer2 + Water4)
   - **H402**: Cool wash buffer to 10°C
   - **M402**: Cell wash mixer
   - **C402**: Washed cell centrifuge
@@ -79,7 +81,7 @@ Single ResinColumn (Adsorption preset) treating the combined stream:
 - **U601**: Diafiltration (NF preset)
   - Heme retention: 98%
   - Concentration factor: 5×
-- **M601**: DF buffer preparation (DfUltraBuffer solute + water)
+- **M601**: DF buffer preparation (DfUltraBuffer1 + Water8)
 
 ### Area 700: Formulation
 Creates the final N-HemoDextrin complex:
@@ -100,13 +102,16 @@ Dosing:
 - Nicotinamide: 2× molar with 2.5% excess
 
 ### Area 800: Final Product
-- **H801**: Cold storage conditioning (4°C)
+- **M802**: Formulation MixTank (Antioxidant + Water12)
+- **H803**: Final cooling (4°C)
+- **T801**: Storage Tank
 - Output: NHemDx_Product
 
 ### Area 900: Wastewater Treatment & Facilities (LegHb Pattern)
 
 **Wastewater Treatment System** (`bst.create_wastewater_treatment_system`):
 - Collects: ResinFlowthrough, ResinWash, ResinRegen, NFPermeate, WashEffluent, PressLiquor
+- **Supplemental Nutrient**: `SupplementalNH3` (0.5 kg/hr) added to sustain biology (required due to N-depleted process effluent).
 - Outputs: biogas, sludge, RO_treated_water, ProcessWaste
 - `mockup=True`, `area=500`
 
@@ -136,6 +141,21 @@ Dosing:
 - `_chemicals.py`: Chemical definitions including HemDx formulation chemicals (with Glucose model copying for WWT compatibility)
 - `_streams.py`: Input stream definitions
 
+### System Creation
+
+```python
+create_NHemDx_system(ins, outs)
+```
+Factory function creating the complete production system.
+
+### Design Specifications
+
+```python
+set_production_rate(system, target_production_rate_kg_hr, verbose=True)
+```
+Adjusts system inputs to achieve target production rate. Incorporates `optimize_NH3_loading` within the scaling loop to ensure ammonia limitation does not constrain production or cause design failures.
+
 ## Last Updated
 2026-01-26 - Upgraded ResinColumn impurity distribution, added ScrewPress, full WWT system with CT/CWP/PWC
 2026-01-26 - Integrated LCA (GWP) tracking and reporting (Inventory & Displacement tables)
+2026-01-28 - Added Ammonia optimization with Supplemental NH3 for WWTP stability

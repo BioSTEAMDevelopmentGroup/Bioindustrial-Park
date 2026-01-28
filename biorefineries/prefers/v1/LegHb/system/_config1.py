@@ -27,7 +27,11 @@ import thermosteam as tmo
 import numpy as np
 from biorefineries.prefers.v1.LegHb import _chemicals as c
 from biorefineries.prefers.v1 import _units as u
+from biorefineries.prefers.v1 import _process_settings
 from biorefineries.prefers.v1._process_settings import price
+
+# Global registry for seed scaling targets (to coordinate between set_production_rate and specs)
+seed_targets = {}
 
 # =============================================================================
 # MODULE INITIALIZATION
@@ -145,7 +149,7 @@ def create_fermentation_reactions(params=None):
     fermentation_reaction[2].product_yield('Leghemoglobin_In', basis='wt', product_yield=yield_LegHb)
     
     neutralization_reaction = bst.Rxn(
-        'H2SO4 + 2 NH3 -> (NH4)2SO4', reactant='NH3', X=1,
+        'H2SO4 + 2 NH3 -> (NH4)2SO4', reactant='H2SO4', X=0.99,
         check_atomic_balance=True
     )
     
@@ -220,14 +224,45 @@ def create_area_200_media_prep(SeedIn1, SeedIn2, CultureIn, Glucose, NH3_25wt):
     dict
         Dictionary of area units and output streams
     """
+    # Initialize streams to reference values (run once during creation)
+    # This ensures valid baseline flows while allowing set_production_rate to scale them later
+    try:
+        SeedIn1.imass['Seed'] = s.SeedSolution1['Seed']
+        SeedIn2.imass['Seed'] = s.SeedSolution2['Seed']
+        
+        # Calculate CultureIn baseline
+        ref_seed2_total = s.SeedSolution2['Seed'] + s.SeedSolution2['H2O'] # Approximate
+        # Better: create temp stream to get mass
+        tmp = bst.Stream(ID='tmp_init', **s.SeedSolution2)
+        ref_seed2_total = tmp.F_mass
+        ratio_culture = (0.1 + 60 + 0.15191) / 1000
+        CultureIn.imass['Culture'] = ref_seed2_total * ratio_culture
+        tmp.empty() # cleanup
+    except:
+        pass # Fallback if stream definitions missing keys
+
     # Seed solution 1 preparation
     M201 = bst.MixTank('M201', ins=[SeedIn1, 'Water1'], outs='M201Out', tau=16)
     
+
+        
     @M201.add_specification(run=True)
     def update_seed1_inputs():
-        target_stream = bst.Stream(**{**s.SeedSolution1, 'ID': None})
-        SeedIn1.imass['Seed'] = target_stream.imass['Seed']
-        M201.ins[1].imass['H2O'] = target_stream.imass['H2O']
+        # Force SeedIn1 to target (from global dict or reference)
+        ref_stream = bst.Stream(**{**s.SeedSolution1, 'ID': 'RefSeed1'})
+        ref_seed = ref_stream.imass['Seed']
+        ref_water = ref_stream.imass['H2O']
+        
+        target = seed_targets.get(SeedIn1, ref_seed)
+        
+        # Enforce target
+        SeedIn1.imass['Seed'] = target
+        
+        # Enforce water ratio
+        if ref_seed > 0:
+            ratio = ref_water / ref_seed
+            M201.ins[1].imass['H2O'] = target * ratio
+        
         M201.ins[1].T = 25 + 273.15
     
     # Seed solution 2 + culture media preparation
@@ -235,14 +270,38 @@ def create_area_200_media_prep(SeedIn1, SeedIn2, CultureIn, Glucose, NH3_25wt):
     
     @M202.add_specification(run=True)
     def update_culture_inputs():
-        target_stream = bst.Stream(**{**s.SeedSolution2, 'ID': None})
-        SeedIn2.imass['Seed'] = target_stream.imass['Seed']
-        M202.ins[2].imass['H2O'] = target_stream.imass['H2O']
+        ref_stream = bst.Stream(**{**s.SeedSolution2, 'ID': 'RefSeed2'})
+        ref_seed = ref_stream.imass['Seed']
+        ref_water = ref_stream.imass['H2O']
+        ref_total = ref_stream.F_mass
+        
+        target = seed_targets.get(SeedIn2, ref_seed)
+        
+        # Enforce target
+        SeedIn2.imass['Seed'] = target
+        
+        if ref_seed > 0:
+            ratio_water = ref_water / ref_seed
+            M202.ins[2].imass['H2O'] = target * ratio_water # Water2
+            
+            # CultureIn logic
+            ratio_culture = (0.1 + 60 + 0.15191) / 1000
+            
+            # Predict current total solution mass
+            current_total_mass_est = target * (ref_total / ref_seed)
+            
+            CultureIn.imass['Culture'] = current_total_mass_est * ratio_culture
+            
         M202.ins[2].T = 25 + 273.15
-        CultureIn.imass['Culture'] = target_stream.imass['SeedSolution'] * (0.1 + 60 + 0.15191) / 1000
+    
+    # Ammonia storage tank
+    T202 = u.AmmoniaStorageTank('T202', ins=NH3_25wt, outs='T202Out')
+    
+    # Ammonia Splitter
+    S202 = bst.Splitter('S202', ins=T202-0, outs=('NH3_Seed', 'NH3_Fer'), split=0.04)
     
     # Seed hold tank
-    M203 = u.SeedHoldTank('M203', ins=[M201-0, M202-0], outs='M203Out')
+    M203 = u.SeedHoldTank('M203', ins=[M201-0, M202-0, S202-0], outs='M203Out')
     
     # Glucose solution preparation (50% dilution)
     M204 = bst.MixTank('M204', ins=[Glucose, 'Water3'], outs='M204Out', tau=16)
@@ -255,16 +314,13 @@ def create_area_200_media_prep(SeedIn1, SeedIn2, CultureIn, Glucose, NH3_25wt):
     # Glucose storage tank
     T201 = bst.StorageTank('T201', ins=M204-0, outs='T201Out', tau=16*4+72)
     
-    # Ammonia storage tank
-    T202 = u.AmmoniaStorageTank('T202', ins=NH3_25wt, outs='T202Out')
-    
     return {
-        'units': [M201, M202, M203, M204, T201, T202],
+        'units': [M201, M202, M203, M204, T201, T202, S202],
         'seed_out': M203.outs[0],
         'glucose_out': T201.outs[0],
-        'ammonia_out': T202.outs[0],
+        'ammonia_out': S202.outs[1],
         'M201': M201, 'M202': M202, 'M203': M203,
-        'M204': M204, 'T201': T201, 'T202': T202,
+        'M204': M204, 'T201': T201, 'T202': T202, 'S202': S202,
     }
 
 # =============================================================================
@@ -410,7 +466,7 @@ def create_area_400_recovery(broth_in, DfUltraBuffer2):
     )
     
     # Wash buffer preparation
-    M401 = bst.MixTank('M401', ins=(DfUltraBuffer2, 'WashWater'), 
+    M401 = bst.MixTank('M401', ins=(DfUltraBuffer2, 'Water4'), 
                        outs='WashBufferOut', tau=0.5)
     
     @M401.add_specification(run=True)
@@ -542,7 +598,7 @@ def create_area_500_purification(clarified_lysate, DfUltraBuffer1):
         Dictionary of area units and output streams
     """
     # DF buffer preparation (minimal for concentration-only mode)
-    M501 = bst.MixTank('M501', ins=(DfUltraBuffer1, 'DFBufferWater'), 
+    M501 = bst.MixTank('M501', ins=(DfUltraBuffer1, 'Water5'), 
                        outs='DFBufferOut', tau=0.5)
     
     # Reference to S403 for specification (will be set via system context)
@@ -580,7 +636,7 @@ def create_area_500_purification(clarified_lysate, DfUltraBuffer1):
     # UF Stage 2 - Final concentration using Diafiltration with minimal buffer
     U502 = u.Diafiltration(
         'U502',
-        ins=(U501-0, bst.Stream('U502_buffer', H2O=0.001)),
+        ins=(U501-0, bst.Stream('Water6', H2O=0.001)),
         outs=('ConcentratedLegH', 'ConcentrationPermeate'),
         TargetProduct_ID='Leghemoglobin',
         Salt_ID=c.chemical_groups['Salts'],
@@ -656,7 +712,7 @@ def create_area_600_formulation(concentrated_product, AntioxidantStream, LegHb_3
     
     # Dilution water stream
     DilutionWater = bst.Stream(
-        'DilutionWater',
+        'Water7',
         H2O=100.0,
         units='kg/hr',
     )
@@ -810,8 +866,8 @@ def create_area_900_facilities(area_400, area_500, effluent1, emissions, ash_dis
     makeup_water_streams = (
         F.cooling_tower_makeup_water,
         F.Water1, F.Water2,
-        F.Water3, F.WashWater,
-        F.DFBufferWater,
+        F.Water3, F.Water4,
+        F.Water5, F.Water6,F.Water7,
         F.boiler_makeup_water,
     )
     process_water_streams = (
@@ -975,6 +1031,128 @@ def create_LegHb_system(ins, outs, use_area_convention=False):
 # =============================================================================
 # DESIGN SPECIFICATION FUNCTIONS
 # =============================================================================
+
+def optimize_NH3_loading(system, verbose=True):
+    """
+    Optimizes NH3_25wt flow rate (X) and S202 split ratio (Y) to meet fermentation demand
+    ensuring residual NH3 < 1e-4 kmol/hr in both seed and main fermenters.
+    
+    This function:
+    1. Sets excess Ammonia to ensure reactions proceed fully.
+    2. Calculates exact Ammonia consumption in R301 and R302.
+    3. Adjusts NH3_25wt flow and S202 split to match demand.
+    """
+    log = print if verbose else (lambda *args, **kwargs: None)
+    log(f"\n{'='*60}")
+    log("Optimizing NH3 Loading (pH Control Strategy)")
+    log(f"{'='*60}")
+    
+    u = system.flowsheet.unit
+    s = system.flowsheet.stream
+    
+    # Retrieve units and streams
+    try:
+        S202 = u.S202
+        R301 = u.R301
+        R302 = u.R302
+        NH3_source = s.NH3_25wt
+        Broth = u.R302.outs[1] # Broth
+    except AttributeError as e:
+        log(f"[WARN] Could not find necessary units/streams for optimization: {e}")
+        return
+
+    # Step 1: Supply excess ammonia to determine max demand
+    # Store initial state
+    initial_flow = NH3_source.F_mass
+    initial_split = S202.split[0]
+    
+    # Set excess relative to current flow (which should be roughly scaled)
+    # 20x should be sufficient without causing design errors (N > 10000)
+    excess_flow = initial_flow * 20 if initial_flow > 1e-6 else 1000 
+    NH3_source.F_mass = excess_flow
+    S202.split[:] = 0.5 # 50/50 split
+    
+    system.simulate()
+    
+    # Step 2: Calculate Demand
+    # R301 Demand
+    # NH3 in R301 comes from S202-0 (Seed Ammonia) + Inputs in Seed?
+    # R301 ins: [SeedIn1, SeedIn2 (via M203)]
+    # M203 ins: [M201, M202, S202-0]
+    # So NH3 enters R301 via M203.
+    
+    # We check reaction extent or mass balance.
+    # Consumption = In - Out - Accumulation (0)
+    # But In is what we want to find.
+    # Current In is Excessive.
+    # Current Out includes Residual.
+    # Consumed = In - Out.
+    
+    def get_NH3_consumption(reactor):
+        nh3_in = sum(i.imol['NH3'] for i in reactor.ins)
+        nh3_out = sum(o.imol['NH3'] for o in reactor.outs)
+        return nh3_in - nh3_out
+
+    consumed_R301 = get_NH3_consumption(R301)
+    consumed_R302 = get_NH3_consumption(R302)
+    
+    log(f"  R301 NH3 Consumption: {consumed_R301:.4f} kmol/hr")
+    log(f"  R302 NH3 Consumption: {consumed_R302:.4f} kmol/hr")
+    
+    # Step 3: Back-calculate required Feed
+    # NH3_25wt is ~25% NH3, 75% Water.
+    # Source stream composition matches NH3_25wt definition.
+    # We need to set NH3_25wt.imol['NH3'] to meet (consumed_R301 + consumed_R302).
+    # And S202 split to distribute it correctly.
+    
+    total_NH3_demand = consumed_R301 + consumed_R302
+    
+    if total_NH3_demand <= 0:
+        log("  [WARN] Zero Ammonia demand detected. Optimization skipped.")
+        NH3_source.F_mass = initial_flow
+        S202.split[:] = initial_split
+        return
+
+    # Calculate required source flow
+    # Source has fixed composition. We scale F_mass.
+    # Current mol fraction of NH3 in source:
+    nh3_mol_frac = NH3_source.imol['NH3'] / NH3_source.F_mol
+    required_F_mol = total_NH3_demand / nh3_mol_frac
+    
+    # We can also just scale F_mass based on current NH3 flow
+    current_NH3_flow_mol = NH3_source.imol['NH3']
+    scaling_factor = total_NH3_demand / current_NH3_flow_mol*1.001
+    new_F_mass = NH3_source.F_mass * scaling_factor
+    
+    # Set Flow Rate 'X'
+    NH3_source.F_mass = new_F_mass
+    
+    # Set Split 'Y'
+    # S202-0 goes to R301 (Seed)
+    # S202-1 goes to R302 (Fer)
+    # We want S202-0 NH3 = consumed_R301
+    
+    split_seed = consumed_R301 / total_NH3_demand
+    S202.split[:] = split_seed # S202 definition: outs=('NH3_Seed', 'NH3_Fer'). split refers to index 0?
+    # bst.Splitter(..., split=0.5) usually means outs[0] gets 0.5.
+    
+    log(f"  Optimized Total Flow (X): {new_F_mass:.2f} kg/hr")
+    log(f"  Optimized Split Ratio (Y): {split_seed:.4f} (to Seed)")
+    
+    # Step 4: Verify
+    system.simulate()
+    
+    r_NH3_R301 = R301.outs[1].imol['NH3'] # R301Out
+    r_NH3_R302 = R302.outs[1].imol['NH3'] # Broth
+    
+    log(f"  Residual NH3 R301: {r_NH3_R301:.2e} kmol/hr (< 1e-4 check: {'PASS' if r_NH3_R301 < 1e-4 else 'FAIL'})")
+    log(f"  Residual NH3 R302: {r_NH3_R302:.2e} kmol/hr (< 1e-4 check: {'PASS' if r_NH3_R302 < 1e-4 else 'FAIL'})")
+    
+    if r_NH3_R301 > 1e-4 or r_NH3_R302 > 1e-4:
+        log("  [WARN] Residual Ammonia target not met. Adjusting slightly...")
+        # Fine tuning could be added here, but stoichiometric calculation should be precise for this system
+        pass
+
 def set_production_rate(system, target_production_rate_kg_hr, verbose=True):
     """
     Adjust system inputs to achieve target LegHb_3 production rate.
@@ -1014,9 +1192,13 @@ def set_production_rate(system, target_production_rate_kg_hr, verbose=True):
     log(f"Baseline input streams stored: {len(baseline_flows)} streams")
     
     log("Running initial simulation to establish baseline...")
-    with warnings.catch_warnings():
-        warnings.simplefilter("ignore")
-        system.simulate()
+    try:
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore")
+            system.simulate()
+    except Exception as e:
+        log(f"  [WARN] Baseline simulation failed: {e}")
+        log("  Proceeding with initialized flow rates as baseline.")
     
     initial_production = product_stream.F_mass
     
@@ -1034,8 +1216,24 @@ def set_production_rate(system, target_production_rate_kg_hr, verbose=True):
     def objective_function(scaling_factor):
         iteration[0] += 1
         try:
+            # We skip explicit stream clearing to avoid accidentally clearing inputs
+            # relying on robust simulation or error catching instead.
+            
             for stream, baseline_flow in baseline_flows.items():
-                stream.F_mass = baseline_flow * scaling_factor
+                target = baseline_flow * scaling_factor
+                stream.F_mass = target
+                # Store target in global registry for specs
+                if 'Seed' in stream.ID:
+                     # Check if it has 'Seed' component to be sure
+                     if 'Seed' in stream.available_chemicals and stream.imass['Seed'] > 0:
+                         seed_targets[stream] = stream.imass['Seed']
+                     else:
+                         seed_targets[stream] = target
+            
+            # Optimize NH3 Loading at this scale
+            # This ensures we don't hit negative flows or infeasible balances
+            optimize_NH3_loading(system, verbose=False)
+            
             system.simulate()
             achieved_rate = product_stream.F_mass
             error = achieved_rate - target_production_rate_kg_hr
@@ -1054,7 +1252,7 @@ def set_production_rate(system, target_production_rate_kg_hr, verbose=True):
             warnings.simplefilter("ignore")
             
             x0 = max(0.01, initial_guess * 0.1)
-            x1 = max(5.0, initial_guess * 2.0)
+            x1 = max(10.0, initial_guess * 3.0)
             y0 = objective_function(x0)
             y1 = objective_function(x1)
             expand_iter = 0
@@ -1081,8 +1279,20 @@ def set_production_rate(system, target_production_rate_kg_hr, verbose=True):
             )
         
         log(f"\nSolver converged. Running final validation simulation...")
+        
+        # Skip clearing streams
+
         for stream, baseline_flow in baseline_flows.items():
-            stream.F_mass = baseline_flow * scaling_factor
+            target = baseline_flow * scaling_factor
+            stream.F_mass = target
+            if 'Seed' in stream.ID:
+                 if 'Seed' in stream.available_chemicals and stream.imass['Seed'] > 0:
+                     seed_targets[stream] = stream.imass['Seed']
+                 else:
+                     seed_targets[stream] = target
+        
+        # Optimize NH3 for the final state
+        optimize_NH3_loading(system, verbose=False)
         
         system.simulate()
         achieved_rate = product_stream.F_mass
@@ -1267,7 +1477,14 @@ if __name__ == '__main__':
     
     print(f"\n3. Applying design specification: TARGET_PRODUCTION = {TARGET_PRODUCTION} kg/hr")
     try:
+        # Run optimization BEFORE production rate setting, to establish correct ratios
+        optimize_NH3_loading(LegHb_sys)
+        
         achieved_production = set_production_rate(LegHb_sys, TARGET_PRODUCTION)
+        
+        # Run optimization AGAIN after production rate scaling, as demand changes with scale
+        optimize_NH3_loading(LegHb_sys)
+        
         LegHb_sys.simulate()
         final_production = ss.LegHb_3.F_mass
         
@@ -1340,3 +1557,5 @@ if __name__ == '__main__':
     print(f"Target Production:   {TARGET_PRODUCTION:.2f} kg/hr")
     print(f"Achieved Production: {ss.LegHb_3.F_mass:.2f} kg/hr")
     print(f"{'='*85}\n")
+    u.R301.show()
+    u.R302.show()

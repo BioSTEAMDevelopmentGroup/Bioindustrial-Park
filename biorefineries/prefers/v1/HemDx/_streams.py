@@ -19,13 +19,11 @@ LegHb={}
 
 
 productivity = 4.2/1000 # [g / L / h]
-tau = 162 # [h]
+tau = 90 # [h]
 titer = productivity * tau # [g / L]
 # OD600 180
 # 1 OD600 = 0.35 g/L dry cell weight
-LegHb_yield = titer * 5 / 1300 # [by wt]
 
-# 72 hours growth + 108 hours fermentation
 
 m=2/5 # scale up factor based on 1.5e5 kg/yr
 # %% In
@@ -47,14 +45,15 @@ SeedSolution1 = stream_kwargs('SeedSolution1', SeedSolution=m*0.15*1e5/16, units
 SeedSolution2 = stream_kwargs('SeedSolution2', SeedSolution=m*1.5*1e5/16, units='kg/hr', T=25+273.15)
 CultureSolution = stream_kwargs('CultureSolution', CultureSolution=m*1.5*1e5/16, units='kg/hr', T=25+273.15)
 
-Glucose = stream_kwargs('Glucose', Glucose=m*1.3*1e5/72, units='kg/hr', T=25+273.15)
-NH3_25wt = stream_kwargs('NH3_25wt', NH3_25wt=m*300, units='kg/hr', T=25+273.15)#, price=price['NH3_25wt'])
+Glucose = stream_kwargs('Glucose', Glucose=m*1.3*1e5/(72+90), units='kg/hr', T=25+273.15)
+NH3_25wt = stream_kwargs('NH3_25wt', NH3_25wt=m*230, units='kg/hr', T=25+273.15)#, price=price['NH3_25wt'])
 
-DfUltraBuffer = stream_kwargs('DfUltraBuffer', DfUltraBuffer=1, units='kg/hr', T=25+273.15)
+DfUltraBuffer1 = stream_kwargs('DfUltraBuffer1', DfUltraBuffer=1, units='kg/hr', T=25+273.15)
+DfUltraBuffer2 = stream_kwargs('DfUltraBuffer2', DfUltraBuffer=1, units='kg/hr', T=25+273.15)
 NaCl_wash = stream_kwargs('NaCl_wash', NaCl=1, units='kg/hr', T=25+273.15)
 NaOH_elute = stream_kwargs('NaOH_elute', NaOH=1, units='kg/hr', T=25+273.15)
 Ethanol_regen = stream_kwargs('Ethanol_regen', Ethanol=1, units='kg/hr', T=25+273.15)
-DFBufferSolute = stream_kwargs('DFBufferSolute', DfUltraBuffer=1, units='kg/hr', T=25+273.15)
+
 GammaCyclodextrinFeed = stream_kwargs('GammaCyclodextrinFeed', GammaCyclodextrin=1, units='kg/hr', T=25+273.15)
 NicotinamideFeed = stream_kwargs('NicotinamideFeed', Nicotinamide=1, units='kg/hr', T=25+273.15)
 AdsorbWash = stream_kwargs('AdsorbWash', H2O=1, units='kg/hr', T=25+273.15)
@@ -64,6 +63,7 @@ IXEquilibriumBuffer = stream_kwargs('IXEquilibriumBuffer', IXEquilibriumBuffer=1
 IXElutionBuffer = stream_kwargs('IXElutionBuffer', IXElutionBuffer=1, units='kg/hr', T=25+273.15)
 IXRegenerationSolution = stream_kwargs('IXRegenerationSolution', NaOH=1, units='kg/hr', T=25+273.15)
 DfNanoBuffer = stream_kwargs('DfNanoBuffer', DfNanoBuffer=1, units='kg/hr', T=25+273.15)
+AntioxidantStream = stream_kwargs('AntioxidantStream', SodiumAscorbate=0.1, H2O=1.0, units='kg/hr', price=price.get('SodiumAscorbate', 5.0))
 
 # %% Out
 
@@ -129,7 +129,7 @@ def create_stream(stream_list):
         streams.append(s)
     return streams
 
-def update_all_input_stream_prices(streamlist):
+def update_all_input_stream_prices(streamlist, verbose=True):
     """Update prices for all input streams"""
     # FIX: Check if streams exist and are proper objects
     try:
@@ -142,7 +142,8 @@ def update_all_input_stream_prices(streamlist):
             if hasattr(stream, 'imass') and hasattr(stream, 'ID'):
                 old_price = getattr(stream, 'price', 0)
                 new_price = set_stream_price_from_components(stream)
-                print(f"{stream.ID}: ${old_price:.4f}/kg → ${new_price:.4f}/kg")
+                if verbose:
+                    print(f"{stream.ID}: ${old_price:.4f}/kg -> ${new_price:.4f}/kg")
             else:
                 print(f"Warning: Stream {stream} is not properly initialized")
     except Exception as e:

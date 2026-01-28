@@ -53,6 +53,9 @@ price = {
     'Cooling tower chemicals': 2716.1 * factor,
     'Makeup water': 0.2e-3, # checked with Ola
     'Ash disposal': -28.86 * factor,
+    'Ethanol': 0.66,  # $/kg 0.4 to 0.8
+    'GammaCyclodextrin': 6.0,  # $/kg 5 to 8
+    'Nicotinamide': 9.0,  # $/kg 7 to 12
 }
 # %%
 # =============================================================================
@@ -85,6 +88,9 @@ GWP_CFs = {
     'CO2': 1.0,  # Direct CO2 emissions
     'ash_disposal': 0.00783,  # bottom ash, MSWI, biowaste kg Global (GLO)
     'AscorbicAcid':2.57, # from ecoinvent 3.11 cutoff, market for ascorbic acid, GLO
+    'Ethanol': 0.90, # from ecoinvent 3.11 cutoff, market for fermentation ethanol, RoW
+    'GammaCyclodextrin': 4.75, # assumed
+    'Nicotinamide': 7.26, # from FineChem2 Prediction, nicotinamide, low uncertainty
 }
 
 # ##### Fossil energy consumption (FEC), in MJ/kg of material unless noted otherwise #####
