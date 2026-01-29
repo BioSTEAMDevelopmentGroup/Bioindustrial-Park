@@ -60,7 +60,9 @@ product = f.ethanol
 broth = ferm_reactor.outs[1]
 
 EtOH_market_range=np.array([0.7, 1.0]) 
-                
+           
+r_te = ferm_reactor.kinetic_reaction_system._te
+     
 #%% Filepaths
 isobutanol_filepath = isobutanol.__file__.replace('\\__init__.py', '')
 
@@ -109,9 +111,9 @@ results = {i: [] for i in range(len(metrics))}
 
 steps = (20, 20, 1)
 
-spec_1 = threshold_conc_sugarses = np.linspace(0., 500., steps[0])
+spec_1 = nsk_k_3es = np.linspace(1., 20., steps[0])
 
-spec_2 = target_conc_sugarses = np.linspace(10., 500., steps[1])
+spec_2 = nsk_k_1ees = np.linspace(10., 200., steps[1])
 
 
 spec_3 = conc_sugars_feed_spikes =\
@@ -123,15 +125,15 @@ spec_3 = conc_sugars_feed_spikes =\
 
 # Parameters analyzed across
 
-x_label = "Threshold glucose concentration" # title of the x axis
-x_units =r"$\mathrm{g} \cdot \mathrm{L}^{-1}$"
-x_ticks = [0, 100, 200, 300, 400, 500]
+x_label = r"$\bfk_3$" # title of the x axis
+x_units = r"$\mathrm{g} \cdot \mathrm{L}^{-1} \cdot \mathrm{h}^{-1}$"
+x_ticks = [0, 5, 10, 15, 20]
 
-y_label = "Target glucose concentration" # title of the x axis
-y_units =r"$\mathrm{g} \cdot \mathrm{L}^{-1}$"
-y_ticks = [0, 100, 200, 300, 400, 500]
+y_label = r"$\bfk_1e$" # title of the y axis
+y_units = r"$\mathrm{g} \cdot \mathrm{L}^{-1} \cdot \mathrm{h}^{-1}$"
+y_ticks = [0, 50, 100, 150, 200]
 
-z_label = "Spike feed glucose concentration" # title of the x axis
+z_label = r"$\bfSpike feed glucose concentration$" # title of the x axis
 z_units =r"$\mathrm{g} \cdot \mathrm{L}^{-1}$"
 z_ticks = [0, 200, 400, 600, 800]
 
@@ -211,15 +213,14 @@ def tickmarks(dmin, dmax, accuracy=50, N_points=5):
 
 #%%
 minute = '0' + str(dateTimeObj.minute) if len(str(dateTimeObj.minute))==1 else str(dateTimeObj.minute)
-file_to_save = f'_{steps}_steps_'+'etoh_fbs_%s.%s.%s-%s.%s'%(dateTimeObj.year, dateTimeObj.month, dateTimeObj.day, dateTimeObj.hour, minute)
+file_to_save = f'_{steps}_steps_'+'etoh_kinetics_%s.%s.%s-%s.%s'%(dateTimeObj.year, dateTimeObj.month, dateTimeObj.day, dateTimeObj.hour, minute)
 
 #%% Initial simulation
 
 print('\n\nSimulating the initial point to avoid bugs ...')
 curr_spec = fbs_spec.current_specifications
-curr_spec.update({'threshold_conc_sugars':threshold_conc_sugarses[0],})
-curr_spec.update({'target_conc_sugars':target_conc_sugarses[0],})
-
+r_te.k_3 = nsk_k_3es[0]
+r_te.k_1e = nsk_k_1ees[0]
 model_specification(**curr_spec,
     n_sims=3,
     n_tea_solves=3,
@@ -258,10 +259,9 @@ for s3 in spec_3:
             curr_no +=1
             error_message = None
             try:
-                assert s1<s2
                 curr_spec = {k:v for k,v in baseline_spec.items()}
-                curr_spec.update({'threshold_conc_sugars':s1,})
-                curr_spec.update({'target_conc_sugars':s2,})
+                r_te.k_3 = s1
+                r_te.k_1e = s2
                 curr_spec.update({'conc_sugars_feed_spike':s3,})
                 
                 model_specification(**curr_spec,
@@ -437,9 +437,9 @@ if plot:
     #%% MPSP
     
     # MPSP_w_levels, MPSP_w_ticks, MPSP_cbar_ticks = get_contour_info_from_metric_data(results_metric_1, lb=3)
-    MPSP_w_levels = np.arange(0.7, 1.01, 0.01)
-    MPSP_cbar_ticks = np.arange(0.7, 1.01, 0.05)
-    MPSP_w_ticks = [0.8, 0.85, 0.9]
+    MPSP_w_levels = np.arange(0.3, 1.21, 0.025)
+    MPSP_cbar_ticks = np.arange(0.3, 1.21, 0.1)
+    MPSP_w_ticks = []
     # MPSP_w_levels = np.arange(0., 15.5, 0.5)
     
     
@@ -478,7 +478,7 @@ if plot:
                                     axis_tick_fontsize = axis_tick_fontsize,
                                     # comparison_range=EtOH_market_range,
                                     n_minor_ticks = 1,
-                                    cbar_n_minor_ticks = 4,
+                                    cbar_n_minor_ticks = 3,
                                     units_on_newline = (False, False, False, False), # x,y,z,w
                                     units_opening_brackets = [" (",] * 4,
                                     units_closing_brackets = [")",] * 4,

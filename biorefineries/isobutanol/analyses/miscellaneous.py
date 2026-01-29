@@ -19,6 +19,8 @@ tea = corn_EtOH_IBO_sys_tea = isobutanol.system.corn_EtOH_IBO_sys_tea
 fbs_spec = isobutanol.system.fbs_spec
 optimize_tau_for_MPSP = isobutanol.system.optimize_tau_for_MPSP
 plot_kinetic_results = isobutanol.system.plot_kinetic_results
+unit_groups = isobutanol.system.unit_groups
+unit_groups_dict = isobutanol.system.unit_groups_dict
 
 f = system.flowsheet
 V406 = f.V406

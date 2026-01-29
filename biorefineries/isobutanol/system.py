@@ -49,11 +49,31 @@ settings = corn.process_settings.BiorefinerySettings()
 
 corn_EtOH_sys = corn.systems.create_system(biorefinery_settings=settings)
 corn_EtOH_sys.simulate()
+
 f = corn_EtOH_sys.flowsheet
+u, s = f.unit, f.stream
 
 parameters = settings.process_parameters
 
 parameters['NH3_per_Yeast'] = 0.1097 # 0.16*14/(12 + 1.6 + 0.56*16 + 0.16*14) *17/14
+
+#%% Update MH101 specification
+feedstock = f.corn
+lime = f.lime
+alpha_amylase = f.alpha_amylase
+sulfuric_acid = f.sulfuric_acid
+MH101 = f.MH101
+MH101.specifications = []
+
+@MH101.add_specification(run=False)
+def refresh_feed_specifications():
+    F_mass_dry_corn = feedstock.F_mass - feedstock.imass['Water']
+    lime.F_mass = F_mass_dry_corn * parameters['slurry_lime_loading'] 
+    # ammonia.F_mass = F_mass_dry_corn * parameters['slurry_ammonia_loading']
+    alpha_amylase.F_mass = F_mass_dry_corn * parameters['liquefaction_alpha_amylase_loading']
+    sulfuric_acid.F_mass = F_mass_dry_corn * parameters['saccharification_sulfuric_acid_loading']
+    MH101._run()
+
 
 #%% Add splitter and feed & spike evaporators, mixers, and heat exchangers
 
@@ -99,6 +119,11 @@ def adjust_M301_water():
     
 H301 = bst.units.HXutility('H301', ins=M301-0, outs=('glucose_initial_feed',), T=32+273.15, rigorous=True)
 
+@H301.add_specification(run=False)
+def H301_spec():
+    H301._run()
+    H301.outs[0].phase = 'l'
+    
 ## Spike evaporator, pumps, mixer, and hx
 F302 = bst.MultiEffectEvaporator('F302', ins=S301-1, outs=('F302_l', 'F302_g'),
                                         P = (101325, 73581, 50892, 32777, 20000), V = 0.1,
@@ -142,6 +167,11 @@ def adjust_M302_water():
     
 H302 = bst.units.HXutility('H302', ins=M302-0, outs=('glucose_spike_feed',), T=32+273.15, rigorous=True)
 
+@H302.add_specification(run=False)
+def H302_spec():
+    H302._run()
+    H302.outs[0].phase = 'l'
+    
 #%%
 V405_old = f.V405
 
@@ -158,7 +188,7 @@ V405_old = f.V405
 V406 = nsk.units.NSKFermentation('V406', 
                                  ins=(H301-0, f.P404-0, H302-0), 
                                  kinetic_reaction_system=te_r,
-                                 n_simulation_steps=2000,
+                                 n_simulation_steps=500,
                                  map_chemicals_nsk_to_bst = {'[s_glu]': 'Glucose',
                                                              '[x]': 'Yeast',
                                                              '[s_EtOH]': 'Ethanol',
@@ -168,6 +198,9 @@ V406 = nsk.units.NSKFermentation('V406',
                                                              },
                                  track_vars = ['y_EtOH_glu_added', 
                                                'y_EtOH_glu_consumed',
+                                               'y_IBO_glu_added', 
+                                               'y_IBO_glu_consumed',
+                                               'y_EtOH_IBO_glu_added',
                                                'curr_n_glu_spikes',
                                                # 'tot_mass_glu', 
                                                'prod_EtOH',
@@ -179,7 +212,7 @@ V406 = nsk.units.NSKFermentation('V406',
                                  sugar_IDs=('Glucose',),
                                  # tau_update_policy=None,
                                  # tau_update_policy=('max', '[s_EtOH]'),
-                                 tau_update_policy=('max', 'y_EtOH_glu_added'),
+                                 tau_update_policy=('max', 'y_EtOH_IBO_glu_added'),
                                  try_fewer_n_spikes_until=lambda r_te: r_te.s_glu<5.0,
                                  perform_hydrolysis=False)
 
@@ -195,8 +228,8 @@ def correct_saccharification_feed_flows():
     mash = V406.ins[0]
     mash_flow = mash.F_mass
     mash_dry_flow = mash_flow - mash.imass['Water']
-    yeast.F_mass = parameters['yeast_loading'] * mash_flow
-    gluco_amylase.F_mass = parameters['saccharification_gluco_amylase_loading'] * mash_dry_flow
+    yeast.F_mass = max(1e-2, parameters['yeast_loading'] * mash_flow)
+    gluco_amylase.F_mass = max(1e-2, parameters['saccharification_gluco_amylase_loading'] * mash_dry_flow)
     
     # V406.simulate()
     
@@ -232,7 +265,7 @@ M401 = bst.Mixer('M401', ins=('', makeup_isopentyl_acetate), outs=('isopentyl_ac
 M401_design = M401._design
 M401_cost = M401._cost
 
-bypass_IBO_separation_conditions = [lambda: True] # if any return True, don't try to recover Isobutanol
+bypass_IBO_separation_conditions = [lambda: V406.kinetic_reaction_system._te.k_16==0.0] # if any return True, don't try to recover Isobutanol
 
 @M401.add_specification(run=False)
 def M401_adjust_makeup_solvent():
@@ -399,7 +432,8 @@ corn_EtOH_IBO_sys = bst.System.from_units('corn_EtOH_IBO_sys',
                                           units = [i for i in corn_EtOH_IBO_sys_no_IBO_recovery.units + recovery_units + [HXN]
                                                    if not i in HXprocess_units]
                                           )
-corn_EtOH_IBO_sys.simulate()
+corn_EtOH_IBO_sys.simulate(update_configuration=True)
+
 
 #%% Set prices
 f.isobutanol.price = 1.43
@@ -491,6 +525,7 @@ def plot_kinetic_results():
     plt.show()
 
 def reset_and_reload(**curr_spec):
+    # !!! Resetting might cause yeast stream problems
     print('Resetting cache and emptying recycles ...')
     corn_EtOH_IBO_sys.reset_cache()
     corn_EtOH_IBO_sys.empty_recycles()
@@ -637,3 +672,63 @@ if simulate_baseline:
     # print(get_purity_adj_price(ethanol, ['Ethanol']))
     
 # optimize_max_n_glu_spikes(baseline_spec)
+
+#%% Unit groups
+feedstock_acquisition_group = bst.UnitGroup('feedstock acquisition', units=[u.MH101, u.V102])
+
+feedstock_juicing_group = bst.UnitGroup('feedstock juicing', 
+                                        units=[i for i in list(u.E402.get_upstream_units()) + [u.E402]
+                                               if not i in feedstock_acquisition_group.units])
+
+sugar_solution_preparation_group = bst.UnitGroup('sugar solution preparation', 
+                                                 units=list(f.S301.get_downstream_units().intersection(u.V406.get_upstream_units()))
+                                                 + [u.S301, u.F301_P1, u.F302_P1])
+
+fermentation_group = bst.UnitGroup('fermentation', units=[u.V406])
+
+# define IBO separation units
+IBO_separation_units = [i for i in corn_EtOH_IBO_sys.units
+                        if not i in list(corn_EtOH_IBO_sys.facilities) + corn_EtOH_IBO_sys_no_IBO_recovery.units
+                                    + feedstock_acquisition_group.units + feedstock_juicing_group.units
+                                    + sugar_solution_preparation_group.units + fermentation_group.units]
+
+isobutanol_separation_group = bst.UnitGroup('isobutanol separation', units=IBO_separation_units)
+
+ethanol_separation_group = bst.UnitGroup('ethanol separation', 
+                             units= [i for i in corn_EtOH_IBO_sys.units
+                            if not i in list(corn_EtOH_IBO_sys.facilities)
+                                        + feedstock_acquisition_group.units + feedstock_juicing_group.units
+                                        + sugar_solution_preparation_group.units + fermentation_group.units
+                                        + isobutanol_separation_group.units]
+                             )
+
+heat_exchanger_network_group = bst.UnitGroup('heat exchanger network', 
+                                                 units=(u.HXN1001,))
+
+other_facilities_group = bst.UnitGroup('other facilities', 
+                                                 units=[i for i in list(corn_EtOH_IBO_sys.facilities)
+                                                        if not i in heat_exchanger_network_group.units])
+unit_groups = [
+    feedstock_acquisition_group,
+    feedstock_juicing_group,
+    sugar_solution_preparation_group,
+    fermentation_group,
+    isobutanol_separation_group,
+    ethanol_separation_group,
+    heat_exchanger_network_group,
+    other_facilities_group,
+    ]
+
+unit_groups_dict = {}
+for i in unit_groups:
+    unit_groups_dict[i.name] = i
+    i.autofill_metrics(shorthand=False, 
+                       electricity_production=False, 
+                       electricity_consumption=True,
+                       material_cost=True)
+    # i.filter_savings = False # check bst implementation
+    # i.metrics.append(bst.evaluation.Metric('Utility cost', 
+    #                         getter=lambda: sum([ui.utility_cost for ui in i.units]), 
+    #                         units='USD/hr',
+    #                         element=None)
+    #                  )
