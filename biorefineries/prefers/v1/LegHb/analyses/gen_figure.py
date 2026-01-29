@@ -139,6 +139,26 @@ def resolve_output_dirs(script_path, config, timestamp=None, results_dir=None):
 def load_breakdown_summary(data_dir):
     filepath = os.path.join(data_dir, 'Breakdown_Summary.xlsx')
     if not os.path.isfile(filepath):
+        # Fallback: Check sibling directories (often gen_data_base runs in a different timestamp folder)
+        try:
+            parent_dir = os.path.dirname(os.path.dirname(data_dir)) # analyses/
+            base_dir_name = os.path.basename(os.path.dirname(data_dir)) # results_...
+            
+            # Find all result directories
+            candidates = [
+                os.path.join(parent_dir, d, 'data', 'Breakdown_Summary.xlsx')
+                for d in os.listdir(parent_dir)
+                if d.startswith('results_') and os.path.isdir(os.path.join(parent_dir, d))
+            ]
+            # Sort by modification time (reverse) to find most recent
+            candidates.sort(key=lambda x: os.path.getmtime(os.path.dirname(x)) if os.path.exists(os.path.dirname(x)) else 0, reverse=True)
+            
+            for candidate in candidates:
+                if os.path.isfile(candidate):
+                    print(f"  [Note] Found breakdown summary in sibling dir: {candidate}")
+                    return pd.ExcelFile(candidate)
+        except Exception:
+            pass
         return None
     return pd.ExcelFile(filepath)
 
@@ -187,6 +207,9 @@ def load_mc_results(data_dir):
 
     results['no_scale'] = load_type('no_scale')
     results['with_scale'] = load_type('with_scale')
+    results['ferm_only'] = load_type('ferm_only')
+    results['dsp_only'] = load_type('dsp_only')
+    results['econ_only'] = load_type('econ_only')
     
     # Fallback: try generic 'monte_carlo_results' and assign to 'no_scale' if others missing
     if results['no_scale'] is None and results['with_scale'] is None:
@@ -223,12 +246,21 @@ def load_baseline_metrics(data_dir):
 
 
 def load_sensitivity_table(data_dir):
+
+    # Load sensitivity table for Tornado plots
     xlsx_path = os.path.join(data_dir, 'tornado_sensitivity.xlsx')
-    csv_path = os.path.join(data_dir, 'tornado_sensitivity.csv')
     if os.path.isfile(xlsx_path):
-        return pd.read_excel(xlsx_path)
+        try:
+             # Try to read 'Summary' sheet first which we created
+             return pd.read_excel(xlsx_path, sheet_name='Summary', index_col=0)
+        except:
+             # Fallback to default if sheet not found
+             return pd.read_excel(xlsx_path, index_col=0)
+    
+    csv_path = os.path.join(data_dir, 'tornado_sensitivity.csv')
     if os.path.isfile(csv_path):
-        return pd.read_csv(csv_path)
+        return pd.read_csv(csv_path, index_col=0)
+        
     return None
 
 
@@ -243,15 +275,15 @@ def get_parameter_category(param_name):
     """
     name = param_name.lower()
     
-    if any(x in name for x in ['yield', 'titer', 'productivity', 'rate']):
+    if any(x in name for x in ['yield', 'titer', 'productivity', 'rate', 'tau', 'days']):
         return 'Process Performance'
-    elif any(x in name for x in ['price', 'cost', 'catalyst', 'enzyme', 'feedstock']):
+    elif any(x in name for x in ['price', 'cost', 'catalyst', 'enzyme', 'feedstock', 'tax', 'irr']):
         return 'Material Prices'
     elif any(x in name for x in ['electricity', 'utility', 'steam', 'cooling']):
         return 'Utility Prices'
     elif any(x in name for x in ['capacity', 'investment', 'lang', 'capex', 'base']):
         return 'CapEx Factors'
-    elif any(x in name for x in ['efficiency', 'recovery', 'split']):
+    elif any(x in name for x in ['efficiency', 'recovery', 'split', 'capture', 'retention']):
         return 'Efficiency/Recovery'
     else:
         return 'Other'
@@ -759,97 +791,48 @@ def generate_figures(config='config1', timestamp=None, results_dir=None):
         print("  [!] MC Results not found, skipping Spearman Analysis")
 
     # -------------------------------------------------------------------------
-    # STEP 2: Joint Marginal Plots (Fixed, Variable, Overlap)
+    # STEP 2: Joint KDE Plots (5 Scenarios)
     # -------------------------------------------------------------------------
     print("\n" + "=" * 80)
-    print("STEP 2: Joint KDE Plots (Cost vs. Carbon)")
+    print("STEP 2: Joint KDE Plots (5 Scenarios)")
     print("=" * 80)
+    
+    scenarios = [
+        ('no_scale', 'Fixed Scale', 'PreFerS_blue'),
+        ('with_scale', 'Variable Scale', 'PreFerS_orange'),
+        ('ferm_only', 'Fermentation Params Only', 'PreFerS_purple'),
+        ('dsp_only', 'DSP Params Only', 'PreFerS_green'),
+        ('econ_only', 'Econ & Env Params Only', 'PreFerS_red'),
+    ]
+    
+    comparative_data = []
 
-    # 1. Fixed Scale
-    if results_no_scale is not None and msp_idx in results_no_scale.columns and gwp_idx in results_no_scale.columns:
-        print("  Generating Joint Plot (Fixed Scale)...")
-        g = plots.plot_joint_marginal(
-            data=results_no_scale, x_col=gwp_idx, y_col=msp_idx,
-            x_label='GWP [kg CO2-eq/kg]', y_label='MSP [$/kg]',
-            kde_color='PreFerS_blue',
-            x_box_color=style.get_color('cerulean'),
-            y_box_color=style.get_color('navy'),
-            baseline_point=(baseline_gwp, baseline_msp),
-            median_point=(results_no_scale[gwp_idx].median(), results_no_scale[msp_idx].median())
-        )
-        g.figure.suptitle('GWP vs MSP (Fixed Scale)', fontweight='bold', y=1.02)
-        utils.save_figure(g.figure, 'kde_joint_fixed_scale', dirs['figure'], formats=('png',))
-        plt.close('all')
-
-    # 2. Variable Scale
-    if results_with_scale is not None and msp_idx in results_with_scale.columns and gwp_idx in results_with_scale.columns:
-        print("  Generating Joint Plot (Variable Scale)...")
-        g = plots.plot_joint_marginal(
-            data=results_with_scale, x_col=gwp_idx, y_col=msp_idx,
-            x_label='GWP [kg CO2-eq/kg]', y_label='MSP [$/kg]',
-            kde_color='PreFerS_orange',
-            x_box_color=style.get_color('orange'),
-            y_box_color=style.get_color('gold'),
-            baseline_point=(baseline_gwp, baseline_msp),
-            median_point=(results_with_scale[gwp_idx].median(), results_with_scale[msp_idx].median())
-        )
-        g.figure.suptitle('GWP vs MSP (Variable Scale)', fontweight='bold', y=1.02)
-        utils.save_figure(g.figure, 'kde_joint_variable_scale', dirs['figure'], formats=('png',))
-        plt.close('all')
-
-    # 3. Overlap / Comparison
-    if (results_no_scale is not None and results_with_scale is not None and 
-        msp_idx in results_no_scale.columns and gwp_idx in results_no_scale.columns and
-        msp_idx in results_with_scale.columns and gwp_idx in results_with_scale.columns):
-        
-        print("  Generating Comparison KDE Plot...")
-        try:
-            fig_comp, ax_comp = plt.subplots(figsize=(10, 8))
-            
-            # No Scale (Blue theme)
-            sns.kdeplot(
-                x=results_no_scale[gwp_idx], y=results_no_scale[msp_idx],
-                ax=ax_comp, fill=False, levels=5, color=style.get_color('cerulean'), 
-                linewidths=2, alpha=0.8, label='Fixed Scale'
-            )
-            
-            # With Scale (Orange theme)
-            sns.kdeplot(
-                x=results_with_scale[gwp_idx], y=results_with_scale[msp_idx],
-                ax=ax_comp, fill=False, levels=5, color=style.get_color('orange'), 
-                linewidths=2, alpha=0.8, linestyles='--', label='Variable Scale'
-            )
-            
-            ax_comp.set_xlabel('GWP [kg CO2-eq/kg]', fontweight='bold')
-            ax_comp.set_ylabel('MSP [$/kg]', fontweight='bold')
-            ax_comp.set_title('Impact of Scale on GWP-MSP Trade-off', fontweight='bold', pad=15)
-            
-            # Add annotations manually (Baseline + 2 Medians)
-            # Baseline
-            ax_comp.scatter(baseline_gwp, baseline_msp,
-                           c=style.get_color('baseline'), s=250, marker='*',
-                           edgecolors='black', linewidths=1.5,
-                           label='Baseline', zorder=10)
-            
-            # Median No Scale (Blue diamond)
-            ax_comp.scatter(results_no_scale[gwp_idx].median(), results_no_scale[msp_idx].median(),
-                           c=style.get_color('navy'), s=150, marker='D',
-                           edgecolors='black', linewidths=1.5,
-                           label='Median (Fixed)', zorder=10)
-
-            # Median With Scale (Orange X)
-            ax_comp.scatter(results_with_scale[gwp_idx].median(), results_with_scale[msp_idx].median(),
-                           c=style.get_color('gold'), s=150, marker='X',
-                           edgecolors='black', linewidths=1.5,
-                           label='Median (Varied)', zorder=10)
-
-            ax_comp.legend()
-            ax_comp.grid(True, alpha=0.3)
-            
-            utils.save_figure(fig_comp, 'kde_comparison_overlap', dirs['figure'], formats=('png',))
-            plt.close(fig_comp)
-        except Exception as e:
-            print(f"    [!] Failed to generate comparison KDE: {e}")
+    for key, title, color_name in scenarios:
+        data = all_results.get(key)
+        if data is not None and msp_idx in data.columns and gwp_idx in data.columns:
+             print(f"  Generating Joint Plot ({title})...")
+             
+             g = plots.plot_joint_marginal(
+                data=data, x_col=gwp_idx, y_col=msp_idx,
+                x_label='GWP [kg CO2-eq/kg]', y_label='MSP [$/kg]',
+                kde_color=color_name,
+                x_box_color=style.get_color(color_name.split('_')[-1]), # approximate mapping
+                y_box_color=style.get_color(color_name.split('_')[-1]),
+                baseline_point=(baseline_gwp, baseline_msp),
+                median_point=(data[gwp_idx].median(), data[msp_idx].median())
+             )
+             g.figure.suptitle(f'GWP vs MSP ({title})', fontweight='bold', y=1.02)
+             utils.save_figure(g.figure, f'joint_kde_{key}', dirs['figure'])
+             plt.close(g.figure)
+             
+             # Collect for comparative (if needed)
+             comparative_data.append({
+                 'name': title,
+                 'msp_mean': data[msp_idx].mean(),
+                 'msp_std': data[msp_idx].std(),
+                 'gwp_mean': data[gwp_idx].mean(),
+                 'gwp_std': data[gwp_idx].std()
+             })
 
     # -------------------------------------------------------------------------
     # STEP 3: Tornado Diagram (Single Point Sensitivity)
@@ -935,116 +918,80 @@ def generate_figures(config='config1', timestamp=None, results_dir=None):
             utils.save_figure(fig5, 'distribution_gwp', dirs['figure'], formats=('png',))
 
     # -------------------------------------------------------------------------
-    # STEP 5: Scale Effects
+    # STEP 5: Comprehensive Parameter Sensitivity Bands (Including Scale)
     # -------------------------------------------------------------------------
     print("\n" + "=" * 80)
-    print("STEP 5: Scale Effects")
+    print("STEP 5: Comprehensive Parameter Sensitivity Bands")
     print("=" * 80)
     
-    scale_idx = ('Design', 'Production scale [kg/hr]')
+    # We want to plot Metric vs Parameter for ALL variable parameters.
+    # We need to choose the source of data. 'with_scale' is best because it includes scale variation.
+    # However, 'no_scale' is better for parameters that might be masked by scale.
+    # We will use 'with_scale' if available, as authorized.
     
-    if results_with_scale is not None:
-        # Check if scale column exists (handle tuple index)
-        scale_col = None
-        if scale_idx in results_with_scale.columns:
-            scale_col = results_with_scale[scale_idx]
-        else:
-             # Try Partial match or string match
-             for c in results_with_scale.columns:
-                 if 'Production scale' in str(c):
-                     scale_col = results_with_scale[c]
-                     break
-        
-        if scale_col is not None:
-            # MSP vs Scale
-            if msp_idx in results_with_scale.columns:
-                fig_sc1, ax_sc1 = plot_scale_effects(
-                    scale_col, results_with_scale[msp_idx], baseline_msp,
-                    ylabel='MSP [$/kg]', title='MSP vs Production Scale', 
-                    color=style.get_color('msp') # Update color
-                )
-                if fig_sc1:
-                    utils.save_figure(fig_sc1, 'scale_effect_msp', dirs['figure'], formats=('png',))
-            
-            # GWP vs Scale
-            if gwp_idx in results_with_scale.columns:
-                fig_sc2, ax_sc2 = plot_scale_effects(
-                    scale_col, results_with_scale[gwp_idx], baseline_gwp,
-                    ylabel='GWP [kg CO2-eq/kg]', title='GWP vs Production Scale', 
-                    color=style.get_color('gwp') # Update color
-                )
-                if fig_sc2:
-                    utils.save_figure(fig_sc2, 'scale_effect_gwp', dirs['figure'], formats=('png',))
-        else:
-            print("  [!] Production scale column not found in variable scale results")
-    else:
-        print("  [!] 'with_scale' results not available for scale effects analysis")
-
-    # -------------------------------------------------------------------------
-    # STEP 5b: Parameter Sensitivity Bands (Extended)
-    # -------------------------------------------------------------------------
-    print("\n" + "=" * 80)
-    print("STEP 5b: Extended Parameter Sensitivity Bands")
-    print("=" * 80)
+    data_for_sen = results_with_scale if results_with_scale is not None else results_no_scale
     
-    # Parameters to analyze (Metric vs Parameter)
-    # Using 'no_scale' results to isolate effects from scale variation
-    data_for_sen = results_no_scale
     if data_for_sen is not None:
-        # Define search terms for target parameters
-        target_params = {
-            'Productivity': ['productivity', 'rate'],
-            'Titer': ['titer', 'concentration'],
-            'Yield': ['yield', 'conversion'],
-            'Electricity Price': ['electricity', 'power'],
-            'Glucose Price': ['glucose', 'feedstock', 'sugar']
-        }
+        # Identify parameter columns (exclude metrics)
+        # Metrics are in metric_indices
+        metric_cols = {msp_idx, gwp_idx} # Set for fast lookup
         
-        # Find column indices
-        param_cols = {}
-        for friendly_name, keywords in target_params.items():
-            for col in data_for_sen.columns:
-                col_str = str(col).lower()
-                if any(k in col_str for k in keywords) and 'scale' not in col_str:
-                    param_cols[friendly_name] = col
-                    break
-        
-        # Plot for both MSP and GWP
-        metrics = [
-            (msp_idx, 'MSP', '$/kg', style.get_color('msp')),
-            (gwp_idx, 'GWP', 'kg CO2-eq/kg', style.get_color('gwp'))
-        ]
-
-        for p_name, p_col in param_cols.items():
-            if p_col is None:
+        # We also need to get readable names
+        param_cols = []
+        for col in data_for_sen.columns:
+            if col in metric_cols:
                 continue
-                
-            print(f"  Generating sensitivity bands for: {p_name}")
+            # Check variance (ensure it actually varies)
+            if data_for_sen[col].nunique() > 5: # Threshold to consider it 'varying' enough for a band plot
+                param_cols.append(col)
+        
+        print(f"  Found {len(param_cols)} varying parameters to plot.")
+        
+        for param_col in param_cols:
+            param_name = param_col[1] if isinstance(param_col, tuple) else str(param_col)
+            # Clean filename
+            safe_name = "".join([c if c.isalnum() else "_" for c in param_name])
             
-            # Extract readable unit if possible (usually in tuple)
-            x_label = f"{p_name}"
-            if isinstance(p_col, tuple) and len(p_col) > 1:
-                x_label += f" [{p_col[1].split('[')[-1] if '[' in p_col[1] else ''}"
-                # Clean up dirty label extraction
-                if not x_label.endswith(']'): x_label = f"{p_name} [-]"
+            # Determine Color based on category
+            category = get_parameter_category(param_name)
+            # Map category to specific color
+            band_color = style.PREFERS_COLORS[0] # Default Navy
+            if 'Process' in category: band_color = style.PREFERS_COLORS[1] # Indigo
+            elif 'Price' in category: band_color = style.PREFERS_COLORS[4] # Emerald
+            elif 'CapEx' in category or 'Scale' in param_name: band_color = style.PREFERS_COLORS[7] # Gold
             
-            for m_idx, m_name, m_unit, m_color in metrics:
-                if m_idx in data_for_sen.columns:
-                    try:
-                        fig_sen, ax_sen = plot_scale_effects(
-                            data_for_sen[p_col], 
-                            data_for_sen[m_idx], 
-                            baseline_metrics.get(m_idx, np.nan),
-                            xlabel=x_label,
-                            ylabel=f"{m_name} [{m_unit}]", 
-                            title=f"{m_name} vs {p_name} (Uncertainty)", 
-                            color=m_color
-                        )
-                        fname = f"sensitivity_{m_name}_vs_{p_name.replace(' ', '_')}"
-                        utils.save_figure(fig_sen, fname, dirs['figure'], formats=('png',))
+            # Plot MSP vs Param
+            if msp_idx in data_for_sen.columns:
+                try:
+                    fig_sen, ax_sen = plot_scale_effects(
+                        data_for_sen[param_col], data_for_sen[msp_idx], baseline_msp,
+                        xlabel=param_name, ylabel='MSP [$/kg]',
+                        title=f'MSP Sensitivity to {param_name}',
+                        color=band_color
+                    )
+                    if fig_sen:
+                        utils.save_figure(fig_sen, f'sensitivity_msp_{safe_name}', dirs['figure'], formats=('png',))
                         plt.close(fig_sen)
-                    except Exception as e:
-                        print(f"    [!] Failed to plot {m_name} vs {p_name}: {e}")
+                except Exception as e:
+                    print(f"    [!] Failed plot MSP vs {param_name}: {e}")
+
+            # Plot GWP vs Param
+            if gwp_idx in data_for_sen.columns:
+                 try:
+                    fig_sen, ax_sen = plot_scale_effects(
+                        data_for_sen[param_col], data_for_sen[gwp_idx], baseline_gwp,
+                        xlabel=param_name, ylabel='GWP [kg CO2-eq/kg]',
+                        title=f'GWP Sensitivity to {param_name}',
+                        color=band_color
+                    )
+                    if fig_sen:
+                         utils.save_figure(fig_sen, f'sensitivity_gwp_{safe_name}', dirs['figure'], formats=('png',))
+                         plt.close(fig_sen)
+                 except Exception as e:
+                    print(f"    [!] Failed plot GWP vs {param_name}: {e}")
+
+    else:
+        print("  [!] No MC data available for sensitivity bands")
 
     # -------------------------------------------------------------------------
     # STEP 6: Contour Scatter Plots (Titer/Yield/Prod vs MSP/GWP)
@@ -1059,7 +1006,10 @@ def generate_figures(config='config1', timestamp=None, results_dir=None):
         # Find parameter indices for Titer, Yield, Productivity
         titer_idx = next((c for c in data_for_scatter.columns if 'titer' in str(c).lower()), None)
         yield_idx = next((c for c in data_for_scatter.columns if 'yield' in str(c).lower()), None)
+        # Check for productivity OR tau
         prod_idx = next((c for c in data_for_scatter.columns if 'productivity' in str(c).lower()), None)
+        if prod_idx is None:
+             prod_idx = next((c for c in data_for_scatter.columns if 'tau' in str(c).lower()), None)
         
         plot_configs = [
              # MSP Plots

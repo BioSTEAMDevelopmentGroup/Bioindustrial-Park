@@ -1,0 +1,172 @@
+{
+  "columns": [
+    {
+      "flat": "Fermentation_Fermentation titer [g/L]",
+      "original": [
+        "Fermentation",
+        "Fermentation titer [g/L]"
+      ]
+    },
+    {
+      "flat": "Fermentation_Fermentation tau [hr]",
+      "original": [
+        "Fermentation",
+        "Fermentation tau [hr]"
+      ]
+    },
+    {
+      "flat": "Fermentation_Product yield [%]",
+      "original": [
+        "Fermentation",
+        "Product yield [%]"
+      ]
+    },
+    {
+      "flat": "Fermentation_Biomass yield [%]",
+      "original": [
+        "Fermentation",
+        "Biomass yield [%]"
+      ]
+    },
+    {
+      "flat": "DSP_Centrifuge split [multiplier]",
+      "original": [
+        "DSP",
+        "Centrifuge split [multiplier]"
+      ]
+    },
+    {
+      "flat": "DSP_Cell disruption efficiency [-]",
+      "original": [
+        "DSP",
+        "Cell disruption efficiency [-]"
+      ]
+    },
+    {
+      "flat": "DSP_Filtration capture [-]",
+      "original": [
+        "DSP",
+        "Filtration capture [-]"
+      ]
+    },
+    {
+      "flat": "DSP_Diafiltration retention [-]",
+      "original": [
+        "DSP",
+        "Diafiltration retention [-]"
+      ]
+    },
+    {
+      "flat": "Facilities_Turbogenerator efficiency [-]",
+      "original": [
+        "Facilities",
+        "Turbogenerator efficiency [-]"
+      ]
+    },
+    {
+      "flat": "Economics_Electricity price [$/kWh]",
+      "original": [
+        "Economics",
+        "Electricity price [$/kWh]"
+      ]
+    },
+    {
+      "flat": "Economics_Glucose price [$/kg]",
+      "original": [
+        "Economics",
+        "Glucose price [$/kg]"
+      ]
+    },
+    {
+      "flat": "Economics_Ammonia price [$/kg]",
+      "original": [
+        "Economics",
+        "Ammonia price [$/kg]"
+      ]
+    },
+    {
+      "flat": "Economics_Buffer/Seed cost [multiplier]",
+      "original": [
+        "Economics",
+        "Buffer/Seed cost [multiplier]"
+      ]
+    },
+    {
+      "flat": "Economics_Operating days [days/yr]",
+      "original": [
+        "Economics",
+        "Operating days [days/yr]"
+      ]
+    },
+    {
+      "flat": "Economics_IRR [fraction]",
+      "original": [
+        "Economics",
+        "IRR [fraction]"
+      ]
+    },
+    {
+      "flat": "Economics_Income tax [fraction]",
+      "original": [
+        "Economics",
+        "Income tax [fraction]"
+      ]
+    },
+    {
+      "flat": "GWP_Electricity GWP [kg CO2/kWh]",
+      "original": [
+        "GWP",
+        "Electricity GWP [kg CO2/kWh]"
+      ]
+    },
+    {
+      "flat": "GWP_Glucose GWP [kg CO2/kg]",
+      "original": [
+        "GWP",
+        "Glucose GWP [kg CO2/kg]"
+      ]
+    },
+    {
+      "flat": "GWP_Ammonia GWP [kg CO2/kg]",
+      "original": [
+        "GWP",
+        "Ammonia GWP [kg CO2/kg]"
+      ]
+    },
+    {
+      "flat": "GWP_Buffer/Seed GWP [multiplier]",
+      "original": [
+        "GWP",
+        "Buffer/Seed GWP [multiplier]"
+      ]
+    },
+    {
+      "flat": "PreFerS_MSP [$/kg]",
+      "original": [
+        "PreFerS",
+        "MSP [$/kg]"
+      ]
+    },
+    {
+      "flat": "PreFerS_TCI [10^6 $]",
+      "original": [
+        "PreFerS",
+        "TCI [10^6 $]"
+      ]
+    },
+    {
+      "flat": "PreFerS_AOC [10^6 $/yr]",
+      "original": [
+        "PreFerS",
+        "AOC [10^6 $/yr]"
+      ]
+    },
+    {
+      "flat": "PreFerS_GWP [kg CO2-eq/kg]",
+      "original": [
+        "PreFerS",
+        "GWP [kg CO2-eq/kg]"
+      ]
+    }
+  ]
+}

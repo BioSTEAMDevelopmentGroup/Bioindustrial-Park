@@ -650,7 +650,7 @@ def create_area_500_purification(clarified_lysate, DfUltraBuffer1):
     
     @U502.add_specification(run=True)
     def U502_adjust_water_recovery():
-        U502.Salt_Retention = 0.95
+        U502.Salt_Retention = 0.05
         U502._run()
     
     return {

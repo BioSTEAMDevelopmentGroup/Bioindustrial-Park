@@ -1,0 +1,52 @@
+{
+  "nodes": [
+    "Inputs",
+    "Media Preparation",
+    "Conversion",
+    "Purification",
+    "Other",
+    "Recovery",
+    "Facilities"
+  ],
+  "links": {
+    "source": [
+      0,
+      1,
+      0,
+      0,
+      5,
+      3,
+      6
+    ],
+    "target": [
+      1,
+      2,
+      3,
+      4,
+      6,
+      4,
+      4
+    ],
+    "value": [
+      2148209824.4481196,
+      1902817621.009202,
+      1670385.049544284,
+      807.4881609658919,
+      2201933469.276716,
+      60949909.81619117,
+      2481698334.259364
+    ],
+    "label": [
+      "2148209824.45 kJ/hr",
+      "1902817621.01 kJ/hr",
+      "1670385.05 kJ/hr",
+      "807.49 kJ/hr",
+      "2201933469.28 kJ/hr",
+      "60949909.82 kJ/hr",
+      "2481698334.26 kJ/hr"
+    ]
+  },
+  "flow_property": "energy",
+  "units": "kJ/hr",
+  "title": "HemDx Sankey (Energy Flow)"
+}

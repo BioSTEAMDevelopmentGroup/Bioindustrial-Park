@@ -112,6 +112,27 @@ def _register_colormaps():
         ['#FFFFFF', '#FFF3CD', PREFERS_COLORS[7], PREFERS_COLORS[8], '#C05600'],
         N=256
     )
+
+    # Purple Gradient (Light -> Indigo)
+    prefers_purple = mcolors.LinearSegmentedColormap.from_list(
+        "PreFerS_purple",
+        ['#FFFFFF', '#E8EAF6', '#9FA8DA', PREFERS_COLORS[1]], # Using Indigo
+        N=256
+    )
+
+    # Green Gradient (Light -> Emerald)
+    prefers_green = mcolors.LinearSegmentedColormap.from_list(
+        "PreFerS_green",
+        ['#FFFFFF', '#E8F5E9', '#A5D6A7', PREFERS_COLORS[4]], # Using Emerald
+        N=256
+    )
+
+    # Red Gradient (Light -> Baseline Red)
+    prefers_red = mcolors.LinearSegmentedColormap.from_list(
+        "PreFerS_red",
+        ['#FFFFFF', '#FFEBEE', '#EF9A9A', '#E74C3C'], # Using Baseline Red
+        N=256
+    )
     
     # Register colormaps
     try:
@@ -122,6 +143,9 @@ def _register_colormaps():
         colormaps.register(cmap=prefers_density, name='PreFerS_density')
         colormaps.register(cmap=prefers_blue, name='PreFerS_blue')
         colormaps.register(cmap=prefers_orange, name='PreFerS_orange')
+        colormaps.register(cmap=prefers_purple, name='PreFerS_purple')
+        colormaps.register(cmap=prefers_green, name='PreFerS_green')
+        colormaps.register(cmap=prefers_red, name='PreFerS_red')
     except ValueError:
         # Already registered, ignore
         pass

@@ -102,10 +102,10 @@ utils.save_figure(g.figure, 'joint_gwp_msp', dirs['figure'], formats=('png', 'pd
 ```
 
 **Description**: *Generate a Bivariate Joint Plot with Marginal Boxplots. The central 
-visualization is a Scatter Plot overlaid with KDE contours to reveal data concentration. 
+visualization is a KDE Cloud (no scatter) to reveal data concentration. 
 The top and right margins feature aligned Box-and-Whisker plots displaying the 
 interquartile range (IQR), median, and outliers. Uses PreFerS palette: Deep Navy 
-(#191538) for scatter points, Leaf Green (#8BC53F) for X marginal, Gold (#F5CA0C) 
+(#191538) for contours, Leaf Green (#8BC53F) for X marginal, Gold (#F5CA0C) 
 for Y marginal.*
 
 ## Utility Functions
@@ -120,11 +120,17 @@ for Y marginal.*
 
 ## Colormaps
 
-Four custom colormaps are registered:
+Ten custom colormaps are registered:
 - `PreFerS` - Full sequential gradient
-- `PreFerS_diverging` - Navy → White → Gold
-- `PreFerS_positive` - Green → Gold gradient
-- `PreFerS_correlation` - Blue → White → Orange
+- `PreFerS_diverging` - Navy → White → Gold (Diverging)
+- `PreFerS_positive` - Green → Gold gradient (Positive metrics)
+- `PreFerS_correlation` - Blue → White → Orange (Correlations)
+- `PreFerS_density` - White → Orange → Blue → Navy (Cloud density)
+- `PreFerS_blue` - White → Navy (Sequential Blue)
+- `PreFerS_orange` - White → Orange (Sequential Orange)
+- `PreFerS_purple` - White → Indigo (Sequential Purple)
+- `PreFerS_green` - White → Emerald (Sequential Green)
+- `PreFerS_red` - White → Red (Sequential Red)
 
 Use with matplotlib:
 ```python

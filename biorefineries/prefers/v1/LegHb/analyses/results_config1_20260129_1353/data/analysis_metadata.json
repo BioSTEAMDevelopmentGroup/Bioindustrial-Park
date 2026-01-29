@@ -1,0 +1,113 @@
+{
+  "config": "config1",
+  "timestamp": "20260129_1353",
+  "baseline_production_kg_hr": 150,
+  "parameter_indices": [
+    [
+      "Fermentation",
+      "Fermentation titer [g/L]"
+    ],
+    [
+      "Fermentation",
+      "Fermentation tau [hr]"
+    ],
+    [
+      "Fermentation",
+      "Product yield [%]"
+    ],
+    [
+      "Fermentation",
+      "Biomass yield [%]"
+    ],
+    [
+      "DSP",
+      "Centrifuge split [multiplier]"
+    ],
+    [
+      "DSP",
+      "Cell disruption efficiency [-]"
+    ],
+    [
+      "DSP",
+      "Filtration capture [-]"
+    ],
+    [
+      "DSP",
+      "Diafiltration retention [-]"
+    ],
+    [
+      "Facilities",
+      "Turbogenerator efficiency [-]"
+    ],
+    [
+      "Economics",
+      "Electricity price [$/kWh]"
+    ],
+    [
+      "Economics",
+      "Glucose price [$/kg]"
+    ],
+    [
+      "Economics",
+      "Ammonia price [$/kg]"
+    ],
+    [
+      "Economics",
+      "Buffer/Seed cost [multiplier]"
+    ],
+    [
+      "Economics",
+      "Operating days [days/yr]"
+    ],
+    [
+      "Economics",
+      "IRR [fraction]"
+    ],
+    [
+      "Economics",
+      "Income tax [fraction]"
+    ],
+    [
+      "GWP",
+      "Electricity GWP [kg CO2/kWh]"
+    ],
+    [
+      "GWP",
+      "Glucose GWP [kg CO2/kg]"
+    ],
+    [
+      "GWP",
+      "Ammonia GWP [kg CO2/kg]"
+    ],
+    [
+      "GWP",
+      "Buffer/Seed GWP [multiplier]"
+    ]
+  ],
+  "metric_indices": [
+    [
+      "PreFerS",
+      "MSP [$/kg]"
+    ],
+    [
+      "PreFerS",
+      "TCI [10^6 $]"
+    ],
+    [
+      "PreFerS",
+      "AOC [10^6 $/yr]"
+    ],
+    [
+      "PreFerS",
+      "GWP [kg CO2-eq/kg]"
+    ]
+  ],
+  "baseline_metric_key_format": "group|metric",
+  "sankey_carbon_json": "sankey_carbon.json",
+  "sankey_energy_json": "sankey_energy.json",
+  "baseline_streams_csv": "baseline_streams.csv",
+  "baseline_streams_xlsx": "baseline_streams.xlsx",
+  "baseline_unit_design_csv": "baseline_unit_design.csv",
+  "baseline_unit_design_xlsx": "baseline_unit_design.xlsx",
+  "breakdown_summary_xlsx": "Breakdown_Summary.xlsx"
+}

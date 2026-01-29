@@ -1,0 +1,108 @@
+{
+  "config": "config1",
+  "timestamp": "20260129_1346",
+  "baseline_production_kg_hr": 150,
+  "n_target": 1000,
+  "batch_size": 1000,
+  "seed": 1234,
+  "parameter_indices": [
+    [
+      "Design",
+      "Production scale [kg/hr]"
+    ],
+    [
+      "Aerated fermentation-R302",
+      "Fermentation titer [g/L]"
+    ],
+    [
+      "Aerated fermentation-R302",
+      "Fermentation productivity [g/L/hr]"
+    ],
+    [
+      "Aerated fermentation-R302",
+      "Substrate yield [%]"
+    ],
+    [
+      "Stream-Glucose",
+      "Glucose price [$/kg]"
+    ],
+    [
+      "TEA",
+      "Electricity price [$/kWh]"
+    ]
+  ],
+  "metric_indices": [
+    [
+      "PreFerS",
+      "MSP [$/kg]"
+    ],
+    [
+      "PreFerS",
+      "TCI [10^6 $]"
+    ],
+    [
+      "PreFerS",
+      "AOC [10^6 $/yr]"
+    ],
+    [
+      "PreFerS",
+      "GWP [kg CO2-eq/kg]"
+    ],
+    [
+      "PreFerS",
+      "N-Hemo dextrin content [%]"
+    ],
+    [
+      "PreFerS",
+      "Heme equivalent content [%]"
+    ],
+    [
+      "PreFerS",
+      "Actual production [kg/hr]"
+    ],
+    [
+      "PreFerS",
+      "Annual production [MT/yr]"
+    ],
+    [
+      "PreFerS",
+      "Specific CAPEX [$/kg/yr]"
+    ]
+  ],
+  "baseline_msp": 17.061562557695648,
+  "baseline_gwp": 21.145196610194585,
+  "baseline_metric_key_format": "group|metric",
+  "scenario_files": {
+    "no_scale": {
+      "pickle": "monte_carlo_no_scale.pkl",
+      "csv": "monte_carlo_no_scale.csv",
+      "xlsx": "monte_carlo_no_scale.xlsx"
+    },
+    "with_scale": {
+      "pickle": "monte_carlo_with_scale.pkl",
+      "csv": "monte_carlo_with_scale.csv",
+      "xlsx": "monte_carlo_with_scale.xlsx"
+    }
+  },
+  "scenario_stats": {
+    "no_scale": {
+      "n_valid": 1000,
+      "n_attempts": 1000,
+      "success_rate": 100.0,
+      "exclude_production_scale": true,
+      "batch_size": 1000,
+      "n_workers": 22
+    },
+    "with_scale": {
+      "n_valid": 1000,
+      "n_attempts": 1000,
+      "success_rate": 100.0,
+      "exclude_production_scale": false,
+      "batch_size": 1000,
+      "n_workers": 22
+    }
+  },
+  "cost_breakdown_steps_csv": "cost_breakdown_steps.csv",
+  "cost_breakdown_steps_xlsx": "cost_breakdown_steps.xlsx",
+  "cost_breakdown_summary_csv": "cost_breakdown_summary.csv"
+}

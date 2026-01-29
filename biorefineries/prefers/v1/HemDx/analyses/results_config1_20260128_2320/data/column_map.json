@@ -1,0 +1,109 @@
+{
+  "columns": [
+    {
+      "flat": "Design_Production scale [kg/hr]",
+      "original": [
+        "Design",
+        "Production scale [kg/hr]"
+      ]
+    },
+    {
+      "flat": "Aerated fermentation-R302_Fermentation titer [g/L]",
+      "original": [
+        "Aerated fermentation-R302",
+        "Fermentation titer [g/L]"
+      ]
+    },
+    {
+      "flat": "Aerated fermentation-R302_Fermentation productivity [g/L/hr]",
+      "original": [
+        "Aerated fermentation-R302",
+        "Fermentation productivity [g/L/hr]"
+      ]
+    },
+    {
+      "flat": "Aerated fermentation-R302_Substrate yield [%]",
+      "original": [
+        "Aerated fermentation-R302",
+        "Substrate yield [%]"
+      ]
+    },
+    {
+      "flat": "Stream-Glucose_Glucose price [$/kg]",
+      "original": [
+        "Stream-Glucose",
+        "Glucose price [$/kg]"
+      ]
+    },
+    {
+      "flat": "TEA_Electricity price [$/kWh]",
+      "original": [
+        "TEA",
+        "Electricity price [$/kWh]"
+      ]
+    },
+    {
+      "flat": "PreFerS_MSP [$/kg]",
+      "original": [
+        "PreFerS",
+        "MSP [$/kg]"
+      ]
+    },
+    {
+      "flat": "PreFerS_TCI [10^6 $]",
+      "original": [
+        "PreFerS",
+        "TCI [10^6 $]"
+      ]
+    },
+    {
+      "flat": "PreFerS_AOC [10^6 $/yr]",
+      "original": [
+        "PreFerS",
+        "AOC [10^6 $/yr]"
+      ]
+    },
+    {
+      "flat": "PreFerS_GWP [kg CO2-eq/kg]",
+      "original": [
+        "PreFerS",
+        "GWP [kg CO2-eq/kg]"
+      ]
+    },
+    {
+      "flat": "PreFerS_N-Hemo dextrin content [%]",
+      "original": [
+        "PreFerS",
+        "N-Hemo dextrin content [%]"
+      ]
+    },
+    {
+      "flat": "PreFerS_Heme equivalent content [%]",
+      "original": [
+        "PreFerS",
+        "Heme equivalent content [%]"
+      ]
+    },
+    {
+      "flat": "PreFerS_Actual production [kg/hr]",
+      "original": [
+        "PreFerS",
+        "Actual production [kg/hr]"
+      ]
+    },
+    {
+      "flat": "PreFerS_Annual production [MT/yr]",
+      "original": [
+        "PreFerS",
+        "Annual production [MT/yr]"
+      ]
+    },
+    {
+      "flat": "PreFerS_Specific CAPEX [$/kg/yr]",
+      "original": [
+        "PreFerS",
+        "Specific CAPEX [$/kg/yr]"
+      ]
+    }
+  ]
+}

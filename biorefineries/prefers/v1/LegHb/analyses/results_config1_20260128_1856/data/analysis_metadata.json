@@ -1,7 +1,10 @@
 {
   "config": "config1",
-  "timestamp": "20260128_1855",
+  "timestamp": "20260128_1856",
   "baseline_production_kg_hr": 150,
+  "n_target": 100000,
+  "batch_size": 10000,
+  "seed": 1234,
   "parameter_indices": [
     [
       "Design",
@@ -66,12 +69,40 @@
       "Specific CAPEX [$/kg/yr]"
     ]
   ],
+  "baseline_msp": 10.860405141323197,
+  "baseline_gwp": 14.923482521240024,
   "baseline_metric_key_format": "group|metric",
-  "sankey_carbon_json": "sankey_carbon.json",
-  "sankey_energy_json": "sankey_energy.json",
-  "baseline_streams_csv": "baseline_streams.csv",
-  "baseline_streams_xlsx": "baseline_streams.xlsx",
-  "baseline_unit_design_csv": "baseline_unit_design.csv",
-  "baseline_unit_design_xlsx": "baseline_unit_design.xlsx",
-  "breakdown_summary_xlsx": "Breakdown_Summary.xlsx"
+  "scenario_files": {
+    "no_scale": {
+      "pickle": "monte_carlo_no_scale.pkl",
+      "csv": "monte_carlo_no_scale.csv",
+      "xlsx": "monte_carlo_no_scale.xlsx"
+    },
+    "with_scale": {
+      "pickle": "monte_carlo_with_scale.pkl",
+      "csv": "monte_carlo_with_scale.csv",
+      "xlsx": "monte_carlo_with_scale.xlsx"
+    }
+  },
+  "scenario_stats": {
+    "no_scale": {
+      "n_valid": 100000,
+      "n_attempts": 100000,
+      "success_rate": 100.0,
+      "exclude_production_scale": true,
+      "batch_size": 10000,
+      "n_workers": 22
+    },
+    "with_scale": {
+      "n_valid": 100000,
+      "n_attempts": 100000,
+      "success_rate": 100.0,
+      "exclude_production_scale": false,
+      "batch_size": 10000,
+      "n_workers": 22
+    }
+  },
+  "cost_breakdown_steps_csv": "cost_breakdown_steps.csv",
+  "cost_breakdown_steps_xlsx": "cost_breakdown_steps.xlsx",
+  "cost_breakdown_summary_csv": "cost_breakdown_summary.csv"
 }

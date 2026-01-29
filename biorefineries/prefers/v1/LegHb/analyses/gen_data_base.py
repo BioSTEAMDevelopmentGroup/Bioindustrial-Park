@@ -229,6 +229,73 @@ def generate_baseline(config='config1', baseline_production_kg_hr=275, timestamp
     print(f"  [+] Saved sankey data: {sankey_carbon_file}")
     print(f"  [+] Saved sankey data: {sankey_energy_file}")
 
+    # =============================================================================
+    # Single-Point Sensitivity (Tornado)
+    # =============================================================================
+    print("\n" + "=" * 70)
+    print("SINGLE-POINT SENSITIVITY ANALYSIS")
+    print("=" * 70)
+    try:
+        # Reset model to ensure clean state
+        model = create_model(baseline_production_kg_hr=baseline_production_kg_hr, config=config)
+        
+        print("Running single-point sensitivity (this may take a moment)...")
+        baseline_sp, lower_sp, upper_sp = model.single_point_sensitivity()
+        
+        # Check for NaN values
+        has_nan = (baseline_sp.isnull().any() or 
+                  lower_sp.isnull().any().any() or 
+                  upper_sp.isnull().any().any())
+        
+        if has_nan:
+             print("  [!] Warning: NaN values detected in sensitivity results")
+        
+        # Save comprehensive table format expected by plotting script
+        # Structure: Parameter | Baseline | Low | High | [Metric_Low] | [Metric_High] ...
+        
+        # We need to restructure this into a single DataFrame for the plotting script
+        # The plotting script usually expects columns like: 
+        # Parameter, Element, Name, Units, Baseline Value, Lower Value, Upper Value, 
+        # Metric1 Baseline, Metric1 Low, Metric1 High, ...
+        
+        # For simplicity, we'll save the raw dataframes to an Excel file with multiple sheets
+        # And also create a "Summary" sheet that is cleaner.
+        
+        tornado_file = os.path.join(dirs['data'], 'tornado_sensitivity.xlsx')
+        
+        with pd.ExcelWriter(tornado_file) as writer:
+            baseline_sp.to_excel(writer, sheet_name='Baseline')
+            lower_sp.to_excel(writer, sheet_name='Lower')
+            upper_sp.to_excel(writer, sheet_name='Upper')
+            
+            # Create a combined summary for easier plotting
+            # Rows = Parameters
+            # Cols = Metric Low/High
+            
+            # Use the first metric as primary for the main table (usually MSP)
+            # But we want all.
+            # Let's create a format:
+            # Index: Parameter
+            # Columns: [Param Lower, Param Upper, Metric1 Low, Metric1 High, Metric2 Low, Metric2 High...]
+            
+            summary_df = pd.DataFrame(index=model.parameters)
+            summary_df['Parameter Name'] = [p.name_with_units for p in model.parameters]
+            summary_df['Element'] = [p.element_name for p in model.parameters]
+            
+            for m in model.metrics:
+                m_name = m.name_with_units if hasattr(m, 'name_with_units') else m.index
+                summary_df[f'{m_name} Low'] = lower_sp[m.index]
+                summary_df[f'{m_name} High'] = upper_sp[m.index]
+            
+            summary_df.to_excel(writer, sheet_name='Summary')
+            
+        print(f"  [+] Saved sensitivity analysis: {tornado_file}")
+        
+    except Exception as e:
+        print(f"  [!] Single-point sensitivity failed: {e}")
+        import traceback
+        traceback.print_exc()
+
     print("\nSaving stream and unit design tables...")
     stream_table = _stream_summary(model.system)
     unit_table = _unit_design_summary(model.system)

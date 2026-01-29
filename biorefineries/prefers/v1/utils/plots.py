@@ -543,7 +543,7 @@ def plot_joint_marginal(data, x_col, y_col, x_label=None, y_label=None,
     
     # Central Plot: KDE Cloud (no scatter)
     # "Cloud with gradient color" - more dense=blue, marginal=orange
-    g.plot_joint(sns.kdeplot, fill=True, cmap=kde_color, levels=100, thresh=0.01)
+    g.plot_joint(sns.kdeplot, fill=True, cmap=kde_color, levels=20, thresh=0.01)
 
     # Marginal Plots: Boxplots to show p25, p75, median
     # "box is too large" -> reduced width
