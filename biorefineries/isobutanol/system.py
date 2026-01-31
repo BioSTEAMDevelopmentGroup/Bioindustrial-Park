@@ -188,7 +188,7 @@ V405_old = f.V405
 V406 = nsk.units.NSKFermentation('V406', 
                                  ins=(H301-0, f.P404-0, H302-0), 
                                  kinetic_reaction_system=te_r,
-                                 n_simulation_steps=500,
+                                 n_simulation_steps=1000,
                                  map_chemicals_nsk_to_bst = {'[s_glu]': 'Glucose',
                                                              '[x]': 'Yeast',
                                                              '[s_EtOH]': 'Ethanol',
@@ -202,6 +202,7 @@ V406 = nsk.units.NSKFermentation('V406',
                                                'y_IBO_glu_consumed',
                                                'y_EtOH_IBO_glu_added',
                                                'curr_n_glu_spikes',
+                                               'curr_a',
                                                # 'tot_mass_glu', 
                                                'prod_EtOH',
                                                'curr_tot_vol_glu_feed_added',
@@ -213,7 +214,7 @@ V406 = nsk.units.NSKFermentation('V406',
                                  # tau_update_policy=None,
                                  # tau_update_policy=('max', '[s_EtOH]'),
                                  tau_update_policy=('max', 'y_EtOH_IBO_glu_added'),
-                                 try_fewer_n_spikes_until=lambda r_te: r_te.s_glu<5.0,
+                                 try_fewer_n_spikes_until=lambda r_te: round(r_te.s_glu, 2)==0.0,
                                  perform_hydrolysis=False)
 
 V406-0-1-f.V409
@@ -513,8 +514,11 @@ def load_simulate_get_EtOH_MPSP(target_conc_sugars=None,
     return get_purity_adj_price(ethanol, ['Ethanol'])
 
 def plot_kinetic_results():
-    # for i in V406.map_chemicals_nsk_to_bst.keys():
-    plt.plot(V406.results_dict['time'], V406.results_dict['[x]'], label='cell mass')
+    # if variables is None:
+    #     variables = ['[x]', 'curr_a', '[s_glu]', '[s_EtOH]', '[s_acetate]', '[s_IBO]']
+    
+    plt.plot(V406.results_dict['time'], V406.results_dict['[x]'], label='cell loading')
+    plt.plot(V406.results_dict['time'], V406.results_dict['curr_a'], label='active cell loading')
     plt.plot(V406.results_dict['time'], V406.results_dict['[s_glu]'], label='glucose')
     plt.plot(V406.results_dict['time'], V406.results_dict['[s_EtOH]'], label='ethanol')
     plt.plot(V406.results_dict['time'], V406.results_dict['[s_acetate]'], label='acetate')
@@ -612,26 +616,44 @@ def model_specification(**kwargs):
                         V406.simulate()
                         success = True
                     except Exception as e:
+                        print(str(e))
                         i += 1
                         if i>=20:
                             try:
                                 r.setIntegrator('rk4')
                                 print('Changing integrator to rk4 ...')
-                                print('Re-running fermentation unit ...')
+                                print('Re-running fermentation unit with rk4 ...')
                                 V406.simulate()
                                 success = True
                             except Exception as e:
+                                print(str(e))
                                 raise e
                             finally:
                                 print('Changing integrator back to cvode ...')
                                 r.setIntegrator('cvode')
             except Exception as e:
-                raise e
+                str_e = str(e).lower()
+                print(str_e)
+                if 'negative concentrations' in str_e:
+                    try:
+                        print('Trying again ...')
+                        load_simulate_get_EtOH_MPSP(**curr_spec)
+                    except Exception as e:
+                        print(str(e))
+                        raise e
+                else:
+                    raise e
         elif 'specifications do not meet required condition' in str_e:
             # flowsheet('AcrylicAcid').F_mass /= 1000.
             raise e
         else:
-            run_bugfix_barrage(**curr_spec)
+            try:
+                print('Trying again ...')
+                load_simulate_get_EtOH_MPSP(**curr_spec)
+            except Exception as e:
+                str_e = str(e).lower()
+                print('Error in model spec: %s'%str_e)
+                run_bugfix_barrage(**curr_spec)
 
 
 def optimize_tau_for_MPSP(threshold_s_EtOH=5, **kwargs):
