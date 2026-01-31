@@ -150,6 +150,9 @@ TCI_units = r"$\mathrm{MM\$}$"
 Yield_w_label = r"$\bfYield$" # title of the color axis
 Yield_units = r"$\mathrm{g}\cdot\mathrm{g}^{-1}$"
 
+Titer_w_label = r"$\bfTiter$" # title of the color axis
+Titer_units = r"$\mathrm{g}\cdot\mathrm{L}^{-1}$"
+
 #%% Colors
 
 marketrange_shadecolor = (*colors.neutral.shade(50).RGBn, 0.3)
@@ -255,7 +258,8 @@ for s3 in spec_3:
             curr_no +=1
             error_message = None
             try:
-                assert s1<s2
+                # if round(s1,2)==round(spec_1[1],2) and round(s2,2)==round(spec_2[4],2):
+                #     breakpoint()
                 curr_spec = {k:v for k,v in baseline_spec.items()}
                 curr_spec.update({'threshold_conc_sugars':s1,})
                 curr_spec.update({'target_conc_sugars':s2,})
@@ -266,6 +270,7 @@ for s3 in spec_3:
                     n_tea_solves=3,
                     plot=False,
                     )
+                assert s1<s2
                 # optimize_max_n_glu_spikes(obj='y_EtOH_glu_added', 
                 #                           optimize_tau=False,
                 #                           show_progress=False,)
@@ -283,6 +288,7 @@ for s3 in spec_3:
                 error_message = str_e
                 if not 'specifications do not meet required' in str_e:
                     errors_dict[(s1, s2, s3)] = str_e
+                    breakpoint()
                     
             if curr_no%print_status_every_n_simulations==0 or error_message:
                 print_status(curr_no, total_no,
@@ -484,8 +490,8 @@ if plot:
     #%% Yield
     
     # Yield_w_levels, Yield_w_ticks, Yield_cbar_ticks = get_contour_info_from_metric_data(results_metric_1, lb=3)
-    Yield_w_levels = np.arange(0., 0.601, 0.01)
-    Yield_cbar_ticks = np.arange(0., 0.601, 0.05)
+    Yield_w_levels = np.arange(0., 0.501, 0.01)
+    Yield_cbar_ticks = np.arange(0., 0.501, 0.05)
     Yield_w_ticks = [0.1, 0.2, 0.3, 0.4, 0.5, 0.55]
     # Yield_w_levels = np.arange(0., 15.5, 0.5)
     
@@ -531,4 +537,54 @@ if plot:
                                     units_opening_brackets = [" (",] * 4,
                                     units_closing_brackets = [")",] * 4,
                                     )
+
+    #%% Titer
     
+    # Titer_w_levels, Titer_w_ticks, Titer_cbar_ticks = get_contour_info_from_metric_data(results_metric_1, lb=3)
+    Titer_w_levels = np.arange(80., 150.1, 2.)
+    Titer_cbar_ticks = np.arange(80., 150.1, 10.)
+    Titer_w_ticks = []
+    # Titer_w_levels = np.arange(0., 15.5, 0.5)
+    
+    
+    contourplots.animated_contourplot(w_data_vs_x_y_at_multiple_z=results[4], # shape = z * x * y # values of the metric you want to plot on the color axis; e.g., Titer
+                                    x_data=spec_1, # x axis values
+                                    # x_data = Titers/theoretical_max_g_HP_acid_per_g_glucose,
+                                    y_data=spec_2, # y axis values
+                                    z_data=spec_3, # z axis values
+                                    x_label=x_label, # title of the x axis
+                                    y_label=y_label, # title of the y axis
+                                    z_label=z_label, # title of the z axis
+                                    w_label=Titer_w_label, # title of the color axis
+                                    x_ticks=x_ticks,
+                                    y_ticks=y_ticks,
+                                    z_ticks=z_ticks,
+                                    w_levels=Titer_w_levels, # levels for unlabeled, filled contour areas (labeled and ticked only on color bar)
+                                    w_ticks=Titer_w_ticks, # labeled, lined contours; a subset of w_levels
+                                    x_units=x_units,
+                                    y_units=y_units,
+                                    z_units=z_units,
+                                    w_units=Titer_units,
+                                    # fmt_clabel=lambda cvalue: r"$\mathrm{\$}$"+" {:.1f} ".format(cvalue)+r"$\cdot\mathrm{kg}^{-1}$", # format of contour labels
+                                    fmt_clabel = lambda cvalue: get_rounded_str(cvalue, 3),
+                                    cmap=JBEI_UCB_colormap(reverse=True), # can use 'viridis' or other default matplotlib colormaps
+                                    # cmap_over_color = colors.grey_dark.shade(8).RGBn,
+                                    cmap_over_color=colors.yellow_tint.RGBn,
+                                    extend_cmap='max',
+                                    cbar_ticks=Titer_cbar_ticks,
+                                    z_marker_color='g', # default matplotlib color names
+                                    fps=fps, # animation frames (z values traversed) per second
+                                    n_loops='inf', # the number of times the animated contourplot should loop animation over z; infinite by default
+                                    animated_contourplot_filename='Titer_animated_contourplot_'+file_to_save, # file name to save animated contourplot as (no extensions)
+                                    keep_frames=keep_frames, # leaves frame PNG files undeleted after running; False by default
+                                    axis_title_fonts=axis_title_fonts,
+                                    clabel_fontsize = clabel_fontsize,
+                                    default_fontsize = default_fontsize,
+                                    axis_tick_fontsize = axis_tick_fontsize,
+                                    # comparison_range=EtOH_market_range,
+                                    n_minor_ticks = 1,
+                                    cbar_n_minor_ticks = 3,
+                                    units_on_newline = (False, False, False, False), # x,y,z,w
+                                    units_opening_brackets = [" (",] * 4,
+                                    units_closing_brackets = [")",] * 4,
+                                    )
