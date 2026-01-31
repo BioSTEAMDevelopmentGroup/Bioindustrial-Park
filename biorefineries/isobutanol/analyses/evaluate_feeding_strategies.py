@@ -107,7 +107,7 @@ results = {i: [] for i in range(len(metrics))}
 
 # %% Generate 3-specification meshgrid and set specification loading functions
 
-steps = (20, 20, 1)
+steps = (10, 10, 1)
 
 spec_1 = threshold_conc_sugarses = np.linspace(0., 500., steps[0])
 
@@ -118,7 +118,10 @@ spec_3 = conc_sugars_feed_spikes =\
     np.array([
               1.*baseline_spec['conc_sugars_feed_spike'],
               ])
+    
+# spec_3 = conc_sugars_feed_spikes = np.linspace(200, 800., steps[2])
 
+    
 #%% Plot stuff
 
 # Parameters analyzed across
@@ -291,7 +294,7 @@ for s3 in spec_3:
                 error_message = str_e
                 if not 'specifications do not meet required' in str_e:
                     errors_dict[(s1, s2, s3)] = str_e
-                    breakpoint()
+                    # breakpoint()
                     
             if curr_no%print_status_every_n_simulations==0 or error_message:
                 print_status(curr_no, total_no,

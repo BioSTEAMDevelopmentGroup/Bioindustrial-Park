@@ -455,15 +455,15 @@ corn_EtOH_IBO_sys._TEA = corn_EtOH_IBO_sys_tea = corn.tea.create_tea(corn_EtOH_I
 
 #%% Set baseline specifications
 
-baseline_spec = {'target_conc_sugars': 100,
-                 'threshold_conc_sugars': 10,
+baseline_spec = {'target_conc_sugars': 190,
+                 'threshold_conc_sugars': 180,
                  'conc_sugars_feed_spike': 600,
                  'tau_max': 10*24,}
 
 #% Create fed-batch strategy specification object
 fbs_spec = nsk.units.FedBatchStrategySpecification(
-    target_conc_sugars=100,
-    threshold_conc_sugars=10,
+    target_conc_sugars=190,
+    threshold_conc_sugars=180,
     conc_sugars_feed_spike=600,
     tau_max=72,
     fermentation_reactor=V406,
