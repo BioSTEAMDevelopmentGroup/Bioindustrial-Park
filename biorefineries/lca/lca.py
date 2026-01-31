@@ -69,9 +69,9 @@ class LCA:
         
         self.complex_feeds = complex_feeds
         
-        for k in complex_feeds.keys:
-            if k in [i.ID for i in chemicals]:
-                raise ValueError('Complex feed key {k} cannot be the same as an existing chemical {k}.')
+        for k in complex_feeds.keys():
+            if k in [i.ID for i in chemicals] and not k=='Glucose':
+                raise ValueError(f'Complex feed key {k} cannot be the same as an existing chemical {k}.')
                 
         kg_product_per_h_fn = lambda: self.main_product.imass[self.main_product_chemical_IDs].sum()
         MJ_LHV_product_per_h_fn = lambda: self.main_product.LHV
