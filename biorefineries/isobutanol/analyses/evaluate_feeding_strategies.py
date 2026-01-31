@@ -443,8 +443,8 @@ if plot:
     #%% MPSP
     
     # MPSP_w_levels, MPSP_w_ticks, MPSP_cbar_ticks = get_contour_info_from_metric_data(results_metric_1, lb=3)
-    MPSP_w_levels = np.arange(0.7, 1.001, 0.01)
-    MPSP_cbar_ticks = np.arange(0.7, 1.001, 0.05)
+    MPSP_w_levels = np.arange(0.8, 1.001, 0.01)
+    MPSP_cbar_ticks = np.arange(0.8, 1.001, 0.05)
     MPSP_w_ticks = [0.8, 0.85, 0.9]
     # MPSP_w_levels = np.arange(0., 15.5, 0.5)
     

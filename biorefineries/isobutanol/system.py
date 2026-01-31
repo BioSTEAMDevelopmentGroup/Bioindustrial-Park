@@ -244,6 +244,15 @@ def correct_saccharification_feed_flows():
 f.S1.outs[0].disconnect_sink()
 
 #%%
+
+V307 = f.V307
+
+@V307.add_specification(run=False)
+def V307_clamp_recycle_flow_spec():
+    V307.ins[4].F_mol = max(1e-3, V307.ins[4].F_mol)
+    V307.simulate()
+    
+#%%
 corn_EtOH_IBO_sys_no_IBO_recovery = bst.System.from_units('corn_EtOH_IBO_sys_no_IBO_recovery', 
                                           units = [i for i in corn_EtOH_sys.units 
                                                    if not (i.ID=='V405')]

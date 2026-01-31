@@ -109,7 +109,7 @@ results = {i: [] for i in range(len(metrics))}
 
 # %% Generate 3-specification meshgrid and set specification loading functions
 
-steps = (20, 20, 1)
+steps = (10, 10, 1)
 
 spec_1 = nsk_k_3es = np.linspace(1., 20., steps[0])
 
@@ -167,21 +167,17 @@ linecolor_light = (*colors.neutral_tint.RGBn, 0.85)
 markercolor = (*colors.CABBI_orange.shade(5).RGBn, 1)
 edgecolor = (*colors.CABBI_black.RGBn, 1)
 
-def JBEI_UCB_colormap(N_levels=90):
-    """
-    Return a matplotlib.colors.LinearSegmentedColormap object
-    that serves as CABBI's green colormap theme for contour plots.
-
-    """
+def JBEI_UCB_colormap(N_levels=90, reverse=False):
     JBEI_orange = (233/255, 83/255, 39/255)
     UCB_blue = (0/255, 38/255, 118/255)
     UCB_yellow = (253/255, 181/255, 21/255)
-    cmap_colors = (
+    cmap_colors = [
                     UCB_yellow,
                     JBEI_orange,
                     UCB_blue,
                     # colors.CABBI_teal_green.shade(50).RGBn,
-                    colors.grey_dark.RGBn)
+                    colors.grey_dark.RGBn]
+    if reverse: cmap_colors.reverse()
     return LinearSegmentedColormap.from_list('CABBI', cmap_colors, N_levels)
 
 def CABBI_green_colormap(N_levels=90):
@@ -487,8 +483,8 @@ if plot:
     #%% Yield
     
     # Yield_w_levels, Yield_w_ticks, Yield_cbar_ticks = get_contour_info_from_metric_data(results_metric_1, lb=3)
-    Yield_w_levels = np.arange(0., 0.5, 0.01)
-    Yield_cbar_ticks = np.arange(0., 0.5, 0.05)
+    Yield_w_levels = np.arange(0., 0.5001, 0.01)
+    Yield_cbar_ticks = np.arange(0., 0.5001, 0.05)
     Yield_w_ticks = [0.1, 0.2, 0.3, 0.4, 0.5]
     # Yield_w_levels = np.arange(0., 15.5, 0.5)
     
@@ -513,8 +509,8 @@ if plot:
                                     w_units=Yield_units,
                                     # fmt_clabel=lambda cvalue: r"$\mathrm{\$}$"+" {:.1f} ".format(cvalue)+r"$\cdot\mathrm{kg}^{-1}$", # format of contour labels
                                     fmt_clabel = lambda cvalue: get_rounded_str(cvalue, 3),
-                                    cmap=JBEI_UCB_colormap(), # can use 'viridis' or other default matplotlib colormaps
-                                    cmap_over_color = colors.grey_dark.shade(8).RGBn,
+                                    cmap=JBEI_UCB_colormap(reverse=True), # can use 'viridis' or other default matplotlib colormaps
+                                    cmap_over_color = colors.yellow_tint.RGBn,
                                     extend_cmap='max',
                                     cbar_ticks=Yield_cbar_ticks,
                                     z_marker_color='g', # default matplotlib color names
