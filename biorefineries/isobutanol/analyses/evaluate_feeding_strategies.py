@@ -108,7 +108,9 @@ metrics = {'MPSP': {'f': get_product_MPSP, 'units': '$/kg'},
             'Combined Yield': {'f': get_yield_nsk, 'units': 'g-EtOH-and-IBO/g-sugars'},
             'EtOH Titer': {'f': get_titer_nsk, 'units': 'g-EtOH/L-broth'},
             'EtOH Productivity': {'f': get_prod_nsk, 'units': 'g-EtOH/L-broth/h'},
-            'Number of glucose spikes': {'f': get_curr_n_glu_spikes, 'units': 'g-EtOH/L-broth/h'}}
+            'Number of glucose spikes': {'f': get_curr_n_glu_spikes, 'units': 'g-EtOH/L-broth/h'},
+            'Number of glucose spikes': {'f': get_curr_n_glu_spikes, 'units': 'g-EtOH/L-broth/h'},
+            }
 
 #%%
 # results = {i: [] for i in range(len(metrics.values()))}
@@ -656,7 +658,7 @@ if plot:
     #                                 )
     
     #%% All metrics
-    for curr_metric in metrics.keys():
+    for curr_metric, val in metrics.values():
         # curr_metric_w_levels, curr_metric_w_ticks, curr_metric_cbar_ticks = get_contour_info_from_metric_data(results_metric_1, lb=3)
         curr_metric_non_nans = np.array(results[curr_metric])[np.where(~np.isnan(np.array(results[curr_metric])))]
         
@@ -693,7 +695,7 @@ if plot:
                                         x_units=x_units,
                                         y_units=y_units,
                                         z_units=z_units,
-                                        w_units='',
+                                        w_units=val['units'],
                                         # fmt_clabel=lambda cvalue: r"$\mathrm{\$}$"+" {:.1f} ".format(cvalue)+r"$\cdot\mathrm{kg}^{-1}$", # format of contour labels
                                         fmt_clabel = lambda cvalue: get_rounded_str(cvalue, 3),
                                         cmap=JBEI_UCB_colormap(reverse=False), # can use 'viridis' or other default matplotlib colormaps
