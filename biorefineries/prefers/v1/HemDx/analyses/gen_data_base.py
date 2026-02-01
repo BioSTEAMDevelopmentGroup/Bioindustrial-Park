@@ -29,13 +29,13 @@ from biorefineries.prefers.v1.utils import sankey_utils
 # =============================================================================
 
 def get_available_configs():
-    return ['config1']
+    return ['config1', 'config2', 'config3']
 
 def parse_arguments():
     parser = argparse.ArgumentParser(description='HemDx baseline data generation')
-    parser.add_argument('--config', type=str, default='config1',
+    parser.add_argument('--config', type=str, default='config2',
                         choices=get_available_configs(),
-                        help='Process configuration (default: config1)')
+                        help='Process configuration (default: config2)')
     parser.add_argument('--production', type=float, default=150,
                         help='Baseline production rate in kg/hr (default: 150)')
     parser.add_argument('--timestamp', type=str, default=None,

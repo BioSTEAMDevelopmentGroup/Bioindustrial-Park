@@ -1,9 +1,8 @@
 # -*- coding: utf-8 -*-
 """
-HemDx TEA Configuration
+HemDx TEA Configuration - Config 3 (Extracellular, SF=0.9)
 
-Refactored to include PreFerSTEA class with integrated production scaling 
-and ammonia optimization logic.
+Based on Config 1, modified for extracellular production.
 """
 from warnings import filterwarnings
 filterwarnings('ignore')
@@ -14,7 +13,7 @@ import flexsolve as flx
 import warnings
 from biorefineries.prefers.v1._tea import PreFerSTEA as PreFerSTEA_Base
 # Import seed_targets to update the global registry used by unit specs
-from biorefineries.prefers.v1.HemDx.system._config1 import seed_targets
+from biorefineries.prefers.v1.HemDx.system._config3 import seed_targets
 
 class PreFerSTEA(PreFerSTEA_Base):
     
@@ -23,7 +22,7 @@ class PreFerSTEA(PreFerSTEA_Base):
         Optimizes NH3_25wt flow rate and S202 split ratio to meet fermentation demand.
         Delegates to system module implementation.
         """
-        from biorefineries.prefers.v1.HemDx.system import optimize_NH3_loading
+        from biorefineries.prefers.v1.HemDx.system._config3 import optimize_NH3_loading
         optimize_NH3_loading(self.system, verbose=verbose)
 
     def set_production_rate(self, target_production_kg_hr, verbose=True):
@@ -31,7 +30,7 @@ class PreFerSTEA(PreFerSTEA_Base):
         Set the target production rate and adjust system inputs accordingly.
         Delegates to system module implementation.
         """
-        from biorefineries.prefers.v1.HemDx.system import set_production_rate
+        from biorefineries.prefers.v1.HemDx.system._config3 import set_production_rate
         
         self._target_production_kg_hr = target_production_kg_hr
         return set_production_rate(self.system, target_production_kg_hr, verbose=verbose)
@@ -55,7 +54,7 @@ class PreFerSTEA(PreFerSTEA_Base):
 
 if __name__ == '__main__':
     import argparse
-    from biorefineries.prefers.v1.HemDx.system import create_NHemDx_system
+    from biorefineries.prefers.v1.HemDx.system._config3 import create_NHemDx_system
     from biorefineries.prefers.v1.HemDx._chemicals import create_chemicals_Hemodextrin
     from biorefineries.prefers.v1._process_settings import load_process_settings
     

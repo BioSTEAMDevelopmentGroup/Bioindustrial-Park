@@ -36,6 +36,9 @@ except Exception:
     go = None
 
 # from biorefineries.prefers.v1.HemDx.system import get_available_configs
+def get_available_configs():
+    return ['config1', 'config2', 'config3']
+
 from biorefineries.prefers.v1.utils import plots, style, utils, plot_utils, diagram_utils
 
 
@@ -76,9 +79,6 @@ MSP_COLORS = {
 # =============================================================================
 # CLI
 # =============================================================================
-
-def get_available_configs():
-    return ['config1']
 
 def parse_arguments():
     parser = argparse.ArgumentParser(description='HemDx figure generation')
@@ -200,12 +200,16 @@ def load_mc_results(data_dir):
             path = os.path.join(data_dir, name)
             if os.path.isfile(path):
                 print(f"  [+] Loading {suffix} results from: {name}")
-                if name.endswith('.pkl'):
-                    return pd.read_pickle(path)
-                elif name.endswith('.xlsx'):
-                    return pd.read_excel(path, index_col=0)
-                elif name.endswith('.csv'):
-                    return pd.read_csv(path, index_col=0)
+                try:
+                    if name.endswith('.pkl'):
+                        return pd.read_pickle(path)
+                    elif name.endswith('.xlsx'):
+                        return pd.read_excel(path, index_col=0)
+                    elif name.endswith('.csv'):
+                        return pd.read_csv(path, index_col=0)
+                except Exception as e:
+                    print(f"  [!] Failed to load {name}: {e}")
+                    continue
         return None
 
     results['no_scale'] = load_type('no_scale')
@@ -249,6 +253,7 @@ def load_baseline_metrics(data_dir):
 
 
 def load_sensitivity_table(data_dir):
+
     # Load sensitivity table for Tornado plots
     xlsx_path = os.path.join(data_dir, 'tornado_sensitivity.xlsx')
     if os.path.isfile(xlsx_path):
@@ -264,11 +269,6 @@ def load_sensitivity_table(data_dir):
         return pd.read_csv(csv_path, index_col=0)
         
     return None
-    if os.path.isfile(xlsx_path):
-        return pd.read_excel(xlsx_path)
-    if os.path.isfile(csv_path):
-        return pd.read_csv(csv_path)
-    return None
 
 
 
@@ -282,15 +282,15 @@ def get_parameter_category(param_name):
     """
     name = param_name.lower()
     
-    if any(x in name for x in ['yield', 'titer', 'productivity', 'rate']):
+    if any(x in name for x in ['yield', 'titer', 'productivity', 'rate', 'tau', 'days', 'fraction', 'secretion', 'conversion']):
         return 'Process Performance'
-    elif any(x in name for x in ['price', 'cost', 'catalyst', 'enzyme', 'feedstock']):
+    elif any(x in name for x in ['price', 'cost', 'catalyst', 'enzyme', 'feedstock', 'tax', 'irr']):
         return 'Material Prices'
     elif any(x in name for x in ['electricity', 'utility', 'steam', 'cooling']):
         return 'Utility Prices'
     elif any(x in name for x in ['capacity', 'investment', 'lang', 'capex', 'base']):
         return 'CapEx Factors'
-    elif any(x in name for x in ['efficiency', 'recovery', 'split']):
+    elif any(x in name for x in ['efficiency', 'recovery', 'split', 'capture', 'retention', 'resin']):
         return 'Efficiency/Recovery'
     else:
         return 'Other'
@@ -697,6 +697,98 @@ def plot_colored_scatter(x_data, y_data, z_data, xlabel, ylabel, zlabel,
 
 
 # =============================================================================
+# Composition Box Plots
+# =============================================================================
+
+def plot_composition_boxplots(results_df, figure_dir, product_type='HemDx'):
+    """
+    Create combined box plots for product composition metrics.
+    
+    Parameters
+    ----------
+    results_df : pd.DataFrame
+        Monte Carlo results containing composition metric columns
+    figure_dir : str
+        Directory to save figure
+    product_type : str
+        Product type for title and spec selection
+    """
+    # Define specifications for HemDx
+    hemdx_specs = {
+        'Salt Content': {'target': (0, 1), 'unit': 'wt%'},
+        'Residual CD': {'target': (0, 1), 'unit': 'wt%'},
+        'Residual Nicotinamide': {'target': (0, 1), 'unit': 'wt%'},
+        'Intermediate HemDx': {'target': (0, 1), 'unit': 'wt%'},
+        'N-HemoDextrin': {'target': (6.5, 8.5), 'unit': 'wt%'},
+    }
+    
+    # Find composition metric columns in results
+    comp_cols = []
+    specs_to_plot = hemdx_specs
+    
+    for col in results_df.columns:
+        col_str = str(col)
+        for spec_name in specs_to_plot.keys():
+            if spec_name.lower() in col_str.lower():
+                comp_cols.append((col, spec_name))
+                break
+    
+    if len(comp_cols) == 0:
+        print("  [!] No composition columns found in results")
+        return None
+    
+    n_plots = min(5, len(comp_cols))
+    fig, axes = plt.subplots(1, n_plots, figsize=(4 * n_plots, 5))
+    if n_plots == 1:
+        axes = [axes]
+    
+    colors = style.get_palette(n_plots)
+    
+    for i, (col, spec_name) in enumerate(comp_cols[:n_plots]):
+        ax = axes[i]
+        data = results_df[col].dropna()
+        
+        if len(data) == 0:
+            continue
+        
+        # Box plot
+        bp = ax.boxplot(data, patch_artist=True, widths=0.6)
+        bp['boxes'][0].set_facecolor(colors[i])
+        bp['boxes'][0].set_alpha(0.7)
+        
+        # Target range as grey band
+        spec = specs_to_plot.get(spec_name, {})
+        target = spec.get('target')
+        if target:
+            ax.axhspan(target[0], target[1], alpha=0.2, color='grey', 
+                      label='Target Range', zorder=0)
+            # Target center line
+            center = (target[0] + target[1]) / 2
+            ax.axhline(center, color='red', linestyle='--', linewidth=1.5, 
+                      alpha=0.8, label='Target Center')
+        
+        ax.set_title(spec_name, fontweight='bold', fontsize=10)
+        ax.set_ylabel(spec.get('unit', '%'))
+        ax.set_xticklabels([''])
+        
+        # Stats annotation
+        stats_text = f'μ={data.mean():.2f}\nσ={data.std():.2f}'
+        ax.text(0.95, 0.95, stats_text, transform=ax.transAxes,
+                fontsize=8, verticalalignment='top', horizontalalignment='right',
+                bbox=dict(boxstyle='round', facecolor='white', alpha=0.8))
+    
+    plt.suptitle(f'{product_type} Product Composition Distribution', 
+                fontweight='bold', fontsize=12)
+    plt.tight_layout()
+    
+    filepath = os.path.join(figure_dir, 'composition_boxplots.png')
+    fig.savefig(filepath, dpi=150, bbox_inches='tight')
+    plt.close(fig)
+    print(f"  [+] Saved: {filepath}")
+    return fig
+
+
+# =============================================================================
 # Main Generation
 # =============================================================================
 
@@ -849,42 +941,59 @@ def generate_figures(config='config1', timestamp=None, results_dir=None):
     print("=" * 80)
 
     if sensitivity_df is not None:
-        sensitivity_df = sensitivity_df.dropna()
+        # sensitivity_df = sensitivity_df.dropna() # Don't dropna blindly, it might drop rows with some NaNs in unrelated columns
         if not sensitivity_df.empty:
             # Create categories map
             categories = {p: get_parameter_category(p) for p in sensitivity_df['Parameter']}
             
+            # ---------------------------
             # Plot MSP
-            # Map columns to Low/High for plot_tornado
-            sensitivity_df['Low'] = sensitivity_df['MSP [$/kg] Low']
-            sensitivity_df['High'] = sensitivity_df['MSP [$/kg] High']
+            # ---------------------------
+            # Map columns to Low/High for plot_tornado if they exist
+            msplow = 'MSP [$/kg] Low'
+            msphigh = 'MSP [$/kg] High'
+            
+            if msplow in sensitivity_df.columns:
+                sens_msp = sensitivity_df.copy()
+                sens_msp['Low'] = sensitivity_df[msplow]
+                sens_msp['High'] = sensitivity_df[msphigh]
+                sens_msp = sens_msp.dropna(subset=['Low', 'High'])
+                
+                if not sens_msp.empty:
+                    fig3, ax3 = plots.plot_tornado(
+                        sensitivity_df=sens_msp,
+                        baseline=baseline_msp,
+                        metric_name='MSP [$/kg]',
+                        categories=categories
+                    )
+                    utils.save_figure(fig3, 'tornado_msp', dirs['figure'], formats=('png', 'pdf'))
+                    plt.close(fig3)
+                    print(f"  [+] Saved MSP tornado diagram")
 
-            fig3, ax3 = plots.plot_tornado(
-                sensitivity_df=sensitivity_df,
-                baseline=baseline_msp,
-                metric_name='MSP [$/kg]',
-                categories=categories
-            )
-            utils.save_figure(fig3, 'tornado_msp', dirs['figure'], formats=('png', 'pdf'))
-            plt.close(fig3)
-
-            # Plot GWP Tornado
-            if 'GWP [kg CO2-eq/kg] Low' in sensitivity_df.columns:
-                 sensitivity_gwp = sensitivity_df.copy()
-                 sensitivity_gwp['Low'] = sensitivity_gwp['GWP [kg CO2-eq/kg] Low']
-                 sensitivity_gwp['High'] = sensitivity_gwp['GWP [kg CO2-eq/kg] High']
+            # ---------------------------
+            # Plot GWP
+            # ---------------------------
+            gwplow = 'GWP [kg CO2-eq/kg] Low'
+            gwphigh = 'GWP [kg CO2-eq/kg] High'
+            
+            if gwplow in sensitivity_df.columns:
+                 sens_gwp = sensitivity_df.copy()
+                 sens_gwp['Low'] = sensitivity_df[gwplow]
+                 sens_gwp['High'] = sensitivity_df[gwphigh]
+                 sens_gwp = sens_gwp.dropna(subset=['Low', 'High'])
                  
-                 categories_gwp = {p: get_parameter_category(p) for p in sensitivity_gwp['Parameter']}
-                 
-                 fig_gwp, ax_gwp = plots.plot_tornado(
-                     sensitivity_df=sensitivity_gwp,
-                     baseline=baseline_gwp,
-                     metric_name='GWP [kg CO2-eq/kg]',
-                     categories=categories_gwp
-                 )
-                 utils.save_figure(fig_gwp, 'tornado_gwp', dirs['figure'], formats=('png', 'pdf'))
-                 plt.close(fig_gwp)
-                 print(f"  [+] Saved GWP tornado diagram")
+                 if not sens_gwp.empty:
+                     categories_gwp = {p: get_parameter_category(p) for p in sens_gwp['Parameter']}
+                     
+                     fig_gwp, ax_gwp = plots.plot_tornado(
+                         sensitivity_df=sens_gwp,
+                         baseline=baseline_gwp,
+                         metric_name='GWP [kg CO2-eq/kg]',
+                         categories=categories_gwp
+                     )
+                     utils.save_figure(fig_gwp, 'tornado_gwp', dirs['figure'], formats=('png', 'pdf'))
+                     plt.close(fig_gwp)
+                     print(f"  [+] Saved GWP tornado diagram")
         else:
              print("  [!] Sensitivity df empty after dropna")
     else:
@@ -929,127 +1038,133 @@ def generate_figures(config='config1', timestamp=None, results_dir=None):
     print("=" * 80)
     
     # We want to plot Metric vs Parameter for ALL variable parameters.
-    # We need to choose the source of data. 'with_scale' is best because it includes scale variation.
-    # However, 'no_scale' is better for parameters that might be masked by scale.
     # We will use 'with_scale' if available, as authorized.
     
     data_for_sen = results_with_scale if results_with_scale is not None else results_no_scale
     
     if data_for_sen is not None:
-        # Identify parameter columns (exclude metrics)
-        # Metrics are in metric_indices
-        metric_cols = {msp_idx, gwp_idx} # Set for fast lookup
+        # Find actual HemDx composition columns in data
+        comp_cols_in_data = {}
+        for col in data_for_sen.columns:
+            col_str = str(col).lower()
+            if 'salt' in col_str: comp_cols_in_data['Salt'] = col
+            elif 'residual cd' in col_str or 'residual_cd' in col_str: comp_cols_in_data['Residual CD'] = col
+            elif 'nicotinamide' in col_str: comp_cols_in_data['Nicotinamide'] = col
+            elif 'intermediate' in col_str and 'hem' in col_str: comp_cols_in_data['Intermediate HemDx'] = col
+            elif 'n-hemo' in col_str or 'n_hemo' in col_str: comp_cols_in_data['N-HemoDextrin'] = col
         
-        # We also need to get readable names
+        # All metrics to plot (MSP, GWP, + found composition)
+        all_metrics = [(msp_idx, 'MSP', '$/kg', baseline_msp), (gwp_idx, 'GWP', 'kg CO2-eq/kg', baseline_gwp)]
+        for name, col in comp_cols_in_data.items():
+            all_metrics.append((col, name, 'wt%', None))
+        
+        print(f"  Metrics to analyze: {[m[1] for m in all_metrics]}")
+        
+        # Identify parameter columns (exclude metrics)
+        metric_col_set = {msp_idx, gwp_idx} | set(comp_cols_in_data.values())
+        
         param_cols = []
         for col in data_for_sen.columns:
-            if col in metric_cols:
+            if col in metric_col_set:
                 continue
             # Check variance (ensure it actually varies)
-            if data_for_sen[col].nunique() > 5: # Threshold to consider it 'varying' enough for a band plot
+            if data_for_sen[col].nunique() > 5:
                 param_cols.append(col)
         
         print(f"  Found {len(param_cols)} varying parameters to plot.")
         
         for param_col in param_cols:
             param_name = param_col[1] if isinstance(param_col, tuple) else str(param_col)
-            # Clean filename
             safe_name = "".join([c if c.isalnum() else "_" for c in param_name])
             
-            # Determine Color based on category
             category = get_parameter_category(param_name)
-            # Map category to specific color
-            band_color = style.PREFERS_COLORS[0] # Default Navy
-            if 'Process' in category: band_color = style.PREFERS_COLORS[1] # Indigo
-            elif 'Price' in category: band_color = style.PREFERS_COLORS[4] # Emerald
-            elif 'CapEx' in category or 'Scale' in param_name: band_color = style.PREFERS_COLORS[7] # Gold
+            band_color = style.PREFERS_COLORS[0]
+            if 'Process' in category: band_color = style.PREFERS_COLORS[1]
+            elif 'Price' in category: band_color = style.PREFERS_COLORS[4]
+            elif 'CapEx' in category or 'Scale' in param_name: band_color = style.PREFERS_COLORS[7]
             
-            # Plot MSP vs Param
-            if msp_idx in data_for_sen.columns:
+            for metric_idx, metric_name, metric_unit, baseline_val in all_metrics:
+                if metric_idx not in data_for_sen.columns:
+                    continue
                 try:
                     fig_sen, ax_sen = plot_scale_effects(
-                        data_for_sen[param_col], data_for_sen[msp_idx], baseline_msp,
-                        xlabel=param_name, ylabel='MSP [$/kg]',
-                        title=f'MSP Sensitivity to {param_name}',
+                        data_for_sen[param_col], data_for_sen[metric_idx], baseline_val,
+                        xlabel=param_name, ylabel=f'{metric_name} [{metric_unit}]',
+                        title=f'{metric_name} Sensitivity to {param_name}',
                         color=band_color
                     )
                     if fig_sen:
-                        utils.save_figure(fig_sen, f'sensitivity_msp_{safe_name}', dirs['figure'], formats=('png',))
+                        utils.save_figure(fig_sen, f'sensitivity_{metric_name.lower()}_{safe_name}', dirs['figure'], formats=('png',))
                         plt.close(fig_sen)
                 except Exception as e:
-                    print(f"    [!] Failed plot MSP vs {param_name}: {e}")
-
-            # Plot GWP vs Param
-            if gwp_idx in data_for_sen.columns:
-                 try:
-                    fig_sen, ax_sen = plot_scale_effects(
-                        data_for_sen[param_col], data_for_sen[gwp_idx], baseline_gwp,
-                        xlabel=param_name, ylabel='GWP [kg CO2-eq/kg]',
-                        title=f'GWP Sensitivity to {param_name}',
-                        color=band_color
-                    )
-                    if fig_sen:
-                         utils.save_figure(fig_sen, f'sensitivity_gwp_{safe_name}', dirs['figure'], formats=('png',))
-                         plt.close(fig_sen)
-                 except Exception as e:
-                    print(f"    [!] Failed plot GWP vs {param_name}: {e}")
+                    print(f"    [!] Failed plot {metric_name} vs {param_name}: {e}")
 
     else:
         print("  [!] No MC data available for sensitivity bands")
 
     # -------------------------------------------------------------------------
-    # STEP 6: Contour Scatter Plots (Titer/Yield/Prod vs MSP/GWP)
+    # STEP 6: Contour Scatter Plots (All Fermentation Params vs MSP/GWP)
     # -------------------------------------------------------------------------
     print("\n" + "=" * 80)
-    print("STEP 6: Contour Scatter Plots")
+    print("STEP 6: Contour Scatter Plots (Fermentation Parameters)")
     print("=" * 80)
 
     # Use no_scale data to isolate biological effects
     data_for_scatter = results_no_scale
     if data_for_scatter is not None:
-        # Find parameter indices for Titer, Yield, Productivity
-        titer_idx = next((c for c in data_for_scatter.columns if 'titer' in str(c).lower()), None)
-        yield_idx = next((c for c in data_for_scatter.columns if 'yield' in str(c).lower()), None)
-        # Check for productivity OR tau
-        prod_idx = next((c for c in data_for_scatter.columns if 'productivity' in str(c).lower()), None)
-        if prod_idx is None:
-             prod_idx = next((c for c in data_for_scatter.columns if 'tau' in str(c).lower()), None)
+        # Find ALL fermentation parameter columns (including SF for HemDx)
+        ferm_params = {}
+        for col in data_for_scatter.columns:
+            col_str = str(col).lower()
+            if 'titer' in col_str: ferm_params['Titer'] = col
+            elif 'product yield' in col_str or ('yield' in col_str and 'biomass' not in col_str): 
+                if 'Yield_P' not in ferm_params: ferm_params['Yield_P'] = col
+            elif 'biomass yield' in col_str or 'biomass_yield' in col_str: ferm_params['Yield_B'] = col
+            elif 'tau' in col_str: ferm_params['Tau'] = col
+            elif 'productivity' in col_str: ferm_params['Productivity'] = col
+            elif 'secretion' in col_str or col_str.endswith(' sf') or 'sf [' in col_str: ferm_params['SF'] = col
         
-        plot_configs = [
-             # MSP Plots
-             {'x': titer_idx, 'y': yield_idx, 'z': msp_idx, 'title': 'MSP_vs_Titer_Yield'},
-             {'x': titer_idx, 'y': prod_idx, 'z': msp_idx, 'title': 'MSP_vs_Titer_Prod'},
-             {'x': yield_idx, 'y': prod_idx, 'z': msp_idx, 'title': 'MSP_vs_Yield_Prod'},
-             # GWP Plots (New)
-             {'x': titer_idx, 'y': yield_idx, 'z': gwp_idx, 'title': 'GWP_vs_Titer_Yield'},
-             {'x': titer_idx, 'y': prod_idx, 'z': gwp_idx, 'title': 'GWP_vs_Titer_Prod'},
-             {'x': yield_idx, 'y': prod_idx, 'z': gwp_idx, 'title': 'GWP_vs_Yield_Prod'},
+        print(f"  Found fermentation parameters: {list(ferm_params.keys())}")
+        
+        # Generate all pairwise combinations
+        from itertools import combinations
+        param_pairs = list(combinations(ferm_params.keys(), 2))
+        
+        # Target metrics for coloring
+        target_metrics = [
+            (msp_idx, 'MSP', '$/kg'),
+            (gwp_idx, 'GWP', 'kg CO2-eq/kg'),
         ]
         
-        if titer_idx and yield_idx and prod_idx and msp_idx in data_for_scatter.columns:
-            for cfg in plot_configs:
+        for metric_idx, metric_name, metric_unit in target_metrics:
+            if metric_idx not in data_for_scatter.columns:
+                continue
+            
+            for p1_name, p2_name in param_pairs:
+                p1_col = ferm_params[p1_name]
+                p2_col = ferm_params[p2_name]
+                
+                if p1_col not in data_for_scatter.columns or p2_col not in data_for_scatter.columns:
+                    continue
+                
                 try:
-                    xlabel = str(cfg['x']).split("'")[3] if "'" in str(cfg['x']) else str(cfg['x'])
-                    ylabel = str(cfg['y']).split("'")[3] if "'" in str(cfg['y']) else str(cfg['y'])
-                    zlabel_raw = str(cfg['z'])
-                    z_name = 'MSP [$/kg]' if 'MSP' in zlabel_raw else 'GWP [kg CO2-eq/kg]'
+                    xlabel = p1_col[1] if isinstance(p1_col, tuple) else str(p1_col)
+                    ylabel = p2_col[1] if isinstance(p2_col, tuple) else str(p2_col)
                     
-                    # Use PreFerS spectrum (reversed if cost, standard if metric)
-                    # Actually MSP is usually lower=better (so reversed might be good if Red=bad, Blue=Good?)
-                    # PreFerS cmap is Navy->...->Gold.
                     fig_s, ax_s = plot_colored_scatter(
-                        data_for_scatter[cfg['x']], data_for_scatter[cfg['y']], data_for_scatter[cfg['z']],
-                        xlabel=xlabel, ylabel=ylabel, zlabel=z_name,
-                        title=cfg['title'].replace('_', ' '),
+                        data_for_scatter[p1_col], data_for_scatter[p2_col], data_for_scatter[metric_idx],
+                        xlabel=xlabel, ylabel=ylabel, zlabel=f'{metric_name} [{metric_unit}]',
+                        title=f'{metric_name} vs {p1_name} & {p2_name}',
                         cmap='PreFerS', figsize=(9, 7)
                     )
                     if fig_s:
-                        utils.save_figure(fig_s, f"scatter_{cfg['title']}", dirs['figure'], formats=('png',))
+                        safe_title = f"scatter_{metric_name}_{p1_name}_{p2_name}"
+                        utils.save_figure(fig_s, safe_title, dirs['figure'], formats=('png',))
                         plt.close(fig_s)
                 except Exception as e:
-                    print(f"    [!] Failed scatter {cfg['title']}: {e}")
-        else:
-            print("  [!] Could not identify Titer, Yield, or Productivity columns")
+                    print(f"    [!] Failed scatter {metric_name} vs {p1_name}/{p2_name}: {e}")
+    else:
+        print("  [!] No MC data available for scatter plots")
     
     # -------------------------------------------------------------------------
     # STEP 7: Breakdown Stacked Bar Charts (Existing)
@@ -1064,6 +1179,23 @@ def generate_figures(config='config1', timestamp=None, results_dir=None):
         plot_stacked_bar_lca(excel_file, dirs['figure'])
     else:
         print("  [!] Breakdown_Summary.xlsx not found")
+
+    # -------------------------------------------------------------------------
+    # STEP 8: Composition Box Plots
+    # -------------------------------------------------------------------------
+    print("\n" + "=" * 80)
+    print("STEP 8: Composition Box Plots")
+    print("=" * 80)
+    
+    # Use the no_scale results for composition analysis
+    comp_data = results_no_scale if results_no_scale is not None else results_with_scale
+    if comp_data is not None:
+        try:
+            plot_composition_boxplots(comp_data, dirs['figure'], product_type='HemDx')
+        except Exception as e:
+            print(f"  [!] Failed to generate composition box plots: {e}")
+    else:
+        print("  [!] No MC data available for composition plots")
 
     print("\n" + "=" * 80)
     print("FIGURE GENERATION COMPLETE")

@@ -525,8 +525,8 @@ def create_area_400_recovery(broth_in, DfUltraBuffer2):
     )
     
     # High-speed centrifuge for debris removal
-    S402 = bst.SolidsCentrifuge(
-        'S402',
+    C403 = u.Centrifuge(
+        'C403',
         ins=H401-0,
         outs=('CellDebris', 'CrudeLysate'),
         split={
@@ -543,27 +543,28 @@ def create_area_400_recovery(broth_in, DfUltraBuffer2):
     )
     
     # Depth filtration
-    S403 = u.Filtration.from_preset(
+    S403 = u.FiltrationAdv.from_preset(
         'MF',
         'S403',
-        ins=S402-1,
+        ins=C403-1,
         outs=('FilterCake', 'ClarifiedLysate'),
         solid_capture_efficiency=0.95,
         cake_moisture_content=0.30,
+        solid_IDs=('cellmass', 'Glucan', 'Chitin', 'OleicAcid', 'RNA', 'Mannoprotein'),
     )
     S403.add_specification(run=True)
     
     # Screw press for debris dewatering
     S404 = bst.ScrewPress(
         'S404',
-        ins=(S402-0, S403-0),
+        ins=(C403-0, S403-0),
         outs=('DehydratedDebris', 'PressLiquor'),
         split=0.999,
         moisture_content=0.001
     )
     
     return {
-        'units': [C401, M401, H402, M402, C402, S401, H401, S402, S403, S404],
+        'units': [C401, M401, H402, M402, C402, S401, H401, C403, S403, S404],
         'clarified_lysate': S403.outs[1],
         'spent_media': C401.outs[1],
         'wash_effluent': C402.outs[1],
@@ -571,7 +572,7 @@ def create_area_400_recovery(broth_in, DfUltraBuffer2):
         'press_liquor': S404.outs[1],
         'C401': C401, 'M401': M401, 'H402': H402,
         'M402': M402, 'C402': C402, 'S401': S401,
-        'H401': H401, 'S402': S402, 'S403': S403, 'S404': S404,
+        'H401': H401, 'C403': C403, 'S403': S403, 'S404': S404,
     }
 
 # =============================================================================
@@ -623,28 +624,28 @@ def create_area_500_purification(clarified_lysate, DfUltraBuffer1):
     )
     
     # UF Stage 1 - concentration + buffer exchange using Diafiltration with UF preset
-    U501 = u.Diafiltration.from_preset(
+    U501 = u.DiafiltrationAdv.from_preset(
         'UF',
         'U501',
         ins=(clarified_lysate, H501-0),
         outs=('UFConcentrate', 'UFPermeate'),
-        TargetProduct_ID='Leghemoglobin',
-        Salt_ID=c.chemical_groups['Salts'],
-        OtherLargeMolecules_ID=c.chemical_groups['OtherLargeMolecules'],
+        TargetProduct_IDs=('Leghemoglobin',),
+        Salt_IDs=tuple(c.chemical_groups['Salts']),
+        OtherLargeMolecules_IDs=tuple(c.chemical_groups['OtherLargeMolecules']),
         TargetProduct_Retention=0.99,
         Salt_Retention=0.05,
     )
     U501.add_specification(run=True)
     
     # UF Stage 2 - Final concentration using Diafiltration with minimal buffer
-    U502 = u.Diafiltration(
+    U502 = u.DiafiltrationAdv(
         'U502',
         ins=(U501-0, bst.Stream('Water6', H2O=0.001)),
         outs=('ConcentratedLegH', 'ConcentrationPermeate'),
-        TargetProduct_ID='Leghemoglobin',
-        Salt_ID=c.chemical_groups['Salts'],
-        OtherLargeMolecules_ID=c.chemical_groups['OtherLargeMolecules'],
-        TMP_bar1=3,
+        TargetProduct_IDs=('Leghemoglobin',),
+        Salt_IDs=tuple(c.chemical_groups['Salts']),
+        OtherLargeMolecules_IDs=tuple(c.chemical_groups['OtherLargeMolecules']),
+        TMP_bar=3.0,
         FeedWater_Recovery_to_Permeate=0.85,
     )
     

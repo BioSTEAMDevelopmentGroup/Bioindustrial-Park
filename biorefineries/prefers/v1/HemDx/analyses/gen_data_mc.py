@@ -48,20 +48,20 @@ except Exception:  # pragma: no cover
 # =============================================================================
 
 def get_available_configs():
-    return ['config1']
+    return ['config1', 'config2', 'config3']
 
 def parse_arguments():
     parser = argparse.ArgumentParser(description='HemDx Monte Carlo data generation')
-    parser.add_argument('--config', type=str, default='config1',
+    parser.add_argument('--config', type=str, default='config2',
                         choices=get_available_configs(),
-                        help='Process configuration (default: config1)')
+                        help='Process configuration (default: config2)')
     parser.add_argument('--production', type=float, default=150,
                         help='Baseline production rate in kg/hr (default: 150)')
     # Reduced default sampling as requested
-    parser.add_argument('--samples', type=int, default=100000,
+    parser.add_argument('--samples', type=int, default=300000,
                         help='Target number of valid samples per scenario')
-    parser.add_argument('--batch-size', type=int, default=10000,
-                        help='Samples per batch (default: 10000)')
+    parser.add_argument('--batch-size', type=int, default=6000,
+                        help='Samples per batch (default: 6000)')
     parser.add_argument('--cores', type=int, default=None,
                         help='Number of worker processes (default: max-2)')
     parser.add_argument('--no-multiprocessing', action='store_true',
@@ -412,8 +412,29 @@ def run_monte_carlo_sequential(model, n_target, baseline_production_kg_hr, exclu
 # Data Generation
 # =============================================================================
 
-def generate_monte_carlo(config='config1', baseline_production_kg_hr=150, n_target=500,
-                          batch_size=250, n_workers=None, seed=1234,
+def filter_ferm(param):
+    name = param.name.lower()
+    # Include if name refers to fermentation metrics
+    # All keywords must be lowercase since we compare against name.lower()
+    # Exclude 'resin' to avoid capturing 'Resin yield' which is DSP
+    keywords = ['titer', 'product', 'biomass', 'tau', 'rate', 'secretion', 'sf', 'yield'] 
+    exclusions = ['resin', 'production scale']
+    return any(k in name for k in keywords) and not any(e in name for e in exclusions)
+
+def filter_dsp(param):
+    name = param.name.lower()
+    # All keywords must be lowercase since we compare against name.lower()
+    keywords = ['dsp', 'targetproduct', 'conversion', 'efficiency', 'recovery', 'split', 'capture', 'retention', 'centrifuge', 'facilities', 'boiler', 'cooling', 'tower', 'resin', 'cstr', 'turbogenerator']
+    return any(k in name for k in keywords) and 'production scale' not in name
+
+def filter_econ_env(param):
+    name = param.name.lower()
+    # All keywords must be lowercase since we compare against name.lower()
+    keywords = ['price', 'economics', 'cost', 'days', 'operating', 'irr', 'gwp', 'tax', 'characterization', 'factor', 'electricity', 'steam', 'waste']
+    return any(k in name for k in keywords) and 'production scale' not in name
+
+def generate_monte_carlo(config='config1', baseline_production_kg_hr=150, n_target=300000,
+                          batch_size=15000, n_workers=None, seed=1234,
                           timestamp=None, results_dir=None, use_multiprocessing=True):
     dirs = resolve_output_dirs(__file__, config, timestamp=timestamp, results_dir=results_dir)
 
@@ -524,13 +545,6 @@ def generate_monte_carlo(config='config1', baseline_production_kg_hr=150, n_targ
     # Reduce n_target for these sub-scenarios to save time? (e.g. 1/4 of target)
     n_target_sub = max(20, n_target // 4)
     
-    # 1. Fermentation Parameters Only
-    def filter_ferm(param):
-        name = param.name.lower()
-        # Include if name refers to fermentation metrics
-        keywords = ['titer', 'yield', 'productivity', 'tau', 'rate']
-        return any(k in name for k in keywords) and 'production scale' not in name
-        
     results_ferm, stats_ferm = run_monte_carlo(
         model=model, n_target=n_target_sub, baseline_production_kg_hr=baseline_production_kg_hr,
         exclude_production_scale=True, # Fixed scale for parameter sensitivity focus
@@ -539,13 +553,6 @@ def generate_monte_carlo(config='config1', baseline_production_kg_hr=150, n_targ
         config=config, use_multiprocessing=use_multiprocessing,
         parameter_filter=filter_ferm
     )
-
-    # 2. DSP & Facilities Parameters Only
-    def filter_dsp(param):
-        name = param.name.lower()
-        keywords = ['efficiency', 'recovery', 'split', 'capture', 'retention', 'membrane', 'filter', 'centrifuge', 'facility', 'boiler', 'cooling', 'tower']
-        # Also include general 'rate' if it applies to DSP, but usually 'rate' is reaction.
-        return any(k in name for k in keywords) and 'production scale' not in name
 
     results_dsp, stats_dsp = run_monte_carlo(
         model=model, n_target=n_target_sub, baseline_production_kg_hr=baseline_production_kg_hr,
@@ -556,19 +563,13 @@ def generate_monte_carlo(config='config1', baseline_production_kg_hr=150, n_targ
         parameter_filter=filter_dsp
     )
 
-    # 3. Economic & Environmental Parameters Only
-    def filter_econ(param):
-        name = param.name.lower()
-        keywords = ['price', 'cost', 'expected', 'irr', 'gwp', 'characterization', 'factor', 'electricity', 'steam', 'waste']
-        return any(k in name for k in keywords) and 'production scale' not in name
-        
     results_econ, stats_econ = run_monte_carlo(
         model=model, n_target=n_target_sub, baseline_production_kg_hr=baseline_production_kg_hr,
         exclude_production_scale=True,
         batch_size=batch_size, n_workers=n_workers,
         scenario_name="Economic & Environmental Parameters Only",
         config=config, use_multiprocessing=use_multiprocessing,
-        parameter_filter=filter_econ
+        parameter_filter=filter_econ_env
     )
 
 

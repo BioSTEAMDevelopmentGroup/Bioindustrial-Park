@@ -4,7 +4,7 @@ BioSTEAM Process Report Generator (v3.1)
 =====================================
 
 Generates TEA/LCA breakdown tables with rigorous Area-based and Cost Item-based categorization.
-Aligned with specific user requirements for LegHb system.
+Aligned with specific requirements for system.
 
 @author: Dr. Ouwen Peng
 @institute: PreFerS - Centre for Precision Fermentation and Sustainability

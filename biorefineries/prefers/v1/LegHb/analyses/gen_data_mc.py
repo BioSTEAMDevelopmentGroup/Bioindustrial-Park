@@ -48,10 +48,10 @@ def parse_arguments():
                         help='Process configuration (default: config1)')
     parser.add_argument('--production', type=float, default=150,
                         help='Baseline production rate in kg/hr (default: 150)')
-    parser.add_argument('--samples', type=int, default=100,
+    parser.add_argument('--samples', type=int, default=150000,
                         help='Target number of valid samples per scenario')
-    parser.add_argument('--batch-size', type=int, default=100,
-                        help='Samples per batch (default: 10000)')
+    parser.add_argument('--batch-size', type=int, default=15000,
+                        help='Samples per batch (default: 15000)')
     parser.add_argument('--cores', type=int, default=None,
                         help='Number of worker processes (default: max-2)')
     parser.add_argument('--no-multiprocessing', action='store_true',
@@ -288,7 +288,7 @@ def run_monte_carlo(model, n_target, baseline_production_kg_hr, exclude_producti
         if total_attempts > 100 and success_rate < 50:
             print(f"\n⚠️  WARNING: Low success rate ({success_rate:.1f}%)")
 
-    print(f"\n✓ Monte Carlo simulation complete!")
+    print(f"\n[OK] Monte Carlo simulation complete!")
     print(f"  Valid samples: {len(valid_results)}")
     print(f"  Total attempts: {total_attempts}")
     print(f"  Success rate: {len(valid_results)/total_attempts*100:.1f}%")
@@ -313,7 +313,7 @@ def run_monte_carlo(model, n_target, baseline_production_kg_hr, exclude_producti
             unique_scales = scale_values.nunique()
             print(f"\n  Verification: Production scale has {unique_scales} unique value(s)")
             if unique_scales == 1:
-                print(f"  ✓ Production scale correctly fixed at {scale_values.iloc[0]:.2f} kg/hr")
+                print(f"  [OK] Production scale correctly fixed at {scale_values.iloc[0]:.2f} kg/hr")
             else:
                 print(f"  ⚠️  WARNING: Production scale varies despite exclude_production_scale=True!")
                 print(f"     Range: {scale_values.min():.2f} - {scale_values.max():.2f} kg/hr")
@@ -414,8 +414,30 @@ def run_monte_carlo_sequential(model, n_target, baseline_production_kg_hr, exclu
 # Data Generation
 # =============================================================================
 
-def generate_monte_carlo(config='config1', baseline_production_kg_hr=275, n_target=120000,
-                          batch_size=30000, n_workers=None, seed=1234,
+def filter_ferm(param):
+    name = param.name.lower()
+    # Include if name refers to fermentation metrics
+    # All keywords must be lowercase since we compare against name.lower()
+    # Exclude 'resin' to avoid capturing 'Resin yield' which is DSP
+    keywords = ['titer', 'product', 'biomass', 'tau', 'rate', 'secretion', 'yield'] 
+    exclusions = ['resin', 'production scale']
+    return any(k in name for k in keywords) and not any(e in name for e in exclusions)
+
+def filter_dsp(param):
+    name = param.name.lower()
+    # All keywords must be lowercase since we compare against name.lower()
+    keywords = ['dsp', 'efficiency', 'recovery', 'split', 'capture', 'retention', 'centrifuge', 'facilities', 'boiler', 'cooling', 'tower', 'resin', 'turbogenerator']
+    return any(k in name for k in keywords) and 'production scale' not in name
+
+def filter_econ_env(param):
+    name = param.name.lower()
+    # All keywords must be lowercase since we compare against name.lower()
+    keywords = ['price', 'economics', 'cost', 'operating', 'days', 'irr', 'gwp', 'tax', 'characterization', 'factor', 'electricity', 'steam', 'waste']
+    return any(k in name for k in keywords) and 'production scale' not in name
+
+
+def generate_monte_carlo(config='config1', baseline_production_kg_hr=275, n_target=300000,
+                          batch_size=15000, n_workers=None, seed=1234,
                           timestamp=None, results_dir=None, use_multiprocessing=True):
     dirs = resolve_output_dirs(__file__, config, timestamp=timestamp, results_dir=results_dir)
 
@@ -526,11 +548,6 @@ def generate_monte_carlo(config='config1', baseline_production_kg_hr=275, n_targ
     
     n_target_sub = max(10, int(n_target / 4))
     
-    # 1. Fermentation Parameters Only
-    def filter_ferm(param):
-        name = param.name.lower()
-        return ('titer' in name) or ('yield' in name) or ('productivity' in name) or ('tau' in name)
-        
     results_ferm_only, stats_ferm_only = run_monte_carlo(
         model=model,
         n_target=n_target_sub,
@@ -544,23 +561,6 @@ def generate_monte_carlo(config='config1', baseline_production_kg_hr=275, n_targ
         parameter_filter=filter_ferm
     )
 
-    # 2. DSP & Facilities Parameters Only
-    def filter_dsp_fac(param):
-        # Everything that is NOT Ferm and NOT Econ/Env
-        # Easier to define by inclusion?
-        # Actually, let's exclude Ferm, exclude Prices/GWP. 
-        # The user said "Only DSP and Facilities". 
-        # Often these are defined by the Element name in bioSTEAM params.
-        # But here we only have param.name and param.element (which is usually the Unit ID or 'Stream').
-        
-        name = param.name.lower()
-        element = param.element_name.lower() if param.element_name else ""
-        
-        is_ferm = ('titer' in name) or ('yield' in name) or ('productivity' in name) or ('tau' in name)
-        is_econ_env = ('price' in name) or ('cost' in name) or ('gwp' in name) or ('characterization factor' in name)
-        
-        return (not is_ferm) and (not is_econ_env) and ('production scale' not in name)
-
     results_dsp_only, stats_dsp_only = run_monte_carlo(
         model=model,
         n_target=n_target_sub,
@@ -571,13 +571,8 @@ def generate_monte_carlo(config='config1', baseline_production_kg_hr=275, n_targ
         scenario_name="DSP & Facilities Only",
         config=config,
         use_multiprocessing=use_multiprocessing,
-        parameter_filter=filter_dsp_fac
+        parameter_filter=filter_dsp
     )
-
-    # 3. Econ & Environmental Only
-    def filter_econ_env(param):
-        name = param.name.lower()
-        return ('price' in name) or ('cost' in name) or ('gwp' in name) or ('characterization factor' in name)
 
     results_econ_only, stats_econ_only = run_monte_carlo(
         model=model,

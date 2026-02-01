@@ -8,6 +8,9 @@ Created on 2025-07-02 15:20:03
 @email: ouwen.peng@iarcs-create.edu.sg
 """
 
+from warnings import filterwarnings
+filterwarnings('ignore')
+
 # NOTE: Removed conflicting import that overwrites thermodynamics
 # from biorefineries.corn import tea
 import biosteam as bst

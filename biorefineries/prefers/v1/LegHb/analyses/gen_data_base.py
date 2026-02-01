@@ -248,7 +248,7 @@ def generate_baseline(config='config1', baseline_production_kg_hr=275, timestamp
                   upper_sp.isnull().any().any())
         
         if has_nan:
-             print("  [!] Warning: NaN values detected in sensitivity results")
+            print("[!] Warning: NaN values detected in sensitivity analysis results!")
         
         # Save comprehensive table format expected by plotting script
         # Structure: Parameter | Baseline | Low | High | [Metric_Low] | [Metric_High] ...
@@ -279,14 +279,27 @@ def generate_baseline(config='config1', baseline_production_kg_hr=275, timestamp
             # Columns: [Param Lower, Param Upper, Metric1 Low, Metric1 High, Metric2 Low, Metric2 High...]
             
             summary_df = pd.DataFrame(index=model.parameters)
-            summary_df['Parameter Name'] = [p.name_with_units for p in model.parameters]
+            summary_df['Parameter'] = [p.name_with_units for p in model.parameters]
             summary_df['Element'] = [p.element_name for p in model.parameters]
             
             for m in model.metrics:
                 m_name = m.name_with_units if hasattr(m, 'name_with_units') else m.index
-                summary_df[f'{m_name} Low'] = lower_sp[m.index]
-                summary_df[f'{m_name} High'] = upper_sp[m.index]
-            
+                # Try to handle MultiIndex columns
+                col_key = m.index
+                
+                # Check if key exists in columns
+                if col_key in lower_sp.columns:
+                     summary_df[f'{m_name} Low'] = lower_sp[col_key].values
+                     summary_df[f'{m_name} High'] = upper_sp[col_key].values
+                else:
+                    # Try alternate access (e.g. if key is tuple but columns are flat or vice versa)
+                    # Or if index is just name
+                    try:
+                        summary_df[f'{m_name} Low'] = lower_sp[col_key].values
+                        summary_df[f'{m_name} High'] = upper_sp[col_key].values
+                    except Exception as e:
+                        print(f"  [!] Failed to match metric {m_name} with key {col_key}: {e}")
+
             summary_df.to_excel(writer, sheet_name='Summary')
             
         print(f"  [+] Saved sensitivity analysis: {tornado_file}")

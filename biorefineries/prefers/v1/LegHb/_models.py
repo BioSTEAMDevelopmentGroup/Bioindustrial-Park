@@ -206,17 +206,17 @@ def create_model(baseline_production_kg_hr=150, config='config1', verbose=True):
             S401.cell_disruption_efficiency = eff
             
     # 2.3 Filtration Solid Capture
-    # Range 0.9~0.99, LogUniform
+    # Range 0.9~0.99, Uniform
     @param(name='Filtration capture', element='DSP', kind='coupled', units='-',
-           baseline=0.95, distribution=shape.LogUniform(0.90, 0.99))
+           baseline=0.95, distribution=shape.Uniform(0.90, 0.99))
     def set_filtration_capture(eff):
         if hasattr(S403, 'solid_capture_efficiency'):
             S403.solid_capture_efficiency = eff
 
     # 2.4 Diafiltration Product Retention
-    # Range 0.9~0.99, LogUniform
+    # Range 0.9~0.99, Uniform
     @param(name='Diafiltration retention', element='DSP', kind='coupled', units='-',
-           baseline=0.95, distribution=shape.LogUniform(0.90, 0.99))
+           baseline=0.95, distribution=shape.Uniform(0.90, 0.99))
     def set_df_retention(eff):
         for u in [U501, U502]:
             if hasattr(u, 'TargetProduct_Retention'):
@@ -357,10 +357,12 @@ def create_model(baseline_production_kg_hr=150, config='config1', verbose=True):
             # Use bst.report.lca_displacement_allocation_table per user instruction
             # Note: The table returns a DataFrame where the last column name might be the GWP value OR product name
             # We access loc['Total', 'GWP'] if named correctly, or last column.
+            # Safe stream access
+            product = LegHb_sys.flowsheet.stream.LegHb_3
             lca_table = bst.report.lca_displacement_allocation_table(
                 systems=[LegHb_sys],
                 key='GWP',
-                items=[s.LegHb_3],
+                items=[product],
             )
             total_gwp = lca_table.values[-1, -1] # Safe access to bottom-right 'Total' value
             return total_gwp
@@ -369,6 +371,65 @@ def create_model(baseline_production_kg_hr=150, config='config1', verbose=True):
             print("FULL TRACEBACK:")
             print(traceback.format_exc())
             return float('nan')
+    
+    # =========================================================================
+    # COMPOSITION METRICS (Product Quality)
+    # =========================================================================
+    product = s.LegHb_3
+    
+    @metric(name='Fat Content', units='wt%', element='Composition')
+    def get_fat_content():
+        """Fat (OleicAcid) weight percent in product"""
+        if product.F_mass > 0:
+            return product.imass['OleicAcid'] / product.F_mass * 100
+        return float('nan')
+    
+    @metric(name='Carbohydrates', units='wt%', element='Composition')
+    def get_carbohydrates():
+        """Carbohydrates (Glucan, Glucose, Chitin) weight percent"""
+        if product.F_mass > 0:
+            carbs = sum(product.imass[c] for c in ['Glucan', 'Glucose', 'Chitin'] 
+                       if c in product.chemicals.IDs)
+            return carbs / product.F_mass * 100
+        return float('nan')
+    
+    @metric(name='Product Content', units='wt%', element='Composition')
+    def get_product_content():
+        """Leghemoglobin weight percent in product"""
+        if product.F_mass > 0:
+            return product.imass['Leghemoglobin'] / product.F_mass * 100
+        return float('nan')
+    
+    @metric(name='Total Solids', units='wt%', element='Composition')
+    def get_total_solids():
+        """Total solids (non-water) weight percent"""
+        if product.F_mass > 0:
+            return (product.F_mass - product.imass['H2O']) / product.F_mass * 100
+        return float('nan')
+    
+    @metric(name='Protein Purity', units='%', element='Composition')
+    def get_protein_purity():
+        """Protein purity: LegHb / (LegHb + Globin + Mannoprotein)"""
+        legh = product.imass['Leghemoglobin']
+        globin = product.imass['Globin'] if 'Globin' in product.chemicals.IDs else 0
+        manno = product.imass['Mannoprotein'] if 'Mannoprotein' in product.chemicals.IDs else 0
+        total = legh + globin + manno
+        if total > 0:
+            return legh / total * 100
+        return float('nan')
+    
+    @metric(name='Heme Equivalent', units='wt%', element='Composition')
+    def get_heme_equivalent():
+        """Heme equivalent weight percent (based on LegHb molar content)"""
+        try:
+            legh_mol = product.imol['Leghemoglobin']
+            heme_mw = product.chemicals.Heme_b.MW
+            heme_mass = (legh_mol / 763.0) * heme_mw  # 1 heme per 763 carbons
+            if product.F_mass > 0:
+                return heme_mass / product.F_mass * 100
+        except:
+            pass
+        return float('nan')
             
     return model
 

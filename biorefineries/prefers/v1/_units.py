@@ -77,8 +77,8 @@ __all__ = (
     'Evaporator',
     'Diafiltration',
     'ResinColumn',
+    'Filtration',
     'ReverseOsmosis',
-    'NanofiltrationDF',
     'SprayDrying',
     'BoilerTurbogenerator',
     'HemDxCSTR',
@@ -2269,9 +2269,6 @@ class ResinColumn(bst.Unit):
 
 
 
-
-
-
 class HemDxCSTR(bst.CSTR):
     """
     Continuous Stirred Tank Reactor for HemDx formulation.
@@ -2292,3 +2289,11 @@ class HemDxCSTR(bst.CSTR):
             self.reactions(out)
         out.T = self.T
         out.P = 101325 if self.P is None else self.P
+
+
+# =============================================================================
+# Re-export Advanced Unit Operations from _units_adv.py
+# This allows configs to use `u.FiltrationAdv`, `u.DiafiltrationAdv`, etc.
+# =============================================================================
+from biorefineries.prefers.v1._units_adv import ResinColumnAdv, DiafiltrationAdv, FiltrationAdv
+

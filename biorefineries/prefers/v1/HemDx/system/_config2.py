@@ -1,8 +1,9 @@
 # -*- coding: utf-8 -*-
 """
-N-HemDx Full Production System - Config 1 (Modular Refactored Version)
+N-HemDx Full Production System - Config 2 (Intracellular)
 
-Modular refactoring of N-HemDx production system into standard BioSTEAM Process Areas.
+Based on Config 1, modified for intracellular production (SF=0.1).
+Supernatant filtration (S404) removed; supernatant goes directly to WWT via M504.
 
 Process Areas:
     - Area 200: Media Preparation
@@ -85,7 +86,7 @@ def get_fermentation_parameters():
         'P_pp_1st': 1e-8,
         'P_Heme_2nd': 4.2/1e3,
         'P_pp_2nd': 0.7/1e3,
-        'SF': 0.45,  # Secretion fraction
+        'SF': 0.1,  # Secretion fraction (Intracellular)
     }
 
 def create_fermentation_reactions(params=None):
@@ -315,7 +316,7 @@ def create_area_300_conversion(seed_in, glucose_in, ammonia_in, vent1, vent2, rx
     return R302-1
 
 # =============================================================================
-# AREA 400: RECOVERY
+# AREA 400: RECOVERY (Config 2 - Intracellular)
 # =============================================================================
 def create_area_400_recovery(broth_in, DfUltraBuffer2):
     # S401: Primary Centrifuge
@@ -348,13 +349,8 @@ def create_area_400_recovery(broth_in, DfUltraBuffer2):
                 S401.isplit[chem_id] = waterresidual
         S401._run()
 
-    # Supernatant microfiltration
-    S404 = u.FiltrationAdv.from_preset(
-        'MF', 'S404', ins=S401-1, outs=('SupernatantCake', 'FilteredSupernatant'),
-        solid_capture_efficiency=0.95, cake_moisture_content=0.30,
-        solid_IDs=('Corynebacterium_glutamicum', 'Protein', 'Cellulose', 'Xylan', 'OleicAcid', 'RNA', 'Ash'),
-    )
-    S404.add_specification(run=True)
+    # Config 2: S404 removed - supernatant goes directly to M504 for WWT
+    M504 = bst.Mixer('M504', ins=S401-1, outs='SupernatantToWWT')
 
     # Cell cream washing & disruption
     M401 = bst.MixTank('M401', ins=(DfUltraBuffer2, 'Water4'), outs='WashBufferOut', tau=0.5)
@@ -403,20 +399,22 @@ def create_area_400_recovery(broth_in, DfUltraBuffer2):
     )
     S405.add_specification(run=True)
 
-    # Debris Dewatering
-    M404 = bst.Mixer('M404', ins=(S403-0, S405-0, S404-0), outs='CellDebrisRaw')
+    # Debris Dewatering (Config 2: no S404-0, only S403-0 and S405-0)
+    M404 = bst.Mixer('M404', ins=(S403-0, S405-0), outs='CellDebrisRaw')
     S406 = bst.ScrewPress(
         'S406', ins=M404-0, outs=('DehydratedDebris', 'PressLiquor'),
         split=0.999, moisture_content=0.001
     )
 
-    M405 = bst.Mixer('M405', ins=(S405-1, S404-1), outs='CombinedLysate')
+    # Config 2: M405 only receives S405-1 (no S404-1)
+    M405 = bst.Mixer('M405', ins=S405-1, outs='CombinedLysate')
     
     return {
         'CombinedLysate': M405-0,
         'DehydratedDebris': S406-0,
         'PressLiquor': S406-1,
         'WashEffluent': C402-1,
+        'SupernatantToWWT': M504-0,  # New: supernatant to WWT
     }
 
 # =============================================================================
@@ -567,11 +565,11 @@ def create_area_800_final_product(crude_product, product_out, AntioxidantStream)
         'UF', 'U801',
         ins=(crude_product, 'Water11'),
         outs=('ConcentratedFinal', 'FinalPermeate'),
-        TargetProduct_IDs=('N-HemoDextrin', 'HemoDextrin', 'Nicotinamide', 'GammaCyclodextrin'),
-        Salt_IDs=('NaCl', 'NaOH', 'Ethanol', 'K2SO4', 'MgSO4', 'FeSO4', '(NH4)2SO4', 'KH2PO4'),
+        TargetProduct_IDs=('N-HemoDextrin', 'HemoDextrin','Nicotinamide', 'GammaCyclodextrin'),
+        Salt_IDs=('NaCl', 'NaOH', 'Ethanol','K2SO4','MgSO4','FeSO4','(NH4)2SO4','KH2PO4'),
         TargetProduct_Retention=0.99,
         Salt_Retention=0.10,
-        diavolumes=5.0,  # Controlled by spec
+        diavolumes=2.0,
     )
     
     # QA/Concentration Control
@@ -732,23 +730,23 @@ def check_HemDx_specifications(product_stream):
 
     specs = {
         'Salt': {
-            'chemicals': ['NaCl', 'NaOH', 'KH2PO4','SodiumAscorbate'], # Covers ions if split
-            'limit': 2.0, 
+            'chemicals': ['NaCl', 'NaOH', 'Sodium', 'Chloride', 'Na+', 'Cl-'], # Covers ions if split
+            'limit': 1.0, 
             'type': 'max'
         },
         'Residual CD': {
             'chemicals': ['GammaCyclodextrin'],
-            'limit': 4.0,
+            'limit': 1.0,
             'type': 'max'
         },
         'Residual Nicotinamide': {
             'chemicals': ['Nicotinamide'],
-            'limit': 2.0,
+            'limit': 1.0,
             'type': 'max'
         },
         'Intermediate HemDx': {
             'chemicals': ['HemoDextrin'],
-            'limit': 2.0,
+            'limit': 1.0,
             'type': 'max'
         },
         'N-HemoDextrin': {
@@ -1106,6 +1104,7 @@ def create_NHemDx_system(ins, outs, use_area_convention=False):
         waste_streams=(
             # area_300 is just a stream
             area_400['PressLiquor'], area_400['WashEffluent'],
+            area_400['SupernatantToWWT'],  # Config 2: supernatant directly to WWT
             area_500['ResinFlowthrough'], area_500['ResinRegenWaste'], area_500['ResinWash'],
             area_600['NFPermeate'],
             area_800['FinalPermeate'],

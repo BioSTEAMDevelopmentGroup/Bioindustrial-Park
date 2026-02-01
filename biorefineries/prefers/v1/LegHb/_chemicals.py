@@ -347,7 +347,7 @@ def create_chemicals_LegHb():
         phase='s',
         formula = 'CH1.78O0.66N0.158P0.009S0.0035',#K0.0015',
         rho=1540,
-        Cp=chems.Glucose.Cp(298.15), # 1.54
+        Cp=chems.Glucose.Cp( 298.15), # 1.54
         default=True,
         search_db=False,
         # aliases=['Cellmass'],
