@@ -213,9 +213,9 @@ V406 = nsk.units.NSKFermentation('V406',
                                  sugar_IDs=('Glucose',),
                                  # tau_update_policy=None,
                                  # tau_update_policy=('max', '[s_EtOH]'),
-                                 tau_update_policy=('max', 'y_EtOH_IBO_glu_added'),
-                                 # tau_update_policy=('min', '[s_glu]'),
-                                 n_decimal_places_for_tau_update_policy=2,
+                                 # tau_update_policy=('max', 'y_EtOH_IBO_glu_added'),
+                                 tau_update_policy=('min', '[s_glu]'),
+                                 n_decimal_places_for_tau_update_policy=0,
                                  try_fewer_n_spikes_until=lambda r_te: round(r_te.s_glu, 2)==0.0,
                                  perform_hydrolysis=False)
 
