@@ -30,6 +30,7 @@ import thermosteam as tmo
 import numpy as np
 from biorefineries.prefers.v1.HemDx import _chemicals as c
 from biorefineries.prefers.v1 import _units as u
+from biorefineries.prefers.v1.utils.convergence import run_titer_convergence
 from biorefineries.prefers.v1 import _process_settings
 from biorefineries.prefers.v1.HemDx import _streams as s
 import numpy as np
@@ -59,6 +60,7 @@ __all__ = (
     'create_area_900_facilities',
     'set_production_rate',
     'optimize_NH3_loading',
+    'adjust_glucose_for_titer',
     'check_HemDx_specifications',
 )
 
@@ -80,6 +82,7 @@ def get_fermentation_parameters():
         'compressor_isentropic_efficiency': 0.85,
         'V_max': 500,
         # Kinetics
+        'titer_Heme': 0.380,  # g/L
         'tau1': 72,  # hours growth
         'tau2': 90,  # hours production
         'P_Heme_1st': 1e-8,
@@ -290,6 +293,9 @@ def create_area_300_conversion(seed_in, glucose_in, ammonia_in, vent1, vent2, rx
         cooler_pressure_drop=params['cooler_pressure_drop'],
         compressor_isentropic_efficiency=params['compressor_isentropic_efficiency'],
         P=1 * 101325,
+        # Titer control parameters
+        titer=None,
+        titer_IDs=('Heme_b', 'Heme_b_In'),
     )
     # Expose parameters for Model analysis
     R302.reaction_params = params
@@ -301,7 +307,8 @@ def create_area_300_conversion(seed_in, glucose_in, ammonia_in, vent1, vent2, rx
     Y_pp = rxns['Y_pp']
     SF = params['SF']
     
-    R302.target_titer = (params['tau1']+params['tau2']) * P_Heme
+    R302.target_titer = params['titer_Heme']
+    R302.titer = R302.target_titer
     R302.target_productivity = P_Heme
     R302.target_yield = Y_Heme
 
@@ -319,41 +326,20 @@ def create_area_300_conversion(seed_in, glucose_in, ammonia_in, vent1, vent2, rx
 # AREA 400: RECOVERY (Config 3 - Extracellular)
 # =============================================================================
 def create_area_400_recovery(broth_in, DfUltraBuffer2):
-    # S401: Primary Centrifuge
-    centrifuge_order = ('Corynebacterium_glutamicum', 'Heme_b_In', 'ProtoporphyrinIX_In')
-    S401 = u.Centrifuge(
-        'S401',
+    # C401: Primary Centrifuge (simplified using chemical_groups)
+    C401 = u.Centrifuge(
+        'C401',
         ins=broth_in,
         outs=('CellCream', 'Supernatant'),
-        moisture_content=0.4,
-        split=(0.999, 0.999, 0.999),
-        order=centrifuge_order,
+        split=c.chemical_groups['SolidsCentrifuge'],
+        moisture_content=0.40,
     )
-    @S401.add_specification(run=True)
-    def update_centrifuge_splits():
-        inlet = S401.ins[0]
-        S401._run()
-        outlets_solid = S401.outs[0]
-        if inlet.imass['H2O'] > 0:
-            waterresidual = outlets_solid.imass['H2O'] / inlet.imass['H2O']
-        else:
-            waterresidual = 0.
-        order_chemicals = set(centrifuge_order)
-        for chem in S401.chemicals:
-            chem_id = chem.ID
-            if chem_id in order_chemicals:
-                S401.isplit[chem_id] = 0.999
-            elif chem_id == 'H2O':
-                pass
-            else:
-                S401.isplit[chem_id] = waterresidual
-        S401._run()
 
     # Supernatant microfiltration (retained for Config 3)
     S404 = u.FiltrationAdv.from_preset(
-        'MF', 'S404', ins=S401-1, outs=('SupernatantCake', 'FilteredSupernatant'),
-        solid_capture_efficiency=0.95, cake_moisture_content=0.30,
-        solid_IDs=('Corynebacterium_glutamicum', 'Protein', 'Cellulose', 'Xylan', 'OleicAcid', 'RNA', 'Ash'),
+        'MF', 'S404', ins=C401-1, outs=('SupernatantCake', 'FilteredSupernatant'),
+        solid_capture_efficiency=0.85, cake_moisture_content=0.30,
+        solid_IDs=c.chemical_groups['FilteredSubstances'],
     )
     S404.add_specification(run=True)
 
@@ -362,21 +348,17 @@ def create_area_400_recovery(broth_in, DfUltraBuffer2):
 
     @M401.add_specification(run=True)
     def update_wash_buffer():
-        M401.ins[1].imass['H2O'] = S401.outs[0].F_mass * 1.5
+        M401.ins[1].imass['H2O'] = C401.outs[0].F_mass * 1.5
         M401.ins[0].imol['DfUltraBuffer'] = M401.ins[1].imass['H2O'] * (0.025 + 0.01 + 0.001) / 1000
 
     H402 = bst.HXutility('H402', ins=M401-0, outs='ColdWashBuffer', T=10 + 273.15, cool_only=True)
-    M402 = bst.MixTank('M402', ins=(S401-0, H402-0), outs='WashedCellSlurry', tau=0.25)
+    M402 = bst.MixTank('M402', ins=(C401-0, H402-0), outs='WashedCellSlurry', tau=0.25)
 
     C402 = u.Centrifuge(
         'C402',
         ins=M402-0,
         outs=('WashedCellCream', 'WashEffluent'),
-        split={
-            'Corynebacterium_glutamicum': 0.999, 'Heme_b_In': 0.999, 'ProtoporphyrinIX_In': 0.999,
-            'Heme_b': 0.85, 'ProtoporphyrinIX': 0.85, 'Protein': 0.99, 'Cellulose': 0.99,
-            'Xylan': 0.99, 'OleicAcid': 0.99, 'RNA': 0.99,
-        },
+        split=c.chemical_groups['SolidsCentrifuge'],
         moisture_content=0.55,
     )
 
@@ -769,6 +751,123 @@ def check_HemDx_specifications(product_stream):
         return False
     return True
 
+
+def adjust_glucose_for_titer(system, verbose=False):
+    """
+    Adjust R302's yield based on target titer using elasticity-based correction.
+    
+    This function should be called BEFORE system.simulate() to ensure
+    the yield adjustment takes effect.
+    """
+    log = print if verbose else (lambda *args, **kwargs: None)
+    
+    u = system.flowsheet.unit
+    s = system.flowsheet.stream
+    
+    try:
+        R302 = u.R302
+        glucose_stream = s.Glucose
+    except AttributeError:
+        log("[WARN] R302 or Glucose stream not found")
+        return
+    
+    # Get target titer
+    target_titer = R302.titer if R302.titer is not None else getattr(R302, 'target_titer', None)
+    
+    if target_titer is None:
+        log("[WARN] No target titer set on R302")
+        return
+    
+    # Capture baseline if not set
+    if not hasattr(R302, '_actual_baseline_titer') or R302._actual_baseline_titer is None:
+        actual_titer = R302.actual_titer
+        if actual_titer and actual_titer > 0:
+            R302._actual_baseline_titer = actual_titer
+            R302._actual_baseline_glucose = glucose_stream.imass['Glucose']
+            R302._actual_baseline_yield = R302.target_yield
+            R302._last_actual_titer = actual_titer
+            log(f"[Titer Control] Captured baseline: titer={actual_titer:.4f} g/L, yield={R302._actual_baseline_yield:.6f}")
+        else:
+            R302._actual_baseline_titer = getattr(R302, '_baseline_titer', target_titer)
+            R302._actual_baseline_glucose = getattr(R302, '_baseline_system_glucose', glucose_stream.imass['Glucose'])
+            R302._actual_baseline_yield = R302.target_yield
+            log(f"[Titer Control] Using design baseline: titer={R302._actual_baseline_titer:.4f} g/L")
+            
+    baseline_titer = R302._actual_baseline_titer
+    baseline_yield = R302._actual_baseline_yield
+    
+    if baseline_titer is None or baseline_titer <= 0:
+        return
+
+    # Elasticity factor: d(log titer)/d(log yield)
+    # HemDx shows oscillation at 1.3, increasing to 2.0 to dampen response
+    ELASTICITY = 2.0
+    
+    # --- INCREMENTAL UPDATE LOGIC (DYNAMIC DAMPING) ---
+    # use LAST SIMULATED yield/titer to step forward
+    current_actual_titer = R302.actual_titer
+    last_stored_titer = getattr(R302, '_last_actual_titer', None)
+    
+    # Prefer current actual if valid (from just-finished simulation), else stored
+    base_titer = current_actual_titer if (current_actual_titer and current_actual_titer > 0) else last_stored_titer
+    
+    if base_titer and base_titer > 0:
+        # Determine Mode
+        error_ratio = abs(target_titer - base_titer) / target_titer
+        
+        if error_ratio > 0.10:
+             # Coarse Mode: Aggressive stepping for deviations > 10%
+             damping = 1.0 # Full step
+             mode = "COARSE"
+        else:
+             # Fine Mode: Damped stepping for convergence < 1%
+             damping = 0.5 
+             mode = "FINE"
+             
+        # Incremental update: New = Current * (Target / Actual)^(1/E)
+        current_yield = R302.target_yield
+        correction_ratio = target_titer / base_titer
+        
+        step = (correction_ratio ** (1.0 / ELASTICITY)) ** damping
+        
+        new_yield = current_yield * step
+        log(f"[Titer Control] {mode} Step: Ratio={correction_ratio:.4f}, Damping={damping}, Step={step:.4f} (Base Titer: {base_titer:.4f} g/L, Error: {error_ratio:.1%})")
+        
+    else:
+        # First time / No history: Use Baseline Interpolation
+        import flexsolve as flx
+        titer_ratio = target_titer / baseline_titer
+        def f(yield_ratio):
+            return (yield_ratio ** ELASTICITY) - titer_ratio
+        
+        y0 = 1e-4
+        y1 = 1e4
+        yield_ratio = flx.IQ_interpolation(
+            f=f, x0=y0, x1=y1,
+            x=max(0.1, min(10.0, titer_ratio ** (1.0 / ELASTICITY))),
+            xtol=1e-8, ytol=1e-8, maxiter=500,
+            checkbounds=True, checkiter=False,
+        )
+        new_yield = baseline_yield * yield_ratio
+        log(f"[Titer Control] Baseline Guess: Expected Ratio={titer_ratio:.4f}, Yield Factor={yield_ratio:.4f}")
+
+    # Clamp yield (HemDx range 0.0001 to 0.5)
+    new_yield = max(0.0001, min(0.5, new_yield))
+    
+    log(f"[Titer Control] Target={target_titer:.4f} g/L (Base Actual: {base_titer} g/L)")
+    log(f"[Titer Control] Yield: {R302.target_yield:.6f} -> {new_yield:.6f}")
+    
+    R302.target_yield = new_yield
+    
+    # Store history
+    if R302.actual_titer and R302.actual_titer > 0:
+        R302._last_actual_titer = R302.actual_titer
+        
+    # Update tau
+    target_productivity = getattr(R302, 'target_productivity', None)
+    if target_productivity and target_productivity > 0:
+        R302.tau = target_titer / target_productivity
+
 def optimize_NH3_loading(system, verbose=True):
     """
     Optimizes NH3_25wt flow rate (X) and S202 split ratio (Y) to meet fermentation demand
@@ -961,7 +1060,7 @@ def set_production_rate(system, target_production_rate_kg_hr, verbose=True):
             
             scaling_factor = flx.IQ_interpolation(
                 f=objective_function, x0=x0, x1=x1, x=initial_guess,
-                xtol=0.001, ytol=0.1, maxiter=50,
+                xtol=0.001, ytol=0.1, maxiter=100,
                 checkbounds=(y0 * y1 <= 0), checkiter=True,
             )
         
@@ -1116,21 +1215,16 @@ if __name__ == '__main__':
     f = sys.flowsheet
     u = f.unit
     ss = f.stream
-    
-    print("\n2. Running baseline simulation...")
-    try:
-        sys.simulate()
-        baseline_production = ss.NHemDx_Product.F_mass
-        print(f"   Baseline production rate: {baseline_production:.2f} kg/hr")
-    except Exception as e:
-        print(f"   Baseline simulation failed: {e}")
-        raise    
-    
-    print("\n3. Setting production rate...")
-    try:
-        set_production_rate(sys, TARGET_PRODUCTION)
-    except Exception as e:
-        print(f"   Production rate setting error: {e}")
+
+    # Iterative Titer Convergence Loop
+    # Iterative Titer Convergence Loop
+    run_titer_convergence(
+        system=sys,
+        target_production=TARGET_PRODUCTION,
+        adjust_glucose_func=adjust_glucose_for_titer,
+        optimize_nh3_func=optimize_NH3_loading,
+        set_prod_func=set_production_rate,
+    )
 
     print(f"\n4. System Summary")
     print("="*85)
@@ -1188,3 +1282,7 @@ if __name__ == '__main__':
     print(f"Target Production:   {TARGET_PRODUCTION:.2f} kg/hr")
     print(f"Achieved Production: {ss.NHemDx_Product.F_mass:.2f} kg/hr")
     print(f"{'='*85}\n")
+    
+    print(f"target titer: {u.R302.titer:.2f} g/L")
+    print(f"Achieved titer: {u.R302.actual_titer:.2f} g/L")
+    print(f"Achieved titer2: {(ss.Broth.imass['Heme_b']+ss.Broth.imass['Heme_b_In']) / ss.Broth.F_vol:.2f} g/L")

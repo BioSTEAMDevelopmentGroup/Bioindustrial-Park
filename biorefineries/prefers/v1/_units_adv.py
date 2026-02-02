@@ -458,7 +458,7 @@ class DiafiltrationAdv(bst.Unit):
     - 'backward' (default): User sets target retention, optional calculation of required DV.
     - 'forward': User sets diavolumes (DV), retention is calculated via washout model.
     
-    Washout Mechanism (CSTR analogy):
+    Washout Mechanism (Constant Volume Diafiltration):
     --------------------------------
     After N diavolumes:
         C_out / C_in = exp(-N * (1 - sigma))
@@ -477,7 +477,7 @@ class DiafiltrationAdv(bst.Unit):
     Reference:
     ----------
     User-provided model in `filtration_and_diafiltation_adv.md` (PReFerS v1 HemDx).
-    Standard TFF theory: constant volume diafiltration.
+    Standard TFF theory: Constant Volume Diafiltration (CVD) with Perfect Mixing.
     """
     _N_ins = 2  # [0] Feed, [1] Wash/Buffer
     _N_outs = 2 # [0] Retentate, [1] Permeate

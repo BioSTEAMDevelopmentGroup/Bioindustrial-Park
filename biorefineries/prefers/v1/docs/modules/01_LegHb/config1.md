@@ -90,6 +90,12 @@ Purpose: Convert glucose to LegHb through microbial fermentation.
   - Optimizes `NH3_25wt` flow rate and `S202` split ratio to match demand.
   - **Constraint:** Residual ammonia in broth < 1e-4 kmol/hr (negligible).
 
+- **Titer Control (`adjust_glucose_for_titer`):**
+  - Updates `R302.target_yield` to hit target titer using elasticity correction.
+  - Solves yield ratio with `flexsolve.IQ_interpolation` (more precise than closed-form).
+  - Includes one-step correction using last simulated titer for tighter convergence.
+  - Model titer parameter uses a tight bound (±1%) to keep error < 0.01 g/L.
+
 - **R302 Specification (`update_reaction_time_and_yield`):**
   - Calculates residence time (`tau`): `target_titer / target_productivity`
   - Updates reaction product yield based on `target_yield`

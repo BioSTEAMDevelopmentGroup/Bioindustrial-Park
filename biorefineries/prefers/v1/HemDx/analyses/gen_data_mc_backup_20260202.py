@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """
-Monte Carlo Data Generation for LegHb
+Monte Carlo Data Generation for HemDx
 ====================================
 
 Runs robust Monte Carlo simulations with/without production scale variation.
@@ -13,6 +13,12 @@ import argparse
 import json
 import multiprocessing as mp
 import os
+import sys
+try:
+    if sys.stdout.encoding != 'utf-8':
+        sys.stdout.reconfigure(encoding='utf-8')
+except Exception:
+    pass
 
 # Force each worker to use only 1 thread. 
 # This prevents them from fighting and causing the "Hang/Timeout".
@@ -27,8 +33,8 @@ from functools import partial
 import numpy as np
 import pandas as pd
 
-from biorefineries.prefers.v1.LegHb._models import create_model
-from biorefineries.prefers.v1.LegHb.system import get_available_configs
+from biorefineries.prefers.v1.HemDx._models import create_model
+# from biorefineries.prefers.v1.HemDx.system import get_available_configs
 from biorefineries.prefers.v1.utils import utils, sankey_utils
 
 try:
@@ -41,17 +47,21 @@ except Exception:  # pragma: no cover
 # CLI
 # =============================================================================
 
+def get_available_configs():
+    return ['config1', 'config2', 'config3']
+
 def parse_arguments():
-    parser = argparse.ArgumentParser(description='LegHb Monte Carlo data generation')
-    parser.add_argument('--config', type=str, default='config1',
+    parser = argparse.ArgumentParser(description='HemDx Monte Carlo data generation')
+    parser.add_argument('--config', type=str, default='config2',
                         choices=get_available_configs(),
-                        help='Process configuration (default: config1)')
+                        help='Process configuration (default: config2)')
     parser.add_argument('--production', type=float, default=150,
                         help='Baseline production rate in kg/hr (default: 150)')
+    # Reduced default sampling as requested
     parser.add_argument('--samples', type=int, default=300000,
                         help='Target number of valid samples per scenario')
-    parser.add_argument('--batch-size', type=int, default=15000,
-                        help='Samples per batch (default: 15000)')
+    parser.add_argument('--batch-size', type=int, default=6000,
+                        help='Samples per batch (default: 6000)')
     parser.add_argument('--cores', type=int, default=None,
                         help='Number of worker processes (default: max-2)')
     parser.add_argument('--no-multiprocessing', action='store_true',
@@ -108,8 +118,7 @@ def resolve_output_dirs(script_path, config, timestamp=None, results_dir=None):
 # =============================================================================
 
 def evaluate_single_sample(sample_index_and_data, baseline_production_kg_hr, exclude_production_scale=False,
-                           config='config1', param_indices=None, metric_indices=None,
-                           parameter_filter=None):
+                           config='config1', param_indices=None, metric_indices=None, parameter_filter=None):
     """
     Worker function to evaluate a single Monte Carlo sample.
     """
@@ -122,24 +131,22 @@ def evaluate_single_sample(sample_index_and_data, baseline_production_kg_hr, exc
         param_values = {}
         for i, param in enumerate(model.parameters):
             is_production_scale = 'production scale' in param.name.lower()
-            
-            # Application of parameter filter logic
-            should_vary = True
-            if parameter_filter:
-                should_vary = parameter_filter(param)
-            
-            if (exclude_production_scale and is_production_scale) or not should_vary:
-                # Set to baseline if it's production scale (when excluded) OR filtered out
-                val = param.baseline
-                if is_production_scale and exclude_production_scale:
-                     val = baseline_production_kg_hr
-                
-                param.setter(val)
-                param_values[param.index] = val
+
+            if exclude_production_scale and is_production_scale:
+                param.setter(baseline_production_kg_hr)
+                param_values[param.index] = baseline_production_kg_hr
             else:
-                # Use MC sample value
-                param.setter(sample[i])
-                param_values[param.index] = sample[i]
+                # Apply parameter filter if provided
+                should_vary = True
+                if parameter_filter:
+                    should_vary = parameter_filter(param)
+                
+                if not should_vary:
+                    param.setter(param.baseline)
+                    param_values[param.index] = param.baseline
+                else:
+                    param.setter(sample[i])
+                    param_values[param.index] = sample[i]
 
         model.system.simulate()
         metric_values = {metric.index: metric() for metric in model.metrics}
@@ -152,15 +159,8 @@ def evaluate_single_sample(sample_index_and_data, baseline_production_kg_hr, exc
         if model is not None:
             for i, param in enumerate(model.parameters):
                 is_production_scale = 'production scale' in param.name.lower()
-                should_vary = True
-                if parameter_filter:
-                    should_vary = parameter_filter(param)
-
-                if (exclude_production_scale and is_production_scale) or not should_vary:
-                    val = param.baseline
-                    if is_production_scale and exclude_production_scale:
-                        val = baseline_production_kg_hr
-                    param_values[param.index] = val
+                if exclude_production_scale and is_production_scale:
+                    param_values[param.index] = baseline_production_kg_hr
                 else:
                     param_values[param.index] = sample[i]
             metric_values = {metric.index: np.nan for metric in model.metrics}
@@ -170,12 +170,12 @@ def evaluate_single_sample(sample_index_and_data, baseline_production_kg_hr, exc
             if metric_indices is None:
                 metric_indices = []
             for i, param_idx in enumerate(param_indices):
-                # This part is tricky without the actual param object.
-                # We assume if a filter is present, and it's not production scale,
-                # then it should be fixed to baseline if the filter excludes it.
-                # For simplicity, if model is None, we just use the sample value
-                # unless it's production scale and excluded.
-                if 'production scale' in str(param_idx).lower() and exclude_production_scale:
+                is_prod = 'production scale' in str(param_idx).lower()
+                # We can't easily re-check filter here without param objects, 
+                # but this is the exception handler so just using sample is fine,
+                # or we could try to be consistent. 
+                # Ideally exception path shouldn't happen often.
+                if is_prod and exclude_production_scale:
                     param_values[param_idx] = baseline_production_kg_hr
                 else:
                     param_values[param_idx] = sample[i]
@@ -202,7 +202,7 @@ def run_monte_carlo(model, n_target, baseline_production_kg_hr, exclude_producti
     else:
         print(f"Production scale VARYING (baseline: {baseline_production_kg_hr} kg/hr)")
 
-    if n_target < 1000:
+    if n_target < 50: # Even smaller threshold for sequential since we act small
         use_multiprocessing = False
 
     n_cores = mp.cpu_count()
@@ -259,6 +259,8 @@ def run_monte_carlo(model, n_target, baseline_production_kg_hr, exclude_producti
                 pool.join()
         except Exception as exc:
             print(f"\n[!] Multiprocessing failed: {exc}")
+            import traceback
+            traceback.print_exc()
             print("[!] Falling back to sequential evaluation for this scenario...")
             return run_monte_carlo_sequential(
                 model=model,
@@ -286,18 +288,20 @@ def run_monte_carlo(model, n_target, baseline_production_kg_hr, exclude_producti
         print(f"  Progress: {len(valid_results)}/{n_target} valid samples ({success_rate:.1f}% success rate)")
 
         if total_attempts > 100 and success_rate < 50:
-            print(f"\n⚠️  WARNING: Low success rate ({success_rate:.1f}%)")
+            print(f"\n[WARN] WARNING: Low success rate ({success_rate:.1f}%)")
 
     print(f"\n[OK] Monte Carlo simulation complete!")
     print(f"  Valid samples: {len(valid_results)}")
     print(f"  Total attempts: {total_attempts}")
     print(f"  Success rate: {len(valid_results)/total_attempts*100:.1f}%")
 
+    # Re-build DataFrame
     param_indices = [param.index for param in model.parameters]
     metric_indices = [metric.index for metric in model.metrics]
     all_indices = param_indices + metric_indices
 
     data = []
+    # Make sure we use the same order as columns
     for _, param_vals, metric_vals in valid_results:
         row = {}
         row.update(param_vals)
@@ -315,7 +319,7 @@ def run_monte_carlo(model, n_target, baseline_production_kg_hr, exclude_producti
             if unique_scales == 1:
                 print(f"  [OK] Production scale correctly fixed at {scale_values.iloc[0]:.2f} kg/hr")
             else:
-                print(f"  ⚠️  WARNING: Production scale varies despite exclude_production_scale=True!")
+                print(f"  [WARN] WARNING: Production scale varies despite exclude_production_scale=True!")
                 print(f"     Range: {scale_values.min():.2f} - {scale_values.max():.2f} kg/hr")
 
     simulation_stats = {
@@ -331,7 +335,7 @@ def run_monte_carlo(model, n_target, baseline_production_kg_hr, exclude_producti
 
 
 def run_monte_carlo_sequential(model, n_target, baseline_production_kg_hr, exclude_production_scale=False,
-                               batch_size=1000, scenario_name="", parameter_filter=None):
+                              batch_size=1000, scenario_name="", parameter_filter=None):
     """
     Run Monte Carlo sequentially using a single model instance.
     """
@@ -359,17 +363,11 @@ def run_monte_carlo_sequential(model, n_target, baseline_production_kg_hr, exclu
 
         batch_samples = model.sample(batch_to_generate, rule='L')
 
-        # Apply filters to current batch samples (replacing data in place where needed)
-        # However, model.evaluate uses sample data. 
-        # But wait, run_monte_carlo_sequential calls model.load_samples THEN evaluate.
-        # If we want to fix parameters, we should modify the samples array BEFORE loading?
-        # Or simpler: in sequential mode, just use element-by-element or rely on model.parameter settings?
-        # Actually bst.Model.sample generates valid samples from distributions. 
-        # If we act like we are "fixing" them, we should overwrite the columns in batch_samples
-        # corresponding to fixed parameters with their baseline values.
-        
+        # Apply filters to current batch samples (vectorized or iterative)
+        # Ideally iterate over parameters and set columns
         for i, param in enumerate(model.parameters):
             is_production_scale = 'production scale' in param.name.lower()
+            
             should_vary = True
             if parameter_filter:
                 should_vary = parameter_filter(param)
@@ -419,30 +417,29 @@ def filter_ferm(param):
     # Include if name refers to fermentation metrics
     # All keywords must be lowercase since we compare against name.lower()
     # Exclude 'resin' to avoid capturing 'Resin yield' which is DSP
-    keywords = ['titer', 'product', 'biomass', 'tau', 'rate', 'secretion', 'yield'] 
+    keywords = ['titer', 'product', 'biomass', 'tau', 'rate', 'secretion', 'sf', 'yield'] 
     exclusions = ['resin', 'production scale']
     return any(k in name for k in keywords) and not any(e in name for e in exclusions)
 
 def filter_dsp(param):
     name = param.name.lower()
     # All keywords must be lowercase since we compare against name.lower()
-    keywords = ['dsp', 'efficiency', 'recovery', 'split', 'capture', 'retention', 'centrifuge', 'facilities', 'boiler', 'cooling', 'tower', 'resin', 'turbogenerator']
+    keywords = ['dsp', 'targetproduct', 'conversion', 'efficiency', 'recovery', 'split', 'capture', 'retention', 'centrifuge', 'facilities', 'boiler', 'cooling', 'tower', 'resin', 'cstr', 'turbogenerator']
     return any(k in name for k in keywords) and 'production scale' not in name
 
 def filter_econ_env(param):
     name = param.name.lower()
     # All keywords must be lowercase since we compare against name.lower()
-    keywords = ['price', 'economics', 'cost', 'operating', 'days', 'irr', 'gwp', 'tax', 'characterization', 'factor', 'electricity', 'steam', 'waste']
+    keywords = ['price', 'economics', 'cost', 'days', 'operating', 'irr', 'gwp', 'tax', 'characterization', 'factor', 'electricity', 'steam', 'waste']
     return any(k in name for k in keywords) and 'production scale' not in name
 
-
-def generate_monte_carlo(config='config1', baseline_production_kg_hr=275, n_target=300000,
+def generate_monte_carlo(config='config1', baseline_production_kg_hr=150, n_target=300000,
                           batch_size=15000, n_workers=None, seed=1234,
                           timestamp=None, results_dir=None, use_multiprocessing=True):
     dirs = resolve_output_dirs(__file__, config, timestamp=timestamp, results_dir=results_dir)
 
     print("=" * 80)
-    print("LEGHEMOGLOBIN - MONTE CARLO DATA GENERATION")
+    print("HEMDX - MONTE CARLO DATA GENERATION")
     print("=" * 80)
     print("\nConfiguration:")
     print(f"  Process config: {config}")
@@ -450,9 +447,9 @@ def generate_monte_carlo(config='config1', baseline_production_kg_hr=275, n_targ
     print(f"  Target samples per scenario: {n_target}")
     print(f"  Batch size: {batch_size}")
     print(f"  Random seed: {seed}")
-    if n_target < 1000:
+    if n_target < 20:
         use_multiprocessing = False
-        print("  Multiprocessing disabled (n_target < 1000)")
+        print("  Multiprocessing disabled (n_target < 20)")
     print(f"  Output data dir: {dirs['data']}")
 
     np.random.seed(seed)
@@ -542,48 +539,36 @@ def generate_monte_carlo(config='config1', baseline_production_kg_hr=275, n_targ
         use_multiprocessing=use_multiprocessing,
     )
 
-    # =============================================================================
-    # NEW SCENARIOS (Subsets of parameters)
-    # =============================================================================
+    # -------------------------------------------------------------------------
+    # New Scenarios (Specific Parameter Groups)
+    # -------------------------------------------------------------------------
+    # Reduce n_target for these sub-scenarios to save time? (e.g. 1/4 of target)
+    n_target_sub = max(20, n_target // 4)
     
-    n_target_sub = max(10, int(n_target / 4))
-    
-    results_ferm_only, stats_ferm_only = run_monte_carlo(
-        model=model,
-        n_target=n_target_sub,
-        baseline_production_kg_hr=baseline_production_kg_hr,
-        exclude_production_scale=True, # Fixed scale
-        batch_size=batch_size,
-        n_workers=n_workers,
+    results_ferm, stats_ferm = run_monte_carlo(
+        model=model, n_target=n_target_sub, baseline_production_kg_hr=baseline_production_kg_hr,
+        exclude_production_scale=True, # Fixed scale for parameter sensitivity focus
+        batch_size=batch_size, n_workers=n_workers,
         scenario_name="Fermentation Parameters Only",
-        config=config,
-        use_multiprocessing=use_multiprocessing,
+        config=config, use_multiprocessing=use_multiprocessing,
         parameter_filter=filter_ferm
     )
 
-    results_dsp_only, stats_dsp_only = run_monte_carlo(
-        model=model,
-        n_target=n_target_sub,
-        baseline_production_kg_hr=baseline_production_kg_hr,
+    results_dsp, stats_dsp = run_monte_carlo(
+        model=model, n_target=n_target_sub, baseline_production_kg_hr=baseline_production_kg_hr,
         exclude_production_scale=True,
-        batch_size=batch_size,
-        n_workers=n_workers,
-        scenario_name="DSP & Facilities Only",
-        config=config,
-        use_multiprocessing=use_multiprocessing,
+        batch_size=batch_size, n_workers=n_workers,
+        scenario_name="DSP & Facilities Parameters Only",
+        config=config, use_multiprocessing=use_multiprocessing,
         parameter_filter=filter_dsp
     )
 
-    results_econ_only, stats_econ_only = run_monte_carlo(
-        model=model,
-        n_target=n_target_sub,
-        baseline_production_kg_hr=baseline_production_kg_hr,
+    results_econ, stats_econ = run_monte_carlo(
+        model=model, n_target=n_target_sub, baseline_production_kg_hr=baseline_production_kg_hr,
         exclude_production_scale=True,
-        batch_size=batch_size,
-        n_workers=n_workers,
-        scenario_name="Economic & Environmental Only",
-        config=config,
-        use_multiprocessing=use_multiprocessing,
+        batch_size=batch_size, n_workers=n_workers,
+        scenario_name="Economic & Environmental Parameters Only",
+        config=config, use_multiprocessing=use_multiprocessing,
         parameter_filter=filter_econ_env
     )
 
@@ -612,9 +597,9 @@ def generate_monte_carlo(config='config1', baseline_production_kg_hr=275, n_targ
     file_no_scale = save_results(results_no_scale, 'no_scale')
     file_with_scale = save_results(results_with_scale, 'with_scale')
     
-    file_ferm_only = save_results(results_ferm_only, 'ferm_only')
-    file_dsp_only = save_results(results_dsp_only, 'dsp_only')
-    file_econ_only = save_results(results_econ_only, 'econ_only')
+    file_ferm = save_results(results_ferm, 'ferm_only')
+    file_dsp = save_results(results_dsp, 'dsp_only')
+    file_econ = save_results(results_econ, 'econ_only')
 
     column_map = {
         'columns': [
@@ -648,16 +633,13 @@ def generate_monte_carlo(config='config1', baseline_production_kg_hr=275, n_targ
         'scenario_files': {
             'no_scale': file_no_scale,
             'with_scale': file_with_scale,
-            'ferm_only': file_ferm_only,
-            'dsp_only': file_dsp_only,
-            'econ_only': file_econ_only,
         },
         'scenario_stats': {
             'no_scale': stats_no_scale,
             'with_scale': stats_with_scale,
-            'ferm_only': stats_ferm_only,
-            'dsp_only': stats_dsp_only,
-            'econ_only': stats_econ_only,
+            'ferm_only': stats_ferm,
+            'dsp_only': stats_dsp,
+            'econ_only': stats_econ,
         },
         'cost_breakdown_steps_csv': os.path.basename(cost_breakdown_csv),
         'cost_breakdown_steps_xlsx': os.path.basename(cost_breakdown_xlsx),
@@ -680,13 +662,14 @@ def generate_monte_carlo(config='config1', baseline_production_kg_hr=275, n_targ
         'monte_carlo_with_scale_pickle': file_with_scale['pickle'],
         'monte_carlo_with_scale_csv': file_with_scale['csv'],
         'monte_carlo_with_scale_xlsx': file_with_scale['xlsx'],
-        'monte_carlo_ferm_only_pickle': file_ferm_only['pickle'],
-        'monte_carlo_dsp_only_pickle': file_dsp_only['pickle'],
-        'monte_carlo_econ_only_pickle': file_econ_only['pickle'],
         'cost_breakdown_steps_csv': os.path.basename(cost_breakdown_csv),
         'cost_breakdown_steps_xlsx': os.path.basename(cost_breakdown_xlsx),
         'cost_breakdown_summary_csv': os.path.basename(cost_summary_csv),
+        'monte_carlo_ferm_only_csv': file_ferm['csv'],
+        'monte_carlo_dsp_only_csv': file_dsp['csv'],
+        'monte_carlo_econ_only_csv': file_econ['csv'],
     }
+
 
     manifest_file = os.path.join(dirs['data'], 'analysis_manifest.json')
     with open(manifest_file, 'w', encoding='utf-8') as f:

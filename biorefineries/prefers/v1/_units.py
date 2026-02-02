@@ -375,6 +375,25 @@ class SeedTrain(bst.Unit):
         self.power_utility(kW)
 
 class AeratedFermentation(bst.AeratedBioreactor):
+    """
+    Aerated fermentation bioreactor with titer control capability.
+    
+    New Parameters (v2026.02)
+    -------------------------
+    titer : float, optional
+        Target product titer [g/L]. Used with titer_IDs to back-calculate glucose requirements.
+    titer_IDs : tuple, optional
+        Chemical IDs contributing to titer measurement. 
+        e.g., ('Leghemoglobin_In', 'Leghemoglobin') for LegHb
+              ('Heme_b_In', 'Heme_b') for HemDx
+    
+    Properties
+    ----------
+    productivity : float
+        Calculated as titer / tau [g/L/hr]
+    actual_titer : float
+        Real titer calculated from broth effluent [g/L]
+    """
     # V_max_default = 500
     def _init(
             self, 
@@ -385,6 +404,8 @@ class AeratedFermentation(bst.AeratedBioreactor):
             dT_hx_loop=8,
             Q_O2_consumption=-460240, # [kJ/kmol] equivalent to 110 kcal / mol as in https://www.academia.edu/19636928/Bioreactor_Design_for_Chemical_Engineers
             batch=True,
+            titer=None,
+            titer_IDs=None,
             **kwargs,
         ):
         bst.AeratedBioreactor._init(self, batch=batch, dT_hx_loop=dT_hx_loop, 
@@ -397,6 +418,52 @@ class AeratedFermentation(bst.AeratedBioreactor):
         self.cell_growth_reaction = cell_growth_reaction
         self.respiration_reaction = respiration_reaction
         self.neutralization_reaction = neutralization_reaction
+        
+        # Titer control attributes
+        self._titer = titer  # Target titer [g/L]
+        self.titer_IDs = titer_IDs if titer_IDs is not None else ()  # Chemical IDs for titer calculation
+        
+    @property
+    def titer(self):
+        """Target titer [g/L]."""
+        return self._titer
+    
+    @titer.setter
+    def titer(self, value):
+        self._titer = value
+        
+    @property
+    def productivity(self):
+        """Calculated productivity [g/L/hr] = titer / tau."""
+        if self._titer is not None and self.tau > 0:
+            return self._titer / self.tau
+        return None
+    
+    @productivity.setter
+    def productivity(self, value):
+        """Set productivity by adjusting titer (keeps tau constant)."""
+        if value is not None and self.tau > 0:
+            self._titer = value * self.tau
+            
+    @property
+    def actual_titer(self):
+        """
+        Calculate actual titer from broth effluent [g/L].
+        
+        actual_titer = sum(mass of titer_IDs) / broth_volume
+        """
+        if not self.titer_IDs or len(self.outs) < 2:
+            return None
+        broth = self.outs[1]  # Broth is typically outs[1] (vent is outs[0])
+        if broth.F_vol <= 0:
+            return None
+        # Sum mass of all titer IDs [kg/hr]
+        total_mass = 0.0
+        for chem_id in self.titer_IDs:
+            if chem_id in broth.chemicals.IDs:
+                total_mass += broth.imass[chem_id]
+        # Convert: (kg/hr) / (m³/hr) = kg/m³ = g/L
+        return (total_mass / broth.F_vol) if broth.F_vol > 0 else 0.0
 
     def _run_vent(self, vent, effluent):
         vent.copy_flow(effluent, ('CO2', 'O2', 'N2'), remove=True)
@@ -877,16 +944,54 @@ class CellDisruption(bst.Unit):
 
 class Centrifuge(bst.SolidsCentrifuge):
         """
-        Centrifuge with expanded solids-loading range for small-scale operation.
+        Centrifuge with automatic soluble substance handling and expanded solids-loading range.
+        
+        Enhanced version that automatically distributes soluble substances based on 
+        moisture_content, similar to FiltrationAdv behavior.
 
+        Parameters
+        ----------
+        split : dict or array
+            Split fractions for SOLID species only. Species in split are sent to 
+            outs[0] (cream/solids) according to the specified fraction.
+        moisture_content : float
+            Target moisture content of the solids stream (outs[0]).
+            Formula: moisture_content = water_mass / (water_mass + dry_solids_mass)
+        order : tuple, optional
+            If using array-style split, specify chemical IDs in this order.
+            
         Notes
         -----
+        - **Automatic Soluble Handling**: Substances NOT in the split dict are 
+          automatically distributed following the water fraction (calculated from
+          moisture_content). This physically models that dissolved substances 
+          follow the liquid phase.
+        - **Solid Species**: Defined by keys in the `split` dict or `order` tuple.
+          These are separated according to their specified split fractions.
+        - **Water**: Distributed to achieve the target moisture_content in cream.
+        - **Soluble Species**: H2SO4, NH3, salts, sugars, etc. follow the same 
+          fraction as water (i.e., if 10% of water goes to cream, 10% of each
+          soluble also goes to cream).
+        
+        Solids Loading Range (Extended):
         - BioSTEAM default bounds are 1-20 (reciprocating pusher) and 2-40 (scroll
-            solid bowl) ton/hr. For pilot-scale operations (0.1-2 ton/hr), we allow
-            extrapolation of the Humbird/Seider correlation to avoid over-warning
-            while keeping the same cost exponent.
+          solid bowl) ton/hr. For pilot-scale operations (0.1-2 ton/hr), we allow
+          extrapolation of the Humbird/Seider correlation.
         - Cost scaling remains consistent with BioSTEAM (Humbird et al. 2011; Seider
-            et al. 2017), but the lower bound is extended for small solids loading.
+          et al. 2017), but the lower bound is extended for small solids loading.
+          
+        Examples
+        --------
+        >>> # Only specify solid species in split - solubles auto-follow water
+        >>> C401 = u.Centrifuge(
+        ...     'C401', ins=broth,
+        ...     outs=('CellCream', 'SpentMedia'),
+        ...     split={
+        ...         'cellmass': 0.999,
+        ...         'Leghemoglobin_In': 0.999,
+        ...     },
+        ...     moisture_content=0.55,
+        ... )
         """
         solids_loading_range = {
                 'reciprocating_pusher': (0.1, 20),
@@ -895,6 +1000,87 @@ class Centrifuge(bst.SolidsCentrifuge):
 
         #: Minimum solids loading used for cost extrapolation (ton/hr)
         min_solids_loading_cost = 0.1
+        
+        def _run(self):
+            """
+            Enhanced _run with automatic soluble substance distribution.
+            
+            Solids (in split dict) are separated by specified fractions.
+            Solubles (not in split dict) follow water based on moisture_content.
+            """
+            if self.moisture_content is None:
+                # Fall back to parent behavior if no moisture_content
+                super()._run()
+                return
+            
+            # Mix all inputs
+            feed = self.ins[0].copy()
+            for inlet in self.ins[1:]:
+                if not inlet.isempty():
+                    feed.mol += inlet.mol
+            
+            cream, liquor = self.outs
+            cream.copy_thermal_condition(feed)
+            liquor.copy_thermal_condition(feed)
+            cream.empty()
+            liquor.empty()
+            
+            # Identify solid species from split specification
+            if hasattr(self, 'order') and self.order:
+                solid_ids = set(self.order)
+            else:
+                # Get from isplit (which is populated from split dict)
+                solid_ids = set()
+                for chem in self.chemicals:
+                    if self.isplit[chem.ID] > 0:
+                        solid_ids.add(chem.ID)
+            
+            # Remove water from solid IDs (water is handled separately)
+            solid_ids.discard('H2O')
+            
+            # First pass: calculate total dry solids going to cream
+            total_solids_to_cream = 0.0
+            for chem_id in solid_ids:
+                if chem_id in self.chemicals.IDs:
+                    mass_in = feed.imass[chem_id]
+                    split_frac = self.isplit[chem_id]
+                    total_solids_to_cream += mass_in * split_frac
+            
+            # Calculate water fraction based on moisture_content
+            # moisture_content = water / (water + dry_solids)
+            # => water = dry_solids * mc / (1 - mc)
+            mc = self.moisture_content
+            if mc > 0 and mc < 1 and total_solids_to_cream > 0:
+                target_water_in_cream = total_solids_to_cream * mc / (1.0 - mc)
+                total_water = feed.imass['H2O']
+                if total_water > 0:
+                    water_frac_to_cream = min(target_water_in_cream / total_water, 0.95)
+                else:
+                    water_frac_to_cream = 0.0
+            else:
+                # Default: 5% water to cream if no valid moisture_content
+                water_frac_to_cream = 0.05
+            
+            # Apply splits
+            for chem in self.chemicals:
+                chem_id = chem.ID
+                mass_in = feed.imass[chem_id]
+                
+                if mass_in < 1e-12:
+                    continue
+                
+                if chem_id in solid_ids:
+                    # Solid species: use specified split
+                    split_frac = self.isplit[chem_id]
+                elif chem_id == 'H2O':
+                    # Water: based on moisture_content calculation
+                    split_frac = water_frac_to_cream
+                else:
+                    # Soluble species: follow water (same fraction as water)
+                    split_frac = water_frac_to_cream
+                
+                cream.imass[chem_id] = mass_in * split_frac
+                liquor.imass[chem_id] = mass_in * (1.0 - split_frac)
 
         def _design(self):
                 solids, centrifuge_type = self._solids, self.centrifuge_type

@@ -29,6 +29,7 @@ from biorefineries.prefers.v1.LegHb import _chemicals as c
 from biorefineries.prefers.v1 import _units as u
 from biorefineries.prefers.v1 import _process_settings
 from biorefineries.prefers.v1._process_settings import price
+from biorefineries.prefers.v1.utils.convergence import run_titer_convergence
 
 # Global registry for seed scaling targets (to coordinate between set_production_rate and specs)
 seed_targets = {}
@@ -46,6 +47,7 @@ __all__ = (
     'set_production_rate',
     'check_LegHb_specifications',
     'optimize_NH3_loading',
+    'adjust_glucose_for_titer',
     # Area creation functions
     'create_area_200_media_prep',
     'create_area_300_conversion',
@@ -256,8 +258,6 @@ def create_area_200_media_prep(SeedIn1, SeedIn2, CultureIn, Glucose, NH3_25wt):
     def update_seed1_inputs():
         # Force SeedIn1 to target (from global dict or reference)
         target = seed_targets.get(SeedIn1, ref_seed1_val)
-        
-        # Enforce target
         SeedIn1.imass['Seed'] = target
         
         # Enforce water ratio
@@ -329,7 +329,7 @@ def create_area_200_media_prep(SeedIn1, SeedIn2, CultureIn, Glucose, NH3_25wt):
 # =============================================================================
 # AREA 300: CONVERSION (FERMENTATION)
 # =============================================================================
-def create_area_300_conversion(seed_in, glucose_in, ammonia_in, vent1, vent2, reactions, params=None):
+def create_area_300_conversion(seed_in, glucose_in, ammonia_in, vent1, vent2, reactions, params=None, system_glucose_stream=None):
     """
     Create Area 300: Conversion (Fermentation)
     
@@ -355,6 +355,8 @@ def create_area_300_conversion(seed_in, glucose_in, ammonia_in, vent1, vent2, re
         Reaction objects from create_fermentation_reactions()
     params : dict, optional
         Fermentation parameters
+    system_glucose_stream : Stream, optional
+        Reference to the main system Glucose input stream for titer control
     
     Returns
     -------
@@ -405,15 +407,44 @@ def create_area_300_conversion(seed_in, glucose_in, ammonia_in, vent1, vent2, re
         cooler_pressure_drop=params['cooler_pressure_drop'],
         compressor_isentropic_efficiency=params['compressor_isentropic_efficiency'],
         P=1 * 101325,
+        # New titer control attributes
+        titer=params['titer_LegHb'],
+        titer_IDs=('Leghemoglobin_In', 'Leghemoglobin'),
     )
     R302.target_titer = params['titer_LegHb']
     R302.target_productivity = params['productivity_LegHb']
     R302.target_yield = params['yield_LegHb']
     
+    # Store reference to BOTH the immediate glucose input and the system-level glucose stream
+    R302._glucose_feed_stream = glucose_in  # T201Out (diluted)
+    R302._system_glucose_stream = system_glucose_stream  # Main system input (Glucose)
+    
+    # Store baseline glucose for scaling
+    if system_glucose_stream is not None:
+        R302._baseline_system_glucose = system_glucose_stream.imass['Glucose']
+    R302._baseline_titer = params['titer_LegHb']
+    
     @R302.add_specification(run=True)
-    def update_reaction_time_and_yield():
-        R302.tau = R302.target_titer / R302.target_productivity
-        fermentation_reaction[2].product_yield('Leghemoglobin_In', basis='wt', product_yield=R302.target_yield)
+    def update_fermentation_params():
+        """
+        Update fermentation parameters (tau, yield) based on current titer settings.
+        
+        NOTE: Glucose adjustment is handled by adjust_glucose_for_titer() at the
+        system level BEFORE simulation. This spec only updates reaction parameters.
+        """
+        # Get target titer (prefer new attribute, fallback to old)
+        target_titer = R302.titer if R302.titer is not None else R302.target_titer
+        target_yield = R302.target_yield
+        
+        if target_titer is None or target_yield is None or target_yield <= 0:
+            return
+        
+        # Update tau based on titer/productivity relationship
+        if R302.target_productivity and R302.target_productivity > 0:
+            R302.tau = target_titer / R302.target_productivity
+        
+        # Update fermentation reaction yield
+        fermentation_reaction[2].product_yield('Leghemoglobin_In', basis='wt', product_yield=target_yield)
     
     return {
         'units': [R301, R302],
@@ -454,18 +485,8 @@ def create_area_400_recovery(broth_in, DfUltraBuffer2):
         'C401',
         ins=broth_in,
         outs=('CellCream', 'SpentMedia'),
-        split={
-            'cellmass': 0.999,
-            'Leghemoglobin_In': 0.999,
-            'Globin_In': 0.999,
-            'Heme_b': 0.85,
-            'Glucan': 0.99,
-            'Mannoprotein': 0.99,
-            'Chitin': 0.99,
-            'OleicAcid': 0.99,
-            'RNA': 0.99,
-        },
-        moisture_content=0.55,
+        split=c.chemical_groups['SolidsCentrifuge'],
+        moisture_content=0.40,
     )
     
     # Wash buffer preparation
@@ -495,14 +516,7 @@ def create_area_400_recovery(broth_in, DfUltraBuffer2):
         'C402',
         ins=M402-0,
         outs=('WashedCellCream', 'WashEffluent'),
-        split={
-            'cellmass': 0.999,
-            'Leghemoglobin_In': 0.999,
-            'Globin_In': 0.999,
-            'Heme_b': 0.85,
-            'Glucan': 0.99,
-            'Mannoprotein': 0.99,
-        },
+        split=c.chemical_groups['SolidsCentrifuge'],
         moisture_content=0.55,
     )
     
@@ -529,16 +543,7 @@ def create_area_400_recovery(broth_in, DfUltraBuffer2):
         'C403',
         ins=H401-0,
         outs=('CellDebris', 'CrudeLysate'),
-        split={
-            'cellmass': 0.98,
-            'Glucan': 0.98,
-            'Chitin': 0.98,
-            'OleicAcid': 0.98,
-            'RNA': 0.85,
-            'Leghemoglobin': 0.02,
-            'Globin': 0.05,
-            'Mannoprotein': 0.98,
-        },
+        split=c.chemical_groups['SolidsCentrifuge'],
         moisture_content=0.20,
     )
     
@@ -548,9 +553,9 @@ def create_area_400_recovery(broth_in, DfUltraBuffer2):
         'S403',
         ins=C403-1,
         outs=('FilterCake', 'ClarifiedLysate'),
-        solid_capture_efficiency=0.95,
+        solid_capture_efficiency=0.85,
         cake_moisture_content=0.30,
-        solid_IDs=('cellmass', 'Glucan', 'Chitin', 'OleicAcid', 'RNA', 'Mannoprotein'),
+        solid_IDs=c.chemical_groups['FilteredSubstances'],
     )
     S403.add_specification(run=True)
     
@@ -559,8 +564,8 @@ def create_area_400_recovery(broth_in, DfUltraBuffer2):
         'S404',
         ins=(C403-0, S403-0),
         outs=('DehydratedDebris', 'PressLiquor'),
-        split=0.999,
-        moisture_content=0.001
+        split=0.99,
+        moisture_content=0.01
     )
     
     return {
@@ -1004,6 +1009,7 @@ def create_LegHb_system(ins, outs, use_area_convention=False):
         vent2=vent2,
         reactions=reactions,
         params=params,
+        system_glucose_stream=Glucose,  # Pass system input for titer control
     )
     
     # Area 400: Recovery
@@ -1045,6 +1051,172 @@ def create_LegHb_system(ins, outs, use_area_convention=False):
 # =============================================================================
 # DESIGN SPECIFICATION FUNCTIONS
 # =============================================================================
+
+def adjust_glucose_for_titer(system, verbose=False):
+    """
+    Adjust R302's yield based on target titer using elasticity-based correction.
+    
+    This function should be called BEFORE system.simulate() to ensure
+    the yield adjustment takes effect.
+    
+    The relationship between yield and titer is non-linear because broth volume
+    also changes with yield. An empirical elasticity factor (approximately 1.83
+    for LegHb) corrects for this:
+        new_yield = baseline_yield * (target_titer/baseline_titer)^(1/elasticity)
+    
+    Parameters
+    ----------
+    system : biosteam.System
+        The LegHb system
+    verbose : bool
+        Print status messages
+    """
+    import math
+    log = print if verbose else (lambda *args, **kwargs: None)
+    
+    u = system.flowsheet.unit
+    s = system.flowsheet.stream
+    
+    try:
+        R302 = u.R302
+        glucose_stream = s.Glucose
+        broth = R302.outs[1]
+    except AttributeError:
+        log("[WARN] R302 or Glucose stream not found")
+        return
+    
+    # Get target titer
+    target_titer = R302.titer if R302.titer is not None else getattr(R302, 'target_titer', None)
+    
+    if target_titer is None:
+        log("[WARN] No target titer set on R302")
+        return
+    
+    # Get or calculate baseline values
+    # On first call after simulation, capture the ACTUAL titer and yield as baseline
+    if not hasattr(R302, '_actual_baseline_titer') or R302._actual_baseline_titer is None:
+        # Check if we have actual titer from a previous simulation
+        actual_titer = R302.actual_titer
+        if actual_titer and actual_titer > 0:
+            # Capture actual titer, glucose, and yield as baseline
+            R302._actual_baseline_titer = actual_titer
+            R302._actual_baseline_glucose = glucose_stream.imass['Glucose']
+            R302._actual_baseline_yield = R302.target_yield
+            log(f"[Titer Control] Captured baseline: titer={actual_titer:.4f} g/L, yield={R302._actual_baseline_yield:.6f}")
+            R302._last_actual_titer = actual_titer
+        else:
+            # No actual data yet, use design parameters
+            R302._actual_baseline_titer = getattr(R302, '_baseline_titer', target_titer)
+            R302._actual_baseline_glucose = getattr(R302, '_baseline_system_glucose', glucose_stream.imass['Glucose'])
+            R302._actual_baseline_yield = R302.target_yield
+            log(f"[Titer Control] Using design baseline: titer={R302._actual_baseline_titer:.4f} g/L")
+    
+    baseline_titer = R302._actual_baseline_titer
+    baseline_yield = R302._actual_baseline_yield
+    
+    if baseline_titer is None or baseline_titer <= 0:
+        log("[WARN] Baseline titer not set or invalid")
+        return
+    
+    # Empirical elasticity factor: d(log titer)/d(log yield)
+    # Measured at baseline conditions - titer increases ~1.83x faster than yield
+    # This is because broth volume decreases as more substrate converts to product
+    ELASTICITY = 1.3 # Optimized for faster convergence (was 1.83)
+    
+    # Calculate scale factor with elasticity correction using IQ_interpolation
+    # titer ratio = yield_ratio^elasticity
+    # Solve for yield_ratio with a robust 1D root finder
+    import flexsolve as flx
+    titer_ratio = target_titer / baseline_titer
+    def f(yield_ratio):
+        return (yield_ratio ** ELASTICITY) - titer_ratio
+    y0 = 1e-4
+    y1 = 1e4
+    yield_ratio = flx.IQ_interpolation(
+        f=f,
+        x0=y0,
+        x1=y1,
+        x=max(0.1, min(10.0, titer_ratio ** (1.0 / ELASTICITY))),
+        xtol=1e-8,
+        ytol=1e-8,
+        maxiter=500,
+        checkbounds=True,
+        checkiter=False,
+    )
+    new_yield = baseline_yield * yield_ratio
+
+    # --- INCREMENTAL UPDATE LOGIC (DYNAMIC DAMPING) ---
+    # use LAST SIMULATED yield/titer to step forward
+    
+    # 1. Determine Baseline Titer for Correction
+    # Prefer current actual if valid (from just-finished simulation), else stored
+    current_actual_titer = R302.actual_titer
+    last_stored_titer = getattr(R302, '_last_actual_titer', None)
+    
+    base_titer = current_actual_titer if (current_actual_titer and current_actual_titer > 0) else last_stored_titer
+    
+    if base_titer and base_titer > 0:
+        # 2. Calculate Error and Determine Mode
+        error_ratio = abs(target_titer - base_titer) / target_titer
+        
+        if error_ratio > 0.10:
+             # Coarse Mode: Aggressive stepping for deviations > 10%
+             damping = 1.0 # Full step
+             mode = "COARSE"
+        else:
+             # Fine Mode: Damped stepping for convergence < 1%
+             damping = 0.5 
+             mode = "FINE"
+
+        # 3. Apply Correction
+        # Incremental update: New = Current * (Target / Actual)^(1/E)
+        current_yield = R302.target_yield
+        correction_ratio = target_titer / base_titer
+        
+        step = (correction_ratio ** (1.0 / ELASTICITY)) ** damping
+        new_yield = current_yield * step
+        
+        log(f"[Titer Control] {mode} Step: Ratio={correction_ratio:.4f}, Damping={damping}, Step={step:.4f}")
+        log(f"[Titer Control] Base Titer: {base_titer:.4f} g/L (Target: {target_titer:.4f} g/L, Error: {error_ratio:.1%})")
+        
+    else:
+        # First time / No history: Use Baseline Interpolation
+        mode = "INITIAL"
+        import flexsolve as flx
+        titer_ratio = target_titer / baseline_titer
+        def f(yield_ratio):
+            return (yield_ratio ** ELASTICITY) - titer_ratio
+        
+        y0 = 1e-4
+        y1 = 1e4
+        yield_ratio = flx.IQ_interpolation(
+            f=f, x0=y0, x1=y1,
+            x=max(0.1, min(10.0, titer_ratio ** (1.0 / ELASTICITY))),
+            xtol=1e-8, ytol=1e-8, maxiter=500,
+            checkbounds=True, checkiter=False,
+        )
+        new_yield = baseline_yield * yield_ratio
+        log(f"[Titer Control] Baseline Guess: Expected Ratio={titer_ratio:.4f}, Yield Factor={yield_ratio:.4f}")
+
+    # Clamp yield (LegHb range 0.005 to 0.15)
+    new_yield = max(0.005, min(0.15, new_yield))
+    
+    log(f"[Titer Control] Yield Update: {R302.target_yield:.6f} -> {new_yield:.6f}")
+    
+    # Update yield
+    R302.target_yield = new_yield
+
+    # Update stored last titer if we have fresh data
+    current_actual_titer = R302.actual_titer
+    if current_actual_titer and current_actual_titer > 0:
+        R302._last_actual_titer = current_actual_titer
+    
+    # Also update tau based on titer/productivity
+    target_productivity = getattr(R302, 'target_productivity', None)
+    if target_productivity and target_productivity > 0:
+        R302.tau = target_titer / target_productivity
+        log(f"[Titer Control] tau updated to {R302.tau:.2f} hr")
+
 
 def optimize_NH3_loading(system, verbose=True):
     """
@@ -1266,7 +1438,7 @@ def set_production_rate(system, target_production_rate_kg_hr, verbose=True):
             warnings.simplefilter("ignore")
             
             x0 = max(0.01, initial_guess * 0.1)
-            x1 = max(10.0, initial_guess * 3.0)
+            x1 = max(100.0, initial_guess * 5.0)
             y0 = objective_function(x0)
             y1 = objective_function(x1)
             expand_iter = 0
@@ -1287,7 +1459,7 @@ def set_production_rate(system, target_production_rate_kg_hr, verbose=True):
                 x=initial_guess,
                 xtol=0.001,
                 ytol=0.1,
-                maxiter=200,
+                maxiter=300,
                 checkbounds=(y0 * y1 <= 0),
                 checkiter=True,
             )
@@ -1488,18 +1660,26 @@ if __name__ == '__main__':
     except Exception as e:
         print(f"   Baseline simulation failed: {e}")
         raise
-    
+
     print(f"\n3. Applying design specification: TARGET_PRODUCTION = {TARGET_PRODUCTION} kg/hr")
     try:
-        # Run optimization BEFORE production rate setting, to establish correct ratios
-        optimize_NH3_loading(LegHb_sys)
+        # Ensure titer is explicitly set to target before optimization
+        target_titer = u.R302.titer if u.R302.titer is not None else u.R302.target_titer
+        if target_titer is not None:
+            u.R302.titer = float(target_titer)
+            u.R302.target_titer = float(target_titer)
+            
+        print(f"   Target Titer: {target_titer} g/L")
         
-        achieved_production = set_production_rate(LegHb_sys, TARGET_PRODUCTION)
+        # Iterative Titer Convergence Loop
+        run_titer_convergence(
+            system=sys,
+            target_production=TARGET_PRODUCTION,
+            adjust_glucose_func=adjust_glucose_for_titer,
+            optimize_nh3_func=optimize_NH3_loading,
+            set_prod_func=set_production_rate,
+        )
         
-        # Run optimization AGAIN after production rate scaling, as demand changes with scale
-        optimize_NH3_loading(LegHb_sys)
-        
-        LegHb_sys.simulate()
         final_production = ss.LegHb_3.F_mass
         
         if abs(final_production - TARGET_PRODUCTION) > 1.0:
@@ -1508,7 +1688,7 @@ if __name__ == '__main__':
             print(f"   Actual:  {final_production:.2f} kg/hr")
             
     except Exception as e:
-        print(f"\n   Could not achieve target production: {e}")
+        print(f"\n   Could not achieve target production/titer: {e}")
         print("   Continuing with baseline production rate...")
         achieved_production = ss.LegHb_3.F_mass
     
@@ -1571,3 +1751,6 @@ if __name__ == '__main__':
     print(f"Target Production:   {TARGET_PRODUCTION:.2f} kg/hr")
     print(f"Achieved Production: {ss.LegHb_3.F_mass:.2f} kg/hr")
     print(f"{'='*85}\n")
+    print(f"target titer: {u.R302.titer:.2f} g/L")
+    print(f"Achieved titer: {u.R302.actual_titer:.2f} g/L")
+    print(f"Achieved titer2: {(ss.Broth.imass['Leghemoglobin']+ss.Broth.imass['Leghemoglobin_In']) / ss.Broth.F_vol:.2f} g/L")

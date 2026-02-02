@@ -11,6 +11,7 @@ Created on 2026-01-29
 import biosteam as bst
 from chaospy import distributions as shape
 from biorefineries.prefers.v1.HemDx.system import _config1, _config2, _config3
+from biorefineries.prefers.v1.utils.convergence import run_titer_convergence
 from biorefineries.prefers.v1.HemDx import _tea_config1, _tea_config2, _tea_config3
 from biorefineries.prefers.v1._process_settings import load_process_settings
 import numpy as np
@@ -100,10 +101,10 @@ def create_model(baseline_production_kg_hr=150, config='config1', verbose=True):
     # Units
     R302 = u.R302  # Fermentation
     
-    # DSP Units
-    S401 = get_u('S401')  # Primary Centrifuge
-    C402 = get_u('C402')  # Washed Centrifuge (Removed in Config 3?) No, Config 3 uses C402-0 to S406. C402 exists.
-    S403 = get_u('S403')  # Debris Centrifuge (Removed in Config 3)
+    # DSP Units (centrifuges renamed to Cx prefix)
+    C401 = get_u('C401')  # Primary Centrifuge
+    C402 = get_u('C402')  # Washed Centrifuge
+    C403 = get_u('C403')  # Debris Centrifuge (Removed in Config 3)
     S402 = get_u('S402')  # Cell Disruption (Removed in Config 3)
     
     # Filtration Units
@@ -142,17 +143,32 @@ def create_model(baseline_production_kg_hr=150, config='config1', verbose=True):
          print(f"Found {len(buffer_streams)} buffer streams for cost analysis.")
 
     # Baseline Centrifuge Splits
-    # HemDx has up to 3 centrifuge steps
+    # HemDx has up to 3 centrifuge steps (C401, C402, C403)
     base_splits = {}
-    for unit in [S401, C402, S403]:
+    for unit in [C401, C402, C403]:
         if unit:
             base_splits[unit] = unit.split.copy()
     
     # Baseline Prices
     base_prices = {st: st.price for st in buffer_streams}
     
-    # Create model
-    model = bst.Model(NHemDx_sys, specification=lambda: optimize_NH3_loading(NHemDx_sys, verbose=False))
+    # Get titer control function from the appropriate config module
+    adjust_glucose_for_titer = sys_module.adjust_glucose_for_titer
+    
+    # Create model with combined specification:
+    # 1. adjust_glucose_for_titer - scales yield based on R302.titer (must run first!)
+    # 2. optimize_NH3_loading - adjusts ammonia for proper nitrogen balance
+    def model_specification():
+        run_titer_convergence(
+            system=NHemDx_sys,
+            target_production=baseline_production_kg_hr,
+            adjust_glucose_func=adjust_glucose_for_titer,
+            optimize_nh3_func=optimize_NH3_loading,
+            set_prod_func=set_production_rate,
+            verbose=False
+        )
+    
+    model = bst.Model(NHemDx_sys, specification=model_specification)
     
     param = model.parameter
     metric = model.metric
@@ -162,10 +178,14 @@ def create_model(baseline_production_kg_hr=150, config='config1', verbose=True):
     # =============================================================================
     
     # 1.1 Titer
-    baseline_titer = R302.target_titer
+    # Use the new titer attribute (falls back to target_titer for compatibility)
+    baseline_titer = R302.titer if R302.titer is not None else R302.target_titer
+
     @param(name='Fermentation titer', element='Fermentation', kind='coupled', units='g/L',
-           baseline=baseline_titer, distribution=shape.Triangle(baseline_titer*0.8, baseline_titer, baseline_titer*1.2))
+           baseline=baseline_titer, distribution=shape.Triangle(baseline_titer*0.5, baseline_titer, baseline_titer*1.5))
     def set_titer(titer):
+        # Set both new and legacy attributes for full compatibility
+        R302.titer = titer
         R302.target_titer = titer
 
     # 1.2 Tau (Residence Time)
@@ -246,7 +266,7 @@ def create_model(baseline_production_kg_hr=150, config='config1', verbose=True):
     
     # 2.1 Centrifuge Split Multiplier
     # Applies to all centrifuges present in the config
-    centrifuges = [u for u in [S401, C402, S403] if u is not None]
+    centrifuges = [u for u in [C401, C402, C403] if u is not None]
     
     if centrifuges:
         @param(name='Centrifuge split', element='DSP', kind='coupled', units='multiplier',
@@ -503,21 +523,87 @@ def create_model(baseline_production_kg_hr=150, config='config1', verbose=True):
             
     return model
 
-# Function to verify (optional, kept from original mostly)
+# Function to verify (enhanced with bounds testing)
 def verify_model_integration():
-    print("Verifying Config 1...")
-    model1 = create_model(config='config1')
-    print(f"Config 1 Model created. Params: {len(model1.parameters)}")
+    """
+    Verification function for HemDx model integration.
+    Uses model(sample) interface for proper parameter evaluation.
+    """
+    import traceback
+    print("="*80)
+    print("HemDx MODEL INTEGRATION VERIFICATION")
+    print("="*80)
     
-    print("\nVerifying Config 2...")
-    model2 = create_model(config='config2')
-    print(f"Config 2 Model created. Params: {len(model2.parameters)}")
+    for config_name in ['config1', 'config2', 'config3']:
+        print(f"\n{'#'*80}")
+        print(f"# Verifying {config_name}")
+        print(f"{'#'*80}")
+        
+        try:
+            model = create_model(config=config_name, baseline_production_kg_hr=150, verbose=False)
+            print(f"\nModel created: {len(model.parameters)} params, {len(model.metrics)} metrics")
+            
+            # Build sample arrays
+            param_bounds = {}
+            for p in model.parameters:
+                dist = p.distribution
+                if hasattr(dist, 'lower'):
+                    lb = float(np.asarray(dist.lower).reshape(-1)[0])
+                else:
+                    lb = p.baseline * 0.9
+                if hasattr(dist, 'upper'):
+                    ub = float(np.asarray(dist.upper).reshape(-1)[0])
+                else:
+                    ub = p.baseline * 1.1
+                param_bounds[p.name] = {'baseline': p.baseline, 'lb': lb, 'ub': ub}
+            
+            baseline_sample = np.array([param_bounds[p.name]['baseline'] for p in model.parameters])
+            lb_sample = np.array([param_bounds[p.name]['lb'] for p in model.parameters])
+            ub_sample = np.array([param_bounds[p.name]['ub'] for p in model.parameters])
+            
+            results = {}
+            
+            # Evaluate each scenario using model(sample) interface
+            for name, sample in [('BASELINE', baseline_sample), ('LB', lb_sample), ('UB', ub_sample)]:
+                print(f"\n  [{name}] Evaluating...")
+                try:
+                    metrics = model(sample)
+                    results[name] = {m.name: metrics[i] for i, m in enumerate(model.metrics)}
+                    print(f"    MSP: {results[name].get('MSP', float('nan')):.4f} $/kg")
+                    print(f"    GWP: {results[name].get('GWP', float('nan')):.4f} kg CO2-eq/kg")
+                except Exception as e:
+                    print(f"    ERROR: {e}")
+                    results[name] = {}
+            
+            # Summary table
+            print("\n  RESULTS:")
+            key_metrics = ['MSP', 'TCI', 'AOC', 'GWP']
+            print(f"  {'Metric':15s} {'BASELINE':>12s} {'LB':>12s} {'UB':>12s}")
+            print("  " + "-"*55)
+            for m_name in key_metrics:
+                bl = results.get('BASELINE', {}).get(m_name, float('nan'))
+                lb = results.get('LB', {}).get(m_name, float('nan'))
+                ub = results.get('UB', {}).get(m_name, float('nan'))
+                print(f"  {m_name:15s} {bl:12.4f} {lb:12.4f} {ub:12.4f}")
+            
+            # Verify results differ
+            bl_msp = results.get('BASELINE', {}).get('MSP', float('nan'))
+            lb_msp = results.get('LB', {}).get('MSP', float('nan'))
+            ub_msp = results.get('UB', {}).get('MSP', float('nan'))
+            
+            if not np.isnan(bl_msp) and not np.isnan(lb_msp) and not np.isnan(ub_msp):
+                if not (np.isclose(bl_msp, lb_msp, rtol=0.001) and np.isclose(bl_msp, ub_msp, rtol=0.001)):
+                    print(f"\n  *** {config_name} PASSED: MSP values differ! ***")
+                else:
+                    print(f"\n  *** {config_name} FAILED: MSP values identical! ***")
+                
+        except Exception as e:
+            print(f"  ERROR creating {config_name}: {e}")
+            traceback.print_exc()
     
-    print("\nVerifying Config 3...")
-    model3 = create_model(config='config3')
-    print(f"Config 3 Model created. Params: {len(model3.parameters)}")
-    
-    # model1.show()
+    print("\n" + "="*80)
+    print("VERIFICATION COMPLETE")
+    print("="*80)
 
 if __name__ == '__main__':
     verify_model_integration()

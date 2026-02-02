@@ -41,6 +41,7 @@ Complete production system for **N-HemDx** using *Corynebacterium glutamicum*, i
   - DO Setpoint: 45%
   - Secretion Fraction (SF): 45% extracellular
   - **Ammonia Optimization**: Exact stoichiometric loading for < 1e-4 kmol/hr residual NH3.
+  - **Titer Control**: Elasticity-based yield adjustment solved with `flexsolve.IQ_interpolation` plus one-step correction for $<0.01$ g/L deviation (tight titer bounds, ±1%).
 
 ### Area 400: Clarification & Cell Disruption (Split-Stream)
 - **S401**: Primary Centrifuge → Supernatant + CellCream

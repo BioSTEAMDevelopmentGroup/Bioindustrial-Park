@@ -5,7 +5,7 @@
 **Module**: `biorefineries.prefers.v1._units_adv`
 
 ## Overview
-`DiafiltrationAdv` implements a CSTR-based washout model for diafiltration with two operating modes:
+`DiafiltrationAdv` implements a **Constant Volume Diafiltration (CVD)** model assuming **Perfect Mixing** for diafiltration with two operating modes:
 - **Backward** (default): User sets retention targets directly
 - **Forward**: User sets diavolumes, retention is calculated via washout equation
 
@@ -64,4 +64,4 @@ U601 = DiafiltrationAdv.from_preset(
 
 ## Reference
 - User model: `filtration_and_diafiltation_adv.md`
-- Standard TFF theory: constant volume diafiltration
+- Standard TFF theory: Constant Volume Diafiltration (CVD) with Perfect Mixing

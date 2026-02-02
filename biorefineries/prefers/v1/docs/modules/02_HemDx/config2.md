@@ -18,6 +18,7 @@ Config 2 represents a scenario where the product is primarily retained intracell
 
 ### Key Parameters
 - **Secretion Fraction:** 0.0 - 0.3 (Uniform Distribution)
+- **Titer Control:** Elasticity-based yield adjustment solved with `flexsolve.IQ_interpolation` plus one-step correction; model titer bounds tightened to ±1% for $<0.01$ g/L deviation.
 
 ## Unit Operations
 See `config1.md` for shared units.

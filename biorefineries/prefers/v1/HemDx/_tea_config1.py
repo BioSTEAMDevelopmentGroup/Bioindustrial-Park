@@ -31,9 +31,10 @@ class PreFerSTEA(PreFerSTEA_Base):
         Set the target production rate and adjust system inputs accordingly.
         Delegates to system module implementation.
         """
-        from biorefineries.prefers.v1.HemDx.system import set_production_rate
+        from biorefineries.prefers.v1.HemDx.system import set_production_rate, adjust_glucose_for_titer
         
         self._target_production_kg_hr = target_production_kg_hr
+        adjust_glucose_for_titer(self.system, verbose=verbose)
         return set_production_rate(self.system, target_production_kg_hr, verbose=verbose)
     
     def check_product_specifications(self):

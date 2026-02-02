@@ -21,6 +21,7 @@ from ._config1 import create_LegHb_system as create_LegHb_system_config1
 from ._config1 import set_production_rate as set_production_rate_config1
 from ._config1 import check_LegHb_specifications
 from ._config1 import optimize_NH3_loading as optimize_NH3_loading_config1
+from ._config1 import adjust_glucose_for_titer as adjust_glucose_for_titer_config1
 
 # Try to import config2, but don't fail if it doesn't exist
 try:
@@ -39,6 +40,7 @@ __all__ = [
     'set_production_rate',
     'check_LegHb_specifications',
     'optimize_NH3_loading',
+    'adjust_glucose_for_titer',
     'get_available_configs',
 ]
 
@@ -164,3 +166,34 @@ def optimize_NH3_loading(system, config=None, verbose=True):
         # Fallback to config1's function
         return optimize_NH3_loading_config1(system, verbose=verbose)
 
+
+def adjust_glucose_for_titer(system, config=None, verbose=False):
+    """
+    Adjust glucose input based on R302's target titer setting.
+    
+    This function should be called BEFORE system.simulate() to ensure
+    the glucose adjustment propagates through the media preparation units.
+    
+    Parameters
+    ----------
+    system : System
+        The BioSTEAM system to adjust.
+    config : str, optional
+        Configuration that was used to create the system.
+        If None, uses default (config1).
+    verbose : bool, optional
+        Print status messages. Default False.
+    """
+    if config is None:
+        config = _DEFAULT_CONFIG
+    
+    config = config.lower().replace('-', '').replace('_', '')
+    
+    if config == 'config1':
+        return adjust_glucose_for_titer_config1(system, verbose=verbose)
+    elif config == 'config2':
+        # For config2, try to use config1's function (same mechanism)
+        return adjust_glucose_for_titer_config1(system, verbose=verbose)
+    else:
+        # Fallback to config1's function
+        return adjust_glucose_for_titer_config1(system, verbose=verbose)

@@ -10,7 +10,8 @@ Created on 2025-01-XX
 
 import biosteam as bst
 from chaospy import distributions as shape
-from biorefineries.prefers.v1.LegHb.system import create_LegHb_system, set_production_rate, optimize_NH3_loading
+from biorefineries.prefers.v1.LegHb.system import create_LegHb_system, set_production_rate, optimize_NH3_loading, adjust_glucose_for_titer
+from biorefineries.prefers.v1.utils.convergence import run_titer_convergence
 from biorefineries.prefers.v1.LegHb._tea_config1 import PreFerSTEA
 from biorefineries.prefers.v1._process_settings import load_process_settings
 import numpy as np
@@ -80,6 +81,7 @@ def create_model(baseline_production_kg_hr=150, config='config1', verbose=True):
     R302 = u.R302  # Fermentation
     C401 = u.C401  # Centrifuge 1
     C402 = u.C402  # Centrifuge 2
+    C403 = u.C403  # Centrifuge 3 (Debris)
     S401 = u.S401  # Cell Disruption
     S403 = u.S403  # Filtration
     U501 = u.U501  # Diafiltration 1
@@ -112,7 +114,8 @@ def create_model(baseline_production_kg_hr=150, config='config1', verbose=True):
     # Baseline Centrifuge Splits
     base_splits = {
         C401: C401.split.copy(),
-        C402: C402.split.copy()
+        C402: C402.split.copy(),
+        C403: C403.split.copy(),
     }
     
     # Baseline Prices
@@ -126,8 +129,20 @@ def create_model(baseline_production_kg_hr=150, config='config1', verbose=True):
     raw_elec_gwp = bst.PowerUtility.characterization_factors.get('GWP', (0.0, 0.0))
     base_elec_gwp = raw_elec_gwp[0] if isinstance(raw_elec_gwp, (tuple, list)) else raw_elec_gwp
 
-    # Create model
-    model = bst.Model(LegHb_sys, specification=lambda: optimize_NH3_loading(LegHb_sys, verbose=False))
+    # Create model with combined specification:
+    # Uses shared iterative convergence logic to ensure Titer, NH3 balance, and Production Rate
+    # are all satisfied for every sample.
+    def model_specification():
+        run_titer_convergence(
+            system=LegHb_sys,
+            target_production=baseline_production_kg_hr,
+            adjust_glucose_func=adjust_glucose_for_titer,
+            optimize_nh3_func=optimize_NH3_loading,
+            set_prod_func=set_production_rate,
+            verbose=False
+        )
+    
+    model = bst.Model(LegHb_sys, specification=model_specification)
     
     param = model.parameter
     metric = model.metric
@@ -140,11 +155,14 @@ def create_model(baseline_production_kg_hr=150, config='config1', verbose=True):
     # =============================================================================
     
     # 1.1 Titer
-    baseline_titer = R302.target_titer
+    # Use the new titer attribute (falls back to target_titer for compatibility)
+    baseline_titer = R302.titer if R302.titer is not None else R302.target_titer
     
     @param(name='Fermentation titer', element='Fermentation', kind='coupled', units='g/L',
-           baseline=baseline_titer, distribution=shape.Triangle(baseline_titer*0.8, baseline_titer, baseline_titer*1.2))
+           baseline=baseline_titer, distribution=shape.Triangle(baseline_titer*0.5, baseline_titer, baseline_titer*1.5))
     def set_titer(titer):
+        # Set both new and legacy attributes for full compatibility
+        R302.titer = titer
         R302.target_titer = titer
 
     # 1.2 Tau (Residence Time)
@@ -158,8 +176,9 @@ def create_model(baseline_production_kg_hr=150, config='config1', verbose=True):
     def set_tau(tau):
         R302.tau = tau
         # Update target productivity to maintain consistency with titer and this tau
-        if tau > 0:
-            R302.target_productivity = R302.target_titer / tau
+        current_titer = R302.titer if R302.titer is not None else R302.target_titer
+        if tau > 0 and current_titer is not None:
+            R302.target_productivity = current_titer / tau
 
     # 1.3 Yield Product (yield p)
     baseline_yield_p = R302.target_yield
@@ -188,7 +207,7 @@ def create_model(baseline_production_kg_hr=150, config='config1', verbose=True):
     @param(name='Centrifuge split', element='DSP', kind='coupled', units='multiplier',
            baseline=1.0, distribution=shape.Uniform(0.95, 1.0))
     def set_centrifuge_split(multiplier):
-        for unit in [C401, C402]:
+        for unit in [C401, C402, C403]:
             # Apply multiplier to original splits
             # We must clip at 1.0 to avoid mass balance errors
             base = base_splits[unit]
@@ -208,7 +227,7 @@ def create_model(baseline_production_kg_hr=150, config='config1', verbose=True):
     # 2.3 Filtration Solid Capture
     # Range 0.9~0.99, Uniform
     @param(name='Filtration capture', element='DSP', kind='coupled', units='-',
-           baseline=0.95, distribution=shape.Uniform(0.90, 0.99))
+           baseline=0.85, distribution=shape.Uniform(0.75, 0.95))
     def set_filtration_capture(eff):
         if hasattr(S403, 'solid_capture_efficiency'):
             S403.solid_capture_efficiency = eff
@@ -438,59 +457,88 @@ def create_model(baseline_production_kg_hr=150, config='config1', verbose=True):
 # =============================================================================
 
 def verify_model_integration():
-    """Verification function to test that design mode integration works correctly."""
+    """
+    Verification function to test that design mode integration works correctly.
+    Uses model(sample) interface for proper parameter evaluation.
+    """
+    import traceback
     print("="*80)
-    print("PREFERS MODEL INTEGRATION VERIFICATION")
+    print("PREFERS MODEL INTEGRATION VERIFICATION (LegHb)")
     print("="*80)
     
     # Create model
-    print("\n1. Creating model and loading system...")
-    model = create_model(baseline_production_kg_hr=150)
-    sys = model.system
+    print("\n1. Creating model...")
+    model = create_model(baseline_production_kg_hr=150, verbose=False)
     
     # Display model structure
-    print("\n2. Model parameters:")
-    for i, p in enumerate(model.parameters):
-        print(f"   {i+1}. {p.name} [{p.element}]: {p.baseline:.4f}")
+    print(f"\n2. Model has {len(model.parameters)} parameters and {len(model.metrics)} metrics")
     
-    # Test baseline
-    print("\n3. Evaluating baseline...")
-    try:
-        baseline = model.metrics_at_baseline()
-        print("\nBaseline Metrics:")
-        for name, value in baseline.items():
-            print(f"  {name}: {value:.4f}")
-    except Exception as e:
-        print(f"Baseline evaluation failed: {e}")
+    # Build sample arrays for baseline, LB, UB
+    param_bounds = {}
+    for p in model.parameters:
+        dist = p.distribution
+        if hasattr(dist, 'lower'):
+            lb = float(np.asarray(dist.lower).reshape(-1)[0])
+        else:
+            lb = p.baseline * 0.9
+        if hasattr(dist, 'upper'):
+            ub = float(np.asarray(dist.upper).reshape(-1)[0])
+        else:
+            ub = p.baseline * 1.1
+        param_bounds[p.name] = {'baseline': p.baseline, 'lb': lb, 'ub': ub}
     
-    # Quick test of specific parameters
-    print("\n4. Testing sensitivity (changing parameters)...")
+    baseline_sample = np.array([param_bounds[p.name]['baseline'] for p in model.parameters])
+    lb_sample = np.array([param_bounds[p.name]['lb'] for p in model.parameters])
+    ub_sample = np.array([param_bounds[p.name]['ub'] for p in model.parameters])
     
-    # GWP Multiplier
-    try:
-        print("   -> Increasing Buffer/Seed GWP multiplier to 1.1")
-        p_gwp = [p for p in model.parameters if p.name == 'Buffer/Seed GWP'][0]
-        p_gwp.setter(1.1)
-        sys.simulate()
-        print(f"      New GWP: {model.metrics[3].get():.4f}")
-    except Exception as e:
-        print(f"   [FAIL] GWP test: {e}")
-
-    # Fermentation Tau
-    try:
-        print("   -> Increasing Tau to 110%")
-        p_tau = [p for p in model.parameters if p.name == 'Fermentation tau'][0]
-        base_tau = p_tau.baseline
-        new_tau = base_tau * 1.1
-        p_tau.setter(new_tau)
-        sys.simulate()
-        u = sys.flowsheet.unit
-        print(f"      Calculated Tau: {u.R302.tau:.4f} hr (Target: {new_tau:.4f})")
-    except Exception as e:
-        print(f"   [FAIL] Tau test: {e}")
-
+    results = {}
+    
+    # Evaluate each scenario using model(sample) interface
+    for name, sample in [('BASELINE', baseline_sample), ('LB', lb_sample), ('UB', ub_sample)]:
+        print(f"\n3. [{name}] Evaluating...")
+        try:
+            metrics = model(sample)
+            results[name] = {m.name: metrics[i] for i, m in enumerate(model.metrics)}
+            print(f"   MSP: {results[name].get('MSP', float('nan')):.4f} $/kg")
+            print(f"   GWP: {results[name].get('GWP', float('nan')):.4f} kg CO2-eq/kg")
+        except Exception as e:
+            print(f"   ERROR: {e}")
+            traceback.print_exc()
+            results[name] = {}
+    
+    # Summary table
     print("\n" + "="*80)
-    print("VERIFICATION COMPLETE")
+    print("RESULTS SUMMARY")
+    print("="*80)
+    
+    key_metrics = ['MSP', 'TCI', 'AOC', 'GWP']
+    print(f"\n{'Metric':20s} {'BASELINE':>15s} {'LB':>15s} {'UB':>15s}")
+    print("-"*65)
+    for m_name in key_metrics:
+        bl = results.get('BASELINE', {}).get(m_name, float('nan'))
+        lb = results.get('LB', {}).get(m_name, float('nan'))
+        ub = results.get('UB', {}).get(m_name, float('nan'))
+        print(f"{m_name:20s} {bl:15.4f} {lb:15.4f} {ub:15.4f}")
+    
+    # Parameter table
+    print("\n" + "-"*80)
+    print(f"{'Parameter':35s} {'BASELINE':>12s} {'LB':>12s} {'UB':>12s}")
+    print("-"*80)
+    for p in model.parameters:
+        b = param_bounds[p.name]
+        print(f"{p.name:35s} {b['baseline']:12.4f} {b['lb']:12.4f} {b['ub']:12.4f}")
+    
+    # Verify results differ
+    bl_msp = results.get('BASELINE', {}).get('MSP', float('nan'))
+    lb_msp = results.get('LB', {}).get('MSP', float('nan'))
+    ub_msp = results.get('UB', {}).get('MSP', float('nan'))
+    
+    print("\n" + "="*80)
+    if not np.isnan(bl_msp) and not np.isnan(lb_msp) and not np.isnan(ub_msp):
+        if not (np.isclose(bl_msp, lb_msp, rtol=0.001) and np.isclose(bl_msp, ub_msp, rtol=0.001)):
+            print("VERIFICATION PASSED: MSP values differ across scenarios!")
+        else:
+            print("VERIFICATION FAILED: MSP values are identical!")
     print("="*80)
 
 if __name__ == '__main__':

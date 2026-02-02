@@ -131,7 +131,7 @@ def create_stream(stream_list):
         streams.append(s)
     return streams
 
-def update_all_input_stream_prices(streamlist, verbose=True):
+def update_all_input_stream_prices(streamlist, verbose=False):
     """Update prices for all input streams"""
     # FIX: Check if streams exist and are proper objects
     try:
