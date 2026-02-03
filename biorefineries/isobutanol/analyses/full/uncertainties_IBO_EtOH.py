@@ -504,8 +504,9 @@ if len(modes)==1:
     
     
     fig = bst_plots.plot_spearman_2d([results_dict['Sensitivity']['p-val Spearman']['MPSP'][mode],
-                                      results_dict['Sensitivity']['p-val Spearman']['GWP100a'][mode],
-                                      results_dict['Sensitivity']['p-val Spearman']['FEC'][mode],],
+                                      # results_dict['Sensitivity']['p-val Spearman']['GWP100a'][mode],
+                                      # results_dict['Sensitivity']['p-val Spearman']['FEC'][mode],
+                                      ],
                                index=[i.element_name + ': ' + i.name for i in model.parameters],
                                # name='MPSP '+"["+MPSP_units+"]", 
                                color_wheel=(colors.to_rgb("#A97802"),
