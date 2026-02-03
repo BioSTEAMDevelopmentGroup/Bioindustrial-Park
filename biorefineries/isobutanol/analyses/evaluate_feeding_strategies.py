@@ -34,15 +34,11 @@ import os
 
 import biosteam as bst
 
-system = corn_EtOH_IBO_sys = isobutanol.system.corn_EtOH_IBO_sys
-load_simulate_get_EtOH_MPSP = isobutanol.system.load_simulate_get_EtOH_MPSP
-model_specification = isobutanol.system.model_specification
-baseline_spec = isobutanol.system.baseline_spec
-tea = corn_EtOH_IBO_sys_tea = isobutanol.system.corn_EtOH_IBO_sys_tea
-fbs_spec = isobutanol.system.fbs_spec
-optimize_tau_for_MPSP = isobutanol.system.optimize_tau_for_MPSP
-plot_kinetic_results = isobutanol.system.plot_kinetic_results
-# optimize_max_n_glu_spikes = isobutanol.system.optimize_max_n_glu_spikes
+model = isobutanol.models.models_EtOH_IBO_corn.model
+fbs_spec = isobutanol.models.models_EtOH_IBO_corn.fbs_spec
+model_specification = model.specification
+system = model.system
+tea = model.system.TEA
 
 f = system.flowsheet
 
@@ -74,7 +70,7 @@ isobutanol_results_filepath = isobutanol_filepath + '\\analyses\\results\\'
 
 
 #%% Baseline -- simulate and solve TEA
-model_specification(**baseline_spec,
+model_specification(
     n_sims=3,
     n_tea_solves=3,
     plot=True,
@@ -89,11 +85,11 @@ get_product_recovery = lambda: sum([product.imol[i] for i in product_chemical_ID
 get_AOC = lambda: tea.AOC / 1e6 # million USD / y
 get_TCI = lambda: tea.TCI / 1e6 # million USD
 
-get_yield_nsk = lambda: ferm_reactor.results_specific_tau_dict['y_EtOH_IBO_glu_added']
-get_titer_nsk = lambda: ferm_reactor.results_specific_tau_dict['[s_EtOH]']
-get_prod_nsk = lambda: ferm_reactor.results_specific_tau_dict['prod_EtOH']
+get_yield_nsk = lambda: ferm_reactor.nsk_results_specific_tau_dict['y_EtOH_IBO_glu_added']
+get_titer_nsk = lambda: ferm_reactor.nsk_results_specific_tau_dict['[s_EtOH]']
+get_prod_nsk = lambda: ferm_reactor.nsk_results_specific_tau_dict['prod_EtOH']
 
-get_curr_n_glu_spikes = lambda: ferm_reactor.results_specific_tau_dict['curr_n_glu_spikes']
+get_curr_n_glu_spikes = lambda: ferm_reactor.nsk_results_specific_tau_dict['curr_n_glu_spikes']
 
 get_tau = lambda: ferm_reactor.tau
 
@@ -133,7 +129,8 @@ spec_2 = target_conc_sugarses = np.linspace(10., 500., steps[1])
 
 spec_3 = conc_sugars_feed_spikes =\
     np.array([
-              1.*baseline_spec['conc_sugars_feed_spike'],
+              # 1.*baseline_spec['conc_sugars_feed_spike'],
+              fbs_spec.conc_sugars_feed_spike,
               ])
     
 # spec_3 = conc_sugars_feed_spikes = np.linspace(200, 800., steps[2])
@@ -239,7 +236,7 @@ file_to_save = f'_{steps}_steps_'+'etoh_fbs_%s.%s.%s-%s.%s'%(dateTimeObj.year, d
 #%% Initial simulation
 
 print('\n\nSimulating the initial point to avoid bugs ...')
-curr_spec = fbs_spec.current_specifications
+curr_spec = {}
 curr_spec.update({'threshold_conc_sugars':threshold_conc_sugarses[0],})
 curr_spec.update({'target_conc_sugars':target_conc_sugarses[0],})
 
@@ -283,7 +280,7 @@ for s3 in spec_3:
             try:
                 # if round(s1,2)==round(spec_1[1],2) and round(s2,2)==round(spec_2[4],2):
                 #     breakpoint()
-                curr_spec = {k:v for k,v in baseline_spec.items()}
+                curr_spec = {k: v for k,v in fbs_spec.current_specifications.items()}
                 curr_spec.update({'threshold_conc_sugars':s1,})
                 curr_spec.update({'target_conc_sugars':s2,})
                 curr_spec.update({'conc_sugars_feed_spike':s3,})
@@ -293,7 +290,7 @@ for s3 in spec_3:
                     n_tea_solves=3,
                     plot=False,
                     )
-                plot_kinetic_results()
+                # plot_kinetic_results()
                 
                 assert s1<s2
                 # optimize_max_n_glu_spikes(obj='y_EtOH_glu_added', 
@@ -314,6 +311,7 @@ for s3 in spec_3:
                 if not 'specifications do not meet required' in str_e:
                     errors_dict[(s1, s2, s3)] = str_e
                     # breakpoint()
+                    # raise e
                     
             if curr_no%print_status_every_n_simulations==0 or error_message:
                 print_status(curr_no, total_no,

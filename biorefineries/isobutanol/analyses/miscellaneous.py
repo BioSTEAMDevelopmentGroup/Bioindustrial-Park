@@ -11,18 +11,9 @@ import biosteam as bst
 from biorefineries import isobutanol
 from matplotlib import pyplot as plt
 
-system = corn_EtOH_IBO_sys = isobutanol.system.corn_EtOH_IBO_sys
-load_simulate_get_EtOH_MPSP = isobutanol.system.load_simulate_get_EtOH_MPSP
-model_specification = isobutanol.system.model_specification
-baseline_spec = isobutanol.system.baseline_spec
-tea = corn_EtOH_IBO_sys_tea = isobutanol.system.corn_EtOH_IBO_sys_tea
-fbs_spec = isobutanol.system.fbs_spec
-optimize_tau_for_MPSP = isobutanol.system.optimize_tau_for_MPSP
-plot_kinetic_results = isobutanol.system.plot_kinetic_results
-unit_groups = isobutanol.system.unit_groups
-unit_groups_dict = isobutanol.system.unit_groups_dict
-
-f = system.flowsheet
+model = isobutanol.models_EtOH_IBO_corn.model
+model_specification = model.specification
+f = model.system.flowsheet
 V406 = f.V406
 
 # %%

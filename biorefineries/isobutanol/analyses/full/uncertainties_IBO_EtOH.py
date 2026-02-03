@@ -351,7 +351,7 @@ if len(modes)==1:
     
     
     contourplots.stacked_bar_plot(dataframe=df_TEA_breakdown, 
-                     y_ticks = [-50, -25, 0, 25, 50, 75, 100],
+                     y_ticks = [-25, 0, 25, 50, 75, 100],
                      y_label=r"$\bfCost$" + " " + r"$\bfand$" + " " +  r"$\bfUtility$" + " " +  r"$\bfBreakdown$", 
                      y_units = "%", 
                      colors=['#7BBD84', 

@@ -458,10 +458,10 @@ corn_EtOH_IBO_sys._TEA = corn_EtOH_IBO_sys_tea = corn.tea.create_tea(corn_EtOH_I
 
 #%% Set baseline specifications
 
-baseline_spec = {'target_conc_sugars': 190,
-                 'threshold_conc_sugars': 180,
-                 'conc_sugars_feed_spike': 600,
-                 'tau_max': 10*24,}
+baseline_spec = {'target_conc_sugars': 190.0,
+                 'threshold_conc_sugars': 180.0,
+                 'conc_sugars_feed_spike': 600.0,
+                 'tau_max': 10.0*24.0,}
 
 #% Create fed-batch strategy specification object
 fbs_spec = nsk.units.FedBatchStrategySpecification(
@@ -658,6 +658,8 @@ def model_specification(**kwargs):
         elif 'specifications do not meet required condition' in str_e:
             # flowsheet('AcrylicAcid').F_mass /= 1000.
             raise e
+        elif 'argument 3 of type' in str_e:
+            raise e
         else:
             try:
                 print('Trying again ...')
@@ -724,7 +726,8 @@ fermentation_group = bst.UnitGroup('fermentation', units=[u.V406])
 IBO_separation_units = [i for i in corn_EtOH_IBO_sys.units
                         if not i in list(corn_EtOH_IBO_sys.facilities) + corn_EtOH_IBO_sys_no_IBO_recovery.units
                                     + feedstock_acquisition_group.units + feedstock_juicing_group.units
-                                    + sugar_solution_preparation_group.units + fermentation_group.units]
+                                    + sugar_solution_preparation_group.units + fermentation_group.units
+                                    + [f.H402]]
 
 isobutanol_separation_group = bst.UnitGroup('isobutanol separation', units=IBO_separation_units)
 
