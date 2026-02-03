@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-# Bioindustrial-Park: BioSTEAM's Premier Biorefinery Models and Results
+# Bioindustrial-Park: BioSTEAM's Premier Biorefinery Models and nsk_results
 # Copyright (C) 2021-, Sarang Bhagwat <sarangb2@illinois.edu>
 # 
 # This module is under the UIUC open-source license. See 
@@ -213,10 +213,10 @@ V406 = nsk.units.NSKFermentation('V406',
                                  sugar_IDs=('Glucose',),
                                  # tau_update_policy=None,
                                  # tau_update_policy=('max', '[s_EtOH]'),
-                                 # tau_update_policy=('max', 'y_EtOH_IBO_glu_added'),
+                                 tau_update_policy=('max', 'y_EtOH_IBO_glu_added'),
                                  # tau_update_policy=('min', '[s_glu]'),
-                                 tau_update_policy=('equals', '[s_glu]', 0.0),
-                                 n_decimal_places_for_tau_update_policy=1,
+                                 # tau_update_policy=('equals', '[s_glu]', 0.0),
+                                 n_decimal_places_for_tau_update_policy=2,
                                  try_fewer_n_spikes_until=lambda r_te: round(r_te.s_glu, 2)==0.0,
                                  perform_hydrolysis=False)
 
@@ -529,12 +529,12 @@ def plot_kinetic_results():
     # if variables is None:
     #     variables = ['[x]', 'curr_a', '[s_glu]', '[s_EtOH]', '[s_acetate]', '[s_IBO]']
     
-    plt.plot(V406.results_dict['time'], V406.results_dict['[x]'], label='cell loading')
-    plt.plot(V406.results_dict['time'], V406.results_dict['curr_a'], label='active cell loading')
-    plt.plot(V406.results_dict['time'], V406.results_dict['[s_glu]'], label='glucose')
-    plt.plot(V406.results_dict['time'], V406.results_dict['[s_EtOH]'], label='ethanol')
-    plt.plot(V406.results_dict['time'], V406.results_dict['[s_acetate]'], label='acetate')
-    plt.plot(V406.results_dict['time'], V406.results_dict['[s_IBO]'], label='isobutanol')
+    plt.plot(V406.nsk_results_dict['time'], V406.nsk_results_dict['[x]'], label='cell loading')
+    plt.plot(V406.nsk_results_dict['time'], V406.nsk_results_dict['curr_a'], label='active cell loading')
+    plt.plot(V406.nsk_results_dict['time'], V406.nsk_results_dict['[s_glu]'], label='glucose')
+    plt.plot(V406.nsk_results_dict['time'], V406.nsk_results_dict['[s_EtOH]'], label='ethanol')
+    plt.plot(V406.nsk_results_dict['time'], V406.nsk_results_dict['[s_acetate]'], label='acetate')
+    plt.plot(V406.nsk_results_dict['time'], V406.nsk_results_dict['[s_IBO]'], label='isobutanol')
     plt.legend()
     plt.xlabel('Time [h]')
     plt.ylabel('Concentration [g/L]')
@@ -670,10 +670,10 @@ def model_specification(**kwargs):
 
 def optimize_tau_for_MPSP(threshold_s_EtOH=5, **kwargs):
     original_run_type = V406.run_type
-    V406.run_type = 'index saved results by tau'
-    results = V406.results_dict
-    where_greq_threshold = np.where(V406.results_dict['[s_EtOH]']>=5)[0]
-    taus = results['time']
+    V406.run_type = 'index saved nsk_results by tau'
+    nsk_results = V406.nsk_results_dict
+    where_greq_threshold = np.where(V406.nsk_results_dict['[s_EtOH]']>=5)[0]
+    taus = nsk_results['time']
     bounds_tau = (taus[where_greq_threshold[0]], taus[where_greq_threshold[-1]])
     def f(x):
         V406.tau = x[0]

@@ -109,7 +109,7 @@ results = {i: [] for i in range(len(metrics))}
 
 # %% Generate 3-specification meshgrid and set specification loading functions
 
-steps = (10, 10, 1)
+steps = (20, 20, 1)
 
 spec_1 = nsk_k_3es = np.linspace(1., 20., steps[0])
 
