@@ -60,7 +60,7 @@ modes=[
         # 'B', 
         # 'C', 'D',
        ]
-N_simulations_per_mode=500
+N_simulations_per_mode=20
 notification_interval=20
 plot_TOC_fig=True
 

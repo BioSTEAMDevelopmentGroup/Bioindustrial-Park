@@ -760,9 +760,5 @@ for i in unit_groups:
                        electricity_production=False, 
                        electricity_consumption=True,
                        material_cost=True)
-    # i.filter_savings = False # check bst implementation
-    # i.metrics.append(bst.evaluation.Metric('Utility cost', 
-    #                         getter=lambda: sum([ui.utility_cost for ui in i.units]), 
-    #                         units='USD/hr',
-    #                         element=None)
-    #                  )
+
+unit_groups_dict['heat exchanger network'].filter_savings=False
