@@ -619,24 +619,30 @@ def model_specification(**kwargs):
         print('Error in model spec: %s'%str_e)
         # raise e
         if 'cv_err_failure' in str_e:
+            # breakpoint()
             try:
                 i = 0
                 success = False
                 while i<20 and not success:
                     try:
-                        print('Re-running fermentation unit ...')
+                        r.integrator.relative_tolerance = 1e-6
+                        print('Re-simulating fermentation unit with lower integrator rtol ...')
                         V406.simulate()
                         success = True
+                        r.integrator.relative_tolerance = 1e-5
+                        print('Succeeded; resetting integrator rtol to original value and re-simulating system ...')
+                        load_simulate_get_EtOH_MPSP(**curr_spec)
                     except Exception as e:
                         print(str(e))
                         i += 1
                         if i>=20:
                             try:
-                                r.setIntegrator('rk4')
-                                print('Changing integrator to rk4 ...')
-                                print('Re-running fermentation unit with rk4 ...')
+                                r.setIntegrator('rk45')
+                                print('Changing integrator to rk45 ...')
+                                print('Re-running fermentation unit with rk45 ...')
                                 V406.simulate()
                                 success = True
+                                load_simulate_get_EtOH_MPSP(**curr_spec)
                             except Exception as e:
                                 print(str(e))
                                 raise e
@@ -661,6 +667,7 @@ def model_specification(**kwargs):
         elif 'argument 3 of type' in str_e:
             raise e
         else:
+            breakpoint()
             try:
                 print('Trying again ...')
                 load_simulate_get_EtOH_MPSP(**curr_spec)

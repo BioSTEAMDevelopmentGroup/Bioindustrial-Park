@@ -11,7 +11,7 @@ import biosteam as bst
 from biorefineries import isobutanol
 from matplotlib import pyplot as plt
 
-model = isobutanol.models_EtOH_IBO_corn.model
+model = isobutanol.models.models_EtOH_IBO_corn.model
 model_specification = model.specification
 f = model.system.flowsheet
 V406 = f.V406
