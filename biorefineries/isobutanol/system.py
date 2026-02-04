@@ -254,7 +254,19 @@ V307 = f.V307
 def V307_clamp_recycle_flow_spec():
     V307.ins[4].F_mol = max(1e-3, V307.ins[4].F_mol)
     V307._run()
-    
+
+#%%
+
+V409 = f.V409
+scrubber_water = V409.ins[0]
+
+V409.specifications = []
+
+@V409.add_specification(run=False)
+def update_scrubber_wash_water():
+    scrubber_water.imass['Water'] =  V409.ins[1].F_mass * parameters['scrubber_wash_water_over_vent']
+    V409._run()
+        
 #%%
 corn_EtOH_IBO_sys_no_IBO_recovery = bst.System.from_units('corn_EtOH_IBO_sys_no_IBO_recovery', 
                                           units = [i for i in corn_EtOH_sys.units 
@@ -667,7 +679,7 @@ def model_specification(**kwargs):
         elif 'argument 3 of type' in str_e:
             raise e
         else:
-            breakpoint()
+            # breakpoint()
             try:
                 print('Trying again ...')
                 load_simulate_get_EtOH_MPSP(**curr_spec)
