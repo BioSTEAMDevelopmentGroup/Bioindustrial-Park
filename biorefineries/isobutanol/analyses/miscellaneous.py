@@ -12,9 +12,19 @@ from biorefineries import isobutanol
 from matplotlib import pyplot as plt
 
 model = isobutanol.models.models_EtOH_IBO_corn.model
+namespace_dict = isobutanol.models.namespace_dict
 model_specification = model.specification
 f = model.system.flowsheet
 V406 = f.V406
+
+IBO_filepath = isobutanol.__file__.replace('\\__init__.py', '')
+parameter_distributions_filename = IBO_filepath+\
+    '\\analyses\\full\\parameter_distributions\\'+\
+    'parameter-distributions_corn_IBO_EtOH_B.xlsx'
+        
+model.parameters = ()
+model.load_parameter_distributions(parameter_distributions_filename, namespace_dict)
+baseline_initial = model.metrics_at_baseline()
 
 # %%
 # conc_sugars_feed_spikes = np.linspace(150, 600, 20)

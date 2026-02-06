@@ -373,7 +373,7 @@ def D401_bypass_spec():
         D401._design = lambda: 0
         D401._cost = lambda: 0
         
-        S401.outs[0] = S401.ins[0].copy()
+        S401.outs[0].copy_like(S401.ins[0])
         
 # M402.simulate()
 # D401.simulate()
@@ -473,7 +473,7 @@ corn_EtOH_IBO_sys._TEA = corn_EtOH_IBO_sys_tea = corn.tea.create_tea(corn_EtOH_I
 baseline_spec = {'target_conc_sugars': 190.0,
                  'threshold_conc_sugars': 180.0,
                  'conc_sugars_feed_spike': 600.0,
-                 'tau_max': 10.0*24.0,}
+                 'tau_max': 120.0,}
 
 #% Create fed-batch strategy specification object
 fbs_spec = nsk.units.FedBatchStrategySpecification(
@@ -630,49 +630,75 @@ def model_specification(**kwargs):
         str_e = str(e).lower()
         print('Error in model spec: %s'%str_e)
         # raise e
+        
         if 'cv_err_failure' in str_e:
-            # breakpoint()
+            
             try:
+                print('Re-simulating fermentation unit with lower tau_max values ...')
+                success = False
+                tau_maxes_to_try = list(np.linspace(curr_spec['tau_max']*0.5, 
+                                                    curr_spec['tau_max'], 
+                                                    20))
+                tau_maxes_to_try.reverse()
+                for tm in tau_maxes_to_try:
+                    try:
+                        load_simulate_get_EtOH_MPSP(tau_max=tm)
+                        success = True
+                        break
+                    except Exception as e:
+                        # print(str(e))
+                        pass
+                
+                if success: print('Succeeded.')
+                print('Resetting tau_max to original value.')
+                fbs_spec.tau_max = curr_spec['tau_max']
+                if not success: raise(e)
+                    
+            except Exception as e:
+                print(str(e))
                 i = 0
                 success = False
                 while i<20 and not success:
                     try:
-                        r.integrator.relative_tolerance = 1e-6
-                        print('Re-simulating fermentation unit with lower integrator rtol ...')
-                        V406.simulate()
-                        success = True
-                        r.integrator.relative_tolerance = 1e-5
-                        print('Succeeded; resetting integrator rtol to original value and re-simulating system ...')
-                        load_simulate_get_EtOH_MPSP(**curr_spec)
+                        try:
+                            r.integrator.relative_tolerance = 1e-6
+                            print('Re-simulating fermentation unit with lower integrator rtol ...')
+                            V406.simulate()
+                            load_simulate_get_EtOH_MPSP(**curr_spec)
+                            success = True
+                        except Exception as e:
+                            print(str(e))
+                            i += 1
+                            if i>=19:
+                                try:
+                                    r.setIntegrator('rk45')
+                                    print('Changing integrator to rk45 ...')
+                                    print('Re-running fermentation unit with rk45 ...')
+                                    V406.simulate()
+                                    success = True
+                                    load_simulate_get_EtOH_MPSP(**curr_spec)
+                                except Exception as e:
+                                    print(str(e))
+                                    raise e
+                        finally:
+                            if success: print('Succeeded.')
+                            print('Resetting integrator to cvode and rtol to original value.')
+                            r.setIntegrator('cvode')
+                            r.integrator.relative_tolerance = 1e-5
+                            
                     except Exception as e:
-                        print(str(e))
-                        i += 1
-                        if i>=20:
+                        str_e = str(e).lower()
+                        print(str_e)
+                        if 'negative concentrations' in str_e:
                             try:
-                                r.setIntegrator('rk45')
-                                print('Changing integrator to rk45 ...')
-                                print('Re-running fermentation unit with rk45 ...')
-                                V406.simulate()
-                                success = True
+                                print('Trying again ...')
                                 load_simulate_get_EtOH_MPSP(**curr_spec)
                             except Exception as e:
                                 print(str(e))
                                 raise e
-                            finally:
-                                print('Changing integrator back to cvode ...')
-                                r.setIntegrator('cvode')
-            except Exception as e:
-                str_e = str(e).lower()
-                print(str_e)
-                if 'negative concentrations' in str_e:
-                    try:
-                        print('Trying again ...')
-                        load_simulate_get_EtOH_MPSP(**curr_spec)
-                    except Exception as e:
-                        print(str(e))
-                        raise e
-                else:
-                    raise e
+                        else:
+                            raise e
+        
         elif 'specifications do not meet required condition' in str_e:
             # flowsheet('AcrylicAcid').F_mass /= 1000.
             raise e

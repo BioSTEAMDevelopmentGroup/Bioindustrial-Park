@@ -36,6 +36,7 @@ import biosteam as bst
 
 model = isobutanol.models.models_EtOH_IBO_corn.model
 fbs_spec = isobutanol.models.models_EtOH_IBO_corn.fbs_spec
+namespace_dict = isobutanol.models.namespace_dict
 model_specification = model.specification
 system = model.system
 tea = model.system.TEA
@@ -68,6 +69,14 @@ isobutanol_filepath = isobutanol.__file__.replace('\\__init__.py', '')
 # ##
 isobutanol_results_filepath = isobutanol_filepath + '\\analyses\\results\\'
 
+
+#%% Load parameter distributions
+parameter_distributions_filename = isobutanol_filepath+\
+    '\\analyses\\full\\parameter_distributions\\'+\
+    'parameter-distributions_corn_IBO_EtOH_A.xlsx'
+        
+model.parameters = ()
+model.load_parameter_distributions(parameter_distributions_filename, namespace_dict)
 
 #%% Baseline -- simulate and solve TEA
 model_specification(
