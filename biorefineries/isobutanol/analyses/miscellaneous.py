@@ -13,6 +13,8 @@ from matplotlib import pyplot as plt
 
 model = isobutanol.models.models_EtOH_IBO_corn.model
 namespace_dict = isobutanol.models.namespace_dict
+optimize_1D_feeding_strategy_for_MPSP = isobutanol.models.optimize_1D_feeding_strategy_for_MPSP
+plot_kinetic_results = isobutanol.models.plot_kinetic_results
 model_specification = model.specification
 f = model.system.flowsheet
 V406 = f.V406
@@ -20,7 +22,7 @@ V406 = f.V406
 IBO_filepath = isobutanol.__file__.replace('\\__init__.py', '')
 parameter_distributions_filename = IBO_filepath+\
     '\\analyses\\full\\parameter_distributions\\'+\
-    'parameter-distributions_corn_IBO_EtOH_B.xlsx'
+    'parameter-distributions_corn_IBO_EtOH_A.xlsx'
         
 model.parameters = ()
 model.load_parameter_distributions(parameter_distributions_filename, namespace_dict)
@@ -66,9 +68,9 @@ for c in target_conc_sugarses:
     
     MPSPs = np.append(MPSPs, ethanol.price * ethanol.F_mass/ethanol.imass['Ethanol'])
     taus = np.append(taus, V406.tau)
-    max_yields = np.append(max_yields, V406.results_specific_tau_dict['y_EtOH_glu_added'])
-    final_n_glu_spikes = np.append(final_n_glu_spikes, V406.results_specific_tau_dict['curr_n_glu_spikes'])
-    titers = np.append(titers, V406.results_specific_tau_dict['[s_EtOH]'])
+    max_yields = np.append(max_yields, V406.nsk_results_specific_tau_dict['y_EtOH_glu_added'])
+    final_n_glu_spikes = np.append(final_n_glu_spikes, V406.nsk_results_specific_tau_dict['curr_n_glu_spikes'])
+    titers = np.append(titers, V406.nsk_results_specific_tau_dict['[s_EtOH]'])
     
     # plt.plot(V406.results_dict['time'], V406.results_dict['y_EtOH_glu_added'])
     # plt.xlabel(f'Time [h]; target conc={c}')

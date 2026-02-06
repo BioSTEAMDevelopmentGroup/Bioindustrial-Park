@@ -15,7 +15,7 @@ from matplotlib import pyplot as plt
 from biorefineries import corn
 from biorefineries.isobutanol import units
 from nskinetics.examples.s_cerevisiae_ferm_fb_inhib_mod_ibo import te_r, reset_kinetic_reaction_system
-from scipy.optimize import differential_evolution
+from scipy.optimize import differential_evolution, minimize, brute
 
 from warnings import filterwarnings
 filterwarnings('ignore')
@@ -734,6 +734,32 @@ def optimize_tau_for_MPSP(threshold_s_EtOH=5, **kwargs):
     V406.run_type = original_run_type
     return res.x[0]
     
+def optimize_1D_feeding_strategy_for_MPSP(bounds=(20.0, 400.0), Ns=20, **kwargs):
+    model_specification(**kwargs)
+    def f(x):
+        target_conc_sugars = x[0]
+        try:
+            model_specification(
+                                target_conc_sugars=target_conc_sugars,
+                                threshold_conc_sugars=target_conc_sugars-10, )
+            MPSP = get_purity_adj_price(ethanol, ['Ethanol'])
+            print(MPSP)
+            return MPSP
+        except:
+            print(np.inf)
+            return np.inf
+    # res = brute(f, ranges=(bounds,), Ns=20)
+    # return res.x[0]
+    concs = np.linspace(bounds[0], bounds[1], Ns)
+    MPSPs = []
+    opt_MPSP = np.inf
+    opt_conc = None
+    for conc in concs:
+        MPSPs.append(f([conc]))
+        if MPSPs[-1]<opt_MPSP:
+            opt_MPSP = MPSPs[-1]
+            opt_conc = conc
+    return (opt_conc, opt_MPSP)
 
 #%% Initialize 
 r = V406.kinetic_reaction_system._te

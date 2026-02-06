@@ -130,20 +130,20 @@ results = {i: [] for i in metrics.keys()}
 
 # %% Generate 3-specification meshgrid and set specification loading functions
 
-steps = (20, 20, 1)
+steps = (8, 8, 8)
 
 spec_1 = threshold_conc_sugarses = np.linspace(1., 500., steps[0])
 
 spec_2 = target_conc_sugarses = np.linspace(10., 500., steps[1])
 
 
-spec_3 = conc_sugars_feed_spikes =\
-    np.array([
-              # 1.*baseline_spec['conc_sugars_feed_spike'],
-              fbs_spec.conc_sugars_feed_spike,
-              ])
+# spec_3 = conc_sugars_feed_spikes =\
+#     np.array([
+#               # 1.*baseline_spec['conc_sugars_feed_spike'],
+#               fbs_spec.conc_sugars_feed_spike,
+#               ])
     
-# spec_3 = conc_sugars_feed_spikes = np.linspace(200, 800., steps[2])
+spec_3 = conc_sugars_feed_spikes = np.linspace(200, 800., steps[2])
 
     
 #%% Plot stuff
@@ -200,15 +200,17 @@ edgecolor = (*colors.CABBI_black.RGBn, 1)
 
 
 def JBEI_UCB_colormap(N_levels=90, reverse=False):
+    UCB_yellow = (253/255, 181/255, 21/255)
     JBEI_orange = (233/255, 83/255, 39/255)
     UCB_blue = (0/255, 38/255, 118/255)
-    UCB_yellow = (253/255, 181/255, 21/255)
+    UCB_blue_dark = (0/255, 29/255, 89/255)
     cmap_colors = [
                     UCB_yellow,
                     JBEI_orange,
                     UCB_blue,
+                    # UCB_blue_dark,
                     # colors.CABBI_teal_green.shade(50).RGBn,
-                    # colors.grey_dark.RGBn,
+                    colors.grey_dark.RGBn,
                     ]
     if reverse: cmap_colors.reverse()
     return LinearSegmentedColormap.from_list('CABBI', cmap_colors, N_levels)
@@ -476,7 +478,7 @@ if plot:
     # MPSP_w_levels, MPSP_w_ticks, MPSP_cbar_ticks = get_contour_info_from_metric_data(results_metric_1, lb=3)
     MPSP_w_levels = np.arange(0.65, 0.8501, 0.01)
     MPSP_cbar_ticks = np.arange(0.65, 0.8501, 0.05)
-    MPSP_w_ticks = [0.65, 0.7, 0.75, 0.85]
+    MPSP_w_ticks = [0.69, 0.72, 0.85]
     # MPSP_w_levels = np.arange(0., 15.5, 0.5)
     
     
@@ -506,7 +508,7 @@ if plot:
                                     cbar_ticks=MPSP_cbar_ticks,
                                     z_marker_color='g', # default matplotlib color names
                                     fps=fps, # animation frames (z values traversed) per second
-                                    n_loops='inf', # the number of times the animated contourplot should loop animation over z; infinite by default
+                                    n_loops=30, # the number of times the animated contourplot should loop animation over z; infinite by default
                                     animated_contourplot_filename='MPSP_animated_contourplot_'+file_to_save, # file name to save animated contourplot as (no extensions)
                                     keep_frames=keep_frames, # leaves frame PNG files undeleted after running; False by default
                                     axis_title_fonts=axis_title_fonts,

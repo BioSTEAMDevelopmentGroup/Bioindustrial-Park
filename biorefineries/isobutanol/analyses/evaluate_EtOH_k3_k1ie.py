@@ -293,6 +293,7 @@ for s3 in spec_3:
                     n_tea_solves=3,
                     plot=False,
                     )
+                opt
                 # plot_kinetic_results()
                 
                 # assert s1<s2
