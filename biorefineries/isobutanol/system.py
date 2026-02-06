@@ -737,11 +737,10 @@ def optimize_tau_for_MPSP(threshold_s_EtOH=5, **kwargs):
 def optimize_1D_feeding_strategy_for_MPSP(bounds=(20.0, 400.0), Ns=20, **kwargs):
     model_specification(**kwargs)
     def f(x):
-        target_conc_sugars = x[0]
         try:
             model_specification(
-                                target_conc_sugars=target_conc_sugars,
-                                threshold_conc_sugars=target_conc_sugars-10, )
+                                target_conc_sugars=x[0],
+                                threshold_conc_sugars=x[0]-10, )
             MPSP = get_purity_adj_price(ethanol, ['Ethanol'])
             print(MPSP)
             return MPSP
@@ -759,7 +758,8 @@ def optimize_1D_feeding_strategy_for_MPSP(bounds=(20.0, 400.0), Ns=20, **kwargs)
         if MPSPs[-1]<opt_MPSP:
             opt_MPSP = MPSPs[-1]
             opt_conc = conc
-    return (opt_conc, opt_MPSP)
+    f([opt_conc])
+    return opt_conc
 
 #%% Initialize 
 r = V406.kinetic_reaction_system._te
