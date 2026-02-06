@@ -1,10 +1,18 @@
 # -*- coding: utf-8 -*-
 """
-LegHb Production System - Config 1 (Modular Refactored Version)
+LegHb Production System - Config 1 NEW (Internalized Specifications)
 
-Modular refactoring of LegHb production system into standard BioSTEAM Process Areas.
+Refactored from _config1.py to embed titer control (adjust_glucose_for_titer)
+and NH3 optimization (optimize_NH3_loading) as unit add_specifications,
+eliminating the need for external iterative convergence loops.
 
-Process Areas:
+Key changes vs _config1.py:
+    - adjust_glucose_for_titer logic → R302 add_specification
+    - optimize_NH3_loading logic → S202 add_specification (analytical)
+    - set_production_rate simplified (no internal optimize_NH3_loading calls)
+    - No run_titer_convergence needed; system.simulate() handles everything
+
+Process Areas (unchanged):
     - Area 200: Media Preparation
     - Area 300: Conversion (Fermentation)
     - Area 400: Recovery (Harvest & Cell Disruption)
@@ -29,7 +37,6 @@ from biorefineries.prefers.v1.LegHb import _chemicals as c
 from biorefineries.prefers.v1 import _units as u
 from biorefineries.prefers.v1 import _process_settings
 from biorefineries.prefers.v1._process_settings import price
-from biorefineries.prefers.v1.utils.convergence import run_titer_convergence
 
 # Global registry for seed scaling targets (to coordinate between set_production_rate and specs)
 seed_targets = {}
@@ -46,8 +53,6 @@ __all__ = (
     'create_LegHb_system',
     'set_production_rate',
     'check_LegHb_specifications',
-    'optimize_NH3_loading',
-    'adjust_glucose_for_titer',
     # Area creation functions
     'create_area_200_media_prep',
     'create_area_300_conversion',
@@ -169,7 +174,6 @@ def create_fermentation_reactions(params=None):
     )
     respiration_reaction2 = bst.Rxn(
         'Glucose + 6 O2 -> 6 CO2 + 6 H2O', 'Glucose', X= 1 - Y_b,
-        #0.9995 - cell_growth_reaction.X -fermentation_reaction[0].X -fermentation_reaction[1].X -fermentation_reaction[2].X,
         check_atomic_balance=True
     )
     
@@ -227,50 +231,40 @@ def create_area_200_media_prep(SeedIn1, SeedIn2, CultureIn, Glucose, NH3_25wt):
     dict
         Dictionary of area units and output streams
     """
-    # Initialize streams to reference values (run once during creation)
-    # This ensures valid baseline flows while allowing set_production_rate to scale them later
+    # Initialize streams to reference values
     try:
         SeedIn1.imass['Seed'] = s.SeedSolution1['Seed']
         SeedIn2.imass['Seed'] = s.SeedSolution2['Seed']
         
-        # Calculate CultureIn baseline
-        ref_seed2_total = s.SeedSolution2['Seed'] + s.SeedSolution2['H2O'] # Approximate
-        # Better: create temp stream to get mass
         tmp = bst.Stream(ID='tmp_init', **s.SeedSolution2)
         ref_seed2_total = tmp.F_mass
         ratio_culture = (0.1 + 60 + 0.15191) / 1000
         CultureIn.imass['Culture'] = ref_seed2_total * ratio_culture
-        tmp.empty() # cleanup
+        tmp.empty()
     except:
-        pass # Fallback if stream definitions missing keys
+        pass
 
     # Seed solution 1 preparation
     M201 = bst.MixTank('M201', ins=[SeedIn1, 'Water1'], outs='M201Out', tau=16)
     
-
-        
-    # Pre-calculate reference values for Seed1 to avoid re-registering stream in loop
+    # Pre-calculate reference values for Seed1
     ref_stream1 = bst.Stream(**{**s.SeedSolution1, 'ID': 'RefSeed1'})
     ref_seed1_val = ref_stream1.imass['Seed']
     ref_water1_val = ref_stream1.imass['H2O']
     
     @M201.add_specification(run=True)
     def update_seed1_inputs():
-        # Force SeedIn1 to target (from global dict or reference)
         target = seed_targets.get(SeedIn1, ref_seed1_val)
         SeedIn1.imass['Seed'] = target
-        
-        # Enforce water ratio
         if ref_seed1_val > 0:
             ratio = ref_water1_val / ref_seed1_val
             M201.ins[1].imass['H2O'] = target * ratio
-        
         M201.ins[1].T = 25 + 273.15
     
     # Seed solution 2 + culture media preparation
     M202 = bst.MixTank('M202', ins=[SeedIn2, CultureIn, 'Water2'], outs='M202Out', tau=16)
     
-    # Pre-calculate reference values for Seed2 to avoid re-registering stream in loop
+    # Pre-calculate reference values for Seed2
     ref_stream2 = bst.Stream(**{**s.SeedSolution2, 'ID': 'RefSeed2'})
     ref_seed2_val = ref_stream2.imass['Seed']
     ref_water2_val = ref_stream2.imass['H2O']
@@ -279,22 +273,13 @@ def create_area_200_media_prep(SeedIn1, SeedIn2, CultureIn, Glucose, NH3_25wt):
     @M202.add_specification(run=True)
     def update_culture_inputs():
         target = seed_targets.get(SeedIn2, ref_seed2_val)
-        
-        # Enforce target
         SeedIn2.imass['Seed'] = target
-        
         if ref_seed2_val > 0:
             ratio_water = ref_water2_val / ref_seed2_val
-            M202.ins[2].imass['H2O'] = target * ratio_water # Water2
-            
-            # CultureIn logic
+            M202.ins[2].imass['H2O'] = target * ratio_water
             ratio_culture = (0.1 + 60 + 0.15191) / 1000
-            
-            # Predict current total solution mass
             current_total_mass_est = target * (ref_total2_val / ref_seed2_val)
-            
             CultureIn.imass['Culture'] = current_total_mass_est * ratio_culture
-            
         M202.ins[2].T = 25 + 273.15
     
     # Ammonia storage tank
@@ -327,17 +312,19 @@ def create_area_200_media_prep(SeedIn1, SeedIn2, CultureIn, Glucose, NH3_25wt):
     }
 
 # =============================================================================
-# AREA 300: CONVERSION (FERMENTATION)
+# AREA 300: CONVERSION (FERMENTATION) - WITH INTERNALIZED SPECS
 # =============================================================================
-def create_area_300_conversion(seed_in, glucose_in, ammonia_in, vent1, vent2, reactions, params=None, system_glucose_stream=None):
+def create_area_300_conversion(seed_in, glucose_in, ammonia_in, vent1, vent2, 
+                                reactions, params=None, system_glucose_stream=None,
+                                NH3_source_stream=None, S202_unit=None):
     """
     Create Area 300: Conversion (Fermentation)
     
-    Purpose: Convert glucose to LegHb through microbial fermentation
+    Purpose: Convert glucose to LegHb through microbial fermentation.
     
-    Process Flow:
-        1. Seed Train (R301): Grow inoculum culture
-        2. Main Fermentation (R302): Batch aerobic fermentation (72h cycle)
+    NEW: Includes internalized specifications for:
+        - Titer control (yield adjustment based on target titer) - replaces adjust_glucose_for_titer
+        - NH3 optimization (analytical stoichiometric calculation) - replaces optimize_NH3_loading
     
     Parameters
     ----------
@@ -357,6 +344,10 @@ def create_area_300_conversion(seed_in, glucose_in, ammonia_in, vent1, vent2, re
         Fermentation parameters
     system_glucose_stream : Stream, optional
         Reference to the main system Glucose input stream for titer control
+    NH3_source_stream : Stream, optional
+        Reference to NH3_25wt input stream for NH3 optimization
+    S202_unit : bst.Splitter, optional
+        Reference to S202 splitter for NH3 split adjustment
     
     Returns
     -------
@@ -407,7 +398,6 @@ def create_area_300_conversion(seed_in, glucose_in, ammonia_in, vent1, vent2, re
         cooler_pressure_drop=params['cooler_pressure_drop'],
         compressor_isentropic_efficiency=params['compressor_isentropic_efficiency'],
         P=1 * 101325,
-        # New titer control attributes
         titer=params['titer_LegHb'],
         titer_IDs=('Leghemoglobin_In', 'Leghemoglobin'),
     )
@@ -415,36 +405,181 @@ def create_area_300_conversion(seed_in, glucose_in, ammonia_in, vent1, vent2, re
     R302.target_productivity = params['productivity_LegHb']
     R302.target_yield = params['yield_LegHb']
     
-    # Store reference to BOTH the immediate glucose input and the system-level glucose stream
+    # Store reference streams for internalized specs
     R302._glucose_feed_stream = glucose_in  # T201Out (diluted)
     R302._system_glucose_stream = system_glucose_stream  # Main system input (Glucose)
+    R302._nh3_source_stream = NH3_source_stream  # NH3_25wt
+    R302._s202_unit = S202_unit  # S202 splitter
     
-    # Store baseline glucose for scaling
+    # Store baseline values
     if system_glucose_stream is not None:
         R302._baseline_system_glucose = system_glucose_stream.imass['Glucose']
     R302._baseline_titer = params['titer_LegHb']
+    R302._baseline_yield = params['yield_LegHb']
     
-    @R302.add_specification(run=True)
-    def update_fermentation_params():
+    # Elasticity factor for titer→yield correction (matches old adjust_glucose_for_titer)
+    ELASTICITY = 1.3
+    MAX_TITER_ITERATIONS = 15
+    TITER_TOL = 0.001  # 0.1% relative tolerance
+    
+    # =========================================================================
+    # INTERNALIZED SPECIFICATION: Titer Control + NH3 Optimization
+    # (Replaces adjust_glucose_for_titer AND optimize_NH3_loading)
+    # =========================================================================
+    @R302.add_specification(run=False)
+    def update_fermentation_and_nh3():
         """
-        Update fermentation parameters (tau, yield) based on current titer settings.
+        Combined specification that:
+        1. Empirically measures NH3 demand (run R302 with excess, measure consumption)
+           → sets correct NH3 in R302's ammonia inlet
+           (replaces optimize_NH3_loading)
+        2. Iteratively adjusts fermentation yield to hit target titer
+           → uses elasticity-based correction with adaptive damping
+           (replaces adjust_glucose_for_titer + run_titer_convergence)
         
-        NOTE: Glucose adjustment is handled by adjust_glucose_for_titer() at the
-        system level BEFORE simulation. This spec only updates reaction parameters.
+        Each iteration: set yield → measure NH3 with excess → set exact NH3 →
+        run R302 → check titer → adjust yield → repeat
         """
-        # Get target titer (prefer new attribute, fallback to old)
         target_titer = R302.titer if R302.titer is not None else R302.target_titer
-        target_yield = R302.target_yield
         
-        if target_titer is None or target_yield is None or target_yield <= 0:
+        if target_titer is None or target_titer <= 0:
+            R302._run()
             return
+        
+        baseline_titer = R302._baseline_titer
+        baseline_yield = R302._baseline_yield
+        
+        if baseline_titer is None or baseline_titer <= 0 or baseline_yield is None or baseline_yield <= 0:
+            R302._run()
+            return
+        
+        # Use R302.target_yield as starting point if set (respects model parameters).
+        # Fall back to _baseline_yield only if target_yield is not set.
+        # This matches old adjust_glucose_for_titer which uses R302.target_yield.
+        starting_yield = R302.target_yield
+        if starting_yield is None or starting_yield <= 0:
+            starting_yield = baseline_yield
         
         # Update tau based on titer/productivity relationship
         if R302.target_productivity and R302.target_productivity > 0:
             R302.tau = target_titer / R302.target_productivity
         
-        # Update fermentation reaction yield
-        fermentation_reaction[2].product_yield('Leghemoglobin_In', basis='wt', product_yield=target_yield)
+        # References
+        nh3_source = R302._nh3_source_stream   # NH3_25wt (upstream of S202)
+        s202 = R302._s202_unit                 # S202 splitter
+        ammonia_in = R302.ins[2]               # NH3_Fer (R302's direct NH3 inlet)
+        
+        # Helper: get NH3 consumption of a reactor
+        def get_nh3_consumption(reactor):
+            nh3_in = sum(i.imol['NH3'] for i in reactor.ins)
+            nh3_out = sum(o.imol['NH3'] for o in reactor.outs)
+            return max(0, nh3_in - nh3_out)
+        
+        # Helper: set stream to supply target_nh3_mol kmol/hr NH3
+        # with 25:75 NH3:H2O mass ratio (matching NH3_25wt composition)
+        def set_nh3_stream(stream, target_nh3_mol):
+            if target_nh3_mol <= 0:
+                return
+            nh3_mass = target_nh3_mol * 17.031  # kg/hr
+            stream.imass['NH3'] = nh3_mass
+            stream.imass['H2O'] = nh3_mass * 3.0  # 75/25 mass ratio
+        
+        # Helper: run R302 with excess NH3, return consumption in kmol/hr
+        def measure_nh3_consumption(yield_val):
+            """Run R302 with 20x excess NH3 to measure actual consumption."""
+            R302.target_yield = yield_val
+            fermentation_reaction[2].product_yield(
+                'Leghemoglobin_In', basis='wt', product_yield=yield_val
+            )
+            # Save state and set excess
+            saved_mol = ammonia_in.mol.copy()
+            if ammonia_in.F_mol > 1e-10:
+                ammonia_in.mol *= 20.0
+            else:
+                set_nh3_stream(ammonia_in, 50.0)
+            R302._run()
+            consumed = get_nh3_consumption(R302)
+            # Restore (will be overwritten next)
+            ammonia_in.mol = saved_mol
+            return consumed
+        
+        # =====================================================================
+        # Measure R301's NH3 consumption (R301 already ran upstream)
+        # =====================================================================
+        consumed_R301 = get_nh3_consumption(R301)
+        
+        # =====================================================================
+        # Unified convergence loop: yield + NH3 interleaved
+        # Each iteration: measure NH3 empirically → set exact → check titer → adjust yield
+        #
+        # Starting yield comes from R302.target_yield (which model parameters can
+        # update), with elasticity correction applied if titer target differs from
+        # the baseline titer. This matches old adjust_glucose_for_titer behavior
+        # where current_yield = R302.target_yield and correction is incremental.
+        # =====================================================================
+        titer_ratio = target_titer / baseline_titer
+        # Start from user-set yield with titer correction (incremental approach)
+        if abs(titer_ratio - 1.0) > 1e-6:
+            # Titer changed from baseline: apply elasticity correction from starting yield
+            current_yield = starting_yield * titer_ratio ** (1.0 / ELASTICITY)
+        else:
+            # Titer at baseline: use starting yield directly
+            current_yield = starting_yield
+        current_yield = max(0.005, min(0.15, current_yield))
+        consumed_R302 = 0.0
+        
+        for _iteration in range(MAX_TITER_ITERATIONS):
+            # 1. Measure NH3 demand at current yield (run with excess)
+            consumed_R302 = measure_nh3_consumption(current_yield)
+            
+            # 2. Set exact NH3 and run R302
+            if consumed_R302 > 0:
+                set_nh3_stream(ammonia_in, consumed_R302 * 1.001)
+            R302.target_yield = current_yield
+            fermentation_reaction[2].product_yield(
+                'Leghemoglobin_In', basis='wt', product_yield=current_yield
+            )
+            R302._run()
+            
+            # 3. Check titer
+            actual_titer = R302.actual_titer
+            if not actual_titer or actual_titer <= 0:
+                break
+            
+            error = abs(target_titer - actual_titer) / target_titer
+            if error < TITER_TOL:
+                break
+            
+            # 4. Adjust yield using elasticity correction
+            correction_ratio = target_titer / actual_titer
+            if error > 0.10:
+                damping = 1.0   # Coarse mode
+            else:
+                damping = 0.5   # Fine mode
+            step = (correction_ratio ** (1.0 / ELASTICITY)) ** damping
+            current_yield *= step
+            current_yield = max(0.005, min(0.15, current_yield))
+        
+        # =====================================================================
+        # Update upstream NH3_25wt source and S202 split for consistency
+        # (so future system.simulate() calls / set_production_rate use correct NH3)
+        # =====================================================================
+        if nh3_source is not None and s202 is not None:
+            total_demand = consumed_R301 + consumed_R302
+            
+            if total_demand > 0:
+                # Set NH3_25wt source to total demand * 1.001
+                if nh3_source.F_mol > 1e-10:
+                    nh3_mol_frac = nh3_source.imol['NH3'] / nh3_source.F_mol
+                    required_total_nh3 = total_demand * 1.001
+                    required_F_mol = required_total_nh3 / nh3_mol_frac
+                    nh3_source.F_mass = nh3_source.F_mass * (required_F_mol / nh3_source.F_mol)
+                else:
+                    set_nh3_stream(nh3_source, total_demand * 1.001)
+                
+                # Set S202 split (outs[0] = NH3_Seed fraction)
+                split_seed = consumed_R301 / total_demand
+                s202.split[:] = split_seed
     
     return {
         'units': [R301, R302],
@@ -606,11 +741,10 @@ def create_area_500_purification(clarified_lysate, DfUltraBuffer1):
     dict
         Dictionary of area units and output streams
     """
-    # DF buffer preparation (minimal for concentration-only mode)
+    # DF buffer preparation
     M501 = bst.MixTank('M501', ins=(DfUltraBuffer1, 'Water5'), 
                        outs='DFBufferOut', tau=0.5)
     
-    # Reference to S403 for specification (will be set via system context)
     clarified_lysate_stream = clarified_lysate
     
     @M501.add_specification(run=True)
@@ -628,7 +762,7 @@ def create_area_500_purification(clarified_lysate, DfUltraBuffer1):
         cool_only=True,
     )
     
-    # UF Stage 1 - concentration + buffer exchange using Diafiltration with UF preset
+    # UF Stage 1 - concentration + buffer exchange
     U501 = u.DiafiltrationAdv.from_preset(
         'UF',
         'U501',
@@ -642,7 +776,7 @@ def create_area_500_purification(clarified_lysate, DfUltraBuffer1):
     )
     U501.add_specification(run=True)
     
-    # UF Stage 2 - Final concentration using Diafiltration with minimal buffer
+    # UF Stage 2 - Final concentration
     U502 = u.DiafiltrationAdv(
         'U502',
         ins=(U501-0, bst.Stream('Water6', H2O=0.001)),
@@ -685,6 +819,8 @@ def create_area_600_formulation(concentrated_product, AntioxidantStream, LegHb_3
     ----------
     concentrated_product : Stream
         Concentrated LegHb from Area 500
+    AntioxidantStream : Stream
+        Antioxidant input stream
     LegHb_3 : Stream
         Final product output stream
     
@@ -709,15 +845,6 @@ def create_area_600_formulation(concentrated_product, AntioxidantStream, LegHb_3
         outs='PasteurizedConcentrate',
         tau=30/3600  # 30 second hold time
     )
-    
-    # # Antioxidant stream
-    # AntioxidantStream = bst.Stream(
-    #     'AntioxidantStream',
-    #     SodiumAscorbate=0.1,
-    #     H2O=1.0,
-    #     units='kg/hr',
-    #     price=price.get('SodiumAscorbate', 5.0)
-    # )
     
     # Dilution water stream
     DilutionWater = bst.Stream(
@@ -818,27 +945,7 @@ def create_area_900_facilities(area_400, area_500, effluent1, emissions, ash_dis
     dict
         Dictionary of area units and output streams
     """
-    # Collect permeate streams for RO treatment
-    # M901 = bst.MixTank(
-    #     'M901',
-    #     ins=(
-    #         area_400['press_liquor'],
-    #         area_400['spent_media'],
-    #         area_400['wash_effluent'],
-    #         area_500['uf_permeate'],
-    #         area_500['concentration_permeate'],
-    #     ),
-    #     outs='CombinedWastewater',
-    #     tau=1
-    # )
-    # M901.add_specification(run=True)
-    
-    # RO treatment for water recovery
-    # S901 = u.ReverseOsmosis('S901', ins=M901-0, outs=('RO_treated_water', effluent1))
-
     # Supplemental nutrient streams for wastewater treatment stability
-    # These ensure minimum nutrient availability for anaerobic digestion at all scales
-    # Required because at low production rates, reactor effluent doesn't have enough nutrients
     SupplementalNH4SO4 = bst.Stream('SupplementalNH4SO4', units='kg/hr', price=0)
     SupplementalFeSO4 = bst.Stream('SupplementalFeSO4', FeSO4=50, units='kg/hr', price=0)
     SupplementalNH4SO4.imass['NH3'] = 50 
@@ -864,10 +971,6 @@ def create_area_900_facilities(area_400, area_500, effluent1, emissions, ash_dis
     CT = bst.CoolingTower(500 if use_area_convention else 'CT')
     CWP = bst.ChilledWaterPackage(500 if use_area_convention else 'CWP')
     
-    # # Route dehydrated debris to disposal
-    # debris_disposal = bst.Stream('debris_disposal')
-    # M503 = bst.Mixer('M503', ins=area_400['dehydrated_debris'], outs=debris_disposal)
-    
     M902 = bst.Mixer(
         'M902',
         ins=(area_400['dehydrated_debris'], sludge),
@@ -886,7 +989,7 @@ def create_area_900_facilities(area_400, area_500, effluent1, emissions, ash_dis
         F.cooling_tower_makeup_water,
         F.Water1, F.Water2,
         F.Water3, F.Water4,
-        F.Water5, F.Water6,F.Water7,
+        F.Water5, F.Water6, F.Water7,
         F.boiler_makeup_water,
     )
     process_water_streams = (
@@ -907,13 +1010,6 @@ def create_area_900_facilities(area_400, area_500, effluent1, emissions, ash_dis
         process_water_price=0.000135,
     )
     
-    # return {
-    #     'units': [M501, S501, CT, CWP, M503, PWC],
-    #     'effluent': effluent1,
-    #     'debris_disposal': debris_disposal,
-    #     'M501': M501, 'S501': S501, 'CT': CT, 'CWP': CWP,
-    #     'M503': M503, 'PWC': PWC,
-    # }
     return {
         'units': [M902, CT, CWP, BT, PWC],
         'effluent': effluent1,
@@ -929,17 +1025,20 @@ def create_area_900_facilities(area_400, area_500, effluent1, emissions, ash_dis
 # =============================================================================
 @bst.SystemFactory(
     ID='LegHb_sys',
-    ins=[s.SeedIn1, s.SeedIn2, s.CultureIn, s.Glucose, s.NH3_25wt, s.DfUltraBuffer1, s.DfUltraBuffer2,s.AntioxidantStream],
-    outs=[s.LegHb_3, s.vent1, s.vent2, s.effluent1,s.emissions,s.ash_disposal],
+    ins=[s.SeedIn1, s.SeedIn2, s.CultureIn, s.Glucose, s.NH3_25wt, s.DfUltraBuffer1, s.DfUltraBuffer2, s.AntioxidantStream],
+    outs=[s.LegHb_3, s.vent1, s.vent2, s.effluent1, s.emissions, s.ash_disposal],
     fthermo=lambda chemicals=None: LEGHB_THERMO,
 )
 def create_LegHb_system(ins, outs, use_area_convention=False):
     """
     Creates the LegHb (Leghemoglobin) production system.
     
+    NEW: Titer control and NH3 optimization are embedded as unit specifications.
+    No external adjust_glucose_for_titer or optimize_NH3_loading calls needed.
+    
     Modular architecture using discrete Process Area functions:
         - Area 200: Media Preparation
-        - Area 300: Conversion (Fermentation)
+        - Area 300: Conversion (Fermentation) [with internalized titer + NH3 specs]
         - Area 400: Recovery (Harvest & Cell Disruption)
         - Area 500: Purification (UF/DF)
         - Area 600: Formulation (Thermal & Product)
@@ -948,7 +1047,7 @@ def create_LegHb_system(ins, outs, use_area_convention=False):
     Parameters
     ----------
     ins : tuple
-        Input streams (SeedIn1, SeedIn2, CultureIn, Glucose, NH3_25wt, DfUltraBuffer1, DfUltraBuffer2,AntioxidantStream)
+        Input streams (SeedIn1, SeedIn2, CultureIn, Glucose, NH3_25wt, DfUltraBuffer1, DfUltraBuffer2, AntioxidantStream)
     outs : tuple
         Output streams (LegHb_3, vent1, vent2, effluent1, emissions, ash_disposal)
     use_area_convention : bool
@@ -957,7 +1056,7 @@ def create_LegHb_system(ins, outs, use_area_convention=False):
     Returns
     -------
     tuple
-        Output streams (LegHb_3, vent1, vent2, effluent1, emissions, ash_disposal, DfUltraBuffer1, DfUltraBuffer, AntioxidantStream)
+        Output streams
     """
     bst.preferences.N = 50
     try:
@@ -969,7 +1068,6 @@ def create_LegHb_system(ins, outs, use_area_convention=False):
     # Unpack streams
     SeedIn1, SeedIn2, CultureIn, Glucose, NH3_25wt, DfUltraBuffer1, DfUltraBuffer2, AntioxidantStream = ins
     LegHb_3, vent1, vent2, effluent1, emissions, ash_disposal = outs
-
     
     # Set GWP characterization factors
     set_GWPCF(Glucose, 'Glucose')
@@ -1000,7 +1098,7 @@ def create_LegHb_system(ins, outs, use_area_convention=False):
     # Area 200: Media Preparation
     area_200 = create_area_200_media_prep(SeedIn1, SeedIn2, CultureIn, Glucose, NH3_25wt)
     
-    # Area 300: Conversion (Fermentation)
+    # Area 300: Conversion (Fermentation) - with internalized titer + NH3 specs
     area_300 = create_area_300_conversion(
         seed_in=area_200['seed_out'],
         glucose_in=area_200['glucose_out'],
@@ -1009,7 +1107,9 @@ def create_LegHb_system(ins, outs, use_area_convention=False):
         vent2=vent2,
         reactions=reactions,
         params=params,
-        system_glucose_stream=Glucose,  # Pass system input for titer control
+        system_glucose_stream=Glucose,
+        NH3_source_stream=NH3_25wt,      # NEW: pass NH3 source for optimization
+        S202_unit=area_200['S202'],       # NEW: pass S202 for split adjustment
     )
     
     # Area 400: Recovery
@@ -1048,300 +1148,18 @@ def create_LegHb_system(ins, outs, use_area_convention=False):
     
     return LegHb_3, vent1, vent2, effluent1, DfUltraBuffer1, DfUltraBuffer2, emissions, ash_disposal, AntioxidantStream
 
+
 # =============================================================================
 # DESIGN SPECIFICATION FUNCTIONS
 # =============================================================================
 
-def adjust_glucose_for_titer(system, verbose=False):
-    """
-    Adjust R302's yield based on target titer using elasticity-based correction.
-    
-    This function should be called BEFORE system.simulate() to ensure
-    the yield adjustment takes effect.
-    
-    The relationship between yield and titer is non-linear because broth volume
-    also changes with yield. An empirical elasticity factor (approximately 1.83
-    for LegHb) corrects for this:
-        new_yield = baseline_yield * (target_titer/baseline_titer)^(1/elasticity)
-    
-    Parameters
-    ----------
-    system : biosteam.System
-        The LegHb system
-    verbose : bool
-        Print status messages
-    """
-    import math
-    log = print if verbose else (lambda *args, **kwargs: None)
-    
-    u = system.flowsheet.unit
-    s = system.flowsheet.stream
-    
-    try:
-        R302 = u.R302
-        glucose_stream = s.Glucose
-        broth = R302.outs[1]
-    except AttributeError:
-        log("[WARN] R302 or Glucose stream not found")
-        return
-    
-    # Get target titer
-    target_titer = R302.titer if R302.titer is not None else getattr(R302, 'target_titer', None)
-    
-    if target_titer is None:
-        log("[WARN] No target titer set on R302")
-        return
-    
-    # Get or calculate baseline values
-    # On first call after simulation, capture the ACTUAL titer and yield as baseline
-    if not hasattr(R302, '_actual_baseline_titer') or R302._actual_baseline_titer is None:
-        # Check if we have actual titer from a previous simulation
-        actual_titer = R302.actual_titer
-        if actual_titer and actual_titer > 0:
-            # Capture actual titer, glucose, and yield as baseline
-            R302._actual_baseline_titer = actual_titer
-            R302._actual_baseline_glucose = glucose_stream.imass['Glucose']
-            R302._actual_baseline_yield = R302.target_yield
-            log(f"[Titer Control] Captured baseline: titer={actual_titer:.4f} g/L, yield={R302._actual_baseline_yield:.6f}")
-            R302._last_actual_titer = actual_titer
-        else:
-            # No actual data yet, use design parameters
-            R302._actual_baseline_titer = getattr(R302, '_baseline_titer', target_titer)
-            R302._actual_baseline_glucose = getattr(R302, '_baseline_system_glucose', glucose_stream.imass['Glucose'])
-            R302._actual_baseline_yield = R302.target_yield
-            log(f"[Titer Control] Using design baseline: titer={R302._actual_baseline_titer:.4f} g/L")
-    
-    baseline_titer = R302._actual_baseline_titer
-    baseline_yield = R302._actual_baseline_yield
-    
-    if baseline_titer is None or baseline_titer <= 0:
-        log("[WARN] Baseline titer not set or invalid")
-        return
-    
-    # Empirical elasticity factor: d(log titer)/d(log yield)
-    # Measured at baseline conditions - titer increases ~1.83x faster than yield
-    # This is because broth volume decreases as more substrate converts to product
-    ELASTICITY = 1.3 # Optimized for faster convergence (was 1.83)
-    
-    # Calculate scale factor with elasticity correction using IQ_interpolation
-    # titer ratio = yield_ratio^elasticity
-    # Solve for yield_ratio with a robust 1D root finder
-    import flexsolve as flx
-    titer_ratio = target_titer / baseline_titer
-    def f(yield_ratio):
-        return (yield_ratio ** ELASTICITY) - titer_ratio
-    y0 = 1e-4
-    y1 = 1e4
-    yield_ratio = flx.IQ_interpolation(
-        f=f,
-        x0=y0,
-        x1=y1,
-        x=max(0.1, min(10.0, titer_ratio ** (1.0 / ELASTICITY))),
-        xtol=1e-8,
-        ytol=1e-8,
-        maxiter=500,
-        checkbounds=True,
-        checkiter=False,
-    )
-    new_yield = baseline_yield * yield_ratio
-
-    # --- INCREMENTAL UPDATE LOGIC (DYNAMIC DAMPING) ---
-    # use LAST SIMULATED yield/titer to step forward
-    
-    # 1. Determine Baseline Titer for Correction
-    # Prefer current actual if valid (from just-finished simulation), else stored
-    current_actual_titer = R302.actual_titer
-    last_stored_titer = getattr(R302, '_last_actual_titer', None)
-    
-    base_titer = current_actual_titer if (current_actual_titer and current_actual_titer > 0) else last_stored_titer
-    
-    if base_titer and base_titer > 0:
-        # 2. Calculate Error and Determine Mode
-        error_ratio = abs(target_titer - base_titer) / target_titer
-        
-        if error_ratio > 0.10:
-             # Coarse Mode: Aggressive stepping for deviations > 10%
-             damping = 1.0 # Full step
-             mode = "COARSE"
-        else:
-             # Fine Mode: Damped stepping for convergence < 1%
-             damping = 0.5 
-             mode = "FINE"
-
-        # 3. Apply Correction
-        # Incremental update: New = Current * (Target / Actual)^(1/E)
-        current_yield = R302.target_yield
-        correction_ratio = target_titer / base_titer
-        
-        step = (correction_ratio ** (1.0 / ELASTICITY)) ** damping
-        new_yield = current_yield * step
-        
-        log(f"[Titer Control] {mode} Step: Ratio={correction_ratio:.4f}, Damping={damping}, Step={step:.4f}")
-        log(f"[Titer Control] Base Titer: {base_titer:.4f} g/L (Target: {target_titer:.4f} g/L, Error: {error_ratio:.1%})")
-        
-    else:
-        # First time / No history: Use Baseline Interpolation
-        mode = "INITIAL"
-        import flexsolve as flx
-        titer_ratio = target_titer / baseline_titer
-        def f(yield_ratio):
-            return (yield_ratio ** ELASTICITY) - titer_ratio
-        
-        y0 = 1e-4
-        y1 = 1e4
-        yield_ratio = flx.IQ_interpolation(
-            f=f, x0=y0, x1=y1,
-            x=max(0.1, min(10.0, titer_ratio ** (1.0 / ELASTICITY))),
-            xtol=1e-8, ytol=1e-8, maxiter=500,
-            checkbounds=True, checkiter=False,
-        )
-        new_yield = baseline_yield * yield_ratio
-        log(f"[Titer Control] Baseline Guess: Expected Ratio={titer_ratio:.4f}, Yield Factor={yield_ratio:.4f}")
-
-    # Clamp yield (LegHb range 0.005 to 0.15)
-    new_yield = max(0.005, min(0.15, new_yield))
-    
-    log(f"[Titer Control] Yield Update: {R302.target_yield:.6f} -> {new_yield:.6f}")
-    
-    # Update yield
-    R302.target_yield = new_yield
-
-    # Update stored last titer if we have fresh data
-    current_actual_titer = R302.actual_titer
-    if current_actual_titer and current_actual_titer > 0:
-        R302._last_actual_titer = current_actual_titer
-    
-    # Also update tau based on titer/productivity
-    target_productivity = getattr(R302, 'target_productivity', None)
-    if target_productivity and target_productivity > 0:
-        R302.tau = target_titer / target_productivity
-        log(f"[Titer Control] tau updated to {R302.tau:.2f} hr")
-
-
-def optimize_NH3_loading(system, verbose=True):
-    """
-    Optimizes NH3_25wt flow rate (X) and S202 split ratio (Y) to meet fermentation demand
-    ensuring residual NH3 < 1e-4 kmol/hr in both seed and main fermenters.
-    
-    This function:
-    1. Sets excess Ammonia to ensure reactions proceed fully.
-    2. Calculates exact Ammonia consumption in R301 and R302.
-    3. Adjusts NH3_25wt flow and S202 split to match demand.
-    """
-    log = print if verbose else (lambda *args, **kwargs: None)
-    log(f"\n{'='*60}")
-    log("Optimizing NH3 Loading (pH Control Strategy)")
-    log(f"{'='*60}")
-    
-    u = system.flowsheet.unit
-    s = system.flowsheet.stream
-    
-    # Retrieve units and streams
-    try:
-        S202 = u.S202
-        R301 = u.R301
-        R302 = u.R302
-        NH3_source = s.NH3_25wt
-        Broth = u.R302.outs[1] # Broth
-    except AttributeError as e:
-        log(f"[WARN] Could not find necessary units/streams for optimization: {e}")
-        return
-
-    # Step 1: Supply excess ammonia to determine max demand
-    # Store initial state
-    initial_flow = NH3_source.F_mass
-    initial_split = S202.split[0]
-    
-    # Set excess relative to current flow (which should be roughly scaled)
-    # 20x should be sufficient without causing design errors (N > 10000)
-    excess_flow = initial_flow * 20 if initial_flow > 1e-6 else 1000 
-    NH3_source.F_mass = excess_flow
-    S202.split[:] = 0.5 # 50/50 split
-    
-    system.simulate()
-    
-    # Step 2: Calculate Demand
-    # R301 Demand
-    # NH3 in R301 comes from S202-0 (Seed Ammonia) + Inputs in Seed?
-    # R301 ins: [SeedIn1, SeedIn2 (via M203)]
-    # M203 ins: [M201, M202, S202-0]
-    # So NH3 enters R301 via M203.
-    
-    # We check reaction extent or mass balance.
-    # Consumption = In - Out - Accumulation (0)
-    # But In is what we want to find.
-    # Current In is Excessive.
-    # Current Out includes Residual.
-    # Consumed = In - Out.
-    
-    def get_NH3_consumption(reactor):
-        nh3_in = sum(i.imol['NH3'] for i in reactor.ins)
-        nh3_out = sum(o.imol['NH3'] for o in reactor.outs)
-        return nh3_in - nh3_out
-
-    consumed_R301 = get_NH3_consumption(R301)
-    consumed_R302 = get_NH3_consumption(R302)
-    
-    log(f"  R301 NH3 Consumption: {consumed_R301:.4f} kmol/hr")
-    log(f"  R302 NH3 Consumption: {consumed_R302:.4f} kmol/hr")
-    
-    # Step 3: Back-calculate required Feed
-    # NH3_25wt is ~25% NH3, 75% Water.
-    # Source stream composition matches NH3_25wt definition.
-    # We need to set NH3_25wt.imol['NH3'] to meet (consumed_R301 + consumed_R302).
-    # And S202 split to distribute it correctly.
-    
-    total_NH3_demand = consumed_R301 + consumed_R302
-    
-    if total_NH3_demand <= 0:
-        log("  [WARN] Zero Ammonia demand detected. Optimization skipped.")
-        NH3_source.F_mass = initial_flow
-        S202.split[:] = initial_split
-        return
-
-    # Calculate required source flow
-    # Source has fixed composition. We scale F_mass.
-    # Current mol fraction of NH3 in source:
-    nh3_mol_frac = NH3_source.imol['NH3'] / NH3_source.F_mol
-    required_F_mol = total_NH3_demand / nh3_mol_frac
-    
-    # We can also just scale F_mass based on current NH3 flow
-    current_NH3_flow_mol = NH3_source.imol['NH3']
-    scaling_factor = total_NH3_demand / current_NH3_flow_mol*1.001
-    new_F_mass = NH3_source.F_mass * scaling_factor
-    
-    # Set Flow Rate 'X'
-    NH3_source.F_mass = new_F_mass
-    
-    # Set Split 'Y'
-    # S202-0 goes to R301 (Seed)
-    # S202-1 goes to R302 (Fer)
-    # We want S202-0 NH3 = consumed_R301
-    
-    split_seed = consumed_R301 / total_NH3_demand
-    S202.split[:] = split_seed # S202 definition: outs=('NH3_Seed', 'NH3_Fer'). split refers to index 0?
-    # bst.Splitter(..., split=0.5) usually means outs[0] gets 0.5.
-    
-    log(f"  Optimized Total Flow (X): {new_F_mass:.2f} kg/hr")
-    log(f"  Optimized Split Ratio (Y): {split_seed:.4f} (to Seed)")
-    
-    # Step 4: Verify
-    system.simulate()
-    
-    r_NH3_R301 = R301.outs[1].imol['NH3'] # R301Out
-    r_NH3_R302 = R302.outs[1].imol['NH3'] # Broth
-    
-    log(f"  Residual NH3 R301: {r_NH3_R301:.2e} kmol/hr (< 1e-4 check: {'PASS' if r_NH3_R301 < 1e-4 else 'FAIL'})")
-    log(f"  Residual NH3 R302: {r_NH3_R302:.2e} kmol/hr (< 1e-4 check: {'PASS' if r_NH3_R302 < 1e-4 else 'FAIL'})")
-    
-    if r_NH3_R301 > 1e-4 or r_NH3_R302 > 1e-4:
-        log("  [WARN] Residual Ammonia target not met. Adjusting slightly...")
-        # Fine tuning could be added here, but stoichiometric calculation should be precise for this system
-        pass
-
 def set_production_rate(system, target_production_rate_kg_hr, verbose=True):
     """
     Adjust system inputs to achieve target LegHb_3 production rate.
+    
+    Simplified compared to _config1.py:
+    - Does NOT call optimize_NH3_loading (handled by R302 specification)
+    - Uses flexsolve IQ_interpolation for scaling factor only
     
     Parameters
     ----------
@@ -1364,19 +1182,14 @@ def set_production_rate(system, target_production_rate_kg_hr, verbose=True):
     
     product_stream = system.flowsheet.stream.LegHb_3
     
-    baseline_flows = {}
-    for stream in system.ins:
-        if stream.F_mass > 0:
-            baseline_flows[stream] = stream.F_mass
-    
-    if not baseline_flows:
-        raise ValueError("No input streams with positive flow rates found")
-    
     log(f"\n{'='*60}")
     log(f"Setting Production Rate to {target_production_rate_kg_hr:.2f} kg/hr")
     log(f"{'='*60}")
-    log(f"Baseline input streams stored: {len(baseline_flows)} streams")
     
+    # Run initial simulation FIRST to establish proper system state.
+    # R302 specification adjusts yield/NH3 during simulation, which changes
+    # input stream flows. We must store baseline_flows AFTER simulation so
+    # that IQ_interpolation scales from the correct post-spec state.
     log("Running initial simulation to establish baseline...")
     try:
         with warnings.catch_warnings():
@@ -1385,6 +1198,17 @@ def set_production_rate(system, target_production_rate_kg_hr, verbose=True):
     except Exception as e:
         log(f"  [WARN] Baseline simulation failed: {e}")
         log("  Proceeding with initialized flow rates as baseline.")
+    
+    # Store baseline flows AFTER simulation (post-spec state)
+    baseline_flows = {}
+    for stream in system.ins:
+        if stream.F_mass > 0:
+            baseline_flows[stream] = stream.F_mass
+    
+    if not baseline_flows:
+        raise ValueError("No input streams with positive flow rates found")
+    
+    log(f"Baseline input streams stored: {len(baseline_flows)} streams")
     
     initial_production = product_stream.F_mass
     
@@ -1402,23 +1226,17 @@ def set_production_rate(system, target_production_rate_kg_hr, verbose=True):
     def objective_function(scaling_factor):
         iteration[0] += 1
         try:
-            # We skip explicit stream clearing to avoid accidentally clearing inputs
-            # relying on robust simulation or error catching instead.
-            
             for stream, baseline_flow in baseline_flows.items():
                 target = baseline_flow * scaling_factor
                 stream.F_mass = target
-                # Store target in global registry for specs
                 if 'Seed' in stream.ID:
-                     # Check if it has 'Seed' component to be sure
-                     if 'Seed' in stream.available_chemicals and stream.imass['Seed'] > 0:
-                         seed_targets[stream] = stream.imass['Seed']
-                     else:
-                         seed_targets[stream] = target
+                    if 'Seed' in stream.available_chemicals and stream.imass['Seed'] > 0:
+                        seed_targets[stream] = stream.imass['Seed']
+                    else:
+                        seed_targets[stream] = target
             
-            # Optimize NH3 Loading at this scale
-            # This ensures we don't hit negative flows or infeasible balances
-            optimize_NH3_loading(system, verbose=False)
+            # NH3 optimization is handled automatically by R302 specification
+            # No need for explicit optimize_NH3_loading call
             
             system.simulate()
             achieved_rate = product_stream.F_mass
@@ -1437,8 +1255,8 @@ def set_production_rate(system, target_production_rate_kg_hr, verbose=True):
         with warnings.catch_warnings():
             warnings.simplefilter("ignore")
             
-            x0 = max(0.01, initial_guess * 0.1)
-            x1 = max(100.0, initial_guess * 5.0)
+            x0 = max(0.01, initial_guess * 0.3)
+            x1 = max(initial_guess * 3.0, 5.0)
             y0 = objective_function(x0)
             y1 = objective_function(x1)
             expand_iter = 0
@@ -1466,20 +1284,16 @@ def set_production_rate(system, target_production_rate_kg_hr, verbose=True):
         
         log(f"\nSolver converged. Running final validation simulation...")
         
-        # Skip clearing streams
-
         for stream, baseline_flow in baseline_flows.items():
             target = baseline_flow * scaling_factor
             stream.F_mass = target
             if 'Seed' in stream.ID:
-                 if 'Seed' in stream.available_chemicals and stream.imass['Seed'] > 0:
-                     seed_targets[stream] = stream.imass['Seed']
-                 else:
-                     seed_targets[stream] = target
+                if 'Seed' in stream.available_chemicals and stream.imass['Seed'] > 0:
+                    seed_targets[stream] = stream.imass['Seed']
+                else:
+                    seed_targets[stream] = target
         
-        # Optimize NH3 for the final state
-        optimize_NH3_loading(system, verbose=False)
-        
+        # NH3 handled by specs - just simulate
         system.simulate()
         achieved_rate = product_stream.F_mass
         
@@ -1603,9 +1417,7 @@ def check_LegHb_specifications(product_stream):
     if not purity_passed:
         all_passed = False
         
-    # Calculate Heme Equivalent (LegHb contains 1 heme group per 763 carbons/normalized units)
-    # Note: Leghemoglobin chemical is defined normalized to C=1 (MW ~22).
-    # Real LegHb has 763 Carbons. Stoichiometry is 1 Heme per 763 mols of chem.
+    # Calculate Heme Equivalent
     legh_mol = product_stream.imol['Leghemoglobin']
     try:
         heme_mw = product_stream.chemicals.Heme_b.MW
@@ -1641,14 +1453,14 @@ if __name__ == '__main__':
     TARGET_PRODUCTION = 150 * nn
     
     print("="*85)
-    print("LEGHEMOGLOBIN PRODUCTION SYSTEM - MODULAR DESIGN")
+    print("LEGHEMOGLOBIN PRODUCTION SYSTEM - CONFIG1_NEW (Internalized Specs)")
     print("="*85)
     
     print("\n1. Creating system...")
     LegHb_sys = create_LegHb_system()
     sys = LegHb_sys
     f = sys.flowsheet
-    u= f.unit
+    u = f.unit
     ss = f.stream
     sys.operating_hours = 8000
     
@@ -1663,7 +1475,6 @@ if __name__ == '__main__':
 
     print(f"\n3. Applying design specification: TARGET_PRODUCTION = {TARGET_PRODUCTION} kg/hr")
     try:
-        # Ensure titer is explicitly set to target before optimization
         target_titer = u.R302.titer if u.R302.titer is not None else u.R302.target_titer
         if target_titer is not None:
             u.R302.titer = float(target_titer)
@@ -1671,14 +1482,9 @@ if __name__ == '__main__':
             
         print(f"   Target Titer: {target_titer} g/L")
         
-        # Iterative Titer Convergence Loop
-        run_titer_convergence(
-            system=sys,
-            target_production=TARGET_PRODUCTION,
-            adjust_glucose_func=adjust_glucose_for_titer,
-            optimize_nh3_func=optimize_NH3_loading,
-            set_prod_func=set_production_rate,
-        )
+        # Direct scaling - no run_titer_convergence needed
+        # NH3 and titer control happen automatically via R302 specification
+        set_production_rate(sys, TARGET_PRODUCTION, verbose=True)
         
         final_production = ss.LegHb_3.F_mass
         
@@ -1688,16 +1494,15 @@ if __name__ == '__main__':
             print(f"   Actual:  {final_production:.2f} kg/hr")
             
     except Exception as e:
-        print(f"\n   Could not achieve target production/titer: {e}")
+        print(f"\n   Could not achieve target production: {e}")
         print("   Continuing with baseline production rate...")
-        achieved_production = ss.LegHb_3.F_mass
+        import traceback; traceback.print_exc()
     
     print(f"\n4. Verifying product specifications...")
     try:
         check_LegHb_specifications(ss.LegHb_3)
     except ValueError as e:
         print(f"\n   SPECIFICATION CHECK FAILED: {e}")
-        print("   System may require process parameter adjustments to meet specifications.")
     
     print(f"\n5. System Summary")
     print("="*85)
@@ -1705,7 +1510,7 @@ if __name__ == '__main__':
     
     legh_purity = ss.LegHb_3.imass['Leghemoglobin'] / ss.LegHb_3.F_mass * 100
     
-    # Calculate Heme Equivalent for Main Report
+    # Calculate Heme Equivalent
     legh_mol = ss.LegHb_3.imol['Leghemoglobin']
     heme_equiv_mass = 0
     try:
@@ -1724,8 +1529,11 @@ if __name__ == '__main__':
     print(f"  Yield (Heme eq):          {heme_equiv_mass:.4f} kg/hr")
     print(f"{'='*85}\n")
     
-    print(f"\n6. Generating system diagram...")
-    LegHb_sys.diagram(format='html', display=True)
+    print(f"\n6. Broth Analysis")
+    print(f"   target titer: {u.R302.titer:.2f} g/L")
+    print(f"   Achieved titer: {u.R302.actual_titer:.2f} g/L")
+    print(f"   Achieved titer2: {(ss.Broth.imass['Leghemoglobin']+ss.Broth.imass['Leghemoglobin_In']) / ss.Broth.F_vol:.2f} g/L")
+    print(ss.Broth)
     
     print(f"\n7. Performing LCA analysis...")
     try:
@@ -1751,7 +1559,3 @@ if __name__ == '__main__':
     print(f"Target Production:   {TARGET_PRODUCTION:.2f} kg/hr")
     print(f"Achieved Production: {ss.LegHb_3.F_mass:.2f} kg/hr")
     print(f"{'='*85}\n")
-    print(f"target titer: {u.R302.titer:.2f} g/L")
-    print(f"Achieved titer: {u.R302.actual_titer:.2f} g/L")
-    print(f"Achieved titer2: {(ss.Broth.imass['Leghemoglobin']+ss.Broth.imass['Leghemoglobin_In']) / ss.Broth.F_vol:.2f} g/L")
-    print(ss.Broth)
