@@ -1,0 +1,167 @@
+Yes, absolutely. Just like in chromatography, we can create **backward-calculating mechanistic models** for filtration.
+
+In Techno-Economic Analysis (TEA), we typically distinguish between two distinct operations:
+
+1. **Dead-End Filtration (Normal Flow):** Used for clarification or sterile filtration. The limit is **Capacity** (clogging).
+2. **Tangential Flow Filtration (TFF) / Diafiltration:** Used for concentration and buffer exchange. The limit is **Flux** and **Rejection**.
+
+Here are the "Integrated" (time-independent) formulas for your steady-state backward calculation.
+
+---
+
+### 1. Diafiltration (TFF) Model
+
+**Purpose:** Washing out impurities (similar to the "Wash" step in Resin) or changing buffer.
+**Mechanism:** Continuous dilution. We model this as a CSTR (Continuous Stirred-Tank Reactor) washout.
+
+#### The Core "Forward" Formula
+
+* ** (Diavolumes):** The ratio of Total Wash Buffer Volume added to the Retentate Volume ().
+* ** (Rejection Coefficient):** How well the membrane "bounces back" the impurity.
+* : Passes freely (Salts, water).
+* : Fully retained (Large proteins).
+* *Typical for impurities:* 0.0 – 0.2 (partial rejection).
+
+
+
+#### The "Backward" Design Formula
+
+To achieve a target **Impurity Removal (Split Ratio)**:
+
+#### Sizing The Hardware (Area)
+
+Once you calculate the required Volume of Buffer (), you calculate the Membrane Area needed to process it within a target time ():
+
+* ** (Average Flux):** The critical parameter. See section 3 for how to derive this.
+
+---
+
+### 2. Concentration (Ultrafiltration) Model
+
+**Purpose:** Removing water to reduce volume (often done before Diafiltration to save buffer).
+
+#### The Core "Forward" Formula
+
+* ** (Volumetric Concentration Factor):** .
+* **:** Rejection of your product (usually assumed 1.0 for Yield = 100%).
+
+#### The "Backward" Design Formula
+
+To achieve a target **Final Concentration**:
+
+**Permeate Volume to Remove:**
+
+
+---
+
+### 3. The Physics of Flux (Pressure & Gel Layer)
+
+You asked about the relationship to **Pressure**. In mechanistic modeling, Flux () is not constant; it depends on the "Gel Polarization Model".
+
+#### The Resistance Model (Darcy's Law adaptation)
+
+* : Transmembrane Pressure.
+* : Viscosity (temperature dependent!).
+* : Intrinsic resistance (constant).
+* : Resistance of the accumulation layer (increases with time/concentration).
+
+#### The "Limiting Flux" Model (Critical for TEA)
+
+In high-concentration biochemical processes, increasing pressure **does not** increase flux because the "gel layer" compresses. The flux becomes independent of pressure and dependent on mass transfer ().
+
+* ****: Concentration at the membrane wall (saturation limit).
+* ****: Current retentate concentration.
+* ****: Mass transfer coefficient (depends on pump crossflow velocity and turbulence).
+
+**How to use this in Backward Calculation:**
+Instead of a constant Flux, you calculate the **Average Flux** by integrating the Limit Model from  to :
+
+---
+
+### 4. Direct Filtration (Dead-End) Model
+
+**Purpose:** Clarification (removing cells/debris).
+**Mechanism:** Pore blocking or Cake formation.
+
+Here, the backward calculation calculates **Filter Area** based on **Capacity ()**, not Flux.
+
+#### The "Backward" Formula
+
+* ** (L/m²):** The maximum volume processed before the filter plugs (determined experimentally, e.g., Pmax method).
+* **:** Total volume to filter.
+
+**Pressure Relationship (Ruth's Equation integrated):**
+If you need to calculate Power (Pump head) for the TEA:
+
+* : Specific cake resistance (m/kg).
+* : Concentration of solids.
+
+---
+
+### Summary: Python Implementation Structure
+
+Here is how you structure the "Backward Sizer" for TFF in your TEA code.
+
+```python
+import numpy as np
+
+class TFF_Sizer:
+    def __init__(self, flux_LMH, rejection_imp=0.1, rejection_target=1.0):
+        self.J = flux_LMH
+        self.sigma_imp = rejection_imp
+        self.sigma_target = rejection_target
+
+    def backward_design(self, vol_feed_L, target_purity_removal, target_concentration_factor):
+        """
+        target_purity_removal: Fraction of impurity to REMOVE (e.g. 0.99 means 1% left)
+        """
+        
+        # 1. Concentration Step (Volume Reduction)
+        # Calculate Volume to remove to hit VCF
+        vol_retentate_L = vol_feed_L / target_concentration_factor
+        vol_permeate_conc = vol_feed_L - vol_retentate_L
+        
+        # 2. Diafiltration Step (Washing)
+        # Calculate Diavolumes (N) needed to hit purity target
+        # Formula: N = ln(C_in / C_out) / (1 - sigma)
+        # Note: target_purity_removal = 1 - (C_out/C_in)
+        fraction_remaining = 1 - target_purity_removal
+        
+        # Handle edge case where sigma is close to 1 (impossible to wash out)
+        if self.sigma_imp >= 0.99:
+             N_dv = 999 # Error state
+        else:
+             N_dv = np.log(1 / fraction_remaining) / (1 - self.sigma_imp)
+        
+        vol_buffer_L = N_dv * vol_retentate_L
+        
+        # 3. Sizing (Area)
+        # Total Permeate to push through membrane
+        total_vol_permeate = vol_permeate_conc + vol_buffer_L
+        
+        # Assume 4 hour process time constraint
+        process_time_h = 4.0 
+        area_m2 = total_vol_permeate / (self.J * process_time_h)
+        
+        return {
+            "Membrane_Area_m2": area_m2,
+            "Buffer_Usage_L": vol_buffer_L,
+            "Total_Permeate_L": total_vol_permeate,
+            "Diavolumes": N_dv
+        }
+
+# Example
+tff = TFF_Sizer(flux_LMH=50, rejection_imp=0.05) # 50 LMH design flux, salts pass freely
+result = tff.backward_design(vol_feed_L=1000, target_purity_removal=0.99, target_concentration_factor=5.0)
+
+print(f"Area Needed: {result['Membrane_Area_m2']:.2f} m2")
+print(f"Buffer Consumed: {result['Buffer_Usage_L']:.2f} L")
+
+```
+
+### Key Parameter for TEA Costing:
+
+* **Chromatography Cost Driver:** **Resin Volume** (Cycle time doesn't change cost much, just throughput).
+* **Filtration Cost Driver:** **Membrane Area** (Flux is the king parameter here).
+
+If you want to reduce CAPEX in TFF, you need to increase Flux () or allow longer processing times ().
