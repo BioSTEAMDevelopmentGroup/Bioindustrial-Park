@@ -123,7 +123,7 @@ metrics = {'MPSP': {'f': get_product_MPSP, 'units': '$/kg'},
             'Number of glucose spikes': {'f': get_curr_n_glu_spikes, 'units': ''},
             'Fermentation time': {'f': get_tau, 'units': 'h'},
             'Total heating duty for sugar sol evap': {'f': get_sugar_sol_evap_duty, 'units': 'kJ/h'},
-            
+            'Target sugars concentration': {'f': lambda: fbs_spec.target_conc_sugars, 'units': 'g-sugars/L'},
             }
 
 #%%
@@ -291,7 +291,7 @@ for s3 in spec_3:
                 r.k_1e = s2
                 curr_spec.update({'conc_sugars_feed_spike':s3,})
                 
-                optimize_1D_feeding_strategy_for_MPSP(Ns=5, **curr_spec)
+                optimize_1D_feeding_strategy_for_MPSP(Ns=20, **curr_spec)
                 # plot_kinetic_results()
                 
                 

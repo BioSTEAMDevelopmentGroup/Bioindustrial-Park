@@ -95,6 +95,7 @@ metrics = [Metric('Minimum selling price', get_MSP, '$/kg', 'Biorefinery'),
            Metric('Annual operating cost (incl. electricity credit)', get_overall_AOC, '10^6 $/yr', 'Biorefinery'),
            Metric('Annual product sale (excl. electricity)', get_annual_sale, '10^6 $/yr', 'Biorefinery'),
            Metric('Fixed operating cost', get_overall_FOC, '10^6 $/yr', 'Biorefinery'),
+           Metric('Target sugars concentration', lambda: fbs_spec.target_conc_sugars, 'g/L', 'Biorefinery'),
            ]
 
 # To see if TEA converges well for each simulation

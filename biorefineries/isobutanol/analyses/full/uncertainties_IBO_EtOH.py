@@ -16,7 +16,7 @@ import pandas as pd
                         #        ],
                         # N_simulations_per_mode=20,
                         # notification_interval=1,
-                        # plot_TOC_fig=True,
+                        # plot_TOC_fig=False,
                          # ):
 
 from warnings import filterwarnings
@@ -55,6 +55,10 @@ get_adjusted_MSP = models.get_adjusted_MSP
 f = bst.main_flowsheet
 
 #%%
+# !!! 
+# model.specification = models.optimize_1D_feeding_strategy_for_MPSP
+
+#%%
 modes=[
        'A', 
         # 'B', 
@@ -62,7 +66,7 @@ modes=[
        ]
 N_simulations_per_mode=1000
 notification_interval=20
-plot_TOC_fig=True
+plot_TOC_fig=False
 
 percentiles = [0, 0.05, 0.1, 0.25, 0.5, 0.75, 0.9, 0.95, 1]
 
@@ -71,7 +75,6 @@ results_dict = {'Baseline':{'MPSP':{}, 'GWP100a':{}, 'FEC':{},
                 'Uncertainty':{'MPSP':{}, 'GWP100a':{}, 'FEC':{}},
                 'Sensitivity':{'Spearman':{'MPSP':{}, 'GWP100a':{}, 'FEC':{}},
                                'p-val Spearman':{'MPSP':{}, 'GWP100a':{}, 'FEC':{}}},}
-
 
 scenario_names =\
                 {

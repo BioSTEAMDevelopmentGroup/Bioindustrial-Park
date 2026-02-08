@@ -470,16 +470,16 @@ corn_EtOH_IBO_sys._TEA = corn_EtOH_IBO_sys_tea = corn.tea.create_tea(corn_EtOH_I
 
 #%% Set baseline specifications
 
-baseline_spec = {'target_conc_sugars': 190.0,
-                 'threshold_conc_sugars': 180.0,
+baseline_spec = {'target_conc_sugars': 220.0,
+                 'threshold_conc_sugars': 210.0,
                  'conc_sugars_feed_spike': 600.0,
                  'tau_max': 120.0,}
 
 #% Create fed-batch strategy specification object
 fbs_spec = nsk.units.FedBatchStrategySpecification(
-    target_conc_sugars=190,
-    threshold_conc_sugars=180,
-    conc_sugars_feed_spike=600,
+    target_conc_sugars=220.0,
+    threshold_conc_sugars=210.0,
+    conc_sugars_feed_spike=600.0,
     tau_max=72,
     fermentation_reactor=V406,
     splitter=S301,
@@ -734,7 +734,7 @@ def optimize_tau_for_MPSP(threshold_s_EtOH=5, **kwargs):
     V406.run_type = original_run_type
     return res.x[0]
     
-def optimize_1D_feeding_strategy_for_MPSP(bounds=(20.0, 400.0), Ns=20, **kwargs):
+def optimize_1D_feeding_strategy_for_MPSP(bounds=(20.0, 400.0), Ns=5, **kwargs):
     model_specification(**kwargs)
     def f(x):
         try:
@@ -742,10 +742,10 @@ def optimize_1D_feeding_strategy_for_MPSP(bounds=(20.0, 400.0), Ns=20, **kwargs)
                                 target_conc_sugars=x[0],
                                 threshold_conc_sugars=x[0]-10, )
             MPSP = get_purity_adj_price(ethanol, ['Ethanol'])
-            print(MPSP)
+            # print(MPSP)
             return MPSP
         except:
-            print(np.inf)
+            # print(np.inf)
             return np.inf
     # res = brute(f, ranges=(bounds,), Ns=20)
     # return res.x[0]

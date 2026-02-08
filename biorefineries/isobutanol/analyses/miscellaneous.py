@@ -13,6 +13,7 @@ from matplotlib import pyplot as plt
 
 model = isobutanol.models.models_EtOH_IBO_corn.model
 namespace_dict = isobutanol.models.namespace_dict
+fbs_spec = isobutanol.models.fbs_spec
 optimize_1D_feeding_strategy_for_MPSP = isobutanol.models.optimize_1D_feeding_strategy_for_MPSP
 plot_kinetic_results = isobutanol.models.plot_kinetic_results
 model_specification = model.specification
