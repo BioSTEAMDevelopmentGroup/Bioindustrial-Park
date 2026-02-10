@@ -548,11 +548,11 @@ def create_area_500_purification(lysate_in, NaCl_wash, NaOH_elute, Ethanol_regen
         outs=('ResinFlowthrough', 'ResinEluate', 'ResinRegenWaste', 'ResinWash'),
         preset='Adsorption',
         TargetProduct_IDs=('Heme_b', 'Heme_b_In', 'ProtoporphyrinIX', 'ProtoporphyrinIX_In'),
-        TargetProduct_Yield=0.99,
+        TargetProduct_Yield=0.97,
         wash_CV=3,
         elution_CV=0.05,
         regeneration_CV=0.05,
-        NonTarget_Removal=0.99,
+        NonTarget_Removal=0.97,
         Wash_Impurity_Carryover=0.02,
         Regen_Impurity_Carryover=0.01
     )
@@ -591,7 +591,7 @@ def create_area_600_concentration(eluate_in, DfUltraBuffer1):
         outs=('ConcentratedHeme', 'NFPermeate'),
         TargetProduct_IDs=('Heme_b', 'Heme_b_In', 'ProtoporphyrinIX', 'ProtoporphyrinIX_In',),
         Salt_IDs=c.chemical_groups['Salts'],
-        TargetProduct_Retention=0.98, Salt_Retention=0.10,
+        TargetProduct_Retention=0.95, Salt_Retention=0.10,
         diavolumes=5.0,
     )
     
@@ -672,7 +672,7 @@ def create_area_800_final_product(crude_product, product_out, AntioxidantStream)
         outs=('ConcentratedFinal', 'FinalPermeate'),
         TargetProduct_IDs=('N-HemoDextrin', 'HemoDextrin', 'Nicotinamide', 'GammaCyclodextrin'),
         Salt_IDs=c.chemical_groups['Salts'],
-        TargetProduct_Retention=0.99,
+        TargetProduct_Retention=0.95,
         Salt_Retention=0.10,
         diavolumes=5.0,
     )

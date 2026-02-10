@@ -528,22 +528,27 @@ def verify_model_integration():
     """
     Verification function for HemDx model integration.
     Uses model(sample) interface for proper parameter evaluation.
+    Tests BASELINE, LB, and UB scenarios for config1, config2, config3.
     """
     import traceback
     print("="*80)
-    print("HemDx MODEL INTEGRATION VERIFICATION")
+    print("PREFERS MODEL INTEGRATION VERIFICATION (HemDx - v1)")
     print("="*80)
     
     for config_name in ['config1', 'config2', 'config3']:
-        print(f"\n{'#'*80}")
-        print(f"# Verifying {config_name}")
-        print(f"{'#'*80}")
+        print(f"\n{'='*80}")
+        print(f"  {config_name.upper()}")
+        print(f"{'='*80}")
         
         try:
+            # Create model
+            print(f"\n1. Creating model ({config_name})...")
             model = create_model(config=config_name, baseline_production_kg_hr=150, verbose=False)
-            print(f"\nModel created: {len(model.parameters)} params, {len(model.metrics)} metrics")
             
-            # Build sample arrays
+            # Display model structure
+            print(f"\n2. Model has {len(model.parameters)} parameters and {len(model.metrics)} metrics")
+            
+            # Build sample arrays for baseline, LB, UB
             param_bounds = {}
             for p in model.parameters:
                 dist = p.distribution
@@ -563,46 +568,62 @@ def verify_model_integration():
             
             results = {}
             
-            # Evaluate each scenario using model(sample) interface
+            # Evaluate each scenario
             for name, sample in [('BASELINE', baseline_sample), ('LB', lb_sample), ('UB', ub_sample)]:
-                print(f"\n  [{name}] Evaluating...")
+                print(f"\n3. [{name}] Evaluating...")
                 try:
                     metrics = model(sample)
                     results[name] = {m.name: metrics[i] for i, m in enumerate(model.metrics)}
-                    print(f"    MSP: {results[name].get('MSP', float('nan')):.4f} $/kg")
-                    print(f"    GWP: {results[name].get('GWP', float('nan')):.4f} kg CO2-eq/kg")
+                    print(f"   MSP: {results[name].get('MSP', float('nan')):.4f} $/kg")
+                    print(f"   GWP: {results[name].get('GWP', float('nan')):.4f} kg CO2-eq/kg")
                 except Exception as e:
-                    print(f"    ERROR: {e}")
+                    print(f"   ERROR: {e}")
+                    traceback.print_exc()
                     results[name] = {}
             
             # Summary table
-            print("\n  RESULTS:")
+            print("\n" + "="*80)
+            print(f"RESULTS SUMMARY ({config_name})")
+            print("="*80)
+            
             key_metrics = ['MSP', 'TCI', 'AOC', 'GWP']
-            print(f"  {'Metric':15s} {'BASELINE':>12s} {'LB':>12s} {'UB':>12s}")
-            print("  " + "-"*55)
+            print(f"\n{'Metric':20s} {'BASELINE':>15s} {'LB':>15s} {'UB':>15s}")
+            print("-"*65)
             for m_name in key_metrics:
                 bl = results.get('BASELINE', {}).get(m_name, float('nan'))
-                lb = results.get('LB', {}).get(m_name, float('nan'))
-                ub = results.get('UB', {}).get(m_name, float('nan'))
-                print(f"  {m_name:15s} {bl:12.4f} {lb:12.4f} {ub:12.4f}")
+                lb_val = results.get('LB', {}).get(m_name, float('nan'))
+                ub_val = results.get('UB', {}).get(m_name, float('nan'))
+                print(f"{m_name:20s} {bl:15.4f} {lb_val:15.4f} {ub_val:15.4f}")
+            
+            # Parameter table
+            print("\n" + "-"*80)
+            print(f"{'Parameter':35s} {'BASELINE':>12s} {'LB':>12s} {'UB':>12s}")
+            print("-"*80)
+            for p in model.parameters:
+                b = param_bounds[p.name]
+                print(f"{p.name:35s} {b['baseline']:12.4f} {b['lb']:12.4f} {b['ub']:12.4f}")
             
             # Verify results differ
             bl_msp = results.get('BASELINE', {}).get('MSP', float('nan'))
             lb_msp = results.get('LB', {}).get('MSP', float('nan'))
             ub_msp = results.get('UB', {}).get('MSP', float('nan'))
             
+            print("\n" + "="*80)
             if not np.isnan(bl_msp) and not np.isnan(lb_msp) and not np.isnan(ub_msp):
                 if not (np.isclose(bl_msp, lb_msp, rtol=0.001) and np.isclose(bl_msp, ub_msp, rtol=0.001)):
-                    print(f"\n  *** {config_name} PASSED: MSP values differ! ***")
+                    print(f"VERIFICATION PASSED ({config_name}): MSP values differ across scenarios!")
                 else:
-                    print(f"\n  *** {config_name} FAILED: MSP values identical! ***")
+                    print(f"VERIFICATION FAILED ({config_name}): MSP values are identical!")
+            else:
+                print(f"VERIFICATION FAILED ({config_name}): Some MSP values are NaN!")
+            print("="*80)
                 
         except Exception as e:
             print(f"  ERROR creating {config_name}: {e}")
             traceback.print_exc()
     
     print("\n" + "="*80)
-    print("VERIFICATION COMPLETE")
+    print("ALL CONFIGS VERIFICATION COMPLETE")
     print("="*80)
 
 if __name__ == '__main__':

@@ -82,9 +82,9 @@ MSP_COLORS = {
 
 def parse_arguments():
     parser = argparse.ArgumentParser(description='HemDx figure generation')
-    parser.add_argument('--config', type=str, default='config1',
+    parser.add_argument('--config', type=str, default='config3',
                         choices=get_available_configs(),
-                        help='Process configuration (default: config1)')
+                        help='Process configuration (default: config3)')
     parser.add_argument('--timestamp', type=str, default=None,
                         help='Custom timestamp (YYYYMMDD_HHMM) to locate results')
     parser.add_argument('--results-dir', type=str, default=None,

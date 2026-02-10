@@ -661,7 +661,7 @@ def create_area_400_recovery(broth_in, DfUltraBuffer2):
         ins=C402-0,
         outs='CrudeHomogenate',
         P_high=1000e5,  # 1000 bar
-        cell_disruption_efficiency=0.90,
+        cell_disruption_efficiency=0.87,
     )
     
     # Post-valve cooling
@@ -771,7 +771,7 @@ def create_area_500_purification(clarified_lysate, DfUltraBuffer1):
         TargetProduct_IDs=('Leghemoglobin',),
         Salt_IDs=tuple(c.chemical_groups['Salts']),
         OtherLargeMolecules_IDs=tuple(c.chemical_groups['OtherLargeMolecules']),
-        TargetProduct_Retention=0.99,
+        TargetProduct_Retention=0.95,
         Salt_Retention=0.05,
     )
     U501.add_specification(run=True)

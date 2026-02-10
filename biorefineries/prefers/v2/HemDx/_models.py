@@ -274,15 +274,15 @@ def create_model(baseline_production_kg_hr=150, config='config1', verbose=True):
     if filters:
         # 2.3 Filtration Solid Capture — Truncated Normal (DSP)
         @param(name='Filtration capture', element='DSP', kind='coupled', units='-',
-               baseline=0.95, distribution=shape.TruncNormal(
-                   mu=0.95, sigma=(0.99 - 0.90) / 4, lower=0.90, upper=0.99))
+               baseline=0.85, distribution=shape.TruncNormal(
+                   mu=0.85, sigma=(0.95 - 0.75) / 4, lower=0.75, upper=0.95))
         def set_filtration_capture(eff):
             for u in filters:
                 if hasattr(u, 'solid_capture_efficiency'):
                     u.solid_capture_efficiency = eff
 
     # 2.4 Diafiltration Product Retention
-    dfs = [u for u in [U601, U801] if u is not None]
+    dfs = [u for u in [U601] if u is not None]
     if dfs:
         # 2.4 Diafiltration Product Retention — Truncated Normal (DSP)
         @param(name='Diafiltration retention', element='DSP', kind='coupled', units='-',
@@ -516,28 +516,108 @@ def create_model(baseline_production_kg_hr=150, config='config1', verbose=True):
     return model
 
 
+def verify_model_integration():
+    """
+    Verification function to test that design mode integration works correctly.
+    Uses model(sample) interface for proper parameter evaluation.
+    Tests BASELINE, LB, and UB scenarios for config1, config2, config3.
+    """
+    import traceback
+    print("="*80)
+    print("PREFERS MODEL INTEGRATION VERIFICATION (HemDx - v2)")
+    print("="*80)
+    
+    for config_name in ['config1', 'config2', 'config3']:
+        print(f"\n{'='*80}")
+        print(f"  {config_name.upper()}")
+        print(f"{'='*80}")
+        
+        try:
+            # Create model
+            print(f"\n1. Creating model ({config_name})...")
+            model = create_model(config=config_name, baseline_production_kg_hr=150, verbose=False)
+            
+            # Display model structure
+            print(f"\n2. Model has {len(model.parameters)} parameters and {len(model.metrics)} metrics")
+            
+            # Build sample arrays for baseline, LB, UB
+            param_bounds = {}
+            for p in model.parameters:
+                dist = p.distribution
+                if hasattr(dist, 'lower'):
+                    lb = float(np.asarray(dist.lower).reshape(-1)[0])
+                else:
+                    lb = p.baseline * 0.9
+                if hasattr(dist, 'upper'):
+                    ub = float(np.asarray(dist.upper).reshape(-1)[0])
+                else:
+                    ub = p.baseline * 1.1
+                param_bounds[p.name] = {'baseline': p.baseline, 'lb': lb, 'ub': ub}
+            
+            baseline_sample = np.array([param_bounds[p.name]['baseline'] for p in model.parameters])
+            lb_sample = np.array([param_bounds[p.name]['lb'] for p in model.parameters])
+            ub_sample = np.array([param_bounds[p.name]['ub'] for p in model.parameters])
+            
+            results = {}
+            
+            # Evaluate each scenario
+            for name, sample in [('BASELINE', baseline_sample), ('LB', lb_sample), ('UB', ub_sample)]:
+                print(f"\n3. [{name}] Evaluating...")
+                try:
+                    metrics = model(sample)
+                    results[name] = {m.name: metrics[i] for i, m in enumerate(model.metrics)}
+                    print(f"   MSP: {results[name].get('MSP', float('nan')):.4f} $/kg")
+                    print(f"   GWP: {results[name].get('GWP', float('nan')):.4f} kg CO2-eq/kg")
+                except Exception as e:
+                    print(f"   ERROR: {e}")
+                    traceback.print_exc()
+                    results[name] = {}
+            
+            # Summary table
+            print("\n" + "="*80)
+            print(f"RESULTS SUMMARY ({config_name})")
+            print("="*80)
+            
+            key_metrics = ['MSP', 'TCI', 'AOC', 'GWP']
+            print(f"\n{'Metric':20s} {'BASELINE':>15s} {'LB':>15s} {'UB':>15s}")
+            print("-"*65)
+            for m_name in key_metrics:
+                bl = results.get('BASELINE', {}).get(m_name, float('nan'))
+                lb_val = results.get('LB', {}).get(m_name, float('nan'))
+                ub_val = results.get('UB', {}).get(m_name, float('nan'))
+                print(f"{m_name:20s} {bl:15.4f} {lb_val:15.4f} {ub_val:15.4f}")
+            
+            # Parameter table
+            print("\n" + "-"*80)
+            print(f"{'Parameter':35s} {'BASELINE':>12s} {'LB':>12s} {'UB':>12s}")
+            print("-"*80)
+            for p in model.parameters:
+                b = param_bounds[p.name]
+                print(f"{p.name:35s} {b['baseline']:12.4f} {b['lb']:12.4f} {b['ub']:12.4f}")
+            
+            # Verify results differ
+            bl_msp = results.get('BASELINE', {}).get('MSP', float('nan'))
+            lb_msp = results.get('LB', {}).get('MSP', float('nan'))
+            ub_msp = results.get('UB', {}).get('MSP', float('nan'))
+            
+            print("\n" + "="*80)
+            if not np.isnan(bl_msp) and not np.isnan(lb_msp) and not np.isnan(ub_msp):
+                if not (np.isclose(bl_msp, lb_msp, rtol=0.001) and np.isclose(bl_msp, ub_msp, rtol=0.001)):
+                    print(f"VERIFICATION PASSED ({config_name}): MSP values differ across scenarios!")
+                else:
+                    print(f"VERIFICATION FAILED ({config_name}): MSP values are identical!")
+            else:
+                print(f"VERIFICATION FAILED ({config_name}): Some MSP values are NaN!")
+            print("="*80)
+                
+        except Exception as e:
+            print(f"  ERROR creating {config_name}: {e}")
+            traceback.print_exc()
+    
+    print("\n" + "="*80)
+    print("ALL CONFIGS VERIFICATION COMPLETE")
+    print("="*80)
+
+
 if __name__ == '__main__':
-    """Quick verification: create model, evaluate baseline."""
-    print("="*80)
-    print("HemDx _models.py Verification (config1)")
-    print("="*80)
-    
-    model = create_model(config='config1', baseline_production_kg_hr=150, verbose=True)
-    print(f"\nModel: {len(model.parameters)} params, {len(model.metrics)} metrics")
-    
-    # Print parameters
-    print("\nParameters:")
-    for p in model.parameters:
-        print(f"  {p.name:<30} baseline={p.baseline}")
-    
-    # Evaluate baseline
-    baseline_sample = np.array([p.baseline for p in model.parameters])
-    print(f"\nEvaluating baseline sample...")
-    metrics = model(baseline_sample)
-    
-    print(f"\nMetrics:")
-    for i, m in enumerate(model.metrics):
-        print(f"  {m.name:<25} = {metrics[i]:.4f} {m.units}")
-    
-    print(f"\n{'='*80}")
-    print("DONE")
+    verify_model_integration()

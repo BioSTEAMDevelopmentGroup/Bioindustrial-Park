@@ -228,7 +228,7 @@ def create_model(baseline_production_kg_hr=150, verbose=True):
            baseline=0.95, distribution=shape.TruncNormal(
                mu=0.95, sigma=(0.99 - 0.90) / 4, lower=0.90, upper=0.99))
     def set_df_retention(eff):
-        for u in [U501, U502]:
+        for u in [U501]:
             if hasattr(u, 'TargetProduct_Retention'):
                 u.TargetProduct_Retention = eff
             elif hasattr(u, 'retention'):

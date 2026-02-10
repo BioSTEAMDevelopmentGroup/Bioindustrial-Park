@@ -35,9 +35,9 @@ def get_available_configs():
 
 def parse_arguments():
     parser = argparse.ArgumentParser(description='HemDx baseline data generation (NEW)')
-    parser.add_argument('--config', type=str, default='config2',
+    parser.add_argument('--config', type=str, default='config3',
                         choices=get_available_configs(),
-                        help='Process configuration (default: config2)')
+                        help='Process configuration (default: config3)')
     parser.add_argument('--production', type=float, default=150,
                         help='Baseline production rate in kg/hr (default: 150)')
     parser.add_argument('--timestamp', type=str, default=None,

@@ -1,1 +1,1 @@
-& "C:\Users\owenp\.conda\envs\BioSTEAMML\python.exe" "c:\Programming\PREFERS\Bioindustrial-Park\biorefineries\prefers\v1\_RUN.py" --samples 300000 --batch-size 15000 --pause-minutes 5
+& "C:\Users\owenp\.conda\envs\BioSTEAMML\python.exe" "c:\Programming\PREFERS\Bioindustrial-Park\biorefineries\prefers\v2\_RUN.py" --samples 300000 --batch-size 15000 --pause-minutes 5

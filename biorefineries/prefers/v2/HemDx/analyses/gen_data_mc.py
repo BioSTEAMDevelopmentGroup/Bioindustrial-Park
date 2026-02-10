@@ -52,17 +52,17 @@ def get_available_configs():
 
 def parse_arguments():
     parser = argparse.ArgumentParser(description='HemDx Monte Carlo data generation')
-    parser.add_argument('--config', type=str, default='config1',
+    parser.add_argument('--config', type=str, default='config3',
                         choices=get_available_configs(),
-                        help='Process configuration (default: config1)')
+                        help='Process configuration (default: config3)')
     parser.add_argument('--production', type=float, default=150,
                         help='Baseline production rate in kg/hr (default: 150)')
     # Reduced default sampling as requested
-    parser.add_argument('--samples', type=int, default=10000,
+    parser.add_argument('--samples', type=int, default=300000,
                         help='Target number of valid samples per scenario')
-    parser.add_argument('--batch-size', type=int, default=10000,
-                        help='Samples per batch (default: 6000)')
-    parser.add_argument('--cores', type=int, default=None,
+    parser.add_argument('--batch-size', type=int, default=15000,
+                        help='Samples per batch (default: 15000)')
+    parser.add_argument('--cores', type=int, default=22,
                         help='Number of worker processes (default: max-2)')
     parser.add_argument('--no-multiprocessing', action='store_true',
                         help='Disable multiprocessing and run sequentially')

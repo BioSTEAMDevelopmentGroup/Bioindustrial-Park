@@ -543,7 +543,7 @@ def create_area_400_recovery(broth_in, DfUltraBuffer2):
     S402 = u.CellDisruption(
         'S402', ins=C402-0, outs='CrudeHomogenate',
         Cell_ID='Corynebacterium_glutamicum',
-        cell_disruption_efficiency=0.55, P_high=1000e5, P_low=101325,
+        cell_disruption_efficiency=0.87, P_high=1000e5, P_low=101325,
         component_fractions={'Protein': 0.45, 'Cellulose': 0.22, 'Xylan': 0.15, 'OleicAcid': 0.08, 'RNA': 0.10}
     )
 
@@ -639,7 +639,7 @@ def create_area_600_concentration(eluate_in, DfUltraBuffer1):
         outs=('ConcentratedHeme', 'NFPermeate'),
         TargetProduct_IDs=('Heme_b', 'Heme_b_In', 'ProtoporphyrinIX', 'ProtoporphyrinIX_In',),
         Salt_IDs=c.chemical_groups['Salts'],
-        TargetProduct_Retention=0.98, Salt_Retention=0.10,
+        TargetProduct_Retention=0.95, Salt_Retention=0.10,
         diavolumes=5.0,
     )
     
