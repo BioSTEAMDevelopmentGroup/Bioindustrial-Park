@@ -2,7 +2,7 @@
 
 **Class:** `CellDisruption`
 **Type:** High-Pressure Homogenizer (HPH)
-**Source:** `v1/_units.py`
+**Source:** `biorefineries/prefers/v2/_units.py`
 
 ## Purpose
 Releases intracellular products (LegHb, Heme) by lysing yeast cells under high pressure.
@@ -14,8 +14,8 @@ Releases intracellular products (LegHb, Heme) by lysing yeast cells under high p
    - Releases intracellular species (`_In` suffix) to extracellular phase.
    - Default Efficiency: 0.55 (0.90 typically used in config).
 2. **Pressure Dynamics**:
-   - Simulates multi-stage pumping to reach `P_high` (e.g., 1000 bar).
-   - Limits per-stage compression ratio (<4.0) and head (<3000 ft) to conservatively model realistic pump constraints and prevent BioSTEAM warnings.
+   - Simulates multi-stage pumping to reach `P_high` (e.g., 1000 bar in LegHb/HemDx configs).
+   - Limits per-stage compression ratio (<4.0) and head (<3000 ft) to avoid pump warnings while preserving total dP.
 3. **Thermal Effect**:
    - Modeled via `bst.IsenthalpicValve` from `P_high` to `P_low`.
    - Captures temperature rise due to energy dissipation (Joule-Thomson effect).

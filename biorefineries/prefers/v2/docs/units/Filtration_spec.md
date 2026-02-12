@@ -1,5 +1,7 @@
 # Filtration Unit Specification
 
+**Source:** `biorefineries/prefers/v2/_units.py`
+
 **Class:** `Filtration`
 **Type:** Continuous Rotary Drum Vacuum Filter (RDVF)
 **Last Updated:** 2026-01-20

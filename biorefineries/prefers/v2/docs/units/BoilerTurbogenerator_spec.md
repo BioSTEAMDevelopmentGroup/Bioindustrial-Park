@@ -2,7 +2,7 @@
 
 **Class:** `BoilerTurbogenerator`
 **Base Class:** `bst.BoilerTurbogenerator`
-**Source:** `v1/_units.py`
+**Source:** `biorefineries/prefers/v2/_units.py`
 
 ## Purpose
 Combined Heat and Power (CHP) unit that burns biomass residues and supplementary natural gas to generate steam and electricity. 
@@ -15,7 +15,7 @@ Combined Heat and Power (CHP) unit that burns biomass residues and supplementary
 2. **Emissions Control**:
    - **SO2 Scrubbing**: Uses Lime ($Ca(OH)_2$ or $CaO$) with 20% stoichiometric excess if SO2 is present.
    - **NOx/Particulates**: Modeled via standard emission factors (derived from composition).
-   - **Ammonia**: Routed to emissions (thermal destruction assumed or accounted in balance).
+   -- **Ammonia**: Routed to emissions (thermal destruction assumed or accounted in balance).
 3. **Steam Balance**:
    - Satisfies process steam demand first.
    - Excess heat generates electricity.
@@ -27,8 +27,8 @@ Combined Heat and Power (CHP) unit that burns biomass residues and supplementary
    - Calculates LHV/HHV of all feed solids and gas.
    - Determines if supplementary CH4 is needed.
 2. **Combustion**:
-   - complete combustion assumed.
-   - Enthalpy of emissions updated with `Guarded` logic (robust to missing thermo params).
+   - Complete combustion assumed.
+   - Emissions enthalpy updated with guarded logic to handle missing thermo on large biomolecules.
 3. **Electricity**:
    - $Work = (H_{combustion} \cdot \eta_B - H_{steam,process}) \cdot \eta_{TG}$
    - Handles "Electricity Demand" satisfaction mode (optional).

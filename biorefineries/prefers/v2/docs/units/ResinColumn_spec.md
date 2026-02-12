@@ -1,5 +1,7 @@
 # ResinColumn Specification
 
+**Source:** `biorefineries/prefers/v2/_units.py`
+
 **Class:** `ResinColumn`
 **Type:** Polymorphic Separation Unit
 **Presets:** 'IonExchange', 'Adsorption'
@@ -60,11 +62,10 @@ $$ Cost_{resin} = V_{resin} \times Cost_{per\_L} $$
 - ins[2] (Elute) → outs[1] (Eluate / Product)
 - ins[3] (Regen) → outs[2] (Regen waste)
 
-**Mass balance:**
-- Flowthrough $=$ Feed $-$ Adsorbed
-- Eluate $=$ Elute $+$ Adsorbed
-- ResinWash $=$ Wash
-- RegenWaste $=$ Regen
+**Mass balance (Adsorption mode):**
+- Non-targets to flowthrough: `NonTarget_Removal` (default 0.99)
+- Impurity carryover to wash: `Wash_Impurity_Carryover` (default 0.02)
+- Impurity carryover to regen: `Regen_Impurity_Carryover` (default 0.01)
 
 ### Equations
 $$ V_{bed} = Q_{vol} \times EBCT $$
@@ -75,11 +76,11 @@ $$ Mass_{adsorbent} = V_{bed} \times \rho_{bulk} $$
 
 ```python
 # Ion Exchange Mode
-R201 = ResinColumn('R201', ins=[feed, buffer_A, buffer_B, regen], 
+R201 = ResinColumn('R201', ins=[feed, buffer_A, buffer_B, regen],
                    preset='IonExchange',
                    resin_DBC_g_L=60)
 
-# Adsorption Mode (e.g. Hydrophobic capture)
+# Adsorption Mode (hydrophobic capture)
 AC301 = ResinColumn('AC301', ins=[feed, wash, elute, regen],
                     preset='Adsorption',
                     TargetProduct_IDs=('Heme_b',),

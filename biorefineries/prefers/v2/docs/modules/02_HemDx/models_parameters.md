@@ -103,10 +103,8 @@ _ln_sigma_10pct  = (np.log(1.1) - np.log(0.9)) / 4  # ≈ 0.0502
 ## Model Specification
 
 The model specification function (called before each evaluation):
-1. `adjust_glucose_for_titer()` — scales yield based on `R302.titer`
-2. `optimize_NH3_loading()` — adjusts ammonia for nitrogen balance
-3. `set_production_rate()` — scales system to target production
-4. All wrapped in `run_titer_convergence()` for iterative convergence
+1. Calls `set_production_rate()` (which runs `system.simulate()` internally).
+2. R302's internal specification handles titer and NH3 convergence automatically.
 
 ---
 

@@ -2,7 +2,7 @@
 
 **Class:** `SeedTrain`
 **Type:** Fermentation Seed Train (Multi-stage)
-**Source:** `v1/_units.py`
+**Source:** `biorefineries/prefers/v2/_units.py`
 
 ## Purpose
 Prepares inoculum for main fermentation by growing biomass in successively larger reactor stages (scale-up ratio ~10x per stage).

@@ -1,5 +1,7 @@
 # Diafiltration Unit Specification
 
+**Source:** `biorefineries/prefers/v2/_units.py`
+
 **Class:** `Diafiltration`
 **Type:** Membrane Separation (Ultrafiltration/Nanofiltration) with Buffer Exchange
 **Last Updated:** 2026-01-20
@@ -18,7 +20,7 @@
 | **Membrane Cost** | 150.00 | USD/m² | $80-$350/m² (industrial) | [2] SNS Insider 2023 |
 | **Membrane Cost (Pharma)** | 1500-5000 | USD/m² | $1500-$5000/m² (TFF cassettes) | [2] SNS Insider 2023 |
 | **Membrane Lifetime** | 2.0 | Years | 1-3 Years | [3] DuPont Water Solutions |
-| **Product Retention** | 99% | - | >95% typical for UF | User/Application Specific |
+| **Product Retention** | 98% | - | >95% typical for UF | User/Application Specific |
 | **Op. Pressure (TMP)** | 2.0-4.0 | bar | 2-10 bar (UF), 10-25 bar (NF) | [5] Synder Filtration |
 | **Recirculation Ratio** | 10.0 | - | 5-20 | Fouling control |
 | **Equipment Lifetime** | 20.0 | Years | - | [4] NREL Guidelines |

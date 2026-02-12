@@ -46,7 +46,7 @@ _ln_sigma_10pct  = (np.log(1.1) - np.log(0.9)) / 4  # ≈ 0.0502
 |---|-----------|----------|-------|-------------|-------|-------|-------|
 | 1.1 | Fermentation titer | ~5.0 | g/L | **Trunc(LogNormal)** | 0.5× baseline | 1.5× baseline | `mu=ln(baseline)`, `σ=0.2747` |
 | 1.2 | Fermentation tau | ~72 | hr | Triangle | 0.8× baseline | 1.2× baseline | Unchanged from v1 |
-| 1.3 | Product yield | ~3.71 | % | **TruncNormal** | 0.9× baseline | 1.1× baseline | `mu=baseline`, `σ=baseline×0.05/2` |
+| 1.3 | Product yield | ~3.08 | % | **TruncNormal** | 0.9× baseline | 1.1× baseline | `mu=baseline`, `σ=baseline×0.05/2` |
 | 1.4 | Biomass yield | ~53 | % | **TruncNormal** | 0.9× baseline | 1.1× baseline | `mu=baseline`, `σ=baseline×0.05/2` |
 
 ### 2. DSP Parameters (Coupled)
@@ -70,7 +70,7 @@ _ln_sigma_10pct  = (np.log(1.1) - np.log(0.9)) / 4  # ≈ 0.0502
 |---|-----------|----------|-------|-------------|-------|-------|-------|
 | 4.1 | Electricity price | ~0.030 | $/kWh | **Trunc(LogNormal)** | 0.9× base | 1.1× base | `mu=ln(base)`, `σ=0.0502` |
 | 4.2 | Glucose price | ~0.420 | $/kg | **Trunc(LogNormal)** | 0.9× base | 1.1× base | `mu=ln(base)`, `σ=0.0502` |
-| 4.3 | Ammonia price | ~0.115 | $/kg | **Trunc(LogNormal)** | 0.9× base | 1.1× base | `mu=ln(base)`, `σ=0.0502` |
+| 4.3 | Ammonia price | ~0.46 | $/kg | **Trunc(LogNormal)** | 0.9× base | 1.1× base | `mu=ln(base)`, `σ=0.0502` |
 | 4.4 | Buffer/Seed cost | 1.0 | multiplier | **Trunc(LogNormal)** | 0.9 | 1.1 | `mu=0`, `σ=0.0502` |
 | 4.5 | Operating days | 333 | days/yr | Triangle | 300 | 350 | Unchanged from v1 |
 | 4.6 | IRR | 0.18 | fraction | Triangle | 0.10 | 0.25 | Unchanged from v1 |
@@ -90,10 +90,8 @@ _ln_sigma_10pct  = (np.log(1.1) - np.log(0.9)) / 4  # ≈ 0.0502
 ## Model Specification
 
 The model specification function is called before each evaluation:
-1. Calls `run_titer_convergence()` which iteratively:
-   - Adjusts glucose for target titer (`adjust_glucose_for_titer`)
-   - Optimizes NH₃ loading (`optimize_NH3_loading`)
-   - Sets production rate (`set_production_rate`)
+1. Calls `set_production_rate()` (which runs `system.simulate()` internally).
+2. R302's internal specification handles titer and NH3 convergence automatically.
 
 ---
 

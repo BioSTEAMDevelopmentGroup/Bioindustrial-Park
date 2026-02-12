@@ -1,9 +1,8 @@
 # Uncertainty & Sensitivity Analysis (`LegHb`)
 
-**Directory:** `v1/LegHb/analyses/`  
-**Data Script:** `gen_data.py`  
-**Figures Script:** `gen_figures.py`  
-**Orchestrator:** `UA_SA.py`
+**Directory:** `biorefineries/prefers/v2/LegHb/analyses/`  
+**Data Scripts:** `gen_data_base.py`, `gen_data_mc.py`  
+**Figures Script:** `gen_figure.py`
 
 This module provides comprehensive tools for quantifying risk and parameter sensitivity in the LegHemoglobin biorefinery through Monte Carlo simulations. The pipeline is now split into a cold-data generation step and a separate plotting step to avoid redundant computation.
 
@@ -25,21 +24,21 @@ The analysis supports **two main scenarios** with flexible configuration:
 
 ### Split Pipeline (Cold Data + Figures)
 
-1. **Cold Data Generation** (`gen_data.py`)
-    - Runs baseline evaluation, Monte Carlo (UA), and single-point sensitivity (SA)
+1. **Baseline + Monte Carlo Data** (`gen_data_base.py`, `gen_data_mc.py`)
+    - Runs baseline evaluation and Monte Carlo (UA)
     - Saves all raw results to `analyses/results_{config}_{timestamp}/data/`
     - Outputs robust, portable files (CSV, Excel, Pickle)
 
-2. **Figure Generation** (`gen_figures.py`)
+2. **Figure Generation** (`gen_figure.py`)
     - Loads the precomputed datasets from `/data`
     - Produces figures in `/figure` without re-running simulations
 
-3. **Orchestrator** (`UA_SA.py`)
-    - Optional convenience wrapper for running data and figures in sequence
+3. **Orchestration**
+    - Use shell scripts or task runners if you want a single-step workflow.
 
 ### Utility Modules Used
 
-The plotting and reporting helpers are centralized in `v1/utils/` and are used by `gen_data.py` and `gen_figures.py`:
+The plotting and reporting helpers are centralized in `v2/utils/` and are used by the analysis scripts:
 
 - `utils/plot_utils.py`: common chart builders and styling
 - `utils/sankey_utils.py`: Sankey preparation and export
@@ -70,28 +69,7 @@ Statistical utility for binned percentile analysis.
 
 ## 3. Model Parameters
 
-The `_models.py` module defines the `create_model()` function which builds a `bst.Model` with uncertain parameters:
-
-### Fermentation Performance Parameters
-
-| Parameter | Distribution | Baseline | Units |
-|-----------|--------------|----------|-------|
-| `Titer` | Triangular/Uniform | 7.27 | g/L |
-| `Productivity` | Triangular/Uniform | 0.101 | g/L/hr |
-| `Yield` | Triangular/Uniform | 0.0224 | g product/g glucose |
-
-### Operating Cost Parameters
-
-| Parameter | Distribution | Baseline | Units |
-|-----------|--------------|----------|-------|
-| `Glucose Price` | Uniform | varies | $/kg |
-| `Electricity Price` | Uniform | varies | $/kWh |
-
-### Optional Scale Parameter
-
-| Parameter | Distribution | Baseline | Units |
-|-----------|--------------|----------|-------|
-| `Production Rate` | Triangular | 275 | kg/hr |
+The `v2/LegHb/_models.py` module defines the `create_model()` function which builds a `bst.Model` with uncertain parameters. Distribution shapes and bounds are documented in [LegHb model parameters](01_LegHb/models_parameters.md).
 
 ## 4. Model Metrics
 
@@ -104,7 +82,6 @@ The analysis tracks Key Performance Indicators (KPIs) defined in `_models.py`:
 | `MSP` | `get_MSP()` | $/kg LegHb |
 | `TCI` | `get_TCI()` | $ Million |
 | `AOC` | `get_AOC()` | $ Million/yr |
-| `Specific CapEx` | `get_specific_capex()` | $/kg annual capacity |
 
 ### Environmental Metrics
 
@@ -114,14 +91,16 @@ The analysis tracks Key Performance Indicators (KPIs) defined in `_models.py`:
 
 **GWP Calculation Method:** Uses BioSTEAM's LCA displacement allocation table, extracting total GWP (sum of inputs - outputs + process impacts) per kg of product.
 
-### Technical Metrics
+### Technical/Composition Metrics
 
 | Metric | Function | Units |
 |--------|----------|-------|
-| `LegHb Content` | `get_LegHb_content()` | mass % |
-| `Protein Purity` | `get_protein_purity()` | % of total protein |
-| `Actual Production` | `get_actual_production()` | kg/hr |
-| `Annual Production` | `get_annual_production()` | metric tons/yr |
+| `Fat Content` | `get_fat_content()` | wt% |
+| `Carbohydrates` | `get_carbohydrates()` | wt% |
+| `Product Content` | `get_product_content()` | wt% |
+| `Total Solids` | `get_total_solids()` | wt% |
+| `Protein Purity` | `get_protein_purity()` | % |
+| `Heme Equivalent` | `get_heme_equivalent()` | wt% |
 
 ## 5. Outputs
 
@@ -155,14 +134,12 @@ The analysis supports both `config1` and `config2` process configurations:
 ### Example Commands
 
 ```bash
-# 1) Generate cold data only
-python v1/LegHb/analyses/gen_data.py --config config1 --samples 500
+# 1) Generate baseline + Monte Carlo data
+python biorefineries/prefers/v2/LegHb/analyses/gen_data_base.py --config config1
+python biorefineries/prefers/v2/LegHb/analyses/gen_data_mc.py --config config1 --samples 500
 
 # 2) Generate figures from existing results
-python v1/LegHb/analyses/gen_figures.py --results-dir v1/LegHb/analyses/results_config1_YYYYMMDD_HHMM
-
-# 3) One-shot (data + figures)
-python v1/LegHb/analyses/UA_SA.py --config config1 --samples 500
+python biorefineries/prefers/v2/LegHb/analyses/gen_figure.py --results-dir biorefineries/prefers/v2/LegHb/analyses/results_config1_YYYYMMDD_HHMM
 ```
 
 ## 7. Verification

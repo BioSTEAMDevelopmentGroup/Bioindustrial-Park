@@ -2,7 +2,7 @@
 
 **Class:** `Centrifuge`
 **Base Class:** `bst.SolidsCentrifuge`
-**Source:** `v1/_units.py`
+**Source:** `biorefineries/prefers/v2/_units.py`
 
 ## Purpose
 Extended centrifuge model suitable for pilot-scale or low-solids operations, preventing warnings where standard BioSTEAM models impose strict lower bounds.
@@ -18,6 +18,11 @@ Extended centrifuge model suitable for pilot-scale or low-solids operations, pre
    - Maintains standard scaling exponents:
      - Reciprocating Pusher: $n=0.5$
      - Scroll Solid Bowl: $n=0.3$
+
+## Notes
+
+- Soluble species automatically follow the water split based on `moisture_content`.
+- Solid species are defined by `split` (or `order`) and separated accordingly.
 
 ## References
 - Humbird et al. (2011) - NREL Biofuels Baseline.

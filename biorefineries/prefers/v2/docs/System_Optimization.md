@@ -4,7 +4,7 @@ This document details the optimization methodologies used in the PreFerS v2 bior
 
 ## Overview: Internalized Specification Architecture
 
-v2 replaces the external `convergence.py` utility with **internalized unit specifications** attached directly to the fermentation reactor (R302) via `@R302.add_specification(run=False)`. This means titer convergence and NH3 optimization execute automatically whenever BioSTEAM simulates the system — no external wrapper function is needed.
+v2 replaces external convergence utilities with **internalized unit specifications** attached directly to the fermentation reactor (R302) via `@R302.add_specification(run=False)`. This means titer convergence and NH3 optimization execute automatically whenever BioSTEAM simulates the system — no external wrapper function is needed.
 
 **Key advantages over the v1 approach:**
 - **3–45x faster** simulation (no redundant outer-loop system simulates)
@@ -19,41 +19,41 @@ The standard design specification requires achieving a specific **target titer**
 ### Architecture
 
 The convergence logic is embedded as `@R302.add_specification(run=False)`, which means:
-1. BioSTEAM calls this spec *instead of* `R302._run()` during simulation
-2. The spec internally calls `R302._run()` within its iteration loop
-3. No external `run_titer_convergence()` call is needed
+1. BioSTEAM calls this spec *instead of* `R302._run()` during simulation.
+2. The spec internally calls `R302._run()` within its iteration loop.
+3. No external `run_titer_convergence()` call is needed.
 
 ### Logic Flow
 
 The `update_fermentation_and_nh3()` specification (attached to R302) executes the following loop until the actual titer matches the target titer or max iterations (15) are reached:
 
-1.  **Initialize Yield from Elasticity Correction**:
-    *   If `target_titer` differs from `baseline_titer`, applies an initial correction:
-    *   $Yield_{init} = Yield_{starting} \times (\frac{Titer_{target}}{Titer_{baseline}})^{\frac{1}{Elasticity}}$
-    *   LegHb: $Elasticity = 1.3$, $Tolerance = 0.1\%$
-    *   HemDx: $Elasticity = 2.0$, $Tolerance = 0.5\%$
+1. **Initialize Yield from Elasticity Correction**:
+    - If `target_titer` differs from `baseline_titer`, applies an initial correction:
+    - $Yield_{init} = Yield_{starting} \times (\frac{Titer_{target}}{Titer_{baseline}})^{\frac{1}{Elasticity}}$
+    - LegHb: $Elasticity = 1.3$, $Tolerance = 0.1\%$
+    - HemDx: $Elasticity = 2.0$, $Tolerance = 0.5\%$
 
-2.  **Measure NH3 Demand Empirically** (per iteration):
-    *   Runs R302 with 20× excess NH3 at the current yield
-    *   Measures actual NH3 consumption: $consumed = \sum NH3_{in} - \sum NH3_{out}$
-    *   This replaces the old stoichiometric `optimize_NH3_loading` function
+2. **Measure NH3 Demand Empirically** (per iteration):
+    - Runs R302 with 20× excess NH3 at the current yield.
+    - Measures actual NH3 consumption: $consumed = \sum NH3_{in} - \sum NH3_{out}$.
+    - Replaces the old stoichiometric `optimize_NH3_loading` function.
 
-3.  **Set Exact NH3 and Run R302**:
-    *   Sets the ammonia inlet to 100.1% of measured consumption (minimal safety margin)
-    *   Runs R302 with correct yield and NH3
+3. **Set Exact NH3 and Run R302**:
+    - Sets the ammonia inlet to ~100.1% of measured consumption (minimal safety margin).
+    - Runs R302 with correct yield and NH3.
 
-4.  **Check Titer Convergence**:
-    *   Calculates relative error: $error = |Titer_{target} - Titer_{actual}| / Titer_{target}$
-    *   If $error < Tolerance$, loop terminates successfully
+4. **Check Titer Convergence**:
+    - Calculates relative error: $error = |Titer_{target} - Titer_{actual}| / Titer_{target}$.
+    - If $error < Tolerance$, loop terminates successfully.
 
-5.  **Adjust Yield with Adaptive Damping**:
-    *   Coarse mode (error > 10%): full elasticity step ($damping = 1.0$)
-    *   Fine mode (error ≤ 10%): half step ($damping = 0.5$)
-    *   $step = (\frac{Titer_{target}}{Titer_{actual}})^{\frac{1}{Elasticity} \times damping}$
-    *   $Yield_{new} = Yield_{current} \times step$, clamped to $[0.005, 0.15]$ (LegHb) or $[0.0001, 0.05]$ (HemDx)
+5. **Adjust Yield with Adaptive Damping**:
+    - Coarse mode (error > 10%): full elasticity step ($damping = 1.0$).
+    - Fine mode (error ≤ 10%): half step ($damping = 0.5$).
+    - $step = (\frac{Titer_{target}}{Titer_{actual}})^{\frac{1}{Elasticity} \times damping}$.
+    - $Yield_{new} = Yield_{current} \times step$, clamped to $[0.005, 0.15]$ (LegHb) or $[0.0001, 0.05]$ (HemDx).
 
-6.  **Update Upstream NH3 Source**:
-    *   After convergence, updates the S202 splitter and NH3_25wt source stream to reflect total NH3 demand (R301 + R302) for downstream consistency
+6. **Update Upstream NH3 Source**:
+    - After convergence, updates the S202 splitter and NH3_25wt source stream to reflect total NH3 demand (R301 + R302) for downstream consistency.
 
 ## Production Rate Scaling
 
@@ -62,12 +62,12 @@ The `set_production_rate(system, target_kg_hr)` function uses `flexsolve.IQ_inte
 ## Usage in System Configs
 
 The internalized specification is implemented in:
-*   `LegHb/system/_config1.py` — `update_fermentation_and_nh3()` on R302
-*   `HemDx/system/_config1.py` — `update_fermentation_and_nh3()` on R302
-*   `HemDx/system/_config2.py` — `update_fermentation_and_nh3()` on R302
-*   `HemDx/system/_config3.py` — `update_fermentation_and_nh3()` on R302
+- `LegHb/system/_config1.py` — `update_fermentation_and_nh3()` on R302.
+- `HemDx/system/_config1.py` — `update_fermentation_and_nh3()` on R302.
+- `HemDx/system/_config2.py` — `update_fermentation_and_nh3()` on R302.
+- `HemDx/system/_config3.py` — `update_fermentation_and_nh3()` on R302.
 
-Each config is fully self-contained with no imports from `utils/convergence.py` (which has been removed in v2).
+Each config is fully self-contained with no external convergence utility imports.
 
 ## Usage in Models (Uncertainty Analysis)
 

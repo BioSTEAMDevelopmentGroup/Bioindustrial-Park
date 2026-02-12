@@ -13,12 +13,12 @@ Config 2 represents a scenario where the product is primarily retained intracell
 ### Key Modifications (vs Config 1)
 - **Area 400 (Recovery):**
     - **S404 Removed:** Supernatant microfiltration is removed as most product is in the cells.
-    - **M504 Added:** Supernatant from S401 is routed directly to Wastewater Treatment (via M504).
+    - **M504 Added:** Supernatant from C401 is routed directly to Wastewater Treatment.
     - **M405:** Receives only Clarified Lysate (S405-1).
 
 ### Key Parameters
 - **Secretion Fraction:** 0.0 - 0.3 (Uniform Distribution)
-- **Titer Control:** Elasticity-based yield adjustment solved with `flexsolve.IQ_interpolation` plus one-step correction; model titer bounds tightened to ±1% for $<0.01$ g/L deviation.
+- **Titer Control:** Internalized spec on R302 with elasticity-based yield adjustment ($Elasticity = 2.0$, $Tolerance = 0.5\%$) and yield clamp $[0.0001, 0.05]$.
 
 ## Unit Operations
 See `config1.md` for shared units.

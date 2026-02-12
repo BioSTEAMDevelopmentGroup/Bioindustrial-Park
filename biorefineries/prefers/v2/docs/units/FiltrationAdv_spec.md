@@ -35,6 +35,7 @@ Where:
 | `V_max_L_per_m2`           | 200.0        | Max capacity (L/m²)            |
 | `safety_factor`            | 0.8          | η_safety                       |
 | `TMP_bar`                  | 1.5          | Transmembrane pressure (bar)   |
+| `TMP_ref`                  | 1.5          | Reference TMP for capacity scaling |
 | `power_per_m2`             | 0.8          | Specific power (kW/m²)         |
 | `efficiency`               | 0.95         | Global efficiency scalar       |
 

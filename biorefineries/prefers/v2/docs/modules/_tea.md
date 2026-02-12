@@ -3,7 +3,7 @@
 **Module Path:** `biorefineries/prefers/v2/_tea.py`  
 **Class Name:** `PreFerSTEA`
 
-The `PreFerSTEA` class is a generalized extension of `biosteam.TEA` designed for the PreFerS v1 project. It standardizes economic parameters, depreciation schedules (including Singapore tax codes), and reporting methods across different biorefinery configurations (e.g., LegHb).
+`PreFerSTEA` is a generalized extension of `biosteam.TEA` for PREFERS v2. It standardizes economic parameters, depreciation schedules (including Singapore IRAS), and reporting utilities across LegHb and HemDx configurations.
 
 ## 1. Core Features
 
@@ -14,11 +14,13 @@ The class sets standard defaults for financial parameters common to the project 
 - **Working Capital:** Configurable percentage of Fixed Capital Investment (FCI).
 
 ### Custom Depreciation Schedules
-In addition to standard MACRS schedules, `PreFerSTEA` implements Singapore-specific tax depreciation schedules (`IRAS`):
+In addition to standard MACRS schedules, `PreFerSTEA` implements Singapore-specific IRAS depreciation schedules:
 - `IRAS1`: 1-year write-off (100%)
 - `IRAS2`: 2-year write-off (75%, 25%)
 - `IRAS3`: 3-year straight line
 - `IRAS6, IRAS12, IRAS16`: Accelerated schedules with initial allowances.
+
+It also supports `DDB` (double declining balance) and `SYD` (sum-of-the-years' digits) schedules.
 
 ### Reporting Methods
 The class includes built-in methods to generate standardized tables for Capital Expenditure (CAPEX) and Fixed Operating Costs (FOC).
@@ -27,32 +29,32 @@ The class includes built-in methods to generate standardized tables for Capital 
 
 ## 2. Usage Pattern
 
-`PreFerSTEA` is designed to be **subclassed** within specific project configurations (e.g., `LegHb/_tea_config1.py`). The base class handles the economics, while the subclass must implement system-specific logic.
+`PreFerSTEA` is designed to be subclassed within specific project configurations (e.g., `LegHb/_tea_config1.py`, `HemDx/_tea_config1.py`). The base class handles the economics, while subclasses connect to system-specific specs.
 
 ### Base Class (Shared)
-Located in `v1/_tea.py`:
+Located in `v2/_tea.py`:
 - `__init__`: Sets up economic parameters.
 - `_FOC`: Calculates fixed operating costs based on labor, maintenance, etc.
 - `CAPEX_table()`: Generates CAPEX breakdown.
 - `FOC_table()`: Generates FOC breakdown.
 
 ### Subclass Implementation (Project-Specific)
-In your project's TEA script (e.g., `LegHb/_tea_config1.py`), you must subclass `PreFerSTEA` and implement:
+In each TEA script (e.g., `LegHb/_tea_config1.py`), subclass `PreFerSTEA` and implement:
 
-1.  **`set_production_rate(self, target_production)`**: Logic to iteratively solve for a target production capacity.
-2.  **`check_product_specifications(self)`**: Logic to verify product purity or quality constraints.
+1. **`set_production_rate(self, target_production)`**: Delegates to the system config `set_production_rate` (internalized specs handle titer/NH3).
+2. **`check_product_specifications(self)`**: Uses the system config QA function for product specs.
 
 ```python
 from biorefineries.prefers.v2._tea import PreFerSTEA as PreFerSTEA_Base
 
 class PreFerSTEA(PreFerSTEA_Base):
     def set_production_rate(self, target):
-        # ... project specific implementation ...
-        pass
+        from biorefineries.prefers.v2.LegHb.system._config1 import set_production_rate
+        return set_production_rate(self.system, target, verbose=False)
 
     def check_product_specifications(self):
-        # ... check stream purities ...
-        pass
+        from biorefineries.prefers.v2.LegHb.system._config1 import check_LegHb_specifications
+        return check_LegHb_specifications(self.system.flowsheet.stream.LegHb_3)
 ```
 
 ---

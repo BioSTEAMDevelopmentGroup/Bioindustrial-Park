@@ -1,9 +1,8 @@
 # ReverseOsmosis Unit Documentation
 
-Reverse Osmosis unit with literature-validated parameters for biorefinery wastewater treatment.
+**Source:** `biorefineries/prefers/v2/_units.py`
 
-> [!NOTE]
-> The legacy implementation has been removed in Phase 0 refactoring. `ReverseOsmosis` now uses validated industrial parameters.
+Reverse Osmosis unit with literature-validated parameters for biorefinery wastewater treatment.
 
 ---
 

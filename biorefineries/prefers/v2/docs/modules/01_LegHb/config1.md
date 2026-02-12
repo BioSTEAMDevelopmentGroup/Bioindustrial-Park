@@ -1,6 +1,6 @@
 # LegHemoglobin Process Flow (`LegHb`) - Config 1
 
-**Source:** `v1/LegHb/system/_config1.py`  
+**Source:** `biorefineries/prefers/v2/LegHb/system/_config1.py`  
 **System ID:** `LegHb_sys`  
 **Architecture:** Modular Process Areas
 
@@ -43,7 +43,7 @@ Purpose: Prepare all feed solutions for fermentation.
 | M202    | MixTank            | Seed Solution 2 & Culture medium preparation (τ = 16 hr) |
 | M203    | SeedHoldTank       | Combines seed streams                                    |
 | M204    | MixTank            | Glucose solution preparation (50% dilution)              |
-| T201    | StorageTank        | Glucose storage tank (96 hours residence)                |
+| T201    | StorageTank        | Glucose storage tank (tau = 16*4 + 72 hr)                |
 | T202    | AmmoniaStorageTank | Ammonia storage tank (25 wt% aqueous ammonia)            |
 | S202    | Splitter           | Splits Ammonia between seed train and main fermenter     |
 
@@ -75,8 +75,8 @@ Purpose: Convert glucose to LegHb through microbial fermentation.
 | Parameter             | Value         | Units        |
 | --------------------- | ------------- | ------------ |
 | `titer_LegHb`         | 5.0           | g/L          |
-| `productivity_LegHb`  | 0.069         | g/L/hr       |
-| `yield_LegHb (Y_p)`   | 0.0333        | wt/wt        |
+| `productivity_LegHb`  | 5/72          | g/L/hr       |
+| `yield_LegHb (Y_p)`   | ~0.0308       | wt/wt        |
 | `Y_b (biomass yield)` | 0.53          | wt/wt        |
 | `theta_O2`            | 0.5           | % saturation |
 | `agitation_power`     | 0.985         | kW/m³        |
@@ -88,11 +88,11 @@ Purpose: Convert glucose to LegHb through microbial fermentation.
 v2 internalizes titer convergence and NH3 optimization as a single `@R302.add_specification(run=False)` — no external `convergence.py`, `optimize_NH3_loading`, or `adjust_glucose_for_titer` functions needed.
 
 - **Combined Specification (`update_fermentation_and_nh3`):**
-  - Empirically measures NH3 demand by running R302 with 20× excess, then sets exact NH3 (replaces `optimize_NH3_loading`)
-  - Iteratively adjusts fermentation yield to hit target titer using elasticity-based correction ($Elasticity = 1.3$, $Tolerance = 0.1\%$) with adaptive damping (replaces `adjust_glucose_for_titer`)
-  - Updates residence time (`tau`): `target_titer / target_productivity`
-  - Updates upstream `NH3_25wt` source and `S202` split ratio for consistency
-  - **Constraint:** Residual ammonia in broth < 1e-4 kmol/hr (negligible)
+  - Empirically measures NH3 demand by running R302 with 20× excess, then sets exact NH3 (replaces `optimize_NH3_loading`).
+  - Iteratively adjusts fermentation yield to hit target titer using elasticity-based correction ($Elasticity = 1.3$, $Tolerance = 0.1\%$) with adaptive damping (replaces `adjust_glucose_for_titer`).
+  - Updates residence time (`tau`): `target_titer / target_productivity`.
+  - Clamps yield to $[0.005, 0.15]$ to preserve physical feasibility.
+  - Updates upstream `NH3_25wt` source and `S202` split ratio for consistency.
 
 ### Outputs
 
@@ -112,35 +112,33 @@ Purpose: Release and clarify intracellular LegHb from yeast cells.
 
 | Unit ID | Type             | Description                                                 |
 | ------- | ---------------- | ----------------------------------------------------------- |
-| C401    | SolidsCentrifuge | Disk stack centrifuge densifying biomass to ~45% dry solids |
+| C401    | SolidsCentrifuge | Primary harvest centrifuge (moisture_content = 0.40)        |
 | M401    | MixTank          | Wash buffer preparation (DfUltraBuffer2 + Water4)           |
 | H402    | HXutility        | Cool wash buffer to 10°C                                    |
 | M402    | MixTank          | Cell wash mixer                                             |
-| C402    | SolidsCentrifuge | Washed cell separation                                      |
+| C402    | SolidsCentrifuge | Washed cell separation (moisture_content = 0.55)            |
 
-- **Cell capture:** 98%
-- **Moisture content:** 55%
+- **Cell capture:** From `c.chemical_groups['SolidsCentrifuge']`
 
 ### Step 2: Cell Disruption (High-Pressure Homogenization)
 
 | Unit ID | Type           | Description                                    |
 | ------- | -------------- | ---------------------------------------------- |
-| S401    | CellDisruption | Multi-pass HPH at 1000 bar (800-1200 bar spec) |
+| S401    | CellDisruption | High-pressure homogenizer at 1000 bar          |
 | H401    | HXutility      | Immediate post-valve cooling to <15°C          |
 
-- **Cell disruption efficiency:** 90%
+- **Cell disruption efficiency:** 0.87
 - **Operating pressure:** 1000 bar (100 MPa)
 
 ### Step 3: Lysate Clarification (Debris Removal)
 
 | Unit ID | Type                   | Description                                  |
 | ------- | ---------------------- | -------------------------------------------- |
-| S402    | SolidsCentrifuge       | High-speed centrifuge for bulk solids        |
-| S403    | Filtration (MF preset) | Depth filtration series (30µm → 5µm → 0.5µm) |
-| S404    | ScrewPress             | Combined debris dewatering                   |
+| C403    | SolidsCentrifuge       | Debris removal (moisture_content = 0.20)     |
+| S403    | FiltrationAdv (MF)     | Depth filtration (solid_capture_eff = 0.85)  |
+| S404    | ScrewPress             | Debris dewatering (split = 0.99)             |
 
-- **Solid capture efficiency:** 95%
-- **Key goal:** Remove Mannoprotein for ≥65% protein purity
+- **Solid capture efficiency:** 0.85 (FiltrationAdv)
 
 ### Outputs
 
@@ -166,22 +164,21 @@ Purpose: Concentrate LegHb and remove impurities using tangential flow filtratio
 | ------- | ------------------------- | ----------------------------------------------- |
 | M501    | MixTank                   | DF buffer preparation (DfUltraBuffer1 + Water5) |
 | H501    | HXutility                 | Cool DF buffer to 5°C                           |
-| U501    | Diafiltration (UF preset) | TFF with 3-10 kDa MWCO membrane                 |
-| U502    | Diafiltration             | Final concentration step                        |
+| U501    | DiafiltrationAdv (UF)      | TFF with 3-10 kDa MWCO membrane                 |
+| U502    | DiafiltrationAdv           | Final concentration step                        |
 
 ### Process Parameters
 
 | Parameter      | Value                   |
 | -------------- | ----------------------- |
-| LegH retention | 99%                     |
+| LegH retention | 95%                     |
 | Salt retention | 5% (salts wash through) |
-| VCF            | 5-10X                   |
-| Diavolumes     | 6 (range 5-7)           |
+| Diavolumes     | 6 (buffer water = 6× feed water) |
 
 ### Control Specifications
 
 - **U502 Specification (`U502_adjust_water_recovery`):**
-  - Fixed Salt_Retention = 0.95 for concentration
+  - Fixed `Salt_Retention = 0.05` and run with configured water recovery
 
 ### Outputs
 
@@ -228,8 +225,8 @@ Purpose: Ensure microbiological safety and achieve final product specification.
 ### Control Specifications
 
 - **M604 Specification (`update_formulation`):**
-  - Calculates dilution water from total solids target
-  - Sets antioxidant at 0.1% w/w of final product
+  - Calculates dilution water from total solids and LegHb targets.
+  - Sets sodium ascorbate at 0.1% w/w of final product (with 10% w/w solution water).
 
 ### Outputs
 
@@ -317,8 +314,6 @@ For comparison with Heme-rich products (e.g. HemDx), the system reports:
 
 | Date       | Version | Description                                                            |
 | ---------- | ------- | ---------------------------------------------------------------------- |
-| 2026-01-28 | 2.3     | Added Ammonia optimization (Splitter S202 + pH control logic)          |
+| 2026-02-07 | 2.4     | Internalized titer + NH3 spec in R302 with empirical NH3 measurement   |
 | 2026-01-23 | 2.2     | Replaced direct RO with BioSTEAM wastewater treatment system           |
-| 2026-01-23 | 2.1     | Unit renaming: Area 500 (M501,H501,U501,U502), Area 900 (M901,S901,BT) |
 | 2026-01-21 | 2.0     | Modular refactoring into Process Areas                                 |
-| 2025-06-04 | 1.0     | Initial monolithic implementation                                      |

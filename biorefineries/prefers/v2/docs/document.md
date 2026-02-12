@@ -1,11 +1,11 @@
-Here is the **Living Documentation Suite** for the **PREFERS v1** codebase. This documentation is structured to serve Product Managers, System Architects, Data Integrators, and Developers.
+Here is the **Living Documentation Suite** for the **PREFERS v2** codebase. This documentation is structured to serve Product Managers, System Architects, Data Integrators, and Developers.
 
 ---
 
-# PREFERS v1: Living Documentation Suite
+# PREFERS v2: Living Documentation Suite
 
-**Version:** 1.0 (LegHb Production / HemDx Dev)  
-**Framework:** Python 3.12 (BioSTEAM, Thermosteam, ChaosPy)  
+**Version:** 2.0 (LegHb Production / HemDx Production)  
+**Framework:** Python 3.12 (BioSTEAM, Thermosteam, Chaospy)  
 **Context:** Bioindustrial Park / Precision Fermentation
 
 ---
@@ -13,16 +13,16 @@ Here is the **Living Documentation Suite** for the **PREFERS v1** codebase. This
 ## SECTION 1: SYSTEM OVERVIEW (The "Product Manager" View)
 
 ### Project Description
-**PREFERS (Precision Fermentation Simulation)** is a modular, high-fidelity techno-economic and environmental assessment (TEA/LCA) framework. It simulates the industrial production of high-value heme proteins (specifically **Leghemoglobin** and **Hemodextrin**) via precision fermentation.
+**PREFERS (Precision Fermentation Simulation)** is a modular, high-fidelity techno-economic and environmental assessment (TEA/LCA) framework. It simulates the industrial production of high-value heme products, including **Leghemoglobin (LegHb)** and **Heme-Cyclodextrin (HemDx)**, using BioSTEAM-based process models.
 
-Unlike static spreadsheet models, PREFERS utilizes **BioSTEAM** to perform rigorous mass and energy balances, dimension equipment based on first principles, and dynamically calculate Minimum Selling Price (MSP) and Global Warming Potential (GWP) under uncertainty.
+Unlike static spreadsheet models, PREFERS performs rigorous mass and energy balances, sizes equipment from first principles, and dynamically computes Minimum Selling Price (MSP) and Global Warming Potential (GWP) under uncertainty.
 
 ### Key Capabilities
-1.  **Integrated TEA & LCA:** Simultaneous calculation of economic metrics (IRR, MSP, CAPEX) and environmental impacts (GWP, FEC) within a single runtime environment.
-2.  **Singapore-Specific Economics:** A custom TEA module (`PreFerSTEA`) implements Singaporean tax structures and IRAS (Inland Revenue Authority of Singapore) depreciation schedules.
-3.  **Design-Spec Driven Scaling:** Automated "goal-seeking" algorithms resize the entire facility to meet specific production targets (e.g., 275 kg/hr) rather than just calculating the output of a fixed size.
-4.  **Stochastic Uncertainty Analysis:** A Monte Carlo simulation engine (`models.py`) quantifies financial and operational risks by varying parameters like titer, yield, and electricity prices.
-5.  **Modular Product Architecture:** A "Plug-and-play" structure allows distinct products (`LegHb`, `HemDx`) to share common unit operations (`units.py`) while maintaining isolated chemical and process logic.
+1. **Integrated TEA & LCA:** Calculates economic metrics (MSP, CAPEX, AOC) and environmental impacts (GWP, FEC) within a single runtime.
+2. **Singapore-Specific Economics:** `PreFerSTEA` implements IRAS depreciation schedules and Singapore tax assumptions.
+3. **Design-Spec Driven Scaling:** Internalized design specifications (e.g., R302 titer + NH3 targets) resize the facility to meet production targets.
+4. **Stochastic Uncertainty Analysis:** A Monte Carlo engine in product `_models.py` varies titer, yield, and price inputs.
+5. **Modular Product Architecture:** Product modules (`LegHb`, `HemDx`) share common unit operations (`_units.py`, `_units_adv.py`) while preserving product-specific chemistry and systems.
 
 ### High-Level Workflow
 ```mermaid
@@ -31,18 +31,18 @@ graph TD
     A -->|Initialize| C{System Factory}
     C -->|Define| D[Thermodynamics & Chemicals]
     C -->|Construct| E[Unit Operations Flowsheet]
-    
+
     A -->|Set Target| F[Design Specification Loop]
     F -->|Iterate| E
     F -->|Solve| G[Mass & Energy Balance]
     G -->|Converged| H[Sizing & Costing]
-    
+
     H --> I[TEA Engine]
     H --> J[LCA Engine]
-    
+
     I --> K[Financial Metrics: MSP, NPV]
     J --> L[Environmental Metrics: GWP]
-    
+
     K & L --> M[Final Reporting]
 ```
 
@@ -51,107 +51,82 @@ graph TD
 ## SECTION 2: ARCHITECTURAL HANDBOOK (The "Architect" View)
 
 ### Directory Structure & Intent
-The system follows a **Package-Subpackage** pattern to ensure separation of concerns between shared infrastructure and specific product verticals.
+The system follows a package-subpackage pattern that separates shared infrastructure from product-specific logic.
 
-*   **`prefers/v2/` (Root Package)**: The production environment.
-    *   `process_settings.py`: **Single Source of Truth** for global parameters (Prices, GWP Factors, Utility definitions).
-    *   `units.py`: **Shared Library**. Contains agnostic `bst.Unit` subclasses (e.g., `CellDisruption`, `Diafiltration`) usable by any project.
-*   **`prefers/v2/LegHb/` (Product Subpackage)**: Encapsulated logic for Leghemoglobin.
-    *   `chemicals.py`: Defines process-specific species (Leghemoglobin, *Pichia pastoris*, buffers).
-    *   `system.py`: **The Assembler**. Connects units into a graph and defines control loops via `@bst.SystemFactory`.
-    *   `tea.py`: **The Financial Model**. Subclasses `bst.TEA` to override depreciation/tax logic.
-    *   `models.py`: **The Analyst**. Wraps the system in `bst.Model` for sensitivity analysis.
+- **`biorefineries/prefers/v2/` (Root Package):** Production environment.
+  - `_process_settings.py`: Single source of truth for prices, utilities, and LCA factors.
+  - `_units.py`: Shared custom `bst.Unit` subclasses.
+  - `_units_adv.py`: Mechanistic/advanced variants for membrane and resin units.
+  - `_tea.py`: `PreFerSTEA` base class with IRAS depreciation keys.
+- **`LegHb/` (Product Subpackage):** Leghemoglobin process logic.
+  - `_chemicals.py`: Product-specific species definitions.
+  - `system/_config1.py`: Default flowsheet with internalized titer + NH3 specs.
+  - `_models.py`: Uncertainty and sensitivity model.
+- **`HemDx/` (Product Subpackage):** HemDx process logic.
+  - `system/_config1.py`: Base secretion flowsheet.
+  - `system/_config2.py`: Intracellular variant.
+  - `system/_config3.py`: Extracellular variant.
+  - `_models.py`: Uncertainty and sensitivity model.
 
 ### Design Patterns
 
-#### 1. The "System Factory" Pattern
-Instead of monolithic scripts, processes are wrapped in `@bst.SystemFactory`.
-*   **Benefit:** Allows the simulation to be instantiated multiple times with different configurations (e.g., for uncertainty analysis) without reloading the Python interpreter.
-*   **Implementation:** `create_LegHb_system(ins, outs)` acts as a constructor, building the flowsheet graph dynamically upon call.
+#### 1. The System Factory Pattern
+Flowsheets are assembled via `@bst.SystemFactory`, allowing re-instantiation for model runs without reloading Python.
 
-#### 2. Design Specification Loop (The Supervisor)
-PREFERS implements a Supervisor Loop (seen in `set_production_rate` inside `LegHb/system.py`) to handle inverse problems.
-*   **Objective:** Hit a precise target (e.g., 275 kg/hr of LegHb product).
-*   **Actuator:** A global scaling factor applied to all input streams.
-*   **Solver:** Uses `flexsolve.IQ_interpolation` to iteratively adjust the scaling factor until `abs(actual - target) < tolerance`.
-*   **Robustness:** Includes `Try/Except` blocks to restore baseline flows if the solver diverges, preventing simulation crashes.
+#### 2. Internalized Design Specification (R302)
+The primary production reactor embeds titer and NH3 targets in a specification that iterates within the system runtime. This enables robust convergence for production goals without external drivers.
 
 #### 3. Custom TEA Inheritance
-The `PreFerSTEA` class inherits from `bst.TEA` but overrides `_depreciation_array_from_key`.
-*   **Logic:** It introduces keys like `('IRAS', 6)` to generate depreciation arrays specific to Singaporean tax law (e.g., 20% initial allowance + straight line), distinct from standard US MACRS.
+`PreFerSTEA` subclasses `bst.TEA` and overrides depreciation logic using IRAS keys (e.g., `('IRAS', 6)`).
 
 ---
 
 ## SECTION 3: THE DATA CONTRACT (The "Interface" View)
 
 ### Input Structure (Global Settings)
-Defined primarily in `process_settings.py`, the system relies on the following global dictionaries. **Changes here propagate globally.**
+Defined in `_process_settings.py`, global dictionaries and helpers are loaded before simulation:
 
-*   **`price` (dict):** Maps Chemical IDs to costs ($/kg).
-    *   *Example:* `'Glucose': 0.42`, `'ElectricitySG': 0.03`.
-*   **`GWP_CFs` (dict):** Maps IDs to CO2-equivalent factors (kg CO2-eq/kg).
-    *   *Example:* `'Ammonia_SEA': 2.84`.
-*   **`load_process_settings()`:** A function that must be called before simulation to inject these values into BioSTEAM objects.
+- `price`: Chemical and utility prices ($/kg or $/kWh).
+- `GWP_CFs`: LCA characterization factors (kg CO2-eq per kg or kWh).
+- `load_process_settings()`: Registers prices, utilities, and characterization factors in BioSTEAM.
 
 ### Output Structure (Results)
 The system exports data at three levels:
 
-1.  **Stream Results:** Mass flows, compositions, and prices (visible via `sys.show()`).
-2.  **TEA Results:**
-    *   **MSP ($/kg):** The primary economic indicator.
-    *   **Cash Flow Table:** Yearly breakdown of FCI, AOC, Tax, and Net Earnings.
-3.  **LCA Results:**
-    *   **Inventory Table:** Detailed breakdown of GWP contributions (e.g., "Electricity: 40%", "Glucose: 30%").
-    *   **Metric:** Total GWP per kg product.
+1. **Stream Results:** Mass flows, compositions, and prices (via `sys.show()`).
+2. **TEA Results:** MSP, cash flow table, and capital/operating breakdown.
+3. **LCA Results:** GWP per kg product and contribution breakdowns.
 
 ### Product Specification Contract
-The `check_LegHb_specifications` function in `LegHb/system.py` defines the quality contract for the final product stream (`LegHb_3`).
-
-| Parameter           | Target Range | Logic                                 |
-| :------------------ | :----------- | :------------------------------------ |
-| **Fat (OleicAcid)** | 0 - 2%       | Mass fraction check                   |
-| **Carbohydrates**   | 0 - 4%       | Sum of Glucan, Glucose, Chitin        |
-| **Leghemoglobin**   | 6 - 9%       | Active ingredient concentration       |
-| **Total Solids**    | 0 - 24%      | Total mass minus water                |
-| **Protein Purity**  | >= 65%       | LegHb / (LegHb + Globin + Mannoprotein) |
+Product quality checks are defined in each product system module. For details, see:
+- [LegHb config 1](modules/01_LegHb/config1.md)
+- [HemDx configs](modules/02_HemDx/config1.md)
 
 ---
 
 ## SECTION 4: MODULE CATALOG (The "Developer" View)
 
-This section details the custom Unit Operations found in `units.py`.
+Custom unit operations are documented under `docs/units/` and listed in [Unit_Operations_Catalog.md](Unit_Operations_Catalog.md).
 
-### 1. SeedTrain
-*   **Type:** `bst.Unit` (Custom Costing)
-*   **Function:** Models a multi-stage seed fermentation train (5 stages).
-*   **Algorithm:** Assumes geometric scaling of reactor volumes (10x scaling per stage).
-*   **Costing:** Iterates through stages, calculating purchase cost based on volume ($S$) using exponential scaling laws: $Cost = Cost_{base} \times (S/S_{base})^n$.
+Key shared units include:
+- Seed train and fermentation (`SeedTrain`, `AeratedFermentation`)
+- Cell disruption and separation (`CellDisruption`, `Centrifuge`)
+- Membranes (`Filtration`, `Diafiltration`, and advanced variants)
+- Resin and polishing (`ResinColumn`, `ResinColumnAdv`)
+- Utilities and supporting systems (`BoilerTurbogenerator`, `VacuumPSA`)
 
-### 2. AeratedFermentation
-*   **Type:** Subclass of `bst.AeratedBioreactor`
-*   **Function:** Main production bioreactor with reaction kinetics.
-*   **Algorithm:**
-    *   Solves for Oxygen Transfer Rate (OTR) based on $k_L a$ and compressor power.
-    *   Runs `fermentation_reaction`, `cell_growth`, and `respiration` sequentially.
-    *   **Logic:** Includes safeguards to prevent negative concentrations (e.g., `if effluent.imol['H2O'] < 0...`).
+---
 
-### 3. CellDisruption
-*   **Type:** `bst.Unit`
-*   **Function:** High-pressure homogenizer to break cells and release intracellular product.
-*   **Mass Balance:** Splits biomass chemical (`Pichia_pastoris`) into components (Protein, Glucan, DNA) based on `component_fractions`. Converts `_In` species (intracellular) to extracellular forms.
-*   **Energy Balance:** Simulates a virtual **Pump + Valve** cycle to calculate the temperature rise and power consumption ($P_{high} \approx 150 \text{ bar}$).
+## SECTION 5: ANALYSIS WORKFLOW (The "Analyst" View)
 
-### 4. Diafiltration & Ultrafiltration
-*   **Type:** `bst.Unit`
-*   **Function:** Membrane separation for purification and concentration.
-*   **Algorithm:** Uses separation factors (`TargetProduct_Retention`, `Salt_Retention`) to split solutes between retentate and permeate.
-*   **Costing:** Calculates membrane area based on `membrane_flux_LMH`. Includes separate OPEX for membrane replacement based on `membrane_lifetime_years`.
-*   **Advanced Logic:** `U404` in `LegHb/system.py` contains an embedded optimization loop (`U404_adjust_water_recovery`) that dynamically alters water removal to hit a specific solids concentration target (e.g., 12%).
+### UA/SA Scripts (LegHb)
+- `LegHb/analyses/gen_data_base.py`: Deterministic baseline evaluation.
+- `LegHb/analyses/gen_data_mc.py`: Monte Carlo sampling runs.
+- `LegHb/analyses/gen_figure.py`: Plot generation from saved results.
 
-### 5. IonExchangeCycle
-*   **Type:** `bst.Unit` (Steady-state approximation)
-*   **Function:** Simulates a dynamic chromatography cycle.
-*   **Algorithm:**
-    *   Calculates resin volume required based on `resin_DBC_g_L` (Dynamic Binding Capacity).
-    *   Calculates buffer usage (Equilibration, Wash, Elution, Regeneration) based on Column Volumes (CV).
-    *   Distributes solutes based on `TargetProduct_Yield` and `BoundImpurity_Removal`.
+### Models
+- `LegHb/_models.py` and `HemDx/_models.py` define parameters, metrics, and sampling methods.
+
+---
+
+*Last Updated: 2026-02-12*

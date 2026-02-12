@@ -2,7 +2,7 @@
 
 **Date:** 2026-01-18  
 **Author:** PreFerS Development Team  
-**Target Module:** `prefers/v2/_units.py`
+**Target Module:** `biorefineries/prefers/v2/_units.py`
 
 ---
 
@@ -112,12 +112,12 @@ for component in feed.chemicals.IDs:
 
 ### Equipment Cost Model
 
-| Equipment | Base Cost ($) | Base Size | Exponent | CE Index | BM Factor |
-|:----------|:--------------|:----------|:---------|:---------|:----------|
-| Pressure Vessels | 50,000 | 10 m³ | 0.6 | 567 | 2.5 |
-| Vacuum Pump | 30,000 | 100 kW | 0.7 | 567 | 1.8 |
-| Adsorbent (initial) | 5 | $/kg | 1.0 | - | 1.0 |
-| Piping & Valves | 15% of vessels | - | - | - | 1.0 |
+| Equipment | Base Cost ($) | Base Size | Exponent | BM Factor |
+|:----------|:--------------|:----------|:---------|:---------|
+| Pressure Vessels | 50,000 | 10 m³ | 0.6 | 2.5 |
+| Vacuum Pump | 30,000 | 100 kW | 0.7 | 1.8 |
+| Adsorbent (initial) | 5 | $/kg | 1.0 | 1.0 |
+| Piping & Valves | 15% of vessels | - | - | 1.0 |
 
 ### Cost Equations
 

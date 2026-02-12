@@ -28,6 +28,9 @@ To achieve target retention:
 N_DV = -ln(Retention) / (k × (1 - σ))
 ```
 
+### Pressure Scaling (Forward Mode)
+In forward mode, $k$ is scaled by $TMP/TMP_{ref}$ to reflect higher washout at higher TMP.
+
 ## Parameters
 
 | Parameter                 | Default      | Description                       |

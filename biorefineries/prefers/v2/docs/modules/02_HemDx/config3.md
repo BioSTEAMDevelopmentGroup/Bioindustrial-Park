@@ -20,7 +20,7 @@ Config 3 represents a scenario where the product is efficiently secreted into th
 
 ### Key Parameters
 - **Secretion Fraction:** 0.7 - 1.0 (Uniform Distribution)
-- **Titer Control:** Elasticity-based yield adjustment solved with `flexsolve.IQ_interpolation` plus one-step correction; model titer bounds tightened to ±1% for $<0.01$ g/L deviation.
+- **Titer Control:** Internalized spec on R302 with elasticity-based yield adjustment ($Elasticity = 2.0$, $Tolerance = 0.5\%$) and yield clamp $[0.0001, 0.05]$.
 
 ## Unit Operations
 See `config1.md` for shared units.

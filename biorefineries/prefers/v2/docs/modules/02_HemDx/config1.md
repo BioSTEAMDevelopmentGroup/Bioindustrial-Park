@@ -1,6 +1,6 @@
 # N-HemDx Process Module (Integrated Full System)
 
-**Source:** `v1/HemDx/system/_config1.py`  
+**Source:** `biorefineries/prefers/v2/HemDx/system/_config1.py`  
 **System ID:** `NHemDx_sys`  
 **Product:** N-HemoDextrin (Nicotinamide-Stabilized Hemodextrin)
 
@@ -13,18 +13,7 @@ Complete production system for **N-HemDx** using *Corynebacterium glutamicum*, i
 - Nicotinamide stabilization
 - Full wastewater treatment and utility systems
 
-**Note:** This configuration uses a single **Adsorption** ResinColumn with realistic impurity distribution parameters on the combined stream. Buffer prep uses solute feeds with CV-based water addition.
-
-## Key Performance Metrics
-
-| Metric                         | Value            |
-| ------------------------------ | ---------------- |
-| N-HemoDextrin                  | 23.81 kg/hr      |
-| HemoDextrin                    | 1.25 kg/hr       |
-| Free Heme (Heme_b + Heme_b_In) | 0.047 kg/hr      |
-| Total Product Stream           | 360.09 kg/hr     |
-| Annual Production              | 2,880.75 MT/year |
-| GWP (LCA)                      | 22.1 kg CO2e/kg  |
+This configuration uses **ResinColumnAdv (Adsorption)** with impurity distribution parameters on the combined lysate stream. Buffer prep uses CV-based water addition.
 
 ## Process Areas
 
@@ -36,53 +25,44 @@ Complete production system for **N-HemDx** using *Corynebacterium glutamicum*, i
 
 ### Area 300: Conversion (Fermentation)
 - **R302**: Aerated Fermentation (*Corynebacterium glutamicum*)
-  - 2-Stage logic: Growth (72h) + Production (90h)
-  - Operating Temp: 30°C
-  - DO Setpoint: 45%
-  - Secretion Fraction (SF): 45% extracellular
-  - **Ammonia Optimization**: Exact stoichiometric loading for < 1e-4 kmol/hr residual NH3.
-  - **Titer Control**: Elasticity-based yield adjustment solved with `flexsolve.IQ_interpolation` plus one-step correction for $<0.01$ g/L deviation (tight titer bounds, ±1%).
+  - 2-stage logic: Growth (72 hr) + Production (90 hr)
+  - Operating temp: 30°C, DO setpoint: 45%
+  - Secretion Fraction (SF): 0.45 baseline
+  - **Internalized specification:** Empirical NH3 measurement and elasticity-based titer control
+    - $Elasticity = 2.0$, $Tolerance = 0.5\%$
+    - Yield clamped to $[0.0001, 0.05]$
+    - Updates NH3 source stream and S202 split for consistency
 
 ### Area 400: Clarification & Cell Disruption (Split-Stream)
-- **S401**: Primary Centrifuge → Supernatant + CellCream
-- **S404**: Microfiltration (MF preset) → FilteredSupernatant
-- **Cell Cream Processing (LegHb sequence)**
-  - **M401**: Wash buffer preparation (DfUltraBuffer2 + Water4)
-  - **H402**: Cool wash buffer to 10°C
-  - **M402**: Cell wash mixer
-  - **C402**: Washed cell centrifuge
-  - **S402**: Cell Disruption (HPH, 1000 bar)
-    - Target: `Corynebacterium_glutamicum`
-    - Disruption efficiency: 55%
-    - Component fractions: Protein (0.45), Cellulose (0.22), Xylan (0.15), OleicAcid (0.08), RNA (0.10)
-  - **H401**: Post-valve cooling to 15°C
-  - **S403**: Debris centrifuge → CrudeLysate + CellDebris
-  - **S405**: Microfiltration (MF preset) → ClarifiedLysate
-- **M404**: Debris mixer → CellDebrisRaw
-- **S406**: ScrewPress for debris dewatering
-  - Outputs: DehydratedDebris → Boiler (M902)
-  - PressLiquor → Wastewater Treatment
-- **M405**: Mixer → FilteredSupernatant + ClarifiedLysate → CombinedLysate
+- **C401**: Centrifuge → CellCream + Supernatant (moisture_content = 0.40)
+- **S404**: FiltrationAdv (MF) → FilteredSupernatant (solid_capture_eff = 0.85, cake_moisture = 0.30)
+- **Cell Cream Processing**
+  - **M401/H402/M402/C402**: Wash buffer prep + cooling + wash (C402 moisture_content = 0.55)
+  - **S402**: Cell Disruption (HPH, 1000 bar, efficiency = 0.87)
+    - Component fractions: Protein 0.45, Cellulose 0.22, Xylan 0.15, OleicAcid 0.08, RNA 0.10
+  - **H401/C403**: Cooling + debris centrifuge (moisture_content = 0.20)
+  - **S405**: FiltrationAdv (MF) → ClarifiedLysate
+- **M404/S406**: Debris mixer + ScrewPress (split = 0.999, moisture_content = 0.001)
+- **M405**: Combine FilteredSupernatant + ClarifiedLysate → CombinedLysate
 
 ### Area 500: Capture & Purification (Single Adsorption Column)
 Single ResinColumn (Adsorption preset) treating the combined stream:
 
 **U501 (Combined Path)**:
-- Preset: Adsorption
-- Feed: CombinedLysate (FilteredSupernatant + ClarifiedLysate)
-- Purpose: Capture heme products with realistic impurity distribution
-- **Impurity Distribution Parameters** (2026-01-26 upgrade):
-  - `NonTarget_Removal`: 0.99 (99% to flowthrough)
-  - `Wash_Impurity_Carryover`: 0.02 (2% to wash stream)
-  - `Regen_Impurity_Carryover`: 0.01 (1% to regen stream)
-- Buffer prep: M501/M502/M503 with NaCl, NaOH, and Ethanol solute feeds
-- CV-based water addition uses wash/elution/regeneration volumes from `U501`
+- Unit: `ResinColumnAdv` (preset = Adsorption)
+- TargetProduct_IDs: Heme_b, Heme_b_In, ProtoporphyrinIX, ProtoporphyrinIX_In
+- TargetProduct_Yield = 0.97, NonTarget_Removal = 0.97
+- wash_CV = 3, elution_CV = 0.05, regeneration_CV = 0.05
+- Wash/Regen impurity carryover: 0.02 / 0.01
+- Buffer prep: M501/M502/M503 with NaCl, NaOH, Ethanol feeds
+- CV-based water addition is driven by U501 CVs
 
 ### Area 600: Concentration
-- **U601**: Diafiltration (NF preset)
-  - Heme retention: 98%
-  - Concentration factor: 5×
-- **M601**: DF buffer preparation (DfUltraBuffer1 + Water8)
+- **U601**: DiafiltrationAdv (NF preset)
+  - TargetProduct_Retention = 0.95
+  - Salt_Retention = 0.10
+  - diavolumes = 5.0
+- **M601**: DF buffer prep (DfUltraBuffer1 + Water8), water = 2× feed water
 
 ### Area 700: Formulation
 Creates the final N-HemoDextrin complex:
@@ -93,53 +73,53 @@ Creates the final N-HemoDextrin complex:
 
 **R702 (Complexation + Stabilization)**:
 ```
-Heme_b + GammaCyclodextrin → HemoDextrin (95%)
-Heme_b_In + GammaCyclodextrin → HemoDextrin (95%)
-HemoDextrin + Nicotinamide → N-HemoDextrin (95%)
+0.0014711 Heme_b + 0.0197913 GammaCyclodextrin → HemoDextrin (95%)
+HemoDextrin + 0.0029422 Nicotinamide → N-HemoDextrin (95%)
 ```
 
 Dosing:
-- γ-CD: 13.45× molar ratio (based on stoichiometry)
-- Nicotinamide: 2× molar with 2.5% excess
+- γ-CD: molar ratio set by reaction stoichiometry; water = 10× γ-CD mass
+- Nicotinamide: 2× molar with 2.5% excess; water = 5× nicotinamide mass
 
 ### Area 800: Final Product
+- **U801**: DiafiltrationAdv (UF) for final concentration and salt removal
+  - TargetProduct_Retention = 0.99, Salt_Retention = 0.10, diavolumes = 5
+  - Spec targets 7.5 wt% N-HemoDextrin
+- **H802**: HTST pasteurization at 74°C
 - **M802**: Formulation MixTank (Antioxidant + Water12)
-- **H803**: Final cooling (4°C)
-- **T801**: Storage Tank
+- **H803**: Final cooling to 4°C
+- **T801**: Storage tank (1 week)
 - Output: NHemDx_Product
 
 ### Area 900: Wastewater Treatment & Facilities (LegHb Pattern)
 
 **Wastewater Treatment System** (`bst.create_wastewater_treatment_system`):
-- Collects: ResinFlowthrough, ResinWash, ResinRegen, NFPermeate, WashEffluent, PressLiquor
-- **Supplemental Nutrient**: `SupplementalNH3` (0.5 kg/hr) added to sustain biology (required due to N-depleted process effluent).
+- Collects: PressLiquor, WashEffluent, ResinFlowthrough, ResinRegenWaste, ResinWash, NFPermeate, FinalPermeate
+- Supplemental nutrients: `SupplementalNH4SO4` (NH3 = 0.5 kg/hr, (NH4)2SO4 = 50 kg/hr) and `SupplementalFeSO4`
 - Outputs: biogas, sludge, RO_treated_water, ProcessWaste
 - `mockup=True`, `area=500`
 
 **Utility Systems:**
-- **CT**: CoolingTower
-- **CWP**: ChilledWaterPackage
-- **PWC**: ProcessWaterCenter (with makeup water streams)
+**Utility Systems:**
+- CT: CoolingTower
+- CWP: ChilledWaterPackage
+- PWC: ProcessWaterCenter (recycled + makeup water)
 
 **Solids Handling:**
-- **M902**: Mixer → DehydratedDebris + WWT sludge → SolidsToBoiler
-- **BT**: BoilerTurbogenerator
-  - Inputs: SolidsToBoiler, biogas, makeup water, natural gas, lime, chems
-  - Outputs: emissions, rejected_water, ash_disposal
-  - Boiler efficiency: 80%, Turbogenerator efficiency: 85%
+- M902: Mixer → DehydratedDebris + WWT sludge → SolidsToBoiler
+- BT: BoilerTurbogenerator (boiler_efficiency = 0.80, turbogenerator_efficiency = 0.85)
 
-## Chemical Additions
+## Product Specifications (QA)
 
-| Chemical                 | Role                    | Stoichiometry         |
-| ------------------------ | ----------------------- | --------------------- |
-| γ-Cyclodextrin (MW 1297) | Carrier molecule        | 13.45:1 molar w/ heme |
-| Nicotinamide (MW 122)    | Axial ligand stabilizer | 2:1 molar w/ 2.5% XS  |
-| HemoDextrin (MW ~25)     | Intermediate complex    | Reaction product      |
-| N-HemoDextrin (MW ~25)   | Final product           | Reaction product      |
+`check_HemDx_specifications()` enforces:
+- Salt < 2.0 wt%
+- Residual Cyclodextrin < 4.0 wt%
+- Residual Nicotinamide < 2.0 wt%
+- Intermediate HemDx < 2.0 wt%
+- N-HemoDextrin 6.5-8.5 wt%
 
 ## Related Files
-- `_config1_DSP_Draft.py`: DSP draft (standalone, for reference)
-- `_chemicals.py`: Chemical definitions including HemDx formulation chemicals (with Glucose model copying for WWT compatibility)
+- `_chemicals.py`: HemDx chemical definitions
 - `_streams.py`: Input stream definitions
 
 ### System Creation
@@ -154,9 +134,7 @@ Factory function creating the complete production system.
 ```python
 set_production_rate(system, target_production_rate_kg_hr, verbose=True)
 ```
-Adjusts system inputs to achieve target production rate. NH3 optimization is handled automatically by R302's internalized specification (`@R302.add_specification(run=False)`) during simulation — no external `optimize_NH3_loading` call needed.
+Adjusts system inputs to achieve target production rate. NH3 optimization is handled automatically by R302's internalized specification during simulation.
 
 ## Last Updated
-2026-01-26 - Upgraded ResinColumn impurity distribution, added ScrewPress, full WWT system with CT/CWP/PWC
-2026-01-26 - Integrated LCA (GWP) tracking and reporting (Inventory & Displacement tables)
-2026-01-28 - Added Ammonia optimization with Supplemental NH3 for WWTP stability
+2026-02-07 - Internalized titer + NH3 specification and advanced filtration/diafiltration units
