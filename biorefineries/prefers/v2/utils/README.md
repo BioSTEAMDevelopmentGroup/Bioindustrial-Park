@@ -17,6 +17,10 @@ fig, ax = style.preview_palette()
 
 ## Color Palette
 
+Two supported palette variants are available:
+- **Original**: `PreFerS` (official source palette, unchanged)
+- **Soft-light suffix**: `PreFerS_softlight` (antiqued/material-style derivative)
+
 | Index | Name       | Hex       | Semantic Use          |
 | ----- | ---------- | --------- | --------------------- |
 | 0     | Deep Navy  | `#191538` | Axes, text            |
@@ -35,6 +39,19 @@ msp_color = style.get_color('msp')     # Gold
 gwp_color = style.get_color('gwp')     # Orange
 low_color = style.get_color('low')     # Indigo
 high_color = style.get_color('high')   # Emerald
+```
+
+Use original vs suffix variants explicitly:
+```python
+from biorefineries.prefers.v2.utils import style
+
+# Keep official original palette
+style.set_style(variant='original')
+original = style.get_palette(9, variant='original')
+
+# Soft-light antiqued/material variant with suffix naming
+style.set_style(variant='softlight')
+soft = style.get_palette(9, variant='softlight')
 ```
 
 ## Example: Tornado Plot
@@ -120,7 +137,7 @@ for Y marginal.*
 
 ## Colormaps
 
-Ten custom colormaps are registered:
+Original colormaps (official):
 - `PreFerS` - Full sequential gradient
 - `PreFerS_diverging` - Navy → White → Gold (Diverging)
 - `PreFerS_positive` - Green → Gold gradient (Positive metrics)
@@ -131,6 +148,13 @@ Ten custom colormaps are registered:
 - `PreFerS_purple` - White → Indigo (Sequential Purple)
 - `PreFerS_green` - White → Emerald (Sequential Green)
 - `PreFerS_red` - White → Red (Sequential Red)
+
+Suffix soft-light colormaps (for infographic-style soft rendering):
+- `PreFerS_softlight`
+- `PreFerS_softlight_diverging`
+- `PreFerS_softlight_positive`
+- `PreFerS_softlight_correlation`
+- `PreFerS_softlight_density`
 
 Use with matplotlib:
 ```python

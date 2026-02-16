@@ -18,6 +18,15 @@ from matplotlib import colormaps
 import seaborn as sns
 import numpy as np
 
+
+def _blend_with_white(hex_color, ratio=0.45):
+    """Return a softened hex color by blending with white."""
+    r, g, b = mcolors.to_rgb(hex_color)
+    r = (1 - ratio) * r + ratio
+    g = (1 - ratio) * g + ratio
+    b = (1 - ratio) * b + ratio
+    return mcolors.to_hex((r, g, b))
+
 # =============================================================================
 # PreFerS Brand Color Palette (from logo/spectrum)
 # =============================================================================
@@ -33,6 +42,9 @@ PREFERS_COLORS = [
     '#F5CA0C',  # 7: Gold        - MSP/economic metrics
     '#EDA211',  # 8: Orange      - Mean/median markers
 ]
+
+PREFERS_SOFT_SUFFIX = 'softlight'
+PREFERS_COLORS_SOFTLIGHT = [_blend_with_white(color, ratio=0.45) for color in PREFERS_COLORS]
 
 # Named color aliases for semantic access
 COLORS = {
@@ -56,6 +68,25 @@ COLORS = {
     'median': PREFERS_COLORS[0],   # Navy for median
     'mean': PREFERS_COLORS[8],     # Orange for mean
 }
+
+COLORS_SOFTLIGHT = {
+    key: PREFERS_COLORS_SOFTLIGHT[idx]
+    for idx, key in enumerate([
+        'navy', 'indigo', 'cerulean', 'teal', 'emerald',
+        'leaf', 'lime', 'gold', 'orange',
+    ])
+}
+COLORS_SOFTLIGHT.update({
+    'msp': PREFERS_COLORS_SOFTLIGHT[7],
+    'tci': PREFERS_COLORS_SOFTLIGHT[5],
+    'aoc': PREFERS_COLORS_SOFTLIGHT[1],
+    'gwp': PREFERS_COLORS_SOFTLIGHT[8],
+    'low': PREFERS_COLORS_SOFTLIGHT[1],
+    'high': PREFERS_COLORS_SOFTLIGHT[4],
+    'baseline': _blend_with_white('#E74C3C', ratio=0.35),
+    'median': PREFERS_COLORS_SOFTLIGHT[0],
+    'mean': PREFERS_COLORS_SOFTLIGHT[8],
+})
 
 
 # =============================================================================
@@ -146,6 +177,41 @@ def _register_colormaps():
         colormaps.register(cmap=prefers_purple, name='PreFerS_purple')
         colormaps.register(cmap=prefers_green, name='PreFerS_green')
         colormaps.register(cmap=prefers_red, name='PreFerS_red')
+
+        prefers_soft_seq = mcolors.LinearSegmentedColormap.from_list(
+            f"PreFerS_{PREFERS_SOFT_SUFFIX}", PREFERS_COLORS_SOFTLIGHT, N=256
+        )
+        prefers_soft_div = mcolors.LinearSegmentedColormap.from_list(
+            f"PreFerS_{PREFERS_SOFT_SUFFIX}_diverging",
+            [PREFERS_COLORS_SOFTLIGHT[0], '#FFFFFF', PREFERS_COLORS_SOFTLIGHT[7]],
+            N=256,
+        )
+        prefers_soft_positive = mcolors.LinearSegmentedColormap.from_list(
+            f"PreFerS_{PREFERS_SOFT_SUFFIX}_positive",
+            [
+                PREFERS_COLORS_SOFTLIGHT[4],
+                PREFERS_COLORS_SOFTLIGHT[5],
+                PREFERS_COLORS_SOFTLIGHT[6],
+                PREFERS_COLORS_SOFTLIGHT[7],
+            ],
+            N=256,
+        )
+        prefers_soft_corr = mcolors.LinearSegmentedColormap.from_list(
+            f"PreFerS_{PREFERS_SOFT_SUFFIX}_correlation",
+            [PREFERS_COLORS_SOFTLIGHT[2], '#FFFFFF', PREFERS_COLORS_SOFTLIGHT[8]],
+            N=256,
+        )
+        prefers_soft_density = mcolors.LinearSegmentedColormap.from_list(
+            f"PreFerS_{PREFERS_SOFT_SUFFIX}_density",
+            ['#FFFFFF', PREFERS_COLORS_SOFTLIGHT[8], PREFERS_COLORS_SOFTLIGHT[2], PREFERS_COLORS_SOFTLIGHT[0]],
+            N=256,
+        )
+
+        colormaps.register(cmap=prefers_soft_seq, name=f'PreFerS_{PREFERS_SOFT_SUFFIX}')
+        colormaps.register(cmap=prefers_soft_div, name=f'PreFerS_{PREFERS_SOFT_SUFFIX}_diverging')
+        colormaps.register(cmap=prefers_soft_positive, name=f'PreFerS_{PREFERS_SOFT_SUFFIX}_positive')
+        colormaps.register(cmap=prefers_soft_corr, name=f'PreFerS_{PREFERS_SOFT_SUFFIX}_correlation')
+        colormaps.register(cmap=prefers_soft_density, name=f'PreFerS_{PREFERS_SOFT_SUFFIX}_density')
     except ValueError:
         # Already registered, ignore
         pass
@@ -154,13 +220,14 @@ def _register_colormaps():
 
 # Register on module load
 PREFERS_CMAP, DIVERGING_CMAP, POSITIVE_CMAP, CORRELATION_CMAP, DENSITY_CMAP = _register_colormaps()
+PREFERS_CMAP_SOFTLIGHT = colormaps.get_cmap(f'PreFerS_{PREFERS_SOFT_SUFFIX}')
 
 
 # =============================================================================
 # Style Application
 # =============================================================================
 
-def set_style(style_name='whitegrid', font_scale=1.0):
+def set_style(style_name='whitegrid', font_scale=1.0, variant='original'):
     """
     Apply the PreFerS academic plotting style.
     
@@ -173,6 +240,8 @@ def set_style(style_name='whitegrid', font_scale=1.0):
         Seaborn base style. Default 'whitegrid' for clean academic look.
     font_scale : float
         Scaling factor for font sizes. Default 1.0.
+    variant : str
+        Style palette variant: 'original' (default) or 'softlight'.
     
     Examples
     --------
@@ -180,6 +249,9 @@ def set_style(style_name='whitegrid', font_scale=1.0):
     >>> style.set_style()
     >>> # All subsequent plots use PreFerS styling
     """
+    variant_key = (variant or 'original').lower()
+    color_series = PREFERS_COLORS_SOFTLIGHT if variant_key == 'softlight' else PREFERS_COLORS
+
     # Base Seaborn style
     sns.set_style(style_name)
     sns.set_context("paper", font_scale=font_scale)
@@ -198,7 +270,7 @@ def set_style(style_name='whitegrid', font_scale=1.0):
         'legend.title_fontsize': 11,
         
         # Color cycle
-        'axes.prop_cycle': plt.cycler(color=PREFERS_COLORS),
+        'axes.prop_cycle': plt.cycler(color=color_series),
         
         # Figure quality
         'figure.dpi': 150,
@@ -215,8 +287,8 @@ def set_style(style_name='whitegrid', font_scale=1.0):
         # Axes
         'axes.linewidth': 1.2,
         'axes.edgecolor': '#333333',
-        'axes.labelcolor': PREFERS_COLORS[0],
-        'axes.titlecolor': PREFERS_COLORS[0],
+        'axes.labelcolor': color_series[0],
+        'axes.titlecolor': color_series[0],
         'axes.titleweight': 'bold',
         'axes.spines.top': True,
         'axes.spines.right': True,
@@ -248,7 +320,7 @@ def set_style(style_name='whitegrid', font_scale=1.0):
     })
 
 
-def get_palette(n_colors=None, as_cmap=False):
+def get_palette(n_colors=None, as_cmap=False, variant='original'):
     """
     Get a seaborn-compatible color palette.
     
@@ -258,6 +330,8 @@ def get_palette(n_colors=None, as_cmap=False):
         Number of colors to return. If None, returns all 9 colors.
     as_cmap : bool
         If True, return as matplotlib colormap instead of list.
+    variant : str
+        Palette variant: 'original' (default) or 'softlight'.
     
     Returns
     -------
@@ -269,17 +343,21 @@ def get_palette(n_colors=None, as_cmap=False):
     >>> colors = get_palette(5)
     >>> sns.barplot(x=[1,2,3], y=[4,5,6], palette=colors)
     """
+    variant_key = (variant or 'original').lower()
+    color_series = PREFERS_COLORS_SOFTLIGHT if variant_key == 'softlight' else PREFERS_COLORS
+    cmap_name = f'PreFerS_{PREFERS_SOFT_SUFFIX}' if variant_key == 'softlight' else 'PreFerS'
+
     if as_cmap:
-        return PREFERS_CMAP
+        return colormaps.get_cmap(cmap_name)
     
     if n_colors is None:
-        return sns.color_palette(PREFERS_COLORS)
+        return sns.color_palette(color_series)
     
-    if n_colors <= len(PREFERS_COLORS):
-        return sns.color_palette(PREFERS_COLORS, n_colors=n_colors)
+    if n_colors <= len(color_series):
+        return sns.color_palette(color_series, n_colors=n_colors)
     
     # Interpolate for larger palettes using the sequential colormap
-    return sns.color_palette('PreFerS', n_colors=n_colors)
+    return sns.color_palette(cmap_name, n_colors=n_colors)
 
 
 def adjust_lightness(color, amount=0.5):
@@ -340,7 +418,7 @@ def get_spectrum_palette(n=10, brightness=1.0, as_cmap=False):
     return sns.color_palette(colors)
 
 
-def get_color(name):
+def get_color(name, variant='original'):
     """
     Get a specific named color from the PreFerS palette.
     
@@ -348,6 +426,8 @@ def get_color(name):
     ----------
     name : str or int
         Color name (e.g., 'msp', 'gwp', 'navy') or index (0-8).
+    variant : str
+        Color variant: 'original' (default) or 'softlight'.
     
     Returns
     -------
@@ -359,12 +439,15 @@ def get_color(name):
     >>> msp_color = get_color('msp')  # Returns '#F5CA0C'
     >>> navy = get_color(0)           # Returns '#191538'
     """
+    variant_key = (variant or 'original').lower()
+    color_series = PREFERS_COLORS_SOFTLIGHT if variant_key == 'softlight' else PREFERS_COLORS
+    color_map = COLORS_SOFTLIGHT if variant_key == 'softlight' else COLORS
     if isinstance(name, int):
-        return PREFERS_COLORS[name]
-    return COLORS.get(name.lower(), PREFERS_COLORS[0])
+        return color_series[name]
+    return color_map.get(name.lower(), color_series[0])
 
 
-def preview_palette():
+def preview_palette(variant='original'):
     """
     Display a visual preview of the PreFerS color palette.
     
@@ -377,7 +460,10 @@ def preview_palette():
         'Emerald', 'Leaf Green', 'Lime', 'Gold', 'Orange'
     ]
     
-    for i, (color, name) in enumerate(zip(PREFERS_COLORS, color_names)):
+    variant_key = (variant or 'original').lower()
+    color_series = PREFERS_COLORS_SOFTLIGHT if variant_key == 'softlight' else PREFERS_COLORS
+
+    for i, (color, name) in enumerate(zip(color_series, color_names)):
         ax.add_patch(plt.Rectangle((i, 0), 1, 1, color=color))
         ax.text(i + 0.5, -0.15, f'{i}', ha='center', va='top', fontsize=9)
         ax.text(i + 0.5, -0.35, name, ha='center', va='top', fontsize=8, rotation=45)
@@ -388,7 +474,8 @@ def preview_palette():
     ax.set_ylim(-0.6, 1)
     ax.set_aspect('equal')
     ax.axis('off')
-    ax.set_title('PreFerS Color Palette', fontsize=14, fontweight='bold', pad=10)
+    title_variant = 'Soft-Light' if variant_key == 'softlight' else 'Original'
+    ax.set_title(f'PreFerS Color Palette ({title_variant})', fontsize=14, fontweight='bold', pad=10)
     
     plt.tight_layout()
     return fig, ax

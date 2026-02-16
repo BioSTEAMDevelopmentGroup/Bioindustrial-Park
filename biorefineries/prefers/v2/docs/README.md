@@ -19,7 +19,7 @@ This codebase implements the "Process Evaluation and Feedstock Engineering for R
 | `_units_adv.py`           | **Advanced Units**. Mechanistic Resin/Diafiltration/Filtration models.                                                         |
 | `_process_settings.py`    | **Data Interface**. Global prices, utilities, and LCA factors.                                                                  |
 | `_tea.py`                 | **TEA Base Class**. `PreFerSTEA` with IRAS depreciation schedules.                                                              |
-| `utils/`                  | **Utilities & Plotting**. Plotting styles, helper functions, and file I/O.                                                      |
+| `utils/`                  | **Utilities & Plotting**. Plotting styles, helper functions, and file I/O (includes original `PreFerS` palette + `PreFerS_softlight` suffix variant). |
 
 ## Documentation Index
 
