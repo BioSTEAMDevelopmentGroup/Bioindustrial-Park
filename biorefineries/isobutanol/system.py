@@ -87,7 +87,7 @@ S301 = bst.Splitter('S301', ins=f.E402-0,
 F301 = bst.MultiEffectEvaporator('F301', ins=S301-0, outs=('F301_l', 'F301_g'),
                                         P = (101325, 73581, 50892, 32777, 20000), V = 0.1,
                                         flash=False)
-F301.V = 0.8 # initial value, updated in FeedStrategySpecification object
+F301.V = 0.1 # initial value, updated in FeedStrategySpecification object
 F301_design = F301._design
 F301_cost = F301._cost
 
@@ -109,7 +109,7 @@ F301_P0 = bst.units.Pump('F301_P0', ins=F301-0, outs='', P=101325.)
 F301_P1 = bst.units.Pump('F301_P1', ins=F301-1, outs='', P=101325.)
 
 M301 = bst.units.Mixer('M301', ins=(F301_P0-0, 'dilution_water'))
-M301.water_to_sugar_mol_ratio = 5. # initial value, updated in FeedStrategySpecification object
+M301.water_to_sugar_mol_ratio = 5000. # initial value, updated in FeedStrategySpecification object
 
 @M301.add_specification(run=False)
 def adjust_M301_water():
@@ -128,7 +128,7 @@ def H301_spec():
 F302 = bst.MultiEffectEvaporator('F302', ins=S301-1, outs=('F302_l', 'F302_g'),
                                         P = (101325, 73581, 50892, 32777, 20000), V = 0.1,
                                         flash=False)
-F302.V = 0.8 # initial value, updated in FeedStrategySpecification object
+F302.V = 0.1 # initial value, updated in FeedStrategySpecification object
 F302_design = F302._design
 F302_cost = F302._cost
 
@@ -157,7 +157,7 @@ F302_P0 = bst.units.Pump('F302_P0', ins=F302-0, outs='', P=101325.)
 F302_P1 = bst.units.Pump('F302_P1', ins=F302-1, outs='', P=101325.)
 
 M302 = bst.units.Mixer('M302', ins=(F302_P0-0, 'dilution_water'))
-M302.water_to_sugar_mol_ratio = 5. # initial value
+M302.water_to_sugar_mol_ratio = 5000. # initial value
 
 @M302.add_specification(run=False)
 def adjust_M302_water():
@@ -213,8 +213,8 @@ V406 = nsk.units.NSKFermentation('V406',
                                  sugar_IDs=('Glucose',),
                                  # tau_update_policy=None,
                                  # tau_update_policy=('max', '[s_EtOH]'),
-                                 tau_update_policy=('max', 'y_EtOH_IBO_glu_added'),
-                                 # tau_update_policy=('min', '[s_glu]'),
+                                 # tau_update_policy=('max', 'y_EtOH_IBO_glu_added'),
+                                 tau_update_policy=('min', '[s_glu]'),
                                  # tau_update_policy=('equals', '[s_glu]', 0.0),
                                  n_decimal_places_for_tau_update_policy=2,
                                  try_fewer_n_spikes_until=lambda r_te: round(r_te.s_glu, 2)==0.0,
@@ -266,7 +266,7 @@ V409.specifications = []
 def update_scrubber_wash_water():
     scrubber_water.imass['Water'] =  V409.ins[1].F_mass * parameters['scrubber_wash_water_over_vent']
     V409._run()
-        
+
 #%%
 corn_EtOH_IBO_sys_no_IBO_recovery = bst.System.from_units('corn_EtOH_IBO_sys_no_IBO_recovery', 
                                           units = [i for i in corn_EtOH_sys.units 
@@ -537,21 +537,37 @@ def load_simulate_get_EtOH_MPSP(target_conc_sugars=None,
     
     return get_purity_adj_price(ethanol, ['Ethanol'])
 
-def plot_kinetic_results():
+def plot_kinetic_results(xlim=None, ylim=None, save_fig=False, filename=None, figwidth=3.9):
     # if variables is None:
     #     variables = ['[x]', 'curr_a', '[s_glu]', '[s_EtOH]', '[s_acetate]', '[s_IBO]']
-    
-    plt.plot(V406.nsk_results_dict['time'], V406.nsk_results_dict['[x]'], label='cell loading')
-    plt.plot(V406.nsk_results_dict['time'], V406.nsk_results_dict['curr_a'], label='active cell loading')
-    plt.plot(V406.nsk_results_dict['time'], V406.nsk_results_dict['[s_glu]'], label='glucose')
-    plt.plot(V406.nsk_results_dict['time'], V406.nsk_results_dict['[s_EtOH]'], label='ethanol')
-    plt.plot(V406.nsk_results_dict['time'], V406.nsk_results_dict['[s_acetate]'], label='acetate')
-    plt.plot(V406.nsk_results_dict['time'], V406.nsk_results_dict['[s_IBO]'], label='isobutanol')
-    plt.legend()
-    plt.xlabel('Time [h]')
-    plt.ylabel('Concentration [g/L]')
-    plt.show()
+    fig = plt.figure()
+    fig.set_figwidth(figwidth)
+    ax = plt.subplot(111)
 
+    ax.plot(V406.nsk_results_dict['time'], V406.nsk_results_dict['[x]'], label='cell loading')
+    ax.plot(V406.nsk_results_dict['time'], V406.nsk_results_dict['curr_a'], label='active cell loading')
+    ax.plot(V406.nsk_results_dict['time'], V406.nsk_results_dict['[s_glu]'], label='glucose')
+    ax.plot(V406.nsk_results_dict['time'], V406.nsk_results_dict['[s_EtOH]'], label='ethanol')
+    ax.plot(V406.nsk_results_dict['time'], V406.nsk_results_dict['[s_acetate]'], label='acetate')
+    ax.plot(V406.nsk_results_dict['time'], V406.nsk_results_dict['[s_IBO]'], label='isobutanol')
+    ax.legend(bbox_to_anchor=(1.05, 1.0), loc='upper left', edgecolor='white')
+    ax.set_xlabel('Time [h]')
+    ax.set_ylabel('Concentration [g/L]')
+    if xlim is not None:
+        ax.set_xlim(xlim)
+    if ylim is not None:
+        ax.set_ylim(ylim)
+    if save_fig:
+        plt.savefig(f'{filename}', 
+                    transparent=False,  
+                    facecolor='white',
+                    bbox_inches='tight',
+                    dpi=600,
+                    )                                
+        # plt.close()
+    plt.show()
+    plt.close()
+    
 def reset_and_reload(**curr_spec):
     # !!! Resetting might cause yeast stream problems
     print('Resetting cache and emptying recycles ...')
@@ -661,7 +677,7 @@ def model_specification(**kwargs):
                 while i<20 and not success:
                     try:
                         try:
-                            r.integrator.relative_tolerance = 1e-6
+                            r.integrator.relative_tolerance = 1e-7
                             print('Re-simulating fermentation unit with lower integrator rtol ...')
                             V406.simulate()
                             load_simulate_get_EtOH_MPSP(**curr_spec)
@@ -684,12 +700,12 @@ def model_specification(**kwargs):
                             if success: print('Succeeded.')
                             print('Resetting integrator to cvode and rtol to original value.')
                             r.setIntegrator('cvode')
-                            r.integrator.relative_tolerance = 1e-5
+                            r.integrator.relative_tolerance = 1e-6
                             
                     except Exception as e:
                         str_e = str(e).lower()
                         print(str_e)
-                        if 'negative concentrations' in str_e:
+                        if 'massbalerror' in str_e:
                             try:
                                 print('Trying again ...')
                                 load_simulate_get_EtOH_MPSP(**curr_spec)
@@ -734,7 +750,35 @@ def optimize_tau_for_MPSP(threshold_s_EtOH=5, **kwargs):
     V406.run_type = original_run_type
     return res.x[0]
     
-def optimize_1D_feeding_strategy_for_MPSP(bounds=(20.0, 400.0), Ns=5, **kwargs):
+def optimize_1D_feeding_strategy_for_MPSP(bounds=(20.0, 400.0), threshold_diff=10.0, Ns=5, **kwargs):
+    model_specification(**kwargs)
+    def f(x):
+        try:
+            model_specification(
+                                target_conc_sugars=x[0],
+                                threshold_conc_sugars=x[0]-threshold_diff, )
+            MPSP = get_purity_adj_price(ethanol, ['Ethanol'])
+            # print(MPSP)
+            return MPSP
+        except:
+            # print(np.inf)
+            return np.inf
+    # res = brute(f, ranges=(bounds,), Ns=20)
+    # return res.x[0]
+    concs = np.linspace(bounds[0], bounds[1], Ns)
+    MPSPs = []
+    opt_MPSP = np.inf
+    opt_conc = None
+    for conc in concs:
+        MPSPs.append(f([conc]))
+        if MPSPs[-1]<opt_MPSP:
+            opt_MPSP = MPSPs[-1]
+            opt_conc = conc
+    f([opt_conc])
+    return opt_conc
+
+#%% !!!
+def optimize_2D_feeding_strategy_for_MPSP(bounds=(20.0, 400.0), Ns=5, **kwargs):
     model_specification(**kwargs)
     def f(x):
         try:

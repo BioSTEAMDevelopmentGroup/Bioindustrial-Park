@@ -32,7 +32,7 @@ f = IBO_sys.flowsheet
 u, s = f.unit, f.stream
 
 __all__ = ('model', 'fbs_spec', 'namespace_dict', 'plot_kinetic_results',
-           'optimize_1D_feeding_strategy_for_MPSP',)
+           'optimize_1D_feeding_strategy_for_MPSP', 'unit_groups_dict',)
 
 # %% 
 

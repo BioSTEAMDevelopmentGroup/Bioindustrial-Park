@@ -16,6 +16,7 @@ namespace_dict = isobutanol.models.namespace_dict
 fbs_spec = isobutanol.models.fbs_spec
 optimize_1D_feeding_strategy_for_MPSP = isobutanol.models.optimize_1D_feeding_strategy_for_MPSP
 plot_kinetic_results = isobutanol.models.plot_kinetic_results
+unit_groups_dict = isobutanol.models.unit_groups_dict
 model_specification = model.specification
 f = model.system.flowsheet
 V406 = f.V406

@@ -137,11 +137,11 @@ metrics = {'MPSP': {'f': get_product_MPSP, 'units': '$/kg'},
 # results = {i: [] for i in range(len(metrics.values()))}
 results = {i: [] for i in metrics.keys()}
 
-steps = (10, 10, 1)
+steps = (20, 20, 1)
 
 spec_1 = nsk_k_3es = np.linspace(1., 20., steps[0])
 
-spec_2 = nsk_k_1iees = np.linspace(0.0001, 0.5, steps[1])
+spec_2 = nsk_k_1ees = np.linspace(10., 200., steps[1])
 
 
 spec_3 = conc_sugars_feed_spikes =\
@@ -158,9 +158,9 @@ x_label = r"$\bfk_3$" # title of the x axis
 x_units = r"$\mathrm{g} \cdot \mathrm{L}^{-1} \cdot \mathrm{h}^{-1}$"
 x_ticks = [0, 5, 10, 15, 20]
 
-y_label = r"$\bfk_1ie$" # title of the y axis
+y_label = r"$\bfk_1e$" # title of the y axis
 y_units = r"$\mathrm{g} \cdot \mathrm{L}^{-1} \cdot \mathrm{h}^{-1}$"
-y_ticks = [0.0, 0.1, 0.2, 0.3, 0.4, 0.5]
+y_ticks = [0, 50, 100, 150, 200]
 
 z_label = r"$\bfSpike feed glucose concentration$" # title of the x axis
 z_units =r"$\mathrm{g} \cdot \mathrm{L}^{-1}$"
@@ -252,7 +252,7 @@ file_to_save = f'_{steps}_steps_'+'etoh_fbs_%s.%s.%s-%s.%s'%(dateTimeObj.year, d
 print('\n\nSimulating the initial point to avoid bugs ...')
 curr_spec = fbs_spec.current_specifications
 r.k_3 = nsk_k_3es[1]
-r.k_1ie = nsk_k_1iees[0]
+r.k_1e = nsk_k_1ees[0]
 model_specification(**curr_spec,
     n_sims=3,
     n_tea_solves=3,
@@ -295,7 +295,7 @@ for s3 in spec_3:
                 #     breakpoint()
                 curr_spec = {k: v for k,v in fbs_spec.current_specifications.items()}
                 r.k_3 = s1
-                r.k_1ie = s2
+                r.k_1e = s2
                 curr_spec.update({'conc_sugars_feed_spike':s3,})
                 
                 if perform_feeding_strategy_opt:
@@ -673,7 +673,7 @@ if plot:
     
     #%% All metrics
     for curr_metric, val in metrics.items():
-        # if 'spike' in curr_metric: break
+        if 'spike' in curr_metric: break
         lccm = curr_metric.lower()
         if 'yield' in lccm or 'titer' in lccm or 'productivity' in lccm:
             cmap = JBEI_UCB_colormap(reverse=True)

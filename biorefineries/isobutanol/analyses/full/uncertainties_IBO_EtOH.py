@@ -60,8 +60,8 @@ f = bst.main_flowsheet
 
 #%%
 modes=[
-       'A', 
-        # 'B', 
+       # 'A', 
+        'B', 
         # 'C', 'D',
        ]
 N_simulations_per_mode=1000

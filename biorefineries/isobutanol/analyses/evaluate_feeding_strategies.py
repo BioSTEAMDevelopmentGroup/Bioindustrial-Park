@@ -31,12 +31,14 @@ from math import log
 
 import os
 
+import imageio
 
 import biosteam as bst
 
 model = isobutanol.models.models_EtOH_IBO_corn.model
 fbs_spec = isobutanol.models.models_EtOH_IBO_corn.fbs_spec
 namespace_dict = isobutanol.models.namespace_dict
+plot_kinetic_results = isobutanol.models.plot_kinetic_results
 model_specification = model.specification
 system = model.system
 tea = model.system.TEA
@@ -80,6 +82,11 @@ model.load_parameter_distributions(parameter_distributions_filename, namespace_d
 baseline_initial = model.metrics_at_baseline()
 
 #%% Baseline -- simulate and solve TEA
+
+#!!!
+# ferm_reactor.kinetic_reaction_system._te.max_n_glu_spikes = 0
+# ferm_reactor.kinetic_reaction_system.default_max_n_glu_spikes = 0  
+
 model_specification(
     n_sims=3,
     n_tea_solves=3,
@@ -130,20 +137,20 @@ results = {i: [] for i in metrics.keys()}
 
 # %% Generate 3-specification meshgrid and set specification loading functions
 
-steps = (8, 8, 8)
+steps = (40, 10, 1)
 
 spec_1 = threshold_conc_sugarses = np.linspace(1., 500., steps[0])
 
 spec_2 = target_conc_sugarses = np.linspace(10., 500., steps[1])
 
 
-# spec_3 = conc_sugars_feed_spikes =\
-#     np.array([
-#               # 1.*baseline_spec['conc_sugars_feed_spike'],
-#               fbs_spec.conc_sugars_feed_spike,
-#               ])
+spec_3 = conc_sugars_feed_spikes =\
+    np.array([
+              # 1.*baseline_spec['conc_sugars_feed_spike'],
+              fbs_spec.conc_sugars_feed_spike,
+              ])
     
-spec_3 = conc_sugars_feed_spikes = np.linspace(200, 800., steps[2])
+# spec_3 = conc_sugars_feed_spikes = np.linspace(200, 800., steps[2])
 
     
 #%% Plot stuff
@@ -246,6 +253,8 @@ def tickmarks(dmin, dmax, accuracy=50, N_points=5):
 minute = '0' + str(dateTimeObj.minute) if len(str(dateTimeObj.minute))==1 else str(dateTimeObj.minute)
 file_to_save = f'_{steps}_steps_'+'etoh_fbs_%s.%s.%s-%s.%s'%(dateTimeObj.year, dateTimeObj.month, dateTimeObj.day, dateTimeObj.hour, minute)
 
+chdir(isobutanol_results_filepath)
+
 #%% Initial simulation
 
 print('\n\nSimulating the initial point to avoid bugs ...')
@@ -284,9 +293,10 @@ errors_dict = {}
 
 for s3 in spec_3:
     for v in list(results.values()): v.append([])
-    
+    i = 0
     for s2 in spec_2:
         for v in list(results.values()): v[-1].append([])
+        j = 0
         for s1 in spec_1:
             curr_no +=1
             error_message = None
@@ -303,7 +313,6 @@ for s3 in spec_3:
                     n_tea_solves=3,
                     plot=False,
                     )
-                # plot_kinetic_results()
                 
                 assert s1<s2
                 # optimize_max_n_glu_spikes(obj='y_EtOH_glu_added', 
@@ -312,6 +321,15 @@ for s3 in spec_3:
                 
                 for k, v in list(results.items()): 
                     v[-1][-1].append(metrics[k]['f']())
+                
+                plot_kinetic_results(
+                    xlim=(0,60), ylim=(0, 
+                                       # round(max(s2, results['EtOH Titer'][-1][-1][-1]), -1)+10
+                                       600,
+                                       ),
+                    
+                    save_fig=True, 
+                    filename=f'feed_strat_kinetics_plot_{i}_{j}.png')
                 
                 HXN_qbal_error = HXN.energy_balance_percent_error
                 if abs(max_HXN_qbal_percent_error)<abs(HXN_qbal_error): max_HXN_qbal_percent_error = HXN_qbal_error
@@ -332,7 +350,8 @@ for s3 in spec_3:
                              results=[v[-1][-1][-1] for v in list(results.values())],
                              HXN_qbal_error=HXN.energy_balance_percent_error,
                              exception_str=error_message)
-
+            j += 1
+        i += 1
     # Convert last 2D list to array and transpose
     for k in results.keys(): 
         # results[k][-1] = np.array(results[k][-1]).transpose()
@@ -348,8 +367,41 @@ print(f'Max HXN Q bal error was {round(max_HXN_qbal_percent_error, 3)} %.')
 
 #%% 
 
-chdir(isobutanol_results_filepath)
+# chdir(isobutanol_results_filepath)
 
+for i in range(len(spec_1)):
+    frames = []
+    for j in range(len(spec_2)):
+        if not np.isnan(results['MPSP'][0][i][j]):
+            image = imageio.v2.imread(f'feed_strat_kinetics_plot_{i}_{j}.png')
+            frames.append(image)
+    
+    if len(frames)>1:
+        try:
+            imageio.mimsave(f'animated_threshold_conc_sugars_{i}' + '.gif',
+                            frames,
+                            fps=1,
+                            loop=20,
+                            )
+        except:
+            pass
+
+for j in range(len(spec_2)):
+    frames = []
+    for i in range(len(spec_1)):
+        if not np.isnan(results['MPSP'][0][i][j]):
+            image = imageio.v2.imread(f'feed_strat_kinetics_plot_{i}_{j}.png')
+            frames.append(image)
+    if len(frames)>1:
+        try:
+            imageio.mimsave(f'animated_target_conc_sugars_{j}' + '.gif',
+                            frames,
+                            fps=1,
+                            loop=20,
+                            )
+        except:
+            pass
+     
 #%% More plot utils
 
 from math import floor, log
@@ -686,7 +738,9 @@ if plot:
         else:
             cmap = JBEI_UCB_colormap(reverse=False)
             cmap_over_color = colors.grey_dark.shade(8).RGBn
-            
+        
+        if 'mpsp' in lccm:
+            continue
         # curr_metric_w_levels, curr_metric_w_ticks, curr_metric_cbar_ticks = get_contour_info_from_metric_data(results_metric_1, lb=3)
         curr_metric_non_nans = np.array(results[curr_metric])[np.where(~np.isnan(np.array(results[curr_metric])))]
         curr_metric_non_nans = np.round(curr_metric_non_nans, 2)
