@@ -194,6 +194,73 @@ for i in IBO_sys.feeds:
                               'Contributions to total material cost [%]',
                               ))
 
+#%% Other kinetics-related metrics
+
+metrics.append(Metric('EtOH Titer', 
+                      lambda: V406.nsk_results_specific_tau_dict['[s_EtOH]'],
+                      'g-EtOH/L-water', 
+                      'Fermentation',
+                      ))
+
+metrics.append(Metric('EtOH Yield', 
+                      lambda: V406.nsk_results_specific_tau_dict['y_EtOH_glu_added'],
+                      'g-EtOH/g-sugars-added', 
+                      'Fermentation',
+                      ))
+
+metrics.append(Metric('EtOH Productivity', 
+                      lambda: V406.nsk_results_specific_tau_dict['[s_EtOH]']/V406.nsk_results_specific_tau_dict['time'],
+                      'g-EtOH/L-water/h', 
+                      'Fermentation',
+                      ))
+
+metrics.append(Metric('IBO Titer', 
+                      lambda: V406.nsk_results_specific_tau_dict['[s_IBO]'],
+                      'g-IBO/L-water', 
+                      'Fermentation',
+                      ))
+
+metrics.append(Metric('IBO Yield', 
+                      lambda: V406.nsk_results_specific_tau_dict['y_IBO_glu_added'],
+                      'g-IBO/g-sugars-added', 
+                      'Fermentation',
+                      ))
+
+metrics.append(Metric('IBO Productivity', 
+                      lambda: V406.nsk_results_specific_tau_dict['[s_IBO]']/V406.nsk_results_specific_tau_dict['time'],
+                      'g-IBO/L-water/h', 
+                      'Fermentation',
+                      ))
+
+metrics.append(Metric('Fermentation time', 
+                      lambda: V406.nsk_results_specific_tau_dict['time'],
+                      'h', 
+                      'Fermentation',
+                      ))
+
+metrics.append(Metric('Combined EtOH IBO Yield', 
+                      lambda: V406.nsk_results_specific_tau_dict['y_EtOH_IBO_glu_added'],
+                      'g-IBO-EtOH/g-sugars-added', 
+                      'Fermentation',
+                      ))
+
+metrics.append(Metric('Cell loading', 
+                      lambda: V406.nsk_results_specific_tau_dict['[x]'],
+                      'g-cells/L-water', 
+                      'Fermentation',
+                      ))
+
+metrics.append(Metric('Active cell loading', 
+                      lambda: V406.nsk_results_specific_tau_dict['curr_a'],
+                      'g-cells/L-water', 
+                      'Fermentation',
+                      ))
+
+metrics.append(Metric('Number of glucose spikes', 
+                      lambda: V406.nsk_results_specific_tau_dict['curr_n_glu_spikes'],
+                      '-', 
+                      'Fermentation',
+                      ))
 
 #%% Generate the required namespace
 namespace_dict = {}

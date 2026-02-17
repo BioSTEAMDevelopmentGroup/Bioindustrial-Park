@@ -249,7 +249,8 @@ def tickmarks(dmin, dmax, accuracy=50, N_points=5):
 
 #%%
 minute = '0' + str(dateTimeObj.minute) if len(str(dateTimeObj.minute))==1 else str(dateTimeObj.minute)
-file_to_save = f'_{steps}_steps_'+'etoh_fbs_%s.%s.%s-%s.%s'%(dateTimeObj.year, dateTimeObj.month, dateTimeObj.day, dateTimeObj.hour, minute)
+# file_to_save = f'_{steps}_steps_'+'etoh_fbs_%s.%s.%s-%s.%s'%(dateTimeObj.year, dateTimeObj.month, dateTimeObj.day, dateTimeObj.hour, minute)
+file_to_save = f'_ibo_{steps}_'+'_{x_label[:5]}_{y_label[:5]}_{z_label[:5]}_'
 
 #%% Initial simulation
 

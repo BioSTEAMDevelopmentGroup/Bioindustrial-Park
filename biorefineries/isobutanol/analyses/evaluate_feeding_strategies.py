@@ -84,8 +84,8 @@ baseline_initial = model.metrics_at_baseline()
 #%% Baseline -- simulate and solve TEA
 
 #!!!
-# ferm_reactor.kinetic_reaction_system._te.max_n_glu_spikes = 0
-# ferm_reactor.kinetic_reaction_system.default_max_n_glu_spikes = 0  
+ferm_reactor.kinetic_reaction_system._te.max_n_glu_spikes = 0
+ferm_reactor.kinetic_reaction_system.default_max_n_glu_spikes = 0  
 
 model_specification(
     n_sims=3,
@@ -137,11 +137,11 @@ results = {i: [] for i in metrics.keys()}
 
 # %% Generate 3-specification meshgrid and set specification loading functions
 
-steps = (40, 10, 1)
+steps = (20, 20, 1)
 
-spec_1 = threshold_conc_sugarses = np.linspace(1., 500., steps[0])
+spec_1 = threshold_conc_sugarses = np.linspace(1., 400., steps[0])
 
-spec_2 = target_conc_sugarses = np.linspace(10., 500., steps[1])
+spec_2 = target_conc_sugarses = np.linspace(10., 400., steps[1])
 
 
 spec_3 = conc_sugars_feed_spikes =\
@@ -159,11 +159,15 @@ spec_3 = conc_sugars_feed_spikes =\
 
 x_label = "Threshold glucose concentration" # title of the x axis
 x_units =r"$\mathrm{g} \cdot \mathrm{L}^{-1}$"
-x_ticks = [0, 100, 200, 300, 400, 500]
+x_ticks = [0, 100, 200, 300, 400,
+           # 300, 400, 500,
+           ]
 
 y_label = "Target glucose concentration" # title of the x axis
 y_units =r"$\mathrm{g} \cdot \mathrm{L}^{-1}$"
-y_ticks = [0, 100, 200, 300, 400, 500]
+y_ticks = [0, 100, 200, 300, 400,
+           # 300, 400, 500,
+           ]
 
 z_label = "Spike feed glucose concentration" # title of the x axis
 z_units =r"$\mathrm{g} \cdot \mathrm{L}^{-1}$"
@@ -251,7 +255,8 @@ def tickmarks(dmin, dmax, accuracy=50, N_points=5):
 
 #%%
 minute = '0' + str(dateTimeObj.minute) if len(str(dateTimeObj.minute))==1 else str(dateTimeObj.minute)
-file_to_save = f'_{steps}_steps_'+'etoh_fbs_%s.%s.%s-%s.%s'%(dateTimeObj.year, dateTimeObj.month, dateTimeObj.day, dateTimeObj.hour, minute)
+# file_to_save = f'_{steps}_steps_'+'etoh_fbs_%s.%s.%s-%s.%s'%(dateTimeObj.year, dateTimeObj.month, dateTimeObj.day, dateTimeObj.hour, minute)
+file_to_save = f'_ibo_{steps}_'+'_{x_label[:5]}_{y_label[:5]}_{z_label[:5]}_'
 
 chdir(isobutanol_results_filepath)
 
@@ -731,7 +736,14 @@ if plot:
     #%% All metrics
     for curr_metric, val in metrics.items():
         lccm = curr_metric.lower()
-        if 'yield' in lccm or 'titer' in lccm or 'productivity' in lccm:
+        if 'spike' in lccm or 'duty' in lccm or 'target sugars' in lccm:
+            # else: 
+            if 'spike' in lccm:
+                if ferm_reactor.kinetic_reaction_system.default_max_n_glu_spikes == 0.:
+                    continue
+            else:
+                pass
+        elif 'yield' in lccm or 'titer' in lccm or 'productivity' in lccm or 'loading' in lccm:
             cmap = JBEI_UCB_colormap(reverse=True)
             cmap_over_color = colors.yellow_tint.RGBn
         
@@ -741,6 +753,7 @@ if plot:
         
         if 'mpsp' in lccm:
             continue
+        
         # curr_metric_w_levels, curr_metric_w_ticks, curr_metric_cbar_ticks = get_contour_info_from_metric_data(results_metric_1, lb=3)
         curr_metric_non_nans = np.array(results[curr_metric])[np.where(~np.isnan(np.array(results[curr_metric])))]
         curr_metric_non_nans = np.round(curr_metric_non_nans, 2)

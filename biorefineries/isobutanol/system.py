@@ -750,7 +750,7 @@ def optimize_tau_for_MPSP(threshold_s_EtOH=5, **kwargs):
     V406.run_type = original_run_type
     return res.x[0]
     
-def optimize_1D_feeding_strategy_for_MPSP(bounds=(20.0, 400.0), threshold_diff=10.0, Ns=5, **kwargs):
+def optimize_1D_feeding_strategy_for_MPSP(bounds=(20.0, 400.0), threshold_diff=5.0, Ns=5, **kwargs):
     model_specification(**kwargs)
     def f(x):
         try:

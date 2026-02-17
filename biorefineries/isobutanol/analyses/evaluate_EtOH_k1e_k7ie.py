@@ -141,7 +141,7 @@ metrics = {'MPSP': {'f': get_product_MPSP, 'units': '$/kg'},
 # results = {i: [] for i in range(len(metrics.values()))}
 results = {i: [] for i in metrics.keys()}
 
-steps = (10, 10, 1)
+steps = (25, 25, 1)
 
 spec_1 = nsk_k_1ees = np.linspace(1., 300., steps[0])
 
@@ -158,15 +158,15 @@ spec_3 = conc_sugars_feed_spikes =\
 
 # Parameters analyzed across
 
-x_label = r"$\bfk_1e$" # title of the x axis
+x_label = "k_1e" # title of the x axis
 x_units = r"$\mathrm{g} \cdot \mathrm{L}^{-1} \cdot \mathrm{h}^{-1}$"
 x_ticks = [0, 100, 200, 300]
 
-y_label = r"$\bfk_7ie$" # title of the y axis
+y_label = "k_7ie" # title of the y axis
 y_units = r"$\mathrm{g} \cdot \mathrm{L}^{-1} \cdot \mathrm{h}^{-1}$"
 y_ticks = [0.0, 0.1, 0.2, 0.3, 0.4, 0.5]
 
-z_label = r"$\bfSpike feed glucose concentration$" # title of the x axis
+z_label = "Spike feed glucose concentration" # title of the x axis
 z_units =r"$\mathrm{g} \cdot \mathrm{L}^{-1}$"
 z_ticks = [0, 200, 400, 600, 800]
 
@@ -249,7 +249,8 @@ def tickmarks(dmin, dmax, accuracy=50, N_points=5):
 
 #%%
 minute = '0' + str(dateTimeObj.minute) if len(str(dateTimeObj.minute))==1 else str(dateTimeObj.minute)
-file_to_save = f'_{steps}_steps_'+'etoh_fbs_%s.%s.%s-%s.%s'%(dateTimeObj.year, dateTimeObj.month, dateTimeObj.day, dateTimeObj.hour, minute)
+# file_to_save = f'_{steps}_steps_'+'etoh_fbs_%s.%s.%s-%s.%s'%(dateTimeObj.year, dateTimeObj.month, dateTimeObj.day, dateTimeObj.hour, minute)
+file_to_save = f'_ibo_{steps}_{x_label[:5]}_{y_label[:5]}_{z_label[:5]}_'
 
 #%% Initial simulation
 
@@ -303,7 +304,7 @@ for s3 in spec_3:
                 curr_spec.update({'conc_sugars_feed_spike':s3,})
                 
                 if perform_feeding_strategy_opt:
-                    optimize_1D_feeding_strategy_for_MPSP(Ns=5, **curr_spec)
+                    optimize_1D_feeding_strategy_for_MPSP(Ns=20, **curr_spec)
                 else:
                     model_specification(**curr_spec)
                 # plot_kinetic_results()
