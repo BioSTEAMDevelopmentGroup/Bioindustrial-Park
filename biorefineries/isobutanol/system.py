@@ -290,11 +290,15 @@ M401 = bst.Mixer('M401', ins=('', makeup_isopentyl_acetate), outs=('isopentyl_ac
 M401_design = M401._design
 M401_cost = M401._cost
 
-bypass_IBO_separation_conditions = [lambda: V406.kinetic_reaction_system._te.k_16==0.0] # if any return True, don't try to recover Isobutanol
+# M401.bypass_IBO_separation_conditions = [lambda: V406.kinetic_reaction_system._te.k_13==0.0] # if any return True, don't try to recover Isobutanol
+
+M401.bypass_IBO_separation_conditions = [lambda: V406.outs[1].imass['Isobutanol']/V406.outs[1].F_vol < 2.0] # if any return True, don't try to recover Isobutanol
+
+# M401.bypass_IBO_separation_conditions = [lambda: True]
 
 @M401.add_specification(run=False)
 def M401_adjust_makeup_solvent():
-    if not np.any([i() for i in bypass_IBO_separation_conditions]):
+    if not np.any([i() for i in M401.bypass_IBO_separation_conditions]):
         M401._design = M401_design
         M401._cost = M401_cost
         req = S401.mol_solvent_per_mol_carrier*S401.ins[0].imol['Water']
@@ -322,7 +326,7 @@ S401_cost = S401._cost
 
 @S401.add_specification(run=False)
 def S401_partial_chems():
-    if not np.any([i() for i in bypass_IBO_separation_conditions]):
+    if not np.any([i() for i in M401.bypass_IBO_separation_conditions]):
         S401._design = S401_design
         S401._cost = S401_cost
         M401.simulate()
@@ -372,8 +376,8 @@ def D401_bypass_spec():
     else:
         D401._design = lambda: 0
         D401._cost = lambda: 0
-        
-        S401.outs[0].copy_like(S401.ins[0])
+        D401.outs[0].empty()
+        D401.outs[1].copy_like(D401.ins[0])
         
 # M402.simulate()
 # D401.simulate()
@@ -408,7 +412,8 @@ M403-0-0-f.V601
 #%% Add storage for isobutanol product
 V514 = bst.StorageTank('V514', ins=H401-0, outs=('isobutanol'), tau=7*24)
 
-V514.isobutanol_price = 1.43
+# V514.isobutanol_price = 1.725 # https://www.alibaba.com/product-detail/China-Isobutanol-CAS-NO-78-83_1600225311840.html?spm=a2700.7724857.0.0.6b071f52Jodf8p
+V514.isobutanol_price = 1.49 # https://www.alibaba.com/product-detail/High-Purity-Industrial-Organic-Solvent-Textile_1601609307567.html?spm=a2700.7724857.0.0.6b071f52XisbBQ
 
 @V514.add_specification(run=False)
 def V514_update_IBO_price():
@@ -461,7 +466,7 @@ corn_EtOH_IBO_sys.simulate(update_configuration=True)
 
 
 #%% Set prices
-f.isobutanol.price = 1.43
+f.isobutanol.price = 1.49 # initial value; updated on purity basis using V514.isobutanol_price https://www.alibaba.com/product-detail/High-Purity-Industrial-Organic-Solvent-Textile_1601609307567.html?spm=a2700.7724857.0.0.6b071f52XisbBQ
 f.makeup_isopentyl_acetate.price = 3.2 # https://www.alibaba.com/product-detail/High-Quality-Colorless-Liquid-99-min_1600206242747.html?spm=a2700.galleryofferlist.normal_offer.d_price.2ed613a0wyq5n8
 
 #%% Create TEA object
@@ -750,7 +755,81 @@ def optimize_tau_for_MPSP(threshold_s_EtOH=5, **kwargs):
     V406.run_type = original_run_type
     return res.x[0]
     
-def optimize_1D_feeding_strategy_for_MPSP(bounds=(20.0, 400.0), threshold_diff=5.0, Ns=5, **kwargs):
+def optimize_1D_feeding_strategy_for_MPSP(bounds=(20.0, 400.0), threshold_diff=5.0,
+                                          method='brute-force', Ns=5,
+                                          model_kwargs={},
+                                          method_kwargs={},
+                                          **kwargs):
+    model_specification(**model_kwargs)
+    def f(x):
+        try:
+            model_kwargs.update({'target_conc_sugars': x[0],
+                                 'threshold_conc_sugars': x[0] - threshold_diff})
+            model_specification(**model_kwargs)
+            MPSP = get_purity_adj_price(ethanol, ['Ethanol'])
+            # print(MPSP)
+            return MPSP
+        except:
+            # print(np.inf)
+            return np.inf
+    # res = brute(f, ranges=(bounds,), Ns=20)
+    # return res.x[0]
+    opt_conc = None
+    if method=='brute-force':
+        concs = np.linspace(bounds[0], bounds[1], Ns)
+        MPSPs = []
+        opt_MPSP = np.inf
+        for conc in concs:
+            MPSPs.append(f([conc]))
+            if MPSPs[-1]<opt_MPSP:
+                opt_MPSP = MPSPs[-1]
+                opt_conc = conc
+    elif method=='scipy-minimize':
+        res = minimize(fun=f, **method_kwargs)
+        opt_conc = res.x[0]
+    f([opt_conc])
+    return opt_conc
+
+def optimize_max_n_glu_spikes_for_MPSP(bounds=(0, 20),
+                                          method='brute-force', Ns=21, 
+                                          model_kwargs={},
+                                          method_kwargs={},
+                                          **kwargs):
+    nsk_r = V406.kinetic_reaction_system
+    r_te = nsk_r._te
+    model_specification(**model_kwargs)
+    def f(x):
+        try:
+            r_te.max_n_glu_spikes = x[0]
+            nsk_r.default_max_n_glu_spikes = x[0]  
+            model_specification(**model_kwargs)
+            MPSP = get_purity_adj_price(ethanol, ['Ethanol'])
+            # print(MPSP)
+            return MPSP
+        except:
+            # print(np.inf)
+            return np.inf
+    # res = brute(f, ranges=(bounds,), Ns=20)
+    # return res.x[0]
+    opt_max_n = None
+    if method=='brute-force':
+        concs = np.linspace(bounds[0], bounds[1], Ns)
+        MPSPs = []
+        opt_MPSP = np.inf
+        for conc in concs:
+            MPSPs.append(f([conc]))
+            if MPSPs[-1]<opt_MPSP:
+                opt_MPSP = MPSPs[-1]
+                opt_max_n = conc
+    elif method=='scipy-minimize':
+        res = minimize(fun=f, **method_kwargs)
+        opt_max_n = res.x[0]
+    f([opt_max_n])
+    return opt_max_n
+
+def optimize_split_1D_2D_feeding_strategy_for_MPSP(bounds=(20.0, 400.0), threshold_diff=5.0, Ns=5, **kwargs):
+    # first, optimize target conc
+    optimize_1D_feeding_strategy_for_MPSP(bounds=bounds, threshold_diff=threshold_diff, Ns=Ns)
     model_specification(**kwargs)
     def f(x):
         try:
@@ -827,7 +906,7 @@ if simulate_baseline:
 #%% Unit groups
 feedstock_acquisition_group = bst.UnitGroup('feedstock acquisition', units=[u.MH101, u.V102])
 
-feedstock_juicing_group = bst.UnitGroup('feedstock juicing', 
+feedstock_saccharification_group = bst.UnitGroup('feedstock saccharification', 
                                         units=[i for i in list(u.E402.get_upstream_units()) + [u.E402]
                                                if not i in feedstock_acquisition_group.units])
 
@@ -840,7 +919,7 @@ fermentation_group = bst.UnitGroup('fermentation', units=[u.V406])
 # define IBO separation units
 IBO_separation_units = [i for i in corn_EtOH_IBO_sys.units
                         if not i in list(corn_EtOH_IBO_sys.facilities) + corn_EtOH_IBO_sys_no_IBO_recovery.units
-                                    + feedstock_acquisition_group.units + feedstock_juicing_group.units
+                                    + feedstock_acquisition_group.units + feedstock_saccharification_group.units
                                     + sugar_solution_preparation_group.units + fermentation_group.units
                                     + [f.H402]]
 
@@ -849,7 +928,7 @@ isobutanol_separation_group = bst.UnitGroup('isobutanol separation', units=IBO_s
 ethanol_separation_group = bst.UnitGroup('ethanol separation', 
                              units= [i for i in corn_EtOH_IBO_sys.units
                             if not i in list(corn_EtOH_IBO_sys.facilities)
-                                        + feedstock_acquisition_group.units + feedstock_juicing_group.units
+                                        + feedstock_acquisition_group.units + feedstock_saccharification_group.units
                                         + sugar_solution_preparation_group.units + fermentation_group.units
                                         + isobutanol_separation_group.units]
                              )
@@ -862,7 +941,7 @@ other_facilities_group = bst.UnitGroup('other facilities',
                                                         if not i in heat_exchanger_network_group.units])
 unit_groups = [
     feedstock_acquisition_group,
-    feedstock_juicing_group,
+    feedstock_saccharification_group,
     sugar_solution_preparation_group,
     fermentation_group,
     isobutanol_separation_group,

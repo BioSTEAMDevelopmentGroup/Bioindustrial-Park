@@ -75,7 +75,7 @@ isobutanol_results_filepath = isobutanol_filepath + '\\analyses\\results\\'
 #%% Load parameter distributions
 parameter_distributions_filename = isobutanol_filepath+\
     '\\analyses\\full\\parameter_distributions\\'+\
-    'parameter-distributions_corn_IBO_EtOH_A.xlsx'
+    'parameter-distributions_corn_IBO_EtOH_B.xlsx'
         
 model.parameters = ()
 model.load_parameter_distributions(parameter_distributions_filename, namespace_dict)
@@ -83,11 +83,14 @@ baseline_initial = model.metrics_at_baseline()
 
 #%% Baseline -- simulate and solve TEA
 
+# !!!
+V406 = f.V406
+f.M401.bypass_IBO_separation_conditions[0] = lambda: V406.outs[1].imass['Isobutanol']/V406.outs[1].F_vol < 10.0
 
 # !!!
 ferm_reactor.kinetic_reaction_system._te.max_n_glu_spikes = 0
 ferm_reactor.kinetic_reaction_system.default_max_n_glu_spikes = 0  
-perform_feeding_strategy_opt = False
+perform_feeding_strategy_opt = True
 
 model_specification(
     n_sims=3,
@@ -136,17 +139,21 @@ metrics = {'MPSP': {'f': get_product_MPSP, 'units': '$/kg'},
             'Target sugars concentration': {'f': lambda: fbs_spec.target_conc_sugars, 'units': 'g-sugars/L-broth'},
             'Cell loading': {'f': get_cell_loading, 'units': 'g-cell/L-broth'},
             'Active cell loading': {'f': get_active_cell_loading, 'units': 'g-cell/L-broth'},
+            'EtOH Yield': {'f': lambda: ferm_reactor.nsk_results_specific_tau_dict['y_EtOH_glu_added'], 'units': 'g-EtOH/g-sugars'},
+            'IBO Yield': {'f': lambda: ferm_reactor.nsk_results_specific_tau_dict['y_IBO_glu_added'], 'units': 'g-IBO/g-sugars'},
+            'IBO Titer': {'f': lambda: ferm_reactor.nsk_results_specific_tau_dict['[s_IBO]'], 'units': 'g-IBO/L-broth'},
+            'IBO Productivity': {'f': lambda: ferm_reactor.nsk_results_specific_tau_dict['[s_IBO]']/ferm_reactor.nsk_results_specific_tau_dict['time'], 'units': 'g-IBO/L-broth/h'},
             }
 
 #%%
 # results = {i: [] for i in range(len(metrics.values()))}
 results = {i: [] for i in metrics.keys()}
 
-steps = (10, 10, 1)
+steps = (25, 25, 1)
 
-spec_1 = nsk_k_1ees = np.linspace(1., 300., steps[0])
+spec_1 = nsk_k_13es = np.linspace(0.0, 40.0, steps[0])
 
-spec_2 = nsk_k_1iees = np.linspace(0.0001, 0.5, steps[1])
+spec_2 = nsk_k_7iies = np.linspace(0.0001, 0.5, steps[1])
 
 
 spec_3 = conc_sugars_feed_spikes =\
@@ -159,15 +166,15 @@ spec_3 = conc_sugars_feed_spikes =\
 
 # Parameters analyzed across
 
-x_label = r"$\bfk_1e$" # title of the x axis
+x_label = "k_13" # title of the x axis
 x_units = r"$\mathrm{g} \cdot \mathrm{L}^{-1} \cdot \mathrm{h}^{-1}$"
-x_ticks = [0, 100, 200, 300]
+x_ticks = [0, 10, 20, 30, 40]
 
-y_label = r"$\bfk_1ie$" # title of the y axis
+y_label = "k_7ii" # title of the y axis
 y_units = r"$\mathrm{g} \cdot \mathrm{L}^{-1} \cdot \mathrm{h}^{-1}$"
 y_ticks = [0.0, 0.1, 0.2, 0.3, 0.4, 0.5]
 
-z_label = r"$\bfSpike feed glucose concentration$" # title of the x axis
+z_label = "Spike feed glucose concentration" # title of the x axis
 z_units =r"$\mathrm{g} \cdot \mathrm{L}^{-1}$"
 z_ticks = [0, 200, 400, 600, 800]
 
@@ -251,14 +258,14 @@ def tickmarks(dmin, dmax, accuracy=50, N_points=5):
 #%%
 minute = '0' + str(dateTimeObj.minute) if len(str(dateTimeObj.minute))==1 else str(dateTimeObj.minute)
 # file_to_save = f'_{steps}_steps_'+'etoh_fbs_%s.%s.%s-%s.%s'%(dateTimeObj.year, dateTimeObj.month, dateTimeObj.day, dateTimeObj.hour, minute)
-file_to_save = f'_ibo_{steps}_'+'_{x_label[:5]}_{y_label[:5]}_{z_label[:5]}_'
+file_to_save = f'_ibo_{steps}_{x_label[:5]}_{y_label[:5]}_{z_label[:5]}_bypass-IBO=conditional_'
 
 #%% Initial simulation
 
 print('\n\nSimulating the initial point to avoid bugs ...')
 curr_spec = fbs_spec.current_specifications
-r.k_1e = nsk_k_1ees[1]
-r.k_1ie = nsk_k_1iees[0]
+r.k_13 = nsk_k_13es[1]
+r.k_7ii = nsk_k_7iies[0]
 model_specification(**curr_spec,
     n_sims=3,
     n_tea_solves=3,
@@ -300,12 +307,12 @@ for s3 in spec_3:
                 # if round(s1,2)==round(spec_1[1],2) and round(s2,2)==round(spec_2[4],2):
                 #     breakpoint()
                 curr_spec = {k: v for k,v in fbs_spec.current_specifications.items()}
-                r.k_1e = s1
-                r.k_1ie = s2
+                r.k_13 = s1
+                r.k_7ii = s2
                 curr_spec.update({'conc_sugars_feed_spike':s3,})
                 
                 if perform_feeding_strategy_opt:
-                    optimize_1D_feeding_strategy_for_MPSP(Ns=5, **curr_spec)
+                    optimize_1D_feeding_strategy_for_MPSP(Ns=20, model_kwargs=curr_spec)
                 else:
                     model_specification(**curr_spec)
                 # plot_kinetic_results()
@@ -477,8 +484,8 @@ if plot:
     #%% MPSP
     
     # MPSP_w_levels, MPSP_w_ticks, MPSP_cbar_ticks = get_contour_info_from_metric_data(results_metric_1, lb=3)
-    MPSP_w_levels = np.arange(0.25, 1.0001, 0.01)
-    MPSP_cbar_ticks = np.arange(0.25, 1.0001, 0.05)
+    MPSP_w_levels = np.arange(0.6, 1.4001, 0.01)
+    MPSP_cbar_ticks = np.arange(0.6, 1.4001, 0.05)
     MPSP_w_ticks = [0.4, 0.6, 0.8]
     # MPSP_w_levels = np.arange(0., 15.5, 0.5)
     
@@ -679,12 +686,17 @@ if plot:
     
     #%% All metrics
     for curr_metric, val in metrics.items():
+        cbar_n_minor_ticks = 3
         lccm = curr_metric.lower()
         if 'spike' in lccm or 'duty' in lccm or 'target sugars' in lccm:
             if not perform_feeding_strategy_opt: 
                 continue
             else: 
-                pass
+                if 'spike' in lccm:
+                    if ferm_reactor.kinetic_reaction_system.default_max_n_glu_spikes == 0.:
+                        continue
+                else:
+                    pass
         elif 'yield' in lccm or 'titer' in lccm or 'productivity' in lccm or 'loading' in lccm:
             cmap = JBEI_UCB_colormap(reverse=True)
             cmap_over_color = colors.yellow_tint.RGBn
@@ -712,6 +724,13 @@ if plot:
         curr_metric_w_ticks.sort(reverse=False)
         # curr_metric_w_levels = np.arange(0., 15.5, 0.5)
         
+        # if 'mpsp' in lccm:
+        #     curr_metric_w_levels = np.arange(0.5, 5.001, 0.1)
+        #     curr_metric_cbar_ticks = np.arange(0.5, 5.001, 0.5)
+        #     curr_metric_w_ticks = [0.7, 0.9, 2.5, 5.0]
+        #     cbar_n_minor_ticks = 4
+        # else:
+        #     break
         
         contourplots.animated_contourplot(w_data_vs_x_y_at_multiple_z=results[curr_metric], # shape = z * x * y # values of the metric you want to plot on the color axis; e.g., curr_metric
                                         x_data=spec_1, # x axis values
@@ -749,7 +768,7 @@ if plot:
                                         axis_tick_fontsize = axis_tick_fontsize,
                                         # comparison_range=EtOH_market_range,
                                         n_minor_ticks = 1,
-                                        cbar_n_minor_ticks = 3,
+                                        cbar_n_minor_ticks = cbar_n_minor_ticks,
                                         units_on_newline = (False, False, False, False), # x,y,z,w
                                         units_opening_brackets = [" (",] * 4,
                                         units_closing_brackets = [")",] * 4,

@@ -16,7 +16,7 @@
 import biosteam as bst
 from biosteam.evaluation import Model, Metric
 # from biorefineries.isobutanol.system import corn_EtOH_IBO_sys, fbs_spec, corn_EtOH_IBO_sys_tea, model_specification, unit_groups, unit_groups_dict
-from ..system import  corn_EtOH_IBO_sys, fbs_spec, corn_EtOH_IBO_sys_tea, model_specification, unit_groups, unit_groups_dict, plot_kinetic_results, optimize_1D_feeding_strategy_for_MPSP
+from ..system import  corn_EtOH_IBO_sys, fbs_spec, corn_EtOH_IBO_sys_tea, model_specification, unit_groups, unit_groups_dict, plot_kinetic_results, optimize_1D_feeding_strategy_for_MPSP, optimize_max_n_glu_spikes_for_MPSP
 IBO_sys = corn_EtOH_IBO_sys
 IBO_tea = corn_EtOH_IBO_sys_tea
 
@@ -32,7 +32,9 @@ f = IBO_sys.flowsheet
 u, s = f.unit, f.stream
 
 __all__ = ('model', 'fbs_spec', 'namespace_dict', 'plot_kinetic_results',
-           'optimize_1D_feeding_strategy_for_MPSP', 'unit_groups_dict',)
+           'optimize_1D_feeding_strategy_for_MPSP', 
+           'optimize_max_n_glu_spikes_for_MPSP',
+           'unit_groups_dict',)
 
 # %% 
 

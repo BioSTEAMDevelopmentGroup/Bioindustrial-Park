@@ -79,6 +79,7 @@ parameter_distributions_filename = isobutanol_filepath+\
         
 model.parameters = ()
 model.load_parameter_distributions(parameter_distributions_filename, namespace_dict)
+baseline_initial = model.metrics_at_baseline()
 
 #%% Baseline -- simulate and solve TEA
 
@@ -304,7 +305,7 @@ for s3 in spec_3:
                 curr_spec.update({'conc_sugars_feed_spike':s3,})
                 
                 if perform_feeding_strategy_opt:
-                    optimize_1D_feeding_strategy_for_MPSP(Ns=20, **curr_spec)
+                    optimize_1D_feeding_strategy_for_MPSP(Ns=20, model_kwargs=curr_spec)
                 else:
                     model_specification(**curr_spec)
                 # plot_kinetic_results()

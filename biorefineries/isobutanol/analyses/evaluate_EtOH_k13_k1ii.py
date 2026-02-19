@@ -75,7 +75,7 @@ isobutanol_results_filepath = isobutanol_filepath + '\\analyses\\results\\'
 #%% Load parameter distributions
 parameter_distributions_filename = isobutanol_filepath+\
     '\\analyses\\full\\parameter_distributions\\'+\
-    'parameter-distributions_corn_IBO_EtOH_A.xlsx'
+    'parameter-distributions_corn_IBO_EtOH_B.xlsx'
         
 model.parameters = ()
 model.load_parameter_distributions(parameter_distributions_filename, namespace_dict)
@@ -87,7 +87,7 @@ baseline_initial = model.metrics_at_baseline()
 # !!!
 ferm_reactor.kinetic_reaction_system._te.max_n_glu_spikes = 0
 ferm_reactor.kinetic_reaction_system.default_max_n_glu_spikes = 0  
-perform_feeding_strategy_opt = False
+perform_feeding_strategy_opt = True
 
 model_specification(
     n_sims=3,
@@ -142,11 +142,11 @@ metrics = {'MPSP': {'f': get_product_MPSP, 'units': '$/kg'},
 # results = {i: [] for i in range(len(metrics.values()))}
 results = {i: [] for i in metrics.keys()}
 
-steps = (10, 10, 1)
+steps = (5, 5, 1)
 
-spec_1 = nsk_k_1ees = np.linspace(1., 300., steps[0])
+spec_1 = nsk_k_13es = np.linspace(0.5, 12.0, steps[0])
 
-spec_2 = nsk_k_1iees = np.linspace(0.0001, 0.5, steps[1])
+spec_2 = nsk_k_1iies = np.linspace(1e-7, 1e-6, steps[1])
 
 
 spec_3 = conc_sugars_feed_spikes =\
@@ -159,15 +159,15 @@ spec_3 = conc_sugars_feed_spikes =\
 
 # Parameters analyzed across
 
-x_label = r"$\bfk_1e$" # title of the x axis
+x_label = "k_13" # title of the x axis
 x_units = r"$\mathrm{g} \cdot \mathrm{L}^{-1} \cdot \mathrm{h}^{-1}$"
-x_ticks = [0, 100, 200, 300]
+x_ticks = [0, 4, 8, 12]
 
-y_label = r"$\bfk_1ie$" # title of the y axis
+y_label = "k_1ii" # title of the y axis
 y_units = r"$\mathrm{g} \cdot \mathrm{L}^{-1} \cdot \mathrm{h}^{-1}$"
-y_ticks = [0.0, 0.1, 0.2, 0.3, 0.4, 0.5]
+y_ticks = [0.0, 5e-7, 1e-6]
 
-z_label = r"$\bfSpike feed glucose concentration$" # title of the x axis
+z_label = "Spike feed glucose concentration" # title of the x axis
 z_units =r"$\mathrm{g} \cdot \mathrm{L}^{-1}$"
 z_ticks = [0, 200, 400, 600, 800]
 
@@ -251,14 +251,14 @@ def tickmarks(dmin, dmax, accuracy=50, N_points=5):
 #%%
 minute = '0' + str(dateTimeObj.minute) if len(str(dateTimeObj.minute))==1 else str(dateTimeObj.minute)
 # file_to_save = f'_{steps}_steps_'+'etoh_fbs_%s.%s.%s-%s.%s'%(dateTimeObj.year, dateTimeObj.month, dateTimeObj.day, dateTimeObj.hour, minute)
-file_to_save = f'_ibo_{steps}_'+'_{x_label[:5]}_{y_label[:5]}_{z_label[:5]}_'
+file_to_save = f'_ibo_{steps}_{x_label[:5]}_{y_label[:5]}_{z_label[:5]}_'
 
 #%% Initial simulation
 
 print('\n\nSimulating the initial point to avoid bugs ...')
 curr_spec = fbs_spec.current_specifications
-r.k_1e = nsk_k_1ees[1]
-r.k_1ie = nsk_k_1iees[0]
+r.k_13 = nsk_k_13es[1]
+r.k_1ii = nsk_k_1iies[0]
 model_specification(**curr_spec,
     n_sims=3,
     n_tea_solves=3,
@@ -300,12 +300,12 @@ for s3 in spec_3:
                 # if round(s1,2)==round(spec_1[1],2) and round(s2,2)==round(spec_2[4],2):
                 #     breakpoint()
                 curr_spec = {k: v for k,v in fbs_spec.current_specifications.items()}
-                r.k_1e = s1
-                r.k_1ie = s2
+                r.k_13 = s1
+                r.k_1ii = s2
                 curr_spec.update({'conc_sugars_feed_spike':s3,})
                 
                 if perform_feeding_strategy_opt:
-                    optimize_1D_feeding_strategy_for_MPSP(Ns=5, **curr_spec)
+                    optimize_1D_feeding_strategy_for_MPSP(Ns=20, model_kwargs=curr_spec)
                 else:
                     model_specification(**curr_spec)
                 # plot_kinetic_results()
@@ -684,7 +684,11 @@ if plot:
             if not perform_feeding_strategy_opt: 
                 continue
             else: 
-                pass
+                if 'spike' in lccm:
+                    if ferm_reactor.kinetic_reaction_system.default_max_n_glu_spikes == 0.:
+                        continue
+                else:
+                    pass
         elif 'yield' in lccm or 'titer' in lccm or 'productivity' in lccm or 'loading' in lccm:
             cmap = JBEI_UCB_colormap(reverse=True)
             cmap_over_color = colors.yellow_tint.RGBn

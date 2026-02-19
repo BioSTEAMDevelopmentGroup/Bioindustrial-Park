@@ -64,8 +64,8 @@ modes=[
         # 'B', 
         # 'C', 'D',
        ]
-N_simulations_per_mode=1000
-notification_interval=20
+N_simulations_per_mode=3000
+notification_interval=100
 plot_TOC_fig=False
 
 percentiles = [0, 0.05, 0.1, 0.25, 0.5, 0.75, 0.9, 0.95, 1]
@@ -218,8 +218,23 @@ for i in range(len(modes)):
     df_rho, df_p = model.spearman_r()
     
     results_dict['Sensitivity']['Spearman']['MPSP'][mode] = df_rho['Biorefinery', 'Adjusted minimum selling price [$/kg IBO]']
-    
     results_dict['Sensitivity']['p-val Spearman']['MPSP'][mode] = df_p['Biorefinery', 'Adjusted minimum selling price [$/kg IBO]']
+    
+    
+    results_dict['Sensitivity']['Spearman']['EtOH Yield'] = {}
+    results_dict['Sensitivity']['p-val Spearman']['EtOH Yield'] = {}
+    results_dict['Sensitivity']['Spearman']['EtOH Yield'][mode] = df_rho['Fermentation', 'Et OH yield [g-EtOH/g-sugars-added]']
+    results_dict['Sensitivity']['p-val Spearman']['EtOH Yield'][mode] = df_p['Fermentation', 'Et OH yield [g-EtOH/g-sugars-added]']
+
+    results_dict['Sensitivity']['Spearman']['EtOH Titer'] = {}
+    results_dict['Sensitivity']['p-val Spearman']['EtOH Titer'] = {}
+    results_dict['Sensitivity']['Spearman']['EtOH Titer'][mode] = df_rho['Fermentation', 'Et OH titer [g-EtOH/L-water]']
+    results_dict['Sensitivity']['p-val Spearman']['EtOH Titer'][mode] = df_p['Fermentation', 'Et OH titer [g-EtOH/L-water]']
+    
+    results_dict['Sensitivity']['Spearman']['EtOH Productivity'] = {}
+    results_dict['Sensitivity']['p-val Spearman']['EtOH Productivity'] = {}
+    results_dict['Sensitivity']['Spearman']['EtOH Productivity'][mode] = df_rho['Fermentation', 'Et OH productivity [g-EtOH/L-water/h]']
+    results_dict['Sensitivity']['p-val Spearman']['EtOH Productivity'][mode] = df_p['Fermentation', 'Et OH productivity [g-EtOH/L-water/h]']
     
     print('\n\nSaved raw results.')
     print('---------------------------------\n\n')
@@ -418,7 +433,7 @@ if len(modes)==1:
     mode = modes[0]
     
     
-    
+    # MPSP
     fig = bst_plots.plot_spearman_1d(results_dict['Sensitivity']['Spearman']['MPSP'][modes[0]],
                                index=[i.element_name + ': ' + i.name for i in model.parameters],
                                name='MPSP '+"["+MPSP_units+"]", color="#A97802",
@@ -434,6 +449,59 @@ if len(modes)==1:
     
     fig[0].show()
 
+    
+    # EtOH Yield
+    fig = bst_plots.plot_spearman_1d(results_dict['Sensitivity']['Spearman']['EtOH Yield'][modes[0]],
+                               index=[i.element_name + ': ' + i.name for i in model.parameters],
+                               name='MPSP '+"["+MPSP_units+"]", color="#A97802",
+                               # xlabel_fn=lambda i: "Spearman's "+rho+ " with "+i,
+                               )
+    
+    fig[0].set_figwidth(6)
+    fig[0].set_figheight(10)
+    
+    fig[0].savefig(file_to_save+'_EtOH-Yield-Spearman.png', dpi=600, bbox_inches='tight',
+                facecolor=fig[0].get_facecolor(),
+                transparent=False)
+    
+    fig[0].show()
+    
+    fig[0].show()
+
+    
+    # EtOH Titer
+    fig = bst_plots.plot_spearman_1d(results_dict['Sensitivity']['Spearman']['EtOH Titer'][modes[0]],
+                               index=[i.element_name + ': ' + i.name for i in model.parameters],
+                               name='MPSP '+"["+MPSP_units+"]", color="#A97802",
+                               # xlabel_fn=lambda i: "Spearman's "+rho+ " with "+i,
+                               )
+    
+    fig[0].set_figwidth(6)
+    fig[0].set_figheight(10)
+    
+    fig[0].savefig(file_to_save+'_EtOH-Titer-Spearman.png', dpi=600, bbox_inches='tight',
+                facecolor=fig[0].get_facecolor(),
+                transparent=False)
+    
+    fig[0].show()
+    
+    # EtOH Productivity
+    fig = bst_plots.plot_spearman_1d(results_dict['Sensitivity']['Spearman']['EtOH Productivity'][modes[0]],
+                               index=[i.element_name + ': ' + i.name for i in model.parameters],
+                               name='MPSP '+"["+MPSP_units+"]", color="#A97802",
+                               # xlabel_fn=lambda i: "Spearman's "+rho+ " with "+i,
+                               )
+    
+    fig[0].set_figwidth(6)
+    fig[0].set_figheight(10)
+    
+    fig[0].savefig(file_to_save+'_EtOH-Productivity-Spearman.png', dpi=600, bbox_inches='tight',
+                facecolor=fig[0].get_facecolor(),
+                transparent=False)
+    
+    fig[0].show()
+    
+    
     #%% #%% Spearman's rank order correlation coefficients - 2D
     from matplotlib import pyplot as plt
     from matplotlib import colors
