@@ -48,7 +48,7 @@ def parse_arguments():
                         help='Process configuration (default: config1)')
     parser.add_argument('--production', type=float, default=150,
                         help='Baseline production rate in kg/hr (default: 150)')
-    parser.add_argument('--samples', type=int, default=300000,
+    parser.add_argument('--samples', type=int, default=45000,
                         help='Target number of valid samples per scenario')
     parser.add_argument('--batch-size', type=int, default=15000,
                         help='Samples per batch (default: 15000)')

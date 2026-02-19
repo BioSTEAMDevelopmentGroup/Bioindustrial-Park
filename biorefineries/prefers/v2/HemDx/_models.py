@@ -115,13 +115,13 @@ def create_model(baseline_production_kg_hr=150, config='config1', verbose=True):
     S404 = get_u('S404')  # Microfiltration 1 (Removed in Config 2)
     S405 = get_u('S405')  # Microfiltration 2 (Removed in Config 3)
     
-    # Purification / Concentration
+    # Purification (Resin + NF/DF)
     U501 = get_u('U501')  # Resin Column
-    U601 = get_u('U601')  # Diafiltration (NF)
-    U801 = get_u('U801')  # Final DF (UF)
+    U502 = get_u('U502')  # Diafiltration (NF) - was U601
     
-    # Formulation CSTR
-    R702 = get_u('R702')  # HemDx CSTR
+    # Formulation (Complexation + Final Processing)
+    U601 = get_u('U601')  # Final DF (UF) - was U801
+    R601 = get_u('R601')  # HemDx CSTR - was R702
     
     BT = u.BT  # Boiler/Turbogenerator
     
@@ -282,7 +282,7 @@ def create_model(baseline_production_kg_hr=150, config='config1', verbose=True):
                     u.solid_capture_efficiency = eff
 
     # 2.4 Diafiltration Product Retention
-    dfs = [u for u in [U601] if u is not None]
+    dfs = [u for u in [U502] if u is not None]
     if dfs:
         # 2.4 Diafiltration Product Retention — Truncated Normal (DSP)
         @param(name='Diafiltration retention', element='DSP', kind='coupled', units='-',
@@ -311,16 +311,16 @@ def create_model(baseline_production_kg_hr=150, config='config1', verbose=True):
                 U501.TargetProduct_Yield = y
 
     # 2.6 HemDx CSTR Conversion
-    if R702:
+    if R601:
         # 2.6 HemDx CSTR Conversion — Truncated Normal (DSP)
         @param(name='CSTR conversion', element='DSP', kind='coupled', units='-',
                baseline=0.95, distribution=shape.TruncNormal(
                    mu=0.95, sigma=(0.97 - 0.87) / 4, lower=0.87, upper=0.97))
         def set_cstr_conversion(X):
-            if hasattr(R702, 'reactions'):
-                rxns_list = list(R702.reactions)
+            if hasattr(R601, 'reactions'):
+                rxns_list = list(R601.reactions)
                 N_rxns = len(rxns_list)
-                R702.reactions.X = [X] * N_rxns
+                R601.reactions.X = [X] * N_rxns
 
     # =============================================================================
     # 3. FACILITIES PARAMETERS

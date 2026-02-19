@@ -19,10 +19,8 @@ Process Areas:
     - Area 200: Media Preparation
     - Area 300: Conversion (Fermentation)
     - Area 400: Recovery (Clarification & Cell Disruption)
-    - Area 500: Purification (Resin Adsorption)
-    - Area 600: Concentration (NF/Diafiltration)
-    - Area 700: Formulation (Complexation)
-    - Area 800: Final Product
+    - Area 500: Purification (Resin Adsorption + NF/Diafiltration)
+    - Area 600: Formulation (Complexation + Final Processing)
     - Area 900: Facilities & Utilities
 
 @author: Dr. Ouwen Peng
@@ -64,8 +62,7 @@ __all__ = (
     'create_area_300_conversion',
     'create_area_400_recovery',
     'create_area_500_purification',
-    'create_area_600_concentration',
-    'create_area_700_formulation',
+    'create_area_600_formulation',
     'create_area_900_facilities',
     'set_production_rate',
     'check_HemDx_specifications',
@@ -549,9 +546,10 @@ def create_area_400_recovery(broth_in, DfUltraBuffer2):
     }
 
 # =============================================================================
-# AREA 500: PURIFICATION
+# AREA 500: PURIFICATION (Resin Adsorption + NF/Diafiltration)
 # =============================================================================
-def create_area_500_purification(lysate_in, NaCl_wash, NaOH_elute, Ethanol_regen):
+def create_area_500_purification(lysate_in, NaCl_wash, NaOH_elute, Ethanol_regen, DfUltraBuffer1):
+    # --- Resin Adsorption ---
     M501 = bst.MixTank('M501', ins=(NaCl_wash, 'Water5'), outs='WashBuffer', tau=1)
     M502 = bst.MixTank('M502', ins=(NaOH_elute, 'Water6'), outs='ElutionBuffer', tau=1)
     M503 = bst.MixTank('M503', ins=(Ethanol_regen, 'Water7'), outs='RegenBuffer', tau=1)
@@ -590,22 +588,13 @@ def create_area_500_purification(lysate_in, NaCl_wash, NaOH_elute, Ethanol_regen
         M503.ins[1].imass['H2O'] = lysate_in.imass['H2O'] * U501.regeneration_CV * 0.3
         M503.ins[0].imass['Ethanol'] = M503.ins[1].imass['H2O'] * U501.regeneration_CV * 0.7
 
-    return {
-        'ResinEluate': U501-1,
-        'ResinFlowthrough': U501-0,
-        'ResinRegenWaste': U501-2,
-        'ResinWash': U501-3,
-    }
-
-# =============================================================================
-# AREA 600: CONCENTRATION
-# =============================================================================
-def create_area_600_concentration(eluate_in, DfUltraBuffer1):
-    M601 = bst.MixTank('M601', ins=(DfUltraBuffer1, 'Water8'), outs='DFBuffer', tau=0.5)
+    # --- NF/Diafiltration (Concentration) ---
+    # Note: M504 already used in Area 400 (Config 2), so use M505
+    M505 = bst.MixTank('M505', ins=(DfUltraBuffer1, 'Water8'), outs='DFBuffer', tau=0.5)
     
-    U601 = u.DiafiltrationAdv.from_preset(
-        'NF', 'U601',
-        ins=(eluate_in, M601-0),
+    U502 = u.DiafiltrationAdv.from_preset(
+        'NF', 'U502',
+        ins=(U501-1, M505-0),
         outs=('ConcentratedHeme', 'NFPermeate'),
         TargetProduct_IDs=('Heme_b', 'Heme_b_In', 'ProtoporphyrinIX', 'ProtoporphyrinIX_In',),
         Salt_IDs=c.chemical_groups['Salts'],
@@ -613,26 +602,42 @@ def create_area_600_concentration(eluate_in, DfUltraBuffer1):
         diavolumes=5.0,
     )
     
-    @U601.add_specification(run=True)
+    @U502.add_specification(run=True)
     def adjust_df_buffer():
-        feed = U601.ins[0]
-        buffer = M601.ins[1]
+        feed = U502.ins[0]
+        buffer = M505.ins[1]
         buffer.imass['H2O'] = feed.imass['H2O'] * 2.0
-        M601.ins[0].imol['DfUltraBuffer'] = buffer.imass['H2O'] * (0.025 + 0.01 + 0.001) / 1000
+        M505.ins[0].imol['DfUltraBuffer'] = buffer.imass['H2O'] * (0.025 + 0.01 + 0.001) / 1000
 
-    H601 = bst.HXutility('H601', ins=U601-0, outs='HemeConcentrate', T=30+273.15)
+    H504 = bst.HXutility('H504', ins=U502-0, outs='HemeConcentrate', T=30+273.15)
     
     return {
-        'HemeConcentrate': H601-0,
-        'NFPermeate': U601-1,
+        'ResinFlowthrough': U501-0,
+        'ResinRegenWaste': U501-2,
+        'ResinWash': U501-3,
+        'HemeConcentrate': H504-0,
+        'NFPermeate': U502-1,
     }
 
 # =============================================================================
-# AREA 700: FORMULATION
+# AREA 600: FORMULATION (Complexation + Final Processing)
 # =============================================================================
-def create_area_700_formulation(heme_concentrate, GammaCyclodextrinFeed, NicotinamideFeed):
-    M701 = bst.MixTank('M701', ins=(GammaCyclodextrinFeed, 'Water9'), outs='GammaCDSolution', tau=0.5)
-    M702 = bst.Mixer('M702', ins=(heme_concentrate, M701-0), outs='HemeWithCD')
+def create_area_600_formulation(heme_concentrate, GammaCyclodextrinFeed, NicotinamideFeed, product_out, AntioxidantStream):
+    """
+    Area 600: Formulation & Final Processing
+    
+    Processing:
+        1. M601-M604: Cyclodextrin encapsulation & nicotinamide coordination buffers
+        2. R601: HemDx CSTR (complexation reactions)
+        3. U601: UF Diafiltration (concentration & salt removal)
+        4. H602: Pasteurization (HTST)
+        5. M605: Antioxidant formulation
+        6. H603: Final cooling
+        7. T601: Product storage
+    """
+    # --- Complexation ---
+    M601 = bst.MixTank('M601', ins=(GammaCyclodextrinFeed, 'Water9'), outs='GammaCDSolution', tau=0.5)
+    M602 = bst.Mixer('M602', ins=(heme_concentrate, M601-0), outs='HemeWithCD')
     
     encapsulation_rxn = bst.Rxn(
         '0.0014711 Heme_b + 0.0197913 GammaCyclodextrin -> HemoDextrin',
@@ -644,49 +649,34 @@ def create_area_700_formulation(heme_concentrate, GammaCyclodextrinFeed, Nicotin
     )
     hemdx_rxns = bst.ReactionSystem(encapsulation_rxn, coordination_rxn)
     
-    M703 = bst.MixTank('M703', ins=(NicotinamideFeed, 'Water10'), outs='NicotinamideSolution', tau=0.5)
-    M704 = bst.Mixer('M704', ins=(M702-0, M703-0), outs='HemeDxWithNic')
+    M603 = bst.MixTank('M603', ins=(NicotinamideFeed, 'Water10'), outs='NicotinamideSolution', tau=0.5)
+    M604 = bst.Mixer('M604', ins=(M602-0, M603-0), outs='HemeDxWithNic')
 
-    R702 = u.HemDxCSTR(
-        'R702',
-        ins=M704-0,
+    R601 = u.HemDxCSTR(
+        'R601',
+        ins=M604-0,
         outs='NHemDx_Crude',
         reactions=hemdx_rxns,
         tau=3.0, T=40 + 273.15, P=101325,
     )
     
-    @M701.add_specification(run=True)
+    @M601.add_specification(run=True)
     def dose_gamma_cd():
         heme_mol = heme_concentrate.imol['Heme_b'] + heme_concentrate.imol['Heme_b_In']
         GammaCyclodextrinFeed.imol['GammaCyclodextrin'] = heme_mol * (0.0197913 / 0.0014711)
-        M701.ins[1].imass['H2O'] = GammaCyclodextrinFeed.imass['GammaCyclodextrin'] * 10
+        M601.ins[1].imass['H2O'] = GammaCyclodextrinFeed.imass['GammaCyclodextrin'] * 10
     
-    @M703.add_specification(run=True)
+    @M603.add_specification(run=True)
     def dose_nicotinamide():
         heme_mol = heme_concentrate.imol['Heme_b'] + heme_concentrate.imol['Heme_b_In']
         nic_mol = heme_mol * 2.0 * 1.025
         NicotinamideFeed.imol['Nicotinamide'] = nic_mol
-        M703.ins[1].imass['H2O'] = NicotinamideFeed.imass['Nicotinamide'] * 5
+        M603.ins[1].imass['H2O'] = NicotinamideFeed.imass['Nicotinamide'] * 5
 
-    return R702-0
-
-# =============================================================================
-# AREA 800: FINAL PRODUCT
-# =============================================================================
-def create_area_800_final_product(crude_product, product_out, AntioxidantStream):
-    """
-    Area 800: Finalization
-    
-    Processing:
-        1. U801: Diafiltration to remove excess salts/nicotinamide and concentrate
-        2. H802: Pasteurization (HTST)
-        3. M802: Formulation with Antioxidant
-        4. H803: Final Cooling
-        5. T801: Final product storage
-    """
-    U801 = u.DiafiltrationAdv.from_preset(
-        'UF', 'U801',
-        ins=(crude_product, 'Water11'),
+    # --- Final Processing ---
+    U601 = u.DiafiltrationAdv.from_preset(
+        'UF', 'U601',
+        ins=(R601-0, 'Water11'),
         outs=('ConcentratedFinal', 'FinalPermeate'),
         TargetProduct_IDs=('N-HemoDextrin', 'HemoDextrin', 'Nicotinamide', 'GammaCyclodextrin'),
         Salt_IDs=c.chemical_groups['Salts'],
@@ -695,58 +685,53 @@ def create_area_800_final_product(crude_product, product_out, AntioxidantStream)
         diavolumes=5.0,
     )
     
-    @U801.add_specification(run=True)
+    @U601.add_specification(run=True)
     def control_final_concentration():
-        feed = U801.ins[0]
-        U801.ins[1].imass['H2O'] = feed.F_mass * 3.0 
+        feed = U601.ins[0]
+        U601.ins[1].imass['H2O'] = feed.F_mass * 3.0 
         target_wt = 0.075
-        U801.FeedWater_Recovery_to_Permeate = 0.5 
-        U801._run()
-        
-        n_hemdx_mass = U801.outs[0].imass['N-HemoDextrin']
-        
+        U601.FeedWater_Recovery_to_Permeate = 0.5 
+        U601._run()
+        n_hemdx_mass = U601.outs[0].imass['N-HemoDextrin']
         if n_hemdx_mass > 0:
             target_total_mass = n_hemdx_mass / target_wt
-            current_solids = U801.outs[0].F_mass - U801.outs[0].imass['H2O']
+            current_solids = U601.outs[0].F_mass - U601.outs[0].imass['H2O']
             target_water_retentate = max(0, target_total_mass - current_solids)
             feed_water = feed.imass['H2O']
-            
             if feed_water > 0:
                 recovery = 1.0 - (target_water_retentate / feed_water)
             else:
                 recovery = 0.0
-            
-            U801.FeedWater_Recovery_to_Permeate = recovery
-            
-        U801._run()
+            U601.FeedWater_Recovery_to_Permeate = recovery
+        U601._run()
 
-    H802 = bst.HXutility(
-        'H802', 
-        ins=U801-0, 
+    H602 = bst.HXutility(
+        'H602', 
+        ins=U601-0, 
         outs='PasteurizedProduct', 
         T=74+273.15, 
         heat_only=True
     )
     
-    M802 = bst.MixTank('M802', ins=(H802-0, AntioxidantStream, 'Water12'), outs='PreCooledProduct', tau=0.5)
+    M605 = bst.MixTank('M605', ins=(H602-0, AntioxidantStream, 'Water12'), outs='PreCooledProduct', tau=0.5)
 
-    H803 = bst.HXutility(
-        'H803',
-        ins=M802-0,
+    H603 = bst.HXutility(
+        'H603',
+        ins=M605-0,
         outs='CooledProduct',
         T=4+273.15,
         cool_only=True
     )
 
-    T801 = bst.StorageTank(
-        'T801',
-        ins=H803-0,
+    T601 = bst.StorageTank(
+        'T601',
+        ins=H603-0,
         outs=product_out,
         tau=24*7,
     )
     
     return {
-        'FinalPermeate': U801-1
+        'FinalPermeate': U601-1
     }
 
 # =============================================================================
@@ -1132,22 +1117,20 @@ def create_NHemDx_system(ins, outs, use_area_convention=False):
     # Area 400: Recovery
     area_400 = create_area_400_recovery(broth, DfUltraBuffer2)
     
-    # Area 500: Purification
+    # Area 500: Purification (Resin + NF/DF)
     area_500 = create_area_500_purification(
         lysate_in=area_400['CombinedLysate'],
         NaCl_wash=NaCl_wash,
         NaOH_elute=NaOH_elute,
         Ethanol_regen=Ethanol_regen,
+        DfUltraBuffer1=DfUltraBuffer1,
     )
     
-    # Area 600: Concentration
-    area_600 = create_area_600_concentration(area_500['ResinEluate'], DfUltraBuffer1)
-    
-    # Area 700: Formulation
-    area_700 = create_area_700_formulation(area_600['HemeConcentrate'], GammaCyclodextrinFeed, NicotinamideFeed)
-    
-    # Area 800: Final Product
-    area_800 = create_area_800_final_product(area_700, NHemDx_Product, AntioxidantStream)
+    # Area 600: Formulation (Complexation + Final Processing)
+    area_600 = create_area_600_formulation(
+        area_500['HemeConcentrate'], GammaCyclodextrinFeed, NicotinamideFeed,
+        NHemDx_Product, AntioxidantStream,
+    )
     
     # Area 900: Facilities
     create_area_900_facilities(
@@ -1155,8 +1138,8 @@ def create_NHemDx_system(ins, outs, use_area_convention=False):
             area_400['PressLiquor'], area_400['WashEffluent'],
             area_400['SupernatantToWWT'],  # Config 2: supernatant directly to WWT
             area_500['ResinFlowthrough'], area_500['ResinRegenWaste'], area_500['ResinWash'],
-            area_600['NFPermeate'],
-            area_800['FinalPermeate'],
+            area_500['NFPermeate'],
+            area_600['FinalPermeate'],
         ),
         dehydrated_debris=area_400['DehydratedDebris'],
         ProcessWaste=ProcessWaste,

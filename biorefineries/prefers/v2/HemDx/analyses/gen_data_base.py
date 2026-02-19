@@ -237,10 +237,10 @@ def generate_baseline(config='config1', baseline_production_kg_hr=150, timestamp
 
     print("\nSaving stream and unit design tables...")
     stream_table = _stream_summary(model.system)
-    stream_table.to_csv(os.path.join(dirs['data'], 'stream_summary.csv'))
+    stream_table.to_csv(os.path.join(dirs['data'], 'stream_summary.csv'), index=False)
     
     design_table = _unit_design_summary(model.system)
-    design_table.to_csv(os.path.join(dirs['data'], 'unit_design_summary.csv'))
+    design_table.to_csv(os.path.join(dirs['data'], 'unit_design_summary.csv'), index=False)
 
     # -------------------------------------------------------------------------
     # Single Point Sensitivity

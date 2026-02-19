@@ -29,31 +29,18 @@ from . import utils
 # CONSTANTS
 # =============================================================================
 
-# Full Category List (for Sheets 1-5)
-FULL_CATEGORY_LIST = [
-    'Conversion',
-    'Concentration',
-    'Purification',
-    'Formulation',
-    'WasteTreatment',
-    'Boiler Turbogenerator',
-    'Cooling Tower',
-    'Chilled Water Package',
-    'Process Water Center',
-    'Facilities (Other)',
-]
-
-# Area Mapping
-AREA_MAPPING = {
+# Area name mapping: x00 area code → display name (auto-adaptive)
+# Any area code not listed here will generate 'Area x00' dynamically.
+AREA_NAMES = {
     '200': 'Conversion',
     '300': 'Conversion',
-    '400': 'Concentration',
+    '400': 'Recovery',
     '500': 'Purification',
     '600': 'Formulation',
     '900': 'Facilities',
 }
 
-# Unit ID Overrides -> Map to specific names (User request: separate area 900)
+# Unit ID overrides → specific facility sub-categories
 UNIT_ID_OVERRIDES = {
     'BT': 'Boiler Turbogenerator',
     'CT': 'Cooling Tower',
@@ -62,11 +49,10 @@ UNIT_ID_OVERRIDES = {
     'M902': 'Boiler Feed Mixer',
 }
 
-# Full Category List (Dynamic + Standard Areas)
-# Note: Specific facilities added to ensure consistent ordering/coloring if possible
-FULL_CATEGORY_LIST = [
+# Standard category display order (dynamic categories inserted before WasteTreatment)
+STANDARD_CATEGORY_ORDER = [
     'Conversion',
-    'Concentration',
+    'Recovery',
     'Purification',
     'Formulation',
     'WasteTreatment',
@@ -75,7 +61,7 @@ FULL_CATEGORY_LIST = [
     'Chilled Water Package',
     'Process Water Center',
     'Boiler Feed Mixer',
-    'Facilities (Other)', 
+    'Facilities (Other)',
 ]
 
 # WasteTreatment override (kept separate)
@@ -162,38 +148,50 @@ class ProcessReportGenerator:
     # Categorization
     # -------------------------------------------------------------------------
     def _get_category(self, unit: bst.Unit) -> str:
+        """Auto-adaptive category detection from unit ID area codes."""
         uid = unit.ID
         
         # WasteTreatment override (solo)
         if WASTEWATER_ID in uid or 'wastewater' in getattr(unit, 'line', '').lower():
             return 'WasteTreatment'
         
-        # Unit ID overrides -> Facilities
+        # Unit ID overrides → Facilities sub-categories
         for key in UNIT_ID_OVERRIDES:
             if key in uid:
                 return UNIT_ID_OVERRIDES[key]
         
-        # Area mapping
+        # Area code extraction (x00 pattern from numeric digits in ID)
+        area_code = None
         area_match = re.search(r'(\d+)', uid)
         if area_match:
             digits = area_match.group(1)
             if len(digits) >= 3:
                 area_code = digits[0] + '00'
-                if area_code in AREA_MAPPING:
-                    cat = AREA_MAPPING[area_code]
-                    if cat != 'Facilities':
-                        return cat
-                    
-        # Fallback for 900/Facilities: Return Unit ID or Class Name if not in overrides
-        # This complies with "separated to the specific unit in area 900"
-        if '900' in uid or area_code == '900':
-            return unit.__class__.__name__
-
+            elif len(digits) >= 1:
+                area_code = digits[0] + '00'
+        
+        if area_code is not None:
+            if area_code in AREA_NAMES:
+                cat = AREA_NAMES[area_code]
+                if cat == 'Facilities':
+                    # Area 900: return class name for individual tracking
+                    return unit.__class__.__name__
+                return cat
+            else:
+                # Auto-adaptive: unknown area code → dynamic category
+                return f'Area {area_code}'
+        
         return 'Facilities (Other)'
 
     def _ensure_full_categories(self, grouped: Dict[str, float]) -> Dict[str, float]:
-        """Ensure all categories are present, even if zero."""
-        result = {cat: 0.0 for cat in FULL_CATEGORY_LIST}
+        """Auto-adaptive: ensure all standard + dynamic categories are present."""
+        ordered = list(STANDARD_CATEGORY_ORDER)
+        for k in grouped:
+            if k not in ordered:
+                # Insert dynamic categories before WasteTreatment
+                wt_idx = ordered.index('WasteTreatment') if 'WasteTreatment' in ordered else len(ordered)
+                ordered.insert(wt_idx, k)
+        result = {cat: 0.0 for cat in ordered}
         for k, v in grouped.items():
             result[k] = result.get(k, 0.0) + v
         return result
@@ -217,7 +215,7 @@ class ProcessReportGenerator:
         df = pd.DataFrame(rows)
         
         # Order
-        df['sort_idx'] = df['Category'].apply(lambda x: FULL_CATEGORY_LIST.index(x) if x in FULL_CATEGORY_LIST else 999)
+        df['sort_idx'] = df['Category'].apply(lambda x: STANDARD_CATEGORY_ORDER.index(x) if x in STANDARD_CATEGORY_ORDER else 999)
         df = df.sort_values('sort_idx').drop(columns=['sort_idx'])
         
         total = df['Cost (USD)'].sum()
@@ -243,7 +241,7 @@ class ProcessReportGenerator:
         rows = [{'Category': k, 'Annual Cost (USD)': v} for k, v in grouped.items()]
         df = pd.DataFrame(rows)
         
-        df['sort_idx'] = df['Category'].apply(lambda x: FULL_CATEGORY_LIST.index(x) if x in FULL_CATEGORY_LIST else 999)
+        df['sort_idx'] = df['Category'].apply(lambda x: STANDARD_CATEGORY_ORDER.index(x) if x in STANDARD_CATEGORY_ORDER else 999)
         df = df.sort_values('sort_idx').drop(columns=['sort_idx'])
         
         total = df['Annual Cost (USD)'].sum()
@@ -283,7 +281,7 @@ class ProcessReportGenerator:
         rows = [{'Category': k, col_name: v} for k, v in grouped.items()]
         df = pd.DataFrame(rows)
         
-        df['sort_idx'] = df['Category'].apply(lambda x: FULL_CATEGORY_LIST.index(x) if x in FULL_CATEGORY_LIST else 999)
+        df['sort_idx'] = df['Category'].apply(lambda x: STANDARD_CATEGORY_ORDER.index(x) if x in STANDARD_CATEGORY_ORDER else 999)
         df = df.sort_values('sort_idx').drop(columns=['sort_idx'])
         
         # Allow signed percentage
@@ -321,7 +319,7 @@ class ProcessReportGenerator:
             if cat in ('WasteTreatment', 'Boiler Turbogenerator', 'Cooling Tower', 
                       'Chilled Water Package', 'Process Water Center', 'Boiler Feed Mixer'):
                  pass
-            elif cat not in ('Conversion', 'Concentration', 'Purification', 'Formulation'):
+            elif cat not in ('Conversion', 'Recovery', 'Purification', 'Formulation'):
                  # Keep specific facility names if distinct
                  pass
             
@@ -375,8 +373,9 @@ class ProcessReportGenerator:
             if r2.empty:
                 return pd.DataFrame()
             
-            # Extract column (product allocation usually first column)
-            col = r2.columns[0]
+            # First column is Characterization Factor; allocation columns follow
+            alloc_cols = [c for c in r2.columns if 'Characterization' not in str(c)]
+            col = alloc_cols[0] if alloc_cols else r2.columns[-1]
             
             rows = []
             for idx in r2.index:
@@ -466,7 +465,9 @@ class ProcessReportGenerator:
                 key="GWP",
                 items=[self.product_stream],
             )
-            val = lca_table.loc[("Total", ""), lca_table.columns[0]]
+            alloc_cols = [c for c in lca_table.columns if 'Characterization' not in str(c)]
+            val_col = alloc_cols[0] if alloc_cols else lca_table.columns[-1]
+            val = lca_table.loc[("Total", ""), val_col]
             return float(val)
         except Exception:
             total_gwp = self.system.get_net_impact("GWP")
