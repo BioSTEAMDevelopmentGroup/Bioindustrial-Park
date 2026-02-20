@@ -135,7 +135,7 @@ metrics = {'MPSP': {'f': get_product_MPSP, 'units': '$/kg'},
             'EtOH Productivity': {'f': get_prod_nsk, 'units': 'g-EtOH/L-broth/h'},
             'Number of glucose spikes': {'f': get_curr_n_glu_spikes, 'units': ''},
             'Fermentation time': {'f': get_tau, 'units': 'h'},
-            'Total heating duty for sugar sol evap': {'f': get_sugar_sol_evap_duty, 'units': 'kJ/h'},
+            'Total Q sugar evap': {'f': get_sugar_sol_evap_duty, 'units': 'kJ/h'},
             'Target sugars concentration': {'f': lambda: fbs_spec.target_conc_sugars, 'units': 'g-sugars/L-broth'},
             'Cell loading': {'f': get_cell_loading, 'units': 'g-cell/L-broth'},
             'Active cell loading': {'f': get_active_cell_loading, 'units': 'g-cell/L-broth'},
@@ -258,7 +258,8 @@ def tickmarks(dmin, dmax, accuracy=50, N_points=5):
 #%%
 minute = '0' + str(dateTimeObj.minute) if len(str(dateTimeObj.minute))==1 else str(dateTimeObj.minute)
 # file_to_save = f'_{steps}_steps_'+'etoh_fbs_%s.%s.%s-%s.%s'%(dateTimeObj.year, dateTimeObj.month, dateTimeObj.day, dateTimeObj.hour, minute)
-file_to_save = f'_ibo_{steps}_{x_label[:5]}_{y_label[:5]}_{z_label[:5]}_bypass-IBO=conditional_'
+
+file_to_save = f'_ibo_{steps}_{x_label[:5]}_{y_label[:5]}_{z_label[:5]}_opt={perform_feeding_strategy_opt}_max_n={ferm_reactor.kinetic_reaction_system.default_max_n_glu_spikes}_'
 
 #%% Initial simulation
 
@@ -724,11 +725,11 @@ if plot:
         curr_metric_w_ticks.sort(reverse=False)
         # curr_metric_w_levels = np.arange(0., 15.5, 0.5)
         
-        # if 'mpsp' in lccm:
-        #     curr_metric_w_levels = np.arange(0.5, 5.001, 0.1)
-        #     curr_metric_cbar_ticks = np.arange(0.5, 5.001, 0.5)
-        #     curr_metric_w_ticks = [0.7, 0.9, 2.5, 5.0]
-        #     cbar_n_minor_ticks = 4
+        if 'mpsp' in lccm:
+            curr_metric_w_levels = np.arange(0.25, 5.001, 0.1)
+            curr_metric_cbar_ticks = np.arange(0.25, 5.001, 0.25)
+            curr_metric_w_ticks = [0.4, 0.9, 2.5, 5.0]
+            cbar_n_minor_ticks = 4
         # else:
         #     break
         

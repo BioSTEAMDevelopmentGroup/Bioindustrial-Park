@@ -25,7 +25,7 @@ V406 = f.V406
 IBO_filepath = isobutanol.__file__.replace('\\__init__.py', '')
 parameter_distributions_filename = IBO_filepath+\
     '\\analyses\\full\\parameter_distributions\\'+\
-    'parameter-distributions_corn_IBO_EtOH_B.xlsx'
+    'parameter-distributions_corn_IBO_EtOH_A.xlsx'
         
 model.parameters = ()
 model.load_parameter_distributions(parameter_distributions_filename, namespace_dict)
