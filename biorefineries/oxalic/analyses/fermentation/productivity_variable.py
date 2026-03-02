@@ -221,3 +221,48 @@ for (yld, tit) in yield_titer_pairs:
         for i in range(3): oxalic_sys.simulate()
         msp = get_product_MPSP()
         print(f"{yld:6.3f}  {tit:8.2f}  {prod:15.3f}  {msp:10.3f}")
+
+# %% Generate a range of productivity under TY
+
+yield_titer_pairs = np.array([
+    (0.2, 28.23), # our work
+    (0.818, 122.72), # highest titer reported; possible yield
+    # (0.1, 122.72) # highest titer reported; possible yield
+], dtype=float)
+
+# ---- productivity range ----
+# for example: 50 points between 0.2*baseline and 10*baseline
+n_prod_steps = 50
+productivities = np.linspace(
+    0.2 * spec.baseline_productivity,
+    10.0 * spec.baseline_productivity,
+    n_prod_steps
+)
+
+# ---------- example usage ----------
+results = []
+for (yld, tit) in yield_titer_pairs:
+    for prod in productivities:
+        spec.load_specifications(yld, tit, prod)
+        for i in range(3): oxalic_sys.simulate()
+        msp = get_product_MPSP()
+        print(f"{yld:6.3f}  {tit:8.2f}  {prod:15.3f}  {msp:10.3f}")
+#%% Cost & CI vs transport distance
+
+spec.load_specifications(0.2, 28.23, 0.24)
+distance = np.linspace(0, 350)
+results = []
+for dis in distance:
+    cost_transport = 0.109 * dis / 1000
+    oxalic_sys.flowsheet.sugarcane.price = 0.03592 + cost_transport
+    CI_transport = 0.049 * dis / 1000
+    oxalic_sys.LCA.CFs['GWP_100']['Sugarcane'] = 0.044535 + CI_transport
+    get_CI = lambda: oxalic_lca.GWP
+    get_GWP_before_offset = lambda: oxalic_lca.GWP - oxalic_lca.net_electricity_GWP
+    for i in range(3): oxalic_sys.simulate()
+    msp = get_product_MPSP()
+    ci = get_CI()
+    ci_wo_e = get_GWP_before_offset()
+    print(f"{dis:6.3f}  {msp:10.3f}  {ci:15.3f}  {ci_wo_e:15.3f}")
+        
+

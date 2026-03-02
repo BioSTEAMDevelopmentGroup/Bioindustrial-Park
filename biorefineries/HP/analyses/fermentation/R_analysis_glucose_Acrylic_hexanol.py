@@ -227,15 +227,26 @@ def plot_multiple_metrics(x_axis_list, y_axis_list_of_lists,
     plt.rcParams['font.size'] = fontsize
     plt.xlim(xlim[0], xlim[1])
     
+    units_opening_brackets = ["[" , "[" ]
+    
     p1, = ax.plot(x_axis_list, y_axis_list_of_lists[0],
                   color=y_plotline_colors_list[0],
                   zorder=1)
+    dict_df_data = {
+        xlabel +" " + units_opening_brackets[0] + x_axis_units + "]": x_axis_list
+        }
+    for yi in range(len(y_axis_list_of_lists)):
+        dict_df_data[ylabels_list[yi] +" " + units_opening_brackets[1] + y_axis_units_list[yi] + "]"] =\
+            y_axis_list_of_lists[yi]
+        
+    df_to_save = pd.DataFrame.from_dict(data=dict_df_data)
+    
+    df_to_save.to_csv(filename.replace(".png", ".csv"))
     
     if ylims_list:
         ax.set_ylim(ylims_list[0])
     ax.yaxis.label.set_color(p1.get_color())
     
-    units_opening_brackets = ["[" , "[" ]
     for j in range(len(units_opening_brackets)):
         if units_on_newline:
             units_opening_brackets[j] = "\n[" 

@@ -8,23 +8,20 @@
 # for license details.
 
 from . import (
-    models,
-    plots,
+    models_EtOH_IBO_corn,
     # system, 
     # units,
     # utils,
     )
 
 __all__ = [
-            *models.__all__,
-            *plots.__all__,
+            *models_EtOH_IBO_corn.__all__,
             # *system.__all__,
             # *units.__all__,
             # *utils.__all__,
 ]
 
-from .models import *
-from .plots import *
+from .models_EtOH_IBO_corn import *
 # from .system import *
 # from .units import *
 # from .utils import *

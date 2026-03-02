@@ -358,13 +358,13 @@ minute = '0' + str(dateTimeObj.minute) if len(str(dateTimeObj.minute))==1 else s
 
 scale = list(range(1500, 600000+1000, 1000))
 
-electricity_consumption = np.array([0.2, 2.4])
+electricity_consumption = np.array([0.2, 2.4, 15])
 
 electricity_price_i = np.array([0.029, 0.041, 0.056])
 
-concentration_1 = np.array([0.005, 0.15])
+concentration_1 = np.array([0.15])
 
-power_unit_cost_1 = np.array([0.8, 1.0, 1.2])
+power_unit_cost_1 = np.array([1.0])
 
 results_1 = []
 for i in electricity_consumption:
@@ -375,17 +375,16 @@ for i in electricity_consumption:
             u.R101.concentration = m
             for n in power_unit_cost_1:
                 u.R101.power_unit_cost = n
-                # for k in scale:
-                #     u.R101.HNO3_scale = k
-                for p in range(3):
-                    sys_plasma.simulate()
-                    
+                for k in scale:
+                    u.R101.HNO3_scale = k
+                    for p in range(3):
+                        sys_plasma.simulate()
                     results_1.append({
                         'electricity_consumption': i,
                         'electricity_price': j,
                         'concentration': m,
                         'power_unit_cost': n,
-                        # 'HNO3_scale': k,
+                        'HNO3_scale': k,
                         'Cost': get_cost(),
                         'power unit': get_U101_cost_contribution(),
                         'plama reactor': get_R101_cost_contribution(),
@@ -396,7 +395,7 @@ for i in electricity_consumption:
                         'cooling utility (compressor)': get_cooling_C101_cost_contribution(),
                         'water': get_water_cost_contribution(),
                     })
-        
+                    
 df_1 = pd.DataFrame(results_1)
 
 file_to_save_1 = results_filepath\
@@ -588,19 +587,24 @@ with pd.ExcelWriter(file_to_save+'_'+'_5_waterfall.xlsx') as writer:
 
 #%% LCA
 
+concentration_6 = np.array([0.005, 0.15])
 electricity_consumption_6 = np.array([0.2, 2.4, 15])
 results_6 = []
 
-for k in electricity_consumption_6:
-    u.R101.electricity_consumption = k
-    for m in range(3):
-        sys_plasma.simulate()
-    results_6.append({
-        'electricity_consumption': k,
-        'water impact': get_water_impact(),
-        'electricity impact': get_electricity_impact(),
-        'total impact': get_total_impact()
-        })
+for q in concentration_6:
+    u.R101.concentration = q
+    for k in electricity_consumption_6:
+        u.R101.electricity_consumption = k
+        for m in range(3):
+            sys_plasma.simulate()
+        results_6.append({
+            'concentration': q,
+            'electricity_consumption': k,
+            'water impact': get_water_impact(),
+            'electricity impact': get_electricity_impact(),
+            'total impact': get_total_impact()
+            })
+
 df_6 = pd.DataFrame(results_6)
 
 file_to_save = results_filepath\
