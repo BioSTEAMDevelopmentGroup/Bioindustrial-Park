@@ -67,8 +67,8 @@ modes=[
         # 'B', 
         # 'C', 'D',
        ]
-N_simulations_per_mode=20
-notification_interval=5
+N_simulations_per_mode=3000
+notification_interval=200
 plot_TOC_fig=False
 
 percentiles = [0, 0.05, 0.1, 0.25, 0.5, 0.75, 0.9, 0.95, 1]
