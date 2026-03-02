@@ -55,6 +55,9 @@ get_adjusted_MSP = models.get_adjusted_MSP
 f = bst.main_flowsheet
 
 #%%
+plot_spearman_matrix = isobutanol.plots.spearman_matrix.plot_spearman_matrix
+
+#%%
 # !!! 
 # model.specification = models.optimize_1D_feeding_strategy_for_MPSP
 
@@ -64,8 +67,8 @@ modes=[
         # 'B', 
         # 'C', 'D',
        ]
-N_simulations_per_mode=100
-notification_interval=20
+N_simulations_per_mode=20
+notification_interval=5
 plot_TOC_fig=False
 
 percentiles = [0, 0.05, 0.1, 0.25, 0.5, 0.75, 0.9, 0.95, 1]

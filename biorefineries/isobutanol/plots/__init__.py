@@ -8,23 +8,20 @@
 # for license details.
 
 from . import (
-    models,
-    plots,
+    spearman_matrix,
     # system, 
     # units,
     # utils,
     )
 
 __all__ = [
-            *models.__all__,
-            *plots.__all__,
+            *spearman_matrix.__all__,
             # *system.__all__,
             # *units.__all__,
             # *utils.__all__,
 ]
 
-from .models import *
-from .plots import *
+from .spearman_matrix import *
 # from .system import *
 # from .units import *
 # from .utils import *
