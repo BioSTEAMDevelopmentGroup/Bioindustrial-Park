@@ -264,6 +264,18 @@ metrics.append(Metric('Number of glucose spikes',
                       'Fermentation',
                       ))
 
+metrics.append(Metric('Stoichiometric aeration rate required', 
+                      lambda: V406.stoich_O2_flow_req,
+                      'kmol-O2/h', 
+                      'Fermentation',
+                      ))
+
+metrics.append(Metric('Actual aeration rate', 
+                      lambda: V406.compressed_air.imol['O2'],
+                      'kmol-O2/h', 
+                      'Fermentation',
+                      ))
+
 #%% Generate the required namespace
 namespace_dict = {}
 exclude_from_globals = [
