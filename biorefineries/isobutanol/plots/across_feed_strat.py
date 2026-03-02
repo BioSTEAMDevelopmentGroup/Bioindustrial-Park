@@ -63,64 +63,54 @@ metrics_units = {"MPSP":  r"$\mathrm{\$}\cdot\mathrm{kg}^{-1}$",
 # !!!
 
 # Spec names
-x_label = "k_13"
-y_label = "k_7ii"
-z_label = "Spike feed glucose concentration"
+x_label = "Threshold glucose concentration" # title of the x axis
+x_units =r"$\mathrm{g} \cdot \mathrm{L}^{-1}$"
+x_ticks = [0, 100, 200, 300, 400,
+           # 300, 400, 500,
+           ]
+
+y_label = "Target glucose concentration" # title of the x axis
+y_units =r"$\mathrm{g} \cdot \mathrm{L}^{-1}$"
+y_ticks = [0, 100, 200, 300, 400,
+           # 300, 400, 500,
+           ]
+
+z_label = "Spike feed glucose concentration" # title of the x axis
+z_units =r"$\mathrm{g} \cdot \mathrm{L}^{-1}$"
+z_ticks = [0, 200, 400, 600, 800]
 
 # Misc
-strategy='adaptive_batch'
 steps = (25, 25, 1)
 
+#
+spec_1 = threshold_conc_sugarses = np.linspace(1., 400., steps[0])
+
+spec_2 = target_conc_sugarses = np.linspace(10., 400., steps[1])
+
+
+spec_3 = conc_sugars_feed_spikes =\
+    np.array([
+              # 1.*baseline_spec['conc_sugars_feed_spike'],
+              fbs_spec.conc_sugars_feed_spike,
+              ])
+    
 #%% Intermediate details
 
 # Misc
-subfolder_name = f'Kinetics_{x_label}_{y_label}\\{strategy}\\'
-perform_feeding_strategy_opt = 'adaptive' in subfolder_name
-max_n = 0 if not 'fed-batch' in subfolder_name else 200
-
-## Spec arrays, units, and ticks
-spec_1, spec_2, spec_3 = None, None, None
-x_units, y_units, z_units = None, None, None
-x_ticks, y_ticks, z_ticks = None, None, None
-
-# spec_1
-if x_label in ('k_1e',):
-    spec_1 = np.linspace(1., 300., steps[0])
-    x_units = r"$\mathrm{g} \cdot \mathrm{L}^{-1} \cdot \mathrm{h}^{-1}$"
-    x_ticks = np.array([0, 100, 200, 300])
-
-elif x_label in ('k_13',):
-    spec_1 = np.linspace(0.0, 40., steps[0])
-    x_units = r"$\mathrm{g} \cdot \mathrm{L}^{-1} \cdot \mathrm{h}^{-1}$"
-    x_ticks = np.array([0, 10, 20, 30, 40])
-
-# spec_2
-if y_label in ('k_1ie', 'k_1ii', 'k_7ie', 'k_7ii',):
-    spec_2 = np.linspace(0.0001, 0.5, steps[1])
-    y_units = r"$\mathrm{L} \cdot \mathrm{g}^{-1}$"
-    y_ticks = np.array([0.0, 0.1, 0.2, 0.3, 0.4, 0.5])
-
-# spec_3
-if z_label in ('Spike feed glucose concentration',):
-    spec_3 = conc_sugars_feed_spikes =\
-        np.array([
-                  fbs_spec.conc_sugars_feed_spike,
-                  ])
-    z_units = r"$\mathrm{g} \cdot \mathrm{L}^{-1}$"
-    z_ticks = [0, 200, 400, 600, 800]
+subfolder_name = f'Feed-strat\\'
 
 #%% Chdir
 
 os.chdir(isobutanol_results_pub_filepath + subfolder_name)
 
 #%% Filename
-file_to_load = f'ibo_{steps}_{x_label[:5]}_{y_label[:5]}_{z_label[:5]}_opt={perform_feeding_strategy_opt}_max_n={max_n}_'
+file_to_load = '-_ibo_(25, 25, 1)_Thres_Targe_Spike__metric_'
 
 #%% Load results
 results = {}
 for k in metrics_units.keys():
     try:
-        df = pd.read_csv(file_to_load + f'_{k}.csv')
+        df = pd.read_csv(k+file_to_load+k+'.csv')
         results[k] = np.array([df[df.columns[1:]].to_numpy(dtype='float', na_value=np.nan)])
     except Exception as e:
         if 'no such file' in str(e).lower():
@@ -167,8 +157,8 @@ axis_tick_fontsize = 9.5
 keep_frames = True
 keep_gifs = False
 
-x_label_for_plot = r"$\bf{" + x_label[:x_label.index('_')] + '}_{' + x_label[x_label.index('_')+1:] + '}' +"$"
-y_label_for_plot = r"$\bf{" + y_label[:y_label.index('_')] + '}_{' + y_label[y_label.index('_')+1:] + '}' +"$"
+x_label_for_plot = x_label
+y_label_for_plot = y_label
 
 #%% Plots
 plot_all_generic = True
@@ -181,16 +171,8 @@ if plot_all_generic:
         if not curr_metric in results.keys(): continue
         cbar_n_minor_ticks = 3
         lccm = curr_metric.lower()
-        if 'spike' in lccm or 'total q' in lccm or 'target sugars' in lccm:
-            if not perform_feeding_strategy_opt: 
-                continue
-            else: 
-                if 'spike' in lccm:
-                    if max_n == 0.:
-                        continue
-                else:
-                    pass
-        elif 'yield' in lccm or 'titer' in lccm or 'productivity' in lccm or 'loading' in lccm:
+
+        if 'yield' in lccm or 'titer' in lccm or 'productivity' in lccm or 'loading' in lccm:
             cmap = JBEI_UCB_colormap(reverse=True)
             cmap_over_color = colors.yellow_tint.RGBn
         
@@ -216,12 +198,7 @@ if plot_all_generic:
                             curr_metric_non_nans.max()]))
         curr_metric_w_ticks.sort(reverse=False)
         # curr_metric_w_levels = np.arange(0., 15.5, 0.5)
-        
-        if 'mpsp' in lccm:
-            curr_metric_w_levels = np.arange(0.25, 5.001, 0.1)
-            curr_metric_cbar_ticks = np.arange(0.25, 5.001, 0.25)
-            curr_metric_w_ticks = [0.4, 0.9, 2.5, 5.0]
-            cbar_n_minor_ticks = 4
+
         # else:
         #     break
         
@@ -274,18 +251,11 @@ if plot_all_generic:
 
 # !!!
 
-#%% MPSP vs k_1e, k_7ie, spike feed conc
+#%% MPSP
 curr_metric = 'MPSP'
-if x_label in ('k_1e',):
-    curr_metric_w_levels = np.arange(0.5, 2.001, 0.05)
-    curr_metric_cbar_ticks = np.arange(0.5, 2.001, 0.25)
-    curr_metric_w_ticks = [0.75, 1.2, 2.0]
-    cbar_n_minor_ticks = 4
-elif x_label in ('k_13',):
-    curr_metric_w_levels = np.arange(0.25, 4.751, 0.1)
-    curr_metric_cbar_ticks = np.arange(0.25, 4.751, 0.5)
-    curr_metric_w_ticks = [0.4, 0.9, 2.5, 4.75]
-    cbar_n_minor_ticks = 4
+curr_metric_w_levels = np.arange(0.65, 0.8501, 0.01)
+curr_metric_cbar_ticks = np.arange(0.65, 0.8501, 0.05)
+curr_metric_w_ticks = [0.69, 0.72, 0.85]
 lccm = curr_metric.lower()
 
 if 'yield' in lccm or 'titer' in lccm or 'productivity' in lccm or 'loading' in lccm:
@@ -299,31 +269,15 @@ else:
 
 # Coords for markers
 
-if x_label in ('k_1e',):
-    metrics_to_opt = [
-                      'Combined Yield', 
-                      'EtOH Titer', 
-                      'EtOH Productivity', 
-                      'Cell loading',
-                      'TCI',
-                      'MPSP', 
-                      # 'Total heating duty for sugar sol evap',
-                      ]
+metrics_to_opt = ['MPSP', 
+                  'Combined Yield', 
+                  'EtOH Titer', 
+                  'EtOH Productivity', 
+                  # 'Cell loading',
+                  'TCI'
+                  # 'Total heating duty for sugar sol evap',
+                  ]
 
-elif x_label in ('k_13',):
-    metrics_to_opt = [
-                      'Combined Yield', 
-                      'EtOH Yield',
-                      'EtOH Titer', 
-                      'EtOH Productivity', 
-                      'IBO Yield',
-                      'IBO Titer', 
-                      'IBO Productivity', 
-                      'Cell loading',
-                      'TCI',
-                      'MPSP', 
-                      # 'Total heating duty for sugar sol evap',
-                      ]
 
 opt_coords = {}
 for m in  metrics_to_opt:
@@ -340,11 +294,11 @@ for m in  metrics_to_opt:
 
 additional_points = {}
 
-if x_label in ('k_1e',):
-    baseline_coords = (47.1, 0.04)
-elif x_label in ('k_13',):
-    baseline_coords = (5.81, 0.04)
-additional_points[baseline_coords] = ('D', 'gray', 6)
+# if x_label in ('k_1e',):
+#     baseline_coords = (47.1, 0.04)
+# elif x_label in ('k_13',):
+#     baseline_coords = (5.81, 0.04)
+# additional_points[baseline_coords] = ('D', 'gray', 6)
 
 opt_marker_shapes = ['^', 's', 'p', 'h', 'v', '<', '>', 'o', 'P']
 

@@ -87,7 +87,7 @@ baseline_initial = model.metrics_at_baseline()
 # !!!
 ferm_reactor.kinetic_reaction_system._te.max_n_glu_spikes = 0
 ferm_reactor.kinetic_reaction_system.default_max_n_glu_spikes = 0  
-perform_feeding_strategy_opt = False
+perform_feeding_strategy_opt = True
 
 model_specification(
     n_sims=3,
@@ -306,7 +306,7 @@ for s3 in spec_3:
                 curr_spec.update({'conc_sugars_feed_spike':s3,})
                 
                 if perform_feeding_strategy_opt:
-                    optimize_1D_feeding_strategy_for_MPSP(Ns=5, **curr_spec)
+                    optimize_1D_feeding_strategy_for_MPSP(Ns=20, model_kwargs=curr_spec)
                 else:
                     model_specification(**curr_spec)
                 # plot_kinetic_results()

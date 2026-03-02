@@ -186,7 +186,7 @@ V405_old = f.V405
 #                             )
 
 V406 = nsk.units.NSKFermentation('V406', 
-                                 ins=(H301-0, f.P404-0, H302-0), 
+                                 ins=(H301-0, f.P404-0, H302-0, ), 
                                  kinetic_reaction_system=te_r,
                                  n_simulation_steps=1000,
                                  map_chemicals_nsk_to_bst = {'[s_glu]': 'Glucose',
@@ -242,6 +242,35 @@ def correct_saccharification_feed_flows():
     
 # V406.simulate()
 
+#%% Compressed air system
+K330 = bst.units.IsothermalCompressor('K330', ins='atmospheric_air', outs=('pressurized_air'), 
+                                P=3e7,
+                                # vle=True,
+                                eta=0.6,
+                                driver='Electric motor',
+                                )
+
+@K330.add_specification(run=False)
+def K330_spec():
+    K330_ins_0 = K330.ins[0]
+    K330_ins_0.T = V406.T
+    # K330.P = R302.air_pressure
+    K330_ins_0.phase = 'g'
+    K330_ins_0.mol[:] = K330.outs[0].mol[:]
+    K330._run()
+
+V330 = bst.units.IsenthalpicValve('V330', ins=K330-0,
+                                  P=101325.,
+                                  vle=False,
+                                  )
+V330.line = 'Valve'
+@V330.add_specification(run=False)
+def V330_spec():
+    V330.ins[0].mol[:] = V330.outs[0].mol[:]
+    V330._run()
+    
+V330-0-3-V406
+
 #%%
 
 f.S1.outs[0].disconnect_sink()
@@ -274,7 +303,8 @@ corn_EtOH_IBO_sys_no_IBO_recovery = bst.System.from_units('corn_EtOH_IBO_sys_no_
                                                   + [S301,
                                                      F301, F301_P0, F301_P1, M301, H301,
                                                      F302, F302_P0, F302_P1, M302, H302,
-                                                     V406])
+                                                     V406,
+                                                     K330, V330])
 corn_EtOH_IBO_sys_no_IBO_recovery.simulate()
 
 #%% Add isobutanol recovery system - stage 1/2

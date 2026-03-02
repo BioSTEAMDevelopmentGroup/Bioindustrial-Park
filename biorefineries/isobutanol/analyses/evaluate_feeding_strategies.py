@@ -85,8 +85,8 @@ baseline_initial = model.metrics_at_baseline()
 #%% Baseline -- simulate and solve TEA
 
 #!!!
-ferm_reactor.kinetic_reaction_system._te.max_n_glu_spikes = 0
-ferm_reactor.kinetic_reaction_system.default_max_n_glu_spikes = 0  
+ferm_reactor.kinetic_reaction_system._te.max_n_glu_spikes = 0 # initial val, changed during optimization
+ferm_reactor.kinetic_reaction_system.default_max_n_glu_spikes = 0 # initial val, changed during optimization
 
 model_specification(
     n_sims=3,
@@ -113,6 +113,9 @@ get_tau = lambda: ferm_reactor.tau
 
 get_sugar_sol_evap_duty = lambda: sum([sum([i.duty for i in evap.heat_utilities if i.duty>0]) for evap in sugar_sol_evaporators])
 
+get_cell_loading = lambda: ferm_reactor.nsk_results_specific_tau_dict['[x]']
+get_active_cell_loading = lambda: ferm_reactor.nsk_results_specific_tau_dict['curr_a']
+
 # metrics = [get_product_MPSP, 
 #             get_AOC,
 #             get_TCI,
@@ -129,7 +132,10 @@ metrics = {'MPSP': {'f': get_product_MPSP, 'units': '$/kg'},
             'EtOH Productivity': {'f': get_prod_nsk, 'units': 'g-EtOH/L-broth/h'},
             'Number of glucose spikes': {'f': get_curr_n_glu_spikes, 'units': 'g-EtOH/L-broth/h'},
             'Fermentation time': {'f': get_tau, 'units': 'h'},
-            'Total heating duty for sugar sol evap': {'f': get_sugar_sol_evap_duty, 'units': 'kJ/h'},
+            'Total Q sugar evap': {'f': get_sugar_sol_evap_duty, 'units': 'kJ/h'},
+            'Target sugars concentration': {'f': lambda: fbs_spec.target_conc_sugars, 'units': 'g-sugars/L-broth'},
+            'Cell loading': {'f': get_cell_loading, 'units': 'g-cell/L-broth'},
+            'Active cell loading': {'f': get_active_cell_loading, 'units': 'g-cell/L-broth'},
             }
 
 #%%
