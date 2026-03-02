@@ -156,7 +156,7 @@ def evaluate_metrics_oil_recovery_integration(microbial_oil_recovery, microbial_
             data[i, j, :] = [i() for i in br.model.metrics]
     return data
 
-def save_pickled_results(N, configurations=None, rule='L', optimize=True):
+def save_pickled_results(N, configurations=None, rule='L'):
     from warnings import filterwarnings
     filterwarnings('ignore', category=bst.exceptions.DesignWarning)
     filterwarnings('ignore', category=bst.exceptions.CostWarning)
@@ -165,7 +165,7 @@ def save_pickled_results(N, configurations=None, rule='L', optimize=True):
         br = cane.Biorefinery(name)
         np.random.seed(1)
         samples = br.model.sample(N, rule)
-        br.model.load_samples(samples, optimize=optimize, ss=False)
+        br.model.load_samples(samples)
         file = monte_carlo_file(name, False)
         br.model.load_pickled_results(
             file=autoload_file_name(name),
@@ -187,7 +187,6 @@ def run_uncertainty_and_sensitivity(name, N, rule='L',
                                     sample_cache={},
                                     autosave=True,
                                     autoload=True,
-                                    optimize=True,
                                     N_coordinate=None,
                                     **kwargs):
     print(f"Running {name}!")
@@ -214,7 +213,7 @@ def run_uncertainty_and_sensitivity(name, N, rule='L',
             config.set_feedstock_line(line)
             current_line[0] = line
             np.random.seed(1)
-            config.model.load_samples(config.model.sample(N, rule=rule), optimize=optimize)
+            config.model.load_samples(config.model.sample(N, rule=rule))
         
         @no_derivative
         def evaluate(current_line=current_line, **kwargs):
@@ -277,7 +276,7 @@ def run_uncertainty_and_sensitivity(name, N, rule='L',
                 br.model.metrics = [br.ROI, br.competitive_biomass_yield, br.net_energy_production]
             else:
                 # Only sugarcane needs the ROI metric (which gets added later)
-                br.model.metrics = [br.competitive_biomass_yield, br.energy_competitive_biomass_yield]
+                br.model.metrics = [br.competitive_biomass_yield] # , br.energy_competitive_biomass_yield
                 br_sugarcane = cane.Biorefinery(name.replace('O', 'S'))
         elif across_oil_content == 'microbial oil vs bioethanol':
             raise NotImplementedError('microbial oil vs bioethanol is not yet ready')
@@ -302,7 +301,7 @@ def run_uncertainty_and_sensitivity(name, N, rule='L',
         if br_sugarcane:
             br_sugarcane.model.metrics = [br_sugarcane.ROI, br_sugarcane.net_energy_production]
             br_sugarcane.model.load_samples(samples)
-        br.model.load_samples(samples, optimize=optimize)
+        br.model.load_samples(samples)
         @no_derivative
         def evaluate(**kwargs):
             oil_content = int(1000 * br.composition_specification.oil)
@@ -385,7 +384,7 @@ def run_uncertainty_and_sensitivity(name, N, rule='L',
         autoload_file = autoload_file_name(name)
         np.random.seed(1)
         samples = br.model.sample(N, rule)
-        br.model.load_samples(samples, optimize=optimize)
+        br.model.load_samples(samples)
         success = False
         if not derivative: br.disable_derivative()
         for i in range(3):
@@ -419,6 +418,7 @@ run = run_uncertainty_and_sensitivity
     
 def run_all(N, across_lines=False, rule='L', configurations=None,
             filter=None,**kwargs):
+    filterwarnings('ignore')
     if configurations is None: configurations = configuration_names
     for name in configurations:
         if filter and not filter(name): continue

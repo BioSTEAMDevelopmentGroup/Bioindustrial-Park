@@ -172,9 +172,13 @@ lca_monte_carlo_derivative_metric_mockups = (
     GWP_crude_glycerol_derivative,
 )
 
-def get_YRCP2023_spearman_names(configuration, kind=None):
-    from biorefineries.cane import Biorefinery, YRCP2023
+def get_YRCP2023_spearman_names(*args, **kwargs):
+    from biorefineries.cane import YRCP2023
     YRCP2023()
+    return get_spearman_names(*args, **kwargs)
+
+def get_spearman_names(configuration, kind=None):
+    from biorefineries.cane import Biorefinery
     br = Biorefinery('O1', simulate=False)
     name = 'name'
     full_name = 'full_name'
@@ -284,13 +288,15 @@ def get_YRCP2023_spearman_names(configuration, kind=None):
     lca_spearman_labels = {
         i: j for i, j in
         tea_spearman_labels.items()
-        if not any([k in ''.join(i).lower() for k in ('price', 'cost', 'days', 'land', 'irr')])
+        if not any([k in ''.join(i).lower() for k in ('price', 'cost', 'days', 'irr')])
     }
     lca_spearman_labels.update(GWP_spearman_labels)
     if kind == 'TEA':
         return tea_spearman_labels
     elif kind == 'LCA':
         return lca_spearman_labels
+    elif kind == 'all':
+        return {i: j for i, j in tea_spearman_labels.items() if i in lca_spearman_labels}
     else:
         return tea_spearman_labels, lca_spearman_labels
 

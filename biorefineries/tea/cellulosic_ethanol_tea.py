@@ -104,6 +104,22 @@ class CellulosicEthanolTEA(TEA):
         else:
             return sum([i.installed_cost for i in self.OSBL_units])
     
+    def itemized_equipment_cost(self):
+        element_name = bst.evaluation._name.element_name
+        index = []
+        data = []
+        OSBL = set(self.OSBL_units)
+        for i in self.system.cost_units:
+            cost = 'OSBL' if i in OSBL else 'ISBL'
+            index.append(
+                (cost, element_name(i))
+            )
+            data.append(
+                i.installed_cost
+            )
+        df = pd.DataFrame(index=pd.MultiIndex.from_tuples(index), data=data)
+        return df
+    
     def _fill_depreciation_array(self, D, start, years, TDC):
         depreciation_array = self._get_depreciation_array()
         N_depreciation_years = depreciation_array.size
@@ -208,7 +224,7 @@ def create_cellulosic_ethanol_tea(sys, OSBL_units=None, cls=None):
         boiler_turbogenerator=BT)
     return tea
 
-def capex_table(teas, names=None, dataframe=True):
+def capex_table(teas, names=None, dataframe=True, itemized_equipment=False):
     if isinstance(teas, bst.TEA): teas = [teas]
     if names is None: 
         if len(teas) == 1:
@@ -219,13 +235,33 @@ def capex_table(teas, names=None, dataframe=True):
     capex = tea.Accounting('MM$', names=names)
     ISBL_installed_equipment_costs = np.array([i.ISBL_installed_equipment_cost / 1e6 for i in teas])
     OSBL_installed_equipment_costs = np.array([i.OSBL_installed_equipment_cost / 1e6 for i in teas])
+    if itemized_equipment:
+        element_name = bst.evaluation._name.element_name
+        ISBL_data = {}
+        OSBL_data = {}
+        N = len(teas)
+        for n, tea in enumerate(teas):
+            OSBL = set(tea.OSBL_units)
+            for unit in tea.system.cost_units:
+                data = OSBL_data if unit in OSBL else ISBL_data
+                key = element_name(unit)
+                if key in data:
+                    arr = data[key] 
+                else:
+                    data[key] = arr = np.zeros(N)
+                arr[n] = unit.installed_cost / 1e6
+        for i, j in ISBL_data.items(): capex.entry(('Inside battery limits (ISBL)', i), j)
+        for i, j in OSBL_data.items(): capex.entry(('Outside battery limits (OSBL)', i), j)
+        equipment_cost = ISBL_installed_equipment_costs + OSBL_installed_equipment_costs
+    else:
+        equipment_cost = 0
     capex.entry(('Direct costs', 'ISBL installed equipment cost'), ISBL_installed_equipment_costs)
     capex.entry(('Direct costs', 'OSBL installed equipment cost'), OSBL_installed_equipment_costs)
     ISBL_factor_entry = lambda name, value: capex.entry(name, ISBL_installed_equipment_costs * value, f"{value:.1%} of ISBL")
     ISBL_factor_entry(('Direct costs', 'Warehouse'), tea.warehouse)
     ISBL_factor_entry(('Direct costs', 'Site development'), tea.site_development)
     ISBL_factor_entry(('Direct costs', 'Additional piping'), tea.additional_piping)
-    TDC = np.array(capex.total_costs)
+    TDC = np.array(capex.total_costs - equipment_cost)
     capex.entry(('Total direct cost (TDC)', ''), TDC)
     TDC_factor_entry = lambda name, value: capex.entry(name, TDC * value, f"{value:.1%} of TDC")
     TDC_factor_entry(('Indirect costs', 'Proratable costs'), tea.proratable_costs)
@@ -233,7 +269,7 @@ def capex_table(teas, names=None, dataframe=True):
     TDC_factor_entry(('Indirect costs', 'Construction'), tea.construction)
     TDC_factor_entry(('Indirect costs', 'Contingency'), tea.contingency)
     TDC_factor_entry(('Indirect costs', 'Other (start-up, permits, etc.)'), tea.other_indirect_costs)
-    TIC = np.array(capex.total_costs) - 2 * TDC
+    TIC = np.array(capex.total_costs) - 2 * TDC - equipment_cost
     capex.entry(('Total indirect cost (TIC)', ''), TIC)
     FCI = TDC + TIC
     capex.entry(('Fixed capital investment (FCI)', ''), FCI, 'TDC + TIC')
