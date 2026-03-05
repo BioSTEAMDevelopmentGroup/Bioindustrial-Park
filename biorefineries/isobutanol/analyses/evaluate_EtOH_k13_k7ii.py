@@ -90,7 +90,7 @@ f.M401.bypass_IBO_separation_conditions[0] = lambda: V406.outs[1].imass['Isobuta
 # !!!
 ferm_reactor.kinetic_reaction_system._te.max_n_glu_spikes = 0
 ferm_reactor.kinetic_reaction_system.default_max_n_glu_spikes = 0  
-perform_feeding_strategy_opt = True
+perform_feeding_strategy_opt = False
 
 model_specification(
     n_sims=3,
@@ -143,6 +143,7 @@ metrics = {'MPSP': {'f': get_product_MPSP, 'units': '$/kg'},
             'IBO Yield': {'f': lambda: ferm_reactor.nsk_results_specific_tau_dict['y_IBO_glu_added'], 'units': 'g-IBO/g-sugars'},
             'IBO Titer': {'f': lambda: ferm_reactor.nsk_results_specific_tau_dict['[s_IBO]'], 'units': 'g-IBO/L-broth'},
             'IBO Productivity': {'f': lambda: ferm_reactor.nsk_results_specific_tau_dict['[s_IBO]']/ferm_reactor.nsk_results_specific_tau_dict['time'], 'units': 'g-IBO/L-broth/h'},
+            'Actual aeration required': {'f': lambda: ferm_reactor.compressed_air.imol['O2'], 'units': 'kmol-O2/h'},
             }
 
 #%%
@@ -689,7 +690,7 @@ if plot:
     for curr_metric, val in metrics.items():
         cbar_n_minor_ticks = 3
         lccm = curr_metric.lower()
-        if 'spike' in lccm or 'duty' in lccm or 'target sugars' in lccm:
+        if 'spike' in lccm or 'q sugar' in lccm or 'target sugars' in lccm:
             if not perform_feeding_strategy_opt: 
                 continue
             else: 

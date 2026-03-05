@@ -136,6 +136,7 @@ metrics = {'MPSP': {'f': get_product_MPSP, 'units': '$/kg'},
             'Target sugars concentration': {'f': lambda: fbs_spec.target_conc_sugars, 'units': 'g-sugars/L-broth'},
             'Cell loading': {'f': get_cell_loading, 'units': 'g-cell/L-broth'},
             'Active cell loading': {'f': get_active_cell_loading, 'units': 'g-cell/L-broth'},
+            'Actual aeration required': {'f': lambda: ferm_reactor.compressed_air.imol['O2'], 'units': 'kmol-O2/h'},
             }
 
 #%%
@@ -680,7 +681,7 @@ if plot:
     #%% All metrics
     for curr_metric, val in metrics.items():
         lccm = curr_metric.lower()
-        if 'spike' in lccm or 'duty' in lccm or 'target sugars' in lccm:
+        if 'spike' in lccm or 'q sugar' in lccm or 'target sugars' in lccm:
             if not perform_feeding_strategy_opt: 
                 continue
             else: 

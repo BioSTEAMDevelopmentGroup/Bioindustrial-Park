@@ -87,7 +87,7 @@ baseline_initial = model.metrics_at_baseline()
 # !!!
 ferm_reactor.kinetic_reaction_system._te.max_n_glu_spikes = 0
 ferm_reactor.kinetic_reaction_system.default_max_n_glu_spikes = 0  
-perform_feeding_strategy_opt = True
+perform_feeding_strategy_opt = False
 
 model_specification(
     n_sims=3,
@@ -136,6 +136,7 @@ metrics = {'MPSP': {'f': get_product_MPSP, 'units': '$/kg'},
             'Target sugars concentration': {'f': lambda: fbs_spec.target_conc_sugars, 'units': 'g-sugars/L-broth'},
             'Cell loading': {'f': get_cell_loading, 'units': 'g-cell/L-broth'},
             'Active cell loading': {'f': get_active_cell_loading, 'units': 'g-cell/L-broth'},
+            'Actual aeration required': {'f': lambda: ferm_reactor.compressed_air.imol['O2'], 'units': 'kmol-O2/h'},
             }
 
 #%%
@@ -478,9 +479,9 @@ if plot:
     #%% MPSP
     
     # MPSP_w_levels, MPSP_w_ticks, MPSP_cbar_ticks = get_contour_info_from_metric_data(results_metric_1, lb=3)
-    MPSP_w_levels = np.arange(0.25, 1.0001, 0.01)
-    MPSP_cbar_ticks = np.arange(0.25, 1.0001, 0.05)
-    MPSP_w_ticks = [0.4, 0.6, 0.8]
+    MPSP_w_levels = np.arange(0.75, 3.0001, 0.05)
+    MPSP_cbar_ticks = np.arange(0.75, 3.0001, 0.25)
+    MPSP_w_ticks = [0.8, 1.5, 2, 3]
     # MPSP_w_levels = np.arange(0., 15.5, 0.5)
     
     
@@ -681,7 +682,7 @@ if plot:
     #%% All metrics
     for curr_metric, val in metrics.items():
         lccm = curr_metric.lower()
-        if 'spike' in lccm or 'duty' in lccm or 'target sugars' in lccm:
+        if 'spike' in lccm or 'q sugar' in lccm or 'target sugars' in lccm:
             if not perform_feeding_strategy_opt: 
                 continue
             else: 
