@@ -104,13 +104,13 @@ subfolder_name = f'Feed-strat\\'
 os.chdir(isobutanol_results_pub_filepath + subfolder_name)
 
 #%% Filename
-file_to_load = '-_ibo_(25, 25, 1)_Thres_Targe_Spike__metric_'
+file_to_load = 'ibo_(25, 25, 1)_Thres_Targe_Spike_'
 
 #%% Load results
 results = {}
 for k in metrics_units.keys():
     try:
-        df = pd.read_csv(k+file_to_load+k+'.csv')
+        df = pd.read_csv(file_to_load + f'_{k}.csv')
         results[k] = np.array([df[df.columns[1:]].to_numpy(dtype='float', na_value=np.nan)])
     except Exception as e:
         if 'no such file' in str(e).lower():
@@ -253,9 +253,9 @@ if plot_all_generic:
 
 #%% MPSP
 curr_metric = 'MPSP'
-curr_metric_w_levels = np.arange(0.65, 0.8501, 0.01)
-curr_metric_cbar_ticks = np.arange(0.65, 0.8501, 0.05)
-curr_metric_w_ticks = [0.69, 0.72, 0.85]
+curr_metric_w_levels = np.arange(0.7, 1.0001, 0.01)
+curr_metric_cbar_ticks = np.arange(0.7, 1.0001, 0.05)
+curr_metric_w_ticks = [0.75,]
 lccm = curr_metric.lower()
 
 if 'yield' in lccm or 'titer' in lccm or 'productivity' in lccm or 'loading' in lccm:
@@ -273,16 +273,18 @@ metrics_to_opt = ['MPSP',
                   'Combined Yield', 
                   'EtOH Titer', 
                   'EtOH Productivity', 
-                  # 'Cell loading',
-                  'TCI'
-                  # 'Total heating duty for sugar sol evap',
+                  'Cell loading',
+                  'Total Q sugar evap',
+                  # 'Actual aeration required',
+                  'TCI',
+                  'AOC',
                   ]
 
 
 opt_coords = {}
 for m in  metrics_to_opt:
     m_non_nans = np.array(results[m])[np.where(~np.isnan(np.array(results[m])))]
-    if m in ('MPSP', 'AOC', 'TCI', 'Total heating duty for sugar sol evap', 'Fermentation time',):
+    if m in ('MPSP', 'AOC', 'TCI', 'Total Q sugar evap', 'Fermentation time', 'Actual aeration required'):
         m_opt_coords = np.where(results[m][0]==m_non_nans.min())
     else:
         m_opt_coords = np.where(results[m][0]==m_non_nans.max())

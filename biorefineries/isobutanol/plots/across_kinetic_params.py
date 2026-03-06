@@ -34,7 +34,10 @@ fbs_spec = isobutanol.models.fbs_spec
 
 #%%
 
-EtOH_market_range=np.array([0.7, 1.0]) 
+EtOH_market_range=np.array([
+    0.52,
+    1.14,
+    ]) # March 2021- March 2026 5-year low and high from https://tradingeconomics.com/commodity/ethanol
                 
 #%% Pub results main filepath
 isobutanol_filepath = isobutanol.__file__.replace('\\__init__.py', '')
@@ -42,8 +45,8 @@ isobutanol_results_pub_filepath = isobutanol_filepath + '\\analyses\\results\\pu
 
 #%%  Metrics
 metrics_units = {"MPSP":  r"$\mathrm{\$}\cdot\mathrm{kg}^{-1}$",
-                "AOC": "MM$/y",
-                "TCI": "MM$",
+                "AOC": "MM\$/y",
+                "TCI": "MM\$",
                 "Combined Yield": "g-EtOH-and-IBO/g-sugars",
                 "EtOH Titer": "g-EtOH/L-broth",
                 "EtOH Productivity": "g-EtOH/L-broth/h",
@@ -57,6 +60,7 @@ metrics_units = {"MPSP":  r"$\mathrm{\$}\cdot\mathrm{kg}^{-1}$",
                 "IBO Yield": "g-IBO/g-sugars",
                 "IBO Titer": "g-IBO/L-broth",
                 "IBO Productivity": "g-IBO/L-broth/h",
+                "Actual aeration required": "kmol-O2/h",
                 }
 
 #%% Input Details
@@ -176,6 +180,85 @@ plot_all_generic = True
 if plot_all_generic: 
     print('\nCreating and saving contour plots ...\n')
     
+    
+    # Coords for markers
+    
+    if x_label in ('k_1e',):
+        metrics_to_opt = [
+                          'Combined Yield', 
+                          'EtOH Titer', 
+                          'EtOH Productivity', 
+                          'Cell loading',
+                          'TCI',
+                          'AOC',
+                          'MPSP', 
+                          'Total Q sugar evap',
+                          'Actual aeration required',
+                          ]
+    
+    elif x_label in ('k_13',):
+        metrics_to_opt = [
+                          'Combined Yield', 
+                          'EtOH Yield',
+                          'EtOH Titer', 
+                          'EtOH Productivity', 
+                          'IBO Yield',
+                          'IBO Titer', 
+                          'IBO Productivity', 
+                          'Cell loading',
+                          'TCI',
+                          'AOC',
+                          'MPSP', 
+                          'Total Q sugar evap',
+                          'Actual aeration required',
+                          ]
+    
+    opt_coords = {}
+    for m in  metrics_to_opt:
+        m_non_nans = np.array(results[m])[np.where(~np.isnan(np.array(results[m])))]
+        if m in ('MPSP', 'AOC', 'TCI', 'Total Q sugar evap', 'Fermentation time', 'Actual aeration required'):
+            m_opt_coords = np.where(results[m][0]==m_non_nans.min())
+        else:
+            m_opt_coords = np.where(results[m][0]==m_non_nans.max())
+        opt_s1 = spec_1[m_opt_coords[1][0]]
+        opt_s2 = spec_2[m_opt_coords[0][0]]
+        opt_coords[m] = (opt_s1, opt_s2)
+        # print(results['MPSP'][0][opt_coords])
+        # print(opt_s1, opt_s2)
+    
+    additional_points = {}
+    
+    if x_label in ('k_1e',):
+        baseline_coords = (47.1, 0.04)
+    elif x_label in ('k_13',):
+        # baseline_coords = (5.81, 0.04)
+        baseline_coords = (0.0, 0.04)
+    additional_points[baseline_coords] = ('D', 'gray', 6)
+    
+    opt_marker_shapes = ['^', 's', 'p', 'h', 'v', '<', '>', 'o', 'P', 'X']
+    
+    shapes_i = 0
+    for m in metrics_to_opt:
+        if m=='MPSP':
+            marker_shape='*'
+            marker_color='#33ccff'
+            marker_size = 8
+        elif m=='TCI':
+            marker_shape='s'
+            marker_color='#33ccff'
+            marker_size = 6
+        elif m=='AOC':
+            marker_shape='p'
+            marker_color='#33ccff'
+            marker_size = 6
+        else:
+            marker_shape = opt_marker_shapes[shapes_i]
+            shapes_i += 1
+            marker_color = 'w'
+            marker_size = 6
+        additional_points[opt_coords[m]] = (marker_shape, marker_color, marker_size)
+        print(m, marker_shape, marker_color, marker_size)
+    
     #%% All metrics
     for curr_metric, val in metrics_units.items():
         if not curr_metric in results.keys(): continue
@@ -197,23 +280,30 @@ if plot_all_generic:
         else:
             cmap = JBEI_UCB_colormap(reverse=False)
             cmap_over_color = colors.grey_dark.shade(8).RGBn
-            
+        
         # curr_metric_w_levels, curr_metric_w_ticks, curr_metric_cbar_ticks = get_contour_info_from_metric_data(results_metric_1, lb=3)
         curr_metric_non_nans = np.array(results[curr_metric])[np.where(~np.isnan(np.array(results[curr_metric])))]
         
+        w_level_top_val = curr_metric_non_nans.max()*0.8
+        extend_cmap = 'max'
+        if 'yield' in lccm or 'titer' in lccm or 'productivity' in lccm or 'cell loading' in lccm:
+            w_level_top_val = curr_metric_non_nans.max()
+            extend_cmap = 'neither'
+        arange_w_level_top_val = w_level_top_val*1.00000000001
         curr_metric_w_levels = np.arange(curr_metric_non_nans.min(), 
-                                      curr_metric_non_nans.max()*1.001, 
-                                      (curr_metric_non_nans.max()-curr_metric_non_nans.min())/80
+                                      arange_w_level_top_val, 
+                                      (w_level_top_val-curr_metric_non_nans.min())/80
                                       )
         curr_metric_cbar_ticks = np.arange(curr_metric_non_nans.min(), 
-                                      curr_metric_non_nans.max()*1.001, 
-                                      (curr_metric_non_nans.max()-curr_metric_non_nans.min())/5
+                                      arange_w_level_top_val, 
+                                      (w_level_top_val-curr_metric_non_nans.min())/5
                                       )
         
         curr_metric_w_ticks = list(set([np.percentile(curr_metric_non_nans, 25),
                             np.percentile(curr_metric_non_nans, 50),
                             np.percentile(curr_metric_non_nans, 75),
-                            curr_metric_non_nans.max()]))
+                            w_level_top_val,
+                            ]))
         curr_metric_w_ticks.sort(reverse=False)
         # curr_metric_w_levels = np.arange(0., 15.5, 0.5)
         
@@ -233,7 +323,7 @@ if plot_all_generic:
                                         x_label=x_label_for_plot, # title of the x axis
                                         y_label=y_label_for_plot, # title of the y axis
                                         z_label=r"$\bf"+z_label+"$", # title of the z axis
-                                        w_label=r"$\bf"+curr_metric+"$", # title of the color axis
+                                        w_label=r"$\bf"+curr_metric.replace(' ', '\ ')+"$", # title of the color axis
                                         x_ticks=x_ticks,
                                         y_ticks=y_ticks,
                                         z_ticks=z_ticks,
@@ -248,7 +338,7 @@ if plot_all_generic:
                                         cmap=cmap, # can use 'viridis' or other default matplotlib colormaps
                                         # cmap_over_color = colors.grey_dark.shade(8).RGBn,
                                         cmap_over_color=cmap_over_color,
-                                        extend_cmap='max',
+                                        extend_cmap=extend_cmap,
                                         cbar_ticks=curr_metric_cbar_ticks,
                                         z_marker_color='g', # default matplotlib color names
                                         fps=fps, # animation frames (z values traversed) per second
@@ -261,13 +351,17 @@ if plot_all_generic:
                                         default_fontsize = default_fontsize,
                                         axis_tick_fontsize = axis_tick_fontsize,
                                         # comparison_range=EtOH_market_range,
-                                        n_minor_ticks = 1,
+                                        # comparison_range=np.array(
+                                        #     [max(EtOH_market_range[0], curr_metric_non_nans.min()),
+                                        #      min(EtOH_market_range[1], curr_metric_non_nans.max())]),
+                                        n_minor_ticks = 3,
                                         cbar_n_minor_ticks = cbar_n_minor_ticks,
                                         units_on_newline = (False, False, False, False), # x,y,z,w
                                         units_opening_brackets = [" [",] * 4,
                                         units_closing_brackets = ["]",] * 4,
                                         round_xticks_to=0,
                                         round_yticks_to=1,
+                                        additional_points=additional_points,
                                         )
 
 #%% Tailor-made plots
@@ -277,15 +371,15 @@ if plot_all_generic:
 #%% MPSP vs k_1e, k_7ie, spike feed conc
 curr_metric = 'MPSP'
 if x_label in ('k_1e',):
-    curr_metric_w_levels = np.arange(0.5, 2.001, 0.05)
-    curr_metric_cbar_ticks = np.arange(0.5, 2.001, 0.25)
-    curr_metric_w_ticks = [0.75, 1.2, 2.0]
-    cbar_n_minor_ticks = 4
+    curr_metric_w_levels = np.arange(0.6, 3.001, 0.05)
+    curr_metric_cbar_ticks = np.arange(0.6, 3.001, 0.4)
+    curr_metric_w_ticks = [0.75, 2.0, 3.0]
+    cbar_n_minor_ticks = 3
 elif x_label in ('k_13',):
-    curr_metric_w_levels = np.arange(0.25, 4.751, 0.1)
-    curr_metric_cbar_ticks = np.arange(0.25, 4.751, 0.5)
-    curr_metric_w_ticks = [0.4, 0.9, 2.5, 4.75]
-    cbar_n_minor_ticks = 4
+    curr_metric_w_levels = np.arange(0.4, 4.001, 0.1)
+    curr_metric_cbar_ticks = np.arange(0.4, 4.001, 0.4)
+    curr_metric_w_ticks = [0.55, 2.5, 4.00]
+    cbar_n_minor_ticks = 3
 lccm = curr_metric.lower()
 
 if 'yield' in lccm or 'titer' in lccm or 'productivity' in lccm or 'loading' in lccm:
@@ -297,72 +391,10 @@ else:
     cmap_over_color = colors.grey_dark.shade(8).RGBn
 
 
-# Coords for markers
-
-if x_label in ('k_1e',):
-    metrics_to_opt = [
-                      'Combined Yield', 
-                      'EtOH Titer', 
-                      'EtOH Productivity', 
-                      'Cell loading',
-                      'TCI',
-                      'MPSP', 
-                      # 'Total heating duty for sugar sol evap',
-                      ]
-
-elif x_label in ('k_13',):
-    metrics_to_opt = [
-                      'Combined Yield', 
-                      'EtOH Yield',
-                      'EtOH Titer', 
-                      'EtOH Productivity', 
-                      'IBO Yield',
-                      'IBO Titer', 
-                      'IBO Productivity', 
-                      'Cell loading',
-                      'TCI',
-                      'MPSP', 
-                      # 'Total heating duty for sugar sol evap',
-                      ]
-
-opt_coords = {}
-for m in  metrics_to_opt:
-    m_non_nans = np.array(results[m])[np.where(~np.isnan(np.array(results[m])))]
-    if m in ('MPSP', 'AOC', 'TCI', 'Total heating duty for sugar sol evap', 'Fermentation time',):
-        m_opt_coords = np.where(results[m][0]==m_non_nans.min())
-    else:
-        m_opt_coords = np.where(results[m][0]==m_non_nans.max())
-    opt_s1 = spec_1[m_opt_coords[1][0]]
-    opt_s2 = spec_2[m_opt_coords[0][0]]
-    opt_coords[m] = (opt_s1, opt_s2)
-    # print(results['MPSP'][0][opt_coords])
-    # print(opt_s1, opt_s2)
-
-additional_points = {}
-
-if x_label in ('k_1e',):
-    baseline_coords = (47.1, 0.04)
-elif x_label in ('k_13',):
-    baseline_coords = (5.81, 0.04)
-additional_points[baseline_coords] = ('D', 'gray', 6)
-
-opt_marker_shapes = ['^', 's', 'p', 'h', 'v', '<', '>', 'o', 'P']
-
-shapes_i = 0
-for m in metrics_to_opt:
-    if m=='MPSP':
-        marker_shape='*'
-        marker_color='#33ccff'
-        marker_size = 8
-    else:
-        marker_shape = opt_marker_shapes[shapes_i]
-        shapes_i += 1
-        marker_color = 'w'
-        marker_size = 6
-    additional_points[opt_coords[m]] = (marker_shape, marker_color, marker_size)
-    print(m, marker_shape, marker_color, marker_size)
 val = metrics_units[curr_metric]
 
+curr_metric_non_nans = np.array(results[curr_metric])[np.where(~np.isnan(np.array(results[curr_metric])))]
+ 
 contourplots.animated_contourplot(w_data_vs_x_y_at_multiple_z=results[curr_metric], # shape = z * x * y # values of the metric you want to plot on the color axis; e.g., curr_metric
                                 x_data=spec_1, # x axis values
                                 # x_data = curr_metrics/theoretical_max_g_HP_acid_per_g_glucose,
@@ -371,7 +403,7 @@ contourplots.animated_contourplot(w_data_vs_x_y_at_multiple_z=results[curr_metri
                                 x_label=x_label_for_plot, # title of the x axis
                                 y_label=y_label_for_plot, # title of the y axis
                                 z_label=r"$\bf"+z_label+"$", # title of the z axis
-                                w_label=r"$\bf"+curr_metric+"$", # title of the color axis
+                                w_label=r"$\bf"+curr_metric.replace(' ', '\ ')+"$", # title of the color axis
                                 x_ticks=x_ticks,
                                 y_ticks=y_ticks,
                                 z_ticks=z_ticks,
@@ -400,7 +432,10 @@ contourplots.animated_contourplot(w_data_vs_x_y_at_multiple_z=results[curr_metri
                                 axis_tick_fontsize = axis_tick_fontsize,
                                 additional_points=additional_points,
                                 # comparison_range=EtOH_market_range,
-                                n_minor_ticks = 1,
+                                comparison_range=np.array(
+                                    [max(EtOH_market_range[0], curr_metric_non_nans.min()),
+                                     min(EtOH_market_range[1], curr_metric_non_nans.max())]),
+                                n_minor_ticks = 3,
                                 cbar_n_minor_ticks = cbar_n_minor_ticks,
                                 units_on_newline = (False, False, False, False), # x,y,z,w
                                 units_opening_brackets = [" [",] * 4,
@@ -408,3 +443,38 @@ contourplots.animated_contourplot(w_data_vs_x_y_at_multiple_z=results[curr_metri
                                 round_xticks_to=0,
                                 round_yticks_to=1,
                                 )
+
+#%% All metric values at opt_coords
+opt_coords_metric_vals = {}
+
+for m1 in metrics_to_opt:
+    opt_s1, opt_s2 = opt_coords[m1]
+    opt_s1_ind, opt_s2_ind = np.where(spec_1==opt_s1)[0][0], np.where(spec_2==opt_s2)[0][0]
+    opt_coords_metric_vals[m1] = {'Coords': (opt_s1, opt_s2),}
+    for m2 in metrics_to_opt:
+        opt_coords_metric_vals[m1][m2] = results[m2][0, opt_s2_ind, opt_s1_ind]
+
+#%%
+round_off = contourplots.utils.round_off
+def get_optima_comparisons(opt_coords_metric_values, rel_to_m='MPSP'):
+    print(f"\n\nRelative to the optimum for '{rel_to_m}', at the optimum for:")
+    print('\n')
+    i = 0
+    for m1, v in opt_coords_metric_values.items():
+        i+=1
+        print(f"{i}. '{m1}' ({v['Coords']}),")
+        for m2 in v.keys():
+            if not m2=='Coords':
+                try:
+                    rel_diff = v[m2]/opt_coords_metric_values[rel_to_m][m2] - 1
+                    sign = '+' if rel_diff>0 else '-'
+                    print(f"'{m2}' is {round_off(v[m2],3)}, which is {sign} {abs(int(100*rel_diff))}%.")
+                except Exception as e:
+                    if 'divide' in str(e).lower():
+                        print(f"'{m2}' is zero.")
+                    else:
+                        breakpoint()
+        print('\n')
+        
+#%%
+get_optima_comparisons(opt_coords_metric_vals)

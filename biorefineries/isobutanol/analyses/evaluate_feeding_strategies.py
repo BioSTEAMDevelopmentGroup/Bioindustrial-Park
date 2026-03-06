@@ -62,7 +62,11 @@ HXN = f.HXN1001
 product = f.ethanol
 broth = ferm_reactor.outs[1]
 
-EtOH_market_range=np.array([0.7, 1.0]) 
+EtOH_market_range=np.array([
+    0.52,
+    1.14,
+    ]) # March 2021- March 2026 5-year low and high from https://tradingeconomics.com/commodity/ethanol
+              
                 
 #%% Filepaths
 isobutanol_filepath = isobutanol.__file__.replace('\\__init__.py', '')
@@ -136,6 +140,7 @@ metrics = {'MPSP': {'f': get_product_MPSP, 'units': '$/kg'},
             'Target sugars concentration': {'f': lambda: fbs_spec.target_conc_sugars, 'units': 'g-sugars/L-broth'},
             'Cell loading': {'f': get_cell_loading, 'units': 'g-cell/L-broth'},
             'Active cell loading': {'f': get_active_cell_loading, 'units': 'g-cell/L-broth'},
+            'Actual aeration required': {'f': lambda: ferm_reactor.compressed_air.imol['O2'], 'units': 'kmol-O2/h'},
             }
 
 #%%
@@ -263,7 +268,7 @@ def tickmarks(dmin, dmax, accuracy=50, N_points=5):
 #%%
 minute = '0' + str(dateTimeObj.minute) if len(str(dateTimeObj.minute))==1 else str(dateTimeObj.minute)
 # file_to_save = f'_{steps}_steps_'+'etoh_fbs_%s.%s.%s-%s.%s'%(dateTimeObj.year, dateTimeObj.month, dateTimeObj.day, dateTimeObj.hour, minute)
-file_to_save = f'_ibo_{steps}_{x_label[:5]}_{y_label[:5]}_{z_label[:5]}_'
+file_to_save = f'ibo_{steps}_{x_label[:5]}_{y_label[:5]}_{z_label[:5]}_'
 
 chdir(isobutanol_results_filepath)
 
@@ -371,8 +376,8 @@ for s3 in spec_3:
 
     # Save generated data
     for k, v in results.items():
-        csv_file_to_save = isobutanol_results_filepath+k+'-'+file_to_save+'.csv'
-        pd.DataFrame(v[-1]).to_csv()
+        csv_file_to_save = file_to_save + f'_{k}'
+        pd.DataFrame(v[-1]).to_csv(isobutanol_results_filepath+csv_file_to_save+'.csv')
 
 #%% Report maximum HXN energy balance error
 print(f'Max HXN Q bal error was {round(max_HXN_qbal_percent_error, 3)} %.')
@@ -540,9 +545,9 @@ if plot:
     #%% MPSP
     
     # MPSP_w_levels, MPSP_w_ticks, MPSP_cbar_ticks = get_contour_info_from_metric_data(results_metric_1, lb=3)
-    MPSP_w_levels = np.arange(0.65, 0.8501, 0.01)
-    MPSP_cbar_ticks = np.arange(0.65, 0.8501, 0.05)
-    MPSP_w_ticks = [0.69, 0.72, 0.85]
+    MPSP_w_levels = np.arange(0.7, 1.0001, 0.01)
+    MPSP_cbar_ticks = np.arange(0.7, 1.0001, 0.05)
+    MPSP_w_ticks = [0.75,]
     # MPSP_w_levels = np.arange(0., 15.5, 0.5)
     
     

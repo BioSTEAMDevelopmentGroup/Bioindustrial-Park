@@ -227,7 +227,7 @@ yeast = f.yeast
 gluco_amylase = f.gluco_amylase
 ammonia = f.ammonia
 
-@V406.add_specification(run=True)
+@V406.add_specification(run=False)
 def correct_saccharification_feed_flows():
     mash = V406.ins[0]
     mash_flow = mash.F_mass
@@ -235,10 +235,12 @@ def correct_saccharification_feed_flows():
     yeast.F_mass = max(1e-2, parameters['yeast_loading'] * mash_flow)
     gluco_amylase.F_mass = max(1e-2, parameters['saccharification_gluco_amylase_loading'] * mash_dry_flow)
     
-    # V406.simulate()
-    
     effluent = V406.outs[1]
     ammonia.imass['NH3'] = parameters['NH3_per_Yeast'] * effluent.imass['Yeast']
+    
+    V406.simulate()
+    K330.simulate()
+    V330.simulate()
     
 # V406.simulate()
 
@@ -295,6 +297,8 @@ V409.specifications = []
 def update_scrubber_wash_water():
     scrubber_water.imass['Water'] =  V409.ins[1].F_mass * parameters['scrubber_wash_water_over_vent']
     V409._run()
+    V409.outs[0].imol['N2'] = V409.outs[1].imol['N2']
+    V409.outs[1].imol['N2'] = 0.0
 
 #%%
 corn_EtOH_IBO_sys_no_IBO_recovery = bst.System.from_units('corn_EtOH_IBO_sys_no_IBO_recovery', 

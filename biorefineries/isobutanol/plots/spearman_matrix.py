@@ -27,13 +27,13 @@ def plot_spearman_matrix(data, data_p, remove_units=True):
             df_p['Parameter'][i] = df_p['Parameter'][i][:df_p['Parameter'][i].index('[')]
     contourplots.ellipse_correlation_matrix_plot(df=df, param_col='Parameter', 
                                                  category_col='Element', corr_prefix='Correlation with ',
-                                                 small_corr_threshold=0.10,
-                                                 exclude_parameters_all_below_threshold=False)
+                                                 small_corr_threshold=0.05,
+                                                 exclude_parameters_all_below_threshold=True)
 
 #%%
 if __name__ == '__main__':
     from biorefineries import isobutanol
     isobutanol_filepath = isobutanol.__file__.replace('\\__init__.py', '')
     isobutanol_results_pub_filepath = isobutanol_filepath + '\\analyses\\results\\publication\\'
-    data = data_p = isobutanol_results_pub_filepath+'Uncertainty\\'+"_IBO_2026.3.2-1.44_['A']_3000sims_A_1_full_evaluation.xlsx"
+    data = data_p = isobutanol_results_pub_filepath+'Uncertainty\\'+"_IBO_2026.3.5-4.47_['A']_5000sims_A_1_full_evaluation.xlsx"
     plot_spearman_matrix(data, data_p)
