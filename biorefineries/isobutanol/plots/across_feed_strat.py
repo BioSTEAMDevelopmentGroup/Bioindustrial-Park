@@ -57,6 +57,7 @@ metrics_units = {"MPSP":  r"$\mathrm{\$}\cdot\mathrm{kg}^{-1}$",
                 "IBO Yield": "g-IBO/g-sugars",
                 "IBO Titer": "g-IBO/L-broth",
                 "IBO Productivity": "g-IBO/L-broth/h",
+                'Actual aeration required': 'kmol-O2/h',
                 }
 
 #%% Input Details
@@ -166,6 +167,68 @@ plot_all_generic = True
 if plot_all_generic: 
     print('\nCreating and saving contour plots ...\n')
     
+    # Coords for markers
+
+    metrics_to_opt = [
+                      'Combined Yield', 
+                      'EtOH Titer', 
+                      'EtOH Productivity', 
+                      'Cell loading',
+                      'TCI',
+                      'AOC',
+                      'MPSP', 
+                      'Total Q sugar evap',
+                      'Actual aeration required',
+                      ]
+
+
+    opt_coords = {}
+    for m in  metrics_to_opt:
+        m_non_nans = np.array(results[m])[np.where(~np.isnan(np.array(results[m])))]
+        if m in ('MPSP', 'AOC', 'TCI', 'Total Q sugar evap', 'Fermentation time', 'Actual aeration required'):
+            m_opt_coords = np.where(results[m][0]==m_non_nans.min())
+        else:
+            m_opt_coords = np.where(results[m][0]==m_non_nans.max())
+        opt_s1 = spec_1[m_opt_coords[1][0]]
+        opt_s2 = spec_2[m_opt_coords[0][0]]
+        opt_coords[m] = (opt_s1, opt_s2)
+        # print(results['MPSP'][0][opt_coords])
+        # print(opt_s1, opt_s2)
+
+    additional_points = {}
+
+    if x_label in ('k_1e',):
+        baseline_coords = (47.1, 0.04)
+    elif x_label in ('k_13',):
+        # baseline_coords = (5.81, 0.04)
+        baseline_coords = (0.0, 0.04)
+    # additional_points[baseline_coords] = ('D', 'gray', 6)
+
+    opt_marker_shapes = ['^', 's', 'p', 'h', 'v', '<', '>', 'o', 'P', 'X']
+
+    shapes_i = 0
+    for m in metrics_to_opt:
+        if m=='MPSP':
+            marker_shape='*'
+            marker_color='#33ccff'
+            marker_size = 8
+        elif m=='TCI':
+            marker_shape='s'
+            marker_color='#33ccff'
+            marker_size = 6
+        elif m=='AOC':
+            marker_shape='p'
+            marker_color='#33ccff'
+            marker_size = 6
+        else:
+            marker_shape = opt_marker_shapes[shapes_i]
+            shapes_i += 1
+            marker_color = 'w'
+            marker_size = 6
+        additional_points[opt_coords[m]] = (marker_shape, marker_color, marker_size)
+        print(m, marker_shape, marker_color, marker_size)
+        
+        
     #%% All metrics
     for curr_metric, val in metrics_units.items():
         if not curr_metric in results.keys(): continue
@@ -238,7 +301,8 @@ if plot_all_generic:
                                         default_fontsize = default_fontsize,
                                         axis_tick_fontsize = axis_tick_fontsize,
                                         # comparison_range=EtOH_market_range,
-                                        n_minor_ticks = 1,
+                                        n_minor_ticks = 3,
+                                        additional_points=additional_points,
                                         cbar_n_minor_ticks = cbar_n_minor_ticks,
                                         units_on_newline = (False, False, False, False), # x,y,z,w
                                         units_opening_brackets = [" [",] * 4,
@@ -256,6 +320,7 @@ curr_metric = 'MPSP'
 curr_metric_w_levels = np.arange(0.7, 1.0001, 0.01)
 curr_metric_cbar_ticks = np.arange(0.7, 1.0001, 0.05)
 curr_metric_w_ticks = [0.75,]
+cbar_n_minor_ticks = 3
 lccm = curr_metric.lower()
 
 if 'yield' in lccm or 'titer' in lccm or 'productivity' in lccm or 'loading' in lccm:
@@ -267,56 +332,6 @@ else:
     cmap_over_color = colors.grey_dark.shade(8).RGBn
 
 
-# Coords for markers
-
-metrics_to_opt = ['MPSP', 
-                  'Combined Yield', 
-                  'EtOH Titer', 
-                  'EtOH Productivity', 
-                  'Cell loading',
-                  'Total Q sugar evap',
-                  # 'Actual aeration required',
-                  'TCI',
-                  'AOC',
-                  ]
-
-
-opt_coords = {}
-for m in  metrics_to_opt:
-    m_non_nans = np.array(results[m])[np.where(~np.isnan(np.array(results[m])))]
-    if m in ('MPSP', 'AOC', 'TCI', 'Total Q sugar evap', 'Fermentation time', 'Actual aeration required'):
-        m_opt_coords = np.where(results[m][0]==m_non_nans.min())
-    else:
-        m_opt_coords = np.where(results[m][0]==m_non_nans.max())
-    opt_s1 = spec_1[m_opt_coords[1][0]]
-    opt_s2 = spec_2[m_opt_coords[0][0]]
-    opt_coords[m] = (opt_s1, opt_s2)
-    # print(results['MPSP'][0][opt_coords])
-    # print(opt_s1, opt_s2)
-
-additional_points = {}
-
-# if x_label in ('k_1e',):
-#     baseline_coords = (47.1, 0.04)
-# elif x_label in ('k_13',):
-#     baseline_coords = (5.81, 0.04)
-# additional_points[baseline_coords] = ('D', 'gray', 6)
-
-opt_marker_shapes = ['^', 's', 'p', 'h', 'v', '<', '>', 'o', 'P']
-
-shapes_i = 0
-for m in metrics_to_opt:
-    if m=='MPSP':
-        marker_shape='*'
-        marker_color='#33ccff'
-        marker_size = 8
-    else:
-        marker_shape = opt_marker_shapes[shapes_i]
-        shapes_i += 1
-        marker_color = 'w'
-        marker_size = 6
-    additional_points[opt_coords[m]] = (marker_shape, marker_color, marker_size)
-    print(m, marker_shape, marker_color, marker_size)
 val = metrics_units[curr_metric]
 
 contourplots.animated_contourplot(w_data_vs_x_y_at_multiple_z=results[curr_metric], # shape = z * x * y # values of the metric you want to plot on the color axis; e.g., curr_metric
@@ -364,3 +379,38 @@ contourplots.animated_contourplot(w_data_vs_x_y_at_multiple_z=results[curr_metri
                                 round_xticks_to=0,
                                 round_yticks_to=1,
                                 )
+
+#%% All metric values at opt_coords
+opt_coords_metric_vals = {}
+
+for m1 in metrics_to_opt:
+    opt_s1, opt_s2 = opt_coords[m1]
+    opt_s1_ind, opt_s2_ind = np.where(spec_1==opt_s1)[0][0], np.where(spec_2==opt_s2)[0][0]
+    opt_coords_metric_vals[m1] = {'Coords': (opt_s1, opt_s2),}
+    for m2 in metrics_to_opt:
+        opt_coords_metric_vals[m1][m2] = results[m2][0, opt_s2_ind, opt_s1_ind]
+
+#%%
+round_off = contourplots.utils.round_off
+def get_optima_comparisons(opt_coords_metric_values, rel_to_m='MPSP'):
+    print(f"\n\nRelative to the optimum for '{rel_to_m}', at the optimum for:")
+    print('\n')
+    i = 0
+    for m1, v in opt_coords_metric_values.items():
+        i+=1
+        print(f"{i}. '{m1}' ({v['Coords']}),")
+        for m2 in v.keys():
+            if not m2=='Coords':
+                try:
+                    rel_diff = v[m2]/opt_coords_metric_values[rel_to_m][m2] - 1
+                    sign = '+' if rel_diff>0 else '-'
+                    print(f"'{m2}' is {round_off(v[m2],3)}, which is {sign} {abs(int(100*rel_diff))}%.")
+                except Exception as e:
+                    if 'divide' in str(e).lower():
+                        print(f"'{m2}' is zero.")
+                    else:
+                        breakpoint()
+        print('\n')
+        
+#%%
+get_optima_comparisons(opt_coords_metric_vals)

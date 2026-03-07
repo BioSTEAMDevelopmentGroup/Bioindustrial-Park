@@ -28,7 +28,9 @@ def plot_spearman_matrix(data, data_p, remove_units=True):
     contourplots.ellipse_correlation_matrix_plot(df=df, param_col='Parameter', 
                                                  category_col='Element', corr_prefix='Correlation with ',
                                                  small_corr_threshold=0.05,
-                                                 exclude_parameters_all_below_threshold=True)
+                                                 exclude_parameters_all_below_threshold=True,
+                                                 legend_max_cols=4,
+                                                 )
 
 #%%
 if __name__ == '__main__':
@@ -37,3 +39,9 @@ if __name__ == '__main__':
     isobutanol_results_pub_filepath = isobutanol_filepath + '\\analyses\\results\\publication\\'
     data = data_p = isobutanol_results_pub_filepath+'Uncertainty\\'+"_IBO_2026.3.5-4.47_['A']_5000sims_A_1_full_evaluation.xlsx"
     plot_spearman_matrix(data, data_p)
+    plt.savefig(
+        fname='spearman_matrix',
+        transparent=False,  
+        facecolor='white',
+        bbox_inches='tight',
+        dpi=600,)

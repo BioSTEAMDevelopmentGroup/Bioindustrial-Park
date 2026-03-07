@@ -67,12 +67,12 @@ metrics_units = {"MPSP":  r"$\mathrm{\$}\cdot\mathrm{kg}^{-1}$",
 # !!!
 
 # Spec names
-x_label = "k_13"
-y_label = "k_7ii"
+x_label = "k_1e"
+y_label = "k_7ie"
 z_label = "Spike feed glucose concentration"
 
 # Misc
-strategy='adaptive_batch'
+strategy='fixed_batch'
 steps = (25, 25, 1)
 
 #%% Intermediate details
@@ -112,6 +112,19 @@ if z_label in ('Spike feed glucose concentration',):
                   ])
     z_units = r"$\mathrm{g} \cdot \mathrm{L}^{-1}$"
     z_ticks = [0, 200, 400, 600, 800]
+
+#%% Metric names for plots
+
+metrics_plot_names = {k: k for k in metrics_units.keys()}
+metrics_plot_names["Total Q sugar evap"] = "Slurry evaporation duty"
+metrics_plot_names["Actual aeration required"] = "Aeration required"
+
+for k in metrics_plot_names.keys():
+    if "IBO" in k: 
+        metrics_plot_names[k] = k.replace("IBO", "BuOH")
+
+if x_label in ("k_1e",):
+    metrics_plot_names["Combined Yield"] = "EtOH Yield"
 
 #%% Chdir
 
@@ -185,32 +198,32 @@ if plot_all_generic:
     
     if x_label in ('k_1e',):
         metrics_to_opt = [
-                          'Combined Yield', 
+                          'Cell loading',
                           'EtOH Titer', 
                           'EtOH Productivity', 
-                          'Cell loading',
+                          'Combined Yield', 
+                          'Total Q sugar evap',
+                          'Actual aeration required',
                           'TCI',
                           'AOC',
                           'MPSP', 
-                          'Total Q sugar evap',
-                          'Actual aeration required',
                           ]
     
     elif x_label in ('k_13',):
         metrics_to_opt = [
-                          'Combined Yield', 
-                          'EtOH Yield',
+                          'Cell loading',
                           'EtOH Titer', 
                           'EtOH Productivity', 
-                          'IBO Yield',
+                          'EtOH Yield',
                           'IBO Titer', 
                           'IBO Productivity', 
-                          'Cell loading',
+                          'IBO Yield',
+                          'Combined Yield', 
+                          'Total Q sugar evap',
+                          'Actual aeration required',
                           'TCI',
                           'AOC',
                           'MPSP', 
-                          'Total Q sugar evap',
-                          'Actual aeration required',
                           ]
     
     opt_coords = {}
@@ -235,7 +248,14 @@ if plot_all_generic:
         baseline_coords = (0.0, 0.04)
     additional_points[baseline_coords] = ('D', 'gray', 6)
     
-    opt_marker_shapes = ['^', 's', 'p', 'h', 'v', '<', '>', 'o', 'P', 'X']
+    opt_marker_shapes = ['o', '^', 's', 'p', 'v', '<', '>', 'h', 
+                         # 'P', 'X',
+                         ]
+    if x_label in ("k_1e",):
+        for i in ['v', '<', '>']:
+            opt_marker_shapes.remove(i)
+            
+    metric_optima_markers = {}
     
     shapes_i = 0
     for m in metrics_to_opt:
@@ -251,13 +271,35 @@ if plot_all_generic:
             marker_shape='p'
             marker_color='#33ccff'
             marker_size = 6
+        elif m=='Total Q sugar evap':
+            marker_shape='P'
+            marker_color = 'w'
+            marker_size = 6
+        elif m=='Actual aeration required':
+            marker_shape='X'
+            marker_color = 'w'
+            marker_size = 6
         else:
             marker_shape = opt_marker_shapes[shapes_i]
             shapes_i += 1
             marker_color = 'w'
             marker_size = 6
+        metric_optima_markers[metrics_plot_names[m]] = (marker_shape, marker_color, marker_size)
         additional_points[opt_coords[m]] = (marker_shape, marker_color, marker_size)
         print(m, marker_shape, marker_color, marker_size)
+    
+    fig, ax = plt.subplots()
+    contourplots.utils.marker_legend(ax, metric_optima_markers, title="Optima", loc="upper right")
+    fig.set_figwidth(5)
+    fig.set_figheight(10)
+    plt.savefig(
+        fname=file_to_load+'_marker_legend.png',
+        transparent=False,  
+        facecolor='white',
+        bbox_inches='tight',
+        # figheight=20, figwidth=10,
+        dpi=600,)
+    plt.close()
     
     #%% All metrics
     for curr_metric, val in metrics_units.items():
@@ -323,7 +365,7 @@ if plot_all_generic:
                                         x_label=x_label_for_plot, # title of the x axis
                                         y_label=y_label_for_plot, # title of the y axis
                                         z_label=r"$\bf"+z_label+"$", # title of the z axis
-                                        w_label=r"$\bf"+curr_metric.replace(' ', '\ ')+"$", # title of the color axis
+                                        w_label=r"$\bf"+metrics_plot_names[curr_metric].replace(' ', '\ ')+"$", # title of the color axis
                                         x_ticks=x_ticks,
                                         y_ticks=y_ticks,
                                         z_ticks=z_ticks,
@@ -403,7 +445,7 @@ contourplots.animated_contourplot(w_data_vs_x_y_at_multiple_z=results[curr_metri
                                 x_label=x_label_for_plot, # title of the x axis
                                 y_label=y_label_for_plot, # title of the y axis
                                 z_label=r"$\bf"+z_label+"$", # title of the z axis
-                                w_label=r"$\bf"+curr_metric.replace(' ', '\ ')+"$", # title of the color axis
+                                w_label=r"$\bf"+metrics_plot_names[curr_metric].replace(' ', '\ ')+"$", # title of the color axis
                                 x_ticks=x_ticks,
                                 y_ticks=y_ticks,
                                 z_ticks=z_ticks,
