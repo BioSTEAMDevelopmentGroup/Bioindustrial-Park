@@ -32,7 +32,6 @@ model.parameters = ()
 model.load_parameter_distributions(parameter_distributions_filename, namespace_dict)
 baseline_initial = model.metrics_at_baseline()
 
-#%%
 model_specification()
 
 # for forced batch mode:
