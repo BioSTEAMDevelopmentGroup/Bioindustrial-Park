@@ -292,8 +292,10 @@ MPSP_uncertainty = [results_dict['Uncertainty']['MPSP'][mode]
 
 # IBO_maximum_viable_market_range = SA_market_range / theoretical_max_g_IBO_per_g_SA
 
-market_range = np.array([0.64, 1.00])
-
+market_range = np.array([
+    0.52, # 1.5475 $/gal/(3.7854 L/gal * 0.789 kg/L)
+    1.15, # 3.4500 $/gal/(3.7854 L/gal * 0.789 kg/L)
+    ]) # Jan 2021 - Dec 2025 5-year low and high from https://tradingeconomics.com/commodity/ethanol
 
 # biobased_lit_MPSP_range = (1.08, 3.63)
 MPSP_box_width = 1.05 if len(modes)==1 else 0.45

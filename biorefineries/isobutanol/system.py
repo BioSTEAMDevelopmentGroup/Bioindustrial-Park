@@ -16,6 +16,7 @@ from biorefineries import corn
 from biorefineries.isobutanol import units
 from nskinetics.examples.s_cerevisiae_ferm_fb_inhib_mod_ibo import te_r, reset_kinetic_reaction_system
 from scipy.optimize import differential_evolution, minimize, brute
+from matplotlib.ticker import AutoMinorLocator
 
 from warnings import filterwarnings
 filterwarnings('ignore')
@@ -509,8 +510,11 @@ corn_EtOH_IBO_sys._TEA = corn_EtOH_IBO_sys_tea = corn.tea.create_tea(corn_EtOH_I
 
 #%% Set baseline specifications
 
-baseline_spec = {'target_conc_sugars': 220.0,
-                 'threshold_conc_sugars': 210.0,
+baseline_spec = {
+                 # 'target_conc_sugars': 220.0,
+                 # 'threshold_conc_sugars': 210.0,
+                 'target_conc_sugars': 225.0,
+                 'threshold_conc_sugars': 217.0,
                  'conc_sugars_feed_spike': 600.0,
                  'tau_max': 120.0,}
 
@@ -579,10 +583,15 @@ def load_simulate_get_EtOH_MPSP(target_conc_sugars=None,
 def plot_kinetic_results(xlim=None, ylim=None, save_fig=False, filename=None, figwidth=3.9):
     # if variables is None:
     #     variables = ['[x]', 'curr_a', '[s_glu]', '[s_EtOH]', '[s_acetate]', '[s_IBO]']
+    plt.rcParams['font.sans-serif'] = "Arial Unicode"
+    plt.rcParams['font.size'] = str(12)
+    n_minor_ticks = 4
+    
     fig = plt.figure()
     fig.set_figwidth(figwidth)
     ax = plt.subplot(111)
-
+    
+    
     ax.plot(V406.nsk_results_dict['time'], V406.nsk_results_dict['[x]'], label='cell loading')
     ax.plot(V406.nsk_results_dict['time'], V406.nsk_results_dict['curr_a'], label='active cell loading')
     ax.plot(V406.nsk_results_dict['time'], V406.nsk_results_dict['[s_glu]'], label='glucose')
@@ -590,8 +599,30 @@ def plot_kinetic_results(xlim=None, ylim=None, save_fig=False, filename=None, fi
     ax.plot(V406.nsk_results_dict['time'], V406.nsk_results_dict['[s_acetate]'], label='acetate')
     ax.plot(V406.nsk_results_dict['time'], V406.nsk_results_dict['[s_IBO]'], label='isobutanol')
     ax.legend(bbox_to_anchor=(1.05, 1.0), loc='upper left', edgecolor='white')
-    ax.set_xlabel('Time [h]')
-    ax.set_ylabel('Concentration [g/L]')
+    ax.set_xlabel(r"$\bfTime$" + ' [h]')
+    ax.set_ylabel(r"$\bfConcentration$" + ' [' + r"$\mathrm{g} \cdot \mathrm{L}^{-1}$" + ']')
+    
+    
+    ax.xaxis.set_minor_locator(AutoMinorLocator(n_minor_ticks+1))
+    ax.yaxis.set_minor_locator(AutoMinorLocator(n_minor_ticks+1))
+    
+    ax.tick_params(
+        axis='x',          # changes apply to the y-axis
+        which='both',      # both major and minor ticks are affected
+        direction='inout',
+        right=True,
+        width=0.65,
+        # zorder=200,
+        )
+    ax.tick_params(
+        axis='y',          # changes apply to the y-axis
+        which='both',      # both major and minor ticks are affected
+        direction='inout',
+        right=True,
+        width=0.65,
+        # zorder=200,
+        )
+    
     if xlim is not None:
         ax.set_xlim(xlim)
     if ylim is not None:
@@ -604,8 +635,9 @@ def plot_kinetic_results(xlim=None, ylim=None, save_fig=False, filename=None, fi
                     dpi=600,
                     )                                
         # plt.close()
-    plt.show()
-    plt.close()
+    # plt.show()
+    # plt.close()
+    return fig, ax
     
 def reset_and_reload(**curr_spec):
     # !!! Resetting might cause yeast stream problems
@@ -824,8 +856,8 @@ def optimize_1D_feeding_strategy_for_MPSP(bounds=(20.0, 400.0), threshold_diff=5
     f([opt_conc])
     return opt_conc
 
-def optimize_max_n_glu_spikes_for_MPSP(bounds=(0, 20),
-                                          method='brute-force', Ns=21, 
+def optimize_max_n_glu_spikes_for_MPSP(bounds=(0, 100),
+                                          method='brute-force', Ns=101, 
                                           model_kwargs={},
                                           method_kwargs={},
                                           **kwargs):

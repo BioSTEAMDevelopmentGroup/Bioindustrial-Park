@@ -35,9 +35,9 @@ fbs_spec = isobutanol.models.fbs_spec
 #%%
 
 EtOH_market_range=np.array([
-    0.52,
-    1.14,
-    ]) # March 2021- March 2026 5-year low and high from https://tradingeconomics.com/commodity/ethanol
+    0.52, # 1.5475 $/gal/(3.7854 L/gal * 0.789 kg/L)
+    1.15, # 3.4500 $/gal/(3.7854 L/gal * 0.789 kg/L)
+    ]) # Jan 2021 - Dec 2025 5-year low and high from https://tradingeconomics.com/commodity/ethanol
                 
 #%% Pub results main filepath
 isobutanol_filepath = isobutanol.__file__.replace('\\__init__.py', '')
@@ -67,12 +67,12 @@ metrics_units = {"MPSP":  r"$\mathrm{\$}\cdot\mathrm{kg}^{-1}$",
 # !!!
 
 # Spec names
-x_label = "k_1e"
-y_label = "k_7ie"
+x_label = "k_13"
+y_label = "k_7ii"
 z_label = "Spike feed glucose concentration"
 
 # Misc
-strategy='fixed_batch'
+strategy='fixed_fed-batch'
 steps = (25, 25, 1)
 
 #%% Intermediate details
@@ -90,12 +90,12 @@ x_ticks, y_ticks, z_ticks = None, None, None
 # spec_1
 if x_label in ('k_1e',):
     spec_1 = np.linspace(1., 300., steps[0])
-    x_units = r"$\mathrm{g} \cdot \mathrm{L}^{-1} \cdot \mathrm{h}^{-1}$"
+    x_units = r"$\mathrm{g} \cdot \mathrm{g}^{-1} \cdot \mathrm{h}^{-1}$"
     x_ticks = np.array([0, 100, 200, 300])
 
 elif x_label in ('k_13',):
     spec_1 = np.linspace(0.0, 40., steps[0])
-    x_units = r"$\mathrm{g} \cdot \mathrm{L}^{-1} \cdot \mathrm{h}^{-1}$"
+    x_units = r"$\mathrm{g} \cdot \mathrm{g}^{-1} \cdot \mathrm{h}^{-1}$"
     x_ticks = np.array([0, 10, 20, 30, 40])
 
 # spec_2
@@ -120,12 +120,17 @@ metrics_plot_names["Total Q sugar evap"] = "Slurry evaporation duty"
 metrics_plot_names["Actual aeration required"] = "Aeration required"
 
 for k in metrics_plot_names.keys():
-    if "IBO" in k: 
-        metrics_plot_names[k] = k.replace("IBO", "BuOH")
-
+    metrics_plot_names[k] = metrics_plot_names[k].replace("IBO", "Isobutanol").replace("EtOH", "Ethanol")
+    
 if x_label in ("k_1e",):
-    metrics_plot_names["Combined Yield"] = "EtOH Yield"
+    metrics_plot_names["Combined Yield"] = "Ethanol Yield"
+   
+metrics_plot_names["Cell loading"] = "Cell density"
 
+for k in metrics_plot_names.keys():
+    if not k in ('TCI', 'AOC', 'MPSP',):
+        metrics_plot_names[k] = metrics_plot_names[k].lower()
+    
 #%% Chdir
 
 os.chdir(isobutanol_results_pub_filepath + subfolder_name)
@@ -243,10 +248,11 @@ if plot_all_generic:
     
     if x_label in ('k_1e',):
         baseline_coords = (47.1, 0.04)
+        additional_points[baseline_coords] = ('D', 'gray', 6)
     elif x_label in ('k_13',):
         # baseline_coords = (5.81, 0.04)
         baseline_coords = (0.0, 0.04)
-    additional_points[baseline_coords] = ('D', 'gray', 6)
+        # additional_points[baseline_coords] = ('D', 'gray', 6)
     
     opt_marker_shapes = ['o', '^', 's', 'p', 'v', '<', '>', 'h', 
                          # 'P', 'X',
@@ -284,7 +290,12 @@ if plot_all_generic:
             shapes_i += 1
             marker_color = 'w'
             marker_size = 6
-        metric_optima_markers[metrics_plot_names[m]] = (marker_shape, marker_color, marker_size)
+            
+        metric_opt_name = metrics_plot_names[m]
+        if not metric_opt_name in ('TCI', 'AOC', 'MPSP',):
+            metric_opt_name = metric_opt_name.lower()
+                
+        metric_optima_markers[metric_opt_name] = (marker_shape, marker_color, marker_size)
         additional_points[opt_coords[m]] = (marker_shape, marker_color, marker_size)
         print(m, marker_shape, marker_color, marker_size)
     
@@ -412,15 +423,18 @@ if plot_all_generic:
 
 #%% MPSP vs k_1e, k_7ie, spike feed conc
 curr_metric = 'MPSP'
-if x_label in ('k_1e',):
-    curr_metric_w_levels = np.arange(0.6, 3.001, 0.05)
-    curr_metric_cbar_ticks = np.arange(0.6, 3.001, 0.4)
-    curr_metric_w_ticks = [0.75, 2.0, 3.0]
-    cbar_n_minor_ticks = 3
-elif x_label in ('k_13',):
-    curr_metric_w_levels = np.arange(0.4, 4.001, 0.1)
-    curr_metric_cbar_ticks = np.arange(0.4, 4.001, 0.4)
-    curr_metric_w_ticks = [0.55, 2.5, 4.00]
+# if x_label in ('k_1e',):
+#     curr_metric_w_levels = np.arange(0.6, 3.001, 0.05)
+#     curr_metric_cbar_ticks = np.arange(0.6, 3.001, 0.4)
+#     curr_metric_w_ticks = [0.75, 2.0, 3.0]
+#     cbar_n_minor_ticks = 3
+if x_label in ('k_13', 'k_1e'):
+    # curr_metric_w_levels = np.arange(0.4, 4.001, 0.1)
+    # curr_metric_cbar_ticks = np.arange(0.4, 4.001, 0.4)
+    # curr_metric_w_ticks = [0.55, 2.5, 4.00]
+    curr_metric_w_levels = np.arange(0.2, 2.401, 0.05)
+    curr_metric_cbar_ticks = np.arange(0.2, 2.401, 0.2)
+    curr_metric_w_ticks = [2.4]
     cbar_n_minor_ticks = 3
 lccm = curr_metric.lower()
 
@@ -455,8 +469,8 @@ contourplots.animated_contourplot(w_data_vs_x_y_at_multiple_z=results[curr_metri
                                 y_units=y_units,
                                 z_units=z_units,
                                 w_units=val,
-                                # fmt_clabel=lambda cvalue: r"$\mathrm{\$}$"+" {:.1f} ".format(cvalue)+r"$\cdot\mathrm{kg}^{-1}$", # format of contour labels
-                                fmt_clabel = lambda cvalue: get_rounded_str(cvalue, 3),
+                                fmt_clabel=lambda cvalue: r"$\mathrm{\$}$"+" {:.2f} ".format(cvalue)+r"$\cdot\mathrm{kg}^{-1}$", # format of contour labels
+                                # fmt_clabel = lambda cvalue: get_rounded_str(cvalue, 3),
                                 cmap=cmap, # can use 'viridis' or other default matplotlib colormaps
                                 # cmap_over_color = colors.grey_dark.shade(8).RGBn,
                                 cmap_over_color=cmap_over_color,
@@ -517,6 +531,20 @@ def get_optima_comparisons(opt_coords_metric_values, rel_to_m='MPSP'):
                     else:
                         breakpoint()
         print('\n')
-        
+    print('\n Note that optima overlap for:')
+    print('\n')
+    coords_metrics = {}
+    for metric, v in opt_coords_metric_values.items():
+        if not v['Coords'] in coords_metrics.keys():
+            coords_metrics[v['Coords']] = [metric]
+        else:
+            coords_metrics[v['Coords']].append(metric)
+    for coords, metrics in coords_metrics.items():
+        if len(metrics)>1:
+            print(f'{metrics}: optimum coordinates are {coords}.')
+
+def get_metric_given_specs(metric, spec_1, spec_2):
+    return results[metric][0][spec_2][spec_1]
+
 #%%
 get_optima_comparisons(opt_coords_metric_vals)

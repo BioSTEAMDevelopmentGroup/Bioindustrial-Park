@@ -90,9 +90,9 @@ V406 = f.V406
 f.M401.bypass_IBO_separation_conditions[0] = lambda: V406.outs[1].imass['Isobutanol']/V406.outs[1].F_vol < 10.0
 
 # !!!
-ferm_reactor.kinetic_reaction_system._te.max_n_glu_spikes = 0
-ferm_reactor.kinetic_reaction_system.default_max_n_glu_spikes = 0  
-perform_feeding_strategy_opt = True
+# ferm_reactor.kinetic_reaction_system._te.max_n_glu_spikes = 0
+# ferm_reactor.kinetic_reaction_system.default_max_n_glu_spikes = 0  
+perform_feeding_strategy_opt = False
 
 model_specification(
     n_sims=3,
