@@ -821,7 +821,7 @@ def optimize_tau_for_MPSP(threshold_s_EtOH=5, **kwargs):
     V406.run_type = original_run_type
     return res.x[0]
     
-def optimize_1D_feeding_strategy_for_MPSP(bounds=(20.0, 400.0), threshold_diff=5.0,
+def optimize_1D_feeding_strategy_for_MPSP(bounds=(100.0, 400.0), threshold_diff=5.0,
                                           method='brute-force', Ns=5,
                                           model_kwargs={},
                                           method_kwargs={},
@@ -856,8 +856,8 @@ def optimize_1D_feeding_strategy_for_MPSP(bounds=(20.0, 400.0), threshold_diff=5
     f([opt_conc])
     return opt_conc
 
-def optimize_max_n_glu_spikes_for_MPSP(bounds=(0, 100),
-                                          method='brute-force', Ns=101, 
+def optimize_stage_1_time_and_max_n_glu_spikes_for_MPSP(bounds=((5, 50), (0, 40)),
+                                          method='brute-force', Ns=(10, 41), 
                                           model_kwargs={},
                                           method_kwargs={},
                                           **kwargs):
@@ -866,8 +866,9 @@ def optimize_max_n_glu_spikes_for_MPSP(bounds=(0, 100),
     model_specification(**model_kwargs)
     def f(x):
         try:
-            r_te.max_n_glu_spikes = x[0]
-            nsk_r.default_max_n_glu_spikes = x[0]  
+            r_te.stage_1_time = x[0]
+            r_te.max_n_glu_spikes = x[1]
+            nsk_r.default_max_n_glu_spikes = x[1]  
             model_specification(**model_kwargs)
             MPSP = get_purity_adj_price(ethanol, ['Ethanol'])
             # print(MPSP)
@@ -878,20 +879,33 @@ def optimize_max_n_glu_spikes_for_MPSP(bounds=(0, 100),
     # res = brute(f, ranges=(bounds,), Ns=20)
     # return res.x[0]
     opt_max_n = None
+    opt_s1t = None
     if method=='brute-force':
-        concs = np.linspace(bounds[0], bounds[1], Ns)
+        stage_1_times = np.linspace(bounds[0][0], bounds[0][1], Ns[0])
+        n_spikes = np.linspace(bounds[1][0], bounds[1][1], Ns[1])
         MPSPs = []
         opt_MPSP = np.inf
-        for conc in concs:
-            MPSPs.append(f([conc]))
-            if MPSPs[-1]<opt_MPSP:
-                opt_MPSP = MPSPs[-1]
-                opt_max_n = conc
+        for s1t in stage_1_times:
+            prev_actual_n = None
+            for n_spike in n_spikes:
+                MPSPs.append(f([s1t, n_spike]))
+                print(s1t, n_spike, MPSPs[-1])
+                if MPSPs[-1]<opt_MPSP:
+                    opt_MPSP = MPSPs[-1]
+                    opt_max_n = n_spike
+                    opt_s1t = s1t
+                if prev_actual_n == r_te.n_glu_spikes:
+                    break
+                else:
+                    prev_actual_n = r_te.n_glu_spikes
+                
     elif method=='scipy-minimize':
         res = minimize(fun=f, **method_kwargs)
-        opt_max_n = res.x[0]
-    f([opt_max_n])
-    return opt_max_n
+        opt_s1t = res.x[0]
+        opt_max_n = res.x[1]
+        
+    f([s1t, n_spike])
+    return opt_s1t, opt_max_n
 
 def optimize_split_1D_2D_feeding_strategy_for_MPSP(bounds=(20.0, 400.0), threshold_diff=5.0, Ns=5, **kwargs):
     # first, optimize target conc
