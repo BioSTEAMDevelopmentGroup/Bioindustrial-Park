@@ -518,6 +518,10 @@ baseline_spec = {
                  'conc_sugars_feed_spike': 600.0,
                  'tau_max': 120.0,}
 
+V406.stage_1_time = 15.0
+te_r._te.max_n_glu_spikes = 10
+te_r.default_max_n_glu_spikes = 10
+
 #% Create fed-batch strategy specification object
 fbs_spec = nsk.units.FedBatchStrategySpecification(
     target_conc_sugars=220.0,
@@ -580,7 +584,7 @@ def load_simulate_get_EtOH_MPSP(target_conc_sugars=None,
     
     return get_purity_adj_price(ethanol, ['Ethanol'])
 
-def plot_kinetic_results(xlim=None, ylim=None, save_fig=False, filename=None, figwidth=3.9):
+def plot_kinetic_results(xlim=None, ylim=None, show_stage_1_time=True, save_fig=False, filename=None, figwidth=3.9):
     # if variables is None:
     #     variables = ['[x]', 'curr_a', '[s_glu]', '[s_EtOH]', '[s_acetate]', '[s_IBO]']
     plt.rcParams['font.sans-serif'] = "Arial Unicode"
@@ -627,6 +631,12 @@ def plot_kinetic_results(xlim=None, ylim=None, save_fig=False, filename=None, fi
         ax.set_xlim(xlim)
     if ylim is not None:
         ax.set_ylim(ylim)
+    
+    if show_stage_1_time:
+        ax.vlines(x=[V406.kinetic_reaction_system._te.stage_1_time], 
+                  ymin=[ax.get_ylim()[0]], ymax=[ax.get_ylim()[1]],
+                  linestyles='dashed', linewidth=1.0, color='gray',
+                  )
     if save_fig:
         plt.savefig(f'{filename}', 
                     transparent=False,  
@@ -856,8 +866,8 @@ def optimize_1D_feeding_strategy_for_MPSP(bounds=(100.0, 400.0), threshold_diff=
     f([opt_conc])
     return opt_conc
 
-def optimize_stage_1_time_and_max_n_glu_spikes_for_MPSP(bounds=((5, 50), (0, 40)),
-                                          method='brute-force', Ns=(10, 41), 
+def optimize_stage_1_time_and_max_n_glu_spikes_for_MPSP(bounds=((5, 40), (0, 40)),
+                                          method='brute-force', Ns=(15, 41), 
                                           model_kwargs={},
                                           method_kwargs={},
                                           **kwargs):
@@ -866,7 +876,7 @@ def optimize_stage_1_time_and_max_n_glu_spikes_for_MPSP(bounds=((5, 50), (0, 40)
     model_specification(**model_kwargs)
     def f(x):
         try:
-            r_te.stage_1_time = x[0]
+            V406.stage_1_time = x[0]
             r_te.max_n_glu_spikes = x[1]
             nsk_r.default_max_n_glu_spikes = x[1]  
             model_specification(**model_kwargs)
@@ -874,6 +884,7 @@ def optimize_stage_1_time_and_max_n_glu_spikes_for_MPSP(bounds=((5, 50), (0, 40)
             # print(MPSP)
             return MPSP
         except:
+            # breakpoint()
             # print(np.inf)
             return np.inf
     # res = brute(f, ranges=(bounds,), Ns=20)
@@ -885,16 +896,21 @@ def optimize_stage_1_time_and_max_n_glu_spikes_for_MPSP(bounds=((5, 50), (0, 40)
         n_spikes = np.linspace(bounds[1][0], bounds[1][1], Ns[1])
         MPSPs = []
         opt_MPSP = np.inf
+        prev_s1t_n0_MPSP = np.inf
         for s1t in stage_1_times:
             prev_actual_n = None
             for n_spike in n_spikes:
                 MPSPs.append(f([s1t, n_spike]))
-                print(s1t, n_spike, MPSPs[-1])
+                # print(s1t, n_spike, MPSPs[-1])
+                if n_spike==n_spikes[0]:
+                    if prev_s1t_n0_MPSP < MPSPs[-1]: # if the last s1t's zeroth n resulted in a lower MPSP than the current s1t's zeroth n, break out of n loop
+                        break
+                    prev_s1t_n0_MPSP = MPSPs[-1]
                 if MPSPs[-1]<opt_MPSP:
                     opt_MPSP = MPSPs[-1]
                     opt_max_n = n_spike
                     opt_s1t = s1t
-                if prev_actual_n == r_te.n_glu_spikes:
+                if prev_actual_n == r_te.n_glu_spikes: # if the last n resulted in the same actual n as the current n, break out of the n loop
                     break
                 else:
                     prev_actual_n = r_te.n_glu_spikes

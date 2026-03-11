@@ -40,6 +40,10 @@ model_specification()
 
 model_specification(target_conc_sugars=221.25, threshold_conc_sugars=217.125)
 
+print(f.ethanol.price * f.ethanol.F_mass/f.ethanol.imass['Ethanol'])
+
+plot_kinetic_results()
+
 #%% Plot conc v time
 
 fig, ax = plot_kinetic_results()

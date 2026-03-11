@@ -42,7 +42,7 @@ plot_kinetic_results = isobutanol.models.plot_kinetic_results
 model_specification = model.specification
 system = model.system
 tea = model.system.TEA
-optimize_max_n_glu_spikes_and_stage_1_time_for_MPSP =  isobutanol.models.optimize_max_n_glu_spikes_and_stage_1_time_for_MPSP
+optimize_stage_1_time_and_max_n_glu_spikes_for_MPSP =  isobutanol.models.optimize_stage_1_time_and_max_n_glu_spikes_for_MPSP
 
 f = system.flowsheet
 
@@ -89,8 +89,8 @@ baseline_initial = model.metrics_at_baseline()
 #%% Baseline -- simulate and solve TEA
 
 #!!!
-ferm_reactor.kinetic_reaction_system._te.max_n_glu_spikes = 0 # initial val, changed during optimization
-ferm_reactor.kinetic_reaction_system.default_max_n_glu_spikes = 0 # initial val, changed during optimization
+# ferm_reactor.kinetic_reaction_system._te.max_n_glu_spikes = 0 # initial val, changed during optimization
+# ferm_reactor.kinetic_reaction_system.default_max_n_glu_spikes = 0 # initial val, changed during optimization
 
 model_specification(
     n_sims=3,
@@ -149,7 +149,7 @@ results = {i: [] for i in metrics.keys()}
 
 # %% Generate 3-specification meshgrid and set specification loading functions
 
-steps = (25, 25, 1)
+steps = (10, 10, 1)
 
 spec_1 = threshold_conc_sugarses = np.linspace(1., 400., steps[0])
 
@@ -335,7 +335,7 @@ for s3 in spec_3:
                 # optimize_max_n_glu_spikes(obj='y_EtOH_glu_added', 
                 #                           optimize_tau=False,
                 #                           show_progress=False,)
-                optimize_max_n_glu_spikes_and_stage_1_time_for_MPSP(model_kwargs=curr_spec)
+                optimize_stage_1_time_and_max_n_glu_spikes_for_MPSP(model_kwargs=curr_spec)
                 for k, v in list(results.items()): 
                     v[-1][-1].append(metrics[k]['f']())
                 
