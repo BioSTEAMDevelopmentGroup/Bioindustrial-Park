@@ -16,6 +16,7 @@ namespace_dict = isobutanol.models.namespace_dict
 fbs_spec = isobutanol.models.fbs_spec
 optimize_1D_feeding_strategy_for_MPSP = isobutanol.models.optimize_1D_feeding_strategy_for_MPSP
 optimize_stage_1_time_and_max_n_glu_spikes_for_MPSP =  isobutanol.models.optimize_stage_1_time_and_max_n_glu_spikes_for_MPSP
+optimize_max_n_glu_spikes_for_MPSP = isobutanol.models.optimize_max_n_glu_spikes_for_MPSP
 plot_kinetic_results = isobutanol.models.plot_kinetic_results
 unit_groups_dict = isobutanol.models.unit_groups_dict
 model_specification = model.specification
@@ -46,7 +47,7 @@ plot_kinetic_results()
 
 #%% Plot conc v time
 
-fig, ax = plot_kinetic_results(xlim=(0,100), ylim=(0,250))
+fig, ax = plot_kinetic_results(xlim=(0,50), ylim=(0,250))
 
 # ax.set_xlim(0, 100)
 # ax.set_ylim(0, 250)

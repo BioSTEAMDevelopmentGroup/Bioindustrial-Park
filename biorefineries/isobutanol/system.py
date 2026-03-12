@@ -518,9 +518,12 @@ baseline_spec = {
                  'conc_sugars_feed_spike': 600.0,
                  'tau_max': 120.0,}
 
-V406.stage_1_time = np.inf
-te_r._te.max_n_glu_spikes = 10
-te_r.default_max_n_glu_spikes = 10
+# V406.stage_1_time = 15.0
+# te_r._te.max_n_glu_spikes = 10
+# te_r.default_max_n_glu_spikes = 10
+
+te_r._te.max_n_glu_spikes = 21
+te_r.default_max_n_glu_spikes = 21
 
 #% Create fed-batch strategy specification object
 fbs_spec = nsk.units.FedBatchStrategySpecification(
@@ -584,7 +587,11 @@ def load_simulate_get_EtOH_MPSP(target_conc_sugars=None,
     
     return get_purity_adj_price(ethanol, ['Ethanol'])
 
-def plot_kinetic_results(xlim=None, ylim=None, show_stage_1_time=True, save_fig=False, filename=None, figwidth=3.9):
+def plot_kinetic_results(xlim=None, ylim=None, 
+                         show_stage_1_time=False, 
+                         show_tau_cell_density_plateau=True, 
+                         show_tau=True,
+                         save_fig=False, filename=None, figwidth=3.9):
     # if variables is None:
     #     variables = ['[x]', 'curr_a', '[s_glu]', '[s_EtOH]', '[s_acetate]', '[s_IBO]']
     plt.rcParams['font.sans-serif'] = "Arial Unicode"
@@ -629,6 +636,8 @@ def plot_kinetic_results(xlim=None, ylim=None, show_stage_1_time=True, save_fig=
     
     if xlim is not None:
         ax.set_xlim(xlim)
+    else:
+        ax.set_xlim(V406.tau + 20)
     if ylim is not None:
         ax.set_ylim(ylim)
     
@@ -637,6 +646,18 @@ def plot_kinetic_results(xlim=None, ylim=None, show_stage_1_time=True, save_fig=
                   ymin=[ax.get_ylim()[0]], ymax=[ax.get_ylim()[1]],
                   linestyles='dashed', linewidth=1.0, color='gray',
                   )
+    if show_tau_cell_density_plateau:
+        ax.vlines(x=[V406.tau_cell_density_plateau], 
+                  ymin=[ax.get_ylim()[0]], ymax=[ax.get_ylim()[1]],
+                  linestyles='dashed', linewidth=1.0, color='gray',
+                  )
+    
+    if show_tau:
+        ax.vlines(x=[V406.tau], 
+                  ymin=[ax.get_ylim()[0]], ymax=[ax.get_ylim()[1]],
+                  linestyles='dashed', linewidth=1.0, color='gray',
+                  )
+        
     if save_fig:
         plt.savefig(f'{filename}', 
                     transparent=False,  
@@ -922,6 +943,51 @@ def optimize_stage_1_time_and_max_n_glu_spikes_for_MPSP(bounds=((5, 40), (0, 40)
         
     f([opt_s1t, opt_max_n])
     return opt_s1t, opt_max_n
+
+def optimize_max_n_glu_spikes_for_MPSP(bounds=(0, 40),
+                                          method='brute-force', Ns=41, 
+                                          model_kwargs={},
+                                          method_kwargs={},
+                                          **kwargs):
+    nsk_r = V406.kinetic_reaction_system
+    r_te = nsk_r._te
+    model_specification(**model_kwargs)
+    def f(x):
+        try:
+            r_te.max_n_glu_spikes = x[0]
+            nsk_r.default_max_n_glu_spikes = x[0]  
+            model_specification(**model_kwargs)
+            MPSP = get_purity_adj_price(ethanol, ['Ethanol'])
+            # print(MPSP)
+            return MPSP
+        except:
+            breakpoint()
+            # print(np.inf)
+            return np.inf
+    # res = brute(f, ranges=(bounds,), Ns=20)
+    # return res.x[0]
+    opt_max_n = None
+    if method=='brute-force':
+        n_spikes = np.linspace(bounds[0], bounds[1], Ns)
+        MPSPs = []
+        opt_MPSP = np.inf
+        prev_actual_n = None
+        for n_spike in n_spikes:
+            MPSPs.append(f([n_spike]))
+            if MPSPs[-1]<opt_MPSP:
+                opt_MPSP = MPSPs[-1]
+                opt_max_n = n_spike
+            if prev_actual_n == r_te.n_glu_spikes: # if the last n resulted in the same actual n as the current n, break out of the n loop
+                break
+            else:
+                prev_actual_n = r_te.n_glu_spikes
+                
+    elif method=='scipy-minimize':
+        res = minimize(fun=f, **method_kwargs)
+        opt_max_n = res.x[0]
+        
+    f([opt_max_n])
+    return opt_max_n
 
 def optimize_split_1D_2D_feeding_strategy_for_MPSP(bounds=(20.0, 400.0), threshold_diff=5.0, Ns=5, **kwargs):
     # first, optimize target conc

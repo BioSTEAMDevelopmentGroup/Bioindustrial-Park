@@ -43,6 +43,7 @@ model_specification = model.specification
 system = model.system
 tea = model.system.TEA
 optimize_stage_1_time_and_max_n_glu_spikes_for_MPSP =  isobutanol.models.optimize_stage_1_time_and_max_n_glu_spikes_for_MPSP
+optimize_max_n_glu_spikes_for_MPSP = isobutanol.models.optimize_max_n_glu_spikes_for_MPSP
 
 f = system.flowsheet
 
@@ -335,7 +336,10 @@ for s3 in spec_3:
                 # optimize_max_n_glu_spikes(obj='y_EtOH_glu_added', 
                 #                           optimize_tau=False,
                 #                           show_progress=False,)
-                optimize_stage_1_time_and_max_n_glu_spikes_for_MPSP(model_kwargs=curr_spec)
+                
+                # optimize_stage_1_time_and_max_n_glu_spikes_for_MPSP(model_kwargs=curr_spec)
+                
+                optimize_max_n_glu_spikes_for_MPSP(model_kwargs=curr_spec)
                 
                 for k, v in list(results.items()): 
                     v[-1][-1].append(metrics[k]['f']())
