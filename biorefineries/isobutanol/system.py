@@ -518,7 +518,7 @@ baseline_spec = {
                  'conc_sugars_feed_spike': 600.0,
                  'tau_max': 120.0,}
 
-V406.stage_1_time = 15.0
+V406.stage_1_time = np.inf
 te_r._te.max_n_glu_spikes = 10
 te_r.default_max_n_glu_spikes = 10
 
