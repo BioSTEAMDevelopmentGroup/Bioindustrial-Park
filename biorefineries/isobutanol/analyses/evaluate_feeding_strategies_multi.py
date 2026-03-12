@@ -92,11 +92,22 @@ baseline_initial = model.metrics_at_baseline()
 # ferm_reactor.kinetic_reaction_system._te.max_n_glu_spikes = 0 # initial val, changed during optimization
 # ferm_reactor.kinetic_reaction_system.default_max_n_glu_spikes = 0 # initial val, changed during optimization
 
+# ferm_reactor.stage_1_time = 5.0
+# ferm_reactor.stage_1_time = 10.0
+# ferm_reactor.stage_1_time = 15.0
+# ferm_reactor.stage_1_time = 20.0
+ferm_reactor.stage_1_time = 25.0
+
 model_specification(
     n_sims=3,
     n_tea_solves=3,
     plot=True,
     )
+
+#%% Parameter load functions
+def load_max_n_glu_spikes(val):
+    ferm_reactor.kinetic_reaction_system._te.max_n_glu_spikes = val 
+    ferm_reactor.kinetic_reaction_system.default_max_n_glu_spikes = val
 
 #%%  Metrics
 product_chemical_IDs = ['Ethanol',]
@@ -149,20 +160,15 @@ results = {i: [] for i in metrics.keys()}
 
 # %% Generate 3-specification meshgrid and set specification loading functions
 
-steps = (25, 25, 1)
+steps = (25, 25, 5)
 
 spec_1 = threshold_conc_sugarses = np.linspace(1., 400., steps[0])
 
 spec_2 = target_conc_sugarses = np.linspace(10., 400., steps[1])
 
-
-spec_3 = conc_sugars_feed_spikes =\
-    np.array([
-              # 1.*baseline_spec['conc_sugars_feed_spike'],
-              fbs_spec.conc_sugars_feed_spike,
-              ])
+spec_3 = max_n_glu_spikes = np.linspace(0, 20, steps[2])
     
-# spec_3 = conc_sugars_feed_spikes = np.linspace(200, 800., steps[2])
+# spec_3 = max_n_glu_spikes = np.linspace(200, 800., steps[2])
 
     
 #%% Plot stuff
@@ -181,9 +187,9 @@ y_ticks = [0, 100, 200, 300, 400,
            # 300, 400, 500,
            ]
 
-z_label = "Max n glu" # title of the x axis
+z_label = "Max. no. of glucose spikes" # title of the x axis
 z_units =r"$\mathrm{g} \cdot \mathrm{L}^{-1}$"
-z_ticks = [0, 200, 400, 600, 800]
+z_ticks = [0, 5, 10, 15, 20]
 
 # Metrics
 MPSP_w_label = r"$\bfMPSP$" # title of the color axis
@@ -268,7 +274,9 @@ def tickmarks(dmin, dmax, accuracy=50, N_points=5):
 #%%
 minute = '0' + str(dateTimeObj.minute) if len(str(dateTimeObj.minute))==1 else str(dateTimeObj.minute)
 # file_to_save = f'_{steps}_steps_'+'etoh_fbs_%s.%s.%s-%s.%s'%(dateTimeObj.year, dateTimeObj.month, dateTimeObj.day, dateTimeObj.hour, minute)
-file_to_save = f'ibo_{steps}_{x_label[:5]}_{y_label[:5]}_{z_label[:5]}_'
+
+
+file_to_save = f'ibo_{steps}_{x_label[:5]}_{y_label[:5]}_Spike_'
 
 chdir(isobutanol_results_filepath)
 
@@ -323,19 +331,22 @@ for s3 in spec_3:
                 curr_spec = {k: v for k,v in fbs_spec.current_specifications.items()}
                 curr_spec.update({'threshold_conc_sugars':s1,})
                 curr_spec.update({'target_conc_sugars':s2,})
-                curr_spec.update({'conc_sugars_feed_spike':s3,})
+                # curr_spec.update({'conc_sugars_feed_spike':s3,})
+                load_max_n_glu_spikes(s3)
                 
-                # model_specification(**curr_spec,
-                #     n_sims=3,
-                #     n_tea_solves=3,
-                #     plot=False,
-                #     )
                 
                 assert s1<s2
                 # optimize_max_n_glu_spikes(obj='y_EtOH_glu_added', 
                 #                           optimize_tau=False,
                 #                           show_progress=False,)
-                optimize_stage_1_time_and_max_n_glu_spikes_for_MPSP(model_kwargs=curr_spec)
+                
+                # optimize_stage_1_time_and_max_n_glu_spikes_for_MPSP(model_kwargs=curr_spec)
+                
+                model_specification(**curr_spec,
+                    n_sims=3,
+                    n_tea_solves=3,
+                    plot=False,
+                    )
                 
                 for k, v in list(results.items()): 
                     v[-1][-1].append(metrics[k]['f']())
@@ -377,7 +388,11 @@ for s3 in spec_3:
 
     # Save generated data
     for k, v in results.items():
-        csv_file_to_save = file_to_save + f'_{k}'
+        
+        max_n = ferm_reactor.kinetic_reaction_system._te.max_n_glu_spikes
+        s1t = ferm_reactor.kinetic_reaction_system._te.stage_1_time
+        
+        csv_file_to_save = file_to_save + f's1t={s1t}_' + f'max_n={max_n}_' + f'_{k}'
         pd.DataFrame(v[-1]).to_csv(isobutanol_results_filepath+csv_file_to_save+'.csv')
 
 #%% Report maximum HXN energy balance error
@@ -385,7 +400,7 @@ print(f'Max HXN Q bal error was {round(max_HXN_qbal_percent_error, 3)} %.')
 
 #%% 
 
-# # chdir(isobutanol_results_filepath)
+# chdir(isobutanol_results_filepath)
 
 # for i in range(len(spec_1)):
 #     frames = []

@@ -46,10 +46,10 @@ plot_kinetic_results()
 
 #%% Plot conc v time
 
-fig, ax = plot_kinetic_results()
+fig, ax = plot_kinetic_results(xlim=(0,100), ylim=(0,250))
 
-ax.set_xlim(0, 100)
-ax.set_ylim(0, 250)
+# ax.set_xlim(0, 100)
+# ax.set_ylim(0, 250)
 
 plt.savefig(f'conc_v_time_{fbs_spec.threshold_conc_sugars}_{fbs_spec.target_conc_sugars}_{fbs_spec.conc_sugars_feed_spike}.png', 
             transparent = False,  

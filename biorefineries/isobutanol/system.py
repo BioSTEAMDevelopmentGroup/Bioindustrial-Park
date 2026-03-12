@@ -884,7 +884,7 @@ def optimize_stage_1_time_and_max_n_glu_spikes_for_MPSP(bounds=((5, 40), (0, 40)
             # print(MPSP)
             return MPSP
         except:
-            # breakpoint()
+            breakpoint()
             # print(np.inf)
             return np.inf
     # res = brute(f, ranges=(bounds,), Ns=20)
@@ -920,7 +920,7 @@ def optimize_stage_1_time_and_max_n_glu_spikes_for_MPSP(bounds=((5, 40), (0, 40)
         opt_s1t = res.x[0]
         opt_max_n = res.x[1]
         
-    f([s1t, n_spike])
+    f([opt_s1t, opt_max_n])
     return opt_s1t, opt_max_n
 
 def optimize_split_1D_2D_feeding_strategy_for_MPSP(bounds=(20.0, 400.0), threshold_diff=5.0, Ns=5, **kwargs):

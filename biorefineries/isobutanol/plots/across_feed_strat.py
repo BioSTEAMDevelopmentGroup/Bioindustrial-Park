@@ -69,20 +69,29 @@ metrics_units = {"MPSP":  r"$\mathrm{\$}\cdot\mathrm{kg}^{-1}$",
 
 # Spec names
 x_label = "Threshold glucose concentration" # title of the x axis
-x_units =r"$\mathrm{g} \cdot \mathrm{L}^{-1}$"
+x_units = r"$\mathrm{g} \cdot \mathrm{L}^{-1}$"
 x_ticks = [0, 100, 200, 300, 400,
            # 300, 400, 500,
            ]
 
 y_label = "Target glucose concentration" # title of the x axis
-y_units =r"$\mathrm{g} \cdot \mathrm{L}^{-1}$"
+y_units = r"$\mathrm{g} \cdot \mathrm{L}^{-1}$"
 y_ticks = [0, 100, 200, 300, 400,
            # 300, 400, 500,
            ]
 
-z_label = "Spike feed glucose concentration" # title of the x axis
-z_units =r"$\mathrm{g} \cdot \mathrm{L}^{-1}$"
-z_ticks = [0, 200, 400, 600, 800]
+# max_n
+row_label = z_label = "Max no. of glucose spikes" # title of the x axis
+row_units = z_units = ""
+row_ticks = z_ticks = [0, 5, 10, 15, 20]
+
+# s1t
+col_label = "Stage 1 time" # title of the x axis
+col_units = "h"
+col_ticks = [5, 10, 15, 20, 25]
+
+max_n = 20.0
+s1t = 15.0
 
 # Misc
 steps = (25, 25, 1)
@@ -92,13 +101,9 @@ spec_1 = threshold_conc_sugarses = np.linspace(1., 400., steps[0])
 
 spec_2 = target_conc_sugarses = np.linspace(10., 400., steps[1])
 
+# spec_3 = max_n_glu_spikes = np.linspace(0, 20, steps[2])
+spec_3 = max_n_glu_spikes = [20]
 
-spec_3 = conc_sugars_feed_spikes =\
-    np.array([
-              # 1.*baseline_spec['conc_sugars_feed_spike'],
-              fbs_spec.conc_sugars_feed_spike,
-              ])
-    
 #%% Intermediate details
 
 # Misc
@@ -125,7 +130,7 @@ for k in metrics_plot_names.keys():
 os.chdir(isobutanol_results_pub_filepath + subfolder_name)
 
 #%% Filename
-file_to_load = 'ibo_(25, 25, 1)_Thres_Targe_Spike_'
+file_to_load = f'ibo_{steps}_{x_label[:5]}_{y_label[:5]}_{z_label[:5]}_'
 
 #%% Load results
 results = {}
@@ -382,8 +387,8 @@ if plot_all_generic:
 
 #%% MPSP
 curr_metric = 'MPSP'
-curr_metric_w_levels = np.arange(0.7, 0.9, 0.01)
-curr_metric_cbar_ticks = np.arange(0.7, 0.9, 0.05)
+curr_metric_w_levels = np.arange(0.65, 0.9001, 0.01)
+curr_metric_cbar_ticks = np.arange(0.65, 0.9001, 0.05)
 curr_metric_w_ticks = []
 cbar_n_minor_ticks = 4
 lccm = curr_metric.lower()
