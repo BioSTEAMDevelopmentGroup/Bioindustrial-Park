@@ -61,7 +61,7 @@ strategies = [
     'fixed_batch',
     'adaptive_batch',
     'fixed_fed-batch',
-    # 'adaptive_fed-batch',
+    'adaptive_fed-batch',
 ]
 
 output_filename = 'MPSP_multi_panel_kinetics.png'
@@ -237,7 +237,7 @@ def build_subfolder_name(x_label, y_label, strategy):
 def build_file_prefix(x_label, y_label, z_label, strategy, steps):
     subfolder_name = build_subfolder_name(x_label, y_label, strategy)
     perform_feeding_strategy_opt = 'adaptive' in subfolder_name
-    max_n = 0 if 'fed-batch' not in subfolder_name else 200
+    max_n = 0 if 'fed-batch' not in subfolder_name else 21
     file_prefix = (
         f"ibo_{steps}_{x_label[:5]}_{y_label[:5]}_{z_label[:5]}"
         f"_opt={perform_feeding_strategy_opt}_max_n={max_n}_"
@@ -510,6 +510,7 @@ for i, (x_label, y_label) in enumerate(row_parameter_pairs):
             additional_points=additional_points,
             fig_ax_to_use=(fig, ax),
             comparison_range=comparison_range,
+            show_comparison_range_clabels=False,
             inline_spacing=0.1,
             label_over_color='black',
         )

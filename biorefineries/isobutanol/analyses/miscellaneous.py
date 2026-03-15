@@ -24,10 +24,11 @@ f = model.system.flowsheet
 V406 = f.V406
 r = V406.kinetic_reaction_system
 
+scenario = 'A'
 IBO_filepath = isobutanol.__file__.replace('\\__init__.py', '')
 parameter_distributions_filename = IBO_filepath+\
     '\\analyses\\full\\parameter_distributions\\'+\
-    'parameter-distributions_corn_IBO_EtOH_A.xlsx'
+    f'parameter-distributions_corn_IBO_EtOH_{scenario}.xlsx'
         
 model.parameters = ()
 model.load_parameter_distributions(parameter_distributions_filename, namespace_dict)
@@ -39,20 +40,32 @@ model_specification()
 # V406.kinetic_reaction_system._te.max_n_glu_spikes = 0
 # V406.kinetic_reaction_system.default_max_n_glu_spikes = 0  
 
-model_specification(target_conc_sugars=221.25, threshold_conc_sugars=217.125)
-
+if scenario=='A':
+    V406.kinetic_reaction_system._te.max_n_glu_spikes = 3
+    V406.kinetic_reaction_system.default_max_n_glu_spikes = 3  
+    model_specification(threshold_conc_sugars=200.5, target_conc_sugars=221.25)
+elif scenario=='B':
+    V406.kinetic_reaction_system._te.max_n_glu_spikes = 16
+    V406.kinetic_reaction_system.default_max_n_glu_spikes = 16  
+    model_specification(threshold_conc_sugars=316.875, target_conc_sugars=318.75)
+else:
+    raise ValueError(f'Scenario {scenario} not found.')
+    
 print(f.ethanol.price * f.ethanol.F_mass/f.ethanol.imass['Ethanol'])
 
 plot_kinetic_results()
 
 #%% Plot conc v time
+isobutanol_filepath = isobutanol.__file__.replace('\\__init__.py', '')
+isobutanol_results_pub_filepath = isobutanol_filepath + '\\analyses\\results\\publication\\'
+subfolder_name='Feed-strat\\'
 
-fig, ax = plot_kinetic_results(xlim=(0,50), ylim=(0,250))
+fig, ax = plot_kinetic_results(xlim=(0,80), ylim=(0,250))
 
 # ax.set_xlim(0, 100)
 # ax.set_ylim(0, 250)
 
-plt.savefig(f'conc_v_time_{fbs_spec.threshold_conc_sugars}_{fbs_spec.target_conc_sugars}_{fbs_spec.conc_sugars_feed_spike}.png', 
+plt.savefig(isobutanol_results_pub_filepath+subfolder_name+f'conc_v_time_{fbs_spec.threshold_conc_sugars}_{fbs_spec.target_conc_sugars}_{fbs_spec.conc_sugars_feed_spike}_{scenario}.png', 
             transparent = False,  
             facecolor = 'white',
             bbox_inches='tight',

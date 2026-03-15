@@ -67,6 +67,9 @@ metrics_units = {"MPSP":  r"$\mathrm{\$}\cdot\mathrm{kg}^{-1}$",
 #%% Input Details
 # !!!
 
+# scenario = 'A' # current state-of-tech
+scenario = 'B' # potential improvements for isobutanol co-production
+
 # Spec names
 x_label = "Threshold glucose concentration" # title of the x axis
 x_units = r"$\mathrm{g} \cdot \mathrm{L}^{-1}$"
@@ -118,7 +121,6 @@ metrics_plot_names["Actual aeration required"] = "Aeration required"
 for k in metrics_plot_names.keys():
     metrics_plot_names[k] = metrics_plot_names[k].replace("IBO", "Isobutanol").replace("EtOH", "Ethanol")
 
-metrics_plot_names["Combined Yield"] = "Ethanol Yield"
 metrics_plot_names["Cell loading"] = "Cell density"
 
 for k in metrics_plot_names.keys():
@@ -130,7 +132,7 @@ for k in metrics_plot_names.keys():
 os.chdir(isobutanol_results_pub_filepath + subfolder_name)
 
 #%% Filename
-file_to_load = f'ibo_{steps}_{x_label[:5]}_{y_label[:5]}_{z_label[:5]}_'
+file_to_load = f'ibo_{steps}_{x_label[:5]}_{y_label[:5]}_{z_label[:5]}_{scenario}_'
 
 #%% Load results
 results = {}
@@ -205,10 +207,27 @@ if plot_all_generic:
     #                   'Total Q sugar evap',
     #                   'Actual aeration required',
     #                   ]
+    
+    # metrics_to_opt = [
+    #                   'Cell loading',
+    #                   'EtOH Titer', 
+    #                   'EtOH Productivity', 
+    #                   'Combined Yield', 
+    #                   'Total Q sugar evap',
+    #                   'Actual aeration required',
+    #                   'TCI',
+    #                   'AOC',
+    #                   'MPSP', 
+    #                   ]
+    
     metrics_to_opt = [
                       'Cell loading',
                       'EtOH Titer', 
                       'EtOH Productivity', 
+                      'EtOH Yield',
+                      'IBO Titer', 
+                      'IBO Productivity', 
+                      'IBO Yield',
                       'Combined Yield', 
                       'Total Q sugar evap',
                       'Actual aeration required',
@@ -216,7 +235,12 @@ if plot_all_generic:
                       'AOC',
                       'MPSP', 
                       ]
-
+    
+    if not scenario=='B':
+        metrics_plot_names["Combined Yield"] = "Ethanol Yield"
+        for i in ['EtOH Yield', 'IBO Titer', 'IBO Productivity', 'IBO Yield']:
+            metrics_to_opt.remove(i)
+            
     opt_coords = {}
     for m in  metrics_to_opt:
         m_non_nans = np.array(results[m])[np.where(~np.isnan(np.array(results[m])))]
@@ -283,7 +307,9 @@ if plot_all_generic:
             
         metric_optima_markers[metric_opt_name] = (marker_shape, marker_color, marker_size)
         additional_points[opt_coords[m]] = (marker_shape, marker_color, marker_size)
-        print(m, marker_shape, marker_color, marker_size)
+        print(m, opt_coords[m], marker_shape, marker_color, marker_size)
+    
+    print(metric_optima_markers)
     
     fig, ax = plt.subplots()
     contourplots.utils.marker_legend(ax, metric_optima_markers, title="Optima", loc="upper right")

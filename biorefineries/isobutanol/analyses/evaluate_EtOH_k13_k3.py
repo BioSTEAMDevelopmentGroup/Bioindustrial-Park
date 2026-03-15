@@ -94,9 +94,12 @@ ferm_reactor.kinetic_reaction_system._te.max_n_glu_spikes = 0
 ferm_reactor.kinetic_reaction_system.default_max_n_glu_spikes = 0  
 perform_feeding_strategy_opt = False
 
+fbs_spec.n_tea_solves = 0
+f.V513.update_ethanol_price = True
+
 model_specification(
     n_sims=3,
-    n_tea_solves=3,
+    # n_tea_solves=3,
     plot=True,
     )
 
@@ -129,7 +132,14 @@ get_active_cell_loading = lambda: ferm_reactor.nsk_results_specific_tau_dict['cu
 #             get_prod_nsk,
 #             get_curr_n_glu_spikes,]
 
-metrics = {'MPSP': {'f': get_product_MPSP, 'units': '$/kg'},
+ethanol = f.ethanol
+isobutanol = f.isobutanol
+def get_IRR():
+    return tea.solve_IRR()
+    
+metrics = {
+            # 'MPSP': {'f': get_product_MPSP, 'units': '$/kg'},
+            'IRR': {'f': get_IRR, 'units': '%'},
             'AOC': {'f': get_AOC, 'units': 'MM$/y'},
             'TCI': {'f': get_TCI, 'units': 'MM$'},
             'Combined Yield': {'f': get_yield_nsk, 'units': 'g-EtOH-and-IBO/g-sugars'},
@@ -152,11 +162,11 @@ metrics = {'MPSP': {'f': get_product_MPSP, 'units': '$/kg'},
 # results = {i: [] for i in range(len(metrics.values()))}
 results = {i: [] for i in metrics.keys()}
 
-steps = (25, 25, 1)
+steps = (10, 10, 1)
 
 spec_1 = nsk_k_13es = np.linspace(0.0, 40.0, steps[0])
 
-spec_2 = nsk_k_7iies = np.linspace(0.0001, 0.5, steps[1])
+spec_2 = nsk_k_3es = np.linspace(0.0, 40.0, steps[1])
 
 
 spec_3 = conc_sugars_feed_spikes =\
@@ -173,9 +183,9 @@ x_label = "k_13" # title of the x axis
 x_units = r"$\mathrm{g} \cdot \mathrm{L}^{-1} \cdot \mathrm{h}^{-1}$"
 x_ticks = [0, 10, 20, 30, 40]
 
-y_label = "k_7ii" # title of the y axis
+y_label = "k_3" # title of the y axis
 y_units = r"$\mathrm{g} \cdot \mathrm{L}^{-1} \cdot \mathrm{h}^{-1}$"
-y_ticks = [0.0, 0.1, 0.2, 0.3, 0.4, 0.5]
+y_ticks = [0, 10, 20, 30, 40]
 
 z_label = "Spike feed glucose concentration" # title of the x axis
 z_units =r"$\mathrm{g} \cdot \mathrm{L}^{-1}$"
@@ -269,10 +279,10 @@ file_to_save = f'ibo_{steps}_{x_label[:5]}_{y_label[:5]}_{z_label[:5]}_opt={perf
 print('\n\nSimulating the initial point to avoid bugs ...')
 curr_spec = fbs_spec.current_specifications
 r.k_13 = nsk_k_13es[1]
-r.k_7ii = nsk_k_7iies[0]
+r.k_3 = nsk_k_3es[0]
 model_specification(**curr_spec,
     n_sims=3,
-    n_tea_solves=3,
+    # n_tea_solves=3,
     plot=True,
     )
 
@@ -308,11 +318,13 @@ for s3 in spec_3:
             curr_no +=1
             error_message = None
             try:
+                if s1==s2==0.0:
+                    raise ValueError('Infeasible combination (both parameters are zero).')
                 # if round(s1,2)==round(spec_1[1],2) and round(s2,2)==round(spec_2[4],2):
                 #     breakpoint()
                 curr_spec = {k: v for k,v in fbs_spec.current_specifications.items()}
                 r.k_13 = s1
-                r.k_7ii = s2
+                r.k_3 = s2
                 curr_spec.update({'conc_sugars_feed_spike':s3,})
                 
                 if perform_feeding_strategy_opt:
@@ -487,53 +499,53 @@ if plot:
     
     #%% MPSP
     
-    # MPSP_w_levels, MPSP_w_ticks, MPSP_cbar_ticks = get_contour_info_from_metric_data(results_metric_1, lb=3)
-    MPSP_w_levels = np.arange(0.6, 1.4001, 0.01)
-    MPSP_cbar_ticks = np.arange(0.6, 1.4001, 0.05)
-    MPSP_w_ticks = [0.4, 0.6, 0.8]
-    # MPSP_w_levels = np.arange(0., 15.5, 0.5)
+    # # MPSP_w_levels, MPSP_w_ticks, MPSP_cbar_ticks = get_contour_info_from_metric_data(results_metric_1, lb=3)
+    # MPSP_w_levels = np.arange(0.6, 1.4001, 0.01)
+    # MPSP_cbar_ticks = np.arange(0.6, 1.4001, 0.05)
+    # MPSP_w_ticks = [0.4, 0.6, 0.8]
+    # # MPSP_w_levels = np.arange(0., 15.5, 0.5)
     
     
-    contourplots.animated_contourplot(w_data_vs_x_y_at_multiple_z=results['MPSP'], # shape = z * x * y # values of the metric you want to plot on the color axis; e.g., MPSP
-                                    x_data=spec_1, # x axis values
-                                    # x_data = yields/theoretical_max_g_HP_acid_per_g_glucose,
-                                    y_data=spec_2, # y axis values
-                                    z_data=spec_3, # z axis values
-                                    x_label=x_label, # title of the x axis
-                                    y_label=y_label, # title of the y axis
-                                    z_label=z_label, # title of the z axis
-                                    w_label=MPSP_w_label, # title of the color axis
-                                    x_ticks=x_ticks,
-                                    y_ticks=y_ticks,
-                                    z_ticks=z_ticks,
-                                    w_levels=MPSP_w_levels, # levels for unlabeled, filled contour areas (labeled and ticked only on color bar)
-                                    w_ticks=MPSP_w_ticks, # labeled, lined contours; a subset of w_levels
-                                    x_units=x_units,
-                                    y_units=y_units,
-                                    z_units=z_units,
-                                    w_units=MPSP_units,
-                                    # fmt_clabel=lambda cvalue: r"$\mathrm{\$}$"+" {:.1f} ".format(cvalue)+r"$\cdot\mathrm{kg}^{-1}$", # format of contour labels
-                                    fmt_clabel = lambda cvalue: get_rounded_str(cvalue, 3),
-                                    cmap=JBEI_UCB_colormap(), # can use 'viridis' or other default matplotlib colormaps
-                                    cmap_over_color = colors.grey_dark.shade(8).RGBn,
-                                    extend_cmap='max',
-                                    cbar_ticks=MPSP_cbar_ticks,
-                                    z_marker_color='g', # default matplotlib color names
-                                    fps=fps, # animation frames (z values traversed) per second
-                                    n_loops=30, # the number of times the animated contourplot should loop animation over z; infinite by default
-                                    animated_contourplot_filename='MPSP_animated_contourplot_'+file_to_save, # file name to save animated contourplot as (no extensions)
-                                    keep_frames=keep_frames, # leaves frame PNG files undeleted after running; False by default
-                                    axis_title_fonts=axis_title_fonts,
-                                    clabel_fontsize = clabel_fontsize,
-                                    default_fontsize = default_fontsize,
-                                    axis_tick_fontsize = axis_tick_fontsize,
-                                    # comparison_range=EtOH_market_range,
-                                    n_minor_ticks = 1,
-                                    cbar_n_minor_ticks = 4,
-                                    units_on_newline = (False, False, False, False), # x,y,z,w
-                                    units_opening_brackets = [" (",] * 4,
-                                    units_closing_brackets = [")",] * 4,
-                                    )
+    # contourplots.animated_contourplot(w_data_vs_x_y_at_multiple_z=results['MPSP'], # shape = z * x * y # values of the metric you want to plot on the color axis; e.g., MPSP
+    #                                 x_data=spec_1, # x axis values
+    #                                 # x_data = yields/theoretical_max_g_HP_acid_per_g_glucose,
+    #                                 y_data=spec_2, # y axis values
+    #                                 z_data=spec_3, # z axis values
+    #                                 x_label=x_label, # title of the x axis
+    #                                 y_label=y_label, # title of the y axis
+    #                                 z_label=z_label, # title of the z axis
+    #                                 w_label=MPSP_w_label, # title of the color axis
+    #                                 x_ticks=x_ticks,
+    #                                 y_ticks=y_ticks,
+    #                                 z_ticks=z_ticks,
+    #                                 w_levels=MPSP_w_levels, # levels for unlabeled, filled contour areas (labeled and ticked only on color bar)
+    #                                 w_ticks=MPSP_w_ticks, # labeled, lined contours; a subset of w_levels
+    #                                 x_units=x_units,
+    #                                 y_units=y_units,
+    #                                 z_units=z_units,
+    #                                 w_units=MPSP_units,
+    #                                 # fmt_clabel=lambda cvalue: r"$\mathrm{\$}$"+" {:.1f} ".format(cvalue)+r"$\cdot\mathrm{kg}^{-1}$", # format of contour labels
+    #                                 fmt_clabel = lambda cvalue: get_rounded_str(cvalue, 3),
+    #                                 cmap=JBEI_UCB_colormap(), # can use 'viridis' or other default matplotlib colormaps
+    #                                 cmap_over_color = colors.grey_dark.shade(8).RGBn,
+    #                                 extend_cmap='max',
+    #                                 cbar_ticks=MPSP_cbar_ticks,
+    #                                 z_marker_color='g', # default matplotlib color names
+    #                                 fps=fps, # animation frames (z values traversed) per second
+    #                                 n_loops=30, # the number of times the animated contourplot should loop animation over z; infinite by default
+    #                                 animated_contourplot_filename='MPSP_animated_contourplot_'+file_to_save, # file name to save animated contourplot as (no extensions)
+    #                                 keep_frames=keep_frames, # leaves frame PNG files undeleted after running; False by default
+    #                                 axis_title_fonts=axis_title_fonts,
+    #                                 clabel_fontsize = clabel_fontsize,
+    #                                 default_fontsize = default_fontsize,
+    #                                 axis_tick_fontsize = axis_tick_fontsize,
+    #                                 # comparison_range=EtOH_market_range,
+    #                                 n_minor_ticks = 1,
+    #                                 cbar_n_minor_ticks = 4,
+    #                                 units_on_newline = (False, False, False, False), # x,y,z,w
+    #                                 units_opening_brackets = [" (",] * 4,
+    #                                 units_closing_brackets = [")",] * 4,
+    #                                 )
     
     # #%% Yield
     

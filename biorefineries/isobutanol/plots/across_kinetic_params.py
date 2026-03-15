@@ -80,7 +80,7 @@ steps = (25, 25, 1)
 # Misc
 subfolder_name = f'Kinetics_{x_label}_{y_label}\\{strategy}\\'
 perform_feeding_strategy_opt = 'adaptive' in subfolder_name
-max_n = 0 if not 'fed-batch' in subfolder_name else 200
+max_n = 0 if not 'fed-batch' in subfolder_name else 21
 
 ## Spec arrays, units, and ticks
 spec_1, spec_2, spec_3 = None, None, None
@@ -268,28 +268,28 @@ if plot_all_generic:
         if m=='MPSP':
             marker_shape='*'
             marker_color='#33ccff'
-            marker_size = 8
+            marker_size = 12
         elif m=='TCI':
             marker_shape='s'
             marker_color='#33ccff'
-            marker_size = 6
+            marker_size = 8
         elif m=='AOC':
             marker_shape='p'
             marker_color='#33ccff'
-            marker_size = 6
+            marker_size = 8
         elif m=='Total Q sugar evap':
             marker_shape='P'
             marker_color = 'w'
-            marker_size = 6
+            marker_size = 8
         elif m=='Actual aeration required':
             marker_shape='X'
             marker_color = 'w'
-            marker_size = 6
+            marker_size = 8
         else:
             marker_shape = opt_marker_shapes[shapes_i]
             shapes_i += 1
             marker_color = 'w'
-            marker_size = 6
+            marker_size = 8
             
         metric_opt_name = metrics_plot_names[m]
         if not metric_opt_name in ('TCI', 'AOC', 'MPSP',):

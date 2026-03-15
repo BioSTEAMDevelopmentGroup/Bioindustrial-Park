@@ -346,7 +346,7 @@ def M401_adjust_makeup_solvent():
         M401._cost = lambda: 0
         M401.ins[1].empty()
         M401._run()
-
+        
 # solvent_extraction_thermo = tmo.Thermo(chemicals=[i for i in chems if i.ID in ('Water', 'Isobutanol', solvent_chem)])
 
 S401 = bst.MultiStageMixerSettlers('S401', 
@@ -449,13 +449,87 @@ V514 = bst.StorageTank('V514', ins=H401-0, outs=('isobutanol'), tau=7*24)
 
 # V514.isobutanol_price = 1.725 # https://www.alibaba.com/product-detail/China-Isobutanol-CAS-NO-78-83_1600225311840.html?spm=a2700.7724857.0.0.6b071f52Jodf8p
 V514.isobutanol_price = 1.49 # https://www.alibaba.com/product-detail/High-Purity-Industrial-Organic-Solvent-Textile_1601609307567.html?spm=a2700.7724857.0.0.6b071f52XisbBQ
-V514.isobutanol_price = 0.95 # https://www.alibaba.com/product-detail/High-Quality-for-Industrial-Grade-Isobutanol_1601289128791.html?spm=a2700.7724857.0.0.6b071f52XisbBQ
+# V514.isobutanol_price = 0.95 # https://www.alibaba.com/product-detail/High-Quality-for-Industrial-Grade-Isobutanol_1601289128791.html?spm=a2700.7724857.0.0.6b071f52XisbBQ
 @V514.add_specification(run=False)
 def V514_update_IBO_price():
-    V514._run()
-    ibo = V514.outs[0]
-    if ibo.F_mol: ibo.price = V514.isobutanol_price * ibo.imass['Isobutanol']/ibo.F_mass
+    if np.any([i() for i in M401.bypass_IBO_separation_conditions]):
+        V514.ins[0].empty()
+        V514.outs[0].empty()
+    else:
+        V514._run()
+        ibo = V514.outs[0]
+        if ibo.F_mol: ibo.price = V514.isobutanol_price * ibo.imass['Isobutanol']/ibo.F_mass
 
+#%% Add ethanol storage specification for optional purity-based price update (when solving IRR rather than MPSP)
+V513 = f.V513
+V513.ethanol_price = 0.835 # mean of ends of market price range (0.52 - 1.15) # Jan 2021 - Dec 2025 5-year low and high from https://tradingeconomics.com/commodity/ethanol
+
+V513.update_ethanol_price = False # False by default when solving for ethanol MPSP rather than IRR or NPV
+@V513.add_specification(run=False)
+def V513_update_etoh_price():
+    if np.any([i() for i in T501.bypass_EtOH_separation_conditions]):
+        V513.ins[0].empty()
+        V513.outs[0].empty()
+    else:
+        V513._run()
+        if V513.update_ethanol_price:
+            etoh = V513.outs[0]
+            if etoh.F_mol: etoh.price = V513.ethanol_price * etoh.imass['Ethanol']/etoh.F_mass
+        
+#%% Add bypass option for ethanol separation
+T501 = f.T501
+P301 = f.P301
+T501.bypass_EtOH_separation_conditions = [lambda: P301.outs[0].imass['Ethanol']/P301.outs[0].F_vol < 2.0] # if any return True, don't try to recover Ethanol
+
+T501_design = T501._design
+T501_cost = T501._cost
+
+@T501.add_specification(run=False)
+def T501_ethanol_separation_bypass_spec():
+    if not np.any([i() for i in T501.bypass_EtOH_separation_conditions]):
+        T501._design = T501_design
+        T501._cost = T501_cost
+        T501._run()
+    else:
+        T501._design = lambda: 0
+        T501._cost = lambda: 0
+        T501.outs[0].empty()
+        T501.outs[1].copy_like(T501.ins[0])
+        
+MX3 = f.MX3
+MX3_design = MX3._design
+MX3_cost = MX3._cost
+@MX3.add_specification(run=False)
+def MX3_ethanol_separation_bypass_spec():
+    if not np.any([i() for i in T501.bypass_EtOH_separation_conditions]):
+        MX3._design = MX3_design
+        MX3._cost = MX3_cost
+        MX3._run()
+    else:
+        MX3._design = lambda: 0
+        MX3._cost = lambda: 0
+        MX3.ins[0].empty()
+        MX3.ins[1].empty()
+        MX3.outs[0].empty()
+
+T503_T507 = f.T503_T507
+
+T503_T507_design = T503_T507._design
+T503_T507_cost = T503_T507._cost
+
+@T503_T507.add_specification(run=False)
+def T503_T507_ethanol_separation_bypass_spec():
+    if not np.any([i() for i in T501.bypass_EtOH_separation_conditions]):
+        T503_T507._design = T503_T507_design
+        T503_T507._cost = T503_T507_cost
+        T503_T507._run()
+    else:
+        T503_T507._design = lambda: 0
+        T503_T507._cost = lambda: 0
+        T503_T507.outs[0].empty()
+        T503_T507.outs[1].copy_like(T503_T507.ins[0])
+        
+        
 #%% Remove all existing HXprocess units
 
 def reconnect_without_HXprocess_unit(HXprocess_unit):
@@ -513,8 +587,8 @@ corn_EtOH_IBO_sys._TEA = corn_EtOH_IBO_sys_tea = corn.tea.create_tea(corn_EtOH_I
 baseline_spec = {
                  # 'target_conc_sugars': 220.0,
                  # 'threshold_conc_sugars': 210.0,
-                 'target_conc_sugars': 225.0,
-                 'threshold_conc_sugars': 217.0,
+                 'target_conc_sugars': 221.25,
+                 'threshold_conc_sugars': 200.5,
                  'conc_sugars_feed_spike': 600.0,
                  'tau_max': 120.0,}
 
@@ -522,8 +596,8 @@ baseline_spec = {
 # te_r._te.max_n_glu_spikes = 10
 # te_r.default_max_n_glu_spikes = 10
 
-te_r._te.max_n_glu_spikes = 21
-te_r.default_max_n_glu_spikes = 21
+te_r._te.max_n_glu_spikes = 3
+te_r.default_max_n_glu_spikes = 3
 
 #% Create fed-batch strategy specification object
 fbs_spec = nsk.units.FedBatchStrategySpecification(
@@ -545,15 +619,18 @@ fbs_spec = nsk.units.FedBatchStrategySpecification(
 
 #%%
 
+fbs_spec.product_stream = f.ethanol
+fbs_spec.n_tea_solves = 3
+
 def get_purity_adj_price(stream, chem_IDs):
     return stream.price * stream.F_mass/sum([stream.imass[ID] for ID in chem_IDs])
 
-def load_simulate_get_EtOH_MPSP(target_conc_sugars=None,
+def load_simulate_get_MPSP(target_conc_sugars=None,
     threshold_conc_sugars=None,
     conc_sugars_feed_spike=None,
     tau_max=None,
     n_sims=3,
-    n_tea_solves=3,
+    n_tea_solves=None,
     plot=False,
     ):
     
@@ -578,14 +655,22 @@ def load_simulate_get_EtOH_MPSP(target_conc_sugars=None,
         tau_max=tau_max,)
         
         corn_EtOH_IBO_sys.simulate()
-        
+    
+    product_stream = fbs_spec.product_stream
+    n_tea_solves = n_tea_solves if n_tea_solves is not None else fbs_spec.n_tea_solves
     for i in range(n_tea_solves):
-        ethanol.price = corn_EtOH_IBO_sys_tea.solve_price(ethanol)
+        product_stream.price = corn_EtOH_IBO_sys_tea.solve_price(product_stream)
 
     if plot:
         plot_kinetic_results()
     
-    return get_purity_adj_price(ethanol, ['Ethanol'])
+    if n_tea_solves > 0:
+        prod_chem = None
+        if product_stream.imol['Ethanol']>0:
+            prod_chem = 'Ethanol'
+        elif product_stream.imol['Isobutanol']>0:
+            prod_chem = 'Isobutanol'
+        return get_purity_adj_price(product_stream, [prod_chem])
 
 def plot_kinetic_results(xlim=None, ylim=None, 
                          show_stage_1_time=False, 
@@ -618,10 +703,11 @@ def plot_kinetic_results(xlim=None, ylim=None,
     ax.yaxis.set_minor_locator(AutoMinorLocator(n_minor_ticks+1))
     
     ax.tick_params(
-        axis='x',          # changes apply to the y-axis
+        axis='x',          # changes apply to the x-axis
         which='both',      # both major and minor ticks are affected
         direction='inout',
-        right=True,
+        # right=True,
+        top=True,
         width=0.65,
         # zorder=200,
         )
@@ -637,7 +723,7 @@ def plot_kinetic_results(xlim=None, ylim=None,
     if xlim is not None:
         ax.set_xlim(xlim)
     else:
-        ax.set_xlim(V406.tau + 20)
+        ax.set_xlim((0, V406.tau + 20))
     if ylim is not None:
         ax.set_ylim(ylim)
     
@@ -678,10 +764,10 @@ def reset_and_reload(**curr_spec):
     print('Loading and simulating with baseline specifications ...')
     # curr_spec = {i: fbs_spec.__getattribute__(i) for i in baseline_spec.keys()}
     corn_EtOH_IBO_sys.simulate()
-    load_simulate_get_EtOH_MPSP(**fbs_spec.baseline_specifications)
+    load_simulate_get_MPSP(**fbs_spec.baseline_specifications)
     print('Loading and simulating with required specifications ...')
-    # load_simulate_get_EtOH_MPSP(**curr_spec)
-    load_simulate_get_EtOH_MPSP(**curr_spec)
+    # load_simulate_get_MPSP(**curr_spec)
+    load_simulate_get_MPSP(**curr_spec)
     
 def reset_and_switch_solver(solver_ID, **curr_spec):
     corn_EtOH_IBO_sys.reset_cache()
@@ -689,7 +775,7 @@ def reset_and_switch_solver(solver_ID, **curr_spec):
     corn_EtOH_IBO_sys.converge_method = solver_ID
     print(f"Trying {solver_ID} ...")
     corn_EtOH_IBO_sys.simulate()
-    load_simulate_get_EtOH_MPSP(**curr_spec)
+    load_simulate_get_MPSP(**curr_spec)
 
 # F403 = u.F403
 def run_bugfix_barrage(**curr_spec):
@@ -702,7 +788,7 @@ def run_bugfix_barrage(**curr_spec):
                 corn_EtOH_IBO_sys.reset_cache()
                 corn_EtOH_IBO_sys.empty_recycles()
                 corn_EtOH_IBO_sys.simulate()
-                load_simulate_get_EtOH_MPSP(**curr_spec)
+                load_simulate_get_MPSP(**curr_spec)
             except:
                 print(str(e))
                 raise e
@@ -718,7 +804,7 @@ def run_bugfix_barrage(**curr_spec):
         #                         j.outs[1].T = j.T
         #                     except:
         #                         pass
-        #         load_simulate_get_EtOH_MPSP()
+        #         load_simulate_get_MPSP()
                 
         #     except:
         #         print(str(e))
@@ -743,7 +829,7 @@ def model_specification(**kwargs):
     curr_spec = {k: v for k,v in fbs_spec.current_specifications.items()}
     curr_spec.update(kwargs)
     try:
-        load_simulate_get_EtOH_MPSP(**curr_spec)
+        load_simulate_get_MPSP(**curr_spec)
     except Exception as e:
         str_e = str(e).lower()
         print('Error in model spec: %s'%str_e)
@@ -760,7 +846,7 @@ def model_specification(**kwargs):
                 tau_maxes_to_try.reverse()
                 for tm in tau_maxes_to_try:
                     try:
-                        load_simulate_get_EtOH_MPSP(tau_max=tm)
+                        load_simulate_get_MPSP(tau_max=tm)
                         success = True
                         break
                     except Exception as e:
@@ -782,7 +868,7 @@ def model_specification(**kwargs):
                             r.integrator.relative_tolerance = 1e-7
                             print('Re-simulating fermentation unit with lower integrator rtol ...')
                             V406.simulate()
-                            load_simulate_get_EtOH_MPSP(**curr_spec)
+                            load_simulate_get_MPSP(**curr_spec)
                             success = True
                         except Exception as e:
                             print(str(e))
@@ -794,7 +880,7 @@ def model_specification(**kwargs):
                                     print('Re-running fermentation unit with rk45 ...')
                                     V406.simulate()
                                     success = True
-                                    load_simulate_get_EtOH_MPSP(**curr_spec)
+                                    load_simulate_get_MPSP(**curr_spec)
                                 except Exception as e:
                                     print(str(e))
                                     raise e
@@ -810,7 +896,7 @@ def model_specification(**kwargs):
                         if 'massbalerror' in str_e:
                             try:
                                 print('Trying again ...')
-                                load_simulate_get_EtOH_MPSP(**curr_spec)
+                                load_simulate_get_MPSP(**curr_spec)
                             except Exception as e:
                                 print(str(e))
                                 raise e
@@ -826,7 +912,7 @@ def model_specification(**kwargs):
             # breakpoint()
             try:
                 print('Trying again ...')
-                load_simulate_get_EtOH_MPSP(**curr_spec)
+                load_simulate_get_MPSP(**curr_spec)
             except Exception as e:
                 str_e = str(e).lower()
                 print('Error in model spec: %s'%str_e)
@@ -1058,7 +1144,6 @@ simulate_baseline = True
 if simulate_baseline:
     model_specification(**fbs_spec.baseline_specifications,
         n_sims=3,
-        n_tea_solves=3,
         plot=True,
         )
     # print(get_purity_adj_price(ethanol, ['Ethanol']))
@@ -1076,7 +1161,9 @@ sugar_solution_preparation_group = bst.UnitGroup('sugar solution preparation',
                                                  units=list(f.S301.get_downstream_units().intersection(u.V406.get_upstream_units()))
                                                  + [u.S301, u.F301_P1, u.F302_P1])
 
-fermentation_group = bst.UnitGroup('fermentation', units=[u.V406])
+fermentation_group = bst.UnitGroup('fermentation', units=[u.V406, u.K330, u.V330,
+                                                          u.V403, 
+                                                          u.P404,])
 
 # define IBO separation units
 IBO_separation_units = [i for i in corn_EtOH_IBO_sys.units
@@ -1087,20 +1174,31 @@ IBO_separation_units = [i for i in corn_EtOH_IBO_sys.units
 
 isobutanol_separation_group = bst.UnitGroup('isobutanol separation', units=IBO_separation_units)
 
+storage_and_handling_group = bst.UnitGroup('storage and handling', 
+                                           units = [i for i in corn_EtOH_IBO_sys.units
+                                                    if isinstance(i, bst.units.StorageTank)
+                                                    or isinstance(i, corn.units.DDGSHandling)]
+                                                 + [f.P510, f.MX4])
+
+DDGS_recovery_group = bst.UnitGroup('DDGS recovery', 
+                                    units = [i for i in list(f.M403.get_downstream_units())
+                                             if not i in [f.MX5, f.T608]])
+
 ethanol_separation_group = bst.UnitGroup('ethanol separation', 
                              units= [i for i in corn_EtOH_IBO_sys.units
                             if not i in list(corn_EtOH_IBO_sys.facilities)
                                         + feedstock_acquisition_group.units + feedstock_saccharification_group.units
                                         + sugar_solution_preparation_group.units + fermentation_group.units
-                                        + isobutanol_separation_group.units]
+                                        + isobutanol_separation_group.units + storage_and_handling_group.units
+                                        + DDGS_recovery_group.units]
                              )
 
 heat_exchanger_network_group = bst.UnitGroup('heat exchanger network', 
                                                  units=(u.HXN1001,))
 
 other_facilities_group = bst.UnitGroup('other facilities', 
-                                                 units=[i for i in list(corn_EtOH_IBO_sys.facilities)
-                                                        if not i in heat_exchanger_network_group.units])
+                                    units=[i for i in list(corn_EtOH_IBO_sys.facilities)
+                                           if not i in heat_exchanger_network_group.units])
 unit_groups = [
     feedstock_acquisition_group,
     feedstock_saccharification_group,
@@ -1108,6 +1206,8 @@ unit_groups = [
     fermentation_group,
     isobutanol_separation_group,
     ethanol_separation_group,
+    storage_and_handling_group,
+    DDGS_recovery_group,
     heat_exchanger_network_group,
     other_facilities_group,
     ]

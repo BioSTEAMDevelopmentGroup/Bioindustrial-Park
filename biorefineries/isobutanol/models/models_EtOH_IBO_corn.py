@@ -277,6 +277,30 @@ metrics.append(Metric('Actual aeration rate',
                       'Fermentation',
                       ))
 
+ethanol = s.ethanol
+etoh_sep_group = unit_groups_dict['ethanol separation']
+
+metrics.append(Metric('Ethanol separation operating cost', 
+                      lambda: (sum([i.utility_cost for i in etoh_sep_group.units if i.utility_cost is not None]) + etoh_sep_group.get_material_cost())/ethanol.F_mass,
+                      '$/kg', 
+                      'Separation',
+                      ))
+
+DDGS = f.DDGS
+
+metrics.append(Metric('DDGS sale revenue', 
+                      lambda: DDGS.cost * IBO_tea.operating_hours,
+                      '$/y', 
+                      'Coproducts',
+                      ))
+crude_oil = f.crude_oil
+
+metrics.append(Metric('Crude oil sale revenue', 
+                      lambda: crude_oil.cost * IBO_tea.operating_hours,
+                      '$/y', 
+                      'Coproducts',
+                      ))
+
 #%% Generate the required namespace
 namespace_dict = {}
 exclude_from_globals = [
@@ -296,6 +320,11 @@ namespace_dict['IBO_tea'] = namespace_dict['tea'] = IBO_tea
 # namespace_dict['spec'] = spec
 PowerUtility = bst.PowerUtility
 namespace_dict['PowerUtility'] = PowerUtility
+
+example_lps_agents = [i.agent for i in f.Ev607.heat_utilities if i.agent.ID=='low_pressure_steam']
+lps_agent = example_lps_agents[0]
+namespace_dict['low_pressure_steam_agent'] = lps_agent
+
 # namespace_dict['PD'] = s.PD
 
 #%% 
