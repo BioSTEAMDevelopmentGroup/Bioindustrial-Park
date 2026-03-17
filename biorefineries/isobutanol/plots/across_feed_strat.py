@@ -208,26 +208,10 @@ if plot_all_generic:
     #                   'Actual aeration required',
     #                   ]
     
-    # metrics_to_opt = [
-    #                   'Cell loading',
-    #                   'EtOH Titer', 
-    #                   'EtOH Productivity', 
-    #                   'Combined Yield', 
-    #                   'Total Q sugar evap',
-    #                   'Actual aeration required',
-    #                   'TCI',
-    #                   'AOC',
-    #                   'MPSP', 
-    #                   ]
-    
     metrics_to_opt = [
                       'Cell loading',
                       'EtOH Titer', 
                       'EtOH Productivity', 
-                      'EtOH Yield',
-                      'IBO Titer', 
-                      'IBO Productivity', 
-                      'IBO Yield',
                       'Combined Yield', 
                       'Total Q sugar evap',
                       'Actual aeration required',
@@ -235,6 +219,22 @@ if plot_all_generic:
                       'AOC',
                       'MPSP', 
                       ]
+    
+    # metrics_to_opt = [
+    #                   'Cell loading',
+    #                   'EtOH Titer', 
+    #                   'EtOH Productivity', 
+    #                   'EtOH Yield',
+    #                   'IBO Titer', 
+    #                   'IBO Productivity', 
+    #                   'IBO Yield',
+    #                   'Combined Yield', 
+    #                   'Total Q sugar evap',
+    #                   'Actual aeration required',
+    #                   'TCI',
+    #                   'AOC',
+    #                   'MPSP', 
+    #                   ]
     
     if not scenario=='B':
         metrics_plot_names["Combined Yield"] = "Ethanol Yield"
@@ -351,11 +351,12 @@ if plot_all_generic:
                                       (curr_metric_non_nans.max()-curr_metric_non_nans.min())/5
                                       )
         
-        curr_metric_w_ticks = list(set([np.percentile(curr_metric_non_nans, 25),
-                            np.percentile(curr_metric_non_nans, 50),
-                            np.percentile(curr_metric_non_nans, 75),
-                            curr_metric_non_nans.max()]))
-        curr_metric_w_ticks.sort(reverse=False)
+        # curr_metric_w_ticks = list(set([np.percentile(curr_metric_non_nans, 25),
+        #                     np.percentile(curr_metric_non_nans, 50),
+        #                     np.percentile(curr_metric_non_nans, 75),
+        #                     curr_metric_non_nans.max()]))
+        # curr_metric_w_ticks.sort(reverse=False)
+        curr_metric_w_ticks = []
         # curr_metric_w_levels = np.arange(0., 15.5, 0.5)
 
         # else:
@@ -413,8 +414,8 @@ if plot_all_generic:
 
 #%% MPSP
 curr_metric = 'MPSP'
-curr_metric_w_levels = np.arange(0.7, 0.9001, 0.01)
-curr_metric_cbar_ticks = np.arange(0.7, 0.9001, 0.05)
+curr_metric_w_levels = np.arange(0.675, 0.9251, 0.01)
+curr_metric_cbar_ticks = np.arange(0.675, 0.9251, 0.05)
 curr_metric_w_ticks = []
 cbar_n_minor_ticks = 4
 lccm = curr_metric.lower()

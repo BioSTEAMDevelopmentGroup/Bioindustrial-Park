@@ -110,7 +110,7 @@ F301_P0 = bst.units.Pump('F301_P0', ins=F301-0, outs='', P=101325.)
 F301_P1 = bst.units.Pump('F301_P1', ins=F301-1, outs='', P=101325.)
 
 M301 = bst.units.Mixer('M301', ins=(F301_P0-0, 'dilution_water'))
-M301.water_to_sugar_mol_ratio = 5000. # initial value, updated in FeedStrategySpecification object
+M301.water_to_sugar_mol_ratio = 100. # initial value, updated in FeedStrategySpecification object
 
 @M301.add_specification(run=False)
 def adjust_M301_water():
@@ -158,7 +158,7 @@ F302_P0 = bst.units.Pump('F302_P0', ins=F302-0, outs='', P=101325.)
 F302_P1 = bst.units.Pump('F302_P1', ins=F302-1, outs='', P=101325.)
 
 M302 = bst.units.Mixer('M302', ins=(F302_P0-0, 'dilution_water'))
-M302.water_to_sugar_mol_ratio = 5000. # initial value
+M302.water_to_sugar_mol_ratio = 100. # initial value
 
 @M302.add_specification(run=False)
 def adjust_M302_water():
@@ -213,11 +213,11 @@ V406 = nsk.units.NSKFermentation('V406',
                                  tau_max=3*24,
                                  sugar_IDs=('Glucose',),
                                  # tau_update_policy=None,
-                                 # tau_update_policy=('max', '[s_EtOH]'),
+                                 tau_update_policy=('max', '[s_EtOH]'),
                                  # tau_update_policy=('max', 'y_EtOH_IBO_glu_added'),
-                                 tau_update_policy=('min', '[s_glu]'),
+                                 # tau_update_policy=('min', '[s_glu]'),
                                  # tau_update_policy=('equals', '[s_glu]', 0.0),
-                                 n_decimal_places_for_tau_update_policy=2,
+                                 n_decimal_places_for_tau_update_policy=0,
                                  try_fewer_n_spikes_until=lambda r_te: round(r_te.s_glu, 2)==0.0,
                                  perform_hydrolysis=False,
                                  stage_1_x_target=10.0,
@@ -481,7 +481,7 @@ def V513_update_etoh_price():
 #%% Add bypass option for ethanol separation
 T501 = f.T501
 P301 = f.P301
-T501.bypass_EtOH_separation_conditions = [lambda: P301.outs[0].imass['Ethanol']/P301.outs[0].F_vol < 2.0] # if any return True, don't try to recover Ethanol
+T501.bypass_EtOH_separation_conditions = [lambda: P301.outs[0].imass['Ethanol']/P301.outs[0].F_vol <= 0.0] # if any return True, don't try to recover Ethanol
 
 T501_design = T501._design
 T501_cost = T501._cost
@@ -589,8 +589,8 @@ corn_EtOH_IBO_sys._TEA = corn_EtOH_IBO_sys_tea = corn.tea.create_tea(corn_EtOH_I
 baseline_spec = {
                  # 'target_conc_sugars': 220.0,
                  # 'threshold_conc_sugars': 210.0,
-                 'target_conc_sugars': 221.25,
-                 'threshold_conc_sugars': 200.5,
+                 'target_conc_sugars': 172.5,
+                 'threshold_conc_sugars': 167.25,
                  'conc_sugars_feed_spike': 600.0,
                  'tau_max': 120.0,}
 
@@ -598,8 +598,8 @@ baseline_spec = {
 # te_r._te.max_n_glu_spikes = 10
 # te_r.default_max_n_glu_spikes = 10
 
-te_r._te.max_n_glu_spikes = 3
-te_r.default_max_n_glu_spikes = 3
+te_r._te.max_n_glu_spikes = 1
+te_r.default_max_n_glu_spikes = 1
 
 #% Create fed-batch strategy specification object
 fbs_spec = nsk.units.FedBatchStrategySpecification(

@@ -41,9 +41,9 @@ model_specification()
 # V406.kinetic_reaction_system.default_max_n_glu_spikes = 0  
 
 if scenario=='A':
-    V406.kinetic_reaction_system._te.max_n_glu_spikes = 3
-    V406.kinetic_reaction_system.default_max_n_glu_spikes = 3  
-    model_specification(threshold_conc_sugars=200.5, target_conc_sugars=221.25)
+    V406.kinetic_reaction_system._te.max_n_glu_spikes = 1
+    V406.kinetic_reaction_system.default_max_n_glu_spikes = 1  
+    model_specification(threshold_conc_sugars=167.25, target_conc_sugars=172.5)
 elif scenario=='B':
     V406.kinetic_reaction_system._te.max_n_glu_spikes = 16
     V406.kinetic_reaction_system.default_max_n_glu_spikes = 16  

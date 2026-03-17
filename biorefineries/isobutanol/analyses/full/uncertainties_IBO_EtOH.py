@@ -63,7 +63,7 @@ plot_spearman_matrix = isobutanol.plots.spearman_matrix.plot_spearman_matrix
 
 #%%
 
-scenario = 'B'
+scenario = 'A'
 
 modes=[
        scenario, 
@@ -93,9 +93,9 @@ parameter_distributions_filenames = {i: 'parameter-distributions_corn_IBO_EtOH_'
 #%%
 V406 = f.V406
 if scenario=='A':
-    V406.kinetic_reaction_system._te.max_n_glu_spikes = 3
-    V406.kinetic_reaction_system.default_max_n_glu_spikes = 3  
-    model.specification(threshold_conc_sugars=200.5, target_conc_sugars=221.25)
+    V406.kinetic_reaction_system._te.max_n_glu_spikes = 1
+    V406.kinetic_reaction_system.default_max_n_glu_spikes = 1  
+    model.specification(threshold_conc_sugars=167.25, target_conc_sugars=172.5)
 elif scenario=='B':
     V406.kinetic_reaction_system._te.max_n_glu_spikes = 16
     V406.kinetic_reaction_system.default_max_n_glu_spikes = 16  

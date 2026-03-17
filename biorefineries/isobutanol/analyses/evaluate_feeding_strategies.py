@@ -79,9 +79,11 @@ isobutanol_results_filepath = isobutanol_filepath + '\\analyses\\results\\'
 
 
 #%% Load parameter distributions
+scenario = 'A'
+
 parameter_distributions_filename = isobutanol_filepath+\
     '\\analyses\\full\\parameter_distributions\\'+\
-    'parameter-distributions_corn_IBO_EtOH_B.xlsx'
+    f'parameter-distributions_corn_IBO_EtOH_{scenario}.xlsx'
         
 model.parameters = ()
 model.load_parameter_distributions(parameter_distributions_filename, namespace_dict)
@@ -154,7 +156,7 @@ results = {i: [] for i in metrics.keys()}
 
 # %% Generate 3-specification meshgrid and set specification loading functions
 
-steps = (10, 10, 1)
+steps = (25, 25, 1)
 
 spec_1 = threshold_conc_sugarses = np.linspace(1., 400., steps[0])
 
@@ -273,7 +275,7 @@ def tickmarks(dmin, dmax, accuracy=50, N_points=5):
 #%%
 minute = '0' + str(dateTimeObj.minute) if len(str(dateTimeObj.minute))==1 else str(dateTimeObj.minute)
 # file_to_save = f'_{steps}_steps_'+'etoh_fbs_%s.%s.%s-%s.%s'%(dateTimeObj.year, dateTimeObj.month, dateTimeObj.day, dateTimeObj.hour, minute)
-file_to_save = f'ibo_{steps}_{x_label[:5]}_{y_label[:5]}_{z_label[:5]}_{parameter_distributions_filename[-6]}_'
+file_to_save = f'ibo_{steps}_{x_label[:5]}_{y_label[:5]}_{z_label[:5]}_{scenario}_'
 
 chdir(isobutanol_results_filepath)
 
