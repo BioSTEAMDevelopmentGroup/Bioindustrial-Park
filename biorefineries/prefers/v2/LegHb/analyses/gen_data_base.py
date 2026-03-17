@@ -21,7 +21,6 @@ import numpy as np
 import pandas as pd
 
 from biorefineries.prefers.v2.LegHb._models import create_model
-from biorefineries.prefers.v2.LegHb._tea_config1 import PreFerSTEA
 from biorefineries.prefers.v2.utils import utils, report_generator
 from biorefineries.prefers.v2.utils import sankey_utils
 
@@ -32,6 +31,9 @@ from biorefineries.prefers.v2.utils import sankey_utils
 
 def parse_arguments():
     parser = argparse.ArgumentParser(description='LegHb baseline data generation (NEW)')
+    parser.add_argument('--config', type=str, default='config1',
+                        choices=['config1', 'config2'],
+                        help='Process configuration (default: config1)')
     parser.add_argument('--production', type=float, default=150,
                         help='Baseline production rate in kg/hr (default: 150)')
     parser.add_argument('--timestamp', type=str, default=None,
@@ -128,8 +130,7 @@ def _unit_design_summary(system):
 # Baseline Generation
 # =============================================================================
 
-def generate_baseline(baseline_production_kg_hr=275, timestamp=None, results_dir=None):
-    config = 'config1'  # _models only supports config1
+def generate_baseline(baseline_production_kg_hr=275, config='config1', timestamp=None, results_dir=None):
     dirs = resolve_output_dirs(__file__, config, timestamp=timestamp, results_dir=results_dir)
 
     print("=" * 70)
@@ -142,10 +143,15 @@ def generate_baseline(baseline_production_kg_hr=275, timestamp=None, results_dir
 
     model = create_model(
         baseline_production_kg_hr=baseline_production_kg_hr,
+        config=config,
         verbose=True,
     )
 
     print("\nGenerating TEA/LCA breakdown summary...")
+    if config == 'config2':
+        from biorefineries.prefers.v2.LegHb._tea_config2 import PreFerSTEA
+    else:
+        from biorefineries.prefers.v2.LegHb._tea_config1 import PreFerSTEA
     tea = PreFerSTEA(
         system=model.system,
         IRR=0.18,
@@ -237,7 +243,7 @@ def generate_baseline(baseline_production_kg_hr=275, timestamp=None, results_dir
     print("=" * 70)
     try:
         # Reset model to ensure clean state
-        model = create_model(baseline_production_kg_hr=baseline_production_kg_hr)
+        model = create_model(baseline_production_kg_hr=baseline_production_kg_hr, config=config)
         
         print("Running single-point sensitivity (this may take a moment)...")
         baseline_sp, lower_sp, upper_sp = model.single_point_sensitivity()
@@ -333,6 +339,7 @@ def main():
     args = parse_arguments()
     generate_baseline(
         baseline_production_kg_hr=args.production,
+        config=args.config,
         timestamp=args.timestamp,
         results_dir=args.results_dir,
     )

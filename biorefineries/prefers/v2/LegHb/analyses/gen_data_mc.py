@@ -48,7 +48,7 @@ def parse_arguments():
                         help='Process configuration (default: config1)')
     parser.add_argument('--production', type=float, default=150,
                         help='Baseline production rate in kg/hr (default: 150)')
-    parser.add_argument('--samples', type=int, default=45000,
+    parser.add_argument('--samples', type=int, default=300000,
                         help='Target number of valid samples per scenario')
     parser.add_argument('--batch-size', type=int, default=15000,
                         help='Samples per batch (default: 15000)')
@@ -117,7 +117,7 @@ def evaluate_single_sample(sample_index_and_data, baseline_production_kg_hr, exc
 
     model = None
     try:
-        model = create_model(baseline_production_kg_hr=baseline_production_kg_hr, verbose=False)
+        model = create_model(baseline_production_kg_hr=baseline_production_kg_hr, config=config, verbose=False)
 
         param_values = {}
         for i, param in enumerate(model.parameters):
@@ -459,6 +459,7 @@ def generate_monte_carlo(config='config1', baseline_production_kg_hr=275, n_targ
 
     model = create_model(
         baseline_production_kg_hr=baseline_production_kg_hr,
+        config=config,
         verbose=True,
     )
 

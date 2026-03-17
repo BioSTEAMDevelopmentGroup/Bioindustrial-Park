@@ -18,22 +18,23 @@ All parameters and metrics are identical to _models.py.
 
 import biosteam as bst
 from chaospy import distributions as shape
-from biorefineries.prefers.v2.LegHb.system._config1 import create_LegHb_system, set_production_rate
-from biorefineries.prefers.v2.LegHb._tea_config1 import PreFerSTEA
 from biorefineries.prefers.v2._process_settings import load_process_settings
 import numpy as np
 
 __all__ = ('create_model',)
 
-def create_model(baseline_production_kg_hr=150, verbose=True):
+def create_model(baseline_production_kg_hr=150, config='config1', verbose=True):
     """
     Create a Model object for uncertainty and sensitivity analysis of the LegHb production facility.
-    Uses _config1 which has internalized titer/NH3 convergence in R302 specification.
+    Uses internalized titer/NH3 convergence in R302 specification.
     
     Parameters
     ----------
     baseline_production_kg_hr : float, optional
         Baseline target production rate [kg/hr]. Default is 150 kg/hr.
+    config : str, optional
+        Process configuration to use. Options: 'config1', 'config2'.
+        Default is 'config1'.
     verbose : bool, optional
         Print progress messages. Default True.
     
@@ -42,18 +43,30 @@ def create_model(baseline_production_kg_hr=150, verbose=True):
     model : biosteam.Model
         Configured model with parameters and metrics for analysis.
     """
+    # Select configuration modules
+    if config == 'config1':
+        from biorefineries.prefers.v2.LegHb.system import _config1 as sys_module
+        from biorefineries.prefers.v2.LegHb import _tea_config1 as tea_module
+    elif config == 'config2':
+        from biorefineries.prefers.v2.LegHb.system import _config2 as sys_module
+        from biorefineries.prefers.v2.LegHb import _tea_config2 as tea_module
+    else:
+        raise ValueError(f"Invalid config: {config}. Options: config1, config2")
+    
+    create_LegHb_system = sys_module.create_LegHb_system
+    set_production_rate = sys_module.set_production_rate
+    PreFerSTEA = tea_module.PreFerSTEA
+
     # Load process settings and create system
     load_process_settings()
     LegHb_sys = create_LegHb_system()
     
     # Set baseline production rate
     if verbose:
-        print(f"Setting baseline production rate to {baseline_production_kg_hr} kg/hr (config1)...")
+        print(f"Setting baseline production rate to {baseline_production_kg_hr} kg/hr for {config}...")
     
     LegHb_sys.operating_hours = 8000
-    # No optimize_NH3_loading needed — R302 spec handles it
     set_production_rate(LegHb_sys, baseline_production_kg_hr, verbose=verbose)
-    # No second optimize_NH3_loading needed
     
     # Create TEA object
     LegHb_tea = PreFerSTEA(
@@ -456,88 +469,102 @@ def verify_model_integration():
     """
     Verification function to test that design mode integration works correctly.
     Uses model(sample) interface for proper parameter evaluation.
-    Tests BASELINE, LB, and UB scenarios.
+    Tests BASELINE, LB, and UB scenarios for config1 and config2.
     """
     import traceback
     print("="*80)
     print("PREFERS MODEL INTEGRATION VERIFICATION (LegHb - v2)")
     print("="*80)
     
-    # Create model
-    print("\n1. Creating model...")
-    model = create_model(baseline_production_kg_hr=150, verbose=False)
-    
-    # Display model structure
-    print(f"\n2. Model has {len(model.parameters)} parameters and {len(model.metrics)} metrics")
-    
-    # Build sample arrays for baseline, LB, UB
-    param_bounds = {}
-    for p in model.parameters:
-        dist = p.distribution
-        if hasattr(dist, 'lower'):
-            lb = float(np.asarray(dist.lower).reshape(-1)[0])
-        else:
-            lb = p.baseline * 0.9
-        if hasattr(dist, 'upper'):
-            ub = float(np.asarray(dist.upper).reshape(-1)[0])
-        else:
-            ub = p.baseline * 1.1
-        param_bounds[p.name] = {'baseline': p.baseline, 'lb': lb, 'ub': ub}
-    
-    baseline_sample = np.array([param_bounds[p.name]['baseline'] for p in model.parameters])
-    lb_sample = np.array([param_bounds[p.name]['lb'] for p in model.parameters])
-    ub_sample = np.array([param_bounds[p.name]['ub'] for p in model.parameters])
-    
-    results = {}
-    
-    # Evaluate each scenario
-    for name, sample in [('BASELINE', baseline_sample), ('LB', lb_sample), ('UB', ub_sample)]:
-        print(f"\n3. [{name}] Evaluating...")
+    for config_name in ['config1', 'config2']:
+        print(f"\n{'='*80}")
+        print(f"  {config_name.upper()}")
+        print(f"{'='*80}")
+        
         try:
-            metrics = model(sample)
-            results[name] = {m.name: metrics[i] for i, m in enumerate(model.metrics)}
-            print(f"   MSP: {results[name].get('MSP', float('nan')):.4f} $/kg")
-            print(f"   GWP: {results[name].get('GWP', float('nan')):.4f} kg CO2-eq/kg")
+            # Create model
+            print(f"\n1. Creating model ({config_name})...")
+            model = create_model(config=config_name, baseline_production_kg_hr=150, verbose=False)
+            
+            # Display model structure
+            print(f"\n2. Model has {len(model.parameters)} parameters and {len(model.metrics)} metrics")
+            
+            # Build sample arrays for baseline, LB, UB
+            param_bounds = {}
+            for p in model.parameters:
+                dist = p.distribution
+                if hasattr(dist, 'lower'):
+                    lb = float(np.asarray(dist.lower).reshape(-1)[0])
+                else:
+                    lb = p.baseline * 0.9
+                if hasattr(dist, 'upper'):
+                    ub = float(np.asarray(dist.upper).reshape(-1)[0])
+                else:
+                    ub = p.baseline * 1.1
+                param_bounds[p.name] = {'baseline': p.baseline, 'lb': lb, 'ub': ub}
+            
+            baseline_sample = np.array([param_bounds[p.name]['baseline'] for p in model.parameters])
+            lb_sample = np.array([param_bounds[p.name]['lb'] for p in model.parameters])
+            ub_sample = np.array([param_bounds[p.name]['ub'] for p in model.parameters])
+            
+            results = {}
+            
+            # Evaluate each scenario
+            for name, sample in [('BASELINE', baseline_sample), ('LB', lb_sample), ('UB', ub_sample)]:
+                print(f"\n3. [{name}] Evaluating...")
+                try:
+                    metrics = model(sample)
+                    results[name] = {m.name: metrics[i] for i, m in enumerate(model.metrics)}
+                    print(f"   MSP: {results[name].get('MSP', float('nan')):.4f} $/kg")
+                    print(f"   GWP: {results[name].get('GWP', float('nan')):.4f} kg CO2-eq/kg")
+                except Exception as e:
+                    print(f"   ERROR: {e}")
+                    traceback.print_exc()
+                    results[name] = {}
+            
+            # Summary table
+            print("\n" + "="*80)
+            print(f"RESULTS SUMMARY ({config_name})")
+            print("="*80)
+            
+            key_metrics = ['MSP', 'TCI', 'AOC', 'GWP']
+            print(f"\n{'Metric':20s} {'BASELINE':>15s} {'LB':>15s} {'UB':>15s}")
+            print("-"*65)
+            for m_name in key_metrics:
+                bl = results.get('BASELINE', {}).get(m_name, float('nan'))
+                lb_val = results.get('LB', {}).get(m_name, float('nan'))
+                ub_val = results.get('UB', {}).get(m_name, float('nan'))
+                print(f"{m_name:20s} {bl:15.4f} {lb_val:15.4f} {ub_val:15.4f}")
+            
+            # Parameter table
+            print("\n" + "-"*80)
+            print(f"{'Parameter':35s} {'BASELINE':>12s} {'LB':>12s} {'UB':>12s}")
+            print("-"*80)
+            for p in model.parameters:
+                b = param_bounds[p.name]
+                print(f"{p.name:35s} {b['baseline']:12.4f} {b['lb']:12.4f} {b['ub']:12.4f}")
+            
+            # Verify results differ
+            bl_msp = results.get('BASELINE', {}).get('MSP', float('nan'))
+            lb_msp = results.get('LB', {}).get('MSP', float('nan'))
+            ub_msp = results.get('UB', {}).get('MSP', float('nan'))
+            
+            print("\n" + "="*80)
+            if not np.isnan(bl_msp) and not np.isnan(lb_msp) and not np.isnan(ub_msp):
+                if not (np.isclose(bl_msp, lb_msp, rtol=0.001) and np.isclose(bl_msp, ub_msp, rtol=0.001)):
+                    print(f"VERIFICATION PASSED ({config_name}): MSP values differ across scenarios!")
+                else:
+                    print(f"VERIFICATION FAILED ({config_name}): MSP values are identical!")
+            else:
+                print(f"VERIFICATION FAILED ({config_name}): Some MSP values are NaN!")
+            print("="*80)
+                
         except Exception as e:
-            print(f"   ERROR: {e}")
+            print(f"  ERROR creating {config_name}: {e}")
             traceback.print_exc()
-            results[name] = {}
-    
-    # Summary table
-    print("\n" + "="*80)
-    print("RESULTS SUMMARY")
-    print("="*80)
-    
-    key_metrics = ['MSP', 'TCI', 'AOC', 'GWP']
-    print(f"\n{'Metric':20s} {'BASELINE':>15s} {'LB':>15s} {'UB':>15s}")
-    print("-"*65)
-    for m_name in key_metrics:
-        bl = results.get('BASELINE', {}).get(m_name, float('nan'))
-        lb = results.get('LB', {}).get(m_name, float('nan'))
-        ub = results.get('UB', {}).get(m_name, float('nan'))
-        print(f"{m_name:20s} {bl:15.4f} {lb:15.4f} {ub:15.4f}")
-    
-    # Parameter table
-    print("\n" + "-"*80)
-    print(f"{'Parameter':35s} {'BASELINE':>12s} {'LB':>12s} {'UB':>12s}")
-    print("-"*80)
-    for p in model.parameters:
-        b = param_bounds[p.name]
-        print(f"{p.name:35s} {b['baseline']:12.4f} {b['lb']:12.4f} {b['ub']:12.4f}")
-    
-    # Verify results differ
-    bl_msp = results.get('BASELINE', {}).get('MSP', float('nan'))
-    lb_msp = results.get('LB', {}).get('MSP', float('nan'))
-    ub_msp = results.get('UB', {}).get('MSP', float('nan'))
     
     print("\n" + "="*80)
-    if not np.isnan(bl_msp) and not np.isnan(lb_msp) and not np.isnan(ub_msp):
-        if not (np.isclose(bl_msp, lb_msp, rtol=0.001) and np.isclose(bl_msp, ub_msp, rtol=0.001)):
-            print("VERIFICATION PASSED: MSP values differ across scenarios!")
-        else:
-            print("VERIFICATION FAILED: MSP values are identical!")
-    else:
-        print("VERIFICATION FAILED: Some MSP values are NaN!")
+    print("ALL CONFIGS VERIFICATION COMPLETE")
     print("="*80)
 
 if __name__ == '__main__':

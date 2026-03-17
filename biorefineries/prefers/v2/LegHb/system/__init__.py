@@ -26,4 +26,4 @@ __all__ = [
 
 def get_available_configs():
     """Return list of available configuration names."""
-    return ['config1']
+    return ['config1', 'config2']
