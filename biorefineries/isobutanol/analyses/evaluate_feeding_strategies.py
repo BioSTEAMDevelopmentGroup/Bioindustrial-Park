@@ -79,7 +79,7 @@ isobutanol_results_filepath = isobutanol_filepath + '\\analyses\\results\\'
 
 
 #%% Load parameter distributions
-scenario = 'A'
+scenario = 'B'
 
 parameter_distributions_filename = isobutanol_filepath+\
     '\\analyses\\full\\parameter_distributions\\'+\

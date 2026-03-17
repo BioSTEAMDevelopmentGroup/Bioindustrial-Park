@@ -220,8 +220,8 @@ V406 = nsk.units.NSKFermentation('V406',
                                  n_decimal_places_for_tau_update_policy=0,
                                  try_fewer_n_spikes_until=lambda r_te: round(r_te.s_glu, 2)==0.0,
                                  perform_hydrolysis=False,
-                                 stage_1_x_target=10.0,
-                                 stage_1_max_time=12.0)
+                                 stage_1_max_x=5.0,
+                                 stage_1_max_time=25.0)
 
 V406-0-1-f.V409
 V406-1-0-f.P406

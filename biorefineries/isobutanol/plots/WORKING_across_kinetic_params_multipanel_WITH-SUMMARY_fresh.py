@@ -51,17 +51,17 @@ metric = 'MPSP'
 z_label = 'Spike feed glucose concentration'
 steps = (25, 25, 1)
 
-row_parameter_pairs = [
+_row_parameter_pairs = [
     ('k_1e', 'k_1ie'),
     ('k_1e', 'k_7ie'),
     ('k_13', 'k_7ii'),
 ]
 
-strategies = [
+_strategies = [
     'fixed_batch',
     'adaptive_batch',
     'fixed_fed-batch',
-    'adaptive_fed-batch',
+    # 'adaptive_fed-batch',
 ]
 
 
@@ -94,18 +94,9 @@ def plot_save_kinetic_multipanel(metric, row_parameter_pairs=None, strategies=No
     if steps is None:
         steps = (25, 25, 1)
     if row_parameter_pairs is None:
-        row_parameter_pairs = [
-            ('k_1e', 'k_1ie'),
-            ('k_1e', 'k_7ie'),
-            ('k_13', 'k_7ii'),
-        ]
+        row_parameter_pairs = _row_parameter_pairs
     if strategies is None:
-        strategies = [
-            'fixed_batch',
-            'adaptive_batch',
-            'fixed_fed-batch',
-            'adaptive_fed-batch',
-        ]
+        strategies = _strategies
         
     output_filename = f'{metric}_{row_parameter_pairs}.png'
     
@@ -264,7 +255,7 @@ def plot_save_kinetic_multipanel(metric, row_parameter_pairs=None, strategies=No
         perform_feeding_strategy_opt = 'adaptive' in subfolder_name
         fed_batch_max_n = 21
         if 'fixed' in strategy:
-            fed_batch_max_n = 3
+            fed_batch_max_n = 1
         max_n = 0 if not 'fed-batch' in subfolder_name else fed_batch_max_n
         file_prefix = (
             f"ibo_{steps}_{x_label[:5]}_{y_label[:5]}_{z_label[:5]}"
