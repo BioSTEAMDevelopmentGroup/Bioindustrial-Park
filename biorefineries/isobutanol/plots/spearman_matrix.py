@@ -30,6 +30,7 @@ def plot_spearman_matrix(data, data_p, remove_units=True):
                                                  small_corr_threshold=0.05,
                                                  exclude_parameters_all_below_threshold=True,
                                                  legend_max_cols=2,
+                                                 format_kinetic_param_names=True,
                                                  )
 
 #%%
@@ -37,10 +38,10 @@ if __name__ == '__main__':
     from biorefineries import isobutanol
     isobutanol_filepath = isobutanol.__file__.replace('\\__init__.py', '')
     isobutanol_results_pub_filepath = isobutanol_filepath + '\\analyses\\results\\publication\\'
-    data = data_p = isobutanol_results_pub_filepath+'Uncertainty\\'+"_IBO_2026.3.13-19.22_['B']_6000sims_B_1_full_evaluation.xlsx"
+    data = data_p = isobutanol_results_pub_filepath+'Uncertainty\\'+"_IBO_2026.3.16-17.45_['A']_6000sims_A_1_full_evaluation" +".xlsx"
     plot_spearman_matrix(data, data_p)
     plt.savefig(
-        fname='spearman_matrix_B',
+        fname='spearman_matrix_A_0.05.png',
         transparent=False,  
         facecolor='white',
         bbox_inches='tight',

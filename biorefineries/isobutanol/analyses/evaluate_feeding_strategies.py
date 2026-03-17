@@ -154,7 +154,7 @@ results = {i: [] for i in metrics.keys()}
 
 # %% Generate 3-specification meshgrid and set specification loading functions
 
-steps = (25, 25, 1)
+steps = (10, 10, 1)
 
 spec_1 = threshold_conc_sugarses = np.linspace(1., 400., steps[0])
 

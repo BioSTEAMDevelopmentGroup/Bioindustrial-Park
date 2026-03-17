@@ -316,6 +316,8 @@ for s3 in spec_3:
                 for k, v in list(results.items()): 
                     v[-1][-1].append(metrics[k]['f']())
                 
+                if metrics['Actual aeration required']['f']() > 1000:
+                    breakpoint()
                 HXN_qbal_error = HXN.energy_balance_percent_error
                 if abs(max_HXN_qbal_percent_error)<abs(HXN_qbal_error): max_HXN_qbal_percent_error = HXN_qbal_error
                 

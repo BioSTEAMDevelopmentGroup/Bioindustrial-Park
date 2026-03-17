@@ -301,6 +301,13 @@ metrics.append(Metric('Crude oil sale revenue',
                       'Coproducts',
                       ))
 
+isobutanol = f.isobutanol
+metrics.append(Metric('Isobutanol sale revenue', 
+                      lambda: isobutanol.cost * IBO_tea.operating_hours,
+                      '$/y', 
+                      'Coproducts',
+                      ))
+
 #%% Generate the required namespace
 namespace_dict = {}
 exclude_from_globals = [

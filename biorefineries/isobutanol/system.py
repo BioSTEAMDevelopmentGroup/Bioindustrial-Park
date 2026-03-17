@@ -219,7 +219,9 @@ V406 = nsk.units.NSKFermentation('V406',
                                  # tau_update_policy=('equals', '[s_glu]', 0.0),
                                  n_decimal_places_for_tau_update_policy=2,
                                  try_fewer_n_spikes_until=lambda r_te: round(r_te.s_glu, 2)==0.0,
-                                 perform_hydrolysis=False)
+                                 perform_hydrolysis=False,
+                                 stage_1_x_target=10.0,
+                                 stage_1_max_time=12.0)
 
 V406-0-1-f.V409
 V406-1-0-f.P406
@@ -674,7 +676,7 @@ def load_simulate_get_MPSP(target_conc_sugars=None,
 
 def plot_kinetic_results(xlim=None, ylim=None, 
                          show_stage_1_time=False, 
-                         show_tau_cell_density_plateau=True, 
+                         show_tau_stage_1_complete=True, 
                          show_tau=True,
                          save_fig=False, filename=None, figwidth=3.9):
     # if variables is None:
@@ -723,17 +725,19 @@ def plot_kinetic_results(xlim=None, ylim=None,
     if xlim is not None:
         ax.set_xlim(xlim)
     else:
-        ax.set_xlim((0, V406.tau + 20))
+        ax.set_xlim((0.0, V406.tau + 20.0))
     if ylim is not None:
         ax.set_ylim(ylim)
-    
+    else:
+        ax.set_ylim((0.0, 20.0 + max([v.max()for k, v in V406.nsk_results_dict.items()
+                             if '[' in k and ']' in k])))
     if show_stage_1_time:
         ax.vlines(x=[V406.kinetic_reaction_system._te.stage_1_time], 
                   ymin=[ax.get_ylim()[0]], ymax=[ax.get_ylim()[1]],
                   linestyles='dashed', linewidth=1.0, color='gray',
                   )
-    if show_tau_cell_density_plateau:
-        ax.vlines(x=[V406.tau_cell_density_plateau], 
+    if show_tau_stage_1_complete:
+        ax.vlines(x=[V406.tau_stop_aeration], 
                   ymin=[ax.get_ylim()[0]], ymax=[ax.get_ylim()[1]],
                   linestyles='dashed', linewidth=1.0, color='gray',
                   )

@@ -67,8 +67,8 @@ metrics_units = {"MPSP":  r"$\mathrm{\$}\cdot\mathrm{kg}^{-1}$",
 #%% Input Details
 # !!!
 
-# scenario = 'A' # current state-of-tech
-scenario = 'B' # potential improvements for isobutanol co-production
+scenario = 'A' # current state-of-tech
+# scenario = 'B' # potential improvements for isobutanol co-production
 
 # Spec names
 x_label = "Threshold glucose concentration" # title of the x axis
@@ -413,8 +413,8 @@ if plot_all_generic:
 
 #%% MPSP
 curr_metric = 'MPSP'
-curr_metric_w_levels = np.arange(0.65, 0.9001, 0.01)
-curr_metric_cbar_ticks = np.arange(0.65, 0.9001, 0.05)
+curr_metric_w_levels = np.arange(0.7, 0.9001, 0.01)
+curr_metric_cbar_ticks = np.arange(0.7, 0.9001, 0.05)
 curr_metric_w_ticks = []
 cbar_n_minor_ticks = 4
 lccm = curr_metric.lower()

@@ -498,7 +498,8 @@ def plot_save_kinetic_multipanel(metric, row_parameter_pairs=None, strategies=No
                         ref_val = opt_coords_metric_values[rel_to_m][m2]
                         rel_diff = v[m2] / ref_val - 1
                         sign = '+' if rel_diff > 0 else '-'
-                        print(f"'{m2}' is {round_off(v[m2],3)}, which is {sign} {abs(int(100*rel_diff))}%.")
+                        sign_other = '+' if sign=='-' else '-'
+                        print(f"'{m2}' is {round_off(v[m2],3)}, which is {sign} {abs(int(100*rel_diff))}% (so {rel_to_m} opt is {sign_other} {abs(int(100*(rel_diff/(1+rel_diff))))}%).")
                     except Exception as e:
                         if 'divide' in str(e).lower() or (isinstance(v[m2], float) and np.isnan(v[m2])):
                             print(f"'{m2}' is zero or unavailable.")
@@ -602,7 +603,10 @@ def plot_save_kinetic_multipanel(metric, row_parameter_pairs=None, strategies=No
                 if opt_record['strategy'] == strategy:
                     # For data with x_label in ('k_1e',) and y_label in ('k_1ie', 'k_7ie'), only ethanol is produced; however, etoh yield is saved as 'combined yield' rather than 'etoh yield'
                     if opt_metric=='Combined Yield' and x_label in ('k_1e',) and y_label in ('k_1ie', 'k_7ie'):
-                        additional_points[(opt_record['x'], opt_record['y'])] = metric_marker_styles['EtOH Yield']
+                        try:
+                            additional_points[(opt_record['x'], opt_record['y'])] = metric_marker_styles['EtOH Yield']
+                        except:
+                            additional_points[(opt_record['x'], opt_record['y'])] = ('p', 'w', 8)
                     else:
                         additional_points[(opt_record['x'], opt_record['y'])] = metric_marker_styles[opt_metric]
             
@@ -679,7 +683,7 @@ def plot_save_kinetic_multipanel(metric, row_parameter_pairs=None, strategies=No
     # -----------------------------------------------------------------------------
     # Shared colorbar and layout
     # -----------------------------------------------------------------------------
-    plt.subplots_adjust(wspace=0.15, hspace=0.4)
+    plt.subplots_adjust(wspace=0.15, hspace=0.6)
     
     norm = Normalize(vmin=float(w_levels[0]), vmax=float(w_levels[-1]))
     sm = ScalarMappable(norm=norm, cmap=cmap)
@@ -744,8 +748,11 @@ def plot_save_kinetic_multipanel(metric, row_parameter_pairs=None, strategies=No
         print('\nMissing summary files:')
         for fp in missing_summary_files:
             print(f'  - {fp}')
+    
+    return panel_data
 
 #%% Plot for all metrics
+results = {}
 if __name__ == '__main__':
-    for metric in metrics_units.keys():
-        plot_save_kinetic_multipanel(metric)
+    for metric in list(metrics_units.keys()):
+        results[metric] = plot_save_kinetic_multipanel(metric)
