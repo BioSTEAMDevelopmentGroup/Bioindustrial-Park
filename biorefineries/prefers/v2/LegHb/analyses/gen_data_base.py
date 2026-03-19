@@ -31,9 +31,9 @@ from biorefineries.prefers.v2.utils import sankey_utils
 
 def parse_arguments():
     parser = argparse.ArgumentParser(description='LegHb baseline data generation (NEW)')
-    parser.add_argument('--config', type=str, default='config1',
+    parser.add_argument('--config', type=str, default='config2',
                         choices=['config1', 'config2'],
-                        help='Process configuration (default: config1)')
+                        help='Process configuration (default: config2)')
     parser.add_argument('--production', type=float, default=150,
                         help='Baseline production rate in kg/hr (default: 150)')
     parser.add_argument('--timestamp', type=str, default=None,

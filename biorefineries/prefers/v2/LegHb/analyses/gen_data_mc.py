@@ -41,11 +41,15 @@ except Exception:  # pragma: no cover
 # CLI
 # =============================================================================
 
+def get_default_worker_count(reserve_cores=4):
+    """Auto-select worker count while keeping some CPU cores free."""
+    return max(1, mp.cpu_count() - reserve_cores)
+
 def parse_arguments():
     parser = argparse.ArgumentParser(description='LegHb Monte Carlo data generation')
-    parser.add_argument('--config', type=str, default='config1',
+    parser.add_argument('--config', type=str, default='config2',
                         choices=get_available_configs(),
-                        help='Process configuration (default: config1)')
+                        help='Process configuration (default: config2)')
     parser.add_argument('--production', type=float, default=150,
                         help='Baseline production rate in kg/hr (default: 150)')
     parser.add_argument('--samples', type=int, default=300000,
@@ -53,7 +57,7 @@ def parse_arguments():
     parser.add_argument('--batch-size', type=int, default=15000,
                         help='Samples per batch (default: 15000)')
     parser.add_argument('--cores', type=int, default=None,
-                        help='Number of worker processes (default: max-2)')
+                        help='Number of worker processes (default: auto = max-4)')
     parser.add_argument('--no-multiprocessing', action='store_true',
                         help='Disable multiprocessing and run sequentially')
     parser.add_argument('--seed', type=int, default=1234,
@@ -207,7 +211,7 @@ def run_monte_carlo(model, n_target, baseline_production_kg_hr, exclude_producti
 
     n_cores = mp.cpu_count()
     if n_workers is None:
-        n_workers = max(1, n_cores - 2)
+        n_workers = get_default_worker_count(reserve_cores=4)
 
     if not use_multiprocessing or n_workers <= 1:
         print(f"\nUsing sequential evaluation (workers={n_workers})")
