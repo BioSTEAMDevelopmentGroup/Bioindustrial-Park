@@ -79,7 +79,7 @@ isobutanol_results_filepath = isobutanol_filepath + '\\analyses\\results\\'
 
 
 #%% Load parameter distributions
-scenario = 'B'
+scenario = 'A'
 
 parameter_distributions_filename = isobutanol_filepath+\
     '\\analyses\\full\\parameter_distributions\\'+\
@@ -556,8 +556,8 @@ if plot:
     #%% MPSP
     
     # MPSP_w_levels, MPSP_w_ticks, MPSP_cbar_ticks = get_contour_info_from_metric_data(results_metric_1, lb=3)
-    MPSP_w_levels = np.arange(0.65, 1.0001, 0.01)
-    MPSP_cbar_ticks = np.arange(0.65, 1.0001, 0.05)
+    MPSP_w_levels = np.arange(0.625, 0.9251, 0.005)
+    MPSP_cbar_ticks = np.arange(0.625, 0.9251, 0.05)
     MPSP_w_ticks = [0.75,]
     # MPSP_w_levels = np.arange(0., 15.5, 0.5)
     

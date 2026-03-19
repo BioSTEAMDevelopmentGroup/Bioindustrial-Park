@@ -83,11 +83,21 @@ baseline_initial = model.metrics_at_baseline()
 
 #%% Baseline -- simulate and solve TEA
 
+scenario = 'A'
 
+if scenario=='A':
+    ferm_reactor.kinetic_reaction_system._te.max_n_glu_spikes = 16
+    ferm_reactor.kinetic_reaction_system.default_max_n_glu_spikes = 16 
+    model_specification(threshold_conc_sugars=217.125, target_conc_sugars=221.25)
+elif scenario=='B':
+    ferm_reactor.kinetic_reaction_system._te.max_n_glu_spikes = 13
+    ferm_reactor.kinetic_reaction_system.default_max_n_glu_spikes = 13  
+    model_specification(threshold_conc_sugars=216.3, target_conc_sugars=226.3)
+    
 # !!!
 ferm_reactor.kinetic_reaction_system._te.max_n_glu_spikes = 0
 ferm_reactor.kinetic_reaction_system.default_max_n_glu_spikes = 0  
-perform_feeding_strategy_opt = True
+perform_feeding_strategy_opt = False
 
 model_specification(
     n_sims=3,

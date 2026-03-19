@@ -89,6 +89,17 @@ baseline_initial = model.metrics_at_baseline()
 V406 = f.V406
 f.M401.bypass_IBO_separation_conditions[0] = lambda: V406.outs[1].imass['Isobutanol']/V406.outs[1].F_vol < 10.0
 
+scenario = 'B'
+
+if scenario=='A':
+    ferm_reactor.kinetic_reaction_system._te.max_n_glu_spikes = 16
+    ferm_reactor.kinetic_reaction_system.default_max_n_glu_spikes = 16 
+    model_specification(threshold_conc_sugars=217.125, target_conc_sugars=221.25)
+elif scenario=='B':
+    ferm_reactor.kinetic_reaction_system._te.max_n_glu_spikes = 13
+    ferm_reactor.kinetic_reaction_system.default_max_n_glu_spikes = 13  
+    model_specification(threshold_conc_sugars=216.3, target_conc_sugars=226.3)
+    
 # !!!
 ferm_reactor.kinetic_reaction_system._te.max_n_glu_spikes = 0
 ferm_reactor.kinetic_reaction_system.default_max_n_glu_spikes = 0  

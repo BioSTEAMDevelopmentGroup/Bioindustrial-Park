@@ -339,8 +339,8 @@ def M401_adjust_makeup_solvent():
         M401._design = M401_design
         M401._cost = M401_cost
         req = S401.mol_solvent_per_mol_carrier*S401.ins[0].imol['Water']
-        recycle = M401.ins[1]
-        makeup = M401.ins[0]
+        recycle = M401.ins[0]
+        makeup = M401.ins[1]
         makeup.imol[solvent_chem] = max(0, req-recycle.imol[solvent_chem])
         M401._run()
     else:
@@ -396,8 +396,16 @@ def S401_partial_chems():
 
 M402 = bst.Mixer('M402', ins=(S401.extract, ''),)
 
+# @M402.add_specification(run=False)
+# def M402_spec():
+#     for i in range(2):
+#         M402._run()
+#         D401.specifications[0]()
+#         M401.specifications[0]()
+#         S401.specifications[0]()
+    
 D401 = bst.BinaryDistillation('D401', ins=M402-0, outs=('D401_t', 'D401_b'), LHK=('Isobutanol', solvent_chem), 
-                              Lr=0.9999, Hr=0.9999, 
+                              Lr=0.999, Hr=0.999, 
                               k=1.2, P=101325.0,
                               partial_condenser=False)
 D401-1-0-M401 # recycle
@@ -452,6 +460,7 @@ V514 = bst.StorageTank('V514', ins=H401-0, outs=('isobutanol'), tau=7*24)
 # V514.isobutanol_price = 1.725 # https://www.alibaba.com/product-detail/China-Isobutanol-CAS-NO-78-83_1600225311840.html?spm=a2700.7724857.0.0.6b071f52Jodf8p
 V514.isobutanol_price = 1.49 # https://www.alibaba.com/product-detail/High-Purity-Industrial-Organic-Solvent-Textile_1601609307567.html?spm=a2700.7724857.0.0.6b071f52XisbBQ
 # V514.isobutanol_price = 0.95 # https://www.alibaba.com/product-detail/High-Quality-for-Industrial-Grade-Isobutanol_1601289128791.html?spm=a2700.7724857.0.0.6b071f52XisbBQ
+V514.update_isobutanol_price = True
 @V514.add_specification(run=False)
 def V514_update_IBO_price():
     if np.any([i() for i in M401.bypass_IBO_separation_conditions]):
@@ -459,8 +468,9 @@ def V514_update_IBO_price():
         V514.outs[0].empty()
     else:
         V514._run()
-        ibo = V514.outs[0]
-        if ibo.F_mol: ibo.price = V514.isobutanol_price * ibo.imass['Isobutanol']/ibo.F_mass
+        if V514.update_isobutanol_price:
+            ibo = V514.outs[0]
+            if ibo.F_mol: ibo.price = V514.isobutanol_price * ibo.imass['Isobutanol']/ibo.F_mass
 
 #%% Add ethanol storage specification for optional purity-based price update (when solving IRR rather than MPSP)
 V513 = f.V513
@@ -573,11 +583,14 @@ corn_EtOH_IBO_sys = bst.System.from_units('corn_EtOH_IBO_sys',
                                           units = [i for i in corn_EtOH_IBO_sys_no_IBO_recovery.units + recovery_units + [HXN]
                                                    if not i in HXprocess_units]
                                           )
+
+corn_EtOH_IBO_sys.set_tolerance(mol=1e-3, rmol=1e-3, subsystems=True)
 corn_EtOH_IBO_sys.simulate(update_configuration=True)
 
 
 #%% Set prices
 f.isobutanol.price = 1.49 # initial value; updated on purity basis using V514.isobutanol_price https://www.alibaba.com/product-detail/High-Purity-Industrial-Organic-Solvent-Textile_1601609307567.html?spm=a2700.7724857.0.0.6b071f52XisbBQ
+
 f.makeup_isopentyl_acetate.price = 3.2 # https://www.alibaba.com/product-detail/High-Quality-Colorless-Liquid-99-min_1600206242747.html?spm=a2700.galleryofferlist.normal_offer.d_price.2ed613a0wyq5n8
 
 #%% Create TEA object
@@ -589,8 +602,8 @@ corn_EtOH_IBO_sys._TEA = corn_EtOH_IBO_sys_tea = corn.tea.create_tea(corn_EtOH_I
 baseline_spec = {
                  # 'target_conc_sugars': 220.0,
                  # 'threshold_conc_sugars': 210.0,
-                 'target_conc_sugars': 172.5,
-                 'threshold_conc_sugars': 167.25,
+                 'target_conc_sugars': 221.25,
+                 'threshold_conc_sugars': 217.125,
                  'conc_sugars_feed_spike': 600.0,
                  'tau_max': 120.0,}
 
@@ -598,8 +611,8 @@ baseline_spec = {
 # te_r._te.max_n_glu_spikes = 10
 # te_r.default_max_n_glu_spikes = 10
 
-te_r._te.max_n_glu_spikes = 1
-te_r.default_max_n_glu_spikes = 1
+te_r._te.max_n_glu_spikes = 16
+te_r.default_max_n_glu_spikes = 16
 
 #% Create fed-batch strategy specification object
 fbs_spec = nsk.units.FedBatchStrategySpecification(
@@ -942,8 +955,8 @@ def optimize_tau_for_MPSP(threshold_s_EtOH=5, **kwargs):
     V406.run_type = original_run_type
     return res.x[0]
     
-def optimize_1D_feeding_strategy_for_MPSP(bounds=(100.0, 400.0), threshold_diff=5.0,
-                                          method='brute-force', Ns=5,
+def optimize_1D_feeding_strategy_for_MPSP(bounds=(100.0, 400.0), threshold_diff=10.0,
+                                          method='brute-force', Ns=20,
                                           model_kwargs={},
                                           method_kwargs={},
                                           **kwargs):

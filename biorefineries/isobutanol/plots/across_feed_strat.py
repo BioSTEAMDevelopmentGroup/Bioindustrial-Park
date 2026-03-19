@@ -208,26 +208,10 @@ if plot_all_generic:
     #                   'Actual aeration required',
     #                   ]
     
-    metrics_to_opt = [
-                      'Cell loading',
-                      'EtOH Titer', 
-                      'EtOH Productivity', 
-                      'Combined Yield', 
-                      'Total Q sugar evap',
-                      'Actual aeration required',
-                      'TCI',
-                      'AOC',
-                      'MPSP', 
-                      ]
-    
     # metrics_to_opt = [
     #                   'Cell loading',
     #                   'EtOH Titer', 
     #                   'EtOH Productivity', 
-    #                   'EtOH Yield',
-    #                   'IBO Titer', 
-    #                   'IBO Productivity', 
-    #                   'IBO Yield',
     #                   'Combined Yield', 
     #                   'Total Q sugar evap',
     #                   'Actual aeration required',
@@ -235,6 +219,22 @@ if plot_all_generic:
     #                   'AOC',
     #                   'MPSP', 
     #                   ]
+    
+    metrics_to_opt = [
+                      'Cell loading',
+                      'EtOH Titer', 
+                      'EtOH Productivity', 
+                      'EtOH Yield',
+                      'IBO Titer', 
+                      'IBO Productivity', 
+                      'IBO Yield',
+                      'Combined Yield', 
+                      'Total Q sugar evap',
+                      'Actual aeration required',
+                      'TCI',
+                      'AOC',
+                      'MPSP', 
+                      ]
     
     if not scenario=='B':
         metrics_plot_names["Combined Yield"] = "Ethanol Yield"
@@ -414,10 +414,10 @@ if plot_all_generic:
 
 #%% MPSP
 curr_metric = 'MPSP'
-curr_metric_w_levels = np.arange(0.675, 0.9251, 0.01)
-curr_metric_cbar_ticks = np.arange(0.675, 0.9251, 0.05)
+curr_metric_w_levels = np.arange(0.64, 0.74001, 0.005)
+curr_metric_cbar_ticks = np.arange(0.64, 0.74001, 0.02)
 curr_metric_w_ticks = []
-cbar_n_minor_ticks = 4
+cbar_n_minor_ticks = 3
 lccm = curr_metric.lower()
 
 if 'yield' in lccm or 'titer' in lccm or 'productivity' in lccm or 'loading' in lccm:
@@ -483,7 +483,7 @@ contourplots.animated_contourplot(w_data_vs_x_y_at_multiple_z=results[curr_metri
                                 cmap=cmap, # can use 'viridis' or other default matplotlib colormaps
                                 # cmap_over_color = colors.grey_dark.shade(8).RGBn,
                                 cmap_over_color=cmap_over_color,
-                                extend_cmap='max',
+                                extend_cmap='neither',
                                 cbar_ticks=curr_metric_cbar_ticks,
                                 z_marker_color='g', # default matplotlib color names
                                 fps=fps, # animation frames (z values traversed) per second

@@ -24,7 +24,7 @@ f = model.system.flowsheet
 V406 = f.V406
 r = V406.kinetic_reaction_system
 
-scenario = 'A'
+scenario = 'B'
 IBO_filepath = isobutanol.__file__.replace('\\__init__.py', '')
 parameter_distributions_filename = IBO_filepath+\
     '\\analyses\\full\\parameter_distributions\\'+\
@@ -39,15 +39,14 @@ model_specification()
 # for forced batch mode:
 # V406.kinetic_reaction_system._te.max_n_glu_spikes = 0
 # V406.kinetic_reaction_system.default_max_n_glu_spikes = 0  
-
 if scenario=='A':
-    V406.kinetic_reaction_system._te.max_n_glu_spikes = 26
-    V406.kinetic_reaction_system.default_max_n_glu_spikes = 26  
-    model_specification(threshold_conc_sugars=170.0, target_conc_sugars=175.0)
-elif scenario=='B':
     V406.kinetic_reaction_system._te.max_n_glu_spikes = 16
-    V406.kinetic_reaction_system.default_max_n_glu_spikes = 16  
-    model_specification(threshold_conc_sugars=316.875, target_conc_sugars=318.75)
+    V406.kinetic_reaction_system.default_max_n_glu_spikes = 16 
+    model_specification(threshold_conc_sugars=217.125, target_conc_sugars=221.25)
+elif scenario=='B':
+    V406.kinetic_reaction_system._te.max_n_glu_spikes = 13
+    V406.kinetic_reaction_system.default_max_n_glu_spikes = 13  
+    model_specification(threshold_conc_sugars=216.3, target_conc_sugars=226.3)
 else:
     raise ValueError(f'Scenario {scenario} not found.')
     

@@ -38,7 +38,7 @@ if __name__ == '__main__':
     from biorefineries import isobutanol
     isobutanol_filepath = isobutanol.__file__.replace('\\__init__.py', '')
     isobutanol_results_pub_filepath = isobutanol_filepath + '\\analyses\\results\\publication\\'
-    data = data_p = isobutanol_results_pub_filepath+'Uncertainty\\'+"_IBO_2026.3.17-4.53_['A']_6000sims_A_1_full_evaluation" +".xlsx"
+    data = data_p = isobutanol_results_pub_filepath+'Uncertainty\\'+"_IBO_2026.3.17-17.36_['A']_6000sims_A_1_full_evaluation" +".xlsx"
     plot_spearman_matrix(data, data_p)
     plt.savefig(
         fname='spearman_matrix_A_0.05.png',
