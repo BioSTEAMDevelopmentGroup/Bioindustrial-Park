@@ -42,7 +42,8 @@ plot_kinetic_results = isobutanol.models.plot_kinetic_results
 model_specification = model.specification
 system = model.system
 tea = model.system.TEA
-optimize_max_n_glu_spikes_for_MPSP =  isobutanol.models.optimize_max_n_glu_spikes_for_MPSP
+optimize_stage_1_time_and_max_n_glu_spikes_for_MPSP =  isobutanol.models.optimize_stage_1_time_and_max_n_glu_spikes_for_MPSP
+optimize_max_n_glu_spikes_for_MPSP = isobutanol.models.optimize_max_n_glu_spikes_for_MPSP
 
 f = system.flowsheet
 
@@ -62,7 +63,11 @@ HXN = f.HXN1001
 product = f.ethanol
 broth = ferm_reactor.outs[1]
 
-EtOH_market_range=np.array([0.7, 1.0]) 
+EtOH_market_range=np.array([
+    0.52,
+    1.14,
+    ]) # March 2021- March 2026 5-year low and high from https://tradingeconomics.com/commodity/ethanol
+              
                 
 #%% Filepaths
 isobutanol_filepath = isobutanol.__file__.replace('\\__init__.py', '')
@@ -74,9 +79,11 @@ isobutanol_results_filepath = isobutanol_filepath + '\\analyses\\results\\'
 
 
 #%% Load parameter distributions
+scenario = 'A'
+
 parameter_distributions_filename = isobutanol_filepath+\
     '\\analyses\\full\\parameter_distributions\\'+\
-    'parameter-distributions_corn_IBO_EtOH_A.xlsx'
+    f'parameter-distributions_corn_IBO_EtOH_{scenario}.xlsx'
         
 model.parameters = ()
 model.load_parameter_distributions(parameter_distributions_filename, namespace_dict)
@@ -85,8 +92,8 @@ baseline_initial = model.metrics_at_baseline()
 #%% Baseline -- simulate and solve TEA
 
 #!!!
-ferm_reactor.kinetic_reaction_system._te.max_n_glu_spikes = 0 # initial val, changed during optimization
-ferm_reactor.kinetic_reaction_system.default_max_n_glu_spikes = 0 # initial val, changed during optimization
+# ferm_reactor.kinetic_reaction_system._te.max_n_glu_spikes = 0 # initial val, changed during optimization
+# ferm_reactor.kinetic_reaction_system.default_max_n_glu_spikes = 0 # initial val, changed during optimization
 
 model_specification(
     n_sims=3,
@@ -130,12 +137,17 @@ metrics = {'MPSP': {'f': get_product_MPSP, 'units': '$/kg'},
             'Combined Yield': {'f': get_yield_nsk, 'units': 'g-EtOH-and-IBO/g-sugars'},
             'EtOH Titer': {'f': get_titer_nsk, 'units': 'g-EtOH/L-broth'},
             'EtOH Productivity': {'f': get_prod_nsk, 'units': 'g-EtOH/L-broth/h'},
-            'Number of glucose spikes': {'f': get_curr_n_glu_spikes, 'units': 'g-EtOH/L-broth/h'},
+            'Number of glucose spikes': {'f': get_curr_n_glu_spikes, 'units': ''},
             'Fermentation time': {'f': get_tau, 'units': 'h'},
             'Total Q sugar evap': {'f': get_sugar_sol_evap_duty, 'units': 'kJ/h'},
             'Target sugars concentration': {'f': lambda: fbs_spec.target_conc_sugars, 'units': 'g-sugars/L-broth'},
             'Cell loading': {'f': get_cell_loading, 'units': 'g-cell/L-broth'},
             'Active cell loading': {'f': get_active_cell_loading, 'units': 'g-cell/L-broth'},
+            'EtOH Yield': {'f': lambda: ferm_reactor.nsk_results_specific_tau_dict['y_EtOH_glu_added'], 'units': 'g-EtOH/g-sugars'},
+            'IBO Yield': {'f': lambda: ferm_reactor.nsk_results_specific_tau_dict['y_IBO_glu_added'], 'units': 'g-IBO/g-sugars'},
+            'IBO Titer': {'f': lambda: ferm_reactor.nsk_results_specific_tau_dict['[s_IBO]'], 'units': 'g-IBO/L-broth'},
+            'IBO Productivity': {'f': lambda: ferm_reactor.nsk_results_specific_tau_dict['[s_IBO]']/ferm_reactor.nsk_results_specific_tau_dict['time'], 'units': 'g-IBO/L-broth/h'},
+            'Actual aeration required': {'f': lambda: ferm_reactor.compressed_air.imol['O2'], 'units': 'kmol-O2/h'},
             }
 
 #%%
@@ -176,7 +188,7 @@ y_ticks = [0, 100, 200, 300, 400,
            # 300, 400, 500,
            ]
 
-z_label = "Spike feed glucose concentration" # title of the x axis
+z_label = "Max n glu" # title of the x axis
 z_units =r"$\mathrm{g} \cdot \mathrm{L}^{-1}$"
 z_ticks = [0, 200, 400, 600, 800]
 
@@ -263,7 +275,7 @@ def tickmarks(dmin, dmax, accuracy=50, N_points=5):
 #%%
 minute = '0' + str(dateTimeObj.minute) if len(str(dateTimeObj.minute))==1 else str(dateTimeObj.minute)
 # file_to_save = f'_{steps}_steps_'+'etoh_fbs_%s.%s.%s-%s.%s'%(dateTimeObj.year, dateTimeObj.month, dateTimeObj.day, dateTimeObj.hour, minute)
-file_to_save = f'_ibo_{steps}_{x_label[:5]}_{y_label[:5]}_{z_label[:5]}_'
+file_to_save = f'ibo_{steps}_{x_label[:5]}_{y_label[:5]}_{z_label[:5]}_{scenario}_'
 
 chdir(isobutanol_results_filepath)
 
@@ -330,18 +342,22 @@ for s3 in spec_3:
                 # optimize_max_n_glu_spikes(obj='y_EtOH_glu_added', 
                 #                           optimize_tau=False,
                 #                           show_progress=False,)
+                
+                # optimize_stage_1_time_and_max_n_glu_spikes_for_MPSP(model_kwargs=curr_spec)
+                
                 optimize_max_n_glu_spikes_for_MPSP(model_kwargs=curr_spec)
+                
                 for k, v in list(results.items()): 
                     v[-1][-1].append(metrics[k]['f']())
                 
-                plot_kinetic_results(
-                    xlim=(0,60), ylim=(0, 
-                                       # round(max(s2, results['EtOH Titer'][-1][-1][-1]), -1)+10
-                                       600,
-                                       ),
+                # plot_kinetic_results(
+                #     xlim=(0,60), ylim=(0, 
+                #                        # round(max(s2, results['EtOH Titer'][-1][-1][-1]), -1)+10
+                #                        600,
+                #                        ),
                     
-                    save_fig=True, 
-                    filename=f'feed_strat_kinetics_plot_{i}_{j}.png')
+                #     save_fig=True, 
+                #     filename=f'feed_strat_kinetics_plot_{i}_{j}.png')
                 
                 HXN_qbal_error = HXN.energy_balance_percent_error
                 if abs(max_HXN_qbal_percent_error)<abs(HXN_qbal_error): max_HXN_qbal_percent_error = HXN_qbal_error
@@ -371,48 +387,48 @@ for s3 in spec_3:
 
     # Save generated data
     for k, v in results.items():
-        csv_file_to_save = isobutanol_results_filepath+k+'-'+file_to_save+'.csv'
-        pd.DataFrame(v[-1]).to_csv()
+        csv_file_to_save = file_to_save + f'_{k}'
+        pd.DataFrame(v[-1]).to_csv(isobutanol_results_filepath+csv_file_to_save+'.csv')
 
 #%% Report maximum HXN energy balance error
 print(f'Max HXN Q bal error was {round(max_HXN_qbal_percent_error, 3)} %.')
 
 #%% 
 
-# chdir(isobutanol_results_filepath)
+# # chdir(isobutanol_results_filepath)
 
-for i in range(len(spec_1)):
-    frames = []
-    for j in range(len(spec_2)):
-        if not np.isnan(results['MPSP'][0][i][j]):
-            image = imageio.v2.imread(f'feed_strat_kinetics_plot_{i}_{j}.png')
-            frames.append(image)
+# for i in range(len(spec_1)):
+#     frames = []
+#     for j in range(len(spec_2)):
+#         if not np.isnan(results['MPSP'][0][i][j]):
+#             image = imageio.v2.imread(f'feed_strat_kinetics_plot_{i}_{j}.png')
+#             frames.append(image)
     
-    if len(frames)>1:
-        try:
-            imageio.mimsave(f'animated_threshold_conc_sugars_{i}' + '.gif',
-                            frames,
-                            fps=1,
-                            loop=20,
-                            )
-        except:
-            pass
+#     if len(frames)>1:
+#         try:
+#             imageio.mimsave(f'animated_threshold_conc_sugars_{i}' + '.gif',
+#                             frames,
+#                             fps=1,
+#                             loop=20,
+#                             )
+#         except:
+#             pass
 
-for j in range(len(spec_2)):
-    frames = []
-    for i in range(len(spec_1)):
-        if not np.isnan(results['MPSP'][0][i][j]):
-            image = imageio.v2.imread(f'feed_strat_kinetics_plot_{i}_{j}.png')
-            frames.append(image)
-    if len(frames)>1:
-        try:
-            imageio.mimsave(f'animated_target_conc_sugars_{j}' + '.gif',
-                            frames,
-                            fps=1,
-                            loop=20,
-                            )
-        except:
-            pass
+# for j in range(len(spec_2)):
+#     frames = []
+#     for i in range(len(spec_1)):
+#         if not np.isnan(results['MPSP'][0][i][j]):
+#             image = imageio.v2.imread(f'feed_strat_kinetics_plot_{i}_{j}.png')
+#             frames.append(image)
+#     if len(frames)>1:
+#         try:
+#             imageio.mimsave(f'animated_target_conc_sugars_{j}' + '.gif',
+#                             frames,
+#                             fps=1,
+#                             loop=20,
+#                             )
+#         except:
+#             pass
      
 #%% More plot utils
 
@@ -540,9 +556,9 @@ if plot:
     #%% MPSP
     
     # MPSP_w_levels, MPSP_w_ticks, MPSP_cbar_ticks = get_contour_info_from_metric_data(results_metric_1, lb=3)
-    MPSP_w_levels = np.arange(0.65, 0.8501, 0.01)
-    MPSP_cbar_ticks = np.arange(0.65, 0.8501, 0.05)
-    MPSP_w_ticks = [0.69, 0.72, 0.85]
+    MPSP_w_levels = np.arange(0.625, 0.9251, 0.005)
+    MPSP_cbar_ticks = np.arange(0.625, 0.9251, 0.05)
+    MPSP_w_ticks = [0.75,]
     # MPSP_w_levels = np.arange(0., 15.5, 0.5)
     
     

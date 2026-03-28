@@ -62,13 +62,16 @@ plot_spearman_matrix = isobutanol.plots.spearman_matrix.plot_spearman_matrix
 # model.specification = models.optimize_1D_feeding_strategy_for_MPSP
 
 #%%
+
+scenario = 'A'
+
 modes=[
-       'A', 
+       scenario, 
         # 'B', 
         # 'C', 'D',
        ]
-N_simulations_per_mode=20
-notification_interval=5
+N_simulations_per_mode=6000
+notification_interval=200
 plot_TOC_fig=False
 
 percentiles = [0, 0.05, 0.1, 0.25, 0.5, 0.75, 0.9, 0.95, 1]
@@ -87,7 +90,17 @@ scenario_names =\
                 
 parameter_distributions_filenames = {i: 'parameter-distributions_corn_IBO_EtOH_' + i + '.xlsx' for i in modes}
 
-
+#%%
+V406 = f.V406
+if scenario=='A':
+    V406.kinetic_reaction_system._te.max_n_glu_spikes = 16
+    V406.kinetic_reaction_system.default_max_n_glu_spikes = 16  
+    model.specification(threshold_conc_sugars=217.125, target_conc_sugars=221.25)
+elif scenario=='B':
+    V406.kinetic_reaction_system._te.max_n_glu_spikes = 13
+    V406.kinetic_reaction_system.default_max_n_glu_spikes = 13  
+    model.specification(threshold_conc_sugars=216.3, target_conc_sugars=226.3)
+    
 #%%
 
 timer = TicToc('timer')
@@ -292,8 +305,10 @@ MPSP_uncertainty = [results_dict['Uncertainty']['MPSP'][mode]
 
 # IBO_maximum_viable_market_range = SA_market_range / theoretical_max_g_IBO_per_g_SA
 
-market_range = np.array([0.64, 1.00])
-
+market_range = np.array([
+    0.52, # 1.5475 $/gal/(3.7854 L/gal * 0.789 kg/L)
+    1.15, # 3.4500 $/gal/(3.7854 L/gal * 0.789 kg/L)
+    ]) # Jan 2021 - Dec 2025 5-year low and high from https://tradingeconomics.com/commodity/ethanol
 
 # biobased_lit_MPSP_range = (1.08, 3.63)
 MPSP_box_width = 1.05 if len(modes)==1 else 0.45
