@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """
 """
-from . import chemicals
+from . import _chemicals as chemicals
 from . import composition
 from . import oil_extraction
 from . import process_settings
@@ -32,7 +32,7 @@ __all__ = (
     *tables.__all__,
 )
 
-from .chemicals import *
+from ._chemicals import *
 from .composition import *
 from .oil_extraction import *
 from .process_settings import *

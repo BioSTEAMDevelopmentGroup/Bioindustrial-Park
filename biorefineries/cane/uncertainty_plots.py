@@ -1116,24 +1116,22 @@ def plot_O7_combined_kde_2025(fs=None):
         "axes.facecolor":    (0.0, 0.0, 0.0, 1), 
         "savefig.facecolor": (0.0, 0.0, 0.0, 0), 
     })
-    L_per_gal = 3.78541
-    hundred_galFF_per_Lha = 0.0014265297550331405
+    # L_per_gal = 3.78541
+    five_hundred_LSF_per_Lha = 0.001428
     fig, axes = plot_scatter_1d(
         ('O7',),
-        xscale=hundred_galFF_per_Lha,
-        yscale=L_per_gal,
-        zscale=L_per_gal,
-        yticks=[0, 4, 8, 12, 16, 20, 24, 28],
+        xscale=five_hundred_LSF_per_Lha,
+        yticks=[0, 1, 2, 3, 4, 5, 6, 7],
         xticks=[[0, 2, 4, 6]],
         metrics=[biodiesel_yield, MBSP, GWP_biodiesel_allocation],
         xlabel="",
-        ylabel=f"MBSP [{format_units('USD/gal')}]",
+        ylabel=f"MBSP [{format_units('USD/L')}]",
         fs=12,
         aspect_ratio=1,
         width=4,
         colors=['managua']*1,
-        zlabel=f"Carbon intensity [{GWP_units_L.replace('L', 'gal')}]",
-        y_center=[0.45 * L_per_gal, 5.5],
+        zlabel=f"Carbon intensity [{GWP_units_L}]",
+        y_center=[0.45, 1.45],
         x_center=1,
         zticks=None,
     )
@@ -1144,8 +1142,8 @@ def plot_O7_combined_kde_2025(fs=None):
         left=0.15,
     )
     fig.text(
-        0.54, 0.03,
-        f"Biodiesel yield [100 {format_units('gal/FF')}]",
+        0.45, 0.03,
+        f"Biodiesel yield [500 {format_units('L/FF')}]",
         ha='center', 
         rotation='horizontal'
     )

@@ -25,7 +25,7 @@ from .feature_mockups import (
     all_metric_mockups, 
 )
 from .process_settings import load_process_settings
-from .chemicals import create_cellulosic_oilcane_chemicals as create_chemicals
+from ._chemicals import create_cellulosic_oilcane_chemicals as create_chemicals
 from biorefineries.cellulosic import PretreatmentReactorSystem as PRS
 from .systems import (
     create_sugarcane_to_ethanol_system,
