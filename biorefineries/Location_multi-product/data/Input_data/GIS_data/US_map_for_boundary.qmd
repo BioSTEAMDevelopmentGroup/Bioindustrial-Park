@@ -1,0 +1,56 @@
+<!DOCTYPE qgis PUBLIC 'http://mrcc.com/qgis.dtd' 'SYSTEM'>
+<qgis version="3.32.3-Lima">
+  <identifier>tl_2012_us_state</identifier>
+  <parentidentifier></parentidentifier>
+  <language>ENG</language>
+  <type>dataset</type>
+  <title>tl_2012_us_state</title>
+  <abstract>The TIGER/Line shapefiles and related database files (.dbf) are an extract of selected geographic and cartographic information from the U.S. Census Bureau's Master Address File / Topologically Integrated Geographic Encoding and Referencing (MAF/TIGER) Database (MTDB). The MTDB represents a seamless national file with no overlaps or gaps between parts, however, each TIGER/Line shapefile is designed to stand alone as an independent data set, or they can be combined to cover the entire nation. States and equivalent entities are the primary governmental divisions of the United States. In addition to the fifty States, the Census Bureau treats the District of Columbia, Puerto Rico, and each of the Island Areas (American Samoa, the Commonwealth of the Northern Mariana Islands, Guam, and the U.S. Virgin Islands) as the statistical equivalents of States for the purpose of data presentation.
+
+In order for others to use the information in the Census MAF/TIGER database in a geographic information system (GIS) or for other geographic applications, the Census Bureau releases to the public extracts of the database in the form of TIGER/Line Shapefiles.</abstract>
+  <keywords vocabulary="gmd:topicCategory">
+    <keyword>boundaries</keyword>
+    <keyword>Nation</keyword>
+  </keywords>
+  <contact>
+    <contactAddress>
+      <type>Mailing</type>
+      <address>4600 Silver Hill Road, Stop 7400</address>
+      <city>Washington</city>
+      <administrativearea>DC</administrativearea>
+      <postalcode>20233-7400</postalcode>
+      <country>United States</country>
+    </contactAddress>
+    <name>U.S. Department of Commerce, U.S. Census Bureau, &#xd;
+                         Geography Division, Geographic Products Branch</name>
+    <organization>U.S. Department of Commerce, U.S. Census Bureau, &#xd;
+                         Geography Division, Geographic Products Branch</organization>
+    <position></position>
+    <voice>301-763-1128</voice>
+    <fax>301-763-4710</fax>
+    <email>geo.tiger@census.gov</email>
+    <role>Point of contact</role>
+  </contact>
+  <links/>
+  <dates/>
+  <fees></fees>
+  <constraints type="Access">None</constraints>
+  <rights>The TIGER/Line Shapefile products are not copyrighted however TIGER/Line and Census TIGER are registered trademarks of the U.S. Census Bureau. These products are free to use in a product or publication, however acknowledgement must be given to the U.S. Census Bureau as the source. The boundary information in the TIGER/Line Shapefiles are for statistical data collection and tabulation purposes only; their depiction and designation for statistical purposes does not constitute a determination of jurisdictional authority or rights of ownership or entitlement and they are not legal land descriptions.Coordinates in the TIGER/Line shapefiles have six implied decimal places, but the positional accuracy of these coordinates is not as great as the six decimal places suggest.</rights>
+  <encoding></encoding>
+  <crs>
+    <spatialrefsys nativeFormat="Wkt">
+      <wkt>PROJCRS["Popular Visualisation CRS / Mercator",BASEGEOGCRS["Popular Visualisation CRS",DATUM["Popular Visualisation Datum",ELLIPSOID["Popular Visualisation Sphere",6378137,0,LENGTHUNIT["metre",1]]],PRIMEM["Greenwich",0,ANGLEUNIT["degree",0.0174532925199433]],ID["EPSG",4055]],CONVERSION["Popular Visualisation Mercator",METHOD["Mercator (1SP) (Spherical)",ID["EPSG",9841]],PARAMETER["Latitude of natural origin",0,ANGLEUNIT["degree",0.0174532925199433],ID["EPSG",8801]],PARAMETER["Longitude of natural origin",0,ANGLEUNIT["degree",0.0174532925199433],ID["EPSG",8802]],PARAMETER["Scale factor at natural origin",1,SCALEUNIT["unity",1],ID["EPSG",8805]],PARAMETER["False easting",0,LENGTHUNIT["metre",1],ID["EPSG",8806]],PARAMETER["False northing",0,LENGTHUNIT["metre",1],ID["EPSG",8807]]],CS[Cartesian,2],AXIS["easting (X)",east,ORDER[1],LENGTHUNIT["metre",1]],AXIS["northing (Y)",north,ORDER[2],LENGTHUNIT["metre",1]],USAGE[SCOPE["Web mapping and visualisation."],AREA["World between 85.06°S and 85.06°N."],BBOX[-85.06,-180,85.06,180]],ID["EPSG",3785]]</wkt>
+      <proj4>+proj=merc +a=6378137 +b=6378137 +lat_ts=0 +lon_0=0 +x_0=0 +y_0=0 +k=1 +units=m +nadgrids=@null +wktext +no_defs</proj4>
+      <srsid>1743</srsid>
+      <srid>3785</srid>
+      <authid>EPSG:3785</authid>
+      <description>Popular Visualisation CRS / Mercator</description>
+      <projectionacronym>merc</projectionacronym>
+      <ellipsoidacronym>EPSG:7059</ellipsoidacronym>
+      <geographicflag>false</geographicflag>
+    </spatialrefsys>
+  </crs>
+  <extent>
+    <spatial minz="0" maxy="71.44105899999999565" miny="-14.60180599999999984" maxx="179.85966600000000426" crs="EPSG:3785" minx="-179.23110099999999534" dimensions="2" maxz="0"/>
+  </extent>
+</qgis>
