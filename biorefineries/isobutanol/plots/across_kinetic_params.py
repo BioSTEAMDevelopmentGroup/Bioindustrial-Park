@@ -72,7 +72,7 @@ y_label = "k_7ii"
 z_label = "Spike feed glucose concentration"
 
 # Misc
-strategy='fixed_fed-batch'
+strategy='adaptive_fed-batch'
 steps = (25, 25, 1)
 
 #%% Intermediate details
