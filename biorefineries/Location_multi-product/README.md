@@ -2,7 +2,7 @@
 
 This repository contains code to replicate or perform similar analyses to those described in the manuscript *Bianco et al. 2026*<sup>[1](#citation)</sup>. The project optimizes the location of biorefineries for multiple bioproducts using RBF models and spatial optimization techniques.
 
-This is a stand-alone module that does not depend on any Biosteam or bioindustrial park dependencies. It can be downloaded and used with the current Biosteam and Bioindustrial Park setup. Biorefinery simulations used for refinery cost coefficients must be run in their specific environment, and the results can be used as input here.
+This is a stand-alone module that does not depend on any Biosteam or Bioindustrial Park dependencies. It can be downloaded and used with the current Biosteam and Bioindustrial Park setup. Biorefinery simulations used for refinery cost coefficients must be run in their specific environment, and the results can be used as input here.
 
 ## Project Structure
 
@@ -100,7 +100,7 @@ trainer = RBFScenarioTrainer("500k_5perc")
 trainer.run()
 ```
 
-The RBF model will be saved as "rbf_models_package_5perc.pkl" (or "X"perc) in the same scenario folder.
+The RBF model will be saved as "rbf_models_package_2perc.pkl", "rbf_models_package_5perc.pkl", or "rbf_models_package_10perc.pkl" in the same scenario folder.
 
 **temp_eval.py** contains an example on how to evaluate predictions, with the test and validation splits.
 
@@ -111,7 +111,7 @@ This step is necessary to determine the refinery cost coefficients for the locat
 For this project, refineries for cellulosic ethanol (ethanol), lactic acid (LA), succinic acid (SA), potassium sorbate (KS), and acrylic acid (AA) were simulated with their corresponding dependencies in BioSTEAM for many different refinery sizes and results were saved in .xlsx format in each product folder/outputs. The name of each file corresponds to the refinery size followed by feedstock price (p0 or p1). These simulation results were used to obtain:
 
 1. The linear coefficient (a) for the feedstock cost contribution to the product minimum selling price (MSP).
-2. To fit a saturation-law equations for the fixed refinery cost coefficient, dependent on refinery size.
+2. Saturation-law equations for the fixed refinery cost coefficient, dependent on refinery size.
 
 
 ## Refinery Data Analysis
@@ -156,7 +156,7 @@ For a single-product optimization, several approaches can be used:
 
 1. Choosing between circular or irregular collection area shapes.
 2. Working with a "Target Mode". In this case, all located refineries will try to meet a total user-defined production target.
-3. Working with Strict or Capped individual refinery sizes. Strict individual sizes forces the model to set all facilities to the same user-defined size. Capped individual sizes lets the model choose the size up to a user-defined maximum size. (When working with 'ethanol' the default maximum size is 400 MMgal/yr, since it is the maximum existing capacity for cellulosic ethanol refineries. If the user is working with other bioproducts, this maximum size must be defined).
+3. Working with Strict or Capped individual refinery sizes. Strict individual sizes force the model to set all facilities to the same user-defined size. Capped individual sizes let the model choose the size up to a user-defined maximum size. (When working with 'ethanol' the default maximum size is 400 MMgal/yr, since it is the maximum existing capacity for cellulosic ethanol refineries. If the user is working with other bioproducts, this maximum size must be defined).
 
 ### Simultaneous Optimization 
 For the simultaneous single-product optimization, the class to create and run is called **SimultaneousSingleProductOptimizer**. It can be initialized with the following parameters:
@@ -204,7 +204,7 @@ The optimization file will show a plot with the best result and the optimization
 `optimizer.best_feasible_score` delivers the weighted average MSP across the N sited refineries.
 `optimizer.best_layout_overall` saves the coordinates and radii of the N refineries.
 
-The class method .generate_refinery_report() allows to explore production, collection area, and MSP for each refinery.
+The class method .generate_refinery_report() can be used to explore production, collection area, and MSP for each refinery.
 
 ### Sequential approach
 Similar to the simultaneous approach, the sequential single product optimization allows to site N refineries (all of the same product), but it is much less computationally expensive.
@@ -341,7 +341,7 @@ Some notebook input files are larger than 100 MB and were not uploaded to GitHub
 - "500k_2perc" 
 - "500k_5perc"
 - "500k_10perc" 
-2. After step 3 (E.g., BioRefineryAnalysis("500k_5perc")), results for costs and production will be saved in "outpus" and the correspondent scenario folder. Copy the generated files Costs_biorefinery.npy and production.npy to the folder "Notebooks/RBF_5perc" (or the correspondent percentage) and rename them as "Costs_biorefinery_500k_Rs_5perc.npy" and "production_biorefineries_farm_sample_500k_Rs_5perc.npy" (with their correct percentage).
+2. After step 3 (E.g., BioRefineryAnalysis("500k_5perc")), results for costs and production will be saved in "outputs" and the corresponding scenario folder. Copy the generated files Costs_biorefinery.npy and production.npy to the folder "Notebooks/RBF_5perc" (or the corresponding percentage) and rename them as "Costs_biorefinery_500k_Rs_5perc.npy" and "production_biorefineries_farm_sample_500k_Rs_5perc.npy" (with their correct percentage).
 3. After step 4 (e.g., RBFScenarioTrainer("500k_5perc")) the .pkl file of the model training will be saved in the same folder as 2. Copy the generated .pkl model file to "Notebooks/rbf_models" without renaming.
 
 
