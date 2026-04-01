@@ -73,7 +73,7 @@ If no data needs to be changed (to replicate the analysis with the same yields a
 
 ### Logistics Calculation for Model Training
 
-The third step calculates logistics results used to train RBF models that predict total feedstock delivered costs (USD/year) and total feedstock supply (metric tons/year). The **BioRefineryAnalysis** class (in the **Target_values_logistics** folder) uses the scenario folder where samples and distances are saved (these must exist), and outputs (Costs_biorefinery.npy and production.npy) are saved to the same folder.
+The third step calculates logistics results used to train RBF models that predict total feedstock delivered costs (USD/year) and total feedstock supply (metric tons/year). The `BioRefineryAnalysis` class (in the **Target_values_logistics** folder) uses the scenario folder where samples and distances are saved (these must exist), and outputs (Costs_biorefinery.npy and production.npy) are saved to the same folder.
 
 Example usage:
 ```python
@@ -333,7 +333,17 @@ opt.run_optimization(n_trials = 1)
 ```
 
 # 7. Notebooks
-The folder **Notebooks** contains the raw Jupyter Notebook files used for the analysis and figure-creation for the manuscript<sup>[1](#citation)</sup>.
+The folder **Notebooks** contains the raw Jupyter Notebook files used for analysis and figure creation for the manuscript<sup>[1](#citation)</sup>.
+
+Some notebook input files are larger than 100 MB and were not uploaded to GitHub due to GitHub size limits. To run the notebook locally, follow these steps:
+
+1. Run steps 1-4 from this README (up to Train RBF models) for each scenario:
+- "500k_2perc" 
+- "500k_5perc"
+- "500k_10perc" 
+2. After step 3 (E.g., BioRefineryAnalysis("500k_5perc")), results for costs and production will be saved in "outpus" and the correspondent scenario folder. Copy the generated files Costs_biorefinery.npy and production.npy to the folder "Notebooks/RBF_5perc" (or the correspondent percentage) and rename them as "Costs_biorefinery_500k_Rs_5perc.npy" and "production_biorefineries_farm_sample_500k_Rs_5perc.npy" (with their correct percentage).
+3. After step 4 (e.g., RBFScenarioTrainer("500k_5perc")) the .pkl file of the model training will be saved in the same folder as 2. Copy the generated .pkl model file to "Notebooks/rbf_models" without renaming.
+
 
 # 8. Installation and Dependencies
 

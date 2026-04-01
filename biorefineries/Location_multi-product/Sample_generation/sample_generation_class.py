@@ -18,6 +18,7 @@ from scipy.spatial import cKDTree  # Fast lookup
 from scipy.interpolate import RegularGridInterpolator
 import os
 import joblib 
+import re
 
 
 class RefineryFarmSampler:
@@ -53,8 +54,13 @@ class RefineryFarmSampler:
                  n_samples_per_refinery=100,
                  N_rand=500_000,
                  seed=123):
+        
+        match = re.search(r"\d+perc", scenario)
+        if match:
+            self.scenario = match.group()
+        else:
+            self.scenario = scenario
 
-        self.scenario = scenario
         if x_coords == None or y_coords == None:
             # Read suitable land for perennial grass cultivation coordinates
             from project.paths import SUITABLE_LAND_X, SUITABLE_LAND_Y
@@ -71,8 +77,8 @@ class RefineryFarmSampler:
         self.seed = seed
 
         # Handle max radius
-        if scenario in self.SCENARIO_RADII:
-            self.max_rad = self.SCENARIO_RADII[scenario]
+        if self.scenario in self.SCENARIO_RADII:
+            self.max_rad = self.SCENARIO_RADII[self.scenario]
         elif max_rad is not None:
             self.max_rad = max_rad
         else:
@@ -83,7 +89,7 @@ class RefineryFarmSampler:
         self.angles_plot = np.linspace(0, 2*np.pi, 100)
 
         np.random.seed(self.seed)
-
+        
     # -------------------------------------------------
     # MAIN SAMPLING
     # -------------------------------------------------
