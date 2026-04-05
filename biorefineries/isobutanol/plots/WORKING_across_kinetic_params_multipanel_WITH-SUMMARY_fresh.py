@@ -743,7 +743,11 @@ def plot_save_kinetic_multipanel(metric, row_parameter_pairs=None, strategies=No
     return panel_data
 
 #%% Plot for all metrics
-results = {}
+# results = {}
+# if __name__ == '__main__':
+#     for metric in list(metrics_units.keys()):
+#         results[metric] = plot_save_kinetic_multipanel(metric)
+
+#%% Plot for MPSP
 if __name__ == '__main__':
-    for metric in list(metrics_units.keys()):
-        results[metric] = plot_save_kinetic_multipanel(metric)
+    results = plot_save_kinetic_multipanel('MPSP')
