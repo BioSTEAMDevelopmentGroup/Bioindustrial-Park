@@ -6,8 +6,6 @@ Created on Thu Dec 15 21:27:15 2022
 """
 from biorefineries.cane import chemicals 
 
-__all__ = [*chemicals.__all__, 'create_chemicals']
+__all__ = ['create_chemicals']
 
-from biorefineries.cane.chemicals import *
-
-create_chemicals = create_sugarcane_chemicals
+create_chemicals = chemicals.create_sugarcane_chemicals

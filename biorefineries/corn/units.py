@@ -328,7 +328,7 @@ class SimultaneousSaccharificationFermentation(bst.BatchBioreactor):
 SSF = SimultaneousSaccharificationFermentation
 
 @copy_algorithm(bst.SolidLiquidsSplitCentrifuge, run=False)
-class DDGSCentrifuge(bst.Splitter): pass
+class DDGSCentrifuge(bst.SolidsCentrifuge): pass
     
 
 @cost('Flow rate', units='kg/hr', CE=CE2007, cost=122800, S=15303.5346, kW=37.3, n=0.6, BM=4)

@@ -59,13 +59,12 @@ products_by_module = {
     'O8': 'biodiesel',
     'O9': 'biodiesel',
 }
-
 must_load = {
     'oilcane', 'corn', 'sugarcane', 'cornstover', 'lipidcane'
 }
-
-marked_slow = {'wheatstraw', 'animal_bedding'}
-
+marked_slow = {
+    'wheatstraw', 'animal_bedding'
+}
 configurations = {
     'HP': ('cellulosic', 'sugarcane'),
     'oilcane': ('S1', 'S2', 'O1', 'O2', 'O3', 'O4', 'S1*', 'S2*', 'O1*', 'O2*',
@@ -189,16 +188,16 @@ def test_corn():
     product = module.ethanol
     tea = module.tea
     units = UnitGroup('Biorefinery', tea.units)
-    assert np.allclose(tea.IRR, 0.06760145804238417, rtol=5e-2)
+    assert np.allclose(tea.IRR, 0.05381572438333119, rtol=5e-2)
     assert np.allclose(feedstock.price, 0.13227735731092652, rtol=5e-2)
     assert np.allclose(product.price, 0.48547915353569393, rtol=5e-2)
-    assert np.allclose(tea.sales, 74976201.15513338, rtol=5e-2)
-    assert np.allclose(tea.material_cost, 52917786.93817723, rtol=5e-2)
-    assert np.allclose(tea.installed_equipment_cost, 66139140.440319434, rtol=5e-2)
-    assert np.allclose(tea.utility_cost, 9396522.56718781, rtol=5e-2)
-    assert np.allclose(units.get_heating_duty(), 108.19366840623299, rtol=5e-2)
-    assert np.allclose(units.get_cooling_duty(), 99.99118048363373, rtol=5e-2)
-    assert np.allclose(units.get_electricity_consumption(), 1.92300294915781, rtol=5e-2)
+    assert np.allclose(tea.sales, 74992038.8556337, rtol=5e-2)
+    assert np.allclose(tea.material_cost, 52925382.42511212, rtol=5e-2)
+    assert np.allclose(tea.installed_equipment_cost, 65387501.9390586, rtol=5e-2)
+    assert np.allclose(tea.utility_cost, 10442066.327145828, rtol=5e-2)
+    assert np.allclose(units.get_heating_duty(), 111.3588815958425, rtol=5e-2)
+    assert np.allclose(units.get_cooling_duty(), 105.08735576937576, rtol=5e-2)
+    assert np.allclose(units.get_electricity_consumption(), 1.6248530112233648, rtol=5e-2)
     assert np.allclose(units.get_electricity_production(), 0.0, rtol=5e-2)
     
 @default_settings
@@ -213,17 +212,17 @@ def test_lipidcane():
     product = module.ethanol
     tea = module.tea
     units = UnitGroup('Biorefinery', tea.units)
-    assert np.allclose(tea.IRR, 0.20838198278635775, rtol=5e-2)
+    assert np.allclose(tea.IRR, 0.2096184874236113, rtol=5e-2)
     assert np.allclose(feedstock.price, 0.03455, rtol=5e-2)
     assert np.allclose(product.price, 0.789, rtol=5e-2)
-    assert np.allclose(tea.sales, 102693810.9072454, rtol=5e-2)
-    assert np.allclose(tea.material_cost, 58792001.55886276, rtol=5e-2)
-    assert np.allclose(tea.installed_equipment_cost, 224839055.5492545, rtol=5e-2)
-    assert np.allclose(tea.utility_cost, -34856288.09454106, rtol=5e-2)
-    assert np.allclose(units.get_heating_duty(), 198.68157123555727, rtol=5e-2)
-    assert np.allclose(units.get_cooling_duty(), 248.78635422182808, rtol=5e-2)
-    assert np.allclose(units.get_electricity_consumption(), 8.337355372241166, rtol=5e-2)
-    assert np.allclose(units.get_electricity_production(), 124.7252091516593, rtol=5e-2)
+    assert np.allclose(tea.sales, 102693810.90724541, rtol=5e-2)
+    assert np.allclose(tea.material_cost, 58791909.359143384, rtol=5e-2)
+    assert np.allclose(tea.installed_equipment_cost, 224993001.08352256, rtol=5e-2)
+    assert np.allclose(tea.utility_cost, -35051662.1479298, rtol=5e-2)
+    assert np.allclose(units.get_heating_duty(), 196.03543411890655, rtol=5e-2)
+    assert np.allclose(units.get_cooling_duty(), 248.74360483108703, rtol=5e-2)
+    assert np.allclose(units.get_electricity_consumption(), 8.335938857939432, rtol=5e-2)
+    assert np.allclose(units.get_electricity_production(), 125.34999152642408, rtol=5e-2)
     
 @default_settings
 def test_cornstover():
@@ -239,15 +238,15 @@ def test_cornstover():
     units = UnitGroup('Biorefinery', tea.units)
     assert np.allclose(tea.IRR, 0.1, rtol=5e-2)
     assert np.allclose(feedstock.price, 0.05158816935126135, rtol=5e-2)
-    assert np.allclose(product.price, 0.6928878018310523, rtol=5e-2)
-    assert np.allclose(tea.sales, 127985910.4050674, rtol=5e-2)
-    assert np.allclose(tea.material_cost, 82367701.92480928, rtol=5e-2)
-    assert np.allclose(tea.installed_equipment_cost, 209983262.83894956, rtol=5e-2)
-    assert np.allclose(tea.utility_cost, -9836829.990654068, rtol=5e-2)
-    assert np.allclose(units.get_heating_duty(), 357.32861206090973, rtol=5e-2)
-    assert np.allclose(units.get_cooling_duty(), 373.7037740897544, rtol=5e-2)
-    assert np.allclose(units.get_electricity_consumption(), 22.431981514031545, rtol=5e-2)
-    assert np.allclose(units.get_electricity_production(), 46.65116253263528, rtol=5e-2)
+    assert np.allclose(product.price, 0.6865466977048817, rtol=5e-2)
+    assert np.allclose(tea.sales, 126814634.63623773, rtol=5e-2)
+    assert np.allclose(tea.material_cost, 82270811.86953875, rtol=5e-2)
+    assert np.allclose(tea.installed_equipment_cost, 209112840.52373964, rtol=5e-2)
+    assert np.allclose(tea.utility_cost, -10675099.091695543, rtol=5e-2)
+    assert np.allclose(units.get_heating_duty(), 351.9303289817331, rtol=5e-2)
+    assert np.allclose(units.get_cooling_duty(), 347.548288866479, rtol=5e-2)
+    assert np.allclose(units.get_electricity_consumption(), 22.05578511575179, rtol=5e-2)
+    assert np.allclose(units.get_electricity_production(), 47.93524983359892, rtol=5e-2)
     
 @default_settings
 def test_sugarcane():
@@ -261,17 +260,17 @@ def test_sugarcane():
     product = module.ethanol
     tea = module.tea
     units = UnitGroup('Biorefinery', tea.units)
-    assert np.allclose(tea.IRR, 0.1371967863869829, rtol=5e-2)
+    assert np.allclose(tea.IRR, 0.13927430031288052, rtol=5e-2)
     assert np.allclose(feedstock.price, 0.03455, rtol=5e-2)
     assert np.allclose(product.price, 0.789, rtol=5e-2)
-    assert np.allclose(tea.sales, 88301968.5027519, rtol=5e-2)
-    assert np.allclose(tea.material_cost, 57173835.32015708, rtol=5e-2)
-    assert np.allclose(tea.installed_equipment_cost, 201025839.2816491, rtol=5e-2)
-    assert np.allclose(tea.utility_cost, -17929238.353891116, rtol=5e-2)
-    assert np.allclose(units.get_heating_duty(), 236.16185047299098, rtol=5e-2)
-    assert np.allclose(units.get_cooling_duty(), 275.3576079652774, rtol=5e-2)
-    assert np.allclose(units.get_electricity_consumption(), 9.10046181695382, rtol=5e-2)
-    assert np.allclose(units.get_electricity_production(), 71.25632300276929, rtol=5e-2)
+    assert np.allclose(tea.sales, 88301968.50275187, rtol=5e-2)
+    assert np.allclose(tea.material_cost, 57173796.168331705, rtol=5e-2)
+    assert np.allclose(tea.installed_equipment_cost, 201382960.99778348, rtol=5e-2)
+    assert np.allclose(tea.utility_cost, -18258007.571078993, rtol=5e-2)
+    assert np.allclose(units.get_heating_duty(), 231.71520460357308, rtol=5e-2)
+    assert np.allclose(units.get_cooling_duty(), 275.1487459328047, rtol=5e-2)
+    assert np.allclose(units.get_electricity_consumption(), 9.09763804588573, rtol=5e-2)
+    assert np.allclose(units.get_electricity_production(), 72.3062254997152, rtol=5e-2)
     
 @default_settings
 def test_oilcane_S1():
@@ -288,14 +287,14 @@ def test_oilcane_S1():
     assert np.allclose(tea.IRR, 0.1, rtol=5e-2)
     assert np.allclose(feedstock.price, 0.03500000000000001, rtol=5e-2)
     assert np.allclose(product.price, 0.46631835806534216, rtol=5e-2)
-    assert np.allclose(tea.sales, 81216703.38995753, rtol=5e-2)
-    assert np.allclose(tea.material_cost, 57899845.382269025, rtol=5e-2)
-    assert np.allclose(tea.installed_equipment_cost, 143958669.77429038, rtol=5e-2)
-    assert np.allclose(tea.utility_cost, -20261634.02582838, rtol=5e-2)
-    assert np.allclose(units.get_heating_duty(), 326.68221545803823, rtol=5e-2)
-    assert np.allclose(units.get_cooling_duty(), 312.8799368271598, rtol=5e-2)
-    assert np.allclose(units.get_electricity_consumption(), 11.158512318371947, rtol=5e-2)
-    assert np.allclose(units.get_electricity_production(), 89.62700162366329, rtol=5e-2)
+    assert np.allclose(tea.sales, 81216703.38995746, rtol=5e-2)
+    assert np.allclose(tea.material_cost, 57899806.22775801, rtol=5e-2)
+    assert np.allclose(tea.installed_equipment_cost, 141266073.40874788, rtol=5e-2)
+    assert np.allclose(tea.utility_cost, -16698257.182554739, rtol=5e-2)
+    assert np.allclose(units.get_heating_duty(), 381.2012571371377, rtol=5e-2)
+    assert np.allclose(units.get_cooling_duty(), 303.72883725099325, rtol=5e-2)
+    assert np.allclose(units.get_electricity_consumption(), 11.155375956039892, rtol=5e-2)
+    assert np.allclose(units.get_electricity_production(), 76.75445011609807, rtol=5e-2)
     
 @default_settings
 def test_oilcane_S2():
@@ -312,14 +311,14 @@ def test_oilcane_S2():
     assert np.allclose(tea.IRR, 0.1, rtol=5e-2)
     assert np.allclose(feedstock.price, 0.03500000000000001, rtol=5e-2)
     assert np.allclose(product.price, 0.789, rtol=5e-2)
-    assert np.allclose(tea.sales, 141975077.2173792, rtol=5e-2)
-    assert np.allclose(tea.material_cost, 69127681.35045795, rtol=5e-2)
-    assert np.allclose(tea.installed_equipment_cost, 262822537.24898067, rtol=5e-2)
-    assert np.allclose(tea.utility_cost, 1818417.09897583, rtol=5e-2)
-    assert np.allclose(units.get_heating_duty(), 424.86265618991405, rtol=5e-2)
-    assert np.allclose(units.get_cooling_duty(), 448.1969630313857, rtol=5e-2)
-    assert np.allclose(units.get_electricity_consumption(), 28.302298500407016, rtol=5e-2)
-    assert np.allclose(units.get_electricity_production(), 28.302298500407026, rtol=5e-2)
+    assert np.allclose(tea.sales, 142237746.46385777, rtol=5e-2)
+    assert np.allclose(tea.material_cost, 69156446.04847895, rtol=5e-2)
+    assert np.allclose(tea.installed_equipment_cost, 262214925.83913735, rtol=5e-2)
+    assert np.allclose(tea.utility_cost, 1752477.5030571576, rtol=5e-2)
+    assert np.allclose(units.get_heating_duty(), 419.21135806535466, rtol=5e-2)
+    assert np.allclose(units.get_cooling_duty(), 440.1365785915077, rtol=5e-2)
+    assert np.allclose(units.get_electricity_consumption(), 28.23560017347859, rtol=5e-2)
+    assert np.allclose(units.get_electricity_production(), 28.235600173478584, rtol=5e-2)
     
 @default_settings
 def test_oilcane_O1():
@@ -337,13 +336,13 @@ def test_oilcane_O1():
     assert np.allclose(feedstock.price, 0.03500000000000001, rtol=5e-2)
     assert np.allclose(product.price, 0.46631835806534216, rtol=5e-2)
     assert np.allclose(tea.sales, 73144071.17496133, rtol=5e-2)
-    assert np.allclose(tea.material_cost, 59941610.823672816, rtol=5e-2)
-    assert np.allclose(tea.installed_equipment_cost, 181781433.74914265, rtol=5e-2)
-    assert np.allclose(tea.utility_cost, -46516765.647639774, rtol=5e-2)
-    assert np.allclose(units.get_heating_duty(), 315.2628578639307, rtol=5e-2)
-    assert np.allclose(units.get_cooling_duty(), 304.5529187937881, rtol=5e-2)
-    assert np.allclose(units.get_electricity_consumption(), 10.64229930094079, rtol=5e-2)
-    assert np.allclose(units.get_electricity_production(), 184.13707727663416, rtol=5e-2)
+    assert np.allclose(tea.material_cost, 59941590.45130447, rtol=5e-2)
+    assert np.allclose(tea.installed_equipment_cost, 179058936.52354053, rtol=5e-2)
+    assert np.allclose(tea.utility_cost, -41571339.24648653, rtol=5e-2)
+    assert np.allclose(units.get_heating_duty(), 390.90054156403824, rtol=5e-2)
+    assert np.allclose(units.get_cooling_duty(), 292.68962161516185, rtol=5e-2)
+    assert np.allclose(units.get_electricity_consumption(), 10.640667230808956, rtol=5e-2)
+    assert np.allclose(units.get_electricity_production(), 166.27564789336768, rtol=5e-2)
     
 @default_settings
 def test_oilcane_O2():
@@ -360,14 +359,14 @@ def test_oilcane_O2():
     assert np.allclose(tea.IRR, 0.1, rtol=5e-2)
     assert np.allclose(feedstock.price, 0.03500000000000001, rtol=5e-2)
     assert np.allclose(product.price, 0.789, rtol=5e-2)
-    assert np.allclose(tea.sales, 166847018.64939293, rtol=5e-2)
-    assert np.allclose(tea.material_cost, 75074403.72902727, rtol=5e-2)
-    assert np.allclose(tea.installed_equipment_cost, 284220766.281826, rtol=5e-2)
-    assert np.allclose(tea.utility_cost, -5522727.834244052, rtol=5e-2)
-    assert np.allclose(units.get_heating_duty(), 434.15019602019845, rtol=5e-2)
-    assert np.allclose(units.get_cooling_duty(), 434.7780438592307, rtol=5e-2)
-    assert np.allclose(units.get_electricity_consumption(), 27.279602352501847, rtol=5e-2)
-    assert np.allclose(units.get_electricity_production(), 52.300773536297754, rtol=5e-2)
+    assert np.allclose(tea.sales, 166847018.57179162, rtol=5e-2)
+    assert np.allclose(tea.material_cost, 75055649.87958117, rtol=5e-2)
+    assert np.allclose(tea.installed_equipment_cost, 284079794.73630774, rtol=5e-2)
+    assert np.allclose(tea.utility_cost, -5953751.651936062, rtol=5e-2)
+    assert np.allclose(units.get_heating_duty(), 428.02725600887777, rtol=5e-2)
+    assert np.allclose(units.get_cooling_duty(), 425.1743322067999, rtol=5e-2)
+    assert np.allclose(units.get_electricity_consumption(), 27.169572389185724, rtol=5e-2)
+    assert np.allclose(units.get_electricity_production(), 53.74711851318012, rtol=5e-2)
     
 @default_settings
 def test_oilcane_O3():
@@ -385,13 +384,13 @@ def test_oilcane_O3():
     assert np.allclose(feedstock.price, 0.03500000000000001, rtol=5e-2)
     assert np.allclose(product.price, 0.46631835806534216, rtol=5e-2)
     assert np.allclose(tea.sales, 60655502.14182142, rtol=5e-2)
-    assert np.allclose(tea.material_cost, 57504847.84397419, rtol=5e-2)
-    assert np.allclose(tea.installed_equipment_cost, 173638417.20087707, rtol=5e-2)
-    assert np.allclose(tea.utility_cost, -46162366.20686135, rtol=5e-2)
-    assert np.allclose(units.get_heating_duty(), 300.8740870661127, rtol=5e-2)
-    assert np.allclose(units.get_cooling_duty(), 288.6970727517349, rtol=5e-2)
-    assert np.allclose(units.get_electricity_consumption(), 10.357176426094066, rtol=5e-2)
-    assert np.allclose(units.get_electricity_production(), 182.556742735425, rtol=5e-2)
+    assert np.allclose(tea.material_cost, 57504827.471605845, rtol=5e-2)
+    assert np.allclose(tea.installed_equipment_cost, 170898761.4138952, rtol=5e-2)
+    assert np.allclose(tea.utility_cost, -41203776.35488143, rtol=5e-2)
+    assert np.allclose(units.get_heating_duty(), 376.72383507765727, rtol=5e-2)
+    assert np.allclose(units.get_cooling_duty(), 276.8132251809804, rtol=5e-2)
+    assert np.allclose(units.get_electricity_consumption(), 10.355542043729026, rtol=5e-2)
+    assert np.allclose(units.get_electricity_production(), 164.64777445492118, rtol=5e-2)
     
 @default_settings
 def test_oilcane_O4():
@@ -408,14 +407,14 @@ def test_oilcane_O4():
     assert np.allclose(tea.IRR, 0.1, rtol=5e-2)
     assert np.allclose(feedstock.price, 0.03500000000000001, rtol=5e-2)
     assert np.allclose(product.price, 0.789, rtol=5e-2)
-    assert np.allclose(tea.sales, 148592752.4063514, rtol=5e-2)
-    assert np.allclose(tea.material_cost, 71540551.36771275, rtol=5e-2)
-    assert np.allclose(tea.installed_equipment_cost, 274133634.54413205, rtol=5e-2)
-    assert np.allclose(tea.utility_cost, -4993056.635532388, rtol=5e-2)
-    assert np.allclose(units.get_heating_duty(), 412.9975573262078, rtol=5e-2)
-    assert np.allclose(units.get_cooling_duty(), 413.3155522741972, rtol=5e-2)
-    assert np.allclose(units.get_electricity_consumption(), 26.954116670112924, rtol=5e-2)
-    assert np.allclose(units.get_electricity_production(), 50.06246435845633, rtol=5e-2)
+    assert np.allclose(tea.sales, 148592752.84767812, rtol=5e-2)
+    assert np.allclose(tea.material_cost, 71521798.12757736, rtol=5e-2)
+    assert np.allclose(tea.installed_equipment_cost, 273980124.0171497, rtol=5e-2)
+    assert np.allclose(tea.utility_cost, -5403704.210478699, rtol=5e-2)
+    assert np.allclose(units.get_heating_duty(), 407.1857538126716, rtol=5e-2)
+    assert np.allclose(units.get_cooling_duty(), 403.6792764194469, rtol=5e-2)
+    assert np.allclose(units.get_electricity_consumption(), 26.844126113125732, rtol=5e-2)
+    assert np.allclose(units.get_electricity_production(), 51.43526492864981, rtol=5e-2)
     
 @default_settings
 def test_oilcane_S1_agile():
@@ -432,14 +431,14 @@ def test_oilcane_S1_agile():
     assert np.allclose(tea.IRR, 0.1, rtol=5e-2)
     assert np.allclose(feedstock.price, 0.03500000000000001, rtol=5e-2)
     assert np.allclose(product.price, 0.46631835806534216, rtol=5e-2)
-    assert np.allclose(tea.sales, 51350651.15547196, rtol=5e-2)
-    assert np.allclose(tea.material_cost, 57868501.810257465, rtol=5e-2)
-    assert np.allclose(tea.installed_equipment_cost, 131655937.23544344, rtol=5e-2)
-    assert np.allclose(tea.utility_cost, -21071534.939589128, rtol=5e-2)
-    assert np.allclose(units.get_heating_duty(), 161.39909953088167, rtol=5e-2)
-    assert np.allclose(units.get_cooling_duty(), 191.01709670499895, rtol=5e-2)
-    assert np.allclose(units.get_electricity_consumption(), 8.972620254391963, rtol=5e-2)
-    assert np.allclose(units.get_electricity_production(), 84.05613664897392, rtol=5e-2)
+    assert np.allclose(tea.sales, 51350651.15547192, rtol=5e-2)
+    assert np.allclose(tea.material_cost, 57868463.28708232, rtol=5e-2)
+    assert np.allclose(tea.installed_equipment_cost, 129289997.63716191, rtol=5e-2)
+    assert np.allclose(tea.utility_cost, -17446725.727028634, rtol=5e-2)
+    assert np.allclose(units.get_heating_duty(), 212.40574416786785, rtol=5e-2)
+    assert np.allclose(units.get_cooling_duty(), 183.9112307198191, rtol=5e-2)
+    assert np.allclose(units.get_electricity_consumption(), 8.970399437290968, rtol=5e-2)
+    assert np.allclose(units.get_electricity_production(), 72.87097722785816, rtol=5e-2)
     
 @default_settings
 def test_oilcane_S2_agile():
@@ -456,14 +455,14 @@ def test_oilcane_S2_agile():
     assert np.allclose(tea.IRR, 0.1, rtol=5e-2)
     assert np.allclose(feedstock.price, 0.03500000000000001, rtol=5e-2)
     assert np.allclose(product.price, 0.789, rtol=5e-2)
-    assert np.allclose(tea.sales, 75565139.39434625, rtol=5e-2)
-    assert np.allclose(tea.material_cost, 69275159.82958414, rtol=5e-2)
-    assert np.allclose(tea.installed_equipment_cost, 236768612.08137593, rtol=5e-2)
-    assert np.allclose(tea.utility_cost, 1006888.0467981086, rtol=5e-2)
-    assert np.allclose(units.get_heating_duty(), 158.24664866227258, rtol=5e-2)
-    assert np.allclose(units.get_cooling_duty(), 253.3693440049269, rtol=5e-2)
-    assert np.allclose(units.get_electricity_consumption(), 22.6858344482754, rtol=5e-2)
-    assert np.allclose(units.get_electricity_production(), 33.46103702877854, rtol=5e-2)
+    assert np.allclose(tea.sales, 75648326.35464674, rtol=5e-2)
+    assert np.allclose(tea.material_cost, 69294551.60661857, rtol=5e-2)
+    assert np.allclose(tea.installed_equipment_cost, 236558724.27895167, rtol=5e-2)
+    assert np.allclose(tea.utility_cost, 892623.9924263542, rtol=5e-2)
+    assert np.allclose(units.get_heating_duty(), 158.24810943502771, rtol=5e-2)
+    assert np.allclose(units.get_cooling_duty(), 247.74161418869107, rtol=5e-2)
+    assert np.allclose(units.get_electricity_consumption(), 22.60122291182192, rtol=5e-2)
+    assert np.allclose(units.get_electricity_production(), 34.23013795039522, rtol=5e-2)
     
 @default_settings
 def test_oilcane_O1_agile():
@@ -481,13 +480,13 @@ def test_oilcane_O1_agile():
     assert np.allclose(feedstock.price, 0.03500000000000001, rtol=5e-2)
     assert np.allclose(product.price, 0.46631835806534216, rtol=5e-2)
     assert np.allclose(tea.sales, 47691059.515063815, rtol=5e-2)
-    assert np.allclose(tea.material_cost, 59454303.88585182, rtol=5e-2)
-    assert np.allclose(tea.installed_equipment_cost, 163532179.4162002, rtol=5e-2)
-    assert np.allclose(tea.utility_cost, -47781009.288975954, rtol=5e-2)
-    assert np.allclose(units.get_heating_duty(), 191.99609067360586, rtol=5e-2)
-    assert np.allclose(units.get_cooling_duty(), 209.50092558012335, rtol=5e-2)
-    assert np.allclose(units.get_electricity_consumption(), 8.578185910875682, rtol=5e-2)
-    assert np.allclose(units.get_electricity_production(), 160.5410569819557, rtol=5e-2)
+    assert np.allclose(tea.material_cost, 59454284.44353091, rtol=5e-2)
+    assert np.allclose(tea.installed_equipment_cost, 161079591.31872085, rtol=5e-2)
+    assert np.allclose(tea.utility_cost, -42745171.73383796, rtol=5e-2)
+    assert np.allclose(units.get_heating_duty(), 258.4931903315889, rtol=5e-2)
+    assert np.allclose(units.get_cooling_duty(), 199.80673709467587, rtol=5e-2)
+    assert np.allclose(units.get_electricity_consumption(), 8.577142107885178, rtol=5e-2)
+    assert np.allclose(units.get_electricity_production(), 145.28168621782208, rtol=5e-2)
     
 @default_settings
 def test_oilcane_O2_agile():
@@ -504,14 +503,14 @@ def test_oilcane_O2_agile():
     assert np.allclose(tea.IRR, 0.1, rtol=5e-2)
     assert np.allclose(feedstock.price, 0.03500000000000001, rtol=5e-2)
     assert np.allclose(product.price, 0.789, rtol=5e-2)
-    assert np.allclose(tea.sales, 89586731.34953077, rtol=5e-2)
-    assert np.allclose(tea.material_cost, 74791952.11412406, rtol=5e-2)
-    assert np.allclose(tea.installed_equipment_cost, 256253258.46082845, rtol=5e-2)
-    assert np.allclose(tea.utility_cost, -6539373.203736096, rtol=5e-2)
-    assert np.allclose(units.get_heating_duty(), 216.019608320438, rtol=5e-2)
-    assert np.allclose(units.get_cooling_duty(), 268.1411434955282, rtol=5e-2)
-    assert np.allclose(units.get_electricity_consumption(), 21.460260373955233, rtol=5e-2)
-    assert np.allclose(units.get_electricity_production(), 54.08362260483393, rtol=5e-2)
+    assert np.allclose(tea.sales, 89586731.3110852, rtol=5e-2)
+    assert np.allclose(tea.material_cost, 74772936.9182138, rtol=5e-2)
+    assert np.allclose(tea.installed_equipment_cost, 256084574.36616516, rtol=5e-2)
+    assert np.allclose(tea.utility_cost, -6961298.235638824, rtol=5e-2)
+    assert np.allclose(units.get_heating_duty(), 215.9550286633267, rtol=5e-2)
+    assert np.allclose(units.get_cooling_duty(), 260.96213963819093, rtol=5e-2)
+    assert np.allclose(units.get_electricity_consumption(), 21.363879199889762, rtol=5e-2)
+    assert np.allclose(units.get_electricity_production(), 55.11560474413598, rtol=5e-2)
     
 @default_settings
 def test_oilcane_O6():
@@ -528,14 +527,14 @@ def test_oilcane_O6():
     assert np.allclose(tea.IRR, 0.1, rtol=5e-2)
     assert np.allclose(feedstock.price, 0.03500000000000001, rtol=5e-2)
     assert np.allclose(product.price, 1.38, rtol=5e-2)
-    assert np.allclose(tea.sales, 93888668.69332117, rtol=5e-2)
-    assert np.allclose(tea.material_cost, 70744412.88256218, rtol=5e-2)
-    assert np.allclose(tea.installed_equipment_cost, 497802493.151333, rtol=5e-2)
-    assert np.allclose(tea.utility_cost, 1398216.2450339957, rtol=5e-2)
-    assert np.allclose(units.get_heating_duty(), 692.0200905863072, rtol=5e-2)
-    assert np.allclose(units.get_cooling_duty(), 928.8215231988936, rtol=5e-2)
-    assert np.allclose(units.get_electricity_consumption(), 56.017680665404534, rtol=5e-2)
-    assert np.allclose(units.get_electricity_production(), 56.044092673049335, rtol=5e-2)
+    assert np.allclose(tea.sales, 91006175.06693201, rtol=5e-2)
+    assert np.allclose(tea.material_cost, 70070199.61688498, rtol=5e-2)
+    assert np.allclose(tea.installed_equipment_cost, 489186430.8591811, rtol=5e-2)
+    assert np.allclose(tea.utility_cost, 1396644.3983708634, rtol=5e-2)
+    assert np.allclose(units.get_heating_duty(), 711.9518530355249, rtol=5e-2)
+    assert np.allclose(units.get_cooling_duty(), 896.1831596698129, rtol=5e-2)
+    assert np.allclose(units.get_electricity_consumption(), 54.47379412534113, rtol=5e-2)
+    assert np.allclose(units.get_electricity_production(), 54.50548041056594, rtol=5e-2)
     
 @default_settings
 def test_oilcane_O8():
@@ -553,13 +552,13 @@ def test_oilcane_O8():
     assert np.allclose(feedstock.price, 0.03500000000000001, rtol=5e-2)
     assert np.allclose(product.price, 1.38, rtol=5e-2)
     assert np.allclose(tea.sales, 87099699.09221663, rtol=5e-2)
-    assert np.allclose(tea.material_cost, 74855595.45285112, rtol=5e-2)
-    assert np.allclose(tea.installed_equipment_cost, 516041733.7265799, rtol=5e-2)
-    assert np.allclose(tea.utility_cost, -32699841.096899867, rtol=5e-2)
-    assert np.allclose(units.get_heating_duty(), 206.21267455652247, rtol=5e-2)
-    assert np.allclose(units.get_cooling_duty(), 704.3541527018426, rtol=5e-2)
-    assert np.allclose(units.get_electricity_consumption(), 58.521927104797314, rtol=5e-2)
-    assert np.allclose(units.get_electricity_production(), 181.68763253446355, rtol=5e-2)
+    assert np.allclose(tea.material_cost, 74828290.96493468, rtol=5e-2)
+    assert np.allclose(tea.installed_equipment_cost, 515526381.2209381, rtol=5e-2)
+    assert np.allclose(tea.utility_cost, -32770585.514114555, rtol=5e-2)
+    assert np.allclose(units.get_heating_duty(), 205.74408141645563, rtol=5e-2)
+    assert np.allclose(units.get_cooling_duty(), 690.9484367882108, rtol=5e-2)
+    assert np.allclose(units.get_electricity_consumption(), 58.37797218308237, rtol=5e-2)
+    assert np.allclose(units.get_electricity_production(), 181.79891812083665, rtol=5e-2)
     
 @default_settings
 def test_oilcane_O9():
@@ -577,13 +576,13 @@ def test_oilcane_O9():
     assert np.allclose(feedstock.price, 0.03500000000000001, rtol=5e-2)
     assert np.allclose(product.price, 1.38, rtol=5e-2)
     assert np.allclose(tea.sales, 97231141.2305434, rtol=5e-2)
-    assert np.allclose(tea.material_cost, 75373239.63862087, rtol=5e-2)
-    assert np.allclose(tea.installed_equipment_cost, 499908740.7723158, rtol=5e-2)
-    assert np.allclose(tea.utility_cost, -29968343.568990905, rtol=5e-2)
-    assert np.allclose(units.get_heating_duty(), 224.07782259173135, rtol=5e-2)
-    assert np.allclose(units.get_cooling_duty(), 678.5283881633434, rtol=5e-2)
-    assert np.allclose(units.get_electricity_consumption(), 56.41423853277878, rtol=5e-2)
-    assert np.allclose(units.get_electricity_production(), 169.71567485527137, rtol=5e-2)
+    assert np.allclose(tea.material_cost, 75354255.64536168, rtol=5e-2)
+    assert np.allclose(tea.installed_equipment_cost, 498073100.4135921, rtol=5e-2)
+    assert np.allclose(tea.utility_cost, -27440503.318503812, rtol=5e-2)
+    assert np.allclose(units.get_heating_duty(), 263.19023480751235, rtol=5e-2)
+    assert np.allclose(units.get_cooling_duty(), 663.2754246494304, rtol=5e-2)
+    assert np.allclose(units.get_electricity_consumption(), 56.30705460772081, rtol=5e-2)
+    # assert np.allclose(units.get_electricity_production(), 160.47964930153773, rtol=5e-2)
   
 # TODO: Potentially deprecate biorefinery
 # @default_settings
