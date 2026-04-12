@@ -1,1 +1,3 @@
-& "C:\Users\owenp\.conda\envs\BioSTEAMML\python.exe" "c:\Programming\PREFERS\Bioindustrial-Park\biorefineries\prefers\v2\_RUN.py" --samples 300000 --batch-size 15000 --pause-minutes 5
+Set-Location "C:\Programming\PREFERS\Bioindustrial-Park\biorefineries\prefers\v2"
+$ts = Get-Date -Format "yyyyMMdd_HHmm"
+& "C:\Users\owenp\.conda\envs\BioSTEAM\python.exe" "_RUN.py" --samples 200000 --batch-size 10000 --cores 20 --pause-minutes 2 --timestamp $ts --mc-progress-step 10

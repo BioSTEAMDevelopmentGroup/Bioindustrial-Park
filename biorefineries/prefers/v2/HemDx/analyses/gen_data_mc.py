@@ -63,7 +63,7 @@ def parse_arguments():
     parser.add_argument('--production', type=float, default=150,
                         help='Baseline production rate in kg/hr (default: 150)')
     # Reduced default sampling as requested
-    parser.add_argument('--samples', type=int, default=300000,
+    parser.add_argument('--samples', type=int, default=200000,
                         help='Target number of valid samples per scenario')
     parser.add_argument('--batch-size', type=int, default=15000,
                         help='Samples per batch (default: 15000)')
@@ -438,6 +438,53 @@ def filter_econ_env(param):
     keywords = ['price', 'economics', 'cost', 'days', 'operating', 'irr', 'gwp', 'tax', 'characterization', 'factor', 'electricity', 'steam', 'waste']
     return any(k in name for k in keywords) and 'production scale' not in name
 
+
+def _hemdx_ferm_name_matches_key(name, key):
+    if key == 'titer':
+        return 'titer' in name
+    if key == 'tau':
+        return 'tau' in name
+    if key == 'product_yield':
+        return 'product' in name and 'yield' in name
+    if key == 'biomass_yield':
+        return 'biomass' in name and 'yield' in name
+    if key == 'secretion_fraction':
+        return 'secretion' in name and ('fraction' in name or 'sf' in name)
+    return False
+
+
+def pair_filter_hemdx(param, key_a, key_b):
+    """Top-level callable so multiprocessing can pickle pair filters on Windows."""
+    name = param.name.lower()
+    if 'production scale' in name:
+        return False
+    return _hemdx_ferm_name_matches_key(name, key_a) or _hemdx_ferm_name_matches_key(name, key_b)
+
+
+def get_hemdx_fermentation_pair_scenarios():
+    """Build all pairwise HemDx fermentation-parameter scenarios."""
+    keys = ['titer', 'tau', 'product_yield', 'biomass_yield', 'secretion_fraction']
+
+    labels = {
+        'titer': 'Titer',
+        'tau': 'Tau',
+        'product_yield': 'Product yield',
+        'biomass_yield': 'Biomass yield',
+        'secretion_fraction': 'Secretion fraction',
+    }
+
+    scenarios = []
+    for i in range(len(keys)):
+        for j in range(i + 1, len(keys)):
+            key_a = keys[i]
+            key_b = keys[j]
+            scenarios.append({
+                'tag': f'ferm_pair_{key_a}_vs_{key_b}',
+                'scenario_name': f"Fermentation Pair: {labels[key_a]} vs {labels[key_b]}",
+                'parameter_filter': partial(pair_filter_hemdx, key_a=key_a, key_b=key_b),
+            })
+    return scenarios
+
 def generate_monte_carlo(config='config1', baseline_production_kg_hr=150, n_target=300000,
                           batch_size=15000, n_workers=None, seed=1234,
                           timestamp=None, results_dir=None, use_multiprocessing=True):
@@ -544,6 +591,27 @@ def generate_monte_carlo(config='config1', baseline_production_kg_hr=150, n_targ
         use_multiprocessing=use_multiprocessing,
     )
 
+    # Pairwise fermentation scenarios first (1/10 of default samples).
+    n_target_pair = max(20, int(n_target / 10))
+    pair_results = {}
+    pair_stats = {}
+
+    for pair in get_hemdx_fermentation_pair_scenarios():
+        pair_result, pair_stat = run_monte_carlo(
+            model=model,
+            n_target=n_target_pair,
+            baseline_production_kg_hr=baseline_production_kg_hr,
+            exclude_production_scale=True,
+            batch_size=batch_size,
+            n_workers=n_workers,
+            scenario_name=pair['scenario_name'],
+            config=config,
+            use_multiprocessing=use_multiprocessing,
+            parameter_filter=pair['parameter_filter'],
+        )
+        pair_results[pair['tag']] = pair_result
+        pair_stats[pair['tag']] = pair_stat
+
     # -------------------------------------------------------------------------
     # New Scenarios (Specific Parameter Groups)
     # -------------------------------------------------------------------------
@@ -605,6 +673,7 @@ def generate_monte_carlo(config='config1', baseline_production_kg_hr=150, n_targ
     file_ferm = save_results(results_ferm, 'ferm_only')
     file_dsp = save_results(results_dsp, 'dsp_only')
     file_econ = save_results(results_econ, 'econ_only')
+    pair_files = {tag: save_results(df, tag) for tag, df in pair_results.items()}
 
     column_map = {
         'columns': [
@@ -638,6 +707,10 @@ def generate_monte_carlo(config='config1', baseline_production_kg_hr=150, n_targ
         'scenario_files': {
             'no_scale': file_no_scale,
             'with_scale': file_with_scale,
+            'ferm_only': file_ferm,
+            'dsp_only': file_dsp,
+            'econ_only': file_econ,
+            **pair_files,
         },
         'scenario_stats': {
             'no_scale': stats_no_scale,
@@ -645,6 +718,7 @@ def generate_monte_carlo(config='config1', baseline_production_kg_hr=150, n_targ
             'ferm_only': stats_ferm,
             'dsp_only': stats_dsp,
             'econ_only': stats_econ,
+            **pair_stats,
         },
         'cost_breakdown_steps_csv': os.path.basename(cost_breakdown_csv),
         'cost_breakdown_steps_xlsx': os.path.basename(cost_breakdown_xlsx),
@@ -674,6 +748,9 @@ def generate_monte_carlo(config='config1', baseline_production_kg_hr=150, n_targ
         'monte_carlo_dsp_only_csv': file_dsp['csv'],
         'monte_carlo_econ_only_csv': file_econ['csv'],
     }
+
+    for tag, file_info in pair_files.items():
+        manifest[f'monte_carlo_{tag}_csv'] = file_info['csv']
 
 
     manifest_file = os.path.join(dirs['data'], 'analysis_manifest.json')

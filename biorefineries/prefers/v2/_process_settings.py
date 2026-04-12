@@ -65,9 +65,9 @@ price = {
 # Individual characterization factor dictionaries for each impact category
 ##### 100-year global warming potential (GWP) in kg CO2-eq/kg unless noted otherwise #####
 GWP_CFs = {
-    'ElectricitySG': (0.55, 0.55), # from ecoinvent 3.11 cutoff, electricity 0.543 to 0.553
+    'ElectricitySG': (0.1, 0.1),#(0.55, 0.55), # from ecoinvent 3.11 cutoff, electricity 0.543 to 0.553
     'Electricity': (0.55, 0.55), # from ecoinvent 3.11 cutoff, electricity, GLO
-    'Glucose': 1.61, # from ecoinvent 3.11 cutoff, market for glucose, GLO
+    'Glucose': 0.835,#1.61, # from ecoinvent 3.11 cutoff, market for glucose, GLO
     'SulfuricAcid': 0.165, # from ecoinvent 3.11 cutoff, market for sulfuric acid, RoW
     'Sugar_Cane': 0.835, # from ecoinvent 3.11 cutoff, market for sugar, GLO
     'Sugar_Beet': 0.564, # from ecoinvent 3.11 cutoff, market for sugar, GLO

@@ -10,23 +10,26 @@ all figures in parallel.
 Run Order:
 1. LegHb: gen_data_base.py + gen_data_mc.py (config1) - PARALLEL
 2. Pause 5 minutes
-3. HemDx: gen_data_base.py + gen_data_mc.py (config1) - PARALLEL
+3. LegHb: gen_data_base.py + gen_data_mc.py (config2) - PARALLEL
 4. Pause 5 minutes  
-5. HemDx: gen_data_base.py + gen_data_mc.py (config2) - PARALLEL
+5. HemDx: gen_data_base.py + gen_data_mc.py (config1) - PARALLEL
 6. Pause 5 minutes
-7. HemDx: gen_data_base.py + gen_data_mc.py (config3) - PARALLEL
+7. HemDx: gen_data_base.py + gen_data_mc.py (config2) - PARALLEL
 8. Pause 5 minutes
-9. Figure Generation (4 parallel): LegHb c1, HemDx c1/c2/c3
+9. HemDx: gen_data_base.py + gen_data_mc.py (config3) - PARALLEL
+10. Pause 5 minutes
+11. Figure Generation (5 parallel): LegHb c1/c2, HemDx c1/c2/c3
 
 Usage:
     python _RUN.py
-    python _RUN.py --samples 300000 --batch-size 15000
+    python _RUN.py --samples 200000 --batch-size 10000
     python _RUN.py --pause-minutes 10
     python _RUN.py --dry-run  # Show what would run without executing
 """
 
 import argparse
 import os
+import re
 import subprocess
 import sys
 import time
@@ -37,7 +40,7 @@ from datetime import datetime, timedelta
 # =============================================================================
 
 # Python executable (from user rules)
-PYTHON_EXE = r"C:\Users\owenp\.conda\envs\BioSTEAMML\python.exe"
+PYTHON_EXE = r"C:\Users\owenp\.conda\envs\BioSTEAM\python.exe"
 
 # Script paths (relative to this file)
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -60,10 +63,16 @@ def parse_arguments():
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog=__doc__
     )
-    parser.add_argument('--samples', type=int, default=300000,
-                        help='Number of MC samples per scenario (default: 300000)')
+    parser.add_argument('--samples', type=int, default=200000,
+                        help='Number of MC samples per scenario (default: 200000)')
     parser.add_argument('--batch-size', type=int, default=10000,
                         help='Batch size for MC evaluation (default: 10000)')
+    parser.add_argument('--cores', type=int, default=None,
+                        help='MC worker processes (default: auto = max(cpu_count-4, 1))')
+    parser.add_argument('--mc-progress-step', type=int, default=0,
+                        help='Only print MC "Evaluating:" progress when percentage advances by this step (0 = no step filter)')
+    parser.add_argument('--mc-progress-interval', type=float, default=0.0,
+                        help='Only print MC "Evaluating:" progress at most once every N seconds (0 = no interval filter)')
     parser.add_argument('--pause-minutes', type=float, default=5.0,
                         help='Pause duration between stages in minutes (default: 5)')
     parser.add_argument('--dry-run', action='store_true',
@@ -114,7 +123,57 @@ def pause_with_countdown(minutes, dry_run=False):
     log("Pause complete. Resuming...")
 
 
-def run_scripts_parallel(script_pairs, config, samples, batch_size, timestamp, dry_run=False):
+def should_print_mc_progress(line, progress_state, step=0, interval=0.0):
+    """Throttle noisy tqdm-style MC progress lines based on step and/or time interval."""
+    if 'Evaluating:' not in line:
+        return True
+
+    # No throttling configured.
+    if (step is None or step <= 0) and (interval is None or interval <= 0):
+        return True
+
+    now = time.monotonic()
+    pct = None
+    match = re.search(r'(\d+)%', line)
+    if match:
+        pct = int(match.group(1))
+
+    last_time = progress_state.get('last_time')
+    last_step_bucket = progress_state.get('last_step_bucket')
+
+    pass_step = False
+    pass_interval = False
+
+    if step is not None and step > 0:
+        if pct is None:
+            pass_step = False
+        else:
+            step_bucket = (pct // step) * step
+            if last_step_bucket is None or step_bucket > last_step_bucket or pct >= 100:
+                pass_step = True
+                progress_state['last_step_bucket'] = step_bucket
+
+    if interval is not None and interval > 0:
+        if last_time is None or (now - last_time) >= interval:
+            pass_interval = True
+
+    should_print = pass_step or pass_interval
+    if should_print:
+        progress_state['last_time'] = now
+    return should_print
+
+
+def run_scripts_parallel(
+    script_pairs,
+    config,
+    samples,
+    batch_size,
+    cores,
+    timestamp,
+    dry_run=False,
+    mc_progress_step=0,
+    mc_progress_interval=0.0,
+):
     """
     Run pairs of scripts in parallel using subprocess.Popen.
     
@@ -123,6 +182,7 @@ def run_scripts_parallel(script_pairs, config, samples, batch_size, timestamp, d
         config: Configuration name (e.g., 'config1')
         samples: Number of MC samples
         batch_size: Batch size
+        cores: MC worker process count
         timestamp: Shared timestamp
         dry_run: If True, only print commands
         
@@ -145,6 +205,7 @@ def run_scripts_parallel(script_pairs, config, samples, batch_size, timestamp, d
             '--config', config,
             '--samples', str(samples),
             '--batch-size', str(batch_size),
+            '--cores', str(cores),
             '--timestamp', timestamp,
         ]
         
@@ -177,11 +238,22 @@ def run_scripts_parallel(script_pairs, config, samples, batch_size, timestamp, d
     log(f"Waiting for {len(processes)} processes to complete...")
     
     exit_codes = []
+    progress_state = {}
     for label, proc in processes:
         # Stream output as it comes
         try:
             for line in proc.stdout:
-                print(f"[{label}] {line.rstrip()}")
+                clean_line = line.rstrip()
+                if label == 'MC':
+                    if should_print_mc_progress(
+                        clean_line,
+                        progress_state,
+                        step=mc_progress_step,
+                        interval=mc_progress_interval,
+                    ):
+                        print(f"[{label}] {clean_line}")
+                else:
+                    print(f"[{label}] {clean_line}")
         except Exception as e:
             log(f"[{label}] Output stream error: {e}")
         
@@ -198,7 +270,16 @@ def run_scripts_parallel(script_pairs, config, samples, batch_size, timestamp, d
 # Stage Runners
 # =============================================================================
 
-def run_leghb_stage(config, samples, batch_size, timestamp, dry_run=False):
+def run_leghb_stage(
+    config,
+    samples,
+    batch_size,
+    cores,
+    timestamp,
+    dry_run=False,
+    mc_progress_step=0,
+    mc_progress_interval=0.0,
+):
     """Run LegHb baseline and MC data generation."""
     log("=" * 80)
     log(f"STAGE: LegHb {config}")
@@ -209,12 +290,24 @@ def run_leghb_stage(config, samples, batch_size, timestamp, dry_run=False):
         config=config,
         samples=samples,
         batch_size=batch_size,
+        cores=cores,
         timestamp=timestamp,
         dry_run=dry_run,
+        mc_progress_step=mc_progress_step,
+        mc_progress_interval=mc_progress_interval,
     )
 
 
-def run_hemdx_stage(config, samples, batch_size, timestamp, dry_run=False):
+def run_hemdx_stage(
+    config,
+    samples,
+    batch_size,
+    cores,
+    timestamp,
+    dry_run=False,
+    mc_progress_step=0,
+    mc_progress_interval=0.0,
+):
     """Run HemDx baseline and MC data generation."""
     log("=" * 80)
     log(f"STAGE: HemDx {config}")
@@ -225,8 +318,11 @@ def run_hemdx_stage(config, samples, batch_size, timestamp, dry_run=False):
         config=config,
         samples=samples,
         batch_size=batch_size,
+        cores=cores,
         timestamp=timestamp,
         dry_run=dry_run,
+        mc_progress_step=mc_progress_step,
+        mc_progress_interval=mc_progress_interval,
     )
 
 
@@ -234,14 +330,15 @@ def run_figure_stage(timestamp, dry_run=False, skip_leghb=False, skip_hemdx=Fals
     """
     Run figure generation for all configurations in parallel.
     
-    Runs 4 scripts in parallel:
+    Runs 5 scripts in parallel:
     - LegHb config1
+    - LegHb config2
     - HemDx config1
     - HemDx config2
     - HemDx config3
     """
     log("=" * 80)
-    log("STAGE: Figure Generation (4 parallel)")
+    log("STAGE: Figure Generation (5 parallel)")
     log("=" * 80)
     
     processes = []
@@ -250,6 +347,7 @@ def run_figure_stage(timestamp, dry_run=False, skip_leghb=False, skip_hemdx=Fals
     # Build command list
     if not skip_leghb:
         commands.append(('LegHb-c1', [PYTHON_EXE, LEGHB_FIG, '--config', 'config1', '--timestamp', timestamp]))
+        commands.append(('LegHb-c2', [PYTHON_EXE, LEGHB_FIG, '--config', 'config2', '--timestamp', timestamp]))
     
     if not skip_hemdx:
         commands.append(('HemDx-c1', [PYTHON_EXE, HEMDX_FIG, '--config', 'config1', '--timestamp', timestamp]))
@@ -304,6 +402,7 @@ def run_figure_stage(timestamp, dry_run=False, skip_leghb=False, skip_hemdx=Fals
 
 def main():
     args = parse_arguments()
+    cores = args.cores if args.cores is not None else max(1, (os.cpu_count() or 1) - 4)
     
     # Generate shared timestamp if not provided
     timestamp = args.timestamp or datetime.now().strftime("%Y%m%d_%H%M")
@@ -315,30 +414,34 @@ def main():
     log(f"  Python: {PYTHON_EXE}")
     log(f"  Samples: {args.samples:,}")
     log(f"  Batch size: {args.batch_size:,}")
+    log(f"  MC cores: {cores}")
+    log(f"  MC progress step: {args.mc_progress_step}")
+    log(f"  MC progress interval: {args.mc_progress_interval} s")
     log(f"  Pause between stages: {args.pause_minutes} minutes")
     log(f"  Timestamp: {timestamp}")
     log(f"  Dry run: {args.dry_run}")
     log("")
     
-    # Calculate estimated total time
-    # Each stage: ~5-7 hours per run, base+MC in parallel
-    # We have: LegHb config1 + HemDx config1/2/3 = 4 stages
-    expected_stages = []
+    data_stages = []
     if not args.skip_leghb and not args.only_hemdx:
-        expected_stages.append("LegHb config1")
+        data_stages.append(("LegHb", "config1"))
+        data_stages.append(("LegHb", "config2"))
+
     if not args.only_leghb:
         if not args.skip_hemdx_config1:
-            expected_stages.append("HemDx config1")
-        expected_stages.append("HemDx config2")
-        expected_stages.append("HemDx config3")
-    expected_stages.append("Figure Generation (4 parallel)")
+            data_stages.append(("HemDx", "config1"))
+        data_stages.append(("HemDx", "config2"))
+        data_stages.append(("HemDx", "config3"))
+
+    expected_stages = [f"{name} {cfg}" for name, cfg in data_stages]
+    expected_stages.append("Figure Generation (5 parallel)")
     
     log(f"Planned stages ({len(expected_stages)}):")
     for i, stage in enumerate(expected_stages, 1):
         log(f"  {i}. {stage}")
     
     # Estimated time: 6 hours per data stage + pauses + ~30 min for figures
-    n_data_stages = len(expected_stages) - 1  # Exclude figure stage
+    n_data_stages = len(data_stages)
     est_hours = n_data_stages * 6 + n_data_stages * (args.pause_minutes / 60) + 0.5
     log(f"\nEstimated total time: ~{est_hours:.1f} hours")
     log("")
@@ -346,45 +449,43 @@ def main():
     start_time = time.time()
     all_exit_codes = []
     
-    # ==========================================================================
-    # Stage 1: LegHb config1
-    # ==========================================================================
-    if not args.skip_leghb and not args.only_hemdx:
-        codes = run_leghb_stage('config1', args.samples, args.batch_size, timestamp, args.dry_run)
+    # Data generation stages, each config executed in sequence.
+    for i, (model_name, config) in enumerate(data_stages):
+        if model_name == 'LegHb':
+            codes = run_leghb_stage(
+                config,
+                args.samples,
+                args.batch_size,
+                cores,
+                timestamp,
+                args.dry_run,
+                mc_progress_step=args.mc_progress_step,
+                mc_progress_interval=args.mc_progress_interval,
+            )
+        else:
+            codes = run_hemdx_stage(
+                config,
+                args.samples,
+                args.batch_size,
+                cores,
+                timestamp,
+                args.dry_run,
+                mc_progress_step=args.mc_progress_step,
+                mc_progress_interval=args.mc_progress_interval,
+            )
+
         all_exit_codes.extend(codes)
-        
-        if not args.only_leghb:
+
+        if i < len(data_stages) - 1:
             pause_with_countdown(args.pause_minutes, args.dry_run)
-    
-    # ==========================================================================
-    # Stage 2: HemDx config1
-    # ==========================================================================
-    if not args.only_leghb and not args.skip_hemdx_config1:
-        codes = run_hemdx_stage('config1', args.samples, args.batch_size, timestamp, args.dry_run)
-        all_exit_codes.extend(codes)
-        pause_with_countdown(args.pause_minutes, args.dry_run)
-    
-    # ==========================================================================
-    # Stage 3: HemDx config2
-    # ==========================================================================
-    if not args.only_leghb:
-        codes = run_hemdx_stage('config2', args.samples, args.batch_size, timestamp, args.dry_run)
-        all_exit_codes.extend(codes)
-        pause_with_countdown(args.pause_minutes, args.dry_run)
-    
-    # ==========================================================================
-    # Stage 4: HemDx config3
-    # ==========================================================================
-    if not args.only_leghb:
-        codes = run_hemdx_stage('config3', args.samples, args.batch_size, timestamp, args.dry_run)
-        all_exit_codes.extend(codes)
     
     # ==========================================================================
     # Pause before Figure Generation (5 minutes)
     # ==========================================================================
-    log("")
-    log("All data generation stages complete. Pausing before figure generation...")
-    pause_with_countdown(args.pause_minutes, args.dry_run)
+    if data_stages:
+        log("")
+        log("All data generation stages complete. Pausing before figure generation...")
+        pause_with_countdown(args.pause_minutes, args.dry_run)
     
     # ==========================================================================
     # Stage 5: Figure Generation (4 parallel)

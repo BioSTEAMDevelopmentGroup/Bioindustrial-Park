@@ -190,7 +190,7 @@ def create_model(baseline_production_kg_hr=150, config='config1', verbose=True):
     # 1.2 Tau (Residence Time)
     baseline_tau = R302.tau
     @param(name='Fermentation tau', element='Fermentation', kind='coupled', units='hr',
-           baseline=baseline_tau, distribution=shape.Triangle(baseline_tau*0.8, baseline_tau, baseline_tau*1.2))
+           baseline=baseline_tau, distribution=shape.Triangle(baseline_tau*0.5, baseline_tau, baseline_tau*1.5))
     def set_tau(tau):
         R302.tau = tau
         if tau > 0:
@@ -202,7 +202,7 @@ def create_model(baseline_production_kg_hr=150, config='config1', verbose=True):
     @param(name='Product yield', element='Fermentation', kind='coupled', units='%',
            baseline=baseline_yield_p*100, distribution=shape.TruncNormal(
                mu=baseline_yield_p*100, sigma=_sigma_yp,
-               lower=baseline_yield_p*100*0.9, upper=baseline_yield_p*100*1.1))
+               lower=baseline_yield_p*100*0.5, upper=baseline_yield_p*100*1.5))
     def set_yield_p(yield_percent):
         R302.target_yield = yield_percent / 100
         
@@ -213,7 +213,7 @@ def create_model(baseline_production_kg_hr=150, config='config1', verbose=True):
     @param(name='Biomass yield', element='Fermentation', kind='coupled', units='%',
            baseline=baseline_yield_b*100, distribution=shape.TruncNormal(
                mu=baseline_yield_b*100, sigma=_sigma_yb,
-               lower=baseline_yield_b*100*0.9, upper=baseline_yield_b*100*1.1))
+               lower=baseline_yield_b*100*0.5, upper=baseline_yield_b*100*1.5))
     def set_yield_b(yield_percent):
         y = yield_percent / 100
         R302.fermentation_rxns_collection['cell_growth_reactionCG2'].product_yield('Corynebacterium_glutamicum', basis='wt', product_yield=y)
@@ -226,11 +226,11 @@ def create_model(baseline_production_kg_hr=150, config='config1', verbose=True):
 
     # Distribution depends on config
     if config == 'config2':  # Intracellular
-        sf_dist = shape.Uniform(0.0, 0.3)
+        sf_dist = shape.Uniform(0.0, 0.7)
     elif config == 'config3':  # Extracellular
-        sf_dist = shape.Uniform(0.7, 1.0)
+        sf_dist = shape.Uniform(0.3, 1.0)
     else:  # Config 1 (Base)
-        sf_dist = shape.Uniform(0.2, 0.8)
+        sf_dist = shape.Uniform(0.0, 1.0)
 
     @param(name='Secretion fraction', element='Fermentation', kind='coupled', units='fraction',
            baseline=baseline_sf, distribution=sf_dist)
@@ -342,7 +342,7 @@ def create_model(baseline_production_kg_hr=150, config='config1', verbose=True):
     @param(name='Electricity price', element='Economics', kind='isolated', units='$/kWh',
            baseline=base_elec_price, distribution=shape.Trunc(
                shape.LogNormal(mu=np.log(base_elec_price), sigma=_ln_sigma_10pct),
-               lower=base_elec_price*0.9, upper=base_elec_price*1.1))
+               lower=base_elec_price*0.8, upper=base_elec_price*1.2))
     def set_elec_price(price):
         bst.PowerUtility.price = price
         
@@ -351,7 +351,7 @@ def create_model(baseline_production_kg_hr=150, config='config1', verbose=True):
     @param(name='Glucose price', element='Economics', kind='isolated', units='$/kg',
            baseline=base_gluc_price, distribution=shape.Trunc(
                shape.LogNormal(mu=np.log(base_gluc_price), sigma=_ln_sigma_10pct),
-               lower=base_gluc_price*0.9, upper=base_gluc_price*1.1))
+               lower=base_gluc_price*0.8, upper=base_gluc_price*1.2))
     def set_glucose_price(price):
         glucose.price = price
         
@@ -360,7 +360,7 @@ def create_model(baseline_production_kg_hr=150, config='config1', verbose=True):
     @param(name='Ammonia price', element='Economics', kind='isolated', units='$/kg',
            baseline=base_nh3_price, distribution=shape.Trunc(
                shape.LogNormal(mu=np.log(base_nh3_price), sigma=_ln_sigma_10pct),
-               lower=base_nh3_price*0.9, upper=base_nh3_price*1.1))
+               lower=base_nh3_price*0.8, upper=base_nh3_price*1.2))
     def set_nh3_price(price):
         ammonia.price = price
         
@@ -368,7 +368,7 @@ def create_model(baseline_production_kg_hr=150, config='config1', verbose=True):
     @param(name='Buffer/Seed cost', element='Economics', kind='isolated', units='multiplier',
            baseline=1.0, distribution=shape.Trunc(
                shape.LogNormal(mu=0.0, sigma=_ln_sigma_10pct),
-               lower=0.9, upper=1.1))
+               lower=0.8, upper=1.2))
     def set_buffer_price_mult(multiplier):
         for st in buffer_streams:
             st.price = base_prices[st] * multiplier
@@ -401,7 +401,7 @@ def create_model(baseline_production_kg_hr=150, config='config1', verbose=True):
     @param(name='Electricity GWP', element='GWP', kind='isolated', units='kg CO2-eq/kWh',
             baseline=base_elec_gwp, distribution=shape.Trunc(
                 shape.LogNormal(mu=np.log(base_elec_gwp), sigma=_ln_sigma_10pct),
-                lower=base_elec_gwp*0.9, upper=base_elec_gwp*1.1))
+                lower=base_elec_gwp*0.8, upper=base_elec_gwp*1.2))
     def set_elec_gwp(val):
         bst.PowerUtility.characterization_factors['GWP'] = (val, val)
 
@@ -410,7 +410,7 @@ def create_model(baseline_production_kg_hr=150, config='config1', verbose=True):
     @param(name='Glucose GWP', element='GWP', kind='isolated', units='kg CO2-eq/kg',
             baseline=base_gluc_gwp, distribution=shape.Trunc(
                 shape.LogNormal(mu=np.log(base_gluc_gwp), sigma=_ln_sigma_10pct),
-                lower=base_gluc_gwp*0.9, upper=base_gluc_gwp*1.1))
+                lower=base_gluc_gwp*0.8, upper=base_gluc_gwp*1.2))
     def set_glucose_gwp(val):
         glucose.characterization_factors['GWP'] = val
         
@@ -419,7 +419,7 @@ def create_model(baseline_production_kg_hr=150, config='config1', verbose=True):
     @param(name='Ammonia GWP', element='GWP', kind='isolated', units='kg CO2-eq/kg',
             baseline=base_nh3_gwp, distribution=shape.Trunc(
                 shape.LogNormal(mu=np.log(base_nh3_gwp), sigma=_ln_sigma_10pct),
-                lower=base_nh3_gwp*0.9, upper=base_nh3_gwp*1.1))
+                lower=base_nh3_gwp*0.8, upper=base_nh3_gwp*1.2))
     def set_nh3_gwp(val):
         ammonia.characterization_factors['GWP'] = val
         
@@ -429,7 +429,7 @@ def create_model(baseline_production_kg_hr=150, config='config1', verbose=True):
     @param(name='Buffer/Seed GWP', element='GWP', kind='isolated', units='multiplier',
             baseline=1.0, distribution=shape.Trunc(
                 shape.LogNormal(mu=0.0, sigma=_ln_sigma_10pct),
-                lower=0.9, upper=1.1))
+                lower=0.8, upper=1.2))
     def set_buffer_gwp_mult(multiplier):
         for st in buffer_streams:
             original = base_gwps[st]

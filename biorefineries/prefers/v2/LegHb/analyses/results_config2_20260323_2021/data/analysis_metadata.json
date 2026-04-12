@@ -1,0 +1,285 @@
+{
+  "config": "config2",
+  "timestamp": "20260323_2021",
+  "baseline_production_kg_hr": 150,
+  "n_target": 200000,
+  "batch_size": 10000,
+  "seed": 1234,
+  "parameter_indices": [
+    [
+      "Fermentation",
+      "Fermentation titer [g/L]"
+    ],
+    [
+      "Fermentation",
+      "Fermentation tau [hr]"
+    ],
+    [
+      "Fermentation",
+      "Product yield [%]"
+    ],
+    [
+      "Fermentation",
+      "Biomass yield [%]"
+    ],
+    [
+      "DSP",
+      "Centrifuge split [multiplier]"
+    ],
+    [
+      "DSP",
+      "Cell disruption efficiency [-]"
+    ],
+    [
+      "DSP",
+      "Filtration capture [-]"
+    ],
+    [
+      "DSP",
+      "Diafiltration retention [-]"
+    ],
+    [
+      "Facilities",
+      "Turbogenerator efficiency [-]"
+    ],
+    [
+      "Economics",
+      "Electricity price [$/kWh]"
+    ],
+    [
+      "Economics",
+      "Glucose price [$/kg]"
+    ],
+    [
+      "Economics",
+      "Ammonia price [$/kg]"
+    ],
+    [
+      "Economics",
+      "Buffer/Seed cost [multiplier]"
+    ],
+    [
+      "Economics",
+      "Operating days [days/yr]"
+    ],
+    [
+      "Economics",
+      "IRR [fraction]"
+    ],
+    [
+      "Economics",
+      "Income tax [fraction]"
+    ],
+    [
+      "GWP",
+      "Electricity GWP [kg CO2/kWh]"
+    ],
+    [
+      "GWP",
+      "Glucose GWP [kg CO2/kg]"
+    ],
+    [
+      "GWP",
+      "Ammonia GWP [kg CO2/kg]"
+    ],
+    [
+      "GWP",
+      "Buffer/Seed GWP [multiplier]"
+    ]
+  ],
+  "metric_indices": [
+    [
+      "PreFerS",
+      "MSP [$/kg]"
+    ],
+    [
+      "PreFerS",
+      "TCI [10^6 $]"
+    ],
+    [
+      "PreFerS",
+      "AOC [10^6 $/yr]"
+    ],
+    [
+      "PreFerS",
+      "GWP [kg CO2-eq/kg]"
+    ],
+    [
+      "Composition",
+      "Fat content [wt%]"
+    ],
+    [
+      "Composition",
+      "Carbohydrates [wt%]"
+    ],
+    [
+      "Composition",
+      "Product content [wt%]"
+    ],
+    [
+      "Composition",
+      "Total solids [wt%]"
+    ],
+    [
+      "Composition",
+      "Protein purity [%]"
+    ],
+    [
+      "Composition",
+      "Heme equivalent [wt%]"
+    ]
+  ],
+  "baseline_msp": 14.74982317712995,
+  "baseline_gwp": 8.46173370101935,
+  "baseline_metric_key_format": "group|metric",
+  "scenario_files": {
+    "no_scale": {
+      "pickle": "monte_carlo_no_scale.pkl",
+      "csv": "monte_carlo_no_scale.csv",
+      "xlsx": "monte_carlo_no_scale.xlsx"
+    },
+    "with_scale": {
+      "pickle": "monte_carlo_with_scale.pkl",
+      "csv": "monte_carlo_with_scale.csv",
+      "xlsx": "monte_carlo_with_scale.xlsx"
+    },
+    "ferm_only": {
+      "pickle": "monte_carlo_ferm_only.pkl",
+      "csv": "monte_carlo_ferm_only.csv",
+      "xlsx": "monte_carlo_ferm_only.xlsx"
+    },
+    "dsp_only": {
+      "pickle": "monte_carlo_dsp_only.pkl",
+      "csv": "monte_carlo_dsp_only.csv",
+      "xlsx": "monte_carlo_dsp_only.xlsx"
+    },
+    "econ_only": {
+      "pickle": "monte_carlo_econ_only.pkl",
+      "csv": "monte_carlo_econ_only.csv",
+      "xlsx": "monte_carlo_econ_only.xlsx"
+    },
+    "ferm_pair_titer_vs_tau": {
+      "pickle": "monte_carlo_ferm_pair_titer_vs_tau.pkl",
+      "csv": "monte_carlo_ferm_pair_titer_vs_tau.csv",
+      "xlsx": "monte_carlo_ferm_pair_titer_vs_tau.xlsx"
+    },
+    "ferm_pair_titer_vs_product_yield": {
+      "pickle": "monte_carlo_ferm_pair_titer_vs_product_yield.pkl",
+      "csv": "monte_carlo_ferm_pair_titer_vs_product_yield.csv",
+      "xlsx": "monte_carlo_ferm_pair_titer_vs_product_yield.xlsx"
+    },
+    "ferm_pair_titer_vs_biomass_yield": {
+      "pickle": "monte_carlo_ferm_pair_titer_vs_biomass_yield.pkl",
+      "csv": "monte_carlo_ferm_pair_titer_vs_biomass_yield.csv",
+      "xlsx": "monte_carlo_ferm_pair_titer_vs_biomass_yield.xlsx"
+    },
+    "ferm_pair_tau_vs_product_yield": {
+      "pickle": "monte_carlo_ferm_pair_tau_vs_product_yield.pkl",
+      "csv": "monte_carlo_ferm_pair_tau_vs_product_yield.csv",
+      "xlsx": "monte_carlo_ferm_pair_tau_vs_product_yield.xlsx"
+    },
+    "ferm_pair_tau_vs_biomass_yield": {
+      "pickle": "monte_carlo_ferm_pair_tau_vs_biomass_yield.pkl",
+      "csv": "monte_carlo_ferm_pair_tau_vs_biomass_yield.csv",
+      "xlsx": "monte_carlo_ferm_pair_tau_vs_biomass_yield.xlsx"
+    },
+    "ferm_pair_product_yield_vs_biomass_yield": {
+      "pickle": "monte_carlo_ferm_pair_product_yield_vs_biomass_yield.pkl",
+      "csv": "monte_carlo_ferm_pair_product_yield_vs_biomass_yield.csv",
+      "xlsx": "monte_carlo_ferm_pair_product_yield_vs_biomass_yield.xlsx"
+    }
+  },
+  "scenario_stats": {
+    "no_scale": {
+      "n_valid": 200000,
+      "n_attempts": 200000,
+      "success_rate": 100.0,
+      "exclude_production_scale": true,
+      "batch_size": 10000,
+      "n_workers": 20
+    },
+    "with_scale": {
+      "n_valid": 200000,
+      "n_attempts": 200000,
+      "success_rate": 100.0,
+      "exclude_production_scale": false,
+      "batch_size": 10000,
+      "n_workers": 20
+    },
+    "ferm_only": {
+      "n_valid": 50000,
+      "n_attempts": 50000,
+      "success_rate": 100.0,
+      "exclude_production_scale": true,
+      "batch_size": 10000,
+      "n_workers": 20
+    },
+    "dsp_only": {
+      "n_valid": 50000,
+      "n_attempts": 50000,
+      "success_rate": 100.0,
+      "exclude_production_scale": true,
+      "batch_size": 10000,
+      "n_workers": 20
+    },
+    "econ_only": {
+      "n_valid": 50000,
+      "n_attempts": 50000,
+      "success_rate": 100.0,
+      "exclude_production_scale": true,
+      "batch_size": 10000,
+      "n_workers": 20
+    },
+    "ferm_pair_titer_vs_tau": {
+      "n_valid": 20000,
+      "n_attempts": 20000,
+      "success_rate": 100.0,
+      "exclude_production_scale": true,
+      "batch_size": 10000,
+      "n_workers": 20
+    },
+    "ferm_pair_titer_vs_product_yield": {
+      "n_valid": 20000,
+      "n_attempts": 20000,
+      "success_rate": 100.0,
+      "exclude_production_scale": true,
+      "batch_size": 10000,
+      "n_workers": 20
+    },
+    "ferm_pair_titer_vs_biomass_yield": {
+      "n_valid": 20000,
+      "n_attempts": 20000,
+      "success_rate": 100.0,
+      "exclude_production_scale": true,
+      "batch_size": 10000,
+      "n_workers": 20
+    },
+    "ferm_pair_tau_vs_product_yield": {
+      "n_valid": 20000,
+      "n_attempts": 20000,
+      "success_rate": 100.0,
+      "exclude_production_scale": true,
+      "batch_size": 10000,
+      "n_workers": 20
+    },
+    "ferm_pair_tau_vs_biomass_yield": {
+      "n_valid": 20000,
+      "n_attempts": 20000,
+      "success_rate": 100.0,
+      "exclude_production_scale": true,
+      "batch_size": 10000,
+      "n_workers": 20
+    },
+    "ferm_pair_product_yield_vs_biomass_yield": {
+      "n_valid": 20000,
+      "n_attempts": 20000,
+      "success_rate": 100.0,
+      "exclude_production_scale": true,
+      "batch_size": 10000,
+      "n_workers": 20
+    }
+  },
+  "cost_breakdown_steps_csv": "cost_breakdown_steps.csv",
+  "cost_breakdown_steps_xlsx": "cost_breakdown_steps.xlsx",
+  "cost_breakdown_summary_csv": "cost_breakdown_summary.csv"
+}
