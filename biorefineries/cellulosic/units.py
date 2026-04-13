@@ -391,9 +391,9 @@ class Saccharification(bst.BatchBioreactor):
               'Reactor volume': 'm3',
               'Reactor duty': 'kJ/hr'}
     
-    def _init(self, tau=72, N=None, V=3785.4118, T=48+273.15, P=101325,
+    def _init(self, tau=72, N=None, V_max=3785.4118, T=48+273.15, P=101325,
                  Nmin=2, Nmax=36, reactions=None):
-        super()._init(tau, N, V, T, P, Nmin, Nmax)
+        super()._init(tau, N, V_max, T, P, Nmin, Nmax)
         chemicals = self.chemicals
         #: [ParallelReaction] Enzymatic hydrolysis reactions including from 
         #: downstream batch tank in co-fermentation.
@@ -432,9 +432,9 @@ class CoFermentation(bst.BatchBioreactor):
     #: Unload and clean up time (hr)
     tau_0 = 4
     
-    def _init(self, tau=36, N=None, V=3785.4118, T=305.15, P=101325,
+    def _init(self, tau=36, N=None, V_max=3785.4118, T=305.15, P=101325,
               Nmin=2, Nmax=36, cofermentation=None, loss=None):
-        super()._init(tau, N, V, T, P, Nmin, Nmax)
+        super()._init(tau, N, V_max, T, P, Nmin, Nmax)
         self.P = P
         chemicals = self.chemicals
         self.loss = loss or ParallelRxn([
