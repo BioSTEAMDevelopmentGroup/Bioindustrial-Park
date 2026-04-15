@@ -18,7 +18,8 @@ This module is a modified implementation of modules from the following:
 
 #%% Run this cell first
 
-def run_TRY_analysis(feedstock, neutralization, yields=None, titers=None, productivities=None, return_YT_arrays=False, plot=False, steps_for_default_YT=50):
+def run_TRY_analysis(feedstock, neutralization, yields=None, titers=None, productivities=None, return_YT_arrays=False, plot=False, steps_for_default_YT=50, FGI=True):
+#%%
     from warnings import filterwarnings
     import copy
     filterwarnings('ignore')
@@ -80,7 +81,9 @@ def run_TRY_analysis(feedstock, neutralization, yields=None, titers=None, produc
     # chdir(succinic.__file__.replace('\\__init__.py', ''))
     # ##
     # mode = 'pilot-scale_batch_sugarcane' 
-    mode = f'pilot-scale_batch_{feedstock}_FGI' 
+    mode = f'pilot-scale_batch_{feedstock}'
+    if FGI: 
+        mode += '_FGI'
     filename = 'parameter-distributions_' + mode + '.xlsx'
     
     succinic_filepath = succinic.__file__.replace('\\__init__.py', '')

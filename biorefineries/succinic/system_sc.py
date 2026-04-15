@@ -761,7 +761,7 @@ globals().update(flowsheet.to_dict())
 # Income tax was changed from 0.35 to 0.21 based on Davis et al., 2018 (new legislation)
 
 get_flow_dry_tpd = lambda: (feedstock.F_mass-feedstock.imass['H2O'])*24/907.185
-succinic_tea = SuccinicTEA(system=succinic_sys, IRR=0.10, duration=(2016, 2046),
+succinic_tea = SuccinicTEA(system=succinic_sys, IRR=0.10, duration=(2019, 2049),
         depreciation='MACRS7', income_tax=0.21, 
         # operating_days=0.9*365,
         operating_days = 200,
