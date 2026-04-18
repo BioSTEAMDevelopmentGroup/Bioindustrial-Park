@@ -69,9 +69,9 @@ product_tag = 'Acrylic'
 
 modes =\
                  [
-                    # 'DASbox', 
+                    'DASbox', 
                     # # '10L',
-                    '300L',
+                    # '300L',
                     # 'E',
                     # 'B', 'F',
                     # 'C', 'G',
@@ -580,7 +580,7 @@ contourplots.stacked_bar_plot(dataframe=df_TEA_breakdown,
 
 #%% LCA breakdown figures
 
-mode = '300L'
+mode = 'DASbox'
 
 # GWP
 temp_GWP_breakdown_dict = results_dict['Baseline']['GWP Breakdown'][mode]
@@ -661,8 +661,6 @@ bst_plots = bst.plots
 
 rho = r"$\mathrm{\rho}}$"
 
-mode = '300L'
-
 
 
 fig = bst_plots.plot_spearman_1d(results_dict['Sensitivity']['Spearman']['MPSP'][modes[0]],
@@ -721,7 +719,6 @@ bst_plots = bst.plots
 
 rho = r"$\mathrm{\rho}}$"
 
-mode = '300L'
 
 # def sort_dfs_by_index(dfs, 
 #                       key,
@@ -772,7 +769,6 @@ bst_plots = bst.plots
 
 rho = r"$\mathrm{\rho}}$"
 
-mode = '300L'
 
 
 

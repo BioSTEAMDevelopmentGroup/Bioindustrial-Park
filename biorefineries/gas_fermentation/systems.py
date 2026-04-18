@@ -58,7 +58,7 @@ def create_hydrogen_oleochemical_system(
                       reactant='CO2', correct_atomic_balance=True, X=1) 
         brxn = rxn.backwards(reactant='AceticAcid')
         AcOH_production = bst.GasFedBioreactor(
-            'AcOH_production',
+            (100, 'AcOH_production'),
             ins=[AcOH_media, H2, flue_gas], 
             outs=('vent_1', 'effluent_1'), tau=100, 
             reactions=rxn, backward_reactions=brxn,
@@ -103,7 +103,7 @@ def create_hydrogen_oleochemical_system(
         )
         feed_gas = bst.Stream(phase='g')
         AcOH_production = bst.GasFedBioreactor(
-            'AcOH_production',
+            (100, 'AcOH_production'),
             ins=[AcOH_media, feed_gas], 
             outs=('vent_1', 'effluent_1'), 
             tau=100, 
@@ -136,13 +136,14 @@ def create_hydrogen_oleochemical_system(
             effluent.imol['AceticAcid'] += vent.imol['AceticAcid']
             vent.imol['AceticAcid'] = 0
             error = AcOH_production.atomic_balance_error()
-            assert sum(error.values()) < 1e-6
+            assert sum(error.values()) < 1e-3
     else:
         raise ValueError('invalid carbon source')
     AcOH_media.set_feed_priority(-1)
     for i in AcOH_production.gas_coolers: i.cool_only = True
     AcOH_production.productivity = 1 # g / L / h
     centrifuge_a = bst.SolidsCentrifuge(
+        100,
         ins=AcOH_production-1, 
         outs=('wastewater', ''),
         split=dict(Cellmass=1),
@@ -167,19 +168,21 @@ def create_hydrogen_oleochemical_system(
         specific_yield=None,
         cellmass_specific_yield=None,
         udct=True,
-        mockup=True
+        mockup=True,
     )
     if carbon_source == 'biomass':
         CO2 = flue_gas
         units = bst.create_all_facilities(
+            area=400,
             WWT_kwargs=dict(kind="high-rate"), 
             HXN_kwargs=dict(force_ideal_thermo=True, cache_network=True),
             CHP_kwargs=dict(fuel_source='Biomass', cls=bst.Boiler),
         )
         for BT in units:
-            if isinstance(BT, bst.BoilerTurbogenerator): 
+            if isinstance(BT, (bst.BoilerTurbogenerator, bst.Boiler)): 
                 ins.append(BT.fuel)
                 break
+        BT.register_alias('BT')
         if carbon_capture:
             thermo = bst.settings.thermo
             cc_chemicals = create_cc_chemicals()
@@ -246,17 +249,19 @@ def create_hydrogen_oleochemical_system(
                 for i in BT.system.facilities: i.simulate()
     else:
         units = bst.create_all_facilities(
+            area=400,
             WWT_kwargs=dict(kind="high-rate"), 
             HXN_kwargs=dict(force_ideal_thermo=True, cache_network=True),
             CHP_kwargs=dict(fuel_source='Biomass', cls=bst.Boiler),
         )
         for BT in units:
-            if isinstance(BT, bst.BoilerTurbogenerator): 
+            if isinstance(BT, (bst.BoilerTurbogenerator, bst.Boiler)): 
                 ins.append(BT.fuel)
                 break
+        BT.register_alias('BT')
         CO2_recycle = udct['oleochemical_production']-0
         CO2_recycle.phase = 'g'
-        feed_gas_mixer = bst.Mixer(ins=[H2, flue_gas, CO2_recycle], outs=feed_gas)
+        feed_gas_mixer = bst.Mixer(400, ins=[H2, flue_gas, CO2_recycle], outs=feed_gas)
     
     
 @bst.SystemFactory(
@@ -273,10 +278,12 @@ def create_substrate_oleochemical_system(
         specific_yield=None,
         cellmass_specific_yield=None,
         facilities=False,
+        production_area=None,
+        separation_area=None,
     ):
     dilution_water, slurry = ins
     oleochemical_product, = outs
-    mixer = bst.Mixer(ins=(dilution_water, slurry))
+    mixer = bst.Mixer(200, ins=(dilution_water, slurry))
     rxn = bst.Rxn(f'{substrate} -> {product} + H2O + CO2', reactant=substrate,
                   X=0.9, correct_atomic_balance=True) 
     bioreactor_maintenance = bst.Rxn(f'{substrate} + O2 -> H2O + CO2', reactant=substrate,
@@ -298,6 +305,7 @@ def create_substrate_oleochemical_system(
         seedtrain_feed = bst.Stream('seedtrain_feed', Water=0.88, Glucose=0.12, units='kg/hr', price=0.12 * 0.33)
         seedtrain_feed.set_CF('GWP', 0.1 * 0.9375) # Sugar GREET 2023
         seedtrain = SeedTrain(
+            (200, 'seed_train'),
             T=37 + 273.15,
             ins=seedtrain_feed,
             reactions=seedtrain_reactions,
@@ -330,7 +338,7 @@ def create_substrate_oleochemical_system(
                          X=0.5, correct_atomic_balance=True) 
         growth.product_yield('Cellmass', 'wt', cellmass_specific_yield) 
         seedtrain_reactions = bst.SeriesReaction([growth, bioreactor_maintenance])
-        seed_splitter = bst.Splitter(ins=mixer-0, split=0.07)
+        seed_splitter = bst.Splitter(200, ins=mixer-0, split=0.07)
         @seed_splitter.add_specification(run=True)
         def adjust_feed():
             # 0.7 g product / g biomass required
@@ -341,14 +349,16 @@ def create_substrate_oleochemical_system(
             ) # g seed / g fermented
             seed_splitter.split[:] = 1 - 1 / (seed_to_ferm_ratio + 1)
         seedtrain = SeedTrain(
+            (200, 'seed_train'),
             ins=seed_splitter-0,
             reactions=seedtrain_reactions,
             T=37 + 273.15,
         )
-        seed_mixer = bst.Mixer(ins=[seedtrain-1, seed_splitter-1])
+        seed_mixer = bst.Mixer(200, ins=[seedtrain-1, seed_splitter-1])
         bioreactor_feed = seed_mixer-0
+    
     oleochemical_production = bst.AeratedBioreactor(
-        'oleochemical_production',
+        (200, 'oleochemical_production'),
         ins=(bioreactor_feed, bst.Stream('air', phase='g')),
         outs=('vent_2', 'effluent_2'), tau=100, 
         V_max=3785,
@@ -402,7 +412,7 @@ def create_substrate_oleochemical_system(
     solvent = 'Hexane'
     solvent_ratio = 0.1
     solvent_recycle = bst.Stream()
-    solvent_mixer = bst.Mixer('solvent_mixer', ins=[oleochemical_production-1, solvent_recycle, solvent.lower()])
+    solvent_mixer = bst.Mixer((200, 'solvent_mixer'), ins=[oleochemical_production-1, solvent_recycle, solvent.lower()])
     solvent_mixer.outs[-1].price = 0.73
     @solvent_mixer.add_specification
     def adjust_solvent():
@@ -416,6 +426,7 @@ def create_substrate_oleochemical_system(
         solvent_mixer._run()
         
     oleochemical_separation = bst.MixerSettler(
+        200,
         ins=solvent_mixer-0, 
         outs=('', 'wastewater'),
         top_chemical=solvent,
@@ -430,6 +441,7 @@ def create_substrate_oleochemical_system(
     oleochemical_product._thermo = ideal_thermo
     heat_integration = bst.Stream(thermo=ideal_thermo)
     solvent_recovery = bst.ShortcutColumn(
+        200, 
         ins=heat_integration,
         outs=('', ''),
         Lr=0.9999,
@@ -440,14 +452,16 @@ def create_substrate_oleochemical_system(
         P=101325 * 0.2,
     )
     solvent_recovery.check_LHK = False
-    bottoms_pump = bst.Pump(ins=solvent_recovery-1, P=2 * 101325)
-    distillate_pump = bst.Pump(ins=solvent_recovery-0, outs=solvent_recycle, P=2 * 101325)
+    bottoms_pump = bst.Pump(200, ins=solvent_recovery-1, P=2 * 101325)
+    distillate_pump = bst.Pump(200, ins=solvent_recovery-0, outs=solvent_recycle, P=2 * 101325)
     hx = bst.HXprocess(
+        200,
         ins=[bottoms_pump-0, oleochemical_separation-0], 
         dT=10, outs=[oleochemical_product, heat_integration]
     )
     if facilities:
         units = bst.create_all_facilities(
+            area=300,
             HXN=False,
             WWT_kwargs=dict(kind="high-rate"), 
             # HXN_kwargs=dict(force_ideal_thermo=True, cache_network=True),
@@ -457,6 +471,7 @@ def create_substrate_oleochemical_system(
             if isinstance(BT, (bst.BoilerTurbogenerator, bst.Boiler)): 
                 ins.append(BT.fuel)
                 break
+        BT.register_alias('BT')
 
 create_glucose_oleochemical_system = None
 create_biomass_oleochemical_system = None

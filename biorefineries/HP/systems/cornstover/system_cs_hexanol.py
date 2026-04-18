@@ -200,6 +200,8 @@ def create_HP_sys(ins, outs):
                                                            makeup_MEA_A301),
                                                    )
     
+    u.R302.neutralization = False
+    
     # %% 
     # =============================================================================
     # Separation streams

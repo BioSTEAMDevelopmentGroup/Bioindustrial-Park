@@ -219,8 +219,10 @@ def add_metrics_to_unit_groups(unit_groups,
     if not LCA:
         LCA = system.LCA
     if not BT:
-        BT = system.flowsheet.unit.BT701
-    
+        try:
+            BT = system.flowsheet.unit.BT701
+        except:
+            pass
     natural_gas_utilizing_non_BT_system_units = [ui for ui in system.units
                                                  if ui.__class__ in natural_gas_utilizing_non_BT_unit_classes]
     
@@ -376,7 +378,7 @@ def TEA_breakdown(unit_groups_dict,
     for ug in unit_groups:
         for metric in ug.metrics:
             # storage_metric_val = None
-            if not ug.name=='storage':
+            if not ug.name=='storage' and 'storage' in unit_groups_dict.keys():
                 if ug.name=='other facilities':
                     metric_breakdowns[metric.name]['storage and ' + ug.name] = metric() + unit_groups_dict['storage'].metrics[ug.metrics.index(metric)]()
                 else:

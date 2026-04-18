@@ -25,7 +25,7 @@ from .feature_mockups import (
     all_metric_mockups, 
 )
 from .process_settings import load_process_settings
-from .chemicals import create_cellulosic_oilcane_chemicals as create_chemicals
+from ._chemicals import create_cellulosic_oilcane_chemicals as create_chemicals
 from biorefineries.cellulosic import PretreatmentReactorSystem as PRS
 from .systems import (
     create_sugarcane_to_ethanol_system,
@@ -64,6 +64,7 @@ from .data.lca_characterization_factors import (
 __all__ = (
     'Biorefinery',
     'YRCP2023',
+    'YRCP2025',
 )
 
 PRS_cost_item = PRS.cost_items['Pretreatment reactor system']
@@ -192,6 +193,13 @@ def exponential_fit(x0, x1, y0, y1): # A x ^ n
 def exponential_val(x, nA): # A x ^ n
     n, A = nA    
     return A * x ** n
+
+def YRCP2025():
+    YRCP2023()
+    Biorefinery.default_oil_content_range = [1.8, 10]
+    Biorefinery.default_dry_biomass_yield_distribution = shape.Uniform(
+        0.69 * Biorefinery.baseline_dry_biomass_yield, Biorefinery.baseline_dry_biomass_yield
+    )
 
 def YRCP2023():
     Biorefinery.default_conversion_performance_distribution = 'longterm'
@@ -838,7 +846,7 @@ class Biorefinery:
         def set_juicing_oil_recovery(juicing_oil_recovery):
             oil_extraction_specification.load_juicing_oil_recovery(juicing_oil_recovery / 100.)
         
-        @performance(70 if number in screwpress_microbial_oil_recovery else 50,
+        @performance(70 if (number in oil_configurations and number in screwpress_microbial_oil_recovery) else 50,
                      90, units='%', kind='coupled')
         def set_microbial_oil_recovery(microbial_oil_recovery):
             oil_extraction_specification.load_microbial_oil_recovery(microbial_oil_recovery / 100.)

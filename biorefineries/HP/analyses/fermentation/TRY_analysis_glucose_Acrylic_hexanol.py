@@ -80,7 +80,12 @@ get_AA_MPSP()
 feedstock_tag = 'glucose'
 product_tag = 'Acrylic'
 
-mode = '300L_FGI'
+# mode = '300L_FGI' # !!! remember to switch if running FGI analyses
+
+mode = 'DASbox'
+
+if mode == 'DASbox':
+    spec.baseline_productivity = 0.548
 
 dist_filename = f'parameter-distributions_{feedstock_tag}_{product_tag}_' + mode + '.xlsx'
 
@@ -212,7 +217,8 @@ steps = (50, 50, 1)
 # spec_2 = titers = np.linspace(5, 
 #                               200.,
 #                                 steps[1]) # titer
-spec_1 = yields = np.linspace(0.05, 0.75, steps[0]) # yield
+# spec_1 = yields = np.linspace(0.05, 0.75, steps[0]) # yield # !!! for FGI
+spec_1 = yields = np.linspace(0.05, 0.95, steps[0]) # yield
 spec_2 = titers = np.linspace(10, 
                               200.,
                                 steps[1]) # titer
@@ -221,7 +227,7 @@ spec_2 = titers = np.linspace(10,
 spec_3 = productivities =\
     np.array([
                 # 0.2*spec.baseline_productivity,
-                # 1.*spec.baseline_productivity,
+                # 1.*spec.baseline_productivity, # !!!
                 5.*spec.baseline_productivity,
               ])
 
@@ -351,7 +357,7 @@ spec_1, spec_2 = np.meshgrid(spec_1, spec_2)
 print('\n\nSimulating the initial point to avoid bugs ...')
 # spec.byproduct_yields_decrease_policy = 'simultaneous, from 0 product yield'
 spec.load_specifications(yields[0], titers[0], productivities[0])
-# spec.set_production_capacity(desired_annual_production=spec.desired_annual_production)
+spec.set_production_capacity(desired_annual_production=spec.desired_annual_production)
 # get_AA_MPSP()
 for i in range(3): HP_sys.simulate()
 print(get_product_MPSP())
@@ -646,11 +652,11 @@ if smoothing:
                         #             print(i,j,k)
                     
 #%% Plots
-plot = False
+plot = True
 
 if plot: 
     
-    #%% MPSP
+    # %% MPSP
     
     # MPSP_w_levels, MPSP_w_ticks, MPSP_cbar_ticks = get_contour_info_from_metric_data(results_metric_1, lb=3)
     MPSP_w_levels = np.arange(0., 4.01, 0.1)

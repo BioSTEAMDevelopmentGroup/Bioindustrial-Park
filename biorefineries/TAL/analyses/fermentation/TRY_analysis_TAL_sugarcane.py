@@ -68,7 +68,7 @@ model = models.TAL_model
 system = TAL_sys = models.TAL_sys
 
 modes = [
-            'A_FGI_sugarcane',
+            'A_sugarcane',
             # 'A',
          ]
 

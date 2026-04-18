@@ -25,16 +25,18 @@ Simply import the biorefinery.
 
     >>> from biorefineries import oxalic
     >>> oxalic.load()
-    >>> # Once loaded, you can have a quick glance of the results
+    
+    >>> # Once loaded, you can have a quick glance of the results of first simulation
+    >>> # (this is not baseline referenced in the main text)
     >>> # Note that the first simulation will take a longer time
     >>> oxalic.simulate_and_print()
     
     ---------- Simulation Results ----------
-    MPSP is $2.41/kg AA
-    GWP-100a is -2.320 kg CO2-eq/kg AA
-    FEC is -55.057 MJ/kg AA
-    GWP-100a without electricity credit is 3.863 kg CO2-eq/kg AA
-    FEC without electricity credit is 21.270 MJ/kg AA
+    MPSP is $1.77/kg AA
+    GWP-100a is -1.822 kg CO2-eq/kg AA
+    FEC is -49.221 MJ/kg AA
+    GWP-100a without electricity credit is 4.131 kg CO2-eq/kg AA
+    FEC without electricity credit is 24.270 MJ/kg AA
     ----------------------------------------
     >>> oxalic.system.feeds[0].chemicals.show()
     >>> # All chemicals used in the biorefinery
@@ -90,9 +92,9 @@ Processes:
     >>> oxalic.system
     System: oxalic_sys
     Highest convergence error among components in recycle
-    stream P203-0 after 1 loops:
-    - flow rate   2.54e-02 kmol/hr (6.6e-05%)
-    - temperature 1.90e-09 K (5.1e-10%)
+    stream P203-0 after 3 loops:
+    - flow rate   7.78e+00 kmol/hr (0.028%)
+    - temperature 9.68e-05 K (2.6e-05%)
     
 
 Analyses
@@ -102,7 +104,7 @@ full Monte Carlo simulation (oxalic.run_uncertainty_analysis)
 and titer-yield-productivity analysis for the fermentation performance space (oxalic.run_TRY_analysis).
 
 Note that results used in the manuscript [1]_ were generated using biosteam==2.46.0,
-thermosteam==0.44.0, contourplots==0.3.4, numpy==1.26.4, and dependencies (`commit 007cebb <https://github.com/BioSTEAMDevelopmentGroup/Bioindustrial-Park/commit/007cebb2343a2189bbb9347913c90917c68c2e2c>`_).
+thermosteam==0.44.0, contourplots==0.3.4, numpy==1.26.4, and dependencies (`commit 3a8acb2 <https://github.com/BioSTEAMDevelopmentGroup/Bioindustrial-Park/commit/3a8acb269f1bf4bf30787d684d89eed23cf076ae>`_).
 
 To reproduce the results, directly run the script of interest, and results will
 be saved as Excel files and figures in analyses/results.

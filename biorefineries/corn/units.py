@@ -300,10 +300,10 @@ class SimultaneousSaccharificationFermentation(bst.BatchBioreactor):
     """
     
     def __init__(self, ID='', ins=None, outs=(), thermo=None, *, 
-                 tau=60.,  N=None, V=None, T=305.15, P=101325., Nmin=2, Nmax=36,
+                 tau=60.,  N=None, V_max=None, T=305.15, P=101325., Nmin=2, Nmax=36,
                  yield_=0.95, V_wf=0.83):
         bst.BatchBioreactor.__init__(self, ID, ins, outs, thermo,
-            tau=tau, N=N, V=V, T=T, P=P, Nmin=Nmin, Nmax=Nmax
+            tau=tau, N=N, V_max=V_max, T=T, P=P, Nmin=Nmin, Nmax=Nmax
         )
         self.reaction = tmo.Rxn('Glucose -> 2Ethanol + 2CO2',  'Glucose', yield_)
         self.growth = tmo.Rxn('Glucose -> Yeast',  'Glucose', 1.0)
@@ -328,7 +328,7 @@ class SimultaneousSaccharificationFermentation(bst.BatchBioreactor):
 SSF = SimultaneousSaccharificationFermentation
 
 @copy_algorithm(bst.SolidLiquidsSplitCentrifuge, run=False)
-class DDGSCentrifuge(bst.Splitter): pass
+class DDGSCentrifuge(bst.SolidsCentrifuge): pass
     
 
 @cost('Flow rate', units='kg/hr', CE=CE2007, cost=122800, S=15303.5346, kW=37.3, n=0.6, BM=4)

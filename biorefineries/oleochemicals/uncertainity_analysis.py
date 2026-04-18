@@ -17,7 +17,7 @@ from biorefineries.oleochemicals.system_simulate import azelaic_acid_tea,aa_base
 import biosteam as bst
 from biosteam import report
 from biosteam import settings
-# from model_samples import sample_list_1999
+from pathlib import Path
 
 #unit conversions
 KJpersec_to_KJhr = 3600 
@@ -224,6 +224,7 @@ def get_economic_based_AA_GWP():
     economic_fa_fraction = aa_baseline.get_market_value(fatty_acid_blend)*get_system_GWP()/get_total_product_market_value()          
     economic_methanol_fraction = aa_baseline.get_market_value(crude_methanol)*get_system_GWP()/get_total_product_market_value()          
     sum_economic = economic_C5_C9_fraction+economic_pa_fraction+economic_glycerol_fraction+economic_fa_fraction+economic_methanol_fraction 
+#this function estimates GWP via economic allocation per kg of azelaic acid produced
     economic_aa_fraction = aa_baseline.get_market_value(azelaic_acid)*get_system_GWP()/get_total_product_market_value()
     return economic_aa_fraction #Kg CO2 per kg of AA
 
@@ -243,7 +244,8 @@ mass_pa_fraction = lambda: aa_baseline.get_mass_flow(pelargonic_acid_rich_fracti
 mass_glycerol_fraction = lambda: aa_baseline.get_mass_flow(crude_glycerol)*get_system_GWP()/get_total_product_mass() 
 mass_fa_fraction = lambda: aa_baseline.get_mass_flow(fatty_acid_blend)*get_system_GWP()/get_total_product_mass()
 mass_methanol_fraction = lambda: aa_baseline.get_mass_flow(crude_methanol)*get_system_GWP()/get_total_product_mass() 
-mass_aa_fraction1 = lambda: aa_baseline.get_mass_flow(azelaic_acid)*get_system_GWP()/get_total_product_mass()
+#this function estimates GWP via mass allocation per kg of azelaic acid produced
+mass_aa_fraction = lambda: aa_baseline.get_mass_flow(azelaic_acid)*get_system_GWP()/get_total_product_mass()
     
 #GWP related functions
 def sum_displacement():
@@ -256,59 +258,42 @@ def sum_displacement():
     sum_displacement = PA + FA + MCA + CG + M
     return sum_displacement
 
+#this function estimates GWP via displacement per kg of azelaic acid produced
 def get_net_GWP_displacement():
     return get_system_GWP() - sum_displacement()
 
 #%%
-def disp_feedstock(): return get_feedstock_GWP() * 100 / -get_net_GWP_displacement() / 20
-def disp_materials(): return get_other_materials_impact() * 100 / -get_net_GWP_displacement() / 20
-def disp_ng(): return get_ng_GWP() * 100 / -get_net_GWP_displacement() / 20
-def disp_electricity(): return net_electricity_purchased_GWP() * 100 / -get_net_GWP_displacement() / 20
-def disp_direct(): return get_total_direct_emissions_GWP() * 100 / -get_net_GWP_displacement() / 20
+def disp_feedstock(): return get_feedstock_GWP() * 100 / abs(get_system_GWP())
+def disp_materials(): return get_other_materials_impact() * 100 / abs(get_system_GWP())
+def disp_ng(): return get_ng_GWP() * 100 / abs(get_system_GWP())
+def disp_electricity(): return net_electricity_purchased_GWP() * 100 / abs(get_system_GWP())
+def disp_direct(): return get_total_direct_emissions_GWP() * 100 / abs(get_system_GWP())
 
 def disp_other_co_products():
     FA = aa_baseline.get_material_impact(fatty_acid_blend, 'GWP100') / aa_baseline.get_mass_flow(azelaic_acid)
     MCA = aa_baseline.get_material_impact(recovered_C5_to_C9_MCA_fraction, 'GWP100') / aa_baseline.get_mass_flow(azelaic_acid)
     CG = aa_baseline.get_material_impact(crude_glycerol, 'GWP100') /aa_baseline.get_mass_flow(azelaic_acid)
     M = aa_baseline.get_material_impact(crude_methanol, 'GWP100') /aa_baseline.get_mass_flow(azelaic_acid)
-    return -(FA + MCA + CG + M) * 100 / -get_net_GWP_displacement() / 20
+    return abs(FA + MCA + CG + M) * 100 / abs(get_system_GWP())
 
 def disp_PA():
     PA = aa_baseline.get_material_impact(pelargonic_acid_rich_fraction, 'GWP100') /aa_baseline.get_mass_flow(azelaic_acid)
-    return -PA * 100 / -get_net_GWP_displacement() / 20
+    return abs(PA) * 100 / abs(get_system_GWP())
 
 #mass allocation fractions based on stacked bar plot
-def get_mass_aa_fraction(): 
-    return aa_baseline.get_mass_flow(azelaic_acid)*get_system_GWP()/get_total_product_mass()
-
-def mass_feedstock(): return get_feedstock_GWP() * 100 / get_mass_aa_fraction() / 20
-def mass_materials(): return get_other_materials_impact() * 100 / get_mass_aa_fraction() / 20
-def mass_ng(): return get_ng_GWP() * 100 / get_mass_aa_fraction() / 20
-def mass_electricity(): return net_electricity_purchased_GWP() * 100 / get_mass_aa_fraction() / 20
-def mass_direct(): return get_total_direct_emissions_GWP() * 100 / get_mass_aa_fraction() / 20
-
 def mass_other_co_products():
     mass_C5_C9_fraction = aa_baseline.get_mass_flow(recovered_C5_to_C9_MCA_fraction)*get_system_GWP()/get_total_product_mass()
     mass_glycerol_fraction = aa_baseline.get_mass_flow(crude_glycerol)*get_system_GWP()/get_total_product_mass() 
     mass_fa_fraction = aa_baseline.get_mass_flow(fatty_acid_blend)*get_system_GWP()/get_total_product_mass()
     mass_methanol_fraction = aa_baseline.get_mass_flow(crude_methanol)*get_system_GWP()/get_total_product_mass()
     sum_mass_others =  mass_C5_C9_fraction+mass_glycerol_fraction+mass_fa_fraction+mass_methanol_fraction
-    return  -sum_mass_others*100/get_mass_aa_fraction()/20
+    return  abs(sum_mass_others)*100/abs(get_system_GWP())
 
 def mass_PA():
     mass_pa_fraction = aa_baseline.get_mass_flow(pelargonic_acid_rich_fraction)*get_system_GWP()/get_total_product_mass()
-    return -mass_pa_fraction *100/get_mass_aa_fraction()/20
+    return abs(mass_pa_fraction) *100/abs(get_system_GWP())
 
 #economic allocation fractions based on stacked bar plot
-def econ_aa_fraction(): 
-    economic_aa_fraction = aa_baseline.get_market_value(azelaic_acid)*get_system_GWP()/get_total_product_market_value()
-    return economic_aa_fraction 
-
-def econ_feedstock(): return get_feedstock_GWP() * 100 / econ_aa_fraction() / 20
-def econ_materials(): return get_other_materials_impact() * 100 / econ_aa_fraction() / 20
-def econ_ng(): return get_ng_GWP() * 100 / econ_aa_fraction() / 20
-def econ_electricity(): return net_electricity_purchased_GWP() * 100 / econ_aa_fraction() / 20
-def econ_direct(): return get_total_direct_emissions_GWP() * 100 / econ_aa_fraction() / 20
 
 def econ_other_co_products():
     economic_C5_C9_fraction = aa_baseline.get_market_value(recovered_C5_to_C9_MCA_fraction)*get_system_GWP()/get_total_product_market_value()
@@ -316,11 +301,11 @@ def econ_other_co_products():
     economic_fa_fraction = aa_baseline.get_market_value(fatty_acid_blend)*get_system_GWP()/get_total_product_market_value()          
     economic_methanol_fraction = aa_baseline.get_market_value(crude_methanol)*get_system_GWP()/get_total_product_market_value()          
     sum_economic_others = economic_C5_C9_fraction+economic_glycerol_fraction+economic_fa_fraction+economic_methanol_fraction 
-    return -sum_economic_others*100/econ_aa_fraction()/ 20
+    return abs(sum_economic_others)*100/abs(get_system_GWP())
 def econ_PA():
     economic_pa_fraction = aa_baseline.get_market_value(pelargonic_acid_rich_fraction)*get_system_GWP()/get_total_product_market_value()
-    return -economic_pa_fraction *100/econ_aa_fraction() / 20
-    
+    return abs(economic_pa_fraction)*100/abs(get_system_GWP())
+
 #%% Keeping track of each section
 #all fractions
 def transesterification_IEC():
@@ -607,32 +592,25 @@ all_metrics = [
     Metric('Total cooling demand', get_system_cooling_demand, 'MMJ/yr', 'Cooling demand'),
     
     # LCA metrics – mass allocation
-    Metric('Mass AA LCA', get_mass_aa_fraction, 'kg CO2-eq/kg', 'LCA'),
-       # LCA metrics – economic allocation and displacement
+    Metric('Mass AA LCA', mass_aa_fraction, 'kg CO2-eq/kg', 'LCA'),
+    # LCA metrics – economic allocation and displacement
     Metric('Economic allocation LCA', get_economic_based_AA_GWP, 'kg CO2-eq/kg', 'LCA'),
-    Metric('Net CI displacement 1', get_net_GWP_displacement, 'kg CO2-eq/kg', 'LCA'),    
+    Metric('Net CI displacement LCA', get_net_GWP_displacement, 'kg CO2-eq/kg', 'LCA'),  
+    Metric('Total emissions', get_system_GWP, 'kg CO2-eq/kg', 'LCA'),  
     
     Metric('Feedstock GWP – Displacement', disp_feedstock, '%', 'LCA'),
     Metric('Other materials GWP – Displacement', disp_materials, '%', 'LCA'),
     Metric('Natural gas GWP – Displacement', disp_ng, '%', 'LCA'),
     Metric('Electricity GWP – Displacement', disp_electricity, '%', 'LCA'),
     Metric('Direct emissions GWP – Displacement', disp_direct, '%', 'LCA'),
+    
     Metric('Other coproducts GWP – Displacement', disp_other_co_products, '%', 'LCA'),
     Metric('Pelargonic acid GWP – Displacement', disp_PA, '%', 'LCA'),
-    Metric('Feedstock GWP – Mass allocation', mass_feedstock, '%', 'LCA'),
     
-    Metric('Other materials GWP – Mass allocation', mass_materials, '%', 'LCA'),
-    Metric('Natural gas GWP – Mass allocation', mass_ng, '%', 'LCA'),
-    Metric('Electricity GWP – Mass allocation', mass_electricity, '%', 'LCA'),
-    Metric('Direct emissions GWP – Mass allocation', mass_direct, '%', 'LCA'),
+   
     Metric('Other coproducts GWP – Mass allocation', mass_other_co_products, '%', 'LCA'),
     Metric('Pelargonic acid GWP – Mass allocation', mass_PA, '%', 'LCA'),
-    Metric('Feedstock GWP – Economic allocation', econ_feedstock, '%', 'LCA'),
     
-    Metric('Other materials GWP – Economic allocation', econ_materials, '%', 'LCA'),
-    Metric('Natural gas GWP – Economic allocation', econ_ng, '%', 'LCA'),
-    Metric('Electricity GWP – Economic allocation', econ_electricity, '%', 'LCA'),
-    Metric('Direct emissions GWP – Economic allocation', econ_direct, '%', 'LCA'),
     Metric('Other coproducts GWP – Economic allocation', econ_other_co_products, '%', 'LCA'),
     Metric('Pelargonic acid GWP – Economic allocation', econ_PA, '%', 'LCA'),
     
@@ -687,33 +665,65 @@ all_metrics = [
     Metric('Electricity – Wastewater treatment', wastewater_electricity_consumption, '%', 'Utility'),
     Metric('Electricity – Other facilities', other_facility_electricity_consumption, '%', 'Utility'),
 
-    Metric('Material cost – Natural gas (%)', natural_gas_material_cost, '%', 'TEA'),
-    Metric('Material cost – Feedstock (%)', feedstock_material_cost, '%', 'TEA'),
-    Metric('Material cost – Hydrogen peroxide (%)', hp_material_cost, '%', 'TEA'),
+    Metric('Material cost – Natural gas', natural_gas_material_cost, '%', 'TEA'),
+    Metric('Material cost – Feedstock', feedstock_material_cost, '%', 'TEA'),
+    Metric('Material cost – Hydrogen peroxide', hp_material_cost, '%', 'TEA'),
     
-    Metric('IEC – Hydrolysis section (%)', hydrolysis_aa_IEC_frac, '%', 'TEA'),
-    Metric('HD – Hydrolysis section (%)', HD_during_hydrolysis_all, '%', 'Utility'),
-    Metric('CD – Hydrolysis section (%)', CD_during_hydrolysis_all, '%', 'Utility'),
+    Metric('IEC – Hydrolysis section', hydrolysis_aa_IEC_frac, '%', 'TEA'),
+    Metric('HD – Hydrolysis section', HD_during_hydrolysis_all, '%', 'Utility'),
+    Metric('CD – Hydrolysis section', CD_during_hydrolysis_all, '%', 'Utility'),
     
-    Metric('HD – Azelaic acid purification (%)', HD_azelaic_acid_purification, '%', 'Utility'),
-    Metric('CD – Azelaic acid purification (%)', CD_azelaic_acid_purification, '%', 'Utility'),
+    Metric('HD – Azelaic acid purification', HD_azelaic_acid_purification, '%', 'Utility'),
+    Metric('CD – Azelaic acid purification', CD_azelaic_acid_purification, '%', 'Utility'),
     
-    Metric('HD – MMA/AA separation (%)', HD_mma_azelaic_acid_sep, '%', 'Utility'),
-    Metric('CD – MMA/AA separation (%)', CD_mma_azelaic_acid_sep, '%', 'Utility'),
+    Metric('HD – MMA/AA separation', HD_mma_azelaic_acid_sep, '%', 'Utility'),
+    Metric('CD – MMA/AA separation', CD_mma_azelaic_acid_sep, '%', 'Utility'),
     
-    Metric('Electricity – D502 fraction (%)', D502_elec_fraction, '%', 'Utility'),
-    Metric('Electricity – F608 fraction (%)', F608_elec_fraction, '%', 'Utility'),
-    Metric('Electricity – CW701 fraction (%)', CW701_elec_fraction, '%', 'Utility'),
+    Metric('Electricity – D502 fraction', D502_elec_fraction, '%', 'Utility'),
+    Metric('Electricity – F608 fraction', F608_elec_fraction, '%', 'Utility'),
+    Metric('Electricity – CW701 fraction', CW701_elec_fraction, '%', 'Utility'),
     ]
+
+def _slice_rows_from_excel(xlsx_path, sheet_name, row_indices, header_rows=3):
+    """
+    Return a NumPy array of samples for the given row(s).
+    
+    Parameters
+    ----------
+    row_indices : int or list[int]
+        - If int → run a single Excel row (e.g. 77).
+        - If list[int] → run multiple Excel rows (e.g. [4, 77, 100]).
+    
+    header_rows : int
+        Number of non-data rows at the top (default=3 → data starts at Excel row 4).
+    """
+    df = pd.read_excel(xlsx_path, sheet_name=sheet_name, header=None)
+    
+    # Normalize row_indices into a list
+    if isinstance(row_indices, int):
+        row_indices = [row_indices]
+    
+    # Convert Excel row numbers to pandas iloc indices
+    adjusted = [r - 1 for r in row_indices]  # Excel rows are 1-based
+    return df.iloc[adjusted].to_numpy()
+
 
 def conduct_uncertainity_analysis(system = aa_baseline, #name of the system
                                   metrics = all_metrics, #list of Metric objects
-                                  number_of_runs = 3, #number of 
+                                  number_of_runs = 100, #number of 
                                   exception_hook = 'warn',#raise/warn
                                   rule = 'L', #for For Latin-Hypercube sampling
                                   notify_runs = 10, #runs after which you are notified 
                                   indicator = 'GWP100',
-                                  feedstock_type = 'HoySoy_oil' #can also provide 'HoSun_oil
+                                  feedstock_type = 'HoySoy_oil', #can also provide 'HoSun_oil
+                                  xlsx_path = r"C:/Users/lavan/gglk_code/Bioindustrial-Park/biorefineries/oleochemicals/model_table_10000_w_aa_price_frac_lca.xlsx",
+                                  sheet_name = "Sheet1",
+                                  batch_id = 1,
+                                  batch_size = 1000,
+                                  row_indices = None,
+                                  header_rows = 3,          # <-- set to 3 to make batch 1 = Excel rows 4–1003 (inclusive)
+                                  outdir = "C:/Users/lavan/gglk_code/Bioindustrial-Park/biorefineries/oleochemicals/batch_wise_uncertainty_analysis"
+                                                              
                                  ):
     model = Model(aa_baseline,metrics = all_metrics,
                   exception_hook= exception_hook,
@@ -960,14 +970,6 @@ def conduct_uncertainity_analysis(system = aa_baseline, #name of the system
         crude_vegetable_oil.characterization_factors[indicator] = crude_vegetable_oil_gwp
 
          
-    # @model.parameter(name='Methanol GWP',
-    #                   element=F.methanol, 
-    #                   kind='isolated',
-    #                   baseline= 1.14,
-    #                   distribution= environmental_facs_dist['Methanol'])
-    # def set_methanol_gwp(methanol_gwp):
-    #         F.methanol.characterization_factors[indicator] = methanol_gwp
-            
     @model.parameter(name='Catalyst biodiesel GWP',
                      element=F.catalyst, 
                      kind='isolated',
@@ -1246,27 +1248,52 @@ def conduct_uncertainity_analysis(system = aa_baseline, #name of the system
     def set_cta(cycles_of_reuse):
         F.unit.M200.specifications[0].args[1] = cycles_of_reuse
         
-        
-    if number_of_runs > 0:
-        rule = rule
-        np.random.seed(1234) # For consistent results
-        samples = model.sample(number_of_runs,rule)
-        model.load_samples(samples)
-        model.evaluate(notify=notify_runs) 
-        model.table.to_excel(f'model_table_{number_of_runs}_w_aa_price_frac_lca.xlsx')
-        df_rho, df_p = model.spearman_r()
-        df_rho.to_excel(f'df_rho_{number_of_runs}_w_aa_price_and_frac_lca.xlsx')
-        df_p.to_excel(f'df_p_{number_of_runs}_w_aa_price_and_frac_lca.xlsx')
+    # --- Use pre-generated samples from Excel for this batch ---
+    samples = _slice_rows_from_excel(xlsx_path, "Sheet1", row_indices=row_indices, header_rows=3)
+
+    # Sanity check: columns in Excel must match the number of model parameters
+    n_params = len(model.parameters)
+    if samples.shape[1] != n_params:
+        raise ValueError(f"Excel has {samples.shape[1]} columns but model expects {n_params} parameters "
+                         f"(order must match model.parameters).")    
+
+    rule = rule
+    np.random.seed(1234) # For consistent results
+    model.load_samples(samples)                 # shape: (1000, n_params)
+    model.evaluate(notify=notify_runs)
+    # Save with batch tag
+    if type(row_indices) == int:
+        row_tag = f"rows{row_indices}"
     else:
-        model.show()
+        row_tag = f"rows{row_indices[0]}-{row_indices[-1]}"
+
+    btag = f"batch_{batch_id:02d}"
+    outdir = Path(outdir)
+    outdir.mkdir(parents=True, exist_ok=True)
+    table = model.table.copy()
+
+    if isinstance(table.columns, pd.MultiIndex):
+        # Convert MultiIndex to single-level string names
+        table.columns = (
+            table.columns
+            .to_flat_index()
+            .map(lambda tup: " | ".join(str(x) for x in tup if x not in (None, "", " ")))
+        )
+    
+    table.to_excel(outdir / f"model_table_{btag}_{row_tag}.xlsx", index=False)
+
+    # df_rho, df_p = model.spearman_r()
+    # df_rho.to_excel(outdir / f"df_rho_{btag}_{row_tag}.xlsx", index=True)
+    # df_p.to_excel(outdir / f"df_p_{btag}_{row_tag}.xlsx", index=True)
     return model
+
 # #%% spearmans rho
 # import pandas as pd
 # import numpy as np
 # from scipy.stats import spearmanr
 
 # # 1. Load Excel
-# df = pd.read_excel('model_table_2000_w_aa_price_frac_lca.xlsx', sheet_name=0, header=1)
+# df = pd.read_excel('C:/Users/lavan/gglk_code/Bioindustrial-Park/biorefineries/oleochemicals/uncertainty_and_sensitivity_analysis_2000/uncertainty_analysis_results_2000.xlsx', sheet_name=0, header=1)
 
 # # 2. Select parameter and metric columns
 # param_df = df.iloc[:, 1:60].copy()
@@ -1329,19 +1356,18 @@ def conduct_uncertainity_analysis(system = aa_baseline, #name of the system
 # except FloatingPointError:
 #     print("❌ Still encountered a floating-point error during correlation.")
 
-# #%%
-# #Explaination on LCA methods below
-# #EOL is always included in cradle to grave
-# # If the feedstock CF does not include that biogenic CO₂ was reabsorbed by the crop, then:
-# # You must subtract the amount of fixed carbon from your process to correct for this.
-# # Otherwise, you'd overestimate the GWP, because it would include carbon that was never fossil-derived.
-# # You would base this subtraction on atomic carbon flow (e.g., how much C is in the oil).
-
-# # If the feedstock CF does not include:
-# # iLUC = indirect land use change
-# # SOC = soil organic carbon losses/gains
-# # Then you should:
-# # Add uncertainty (e.g., ±X%) to the CF to reflect the possible unaccounted emissions or sequestration.
-# # This is commonly done when relying on partial or optimistic LCA models that ignore landscape-level effects.
-# #cradle to gate will be a higher number since EOL is not included
-# #gate to gate will not be able let you do a fair comparision between fossil fuel and bioproducts
+# # #%%
+# # #Explaination on LCA methods below
+# # #EOL is always included in cradle to grave
+# # # If the feedstock CF does not include that biogenic CO₂ was reabsorbed by the crop, then:
+# # # You must subtract the amount of fixed carbon from your process to correct for this.
+# # # Otherwise, you'd overestimate the GWP, because it would include carbon that was never fossil-derived.
+# # # You would base this subtraction on atomic carbon flow (e.g., how much C is in the oil).
+# # # If the feedstock CF does not include:
+# # # iLUC = indirect land use change
+# # # SOC = soil organic carbon losses/gains
+# # # Then you should:
+# # # Add uncertainty (e.g., ±X%) to the CF to reflect the possible unaccounted emissions or sequestration.
+# # # This is commonly done when relying on partial or optimistic LCA models that ignore landscape-level effects.
+# # #cradle to gate will be a higher number since EOL is not included
+# # #gate to gate will not be able let you do a fair comparision between fossil fuel and bioproducts

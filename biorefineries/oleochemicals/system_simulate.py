@@ -41,6 +41,7 @@ azelaic_acid_tea = aa_baseline.TEA
 F.T101.tau = 504
 
 aa_baseline.simulate()
+
 # #%% To generate an excel file with total installed equipment costs of each equipment in each area
 # area_1 = []
 # for i in F.crude_HO_oil_to_biodiesel.units:

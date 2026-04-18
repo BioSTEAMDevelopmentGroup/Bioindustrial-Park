@@ -16,7 +16,7 @@ def load_HP_model(feedstock, product, fermentation_performance):
     ## Tags
     feedstock_tag, product_tag, mode = None, None, None
     
-    if feedstock.lower() in ['dextrose monohydrate', 'glucose']:
+    if feedstock.lower() in ['dextrose monohydrate', 'glucose', 'dextrose']:
         feedstock_tag = 'glucose'
     elif feedstock=='corn':
         feedstock_tag = 'corn'

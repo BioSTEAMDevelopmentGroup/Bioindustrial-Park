@@ -21,6 +21,7 @@ import flexsolve as flx
 from . import feature_mockups as features
 from .feature_mockups import (
     get_YRCP2023_spearman_names,
+    get_spearman_names,
     tea_monte_carlo_metric_mockups,
     tea_monte_carlo_derivative_metric_mockups,
     lca_monte_carlo_metric_mockups, 
@@ -96,6 +97,9 @@ __all__ = (
     'plot_oilcane_microbial_oil_development_economics_kde_2023',
     'plot_oilcane_cellulosic_microbial_oil_development_sustainability_kde_2023',
     'plot_oilcane_cellulosic_microbial_oil_development_economics_kde_2023',
+    'plot_oilcane_microbial_oil_development_combined_kde_2023',
+    'plot_spearman_indicators_YRCP2025',
+    'plot_O7_combined_kde_2025'
     # 'plot_competitive_biomass_yield_across_oil_content_TOC',
 )
 
@@ -789,6 +793,54 @@ def plot_kde_fake_scenarios_ethanol_price(name, xticks=None, yticks=None,
     )
     return fig, ax
 
+def plot_scatter_1d(name, metrics, 
+                xticks=None, yticks=None, zticks=None,
+                fs=None, ticklabels=True,  
+                xlabel=None, ylabel=None, 
+                aspect_ratio=0.4, width=None,
+                xscale=1, x_center=None, y_center=None,
+                yscale=1, zscale=1,
+                **kwargs):
+    set_font(size=fs or 12)
+    set_figure_size(width=width, aspect_ratio=aspect_ratio)
+    if isinstance(name, str): name = (name,)
+    Xi, Yi, Zi = [i.index for i in metrics]
+    dfs = [get_monte_carlo(i, metrics) for i in name]
+    xs = np.array([df[Xi].values for df in dfs]) * xscale
+    ys = np.array([df[Yi].values for df in dfs]) * yscale
+    zs = np.array([df[Zi].values for df in dfs]) * zscale
+    fig, axes = bst.plots.plot_scatter_1d(
+        xs=xs, ys=ys, zs=zs,
+        xticks=xticks, yticks=yticks, zticks=zticks,
+        xticklabels=ticklabels, yticklabels=ticklabels,
+        xlabel=xlabel,
+        ylabel=ylabel,
+        autobox=False,
+        **kwargs,
+    )
+    M, N = axes.shape
+    Mrange = range(M)
+    Nrange = range(N)
+    for i in Mrange:
+        for j in Nrange:
+            ax = axes[i, j]
+            plt.sca(ax)
+            if i == M - 1: plt.xlabel(xlabel)
+            if j == 0: plt.ylabel(ylabel)
+            df = dfs[j]
+            x = df[Xi]
+            y = df[Yi]
+            bst.plots.plot_quadrants(
+                data=[x, y], x=x_center, y=y_center, quadrant_color=[None] * 4,
+                line_color=(0.99, 0.99, 0.99, 0.5), fill_color=(0.81, 0.81, 0.81, 0.3),
+            )
+    plt.subplots_adjust(
+        hspace=0, wspace=0,
+        top=0.98, bottom=0.15,
+        left=0.08, right=0.88,
+    )
+    return fig, axes
+
 def plot_kde_2d(name, metrics=(GWP_biofuel_allocation, MFPP), xticks=None, yticks=None,
                 top_left='', top_right='', bottom_left='',
                 bottom_right='', xbox_kwargs=None, ybox_kwargs=None, titles=None,
@@ -1055,6 +1107,92 @@ def plot_oilcane_microbial_oil_development_sustainability_kde_2023(fs=None):
     )
     for i in ('svg', 'png'):
         file = os.path.join(images_folder, f'oilcane_microbial_oil_development_sustainability_kde.{i}')
+        plt.savefig(file, dpi=900, transparent=True)
+
+def plot_O7_combined_kde_2025(fs=None):
+    plt.style.use('dark_background')
+    plt.rcParams.update({
+        "figure.facecolor":  (0.0, 0.0, 0.0, 0), 
+        "axes.facecolor":    (0.0, 0.0, 0.0, 1), 
+        "savefig.facecolor": (0.0, 0.0, 0.0, 0), 
+    })
+    # L_per_gal = 3.78541
+    five_hundred_LSF_per_Lha = 0.001428
+    fig, axes = plot_scatter_1d(
+        ('O7',),
+        xscale=five_hundred_LSF_per_Lha,
+        yticks=[0, 1, 2, 3, 4, 5, 6, 7],
+        xticks=[[0, 2, 4, 6]],
+        metrics=[biodiesel_yield, MBSP, GWP_biodiesel_allocation],
+        xlabel="",
+        ylabel=f"MBSP [{format_units('USD/L')}]",
+        fs=12,
+        aspect_ratio=1,
+        width=4,
+        colors=['managua']*1,
+        zlabel=f"Carbon intensity [{GWP_units_L}]",
+        y_center=[0.45, 1.45],
+        x_center=1,
+        zticks=None,
+    )
+    plt.subplots_adjust(
+        wspace=0,
+        top=0.85,
+        right=0.8,
+        left=0.15,
+    )
+    fig.text(
+        0.45, 0.03,
+        f"Biodiesel yield [500 {format_units('L/FF')}]",
+        ha='center', 
+        rotation='horizontal'
+    )
+    for i in ('svg', 'png'):
+        file = os.path.join(images_folder, f'oilcane_microbial_oil_combined_kde.{i}')
+        plt.savefig(file, dpi=900, transparent=True)
+
+def plot_oilcane_microbial_oil_development_combined_kde_2023(fs=None):
+    plt.style.use('dark_background')
+    plt.rcParams.update({
+        "figure.facecolor":  (0.0, 0.0, 0.0, 0), 
+        "axes.facecolor":    (0.0, 0.0, 0.0, 1), 
+        "savefig.facecolor": (0.0, 0.0, 0.0, 0), 
+    })
+    L_per_gal = 3.78541
+    hundred_galFF_per_Lha = 0.0014265297550331405
+    fig, axes = plot_scatter_1d(
+        ('O7.1566|baseline fermentation performance', 
+         'O7.1566|target fermentation performance',
+         'O7.Target|target fermentation performance',
+         'O7.Ideal|target fermentation performance'),
+        xscale=hundred_galFF_per_Lha,
+        yscale=L_per_gal,
+        zscale=L_per_gal,
+        yticks=[0, 4, 8, 12, 16, 20, 24, 28],
+        xticks=[[0, 2, 4, 6]]*4,
+        metrics=[biodiesel_yield, MBSP, GWP_biodiesel_allocation],
+        xlabel="",
+        ylabel=f"MBSP [{format_units('USD/gal')}]",
+        fs=fs,
+        aspect_ratio=0.45,
+        width=7.6142,
+        colors=['managua']*4,
+        zlabel=f"Carbon intensity [{GWP_units_L.replace('L', 'gal')}]",
+        y_center=[0.45 * L_per_gal, 5.5],
+        x_center=1,
+    )
+    plt.subplots_adjust(
+        wspace=0,
+        top=0.85,
+    )
+    fig.text(
+        0.54, 0.03,
+        f"Biodiesel yield [100 {format_units('gal/FF')}]",
+        ha='center', 
+        rotation='horizontal'
+    )
+    for i in ('svg', 'png'):
+        file = os.path.join(images_folder, f'oilcane_microbial_oil_development_combined_kde.{i}')
         plt.savefig(file, dpi=900, transparent=True)
 
 def plot_oilcane_microbial_oil_development_economics_kde_2023(fs=None):
@@ -2051,6 +2189,60 @@ def plot_spearman(configurations, labels=None, metric=None,
             ], 
             **legend_kwargs,
         )
+    return fig, ax
+
+def plot_spearman_indicators_YRCP2025():
+    plt.style.use('dark_background')
+    plt.rcParams.update({
+        "figure.facecolor":  (0.0, 0.0, 0.0, 0), 
+        "axes.facecolor":    (0.0, 0.0, 0.0, 1), 
+        "savefig.facecolor": (0.0, 0.0, 0.0, 0), 
+    })
+    set_figure_size(aspect_ratio=0.8, width=5)
+    set_font(size=12)
+    configuration = 'O7'
+    cane.YRCP2025()
+    rhos = []
+    file = spearman_file(configuration)
+    df = pd.read_excel(file, header=[0, 1], index_col=[0, 1])
+    names = get_spearman_names(configuration, 'all')
+    labels = ['MBSP', 'CI', 'Yield']
+    metrics = [MBSP, GWP_biofuel_allocation, biodiesel_yield]
+    for metric in metrics:
+        s = df[metric.index]
+        rhos.append(
+            {j.split('\n[')[0]: s[i] for i, j in names.items() if i in s.index}
+        )
+    rhos = pd.DataFrame(rhos).T
+    rhos.fillna(0, inplace=True)
+    index = rhos.index
+    rhos = [rhos[i] for i in rhos]
+    color_wheel = [
+        GG_colors.blue, GG_colors.red, GG_colors.yellow,
+    ]
+    fig, ax = bst.plots.plot_spearman_2d(
+        rhos, index=index,
+        color_wheel=color_wheel,
+        xlabel=r"Spearman's rank correlation",
+        sort_index=(2, slice(None)),
+        top=5,
+        w=1.0,
+    )
+    # plt.legend(
+    #     handles=[
+    #         mpatches.Patch(
+    #             color=color_wheel[i].RGBn, 
+    #             label=labels[i],
+    #         )
+    #         for i in range(len(metrics))
+    #     ], 
+    #     facecolor='black',
+    #     loc='lower right',
+    # )
+    plt.subplots_adjust(left=0.40, right=0.95, top=0.98, bottom=0.12)
+    for i in ('svg', 'png'):
+        file = os.path.join(images_folder, f'spearman_indicators_O7_YRCP2023.{i}')
+        plt.savefig(file, dpi=900, transparent=True)
     return fig, ax
 
 def plot_spearman_YRCP2023(configurations=None, labels=None, 

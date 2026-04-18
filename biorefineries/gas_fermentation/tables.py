@@ -18,14 +18,14 @@ __all__ = (
     'save_detailed_life_cycle_tables',  
     'save_distribution_table',
 )
-key_scenarios = ('all fermentation-glucose growth', 'all fermentation-acetate growth')
-names = ['glucose growth', 'acetate growth']
+names = key_scenarios = ('acetate', 'acetate/glucose-seed', 'glucose')
 
 def save_system_reports():
     folder = os.path.dirname(__file__)
     folder = os.path.join(folder, 'results')
     for scenario in key_scenarios:
         pm = Biorefinery(scenario=scenario)
+        scenario = scenario.replace('/', '_')
         filename = f'{scenario}_detailed_report.xlsx'
         file = os.path.join(folder, filename)
         pm.system.save_report(file)

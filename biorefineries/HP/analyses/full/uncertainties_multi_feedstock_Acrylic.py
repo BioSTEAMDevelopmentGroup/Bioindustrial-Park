@@ -47,7 +47,7 @@ HP_results_filepath = HP_filepath + '\\analyses\\results\\'
 
 # %% 
 
-N_simulations_per_mode = 6000 # 6000
+N_simulations_per_mode = 5 # 6000
 
 percentiles = [0, 0.05, 0.1, 0.25, 0.5, 0.75, 0.9, 0.95, 1]
 
@@ -65,11 +65,11 @@ product_tag = 'Acrylic'
 modes =\
                  [
                     'DASbox \ndextrose', 
-                    '10L \ndextrose',
-                    '300L \ndextrose',
-                    '300L \ncorn',
-                    '300L \nsugarcane',
-                    '300L \ncorn stover',
+                    # '10L \ndextrose',
+                    # '300L \ndextrose',
+                    'DASbox \ncorn',
+                    'DASbox \nsugarcane',
+                    'DASbox \ncorn stover',
                     # 'E',
                     # 'B', 'F',
                     # 'C', 'G',
@@ -80,11 +80,11 @@ scenario_names = modes
              
 modelses = {
           'DASbox \ndextrose': models_glucose_improved_separations,
-          '10L \ndextrose': models_glucose_improved_separations,
-          '300L \ndextrose': models_glucose_improved_separations,
-          '300L \ncorn': models_corn_improved_separations,
-          '300L \nsugarcane': models_sc_improved_separations,
-          '300L \ncorn stover': models_cs_improved_separations,
+          # '10L \ndextrose': models_glucose_improved_separations,
+          # '300L \ndextrose': models_glucose_improved_separations,
+          'DASbox \ncorn': models_corn_improved_separations,
+          'DASbox \nsugarcane': models_sc_improved_separations,
+          'DASbox \ncorn stover': models_cs_improved_separations,
           }
 
 
@@ -375,17 +375,56 @@ scenario_xtick_labels = [i.replace('L', '-L') for i in scenario_names]
 #%% Uncertainty
 def get_small_range(num, offset):
     return(num-offset, num+offset)
-baseline_marker_shapes=["s", "^", "D","p", "h", "8"]
-baseline_marker_sizes=[6, 8, 6, 10]*2
+baseline_marker_shapes=["D", "s", "^", "p", "h", "8"]
+baseline_marker_sizes=[6, 6, 8, 10]*2
 baseline_marker_colors = ['w', '#F8858A']*4
 
+#%% Load saved file if desired (overwrites results_dict)
+file_to_load = None
+
+if file_to_load is not None:
+    for modename in modes:
+        if 'dextrose' in modename:
+            MPSP_col = 4
+            GWP_col = 245
+            FEC_col = 260
+        elif 'corn stover' in modename:
+            MPSP_col = 4
+            GWP_col = 251
+            FEC_col = 268
+        elif 'corn' in modename:
+            MPSP_col = 4
+            GWP_col = 253
+            FEC_col = 268
+        elif 'sugarcane' in modename:
+            MPSP_col = 4
+            GWP_col = 247
+            FEC_col = 263
+            
+        print(modename)
+        
+        df_baseline = pd.read_excel(file_to_load+modename.replace('\n', ' ')+'_0_baseline'+'.xlsx', sheet_name='Sheet1')
+        results_dict['Baseline']['MPSP'][modename] = df_baseline[df_baseline.columns[MPSP_col]][2]
+        results_dict['Baseline']['GWP100a'][modename] = df_baseline[df_baseline.columns[GWP_col]][2]
+        results_dict['Baseline']['FEC'][modename] = df_baseline[df_baseline.columns[FEC_col]][2]
+        
+        df_uncertainty = pd.read_excel(file_to_load+modename.replace('\n', ' ')+'_1_full_evaluation'+'.xlsx', sheet_name='TEA results')
+        results_dict['Uncertainty']['MPSP'][modename] = list(df_uncertainty[df_uncertainty.columns[MPSP_col]][2:6002])
+        results_dict['Uncertainty']['GWP100a'][modename] = list(df_uncertainty[df_uncertainty.columns[GWP_col]][2:6002])
+        results_dict['Uncertainty']['FEC'][modename] = list(df_uncertainty[df_uncertainty.columns[FEC_col]][2:6002])
+        
+        # breakpoint()
+        
 #%% MPSP
 # modes = ['A',]
-modename = mode = '300L \ndextrose'
+
 file_to_save = HP_results_filepath\
     +'_' + product_tag + '_' + 'all_modes' + '_%s.%s.%s-%s.%s'%(dateTimeObj.year, dateTimeObj.month, dateTimeObj.day, dateTimeObj.hour, minute)\
     + '_' + str(N_simulations_per_mode) + 'sims'
-    
+
+
+
+        
 MPSP_uncertainty = [results_dict['Uncertainty']['MPSP'][modename]
                     for modename in modes
                     ]
@@ -426,16 +465,16 @@ contourplots.box_and_whiskers_plot(uncertainty_data=MPSP_uncertainty,
                                                         
                                                         ],
                           # values_for_comparison=[biobased_price],
-                          n_minor_ticks=3,
+                          n_minor_ticks=4,
                           show_x_ticks=True,
                           x_tick_labels=scenario_xtick_labels,
                           x_tick_wrap_width=9,
                           y_label=r"$\bfMPSP$",
                           y_units=MPSP_units,
-                          y_ticks=np.arange(0., 2.41, 0.4),
+                          y_ticks=np.arange(0., 2.51, 0.5),
                           save_file=True,
                           fig_height=5.5,
-                          fig_width = 8,
+                          fig_width = 4,
                           box_width=0.45,
                           filename=file_to_save+'_uncertainty_MPSP',
                           dpi=600,
@@ -476,13 +515,13 @@ contourplots.box_and_whiskers_plot(uncertainty_data=GWP_uncertainty,
                           # y_label=r"$\mathrm{\bfCarbon}$" + " " + r"$\mathrm{\bfIntensity}$",
                           y_label=r"$\bfCI$",
                           y_units=GWP_units,
-                          y_ticks=np.arange(-2, 8.01, 2),
+                          y_ticks=np.arange(0, 8.01, 1),
                           save_file=True,
                           # fig_height=5.5,
                           # fig_width = 3.,
                           # box_width=0.65,
                           fig_height=5.5,
-                          fig_width = 8,
+                          fig_width = 4,
                           box_width=0.45,
                           filename=file_to_save+'_uncertainty_GWP100a',
                           dpi=600,
@@ -525,13 +564,13 @@ contourplots.box_and_whiskers_plot(uncertainty_data=FEC_uncertainty,
                           x_tick_wrap_width=9,
                           y_label=r"$\bfFEC$",
                           y_units=FEC_units,
-                          y_ticks=np.arange(-100, 150.1, 50),
+                          y_ticks=np.arange(-50, 150.1, 50),
                           save_file=True,
                           # fig_height=5.5,
                           # fig_width = 3.,
                           # box_width=0.65,
                           fig_height=5.5,
-                          fig_width = 8.25,
+                          fig_width = 4.10,
                           # fig_width = 9.6,
                           box_width=0.45,
                           filename=file_to_save+'_uncertainty_FEC',
@@ -581,7 +620,7 @@ for i in range(len(metrics)):
 
 
 contourplots.stacked_bar_plot(dataframe=df_TEA_breakdown, 
-                 y_ticks = [-40, -20, 0, 20, 40, 60, 80, 100],
+                 y_ticks = [-20, 0, 20, 40, 60, 80, 100],
                  y_label=r"$\bfCost$" + " " + r"$\bfand$" + " " +  r"$\bfUtility$" + " " +  r"$\bfBreakdown$", 
                  y_units = "%", 
                  colors=['#7BBD84', 
@@ -606,7 +645,7 @@ contourplots.stacked_bar_plot(dataframe=df_TEA_breakdown,
                          '#b6fcd5',
                          ],
                  hatch_patterns=('\\', '//', '|', 'x',),
-                 filename=file_to_save+'_'+mode+'_'+'AA_TEA_breakdown_stacked_bar_plot',
+                 filename=file_to_save+'_'+mode.replace('\n', ' ')+'_'+'AA_TEA_breakdown',
                  n_minor_ticks=4,
                  fig_height=5.5*1.1777*0.94*1.0975,
                  fig_width=10,
@@ -622,7 +661,7 @@ contourplots.stacked_bar_plot(dataframe=df_TEA_breakdown,
 #%%
 
 #%% LCA breakdown figures
-modename = mode = '300L \ndextrose'
+modename = mode = 'DASbox \ndextrose'
 file_to_save = HP_results_filepath\
     +'_' + product_tag + '_' + modename.replace('\n', ' ') + '_%s.%s.%s-%s.%s'%(dateTimeObj.year, dateTimeObj.month, dateTimeObj.day, dateTimeObj.hour, minute)\
     + '_' + str(N_simulations_per_mode) + 'sims'
@@ -656,7 +695,7 @@ contourplots.stacked_bar_plot(dataframe=df_GWP_breakdown,
                           ],
                   hatch_patterns=('\\', '//', '|', 'x', ),
                   # '#94948C', '#734A8C', '#D1C0E1', '#648496', '#B97A57', '#F8858A', 'red', 'magenta'],
-                  filename=file_to_save+'_'+mode+'_''AA_GWP_breakdown_stacked_bar_plot',
+                  filename=file_to_save+'_'+mode.replace('\n', ' ')+'_''AA_GWP_breakdown',
                   fig_width=2,
                   fig_height=5.5*1.1777*0.94)
 
@@ -685,7 +724,7 @@ contourplots.stacked_bar_plot(dataframe=df_FEC_breakdown,
                   colors=['#FEC1FE', '#FF80FF', '#A100A1', 
                           ],
                   hatch_patterns=('\\', '//', '|', 'x',),
-                  filename=file_to_save+'_'+mode+'_'+'AA_FEC_breakdown_stacked_bar_plot',
+                  filename=file_to_save+'_'+mode.replace('\n', ' ')+'_'+'AA_FEC_breakdown',
                   fig_width=2,
                   fig_height=5.5*1.1777*0.94)
 
@@ -695,7 +734,7 @@ chdir(HP_results_filepath)
 plt.rcParams['font.sans-serif'] = "Arial Unicode"
 plt.rcParams['font.size'] = "7.5"
 
-modename = mode = '300L \ndextrose'
+
 file_to_save = HP_results_filepath\
     +'_' + product_tag + '_' + modename.replace('\n', ' ') + '_%s.%s.%s-%s.%s'%(dateTimeObj.year, dateTimeObj.month, dateTimeObj.day, dateTimeObj.hour, minute)\
     + '_' + str(N_simulations_per_mode) + 'sims'
@@ -754,7 +793,7 @@ chdir(HP_results_filepath)
 plt.rcParams['font.sans-serif'] = "Arial Unicode"
 plt.rcParams['font.size'] = "7.5"
 
-modename = mode = '300L \ndextrose'
+
 file_to_save = HP_results_filepath\
     +'_' + product_tag + '_' + modename.replace('\n', ' ') + '_%s.%s.%s-%s.%s'%(dateTimeObj.year, dateTimeObj.month, dateTimeObj.day, dateTimeObj.hour, minute)\
     + '_' + str(N_simulations_per_mode) + 'sims'
@@ -804,7 +843,7 @@ chdir(HP_results_filepath)
 plt.rcParams['font.sans-serif'] = "Arial Unicode"
 plt.rcParams['font.size'] = "7.5"
 
-modename = mode = '300L \ndextrose'
+
 file_to_save = HP_results_filepath\
     +'_' + product_tag + '_' + modename.replace('\n', ' ') + '_%s.%s.%s-%s.%s'%(dateTimeObj.year, dateTimeObj.month, dateTimeObj.day, dateTimeObj.hour, minute)\
     + '_' + str(N_simulations_per_mode) + 'sims'
@@ -843,7 +882,7 @@ fig[0].show()
 #%% Sensitivity analysis take-aways
 #!!! TODO: make compatible with multiple modes
 
-modename = mode = '300L \ndextrose'
+
 file_to_save = HP_results_filepath\
     +'_' + product_tag + '_' + modename.replace('\n', ' ') + '_%s.%s.%s-%s.%s'%(dateTimeObj.year, dateTimeObj.month, dateTimeObj.day, dateTimeObj.hour, minute)\
     + '_' + str(N_simulations_per_mode) + 'sims'

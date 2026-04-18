@@ -51,9 +51,9 @@ class SeedTrain(SeedTrain):
 
 class CoFermentation(CoFermentation):
     
-    def _init(self, tau=36, N=None, V=3785.4118, T=305.15, P=101325,
+    def _init(self, tau=36, N=None, V_max=3785.4118, T=305.15, P=101325,
               Nmin=2, Nmax=36, cofermentation=None):
-        bst.BatchBioreactor._init(self, tau, N, V, T, P, Nmin, Nmax)
+        bst.BatchBioreactor._init(self, tau, N, V_max, T, P, Nmin, Nmax)
         self.P = P
         chemicals = self.chemicals
         self.loss = None

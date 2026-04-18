@@ -156,7 +156,7 @@ def plot_multiple_metrics(x_axis_list, y_axis_list_of_lists,
 
 
 #%% 
-simulate_and_plot = True
+simulate_and_plot = False
 
 if simulate_and_plot:
     

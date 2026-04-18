@@ -21,7 +21,7 @@ import flexsolve as flx
 import numpy as np
 from biosteam.exceptions import InfeasibleRegion
 from biorefineries.succinic.units import compute_succinic_acid_titer, compute_succinic_acid_mass
-from winsound import Beep
+# from winsound import Beep
 
 _red_highlight_white_text = '\033[1;47;41m'
 _yellow_text = '\033[1;33m'

@@ -10,7 +10,8 @@ GWP = 'GWP'
 characterization_factors = {
     # 'Electricity': 0.38, # [kg*CO2*eq / kWhr] From GREET 2020; NG-Fired Simple-Cycle Gas Turbine CHP Plant
     # https://www2.gov.bc.ca/assets/gov/business/natural-resource-industries/reports/carbon_intensity_of_hydrogen_production_methods.pdf
-    'H2': 1.8023, # [kg*CO2*eq / kg] From GREET 2022; Compressed G.H2 produced from PEM electrolysis (solar or wind)
+    'H2': 0, # [kg*CO2*eq / kg] From GREET 2023; Compressed G.H2 produced from PEM electrolysis (solar or wind)
+    #'H2': 1.8023, # [kg*CO2*eq / kg] From GREET 2022; Compressed G.H2 produced from PEM electrolysis (solar or wind)
     'Cornstover': 0.03819, # [kg*CO2*eq / kg] From GREET 2023; Miscanthus for ethanol production
     'Miscanthus': 0.07606, # [kg*CO2*eq / kg] From GREET 2023; Miscanthus for ethanol production
     'Flue gas': -0.07134147183700712, # [kg*CO2*eq / kg] Assume C is displaced from flue gas
