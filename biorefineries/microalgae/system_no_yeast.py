@@ -3,7 +3,7 @@
 Created on Sat July 05 12:50:00 2025
 
 Microalgae biorefinery to produce medium chain fatty acids 
-by anaerobic fermentation without external electron donor addition- system
+by anaerobic fermentation without external electron donor addition- system without yeast
 
 References
 ----------
@@ -31,7 +31,7 @@ from biosteam import main_flowsheet
 import os
 from datetime import datetime
 from .units import (
-    FeedstockPreprocessing, AcidPretreatmentReactor, Saccharification, SolidLiquidSeparation, MCCAFermentation, 
+    FeedstockPreprocessing, AcidPretreatmentReactor, Saccharification, SolidLiquidSeparation, MCCAFermentation_no_yeast, 
     NeutralizationTank, AnaerobicDigestion
 )
 from .utils import price
@@ -74,7 +74,7 @@ bst.System.default_relative_molar_tolerance = 1e-1 # supersedes absolute toleran
 bst.System.strict_convergence = False # True => throw exception if system does not converge; False => continue with unconverged system
 
 @SystemFactory(
-    ID='Microalgae_MCCA_production',
+    ID='Microalgae_MCCA_production_no_yeast',
     ins=[dict(microalgae_feed, thermo=chems)],
     outs=[
           #dict(ID='butanol_product', thermo=chems), 
@@ -83,7 +83,7 @@ bst.System.strict_convergence = False # True => throw exception if system does n
           dict(ID='heptanoic_acid_product', thermo=chems), 
           dict(ID='caprylic_acid_product', thermo=chems)]
     )
-def create_microalgae_MCCA_production_sys(ins, outs):
+def create_microalgae_MCCA_production_no_yeast_sys(ins, outs):
     # Set the thermodynamic package explicitly
     tmo.settings.set_thermo(chems)
     
@@ -116,8 +116,8 @@ def create_microalgae_MCCA_production_sys(ins, outs):
     nh4oh_mass = nh4oh_mol * 35 / 1000 # mol mass to mass
     ammonium_hydroxide = Stream('ammonium_hydroxide', NH4OH=nh4oh_mass, units='kg/hr', price=price['AmmoniumHydroxide'])
     # Enzyme dosages
-    gluco_coeff = 0.0011  # kg enzyme per kg microalgae
-    alpha_coeff = 0.0082  # kg enzyme per kg microalgae
+    gluco_coeff = 0.0011
+    alpha_coeff = 0.0082
     glucoamylase_mass = float(microalgae_mass * gluco_coeff)
     alpha_amylase_mass = float(microalgae_mass * alpha_coeff)
     glucoamylase = Stream('glucoamylase', GlucoAmylase=glucoamylase_mass, units='kg/hr', price=price['GlucoAmylase'])
@@ -131,11 +131,6 @@ def create_microalgae_MCCA_production_sys(ins, outs):
     naoh2_mass = microalgae_mass * 0.02 # pH 5.5
     total_naoh_mass = naoh1_mass + naoh2_mass
     naoh = Stream('naoh', NaOH=total_naoh_mass, units='kg/hr', price=price['NaOH'])
-    # Yeast addition in MCCA fermentation
-    yeast_mass = microalgae_mass * 5 / 75
-    fresh_yeast = Stream('fresh_yeast', Yeast=yeast_mass, units='kg/hr', price=price['Yeast'])
-    yeast_recycle = Stream('yeast_recycle', Yeast=0, units='kg/hr')
-    yeast_feed = bst.Stream('yeast') 
     # OleylAlcohol for extraction
     fresh_oleylalcohol = Stream('fresh_oleylalcohol', OleylAlcohol=200, units='kg/hr', price=price['OleylAlcohol'])
     oleylalcohol_recycle = Stream('oleylalcohol_recycle', OleylAlcohol=50, units='kg/hr')
@@ -185,19 +180,9 @@ def create_microalgae_MCCA_production_sys(ins, outs):
     # Area 3: Fermentation for MCCA production
     # =====================
     H301 = HXutility('H301', P208-0, T=37+273.15)
-    
-    # Yeast mixing for fresh and recycle
-    M301 = Mixer('M301', [fresh_yeast, yeast_recycle], yeast_feed)
-    @M301.add_specification(run=True)
-    def adjust_fresh_yeast():
-        total_yeast_needed = yeast_mass  
-        recycle = yeast_recycle.imass['Yeast']
-        fresh = max(total_yeast_needed - recycle, total_yeast_needed * 0.05)  # 5% fresh yeast supply
-        fresh_yeast.imass['Yeast'] = fresh
-    
-    T301 = StorageTank('T301', yeast_feed)
+    T301 = StorageTank('T301', H301-0)
     P301 = Pump('P301', T301-0)
-    R301 = MCCAFermentation('R301', [H301-0, P301-0], ['', '', '', yeast_recycle], microalgae_mass_flow=microalgae_mass, titer = 2.003)
+    R301 = MCCAFermentation_no_yeast('R301', P301-0, microalgae_mass_flow=microalgae_mass, titer = 1.208)
 
     # Add C6 yield factor specification
     @R301.add_specification(run=True)
@@ -272,7 +257,6 @@ def create_microalgae_MCCA_production_sys(ins, outs):
     # Add distillation efficiency specification
     distillation_units = [D402, D403, D404, D405]
     @D403.add_specification(run=True)  # Use D403 as the representative unit
-    
     def set_distillation_efficiency(efficiency=1.0):
         for unit in distillation_units:
             unit.Lr = 0.99 * efficiency
@@ -291,7 +275,6 @@ def create_microalgae_MCCA_production_sys(ins, outs):
         water_mass_acid_new = acid_solution_mass_new * (1 - acid_purity)
         _sulfuric_acid_stream.imass['H2SO4'] = pure_h2so4
         _sulfuric_acid_stream.imass['Water'] = water_mass_acid_new
-    # Bind as method for parameter loading (function(x))
     R201.set_acid_loading = lambda x: (
         _sulfuric_acid_stream.imass.__setitem__('H2SO4', microalgae_mass*float(x)) or
         _sulfuric_acid_stream.imass.__setitem__('Water', (microalgae_mass*float(x))/acid_purity*(1-acid_purity))
@@ -308,7 +291,6 @@ def create_microalgae_MCCA_production_sys(ins, outs):
         nonlocal alpha_coeff
         alpha_coeff = float(x)
         _alpha_amylase_stream.imass['AlphaAmylase'] = microalgae_mass * alpha_coeff
-    # Bind as methods for parameter loading (function(x))
     R203.set_glucoamylase_loading = lambda x: _glucoamylase_stream.imass.__setitem__('GlucoAmylase', microalgae_mass * float(x))
     R204.set_alpha_amylase_loading = lambda x: _alpha_amylase_stream.imass.__setitem__('AlphaAmylase', microalgae_mass * float(x))
 
@@ -360,69 +342,50 @@ def create_microalgae_MCCA_production_sys(ins, outs):
 # Create system and TEA objects at module level for import
 u = flowsheet.unit
 s = flowsheet.stream
-microalgae_mcca_sys = create_microalgae_MCCA_production_sys()
-microalgae_mcca_sys.simulate()
+microalgae_mcca_sys_no_yeast = create_microalgae_MCCA_production_no_yeast_sys()
+microalgae_mcca_sys_no_yeast.simulate()
 
 # TEA analysis
 # Dry biomass feed rate in ton per day (t/d)
 dry_tpd = u.U101.ins[0].F_mass * 24 / 1000  # kg/h -> t/d
-microalgae_tea = microalgae_tea(microalgae_mcca_sys)
+microalgae_tea_no_yeast = microalgae_tea(microalgae_mcca_sys_no_yeast)
 
 if __name__ == '__main__':
-    microalgae_mcca_sys.diagram('cluster', format='png')
-    microalgae_mcca_sys.print()
+    microalgae_mcca_sys_no_yeast.diagram('cluster', format='png')
+    microalgae_mcca_sys_no_yeast.print()
     print("\n===== Techno-Economic Analysis (TEA) Main Results =====")
     # Use the system's main product stream directly for price calculation
     caproic_acid_product = s.caproic_acid_product
-    price = microalgae_tea.solve_price(caproic_acid_product)
-    print(f"Caproic Acid Minimum Selling Price: {price:.2f} $/kg")
-    if caproic_acid_product.F_mass > 0 and caproic_acid_product.price > 0:
-        print("Caproic Acid Unit Production Cost:", microalgae_tea.production_costs([caproic_acid_product]))
-    print("NPV:", microalgae_tea.NPV)
-    print("TCI:", microalgae_tea.TCI)
-    print("FCI:", microalgae_tea.FCI)
-    print("DPI:", microalgae_tea.DPI)
-    print("TDC:", microalgae_tea.TDC)
-    print("FOC:", microalgae_tea.FOC)
-    print("VOC:", microalgae_tea.VOC)
-    print("AOC:", microalgae_tea.AOC)
-    print("ROI:", microalgae_tea.ROI)
-    print("PBP:", microalgae_tea.PBP)
-    print("Annual Depreciation:", microalgae_tea.annual_depreciation)
-    print("Sales:", microalgae_tea.sales)
-    print("Material Cost:", microalgae_tea.material_cost)
-    print("Utility Cost:", microalgae_tea.utility_cost)
-    print("CAPEX Table:\n", microalgae_tea.CAPEX_table())
-    print("FOC Table:\n", microalgae_tea.FOC_table())
-    cashflow_df = microalgae_tea.get_cashflow_table()
+    if caproic_acid_product is not None:
+        if caproic_acid_product.price is None or caproic_acid_product.price == 0:
+            caproic_acid_product.price = 4.5
+        price = microalgae_tea_no_yeast.solve_price(caproic_acid_product)
+        print(f"Caproic Acid Minimum Selling Price: {price:.2f} $/kg")
+        if caproic_acid_product.F_mass > 0 and caproic_acid_product.price > 0:
+            print("Caproic Acid Unit Production Cost:", microalgae_tea_no_yeast.production_costs([caproic_acid_product]))
+    print("NPV:", microalgae_tea_no_yeast.NPV)
+    print("TCI:", microalgae_tea_no_yeast.TCI)
+    print("FCI:", microalgae_tea_no_yeast.FCI)
+    print("DPI:", microalgae_tea_no_yeast.DPI)
+    print("TDC:", microalgae_tea_no_yeast.TDC)
+    print("FOC:", microalgae_tea_no_yeast.FOC)
+    print("VOC:", microalgae_tea_no_yeast.VOC)
+    print("AOC:", microalgae_tea_no_yeast.AOC)
+    print("ROI:", microalgae_tea_no_yeast.ROI)
+    print("PBP:", microalgae_tea_no_yeast.PBP)
+    print("Annual Depreciation:", microalgae_tea_no_yeast.annual_depreciation)
+    print("Sales:", microalgae_tea_no_yeast.sales)
+    print("Material Cost:", microalgae_tea_no_yeast.material_cost)
+    print("Utility Cost:", microalgae_tea_no_yeast.utility_cost)
+    print("CAPEX Table:\n", microalgae_tea_no_yeast.CAPEX_table())
+    print("FOC Table:\n", microalgae_tea_no_yeast.FOC_table())
+    cashflow_df = microalgae_tea_no_yeast.get_cashflow_table()
     print("Cashflow Table:\n", cashflow_df.to_string(index=True))
-    # Save cashflow as CSV to analyses/results with timestamp
     results_dir = os.path.join(os.path.dirname(__file__), 'analyses', 'results')
     os.makedirs(results_dir, exist_ok=True)
     timestamp = datetime.now().strftime('%Y%m%d-%H%M%S')
-    csv_path = os.path.join(results_dir, f"cashflow_{timestamp}.csv")
+    csv_path = os.path.join(results_dir, f"cashflow_no_yeast_{timestamp}.csv")
     cashflow_df.to_csv(csv_path, index=True)
     print(f"Cashflow CSV saved to: {csv_path}")
-    
-    # Quick check: product flows in each units
-    # print("\n===== Stream Mass Flows for Each Unit (kg/hr) =====")
-    # for u_ in microalgae_mcca_sys.units:
-    #     print(f"\n[{u_.ID} - {u_.__class__.__name__}]")
-    #     for i, stream in enumerate(u_.ins):
-    #         if stream:
-    #             print(f"  Inlet {i+1} ({stream.ID}):")
-    #             for chem, flow in zip(stream.chemicals.IDs, stream.mass):
-    #                 if abs(flow) > 1e-6:
-    #                     print(f"    {chem}: {flow:.2f} kg/hr")
-    #     for i, stream in enumerate(u_.outs):
-    #         if stream:
-    #             print(f"  Outlet {i+1} ({stream.ID}):")
-    #             for chem, flow in zip(stream.chemicals.IDs, stream.mass):
-    #                 if abs(flow) > 1e-6:
-    #                     print(f"    {chem}: {flow:.2f} kg/hr")
 
-    # Quick check: product flows and prices
-    # for p in (#s.butanol_product, 
-    #           s.caproic_acid_product,s.heptanoic_acid_product, s.caprylic_acid_product, s.butyric_acid_product):
-    #    print(f"{p.ID}: {p.F_mass:.2f} kg/h @ {p.price} $/kg")
 
