@@ -415,16 +415,27 @@ def objective_sequential(x_new_raw, lambda_size=1e4, lambda_overlap=0, use_mean_
         c_p_f, s_p_f = predictor.predict(fixed_arr)
         a_f = calculate_areas_vectorized(fixed_arr.T, 4)/1e6
         
-        size_f = s_p_f * a_f * conv_factor
+        size_f = np.maximum(s_p_f * a_f * conv_factor, 1e-3) # Changed here
         cost_ton_f = (c_p_f * a_f) / (s_p_f * a_f * ton_to_kg)
         b_f, c_f = bc_interpolator(fixed_arr[:, :2])
         
         msp_f = a * cost_ton_f + (b_f / size_f) + c_f
         current_system_vol = np.sum(size_f)
         total_revenue += np.sum(msp_f * size_f)
-        
+    
     total_vol = current_system_vol + size_units
-    system_msp = total_revenue / total_vol
+    
+    if total_vol < 1e-6:
+        # If there's no volume, the MSP is effectively infinite or a very high penalty
+        system_msp = 2500.0 
+    else:
+        system_msp = total_revenue / total_vol
+
+    # Check for NaNs before returning
+    if np.isnan(system_msp):
+        system_msp = 2500.0  # Assign a high default value if calculation failed            
+        total_vol = current_system_vol + size_units
+        system_msp = total_revenue / total_vol
     
     # --- 6. FLEXIBLE PENALTIES ---
     # Check if target is already hit
@@ -434,7 +445,8 @@ def objective_sequential(x_new_raw, lambda_size=1e4, lambda_overlap=0, use_mean_
         # If target met, force this refinery to zero size/area
         size_penalty = 1e6 * (size_mmgal_new**2)
         # return a very high value so the optimizer doesn't place anything here
-        return float(2500.0 + size_penalty) 
+        # return float(2500.0 + size_penalty) 
+        return 1e10  # Return a massive constant instead of a calculation
 
     if not target_mode:
         # Standard Mode: Every refinery tries to hit S_target_individual
@@ -533,6 +545,7 @@ def size_con_sequential_flex(x_new_raw, circular=False, S_target_individual=400,
     # X_norm = (x_reshaped - X_min) / (X_max - X_min)
     
     _, size_pred = predictor.predict(x_new)
+    size_pred = np.maximum(size_pred, 0.0) # ADDED THIS
     # size_pred = predict_batch_rbf_size(X_norm, model_size_total, scale_size_total, y2_min, y2_max)
     areas_preds = calculate_areas_vectorized(x_reshaped.T, 4)/1e6
     if product_name == 'ethanol':
