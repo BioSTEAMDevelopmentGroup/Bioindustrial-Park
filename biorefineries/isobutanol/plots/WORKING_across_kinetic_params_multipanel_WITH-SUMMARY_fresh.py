@@ -88,7 +88,7 @@ metrics_units = {
     
 #%%
 def plot_save_kinetic_multipanel(metric, row_parameter_pairs=None, strategies=None, steps=None,
-                                 z_label=None,):
+                                 z_label=None, show_optima=False):
     if z_label is None:
         z_label = 'Spike feed glucose concentration'
     if steps is None:
@@ -120,7 +120,7 @@ def plot_save_kinetic_multipanel(metric, row_parameter_pairs=None, strategies=No
     # -----------------------------------------------------------------------------
     # Shared metadata from across_kinetic_params.py
     # -----------------------------------------------------------------------------
-    fbs_spec = isobutanol.models.fbs_spec
+    # fbs_spec = isobutanol.models.fbs_spec
     
     
     metrics_plot_names = {k: k for k in metrics_units.keys()}
@@ -237,7 +237,8 @@ def plot_save_kinetic_multipanel(metric, row_parameter_pairs=None, strategies=No
             raise ValueError(f'Unsupported y_label: {y_label}')
     
         if z_label == 'Spike feed glucose concentration':
-            spec_3 = np.array([fbs_spec.conc_sugars_feed_spike])
+            # spec_3 = np.array([fbs_spec.conc_sugars_feed_spike])
+            spec_3 = np.array([600.])
             z_units = r"$\mathrm{g} \cdot \mathrm{L}^{-1}$"
             z_ticks = [0, 200, 400, 600, 800]
         else:
@@ -590,27 +591,28 @@ def plot_save_kinetic_multipanel(metric, row_parameter_pairs=None, strategies=No
                 continue
     
             additional_points = {}
-            for opt_metric, opt_record in rowwise_optima.get(i, {}).items():
-                if opt_record['strategy'] == strategy:
-                    # For data with x_label in ('k_1e',) and y_label in ('k_1ie', 'k_7ie'), only ethanol is produced; however, etoh yield is saved as 'combined yield' rather than 'etoh yield'
-                    if opt_metric=='Combined Yield' and x_label in ('k_1e',) and y_label in ('k_1ie', 'k_7ie'):
-                        try:
-                            additional_points[(opt_record['x'], opt_record['y'])] = metric_marker_styles['EtOH Yield']
-                        except:
-                            additional_points[(opt_record['x'], opt_record['y'])] = ('p', 'w', 8)
-                    else:
-                        additional_points[(opt_record['x'], opt_record['y'])] = metric_marker_styles[opt_metric]
+            if show_optima:
+                for opt_metric, opt_record in rowwise_optima.get(i, {}).items():
+                    if opt_record['strategy'] == strategy:
+                        # For data with x_label in ('k_1e',) and y_label in ('k_1ie', 'k_7ie'), only ethanol is produced; however, etoh yield is saved as 'combined yield' rather than 'etoh yield'
+                        if opt_metric=='Combined Yield' and x_label in ('k_1e',) and y_label in ('k_1ie', 'k_7ie'):
+                            try:
+                                additional_points[(opt_record['x'], opt_record['y'])] = metric_marker_styles['EtOH Yield']
+                            except:
+                                additional_points[(opt_record['x'], opt_record['y'])] = ('p', 'w', 8)
+                        else:
+                            additional_points[(opt_record['x'], opt_record['y'])] = metric_marker_styles[opt_metric]
             
-            # add baseline marker
-            baseline_coords = None
-            if x_label in ('k_1e',) and y_label in ('k_1ie', 'k_7ie',):
-                baseline_coords = (47.1, 0.04)
-            elif x_label in ('k_13',) and y_label in ('k_7ii',):
-                # baseline_coords = (5.81, 0.04)
-                # baseline_coords = (0.0, 0.04)
-                pass
-            if baseline_coords is not None:
-                additional_points[baseline_coords] = ('D', 'gray', 6)
+                # add baseline marker
+                baseline_coords = None
+                if x_label in ('k_1e',) and y_label in ('k_1ie', 'k_7ie',):
+                    baseline_coords = (47.1, 0.04)
+                elif x_label in ('k_13',) and y_label in ('k_7ii',):
+                    # baseline_coords = (5.81, 0.04)
+                    # baseline_coords = (0.0, 0.04)
+                    pass
+                if baseline_coords is not None:
+                    additional_points[baseline_coords] = ('D', 'gray', 6)
                 
             contourplots.animated_contourplot(
                 w_data_vs_x_y_at_multiple_z=arr,
@@ -658,12 +660,16 @@ def plot_save_kinetic_multipanel(metric, row_parameter_pairs=None, strategies=No
                 # include_x_axis_ticklabels=(i == nrows - 1),
                 include_x_axis_ticklabels=True,
                 # include_last_x_axis_ticklabel=(j==ncols-1),
+                
                 include_last_x_axis_ticklabel=True,
+                
                 include_y_axis_ticklabels=(j == 0),
                 additional_points=additional_points,
                 fig_ax_to_use=(fig, ax),
                 comparison_range=comparison_range,
+                
                 show_comparison_range_clabels=False,
+                
                 inline_spacing=0.1,
                 label_over_color='black',
             )
@@ -686,7 +692,7 @@ def plot_save_kinetic_multipanel(metric, row_parameter_pairs=None, strategies=No
     fig.set_figwidth(3.2 * ncols + 1.2)
     fig.set_figheight(2.7 * nrows + 1.6)
     
-    plt.savefig(output_filename, transparent=False, facecolor='white', bbox_inches='tight', dpi=600)
+    plt.savefig(output_filename, transparent=False, facecolor='white', bbox_inches='tight', dpi=1200)
     plt.close(fig)
     
     print(f'Saved multi-panel figure to: {output_filename}')
