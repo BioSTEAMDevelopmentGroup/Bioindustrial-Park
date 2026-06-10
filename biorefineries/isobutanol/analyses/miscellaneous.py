@@ -24,7 +24,7 @@ f = model.system.flowsheet
 V406 = f.V406
 r = V406.kinetic_reaction_system
 
-scenario = 'B'
+scenario = 'A'
 IBO_filepath = isobutanol.__file__.replace('\\__init__.py', '')
 parameter_distributions_filename = IBO_filepath+\
     '\\analyses\\full\\parameter_distributions\\'+\
