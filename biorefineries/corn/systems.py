@@ -156,7 +156,7 @@ def create_system(flowsheet=None, biorefinery_settings=None):
     E402 = bst.HXutility('E402', E401-0, ft=0.95, U=0.9937, T=32.2 + 273.15)
     V403 = units.YeastTank('V403', yeast)
     P404 = bst.Pump('P404', V403-0)
-    V405 = units.SSF('V405', (E402-0, P404-0), outs=('CO2', ''), V_max=1.9e3)
+    V405 = units.SSF('V405', (E402-0, P404-0), outs=('CO2', ''), V=1.9e3)
     
     @V405.add_specification(run=True)
     def correct_saccharification_feed_flows():
@@ -239,7 +239,7 @@ def create_system(flowsheet=None, biorefinery_settings=None):
     
     MX5 = bst.Mixer('MX5', (Ev607-1, P410-0, u.P508-0))
     MX6 = bst.Mixer('MX6', (C603_2-1, MH604-0))
-    D610 = bst.DrumDryer('D610', (MX6-0, 'dryer_air', 'natural_gas'), moisture_content=0.10, split=dict(Ethanol=1.0), RH=1)
+    D610 = bst.DrumDryer('D610', (MX6-0, 'dryer_air', 'natural_gas'), moisture_content=0.10, split=dict(Ethanol=1.0))
     X611 = bst.ThermalOxidizer('X611', (D610-1, 'oxidizer_air', ''))
     MH612 = units.DDGSHandling('MH612', D610-0, DDGS)
     T608 = bst.facilities.ProcessWaterCenter(

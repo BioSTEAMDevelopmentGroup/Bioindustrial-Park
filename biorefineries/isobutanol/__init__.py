@@ -8,26 +8,26 @@
 # for license details.
 
 from . import (
-    # models,
+    models,
     plots,
-    # system, 
-    # units,
-    # utils,
+    system, 
+    units,
+    utils,
     )
 
 __all__ = [
-            # *models.__all__,
+            *models.__all__,
             *plots.__all__,
-            # *system.__all__,
-            # *units.__all__,
-            # *utils.__all__,
+            *system.__all__,
+            *units.__all__,
+            *utils.__all__,
 ]
 
-# from .models import *
+from .models import *
 from .plots import *
-# from .system import *
-# from .units import *
-# from .utils import *
+from .system import *
+from .units import *
+from .utils import *
 
 # def load(*args, **kwargs):
 #     br = Biorefinery(*args, **kwargs)
