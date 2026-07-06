@@ -220,8 +220,17 @@ V406 = nsk.units.NSKFermentation('V406',
                                  n_decimal_places_for_tau_update_policy=0,
                                  try_fewer_n_spikes_until=lambda r_te: round(r_te.s_glu, 2)==0.0,
                                  perform_hydrolysis=False,
+                                 
+                                 # !!!
+                                 
+                                 # # Option i
+                                 # stop_aeration_when_cell_density_plateaus = True
+                                 
+                                 # Option ii
                                  stage_1_max_x=5.0,
-                                 stage_1_max_time=25.0)
+                                 stage_1_max_time=25.0,
+                                 
+                                 )
 
 V406-0-1-f.V409
 V406-1-0-f.P406
@@ -1187,7 +1196,7 @@ IBO_separation_units = [i for i in corn_EtOH_IBO_sys.units
                         if not i in list(corn_EtOH_IBO_sys.facilities) + corn_EtOH_IBO_sys_no_IBO_recovery.units
                                     + feedstock_acquisition_group.units + feedstock_saccharification_group.units
                                     + sugar_solution_preparation_group.units + fermentation_group.units
-                                    + [f.H402]]
+                                    + [f.H402, f.V514]]
 
 isobutanol_separation_group = bst.UnitGroup('isobutanol separation', units=IBO_separation_units)
 
@@ -1199,7 +1208,7 @@ storage_and_handling_group = bst.UnitGroup('storage and handling',
 
 DDGS_recovery_group = bst.UnitGroup('DDGS recovery', 
                                     units = [i for i in list(f.M403.get_downstream_units())
-                                             if not i in [f.MX5, f.T608]])
+                                             if not i in [f.MX5, f.T608, f.MH612]])
 
 ethanol_separation_group = bst.UnitGroup('ethanol separation', 
                              units= [i for i in corn_EtOH_IBO_sys.units

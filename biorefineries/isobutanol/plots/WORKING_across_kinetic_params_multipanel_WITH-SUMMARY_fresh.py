@@ -47,7 +47,7 @@ from biorefineries import isobutanol
 # -----------------------------------------------------------------------------
 # User inputs
 # -----------------------------------------------------------------------------
-metric = 'MPSP'
+metric = 'AOC'
 z_label = 'Spike feed glucose concentration'
 steps = (25, 25, 1)
 

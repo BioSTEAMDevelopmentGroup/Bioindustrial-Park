@@ -423,6 +423,8 @@ def get_major_units_df(units, unit_groups, save_filename='major_units.xlsx',
         found_area = False
         for j in unit_groups:
             if ui in j.units:
+                if found_area:
+                    breakpoint()
                 areas.append(j.name)
                 found_area = True
         if not found_area: areas.append('?')
@@ -461,9 +463,11 @@ def get_major_units_df(units, unit_groups, save_filename='major_units.xlsx',
         exclude_given_indices_from_list(equipment_strings, exc_ind),\
         exclude_given_indices_from_list(sources, exc_ind)
     
-    df = pd.DataFrame(data={'Process': areas, 'ID': IDs, 'Unit': lines, 'Equipment': equipment_strings, 'Sources': sources})
-    df.to_excel(save_filename)
-    
+    try:
+        df = pd.DataFrame(data={'Process': areas, 'ID': IDs, 'Unit': lines, 'Equipment': equipment_strings, 'Sources': sources})
+        df.to_excel(save_filename)
+    except:
+        breakpoint()
 
     return df
 
