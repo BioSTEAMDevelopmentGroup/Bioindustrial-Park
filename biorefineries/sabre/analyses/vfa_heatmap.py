@@ -14,7 +14,7 @@ feedstock price (x-axis) and biostimulant price (y-axis)
 for the acidogenic AD–fermentation pathway.
 
 Outputs:
-  - fig_vfa_msp_heatmap.png / .pdf   (single panel, main text)
+  - fig_vfa_msp_heatmap.png   (single panel, main text)
 
 Run from sabre_project root:
     python scripts/vfa_heatmap.py
@@ -30,8 +30,10 @@ import matplotlib.pyplot as plt
 import numpy as np
 
 SCRIPT_DIR = Path(__file__).resolve().parent
-if str(SCRIPT_DIR) not in sys.path:
-    sys.path.append(str(SCRIPT_DIR))
+REPO_ROOT = SCRIPT_DIR.parents[2]
+for _p in (REPO_ROOT, SCRIPT_DIR):
+    if str(_p) not in sys.path:
+        sys.path.insert(0, str(_p))
 
 from vfa_fermentation_tea import (
     OIL_EXTRACTION_REAGENT_USD_PER_KG_OIL,
@@ -43,7 +45,7 @@ from vfa_fermentation_tea import (
 from biorefineries.sabre._tea import make_baseline_tea, solve_product_msp
 
 
-OUT = Path("results/figures")
+OUT = SCRIPT_DIR.parent / "results" / "figures"
 OUT.mkdir(parents=True, exist_ok=True)
 
 # ── Grid definition ───────────────────────────────────────────────────────────
@@ -189,7 +191,6 @@ fig.legend(handles=legend_handles, fontsize=8, frameon=False,
 
 fig.tight_layout()
 fig.savefig(OUT / "fig_vfa_msp_heatmap.png", bbox_inches="tight")
-fig.savefig(OUT / "fig_vfa_msp_heatmap.pdf", bbox_inches="tight")
 print("\nSaved: fig_vfa_msp_heatmap.png")
 
 # ── Console summary ───────────────────────────────────────────────────────────

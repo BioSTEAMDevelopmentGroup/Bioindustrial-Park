@@ -7,16 +7,22 @@
 # for license details.
 
 import os
+import sys
 from pathlib import Path
 
 import biosteam as bst
 
 os.environ["PATH"] = "/opt/homebrew/bin:" + os.environ["PATH"]
 
+SCRIPT_DIR = Path(__file__).resolve().parent
+REPO_ROOT = SCRIPT_DIR.parents[2]
+if str(REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(REPO_ROOT))
+
 from biorefineries.sabre._chemicals import set_thermo
 from biorefineries.sabre.systems import create_integrated_biorefinery
 
-OUTDIR = Path("results") / "flowsheets"
+OUTDIR = SCRIPT_DIR.parent / "results" / "flowsheets"
 OUTDIR.mkdir(parents=True, exist_ok=True)
 
 set_thermo()

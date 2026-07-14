@@ -11,13 +11,13 @@ vfa_price_scenarios.py
 ---------------------------
 
 Figures:
-1) fig_vfa_feed_price.png / pdf
+1) fig_vfa_feed_price.png
    - crude microbial oil MSP vs feed price
 
-2) fig_vfa_biostimulant_price.png / pdf
+2) fig_vfa_biostimulant_price.png
    - crude microbial oil MSP vs assumed biostimulant price
 
-3) fig_vfa_product_scenarios.png / pdf
+3) fig_vfa_product_scenarios.png
    - MSP by product scenario, with market-price markers
    - initial scoping assumptions
 
@@ -36,8 +36,10 @@ from matplotlib.patches import Patch
 from matplotlib.lines import Line2D
 
 SCRIPT_DIR = Path(__file__).resolve().parent
-if str(SCRIPT_DIR) not in sys.path:
-    sys.path.append(str(SCRIPT_DIR))
+REPO_ROOT = SCRIPT_DIR.parents[2]
+for _p in (REPO_ROOT, SCRIPT_DIR):
+    if str(_p) not in sys.path:
+        sys.path.insert(0, str(_p))
 
 from vfa_fermentation_tea import (
     FEED_PRICE_CASES,
@@ -53,7 +55,7 @@ from vfa_fermentation_tea import (
 from biorefineries.sabre._tea import make_baseline_tea, solve_product_msp
 
 
-OUT = Path("results/figures")
+OUT = SCRIPT_DIR.parent / "results" / "figures"
 OUT.mkdir(parents=True, exist_ok=True)
 
 # ── Base assumptions ──────────────────────────────────────────────────────────
@@ -218,7 +220,6 @@ def make_feed_price_figure():
 
     fig.tight_layout()
     fig.savefig(OUT / "fig_vfa_feed_price.png", bbox_inches="tight")
-    fig.savefig(OUT / "fig_vfa_feed_price.pdf", bbox_inches="tight")
     print("Saved: fig_vfa_feed_price.png")
 
 
@@ -275,7 +276,6 @@ def make_biostimulant_price_figure():
 
     fig.tight_layout()
     fig.savefig(OUT / "fig_vfa_biostimulant_price.png", bbox_inches="tight")
-    fig.savefig(OUT / "fig_vfa_biostimulant_price.pdf", bbox_inches="tight")
     print("Saved: fig_vfa_biostimulant_price.png")
 
 
@@ -381,7 +381,6 @@ def make_product_scenarios_figure():
 
     fig.tight_layout()
     fig.savefig(OUT / "fig_vfa_product_scenarios.png", bbox_inches="tight")
-    fig.savefig(OUT / "fig_vfa_product_scenarios.pdf", bbox_inches="tight")
     print("Saved: fig_vfa_product_scenarios.png")
 
     print("\nProduct scenario results:")

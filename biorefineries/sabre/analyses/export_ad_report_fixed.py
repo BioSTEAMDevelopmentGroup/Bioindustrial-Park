@@ -19,12 +19,18 @@ from __future__ import annotations
 
 import argparse
 import math
+import sys
 from pathlib import Path
 from typing import Any
 
 from openpyxl import Workbook
 from openpyxl.styles import Alignment, Border, Font, PatternFill, Side
 from openpyxl.utils import get_column_letter
+
+SCRIPT_DIR = Path(__file__).resolve().parent
+REPO_ROOT = SCRIPT_DIR.parents[2]
+if str(REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(REPO_ROOT))
 
 from biorefineries.sabre._chemicals import set_thermo
 from biorefineries.sabre._process_settings import load_assumptions
@@ -421,7 +427,10 @@ def write_diagnostics_sheet(wb: Workbook, cases_data: dict[str, dict[str, Any]])
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--quality", default="pelagic_high_quality")
-    parser.add_argument("--out", default="results/SaBRe_Unit_CAPEX_OPEX_generated.xlsx")
+    parser.add_argument(
+        "--out",
+        default=str(SCRIPT_DIR.parent / "results" / "SaBRe_Unit_CAPEX_OPEX_generated.xlsx"),
+    )
     args = parser.parse_args()
 
     set_thermo()

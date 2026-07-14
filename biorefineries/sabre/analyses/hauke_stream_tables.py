@@ -16,14 +16,25 @@ a BioSTEAM stream output Excel table matching Hauke's format:
 Output: AD_stream_table.xlsx
 """
 
+import sys
+from pathlib import Path
+
 import biosteam as bst
 import pandas as pd
 from openpyxl import load_workbook
 from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
 from openpyxl.utils import get_column_letter
 
+SCRIPT_DIR = Path(__file__).resolve().parent
+REPO_ROOT = SCRIPT_DIR.parents[2]
+if str(REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(REPO_ROOT))
+
 from biorefineries.sabre._chemicals import set_thermo
 from biorefineries.sabre.systems import create_ad_biogas_system
+
+OUT = SCRIPT_DIR.parent / "results"
+OUT.mkdir(parents=True, exist_ok=True)
 
 # ── Configuration ──────────────────────────────────────────────────────────
 
@@ -179,7 +190,7 @@ df = pd.DataFrame(all_rows)
 
 # ── Write Excel ────────────────────────────────────────────────────────────
 
-OUTFILE = "AD_stream_table.xlsx"
+OUTFILE = OUT / "AD_stream_table.xlsx"
 
 # Column order
 meta_cols  = ["case", "stream", "phase", "F_mass_kg_hr",

@@ -29,8 +29,10 @@ import numpy as np
 import biosteam as bst
 
 SCRIPT_DIR = Path(__file__).resolve().parent
-if str(SCRIPT_DIR) not in sys.path:
-    sys.path.append(str(SCRIPT_DIR))
+REPO_ROOT = SCRIPT_DIR.parents[2]
+for _p in (REPO_ROOT, SCRIPT_DIR):
+    if str(_p) not in sys.path:
+        sys.path.insert(0, str(_p))
 
 from vfa_fermentation_tea import (
     build_and_simulate,
@@ -41,7 +43,7 @@ from vfa_fermentation_tea import (
 from biorefineries.sabre._tea import make_baseline_tea, solve_product_msp
 
 
-OUT = Path("results/figures")
+OUT = SCRIPT_DIR.parent / "results" / "figures"
 OUT.mkdir(parents=True, exist_ok=True)
 
 # -------------------------
@@ -203,7 +205,6 @@ ax1.legend(frameon=False, fontsize=8, loc="upper right")
 
 fig1.tight_layout()
 fig1.savefig(OUT / "fig_msp_vs_acidogenic_vfa_yield.png", bbox_inches="tight")
-fig1.savefig(OUT / "fig_msp_vs_acidogenic_vfa_yield.pdf", bbox_inches="tight")
 
 
 # ============================================================
@@ -291,7 +292,6 @@ ax2.legend(frameon=False, fontsize=8, loc="upper right")
 
 fig2.tight_layout()
 fig2.savefig(OUT / "fig_msp_vs_fermentation_yield.png", bbox_inches="tight")
-fig2.savefig(OUT / "fig_msp_vs_fermentation_yield.pdf", bbox_inches="tight")
 
 print("\nMSP vs acidogenic VFA yield:")
 for x, y in zip(VFA_YIELD_RANGE, msp_vs_vfa_yield):

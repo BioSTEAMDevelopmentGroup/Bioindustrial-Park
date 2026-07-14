@@ -13,14 +13,15 @@ Recalculate methane production and MSP directly from the current SABRE model and
 including error bars based on the low/high methane-yield estimates in assumptions.yaml.
 
 Outputs:
-1) fig_methane_production_by_pretreatment_errorbars.(png/pdf)
-2) fig_msp_by_pretreatment_errorbars.(png/pdf)
+1) fig_methane_production_by_pretreatment_errorbars.png
+2) fig_msp_by_pretreatment_errorbars.png
 
 BASECASE: biostimulant: $0/kg (no revenue), feedstock: $0.02/kg wet
 """
 
 from __future__ import annotations
 
+import sys
 from pathlib import Path
 
 import biosteam as bst
@@ -28,13 +29,18 @@ import matplotlib.pyplot as plt
 import matplotlib.ticker as mticker
 import numpy as np
 
+SCRIPT_DIR = Path(__file__).resolve().parent
+REPO_ROOT = SCRIPT_DIR.parents[2]
+if str(REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(REPO_ROOT))
+
 from biorefineries.sabre._chemicals import set_thermo
 from biorefineries.sabre._process_settings import load_assumptions
 from biorefineries.sabre.systems import create_ad_biogas_system
 from biorefineries.sabre._tea import make_baseline_tea, solve_biomethane_msp
 
 
-OUT = Path("results/figures")
+OUT = SCRIPT_DIR.parent / "results" / "figures"
 OUT.mkdir(parents=True, exist_ok=True)
 
 # Reads the methane yield effects for each pretreatment case from assumptions.yaml
@@ -232,7 +238,6 @@ ax1.set_ylim(0, max(np.array(methane_kgph) + np.array(methane_err_high)) * 1.10)
 
 fig1.tight_layout()
 fig1.savefig(OUT / "fig_methane_production_by_pretreatment_errorbars.png", bbox_inches="tight")
-fig1.savefig(OUT / "fig_methane_production_by_pretreatment_errorbars.pdf", bbox_inches="tight")
 
 
 # ============================================================
@@ -304,7 +309,6 @@ ax2.legend(fontsize=8, frameon=False)
 
 fig2.tight_layout()
 fig2.savefig(OUT / "fig_msp_by_pretreatment_errorbars.png", bbox_inches="tight")
-fig2.savefig(OUT / "fig_msp_by_pretreatment_errorbars.pdf", bbox_inches="tight")
 
 
 print("Methane production (kg/hr) with low/high bounds:")

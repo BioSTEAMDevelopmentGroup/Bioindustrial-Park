@@ -29,8 +29,10 @@ import numpy as np
 import pandas as pd
 
 THIS_DIR = Path(__file__).resolve().parent
-if str(THIS_DIR) not in sys.path:
-    sys.path.insert(0, str(THIS_DIR))
+REPO_ROOT = THIS_DIR.parents[2]
+for _p in (REPO_ROOT, THIS_DIR):
+    if str(_p) not in sys.path:
+        sys.path.insert(0, str(_p))
 
 from integrated_tea import (
     BIOMETHANE_MARKET_MMBTU,
@@ -47,7 +49,7 @@ from biorefineries.sabre.systems import create_integrated_biorefinery
 from biorefineries.sabre._tea import make_baseline_tea
 
 # ── Output directories ────────────────────────────────────────────────────────
-OUTPUT_DIR = Path("results") / "integrated_figures"
+OUTPUT_DIR = THIS_DIR.parent / "results" / "integrated_figures"
 CSV_DIR    = OUTPUT_DIR / "csv"
 FIG_DIR    = OUTPUT_DIR / "figures"
 

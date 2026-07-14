@@ -18,18 +18,24 @@ Run from sabre_project root:
 
 from __future__ import annotations
 
+import sys
 from pathlib import Path
 
 import biosteam as bst
 import matplotlib.pyplot as plt
 import matplotlib.ticker as mticker
 
+SCRIPT_DIR = Path(__file__).resolve().parent
+REPO_ROOT = SCRIPT_DIR.parents[2]
+if str(REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(REPO_ROOT))
+
 from biorefineries.sabre._chemicals import set_thermo
 from biorefineries.sabre.systems import create_ad_biogas_system
 from biorefineries.sabre._tea import make_baseline_tea, solve_biomethane_msp
 
 
-OUT = Path("results/figures")
+OUT = SCRIPT_DIR.parent / "results" / "figures"
 OUT.mkdir(parents=True, exist_ok=True)
 
 PRETREATMENT_CASES = [
@@ -178,7 +184,6 @@ ax.axvline(
 
 fig.tight_layout()
 fig.savefig(OUT / "fig_biostimulant_sensitivity.png", bbox_inches="tight")
-fig.savefig(OUT / "fig_biostimulant_sensitivity.pdf", bbox_inches="tight")
 
 print("\nMSP results ($/MMBtu):")
 for case in PRETREATMENT_CASES:
@@ -188,4 +193,3 @@ for case in PRETREATMENT_CASES:
 
 print("\nSaved:")
 print(OUT / "fig_biostimulant_sensitivity.png")
-print(OUT / "fig_biostimulant_sensitivity.pdf")

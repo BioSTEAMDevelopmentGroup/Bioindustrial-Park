@@ -25,18 +25,24 @@ Run from sabre_project root:
 
 from __future__ import annotations
 
+import sys
 from pathlib import Path
 
 import biosteam as bst
 import matplotlib.pyplot as plt
 import numpy as np
 
+SCRIPT_DIR = Path(__file__).resolve().parent
+REPO_ROOT = SCRIPT_DIR.parents[2]
+if str(REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(REPO_ROOT))
+
 from biorefineries.sabre._chemicals import set_thermo
 from biorefineries.sabre.systems import create_ad_biogas_system
 from biorefineries.sabre._tea import make_baseline_tea, solve_biomethane_msp
 
 
-OUT = Path("results/figures")
+OUT = SCRIPT_DIR.parent / "results" / "figures"
 OUT.mkdir(parents=True, exist_ok=True)
 
 # ── Grid definition ───────────────────────────────────────────────────────────
@@ -195,7 +201,6 @@ cbar.set_label("Biomethane MSP ($/MMBtu)", fontsize=9)
 
 fig1.tight_layout()
 fig1.savefig(OUT / "fig_msp_heatmap_combined_PE.png", bbox_inches="tight")
-fig1.savefig(OUT / "fig_msp_heatmap_combined_PE.pdf", bbox_inches="tight")
 print("\nSaved: fig_msp_heatmap_combined_PE.png")
 
 
@@ -273,7 +278,6 @@ fig2.suptitle(
 )
 
 fig2.savefig(OUT / "fig_msp_heatmap_all_cases.png", bbox_inches="tight")
-fig2.savefig(OUT / "fig_msp_heatmap_all_cases.pdf", bbox_inches="tight")
 print("Saved: fig_msp_heatmap_all_cases.png")
 
 

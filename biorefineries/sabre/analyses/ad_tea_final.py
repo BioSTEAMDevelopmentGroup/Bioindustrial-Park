@@ -32,11 +32,22 @@ Sources:
       pelagic Sargassum prevents land application as fertilizer.
 """
 
+import sys
+from pathlib import Path
+
 import biosteam as bst
+
+SCRIPT_DIR = Path(__file__).resolve().parent
+REPO_ROOT = SCRIPT_DIR.parents[2]
+if str(REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(REPO_ROOT))
 
 from biorefineries.sabre._chemicals import set_thermo
 from biorefineries.sabre.systems import create_ad_biogas_system
 from biorefineries.sabre._tea import make_baseline_tea, solve_biomethane_msp
+
+OUT = SCRIPT_DIR.parent / "results" / "figures"
+OUT.mkdir(parents=True, exist_ok=True)
 
 # -------------------------
 # Pretreatment cases
@@ -633,7 +644,7 @@ def make_feed_pretreatment_figures(
         value_col="msp_usd_per_mmbtu",
         title="Biomethane MSP across feed price and pretreatment scenarios",
         cbar_label="MSP ($/MMBtu)",
-        outfile="fig_feed_pretreatment_msp_heatmap.png",
+        outfile=str(OUT / "fig_feed_pretreatment_msp_heatmap.png"),
         fmt="{:.2f}",
     )
 
@@ -642,12 +653,12 @@ def make_feed_pretreatment_figures(
         value_col="methane_kgph",
         title="Methane production across feed price and pretreatment scenarios",
         cbar_label="Methane production (kg/h)",
-        outfile="fig_feed_pretreatment_ch4_heatmap.png",
+        outfile=str(OUT / "fig_feed_pretreatment_ch4_heatmap.png"),
         fmt="{:.0f}",
     )
 
     # Also save the underlying table
-    df.to_csv("feed_pretreatment_results.csv", index=False)
+    df.to_csv(OUT / "feed_pretreatment_results.csv", index=False)
 
     print("\nSaved:")
     print("  fig_feed_pretreatment_msp_heatmap.png")

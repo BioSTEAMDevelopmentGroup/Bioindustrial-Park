@@ -26,10 +26,12 @@ import matplotlib.ticker as mticker
 import numpy as np
 import biosteam as bst
 
-# Make sure imports work when the script is run from repo root
+# Make sure imports work regardless of the invocation cwd or sys.path state
 SCRIPT_DIR = Path(__file__).resolve().parent
-if str(SCRIPT_DIR) not in sys.path:
-    sys.path.append(str(SCRIPT_DIR))
+REPO_ROOT = SCRIPT_DIR.parents[2]
+for _p in (REPO_ROOT, SCRIPT_DIR):
+    if str(_p) not in sys.path:
+        sys.path.insert(0, str(_p))
 
 from vfa_fermentation_tea import (
     VFA_IDS,
@@ -44,7 +46,7 @@ from vfa_fermentation_tea import (
 from biorefineries.sabre._tea import make_baseline_tea, solve_product_msp
 
 
-OUT = Path("results/figures")
+OUT = SCRIPT_DIR.parent / "results" / "figures"
 OUT.mkdir(parents=True, exist_ok=True)
 
 # -------------------------
@@ -107,7 +109,6 @@ def make_vfa_composition_figure(feed_price: float = 0.02):
 
     fig.tight_layout()
     fig.savefig(OUT / "fig_vfa_composition.png", bbox_inches="tight")
-    fig.savefig(OUT / "fig_vfa_composition.pdf", bbox_inches="tight")
 
     print("\nVFA composition (kg/hr):")
     for lab, val in zip(labels, flows):
@@ -169,7 +170,6 @@ def make_oil_msp_vs_feed_price_figure():
 
     fig.tight_layout()
     fig.savefig(OUT / "fig_crude_oil_msp_vs_feed_price.png", bbox_inches="tight")
-    fig.savefig(OUT / "fig_crude_oil_msp_vs_feed_price.pdf", bbox_inches="tight")
 
     print("\nCrude microbial oil MSP by feed price:")
     for (label, price), msp in zip(FEED_PRICE_CASES, msp_usd_per_kg_oil):
@@ -235,7 +235,6 @@ def make_product_scenario_comparison_figure(feed_price: float = 0.00):
 
     fig.tight_layout()
     fig.savefig(OUT / "fig_product_scenario_comparison.png", bbox_inches="tight")
-    fig.savefig(OUT / "fig_product_scenario_comparison.pdf", bbox_inches="tight")
 
     print("\nProduct scenario comparison at near-zero feed:")
     for lab, msp, prod in zip(labels, msp_vals, annual_prod_t):
