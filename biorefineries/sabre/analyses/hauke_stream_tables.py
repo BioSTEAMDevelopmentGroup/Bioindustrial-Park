@@ -180,128 +180,129 @@ def run_case(case):
 # ── Build data ─────────────────────────────────────────────────────────────
 
 all_rows = []
-for case in PRETREATMENT_CASES:
-    print(f"  Running {case}...")
-    case_rows = run_case(case)
-    all_rows.extend(case_rows)
-    all_rows.append({})  # blank separator row
+if __name__ == "__main__":
+    for case in PRETREATMENT_CASES:
+        print(f"  Running {case}...")
+        case_rows = run_case(case)
+        all_rows.extend(case_rows)
+        all_rows.append({})  # blank separator row
 
-df = pd.DataFrame(all_rows)
+    df = pd.DataFrame(all_rows)
 
-# ── Write Excel ────────────────────────────────────────────────────────────
+    # ── Write Excel ────────────────────────────────────────────────────────────
 
-OUTFILE = OUT / "AD_stream_table.xlsx"
+    OUTFILE = OUT / "AD_stream_table.xlsx"
 
-# Column order
-meta_cols  = ["case", "stream", "phase", "F_mass_kg_hr",
-               "water_wt_frac", "TS_kg_hr", "VS_kg_hr"]
-comp_cols  = [f"{c}_kg_hr" for c in COMPONENTS]
-all_cols   = meta_cols + comp_cols
+    # Column order
+    meta_cols  = ["case", "stream", "phase", "F_mass_kg_hr",
+                   "water_wt_frac", "TS_kg_hr", "VS_kg_hr"]
+    comp_cols  = [f"{c}_kg_hr" for c in COMPONENTS]
+    all_cols   = meta_cols + comp_cols
 
-# Ensure all columns exist
-for c in all_cols:
-    if c not in df.columns:
-        df[c] = 0.0
+    # Ensure all columns exist
+    for c in all_cols:
+        if c not in df.columns:
+            df[c] = 0.0
 
-df = df[all_cols]
-df.to_excel(OUTFILE, index=False, sheet_name="Streams")
+    df = df[all_cols]
+    df.to_excel(OUTFILE, index=False, sheet_name="Streams")
 
-# ── Formatting ─────────────────────────────────────────────────────────────
+    # ── Formatting ─────────────────────────────────────────────────────────────
 
-wb = load_workbook(OUTFILE)
-ws = wb["Streams"]
+    wb = load_workbook(OUTFILE)
+    ws = wb["Streams"]
 
-# Styles
-HEADER_FILL  = PatternFill("solid", start_color="1F3864", end_color="1F3864")
-HEADER_FONT  = Font(name="Arial", bold=True, color="FFFFFF", size=9)
-CASE_FILL    = PatternFill("solid", start_color="D9E1F2", end_color="D9E1F2")
-CASE_FONT    = Font(name="Arial", bold=True, size=9, color="1F3864")
-BODY_FONT    = Font(name="Arial", size=9)
-BLANK_FILL   = PatternFill("solid", start_color="F2F2F2", end_color="F2F2F2")
-CENTER       = Alignment(horizontal="center", vertical="center", wrap_text=True)
-RIGHT        = Alignment(horizontal="right",  vertical="center")
-LEFT         = Alignment(horizontal="left",   vertical="center")
+    # Styles
+    HEADER_FILL  = PatternFill("solid", start_color="1F3864", end_color="1F3864")
+    HEADER_FONT  = Font(name="Arial", bold=True, color="FFFFFF", size=9)
+    CASE_FILL    = PatternFill("solid", start_color="D9E1F2", end_color="D9E1F2")
+    CASE_FONT    = Font(name="Arial", bold=True, size=9, color="1F3864")
+    BODY_FONT    = Font(name="Arial", size=9)
+    BLANK_FILL   = PatternFill("solid", start_color="F2F2F2", end_color="F2F2F2")
+    CENTER       = Alignment(horizontal="center", vertical="center", wrap_text=True)
+    RIGHT        = Alignment(horizontal="right",  vertical="center")
+    LEFT         = Alignment(horizontal="left",   vertical="center")
 
-thin = Side(style="thin", color="BFBFBF")
-BORDER = Border(left=thin, right=thin, top=thin, bottom=thin)
+    thin = Side(style="thin", color="BFBFBF")
+    BORDER = Border(left=thin, right=thin, top=thin, bottom=thin)
 
-n_cols = len(all_cols)
+    n_cols = len(all_cols)
 
-# Header row
-for col_idx, col_name in enumerate(all_cols, start=1):
-    cell = ws.cell(row=1, column=col_idx)
-    cell.fill = HEADER_FILL
-    cell.font = HEADER_FONT
-    cell.alignment = CENTER
-    cell.border = BORDER
-    # Nicer header labels
-    label = col_name.replace("_kg_hr", "\n(kg/hr)").replace("_", " ")
-    cell.value = label
-
-# Data rows
-for row_idx in range(2, ws.max_row + 1):
-    row_data = df.iloc[row_idx - 2]
-    is_blank = pd.isna(row_data.get("case")) or row_data.get("case") == ""
-    is_new_case = not is_blank and (
-        row_idx == 2 or
-        df.iloc[row_idx - 3].get("case") != row_data.get("case")
-    )
-
-    for col_idx in range(1, n_cols + 1):
-        cell = ws.cell(row=row_idx, column=col_idx)
+    # Header row
+    for col_idx, col_name in enumerate(all_cols, start=1):
+        cell = ws.cell(row=1, column=col_idx)
+        cell.fill = HEADER_FILL
+        cell.font = HEADER_FONT
+        cell.alignment = CENTER
         cell.border = BORDER
+        # Nicer header labels
+        label = col_name.replace("_kg_hr", "\n(kg/hr)").replace("_", " ")
+        cell.value = label
 
-        if is_blank:
-            cell.fill = BLANK_FILL
-            cell.value = None
-            continue
+    # Data rows
+    for row_idx in range(2, ws.max_row + 1):
+        row_data = df.iloc[row_idx - 2]
+        is_blank = pd.isna(row_data.get("case")) or row_data.get("case") == ""
+        is_new_case = not is_blank and (
+            row_idx == 2 or
+            df.iloc[row_idx - 3].get("case") != row_data.get("case")
+        )
 
-        col_name = all_cols[col_idx - 1]
+        for col_idx in range(1, n_cols + 1):
+            cell = ws.cell(row=row_idx, column=col_idx)
+            cell.border = BORDER
 
-        if is_new_case and col_idx == 1:
-            cell.fill = CASE_FILL
-            cell.font = CASE_FONT
-        elif col_name in ("case", "stream", "phase"):
-            cell.font = CASE_FONT if is_new_case else BODY_FONT
-            cell.fill = CASE_FILL if is_new_case else PatternFill()
-            cell.alignment = LEFT
-        else:
-            cell.font = BODY_FONT
-            cell.alignment = RIGHT
+            if is_blank:
+                cell.fill = BLANK_FILL
+                cell.value = None
+                continue
 
-        val = row_data.get(col_name)
-        if pd.isna(val):
-            cell.value = None
-        elif col_name == "water_wt_frac":
-            cell.value = round(float(val), 6)
-            cell.number_format = "0.0000"
-        elif col_name in ("case", "stream", "phase"):
-            cell.value = str(val) if val else None
-        else:
-            cell.value = round(float(val), 2)
-            cell.number_format = "#,##0.00"
+            col_name = all_cols[col_idx - 1]
 
-# Column widths
-COL_WIDTHS = {
-    "case":          18,
-    "stream":        28,
-    "phase":          7,
-    "F_mass_kg_hr":  14,
-    "water_wt_frac": 12,
-    "TS_kg_hr":      12,
-    "VS_kg_hr":      12,
-}
-DEFAULT_WIDTH = 14
+            if is_new_case and col_idx == 1:
+                cell.fill = CASE_FILL
+                cell.font = CASE_FONT
+            elif col_name in ("case", "stream", "phase"):
+                cell.font = CASE_FONT if is_new_case else BODY_FONT
+                cell.fill = CASE_FILL if is_new_case else PatternFill()
+                cell.alignment = LEFT
+            else:
+                cell.font = BODY_FONT
+                cell.alignment = RIGHT
 
-for col_idx, col_name in enumerate(all_cols, start=1):
-    ws.column_dimensions[get_column_letter(col_idx)].width = \
-        COL_WIDTHS.get(col_name, DEFAULT_WIDTH)
+            val = row_data.get(col_name)
+            if pd.isna(val):
+                cell.value = None
+            elif col_name == "water_wt_frac":
+                cell.value = round(float(val), 6)
+                cell.number_format = "0.0000"
+            elif col_name in ("case", "stream", "phase"):
+                cell.value = str(val) if val else None
+            else:
+                cell.value = round(float(val), 2)
+                cell.number_format = "#,##0.00"
 
-# Freeze header row
-ws.freeze_panes = "A2"
+    # Column widths
+    COL_WIDTHS = {
+        "case":          18,
+        "stream":        28,
+        "phase":          7,
+        "F_mass_kg_hr":  14,
+        "water_wt_frac": 12,
+        "TS_kg_hr":      12,
+        "VS_kg_hr":      12,
+    }
+    DEFAULT_WIDTH = 14
 
-# Row height — header taller for wrapped text
-ws.row_dimensions[1].height = 32
+    for col_idx, col_name in enumerate(all_cols, start=1):
+        ws.column_dimensions[get_column_letter(col_idx)].width = \
+            COL_WIDTHS.get(col_name, DEFAULT_WIDTH)
 
-wb.save(OUTFILE)
-print(f"\nSaved: {OUTFILE}")
+    # Freeze header row
+    ws.freeze_panes = "A2"
+
+    # Row height — header taller for wrapped text
+    ws.row_dimensions[1].height = 32
+
+    wb.save(OUTFILE)
+    print(f"\nSaved: {OUTFILE}")

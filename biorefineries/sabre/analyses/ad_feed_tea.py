@@ -120,91 +120,92 @@ def build_case(pretreatment_case: str, feed_price: float):
 
 
 # ── Run simulations ──────────────────────────────────────────────────────────
+if __name__ == "__main__":
 
-results = {case: [] for case in PRETREATMENT_CASES}
-feed_costs = {case: [] for case in PRETREATMENT_CASES}
+    results = {case: [] for case in PRETREATMENT_CASES}
+    feed_costs = {case: [] for case in PRETREATMENT_CASES}
 
-for case in PRETREATMENT_CASES:
-    for fp in FEED_PRICES_USD_PER_KG_WET:
-        msp_val, fc_musd = build_case(case, fp)
-        results[case].append(msp_val)
-        feed_costs[case].append(fc_musd)
-        print(f"{case:20s}  feed=${fp:+.2f}/kg  MSP=${msp_val:.2f}/MMBtu  feed cost=${fc_musd:.1f}M/yr")
+    for case in PRETREATMENT_CASES:
+        for fp in FEED_PRICES_USD_PER_KG_WET:
+            msp_val, fc_musd = build_case(case, fp)
+            results[case].append(msp_val)
+            feed_costs[case].append(fc_musd)
+            print(f"{case:20s}  feed=${fp:+.2f}/kg  MSP=${msp_val:.2f}/MMBtu  feed cost=${fc_musd:.1f}M/yr")
 
-# ── Plot ─────────────────────────────────────────────────────────────────────
+    # ── Plot ─────────────────────────────────────────────────────────────────────
 
-plt.rcParams.update({
-    "font.family":      "DejaVu Sans",
-    "font.size":        10,
-    "axes.titlesize":   10,
-    "axes.labelsize":   10,
-    "xtick.labelsize":  9,
-    "ytick.labelsize":  9,
-    "figure.dpi":       150,
-    "axes.linewidth":   0.8,
-    "axes.edgecolor":   "black",
-    "xtick.direction":  "in",
-    "ytick.direction":  "in",
-    "xtick.top":        True,
-    "ytick.right":      True,
-})
+    plt.rcParams.update({
+        "font.family":      "DejaVu Sans",
+        "font.size":        10,
+        "axes.titlesize":   10,
+        "axes.labelsize":   10,
+        "xtick.labelsize":  9,
+        "ytick.labelsize":  9,
+        "figure.dpi":       150,
+        "axes.linewidth":   0.8,
+        "axes.edgecolor":   "black",
+        "xtick.direction":  "in",
+        "ytick.direction":  "in",
+        "xtick.top":        True,
+        "ytick.right":      True,
+    })
 
-markers = {
-    "press_mill_only": "o",
-    "enzymatic":       "s",
-    "peroxide":        "^",
-    "combined_PE":     "D",
-    "combined_PTE":    "v",
-}
+    markers = {
+        "press_mill_only": "o",
+        "enzymatic":       "s",
+        "peroxide":        "^",
+        "combined_PE":     "D",
+        "combined_PTE":    "v",
+    }
 
-fig, ax = plt.subplots(figsize=(7.0, 4.8))
+    fig, ax = plt.subplots(figsize=(7.0, 4.8))
 
-for case in PRETREATMENT_CASES:
-    ax.plot(
-        FEED_PRICES_USD_PER_KG_WET,
-        results[case],
-        marker=markers[case],
-        linewidth=1.8,
-        markersize=6,
-        markeredgecolor="black",
-        label=CASE_LABELS[case],
-        zorder=3,
+    for case in PRETREATMENT_CASES:
+        ax.plot(
+            FEED_PRICES_USD_PER_KG_WET,
+            results[case],
+            marker=markers[case],
+            linewidth=1.8,
+            markersize=6,
+            markeredgecolor="black",
+            label=CASE_LABELS[case],
+            zorder=3,
+        )
+
+    # Market price reference lines
+    ax.axhline(3.0,  color="black", linewidth=1.3, linestyle="--",  zorder=2, label="$3/MMBtu")
+    ax.axhline(10.0, color="black", linewidth=1.3, linestyle=":",   zorder=2, label="$10/MMBtu")
+    ax.axhline(14.0, color="black", linewidth=1.3, linestyle="-.",  zorder=2, label="$14/MMBtu")
+
+    ax.set_xlabel("Feedstock price ($/kg wet)")
+    ax.set_ylabel("Biomethane MSP ($/MMBtu)")
+    ax.set_title("Effect of feedstock price on biomethane MSP")
+
+    ax.axvline(
+        0.02,
+        color="black",
+        linewidth=1.0,
+        linestyle="--",
+        zorder=2,
+        label="Baseline ($0.02/kg)",
     )
 
-# Market price reference lines
-ax.axhline(3.0,  color="black", linewidth=1.3, linestyle="--",  zorder=2, label="$3/MMBtu")
-ax.axhline(10.0, color="black", linewidth=1.3, linestyle=":",   zorder=2, label="$10/MMBtu")
-ax.axhline(14.0, color="black", linewidth=1.3, linestyle="-.",  zorder=2, label="$14/MMBtu")
+    ax.xaxis.set_major_formatter(mticker.FormatStrFormatter("$%.2f"))
+    ax.yaxis.set_major_formatter(mticker.FormatStrFormatter("$%.0f"))
+    ax.grid(axis="both", linewidth=0.4, color="#D3D1C7", zorder=0)
+    ax.legend(frameon=False, fontsize=8, ncol=2, loc="upper left")
 
-ax.set_xlabel("Feedstock price ($/kg wet)")
-ax.set_ylabel("Biomethane MSP ($/MMBtu)")
-ax.set_title("Effect of feedstock price on biomethane MSP")
+    fig.tight_layout()
+    fig.savefig(OUT / "fig_feed_price_sensitivity.png", bbox_inches="tight")
 
-ax.axvline(
-    0.02,
-    color="black",
-    linewidth=1.0,
-    linestyle="--",
-    zorder=2,
-    label="Baseline ($0.02/kg)",
-)
+    # ── Console summary ───────────────────────────────────────────────────────────
 
-ax.xaxis.set_major_formatter(mticker.FormatStrFormatter("$%.2f"))
-ax.yaxis.set_major_formatter(mticker.FormatStrFormatter("$%.0f"))
-ax.grid(axis="both", linewidth=0.4, color="#D3D1C7", zorder=0)
-ax.legend(frameon=False, fontsize=8, ncol=2, loc="upper left")
+    print("\nMSP results ($/MMBtu):")
+    for case in PRETREATMENT_CASES:
+        print(f"\n{CASE_LABELS[case]}")
+        for fp, msp, fc in zip(FEED_PRICES_USD_PER_KG_WET, results[case], feed_costs[case]):
+            sign = "income" if fc < 0 else "cost"
+            print(f"  feed = {fp:+.2f} $/kg  ->  MSP = ${msp:.2f}/MMBtu  |  annual feed {sign} = ${abs(fc):.1f}M/yr")
 
-fig.tight_layout()
-fig.savefig(OUT / "fig_feed_price_sensitivity.png", bbox_inches="tight")
-
-# ── Console summary ───────────────────────────────────────────────────────────
-
-print("\nMSP results ($/MMBtu):")
-for case in PRETREATMENT_CASES:
-    print(f"\n{CASE_LABELS[case]}")
-    for fp, msp, fc in zip(FEED_PRICES_USD_PER_KG_WET, results[case], feed_costs[case]):
-        sign = "income" if fc < 0 else "cost"
-        print(f"  feed = {fp:+.2f} $/kg  ->  MSP = ${msp:.2f}/MMBtu  |  annual feed {sign} = ${abs(fc):.1f}M/yr")
-
-print("\nSaved:")
-print(OUT / "fig_feed_price_sensitivity.png")
+    print("\nSaved:")
+    print(OUT / "fig_feed_price_sensitivity.png")

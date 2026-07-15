@@ -122,185 +122,186 @@ def override_acidogenic_vfa_yield(vfa_sys, target_vfa_yield):
 
 
 # ============================================================
-# Figure 1 — MSP vs acidogenic VFA yield
-# ============================================================
-msp_vs_vfa_yield = []
+if __name__ == "__main__":
+    # Figure 1 — MSP vs acidogenic VFA yield
+    # ============================================================
+    msp_vs_vfa_yield = []
 
-for vfa_yield in VFA_YIELD_RANGE:
-    # Build normal base case first
-    vfa_sys, fer_sys, streams, units, full_sys = build_and_simulate(FEED_PRICE_USD_PER_KG_WET)
+    for vfa_yield in VFA_YIELD_RANGE:
+        # Build normal base case first
+        vfa_sys, fer_sys, streams, units, full_sys = build_and_simulate(FEED_PRICE_USD_PER_KG_WET)
 
-    # Override acidogenic yield and re-simulate upstream + full system
-    override_acidogenic_vfa_yield(vfa_sys, vfa_yield)
+        # Override acidogenic yield and re-simulate upstream + full system
+        override_acidogenic_vfa_yield(vfa_sys, vfa_yield)
 
-    # Rebuild downstream system feed connection by forcing the full system to resimulate
-    full_sys.simulate()
+        # Rebuild downstream system feed connection by forcing the full system to resimulate
+        full_sys.simulate()
 
-    msp_val = solve_oil_msp_from_full_system(full_sys, streams, extraction_usd_per_kg_oil=0.50)
-    msp_vs_vfa_yield.append(msp_val)
+        msp_val = solve_oil_msp_from_full_system(full_sys, streams, extraction_usd_per_kg_oil=0.50)
+        msp_vs_vfa_yield.append(msp_val)
 
-fig1, ax1 = plt.subplots(figsize=(6.6, 4.4))
-ax1.plot(
-    VFA_YIELD_RANGE,
-    msp_vs_vfa_yield,
-    marker="o",
-    linewidth=1.8,
-    markersize=6,
-    markeredgecolor="black",
-    zorder=3,
-)
-
-ax1.axhline(
-    y=1.50,
-    linestyle="--",
-    linewidth=1.2,
-    color="black",
-    zorder=2,
-    label="Soybean oil market price ($0.62–1.50/kg)",
-)
-ax1.axhline(
-    y=0.62,
-    linestyle="--",
-    linewidth=1.2,
-    color="black",
-    zorder=2,
-)
-ax1.axhspan(0.62, 1.50, alpha=0.10, color="black", zorder=1)
-
-for x, y in zip(VFA_YIELD_RANGE, msp_vs_vfa_yield):
-    ax1.text(
-        x,
-        y + max(msp_vs_vfa_yield) * 0.015,
-        f"{y:.2f}",
-        ha="center",
-        va="bottom",
-        fontsize=8,
+    fig1, ax1 = plt.subplots(figsize=(6.6, 4.4))
+    ax1.plot(
+        VFA_YIELD_RANGE,
+        msp_vs_vfa_yield,
+        marker="o",
+        linewidth=1.8,
+        markersize=6,
+        markeredgecolor="black",
+        zorder=3,
     )
 
-# base-case star
-base_vfa_yield = 0.55
-base_idx = list(VFA_YIELD_RANGE).index(base_vfa_yield)
-base_msp_vfa = msp_vs_vfa_yield[base_idx]
-
-ax1.scatter(
-    [base_vfa_yield],
-    [base_msp_vfa],
-    marker="*",
-    s=220,
-    color="gold",
-    edgecolors="black",
-    linewidths=0.8,
-    zorder=5,
-    label="Base case",
-)
-
-ax1.set_xlabel("Acidogenic VFA yield (kg VFA/kg VS destroyed)")
-ax1.set_ylabel("Crude microbial oil MSP ($/kg)")
-ax1.set_title("Effect of acidogenic VFA yield on crude microbial oil MSP")
-ax1.xaxis.set_major_formatter(mticker.FormatStrFormatter("%.2f"))
-ax1.yaxis.set_major_formatter(mticker.FormatStrFormatter("$%.0f"))
-ax1.set_ylim(0, max(msp_vs_vfa_yield) * 1.10)
-ax1.grid(axis="both", linewidth=0.4, color="#D3D1C7", zorder=0)
-ax1.legend(frameon=False, fontsize=8, loc="upper right")
-
-fig1.tight_layout()
-fig1.savefig(OUT / "fig_msp_vs_acidogenic_vfa_yield.png", bbox_inches="tight")
-
-
-# ============================================================
-# Figure 2 — MSP vs fermentation oil yield
-# ============================================================
-msp_vs_ferm_yield = []
-
-for ferm_yield in FERM_YIELD_RANGE:
-    vfa_sys, fer_sys, streams, units, full_sys = build_and_simulate_scenario(
-        feed_price_per_kg_wet=FEED_PRICE_USD_PER_KG_WET,
-        product_yield=float(ferm_yield),
-        residence_time_h=BASE_RESIDENCE_H,
+    ax1.axhline(
+        y=1.50,
+        linestyle="--",
+        linewidth=1.2,
+        color="black",
+        zorder=2,
+        label="Soybean oil market price ($0.62–1.50/kg)",
     )
+    ax1.axhline(
+        y=0.62,
+        linestyle="--",
+        linewidth=1.2,
+        color="black",
+        zorder=2,
+    )
+    ax1.axhspan(0.62, 1.50, alpha=0.10, color="black", zorder=1)
 
-    msp_val = solve_oil_msp_from_full_system(
-        full_sys,
-        streams,
-        extraction_usd_per_kg_oil=0.50,
+    for x, y in zip(VFA_YIELD_RANGE, msp_vs_vfa_yield):
+        ax1.text(
+            x,
+            y + max(msp_vs_vfa_yield) * 0.015,
+            f"{y:.2f}",
+            ha="center",
+            va="bottom",
+            fontsize=8,
         )
-    msp_vs_ferm_yield.append(msp_val)
 
-fig2, ax2 = plt.subplots(figsize=(6.6, 4.4))
-ax2.plot(
-    FERM_YIELD_RANGE,
-    msp_vs_ferm_yield,
-    marker="o",
-    linewidth=1.8,
-    markersize=6,
-    markeredgecolor="black",
-    zorder=3,
-)
+    # base-case star
+    base_vfa_yield = 0.55
+    base_idx = list(VFA_YIELD_RANGE).index(base_vfa_yield)
+    base_msp_vfa = msp_vs_vfa_yield[base_idx]
 
-ax2.axhline(
-    y=1.50,
-    linestyle="--",
-    linewidth=1.2,
-    color="black",
-    zorder=2,
-    label="Soybean oil market price ($0.62–1.50/kg)",
-)
-ax2.axhline(
-    y=0.62,
-    linestyle="--",
-    linewidth=1.2,
-    color="black",
-    zorder=2,
-)
-ax2.axhspan(0.62, 1.50, alpha=0.10, color="black", zorder=1)
-
-for x, y in zip(FERM_YIELD_RANGE, msp_vs_ferm_yield):
-    ax2.text(
-        x,
-        y + max(msp_vs_ferm_yield) * 0.015,
-        f"{y:.2f}",
-        ha="center",
-        va="bottom",
-        fontsize=8,
+    ax1.scatter(
+        [base_vfa_yield],
+        [base_msp_vfa],
+        marker="*",
+        s=220,
+        color="gold",
+        edgecolors="black",
+        linewidths=0.8,
+        zorder=5,
+        label="Base case",
     )
 
-# base-case star
-base_ferm_yield = 0.144
-base_idx = list(FERM_YIELD_RANGE).index(base_ferm_yield)
-base_msp_ferm = msp_vs_ferm_yield[base_idx]
+    ax1.set_xlabel("Acidogenic VFA yield (kg VFA/kg VS destroyed)")
+    ax1.set_ylabel("Crude microbial oil MSP ($/kg)")
+    ax1.set_title("Effect of acidogenic VFA yield on crude microbial oil MSP")
+    ax1.xaxis.set_major_formatter(mticker.FormatStrFormatter("%.2f"))
+    ax1.yaxis.set_major_formatter(mticker.FormatStrFormatter("$%.0f"))
+    ax1.set_ylim(0, max(msp_vs_vfa_yield) * 1.10)
+    ax1.grid(axis="both", linewidth=0.4, color="#D3D1C7", zorder=0)
+    ax1.legend(frameon=False, fontsize=8, loc="upper right")
 
-ax2.scatter(
-    [base_ferm_yield],
-    [base_msp_ferm],
-    marker="*",
-    s=220,
-    color="gold",
-    edgecolors="black",
-    linewidths=0.8,
-    zorder=5,
-    label="Base case",
-)
+    fig1.tight_layout()
+    fig1.savefig(OUT / "fig_msp_vs_acidogenic_vfa_yield.png", bbox_inches="tight")
 
-ax2.set_xlabel("Fermentation oil yield (kg oil/kg VFA consumed)")
-ax2.set_ylabel("Crude microbial oil MSP ($/kg)")
-ax2.set_title("Effect of fermentation oil yield on crude microbial oil MSP")
-ax2.xaxis.set_major_formatter(mticker.FormatStrFormatter("%.2f"))
-ax2.yaxis.set_major_formatter(mticker.FormatStrFormatter("$%.0f"))
-ax2.grid(axis="both", linewidth=0.4, color="#D3D1C7", zorder=0)
-ax2.set_ylim(0, max(msp_vs_ferm_yield) * 1.10)
-ax2.legend(frameon=False, fontsize=8, loc="upper right")
 
-fig2.tight_layout()
-fig2.savefig(OUT / "fig_msp_vs_fermentation_yield.png", bbox_inches="tight")
+    # ============================================================
+    # Figure 2 — MSP vs fermentation oil yield
+    # ============================================================
+    msp_vs_ferm_yield = []
 
-print("\nMSP vs acidogenic VFA yield:")
-for x, y in zip(VFA_YIELD_RANGE, msp_vs_vfa_yield):
-    print(f"  {x:.2f} kg VFA/kg VS destroyed -> ${y:.3f}/kg oil")
+    for ferm_yield in FERM_YIELD_RANGE:
+        vfa_sys, fer_sys, streams, units, full_sys = build_and_simulate_scenario(
+            feed_price_per_kg_wet=FEED_PRICE_USD_PER_KG_WET,
+            product_yield=float(ferm_yield),
+            residence_time_h=BASE_RESIDENCE_H,
+        )
 
-print("\nMSP vs fermentation oil yield:")
-for x, y in zip(FERM_YIELD_RANGE, msp_vs_ferm_yield):
-    print(f"  {x:.2f} kg oil/kg VFA consumed -> ${y:.3f}/kg oil")
+        msp_val = solve_oil_msp_from_full_system(
+            full_sys,
+            streams,
+            extraction_usd_per_kg_oil=0.50,
+            )
+        msp_vs_ferm_yield.append(msp_val)
 
-print("\nSaved:")
-print(OUT / "fig_msp_vs_acidogenic_vfa_yield.png")
-print(OUT / "fig_msp_vs_fermentation_yield.png")
+    fig2, ax2 = plt.subplots(figsize=(6.6, 4.4))
+    ax2.plot(
+        FERM_YIELD_RANGE,
+        msp_vs_ferm_yield,
+        marker="o",
+        linewidth=1.8,
+        markersize=6,
+        markeredgecolor="black",
+        zorder=3,
+    )
+
+    ax2.axhline(
+        y=1.50,
+        linestyle="--",
+        linewidth=1.2,
+        color="black",
+        zorder=2,
+        label="Soybean oil market price ($0.62–1.50/kg)",
+    )
+    ax2.axhline(
+        y=0.62,
+        linestyle="--",
+        linewidth=1.2,
+        color="black",
+        zorder=2,
+    )
+    ax2.axhspan(0.62, 1.50, alpha=0.10, color="black", zorder=1)
+
+    for x, y in zip(FERM_YIELD_RANGE, msp_vs_ferm_yield):
+        ax2.text(
+            x,
+            y + max(msp_vs_ferm_yield) * 0.015,
+            f"{y:.2f}",
+            ha="center",
+            va="bottom",
+            fontsize=8,
+        )
+
+    # base-case star
+    base_ferm_yield = 0.144
+    base_idx = list(FERM_YIELD_RANGE).index(base_ferm_yield)
+    base_msp_ferm = msp_vs_ferm_yield[base_idx]
+
+    ax2.scatter(
+        [base_ferm_yield],
+        [base_msp_ferm],
+        marker="*",
+        s=220,
+        color="gold",
+        edgecolors="black",
+        linewidths=0.8,
+        zorder=5,
+        label="Base case",
+    )
+
+    ax2.set_xlabel("Fermentation oil yield (kg oil/kg VFA consumed)")
+    ax2.set_ylabel("Crude microbial oil MSP ($/kg)")
+    ax2.set_title("Effect of fermentation oil yield on crude microbial oil MSP")
+    ax2.xaxis.set_major_formatter(mticker.FormatStrFormatter("%.2f"))
+    ax2.yaxis.set_major_formatter(mticker.FormatStrFormatter("$%.0f"))
+    ax2.grid(axis="both", linewidth=0.4, color="#D3D1C7", zorder=0)
+    ax2.set_ylim(0, max(msp_vs_ferm_yield) * 1.10)
+    ax2.legend(frameon=False, fontsize=8, loc="upper right")
+
+    fig2.tight_layout()
+    fig2.savefig(OUT / "fig_msp_vs_fermentation_yield.png", bbox_inches="tight")
+
+    print("\nMSP vs acidogenic VFA yield:")
+    for x, y in zip(VFA_YIELD_RANGE, msp_vs_vfa_yield):
+        print(f"  {x:.2f} kg VFA/kg VS destroyed -> ${y:.3f}/kg oil")
+
+    print("\nMSP vs fermentation oil yield:")
+    for x, y in zip(FERM_YIELD_RANGE, msp_vs_ferm_yield):
+        print(f"  {x:.2f} kg oil/kg VFA consumed -> ${y:.3f}/kg oil")
+
+    print("\nSaved:")
+    print(OUT / "fig_msp_vs_acidogenic_vfa_yield.png")
+    print(OUT / "fig_msp_vs_fermentation_yield.png")

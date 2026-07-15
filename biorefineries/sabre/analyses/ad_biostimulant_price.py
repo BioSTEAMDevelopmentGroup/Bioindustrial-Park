@@ -115,81 +115,82 @@ def build_case(pretreatment_case: str, biostimulant_price: float):
 
 
 results = {case: [] for case in PRETREATMENT_CASES}
-revenues = {case: [] for case in PRETREATMENT_CASES}
+if __name__ == "__main__":
+    revenues = {case: [] for case in PRETREATMENT_CASES}
 
-for case in PRETREATMENT_CASES:
-    for bs_price in BIOSTIMULANT_PRICES:
-        msp_mmbtu, annual_rev_musd = build_case(case, bs_price)
-        results[case].append(msp_mmbtu)
-        revenues[case].append(annual_rev_musd)
+    for case in PRETREATMENT_CASES:
+        for bs_price in BIOSTIMULANT_PRICES:
+            msp_mmbtu, annual_rev_musd = build_case(case, bs_price)
+            results[case].append(msp_mmbtu)
+            revenues[case].append(annual_rev_musd)
 
-# plotting styles
-plt.rcParams.update({
-    "font.family":      "DejaVu Sans",
-    "font.size":        10,
-    "axes.titlesize":   10,
-    "axes.labelsize":   10,
-    "xtick.labelsize":  9,
-    "ytick.labelsize":  9,
-    "figure.dpi":       150,
-    "axes.linewidth":   0.8,
-    "axes.edgecolor":   "black",
-    "xtick.direction":  "in",
-    "ytick.direction":  "in",
-    "xtick.top":        True,
-    "ytick.right":      True,
-})
+    # plotting styles
+    plt.rcParams.update({
+        "font.family":      "DejaVu Sans",
+        "font.size":        10,
+        "axes.titlesize":   10,
+        "axes.labelsize":   10,
+        "xtick.labelsize":  9,
+        "ytick.labelsize":  9,
+        "figure.dpi":       150,
+        "axes.linewidth":   0.8,
+        "axes.edgecolor":   "black",
+        "xtick.direction":  "in",
+        "ytick.direction":  "in",
+        "xtick.top":        True,
+        "ytick.right":      True,
+    })
 
-fig, ax = plt.subplots(figsize=(7.0, 4.8))
+    fig, ax = plt.subplots(figsize=(7.0, 4.8))
 
-markers = {
-    "press_mill_only": "o",
-    "enzymatic": "s",
-    "peroxide": "^",
-    "combined_PE": "D",
-    "combined_PTE": "v",
-}
+    markers = {
+        "press_mill_only": "o",
+        "enzymatic": "s",
+        "peroxide": "^",
+        "combined_PE": "D",
+        "combined_PTE": "v",
+    }
 
-for case in PRETREATMENT_CASES:
-    ax.plot(
-        BIOSTIMULANT_PRICES,
-        results[case],
-        marker=markers[case],
-        linewidth=1.8,
-        markersize=6,
-        markeredgecolor="black",
-        label=CASE_LABELS[case],
-        zorder=3,
+    for case in PRETREATMENT_CASES:
+        ax.plot(
+            BIOSTIMULANT_PRICES,
+            results[case],
+            marker=markers[case],
+            linewidth=1.8,
+            markersize=6,
+            markeredgecolor="black",
+            label=CASE_LABELS[case],
+            zorder=3,
+        )
+
+    ax.axhline(3.0, color="black", linewidth=1.3, linestyle="--", zorder=2, label="$3/MMBtu")
+    ax.axhline(10.0, color="black", linewidth=1.3, linestyle=":", zorder=2, label="$10/MMBtu")
+    ax.axhline(14.0, color="black", linewidth=1.3, linestyle="-.", zorder=2, label="$14/MMBtu")
+
+    ax.set_xlabel("Biostimulant price ($/kg)")
+    ax.set_ylabel("Biomethane MSP ($/MMBtu)")
+    ax.set_title("Effect of biostimulant price on biomethane MSP")
+    ax.xaxis.set_major_formatter(mticker.FormatStrFormatter("%.2f"))
+    ax.yaxis.set_major_formatter(mticker.FormatStrFormatter("$%.0f"))
+    ax.grid(axis="both", linewidth=0.4, color="#D3D1C7", zorder=0)
+    ax.legend(frameon=False, fontsize=8, ncol=2, loc="upper right")
+    ax.axvline(
+        0.00,
+        color="black",
+        linewidth=1.0,
+        linestyle="--",
+        zorder=2,
+        label="Baseline ($0.00/kg)",
     )
 
-ax.axhline(3.0, color="black", linewidth=1.3, linestyle="--", zorder=2, label="$3/MMBtu")
-ax.axhline(10.0, color="black", linewidth=1.3, linestyle=":", zorder=2, label="$10/MMBtu")
-ax.axhline(14.0, color="black", linewidth=1.3, linestyle="-.", zorder=2, label="$14/MMBtu")
+    fig.tight_layout()
+    fig.savefig(OUT / "fig_biostimulant_sensitivity.png", bbox_inches="tight")
 
-ax.set_xlabel("Biostimulant price ($/kg)")
-ax.set_ylabel("Biomethane MSP ($/MMBtu)")
-ax.set_title("Effect of biostimulant price on biomethane MSP")
-ax.xaxis.set_major_formatter(mticker.FormatStrFormatter("%.2f"))
-ax.yaxis.set_major_formatter(mticker.FormatStrFormatter("$%.0f"))
-ax.grid(axis="both", linewidth=0.4, color="#D3D1C7", zorder=0)
-ax.legend(frameon=False, fontsize=8, ncol=2, loc="upper right")
-ax.axvline(
-    0.00,
-    color="black",
-    linewidth=1.0,
-    linestyle="--",
-    zorder=2,
-    label="Baseline ($0.00/kg)",
-)
+    print("\nMSP results ($/MMBtu):")
+    for case in PRETREATMENT_CASES:
+        print(f"\n{CASE_LABELS[case]}")
+        for bs_price, msp, rev in zip(BIOSTIMULANT_PRICES, results[case], revenues[case]):
+            print(f"  biostimulant = ${bs_price:.2f}/kg -> MSP = ${msp:.3f}/MMBtu | annual revenue = ${rev:.2f}M/yr")
 
-fig.tight_layout()
-fig.savefig(OUT / "fig_biostimulant_sensitivity.png", bbox_inches="tight")
-
-print("\nMSP results ($/MMBtu):")
-for case in PRETREATMENT_CASES:
-    print(f"\n{CASE_LABELS[case]}")
-    for bs_price, msp, rev in zip(BIOSTIMULANT_PRICES, results[case], revenues[case]):
-        print(f"  biostimulant = ${bs_price:.2f}/kg -> MSP = ${msp:.3f}/MMBtu | annual revenue = ${rev:.2f}M/yr")
-
-print("\nSaved:")
-print(OUT / "fig_biostimulant_sensitivity.png")
+    print("\nSaved:")
+    print(OUT / "fig_biostimulant_sensitivity.png")

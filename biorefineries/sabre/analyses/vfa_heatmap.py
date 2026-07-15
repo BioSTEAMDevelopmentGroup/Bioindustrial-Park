@@ -100,108 +100,109 @@ def build_case(feed_price: float, biostim_price: float) -> float:
 
 # grid shape: (len(BIOSTIM_PRICES), len(FEED_PRICES))
 # rows = biostimulant price (y-axis), cols = feed price (x-axis)
-print("Running VFA MSP heatmap grid...")
-grid = np.zeros((len(BIOSTIM_PRICES), len(FEED_PRICES)))
+if __name__ == "__main__":
+    print("Running VFA MSP heatmap grid...")
+    grid = np.zeros((len(BIOSTIM_PRICES), len(FEED_PRICES)))
 
-for i, bs in enumerate(BIOSTIM_PRICES):
-    for j, fp in enumerate(FEED_PRICES):
-        msp = build_case(fp, bs)
-        grid[i, j] = msp
-        print(f"  feed={fp:+.2f}  bs={bs:.2f}  -> MSP=${msp:.2f}/kg")
+    for i, bs in enumerate(BIOSTIM_PRICES):
+        for j, fp in enumerate(FEED_PRICES):
+            msp = build_case(fp, bs)
+            grid[i, j] = msp
+            print(f"  feed={fp:+.2f}  bs={bs:.2f}  -> MSP=${msp:.2f}/kg")
 
 
-# ── Plot ──────────────────────────────────────────────────────────────────────
+    # ── Plot ──────────────────────────────────────────────────────────────────────
 
-plt.rcParams.update({
-    "font.family":     "DejaVu Sans",
-    "font.size":       10,
-    "axes.titlesize":  11,
-    "axes.labelsize":  10,
-    "xtick.labelsize": 9,
-    "ytick.labelsize": 9,
-    "figure.dpi":      150,
-    "axes.linewidth":  0.8,
-})
+    plt.rcParams.update({
+        "font.family":     "DejaVu Sans",
+        "font.size":       10,
+        "axes.titlesize":  11,
+        "axes.labelsize":  10,
+        "xtick.labelsize": 9,
+        "ytick.labelsize": 9,
+        "figure.dpi":      150,
+        "axes.linewidth":  0.8,
+    })
 
-CMAP = "RdYlGn_r"
-VMIN = np.percentile(grid, 2)
-VMAX = np.percentile(grid, 98)
+    CMAP = "RdYlGn_r"
+    VMIN = np.percentile(grid, 2)
+    VMAX = np.percentile(grid, 98)
 
-n_rows, n_cols = grid.shape
+    n_rows, n_cols = grid.shape
 
-fig, ax = plt.subplots(figsize=(7.5, 5.5))
+    fig, ax = plt.subplots(figsize=(7.5, 5.5))
 
-im = ax.imshow(
-    grid,
-    aspect="auto",
-    origin="lower",
-    cmap=CMAP,
-    vmin=VMIN,
-    vmax=VMAX,
-    extent=[-0.5, n_cols - 0.5, -0.5, n_rows - 0.5],
-)
+    im = ax.imshow(
+        grid,
+        aspect="auto",
+        origin="lower",
+        cmap=CMAP,
+        vmin=VMIN,
+        vmax=VMAX,
+        extent=[-0.5, n_cols - 0.5, -0.5, n_rows - 0.5],
+    )
 
-# Cell annotations
-for i in range(n_rows):
-    for j in range(n_cols):
-        val = grid[i, j]
-        normed = (val - VMIN) / max(VMAX - VMIN, 1)
-        color = "white" if normed < 0.35 or normed > 0.72 else "black"
-        ax.text(
-            j, i, f"${val:.0f}",
-            ha="center", va="center",
-            fontsize=7, color=color, fontweight="bold",
-        )
-
-# Highlight cells within soybean oil market price range
-for i in range(n_rows):
-    for j in range(n_cols):
-        val = grid[i, j]
-        if val <= SOYBEAN_OIL_HIGH:
-            edgecolor = "#1a6faf" if val <= SOYBEAN_OIL_LOW else "black"
-            rect = plt.Rectangle(
-                (j - 0.5, i - 0.5), 1.0, 1.0,
-                linewidth=2.5, edgecolor=edgecolor,
-                facecolor="none", zorder=6,
+    # Cell annotations
+    for i in range(n_rows):
+        for j in range(n_cols):
+            val = grid[i, j]
+            normed = (val - VMIN) / max(VMAX - VMIN, 1)
+            color = "white" if normed < 0.35 or normed > 0.72 else "black"
+            ax.text(
+                j, i, f"${val:.0f}",
+                ha="center", va="center",
+                fontsize=7, color=color, fontweight="bold",
             )
-            ax.add_patch(rect)
 
-# Tick labels
-ax.set_xticks(range(n_cols))
-ax.set_xticklabels([f"${fp:.2f}" for fp in FEED_PRICES], fontsize=8)
-ax.set_yticks(range(n_rows))
-ax.set_yticklabels([f"${bs:.2f}" for bs in BIOSTIM_PRICES], fontsize=8)
+    # Highlight cells within soybean oil market price range
+    for i in range(n_rows):
+        for j in range(n_cols):
+            val = grid[i, j]
+            if val <= SOYBEAN_OIL_HIGH:
+                edgecolor = "#1a6faf" if val <= SOYBEAN_OIL_LOW else "black"
+                rect = plt.Rectangle(
+                    (j - 0.5, i - 0.5), 1.0, 1.0,
+                    linewidth=2.5, edgecolor=edgecolor,
+                    facecolor="none", zorder=6,
+                )
+                ax.add_patch(rect)
 
-ax.set_xlabel("Feedstock price ($/kg wet)")
-ax.set_ylabel("Biostimulant price ($/kg)")
-ax.set_title("Crude microbial oil MSP ($/kg)\nAcidogenic AD–fermentation pathway", pad=6)
+    # Tick labels
+    ax.set_xticks(range(n_cols))
+    ax.set_xticklabels([f"${fp:.2f}" for fp in FEED_PRICES], fontsize=8)
+    ax.set_yticks(range(n_rows))
+    ax.set_yticklabels([f"${bs:.2f}" for bs in BIOSTIM_PRICES], fontsize=8)
 
-cbar = fig.colorbar(im, ax=ax, fraction=0.046, pad=0.04)
-cbar.set_label("Crude microbial oil MSP ($/kg)", fontsize=9)
+    ax.set_xlabel("Feedstock price ($/kg wet)")
+    ax.set_ylabel("Biostimulant price ($/kg)")
+    ax.set_title("Crude microbial oil MSP ($/kg)\nAcidogenic AD–fermentation pathway", pad=6)
 
-# Legend for borders
-from matplotlib.patches import Patch
-legend_handles = [
-    Patch(facecolor="none", edgecolor="black",   linewidth=2.0, label=f"MSP ≤ ${SOYBEAN_OIL_HIGH}/kg (soybean oil high)"),
-    Patch(facecolor="none", edgecolor="#1a6faf", linewidth=2.0, label=f"MSP ≤ ${SOYBEAN_OIL_LOW}/kg (soybean oil low)"),
-]
-fig.legend(handles=legend_handles, fontsize=8, frameon=False,
-           loc="lower center", ncol=2,
-           bbox_to_anchor=(0.5, -0.04))
+    cbar = fig.colorbar(im, ax=ax, fraction=0.046, pad=0.04)
+    cbar.set_label("Crude microbial oil MSP ($/kg)", fontsize=9)
 
-fig.tight_layout()
-fig.savefig(OUT / "fig_vfa_msp_heatmap.png", bbox_inches="tight")
-print("\nSaved: fig_vfa_msp_heatmap.png")
+    # Legend for borders
+    from matplotlib.patches import Patch
+    legend_handles = [
+        Patch(facecolor="none", edgecolor="black",   linewidth=2.0, label=f"MSP ≤ ${SOYBEAN_OIL_HIGH}/kg (soybean oil high)"),
+        Patch(facecolor="none", edgecolor="#1a6faf", linewidth=2.0, label=f"MSP ≤ ${SOYBEAN_OIL_LOW}/kg (soybean oil low)"),
+    ]
+    fig.legend(handles=legend_handles, fontsize=8, frameon=False,
+               loc="lower center", ncol=2,
+               bbox_to_anchor=(0.5, -0.04))
 
-# ── Console summary ───────────────────────────────────────────────────────────
+    fig.tight_layout()
+    fig.savefig(OUT / "fig_vfa_msp_heatmap.png", bbox_inches="tight")
+    print("\nSaved: fig_vfa_msp_heatmap.png")
 
-print("\nMSP grid — Crude microbial oil ($/kg):")
-print(f"{'':>14}", end="")
-for fp in FEED_PRICES:
-    print(f"  feed={fp:+.2f}", end="")
-print()
-for i, bs in enumerate(BIOSTIM_PRICES):
-    print(f"bs=${bs:.2f}/kg    ", end="")
-    for j in range(len(FEED_PRICES)):
-        print(f"  {grid[i, j]:9.2f}", end="")
+    # ── Console summary ───────────────────────────────────────────────────────────
+
+    print("\nMSP grid — Crude microbial oil ($/kg):")
+    print(f"{'':>14}", end="")
+    for fp in FEED_PRICES:
+        print(f"  feed={fp:+.2f}", end="")
     print()
+    for i, bs in enumerate(BIOSTIM_PRICES):
+        print(f"bs=${bs:.2f}/kg    ", end="")
+        for j in range(len(FEED_PRICES)):
+            print(f"  {grid[i, j]:9.2f}", end="")
+        print()

@@ -158,167 +158,168 @@ plt.rcParams.update({
 })
 
 methane_kgph = []
-methane_err_low = []
-methane_err_high = []
+if __name__ == "__main__":
+    methane_err_low = []
+    methane_err_high = []
 
-msp_mmbtu = []
-msp_err_low = []
-msp_err_high = []
+    msp_mmbtu = []
+    msp_err_low = []
+    msp_err_high = []
 
-labels = [CASE_LABELS[c] for c in PRETREATMENT_CASES]
+    labels = [CASE_LABELS[c] for c in PRETREATMENT_CASES]
 
-for case in PRETREATMENT_CASES:
-    central_y, low_y, high_y = get_case_yields(case)
+    for case in PRETREATMENT_CASES:
+        central_y, low_y, high_y = get_case_yields(case)
 
-    sys_c, tea_c, msp_c, ch4_c = build_case(case, yield_override=central_y)
-    sys_l, tea_l, msp_l, ch4_l = build_case(case, yield_override=low_y)
-    sys_h, tea_h, msp_h, ch4_h = build_case(case, yield_override=high_y)
+        sys_c, tea_c, msp_c, ch4_c = build_case(case, yield_override=central_y)
+        sys_l, tea_l, msp_l, ch4_l = build_case(case, yield_override=low_y)
+        sys_h, tea_h, msp_h, ch4_h = build_case(case, yield_override=high_y)
 
-    methane_kgph.append(ch4_c)
-    methane_err_low.append(max(ch4_c - ch4_l, 0.0))
-    methane_err_high.append(max(ch4_h - ch4_c, 0.0))
+        methane_kgph.append(ch4_c)
+        methane_err_low.append(max(ch4_c - ch4_l, 0.0))
+        methane_err_high.append(max(ch4_h - ch4_c, 0.0))
 
-    msp_c_val = float(msp_c["usd_per_mmbtu"])
-    msp_l_val = float(msp_l["usd_per_mmbtu"])
-    msp_h_val = float(msp_h["usd_per_mmbtu"])
+        msp_c_val = float(msp_c["usd_per_mmbtu"])
+        msp_l_val = float(msp_l["usd_per_mmbtu"])
+        msp_h_val = float(msp_h["usd_per_mmbtu"])
 
-    msp_mmbtu.append(msp_c_val)
-    msp_err_low.append(max(msp_c_val - msp_h_val, 0.0))
-    msp_err_high.append(max(msp_l_val - msp_c_val, 0.0))
+        msp_mmbtu.append(msp_c_val)
+        msp_err_low.append(max(msp_c_val - msp_h_val, 0.0))
+        msp_err_high.append(max(msp_l_val - msp_c_val, 0.0))
 
-x = np.arange(len(labels))
-best_idx = int(np.argmin(msp_mmbtu))
-
-
-def bar_colors(n, best_idx, default, best):
-    return [best if i == best_idx else default for i in range(n)]
+    x = np.arange(len(labels))
+    best_idx = int(np.argmin(msp_mmbtu))
 
 
-# ============================================================
-# Figure 1 — Methane production by pretreatment case
-# ============================================================
-fig1, ax1 = plt.subplots(figsize=(6.5, 4))
+    def bar_colors(n, best_idx, default, best):
+        return [best if i == best_idx else default for i in range(n)]
 
-bars1 = ax1.bar(
-    x,
-    methane_kgph,
-    color=bar_colors(len(labels), best_idx, "#74c476", "#238b45"),
-    edgecolor="black",
-    linewidth=0.8,
-    width=0.55,
-    yerr=np.array([methane_err_low, methane_err_high]),
-    capsize=6,
-    error_kw={
-        "elinewidth": 1.0,
-        "ecolor": "#222222",
-        "capthick": 1.0,
-        "zorder": 5,
-    },
-    zorder=3,
-)
 
-for bar, val, ehi in zip(bars1, methane_kgph, methane_err_high):
-    ax1.text(
-        bar.get_x() + bar.get_width() / 2,
-        bar.get_height() + ehi + max(methane_kgph) * 0.008,
-        f"{val:,.0f}",
-        ha="center",
-        va="bottom",
-        fontsize=8,
+    # ============================================================
+    # Figure 1 — Methane production by pretreatment case
+    # ============================================================
+    fig1, ax1 = plt.subplots(figsize=(6.5, 4))
+
+    bars1 = ax1.bar(
+        x,
+        methane_kgph,
+        color=bar_colors(len(labels), best_idx, "#74c476", "#238b45"),
+        edgecolor="black",
+        linewidth=0.8,
+        width=0.55,
+        yerr=np.array([methane_err_low, methane_err_high]),
+        capsize=6,
+        error_kw={
+            "elinewidth": 1.0,
+            "ecolor": "#222222",
+            "capthick": 1.0,
+            "zorder": 5,
+        },
+        zorder=3,
     )
 
-ax1.set_xticks(x)
-ax1.set_xticklabels(labels)
-ax1.set_ylabel("CH₄ production (kg/hr)")
-ax1.grid(axis="y", linewidth=0.4, color="#D3D1C7", zorder=0)
-ax1.yaxis.set_major_formatter(mticker.FuncFormatter(lambda v, _: f"{v:,.0f}"))
+    for bar, val, ehi in zip(bars1, methane_kgph, methane_err_high):
+        ax1.text(
+            bar.get_x() + bar.get_width() / 2,
+            bar.get_height() + ehi + max(methane_kgph) * 0.008,
+            f"{val:,.0f}",
+            ha="center",
+            va="bottom",
+            fontsize=8,
+        )
 
-# force room above bars so caps are not cramped
-ax1.set_ylim(0, max(np.array(methane_kgph) + np.array(methane_err_high)) * 1.10)
+    ax1.set_xticks(x)
+    ax1.set_xticklabels(labels)
+    ax1.set_ylabel("CH₄ production (kg/hr)")
+    ax1.grid(axis="y", linewidth=0.4, color="#D3D1C7", zorder=0)
+    ax1.yaxis.set_major_formatter(mticker.FuncFormatter(lambda v, _: f"{v:,.0f}"))
 
-fig1.tight_layout()
-fig1.savefig(OUT / "fig_methane_production_by_pretreatment_errorbars.png", bbox_inches="tight")
+    # force room above bars so caps are not cramped
+    ax1.set_ylim(0, max(np.array(methane_kgph) + np.array(methane_err_high)) * 1.10)
+
+    fig1.tight_layout()
+    fig1.savefig(OUT / "fig_methane_production_by_pretreatment_errorbars.png", bbox_inches="tight")
 
 
-# ============================================================
-# Figure 2 — MSP by pretreatment case
-# ============================================================
-fig2, ax2 = plt.subplots(figsize=(6.5, 4))
+    # ============================================================
+    # Figure 2 — MSP by pretreatment case
+    # ============================================================
+    fig2, ax2 = plt.subplots(figsize=(6.5, 4))
 
-bars2 = ax2.bar(
-    x,
-    msp_mmbtu,
-    color=bar_colors(len(labels), best_idx, "#6baed6", "#2171b5"),
-    edgecolor="black",
-    linewidth=0.8,
-    width=0.55,
-    yerr=np.array([msp_err_low, msp_err_high]),
-    capsize=6,
-    error_kw={
-        "elinewidth": 1.0,
-        "ecolor": "#222222",
-        "capthick": 1.0,
-        "zorder": 5,
-    },
-    zorder=3,
-)
-
-for bar, val, ehi in zip(bars2, msp_mmbtu, msp_err_high):
-    ax2.text(
-        bar.get_x() + bar.get_width() / 2,
-        bar.get_height() + ehi + max(msp_mmbtu) * 0.015,
-        f"${val:.2f}",
-        ha="center",
-        va="bottom",
-        fontsize=8,
+    bars2 = ax2.bar(
+        x,
+        msp_mmbtu,
+        color=bar_colors(len(labels), best_idx, "#6baed6", "#2171b5"),
+        edgecolor="black",
+        linewidth=0.8,
+        width=0.55,
+        yerr=np.array([msp_err_low, msp_err_high]),
+        capsize=6,
+        error_kw={
+            "elinewidth": 1.0,
+            "ecolor": "#222222",
+            "capthick": 1.0,
+            "zorder": 5,
+        },
+        zorder=3,
     )
 
-ax2.axhline(
-    3.0,
-    color="black",
-    linewidth=1.3,
-    linestyle="--",
-    zorder=2,
-    label="Market price ~$3/MMBtu",
-)
+    for bar, val, ehi in zip(bars2, msp_mmbtu, msp_err_high):
+        ax2.text(
+            bar.get_x() + bar.get_width() / 2,
+            bar.get_height() + ehi + max(msp_mmbtu) * 0.015,
+            f"${val:.2f}",
+            ha="center",
+            va="bottom",
+            fontsize=8,
+        )
 
-ax2.axhline(
-    10.0,
-    color="black",
-    linewidth=1.3,
-    linestyle=":",
-    zorder=2,
-    label="Market price ~$10/MMBtu",
-)
+    ax2.axhline(
+        3.0,
+        color="black",
+        linewidth=1.3,
+        linestyle="--",
+        zorder=2,
+        label="Market price ~$3/MMBtu",
+    )
 
-ax2.axhline(
-    14.0,
-    color="black",
-    linewidth=1.3,
-    linestyle="-.",
-    zorder=2,
-    label="Market price ~$14/MMBtu",
-)
+    ax2.axhline(
+        10.0,
+        color="black",
+        linewidth=1.3,
+        linestyle=":",
+        zorder=2,
+        label="Market price ~$10/MMBtu",
+    )
 
-ax2.set_xticks(x)
-ax2.set_xticklabels(labels)
-ax2.set_ylabel("Biomethane MSP ($/MMBtu)")
-ax2.yaxis.set_major_formatter(mticker.FormatStrFormatter("$%.0f"))
-ax2.grid(axis="y", linewidth=0.4, color="#D3D1C7", zorder=0)
-ax2.legend(fontsize=8, frameon=False)
+    ax2.axhline(
+        14.0,
+        color="black",
+        linewidth=1.3,
+        linestyle="-.",
+        zorder=2,
+        label="Market price ~$14/MMBtu",
+    )
 
-fig2.tight_layout()
-fig2.savefig(OUT / "fig_msp_by_pretreatment_errorbars.png", bbox_inches="tight")
+    ax2.set_xticks(x)
+    ax2.set_xticklabels(labels)
+    ax2.set_ylabel("Biomethane MSP ($/MMBtu)")
+    ax2.yaxis.set_major_formatter(mticker.FormatStrFormatter("$%.0f"))
+    ax2.grid(axis="y", linewidth=0.4, color="#D3D1C7", zorder=0)
+    ax2.legend(fontsize=8, frameon=False)
+
+    fig2.tight_layout()
+    fig2.savefig(OUT / "fig_msp_by_pretreatment_errorbars.png", bbox_inches="tight")
 
 
-print("Methane production (kg/hr) with low/high bounds:")
-for label, val, elo, ehi in zip(labels, methane_kgph, methane_err_low, methane_err_high):
-    print(f"  {label:<18} {val:,.2f} (-{elo:,.2f}, +{ehi:,.2f})")
+    print("Methane production (kg/hr) with low/high bounds:")
+    for label, val, elo, ehi in zip(labels, methane_kgph, methane_err_low, methane_err_high):
+        print(f"  {label:<18} {val:,.2f} (-{elo:,.2f}, +{ehi:,.2f})")
 
-print("\nMSP ($/MMBtu) with low/high bounds:")
-for label, val, elo, ehi in zip(labels, msp_mmbtu, msp_err_low, msp_err_high):
-    print(f"  {label:<18} {val:.3f} (-{elo:.3f}, +{ehi:.3f})")
+    print("\nMSP ($/MMBtu) with low/high bounds:")
+    for label, val, elo, ehi in zip(labels, msp_mmbtu, msp_err_low, msp_err_high):
+        print(f"  {label:<18} {val:.3f} (-{elo:.3f}, +{ehi:.3f})")
 
-print("\nSaved:")
-print(OUT / "fig_methane_production_by_pretreatment_errorbars.png")
-print(OUT / "fig_msp_by_pretreatment_errorbars.png")
+    print("\nSaved:")
+    print(OUT / "fig_methane_production_by_pretreatment_errorbars.png")
+    print(OUT / "fig_msp_by_pretreatment_errorbars.png")

@@ -665,4 +665,5 @@ def make_feed_pretreatment_figures(
     print("  fig_feed_pretreatment_ch4_heatmap.png")
     print("  feed_pretreatment_results.csv")
 
-make_feed_pretreatment_figures(biostimulant_price=0.0)
+if __name__ == "__main__":
+    make_feed_pretreatment_figures(biostimulant_price=0.0)
