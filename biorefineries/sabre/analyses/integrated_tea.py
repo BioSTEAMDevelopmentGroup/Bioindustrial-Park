@@ -26,8 +26,16 @@ Products:
   - Biostimulant at $0.50/kg (standard assumption)
 """
 
+import sys
+from pathlib import Path
+
 import biosteam as bst
 import math
+
+SCRIPT_DIR = Path(__file__).resolve().parent
+REPO_ROOT = SCRIPT_DIR.parents[2]
+if str(REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(REPO_ROOT))
 
 from biorefineries.sabre._chemicals import set_thermo
 from biorefineries.sabre.systems import create_integrated_biorefinery
