@@ -32,8 +32,8 @@ from biorefineries.sabre.utils import load_assumptions, get_quality_params, get_
 from biorefineries.sabre.streams import make_sargassum_feed
 from biorefineries.sabre.units import Press, Mill, PressateConcentrator
 from biorefineries.sabre.systems._ad_biogas_system import _build_methanogenic_pathway
-from biorefineries.sabre.systems._vfa_ad_system import create_vfa_ad_system
-from biorefineries.sabre.systems._vfa_fermentation_system import create_vfa_fermentation_system
+from biorefineries.sabre.systems._ad_vfa_system import create_ad_vfa_system
+from biorefineries.sabre.systems._ad_fermentation_system import _create_vfa_fermentation_system
 
 __all__ = ('create_integrated_biorefinery', 'MassSplitter')
 
@@ -107,15 +107,15 @@ def _build_methane_pathway(A, ad_feed_in, pretreatment_case):
 
 def _build_vfa_pathway(vfa_stream, ferm_kwargs):
     """Build VFA_AD -> SP_VFA -> fermentation chain. Returns (units_list, streams_dict, units_dict)."""
-    vfa_subsys = create_vfa_ad_system(milled_biomass_stream=vfa_stream)
+    vfa_subsys = create_ad_vfa_system(milled_biomass_stream=vfa_stream)
 
     vfa_broth = _get_stream("vfa_broth")
     if vfa_broth is None:
         raise RuntimeError(
-            "Could not find 'vfa_broth' stream. Check SP_VFA output IDs in _vfa_ad_system.py."
+            "Could not find 'vfa_broth' stream. Check SP_VFA output IDs in _ad_vfa_system.py."
         )
 
-    fer_sys, fer_streams, fer_units = create_vfa_fermentation_system(
+    fer_sys, fer_streams, fer_units = _create_vfa_fermentation_system(
         vfa_broth=vfa_broth, **ferm_kwargs
     )
 

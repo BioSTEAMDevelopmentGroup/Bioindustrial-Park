@@ -73,8 +73,8 @@ plt.rcParams.update({
 # Figure 1 — VFA composition in acidogenic broth
 # ============================================================
 def make_vfa_composition_figure(feed_price: float = 0.02):
-    vfa_sys, fer_sys, streams, units, full_sys = build_and_simulate(feed_price)
-    vfa_broth = vfa_sys.flowsheet.stream.vfa_broth
+    streams, units, full_sys = build_and_simulate(feed_price)
+    vfa_broth = streams["vfa_broth"]
 
     vfa_names = {
         "AceticAcid": "Acetate",
@@ -185,7 +185,7 @@ def make_product_scenario_comparison_figure(feed_price: float = 0.00):
     annual_prod_t = []
 
     for sc in PRODUCT_SCENARIOS:
-        vfa_sys, fer_sys, streams, units, full_sys = build_and_simulate_scenario(
+        streams, units, full_sys = build_and_simulate_scenario(
             feed_price_per_kg_wet=feed_price,
             product_yield=sc["yield"],
             residence_time_h=sc["residence_h"],

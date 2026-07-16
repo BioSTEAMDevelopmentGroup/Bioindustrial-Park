@@ -27,7 +27,12 @@ The four flowsheets currently available (see ``load()`` in
   rather than methane.
 - **VFA fermentation**: VFA-rich broth fermented by *Yarrowia
   lipolytica* into microbial oil, with cell disruption, extraction,
-  and biomass recycle.
+  and biomass recycle. Cannot be loaded standalone via ``load()``, and
+  has no standalone public builder of its own (it would require a
+  pre-built ``vfa_broth`` stream, which nothing else produces in
+  isolation); call ``systems.create_ad_fermentation_system(...)`` for a
+  self-contained feedstock -> microbial-oil system (VFA-AD and
+  fermentation simulated together as one ``bst.System``).
 - **Integrated**: shared preprocessing with an alpha-split between the
   methanogenic AD pathway and the VFA-to-oil pathway, so both products
   can be produced from one feedstock at a tunable ratio.

@@ -23,7 +23,7 @@ HR_PER_DAY = 24.0
 class Press(bst.Unit):
     """
     Multi-train mechanical dewatering press. Constructed in three places in
-    this codebase (`systems/_ad_biogas_system.py`, `systems/_vfa_ad_system.py`,
+    this codebase (`systems/_ad_biogas_system.py`, `systems/_ad_vfa_system.py`,
     `systems/_integrated_system.py`), all with the same
     `assumptions.yaml`-sourced parameters.
 
@@ -241,7 +241,7 @@ class Press(bst.Unit):
 class Mill(bst.Unit):
     """
     Multi-train hammer mill. Constructed in three places in this codebase
-    (`systems/_ad_biogas_system.py`, `systems/_vfa_ad_system.py`,
+    (`systems/_ad_biogas_system.py`, `systems/_ad_vfa_system.py`,
     `systems/_integrated_system.py`), all with the same
     `assumptions.yaml`-sourced parameters.
 

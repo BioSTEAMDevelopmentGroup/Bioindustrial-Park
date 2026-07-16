@@ -19,7 +19,7 @@ from biorefineries.sabre.units import (
     BiostimulantEvaporator, Press, Mill,
 )
 
-__all__ = ('create_vfa_ad_system',)
+__all__ = ('create_ad_vfa_system',)
 
 
 SOLIDS_IDS = [
@@ -28,12 +28,12 @@ SOLIDS_IDS = [
 ]
 
 
-def _get_vfa_case(assumptions: dict) -> dict:
+def _get_ad_vfa_case(assumptions: dict) -> dict:
     """
     Merge top-level vfa_ad_performance with the selected case.
     Returns a flat dict of scalar parameters only.
     NOTE: vfa_split is a nested dict and must be read separately
-    via _get_vfa_split() to avoid being silently dropped on merge.
+    via _get_ad_vfa_split() to avoid being silently dropped on merge.
     """
     perf = assumptions["vfa_ad_performance"]
     case_name = perf.get("case")
@@ -47,10 +47,10 @@ def _get_vfa_case(assumptions: dict) -> dict:
     return perf
 
 
-def _get_vfa_split(assumptions: dict) -> dict | None:
+def _get_ad_vfa_split(assumptions: dict) -> dict | None:
     """
     Read vfa_split directly from the selected case dict.
-    Bypasses the shallow-merge issue in _get_vfa_case() that silently
+    Bypasses the shallow-merge issue in _get_ad_vfa_case() that silently
     drops nested dicts. Returns a plain {str: float} dict or None.
     """
     perf = assumptions["vfa_ad_performance"]
@@ -67,7 +67,7 @@ def _get_vfa_split(assumptions: dict) -> dict | None:
     return {str(k): float(v) for k, v in raw_split.items()}
 
 
-def create_vfa_ad_system(
+def create_ad_vfa_system(
     quality: str = "pelagic_high_quality",
     milled_biomass_stream=None,
     enable_heat_shock: bool = False,
@@ -104,8 +104,8 @@ def create_vfa_ad_system(
     A = load_assumptions()
 
     vfaS = A["vfa_ad"]
-    vfaP = _get_vfa_case(A)
-    vfa_split = _get_vfa_split(A)
+    vfaP = _get_ad_vfa_case(A)
+    vfa_split = _get_ad_vfa_split(A)
 
     path = []
 
@@ -275,5 +275,5 @@ def create_vfa_ad_system(
 
     path.extend([AD, SP])
 
-    sys_id = "VFA_AD_sys" if milled_biomass_stream is None else "VFA_AD_subsys"
+    sys_id = "AD_VFA_sys" if milled_biomass_stream is None else "AD_VFA_subsys"
     return bst.System(sys_id, path=tuple(path))

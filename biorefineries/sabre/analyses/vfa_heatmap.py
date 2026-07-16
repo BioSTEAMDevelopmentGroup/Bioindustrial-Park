@@ -70,7 +70,7 @@ def _apply_biostimulant_price(price_per_kg: float):
 
 
 def build_case(feed_price: float, biostim_price: float) -> float:
-    vfa_sys, fer_sys, streams, units, full_sys = build_and_simulate(feed_price)
+    streams, units, full_sys = build_and_simulate(feed_price)
 
     _apply_biostimulant_price(biostim_price)
     _patch_ev607(full_sys, silent=True)

@@ -132,7 +132,7 @@ def test_vfa_fermentation_product_scenarios():
     }
 
     for sc in PRODUCT_SCENARIOS:
-        vfa_sys, fer_sys, streams, units, full_sys = build_and_simulate_scenario(
+        streams, units, full_sys = build_and_simulate_scenario(
             feed_price_per_kg_wet=0.00,
             product_yield=sc["yield"],
             residence_time_h=sc["residence_h"],
@@ -414,8 +414,8 @@ import vfa_pathway_figures as _vpf  # noqa: E402
 
 
 def test_vfa_pathway_figures_vfa_composition():
-    vfa_sys, fer_sys, streams, units, full_sys = _vpf.build_and_simulate(0.02)
-    vfa_broth = vfa_sys.flowsheet.stream.vfa_broth
+    streams, units, full_sys = _vpf.build_and_simulate(0.02)
+    vfa_broth = streams["vfa_broth"]
 
     expected = {
         "AceticAcid": 9198.11406227174,
@@ -439,7 +439,7 @@ def test_vfa_price_scenarios_biostimulant_price():
         (0.00, 14.366978528098292),
         (1.00, 10.33964036545701),
     ):
-        vfa_sys, fer_sys, streams, units, full_sys = _vps.build_and_simulate(
+        streams, units, full_sys = _vps.build_and_simulate(
             _vps.FEED_PRICE_BASE
         )
         _vps._apply_biostimulant_price(streams, bs_price)
@@ -454,11 +454,10 @@ import vfa_yield_sensitivities as _vys  # noqa: E402
 
 
 def test_vfa_yield_sensitivities_acidogenic_yield():
-    vfa_sys, fer_sys, streams, units, full_sys = _vys.build_and_simulate(
+    streams, units, full_sys = _vys.build_and_simulate(
         _vys.FEED_PRICE_USD_PER_KG_WET
     )
-    _vys.override_acidogenic_vfa_yield(vfa_sys, 0.47)
-    full_sys.simulate()
+    _vys.override_acidogenic_vfa_yield(full_sys, 0.47)
     msp_val = _vys.solve_oil_msp_from_full_system(
         full_sys, streams, extraction_usd_per_kg_oil=0.50
     )
@@ -466,7 +465,7 @@ def test_vfa_yield_sensitivities_acidogenic_yield():
 
 
 def test_vfa_yield_sensitivities_fermentation_yield():
-    vfa_sys, fer_sys, streams, units, full_sys = _vys.build_and_simulate_scenario(
+    streams, units, full_sys = _vys.build_and_simulate_scenario(
         feed_price_per_kg_wet=_vys.FEED_PRICE_USD_PER_KG_WET,
         product_yield=0.20,
         residence_time_h=_vys.BASE_RESIDENCE_H,

@@ -505,7 +505,7 @@ class AcidogenicDigester(bst.Unit):
     headspace_frac (0.25), slurry_density_kg_per_m3,
     max_single_digester_volume_MG, mixing_W_per_m3, cp_kJ_per_kgK:
         assumptions.yaml `vfa_ad` section, matching values already used at
-        the real call site (`systems/_vfa_ad_system.py`). No named source
+        the real call site (`systems/_ad_vfa_system.py`). No named source
         beyond the yaml values themselves.
     ADBC_VOL_M3 / ADBC_CAPEX interpolation table (defined above in this
     module, used by `interp_capex`, the actual installed-cost
@@ -1250,7 +1250,7 @@ class DigestateScrewPress(bst.Unit):
         - Optional polymer dosing unit per press (12k-50k EUR) can be included
 
     Constructed twice in this codebase (systems/_ad_biogas_system.py's "SP"
-    and systems/_vfa_ad_system.py's "SP_VFA"), both routing their own
+    and systems/_ad_vfa_system.py's "SP_VFA"), both routing their own
     digestate streams through the same class with different
     assumptions.yaml-sourced parameters.
 

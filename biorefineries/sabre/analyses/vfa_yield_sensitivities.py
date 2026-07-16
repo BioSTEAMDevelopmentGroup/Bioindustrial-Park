@@ -106,19 +106,19 @@ def solve_oil_msp_from_full_system(
     return float(msp["usd_per_kg_product"])
 
 
-def override_acidogenic_vfa_yield(vfa_sys, target_vfa_yield):
+def override_acidogenic_vfa_yield(sys, target_vfa_yield):
     """
     Find the acidogenic digester unit generically and override
-    vfa_kg_per_kg_vs, then re-simulate that subsystem.
+    vfa_kg_per_kg_vs, then re-simulate the (single, unified) system.
     """
     found = False
-    for u in vfa_sys.units:
+    for u in sys.units:
         if hasattr(u, "vfa_kg_per_kg_vs"):
             u.vfa_kg_per_kg_vs = float(target_vfa_yield)
             found = True
     if not found:
         raise RuntimeError("Could not find acidogenic digester unit with attribute 'vfa_kg_per_kg_vs'.")
-    vfa_sys.simulate()
+    sys.simulate()
 
 
 # ============================================================
@@ -129,13 +129,10 @@ if __name__ == "__main__":
 
     for vfa_yield in VFA_YIELD_RANGE:
         # Build normal base case first
-        vfa_sys, fer_sys, streams, units, full_sys = build_and_simulate(FEED_PRICE_USD_PER_KG_WET)
+        streams, units, full_sys = build_and_simulate(FEED_PRICE_USD_PER_KG_WET)
 
-        # Override acidogenic yield and re-simulate upstream + full system
-        override_acidogenic_vfa_yield(vfa_sys, vfa_yield)
-
-        # Rebuild downstream system feed connection by forcing the full system to resimulate
-        full_sys.simulate()
+        # Override acidogenic yield and re-simulate the (single, unified) system
+        override_acidogenic_vfa_yield(full_sys, vfa_yield)
 
         msp_val = solve_oil_msp_from_full_system(full_sys, streams, extraction_usd_per_kg_oil=0.50)
         msp_vs_vfa_yield.append(msp_val)
@@ -214,7 +211,7 @@ if __name__ == "__main__":
     msp_vs_ferm_yield = []
 
     for ferm_yield in FERM_YIELD_RANGE:
-        vfa_sys, fer_sys, streams, units, full_sys = build_and_simulate_scenario(
+        streams, units, full_sys = build_and_simulate_scenario(
             feed_price_per_kg_wet=FEED_PRICE_USD_PER_KG_WET,
             product_yield=float(ferm_yield),
             residence_time_h=BASE_RESIDENCE_H,

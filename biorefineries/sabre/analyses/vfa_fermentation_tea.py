@@ -17,8 +17,7 @@ if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
 from biorefineries.sabre._chemicals import set_thermo
-from biorefineries.sabre.systems import create_vfa_ad_system
-from biorefineries.sabre.systems import create_vfa_fermentation_system
+from biorefineries.sabre.systems import create_ad_fermentation_system
 from biorefineries.sabre._tea import make_baseline_tea, solve_product_msp
 
 # -------------------------
@@ -159,12 +158,8 @@ def build_and_simulate(feed_price_per_kg_wet: float):
     bst.main_flowsheet.clear()
     set_thermo()
 
-    vfa_sys = create_vfa_ad_system()
-    vfa_sys.feeds[0].price = feed_price_per_kg_wet
-
-    fer_sys, streams, units = create_vfa_fermentation_system(
-        vfa_broth=vfa_sys.flowsheet.stream.vfa_broth,
-    )
+    full_sys, streams, units = create_ad_fermentation_system()
+    streams["feed"].price = feed_price_per_kg_wet
 
     for sid, price in {
         "fermentation_mgso4":     PRICE_MGSO4_USD_PER_KG,
@@ -177,13 +172,9 @@ def build_and_simulate(feed_price_per_kg_wet: float):
         except Exception:
             pass
 
-    full_sys = bst.System.from_units(
-        "full_vfa_to_oil_sys",
-        units=list(vfa_sys.units) + list(fer_sys.units),
-    )
     full_sys.simulate()
 
-    return vfa_sys, fer_sys, streams, units, full_sys
+    return streams, units, full_sys
 
 def run_case(
     feed_price_per_kg_wet: float,
@@ -194,7 +185,7 @@ def run_case(
     silent: bool = False,
 ):
 
-    vfa_sys, fer_sys, streams, units, full_sys = build_and_simulate(feed_price_per_kg_wet)
+    streams, units, full_sys = build_and_simulate(feed_price_per_kg_wet)
 
     _patch_ev607(full_sys)
     disposal_costs = _apply_disposal_costs(
@@ -251,7 +242,7 @@ def run_case(
         print("DIAGNOSTIC: VFA MASS BALANCE TRACE")
         print("-" * 60)
 
-        sargassum_feed = vfa_sys.feeds[0]
+        sargassum_feed = streams["feed"]
         print(f"\n  [sargassum_feed]")
         print(f"    Total F_mass:  {sargassum_feed.F_mass:>12.2f} kg/hr")
         try:
@@ -261,7 +252,7 @@ def run_case(
             pass
 
         try:
-            vfa_broth = vfa_sys.flowsheet.stream.vfa_broth
+            vfa_broth = streams["vfa_broth"]
             total_vfa_in = _print_stream_vfa(
                 "vfa_broth (VFA AD outlet → fermenter inlet)", vfa_broth
             )
@@ -473,7 +464,7 @@ def _apply_biostimulant_credit(
 # different yield, residence time, extraction cost, and market price.
 #
 # Modeling scope:
-#   - Yield and residence time are passed directly into create_vfa_fermentation_system()
+#   - Yield and residence time are passed directly into create_ad_fermentation_system()
 #     so the fermenter (R601) auto-scales its volume and CAPEX correctly.
 #   - Extraction cost replaces the oil reagent in OE.add_OPEX ($/kg product).
 #   - Downstream purification (HPLC for astaxanthin, winterization for EPA)
@@ -530,21 +521,18 @@ def build_and_simulate_scenario(
     residence_time_h: float,
 ):
     """
-    Build and simulate the VFA fermentation system with custom
+    Build and simulate the AD-fermentation system with custom
     yield and residence time parameters.
-    Returns (vfa_sys, fer_sys, streams, units, full_sys).
+    Returns (streams, units, full_sys).
     """
     bst.main_flowsheet.clear()
     set_thermo()
 
-    vfa_sys = create_vfa_ad_system()
-    vfa_sys.feeds[0].price = feed_price_per_kg_wet
-
-    fer_sys, streams, units = create_vfa_fermentation_system(
-        vfa_broth=vfa_sys.flowsheet.stream.vfa_broth,
+    full_sys, streams, units = create_ad_fermentation_system(
         product_yield_kg_per_kg_vfa_consumed=product_yield,   # scenario override --> from scenario input
         residence_time_h=residence_time_h,                    # scenario override --> from scenario input
     )
+    streams["feed"].price = feed_price_per_kg_wet
 
     for sid, price in {
         "fermentation_mgso4":     PRICE_MGSO4_USD_PER_KG,
@@ -557,13 +545,9 @@ def build_and_simulate_scenario(
         except Exception:
             pass
 
-    full_sys = bst.System.from_units(
-        "full_vfa_to_product_sys",
-        units=list(vfa_sys.units) + list(fer_sys.units),
-    )
     full_sys.simulate()
 
-    return vfa_sys, fer_sys, streams, units, full_sys
+    return streams, units, full_sys
 
 
 def run_product_scenario_comparison(feed_price: float = 0.00):
@@ -591,7 +575,7 @@ def run_product_scenario_comparison(feed_price: float = 0.00):
 
     for sc in PRODUCT_SCENARIOS:
         try:
-            vfa_sys, fer_sys, streams, units, full_sys = build_and_simulate_scenario(
+            streams, units, full_sys = build_and_simulate_scenario(
                 feed_price_per_kg_wet=feed_price,
                 product_yield=sc["yield"],
                 residence_time_h=sc["residence_h"],

@@ -228,7 +228,7 @@ def make_biostimulant_price_figure():
     msp_vals = []
 
     for bs_price in BIOSTIMULANT_PRICE_CASES:
-        vfa_sys, fer_sys, streams, units, full_sys = build_and_simulate(FEED_PRICE_BASE)
+        streams, units, full_sys = build_and_simulate(FEED_PRICE_BASE)
         _apply_biostimulant_price(streams, bs_price)
         msp_val = _solve_msp_from_system(full_sys, streams)
         msp_vals.append(msp_val)
@@ -286,7 +286,7 @@ def make_product_scenarios_figure():
     market_vals = []
 
     for sc in PRODUCT_SCENARIOS:
-        vfa_sys, fer_sys, streams, units, full_sys = build_and_simulate_scenario(
+        streams, units, full_sys = build_and_simulate_scenario(
             feed_price_per_kg_wet=FEED_PRICE_BASE,
             product_yield=sc["yield"],
             residence_time_h=sc["residence_h"],

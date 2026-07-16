@@ -62,7 +62,9 @@ def load(flowsheet_name: str = 'ad_biogas', **kwargs):
         One of 'ad_biogas', 'vfa_ad', 'integrated'. ('vfa_fermentation'
         cannot be loaded standalone — it requires a vfa_broth stream,
         which only 'vfa_ad' or 'integrated' produce; call
-        `create_vfa_fermentation_system(vfa_broth, ...)` directly instead.)
+        `create_ad_fermentation_system(...)` directly instead, which
+        builds the acidogenic-AD and fermentation halves together from
+        feedstock in one call.)
     **kwargs
         Forwarded to the corresponding `create_*` system builder.
     """
@@ -84,7 +86,7 @@ def load(flowsheet_name: str = 'ad_biogas', **kwargs):
         biomethane = flowsheet.stream.biomethane
         biomethane.price = tea.solve_price(biomethane)
     elif flowsheet_name == 'vfa_ad':
-        sys = create_vfa_ad_system(**kwargs)
+        sys = create_ad_vfa_system(**kwargs)
         sys.simulate()
         tea = _tea.make_baseline_tea(sys)
     elif flowsheet_name == 'integrated':

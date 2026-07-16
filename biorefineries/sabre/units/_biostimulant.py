@@ -20,7 +20,7 @@ class PressateConcentrator(bst.Unit):
     """
     Membrane concentrator for the pressate-derived biostimulant side-stream.
     Constructed in three places in this codebase
-    (`systems/_ad_biogas_system.py`, `systems/_vfa_ad_system.py`,
+    (`systems/_ad_biogas_system.py`, `systems/_ad_vfa_system.py`,
     `systems/_integrated_system.py`), all with the same
     `assumptions.yaml`-sourced parameters.
 
@@ -209,7 +209,7 @@ class BiostimulantEvaporator(bst.Unit):
     Finishing evaporator for the pressate-derived biostimulant product.
 
     Not constructed anywhere in this codebase currently: both real call
-    sites (`systems/_ad_biogas_system.py`, `systems/_vfa_ad_system.py`)
+    sites (`systems/_ad_biogas_system.py`, `systems/_ad_vfa_system.py`)
     gate construction behind `evA.get("enabled", False)`, and
     `assumptions.yaml` has no `pressate_biostimulant.evaporator` section
     at all (confirmed by grep across the whole yaml file) -- so `evA` is

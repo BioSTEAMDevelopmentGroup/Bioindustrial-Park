@@ -6,7 +6,25 @@
 # github.com/BioSTEAMDevelopmentGroup/biosteam/blob/master/LICENSE.txt
 # for license details.
 """
-VFA fermentation-to-microbial-oil system builder for the SaBRe flowsheets.
+Acidogenic-AD-to-microbial-oil system builder for the SaBRe flowsheets.
+
+Public entry point:
+- create_ad_fermentation_system(...): the full feedstock-to-product
+  system. Wraps create_ad_vfa_system() (raw Sargassum -> acidogenic AD ->
+  vfa_broth) followed by _create_vfa_fermentation_system(), and returns
+  one assembled bst.System so the whole feedstock-to-oil chain simulates
+  (and propagates changes) as a single graph, mirroring how
+  create_ad_biogas_system() is a single self-contained entry point.
+
+Internal helper:
+- _create_vfa_fermentation_system(vfa_broth, ...): the fermentation train
+  alone (microfilter -> medium conditioning -> Yarrowia lipolytica
+  fermenter -> oil recovery). Requires an already-built vfa_broth stream
+  as input, so it cannot run standalone -- not part of this module's
+  public API. Used by create_ad_fermentation_system() above, and directly
+  by systems._integrated_system, which already has a vfa_broth stream
+  from a shared/partial preprocessing train and just needs the
+  fermentation half.
 """
 from __future__ import annotations
 
@@ -19,11 +37,12 @@ from biorefineries.sabre.units import (
     VFAMicrofilter,
     FermentationMediumTank,
 )
+from biorefineries.sabre.systems._ad_vfa_system import create_ad_vfa_system
 
-__all__ = ('create_vfa_fermentation_system',)
+__all__ = ('create_ad_fermentation_system',)
 
 
-def create_vfa_fermentation_system(
+def _create_vfa_fermentation_system(
     vfa_broth,
     *,
     product_ID: str = "MicrobialOil",
@@ -347,3 +366,81 @@ def create_vfa_fermentation_system(
     }
 
     return sys, key_streams, units
+
+
+def create_ad_fermentation_system(
+    quality: str = "pelagic_high_quality",
+    milled_biomass_stream=None,
+    enable_heat_shock: bool = False,
+    hs_target_temperature_K: float = 338.15,
+    hs_events_per_day: float = 1.0 / 7.0,
+    hs_heated_fraction_of_liquid: float = 0.10,
+    hs_duration_min: float = 15.0,
+    **fermentation_kwargs,
+):
+    """
+    Build the full feedstock-to-product system: raw Sargassum (or an
+    already-milled biomass stream) -> acidogenic AD -> VFA broth -> VFA
+    fermentation -> microbial oil.
+
+    Wraps create_ad_vfa_system() and _create_vfa_fermentation_system() and
+    returns one assembled bst.System, so both halves simulate as a single
+    graph. Unlike calling the two builders separately and manually
+    re-stitching their unit lists together, this means upstream changes
+    (feed price, quality bin, heat-shock settings, ...) always propagate
+    through the fermentation half automatically at simulation time, and
+    this system -- unlike _create_vfa_fermentation_system() alone -- can
+    be built standalone directly from feedstock. This is the only public
+    way to reach the fermentation train: _create_vfa_fermentation_system()
+    is a private helper (it requires a pre-built vfa_broth stream, so it
+    cannot run on its own).
+
+    Parameters
+    ----------
+    quality, milled_biomass_stream, enable_heat_shock,
+    hs_target_temperature_K, hs_events_per_day,
+    hs_heated_fraction_of_liquid, hs_duration_min
+        Forwarded to create_ad_vfa_system().
+    **fermentation_kwargs
+        Forwarded to _create_vfa_fermentation_system() (everything except
+        vfa_broth, which is supplied internally from the AD-VFA
+        subsystem's output).
+
+    Returns
+    -------
+    sys : bst.System
+        The full feedstock -> fermentation-product system.
+    streams : dict
+        Key streams, including the raw feedstock ('feed'), the AD-VFA
+        subsystem's 'vfa_broth', and all of
+        _create_vfa_fermentation_system()'s streams (final product in
+        'backend_oil').
+    units : dict
+        Key units from both subsystems.
+    """
+    ad_vfa_sys = create_ad_vfa_system(
+        quality=quality,
+        milled_biomass_stream=milled_biomass_stream,
+        enable_heat_shock=enable_heat_shock,
+        hs_target_temperature_K=hs_target_temperature_K,
+        hs_events_per_day=hs_events_per_day,
+        hs_heated_fraction_of_liquid=hs_heated_fraction_of_liquid,
+        hs_duration_min=hs_duration_min,
+    )
+    feed = ad_vfa_sys.feeds[0]
+    vfa_broth = ad_vfa_sys.flowsheet.stream.vfa_broth
+
+    fer_sys, fer_streams, fer_units = _create_vfa_fermentation_system(
+        vfa_broth=vfa_broth, **fermentation_kwargs,
+    )
+
+    sys = bst.System.from_units(
+        "AD_Fermentation_sys",
+        units=list(ad_vfa_sys.units) + list(fer_sys.units),
+    )
+
+    streams = {"feed": feed, "vfa_broth": vfa_broth, **fer_streams}
+    units = {u.ID: u for u in ad_vfa_sys.units}
+    units.update(fer_units)
+
+    return sys, streams, units
