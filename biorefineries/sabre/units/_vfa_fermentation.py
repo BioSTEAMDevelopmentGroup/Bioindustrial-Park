@@ -58,6 +58,10 @@ class YarrowiaLipidFermenter(bst.AeratedBioreactor):
         accumulates intracellular lipids); Pereira et al. 2023 (tested on
         food-waste-derived VFAs); Frontiers 2021 review (VFA-to-microbial-oil
         pathway concept).
+    
+    References
+    ----------
+    [1] Gao, R.; Li, Z.; Zhou, X.; Bao, W.; Cheng, S.; Zheng, L. Enhanced Lipid Production by Yarrowia Lipolytica Cultured with Synthetic and Waste-Derived High-Content Volatile Fatty Acids under Alkaline Conditions. Biotechnol Biofuels 2020, 13 (1), 3. https://doi.org/10.1186/s13068-019-1645-y.
     """
 
     V_max_default = 150
