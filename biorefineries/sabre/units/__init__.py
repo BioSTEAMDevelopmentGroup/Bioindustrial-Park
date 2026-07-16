@@ -27,42 +27,21 @@
 .. autoclass:: biorefineries.sabre.units.OilExtractionPlaceholder
 """
 from . import _ad
-from . import _ad_vfa
-from . import _press
-from . import _mill
-from . import _screwpress
-from . import _centrifuge
-from . import _pressate_concentrator
-from . import _biostimulant_evaporator
-from . import _heating_pretreatment
-from . import _enzymatic_pretreatment
-from . import _peroxide_pretreatment
-from . import _h2s_removal
-from . import _biogas_upgrading
-from . import _vfa_fermentation
-from . import _oil_extraction
+from . import _preprocessing
+from . import _biostimulant
+from . import _pretreatment
+from . import _fermentation
+from . import _downstream_processing
 
 from ._ad import *
-from ._ad_vfa import *
-from ._press import *
-from ._mill import *
-from ._screwpress import *
-from ._centrifuge import *
-from ._pressate_concentrator import *
-from ._biostimulant_evaporator import *
-from ._heating_pretreatment import *
-from ._enzymatic_pretreatment import *
-from ._peroxide_pretreatment import *
-from ._h2s_removal import *
-from ._biogas_upgrading import *
-from ._vfa_fermentation import *
-from ._oil_extraction import *
+from ._preprocessing import *
+from ._biostimulant import *
+from ._pretreatment import *
+from ._fermentation import *
+from ._downstream_processing import *
 
 __all__ = (
-    *_ad.__all__, *_ad_vfa.__all__, *_press.__all__, *_mill.__all__,
-    *_screwpress.__all__, *_centrifuge.__all__, *_pressate_concentrator.__all__,
-    *_biostimulant_evaporator.__all__, *_heating_pretreatment.__all__,
-    *_enzymatic_pretreatment.__all__, *_peroxide_pretreatment.__all__,
-    *_h2s_removal.__all__, *_biogas_upgrading.__all__,
-    *_vfa_fermentation.__all__, *_oil_extraction.__all__,
+    *_ad.__all__, *_preprocessing.__all__, *_biostimulant.__all__,
+    *_pretreatment.__all__, *_fermentation.__all__,
+    *_downstream_processing.__all__,
 )
