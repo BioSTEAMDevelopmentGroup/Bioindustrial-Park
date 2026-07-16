@@ -35,13 +35,18 @@ revisiting later. Neither is logged below since neither changed the baseline.
 
 ## Metric-deviation bugs
 
-*(none yet — VFA fermentation, AD-biogas, VFA-AD, digestate handling, and
-preprocessing subsystems converted with zero baseline deviation, confirmed
-by `tests.py`'s full 20-test suite matching pre-conversion output exactly,
-`rtol=1e-6`. Two substantive discrepancies were found in the preprocessing
-subsystem and deliberately NOT fixed — see the "Preprocessing" entry below
-under Citation-accuracy issues; fixing either would change simulation
-output, out of scope for a conversion pass.)*
+*(none yet — VFA fermentation, AD-biogas, VFA-AD, digestate handling,
+preprocessing, and pressate-biostimulant subsystems converted with zero
+baseline deviation, confirmed by `tests.py`'s full 20-test suite matching
+pre-conversion output exactly, `rtol=1e-6`. Two substantive discrepancies
+were found in the preprocessing subsystem and deliberately NOT fixed — see
+the "Preprocessing" entry below under Citation-accuracy issues; fixing
+either would change simulation output, out of scope for a conversion pass.
+One functional fix was made in the pressate-biostimulant subsystem
+(`BiostimulantEvaporator`'s missing `add_OPEX` wiring) — not logged as a
+metric-deviation bug because the unit carries zero test coverage and is
+never actually simulated by any code path in this codebase, so the fix
+changed no measured output; see the "Pressate-biostimulant" entry below.)*
 
 ---
 
@@ -399,3 +404,72 @@ inferring from yaml indentation — attributed to `Mill` in its docstring,
 not to "preprocessing in general," to avoid the kind of citation
 cross-contamination flagged earlier in this file for
 `VFAMicrofilter`/`PressateConcentrator`.
+
+### Pressate-biostimulant side-stream (`units/_pressate_concentrator.py`, `units/_biostimulant_evaporator.py`)
+
+Converted with zero metric deviation (full `tests.py` suite unchanged at
+`rtol=1e-6` — `PressateConcentrator` is exercised by every pathway that
+enables the biostimulant side-stream, including `test_ad_biostimulant_price_*`
+and `test_vfa_price_scenarios_*`; `BiostimulantEvaporator` carries zero test
+coverage, see below).
+
+**`VFAMicrofilter`'s cross-contaminated citation, now correctly attributed
+here.** The VFA fermentation subsystem's conversion notes (above) already
+documented that `VFAMicrofilter`'s design flux citation (Sievers et al.
+2017; Diaz-Reinoso and Dominguez 2020) actually belonged to
+`PressateConcentrator`. Confirmed and closed out here: `PressateConcentrator
+.design_flux_L_m2_h` (35.0) matches `assumptions.yaml`'s
+`pressate_biostimulant.concentrator.sources.flux` citation exactly — that
+citation is now correctly attached to this unit's docstring.
+
+**`PressateConcentrator` stale defaults corrected** (dead code — always
+overridden at every one of the 3 real call sites, zero output impact):
+`water_recovery_to_permeate` (0.70→0.93), `electricity_kWh_per_m3_feed`
+(0.8→2.5), `capex_usd_per_m2` (120.0→500.0). Kept as custom `_design`/`_cost`
+rather than converting to `@cost`, same reasoning documented for
+`BiogasUpgrading`: its maintenance OPEX depends on its own computed CAPEX.
+
+**New citation-accuracy finding: a duplicate-key yaml bug, verified by
+actually parsing the file, not just reading it.**
+`assumptions.yaml`'s `pressate_biostimulant.concentrator.sources.capex`
+block contains two `citation:`/`note:` key pairs under the same mapping —
+the real capex citation (Sethi and Wiesner 2000; Nguyen and Yoshikawa
+2020; Cheryan 1998, "$200-500/m2; $800/m2 for conservative assumption")
+immediately followed by a second, unrelated citation/note pair about
+maintenance fraction, using the identical key names. Standard YAML
+semantics keep only the *last* of duplicate keys within a mapping, so
+`yaml.safe_load()` on this file actually returns the maintenance-fraction
+text for `sources.capex.citation`/`.note` — confirmed directly by running
+`yaml.safe_load()` on the file during this conversion, not inferred from
+indentation or assumed from the raw text. The real Sethi/Wiesner/Nguyen/
+Cheryan citation is present in the raw file text but is invisible to any
+code that actually parses the yaml. Not fixable here — editing
+`assumptions.yaml` is out of scope for this conversion regardless of
+whether the edit would be a bug fix. Documented in
+`units/_pressate_concentrator.py`'s docstring so the correct (raw-text)
+citation is at least discoverable, with an explicit warning that it is not
+what `yaml.safe_load()` actually returns.
+
+**`BiostimulantEvaporator` is never instantiated anywhere in this
+codebase** (same situation as `DigestateDecanterCentrifuge`, logged
+above): both real call sites gate construction behind
+`evA.get("enabled", False)`, and `assumptions.yaml` has **no**
+`pressate_biostimulant.evaporator` section at all (confirmed by grepping
+the whole yaml file for "evaporator" — zero matches), so `evA` is always
+`{}` and the gate is always `False`. Unlike `DigestateDecanterCentrifuge`,
+there isn't even an orphaned/unused yaml block to cross-reference this
+unit's defaults against — every parameter is a pure code-level scoping
+assumption with no yaml or literature grounding whatsoever, documented as
+such rather than left implying a citation exists.
+
+**Functional fix (not a metric-deviation bug, since the unit is never
+simulated by any code path): `BiostimulantEvaporator._cost()` computed
+annual maintenance into `design_results` but never assigned it to
+`self.add_OPEX`**, unlike every other capex-dependent-maintenance unit in
+this codebase (`PressateConcentrator`, `BiogasUpgrading`). Fixed to match
+that pattern. Zero regression risk (confirmed by the unchanged 20-test
+suite) since this unit has no test coverage and isn't constructed by any
+system builder — flagged here rather than silently fixed, since it is a
+genuine behavioral change to the unit's own logic, not merely a docstring
+or default-value correction, even though it currently affects no measured
+output.

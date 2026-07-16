@@ -16,6 +16,44 @@ __all__ = ('BiostimulantEvaporator',)
 
 
 class BiostimulantEvaporator(bst.Unit):
+    """
+    Finishing evaporator for the pressate-derived biostimulant product.
+
+    Not constructed anywhere in this codebase currently: both real call
+    sites (`systems/_ad_biogas_system.py`, `systems/_vfa_ad_system.py`)
+    gate construction behind `evA.get("enabled", False)`, and
+    `assumptions.yaml` has no `pressate_biostimulant.evaporator` section
+    at all (confirmed by grep across the whole yaml file) -- so `evA` is
+    always `{}` and this unit is never actually instantiated. Same
+    situation as `DigestateDecanterCentrifuge`.
+
+    Sources
+    -------
+    All parameters below (target_solids_wt_frac, boiling_temperature_K,
+    latent_heat_kJ_per_kg, sensible_cp_kJ_per_kgK,
+    electricity_kWh_per_kg_water_evap, nonwater_recovery_to_product,
+    capex_ref_usd, ref_evaporation_kgph, scale_exponent,
+    maintenance_frac_of_capex_per_yr):
+        No assumptions.yaml section exists for this unit at all -- unlike
+        every other unwired-but-yaml-documented unit in this conversion
+        (e.g. `DigestateDecanterCentrifuge`), there isn't even an orphaned
+        yaml block to check these against. Every default here is a pure
+        code-level scoping assumption with no literature or yaml grounding
+        whatsoever. This module's own pre-existing docstring had no
+        citations either (just "mild vacuum evaporation ~60 C" as an
+        inline comment on `boiling_temperature_K`).
+
+    Maintenance OPEX wiring: `_cost()` computed annual maintenance into
+    `design_results` but never assigned it to `self.add_OPEX`, unlike
+    every sibling unit with capex-dependent maintenance in this codebase
+    (`PressateConcentrator`, `BiogasUpgrading`) -- meaning it would
+    silently not affect TEA/MSP if this unit were ever wired in. Fixed
+    during this conversion (zero regression risk, since the unit carries
+    no test coverage either way -- it's never simulated) to match the
+    add_OPEX pattern used everywhere else in this file family, rather than
+    left as a latent gap for whoever eventually wires this unit in.
+    """
+
     _N_ins = 1
     _N_outs = 2  # concentrated_product, evaporated_water
 
@@ -153,6 +191,12 @@ class BiostimulantEvaporator(bst.Unit):
             capex = self.capex_ref_usd * (evap / self.ref_evaporation_kgph) ** self.scale_exponent
 
         self.baseline_purchase_costs["Biostimulant evaporator"] = capex
-        self.design_results["Annual maintenance ($/yr)"] = (
-            self.maintenance_frac_of_capex_per_yr * capex
-        )
+
+        annual_maintenance = self.maintenance_frac_of_capex_per_yr * capex
+        self.design_results["Annual maintenance ($/yr)"] = annual_maintenance
+
+        if annual_maintenance > 0:
+            operating_hours_per_yr = 330.0 * 24.0
+            self.add_OPEX = {
+                "Biostimulant evaporator maintenance": annual_maintenance / operating_hours_per_yr
+            }
