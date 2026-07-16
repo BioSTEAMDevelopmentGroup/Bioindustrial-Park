@@ -12,7 +12,7 @@ from __future__ import annotations
 
 import biosteam as bst
 
-from biorefineries.sabre._process_settings import load_assumptions, get_quality_params, get_scale_feed_kgph
+from biorefineries.sabre.utils import load_assumptions, get_quality_params, get_scale_feed_kgph
 from biorefineries.sabre.streams import make_sargassum_feed
 from biorefineries.sabre.units import (
     AcidogenicDigester, DigestateScrewPress, PressateConcentrator,

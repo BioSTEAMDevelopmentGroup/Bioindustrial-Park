@@ -14,7 +14,6 @@ Purpose:
 """
 
 import biosteam as bst
-from biorefineries.sabre._process_settings import load_assumptions
 
 __all__ = ('make_sargassum_feed',)
 
@@ -30,9 +29,26 @@ WET_COMPOSITION = dict(
     Fucoidan=0.00663,   # 5.00% dry × 0.1327
 )
 
+# Feedstock quality bins (assumptions.yaml `quality_bins` section), inlined
+# here as defaults so this module doesn't need to read the yaml at runtime.
+# Source: Milledge et al. 2020, Energies, Table 1 -- Turks and Caicos
+# pelagic species averages for `pelagic_high_quality`; mixed Sargassum
+# inundation for `beach_wrack_low_quality`.
+QUALITY_BINS = {
+    "pelagic_high_quality": dict(
+        moisture_frac=0.8673,
+        ash_wt_frac_dry=0.3453,
+    ),
+    "beach_wrack_low_quality": dict(
+        moisture_frac=0.8198,
+        ash_wt_frac_dry=0.4694,
+    ),
+}
+
 def make_sargassum_feed(fresh_feed_kgph: float, moisture_frac: float, quality: str):
-    A = load_assumptions()
-    ash_target = float(A["quality_bins"][quality]["ash_wt_frac_dry"])  # dry-basis ash
+    if quality not in QUALITY_BINS:
+        raise KeyError(f"Unknown quality '{quality}'. Options: {list(QUALITY_BINS.keys())}")
+    ash_target = QUALITY_BINS[quality]["ash_wt_frac_dry"]  # dry-basis ash
 
     water_kgph = fresh_feed_kgph * moisture_frac
     dry_kgph   = fresh_feed_kgph * (1 - moisture_frac)

@@ -33,7 +33,7 @@ if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
 from biorefineries.sabre._chemicals import set_thermo
-from biorefineries.sabre._process_settings import load_assumptions
+from biorefineries.sabre.utils import load_assumptions
 from biorefineries.sabre.systems import create_ad_biogas_system
 
 ANNUAL_DAYS = 330.0

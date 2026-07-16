@@ -497,7 +497,7 @@ def test_integrated_system_sensitivity_npv_at_alpha():
 # =================================================================
 import biosteam as _bst  # noqa: E402
 from biorefineries.sabre._chemicals import set_thermo as _set_thermo  # noqa: E402
-from biorefineries.sabre._process_settings import (  # noqa: E402
+from biorefineries.sabre.utils import (  # noqa: E402
     load_assumptions as _load_assumptions,
     get_quality_params as _get_quality_params,
     get_scale_feed_kgph as _get_scale_feed_kgph,

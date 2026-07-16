@@ -45,7 +45,7 @@ Repository structure
 ---------------------
 ``_chemicals.py``: chemical species used across all four flowsheets.
 
-``_process_settings.py``: loads ``data/assumptions.yaml`` (feedstock
+``utils.py``: loads ``data/assumptions.yaml`` (feedstock
 quality bins, plant scale, unit performance/costing assumptions, all
 literature-sourced where available).
 
