@@ -13,197 +13,14 @@ from __future__ import annotations
 import biosteam as bst
 import flexsolve as flx
 
-from biorefineries.sabre.units import YarrowiaLipidFermenter, OilExtractionPlaceholder
-from biosteam.units.design_tools.tank_design import (
-    mix_tank_purchase_cost_algorithms,
-    compute_number_of_tanks_and_purchase_cost,
+from biorefineries.sabre.units import (
+    YarrowiaLipidFermenter,
+    OilExtractionPlaceholder,
+    VFAMicrofilter,
+    FermentationMediumTank,
 )
 
-__all__ = ('create_vfa_fermentation_system', 'VFAMicrofilter', 'FermentationMediumTank')
-
-
-class VFAMicrofilter(bst.Unit):
-    """
-    Split-based representation of a VFA-rich permeate step.
-    Includes first-pass power draw and area-based membrane cost.
-    """
-    _N_ins = 1
-    _N_outs = 2
-    _F_BM_default = {"Microfilter": 1.0}
-
-    def __init__(
-        self,
-        ID: str = "",
-        ins=None,
-        outs=(),
-        *,
-        vfa_IDs=None,
-        solids_IDs=None,
-        vfa_to_permeate_frac: float = 0.98,
-        water_to_permeate_frac: float = 0.97,
-        solids_to_permeate_frac: float = 0.05,
-        dissolved_other_to_permeate_frac: float = 0.90,
-        broth_density_kg_per_m3: float = 1000.0,
-        SEC_kWh_per_m3_feed: float = 0.08,
-        design_flux_L_m2_h: float = 20.0,
-        membrane_cost_usd_per_m2: float = 200.0,
-        **kwargs,
-    ):
-        super().__init__(ID, ins, outs, **kwargs)
-        self.vfa_IDs = tuple(vfa_IDs or [
-            "AceticAcid", "PropionicAcid", "ButyricAcid", "ValericAcid", "HexanoicAcid"
-        ])
-        self.solids_IDs = tuple(solids_IDs or [
-            "Ash", "Protein", "Lignin", "Glucan", "Xylan", "Mannan", "Galactan",
-            "Arabinan", "Alginate", "Fucoidan", "Mannitol", "OtherSolids", "CellMass"
-        ])
-        self.vfa_to_permeate_frac = float(vfa_to_permeate_frac)
-        self.water_to_permeate_frac = float(water_to_permeate_frac)
-        self.solids_to_permeate_frac = float(solids_to_permeate_frac)
-        self.dissolved_other_to_permeate_frac = float(dissolved_other_to_permeate_frac)
-        self.broth_density_kg_per_m3 = float(broth_density_kg_per_m3)
-        self.SEC_kWh_per_m3_feed = float(SEC_kWh_per_m3_feed)
-        self.design_flux_L_m2_h = float(design_flux_L_m2_h)
-        self.membrane_cost_usd_per_m2 = float(membrane_cost_usd_per_m2)
-
-    def _run(self):
-        feed = self.ins[0]
-        permeate, retentate = self.outs
-
-        permeate.empty()
-        retentate.empty()
-        permeate.phase = "l"
-        retentate.phase = "l"
-
-        for cid in feed.chemicals.IDs:
-            m = float(feed.imass[cid])
-            if m <= 0:
-                continue
-
-            if cid in self.vfa_IDs:
-                frac = self.vfa_to_permeate_frac
-            elif cid == "Water":
-                frac = self.water_to_permeate_frac
-            elif cid in self.solids_IDs:
-                frac = self.solids_to_permeate_frac
-            else:
-                frac = self.dissolved_other_to_permeate_frac
-
-            frac = min(max(frac, 0.0), 1.0)
-            permeate.imass[cid] = m * frac
-            retentate.imass[cid] = m * (1.0 - frac)
-
-    def _design(self):
-        feed = self.ins[0]
-        feed_m3h = (
-            feed.F_mass / self.broth_density_kg_per_m3
-            if self.broth_density_kg_per_m3 > 0 else 0.0
-        )
-        membrane_area_m2 = 0.0
-        if self.design_flux_L_m2_h > 0:
-            membrane_area_m2 = feed_m3h * 1000.0 / self.design_flux_L_m2_h
-
-        self.design_results["Feed flow (kg/h)"] = feed.F_mass
-        self.design_results["Feed flow (m3/h)"] = feed_m3h
-        self.design_results["Permeate flow (kg/h)"] = self.outs[0].F_mass
-        self.design_results["Retentate flow (kg/h)"] = self.outs[1].F_mass
-        self.design_results["Membrane area (m2)"] = membrane_area_m2
-        self.power_utility.consumption = self.SEC_kWh_per_m3_feed * feed_m3h
-
-    def _cost(self):
-        A = float(self.design_results.get("Membrane area (m2)", 0.0))
-        self.baseline_purchase_costs["Microfilter"] = max(A, 0.0) * self.membrane_cost_usd_per_m2
-
-class FermentationMediumTank(bst.Unit):
-    """
-    Simple medium adjustment tank for pH control and nutrient dosing.
-    """
-
-    _N_ins = 5
-    _N_outs = 1
-    _F_BM_default = {"Medium tank": 1.0}
-
-    def __init__(
-        self,
-        ID: str = "",
-        ins=None,
-        outs=(),
-        *,
-        ammonia_dose_kg_per_m3: float = 0.0,
-        phosphate_dose_kg_per_m3: float = 0.0,
-        base_dose_kg_per_m3: float = 0.0,
-        magnesium_sulfate_dose_kg_per_m3: float = 0.0,
-        broth_density_kg_per_m3: float = 1000.0,
-        target_pH: float = 8.0,
-        residence_time_h: float = 0.5,
-        mixing_kW_per_m3: float = 0.05,
-        **kwargs,
-    ):
-        super().__init__(ID, ins, outs, **kwargs)
-        self.ammonia_dose_kg_per_m3 = float(ammonia_dose_kg_per_m3)
-        self.phosphate_dose_kg_per_m3 = float(phosphate_dose_kg_per_m3)
-        self.base_dose_kg_per_m3 = float(base_dose_kg_per_m3)
-        self.magnesium_sulfate_dose_kg_per_m3 = float(magnesium_sulfate_dose_kg_per_m3)
-        self.broth_density_kg_per_m3 = float(broth_density_kg_per_m3)
-        self.target_pH = float(target_pH)
-        self.residence_time_h = float(residence_time_h)
-        self.mixing_kW_per_m3 = float(mixing_kW_per_m3)
-
-    def _run(self):
-        broth, ammonia, phosphate, base, mgso4 = self.ins
-        out = self.outs[0]
-        out.copy_like(broth)
-        out.phase = "l"
-
-        vol_m3ph = broth.F_mass / self.broth_density_kg_per_m3 if self.broth_density_kg_per_m3 > 0 else 0.0
-        ammonia.empty(); phosphate.empty(); base.empty(); mgso4.empty()
-
-        chem_ids = set(out.chemicals.IDs)
-        if self.ammonia_dose_kg_per_m3 > 0 and "Ammonia" not in chem_ids:
-            raise RuntimeError("Ammonia dose specified but 'Ammonia' is not in thermo.")
-        if self.phosphate_dose_kg_per_m3 > 0 and "KH2PO4" not in chem_ids:
-            raise RuntimeError("Phosphate dose specified but 'KH2PO4' is not in thermo.")
-        if self.base_dose_kg_per_m3 > 0 and "NaOH" not in chem_ids:
-            raise RuntimeError("Base dose specified but 'NaOH' is not in thermo.")
-        if self.magnesium_sulfate_dose_kg_per_m3 > 0 and "MagnesiumSulfate" not in chem_ids:
-            raise RuntimeError("MgSO4 dose specified but 'MagnesiumSulfate' is not in thermo.")
-
-        if "Ammonia" in chem_ids and self.ammonia_dose_kg_per_m3 > 0:
-            ammonia.imass["Ammonia"] = self.ammonia_dose_kg_per_m3 * vol_m3ph
-            out.imass["Ammonia"] += ammonia.imass["Ammonia"]
-        if "KH2PO4" in chem_ids and self.phosphate_dose_kg_per_m3 > 0:
-            phosphate.imass["KH2PO4"] = self.phosphate_dose_kg_per_m3 * vol_m3ph
-            out.imass["KH2PO4"] += phosphate.imass["KH2PO4"]
-        if "NaOH" in chem_ids and self.base_dose_kg_per_m3 > 0:
-            base.imass["NaOH"] = self.base_dose_kg_per_m3 * vol_m3ph
-            out.imass["NaOH"] += base.imass["NaOH"]
-        if "MagnesiumSulfate" in chem_ids and self.magnesium_sulfate_dose_kg_per_m3 > 0:
-            mgso4.imass["MagnesiumSulfate"] = self.magnesium_sulfate_dose_kg_per_m3 * vol_m3ph
-            out.imass["MagnesiumSulfate"] += mgso4.imass["MagnesiumSulfate"]
-
-        self.design_results["Target pH"] = self.target_pH
-        self.design_results["Broth flow (m3/h)"] = vol_m3ph
-
-    def _design(self):
-        vol_m3h = float(self.design_results.get("Broth flow (m3/h)", 0.0))
-        tank_vol = vol_m3h * self.residence_time_h
-        self.design_results["Tank residence time (h)"] = self.residence_time_h
-        self.design_results["Tank volume (m3)"] = tank_vol
-        self.power_utility.consumption = self.mixing_kW_per_m3 * tank_vol
-
-    def _cost(self):
-        V_total = max(float(self.design_results.get("Tank volume (m3)", 0.0)), 0.0)
-        if V_total <= 0.0:
-            self.baseline_purchase_costs["Medium tank"] = 0.0
-            return
-
-        alg = mix_tank_purchase_cost_algorithms["Conventional"]
-        N, Cp_each = compute_number_of_tanks_and_purchase_cost(V_total, alg)
-        V_each = V_total / N
-
-        self.design_results["Number of tanks"] = N
-        self.design_results["Tank volume per tank (m3)"] = V_each
-        self.baseline_purchase_costs["Medium tank"] = N * Cp_each
+__all__ = ('create_vfa_fermentation_system',)
 
 
 def create_vfa_fermentation_system(
@@ -232,12 +49,11 @@ def create_vfa_fermentation_system(
     dissolved_other_to_permeate_frac: float = 0.90,
     microfilter_SEC_kWh_per_m3_feed: float = 0.08,
     microfilter_design_flux_L_m2_h: float = 20.0,
-    microfilter_membrane_cost_usd_per_m2: float = 200.0,
 
     medium_tank_residence_time_h: float = 0.5,
     medium_tank_mixing_kW_per_m3: float = 0.05,
 
-    target_oil_and_solids_content: float = 60.0,
+    target_oil_and_solids_content: float = 70.0,
     target_wastewater_concentration: float = 60.0,
     backend_oil_recovery: float = 0.99,
     backend_oil_water_split: float = 0.0001,
@@ -245,10 +61,7 @@ def create_vfa_fermentation_system(
     recycle_total_fraction: float = 0.10,
     recycle_cellmass_wt_frac: float = 0.10,
 
-    oil_extraction_ref_dry_biomass_tph: float = 10.0,
-    oil_extraction_ref_installed_cost_usd: float = 7_848_000.0,
     oil_extraction_homogenization_kWh_per_kg: float = 0.203,
-    oil_extraction_scale_exponent: float = 0.6,
 ):
 
     chem_ids = set(bst.settings.thermo.chemicals.IDs)
@@ -287,7 +100,6 @@ def create_vfa_fermentation_system(
         broth_density_kg_per_m3=broth_density_kg_per_m3,
         SEC_kWh_per_m3_feed=microfilter_SEC_kWh_per_m3_feed,
         design_flux_L_m2_h=microfilter_design_flux_L_m2_h,
-        membrane_cost_usd_per_m2=microfilter_membrane_cost_usd_per_m2,
     )
 
     T601 = FermentationMediumTank(
@@ -407,10 +219,6 @@ def create_vfa_fermentation_system(
         product_ID=product_ID,
         cellmass_ID="CellMass",
         homogenization_kWh_per_kg_dry_biomass=oil_extraction_homogenization_kWh_per_kg,
-        ref_dry_biomass_tph=oil_extraction_ref_dry_biomass_tph,
-        ref_installed_cost_usd=oil_extraction_ref_installed_cost_usd,
-        scale_exponent=oil_extraction_scale_exponent,
-        F_BM=1.0,
     )
 
     C603_2 = bst.LiquidsSplitCentrifuge(

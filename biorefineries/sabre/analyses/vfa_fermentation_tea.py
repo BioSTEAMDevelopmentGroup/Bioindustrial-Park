@@ -159,39 +159,11 @@ def build_and_simulate(feed_price_per_kg_wet: float):
     bst.main_flowsheet.clear()
     set_thermo()
 
-    # ── from YAML ────────────────────────────────
-    from biorefineries.sabre._process_settings import load_assumptions
-    A = load_assumptions()
-    vfaF = A.get("vfa_fermentation", {})
-    fc   = vfaF.get("cases", {}).get(vfaF.get("case", "yarrowia_vfa_base"), {})
-    mf   = vfaF.get("vfa_microfilter", {})
-    fmed = vfaF.get("fermentation_medium_tank", {})
-
     vfa_sys = create_vfa_ad_system()
     vfa_sys.feeds[0].price = feed_price_per_kg_wet
 
     fer_sys, streams, units = create_vfa_fermentation_system(
         vfa_broth=vfa_sys.flowsheet.stream.vfa_broth,
-        product_ID=fc.get("product_ID", "MicrobialOil"),
-        conversion=fc.get("conversion", 0.85),
-        product_yield_kg_per_kg_vfa_consumed=fc.get("product_yield_kg_per_kg_vfa_consumed", 0.15),
-        biomass_yield_kg_per_kg_vfa_consumed=fc.get("biomass_yield_kg_per_kg_vfa_consumed", 0.40),
-        co2_yield_kg_per_kg_vfa_consumed=fc.get("co2_yield_kg_per_kg_vfa_consumed", 0.20),
-        oxygen_kg_per_kg_vfa_consumed=fc.get("oxygen_kg_per_kg_vfa_consumed", 0.80),
-        residence_time_h=fc.get("residence_time_h", 48.0),
-        broth_density_kg_per_m3=fmed.get("broth_density_kg_per_m3", 1000.0),
-        target_pH=fc.get("target_pH", fmed.get("target_pH", 8.0)),
-        ammonia_dose_kg_per_m3=fmed.get("ammonia_dose_kg_per_m3", 0.0),
-        phosphate_dose_kg_per_m3=fmed.get("phosphate_dose_kg_per_m3", 0.0),
-        base_dose_kg_per_m3=fmed.get("base_dose_kg_per_m3", 0.0),
-        magnesium_sulfate_dose_kg_per_m3=fmed.get("magnesium_sulfate_dose_kg_per_m3", 0.49),
-        seed_water_kgph=fc.get("seed_water_kgph", 0.0),
-        seed_cellmass_kgph=fc.get("seed_cellmass_kgph", 0.0),
-        vfa_to_permeate_frac=mf.get("vfa_to_permeate_frac", 0.98),
-        water_to_permeate_frac=mf.get("water_to_permeate_frac", 0.97),
-        solids_to_permeate_frac=mf.get("solids_to_permeate_frac", 0.05),
-        dissolved_other_to_permeate_frac=mf.get("dissolved_other_to_permeate_frac", 0.90),
-        target_oil_and_solids_content=vfaF.get("target_oil_and_solids_content", 70.0),
     )
 
     for sid, price in {
@@ -565,38 +537,13 @@ def build_and_simulate_scenario(
     bst.main_flowsheet.clear()
     set_thermo()
 
-    from biorefineries.sabre._process_settings import load_assumptions
-    A = load_assumptions()
-    vfaF = A.get("vfa_fermentation", {})
-    fc   = vfaF.get("cases", {}).get(vfaF.get("case", "yarrowia_vfa_base"), {})
-    mf   = vfaF.get("vfa_microfilter", {})
-    fmed = vfaF.get("fermentation_medium_tank", {})
-
     vfa_sys = create_vfa_ad_system()
     vfa_sys.feeds[0].price = feed_price_per_kg_wet
 
     fer_sys, streams, units = create_vfa_fermentation_system(
         vfa_broth=vfa_sys.flowsheet.stream.vfa_broth,
-        product_ID=fc.get("product_ID", "MicrobialOil"),
-        conversion=fc.get("conversion", 0.85),
         product_yield_kg_per_kg_vfa_consumed=product_yield,   # scenario override --> from scenario input
-        biomass_yield_kg_per_kg_vfa_consumed=fc.get("biomass_yield_kg_per_kg_vfa_consumed", 0.40),
-        co2_yield_kg_per_kg_vfa_consumed=fc.get("co2_yield_kg_per_kg_vfa_consumed", 0.20),
-        oxygen_kg_per_kg_vfa_consumed=fc.get("oxygen_kg_per_kg_vfa_consumed", 0.80),
         residence_time_h=residence_time_h,                    # scenario override --> from scenario input
-        broth_density_kg_per_m3=fmed.get("broth_density_kg_per_m3", 1000.0),
-        target_pH=fc.get("target_pH", fmed.get("target_pH", 8.0)),
-        ammonia_dose_kg_per_m3=fmed.get("ammonia_dose_kg_per_m3", 0.0),
-        phosphate_dose_kg_per_m3=fmed.get("phosphate_dose_kg_per_m3", 0.0),
-        base_dose_kg_per_m3=fmed.get("base_dose_kg_per_m3", 0.0),
-        magnesium_sulfate_dose_kg_per_m3=fmed.get("magnesium_sulfate_dose_kg_per_m3", 0.49),
-        seed_water_kgph=fc.get("seed_water_kgph", 0.0),
-        seed_cellmass_kgph=fc.get("seed_cellmass_kgph", 0.0),
-        vfa_to_permeate_frac=mf.get("vfa_to_permeate_frac", 0.98),
-        water_to_permeate_frac=mf.get("water_to_permeate_frac", 0.97),
-        solids_to_permeate_frac=mf.get("solids_to_permeate_frac", 0.05),
-        dissolved_other_to_permeate_frac=mf.get("dissolved_other_to_permeate_frac", 0.90),
-        target_oil_and_solids_content=vfaF.get("target_oil_and_solids_content", 70.0),
     )
 
     for sid, price in {

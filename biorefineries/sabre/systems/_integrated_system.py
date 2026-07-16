@@ -142,8 +142,8 @@ def create_integrated_biorefinery(
     quality: str = "pelagic_high_quality",
     pretreatment_case: str = "press_mill_only",
     vfa_conversion: float = 0.85,
-    vfa_product_yield: float = 0.45,
-    vfa_biomass_yield: float = 0.10,
+    vfa_product_yield: float = 0.144,
+    vfa_biomass_yield: float = 0.40,
     vfa_co2_yield: float = 0.20,
     vfa_o2_demand: float = 0.80,
     ferm_residence_time_h: float = 48.0,
@@ -263,49 +263,15 @@ def create_integrated_biorefinery(
     # =========================================================
     # BUILD PATHWAYS CONDITIONALLY
     # =========================================================
-    # -- Read fermentation parameters from YAML --
-    # Caller-supplied arguments take precedence over YAML when they differ
-    # from their defaults (same pattern as _ad_biogas_system.py).
-    vfaF  = A.get("vfa_fermentation", {})
-    fc    = vfaF.get("cases", {}).get(vfaF.get("case", "yarrowia_vfa_base"), {})
-    mf    = vfaF.get("vfa_microfilter", {})
-    fmed  = vfaF.get("fermentation_medium_tank", {})
-
-    _conversion       = vfa_conversion        if vfa_conversion        != 0.85 else fc.get("conversion",                          0.85)
-    _product_yield    = vfa_product_yield      if vfa_product_yield      != 0.45 else fc.get("product_yield_kg_per_kg_vfa_consumed", 0.45)
-    _biomass_yield    = vfa_biomass_yield      if vfa_biomass_yield      != 0.10 else fc.get("biomass_yield_kg_per_kg_vfa_consumed", 0.10)
-    _co2_yield        = vfa_co2_yield          if vfa_co2_yield          != 0.20 else fc.get("co2_yield_kg_per_kg_vfa_consumed",     0.20)
-    _o2_demand        = vfa_o2_demand          if vfa_o2_demand          != 0.80 else fc.get("oxygen_kg_per_kg_vfa_consumed",        0.80)
-    _res_time         = ferm_residence_time_h  if ferm_residence_time_h  != 48.0 else fc.get("residence_time_h",                    48.0)
-    _target_pH        = ferm_target_pH         if ferm_target_pH         != 8.0  else fc.get("target_pH",                           8.0)
-    _vfa_perm_frac    = mf.get("vfa_to_permeate_frac",    0.98)
-    _water_perm_frac  = mf.get("water_to_permeate_frac",  0.97)
-    _solids_perm_frac = mf.get("solids_to_permeate_frac", 0.05)
-    _ammonia_dose     = fmed.get("ammonia_dose_kg_per_m3",   0.0)
-    _phosphate_dose   = fmed.get("phosphate_dose_kg_per_m3", 0.0)
-    _base_dose        = fmed.get("base_dose_kg_per_m3",      0.0)
-    # -----------------------------------------------------------
-
     ferm_kwargs = dict(
-        product_ID="MicrobialOil",
-        conversion=_conversion,
-        product_yield_kg_per_kg_vfa_consumed=_product_yield,
-        biomass_yield_kg_per_kg_vfa_consumed=_biomass_yield,
-        co2_yield_kg_per_kg_vfa_consumed=_co2_yield,
-        oxygen_kg_per_kg_vfa_consumed=_o2_demand,
-        residence_time_h=_res_time,
-        broth_density_kg_per_m3=1000.0,
-        target_pH=_target_pH,
-        ammonia_dose_kg_per_m3=_ammonia_dose,
-        phosphate_dose_kg_per_m3=_phosphate_dose,
-        base_dose_kg_per_m3=_base_dose,
+        conversion=vfa_conversion,
+        product_yield_kg_per_kg_vfa_consumed=vfa_product_yield,
+        biomass_yield_kg_per_kg_vfa_consumed=vfa_biomass_yield,
+        co2_yield_kg_per_kg_vfa_consumed=vfa_co2_yield,
+        oxygen_kg_per_kg_vfa_consumed=vfa_o2_demand,
+        residence_time_h=ferm_residence_time_h,
+        target_pH=ferm_target_pH,
         magnesium_sulfate_dose_kg_per_m3=ferm_mgso4_dose,
-        seed_water_kgph=0.0,
-        seed_cellmass_kgph=0.0,
-        vfa_to_permeate_frac=_vfa_perm_frac,
-        water_to_permeate_frac=_water_perm_frac,
-        solids_to_permeate_frac=_solids_perm_frac,
-        dissolved_other_to_permeate_frac=0.90,
         target_oil_and_solids_content=target_oil_and_solids_content,
     )
 

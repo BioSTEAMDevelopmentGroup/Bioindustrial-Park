@@ -16,27 +16,41 @@ Its purpose is to carry realistic capital and operating costs for:
     1. Cell disruption (high-pressure homogenization)
     2. Solvent or aqueous extraction of intracellular lipids
 
-Capital cost anchor:
-    NREL/TP-5100-55431 (2012), Davis et al., "Techno-Economic Analysis of
-    Autotrophic Microalgae for Fuel Production". Cell disruption + extraction
-    section reported at ~$8.5M installed for ~10 dry ton/hr biomass throughput.
-    Scaled here using a 0.6 power law on dry biomass flow.
+Capital cost anchor (UNVERIFIED -- see CONVERSION_NOTES.md, "Citation-accuracy
+issues" -- nobody involved in this conversion has read the primary source):
+    assumptions.yaml states the $7.848M installed cost (at 10 dry ton/hr
+    biomass throughput) is "back-calculated from NREL 55431 cell-disruption
+    plus extraction/separation cost bases," without showing the calculation.
+    A separate, pre-existing docstring in this codebase attributed the figure
+    to NREL/TP-5100-55431 (2012), Davis et al., "Techno-Economic Analysis of
+    Autotrophic Microalgae for Fuel Production," and claimed that report
+    itself gives ~$8.5M for the same throughput. Neither claim has been
+    checked against the actual report. Scaled here using a 0.6 power law on
+    dry biomass flow.
 
 Operating cost:
-    - Electricity: high-pressure homogenization ~1.5 kWh/kg dry biomass
-      (Doucha & Livansky 2008; Postma et al. 2017)
+    - Electricity: high-pressure homogenization 0.203 kWh/kg dry biomass.
+      assumptions.yaml describes this only as "harmonized to the NREL
+      algal-lipid basis," no specific paper named. Doucha & Livansky (2008)
+      and Postma et al. (2017) are cited elsewhere in this codebase for the
+      superseded 1.5 kWh/kg figure -- NOT verified to support 0.203.
+      UNVERIFIED, see CONVERSION_NOTES.md ("Citation-accuracy issues").
     - Reagent/solvent cost included as $/kg oil surrogate operating cost,
       passed through as a fixed annual cost adder in the TEA script
       Literature range: $0.50-1.50/kg oil for solvent + recovery
-      (Knoshaug et al. 2018, NREL; Laurens et al. 2017, Green Chem.)
+      (Knoshaug et al. 2018, NREL; Laurens et al. 2017, Green Chem.) --
+      also not independently verified against the primary sources.
 """
 
 from __future__ import annotations
 import biosteam as bst
+from biosteam.units.decorators import cost
 
 __all__ = ('OilExtractionPlaceholder',)
 
 
+@cost('Dry biomass feed (dry ton/h)', 'Oil extraction', units='dry ton/h',
+      CE=567.5, cost=7_848_000.0, S=10.0, n=0.6, BM=1.0)
 class OilExtractionPlaceholder(bst.Unit):
     """
     Pass-through unit representing cell disruption and lipid extraction
@@ -47,11 +61,25 @@ class OilExtractionPlaceholder(bst.Unit):
     Outputs:
         outs[0]: extracted broth (same composition — split handled by C603_2)
 
+    Sources
+    -------
+    installed cost anchor ($7.848M at 10 dry ton/h, n=0.6):
+        assumptions.yaml states this is back-calculated from NREL/TP-5100-55431
+        (2012) cell-disruption plus extraction/separation cost bases; the
+        calculation itself is not shown/verified.
+    homogenization_kWh_per_kg_dry_biomass:
+        UNVERIFIED. assumptions.yaml says only "harmonized to the NREL
+        algal-lipid basis." A pre-existing docstring in this codebase
+        attributed Doucha & Livansky (2008) and Postma et al. (2017) to the
+        superseded 1.5 kWh/kg figure this replaced -- that attribution itself
+        was never checked against the papers either. See CONVERSION_NOTES.md
+        ("Citation-accuracy issues") before citing either paper for anything
+        here.
     """
 
     _N_ins = 1
     _N_outs = 1
-    _F_BM_default = {"Oil extraction": 1.0}
+    _units = {'Dry biomass feed (dry ton/h)': 'dry ton/h'}
 
     def __init__(
         self,
@@ -61,11 +89,7 @@ class OilExtractionPlaceholder(bst.Unit):
         *,
         product_ID: str = "MicrobialOil",
         cellmass_ID: str = "CellMass",
-        homogenization_kWh_per_kg_dry_biomass: float = 1.5,
-        ref_dry_biomass_tph: float = 10.0,
-        ref_installed_cost_usd: float = 8_500_000.0,
-        scale_exponent: float = 0.6,
-        F_BM: float = 1.0,
+        homogenization_kWh_per_kg_dry_biomass: float = 0.203,
         **kwargs,
     ):
         super().__init__(ID, ins, outs, **kwargs)
@@ -74,10 +98,6 @@ class OilExtractionPlaceholder(bst.Unit):
         self.homogenization_kWh_per_kg_dry_biomass = float(
             homogenization_kWh_per_kg_dry_biomass
         )
-        self.ref_dry_biomass_tph = float(ref_dry_biomass_tph)
-        self.ref_installed_cost_usd = float(ref_installed_cost_usd)
-        self.scale_exponent = float(scale_exponent)
-        self.F_BM = {"Oil extraction": float(F_BM)}
 
     def _run(self):
         # Pass-through: composition unchanged.
@@ -118,18 +138,3 @@ class OilExtractionPlaceholder(bst.Unit):
         self.design_results[
             "Electricity intensity (kWh/kg dry biomass)"
         ] = self.homogenization_kWh_per_kg_dry_biomass
-
-    def _cost(self):
-        dry_biomass_tph = (
-            self.design_results.get("Dry biomass feed (dry ton/h)", 0.0)
-        )
-        ref = self.ref_dry_biomass_tph
-        ref_cost = self.ref_installed_cost_usd
-
-        if dry_biomass_tph <= 0 or ref <= 0:
-            installed_cost = ref_cost
-        else:
-            installed_cost = ref_cost * (dry_biomass_tph / ref) ** self.scale_exponent
-
-        self.baseline_purchase_costs["Oil extraction"] = installed_cost
-        self.design_results["Installed cost ($)"] = installed_cost
