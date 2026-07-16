@@ -22,7 +22,7 @@ this builder's own kwarg, not read from assumptions.yaml (this codebase
 doesn't store stream prices in the yaml; every other price in these
 system builders -- feed price, disposal costs -- is likewise set as a
 Python-level default that callers can override, e.g.
-`analyses/vfa_fermentation_tea.py`'s `*_DISPOSAL_USD_PER_KG` constants).
+`legacy_analyses/vfa_fermentation_tea.py`'s `*_DISPOSAL_USD_PER_KG` constants).
 Fresh water make-up is priced the same way
 (`fresh_water_price_usd_per_kg`, default 0.0).
 """

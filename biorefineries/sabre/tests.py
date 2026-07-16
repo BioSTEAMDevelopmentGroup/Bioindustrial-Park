@@ -6,7 +6,7 @@
 # github.com/BioSTEAMDevelopmentGroup/biosteam/blob/master/LICENSE.txt
 # for license details.
 """
-Regression tests for the SaBRe biorefineries.sabre.analyses scripts.
+Regression tests for the SaBRe biorefineries.sabre.legacy_analyses scripts.
 
 Baseline values were captured by running the current, pre-migration code
 (assumptions.yaml loaded and threaded through as kwargs at the analyses-script
@@ -15,7 +15,7 @@ decorators, these tests should keep passing unchanged, since the same
 underlying numbers are being moved, not altered. A failure here means a
 migration step silently changed a value instead of just relocating it.
 
-Most analyses/*.py scripts originally ran their full simulation sweep
+Most legacy_analyses/*.py scripts originally ran their full simulation sweep
 unconditionally at import time (no `if __name__ == "__main__":` guard),
 which made them expensive and side-effecting (writing figures/spreadsheets)
 just to import their reusable build_case()/run_case() functions. Those
@@ -30,9 +30,9 @@ from pathlib import Path
 
 import numpy as np
 
-_ANALYSES_DIR = Path(__file__).resolve().parent / "analyses"
-if str(_ANALYSES_DIR) not in sys.path:
-    sys.path.insert(0, str(_ANALYSES_DIR))
+_LEGACY_ANALYSES_DIR = Path(__file__).resolve().parent / "legacy_analyses"
+if str(_LEGACY_ANALYSES_DIR) not in sys.path:
+    sys.path.insert(0, str(_LEGACY_ANALYSES_DIR))
 
 from vfa_fermentation_tea import (  # noqa: E402
     run_case,

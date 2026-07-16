@@ -7,20 +7,26 @@ sabre: Sargassum Biorefinery (SaBRe)
 Work in progress
 -----------------
 This package currently implements only the flowsheets covered in Azhar
-Razin's senior thesis (below):
+Razin's senior thesis (below), plus a standalone biostimulant pathway:
+- Biostimulant production from the press pressate (no AD involved).
 - Methanogenic anaerobic digestion (AD) for biomethane production.
 - Acidogenic AD for volatile fatty acid (VFA) production
 - Acidogenic AD with VFA fermentation to product microbial oil.
 - Integrated systesm splitting between the biomethane and microbial oil
   product pathways.
-  
+
 Additional flowsheets are expected to be added here over time
 as more of that work is incorporated.
 
-The four flowsheets currently available (see ``load()`` in
+The five flowsheets currently available (see ``load()`` in
 ``__init__.py`` for how to select one):
 
-- **AD-biomethane** (``'ad_biomethane'``, default): press -> mill -> optional
+- **Biostimulant** (``'biostimulant'``, default): press -> pressate
+  concentrator -> biostimulant evaporator, producing a biostimulant
+  product at a tunable target solids content (the evaporator dilutes
+  with permeate/fresh water or concentrates by evaporation as needed)
+  and treating the pressed cake as a disposal liability.
+- **AD-biomethane** (``'ad_biomethane'``): press -> mill -> optional
   pretreatment (heating, enzymatic, peroxide, or combined) -> anaerobic
   digestion -> H2S removal -> biogas upgrading -> digestate dewatering,
   producing biomethane and a soil-amendment digestate.
@@ -48,7 +54,7 @@ Getting started
 
 Repository structure
 ---------------------
-``_chemicals.py``: chemical species used across all four flowsheets.
+``_chemicals.py``: chemical species used across all five flowsheets.
 
 ``utils.py``: loads ``data/assumptions.yaml`` (feedstock
 quality bins, plant scale, unit performance/costing assumptions, all
@@ -62,10 +68,14 @@ and minimum-selling-price helpers.
 ``units/``: unit operations (digesters, press, mill, pretreatment options,
 H2S removal, biogas upgrading, dewatering, fermentation, oil extraction).
 
-``systems/``: the four flowsheet builders described above.
+``systems/``: the five flowsheet builders described above.
 
-``analyses/``: exploratory analysis and plotting scripts (heatmaps,
-sensitivity studies, TEA scenario comparisons).
+``analyses/``: new analysis and plotting scripts.
+
+``legacy_analyses/``: the original exploratory analysis and plotting
+scripts (heatmaps, sensitivity studies, TEA scenario comparisons) from
+Azhar Razin's thesis work, covered by the regression tests in
+``tests.py``.
 
 References
 ----------
