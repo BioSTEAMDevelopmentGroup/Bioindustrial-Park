@@ -153,10 +153,16 @@ class EnzymaticPretreatment(bst.Unit):
         enzyme_kgph = getattr(self, "_enzyme_kgph", 0.0)
         enzyme_cost_usd_per_hr = enzyme_kgph * self.enzyme_price_usd_per_kg
 
-        if enzyme_cost_usd_per_hr > 0:
-            self.add_OPEX = {
-                "Enzyme reagent cost": enzyme_cost_usd_per_hr
-            }
-
         annual_maintenance = self.maintenance_frac_of_capex_per_yr * capex
         self.design_results["Annual maintenance ($/yr)"] = annual_maintenance
+
+        add_opex = {}
+        if enzyme_cost_usd_per_hr > 0:
+            add_opex["Enzyme reagent cost"] = enzyme_cost_usd_per_hr
+        if annual_maintenance > 0:
+            operating_hours_per_yr = 330.0 * 24.0
+            add_opex["Enzymatic pretreatment maintenance"] = (
+                annual_maintenance / operating_hours_per_yr
+            )
+        if add_opex:
+            self.add_OPEX = add_opex

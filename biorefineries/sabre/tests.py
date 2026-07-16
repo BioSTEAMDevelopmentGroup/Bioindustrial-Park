@@ -216,14 +216,14 @@ def test_ad_tea_final_press_mill_only_tipping_fee():
 def test_ad_tea_final_combined_pe_near_zero():
     _check_ad_tea_final_case("combined_PE", 0.00, {
         "TCI": 260748060.61126694,
-        "VOC": 22433166.024744563,
+        "VOC": 22722966.024744563,
         "FOC": 9933259.451857788,
         "material_cost": 0.0,
-        "utility_cost": 7585557.70201066,
-        "msp_usd_per_mmbtu": 13.543093261271574,
-        "msp_usd_per_kg_ch4": 0.7123667055428848,
+        "utility_cost": 7585557.7020106595,
+        "msp_usd_per_mmbtu": 13.592238494753259,
+        "msp_usd_per_kg_ch4": 0.7149517448240215,
         "biomethane_kg_hr": 14395.227832748194,
-        "npv_at_3_mmbtu": -515738681.5999446,
+        "npv_at_3_mmbtu": -518172980.547749,
     })
 
 
@@ -283,7 +283,7 @@ def test_ad_biostimulant_price_build_case():
     _assert_close(annual_rev_musd, 0.0, "press_mill_only/$0.00 annual_rev_musd")
 
     msp_mmbtu, annual_rev_musd = _abp.build_case("combined_PE", 1.00)
-    _assert_close(msp_mmbtu, 21.213980682219965, "combined_PE/$1.00 msp_mmbtu")
+    _assert_close(msp_mmbtu, 21.263125915566526, "combined_PE/$1.00 msp_mmbtu")
     _assert_close(annual_rev_musd, 53.7662505435227, "combined_PE/$1.00 annual_rev_musd")
 
 
@@ -299,7 +299,7 @@ def test_ad_feed_tea_build_case():
     _assert_close(fc_musd, 99.00000000000001, "press_mill_only/0.02 annual_feed_cost_musd")
 
     msp_mmbtu, fc_musd = _aft.build_case("enzymatic", -0.02)
-    _assert_close(msp_mmbtu, -12.302964057653245, "enzymatic/-0.02 msp_mmbtu")
+    _assert_close(msp_mmbtu, -12.205654152893255, "enzymatic/-0.02 msp_mmbtu")
     _assert_close(fc_musd, -99.00000000000001, "enzymatic/-0.02 annual_feed_cost_musd")
 
 
@@ -311,7 +311,7 @@ import ad_heatmap as _adh  # noqa: E402
 
 def test_ad_heatmap_build_case():
     msp_mmbtu = _adh.build_case("combined_PE", 0.02, 0.50)
-    _assert_close(msp_mmbtu, 25.77290912984433, "combined_PE/0.02/0.50 msp_mmbtu")
+    _assert_close(msp_mmbtu, 25.822054363160436, "combined_PE/0.02/0.50 msp_mmbtu")
 
 
 # =================================================================

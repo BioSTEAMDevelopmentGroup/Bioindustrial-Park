@@ -37,8 +37,11 @@ revisiting later. Neither is logged below since neither changed the baseline.
 
 All 7 subsystems converted so far (VFA fermentation, AD-biogas, VFA-AD,
 digestate handling, preprocessing, pressate-biostimulant, pretreatment
-units) preserve `tests.py`'s full 20-test suite exactly, `rtol=1e-6` — zero
-conversion-caused deviation. Two substantive discrepancies were found in
+units) preserve `tests.py`'s full 20-test suite, `rtol=1e-6`, **except for
+one deliberate fix** — see the `EnzymaticPretreatment`/
+`PeroxidePretreatment` entry immediately below, whose corrected values are
+now what `tests.py` asserts against. Two substantive discrepancies were
+found in
 the preprocessing subsystem and deliberately NOT fixed (see "Preprocessing"
 under Citation-accuracy issues below; fixing either would change simulation
 output). One functional fix was made in the pressate-biostimulant subsystem
@@ -47,41 +50,67 @@ since that unit carries zero test coverage and is never actually simulated,
 so the fix changed no measured output — see "Pressate-biostimulant" below.
 
 One **real, verified, currently-live bug** was found in the pretreatment
-units subsystem and deliberately NOT fixed, since fixing it changes
-simulated output:
+units subsystem. Initially left unfixed (see the superseded writeup that
+used to be here, in git history); **fixed on explicit user request** after
+a systematic check confirmed no other unit in the codebase had the same
+gap. Details below.
 
-### `EnzymaticPretreatment`/`PeroxidePretreatment` — maintenance OPEX never reaches the TEA
+### `EnzymaticPretreatment`/`PeroxidePretreatment` — maintenance OPEX never reached the TEA — FIXED
 
-`_cost()` in both units computes `annual_maintenance =
-maintenance_frac_of_capex_per_yr * capex_usd` and stores it in
+`_cost()` in both units computed `annual_maintenance =
+maintenance_frac_of_capex_per_yr * capex_usd` and stored it in
 `design_results`, but — unlike every other capex-dependent-maintenance unit
 in this codebase (`HeatingPretreatment`, `PressateConcentrator`,
-`BiogasUpgrading`, `H2SRemoval`'s reagent cost) — never assigns it to
-`self.add_OPEX`. Since `capex_usd` is genuinely nonzero at these units' one
-real call site (`assumptions.yaml`: `enzymatic.capex_usd: 7,280,000`,
-`peroxide.capex_usd: 1,000,000`), this silently omits real maintenance cost
-from VOC/MSP for every pretreatment case that includes an enzymatic or
+`BiogasUpgrading`, `AnaerobicDigester`'s volume-based maintenance,
+`H2SRemoval`'s reagent cost) — never assigned it to `self.add_OPEX`. Since
+`capex_usd` is genuinely nonzero at these units' one real call site
+(`assumptions.yaml`: `enzymatic.capex_usd: 7,280,000`,
+`peroxide.capex_usd: 1,000,000`), this silently omitted real maintenance
+cost from VOC/MSP for every pretreatment case that includes an enzymatic or
 peroxide stage — `enzymatic`, `peroxide`, `combined_PE`, `combined_PTE`
 (everything except `press_mill_only`, which has no pretreatment stage at
 all).
 
-**Verified as real** (not a dead-code false alarm like the digestate/
-pressate findings): these exact cases are pinned by exact-value assertions
-in `tests.py` — `test_ad_tea_final_combined_pe_near_zero` (combined_PE) and
-`test_ad_feed_tea_build_case`'s `"enzymatic"` case — both currently passing
-against the buggy (maintenance-omitting) behavior.
+**Systematic check for the same gap elsewhere, before fixing**: grepped
+every file in `units/` for `maintenance_frac_of_capex_per_yr`/
+`Annual maintenance`/`maintenance_usd_per_m3_yr` (7 files matched) and
+inspected each `_cost()`. Confirmed clean (already wired to `add_OPEX`
+correctly): `AnaerobicDigester`, `BiogasUpgrading`, `PressateConcentrator`,
+`HeatingPretreatment`, and `BiostimulantEvaporator` (fixed earlier this
+conversion, see the Pressate-biostimulant entry above). No other unit in
+`units/` computes a capex-dependent maintenance figure at all (confirmed
+by the same grep returning only those 7 files) — so `EnzymaticPretreatment`
+and `PeroxidePretreatment` were the only two live instances of this bug.
 
-**Deliberately NOT fixed.** This conversion's mandate is to preserve
-simulated output exactly, not re-model it — fixing this would increase VOC
-(and thus MSP) for 4 of the 5 pretreatment cases, breaking both pinned
-tests by design (the fix is exactly what would make them fail). If this is
-ever fixed, it needs: explicit user sign-off (since it changes reported
-economics, not just internal code structure), a `tests.py` baseline
-recapture for every test that touches enzymatic/peroxide/combined_PE/
-combined_PTE cases, and ideally a check for the same gap elsewhere in the
-codebase (only `HeatingPretreatment` was confirmed clean in this
-conversion; units outside the 7 subsystems converted so far have not been
-checked for this specific pattern).
+**Fix**: both units' `_cost()` now build a combined `add_OPEX` dict
+(reagent cost + maintenance, when either is nonzero) and assign it once,
+instead of only ever assigning the reagent-cost half.
+
+**Metric impact, verified by direct recomputation against
+`tests.py`'s 20-test suite** (`press_mill_only`-only tests — 16 of the
+20 — are completely unaffected, since that case has no pretreatment
+stage; TCI/FCI/material_cost/utility_cost/mass-balance outputs are
+unaffected in every test, since only OPEX/VOC and everything downstream of
+it (MSP, NPV) changed):
+
+| Test | Metric | Before (buggy) | After (fixed) | Change |
+|---|---|---|---|---|
+| `test_ad_tea_final_combined_pe_near_zero` | VOC | $22,433,166.02 | $22,722,966.02 | +$289,800.00/yr |
+| | MSP ($/MMBtu) | 13.5431 | 13.5922 | +0.0491 |
+| | MSP ($/kg CH4) | 0.71237 | 0.71495 | +0.00258 |
+| | NPV @ $3/MMBtu | -$515,738,681.60 | -$518,172,980.55 | -$2,434,298.95 |
+| `test_ad_biostimulant_price_build_case` (combined_PE/$1.00) | MSP ($/MMBtu) | 21.2140 | 21.2631 | +0.0491 |
+| `test_ad_feed_tea_build_case` (enzymatic/-0.02) | MSP ($/MMBtu) | -12.3030 | -12.2057 | +0.0973 |
+| `test_ad_heatmap_build_case` (combined_PE/0.02/0.50) | MSP ($/MMBtu) | 25.7729 | 25.8221 | +0.0491 |
+
+The combined_PE MSP shift (+0.0491 $/MMBtu, consistent across all 3
+combined_PE-based tests) reflects the *combined* enzymatic + peroxide
+maintenance now flowing through; the enzymatic-only case shifts more
+(+0.0973 $/MMBtu) since that test uses a `-$0.02/kg` tipping-fee feed
+price, which changes the MSP-to-cost sensitivity. `tests.py`'s expected
+values were updated to match the fixed (correct) behavior — anyone running
+this suite against a pre-fix checkout will see the values above as the old
+baseline.
 
 ---
 
@@ -511,11 +540,13 @@ output.
 
 ### Pretreatment units (`units/_enzymatic_pretreatment.py`, `units/_peroxide_pretreatment.py`, `units/_heating_pretreatment.py`)
 
-Converted with zero metric deviation (full `tests.py` suite unchanged at
-`rtol=1e-6`). The live, verified maintenance-OPEX bug in
-`EnzymaticPretreatment`/`PeroxidePretreatment` is logged above under
-Metric-deviation bugs, not here, since it's a real correctness defect
-rather than a citation/documentation issue.
+Converted with zero metric deviation from the docstring/stale-default work
+itself. The live, verified maintenance-OPEX bug in
+`EnzymaticPretreatment`/`PeroxidePretreatment` — found during this same
+pass and initially left unfixed, then fixed on explicit user request, with
+`tests.py`'s baseline updated to match — is logged above under
+Metric-deviation bugs with full before/after values, not here, since it's
+a real correctness defect rather than a citation/documentation issue.
 
 All three units are constructed in exactly one place in this codebase —
 `systems._ad_biogas_system._build_methanogenic_pathway` — confirmed by

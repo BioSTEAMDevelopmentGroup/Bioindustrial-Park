@@ -128,10 +128,16 @@ class PeroxidePretreatment(bst.Unit):
         h2o2_kgph = getattr(self, "_h2o2_kgph", 0.0)
         h2o2_cost_usd_per_hr = h2o2_kgph * self.h2o2_price_usd_per_kg
 
-        if h2o2_cost_usd_per_hr > 0:
-            self.add_OPEX = {
-                "H2O2 reagent cost": h2o2_cost_usd_per_hr
-            }
-
         annual_maintenance = self.maintenance_frac_of_capex_per_yr * capex
         self.design_results["Annual maintenance ($/yr)"] = annual_maintenance
+
+        add_opex = {}
+        if h2o2_cost_usd_per_hr > 0:
+            add_opex["H2O2 reagent cost"] = h2o2_cost_usd_per_hr
+        if annual_maintenance > 0:
+            operating_hours_per_yr = 330.0 * 24.0
+            add_opex["Peroxide pretreatment maintenance"] = (
+                annual_maintenance / operating_hours_per_yr
+            )
+        if add_opex:
+            self.add_OPEX = add_opex
