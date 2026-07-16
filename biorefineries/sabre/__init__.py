@@ -77,23 +77,23 @@ def load(flowsheet_name: str = 'ad_biomethane', **kwargs):
     if flowsheet_name == 'ad_biomethane':
         sys = create_ad_biomethane_system(**kwargs)
         sys.simulate()
-        tea = _tea.make_baseline_tea(sys)
+        tea = _tea.create_tea(sys)
         biomethane = flowsheet.stream.biomethane
         biomethane.price = tea.solve_price(biomethane)
     elif flowsheet_name == 'ad_vfa':
         sys = create_ad_vfa_system(**kwargs)
         sys.simulate()
-        tea = _tea.make_baseline_tea(sys)
+        tea = _tea.create_tea(sys)
     elif flowsheet_name == 'ad_fermentation':
         sys, streams, units_dict = create_ad_fermentation_system(**kwargs)
         sys.simulate()
-        tea = _tea.make_baseline_tea(sys)
+        tea = _tea.create_tea(sys)
         backend_oil = streams['backend_oil']
         backend_oil.price = tea.solve_price(backend_oil)
     elif flowsheet_name == 'integrated':
         sys, streams, units_dict, alpha = create_integrated_biorefinery(**kwargs)
         sys.simulate()
-        tea = _tea.make_baseline_tea(sys)
+        tea = _tea.create_tea(sys)
     else:
         raise ValueError(
             f"Unknown flowsheet_name {flowsheet_name!r}. "

@@ -193,7 +193,7 @@ class PressateConcentrator(bst.Unit):
         self.baseline_purchase_costs["Pressate concentrator"] = capex
 
         # Annual maintenance -> add_OPEX so it flows through
-        # SABREBaselineTEA.VOC -> solve_product_msp correctly
+        # SaBReTEA.VOC -> solve_product_msp correctly
         annual_maintenance = self.maintenance_frac_of_capex_per_yr * capex
         self.design_results["Annual maintenance ($/yr)"] = annual_maintenance
 

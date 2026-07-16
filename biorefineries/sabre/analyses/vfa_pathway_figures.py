@@ -43,7 +43,7 @@ from vfa_fermentation_tea import (
     _patch_ev607,
     _apply_disposal_costs,
 )
-from biorefineries.sabre._tea import make_baseline_tea, solve_product_msp
+from biorefineries.sabre._tea import create_tea, solve_product_msp
 
 
 OUT = SCRIPT_DIR.parent / "results" / "figures"
@@ -205,7 +205,7 @@ def make_product_scenario_comparison_figure(feed_price: float = 0.00):
         except Exception:
             pass
 
-        tea = make_baseline_tea(full_sys)
+        tea = create_tea(full_sys)
 
         msp_dict = solve_product_msp(
             tea=tea,

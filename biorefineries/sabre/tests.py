@@ -39,7 +39,7 @@ from vfa_fermentation_tea import (  # noqa: E402
     build_and_simulate_scenario,
     PRODUCT_SCENARIOS,
 )
-from biorefineries.sabre._tea import make_baseline_tea, solve_product_msp  # noqa: E402
+from biorefineries.sabre._tea import create_tea, solve_product_msp  # noqa: E402
 
 _RTOL = 1e-6
 _ATOL = 1e-6
@@ -137,7 +137,7 @@ def test_vfa_fermentation_product_scenarios():
             product_yield=sc["yield"],
             residence_time_h=sc["residence_h"],
         )
-        tea = make_baseline_tea(full_sys)
+        tea = create_tea(full_sys)
         oil_stream = streams["backend_oil"]
         msp_dict = solve_product_msp(
             tea=tea, product_stream=oil_stream, product_ID="MicrobialOil",

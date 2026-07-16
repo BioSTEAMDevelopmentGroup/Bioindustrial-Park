@@ -56,7 +56,7 @@ literature-sourced where available).
 
 ``streams.py``: feedstock stream construction from scenario inputs.
 
-``_tea.py``: SaBRe-specific techno-economic analysis (``SABREBaselineTEA``)
+``_tea.py``: SaBRe-specific techno-economic analysis (``SaBReTEA``)
 and minimum-selling-price helpers.
 
 ``units/``: unit operations (digesters, press, mill, pretreatment options,

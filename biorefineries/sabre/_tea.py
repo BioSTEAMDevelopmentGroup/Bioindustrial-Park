@@ -12,12 +12,12 @@ from __future__ import annotations
 
 import biosteam as bst
 
-__all__ = ('SABREBaselineTEA', 'make_baseline_tea', 'solve_product_msp', 'solve_biomethane_msp')
+__all__ = ('SaBReTEA', 'create_tea', 'solve_product_msp', 'solve_biomethane_msp')
 
 CH4_MMBTU_PER_KG = 0.0526
 
 
-class SABREBaselineTEA(bst.TEA):
+class SaBReTEA(bst.TEA):
     """
     Simplified TEA
 
@@ -70,7 +70,7 @@ class SABREBaselineTEA(bst.TEA):
         )
 
 
-def make_baseline_tea(
+def create_tea(
     sys,
     IRR: float = 0.10,
     duration: tuple[int, int] = (2026, 2046),
@@ -89,9 +89,9 @@ def make_baseline_tea(
     foc_frac_of_fci: float = 0.04,
 ):
     """
-    Create a baseline TEA object for any SABRE system.
+    Create a TEA object for any SaBRe system.
     """
-    tea = SABREBaselineTEA(
+    tea = SaBReTEA(
         system=sys,
 
         # Economic targets

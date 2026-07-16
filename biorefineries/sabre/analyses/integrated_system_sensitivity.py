@@ -46,7 +46,7 @@ from integrated_tea import (
 )
 from biorefineries.sabre._chemicals import set_thermo
 from biorefineries.sabre.systems import create_integrated_biorefinery
-from biorefineries.sabre._tea import make_baseline_tea
+from biorefineries.sabre._tea import create_tea
 
 # ── Output directories ────────────────────────────────────────────────────────
 OUTPUT_DIR = THIS_DIR.parent / "results" / "integrated_figures"
@@ -145,7 +145,7 @@ def _build_npv_at_alpha(
     _apply_stream_prices(streams, biostimulant_price)
     _wire_oil_reagent(streams, units)
 
-    tea = make_baseline_tea(sys)
+    tea = create_tea(sys)
     npv = _compute_npv_at_market(tea, streams, market_mmbtu, market_oil)
     return npv / 1e6
 

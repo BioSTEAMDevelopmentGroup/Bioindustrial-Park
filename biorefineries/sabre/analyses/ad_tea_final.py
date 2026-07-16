@@ -44,7 +44,7 @@ if str(REPO_ROOT) not in sys.path:
 
 from biorefineries.sabre._chemicals import set_thermo
 from biorefineries.sabre.systems import create_ad_biomethane_system
-from biorefineries.sabre._tea import make_baseline_tea, solve_biomethane_msp
+from biorefineries.sabre._tea import create_tea, solve_biomethane_msp
 
 OUT = SCRIPT_DIR.parent / "results" / "figures"
 OUT.mkdir(parents=True, exist_ok=True)
@@ -207,7 +207,7 @@ def run_case(
 
     stream_economics = _apply_stream_economics(sys, biostimulant_price)
 
-    tea = make_baseline_tea(sys)
+    tea = create_tea(sys)
     msp = solve_biomethane_msp(tea, sys.flowsheet.stream.biomethane)
 
     # NPV at target market prices

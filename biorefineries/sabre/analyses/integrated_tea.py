@@ -39,7 +39,7 @@ if str(REPO_ROOT) not in sys.path:
 
 from biorefineries.sabre._chemicals import set_thermo
 from biorefineries.sabre.systems import create_integrated_biorefinery
-from biorefineries.sabre._tea import make_baseline_tea, solve_product_msp, solve_biomethane_msp
+from biorefineries.sabre._tea import create_tea, solve_product_msp, solve_biomethane_msp
 
 # -------------------------
 # Market price assumptions
@@ -193,7 +193,7 @@ def run_alpha_sweep(
             _apply_stream_prices(streams, biostimulant_price)
             _wire_oil_reagent(streams, units)
 
-            tea = make_baseline_tea(sys)
+            tea = create_tea(sys)
 
             biomethane = streams.get("biomethane")
             oil_stream = streams.get("backend_oil")

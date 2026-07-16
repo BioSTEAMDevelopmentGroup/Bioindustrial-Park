@@ -18,7 +18,7 @@ if str(REPO_ROOT) not in sys.path:
 
 from biorefineries.sabre._chemicals import set_thermo
 from biorefineries.sabre.systems import create_ad_fermentation_system
-from biorefineries.sabre._tea import make_baseline_tea, solve_product_msp
+from biorefineries.sabre._tea import create_tea, solve_product_msp
 
 # -------------------------
 # Nutrient / reagent prices
@@ -201,7 +201,7 @@ def run_case(
 
     # -------------------------
     # Reagent cost into OE.add_OPEX ($/hr)
-    # SABREBaselineTEA.VOC reads _annual_unit_add_opex() which sums
+    # SaBReTEA.VOC reads _annual_unit_add_opex() which sums
     # add_OPEX across all units
     # -------------------------
     reagent_usd_per_hr = oil_kg_hr * reagent_usd_per_kg_oil
@@ -213,7 +213,7 @@ def run_case(
         if not silent:
             print(f"  [WARNING] Could not set OE.add_OPEX: {e}")
 
-    tea = make_baseline_tea(full_sys)
+    tea = create_tea(full_sys)
 
     msp = solve_product_msp(
         tea=tea,
@@ -599,7 +599,7 @@ def run_product_scenario_comparison(feed_price: float = 0.00):
             except Exception:
                 pass
 
-            tea = make_baseline_tea(full_sys)
+            tea = create_tea(full_sys)
 
             msp_dict = solve_product_msp(
                 tea=tea,

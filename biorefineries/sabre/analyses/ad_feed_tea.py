@@ -37,7 +37,7 @@ if str(REPO_ROOT) not in sys.path:
 
 from biorefineries.sabre._chemicals import set_thermo
 from biorefineries.sabre.systems import create_ad_biomethane_system
-from biorefineries.sabre._tea import make_baseline_tea, solve_biomethane_msp
+from biorefineries.sabre._tea import create_tea, solve_biomethane_msp
 
 
 OUT = SCRIPT_DIR.parent / "results" / "figures"
@@ -109,7 +109,7 @@ def build_case(pretreatment_case: str, feed_price: float):
 
     apply_stream_economics(sys)
 
-    tea = make_baseline_tea(sys)
+    tea = create_tea(sys)
     msp = solve_biomethane_msp(tea, sys.flowsheet.stream.biomethane)
 
     # Annual feedstock cost for reporting
