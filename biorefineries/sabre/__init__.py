@@ -9,7 +9,7 @@
 SaBRe (Sargassum Biorefinery) flowsheets.
 
 Four flowsheets are available, selected via `load(flowsheet_name=...)`:
-    - 'ad_biogas' (default): press -> mill -> [pretreatment] -> AD -> H2S
+    - 'ad_biomethane' (default): press -> mill -> [pretreatment] -> AD -> H2S
       removal -> biogas upgrading -> digestate screw press -> biomethane
     - 'ad_vfa': press -> mill -> acidogenic AD -> digestate screw press -> VFA broth
     - 'ad_fermentation': press -> mill -> acidogenic AD -> VFA broth ->
@@ -51,7 +51,7 @@ def _load_chemicals():
     _chemicals_loaded = True
 
 
-def load(flowsheet_name: str = 'ad_biogas', **kwargs):
+def load(flowsheet_name: str = 'ad_biomethane', **kwargs):
     """
     Load a SaBRe flowsheet and populate module-level names for its
     streams/units/system/TEA.
@@ -59,7 +59,7 @@ def load(flowsheet_name: str = 'ad_biogas', **kwargs):
     Parameters
     ----------
     flowsheet_name : str
-        One of 'ad_biogas', 'ad_vfa', 'ad_fermentation', 'integrated'.
+        One of 'ad_biomethane', 'ad_vfa', 'ad_fermentation', 'integrated'.
     **kwargs
         Forwarded to the corresponding `create_*` system builder.
     """
@@ -74,8 +74,8 @@ def load(flowsheet_name: str = 'ad_biogas', **kwargs):
     F.set_flowsheet(flowsheet)
     bst.settings.set_thermo(chemicals)
 
-    if flowsheet_name == 'ad_biogas':
-        sys = create_ad_biogas_system(**kwargs)
+    if flowsheet_name == 'ad_biomethane':
+        sys = create_ad_biomethane_system(**kwargs)
         sys.simulate()
         tea = _tea.make_baseline_tea(sys)
         biomethane = flowsheet.stream.biomethane
@@ -97,7 +97,7 @@ def load(flowsheet_name: str = 'ad_biogas', **kwargs):
     else:
         raise ValueError(
             f"Unknown flowsheet_name {flowsheet_name!r}. "
-            "Choose from 'ad_biogas', 'ad_vfa', 'ad_fermentation', 'integrated'."
+            "Choose from 'ad_biomethane', 'ad_vfa', 'ad_fermentation', 'integrated'."
         )
 
     _loaded_flowsheet_name = flowsheet_name

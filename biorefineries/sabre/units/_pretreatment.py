@@ -19,7 +19,7 @@ __all__ = ('EnzymaticPretreatment', 'HeatingPretreatment', 'PeroxidePretreatment
 class EnzymaticPretreatment(bst.Unit):
     """
     Enzymatic pretreatment reactor, one of the optional pre-AD pretreatment
-    stages in `systems._ad_biogas_system._build_methanogenic_pathway`.
+    stages in `systems._ad_biomethane_system._build_methanogenic_pathway`.
     Constructed in exactly one place in this codebase (that function),
     reached only when the selected pretreatment case has `kind: enzymatic`
     or `kind: combined_PE`/`combined_PTE` (which include an enzymatic
@@ -173,7 +173,7 @@ class HeatingPretreatment(bst.Unit):
     """
     Thermal (heating) pretreatment reactor, one of the optional pre-AD
     pretreatment stages in
-    `systems._ad_biogas_system._build_methanogenic_pathway`. Constructed in
+    `systems._ad_biomethane_system._build_methanogenic_pathway`. Constructed in
     exactly one place in this codebase (that function) -- and only ever
     actually reached via the `combined_PTE` case's peroxide->heating->
     enzymatic sequence: `assumptions.yaml` has no standalone
@@ -290,7 +290,7 @@ class PeroxidePretreatment(bst.Unit):
     """
     Hydrogen peroxide pretreatment reactor, one of the optional pre-AD
     pretreatment stages in
-    `systems._ad_biogas_system._build_methanogenic_pathway`. Constructed in
+    `systems._ad_biomethane_system._build_methanogenic_pathway`. Constructed in
     exactly one place in this codebase (that function), reached only when
     the selected pretreatment case has `kind: peroxide` or
     `kind: combined_PE`/`combined_PTE` (which include a peroxide stage in

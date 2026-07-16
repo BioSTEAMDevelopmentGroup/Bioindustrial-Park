@@ -122,7 +122,7 @@ class AnaerobicDigester(bst.Unit):
     mixing_W_per_m3, influent_temperature_K, target_temperature_K,
     cp_kJ_per_kgK:
         assumptions.yaml `ad` section, matching values already used at the
-        real call site (`systems/_ad_biogas_system.py`). No named literature
+        real call site (`systems/_ad_biomethane_system.py`). No named literature
         source for these beyond the yaml values themselves.
     ADBC_VOL_M3 / ADBC_CAPEX interpolation table (used by `interp_capex`,
     the actual installed-cost calculation):
@@ -1071,7 +1071,7 @@ class DigestateDecanterCentrifuge(bst.Unit):
     report: centrifuge ~59+-17% vs screw press ~33+-14%) at a different cost
     and electricity profile. Not wired into any of the default system builders
     today — kept available as a selectable alternative, same as the
-    pretreatment options in systems._ad_biogas_system.
+    pretreatment options in systems._ad_biomethane_system.
 
     Splits digestate into:
         - cake (soil_amendment): captured solids + entrained water to hit cake_moisture_frac
@@ -1249,7 +1249,7 @@ class DigestateScrewPress(bst.Unit):
         - Total purchased cost = N_parallel * cost_per_press
         - Optional polymer dosing unit per press (12k-50k EUR) can be included
 
-    Constructed twice in this codebase (systems/_ad_biogas_system.py's "SP"
+    Constructed twice in this codebase (systems/_ad_biomethane_system.py's "SP"
     and systems/_ad_vfa_system.py's "SP_VFA"), both routing their own
     digestate streams through the same class with different
     assumptions.yaml-sourced parameters.

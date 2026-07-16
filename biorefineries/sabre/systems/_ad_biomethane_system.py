@@ -6,14 +6,14 @@
 # github.com/BioSTEAMDevelopmentGroup/biosteam/blob/master/LICENSE.txt
 # for license details.
 """
-AD/biogas system builder for the SaBRe (Sargassum Biorefinery) flowsheets.
+AD/biomethane system builder for the SaBRe (Sargassum Biorefinery) flowsheets.
 
 Purpose:
 - Build a flowsheet block for the methanogenic AD system
 - Return a BioSTEAM System for simulation and diagramming
 
 Key entry points:
-- create_ad_biogas_system(...)
+- create_ad_biomethane_system(...)
 - _build_methanogenic_pathway(...) — shared with systems._integrated_system,
   which routes only a fraction of milled biomass through this same pathway.
 
@@ -21,6 +21,7 @@ Notes:
 - feed -> press -> pressate concentrator -> mill
   -> optional pretreatment -> AD -> H2S removal -> biogas upgrading -> digestate separation
 - Uses plant-scale throughput from YAML (e.g. 15,000 ton/day wet feed)
+- Final product is biomethane (post-upgrading), not the raw AD biogas.
 """
 
 from __future__ import annotations
@@ -35,7 +36,7 @@ from biorefineries.sabre.units import (
     PeroxidePretreatment, PressateConcentrator, BiostimulantEvaporator,
 )
 
-__all__ = ('create_ad_biogas_system',)
+__all__ = ('create_ad_biomethane_system',)
 
 
 def _apply_biodegradability_overrides(base_dict, override_factors):
@@ -70,7 +71,7 @@ def _build_methanogenic_pathway(A, feed_stream, pretreatment_case, biogas_ids=("
     Build [optional pretreatment] -> AD -> H2S removal -> biogas upgrading
     -> digestate screw press, starting from an already-milled feed stream.
 
-    Shared by create_ad_biogas_system() (which supplies a Press+Mill-derived
+    Shared by create_ad_biomethane_system() (which supplies a Press+Mill-derived
     feed) and systems._integrated_system.create_integrated_biorefinery()
     (which supplies a splitter-derived feed). Returns (path_units, streams,
     units) so callers can assemble their own bst.System.
@@ -318,7 +319,7 @@ def _build_methanogenic_pathway(A, feed_stream, pretreatment_case, biogas_ids=("
     return path_units, streams, units
 
 
-def create_ad_biogas_system(
+def create_ad_biomethane_system(
     quality: str = "pelagic_high_quality",
     pretreatment_case: str | None = None,
     press_cake_solids_wt_frac: float | None = None,
@@ -418,5 +419,5 @@ def create_ad_biogas_system(
     path.append(ML)
     path.extend(path_units)
 
-    sys = bst.System("AD_Biogas_sys", path=path)
+    sys = bst.System("AD_Biomethane_sys", path=path)
     return sys

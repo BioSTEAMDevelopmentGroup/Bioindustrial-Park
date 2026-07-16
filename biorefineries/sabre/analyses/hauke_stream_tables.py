@@ -31,7 +31,7 @@ if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
 from biorefineries.sabre._chemicals import set_thermo
-from biorefineries.sabre.systems import create_ad_biogas_system
+from biorefineries.sabre.systems import create_ad_biomethane_system
 
 OUT = SCRIPT_DIR.parent / "results"
 OUT.mkdir(parents=True, exist_ok=True)
@@ -150,7 +150,7 @@ def run_case(case):
     bst.main_flowsheet.clear()
     set_thermo()
 
-    sys = create_ad_biogas_system(
+    sys = create_ad_biomethane_system(
         quality="pelagic_high_quality",
         pretreatment_case=case,
     )

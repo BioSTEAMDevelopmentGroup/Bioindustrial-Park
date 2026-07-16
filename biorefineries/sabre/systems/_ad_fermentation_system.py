@@ -14,7 +14,7 @@ Public entry point:
   vfa_broth) followed by _create_vfa_fermentation_system(), and returns
   one assembled bst.System so the whole feedstock-to-oil chain simulates
   (and propagates changes) as a single graph, mirroring how
-  create_ad_biogas_system() is a single self-contained entry point.
+  create_ad_biomethane_system() is a single self-contained entry point.
 
 Internal helper:
 - _create_vfa_fermentation_system(vfa_broth, ...): the fermentation train

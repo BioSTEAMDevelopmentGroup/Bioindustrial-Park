@@ -20,7 +20,7 @@ as more of that work is incorporated.
 The four flowsheets currently available (see ``load()`` in
 ``__init__.py`` for how to select one):
 
-- **AD-biogas** (``'ad_biogas'``, default): press -> mill -> optional
+- **AD-biomethane** (``'ad_biomethane'``, default): press -> mill -> optional
   pretreatment (heating, enzymatic, peroxide, or combined) -> anaerobic
   digestion -> H2S removal -> biogas upgrading -> digestate dewatering,
   producing biomethane and a soil-amendment digestate.
@@ -42,7 +42,7 @@ Getting started
 .. code-block:: python
 
     from biorefineries import sabre
-    sabre.load('ad_biogas')
+    sabre.load('ad_biomethane')
     sabre.sys.diagram()
     print(sabre.tea.sales)
 

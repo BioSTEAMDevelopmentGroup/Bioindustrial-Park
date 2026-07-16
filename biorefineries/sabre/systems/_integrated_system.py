@@ -18,8 +18,8 @@ Edge cases handled cleanly:
 
 The methanogenic pathway (pretreatment -> AD -> H2S removal -> biogas
 upgrading -> digestate screw press) is built via the shared
-_build_methanogenic_pathway() helper in systems._ad_biogas_system, so this
-integrated system and the standalone AD/biogas system never drift apart.
+_build_methanogenic_pathway() helper in systems._ad_biomethane_system, so this
+integrated system and the standalone AD/biomethane system never drift apart.
 
 Returns (sys, streams, units, alpha).
 """
@@ -31,7 +31,7 @@ import biosteam as bst
 from biorefineries.sabre.utils import load_assumptions, get_quality_params, get_scale_feed_kgph
 from biorefineries.sabre.streams import make_sargassum_feed
 from biorefineries.sabre.units import Press, Mill, PressateConcentrator
-from biorefineries.sabre.systems._ad_biogas_system import _build_methanogenic_pathway
+from biorefineries.sabre.systems._ad_biomethane_system import _build_methanogenic_pathway
 from biorefineries.sabre.systems._ad_vfa_system import create_ad_vfa_system
 from biorefineries.sabre.systems._ad_fermentation_system import _create_vfa_fermentation_system
 
@@ -97,8 +97,8 @@ class MassSplitter(bst.Unit):
 def _build_methane_pathway(A, ad_feed_in, pretreatment_case):
     """
     Thin wrapper: builds AD -> H2SR -> UP -> SP via the shared
-    methanogenic-pathway builder in systems._ad_biogas_system, so this
-    integrated system and the standalone AD/biogas system never drift
+    methanogenic-pathway builder in systems._ad_biomethane_system, so this
+    integrated system and the standalone AD/biomethane system never drift
     apart. Returns (units_list, streams_dict, units_dict).
     """
     path_units, streams, units = _build_methanogenic_pathway(A, ad_feed_in, pretreatment_case)

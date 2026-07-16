@@ -36,7 +36,7 @@ if str(REPO_ROOT) not in sys.path:
 
 from biorefineries.sabre._chemicals import set_thermo
 from biorefineries.sabre.utils import load_assumptions
-from biorefineries.sabre.systems import create_ad_biogas_system
+from biorefineries.sabre.systems import create_ad_biomethane_system
 from biorefineries.sabre._tea import make_baseline_tea, solve_biomethane_msp
 
 
@@ -107,7 +107,7 @@ def build_case(
     bst.main_flowsheet.clear()
     set_thermo()
 
-    sys = create_ad_biogas_system(
+    sys = create_ad_biomethane_system(
         quality="pelagic_high_quality",
         pretreatment_case=pretreatment_case,
         ch4_override=yield_override,
