@@ -18,16 +18,20 @@ option for biogas desulfurization at this scale
 Modeling approach:
 - Pass-through for CH4 and CO2 (not affected by iron sponge)
 - H2S captured to near-zero in treated gas
-- Capital cost scaled to raw biogas flow (Nm3/h)
-- Reagent cost (iron sponge replacement) as add_OPEX
+- Capital cost scaled to raw biogas flow (Nm3/h) via a power-law @cost item
+- Reagent cost (iron sponge replacement) as add_OPEX, computed in _design
+  since it depends on raw biogas flow, not on the unit's own installed cost
 """
 
 from __future__ import annotations
 import biosteam as bst
+from biosteam.units.decorators import cost
 
 __all__ = ('H2SRemoval',)
 
 
+@cost('Raw biogas flow (Nm3/h)', 'H2S removal (iron sponge)', units='Nm3/h',
+      CE=567.5, cost=450_000.0, S=1700.0, n=0.7, BM=1.0)
 class H2SRemoval(bst.Unit):
     """
     Iron sponge H2S removal unit for raw biogas desulfurization.
@@ -38,11 +42,30 @@ class H2SRemoval(bst.Unit):
     Outputs:
         outs[0]: treated biogas (H2S removed to near-zero)
         outs[1]: spent media / captured H2S (solid waste, negligible mass)
+
+    Sources
+    -------
+    ref_installed_cost_usd ($450,000 at 1,700 Nm3/hr, n=0.7):
+        assumptions.yaml `h2s_removal.sources.capex`: Diaz, I.; Ramos, I.;
+        Fdz-Polanco, M. Bioresour. Technol. 2015, 192, 280-286. Original
+        anchor from Abatzoglou & Boivin (2009); scale exponent 0.7 per
+        Green & Perry (2008) convention.
+    h2s_removal_efficiency (0.99):
+        assumptions.yaml `h2s_removal.h2s_removal_efficiency` -- this is the
+        modeled value, chosen conservatively. The yaml citation (Choudhury
+        et al. Energies 2019, 12, 4605) reports the cited iron-sponge media
+        as achieving >99.9% removal in practice -- 0.99 is not a literal
+        transcription of that number, it's a deliberately conservative
+        modeling choice.
+    reagent_cost_usd_per_Nm3_raw (0.002):
+        assumptions.yaml `h2s_removal.sources.reagent`: IEA Bioenergy Task 37
+        (2014), yaml note gives a $0.001-0.003/Nm3 range; 0.002 is the
+        midpoint.
     """
 
     _N_ins = 1
     _N_outs = 2   # treated_biogas, spent_media
-    _F_BM_default = {"H2S removal (iron sponge)": 1.0}
+    _units = {'Raw biogas flow (Nm3/h)': 'Nm3/h'}
 
     def __init__(
         self,
@@ -51,20 +74,12 @@ class H2SRemoval(bst.Unit):
         outs=(),
         *,
         h2s_removal_efficiency: float = 0.99,
-        ref_flow_Nm3ph: float = 1700.0,
-        ref_installed_cost_usd: float = 450_000.0,
-        scale_exponent: float = 0.7,
-        reagent_cost_usd_per_Nm3_raw: float = 0.005,
-        F_BM: float = 1.0,
+        reagent_cost_usd_per_Nm3_raw: float = 0.002,
         **kwargs,
     ):
         super().__init__(ID, ins, outs, **kwargs)
         self.h2s_removal_efficiency = float(h2s_removal_efficiency)
-        self.ref_flow_Nm3ph = float(ref_flow_Nm3ph)
-        self.ref_installed_cost_usd = float(ref_installed_cost_usd)
-        self.scale_exponent = float(scale_exponent)
         self.reagent_cost_usd_per_Nm3_raw = float(reagent_cost_usd_per_Nm3_raw)
-        self.F_BM = {"H2S removal (iron sponge)": float(F_BM)}
 
     def _run(self):
         raw = self.ins[0]
@@ -125,21 +140,9 @@ class H2SRemoval(bst.Unit):
         # Iron sponge is passive —> no electricity
         self.power_utility.consumption = 0.0
 
-    def _cost(self):
-        Q_Nm3ph = self.design_results.get("Raw biogas flow (Nm3/h)", 0.0)
-        ref = self.ref_flow_Nm3ph
-        ref_cost = self.ref_installed_cost_usd
-
-        if Q_Nm3ph <= 0 or ref <= 0:
-            installed_cost = ref_cost
-        else:
-            installed_cost = ref_cost * (Q_Nm3ph / ref) ** self.scale_exponent
-
-        self.baseline_purchase_costs["H2S removal (iron sponge)"] = installed_cost
-        self.design_results["Installed cost ($)"] = installed_cost
-
-        # Reagent (iron sponge media replacement) as add_OPEX
-        # Basis: $0.002/Nm3 raw biogas
+        # Reagent (iron sponge media replacement) as add_OPEX.
+        # Computed here (not in _cost) because it scales with raw biogas
+        # flow, not with this unit's own installed cost -- @cost owns _cost.
         reagent_usd_per_hr = self.reagent_cost_usd_per_Nm3_raw * Q_Nm3ph
         if reagent_usd_per_hr > 0:
             self.add_OPEX = {

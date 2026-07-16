@@ -16,6 +16,49 @@ __all__ = ('BiogasUpgrading',)
 
 
 class BiogasUpgrading(bst.Unit):
+    """
+    Membrane biogas upgrading to pipeline-quality biomethane.
+
+    Inputs:
+        ins[0]: raw biogas (post H2S removal)
+
+    Outputs:
+        outs[0]: biomethane
+        outs[1]: offgas
+
+    Kept as custom _design/_cost rather than an @cost decorator: annual
+    maintenance OPEX here is a fraction of this unit's own installed cost,
+    which @cost only computes inside its decorator-owned _cost() -- after
+    _design() has already run. There's no clean way to read that
+    not-yet-computed value early without duplicating the cost formula (a
+    latent-bug risk if the two copies ever drift), so this unit keeps an
+    explicit _cost() instead, unlike H2SRemoval (whose OPEX depends only on
+    _design()-computed flow, not its own CAPEX).
+
+    Sources
+    -------
+    co2_removal (0.95), electricity_kwh_per_Nm3_raw (0.25),
+    maintenance_frac_of_capex_per_yr (0.035):
+        assumptions.yaml `biogas_upgrading` section, sourced to IEA
+        Bioenergy Task 37, "Biomethane status and factors affecting market
+        development" (2014). Electricity: "typically 0.2-0.3 kWh/Nm3 raw
+        biogas for mature upgrading technologies (incl. membranes)."
+        Maintenance: "annual maintenance cost for membranes at ~3-4% of
+        investment cost."
+    ch4_recovery (0.99):
+        assumptions.yaml `biogas_upgrading.ch4_recovery`. yaml's
+        `sources.methane_slip` note (also IEA Bioenergy Task 37, 2014)
+        states "manufacturers guarantee methane losses below ~0.5-2% for
+        new plants" -- consistent with a 0.99 (1%) recovery/slip choice, but
+        yaml does not cite a number specifically for ch4_recovery itself.
+    capex_usd_per_Nm3ph_raw (2200):
+        assumptions.yaml `biogas_upgrading.sources.capex`: IEA-ETSAP
+        E-TechDS: Biogas and Bio-syngas Production (Dec 2013). "Investment
+        cost for biogas-to-biomethane upgrading units reported ~USD
+        1950-2600 per Nm3/h for larger raw gas capacities" -- 2200 falls
+        within that range.
+    """
+
     _N_ins = 1
     _N_outs = 2  # biomethane, offgas
 
@@ -27,7 +70,7 @@ class BiogasUpgrading(bst.Unit):
         ID="",
         ins=None,
         outs=(),
-        ch4_recovery=0.98,
+        ch4_recovery=0.99,
         co2_removal=0.95,
         electricity_kwh_per_Nm3_raw=0.25,
         capex_usd_per_Nm3ph_raw=2200.0,

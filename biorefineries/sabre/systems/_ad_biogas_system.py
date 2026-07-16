@@ -278,11 +278,7 @@ def _build_methanogenic_pathway(A, feed_stream, pretreatment_case, biogas_ids=("
     H2SR = H2SRemoval(
         "H2SR", ins=AD - 0, outs=("treated_biogas", "spent_h2s_media"),
         h2s_removal_efficiency=h2sA.get("h2s_removal_efficiency", 0.99),
-        ref_flow_Nm3ph=h2sA.get("ref_flow_Nm3ph", 1000.0),
-        ref_installed_cost_usd=h2sA.get("ref_installed_cost_usd", 400_000.0),
-        scale_exponent=h2sA.get("scale_exponent", 0.6),
         reagent_cost_usd_per_Nm3_raw=h2sA.get("reagent_cost_usd_per_Nm3_raw", 0.002),
-        F_BM=h2sA.get("F_BM", 1.0),
     )
 
     upA = A["biogas_upgrading"]

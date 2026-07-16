@@ -5,16 +5,17 @@ Bugs found while converting `biorefineries/sabre` from its pre-conversion form
 MSP, NPV, etc.) to deviate from the `sabre_ad` baseline**. Updated as the
 conversion proceeds subsystem by subsystem.
 
-**`assumptions.yaml` is off-limits for edits until the user has reviewed its
-citations themselves.** It was reverted to its exact original (pre-conversion)
-content — the `vfa_fermentation:` section that had been deleted earlier in this
-conversion (on the reasoning that its values were now baked into code) is back.
-Restoring it is inert from the code's perspective: no Python file reads
-`A["vfa_fermentation"]` anymore, those call sites were already removed from
-`analyses/vfa_fermentation_tea.py` and `systems/_integrated_system.py`
-independent of whether the yaml section exists. This reversal was requested by
-the user directly because of the citation-transfer failures below — do not
-re-delete or otherwise edit `assumptions.yaml` without explicit approval.
+**Editing `assumptions.yaml` is out of scope for this conversion, permanently
+— not a temporary pause.** The original plan called for slimming yaml down
+subsystem by subsystem; that's no longer the plan. The `vfa_fermentation:`
+section was deleted (125 lines) during this conversion, then the citation
+errors below were found, and the user reverted it to its exact original
+content and removed yaml editing from scope entirely, for every subsystem,
+not just this one. Restoring it was inert from the code's perspective — no
+Python file reads `A["vfa_fermentation"]` anymore regardless of whether the
+yaml section exists. Going forward: bake assumptions into unit/system-builder
+code as usual; leave `assumptions.yaml` itself completely untouched. Yaml
+curation is the user's own task, done separately.
 
 Scope note: several stale unit-level defaults were found and corrected during the
 VFA fermentation conversion (e.g. `YarrowiaLipidFermenter`'s own
@@ -34,8 +35,9 @@ revisiting later. Neither is logged below since neither changed the baseline.
 
 ## Metric-deviation bugs
 
-*(none yet — VFA fermentation subsystem converted with zero baseline deviation,
-confirmed by `tests.py` matching `sabre_ad` output exactly)*
+*(none yet — VFA fermentation and AD-biogas subsystems converted with zero
+baseline deviation, confirmed by `tests.py`'s full 20-test suite matching
+pre-conversion output exactly, `rtol=1e-6`)*
 
 ---
 
@@ -137,3 +139,79 @@ for low-pressure clarification"). **FIXED**: docstring in
 `units/_vfa_fermentation.py` now states no source is given for this value and
 explicitly flags the earlier mix-up so it doesn't recur when
 `PressateConcentrator` gets converted later.
+
+### AD-biogas subsystem (`units/_ad.py`, `units/_h2s_removal.py`, `units/_biogas_upgrading.py`)
+
+Converted with zero metric deviation (`tests.py`'s AD-related tests —
+`test_ad_tea_final_*`, `test_ad_biostimulant_price_*`, `test_ad_feed_tea_*`,
+`test_ad_heatmap_*`, `test_export_ad_report_fixed_*`,
+`test_hauke_stream_tables_*`, `test_plot_two_pretreatment_figures_*`,
+`test_integrated_tea_*`, `test_integrated_system_sensitivity_*` — all
+unchanged at `rtol=1e-6`). Scope was limited to these three unit files plus
+the `H2SR` construction call in `systems/_ad_biogas_system.py`; the rest of
+that system-builder file (Press, Mill, pretreatment units, digestate units,
+pressate concentration) belongs to other not-yet-converted subsystems and
+was left untouched, mirroring how `_integrated_system.py` was scoped to
+"fermentation block only" during the VFA conversion.
+
+**`AnaerobicDigester.ADBC_VOL_M3`/`ADBC_CAPEX` — unverified provenance, not
+fixed, flagged only.** The six-point interpolation table actually used by
+`interp_capex()` (the real installed-cost calculation) has no corresponding
+entry anywhere in `assumptions.yaml`. A *separate*, structurally unused
+single-point anchor (`ad_costing.base_volume_m3`/`base_capex_usd`, stored on
+the unit's own `base_volume_m3`/`base_capex_usd` `__init__` params but never
+read by `_design`/`_cost`) is cited in yaml to the "ADBC" spreadsheet tool
+(`ADBCv2-48 (2).xlsm`, sheet "AnaerobicDigester"). Whether the six-point
+table was pulled from the same spreadsheet run as that single-point anchor
+has not been verified by anyone in this conversion. **Do not** state or
+imply that `ADBC_VOL_M3`/`ADBC_CAPEX` come from that spreadsheet without
+opening the actual file and checking. Flagged in the unit's docstring;
+status: OPEN, same as the `OilExtractionPlaceholder` NREL/TP-5100-55431 item
+above.
+
+**`H2SRemoval.h2s_removal_efficiency` (0.99) is a deliberately conservative
+modeling choice, not a transcription of its own citation.** yaml's
+`h2s_removal.sources.efficiency` note (Choudhury et al. 2019) states the
+cited iron-sponge technology achieves >99.9% removal in practice, but the
+actual modeled parameter (`h2s_removal.h2s_removal_efficiency` in yaml, and
+this unit's own default) is `0.99`, not `0.999`. The unit's docstring now
+states this distinction explicitly rather than implying the citation
+supports the exact modeled number.
+
+**`BiogasUpgrading` intentionally kept custom `_design`/`_cost` instead of
+switching to the `@cost` decorator**, unlike `H2SRemoval`. Its formula is
+single-train and linear in flow (`n=1`), which would otherwise be a clean
+`@cost` candidate — but its annual maintenance OPEX is
+`maintenance_frac_of_capex_per_yr * <this unit's own installed cost>`, and
+`@cost`'s decorator-owned `_cost()` only computes that installed cost
+*after* `_design()` has already run (BioSTEAM lifecycle: `_run` → `_design`
+→ `_cost`). There's no way to read the not-yet-computed CAPEX from
+`_design()` without duplicating the cost formula there too — a latent-bug
+risk if the two copies of the formula ever drift. `H2SRemoval` didn't have
+this problem because its only OPEX (reagent replacement) depends on
+`_design()`-computed raw biogas flow, not on its own CAPEX. This is a
+deliberate, documented exception to the general "single-train power-law
+units use `@cost`" convention, not an inconsistency to "fix" later.
+
+**`H2SRemoval` zero-flow edge case changed behavior, non-triggering.** The
+pre-conversion custom `_cost()` had a `Q_Nm3ph <= 0` guard that returned the
+full reference installed cost (`$450,000`) even at zero raw-biogas flow. The
+`@cost` decorator's formula naturally gives `0**0.7 = 0` instead. This never
+triggers in any of the 20 regression tests or any real call site (the AD
+unit always produces nonzero biogas in every case exercised in this
+codebase), so it wasn't preserved — flagging it here in case a future
+zero-throughput sensitivity run surfaces it.
+
+**Several stale unit-level `__init__` defaults were corrected** (dead code —
+always overridden by `systems/_ad_biogas_system.py`, zero output impact,
+verified by the unchanged test suite): `AnaerobicDigester.vs_destruction`
+(0.50→0.20), `ch4_kg_per_kg_vs_fed` (0.0555→0.100, the `press_mill_only`
+baseline case value — not universal, see unit docstring),
+`raw_biogas_molfrac` (CarbonDioxide/HydrogenSulfide 0.43/0.02→0.42/0.03),
+`headspace_frac` (0.20→0.25), `maintenance_usd_per_m3_yr` (None→10.0),
+`digestible_IDs`/`biodegradability` (dropped `Xylan`/`Mannan`/`Galactan`,
+absent from yaml's list — these are real thermo chemicals, not typos, just
+not part of what `assumptions.yaml`'s AD sections track as biodegradable);
+`H2SRemoval.reagent_cost_usd_per_Nm3_raw` (0.005→0.002);
+`BiogasUpgrading.ch4_recovery` (0.98→0.99). Per the scope note at the top of
+this file, none of these belong in the metric-deviation section above.

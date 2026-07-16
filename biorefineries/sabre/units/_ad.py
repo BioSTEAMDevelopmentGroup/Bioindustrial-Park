@@ -64,6 +64,70 @@ def interp_capex(volume_m3: float) -> float:
 
 
 class AnaerobicDigester(bst.Unit):
+    """
+    Lumped mesophilic anaerobic digester with parallel-train sizing and
+    ADBC-interpolated capital cost.
+
+    Inputs:
+        ins[0]: pretreated/diluted feed slurry
+
+    Outputs:
+        outs[0]: raw biogas
+        outs[1]: digestate
+
+    Sources
+    -------
+    vs_destruction (0.20):
+        assumptions.yaml `ad_performance.vs_destruction`, labeled "Global CSTR
+        vs_destruction -- uniform across all pretreatment cases." No named
+        literature source; yaml's own note: "Conservative lower bound of
+        20-70% range for full-scale mesophilic CSTRs. No continuous CSTR data
+        for pretreated pelagic Sargassum exists in literature." Scoping
+        assumption, not a citation.
+    ch4_kg_per_kg_vs_fed (0.100):
+        This is the `press_mill_only` baseline pretreatment case value (yaml
+        `ad_pretreatment_cases.press_mill_only.ad_effects.ch4_kg_per_kg_vs_fed`),
+        not a universal constant -- the 4 other pretreatment cases in yaml use
+        different values (0.123 enzymatic, 0.165 peroxide, 0.277 combined_PE,
+        0.261 combined_PTE), each cited to a different row of the same table.
+        Source: Chikani-Cabrera et al. 2022, Table 4 -- "224.19 +/- 9.45 L
+        CH4/kg VS," scaled to 0.100 kg/kg VS for continuous CSTR (yaml key
+        `chikani_cabrera_2022_physical_C`).
+    raw_biogas_molfrac (Methane 0.55, CarbonDioxide 0.42, HydrogenSulfide 0.03):
+        assumptions.yaml `ad_performance.raw_biogas_molfrac`, labeled "Global
+        fallback biogas composition (overridden per pretreatment case below)."
+        No named source -- scoping default, overridden per-case in real runs.
+    headspace_frac (0.25):
+        assumptions.yaml `ad.gas_storage_frac_of_total_volume`. No named
+        source.
+    maintenance_usd_per_m3_yr (10.0):
+        assumptions.yaml `ad_costing.maintenance_usd_per_m3_yr`, sourced to
+        the ADBC spreadsheet tool (`ADBCv2-48 (2).xlsm`, sheet
+        "AnaerobicDigester", cell AB18).
+    digestible_IDs, biodegradability:
+        assumptions.yaml `ad_performance.digestible_IDs` /
+        `ad_performance.biodegradability`. No named source for the individual
+        factors beyond the yaml values themselves.
+    hrt_days, slurry_density_kg_per_m3, max_single_digester_volume_MG,
+    mixing_W_per_m3, influent_temperature_K, target_temperature_K,
+    cp_kJ_per_kgK:
+        assumptions.yaml `ad` section, matching values already used at the
+        real call site (`systems/_ad_biogas_system.py`). No named literature
+        source for these beyond the yaml values themselves.
+    ADBC_VOL_M3 / ADBC_CAPEX interpolation table (used by `interp_capex`,
+    the actual installed-cost calculation):
+        UNVERIFIED PROVENANCE. assumptions.yaml has no entry for this
+        six-point table. A *separate*, structurally unused single-point
+        anchor (`ad_costing.base_volume_m3`/`base_capex_usd`, stored on this
+        unit's `base_volume_m3`/`base_capex_usd` __init__ params but never
+        read by `_design`/`_cost`) is cited to the same-sounding "ADBC"
+        spreadsheet tool (`ADBCv2-48 (2).xlsm`, sheet "AnaerobicDigester").
+        Whether the six-point table below was pulled from the same
+        spreadsheet run has not been verified by anyone in this conversion --
+        do not repeat "ADBC spreadsheet" as a confirmed source for
+        ADBC_VOL_M3/ADBC_CAPEX without checking the actual file.
+    """
+
     _N_ins = 1
     _N_outs = 2  # biogas, digestate
 
@@ -75,20 +139,20 @@ class AnaerobicDigester(bst.Unit):
         ins=None,
         outs=(),
         # Performance
-        vs_destruction=0.50,
-        ch4_kg_per_kg_vs_fed=0.0555,
+        vs_destruction=0.20,
+        ch4_kg_per_kg_vs_fed=0.100,
         raw_biogas_molfrac=None,
         digestible_IDs=None,
         biodegradability=None,
         # Sizing
         hrt_days=25.0,
         slurry_density_kg_per_m3=1000.0,
-        headspace_frac=0.20,
+        headspace_frac=0.25,
         max_single_digester_volume_MG=1.5,
         # Costing anchors
         base_volume_m3=None,
         base_capex_usd=None,
-        maintenance_usd_per_m3_yr=None,
+        maintenance_usd_per_m3_yr=10.0,
         # Utilities
         mixing_W_per_m3=5.0,
         influent_temperature_K=298.15,
@@ -103,15 +167,12 @@ class AnaerobicDigester(bst.Unit):
 
         self.raw_biogas_molfrac = raw_biogas_molfrac or {
             "Methane": 0.55,
-            "CarbonDioxide": 0.43,
-            "HydrogenSulfide": 0.02,
+            "CarbonDioxide": 0.42,
+            "HydrogenSulfide": 0.03,
         }
 
         self.digestible_IDs = tuple(digestible_IDs) if digestible_IDs is not None else (
             "Glucan",
-            "Xylan",
-            "Mannan",
-            "Galactan",
             "Arabinan",
             "Alginate",
             "Fucoidan",
@@ -123,9 +184,6 @@ class AnaerobicDigester(bst.Unit):
         self.biodegradability = biodegradability or {
             "Mannitol": 0.95,
             "Glucan": 0.75,
-            "Xylan": 0.70,
-            "Mannan": 0.70,
-            "Galactan": 0.70,
             "Arabinan": 0.70,
             "Protein": 0.65,
             "Alginate": 0.45,
