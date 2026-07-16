@@ -35,9 +35,13 @@ revisiting later. Neither is logged below since neither changed the baseline.
 
 ## Metric-deviation bugs
 
-*(none yet — VFA fermentation, AD-biogas, VFA-AD, and digestate handling
-subsystems converted with zero baseline deviation, confirmed by `tests.py`'s
-full 20-test suite matching pre-conversion output exactly, `rtol=1e-6`)*
+*(none yet — VFA fermentation, AD-biogas, VFA-AD, digestate handling, and
+preprocessing subsystems converted with zero baseline deviation, confirmed
+by `tests.py`'s full 20-test suite matching pre-conversion output exactly,
+`rtol=1e-6`. Two substantive discrepancies were found in the preprocessing
+subsystem and deliberately NOT fixed — see the "Preprocessing" entry below
+under Citation-accuracy issues; fixing either would change simulation
+output, out of scope for a conversion pass.)*
 
 ---
 
@@ -329,3 +333,69 @@ module-docstring text (SYSTEMIC D3.2 report 2021, SYSTEMIC database,
 SYSTEMIC Table 2-11, Tchobanoglous et al. Wastewater Engineering 5th ed.),
 carried into the class docstrings as-is, not independently re-verified
 against the primary SYSTEMIC/Tchobanoglous sources in this conversion.
+
+### Preprocessing (`units/_press.py`, `units/_mill.py`)
+
+Converted with zero metric deviation (full `tests.py` suite unchanged at
+`rtol=1e-6` — both units are exercised by every pathway: AD-biogas, VFA-AD,
+and integrated). `capex_model` string-dispatch removed from both classes
+(matching the `AnaerobicDigester`/`AcidogenicDigester` "hardcoded anchor,
+no string dispatch" convention) since each dispatched string was always
+set to the same one value at every real call site (`"scaled_anchor"` for
+`Press`, `"inl_hammermill_anchor"` for `Mill`), confirmed by grep across
+this codebase and `assumptions.yaml` — `Press`'s second branch
+(`"pca_screwpress_curve"`) was never set anywhere and is now deleted
+entirely as genuinely dead code, not merely a stale default. Removing the
+parameter required editing the 6 real construction call sites across 3
+system-builder files (`systems/_ad_biogas_system.py`,
+`systems/_vfa_ad_system.py`, `systems/_integrated_system.py` — Press and
+Mill are each constructed once per file) to drop the now-nonexistent
+`capex_model=...` kwarg. No other part of any of those 3 files was
+touched.
+
+**Two substantive discrepancies found, deliberately NOT fixed** (fixing
+either would change simulation output — out of scope for a conversion
+pass; flagging per the same precedent as the VFA fermentation subsystem's
+`target_oil_and_solids_content`/`ferm_mgso4_dose` items):
+
+1. **`Press` capex reference-capacity basis mismatch.**
+   `assumptions.yaml`'s `preprocessing.press` section declares
+   `basis: dry_tph` and `ref_capacity_tph_dry: 0.953` — but `Press._cost()`
+   (both before and after this conversion) only ever implements a
+   *wet*-tph reference capacity (`ref_capacity_tph_wet`, default 50.0, no
+   yaml counterpart at all). Nothing in this codebase reads
+   `ref_capacity_tph_dry` or `basis` from yaml. The $3.1M installed-cost
+   anchor is therefore being scaled against a 50 wet-tph reference
+   capacity in the actual simulation, not the 0.953 dry-tph reference
+   capacity yaml's own structure suggests it should be. Not changed here.
+2. **`Press.cake_solids_wt_frac` vs. its own citation note.** yaml's
+   `preprocessing.press.cake_solids_wt_frac` is `0.15`, but the adjacent
+   `sources.performance` note says "Sargassum-specific pressing data
+   indicate cake solids around 26-29 wt% TS; 27 wt% TS selected as central
+   baseline" — the modeled value (15%) doesn't match the citation's stated
+   baseline (27%). Not changed here.
+
+**Stale defaults corrected** (dead code — always overridden at every real
+call site, zero output impact): `Press.cake_solids_wt_frac` (0.35→0.15,
+*not* to be confused with discrepancy #2 above — 0.15 is what yaml
+actually sets, the mismatch is between yaml's own value and yaml's own
+citation note, not between the unit default and yaml), `capex_installed_ref_usd`
+($5,000,000→$3,100,000), `power_kWh_per_dry_ton_TS` (None→5.0),
+`solids_IDs` (dropped `Xylan`/`Mannan`/`Galactan`, absent from yaml's list
+— same pattern as `AnaerobicDigester`/`AcidogenicDigester`, but note
+`Press.solids_IDs` *is* actively read by `_run()`, unlike
+`DigestateScrewPress.solids_IDs`); `Mill.loss_frac` (0.15→0.03),
+`power_kWh_per_dry_ton_dry` (None→25.0). `ref_capacity_tph_wet` (50.0) was
+*not* changed — see discrepancy #1 above, there is no yaml value to align
+it to.
+
+**Citation attribution note**: `assumptions.yaml`'s `preprocessing.sources`
+block is indented as a sibling of `press:`/`mill:` (not nested inside
+`mill:` specifically), but its three citations (Oyedeji et al. 2020/NREL
+FY11 for grinding power, INL hammer mill cost anchor for capex, INL
+preprocessing/logistics accounting for loss) are all specific to `Mill`'s
+own parameters, verified by reading the citation text itself rather than
+inferring from yaml indentation — attributed to `Mill` in its docstring,
+not to "preprocessing in general," to avoid the kind of citation
+cross-contamination flagged earlier in this file for
+`VFAMicrofilter`/`PressateConcentrator`.

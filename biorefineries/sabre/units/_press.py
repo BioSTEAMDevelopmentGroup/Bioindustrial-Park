@@ -29,6 +29,65 @@ HR_PER_DAY = 24.0
 
 
 class Press(bst.Unit):
+    """
+    Multi-train mechanical dewatering press. Constructed in three places in
+    this codebase (`systems/_ad_biogas_system.py`, `systems/_vfa_ad_system.py`,
+    `systems/_integrated_system.py`), all with the same
+    `assumptions.yaml`-sourced parameters.
+
+    Sources
+    -------
+    solids_capture_frac (0.98), solubles_to_pressate_frac (1.0),
+    capex_installed_ref_usd ($3,100,000), scale_exponent (0.60),
+    power_kWh_per_dry_ton_TS (5.0):
+        assumptions.yaml `preprocessing.press` section.
+        `capex_installed_ref_usd` sourced to `sources.capex`: "City of
+        Bellingham Biosolids Facility Planning Report, TM 12: Solids
+        Screening, Thickening, and Dewatering Technology Evaluation (2021)
+        -- installed screw press system anchor based on municipal screw
+        press dewatering cost tables; adapted to this model using
+        dry-solids throughput scaling." `power_kWh_per_dry_ton_TS` sourced
+        to `sources.power`: "HUBER screw press case study (2023) -- use ~5
+        kWh/t dry solids for press-only electricity."
+    cake_solids_wt_frac (0.15):
+        assumptions.yaml `preprocessing.press.cake_solids_wt_frac`. NOTE:
+        the yaml's own `sources.performance` citation (Vincent Corporation
+        seaweed pressing notes; brown macroalgae dewatering literature)
+        states "Sargassum-specific pressing data indicate cake solids
+        around 26-29 wt% TS; 27 wt% TS selected as central baseline" -- but
+        the actual modeled value is 0.15 (15%), not 0.27. This mismatch was
+        found during this conversion and deliberately NOT changed (fixing
+        it would alter simulation output, out of scope for a conversion
+        pass) -- flagged in CONVERSION_NOTES.md.
+    ref_capacity_tph_wet (50.0) -- basis mismatch, flagged not fixed:
+        No yaml counterpart. assumptions.yaml actually declares
+        `preprocessing.press.basis: dry_tph` with
+        `ref_capacity_tph_dry: 0.953`, but this class only ever implements
+        a wet-tph reference capacity -- the yaml's dry-basis fields are
+        never read by any code path in this codebase. This 50.0 default
+        (matching what every real call site already falls back to, since
+        no call site supplies a dry-basis equivalent either) was not
+        changed; see CONVERSION_NOTES.md.
+    solids_IDs:
+        assumptions.yaml `preprocessing.press.solids_IDs`. The
+        pre-conversion default additionally listed `Xylan`, `Mannan`,
+        `Galactan` -- real thermo chemicals, just absent from this yaml
+        list, dropped to match (same pattern seen in `AnaerobicDigester`
+        and `AcidogenicDigester`). Unlike `DigestateScrewPress`, this
+        parameter *is* actively used by `_run()`/`_design()`.
+    capex_model / "pca_screwpress_curve":
+        REMOVED. The pre-conversion `_cost()` dispatched on a
+        `capex_model` string with two branches ("scaled_anchor" and
+        "pca_screwpress_curve"). Grep across this codebase and
+        assumptions.yaml confirmed "pca_screwpress_curve" is never set
+        anywhere -- yaml's `preprocessing.press.capex_model` is always
+        "scaled_anchor", the only branch ever exercised at any of the 3
+        real call sites. Collapsed to a single hardcoded formula (the old
+        "scaled_anchor" branch), matching the "hardcoded anchor values
+        instead of a capex_model string-dispatch pattern" convention used
+        for `AnaerobicDigester`/`AcidogenicDigester`.
+    """
+
     _N_ins = 1
     _N_outs = 2  # pressed_cake, pressate
 
@@ -36,9 +95,6 @@ class Press(bst.Unit):
         self, ID="", ins=None, outs=(),
         solids_IDs=(
             "Glucan",
-            "Xylan",
-            "Mannan",
-            "Galactan",
             "Arabinan",
             "Alginate",
             "Fucoidan",
@@ -49,18 +105,17 @@ class Press(bst.Unit):
             "Ash",
         ),
         solids_capture_frac=0.98,
-        cake_solids_wt_frac=0.35,
+        cake_solids_wt_frac=0.15,
         solubles_to_pressate_frac=1.0,
 
         # --- utilities ---
-        power_kWh_per_dry_ton_TS=None,
+        power_kWh_per_dry_ton_TS=5.0,
         power_kWh_per_ton_wet=None,
 
         # --- costing ---
-        capex_model=None,
         F_BM=1.0,
         ref_capacity_tph_wet=50.0,
-        capex_installed_ref_usd=5e6,
+        capex_installed_ref_usd=3_100_000.0,
         scale_exponent=0.6,
         **kwargs
     ):
@@ -73,7 +128,6 @@ class Press(bst.Unit):
         self.power_kWh_per_dry_ton_TS = power_kWh_per_dry_ton_TS
         self.power_kWh_per_ton_wet = power_kWh_per_ton_wet
 
-        self.capex_model = capex_model
         self.F_BM = dict(getattr(self, "F_BM", {}))
         self.F_BM["Press system"] = float(F_BM)
         self.ref_capacity_tph_wet = float(ref_capacity_tph_wet)
@@ -161,32 +215,24 @@ class Press(bst.Unit):
 
     def _cost(self):
         feed = self.ins[0]
-        capex = 0.0
 
-        model = (self.capex_model or "").lower()
+        wet_tph = feed.F_mass / 1000.0  # metric ton/h
+        Q0 = self.ref_capacity_tph_wet
+        C0 = self.capex_installed_ref_usd
+        n = self.scale_exponent
 
-        if model == "scaled_anchor":
-            wet_tph = feed.F_mass / 1000.0  # metric ton/h
-            Q0 = float(getattr(self, "ref_capacity_tph_wet", 50.0))
-            C0 = float(getattr(self, "capex_installed_ref_usd", 5e6))
-            n = float(getattr(self, "scale_exponent", 0.6))
+        if wet_tph <= 0:
+            capex = 0.0
+            N = 0
+            Q_each = 0.0
+        else:
+            N = max(1, math.ceil(wet_tph / Q0))
+            Q_each = wet_tph / N
+            capex = N * C0 * (Q_each / Q0) ** n
 
-            if wet_tph <= 0:
-                capex = 0.0
-                N = 0
-                Q_each = 0.0
-            else:
-                N = max(1, math.ceil(wet_tph / Q0))
-                Q_each = wet_tph / N
-                capex = N * C0 * (Q_each / Q0) ** n
-
-            self.design_results["Wet throughput (tph)"] = wet_tph
-            self.design_results["Number of press trains"] = int(N)
-            self.design_results["Train throughput (tph)"] = Q_each
-            self.design_results["Installed CAPEX ($)"] = capex
-
-        elif model == "pca_screwpress_curve":
-            dtpd = float(self.design_results.get("Capacity (dry ton/day)", 0.0))
-            capex = (0.574 * dtpd + 3.27) * 1e6
+        self.design_results["Wet throughput (tph)"] = wet_tph
+        self.design_results["Number of press trains"] = int(N)
+        self.design_results["Train throughput (tph)"] = Q_each
+        self.design_results["Installed CAPEX ($)"] = capex
 
         self.baseline_purchase_costs["Press system"] = capex
