@@ -30,6 +30,7 @@ docs/.ipynb_checkpoints
 docs/_build/*
 docs/_static/*
 docs/_templates/*
+docs/superpowers
 
 # Data/results #
 ################
