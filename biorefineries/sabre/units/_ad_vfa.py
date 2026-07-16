@@ -22,12 +22,72 @@ __all__ = ('AcidogenicDigester',)
 
 class AcidogenicDigester(bst.Unit):
     """
-    Acidogenic / arrested AD unit for VFA platform modeling.
+    Acidogenic / arrested AD unit for VFA platform modeling. Structurally
+    parallel to `AnaerobicDigester` (multi-train, ADBC-interpolated capital
+    cost via the same `interp_capex`/`ADBC_VOL_M3`/`ADBC_CAPEX` table) but
+    produces a VFA-rich broth instead of biogas, and has no biodegradability
+    weighting per component -- all mass in `digestible_IDs` is treated as
+    equally available for VS destruction.
 
     Outputs:
     0) offgas
     1) acidogenic_broth
 
+    Sources
+    -------
+    vs_destruction (0.50):
+        assumptions.yaml `vfa_ad_performance.cases.seaweed_arrested_fitted.
+        vs_destruction`. No named literature source in yaml for this value.
+    vfa_kg_per_kg_vs (0.55):
+        assumptions.yaml `vfa_ad_performance.cases.seaweed_arrested_fitted.
+        vfa_kg_per_kg_vs`. No named literature source in yaml for this
+        value (yaml's `vfa_fermentation.sources.seaweed_arrested_anchor`
+        note describes a related but distinct downstream observation --
+        "Peak ~14.5 g/L total VFA... biogas suppression 96%" -- from a
+        preprint on arrested AD; it is not cited as the source of this
+        specific 0.55 yield number, so not repeated as one here).
+    vfa_split (AceticAcid 0.648, PropionicAcid 0.186, ButyricAcid 0.084,
+    ValericAcid 0.082, HexanoicAcid 0.000):
+        assumptions.yaml `vfa_ad_performance.cases.seaweed_arrested_fitted.
+        vfa_split`. No named literature source in yaml. This is the
+        __init__ default *object* (None, deferring to
+        `_resolve_vfa_split()`'s own separate internal fallback split
+        below) -- not literally hardcoded as this __init__'s default value.
+        `_resolve_vfa_split()`'s internal fallback
+        (AceticAcid 0.40/PropionicAcid 0.10/ButyricAcid 0.30/ValericAcid
+        0.05/HexanoicAcid 0.15) is left as-is: it is a generic placeholder
+        for *any* thermo with the five common VFA IDs, not a stale copy of
+        this case's fitted split, so it is not "corrected" to the
+        Sargassum-specific numbers above -- doing so would conflate a
+        general fallback with a case-specific fitted result.
+    digestible_IDs:
+        assumptions.yaml `vfa_ad_performance.digestible_IDs`. The
+        pre-conversion default additionally listed `Xylan`, `Mannan`,
+        `Galactan` (real thermo chemicals, just absent from this yaml list)
+        and `Cellulose` (not a chemical defined in `_chemicals.py` at all --
+        a stale leftover reference). All four dropped to match yaml exactly.
+    hrt_days (15.0):
+        assumptions.yaml `vfa_ad.hrt_days`, sourced to `aad_review_window`:
+        "15 d retained as a midpoint design basis within the 10-20 d AAD
+        operating window; not a direct fitted value for this exact
+        Sargassum system."
+    influent_temperature_K, target_temperature_K:
+        assumptions.yaml `vfa_ad` section, sourced to `mesophilic_operation`:
+        "Mesophilic operation near 35 C."
+    headspace_frac (0.25), slurry_density_kg_per_m3,
+    max_single_digester_volume_MG, mixing_W_per_m3, cp_kJ_per_kgK:
+        assumptions.yaml `vfa_ad` section, matching values already used at
+        the real call site (`systems/_vfa_ad_system.py`). No named source
+        beyond the yaml values themselves.
+    ADBC_VOL_M3 / ADBC_CAPEX interpolation table (imported from
+    `units._ad`, used by `interp_capex`, the actual installed-cost
+    calculation):
+        Same unverified provenance caveat as `AnaerobicDigester` -- see
+        that unit's docstring and CONVERSION_NOTES.md. Not re-verified here.
+    enable_heat_shock and the hs_* parameters:
+        No assumptions.yaml section covers heat-shock operation at all --
+        these are pure code-level scoping parameters, off by default, not
+        grounded in any cited source.
     """
 
     _N_ins = 1
@@ -42,13 +102,13 @@ class AcidogenicDigester(bst.Unit):
         outs=(),
         *,
         vs_destruction: float = 0.50,
-        vfa_kg_per_kg_vs: float = 0.80,
+        vfa_kg_per_kg_vs: float = 0.55,
         vfa_split: Optional[Dict[str, float]] = None,
         digestible_IDs: Optional[Iterable[str]] = None,
         produce_offgas_co2: bool = True,
         hrt_days: float = 15.0,
         slurry_density_kg_per_m3: float = 1000.0,
-        headspace_frac: float = 0.2,
+        headspace_frac: float = 0.25,
         max_single_digester_volume_MG: float = 1.5,
         mixing_W_per_m3: float = 5.0,
         influent_temperature_K: float = 298.15,
@@ -68,16 +128,12 @@ class AcidogenicDigester(bst.Unit):
         self.vfa_split = dict(vfa_split) if vfa_split is not None else None
         self.digestible_IDs = tuple(digestible_IDs) if digestible_IDs is not None else (
             "Glucan",
-            "Xylan",
-            "Mannan",
-            "Galactan",
             "Arabinan",
             "Alginate",
             "Fucoidan",
             "Mannitol",
             "Protein",
             "OtherSolids",
-            "Cellulose",
         )
         self.produce_offgas_co2 = bool(produce_offgas_co2)
 

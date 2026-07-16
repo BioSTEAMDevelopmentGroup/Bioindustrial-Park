@@ -35,9 +35,9 @@ revisiting later. Neither is logged below since neither changed the baseline.
 
 ## Metric-deviation bugs
 
-*(none yet — VFA fermentation and AD-biogas subsystems converted with zero
-baseline deviation, confirmed by `tests.py`'s full 20-test suite matching
-pre-conversion output exactly, `rtol=1e-6`)*
+*(none yet — VFA fermentation, AD-biogas, and VFA-AD subsystems converted
+with zero baseline deviation, confirmed by `tests.py`'s full 20-test suite
+matching pre-conversion output exactly, `rtol=1e-6`)*
 
 ---
 
@@ -215,3 +215,62 @@ not part of what `assumptions.yaml`'s AD sections track as biodegradable);
 `H2SRemoval.reagent_cost_usd_per_Nm3_raw` (0.005→0.002);
 `BiogasUpgrading.ch4_recovery` (0.98→0.99). Per the scope note at the top of
 this file, none of these belong in the metric-deviation section above.
+
+### VFA-AD pathway (`units/_ad_vfa.py`, `AcidogenicDigester`)
+
+Converted with zero metric deviation (full `tests.py` suite unchanged at
+`rtol=1e-6`, including the VFA-pathway-dependent tests --
+`test_vfa_pathway_figures_vfa_composition`,
+`test_vfa_price_scenarios_biostimulant_price`,
+`test_vfa_yield_sensitivities_*`, `test_hauke_stream_tables_*` -- since all
+of these route through `create_vfa_ad_system()` → `AcidogenicDigester`).
+
+`AcidogenicDigester` is structurally already correct (multi-train, custom
+`_design`/`_cost`, reuses `AnaerobicDigester`'s `interp_capex`/`ADBC_VOL_M3`/
+`ADBC_CAPEX` table via `from biorefineries.sabre.units._ad import
+GAL_TO_M3, interp_capex`) -- no structural change, only a Sources docstring
+and stale-default corrections, same treatment as the AD-biogas subsystem.
+The same **unverified ADBC_VOL_M3/ADBC_CAPEX provenance** caveat logged
+above for `AnaerobicDigester` applies here too (shared table) and is not
+re-verified separately.
+
+No edit was needed to `systems/_vfa_ad_system.py`: unlike `H2SRemoval` in
+the AD-biogas subsystem, `AcidogenicDigester`'s `__init__` signature did not
+change (no `@cost`-decorator conversion here — it's multi-train, same
+reasoning as `AnaerobicDigester`), so the existing construction call in
+`create_vfa_ad_system()` needed no changes. Confirmed via grep that
+`AcidogenicDigester` is constructed in exactly one place in this codebase.
+
+**Stale `__init__` defaults corrected** (dead code — always overridden by
+`create_vfa_ad_system()`, zero output impact): `vfa_kg_per_kg_vs`
+(0.80→0.55, yaml `vfa_ad_performance.cases.seaweed_arrested_fitted.
+vfa_kg_per_kg_vs`), `headspace_frac` (0.2→0.25, yaml `vfa_ad.
+gas_storage_frac_of_total_volume`), `digestible_IDs` (dropped `Xylan`,
+`Mannan`, `Galactan` — real thermo chemicals absent from yaml's list, same
+pattern as `AnaerobicDigester` — and `Cellulose`, which is not even a
+chemical defined in `_chemicals.py` at all, a stale leftover reference with
+no yaml counterpart to check against). `vs_destruction` (0.50) already
+matched yaml exactly, no change needed.
+
+**`_resolve_vfa_split()`'s internal fallback split left untouched,
+deliberately** (AceticAcid 0.40/PropionicAcid 0.10/ButyricAcid
+0.30/ValericAcid 0.05/HexanoicAcid 0.15) — while dead in the current
+codebase (the one real call site always supplies yaml's fitted split,
+AceticAcid 0.648/PropionicAcid 0.186/ButyricAcid 0.084/ValericAcid
+0.082/HexanoicAcid 0.000), this fallback is a generic placeholder for any
+thermo with the five common VFA IDs, not a stale copy of the Sargassum
+case's fitted split. Overwriting it with the case-specific numbers would
+conflate a general-purpose fallback with a case-specific fitted result —
+a different situation from the other stale-default corrections in this
+file, so not "corrected" the same way.
+
+**`_get_vfa_case()`/`_get_vfa_split()` shallow-merge split, reviewed and
+confirmed non-fragile as currently used.** `_get_vfa_case()` does a
+one-level `dict.update()` of the selected case onto the top-level
+`vfa_ad_performance` dict; `_get_vfa_split()` is kept as a separate function
+specifically to avoid relying on that shallow merge for the nested
+`vfa_split` dict. As currently used, this isn't an active bug — top-level
+`vfa_ad_performance` has no `vfa_split` key of its own for the case's key to
+shallow-clobber, so `.update()` behaves correctly either way. The separate
+accessor is defensive, not a workaround for an active bug. Not changed;
+already the correct level of caution given the current yaml shape.
