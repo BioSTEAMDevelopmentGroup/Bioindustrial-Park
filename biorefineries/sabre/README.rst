@@ -2,40 +2,40 @@
 sabre: Sargassum Biorefinery (SaBRe)
 ====================================
 
-`Sargassum BioRefinery (SaBRe) <https://sabreproject.org/>` is a virtual institute-sponsored research center tasked to transform Sargassum seaweed into a future renewable feedstock for sustainable biomanufacturing.
+`Sargassum BioRefinery (SaBRe) <https://sabreproject.org/>` is a virtual institute-sponsored research center tasked to transform *Sargassum* seaweed into a future renewable feedstock for sustainable biomanufacturing.
 
 Work in progress
 -----------------
 This package currently implements only the flowsheets covered in Azhar
-Razin's senior thesis (below): biomethane production via anaerobic
-digestion, volatile fatty acid (VFA) production, VFA-to-microbial-oil
-fermentation, and an integrated system splitting between the two
-product pathways. SaBRe's research program is broader than this —
-additional flowsheets (e.g. other feedstocks, conversion pathways, and
-products) are expected to be added here over time as more of that work
-is incorporated.
+Razin's senior thesis (below):
+- Methanogenic anaerobic digestion (AD) for biomethane production.
+- Acidogenic AD for volatile fatty acid (VFA) production
+- Acidogenic AD with VFA fermentation to product microbial oil.
+- Integrated systesm splitting between the biomethane and microbial oil
+  product pathways.
+  
+Additional flowsheets are expected to be added here over time
+as more of that work is incorporated.
 
 The four flowsheets currently available (see ``load()`` in
 ``__init__.py`` for how to select one):
 
-- **AD/biogas**: press -> mill -> optional pretreatment (heating,
-  enzymatic, peroxide, or combined) -> anaerobic digestion -> H2S
-  removal -> biogas upgrading -> digestate dewatering, producing
-  biomethane and a soil-amendment digestate.
-- **VFA-AD**: the same preprocessing train feeding an acidogenic
-  (arrested) digester tuned to produce volatile fatty acids (VFAs)
-  rather than methane.
-- **VFA fermentation**: VFA-rich broth fermented by *Yarrowia
-  lipolytica* into microbial oil, with cell disruption, extraction,
-  and biomass recycle. Cannot be loaded standalone via ``load()``, and
-  has no standalone public builder of its own (it would require a
-  pre-built ``vfa_broth`` stream, which nothing else produces in
-  isolation); call ``systems.create_ad_fermentation_system(...)`` for a
-  self-contained feedstock -> microbial-oil system (VFA-AD and
-  fermentation simulated together as one ``bst.System``).
-- **Integrated**: shared preprocessing with an alpha-split between the
-  methanogenic AD pathway and the VFA-to-oil pathway, so both products
-  can be produced from one feedstock at a tunable ratio.
+- **AD-biogas** (``'ad_biogas'``, default): press -> mill -> optional
+  pretreatment (heating, enzymatic, peroxide, or combined) -> anaerobic
+  digestion -> H2S removal -> biogas upgrading -> digestate dewatering,
+  producing biomethane and a soil-amendment digestate.
+- **AD-VFA** (``'ad_vfa'``): the same preprocessing train feeding an
+  acidogenic (arrested) digester tuned to produce volatile fatty acids
+  (VFAs) rather than methane.
+- **AD-fermentation** (``'ad_fermentation'``): the AD-VFA pathway above,
+  followed by VFA-rich broth fermented by *Yarrowia lipolytica* into
+  microbial oil, with cell disruption, extraction, and biomass recycle —
+  simulated together as one ``bst.System`` from feedstock straight
+  through to microbial oil.
+- **Integrated** (``'integrated'``): shared preprocessing with an
+  alpha-split between the methanogenic AD pathway and the VFA-to-oil
+  pathway, so both products can be produced from one feedstock at a
+  tunable ratio.
 
 Getting started
 ----------------

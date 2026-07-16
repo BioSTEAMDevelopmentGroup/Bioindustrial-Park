@@ -11,9 +11,9 @@ SaBRe (Sargassum Biorefinery) flowsheets.
 Four flowsheets are available, selected via `load(flowsheet_name=...)`:
     - 'ad_biogas' (default): press -> mill -> [pretreatment] -> AD -> H2S
       removal -> biogas upgrading -> digestate screw press -> biomethane
-    - 'vfa_ad': press -> mill -> acidogenic AD -> digestate screw press -> VFA broth
-    - 'vfa_fermentation': VFA broth -> Yarrowia lipolytica fermentation -> microbial oil
-      (requires a vfa_broth stream; only usable after 'vfa_ad' or 'integrated' is loaded)
+    - 'ad_vfa': press -> mill -> acidogenic AD -> digestate screw press -> VFA broth
+    - 'ad_fermentation': press -> mill -> acidogenic AD -> VFA broth ->
+      Yarrowia lipolytica fermentation -> microbial oil
     - 'integrated': shared preprocessing, alpha-split between the
       methanogenic AD pathway and the VFA-to-oil pathway
 
@@ -59,12 +59,7 @@ def load(flowsheet_name: str = 'ad_biogas', **kwargs):
     Parameters
     ----------
     flowsheet_name : str
-        One of 'ad_biogas', 'vfa_ad', 'integrated'. ('vfa_fermentation'
-        cannot be loaded standalone — it requires a vfa_broth stream,
-        which only 'vfa_ad' or 'integrated' produce; call
-        `create_ad_fermentation_system(...)` directly instead, which
-        builds the acidogenic-AD and fermentation halves together from
-        feedstock in one call.)
+        One of 'ad_biogas', 'ad_vfa', 'ad_fermentation', 'integrated'.
     **kwargs
         Forwarded to the corresponding `create_*` system builder.
     """
@@ -85,10 +80,16 @@ def load(flowsheet_name: str = 'ad_biogas', **kwargs):
         tea = _tea.make_baseline_tea(sys)
         biomethane = flowsheet.stream.biomethane
         biomethane.price = tea.solve_price(biomethane)
-    elif flowsheet_name == 'vfa_ad':
+    elif flowsheet_name == 'ad_vfa':
         sys = create_ad_vfa_system(**kwargs)
         sys.simulate()
         tea = _tea.make_baseline_tea(sys)
+    elif flowsheet_name == 'ad_fermentation':
+        sys, streams, units_dict = create_ad_fermentation_system(**kwargs)
+        sys.simulate()
+        tea = _tea.make_baseline_tea(sys)
+        backend_oil = streams['backend_oil']
+        backend_oil.price = tea.solve_price(backend_oil)
     elif flowsheet_name == 'integrated':
         sys, streams, units_dict, alpha = create_integrated_biorefinery(**kwargs)
         sys.simulate()
@@ -96,7 +97,7 @@ def load(flowsheet_name: str = 'ad_biogas', **kwargs):
     else:
         raise ValueError(
             f"Unknown flowsheet_name {flowsheet_name!r}. "
-            "Choose from 'ad_biogas', 'vfa_ad', 'integrated'."
+            "Choose from 'ad_biogas', 'ad_vfa', 'ad_fermentation', 'integrated'."
         )
 
     _loaded_flowsheet_name = flowsheet_name
