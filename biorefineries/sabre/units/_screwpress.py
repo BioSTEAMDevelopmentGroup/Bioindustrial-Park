@@ -39,18 +39,58 @@ __all__ = ('DigestateScrewPress',)
 
 
 class DigestateScrewPress(bst.Unit):
+    """
+    Multi-train digestate screw press. Constructed twice in this codebase
+    (systems/_ad_biogas_system.py's "SP" and systems/_vfa_ad_system.py's
+    "SP_VFA"), both routing their own digestate streams through the same
+    class with different assumptions.yaml-sourced parameters.
+
+    Sources
+    -------
+    ts_capture_frac (0.40), cake_moisture_frac (0.45), kWh_per_m3 (0.67):
+        assumptions.yaml `digestate_screw_press` section. No `sources:`
+        sub-block in yaml for this section -- citations below are from this
+        module's own pre-existing docstring text, not yaml: SYSTEMIC D3.2
+        report (2021), "SE_DM screw press ~33+-14% vs centrifuge ~59+-17%"
+        (yaml's modeled ts_capture_frac of 0.40 is close to but not
+        identical to that reported ~33% average); SYSTEMIC database
+        (n=13) for both cake solids fraction (~23% DM -> yaml's 0.45
+        moisture is a rounder number than the ~77% moisture that ~23% DM
+        implies -- not verified further) and the 0.67 kWh/m3 electricity
+        intensity.
+    capex_eur_table (SYSTEMIC Table 2-11, 10 (capacity_tph, capex_eur)
+    points):
+        assumptions.yaml's `digestate_screw_press` section has no
+        `capex_eur_table` key, so this hardcoded table -- not the yaml
+        section -- is what's actually used at every real call site. Cited
+        to this module's pre-existing docstring text: "SYSTEMIC Table
+        2-11 (CAPEX vs ton/h)."
+    eur_to_usd (1.19):
+        assumptions.yaml `digestate_screw_press.eur_to_usd`. No named
+        source in yaml.
+    solids_IDs -- accepted and stored but NOT used by _run/_design/_cost:
+        TS for capture purposes is instead computed dynamically in _run()
+        as "everything except Water and dissolved_IDs," not as this
+        explicit whitelist. This parameter is dead code regardless of its
+        value -- left at its pre-existing default (which itself references
+        "Cellulose," not a chemical defined anywhere in `_chemicals.py`)
+        rather than "corrected" to assumptions.yaml's `digestate_screw_press
+        .solids_IDs` list, since doing so would misleadingly imply the
+        parameter has an effect it doesn't have.
+    """
+
     _N_ins = 1
     _N_outs = 2
 
     def __init__(self, ID="", ins=None, outs=(),
                  solids_IDs=("Cellulose", "Ash"),
                  dissolved_IDs=None,            # chemicals treated as dissolved — always route to pressate
-                 ts_capture_frac=0.33,          # SYSTEMIC avg SE_DM for screw press
-                 cake_moisture_frac=0.77,       # ~23% DM solid fraction
+                 ts_capture_frac=0.40,          # assumptions.yaml digestate_screw_press.ts_capture_frac
+                 cake_moisture_frac=0.45,       # assumptions.yaml digestate_screw_press.cake_moisture_frac
                  capacity_tph_each=6.0,         # aligns with reported 6 ton/h energy datapoint
                  kWh_per_m3=0.67,               # SYSTEMIC avg electricity intensity
                  capex_eur_table=None,          # override if you want your own table
-                 eur_to_usd=1.0,                # set in your config if you want USD
+                 eur_to_usd=1.19,               # assumptions.yaml digestate_screw_press.eur_to_usd
                  include_polymer_dosing=False,
                  polymer_dosing_cost_eur_each=0.0,  # set within 12k–50k if included
                  F_BM=1.0,

@@ -38,6 +38,43 @@ __all__ = ('DigestateDecanterCentrifuge',)
 
 
 class DigestateDecanterCentrifuge(bst.Unit):
+    """
+    Alternative digestate dewatering unit, not currently constructed by any
+    system builder in this codebase (confirmed by grep -- only this file and
+    units/__init__.py reference the class name) -- so every parameter below
+    is only ever exercised via its own __init__ default, never overridden by
+    a real call site. Unlike `DigestateScrewPress`, `solids_IDs` here is an
+    active whitelist (see _run): only chemicals in this list are captured to
+    cake at `ts_capture_frac`; everything else goes entirely to centrate.
+
+    Sources
+    -------
+    solids_IDs (Cellulose, Ash), ts_capture_frac (0.78),
+    cake_moisture_frac (0.75), capacity_tph_each (50.0),
+    centrifuge_purchase_cost_usd_each ($297,500):
+        assumptions.yaml `digestate_decanter_centrifuge` section (no
+        `sources:` sub-block in yaml for this section, so no named
+        literature citation for any of these values beyond the yaml values
+        themselves). `solids_IDs` matches yaml exactly (`["Cellulose",
+        "Ash"]`) -- unlike `DigestateScrewPress`, this default was not
+        stale, but note "Cellulose" is not a chemical defined anywhere in
+        `_chemicals.py`, so in practice only Ash is ever captured to cake
+        by this whitelist; not changed since it matches assumptions.yaml.
+        `centrifuge_purchase_cost_usd_each` was `None` (i.e. `_cost()`
+        returns early, giving $0 installed cost) -- corrected to yaml's
+        297500.0 so a standalone instantiation of this currently-unwired
+        unit doesn't silently cost nothing.
+    ts_capture_frac comparison to DigestateScrewPress (module docstring,
+    pre-existing text, not yaml):
+        SYSTEMIC D3.2 report (2021): "centrifuge ~59+-17% vs screw press
+        ~33+-14%" -- yaml's modeled 0.78 for this unit is higher than that
+        reported ~59% average, not verified further.
+    Electricity intensity (1.0 kWh/m3, hardcoded in _design, not an
+    __init__ param):
+        Tchobanoglous et al., Wastewater Engineering, 5th ed. (pre-existing
+        module docstring citation, not independently verified in this
+        conversion).
+    """
 
     _N_ins = 1
     _N_outs = 2
@@ -47,7 +84,7 @@ class DigestateDecanterCentrifuge(bst.Unit):
                  ts_capture_frac=0.78,
                  cake_moisture_frac=0.75,
                  capacity_tph_each=50.0,
-                 centrifuge_purchase_cost_usd_each=None,
+                 centrifuge_purchase_cost_usd_each=297_500.0,
                  F_BM=1.0,
                  **kwargs):
         super().__init__(ID, ins, outs, **kwargs)

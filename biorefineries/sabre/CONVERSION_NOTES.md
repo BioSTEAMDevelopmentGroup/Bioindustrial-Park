@@ -35,9 +35,9 @@ revisiting later. Neither is logged below since neither changed the baseline.
 
 ## Metric-deviation bugs
 
-*(none yet — VFA fermentation, AD-biogas, and VFA-AD subsystems converted
-with zero baseline deviation, confirmed by `tests.py`'s full 20-test suite
-matching pre-conversion output exactly, `rtol=1e-6`)*
+*(none yet — VFA fermentation, AD-biogas, VFA-AD, and digestate handling
+subsystems converted with zero baseline deviation, confirmed by `tests.py`'s
+full 20-test suite matching pre-conversion output exactly, `rtol=1e-6`)*
 
 ---
 
@@ -274,3 +274,58 @@ specifically to avoid relying on that shallow merge for the nested
 shallow-clobber, so `.update()` behaves correctly either way. The separate
 accessor is defensive, not a workaround for an active bug. Not changed;
 already the correct level of caution given the current yaml shape.
+
+### Digestate handling (`units/_screwpress.py`, `units/_centrifuge.py`)
+
+Scope note: this subsystem is `DigestateScrewPress` and
+`DigestateDecanterCentrifuge` only. `PressateConcentrator` and
+`BiostimulantEvaporator` (also under `units/`, also digestate-adjacent by
+proximity in `_ad_biogas_system.py`) are the *pressate-biostimulant*
+side-stream, a separate subsystem, not touched here.
+
+Converted with zero metric deviation (full `tests.py` suite unchanged at
+`rtol=1e-6` — `DigestateScrewPress` is exercised by every AD-biogas and
+VFA-AD test; `DigestateDecanterCentrifuge` is not constructed by any system
+builder in this codebase at all, confirmed by grep, so it carries zero test
+coverage either way).
+
+**`DigestateScrewPress.solids_IDs` is a dead `__init__` parameter — accepted
+and stored on `self`, but never read by `_run()`, `_design()`, or
+`_cost()`.** `_run()` instead computes TS dynamically as "everything except
+Water and `dissolved_IDs`." This is a different, deeper kind of staleness
+than the usual "always-overridden by the system builder" pattern seen
+elsewhere in this conversion — the parameter has no effect at any value, not
+just its default. Left unchanged (default still references `"Cellulose"`,
+not a chemical defined anywhere in `_chemicals.py`) rather than "corrected"
+to `assumptions.yaml`'s `digestate_screw_press.solids_IDs` list, since doing
+so would misleadingly imply the parameter does something it doesn't.
+Flagging here in case a future pass wants to either wire it in or remove it
+outright — out of scope for a pure conversion pass either way.
+
+**`DigestateScrewPress` stale defaults corrected** (dead code — always
+overridden by both real call sites, `systems/_ad_biogas_system.py` and
+`systems/_vfa_ad_system.py` — zero output impact): `ts_capture_frac`
+(0.33→0.40), `cake_moisture_frac` (0.77→0.45), `eur_to_usd` (1.0→1.19), all
+against `assumptions.yaml`'s `digestate_screw_press` section. `capacity_tph_each`
+(6.0) and `kWh_per_m3` (0.67) already matched. `capex_eur_table` was *not*
+stale — yaml has no `capex_eur_table` key at all, so the unit's own
+hardcoded SYSTEMIC Table 2-11 default is genuinely exercised at every real
+call site, unlike the other params in this class.
+
+**`DigestateDecanterCentrifuge` — different situation from every other unit
+converted so far: it's not constructed anywhere in this codebase**, so its
+`__init__` defaults aren't "dead code always overridden" — they're the only
+values that would ever apply if someone instantiated it. `solids_IDs`,
+`ts_capture_frac`, `cake_moisture_frac`, and `capacity_tph_each` already
+matched `assumptions.yaml`'s `digestate_decanter_centrifuge` section
+exactly, no change needed. `centrifuge_purchase_cost_usd_each` was `None`
+(silently giving $0 installed cost in `_cost()`) — corrected to yaml's
+297,500.0, since leaving it `None` would make the unit silently free to
+build if anyone does wire it in later. Neither yaml digestate section
+(`digestate_screw_press` or `digestate_decanter_centrifuge`) has a
+`sources:` sub-block, so no yaml-level literature citations exist for
+either unit — all citations present are this codebase's own pre-existing
+module-docstring text (SYSTEMIC D3.2 report 2021, SYSTEMIC database,
+SYSTEMIC Table 2-11, Tchobanoglous et al. Wastewater Engineering 5th ed.),
+carried into the class docstrings as-is, not independently re-verified
+against the primary SYSTEMIC/Tchobanoglous sources in this conversion.
