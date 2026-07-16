@@ -16,6 +16,44 @@ __all__ = ('PeroxidePretreatment',)
 
 
 class PeroxidePretreatment(bst.Unit):
+    """
+    Hydrogen peroxide pretreatment reactor, one of the optional pre-AD
+    pretreatment stages in
+    `systems._ad_biogas_system._build_methanogenic_pathway`. Constructed in
+    exactly one place in this codebase (that function), reached only when
+    the selected pretreatment case has `kind: peroxide` or
+    `kind: combined_PE`/`combined_PTE` (which include a peroxide stage in
+    sequence).
+
+    Not converted to an `@cost` decorator: same reasoning as
+    `EnzymaticPretreatment` -- `capex_usd` is a flat, non-scaling
+    placeholder cost, not a function of any design basis.
+
+    Sources
+    -------
+    capex_usd ($1,000,000):
+        assumptions.yaml `ad_pretreatment_cases.peroxide.sources.capex`,
+        key `nrel_2011_conditioning_tank_anchor`, report
+        NREL/TP-5100-47764.
+    h2o2_wt_frac_on_dry_feed, temperature_K, residence_time_hr,
+    h2o2_price_usd_per_kg ($0.37/kg):
+        assumptions.yaml `ad_pretreatment_cases.peroxide.peroxide` section.
+        No named literature source for these four in yaml -- only `capex`
+        has a `sources:` entry. Same caveat as `EnzymaticPretreatment`:
+        yaml's `sources.methane_yield`/`biogas_composition`/
+        `vs_destruction` entries describe the downstream AD effect of this
+        pretreatment case, not this reactor's own operating parameters --
+        not cited here.
+
+    KNOWN BUG, VERIFIED, NOT FIXED (see CONVERSION_NOTES.md): same
+    missing `add_OPEX` wiring for maintenance as `EnzymaticPretreatment` --
+    `_cost()` computes `annual_maintenance` but never assigns it to
+    `self.add_OPEX`. Understates VOC/MSP for every pretreatment case that
+    includes a peroxide stage (peroxide, combined_PE, combined_PTE). NOT
+    fixed here for the same reason: pinned by `tests.py` assertions
+    captured from the current, buggy behavior.
+    """
+
     _N_ins = 1
     _N_outs = 1  # peroxide_treated_biomass
 
@@ -27,7 +65,7 @@ class PeroxidePretreatment(bst.Unit):
         slurry_density_kg_per_m3=1000.0,
 
         # economics
-        capex_usd=0.0,
+        capex_usd=1_000_000.0,
         h2o2_price_usd_per_kg=0.37,
         maintenance_frac_of_capex_per_yr=0.035,
         F_BM=1.0,

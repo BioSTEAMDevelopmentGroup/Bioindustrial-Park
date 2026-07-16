@@ -16,6 +16,55 @@ __all__ = ('EnzymaticPretreatment',)
 
 
 class EnzymaticPretreatment(bst.Unit):
+    """
+    Enzymatic pretreatment reactor, one of the optional pre-AD pretreatment
+    stages in `systems._ad_biogas_system._build_methanogenic_pathway`.
+    Constructed in exactly one place in this codebase (that function),
+    reached only when the selected pretreatment case has `kind: enzymatic`
+    or `kind: combined_PE`/`combined_PTE` (which include an enzymatic
+    stage in sequence).
+
+    Not converted to an `@cost` decorator: `capex_usd` is a flat,
+    non-scaling placeholder cost (not a function of any design basis), so
+    the decorator's power-law machinery wouldn't apply cleanly -- kept as
+    the simplest possible custom `_cost()` instead.
+
+    Sources
+    -------
+    capex_usd ($7,280,000):
+        assumptions.yaml `ad_pretreatment_cases.enzymatic.sources.capex`,
+        key `nrel_2015_saccharification_tank`, report NREL/TP-5100-62498.
+    enzyme_price_usd_per_kg ($7.00):
+        assumptions.yaml `ad_pretreatment_cases.enzymatic.sources.
+        enzyme_price`, key `nrel_2015_enzyme_cost`, report
+        NREL/TP-5100-62498 (same report as capex, different section).
+    temperature_K, residence_time_hr, enzyme_dose_kg_per_kg_dry_feed
+    (0.005), treated_fraction (0.25), enzyme_recycle_factor (2.0):
+        assumptions.yaml `ad_pretreatment_cases.enzymatic.enzymatic`
+        section. No named literature source for these five in yaml --
+        only `capex` and `enzyme_price` have `sources:` entries. The
+        yaml's `sources.methane_yield`/`biogas_composition`/
+        `vs_destruction` entries (Chikani-Cabrera et al. 2022) describe the
+        *downstream AD effect* of this pretreatment case, not this
+        reactor's own operating parameters -- not cited here to avoid
+        misattributing an AD-outcome citation to a pretreatment-reactor
+        parameter.
+
+    KNOWN BUG, VERIFIED, NOT FIXED (see CONVERSION_NOTES.md): `_cost()`
+    computes `annual_maintenance` into `design_results` but never assigns
+    it to `self.add_OPEX`, unlike `HeatingPretreatment` (which does this
+    correctly). Since `capex_usd` is nonzero at this unit's real call site,
+    this silently omits real maintenance cost from every pretreatment case
+    that includes an enzymatic stage (enzymatic, combined_PE, combined_PTE)
+    -- understating VOC/MSP for those cases. NOT fixed here: those exact
+    cases are pinned by `tests.py` assertions
+    (`test_ad_tea_final_combined_pe_near_zero`,
+    `test_ad_feed_tea_build_case`'s "enzymatic" case) captured from the
+    current, buggy behavior -- fixing this would change simulated output,
+    out of scope for a conversion pass. Needs explicit sign-off and a
+    `tests.py` baseline update before ever fixing.
+    """
+
     _N_ins = 1
     _N_outs = 1  # enzyme_treated_biomass
 
@@ -23,13 +72,13 @@ class EnzymaticPretreatment(bst.Unit):
         self, ID="", ins=None, outs=(),
         temperature_K=308.15,
         residence_time_hr=24.0,
-        enzyme_dose_kg_per_kg_dry_feed=0.02,
-        treated_fraction=1.0,
-        enzyme_recycle_factor=1.0,
+        enzyme_dose_kg_per_kg_dry_feed=0.005,
+        treated_fraction=0.25,
+        enzyme_recycle_factor=2.0,
         slurry_density_kg_per_m3=1000.0,
 
         # economics
-        capex_usd=0.0,
+        capex_usd=7_280_000.0,
         enzyme_price_usd_per_kg=7.0,
         maintenance_frac_of_capex_per_yr=0.035,
         F_BM=1.0,

@@ -35,18 +35,53 @@ revisiting later. Neither is logged below since neither changed the baseline.
 
 ## Metric-deviation bugs
 
-*(none yet — VFA fermentation, AD-biogas, VFA-AD, digestate handling,
-preprocessing, and pressate-biostimulant subsystems converted with zero
-baseline deviation, confirmed by `tests.py`'s full 20-test suite matching
-pre-conversion output exactly, `rtol=1e-6`. Two substantive discrepancies
-were found in the preprocessing subsystem and deliberately NOT fixed — see
-the "Preprocessing" entry below under Citation-accuracy issues; fixing
-either would change simulation output, out of scope for a conversion pass.
-One functional fix was made in the pressate-biostimulant subsystem
-(`BiostimulantEvaporator`'s missing `add_OPEX` wiring) — not logged as a
-metric-deviation bug because the unit carries zero test coverage and is
-never actually simulated by any code path in this codebase, so the fix
-changed no measured output; see the "Pressate-biostimulant" entry below.)*
+All 7 subsystems converted so far (VFA fermentation, AD-biogas, VFA-AD,
+digestate handling, preprocessing, pressate-biostimulant, pretreatment
+units) preserve `tests.py`'s full 20-test suite exactly, `rtol=1e-6` — zero
+conversion-caused deviation. Two substantive discrepancies were found in
+the preprocessing subsystem and deliberately NOT fixed (see "Preprocessing"
+under Citation-accuracy issues below; fixing either would change simulation
+output). One functional fix was made in the pressate-biostimulant subsystem
+(`BiostimulantEvaporator`'s missing `add_OPEX` wiring) but not logged here
+since that unit carries zero test coverage and is never actually simulated,
+so the fix changed no measured output — see "Pressate-biostimulant" below.
+
+One **real, verified, currently-live bug** was found in the pretreatment
+units subsystem and deliberately NOT fixed, since fixing it changes
+simulated output:
+
+### `EnzymaticPretreatment`/`PeroxidePretreatment` — maintenance OPEX never reaches the TEA
+
+`_cost()` in both units computes `annual_maintenance =
+maintenance_frac_of_capex_per_yr * capex_usd` and stores it in
+`design_results`, but — unlike every other capex-dependent-maintenance unit
+in this codebase (`HeatingPretreatment`, `PressateConcentrator`,
+`BiogasUpgrading`, `H2SRemoval`'s reagent cost) — never assigns it to
+`self.add_OPEX`. Since `capex_usd` is genuinely nonzero at these units' one
+real call site (`assumptions.yaml`: `enzymatic.capex_usd: 7,280,000`,
+`peroxide.capex_usd: 1,000,000`), this silently omits real maintenance cost
+from VOC/MSP for every pretreatment case that includes an enzymatic or
+peroxide stage — `enzymatic`, `peroxide`, `combined_PE`, `combined_PTE`
+(everything except `press_mill_only`, which has no pretreatment stage at
+all).
+
+**Verified as real** (not a dead-code false alarm like the digestate/
+pressate findings): these exact cases are pinned by exact-value assertions
+in `tests.py` — `test_ad_tea_final_combined_pe_near_zero` (combined_PE) and
+`test_ad_feed_tea_build_case`'s `"enzymatic"` case — both currently passing
+against the buggy (maintenance-omitting) behavior.
+
+**Deliberately NOT fixed.** This conversion's mandate is to preserve
+simulated output exactly, not re-model it — fixing this would increase VOC
+(and thus MSP) for 4 of the 5 pretreatment cases, breaking both pinned
+tests by design (the fix is exactly what would make them fail). If this is
+ever fixed, it needs: explicit user sign-off (since it changes reported
+economics, not just internal code structure), a `tests.py` baseline
+recapture for every test that touches enzymatic/peroxide/combined_PE/
+combined_PTE cases, and ideally a check for the same gap elsewhere in the
+codebase (only `HeatingPretreatment` was confirmed clean in this
+conversion; units outside the 7 subsystems converted so far have not been
+checked for this specific pattern).
 
 ---
 
@@ -473,3 +508,49 @@ system builder — flagged here rather than silently fixed, since it is a
 genuine behavioral change to the unit's own logic, not merely a docstring
 or default-value correction, even though it currently affects no measured
 output.
+
+### Pretreatment units (`units/_enzymatic_pretreatment.py`, `units/_peroxide_pretreatment.py`, `units/_heating_pretreatment.py`)
+
+Converted with zero metric deviation (full `tests.py` suite unchanged at
+`rtol=1e-6`). The live, verified maintenance-OPEX bug in
+`EnzymaticPretreatment`/`PeroxidePretreatment` is logged above under
+Metric-deviation bugs, not here, since it's a real correctness defect
+rather than a citation/documentation issue.
+
+All three units are constructed in exactly one place in this codebase —
+`systems._ad_biogas_system._build_methanogenic_pathway` — confirmed by
+grep. None needed a `capex_model` string-dispatch removal (they never had
+one; `capex_usd` was already a flat `__init__` default in all three, just
+stale/zero) and none were converted to an `@cost` decorator: `capex_usd`
+is a flat, non-scaling placeholder cost in all three, not a function of
+any design basis, so the decorator's power-law machinery doesn't apply.
+
+**`HeatingPretreatment` is only ever reachable via the `combined_PTE`
+pretreatment case's peroxide→heating→enzymatic sequence.**
+`_build_methanogenic_pathway` has a standalone `pt_kind == "heating"`
+dispatch branch with its own inline fallback values (338.15 K / 0.25 h,
+matching this unit's pre-conversion defaults exactly) — but
+`assumptions.yaml` defines no `ad_pretreatment_cases` entry with
+`kind: heating` (only `press_mill_only`/`enzymatic`/`peroxide`/
+`combined_PE`/`combined_PTE`), so that branch is dead code, unreachable
+with the current yaml configuration. The unit's real (and only reachable)
+values come from `combined_PTE.heating` instead (393.15 K / 0.25 h /
+$1.2M), which is what its corrected defaults now reflect.
+
+**Stale defaults corrected** (dead code — always overridden at the one
+real call site, zero output impact, confirmed by the unchanged test
+suite): `EnzymaticPretreatment.enzyme_dose_kg_per_kg_dry_feed` (0.02→0.005),
+`treated_fraction` (1.0→0.25), `enzyme_recycle_factor` (1.0→2.0),
+`capex_usd` (0.0→$7,280,000); `PeroxidePretreatment.capex_usd`
+(0.0→$1,000,000); `HeatingPretreatment.target_temperature_K`
+(338.15→393.15 K, see reachability note above), `capex_usd`
+(0.0→$1,200,000).
+
+**Citation scope note**: `assumptions.yaml`'s `ad_pretreatment_cases.*`
+`sources.methane_yield`/`biogas_composition`/`vs_destruction` entries
+(Chikani-Cabrera et al. 2022) describe the *downstream AD effect* of each
+pretreatment case (i.e. parameters consumed by `AnaerobicDigester` via
+`ad_effects`), not these pretreatment reactors' own operating parameters
+(temperature, residence time, dose, recycle factor). Not cited in these
+three units' docstrings, to avoid attributing an AD-outcome citation to a
+pretreatment-reactor parameter it doesn't actually describe.

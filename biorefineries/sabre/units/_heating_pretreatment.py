@@ -17,18 +17,58 @@ __all__ = ('HeatingPretreatment',)
 
 
 class HeatingPretreatment(bst.Unit):
+    """
+    Thermal (heating) pretreatment reactor, one of the optional pre-AD
+    pretreatment stages in
+    `systems._ad_biogas_system._build_methanogenic_pathway`. Constructed in
+    exactly one place in this codebase (that function) -- and only ever
+    actually reached via the `combined_PTE` case's peroxide->heating->
+    enzymatic sequence: `assumptions.yaml` has no standalone
+    `ad_pretreatment_cases` entry with `kind: heating` (only
+    `press_mill_only`/`enzymatic`/`peroxide`/`combined_PE`/`combined_PTE`
+    are defined), so `_build_methanogenic_pathway`'s standalone
+    `pt_kind == "heating"` branch (with its own inline fallback values,
+    338.15 K / 0.25 h, matching this unit's pre-conversion defaults) is
+    dead code, never reachable with the current yaml configuration.
+
+    Not converted to an `@cost` decorator: same reasoning as
+    `EnzymaticPretreatment`/`PeroxidePretreatment` -- `capex_usd` is a
+    flat, non-scaling placeholder cost.
+
+    Sources
+    -------
+    target_temperature_K (393.15 K), residence_time_hr (0.25 h),
+    capex_usd ($1,200,000):
+        assumptions.yaml `ad_pretreatment_cases.combined_PTE.heating`
+        section -- the only reachable real values, per the note above.
+        No named literature source for any of these three; yaml's
+        `sources.capex` entry for `combined_PTE`
+        (`additive_peroxide_plus_heating_plus_enzymatic`) describes only
+        how the *aggregate* combined_PTE capex is computed (sum of
+        peroxide + heating + enzymatic installed CAPEX), not a citation
+        for this $1.2M line item itself.
+    slurry_density_kg_per_m3, cp_kJ_per_kgK:
+        assumptions.yaml `ad` section (shared with `AnaerobicDigester`),
+        matching values already used at the real call site. No named
+        source beyond the yaml values themselves.
+
+    Unlike `EnzymaticPretreatment`/`PeroxidePretreatment`, this unit's
+    `_cost()` already correctly wires annual maintenance into
+    `self.add_OPEX` -- no bug here.
+    """
+
     _N_ins = 1
     _N_outs = 1  # heated_biomass
 
     def __init__(
         self, ID="", ins=None, outs=(),
-        target_temperature_K=338.15,
+        target_temperature_K=393.15,
         residence_time_hr=0.25,
         slurry_density_kg_per_m3=1000.0,
         cp_kJ_per_kgK=4.18,
 
         # costing
-        capex_usd=0.0,
+        capex_usd=1_200_000.0,
         maintenance_frac_of_capex_per_yr=0.035,
         F_BM=1.0,
         **kwargs
