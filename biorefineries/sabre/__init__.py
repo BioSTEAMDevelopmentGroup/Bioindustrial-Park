@@ -8,8 +8,10 @@
 """
 SaBRe (Sargassum Biorefinery) flowsheets.
 
-Four flowsheets are available, selected via `load(flowsheet_name=...)`:
-    - 'ad_biomethane' (default): press -> mill -> [pretreatment] -> AD -> H2S
+Five flowsheets are available, selected via `load(flowsheet_name=...)`:
+    - 'biostimulant' (default): press -> pressate concentrator -> biostimulant
+      evaporator -> biostimulant product (pressed cake is a disposal liability)
+    - 'ad_biomethane': press -> mill -> [pretreatment] -> AD -> H2S
       removal -> biogas upgrading -> digestate screw press -> biomethane
     - 'ad_vfa': press -> mill -> acidogenic AD -> digestate screw press -> VFA broth
     - 'ad_fermentation': press -> mill -> acidogenic AD -> VFA broth ->
@@ -51,7 +53,7 @@ def _load_chemicals():
     _chemicals_loaded = True
 
 
-def load(flowsheet_name: str = 'ad_biomethane', **kwargs):
+def load(flowsheet_name: str = 'biostimulant', **kwargs):
     """
     Load a SaBRe flowsheet and populate module-level names for its
     streams/units/system/TEA.
@@ -59,7 +61,8 @@ def load(flowsheet_name: str = 'ad_biomethane', **kwargs):
     Parameters
     ----------
     flowsheet_name : str
-        One of 'ad_biomethane', 'ad_vfa', 'ad_fermentation', 'integrated'.
+        One of 'biostimulant', 'ad_biomethane', 'ad_vfa', 'ad_fermentation',
+        'integrated'.
     **kwargs
         Forwarded to the corresponding `create_*` system builder.
     """
@@ -74,7 +77,13 @@ def load(flowsheet_name: str = 'ad_biomethane', **kwargs):
     F.set_flowsheet(flowsheet)
     bst.settings.set_thermo(chemicals)
 
-    if flowsheet_name == 'ad_biomethane':
+    if flowsheet_name == 'biostimulant':
+        sys, streams, units_dict = create_biostimulant_system(**kwargs)
+        sys.simulate()
+        tea = _tea.create_tea(sys)
+        biostimulant_product = streams['biostimulant_product']
+        biostimulant_product.price = tea.solve_price(biostimulant_product)
+    elif flowsheet_name == 'ad_biomethane':
         sys = create_ad_biomethane_system(**kwargs)
         sys.simulate()
         tea = _tea.create_tea(sys)
@@ -97,7 +106,7 @@ def load(flowsheet_name: str = 'ad_biomethane', **kwargs):
     else:
         raise ValueError(
             f"Unknown flowsheet_name {flowsheet_name!r}. "
-            "Choose from 'ad_biomethane', 'ad_vfa', 'ad_fermentation', 'integrated'."
+            "Choose from 'biostimulant', 'ad_biomethane', 'ad_vfa', 'ad_fermentation', 'integrated'."
         )
 
     _loaded_flowsheet_name = flowsheet_name

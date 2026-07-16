@@ -206,15 +206,45 @@ class PressateConcentrator(bst.Unit):
 
 class BiostimulantEvaporator(bst.Unit):
     """
-    Finishing evaporator for the pressate-derived biostimulant product.
+    Finishing step for the pressate-derived biostimulant product: adjusts
+    a concentrate stream to a target solids content, in either direction.
 
-    Not constructed anywhere in this codebase currently: both real call
-    sites (`systems/_ad_biomethane_system.py`, `systems/_ad_vfa_system.py`)
-    gate construction behind `evA.get("enabled", False)`, and
-    `assumptions.yaml` has no `pressate_biostimulant.evaporator` section
-    at all (confirmed by grep across the whole yaml file) -- so `evA` is
-    always `{}` and this unit is never actually instantiated. Same
-    situation as `DigestateDecanterCentrifuge`.
+    Constructed by `systems._biostimulant_system.create_biostimulant_system`,
+    following a `PressateConcentrator`.
+
+    Inputs:
+        ins[0]: concentrate to adjust (e.g. PressateConcentrator's
+            concentrated_biostimulant outlet)
+        ins[1]: permeate -- an available water source (e.g. the same
+            PressateConcentrator's permeate outlet). Water is drawn from
+            this stream when diluting; otherwise it passes straight
+            through to outs[2] unchanged.
+        ins[2]: fresh_water -- utility water make-up. A settable/phantom
+            stream, like `FermentationMediumTank`'s reagent inputs: this
+            unit fills in exactly the shortfall not covered by ins[1],
+            and leaves it empty if ins[1]'s water is enough (or if no
+            dilution is needed at all).
+
+    Outputs:
+        outs[0]: biostimulant_product, adjusted to target_solids_wt_frac
+        outs[1]: vapor -- water removed by evaporation when concentrating
+            (zero when diluting)
+        outs[2]: residual_permeate -- ins[1] minus whatever water it
+            contributed to outs[0]
+
+    Direction logic (in `_run`):
+    - If the concentrate is below target_solids_wt_frac (needs
+      concentrating): evaporates the excess water, same as this unit's
+      original press-pretreatment-side design -- utility duty and CAPEX
+      scale with the amount of water evaporated (`_design`/`_cost`,
+      unchanged from before).
+    - If the concentrate is above target_solids_wt_frac (needs diluting):
+      adds water to hit the target. Water is drawn from ins[1] (permeate)
+      first, up to its availability; any remaining shortfall is drawn
+      from ins[2] (fresh water). No evaporation duty or CAPEX applies to
+      this direction -- diluting is just mixing, not a heat/mass-transfer
+      operation, so `_design`/`_cost` naturally come out to zero when
+      `_water_evaporated_kgph` is zero.
 
     Sources
     -------
@@ -237,14 +267,14 @@ class BiostimulantEvaporator(bst.Unit):
     every sibling unit with capex-dependent maintenance in this codebase
     (`PressateConcentrator`, `BiogasUpgrading`) -- meaning it would
     silently not affect TEA/MSP if this unit were ever wired in. Fixed
-    during this conversion (zero regression risk, since the unit carries
-    no test coverage either way -- it's never simulated) to match the
+    during this conversion (zero regression risk, since the unit carried
+    no test coverage either way -- it was never simulated) to match the
     add_OPEX pattern used everywhere else in this file family, rather than
     left as a latent gap for whoever eventually wires this unit in.
     """
 
-    _N_ins = 1
-    _N_outs = 2  # concentrated_product, evaporated_water
+    _N_ins = 3
+    _N_outs = 3  # biostimulant_product, vapor, residual_permeate
 
     def __init__(
         self,
@@ -282,27 +312,30 @@ class BiostimulantEvaporator(bst.Unit):
         self.F_BM["Biostimulant evaporator"] = float(F_BM)
 
     def _run(self):
-        feed = self.ins[0]
-        product, vapor = self.outs
+        conc_in, permeate_in, fresh_water_in = self.ins
+        product, vapor, residual_permeate = self.outs
 
         product.empty()
         vapor.empty()
+        fresh_water_in.empty()
+        residual_permeate.copy_like(permeate_in)
 
         product.phase = "l"
         vapor.phase = "g"
+        residual_permeate.phase = "l"
+        fresh_water_in.phase = "l"
 
-        ids = set(feed.chemicals.IDs)
+        ids = set(conc_in.chemicals.IDs)
 
-        water_in = float(feed.imass["Water"]) if "Water" in ids else 0.0
-        nonwater_in = float(feed.F_mass) - water_in
+        water_in = float(conc_in.imass["Water"]) if "Water" in ids else 0.0
 
         # Keep nearly all non-water in product
         rec = min(max(self.nonwater_recovery_to_product, 0.0), 1.0)
 
-        for cid in feed.chemicals.IDs:
+        for cid in conc_in.chemicals.IDs:
             if cid == "Water":
                 continue
-            m = float(feed.imass[cid])
+            m = float(conc_in.imass[cid])
             if m <= 0:
                 continue
             m_prod = rec * m
@@ -311,7 +344,7 @@ class BiostimulantEvaporator(bst.Unit):
             vapor.imass[cid] = m_vap
 
         nonwater_prod = sum(
-            float(product.imass[cid]) for cid in feed.chemicals.IDs if cid != "Water"
+            float(product.imass[cid]) for cid in conc_in.chemicals.IDs if cid != "Water"
         )
 
         x_target = self.target_solids_wt_frac
@@ -323,28 +356,54 @@ class BiostimulantEvaporator(bst.Unit):
             water_to_product = 0.0
         else:
             water_to_product = nonwater_prod * (1.0 - x_target) / x_target
+        water_to_product = max(water_to_product, 0.0)
 
-        water_to_product = min(max(water_to_product, 0.0), water_in)
-        water_to_vapor = water_in - water_to_product
+        permeate_water_used = 0.0
+        fresh_water_used = 0.0
+
+        if water_to_product <= water_in:
+            # Concentrating: evaporate the excess water
+            water_to_vapor = water_in - water_to_product
+        else:
+            # Diluting: draw the shortfall from permeate first, then fresh water
+            water_to_vapor = 0.0
+            shortfall = water_to_product - water_in
+
+            permeate_water_avail = (
+                float(permeate_in.imass["Water"])
+                if "Water" in permeate_in.chemicals.IDs else 0.0
+            )
+            permeate_water_used = min(shortfall, permeate_water_avail)
+            shortfall -= permeate_water_used
+            fresh_water_used = max(shortfall, 0.0)
 
         if "Water" in ids:
             product.imass["Water"] = water_to_product
             vapor.imass["Water"] = water_to_vapor
 
+        if permeate_water_used > 0:
+            residual_permeate.imass["Water"] = max(
+                float(permeate_in.imass["Water"]) - permeate_water_used, 0.0
+            )
+        if fresh_water_used > 0:
+            fresh_water_in.imass["Water"] = fresh_water_used
+
         self._water_evaporated_kgph = water_to_vapor
+        self._permeate_water_used_kgph = permeate_water_used
+        self._fresh_water_used_kgph = fresh_water_used
         self._product_solids_wt_frac = (
             nonwater_prod / product.F_mass if product.F_mass > 0 else 0.0
         )
 
     def _design(self):
-        feed = self.ins[0]
+        conc_in = self.ins[0]
 
         water_evap = getattr(self, "_water_evaporated_kgph", 0.0)
 
         sensible = 0.0
-        feed_T = float(feed.T)
+        feed_T = float(conc_in.T)
         if water_evap > 0 and feed_T < self.boiling_temperature_K:
-            sensible = float(feed.F_mass) * self.sensible_cp_kJ_per_kgK * (
+            sensible = float(conc_in.F_mass) * self.sensible_cp_kJ_per_kgK * (
                 self.boiling_temperature_K - feed_T
             )
 
@@ -352,8 +411,14 @@ class BiostimulantEvaporator(bst.Unit):
         total_duty_kJph = sensible + latent
         power_kW = water_evap * self.electricity_kWh_per_kg_water_evap
 
-        self.design_results["Feed flow (kg/h)"] = float(feed.F_mass)
+        self.design_results["Feed flow (kg/h)"] = float(conc_in.F_mass)
         self.design_results["Water evaporated (kg/h)"] = water_evap
+        self.design_results["Permeate water used (kg/h)"] = getattr(
+            self, "_permeate_water_used_kgph", 0.0
+        )
+        self.design_results["Fresh water used (kg/h)"] = getattr(
+            self, "_fresh_water_used_kgph", 0.0
+        )
         self.design_results["Target solids wt frac"] = self.target_solids_wt_frac
         self.design_results["Actual product solids wt frac"] = getattr(
             self, "_product_solids_wt_frac", 0.0
@@ -365,7 +430,7 @@ class BiostimulantEvaporator(bst.Unit):
         self.design_results["Electricity demand (kW)"] = power_kW
 
         if total_duty_kJph > 0:
-            self.add_heat_utility(total_duty_kJph, T_in=feed.T, T_out=self.boiling_temperature_K)
+            self.add_heat_utility(total_duty_kJph, T_in=conc_in.T, T_out=self.boiling_temperature_K)
         if power_kW > 0:
             self.power_utility(power_kW)
 
