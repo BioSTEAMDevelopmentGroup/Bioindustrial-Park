@@ -9,7 +9,7 @@
 """
 Feed testing
 
-1) Making sure the feed stream is created correctly with the expected mass flow and composition based on the YAML assumptions for "pelagic_high_quality" Sargassum.
+1) Making sure the feed stream is created correctly with the expected mass flow and composition based on the YAML assumptions for "pelagic" Sargassum.
 """
 
 import sys
@@ -21,23 +21,24 @@ if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
 from biorefineries.sabre._chemicals import set_thermo
-from biorefineries.sabre.utils import load_assumptions, get_quality_params, get_scale_feed_kgph
-from biorefineries.sabre.streams import make_sargassum_feed
+from biorefineries.sabre.utils import (
+    load_assumptions, get_feedstock_type_params, get_scale_feed_kgph, make_sargassum_feed,
+)
 
 if __name__ == "__main__":
     set_thermo()
-    A = load_assumptions()
-    q = get_quality_params(A, "pelagic_high_quality")
-    fresh_feed_kgph = get_scale_feed_kgph(A)
+    feedstock_assumptions = load_assumptions("feedstock.yaml")
+    params = get_feedstock_type_params(feedstock_assumptions, "pelagic")
+    fresh_feed_kgph = get_scale_feed_kgph(feedstock_assumptions)
 
     feed = make_sargassum_feed(
         fresh_feed_kgph=fresh_feed_kgph,
-        moisture_frac=q["moisture_frac"],
-        quality="pelagic_high_quality",
+        moisture_frac=params["moisture_frac"],
+        ash_wt_frac_dry=params["ash_wt_frac_dry"],
     )
 
     print(f"\nFeed total: {feed.F_mass:.2f} kg/hr")
-    print(f"Moisture frac from YAML: {q['moisture_frac']:.4f}")
+    print(f"Moisture frac from YAML: {params['moisture_frac']:.4f}")
     print()
 
     water = float(feed.imass["Water"])
@@ -68,6 +69,6 @@ if __name__ == "__main__":
     print(f"  VS/TS:      {vs_dry/100 * dry / dry * 100:.2f}%  (i.e. VS = {dry-ash:.2f} kg/hr)")
     print(f"  Moisture:   {water/total*100:.2f}%")
     print(f"\n  YAML targets:")
-    print(f"    moisture_frac:    {q['moisture_frac']:.4f} ({q['moisture_frac']*100:.2f}%)")
-    print(f"    ash_wt_frac_dry:  {q.get('ash_wt_frac_dry', 'n/a')}")
-    print(f"    vs_ts:            {q.get('vs_ts', 'n/a')}")
+    print(f"    moisture_frac:    {params['moisture_frac']:.4f} ({params['moisture_frac']*100:.2f}%)")
+    print(f"    ash_wt_frac_dry:  {params.get('ash_wt_frac_dry', 'n/a')}")
+    print(f"    vs_ts:            {params.get('vs_ts', 'n/a')}")

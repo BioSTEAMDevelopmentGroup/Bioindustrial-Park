@@ -69,7 +69,7 @@ if __name__ == "__main__":
 
     from biorefineries.sabre.systems import create_ad_vfa_system
 
-    sys = create_ad_vfa_system(quality="pelagic_high_quality")
+    sys = create_ad_vfa_system(feedstock_type="pelagic")
     sys.simulate()
     sys.diagram(file=str(OUTDIR / "vfa_subset"))
 

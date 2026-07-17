@@ -56,11 +56,8 @@ Repository structure
 ---------------------
 ``_chemicals.py``: chemical species used across all five flowsheets.
 
-``utils.py``: loads ``data/assumptions.yaml`` (feedstock
-quality bins, plant scale, unit performance/costing assumptions, all
-literature-sourced where available).
-
-``streams.py``: feedstock stream construction from scenario inputs.
+``utils.py``: utility functions, e.g., loading feedstock and process
+assumptions (stored in ``data``).
 
 ``_tea.py``: SaBRe-specific techno-economic analysis (``SaBReTEA``)
 and minimum-selling-price helpers.

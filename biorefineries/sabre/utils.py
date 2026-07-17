@@ -6,16 +6,24 @@
 # github.com/BioSTEAMDevelopmentGroup/biosteam/blob/master/LICENSE.txt
 # for license details.
 """
-Process settings (scenario assumptions) for the SaBRe flowsheets.
+Process settings (scenario assumptions) for the SaBRe flowsheets, and
+feedstock stream construction from those assumptions.
 """
 from pathlib import Path
 import yaml
+import biosteam as bst
 
-__all__ = ('load_assumptions', 'wet_tpd_to_kgph', 'get_scale_feed_kgph', 'get_quality_params')
+__all__ = (
+    'load_assumptions', 'wet_tpd_to_kgph', 'get_scale_feed_kgph',
+    'get_feedstock_type_params', 'make_sargassum_feed',
+)
 
 
-def load_assumptions():
-    path = Path(__file__).resolve().parent / "data" / "assumptions.yaml"
+def load_assumptions(filename: str = "assumptions.yaml"):
+    # TODO: drop the default once all assumptions have migrated out of
+    # assumptions.yaml into topic-specific files (e.g. feedstock.yaml)
+    # and every caller passes filename explicitly.
+    path = Path(__file__).resolve().parent / "data" / filename
     with open(path, "r") as f:
         return yaml.safe_load(f)
 
@@ -36,8 +44,51 @@ def get_scale_feed_kgph(A: dict) -> float:
     return wet_tpd_to_kgph(wet_tpd, ton_def)
 
 
-def get_quality_params(A: dict, quality: str) -> dict:
-    qb = A["quality_bins"]
-    if quality not in qb:
-        raise KeyError(f"Unknown quality '{quality}'. Options: {list(qb.keys())}")
-    return qb[quality]
+def get_feedstock_type_params(A: dict, feedstock_type: str) -> dict:
+    ft = A["feedstock_type"]
+    if feedstock_type not in ft:
+        raise KeyError(f"Unknown feedstock_type '{feedstock_type}'. Options: {list(ft.keys())}")
+    return ft[feedstock_type]
+
+
+# Dry-basis composition (data/feedstock.yaml `dry_composition` section).
+# Structural ratios among non-water components; per-feedstock-type moisture
+# and ash targets (`feedstock_type` section) scale/override this baseline
+# in make_sargassum_feed() below.
+DRY_COMPOSITION = load_assumptions("feedstock.yaml")["dry_composition"]
+
+
+def make_sargassum_feed(fresh_feed_kgph: float, moisture_frac: float, ash_wt_frac_dry: float):
+    water_kgph = fresh_feed_kgph * moisture_frac
+    dry_kgph   = fresh_feed_kgph * (1 - moisture_frac)
+
+    base_ash = DRY_COMPOSITION["Ash"]
+    base_nonash_sum = 1.0 - base_ash
+    target_nonash_sum = 1.0 - ash_wt_frac_dry
+
+    if base_nonash_sum <= 1e-12:
+        raise RuntimeError("Base non-ash fraction is ~0; cannot scale.")
+    scale = target_nonash_sum / base_nonash_sum
+
+    # Build final dry-basis fractions with ash overridden, other components
+    # rescaled to fill the remaining dry mass proportionally.
+    dry_fracs = {"Ash": ash_wt_frac_dry}
+    for k, v in DRY_COMPOSITION.items():
+        if k == "Ash":
+            continue
+        dry_fracs[k] = v * scale
+
+    # Normalize for numerical safety
+    s = sum(dry_fracs.values())
+    dry_fracs = {k: v / s for k, v in dry_fracs.items()}
+
+    # Allocate component mass flows
+    kwargs = {k: dry_kgph * frac for k, frac in dry_fracs.items()}
+
+    return bst.Stream(
+        "sargassum_feed",
+        Water=water_kgph,
+        units="kg/hr",
+        phase="l",
+        **kwargs,
+    )

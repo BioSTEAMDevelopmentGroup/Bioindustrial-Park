@@ -149,7 +149,7 @@ def price_ad_biomethane_system() -> dict:
     bst.main_flowsheet.clear()
     set_thermo()
 
-    sys = create_ad_biomethane_system(quality="pelagic_high_quality")
+    sys = create_ad_biomethane_system(feedstock_type="pelagic")
     sys.flowsheet.stream.sargassum_feed.price = FEED_PRICE_USD_PER_KG_WET
 
     fs = sys.flowsheet
@@ -180,7 +180,7 @@ def price_ad_vfa_system() -> dict:
     bst.main_flowsheet.clear()
     set_thermo()
 
-    sys = create_ad_vfa_system(quality="pelagic_high_quality")
+    sys = create_ad_vfa_system(feedstock_type="pelagic")
     sys.flowsheet.stream.sargassum_feed.price = FEED_PRICE_USD_PER_KG_WET
 
     fs = sys.flowsheet
@@ -215,7 +215,7 @@ def price_ad_fermentation_system() -> dict:
     bst.main_flowsheet.clear()
     set_thermo()
 
-    sys, streams, units = create_ad_fermentation_system(quality="pelagic_high_quality")
+    sys, streams, units = create_ad_fermentation_system(feedstock_type="pelagic")
     streams["feed"].price = FEED_PRICE_USD_PER_KG_WET
 
     fs = sys.flowsheet

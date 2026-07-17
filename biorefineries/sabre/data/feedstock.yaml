@@ -1,0 +1,41 @@
+# Model Assumptions: Feedstocks
+
+# Dry-basis composition (mass fractions of dry solids, sums to 1). This is
+# a structural baseline independent of any one feedstock type's moisture --
+# per-feedstock-type moisture and ash targets below scale/override it (see
+# make_sargassum_feed() in utils.py).
+dry_composition:
+  Ash: 0.3453          # 34.53% dry
+  OtherSolids: 0.2941  # 29.41% dry
+  Glucan: 0.1100       # 11.00% dry
+  Alginate: 0.1050     # 10.50% dry
+  Protein: 0.0756      # 7.56% dry
+  Mannitol: 0.0200     # 2.00% dry
+  Fucoidan: 0.0500     # 5.00% dry
+
+feedstock_type:
+  pelagic:
+    moisture_frac: 0.8673
+    ash_wt_frac_dry: 0.3453
+    vs_ts: 0.6550
+    source:
+      key: milledge2020
+      note: "Energies 2020 paper (Turks and Caicos pelagic species averages), Table 1."
+
+  beach_wrack:
+    moisture_frac: 0.8198
+    ash_wt_frac_dry: 0.4694
+    vs_ts: 0.5311
+    source:
+      key: milledge2020
+      note: "Energies 2020 paper (Mixed Sargassum inundation), Table 1."
+
+policies:
+  solids_loading_target_ts_wt_frac: 0.15
+  solids_loading_target_ts_wt_frac_max: 0.20
+  freshwater_wash_allowed: false
+  retain_salinity: true
+
+scale:
+  wet_feed_ton_per_day: 15000
+  ton_definition: metric

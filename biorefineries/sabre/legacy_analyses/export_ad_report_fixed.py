@@ -188,8 +188,8 @@ def set_widths(ws, widths: dict[int, float]):
     for idx, width in widths.items():
         ws.column_dimensions[get_column_letter(idx)].width = width
 
-def build_case(quality: str, case_key: str):
-    sys = create_ad_biomethane_system(quality=quality, pretreatment_case=case_key)
+def build_case(feedstock_type: str, case_key: str):
+    sys = create_ad_biomethane_system(feedstock_type=feedstock_type, pretreatment_case=case_key)
     sys.simulate()
     return sys, get_unit_map(sys)
 
@@ -424,7 +424,7 @@ def write_diagnostics_sheet(wb: Workbook, cases_data: dict[str, dict[str, Any]])
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--quality", default="pelagic_high_quality")
+    parser.add_argument("--feedstock_type", default="pelagic")
     parser.add_argument(
         "--out",
         default=str(SCRIPT_DIR.parent / "results" / "SaBRe_Unit_CAPEX_OPEX_generated.xlsx"),
@@ -436,7 +436,7 @@ def main():
 
     cases_data: dict[str, dict[str, Any]] = {}
     for case_key, case_label in CASES:
-        system, unit_map = build_case(args.quality, case_key)
+        system, unit_map = build_case(args.feedstock_type, case_key)
         cases_data[case_key] = {
             "label": case_label,
             "system": system,

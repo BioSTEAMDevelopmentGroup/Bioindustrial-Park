@@ -26,8 +26,9 @@ Returns (sys, streams, units, alpha).
 
 import biosteam as bst
 
-from biorefineries.sabre.utils import load_assumptions, get_quality_params, get_scale_feed_kgph
-from biorefineries.sabre.streams import make_sargassum_feed
+from biorefineries.sabre.utils import (
+    load_assumptions, get_feedstock_type_params, get_scale_feed_kgph, make_sargassum_feed,
+)
 from biorefineries.sabre.units import Press, Mill, PressateConcentrator
 from biorefineries.sabre.systems._ad_biomethane_system import _build_methanogenic_pathway
 from biorefineries.sabre.systems._ad_vfa_system import create_ad_vfa_system
@@ -137,7 +138,7 @@ def _build_vfa_pathway(vfa_stream, ferm_kwargs):
 
 def create_integrated_biorefinery(
     alpha: float = 0.5,
-    quality: str = "pelagic_high_quality",
+    feedstock_type: str = "pelagic",
     pretreatment_case: str = "press_mill_only",
     vfa_conversion: float = 0.85,
     vfa_product_yield: float = 0.144,
@@ -174,16 +175,17 @@ def create_integrated_biorefinery(
     build_vfa     = alpha < 1.0
 
     A = load_assumptions()
-    q = get_quality_params(A, quality)
-    fresh_feed_kgph = get_scale_feed_kgph(A)
+    feedstock_assumptions = load_assumptions("feedstock.yaml")
+    params = get_feedstock_type_params(feedstock_assumptions, feedstock_type)
+    fresh_feed_kgph = get_scale_feed_kgph(feedstock_assumptions)
 
     # =========================================================
     # SHARED PREPROCESSING: Press -> PC -> Mill
     # =========================================================
     feed = make_sargassum_feed(
         fresh_feed_kgph=fresh_feed_kgph,
-        moisture_frac=q["moisture_frac"],
-        quality=quality,
+        moisture_frac=params["moisture_frac"],
+        ash_wt_frac_dry=params["ash_wt_frac_dry"],
     )
 
     pp  = A.get("preprocessing", {})

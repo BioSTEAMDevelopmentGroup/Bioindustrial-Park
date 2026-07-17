@@ -367,7 +367,7 @@ def _create_vfa_fermentation_system(
 
 
 def create_ad_fermentation_system(
-    quality: str = "pelagic_high_quality",
+    feedstock_type: str = "pelagic",
     milled_biomass_stream=None,
     enable_heat_shock: bool = False,
     hs_target_temperature_K: float = 338.15,
@@ -381,21 +381,9 @@ def create_ad_fermentation_system(
     already-milled biomass stream) -> acidogenic AD -> VFA broth -> VFA
     fermentation -> microbial oil.
 
-    Wraps create_ad_vfa_system() and _create_vfa_fermentation_system() and
-    returns one assembled bst.System, so both halves simulate as a single
-    graph. Unlike calling the two builders separately and manually
-    re-stitching their unit lists together, this means upstream changes
-    (feed price, quality bin, heat-shock settings, ...) always propagate
-    through the fermentation half automatically at simulation time, and
-    this system -- unlike _create_vfa_fermentation_system() alone -- can
-    be built standalone directly from feedstock. This is the only public
-    way to reach the fermentation train: _create_vfa_fermentation_system()
-    is a private helper (it requires a pre-built vfa_broth stream, so it
-    cannot run on its own).
-
     Parameters
     ----------
-    quality, milled_biomass_stream, enable_heat_shock,
+    feedstock_type, milled_biomass_stream, enable_heat_shock,
     hs_target_temperature_K, hs_events_per_day,
     hs_heated_fraction_of_liquid, hs_duration_min
         Forwarded to create_ad_vfa_system().
@@ -417,7 +405,7 @@ def create_ad_fermentation_system(
         Key units from both subsystems.
     """
     ad_vfa_sys = create_ad_vfa_system(
-        quality=quality,
+        feedstock_type=feedstock_type,
         milled_biomass_stream=milled_biomass_stream,
         enable_heat_shock=enable_heat_shock,
         hs_target_temperature_K=hs_target_temperature_K,

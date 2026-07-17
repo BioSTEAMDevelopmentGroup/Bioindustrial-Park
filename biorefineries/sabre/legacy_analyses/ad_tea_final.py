@@ -148,12 +148,12 @@ def _apply_stream_economics(
 def build_and_simulate(
     pretreatment_case: str,
     feed_price_per_kg_wet: float,
-    quality: str = "pelagic_high_quality",
+    feedstock_type: str = "pelagic",
 ):
     bst.main_flowsheet.clear()
     set_thermo()
     sys = create_ad_biomethane_system(
-        quality=quality,
+        feedstock_type=feedstock_type,
         pretreatment_case=pretreatment_case,
     )
     sys.feeds[0].price = feed_price_per_kg_wet

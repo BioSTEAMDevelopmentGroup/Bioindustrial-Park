@@ -10,8 +10,9 @@ VFA-producing acidogenic AD system builder for the SaBRe flowsheets.
 """
 import biosteam as bst
 
-from biorefineries.sabre.utils import load_assumptions, get_quality_params, get_scale_feed_kgph
-from biorefineries.sabre.streams import make_sargassum_feed
+from biorefineries.sabre.utils import (
+    load_assumptions, get_feedstock_type_params, get_scale_feed_kgph, make_sargassum_feed,
+)
 from biorefineries.sabre.units import (
     AcidogenicDigester, DigestateScrewPress, PressateConcentrator,
     BiostimulantEvaporator, Press, Mill,
@@ -66,7 +67,7 @@ def _get_ad_vfa_split(assumptions: dict) -> dict | None:
 
 
 def create_ad_vfa_system(
-    quality: str = "pelagic_high_quality",
+    feedstock_type: str = "pelagic",
     milled_biomass_stream=None,
     enable_heat_shock: bool = False,
     hs_target_temperature_K: float = 338.15,
@@ -119,14 +120,15 @@ def create_ad_vfa_system(
         # STANDALONE MODE
         # Build full preprocessing from raw feed.
         # -------------------------
-        q = get_quality_params(A, quality)
-        fresh_feed_kgph = get_scale_feed_kgph(A)
-        moisture_frac = q["moisture_frac"]
+        feedstock_assumptions = load_assumptions("feedstock.yaml")
+        params = get_feedstock_type_params(feedstock_assumptions, feedstock_type)
+        fresh_feed_kgph = get_scale_feed_kgph(feedstock_assumptions)
+        moisture_frac = params["moisture_frac"]
 
         feed = make_sargassum_feed(
             fresh_feed_kgph=fresh_feed_kgph,
             moisture_frac=moisture_frac,
-            quality=quality,
+            ash_wt_frac_dry=params["ash_wt_frac_dry"],
         )
 
         pp = A.get("preprocessing", {})

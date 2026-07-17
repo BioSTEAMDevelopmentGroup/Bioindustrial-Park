@@ -106,7 +106,7 @@ def build_case(
     set_thermo()
 
     sys = create_ad_biomethane_system(
-        quality="pelagic_high_quality",
+        feedstock_type="pelagic",
         pretreatment_case=pretreatment_case,
         ch4_override=yield_override,
     )

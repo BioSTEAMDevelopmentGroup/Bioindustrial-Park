@@ -28,8 +28,9 @@ Fresh water make-up is priced the same way
 """
 import biosteam as bst
 
-from biorefineries.sabre.utils import load_assumptions, get_quality_params, get_scale_feed_kgph
-from biorefineries.sabre.streams import make_sargassum_feed
+from biorefineries.sabre.utils import (
+    load_assumptions, get_feedstock_type_params, get_scale_feed_kgph, make_sargassum_feed,
+)
 from biorefineries.sabre.units import Press, PressateConcentrator, BiostimulantEvaporator
 
 __all__ = ('create_biostimulant_system',)
@@ -42,7 +43,7 @@ SOLIDS_IDS = [
 
 
 def create_biostimulant_system(
-    quality: str = "pelagic_high_quality",
+    feedstock_type: str = "pelagic",
     target_solids_wt_frac: float = 0.20,
     pressed_cake_disposal_usd_per_kg: float = 0.0,
     fresh_water_price_usd_per_kg: float = 0.0,
@@ -55,8 +56,8 @@ def create_biostimulant_system(
 
     Parameters
     ----------
-    quality : str
-        Feedstock quality bin (assumptions.yaml `quality_bins`).
+    feedstock_type : str
+        Feedstock type (data/feedstock.yaml `feedstock_type`).
     target_solids_wt_frac : float
         Target dry-solids weight fraction for the final biostimulant
         product. If higher than what PressateConcentrator alone
@@ -80,12 +81,14 @@ def create_biostimulant_system(
         'PR', 'PC', 'EV'.
     """
     A = load_assumptions()
-    q = get_quality_params(A, quality)
-    fresh_feed_kgph = get_scale_feed_kgph(A)
-    moisture_frac = q["moisture_frac"]
+    feedstock_assumptions = load_assumptions("feedstock.yaml")
+    params = get_feedstock_type_params(feedstock_assumptions, feedstock_type)
+    fresh_feed_kgph = get_scale_feed_kgph(feedstock_assumptions)
+    moisture_frac = params["moisture_frac"]
 
     feed = make_sargassum_feed(
-        fresh_feed_kgph=fresh_feed_kgph, moisture_frac=moisture_frac, quality=quality,
+        fresh_feed_kgph=fresh_feed_kgph, moisture_frac=moisture_frac,
+        ash_wt_frac_dry=params["ash_wt_frac_dry"],
     )
 
     pp = A.get("preprocessing", {})

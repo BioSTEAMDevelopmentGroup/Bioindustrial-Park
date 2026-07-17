@@ -151,7 +151,7 @@ def run_case(case):
     set_thermo()
 
     sys = create_ad_biomethane_system(
-        quality="pelagic_high_quality",
+        feedstock_type="pelagic",
         pretreatment_case=case,
     )
     sys.feeds[0].price = FEED_PRICE

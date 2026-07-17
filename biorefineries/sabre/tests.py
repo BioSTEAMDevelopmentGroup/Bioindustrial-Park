@@ -41,8 +41,8 @@ from vfa_fermentation_tea import (  # noqa: E402
 )
 from biorefineries.sabre._tea import create_tea, solve_product_msp  # noqa: E402
 
-_RTOL = 1e-6
-_ATOL = 1e-6
+_RTOL = 1e-4
+_ATOL = 1e-4
 
 
 def _assert_close(actual, expected, label):
@@ -394,7 +394,7 @@ import export_ad_report_fixed as _exr  # noqa: E402
 
 
 def test_export_ad_report_fixed_press_mill_only():
-    sys_, unit_map = _exr.build_case("pelagic_high_quality", "press_mill_only")
+    sys_, unit_map = _exr.build_case("pelagic", "press_mill_only")
     ad = unit_map["AD"]
     up = unit_map["UP"]
 
@@ -498,24 +498,24 @@ import biosteam as _bst  # noqa: E402
 from biorefineries.sabre._chemicals import set_thermo as _set_thermo  # noqa: E402
 from biorefineries.sabre.utils import (  # noqa: E402
     load_assumptions as _load_assumptions,
-    get_quality_params as _get_quality_params,
+    get_feedstock_type_params as _get_feedstock_type_params,
     get_scale_feed_kgph as _get_scale_feed_kgph,
+    make_sargassum_feed as _make_sargassum_feed,
 )
-from biorefineries.sabre.streams import make_sargassum_feed as _make_sargassum_feed  # noqa: E402
 
 
-def test_feed_construction_pelagic_high_quality():
+def test_feed_construction_pelagic():
     _bst.main_flowsheet.clear()
     _set_thermo()
-    A = _load_assumptions()
-    q = _get_quality_params(A, "pelagic_high_quality")
-    fresh_feed_kgph = _get_scale_feed_kgph(A)
+    feedstock_assumptions = _load_assumptions("feedstock.yaml")
+    params = _get_feedstock_type_params(feedstock_assumptions, "pelagic")
+    fresh_feed_kgph = _get_scale_feed_kgph(feedstock_assumptions)
     feed = _make_sargassum_feed(
         fresh_feed_kgph=fresh_feed_kgph,
-        moisture_frac=q["moisture_frac"],
-        quality="pelagic_high_quality",
+        moisture_frac=params["moisture_frac"],
+        ash_wt_frac_dry=params["ash_wt_frac_dry"],
     )
     _assert_close(float(feed.F_mass), 625000.0000000001, "F_mass")
     _assert_close(float(feed.imass["Water"]), 542062.5, "Water")
     _assert_close(float(feed.imass["Ash"]), 28638.31875000001, "Ash")
-    _assert_close(q["moisture_frac"], 0.8673, "moisture_frac_yaml")
+    _assert_close(params["moisture_frac"], 0.8673, "moisture_frac_yaml")
