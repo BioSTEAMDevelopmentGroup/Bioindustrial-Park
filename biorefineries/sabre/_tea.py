@@ -10,6 +10,8 @@ Techno-economic analysis for the SaBRe flowsheets.
 """
 import biosteam as bst
 
+from biorefineries.sabre.utils import OPERATING_DAYS_PER_YEAR
+
 __all__ = ('SaBReTEA', 'create_tea', 'solve_product_msp', 'solve_biomethane_msp')
 
 CH4_MMBTU_PER_KG = 0.0526
@@ -74,7 +76,7 @@ def create_tea(
     duration: tuple[int, int] = (2026, 2046),
     depreciation: str = "MACRS7",
     income_tax: float = 0.21,
-    operating_days: int = 330,
+    operating_days: int = OPERATING_DAYS_PER_YEAR,
     construction_schedule: tuple[float, ...] = (0.4, 0.6),
     WC_over_FCI: float = 0.05,
     finance_interest: float = 0.08,

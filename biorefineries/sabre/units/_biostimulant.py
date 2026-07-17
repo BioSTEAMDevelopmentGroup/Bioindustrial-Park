@@ -11,6 +11,8 @@ finishing evaporation.
 """
 import biosteam as bst
 
+from biorefineries.sabre.utils import OPERATING_HOURS_PER_YEAR
+
 __all__ = ('PressateConcentrator', 'BiostimulantEvaporator')
 
 
@@ -196,9 +198,8 @@ class PressateConcentrator(bst.Unit):
         self.design_results["Annual maintenance ($/yr)"] = annual_maintenance
 
         if annual_maintenance > 0:
-            operating_hours_per_yr = 330.0 * 24.0
             self.add_OPEX = {
-                "Pressate concentrator maintenance": annual_maintenance / operating_hours_per_yr
+                "Pressate concentrator maintenance": annual_maintenance / OPERATING_HOURS_PER_YEAR
             }
 
 
@@ -448,7 +449,6 @@ class BiostimulantEvaporator(bst.Unit):
         self.design_results["Annual maintenance ($/yr)"] = annual_maintenance
 
         if annual_maintenance > 0:
-            operating_hours_per_yr = 330.0 * 24.0
             self.add_OPEX = {
-                "Biostimulant evaporator maintenance": annual_maintenance / operating_hours_per_yr
+                "Biostimulant evaporator maintenance": annual_maintenance / OPERATING_HOURS_PER_YEAR
             }

@@ -1,0 +1,7 @@
+# Model Assumptions: Techno-Economic Analysis (TEA)
+
+# Plant uptime, in operating days per year. Single source of truth for
+# SaBReTEA's operating_days default (_tea.py) and every unit-level add_OPEX
+# annualization (kg/hr -> $/yr conversions in units/_ad.py, _pretreatment.py,
+# _biostimulant.py) -- keeps both in sync if plant uptime assumptions change.
+operating_days: 330

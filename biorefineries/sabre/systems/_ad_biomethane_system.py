@@ -67,21 +67,6 @@ def _apply_biodegradability_overrides(base_dict, override_factors):
     return out
 
 
-def _default_digestible_ids():
-    return (
-        "Glucan",
-        "Xylan",
-        "Mannan",
-        "Galactan",
-        "Arabinan",
-        "Alginate",
-        "Fucoidan",
-        "Mannitol",
-        "Protein",
-        "OtherSolids",
-    )
-
-
 def _build_methanogenic_pathway(
     feed_stream, pretreatment_case, temperature_regime="mesophilic",
     biogas_ids=("biogas", "digestate"),
@@ -107,18 +92,6 @@ def _build_methanogenic_pathway(
     selected_pretreatment = pretreatment_case or adS.get("pretreatment_case", "press_mill_only")
     pt_case = pretreatments.get(selected_pretreatment, {})
     pt_kind = pt_case.get("kind", "none")
-
-    vs_destruction = float(adp.get("vs_destruction", 0.20))
-    ad_effects = pt_case.get("ad_effects", {})
-    ch4_kg_per_kg_vs_fed = float(
-        ad_effects.get("ch4_kg_per_kg_vs_fed", adp.get("ch4_kg_per_kg_vs_fed", 0.09))
-    )
-
-    _global_molfrac = adp.get("raw_biogas_molfrac", {
-        "Methane": 0.55, "CarbonDioxide": 0.43, "HydrogenSulfide": 0.02,
-    })
-    raw_biogas_molfrac = dict(ad_effects.get("raw_biogas_molfrac", _global_molfrac))
-    biodegradability = dict(adp.get("biodegradability", {}))
 
     ad_feed = feed_stream
     pt_units = []
@@ -242,11 +215,12 @@ def _build_methanogenic_pathway(
     else:
         raise ValueError(f"Unknown pretreatment_case '{selected_pretreatment}'")
 
-    ad_effects = pt_case.get("ad_effects", {})
-    vs_destruction = float(ad_effects.get("vs_destruction", vs_destruction))
-    ch4_kg_per_kg_vs_fed = float(ad_effects.get("ch4_kg_per_kg_vs_fed", ch4_kg_per_kg_vs_fed))
+    ad_effects = pt_case["ad_effects"]
+    vs_destruction = float(ad_effects["vs_destruction"])
+    ch4_kg_per_kg_vs_fed = float(ad_effects["ch4_kg_per_kg_vs_fed"])
+    raw_biogas_molfrac = dict(ad_effects["raw_biogas_molfrac"])
     biodegradability = _apply_biodegradability_overrides(
-        biodegradability, ad_effects.get("biodegradability_factor_overrides", {})
+        dict(adp["biodegradability"]), ad_effects.get("biodegradability_factor_overrides", {})
     )
 
     MX = None
@@ -280,19 +254,17 @@ def _build_methanogenic_pathway(
         vs_destruction=vs_destruction,
         ch4_kg_per_kg_vs_fed=ch4_kg_per_kg_vs_fed,
         raw_biogas_molfrac=raw_biogas_molfrac,
-        digestible_IDs=tuple(adp.get("digestible_IDs", _default_digestible_ids())),
+        digestible_IDs=tuple(adp["digestible_IDs"]),
         biodegradability=biodegradability,
         hrt_days=adS["hrt_days"],
         slurry_density_kg_per_m3=adS["slurry_density_kg_per_m3"],
         headspace_frac=adS["gas_storage_frac_of_total_volume"],
-        max_single_digester_volume_MG=adS.get("max_single_digester_volume_MG", 1.5),
-        base_volume_m3=adC.get("base_volume_m3", None),
-        base_capex_usd=adC.get("base_capex_usd", None),
+        max_single_digester_volume_MG=adS["max_single_digester_volume_MG"],
         maintenance_usd_per_m3_yr=adC.get("maintenance_usd_per_m3_yr", None),
-        mixing_W_per_m3=adS.get("mixing_W_per_m3", 5.0),
-        influent_temperature_K=adS.get("influent_temperature_K", 298.15),
-        target_temperature_K=adS.get("temperature_K", 308.15),
-        cp_kJ_per_kgK=adS.get("cp_kJ_per_kgK", 4.18),
+        mixing_W_per_m3=adS["mixing_W_per_m3"],
+        influent_temperature_K=adS["influent_temperature_K"],
+        target_temperature_K=adS["temperature_K"],
+        cp_kJ_per_kgK=adS["cp_kJ_per_kgK"],
     )
 
     h2sA = _H2S_REMOVAL
@@ -315,18 +287,12 @@ def _build_methanogenic_pathway(
     sp = _DIGESTATE_SCREW_PRESS
     SP = DigestateScrewPress(
         ID="SP", ins=AD - 1, outs=("soil_amendment", "liquid_digestate"),
-        solids_IDs=tuple(sp.get("solids_IDs", [
-            "Glucan", "Xylan", "Mannan", "Galactan", "Arabinan", "Alginate",
-            "Fucoidan", "Mannitol", "Protein", "OtherSolids", "Lignin", "Ash",
-        ])),
         ts_capture_frac=sp.get("ts_capture_frac", 0.40),
         cake_moisture_frac=sp.get("cake_moisture_frac", 0.50),
         capacity_tph_each=sp.get("capacity_tph_each", 6.0),
         kWh_per_m3=sp.get("kWh_per_m3", 0.67),
-        eur_to_usd=sp.get("eur_to_usd", 1.19),
-        capex_eur_table=sp.get("capex_eur_table", None),
         include_polymer_dosing=sp.get("include_polymer_dosing", False),
-        polymer_dosing_cost_eur_each=sp.get("polymer_dosing_cost_eur_each", 0.0),
+        polymer_dosing_cost_usd_each=sp.get("polymer_dosing_cost_usd_each", 0.0),
         F_BM=sp.get("F_BM", 1.0),
     )
 

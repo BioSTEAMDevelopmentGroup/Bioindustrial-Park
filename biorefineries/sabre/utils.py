@@ -16,6 +16,7 @@ import biosteam as bst
 __all__ = (
     'load_assumptions', 'wet_tpd_to_kgph', 'get_scale_feed_kgph',
     'get_feedstock_type_params', 'get_ad_temperature_K', 'make_sargassum_feed',
+    'OPERATING_DAYS_PER_YEAR', 'OPERATING_HOURS_PER_YEAR',
 )
 
 
@@ -25,6 +26,13 @@ def load_assumptions(filename: str):
     path = Path(__file__).resolve().parent / "data" / filename
     with open(path, "r") as f:
         return yaml.safe_load(f)
+
+
+# data/tea.yaml's operating_days -- single source of truth for SaBReTEA's
+# operating_days default (_tea.py) and every unit-level add_OPEX
+# annualization (units/_ad.py, _pretreatment.py, _biostimulant.py).
+OPERATING_DAYS_PER_YEAR = load_assumptions("tea.yaml")["operating_days"]
+OPERATING_HOURS_PER_YEAR = float(OPERATING_DAYS_PER_YEAR) * 24.0
 
 
 def wet_tpd_to_kgph(wet_tpd: float, ton_definition: str) -> float:

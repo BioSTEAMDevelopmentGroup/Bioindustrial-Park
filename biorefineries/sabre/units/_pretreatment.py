@@ -11,6 +11,8 @@ peroxide pretreatment before methanogenic AD.
 """
 import biosteam as bst
 
+from biorefineries.sabre.utils import OPERATING_HOURS_PER_YEAR
+
 __all__ = ('EnzymaticPretreatment', 'HeatingPretreatment', 'PeroxidePretreatment')
 
 
@@ -159,9 +161,8 @@ class EnzymaticPretreatment(bst.Unit):
         if enzyme_cost_usd_per_hr > 0:
             add_opex["Enzyme reagent cost"] = enzyme_cost_usd_per_hr
         if annual_maintenance > 0:
-            operating_hours_per_yr = 330.0 * 24.0
             add_opex["Enzymatic pretreatment maintenance"] = (
-                annual_maintenance / operating_hours_per_yr
+                annual_maintenance / OPERATING_HOURS_PER_YEAR
             )
         if add_opex:
             self.add_OPEX = add_opex
@@ -278,9 +279,8 @@ class HeatingPretreatment(bst.Unit):
         self.design_results["Annual maintenance ($/yr)"] = annual_maintenance
 
         if annual_maintenance > 0:
-            operating_hours_per_yr = 330.0 * 24.0
             self.add_OPEX = {
-                "Heating pretreatment maintenance": annual_maintenance / operating_hours_per_yr
+                "Heating pretreatment maintenance": annual_maintenance / OPERATING_HOURS_PER_YEAR
             }
 
 
@@ -404,9 +404,8 @@ class PeroxidePretreatment(bst.Unit):
         if h2o2_cost_usd_per_hr > 0:
             add_opex["H2O2 reagent cost"] = h2o2_cost_usd_per_hr
         if annual_maintenance > 0:
-            operating_hours_per_yr = 330.0 * 24.0
             add_opex["Peroxide pretreatment maintenance"] = (
-                annual_maintenance / operating_hours_per_yr
+                annual_maintenance / OPERATING_HOURS_PER_YEAR
             )
         if add_opex:
             self.add_OPEX = add_opex

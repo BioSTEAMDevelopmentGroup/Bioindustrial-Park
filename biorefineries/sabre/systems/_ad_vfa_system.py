@@ -271,15 +271,12 @@ def create_ad_vfa_system(
         ID="SP_VFA",
         ins=AD - 1,
         outs=("acidogenic_residual_solids", "vfa_broth"),
-        solids_IDs=SOLIDS_IDS,
         ts_capture_frac=_DIGESTATE_SCREW_PRESS.get("ts_capture_frac", 0.40),
         cake_moisture_frac=_DIGESTATE_SCREW_PRESS.get("cake_moisture_frac", 0.50),
         capacity_tph_each=_DIGESTATE_SCREW_PRESS.get("capacity_tph_each", 6.0),
         kWh_per_m3=_DIGESTATE_SCREW_PRESS.get("kWh_per_m3", 0.67),
-        eur_to_usd=_DIGESTATE_SCREW_PRESS.get("eur_to_usd", 1.19),
-        capex_eur_table=_DIGESTATE_SCREW_PRESS.get("capex_eur_table"),
         include_polymer_dosing=_DIGESTATE_SCREW_PRESS.get("include_polymer_dosing", False),
-        polymer_dosing_cost_eur_each=_DIGESTATE_SCREW_PRESS.get("polymer_dosing_cost_eur_each", 0.0),
+        polymer_dosing_cost_usd_each=_DIGESTATE_SCREW_PRESS.get("polymer_dosing_cost_usd_each", 0.0),
         F_BM=_DIGESTATE_SCREW_PRESS.get("F_BM", 1.0),
     )
 
