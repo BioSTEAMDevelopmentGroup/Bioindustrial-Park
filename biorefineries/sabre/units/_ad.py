@@ -86,7 +86,7 @@ class AnaerobicDigester(bst.Unit):
     Sources
     -------
     vs_destruction (0.20):
-        assumptions.yaml `ad_performance.vs_destruction`, labeled "Global CSTR
+        data/ad.yaml `ad_performance.methanogenic.vs_destruction`, labeled "Global CSTR
         vs_destruction -- uniform across all pretreatment cases." No named
         literature source; yaml's own note: "Conservative lower bound of
         20-70% range for full-scale mesophilic CSTRs. No continuous CSTR data
@@ -102,31 +102,32 @@ class AnaerobicDigester(bst.Unit):
         CH4/kg VS," scaled to 0.100 kg/kg VS for continuous CSTR (yaml key
         `chikani_cabrera_2022_physical_C`).
     raw_biogas_molfrac (Methane 0.55, CarbonDioxide 0.42, HydrogenSulfide 0.03):
-        assumptions.yaml `ad_performance.raw_biogas_molfrac`, labeled "Global
+        data/ad.yaml `ad_performance.methanogenic.raw_biogas_molfrac`, labeled "Global
         fallback biogas composition (overridden per pretreatment case below)."
         No named source -- scoping default, overridden per-case in real runs.
     headspace_frac (0.25):
-        assumptions.yaml `ad.gas_storage_frac_of_total_volume`. No named
+        data/ad.yaml `ad.gas_storage_frac_of_total_volume`. No named
         source.
     maintenance_usd_per_m3_yr (10.0):
-        assumptions.yaml `ad_costing.maintenance_usd_per_m3_yr`, sourced to
+        data/ad.yaml `ad.cost.maintenance_usd_per_m3_yr`, sourced to
         the ADBC spreadsheet tool (`ADBCv2-48 (2).xlsm`, sheet
         "AnaerobicDigester", cell AB18).
     digestible_IDs, biodegradability:
-        assumptions.yaml `ad_performance.digestible_IDs` /
-        `ad_performance.biodegradability`. No named source for the individual
-        factors beyond the yaml values themselves.
+        data/ad.yaml `ad_performance.digestible_IDs` (shared with the
+        acidogenic mode) / `ad_performance.methanogenic.biodegradability`.
+        No named source for the individual factors beyond the yaml values
+        themselves.
     hrt_days, slurry_density_kg_per_m3, max_single_digester_volume_MG,
     mixing_W_per_m3, influent_temperature_K, target_temperature_K,
     cp_kJ_per_kgK:
-        assumptions.yaml `ad` section, matching values already used at the
+        data/ad.yaml `ad` section, matching values already used at the
         real call site (`systems/_ad_biomethane_system.py`). No named literature
         source for these beyond the yaml values themselves.
     ADBC_VOL_M3 / ADBC_CAPEX interpolation table (used by `interp_capex`,
     the actual installed-cost calculation):
-        UNVERIFIED PROVENANCE. assumptions.yaml has no entry for this
+        UNVERIFIED PROVENANCE. data/ad.yaml has no entry for this
         six-point table. A *separate*, structurally unused single-point
-        anchor (`ad_costing.base_volume_m3`/`base_capex_usd`, stored on this
+        anchor (`ad.cost.base_volume_m3`/`base_capex_usd`, stored on this
         unit's `base_volume_m3`/`base_capex_usd` __init__ params but never
         read by `_design`/`_cost`) is cited to the same-sounding "ADBC"
         spreadsheet tool (`ADBCv2-48 (2).xlsm`, sheet "AnaerobicDigester").
@@ -462,10 +463,10 @@ class AcidogenicDigester(bst.Unit):
     Sources
     -------
     vs_destruction (0.50):
-        assumptions.yaml `vfa_ad_performance.cases.seaweed_arrested_fitted.
+        data/ad.yaml `ad_performance.acidogenic.cases.seaweed_arrested_fitted.
         vs_destruction`. No named literature source in yaml for this value.
     vfa_kg_per_kg_vs (0.55):
-        assumptions.yaml `vfa_ad_performance.cases.seaweed_arrested_fitted.
+        data/ad.yaml `ad_performance.acidogenic.cases.seaweed_arrested_fitted.
         vfa_kg_per_kg_vs`. No named literature source in yaml for this
         value (yaml's `vfa_fermentation.sources.seaweed_arrested_anchor`
         note describes a related but distinct downstream observation --
@@ -474,7 +475,7 @@ class AcidogenicDigester(bst.Unit):
         specific 0.55 yield number, so not repeated as one here).
     vfa_split (AceticAcid 0.648, PropionicAcid 0.186, ButyricAcid 0.084,
     ValericAcid 0.082, HexanoicAcid 0.000):
-        assumptions.yaml `vfa_ad_performance.cases.seaweed_arrested_fitted.
+        data/ad.yaml `ad_performance.acidogenic.cases.seaweed_arrested_fitted.
         vfa_split`. No named literature source in yaml. This is the
         __init__ default *object* (None, deferring to
         `_resolve_vfa_split()`'s own separate internal fallback split
@@ -487,13 +488,14 @@ class AcidogenicDigester(bst.Unit):
         Sargassum-specific numbers above -- doing so would conflate a
         general fallback with a case-specific fitted result.
     digestible_IDs:
-        assumptions.yaml `vfa_ad_performance.digestible_IDs`. The
+        data/ad.yaml `ad_performance.digestible_IDs` (shared with the
+        methanogenic mode). The
         pre-conversion default additionally listed `Xylan`, `Mannan`,
         `Galactan` (real thermo chemicals, just absent from this yaml list)
         and `Cellulose` (not a chemical defined in `_chemicals.py` at all --
         a stale leftover reference). All four dropped to match yaml exactly.
     hrt_days (15.0):
-        assumptions.yaml `vfa_ad.hrt_days`, sourced to `aad_review_window`:
+        data/ad.yaml `ad.vfa.hrt_days`, sourced to `aad_review_window`:
         "15 d retained as a midpoint design basis within the 10-20 d AAD
         operating window; not a direct fitted value for this exact
         Sargassum system."

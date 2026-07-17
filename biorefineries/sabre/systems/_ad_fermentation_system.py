@@ -383,6 +383,7 @@ def create_ad_fermentation_system(
     hs_events_per_day: float = 1.0 / 7.0,
     hs_heated_fraction_of_liquid: float = 0.10,
     hs_duration_min: float = 15.0,
+    temperature_regime: str = "mesophilic",
     **fermentation_kwargs,
 ):
     """
@@ -394,7 +395,7 @@ def create_ad_fermentation_system(
     ----------
     feedstock_type, milled_biomass_stream, enable_heat_shock,
     hs_target_temperature_K, hs_events_per_day,
-    hs_heated_fraction_of_liquid, hs_duration_min
+    hs_heated_fraction_of_liquid, hs_duration_min, temperature_regime
         Forwarded to create_ad_vfa_system().
     **fermentation_kwargs
         Forwarded to _create_vfa_fermentation_system() (everything except
@@ -421,6 +422,7 @@ def create_ad_fermentation_system(
         hs_events_per_day=hs_events_per_day,
         hs_heated_fraction_of_liquid=hs_heated_fraction_of_liquid,
         hs_duration_min=hs_duration_min,
+        temperature_regime=temperature_regime,
     )
     feed = ad_vfa_sys.feeds[0]
     vfa_broth = ad_vfa_sys.flowsheet.stream.vfa_broth

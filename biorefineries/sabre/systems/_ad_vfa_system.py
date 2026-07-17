@@ -12,6 +12,7 @@ import biosteam as bst
 
 from biorefineries.sabre.utils import (
     load_assumptions, get_feedstock_type_params, get_scale_feed_kgph, make_sargassum_feed,
+    get_ad_temperature_K,
 )
 from biorefineries.sabre.units import (
     AcidogenicDigester, DigestateScrewPress, PressateConcentrator,
@@ -21,38 +22,48 @@ from biorefineries.sabre.units import (
 __all__ = ('create_ad_vfa_system',)
 
 
+# AD sizing/operating parameters shared between the biogas (methanogenic)
+# and vfa (acidogenic) digester modes (data/ad.yaml `ad` section).
+_AD_SHARED = load_assumptions("ad.yaml")["ad"]
+
+# AD performance parameters, shared between the methanogenic and acidogenic
+# digester modes (data/ad.yaml `ad_performance` section).
+_AD_PERFORMANCE = load_assumptions("ad.yaml")["ad_performance"]
+
+
 SOLIDS_IDS = [
     "Ash", "Protein", "Lignin", "Glucan", "Xylan", "Mannan", "Galactan", "Arabinan",
     "Alginate", "Fucoidan", "Mannitol", "OtherSolids",
 ]
 
 
-def _get_ad_vfa_case(assumptions: dict) -> dict:
+def _get_ad_vfa_case(ad_performance: dict) -> dict:
     """
-    Merge top-level vfa_ad_performance with the selected case.
+    Merge the shared ad_performance fields (e.g. digestible_IDs) with
+    ad_performance.acidogenic and the selected case.
     Returns a flat dict of scalar parameters only.
     NOTE: vfa_split is a nested dict and must be read separately
     via _get_ad_vfa_split() to avoid being silently dropped on merge.
     """
-    perf = assumptions["vfa_ad_performance"]
+    shared = {k: v for k, v in ad_performance.items() if k not in ("methanogenic", "acidogenic")}
+    perf = ad_performance["acidogenic"]
     case_name = perf.get("case")
     cases = perf.get("cases")
+    merged = {**shared, **perf}
     if case_name and isinstance(cases, dict):
         if case_name not in cases:
             raise KeyError(f"Unknown VFA AD case: {case_name}")
-        merged = dict(perf)
         merged.update(cases[case_name])
-        return merged
-    return perf
+    return merged
 
 
-def _get_ad_vfa_split(assumptions: dict) -> dict | None:
+def _get_ad_vfa_split(ad_performance: dict) -> dict | None:
     """
     Read vfa_split directly from the selected case dict.
     Bypasses the shallow-merge issue in _get_ad_vfa_case() that silently
     drops nested dicts. Returns a plain {str: float} dict or None.
     """
-    perf = assumptions["vfa_ad_performance"]
+    perf = ad_performance["acidogenic"]
     case_name = perf.get("case")
     cases = perf.get("cases", {})
 
@@ -74,6 +85,7 @@ def create_ad_vfa_system(
     hs_events_per_day: float = 1.0 / 7.0,
     hs_heated_fraction_of_liquid: float = 0.10,
     hs_duration_min: float = 15.0,
+    temperature_regime: str = "mesophilic",
 ):
     """
     Build the VFA acidogenic AD subsystem.
@@ -102,9 +114,10 @@ def create_ad_vfa_system(
     """
     A = load_assumptions()
 
-    vfaS = A["vfa_ad"]
-    vfaP = _get_ad_vfa_case(A)
-    vfa_split = _get_ad_vfa_split(A)
+    vfaS = {**_AD_SHARED, **_AD_SHARED.get("acidogenic", {})}
+    vfaS["temperature_K"] = get_ad_temperature_K(_AD_SHARED, temperature_regime)
+    vfaP = _get_ad_vfa_case(_AD_PERFORMANCE)
+    vfa_split = _get_ad_vfa_split(_AD_PERFORMANCE)
 
     path = []
 
@@ -239,9 +252,7 @@ def create_ad_vfa_system(
         vs_destruction=float(vfaP.get("vs_destruction", 0.50)),
         vfa_kg_per_kg_vs=float(vfaP.get("vfa_kg_per_kg_vs", 0.47)),
         vfa_split=vfa_split,
-        digestible_IDs=vfaP.get(
-            "digestible_IDs", A.get("ad_performance", {}).get("digestible_IDs")
-        ),
+        digestible_IDs=vfaP.get("digestible_IDs"),
         produce_offgas_co2=bool(vfaP.get("produce_offgas_co2", True)),
         hrt_days=float(vfaS.get("hrt_days", 15.0)),
         slurry_density_kg_per_m3=float(vfaS.get("slurry_density_kg_per_m3", 1000.0)),
@@ -249,7 +260,7 @@ def create_ad_vfa_system(
         max_single_digester_volume_MG=float(vfaS.get("max_single_digester_volume_MG", 1.5)),
         mixing_W_per_m3=float(vfaS.get("mixing_W_per_m3", 5.0)),
         influent_temperature_K=float(vfaS.get("influent_temperature_K", 298.15)),
-        target_temperature_K=float(vfaS.get("target_temperature_K", 308.15)),
+        target_temperature_K=float(vfaS.get("temperature_K", 308.15)),
         cp_kJ_per_kgK=float(vfaS.get("cp_kJ_per_kgK", 4.18)),
         enable_heat_shock=enable_heat_shock,
         hs_target_temperature_K=hs_target_temperature_K,

@@ -28,6 +28,7 @@ import biosteam as bst
 
 from biorefineries.sabre.utils import (
     load_assumptions, get_feedstock_type_params, get_scale_feed_kgph, make_sargassum_feed,
+    get_ad_temperature_K,
 )
 from biorefineries.sabre.units import (
     AnaerobicDigester, BiogasUpgrading, H2SRemoval, DigestateScrewPress,
@@ -41,6 +42,14 @@ __all__ = ('create_ad_biomethane_system',)
 # Pretreatment case definitions, shared by _build_methanogenic_pathway()
 # below (data/pretreatment.yaml `pretreatment_ad` section).
 _PRETREATMENT_AD = load_assumptions("pretreatment.yaml")["pretreatment_ad"]
+
+# AD sizing/operating parameters shared between the biogas (methanogenic)
+# and vfa (acidogenic) digester modes (data/ad.yaml `ad` section).
+_AD_SHARED = load_assumptions("ad.yaml")["ad"]
+
+# AD performance parameters, shared between the methanogenic and acidogenic
+# digester modes (data/ad.yaml `ad_performance` section).
+_AD_PERFORMANCE = load_assumptions("ad.yaml")["ad_performance"]
 
 
 def _apply_biodegradability_overrides(base_dict, override_factors):
@@ -70,7 +79,10 @@ def _default_digestible_ids():
     )
 
 
-def _build_methanogenic_pathway(A, feed_stream, pretreatment_case, biogas_ids=("biogas", "digestate")):
+def _build_methanogenic_pathway(
+    A, feed_stream, pretreatment_case, temperature_regime="mesophilic",
+    biogas_ids=("biogas", "digestate"),
+):
     """
     Build [optional pretreatment] -> AD -> H2S removal -> biogas upgrading
     -> digestate screw press, starting from an already-milled feed stream.
@@ -80,9 +92,10 @@ def _build_methanogenic_pathway(A, feed_stream, pretreatment_case, biogas_ids=("
     (which supplies a splitter-derived feed). Returns (path_units, streams,
     units) so callers can assemble their own bst.System.
     """
-    adS = A["ad"]
-    adp = A["ad_performance"]
-    adC = A["ad_costing"]
+    adS = {**_AD_SHARED, **_AD_SHARED.get("methanogenic", {})}
+    adS["temperature_K"] = get_ad_temperature_K(_AD_SHARED, temperature_regime)
+    adp = {**_AD_PERFORMANCE, **_AD_PERFORMANCE.get("methanogenic", {})}
+    adC = _AD_SHARED["cost"]
     pretreatments = _PRETREATMENT_AD
 
     enable_feed_dilution = bool(adS.get("enable_feed_dilution", True))
@@ -327,7 +340,8 @@ def create_ad_biomethane_system(
     feedstock_type: str = "pelagic",
     pretreatment_case: str | None = None,
     press_cake_solids_wt_frac: float | None = None,
-    ch4_override=None
+    ch4_override=None,
+    temperature_regime: str = "mesophilic",
 ):
     A = load_assumptions()
     feedstock_assumptions = load_assumptions("feedstock.yaml")
@@ -412,8 +426,10 @@ def create_ad_biomethane_system(
         F_BM=mlA.get("F_BM", 1.0),
     )
 
-    resolved_pretreatment_case = pretreatment_case or A["ad"].get("pretreatment_case", "press_mill_only")
-    path_units, streams, units = _build_methanogenic_pathway(A, ML - 0, resolved_pretreatment_case)
+    resolved_pretreatment_case = pretreatment_case or _AD_SHARED.get("methanogenic", {}).get("pretreatment_case", "press_mill_only")
+    path_units, streams, units = _build_methanogenic_pathway(
+        A, ML - 0, resolved_pretreatment_case, temperature_regime=temperature_regime,
+    )
 
     if ch4_override is not None:
         units["AD"].ch4_kg_per_kg_vs_fed = float(ch4_override)

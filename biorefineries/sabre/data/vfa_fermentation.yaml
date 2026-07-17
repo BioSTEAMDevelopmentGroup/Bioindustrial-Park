@@ -1,4 +1,4 @@
-# Model Assumptions: VFA Fermentation
+# Model Assumptions: Volatile Fatty Acid (VFA) Fermentation
 
 vfa_fermentation:
   case: yarrowia_vfa_base

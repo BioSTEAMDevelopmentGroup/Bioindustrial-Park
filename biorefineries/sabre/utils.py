@@ -15,7 +15,7 @@ import biosteam as bst
 
 __all__ = (
     'load_assumptions', 'wet_tpd_to_kgph', 'get_scale_feed_kgph',
-    'get_feedstock_type_params', 'make_sargassum_feed',
+    'get_feedstock_type_params', 'get_ad_temperature_K', 'make_sargassum_feed',
 )
 
 
@@ -49,6 +49,21 @@ def get_feedstock_type_params(A: dict, feedstock_type: str) -> dict:
     if feedstock_type not in ft:
         raise KeyError(f"Unknown feedstock_type '{feedstock_type}'. Options: {list(ft.keys())}")
     return ft[feedstock_type]
+
+
+def get_ad_temperature_K(ad_assumptions: dict, temperature_regime: str) -> float:
+    """
+    Resolve the AD operating temperature (K) for a given regime
+    ('mesophilic' or 'thermophilic') from data/ad.yaml's
+    `ad.temperature_regimes` section.
+    """
+    regimes = ad_assumptions["temperature_regimes"]
+    if temperature_regime not in regimes:
+        raise KeyError(
+            f"Unknown temperature_regime '{temperature_regime}'. "
+            f"Options: {list(regimes.keys())}"
+        )
+    return float(regimes[temperature_regime]["temperature_K"])
 
 
 # Dry-basis composition (data/feedstock.yaml `dry_composition` section).

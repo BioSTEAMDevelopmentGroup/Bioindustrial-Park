@@ -1,0 +1,187 @@
+# Model Assumptions: Anaerobic Digestion (AD)
+
+ad:
+  # Shared digester sizing/operating parameters
+  max_single_digester_volume_MG: 1.5
+  gas_storage_frac_of_total_volume: 0.25
+  influent_temperature_K: 298.15
+  slurry_density_kg_per_m3: 1000.0
+  cp_kJ_per_kgK: 4.18
+
+  enable_feed_dilution: false
+  target_feed_moisture_frac: 0.92
+
+  temperature_regime: mesophilic
+  temperature_regimes:
+    mesophilic:
+      temperature_K: 308.15
+      source:
+        key: mesophilic_operation
+        note: "Mesophilic operation near 35°C."
+    thermophilic:
+      temperature_K: 328.15
+      source:
+        key: thermophilic_operation
+        note: "Thermophilic operation near 55°C."
+
+  mixing_W_per_m3: 5.0
+  cost:
+    base_volume_m3: 2779.92
+    base_capex_usd: 1796981.40
+    maintenance_usd_per_m3_yr: 10.0
+    source:
+      key: adbc_spreadsheet
+      file: "ADBCv2-48 (2).xlsm"
+      sheet: "AnaerobicDigester"
+      cells:
+        base_volume_m3: "K8"
+        base_capex_usd: "U33"
+        maintenance_usd_per_m3_yr: "AB18"
+
+  methanogenic:
+    hrt_days: 25
+    pretreatment_case: press_mill_only
+
+  acidogenic:
+    hrt_days: 15.0
+    sources:
+      hrt_days:
+        key: aad_review_window
+        note: "15 d retained as a midpoint design basis within the 10–20 d AAD operating window; not a direct fitted value for this exact Sargassum system."
+
+
+ad_performance:
+  # Shared: digestible solids ID list, identical for both digester modes'
+  # biodegradable-pool calculations.
+  digestible_IDs:
+    - Glucan
+    - Arabinan
+    - Alginate
+    - Fucoidan
+    - Mannitol
+    - Protein
+    - OtherSolids
+
+  methanogenic:
+    # Global CSTR vs_destruction — uniform across all pretreatment cases
+    # Conservative lower bound of 20–70% range for full-scale mesophilic CSTRs
+    # No continuous CSTR data for pretreated pelagic Sargassum exists in literature
+    vs_destruction: 0.20
+
+    # Global fallback biogas composition (overridden per pretreatment case, see pretreatment.yaml)
+    raw_biogas_molfrac:
+      Methane: 0.55
+      CarbonDioxide: 0.42
+      HydrogenSulfide: 0.03
+
+    biodegradability:
+      Mannitol: 0.95
+      Glucan: 0.75
+      Arabinan: 0.70
+      Protein: 0.65
+      Alginate: 0.45
+      Fucoidan: 0.35
+      OtherSolids: 0.30
+
+  acidogenic:
+    case: seaweed_arrested_fitted
+    cases:
+      seaweed_arrested_fitted:
+        vs_destruction: 0.50
+        vfa_kg_per_kg_vs: 0.55
+
+        vfa_split:
+          AceticAcid: 0.648
+          PropionicAcid: 0.186
+          ButyricAcid: 0.084
+          ValericAcid: 0.082
+          HexanoicAcid: 0.000
+
+
+h2s_removal:
+  technology: iron_sponge
+  h2s_removal_efficiency: 0.99
+
+  # Capital cost anchor from Díaz et al. (2015), Bioresour. Technol. 192:280-286
+  # citing Abatzoglou & Boivin (2009): $450,000 at 1,700 Nm3/hr iron sponge system
+  # Scale exponent 0.7 from Díaz et al. (2015) Eq. 4 (Green & Perry 2008 convention)
+  ref_flow_Nm3ph: 1700.0
+  ref_installed_cost_usd: 450000.0
+  scale_exponent: 0.7
+
+  # Reagent cost: iron sponge media replacement
+  # Source: IEA Bioenergy Task 37 (2014); Wellinger & Linberg (2000)
+  reagent_cost_usd_per_Nm3_raw: 0.002
+
+  sources:
+    capex:
+      citation: "Díaz, I.; Ramos, I.; Fdz-Polanco, M. Bioresour. Technol. 2015, 192, 280–286."
+      note: "Capital cost of $450,000 at 1,700 Nm3/hr for iron-sponge-bed filter, scaled
+             with exponent 0.7 per Green & Perry (2008). Original anchor from
+             Abatzoglou & Boivin (2009) A review of biogas purification processes."
+    efficiency:
+      citation: "Choudhury et al. Energies 2019, 12, 4605."
+      note: "Commercially available iron sponge media achieves >99.9% H2S removal,
+             reducing concentrations from 3,600 ppm to <1 ppm."
+    reagent:
+      citation: "IEA Bioenergy Task 37 (2014)."
+      note: "Iron sponge media replacement cost ~$0.001-0.003/Nm3 raw biogas."
+
+
+biogas_upgrading:
+  technology: membrane
+
+  ch4_recovery: 0.99
+  co2_removal: 0.95
+
+  target_ch4_molfrac: 0.97
+  methane_slip_frac: 0.01
+
+  electricity_kWh_per_Nm3_raw: 0.25
+
+  capex_usd_per_Nm3ph_raw: 2200
+  maintenance_frac_of_capex_per_yr: 0.035
+
+  sources:
+    electricity:
+      citation: "IEA Bioenergy Task 37, Biomethane status and factors affecting market development (2014)"
+      note: "Reports electricity consumption typically 0.2–0.3 kWh/Nm³ raw biogas for mature upgrading technologies (incl. membranes)."
+    methane_slip:
+      citation: "IEA Bioenergy Task 37, Biomethane status and factors affecting market development (2014)"
+      note: "States manufacturers guarantee methane losses below ~0.5–2% for new plants."
+    maintenance:
+      citation: "IEA Bioenergy Task 37, Biomethane status and factors affecting market development (2014)"
+      note: "Table lists annual maintenance cost for membranes at ~3–4% of investment cost."
+    capex:
+      citation: "IEA-ETSAP E-TechDS: Biogas and Bio-syngas Production (Dec 2013)"
+      note: "Investment cost for biogas-to-biomethane upgrading units reported ~USD 1950–2600 per Nm³/h for larger raw gas capacities."
+
+
+digestate_decanter_centrifuge:
+  solids_IDs: ["Cellulose", "Ash"]
+  ts_capture_frac: 0.78
+  cake_moisture_frac: 0.75
+  capacity_tph_each: 50.0
+  centrifuge_purchase_cost_usd_each: 297500.0
+  F_BM: 1.0
+
+
+digestate_screw_press:
+  solids_IDs:
+    - Glucan
+    - Arabinan
+    - Alginate
+    - Fucoidan
+    - Mannitol
+    - Protein
+    - OtherSolids
+    - Lignin
+    - Ash
+  ts_capture_frac: 0.4
+  cake_moisture_frac: 0.45
+  capacity_tph_each: 6.0
+  kWh_per_m3: 0.67
+  eur_to_usd: 1.19
+  include_polymer_dosing: false
+  polymer_dosing_cost_eur_each: 0.0
+  F_BM: 1.0
