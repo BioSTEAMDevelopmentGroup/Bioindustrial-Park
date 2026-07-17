@@ -11,23 +11,6 @@ Stream functions (feed/product streams)
 Purpose:
 - Create BioSTEAM Stream objects with correct mass flowrates and composition
 - Convert scenario inputs (fresh feed kg/hr, moisture, quality bin) into component flows
-
-quality_bins:
-  pelagic_high_quality:
-    moisture_frac: 0.8673
-    ash_wt_frac_dry: 0.3453
-    vs_ts: 0.6550
-    source:
-      key: milledge2020
-      note: "Energies 2020 paper (Turks and Caicos pelagic species averages), Table 1."
-
-  beach_wrack_low_quality:
-    moisture_frac: 0.8198
-    ash_wt_frac_dry: 0.4694
-    vs_ts: 0.5311
-    source:
-      key: milledge2020
-      note: "Energies 2020 paper (Mixed Sargassum inundation), Table 1."
 """
 
 import biosteam as bst
@@ -45,6 +28,25 @@ WET_COMPOSITION = dict(
     Mannitol=0.00265,   # 2.00% dry × 0.1327
     Fucoidan=0.00663,   # 5.00% dry × 0.1327
 )
+
+'''
+quality_bins:
+  pelagic_high_quality:
+    moisture_frac: 0.8673
+    ash_wt_frac_dry: 0.3453
+    vs_ts: 0.6550
+    source:
+      key: milledge2020
+      note: "Energies 2020 paper (Turks and Caicos pelagic species averages), Table 1."
+
+  beach_wrack_low_quality:
+    moisture_frac: 0.8198
+    ash_wt_frac_dry: 0.4694
+    vs_ts: 0.5311
+    source:
+      key: milledge2020
+      note: "Energies 2020 paper (Mixed Sargassum inundation), Table 1."
+'''
 
 QUALITY_BINS = {
     "pelagic_high_quality": dict(
