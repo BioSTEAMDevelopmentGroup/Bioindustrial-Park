@@ -29,6 +29,7 @@ Internal helper:
 import biosteam as bst
 import flexsolve as flx
 
+from biorefineries.sabre.utils import load_assumptions
 from biorefineries.sabre.units import (
     YarrowiaLipidFermenter,
     OilExtractionPlaceholder,
@@ -40,45 +41,53 @@ from biorefineries.sabre.systems._ad_vfa_system import create_ad_vfa_system
 __all__ = ('create_ad_fermentation_system',)
 
 
+# Default parameters for _create_vfa_fermentation_system() below (data/vfa_fermentation.yaml).
+_VFA_FERM = load_assumptions("vfa_fermentation.yaml")["vfa_fermentation"]
+_VFA_CASE = _VFA_FERM["cases"][_VFA_FERM["case"]]
+_VFA_MICROFILTER = _VFA_FERM["vfa_microfilter"]
+_VFA_MEDIUM_TANK = _VFA_FERM["fermentation_medium_tank"]
+_VFA_DOWNSTREAM = _VFA_FERM["downstream_recovery"]
+
+
 def _create_vfa_fermentation_system(
     vfa_broth,
     *,
-    product_ID: str = "MicrobialOil",
+    product_ID: str = _VFA_CASE["product_ID"],
     vfa_IDs: list[str] | None = None,
-    conversion: float = 0.85,
-    product_yield_kg_per_kg_vfa_consumed: float = 0.144,
-    biomass_yield_kg_per_kg_vfa_consumed: float = 0.40,
-    co2_yield_kg_per_kg_vfa_consumed: float = 0.20,
-    oxygen_kg_per_kg_vfa_consumed: float = 0.80,
-    residence_time_h: float = 48.0,
-    broth_density_kg_per_m3: float = 1000.0,
-    target_pH: float = 8.0,
-    ammonia_dose_kg_per_m3: float = 0.0,
-    phosphate_dose_kg_per_m3: float = 0.0,
-    base_dose_kg_per_m3: float = 0.0,
-    magnesium_sulfate_dose_kg_per_m3: float = 0.0,
-    seed_water_kgph: float = 0.0,
-    seed_cellmass_kgph: float = 0.0,
+    conversion: float = _VFA_CASE["conversion"],
+    product_yield_kg_per_kg_vfa_consumed: float = _VFA_CASE["product_yield_kg_per_kg_vfa_consumed"],
+    biomass_yield_kg_per_kg_vfa_consumed: float = _VFA_CASE["biomass_yield_kg_per_kg_vfa_consumed"],
+    co2_yield_kg_per_kg_vfa_consumed: float = _VFA_CASE["co2_yield_kg_per_kg_vfa_consumed"],
+    oxygen_kg_per_kg_vfa_consumed: float = _VFA_CASE["oxygen_kg_per_kg_vfa_consumed"],
+    residence_time_h: float = _VFA_CASE["residence_time_h"],
+    broth_density_kg_per_m3: float = _VFA_MICROFILTER["broth_density_kg_per_m3"],
+    target_pH: float = _VFA_CASE["target_pH"],
+    ammonia_dose_kg_per_m3: float = _VFA_MEDIUM_TANK["ammonia_dose_kg_per_m3"],
+    phosphate_dose_kg_per_m3: float = _VFA_MEDIUM_TANK["phosphate_dose_kg_per_m3"],
+    base_dose_kg_per_m3: float = _VFA_MEDIUM_TANK["base_dose_kg_per_m3"],
+    magnesium_sulfate_dose_kg_per_m3: float = _VFA_MEDIUM_TANK["magnesium_sulfate_dose_kg_per_m3"],
+    seed_water_kgph: float = _VFA_CASE["seed_water_kgph"],
+    seed_cellmass_kgph: float = _VFA_CASE["seed_cellmass_kgph"],
 
-    vfa_to_permeate_frac: float = 0.98,
-    water_to_permeate_frac: float = 0.97,
-    solids_to_permeate_frac: float = 0.05,
-    dissolved_other_to_permeate_frac: float = 0.90,
-    microfilter_SEC_kWh_per_m3_feed: float = 0.08,
-    microfilter_design_flux_L_m2_h: float = 20.0,
+    vfa_to_permeate_frac: float = _VFA_MICROFILTER["vfa_to_permeate_frac"],
+    water_to_permeate_frac: float = _VFA_MICROFILTER["water_to_permeate_frac"],
+    solids_to_permeate_frac: float = _VFA_MICROFILTER["solids_to_permeate_frac"],
+    dissolved_other_to_permeate_frac: float = _VFA_MICROFILTER["dissolved_other_to_permeate_frac"],
+    microfilter_SEC_kWh_per_m3_feed: float = _VFA_MICROFILTER["SEC_kWh_per_m3_feed"],
+    microfilter_design_flux_L_m2_h: float = _VFA_MICROFILTER["design_flux_L_m2_h"],
 
-    medium_tank_residence_time_h: float = 0.5,
-    medium_tank_mixing_kW_per_m3: float = 0.05,
+    medium_tank_residence_time_h: float = _VFA_MEDIUM_TANK["residence_time_h"],
+    medium_tank_mixing_kW_per_m3: float = _VFA_MEDIUM_TANK["mixing_kW_per_m3"],
 
-    target_oil_and_solids_content: float = 70.0,
-    target_wastewater_concentration: float = 60.0,
-    backend_oil_recovery: float = 0.99,
-    backend_oil_water_split: float = 0.0001,
+    target_oil_and_solids_content: float = _VFA_DOWNSTREAM["target_oil_and_solids_content_g_per_L"],
+    target_wastewater_concentration: float = 60.0,  # no yaml counterpart
+    backend_oil_recovery: float = _VFA_DOWNSTREAM["backend_oil_recovery"],
+    backend_oil_water_split: float = _VFA_DOWNSTREAM["backend_oil_water_split"],
 
-    recycle_total_fraction: float = 0.10,
-    recycle_cellmass_wt_frac: float = 0.10,
+    recycle_total_fraction: float = _VFA_DOWNSTREAM["recycle_total_fraction"],
+    recycle_cellmass_wt_frac: float = _VFA_DOWNSTREAM["recycle_cellmass_wt_frac"],
 
-    oil_extraction_homogenization_kWh_per_kg: float = 0.203,
+    oil_extraction_homogenization_kWh_per_kg: float = _VFA_DOWNSTREAM["oil_extraction_homogenization_kWh_per_kg"],
 ):
 
     chem_ids = set(bst.settings.thermo.chemicals.IDs)
@@ -87,7 +96,7 @@ def _create_vfa_fermentation_system(
             raise RuntimeError(f"Missing required chemical in thermo: {req}")
 
     if vfa_IDs is None:
-        vfa_IDs = ["AceticAcid", "PropionicAcid", "ButyricAcid", "ValericAcid", "HexanoicAcid"]
+        vfa_IDs = list(_VFA_FERM["vfa_IDs"])
 
     ammonia = bst.Stream("fermentation_ammonia")
     phosphate = bst.Stream("fermentation_phosphate")

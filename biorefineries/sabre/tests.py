@@ -77,31 +77,31 @@ def _check_base_case(feed_price, expected):
 
 def test_vfa_fermentation_near_zero_feed_price():
     _check_base_case(0.00, {
-        "TCI": 283650633.1905655,
-        "FCI": 270143460.18149096,
-        "VOC": 25319059.33262662,
-        "FOC": 10805738.40725964,
+        "TCI": 285259474.42159647,
+        "FCI": 271675689.92533,
+        "VOC": 24204213.354501214,
+        "FOC": 10867027.5970132,
         "material_cost": 0.0,
-        "utility_cost": 18602208.87289611,
-        "sales": -21669346.949496437,
-        "NPV": -772484936.7882472,
-        "MSP_usd_per_kg": 6.9514255681728745,
-        "oil_kg_hr": 1685.646383051919,
+        "utility_cost": 17487362.894770686,
+        "sales": -23227794.472115204,
+        "NPV": -778353924.7293922,
+        "MSP_usd_per_kg": 7.004118099310033,
+        "oil_kg_hr": 1685.646383051923,
     })
 
 
 def test_vfa_fermentation_tipping_fee_feed_price():
     _check_base_case(-0.02, {
-        "TCI": 283650633.1905656,
-        "FCI": 270143460.181491,
-        "VOC": -73680940.6673734,
-        "FOC": 10805738.407259641,
-        "material_cost": -99000000.00000001,
-        "utility_cost": 18602208.87289611,
-        "sales": -21669346.949496437,
-        "NPV": 45842016.47741586,
-        "MSP_usd_per_kg": -0.46412745216541507,
-        "oil_kg_hr": 1685.646383051919,
+        "TCI": 285259474.42159647,
+        "FCI": 271675689.92533,
+        "VOC": -74795786.64549878,
+        "FOC": 10867027.5970132,
+        "material_cost": -98999999.99999999,
+        "utility_cost": 17487362.894770686,
+        "sales": -23227794.472115204,
+        "NPV": 40694981.44913706,
+        "MSP_usd_per_kg": -0.4114349215105148,
+        "oil_kg_hr": 1685.646383051923,
     })
 
 
@@ -112,22 +112,22 @@ def test_vfa_fermentation_product_scenarios():
     """
     expected = {
         "Microbial oil": {
-            "TCI": 283650633.1905656,
-            "VOC": 18643899.655741017,
-            "MSP_usd_per_kg": 4.828292327488782,
-            "annual_product_kg": 13350319.353771199,
+            "TCI": 285259474.4215966,
+            "VOC": 17529053.677615598,
+            "MSP_usd_per_kg": 4.764250008059018,
+            "annual_product_kg": 13350319.35377123,
         },
         "Omega-3 EPA oil": {
-            "TCI": 577359449.7001549,
-            "VOC": 20609437.1094456,
-            "MSP_usd_per_kg": 12.28174425161931,
-            "annual_product_kg": 9271055.106785554,
+            "TCI": 581997090.8504997,
+            "VOC": 19514055.441561863,
+            "MSP_usd_per_kg": 12.244390537885744,
+            "annual_product_kg": 9271055.106785577,
         },
         "Astaxanthin": {
-            "TCI": 547534273.5079175,
-            "VOC": 20264448.373959795,
-            "MSP_usd_per_kg": 390.8306206438654,
-            "annual_product_kg": 278131.6532035666,
+            "TCI": 551755718.0341935,
+            "VOC": 19166237.95562546,
+            "MSP_usd_per_kg": 389.33362703963525,
+            "annual_product_kg": 278131.6532035673,
         },
     }
 
@@ -239,25 +239,25 @@ def test_integrated_tea_alpha_sweep():
 
     expected = {
         0.0: {
-            "msp_oil_usd_per_kg": 11.858154113399467,
-            "combined_npv_M": -1210.5891785004417,
-            "tci_M": 283.7706558745471,
-            "voc_M": 117.56345963121451,
-            "oil_kg_yr": 13350319.353771199,
+            "msp_oil_usd_per_kg": 11.905987176215474,
+            "combined_npv_M": -1215.916204608946,
+            "tci_M": 285.25947442159645,
+            "voc_M": 116.52905367761558,
+            "oil_kg_yr": 13350319.35377123,
         },
         0.5: {
-            "msp_biomethane_mmbtu": 139.65967888996116,
-            "msp_oil_usd_per_kg": 22.2698143184909,
-            "combined_npv_M": -1096.662612438269,
-            "tci_M": 262.9567856842591,
-            "voc_M": 114.3342005534255,
-            "oil_kg_yr": 6675159.676885599,
+            "msp_biomethane_mmbtu": 139.96180632306888,
+            "msp_oil_usd_per_kg": 22.31799087087387,
+            "combined_npv_M": -1099.3450261378782,
+            "tci_M": 263.7156232654399,
+            "voc_M": 113.81705695250689,
+            "oil_kg_yr": 6675159.676885615,
         },
         1.0: {
-            "msp_biomethane_mmbtu": 64.69794194966727,
-            "combined_npv_M": -972.2687745173178,
-            "tci_M": 234.32990954345922,
-            "voc_M": 111.09763611626092,
+            "msp_biomethane_mmbtu": 64.69785082532837,
+            "combined_npv_M": -972.2671450444597,
+            "tci_M": 234.3299095434593,
+            "voc_M": 111.09763611621827,
             "oil_kg_yr": 0.0,
         },
     }
@@ -341,7 +341,7 @@ import vfa_heatmap as _vhm  # noqa: E402
 
 def test_vfa_heatmap_build_case():
     msp = _vhm.build_case(0.02, 0.50)
-    _assert_close(msp, 12.353309447221273, "feed=0.02/biostim=0.50 msp_usd_per_kg")
+    _assert_close(msp, 12.405987176909537, "feed=0.02/biostim=0.50 msp_usd_per_kg")
 
 
 # =================================================================
@@ -436,8 +436,8 @@ import vfa_price_scenarios as _vps  # noqa: E402
 
 def test_vfa_price_scenarios_biostimulant_price():
     for bs_price, expected_msp in (
-        (0.00, 14.366978528098292),
-        (1.00, 10.33964036545701),
+        (0.00, 14.419671059237162),
+        (1.00, 10.392303293696184),
     ):
         streams, units, full_sys = _vps.build_and_simulate(
             _vps.FEED_PRICE_BASE
@@ -461,7 +461,7 @@ def test_vfa_yield_sensitivities_acidogenic_yield():
     msp_val = _vys.solve_oil_msp_from_full_system(
         full_sys, streams, extraction_usd_per_kg_oil=0.50
     )
-    _assert_close(msp_val, 16.65218743436552, "acidogenic_vfa_yield=0.47 msp_usd_per_kg")
+    _assert_close(msp_val, 16.7113465079317, "acidogenic_vfa_yield=0.47 msp_usd_per_kg")
 
 
 def test_vfa_yield_sensitivities_fermentation_yield():
@@ -473,7 +473,7 @@ def test_vfa_yield_sensitivities_fermentation_yield():
     msp_val = _vys.solve_oil_msp_from_full_system(
         full_sys, streams, extraction_usd_per_kg_oil=0.50
     )
-    _assert_close(msp_val, 10.490020104025023, "fermentation_yield=0.20 msp_usd_per_kg")
+    _assert_close(msp_val, 10.5278868696822, "fermentation_yield=0.20 msp_usd_per_kg")
 
 
 # =================================================================

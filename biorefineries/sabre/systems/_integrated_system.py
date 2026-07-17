@@ -32,7 +32,9 @@ from biorefineries.sabre.utils import (
 from biorefineries.sabre.units import Press, Mill, PressateConcentrator
 from biorefineries.sabre.systems._ad_biomethane_system import _build_methanogenic_pathway
 from biorefineries.sabre.systems._ad_vfa_system import create_ad_vfa_system
-from biorefineries.sabre.systems._ad_fermentation_system import _create_vfa_fermentation_system
+from biorefineries.sabre.systems._ad_fermentation_system import (
+    _create_vfa_fermentation_system, _VFA_CASE, _VFA_MEDIUM_TANK, _VFA_DOWNSTREAM,
+)
 
 __all__ = ('create_integrated_biorefinery', 'MassSplitter')
 
@@ -140,15 +142,15 @@ def create_integrated_biorefinery(
     alpha: float = 0.5,
     feedstock_type: str = "pelagic",
     pretreatment_case: str = "press_mill_only",
-    vfa_conversion: float = 0.85,
-    vfa_product_yield: float = 0.144,
-    vfa_biomass_yield: float = 0.40,
-    vfa_co2_yield: float = 0.20,
-    vfa_o2_demand: float = 0.80,
-    ferm_residence_time_h: float = 48.0,
-    ferm_target_pH: float = 8.0,
-    ferm_mgso4_dose: float = 0.49,
-    target_oil_and_solids_content: float = 70.0,
+    vfa_conversion: float = _VFA_CASE["conversion"],
+    vfa_product_yield: float = _VFA_CASE["product_yield_kg_per_kg_vfa_consumed"],
+    vfa_biomass_yield: float = _VFA_CASE["biomass_yield_kg_per_kg_vfa_consumed"],
+    vfa_co2_yield: float = _VFA_CASE["co2_yield_kg_per_kg_vfa_consumed"],
+    vfa_o2_demand: float = _VFA_CASE["oxygen_kg_per_kg_vfa_consumed"],
+    ferm_residence_time_h: float = _VFA_CASE["residence_time_h"],
+    ferm_target_pH: float = _VFA_CASE["target_pH"],
+    ferm_mgso4_dose: float = _VFA_MEDIUM_TANK["magnesium_sulfate_dose_kg_per_m3"],
+    target_oil_and_solids_content: float = _VFA_DOWNSTREAM["target_oil_and_solids_content_g_per_L"],
 ):
     """
     Build the full integrated Sargassum biorefinery.
