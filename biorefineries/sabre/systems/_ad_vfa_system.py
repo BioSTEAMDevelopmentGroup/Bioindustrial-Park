@@ -121,6 +121,7 @@ def create_ad_vfa_system(
         # Build full preprocessing from raw feed.
         # -------------------------
         feedstock_assumptions = load_assumptions("feedstock.yaml")
+        preprocessing_assumptions = load_assumptions("preprocessing.yaml")
         params = get_feedstock_type_params(feedstock_assumptions, feedstock_type)
         fresh_feed_kgph = get_scale_feed_kgph(feedstock_assumptions)
         moisture_frac = params["moisture_frac"]
@@ -131,7 +132,7 @@ def create_ad_vfa_system(
             ash_wt_frac_dry=params["ash_wt_frac_dry"],
         )
 
-        pp = A.get("preprocessing", {})
+        pp = preprocessing_assumptions.get("preprocessing", {})
         prA = pp.get("press", {})
         mlA = pp.get("mill", {})
 
@@ -155,7 +156,7 @@ def create_ad_vfa_system(
         # -------------------------
         # Pressate biostimulant side-stream
         # -------------------------
-        pb = A.get("pressate_biostimulant", {})
+        pb = preprocessing_assumptions.get("pressate_biostimulant", {})
         pcA = pb.get("concentrator", {})
         evA = pb.get("evaporator", {})
 

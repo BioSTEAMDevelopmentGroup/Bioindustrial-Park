@@ -82,6 +82,7 @@ def create_biostimulant_system(
     """
     A = load_assumptions()
     feedstock_assumptions = load_assumptions("feedstock.yaml")
+    preprocessing_assumptions = load_assumptions("preprocessing.yaml")
     params = get_feedstock_type_params(feedstock_assumptions, feedstock_type)
     fresh_feed_kgph = get_scale_feed_kgph(feedstock_assumptions)
     moisture_frac = params["moisture_frac"]
@@ -91,7 +92,7 @@ def create_biostimulant_system(
         ash_wt_frac_dry=params["ash_wt_frac_dry"],
     )
 
-    pp = A.get("preprocessing", {})
+    pp = preprocessing_assumptions.get("preprocessing", {})
     prA = pp.get("press", {})
 
     PR = Press(
@@ -108,7 +109,7 @@ def create_biostimulant_system(
     )
     PR.outs[0].price = float(pressed_cake_disposal_usd_per_kg)
 
-    pcA = A.get("pressate_biostimulant", {}).get("concentrator", {})
+    pcA = preprocessing_assumptions.get("pressate_biostimulant", {}).get("concentrator", {})
 
     PC = PressateConcentrator(
         "PC", ins=PR - 1,

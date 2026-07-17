@@ -176,6 +176,7 @@ def create_integrated_biorefinery(
 
     A = load_assumptions()
     feedstock_assumptions = load_assumptions("feedstock.yaml")
+    preprocessing_assumptions = load_assumptions("preprocessing.yaml")
     params = get_feedstock_type_params(feedstock_assumptions, feedstock_type)
     fresh_feed_kgph = get_scale_feed_kgph(feedstock_assumptions)
 
@@ -188,7 +189,7 @@ def create_integrated_biorefinery(
         ash_wt_frac_dry=params["ash_wt_frac_dry"],
     )
 
-    pp  = A.get("preprocessing", {})
+    pp  = preprocessing_assumptions.get("preprocessing", {})
     prA = pp.get("press", {})
     mlA = pp.get("mill", {})
 
@@ -207,7 +208,7 @@ def create_integrated_biorefinery(
         F_BM=(prA.get("F_BM") or 1.0),
     )
 
-    pb  = A.get("pressate_biostimulant", {})
+    pb  = preprocessing_assumptions.get("pressate_biostimulant", {})
     pcA = pb.get("concentrator", {})
     PC  = None
     if pb.get("enabled", False) and pb.get("concentrate_pressate", False):
