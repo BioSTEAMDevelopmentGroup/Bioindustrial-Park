@@ -10,7 +10,8 @@
 plot_two_pretreatment_figures_from_tea_with_errorbars.py
 --------------------------------------------------------
 Recalculate methane production and MSP directly from the current SABRE model and TEA,
-including error bars based on the low/high methane-yield estimates in assumptions.yaml.
+including error bars based on the low/high methane-yield estimates in
+data/pretreatment.yaml.
 
 Outputs:
 1) fig_methane_production_by_pretreatment_errorbars.png
@@ -41,7 +42,7 @@ from biorefineries.sabre._tea import create_tea, solve_biomethane_msp
 OUT = SCRIPT_DIR.parent / "results" / "figures"
 OUT.mkdir(parents=True, exist_ok=True)
 
-# Reads the methane yield effects for each pretreatment case from assumptions.yaml
+# Reads the methane yield effects for each pretreatment case from data/pretreatment.yaml
 PRETREATMENT_CASES = [
     "press_mill_only",
     "enzymatic",
@@ -126,8 +127,7 @@ def build_case(
     return sys, tea, msp, ch4_kgph
 
 
-A = load_assumptions()
-CASE_DEFS = A["ad_pretreatment_cases"]
+CASE_DEFS = load_assumptions("pretreatment.yaml")["pretreatment_ad"]
 
 
 def get_case_yields(case: str):

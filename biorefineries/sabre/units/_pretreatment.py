@@ -31,15 +31,15 @@ class EnzymaticPretreatment(bst.Unit):
     Sources
     -------
     capex_usd ($7,280,000):
-        assumptions.yaml `ad_pretreatment_cases.enzymatic.sources.capex`,
+        data/pretreatment.yaml `pretreatment_ad.enzymatic.sources.capex`,
         key `nrel_2015_saccharification_tank`, report NREL/TP-5100-62498.
     enzyme_price_usd_per_kg ($7.00):
-        assumptions.yaml `ad_pretreatment_cases.enzymatic.sources.
+        data/pretreatment.yaml `pretreatment_ad.enzymatic.sources.
         enzyme_price`, key `nrel_2015_enzyme_cost`, report
         NREL/TP-5100-62498 (same report as capex, different section).
     temperature_K, residence_time_hr, enzyme_dose_kg_per_kg_dry_feed
     (0.005), treated_fraction (0.25), enzyme_recycle_factor (2.0):
-        assumptions.yaml `ad_pretreatment_cases.enzymatic.enzymatic`
+        data/pretreatment.yaml `pretreatment_ad.enzymatic.enzymatic`
         section. No named literature source for these five in yaml --
         only `capex` and `enzyme_price` have `sources:` entries. The
         yaml's `sources.methane_yield`/`biogas_composition`/
@@ -174,8 +174,8 @@ class HeatingPretreatment(bst.Unit):
     `systems._ad_biomethane_system._build_methanogenic_pathway`. Constructed in
     exactly one place in this codebase (that function) -- and only ever
     actually reached via the `combined_PTE` case's peroxide->heating->
-    enzymatic sequence: `assumptions.yaml` has no standalone
-    `ad_pretreatment_cases` entry with `kind: heating` (only
+    enzymatic sequence: `data/pretreatment.yaml` has no standalone
+    `pretreatment_ad` entry with `kind: heating` (only
     `press_mill_only`/`enzymatic`/`peroxide`/`combined_PE`/`combined_PTE`
     are defined), so `_build_methanogenic_pathway`'s standalone
     `pt_kind == "heating"` branch (with its own inline fallback values,
@@ -190,7 +190,7 @@ class HeatingPretreatment(bst.Unit):
     -------
     target_temperature_K (393.15 K), residence_time_hr (0.25 h),
     capex_usd ($1,200,000):
-        assumptions.yaml `ad_pretreatment_cases.combined_PTE.heating`
+        data/pretreatment.yaml `pretreatment_ad.combined_PTE.heating`
         section -- the only reachable real values, per the note above.
         No named literature source for any of these three; yaml's
         `sources.capex` entry for `combined_PTE`
@@ -301,12 +301,12 @@ class PeroxidePretreatment(bst.Unit):
     Sources
     -------
     capex_usd ($1,000,000):
-        assumptions.yaml `ad_pretreatment_cases.peroxide.sources.capex`,
+        data/pretreatment.yaml `pretreatment_ad.peroxide.sources.capex`,
         key `nrel_2011_conditioning_tank_anchor`, report
         NREL/TP-5100-47764.
     h2o2_wt_frac_on_dry_feed, temperature_K, residence_time_hr,
     h2o2_price_usd_per_kg ($0.37/kg):
-        assumptions.yaml `ad_pretreatment_cases.peroxide.peroxide` section.
+        data/pretreatment.yaml `pretreatment_ad.peroxide.peroxide` section.
         No named literature source for these four in yaml -- only `capex`
         has a `sources:` entry. Same caveat as `EnzymaticPretreatment`:
         yaml's `sources.methane_yield`/`biogas_composition`/

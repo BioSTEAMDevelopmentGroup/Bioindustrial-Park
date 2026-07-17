@@ -93,8 +93,8 @@ class AnaerobicDigester(bst.Unit):
         for pretreated pelagic Sargassum exists in literature." Scoping
         assumption, not a citation.
     ch4_kg_per_kg_vs_fed (0.100):
-        This is the `press_mill_only` baseline pretreatment case value (yaml
-        `ad_pretreatment_cases.press_mill_only.ad_effects.ch4_kg_per_kg_vs_fed`),
+        This is the `press_mill_only` baseline pretreatment case value
+        (data/pretreatment.yaml `pretreatment_ad.press_mill_only.ad_effects.ch4_kg_per_kg_vs_fed`),
         not a universal constant -- the 4 other pretreatment cases in yaml use
         different values (0.123 enzymatic, 0.165 peroxide, 0.277 combined_PE,
         0.261 combined_PTE), each cited to a different row of the same table.

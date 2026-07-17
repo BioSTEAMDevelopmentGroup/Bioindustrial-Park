@@ -38,6 +38,11 @@ from biorefineries.sabre.units import (
 __all__ = ('create_ad_biomethane_system',)
 
 
+# Pretreatment case definitions, shared by _build_methanogenic_pathway()
+# below (data/pretreatment.yaml `pretreatment_ad` section).
+_PRETREATMENT_AD = load_assumptions("pretreatment.yaml")["pretreatment_ad"]
+
+
 def _apply_biodegradability_overrides(base_dict, override_factors):
     """
     Multiply selected biodegradability values by override factors, clamped to [0, 1].
@@ -78,7 +83,7 @@ def _build_methanogenic_pathway(A, feed_stream, pretreatment_case, biogas_ids=("
     adS = A["ad"]
     adp = A["ad_performance"]
     adC = A["ad_costing"]
-    pretreatments = A.get("ad_pretreatment_cases", {})
+    pretreatments = _PRETREATMENT_AD
 
     enable_feed_dilution = bool(adS.get("enable_feed_dilution", True))
     target_feed_moisture_frac = float(adS.get("target_feed_moisture_frac", 0.92))

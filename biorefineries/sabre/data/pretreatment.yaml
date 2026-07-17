@@ -1,0 +1,166 @@
+# Model Assumptions: Pretreatment
+
+# For anaerobic digestion
+pretreatment_ad:
+  press_mill_only:
+    kind: none
+    description: "Baseline physical preprocessing only: press plus mill anchored to Yuhendra et al. mechanical pretreatment result on Sargassum fulvellum"
+    ad_effects:
+      vs_destruction: 0.20
+      ch4_kg_per_kg_vs_fed: 0.100
+      ch4_kg_per_kg_vs_fed_low: 0.1000   # BMP (142.91 - 0.004) mL CH4/gVS, scaled; near-zero uncertainty
+      ch4_kg_per_kg_vs_fed_high: 0.1000  # BMP (142.91 + 0.004) mL CH4/gVS, scaled; near-zero uncertainty
+      raw_biogas_molfrac:
+        Methane: 0.4644
+        CarbonDioxide: 0.5056
+        HydrogenSulfide: 0.03
+      biodegradability_factor_overrides: {}
+    sources:
+      methane_yield:
+        key: chikani_cabrera_2022_physical_C
+        note: "224.19 ± 9.45 L CH4/kg VS (Chikani-Cabrera et al. 2022, Table 4). Central value scaled conservatively to 0.100 kg/kg VS for continuous CSTR."
+      biogas_composition:
+        key: chikani_cabrera_2022_physical_C
+        note: "46.44% CH4 in biogas reported for physical pretreatment C condition."
+      vs_destruction:
+        key: calibrated_from_biodegradability_index
+        note: "Baseline vs_destruction retained at 0.20 as the continuous-CSTR anchor. Other pretreatment cases are scaled relative to this baseline using the Chikani-Cabrera et al. (2022) biodegradability index trend."
+
+  enzymatic:
+    kind: enzymatic
+    description: "Enzymatic pretreatment before methanogenic AD"
+    enzymatic:
+      temperature_K: 308.15
+      residence_time_hr: 24.0
+      enzyme_dose_kg_per_kg_dry_feed: 0.005
+      treated_fraction: 0.25
+      enzyme_recycle_factor: 2.0
+      capex_usd: 7280000.0
+      enzyme_price_usd_per_kg: 7.0
+      maintenance_frac_of_capex_per_yr: 0.035
+    ad_effects:
+      vs_destruction: 0.15
+      ch4_kg_per_kg_vs_fed: 0.123
+      ch4_kg_per_kg_vs_fed_low: 0.1226   # BMP (172.57 - 0.56) L/kg VS, scaled
+      ch4_kg_per_kg_vs_fed_high: 0.1234  # BMP (172.57 + 0.56) L/kg VS, scaled
+      raw_biogas_molfrac:
+        Methane: 0.8456
+        CarbonDioxide: 0.1244
+        HydrogenSulfide: 0.03
+      biodegradability_factor_overrides: {}
+    sources:
+      methane_yield:
+        key: chikani_cabrera_2022_enzymatic_E
+        note: "172.57 ± 0.56 L CH4/kg VS (Chikani-Cabrera et al. 2022, Table 4)."
+      biogas_composition:
+        key: chikani_cabrera_2022_enzymatic_E
+        note: "84.56% CH4 in biogas reported for enzymatic pretreatment E condition."
+      vs_destruction:
+        key: calibrated_from_biodegradability_index
+        note: "Set to 0.15 by scaling the baseline continuous-CSTR vs_destruction of 0.20 by the relative biodegradability index ratio E/C = 0.42/0.55 from Chikani-Cabrera et al. (2022)."
+      capex:
+        key: nrel_2015_saccharification_tank
+        report: "NREL/TP-5100-62498"
+      enzyme_price:
+        key: nrel_2015_enzyme_cost
+        report: "NREL/TP-5100-62498"
+
+  peroxide:
+    kind: peroxide
+    description: "Hydrogen peroxide pretreatment before methanogenic AD"
+    peroxide:
+      h2o2_wt_frac_on_dry_feed: 0.025
+      temperature_K: 298.15
+      residence_time_hr: 2.0
+      capex_usd: 1000000.0
+      h2o2_price_usd_per_kg: 0.37
+      maintenance_frac_of_capex_per_yr: 0.035
+    ad_effects:
+      vs_destruction: 0.21
+      ch4_kg_per_kg_vs_fed: 0.165
+      ch4_kg_per_kg_vs_fed_low: 0.1566   # BMP (230.82 - 11.65) L/kg VS, scaled
+      ch4_kg_per_kg_vs_fed_high: 0.1732  # BMP (230.82 + 11.65) L/kg VS, scaled
+      raw_biogas_molfrac:
+        Methane: 0.5155
+        CarbonDioxide: 0.4545
+        HydrogenSulfide: 0.03
+      biodegradability_factor_overrides: {}
+    sources:
+      methane_yield:
+        key: chikani_cabrera_2022_peroxide_P
+        note: "230.82 ± 11.65 L CH4/kg VS (Chikani-Cabrera et al. 2022, Table 4)."
+      biogas_composition:
+        key: chikani_cabrera_2022_peroxide_P
+        note: "51.55% CH4 in biogas reported for peroxide pretreatment P condition."
+      vs_destruction:
+        key: calibrated_from_biodegradability_index
+        note: "Set to 0.21 by scaling the baseline continuous-CSTR vs_destruction of 0.20 by the relative biodegradability index ratio P/C = 0.57/0.55 from Chikani-Cabrera et al. (2022)."
+      capex:
+        key: nrel_2011_conditioning_tank_anchor
+        report: "NREL/TP-5100-47764"
+
+  combined_PE:
+    kind: combined_PE
+    description: "Peroxide pretreatment followed by enzymatic pretreatment"
+    sequence:
+      - peroxide
+      - enzymatic
+    ad_effects:
+      vs_destruction: 0.35
+      ch4_kg_per_kg_vs_fed: 0.277
+      ch4_kg_per_kg_vs_fed_low: 0.2760   # BMP (387.64 - 1.41) L/kg VS, scaled
+      ch4_kg_per_kg_vs_fed_high: 0.2780  # BMP (387.64 + 1.41) L/kg VS, scaled
+      raw_biogas_molfrac:
+        Methane: 0.8641
+        CarbonDioxide: 0.1059
+        HydrogenSulfide: 0.03
+      biodegradability_factor_overrides: {}
+    sources:
+      methane_yield:
+        key: chikani_cabrera_2022_combined_PE
+        note: "387.64 ± 1.41 L CH4/kg VS (Chikani-Cabrera et al. 2022, Table 4)."
+      biogas_composition:
+        key: chikani_cabrera_2022_combined_PE
+        note: "86.41% CH4 in biogas reported for combined PE condition."
+      vs_destruction:
+        key: calibrated_from_biodegradability_index
+        note: "Set to 0.35 by scaling the baseline continuous-CSTR vs_destruction of 0.20 by the relative biodegradability index ratio PE/C = 0.95/0.55 from Chikani-Cabrera et al. (2022)."
+      capex:
+        key: additive_peroxide_plus_enzymatic
+        note: "Combined PE CAPEX = sum of peroxide and enzymatic installed CAPEX."
+
+  combined_PTE:
+    kind: combined_PTE
+    description: "Peroxide pretreatment followed by thermal pretreatment and enzymatic pretreatment"
+    sequence:
+      - peroxide
+      - heating
+      - enzymatic
+    heating:
+      target_temperature_K: 393.15
+      residence_time_hr: 0.25
+      capex_usd: 1200000.0
+      maintenance_frac_of_capex_per_yr: 0.035
+    ad_effects:
+      vs_destruction: 0.32
+      ch4_kg_per_kg_vs_fed: 0.261
+      ch4_kg_per_kg_vs_fed_low: 0.2551   # BMP (364.95 - 8.18) L/kg VS, scaled
+      ch4_kg_per_kg_vs_fed_high: 0.2667  # BMP (364.95 + 8.18) L/kg VS, scaled
+      raw_biogas_molfrac:
+        Methane: 0.8769
+        CarbonDioxide: 0.0931
+        HydrogenSulfide: 0.03
+      biodegradability_factor_overrides: {}
+    sources:
+      methane_yield:
+        key: chikani_cabrera_2022_combined_PTE
+        note: "364.95 ± 8.18 L CH4/kg VS (Chikani-Cabrera et al. 2022, Table 4)."
+      biogas_composition:
+        key: chikani_cabrera_2022_combined_PTE
+        note: "87.69% CH4 in biogas reported for combined PTE condition."
+      vs_destruction:
+        key: calibrated_from_biodegradability_index
+        note: "Set to 0.32 by scaling the baseline continuous-CSTR vs_destruction of 0.20 by the relative biodegradability index ratio PTE/C = 0.88/0.55 from Chikani-Cabrera et al. (2022)."
+      capex:
+        key: additive_peroxide_plus_heating_plus_enzymatic
+        note: "Combined PTE CAPEX = sum of peroxide, heating, and enzymatic installed CAPEX."
