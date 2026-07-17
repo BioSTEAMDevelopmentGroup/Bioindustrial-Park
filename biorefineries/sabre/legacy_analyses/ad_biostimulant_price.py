@@ -16,8 +16,6 @@ Run from sabre_project root:
     python scripts/plot_biostimulant_sensitivity.py
 """
 
-from __future__ import annotations
-
 import sys
 from pathlib import Path
 

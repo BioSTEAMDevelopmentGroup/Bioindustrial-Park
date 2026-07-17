@@ -24,8 +24,6 @@ Notes:
 - Final product is biomethane (post-upgrading), not the raw AD biogas.
 """
 
-from __future__ import annotations
-
 import biosteam as bst
 
 from biorefineries.sabre.utils import load_assumptions, get_quality_params, get_scale_feed_kgph

@@ -26,8 +26,6 @@ Python-level default that callers can override, e.g.
 Fresh water make-up is priced the same way
 (`fresh_water_price_usd_per_kg`, default 0.0).
 """
-from __future__ import annotations
-
 import biosteam as bst
 
 from biorefineries.sabre.utils import load_assumptions, get_quality_params, get_scale_feed_kgph

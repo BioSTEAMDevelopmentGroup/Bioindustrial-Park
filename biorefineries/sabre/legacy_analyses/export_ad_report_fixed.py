@@ -15,8 +15,6 @@ Updated exporter:
 - uses current model outputs case-by-case
 """
 
-from __future__ import annotations
-
 import argparse
 import math
 import sys

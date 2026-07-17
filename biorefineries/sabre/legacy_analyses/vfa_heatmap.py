@@ -20,8 +20,6 @@ Run from sabre_project root:
     python scripts/vfa_heatmap.py
 """
 
-from __future__ import annotations
-
 from pathlib import Path
 import sys
 

@@ -8,8 +8,6 @@
 """
 Techno-economic analysis for the SaBRe flowsheets.
 """
-from __future__ import annotations
-
 import biosteam as bst
 
 __all__ = ('SaBReTEA', 'create_tea', 'solve_product_msp', 'solve_biomethane_msp')

@@ -9,8 +9,6 @@
 Pre-AD pretreatment stages: enzymatic, thermal (heating), and hydrogen
 peroxide pretreatment before methanogenic AD.
 """
-from __future__ import annotations
-
 import biosteam as bst
 
 __all__ = ('EnzymaticPretreatment', 'HeatingPretreatment', 'PeroxidePretreatment')

@@ -29,8 +29,6 @@ Modeling notes:
 - Raw biogas composition is imposed from target mole fractions
 """
 
-from __future__ import annotations
-
 import math
 from typing import Dict, Iterable, Optional
 

@@ -16,8 +16,6 @@ Figures:
   4) 2×3 panel heatmaps — alpha=0/0.25/0.50/0.75/1.0, three feed prices
 """
 
-from __future__ import annotations
-
 import sys
 from dataclasses import dataclass
 from pathlib import Path

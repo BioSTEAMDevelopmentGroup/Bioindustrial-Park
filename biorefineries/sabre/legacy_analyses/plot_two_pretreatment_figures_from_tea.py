@@ -19,8 +19,6 @@ Outputs:
 BASECASE: biostimulant: $0/kg (no revenue), feedstock: $0.02/kg wet
 """
 
-from __future__ import annotations
-
 import sys
 from pathlib import Path
 

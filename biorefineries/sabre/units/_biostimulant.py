@@ -9,8 +9,6 @@
 Pressate-derived biostimulant side-stream: membrane concentration and
 finishing evaporation.
 """
-from __future__ import annotations
-
 import biosteam as bst
 
 __all__ = ('PressateConcentrator', 'BiostimulantEvaporator')

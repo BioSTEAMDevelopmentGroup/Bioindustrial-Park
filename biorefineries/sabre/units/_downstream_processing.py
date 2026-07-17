@@ -42,7 +42,6 @@ Operating cost:
       also not independently verified against the primary sources.
 """
 
-from __future__ import annotations
 import biosteam as bst
 from biosteam.units.decorators import cost
 

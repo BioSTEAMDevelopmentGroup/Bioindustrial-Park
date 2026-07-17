@@ -24,8 +24,6 @@ integrated system and the standalone AD/biomethane system never drift apart.
 Returns (sys, streams, units, alpha).
 """
 
-from __future__ import annotations
-
 import biosteam as bst
 
 from biorefineries.sabre.utils import load_assumptions, get_quality_params, get_scale_feed_kgph

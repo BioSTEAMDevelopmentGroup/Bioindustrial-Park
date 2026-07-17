@@ -8,8 +8,6 @@
 """""
 Creating the chemical list used for the SaBRe systems
 """""
-from __future__ import annotations
-
 import biosteam as bst
 import thermosteam as tmo
 

@@ -26,8 +26,6 @@ Internal helper:
   from a shared/partial preprocessing train and just needs the
   fermentation half.
 """
-from __future__ import annotations
-
 import biosteam as bst
 import flexsolve as flx
 

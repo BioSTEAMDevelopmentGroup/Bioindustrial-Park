@@ -18,8 +18,6 @@ plot_vfa_yield_sensitivities.py --> see how yield effects the VFA and oil produc
 
 """
 
-from __future__ import annotations
-
 from pathlib import Path
 import sys
 

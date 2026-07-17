@@ -9,8 +9,6 @@
 VFA fermentation train: microfilter clarification, medium conditioning,
 and the Yarrowia lipolytica fermenter itself.
 """
-from __future__ import annotations
-
 from typing import Optional
 import biosteam as bst
 from biosteam.units.decorators import cost
