@@ -26,16 +26,14 @@ ad:
 
   mixing_W_per_m3: 5.0
   cost:
-    base_volume_m3: 2779.92
-    base_capex_usd: 1796981.40
     maintenance_usd_per_m3_yr: 10.0
     source:
+      adbc: Anaerobic Digester Budget Calculator
+      link: https://csanr.wsu.edu/resources/enterprise-budget-calculator/
       key: adbc_spreadsheet
       file: "ADBCv2-48 (2).xlsm"
       sheet: "AnaerobicDigester"
       cells:
-        base_volume_m3: "K8"
-        base_capex_usd: "U33"
         maintenance_usd_per_m3_yr: "AB18"
 
   methanogenic:
@@ -167,21 +165,10 @@ digestate_decanter_centrifuge:
 
 
 digestate_screw_press:
-  solids_IDs:
-    - Glucan
-    - Arabinan
-    - Alginate
-    - Fucoidan
-    - Mannitol
-    - Protein
-    - OtherSolids
-    - Lignin
-    - Ash
   ts_capture_frac: 0.4
   cake_moisture_frac: 0.45
   capacity_tph_each: 6.0
   kWh_per_m3: 0.67
-  eur_to_usd: 1.19
   include_polymer_dosing: false
-  polymer_dosing_cost_eur_each: 0.0
+  polymer_dosing_cost_usd_each: 35000 # set within 12k–50k EURO (1 EURO = 1.19 USD) if included
   F_BM: 1.0

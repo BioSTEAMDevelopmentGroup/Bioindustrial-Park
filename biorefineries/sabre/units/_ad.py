@@ -9,24 +9,6 @@
 Anaerobic digestion (AD) and the surrounding biogas train: methanogenic and
 acidogenic digestion, biogas upgrading, H2S removal, and digestate
 dewatering (screw press / decanter centrifuge).
-
-AnaerobicDigester
------------------
-Purpose:
-- Convert a biodegradable fraction of Sargassum organics into raw biogas
-  using component-specific biodegradability factors
-- Produce a residual digestate stream containing undegraded material
-- Size the digester using HRT and headspace
-- Enforce a maximum single-digester size and model parallel digesters
-- Estimate CAPEX using ADBC-based interpolation
-
-Modeling notes:
-- Lumped methanogenic AD model
-- Methane production is based on:
-    feed VS * ch4_kg_per_kg_vs_fed
-- Different components can have different biodegradability factors
-- Biodegradability + vs_destruction determine digestate solids reduction
-- Raw biogas composition is imposed from target mole fractions
 """
 
 import math
@@ -35,23 +17,39 @@ from typing import Dict, Iterable, Optional
 import biosteam as bst
 from biosteam.units.decorators import cost
 
+from biorefineries.sabre.utils import load_assumptions, OPERATING_HOURS_PER_YEAR
+
 __all__ = (
-    'AnaerobicDigester', 'GAL_TO_M3', 'NM3_PER_KMOL', 'interp_capex',
-    'AcidogenicDigester', 'BiogasUpgrading', 'H2SRemoval',
+    'AnaerobicDigester', 'AcidogenicDigester',
+    'H2SRemoval', 'BiogasUpgrading',
     'DigestateDecanterCentrifuge', 'DigestateScrewPress',
 )
+
 
 # Conversion factors and ADBC data
 GAL_TO_M3 = 0.003785411784  # US gallons -> m3
 NM3_PER_KMOL = 22.414
 
+# Loaded once at import time -- data/ad.yaml is the single source of truth
+# for AnaerobicDigester.__init__'s default values below, so a yaml edit
+# doesn't need a matching literal edit here too.
+_AD_YAML = load_assumptions("ad.yaml")
+_AD_SHARED = _AD_YAML["ad"]
+_AD_PERFORMANCE = _AD_YAML["ad_performance"]
+_AD_METHANOGENIC = {**_AD_SHARED, **_AD_SHARED.get("methanogenic", {})}
+_ADP_METHANOGENIC = {**_AD_PERFORMANCE, **_AD_PERFORMANCE.get("methanogenic", {})}
+_AD_COST = _AD_SHARED["cost"]
+
 # ADBC-based digester installed cost anchor points (m3, USD)
 ADBC_VOL_M3 = [878, 1755, 2633, 3510, 5265, 8775]
 ADBC_CAPEX = [1720964, 1750201, 1779439, 1808676, 1867151, 1984101]
 
-
-def interp_capex(volume_m3: float) -> float:
-    """Linear interpolation/extrapolation of ADBC digester CAPEX"""
+def interp_ad_capex(volume_m3: float) -> float:
+    """
+    Linear interpolation/extrapolation of digester CAPEX based on the
+    Anaerobic Digester Budget Calculator (ADBC).
+    See https://csanr.wsu.edu/resources/enterprise-budget-calculator/
+    """
     x = ADBC_VOL_M3
     y = ADBC_CAPEX
 
@@ -73,68 +71,68 @@ def interp_capex(volume_m3: float) -> float:
 
 class AnaerobicDigester(bst.Unit):
     """
-    Lumped mesophilic anaerobic digester with parallel-train sizing and
-    ADBC-interpolated capital cost.
+    Convert a biodegradable fraction of Sargassum organics into raw biogas
+    using component-specific biodegradability factors. The digestate contains
+    undegraded material.
 
-    Inputs:
-        ins[0]: pretreated/diluted feed slurry
+    Modeling notes:
+    - Lumped methanogenic AD model
+    - Methane production is based on: feed VS * ch4_kg_per_kg_vs_fed
+    - Different components can have different biodegradability factors
+    - Biodegradability + vs_destruction determine digestate solids reduction
+    - Raw biogas composition is imposed from target mole fractions
+    - Paralle-train, reactor sized using HRT and headspace
+    - Enforce a maximum single-digester size and model parallel digesters
+    - Estimate CAPEX using ADBC-based interpolation
 
-    Outputs:
-        outs[0]: raw biogas
-        outs[1]: digestate
+    Parameters
+    ----------
+    ins : stream
+        Pretreated/diluted feed slurry.
+    outs : tuple[stream, stream]
+        Raw biogas and digestate.
+    vs_destruction : float
+        Fraction of the biodegradability-weighted VS pool destroyed
+        during digestion.
+    ch4_kg_per_kg_vs_fed : float
+        Methane yield per kg of VS fed (not VS destroyed).
+    raw_biogas_molfrac : dict[str, float]
+        Target raw biogas composition (mol fractions of Methane,
+        CarbonDioxide, HydrogenSulfide); must sum to 1.
+    digestible_IDs : Iterable[str]
+        Chemical IDs eligible for VS destruction.
+    biodegradability : dict[str, float]
+        Per-component biodegradability factor (0-1) for IDs in
+        `digestible_IDs`; components not listed default to 0
+        (unavailable).
+    hrt_days : float
+        Hydraulic retention time, used to size total liquid digester
+        volume.
+    slurry_density_kg_per_m3 : float
+        Feed slurry density, used to convert mass flow to volumetric
+        flow for sizing.
+    headspace_frac : float
+        Fraction of total digester volume reserved for gas headspace.
+    max_single_digester_volume_MG : float
+        Maximum volume (million US gallons) of a single digester train;
+        larger required volumes are split across parallel trains.
+    maintenance_usd_per_m3_yr : float, optional
+        Annual maintenance cost per m3 of total digester volume, added
+        to `add_OPEX`. If None, no maintenance OPEX is added.
+    mixing_W_per_m3 : float
+        Mixing power intensity per m3 of liquid volume.
+    influent_temperature_K : float
+        Feed slurry inlet temperature, used to size heating duty.
+    target_temperature_K : float
+        Digester operating temperature, used to size heating duty.
+    cp_kJ_per_kgK : float
+        Feed slurry specific heat capacity, used to size heating duty.
+    **kwargs
+        Forwarded to `bst.Unit.__init__`.
 
-    Sources
-    -------
-    vs_destruction (0.20):
-        data/ad.yaml `ad_performance.methanogenic.vs_destruction`, labeled "Global CSTR
-        vs_destruction -- uniform across all pretreatment cases." No named
-        literature source; yaml's own note: "Conservative lower bound of
-        20-70% range for full-scale mesophilic CSTRs. No continuous CSTR data
-        for pretreated pelagic Sargassum exists in literature." Scoping
-        assumption, not a citation.
-    ch4_kg_per_kg_vs_fed (0.100):
-        This is the `press_mill_only` baseline pretreatment case value
-        (data/pretreatment.yaml `pretreatment_ad.press_mill_only.ad_effects.ch4_kg_per_kg_vs_fed`),
-        not a universal constant -- the 4 other pretreatment cases in yaml use
-        different values (0.123 enzymatic, 0.165 peroxide, 0.277 combined_PE,
-        0.261 combined_PTE), each cited to a different row of the same table.
-        Source: Chikani-Cabrera et al. 2022, Table 4 -- "224.19 +/- 9.45 L
-        CH4/kg VS," scaled to 0.100 kg/kg VS for continuous CSTR (yaml key
-        `chikani_cabrera_2022_physical_C`).
-    raw_biogas_molfrac (Methane 0.55, CarbonDioxide 0.42, HydrogenSulfide 0.03):
-        data/ad.yaml `ad_performance.methanogenic.raw_biogas_molfrac`, labeled "Global
-        fallback biogas composition (overridden per pretreatment case below)."
-        No named source -- scoping default, overridden per-case in real runs.
-    headspace_frac (0.25):
-        data/ad.yaml `ad.gas_storage_frac_of_total_volume`. No named
-        source.
-    maintenance_usd_per_m3_yr (10.0):
-        data/ad.yaml `ad.cost.maintenance_usd_per_m3_yr`, sourced to
-        the ADBC spreadsheet tool (`ADBCv2-48 (2).xlsm`, sheet
-        "AnaerobicDigester", cell AB18).
-    digestible_IDs, biodegradability:
-        data/ad.yaml `ad_performance.digestible_IDs` (shared with the
-        acidogenic mode) / `ad_performance.methanogenic.biodegradability`.
-        No named source for the individual factors beyond the yaml values
-        themselves.
-    hrt_days, slurry_density_kg_per_m3, max_single_digester_volume_MG,
-    mixing_W_per_m3, influent_temperature_K, target_temperature_K,
-    cp_kJ_per_kgK:
-        data/ad.yaml `ad` section, matching values already used at the
-        real call site (`systems/_ad_biomethane_system.py`). No named literature
-        source for these beyond the yaml values themselves.
-    ADBC_VOL_M3 / ADBC_CAPEX interpolation table (used by `interp_capex`,
-    the actual installed-cost calculation):
-        UNVERIFIED PROVENANCE. data/ad.yaml has no entry for this
-        six-point table. A *separate*, structurally unused single-point
-        anchor (`ad.cost.base_volume_m3`/`base_capex_usd`, stored on this
-        unit's `base_volume_m3`/`base_capex_usd` __init__ params but never
-        read by `_design`/`_cost`) is cited to the same-sounding "ADBC"
-        spreadsheet tool (`ADBCv2-48 (2).xlsm`, sheet "AnaerobicDigester").
-        Whether the six-point table below was pulled from the same
-        spreadsheet run has not been verified by anyone in this conversion --
-        do not repeat "ADBC spreadsheet" as a confirmed source for
-        ADBC_VOL_M3/ADBC_CAPEX without checking the actual file.
+    See Also
+    --------
+    Refer to data/ad.yaml and data/pretreatment.yaml for the default values and references.
     """
 
     _N_ins = 1
@@ -147,79 +145,47 @@ class AnaerobicDigester(bst.Unit):
         ID="",
         ins=None,
         outs=(),
+        *,
         # Performance
-        vs_destruction=0.20,
-        ch4_kg_per_kg_vs_fed=0.100,
-        raw_biogas_molfrac=None,
-        digestible_IDs=None,
-        biodegradability=None,
+        vs_destruction=_ADP_METHANOGENIC["vs_destruction"],
+        ch4_kg_per_kg_vs_fed,
+        raw_biogas_molfrac=_ADP_METHANOGENIC["raw_biogas_molfrac"],
+        digestible_IDs=_ADP_METHANOGENIC["digestible_IDs"],
+        biodegradability=_ADP_METHANOGENIC["biodegradability"],
         # Sizing
-        hrt_days=25.0,
-        slurry_density_kg_per_m3=1000.0,
-        headspace_frac=0.25,
-        max_single_digester_volume_MG=1.5,
+        hrt_days=_AD_METHANOGENIC["hrt_days"],
+        slurry_density_kg_per_m3=_AD_METHANOGENIC["slurry_density_kg_per_m3"],
+        headspace_frac=_AD_METHANOGENIC["gas_storage_frac_of_total_volume"],
+        max_single_digester_volume_MG=_AD_METHANOGENIC["max_single_digester_volume_MG"],
         # Costing anchors
-        base_volume_m3=None,
-        base_capex_usd=None,
-        maintenance_usd_per_m3_yr=10.0,
+        maintenance_usd_per_m3_yr=_AD_COST.get("maintenance_usd_per_m3_yr"),
         # Utilities
-        mixing_W_per_m3=5.0,
-        influent_temperature_K=298.15,
-        target_temperature_K=308.15,
-        cp_kJ_per_kgK=4.18,
+        mixing_W_per_m3=_AD_METHANOGENIC["mixing_W_per_m3"],
+        influent_temperature_K=_AD_METHANOGENIC["influent_temperature_K"],
+        target_temperature_K=_AD_SHARED["temperature_regimes"]["mesophilic"]["temperature_K"],
+        cp_kJ_per_kgK=_AD_METHANOGENIC["cp_kJ_per_kgK"],
         **kwargs,
     ):
         super().__init__(ID, ins, outs, **kwargs)
 
         self.vs_destruction = float(vs_destruction)
         self.ch4_kg_per_kg_vs_fed = float(ch4_kg_per_kg_vs_fed)
-
-        self.raw_biogas_molfrac = raw_biogas_molfrac or {
-            "Methane": 0.55,
-            "CarbonDioxide": 0.42,
-            "HydrogenSulfide": 0.03,
-        }
-
-        self.digestible_IDs = tuple(digestible_IDs) if digestible_IDs is not None else (
-            "Glucan",
-            "Arabinan",
-            "Alginate",
-            "Fucoidan",
-            "Mannitol",
-            "Protein",
-            "OtherSolids",
-        )
-
-        self.biodegradability = biodegradability or {
-            "Mannitol": 0.95,
-            "Glucan": 0.75,
-            "Arabinan": 0.70,
-            "Protein": 0.65,
-            "Alginate": 0.45,
-            "Fucoidan": 0.35,
-            "OtherSolids": 0.30,
-        }
-
+        self.raw_biogas_molfrac = dict(raw_biogas_molfrac)
+        self.digestible_IDs = tuple(digestible_IDs)
+        self.biodegradability = dict(biodegradability)
         self.mixing_W_per_m3 = float(mixing_W_per_m3)
         self.influent_temperature_K = float(influent_temperature_K)
         self.target_temperature_K = float(target_temperature_K)
         self.cp_kJ_per_kgK = float(cp_kJ_per_kgK)
-
         self.hrt_days = float(hrt_days)
         self.slurry_density_kg_per_m3 = float(slurry_density_kg_per_m3)
         self.headspace_frac = float(headspace_frac)
-        self.max_single_digester_volume_m3 = (
-            float(max_single_digester_volume_MG) * 1e6 * GAL_TO_M3
-        )
-
-        self.base_volume_m3 = base_volume_m3
-        self.base_capex_usd = base_capex_usd
+        self.max_single_digester_volume_m3 = float(max_single_digester_volume_MG) * 1e6 * GAL_TO_M3
         self.maintenance_usd_per_m3_yr = maintenance_usd_per_m3_yr
-
         self.F_BM = dict(self.F_BM)
 
     def _available_digestible_pool(self, stream):
-        thermo_ids = set(bst.settings.thermo.chemicals.IDs)
+        thermo_ids = set(self.chemicals.IDs)
         avail = {}
 
         for cid in self.digestible_IDs:
@@ -227,8 +193,6 @@ class AnaerobicDigester(bst.Unit):
                 continue
 
             mass = float(stream.imass[cid])
-            if mass <= 0:
-                continue
 
             factor = float(self.biodegradability.get(cid, 0.0))
             factor = min(max(factor, 0.0), 1.0)
@@ -251,11 +215,11 @@ class AnaerobicDigester(bst.Unit):
         biogas.phase = "g"
         digestate.phase = "l"
 
-        chems = bst.settings.thermo.chemicals
+        chems = self.chemicals
         ids = set(chems.IDs)
 
-        water_in = float(feed.imass["Water"]) if "Water" in ids else 0.0
-        ash_in = float(feed.imass["Ash"]) if "Ash" in ids else 0.0
+        water_in = float(feed.imass["Water"])
+        ash_in = float(feed.imass["Ash"])
         TS_in = max(float(feed.F_mass) - water_in, 0.0)
         VS_in = max(TS_in - ash_in, 0.0)
 
@@ -294,8 +258,8 @@ class AnaerobicDigester(bst.Unit):
             )
 
         y = self.raw_biogas_molfrac
-        y_ch4 = float(y.get("Methane", 0.0))
-        y_co2 = float(y.get("CarbonDioxide", 0.0))
+        y_ch4 = float(y['Methane'])
+        y_co2 = float(y['CarbonDioxide'])
         y_h2s = float(y.get("HydrogenSulfide", 0.0))
 
         y_sum = y_ch4 + y_co2 + y_h2s
@@ -329,7 +293,7 @@ class AnaerobicDigester(bst.Unit):
         gas_mass = float(biogas.F_mass)
         water_adjust = biodegradable_destroyed_actual - gas_mass
 
-        if "Water" in ids and abs(water_adjust) > 1e-9:
+        if abs(water_adjust) > 1e-9:
             current_water = float(digestate.imass["Water"])
             new_water = current_water + water_adjust
             if new_water < 0:
@@ -339,19 +303,9 @@ class AnaerobicDigester(bst.Unit):
                 )
             digestate.imass["Water"] = new_water
 
-        self._TS_in_kgph = TS_in
-        self._VS_in_kgph = VS_in
-        self._biodegradable_pool_kgph = biodegradable_pool
-        self._biodegradable_destroyed_kgph = biodegradable_destroyed_actual
-        self._methane_kgph = ch4_mass
-        self._co2_kgph = float(biogas.imass["CarbonDioxide"]) if "CarbonDioxide" in ids else 0.0
-        self._h2s_kgph = float(biogas.imass["HydrogenSulfide"]) if "HydrogenSulfide" in ids else 0.0
-        self._biogas_mass_kgph = gas_mass
-        self._biogas_Nm3ph = float(biogas.F_mol) * NM3_PER_KMOL
-        self._digestate_mass_kgph = float(digestate.F_mass)
-
     def _design(self):
         feed = self.ins[0]
+        biogas, digestate = self.outs
 
         slurry_m3_per_hr = feed.F_mass / self.slurry_density_kg_per_m3
         V_liquid = slurry_m3_per_hr * 24.0 * self.hrt_days
@@ -385,36 +339,39 @@ class AnaerobicDigester(bst.Unit):
         self.design_results["Target T (K)"] = T_target
         self.design_results["Heating duty (kJ/h)"] = Q_kJph
 
-        TS_in = getattr(self, "_TS_in_kgph", 0.0)
-        VS_in = getattr(self, "_VS_in_kgph", 0.0)
-        biodegradable_pool = getattr(self, "_biodegradable_pool_kgph", 0.0)
-        biodegradable_destroyed = getattr(self, "_biodegradable_destroyed_kgph", 0.0)
-        methane_kgph = getattr(self, "_methane_kgph", 0.0)
+        ids = set(self.chemicals.IDs)
+
+        water_in = float(feed.imass["Water"])
+        ash_in = float(feed.imass["Ash"])
+        TS_in = max(float(feed.F_mass) - water_in, 0.0)
+        VS_in = max(TS_in - ash_in, 0.0)
+
+        avail = self._available_digestible_pool(feed)
+        biodegradable_pool = sum(v["biodegradable_mass"] for v in avail.values())
+        biodegradable_destroyed = min(self.vs_destruction * biodegradable_pool, biodegradable_pool)
+
+        methane_kgph = float(biogas.imass["Methane"]) if "Methane" in ids else 0.0
+        co2_kgph = float(biogas.imass["CarbonDioxide"]) if "CarbonDioxide" in ids else 0.0
+        h2s_kgph = float(biogas.imass["HydrogenSulfide"]) if "HydrogenSulfide" in ids else 0.0
+        biogas_mass_kgph = float(biogas.F_mass)
+        biogas_Nm3ph = float(biogas.F_mol) * NM3_PER_KMOL
+        digestate_mass_kgph = float(digestate.F_mass)
 
         self.design_results["AD inlet TS (kg/hr)"] = TS_in
         self.design_results["AD inlet VS (kg/hr)"] = VS_in
         self.design_results["Biodegradable pool (kg/hr)"] = biodegradable_pool
         self.design_results["Biodegradable destroyed (kg/hr)"] = biodegradable_destroyed
         self.design_results["Methane production (kg/hr)"] = methane_kgph
-        self.design_results["CO2 production (kg/hr)"] = getattr(self, "_co2_kgph", 0.0)
-        self.design_results["H2S production (kg/hr)"] = getattr(self, "_h2s_kgph", 0.0)
-        self.design_results["Raw biogas total (kg/hr)"] = getattr(self, "_biogas_mass_kgph", 0.0)
-        self.design_results["Raw biogas total (Nm3/hr)"] = getattr(self, "_biogas_Nm3ph", 0.0)
-        self.design_results["Digestate outflow (kg/hr)"] = getattr(self, "_digestate_mass_kgph", 0.0)
-
-        if V_liquid > 0:
-            self.design_results["Organic loading proxy (kg/m3-h)"] = (
-                biodegradable_pool / V_liquid
-            )
-            self.design_results["Methane productivity (kg/m3-h)"] = (
-                methane_kgph / V_liquid
-            )
-
-        if VS_in > 0:
-            self.design_results["CH4 yield (kg/kg VS fed)"] = methane_kgph / VS_in
+        self.design_results["CO2 production (kg/hr)"] = co2_kgph
+        self.design_results["H2S production (kg/hr)"] = h2s_kgph
+        self.design_results["Raw biogas total (kg/hr)"] = biogas_mass_kgph
+        self.design_results["Raw biogas total (Nm3/hr)"] = biogas_Nm3ph
+        self.design_results["Digestate outflow (kg/hr)"] = digestate_mass_kgph
+        self.design_results["Organic loading proxy (kg/m3-h)"] = biodegradable_pool / V_liquid
+        self.design_results["Methane productivity (kg/m3-h)"] = methane_kgph / V_liquid
+        self.design_results["CH4 yield (kg/kg VS fed)"] = methane_kgph / VS_in
 
         self.power_utility.consumption = mixing_kW
-        self.power_utility.production = 0.0
 
         if Q_kJph > 0:
             try:
@@ -428,7 +385,7 @@ class AnaerobicDigester(bst.Unit):
 
         self.F_BM["Anaerobic digester"] = 1.0
 
-        C_each = interp_capex(V_each)
+        C_each = interp_ad_capex(V_each)
         C_total = N * C_each
 
         self.design_results["ADBC CAPEX each ($)"] = C_each
@@ -441,81 +398,77 @@ class AnaerobicDigester(bst.Unit):
             self.design_results["Annual maintenance ($/yr)"] = annual_maintenance
 
             if annual_maintenance > 0:
-                operating_hours_per_yr = 330.0 * 24.0
                 self.add_OPEX = {
-                    "Digester maintenance": annual_maintenance / operating_hours_per_yr
+                    "Digester maintenance": annual_maintenance / OPERATING_HOURS_PER_YEAR
                 }
 
 
 class AcidogenicDigester(bst.Unit):
     """
     Acidogenic / arrested AD unit for VFA platform modeling. Structurally
-    parallel to `AnaerobicDigester` (multi-train, ADBC-interpolated capital
-    cost via the same `interp_capex`/`ADBC_VOL_M3`/`ADBC_CAPEX` table) but
-    produces a VFA-rich broth instead of biogas, and has no biodegradability
-    weighting per component -- all mass in `digestible_IDs` is treated as
-    equally available for VS destruction.
+    parallel to `AnaerobicDigester` but produces a VFA-rich broth instead of biogas.
+    There is no biodegradability weighting per component, all mass in `digestible_IDs`
+    is treated as equally available for VS destruction.
 
-    Outputs:
-    0) offgas
-    1) acidogenic_broth
+    Parameters
+    ----------
+    ins : stream
+        Feed slurry (or milled biomass stream, in integrated mode).
+    outs : tuple[stream, stream]
+        Offgas and acidogenic broth.
+    vs_destruction : float
+        Fraction of VS destroyed during digestion (no per-component
+        weighting -- all mass in `digestible_IDs` is equally available).
+    vfa_kg_per_kg_vs : float
+        VFA yield per kg of VS destroyed.
+    vfa_split : dict[str, float], optional
+        Mass split of produced VFA among chemical IDs; renormalized to
+        sum to 1. If not given, resolved at runtime by
+        `_resolve_vfa_split()` (a thermo-dependent fallback).
+    digestible_IDs : Iterable[str], optional
+        Chemical IDs eligible for VS destruction. Falls back to a
+        built-in default list if not given.
+    produce_offgas_co2 : bool
+        If True, VS destroyed but not converted to VFA is sent to the
+        offgas as CarbonDioxide; if False (or CarbonDioxide absent from
+        thermo), it's returned to the broth as Water instead.
+    hrt_days : float
+        Hydraulic retention time, used to size total liquid digester
+        volume.
+    slurry_density_kg_per_m3 : float
+        Feed slurry density, used to convert mass flow to volumetric
+        flow for sizing.
+    headspace_frac : float
+        Fraction of total digester volume reserved for gas headspace.
+    max_single_digester_volume_MG : float
+        Maximum volume (million US gallons) of a single digester train;
+        larger required volumes are split across parallel trains.
+    mixing_W_per_m3 : float
+        Mixing power intensity per m3 of liquid volume.
+    influent_temperature_K : float
+        Feed slurry inlet temperature, used to size base heating duty.
+    target_temperature_K : float
+        Digester operating temperature, used to size base heating duty.
+    cp_kJ_per_kgK : float
+        Feed slurry specific heat capacity, used to size heating duty.
+    enable_heat_shock : bool
+        If True, adds a periodic heat-shock duty on top of the base
+        heating duty.
+    hs_target_temperature_K : float
+        Peak temperature reached during each heat-shock event.
+    hs_events_per_day : float
+        Frequency of heat-shock events.
+    hs_heated_fraction_of_liquid : float
+        Fraction of the liquid volume heated during each event.
+    hs_duration_min : float
+        Duration of each heat-shock event; recorded in design_results,
+        not used in the duty calculation itself.
+    **kwargs
+        Forwarded to `bst.Unit.__init__`.
 
-    Sources
-    -------
-    vs_destruction (0.50):
-        data/ad.yaml `ad_performance.acidogenic.cases.seaweed_arrested_fitted.
-        vs_destruction`. No named literature source in yaml for this value.
-    vfa_kg_per_kg_vs (0.55):
-        data/ad.yaml `ad_performance.acidogenic.cases.seaweed_arrested_fitted.
-        vfa_kg_per_kg_vs`. No named literature source in yaml for this
-        value (yaml's `vfa_fermentation.sources.seaweed_arrested_anchor`
-        note describes a related but distinct downstream observation --
-        "Peak ~14.5 g/L total VFA... biogas suppression 96%" -- from a
-        preprint on arrested AD; it is not cited as the source of this
-        specific 0.55 yield number, so not repeated as one here).
-    vfa_split (AceticAcid 0.648, PropionicAcid 0.186, ButyricAcid 0.084,
-    ValericAcid 0.082, HexanoicAcid 0.000):
-        data/ad.yaml `ad_performance.acidogenic.cases.seaweed_arrested_fitted.
-        vfa_split`. No named literature source in yaml. This is the
-        __init__ default *object* (None, deferring to
-        `_resolve_vfa_split()`'s own separate internal fallback split
-        below) -- not literally hardcoded as this __init__'s default value.
-        `_resolve_vfa_split()`'s internal fallback
-        (AceticAcid 0.40/PropionicAcid 0.10/ButyricAcid 0.30/ValericAcid
-        0.05/HexanoicAcid 0.15) is left as-is: it is a generic placeholder
-        for *any* thermo with the five common VFA IDs, not a stale copy of
-        this case's fitted split, so it is not "corrected" to the
-        Sargassum-specific numbers above -- doing so would conflate a
-        general fallback with a case-specific fitted result.
-    digestible_IDs:
-        data/ad.yaml `ad_performance.digestible_IDs` (shared with the
-        methanogenic mode). The
-        pre-conversion default additionally listed `Xylan`, `Mannan`,
-        `Galactan` (real thermo chemicals, just absent from this yaml list)
-        and `Cellulose` (not a chemical defined in `_chemicals.py` at all --
-        a stale leftover reference). All four dropped to match yaml exactly.
-    hrt_days (15.0):
-        data/ad.yaml `ad.vfa.hrt_days`, sourced to `aad_review_window`:
-        "15 d retained as a midpoint design basis within the 10-20 d AAD
-        operating window; not a direct fitted value for this exact
-        Sargassum system."
-    influent_temperature_K, target_temperature_K:
-        assumptions.yaml `vfa_ad` section, sourced to `mesophilic_operation`:
-        "Mesophilic operation near 35 C."
-    headspace_frac (0.25), slurry_density_kg_per_m3,
-    max_single_digester_volume_MG, mixing_W_per_m3, cp_kJ_per_kgK:
-        assumptions.yaml `vfa_ad` section, matching values already used at
-        the real call site (`systems/_ad_vfa_system.py`). No named source
-        beyond the yaml values themselves.
-    ADBC_VOL_M3 / ADBC_CAPEX interpolation table (defined above in this
-    module, used by `interp_capex`, the actual installed-cost
-    calculation):
-        Same unverified provenance caveat as `AnaerobicDigester` -- see
-        that unit's docstring and CONVERSION_NOTES.md. Not re-verified here.
-    enable_heat_shock and the hs_* parameters:
-        No assumptions.yaml section covers heat-shock operation at all --
-        these are pure code-level scoping parameters, off by default, not
-        grounded in any cited source.
+    See Also
+    --------
+    Refer to data/ad.yaml for the default values and references.
     """
 
     _N_ins = 1
@@ -584,7 +537,7 @@ class AcidogenicDigester(bst.Unit):
         self.F_BM = dict(self.F_BM)
 
     def _resolve_vfa_split(self):
-        chems = bst.settings.thermo.chemicals
+        chems = self.chemicals
         ids = set(chems.IDs)
 
         if self.vfa_split is not None:
@@ -618,7 +571,7 @@ class AcidogenicDigester(bst.Unit):
         )
 
     def _available_digestible_pool(self, broth) -> Dict[str, float]:
-        ids = set(bst.settings.thermo.chemicals.IDs)
+        ids = set(self.chemicals.IDs)
         avail: Dict[str, float] = {}
         for cid in self.digestible_IDs:
             if cid not in ids:
@@ -665,7 +618,7 @@ class AcidogenicDigester(bst.Unit):
 
         residual_destroyed = max(0.0, remove - vfa_total)
         if residual_destroyed > 0.0:
-            ids = set(bst.settings.thermo.chemicals.IDs)
+            ids = set(self.chemicals.IDs)
             if self.produce_offgas_co2 and "CarbonDioxide" in ids:
                 offgas.imass["CarbonDioxide"] += residual_destroyed
             elif "Water" in ids:
@@ -750,55 +703,173 @@ class AcidogenicDigester(bst.Unit):
         N = int(self.design_results["Number of digesters"])
         self.F_BM["Acidogenic digester"] = 1.0
 
-        C_each = interp_capex(V_each)
+        C_each = interp_ad_capex(V_each)
         C_total = N * C_each
 
         self.design_results["ADBC_capex_each_$"] = C_each
         self.baseline_purchase_costs["Acidogenic digester"] = C_total
 
 
+@cost('Raw biogas flow (Nm3/h)', 'H2S removal (iron sponge)', units='Nm3/h',
+      CE=567.5, cost=450_000.0, S=1700.0, n=0.7, BM=1.0)
+class H2SRemoval(bst.Unit):
+    """
+    Iron sponge H2S removal unit for raw biogas desulfurization.
+
+    Removes hydrogen sulfide from raw biogas before membrane upgrading.
+    H2S must be removed because it degrades polymer membranes rapidly and
+    is toxic above ~200 ppm in pipeline-quality biomethane.
+
+    Technology: Iron sponge (dry oxidation) -- the standard, lowest-cost
+    option for biogas desulfurization at this scale.
+
+    Modeling approach:
+    - Pass-through for CH4 and CO2 (not affected by iron sponge)
+    - H2S captured to near-zero in treated gas
+    - Capital cost scaled to raw biogas flow (Nm3/h) via a power-law @cost item
+    - Reagent cost (iron sponge replacement) as add_OPEX, computed in _design
+      since it depends on raw biogas flow, not on the unit's own installed cost
+
+
+    Parameters
+    ----------
+    ins : stream
+        Raw biogas.
+    outs : tuple[stream, stream]
+        Treated biogas (H2S removed to near-zero) and spent media /
+        captured H2S.
+    h2s_removal_efficiency : float
+        Fraction of inlet H2S removed (0-1).
+    reagent_cost_usd_per_Nm3_raw : float
+        Iron sponge media replacement cost per Nm3 of raw biogas
+        treated, added to `add_OPEX`.
+    **kwargs
+        Forwarded to `bst.Unit.__init__`. Installed cost itself is set
+        by the class-level `@cost` decorator (power-law on raw biogas
+        flow), not by an __init__ parameter.
+
+    See Also
+    --------
+    Refer to data/ad.yaml for the default values and references.
+    """
+
+    _N_ins = 1
+    _N_outs = 2   # treated_biogas, spent_media
+    _units = {'Raw biogas flow (Nm3/h)': 'Nm3/h'}
+
+    def __init__(
+        self,
+        ID: str = "",
+        ins=None,
+        outs=(),
+        *,
+        h2s_removal_efficiency: float = 0.99,
+        reagent_cost_usd_per_Nm3_raw: float = 0.002,
+        **kwargs,
+    ):
+        super().__init__(ID, ins, outs, **kwargs)
+        self.h2s_removal_efficiency = float(h2s_removal_efficiency)
+        self.reagent_cost_usd_per_Nm3_raw = float(reagent_cost_usd_per_Nm3_raw)
+
+    def _run(self):
+        raw = self.ins[0]
+        treated, spent = self.outs
+
+        treated.empty()
+        spent.empty()
+        treated.phase = "g"
+        spent.phase = "l"  # negligible solid waste
+
+        ids = set(raw.chemicals.IDs)
+
+        # Pass CH4 and CO2 entirely to treated gas
+        for cid in ("Methane", "CarbonDioxide"):
+            if cid in ids:
+                treated.imol[cid] = float(raw.imol[cid])
+
+        # Remove H2S by efficiency
+        if "HydrogenSulfide" in ids:
+            h2s_in = float(raw.imol["HydrogenSulfide"])
+            h2s_removed = self.h2s_removal_efficiency * h2s_in
+            h2s_out = h2s_in - h2s_removed
+            treated.imol["HydrogenSulfide"] = h2s_out
+            # Spent media is mostly iron sulfide solids —> negligible mass in model
+            # Not explicitly tracked as a chemical stream
+
+        # Pass any other gas components to treated
+        for cid in ids:
+            if cid in ("Methane", "CarbonDioxide", "HydrogenSulfide"):
+                continue
+            n = float(raw.imol[cid])
+            if n > 0:
+                treated.imol[cid] = n
+
+    def _design(self):
+        raw = self.ins[0]
+
+        # Raw biogas flow in Nm3/h (ideal gas at STP)
+        n_kmolph = float(raw.F_mol)
+        Q_Nm3ph = 22.414 * n_kmolph
+
+        self.design_results["Raw biogas flow (Nm3/h)"] = Q_Nm3ph
+        self.design_results["H2S removal efficiency"] = self.h2s_removal_efficiency
+
+        if "HydrogenSulfide" in raw.chemicals.IDs:
+            h2s_in_ppm = (
+                float(raw.imol["HydrogenSulfide"]) / float(raw.F_mol) * 1e6
+                if raw.F_mol > 0 else 0.0
+            )
+            treated = self.outs[0]
+            h2s_out_ppm = (
+                float(treated.imol["HydrogenSulfide"]) / float(treated.F_mol) * 1e6
+                if treated.F_mol > 0 else 0.0
+            )
+            self.design_results["H2S inlet (ppm mol)"] = h2s_in_ppm
+            self.design_results["H2S outlet (ppm mol)"] = h2s_out_ppm
+
+        # Iron sponge is passive —> no electricity
+        self.power_utility.consumption = 0.0
+
+        # Reagent (iron sponge media replacement) as add_OPEX.
+        # Computed here (not in _cost) because it scales with raw biogas
+        # flow, not with this unit's own installed cost -- @cost owns _cost.
+        reagent_usd_per_hr = self.reagent_cost_usd_per_Nm3_raw * Q_Nm3ph
+        if reagent_usd_per_hr > 0:
+            self.add_OPEX = {
+                "Iron sponge media replacement": reagent_usd_per_hr
+            }
+            self.design_results["Reagent cost ($/hr)"] = reagent_usd_per_hr
+            self.design_results["Reagent cost ($/yr)"] = reagent_usd_per_hr * OPERATING_HOURS_PER_YEAR
+
+
 class BiogasUpgrading(bst.Unit):
     """
     Membrane biogas upgrading to pipeline-quality biomethane.
 
-    Inputs:
-        ins[0]: raw biogas (post H2S removal)
+    Parameters
+    ----------
+    ins : stream
+        Raw biogas (post H2S removal).
+    outs : tuple[stream, stream]
+        Biomethane and offgas.
+    ch4_recovery : float
+        Fraction of inlet methane recovered to the biomethane product
+        (0-1).
+    co2_removal : float
+        Fraction of inlet CO2 removed to offgas (0-1).
+    electricity_kwh_per_Nm3_raw : float
+        Electricity intensity per Nm3 of dry raw biogas processed.
+    capex_usd_per_Nm3ph_raw : float
+        Installed cost per Nm3/h of dry raw biogas capacity.
+    maintenance_frac_of_capex_per_yr : float
+        Annual maintenance cost as a fraction of installed cost, added
+        to `add_OPEX`.
+    **kwargs
+        Forwarded to `bst.Unit.__init__`.
 
-    Outputs:
-        outs[0]: biomethane
-        outs[1]: offgas
-
-    Kept as custom _design/_cost rather than an @cost decorator: annual
-    maintenance OPEX here is a fraction of this unit's own installed cost,
-    which @cost only computes inside its decorator-owned _cost() -- after
-    _design() has already run. There's no clean way to read that
-    not-yet-computed value early without duplicating the cost formula (a
-    latent-bug risk if the two copies ever drift), so this unit keeps an
-    explicit _cost() instead, unlike H2SRemoval (whose OPEX depends only on
-    _design()-computed flow, not its own CAPEX).
-
-    Sources
-    -------
-    co2_removal (0.95), electricity_kwh_per_Nm3_raw (0.25),
-    maintenance_frac_of_capex_per_yr (0.035):
-        assumptions.yaml `biogas_upgrading` section, sourced to IEA
-        Bioenergy Task 37, "Biomethane status and factors affecting market
-        development" (2014). Electricity: "typically 0.2-0.3 kWh/Nm3 raw
-        biogas for mature upgrading technologies (incl. membranes)."
-        Maintenance: "annual maintenance cost for membranes at ~3-4% of
-        investment cost."
-    ch4_recovery (0.99):
-        assumptions.yaml `biogas_upgrading.ch4_recovery`. yaml's
-        `sources.methane_slip` note (also IEA Bioenergy Task 37, 2014)
-        states "manufacturers guarantee methane losses below ~0.5-2% for
-        new plants" -- consistent with a 0.99 (1%) recovery/slip choice, but
-        yaml does not cite a number specifically for ch4_recovery itself.
-    capex_usd_per_Nm3ph_raw (2200):
-        assumptions.yaml `biogas_upgrading.sources.capex`: IEA-ETSAP
-        E-TechDS: Biogas and Bio-syngas Production (Dec 2013). "Investment
-        cost for biogas-to-biomethane upgrading units reported ~USD
-        1950-2600 per Nm3/h for larger raw gas capacities" -- 2200 falls
-        within that range.
+    See Also
+    --------
+    Refer to data/ad.yaml for the default values and references.
     """
 
     _N_ins = 1
@@ -920,146 +991,10 @@ class BiogasUpgrading(bst.Unit):
         self.design_results["Annual maintenance ($/yr)"] = annual_maintenance
 
         if annual_maintenance > 0:
-            operating_hours_per_yr = 330.0 * 24.0
             self.add_OPEX = {
-                "Membrane upgrading maintenance": annual_maintenance / operating_hours_per_yr
+                "Membrane upgrading maintenance": annual_maintenance / OPERATING_HOURS_PER_YEAR
             }
 
-
-@cost('Raw biogas flow (Nm3/h)', 'H2S removal (iron sponge)', units='Nm3/h',
-      CE=567.5, cost=450_000.0, S=1700.0, n=0.7, BM=1.0)
-class H2SRemoval(bst.Unit):
-    """
-    Iron sponge H2S removal unit for raw biogas desulfurization.
-
-    Removes hydrogen sulfide from raw biogas before membrane upgrading.
-    H2S must be removed because it degrades polymer membranes rapidly and
-    is toxic above ~200 ppm in pipeline-quality biomethane.
-
-    Technology: Iron sponge (dry oxidation) -- the standard, lowest-cost
-    option for biogas desulfurization at this scale.
-
-    Modeling approach:
-    - Pass-through for CH4 and CO2 (not affected by iron sponge)
-    - H2S captured to near-zero in treated gas
-    - Capital cost scaled to raw biogas flow (Nm3/h) via a power-law @cost item
-    - Reagent cost (iron sponge replacement) as add_OPEX, computed in _design
-      since it depends on raw biogas flow, not on the unit's own installed cost
-
-    Inputs:
-        ins[0]: raw biogas (CH4 + CO2 + H2S)
-
-    Outputs:
-        outs[0]: treated biogas (H2S removed to near-zero)
-        outs[1]: spent media / captured H2S (solid waste, negligible mass)
-
-    Sources
-    -------
-    ref_installed_cost_usd ($450,000 at 1,700 Nm3/hr, n=0.7):
-        assumptions.yaml `h2s_removal.sources.capex`: Diaz, I.; Ramos, I.;
-        Fdz-Polanco, M. Bioresour. Technol. 2015, 192, 280-286. Original
-        anchor from Abatzoglou & Boivin (2009); scale exponent 0.7 per
-        Green & Perry (2008) convention.
-    h2s_removal_efficiency (0.99):
-        assumptions.yaml `h2s_removal.h2s_removal_efficiency` -- this is the
-        modeled value, chosen conservatively. The yaml citation (Choudhury
-        et al. Energies 2019, 12, 4605) reports the cited iron-sponge media
-        as achieving >99.9% removal in practice -- 0.99 is not a literal
-        transcription of that number, it's a deliberately conservative
-        modeling choice.
-    reagent_cost_usd_per_Nm3_raw (0.002):
-        assumptions.yaml `h2s_removal.sources.reagent`: IEA Bioenergy Task 37
-        (2014), yaml note gives a $0.001-0.003/Nm3 range; 0.002 is the
-        midpoint.
-    """
-
-    _N_ins = 1
-    _N_outs = 2   # treated_biogas, spent_media
-    _units = {'Raw biogas flow (Nm3/h)': 'Nm3/h'}
-
-    def __init__(
-        self,
-        ID: str = "",
-        ins=None,
-        outs=(),
-        *,
-        h2s_removal_efficiency: float = 0.99,
-        reagent_cost_usd_per_Nm3_raw: float = 0.002,
-        **kwargs,
-    ):
-        super().__init__(ID, ins, outs, **kwargs)
-        self.h2s_removal_efficiency = float(h2s_removal_efficiency)
-        self.reagent_cost_usd_per_Nm3_raw = float(reagent_cost_usd_per_Nm3_raw)
-
-    def _run(self):
-        raw = self.ins[0]
-        treated, spent = self.outs
-
-        treated.empty()
-        spent.empty()
-        treated.phase = "g"
-        spent.phase = "l"  # negligible solid waste
-
-        ids = set(raw.chemicals.IDs)
-
-        # Pass CH4 and CO2 entirely to treated gas
-        for cid in ("Methane", "CarbonDioxide"):
-            if cid in ids:
-                treated.imol[cid] = float(raw.imol[cid])
-
-        # Remove H2S by efficiency
-        if "HydrogenSulfide" in ids:
-            h2s_in = float(raw.imol["HydrogenSulfide"])
-            h2s_removed = self.h2s_removal_efficiency * h2s_in
-            h2s_out = h2s_in - h2s_removed
-            treated.imol["HydrogenSulfide"] = h2s_out
-            # Spent media is mostly iron sulfide solids —> negligible mass in model
-            # Not explicitly tracked as a chemical stream
-
-        # Pass any other gas components to treated
-        for cid in ids:
-            if cid in ("Methane", "CarbonDioxide", "HydrogenSulfide"):
-                continue
-            n = float(raw.imol[cid])
-            if n > 0:
-                treated.imol[cid] = n
-
-    def _design(self):
-        raw = self.ins[0]
-
-        # Raw biogas flow in Nm3/h (ideal gas at STP)
-        n_kmolph = float(raw.F_mol)
-        Q_Nm3ph = 22.414 * n_kmolph
-
-        self.design_results["Raw biogas flow (Nm3/h)"] = Q_Nm3ph
-        self.design_results["H2S removal efficiency"] = self.h2s_removal_efficiency
-
-        if "HydrogenSulfide" in raw.chemicals.IDs:
-            h2s_in_ppm = (
-                float(raw.imol["HydrogenSulfide"]) / float(raw.F_mol) * 1e6
-                if raw.F_mol > 0 else 0.0
-            )
-            treated = self.outs[0]
-            h2s_out_ppm = (
-                float(treated.imol["HydrogenSulfide"]) / float(treated.F_mol) * 1e6
-                if treated.F_mol > 0 else 0.0
-            )
-            self.design_results["H2S inlet (ppm mol)"] = h2s_in_ppm
-            self.design_results["H2S outlet (ppm mol)"] = h2s_out_ppm
-
-        # Iron sponge is passive —> no electricity
-        self.power_utility.consumption = 0.0
-
-        # Reagent (iron sponge media replacement) as add_OPEX.
-        # Computed here (not in _cost) because it scales with raw biogas
-        # flow, not with this unit's own installed cost -- @cost owns _cost.
-        reagent_usd_per_hr = self.reagent_cost_usd_per_Nm3_raw * Q_Nm3ph
-        if reagent_usd_per_hr > 0:
-            self.add_OPEX = {
-                "Iron sponge media replacement": reagent_usd_per_hr
-            }
-            self.design_results["Reagent cost ($/hr)"] = reagent_usd_per_hr
-            self.design_results["Reagent cost ($/yr)"] = reagent_usd_per_hr * 330.0 * 24.0
 
 
 class DigestateDecanterCentrifuge(bst.Unit):
@@ -1069,16 +1004,14 @@ class DigestateDecanterCentrifuge(bst.Unit):
     An alternative to DigestateScrewPress for digestate dewatering: a decanter
     centrifuge achieves higher TS capture than a screw press (SYSTEMIC D3.2
     report: centrifuge ~59+-17% vs screw press ~33+-14%) at a different cost
-    and electricity profile. Not wired into any of the default system builders
-    today — kept available as a selectable alternative, same as the
-    pretreatment options in systems._ad_biomethane_system.
+    and electricity profile.
 
     Splits digestate into:
         - cake (soil_amendment): captured solids + entrained water to hit cake_moisture_frac
         - centrate (liquid_digestate): remaining liquid + uncaptured solids
 
     Assumptions:
-        - "Solids" are explicitly defined chemical IDs (default: Cellulose, Ash)
+        - "Solids" are explicitly defined chemical IDs
         - Everything else is treated as liquid and starts in centrate
 
     Sizing:
@@ -1088,41 +1021,36 @@ class DigestateDecanterCentrifuge(bst.Unit):
     Costing (USD):
         - Total purchased cost = N_parallel * centrifuge_purchase_cost_usd_each
 
-    Not currently constructed by any system builder in this codebase
-    (confirmed by grep -- only this file and units/__init__.py reference
-    the class name) -- so every parameter below is only ever exercised via
-    its own __init__ default, never overridden by a real call site. Unlike
-    `DigestateScrewPress`, `solids_IDs` here is an active whitelist (see
-    _run): only chemicals in this list are captured to cake at
-    `ts_capture_frac`; everything else goes entirely to centrate.
+    Parameters
+    ----------
+    ins : stream
+        AD digestate.
+    outs : tuple[stream, stream]
+        Cake (soil_amendment) and centrate (liquid_digestate).
+    solids_IDs : Iterable[str]
+        Chemical IDs treated as solids; only these are captured to cake
+        (at `ts_capture_frac`), everything else goes entirely to
+        centrate.
+    ts_capture_frac : float
+        Fraction of solids-ID mass captured to cake (0-1).
+    cake_moisture_frac : float
+        Target moisture fraction of the cake; entrained water is added
+        to meet it.
+    capacity_tph_each : float
+        Throughput capacity (metric ton/h) of a single centrifuge;
+        larger throughputs are split across parallel units.
+    centrifuge_purchase_cost_usd_each : float, optional
+        Purchase cost per centrifuge. If None, `_cost()` returns early
+        and the unit is costed at $0.
+    F_BM : float
+        Bare-module cost factor applied to the centrifuge purchase
+        cost.
+    **kwargs
+        Forwarded to `bst.Unit.__init__`.
 
-    Sources
-    -------
-    solids_IDs (Cellulose, Ash), ts_capture_frac (0.78),
-    cake_moisture_frac (0.75), capacity_tph_each (50.0),
-    centrifuge_purchase_cost_usd_each ($297,500):
-        assumptions.yaml `digestate_decanter_centrifuge` section (no
-        `sources:` sub-block in yaml for this section, so no named
-        literature citation for any of these values beyond the yaml values
-        themselves). `solids_IDs` matches yaml exactly (`["Cellulose",
-        "Ash"]`) -- unlike `DigestateScrewPress`, this default was not
-        stale, but note "Cellulose" is not a chemical defined anywhere in
-        `_chemicals.py`, so in practice only Ash is ever captured to cake
-        by this whitelist; not changed since it matches assumptions.yaml.
-        `centrifuge_purchase_cost_usd_each` was `None` (i.e. `_cost()`
-        returns early, giving $0 installed cost) -- corrected to yaml's
-        297500.0 so a standalone instantiation of this currently-unwired
-        unit doesn't silently cost nothing.
-    ts_capture_frac comparison to DigestateScrewPress (module docstring,
-    pre-existing text, not yaml):
-        SYSTEMIC D3.2 report (2021): "centrifuge ~59+-17% vs screw press
-        ~33+-14%" -- yaml's modeled 0.78 for this unit is higher than that
-        reported ~59% average, not verified further.
-    Electricity intensity (1.0 kWh/m3, hardcoded in _design, not an
-    __init__ param):
-        Tchobanoglous et al., Wastewater Engineering, 5th ed. (pre-existing
-        module docstring citation, not independently verified in this
-        conversion).
+    See Also
+    --------
+    Refer to data/ad.yaml for the default values and references.
     """
 
     _N_ins = 1
@@ -1222,6 +1150,45 @@ class DigestateDecanterCentrifuge(bst.Unit):
         self.F_BM[key] = self.F_BM_default
 
 
+# DigestateScrewPress per-unit installed cost anchor points (SYSTEMIC Table
+# 2-11, CAPEX vs ton/h), pre-converted from EUR to USD at a fixed 1.19
+# EUR/USD rate.
+SCREW_PRESS_CAPACITY_TPH = [2.0, 3.0, 4.0, 5.0, 6.25, 8.0, 9.0, 10.0, 12.0, 15.5]
+SCREW_PRESS_CAPEX_USD = [
+    30493.75,  # 25625.00 EUR at 2.00 tph
+    43062.53,  # 36187.00 EUR at 3.00 tph
+    36195.04,  # 30416.00 EUR at 4.00 tph
+    47089.49,  # 39571.00 EUR at 5.00 tph
+    34212.50,  # 28750.00 EUR at 6.25 tph
+    41153.77,  # 34583.00 EUR at 8.00 tph
+    52836.00,  # 44400.00 EUR at 9.00 tph
+    28633.78,  # 24062.00 EUR at 10.00 tph
+    62475.00,  # 52500.00 EUR at 12.00 tph
+    20230.00,  # 17000.00 EUR at 15.50 tph
+]
+
+
+def interp_screw_press_capex_usd(capacity_tph: float) -> float:
+    """
+    Linear interpolation/extrapolation of DigestateScrewPress per-unit
+    installed cost (USD) from SCREW_PRESS_CAPACITY_TPH/SCREW_PRESS_CAPEX_USD.
+    """
+    xs = SCREW_PRESS_CAPACITY_TPH
+    ys = SCREW_PRESS_CAPEX_USD
+
+    if capacity_tph <= xs[0]:
+        return ys[0]
+    if capacity_tph >= xs[-1]:
+        return ys[-1]
+
+    for i in range(len(xs) - 1):
+        if xs[i] <= capacity_tph <= xs[i + 1]:
+            t = (capacity_tph - xs[i]) / (xs[i + 1] - xs[i])
+            return ys[i] + t * (ys[i + 1] - ys[i])
+
+    return ys[-1]
+
+
 class DigestateScrewPress(bst.Unit):
     """
     Post-AD digestate screw press (solid-liquid separation).
@@ -1231,7 +1198,7 @@ class DigestateScrewPress(bst.Unit):
         - pressate (liquid_digestate): remaining liquid + uncaptured solids
 
     Assumptions:
-        - "Solids" are explicitly defined chemical IDs (default: Cellulose, Ash)
+        - "Solids" are everything except Water and dissolved_IDs (dynamically computed)
         - Everything else is treated as liquid and starts in pressate
         - Default DM (TS) capture to solids is lower than centrifuge:
             SE_DM screw press ~33+-14% vs centrifuge ~59+-17% (SYSTEMIC D3.2 report, 2021)
@@ -1245,68 +1212,65 @@ class DigestateScrewPress(bst.Unit):
         - Electricity intensity: 0.67 kWh/m3 digestate treated (SYSTEMIC database; n=13)
 
     Costing:
-        - Purchased cost per press from SYSTEMIC Table 2-11 (CAPEX vs ton/h), interpolated
+        - Purchased cost per press interpolated from a fixed SYSTEMIC Table
+          2-11 (CAPEX vs ton/h) anchor table, pre-converted to USD -- not a
+          user-configurable input, see interp_screw_press_capex_usd() above
         - Total purchased cost = N_parallel * cost_per_press
-        - Optional polymer dosing unit per press (12k-50k EUR) can be included
+        - Optional polymer dosing unit per press (~12k-50k EUR, pre-converted
+          to USD) can be included
 
-    Constructed twice in this codebase (systems/_ad_biomethane_system.py's "SP"
-    and systems/_ad_vfa_system.py's "SP_VFA"), both routing their own
-    digestate streams through the same class with different
-    assumptions.yaml-sourced parameters.
 
-    Sources
-    -------
-    ts_capture_frac (0.40), cake_moisture_frac (0.45), kWh_per_m3 (0.67):
-        assumptions.yaml `digestate_screw_press` section. No `sources:`
-        sub-block in yaml for this section -- citations below are from this
-        module's own pre-existing docstring text, not yaml: SYSTEMIC D3.2
-        report (2021), "SE_DM screw press ~33+-14% vs centrifuge ~59+-17%"
-        (yaml's modeled ts_capture_frac of 0.40 is close to but not
-        identical to that reported ~33% average); SYSTEMIC database
-        (n=13) for both cake solids fraction (~23% DM -> yaml's 0.45
-        moisture is a rounder number than the ~77% moisture that ~23% DM
-        implies -- not verified further) and the 0.67 kWh/m3 electricity
-        intensity.
-    capex_eur_table (SYSTEMIC Table 2-11, 10 (capacity_tph, capex_eur)
-    points):
-        assumptions.yaml's `digestate_screw_press` section has no
-        `capex_eur_table` key, so this hardcoded table -- not the yaml
-        section -- is what's actually used at every real call site. Cited
-        to this module's pre-existing docstring text: "SYSTEMIC Table
-        2-11 (CAPEX vs ton/h)."
-    eur_to_usd (1.19):
-        assumptions.yaml `digestate_screw_press.eur_to_usd`. No named
-        source in yaml.
-    solids_IDs -- accepted and stored but NOT used by _run/_design/_cost:
-        TS for capture purposes is instead computed dynamically in _run()
-        as "everything except Water and dissolved_IDs," not as this
-        explicit whitelist. This parameter is dead code regardless of its
-        value -- left at its pre-existing default (which itself references
-        "Cellulose," not a chemical defined anywhere in `_chemicals.py`)
-        rather than "corrected" to assumptions.yaml's `digestate_screw_press
-        .solids_IDs` list, since doing so would misleadingly imply the
-        parameter has an effect it doesn't have.
+    Parameters
+    ----------
+    ins : stream
+        AD digestate.
+    outs : tuple[stream, stream]
+        Cake (soil_amendment) and pressate (liquid_digestate).
+    dissolved_IDs : Iterable[str], optional
+        Chemical IDs always routed entirely to pressate regardless of
+        `ts_capture_frac` (e.g. VFAs, which must not be captured in the
+        cake). Falls back to the standard VFA set plus CarbonDioxide and
+        Ammonia if not given.
+    ts_capture_frac : float
+        Fraction of dynamically-computed TS (everything except Water
+        and `dissolved_IDs`) captured to cake (0-1).
+    cake_moisture_frac : float
+        Target moisture fraction of the cake; entrained water is added
+        to meet it.
+    capacity_tph_each : float
+        Throughput capacity (metric ton/h) of a single press; larger
+        throughputs are split across parallel units.
+    kWh_per_m3 : float
+        Electricity intensity per m3 of digestate treated.
+    include_polymer_dosing : bool
+        If True, adds an optional polymer dosing cost per press.
+    polymer_dosing_cost_usd_each : float
+        Polymer dosing cost per press, in USD; only applied if
+        `include_polymer_dosing` is True.
+    F_BM : float
+        Bare-module cost factor applied to the press purchase cost.
+    **kwargs
+        Forwarded to `bst.Unit.__init__`.
+
+    See Also
+    --------
+    Refer to data/ad.yaml for the default values and references.
     """
 
     _N_ins = 1
     _N_outs = 2
 
     def __init__(self, ID="", ins=None, outs=(),
-                 solids_IDs=("Cellulose", "Ash"),
                  dissolved_IDs=None,            # chemicals treated as dissolved — always route to pressate
                  ts_capture_frac=0.40,          # assumptions.yaml digestate_screw_press.ts_capture_frac
                  cake_moisture_frac=0.45,       # assumptions.yaml digestate_screw_press.cake_moisture_frac
                  capacity_tph_each=6.0,         # aligns with reported 6 ton/h energy datapoint
                  kWh_per_m3=0.67,               # SYSTEMIC avg electricity intensity
-                 capex_eur_table=None,          # override if you want your own table
-                 eur_to_usd=1.19,               # assumptions.yaml digestate_screw_press.eur_to_usd
                  include_polymer_dosing=False,
-                 polymer_dosing_cost_eur_each=0.0,  # set within 12k–50k if included
+                 polymer_dosing_cost_usd_each=35000, 
                  F_BM=1.0,
                  **kwargs):
         super().__init__(ID, ins, outs, **kwargs)
-
-        self.solids_IDs = tuple(solids_IDs)
 
         # Dissolved chemicals pass entirely to pressate regardless of ts_capture_frac
         # VFAs are soluble acids — they must not be captured in the cake
@@ -1326,27 +1290,8 @@ class DigestateScrewPress(bst.Unit):
 
         self.kWh_per_m3 = float(kWh_per_m3)
 
-        # SYSTEMIC Table 2-11 (capacity_tph, capex_eur)
-        # (2, 25625), (3, 36187), (4, 30416), (5, 39571),
-        # (6.25, 28750), (8, 34583), (9, 44400), (10, 24062),
-        # (12, 52500), (15.5, 17000)
-        self.capex_eur_table = capex_eur_table or [
-            (2.0, 25625.0),
-            (3.0, 36187.0),
-            (4.0, 30416.0),
-            (5.0, 39571.0),
-            (6.25, 28750.0),
-            (8.0, 34583.0),
-            (9.0, 44400.0),
-            (10.0, 24062.0),
-            (12.0, 52500.0),
-            (15.5, 17000.0),
-        ]
-
-        self.eur_to_usd = float(eur_to_usd)
-
         self.include_polymer_dosing = bool(include_polymer_dosing)
-        self.polymer_dosing_cost_eur_each = float(polymer_dosing_cost_eur_each)
+        self.polymer_dosing_cost_usd_each = float(polymer_dosing_cost_usd_each)
 
         self.F_BM_default = float(F_BM)
 
@@ -1430,47 +1375,23 @@ class DigestateScrewPress(bst.Unit):
         self.design_results["kWh_per_m3"] = self.kWh_per_m3
         self.design_results["Power_kW"] = kW
 
-    def _interp_capex_eur(self, cap_tph):
-        pts = sorted(self.capex_eur_table, key=lambda x: x[0])
-        xs = [p[0] for p in pts]
-        ys = [p[1] for p in pts]
-
-        if cap_tph <= xs[0]:
-            return ys[0]
-        if cap_tph >= xs[-1]:
-            return ys[-1]
-
-        for i in range(len(xs) - 1):
-            x0, x1 = xs[i], xs[i + 1]
-            if x0 <= cap_tph <= x1:
-                y0, y1 = ys[i], ys[i + 1]
-                # linear interpolation
-                t = (cap_tph - x0) / (x1 - x0)
-                return y0 + t * (y1 - y0)
-
-        return ys[-1]
-
     def _cost(self):
         N = int(self.design_results.get("N_screw_presses_parallel", 1))
         cap_each = float(self.capacity_tph_each)
 
-        capex_eur_each = float(self._interp_capex_eur(cap_each))
-        capex_usd_each = capex_eur_each * self.eur_to_usd
-
+        capex_usd_each = interp_screw_press_capex_usd(cap_each)
         total_usd = N * capex_usd_each
 
         if self.include_polymer_dosing:
-            dosing_usd_each = self.polymer_dosing_cost_eur_each * self.eur_to_usd
+            dosing_usd_each = self.polymer_dosing_cost_usd_each
             total_usd += N * dosing_usd_each
 
         key = "Screw press (digestate)"
         self.baseline_purchase_costs[key] = total_usd
         self.F_BM[key] = self.F_BM_default
 
-        self.design_results["Capex_eur_each"] = capex_eur_each
         self.design_results["Capex_usd_each"] = capex_usd_each
         if self.include_polymer_dosing:
-            self.design_results["Polymer_dosing_cost_eur_each"] = self.polymer_dosing_cost_eur_each
-            self.design_results["Polymer_dosing_cost_usd_each"] = self.polymer_dosing_cost_eur_each * self.eur_to_usd
+            self.design_results["Polymer_dosing_cost_usd_each"] = dosing_usd_each
         self.design_results["N_parallel"] = N
         self.design_results["Total_purchase_cost_usd"] = total_usd
