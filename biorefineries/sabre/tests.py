@@ -30,7 +30,7 @@ from pathlib import Path
 
 import numpy as np
 
-_LEGACY_ANALYSES_DIR = Path(__file__).resolve().parent / "legacy_analyses"
+_LEGACY_ANALYSES_DIR = Path(__file__).resolve().parent / "legacy" / "analyses"
 if str(_LEGACY_ANALYSES_DIR) not in sys.path:
     sys.path.insert(0, str(_LEGACY_ANALYSES_DIR))
 

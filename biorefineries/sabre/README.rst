@@ -69,10 +69,13 @@ H2S removal, biogas upgrading, dewatering, fermentation, oil extraction).
 
 ``analyses/``: new analysis and plotting scripts.
 
-``legacy_analyses/``: the original exploratory analysis and plotting
+``legacy/``: retired code kept for reference and regression coverage --
+``legacy/analyses/`` holds the original exploratory analysis and plotting
 scripts (heatmaps, sensitivity studies, TEA scenario comparisons) from
 Azhar Razin's thesis work, covered by the regression tests in
-``tests.py``.
+``tests.py``; ``legacy/results/`` their old output; ``legacy/assumptions.yaml``
+the pre-migration monolithic assumptions file, superseded by the
+topic-specific files under ``data/``.
 
 References
 ----------

@@ -43,13 +43,16 @@ __all__ = ('create_ad_biomethane_system',)
 # below (data/pretreatment.yaml `pretreatment_ad` section).
 _PRETREATMENT_AD = load_assumptions("pretreatment.yaml")["pretreatment_ad"]
 
-# AD sizing/operating parameters shared between the biogas (methanogenic)
-# and vfa (acidogenic) digester modes (data/ad.yaml `ad` section).
-_AD_SHARED = load_assumptions("ad.yaml")["ad"]
-
-# AD performance parameters, shared between the methanogenic and acidogenic
-# digester modes (data/ad.yaml `ad_performance` section).
-_AD_PERFORMANCE = load_assumptions("ad.yaml")["ad_performance"]
+# data/ad.yaml, loaded once -- AD sizing/operating parameters, performance
+# parameters, and the H2S removal / biogas upgrading / digestate screw
+# press sections, all shared with systems._ad_vfa_system and/or
+# systems._integrated_system.
+_AD_YAML = load_assumptions("ad.yaml")
+_AD_SHARED = _AD_YAML["ad"]
+_AD_PERFORMANCE = _AD_YAML["ad_performance"]
+_H2S_REMOVAL = _AD_YAML["h2s_removal"]
+_BIOGAS_UPGRADING = _AD_YAML["biogas_upgrading"]
+_DIGESTATE_SCREW_PRESS = _AD_YAML["digestate_screw_press"]
 
 
 def _apply_biodegradability_overrides(base_dict, override_factors):
@@ -80,7 +83,7 @@ def _default_digestible_ids():
 
 
 def _build_methanogenic_pathway(
-    A, feed_stream, pretreatment_case, temperature_regime="mesophilic",
+    feed_stream, pretreatment_case, temperature_regime="mesophilic",
     biogas_ids=("biogas", "digestate"),
 ):
     """
@@ -292,14 +295,14 @@ def _build_methanogenic_pathway(
         cp_kJ_per_kgK=adS.get("cp_kJ_per_kgK", 4.18),
     )
 
-    h2sA = A.get("h2s_removal", {})
+    h2sA = _H2S_REMOVAL
     H2SR = H2SRemoval(
         "H2SR", ins=AD - 0, outs=("treated_biogas", "spent_h2s_media"),
         h2s_removal_efficiency=h2sA.get("h2s_removal_efficiency", 0.99),
         reagent_cost_usd_per_Nm3_raw=h2sA.get("reagent_cost_usd_per_Nm3_raw", 0.002),
     )
 
-    upA = A["biogas_upgrading"]
+    upA = _BIOGAS_UPGRADING
     UP = BiogasUpgrading(
         "UP", ins=H2SR - 0, outs=("biomethane", "offgas"),
         ch4_recovery=upA["ch4_recovery"],
@@ -309,7 +312,7 @@ def _build_methanogenic_pathway(
         maintenance_frac_of_capex_per_yr=upA.get("maintenance_frac_of_capex_per_yr", 0.035),
     )
 
-    sp = A.get("digestate_screw_press", {})
+    sp = _DIGESTATE_SCREW_PRESS
     SP = DigestateScrewPress(
         ID="SP", ins=AD - 1, outs=("soil_amendment", "liquid_digestate"),
         solids_IDs=tuple(sp.get("solids_IDs", [
@@ -343,7 +346,6 @@ def create_ad_biomethane_system(
     ch4_override=None,
     temperature_regime: str = "mesophilic",
 ):
-    A = load_assumptions()
     feedstock_assumptions = load_assumptions("feedstock.yaml")
     preprocessing_assumptions = load_assumptions("preprocessing.yaml")
     params = get_feedstock_type_params(feedstock_assumptions, feedstock_type)
@@ -428,7 +430,7 @@ def create_ad_biomethane_system(
 
     resolved_pretreatment_case = pretreatment_case or _AD_SHARED.get("methanogenic", {}).get("pretreatment_case", "press_mill_only")
     path_units, streams, units = _build_methanogenic_pathway(
-        A, ML - 0, resolved_pretreatment_case, temperature_regime=temperature_regime,
+        ML - 0, resolved_pretreatment_case, temperature_regime=temperature_regime,
     )
 
     if ch4_override is not None:

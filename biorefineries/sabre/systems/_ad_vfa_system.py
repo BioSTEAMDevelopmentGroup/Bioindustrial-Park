@@ -22,13 +22,13 @@ from biorefineries.sabre.units import (
 __all__ = ('create_ad_vfa_system',)
 
 
-# AD sizing/operating parameters shared between the biogas (methanogenic)
-# and vfa (acidogenic) digester modes (data/ad.yaml `ad` section).
-_AD_SHARED = load_assumptions("ad.yaml")["ad"]
-
-# AD performance parameters, shared between the methanogenic and acidogenic
-# digester modes (data/ad.yaml `ad_performance` section).
-_AD_PERFORMANCE = load_assumptions("ad.yaml")["ad_performance"]
+# data/ad.yaml, loaded once -- AD sizing/operating parameters, performance
+# parameters, and the digestate screw press section, all shared with
+# systems._ad_biomethane_system and/or systems._integrated_system.
+_AD_YAML = load_assumptions("ad.yaml")
+_AD_SHARED = _AD_YAML["ad"]
+_AD_PERFORMANCE = _AD_YAML["ad_performance"]
+_DIGESTATE_SCREW_PRESS = _AD_YAML["digestate_screw_press"]
 
 
 SOLIDS_IDS = [
@@ -112,8 +112,6 @@ def create_ad_vfa_system(
         - pressate_permeate
         - biostimulant_product
     """
-    A = load_assumptions()
-
     vfaS = {**_AD_SHARED, **_AD_SHARED.get("acidogenic", {})}
     vfaS["temperature_K"] = get_ad_temperature_K(_AD_SHARED, temperature_regime)
     vfaP = _get_ad_vfa_case(_AD_PERFORMANCE)
@@ -274,15 +272,15 @@ def create_ad_vfa_system(
         ins=AD - 1,
         outs=("acidogenic_residual_solids", "vfa_broth"),
         solids_IDs=SOLIDS_IDS,
-        ts_capture_frac=A.get("digestate_screw_press", {}).get("ts_capture_frac", 0.40),
-        cake_moisture_frac=A.get("digestate_screw_press", {}).get("cake_moisture_frac", 0.50),
-        capacity_tph_each=A.get("digestate_screw_press", {}).get("capacity_tph_each", 6.0),
-        kWh_per_m3=A.get("digestate_screw_press", {}).get("kWh_per_m3", 0.67),
-        eur_to_usd=A.get("digestate_screw_press", {}).get("eur_to_usd", 1.19),
-        capex_eur_table=A.get("digestate_screw_press", {}).get("capex_eur_table"),
-        include_polymer_dosing=A.get("digestate_screw_press", {}).get("include_polymer_dosing", False),
-        polymer_dosing_cost_eur_each=A.get("digestate_screw_press", {}).get("polymer_dosing_cost_eur_each", 0.0),
-        F_BM=A.get("digestate_screw_press", {}).get("F_BM", 1.0),
+        ts_capture_frac=_DIGESTATE_SCREW_PRESS.get("ts_capture_frac", 0.40),
+        cake_moisture_frac=_DIGESTATE_SCREW_PRESS.get("cake_moisture_frac", 0.50),
+        capacity_tph_each=_DIGESTATE_SCREW_PRESS.get("capacity_tph_each", 6.0),
+        kWh_per_m3=_DIGESTATE_SCREW_PRESS.get("kWh_per_m3", 0.67),
+        eur_to_usd=_DIGESTATE_SCREW_PRESS.get("eur_to_usd", 1.19),
+        capex_eur_table=_DIGESTATE_SCREW_PRESS.get("capex_eur_table"),
+        include_polymer_dosing=_DIGESTATE_SCREW_PRESS.get("include_polymer_dosing", False),
+        polymer_dosing_cost_eur_each=_DIGESTATE_SCREW_PRESS.get("polymer_dosing_cost_eur_each", 0.0),
+        F_BM=_DIGESTATE_SCREW_PRESS.get("F_BM", 1.0),
     )
 
     path.extend([AD, SP])

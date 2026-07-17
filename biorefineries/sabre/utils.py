@@ -19,10 +19,9 @@ __all__ = (
 )
 
 
-def load_assumptions(filename: str = "assumptions.yaml"):
-    # TODO: drop the default once all assumptions have migrated out of
-    # assumptions.yaml into topic-specific files (e.g. feedstock.yaml)
-    # and every caller passes filename explicitly.
+def load_assumptions(filename: str):
+    # assumptions.yaml is retired (moved to legacy/); every caller must
+    # name one of the topic-specific files under data/ explicitly.
     path = Path(__file__).resolve().parent / "data" / filename
     with open(path, "r") as f:
         return yaml.safe_load(f)

@@ -95,7 +95,7 @@ class MassSplitter(bst.Unit):
         pass
 
 
-def _build_methane_pathway(A, ad_feed_in, pretreatment_case, temperature_regime="mesophilic"):
+def _build_methane_pathway(ad_feed_in, pretreatment_case, temperature_regime="mesophilic"):
     """
     Thin wrapper: builds AD -> H2SR -> UP -> SP via the shared
     methanogenic-pathway builder in systems._ad_biomethane_system, so this
@@ -103,7 +103,7 @@ def _build_methane_pathway(A, ad_feed_in, pretreatment_case, temperature_regime=
     apart. Returns (units_list, streams_dict, units_dict).
     """
     path_units, streams, units = _build_methanogenic_pathway(
-        A, ad_feed_in, pretreatment_case, temperature_regime=temperature_regime,
+        ad_feed_in, pretreatment_case, temperature_regime=temperature_regime,
     )
     return path_units, streams, units
 
@@ -181,7 +181,6 @@ def create_integrated_biorefinery(
     build_methane = alpha > 0.0
     build_vfa     = alpha < 1.0
 
-    A = load_assumptions()
     feedstock_assumptions = load_assumptions("feedstock.yaml")
     preprocessing_assumptions = load_assumptions("preprocessing.yaml")
     params = get_feedstock_type_params(feedstock_assumptions, feedstock_type)
@@ -286,7 +285,7 @@ def create_integrated_biorefinery(
     methane_units_d = {}
     if build_methane:
         methane_units, methane_streams, methane_units_d = _build_methane_pathway(
-            A, SPL - 0, pretreatment_case, temperature_regime=temperature_regime,
+            SPL - 0, pretreatment_case, temperature_regime=temperature_regime,
         )
 
     vfa_units   = []

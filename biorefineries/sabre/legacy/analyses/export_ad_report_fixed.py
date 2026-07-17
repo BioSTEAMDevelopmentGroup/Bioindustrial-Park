@@ -432,7 +432,6 @@ def main():
     args = parser.parse_args()
 
     set_thermo()
-    load_assumptions()
 
     cases_data: dict[str, dict[str, Any]] = {}
     for case_key, case_label in CASES:

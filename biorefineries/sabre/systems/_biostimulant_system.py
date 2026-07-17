@@ -80,7 +80,6 @@ def create_biostimulant_system(
     units : dict
         'PR', 'PC', 'EV'.
     """
-    A = load_assumptions()
     feedstock_assumptions = load_assumptions("feedstock.yaml")
     preprocessing_assumptions = load_assumptions("preprocessing.yaml")
     params = get_feedstock_type_params(feedstock_assumptions, feedstock_type)
