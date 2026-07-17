@@ -1,0 +1,116 @@
+# Model Assumptions: HTL (NOT YET DEVELOPED)
+
+htl_feed:
+  target_solids_wt_frac: 0.10
+  source:
+    key: asama_2025_inferred
+    note: "Brown macroalgae HTL optimum reported at water-to-biomass ratio 10:1; converted to ~0.0909 solids mass fraction for slurry basis."
+
+htl:
+  temperature_C: 280.0
+  pressure_bar: 100.0
+  residence_time_min: 15.0
+
+  sources:
+    temperature_C:
+      key: allen_2024
+      note: "Continuous Mexican Sargassum HTL anchor case; 280 C used as conservative literature-based baseline."
+    pressure_bar:
+      key: assumed_htl_baseline
+      note: "Placeholder until exact continuous Sargassum operating pressure is fixed from selected design basis."
+    residence_time_min:
+      key: allen_2024_assumed
+      note: "Short residence time selected as conservative continuous HTL-style baseline; revise once exact basis is finalized."
+
+htl_performance:
+  basis: dry_feed
+
+  # literature-anchored base case
+  biocrude_yield_wt_frac_dry: 0.12
+  aqueous_yield_wt_frac_dry: 0.46
+  gas_yield_wt_frac_dry: 0.10
+  char_yield_wt_frac_dry: 0.32
+
+  biocrude_HHV_MJ_per_kg: 28.48
+
+  sources:
+    biocrude_yield:
+      key: allen_2024
+      note: "Continuous HTL of Mexican Sargassum reported total biocrude yield ~12 wt% on dry seaweed basis."
+    biocrude_HHV:
+      key: allen_2024
+      note: "Reported HHV of Sargassum HTL biocrude was 28.48 MJ/kg."
+    aqueous_gas_char_split:
+      key: assumed_closure
+      note: "Temporary closure assumption to complete dry-feed mass split until a tighter product distribution source is selected."
+
+  cases:
+    continuous_mexican_sargassum:
+      temperature_C: 280.0
+      pressure_bar: 100.0
+      residence_time_min: 15.0
+      target_solids_wt_frac: 0.10
+      biocrude_yield_wt_frac_dry: 0.12
+      aqueous_yield_wt_frac_dry: 0.46
+      gas_yield_wt_frac_dry: 0.10
+      char_yield_wt_frac_dry: 0.32
+      biocrude_HHV_MJ_per_kg: 28.48
+      slurry_density_kg_per_m3: 1000.0
+
+      source:
+        key: allen_2024
+        note: "Biocrude yield and HHV from continuous Mexican Sargassum HTL paper; non-oil product split provisional."
+
+    batch_sargassum_water:
+      temperature_C: 280.0
+      pressure_bar: 100.0
+      residence_time_min: 30.0
+      target_solids_wt_frac: 0.10
+      biocrude_yield_wt_frac_dry: 0.1633
+      aqueous_yield_wt_frac_dry: 0.40
+      gas_yield_wt_frac_dry: 0.08
+      char_yield_wt_frac_dry: 0.3567
+      biocrude_HHV_MJ_per_kg: 28.48
+      slurry_density_kg_per_m3: 1000.0
+
+      source:
+        key: biswas_2017
+        note: "Water-only HTL of Sargassum tenerrimum reported max biocrude yield ~16.33 wt% at 280 C; non-oil split provisional."
+
+    optimized_brown_macroalgae:
+      temperature_C: 283.0
+      pressure_bar: 200.0
+      residence_time_min: 54.0
+      water_to_biomass_ratio: 10.0
+      target_solids_wt_frac: 0.0909
+      biocrude_yield_wt_frac_dry: 0.23
+      aqueous_yield_wt_frac_dry: 0.37
+      gas_yield_wt_frac_dry: 0.10
+      char_yield_wt_frac_dry: 0.30
+      slurry_density_kg_per_m3: 1000.0
+
+      source:
+        key: asama_2025
+        note: "Predictive optimum for brown macroalgae HTL; non-oil split provisional."
+
+htl_costing:
+  reactor:
+    capex_model: placeholder_scaled
+    basis: dry_kg_per_hr
+    ref_capacity_dry_kg_per_hr: 1000.0
+    purchase_cost_ref_usd: 5000000.0
+    scale_exponent: 0.60
+    F_BM: 2.0
+
+
+  separator:
+    capex_model: placeholder_fraction
+    fraction_of_reactor_purchase_cost: 0.20
+    F_BM: 1.5
+
+htl_separation:
+  biocrude_recovery_to_oil: 0.98
+  aqueous_org_recovery_to_aqueous: 0.99
+  char_recovery_to_solids: 1.00
+  gas_recovery_to_gas: 1.00
+  oil_water_to_oil_frac: 0.02
