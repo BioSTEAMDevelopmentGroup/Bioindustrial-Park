@@ -29,6 +29,7 @@ _AD_YAML = load_assumptions("ad.yaml")
 _AD_SHARED = _AD_YAML["ad"]
 _AD_PERFORMANCE = _AD_YAML["ad_performance"]
 _DIGESTATE_SCREW_PRESS = _AD_YAML["digestate_screw_press"]
+_AD_ACIDOGENIC_HS = _AD_SHARED["acidogenic"]["heat_shock"]
 
 
 SOLIDS_IDS = [
@@ -57,34 +58,26 @@ def _get_ad_vfa_case(ad_performance: dict) -> dict:
     return merged
 
 
-def _get_ad_vfa_split(ad_performance: dict) -> dict | None:
+def _get_ad_vfa_split(ad_performance: dict) -> dict:
     """
     Read vfa_split directly from the selected case dict.
     Bypasses the shallow-merge issue in _get_ad_vfa_case() that silently
-    drops nested dicts. Returns a plain {str: float} dict or None.
+    drops nested dicts. AcidogenicDigester requires vfa_split to be a
+    dict (never None), so this requires the case to define one too.
     """
     perf = ad_performance["acidogenic"]
-    case_name = perf.get("case")
-    cases = perf.get("cases", {})
-
-    if not case_name or case_name not in cases:
-        return None
-
-    raw_split = cases[case_name].get("vfa_split")
-    if not raw_split:
-        return None
-
+    raw_split = perf["cases"][perf["case"]]["vfa_split"]
     return {str(k): float(v) for k, v in raw_split.items()}
 
 
 def create_ad_vfa_system(
     feedstock_type: str = "pelagic",
     milled_biomass_stream=None,
-    enable_heat_shock: bool = False,
-    hs_target_temperature_K: float = 338.15,
-    hs_events_per_day: float = 1.0 / 7.0,
-    hs_heated_fraction_of_liquid: float = 0.10,
-    hs_duration_min: float = 15.0,
+    enable_heat_shock: bool = _AD_ACIDOGENIC_HS["enable"],
+    hs_target_temperature_K: float = _AD_ACIDOGENIC_HS["target_temperature_K"],
+    hs_events_per_day: float = _AD_ACIDOGENIC_HS["events_per_day"],
+    hs_heated_fraction_of_liquid: float = _AD_ACIDOGENIC_HS["heated_fraction_of_liquid"],
+    hs_duration_min: float = _AD_ACIDOGENIC_HS["duration_min"],
     temperature_regime: str = "mesophilic",
 ):
     """
@@ -247,19 +240,18 @@ def create_ad_vfa_system(
         "VFA_AD",
         ins=ad_inlet,
         outs=("offgas", "acidogenic_broth"),
-        vs_destruction=float(vfaP.get("vs_destruction", 0.50)),
-        vfa_kg_per_kg_vs=float(vfaP.get("vfa_kg_per_kg_vs", 0.47)),
+        vs_destruction=float(vfaP["vs_destruction"]),
+        vfa_kg_per_kg_vs=float(vfaP["vfa_kg_per_kg_vs"]),
         vfa_split=vfa_split,
-        digestible_IDs=vfaP.get("digestible_IDs"),
-        produce_offgas_co2=bool(vfaP.get("produce_offgas_co2", True)),
-        hrt_days=float(vfaS.get("hrt_days", 15.0)),
-        slurry_density_kg_per_m3=float(vfaS.get("slurry_density_kg_per_m3", 1000.0)),
-        headspace_frac=float(vfaS.get("gas_storage_frac_of_total_volume", 0.2)),
-        max_single_digester_volume_MG=float(vfaS.get("max_single_digester_volume_MG", 1.5)),
-        mixing_W_per_m3=float(vfaS.get("mixing_W_per_m3", 5.0)),
-        influent_temperature_K=float(vfaS.get("influent_temperature_K", 298.15)),
-        target_temperature_K=float(vfaS.get("temperature_K", 308.15)),
-        cp_kJ_per_kgK=float(vfaS.get("cp_kJ_per_kgK", 4.18)),
+        digestible_IDs=vfaP["digestible_IDs"],
+        hrt_days=float(vfaS["hrt_days"]),
+        slurry_density_kg_per_m3=float(vfaS["slurry_density_kg_per_m3"]),
+        headspace_frac=float(vfaS["gas_storage_frac_of_total_volume"]),
+        max_single_digester_volume_MG=float(vfaS["max_single_digester_volume_MG"]),
+        mixing_W_per_m3=float(vfaS["mixing_W_per_m3"]),
+        influent_temperature_K=float(vfaS["influent_temperature_K"]),
+        target_temperature_K=float(vfaS["temperature_K"]),
+        cp_kJ_per_kgK=float(vfaS["cp_kJ_per_kgK"]),
         enable_heat_shock=enable_heat_shock,
         hs_target_temperature_K=hs_target_temperature_K,
         hs_events_per_day=hs_events_per_day,

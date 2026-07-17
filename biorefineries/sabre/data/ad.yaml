@@ -42,6 +42,12 @@ ad:
 
   acidogenic:
     hrt_days: 15.0
+    heat_shock:
+      enable: false
+      target_temperature_K: 338.15
+      events_per_day: 0.14285714285714285  # 1 event per week (1/7 per day)
+      heated_fraction_of_liquid: 0.10
+      duration_min: 15.0
     sources:
       hrt_days:
         key: aad_review_window

@@ -30,15 +30,17 @@ __all__ = (
 GAL_TO_M3 = 0.003785411784  # US gallons -> m3
 NM3_PER_KMOL = 22.414
 
-# Loaded once at import time -- data/ad.yaml is the single source of truth
-# for AnaerobicDigester.__init__'s default values below, so a yaml edit
-# doesn't need a matching literal edit here too.
+# Loaded data
 _AD_YAML = load_assumptions("ad.yaml")
 _AD_SHARED = _AD_YAML["ad"]
 _AD_PERFORMANCE = _AD_YAML["ad_performance"]
 _AD_METHANOGENIC = {**_AD_SHARED, **_AD_SHARED.get("methanogenic", {})}
 _ADP_METHANOGENIC = {**_AD_PERFORMANCE, **_AD_PERFORMANCE.get("methanogenic", {})}
 _AD_COST = _AD_SHARED["cost"]
+
+_AD_ACIDOGENIC = {**_AD_SHARED, **_AD_SHARED.get("acidogenic", {})}
+_ADP_ACIDOGENIC = _AD_PERFORMANCE["acidogenic"]
+_ADP_ACIDOGENIC_CASE = _ADP_ACIDOGENIC["cases"][_ADP_ACIDOGENIC["case"]]
 
 # ADBC-based digester installed cost anchor points (m3, USD)
 ADBC_VOL_M3 = [878, 1755, 2633, 3510, 5265, 8775]
@@ -408,7 +410,8 @@ class AcidogenicDigester(bst.Unit):
     Acidogenic / arrested AD unit for VFA platform modeling. Structurally
     parallel to `AnaerobicDigester` but produces a VFA-rich broth instead of biogas.
     There is no biodegradability weighting per component, all mass in `digestible_IDs`
-    is treated as equally available for VS destruction.
+    is treated as equally available for VS destruction. VS destroyed but not
+    converted to VFA is sent to the offgas as CarbonDioxide.
 
     Parameters
     ----------
@@ -421,17 +424,11 @@ class AcidogenicDigester(bst.Unit):
         weighting -- all mass in `digestible_IDs` is equally available).
     vfa_kg_per_kg_vs : float
         VFA yield per kg of VS destroyed.
-    vfa_split : dict[str, float], optional
+    vfa_split : dict[str, float]
         Mass split of produced VFA among chemical IDs; renormalized to
-        sum to 1. If not given, resolved at runtime by
-        `_resolve_vfa_split()` (a thermo-dependent fallback).
-    digestible_IDs : Iterable[str], optional
-        Chemical IDs eligible for VS destruction. Falls back to a
-        built-in default list if not given.
-    produce_offgas_co2 : bool
-        If True, VS destroyed but not converted to VFA is sent to the
-        offgas as CarbonDioxide; if False (or CarbonDioxide absent from
-        thermo), it's returned to the broth as Water instead.
+        sum to 1.
+    digestible_IDs : Iterable[str]
+        Chemical IDs eligible for VS destruction.
     hrt_days : float
         Hydraulic retention time, used to size total liquid digester
         volume.
@@ -482,52 +479,39 @@ class AcidogenicDigester(bst.Unit):
         ins=None,
         outs=(),
         *,
-        vs_destruction: float = 0.50,
-        vfa_kg_per_kg_vs: float = 0.55,
-        vfa_split: Optional[Dict[str, float]] = None,
-        digestible_IDs: Optional[Iterable[str]] = None,
-        produce_offgas_co2: bool = True,
-        hrt_days: float = 15.0,
-        slurry_density_kg_per_m3: float = 1000.0,
-        headspace_frac: float = 0.25,
-        max_single_digester_volume_MG: float = 1.5,
-        mixing_W_per_m3: float = 5.0,
-        influent_temperature_K: float = 298.15,
-        target_temperature_K: float = 308.15,
-        cp_kJ_per_kgK: float = 4.18,
-        enable_heat_shock: bool = False,
-        hs_target_temperature_K: float = 338.15,
-        hs_events_per_day: float = 1.0 / 7.0,
-        hs_heated_fraction_of_liquid: float = 0.10,
-        hs_duration_min: float = 15.0,
+        vs_destruction: float = _ADP_ACIDOGENIC_CASE["vs_destruction"],
+        vfa_kg_per_kg_vs: float = _ADP_ACIDOGENIC_CASE["vfa_kg_per_kg_vs"],
+        vfa_split: Dict[str, float] = _ADP_ACIDOGENIC_CASE["vfa_split"],
+        digestible_IDs: Optional[Iterable[str]] = _AD_PERFORMANCE["digestible_IDs"],
+        hrt_days: float = _AD_ACIDOGENIC["hrt_days"],
+        slurry_density_kg_per_m3: float = _AD_ACIDOGENIC["slurry_density_kg_per_m3"],
+        headspace_frac: float = _AD_ACIDOGENIC["gas_storage_frac_of_total_volume"],
+        max_single_digester_volume_MG: float = _AD_ACIDOGENIC["max_single_digester_volume_MG"],
+        mixing_W_per_m3: float = _AD_ACIDOGENIC["mixing_W_per_m3"],
+        influent_temperature_K: float = _AD_ACIDOGENIC["influent_temperature_K"],
+        target_temperature_K: float = _AD_SHARED["temperature_regimes"]["mesophilic"]["temperature_K"],
+        cp_kJ_per_kgK: float = _AD_ACIDOGENIC["cp_kJ_per_kgK"],
+        enable_heat_shock: bool = _AD_ACIDOGENIC["heat_shock"]["enable"],
+        hs_target_temperature_K: float = _AD_ACIDOGENIC["heat_shock"]["target_temperature_K"],
+        hs_events_per_day: float = _AD_ACIDOGENIC["heat_shock"]["events_per_day"],
+        hs_heated_fraction_of_liquid: float = _AD_ACIDOGENIC["heat_shock"]["heated_fraction_of_liquid"],
+        hs_duration_min: float = _AD_ACIDOGENIC["heat_shock"]["duration_min"],
         **kwargs,
     ):
         super().__init__(ID, ins, outs, **kwargs)
 
         self.vs_destruction = float(vs_destruction)
-        self.vfa_kg_per_kg_vs= float(vfa_kg_per_kg_vs)
-        self.vfa_split = dict(vfa_split) if vfa_split is not None else None
-        self.digestible_IDs = tuple(digestible_IDs) if digestible_IDs is not None else (
-            "Glucan",
-            "Arabinan",
-            "Alginate",
-            "Fucoidan",
-            "Mannitol",
-            "Protein",
-            "OtherSolids",
-        )
-        self.produce_offgas_co2 = bool(produce_offgas_co2)
-
+        self.vfa_kg_per_kg_vs = float(vfa_kg_per_kg_vs)
+        self.vfa_split = dict(vfa_split)
+        self.digestible_IDs = tuple(digestible_IDs)
         self.hrt_days = float(hrt_days)
         self.slurry_density_kg_per_m3 = float(slurry_density_kg_per_m3)
         self.headspace_frac = float(headspace_frac)
         self.max_single_digester_volume_m3 = float(max_single_digester_volume_MG) * 1e6 * GAL_TO_M3
-
         self.mixing_W_per_m3 = float(mixing_W_per_m3)
         self.influent_temperature_K = float(influent_temperature_K)
         self.target_temperature_K = float(target_temperature_K)
         self.cp_kJ_per_kgK = float(cp_kJ_per_kgK)
-
         self.enable_heat_shock = bool(enable_heat_shock)
         self.hs_target_temperature_K = float(hs_target_temperature_K)
         self.hs_events_per_day = float(hs_events_per_day)
@@ -537,38 +521,19 @@ class AcidogenicDigester(bst.Unit):
         self.F_BM = dict(self.F_BM)
 
     def _resolve_vfa_split(self):
-        chems = self.chemicals
-        ids = set(chems.IDs)
+        ids = set(self.chemicals.IDs)
 
-        if self.vfa_split is not None:
-            split = dict(self.vfa_split)
-            missing = [k for k in split.keys() if k not in ids]
-            if missing:
-                raise RuntimeError(
-                    f"VFA split includes chemicals not in thermo: {missing}. "
-                    "Use thermo IDs that actually exist in your project."
-                )
-            s = sum(split.values())
-            if s <= 0:
-                raise RuntimeError("vfa_split sums to 0; provide positive fractions.")
-            return {k: v / s for k, v in split.items()}
-
-        common = ["AceticAcid", "PropionicAcid", "ButyricAcid", "ValericAcid", "HexanoicAcid"]
-        if all(c in ids for c in common):
-            return {
-                "AceticAcid": 0.40,
-                "PropionicAcid": 0.10,
-                "ButyricAcid": 0.30,
-                "ValericAcid": 0.05,
-                "HexanoicAcid": 0.15,
-            }
-
-        if "VFA" in ids:
-            return {"VFA": 1.0}
-
-        raise RuntimeError(
-            "No valid VFA representation found. Add the acid IDs to thermo or add a pseudo-component named 'VFA'."
-        )
+        split = dict(self.vfa_split)
+        missing = [k for k in split.keys() if k not in ids]
+        if missing:
+            raise RuntimeError(
+                f"VFA split includes chemicals not in thermo: {missing}. "
+                "Use thermo IDs that actually exist in your project."
+            )
+        s = sum(split.values())
+        if s <= 0:
+            raise RuntimeError("vfa_split sums to 0; provide positive fractions.")
+        return {k: v / s for k, v in split.items()}
 
     def _available_digestible_pool(self, broth) -> Dict[str, float]:
         ids = set(self.chemicals.IDs)
@@ -616,22 +581,14 @@ class AcidogenicDigester(bst.Unit):
         for chem_id, frac in split.items():
             broth.imass[chem_id] += vfa_total * frac
 
-        residual_destroyed = max(0.0, remove - vfa_total)
+        residual_destroyed = remove - vfa_total
+        if residual_destroyed < 0.0:
+            raise RuntimeError(
+                f"residual_destroyed became negative ({residual_destroyed:.6g} kg/h) for "
+                f"unit {self.ID}; vfa_total exceeded remove, which should be impossible."
+            )
         if residual_destroyed > 0.0:
-            ids = set(self.chemicals.IDs)
-            if self.produce_offgas_co2 and "CarbonDioxide" in ids:
-                offgas.imass["CarbonDioxide"] += residual_destroyed
-            elif "Water" in ids:
-                broth.imass["Water"] += residual_destroyed
-
-        self.design_results["VS in (kg/h)"] = VS
-        self.design_results["VS destroyed target (kg/h)"] = VS_destroyed_target
-        self.design_results["Digestible pool (kg/h)"] = pool
-        self.design_results["Destroyed digestible mass (kg/h)"] = remove
-        self.design_results["Total VFA produced (kg/h)"] = vfa_total
-        self.design_results["Residual destroyed mass to closure (kg/h)"] = residual_destroyed
-        for chem_id, frac in split.items():
-            self.design_results[f"{chem_id} produced (kg/h)"] = vfa_total * frac
+            offgas.imass["CarbonDioxide"] += residual_destroyed
 
     def _design(self):
         feed = self.ins[0]
@@ -697,6 +654,35 @@ class AcidogenicDigester(bst.Unit):
                 )
             except TypeError:
                 self.add_heat_utility(Q_total_kJph, T_in)
+
+        water = float(feed.imass["Water"]) if "Water" in feed.chemicals else 0.0
+        ash = float(feed.imass["Ash"]) if "Ash" in feed.chemicals else 0.0
+        TS = max(feed.F_mass - water, 0.0)
+        VS = max(TS - ash, 0.0)
+        VS_destroyed_target = max(0.0, self.vs_destruction) * VS
+
+        avail = self._available_digestible_pool(feed)
+        pool = sum(avail.values())
+        remove = min(VS_destroyed_target, pool)
+
+        split = self._resolve_vfa_split()
+        vfa_total = max(0.0, self.vfa_kg_per_kg_vs) * remove
+        vfa_total = min(vfa_total, remove)
+        residual_destroyed = remove - vfa_total
+        if residual_destroyed < 0.0:
+            raise RuntimeError(
+                f"residual_destroyed became negative ({residual_destroyed:.6g} kg/h) for "
+                f"unit {self.ID}; vfa_total exceeded remove, which should be impossible."
+            )
+
+        self.design_results["VS in (kg/h)"] = VS
+        self.design_results["VS destroyed target (kg/h)"] = VS_destroyed_target
+        self.design_results["Digestible pool (kg/h)"] = pool
+        self.design_results["Destroyed digestible mass (kg/h)"] = remove
+        self.design_results["Total VFA produced (kg/h)"] = vfa_total
+        self.design_results["Residual destroyed mass to closure (kg/h)"] = residual_destroyed
+        for chem_id, frac in split.items():
+            self.design_results[f"{chem_id} produced (kg/h)"] = vfa_total * frac
 
     def _cost(self):
         V_each = self.design_results["Digester volume each (m3)"]
