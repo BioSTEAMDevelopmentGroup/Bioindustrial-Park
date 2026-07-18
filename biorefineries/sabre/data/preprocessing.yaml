@@ -4,17 +4,6 @@ preprocessing:
   press:
     cake_solids_wt_frac: 0.15
     solids_capture_frac: 0.98
-    solids_IDs:
-      - Glucan
-      - Arabinan
-      - Alginate
-      - Fucoidan
-      - Mannitol
-      - Protein
-      - OtherSolids
-      - Lignin
-      - Ash
-
     solubles_to_pressate_frac: 1.0
 
     power_kWh_per_dry_ton_TS: 5.0

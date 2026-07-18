@@ -17,7 +17,9 @@ from typing import Dict, Iterable, Optional
 import biosteam as bst
 from biosteam.units.decorators import cost
 
-from biorefineries.sabre.utils import load_assumptions, OPERATING_HOURS_PER_YEAR
+from biorefineries.sabre.utils import (
+    load_assumptions, OPERATING_HOURS_PER_YEAR, get_solids_group_IDs,
+)
 
 __all__ = (
     'AnaerobicDigester', 'AcidogenicDigester',
@@ -1043,7 +1045,7 @@ class DigestateDecanterCentrifuge(bst.Unit):
     _N_outs = 2
 
     def __init__(self, ID="", ins=None, outs=(),
-                 solids_IDs=_DIGESTATE_DECANTER_CENTRIFUGE["solids_IDs"],
+                 solids_IDs=None,  # if not given, defaults to the "solids" chemical group (see utils.get_solids_group_IDs)
                  ts_capture_frac=_DIGESTATE_DECANTER_CENTRIFUGE["ts_capture_frac"],
                  cake_moisture_frac=_DIGESTATE_DECANTER_CENTRIFUGE["cake_moisture_frac"],
                  capacity_tph_each=_DIGESTATE_DECANTER_CENTRIFUGE["capacity_tph_each"],
@@ -1052,6 +1054,8 @@ class DigestateDecanterCentrifuge(bst.Unit):
                  **kwargs):
         super().__init__(ID, ins, outs, **kwargs)
 
+        if solids_IDs is None:
+            solids_IDs = get_solids_group_IDs(self.chemicals)
         self.solids_IDs = tuple(solids_IDs)
         self.ts_capture_frac = float(ts_capture_frac)
         self.cake_moisture_frac = float(cake_moisture_frac)

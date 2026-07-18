@@ -160,7 +160,6 @@ biogas_upgrading:
 
 
 digestate_decanter_centrifuge:
-  solids_IDs: ["Cellulose", "Ash"]
   ts_capture_frac: 0.78
   cake_moisture_frac: 0.75
   capacity_tph_each: 50.0

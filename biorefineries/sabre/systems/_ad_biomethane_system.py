@@ -330,10 +330,6 @@ def create_ad_biomethane_system(
 
     PR = Press(
         "PR", ins=feed, outs=("pressed_cake", "pressate"),
-        solids_IDs=tuple(prA.get("solids_IDs", [
-            "Glucan", "Xylan", "Mannan", "Galactan", "Arabinan", "Alginate",
-            "Fucoidan", "Mannitol", "Protein", "OtherSolids", "Lignin", "Ash",
-        ])),
         solids_capture_frac=prA.get("solids_capture_frac", 0.98),
         cake_solids_wt_frac=(
             float(press_cake_solids_wt_frac) if press_cake_solids_wt_frac is not None

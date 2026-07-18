@@ -36,12 +36,6 @@ from biorefineries.sabre.units import Press, PressateConcentrator, BiostimulantE
 __all__ = ('create_biostimulant_system',)
 
 
-SOLIDS_IDS = [
-    "Ash", "Protein", "Lignin", "Glucan", "Xylan", "Mannan", "Galactan", "Arabinan",
-    "Alginate", "Fucoidan", "Mannitol", "OtherSolids",
-]
-
-
 def create_biostimulant_system(
     feedstock_type: str = "pelagic",
     target_solids_wt_frac: float = 0.20,
@@ -96,7 +90,6 @@ def create_biostimulant_system(
 
     PR = Press(
         "PR", ins=feed, outs=("pressed_cake", "pressate"),
-        solids_IDs=tuple(prA.get("solids_IDs", SOLIDS_IDS)),
         solids_capture_frac=prA.get("solids_capture_frac", 0.98),
         cake_solids_wt_frac=prA.get("cake_solids_wt_frac", 0.35),
         solubles_to_pressate_frac=prA.get("solubles_to_pressate_frac", 1.0),

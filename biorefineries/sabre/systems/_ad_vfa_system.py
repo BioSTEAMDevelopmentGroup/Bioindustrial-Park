@@ -32,12 +32,6 @@ _DIGESTATE_SCREW_PRESS = _AD_YAML["digestate_screw_press"]
 _AD_ACIDOGENIC_HS = _AD_SHARED["acidogenic"]["heat_shock"]
 
 
-SOLIDS_IDS = [
-    "Ash", "Protein", "Lignin", "Glucan", "Xylan", "Mannan", "Galactan", "Arabinan",
-    "Alginate", "Fucoidan", "Mannitol", "OtherSolids",
-]
-
-
 def _get_ad_vfa_case(ad_performance: dict) -> dict:
     """
     Merge the shared ad_performance fields (e.g. digestible_IDs) with
@@ -144,7 +138,6 @@ def create_ad_vfa_system(
             "PR",
             ins=feed,
             outs=("pressed_cake", "pressate"),
-            solids_IDs=SOLIDS_IDS,
             solids_capture_frac=prA.get("solids_capture_frac", 0.98),
             cake_solids_wt_frac=prA.get("cake_solids_wt_frac", 0.35),
             solubles_to_pressate_frac=prA.get("solubles_to_pressate_frac", 1.0),

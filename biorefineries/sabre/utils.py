@@ -16,7 +16,7 @@ import biosteam as bst
 __all__ = (
     'load_assumptions', 'wet_tpd_to_kgph', 'get_scale_feed_kgph',
     'get_feedstock_type_params', 'get_ad_temperature_K', 'make_sargassum_feed',
-    'OPERATING_DAYS_PER_YEAR', 'OPERATING_HOURS_PER_YEAR',
+    'OPERATING_DAYS_PER_YEAR', 'OPERATING_HOURS_PER_YEAR', 'get_solids_group_IDs',
 )
 
 
@@ -56,6 +56,22 @@ def get_feedstock_type_params(A: dict, feedstock_type: str) -> dict:
     if feedstock_type not in ft:
         raise KeyError(f"Unknown feedstock_type '{feedstock_type}'. Options: {list(ft.keys())}")
     return ft[feedstock_type]
+
+
+def get_solids_group_IDs(chemicals=None) -> tuple:
+    """
+    Resolve chemical IDs in the 'solids' (or 'Solids') group defined on
+    the given Chemicals object (defaults to `bst.settings.chemicals`) --
+    see `_chemicals.py::create_chemicals()`, which defines this group from
+    `data/feedstock.yaml`'s `solids_IDs` list. Returns an empty tuple if
+    neither group name is defined.
+    """
+    if chemicals is None:
+        chemicals = bst.settings.chemicals
+    for name in ("solids", "Solids"):
+        if name in chemicals.chemical_groups:
+            return tuple(chem.ID for chem in getattr(chemicals, name))
+    return ()
 
 
 def get_ad_temperature_K(ad_assumptions: dict, temperature_regime: str) -> float:

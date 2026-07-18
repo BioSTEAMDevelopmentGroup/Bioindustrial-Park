@@ -11,6 +11,8 @@ Creating the chemical list used for the SaBRe systems
 import biosteam as bst
 import thermosteam as tmo
 
+from biorefineries.sabre.utils import load_assumptions
+
 __all__ = ('create_chemicals', 'set_thermo')
 
 
@@ -89,6 +91,16 @@ def create_chemicals():
         Ammonia, KH2PO4, NaOH, MagnesiumSulfate,
     ])
     chems.compile()
+
+    # Single source of truth for which chemicals count as "solids" -- see
+    # data/feedstock.yaml's solids_IDs. Skips any ID not currently
+    # registered as a chemical (e.g. if the yaml list is extended ahead of
+    # _chemicals.py itself). Units with a solids_IDs parameter default to
+    # this group (via utils.get_solids_group_IDs()) when not given directly.
+    solids_IDs = load_assumptions("feedstock.yaml").get("solids_IDs", [])
+    solids_IDs = [i for i in solids_IDs if i in chems]
+    if solids_IDs:
+        chems.define_group("solids", solids_IDs)
 
     thermo = tmo.Thermo(chems)
     bst.settings.set_thermo(thermo)

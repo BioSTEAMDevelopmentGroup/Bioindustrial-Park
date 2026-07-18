@@ -17,7 +17,7 @@ from biosteam.units.design_tools.tank_design import (
     compute_number_of_tanks_and_purchase_cost,
 )
 
-from biorefineries.sabre.utils import load_assumptions
+from biorefineries.sabre.utils import load_assumptions, get_solids_group_IDs
 
 __all__ = ('YarrowiaLipidFermenter', 'VFAMicrofilter', 'FermentationMediumTank')
 
@@ -247,10 +247,9 @@ class VFAMicrofilter(bst.Unit):
         self.vfa_IDs = tuple(vfa_IDs or [
             "AceticAcid", "PropionicAcid", "ButyricAcid", "ValericAcid", "HexanoicAcid"
         ])
-        self.solids_IDs = tuple(solids_IDs or [
-            "Ash", "Protein", "Lignin", "Glucan", "Xylan", "Mannan", "Galactan",
-            "Arabinan", "Alginate", "Fucoidan", "Mannitol", "OtherSolids", "CellMass"
-        ])
+        if solids_IDs is None:
+            solids_IDs = get_solids_group_IDs(self.chemicals)
+        self.solids_IDs = tuple(solids_IDs)
         self.vfa_to_permeate_frac = float(vfa_to_permeate_frac)
         self.water_to_permeate_frac = float(water_to_permeate_frac)
         self.solids_to_permeate_frac = float(solids_to_permeate_frac)

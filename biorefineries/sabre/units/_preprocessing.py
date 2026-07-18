@@ -12,6 +12,8 @@ Preprocessing: mechanical dewatering (press) and milling / size reduction.
 import math
 import biosteam as bst
 
+from biorefineries.sabre.utils import get_solids_group_IDs
+
 __all__ = ('Press', 'Mill')
 
 # --- constants ---
@@ -69,12 +71,12 @@ class Press(bst.Unit):
         no call site supplies a dry-basis equivalent either) was not
         changed; see CONVERSION_NOTES.md.
     solids_IDs:
-        assumptions.yaml `preprocessing.press.solids_IDs`. The
-        pre-conversion default additionally listed `Xylan`, `Mannan`,
-        `Galactan` -- real thermo chemicals, just absent from this yaml
-        list, dropped to match (same pattern seen in `AnaerobicDigester`
-        and `AcidogenicDigester`). Unlike `DigestateScrewPress`, this
-        parameter *is* actively used by `_run()`/`_design()`.
+        No longer a yaml-sourced default. Defaults to the "solids"
+        chemical group (data/feedstock.yaml's `solids_IDs`, defined on
+        the Chemicals object in `_chemicals.py::create_chemicals()`) via
+        `utils.get_solids_group_IDs()` when not given explicitly. Unlike
+        `DigestateScrewPress`, this parameter *is* actively used by
+        `_run()`/`_design()`.
     capex_model / "pca_screwpress_curve":
         REMOVED. The pre-conversion `_cost()` dispatched on a
         `capex_model` string with two branches ("scaled_anchor" and
@@ -93,17 +95,7 @@ class Press(bst.Unit):
 
     def __init__(
         self, ID="", ins=None, outs=(),
-        solids_IDs=(
-            "Glucan",
-            "Arabinan",
-            "Alginate",
-            "Fucoidan",
-            "Mannitol",
-            "Protein",
-            "OtherSolids",
-            "Lignin",
-            "Ash",
-        ),
+        solids_IDs=None,  # if not given, defaults to the "solids" chemical group (see utils.get_solids_group_IDs)
         solids_capture_frac=0.98,
         cake_solids_wt_frac=0.15,
         solubles_to_pressate_frac=1.0,
@@ -120,6 +112,8 @@ class Press(bst.Unit):
         **kwargs
     ):
         super().__init__(ID, ins, outs, **kwargs)
+        if solids_IDs is None:
+            solids_IDs = get_solids_group_IDs(self.chemicals)
         self.solids_IDs = tuple(solids_IDs)
         self.solids_capture_frac = float(solids_capture_frac)
         self.cake_solids_wt_frac = float(cake_solids_wt_frac)
