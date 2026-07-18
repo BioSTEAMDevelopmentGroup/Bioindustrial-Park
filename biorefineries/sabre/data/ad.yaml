@@ -101,6 +101,10 @@ ad_performance:
           ButyricAcid: 0.084
           ValericAcid: 0.082
           HexanoicAcid: 0.000
+    sources:
+      seaweed_arrested_anchor:
+        key: seaweed_arrested_ad_preprint
+        note: "Peak ~14.5 g/L total VFA; dominant acids butyrate, hexanoate, acetate; CH4/CO2 < 0.04; biogas suppression 96%."
 
 
 h2s_removal:
