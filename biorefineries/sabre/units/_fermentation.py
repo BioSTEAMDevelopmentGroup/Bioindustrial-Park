@@ -6,22 +6,15 @@
 # github.com/BioSTEAMDevelopmentGroup/biosteam/blob/master/LICENSE.txt
 # for license details.
 """
-VFA fermentation train: microfilter clarification, medium conditioning,
-and the Yarrowia lipolytica fermenter itself.
+VFA fermentation train: medium conditioning and the Yarrowia lipolytica
+fermenter itself.
 """
 from typing import Optional
 import biosteam as bst
-from biosteam.units.decorators import cost
 from biosteam.units.tank import Tank
 from biosteam.units.design_tools.tank_design import mix_tank_purchase_cost_algorithms
 
-from biorefineries.sabre.utils import load_assumptions, get_solids_group_IDs
-
-__all__ = ('YarrowiaLipidFermenter', 'VFAMicrofilter', 'FermentationMediumTank')
-
-# Loaded yaml assumptions
-_VFA_FERMENTATION_YAML = load_assumptions("vfa_fermentation.yaml")
-_VFA_MICROFILTER = _VFA_FERMENTATION_YAML["vfa_fermentation"]["vfa_microfilter"]
+__all__ = ('YarrowiaLipidFermenter', 'FermentationMediumTank')
 
 
 class YarrowiaLipidFermenter(bst.AeratedBioreactor):
@@ -199,106 +192,6 @@ class YarrowiaLipidFermenter(bst.AeratedBioreactor):
         self.design_results["Biomass formed (kg/h)"] = biomass_formed
         self.design_results["CO2 formed (kg/h)"] = co2_formed
         self.design_results["O2 demand (kg/h)"] = o2_demand
-
-
-@cost('Membrane area (m2)', 'Microfilter', units='m2',
-      CE=567.5, cost=_VFA_MICROFILTER["membrane_cost_usd_per_m2"], S=1., n=1., BM=_VFA_MICROFILTER["F_BM"])
-class VFAMicrofilter(bst.Unit):
-    """
-    Split-based representation of a VFA-rich permeate step.
-    Includes first-pass power draw and area-based membrane cost.
-
-    Sources
-    -------
-    design_flux_L_m2_h, membrane_cost_usd_per_m2:
-        assumptions.yaml gives no citation for these two values (20 LMH,
-        $200/m2) beyond descriptive notes -- "20 LMH selected as a
-        conservative design flux for low-pressure clarification" and "$200/m2
-        selected as an upper-end polymeric membrane cost proxy." No named
-        source. (Do not confuse with the *different* PressateConcentrator
-        unit's 35 LMH flux, which yaml does cite to seaweed/algal membrane
-        concentration literature -- Sievers et al. 2017; Diaz-Reinoso and
-        Dominguez 2020 -- that citation does not apply here.)
-    """
-    _N_ins = 1
-    _N_outs = 2
-    _units = {'Membrane area (m2)': 'm2'}
-
-    def __init__(
-        self,
-        ID: str = "",
-        ins=None,
-        outs=(),
-        *,
-        vfa_IDs=None,
-        solids_IDs=None,
-        vfa_to_permeate_frac: float = 0.98,
-        water_to_permeate_frac: float = 0.97,
-        solids_to_permeate_frac: float = 0.05,
-        dissolved_other_to_permeate_frac: float = 0.90,
-        broth_density_kg_per_m3: float = 1000.0,
-        SEC_kWh_per_m3_feed: float = 0.08,
-        design_flux_L_m2_h: float = 20.0,
-        **kwargs,
-    ):
-        super().__init__(ID, ins, outs, **kwargs)
-        self.vfa_IDs = tuple(vfa_IDs or [
-            "AceticAcid", "PropionicAcid", "ButyricAcid", "ValericAcid", "HexanoicAcid"
-        ])
-        if solids_IDs is None:
-            solids_IDs = get_solids_group_IDs(self.chemicals)
-        self.solids_IDs = tuple(solids_IDs)
-        self.vfa_to_permeate_frac = float(vfa_to_permeate_frac)
-        self.water_to_permeate_frac = float(water_to_permeate_frac)
-        self.solids_to_permeate_frac = float(solids_to_permeate_frac)
-        self.dissolved_other_to_permeate_frac = float(dissolved_other_to_permeate_frac)
-        self.broth_density_kg_per_m3 = float(broth_density_kg_per_m3)
-        self.SEC_kWh_per_m3_feed = float(SEC_kWh_per_m3_feed)
-        self.design_flux_L_m2_h = float(design_flux_L_m2_h)
-
-    def _run(self):
-        feed = self.ins[0]
-        permeate, retentate = self.outs
-
-        permeate.empty()
-        retentate.empty()
-        permeate.phase = "l"
-        retentate.phase = "l"
-
-        for cid in feed.chemicals.IDs:
-            m = float(feed.imass[cid])
-            if m <= 0:
-                continue
-
-            if cid in self.vfa_IDs:
-                frac = self.vfa_to_permeate_frac
-            elif cid == "Water":
-                frac = self.water_to_permeate_frac
-            elif cid in self.solids_IDs:
-                frac = self.solids_to_permeate_frac
-            else:
-                frac = self.dissolved_other_to_permeate_frac
-
-            frac = min(max(frac, 0.0), 1.0)
-            permeate.imass[cid] = m * frac
-            retentate.imass[cid] = m * (1.0 - frac)
-
-    def _design(self):
-        feed = self.ins[0]
-        feed_m3h = (
-            feed.F_mass / self.broth_density_kg_per_m3
-            if self.broth_density_kg_per_m3 > 0 else 0.0
-        )
-        membrane_area_m2 = 0.0
-        if self.design_flux_L_m2_h > 0:
-            membrane_area_m2 = feed_m3h * 1000.0 / self.design_flux_L_m2_h
-
-        self.design_results["Feed flow (kg/h)"] = feed.F_mass
-        self.design_results["Feed flow (m3/h)"] = feed_m3h
-        self.design_results["Permeate flow (kg/h)"] = self.outs[0].F_mass
-        self.design_results["Retentate flow (kg/h)"] = self.outs[1].F_mass
-        self.design_results["Membrane area (m2)"] = membrane_area_m2
-        self.power_utility.consumption = self.SEC_kWh_per_m3_feed * feed_m3h
 
 
 class FermentationMediumTank(Tank):

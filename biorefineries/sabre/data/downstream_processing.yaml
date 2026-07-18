@@ -1,0 +1,42 @@
+# Model Assumptions: Downstream Processing
+
+vfa_microfilter:
+  broth_density_kg_per_m3: 1000.0
+
+  vfa_to_permeate_frac: 0.98
+  water_to_permeate_frac: 0.97
+  solids_to_permeate_frac: 0.05
+  dissolved_other_to_permeate_frac: 0.90
+
+  SEC_kWh_per_m3_feed: 0.08
+
+  # Area-based membrane costing
+  design_flux_L_m2_h: 20.0
+  membrane_cost_usd_per_m2: 200.0
+  F_BM: 1.0 # capex already installed
+
+  notes:
+    - "Area basis uses A = Q_feed * 1000 / flux, where flux is in L/m2/h."
+    - "20 LMH selected as a conservative design flux for low-pressure clarification."
+    - "$200/m2 selected as an upper-end polymeric membrane cost proxy."
+
+
+oil_extraction:
+  target_oil_and_solids_content_g_per_L: 60.0
+
+  backend_oil_recovery: 0.99
+  backend_oil_water_split: 0.0001
+
+  recycle_total_fraction: 0.10
+  recycle_cellmass_wt_frac: 0.10
+
+  oil_extraction_ref_dry_biomass_tph: 10.0
+  oil_extraction_ref_installed_cost_usd: 7848000.0
+  oil_extraction_homogenization_kWh_per_kg: 0.203
+  oil_extraction_scale_exponent: 0.6
+  oil_extraction_F_BM: 1.0 # capex already installed
+
+  notes:
+    - "Oil extraction placeholder carries disruption + wet extraction burden."
+    - "Installed cost basis back-calculated from NREL 55431 cell-disruption plus extraction/separation cost bases."
+    - "Homogenization electricity aligned to the harmonized NREL algal-lipid basis rather than the earlier 1.5 kWh/kg placeholder."
