@@ -263,13 +263,13 @@ def create_ad_vfa_system(
         ID="SP_VFA",
         ins=AD - 1,
         outs=("acidogenic_residual_solids", "vfa_broth"),
-        ts_capture_frac=_DIGESTATE_SCREW_PRESS.get("ts_capture_frac", 0.40),
-        cake_moisture_frac=_DIGESTATE_SCREW_PRESS.get("cake_moisture_frac", 0.50),
-        capacity_tph_each=_DIGESTATE_SCREW_PRESS.get("capacity_tph_each", 6.0),
-        kWh_per_m3=_DIGESTATE_SCREW_PRESS.get("kWh_per_m3", 0.67),
-        include_polymer_dosing=_DIGESTATE_SCREW_PRESS.get("include_polymer_dosing", False),
-        polymer_dosing_cost_usd_each=_DIGESTATE_SCREW_PRESS.get("polymer_dosing_cost_usd_each", 0.0),
-        F_BM=_DIGESTATE_SCREW_PRESS.get("F_BM", 1.0),
+        ts_capture_frac=_DIGESTATE_SCREW_PRESS["ts_capture_frac"],
+        cake_moisture_frac=_DIGESTATE_SCREW_PRESS["cake_moisture_frac"],
+        capacity_tph_each=_DIGESTATE_SCREW_PRESS["capacity_tph_each"],
+        kWh_per_m3=_DIGESTATE_SCREW_PRESS["kWh_per_m3"],
+        include_polymer_dosing=_DIGESTATE_SCREW_PRESS["include_polymer_dosing"],
+        polymer_dosing_cost_usd_each=_DIGESTATE_SCREW_PRESS["polymer_dosing_cost_usd_each"],
+        F_BM=_DIGESTATE_SCREW_PRESS["F_BM"],
     )
 
     path.extend([AD, SP])

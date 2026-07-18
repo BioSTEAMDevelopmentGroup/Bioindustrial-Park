@@ -270,30 +270,30 @@ def _build_methanogenic_pathway(
     h2sA = _H2S_REMOVAL
     H2SR = H2SRemoval(
         "H2SR", ins=AD - 0, outs=("treated_biogas", "spent_h2s_media"),
-        h2s_removal_efficiency=h2sA.get("h2s_removal_efficiency", 0.99),
-        reagent_cost_usd_per_Nm3_raw=h2sA.get("reagent_cost_usd_per_Nm3_raw", 0.002),
+        h2s_removal_efficiency=h2sA["h2s_removal_efficiency"],
+        reagent_cost_usd_per_Nm3_raw=h2sA["reagent_cost_usd_per_Nm3_raw"],
     )
 
     upA = _BIOGAS_UPGRADING
     UP = BiogasUpgrading(
         "UP", ins=H2SR - 0, outs=("biomethane", "offgas"),
-        ch4_recovery=upA["ch4_recovery"],
+        methane_loss_frac=upA["methane_loss_frac"],
         co2_removal=upA["co2_removal"],
         electricity_kwh_per_Nm3_raw=upA["electricity_kWh_per_Nm3_raw"],
         capex_usd_per_Nm3ph_raw=upA["capex_usd_per_Nm3ph_raw"],
-        maintenance_frac_of_capex_per_yr=upA.get("maintenance_frac_of_capex_per_yr", 0.035),
+        maintenance_frac_of_capex_per_yr=upA["maintenance_frac_of_capex_per_yr"],
     )
 
     sp = _DIGESTATE_SCREW_PRESS
     SP = DigestateScrewPress(
         ID="SP", ins=AD - 1, outs=("soil_amendment", "liquid_digestate"),
-        ts_capture_frac=sp.get("ts_capture_frac", 0.40),
-        cake_moisture_frac=sp.get("cake_moisture_frac", 0.50),
-        capacity_tph_each=sp.get("capacity_tph_each", 6.0),
-        kWh_per_m3=sp.get("kWh_per_m3", 0.67),
-        include_polymer_dosing=sp.get("include_polymer_dosing", False),
-        polymer_dosing_cost_usd_each=sp.get("polymer_dosing_cost_usd_each", 0.0),
-        F_BM=sp.get("F_BM", 1.0),
+        ts_capture_frac=sp["ts_capture_frac"],
+        cake_moisture_frac=sp["cake_moisture_frac"],
+        capacity_tph_each=sp["capacity_tph_each"],
+        kWh_per_m3=sp["kWh_per_m3"],
+        include_polymer_dosing=sp["include_polymer_dosing"],
+        polymer_dosing_cost_usd_each=sp["polymer_dosing_cost_usd_each"],
+        F_BM=sp["F_BM"],
     )
 
     path_units = [*pt_units, AD, H2SR, UP, SP]
