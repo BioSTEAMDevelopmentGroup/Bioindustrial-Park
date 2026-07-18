@@ -38,6 +38,7 @@ pretreatment_ad:
       capex_usd: 7280000.0
       enzyme_price_usd_per_kg: 7.0
       maintenance_frac_of_capex_per_yr: 0.035
+      F_BM: 1.0 # capex already installed
     ad_effects:
       vs_destruction: 0.15
       ch4_kg_per_kg_vs_fed: 0.123
@@ -75,6 +76,7 @@ pretreatment_ad:
       capex_usd: 1000000.0
       h2o2_price_usd_per_kg: 0.37
       maintenance_frac_of_capex_per_yr: 0.035
+      F_BM: 1.0 # capex already installed
     ad_effects:
       vs_destruction: 0.21
       ch4_kg_per_kg_vs_fed: 0.165
@@ -141,6 +143,7 @@ pretreatment_ad:
       residence_time_hr: 0.25
       capex_usd: 1200000.0
       maintenance_frac_of_capex_per_yr: 0.035
+      F_BM: 1.0 # capex already installed
     ad_effects:
       vs_destruction: 0.32
       ch4_kg_per_kg_vs_fed: 0.261

@@ -1,42 +1,49 @@
 # Model Assumptions: Preprocessing
 
-preprocessing:
-  press:
-    cake_solids_wt_frac: 0.15
-    solids_capture_frac: 0.98
-    solubles_to_pressate_frac: 1.0
+press:
+  cake_solids_wt_frac: 0.15 # TODO: not within the 26-29% range reported in literature; see sources.note
+  solids_capture_frac: 0.98
+  solubles_to_pressate_frac: 1.0
 
-    power_kWh_per_dry_ton_TS: 5.0
+  power_kWh_per_dry_ton_TS: 5.0
 
-    capex_model: scaled_anchor
-    basis: dry_tph
-    ref_capacity_tph_dry: 0.953
-    capex_installed_ref_usd: 3100000.0
-    scale_exponent: 0.60
-    F_BM: 1.0
+  capex_model: scaled_anchor
+  basis: dry_tph
+  ref_capacity_tph_dry: 0.953 # unused
+  ref_capacity_tph_wet: 50.0 # no source; this is the value the code actually uses for CAPEX scaling.
+    # DISCREPANCY: basis above is declared "dry_tph" and ref_capacity_tph_dry (0.953) is the
+    # value that basis implies, but no code path ever reads a dry-basis reference capacity --
+    # only this wet-tph value is used (see _preprocessing.py::Press). If ref_capacity_tph_dry
+    # and ref_capacity_tph_wet were meant to describe the same single press train, their ratio
+    # (0.953 / 50.0 = 1.9%) implies ~2 wt% solids at the reference point -- far more dilute than
+    # this model's own feedstock TS content (~13.3 wt%, see feedstock.yaml moisture_frac: 0.8673)
+    # and nowhere near the 26-29 wt% cake solids the sources.performance citation reports for
+    # Sargassum. The two numbers do not appear to describe the same basis; not reconciled here.
+  capex_installed_ref_usd: 3100000.0
+  scale_exponent: 0.60
+  F_BM: 1.0 # capex already installed
 
-    sources:
-      capex:
-        citation: "City of Bellingham Biosolids Facility Planning Report, TM 12: Solids Screening, Thickening, and Dewatering Technology Evaluation (2021)"
-        note: "Installed screw press system anchor based on municipal screw press dewatering cost tables; adapted to this model using dry-solids throughput scaling."
-      performance:
-        citation: "Vincent Corporation seaweed pressing notes; supported by brown macroalgae dewatering literature"
-        note: "Sargassum-specific pressing data indicate cake solids around 26–29 wt% TS; 27 wt% TS selected as central baseline."
-      power:
-        citation: "HUBER screw press case study (2023)"
-        note: "Use ~5 kWh/t dry solids for press-only electricity. Larger values such as ~20 kWh/t DS correspond to total system electricity including pumps and auxiliaries."
+  sources:
+    capex:
+      citation: "City of Bellingham Biosolids Facility Planning Report, TM 12: Solids Screening, Thickening, and Dewatering Technology Evaluation (2021)"
+      note: "Installed screw press system anchor based on municipal screw press dewatering cost tables; adapted to this model using dry-solids throughput scaling."
+    performance:
+      citation: "Vincent Corporation seaweed pressing notes; supported by brown macroalgae dewatering literature"
+      note: "Sargassum-specific pressing data indicate cake solids around 26–29 wt% TS; 27 wt% TS selected as central baseline."
+    power:
+      citation: "HUBER screw press case study (2023)"
+      note: "Use ~5 kWh/t dry solids for press-only electricity. Larger values such as ~20 kWh/t DS correspond to total system electricity including pumps and auxiliaries."
 
-  mill:
-    loss_frac: 0.03
+mill:
+  loss_frac: 0.03
 
-    power_kWh_per_dry_ton_dry: 25.0
+  power_kWh_per_dry_ton_dry: 25.0
 
-    capex_model: inl_hammermill_anchor
-    ref_capacity_dry_ton_per_hr: 10.0
-    purchase_cost_ref_usd: 206400.0
-    install_factor: 1.8
-    scale_exponent: 0.6
-    F_BM: 1.0
+  capex_model: inl_hammermill_anchor
+  ref_capacity_dry_ton_per_hr: 10.0
+  purchase_cost_ref_usd: 206400.0
+  scale_exponent: 0.6
+  F_BM: 1.8 # bare-module/install factor
 
   sources:
     power:
@@ -63,6 +70,7 @@ pressate_biostimulant:
     electricity_kWh_per_m3_feed: 2.5
     capex_usd_per_m2: 500.0
     maintenance_frac_of_capex_per_yr: 0.035
+    F_BM: 1.0 # capex already installed
 
     sources:
       flux:
@@ -76,3 +84,6 @@ pressate_biostimulant:
         note: "UF membrane/module cost commonly reported around $200–$500/m2; $800/m2 for convervative assumption"
         citation: "Assumed maintenance fraction consistent with other membrane systems in this model"
         note: "Annual maintenance retained at 3.5% of installed CAPEX for consistency."
+
+  evaporator:
+    F_BM: 1.0 # capex already installed

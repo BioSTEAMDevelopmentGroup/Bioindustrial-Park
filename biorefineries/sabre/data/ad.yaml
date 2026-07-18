@@ -27,6 +27,7 @@ ad:
   mixing_W_per_m3: 5.0
   cost:
     maintenance_usd_per_m3_yr: 10.0
+    F_BM: 1.0 # capex already installed, shared by AnaerobicDigester and AcidogenicDigester
     source:
       adbc: Anaerobic Digester Budget Calculator
       link: https://csanr.wsu.edu/resources/enterprise-budget-calculator/
@@ -112,6 +113,7 @@ h2s_removal:
   ref_flow_Nm3ph: 1700.0
   ref_installed_cost_usd: 450000.0
   scale_exponent: 0.7
+  F_BM: 1.0 # capex already installed
 
   # Reagent cost: iron sponge media replacement
   # Source: IEA Bioenergy Task 37 (2014); Wellinger & Linberg (2000)
@@ -143,6 +145,7 @@ biogas_upgrading:
 
   capex_usd_per_Nm3ph_raw: 2200
   maintenance_frac_of_capex_per_yr: 0.035
+  F_BM: 1.0 # capex already installed
 
   sources:
     electricity:

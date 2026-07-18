@@ -11,9 +11,16 @@ peroxide pretreatment before methanogenic AD.
 """
 import biosteam as bst
 
-from biorefineries.sabre.utils import OPERATING_HOURS_PER_YEAR
+from biorefineries.sabre.utils import OPERATING_HOURS_PER_YEAR, load_assumptions
 
 __all__ = ('EnzymaticPretreatment', 'HeatingPretreatment', 'PeroxidePretreatment')
+
+# data/pretreatment.yaml, loaded once -- only F_BM is sourced from here so far;
+# the rest of this file's __init__ defaults are still plain Python literals.
+_PRETREATMENT_AD = load_assumptions("pretreatment.yaml")["pretreatment_ad"]
+_ENZYMATIC = _PRETREATMENT_AD["enzymatic"]["enzymatic"]
+_PEROXIDE = _PRETREATMENT_AD["peroxide"]["peroxide"]
+_HEATING = _PRETREATMENT_AD["combined_PTE"]["heating"]
 
 
 class EnzymaticPretreatment(bst.Unit):
@@ -68,6 +75,7 @@ class EnzymaticPretreatment(bst.Unit):
 
     _N_ins = 1
     _N_outs = 1  # enzyme_treated_biomass
+    _F_BM_default = {"Enzymatic pretreatment": _ENZYMATIC["F_BM"]}
 
     def __init__(
         self, ID="", ins=None, outs=(),
@@ -82,7 +90,6 @@ class EnzymaticPretreatment(bst.Unit):
         capex_usd=7_280_000.0,
         enzyme_price_usd_per_kg=7.0,
         maintenance_frac_of_capex_per_yr=0.035,
-        F_BM=1.0,
         **kwargs
     ):
         super().__init__(ID, ins, outs, **kwargs)
@@ -97,9 +104,6 @@ class EnzymaticPretreatment(bst.Unit):
         self.capex_usd = float(capex_usd)
         self.enzyme_price_usd_per_kg = float(enzyme_price_usd_per_kg)
         self.maintenance_frac_of_capex_per_yr = float(maintenance_frac_of_capex_per_yr)
-
-        self.F_BM = dict(getattr(self, "F_BM", {}))
-        self.F_BM["Enzymatic pretreatment"] = float(F_BM)
 
     def _run(self):
         feed = self.ins[0]
@@ -211,6 +215,7 @@ class HeatingPretreatment(bst.Unit):
 
     _N_ins = 1
     _N_outs = 1  # heated_biomass
+    _F_BM_default = {"Heating pretreatment": _HEATING["F_BM"]}
 
     def __init__(
         self, ID="", ins=None, outs=(),
@@ -222,7 +227,6 @@ class HeatingPretreatment(bst.Unit):
         # costing
         capex_usd=1_200_000.0,
         maintenance_frac_of_capex_per_yr=0.035,
-        F_BM=1.0,
         **kwargs
     ):
         super().__init__(ID, ins, outs, **kwargs)
@@ -234,9 +238,6 @@ class HeatingPretreatment(bst.Unit):
 
         self.capex_usd = float(capex_usd)
         self.maintenance_frac_of_capex_per_yr = float(maintenance_frac_of_capex_per_yr)
-
-        self.F_BM = dict(getattr(self, "F_BM", {}))
-        self.F_BM["Heating pretreatment"] = float(F_BM)
 
     def _run(self):
         feed = self.ins[0]
@@ -325,6 +326,7 @@ class PeroxidePretreatment(bst.Unit):
 
     _N_ins = 1
     _N_outs = 1  # peroxide_treated_biomass
+    _F_BM_default = {"Peroxide pretreatment": _PEROXIDE["F_BM"]}
 
     def __init__(
         self, ID="", ins=None, outs=(),
@@ -337,7 +339,6 @@ class PeroxidePretreatment(bst.Unit):
         capex_usd=1_000_000.0,
         h2o2_price_usd_per_kg=0.37,
         maintenance_frac_of_capex_per_yr=0.035,
-        F_BM=1.0,
         **kwargs
     ):
         super().__init__(ID, ins, outs, **kwargs)
@@ -350,9 +351,6 @@ class PeroxidePretreatment(bst.Unit):
         self.capex_usd = float(capex_usd)
         self.h2o2_price_usd_per_kg = float(h2o2_price_usd_per_kg)
         self.maintenance_frac_of_capex_per_yr = float(maintenance_frac_of_capex_per_yr)
-
-        self.F_BM = dict(getattr(self, "F_BM", {}))
-        self.F_BM["Peroxide pretreatment"] = float(F_BM)
 
     def _run(self):
         feed = self.ins[0]

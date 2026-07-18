@@ -11,9 +11,15 @@ finishing evaporation.
 """
 import biosteam as bst
 
-from biorefineries.sabre.utils import OPERATING_HOURS_PER_YEAR
+from biorefineries.sabre.utils import OPERATING_HOURS_PER_YEAR, load_assumptions
 
 __all__ = ('PressateConcentrator', 'BiostimulantEvaporator')
+
+# data/preprocessing.yaml, loaded once -- only F_BM is sourced from here so far;
+# the rest of this file's __init__ defaults are still plain Python literals.
+_PRESSATE_BIOSTIMULANT = load_assumptions("preprocessing.yaml")["pressate_biostimulant"]
+_CONCENTRATOR = _PRESSATE_BIOSTIMULANT["concentrator"]
+_EVAPORATOR = _PRESSATE_BIOSTIMULANT["evaporator"]
 
 
 class PressateConcentrator(bst.Unit):
@@ -83,6 +89,7 @@ class PressateConcentrator(bst.Unit):
 
     _N_ins = 1
     _N_outs = 2  # concentrated_biostimulant, permeate
+    _F_BM_default = {"Pressate concentrator": _CONCENTRATOR["F_BM"]}
 
     def __init__(
         self,
@@ -103,7 +110,6 @@ class PressateConcentrator(bst.Unit):
         electricity_kWh_per_m3_feed=2.5,
         capex_usd_per_m2=500.0,
         maintenance_frac_of_capex_per_yr=0.035,
-        F_BM=1.0,
         **kwargs,
     ):
         super().__init__(ID, ins, outs, **kwargs)
@@ -120,9 +126,6 @@ class PressateConcentrator(bst.Unit):
         self.maintenance_frac_of_capex_per_yr = float(
             maintenance_frac_of_capex_per_yr
         )
-
-        self.F_BM = dict(getattr(self, "F_BM", {}))
-        self.F_BM["Pressate concentrator"] = float(F_BM)
 
     def _run(self):
         feed = self.ins[0]
@@ -274,6 +277,7 @@ class BiostimulantEvaporator(bst.Unit):
 
     _N_ins = 3
     _N_outs = 3  # biostimulant_product, vapor, residual_permeate
+    _F_BM_default = {"Biostimulant evaporator": _EVAPORATOR["F_BM"]}
 
     def __init__(
         self,
@@ -290,7 +294,6 @@ class BiostimulantEvaporator(bst.Unit):
         ref_evaporation_kgph=10000.0,
         scale_exponent=0.60,
         maintenance_frac_of_capex_per_yr=0.035,
-        F_BM=1.0,
         **kwargs,
     ):
         super().__init__(ID, ins, outs, **kwargs)
@@ -306,9 +309,6 @@ class BiostimulantEvaporator(bst.Unit):
         self.ref_evaporation_kgph = float(ref_evaporation_kgph)
         self.scale_exponent = float(scale_exponent)
         self.maintenance_frac_of_capex_per_yr = float(maintenance_frac_of_capex_per_yr)
-
-        self.F_BM = dict(getattr(self, "F_BM", {}))
-        self.F_BM["Biostimulant evaporator"] = float(F_BM)
 
     def _run(self):
         conc_in, permeate_in, fresh_water_in = self.ins

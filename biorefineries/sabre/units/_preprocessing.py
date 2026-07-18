@@ -12,7 +12,7 @@ Preprocessing: mechanical dewatering (press) and milling / size reduction.
 import math
 import biosteam as bst
 
-from biorefineries.sabre.utils import get_solids_group_IDs
+from biorefineries.sabre.utils import get_solids_group_IDs, load_assumptions
 
 __all__ = ('Press', 'Mill')
 
@@ -21,94 +21,80 @@ KG_PER_METRIC_TON = 1000.0
 KG_PER_DRY_TON = 907.18474  # US short ton (2000 lb)
 HR_PER_DAY = 24.0
 
+# Loaded assumptions
+_PREPROCESSING = load_assumptions("preprocessing.yaml")
+_PRESS = _PREPROCESSING["press"]
+_MILL = _PREPROCESSING["mill"]
+
 
 class Press(bst.Unit):
     """
-    Multi-train mechanical dewatering press. Constructed in three places in
-    this codebase (`systems/_ad_biomethane_system.py`, `systems/_ad_vfa_system.py`,
-    `systems/_integrated_system.py`), all with the same
-    `assumptions.yaml`-sourced parameters.
-
-    Splits wet biomass into:
+    Multi-train mechanical dewatering press. Splits wet biomass into:
       - pressed_cake: retains most solids + enough water to hit target solids wt%
       - pressate: remaining water + uncaptured solids + (optional) solubles
 
     Economics:
     - CAPEX can be set using an installed system correlation
-    - Electricity set using kWh per dry ton TS (preferred) or legacy kWh per wet ton (optional)
+    - Electricity set using kWh per dry ton TS
 
-    Sources
-    -------
-    solids_capture_frac (0.98), solubles_to_pressate_frac (1.0),
-    capex_installed_ref_usd ($3,100,000), scale_exponent (0.60),
-    power_kWh_per_dry_ton_TS (5.0):
-        assumptions.yaml `preprocessing.press` section.
-        `capex_installed_ref_usd` sourced to `sources.capex`: "City of
-        Bellingham Biosolids Facility Planning Report, TM 12: Solids
-        Screening, Thickening, and Dewatering Technology Evaluation (2021)
-        -- installed screw press system anchor based on municipal screw
-        press dewatering cost tables; adapted to this model using
-        dry-solids throughput scaling." `power_kWh_per_dry_ton_TS` sourced
-        to `sources.power`: "HUBER screw press case study (2023) -- use ~5
-        kWh/t dry solids for press-only electricity."
-    cake_solids_wt_frac (0.15):
-        assumptions.yaml `preprocessing.press.cake_solids_wt_frac`. NOTE:
-        the yaml's own `sources.performance` citation (Vincent Corporation
-        seaweed pressing notes; brown macroalgae dewatering literature)
-        states "Sargassum-specific pressing data indicate cake solids
-        around 26-29 wt% TS; 27 wt% TS selected as central baseline" -- but
-        the actual modeled value is 0.15 (15%), not 0.27. This mismatch was
-        found during this conversion and deliberately NOT changed (fixing
-        it would alter simulation output, out of scope for a conversion
-        pass) -- flagged in CONVERSION_NOTES.md.
-    ref_capacity_tph_wet (50.0) -- basis mismatch, flagged not fixed:
-        No yaml counterpart. assumptions.yaml actually declares
-        `preprocessing.press.basis: dry_tph` with
-        `ref_capacity_tph_dry: 0.953`, but this class only ever implements
-        a wet-tph reference capacity -- the yaml's dry-basis fields are
-        never read by any code path in this codebase. This 50.0 default
-        (matching what every real call site already falls back to, since
-        no call site supplies a dry-basis equivalent either) was not
-        changed; see CONVERSION_NOTES.md.
-    solids_IDs:
-        No longer a yaml-sourced default. Defaults to the "solids"
-        chemical group (data/feedstock.yaml's `solids_IDs`, defined on
-        the Chemicals object in `_chemicals.py::create_chemicals()`) via
-        `utils.get_solids_group_IDs()` when not given explicitly. Unlike
-        `DigestateScrewPress`, this parameter *is* actively used by
-        `_run()`/`_design()`.
-    capex_model / "pca_screwpress_curve":
-        REMOVED. The pre-conversion `_cost()` dispatched on a
-        `capex_model` string with two branches ("scaled_anchor" and
-        "pca_screwpress_curve"). Grep across this codebase and
-        assumptions.yaml confirmed "pca_screwpress_curve" is never set
-        anywhere -- yaml's `preprocessing.press.capex_model` is always
-        "scaled_anchor", the only branch ever exercised at any of the 3
-        real call sites. Collapsed to a single hardcoded formula (the old
-        "scaled_anchor" branch), matching the "hardcoded anchor values
-        instead of a capex_model string-dispatch pattern" convention used
-        for `AnaerobicDigester`/`AcidogenicDigester`.
+    Parameters
+    ----------
+    ins : stream
+        Wet biomass feed.
+    outs : tuple[stream, stream]
+        Pressed cake and pressate.
+    solids_IDs : Iterable[str], optional
+        Chemical IDs captured (at `solids_capture_frac`) to the cake;
+        everything else (except Water) is split by
+        `solubles_to_pressate_frac`. Defaults to the "solids" chemical
+        group when not given (see Sources below).
+    solids_capture_frac : float
+        Fraction of solids-ID mass captured to the cake (0-1).
+    cake_solids_wt_frac : float
+        Target cake solids weight fraction; entrained water is added to
+        meet it.
+    solubles_to_pressate_frac : float
+        Fraction of non-solids, non-water mass routed to pressate (0-1);
+        the remainder stays in the cake.
+    power_kWh_per_dry_ton_TS : float
+        Electricity intensity per dry ton of TS processed (preferred
+        basis).
+    ref_capacity_tph_wet : float
+        Reference wet-throughput capacity (metric ton/h) of a single
+        press train for CAPEX scaling; larger throughputs are split
+        across parallel trains.
+    capex_installed_ref_usd : float
+        Installed cost at `ref_capacity_tph_wet`, scaled by
+        `scale_exponent` for other train sizes.
+    scale_exponent : float
+        Power-law scaling exponent for installed CAPEX vs. train
+        capacity.
+    **kwargs
+        Forwarded to `bst.Unit.__init__`.
+
+    See Also
+    --------
+    Refer to data/preprocessing.yaml for the default values and references.
     """
 
     _N_ins = 1
     _N_outs = 2  # pressed_cake, pressate
+    _F_BM_default = {"Press system": _PRESS["F_BM"]}
 
     def __init__(
         self, ID="", ins=None, outs=(),
         solids_IDs=None,  # if not given, defaults to the "solids" chemical group (see utils.get_solids_group_IDs)
-        solids_capture_frac=0.98,
-        cake_solids_wt_frac=0.15,
-        solubles_to_pressate_frac=1.0,
+        solids_capture_frac=_PRESS["solids_capture_frac"],
+        cake_solids_wt_frac=_PRESS["cake_solids_wt_frac"],
+        solubles_to_pressate_frac=_PRESS["solubles_to_pressate_frac"],
 
         # --- utilities ---
-        power_kWh_per_dry_ton_TS=5.0,
-        power_kWh_per_ton_wet=None,
+        power_kWh_per_dry_ton_TS=_PRESS["power_kWh_per_dry_ton_TS"],
 
         # --- costing ---
-        F_BM=1.0,
-        ref_capacity_tph_wet=50.0,
-        capex_installed_ref_usd=3_100_000.0,
-        scale_exponent=0.6,
+        ref_capacity_tph_wet=_PRESS["ref_capacity_tph_wet"],  # no source; see data/preprocessing.yaml for a basis-mismatch note
+        capex_installed_ref_usd=_PRESS["capex_installed_ref_usd"],
+        scale_exponent=_PRESS["scale_exponent"],
         **kwargs
     ):
         super().__init__(ID, ins, outs, **kwargs)
@@ -120,10 +106,7 @@ class Press(bst.Unit):
         self.solubles_to_pressate_frac = float(solubles_to_pressate_frac)
 
         self.power_kWh_per_dry_ton_TS = power_kWh_per_dry_ton_TS
-        self.power_kWh_per_ton_wet = power_kWh_per_ton_wet
 
-        self.F_BM = dict(getattr(self, "F_BM", {}))
-        self.F_BM["Press system"] = float(F_BM)
         self.ref_capacity_tph_wet = float(ref_capacity_tph_wet)
         self.capex_installed_ref_usd = float(capex_installed_ref_usd)
         self.scale_exponent = float(scale_exponent)
@@ -198,14 +181,8 @@ class Press(bst.Unit):
         self.design_results["TS (dry ton/h)"] = dry_ton_per_hr_TS
         self.design_results["Capacity (dry ton/day)"] = dtpd
 
-        # Power (preferred TS basis; fallback wet basis)
-        if self.power_kWh_per_dry_ton_TS is not None:
-            kW = float(self.power_kWh_per_dry_ton_TS) * dry_ton_per_hr_TS
-            self.power_utility(kW)
-        elif self.power_kWh_per_ton_wet is not None:
-            wet_ton_per_hr = feed.F_mass / KG_PER_METRIC_TON
-            kW = float(self.power_kWh_per_ton_wet) * wet_ton_per_hr
-            self.power_utility(kW)
+        kW = float(self.power_kWh_per_dry_ton_TS) * dry_ton_per_hr_TS
+        self.power_utility(kW)
 
     def _cost(self):
         feed = self.ins[0]
@@ -234,90 +211,66 @@ class Press(bst.Unit):
 
 class Mill(bst.Unit):
     """
-    Multi-train hammer mill. Constructed in three places in this codebase
-    (`systems/_ad_biomethane_system.py`, `systems/_ad_vfa_system.py`,
-    `systems/_integrated_system.py`), all with the same
-    `assumptions.yaml`-sourced parameters.
-
-    Applies explicit mass loss during milling/shredding.
+    Multi-train hammer mill. Applies explicit mass loss during milling/shredding.
     Sends lost material to a 'losses' stream (same composition as feed).
 
     Economics:
-    - Electricity: kWh per dry ton of dry material (preferred) or legacy wet ton basis
-    - CAPEX: anchor scaling for hammer mill (purchase cost), then apply install factor
+    - Electricity: kWh per dry ton of dry material
+    - CAPEX: anchor scaling for hammer mill
 
-    Sources
-    -------
-    loss_frac (0.03):
-        assumptions.yaml `preprocessing.mill.loss_frac`. Cited in yaml's
-        `preprocessing.sources.loss` (a sibling of `press`/`mill` under
-        `preprocessing`, but content-wise specific to Mill -- see note
-        below): "INL preprocessing/logistics accounting -- dry matter loss
-        across preprocessing is typically on the order of ~1-5%; 3%
-        selected as central baseline."
-    power_kWh_per_dry_ton_dry (25.0):
-        assumptions.yaml `preprocessing.mill.power_kWh_per_dry_ton_dry`.
-        Cited in `preprocessing.sources.power`: "Oyedeji et al. (2020);
-        NREL FY11 grinding basis -- herbaceous biomass coarse grinding
-        typically falls in the ~11-28 kWh/t range; 25 kWh/t selected as a
-        defensible central proxy for dried Sargassum."
-    ref_capacity_dry_ton_per_hr (10.0), purchase_cost_ref_usd ($206,400),
-    install_factor (1.8), scale_exponent (0.6):
-        assumptions.yaml `preprocessing.mill` section.
-        `purchase_cost_ref_usd` cited in `preprocessing.sources.capex`:
-        "INL hammer mill cost anchor
-        (https://inldigitallibrary.inl.gov/sites/sti/sti/7323596.pdf) --
-        hammer mill purchase cost anchor $206,400 used for capacity
-        scaling with exponent 0.6 and install factor."
-    Note on yaml structure: `preprocessing.sources` is indented as a
-    sibling of `press:`/`mill:` (not nested inside `mill:`), but every
-    citation under it is specific to Mill's own parameters (grinding
-    power, hammer mill capex, preprocessing dry-matter loss) -- verified
-    by reading the citation text itself, not inferred from yaml
-    indentation, to avoid misattributing a Press citation here.
-    capex_model / "inl_hammermill_anchor":
-        REMOVED. The pre-conversion `_cost()` gated its only cost formula
-        behind a `capex_model == "inl_hammermill_anchor"` string check.
-        yaml's `preprocessing.mill.capex_model` is always exactly that
-        string at every real call site (confirmed by grep across this
-        codebase and assumptions.yaml) -- there was never a second
-        branch, so the check was always true in practice. Collapsed to
-        run unconditionally, same "hardcoded anchor, no string dispatch"
-        convention used for `AnaerobicDigester`/`AcidogenicDigester`/`Press`.
+    Parameters
+    ----------
+    ins : stream
+        Feed to be milled.
+    outs : tuple[stream, stream]
+        Milled biomass and milling losses (same composition as feed).
+    loss_frac : float
+        Fraction of feed mass lost during milling/shredding (0-1), sent
+        to the losses stream.
+    power_kWh_per_dry_ton_dry : float
+        Electricity intensity per dry ton of dry material processed.
+    ref_capacity_dry_ton_per_hr : float
+        Reference dry-throughput capacity (dry ton/h) of a single mill
+        for CAPEX scaling; larger throughputs are split across parallel
+        mills.
+    purchase_cost_ref_usd : float
+        Purchase cost at `ref_capacity_dry_ton_per_hr`, scaled by
+        `scale_exponent` for other mill sizes.
+    scale_exponent : float
+        Power-law scaling exponent for purchase cost vs. mill capacity.
+    **kwargs
+        Forwarded to `bst.Unit.__init__`.
+
+    See Also
+    --------
+    Refer to data/preprocessing.yaml for the default values and references.
     """
 
     _N_ins = 1
     _N_outs = 2  # milled_biomass, milling_losses
+    _F_BM_default = {"Hammer mill": _MILL["F_BM"]}
 
     def __init__(
         self, ID="", ins=None, outs=(),
-        loss_frac=0.03,
+        loss_frac=_MILL["loss_frac"],
 
         # utilities
-        power_kWh_per_dry_ton_dry=25.0,  # preferred
-        power_kWh_per_ton_wet=None,      # legacy optional
+        power_kWh_per_dry_ton_dry=_MILL["power_kWh_per_dry_ton_dry"],
 
         # costing
-        ref_capacity_dry_ton_per_hr=10.0,
-        purchase_cost_ref_usd=206400.0,
-        install_factor=1.8,
-        scale_exponent=0.6,
-        F_BM=1.0,
+        ref_capacity_dry_ton_per_hr=_MILL["ref_capacity_dry_ton_per_hr"],
+        purchase_cost_ref_usd=_MILL["purchase_cost_ref_usd"],
+        scale_exponent=_MILL["scale_exponent"],
         **kwargs
     ):
         super().__init__(ID, ins, outs, **kwargs)
         self.loss_frac = float(loss_frac)
 
         self.power_kWh_per_dry_ton_dry = power_kWh_per_dry_ton_dry
-        self.power_kWh_per_ton_wet = power_kWh_per_ton_wet
 
         self.ref_capacity_dry_ton_per_hr = float(ref_capacity_dry_ton_per_hr)
         self.purchase_cost_ref_usd = float(purchase_cost_ref_usd)
-        self.install_factor = float(install_factor)
         self.scale_exponent = float(scale_exponent)
-
-        self.F_BM = dict(getattr(self, "F_BM", {}))
-        self.F_BM["Hammer mill"] = float(F_BM)
 
     def _run(self):
         feed = self.ins[0]
@@ -344,14 +297,8 @@ class Mill(bst.Unit):
         self.design_results["Dry mass (kg/h)"] = dry_kgph
         self.design_results["Dry throughput (dry ton/h)"] = dry_ton_per_hr
 
-        # Power: prefer dry-basis, fallback wet-basis
-        if self.power_kWh_per_dry_ton_dry is not None:
-            kW = float(self.power_kWh_per_dry_ton_dry) * dry_ton_per_hr
-            self.power_utility(kW)
-        elif self.power_kWh_per_ton_wet is not None:
-            wet_ton_per_hr = feed.F_mass / KG_PER_METRIC_TON
-            kW = float(self.power_kWh_per_ton_wet) * wet_ton_per_hr
-            self.power_utility(kW)
+        kW = float(self.power_kWh_per_dry_ton_dry) * dry_ton_per_hr
+        self.power_utility(kW)
 
     def _cost(self):
         dry_ton_per_hr = float(self.design_results.get("Dry throughput (dry ton/h)", 0.0))
@@ -365,11 +312,10 @@ class Mill(bst.Unit):
         Q_each = dry_ton_per_hr / N if N else dry_ton_per_hr
 
         purchase_each = C0 * (max(Q_each, 1e-9) / Q0) ** n
-        installed_total = N * purchase_each * self.install_factor
+        purchase_total = N * purchase_each
 
         self.design_results["Number of mills"] = N
         self.design_results["Mill capacity each (dry ton/h)"] = Q_each
         self.design_results["Purchase cost each ($)"] = purchase_each
-        self.design_results["Installed cost total ($)"] = installed_total
 
-        self.baseline_purchase_costs["Hammer mill"] = installed_total
+        self.baseline_purchase_costs["Hammer mill"] = purchase_total

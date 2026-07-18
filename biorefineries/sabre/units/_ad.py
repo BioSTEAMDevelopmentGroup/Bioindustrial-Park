@@ -146,8 +146,7 @@ class AnaerobicDigester(bst.Unit):
 
     _N_ins = 1
     _N_outs = 2  # biogas, digestate
-
-    F_BM = {"Anaerobic digester": 1.0}
+    _F_BM_default = {"Anaerobic digester": _AD_COST["F_BM"]}
 
     def __init__(
         self,
@@ -191,7 +190,6 @@ class AnaerobicDigester(bst.Unit):
         self.headspace_frac = float(headspace_frac)
         self.max_single_digester_volume_m3 = float(max_single_digester_volume_MG) * 1e6 * GAL_TO_M3
         self.maintenance_usd_per_m3_yr = maintenance_usd_per_m3_yr
-        self.F_BM = dict(self.F_BM)
 
     def _available_digestible_pool(self, stream):
         thermo_ids = set(self.chemicals.IDs)
@@ -379,7 +377,6 @@ class AnaerobicDigester(bst.Unit):
         self.design_results["Organic loading proxy (kg/m3-h)"] = biodegradable_pool / V_liquid
         self.design_results["Methane productivity (kg/m3-h)"] = methane_kgph / V_liquid
         self.design_results["CH4 yield (kg/kg VS fed)"] = methane_kgph / VS_in
-
         self.power_utility.consumption = mixing_kW
 
         if Q_kJph > 0:
@@ -391,8 +388,6 @@ class AnaerobicDigester(bst.Unit):
     def _cost(self):
         V_each = self.design_results["Digester volume each (m3)"]
         N = int(self.design_results["Number of digesters"])
-
-        self.F_BM["Anaerobic digester"] = 1.0
 
         C_each = interp_ad_capex(V_each)
         C_total = N * C_each
@@ -477,8 +472,7 @@ class AcidogenicDigester(bst.Unit):
 
     _N_ins = 1
     _N_outs = 2  # offgas, acidogenic_broth
-
-    F_BM = {"Acidogenic digester": 1.0}
+    _F_BM_default = {"Acidogenic digester": _AD_COST["F_BM"]}
 
     def __init__(
         self,
@@ -524,8 +518,6 @@ class AcidogenicDigester(bst.Unit):
         self.hs_events_per_day = float(hs_events_per_day)
         self.hs_heated_fraction_of_liquid = float(hs_heated_fraction_of_liquid)
         self.hs_duration_min = float(hs_duration_min)
-
-        self.F_BM = dict(self.F_BM)
 
     def _resolve_vfa_split(self):
         ids = set(self.chemicals.IDs)
@@ -694,7 +686,6 @@ class AcidogenicDigester(bst.Unit):
     def _cost(self):
         V_each = self.design_results["Digester volume each (m3)"]
         N = int(self.design_results["Number of digesters"])
-        self.F_BM["Acidogenic digester"] = 1.0
 
         C_each = interp_ad_capex(V_each)
         C_total = N * C_each
@@ -705,7 +696,7 @@ class AcidogenicDigester(bst.Unit):
 
 @cost('Raw biogas flow (Nm3/h)', 'H2S removal (iron sponge)', units='Nm3/h',
       CE=567.5, cost=_H2S_REMOVAL["ref_installed_cost_usd"],
-      S=_H2S_REMOVAL["ref_flow_Nm3ph"], n=_H2S_REMOVAL["scale_exponent"], BM=1.0)
+      S=_H2S_REMOVAL["ref_flow_Nm3ph"], n=_H2S_REMOVAL["scale_exponent"], BM=_H2S_REMOVAL["F_BM"])
 class H2SRemoval(bst.Unit):
     """
     Iron sponge H2S removal unit for raw biogas desulfurization.
@@ -868,9 +859,7 @@ class BiogasUpgrading(bst.Unit):
 
     _N_ins = 1
     _N_outs = 2  # biomethane, offgas
-
-    COST_ITEM = "Membrane upgrading skid"
-    F_BM = {COST_ITEM: 1.0}
+    _F_BM_default = {"Membrane upgrading skid": _BIOGAS_UPGRADING["F_BM"]}
 
     def __init__(
         self,
@@ -891,9 +880,6 @@ class BiogasUpgrading(bst.Unit):
         self.electricity_kwh_per_Nm3_raw = float(electricity_kwh_per_Nm3_raw)
         self.capex_usd_per_Nm3ph_raw = float(capex_usd_per_Nm3ph_raw)
         self.maintenance_frac_of_capex_per_yr = float(maintenance_frac_of_capex_per_yr)
-
-        # make sure instance has the same F_BM mapping
-        self.F_BM = dict(type(self).F_BM)
 
         if not (0.0 <= self.methane_loss_frac <= 1.0):
             raise ValueError("methane_loss_frac must be between 0 and 1.")
@@ -973,7 +959,7 @@ class BiogasUpgrading(bst.Unit):
         Q_Nm3ph = self.design_results["Raw biogas flow (Nm3/h, dry)"]
 
         capex = self.capex_usd_per_Nm3ph_raw * float(Q_Nm3ph)
-        self.baseline_purchase_costs[self.COST_ITEM] = capex
+        self.baseline_purchase_costs["Membrane upgrading skid"] = capex
 
         annual_maintenance = self.maintenance_frac_of_capex_per_yr * capex
         self.design_results["Annual maintenance ($/yr)"] = annual_maintenance
@@ -1030,9 +1016,6 @@ class DigestateDecanterCentrifuge(bst.Unit):
     centrifuge_purchase_cost_usd_each : float, optional
         Purchase cost per centrifuge. If None, `_cost()` returns early
         and the unit is costed at $0.
-    F_BM : float
-        Bare-module cost factor applied to the centrifuge purchase
-        cost.
     **kwargs
         Forwarded to `bst.Unit.__init__`.
 
@@ -1043,6 +1026,7 @@ class DigestateDecanterCentrifuge(bst.Unit):
 
     _N_ins = 1
     _N_outs = 2
+    _F_BM_default = {"Decanter centrifuge (digestate)": _DIGESTATE_DECANTER_CENTRIFUGE["F_BM"]}
 
     def __init__(self, ID="", ins=None, outs=(),
                  solids_IDs=None,  # if not given, defaults to the "solids" chemical group (see utils.get_solids_group_IDs)
@@ -1050,7 +1034,6 @@ class DigestateDecanterCentrifuge(bst.Unit):
                  cake_moisture_frac=_DIGESTATE_DECANTER_CENTRIFUGE["cake_moisture_frac"],
                  capacity_tph_each=_DIGESTATE_DECANTER_CENTRIFUGE["capacity_tph_each"],
                  centrifuge_purchase_cost_usd_each=_DIGESTATE_DECANTER_CENTRIFUGE["centrifuge_purchase_cost_usd_each"],
-                 F_BM=_DIGESTATE_DECANTER_CENTRIFUGE["F_BM"],
                  **kwargs):
         super().__init__(ID, ins, outs, **kwargs)
 
@@ -1062,8 +1045,6 @@ class DigestateDecanterCentrifuge(bst.Unit):
 
         self.capacity_tph_each = float(capacity_tph_each)
         self.centrifuge_purchase_cost_usd_each = centrifuge_purchase_cost_usd_each
-
-        self.F_BM_default = float(F_BM)
 
     def _run(self):
         feed = self.ins[0]
@@ -1137,7 +1118,6 @@ class DigestateDecanterCentrifuge(bst.Unit):
 
         key = "Decanter centrifuge (digestate)"
         self.baseline_purchase_costs[key] = N * u_cost
-        self.F_BM[key] = self.F_BM_default
 
 
 # DigestateScrewPress per-unit installed cost anchor points (SYSTEMIC Table
@@ -1237,8 +1217,6 @@ class DigestateScrewPress(bst.Unit):
     polymer_dosing_cost_usd_each : float
         Polymer dosing cost per press, in USD; only applied if
         `include_polymer_dosing` is True.
-    F_BM : float
-        Bare-module cost factor applied to the press purchase cost.
     **kwargs
         Forwarded to `bst.Unit.__init__`.
 
@@ -1249,6 +1227,7 @@ class DigestateScrewPress(bst.Unit):
 
     _N_ins = 1
     _N_outs = 2
+    _F_BM_default = {"Screw press (digestate)": _DIGESTATE_SCREW_PRESS["F_BM"]}
 
     def __init__(self, ID="", ins=None, outs=(),
                  dissolved_IDs=None,            # chemicals treated as dissolved — always route to pressate; no yaml home
@@ -1258,7 +1237,6 @@ class DigestateScrewPress(bst.Unit):
                  kWh_per_m3=_DIGESTATE_SCREW_PRESS["kWh_per_m3"],
                  include_polymer_dosing=_DIGESTATE_SCREW_PRESS["include_polymer_dosing"],
                  polymer_dosing_cost_usd_each=_DIGESTATE_SCREW_PRESS["polymer_dosing_cost_usd_each"],
-                 F_BM=_DIGESTATE_SCREW_PRESS["F_BM"],
                  **kwargs):
         super().__init__(ID, ins, outs, **kwargs)
 
@@ -1283,7 +1261,6 @@ class DigestateScrewPress(bst.Unit):
         self.include_polymer_dosing = bool(include_polymer_dosing)
         self.polymer_dosing_cost_usd_each = float(polymer_dosing_cost_usd_each)
 
-        self.F_BM_default = float(F_BM)
 
     def _run(self):
         feed = self.ins[0]
@@ -1378,7 +1355,6 @@ class DigestateScrewPress(bst.Unit):
 
         key = "Screw press (digestate)"
         self.baseline_purchase_costs[key] = total_usd
-        self.F_BM[key] = self.F_BM_default
 
         self.design_results["Capex_usd_each"] = capex_usd_each
         if self.include_polymer_dosing:

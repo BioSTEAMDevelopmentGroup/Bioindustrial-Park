@@ -57,7 +57,7 @@ _DOWNSTREAM_RECOVERY = _VFA_FERMENTATION_YAML["vfa_fermentation"]["downstream_re
 @cost('Dry biomass feed (dry ton/h)', 'Oil extraction', units='dry ton/h',
       CE=567.5, cost=_DOWNSTREAM_RECOVERY["oil_extraction_ref_installed_cost_usd"],
       S=_DOWNSTREAM_RECOVERY["oil_extraction_ref_dry_biomass_tph"],
-      n=_DOWNSTREAM_RECOVERY["oil_extraction_scale_exponent"], BM=1.0)
+      n=_DOWNSTREAM_RECOVERY["oil_extraction_scale_exponent"], BM=_DOWNSTREAM_RECOVERY["oil_extraction_F_BM"])
 class OilExtractionPlaceholder(bst.Unit):
     """
     Pass-through unit representing cell disruption and lipid extraction

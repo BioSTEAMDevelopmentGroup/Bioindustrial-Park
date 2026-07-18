@@ -12,10 +12,8 @@ and the Yarrowia lipolytica fermenter itself.
 from typing import Optional
 import biosteam as bst
 from biosteam.units.decorators import cost
-from biosteam.units.design_tools.tank_design import (
-    mix_tank_purchase_cost_algorithms,
-    compute_number_of_tanks_and_purchase_cost,
-)
+from biosteam.units.tank import Tank
+from biosteam.units.design_tools.tank_design import mix_tank_purchase_cost_algorithms
 
 from biorefineries.sabre.utils import load_assumptions, get_solids_group_IDs
 
@@ -204,7 +202,7 @@ class YarrowiaLipidFermenter(bst.AeratedBioreactor):
 
 
 @cost('Membrane area (m2)', 'Microfilter', units='m2',
-      CE=567.5, cost=_VFA_MICROFILTER["membrane_cost_usd_per_m2"], S=1., n=1., BM=1.0)
+      CE=567.5, cost=_VFA_MICROFILTER["membrane_cost_usd_per_m2"], S=1., n=1., BM=_VFA_MICROFILTER["F_BM"])
 class VFAMicrofilter(bst.Unit):
     """
     Split-based representation of a VFA-rich permeate step.
@@ -303,16 +301,34 @@ class VFAMicrofilter(bst.Unit):
         self.power_utility.consumption = self.SEC_kWh_per_m3_feed * feed_m3h
 
 
-class FermentationMediumTank(bst.Unit):
+class FermentationMediumTank(Tank):
     """
     Simple medium adjustment tank for pH control and nutrient dosing.
-    Uses BioSTEAM's conventional stainless-steel mix-tank purchase-cost
-    algorithm rather than a custom placeholder.
+    Reuses BioSTEAM's own conventional stainless-steel mix-tank
+    purchase-cost algorithm by inheriting from `bst.units.tank.Tank`
+    directly (rather than reimplementing it) -- `_cost()` is Tank's own,
+    unmodified. That means the bare-module factor (2.3x) and the
+    stainless-steel material-factor normalization Tank._cost() applies
+    (dividing the material factor out of the raw correlation cost, then
+    reapplying it via `F_M`) both come from BioSTEAM directly. Previously
+    this was a `bst.Unit` subclass with a hand-rolled `_cost()` that
+    duplicated the cost correlation but hardcoded F_BM=1.0 -- silently
+    skipping both factors and understating installed cost.
+
+    Only `_run()` (dosing) and `_design()` (this unit's own
+    residence-time/broth-density volume basis, not Tank's generic
+    tau * F_vol_out / V_wf) are overridden; `_design()` writes into
+    Tank's own `'Total volume'`/`'Residence time'` design_results keys so
+    the inherited `_cost()` can read them directly.
     """
 
     _N_ins = 5
     _N_outs = 1
-    _F_BM_default = {"Medium tank": 1.0}
+    purchase_cost_algorithms = mix_tank_purchase_cost_algorithms
+    _default_vessel_type = 'Conventional'
+    _default_tau = 1
+    _default_V_wf = 0.8
+    _default_vessel_material = 'Stainless steel'
 
     def __init__(
         self,
@@ -338,7 +354,9 @@ class FermentationMediumTank(bst.Unit):
         self.broth_density_kg_per_m3 = float(broth_density_kg_per_m3)
         self.target_pH = float(target_pH)
         self.residence_time_h = float(residence_time_h)
-        self.mixing_kW_per_m3 = float(mixing_kW_per_m3)
+        # Tank._init() (run inside super().__init__() above) already set
+        # self.kW_per_m3 = 0.0 (Tank's own default); overwrite with ours.
+        self.kW_per_m3 = float(mixing_kW_per_m3)
 
     def _run(self):
         broth, ammonia, phosphate, base, mgso4 = self.ins
@@ -376,22 +394,11 @@ class FermentationMediumTank(bst.Unit):
         self.design_results["Broth flow (m3/h)"] = vol_m3ph
 
     def _design(self):
+        # Deliberately not Tank's own generic tau * F_vol_out / V_wf --
+        # this unit sizes off the dosed broth's constant-density flow
+        # basis instead. Writes into Tank's own design_results keys
+        # ('Total volume', 'Residence time') so the inherited _cost()
+        # (Tank._cost(), not overridden here) can read them directly.
         vol_m3h = float(self.design_results.get("Broth flow (m3/h)", 0.0))
-        tank_vol = vol_m3h * self.residence_time_h
-        self.design_results["Tank residence time (h)"] = self.residence_time_h
-        self.design_results["Tank volume (m3)"] = tank_vol
-        self.power_utility.consumption = self.mixing_kW_per_m3 * tank_vol
-
-    def _cost(self):
-        V_total = max(float(self.design_results.get("Tank volume (m3)", 0.0)), 0.0)
-        if V_total <= 0.0:
-            self.baseline_purchase_costs["Medium tank"] = 0.0
-            return
-
-        alg = mix_tank_purchase_cost_algorithms["Conventional"]
-        N, Cp_each = compute_number_of_tanks_and_purchase_cost(V_total, alg)
-        V_each = V_total / N
-
-        self.design_results["Number of tanks"] = N
-        self.design_results["Tank volume per tank (m3)"] = V_each
-        self.baseline_purchase_costs["Medium tank"] = N * Cp_each
+        self.design_results["Residence time"] = self.residence_time_h
+        self.design_results["Total volume"] = vol_m3h * self.residence_time_h

@@ -62,6 +62,7 @@ vfa_fermentation:
     # Area-based membrane costing
     design_flux_L_m2_h: 20.0
     membrane_cost_usd_per_m2: 200.0
+    F_BM: 1.0 # capex already installed
 
     notes:
       - "Area basis uses A = Q_feed * 1000 / flux, where flux is in L/m2/h."
@@ -81,6 +82,10 @@ vfa_fermentation:
     magnesium_sulfate_dose_kg_per_m3: 0.0
 
     cost_model: biosteam_conventional_mix_tank
+    # No F_BM here -- FermentationMediumTank now subclasses bst.units.tank.Tank
+    # directly and uses its inherited, unmodified _cost(), so F_BM (2.3), the
+    # stainless-steel material factor, and the cost correlation all come from
+    # BioSTEAM itself rather than being duplicated in this codebase.
 
     notes:
       - "Uses BioSTEAM conventional stainless-steel mix-tank purchase-cost algorithm rather than a custom placeholder."
@@ -98,6 +103,7 @@ vfa_fermentation:
     oil_extraction_ref_installed_cost_usd: 7848000.0
     oil_extraction_homogenization_kWh_per_kg: 0.203
     oil_extraction_scale_exponent: 0.6
+    oil_extraction_F_BM: 1.0 # capex already installed
 
     notes:
       - "Oil extraction placeholder carries disruption + wet extraction burden."
