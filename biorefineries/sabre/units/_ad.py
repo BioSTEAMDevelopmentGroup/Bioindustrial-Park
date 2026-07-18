@@ -43,6 +43,9 @@ _ADP_ACIDOGENIC = _AD_PERFORMANCE["acidogenic"]
 _ADP_ACIDOGENIC_CASE = _ADP_ACIDOGENIC["cases"][_ADP_ACIDOGENIC["case"]]
 
 _H2S_REMOVAL = _AD_YAML["h2s_removal"]
+_BIOGAS_UPGRADING = _AD_YAML["biogas_upgrading"]
+_DIGESTATE_DECANTER_CENTRIFUGE = _AD_YAML["digestate_decanter_centrifuge"]
+_DIGESTATE_SCREW_PRESS = _AD_YAML["digestate_screw_press"]
 
 # ADBC-based digester installed cost anchor points (m3, USD)
 ADBC_VOL_M3 = [878, 1755, 2633, 3510, 5265, 8775]
@@ -752,8 +755,8 @@ class H2SRemoval(bst.Unit):
         ins=None,
         outs=(),
         *,
-        h2s_removal_efficiency: float = 0.99,
-        reagent_cost_usd_per_Nm3_raw: float = 0.002,
+        h2s_removal_efficiency: float = _H2S_REMOVAL["h2s_removal_efficiency"],
+        reagent_cost_usd_per_Nm3_raw: float = _H2S_REMOVAL["reagent_cost_usd_per_Nm3_raw"],
         **kwargs,
     ):
         super().__init__(ID, ins, outs, **kwargs)
@@ -841,9 +844,9 @@ class BiogasUpgrading(bst.Unit):
         Raw biogas (post H2S removal).
     outs : tuple[stream, stream]
         Biomethane and offgas.
-    ch4_recovery : float
-        Fraction of inlet methane recovered to the biomethane product
-        (0-1).
+    methane_loss_frac : float
+        Fraction of inlet methane lost to offgas (methane slip); the
+        rest is recovered to the biomethane product (0-1).
     co2_removal : float
         Fraction of inlet CO2 removed to offgas (0-1).
     electricity_kwh_per_Nm3_raw : float
@@ -872,16 +875,16 @@ class BiogasUpgrading(bst.Unit):
         ID="",
         ins=None,
         outs=(),
-        ch4_recovery=0.99,
-        co2_removal=0.95,
-        electricity_kwh_per_Nm3_raw=0.25,
-        capex_usd_per_Nm3ph_raw=2200.0,
-        maintenance_frac_of_capex_per_yr=0.035,
+        methane_loss_frac=_BIOGAS_UPGRADING["methane_loss_frac"],
+        co2_removal=_BIOGAS_UPGRADING["co2_removal"],
+        electricity_kwh_per_Nm3_raw=_BIOGAS_UPGRADING["electricity_kWh_per_Nm3_raw"],
+        capex_usd_per_Nm3ph_raw=_BIOGAS_UPGRADING["capex_usd_per_Nm3ph_raw"],
+        maintenance_frac_of_capex_per_yr=_BIOGAS_UPGRADING["maintenance_frac_of_capex_per_yr"],
         **kwargs
     ):
         super().__init__(ID, ins, outs, **kwargs)
 
-        self.ch4_recovery = float(ch4_recovery)
+        self.methane_loss_frac = float(methane_loss_frac)
         self.co2_removal = float(co2_removal)
         self.electricity_kwh_per_Nm3_raw = float(electricity_kwh_per_Nm3_raw)
         self.capex_usd_per_Nm3ph_raw = float(capex_usd_per_Nm3ph_raw)
@@ -890,8 +893,8 @@ class BiogasUpgrading(bst.Unit):
         # make sure instance has the same F_BM mapping
         self.F_BM = dict(type(self).F_BM)
 
-        if not (0.0 <= self.ch4_recovery <= 1.0):
-            raise ValueError("ch4_recovery must be between 0 and 1.")
+        if not (0.0 <= self.methane_loss_frac <= 1.0):
+            raise ValueError("methane_loss_frac must be between 0 and 1.")
         if not (0.0 <= self.co2_removal <= 1.0):
             raise ValueError("co2_removal must be between 0 and 1.")
         if self.electricity_kwh_per_Nm3_raw < 0:
@@ -914,9 +917,9 @@ class BiogasUpgrading(bst.Unit):
         ch4_in = float(raw.imol["Methane"])
         co2_in = float(raw.imol["CarbonDioxide"])
 
-        ch4_to_bm = self.ch4_recovery * ch4_in
-        biomethane.imol["Methane"] = ch4_to_bm
-        offgas.imol["Methane"] = ch4_in - ch4_to_bm
+        ch4_lost = self.methane_loss_frac * ch4_in
+        biomethane.imol["Methane"] = ch4_in - ch4_lost
+        offgas.imol["Methane"] = ch4_lost
 
         co2_to_off = self.co2_removal * co2_in
         offgas.imol["CarbonDioxide"] = co2_to_off
@@ -954,7 +957,7 @@ class BiogasUpgrading(bst.Unit):
         else:
             self.design_results["Biomethane CH4 mol%"] = 0.0
 
-        self.design_results["Methane slip (kmol/h)"] = float(offgas.imol["Methane"])
+        self.design_results["Methane loss (kmol/h)"] = float(offgas.imol["Methane"])
 
         ch4_in = float(raw.imol["Methane"])
         if ch4_in > 0:
@@ -965,13 +968,7 @@ class BiogasUpgrading(bst.Unit):
             self.design_results["Methane recovery actual"] = 0.0
 
     def _cost(self):
-        Q_Nm3ph = self.design_results.get("Raw biogas flow (Nm3/h, dry)")
-        if Q_Nm3ph is None:
-            raw = self.ins[0]
-            dry_gas_IDs = ["Methane", "CarbonDioxide", "HydrogenSulfide", "Nitrogen", "Oxygen"]
-            n_kmolph_dry = sum(float(raw.imol[i]) for i in dry_gas_IDs if i in raw.chemicals.IDs)
-            Q_Nm3ph = 22.414 * n_kmolph_dry
-            self.design_results["Raw biogas flow (Nm3/h, dry)"] = Q_Nm3ph
+        Q_Nm3ph = self.design_results["Raw biogas flow (Nm3/h, dry)"]
 
         capex = self.capex_usd_per_Nm3ph_raw * float(Q_Nm3ph)
         self.baseline_purchase_costs[self.COST_ITEM] = capex
@@ -1046,12 +1043,12 @@ class DigestateDecanterCentrifuge(bst.Unit):
     _N_outs = 2
 
     def __init__(self, ID="", ins=None, outs=(),
-                 solids_IDs=("Cellulose", "Ash"),
-                 ts_capture_frac=0.78,
-                 cake_moisture_frac=0.75,
-                 capacity_tph_each=50.0,
-                 centrifuge_purchase_cost_usd_each=297_500.0,
-                 F_BM=1.0,
+                 solids_IDs=_DIGESTATE_DECANTER_CENTRIFUGE["solids_IDs"],
+                 ts_capture_frac=_DIGESTATE_DECANTER_CENTRIFUGE["ts_capture_frac"],
+                 cake_moisture_frac=_DIGESTATE_DECANTER_CENTRIFUGE["cake_moisture_frac"],
+                 capacity_tph_each=_DIGESTATE_DECANTER_CENTRIFUGE["capacity_tph_each"],
+                 centrifuge_purchase_cost_usd_each=_DIGESTATE_DECANTER_CENTRIFUGE["centrifuge_purchase_cost_usd_each"],
+                 F_BM=_DIGESTATE_DECANTER_CENTRIFUGE["F_BM"],
                  **kwargs):
         super().__init__(ID, ins, outs, **kwargs)
 
@@ -1250,14 +1247,14 @@ class DigestateScrewPress(bst.Unit):
     _N_outs = 2
 
     def __init__(self, ID="", ins=None, outs=(),
-                 dissolved_IDs=None,            # chemicals treated as dissolved — always route to pressate
-                 ts_capture_frac=0.40,          # assumptions.yaml digestate_screw_press.ts_capture_frac
-                 cake_moisture_frac=0.45,       # assumptions.yaml digestate_screw_press.cake_moisture_frac
-                 capacity_tph_each=6.0,         # aligns with reported 6 ton/h energy datapoint
-                 kWh_per_m3=0.67,               # SYSTEMIC avg electricity intensity
-                 include_polymer_dosing=False,
-                 polymer_dosing_cost_usd_each=35000, 
-                 F_BM=1.0,
+                 dissolved_IDs=None,            # chemicals treated as dissolved — always route to pressate; no yaml home
+                 ts_capture_frac=_DIGESTATE_SCREW_PRESS["ts_capture_frac"],
+                 cake_moisture_frac=_DIGESTATE_SCREW_PRESS["cake_moisture_frac"],
+                 capacity_tph_each=_DIGESTATE_SCREW_PRESS["capacity_tph_each"],
+                 kWh_per_m3=_DIGESTATE_SCREW_PRESS["kWh_per_m3"],
+                 include_polymer_dosing=_DIGESTATE_SCREW_PRESS["include_polymer_dosing"],
+                 polymer_dosing_cost_usd_each=_DIGESTATE_SCREW_PRESS["polymer_dosing_cost_usd_each"],
+                 F_BM=_DIGESTATE_SCREW_PRESS["F_BM"],
                  **kwargs):
         super().__init__(ID, ins, outs, **kwargs)
 
