@@ -17,7 +17,13 @@ from biosteam.units.design_tools.tank_design import (
     compute_number_of_tanks_and_purchase_cost,
 )
 
+from biorefineries.sabre.utils import load_assumptions
+
 __all__ = ('YarrowiaLipidFermenter', 'VFAMicrofilter', 'FermentationMediumTank')
+
+# Loaded yaml assumptions
+_VFA_FERMENTATION_YAML = load_assumptions("vfa_fermentation.yaml")
+_VFA_MICROFILTER = _VFA_FERMENTATION_YAML["vfa_fermentation"]["vfa_microfilter"]
 
 
 class YarrowiaLipidFermenter(bst.AeratedBioreactor):
@@ -198,7 +204,7 @@ class YarrowiaLipidFermenter(bst.AeratedBioreactor):
 
 
 @cost('Membrane area (m2)', 'Microfilter', units='m2',
-      CE=567.5, cost=200.0, S=1., n=1., BM=1.0)
+      CE=567.5, cost=_VFA_MICROFILTER["membrane_cost_usd_per_m2"], S=1., n=1., BM=1.0)
 class VFAMicrofilter(bst.Unit):
     """
     Split-based representation of a VFA-rich permeate step.

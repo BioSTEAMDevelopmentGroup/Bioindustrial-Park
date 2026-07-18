@@ -42,6 +42,8 @@ _AD_ACIDOGENIC = {**_AD_SHARED, **_AD_SHARED.get("acidogenic", {})}
 _ADP_ACIDOGENIC = _AD_PERFORMANCE["acidogenic"]
 _ADP_ACIDOGENIC_CASE = _ADP_ACIDOGENIC["cases"][_ADP_ACIDOGENIC["case"]]
 
+_H2S_REMOVAL = _AD_YAML["h2s_removal"]
+
 # ADBC-based digester installed cost anchor points (m3, USD)
 ADBC_VOL_M3 = [878, 1755, 2633, 3510, 5265, 8775]
 ADBC_CAPEX = [1720964, 1750201, 1779439, 1808676, 1867151, 1984101]
@@ -697,7 +699,8 @@ class AcidogenicDigester(bst.Unit):
 
 
 @cost('Raw biogas flow (Nm3/h)', 'H2S removal (iron sponge)', units='Nm3/h',
-      CE=567.5, cost=450_000.0, S=1700.0, n=0.7, BM=1.0)
+      CE=567.5, cost=_H2S_REMOVAL["ref_installed_cost_usd"],
+      S=_H2S_REMOVAL["ref_flow_Nm3ph"], n=_H2S_REMOVAL["scale_exponent"], BM=1.0)
 class H2SRemoval(bst.Unit):
     """
     Iron sponge H2S removal unit for raw biogas desulfurization.

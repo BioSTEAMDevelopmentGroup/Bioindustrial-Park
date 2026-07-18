@@ -45,11 +45,19 @@ Operating cost:
 import biosteam as bst
 from biosteam.units.decorators import cost
 
+from biorefineries.sabre.utils import load_assumptions
+
 __all__ = ('OilExtractionPlaceholder',)
+
+# Loaded yaml assumptions
+_VFA_FERMENTATION_YAML = load_assumptions("vfa_fermentation.yaml")
+_DOWNSTREAM_RECOVERY = _VFA_FERMENTATION_YAML["vfa_fermentation"]["downstream_recovery"]
 
 
 @cost('Dry biomass feed (dry ton/h)', 'Oil extraction', units='dry ton/h',
-      CE=567.5, cost=7_848_000.0, S=10.0, n=0.6, BM=1.0)
+      CE=567.5, cost=_DOWNSTREAM_RECOVERY["oil_extraction_ref_installed_cost_usd"],
+      S=_DOWNSTREAM_RECOVERY["oil_extraction_ref_dry_biomass_tph"],
+      n=_DOWNSTREAM_RECOVERY["oil_extraction_scale_exponent"], BM=1.0)
 class OilExtractionPlaceholder(bst.Unit):
     """
     Pass-through unit representing cell disruption and lipid extraction
