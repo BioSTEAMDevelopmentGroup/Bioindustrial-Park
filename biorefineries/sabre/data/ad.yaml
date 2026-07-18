@@ -135,11 +135,9 @@ h2s_removal:
 biogas_upgrading:
   technology: membrane
 
-  ch4_recovery: 0.99
+  target_ch4_molfrac: 0.97 # unused
+  methane_loss_frac: 0.01
   co2_removal: 0.95
-
-  target_ch4_molfrac: 0.97
-  methane_slip_frac: 0.01
 
   electricity_kWh_per_Nm3_raw: 0.25
 
@@ -150,7 +148,7 @@ biogas_upgrading:
     electricity:
       citation: "IEA Bioenergy Task 37, Biomethane status and factors affecting market development (2014)"
       note: "Reports electricity consumption typically 0.2–0.3 kWh/Nm³ raw biogas for mature upgrading technologies (incl. membranes)."
-    methane_slip:
+    methane_loss:
       citation: "IEA Bioenergy Task 37, Biomethane status and factors affecting market development (2014)"
       note: "States manufacturers guarantee methane losses below ~0.5–2% for new plants."
     maintenance:

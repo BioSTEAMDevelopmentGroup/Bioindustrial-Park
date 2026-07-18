@@ -108,17 +108,12 @@ vfa_fermentation:
     crude_product_stream_ID: crude_microbial_oil
     report_as: crude_microbial_oil
 
-    dha_wt_frac_in_oil: 0.0
-    squalene_wt_frac_in_oil: 0.0
+    dha_wt_frac_in_oil: 0.0 # unused
+    squalene_wt_frac_in_oil: 0.0 # unused
 
     notes:
       - "Base case reports crude microbial oil only."
       - "DHA and squalene can be added later as fractions of recovered oil in a higher-value variant."
-
-  scenario_flags:
-    send_vfa_retentate_to_secondary_AD: false
-    use_yarrowia_base_case: true
-    use_high_value_oil_variant: false
 
   sources:
     seaweed_arrested_anchor:
