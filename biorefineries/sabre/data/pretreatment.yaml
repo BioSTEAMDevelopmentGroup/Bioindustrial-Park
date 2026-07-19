@@ -71,7 +71,6 @@ pretreatment_ad:
     description: "Hydrogen peroxide pretreatment before methanogenic AD"
     peroxide:
       h2o2_wt_frac_on_dry_feed: 0.025
-      temperature_K: 298.15
       residence_time_hr: 2.0
       capex_usd: 1000000.0
       h2o2_price_usd_per_kg: 0.37

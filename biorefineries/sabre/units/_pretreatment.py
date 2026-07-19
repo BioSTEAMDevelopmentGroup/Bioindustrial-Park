@@ -17,7 +17,6 @@ _PRETREATMENT_AD = load_assumptions("pretreatment.yaml")["pretreatment_ad"]
 _ENZYMATIC = _PRETREATMENT_AD["enzymatic"]["enzymatic"]
 _PEROXIDE = _PRETREATMENT_AD["peroxide"]["peroxide"]
 _HEATING = _PRETREATMENT_AD["combined_PTE"]["heating"]
-_AD_SHARED = load_assumptions("ad.yaml")["ad"]
 
 
 class EnzymaticPretreatment(bst.Unit):
@@ -47,11 +46,6 @@ class EnzymaticPretreatment(bst.Unit):
     enzyme_recycle_factor : float
         Factor (>=1) by which enzyme is recycled; fresh enzyme addition is
         divided by this factor.
-    slurry_density_kg_per_m3 : float
-        Feed slurry density, used to convert mass flow to volumetric flow
-        for sizing and to size the heating duty.
-    cp_kJ_per_kgK : float
-        Feed slurry specific heat capacity, used to size the heating duty.
     capex_usd : float
         Flat installed capital cost (not a function of throughput).
     enzyme_price_usd_per_kg : float
@@ -64,7 +58,7 @@ class EnzymaticPretreatment(bst.Unit):
 
     See Also
     --------
-    Refer to data/pretreatment.yaml and data/ad.yaml for the default values and references.
+    Refer to data/pretreatment.yaml for the default values and references.
     """
 
     _N_ins = 1
@@ -78,8 +72,6 @@ class EnzymaticPretreatment(bst.Unit):
         enzyme_dose_kg_per_kg_dry_feed=_ENZYMATIC["enzyme_dose_kg_per_kg_dry_feed"],
         treated_fraction=_ENZYMATIC["treated_fraction"],
         enzyme_recycle_factor=_ENZYMATIC["enzyme_recycle_factor"],
-        slurry_density_kg_per_m3=_AD_SHARED["slurry_density_kg_per_m3"],
-        cp_kJ_per_kgK=_AD_SHARED["cp_kJ_per_kgK"],
 
         # economics
         capex_usd=_ENZYMATIC["capex_usd"],
@@ -94,8 +86,6 @@ class EnzymaticPretreatment(bst.Unit):
         self.enzyme_dose_kg_per_kg_dry_feed = float(enzyme_dose_kg_per_kg_dry_feed)
         self.treated_fraction = float(treated_fraction)
         self.enzyme_recycle_factor = float(enzyme_recycle_factor)
-        self.slurry_density_kg_per_m3 = float(slurry_density_kg_per_m3)
-        self.cp_kJ_per_kgK = float(cp_kJ_per_kgK)
 
         self.capex_usd = float(capex_usd)
         self.enzyme_price_usd_per_kg = float(enzyme_price_usd_per_kg)
@@ -106,6 +96,7 @@ class EnzymaticPretreatment(bst.Unit):
         treated = self.outs[0]
         treated.copy_like(feed)
         treated.phase = feed.phase
+        treated.T = self.temperature_K
 
         water = float(feed.imass["Water"]) if "Water" in feed.chemicals.IDs else 0.0
         dry_mass = max(feed.F_mass - water, 0.0)
@@ -127,7 +118,7 @@ class EnzymaticPretreatment(bst.Unit):
         feed = self.ins[0]
 
         m_kgph = float(feed.F_mass)
-        vol_m3ph = m_kgph / self.slurry_density_kg_per_m3
+        vol_m3ph = feed.F_vol
         V = vol_m3ph * self.residence_time_hr
 
         dry_mass = getattr(self, "_dry_mass_kgph", 0.0)
@@ -139,7 +130,7 @@ class EnzymaticPretreatment(bst.Unit):
         T_in = float(getattr(feed, "T", self.temperature_K))
         T_out = self.temperature_K
         dT = max(T_out - T_in, 0.0)
-        Q_kJph = m_kgph * self.cp_kJ_per_kgK * dT
+        Q_kJph = m_kgph * feed.Cp * dT
 
         self.design_results["Mass flow (kg/h)"] = m_kgph
         self.design_results["Slurry flow (m3/h)"] = vol_m3ph
@@ -199,11 +190,6 @@ class HeatingPretreatment(bst.Unit):
         heat utility.
     residence_time_hr : float
         Reactor residence time, used to size reactor volume.
-    slurry_density_kg_per_m3 : float
-        Feed slurry density, used to convert mass flow to volumetric flow
-        for sizing.
-    cp_kJ_per_kgK : float
-        Feed slurry specific heat capacity, used to size the heating duty.
     capex_usd : float
         Flat installed capital cost (not a function of throughput).
     maintenance_frac_of_capex_per_yr : float
@@ -214,7 +200,7 @@ class HeatingPretreatment(bst.Unit):
 
     See Also
     --------
-    Refer to data/pretreatment.yaml and data/ad.yaml for the default values and references.
+    Refer to data/pretreatment.yaml for the default values and references.
     """
 
     _N_ins = 1
@@ -225,8 +211,6 @@ class HeatingPretreatment(bst.Unit):
         self, ID="", ins=None, outs=(),
         target_temperature_K=_HEATING["target_temperature_K"],
         residence_time_hr=_HEATING["residence_time_hr"],
-        slurry_density_kg_per_m3=_AD_SHARED["slurry_density_kg_per_m3"],
-        cp_kJ_per_kgK=_AD_SHARED["cp_kJ_per_kgK"],
 
         # costing
         capex_usd=_HEATING["capex_usd"],
@@ -237,8 +221,6 @@ class HeatingPretreatment(bst.Unit):
 
         self.target_temperature_K = float(target_temperature_K)
         self.residence_time_hr = float(residence_time_hr)
-        self.slurry_density_kg_per_m3 = float(slurry_density_kg_per_m3)
-        self.cp_kJ_per_kgK = float(cp_kJ_per_kgK)
 
         self.capex_usd = float(capex_usd)
         self.maintenance_frac_of_capex_per_yr = float(maintenance_frac_of_capex_per_yr)
@@ -248,19 +230,20 @@ class HeatingPretreatment(bst.Unit):
         heated = self.outs[0]
         heated.copy_like(feed)
         heated.phase = feed.phase
+        heated.T = self.target_temperature_K
 
     def _design(self):
         feed = self.ins[0]
 
         m_kgph = float(feed.F_mass)
-        vol_m3ph = m_kgph / self.slurry_density_kg_per_m3
+        vol_m3ph = feed.F_vol
 
         T_in = float(getattr(feed, "T", self.target_temperature_K))
         T_out = self.target_temperature_K
         dT = max(T_out - T_in, 0.0)
 
         V = vol_m3ph * self.residence_time_hr
-        Q_kJph = m_kgph * self.cp_kJ_per_kgK * dT
+        Q_kJph = m_kgph * feed.Cp * dT
 
         self.design_results["Mass flow (kg/h)"] = m_kgph
         self.design_results["Slurry flow (m3/h)"] = vol_m3ph
@@ -305,14 +288,8 @@ class PeroxidePretreatment(bst.Unit):
     h2o2_wt_frac_on_dry_feed : float
         Hydrogen peroxide dose as a weight fraction of dry (non-water)
         feed processed.
-    temperature_K : float
-        Reactor operating temperature (informational/design-basis only;
-        no heat utility is charged -- see Sources below).
     residence_time_hr : float
         Reactor residence time, used to size reactor volume.
-    slurry_density_kg_per_m3 : float
-        Feed slurry density, used to convert mass flow to volumetric flow
-        for sizing.
     capex_usd : float
         Flat installed capital cost (not a function of throughput).
     h2o2_price_usd_per_kg : float
@@ -323,9 +300,14 @@ class PeroxidePretreatment(bst.Unit):
     **kwargs
         Forwarded to `bst.Unit.__init__`.
 
+    Notes
+    -----
+    Feed slurry volumetric flow is read directly from the inlet stream
+    (`feed.F_vol`), not from a fixed assumption.
+
     See Also
     --------
-    Refer to data/pretreatment.yaml and data/ad.yaml for the default values and references.
+    Refer to data/pretreatment.yaml for the default values and references.
     """
 
     _N_ins = 1
@@ -335,9 +317,7 @@ class PeroxidePretreatment(bst.Unit):
     def __init__(
         self, ID="", ins=None, outs=(),
         h2o2_wt_frac_on_dry_feed=_PEROXIDE["h2o2_wt_frac_on_dry_feed"],
-        temperature_K=_PEROXIDE["temperature_K"],
         residence_time_hr=_PEROXIDE["residence_time_hr"],
-        slurry_density_kg_per_m3=_AD_SHARED["slurry_density_kg_per_m3"],
 
         # economics
         capex_usd=_PEROXIDE["capex_usd"],
@@ -348,9 +328,7 @@ class PeroxidePretreatment(bst.Unit):
         super().__init__(ID, ins, outs, **kwargs)
 
         self.h2o2_wt_frac_on_dry_feed = float(h2o2_wt_frac_on_dry_feed)
-        self.temperature_K = float(temperature_K)
         self.residence_time_hr = float(residence_time_hr)
-        self.slurry_density_kg_per_m3 = float(slurry_density_kg_per_m3)
 
         self.capex_usd = float(capex_usd)
         self.h2o2_price_usd_per_kg = float(h2o2_price_usd_per_kg)
@@ -376,7 +354,7 @@ class PeroxidePretreatment(bst.Unit):
         feed = self.ins[0]
 
         m_kgph = float(feed.F_mass)
-        vol_m3ph = m_kgph / self.slurry_density_kg_per_m3
+        vol_m3ph = feed.F_vol
         V = vol_m3ph * self.residence_time_hr
 
         dry_mass = getattr(self, "_dry_mass_kgph", 0.0)
@@ -388,7 +366,6 @@ class PeroxidePretreatment(bst.Unit):
         self.design_results["Slurry flow (m3/h)"] = vol_m3ph
         self.design_results["Residence time (h)"] = self.residence_time_hr
         self.design_results["Reactor volume (m3)"] = V
-        self.design_results["Temperature (K)"] = self.temperature_K
         self.design_results["Dry feed basis (kg/h)"] = dry_mass
         self.design_results["H2O2 addition (kg/h)"] = h2o2_kgph
         self.design_results["H2O2 cost ($/h)"] = h2o2_cost_usd_per_hr

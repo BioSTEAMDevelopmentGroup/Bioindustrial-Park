@@ -112,9 +112,6 @@ class AnaerobicDigester(bst.Unit):
     hrt_days : float
         Hydraulic retention time, used to size total liquid digester
         volume.
-    slurry_density_kg_per_m3 : float
-        Feed slurry density, used to convert mass flow to volumetric
-        flow for sizing.
     headspace_frac : float
         Fraction of total digester volume reserved for gas headspace.
     max_single_digester_volume_MG : float
@@ -125,12 +122,8 @@ class AnaerobicDigester(bst.Unit):
         to `add_OPEX`. If None, no maintenance OPEX is added.
     mixing_W_per_m3 : float
         Mixing power intensity per m3 of liquid volume.
-    influent_temperature_K : float
-        Feed slurry inlet temperature, used to size heating duty.
     target_temperature_K : float
-        Digester operating temperature, used to size heating duty.
-    cp_kJ_per_kgK : float
-        Feed slurry specific heat capacity, used to size heating duty.
+        Digester operating temperature (mesophilic/thermophilic).
     **kwargs
         Forwarded to `bst.Unit.__init__`.
 
@@ -157,16 +150,13 @@ class AnaerobicDigester(bst.Unit):
         biodegradability=_ADP_METHANOGENIC["biodegradability"],
         # Sizing
         hrt_days=_AD_METHANOGENIC["hrt_days"],
-        slurry_density_kg_per_m3=_AD_METHANOGENIC["slurry_density_kg_per_m3"],
         headspace_frac=_AD_METHANOGENIC["gas_storage_frac_of_total_volume"],
         max_single_digester_volume_MG=_AD_METHANOGENIC["max_single_digester_volume_MG"],
         # Costing anchors
         maintenance_usd_per_m3_yr=_AD_COST.get("maintenance_usd_per_m3_yr"),
         # Utilities
         mixing_W_per_m3=_AD_METHANOGENIC["mixing_W_per_m3"],
-        influent_temperature_K=_AD_METHANOGENIC["influent_temperature_K"],
         target_temperature_K=_AD_SHARED["temperature_regimes"]["mesophilic"]["temperature_K"],
-        cp_kJ_per_kgK=_AD_METHANOGENIC["cp_kJ_per_kgK"],
         **kwargs,
     ):
         super().__init__(ID, ins, outs, **kwargs)
@@ -177,11 +167,8 @@ class AnaerobicDigester(bst.Unit):
         self.digestible_IDs = tuple(digestible_IDs)
         self.biodegradability = dict(biodegradability)
         self.mixing_W_per_m3 = float(mixing_W_per_m3)
-        self.influent_temperature_K = float(influent_temperature_K)
         self.target_temperature_K = float(target_temperature_K)
-        self.cp_kJ_per_kgK = float(cp_kJ_per_kgK)
         self.hrt_days = float(hrt_days)
-        self.slurry_density_kg_per_m3 = float(slurry_density_kg_per_m3)
         self.headspace_frac = float(headspace_frac)
         self.max_single_digester_volume_m3 = float(max_single_digester_volume_MG) * 1e6 * GAL_TO_M3
         self.maintenance_usd_per_m3_yr = maintenance_usd_per_m3_yr
@@ -216,6 +203,7 @@ class AnaerobicDigester(bst.Unit):
 
         biogas.phase = "g"
         digestate.phase = "l"
+        biogas.T = digestate.T = self.target_temperature_K
 
         chems = self.chemicals
         ids = set(chems.IDs)
@@ -309,7 +297,7 @@ class AnaerobicDigester(bst.Unit):
         feed = self.ins[0]
         biogas, digestate = self.outs
 
-        slurry_m3_per_hr = feed.F_mass / self.slurry_density_kg_per_m3
+        slurry_m3_per_hr = feed.F_vol
         V_liquid = slurry_m3_per_hr * 24.0 * self.hrt_days
 
         hf = min(max(self.headspace_frac, 0.0), 0.95)
@@ -329,12 +317,12 @@ class AnaerobicDigester(bst.Unit):
 
         mixing_kW = (self.mixing_W_per_m3 * V_liquid) / 1000.0
 
-        T_in = self.influent_temperature_K
+        T_in = float(getattr(feed, "T", self.target_temperature_K))
         T_target = self.target_temperature_K
         dT = max(0.0, T_target - T_in)
 
         m_dot_kgph = feed.F_mass
-        Q_kJph = m_dot_kgph * self.cp_kJ_per_kgK * dT
+        Q_kJph = m_dot_kgph * feed.Cp * dT
 
         self.design_results["Mixing power (kW)"] = mixing_kW
         self.design_results["Influent T (K)"] = T_in
@@ -429,9 +417,6 @@ class AcidogenicDigester(bst.Unit):
     hrt_days : float
         Hydraulic retention time, used to size total liquid digester
         volume.
-    slurry_density_kg_per_m3 : float
-        Feed slurry density, used to convert mass flow to volumetric
-        flow for sizing.
     headspace_frac : float
         Fraction of total digester volume reserved for gas headspace.
     max_single_digester_volume_MG : float
@@ -439,12 +424,8 @@ class AcidogenicDigester(bst.Unit):
         larger required volumes are split across parallel trains.
     mixing_W_per_m3 : float
         Mixing power intensity per m3 of liquid volume.
-    influent_temperature_K : float
-        Feed slurry inlet temperature, used to size base heating duty.
     target_temperature_K : float
-        Digester operating temperature, used to size base heating duty.
-    cp_kJ_per_kgK : float
-        Feed slurry specific heat capacity, used to size heating duty.
+        Digester operating temperature.
     enable_heat_shock : bool
         If True, adds a periodic heat-shock duty on top of the base
         heating duty.
@@ -480,13 +461,10 @@ class AcidogenicDigester(bst.Unit):
         vfa_split: Dict[str, float] = _ADP_ACIDOGENIC_CASE["vfa_split"],
         digestible_IDs: Optional[Iterable[str]] = _AD_PERFORMANCE["digestible_IDs"],
         hrt_days: float = _AD_ACIDOGENIC["hrt_days"],
-        slurry_density_kg_per_m3: float = _AD_ACIDOGENIC["slurry_density_kg_per_m3"],
         headspace_frac: float = _AD_ACIDOGENIC["gas_storage_frac_of_total_volume"],
         max_single_digester_volume_MG: float = _AD_ACIDOGENIC["max_single_digester_volume_MG"],
         mixing_W_per_m3: float = _AD_ACIDOGENIC["mixing_W_per_m3"],
-        influent_temperature_K: float = _AD_ACIDOGENIC["influent_temperature_K"],
         target_temperature_K: float = _AD_SHARED["temperature_regimes"]["mesophilic"]["temperature_K"],
-        cp_kJ_per_kgK: float = _AD_ACIDOGENIC["cp_kJ_per_kgK"],
         enable_heat_shock: bool = _AD_ACIDOGENIC["heat_shock"]["enable"],
         hs_target_temperature_K: float = _AD_ACIDOGENIC["heat_shock"]["target_temperature_K"],
         hs_events_per_day: float = _AD_ACIDOGENIC["heat_shock"]["events_per_day"],
@@ -501,13 +479,10 @@ class AcidogenicDigester(bst.Unit):
         self.vfa_split = dict(vfa_split)
         self.digestible_IDs = tuple(digestible_IDs)
         self.hrt_days = float(hrt_days)
-        self.slurry_density_kg_per_m3 = float(slurry_density_kg_per_m3)
         self.headspace_frac = float(headspace_frac)
         self.max_single_digester_volume_m3 = float(max_single_digester_volume_MG) * 1e6 * GAL_TO_M3
         self.mixing_W_per_m3 = float(mixing_W_per_m3)
-        self.influent_temperature_K = float(influent_temperature_K)
         self.target_temperature_K = float(target_temperature_K)
-        self.cp_kJ_per_kgK = float(cp_kJ_per_kgK)
         self.enable_heat_shock = bool(enable_heat_shock)
         self.hs_target_temperature_K = float(hs_target_temperature_K)
         self.hs_events_per_day = float(hs_events_per_day)
@@ -549,6 +524,7 @@ class AcidogenicDigester(bst.Unit):
 
         offgas.phase = "g"
         broth.phase = "l"
+        offgas.T = broth.T = self.target_temperature_K
 
         water = float(broth.imass["Water"]) if "Water" in broth.chemicals else 0.0
         ash = float(broth.imass["Ash"]) if "Ash" in broth.chemicals else 0.0
@@ -586,7 +562,7 @@ class AcidogenicDigester(bst.Unit):
 
     def _design(self):
         feed = self.ins[0]
-        slurry_m3_per_hr = feed.F_mass / self.slurry_density_kg_per_m3
+        slurry_m3_per_hr = feed.F_vol
         V_liquid = slurry_m3_per_hr * 24.0 * self.hrt_days
 
         hf = min(max(self.headspace_frac, 0.0), 0.95)
@@ -608,11 +584,11 @@ class AcidogenicDigester(bst.Unit):
         self.power_utility.consumption = mixing_kW
         self.power_utility.production = 0.0
 
-        T_in = self.influent_temperature_K
+        T_in = float(getattr(feed, "T", self.target_temperature_K))
         T_base = self.target_temperature_K
         dT = max(0.0, T_base - T_in)
         m_dot_kgph = feed.F_mass
-        Q_base_kJph = m_dot_kgph * self.cp_kJ_per_kgK * dT
+        Q_base_kJph = m_dot_kgph * feed.Cp * dT
 
         self.design_results["Influent T (K)"] = T_in
         self.design_results["Base target T (K)"] = T_base
@@ -623,8 +599,8 @@ class AcidogenicDigester(bst.Unit):
             frac = min(max(self.hs_heated_fraction_of_liquid, 0.0), 1.0)
             events_per_day = max(0.0, self.hs_events_per_day)
             dT_hs = max(0.0, self.hs_target_temperature_K - T_base)
-            m_liq_kg = V_liquid * self.slurry_density_kg_per_m3
-            Q_event_kJ = (m_liq_kg * frac) * self.cp_kJ_per_kgK * dT_hs
+            m_liq_kg = V_liquid * feed.rho
+            Q_event_kJ = (m_liq_kg * frac) * feed.Cp * dT_hs
             Q_day_kJ = Q_event_kJ * events_per_day
             Q_hs_kJph = Q_day_kJ / 24.0
 

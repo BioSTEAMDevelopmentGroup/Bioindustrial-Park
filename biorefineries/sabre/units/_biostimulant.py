@@ -248,7 +248,6 @@ class BiostimulantEvaporator(bst.Unit):
     Sources
     -------
     All parameters below (target_solids_wt_frac, boiling_temperature_K,
-    latent_heat_kJ_per_kg, sensible_cp_kJ_per_kgK,
     electricity_kWh_per_kg_water_evap, nonwater_recovery_to_product,
     capex_ref_usd, ref_evaporation_kgph, scale_exponent,
     maintenance_frac_of_capex_per_yr):
@@ -260,6 +259,16 @@ class BiostimulantEvaporator(bst.Unit):
         whatsoever. This module's own pre-existing docstring had no
         citations either (just "mild vacuum evaporation ~60 C" as an
         inline comment on `boiling_temperature_K`).
+
+    Sensible/latent heating duty (`_design()`): specific heat capacity is
+    read from the actual inlet stream (`conc_in.Cp`) and the latent heat
+    of vaporization is read from the Water chemical's own T-dependent
+    correlation (`self.chemicals.Water.Hvap(boiling_temperature_K)`, J/mol
+    converted to kJ/kg), rather than the flat literals
+    (`sensible_cp_kJ_per_kgK=4.18`, `latent_heat_kJ_per_kg=2350.0`) this
+    unit used before -- consistent with how `AnaerobicDigester`,
+    `EnzymaticPretreatment`, `HeatingPretreatment` etc. already source
+    `Cp`/density from BioSTEAM instead of a fixed assumption.
 
     Maintenance OPEX wiring: `_cost()` computed annual maintenance into
     `design_results` but never assigned it to `self.add_OPEX`, unlike
@@ -283,8 +292,6 @@ class BiostimulantEvaporator(bst.Unit):
         outs=(),
         target_solids_wt_frac=0.20,
         boiling_temperature_K=333.15,  # mild vacuum evaporation ~60 C
-        latent_heat_kJ_per_kg=2350.0,
-        sensible_cp_kJ_per_kgK=4.18,
         electricity_kWh_per_kg_water_evap=0.0,
         nonwater_recovery_to_product=0.995,
         capex_ref_usd=750000.0,
@@ -297,8 +304,6 @@ class BiostimulantEvaporator(bst.Unit):
 
         self.target_solids_wt_frac = float(target_solids_wt_frac)
         self.boiling_temperature_K = float(boiling_temperature_K)
-        self.latent_heat_kJ_per_kg = float(latent_heat_kJ_per_kg)
-        self.sensible_cp_kJ_per_kgK = float(sensible_cp_kJ_per_kgK)
         self.electricity_kWh_per_kg_water_evap = float(electricity_kWh_per_kg_water_evap)
         self.nonwater_recovery_to_product = float(nonwater_recovery_to_product)
 
@@ -399,11 +404,13 @@ class BiostimulantEvaporator(bst.Unit):
         sensible = 0.0
         feed_T = float(conc_in.T)
         if water_evap > 0 and feed_T < self.boiling_temperature_K:
-            sensible = float(conc_in.F_mass) * self.sensible_cp_kJ_per_kgK * (
+            sensible = float(conc_in.F_mass) * conc_in.Cp * (
                 self.boiling_temperature_K - feed_T
             )
 
-        latent = water_evap * self.latent_heat_kJ_per_kg
+        water_chem = self.chemicals.Water
+        latent_heat_kJ_per_kg = water_chem.Hvap(self.boiling_temperature_K) / water_chem.MW
+        latent = water_evap * latent_heat_kJ_per_kg
         total_duty_kJph = sensible + latent
         power_kW = water_evap * self.electricity_kWh_per_kg_water_evap
 

@@ -4,9 +4,6 @@ ad:
   # Shared digester sizing/operating parameters
   max_single_digester_volume_MG: 1.5
   gas_storage_frac_of_total_volume: 0.25
-  influent_temperature_K: 298.15
-  slurry_density_kg_per_m3: 1000.0
-  cp_kJ_per_kgK: 4.18
 
   enable_feed_dilution: false
   target_feed_moisture_frac: 0.92
