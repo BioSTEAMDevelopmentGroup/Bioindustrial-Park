@@ -8,110 +8,95 @@
 
 from typing import Optional
 import biosteam as bst
-from biosteam.units.tank import Tank
 from biosteam.units.design_tools.tank_design import mix_tank_purchase_cost_algorithms
 
+from biorefineries.sabre.utils import load_assumptions
+
 __all__ = ('YarrowiaLipidFermenter', 'FermentationMediumTank')
+
+# Loaded yaml assumptions
+_FERMENTATION_YAML = load_assumptions("fermentation.yaml")
+_VFA = _FERMENTATION_YAML["vfa"]
+_VFA_CASE = _VFA["cases"][_VFA["case"]]
+_FERMENTATION_MEDIUM_TANK = _FERMENTATION_YAML["fermentation_medium_tank"]
 
 
 class YarrowiaLipidFermenter(bst.AeratedBioreactor):
     """
     VFA-fed microbial-oil fermenter structured after the oilcane
-    AeratedFermentation class
-
-    This is now using the *reactor architecture* of the oilcane code
-    (AeratedBioreactor with automatic aeration / power optimization),
+    AeratedFermentation class. It uses AeratedBioreactor
+    with automatic aeration / power optimization),
     but it still uses yield-based VFA conversion because MicrobialOil
     is a pseudo-component in the current Sabre thermo
 
-    Inputs:
-    - conditioned VFA broth
-    - optional seed stream
-
-    Outputs:
-    - vent
-    - fermentation broth
-
-    Sources
-    -------
-    target_pH:
-        Gao et al. 2020, Biotechnol Biofuels -- initial pH 8 reported as
-        optimal under high-VFA alkaline cultivation.
-    product_yield_kg_per_kg_vfa_consumed:
-        Gao et al. 2020, Biotechnol Biofuels -- Y_L/S at pH 8.
-    conversion, biomass_yield_kg_per_kg_vfa_consumed,
-    co2_yield_kg_per_kg_vfa_consumed, oxygen_kg_per_kg_vfa_consumed,
-    residence_time_h:
-        No literature source found in assumptions.yaml or elsewhere in this
-        codebase (checked both biorefineries/sabre and sabre_ad). Current
-        scoping assumptions for process modeling. Should be sensitivity-tested.
-    pathway feasibility:
-        Fontanille et al. 2012 (Yarrowia lipolytica assimilates VFAs and
-        accumulates intracellular lipids); Pereira et al. 2023 (tested on
-        food-waste-derived VFAs); Frontiers 2021 review (VFA-to-microbial-oil
-        pathway concept).
-
-    References
+    Parameters
     ----------
-    [1] Gao, R.; Li, Z.; Zhou, X.; Bao, W.; Cheng, S.; Zheng, L. Enhanced Lipid Production by Yarrowia Lipolytica Cultured with Synthetic and Waste-Derived High-Content Volatile Fatty Acids under Alkaline Conditions. Biotechnol Biofuels 2020, 13 (1), 3. https://doi.org/10.1186/s13068-019-1645-y.
-    """
+    ins : stream
+        Conditioned VFA broth (optionally with a seed stream appended).
+    outs : tuple[stream, stream]
+        Vent and fermentation broth.
+    vfa_IDs : list[str]
+        Chemical IDs treated as VFA substrate.
+    product_ID : str
+        Chemical ID of the fermentation product.
+    conversion : float
+        Fraction of available VFA mass consumed (0-1).
+    product_yield_kg_per_kg_vfa_consumed : float
+        Product yield per kg of VFA consumed.
+    biomass_yield_kg_per_kg_vfa_consumed : float
+        Cell mass yield per kg of VFA consumed.
+    co2_yield_kg_per_kg_vfa_consumed : float
+        CO2 yield per kg of VFA consumed.
+    oxygen_kg_per_kg_vfa_consumed : float
+        O2 demand per kg of VFA consumed.
+    tau : float
+        Fermentation residence time [hr] (bst.AeratedBioreactor's own
+        attribute name).
+    Q_O2_consumption : float
+        Heat of reaction per kmol O2 consumed; forwarded to
+        `bst.AeratedBioreactor`. Not yaml-sourced.
+        Cannot be calculated from the current sabre thermo because MicrobialOil is a pseudo-component.
+    target_pH : float
+        Target fermentation pH; recorded in `design_results`, not
+        enforced.
+    **kwargs
+        Forwarded to `bst.AeratedBioreactor.__init__`.
 
-    V_max_default = 150
+    See Also
+    --------
+    Refer to data/fermentation.yaml for the default values and references.
+    """
 
     def _init(
         self,
-        vfa_IDs: Optional[list[str]] = None,
-        product_ID: str = "MicrobialOil",
-        conversion: float = 0.85,  # no literature source found; scoping assumption
-        product_yield_kg_per_kg_vfa_consumed: float = 0.144,  # Gao et al. 2020, Y_L/S at pH 8
-        biomass_yield_kg_per_kg_vfa_consumed: float = 0.40,  # scoping assumption
-        co2_yield_kg_per_kg_vfa_consumed: float = 0.20,  # scoping assumption
-        oxygen_kg_per_kg_vfa_consumed: float = 0.80,  # scoping assumption
-        residence_time_h: float = 48.0,  # scoping assumption
-        dT_hx_loop: float = 8.0,
+        vfa_IDs: list[str] = _VFA["vfa_IDs"],
+        product_ID: str = _VFA_CASE["product_ID"],
+        conversion: float = _VFA_CASE["conversion"],
+        product_yield_kg_per_kg_vfa_consumed: float = _VFA_CASE["product_yield_kg_per_kg_vfa_consumed"],
+        biomass_yield_kg_per_kg_vfa_consumed: float = _VFA_CASE["biomass_yield_kg_per_kg_vfa_consumed"],
+        co2_yield_kg_per_kg_vfa_consumed: float = _VFA_CASE["co2_yield_kg_per_kg_vfa_consumed"],
+        oxygen_kg_per_kg_vfa_consumed: float = _VFA_CASE["oxygen_kg_per_kg_vfa_consumed"],
+        tau: float = _VFA_CASE["tau"],
         Q_O2_consumption: float = -460240.0,
-        batch: bool = True,
-        broth_density_kg_per_m3: float = 1000.0,
-        target_pH: float = 8.0,  # Gao et al. 2020, optimal under high-VFA alkaline cultivation
-
-        # real stirred-tank sizing / power args
-        V_wf: float = 0.8,
-        V_max: float = 300.0,
-        kW_per_m3: float = 0.06,
-        tau_0: float = 3.4,
-        N_reactors: int | None = None,
-
+        target_pH: float = _VFA_CASE["target_pH"],
         **kwargs,
     ):
+        kwargs.setdefault('optimize_power', True)
         bst.AeratedBioreactor._init(
         self,
         reactions=None,
-        batch=batch,
-        dT_hx_loop=dT_hx_loop,
         Q_O2_consumption=Q_O2_consumption,
-        optimize_power=True,
-        tau=residence_time_h,
-        V_wf=V_wf,
-        V_max=V_max,
-        kW_per_m3=kW_per_m3,
-        tau_0=tau_0,
+        tau=tau,
         **kwargs,
     )
 
-        self.vfa_IDs = vfa_IDs or [
-            "AceticAcid",
-            "PropionicAcid",
-            "ButyricAcid",
-            "ValericAcid",
-            "HexanoicAcid",
-        ]
+        self.vfa_IDs = list(vfa_IDs)
         self.product_ID = product_ID
         self.conversion = float(conversion)
         self.product_yield_kg_per_kg_vfa_consumed = float(product_yield_kg_per_kg_vfa_consumed)
         self.biomass_yield_kg_per_kg_vfa_consumed = float(biomass_yield_kg_per_kg_vfa_consumed)
         self.co2_yield_kg_per_kg_vfa_consumed = float(co2_yield_kg_per_kg_vfa_consumed)
         self.oxygen_kg_per_kg_vfa_consumed = float(oxygen_kg_per_kg_vfa_consumed)
-        self.broth_density_kg_per_m3 = float(broth_density_kg_per_m3)
         self.target_pH = float(target_pH)
 
     def _run_vent(self, vent, effluent):
@@ -191,25 +176,39 @@ class YarrowiaLipidFermenter(bst.AeratedBioreactor):
         self.design_results["O2 demand (kg/h)"] = o2_demand
 
 
-class FermentationMediumTank(Tank):
+class FermentationMediumTank(bst.Tank):
     """
     Simple medium adjustment tank for pH control and nutrient dosing.
     Reuses BioSTEAM's own conventional stainless-steel mix-tank
-    purchase-cost algorithm by inheriting from `bst.units.tank.Tank`
-    directly (rather than reimplementing it) -- `_cost()` is Tank's own,
-    unmodified. That means the bare-module factor (2.3x) and the
-    stainless-steel material-factor normalization Tank._cost() applies
-    (dividing the material factor out of the raw correlation cost, then
-    reapplying it via `F_M`) both come from BioSTEAM directly. Previously
-    this was a `bst.Unit` subclass with a hand-rolled `_cost()` that
-    duplicated the cost correlation but hardcoded F_BM=1.0 -- silently
-    skipping both factors and understating installed cost.
+    purchase-cost algorithm. Only `_run()` (dosing) is overridden;
+    `_design()` and `_cost()` are bst.Tank's own, unmodified.
 
-    Only `_run()` (dosing) and `_design()` (this unit's own
-    residence-time/broth-density volume basis, not Tank's generic
-    tau * F_vol_out / V_wf) are overridden; `_design()` writes into
-    Tank's own `'Total volume'`/`'Residence time'` design_results keys so
-    the inherited `_cost()` can read them directly.
+    Parameters
+    ----------
+    ins : tuple[stream, stream, stream, stream, stream]
+        Broth, ammonia, phosphate, base, and magnesium sulfate feeds.
+    outs : stream
+        Conditioned broth.
+    ammonia_dose_kg_per_m3 : float
+        Ammonia dose per m3 of broth (mass basis); 0 disables dosing.
+    phosphate_dose_kg_per_m3 : float
+        KH2PO4 dose per m3 of broth; 0 disables dosing.
+    base_dose_kg_per_m3 : float
+        NaOH dose per m3 of broth; 0 disables dosing.
+    magnesium_sulfate_dose_kg_per_m3 : float
+        MagnesiumSulfate dose per m3 of broth; 0 disables dosing.
+    target_pH : float
+        Target pH; recorded in `design_results`, not enforced.
+    tau : float
+        Tank residence time [hr] (bst.Tank's own attribute name).
+    mixing_kW_per_m3 : float
+        Mixing power intensity.
+    **kwargs
+        Forwarded to `bst.Tank.__init__`.
+
+    See Also
+    --------
+    Refer to data/fermentation.yaml for the default values and references.
     """
 
     _N_ins = 5
@@ -226,14 +225,13 @@ class FermentationMediumTank(Tank):
         ins=None,
         outs=(),
         *,
-        ammonia_dose_kg_per_m3: float = 0.0,
-        phosphate_dose_kg_per_m3: float = 0.0,
-        base_dose_kg_per_m3: float = 0.0,
-        magnesium_sulfate_dose_kg_per_m3: float = 0.0,
-        broth_density_kg_per_m3: float = 1000.0,
-        target_pH: float = 8.0,
-        residence_time_h: float = 0.5,
-        mixing_kW_per_m3: float = 0.05,
+        ammonia_dose_kg_per_m3: float = _FERMENTATION_MEDIUM_TANK["ammonia_dose_kg_per_m3"],
+        phosphate_dose_kg_per_m3: float = _FERMENTATION_MEDIUM_TANK["phosphate_dose_kg_per_m3"],
+        base_dose_kg_per_m3: float = _FERMENTATION_MEDIUM_TANK["base_dose_kg_per_m3"],
+        magnesium_sulfate_dose_kg_per_m3: float = _FERMENTATION_MEDIUM_TANK["magnesium_sulfate_dose_kg_per_m3"],
+        target_pH: float = _FERMENTATION_MEDIUM_TANK["target_pH"],
+        tau: float = _FERMENTATION_MEDIUM_TANK["tau"],
+        mixing_kW_per_m3: float = _FERMENTATION_MEDIUM_TANK["mixing_kW_per_m3"],
         **kwargs,
     ):
         super().__init__(ID, ins, outs, **kwargs)
@@ -241,11 +239,8 @@ class FermentationMediumTank(Tank):
         self.phosphate_dose_kg_per_m3 = float(phosphate_dose_kg_per_m3)
         self.base_dose_kg_per_m3 = float(base_dose_kg_per_m3)
         self.magnesium_sulfate_dose_kg_per_m3 = float(magnesium_sulfate_dose_kg_per_m3)
-        self.broth_density_kg_per_m3 = float(broth_density_kg_per_m3)
         self.target_pH = float(target_pH)
-        self.residence_time_h = float(residence_time_h)
-        # Tank._init() (run inside super().__init__() above) already set
-        # self.kW_per_m3 = 0.0 (Tank's own default); overwrite with ours.
+        self.tau = float(tau)
         self.kW_per_m3 = float(mixing_kW_per_m3)
 
     def _run(self):
@@ -254,7 +249,7 @@ class FermentationMediumTank(Tank):
         out.copy_like(broth)
         out.phase = "l"
 
-        vol_m3ph = broth.F_mass / self.broth_density_kg_per_m3 if self.broth_density_kg_per_m3 > 0 else 0.0
+        vol_m3ph = broth.F_vol
         ammonia.empty(); phosphate.empty(); base.empty(); mgso4.empty()
 
         chem_ids = set(out.chemicals.IDs)
@@ -282,13 +277,3 @@ class FermentationMediumTank(Tank):
 
         self.design_results["Target pH"] = self.target_pH
         self.design_results["Broth flow (m3/h)"] = vol_m3ph
-
-    def _design(self):
-        # Deliberately not Tank's own generic tau * F_vol_out / V_wf --
-        # this unit sizes off the dosed broth's constant-density flow
-        # basis instead. Writes into Tank's own design_results keys
-        # ('Total volume', 'Residence time') so the inherited _cost()
-        # (Tank._cost(), not overridden here) can read them directly.
-        vol_m3h = float(self.design_results.get("Broth flow (m3/h)", 0.0))
-        self.design_results["Residence time"] = self.residence_time_h
-        self.design_results["Total volume"] = vol_m3h * self.residence_time_h

@@ -34,7 +34,7 @@ vfa:
 
       target_pH: 8.0
 
-      residence_time_h: 48.0
+      tau: 48.0  # residence time [hr]; bst.AeratedBioreactor's own attribute name
       conversion: 0.85
       product_yield_kg_per_kg_vfa_consumed: 0.144
       biomass_yield_kg_per_kg_vfa_consumed: 0.40
@@ -51,25 +51,15 @@ vfa:
 
 
 fermentation_medium_tank:
-  broth_density_kg_per_m3: 1000.0
   target_pH: 8.0
 
-  residence_time_h: 0.5
+  tau: 0.5  # residence time [hr]; bst.Tank's own attribute name
   mixing_kW_per_m3: 0.05
 
   ammonia_dose_kg_per_m3: 0.0
   phosphate_dose_kg_per_m3: 0.0
   base_dose_kg_per_m3: 0.0
   magnesium_sulfate_dose_kg_per_m3: 0.0
-
-  cost_model: biosteam_conventional_mix_tank
-  # No F_BM here -- FermentationMediumTank now subclasses bst.units.tank.Tank
-  # directly and uses its inherited, unmodified _cost(), so F_BM (2.3), the
-  # stainless-steel material factor, and the cost correlation all come from
-  # BioSTEAM itself rather than being duplicated in this codebase.
-
-  notes:
-    - "Uses BioSTEAM conventional stainless-steel mix-tank purchase-cost algorithm rather than a custom placeholder."
 
   product_quality:
     crude_product_stream_ID: crude_microbial_oil
