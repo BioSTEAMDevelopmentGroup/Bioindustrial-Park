@@ -360,7 +360,7 @@ class AnaerobicDigester(bst.Unit):
         self.design_results["Organic loading proxy (kg/m3-h)"] = biodegradable_pool / V_liquid
         self.design_results["Methane productivity (kg/m3-h)"] = methane_kgph / V_liquid
         self.design_results["CH4 yield (kg/kg VS fed)"] = methane_kgph / VS_in
-        self.power_utility.consumption = mixing_kW
+        self.power_utility(mixing_kW)
 
         if Q_kJph > 0:
             try:
@@ -581,8 +581,7 @@ class AcidogenicDigester(bst.Unit):
 
         mixing_kW = (self.mixing_W_per_m3 * V_liquid) / 1000.0
         self.design_results["Mixing power (kW)"] = mixing_kW
-        self.power_utility.consumption = mixing_kW
-        self.power_utility.production = 0.0
+        self.power_utility(mixing_kW)
 
         T_in = float(getattr(feed, "T", self.target_temperature_K))
         T_base = self.target_temperature_K
@@ -784,7 +783,7 @@ class H2SRemoval(bst.Unit):
             self.design_results["H2S outlet (ppm mol)"] = h2s_out_ppm
 
         # Iron sponge is passive —> no electricity
-        self.power_utility.consumption = 0.0
+        self.power_utility(0.0)
 
         # Reagent (iron sponge media replacement) as add_OPEX.
         # Computed here (not in _cost) because it scales with raw biogas
@@ -906,8 +905,7 @@ class BiogasUpgrading(bst.Unit):
         self.design_results["Electricity demand (kW)"] = kW
 
         # Explicit overwrite
-        self.power_utility.consumption = kW
-        self.power_utility.production = 0.0
+        self.power_utility(kW)
 
         if biomethane.F_mol > 0:
             self.design_results["Biomethane CH4 mol%"] = (
@@ -1076,7 +1074,7 @@ class DigestateDecanterCentrifuge(bst.Unit):
         F_m3ph = float(self.ins[0].F_vol)
         kWh_per_m3 = 1.0
         power_kW = kWh_per_m3 * F_m3ph
-        self.power_utility.consumption = power_kW
+        self.power_utility(power_kW)
         self.design_results["Feed flow (m3/h)"] = F_m3ph
         self.design_results["Power (kW)"] = power_kW
 
@@ -1307,7 +1305,7 @@ class DigestateScrewPress(bst.Unit):
         # Power: kW = (kWh/m3) * (m3/h)
         F_m3ph = float(self.ins[0].F_vol)
         kW = self.kWh_per_m3 * F_m3ph
-        self.power_utility.consumption = kW
+        self.power_utility(kW)
 
         self.design_results["Throughput_m3ph"] = F_m3ph
         self.design_results["kWh_per_m3"] = self.kWh_per_m3

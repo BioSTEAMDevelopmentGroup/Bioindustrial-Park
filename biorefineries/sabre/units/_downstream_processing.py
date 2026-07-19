@@ -116,7 +116,7 @@ class VFAMicrofilter(bst.Unit):
         self.design_results["Permeate flow (kg/h)"] = self.outs[0].F_mass
         self.design_results["Retentate flow (kg/h)"] = self.outs[1].F_mass
         self.design_results["Membrane area (m2)"] = membrane_area_m2
-        self.power_utility.consumption = self.SEC_kWh_per_m3_feed * feed_m3h
+        self.power_utility(self.SEC_kWh_per_m3_feed * feed_m3h)
 
 
 @cost('Dry biomass feed (dry ton/h)', 'Oil extraction', units='dry ton/h',
@@ -230,7 +230,7 @@ class OilExtractionPlaceholder(bst.Unit):
         homogenization_kW = (
             self.homogenization_kWh_per_kg_dry_biomass * dry_biomass_kgph
         )
-        self.power_utility.consumption = homogenization_kW
+        self.power_utility(homogenization_kW)
 
         # Oil produced
         oil_kgph = float(feed.imass[self.product_ID]) if self.product_ID in chem_ids else 0.0

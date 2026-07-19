@@ -113,7 +113,6 @@ def _patch_ev607():
     for k in list(ev607.baseline_purchase_costs.keys()):
         ev607.baseline_purchase_costs[k] = 0.0
     ev607.baseline_purchase_costs["Evaporator (low-duty placeholder)"] = placeholder_usd
-    ev607.power_utility.consumption = 0.0
     ev607.heat_utilities.clear()
 
 
