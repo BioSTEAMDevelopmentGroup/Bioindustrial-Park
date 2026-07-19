@@ -24,7 +24,7 @@
 .. autoclass:: biorefineries.sabre.units.YarrowiaLipidFermenter
 .. autoclass:: biorefineries.sabre.units.VFAMicrofilter
 .. autoclass:: biorefineries.sabre.units.FermentationMediumTank
-.. autoclass:: biorefineries.sabre.units.OilExtractionPlaceholder
+.. autoclass:: biorefineries.sabre.units.OilExtraction
 """
 from . import _ad
 from . import _preprocessing

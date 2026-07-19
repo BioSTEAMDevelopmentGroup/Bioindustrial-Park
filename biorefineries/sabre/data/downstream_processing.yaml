@@ -1,7 +1,12 @@
 # Model Assumptions: Downstream Processing
 
 vfa_microfilter:
-  broth_density_kg_per_m3: 1000.0
+  vfa_IDs:
+    - AceticAcid
+    - PropionicAcid
+    - ButyricAcid
+    - ValericAcid
+    - HexanoicAcid
 
   vfa_to_permeate_frac: 0.98
   water_to_permeate_frac: 0.97
@@ -22,6 +27,9 @@ vfa_microfilter:
 
 
 oil_extraction:
+  product_ID: MicrobialOil
+  cellmass_ID: CellMass
+
   target_oil_and_solids_content_g_per_L: 60.0
 
   backend_oil_recovery: 0.99
@@ -30,13 +38,13 @@ oil_extraction:
   recycle_total_fraction: 0.10
   recycle_cellmass_wt_frac: 0.10
 
-  oil_extraction_ref_dry_biomass_tph: 10.0
-  oil_extraction_ref_installed_cost_usd: 7848000.0
-  oil_extraction_homogenization_kWh_per_kg: 0.203
-  oil_extraction_scale_exponent: 0.6
-  oil_extraction_F_BM: 1.0 # capex already installed
+  ref_dry_biomass_tph: 10.0
+  ref_installed_cost_usd: 7848000.0
+  homogenization_kWh_per_kg_dry_biomass: 0.203
+  scale_exponent: 0.6
+  F_BM: 1.0 # capex already installed
 
   notes:
     - "Oil extraction placeholder carries disruption + wet extraction burden."
     - "Installed cost basis back-calculated from NREL 55431 cell-disruption plus extraction/separation cost bases."
-    - "Homogenization electricity aligned to the harmonized NREL algal-lipid basis rather than the earlier 1.5 kWh/kg placeholder."
+    - "Homogenization electricity aligned to the harmonized NREL algal-lipid basis."

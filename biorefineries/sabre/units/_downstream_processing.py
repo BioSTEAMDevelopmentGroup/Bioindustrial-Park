@@ -11,7 +11,7 @@ from biosteam.units.decorators import cost
 
 from biorefineries.sabre.utils import load_assumptions, get_solids_group_IDs
 
-__all__ = ('VFAMicrofilter', 'OilExtractionPlaceholder')
+__all__ = ('VFAMicrofilter', 'OilExtraction')
 
 # Loaded yaml assumptions
 _DOWNSTREAM_PROCESSING_YAML = load_assumptions("downstream_processing.yaml")
@@ -26,17 +26,36 @@ class VFAMicrofilter(bst.Unit):
     Split-based representation of a VFA-rich permeate step.
     Includes first-pass power draw and area-based membrane cost.
 
-    Sources
-    -------
-    design_flux_L_m2_h, membrane_cost_usd_per_m2:
-        assumptions.yaml gives no citation for these two values (20 LMH,
-        $200/m2) beyond descriptive notes -- "20 LMH selected as a
-        conservative design flux for low-pressure clarification" and "$200/m2
-        selected as an upper-end polymeric membrane cost proxy." No named
-        source. (Do not confuse with the *different* PressateConcentrator
-        unit's 35 LMH flux, which yaml does cite to seaweed/algal membrane
-        concentration literature -- Sievers et al. 2017; Diaz-Reinoso and
-        Dominguez 2020 -- that citation does not apply here.)
+    Parameters
+    ----------
+    ins : stream
+        VFA-rich broth feed.
+    outs : tuple[stream, stream]
+        Permeate and retentate.
+    vfa_IDs : Iterable[str]
+        Chemical IDs treated as VFA.
+    solids_IDs : Iterable[str]
+        Chemical IDs treated as solids for the split. Defaults to the
+        "solids" chemical group when not given (see
+        `utils.get_solids_group_IDs`).
+    vfa_to_permeate_frac : float
+        Fraction of VFA mass routed to permeate (0-1).
+    water_to_permeate_frac : float
+        Fraction of water mass routed to permeate (0-1).
+    solids_to_permeate_frac : float
+        Fraction of solids-ID mass routed to permeate (0-1).
+    dissolved_other_to_permeate_frac : float
+        Fraction of remaining dissolved mass routed to permeate (0-1).
+    SEC_kWh_per_m3_feed : float
+        Specific electricity consumption per m3 of feed.
+    design_flux_L_m2_h : float
+        Design membrane flux, used to size membrane area.
+    **kwargs
+        Forwarded to `bst.Unit.__init__`.
+
+    See Also
+    --------
+    Refer to data/downstream_processing.yaml for the default values and references.
     """
     _N_ins = 1
     _N_outs = 2
@@ -48,21 +67,18 @@ class VFAMicrofilter(bst.Unit):
         ins=None,
         outs=(),
         *,
-        vfa_IDs=None,
-        solids_IDs=None,
-        vfa_to_permeate_frac: float = 0.98,
-        water_to_permeate_frac: float = 0.97,
-        solids_to_permeate_frac: float = 0.05,
-        dissolved_other_to_permeate_frac: float = 0.90,
-        broth_density_kg_per_m3: float = 1000.0,
-        SEC_kWh_per_m3_feed: float = 0.08,
-        design_flux_L_m2_h: float = 20.0,
+        vfa_IDs: list[str] = _VFA_MICROFILTER["vfa_IDs"],
+        solids_IDs=None,  # if not given, defaults to the "solids" chemical group (see utils.get_solids_group_IDs)
+        vfa_to_permeate_frac: float = _VFA_MICROFILTER["vfa_to_permeate_frac"],
+        water_to_permeate_frac: float = _VFA_MICROFILTER["water_to_permeate_frac"],
+        solids_to_permeate_frac: float = _VFA_MICROFILTER["solids_to_permeate_frac"],
+        dissolved_other_to_permeate_frac: float = _VFA_MICROFILTER["dissolved_other_to_permeate_frac"],
+        SEC_kWh_per_m3_feed: float = _VFA_MICROFILTER["SEC_kWh_per_m3_feed"],
+        design_flux_L_m2_h: float = _VFA_MICROFILTER["design_flux_L_m2_h"],
         **kwargs,
     ):
         super().__init__(ID, ins, outs, **kwargs)
-        self.vfa_IDs = tuple(vfa_IDs or [
-            "AceticAcid", "PropionicAcid", "ButyricAcid", "ValericAcid", "HexanoicAcid"
-        ])
+        self.vfa_IDs = tuple(vfa_IDs)
         if solids_IDs is None:
             solids_IDs = get_solids_group_IDs(self.chemicals)
         self.solids_IDs = tuple(solids_IDs)
@@ -70,7 +86,6 @@ class VFAMicrofilter(bst.Unit):
         self.water_to_permeate_frac = float(water_to_permeate_frac)
         self.solids_to_permeate_frac = float(solids_to_permeate_frac)
         self.dissolved_other_to_permeate_frac = float(dissolved_other_to_permeate_frac)
-        self.broth_density_kg_per_m3 = float(broth_density_kg_per_m3)
         self.SEC_kWh_per_m3_feed = float(SEC_kWh_per_m3_feed)
         self.design_flux_L_m2_h = float(design_flux_L_m2_h)
 
@@ -103,10 +118,7 @@ class VFAMicrofilter(bst.Unit):
 
     def _design(self):
         feed = self.ins[0]
-        feed_m3h = (
-            feed.F_mass / self.broth_density_kg_per_m3
-            if self.broth_density_kg_per_m3 > 0 else 0.0
-        )
+        feed_m3h = feed.F_vol
         membrane_area_m2 = 0.0
         if self.design_flux_L_m2_h > 0:
             membrane_area_m2 = feed_m3h * 1000.0 / self.design_flux_L_m2_h
@@ -120,68 +132,34 @@ class VFAMicrofilter(bst.Unit):
 
 
 @cost('Dry biomass feed (dry ton/h)', 'Oil extraction', units='dry ton/h',
-      CE=567.5, cost=_OIL_EXTRACTION["oil_extraction_ref_installed_cost_usd"],
-      S=_OIL_EXTRACTION["oil_extraction_ref_dry_biomass_tph"],
-      n=_OIL_EXTRACTION["oil_extraction_scale_exponent"], BM=_OIL_EXTRACTION["oil_extraction_F_BM"])
-class OilExtractionPlaceholder(bst.Unit):
+      CE=567.5, cost=_OIL_EXTRACTION["ref_installed_cost_usd"],
+      S=_OIL_EXTRACTION["ref_dry_biomass_tph"],
+      n=_OIL_EXTRACTION["scale_exponent"], BM=_OIL_EXTRACTION["F_BM"])
+class OilExtraction(bst.Unit):
     """
-    Pass-through unit representing cell disruption and lipid extraction
+    Cell disruption and lipid extraction for microbial oil recovery
+    from Yarrowia lipolytica fermentation broth.
+    All separation should be handled downstream.
 
-    Inputs:
-        ins[0]: concentrated fermentation broth (from upstream pump/evaporator)
+    Parameters
+    ----------
+    ins : stream
+        Concentrated fermentation broth (from upstream pump/evaporator).
+    outs : stream
+        Extracted broth (same composition; split should be handled downstream).
+    product_ID : str
+        Chemical ID of the fermentation product (oil) in the feed.
+    cellmass_ID : str
+        Chemical ID of cell mass in the feed.
+    homogenization_kWh_per_kg_dry_biomass : float
+        Electricity intensity for high-pressure homogenization, per kg
+        of dry biomass (cell mass + product) in the feed.
+    **kwargs
+        Forwarded to `bst.Unit.__init__`.
 
-    Outputs:
-        outs[0]: extracted broth (same composition — split handled by C603_2)
-
-    Oil Extraction Placeholder Unit
-    ================================
-    Represents cell disruption + lipid extraction for microbial oil recovery
-    from Yarrowia lipolytica fermentation broth
-
-    All separation is handled downstream by C603_2 (LiquidsSplitCentrifuge).
-    Its purpose is to carry realistic capital and operating costs for:
-        1. Cell disruption (high-pressure homogenization)
-        2. Solvent or aqueous extraction of intracellular lipids
-
-    Capital cost anchor (UNVERIFIED -- see CONVERSION_NOTES.md, "Citation-accuracy
-    issues" -- nobody involved in this conversion has read the primary source):
-        assumptions.yaml states the $7.848M installed cost (at 10 dry ton/hr
-        biomass throughput) is "back-calculated from NREL 55431 cell-disruption
-        plus extraction/separation cost bases," without showing the calculation.
-        A separate, pre-existing docstring in this codebase attributed the figure
-        to NREL/TP-5100-55431 (2012), Davis et al., "Techno-Economic Analysis of
-        Autotrophic Microalgae for Fuel Production," and claimed that report
-        itself gives ~$8.5M for the same throughput. Neither claim has been
-        checked against the actual report. Scaled here using a 0.6 power law on
-        dry biomass flow.
-
-    Operating cost:
-        - Electricity: high-pressure homogenization 0.203 kWh/kg dry biomass.
-        assumptions.yaml describes this only as "harmonized to the NREL
-        algal-lipid basis," no specific paper named. Doucha & Livansky (2008)
-        and Postma et al. (2017) are cited elsewhere in this codebase for the
-        superseded 1.5 kWh/kg figure -- NOT verified to support 0.203.
-        UNVERIFIED, see CONVERSION_NOTES.md ("Citation-accuracy issues").
-        - Reagent/solvent cost included as $/kg oil surrogate operating cost,
-        passed through as a fixed annual cost adder in the TEA script
-        Literature range: $0.50-1.50/kg oil for solvent + recovery
-        (Knoshaug et al. 2018, NREL; Laurens et al. 2017, Green Chem.) --
-        also not independently verified against the primary sources.
-
-    Sources
-    -------
-    installed cost anchor ($7.848M at 10 dry ton/h, n=0.6):
-        assumptions.yaml states this is back-calculated from NREL/TP-5100-55431
-        (2012) cell-disruption plus extraction/separation cost bases; the
-        calculation itself is not shown/verified.
-    homogenization_kWh_per_kg_dry_biomass:
-        UNVERIFIED. assumptions.yaml says only "harmonized to the NREL
-        algal-lipid basis." A pre-existing docstring in this codebase
-        attributed Doucha & Livansky (2008) and Postma et al. (2017) to the
-        superseded 1.5 kWh/kg figure this replaced -- that attribution itself
-        was never checked against the papers either. See CONVERSION_NOTES.md
-        ("Citation-accuracy issues") before citing either paper for anything
-        here.
+    See Also
+    --------
+    Refer to data/downstream_processing.yaml for the default values and references.
     """
 
     _N_ins = 1
@@ -194,9 +172,9 @@ class OilExtractionPlaceholder(bst.Unit):
         ins=None,
         outs=(),
         *,
-        product_ID: str = "MicrobialOil",
-        cellmass_ID: str = "CellMass",
-        homogenization_kWh_per_kg_dry_biomass: float = 0.203,
+        product_ID: str = _OIL_EXTRACTION["product_ID"],
+        cellmass_ID: str = _OIL_EXTRACTION["cellmass_ID"],
+        homogenization_kWh_per_kg_dry_biomass: float = _OIL_EXTRACTION["homogenization_kWh_per_kg_dry_biomass"],
         **kwargs,
     ):
         super().__init__(ID, ins, outs, **kwargs)
@@ -239,9 +217,7 @@ class OilExtractionPlaceholder(bst.Unit):
         self.design_results["Dry biomass feed (kg/h)"] = dry_biomass_kgph
         self.design_results["Dry biomass feed (dry ton/h)"] = dry_biomass_tph
         self.design_results["Oil in feed (kg/h)"] = oil_kgph
-        self.design_results[
-            "Homogenization power (kW)"
-        ] = homogenization_kW
+        self.design_results["Homogenization power (kW)"] = homogenization_kW
         self.design_results[
             "Electricity intensity (kWh/kg dry biomass)"
         ] = self.homogenization_kWh_per_kg_dry_biomass
