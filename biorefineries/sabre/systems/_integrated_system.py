@@ -90,20 +90,7 @@ class MassSplitter(bst.Unit):
         pass
 
 
-def _build_methane_pathway(ad_feed_in, pretreatment_case, temperature_regime="mesophilic"):
-    """
-    Thin wrapper: builds AD -> H2SR -> UP -> SP via the shared
-    methanogenic-pathway builder in systems._ad_biomethane_system, so this
-    integrated system and the standalone AD/biomethane system never drift
-    apart. Returns (units_list, streams_dict, units_dict).
-    """
-    path_units, streams, units = _build_methanogenic_pathway(
-        ad_feed_in, pretreatment_case, temperature_regime=temperature_regime,
-    )
-    return path_units, streams, units
-
-
-def _build_vfa_pathway(vfa_stream, ferm_kwargs, temperature_regime="mesophilic"):
+def _build_acidogenic_pathway(vfa_stream, ferm_kwargs, temperature_regime="mesophilic"):
     """Build VFA_AD -> SP_VFA -> fermentation chain. Returns (units_list, streams_dict, units_dict)."""
     vfa_subsys = create_ad_vfa_system(
         milled_biomass_stream=vfa_stream, temperature_regime=temperature_regime,
@@ -244,7 +231,7 @@ def create_integrated_biorefinery(
     methane_streams = {}
     methane_units_d = {}
     if build_methane:
-        methane_units, methane_streams, methane_units_d = _build_methane_pathway(
+        methane_units, methane_streams, methane_units_d = _build_methanogenic_pathway(
             SPL - 0, pretreatment_case, temperature_regime=temperature_regime,
         )
 
@@ -252,7 +239,7 @@ def create_integrated_biorefinery(
     vfa_streams = {}
     vfa_units_d = {}
     if build_vfa:
-        vfa_units, vfa_streams, vfa_units_d = _build_vfa_pathway(
+        vfa_units, vfa_streams, vfa_units_d = _build_acidogenic_pathway(
             SPL - 1, ferm_kwargs, temperature_regime=temperature_regime,
         )
 
