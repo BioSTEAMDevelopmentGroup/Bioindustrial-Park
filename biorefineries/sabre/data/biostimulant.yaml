@@ -1,0 +1,53 @@
+# Model Assumptions: Biostimulant Prouduction
+
+pressate_concentrator:
+  enabled: true
+  retained_solute_IDs: [Alginate, Fucoidan, Mannitol, Protein, OtherSolids]
+  water_recovery_to_permeate: 0.93
+  retained_solute_recovery_to_concentrate: 0.95
+  nontarget_solute_recovery_to_permeate: 0.70 #!!! TODO: check if this value is in reference
+  design_flux_L_m2_h: 35.0
+  operating_pressure_bar: 5.0
+  electricity_kWh_per_m3_feed: 2.5
+  capex_usd_per_m2: 500.0
+  maintenance_frac_of_capex_per_yr: 0.035
+  F_BM: 1.0 # capex already installed
+
+  sources:
+    flux:
+      citation: "Seaweed/algal membrane concentration literature; Sievers et al. (2017); Díaz-Reinoso and Domínguez (2020)"
+      note: "UF fluxes for bioprocess and seaweed-derived streams commonly fall in the ~15–60 LMH range; 35 LMH selected as a central design value."
+    electricity:
+      citation: "Membrane concentration literature for algal and bioprocess streams"
+      note: "UF electricity commonly falls in the ~0.5–2.5 kWh/m3 range"
+    nontarget_solute_recovery:
+      note: "No literature or prior-yaml grounding -- pure code-level scoping
+             assumption, moved here unchanged from units/_biostimulant.py's
+             old hardcoded inline 0.70 in _run()."
+    capex:
+      citation: "Sethi and Wiesner (2000); Nguyen and Yoshikawa (2020); Cheryan (1998)"
+      note: "UF membrane/module cost commonly reported around $200–$500/m2; $800/m2 for convervative assumption"
+      citation: "Assumed maintenance fraction consistent with other membrane systems in this model"
+      note: "Annual maintenance retained at 3.5% of installed CAPEX for consistency."
+
+biostimulant_evaporator:
+  enabled: true
+  target_solids_wt_frac: 0.20
+  boiling_temperature_K: 333.15 # mild vacuum evaporation ~60 C
+  electricity_kWh_per_kg_water_evap: 0.0
+  nonwater_recovery_to_product: 0.995
+  capex_ref_usd: 750000.0
+  ref_evaporation_kgph: 10000.0
+  scale_exponent: 0.60
+  maintenance_frac_of_capex_per_yr: 0.035
+  F_BM: 1.0 # capex already installed
+
+  sources:
+    all_params:
+      note: "No literature or prior-yaml grounding for any parameter in
+             this section -- pure code-level scoping assumptions, moved
+             here unchanged from units/_biostimulant.py's old hardcoded
+             __init__ defaults. sensible_cp_kJ_per_kgK and
+             latent_heat_kJ_per_kg were removed entirely (not moved here)
+             since BiostimulantEvaporator now reads those from BioSTEAM
+             directly (conc_in.Cp, chemicals.Water.Hvap)."

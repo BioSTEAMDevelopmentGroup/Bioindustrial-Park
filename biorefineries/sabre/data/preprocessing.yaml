@@ -56,34 +56,3 @@ mill:
     loss:
       citation: "INL preprocessing/logistics accounting"
       note: "Dry matter loss across preprocessing is typically on the order of ~1–5%; 3% selected as central baseline."
-
-pressate_biostimulant:
-  enabled: true
-  concentrate_pressate: true
-
-  concentrator:
-    retained_solute_IDs: [Alginate, Fucoidan, Mannitol, Protein, OtherSolids]
-    water_recovery_to_permeate: 0.93
-    retained_solute_recovery_to_concentrate: 0.95
-    design_flux_L_m2_h: 35.0
-    operating_pressure_bar: 5.0
-    electricity_kWh_per_m3_feed: 2.5
-    capex_usd_per_m2: 500.0
-    maintenance_frac_of_capex_per_yr: 0.035
-    F_BM: 1.0 # capex already installed
-
-    sources:
-      flux:
-        citation: "Seaweed/algal membrane concentration literature; Sievers et al. (2017); Díaz-Reinoso and Domínguez (2020)"
-        note: "UF fluxes for bioprocess and seaweed-derived streams commonly fall in the ~15–60 LMH range; 35 LMH selected as a central design value."
-      electricity:
-        citation: "Membrane concentration literature for algal and bioprocess streams"
-        note: "UF electricity commonly falls in the ~0.5–2.5 kWh/m3 range"
-      capex:
-        citation: "Sethi and Wiesner (2000); Nguyen and Yoshikawa (2020); Cheryan (1998)"
-        note: "UF membrane/module cost commonly reported around $200–$500/m2; $800/m2 for convervative assumption"
-        citation: "Assumed maintenance fraction consistent with other membrane systems in this model"
-        note: "Annual maintenance retained at 3.5% of installed CAPEX for consistency."
-
-  evaporator:
-    F_BM: 1.0 # capex already installed
