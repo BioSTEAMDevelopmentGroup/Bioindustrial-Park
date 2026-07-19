@@ -6,12 +6,6 @@
 # github.com/BioSTEAMDevelopmentGroup/biosteam/blob/master/LICENSE.txt
 # for license details.
 
-"""
-Downstream processing of the VFA-fermentation broth: microfilter
-clarification and the oil extraction placeholder (cell disruption +
-lipid extraction).
-"""
-
 import biosteam as bst
 from biosteam.units.decorators import cost
 

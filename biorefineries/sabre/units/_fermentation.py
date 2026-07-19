@@ -5,10 +5,7 @@
 # This module is under the UIUC open-source license. See
 # github.com/BioSTEAMDevelopmentGroup/biosteam/blob/master/LICENSE.txt
 # for license details.
-"""
-VFA fermentation train: medium conditioning and the Yarrowia lipolytica
-fermenter itself.
-"""
+
 from typing import Optional
 import biosteam as bst
 from biosteam.units.tank import Tank

@@ -5,9 +5,6 @@
 # This module is under the UIUC open-source license. See
 # github.com/BioSTEAMDevelopmentGroup/biosteam/blob/master/LICENSE.txt
 # for license details.
-"""
-Preprocessing: mechanical dewatering (press) and milling / size reduction.
-"""
 
 import math
 import biosteam as bst

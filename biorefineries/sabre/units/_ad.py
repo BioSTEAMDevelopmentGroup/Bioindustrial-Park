@@ -5,11 +5,6 @@
 # This module is under the UIUC open-source license. See
 # github.com/BioSTEAMDevelopmentGroup/biosteam/blob/master/LICENSE.txt
 # for license details.
-"""
-Anaerobic digestion (AD) and the surrounding biogas train: methanogenic and
-acidogenic digestion, biogas upgrading, H2S removal, and digestate
-dewatering (screw press / decanter centrifuge).
-"""
 
 import math
 from typing import Dict, Iterable, Optional

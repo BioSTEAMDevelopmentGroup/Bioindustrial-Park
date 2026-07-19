@@ -5,10 +5,7 @@
 # This module is under the UIUC open-source license. See
 # github.com/BioSTEAMDevelopmentGroup/biosteam/blob/master/LICENSE.txt
 # for license details.
-"""
-Pre-AD pretreatment stages: enzymatic, thermal (heating), and hydrogen
-peroxide pretreatment before methanogenic AD.
-"""
+
 import biosteam as bst
 
 from biorefineries.sabre.utils import OPERATING_HOURS_PER_YEAR, load_assumptions
