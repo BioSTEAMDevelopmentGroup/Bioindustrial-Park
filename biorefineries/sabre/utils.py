@@ -17,6 +17,7 @@ __all__ = (
     'load_assumptions', 'wet_tpd_to_kgph', 'get_scale_feed_kgph',
     'get_feedstock_type_params', 'get_ad_temperature_K', 'make_sargassum_feed',
     'OPERATING_DAYS_PER_YEAR', 'OPERATING_HOURS_PER_YEAR', 'get_solids_group_IDs',
+    'non_none',
 )
 
 
@@ -26,6 +27,14 @@ def load_assumptions(filename: str):
     path = Path(__file__).resolve().parent / "data" / filename
     with open(path, "r") as f:
         return yaml.safe_load(f)
+
+
+def non_none(**kwargs):
+    """Drop None-valued kwargs so the receiving unit class's own
+    yaml-sourced default applies instead of duplicating it in a system
+    builder. Used across systems/*.py to avoid re-declaring the same
+    default a unit class already sources from the same yaml file."""
+    return {k: v for k, v in kwargs.items() if v is not None}
 
 
 # data/tea.yaml's operating_days -- single source of truth for SaBReTEA's

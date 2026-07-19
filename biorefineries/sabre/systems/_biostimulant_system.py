@@ -75,7 +75,6 @@ def create_biostimulant_system(
         'PR', 'PC', 'EV'.
     """
     feedstock_assumptions = load_assumptions("feedstock.yaml")
-    preprocessing_assumptions = load_assumptions("preprocessing.yaml")
     params = get_feedstock_type_params(feedstock_assumptions, feedstock_type)
     fresh_feed_kgph = get_scale_feed_kgph(feedstock_assumptions)
     moisture_frac = params["moisture_frac"]
@@ -85,37 +84,15 @@ def create_biostimulant_system(
         ash_wt_frac_dry=params["ash_wt_frac_dry"],
     )
 
-    pp = preprocessing_assumptions.get("preprocessing", {})
-    prA = pp.get("press", {})
-
-    PR = Press(
-        "PR", ins=feed, outs=("pressed_cake", "pressate"),
-        solids_capture_frac=prA.get("solids_capture_frac", 0.98),
-        cake_solids_wt_frac=prA.get("cake_solids_wt_frac", 0.35),
-        solubles_to_pressate_frac=prA.get("solubles_to_pressate_frac", 1.0),
-        power_kWh_per_dry_ton_TS=prA.get("power_kWh_per_dry_ton_TS", None),
-        ref_capacity_tph_wet=prA.get("ref_capacity_tph_wet", 50.0),
-        capex_installed_ref_usd=prA.get("capex_installed_ref_usd", 5e6),
-        scale_exponent=prA.get("scale_exponent", 0.6),
-        F_BM=prA.get("F_BM", 1.0),
-    )
+    # Press/PC both have their own yaml-sourced defaults
+    # (data/preprocessing.yaml, data/biostimulant.yaml) -- not
+    # re-declared here.
+    PR = Press("PR", ins=feed, outs=("pressed_cake", "pressate"))
     PR.outs[0].price = float(pressed_cake_disposal_usd_per_kg)
-
-    pcA = preprocessing_assumptions.get("pressate_biostimulant", {}).get("concentrator", {})
 
     PC = PressateConcentrator(
         "PC", ins=PR - 1,
         outs=("biostimulant_membrane_concentrate", "pressate_permeate"),
-        retained_solute_IDs=tuple(pcA.get(
-            "retained_solute_IDs", ["Alginate", "Fucoidan", "Mannitol", "Protein", "OtherSolids"],
-        )),
-        water_recovery_to_permeate=pcA.get("water_recovery_to_permeate", 0.93),
-        retained_solute_recovery_to_concentrate=pcA.get("retained_solute_recovery_to_concentrate", 0.95),
-        design_flux_L_m2_h=pcA.get("design_flux_L_m2_h", 35.0),
-        operating_pressure_bar=pcA.get("operating_pressure_bar", 5.0),
-        electricity_kWh_per_m3_feed=pcA.get("electricity_kWh_per_m3_feed", 2.5),
-        capex_usd_per_m2=pcA.get("capex_usd_per_m2", 500.0),
-        maintenance_frac_of_capex_per_yr=pcA.get("maintenance_frac_of_capex_per_yr", 0.035),
     )
 
     fresh_water = bst.Stream("biostimulant_fresh_water", Water=0.0, units="kg/hr")

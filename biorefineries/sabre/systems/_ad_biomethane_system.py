@@ -28,7 +28,7 @@ import biosteam as bst
 
 from biorefineries.sabre.utils import (
     load_assumptions, get_feedstock_type_params, get_scale_feed_kgph, make_sargassum_feed,
-    get_ad_temperature_K,
+    get_ad_temperature_K, non_none,
 )
 from biorefineries.sabre.units import (
     AnaerobicDigester, BiogasUpgrading, H2SRemoval, DigestateScrewPress,
@@ -43,16 +43,14 @@ __all__ = ('create_ad_biomethane_system',)
 # below (data/pretreatment.yaml `pretreatment_ad` section).
 _PRETREATMENT_AD = load_assumptions("pretreatment.yaml")["pretreatment_ad"]
 
-# data/ad.yaml, loaded once -- AD sizing/operating parameters, performance
-# parameters, and the H2S removal / biogas upgrading / digestate screw
-# press sections, all shared with systems._ad_vfa_system and/or
-# systems._integrated_system.
+# data/ad.yaml, loaded once -- AD sizing/operating parameters and
+# performance parameters, shared with systems._ad_vfa_system and/or
+# systems._integrated_system. (H2SRemoval/BiogasUpgrading/
+# DigestateScrewPress source their own defaults directly from this same
+# file, so their sub-blocks aren't re-extracted here.)
 _AD_YAML = load_assumptions("ad.yaml")
 _AD_SHARED = _AD_YAML["ad"]
 _AD_PERFORMANCE = _AD_YAML["ad_performance"]
-_H2S_REMOVAL = _AD_YAML["h2s_removal"]
-_BIOGAS_UPGRADING = _AD_YAML["biogas_upgrading"]
-_DIGESTATE_SCREW_PRESS = _AD_YAML["digestate_screw_press"]
 
 
 def _apply_biodegradability_overrides(base_dict, override_factors):
@@ -83,7 +81,6 @@ def _build_methanogenic_pathway(
     adS = {**_AD_SHARED, **_AD_SHARED.get("methanogenic", {})}
     adS["temperature_K"] = get_ad_temperature_K(_AD_SHARED, temperature_regime)
     adp = {**_AD_PERFORMANCE, **_AD_PERFORMANCE.get("methanogenic", {})}
-    adC = _AD_SHARED["cost"]
     pretreatments = _PRETREATMENT_AD
 
     enable_feed_dilution = bool(adS.get("enable_feed_dilution", True))
@@ -100,115 +97,31 @@ def _build_methanogenic_pathway(
     if pt_kind == "none":
         pass
 
-    elif pt_kind == "heating":
-        hA = pt_case.get("heating", {})
-        HT = HeatingPretreatment(
-            "HT", ins=ad_feed, outs=("heated_biomass",),
-            target_temperature_K=hA.get("target_temperature_K", 338.15),
-            residence_time_hr=hA.get("residence_time_hr", 0.25),
-            slurry_density_kg_per_m3=adS.get("slurry_density_kg_per_m3", 1000.0),
-            cp_kJ_per_kgK=adS.get("cp_kJ_per_kgK", 4.18),
-            capex_usd=hA.get("capex_usd", 0.0),
-            maintenance_frac_of_capex_per_yr=hA.get("maintenance_frac_of_capex_per_yr", 0.035),
-        )
-        ad_feed = HT - 0
-        pt_units.append(HT)
-
+    # EnzymaticPretreatment/PeroxidePretreatment/HeatingPretreatment all
+    # source these same parameters from the same pretreatment.yaml paths
+    # as their own class-level defaults (enzymatic/enzymatic,
+    # peroxide/peroxide, combined_PTE/heating respectively) -- not
+    # re-declared here.
     elif pt_kind == "enzymatic":
-        eA = pt_case.get("enzymatic", {})
-        EZ = EnzymaticPretreatment(
-            "EZ", ins=ad_feed, outs=("enzyme_treated_biomass",),
-            temperature_K=eA.get("temperature_K", 308.15),
-            residence_time_hr=eA.get("residence_time_hr", 24.0),
-            enzyme_dose_kg_per_kg_dry_feed=eA.get("enzyme_dose_kg_per_kg_dry_feed", 0.02),
-            treated_fraction=eA.get("treated_fraction", 1.0),
-            enzyme_recycle_factor=eA.get("enzyme_recycle_factor", 1.0),
-            slurry_density_kg_per_m3=adS.get("slurry_density_kg_per_m3", 1000.0),
-            capex_usd=eA.get("capex_usd", 0.0),
-            enzyme_price_usd_per_kg=eA.get("enzyme_price_usd_per_kg", 7.0),
-            maintenance_frac_of_capex_per_yr=eA.get("maintenance_frac_of_capex_per_yr", 0.035),
-        )
+        EZ = EnzymaticPretreatment("EZ", ins=ad_feed, outs=("enzyme_treated_biomass",))
         ad_feed = EZ - 0
         pt_units.append(EZ)
 
     elif pt_kind == "peroxide":
-        pA = pt_case.get("peroxide", {})
-        PX = PeroxidePretreatment(
-            "PX", ins=ad_feed, outs=("peroxide_treated_biomass",),
-            h2o2_wt_frac_on_dry_feed=pA.get("h2o2_wt_frac_on_dry_feed", 0.025),
-            temperature_K=pA.get("temperature_K", 298.15),
-            residence_time_hr=pA.get("residence_time_hr", 2.0),
-            slurry_density_kg_per_m3=adS.get("slurry_density_kg_per_m3", 1000.0),
-            capex_usd=pA.get("capex_usd", 0.0),
-            h2o2_price_usd_per_kg=pA.get("h2o2_price_usd_per_kg", 0.37),
-            maintenance_frac_of_capex_per_yr=pA.get("maintenance_frac_of_capex_per_yr", 0.035),
-        )
+        PX = PeroxidePretreatment("PX", ins=ad_feed, outs=("peroxide_treated_biomass",))
         ad_feed = PX - 0
         pt_units.append(PX)
 
     elif pt_kind == "combined_PE":
-        pA = pretreatments.get("peroxide", {}).get("peroxide", {})
-        eA = pretreatments.get("enzymatic", {}).get("enzymatic", {})
-        PX = PeroxidePretreatment(
-            "PX", ins=ad_feed, outs=("peroxide_treated_biomass",),
-            h2o2_wt_frac_on_dry_feed=pA.get("h2o2_wt_frac_on_dry_feed", 0.025),
-            temperature_K=pA.get("temperature_K", 298.15),
-            residence_time_hr=pA.get("residence_time_hr", 2.0),
-            slurry_density_kg_per_m3=adS.get("slurry_density_kg_per_m3", 1000.0),
-            capex_usd=pA.get("capex_usd", 0.0),
-            h2o2_price_usd_per_kg=pA.get("h2o2_price_usd_per_kg", 0.37),
-            maintenance_frac_of_capex_per_yr=pA.get("maintenance_frac_of_capex_per_yr", 0.035),
-        )
-        EZ = EnzymaticPretreatment(
-            "EZ", ins=PX - 0, outs=("combined_PE_treated_biomass",),
-            temperature_K=eA.get("temperature_K", 308.15),
-            residence_time_hr=eA.get("residence_time_hr", 24.0),
-            enzyme_dose_kg_per_kg_dry_feed=eA.get("enzyme_dose_kg_per_kg_dry_feed", 0.02),
-            treated_fraction=eA.get("treated_fraction", 1.0),
-            enzyme_recycle_factor=eA.get("enzyme_recycle_factor", 1.0),
-            slurry_density_kg_per_m3=adS.get("slurry_density_kg_per_m3", 1000.0),
-            capex_usd=eA.get("capex_usd", 0.0),
-            enzyme_price_usd_per_kg=eA.get("enzyme_price_usd_per_kg", 7.0),
-            maintenance_frac_of_capex_per_yr=eA.get("maintenance_frac_of_capex_per_yr", 0.035),
-        )
+        PX = PeroxidePretreatment("PX", ins=ad_feed, outs=("peroxide_treated_biomass",))
+        EZ = EnzymaticPretreatment("EZ", ins=PX - 0, outs=("combined_PE_treated_biomass",))
         ad_feed = EZ - 0
         pt_units.extend([PX, EZ])
 
     elif pt_kind == "combined_PTE":
-        pA = pretreatments.get("peroxide", {}).get("peroxide", {})
-        hA = pt_case.get("heating", {})
-        eA = pretreatments.get("enzymatic", {}).get("enzymatic", {})
-        PX = PeroxidePretreatment(
-            "PX", ins=ad_feed, outs=("peroxide_treated_biomass",),
-            h2o2_wt_frac_on_dry_feed=pA.get("h2o2_wt_frac_on_dry_feed", 0.025),
-            temperature_K=pA.get("temperature_K", 298.15),
-            residence_time_hr=pA.get("residence_time_hr", 2.0),
-            slurry_density_kg_per_m3=adS.get("slurry_density_kg_per_m3", 1000.0),
-            capex_usd=pA.get("capex_usd", 0.0),
-            h2o2_price_usd_per_kg=pA.get("h2o2_price_usd_per_kg", 0.37),
-            maintenance_frac_of_capex_per_yr=pA.get("maintenance_frac_of_capex_per_yr", 0.035),
-        )
-        HT = HeatingPretreatment(
-            "HT", ins=PX - 0, outs=("heated_biomass",),
-            target_temperature_K=hA.get("target_temperature_K", 393.15),
-            residence_time_hr=hA.get("residence_time_hr", 0.25),
-            slurry_density_kg_per_m3=adS.get("slurry_density_kg_per_m3", 1000.0),
-            cp_kJ_per_kgK=adS.get("cp_kJ_per_kgK", 4.18),
-            capex_usd=hA.get("capex_usd", 0.0),
-            maintenance_frac_of_capex_per_yr=hA.get("maintenance_frac_of_capex_per_yr", 0.035),
-        )
-        EZ = EnzymaticPretreatment(
-            "EZ", ins=HT - 0, outs=("combined_PTE_treated_biomass",),
-            temperature_K=eA.get("temperature_K", 308.15),
-            residence_time_hr=eA.get("residence_time_hr", 24.0),
-            enzyme_dose_kg_per_kg_dry_feed=eA.get("enzyme_dose_kg_per_kg_dry_feed", 0.02),
-            treated_fraction=eA.get("treated_fraction", 1.0),
-            enzyme_recycle_factor=eA.get("enzyme_recycle_factor", 1.0),
-            slurry_density_kg_per_m3=adS.get("slurry_density_kg_per_m3", 1000.0),
-            capex_usd=eA.get("capex_usd", 0.0),
-            enzyme_price_usd_per_kg=eA.get("enzyme_price_usd_per_kg", 7.0),
-            maintenance_frac_of_capex_per_yr=eA.get("maintenance_frac_of_capex_per_yr", 0.035),
-        )
+        PX = PeroxidePretreatment("PX", ins=ad_feed, outs=("peroxide_treated_biomass",))
+        HT = HeatingPretreatment("HT", ins=PX - 0, outs=("heated_biomass",))
+        EZ = EnzymaticPretreatment("EZ", ins=HT - 0, outs=("combined_PTE_treated_biomass",))
         ad_feed = EZ - 0
         pt_units.extend([PX, HT, EZ])
 
@@ -249,52 +162,30 @@ def _build_methanogenic_pathway(
         ad_feed = MX - 0
         pt_units.append(MX)
 
+    # vs_destruction/ch4_kg_per_kg_vs_fed/raw_biogas_molfrac/biodegradability
+    # are pretreatment-case-specific (data/pretreatment.yaml ad_effects) and
+    # target_temperature_K depends on temperature_regime -- both must stay
+    # explicit here. The rest (hrt_days, headspace_frac,
+    # max_single_digester_volume_MG, maintenance_usd_per_m3_yr,
+    # mixing_W_per_m3, digestible_IDs) match AnaerobicDigester's own
+    # data/ad.yaml-sourced defaults exactly, so aren't re-declared.
     AD = AnaerobicDigester(
         "AD", ins=ad_feed, outs=biogas_ids,
         vs_destruction=vs_destruction,
         ch4_kg_per_kg_vs_fed=ch4_kg_per_kg_vs_fed,
         raw_biogas_molfrac=raw_biogas_molfrac,
-        digestible_IDs=tuple(adp["digestible_IDs"]),
         biodegradability=biodegradability,
-        hrt_days=adS["hrt_days"],
-        slurry_density_kg_per_m3=adS["slurry_density_kg_per_m3"],
-        headspace_frac=adS["gas_storage_frac_of_total_volume"],
-        max_single_digester_volume_MG=adS["max_single_digester_volume_MG"],
-        maintenance_usd_per_m3_yr=adC.get("maintenance_usd_per_m3_yr", None),
-        mixing_W_per_m3=adS["mixing_W_per_m3"],
-        influent_temperature_K=adS["influent_temperature_K"],
         target_temperature_K=adS["temperature_K"],
-        cp_kJ_per_kgK=adS["cp_kJ_per_kgK"],
     )
 
-    h2sA = _H2S_REMOVAL
-    H2SR = H2SRemoval(
-        "H2SR", ins=AD - 0, outs=("treated_biogas", "spent_h2s_media"),
-        h2s_removal_efficiency=h2sA["h2s_removal_efficiency"],
-        reagent_cost_usd_per_Nm3_raw=h2sA["reagent_cost_usd_per_Nm3_raw"],
-    )
+    # H2SRemoval/BiogasUpgrading/DigestateScrewPress all source these same
+    # parameters from data/ad.yaml as their own class-level defaults -- not
+    # re-declared here.
+    H2SR = H2SRemoval("H2SR", ins=AD - 0, outs=("treated_biogas", "spent_h2s_media"))
 
-    upA = _BIOGAS_UPGRADING
-    UP = BiogasUpgrading(
-        "UP", ins=H2SR - 0, outs=("biomethane", "offgas"),
-        methane_loss_frac=upA["methane_loss_frac"],
-        co2_removal=upA["co2_removal"],
-        electricity_kwh_per_Nm3_raw=upA["electricity_kWh_per_Nm3_raw"],
-        capex_usd_per_Nm3ph_raw=upA["capex_usd_per_Nm3ph_raw"],
-        maintenance_frac_of_capex_per_yr=upA["maintenance_frac_of_capex_per_yr"],
-    )
+    UP = BiogasUpgrading("UP", ins=H2SR - 0, outs=("biomethane", "offgas"))
 
-    sp = _DIGESTATE_SCREW_PRESS
-    SP = DigestateScrewPress(
-        ID="SP", ins=AD - 1, outs=("soil_amendment", "liquid_digestate"),
-        ts_capture_frac=sp["ts_capture_frac"],
-        cake_moisture_frac=sp["cake_moisture_frac"],
-        capacity_tph_each=sp["capacity_tph_each"],
-        kWh_per_m3=sp["kWh_per_m3"],
-        include_polymer_dosing=sp["include_polymer_dosing"],
-        polymer_dosing_cost_usd_each=sp["polymer_dosing_cost_usd_each"],
-        F_BM=sp["F_BM"],
-    )
+    SP = DigestateScrewPress(ID="SP", ins=AD - 1, outs=("soil_amendment", "liquid_digestate"))
 
     path_units = [*pt_units, AD, H2SR, UP, SP]
     streams = {
@@ -313,7 +204,6 @@ def create_ad_biomethane_system(
     temperature_regime: str = "mesophilic",
 ):
     feedstock_assumptions = load_assumptions("feedstock.yaml")
-    preprocessing_assumptions = load_assumptions("preprocessing.yaml")
     params = get_feedstock_type_params(feedstock_assumptions, feedstock_type)
 
     fresh_feed_kgph = get_scale_feed_kgph(feedstock_assumptions)
@@ -324,71 +214,26 @@ def create_ad_biomethane_system(
         ash_wt_frac_dry=params["ash_wt_frac_dry"],
     )
 
-    pp = preprocessing_assumptions.get("preprocessing", {})
-    prA = pp.get("press", {})
-    mlA = pp.get("mill", {})
-
+    # Press/PC/EV/Mill all have their own yaml-sourced defaults
+    # (data/preprocessing.yaml, data/biostimulant.yaml) -- not
+    # re-declared here.
     PR = Press(
         "PR", ins=feed, outs=("pressed_cake", "pressate"),
-        solids_capture_frac=prA.get("solids_capture_frac", 0.98),
-        cake_solids_wt_frac=(
-            float(press_cake_solids_wt_frac) if press_cake_solids_wt_frac is not None
-            else prA.get("cake_solids_wt_frac", 0.35)
-        ),
-        solubles_to_pressate_frac=prA.get("solubles_to_pressate_frac", 1.0),
-        power_kWh_per_dry_ton_TS=prA.get("power_kWh_per_dry_ton_TS", None),
-        ref_capacity_tph_wet=prA.get("ref_capacity_tph_wet", 50.0),
-        capex_installed_ref_usd=prA.get("capex_installed_ref_usd", 5e6),
-        scale_exponent=prA.get("scale_exponent", 0.6),
-        F_BM=prA.get("F_BM", 1.0),
+        **non_none(cake_solids_wt_frac=press_cake_solids_wt_frac),
     )
 
-    pb = preprocessing_assumptions.get("pressate_biostimulant", {})
-    pcA = pb.get("concentrator", {})
-    evA = pb.get("evaporator", {})
-    PC = EV = None
-
-    if pb.get("enabled", False) and pb.get("concentrate_pressate", False):
-        PC = PressateConcentrator(
-            "PC", ins=PR - 1,
-            outs=("biostimulant_membrane_concentrate", "pressate_permeate"),
-            retained_solute_IDs=tuple(pcA.get(
-                "retained_solute_IDs", ["Alginate", "Fucoidan", "Mannitol", "Protein", "OtherSolids"],
-            )),
-            water_recovery_to_permeate=pcA.get("water_recovery_to_permeate", 0.70),
-            retained_solute_recovery_to_concentrate=pcA.get("retained_solute_recovery_to_concentrate", 0.95),
-            design_flux_L_m2_h=pcA.get("design_flux_L_m2_h", 35.0),
-            operating_pressure_bar=pcA.get("operating_pressure_bar", 5.0),
-            electricity_kWh_per_m3_feed=pcA.get("electricity_kWh_per_m3_feed", 0.8),
-            capex_usd_per_m2=pcA.get("capex_usd_per_m2", 120.0),
-            maintenance_frac_of_capex_per_yr=pcA.get("maintenance_frac_of_capex_per_yr", 0.035),
-        )
-        if evA.get("enabled", False):
-            EV = BiostimulantEvaporator(
-                "EV", ins=PC - 0, outs=("biostimulant_product", "biostimulant_vapor"),
-                target_solids_wt_frac=evA.get("target_solids_wt_frac", 0.20),
-                boiling_temperature_K=evA.get("boiling_temperature_K", 333.15),
-                latent_heat_kJ_per_kg=evA.get("latent_heat_kJ_per_kg", 2350.0),
-                sensible_cp_kJ_per_kgK=evA.get("sensible_cp_kJ_per_kgK", 4.18),
-                electricity_kWh_per_kg_water_evap=evA.get("electricity_kWh_per_kg_water_evap", 0.0),
-                nonwater_recovery_to_product=evA.get("nonwater_recovery_to_product", 0.995),
-                capex_ref_usd=evA.get("capex_ref_usd", 750000.0),
-                ref_evaporation_kgph=evA.get("ref_evaporation_kgph", 10000.0),
-                scale_exponent=evA.get("scale_exponent", 0.60),
-                maintenance_frac_of_capex_per_yr=evA.get("maintenance_frac_of_capex_per_yr", 0.035),
-                F_BM=evA.get("F_BM", 1.0),
-            )
-
-    ML = Mill(
-        "ML", ins=PR - 0, outs=("milled_biomass", "milling_losses"),
-        loss_frac=mlA.get("loss_frac", 0.15),
-        power_kWh_per_dry_ton_dry=mlA.get("power_kWh_per_dry_ton_dry", None),
-        ref_capacity_dry_ton_per_hr=mlA.get("ref_capacity_dry_ton_per_hr", 10.0),
-        purchase_cost_ref_usd=mlA.get("purchase_cost_ref_usd", 206400.0),
-        install_factor=mlA.get("install_factor", 1.8),
-        scale_exponent=mlA.get("scale_exponent", 0.6),
-        F_BM=mlA.get("F_BM", 1.0),
+    PC = PressateConcentrator(
+        "PC", ins=PR - 1,
+        outs=("biostimulant_membrane_concentrate", "pressate_permeate"),
     )
+
+    biostimulant_fresh_water = bst.Stream("biostimulant_fresh_water", Water=0.0, units="kg/hr")
+    EV = BiostimulantEvaporator(
+        "EV", ins=(PC - 0, PC - 1, biostimulant_fresh_water),
+        outs=("biostimulant_product", "biostimulant_vapor", "residual_permeate"),
+    )
+
+    ML = Mill("ML", ins=PR - 0, outs=("milled_biomass", "milling_losses"))
 
     resolved_pretreatment_case = pretreatment_case or _AD_SHARED.get("methanogenic", {}).get("pretreatment_case", "press_mill_only")
     path_units, streams, units = _build_methanogenic_pathway(
@@ -398,12 +243,7 @@ def create_ad_biomethane_system(
     if ch4_override is not None:
         units["AD"].ch4_kg_per_kg_vs_fed = float(ch4_override)
 
-    path = [PR]
-    if PC is not None:
-        path.append(PC)
-    if EV is not None:
-        path.append(EV)
-    path.append(ML)
+    path = [PR, PC, EV, ML]
     path.extend(path_units)
 
     sys = bst.System("AD_Biomethane_sys", path=path)

@@ -30,7 +30,7 @@ oil_extraction:
   product_ID: MicrobialOil
   cellmass_ID: CellMass
 
-  target_oil_and_solids_content_g_per_L: 60.0
+  target_oil_and_solids_content_g_per_L: 70.0  # matches sabre_ad legacy behavior (vfa_fermentation_tea.py fallback); no source found for this value
 
   backend_oil_recovery: 0.99
   backend_oil_water_split: 0.0001

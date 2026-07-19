@@ -28,12 +28,13 @@ import biosteam as bst
 
 from biorefineries.sabre.utils import (
     load_assumptions, get_feedstock_type_params, get_scale_feed_kgph, make_sargassum_feed,
+    non_none,
 )
-from biorefineries.sabre.units import Press, Mill, PressateConcentrator
+from biorefineries.sabre.units import Press, Mill, PressateConcentrator, BiostimulantEvaporator
 from biorefineries.sabre.systems._ad_biomethane_system import _build_methanogenic_pathway
 from biorefineries.sabre.systems._ad_vfa_system import create_ad_vfa_system
 from biorefineries.sabre.systems._ad_fermentation_system import (
-    _create_vfa_fermentation_system, _VFA_CASE, _VFA_MEDIUM_TANK, _VFA_DOWNSTREAM,
+    _create_vfa_fermentation_system, _VFA_DOWNSTREAM,
 )
 
 __all__ = ('create_integrated_biorefinery', 'MassSplitter')
@@ -140,14 +141,14 @@ def create_integrated_biorefinery(
     alpha: float = 0.5,
     feedstock_type: str = "pelagic",
     pretreatment_case: str = "press_mill_only",
-    vfa_conversion: float = _VFA_CASE["conversion"],
-    vfa_product_yield: float = _VFA_CASE["product_yield_kg_per_kg_vfa_consumed"],
-    vfa_biomass_yield: float = _VFA_CASE["biomass_yield_kg_per_kg_vfa_consumed"],
-    vfa_co2_yield: float = _VFA_CASE["co2_yield_kg_per_kg_vfa_consumed"],
-    vfa_o2_demand: float = _VFA_CASE["oxygen_kg_per_kg_vfa_consumed"],
-    ferm_residence_time_h: float = _VFA_CASE["residence_time_h"],
-    ferm_target_pH: float = _VFA_CASE["target_pH"],
-    ferm_mgso4_dose: float = _VFA_MEDIUM_TANK["magnesium_sulfate_dose_kg_per_m3"],
+    vfa_conversion: float = None,
+    vfa_product_yield: float = None,
+    vfa_biomass_yield: float = None,
+    vfa_co2_yield: float = None,
+    vfa_o2_demand: float = None,
+    ferm_residence_time_h: float = None,
+    ferm_target_pH: float = None,
+    ferm_mgso4_dose: float = None,
     target_oil_and_solids_content: float = _VFA_DOWNSTREAM["target_oil_and_solids_content_g_per_L"],
     temperature_regime: str = "mesophilic",
 ):
@@ -176,12 +177,15 @@ def create_integrated_biorefinery(
     build_vfa     = alpha < 1.0
 
     feedstock_assumptions = load_assumptions("feedstock.yaml")
-    preprocessing_assumptions = load_assumptions("preprocessing.yaml")
     params = get_feedstock_type_params(feedstock_assumptions, feedstock_type)
     fresh_feed_kgph = get_scale_feed_kgph(feedstock_assumptions)
 
     # =========================================================
     # SHARED PREPROCESSING: Press -> PC -> Mill
+    # Press/PC/EV/Mill all have their own yaml-sourced defaults
+    # (data/preprocessing.yaml, data/biostimulant.yaml) -- not
+    # re-declared here since none are exposed as overridable
+    # parameters of create_integrated_biorefinery() itself.
     # =========================================================
     feed = make_sargassum_feed(
         fresh_feed_kgph=fresh_feed_kgph,
@@ -189,61 +193,24 @@ def create_integrated_biorefinery(
         ash_wt_frac_dry=params["ash_wt_frac_dry"],
     )
 
-    pp  = preprocessing_assumptions.get("preprocessing", {})
-    prA = pp.get("press", {})
-    mlA = pp.get("mill", {})
+    PR = Press("PR", ins=feed, outs=("pressed_cake", "pressate"))
 
-    PR = Press(
-        "PR",
-        ins=feed,
-        outs=("pressed_cake", "pressate"),
-        solids_capture_frac=prA.get("solids_capture_frac", 0.98),
-        cake_solids_wt_frac=prA.get("cake_solids_wt_frac", 0.35),
-        solubles_to_pressate_frac=prA.get("solubles_to_pressate_frac", 1.0),
-        power_kWh_per_dry_ton_TS=prA.get("power_kWh_per_dry_ton_TS"),
-        ref_capacity_tph_wet=(prA.get("ref_capacity_tph_wet") or 50.0),
-        capex_installed_ref_usd=(prA.get("capex_installed_ref_usd") or 5e6),
-        scale_exponent=(prA.get("scale_exponent") or 0.6),
-        F_BM=(prA.get("F_BM") or 1.0),
+    PC = PressateConcentrator(
+        "PC",
+        ins=PR - 1,
+        outs=("biostimulant_membrane_concentrate", "pressate_permeate"),
     )
 
-    pb  = preprocessing_assumptions.get("pressate_biostimulant", {})
-    pcA = pb.get("concentrator", {})
-    PC  = None
-    if pb.get("enabled", False) and pb.get("concentrate_pressate", False):
-        PC = PressateConcentrator(
-            "PC",
-            ins=PR - 1,
-            outs=("biostimulant_membrane_concentrate", "pressate_permeate"),
-            retained_solute_IDs=tuple(pcA.get(
-                "retained_solute_IDs",
-                ["Alginate", "Fucoidan", "Mannitol", "Protein", "OtherSolids"],
-            )),
-            water_recovery_to_permeate=pcA.get("water_recovery_to_permeate", 0.70),
-            retained_solute_recovery_to_concentrate=pcA.get(
-                "retained_solute_recovery_to_concentrate", 0.95
-            ),
-            design_flux_L_m2_h=pcA.get("design_flux_L_m2_h", 35.0),
-            operating_pressure_bar=pcA.get("operating_pressure_bar", 5.0),
-            electricity_kWh_per_m3_feed=pcA.get("electricity_kWh_per_m3_feed", 0.8),
-            capex_usd_per_m2=pcA.get("capex_usd_per_m2", 120.0),
-            maintenance_frac_of_capex_per_yr=pcA.get(
-                "maintenance_frac_of_capex_per_yr", 0.035
-            ),
-        )
-
-    ML = Mill(
-        "ML",
-        ins=PR - 0,
-        outs=("milled_biomass", "milling_losses"),
-        loss_frac=mlA.get("loss_frac", 0.15),
-        power_kWh_per_dry_ton_dry=mlA.get("power_kWh_per_dry_ton_dry"),
-        ref_capacity_dry_ton_per_hr=mlA.get("ref_capacity_dry_ton_per_hr", 10.0),
-        purchase_cost_ref_usd=mlA.get("purchase_cost_ref_usd", 206400.0),
-        install_factor=mlA.get("install_factor", 1.8),
-        scale_exponent=mlA.get("scale_exponent", 0.6),
-        F_BM=mlA.get("F_BM", 1.0),
+    biostimulant_fresh_water = bst.Stream(
+        "biostimulant_fresh_water", Water=0.0, units="kg/hr"
     )
+    EV = BiostimulantEvaporator(
+        "EV",
+        ins=(PC - 0, PC - 1, biostimulant_fresh_water),
+        outs=("biostimulant_product", "biostimulant_vapor", "residual_permeate"),
+    )
+
+    ML = Mill("ML", ins=PR - 0, outs=("milled_biomass", "milling_losses"))
 
     # =========================================================
     # SPLITTER
@@ -261,7 +228,7 @@ def create_integrated_biorefinery(
     # =========================================================
     # BUILD PATHWAYS CONDITIONALLY
     # =========================================================
-    ferm_kwargs = dict(
+    ferm_kwargs = non_none(
         conversion=vfa_conversion,
         product_yield_kg_per_kg_vfa_consumed=vfa_product_yield,
         biomass_yield_kg_per_kg_vfa_consumed=vfa_biomass_yield,
@@ -292,7 +259,7 @@ def create_integrated_biorefinery(
     # =========================================================
     # ASSEMBLE FULL SYSTEM
     # =========================================================
-    preprocessing = [PR] + ([PC] if PC else []) + [ML]
+    preprocessing = [PR, PC, EV, ML]
     all_units = preprocessing + [SPL] + methane_units + vfa_units
 
     sys = bst.System.from_units("integrated_biorefinery", units=all_units)
@@ -305,9 +272,8 @@ def create_integrated_biorefinery(
         "milled_biomass": ML.outs[0],
         "to_methane_ad":  to_methane_ad,
         "to_vfa_ad":      to_vfa_ad,
-        "biostimulant_membrane_concentrate": (
-            _get_stream("biostimulant_membrane_concentrate") if PC else None
-        ),
+        "biostimulant_membrane_concentrate": _get_stream("biostimulant_membrane_concentrate"),
+        "biostimulant_product": _get_stream("biostimulant_product"),
         # Methane pathway (None if alpha=0)
         **{k: methane_streams.get(k) for k in [
             "biomethane", "offgas", "soil_amendment", "liquid_digestate"
@@ -320,7 +286,7 @@ def create_integrated_biorefinery(
     }
 
     units = {
-        "PR": PR, "PC": PC, "ML": ML, "SPL": SPL,
+        "PR": PR, "PC": PC, "EV": EV, "ML": ML, "SPL": SPL,
         **methane_units_d,
         **vfa_units_d,
     }

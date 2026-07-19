@@ -29,10 +29,10 @@ Internal helper:
 import biosteam as bst
 import flexsolve as flx
 
-from biorefineries.sabre.utils import load_assumptions
+from biorefineries.sabre.utils import load_assumptions, non_none
 from biorefineries.sabre.units import (
     YarrowiaLipidFermenter,
-    OilExtractionPlaceholder,
+    OilExtraction,
     VFAMicrofilter,
     FermentationMediumTank,
 )
@@ -41,12 +41,14 @@ from biorefineries.sabre.systems._ad_vfa_system import create_ad_vfa_system
 __all__ = ('create_ad_fermentation_system',)
 
 
-# Default parameters for _create_vfa_fermentation_system() below (data/vfa_fermentation.yaml).
-_VFA_FERM = load_assumptions("vfa_fermentation.yaml")["vfa_fermentation"]
+# Default parameters for _create_vfa_fermentation_system() below
+# (data/fermentation.yaml and data/downstream_processing.yaml).
+_FERMENTATION_YAML = load_assumptions("fermentation.yaml")
+_VFA_FERM = _FERMENTATION_YAML["vfa"]
 _VFA_CASE = _VFA_FERM["cases"][_VFA_FERM["case"]]
-_VFA_MICROFILTER = _VFA_FERM["vfa_microfilter"]
-_VFA_MEDIUM_TANK = _VFA_FERM["fermentation_medium_tank"]
-_VFA_DOWNSTREAM = _VFA_FERM["downstream_recovery"]
+
+_DOWNSTREAM_PROCESSING_YAML = load_assumptions("downstream_processing.yaml")
+_VFA_DOWNSTREAM = _DOWNSTREAM_PROCESSING_YAML["oil_extraction"]
 
 
 def _create_vfa_fermentation_system(
@@ -54,30 +56,29 @@ def _create_vfa_fermentation_system(
     *,
     product_ID: str = _VFA_CASE["product_ID"],
     vfa_IDs: list[str] | None = None,
-    conversion: float = _VFA_CASE["conversion"],
-    product_yield_kg_per_kg_vfa_consumed: float = _VFA_CASE["product_yield_kg_per_kg_vfa_consumed"],
-    biomass_yield_kg_per_kg_vfa_consumed: float = _VFA_CASE["biomass_yield_kg_per_kg_vfa_consumed"],
-    co2_yield_kg_per_kg_vfa_consumed: float = _VFA_CASE["co2_yield_kg_per_kg_vfa_consumed"],
-    oxygen_kg_per_kg_vfa_consumed: float = _VFA_CASE["oxygen_kg_per_kg_vfa_consumed"],
-    residence_time_h: float = _VFA_CASE["residence_time_h"],
-    broth_density_kg_per_m3: float = _VFA_MICROFILTER["broth_density_kg_per_m3"],
-    target_pH: float = _VFA_CASE["target_pH"],
-    ammonia_dose_kg_per_m3: float = _VFA_MEDIUM_TANK["ammonia_dose_kg_per_m3"],
-    phosphate_dose_kg_per_m3: float = _VFA_MEDIUM_TANK["phosphate_dose_kg_per_m3"],
-    base_dose_kg_per_m3: float = _VFA_MEDIUM_TANK["base_dose_kg_per_m3"],
-    magnesium_sulfate_dose_kg_per_m3: float = _VFA_MEDIUM_TANK["magnesium_sulfate_dose_kg_per_m3"],
+    conversion: float = None,
+    product_yield_kg_per_kg_vfa_consumed: float = None,
+    biomass_yield_kg_per_kg_vfa_consumed: float = None,
+    co2_yield_kg_per_kg_vfa_consumed: float = None,
+    oxygen_kg_per_kg_vfa_consumed: float = None,
+    residence_time_h: float = None,
+    target_pH: float = None,
+    ammonia_dose_kg_per_m3: float = None,
+    phosphate_dose_kg_per_m3: float = None,
+    base_dose_kg_per_m3: float = None,
+    magnesium_sulfate_dose_kg_per_m3: float = None,
     seed_water_kgph: float = _VFA_CASE["seed_water_kgph"],
     seed_cellmass_kgph: float = _VFA_CASE["seed_cellmass_kgph"],
 
-    vfa_to_permeate_frac: float = _VFA_MICROFILTER["vfa_to_permeate_frac"],
-    water_to_permeate_frac: float = _VFA_MICROFILTER["water_to_permeate_frac"],
-    solids_to_permeate_frac: float = _VFA_MICROFILTER["solids_to_permeate_frac"],
-    dissolved_other_to_permeate_frac: float = _VFA_MICROFILTER["dissolved_other_to_permeate_frac"],
-    microfilter_SEC_kWh_per_m3_feed: float = _VFA_MICROFILTER["SEC_kWh_per_m3_feed"],
-    microfilter_design_flux_L_m2_h: float = _VFA_MICROFILTER["design_flux_L_m2_h"],
+    vfa_to_permeate_frac: float = None,
+    water_to_permeate_frac: float = None,
+    solids_to_permeate_frac: float = None,
+    dissolved_other_to_permeate_frac: float = None,
+    microfilter_SEC_kWh_per_m3_feed: float = None,
+    microfilter_design_flux_L_m2_h: float = None,
 
-    medium_tank_residence_time_h: float = _VFA_MEDIUM_TANK["residence_time_h"],
-    medium_tank_mixing_kW_per_m3: float = _VFA_MEDIUM_TANK["mixing_kW_per_m3"],
+    medium_tank_residence_time_h: float = None,
+    medium_tank_mixing_kW_per_m3: float = None,
 
     target_oil_and_solids_content: float = _VFA_DOWNSTREAM["target_oil_and_solids_content_g_per_L"],
     target_wastewater_concentration: float = 60.0,  # no yaml counterpart
@@ -87,7 +88,7 @@ def _create_vfa_fermentation_system(
     recycle_total_fraction: float = _VFA_DOWNSTREAM["recycle_total_fraction"],
     recycle_cellmass_wt_frac: float = _VFA_DOWNSTREAM["recycle_cellmass_wt_frac"],
 
-    oil_extraction_homogenization_kWh_per_kg: float = _VFA_DOWNSTREAM["oil_extraction_homogenization_kWh_per_kg"],
+    homogenization_kWh_per_kg_dry_biomass: float = None,
 ):
 
     chem_ids = set(bst.settings.thermo.chemicals.IDs)
@@ -119,27 +120,29 @@ def _create_vfa_fermentation_system(
         ins=vfa_broth,
         outs=("vfa_permeate", "vfa_retentate"),
         vfa_IDs=vfa_IDs,
-        vfa_to_permeate_frac=vfa_to_permeate_frac,
-        water_to_permeate_frac=water_to_permeate_frac,
-        solids_to_permeate_frac=solids_to_permeate_frac,
-        dissolved_other_to_permeate_frac=dissolved_other_to_permeate_frac,
-        broth_density_kg_per_m3=broth_density_kg_per_m3,
-        SEC_kWh_per_m3_feed=microfilter_SEC_kWh_per_m3_feed,
-        design_flux_L_m2_h=microfilter_design_flux_L_m2_h,
+        **non_none(
+            vfa_to_permeate_frac=vfa_to_permeate_frac,
+            water_to_permeate_frac=water_to_permeate_frac,
+            solids_to_permeate_frac=solids_to_permeate_frac,
+            dissolved_other_to_permeate_frac=dissolved_other_to_permeate_frac,
+            SEC_kWh_per_m3_feed=microfilter_SEC_kWh_per_m3_feed,
+            design_flux_L_m2_h=microfilter_design_flux_L_m2_h,
+        ),
     )
 
     T601 = FermentationMediumTank(
         "T601",
         ins=(MF - 0, ammonia, phosphate, base, mgso4),
         outs=("conditioned_vfa_broth",),
-        ammonia_dose_kg_per_m3=ammonia_dose_kg_per_m3,
-        phosphate_dose_kg_per_m3=phosphate_dose_kg_per_m3,
-        base_dose_kg_per_m3=base_dose_kg_per_m3,
-        magnesium_sulfate_dose_kg_per_m3=magnesium_sulfate_dose_kg_per_m3,
-        broth_density_kg_per_m3=broth_density_kg_per_m3,
-        target_pH=target_pH,
-        residence_time_h=medium_tank_residence_time_h,
-        mixing_kW_per_m3=medium_tank_mixing_kW_per_m3,
+        **non_none(
+            ammonia_dose_kg_per_m3=ammonia_dose_kg_per_m3,
+            phosphate_dose_kg_per_m3=phosphate_dose_kg_per_m3,
+            base_dose_kg_per_m3=base_dose_kg_per_m3,
+            magnesium_sulfate_dose_kg_per_m3=magnesium_sulfate_dose_kg_per_m3,
+            target_pH=target_pH,
+            tau=medium_tank_residence_time_h,
+            mixing_kW_per_m3=medium_tank_mixing_kW_per_m3,
+        ),
     )
 
     # -------------------------------------------------
@@ -151,18 +154,19 @@ def _create_vfa_fermentation_system(
         outs=("fermentation_vent", "fermentation_broth"),
         vfa_IDs=vfa_IDs,
         product_ID=product_ID,
-        conversion=conversion,
-        product_yield_kg_per_kg_vfa_consumed=product_yield_kg_per_kg_vfa_consumed,
-        biomass_yield_kg_per_kg_vfa_consumed=biomass_yield_kg_per_kg_vfa_consumed,
-        co2_yield_kg_per_kg_vfa_consumed=co2_yield_kg_per_kg_vfa_consumed,
-        oxygen_kg_per_kg_vfa_consumed=oxygen_kg_per_kg_vfa_consumed,
-        residence_time_h=residence_time_h,
-        broth_density_kg_per_m3=broth_density_kg_per_m3,
-        target_pH=target_pH,
         V_wf=0.8,
         V_max=150.0,
         kW_per_m3=0.06,
         tau_0=3.0,
+        **non_none(
+            conversion=conversion,
+            product_yield_kg_per_kg_vfa_consumed=product_yield_kg_per_kg_vfa_consumed,
+            biomass_yield_kg_per_kg_vfa_consumed=biomass_yield_kg_per_kg_vfa_consumed,
+            co2_yield_kg_per_kg_vfa_consumed=co2_yield_kg_per_kg_vfa_consumed,
+            oxygen_kg_per_kg_vfa_consumed=oxygen_kg_per_kg_vfa_consumed,
+            tau=residence_time_h,
+            target_pH=target_pH,
+        ),
     )
 
     # -------------------------------------------------
@@ -238,13 +242,13 @@ def _create_vfa_fermentation_system(
     # high-pressure homogenization and lipid extraction.
     # Capital anchor: NREL/TP-5100-55431 (2012), Davis et al.
     # -------------------------------------------------
-    OE = OilExtractionPlaceholder(
+    OE = OilExtraction(
         "OE",
         ins=P607 - 0,
         outs=("extracted_broth",),
         product_ID=product_ID,
         cellmass_ID="CellMass",
-        homogenization_kWh_per_kg_dry_biomass=oil_extraction_homogenization_kWh_per_kg,
+        **non_none(homogenization_kWh_per_kg_dry_biomass=homogenization_kWh_per_kg_dry_biomass),
     )
 
     C603_2 = bst.LiquidsSplitCentrifuge(
