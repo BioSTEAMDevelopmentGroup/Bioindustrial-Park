@@ -86,8 +86,8 @@ def _get_integrated_stream(stream_id: str):
 
 
 def _apply_stream_prices(streams, biostimulant_price=BIOSTIMULANT_USD_PER_KG):
-    if streams.get("biostimulant_membrane_concentrate") is not None:
-        streams["biostimulant_membrane_concentrate"].price = biostimulant_price
+    if streams.get("biostimulant_product") is not None:
+        streams["biostimulant_product"].price = biostimulant_price
 
     permeate = _get_integrated_stream("pressate_permeate")
     if permeate is not None:

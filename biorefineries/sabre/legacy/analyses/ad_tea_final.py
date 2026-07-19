@@ -115,8 +115,11 @@ def _apply_stream_economics(
         except Exception:
             pass
 
-    # Biostimulant concentrate (pressate concentrator outlet)
-    for sid in ("biostimulant_membrane_concentrate",):
+    # Biostimulant product (BiostimulantEvaporator outlet -- the actual
+    # system-boundary product stream; biostimulant_membrane_concentrate is
+    # now an internal stream consumed by BiostimulantEvaporator, so pricing
+    # it has no effect on TEA revenue)
+    for sid in ("biostimulant_product",):
         try:
             s = sys.flowsheet.stream[sid]
             s.price = biostimulant_price
@@ -466,7 +469,7 @@ def run_biostimulant_sensitivity(
         msp_mmbtu = msp.get("usd_per_mmbtu", float("nan"))
         # Get biostimulant stream flow
         try:
-            conc = sys.flowsheet.stream["biostimulant_membrane_concentrate"]
+            conc = sys.flowsheet.stream["biostimulant_product"]
             bs_revenue = bs_price * conc.F_mass * 330 * 24
         except Exception:
             bs_revenue = 0.0

@@ -77,7 +77,7 @@ def apply_stream_economics(sys, biostimulant_price: float = BIOSTIMULANT_PRICE_U
             sys.flowsheet.stream[sid].price = 0.0
         except Exception:
             pass
-    for sid in ("biostimulant_membrane_concentrate",):
+    for sid in ("biostimulant_product",):
         try:
             sys.flowsheet.stream[sid].price = biostimulant_price
         except Exception:

@@ -445,7 +445,11 @@ def _apply_biostimulant_credit(
     annual_hours = 330.0 * 24.0
     summary = {}
 
-    for sid in ("biostimulant_membrane_concentrate", "biostimulant_product"):
+    # biostimulant_product (BiostimulantEvaporator outlet) is the actual
+    # system-boundary product stream; biostimulant_membrane_concentrate is
+    # now internal (consumed by BiostimulantEvaporator), so pricing it has
+    # no effect on TEA revenue.
+    for sid in ("biostimulant_product",):
         try:
             s = bst.main_flowsheet.stream[sid]
             s.price = price_usd_per_kg

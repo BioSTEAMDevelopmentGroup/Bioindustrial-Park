@@ -67,7 +67,7 @@ def apply_stream_economics(sys, biostimulant_price: float):
         except Exception:
             pass
 
-    for sid in ("biostimulant_membrane_concentrate",):
+    for sid in ("biostimulant_product",):
         try:
             sys.flowsheet.stream[sid].price = biostimulant_price
         except Exception:
@@ -104,7 +104,7 @@ def build_case(pretreatment_case: str, biostimulant_price: float):
 
     annual_revenue = 0.0
     try:
-        conc = sys.flowsheet.stream["biostimulant_membrane_concentrate"]
+        conc = sys.flowsheet.stream["biostimulant_product"]
         annual_revenue = biostimulant_price * conc.F_mass * 330 * 24
     except Exception:
         pass

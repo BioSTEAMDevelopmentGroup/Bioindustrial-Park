@@ -76,8 +76,9 @@ def apply_stream_economics(
         except Exception:
             pass
 
-    # Biostimulant concentrate
-    for sid in ("biostimulant_membrane_concentrate",):
+    # Biostimulant product (BiostimulantEvaporator outlet -- the actual
+    # system-boundary product stream)
+    for sid in ("biostimulant_product",):
         try:
             sys.flowsheet.stream[sid].price = biostimulant_price
         except Exception:

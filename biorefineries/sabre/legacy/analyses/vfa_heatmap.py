@@ -59,12 +59,14 @@ SOYBEAN_OIL_HIGH = 1.50
 # ── Helpers ───────────────────────────────────────────────────────────────────
 
 def _apply_biostimulant_price(price_per_kg: float):
-    for sid in ("biostimulant_membrane_concentrate", "biostimulant_concentrate", "pressate_concentrate"):
-        try:
-            bst.main_flowsheet.stream[sid].price = price_per_kg
-            return
-        except Exception:
-            pass
+    # biostimulant_product (BiostimulantEvaporator outlet) is the actual
+    # system-boundary product stream; biostimulant_membrane_concentrate is
+    # now internal (consumed by BiostimulantEvaporator), so pricing it has
+    # no effect on TEA revenue.
+    try:
+        bst.main_flowsheet.stream["biostimulant_product"].price = price_per_kg
+    except Exception:
+        pass
 
 
 def build_case(feed_price: float, biostim_price: float) -> float:

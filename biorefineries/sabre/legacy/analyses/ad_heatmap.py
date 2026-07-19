@@ -73,7 +73,7 @@ SOLIDS_DIGESTATE_USD_PER_KG = -0.02
 def apply_stream_economics(sys, biostimulant_price: float):
     for sid, price in [
         ("pressate_permeate",              0.0),
-        ("biostimulant_membrane_concentrate", biostimulant_price),
+        ("biostimulant_product",           biostimulant_price),
         ("soil_amendment",                 SOLIDS_DIGESTATE_USD_PER_KG),
         ("liquid_digestate",               LIQUID_DIGESTATE_USD_PER_KG),
     ]:

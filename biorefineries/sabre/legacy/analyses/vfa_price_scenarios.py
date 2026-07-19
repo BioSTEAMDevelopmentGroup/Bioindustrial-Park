@@ -121,24 +121,21 @@ def _solve_msp_from_system(
 
 
 def _apply_biostimulant_price(streams, price_per_kg: float) -> bool:
-    candidate_ids = [
-        "biostimulant_membrane_concentrate",
-        "biostimulant_concentrate",
-        "pressate_concentrate",
-    ]
-    for sid in candidate_ids:
+    # biostimulant_product (BiostimulantEvaporator outlet) is the actual
+    # system-boundary product stream; biostimulant_membrane_concentrate is
+    # now internal (consumed by BiostimulantEvaporator), so pricing it has
+    # no effect on TEA revenue.
+    try:
+        bst.main_flowsheet.stream["biostimulant_product"].price = price_per_kg
+        return True
+    except Exception:
+        pass
+    if isinstance(streams, dict):
         try:
-            bst.main_flowsheet.stream[sid].price = price_per_kg
+            streams["biostimulant_product"].price = price_per_kg
             return True
         except Exception:
             pass
-    if isinstance(streams, dict):
-        for sid in candidate_ids:
-            try:
-                streams[sid].price = price_per_kg
-                return True
-            except Exception:
-                pass
     return False
 
 
