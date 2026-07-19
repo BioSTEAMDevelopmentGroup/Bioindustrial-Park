@@ -81,7 +81,7 @@ def create_cofermentation_system(
     T301 = units.SeedHoldTank('T301', R302-1)
     R303 = CoFermentation('R303', (S304-1, T301-0, *nutrients_2),
                           outs=('', ''), cofermentation=cofermentation_reactions)
-    
+    R303.register_alias('cofermentation')
     if add_nutrients:
         @R303.add_specification(run=True)
         def adjust_CSL_and_DAP_feed_to_fermentation():

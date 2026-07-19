@@ -89,4 +89,5 @@ def create_saccharification_system(
     
     if Saccharification is None:
         Saccharification = units.ContinuousPresaccharification
-    Saccharification('R301', H301-0, slurry, reactions=saccharification_reactions)
+    R301 = Saccharification('R301', H301-0, slurry, reactions=saccharification_reactions)
+    R301.register_alias('saccharification')
