@@ -5,13 +5,7 @@
 # It lives in systems/ (next to the code it documents) rather than data/,
 # specifically because it is not a source of runtime defaults.
 #
-# Two sections:
-#   1. process_vs_yaml_discrepancies -- cases where a legacy_analyses script
-#      relied (implicitly, by never overriding a system-builder default) on
-#      a numeric value that the current data/*.yaml-sourced default no
-#      longer matches. Recorded so the old value isn't lost once the code
-#      default changes out from under it.
-#   2. legacy_only_economics -- economic assumptions (prices, disposal
+#      economic assumptions (prices, disposal
 #      costs, reagent costs) hardcoded as Python module-level constants
 #      across legacy_analyses/*.py. None of data/feedstock.yaml,
 #      data/preprocessing.yaml, or data/vfa_fermentation.yaml cover
@@ -20,61 +14,6 @@
 #      list for a future data/economics.yaml.
 #
 # Compiled: 2026-07-17.
-
-process_vs_yaml_discrepancies:
-
-  target_oil_and_solids_content:
-    description: >
-      Target non-water content (g/L) that Ev607 (MultiEffectEvaporator)
-      concentrates the fermentation broth to, before oil extraction.
-    legacy_value_g_per_L: 70.0
-    current_yaml_value_g_per_L: 60.0
-    yaml_source: data/vfa_fermentation.yaml -> downstream_recovery.target_oil_and_solids_content_g_per_L
-    code_param: _create_vfa_fermentation_system(target_oil_and_solids_content=...)
-    status: "FIXED — _create_vfa_fermentation_system()'s default now reads from yaml (60.0), was hardcoded 70.0."
-    who_relied_on_the_old_value: >
-      Every legacy_analyses script that builds the standalone AD-fermentation
-      pathway without overriding this kwarg: vfa_fermentation_tea.py
-      (build_and_simulate, run_case base case), vfa_heatmap.py,
-      vfa_price_scenarios.py, vfa_yield_sensitivities.py (build_and_simulate),
-      vfa_pathway_figures.py. None of these pass target_oil_and_solids_content
-      explicitly, so they all silently moved from 70 to 60 g/L when the
-      function default changed. Confirmed by tests.py regression baseline
-      shift (MSP for the near-zero-feed base case moved from
-      6.9514255681728745 to 7.004118099310033 $/kg).
-    first_documented: CONVERSION_NOTES.md, "Two apparent discrepancies were
-      found and deliberately not changed" (pre-existing note, written before
-      this fix).
-
-  ferm_mgso4_dose:
-    description: >
-      MgSO4 dosing rate into the fermentation medium tank, integrated
-      pathway only (create_integrated_biorefinery's own separate default,
-      not the standalone AD-fermentation path).
-    legacy_value_kg_per_m3: 0.49
-    current_yaml_value_kg_per_m3: 0.0
-    yaml_source: data/vfa_fermentation.yaml -> fermentation_medium_tank.magnesium_sulfate_dose_kg_per_m3
-    code_param: create_integrated_biorefinery(ferm_mgso4_dose=...)
-    status: "FIXED — create_integrated_biorefinery()'s default now reads from yaml (0.0), was hardcoded 0.49."
-    who_relied_on_the_old_value: >
-      integrated_tea.py, integrated_system_sensitivity.py,
-      integrated_system_plot.py — none override ferm_mgso4_dose explicitly,
-      so all three silently moved from 0.49 to 0.0 kg/m3 MgSO4 dosing when
-      the function default changed. Confirmed by tests.py regression
-      baseline shift (test_integrated_tea_alpha_sweep's alpha=0.0
-      combined_npv_M moved from -1210.59M to -1215.92M).
-    first_documented: CONVERSION_NOTES.md, same entry as above.
-
-  note_no_other_discrepancies_found: >
-    Every create_ad_biomethane_system / create_ad_vfa_system /
-    create_biostimulant_system call site across all 16 legacy_analyses/*.py
-    scripts was checked (feedstock_type, pretreatment_case kwargs only —
-    always "pelagic" and a named pretreatment case, both matching current
-    yaml). No other process/composition-level mismatch was found as of the
-    audit date above. This does not cover every unit-attribute override
-    (e.g. ch4_kg_per_kg_vs_fed set directly on a built unit) exhaustively —
-    only system-builder-level kwargs.
-
 
 legacy_only_economics:
   # None of these have a data/*.yaml counterpart. Grouped by category;
