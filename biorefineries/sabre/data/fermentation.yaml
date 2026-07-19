@@ -59,7 +59,7 @@ fermentation_medium_tank:
   ammonia_dose_kg_per_m3: 0.0
   phosphate_dose_kg_per_m3: 0.0
   base_dose_kg_per_m3: 0.0
-  magnesium_sulfate_dose_kg_per_m3: 0.0
+  magnesium_sulfate_dose_kg_per_m3: 0.49  # matches sabre_ad legacy default (integrated_system.py); no source found for this value
 
   product_quality:
     crude_product_stream_ID: crude_microbial_oil
