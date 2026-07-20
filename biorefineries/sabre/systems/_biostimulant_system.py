@@ -34,34 +34,18 @@ __all__ = ('create_biostimulant_system',)
 
 def create_biostimulant_system(
     feedstock_type: str = "pelagic",
-    target_solids_wt_frac: float | None = 0.20,
-    pressed_cake_disposal_usd_per_kg: float = 0.0,
-    fresh_water_price_usd_per_kg: float = 0.0,
 ):
     """
     Build the standalone biostimulant system: Press -> PressateConcentrator
     -> PSP/DIL (dilute, if needed) -> BiostimulantEvaporator (concentrate,
-    if needed), producing a biostimulant product at `target_solids_wt_frac`
-    regardless of whether that's above or below the concentrator's natural
-    output concentration.
+    if needed), producing a biostimulant product at its target solids
+    content regardless of whether that's above or below the concentrator's
+    natural output concentration.
 
     Parameters
     ----------
     feedstock_type : str
         Feedstock type (data/feedstock.yaml `feedstock_type`).
-    target_solids_wt_frac : float or None
-        Target dry-solids weight fraction for the final biostimulant
-        product. If lower than PressateConcentrator's natural output, the
-        PSP/DIL stage dilutes with permeate water first, then fresh
-        water. If higher, BiostimulantEvaporator evaporates water to
-        reach it. `None` disables both stages (direct pass-through, no
-        CAPEX/OPEX, no mass flow change).
-    pressed_cake_disposal_usd_per_kg : float
-        Price assigned to the pressed cake stream, since this pathway
-        has no use for it (default 0.0; pass a negative value for a
-        disposal cost).
-    fresh_water_price_usd_per_kg : float
-        Price assigned to the fresh water make-up stream (default 0.0).
 
     Returns
     -------
@@ -90,7 +74,7 @@ def create_biostimulant_system(
     # (data/preprocessing.yaml, data/biostimulant.yaml) -- not
     # re-declared here.
     PR = Press("PR", ins=feed, outs=("pressed_cake", "pressate"))
-    PR.outs[0].price = float(pressed_cake_disposal_usd_per_kg)
+    PR.outs[0].price = 0.0
 
     PC = PressateConcentrator(
         "PC", ins=PR - 1,
@@ -98,7 +82,7 @@ def create_biostimulant_system(
     )
 
     fresh_water = bst.Stream("biostimulant_fresh_water", Water=0.0, units="kg/hr")
-    fresh_water.price = float(fresh_water_price_usd_per_kg)
+    fresh_water.price = 0.0
 
     # Splits PC's permeate into just the amount DIL needs for dilution
     # (outs[0]) and whatever's left over (outs[1], residual_permeate).
@@ -120,7 +104,6 @@ def create_biostimulant_system(
         "EV",
         ins=DIL - 0,
         outs=("biostimulant_product", "biostimulant_vapor"),
-        target_solids_wt_frac=target_solids_wt_frac,
     )
 
     @PSP.add_specification(run=True)

@@ -101,7 +101,7 @@ def _solve_msp_from_system(
     _patch_ev607(full_sys, silent=True)
     _apply_disposal_costs(streams, solids_disposal_usd_per_kg=solids_disposal_usd_per_kg)
 
-    oil_stream = streams["backend_oil"]
+    oil_stream = streams["microbial_oil"]
     oil_kg_hr = float(oil_stream.imass["MicrobialOil"])
 
     extraction_usd_per_hr = oil_kg_hr * extraction_usd_per_kg_oil
@@ -290,7 +290,7 @@ def make_product_scenarios_figure():
         _patch_ev607(full_sys, silent=True)
         _apply_disposal_costs(streams)
 
-        oil_stream = streams["backend_oil"]
+        oil_stream = streams["microbial_oil"]
         product_kg_hr = float(oil_stream.imass["MicrobialOil"])
         extraction_usd_per_hr = product_kg_hr * sc["extraction_usd_per_kg"]
 

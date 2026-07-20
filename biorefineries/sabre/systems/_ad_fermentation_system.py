@@ -143,10 +143,10 @@ def _create_vfa_fermentation_system(vfa_broth):
     C603_2 = bst.LiquidsSplitCentrifuge(
         "C603_2",
         ins=OE - 0,   # now takes from OE, not P607
-        outs=("backend_oil", "cellmass_plus_aqueous"),
+        outs=("microbial_oil", "cellmass_plus_aqueous"),
         split={
-            product_ID: _VFA_DOWNSTREAM["backend_oil_recovery"],
-            "Water": _VFA_DOWNSTREAM["backend_oil_water_split"],
+            product_ID: _VFA_DOWNSTREAM["oil_recovery"],
+            "Water": _VFA_DOWNSTREAM["oil_water_split"],
         },
     )
 
@@ -208,7 +208,7 @@ def _create_vfa_fermentation_system(vfa_broth):
         "vent": R601.outs[0],
         "fermentation_broth": R601.outs[1],
         "extracted_broth": OE.outs[0],
-        "backend_oil": C603_2.outs[0],
+        "microbial_oil": C603_2.outs[0],
         "residual_slurry": C603_2.outs[1],
         "residual_purge": S602.outs[1],
         "wastewater": M601.outs[0],
@@ -225,7 +225,7 @@ def _create_vfa_fermentation_system(vfa_broth):
         "post_mix_tank": V605,
         "post_feed_pump": P606,
         "evaporator": Ev607,
-        "backend_oil_pump": P607,
+        "fermentation_broth_pump": P607,
         "oil_extraction": OE,
         "oil_centrifuge": C603_2,
         "biomass_recycle_splitter": S602,
@@ -260,7 +260,7 @@ def create_ad_fermentation_system(
         Key streams, including the raw feedstock ('feed'), the AD-VFA
         subsystem's 'vfa_broth' and 'acidogenic_residual_solids', and all
         of _create_vfa_fermentation_system()'s streams (final product in
-        'backend_oil').
+        'microbial_oil').
     units : dict
         Key units from both subsystems.
     """

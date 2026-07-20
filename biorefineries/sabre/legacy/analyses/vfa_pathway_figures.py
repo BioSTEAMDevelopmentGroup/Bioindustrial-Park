@@ -193,7 +193,7 @@ def make_product_scenario_comparison_figure(feed_price: float = 0.00):
         _apply_disposal_costs(streams)
 
         # Putting purification cost into OE.add_OPEX exactly as in vfa_fermentation_tea.py
-        oil_stream = streams["backend_oil"]
+        oil_stream = streams["microbial_oil"]
         product_kg_hr = float(oil_stream.imass["MicrobialOil"])
         extraction_usd_per_hr = product_kg_hr * sc["extraction_usd_per_kg"]
 

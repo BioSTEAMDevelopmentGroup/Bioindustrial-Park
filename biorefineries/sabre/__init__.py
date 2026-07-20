@@ -96,8 +96,8 @@ def load(flowsheet_name: str = 'biostimulant', **kwargs):
         sys, streams, units_dict = create_ad_fermentation_system(**kwargs)
         sys.simulate()
         tea = _tea.create_tea(sys)
-        backend_oil = streams['backend_oil']
-        backend_oil.price = tea.solve_price(backend_oil)
+        microbial_oil = streams['microbial_oil']
+        microbial_oil.price = tea.solve_price(microbial_oil)
     elif flowsheet_name == 'integrated':
         sys, streams, units_dict, alpha = create_ad_integrated_system(**kwargs)
         sys.simulate()

@@ -175,7 +175,7 @@ def create_ad_integrated_system(
         ]},
         # VFA pathway (None if alpha=1)
         **{k: vfa_streams.get(k) for k in [
-            "vfa_broth", "backend_oil", "wastewater",
+            "vfa_broth", "microbial_oil", "wastewater",
             "vfa_retentate", "acidogenic_residual_solids",
         ]},
     }

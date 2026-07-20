@@ -59,7 +59,7 @@ def _check_base_case(feed_price, expected):
     tea, msp, streams, units, full_sys = run_case(
         feed_price, run_diagnostics=False, silent=True,
     )
-    oil_stream = streams["backend_oil"]
+    oil_stream = streams["microbial_oil"]
 
     _assert_close(tea.TCI, expected["TCI"], "TCI")
     _assert_close(tea.FCI, expected["FCI"], "FCI")
@@ -138,7 +138,7 @@ def test_vfa_fermentation_product_scenarios():
             residence_time_h=sc["residence_h"],
         )
         tea = create_tea(full_sys)
-        oil_stream = streams["backend_oil"]
+        oil_stream = streams["microbial_oil"]
         msp_dict = solve_product_msp(
             tea=tea, product_stream=oil_stream, product_ID="MicrobialOil",
         )

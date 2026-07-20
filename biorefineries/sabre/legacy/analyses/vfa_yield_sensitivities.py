@@ -84,7 +84,7 @@ def solve_oil_msp_from_full_system(
     _patch_ev607(full_sys, silent=True)
     _apply_disposal_costs(streams)
 
-    oil_stream = streams["backend_oil"]
+    oil_stream = streams["microbial_oil"]
     oil_kg_hr = float(oil_stream.imass["MicrobialOil"])
 
     # match run_case() logic in vfa_fermentation_tea.py

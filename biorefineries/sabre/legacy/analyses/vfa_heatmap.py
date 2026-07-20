@@ -76,7 +76,7 @@ def build_case(feed_price: float, biostim_price: float) -> float:
     _patch_ev607(full_sys, silent=True)
     _apply_disposal_costs(streams, solids_disposal_usd_per_kg=SOLIDS_DISPOSAL_USD_PER_KG)
 
-    oil_stream = streams["backend_oil"]
+    oil_stream = streams["microbial_oil"]
     oil_kg_hr = float(oil_stream.imass["MicrobialOil"])
 
     extraction_usd_per_hr = oil_kg_hr * OIL_EXTRACTION_REAGENT_USD_PER_KG_OIL

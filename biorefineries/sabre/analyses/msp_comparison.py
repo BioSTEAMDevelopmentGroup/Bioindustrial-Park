@@ -125,10 +125,9 @@ def price_biostimulant_system() -> dict:
     bst.main_flowsheet.clear()
     create_chemicals()
 
-    sys, streams, units = create_biostimulant_system(
-        pressed_cake_disposal_usd_per_kg=SOLIDS_DISPOSAL_USD_PER_KG,
-    )
+    sys, streams, units = create_biostimulant_system()
     streams["feed"].price = FEED_PRICE_USD_PER_KG_WET
+    streams["pressed_cake"].price = SOLIDS_DISPOSAL_USD_PER_KG
     sys.simulate()
 
     tea = create_tea(sys)
@@ -235,7 +234,7 @@ def price_ad_fermentation_system() -> dict:
     _set_price(fs, "acidogenic_residual_solids", SOLIDS_DISPOSAL_USD_PER_KG)
     _set_price(fs, "wastewater", FERM_WASTEWATER_DISPOSAL_USD_PER_KG)
 
-    oil_stream = streams["backend_oil"]
+    oil_stream = streams["microbial_oil"]
     oil_kg_hr = float(oil_stream.imass["MicrobialOil"])
     try:
         fs.unit["OE"].add_OPEX = {

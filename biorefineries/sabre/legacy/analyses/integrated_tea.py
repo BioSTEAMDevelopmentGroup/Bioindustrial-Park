@@ -112,7 +112,7 @@ def _apply_stream_prices(streams, biostimulant_price=BIOSTIMULANT_USD_PER_KG):
 
 
 def _wire_oil_reagent(streams, units):
-    oil_stream = streams.get("backend_oil")
+    oil_stream = streams.get("microbial_oil")
     oe = units.get("OE")
     if oil_stream is not None and oe is not None:
         oil_kg_hr = float(oil_stream.imass["MicrobialOil"])
@@ -139,7 +139,7 @@ def _patch_ev607():
 
 def _compute_npv_at_market(tea, streams, market_mmbtu, market_oil_usd_per_kg):
     biomethane = streams.get("biomethane")
-    oil_stream = streams.get("backend_oil")
+    oil_stream = streams.get("microbial_oil")
 
     old_bm_price  = biomethane.price  if biomethane  is not None else None
     old_oil_price = oil_stream.price  if oil_stream  is not None else None
@@ -196,7 +196,7 @@ def run_alpha_sweep(
             tea = create_tea(sys)
 
             biomethane = streams.get("biomethane")
-            oil_stream = streams.get("backend_oil")
+            oil_stream = streams.get("microbial_oil")
             msp_mmbtu = float("nan")
             msp_ch4   = float("nan")
             msp_oil   = float("nan")

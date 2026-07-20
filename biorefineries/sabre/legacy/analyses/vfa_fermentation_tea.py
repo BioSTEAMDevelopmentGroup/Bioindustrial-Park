@@ -186,7 +186,7 @@ def run_case(
 
     biostim_summary = _apply_biostimulant_credit(BIOSTIMULANT_PRICE_BASE_USD_PER_KG)
 
-    oil_stream = streams["backend_oil"]
+    oil_stream = streams["microbial_oil"]
     oil_kg_hr = float(oil_stream.imass["MicrobialOil"])
     annual_hours = 330.0 * 24.0
 
@@ -279,7 +279,7 @@ def run_case(
 
         try:
             oil_kg_hr_diag = float(oil_stream.imass["MicrobialOil"])
-            print(f"\n  [backend_oil (final product)]")
+            print(f"\n  [microbial_oil (final product)]")
             print(f"    Total F_mass:   {oil_stream.F_mass:>12.2f} kg/hr")
             print(f"    MicrobialOil:   {oil_kg_hr_diag:>12.2f} kg/hr")
             if total_vfa_in > 0:
@@ -302,7 +302,7 @@ def run_case(
                 if exp_oil > 0:
                     print(f"    Actual vs expected:           {oil_kg_hr_diag / exp_oil * 100:>10.1f}%")
         except Exception as e:
-            print(f"  Could not read backend_oil: {e}")
+            print(f"  Could not read microbial_oil: {e}")
 
         print("\n" + "-" * 60)
 
@@ -349,7 +349,7 @@ def run_case(
     # -------------------------
     print("\n=== PRODUCT RATE ===")
     op_days = getattr(tea, "operating_days", 330.0)
-    print(f"  backend_oil total (kg/hr):      {oil_stream.F_mass:>10.2f}")
+    print(f"  microbial_oil total (kg/hr):    {oil_stream.F_mass:>10.2f}")
     print(f"  MicrobialOil in stream (kg/hr): {float(oil_stream.imass['MicrobialOil']):>10.2f}")
     print(f"  MicrobialOil annual (kg/yr):    {float(oil_stream.imass['MicrobialOil']) * op_days * 24:>10.0f}")
 
@@ -585,7 +585,7 @@ def run_product_scenario_comparison(feed_price: float = 0.00):
             _apply_disposal_costs(streams)
 
             # Wire extraction cost as OE.add_OPEX
-            oil_stream = streams["backend_oil"]
+            oil_stream = streams["microbial_oil"]
             product_kg_hr = float(oil_stream.imass["MicrobialOil"])
             extraction_usd_per_hr = product_kg_hr * sc["extraction_usd_per_kg"]
             try:
