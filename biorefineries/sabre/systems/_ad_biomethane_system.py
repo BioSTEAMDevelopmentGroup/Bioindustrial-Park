@@ -119,5 +119,5 @@ def create_ad_biomethane_system(
 
     path.extend([*pt_units, AD, H2SR, UP, SP])
 
-    sys = bst.System("AD_Biomethane_sys", path=path)
+    sys = bst.System("ad_biomethane_sys", path=path)
     return sys

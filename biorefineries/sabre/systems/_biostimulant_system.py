@@ -153,7 +153,7 @@ def create_biostimulant_system(
         if fresh_water_used > 0:
             fresh_water.imass["Water"] = fresh_water_used
 
-    sys = bst.System("Biostimulant_sys", path=(PR, PC, PSP, DIL, EV))
+    sys = bst.System("biostimulant_sys", path=(PR, PC, PSP, DIL, EV))
 
     streams = {
         "feed": feed,

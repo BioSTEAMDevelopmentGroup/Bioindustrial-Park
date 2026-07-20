@@ -157,7 +157,7 @@ def create_ad_integrated_system(
     preprocessing = list(bio_sys.units) + [ML]
     all_units = preprocessing + [SPL] + methane_units + vfa_units
 
-    sys = bst.System.from_units("integrated_biorefinery", units=all_units)
+    sys = bst.System.from_units("ad_integrated_sys", units=all_units)
 
     # =========================================================
     # STREAMS DICT

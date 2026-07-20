@@ -58,4 +58,4 @@ def create_ad_vfa_system(feedstock: str | bst.Stream = "pelagic"):
     SP = DigestateScrewPress(ID="SP_VFA", ins=AD - 1, outs=("acidogenic_residual_solids", "vfa_broth"))
     path.extend([AD, SP])
 
-    return bst.System("AD_VFA_sys", path=tuple(path))
+    return bst.System("ad_vfa_sys", path=tuple(path))

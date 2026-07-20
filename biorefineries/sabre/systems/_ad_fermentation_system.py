@@ -195,7 +195,7 @@ def _create_vfa_fermentation_system(vfa_broth):
 
     # OE added to system path between P607 and C603_2
     sys = bst.System(
-        "VFA_FER_sys",
+        "_vfa_fermentation_sys",
         path=(MF, T601, R601, V605, P606, Ev607, P607, OE, C603_2, S602, M601)
     )
 
@@ -274,7 +274,7 @@ def create_ad_fermentation_system(
     fer_sys, fer_streams, fer_units = _create_vfa_fermentation_system(vfa_broth=vfa_broth)
 
     sys = bst.System.from_units(
-        "AD_Fermentation_sys",
+        "ad_fermentation_sys",
         units=list(ad_vfa_sys.units) + list(fer_sys.units),
     )
 
