@@ -28,7 +28,7 @@ REPO_ROOT = SCRIPT_DIR.parents[2]
 if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
-from biorefineries.sabre._chemicals import set_thermo
+from biorefineries.sabre._chemicals import create_chemicals
 from biorefineries.sabre.systems import create_ad_biomethane_system
 from biorefineries.sabre._tea import create_tea, solve_biomethane_msp
 
@@ -88,7 +88,7 @@ def apply_stream_economics(sys, biostimulant_price: float):
 
 def build_case(pretreatment_case: str, biostimulant_price: float):
     bst.main_flowsheet.clear()
-    set_thermo()
+    create_chemicals()
 
     sys = create_ad_biomethane_system(
         feedstock="pelagic",

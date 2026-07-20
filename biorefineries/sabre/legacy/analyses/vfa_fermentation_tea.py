@@ -16,7 +16,7 @@ REPO_ROOT = SCRIPT_DIR.parents[2]
 if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
-from biorefineries.sabre._chemicals import set_thermo
+from biorefineries.sabre._chemicals import create_chemicals
 from biorefineries.sabre.systems import create_ad_fermentation_system
 from biorefineries.sabre._tea import create_tea, solve_product_msp
 
@@ -147,7 +147,7 @@ def _apply_disposal_costs(
 
 def build_and_simulate(feed_price_per_kg_wet: float):
     bst.main_flowsheet.clear()
-    set_thermo()
+    create_chemicals()
 
     full_sys, streams, units = create_ad_fermentation_system()
     streams["feed"].price = feed_price_per_kg_wet
@@ -521,7 +521,7 @@ def build_and_simulate_scenario(
     Returns (streams, units, full_sys).
     """
     bst.main_flowsheet.clear()
-    set_thermo()
+    create_chemicals()
 
     full_sys, streams, units = create_ad_fermentation_system()
 

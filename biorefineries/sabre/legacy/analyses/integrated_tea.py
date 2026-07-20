@@ -37,7 +37,7 @@ REPO_ROOT = SCRIPT_DIR.parents[2]
 if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
-from biorefineries.sabre._chemicals import set_thermo
+from biorefineries.sabre._chemicals import create_chemicals
 from biorefineries.sabre.systems import create_ad_integrated_system
 from biorefineries.sabre._tea import create_tea, solve_product_msp, solve_biomethane_msp
 
@@ -179,7 +179,7 @@ def run_alpha_sweep(
 
     for alpha in ALPHA_SWEEP:
         bst.main_flowsheet.clear()
-        set_thermo()
+        create_chemicals()
 
         try:
             sys, streams, units, _ = create_ad_integrated_system(

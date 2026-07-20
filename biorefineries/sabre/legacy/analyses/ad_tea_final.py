@@ -42,7 +42,7 @@ REPO_ROOT = SCRIPT_DIR.parents[2]
 if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
-from biorefineries.sabre._chemicals import set_thermo
+from biorefineries.sabre._chemicals import create_chemicals
 from biorefineries.sabre.systems import create_ad_biomethane_system
 from biorefineries.sabre._tea import create_tea, solve_biomethane_msp
 
@@ -154,7 +154,7 @@ def build_and_simulate(
     feedstock_type: str = "pelagic",
 ):
     bst.main_flowsheet.clear()
-    set_thermo()
+    create_chemicals()
     sys = create_ad_biomethane_system(
         feedstock=feedstock_type,
         pretreatment_case=pretreatment_case,

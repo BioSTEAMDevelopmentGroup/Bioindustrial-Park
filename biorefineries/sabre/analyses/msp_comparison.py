@@ -48,7 +48,7 @@ REPO_ROOT = SCRIPT_DIR.parents[2]
 if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
-from biorefineries.sabre._chemicals import set_thermo
+from biorefineries.sabre._chemicals import create_chemicals
 from biorefineries.sabre.systems import (
     create_biostimulant_system,
     create_ad_biomethane_system,
@@ -123,7 +123,7 @@ def _patch_ev607():
 
 def price_biostimulant_system() -> dict:
     bst.main_flowsheet.clear()
-    set_thermo()
+    create_chemicals()
 
     sys, streams, units = create_biostimulant_system(
         pressed_cake_disposal_usd_per_kg=SOLIDS_DISPOSAL_USD_PER_KG,
@@ -147,7 +147,7 @@ def price_biostimulant_system() -> dict:
 
 def price_ad_biomethane_system() -> dict:
     bst.main_flowsheet.clear()
-    set_thermo()
+    create_chemicals()
 
     sys = create_ad_biomethane_system(feedstock="pelagic")
     sys.flowsheet.stream.sargassum_feed.price = FEED_PRICE_USD_PER_KG_WET
@@ -178,7 +178,7 @@ def price_ad_biomethane_system() -> dict:
 
 def price_ad_vfa_system() -> dict:
     bst.main_flowsheet.clear()
-    set_thermo()
+    create_chemicals()
 
     sys = create_ad_vfa_system(feedstock="pelagic")
     sys.flowsheet.stream.sargassum_feed.price = FEED_PRICE_USD_PER_KG_WET
@@ -213,7 +213,7 @@ def price_ad_vfa_system() -> dict:
 
 def price_ad_fermentation_system() -> dict:
     bst.main_flowsheet.clear()
-    set_thermo()
+    create_chemicals()
 
     sys, streams, units = create_ad_fermentation_system(feedstock="pelagic")
     streams["feed"].price = FEED_PRICE_USD_PER_KG_WET

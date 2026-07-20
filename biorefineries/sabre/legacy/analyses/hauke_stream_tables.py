@@ -30,7 +30,7 @@ REPO_ROOT = SCRIPT_DIR.parents[2]
 if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
-from biorefineries.sabre._chemicals import set_thermo
+from biorefineries.sabre._chemicals import create_chemicals
 from biorefineries.sabre.systems import create_ad_biomethane_system
 
 OUT = SCRIPT_DIR.parent / "results"
@@ -148,7 +148,7 @@ STREAM_ORDER = [
 def run_case(case):
     """Build, simulate, and extract stream rows for one pretreatment case."""
     bst.main_flowsheet.clear()
-    set_thermo()
+    create_chemicals()
 
     sys = create_ad_biomethane_system(
         feedstock="pelagic",

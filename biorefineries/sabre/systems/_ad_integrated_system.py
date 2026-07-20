@@ -28,6 +28,7 @@ Returns (sys, streams, units, alpha).
 
 import biosteam as bst
 
+from biorefineries.sabre._chemicals import create_chemicals
 from biorefineries.sabre.units import Mill
 from biorefineries.sabre.systems._biostimulant_system import create_biostimulant_system
 from biorefineries.sabre.systems._ad_biomethane_system import create_ad_biomethane_system
@@ -92,6 +93,8 @@ def create_ad_integrated_system(
     units : dict of key units
     alpha : float
     """
+    try: bst.settings.get_chemicals()
+    except Exception: create_chemicals()
     alpha = float(alpha)
     if not (0.0 <= alpha <= 1.0):
         raise ValueError(f"alpha must be in [0, 1], got {alpha}")

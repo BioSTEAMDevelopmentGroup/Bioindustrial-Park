@@ -20,13 +20,13 @@ REPO_ROOT = SCRIPT_DIR.parents[2]
 if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
-from biorefineries.sabre._chemicals import set_thermo
+from biorefineries.sabre._chemicals import create_chemicals
 from biorefineries.sabre.utils import (
     load_assumptions, get_feedstock_type_params, get_scale_feed_kgph, make_sargassum_feed,
 )
 
 if __name__ == "__main__":
-    set_thermo()
+    create_chemicals()
     feedstock_assumptions = load_assumptions("feedstock.yaml")
     params = get_feedstock_type_params(feedstock_assumptions, "pelagic")
     fresh_feed_kgph = get_scale_feed_kgph(feedstock_assumptions)

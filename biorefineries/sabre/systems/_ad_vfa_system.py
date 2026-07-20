@@ -10,6 +10,7 @@ VFA-producing acidogenic AD system builder for the SaBRe flowsheets.
 """
 import biosteam as bst
 
+from biorefineries.sabre._chemicals import create_chemicals
 from biorefineries.sabre.units import AcidogenicDigester, DigestateScrewPress, Mill
 from biorefineries.sabre.systems._biostimulant_system import create_biostimulant_system
 
@@ -39,6 +40,8 @@ def create_ad_vfa_system(feedstock: str | bst.Stream = "pelagic"):
         - pressate_permeate (standalone mode only)
         - biostimulant_product (standalone mode only)
     """
+    try: bst.settings.get_chemicals()
+    except Exception: create_chemicals()
     path = []
 
     if isinstance(feedstock, str):

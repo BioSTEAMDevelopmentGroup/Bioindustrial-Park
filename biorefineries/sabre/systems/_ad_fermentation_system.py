@@ -11,6 +11,7 @@ Acidogenic-AD-to-microbial-oil system builder for the SaBRe flowsheets.
 import biosteam as bst
 import flexsolve as flx
 
+from biorefineries.sabre._chemicals import create_chemicals
 from biorefineries.sabre.utils import load_assumptions
 from biorefineries.sabre.units import (
     YarrowiaLipidFermenter,
@@ -263,6 +264,8 @@ def create_ad_fermentation_system(
     units : dict
         Key units from both subsystems.
     """
+    try: bst.settings.get_chemicals()
+    except Exception: create_chemicals()
     ad_vfa_sys = create_ad_vfa_system(feedstock=feedstock)
     feed = feedstock if not isinstance(feedstock, str) else ad_vfa_sys.feeds[0]
     vfa_broth = ad_vfa_sys.flowsheet.stream.vfa_broth

@@ -11,6 +11,7 @@ AD/biomethane system builder for the SaBRe (Sargassum Biorefinery) flowsheets.
 
 import biosteam as bst
 
+from biorefineries.sabre._chemicals import create_chemicals
 from biorefineries.sabre.utils import load_assumptions, get_ad_temperature_K
 from biorefineries.sabre.units import (
     AnaerobicDigester, BiogasUpgrading, H2SRemoval, DigestateScrewPress,
@@ -49,6 +50,8 @@ def create_ad_biomethane_system(
     pretreatment_case : str
         data/pretreatment.yaml `pretreatment_ad` case name.
     """
+    try: bst.settings.get_chemicals()
+    except Exception: create_chemicals()
     path = []
 
     if isinstance(feedstock, str):

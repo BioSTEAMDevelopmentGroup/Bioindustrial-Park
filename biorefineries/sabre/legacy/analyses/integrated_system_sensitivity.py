@@ -42,7 +42,7 @@ from integrated_tea import (
     _wire_oil_reagent,
     run_alpha_sweep,
 )
-from biorefineries.sabre._chemicals import set_thermo
+from biorefineries.sabre._chemicals import create_chemicals
 from biorefineries.sabre.systems import create_ad_integrated_system
 from biorefineries.sabre._tea import create_tea
 
@@ -130,7 +130,7 @@ def _build_npv_at_alpha(
 ) -> float:
     """Run one simulation at given alpha and return NPV ($M)."""
     bst.main_flowsheet.clear()
-    set_thermo()
+    create_chemicals()
 
     sys, streams, units, _ = create_ad_integrated_system(
         alpha=alpha,

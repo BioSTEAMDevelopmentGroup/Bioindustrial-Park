@@ -23,6 +23,7 @@ Pathway:
 """
 import biosteam as bst
 
+from biorefineries.sabre._chemicals import create_chemicals
 from biorefineries.sabre.utils import (
     load_assumptions, get_feedstock_type_params, get_scale_feed_kgph, make_sargassum_feed,
 )
@@ -73,6 +74,8 @@ def create_biostimulant_system(
     units : dict
         'PR', 'PC', 'PSP', 'DIL', 'EV'.
     """
+    try: bst.settings.get_chemicals()
+    except Exception: create_chemicals()
     feedstock_assumptions = load_assumptions("feedstock.yaml")
     params = get_feedstock_type_params(feedstock_assumptions, feedstock_type)
     fresh_feed_kgph = get_scale_feed_kgph(feedstock_assumptions)
