@@ -31,11 +31,9 @@ PRICE_NAOH_USD_PER_KG      = 0.35  # NaOH (pH base)
 # -------------------------
 # Disposal costs (negative stream prices = cost in BioSTEAM VOC)
 # -------------------------
-# Retentate: microfilter reject → modeled as wastewater disposal
-#   Basis: industrial wastewater $3-8/m3 ≈ $0.003-0.008/kg
-RETENTATE_DISPOSAL_USD_PER_KG = -0.005
-
-# Fermentation wastewater: residual organics + salts + cell debris
+# Fermentation wastewater: residual organics + salts + cell debris, plus
+# evaporator condensate and microfilter retentate (mixed upstream into the
+# same stream, so one disposal price covers all three)
 #   Basis: biological wastewater treatment $3-8/m3 ≈ $0.003-0.008/kg
 FERM_WASTEWATER_DISPOSAL_USD_PER_KG = -0.005
 
@@ -127,16 +125,9 @@ def _apply_disposal_costs(
     summary = {}
 
     try:
-        s = streams["vfa_retentate"]
-        s.price = RETENTATE_DISPOSAL_USD_PER_KG
-        summary["vfa_retentate"] = abs(s.price * s.F_mass * annual_hours)
-    except Exception as e:
-        print(f"  [WARNING] retentate disposal: {e}")
-
-    try:
-        s = streams["fermentation_wastewater"]
+        s = streams["wastewater"]
         s.price = FERM_WASTEWATER_DISPOSAL_USD_PER_KG
-        summary["fermentation_wastewater"] = abs(s.price * s.F_mass * annual_hours)
+        summary["wastewater"] = abs(s.price * s.F_mass * annual_hours)
     except Exception as e:
         print(f"  [WARNING] ferm wastewater disposal: {e}")
 

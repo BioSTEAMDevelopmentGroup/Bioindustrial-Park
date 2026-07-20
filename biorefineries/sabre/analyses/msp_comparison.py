@@ -71,8 +71,9 @@ FEED_PRICE_USD_PER_KG_WET = 0.00  # near-zero feedstock price (base case)
 SOLIDS_DISPOSAL_USD_PER_KG           = -0.04   # wet solids cake, "standard biosolids" basis
 SOIL_AMENDMENT_DISPOSAL_USD_PER_KG   = -0.02   # AD digestate solids; heavy metals rule out land application
 LIQUID_DIGESTATE_DISPOSAL_USD_PER_KG = -0.002  # ~$2/m3 wastewater basis
-RETENTATE_DISPOSAL_USD_PER_KG        = -0.005  # microfilter reject, wastewater basis
-FERM_WASTEWATER_DISPOSAL_USD_PER_KG  = -0.005  # fermentation wastewater, wastewater basis
+FERM_WASTEWATER_DISPOSAL_USD_PER_KG  = -0.005  # fermentation wastewater basis; also covers
+                                                # evaporator condensate + microfilter retentate,
+                                                # which are now mixed into this stream upstream
 BIOSTIMULANT_CREDIT_USD_PER_KG       = 0.00    # no byproduct revenue in the base case
 
 OIL_EXTRACTION_REAGENT_USD_PER_KG_OIL = 0.50
@@ -152,8 +153,8 @@ def price_ad_biomethane_system() -> dict:
     sys.flowsheet.stream.sargassum_feed.price = FEED_PRICE_USD_PER_KG_WET
 
     fs = sys.flowsheet
-    _set_price(fs, "pressate_permeate", 0.0)
-    _set_price(fs, "biostimulant_membrane_concentrate", BIOSTIMULANT_CREDIT_USD_PER_KG)
+    _set_price(fs, "residual_permeate", 0.0)
+    _set_price(fs, "biostimulant_product", BIOSTIMULANT_CREDIT_USD_PER_KG)
     _set_price(fs, "soil_amendment", SOIL_AMENDMENT_DISPOSAL_USD_PER_KG)
     _set_price(fs, "liquid_digestate", LIQUID_DIGESTATE_DISPOSAL_USD_PER_KG)
 
@@ -183,8 +184,8 @@ def price_ad_vfa_system() -> dict:
     sys.flowsheet.stream.sargassum_feed.price = FEED_PRICE_USD_PER_KG_WET
 
     fs = sys.flowsheet
-    _set_price(fs, "pressate_permeate", 0.0)
-    _set_price(fs, "biostimulant_membrane_concentrate", BIOSTIMULANT_CREDIT_USD_PER_KG)
+    _set_price(fs, "residual_permeate", 0.0)
+    _set_price(fs, "biostimulant_product", BIOSTIMULANT_CREDIT_USD_PER_KG)
     _set_price(fs, "acidogenic_residual_solids", SOLIDS_DISPOSAL_USD_PER_KG)
 
     sys.simulate()
@@ -229,11 +230,10 @@ def price_ad_fermentation_system() -> dict:
     sys.simulate()
     _patch_ev607()
 
-    _set_price(fs, "pressate_permeate", 0.0)
-    _set_price(fs, "biostimulant_membrane_concentrate", BIOSTIMULANT_CREDIT_USD_PER_KG)
+    _set_price(fs, "residual_permeate", 0.0)
+    _set_price(fs, "biostimulant_product", BIOSTIMULANT_CREDIT_USD_PER_KG)
     _set_price(fs, "acidogenic_residual_solids", SOLIDS_DISPOSAL_USD_PER_KG)
-    _set_price(fs, "vfa_retentate", RETENTATE_DISPOSAL_USD_PER_KG)
-    _set_price(fs, "fermentation_wastewater", FERM_WASTEWATER_DISPOSAL_USD_PER_KG)
+    _set_price(fs, "wastewater", FERM_WASTEWATER_DISPOSAL_USD_PER_KG)
 
     oil_stream = streams["backend_oil"]
     oil_kg_hr = float(oil_stream.imass["MicrobialOil"])

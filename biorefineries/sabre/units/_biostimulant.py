@@ -201,45 +201,23 @@ class PressateConcentrator(bst.Unit):
 
 class BiostimulantEvaporator(bst.Unit):
     """
-    Finishing step for the pressate-derived biostimulant product: adjusts
-    a concentrate stream to a target solids content, in either direction.
-
-    Direction logic (in `_run`):
-    - If the concentrate is below target_solids_wt_frac (needs
-      concentrating): evaporates the excess water, same as this unit's
-      original press-pretreatment-side design -- utility duty and CAPEX
-      scale with the amount of water evaporated (`_design`/`_cost`,
-      unchanged from before).
-    - If the concentrate is above target_solids_wt_frac (needs diluting):
-      adds water to hit the target. Water is drawn from ins[1] (permeate)
-      first, up to its availability; any remaining shortfall is drawn
-      from ins[2] (fresh water). No evaporation duty or CAPEX applies to
-      this direction -- diluting is just mixing, not a heat/mass-transfer
-      operation, so `_design`/`_cost` naturally come out to zero when
-      `_water_evaporated_kgph` is zero.
+    Finishing step for the pressate-derived biostimulant product: evaporates
+    water to reach a target solids content.
 
     Parameters
     ----------
-    ins : tuple[stream, stream, stream]
-        Concentrate to adjust, permeate (water source when diluting), and
-        fresh water make-up (settable/phantom stream, filled in by
-        `_run()` with exactly the shortfall permeate doesn't cover).
-    outs : tuple[stream, stream, stream]
-        Biostimulant product (adjusted to `target_solids_wt_frac`), vapor
-        (water removed by evaporation; zero when diluting), and residual
-        permeate (permeate minus whatever water it contributed).
-    enabled : bool
-        If False, this unit is a no-op bypass: the concentrate passes
-        straight through to the product outlet unchanged (vapor stays
-        empty, permeate passes straight through to residual permeate
-        unchanged, no fresh water is drawn), and `_design`/`_cost` report
-        zero duty, electricity, installed cost, and maintenance OPEX.
-        Lets this unit sit permanently wired into a flowsheet's `path`
-        while being switched on/off without restructuring stream
-        connectivity.
-    target_solids_wt_frac : float
-        Target dry-solids weight fraction of the product (0-1); the unit
-        evaporates or dilutes to reach it, whichever direction applies.
+    ins : stream
+        Concentrate to evaporate.
+    outs : tuple[stream, stream]
+        Biostimulant product (adjusted to `target_solids_wt_frac`) and
+        vapor (water removed by evaporation, plus the small
+        non-recovered-solute fraction).
+    target_solids_wt_frac : float or None
+        Target dry-solids weight fraction of the product (0-1). `None` is
+        a no-op bypass: the concentrate passes straight through to the
+        product outlet unchanged (vapor stays empty), and `_design`/
+        `_cost` report zero duty, electricity, installed cost, and
+        maintenance OPEX.
     boiling_temperature_K : float
         Evaporation temperature; also the reference temperature for the
         latent-heat lookup (see Notes below).
@@ -267,8 +245,8 @@ class BiostimulantEvaporator(bst.Unit):
     Refer to data/biostimulant.yaml for the default values and references.
     """
 
-    _N_ins = 3
-    _N_outs = 3  # biostimulant_product, vapor, residual_permeate
+    _N_ins = 1
+    _N_outs = 2  # biostimulant_product, vapor
     _F_BM_default = {"Biostimulant evaporator": _EVAPORATOR["F_BM"]}
 
     def __init__(
@@ -276,7 +254,6 @@ class BiostimulantEvaporator(bst.Unit):
         ID="",
         ins=None,
         outs=(),
-        enabled=_EVAPORATOR["enabled"],
         target_solids_wt_frac=_EVAPORATOR["target_solids_wt_frac"],
         boiling_temperature_K=_EVAPORATOR["boiling_temperature_K"],
         electricity_kWh_per_kg_water_evap=_EVAPORATOR["electricity_kWh_per_kg_water_evap"],
@@ -289,8 +266,9 @@ class BiostimulantEvaporator(bst.Unit):
     ):
         super().__init__(ID, ins, outs, **kwargs)
 
-        self.enabled = bool(enabled)
-        self.target_solids_wt_frac = float(target_solids_wt_frac)
+        self.target_solids_wt_frac = (
+            None if target_solids_wt_frac is None else float(target_solids_wt_frac)
+        )
         self.boiling_temperature_K = float(boiling_temperature_K)
         self.electricity_kWh_per_kg_water_evap = float(electricity_kWh_per_kg_water_evap)
         self.nonwater_recovery_to_product = float(nonwater_recovery_to_product)
@@ -301,24 +279,17 @@ class BiostimulantEvaporator(bst.Unit):
         self.maintenance_frac_of_capex_per_yr = float(maintenance_frac_of_capex_per_yr)
 
     def _run(self):
-        conc_in, permeate_in, fresh_water_in = self.ins
-        product, vapor, residual_permeate = self.outs
+        conc_in, = self.ins
+        product, vapor = self.outs
 
         product.empty()
         vapor.empty()
-        fresh_water_in.empty()
-        residual_permeate.copy_like(permeate_in)
-
         product.phase = "l"
         vapor.phase = "g"
-        residual_permeate.phase = "l"
-        fresh_water_in.phase = "l"
 
-        if not self.enabled:
+        if self.target_solids_wt_frac is None:
             product.copy_like(conc_in)
             self._water_evaporated_kgph = 0.0
-            self._permeate_water_used_kgph = 0.0
-            self._fresh_water_used_kgph = 0.0
             water = float(conc_in.imass["Water"]) if "Water" in conc_in.chemicals.IDs else 0.0
             nonwater = product.F_mass - water
             self._product_solids_wt_frac = nonwater / product.F_mass if product.F_mass > 0 else 0.0
@@ -357,38 +328,12 @@ class BiostimulantEvaporator(bst.Unit):
             water_to_product = nonwater_prod * (1.0 - x_target) / x_target
         water_to_product = max(water_to_product, 0.0)
 
-        permeate_water_used = 0.0
-        fresh_water_used = 0.0
-
-        if water_to_product <= water_in:
-            # Concentrating: evaporate the excess water
-            water_to_vapor = water_in - water_to_product
-        else:
-            # Diluting: draw the shortfall from permeate first, then fresh water
-            water_to_vapor = 0.0
-            shortfall = water_to_product - water_in
-
-            permeate_water_avail = (
-                float(permeate_in.imass["Water"])
-                if "Water" in permeate_in.chemicals.IDs else 0.0
-            )
-            permeate_water_used = min(shortfall, permeate_water_avail)
-            shortfall -= permeate_water_used
-            fresh_water_used = max(shortfall, 0.0)
-
-        product.imass["Water"] = water_to_product
+        # Evaporate the excess water.
+        water_to_vapor = max(water_in - water_to_product, 0.0)
+        product.imass["Water"] = water_in - water_to_vapor
         vapor.imass["Water"] = water_to_vapor
 
-        if permeate_water_used > 0:
-            residual_permeate.imass["Water"] = max(
-                float(permeate_in.imass["Water"]) - permeate_water_used, 0.0
-            )
-        if fresh_water_used > 0:
-            fresh_water_in.imass["Water"] = fresh_water_used
-
         self._water_evaporated_kgph = water_to_vapor
-        self._permeate_water_used_kgph = permeate_water_used
-        self._fresh_water_used_kgph = fresh_water_used
         self._product_solids_wt_frac = (
             nonwater_prod / product.F_mass if product.F_mass > 0 else 0.0
         )
@@ -396,7 +341,7 @@ class BiostimulantEvaporator(bst.Unit):
     def _design(self):
         conc_in = self.ins[0]
 
-        if not self.enabled:
+        if self.target_solids_wt_frac is None:
             self.design_results["Feed flow (kg/h)"] = float(conc_in.F_mass)
             self.design_results["Water evaporated (kg/h)"] = 0.0
             self.design_results["Total duty (kJ/h)"] = 0.0
@@ -421,12 +366,6 @@ class BiostimulantEvaporator(bst.Unit):
 
         self.design_results["Feed flow (kg/h)"] = float(conc_in.F_mass)
         self.design_results["Water evaporated (kg/h)"] = water_evap
-        self.design_results["Permeate water used (kg/h)"] = getattr(
-            self, "_permeate_water_used_kgph", 0.0
-        )
-        self.design_results["Fresh water used (kg/h)"] = getattr(
-            self, "_fresh_water_used_kgph", 0.0
-        )
         self.design_results["Target solids wt frac"] = self.target_solids_wt_frac
         self.design_results["Actual product solids wt frac"] = getattr(
             self, "_product_solids_wt_frac", 0.0

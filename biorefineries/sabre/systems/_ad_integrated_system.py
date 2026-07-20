@@ -8,8 +8,8 @@
 """
 Integrated Sargassum Biorefinery System Builder
 ================================================
-Shared preprocessing (create_biostimulant_system's Press -> PC -> EV, plus
-a Mill on the pressed cake) then splits milled biomass:
+Shared preprocessing (create_biostimulant_system's Press -> PC -> PSP/DIL ->
+EV, plus a Mill on the pressed cake) then splits milled biomass:
   alpha     -> Methanogenic AD pathway -> biomethane
   (1-alpha) -> VFA fermentation pathway -> microbial oil
 
@@ -103,8 +103,8 @@ def create_ad_integrated_system(
     build_vfa     = alpha < 1.0
 
     # =========================================================
-    # SHARED PREPROCESSING: create_biostimulant_system's Press -> PC -> EV,
-    # plus a Mill on the pressed cake.
+    # SHARED PREPROCESSING: create_biostimulant_system's Press -> PC ->
+    # PSP/DIL -> EV, plus a Mill on the pressed cake.
     # =========================================================
     bio_sys, bio_streams, bio_units = create_biostimulant_system(feedstock_type=feedstock_type)
     PR, PC, EV = bio_units["PR"], bio_units["PC"], bio_units["EV"]
@@ -182,7 +182,7 @@ def create_ad_integrated_system(
         ]},
         # VFA pathway (None if alpha=1)
         **{k: vfa_streams.get(k) for k in [
-            "vfa_broth", "backend_oil", "fermentation_wastewater",
+            "vfa_broth", "backend_oil", "wastewater",
             "vfa_retentate", "acidogenic_residual_solids",
         ]},
     }

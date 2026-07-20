@@ -199,44 +199,16 @@ def _create_vfa_fermentation_system(
         purge.mol.remove_negatives()
         recycle.T = purge.T = feed.T
 
-    S601 = bst.Splitter(
-        "S601",
-        ins=Ev607 - 1,
-        outs=("condensate_to_wastewater", "evaporator_condensate"),
-        split=0.5,
-    )
-
     M601 = bst.Mixer(
         "M601",
-        ins=(S601 - 0, S602 - 1),
-        outs=("fermentation_wastewater",),
+        ins=(Ev607 - 1, S602 - 1, MF - 1),
+        outs=("wastewater",),
     )
-
-    M601.target_wastewater_concentration = 60.0  # no yaml counterpart
-
-    @M601.add_specification(run=True, impacted_units=[S601])
-    def adjust_wastewater_concentration():
-        concentrated_wastewater = M601.ins[1]
-        waste = concentrated_wastewater.F_mass - concentrated_wastewater.imass["Water"]
-        if concentrated_wastewater.F_vol <= 0 or waste <= 0:
-            S601.split[:] = 0.0
-            return
-
-        current_concentration = waste / concentrated_wastewater.F_vol
-        required_water = (
-            (1.0 / M601.target_wastewater_concentration) - (1.0 / current_concentration)
-        ) * waste * 1000.0
-
-        F_mass = S601.ins[0].F_mass
-        if F_mass > 0:
-            split = required_water / F_mass
-            split = min(max(split, 0.0), 1.0)
-            S601.split[:] = split
 
     # OE added to system path between P607 and C603_2
     sys = bst.System(
         "VFA_FER_sys",
-        path=(MF, T601, R601, V605, P606, Ev607, P607, OE, C603_2, S602, S601, M601)
+        path=(MF, T601, R601, V605, P606, Ev607, P607, OE, C603_2, S602, M601)
     )
 
     key_streams = {
@@ -251,8 +223,7 @@ def _create_vfa_fermentation_system(
         "backend_oil": C603_2.outs[0],
         "residual_slurry": C603_2.outs[1],
         "residual_purge": S602.outs[1],
-        "evaporator_condensate": S601.outs[1],
-        "fermentation_wastewater": M601.outs[0],
+        "wastewater": M601.outs[0],
         "ammonia": ammonia,
         "phosphate": phosphate,
         "base": base,
@@ -270,7 +241,6 @@ def _create_vfa_fermentation_system(
         "oil_extraction": OE,
         "oil_centrifuge": C603_2,
         "biomass_recycle_splitter": S602,
-        "condensate_splitter": S601,
         "wastewater_mixer": M601,
         # legacy aliases
         "centrifuge": C603_2,

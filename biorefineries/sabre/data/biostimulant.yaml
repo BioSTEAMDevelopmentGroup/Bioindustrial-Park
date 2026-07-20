@@ -29,7 +29,6 @@ pressate_concentrator:
       note: "Annual maintenance retained at 3.5% of installed CAPEX for consistency."
 
 biostimulant_evaporator:
-  enabled: true
   target_solids_wt_frac: 0.20
   boiling_temperature_K: 333.15 # mild vacuum evaporation ~60 C
   electricity_kWh_per_kg_water_evap: 0.0
