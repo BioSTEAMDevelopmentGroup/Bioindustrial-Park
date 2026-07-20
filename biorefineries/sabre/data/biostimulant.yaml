@@ -5,7 +5,7 @@ pressate_concentrator:
   retained_solute_IDs: [Alginate, Fucoidan, Mannitol, Protein, OtherSolids]
   water_recovery_to_permeate: 0.93
   retained_solute_recovery_to_concentrate: 0.95
-  nontarget_solute_recovery_to_permeate: 0.70 #!!! TODO: check if this value is in reference
+  nontarget_solute_recovery_to_permeate: 0.70 # no reference
   design_flux_L_m2_h: 35.0
   operating_pressure_bar: 5.0
   electricity_kWh_per_m3_feed: 2.5
@@ -21,9 +21,7 @@ pressate_concentrator:
       citation: "Membrane concentration literature for algal and bioprocess streams"
       note: "UF electricity commonly falls in the ~0.5–2.5 kWh/m3 range"
     nontarget_solute_recovery:
-      note: "No literature or prior-yaml grounding -- pure code-level scoping
-             assumption, moved here unchanged from units/_biostimulant.py's
-             old hardcoded inline 0.70 in _run()."
+      note: "No literature or prior-yaml grounding."
     capex:
       citation: "Sethi and Wiesner (2000); Nguyen and Yoshikawa (2020); Cheryan (1998)"
       note: "UF membrane/module cost commonly reported around $200–$500/m2; $800/m2 for convervative assumption"
@@ -44,10 +42,4 @@ biostimulant_evaporator:
 
   sources:
     all_params:
-      note: "No literature or prior-yaml grounding for any parameter in
-             this section -- pure code-level scoping assumptions, moved
-             here unchanged from units/_biostimulant.py's old hardcoded
-             __init__ defaults. sensible_cp_kJ_per_kgK and
-             latent_heat_kJ_per_kg were removed entirely (not moved here)
-             since BiostimulantEvaporator now reads those from BioSTEAM
-             directly (conc_in.Cp, chemicals.Water.Hvap)."
+      note: "No literature or prior-yaml grounding for any parameter in this section.
