@@ -70,11 +70,7 @@ def create_biostimulant_system(
         ash_wt_frac_dry=params["ash_wt_frac_dry"],
     )
 
-    # Press/PC both have their own yaml-sourced defaults
-    # (data/preprocessing.yaml, data/biostimulant.yaml) -- not
-    # re-declared here.
     PR = Press("PR", ins=feed, outs=("pressed_cake", "pressate"))
-    PR.outs[0].price = 0.0
 
     PC = PressateConcentrator(
         "PC", ins=PR - 1,
@@ -82,7 +78,6 @@ def create_biostimulant_system(
     )
 
     fresh_water = bst.Stream("biostimulant_fresh_water", Water=0.0, units="kg/hr")
-    fresh_water.price = 0.0
 
     # Splits PC's permeate into just the amount DIL needs for dilution
     # (outs[0]) and whatever's left over (outs[1], residual_permeate).
