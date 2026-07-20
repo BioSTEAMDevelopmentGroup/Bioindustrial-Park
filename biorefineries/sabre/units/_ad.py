@@ -73,6 +73,48 @@ def interp_ad_capex(volume_m3: float) -> float:
     raise RuntimeError("CAPEX interpolation failed")
 
 
+def _dilution_water_volume_m3ph(feed, water_kgph):
+    """
+    Volumetric flow (m3/hr) of `water_kgph` kg/hr of liquid water, using
+    BioSTEAM's own thermo-based density calc (at `feed`'s temperature)
+    rather than a fixed water-density constant.
+    """
+    if water_kgph <= 0.0:
+        return 0.0
+    water_stream = bst.Stream(thermo=feed.thermo, Water=water_kgph, units="kg/hr", phase="l", T=feed.T)
+    return float(water_stream.F_vol)
+
+
+def _resolve_dilution_water_kgph(feed, target_feed_moisture_frac):
+    """
+    Additional water (kg/hr) needed to bring `feed` up to
+    `target_feed_moisture_frac`. Returns 0.0 if `target_feed_moisture_frac`
+    is None (no dilution). Raises ValueError if the target is below the
+    feed's own moisture fraction, since dilution can only add water, not
+    remove it.
+    """
+    if target_feed_moisture_frac is None:
+        return 0.0
+
+    total_mass = float(feed.F_mass)
+    water_mass = float(feed.imass["Water"]) if "Water" in feed.chemicals else 0.0
+    current_moisture_frac = water_mass / total_mass if total_mass > 0.0 else 0.0
+
+    if target_feed_moisture_frac < current_moisture_frac:
+        raise ValueError(
+            f"target_feed_moisture_frac ({target_feed_moisture_frac}) is below the "
+            f"feed's own moisture fraction ({current_moisture_frac:.4f}); dilution can "
+            "only add water, not remove it."
+        )
+
+    dry_mass = max(total_mass - water_mass, 0.0)
+    if dry_mass <= 0.0:
+        return 0.0
+
+    target_water_mass = dry_mass * target_feed_moisture_frac / (1.0 - target_feed_moisture_frac)
+    return max(target_water_mass - water_mass, 0.0)
+
+
 class AnaerobicDigester(bst.Unit):
     """
     Convert a biodegradable fraction of Sargassum organics into raw biogas
@@ -124,6 +166,11 @@ class AnaerobicDigester(bst.Unit):
         Mixing power intensity per m3 of liquid volume.
     target_temperature_K : float
         Digester operating temperature (mesophilic/thermophilic).
+    target_feed_moisture_frac : float, optional
+        If given, water is added to the feed to reach this moisture
+        fraction before digestion. If None, no dilution water is added.
+        Must be >= the feed's own moisture fraction (dilution can only
+        add water, not remove it); raises ValueError otherwise.
     **kwargs
         Forwarded to `bst.Unit.__init__`.
 
@@ -157,6 +204,7 @@ class AnaerobicDigester(bst.Unit):
         # Utilities
         mixing_W_per_m3=_AD_METHANOGENIC["mixing_W_per_m3"],
         target_temperature_K=_AD_SHARED["temperature_regimes"]["mesophilic"]["temperature_K"],
+        target_feed_moisture_frac=_AD_METHANOGENIC.get("target_feed_moisture_frac"),
         **kwargs,
     ):
         super().__init__(ID, ins, outs, **kwargs)
@@ -172,6 +220,9 @@ class AnaerobicDigester(bst.Unit):
         self.headspace_frac = float(headspace_frac)
         self.max_single_digester_volume_m3 = float(max_single_digester_volume_MG) * 1e6 * GAL_TO_M3
         self.maintenance_usd_per_m3_yr = maintenance_usd_per_m3_yr
+        self.target_feed_moisture_frac = (
+            float(target_feed_moisture_frac) if target_feed_moisture_frac is not None else None
+        )
 
     def _available_digestible_pool(self, stream):
         thermo_ids = set(self.chemicals.IDs)
@@ -200,6 +251,10 @@ class AnaerobicDigester(bst.Unit):
 
         biogas.empty()
         digestate.copy_like(feed)
+
+        dilution_water_kgph = _resolve_dilution_water_kgph(feed, self.target_feed_moisture_frac)
+        if dilution_water_kgph > 0:
+            digestate.imass["Water"] += dilution_water_kgph
 
         biogas.phase = "g"
         digestate.phase = "l"
@@ -297,7 +352,9 @@ class AnaerobicDigester(bst.Unit):
         feed = self.ins[0]
         biogas, digestate = self.outs
 
-        slurry_m3_per_hr = feed.F_vol
+        dilution_water_kgph = _resolve_dilution_water_kgph(feed, self.target_feed_moisture_frac)
+
+        slurry_m3_per_hr = feed.F_vol + _dilution_water_volume_m3ph(feed, dilution_water_kgph)
         V_liquid = slurry_m3_per_hr * 24.0 * self.hrt_days
 
         hf = min(max(self.headspace_frac, 0.0), 0.95)
@@ -321,7 +378,7 @@ class AnaerobicDigester(bst.Unit):
         T_target = self.target_temperature_K
         dT = max(0.0, T_target - T_in)
 
-        m_dot_kgph = feed.F_mass
+        m_dot_kgph = feed.F_mass + dilution_water_kgph
         Q_kJph = m_dot_kgph * feed.Cp * dT
 
         self.design_results["Mixing power (kW)"] = mixing_kW
@@ -426,6 +483,11 @@ class AcidogenicDigester(bst.Unit):
         Mixing power intensity per m3 of liquid volume.
     target_temperature_K : float
         Digester operating temperature.
+    target_feed_moisture_frac : float, optional
+        If given, water is added to the feed to reach this moisture
+        fraction before digestion. If None, no dilution water is added.
+        Must be >= the feed's own moisture fraction (dilution can only
+        add water, not remove it); raises ValueError otherwise.
     enable_heat_shock : bool
         If True, adds a periodic heat-shock duty on top of the base
         heating duty.
@@ -465,6 +527,7 @@ class AcidogenicDigester(bst.Unit):
         max_single_digester_volume_MG: float = _AD_ACIDOGENIC["max_single_digester_volume_MG"],
         mixing_W_per_m3: float = _AD_ACIDOGENIC["mixing_W_per_m3"],
         target_temperature_K: float = _AD_SHARED["temperature_regimes"]["mesophilic"]["temperature_K"],
+        target_feed_moisture_frac: Optional[float] = _AD_ACIDOGENIC.get("target_feed_moisture_frac"),
         enable_heat_shock: bool = _AD_ACIDOGENIC["heat_shock"]["enable"],
         hs_target_temperature_K: float = _AD_ACIDOGENIC["heat_shock"]["target_temperature_K"],
         hs_events_per_day: float = _AD_ACIDOGENIC["heat_shock"]["events_per_day"],
@@ -483,6 +546,9 @@ class AcidogenicDigester(bst.Unit):
         self.max_single_digester_volume_m3 = float(max_single_digester_volume_MG) * 1e6 * GAL_TO_M3
         self.mixing_W_per_m3 = float(mixing_W_per_m3)
         self.target_temperature_K = float(target_temperature_K)
+        self.target_feed_moisture_frac = (
+            float(target_feed_moisture_frac) if target_feed_moisture_frac is not None else None
+        )
         self.enable_heat_shock = bool(enable_heat_shock)
         self.hs_target_temperature_K = float(hs_target_temperature_K)
         self.hs_events_per_day = float(hs_events_per_day)
@@ -521,6 +587,10 @@ class AcidogenicDigester(bst.Unit):
 
         offgas.empty()
         broth.copy_like(feed)
+
+        dilution_water_kgph = _resolve_dilution_water_kgph(feed, self.target_feed_moisture_frac)
+        if dilution_water_kgph > 0:
+            broth.imass["Water"] += dilution_water_kgph
 
         offgas.phase = "g"
         broth.phase = "l"
@@ -562,7 +632,10 @@ class AcidogenicDigester(bst.Unit):
 
     def _design(self):
         feed = self.ins[0]
-        slurry_m3_per_hr = feed.F_vol
+
+        dilution_water_kgph = _resolve_dilution_water_kgph(feed, self.target_feed_moisture_frac)
+
+        slurry_m3_per_hr = feed.F_vol + _dilution_water_volume_m3ph(feed, dilution_water_kgph)
         V_liquid = slurry_m3_per_hr * 24.0 * self.hrt_days
 
         hf = min(max(self.headspace_frac, 0.0), 0.95)
@@ -586,7 +659,7 @@ class AcidogenicDigester(bst.Unit):
         T_in = float(getattr(feed, "T", self.target_temperature_K))
         T_base = self.target_temperature_K
         dT = max(0.0, T_base - T_in)
-        m_dot_kgph = feed.F_mass
+        m_dot_kgph = feed.F_mass + dilution_water_kgph
         Q_base_kJph = m_dot_kgph * feed.Cp * dT
 
         self.design_results["Influent T (K)"] = T_in
@@ -1305,7 +1378,7 @@ class DigestateScrewPress(bst.Unit):
         # Power: kW = (kWh/m3) * (m3/h)
         F_m3ph = float(self.ins[0].F_vol)
         kW = self.kWh_per_m3 * F_m3ph
-        self.power_utility(kW)
+        self.power_utility.consumption = kW
 
         self.design_results["Throughput_m3ph"] = F_m3ph
         self.design_results["kWh_per_m3"] = self.kWh_per_m3
