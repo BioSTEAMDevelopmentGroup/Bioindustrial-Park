@@ -1,7 +1,7 @@
 # Model Assumptions: Preprocessing
 
 press:
-  cake_solids_wt_frac: 0.15 # TODO: not within the 26-29% range reported in literature; see sources.note
+  cake_solids_wt_frac: 0.15
   solids_capture_frac: 0.98
   solubles_to_pressate_frac: 1.0
 
@@ -9,16 +9,8 @@ press:
 
   capex_model: scaled_anchor
   basis: dry_tph
-  ref_capacity_tph_dry: 0.953 # unused
-  ref_capacity_tph_wet: 50.0 # no source; this is the value the code actually uses for CAPEX scaling.
-    # DISCREPANCY: basis above is declared "dry_tph" and ref_capacity_tph_dry (0.953) is the
-    # value that basis implies, but no code path ever reads a dry-basis reference capacity --
-    # only this wet-tph value is used (see _preprocessing.py::Press). If ref_capacity_tph_dry
-    # and ref_capacity_tph_wet were meant to describe the same single press train, their ratio
-    # (0.953 / 50.0 = 1.9%) implies ~2 wt% solids at the reference point -- far more dilute than
-    # this model's own feedstock TS content (~13.3 wt%, see feedstock.yaml moisture_frac: 0.8673)
-    # and nowhere near the 26-29 wt% cake solids the sources.performance citation reports for
-    # Sargassum. The two numbers do not appear to describe the same basis; not reconciled here.
+  ref_capacity_tph_dry: 0.953 # cannot match back to source
+  ref_capacity_tph_wet: 15 # originally 50, cannot match back to source
   capex_installed_ref_usd: 3100000.0
   scale_exponent: 0.60
   F_BM: 1.0 # capex already installed
@@ -26,10 +18,12 @@ press:
   sources:
     capex:
       citation: "City of Bellingham Biosolids Facility Planning Report, TM 12: Solids Screening, Thickening, and Dewatering Technology Evaluation (2021)"
-      note: "Installed screw press system anchor based on municipal screw press dewatering cost tables; adapted to this model using dry-solids throughput scaling."
+      note: 
+        original: "Installed screw press system anchor based on municipal screw press dewatering cost tables; adapted to this model using dry-solids throughput scaling."
+        added: "cannot find original value basis, changed to 17.5 for ref_capacity_tph_wet based on Tables 4-11 and 4-13 from https://cob.org/wp-content/uploads/TM-12-Screening-Thickening-and-Dewatering.pdf, 9.3 million for 3, so 3.1 million for 1 (matches capex here). 1,050 lb TS/hr per unit, 2.4-4.5% TS for feed (assumed 3%, 1050/2204.62/0.03 is about 15.9)."
     performance:
       citation: "Vincent Corporation seaweed pressing notes; supported by brown macroalgae dewatering literature"
-      note: "Sargassum-specific pressing data indicate cake solids around 26–29 wt% TS; 27 wt% TS selected as central baseline."
+      note: "Sargassum-specific pressing data indicate cake solids around 26–29 wt% TS; 27 wt% TS selected as central baseline. The screw press in Table 4-11 as noted above indicates ~18% solids in the cake."
     power:
       citation: "HUBER screw press case study (2023)"
       note: "Use ~5 kWh/t dry solids for press-only electricity. Larger values such as ~20 kWh/t DS correspond to total system electricity including pumps and auxiliaries."

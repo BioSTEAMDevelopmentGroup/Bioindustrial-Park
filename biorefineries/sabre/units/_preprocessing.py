@@ -89,7 +89,7 @@ class Press(bst.Unit):
         power_kWh_per_dry_ton_TS=_PRESS["power_kWh_per_dry_ton_TS"],
 
         # --- costing ---
-        ref_capacity_tph_wet=_PRESS["ref_capacity_tph_wet"],  # no source; see data/preprocessing.yaml for a basis-mismatch note
+        ref_capacity_tph_wet=_PRESS["ref_capacity_tph_wet"],
         capex_installed_ref_usd=_PRESS["capex_installed_ref_usd"],
         scale_exponent=_PRESS["scale_exponent"],
         **kwargs
@@ -101,9 +101,7 @@ class Press(bst.Unit):
         self.solids_capture_frac = float(solids_capture_frac)
         self.cake_solids_wt_frac = float(cake_solids_wt_frac)
         self.solubles_to_pressate_frac = float(solubles_to_pressate_frac)
-
         self.power_kWh_per_dry_ton_TS = power_kWh_per_dry_ton_TS
-
         self.ref_capacity_tph_wet = float(ref_capacity_tph_wet)
         self.capex_installed_ref_usd = float(capex_installed_ref_usd)
         self.scale_exponent = float(scale_exponent)
