@@ -534,7 +534,7 @@ def build_and_simulate_scenario(
 
     full_sys, streams, units = create_ad_fermentation_system(
         product_yield_kg_per_kg_vfa_consumed=product_yield,   # scenario override --> from scenario input
-        residence_time_h=residence_time_h,                    # scenario override --> from scenario input
+        fermenter_tau=residence_time_h,                       # scenario override --> from scenario input
     )
     streams["feed"].price = feed_price_per_kg_wet
 

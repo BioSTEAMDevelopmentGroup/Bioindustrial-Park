@@ -38,7 +38,7 @@ if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
 from biorefineries.sabre._chemicals import set_thermo
-from biorefineries.sabre.systems import create_integrated_biorefinery
+from biorefineries.sabre.systems import create_ad_integrated_system
 from biorefineries.sabre._tea import create_tea, solve_product_msp, solve_biomethane_msp
 
 # -------------------------
@@ -182,7 +182,7 @@ def run_alpha_sweep(
         set_thermo()
 
         try:
-            sys, streams, units, _ = create_integrated_biorefinery(
+            sys, streams, units, _ = create_ad_integrated_system(
                 alpha=alpha,
                 pretreatment_case=pretreatment_case,
             )

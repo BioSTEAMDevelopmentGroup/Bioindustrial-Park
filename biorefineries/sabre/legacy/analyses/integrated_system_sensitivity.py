@@ -43,7 +43,7 @@ from integrated_tea import (
     run_alpha_sweep,
 )
 from biorefineries.sabre._chemicals import set_thermo
-from biorefineries.sabre.systems import create_integrated_biorefinery
+from biorefineries.sabre.systems import create_ad_integrated_system
 from biorefineries.sabre._tea import create_tea
 
 # ── Output directories ────────────────────────────────────────────────────────
@@ -132,7 +132,7 @@ def _build_npv_at_alpha(
     bst.main_flowsheet.clear()
     set_thermo()
 
-    sys, streams, units, _ = create_integrated_biorefinery(
+    sys, streams, units, _ = create_ad_integrated_system(
         alpha=alpha,
         pretreatment_case=pretreatment_case,
     )

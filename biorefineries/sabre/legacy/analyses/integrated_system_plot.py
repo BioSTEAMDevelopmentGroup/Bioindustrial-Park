@@ -20,7 +20,7 @@ if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
 from biorefineries.sabre._chemicals import set_thermo
-from biorefineries.sabre.systems import create_integrated_biorefinery
+from biorefineries.sabre.systems import create_ad_integrated_system
 
 OUTDIR = SCRIPT_DIR.parent / "results" / "flowsheets"
 OUTDIR.mkdir(parents=True, exist_ok=True)
@@ -29,7 +29,7 @@ set_thermo()
 if __name__ == "__main__":
 
     # Build at alpha=0.5 so both pathways are populated --> just to have it
-    sys, streams, units, _ = create_integrated_biorefinery(
+    sys, streams, units, _ = create_ad_integrated_system(
         alpha=0.5,
         pretreatment_case="combined_PE",
     )

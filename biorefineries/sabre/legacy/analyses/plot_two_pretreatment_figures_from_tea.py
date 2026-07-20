@@ -110,7 +110,6 @@ def build_case(
     sys = create_ad_biomethane_system(
         feedstock_type="pelagic",
         pretreatment_case=pretreatment_case,
-        ch4_override=yield_override,
     )
 
     if yield_override is not None:

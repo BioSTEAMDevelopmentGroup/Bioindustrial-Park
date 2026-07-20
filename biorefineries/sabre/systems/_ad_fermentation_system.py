@@ -7,24 +7,6 @@
 # for license details.
 """
 Acidogenic-AD-to-microbial-oil system builder for the SaBRe flowsheets.
-
-Public entry point:
-- create_ad_fermentation_system(...): the full feedstock-to-product
-  system. Wraps create_ad_vfa_system() (raw Sargassum -> acidogenic AD ->
-  vfa_broth) followed by _create_vfa_fermentation_system(), and returns
-  one assembled bst.System so the whole feedstock-to-oil chain simulates
-  (and propagates changes) as a single graph, mirroring how
-  create_ad_biomethane_system() is a single self-contained entry point.
-
-Internal helper:
-- _create_vfa_fermentation_system(vfa_broth, ...): the fermentation train
-  alone (microfilter -> medium conditioning -> Yarrowia lipolytica
-  fermenter -> oil recovery). Requires an already-built vfa_broth stream
-  as input, so it cannot run standalone -- not part of this module's
-  public API. Used by create_ad_fermentation_system() above, and directly
-  by systems._integrated_system, which already has a vfa_broth stream
-  from a shared/partial preprocessing train and just needs the
-  fermentation half.
 """
 import biosteam as bst
 import flexsolve as flx
@@ -36,17 +18,14 @@ from biorefineries.sabre.units import (
     VFAMicrofilter,
     FermentationMediumTank,
 )
-from biorefineries.sabre.systems._ad_vfa_system import create_ad_vfa_system
+from biorefineries.sabre.systems._ad_vfa_system import create_ad_vfa_system, _build_acidogenic_pathway
 
 __all__ = ('create_ad_fermentation_system',)
 
-
-# Default parameters for _create_vfa_fermentation_system() below
-# (data/fermentation.yaml and data/downstream_processing.yaml).
+# Load assumptions
 _FERMENTATION_YAML = load_assumptions("fermentation.yaml")
 _VFA_FERM = _FERMENTATION_YAML["vfa"]
 _VFA_CASE = _VFA_FERM["cases"][_VFA_FERM["case"]]
-
 _DOWNSTREAM_PROCESSING_YAML = load_assumptions("downstream_processing.yaml")
 _VFA_DOWNSTREAM = _DOWNSTREAM_PROCESSING_YAML["oil_extraction"]
 
@@ -54,95 +33,25 @@ _VFA_DOWNSTREAM = _DOWNSTREAM_PROCESSING_YAML["oil_extraction"]
 def _create_vfa_fermentation_system(
     vfa_broth,
     *,
-    product_ID: str = _VFA_CASE["product_ID"],
-    vfa_IDs: list[str] | None = None,
-    conversion: float = None,
     product_yield_kg_per_kg_vfa_consumed: float = None,
-    biomass_yield_kg_per_kg_vfa_consumed: float = None,
-    co2_yield_kg_per_kg_vfa_consumed: float = None,
-    oxygen_kg_per_kg_vfa_consumed: float = None,
-    residence_time_h: float = None,
-    target_pH: float = None,
-    ammonia_dose_kg_per_m3: float = None,
-    phosphate_dose_kg_per_m3: float = None,
-    base_dose_kg_per_m3: float = None,
-    magnesium_sulfate_dose_kg_per_m3: float = None,
-    seed_water_kgph: float = _VFA_CASE["seed_water_kgph"],
-    seed_cellmass_kgph: float = _VFA_CASE["seed_cellmass_kgph"],
-
-    vfa_to_permeate_frac: float = None,
-    water_to_permeate_frac: float = None,
-    solids_to_permeate_frac: float = None,
-    dissolved_other_to_permeate_frac: float = None,
-    microfilter_SEC_kWh_per_m3_feed: float = None,
-    microfilter_design_flux_L_m2_h: float = None,
-
-    medium_tank_residence_time_h: float = None,
-    medium_tank_mixing_kW_per_m3: float = None,
-
-    target_oil_and_solids_content: float = _VFA_DOWNSTREAM["target_oil_and_solids_content_g_per_L"],
-    target_wastewater_concentration: float = 60.0,  # no yaml counterpart
-    backend_oil_recovery: float = _VFA_DOWNSTREAM["backend_oil_recovery"],
-    backend_oil_water_split: float = _VFA_DOWNSTREAM["backend_oil_water_split"],
-
-    recycle_total_fraction: float = _VFA_DOWNSTREAM["recycle_total_fraction"],
-    recycle_cellmass_wt_frac: float = _VFA_DOWNSTREAM["recycle_cellmass_wt_frac"],
-
-    homogenization_kWh_per_kg_dry_biomass: float = None,
+    fermenter_tau: float = None,
 ):
-
-    chem_ids = set(bst.settings.thermo.chemicals.IDs)
-    for req in (product_ID, "CarbonDioxide", "CellMass", "Water"):
-        if req not in chem_ids:
-            raise RuntimeError(f"Missing required chemical in thermo: {req}")
-
-    if vfa_IDs is None:
-        vfa_IDs = list(_VFA_FERM["vfa_IDs"])
+    product_ID = _VFA_CASE["product_ID"]
 
     ammonia = bst.Stream("fermentation_ammonia")
     phosphate = bst.Stream("fermentation_phosphate")
     base = bst.Stream("fermentation_base")
     mgso4 = bst.Stream("fermentation_mgso4")
-    fresh_seed = bst.Stream(
-        "fresh_seed_makeup",
-        Water=seed_water_kgph,
-        CellMass=seed_cellmass_kgph,
-        units="kg/hr",
-    )
     recycle_biomass = bst.Stream("recycle_biomass")
-    M602 = bst.Mixer("M602", ins=(fresh_seed, recycle_biomass), outs=("seed_to_fermenter",))
 
     # -------------------------------------------------
     # Upstream conditioning
     # -------------------------------------------------
-    MF = VFAMicrofilter(
-        "MF",
-        ins=vfa_broth,
-        outs=("vfa_permeate", "vfa_retentate"),
-        vfa_IDs=vfa_IDs,
-        **non_none(
-            vfa_to_permeate_frac=vfa_to_permeate_frac,
-            water_to_permeate_frac=water_to_permeate_frac,
-            solids_to_permeate_frac=solids_to_permeate_frac,
-            dissolved_other_to_permeate_frac=dissolved_other_to_permeate_frac,
-            SEC_kWh_per_m3_feed=microfilter_SEC_kWh_per_m3_feed,
-            design_flux_L_m2_h=microfilter_design_flux_L_m2_h,
-        ),
-    )
-
+    MF = VFAMicrofilter("MF", ins=vfa_broth, outs=("vfa_permeate", "vfa_retentate"))
     T601 = FermentationMediumTank(
         "T601",
         ins=(MF - 0, ammonia, phosphate, base, mgso4),
         outs=("conditioned_vfa_broth",),
-        **non_none(
-            ammonia_dose_kg_per_m3=ammonia_dose_kg_per_m3,
-            phosphate_dose_kg_per_m3=phosphate_dose_kg_per_m3,
-            base_dose_kg_per_m3=base_dose_kg_per_m3,
-            magnesium_sulfate_dose_kg_per_m3=magnesium_sulfate_dose_kg_per_m3,
-            target_pH=target_pH,
-            tau=medium_tank_residence_time_h,
-            mixing_kW_per_m3=medium_tank_mixing_kW_per_m3,
-        ),
     )
 
     # -------------------------------------------------
@@ -150,22 +59,15 @@ def _create_vfa_fermentation_system(
     # -------------------------------------------------
     R601 = YarrowiaLipidFermenter(
         "R601",
-        ins=(T601 - 0, M602 - 0),
+        ins=(T601 - 0, recycle_biomass),
         outs=("fermentation_vent", "fermentation_broth"),
-        vfa_IDs=vfa_IDs,
-        product_ID=product_ID,
         V_wf=0.8,
         V_max=150.0,
         kW_per_m3=0.06,
         tau_0=3.0,
         **non_none(
-            conversion=conversion,
             product_yield_kg_per_kg_vfa_consumed=product_yield_kg_per_kg_vfa_consumed,
-            biomass_yield_kg_per_kg_vfa_consumed=biomass_yield_kg_per_kg_vfa_consumed,
-            co2_yield_kg_per_kg_vfa_consumed=co2_yield_kg_per_kg_vfa_consumed,
-            oxygen_kg_per_kg_vfa_consumed=oxygen_kg_per_kg_vfa_consumed,
-            tau=residence_time_h,
-            target_pH=target_pH,
+            tau=fermenter_tau,
         ),
     )
 
@@ -185,7 +87,7 @@ def _create_vfa_fermentation_system(
         thermo=(R601.outs[1].thermo.ideal()),
         flash=False,
     )
-    Ev607.target_oil_and_solids_content = target_oil_and_solids_content
+    Ev607.target_oil_and_solids_content = _VFA_DOWNSTREAM["target_oil_and_solids_content_g_per_L"]
     Ev607.remove_evaporators = True
 
     P_original = tuple(Ev607.P)
@@ -236,7 +138,7 @@ def _create_vfa_fermentation_system(
     P607 = bst.Pump("P607", ins=Ev607 - 0, outs=("pumped_concentrate",), P=101325.0)
 
     # -------------------------------------------------
-    # Cell disruption + oil extraction placeholder
+    # Cell disruption + oil extraction
     # Slots between P607 and C603_2.
     # Pass-through unit: carries capital + electricity costs for
     # high-pressure homogenization and lipid extraction.
@@ -248,14 +150,16 @@ def _create_vfa_fermentation_system(
         outs=("extracted_broth",),
         product_ID=product_ID,
         cellmass_ID="CellMass",
-        **non_none(homogenization_kWh_per_kg_dry_biomass=homogenization_kWh_per_kg_dry_biomass),
     )
 
     C603_2 = bst.LiquidsSplitCentrifuge(
         "C603_2",
         ins=OE - 0,   # now takes from OE, not P607
         outs=("backend_oil", "cellmass_plus_aqueous"),
-        split={product_ID: backend_oil_recovery, "Water": backend_oil_water_split},
+        split={
+            product_ID: _VFA_DOWNSTREAM["backend_oil_recovery"],
+            "Water": _VFA_DOWNSTREAM["backend_oil_water_split"],
+        },
     )
 
     S602 = bst.MockSplitter(
@@ -263,8 +167,8 @@ def _create_vfa_fermentation_system(
         ins=C603_2 - 1,
         outs=(recycle_biomass, "residual_purge"),
     )
-    S602.recycle_total_fraction = recycle_total_fraction
-    S602.recycle_cellmass_wt_frac = recycle_cellmass_wt_frac
+    S602.recycle_total_fraction = _VFA_DOWNSTREAM["recycle_total_fraction"]
+    S602.recycle_cellmass_wt_frac = _VFA_DOWNSTREAM["recycle_cellmass_wt_frac"]
 
     @S602.add_specification(run=True)
     def adjust_biomass_recycle():
@@ -308,7 +212,7 @@ def _create_vfa_fermentation_system(
         outs=("fermentation_wastewater",),
     )
 
-    M601.target_wastewater_concentration = target_wastewater_concentration
+    M601.target_wastewater_concentration = 60.0  # no yaml counterpart
 
     @M601.add_specification(run=True, impacted_units=[S601])
     def adjust_wastewater_concentration():
@@ -332,7 +236,7 @@ def _create_vfa_fermentation_system(
     # OE added to system path between P607 and C603_2
     sys = bst.System(
         "VFA_FER_sys",
-        path=(MF, T601, M602, R601, V605, P606, Ev607, P607, OE, C603_2, S602, S601, M601)
+        path=(MF, T601, R601, V605, P606, Ev607, P607, OE, C603_2, S602, S601, M601)
     )
 
     key_streams = {
@@ -340,9 +244,7 @@ def _create_vfa_fermentation_system(
         "vfa_permeate": MF.outs[0],
         "vfa_retentate": MF.outs[1],
         "conditioned_vfa_broth": T601.outs[0],
-        "fresh_seed_makeup": fresh_seed,
         "recycle_biomass": recycle_biomass,
-        "seed": M602.outs[0],
         "vent": R601.outs[0],
         "fermentation_broth": R601.outs[1],
         "extracted_broth": OE.outs[0],
@@ -360,7 +262,6 @@ def _create_vfa_fermentation_system(
     units = {
         "microfilter": MF,
         "medium_tank": T601,
-        "seed_mixer": M602,
         "fermenter": R601,
         "post_mix_tank": V605,
         "post_feed_pump": P606,
@@ -382,12 +283,6 @@ def _create_vfa_fermentation_system(
 def create_ad_fermentation_system(
     feedstock_type: str = "pelagic",
     milled_biomass_stream=None,
-    enable_heat_shock: bool = False,
-    hs_target_temperature_K: float = 338.15,
-    hs_events_per_day: float = 1.0 / 7.0,
-    hs_heated_fraction_of_liquid: float = 0.10,
-    hs_duration_min: float = 15.0,
-    temperature_regime: str = "mesophilic",
     **fermentation_kwargs,
 ):
     """
@@ -397,10 +292,14 @@ def create_ad_fermentation_system(
 
     Parameters
     ----------
-    feedstock_type, milled_biomass_stream, enable_heat_shock,
-    hs_target_temperature_K, hs_events_per_day,
-    hs_heated_fraction_of_liquid, hs_duration_min, temperature_regime
-        Forwarded to create_ad_vfa_system().
+    feedstock_type : str
+        Forwarded to create_ad_vfa_system(); ignored if
+        milled_biomass_stream is given.
+    milled_biomass_stream : stream, optional
+        Already-milled feed (e.g. from shared preprocessing in
+        systems._ad_integrated_system). If given, VFA_AD/SP_VFA are built
+        directly via _build_acidogenic_pathway() instead of building a
+        full standalone AD-VFA subsystem.
     **fermentation_kwargs
         Forwarded to _create_vfa_fermentation_system() (everything except
         vfa_broth, which is supplied internally from the AD-VFA
@@ -412,24 +311,26 @@ def create_ad_fermentation_system(
         The full feedstock -> fermentation-product system.
     streams : dict
         Key streams, including the raw feedstock ('feed'), the AD-VFA
-        subsystem's 'vfa_broth', and all of
-        _create_vfa_fermentation_system()'s streams (final product in
+        subsystem's 'vfa_broth' and 'acidogenic_residual_solids', and all
+        of _create_vfa_fermentation_system()'s streams (final product in
         'backend_oil').
     units : dict
         Key units from both subsystems.
     """
-    ad_vfa_sys = create_ad_vfa_system(
-        feedstock_type=feedstock_type,
-        milled_biomass_stream=milled_biomass_stream,
-        enable_heat_shock=enable_heat_shock,
-        hs_target_temperature_K=hs_target_temperature_K,
-        hs_events_per_day=hs_events_per_day,
-        hs_heated_fraction_of_liquid=hs_heated_fraction_of_liquid,
-        hs_duration_min=hs_duration_min,
-        temperature_regime=temperature_regime,
-    )
-    feed = ad_vfa_sys.feeds[0]
-    vfa_broth = ad_vfa_sys.flowsheet.stream.vfa_broth
+    if milled_biomass_stream is not None:
+        ad_units, ad_streams, ad_units_d = _build_acidogenic_pathway(milled_biomass_stream)
+        feed = milled_biomass_stream
+    else:
+        ad_vfa_sys = create_ad_vfa_system(feedstock_type=feedstock_type)
+        ad_units = list(ad_vfa_sys.units)
+        ad_streams = {
+            "vfa_broth": ad_vfa_sys.flowsheet.stream.vfa_broth,
+            "acidogenic_residual_solids": ad_vfa_sys.flowsheet.stream.acidogenic_residual_solids,
+        }
+        ad_units_d = {u.ID: u for u in ad_vfa_sys.units}
+        feed = ad_vfa_sys.feeds[0]
+
+    vfa_broth = ad_streams["vfa_broth"]
 
     fer_sys, fer_streams, fer_units = _create_vfa_fermentation_system(
         vfa_broth=vfa_broth, **fermentation_kwargs,
@@ -437,11 +338,16 @@ def create_ad_fermentation_system(
 
     sys = bst.System.from_units(
         "AD_Fermentation_sys",
-        units=list(ad_vfa_sys.units) + list(fer_sys.units),
+        units=ad_units + list(fer_sys.units),
     )
 
-    streams = {"feed": feed, "vfa_broth": vfa_broth, **fer_streams}
-    units = {u.ID: u for u in ad_vfa_sys.units}
+    streams = {
+        "feed": feed,
+        "acidogenic_residual_solids": ad_streams["acidogenic_residual_solids"],
+        **fer_streams,
+        "vfa_broth": vfa_broth,
+    }
+    units = dict(ad_units_d)
     units.update(fer_units)
 
     return sys, streams, units
