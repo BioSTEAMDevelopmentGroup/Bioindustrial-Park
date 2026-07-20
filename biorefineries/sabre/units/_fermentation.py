@@ -54,8 +54,10 @@ class YarrowiaLipidFermenter(bst.AeratedBioreactor):
         attribute name).
     Q_O2_consumption : float
         Heat of reaction per kmol O2 consumed; forwarded to
-        `bst.AeratedBioreactor`. Not yaml-sourced.
-        Cannot be calculated from the current sabre thermo because MicrobialOil is a pseudo-component.
+        `bst.AeratedBioreactor`. Literature heuristic (Cooney's rule), not
+        calculated from thermo Hf, since VFA conversion here is yield-based
+        rather than atom-balanced. See data/fermentation.yaml
+        (sources.heat_of_reaction) for the reference.
     target_pH : float
         Target fermentation pH; recorded in `design_results`, not
         enforced.
@@ -81,7 +83,7 @@ class YarrowiaLipidFermenter(bst.AeratedBioreactor):
         co2_yield_kg_per_kg_vfa_consumed: float = _VFA_CASE["co2_yield_kg_per_kg_vfa_consumed"],
         oxygen_kg_per_kg_vfa_consumed: float = _VFA_CASE["oxygen_kg_per_kg_vfa_consumed"],
         tau: float = _VFA_CASE["tau"],
-        Q_O2_consumption: float = -460240.0,
+        Q_O2_consumption: float = _VFA_CASE["Q_O2_consumption"],
         target_pH: float = _VFA_CASE["target_pH"],
         seed_water_kgph: float = _VFA_CASE["seed_water_kgph"],
         seed_cellmass_kgph: float = _VFA_CASE["seed_cellmass_kgph"],
@@ -160,8 +162,7 @@ class YarrowiaLipidFermenter(bst.AeratedBioreactor):
         o2_demand = self.oxygen_kg_per_kg_vfa_consumed * vfa_consumed
 
         # Yields don't sum to 1, so only this much of vfa_consumed is actually
-        # explained by tracked products; the remainder is left as VFA rather
-        # than converted into a fictitious byproduct (previously SolubleOrganics).
+        # explained by tracked products; the remainder is left as VFA.
         accounted = product_formed + biomass_formed + co2_formed
 
         # Remove accounted VFA mass in proportion to composition
@@ -265,26 +266,16 @@ class FermentationMediumTank(bst.Tank):
         vol_m3ph = broth.F_vol
         ammonia.empty(); phosphate.empty(); base.empty(); mgso4.empty()
 
-        chem_ids = set(out.chemicals.IDs)
-        if self.ammonia_dose_kg_per_m3 > 0 and "Ammonia" not in chem_ids:
-            raise RuntimeError("Ammonia dose specified but 'Ammonia' is not in thermo.")
-        if self.phosphate_dose_kg_per_m3 > 0 and "KH2PO4" not in chem_ids:
-            raise RuntimeError("Phosphate dose specified but 'KH2PO4' is not in thermo.")
-        if self.base_dose_kg_per_m3 > 0 and "NaOH" not in chem_ids:
-            raise RuntimeError("Base dose specified but 'NaOH' is not in thermo.")
-        if self.magnesium_sulfate_dose_kg_per_m3 > 0 and "MagnesiumSulfate" not in chem_ids:
-            raise RuntimeError("MgSO4 dose specified but 'MagnesiumSulfate' is not in thermo.")
-
-        if "Ammonia" in chem_ids and self.ammonia_dose_kg_per_m3 > 0:
+        if self.ammonia_dose_kg_per_m3 > 0:
             ammonia.imass["Ammonia"] = self.ammonia_dose_kg_per_m3 * vol_m3ph
             out.imass["Ammonia"] += ammonia.imass["Ammonia"]
-        if "KH2PO4" in chem_ids and self.phosphate_dose_kg_per_m3 > 0:
+        if self.phosphate_dose_kg_per_m3 > 0:
             phosphate.imass["KH2PO4"] = self.phosphate_dose_kg_per_m3 * vol_m3ph
             out.imass["KH2PO4"] += phosphate.imass["KH2PO4"]
-        if "NaOH" in chem_ids and self.base_dose_kg_per_m3 > 0:
+        if self.base_dose_kg_per_m3 > 0:
             base.imass["NaOH"] = self.base_dose_kg_per_m3 * vol_m3ph
             out.imass["NaOH"] += base.imass["NaOH"]
-        if "MagnesiumSulfate" in chem_ids and self.magnesium_sulfate_dose_kg_per_m3 > 0:
+        if self.magnesium_sulfate_dose_kg_per_m3 > 0:
             mgso4.imass["MagnesiumSulfate"] = self.magnesium_sulfate_dose_kg_per_m3 * vol_m3ph
             out.imass["MagnesiumSulfate"] += mgso4.imass["MagnesiumSulfate"]
 

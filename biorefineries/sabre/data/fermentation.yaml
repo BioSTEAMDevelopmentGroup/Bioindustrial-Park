@@ -26,6 +26,9 @@ vfa:
     modeling_note:
       key: thesis_scoping_model
       note: "Residence time, stoichiometric yields, split fractions, and some equipment-cost placeholders below are current scoping assumptions for process modeling and should be sensitivity-tested."
+    heat_of_reaction:
+      key: cooney_bioreactor_design_o2_heat_of_reaction
+      note: "Aerobic heat release of ~110 kcal (460 kJ) per mol O2 consumed is a standard heuristic (Cooney's rule) for Q_O2_consumption. Same value and source used in biorefineries.cane's AeratedFermentation/AeratedCoFermentation and biorefineries.OHFA's AeratedCoFermentation. Not calculated from thermo Hf: sabre's yield-based (non-atom-balanced) VFA conversion leaves the reaction enthalpy inconsistent, unlike biorefineries.milk/gas_fermentation which use atom-balanced Reaction objects and can rely on the Hf-based calculation. See https://www.academia.edu/19636928/Bioreactor_Design_for_Chemical_Engineers"
 
   cases:
     yarrowia_vfa_base:
@@ -41,6 +44,8 @@ vfa:
       co2_yield_kg_per_kg_vfa_consumed: 0.20
       oxygen_kg_per_kg_vfa_consumed: 0.80
 
+      Q_O2_consumption: -460240.0  # [kJ/kmol O2]; see sources.heat_of_reaction
+
       seed_water_kgph: 0.0
       seed_cellmass_kgph: 0.0
 
@@ -48,6 +53,7 @@ vfa:
         - "Main fermentation product is crude microbial oil."
         - "Omega fatty acids and squalene are not modeled as primary fermenter products in the base case."
         - "Residence time, conversion, biomass yield, CO2 yield, and O2 demand are current scoping assumptions."
+        - "Q_O2_consumption is a hardcoded literature heuristic (see sources.heat_of_reaction), not calculated from thermo Hf."
 
 
 fermentation_medium_tank:
