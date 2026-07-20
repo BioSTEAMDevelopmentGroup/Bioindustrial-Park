@@ -42,4 +42,4 @@ biostimulant_evaporator:
 
   sources:
     all_params:
-      note: "No literature or prior-yaml grounding for any parameter in this section.
+      note: "No literature or prior-yaml grounding for any parameter in this section."
