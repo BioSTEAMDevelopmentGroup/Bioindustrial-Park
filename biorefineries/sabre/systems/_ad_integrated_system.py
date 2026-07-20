@@ -28,7 +28,6 @@ Returns (sys, streams, units, alpha).
 
 import biosteam as bst
 
-from biorefineries.sabre.utils import non_none
 from biorefineries.sabre.units import Mill
 from biorefineries.sabre.systems._biostimulant_system import create_biostimulant_system
 from biorefineries.sabre.systems._ad_biomethane_system import create_ad_biomethane_system
@@ -75,8 +74,6 @@ def create_ad_integrated_system(
     alpha: float = 0.5,
     feedstock_type: str = "pelagic",
     pretreatment_case: str = "press_mill_only",
-    vfa_product_yield: float = None,
-    ferm_residence_time_h: float = None,
 ):
     """
     Build the full integrated Sargassum biorefinery.
@@ -128,11 +125,6 @@ def create_ad_integrated_system(
     # =========================================================
     # BUILD PATHWAYS CONDITIONALLY
     # =========================================================
-    ferm_kwargs = non_none(
-        product_yield_kg_per_kg_vfa_consumed=vfa_product_yield,
-        fermenter_tau=ferm_residence_time_h,
-    )
-
     methane_units   = []
     methane_streams = {}
     methane_units_d = {}
@@ -153,9 +145,7 @@ def create_ad_integrated_system(
     vfa_streams = {}
     vfa_units_d = {}
     if build_vfa:
-        vfa_fer_sys, vfa_streams, vfa_units_d = create_ad_fermentation_system(
-            feedstock=SPL - 1, **ferm_kwargs,
-        )
+        vfa_fer_sys, vfa_streams, vfa_units_d = create_ad_fermentation_system(feedstock=SPL - 1)
         vfa_units = list(vfa_fer_sys.units)
 
     # =========================================================

@@ -523,10 +523,12 @@ def build_and_simulate_scenario(
     bst.main_flowsheet.clear()
     set_thermo()
 
-    full_sys, streams, units = create_ad_fermentation_system(
-        product_yield_kg_per_kg_vfa_consumed=product_yield,   # scenario override --> from scenario input
-        fermenter_tau=residence_time_h,                       # scenario override --> from scenario input
-    )
+    full_sys, streams, units = create_ad_fermentation_system()
+
+    R601 = units["fermenter"]
+    R601.product_yield_kg_per_kg_vfa_consumed = float(product_yield)   # scenario override --> from scenario input
+    R601.tau = float(residence_time_h)                                # scenario override --> from scenario input
+
     streams["feed"].price = feed_price_per_kg_wet
 
     for sid, price in {

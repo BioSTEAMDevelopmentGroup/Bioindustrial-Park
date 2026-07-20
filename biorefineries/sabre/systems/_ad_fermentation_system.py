@@ -11,7 +11,7 @@ Acidogenic-AD-to-microbial-oil system builder for the SaBRe flowsheets.
 import biosteam as bst
 import flexsolve as flx
 
-from biorefineries.sabre.utils import load_assumptions, non_none
+from biorefineries.sabre.utils import load_assumptions
 from biorefineries.sabre.units import (
     YarrowiaLipidFermenter,
     OilExtraction,
@@ -30,12 +30,7 @@ _DOWNSTREAM_PROCESSING_YAML = load_assumptions("downstream_processing.yaml")
 _VFA_DOWNSTREAM = _DOWNSTREAM_PROCESSING_YAML["oil_extraction"]
 
 
-def _create_vfa_fermentation_system(
-    vfa_broth,
-    *,
-    product_yield_kg_per_kg_vfa_consumed: float = None,
-    fermenter_tau: float = None,
-):
+def _create_vfa_fermentation_system(vfa_broth):
     product_ID = _VFA_CASE["product_ID"]
 
     ammonia = bst.Stream("fermentation_ammonia")
@@ -61,14 +56,6 @@ def _create_vfa_fermentation_system(
         "R601",
         ins=(T601 - 0, recycle_biomass),
         outs=("fermentation_vent", "fermentation_broth"),
-        V_wf=0.8,
-        V_max=150.0,
-        kW_per_m3=0.06,
-        tau_0=3.0,
-        **non_none(
-            product_yield_kg_per_kg_vfa_consumed=product_yield_kg_per_kg_vfa_consumed,
-            tau=fermenter_tau,
-        ),
     )
 
     # -------------------------------------------------
@@ -252,7 +239,6 @@ def _create_vfa_fermentation_system(
 
 def create_ad_fermentation_system(
     feedstock: str | bst.Stream = "pelagic",
-    **fermentation_kwargs,
 ):
     """
     Build the full feedstock-to-product system: raw Sargassum (or an
@@ -264,10 +250,6 @@ def create_ad_fermentation_system(
     feedstock : str or stream
         Forwarded to create_ad_vfa_system() -- see its docstring for the
         str-vs-stream distinction.
-    **fermentation_kwargs
-        Forwarded to _create_vfa_fermentation_system() (everything except
-        vfa_broth, which is supplied internally from the AD-VFA
-        subsystem's output).
 
     Returns
     -------
@@ -286,9 +268,7 @@ def create_ad_fermentation_system(
     vfa_broth = ad_vfa_sys.flowsheet.stream.vfa_broth
     acidogenic_residual_solids = ad_vfa_sys.flowsheet.stream.acidogenic_residual_solids
 
-    fer_sys, fer_streams, fer_units = _create_vfa_fermentation_system(
-        vfa_broth=vfa_broth, **fermentation_kwargs,
-    )
+    fer_sys, fer_streams, fer_units = _create_vfa_fermentation_system(vfa_broth=vfa_broth)
 
     sys = bst.System.from_units(
         "AD_Fermentation_sys",
