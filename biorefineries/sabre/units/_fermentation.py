@@ -159,14 +159,16 @@ class YarrowiaLipidFermenter(bst.AeratedBioreactor):
         co2_formed = self.co2_yield_kg_per_kg_vfa_consumed * vfa_consumed
         o2_demand = self.oxygen_kg_per_kg_vfa_consumed * vfa_consumed
 
+        # Yields don't sum to 1, so only this much of vfa_consumed is actually
+        # explained by tracked products; the remainder is left as VFA rather
+        # than converted into a fictitious byproduct (previously SolubleOrganics).
         accounted = product_formed + biomass_formed + co2_formed
-        unaccounted = max(0.0, vfa_consumed - accounted)
 
-        # Remove VFAs in proportion to composition
+        # Remove accounted VFA mass in proportion to composition
         for cid in self.vfa_IDs:
             if cid in ids:
                 m = float(effluent.imass[cid])
-                take = vfa_consumed * (m / vfa_available) if vfa_available > 0 else 0.0
+                take = accounted * (m / vfa_available) if vfa_available > 0 else 0.0
                 effluent.imass[cid] -= take
 
         # Form product, biomass, CO2
@@ -178,18 +180,9 @@ class YarrowiaLipidFermenter(bst.AeratedBioreactor):
         available_o2 = float(effluent.imass["Oxygen"])
         effluent.imass["Oxygen"] = max(0.0, available_o2 - o2_demand)
 
-        # Put leftover converted mass into soluble organics if available
-        if "SolubleOrganics" in ids:
-            effluent.imass["SolubleOrganics"] += unaccounted
-        else:
-            effluent.imass["Water"] += unaccounted
-
-        if effluent.imass["Water"] < 0.0:
-            effluent.imass["Water"] = 0.0
-
         self.design_results["Target pH"] = self.target_pH
         self.design_results["VFA available (kg/h)"] = vfa_available
-        self.design_results["VFA consumed (kg/h)"] = vfa_consumed
+        self.design_results["VFA consumed (kg/h)"] = accounted
         self.design_results["Microbial oil formed (kg/h)"] = product_formed
         self.design_results["Biomass formed (kg/h)"] = biomass_formed
         self.design_results["CO2 formed (kg/h)"] = co2_formed

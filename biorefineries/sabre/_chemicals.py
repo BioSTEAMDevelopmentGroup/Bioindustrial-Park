@@ -16,16 +16,10 @@ from biorefineries.sabre.utils import load_assumptions
 __all__ = ('create_chemicals',)
 
 
-def _pseudo_chemical(ID: str, phase: str, MW: float = 1.0, formula: str = None):
-    if formula is not None:
-        return bst.Chemical(ID, search_db=False, default=True, phase=phase, formula=formula)
-    return bst.Chemical(ID, search_db=False, default=True, phase=phase, MW=MW)
-
 def _pseudo_solid(ID: str, MW: float = 1.0, formula: str = None):
-    return _pseudo_chemical(ID, phase="s", MW=MW, formula=formula)
-
-def _pseudo_liquid(ID: str, MW: float = 1.0, formula: str = None):
-    return _pseudo_chemical(ID, phase="l", MW=MW, formula=formula)
+    if formula is not None:
+        return bst.Chemical(ID, search_db=False, default=True, phase="s", formula=formula)
+    return bst.Chemical(ID, search_db=False, default=True, phase="s", MW=MW)
 
 # Structural-carbohydrate constants reused from biorefineries.cellulosic.chemicals,
 # which sources Hf from the Humbird et al. 2011 NREL report
@@ -113,7 +107,6 @@ def create_chemicals(set_thermo: bool = True):
     CellMass = bst.Chemical("CellMass", search_db=False, default=True, phase="s",
                              formula="CH1.61O0.56N0.16", Hf=-31169.39 * _cal2joule)
     CellMass.V.add_model(tmo.functional.rho_to_V(_rho_solids, CellMass.MW), top_priority=True)
-    SolubleOrganics = _pseudo_liquid("SolubleOrganics")
 
     # Conditioner / nutrient additions -- real database chemicals. Ammonia's
     # natural phase_ref is gas; forced to liquid since it's dosed as an
@@ -150,7 +143,7 @@ def create_chemicals(set_thermo: bool = True):
         Alginate, Fucoidan, Mannitol, OtherSolids,
         CH4, CO2, H2S, Oxygen, Nitrogen,
         AceticAcid, PropionicAcid, ButyricAcid, ValericAcid, HexanoicAcid,
-        MicrobialOil, CellMass, SolubleOrganics,
+        MicrobialOil, CellMass,
         Ammonia, KH2PO4, NaOH, MagnesiumSulfate,
     ])
     chems.compile()
