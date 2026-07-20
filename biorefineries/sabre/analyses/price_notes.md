@@ -1,20 +1,109 @@
-# Audit: assumptions used by biorefineries/sabre/legacy_analyses/*.py that
-# are NOT sourced from data/*.yaml.
-#
-# This file is documentation only -- nothing in this codebase loads it.
-# It lives in systems/ (next to the code it documents) rather than data/,
-# specifically because it is not a source of runtime defaults.
-#
-#      economic assumptions (prices, disposal
-#      costs, reagent costs) hardcoded as Python module-level constants
-#      across legacy_analyses/*.py. None of data/feedstock.yaml,
-#      data/preprocessing.yaml, or data/vfa_fermentation.yaml cover
-#      economics, so these were never "migrated" from anywhere -- this is
-#      the first time they're written down in one place. Candidate seed
-#      list for a future data/economics.yaml.
-#
-# Compiled: 2026-07-17.
+<!--
+Bioindustrial-Park: BioSTEAM's Premier Biorefinery Models and Results
+Copyright (C) 2026-, Yalin Li <mailto.yalin.li@gmail.com>
 
+This module is under the UIUC open-source license. See
+github.com/BioSTEAMDevelopmentGroup/biosteam/blob/master/LICENSE.txt
+for license details.
+-->
+
+# Sabre pricing notes
+
+This file merges two pieces of documentation-only pricing analysis for
+sabre (nothing in the codebase loads either):
+
+1. A cross-check of sabre's flat per-kg wastewater/solids disposal
+   assumptions against `biorefineries/wwt`'s COD-based pricing method.
+2. An audit of economic assumptions used by `legacy/analyses/*.py` that
+   are not sourced from `data/*.yaml` (compiled 2026-07-17, originally
+   `legacy_analyses_assumptions_audit.yaml`).
+
+## COD-based wastewater pricing cross-check
+
+Applied to sabre's actual effluent streams (`pelagic` feedstock, default
+simulation).
+
+### Method (from `biorefineries/wwt/_utils.py`)
+
+1. `compute_stream_COD(stream)` derives each chemical's theoretical oxygen
+   demand from its elemental composition (C, H, O, N, S, P), sums over the
+   stream, and returns a concentration in kg-O2/m3.
+2. COD load = `compute_stream_COD(stream) * stream.F_vol` (kg-COD/hr).
+3. Unit disposal rate: **-$0.3676/kg-COD**, averaged from Schueller (2020)
+   *Municipal Residential Wastewater Rates* excess-COD surcharge range
+   ($0.127-$0.2065/lb).
+4. `stream.price = rate * COD_load / stream.F_mass` ($/kg stream), the form
+   BioSTEAM's TEA expects.
+
+wwt module could not be imported as a package as-is in this checkout (its
+`__init__.py` chain uses `from ... import Stream, Unit`, which assumes a
+different repo layout than this one and raises `ImportError: attempted
+relative import beyond top-level package`). `_chemicals.py` and `_utils.py`
+were loaded directly via `importlib` with a stub `biorefineries.wwt`
+package registered in `sys.modules` to satisfy their internal relative
+imports, bypassing `__init__.py`. No wwt files were modified.
+
+### Results
+
+Sabre's actual streams were simulated (`create_ad_fermentation_system`,
+`create_ad_biomethane_system`, feedstock='pelagic') and
+`compute_stream_COD` applied directly to the resulting `Stream` objects.
+
+| Stream | Flow (kg/hr) | COD conc. (mg/L) | COD-based price | sabre's current flat price |
+|---|---:|---:|---:|---:|
+| `wastewater` (VFA fermentation pathway) | 471,561 | 24,289 | -$0.00896/kg (-$8.93/m3) | -$0.005/kg |
+| `liquid_digestate` (biomethane pathway) | 450,460 | 18,307 | -$0.00662/kg (-$6.73/m3) | -$0.002/kg |
+| `acidogenic_residual_solids` (VFA AD solids cake) | 38,569 | 88,626 | -$0.02846/kg | -$0.04/kg |
+| `soil_amendment` (biomethane solids cake) | 53,857 | 112,154 | -$0.03691/kg | -$0.02/kg |
+
+sabre's current flat rates (`FERM_WASTEWATER_DISPOSAL_USD_PER_KG`,
+`LIQUID_DIGESTATE_DISPOSAL_USD_PER_KG`, `SOLIDS_DISPOSAL_USD_PER_KG`,
+`SOIL_AMENDMENT_DISPOSAL_USD_PER_KG`) are set in
+`analyses/msp_comparison.py` (and duplicated across
+`legacy/analyses/integrated_tea.py`, `legacy/analyses/vfa_fermentation_tea.py`,
+`legacy/analyses/ad_tea_final.py`).
+
+For the `wastewater` stream, COD is dominated by residual VFAs and
+unconverted seaweed polysaccharides (via `get_COD_breakdown`): acetic acid
+34%, alginate 21%, fucoidan 16%, propionic acid 14%, valeric+butyric acids
+16%, mannitol 5%, microbial oil <1%.
+
+### Takeaways
+
+- For the two **liquid** effluent streams, the COD-based method prices
+  disposal roughly **1.8x (`wastewater`) and 3.3x (`liquid_digestate`)**
+  higher than sabre's current flat assumptions -- at 8,000 h/yr, about
+  -$33.8M/yr and -$23.9M/yr vs. sabre's current ~-$18.9M/yr and ~-$7.2M/yr.
+- For the **solids cakes**, the COD-based numbers land in the same
+  ballpark as sabre's existing biosolids assumptions (within ~30-85%).
+
+### Caveat
+
+wwt's $0.3676/kg-COD rate is a municipal-wastewater "excess COD" surcharge
+calibrated for conventional, much more dilute sewage. Sabre's streams run
+18,000-112,000 mg/L COD -- roughly 10-100x typical municipal strength --
+so a flat linear $/kg-COD extrapolation likely overstates true disposal
+cost at this concentration; streams this strong are usually candidates for
+on-site anaerobic treatment (which sabre's AD pathways already partly
+provide) or resource recovery rather than municipal-surcharge billing.
+Treat this as an order-of-magnitude cross-check against sabre's
+literature-based flat rates, not a rigorous replacement for them.
+
+## Legacy economics audit
+
+Assumptions used by `biorefineries/sabre/legacy/analyses/*.py` that are
+**not** sourced from `data/*.yaml`. None of `data/feedstock.yaml`,
+`data/preprocessing.yaml`, or `data/vfa_fermentation.yaml` cover
+economics, so these were never "migrated" from anywhere -- this was the
+first time they were written down in one place. Candidate seed list for a
+future `data/economics.yaml`. Compiled 2026-07-17; kept verbatim (as YAML)
+from the original standalone audit file rather than reformatted, since
+reformatting dense structured data into prose risks introducing errors.
+
+The `disposal_costs_usd_per_kg` block below is the direct source for the
+"sabre's current flat price" column in the COD cross-check table above.
+
+```yaml
 legacy_only_economics:
   # None of these have a data/*.yaml counterpart. Grouped by category;
   # each entry lists every legacy_analyses script that defines it and
@@ -144,3 +233,4 @@ legacy_only_economics:
       _ad_fermentation_system.py) and analyses/msp_comparison.py's own
       VFA_IDS constant. Three independent copies of the same list; only the
       yaml one is load-bearing for simulation now.
+```
