@@ -32,7 +32,7 @@ class YarrowiaLipidFermenter(bst.AeratedBioreactor):
     Parameters
     ----------
     ins : stream
-        Conditioned VFA broth (optionally with a seed stream appended).
+        Conditioned VFA broth, recycle biomass, and seed makeup.
     outs : tuple[stream, stream]
         Vent and fermentation broth.
     vfa_IDs : list[str]
@@ -59,6 +59,10 @@ class YarrowiaLipidFermenter(bst.AeratedBioreactor):
     target_pH : float
         Target fermentation pH; recorded in `design_results`, not
         enforced.
+    seed_water_kgph : float
+        Water flow (kg/hr) for the `seed` influent stream.
+    seed_cellmass_kgph : float
+        Cell mass flow (kg/hr) for the `seed` influent stream.
     **kwargs
         Forwarded to `bst.AeratedBioreactor.__init__`.
 
@@ -79,6 +83,8 @@ class YarrowiaLipidFermenter(bst.AeratedBioreactor):
         tau: float = _VFA_CASE["tau"],
         Q_O2_consumption: float = -460240.0,
         target_pH: float = _VFA_CASE["target_pH"],
+        seed_water_kgph: float = _VFA_CASE["seed_water_kgph"],
+        seed_cellmass_kgph: float = _VFA_CASE["seed_cellmass_kgph"],
         **kwargs,
     ):
         kwargs.setdefault('optimize_power', True)
@@ -98,6 +104,20 @@ class YarrowiaLipidFermenter(bst.AeratedBioreactor):
         self.co2_yield_kg_per_kg_vfa_consumed = float(co2_yield_kg_per_kg_vfa_consumed)
         self.oxygen_kg_per_kg_vfa_consumed = float(oxygen_kg_per_kg_vfa_consumed)
         self.target_pH = float(target_pH)
+        self.seed_water_kgph = float(seed_water_kgph)
+        self.seed_cellmass_kgph = float(seed_cellmass_kgph)
+        self.seed = seed = bst.Stream(None, thermo=self.thermo)
+        self.ins.append(seed)
+
+    def _run(self):
+        # Fresh seed makeup, added as a genuine influent stream instead of
+        # via an external pre-built stream + mixer. Recomputed every run so
+        # it's empty when both kgph values are 0.
+        seed = self.seed
+        seed.empty()
+        seed.imass["Water"] = self.seed_water_kgph
+        seed.imass["CellMass"] = self.seed_cellmass_kgph
+        super()._run()
 
     def _run_vent(self, vent, effluent):
         vent.copy_flow(effluent, ("CarbonDioxide", "Oxygen", "Nitrogen"), remove=True)
