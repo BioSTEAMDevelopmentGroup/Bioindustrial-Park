@@ -5,8 +5,7 @@ ad:
   max_single_digester_volume_MG: 1.5
   gas_storage_frac_of_total_volume: 0.25
 
-  enable_feed_dilution: false
-  target_feed_moisture_frac: 0.92
+  target_feed_moisture_frac: null  # None = no dilution water added
 
   temperature_regime: mesophilic
   temperature_regimes:

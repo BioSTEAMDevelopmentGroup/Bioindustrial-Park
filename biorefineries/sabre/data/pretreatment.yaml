@@ -14,7 +14,6 @@ pretreatment_ad:
         Methane: 0.4644
         CarbonDioxide: 0.5056
         HydrogenSulfide: 0.03
-      biodegradability_factor_overrides: {}
     sources:
       methane_yield:
         key: chikani_cabrera_2022_physical_C
@@ -48,7 +47,6 @@ pretreatment_ad:
         Methane: 0.8456
         CarbonDioxide: 0.1244
         HydrogenSulfide: 0.03
-      biodegradability_factor_overrides: {}
     sources:
       methane_yield:
         key: chikani_cabrera_2022_enzymatic_E
@@ -85,7 +83,6 @@ pretreatment_ad:
         Methane: 0.5155
         CarbonDioxide: 0.4545
         HydrogenSulfide: 0.03
-      biodegradability_factor_overrides: {}
     sources:
       methane_yield:
         key: chikani_cabrera_2022_peroxide_P
@@ -115,7 +112,6 @@ pretreatment_ad:
         Methane: 0.8641
         CarbonDioxide: 0.1059
         HydrogenSulfide: 0.03
-      biodegradability_factor_overrides: {}
     sources:
       methane_yield:
         key: chikani_cabrera_2022_combined_PE
@@ -152,7 +148,6 @@ pretreatment_ad:
         Methane: 0.8769
         CarbonDioxide: 0.0931
         HydrogenSulfide: 0.03
-      biodegradability_factor_overrides: {}
     sources:
       methane_yield:
         key: chikani_cabrera_2022_combined_PTE
