@@ -32,9 +32,7 @@ from biorefineries.sabre.utils import non_none
 from biorefineries.sabre.units import Mill
 from biorefineries.sabre.systems._biostimulant_system import create_biostimulant_system
 from biorefineries.sabre.systems._ad_biomethane_system import create_ad_biomethane_system
-from biorefineries.sabre.systems._ad_fermentation_system import (
-    create_ad_fermentation_system, _VFA_DOWNSTREAM,
-)
+from biorefineries.sabre.systems._ad_fermentation_system import create_ad_fermentation_system
 
 __all__ = ('create_ad_integrated_system', 'MassSplitter')
 
@@ -77,15 +75,8 @@ def create_ad_integrated_system(
     alpha: float = 0.5,
     feedstock_type: str = "pelagic",
     pretreatment_case: str = "press_mill_only",
-    vfa_conversion: float = None,
     vfa_product_yield: float = None,
-    vfa_biomass_yield: float = None,
-    vfa_co2_yield: float = None,
-    vfa_o2_demand: float = None,
     ferm_residence_time_h: float = None,
-    ferm_target_pH: float = None,
-    ferm_mgso4_dose: float = None,
-    target_oil_and_solids_content: float = _VFA_DOWNSTREAM["target_oil_and_solids_content_g_per_L"],
 ):
     """
     Build the full integrated Sargassum biorefinery.
