@@ -18,7 +18,7 @@ from biorefineries.sabre.units import (
     VFAMicrofilter,
     FermentationMediumTank,
 )
-from biorefineries.sabre.systems._ad_vfa_system import create_ad_vfa_system, _build_acidogenic_pathway
+from biorefineries.sabre.systems._ad_vfa_system import create_ad_vfa_system
 
 __all__ = ('create_ad_fermentation_system',)
 
@@ -281,8 +281,7 @@ def _create_vfa_fermentation_system(
 
 
 def create_ad_fermentation_system(
-    feedstock_type: str = "pelagic",
-    milled_biomass_stream=None,
+    feedstock: str | bst.Stream = "pelagic",
     **fermentation_kwargs,
 ):
     """
@@ -292,14 +291,9 @@ def create_ad_fermentation_system(
 
     Parameters
     ----------
-    feedstock_type : str
-        Forwarded to create_ad_vfa_system(); ignored if
-        milled_biomass_stream is given.
-    milled_biomass_stream : stream, optional
-        Already-milled feed (e.g. from shared preprocessing in
-        systems._ad_integrated_system). If given, VFA_AD/SP_VFA are built
-        directly via _build_acidogenic_pathway() instead of building a
-        full standalone AD-VFA subsystem.
+    feedstock : str or stream
+        Forwarded to create_ad_vfa_system() -- see its docstring for the
+        str-vs-stream distinction.
     **fermentation_kwargs
         Forwarded to _create_vfa_fermentation_system() (everything except
         vfa_broth, which is supplied internally from the AD-VFA
@@ -317,20 +311,10 @@ def create_ad_fermentation_system(
     units : dict
         Key units from both subsystems.
     """
-    if milled_biomass_stream is not None:
-        ad_units, ad_streams, ad_units_d = _build_acidogenic_pathway(milled_biomass_stream)
-        feed = milled_biomass_stream
-    else:
-        ad_vfa_sys = create_ad_vfa_system(feedstock_type=feedstock_type)
-        ad_units = list(ad_vfa_sys.units)
-        ad_streams = {
-            "vfa_broth": ad_vfa_sys.flowsheet.stream.vfa_broth,
-            "acidogenic_residual_solids": ad_vfa_sys.flowsheet.stream.acidogenic_residual_solids,
-        }
-        ad_units_d = {u.ID: u for u in ad_vfa_sys.units}
-        feed = ad_vfa_sys.feeds[0]
-
-    vfa_broth = ad_streams["vfa_broth"]
+    ad_vfa_sys = create_ad_vfa_system(feedstock=feedstock)
+    feed = feedstock if not isinstance(feedstock, str) else ad_vfa_sys.feeds[0]
+    vfa_broth = ad_vfa_sys.flowsheet.stream.vfa_broth
+    acidogenic_residual_solids = ad_vfa_sys.flowsheet.stream.acidogenic_residual_solids
 
     fer_sys, fer_streams, fer_units = _create_vfa_fermentation_system(
         vfa_broth=vfa_broth, **fermentation_kwargs,
@@ -338,16 +322,16 @@ def create_ad_fermentation_system(
 
     sys = bst.System.from_units(
         "AD_Fermentation_sys",
-        units=ad_units + list(fer_sys.units),
+        units=list(ad_vfa_sys.units) + list(fer_sys.units),
     )
 
     streams = {
         "feed": feed,
-        "acidogenic_residual_solids": ad_streams["acidogenic_residual_solids"],
+        "acidogenic_residual_solids": acidogenic_residual_solids,
         **fer_streams,
         "vfa_broth": vfa_broth,
     }
-    units = dict(ad_units_d)
+    units = {u.ID: u for u in ad_vfa_sys.units}
     units.update(fer_units)
 
     return sys, streams, units

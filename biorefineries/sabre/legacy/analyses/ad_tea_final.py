@@ -156,7 +156,7 @@ def build_and_simulate(
     bst.main_flowsheet.clear()
     set_thermo()
     sys = create_ad_biomethane_system(
-        feedstock_type=feedstock_type,
+        feedstock=feedstock_type,
         pretreatment_case=pretreatment_case,
     )
     sys.feeds[0].price = feed_price_per_kg_wet

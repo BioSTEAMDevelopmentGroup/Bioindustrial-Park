@@ -8,7 +8,8 @@
 """
 Integrated Sargassum Biorefinery System Builder
 ================================================
-Shared preprocessing (Press -> PC -> Mill) then splits milled biomass:
+Shared preprocessing (create_biostimulant_system's Press -> PC -> EV, plus
+a Mill on the pressed cake) then splits milled biomass:
   alpha     -> Methanogenic AD pathway -> biomethane
   (1-alpha) -> VFA fermentation pathway -> microbial oil
 
@@ -16,35 +17,26 @@ Edge cases handled cleanly:
   alpha=0.0 -> pure VFA-to-oil  (methanogenic pathway not built)
   alpha=1.0 -> pure biomethane  (VFA/fermentation pathway not built)
 
-The methanogenic pathway (pretreatment -> AD -> H2S removal -> biogas
-upgrading -> digestate screw press) is built via the shared
-_build_methanogenic_pathway() helper in systems._ad_biomethane_system, so this
-integrated system and the standalone AD/biomethane system never drift apart.
+Each pathway is built by calling create_ad_biomethane_system() /
+create_ad_fermentation_system() directly, passing the splitter-derived
+stream as `feedstock` (so each skips its own create_biostimulant_system
+call and uses the shared preprocessing built here instead) -- so this
+integrated system and the standalone AD systems never drift apart.
 
 Returns (sys, streams, units, alpha).
 """
 
 import biosteam as bst
 
-from biorefineries.sabre.utils import (
-    load_assumptions, get_feedstock_type_params, get_scale_feed_kgph, make_sargassum_feed,
-    non_none,
-)
-from biorefineries.sabre.units import Press, Mill, PressateConcentrator, BiostimulantEvaporator
-from biorefineries.sabre.systems._ad_biomethane_system import _build_methanogenic_pathway
+from biorefineries.sabre.utils import non_none
+from biorefineries.sabre.units import Mill
+from biorefineries.sabre.systems._biostimulant_system import create_biostimulant_system
+from biorefineries.sabre.systems._ad_biomethane_system import create_ad_biomethane_system
 from biorefineries.sabre.systems._ad_fermentation_system import (
     create_ad_fermentation_system, _VFA_DOWNSTREAM,
 )
 
 __all__ = ('create_ad_integrated_system', 'MassSplitter')
-
-
-def _get_stream(stream_id: str):
-    """Safe stream lookup — returns None if not in registry."""
-    try:
-        return bst.main_flowsheet.stream[stream_id]
-    except Exception:
-        return None
 
 
 class MassSplitter(bst.Unit):
@@ -94,7 +86,6 @@ def create_ad_integrated_system(
     ferm_target_pH: float = None,
     ferm_mgso4_dose: float = None,
     target_oil_and_solids_content: float = _VFA_DOWNSTREAM["target_oil_and_solids_content_g_per_L"],
-    temperature_regime: str = "mesophilic",
 ):
     """
     Build the full integrated Sargassum biorefinery.
@@ -120,41 +111,15 @@ def create_ad_integrated_system(
     build_methane = alpha > 0.0
     build_vfa     = alpha < 1.0
 
-    feedstock_assumptions = load_assumptions("feedstock.yaml")
-    params = get_feedstock_type_params(feedstock_assumptions, feedstock_type)
-    fresh_feed_kgph = get_scale_feed_kgph(feedstock_assumptions)
-
     # =========================================================
-    # SHARED PREPROCESSING: Press -> PC -> Mill
-    # Press/PC/EV/Mill all have their own yaml-sourced defaults
-    # (data/preprocessing.yaml, data/biostimulant.yaml) -- not
-    # re-declared here since none are exposed as overridable
-    # parameters of create_ad_integrated_system() itself.
+    # SHARED PREPROCESSING: create_biostimulant_system's Press -> PC -> EV,
+    # plus a Mill on the pressed cake.
     # =========================================================
-    feed = make_sargassum_feed(
-        fresh_feed_kgph=fresh_feed_kgph,
-        moisture_frac=params["moisture_frac"],
-        ash_wt_frac_dry=params["ash_wt_frac_dry"],
-    )
+    bio_sys, bio_streams, bio_units = create_biostimulant_system(feedstock_type=feedstock_type)
+    PR, PC, EV = bio_units["PR"], bio_units["PC"], bio_units["EV"]
+    feed = bio_streams["feed"]
 
-    PR = Press("PR", ins=feed, outs=("pressed_cake", "pressate"))
-
-    PC = PressateConcentrator(
-        "PC",
-        ins=PR - 1,
-        outs=("biostimulant_membrane_concentrate", "pressate_permeate"),
-    )
-
-    biostimulant_fresh_water = bst.Stream(
-        "biostimulant_fresh_water", Water=0.0, units="kg/hr"
-    )
-    EV = BiostimulantEvaporator(
-        "EV",
-        ins=(PC - 0, PC - 1, biostimulant_fresh_water),
-        outs=("biostimulant_product", "biostimulant_vapor", "residual_permeate"),
-    )
-
-    ML = Mill("ML", ins=PR - 0, outs=("milled_biomass", "milling_losses"))
+    ML = Mill("ML", ins=bio_streams["pressed_cake"], outs=("milled_biomass", "milling_losses"))
 
     # =========================================================
     # SPLITTER
@@ -181,23 +146,31 @@ def create_ad_integrated_system(
     methane_streams = {}
     methane_units_d = {}
     if build_methane:
-        methane_units, methane_streams, methane_units_d = _build_methanogenic_pathway(
-            SPL - 0, pretreatment_case, temperature_regime=temperature_regime,
+        methane_sys = create_ad_biomethane_system(
+            feedstock=SPL - 0, pretreatment_case=pretreatment_case,
         )
+        methane_units = list(methane_sys.units)
+        methane_units_d = {u.ID: u for u in methane_sys.units}
+        methane_streams = {
+            "biomethane": methane_sys.flowsheet.stream.biomethane,
+            "offgas": methane_sys.flowsheet.stream.offgas,
+            "soil_amendment": methane_sys.flowsheet.stream.soil_amendment,
+            "liquid_digestate": methane_sys.flowsheet.stream.liquid_digestate,
+        }
 
     vfa_units   = []
     vfa_streams = {}
     vfa_units_d = {}
     if build_vfa:
         vfa_fer_sys, vfa_streams, vfa_units_d = create_ad_fermentation_system(
-            milled_biomass_stream=SPL - 1, **ferm_kwargs,
+            feedstock=SPL - 1, **ferm_kwargs,
         )
         vfa_units = list(vfa_fer_sys.units)
 
     # =========================================================
     # ASSEMBLE FULL SYSTEM
     # =========================================================
-    preprocessing = [PR, PC, EV, ML]
+    preprocessing = list(bio_sys.units) + [ML]
     all_units = preprocessing + [SPL] + methane_units + vfa_units
 
     sys = bst.System.from_units("integrated_biorefinery", units=all_units)
@@ -210,8 +183,8 @@ def create_ad_integrated_system(
         "milled_biomass": ML.outs[0],
         "to_methane_ad":  to_methane_ad,
         "to_vfa_ad":      to_vfa_ad,
-        "biostimulant_membrane_concentrate": _get_stream("biostimulant_membrane_concentrate"),
-        "biostimulant_product": _get_stream("biostimulant_product"),
+        "biostimulant_membrane_concentrate": PC.outs[0],
+        "biostimulant_product": bio_streams["biostimulant_product"],
         # Methane pathway (None if alpha=0)
         **{k: methane_streams.get(k) for k in [
             "biomethane", "offgas", "soil_amendment", "liquid_digestate"

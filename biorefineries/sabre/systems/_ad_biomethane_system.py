@@ -3,7 +3,7 @@
 #                      Yalin Li <mailto.yalin.li@gmail.com>
 #
 # This module is under the UIUC open-source license. See
-# github.com/BioSTEAMDevelopmentGroup/biosteam/blob/master/LICENSE.txt
+# github.com/BIOSTEAMDevelopmentGroup/biosteam/blob/master/LICENSE.txt
 # for license details.
 """
 AD/biomethane system builder for the SaBRe (Sargassum Biorefinery) flowsheets.
@@ -11,15 +11,12 @@ AD/biomethane system builder for the SaBRe (Sargassum Biorefinery) flowsheets.
 
 import biosteam as bst
 
-from biorefineries.sabre.utils import (
-    load_assumptions, get_feedstock_type_params, get_scale_feed_kgph, make_sargassum_feed,
-    get_ad_temperature_K,
-)
+from biorefineries.sabre.utils import load_assumptions, get_ad_temperature_K
 from biorefineries.sabre.units import (
     AnaerobicDigester, BiogasUpgrading, H2SRemoval, DigestateScrewPress,
-    Press, Mill, HeatingPretreatment, EnzymaticPretreatment,
-    PeroxidePretreatment, PressateConcentrator, BiostimulantEvaporator,
+    Mill, HeatingPretreatment, EnzymaticPretreatment, PeroxidePretreatment,
 )
+from biorefineries.sabre.systems._biostimulant_system import create_biostimulant_system
 
 __all__ = ('create_ad_biomethane_system',)
 
@@ -31,19 +28,44 @@ _AD_SHARED = _AD_YAML["ad"]
 _AD_PERFORMANCE = _AD_YAML["ad_performance"]
 
 
-def _build_methanogenic_pathway(
-    feed_stream, pretreatment_case, temperature_regime="mesophilic",
+def create_ad_biomethane_system(
+    feedstock: str | bst.Stream = "pelagic",
+    pretreatment_case: str = 'press_mill_only',
 ):
     """
-    Build [optional pretreatment] -> AD -> H2S removal -> biogas upgrading
-    -> digestate screw press, starting from an already-milled feed stream.
+    Build the AD/biomethane system: [optional pretreatment] -> AD -> H2S
+    removal -> biogas upgrading -> digestate screw press.
+
+    Parameters
+    ----------
+    feedstock : str or stream
+        If a str, it's a feedstock type (data/feedstock.yaml
+        `feedstock_type`) and create_biostimulant_system() is called to
+        build Press -> PressateConcentrator -> BiostimulantEvaporator,
+        followed by a Mill on the pressed cake, to get a milled feed.
+        If a stream, it's used directly as the already-milled feed (e.g.
+        a splitter-derived stream from systems._ad_integrated_system,
+        which builds its own shared preprocessing once).
+    pretreatment_case : str
+        data/pretreatment.yaml `pretreatment_ad` case name.
     """
+    path = []
+
+    if isinstance(feedstock, str):
+        bio_sys, bio_streams, bio_units = create_biostimulant_system(feedstock_type=feedstock)
+        path.extend(bio_sys.units)
+
+        ML = Mill("ML", ins=bio_streams["pressed_cake"], outs=("milled_biomass", "milling_losses"))
+        path.append(ML)
+        ad_feed = ML - 0
+    else:
+        ad_feed = feedstock
+
     adS = {**_AD_SHARED, **_AD_SHARED.get("methanogenic", {})}
-    adS["temperature_K"] = get_ad_temperature_K(_AD_SHARED, temperature_regime)
+    adS["temperature_K"] = get_ad_temperature_K(_AD_SHARED, "mesophilic")
     adp = {**_AD_PERFORMANCE, **_AD_PERFORMANCE.get("methanogenic", {})}
     pretreatments = _PRETREATMENT_AD
 
-    ad_feed = feed_stream
     pt_units = []
     HT = EZ = PX = None
 
@@ -88,51 +110,11 @@ def _build_methanogenic_pathway(
         target_temperature_K=adS["temperature_K"],
     )
 
-
     H2SR = H2SRemoval("H2SR", ins=AD - 0, outs=("treated_biogas", "spent_h2s_media"))
     UP = BiogasUpgrading("UP", ins=H2SR - 0, outs=("biomethane", "offgas"))
     SP = DigestateScrewPress(ID="SP", ins=AD - 1, outs=("soil_amendment", "liquid_digestate"))
 
-    path_units = [*pt_units, AD, H2SR, UP, SP]
-    streams = {
-        "biomethane": UP.outs[0], "offgas": UP.outs[1],
-        "soil_amendment": SP.outs[0], "liquid_digestate": SP.outs[1],
-    }
-    units = {"AD": AD, "H2SR": H2SR, "UP": UP, "SP": SP}
-    return path_units, streams, units
-
-
-def create_ad_biomethane_system(
-    feedstock_type: str = "pelagic",
-    pretreatment_case: str = 'press_mill_only',
-):
-    feedstock_assumptions = load_assumptions("feedstock.yaml")
-    params = get_feedstock_type_params(feedstock_assumptions, feedstock_type)
-    feed = make_sargassum_feed(
-        fresh_feed_kgph=get_scale_feed_kgph(feedstock_assumptions),
-        moisture_frac=params["moisture_frac"],
-        ash_wt_frac_dry=params["ash_wt_frac_dry"],
-    )
-
-    PR = Press("PR", ins=feed, outs=("pressed_cake", "pressate"))
-
-    PC = PressateConcentrator(
-        "PC", ins=PR - 1,
-        outs=("biostimulant_membrane_concentrate", "pressate_permeate"),
-    )
-
-    biostimulant_fresh_water = bst.Stream("biostimulant_fresh_water", Water=0.0, units="kg/hr")
-    EV = BiostimulantEvaporator(
-        "EV", ins=(PC - 0, PC - 1, biostimulant_fresh_water),
-        outs=("biostimulant_product", "biostimulant_vapor", "residual_permeate"),
-    )
-
-    ML = Mill("ML", ins=PR - 0, outs=("milled_biomass", "milling_losses"))
-
-    path_units, streams, units = _build_methanogenic_pathway(ML - 0, pretreatment_case)
-
-    path = [PR, PC, EV, ML]
-    path.extend(path_units)
+    path.extend([*pt_units, AD, H2SR, UP, SP])
 
     sys = bst.System("AD_Biomethane_sys", path=path)
     return sys

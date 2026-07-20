@@ -10,89 +10,49 @@ VFA-producing acidogenic AD system builder for the SaBRe flowsheets.
 """
 import biosteam as bst
 
-from biorefineries.sabre.utils import (
-    load_assumptions, get_feedstock_type_params, get_scale_feed_kgph, make_sargassum_feed,
-)
-from biorefineries.sabre.units import (
-    AcidogenicDigester, DigestateScrewPress, PressateConcentrator,
-    BiostimulantEvaporator, Press, Mill,
-)
+from biorefineries.sabre.units import AcidogenicDigester, DigestateScrewPress, Mill
+from biorefineries.sabre.systems._biostimulant_system import create_biostimulant_system
 
 __all__ = ('create_ad_vfa_system',)
 
 
-def _build_acidogenic_pathway(feed_stream):
+def create_ad_vfa_system(feedstock: str | bst.Stream = "pelagic"):
     """
-    Build VFA_AD -> SP_VFA, starting from an already-milled feed stream.
-    It does not include downstream usage of the VFA sream.
-    """
-    AD = AcidogenicDigester("VFA_AD", ins=feed_stream, outs=("offgas", "acidogenic_broth"))
-    SP = DigestateScrewPress(ID="SP_VFA", ins=AD - 1, outs=("acidogenic_residual_solids", "vfa_broth"))
+    Build the VFA acidogenic AD system: VFA_AD -> SP_VFA.
 
-    path_units = [AD, SP]
-    streams = {
-        "offgas": AD.outs[0],
-        "acidogenic_residual_solids": SP.outs[0],
-        "vfa_broth": SP.outs[1],
-    }
-    units = {"VFA_AD": AD, "SP_VFA": SP}
-    return path_units, streams, units
-
-
-def create_ad_vfa_system(feedstock_type: str = "pelagic"):
-    """
-    Build the standalone VFA acidogenic AD subsystem, from raw feedstock:
-
-        raw Sargassum
-          -> Press
-          -> optional PressateConcentrator / optional BiostimulantEvaporator
-          -> Mill
-          -> VFA_AD
-          -> ScrewPress
-
-    For an already-milled feed stream (e.g. shared preprocessing in
-    systems._ad_integrated_system), use _build_acidogenic_pathway() directly
-    instead.
+    Parameters
+    ----------
+    feedstock : str or stream
+        If a str, it's a feedstock type (data/feedstock.yaml
+        `feedstock_type`) and create_biostimulant_system() is called to
+        build Press -> PressateConcentrator -> BiostimulantEvaporator,
+        followed by a Mill on the pressed cake, to get a milled feed.
+        If a stream, it's used directly as the already-milled feed (e.g.
+        a splitter-derived stream from systems._ad_integrated_system,
+        which builds its own shared preprocessing once).
 
     Key outputs (accessible via flowsheet):
         - offgas
         - vfa_broth
         - acidogenic_residual_solids
-        - biostimulant_membrane_concentrate
-        - pressate_permeate
-        - biostimulant_product
+        - biostimulant_membrane_concentrate (standalone mode only)
+        - pressate_permeate (standalone mode only)
+        - biostimulant_product (standalone mode only)
     """
-    feedstock_assumptions = load_assumptions("feedstock.yaml")
-    params = get_feedstock_type_params(feedstock_assumptions, feedstock_type)
-    fresh_feed_kgph = get_scale_feed_kgph(feedstock_assumptions)
-    moisture_frac = params["moisture_frac"]
+    path = []
 
-    feed = make_sargassum_feed(
-        fresh_feed_kgph=fresh_feed_kgph,
-        moisture_frac=moisture_frac,
-        ash_wt_frac_dry=params["ash_wt_frac_dry"],
-    )
+    if isinstance(feedstock, str):
+        bio_sys, bio_streams, bio_units = create_biostimulant_system(feedstock_type=feedstock)
+        path.extend(bio_sys.units)
 
-    PR = Press("PR", ins=feed, outs=("pressed_cake", "pressate"))
+        ML = Mill("ML", ins=bio_streams["pressed_cake"], outs=("milled_biomass", "milling_losses"))
+        path.append(ML)
+        ad_inlet = ML - 0
+    else:
+        ad_inlet = feedstock
 
-    PC = PressateConcentrator(
-        "PC_VFA",
-        ins=PR - 1,
-        outs=("biostimulant_membrane_concentrate", "pressate_permeate"),
-    )
-
-    biostimulant_fresh_water_vfa = bst.Stream(
-        "biostimulant_fresh_water_vfa", Water=0.0, units="kg/hr"
-    )
-    EV = BiostimulantEvaporator(
-        "EV_VFA",
-        ins=(PC - 0, PC - 1, biostimulant_fresh_water_vfa),
-        outs=("biostimulant_product", "biostimulant_vapor", "residual_permeate"),
-    )
-
-    ML = Mill("ML", ins=PR - 0, outs=("milled_biomass", "milling_losses"))
-
-    path_units, streams, units = _build_acidogenic_pathway(ML - 0)
-    path = [PR, PC, EV, ML, *path_units]
+    AD = AcidogenicDigester("VFA_AD", ins=ad_inlet, outs=("offgas", "acidogenic_broth"))
+    SP = DigestateScrewPress(ID="SP_VFA", ins=AD - 1, outs=("acidogenic_residual_solids", "vfa_broth"))
+    path.extend([AD, SP])
 
     return bst.System("AD_VFA_sys", path=tuple(path))

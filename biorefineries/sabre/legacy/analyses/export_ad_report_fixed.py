@@ -189,7 +189,7 @@ def set_widths(ws, widths: dict[int, float]):
         ws.column_dimensions[get_column_letter(idx)].width = width
 
 def build_case(feedstock_type: str, case_key: str):
-    sys = create_ad_biomethane_system(feedstock_type=feedstock_type, pretreatment_case=case_key)
+    sys = create_ad_biomethane_system(feedstock=feedstock_type, pretreatment_case=case_key)
     sys.simulate()
     return sys, get_unit_map(sys)
 
