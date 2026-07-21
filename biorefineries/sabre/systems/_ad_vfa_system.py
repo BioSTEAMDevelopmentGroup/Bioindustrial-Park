@@ -11,7 +11,12 @@ VFA-producing acidogenic AD system builder for the SaBRe flowsheets.
 import biosteam as bst
 
 from biorefineries.sabre._chemicals import create_chemicals
-from biorefineries.sabre.units import AcidogenicDigester, DigestateScrewPress, Mill
+from biorefineries.sabre.units import (
+    AcidogenicDigester,
+    DigestateScrewPress,
+    Mill,
+    VFAMicrofilter,
+)
 from biorefineries.sabre.systems._biostimulant_system import create_biostimulant_system
 
 __all__ = ('create_ad_vfa_system',)
@@ -19,7 +24,7 @@ __all__ = ('create_ad_vfa_system',)
 
 def create_ad_vfa_system(feedstock: str | bst.Stream = "pelagic"):
     """
-    Build the VFA acidogenic AD system: VFA_AD -> SP_VFA.
+    Build the VFA acidogenic AD system: VFA_AD -> SP_VFA -> MF.
 
     Parameters
     ----------
@@ -34,7 +39,8 @@ def create_ad_vfa_system(feedstock: str | bst.Stream = "pelagic"):
 
     Key outputs (accessible via flowsheet):
         - offgas
-        - vfa_broth
+        - vfa_broth (post-microfiltration permeate; ready for fermentation)
+        - vfa_retentate
         - acidogenic_residual_solids
         - biostimulant_membrane_concentrate (standalone mode only)
         - pressate_permeate (standalone mode only)
@@ -59,8 +65,9 @@ def create_ad_vfa_system(feedstock: str | bst.Stream = "pelagic"):
         ad_inlet = feedstock
 
     AD = AcidogenicDigester("VFA_AD", ins=ad_inlet, outs=("offgas", "acidogenic_broth"))
-    SP = DigestateScrewPress(ID="SP_VFA", ins=AD - 1, outs=("acidogenic_residual_solids", "vfa_broth"))
-    path.extend([AD, SP])
+    SP = DigestateScrewPress(ID="SP_VFA", ins=AD - 1, outs=("acidogenic_residual_solids", "raw_vfa_broth"))
+    MF = VFAMicrofilter("MF", ins=SP - 1, outs=("vfa_broth", "vfa_retentate"))
+    path.extend([AD, SP, MF])
 
     HXN = bst.HeatExchangerNetwork("HXN", units=tuple(path))
     path.append(HXN)

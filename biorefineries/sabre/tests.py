@@ -408,7 +408,8 @@ def test_export_ad_report_fixed_press_mill_only():
 
 
 # =================================================================
-# vfa_pathway_figures.py -- VFA composition of the acidogenic broth
+# vfa_pathway_figures.py -- VFA composition of the vfa_broth stream
+# (post-microfiltration permeate, ready for fermentation)
 # =================================================================
 import vfa_pathway_figures as _vpf  # noqa: E402
 
@@ -418,10 +419,10 @@ def test_vfa_pathway_figures_vfa_composition():
     vfa_broth = streams["vfa_broth"]
 
     expected = {
-        "AceticAcid": 8917.126921221765,
-        "PropionicAcid": 2559.5456903506915,
-        "ButyricAcid": 1155.923860158377,
-        "ValericAcid": 1128.4018634879394,
+        "AceticAcid": 8738.78438279733,
+        "PropionicAcid": 2508.354776543678,
+        "ButyricAcid": 1132.8053829552096,
+        "ValericAcid": 1105.8338262181805,
         "HexanoicAcid": 0.0,
     }
     for cid, val in expected.items():

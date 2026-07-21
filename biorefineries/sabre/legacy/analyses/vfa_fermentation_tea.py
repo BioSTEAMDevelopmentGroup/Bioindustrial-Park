@@ -32,10 +32,14 @@ PRICE_NAOH_USD_PER_KG      = 0.35  # NaOH (pH base)
 # Disposal costs (negative stream prices = cost in BioSTEAM VOC)
 # -------------------------
 # Fermentation wastewater: residual organics + salts + cell debris, plus
-# evaporator condensate and microfilter retentate (mixed upstream into the
-# same stream, so one disposal price covers all three)
+# evaporator condensate (mixed into the same stream)
 #   Basis: biological wastewater treatment $3-8/m3 ≈ $0.003-0.008/kg
 FERM_WASTEWATER_DISPOSAL_USD_PER_KG = -0.005
+
+# VFA microfilter retentate: now a separate stream out of the AD-VFA
+# subsystem (upstream of fermentation) rather than mixed into wastewater.
+# Same wastewater-treatment basis applies.
+VFA_RETENTATE_DISPOSAL_USD_PER_KG = -0.005
 
 # Acidogenic residual solids: screw press cake
 #   Basis: standard biosolids ~$30-80/dry ton ≈ $0.03-0.08/kg wet
@@ -137,6 +141,13 @@ def _apply_disposal_costs(
         summary["acidogenic_residual_solids"] = abs(s.price * s.F_mass * annual_hours)
     except Exception as e:
         print(f"  [WARNING] solids disposal: {e}")
+
+    try:
+        s = bst.main_flowsheet.stream["vfa_retentate"]
+        s.price = VFA_RETENTATE_DISPOSAL_USD_PER_KG
+        summary["vfa_retentate"] = abs(s.price * s.F_mass * annual_hours)
+    except Exception as e:
+        print(f"  [WARNING] vfa retentate disposal: {e}")
 
     return summary
 

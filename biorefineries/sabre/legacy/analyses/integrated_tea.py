@@ -59,9 +59,12 @@ OIL_EXTRACTION_REAGENT_USD_PER_KG_OIL = 0.50
 # -------------------------
 # Disposal costs
 # -------------------------
-# Covers fermentation wastewater plus evaporator condensate and microfilter
-# retentate, mixed upstream into the same stream
+# Covers fermentation wastewater plus evaporator condensate, mixed upstream
+# into the same stream
 FERM_WASTEWATER_DISPOSAL_USD_PER_KG = -0.005
+# VFA microfilter retentate: separate stream out of the AD-VFA subsystem;
+# same wastewater-treatment basis applies.
+VFA_RETENTATE_DISPOSAL_USD_PER_KG    = -0.005
 SOLIDS_DISPOSAL_USD_PER_KG          = -0.04
 LIQUID_DIGESTATE_DISPOSAL_USD_PER_KG = -0.002
 SOLID_DIGESTATE_DISPOSAL_USD_PER_KG  = -0.02
@@ -97,6 +100,7 @@ def _apply_stream_prices(streams, biostimulant_price=BIOSTIMULANT_USD_PER_KG):
     for sid, price in [
         ("wastewater",                 FERM_WASTEWATER_DISPOSAL_USD_PER_KG),
         ("acidogenic_residual_solids", SOLIDS_DISPOSAL_USD_PER_KG),
+        ("vfa_retentate",              VFA_RETENTATE_DISPOSAL_USD_PER_KG),
     ]:
         s = streams.get(sid)
         if s is not None:

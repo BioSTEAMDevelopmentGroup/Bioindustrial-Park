@@ -16,7 +16,6 @@ from biorefineries.sabre.utils import load_assumptions
 from biorefineries.sabre.units import (
     YarrowiaLipidFermenter,
     OilExtraction,
-    VFAMicrofilter,
     FermentationMediumTank,
 )
 from biorefineries.sabre.systems._ad_vfa_system import create_ad_vfa_system
@@ -43,10 +42,9 @@ def _create_vfa_fermentation_system(vfa_broth):
     # -------------------------------------------------
     # Upstream conditioning
     # -------------------------------------------------
-    MF = VFAMicrofilter("MF", ins=vfa_broth, outs=("vfa_permeate", "vfa_retentate"))
     T601 = FermentationMediumTank(
         "T601",
-        ins=(MF - 0, ammonia, phosphate, base, mgso4),
+        ins=(vfa_broth, ammonia, phosphate, base, mgso4),
         outs=("conditioned_vfa_broth",),
     )
 
@@ -189,20 +187,18 @@ def _create_vfa_fermentation_system(vfa_broth):
 
     M601 = bst.Mixer(
         "M601",
-        ins=(Ev607 - 1, S602 - 1, MF - 1),
+        ins=(Ev607 - 1, S602 - 1),
         outs=("wastewater",),
     )
 
     # OE added to system path between P607 and C603_2
     sys = bst.System(
         "_vfa_fermentation_sys",
-        path=(MF, T601, R601, V605, P606, Ev607, P607, OE, C603_2, S602, M601)
+        path=(T601, R601, V605, P606, Ev607, P607, OE, C603_2, S602, M601)
     )
 
     key_streams = {
         "vfa_broth": vfa_broth,
-        "vfa_permeate": MF.outs[0],
-        "vfa_retentate": MF.outs[1],
         "conditioned_vfa_broth": T601.outs[0],
         "recycle_biomass": recycle_biomass,
         "vent": R601.outs[0],
@@ -219,7 +215,6 @@ def _create_vfa_fermentation_system(vfa_broth):
     }
 
     units = {
-        "microfilter": MF,
         "medium_tank": T601,
         "fermenter": R601,
         "post_mix_tank": V605,
@@ -258,7 +253,8 @@ def create_ad_fermentation_system(
         The full feedstock -> fermentation-product system.
     streams : dict
         Key streams, including the raw feedstock ('feed'), the AD-VFA
-        subsystem's 'vfa_broth' and 'acidogenic_residual_solids', and all
+        subsystem's 'vfa_broth' (post-microfiltration permeate),
+        'vfa_retentate', and 'acidogenic_residual_solids', and all
         of _create_vfa_fermentation_system()'s streams (final product in
         'microbial_oil').
     units : dict
@@ -269,6 +265,7 @@ def create_ad_fermentation_system(
     ad_vfa_sys = create_ad_vfa_system(feedstock=feedstock)
     feed = feedstock if not isinstance(feedstock, str) else ad_vfa_sys.feeds[0]
     vfa_broth = ad_vfa_sys.flowsheet.stream.vfa_broth
+    vfa_retentate = ad_vfa_sys.flowsheet.stream.vfa_retentate
     acidogenic_residual_solids = ad_vfa_sys.flowsheet.stream.acidogenic_residual_solids
 
     fer_sys, fer_streams, fer_units = _create_vfa_fermentation_system(vfa_broth=vfa_broth)
@@ -291,11 +288,13 @@ def create_ad_fermentation_system(
     streams = {
         "feed": feed,
         "acidogenic_residual_solids": acidogenic_residual_solids,
+        "vfa_retentate": vfa_retentate,
         **fer_streams,
         "vfa_broth": vfa_broth,
     }
     units = {u.ID: u for u in ad_vfa_sys.units}
     units.update(fer_units)
+    units["microfilter"] = units["MF"]
     # Override the vfa subsystem's own (excluded, unsimulated) inner "HXN" key
     # with the actual top-level HXN that's part of `sys`.
     units["HXN"] = HXN
