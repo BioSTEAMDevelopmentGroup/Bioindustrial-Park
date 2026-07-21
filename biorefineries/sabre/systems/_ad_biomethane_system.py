@@ -56,7 +56,11 @@ def create_ad_biomethane_system(
 
     if isinstance(feedstock, str):
         bio_sys, bio_streams, bio_units = create_biostimulant_system(feedstock_type=feedstock)
-        path.extend(bio_sys.units)
+        # Fold in the biostimulant subsystem's units, but not its own HXN facility --
+        # this system gets its own HXN below, scoped to all units visible here, so
+        # nesting the subsystem's narrower one would double-count already-optimized
+        # utilities.
+        path.extend(u for u in bio_sys.units if not isinstance(u, bst.HeatExchangerNetwork))
 
         ML = Mill("ML", ins=bio_streams["pressed_cake"], outs=("milled_biomass", "milling_losses"))
         path.append(ML)
@@ -118,6 +122,9 @@ def create_ad_biomethane_system(
     SP = DigestateScrewPress(ID="SP", ins=AD - 1, outs=("soil_amendment", "liquid_digestate"))
 
     path.extend([*pt_units, AD, H2SR, UP, SP])
+
+    HXN = bst.HeatExchangerNetwork("HXN", units=tuple(path))
+    path.append(HXN)
 
     sys = bst.System("ad_biomethane_sys", path=path)
     return sys

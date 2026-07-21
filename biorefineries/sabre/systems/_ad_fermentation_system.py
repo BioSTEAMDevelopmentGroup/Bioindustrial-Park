@@ -273,9 +273,19 @@ def create_ad_fermentation_system(
 
     fer_sys, fer_streams, fer_units = _create_vfa_fermentation_system(vfa_broth=vfa_broth)
 
+    # Fold in both subsystems' units, but not their own HXN facilities -- this
+    # system gets its own HXN below, scoped to all units visible here, so nesting
+    # either subsystem's narrower one would double-count already-optimized utilities.
+    combined_units = [
+        u for u in (*ad_vfa_sys.units, *fer_sys.units)
+        if not isinstance(u, bst.HeatExchangerNetwork)
+    ]
+    HXN = bst.HeatExchangerNetwork("HXN", units=tuple(combined_units))
+    combined_units.append(HXN)
+
     sys = bst.System.from_units(
         "ad_fermentation_sys",
-        units=list(ad_vfa_sys.units) + list(fer_sys.units),
+        units=combined_units,
     )
 
     streams = {
@@ -286,5 +296,8 @@ def create_ad_fermentation_system(
     }
     units = {u.ID: u for u in ad_vfa_sys.units}
     units.update(fer_units)
+    # Override the vfa subsystem's own (excluded, unsimulated) inner "HXN" key
+    # with the actual top-level HXN that's part of `sys`.
+    units["HXN"] = HXN
 
     return sys, streams, units

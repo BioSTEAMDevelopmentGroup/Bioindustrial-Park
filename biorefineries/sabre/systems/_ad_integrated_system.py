@@ -154,8 +154,16 @@ def create_ad_integrated_system(
     # =========================================================
     # ASSEMBLE FULL SYSTEM
     # =========================================================
-    preprocessing = list(bio_sys.units) + [ML]
+    # Fold in every subsystem's units, but not their own HXN facilities -- this
+    # system gets its own HXN below, scoped to all units visible here, so nesting
+    # any subsystem's narrower one would double-count already-optimized utilities.
+    preprocessing = [u for u in bio_sys.units if not isinstance(u, bst.HeatExchangerNetwork)] + [ML]
+    methane_units = [u for u in methane_units if not isinstance(u, bst.HeatExchangerNetwork)]
+    vfa_units = [u for u in vfa_units if not isinstance(u, bst.HeatExchangerNetwork)]
     all_units = preprocessing + [SPL] + methane_units + vfa_units
+
+    HXN = bst.HeatExchangerNetwork("HXN", units=tuple(all_units))
+    all_units = all_units + [HXN]
 
     sys = bst.System.from_units("ad_integrated_sys", units=all_units)
 
@@ -184,6 +192,9 @@ def create_ad_integrated_system(
         "PR": PR, "PC": PC, "EV": EV, "ML": ML, "SPL": SPL,
         **methane_units_d,
         **vfa_units_d,
+        # Override any subsystem's own (excluded, unsimulated) inner "HXN" key
+        # with the actual top-level HXN that's part of `sys`.
+        "HXN": HXN,
     }
 
     return sys, streams, units, alpha
