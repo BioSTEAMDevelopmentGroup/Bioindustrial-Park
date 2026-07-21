@@ -13,27 +13,6 @@ dry_composition:
   Mannitol: 0.0200     # 2.00% dry
   Fucoidan: 0.0500     # 5.00% dry
 
-# Single source of truth for the "solids" chemical group (see
-# _chemicals.py::create_chemicals(), which defines a `solids` group on the
-# compiled Chemicals object from this list, skipping any ID not currently
-# registered as a chemical). Units with a solids_IDs parameter (Press,
-# VFAMicrofilter, DigestateDecanterCentrifuge) default to this group when
-# solids_IDs is not explicitly given.
-solids_IDs:
-  - Glucan
-  - Xylan
-  - Mannan
-  - Galactan
-  - Arabinan
-  - Alginate
-  - Fucoidan
-  - Mannitol
-  - Protein
-  - Lignin
-  - CellMass
-  - OtherSolids
-  - Ash
-
 feedstock_type:
   pelagic:
     moisture_frac: 0.8673

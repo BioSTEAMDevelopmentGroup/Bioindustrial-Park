@@ -77,31 +77,31 @@ def _check_base_case(feed_price, expected):
 
 def test_vfa_fermentation_near_zero_feed_price():
     _check_base_case(0.00, {
-        "TCI": 330278281.2229998,
-        "FCI": 314550744.0219046,
-        "VOC": 29439145.20873755,
-        "FOC": 12582029.760876184,
-        "material_cost": 671674.3534251114,
-        "utility_cost": 22042759.36098426,
-        "sales": -30892384.109899305,
-        "NPV": -946668161.4238602,
-        "MSP_usd_per_kg": 8.515016355034618,
-        "oil_kg_hr": 1685.646383051923,
+        "TCI": 321946903.1076777,
+        "FCI": 306616098.1977883,
+        "VOC": 28604341.178343315,
+        "FOC": 12264643.927911533,
+        "material_cost": 657159.5976143774,
+        "utility_cost": 21428286.87443263,
+        "sales": -30335955.827604245,
+        "NPV": -923885599.4132847,
+        "MSP_usd_per_kg": 8.571864843618854,
+        "oil_kg_hr": 1634.1526795831005,
     })
 
 
 def test_vfa_fermentation_tipping_fee_feed_price():
     _check_base_case(-0.02, {
-        "TCI": 330278281.22299975,
-        "FCI": 314550744.0219045,
-        "VOC": -69560854.79126245,
-        "FOC": 12582029.76087618,
-        "material_cost": -98328325.64657488,
-        "utility_cost": 22042759.360984255,
-        "sales": -30892384.109899305,
-        "NPV": -115075353.16776276,
-        "MSP_usd_per_kg": 1.0994633193101493,
-        "oil_kg_hr": 1685.646383051923,
+        "TCI": 321946903.1076778,
+        "FCI": 306616098.19778836,
+        "VOC": -70395658.82165666,
+        "FOC": 12264643.927911535,
+        "material_cost": -98342840.4023856,
+        "utility_cost": 21428286.87443263,
+        "sales": -30335955.827604245,
+        "NPV": -92292791.15718769,
+        "MSP_usd_per_kg": 0.922640690225506,
+        "oil_kg_hr": 1634.1526795831005,
     })
 
 
@@ -112,22 +112,22 @@ def test_vfa_fermentation_product_scenarios():
     """
     expected = {
         "Microbial oil": {
-            "TCI": 330278281.22299975,
-            "VOC": 22763985.53185193,
-            "MSP_usd_per_kg": 5.70103543072351,
-            "annual_product_kg": 13350319.35377123,
+            "TCI": 321946903.1076778,
+            "VOC": 22133096.567194235,
+            "MSP_usd_per_kg": 5.727960552068033,
+            "annual_product_kg": 12942489.222298156,
         },
         "Omega-3 EPA oil": {
-            "TCI": 512889561.9750169,
-            "VOC": 32684177.32542391,
-            "MSP_usd_per_kg": 12.460962538486445,
-            "annual_product_kg": 9271055.106785577,
+            "TCI": 500630031.6936701,
+            "VOC": 31833213.972536694,
+            "MSP_usd_per_kg": 12.538624062591019,
+            "annual_product_kg": 8987839.737707054,
         },
         "Astaxanthin": {
-            "TCI": 494093839.24587095,
-            "VOC": 31553730.197884288,
-            "MSP_usd_per_kg": 400.3856827023778,
-            "annual_product_kg": 278131.6532035673,
+            "TCI": 482086372.7237672,
+            "VOC": 30722597.30314086,
+            "MSP_usd_per_kg": 402.7269144631757,
+            "annual_product_kg": 269635.19213121163,
         },
     }
 
@@ -187,43 +187,43 @@ def _check_ad_tea_final_case(pretreatment_case, feed_price, expected):
 
 def test_ad_tea_final_press_mill_only_base_feed_price():
     _check_ad_tea_final_case("press_mill_only", 0.02, {
-        "TCI": 325354883.81482464,
-        "VOC": 111103750.35720775,
-        "FOC": 12394471.764374271,
+        "TCI": 314288091.86619276,
+        "VOC": 110450442.98333445,
+        "FOC": 11972879.690140678,
         "material_cost": 98999999.99999999,
-        "utility_cost": 6553312.015024585,
-        "msp_usd_per_mmbtu": 84.23542897188696,
-        "msp_usd_per_kg_ch4": 4.4307835639212545,
-        "biomethane_kg_hr": 5880.880607140312,
-        "npv_at_3_mmbtu": -1444542920.658153,
+        "utility_cost": 6201457.308176152,
+        "msp_usd_per_mmbtu": 85.5672175841436,
+        "msp_usd_per_kg_ch4": 4.500835644925954,
+        "biomethane_kg_hr": 5701.229450667415,
+        "npv_at_3_mmbtu": -1423529952.6842077,
     })
 
 
 def test_ad_tea_final_press_mill_only_tipping_fee():
     _check_ad_tea_final_case("press_mill_only", -0.02, {
-        "TCI": 325354883.8148245,
-        "VOC": -86896249.64279222,
-        "FOC": 12394471.76437427,
+        "TCI": 314288091.86619276,
+        "VOC": -87549557.01666552,
+        "FOC": 11972879.690140678,
         "material_cost": -98999999.99999999,
-        "utility_cost": 6553312.015024586,
-        "msp_usd_per_mmbtu": -8.774214957135278,
-        "msp_usd_per_kg_ch4": -0.4615237067453156,
-        "biomethane_kg_hr": 5880.880607140312,
-        "npv_at_3_mmbtu": 181548712.00937253,
+        "utility_cost": 6201457.3081761515,
+        "msp_usd_per_mmbtu": -10.37324856974666,
+        "msp_usd_per_kg_ch4": -0.5456328747686744,
+        "biomethane_kg_hr": 5701.229450667415,
+        "npv_at_3_mmbtu": 199116899.0050825,
     })
 
 
 def test_ad_tea_final_combined_pe_near_zero():
     _check_ad_tea_final_case("combined_PE", 0.00, {
-        "TCI": 351811094.30027896,
-        "VOC": 22742742.1008502,
-        "FOC": 13402327.401915388,
+        "TCI": 340208528.941262,
+        "VOC": 21863399.58021939,
+        "FOC": 12960324.912048075,
         "material_cost": 0.0,
-        "utility_cost": 7696739.486938889,
-        "msp_usd_per_mmbtu": 16.089914216945758,
-        "msp_usd_per_kg_ch4": 0.8463294878113469,
-        "biomethane_kg_hr": 14395.227832748227,
-        "npv_at_3_mmbtu": -639623263.929321,
+        "utility_cost": 7310225.568487884,
+        "msp_usd_per_mmbtu": 16.068770146492213,
+        "msp_usd_per_kg_ch4": 0.8452173097054904,
+        "biomethane_kg_hr": 13955.47747891447,
+        "npv_at_3_mmbtu": -619089791.3158991,
     })
 
 
@@ -239,25 +239,25 @@ def test_integrated_tea_alpha_sweep():
 
     expected = {
         0.0: {
-            "msp_oil_usd_per_kg": 13.779256022381588,
-            "combined_npv_M": -1424.8672999344783,
-            "tci_M": 330.27828122299974,
-            "voc_M": 121.09231117842681,
-            "oil_kg_yr": 13350319.35377123,
+            "msp_oil_usd_per_kg": 11.668141716847924,
+            "combined_npv_M": -1151.784370627267,
+            "tci_M": 321.9469031076779,
+            "voc_M": 120.47593696957985,
+            "oil_kg_yr": 12942489.222298156,
         },
         0.5: {
-            "msp_biomethane_mmbtu": 161.1149247234328,
-            "msp_oil_usd_per_kg": 25.691018954407717,
-            "combined_npv_M": -1286.7992983591541,
-            "tci_M": 330.9858459799484,
-            "voc_M": 116.12531687237623,
-            "oil_kg_yr": 6675159.676885615,
+            "msp_biomethane_mmbtu": 134.16531644113516,
+            "msp_oil_usd_per_kg": 21.393695795905362,
+            "combined_npv_M": -1013.885598612645,
+            "tci_M": 321.288127759213,
+            "voc_M": 115.49059117707203,
+            "oil_kg_yr": 6471244.611149078,
         },
         1.0: {
-            "msp_biomethane_mmbtu": 74.19513875892596,
-            "combined_npv_M": -1139.8308010413036,
-            "tci_M": 325.35488381482463,
-            "voc_M": 111.10375035720774,
+            "msp_biomethane_mmbtu": 60.468578391709265,
+            "combined_npv_M": -867.080756429005,
+            "tci_M": 314.28809186619276,
+            "voc_M": 110.45044298333445,
             "oil_kg_yr": 0.0,
         },
     }
@@ -279,12 +279,12 @@ import ad_biostimulant_price as _abp  # noqa: E402
 
 def test_ad_biostimulant_price_build_case():
     msp_mmbtu, annual_rev_musd = _abp.build_case("press_mill_only", 0.00)
-    _assert_close(msp_mmbtu, 84.23542897188696, "press_mill_only/$0.00 msp_mmbtu")
+    _assert_close(msp_mmbtu, 85.5672175841436, "press_mill_only/$0.00 msp_mmbtu")
     _assert_close(annual_rev_musd, 0.0, "press_mill_only/$0.00 annual_rev_musd")
 
     msp_mmbtu, annual_rev_musd = _abp.build_case("combined_PE", 1.00)
-    _assert_close(msp_mmbtu, 25.629351530945932, "combined_PE/$1.00 msp_mmbtu")
-    _assert_close(annual_rev_musd, 42.74777083871249, "combined_PE/$1.00 annual_rev_musd")
+    _assert_close(msp_mmbtu, 15.264782588764596, "combined_PE/$1.00 msp_mmbtu")
+    _assert_close(annual_rev_musd, 103.59613168121251, "combined_PE/$1.00 annual_rev_musd")
 
 
 # =================================================================
@@ -295,11 +295,11 @@ import ad_feed_tea as _aft  # noqa: E402
 
 def test_ad_feed_tea_build_case():
     msp_mmbtu, fc_musd = _aft.build_case("press_mill_only", 0.02)
-    _assert_close(msp_mmbtu, 84.23542897188695, "press_mill_only/0.02 msp_mmbtu")
+    _assert_close(msp_mmbtu, 85.5672175841436, "press_mill_only/0.02 msp_mmbtu")
     _assert_close(fc_musd, 98.99999999999999, "press_mill_only/0.02 annual_feed_cost_musd")
 
     msp_mmbtu, fc_musd = _aft.build_case("enzymatic", -0.02)
-    _assert_close(msp_mmbtu, -6.580933582245015, "enzymatic/-0.02 msp_mmbtu")
+    _assert_close(msp_mmbtu, -7.8533673251409954, "enzymatic/-0.02 msp_mmbtu")
     _assert_close(fc_musd, -98.99999999999999, "enzymatic/-0.02 annual_feed_cost_musd")
 
 
@@ -311,7 +311,7 @@ import ad_heatmap as _adh  # noqa: E402
 
 def test_ad_heatmap_build_case():
     msp_mmbtu = _adh.build_case("combined_PE", 0.02, 0.50)
-    _assert_close(msp_mmbtu, 29.254005039049563, "combined_PE/0.02/0.50 msp_mmbtu")
+    _assert_close(msp_mmbtu, 24.32566318367999, "combined_PE/0.02/0.50 msp_mmbtu")
 
 
 # =================================================================
@@ -327,10 +327,10 @@ def test_plot_two_pretreatment_figures_press_mill_only():
     _assert_close(high, 0.1, "press_mill_only high_yield")
 
     sys_, tea, msp, ch4_kgph = _p2p.build_case("press_mill_only", yield_override=central)
-    _assert_close(msp["usd_per_mmbtu"], 84.23542897188696, "msp_usd_per_mmbtu")
-    _assert_close(ch4_kgph, 5110.063367928756, "ch4_kgph")
-    _assert_close(tea.TCI, 325354883.81482464, "TCI")
-    _assert_close(tea.VOC, 111103750.35720775, "VOC")
+    _assert_close(msp["usd_per_mmbtu"], 85.5672175841436, "msp_usd_per_mmbtu")
+    _assert_close(ch4_kgph, 4953.959400678757, "ch4_kgph")
+    _assert_close(tea.TCI, 314288091.8661928, "TCI")
+    _assert_close(tea.VOC, 110450442.98333445, "VOC")
 
 
 # =================================================================
@@ -341,7 +341,7 @@ import vfa_heatmap as _vhm  # noqa: E402
 
 def test_vfa_heatmap_build_case():
     msp = _vhm.build_case(0.02, 0.50)
-    _assert_close(msp, 14.329567505264734, "feed=0.02/biostim=0.50 msp_usd_per_kg")
+    _assert_close(msp, 12.218917081630563, "feed=0.02/biostim=0.50 msp_usd_per_kg")
 
 
 # =================================================================
@@ -356,28 +356,28 @@ def test_hauke_stream_tables_press_mill_only():
 
     expected = {
         "sargassum_feed": {
-            "F_mass_kg_hr": 625000.0000000001,
-            "TS_kg_hr": 82937.50000000012,
-            "VS_kg_hr": 54299.18125000011,
-            "water_wt_frac": 0.8672999999999998,
+            "F_mass_kg_hr": 624999.9999999999,
+            "TS_kg_hr": 82937.49999999988,
+            "VS_kg_hr": 54299.18124999988,
+            "water_wt_frac": 0.8673000000000002,
         },
         "biomethane": {
-            "F_mass_kg_hr": 5880.880607140298,
-            "TS_kg_hr": 5880.880607140298,
-            "VS_kg_hr": 5880.880607140298,
+            "F_mass_kg_hr": 5701.229450667415,
+            "TS_kg_hr": 5701.229450667415,
+            "VS_kg_hr": 5701.229450667415,
             "water_wt_frac": 0.0,
         },
         "soil_amendment": {
-            "F_mass_kg_hr": 53856.6173953014,
-            "TS_kg_hr": 29621.139567415772,
-            "VS_kg_hr": 18731.705245915764,
+            "F_mass_kg_hr": 52927.759659600015,
+            "TS_kg_hr": 29110.26781278001,
+            "VS_kg_hr": 18220.833491280006,
             "water_wt_frac": 0.44999999999999996,
         },
         "liquid_digestate": {
-            "F_mass_kg_hr": 450459.5712948056,
-            "TS_kg_hr": 44431.7093511236,
-            "VS_kg_hr": 28097.5578688736,
-            "water_wt_frac": 0.9013636024573556,
+            "F_mass_kg_hr": 441526.6414433647,
+            "TS_kg_hr": 43665.40171916998,
+            "VS_kg_hr": 27331.250236919976,
+            "water_wt_frac": 0.9011035855584469,
         },
     }
 
@@ -398,10 +398,10 @@ def test_export_ad_report_fixed_press_mill_only():
     ad = unit_map["AD"]
     up = unit_map["UP"]
 
-    _assert_close(_exr.installed_cost(ad), 137139082.3123173, "AD installed_cost")
-    _assert_close(_exr.annualize_add_opex(ad), 4094675.1548724906, "AD add_opex_annual")
-    _assert_close(_exr.installed_cost(up), 33149424.622709453, "UP installed_cost")
-    _assert_close(_exr.stream_total_mass(up.outs[0]), 5880.880607140312, "biomethane F_mass")
+    _assert_close(_exr.installed_cost(ad), 127825506.10408078, "AD installed_cost")
+    _assert_close(_exr.annualize_add_opex(ad), 3838081.637052034, "AD add_opex_annual")
+    _assert_close(_exr.installed_cost(up), 32136764.637289904, "UP installed_cost")
+    _assert_close(_exr.stream_total_mass(up.outs[0]), 5701.229450667415, "biomethane F_mass")
     _assert_close(
         _exr.gas_molpct(up.outs[0], "Methane"), 94.78801573491452, "biomethane CH4 mol%"
     )
@@ -418,10 +418,10 @@ def test_vfa_pathway_figures_vfa_composition():
     vfa_broth = streams["vfa_broth"]
 
     expected = {
-        "AceticAcid": 9198.11406227174,
-        "PropionicAcid": 2640.1994067631845,
-        "ButyricAcid": 1192.3481191833737,
-        "ValericAcid": 1163.9588782504363,
+        "AceticAcid": 8917.126921221765,
+        "PropionicAcid": 2559.5456903506915,
+        "ButyricAcid": 1155.923860158377,
+        "ValericAcid": 1128.4018634879394,
         "HexanoicAcid": 0.0,
     }
     for cid, val in expected.items():
@@ -436,8 +436,8 @@ import vfa_price_scenarios as _vps  # noqa: E402
 
 def test_vfa_price_scenarios_biostimulant_price():
     for bs_price, expected_msp in (
-        (0.00, 15.93056931493961),
-        (1.00, 12.72856569510954),
+        (0.00, 16.22108892226574),
+        (1.00, 8.216745235624105),
     ):
         streams, units, full_sys = _vps.build_and_simulate(
             _vps.FEED_PRICE_BASE
@@ -461,7 +461,7 @@ def test_vfa_yield_sensitivities_acidogenic_yield():
     msp_val = _vys.solve_oil_msp_from_full_system(
         full_sys, streams, extraction_usd_per_kg_oil=0.50
     )
-    _assert_close(msp_val, 18.565831009809877, "acidogenic_vfa_yield=0.47 msp_usd_per_kg")
+    _assert_close(msp_val, 18.906519198206688, "acidogenic_vfa_yield=0.47 msp_usd_per_kg")
 
 
 def test_vfa_yield_sensitivities_fermentation_yield():
@@ -473,7 +473,7 @@ def test_vfa_yield_sensitivities_fermentation_yield():
     msp_val = _vys.solve_oil_msp_from_full_system(
         full_sys, streams, extraction_usd_per_kg_oil=0.50
     )
-    _assert_close(msp_val, 11.615678161387232, "fermentation_yield=0.20 msp_usd_per_kg")
+    _assert_close(msp_val, 11.825087704139658, "fermentation_yield=0.20 msp_usd_per_kg")
 
 
 # =================================================================
@@ -486,7 +486,7 @@ def test_integrated_system_sensitivity_npv_at_alpha():
     npv_M = _iss._build_npv_at_alpha(
         1.0, 0.02, 0.50, "press_mill_only", 3.0, _iss.OIL_MARKET_USD_PER_KG
     )
-    _assert_close(npv_M, -1265.0038358174813, "alpha=1.0 base scenario @ $3/MMBtu NPV ($M)")
+    _assert_close(npv_M, -988.4299624354809, "alpha=1.0 base scenario @ $3/MMBtu NPV ($M)")
 
 
 # =================================================================

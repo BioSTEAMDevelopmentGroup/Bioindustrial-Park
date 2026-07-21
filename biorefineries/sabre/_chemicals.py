@@ -11,8 +11,6 @@ Creating the chemical list used for the SaBRe systems
 import biosteam as bst
 import thermosteam as tmo
 
-from biorefineries.sabre.utils import load_assumptions
-
 __all__ = ('create_chemicals',)
 
 
@@ -26,7 +24,8 @@ _Cp_structural = 1.364  # J/g/K
 _rho_solids = 1540  # kg/m3, same value used in cellulosic/cane/microalgae
 
 
-def _structural_solid(ID: str, formula: str, Hf_cal: float, Cp: float = _Cp_structural, rho: float = _rho_solids):
+def _structural_solid(ID: str, formula: str, Hf_cal: float,
+                       Cp: float = _Cp_structural, rho: float = _rho_solids):
     chemical = bst.Chemical(ID, search_db=False, default=True, phase="s",
                              formula=formula, Hf=Hf_cal * _cal2joule)
     chemical.Cn.add_model(Cp * chemical.MW, top_priority=True)
@@ -153,10 +152,15 @@ def create_chemicals(set_thermo: bool = True):
     ])
     chems.compile()
 
-    solids_IDs = load_assumptions("feedstock.yaml").get("solids_IDs", [])
-    solids_IDs = [i for i in solids_IDs if i in chems]
-    if solids_IDs:
-        chems.define_group("solids", solids_IDs)
+    # "solids" group derived directly from which chemicals are actually
+    # locked to phase='s' above -- the single source of truth for which
+    # chemicals count as solids in unit simulations (Press,
+    # VFAMicrofilter, DigestateDecanterCentrifuge via
+    # utils.get_solids_group_IDs()) is the chemical models themselves, not
+    # a separately-maintained ID list that could drift out of sync with them.
+    solid_IDs = [c.ID for c in chems if c.locked_state == "s"]
+    if solid_IDs:
+        chems.define_group("solids", solid_IDs)
 
     if set_thermo:
         thermo = tmo.Thermo(chems)

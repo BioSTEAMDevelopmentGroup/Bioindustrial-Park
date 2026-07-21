@@ -62,9 +62,10 @@ def get_solids_group_IDs(chemicals=None) -> tuple:
     """
     Resolve chemical IDs in the 'solids' (or 'Solids') group defined on
     the given Chemicals object (defaults to `bst.settings.chemicals`) --
-    see `_chemicals.py::create_chemicals()`, which defines this group from
-    `data/feedstock.yaml`'s `solids_IDs` list. Returns an empty tuple if
-    neither group name is defined.
+    see `_chemicals.py::create_chemicals()`, which defines this group
+    directly from which chemicals are locked to phase='s' (not a
+    separately-maintained ID list). Returns an empty tuple if neither
+    group name is defined.
     """
     if chemicals is None:
         chemicals = bst.settings.chemicals
