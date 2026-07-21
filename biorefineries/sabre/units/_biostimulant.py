@@ -210,17 +210,21 @@ class BiostimulantEvaporator(bst.Unit):
         Concentrate to evaporate.
     outs : tuple[stream, stream]
         Biostimulant product (adjusted to `target_solids_wt_frac`) and
-        vapor (water removed by evaporation, plus the small
-        non-recovered-solute fraction).
+        condensed vapor (water removed by evaporation, plus the small
+        non-recovered-solute fraction, cooled to `condensing_temperature_K`
+        by the auxiliary condenser -- see Notes -- so it leaves this unit
+        as a liquid, e.g. ready for a wastewater mixer downstream).
     target_solids_wt_frac : float or None
         Target dry-solids weight fraction of the product (0-1). `None` is
         a no-op bypass: the concentrate passes straight through to the
-        product outlet unchanged (vapor stays empty), and `_design`/
-        `_cost` report zero duty, electricity, installed cost, and
-        maintenance OPEX.
+        product outlet unchanged (condensed-vapor outlet stays empty), and
+        `_design`/`_cost` report zero duty, electricity, installed cost,
+        and maintenance OPEX (including for the auxiliary condenser).
     boiling_temperature_K : float
         Evaporation temperature; also the reference temperature for the
         latent-heat lookup (see Notes below).
+    condensing_temperature_K : float
+        Temperature the auxiliary condenser cools the vapor down to.
     electricity_kWh_per_kg_water_evap : float
         Electricity intensity per kg of water evaporated.
     nonwater_recovery_to_product : float
@@ -246,8 +250,9 @@ class BiostimulantEvaporator(bst.Unit):
     """
 
     _N_ins = 1
-    _N_outs = 2  # biostimulant_product, vapor
+    _N_outs = 2  # biostimulant_product, condensed_vapor
     _F_BM_default = {"Biostimulant evaporator": _EVAPORATOR["F_BM"]}
+    auxiliary_unit_names = ('condenser',)
 
     def __init__(
         self,
@@ -256,6 +261,7 @@ class BiostimulantEvaporator(bst.Unit):
         outs=(),
         target_solids_wt_frac=_EVAPORATOR["target_solids_wt_frac"],
         boiling_temperature_K=_EVAPORATOR["boiling_temperature_K"],
+        condensing_temperature_K=_EVAPORATOR["condensing_temperature_K"],
         electricity_kWh_per_kg_water_evap=_EVAPORATOR["electricity_kWh_per_kg_water_evap"],
         nonwater_recovery_to_product=_EVAPORATOR["nonwater_recovery_to_product"],
         capex_ref_usd=_EVAPORATOR["capex_ref_usd"],
@@ -270,6 +276,7 @@ class BiostimulantEvaporator(bst.Unit):
             None if target_solids_wt_frac is None else float(target_solids_wt_frac)
         )
         self.boiling_temperature_K = float(boiling_temperature_K)
+        self.condensing_temperature_K = float(condensing_temperature_K)
         self.electricity_kWh_per_kg_water_evap = float(electricity_kWh_per_kg_water_evap)
         self.nonwater_recovery_to_product = float(nonwater_recovery_to_product)
 
@@ -278,17 +285,32 @@ class BiostimulantEvaporator(bst.Unit):
         self.scale_exponent = float(scale_exponent)
         self.maintenance_frac_of_capex_per_yr = float(maintenance_frac_of_capex_per_yr)
 
+        # Auxiliary condenser: cools/condenses the raw vapor (a pure-Water
+        # sub-stream, set up in _run) down to condensing_temperature_K
+        # before it leaves as outs[1]. Its ins[0] is an internal auxlet
+        # stream (populated each _run); its outs[0] writes directly into
+        # this unit's own real outs[1], so no extra system-level unit or
+        # stream is needed downstream to do the condensing.
+        self.auxiliary(
+            "condenser", bst.HXutility,
+            ins=[None], outs=[self.outs[1]],
+            T=self.condensing_temperature_K, V=0,
+        )
+
     def _run(self):
         conc_in, = self.ins
-        product, vapor = self.outs
+        product, condensate = self.outs
+        condenser = self.condenser
+        raw_vapor = condenser.ins[0]
 
         product.empty()
-        vapor.empty()
         product.phase = "l"
-        vapor.phase = "g"
+        raw_vapor.empty()
+        raw_vapor.phase = "g"
 
         if self.target_solids_wt_frac is None:
             product.copy_like(conc_in)
+            condenser._run()
             self._water_evaporated_kgph = 0.0
             water = float(conc_in.imass["Water"]) if "Water" in conc_in.chemicals.IDs else 0.0
             nonwater = product.F_mass - water
@@ -311,7 +333,7 @@ class BiostimulantEvaporator(bst.Unit):
             m_prod = rec * m
             m_vap = m - m_prod
             product.imass[cid] = m_prod
-            vapor.imass[cid] = m_vap
+            raw_vapor.imass[cid] = m_vap
 
         nonwater_prod = sum(
             float(product.imass[cid]) for cid in conc_in.chemicals.IDs if cid != "Water"
@@ -331,7 +353,15 @@ class BiostimulantEvaporator(bst.Unit):
         # Evaporate the excess water.
         water_to_vapor = max(water_in - water_to_product, 0.0)
         product.imass["Water"] = water_in - water_to_vapor
-        vapor.imass["Water"] = water_to_vapor
+        raw_vapor.imass["Water"] = water_to_vapor
+
+        # product and raw_vapor both actually leave the evaporator at its
+        # operating (boiling) temperature.
+        product.T = raw_vapor.T = self.boiling_temperature_K
+
+        # Condense the raw vapor down to condensing_temperature_K; writes
+        # directly into `condensate` (this unit's real outs[1]).
+        condenser._run()
 
         self._water_evaporated_kgph = water_to_vapor
         self._product_solids_wt_frac = (
@@ -347,6 +377,7 @@ class BiostimulantEvaporator(bst.Unit):
             self.design_results["Total duty (kJ/h)"] = 0.0
             self.design_results["Electricity demand (kW)"] = 0.0
             self.power_utility(0.0)
+            self.condenser.simulate(run=False)
             return
 
         water_evap = getattr(self, "_water_evaporated_kgph", 0.0)
@@ -378,8 +409,13 @@ class BiostimulantEvaporator(bst.Unit):
 
         if total_duty_kJph > 0:
             self.add_heat_utility(total_duty_kJph, T_in=conc_in.T, T_out=self.boiling_temperature_K)
-        
+
         self.power_utility(power_kW)
+
+        # Auxiliary condenser: its own duty/area/cost, from BioSTEAM's own
+        # HXutility design+costing algorithms (run=False since _run already
+        # populated its ins/outs above).
+        self.condenser.simulate(run=False)
 
     def _cost(self):
         evap = max(float(self.design_results.get("Water evaporated (kg/h)", 0.0)), 0.0)

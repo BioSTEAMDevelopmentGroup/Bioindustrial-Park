@@ -30,8 +30,10 @@ pressate_concentrator:
       note: "Annual maintenance retained at 3.5% of installed CAPEX for consistency."
 
 biostimulant_evaporator:
-  target_solids_wt_frac: 0.20
+  target_solids_wt_frac: null # originally set to 0.20, but this unit was not included in the system
   boiling_temperature_K: 333.15 # mild vacuum evaporation ~60 C
+  condensing_temperature_K: 310.15 # ~37 C; auxiliary condenser cools the vapor to this before it
+    # leaves as a liquid (e.g. to a wastewater mixer), rather than exiting as vapor.
   electricity_kWh_per_kg_water_evap: 0.0
   nonwater_recovery_to_product: 0.995
   capex_ref_usd: 750000.0
@@ -43,3 +45,7 @@ biostimulant_evaporator:
   sources:
     all_params:
       note: "No literature or prior-yaml grounding for any parameter in this section."
+    condensing_temperature:
+      note: "No literature grounding; picked as a plausible cooled-liquid outlet
+        temperature above ambient, consistent with a typical process-side
+        approach to cooling water."
