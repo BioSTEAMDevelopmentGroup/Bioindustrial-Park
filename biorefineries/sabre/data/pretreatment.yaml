@@ -34,7 +34,9 @@ pretreatment_ad:
       enzyme_dose_kg_per_kg_dry_feed: 0.005
       treated_fraction: 0.25
       enzyme_recycle_factor: 2.0
-      capex_usd: 7280000.0
+      capex_usd: 7280000.0  # NREL/TP-5100-62498 saccharification tank cost;
+                            # does not include heat-exchange equipment. EnzymaticPretreatment
+                            # adds its own auxiliary heat_exchanger capital cost on top.
       enzyme_price_usd_per_kg: 7.0
       maintenance_frac_of_capex_per_yr: 0.035
       F_BM: 1.0 # capex already installed
@@ -136,7 +138,10 @@ pretreatment_ad:
     heating:
       target_temperature_K: 393.15
       residence_time_hr: 0.25
-      capex_usd: 1200000.0
+      capex_usd: 1200000.0  # NOTE: no cost source cited (unlike enzymatic/peroxide
+                            # above); assumed to exclude heat-exchange equipment.
+                            # HeatingPretreatment adds its own auxiliary
+                            # heat_exchanger capital cost on top. Unverified.
       maintenance_frac_of_capex_per_yr: 0.035
       F_BM: 1.0 # capex already installed
     ad_effects:

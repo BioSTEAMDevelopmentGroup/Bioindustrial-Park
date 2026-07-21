@@ -44,7 +44,7 @@ _BIOGAS_UPGRADING = _AD_YAML["biogas_upgrading"]
 _DIGESTATE_DECANTER_CENTRIFUGE = _AD_YAML["digestate_decanter_centrifuge"]
 _DIGESTATE_SCREW_PRESS = _AD_YAML["digestate_screw_press"]
 
-# ADBC-based digester installed cost anchor points (m3, USD)
+# ADBC-based digester installed cost anchor points (m3, USD).
 ADBC_VOL_M3 = [878, 1755, 2633, 3510, 5265, 8775]
 ADBC_CAPEX = [1720964, 1750201, 1779439, 1808676, 1867151, 1984101]
 
@@ -182,6 +182,7 @@ class AnaerobicDigester(bst.Unit):
     _N_ins = 1
     _N_outs = 2  # biogas, digestate
     _F_BM_default = {"Anaerobic digester": _AD_COST["F_BM"]}
+    auxiliary_unit_names = ("heat_exchanger",)
 
     def __init__(
         self,
@@ -374,17 +375,17 @@ class AnaerobicDigester(bst.Unit):
 
         mixing_kW = (self.mixing_W_per_m3 * V_liquid) / 1000.0
 
-        T_in = float(getattr(feed, "T", self.target_temperature_K))
-        T_target = self.target_temperature_K
-        dT = max(0.0, T_target - T_in)
-
-        m_dot_kgph = feed.F_mass + dilution_water_kgph
-        Q_kJph = m_dot_kgph * feed.Cp * dT
+        # Influent = feed + dilution water, heated via an auxiliary HXutility.
+        influent = feed.copy()
+        if dilution_water_kgph > 0:
+            influent.imass["Water"] += dilution_water_kgph
+        hx = self.auxiliary("heat_exchanger", bst.HXutility, ins=influent, T=self.target_temperature_K)
+        hx.simulate()
 
         self.design_results["Mixing power (kW)"] = mixing_kW
-        self.design_results["Influent T (K)"] = T_in
-        self.design_results["Target T (K)"] = T_target
-        self.design_results["Heating duty (kJ/h)"] = Q_kJph
+        self.design_results["Influent T (K)"] = float(feed.T)
+        self.design_results["Target T (K)"] = self.target_temperature_K
+        self.design_results["Heating duty (kJ/h)"] = hx.net_duty
 
         ids = set(self.chemicals.IDs)
 
@@ -419,12 +420,6 @@ class AnaerobicDigester(bst.Unit):
         self.design_results["CH4 yield (kg/kg VS fed)"] = methane_kgph / VS_in
         self.power_utility(mixing_kW)
 
-        if Q_kJph > 0:
-            try:
-                self.add_heat_utility(Q_kJph, T_in, T_target)
-            except TypeError:
-                self.add_heat_utility(Q_kJph, T_in)
-
     def _cost(self):
         V_each = self.design_results["Digester volume each (m3)"]
         N = int(self.design_results["Number of digesters"])
@@ -435,6 +430,13 @@ class AnaerobicDigester(bst.Unit):
         self.design_results["ADBC CAPEX each ($)"] = C_each
         self.design_results["ADBC CAPEX total ($)"] = C_total
         self.baseline_purchase_costs["Anaerobic digester"] = C_total
+
+        # ADBC digester CAPEX is assumed to already include heating equipment.
+        # Zero out the auxiliary heat_exchanger's
+        # own capital cost here to avoid double-counting.
+        self.heat_exchanger.baseline_purchase_costs.clear()
+        self.heat_exchanger.purchase_costs.clear()
+        self.heat_exchanger.installed_costs.clear()
 
         if self.maintenance_usd_per_m3_yr is not None:
             total_volume = self.design_results["Total digester volume (m3)"]
@@ -511,6 +513,7 @@ class AcidogenicDigester(bst.Unit):
     _N_ins = 1
     _N_outs = 2  # offgas, acidogenic_broth
     _F_BM_default = {"Acidogenic digester": _AD_COST["F_BM"]}
+    auxiliary_unit_names = ("heat_exchanger", "heat_shock_exchanger")
 
     def __init__(
         self,
@@ -632,6 +635,7 @@ class AcidogenicDigester(bst.Unit):
 
     def _design(self):
         feed = self.ins[0]
+        broth = self.outs[1]
 
         dilution_water_kgph = _resolve_dilution_water_kgph(feed, self.target_feed_moisture_frac)
 
@@ -656,46 +660,54 @@ class AcidogenicDigester(bst.Unit):
         self.design_results["Mixing power (kW)"] = mixing_kW
         self.power_utility(mixing_kW)
 
-        T_in = float(getattr(feed, "T", self.target_temperature_K))
+        T_in = float(feed.T)
         T_base = self.target_temperature_K
-        dT = max(0.0, T_base - T_in)
-        m_dot_kgph = feed.F_mass + dilution_water_kgph
-        Q_base_kJph = m_dot_kgph * feed.Cp * dT
+
+        # Influent = feed + dilution water, heated via an auxiliary HXutility.
+        influent = feed.copy()
+        if dilution_water_kgph > 0:
+            influent.imass["Water"] += dilution_water_kgph
+        hx = self.auxiliary("heat_exchanger", bst.HXutility, ins=influent, T=T_base)
+        hx.simulate()
 
         self.design_results["Influent T (K)"] = T_in
         self.design_results["Base target T (K)"] = T_base
-        self.design_results["Base heating duty (kJ/h)"] = Q_base_kJph
+        self.design_results["Base heating duty (kJ/h)"] = hx.net_duty
 
+        # Heat-shock reheats a periodic slipstream of resident liquid (not the
+        # main feed), represented as an equivalent continuous slipstream split
+        # from the broth outlet -- same averaged energy basis as before
+        # (event mass * events/day / 24h), but now heated via its own auxiliary
+        # HXutility so the duty comes from BioSTEAM's own enthalpy balance and
+        # the utility is HXN-eligible.
         Q_hs_kJph = 0.0
         if self.enable_heat_shock:
             frac = min(max(self.hs_heated_fraction_of_liquid, 0.0), 1.0)
             events_per_day = max(0.0, self.hs_events_per_day)
-            dT_hs = max(0.0, self.hs_target_temperature_K - T_base)
             m_liq_kg = V_liquid * feed.rho
-            Q_event_kJ = (m_liq_kg * frac) * feed.Cp * dT_hs
-            Q_day_kJ = Q_event_kJ * events_per_day
-            Q_hs_kJph = Q_day_kJ / 24.0
+            m_heated_kgph = (m_liq_kg * frac * events_per_day) / 24.0
 
             self.design_results["HS enabled"] = True
             self.design_results["HS target T (K)"] = self.hs_target_temperature_K
             self.design_results["HS events/day"] = events_per_day
             self.design_results["HS heated fraction"] = frac
             self.design_results["HS duration (min)"] = self.hs_duration_min
+            self.design_results["HS slipstream flow (kg/h)"] = m_heated_kgph
+
+            if m_heated_kgph > 0 and broth.F_mass > 0:
+                heated_stream = broth.copy()
+                heated_stream.mol *= m_heated_kgph / heated_stream.F_mass
+                hs_hx = self.auxiliary(
+                    "heat_shock_exchanger", bst.HXutility, ins=heated_stream, T=self.hs_target_temperature_K
+                )
+                hs_hx.simulate()
+                Q_hs_kJph = hs_hx.net_duty
+
             self.design_results["HS avg duty (kJ/h)"] = Q_hs_kJph
         else:
             self.design_results["HS enabled"] = False
 
-        Q_total_kJph = Q_base_kJph + Q_hs_kJph
-        self.design_results["Total heating duty (kJ/h)"] = Q_total_kJph
-        if Q_total_kJph > 0:
-            try:
-                self.add_heat_utility(
-                    Q_total_kJph,
-                    T_in,
-                    max(T_base, self.hs_target_temperature_K if self.enable_heat_shock else T_base),
-                )
-            except TypeError:
-                self.add_heat_utility(Q_total_kJph, T_in)
+        self.design_results["Total heating duty (kJ/h)"] = hx.net_duty + Q_hs_kJph
 
         water = float(feed.imass["Water"]) if "Water" in feed.chemicals else 0.0
         ash = float(feed.imass["Ash"]) if "Ash" in feed.chemicals else 0.0
@@ -736,6 +748,16 @@ class AcidogenicDigester(bst.Unit):
         self.design_results["ADBC_capex_each_$"] = C_each
         self.baseline_purchase_costs["Acidogenic digester"] = C_total
 
+        # ADBC digester CAPEX already include heating equipment (continuous
+        # jacket/coil/external HX loop). Zero out the base auxiliary
+        # heat_exchanger's own capital cost here to avoid double-counting.
+        # Periodic thermal-shock treatment is not obviously part of a standard
+        # digester cost correlation, so heat_shock_exchanger's own capital cost
+        # (when heat shock is enabled) is left in place, not zeroed.
+        self.heat_exchanger.baseline_purchase_costs.clear()
+        self.heat_exchanger.purchase_costs.clear()
+        self.heat_exchanger.installed_costs.clear()
+        
 
 @cost('Raw biogas flow (Nm3/h)', 'H2S removal (iron sponge)', units='Nm3/h',
       CE=567.5, cost=_H2S_REMOVAL["ref_installed_cost_usd"],

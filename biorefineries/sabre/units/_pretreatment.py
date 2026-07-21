@@ -64,6 +64,7 @@ class EnzymaticPretreatment(bst.Unit):
     _N_ins = 1
     _N_outs = 1  # enzyme_treated_biomass
     _F_BM_default = {"Enzymatic pretreatment": _ENZYMATIC["F_BM"]}
+    auxiliary_unit_names = ("heat_exchanger",)
 
     def __init__(
         self, ID="", ins=None, outs=(),
@@ -127,10 +128,10 @@ class EnzymaticPretreatment(bst.Unit):
         enzyme_cost_usd_per_hr = enzyme_kgph * self.enzyme_price_usd_per_kg
         self._enzyme_cost_usd_per_hr = enzyme_cost_usd_per_hr
 
-        T_in = float(getattr(feed, "T", self.temperature_K))
+        T_in = float(feed.T)
         T_out = self.temperature_K
-        dT = max(T_out - T_in, 0.0)
-        Q_kJph = m_kgph * feed.Cp * dT
+        hx = self.auxiliary("heat_exchanger", bst.HXutility, ins=self.ins[0], T=T_out)
+        hx.simulate()
 
         self.design_results["Mass flow (kg/h)"] = m_kgph
         self.design_results["Slurry flow (m3/h)"] = vol_m3ph
@@ -138,7 +139,7 @@ class EnzymaticPretreatment(bst.Unit):
         self.design_results["Reactor volume (m3)"] = V
         self.design_results["Inlet T (K)"] = T_in
         self.design_results["Temperature (K)"] = self.temperature_K
-        self.design_results["Heating duty (kJ/h)"] = Q_kJph
+        self.design_results["Heating duty (kJ/h)"] = hx.net_duty
         self.design_results["Dry feed basis (kg/h)"] = dry_mass
         self.design_results["Treated dry feed basis (kg/h)"] = treated_dry_mass
         self.design_results["Treated fraction"] = self.treated_fraction
@@ -146,16 +147,11 @@ class EnzymaticPretreatment(bst.Unit):
         self.design_results["Enzyme addition (kg/h)"] = enzyme_kgph
         self.design_results["Enzyme cost ($/h)"] = enzyme_cost_usd_per_hr
 
-        if Q_kJph > 0:
-            try:
-                self.add_heat_utility(Q_kJph, T_in, T_out)
-            except TypeError:
-                self.add_heat_utility(Q_kJph, T_in)
-
     def _cost(self):
         capex = self.capex_usd
         self.baseline_purchase_costs["Enzymatic pretreatment"] = capex
-
+        # NOTE: `capex_usd` is sourced from an NREL saccharification-tank cost
+        # anchor and does not include heat-exchange equipment.
         enzyme_cost_usd_per_hr = getattr(self, "_enzyme_cost_usd_per_hr", 0.0)
 
         annual_maintenance = self.maintenance_frac_of_capex_per_yr * capex
@@ -206,6 +202,7 @@ class HeatingPretreatment(bst.Unit):
     _N_ins = 1
     _N_outs = 1  # heated_biomass
     _F_BM_default = {"Heating pretreatment": _HEATING["F_BM"]}
+    auxiliary_unit_names = ("heat_exchanger",)
 
     def __init__(
         self, ID="", ins=None, outs=(),
@@ -237,13 +234,14 @@ class HeatingPretreatment(bst.Unit):
 
         m_kgph = float(feed.F_mass)
         vol_m3ph = feed.F_vol
-
-        T_in = float(getattr(feed, "T", self.target_temperature_K))
-        T_out = self.target_temperature_K
-        dT = max(T_out - T_in, 0.0)
-
         V = vol_m3ph * self.residence_time_hr
-        Q_kJph = m_kgph * feed.Cp * dT
+
+        T_in = float(feed.T)
+        T_out = self.target_temperature_K
+        # Auxiliary HXutility: duty comes from BioSTEAM's own enthalpy balance
+        # instead of a fixed single-point feed.Cp, and is HXN-eligible by default.
+        hx = self.auxiliary("heat_exchanger", bst.HXutility, ins=self.ins[0], T=T_out)
+        hx.simulate()
 
         self.design_results["Mass flow (kg/h)"] = m_kgph
         self.design_results["Slurry flow (m3/h)"] = vol_m3ph
@@ -251,17 +249,14 @@ class HeatingPretreatment(bst.Unit):
         self.design_results["Reactor volume (m3)"] = V
         self.design_results["Inlet T (K)"] = T_in
         self.design_results["Target T (K)"] = T_out
-        self.design_results["Heating duty (kJ/h)"] = Q_kJph
-
-        if Q_kJph > 0:
-            try:
-                self.add_heat_utility(Q_kJph, T_in, T_out)
-            except TypeError:
-                self.add_heat_utility(Q_kJph, T_in)
+        self.design_results["Heating duty (kJ/h)"] = hx.net_duty
 
     def _cost(self):
         capex = self.capex_usd
         self.baseline_purchase_costs["Heating pretreatment"] = capex
+        # NOTE: `capex_usd` has no cited cost source in data/pretreatment.yaml;
+        # assumed here to NOT include heat-exchange
+        # equipment.
 
         annual_maintenance = self.maintenance_frac_of_capex_per_yr * capex
         self.design_results["Annual maintenance ($/yr)"] = annual_maintenance

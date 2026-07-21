@@ -215,15 +215,15 @@ def test_ad_tea_final_press_mill_only_tipping_fee():
 
 def test_ad_tea_final_combined_pe_near_zero():
     _check_ad_tea_final_case("combined_PE", 0.00, {
-        "TCI": 340208528.941262,
-        "VOC": 21863399.58021939,
-        "FOC": 12960324.912048075,
+        "TCI": 340312401.5443701,
+        "VOC": 21863179.353636723,
+        "FOC": 12964281.963595051,
         "material_cost": 0.0,
-        "utility_cost": 7310225.568487884,
-        "msp_usd_per_mmbtu": 16.068770146492213,
-        "msp_usd_per_kg_ch4": 0.8452173097054904,
+        "utility_cost": 7310005.341905215,
+        "msp_usd_per_mmbtu": 16.07166646730416,
+        "msp_usd_per_kg_ch4": 0.8453696561801987,
         "biomethane_kg_hr": 13955.47747891447,
-        "npv_at_3_mmbtu": -619089791.3158991,
+        "npv_at_3_mmbtu": -619226286.2210099,
     })
 
 
@@ -283,7 +283,7 @@ def test_ad_biostimulant_price_build_case():
     _assert_close(annual_rev_musd, 0.0, "press_mill_only/$0.00 annual_rev_musd")
 
     msp_mmbtu, annual_rev_musd = _abp.build_case("combined_PE", 1.00)
-    _assert_close(msp_mmbtu, 15.264782588764596, "combined_PE/$1.00 msp_mmbtu")
+    _assert_close(msp_mmbtu, 15.267678909575347, "combined_PE/$1.00 msp_mmbtu")
     _assert_close(annual_rev_musd, 103.59613168121251, "combined_PE/$1.00 annual_rev_musd")
 
 
@@ -299,7 +299,7 @@ def test_ad_feed_tea_build_case():
     _assert_close(fc_musd, 98.99999999999999, "press_mill_only/0.02 annual_feed_cost_musd")
 
     msp_mmbtu, fc_musd = _aft.build_case("enzymatic", -0.02)
-    _assert_close(msp_mmbtu, -7.8533673251409954, "enzymatic/-0.02 msp_mmbtu")
+    _assert_close(msp_mmbtu, -7.846844716589438, "enzymatic/-0.02 msp_mmbtu")
     _assert_close(fc_musd, -98.99999999999999, "enzymatic/-0.02 annual_feed_cost_musd")
 
 
@@ -311,7 +311,7 @@ import ad_heatmap as _adh  # noqa: E402
 
 def test_ad_heatmap_build_case():
     msp_mmbtu = _adh.build_case("combined_PE", 0.02, 0.50)
-    _assert_close(msp_mmbtu, 24.32566318367999, "combined_PE/0.02/0.50 msp_mmbtu")
+    _assert_close(msp_mmbtu, 24.32855950450206, "combined_PE/0.02/0.50 msp_mmbtu")
 
 
 # =================================================================
