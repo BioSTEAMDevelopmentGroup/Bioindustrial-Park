@@ -16,11 +16,6 @@ from biorefineries.sabre.utils import load_assumptions
 __all__ = ('create_chemicals',)
 
 
-def _pseudo_solid(ID: str, MW: float = 1.0, formula: str = None):
-    if formula is not None:
-        return bst.Chemical(ID, search_db=False, default=True, phase="s", formula=formula)
-    return bst.Chemical(ID, search_db=False, default=True, phase="s", MW=MW)
-
 # Structural-carbohydrate constants reused from biorefineries.cellulosic.chemicals,
 # which sources Hf from the Humbird et al. 2011 NREL report
 # (https://www.nrel.gov/docs/fy11osti/47764.pdf) and Cp from
@@ -43,11 +38,14 @@ def create_chemicals(set_thermo: bool = True):
     Water = bst.Chemical("Water")
 
     # Sargassum components
-    Ash = _pseudo_solid("Ash")
-    # Cp and density from biorefineries.cane._chemicals (create_sugarcane_chemicals);
-    # Ash is kept as a MW=1 mixture placeholder since it has no single formula.
-    Ash.Cn.add_model(0.09 * _cal2joule * Ash.MW, top_priority=True)
-    Ash.V.add_model(tmo.functional.rho_to_V(_rho_solids, Ash.MW), top_priority=True)
+    # Ash modeled as CaO (following biorefineries.lactic's precedent for
+    # generic biomass ash). CaO's database liquid-viscosity correlation
+    # ('NEGLECT_P') is invalid at process T/P, the same issue this file
+    # already works around for KH2PO4/MagnesiumSulfate below,
+    # approximated with Water's viscosity for the same reason.
+    CaO = bst.Chemical("CaO", phase="s", HHV=0, LHV=0)
+    CaO.copy_models_from(Water, ["mu"])
+    Ash = CaO.copy(ID="Ash")
 
     # Hf/Cp from biorefineries.cellulosic.chemicals (Humbird et al. 2011 NREL report)
     Glucan = _structural_solid("Glucan", "C6H10O5", -233200)
@@ -60,14 +58,24 @@ def create_chemicals(set_thermo: bool = True):
     # Leow et al., Green Chem. 2015, 17, 3584-3599 (as in biorefineries.microalgae)
     Protein = _structural_solid("Protein", "CH1.57O0.31N0.29S0.007", -17618, Cp=1.25)
 
-    # Alginic acid uronic-acid repeat unit, dehydrated (C6H10O7 - H2O); no database
-    # entry or literature Hf found, so Hf falls back to the pseudo-chemical default (0).
-    Alginate = _pseudo_solid("Alginate", formula="C6H8O6")
+    # Alginic acid uronic-acid repeat unit, dehydrated (C6H10O7 - H2O); MW is
+    # computed from the formula. No database entry or literature Hf found for
+    # alginic acid or its mannuronic/guluronic acid monomers (checked NIST
+    # WebBook and general literature), so Hf borrows Glucan's structural-
+    # carbohydrate value as the least-bad available proxy; Cn/V likewise
+    # reuse Glucan's Cp/density basis rather than bst.Chemical's generic
+    # (and here badly wrong -- implied density ~1e6 kg/m3) default estimates.
+    Alginate = _structural_solid("Alginate", "C6H8O6", -233200)
     # Fucose repeat unit, dehydrated (C6H12O5 - H2O); ignores fucoidan's sulfate
-    # substitution. Hf likewise falls back to 0 (no formula-only estimation available).
-    Fucoidan = _pseudo_solid("Fucoidan", formula="C6H10O4")
+    # substitution. No literature Hf found for fucoidan or its L-fucose
+    # monomer either, so Hf and Cn/V all borrow Glucan's basis for the same
+    # reason as Alginate.
+    Fucoidan = _structural_solid("Fucoidan", "C6H10O4", -233200)
     Mannitol = bst.Chemical("Mannitol")
-    OtherSolids = _pseudo_solid("OtherSolids")
+    # No known formula/composition for this lumped catch-all; treated as
+    # generically Glucan-like (same MW/Cn/V/Hf), consistent with how
+    # Mannan/Galactan already borrow Glucan's properties above.
+    OtherSolids = Glucan.copy("OtherSolids")
 
     # Gases
     CH4 = bst.Chemical("Methane", phase="g")
@@ -108,7 +116,7 @@ def create_chemicals(set_thermo: bool = True):
                              formula="CH1.61O0.56N0.16", Hf=-31169.39 * _cal2joule)
     CellMass.V.add_model(tmo.functional.rho_to_V(_rho_solids, CellMass.MW), top_priority=True)
 
-    # Conditioner / nutrient additions -- real database chemicals. Ammonia's
+    # Conditioner / nutrient additions. Ammonia's
     # natural phase_ref is gas; forced to liquid since it's dosed as an
     # aqueous nutrient stream (matches the NH3 handling in
     # biorefineries.cornstover/cellulosic).
@@ -122,16 +130,13 @@ def create_chemicals(set_thermo: bool = True):
     # own volume is treated as negligible (rho=1e5 kg/m3 proxy), matching
     # biorefineries.cane's treatment of HCl/NaOH. This also works around
     # KH2PO4 and MagnesiumSulfate's database liquid-volume correlations
-    # ('NEGLECT_P') raising at ambient T/P -- confirmed by testing that
-    # bst.Chemical('KH2PO4').V('l', 298.15, 101325) and the MagnesiumSulfate
-    # equivalent both fail without this override.
+    # ('NEGLECT_P') raising at ambient T/P.
     for _nutrient in (NaOH, KH2PO4, MagnesiumSulfate):
         _nutrient.V.l.add_model(tmo.functional.rho_to_V(1e5, _nutrient.MW), top_priority=True)
 
     # KH2PO4 and MagnesiumSulfate's database liquid-viscosity correlations
-    # ('NEGLECT_P') are likewise invalid at process T/P -- confirmed by
-    # testing bst.Chemical('KH2PO4').mu('l', 298.15, 101325) and the
-    # MagnesiumSulfate equivalent. As dilute solutes, approximate their
+    # ('NEGLECT_P') are likewise invalid at process T/P.
+    # As dilute solutes, approximate their
     # solution viscosity contribution with Water's (NaOH's own liquid mu
     # model is valid, so it's left alone).
     for _nutrient in (KH2PO4, MagnesiumSulfate):
