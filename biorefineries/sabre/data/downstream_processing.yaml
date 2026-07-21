@@ -44,7 +44,10 @@ oil_extraction:
   scale_exponent: 0.6
   F_BM: 1.0 # capex already installed
 
+  oil_extraction_reagent_usd_per_kg_oil: 0.50
+
   notes:
     - "Oil extraction placeholder carries disruption + wet extraction burden."
     - "Installed cost basis back-calculated from NREL 55431 cell-disruption plus extraction/separation cost bases."
     - "Homogenization electricity aligned to the harmonized NREL algal-lipid basis."
+    - "No literature source cited in legacy scripts for reagent cost."
