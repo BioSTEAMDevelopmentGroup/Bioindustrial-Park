@@ -39,12 +39,3 @@ policies:
 scale:
   wet_feed_ton_per_day: 15000
   ton_definition: metric
-
-feed_price_sensitivity:
-  tipping_fee_usd_per_kg_wet: -0.02
-  near_zero_usd_per_kg_wet: 0.00
-  low_cost_collect_usd_per_kg_wet: 0.03
-  mid_cost_collect_usd_per_kg_wet: 0.05
-  high_cost_collect_usd_per_kg_wet: 0.1
-  source: "Rodriguez-Martinez et al. 2023 (Sci Total Environ); 
-           cleanup costs $19-85/m3 wet = $0.024-0.106/kg wet."
