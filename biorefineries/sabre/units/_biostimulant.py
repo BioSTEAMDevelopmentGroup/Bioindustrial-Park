@@ -217,32 +217,39 @@ class BiostimulantEvaporator(bst.Unit):
     target_solids_wt_frac : float or None
         Target dry-solids weight fraction of the product (0-1). `None` is
         a no-op bypass: the concentrate passes straight through to the
-        product outlet unchanged (condensed-vapor outlet stays empty), and
-        `_design`/`_cost` report zero duty, electricity, installed cost,
-        and maintenance OPEX (including for the auxiliary condenser).
+        product outlet unchanged.
     boiling_temperature_K : float
         Evaporation temperature; also the reference temperature for the
         latent-heat lookup (see Notes below).
     condensing_temperature_K : float
         Temperature the auxiliary condenser cools the vapor down to.
-    electricity_kWh_per_kg_water_evap : float
-        Electricity intensity per kg of water evaporated.
     nonwater_recovery_to_product : float
         Fraction of non-water solute mass recovered to the product (0-1);
         the remainder is carried out with the vapor.
-    capex_ref_usd : float
-        Installed cost at `ref_evaporation_kgph`, scaled by
-        `scale_exponent` for other evaporation rates.
-    ref_evaporation_kgph : float
-        Reference water-evaporation rate (kg/h) for CAPEX scaling.
-    scale_exponent : float
-        Power-law scaling exponent for installed CAPEX vs. evaporation
-        rate.
-    maintenance_frac_of_capex_per_yr : float
-        Annual maintenance cost as a fraction of installed cost, added to
-        `add_OPEX`.
+    tau : float
+        Nominal vessel holdup time, in hr. No literature/prior-yaml grounding.
+    vacuum_system_preference : str
+        Forwarded to `bst.VacuumSystem`. Defaults to 'Liquid-ring pump'.
     **kwargs
         Forwarded to `bst.Unit.__init__`.
+
+    Notes
+    -----
+    No literature or prior-yaml cost basis exists for a flat or
+    evaporation-rate-scaled evaporator vessel cost, so this unit has no
+    cost item of its own -- installed cost comes entirely from the
+    `evaporation_hx`, `condenser`, and `vacuum_system` auxiliaries' own
+    BioSTEAM-computed design and costing.
+
+    `boiling_temperature_K` (333.15 K / 60 C) is below water's atmospheric
+    boiling point, i.e. this represents a vacuum evaporator. `vacuum_system`
+    (a `bst.VacuumSystem`, sized from the raw vapor flow and the water
+    saturation pressure at `boiling_temperature_K`) costs the vacuum
+    pump/ejector itself; tried 'Steam-jet ejector' at this unit's scale and
+    got a steam duty larger than the evaporator's own heating duty --
+    implausible, looks like the correlation extrapolating outside its valid
+    range (same failure mode seen sizing HeatingPretreatment's auxiliary HX
+    at combined_PTE scale) -- so 'Liquid-ring pump' is the default instead.
 
     See Also
     --------
@@ -251,8 +258,7 @@ class BiostimulantEvaporator(bst.Unit):
 
     _N_ins = 1
     _N_outs = 2  # biostimulant_product, condensed_vapor
-    _F_BM_default = {"Biostimulant evaporator": _EVAPORATOR["F_BM"]}
-    auxiliary_unit_names = ('condenser',)
+    auxiliary_unit_names = ('evaporation_hx', 'condenser', 'vacuum_system')
 
     def __init__(
         self,
@@ -262,12 +268,9 @@ class BiostimulantEvaporator(bst.Unit):
         target_solids_wt_frac=_EVAPORATOR["target_solids_wt_frac"],
         boiling_temperature_K=_EVAPORATOR["boiling_temperature_K"],
         condensing_temperature_K=_EVAPORATOR["condensing_temperature_K"],
-        electricity_kWh_per_kg_water_evap=_EVAPORATOR["electricity_kWh_per_kg_water_evap"],
         nonwater_recovery_to_product=_EVAPORATOR["nonwater_recovery_to_product"],
-        capex_ref_usd=_EVAPORATOR["capex_ref_usd"],
-        ref_evaporation_kgph=_EVAPORATOR["ref_evaporation_kgph"],
-        scale_exponent=_EVAPORATOR["scale_exponent"],
-        maintenance_frac_of_capex_per_yr=_EVAPORATOR["maintenance_frac_of_capex_per_yr"],
+        tau=_EVAPORATOR["tau"],
+        vacuum_system_preference=_EVAPORATOR["vacuum_system_preference"],
         **kwargs,
     ):
         super().__init__(ID, ins, outs, **kwargs)
@@ -277,13 +280,21 @@ class BiostimulantEvaporator(bst.Unit):
         )
         self.boiling_temperature_K = float(boiling_temperature_K)
         self.condensing_temperature_K = float(condensing_temperature_K)
-        self.electricity_kWh_per_kg_water_evap = float(electricity_kWh_per_kg_water_evap)
         self.nonwater_recovery_to_product = float(nonwater_recovery_to_product)
+        self.tau = float(tau)  # hr
+        self.vacuum_system_preference = vacuum_system_preference
 
-        self.capex_ref_usd = float(capex_ref_usd)
-        self.ref_evaporation_kgph = float(ref_evaporation_kgph)
-        self.scale_exponent = float(scale_exponent)
-        self.maintenance_frac_of_capex_per_yr = float(maintenance_frac_of_capex_per_yr)
+        # Auxiliary evaporation_hx: heats the incoming concentrate up to the
+        # combined (product + raw_vapor) exit state -- not a simple T-target,
+        # since this is a partial, recovery-fraction-driven evaporation (not
+        # an equilibrium flash), so ins[0]/outs[0] are hand-populated in _run
+        # to match the real mass balance exactly, and its own _run is never
+        # called (see .simulate(run=False) in _design).
+        self.auxiliary(
+            "evaporation_hx", bst.HXutility,
+            ins=[None], outs=[None],
+            T=self.boiling_temperature_K,
+        )
 
         # Auxiliary condenser: cools/condenses the raw vapor (a pure-Water
         # sub-stream, set up in _run) down to condensing_temperature_K
@@ -300,8 +311,10 @@ class BiostimulantEvaporator(bst.Unit):
     def _run(self):
         conc_in, = self.ins
         product, condensate = self.outs
+        evap_hx = self.evaporation_hx
         condenser = self.condenser
         raw_vapor = condenser.ins[0]
+        heated_in, heated_out = evap_hx.ins[0], evap_hx.outs[0]
 
         product.empty()
         product.phase = "l"
@@ -311,6 +324,8 @@ class BiostimulantEvaporator(bst.Unit):
         if self.target_solids_wt_frac is None:
             product.copy_like(conc_in)
             condenser._run()
+            heated_in.empty()
+            heated_out.empty()
             self._water_evaporated_kgph = 0.0
             water = float(conc_in.imass["Water"]) if "Water" in conc_in.chemicals.IDs else 0.0
             nonwater = product.F_mass - water
@@ -359,6 +374,17 @@ class BiostimulantEvaporator(bst.Unit):
         # operating (boiling) temperature.
         product.T = raw_vapor.T = self.boiling_temperature_K
 
+        # evaporation_hx: ins[0] = incoming concentrate; outs[0] = the combined
+        # (product + raw_vapor) exit state, hand-built to match the real mass
+        # balance above exactly (a partial, recovery-fraction-driven
+        # evaporation, not an equilibrium flash that HXutility's own T/V/H
+        # targeting could reproduce).
+        heated_in.copy_like(conc_in)
+        heated_out.copy_like(conc_in)
+        heated_out.phases = ("g", "l")
+        heated_out["g"].copy_like(raw_vapor)
+        heated_out["l"].copy_like(product)
+
         # Condense the raw vapor down to condensing_temperature_K; writes
         # directly into `condensate` (this unit's real outs[1]).
         condenser._run()
@@ -375,25 +401,17 @@ class BiostimulantEvaporator(bst.Unit):
             self.design_results["Feed flow (kg/h)"] = float(conc_in.F_mass)
             self.design_results["Water evaporated (kg/h)"] = 0.0
             self.design_results["Total duty (kJ/h)"] = 0.0
-            self.design_results["Electricity demand (kW)"] = 0.0
-            self.power_utility(0.0)
+            self.evaporation_hx.simulate(run=False)
             self.condenser.simulate(run=False)
+            # No vacuum_system here: unlike the HXutility auxiliaries (which
+            # correctly go to exactly zero cost/utility on empty streams),
+            # bst.VacuumSystem has a nonzero baseline floor (a small minimum
+            # pump size) even with all-zero inputs -- so for this true no-op
+            # bypass, skip creating it entirely rather than report a
+            # nonzero cost/utility for a vacuum system that doesn't exist.
             return
 
         water_evap = getattr(self, "_water_evaporated_kgph", 0.0)
-
-        sensible = 0.0
-        feed_T = float(conc_in.T)
-        if water_evap > 0 and feed_T < self.boiling_temperature_K:
-            sensible = float(conc_in.F_mass) * conc_in.Cp * (
-                self.boiling_temperature_K - feed_T
-            )
-
-        water_chem = self.chemicals.Water
-        latent_heat_kJ_per_kg = water_chem.Hvap(self.boiling_temperature_K) / water_chem.MW
-        latent = water_evap * latent_heat_kJ_per_kg
-        total_duty_kJph = sensible + latent
-        power_kW = water_evap * self.electricity_kWh_per_kg_water_evap
 
         self.design_results["Feed flow (kg/h)"] = float(conc_in.F_mass)
         self.design_results["Water evaporated (kg/h)"] = water_evap
@@ -402,37 +420,26 @@ class BiostimulantEvaporator(bst.Unit):
             self, "_product_solids_wt_frac", 0.0
         )
         self.design_results["Boiling temperature (K)"] = self.boiling_temperature_K
-        self.design_results["Sensible duty (kJ/h)"] = sensible
-        self.design_results["Latent duty (kJ/h)"] = latent
-        self.design_results["Total duty (kJ/h)"] = total_duty_kJph
-        self.design_results["Electricity demand (kW)"] = power_kW
 
-        if total_duty_kJph > 0:
-            self.add_heat_utility(total_duty_kJph, T_in=conc_in.T, T_out=self.boiling_temperature_K)
-
-        self.power_utility(power_kW)
-
-        # Auxiliary condenser: its own duty/area/cost, from BioSTEAM's own
-        # HXutility design+costing algorithms (run=False since _run already
-        # populated its ins/outs above).
+        # Auxiliary evaporation_hx and condenser: their own duty/area/cost,
+        # from BioSTEAM's own HXutility design+costing algorithms (run=False
+        # since _run already populated their ins/outs above). No cost item of
+        # our own is needed -- BioSTEAM rolls up all three auxiliaries'
+        # installed costs automatically via auxiliary_unit_names.
+        self.evaporation_hx.simulate(run=False)
         self.condenser.simulate(run=False)
+        self.design_results["Total duty (kJ/h)"] = self.evaporation_hx.net_duty
 
-    def _cost(self):
-        evap = max(float(self.design_results.get("Water evaporated (kg/h)", 0.0)), 0.0)
-        if self.ref_evaporation_kgph <= 0:
-            raise ValueError("ref_evaporation_kgph must be > 0")
-
-        if evap <= 0:
-            capex = 0.0
-        else:
-            capex = self.capex_ref_usd * (evap / self.ref_evaporation_kgph) ** self.scale_exponent
-
-        self.baseline_purchase_costs["Biostimulant evaporator"] = capex
-
-        annual_maintenance = self.maintenance_frac_of_capex_per_yr * capex
-        self.design_results["Annual maintenance ($/yr)"] = annual_maintenance
-
-        if annual_maintenance > 0:
-            self.add_OPEX = {
-                "Biostimulant evaporator maintenance": annual_maintenance / OPERATING_HOURS_PER_YEAR
-            }
+        # Auxiliary vacuum_system: costs the vacuum pump/ejector itself, since
+        # boiling_temperature_K is below water's atmospheric boiling point
+        # (P_suction = water's saturation pressure there). vessel_volume is a
+        # nominal holdup-time-based estimate (see `tau`), not a real vessel
+        # design -- BioSTEAM's own air-inleakage sizing scales with it.
+        raw_vapor = self.condenser.ins[0]
+        vessel_volume = conc_in.F_vol * self.tau
+        Psat = self.chemicals.Water.Psat(self.boiling_temperature_K)
+        self.vacuum_system = bst.VacuumSystem(
+            None, self.vacuum_system_preference,
+            F_mass=raw_vapor.F_mass, F_vol=raw_vapor.F_vol,
+            P_suction=Psat, vessel_volume=vessel_volume,
+        )

@@ -34,17 +34,22 @@ biostimulant_evaporator:
   boiling_temperature_K: 333.15 # mild vacuum evaporation ~60 C
   condensing_temperature_K: 310.15 # ~37 C; auxiliary condenser cools the vapor to this before it
     # leaves as a liquid (e.g. to a wastewater mixer), rather than exiting as vapor.
-  electricity_kWh_per_kg_water_evap: 0.0
   nonwater_recovery_to_product: 0.995
-  capex_ref_usd: 750000.0
-  ref_evaporation_kgph: 10000.0
-  scale_exponent: 0.60
-  maintenance_frac_of_capex_per_yr: 0.035
-  F_BM: 1.0 # capex already installed
+  tau: 0.25 # hr; nominal vessel holdup time, used only to size vacuum_system's
+    # air-inleakage estimate. No literature/prior-yaml grounding.
+  vacuum_system_preference: "Liquid-ring pump" # bst.Flash's own default;
+    # "Steam-jet ejector" gives an implausibly large steam duty at this
+    # unit's scale (correlation extrapolating outside its valid range).
+
+  # NOTE: capex_ref_usd/ref_evaporation_kgph/scale_exponent (a flat $750,000
+  # @ 10,000 kg/h evaporation, ^0.60 scaling) were removed -- no literature or
+  # prior-yaml grounding for those numbers (confirmed against the pre-migration
+  # BioSTEAM-platform/sabre_ad/sabre/units/biostimulant_evaporator.py, where
+  # they were hardcoded __init__ defaults with no citation either). Capex now
+  # comes entirely from BiostimulantEvaporator's evaporation_hx, condenser,
+  # and vacuum_system auxiliaries' own BioSTEAM-computed installed costs.
 
   sources:
-    all_params:
-      note: "No literature or prior-yaml grounding for any parameter in this section."
     condensing_temperature:
       note: "No literature grounding; picked as a plausible cooled-liquid outlet
         temperature above ambient, consistent with a typical process-side

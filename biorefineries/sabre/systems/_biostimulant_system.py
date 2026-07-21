@@ -148,13 +148,15 @@ def create_biostimulant_system(
         if fresh_water_used > 0:
             fresh_water.imass["Water"] = fresh_water_used
 
-    # NOTE: no HXN here (yet) -- none of these units currently produce an
-    # HXN-eligible heat utility (BiostimulantEvaporator still uses a manual,
-    # hxn_ok=False add_heat_utility call), and BioSTEAM's HeatExchangerNetwork
-    # crashes (ValueError in synthesize_network) rather than returning $0 when
-    # given zero candidate utilities. Add HXN here once BiostimulantEvaporator
-    # gets its own auxiliary HXutility.
-    sys = bst.System("biostimulant_sys", path=(PR, PC, PSP, DIL, EV))
+    path = [PR, PC, PSP, DIL, EV]
+
+    # EV is the only HXN-eligible unit in this scope.
+    # HXN would crash if there is no HXN-eligible units in the sysem.
+    if EV.target_solids_wt_frac is not None:
+        HXN = bst.HeatExchangerNetwork("HXN", units=tuple(path))
+        path.append(HXN)
+
+    sys = bst.System("biostimulant_sys", path=path)
 
     streams = {
         "feed": feed,
