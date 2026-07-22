@@ -24,7 +24,7 @@ pressate_concentrator:
       note: "No literature or prior-yaml grounding."
     capex:
       citation: "Sethi and Wiesner (2000); Nguyen and Yoshikawa (2020); Cheryan (1998)"
-      note: "UF membrane/module cost commonly reported around $200–$500/m2; $800/m2 for convervative assumption"
+      note: "UF membrane/module cost commonly reported around $200–$500/m2; $800/m2 for conservative assumption"
     maintenance:
       citation: "Assumed maintenance fraction consistent with other membrane systems in this model"
       note: "Annual maintenance retained at 3.5% of installed CAPEX for consistency."
