@@ -44,7 +44,7 @@ if str(REPO_ROOT) not in sys.path:
 
 from biorefineries.sabre._chemicals import create_chemicals
 from biorefineries.sabre.systems import create_ad_biomethane_system
-from biorefineries.sabre._tea import create_tea, solve_biomethane_msp
+from biorefineries.sabre._tea import create_tea, solve_product_msp, CH4_MMBTU_PER_KG
 
 OUT = SCRIPT_DIR.parent / "results" / "figures"
 OUT.mkdir(parents=True, exist_ok=True)
@@ -211,7 +211,10 @@ def run_case(
     stream_economics = _apply_stream_economics(sys, biostimulant_price)
 
     tea = create_tea(sys)
-    msp = solve_biomethane_msp(tea, sys.flowsheet.stream.biomethane)
+    msp = solve_product_msp(
+        tea=tea, product_stream=sys.flowsheet.stream.biomethane,
+        energy_content_mmbtu_per_kg=CH4_MMBTU_PER_KG,
+    )
 
     # NPV at target market prices
     npv_results = {}
@@ -384,7 +387,7 @@ def run_pretreatment_comparison(
             silent=True,
         )
         msp_mmbtu = msp.get("usd_per_mmbtu", float("nan"))
-        msp_ch4 = msp.get("usd_per_kg_ch4", float("nan"))
+        msp_ch4 = msp.get("usd_per_kg_stream", float("nan"))
         print(
             f"  {case:<20} ${msp_mmbtu:<17.3f} ${msp_ch4:<17.4f} "
             f"${tea.TCI/1e6:<11.1f} ${tea.VOC/1e6:.1f}M"
@@ -408,7 +411,7 @@ def run_feed_price_sensitivity(pretreatment_case: str = "press_mill_only"):
             silent=True,
         )
         msp_mmbtu = msp.get("usd_per_mmbtu", float("nan"))
-        msp_ch4 = msp.get("usd_per_kg_ch4", float("nan"))
+        msp_ch4 = msp.get("usd_per_kg_stream", float("nan"))
         print(
             f"  {label:<20} ${price:<13.3f} "
             f"${msp_mmbtu:<17.3f} ${msp_ch4:.4f}"
@@ -582,7 +585,7 @@ def collect_feed_pretreatment_results(
                 "feed_label_pretty": FEED_LABELS.get(feed_label, feed_label),
                 "feed_price_usd_per_kg_wet": feed_price,
                 "msp_usd_per_mmbtu": float(msp.get("usd_per_mmbtu", np.nan)),
-                "msp_usd_per_kg_ch4": float(msp.get("usd_per_kg_ch4", np.nan)),
+                "msp_usd_per_kg_ch4": float(msp.get("usd_per_kg_stream", np.nan)),
                 "methane_kgph": ch4_prod_kgph,
                 "TCI_MUSD": tea.TCI / 1e6,
                 "VOC_MUSD_per_yr": tea.VOC / 1e6,

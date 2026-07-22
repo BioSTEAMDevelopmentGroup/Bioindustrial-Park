@@ -34,6 +34,10 @@ from biorefineries.sabre.units import Press, PressateConcentrator, BiostimulantE
 
 __all__ = ('create_biostimulant_system',)
 
+_TEA_PRICE = load_assumptions("tea.yaml")["price"]
+
+FRESH_WATER_PRICE_USD_PER_KG = bst.stream_utility_prices['Process water']
+
 
 def create_biostimulant_system(
     feedstock_type: str = "pelagic",
@@ -72,10 +76,17 @@ def create_biostimulant_system(
         fresh_feed_kgph=fresh_feed_kgph, moisture_frac=moisture_frac,
         ash_wt_frac_dry=params["ash_wt_frac_dry"],
     )
+    feed.price = _TEA_PRICE["sargassum"]["baseline"]
 
     PR = Press("PR", ins=feed, outs=("pressed_cake", "pressate"))
+    # Solid waste when this system runs standalone (pressed_cake is a leaf
+    # stream of *this* bst.System). When embedded in a caller that feeds
+    # pressed_cake into its own Mill instead, this price becomes inert --
+    # BioSTEAM's TEA only counts price on that caller's own boundary streams.
+    PR.outs[0].price = _TEA_PRICE["disposal_solid"]["baseline"]
 
     fresh_water = bst.Stream("biostimulant_fresh_water", Water=0.0, units="kg/hr")
+    fresh_water.price = FRESH_WATER_PRICE_USD_PER_KG
 
     # Splits raw pressate into only the fraction that needs concentrating
     # (outs[0], to PC) and a raw, unconcentrated bypass (outs[1], to DIL) --
@@ -90,6 +101,8 @@ def create_biostimulant_system(
         "PC", ins=PFS - 0,
         outs=("biostimulant_membrane_concentrate", "permeate"),
     )
+    # Liquid waste: "a pure byproduct stream, never drawn from" (see docstring).
+    PC.outs[1].price = _TEA_PRICE["disposal_wastewater"]["baseline"]
 
     # Mixes PC's concentrate with PFS's bypass pressate and fresh water
     # make-up.
@@ -104,6 +117,10 @@ def create_biostimulant_system(
         ins=DIL - 0,
         outs=("biostimulant_product", "biostimulant_vapor"),
     )
+    EV.outs[0].price = _TEA_PRICE["biostimulant"]["baseline"]
+    # Condensed by EV's own auxiliary condenser (V=0) -- leaves as a liquid,
+    # not an off-gas -- so it's liquid waste, not exempt from pricing.
+    EV.outs[1].price = _TEA_PRICE["disposal_wastewater"]["baseline"]
 
     @PFS.add_specification(run=True)
     def adjust_pressate_split():

@@ -18,6 +18,7 @@ from biorefineries.sabre.units import (
     Mill, HeatingPretreatment, EnzymaticPretreatment, PeroxidePretreatment,
 )
 from biorefineries.sabre.systems._biostimulant_system import create_biostimulant_system
+from biorefineries.sabre._tea import usd_per_mmbtu_to_usd_per_kg
 
 __all__ = ('create_ad_biomethane_system',)
 
@@ -27,6 +28,7 @@ _PRETREATMENT_AD = load_assumptions("pretreatment.yaml")["pretreatment_ad"]
 _AD_YAML = load_assumptions("ad.yaml")
 _AD_SHARED = _AD_YAML["ad"]
 _AD_PERFORMANCE = _AD_YAML["ad_performance"]
+_TEA_PRICE = load_assumptions("tea.yaml")["price"]
 
 
 def create_ad_biomethane_system(
@@ -62,6 +64,7 @@ def create_ad_biomethane_system(
         # utilities.
         path.extend(u for u in bio_sys.units if not isinstance(u, bst.HeatExchangerNetwork))
 
+        # milling_losses: no price -- pure mass loss, not a disposed waste stream.
         ML = Mill("ML", ins=bio_streams["pressed_cake"], outs=("milled_biomass", "milling_losses"))
         path.append(ML)
         ad_feed = ML - 0
@@ -118,8 +121,18 @@ def create_ad_biomethane_system(
     )
 
     H2SR = H2SRemoval("H2SR", ins=AD - 0, outs=("treated_biogas", "spent_h2s_media"))
-    UP = BiogasUpgrading("UP", ins=H2SR - 0, outs=("biomethane", "offgas"))
-    SP = DigestateScrewPress(ID="SP", ins=AD - 1, outs=("soil_amendment", "liquid_digestate"))
+    H2SR.outs[1].price = _TEA_PRICE["disposal_solid"]["baseline"]
+    # UP.outs[1] (methanogenic_offgas) is a gas waste stream -- no price needed.
+    UP = BiogasUpgrading("UP", ins=H2SR - 0, outs=("biomethane", "methanogenic_offgas"))
+    # data/tea.yaml `biomethane_mmbtu` is priced on an energy basis; convert
+    # to a flat $/kg via mmbtu_per_kg (see _tea.py's usd_per_mmbtu_to_usd_per_kg).
+    UP.outs[0].price = usd_per_mmbtu_to_usd_per_kg(
+        _TEA_PRICE["biomethane_mmbtu"]["baseline"],
+        _TEA_PRICE["biomethane_mmbtu"]["mmbtu_per_kg"],
+    )
+    SP = DigestateScrewPress(ID="SP", ins=AD - 1, outs=("methanogenic_solid_digestate", "liquid_digestate"))
+    SP.outs[0].price = _TEA_PRICE["disposal_solid"]["baseline"]
+    SP.outs[1].price = _TEA_PRICE["disposal_wastewater"]["baseline"]
 
     path.extend([*pt_units, AD, H2SR, UP, SP])
 

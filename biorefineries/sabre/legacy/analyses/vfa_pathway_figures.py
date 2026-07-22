@@ -134,7 +134,7 @@ def make_oil_msp_vs_feed_price_figure():
             run_diagnostics=False,
             silent=True,
         )
-        msp_usd_per_kg_oil.append(float(msp["usd_per_kg_product"]))
+        msp_usd_per_kg_oil.append(float(msp["usd_per_kg_stream"]))
 
     fig, ax = plt.subplots(figsize=(6.8, 4.4))
     ax.plot(
@@ -208,12 +208,11 @@ def make_product_scenario_comparison_figure(feed_price: float = 0.00):
         msp_dict = solve_product_msp(
             tea=tea,
             product_stream=oil_stream,
-            product_ID="MicrobialOil",
         )
 
         labels.append(sc["label"])
-        msp_vals.append(float(msp_dict["usd_per_kg_product"]))
-        annual_prod_t.append(float(msp_dict["annual_product_kg"]) / 1000.0)
+        msp_vals.append(float(msp_dict["usd_per_kg_stream"]))
+        annual_prod_t.append(float(msp_dict["annual_stream_kg"]) / 1000.0)
 
     fig, ax = plt.subplots(figsize=(6.8, 4.4))
     bars = ax.bar(labels, msp_vals, edgecolor="black", linewidth=0.8, zorder=3)

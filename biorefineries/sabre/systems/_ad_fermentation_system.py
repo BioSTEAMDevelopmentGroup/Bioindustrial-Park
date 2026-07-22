@@ -28,15 +28,20 @@ _VFA_FERM = _FERMENTATION_YAML["vfa"]
 _VFA_CASE = _VFA_FERM["cases"][_VFA_FERM["case"]]
 _DOWNSTREAM_PROCESSING_YAML = load_assumptions("downstream_processing.yaml")
 _VFA_DOWNSTREAM = _DOWNSTREAM_PROCESSING_YAML["oil_extraction"]
+_TEA_PRICE = load_assumptions("tea.yaml")["price"]
 
 
 def _create_vfa_fermentation_system(vfa_broth):
     product_ID = _VFA_CASE["product_ID"]
 
     ammonia = bst.Stream("fermentation_ammonia")
+    ammonia.price = _TEA_PRICE["ammonia"]["baseline"]
     phosphate = bst.Stream("fermentation_phosphate")
+    phosphate.price = _TEA_PRICE["phosphate"]["baseline"]
     base = bst.Stream("fermentation_base")
+    base.price = _TEA_PRICE["naoh"]["baseline"]
     mgso4 = bst.Stream("fermentation_mgso4")
+    mgso4.price = _TEA_PRICE["mgso4"]["baseline"]
     recycle_biomass = bst.Stream("recycle_biomass")
 
     # -------------------------------------------------
@@ -51,6 +56,7 @@ def _create_vfa_fermentation_system(vfa_broth):
     # -------------------------------------------------
     # Aerated fermenter (Yarrowia lipolytica)
     # -------------------------------------------------
+    # outs[0] (fermentation_vent) is a gas waste stream -- no price needed.
     R601 = YarrowiaLipidFermenter(
         "R601",
         ins=(T601 - 0, recycle_biomass),
@@ -147,6 +153,7 @@ def _create_vfa_fermentation_system(vfa_broth):
             "Water": _VFA_DOWNSTREAM["oil_water_split"],
         },
     )
+    C603_2.outs[0].price = _TEA_PRICE["microbial_oil"]["baseline"]
 
     S602 = bst.MockSplitter(
         "S602",
@@ -190,6 +197,7 @@ def _create_vfa_fermentation_system(vfa_broth):
         ins=(Ev607 - 1, S602 - 1),
         outs=("wastewater",),
     )
+    M601.outs[0].price = _TEA_PRICE["disposal_wastewater"]["baseline"]
 
     # OE added to system path between P607 and C603_2
     sys = bst.System(
@@ -225,9 +233,6 @@ def _create_vfa_fermentation_system(vfa_broth):
         "oil_centrifuge": C603_2,
         "biomass_recycle_splitter": S602,
         "wastewater_mixer": M601,
-        # legacy aliases
-        "centrifuge": C603_2,
-        "lipid_recovery": C603_2,
     }
 
     return sys, key_streams, units
@@ -254,7 +259,7 @@ def create_ad_fermentation_system(
     streams : dict
         Key streams, including the raw feedstock ('feed'), the AD-VFA
         subsystem's 'vfa_broth' (post-microfiltration permeate),
-        'vfa_retentate', and 'acidogenic_residual_solids', and all
+        'vfa_cake', and 'acidogenic_solid_digestate', and all
         of _create_vfa_fermentation_system()'s streams (final product in
         'microbial_oil').
     units : dict
@@ -268,8 +273,8 @@ def create_ad_fermentation_system(
     ad_vfa_sys = create_ad_vfa_system(feedstock=feedstock, add_product_splitter=False)
     feed = feedstock if not isinstance(feedstock, str) else ad_vfa_sys.feeds[0]
     vfa_broth = ad_vfa_sys.flowsheet.stream.vfa_broth
-    vfa_retentate = ad_vfa_sys.flowsheet.stream.vfa_retentate
-    acidogenic_residual_solids = ad_vfa_sys.flowsheet.stream.acidogenic_residual_solids
+    vfa_cake = ad_vfa_sys.flowsheet.stream.vfa_cake
+    acidogenic_solid_digestate = ad_vfa_sys.flowsheet.stream.acidogenic_solid_digestate
 
     fer_sys, fer_streams, fer_units = _create_vfa_fermentation_system(vfa_broth=vfa_broth)
 
@@ -290,8 +295,8 @@ def create_ad_fermentation_system(
 
     streams = {
         "feed": feed,
-        "acidogenic_residual_solids": acidogenic_residual_solids,
-        "vfa_retentate": vfa_retentate,
+        "acidogenic_solid_digestate": acidogenic_solid_digestate,
+        "vfa_cake": vfa_cake,
         **fer_streams,
         "vfa_broth": vfa_broth,
     }

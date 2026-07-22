@@ -220,7 +220,6 @@ def run_case(
     msp = solve_product_msp(
         tea=tea,
         product_stream=oil_stream,
-        product_ID="MicrobialOil",
     )
 
     if silent:
@@ -401,7 +400,7 @@ def run_reagent_sensitivity(feed_price: float = 0.00):
             reagent_usd_per_kg_oil=reagent,
             silent=True,
         )
-        msp_val = msp.get("usd_per_kg_product", float("nan"))
+        msp_val = msp.get("usd_per_kg_stream", float("nan"))
         print(
             f"  ${reagent:<21.2f} ${msp_val:<19.4f} "
             f"${tea.TCI/1e6:<14.1f} ${tea.VOC/1e6:.1f}M"
@@ -428,7 +427,7 @@ def run_solids_sensitivity(feed_price: float = 0.00):
             solids_disposal_usd_per_kg=rate,
             silent=True,
         )
-        msp_val = msp.get("usd_per_kg_product", float("nan"))
+        msp_val = msp.get("usd_per_kg_stream", float("nan"))
         # compute disposal cost for solids only
         annual_hours = 330.0 * 24.0
         try:
@@ -612,10 +611,9 @@ def run_product_scenario_comparison(feed_price: float = 0.00):
             msp_dict = solve_product_msp(
                 tea=tea,
                 product_stream=oil_stream,
-                product_ID="MicrobialOil",
             )
-            msp_val = msp_dict.get("usd_per_kg_product", float("nan"))
-            annual_product_kg = msp_dict.get("annual_product_kg", 0.0)
+            msp_val = msp_dict.get("usd_per_kg_stream", float("nan"))
+            annual_product_kg = msp_dict.get("annual_stream_kg", 0.0)
             annual_product_t = annual_product_kg / 1000.0
 
             # NPV at market price

@@ -162,16 +162,16 @@ def price_ad_biomethane_system() -> dict:
     tea = create_tea(sys)
     biomethane = fs.stream.biomethane
     msp = solve_product_msp(
-        tea=tea, product_stream=biomethane, product_ID="Methane",
+        tea=tea, product_stream=biomethane,
         energy_content_mmbtu_per_kg=CH4_MMBTU_PER_KG,
     )
 
     return {
         "label": "AD-biomethane",
-        "product_desc": "biomethane (CH4 basis)",
-        "msp_usd_per_kg": msp["usd_per_kg_product"],
+        "product_desc": "biomethane (whole-stream basis)",
+        "msp_usd_per_kg": msp["usd_per_kg_stream"],
         "tea": tea,
-        "annual_product_t": msp["annual_product_kg"] / 1000.0,
+        "annual_product_t": msp["annual_stream_kg"] / 1000.0,
     }
 
 
@@ -244,14 +244,14 @@ def price_ad_fermentation_system() -> dict:
         pass
 
     tea = create_tea(sys)
-    msp = solve_product_msp(tea=tea, product_stream=oil_stream, product_ID="MicrobialOil")
+    msp = solve_product_msp(tea=tea, product_stream=oil_stream)
 
     return {
         "label": "AD-fermentation",
         "product_desc": "crude microbial oil",
-        "msp_usd_per_kg": msp["usd_per_kg_product"],
+        "msp_usd_per_kg": msp["usd_per_kg_stream"],
         "tea": tea,
-        "annual_product_t": msp["annual_product_kg"] / 1000.0,
+        "annual_product_t": msp["annual_stream_kg"] / 1000.0,
     }
 
 

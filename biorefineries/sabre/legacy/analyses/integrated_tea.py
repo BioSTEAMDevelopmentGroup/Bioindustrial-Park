@@ -39,7 +39,7 @@ if str(REPO_ROOT) not in sys.path:
 
 from biorefineries.sabre._chemicals import create_chemicals
 from biorefineries.sabre.systems import create_ad_integrated_system
-from biorefineries.sabre._tea import create_tea, solve_product_msp, solve_biomethane_msp
+from biorefineries.sabre._tea import create_tea, solve_product_msp, CH4_MMBTU_PER_KG
 
 # -------------------------
 # Market price assumptions
@@ -78,8 +78,6 @@ FEED_PRICE_BASE = 0.02   # $/kg wet — standard collection cost assumption
 # Alpha sweep points
 # -------------------------
 ALPHA_SWEEP = [0.0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0]
-
-CH4_MMBTU_PER_KG = 0.0526
 
 
 def _get_integrated_stream(stream_id: str):
@@ -212,9 +210,12 @@ def run_alpha_sweep(
                 try:
                     if oil_stream is not None:
                         oil_stream.price = 0.0
-                    bm_msp    = solve_biomethane_msp(tea, biomethane)
+                    bm_msp    = solve_product_msp(
+                        tea=tea, product_stream=biomethane,
+                        energy_content_mmbtu_per_kg=CH4_MMBTU_PER_KG,
+                    )
                     msp_mmbtu = bm_msp.get("usd_per_mmbtu", float("nan"))
-                    msp_ch4   = bm_msp.get("usd_per_kg_ch4", float("nan"))
+                    msp_ch4   = bm_msp.get("usd_per_kg_stream", float("nan"))
                 finally:
                     if oil_stream is not None and old_oil_price is not None:
                         oil_stream.price = old_oil_price
@@ -225,9 +226,9 @@ def run_alpha_sweep(
                 try:
                     if biomethane is not None:
                         biomethane.price = 0.0
-                    oil_msp  = solve_product_msp(tea, oil_stream, product_ID="MicrobialOil")
-                    msp_oil  = oil_msp.get("usd_per_kg_product", float("nan"))
-                    oil_kg_yr = oil_msp.get("annual_product_kg", 0.0)
+                    oil_msp  = solve_product_msp(tea, oil_stream)
+                    msp_oil  = oil_msp.get("usd_per_kg_stream", float("nan"))
+                    oil_kg_yr = oil_msp.get("annual_stream_kg", 0.0)
                 finally:
                     if biomethane is not None and old_bm_price is not None:
                         biomethane.price = old_bm_price

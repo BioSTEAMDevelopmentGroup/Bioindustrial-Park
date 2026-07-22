@@ -49,15 +49,18 @@ price:
         legacy_assumption: -0.04
         cod_basis: -0.02846
         sensitivity_range: [-0.02, -0.04, -0.10]
+        note: renamed solid_digestate
         source: "standard biosolids, $30-80/dry ton (~$0.03-0.08/kg wet)"
       solid_digestate:
         legacy_assumption: -0.02
         cod_basis: -0.03691
+        note: previously named soil_amendment
         source: "standard biosolids, heavy metal contamination (As, Cd, Pb) from pelagic Sargassum digestate prevents land application as fertilizer"
       vfa_retentate:
         legacy_assumption: -0.005 # treated as a wastewater
         cod_basis: -0.14904
         note: >
+          - reanmed to vfa_cake
           - mixed upstream into the fermentation_wastewater stream so shares its disposal price.
           - "Dominated (~97% of COD) by Alginate/Fucoidan/OtherSolids, excluded here as
           insoluble solids, consistent with how Glucan/Protein/CellMass are
@@ -100,6 +103,7 @@ price:
       mid: 10
       high: 20
     range: [2, 30]
+    mmbtu_per_kg: 0.0526
     distribution: "triangular"
     source:
       - "US Henry Hub $2-8/MMBtu typical range for natural gas."

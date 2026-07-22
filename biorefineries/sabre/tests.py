@@ -69,7 +69,7 @@ def _check_base_case(feed_price, expected):
     _assert_close(tea.utility_cost, expected["utility_cost"], "utility_cost")
     _assert_close(tea.sales, expected["sales"], "sales")
     _assert_close(tea.NPV, expected["NPV"], "NPV")
-    _assert_close(msp["usd_per_kg_product"], expected["MSP_usd_per_kg"], "MSP")
+    _assert_close(msp["usd_per_kg_stream"], expected["MSP_usd_per_kg"], "MSP")
     _assert_close(
         float(oil_stream.imass["MicrobialOil"]), expected["oil_kg_hr"], "oil_kg_hr"
     )
@@ -139,19 +139,17 @@ def test_vfa_fermentation_product_scenarios():
         )
         tea = create_tea(full_sys)
         oil_stream = streams["microbial_oil"]
-        msp_dict = solve_product_msp(
-            tea=tea, product_stream=oil_stream, product_ID="MicrobialOil",
-        )
+        msp_dict = solve_product_msp(tea=tea, product_stream=oil_stream)
 
         exp = expected[sc["label"]]
         label = sc["label"]
         _assert_close(tea.TCI, exp["TCI"], f"{label} TCI")
         _assert_close(tea.VOC, exp["VOC"], f"{label} VOC")
         _assert_close(
-            msp_dict["usd_per_kg_product"], exp["MSP_usd_per_kg"], f"{label} MSP"
+            msp_dict["usd_per_kg_stream"], exp["MSP_usd_per_kg"], f"{label} MSP"
         )
         _assert_close(
-            msp_dict["annual_product_kg"],
+            msp_dict["annual_stream_kg"],
             exp["annual_product_kg"],
             f"{label} annual_product_kg",
         )

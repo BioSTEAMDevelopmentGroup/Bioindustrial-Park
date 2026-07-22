@@ -23,6 +23,7 @@ from biorefineries.sabre.systems._biostimulant_system import create_biostimulant
 __all__ = ('create_ad_vfa_system',)
 
 _VFA_PRODUCT_SPLITTER = load_assumptions("downstream_processing.yaml")["vfa_product_splitter"]
+_TEA_PRICE = load_assumptions("tea.yaml")["price"]
 
 
 def create_ad_vfa_system(
@@ -53,10 +54,10 @@ def create_ad_vfa_system(
         `vfa_broth` as its own feed) so that system is unaffected.
 
     Key outputs (accessible via flowsheet):
-        - offgas
+        - acidogenic_offgas
         - vfa_broth (post-microfiltration permeate; ready for fermentation)
-        - vfa_retentate
-        - acidogenic_residual_solids
+        - vfa_cake
+        - acidogenic_solid_digestate
         - pure_vfa, vfa_disposal (only if add_product_splitter is True)
         - biostimulant_membrane_concentrate (standalone mode only)
         - pressate_permeate (standalone mode only)
@@ -74,15 +75,20 @@ def create_ad_vfa_system(
         # utilities.
         path.extend(u for u in bio_sys.units if not isinstance(u, bst.HeatExchangerNetwork))
 
+        # milling_losses: no price -- pure mass loss, not a disposed waste stream.
         ML = Mill("ML", ins=bio_streams["pressed_cake"], outs=("milled_biomass", "milling_losses"))
         path.append(ML)
         ad_inlet = ML - 0
     else:
         ad_inlet = feedstock
 
-    AD = AcidogenicDigester("VFA_AD", ins=ad_inlet, outs=("offgas", "acidogenic_broth"))
-    SP = DigestateScrewPress(ID="SP_VFA", ins=AD - 1, outs=("acidogenic_residual_solids", "raw_vfa_broth"))
-    MF = VFAMicrofilter("MF", ins=SP - 1, outs=("vfa_broth", "vfa_retentate"))
+    # AD.outs[0] (acidogenic_offgas) is a gas waste stream -- no price needed.
+    AD = AcidogenicDigester("VFA_AD", ins=ad_inlet, outs=("acidogenic_offgas", "acidogenic_broth"))
+    SP = DigestateScrewPress(ID="SP_VFA", ins=AD - 1, outs=("acidogenic_solid_digestate", "raw_vfa_broth"))
+    SP.outs[0].price = _TEA_PRICE["disposal_solid"]["baseline"]
+    MF = VFAMicrofilter("MF", ins=SP - 1, outs=("vfa_broth", "vfa_cake"))
+    # vfa_cake: solid waste (screw-pressed VFA-microfilter retentate).
+    MF.outs[1].price = _TEA_PRICE["disposal_solid"]["baseline"]
     path.extend([AD, SP, MF])
 
     if add_product_splitter:
@@ -91,6 +97,8 @@ def create_ad_vfa_system(
         SP_PRODUCT = bst.Splitter(
             "SP_PRODUCT", ins=MF - 0, outs=("pure_vfa", "vfa_disposal"), split=split,
         )
+        SP_PRODUCT.outs[0].price = _TEA_PRICE["vfa"]["baseline"]
+        SP_PRODUCT.outs[1].price = _TEA_PRICE["disposal_wastewater"]["baseline"]
         path.append(SP_PRODUCT)
 
     HXN = bst.HeatExchangerNetwork("HXN", units=tuple(path))

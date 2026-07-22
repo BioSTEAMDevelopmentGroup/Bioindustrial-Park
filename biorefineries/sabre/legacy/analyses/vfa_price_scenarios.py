@@ -115,9 +115,8 @@ def _solve_msp_from_system(
     msp = solve_product_msp(
         tea=tea,
         product_stream=oil_stream,
-        product_ID="MicrobialOil",
     )
-    return float(msp["usd_per_kg_product"])
+    return float(msp["usd_per_kg_stream"])
 
 
 def _apply_biostimulant_price(streams, price_per_kg: float) -> bool:
@@ -169,7 +168,7 @@ def make_feed_price_figure():
             run_diagnostics=False,
             silent=True,
         )
-        msp_vals.append(float(msp["usd_per_kg_product"]))
+        msp_vals.append(float(msp["usd_per_kg_stream"]))
 
     fig, ax = plt.subplots(figsize=(6.8, 4.5))
     ax.plot(
@@ -305,11 +304,10 @@ def make_product_scenarios_figure():
         msp_dict = solve_product_msp(
             tea=tea,
             product_stream=oil_stream,
-            product_ID="MicrobialOil",
         )
 
         labels.append(sc["label"])
-        msp_vals.append(float(msp_dict["usd_per_kg_product"]))
+        msp_vals.append(float(msp_dict["usd_per_kg_stream"]))
         market_vals.append(float(sc["market_price"]))
 
     x = np.arange(len(labels))

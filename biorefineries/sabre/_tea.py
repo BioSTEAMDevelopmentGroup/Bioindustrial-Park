@@ -10,11 +10,23 @@ Techno-economic analysis for the SaBRe flowsheets.
 """
 import biosteam as bst
 
-from biorefineries.sabre.utils import OPERATING_DAYS_PER_YEAR
+from biorefineries.sabre.utils import OPERATING_DAYS_PER_YEAR, load_assumptions
 
-__all__ = ('SaBReTEA', 'create_tea', 'solve_product_msp', 'solve_biomethane_msp')
+__all__ = (
+    'SaBReTEA', 'create_tea', 'solve_product_msp',
+)
 
-CH4_MMBTU_PER_KG = 0.0526
+CH4_MMBTU_PER_KG = load_assumptions("tea.yaml")["price"]["biomethane_mmbtu"]["mmbtu_per_kg"]
+
+
+def usd_per_mmbtu_to_usd_per_kg(usd_per_mmbtu: float, mmbtu_per_kg: float) -> float:
+    """Convert an energy-basis price (USD/mmbtu) to a mass-basis price (USD/kg)."""
+    return usd_per_mmbtu * mmbtu_per_kg
+
+
+def usd_per_kg_to_usd_per_mmbtu(usd_per_kg: float, mmbtu_per_kg: float) -> float:
+    """Convert a mass-basis price (USD/kg) to an energy-basis price (USD/mmbtu)."""
+    return usd_per_kg / mmbtu_per_kg
 
 
 class SaBReTEA(bst.TEA):
@@ -126,75 +138,32 @@ def create_tea(
 def solve_product_msp(
     tea,
     product_stream,
-    product_ID: str | None = None,
     energy_content_mmbtu_per_kg: float | None = None,
 ):
     """
-    Solve minimum selling price for a product stream.
+    Solve minimum selling price for a product stream, on a whole-stream
+    basis. Used for biomethane by passing energy_content_mmbtu_per_kg
+    =CH4_MMBTU_PER_KG (data/tea.yaml `price.biomethane_mmbtu.mmbtu_per_kg`).
 
     Returns a dict with:
     - usd_per_kg_stream
     - annual_stream_kg
-    - product_ID
-    - product_mass_fraction
-    - usd_per_kg_product
-    - annual_product_kg
-    - usd_per_mmbtu  (if energy basis is provided)
+    - usd_per_mmbtu        (if energy basis is provided)
+    - annual_product_mmbtu (if energy basis is provided)
     """
     msp_usd_per_kg_stream = tea.solve_price(product_stream)
     annual_hours = tea.operating_days * 24
+    annual_stream_kg = float(product_stream.F_mass) * annual_hours
 
     result = {
         "usd_per_kg_stream": msp_usd_per_kg_stream,
-        "annual_stream_kg": float(product_stream.F_mass) * annual_hours,
-        "product_ID": product_ID,
-        "product_mass_fraction": float("nan"),
-        "usd_per_kg_product": float("nan"),
-        "annual_product_kg": float("nan"),
+        "annual_stream_kg": annual_stream_kg,
         "usd_per_mmbtu": float("nan"),
+        "annual_product_mmbtu": float("nan"),
     }
-
-    if product_ID is not None:
-        if product_ID not in product_stream.chemicals.IDs:
-            return result
-
-        product_mass = float(product_stream.imass[product_ID])
-        total_mass = float(product_stream.F_mass)
-        product_mass_frac = product_mass / total_mass if total_mass > 0 else 0.0
-
-        result["product_mass_fraction"] = product_mass_frac
-        result["annual_product_kg"] = product_mass * annual_hours
-
-        if product_mass_frac > 0:
-            result["usd_per_kg_product"] = msp_usd_per_kg_stream / product_mass_frac
 
     if energy_content_mmbtu_per_kg is not None and energy_content_mmbtu_per_kg > 0:
-        if product_ID is not None and result["usd_per_kg_product"] == result["usd_per_kg_product"]:
-            result["usd_per_mmbtu"] = result["usd_per_kg_product"] / energy_content_mmbtu_per_kg
-        else:
-            result["usd_per_mmbtu"] = msp_usd_per_kg_stream / energy_content_mmbtu_per_kg
+        result["usd_per_mmbtu"] = usd_per_kg_to_usd_per_mmbtu(msp_usd_per_kg_stream, energy_content_mmbtu_per_kg)
+        result["annual_product_mmbtu"] = annual_stream_kg * energy_content_mmbtu_per_kg
 
     return result
-
-
-def solve_biomethane_msp(tea, biomethane_stream):
-    """
-    Solve minimum selling price for the biomethane stream.
-
-    Returns a dict with:
-    - usd_per_kg_stream
-    - usd_per_kg_ch4
-    - usd_per_mmbtu
-    """
-    result = solve_product_msp(
-        tea=tea,
-        product_stream=biomethane_stream,
-        product_ID="Methane",
-        energy_content_mmbtu_per_kg=CH4_MMBTU_PER_KG,
-    )
-
-    return {
-        "usd_per_kg_stream": result["usd_per_kg_stream"],
-        "usd_per_kg_ch4": result["usd_per_kg_product"],
-        "usd_per_mmbtu": result["usd_per_mmbtu"],
-    }

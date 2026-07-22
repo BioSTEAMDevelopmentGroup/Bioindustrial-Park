@@ -99,9 +99,8 @@ def solve_oil_msp_from_full_system(
     msp = solve_product_msp(
         tea=tea,
         product_stream=oil_stream,
-        product_ID="MicrobialOil",
     )
-    return float(msp["usd_per_kg_product"])
+    return float(msp["usd_per_kg_stream"])
 
 
 def override_acidogenic_vfa_yield(sys, target_vfa_yield):

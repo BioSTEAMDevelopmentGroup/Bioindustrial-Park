@@ -110,6 +110,7 @@ def create_ad_integrated_system(
     PR, PC, EV = bio_units["PR"], bio_units["PC"], bio_units["EV"]
     feed = bio_streams["feed"]
 
+    # milling_losses: no price -- pure mass loss, not a disposed waste stream.
     ML = Mill("ML", ins=bio_streams["pressed_cake"], outs=("milled_biomass", "milling_losses"))
 
     # =========================================================
@@ -139,8 +140,8 @@ def create_ad_integrated_system(
         methane_units_d = {u.ID: u for u in methane_sys.units}
         methane_streams = {
             "biomethane": methane_sys.flowsheet.stream.biomethane,
-            "offgas": methane_sys.flowsheet.stream.offgas,
-            "soil_amendment": methane_sys.flowsheet.stream.soil_amendment,
+            "methanogenic_offgas": methane_sys.flowsheet.stream.methanogenic_offgas,
+            "methanogenic_solid_digestate": methane_sys.flowsheet.stream.methanogenic_solid_digestate,
             "liquid_digestate": methane_sys.flowsheet.stream.liquid_digestate,
         }
 
@@ -179,12 +180,13 @@ def create_ad_integrated_system(
         "biostimulant_product": bio_streams["biostimulant_product"],
         # Methane pathway (None if alpha=0)
         **{k: methane_streams.get(k) for k in [
-            "biomethane", "offgas", "soil_amendment", "liquid_digestate"
+            "biomethane", "methanogenic_offgas", "methanogenic_solid_digestate", "liquid_digestate"
         ]},
         # VFA pathway (None if alpha=1)
+        "vfa_cake": vfa_streams.get("vfa_cake"),
+        "acidogenic_solid_digestate": vfa_streams.get("acidogenic_solid_digestate"),
         **{k: vfa_streams.get(k) for k in [
             "vfa_broth", "microbial_oil", "wastewater",
-            "vfa_retentate", "acidogenic_residual_solids",
         ]},
     }
 
