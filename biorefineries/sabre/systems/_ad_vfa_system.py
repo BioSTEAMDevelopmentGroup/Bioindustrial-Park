@@ -21,7 +21,7 @@ from biorefineries.sabre.units import (
 from biorefineries.sabre.systems._biostimulant_system import create_biostimulant_system
 from biorefineries.sabre._tea import create_tea
 
-__all__ = ('create_ad_vfa_system',)
+__all__ = ('create_ad_vfa_system', 'price_ad_vfa_system')
 
 _VFA_PRODUCT_SPLITTER = load_assumptions("downstream_processing.yaml")["vfa_product_splitter"]
 _TEA_PRICE = load_assumptions("tea.yaml")["price"]
@@ -109,3 +109,27 @@ def create_ad_vfa_system(
     create_tea(sys)
 
     return sys
+
+
+def price_ad_vfa_system() -> dict:
+    from biorefineries.sabre._tea import solve_product_msp
+    bst.main_flowsheet.clear()
+
+    sys = create_ad_vfa_system(feedstock="pelagic")
+    sys.simulate()
+    
+    product = sys.flowsheet.stream.pure_vfa
+    msp = solve_product_msp(tea=sys.TEA, product_stream=product)
+
+    return {
+        "label": "AD-VFA",
+        "product_desc": "VFA broth (total-VFA basis)",
+        "msp_usd_per_kg": msp["usd_per_kg"],
+        "annual_product_kg": msp["annual_product_kg"],
+        'sys': sys,
+    }
+
+
+if __name__ == '__main__':
+    results = price_ad_vfa_system()
+    sys = results['sys']

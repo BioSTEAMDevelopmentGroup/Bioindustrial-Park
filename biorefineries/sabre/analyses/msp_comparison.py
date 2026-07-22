@@ -40,125 +40,17 @@ if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
 from biorefineries.sabre.systems import (
-    create_biostimulant_system,
-    create_ad_biomethane_system,
-    create_ad_vfa_system,
-    create_ad_fermentation_system,
+    price_biostimulant_system,
+    price_ad_biomethane_system,
+    price_ad_vfa_system,
+    price_ad_fermentation_system,
 )
-from biorefineries.sabre._tea import solve_product_msp, CH4_MMBTU_PER_KG
 
 OUT = SCRIPT_DIR.parent / "results" / "figures"
 OUT.mkdir(parents=True, exist_ok=True)
 
-# =================================================================
-# Shared baseline economics
-# Values match the defaults already used across
-# legacy_analyses/ad_feed_tea.py and legacy_analyses/vfa_fermentation_tea.py
-# so all four systems are compared on a common basis.
-# =================================================================
 
-# Not used now, kept as a reference
-# def _patch_ev607():
-#     """
-#     Replace Ev607's cost + utility with a low-duty placeholder when V < 0.02.
-#     BioSTEAM's MultiEffectEvaporator cost correlation produces nonsensical
-#     vessel geometry at near-zero evaporation duty (see
-#     legacy_analyses/vfa_fermentation_tea.py::_patch_ev607).
-#     """
-#     try:
-#         ev607 = bst.main_flowsheet.unit["Ev607"]
-#     except Exception:
-#         return
-#     v = getattr(ev607, "V", None)
-#     if v is None or v >= 0.02:
-#         return
-#     feed = ev607.ins[0]
-#     feed_m3h = max(feed.F_mass / 1000.0, 1.0)
-#     placeholder_usd = 50000.0 * (feed_m3h ** 0.6)
-#     for k in list(ev607.baseline_purchase_costs.keys()):
-#         ev607.baseline_purchase_costs[k] = 0.0
-#     ev607.baseline_purchase_costs["Evaporator (low-duty placeholder)"] = placeholder_usd
-#     ev607.heat_utilities.clear()
-
-
-# =================================================================
 # System builders -- each returns a common result dict
-# =================================================================
-
-def price_biostimulant_system() -> dict:
-    bst.main_flowsheet.clear()
-
-    sys = create_biostimulant_system()
-    sys.simulate()
-
-    product = sys.flowsheet.stream.biostimulant_product
-    msp = solve_product_msp(tea=sys.TEA, product_stream=product)
-
-    return {
-        "label": "Biostimulant",
-        "product_desc": "biostimulant liquid product",
-        "msp_usd_per_kg": msp["usd_per_kg"],
-        "annual_product_kg": msp["annual_product_kg"],
-    }
-
-
-def price_ad_biomethane_system() -> dict:
-    bst.main_flowsheet.clear()
-
-    sys = create_ad_biomethane_system(feedstock="pelagic")
-    sys.simulate()
-
-    product = sys.flowsheet.stream.biomethane
-    msp = solve_product_msp(
-        tea=sys.TEA, product_stream=product,
-        energy_content_mmbtu_per_kg=CH4_MMBTU_PER_KG,
-    )
-
-    return {
-        "label": "AD-biomethane",
-        "product_desc": "biomethane (whole-stream basis)",
-        "msp_usd_per_kg": msp["usd_per_kg"],
-        "annual_product_kg": msp["annual_product_kg"],
-        "msp_usd_per_mmbtu": msp["usd_per_mmbtu"],
-        "annual_product_mmbtu": msp["annual_product_mmbtu"],
-    }
-
-
-def price_ad_vfa_system() -> dict:
-    bst.main_flowsheet.clear()
-
-    sys = create_ad_vfa_system(feedstock="pelagic")
-    sys.simulate()
-    
-    product = sys.flowsheet.stream.pure_vfa
-    msp = solve_product_msp(tea=sys.TEA, product_stream=product)
-
-    return {
-        "label": "AD-VFA",
-        "product_desc": "VFA broth (total-VFA basis)",
-        "msp_usd_per_kg": msp["usd_per_kg"],
-        "annual_product_kg": msp["annual_product_kg"],
-    }
-
-
-def price_ad_fermentation_system() -> dict:
-    bst.main_flowsheet.clear()
-
-    sys = create_ad_fermentation_system(feedstock="pelagic")
-    sys.simulate()
-    # _patch_ev607() not used now, kept as a reference
-
-    product = sys.flowsheet.stream.microbial_oil
-    msp = solve_product_msp(tea=sys.TEA, product_stream=product)
-
-    return {
-        "label": "AD-fermentation",
-        "product_desc": "crude microbial oil",
-        "msp_usd_per_kg": msp["usd_per_kg"],
-        "annual_product_kg": msp["annual_product_kg"],
-    }
-
-
 BUILDERS = (
     price_biostimulant_system,
     price_ad_biomethane_system,

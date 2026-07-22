@@ -33,7 +33,7 @@ from biorefineries.sabre.utils import (
 from biorefineries.sabre.units import Press, PressateConcentrator, BiostimulantEvaporator
 from biorefineries.sabre._tea import create_tea
 
-__all__ = ('create_biostimulant_system',)
+__all__ = ('create_biostimulant_system', 'price_biostimulant_system')
 
 _TEA_PRICE = load_assumptions("tea.yaml")["price"]
 
@@ -206,3 +206,25 @@ def create_biostimulant_system(
     create_tea(sys)
 
     return sys
+
+def price_biostimulant_system() -> dict:
+    from biorefineries.sabre._tea import solve_product_msp
+    bst.main_flowsheet.clear()
+
+    sys = create_biostimulant_system()
+    sys.simulate()
+
+    product = sys.flowsheet.stream.biostimulant_product
+    msp = solve_product_msp(tea=sys.TEA, product_stream=product)
+
+    return {
+        "label": "Biostimulant",
+        "product_desc": "biostimulant liquid product",
+        "msp_usd_per_kg": msp["usd_per_kg"],
+        "annual_product_kg": msp["annual_product_kg"],
+        'sys': sys,
+    }
+
+if __name__ == '__main__':
+    results = price_biostimulant_system()
+    sys = results['sys']

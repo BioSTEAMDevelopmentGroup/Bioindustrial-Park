@@ -21,7 +21,7 @@ from biorefineries.sabre.units import (
 from biorefineries.sabre.systems._ad_vfa_system import create_ad_vfa_system
 from biorefineries.sabre._tea import create_tea
 
-__all__ = ('create_ad_fermentation_system',)
+__all__ = ('create_ad_fermentation_system', 'price_ad_fermentation_system')
 
 # Load assumptions
 _FERMENTATION_YAML = load_assumptions("fermentation.yaml")
@@ -292,3 +292,51 @@ def create_ad_fermentation_system(
     create_tea(sys)
 
     return sys
+
+# Not used now, kept as a reference
+# def _patch_ev607():
+#     """
+#     Replace Ev607's cost + utility with a low-duty placeholder when V < 0.02.
+#     BioSTEAM's MultiEffectEvaporator cost correlation produces nonsensical
+#     vessel geometry at near-zero evaporation duty (see
+#     legacy_analyses/vfa_fermentation_tea.py::_patch_ev607).
+#     """
+#     try:
+#         ev607 = bst.main_flowsheet.unit["Ev607"]
+#     except Exception:
+#         return
+#     v = getattr(ev607, "V", None)
+#     if v is None or v >= 0.02:
+#         return
+#     feed = ev607.ins[0]
+#     feed_m3h = max(feed.F_mass / 1000.0, 1.0)
+#     placeholder_usd = 50000.0 * (feed_m3h ** 0.6)
+#     for k in list(ev607.baseline_purchase_costs.keys()):
+#         ev607.baseline_purchase_costs[k] = 0.0
+#     ev607.baseline_purchase_costs["Evaporator (low-duty placeholder)"] = placeholder_usd
+#     ev607.heat_utilities.clear()
+
+
+def price_ad_fermentation_system() -> dict:
+    from biorefineries.sabre._tea import solve_product_msp
+    bst.main_flowsheet.clear()
+
+    sys = create_ad_fermentation_system(feedstock="pelagic")
+    sys.simulate()
+    # _patch_ev607() not used now, kept as a reference
+
+    product = sys.flowsheet.stream.microbial_oil
+    msp = solve_product_msp(tea=sys.TEA, product_stream=product)
+
+    return {
+        "label": "AD-fermentation",
+        "product_desc": "crude microbial oil",
+        "msp_usd_per_kg": msp["usd_per_kg"],
+        "annual_product_kg": msp["annual_product_kg"],
+        'sys': sys,
+    }
+
+
+if __name__ == '__main__':
+    results = price_ad_fermentation_system()
+    sys = results['sys']

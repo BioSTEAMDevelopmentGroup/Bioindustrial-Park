@@ -20,7 +20,7 @@ from biorefineries.sabre.units import (
 from biorefineries.sabre.systems._biostimulant_system import create_biostimulant_system
 from biorefineries.sabre._tea import create_tea, usd_per_mmbtu_to_usd_per_kg
 
-__all__ = ('create_ad_biomethane_system',)
+__all__ = ('create_ad_biomethane_system', 'price_ad_biomethane_system')
 
 
 # Load assumptions
@@ -143,3 +143,32 @@ def create_ad_biomethane_system(
     create_tea(sys)
     
     return sys
+
+
+def price_ad_biomethane_system() -> dict:
+    from biorefineries.sabre._tea import solve_product_msp, CH4_MMBTU_PER_KG
+    bst.main_flowsheet.clear()
+
+    sys = create_ad_biomethane_system(feedstock="pelagic")
+    sys.simulate()
+
+    product = sys.flowsheet.stream.biomethane
+    msp = solve_product_msp(
+        tea=sys.TEA, product_stream=product,
+        energy_content_mmbtu_per_kg=CH4_MMBTU_PER_KG,
+    )
+
+    return {
+        "label": "AD-biomethane",
+        "product_desc": "biomethane (whole-stream basis)",
+        "msp_usd_per_kg": msp["usd_per_kg"],
+        "annual_product_kg": msp["annual_product_kg"],
+        "msp_usd_per_mmbtu": msp["usd_per_mmbtu"],
+        "annual_product_mmbtu": msp["annual_product_mmbtu"],
+        'sys': sys,
+    }
+
+
+if __name__ == '__main__':
+    results = price_ad_biomethane_system()
+    sys = results['sys']
