@@ -81,7 +81,7 @@ price:
   # Products
   biostimulant:
     baseline: 1.00
-    range: [0.00, 0.50, 1.00, 1.50, 2.00, 2.50, 3.00]
+    range: [0.50, 3.00]
     distribution: "uniform"
     source: >
       Market.us Seaweed Extract Biostimulant Market (2024): global market
