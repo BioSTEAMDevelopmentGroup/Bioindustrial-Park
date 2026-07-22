@@ -2,3 +2,111 @@
 
 # Plant uptime, in operating days per year.
 operating_days: 330
+
+price:
+  note:
+    - "all prices are USD per wet kg unless noted otherwisely."
+    - "different values for baseline, scenario, and uncertainty/sensitivity analysis."
+    - "for waste streams, cod_basis means disposal prices estimated vased on stream COD load (rate -$0.3676 kg-COD, Schueller (2020) Municipal Residential Wastewater Rates excess-COD surcharge), see details in biorefineries/wwt module. Cost might have deviated due to system update."
+
+  # Feedstock
+  sargassum:
+    baseline: 0.0
+    scenario:
+      tipping_fee: -0.02
+      low_cost_collect: 0.02
+      mid_cost_collect: 0.05
+      high_cost_collect: 0.05
+    range: [-0.02, 0.1]
+    distribution: "uniform"
+    source: "Rodriguez-Martinez et al. 2023 (Sci Total Environ); cleanup costs $19-85/m3 wet = $0.024-0.106/kg wet"
+  
+  # Reagents
+  mgso4:
+    baseline: 0.40
+    note: "fermentation medium, industrial grade"
+    source: "no literature source cited in legacy scripts"
+  ammonia:
+    baseline: 0.50
+    note: "liquid ammonia, N source for fermentation medium"
+    source: "no literature source cited in legacy scripts"
+  phosphate:
+    baseline: 0.80
+    note: "KH2PO4, P source for fermentation medium"
+    source: "no literature source cited in legacy scripts"
+  naoh:
+    baseline: 0.35
+    note: "fermentation medium, pH base"
+    source: "no literature source cited in legacy scripts"
+
+  # Waste streams, negative price to indicate as a cost
+  disposal_solid:
+    baseline: -0.04
+    range: [-0.08, 0]
+    distribution: "uniform"
+    note:
+      acidogenic_residual_solids:
+        legacy_assumption: -0.04
+        cod_basis: -0.02846
+        sensitivity_range: [-0.02, -0.04, -0.10]
+        source: "standard biosolids, $30-80/dry ton (~$0.03-0.08/kg wet)"
+      solid_digestate:
+        legacy_assumption: -0.02
+        cod_basis: -0.03691
+        source: "standard biosolids, heavy metal contamination (As, Cd, Pb) from pelagic Sargassum digestate prevents land application as fertilizer"
+      vfa_retentate:
+        legacy_assumption: -0.005 # treated as a wastewater
+        cod_basis: -0.14904
+        note: >
+          - mixed upstream into the fermentation_wastewater stream so shares its disposal price.
+          - "Dominated (~97% of COD) by Alginate/Fucoidan/OtherSolids, excluded here as
+          insoluble solids, consistent with how Glucan/Protein/CellMass are
+          already excluded; counting them as soluble organics instead would give
+          -0.1027, ~33x higher."
+        source: "biological wastewater treatment, $3-8/m3 (~$0.003-0.008/kg)"
+  disposal_wastewater:
+    baseline: -0.004
+    range: [-0.008, 0]
+    distribution: "uniform"
+    note:
+      fermentation_wastewater:
+        legacy_assumption: -0.005
+        cod_basis: -0.02432
+        source: "biological wastewater treatment, $3-8/m3 (~$0.003-0.008/kg)"
+      liquid_digestate:
+        legacy_assumption: -0.002
+        cod_basis: -0.02702
+        source: "$2/m3 wastewater disposal"
+
+  # Products
+  biostimulant:
+    baseline: 1.00
+    range: [0.00, 0.50, 1.00, 1.50, 2.00, 2.50, 3.00]
+    distribution: "uniform"
+    source: >
+      Market.us Seaweed Extract Biostimulant Market (2024): global market
+      $1.1B (2024), brown seaweed 64.7% share, liquid 76.8% share;
+      wholesale bulk liquid concentrate $0.50-2.00/kg.
+  vfa:
+    baseline: 1.00
+    range: [0.5, 2]
+    distribution: "triangular"
+    note: "price is for individual purified acids, not a mixture, hence needs updating"
+    source: "lower range of VFAs at https://encyclopedia.pub/entry/history/show/32510"
+  biomethane_mmbtu: # $/mmbtu
+    baseline: 10
+    scenario:
+      low: 5
+      mid: 10
+      high: 20
+    range: [2, 30]
+    distribution: "triangular"
+    source:
+      - "US Henry Hub $2-8/MMBtu typical range for natural gas."
+      - "$10/MMBtu for European TTF, $14/MMBtu for Asian JKM."
+      - "$10-30/GJ ($1/GJ=$1.055/MMBtu) for biomethane per IEA (https://www.iea.org/reports/outlook-for-biogas-and-biomethane/key-findings)"
+  microbial_oil:
+    baseline: 1.00
+    range: [0.6, 1.5]
+    distribution: "triangular"
+    source: "midpoint of soybean oil $0.62-1.50/kg market price benchmark"
