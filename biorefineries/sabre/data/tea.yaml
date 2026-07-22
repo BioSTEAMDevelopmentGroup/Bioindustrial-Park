@@ -3,6 +3,23 @@
 # Plant uptime, in operating days per year.
 operating_days: 330
 
+# create_tea()/SaBReTEA default economic and financing assumptions.
+tea:
+  IRR: 0.10
+  duration: [2026, 2046]
+  depreciation: "MACRS7"
+  income_tax: 0.21
+  construction_schedule: [0.4, 0.6]
+  WC_over_FCI: 0.05
+  finance_interest: 0.08
+  finance_years: 10
+  finance_fraction: 0.6
+  startup_months: 3
+  startup_FOCfrac: 1.0
+  startup_VOCfrac: 0.5
+  startup_salesfrac: 0.5
+  foc_frac_of_fci: 0.04
+
 price:
   note:
     - "all prices are USD per wet kg unless noted otherwisely."

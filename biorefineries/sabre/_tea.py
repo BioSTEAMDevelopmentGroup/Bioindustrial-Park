@@ -16,6 +16,7 @@ __all__ = (
     'SaBReTEA', 'create_tea', 'solve_product_msp',
 )
 
+_TEA_DEFAULTS = load_assumptions("tea.yaml")["tea"]
 CH4_MMBTU_PER_KG = load_assumptions("tea.yaml")["price"]["biomethane_mmbtu"]["mmbtu_per_kg"]
 
 
@@ -84,21 +85,21 @@ class SaBReTEA(bst.TEA):
 
 def create_tea(
     sys,
-    IRR: float = 0.10,
-    duration: tuple[int, int] = (2026, 2046),
-    depreciation: str = "MACRS7",
-    income_tax: float = 0.21,
+    IRR: float = _TEA_DEFAULTS["IRR"],
+    duration: tuple[int, int] = tuple(_TEA_DEFAULTS["duration"]),
+    depreciation: str = _TEA_DEFAULTS["depreciation"],
+    income_tax: float = _TEA_DEFAULTS["income_tax"],
     operating_days: int = OPERATING_DAYS_PER_YEAR,
-    construction_schedule: tuple[float, ...] = (0.4, 0.6),
-    WC_over_FCI: float = 0.05,
-    finance_interest: float = 0.08,
-    finance_years: int = 10,
-    finance_fraction: float = 0.6,
-    startup_months: int = 3,
-    startup_FOCfrac: float = 1.0,
-    startup_VOCfrac: float = 0.5,
-    startup_salesfrac: float = 0.5,
-    foc_frac_of_fci: float = 0.04,
+    construction_schedule: tuple[float, ...] = tuple(_TEA_DEFAULTS["construction_schedule"]),
+    WC_over_FCI: float = _TEA_DEFAULTS["WC_over_FCI"],
+    finance_interest: float = _TEA_DEFAULTS["finance_interest"],
+    finance_years: int = _TEA_DEFAULTS["finance_years"],
+    finance_fraction: float = _TEA_DEFAULTS["finance_fraction"],
+    startup_months: int = _TEA_DEFAULTS["startup_months"],
+    startup_FOCfrac: float = _TEA_DEFAULTS["startup_FOCfrac"],
+    startup_VOCfrac: float = _TEA_DEFAULTS["startup_VOCfrac"],
+    startup_salesfrac: float = _TEA_DEFAULTS["startup_salesfrac"],
+    foc_frac_of_fci: float = _TEA_DEFAULTS["foc_frac_of_fci"],
 ):
     """
     Create a TEA object for any SaBRe system.
