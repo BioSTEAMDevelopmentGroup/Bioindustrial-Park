@@ -26,6 +26,13 @@ vfa_microfilter:
     - "$200/m2 selected as an upper-end polymeric membrane cost proxy."
 
 
+vfa_product_splitter:
+  # Fraction of VFA mass (the vfa_microfilter.vfa_IDs set) recovered to the
+  # pure_vfa product stream; the rest (unrecovered VFA + everything else --
+  # water, residual dissolved solids, etc.) goes to the vfa_disposal stream.
+  vfa_recovery_frac: 0.98
+
+
 oil_extraction:
   product_ID: MicrobialOil
   cellmass_ID: CellMass

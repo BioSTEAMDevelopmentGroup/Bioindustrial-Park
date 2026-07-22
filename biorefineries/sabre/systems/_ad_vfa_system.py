@@ -11,6 +11,7 @@ VFA-producing acidogenic AD system builder for the SaBRe flowsheets.
 import biosteam as bst
 
 from biorefineries.sabre._chemicals import create_chemicals
+from biorefineries.sabre.utils import load_assumptions
 from biorefineries.sabre.units import (
     AcidogenicDigester,
     DigestateScrewPress,
@@ -21,10 +22,15 @@ from biorefineries.sabre.systems._biostimulant_system import create_biostimulant
 
 __all__ = ('create_ad_vfa_system',)
 
+_VFA_PRODUCT_SPLITTER = load_assumptions("downstream_processing.yaml")["vfa_product_splitter"]
 
-def create_ad_vfa_system(feedstock: str | bst.Stream = "pelagic"):
+
+def create_ad_vfa_system(
+    feedstock: str | bst.Stream = "pelagic",
+    add_product_splitter: bool = True,
+):
     """
-    Build the VFA acidogenic AD system: VFA_AD -> SP_VFA -> MF.
+    Build the VFA acidogenic AD system: VFA_AD -> SP_VFA -> MF (-> SP_PRODUCT).
 
     Parameters
     ----------
@@ -36,12 +42,22 @@ def create_ad_vfa_system(feedstock: str | bst.Stream = "pelagic"):
         If a stream, it's used directly as the already-milled feed (e.g.
         a splitter-derived stream from systems._ad_integrated_system,
         which builds its own shared preprocessing once).
+    add_product_splitter : bool
+        If True (default), adds SP_PRODUCT: a splitter on vfa_broth that
+        recovers `vfa_product_splitter.vfa_recovery_frac` (data/
+        downstream_processing.yaml) of the VFA mass to a `pure_vfa`
+        product stream, sending the remainder (unrecovered VFA + everything
+        else) to a `vfa_disposal` stream. Set to False when this system is
+        built as a component of a larger system (e.g.
+        systems._ad_fermentation_system, which needs the raw, unsplit
+        `vfa_broth` as its own feed) so that system is unaffected.
 
     Key outputs (accessible via flowsheet):
         - offgas
         - vfa_broth (post-microfiltration permeate; ready for fermentation)
         - vfa_retentate
         - acidogenic_residual_solids
+        - pure_vfa, vfa_disposal (only if add_product_splitter is True)
         - biostimulant_membrane_concentrate (standalone mode only)
         - pressate_permeate (standalone mode only)
         - biostimulant_product (standalone mode only)
@@ -68,6 +84,14 @@ def create_ad_vfa_system(feedstock: str | bst.Stream = "pelagic"):
     SP = DigestateScrewPress(ID="SP_VFA", ins=AD - 1, outs=("acidogenic_residual_solids", "raw_vfa_broth"))
     MF = VFAMicrofilter("MF", ins=SP - 1, outs=("vfa_broth", "vfa_retentate"))
     path.extend([AD, SP, MF])
+
+    if add_product_splitter:
+        vfa_recovery_frac = float(_VFA_PRODUCT_SPLITTER["vfa_recovery_frac"])
+        split = {cid: vfa_recovery_frac for cid in MF.vfa_IDs}
+        SP_PRODUCT = bst.Splitter(
+            "SP_PRODUCT", ins=MF - 0, outs=("pure_vfa", "vfa_disposal"), split=split,
+        )
+        path.append(SP_PRODUCT)
 
     HXN = bst.HeatExchangerNetwork("HXN", units=tuple(path))
     path.append(HXN)

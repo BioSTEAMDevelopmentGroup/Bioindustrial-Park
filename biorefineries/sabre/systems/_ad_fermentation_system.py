@@ -262,7 +262,10 @@ def create_ad_fermentation_system(
     """
     try: bst.settings.get_chemicals()
     except Exception: create_chemicals()
-    ad_vfa_sys = create_ad_vfa_system(feedstock=feedstock)
+    # add_product_splitter=False: this system needs the raw, unsplit
+    # vfa_broth as its own fermentation feed, not ad_vfa_sys's standalone
+    # pure_vfa/vfa_disposal split.
+    ad_vfa_sys = create_ad_vfa_system(feedstock=feedstock, add_product_splitter=False)
     feed = feedstock if not isinstance(feedstock, str) else ad_vfa_sys.feeds[0]
     vfa_broth = ad_vfa_sys.flowsheet.stream.vfa_broth
     vfa_retentate = ad_vfa_sys.flowsheet.stream.vfa_retentate
