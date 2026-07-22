@@ -145,11 +145,11 @@ def create_ad_biomethane_system(
     return sys
 
 
-def price_ad_biomethane_system() -> dict:
+def price_ad_biomethane_system(pretreatment_case: str = 'press_mill_only') -> dict:
     from biorefineries.sabre._tea import solve_product_msp, CH4_MMBTU_PER_KG
     bst.main_flowsheet.clear()
 
-    sys = create_ad_biomethane_system(feedstock="pelagic")
+    sys = create_ad_biomethane_system(feedstock="pelagic", pretreatment_case=pretreatment_case)
     sys.simulate()
 
     product = sys.flowsheet.stream.biomethane
@@ -160,6 +160,7 @@ def price_ad_biomethane_system() -> dict:
 
     return {
         "label": "AD-biomethane",
+        "pretreatment_case": pretreatment_case,
         "product_desc": "biomethane (whole-stream basis)",
         "msp_usd_per_kg": msp["usd_per_kg"],
         "annual_product_kg": msp["annual_product_kg"],
