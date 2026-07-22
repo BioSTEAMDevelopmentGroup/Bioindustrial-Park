@@ -71,7 +71,7 @@ class MassSplitter(bst.Unit):
 
 def create_ad_integrated_system(
     alpha: float = 0.5,
-    feedstock_type: str = "pelagic",
+    feedstock: str = "pelagic",
     pretreatment_case: str = "press_mill_only",
 ):
     """
@@ -83,6 +83,10 @@ def create_ad_integrated_system(
         Fraction of milled biomass routed to methanogenic AD.
         alpha=0 -> pure VFA-to-oil (methane path not built).
         alpha=1 -> pure biomethane (VFA path not built).
+    feedstock : str
+        Feedstock type (data/feedstock.yaml `feedstock_type`).
+    pretreatment_case : str
+        data/pretreatment.yaml `pretreatment_ad` case name.
 
     Returns
     -------
@@ -105,7 +109,7 @@ def create_ad_integrated_system(
     # SHARED PREPROCESSING: create_biostimulant_system's Press -> PC ->
     # PSP/DIL -> EV, plus a Mill on the pressed cake.
     # =========================================================
-    bio_sys = create_biostimulant_system(feedstock_type=feedstock_type)
+    bio_sys = create_biostimulant_system(feedstock=feedstock)
 
     # milling_losses: no price -- pure mass loss, not a disposed waste stream.
     ML = Mill("ML", ins=bio_sys.flowsheet.stream.pressed_cake, outs=("milled_biomass", "milling_losses"))
@@ -155,3 +159,8 @@ def create_ad_integrated_system(
     sys = bst.System.from_units("ad_integrated_sys", units=all_units)
 
     return sys
+
+
+if __name__ == '__main__':
+    sys = create_ad_integrated_system(feedstock="pelagic")
+    sys.simulate()

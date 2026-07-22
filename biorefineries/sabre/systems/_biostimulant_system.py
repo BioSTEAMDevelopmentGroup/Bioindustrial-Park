@@ -41,7 +41,7 @@ FRESH_WATER_PRICE_USD_PER_KG = bst.stream_utility_prices['Process water']
 
 
 def create_biostimulant_system(
-    feedstock_type: str = "pelagic",
+    feedstock: str = "pelagic",
 ):
     """
     Build the standalone biostimulant system: Press -> PFS (splits off only
@@ -53,7 +53,7 @@ def create_biostimulant_system(
 
     Parameters
     ----------
-    feedstock_type : str
+    feedstock : str
         Feedstock type (data/feedstock.yaml `feedstock_type`).
 
     Returns
@@ -66,7 +66,7 @@ def create_biostimulant_system(
     try: bst.settings.get_chemicals()
     except Exception: create_chemicals()
     feedstock_assumptions = load_assumptions("feedstock.yaml")
-    params = get_feedstock_type_params(feedstock_assumptions, feedstock_type)
+    params = get_feedstock_type_params(feedstock_assumptions, feedstock)
     fresh_feed_kgph = get_scale_feed_kgph(feedstock_assumptions)
     moisture_frac = params["moisture_frac"]
 
@@ -113,7 +113,7 @@ def create_biostimulant_system(
     EV = BiostimulantEvaporator(
         "EV",
         ins=DIL - 0,
-        outs=("biostimulant_product", "biostimulant_vapor"),
+        outs=("biostimulant_product", "condensed_vapor"),
     )
     EV.outs[0].price = _TEA_PRICE["biostimulant"]["baseline"]
     # Condensed by EV's own auxiliary condenser (V=0) -- leaves as a liquid,

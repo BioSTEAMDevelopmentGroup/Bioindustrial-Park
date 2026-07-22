@@ -192,7 +192,7 @@ def test_ad_tea_final_press_mill_only_base_feed_price():
         "utility_cost": 6109050.465734033,
         "msp_usd_per_mmbtu": 85.51925191724928,
         "msp_usd_per_kg_ch4": 4.498312650847312,
-        "biomethane_kg_hr": 5701.229450667415,
+        "biomethane_kg_hr": 5055.060612937506,
         "npv_at_3_mmbtu": -1422699279.9872646,
     })
 
@@ -206,7 +206,7 @@ def test_ad_tea_final_press_mill_only_tipping_fee():
         "utility_cost": 6109050.465734033,
         "msp_usd_per_mmbtu": -10.421214236518416,
         "msp_usd_per_kg_ch4": -0.5481558688408688,
-        "biomethane_kg_hr": 5701.229450667415,
+        "biomethane_kg_hr": 5055.060612937506,
         "npv_at_3_mmbtu": 199805212.71141493,
     })
 
@@ -220,7 +220,7 @@ def test_ad_tea_final_combined_pe_near_zero():
         "utility_cost": 7217818.726045765,
         "msp_usd_per_mmbtu": 16.054388865578613,
         "msp_usd_per_kg_ch4": 0.8444608543294351,
-        "biomethane_kg_hr": 13955.47747891447,
+        "biomethane_kg_hr": 14002.517897836899,
         "npv_at_3_mmbtu": -618397463.4113625,
     })
 
@@ -360,9 +360,9 @@ def test_hauke_stream_tables_press_mill_only():
             "water_wt_frac": 0.8673000000000002,
         },
         "biomethane": {
-            "F_mass_kg_hr": 5701.229450667415,
-            "TS_kg_hr": 5701.229450667415,
-            "VS_kg_hr": 5701.229450667415,
+            "F_mass_kg_hr": 5055.060612937506,
+            "TS_kg_hr": 5055.060612937506,
+            "VS_kg_hr": 5055.060612937506,
             "water_wt_frac": 0.0,
         },
         "methanogenic_solid_digestate": {
@@ -399,9 +399,9 @@ def test_export_ad_report_fixed_press_mill_only():
     _assert_close(_exr.installed_cost(ad), 127825506.10408078, "AD installed_cost")
     _assert_close(_exr.annualize_add_opex(ad), 3838081.637052034, "AD add_opex_annual")
     _assert_close(_exr.installed_cost(up), 32136764.637289904, "UP installed_cost")
-    _assert_close(_exr.stream_total_mass(up.outs[0]), 5701.229450667415, "biomethane F_mass")
+    _assert_close(_exr.stream_total_mass(up.outs[0]), 5055.060612937506, "biomethane F_mass")
     _assert_close(
-        _exr.gas_molpct(up.outs[0], "Methane"), 94.78801573491452, "biomethane CH4 mol%"
+        _exr.gas_molpct(up.outs[0], "Methane"), 99.26147149151141, "biomethane CH4 mol%"
     )
 
 

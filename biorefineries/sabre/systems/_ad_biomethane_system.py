@@ -57,7 +57,7 @@ def create_ad_biomethane_system(
     path = []
 
     if isinstance(feedstock, str):
-        bio_sys = create_biostimulant_system(feedstock_type=feedstock)
+        bio_sys = create_biostimulant_system(feedstock=feedstock)
         # Fold in the biostimulant subsystem's units, but not its own HXN facility --
         # this system gets its own HXN below, scoped to all units visible here, so
         # nesting the subsystem's narrower one would double-count already-optimized

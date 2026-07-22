@@ -905,8 +905,12 @@ class BiogasUpgrading(bst.Unit):
     methane_loss_frac : float
         Fraction of inlet methane lost to offgas (methane slip); the
         rest is recovered to the biomethane product (0-1).
-    co2_removal : float
-        Fraction of inlet CO2 removed to offgas (0-1).
+    min_ch4_massfrac : float
+        Minimum CH4 mass fraction required in the biomethane product (0-1).
+        Non-methane species are removed to offgas at a uniform (proportional)
+        removal fraction, computed each run so that the biomethane just meets
+        this minimum. Raises `ValueError` if it cannot be met (e.g., no
+        methane in the biomethane stream).
     electricity_kwh_per_Nm3_raw : float
         Electricity intensity per Nm3 of dry raw biogas processed.
     capex_usd_per_Nm3ph_raw : float
@@ -932,7 +936,7 @@ class BiogasUpgrading(bst.Unit):
         ins=None,
         outs=(),
         methane_loss_frac=_BIOGAS_UPGRADING["methane_loss_frac"],
-        co2_removal=_BIOGAS_UPGRADING["co2_removal"],
+        min_ch4_massfrac=_BIOGAS_UPGRADING["min_ch4_massfrac"],
         electricity_kwh_per_Nm3_raw=_BIOGAS_UPGRADING["electricity_kWh_per_Nm3_raw"],
         capex_usd_per_Nm3ph_raw=_BIOGAS_UPGRADING["capex_usd_per_Nm3ph_raw"],
         maintenance_frac_of_capex_per_yr=_BIOGAS_UPGRADING["maintenance_frac_of_capex_per_yr"],
@@ -941,15 +945,15 @@ class BiogasUpgrading(bst.Unit):
         super().__init__(ID, ins, outs, **kwargs)
 
         self.methane_loss_frac = float(methane_loss_frac)
-        self.co2_removal = float(co2_removal)
+        self.min_ch4_massfrac = float(min_ch4_massfrac)
         self.electricity_kwh_per_Nm3_raw = float(electricity_kwh_per_Nm3_raw)
         self.capex_usd_per_Nm3ph_raw = float(capex_usd_per_Nm3ph_raw)
         self.maintenance_frac_of_capex_per_yr = float(maintenance_frac_of_capex_per_yr)
 
         if not (0.0 <= self.methane_loss_frac <= 1.0):
             raise ValueError("methane_loss_frac must be between 0 and 1.")
-        if not (0.0 <= self.co2_removal <= 1.0):
-            raise ValueError("co2_removal must be between 0 and 1.")
+        if not (0.0 <= self.min_ch4_massfrac <= 1.0):
+            raise ValueError("min_ch4_massfrac must be between 0 and 1.")
         if self.electricity_kwh_per_Nm3_raw < 0:
             raise ValueError("electricity_kwh_per_Nm3_raw must be >= 0.")
         if self.capex_usd_per_Nm3ph_raw < 0:
@@ -968,22 +972,38 @@ class BiogasUpgrading(bst.Unit):
         offgas.phase = "g"
 
         ch4_in = float(raw.imol["Methane"])
-        co2_in = float(raw.imol["CarbonDioxide"])
+        ch4_mass_in = float(raw.imass["Methane"])
+        non_ch4_mass_in = float(raw.F_mass) - ch4_mass_in
 
         ch4_lost = self.methane_loss_frac * ch4_in
         biomethane.imol["Methane"] = ch4_in - ch4_lost
         offgas.imol["Methane"] = ch4_lost
+        ch4_mass_biomethane = float(biomethane.imass["Methane"])
 
-        co2_to_off = self.co2_removal * co2_in
-        offgas.imol["CarbonDioxide"] = co2_to_off
-        biomethane.imol["CarbonDioxide"] = co2_in - co2_to_off
+        # Uniform (proportional) removal fraction applied to every non-methane
+        # species, solved so the biomethane just meets min_ch4_massfrac.
+        if self.min_ch4_massfrac <= 0.0 or non_ch4_mass_in <= 0.0:
+            removal_frac = 0.0
+        elif ch4_mass_biomethane <= 0.0:
+            raise ValueError(
+                f"BiogasUpgrading {self.ID!r}: cannot achieve min_ch4_massfrac="
+                f"{self.min_ch4_massfrac}; the biomethane stream contains no methane."
+            )
+        else:
+            retention_frac = (
+                ch4_mass_biomethane * (1.0 - self.min_ch4_massfrac)
+                / (self.min_ch4_massfrac * non_ch4_mass_in)
+            )
+            retention_frac = min(max(retention_frac, 0.0), 1.0)
+            removal_frac = 1.0 - retention_frac
 
         for cid in raw.chemicals.IDs:
-            if cid in ("Methane", "CarbonDioxide"):
+            if cid == "Methane":
                 continue
             n = float(raw.imol[cid])
             if n > 0:
-                offgas.imol[cid] = n
+                offgas.imol[cid] = removal_frac * n
+                biomethane.imol[cid] = (1.0 - removal_frac) * n
 
     def _design(self):
         raw = self.ins[0]
