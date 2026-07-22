@@ -18,7 +18,7 @@ from biorefineries.sabre.units import (
     Mill, HeatingPretreatment, EnzymaticPretreatment, PeroxidePretreatment,
 )
 from biorefineries.sabre.systems._biostimulant_system import create_biostimulant_system
-from biorefineries.sabre._tea import usd_per_mmbtu_to_usd_per_kg
+from biorefineries.sabre._tea import create_tea, usd_per_mmbtu_to_usd_per_kg
 
 __all__ = ('create_ad_biomethane_system',)
 
@@ -57,7 +57,7 @@ def create_ad_biomethane_system(
     path = []
 
     if isinstance(feedstock, str):
-        bio_sys, bio_streams, bio_units = create_biostimulant_system(feedstock_type=feedstock)
+        bio_sys = create_biostimulant_system(feedstock_type=feedstock)
         # Fold in the biostimulant subsystem's units, but not its own HXN facility --
         # this system gets its own HXN below, scoped to all units visible here, so
         # nesting the subsystem's narrower one would double-count already-optimized
@@ -65,7 +65,7 @@ def create_ad_biomethane_system(
         path.extend(u for u in bio_sys.units if not isinstance(u, bst.HeatExchangerNetwork))
 
         # milling_losses: no price -- pure mass loss, not a disposed waste stream.
-        ML = Mill("ML", ins=bio_streams["pressed_cake"], outs=("milled_biomass", "milling_losses"))
+        ML = Mill("ML", ins=bio_sys.flowsheet.stream.pressed_cake, outs=("milled_biomass", "milling_losses"))
         path.append(ML)
         ad_feed = ML - 0
     else:
@@ -140,4 +140,6 @@ def create_ad_biomethane_system(
     path.append(HXN)
 
     sys = bst.System("ad_biomethane_sys", path=path)
+    create_tea(sys)
+    
     return sys

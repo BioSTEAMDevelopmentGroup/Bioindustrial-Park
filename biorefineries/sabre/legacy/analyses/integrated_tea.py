@@ -91,22 +91,22 @@ def _apply_stream_prices(streams, biostimulant_price=BIOSTIMULANT_USD_PER_KG):
     if streams.get("biostimulant_product") is not None:
         streams["biostimulant_product"].price = biostimulant_price
 
-    permeate = _get_integrated_stream("pressate_permeate")
+    permeate = _get_integrated_stream("permeate")
     if permeate is not None:
         permeate.price = 0.0
 
     for sid, price in [
-        ("wastewater",                 FERM_WASTEWATER_DISPOSAL_USD_PER_KG),
-        ("acidogenic_residual_solids", SOLIDS_DISPOSAL_USD_PER_KG),
-        ("vfa_retentate",              VFA_RETENTATE_DISPOSAL_USD_PER_KG),
+        ("wastewater",                   FERM_WASTEWATER_DISPOSAL_USD_PER_KG),
+        ("acidogenic_solid_digestate",   SOLIDS_DISPOSAL_USD_PER_KG),
+        ("vfa_cake",                     VFA_RETENTATE_DISPOSAL_USD_PER_KG),
     ]:
         s = streams.get(sid)
         if s is not None:
             s.price = price
 
     for sid, price in [
-        ("soil_amendment",   SOLID_DIGESTATE_DISPOSAL_USD_PER_KG),
-        ("liquid_digestate", LIQUID_DIGESTATE_DISPOSAL_USD_PER_KG),
+        ("methanogenic_solid_digestate", SOLID_DIGESTATE_DISPOSAL_USD_PER_KG),
+        ("liquid_digestate",             LIQUID_DIGESTATE_DISPOSAL_USD_PER_KG),
     ]:
         s = streams.get(sid)
         if s is not None:
@@ -184,10 +184,27 @@ def run_alpha_sweep(
         create_chemicals()
 
         try:
-            sys, streams, units, _ = create_ad_integrated_system(
+            sys = create_ad_integrated_system(
                 alpha=alpha,
                 pretreatment_case=pretreatment_case,
             )
+            fs = sys.flowsheet
+            streams = {
+                "feed": fs.stream.sargassum_feed,
+                "biostimulant_product": _get_integrated_stream("biostimulant_product"),
+                "wastewater": _get_integrated_stream("wastewater"),
+                "biomethane": _get_integrated_stream("biomethane"),
+                "microbial_oil": _get_integrated_stream("microbial_oil"),
+                "acidogenic_solid_digestate": _get_integrated_stream("acidogenic_solid_digestate"),
+                "vfa_cake": _get_integrated_stream("vfa_cake"),
+                "methanogenic_solid_digestate": _get_integrated_stream("methanogenic_solid_digestate"),
+                "liquid_digestate": _get_integrated_stream("liquid_digestate"),
+            }
+            try:
+                oe_unit = fs.unit.OE
+            except Exception:
+                oe_unit = None
+            units = {"OE": oe_unit}
             streams["feed"].price = feed_price
             sys.simulate()
 
@@ -214,8 +231,15 @@ def run_alpha_sweep(
                         tea=tea, product_stream=biomethane,
                         energy_content_mmbtu_per_kg=CH4_MMBTU_PER_KG,
                     )
-                    msp_mmbtu = bm_msp.get("usd_per_mmbtu", float("nan"))
-                    msp_ch4   = bm_msp.get("usd_per_kg_stream", float("nan"))
+                    # Legacy convention: biomethane is priced on its pure-CH4
+                    # content, not the whole (CH4 + CO2 + trace) stream mass --
+                    # rescale by the CH4 mass fraction.
+                    ch4_mass_ = float(biomethane.imass["Methane"])
+                    total_mass_ = float(biomethane.F_mass)
+                    ch4_frac_ = ch4_mass_ / total_mass_ if total_mass_ > 0 else 0.0
+                    if ch4_frac_ > 0:
+                        msp_ch4   = bm_msp["usd_per_kg"] / ch4_frac_
+                        msp_mmbtu = msp_ch4 / CH4_MMBTU_PER_KG
                 finally:
                     if oil_stream is not None and old_oil_price is not None:
                         oil_stream.price = old_oil_price
@@ -227,8 +251,8 @@ def run_alpha_sweep(
                     if biomethane is not None:
                         biomethane.price = 0.0
                     oil_msp  = solve_product_msp(tea, oil_stream)
-                    msp_oil  = oil_msp.get("usd_per_kg_stream", float("nan"))
-                    oil_kg_yr = oil_msp.get("annual_stream_kg", 0.0)
+                    msp_oil  = oil_msp.get("usd_per_kg", float("nan"))
+                    oil_kg_yr = oil_msp.get("annual_product_kg", 0.0)
                 finally:
                     if biomethane is not None and old_bm_price is not None:
                         biomethane.price = old_bm_price

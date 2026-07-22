@@ -31,6 +31,7 @@ from biorefineries.sabre.utils import (
     load_assumptions, get_feedstock_type_params, get_scale_feed_kgph, make_sargassum_feed,
 )
 from biorefineries.sabre.units import Press, PressateConcentrator, BiostimulantEvaporator
+from biorefineries.sabre._tea import create_tea
 
 __all__ = ('create_biostimulant_system',)
 
@@ -58,12 +59,9 @@ def create_biostimulant_system(
     Returns
     -------
     sys : bst.System
-    streams : dict
-        'feed', 'pressed_cake', 'permeate' (PC's permeate -- a pure
-        byproduct stream, never drawn from), 'fresh_water',
-        'biostimulant_product', 'vapor'.
-    units : dict
-        'PR', 'PFS', 'PC', 'DIL', 'EV'.
+        Key streams and units are accessible via `sys.flowsheet.stream`
+        and `sys.flowsheet.unit` (e.g. 'feed', 'pressed_cake',
+        'biostimulant_product', 'PR', 'PC', 'EV').
     """
     try: bst.settings.get_chemicals()
     except Exception: create_chemicals()
@@ -205,15 +203,6 @@ def create_biostimulant_system(
         path.append(HXN)
 
     sys = bst.System("biostimulant_sys", path=path)
+    create_tea(sys)
 
-    streams = {
-        "feed": feed,
-        "pressed_cake": PR.outs[0],
-        "permeate": PC.outs[1],
-        "fresh_water": fresh_water,
-        "biostimulant_product": EV.outs[0],
-        "vapor": EV.outs[1],
-    }
-    units = {"PR": PR, "PFS": PFS, "PC": PC, "DIL": DIL, "EV": EV}
-
-    return sys, streams, units
+    return sys

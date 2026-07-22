@@ -221,3 +221,7 @@ class OilExtraction(bst.Unit):
         self.design_results[
             "Electricity intensity (kWh/kg dry biomass)"
         ] = self.homogenization_kWh_per_kg_dry_biomass
+
+        self.add_OPEX = {
+            "Oil extraction reagent": oil_kgph * _OIL_EXTRACTION["oil_extraction_reagent_usd_per_kg_oil"]
+        }

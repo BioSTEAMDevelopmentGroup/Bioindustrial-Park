@@ -14,6 +14,7 @@ from biorefineries.sabre.utils import OPERATING_DAYS_PER_YEAR, load_assumptions
 
 __all__ = (
     'SaBReTEA', 'create_tea', 'solve_product_msp',
+    'usd_per_mmbtu_to_usd_per_kg', 'usd_per_kg_to_usd_per_mmbtu',
 )
 
 _TEA_DEFAULTS = load_assumptions("tea.yaml")["tea"]
@@ -147,24 +148,24 @@ def solve_product_msp(
     =CH4_MMBTU_PER_KG (data/tea.yaml `price.biomethane_mmbtu.mmbtu_per_kg`).
 
     Returns a dict with:
-    - usd_per_kg_stream
-    - annual_stream_kg
-    - usd_per_mmbtu        (if energy basis is provided)
-    - annual_product_mmbtu (if energy basis is provided)
+    - usd_per_kg
+    - annual_product_kg
+    - usd_per_mmbtu        (if energy_content_mmbtu_per_kg is provided)
+    - annual_product_mmbtu (if energy_content_mmbtu_per_kg is provided)
     """
-    msp_usd_per_kg_stream = tea.solve_price(product_stream)
+    usd_per_kg = tea.solve_price(product_stream)
     annual_hours = tea.operating_days * 24
-    annual_stream_kg = float(product_stream.F_mass) * annual_hours
+    annual_product_kg = float(product_stream.F_mass) * annual_hours
 
     result = {
-        "usd_per_kg_stream": msp_usd_per_kg_stream,
-        "annual_stream_kg": annual_stream_kg,
+        "usd_per_kg": usd_per_kg,
+        "annual_product_kg": annual_product_kg,
         "usd_per_mmbtu": float("nan"),
         "annual_product_mmbtu": float("nan"),
     }
 
-    if energy_content_mmbtu_per_kg is not None and energy_content_mmbtu_per_kg > 0:
-        result["usd_per_mmbtu"] = usd_per_kg_to_usd_per_mmbtu(msp_usd_per_kg_stream, energy_content_mmbtu_per_kg)
-        result["annual_product_mmbtu"] = annual_stream_kg * energy_content_mmbtu_per_kg
+    if energy_content_mmbtu_per_kg is not None:
+        result["usd_per_mmbtu"] = usd_per_kg_to_usd_per_mmbtu(usd_per_kg, energy_content_mmbtu_per_kg)
+        result["annual_product_mmbtu"] = annual_product_kg * energy_content_mmbtu_per_kg
 
     return result

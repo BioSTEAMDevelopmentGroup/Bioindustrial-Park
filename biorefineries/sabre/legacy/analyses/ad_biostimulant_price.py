@@ -61,7 +61,7 @@ SOLIDS_DIGESTATE_DISPOSAL_USD_PER_KG = -0.02
 
 
 def apply_stream_economics(sys, biostimulant_price: float):
-    for sid in ("pressate_permeate",):
+    for sid in ("permeate",):
         try:
             sys.flowsheet.stream[sid].price = 0.0
         except Exception:
@@ -73,7 +73,7 @@ def apply_stream_economics(sys, biostimulant_price: float):
         except Exception:
             pass
 
-    for sid in ("soil_amendment",):
+    for sid in ("methanogenic_solid_digestate",):
         try:
             sys.flowsheet.stream[sid].price = SOLIDS_DIGESTATE_DISPOSAL_USD_PER_KG
         except Exception:
@@ -100,10 +100,19 @@ def build_case(pretreatment_case: str, biostimulant_price: float):
     apply_stream_economics(sys, biostimulant_price=biostimulant_price)
 
     tea = create_tea(sys)
+    biomethane = sys.flowsheet.stream.biomethane
     msp = solve_product_msp(
-        tea=tea, product_stream=sys.flowsheet.stream.biomethane,
+        tea=tea, product_stream=biomethane,
         energy_content_mmbtu_per_kg=CH4_MMBTU_PER_KG,
     )
+    # Legacy convention: biomethane is priced on its pure-CH4 content, not
+    # the whole (CH4 + CO2 + trace) stream mass -- rescale by the CH4 mass
+    # fraction to get the pure-chemical-basis price.
+    ch4_mass = float(biomethane.imass["Methane"])
+    total_mass = float(biomethane.F_mass)
+    ch4_frac = ch4_mass / total_mass if total_mass > 0 else 0.0
+    if ch4_frac > 0:
+        msp["usd_per_mmbtu"] = (msp["usd_per_kg"] / ch4_frac) / CH4_MMBTU_PER_KG
 
     annual_revenue = 0.0
     try:

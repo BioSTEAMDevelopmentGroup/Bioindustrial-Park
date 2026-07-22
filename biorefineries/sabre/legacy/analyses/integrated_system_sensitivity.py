@@ -38,6 +38,7 @@ from integrated_tea import (
     OIL_MARKET_USD_PER_KG,
     _apply_stream_prices,
     _compute_npv_at_market,
+    _get_integrated_stream,
     _patch_ev607,
     _wire_oil_reagent,
     run_alpha_sweep,
@@ -132,10 +133,27 @@ def _build_npv_at_alpha(
     bst.main_flowsheet.clear()
     create_chemicals()
 
-    sys, streams, units, _ = create_ad_integrated_system(
+    sys = create_ad_integrated_system(
         alpha=alpha,
         pretreatment_case=pretreatment_case,
     )
+    fs = sys.flowsheet
+    streams = {
+        "feed": fs.stream.sargassum_feed,
+        "biostimulant_product": _get_integrated_stream("biostimulant_product"),
+        "wastewater": _get_integrated_stream("wastewater"),
+        "biomethane": _get_integrated_stream("biomethane"),
+        "microbial_oil": _get_integrated_stream("microbial_oil"),
+        "acidogenic_solid_digestate": _get_integrated_stream("acidogenic_solid_digestate"),
+        "vfa_cake": _get_integrated_stream("vfa_cake"),
+        "methanogenic_solid_digestate": _get_integrated_stream("methanogenic_solid_digestate"),
+        "liquid_digestate": _get_integrated_stream("liquid_digestate"),
+    }
+    try:
+        oe_unit = fs.unit.OE
+    except Exception:
+        oe_unit = None
+    units = {"OE": oe_unit}
     streams["feed"].price = feed_price
     sys.simulate()
 

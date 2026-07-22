@@ -22,8 +22,6 @@ create_ad_fermentation_system() directly, passing the splitter-derived
 stream as `feedstock` (so each skips its own create_biostimulant_system
 call and uses the shared preprocessing built here instead) -- so this
 integrated system and the standalone AD systems never drift apart.
-
-Returns (sys, streams, units, alpha).
 """
 
 import biosteam as bst
@@ -89,9 +87,10 @@ def create_ad_integrated_system(
     Returns
     -------
     sys : bst.System
-    streams : dict of key streams (None for streams not built at edge cases)
-    units : dict of key units
-    alpha : float
+        Key streams and units are accessible via `sys.flowsheet.stream`
+        and `sys.flowsheet.unit` (e.g. 'feed', 'biomethane',
+        'microbial_oil', 'PR', 'SPL'). Streams belonging to a pathway
+        that wasn't built (alpha=0 or alpha=1) are simply absent.
     """
     try: bst.settings.get_chemicals()
     except Exception: create_chemicals()
@@ -106,12 +105,10 @@ def create_ad_integrated_system(
     # SHARED PREPROCESSING: create_biostimulant_system's Press -> PC ->
     # PSP/DIL -> EV, plus a Mill on the pressed cake.
     # =========================================================
-    bio_sys, bio_streams, bio_units = create_biostimulant_system(feedstock_type=feedstock_type)
-    PR, PC, EV = bio_units["PR"], bio_units["PC"], bio_units["EV"]
-    feed = bio_streams["feed"]
+    bio_sys = create_biostimulant_system(feedstock_type=feedstock_type)
 
     # milling_losses: no price -- pure mass loss, not a disposed waste stream.
-    ML = Mill("ML", ins=bio_streams["pressed_cake"], outs=("milled_biomass", "milling_losses"))
+    ML = Mill("ML", ins=bio_sys.flowsheet.stream.pressed_cake, outs=("milled_biomass", "milling_losses"))
 
     # =========================================================
     # SPLITTER
@@ -129,27 +126,16 @@ def create_ad_integrated_system(
     # =========================================================
     # BUILD PATHWAYS CONDITIONALLY
     # =========================================================
-    methane_units   = []
-    methane_streams = {}
-    methane_units_d = {}
+    methane_units = []
     if build_methane:
         methane_sys = create_ad_biomethane_system(
             feedstock=SPL - 0, pretreatment_case=pretreatment_case,
         )
         methane_units = list(methane_sys.units)
-        methane_units_d = {u.ID: u for u in methane_sys.units}
-        methane_streams = {
-            "biomethane": methane_sys.flowsheet.stream.biomethane,
-            "methanogenic_offgas": methane_sys.flowsheet.stream.methanogenic_offgas,
-            "methanogenic_solid_digestate": methane_sys.flowsheet.stream.methanogenic_solid_digestate,
-            "liquid_digestate": methane_sys.flowsheet.stream.liquid_digestate,
-        }
 
-    vfa_units   = []
-    vfa_streams = {}
-    vfa_units_d = {}
+    vfa_units = []
     if build_vfa:
-        vfa_fer_sys, vfa_streams, vfa_units_d = create_ad_fermentation_system(feedstock=SPL - 1)
+        vfa_fer_sys = create_ad_fermentation_system(feedstock=SPL - 1)
         vfa_units = list(vfa_fer_sys.units)
 
     # =========================================================
@@ -168,35 +154,4 @@ def create_ad_integrated_system(
 
     sys = bst.System.from_units("ad_integrated_sys", units=all_units)
 
-    # =========================================================
-    # STREAMS DICT
-    # =========================================================
-    streams = {
-        "feed":           feed,
-        "milled_biomass": ML.outs[0],
-        "to_methane_ad":  to_methane_ad,
-        "to_vfa_ad":      to_vfa_ad,
-        "biostimulant_membrane_concentrate": PC.outs[0],
-        "biostimulant_product": bio_streams["biostimulant_product"],
-        # Methane pathway (None if alpha=0)
-        **{k: methane_streams.get(k) for k in [
-            "biomethane", "methanogenic_offgas", "methanogenic_solid_digestate", "liquid_digestate"
-        ]},
-        # VFA pathway (None if alpha=1)
-        "vfa_cake": vfa_streams.get("vfa_cake"),
-        "acidogenic_solid_digestate": vfa_streams.get("acidogenic_solid_digestate"),
-        **{k: vfa_streams.get(k) for k in [
-            "vfa_broth", "microbial_oil", "wastewater",
-        ]},
-    }
-
-    units = {
-        "PR": PR, "PC": PC, "EV": EV, "ML": ML, "SPL": SPL,
-        **methane_units_d,
-        **vfa_units_d,
-        # Override any subsystem's own (excluded, unsimulated) inner "HXN" key
-        # with the actual top-level HXN that's part of `sys`.
-        "HXN": HXN,
-    }
-
-    return sys, streams, units, alpha
+    return sys

@@ -19,6 +19,7 @@ from biorefineries.sabre.units import (
     FermentationMediumTank,
 )
 from biorefineries.sabre.systems._ad_vfa_system import create_ad_vfa_system
+from biorefineries.sabre._tea import create_tea
 
 __all__ = ('create_ad_fermentation_system',)
 
@@ -255,15 +256,11 @@ def create_ad_fermentation_system(
     Returns
     -------
     sys : bst.System
-        The full feedstock -> fermentation-product system.
-    streams : dict
-        Key streams, including the raw feedstock ('feed'), the AD-VFA
+        The full feedstock -> fermentation-product system. Key streams
+        are accessible via `sys.flowsheet.stream`, including the AD-VFA
         subsystem's 'vfa_broth' (post-microfiltration permeate),
-        'vfa_cake', and 'acidogenic_solid_digestate', and all
-        of _create_vfa_fermentation_system()'s streams (final product in
-        'microbial_oil').
-    units : dict
-        Key units from both subsystems.
+        'vfa_cake', 'acidogenic_solid_digestate', and the final product
+        'microbial_oil'.
     """
     try: bst.settings.get_chemicals()
     except Exception: create_chemicals()
@@ -292,19 +289,6 @@ def create_ad_fermentation_system(
         "ad_fermentation_sys",
         units=combined_units,
     )
+    create_tea(sys)
 
-    streams = {
-        "feed": feed,
-        "acidogenic_solid_digestate": acidogenic_solid_digestate,
-        "vfa_cake": vfa_cake,
-        **fer_streams,
-        "vfa_broth": vfa_broth,
-    }
-    units = {u.ID: u for u in ad_vfa_sys.units}
-    units.update(fer_units)
-    units["microfilter"] = units["MF"]
-    # Override the vfa subsystem's own (excluded, unsimulated) inner "HXN" key
-    # with the actual top-level HXN that's part of `sys`.
-    units["HXN"] = HXN
-
-    return sys, streams, units
+    return sys

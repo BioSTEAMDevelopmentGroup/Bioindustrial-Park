@@ -29,7 +29,7 @@ create_chemicals()
 if __name__ == "__main__":
 
     # Build at alpha=0.5 so both pathways are populated --> just to have it
-    sys, streams, units, _ = create_ad_integrated_system(
+    sys = create_ad_integrated_system(
         alpha=0.5,
         pretreatment_case="combined_PE",
     )

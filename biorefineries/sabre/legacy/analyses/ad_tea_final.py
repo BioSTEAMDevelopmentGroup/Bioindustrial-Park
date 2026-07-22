@@ -108,7 +108,7 @@ def _apply_stream_economics(
     summary = {}
 
     # Pressate permeate — zero-cost discharge (floating biorefinery assumption)
-    for sid in ("pressate_permeate",):
+    for sid in ("permeate",):
         try:
             s = sys.flowsheet.stream[sid]
             s.price = 0.0
@@ -128,7 +128,7 @@ def _apply_stream_economics(
             pass
 
     # Solid digestate disposal
-    for sid in ("soil_amendment",):
+    for sid in ("methanogenic_solid_digestate",):
         try:
             s = sys.flowsheet.stream[sid]
             s.price = SOLIDS_DIGESTATE_DISPOSAL_USD_PER_KG
@@ -211,19 +211,25 @@ def run_case(
     stream_economics = _apply_stream_economics(sys, biostimulant_price)
 
     tea = create_tea(sys)
+    biomethane = sys.flowsheet.stream.biomethane
     msp = solve_product_msp(
-        tea=tea, product_stream=sys.flowsheet.stream.biomethane,
+        tea=tea, product_stream=biomethane,
         energy_content_mmbtu_per_kg=CH4_MMBTU_PER_KG,
     )
+    # Legacy convention: biomethane is priced on its pure-CH4 content, not
+    # the whole (CH4 + CO2 + trace) stream mass -- solve_product_msp's
+    # usd_per_kg/usd_per_mmbtu are whole-stream basis, so rescale by the
+    # CH4 mass fraction to get the pure-chemical-basis price.
+    ch4_mass = float(biomethane.imass["Methane"])
+    total_mass = float(biomethane.F_mass)
+    ch4_frac = ch4_mass / total_mass if total_mass > 0 else 0.0
+    msp["usd_per_kg_ch4"] = msp["usd_per_kg"] / ch4_frac if ch4_frac > 0 else float("nan")
+    msp["usd_per_mmbtu"] = msp["usd_per_kg_ch4"] / CH4_MMBTU_PER_KG if ch4_frac > 0 else float("nan")
 
     # NPV at target market prices
     npv_results = {}
     if target_biomethane_prices_mmbtu:
-        biomethane = sys.flowsheet.stream.biomethane
         ch4_mmbtu_per_kg = 0.0526
-        ch4_mass = float(biomethane.imass["Methane"])
-        total_mass = float(biomethane.F_mass)
-        ch4_frac = ch4_mass / total_mass if total_mass > 0 else 0.0
 
         for target_mmbtu in target_biomethane_prices_mmbtu:
             target_usd_per_kg_stream = target_mmbtu * ch4_mmbtu_per_kg * ch4_frac
@@ -304,10 +310,10 @@ def run_case(
             pass
 
         try:
-            sa = sys.flowsheet.stream.soil_amendment
+            sa = sys.flowsheet.stream.methanogenic_solid_digestate
             ld = sys.flowsheet.stream.liquid_digestate
             print(f"\n  [Digestate]")
-            print(f"    soil_amendment:   {sa.F_mass:>10.2f} kg/hr")
+            print(f"    methanogenic_solid_digestate:   {sa.F_mass:>10.2f} kg/hr")
             print(f"    liquid_digestate: {ld.F_mass:>10.2f} kg/hr")
             print(f"    Note: heavy metal content prevents fertilizer credit")
         except Exception:
@@ -387,7 +393,7 @@ def run_pretreatment_comparison(
             silent=True,
         )
         msp_mmbtu = msp.get("usd_per_mmbtu", float("nan"))
-        msp_ch4 = msp.get("usd_per_kg_stream", float("nan"))
+        msp_ch4 = msp.get("usd_per_kg", float("nan"))
         print(
             f"  {case:<20} ${msp_mmbtu:<17.3f} ${msp_ch4:<17.4f} "
             f"${tea.TCI/1e6:<11.1f} ${tea.VOC/1e6:.1f}M"
@@ -411,7 +417,7 @@ def run_feed_price_sensitivity(pretreatment_case: str = "press_mill_only"):
             silent=True,
         )
         msp_mmbtu = msp.get("usd_per_mmbtu", float("nan"))
-        msp_ch4 = msp.get("usd_per_kg_stream", float("nan"))
+        msp_ch4 = msp.get("usd_per_kg", float("nan"))
         print(
             f"  {label:<20} ${price:<13.3f} "
             f"${msp_mmbtu:<17.3f} ${msp_ch4:.4f}"
@@ -585,7 +591,7 @@ def collect_feed_pretreatment_results(
                 "feed_label_pretty": FEED_LABELS.get(feed_label, feed_label),
                 "feed_price_usd_per_kg_wet": feed_price,
                 "msp_usd_per_mmbtu": float(msp.get("usd_per_mmbtu", np.nan)),
-                "msp_usd_per_kg_ch4": float(msp.get("usd_per_kg_stream", np.nan)),
+                "msp_usd_per_kg_ch4": float(msp.get("usd_per_kg", np.nan)),
                 "methane_kgph": ch4_prod_kgph,
                 "TCI_MUSD": tea.TCI / 1e6,
                 "VOC_MUSD_per_yr": tea.VOC / 1e6,

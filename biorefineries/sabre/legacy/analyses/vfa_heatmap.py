@@ -92,7 +92,7 @@ def build_case(feed_price: float, biostim_price: float) -> float:
         tea=tea,
         product_stream=oil_stream,
     )
-    return float(msp["usd_per_kg_stream"])
+    return float(msp["usd_per_kg"])
 
 
 # ── Run grid ──────────────────────────────────────────────────────────────────

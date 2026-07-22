@@ -77,31 +77,20 @@ def load(flowsheet_name: str = 'biostimulant', **kwargs):
     bst.settings.set_thermo(chemicals)
 
     if flowsheet_name == 'biostimulant':
-        sys, streams, units_dict = create_biostimulant_system(**kwargs)
+        sys = create_biostimulant_system(**kwargs)
         sys.simulate()
-        tea = _tea.create_tea(sys)
-        biostimulant_product = streams['biostimulant_product']
-        biostimulant_product.price = tea.solve_price(biostimulant_product)
     elif flowsheet_name == 'ad_biomethane':
         sys = create_ad_biomethane_system(**kwargs)
         sys.simulate()
-        tea = _tea.create_tea(sys)
-        biomethane = flowsheet.stream.biomethane
-        biomethane.price = tea.solve_price(biomethane)
     elif flowsheet_name == 'ad_vfa':
         sys = create_ad_vfa_system(**kwargs)
         sys.simulate()
-        tea = _tea.create_tea(sys)
     elif flowsheet_name == 'ad_fermentation':
-        sys, streams, units_dict = create_ad_fermentation_system(**kwargs)
+        sys = create_ad_fermentation_system(**kwargs)
         sys.simulate()
-        tea = _tea.create_tea(sys)
-        microbial_oil = streams['microbial_oil']
-        microbial_oil.price = tea.solve_price(microbial_oil)
     elif flowsheet_name == 'integrated':
-        sys, streams, units_dict, alpha = create_ad_integrated_system(**kwargs)
+        sys = create_ad_integrated_system(**kwargs)
         sys.simulate()
-        tea = _tea.create_tea(sys)
     else:
         raise ValueError(
             f"Unknown flowsheet_name {flowsheet_name!r}. "

@@ -136,16 +136,16 @@ def _apply_disposal_costs(
         print(f"  [WARNING] ferm wastewater disposal: {e}")
 
     try:
-        s = bst.main_flowsheet.stream["acidogenic_residual_solids"]
+        s = bst.main_flowsheet.stream["acidogenic_solid_digestate"]
         s.price = solids_disposal_usd_per_kg
-        summary["acidogenic_residual_solids"] = abs(s.price * s.F_mass * annual_hours)
+        summary["acidogenic_solid_digestate"] = abs(s.price * s.F_mass * annual_hours)
     except Exception as e:
         print(f"  [WARNING] solids disposal: {e}")
 
     try:
-        s = bst.main_flowsheet.stream["vfa_retentate"]
+        s = bst.main_flowsheet.stream["vfa_cake"]
         s.price = VFA_RETENTATE_DISPOSAL_USD_PER_KG
-        summary["vfa_retentate"] = abs(s.price * s.F_mass * annual_hours)
+        summary["vfa_cake"] = abs(s.price * s.F_mass * annual_hours)
     except Exception as e:
         print(f"  [WARNING] vfa retentate disposal: {e}")
 
@@ -160,7 +160,17 @@ def build_and_simulate(feed_price_per_kg_wet: float):
     bst.main_flowsheet.clear()
     create_chemicals()
 
-    full_sys, streams, units = create_ad_fermentation_system()
+    full_sys = create_ad_fermentation_system()
+    fs = full_sys.flowsheet
+    streams = {
+        "feed": fs.stream.sargassum_feed,
+        "vfa_broth": fs.stream.vfa_broth,
+        "conditioned_vfa_broth": fs.stream.conditioned_vfa_broth,
+        "fermentation_broth": fs.stream.fermentation_broth,
+        "microbial_oil": fs.stream.microbial_oil,
+        "wastewater": fs.stream.wastewater,
+    }
+    units = {"fermenter": fs.unit.R601}
     streams["feed"].price = feed_price_per_kg_wet
 
     for sid, price in {
@@ -260,11 +270,6 @@ def run_case(
         except Exception as e:
             print(f"  Could not read vfa_broth: {e}")
             total_vfa_in = 0.0
-
-        try:
-            _print_stream_vfa("vfa_permeate (after microfilter)", streams["vfa_permeate"])
-        except Exception as e:
-            print(f"  Could not read vfa_permeate: {e}")
 
         try:
             _print_stream_vfa(
@@ -431,7 +436,7 @@ def run_solids_sensitivity(feed_price: float = 0.00):
         # compute disposal cost for solids only
         annual_hours = 330.0 * 24.0
         try:
-            solids_stream = bst.main_flowsheet.stream["acidogenic_residual_solids"]
+            solids_stream = bst.main_flowsheet.stream["acidogenic_solid_digestate"]
             disposal_annual = abs(rate * solids_stream.F_mass * annual_hours)
         except Exception:
             disposal_annual = float("nan")
@@ -533,7 +538,17 @@ def build_and_simulate_scenario(
     bst.main_flowsheet.clear()
     create_chemicals()
 
-    full_sys, streams, units = create_ad_fermentation_system()
+    full_sys = create_ad_fermentation_system()
+    fs = full_sys.flowsheet
+    streams = {
+        "feed": fs.stream.sargassum_feed,
+        "vfa_broth": fs.stream.vfa_broth,
+        "conditioned_vfa_broth": fs.stream.conditioned_vfa_broth,
+        "fermentation_broth": fs.stream.fermentation_broth,
+        "microbial_oil": fs.stream.microbial_oil,
+        "wastewater": fs.stream.wastewater,
+    }
+    units = {"fermenter": fs.unit.R601}
 
     R601 = units["fermenter"]
     R601.product_yield_kg_per_kg_vfa_consumed = float(product_yield)   # scenario override --> from scenario input
