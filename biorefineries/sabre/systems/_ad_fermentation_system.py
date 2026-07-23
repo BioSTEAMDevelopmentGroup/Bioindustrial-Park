@@ -8,6 +8,8 @@
 """
 Acidogenic-AD-to-microbial-oil system builder for the SaBRe flowsheets.
 """
+from pathlib import Path
+
 import biosteam as bst
 import flexsolve as flx
 
@@ -19,6 +21,7 @@ from biorefineries.sabre.units import (
     FermentationMediumTank,
 )
 from biorefineries.sabre.systems._ad_vfa_system import create_ad_vfa_system
+from biorefineries.sabre.systems._biostimulant_system import BIOSTIMULANT_UNIT_IDS
 from biorefineries.sabre._tea import create_tea
 
 __all__ = ('create_ad_fermentation_system', 'price_ad_fermentation_system')
@@ -241,6 +244,7 @@ def _create_vfa_fermentation_system(vfa_broth):
 
 def create_ad_fermentation_system(
     feedstock: str | bst.Stream = "pelagic",
+    biostimulant_price: float | None = None,
 ):
     """
     Build the full feedstock-to-product system: raw Sargassum (or an
@@ -252,6 +256,9 @@ def create_ad_fermentation_system(
     feedstock : str or stream
         Forwarded to create_ad_vfa_system() -- see its docstring for the
         str-vs-stream distinction.
+    biostimulant_price : float, optional
+        Forwarded to create_ad_vfa_system() -> create_biostimulant_system()
+        -- only used when feedstock is a str.
 
     Returns
     -------
@@ -267,7 +274,10 @@ def create_ad_fermentation_system(
     # add_product_splitter=False: this system needs the raw, unsplit
     # vfa_broth as its own fermentation feed, not ad_vfa_sys's standalone
     # pure_vfa/vfa_disposal split.
-    ad_vfa_sys = create_ad_vfa_system(feedstock=feedstock, add_product_splitter=False)
+    ad_vfa_sys = create_ad_vfa_system(
+        feedstock=feedstock, add_product_splitter=False,
+        biostimulant_price=biostimulant_price,
+    )
     feed = feedstock if not isinstance(feedstock, str) else ad_vfa_sys.feeds[0]
     vfa_broth = ad_vfa_sys.flowsheet.stream.vfa_broth
     vfa_cake = ad_vfa_sys.flowsheet.stream.vfa_cake
@@ -317,22 +327,87 @@ def create_ad_fermentation_system(
 #     ev607.heat_utilities.clear()
 
 
-def price_ad_fermentation_system() -> dict:
-    from biorefineries.sabre._tea import solve_product_msp
-    bst.main_flowsheet.clear()
+def price_ad_fermentation_system(credit_tipping_fee: bool = False) -> dict:
+    """
+    Parameters
+    ----------
+    credit_tipping_fee : bool
+        If False (default): the fixed data/tea.yaml assumption basis --
+        biostimulant is priced at its flat `price.biostimulant.baseline`
+        assumption, and microbial oil's price is solved on a single
+        combined TEA covering every unit in this system (biostimulant's
+        Press/PressateConcentrator/Evaporator included), so microbial oil's
+        price also recovers a share of biostimulant's own capital.
 
-    sys = create_ad_fermentation_system(feedstock="pelagic")
-    sys.simulate()
-    # _patch_ev607() not used now, kept as a reference
+        If True: biostimulant is instead priced at its own standalone MSP
+        (still target IRR), and microbial oil's price is solved against an
+        AD-only TEA scope that excludes biostimulant's capital entirely --
+        which biostimulant's own standalone price already recovers on its
+        own -- plus a tipping-fee credit equal to data/tea.yaml
+        `price.disposal_solid.baseline` on the pressed_cake mass taken in,
+        since biostimulant would otherwise have paid that same fee to
+        dispose of it (whether to a landfill or here).
+    """
+    from biorefineries.sabre._tea import (
+        solve_product_msp,
+        disposal_avoided_credit_usd_per_yr, apply_revenue_credit,
+    )
 
-    product = sys.flowsheet.stream.microbial_oil
-    msp = solve_product_msp(tea=sys.TEA, product_stream=product)
+    tipping_fee_usd_per_yr = 0.0
+
+    if not credit_tipping_fee:
+        # Fixed assumption basis: biostimulant priced at its flat tea.yaml
+        # baseline, combined TEA over every unit (biostimulant's own
+        # capital included).
+        biostimulant_price = _TEA_PRICE["biostimulant"]["baseline"]
+
+        bst.main_flowsheet.clear()
+        sys = create_ad_fermentation_system(feedstock="pelagic", biostimulant_price=biostimulant_price)
+        sys.simulate()
+        # _patch_ev607() not used now, kept as a reference
+
+        product = sys.flowsheet.stream.microbial_oil
+        msp = solve_product_msp(tea=sys.TEA, product_stream=product)
+    else:
+        from biorefineries.sabre.systems._biostimulant_system import price_biostimulant_system
+
+        # Biostimulant's own standalone MSP (target IRR) -- set on the
+        # biostimulant_product stream purely for reporting/consistency. It
+        # plays no role in this pathway's own product price below.
+        biostimulant_price = price_biostimulant_system()["msp_usd_per_kg"]
+
+        bst.main_flowsheet.clear()
+        sys = create_ad_fermentation_system(feedstock="pelagic", biostimulant_price=biostimulant_price)
+        sys.simulate()
+        # _patch_ev607() not used now, kept as a reference
+
+        # AD-only TEA scope: same simulated units, minus the embedded
+        # biostimulant subsystem's units, so microbial oil's solved price
+        # recovers only this pathway's own capital (Mill, acidogenic AD,
+        # screw press, microfilter, fermentation train, HXN) -- not
+        # biostimulant's Press/PressateConcentrator/Evaporator, which
+        # biostimulant's own price already covers in its own standalone
+        # system.
+        ad_specific_units = [u for u in sys.units if u.ID not in BIOSTIMULANT_UNIT_IDS]
+        ad_specific_sys = bst.System.from_units("ad_fermentation_specific_sys", units=ad_specific_units)
+        ad_specific_tea = create_tea(ad_specific_sys)
+
+        product = sys.flowsheet.stream.microbial_oil
+        msp = solve_product_msp(tea=ad_specific_tea, product_stream=product)
+
+        tipping_fee_usd_per_yr = disposal_avoided_credit_usd_per_yr(
+            sys.flowsheet.stream.pressed_cake, _TEA_PRICE["disposal_solid"]["baseline"], ad_specific_tea,
+        )
+        msp = apply_revenue_credit(msp, tipping_fee_usd_per_yr)
 
     return {
         "label": "AD-fermentation",
         "product_desc": "crude microbial oil",
         "msp_usd_per_kg": msp["usd_per_kg"],
         "annual_product_kg": msp["annual_product_kg"],
+        "biostimulant_price_usd_per_kg": biostimulant_price,
+        "credit_tipping_fee": credit_tipping_fee,
+        "tipping_fee_usd_per_yr": tipping_fee_usd_per_yr,
         'sys': sys,
     }
 
@@ -340,3 +415,9 @@ def price_ad_fermentation_system() -> dict:
 if __name__ == '__main__':
     results = price_ad_fermentation_system()
     sys = results['sys']
+
+    figures_dir = Path(__file__).resolve().parent.parent / "results" / "figures"
+    figures_dir.mkdir(parents=True, exist_ok=True)
+    diagram_path = figures_dir / f"{sys.ID}.svg"
+    sys.diagram(file=str(figures_dir / sys.ID), format="svg")
+    print(f"System diagram saved to: {diagram_path}")

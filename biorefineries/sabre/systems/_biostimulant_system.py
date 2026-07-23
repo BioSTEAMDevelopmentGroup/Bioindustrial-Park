@@ -24,6 +24,8 @@ Pathway:
          concentrate down to the target)
       -> biostimulant_product
 """
+from pathlib import Path
+
 import biosteam as bst
 
 from biorefineries.sabre._chemicals import create_chemicals
@@ -33,15 +35,26 @@ from biorefineries.sabre.utils import (
 from biorefineries.sabre.units import Press, PressateConcentrator, BiostimulantEvaporator
 from biorefineries.sabre._tea import create_tea
 
-__all__ = ('create_biostimulant_system', 'price_biostimulant_system')
+__all__ = ('create_biostimulant_system', 'price_biostimulant_system', 'BIOSTIMULANT_UNIT_IDS')
 
 _TEA_PRICE = load_assumptions("tea.yaml")["price"]
+
+# Unit IDs built by create_biostimulant_system(). Used by the AD pathway
+# systems (systems._ad_biomethane_system, systems._ad_vfa_system,
+# systems._ad_fermentation_system) to carve an AD-only TEA scope out of
+# their combined system -- excluding these units' capital -- so their own
+# product's price recovers only that pathway's own capital, not
+# biostimulant's (which biostimulant's own standalone price already
+# recovers on its own; bst.System has no free attribute slot to tag this
+# per-instance, so it's a fixed constant instead).
+BIOSTIMULANT_UNIT_IDS = frozenset({'PR', 'PFS', 'PC', 'DIL', 'EV'})
 
 FRESH_WATER_PRICE_USD_PER_KG = bst.stream_utility_prices['Process water']
 
 
 def create_biostimulant_system(
     feedstock: str = "pelagic",
+    biostimulant_price: float | None = None,
 ):
     """
     Build the standalone biostimulant system: Press -> PFS (splits off only
@@ -55,6 +68,13 @@ def create_biostimulant_system(
     ----------
     feedstock : str
         Feedstock type (data/feedstock.yaml `feedstock_type`).
+    biostimulant_price : float, optional
+        Price (USD/kg) to set on the biostimulant_product stream. Defaults
+        to data/tea.yaml `price.biostimulant.baseline` when not given -- pass
+        this in (e.g. an IRR=0 cost-basis price solved from the standalone
+        biostimulant system) when this subsystem is embedded as a byproduct
+        credit inside a larger pathway (see systems._ad_biomethane_system,
+        systems._ad_vfa_system).
 
     Returns
     -------
@@ -115,7 +135,10 @@ def create_biostimulant_system(
         ins=DIL - 0,
         outs=("biostimulant_product", "condensed_vapor"),
     )
-    EV.outs[0].price = _TEA_PRICE["biostimulant"]["baseline"]
+    EV.outs[0].price = (
+        _TEA_PRICE["biostimulant"]["baseline"] if biostimulant_price is None
+        else float(biostimulant_price)
+    )
     # Condensed by EV's own auxiliary condenser (V=0) -- leaves as a liquid,
     # not an off-gas -- so it's liquid waste, not exempt from pricing.
     EV.outs[1].price = _TEA_PRICE["disposal_wastewater"]["baseline"]
@@ -207,12 +230,27 @@ def create_biostimulant_system(
 
     return sys
 
-def price_biostimulant_system() -> dict:
+def price_biostimulant_system(IRR: float | None = None) -> dict:
+    """
+    Parameters
+    ----------
+    IRR : float, optional
+        Overrides the TEA's target IRR (data/tea.yaml `tea.IRR`, normally
+        10%) before solving biostimulant_product's price. Pass IRR=0.0 to
+        get biostimulant's zero-return, cost-basis price -- e.g. for use as
+        a byproduct credit in a larger pathway (see
+        systems._ad_biomethane_system.price_ad_biomethane_system(), which
+        uses this to avoid crediting the other pathways with a return on
+        the biostimulant subsystem's own capital on top of their own
+        target-IRR product price).
+    """
     from biorefineries.sabre._tea import solve_product_msp
     bst.main_flowsheet.clear()
 
     sys = create_biostimulant_system()
     sys.simulate()
+    if IRR is not None:
+        sys.TEA.IRR = float(IRR)
 
     product = sys.flowsheet.stream.biostimulant_product
     msp = solve_product_msp(tea=sys.TEA, product_stream=product)
@@ -228,3 +266,9 @@ def price_biostimulant_system() -> dict:
 if __name__ == '__main__':
     results = price_biostimulant_system()
     sys = results['sys']
+
+    figures_dir = Path(__file__).resolve().parent.parent / "results" / "figures"
+    figures_dir.mkdir(parents=True, exist_ok=True)
+    diagram_path = figures_dir / f"{sys.ID}.svg"
+    sys.diagram(file=str(figures_dir / sys.ID), format="svg")
+    print(f"System diagram saved to: {diagram_path}")

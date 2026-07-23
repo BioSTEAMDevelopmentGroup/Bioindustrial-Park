@@ -15,6 +15,7 @@ from biorefineries.sabre.utils import OPERATING_DAYS_PER_YEAR, load_assumptions
 __all__ = (
     'SaBReTEA', 'create_tea', 'solve_product_msp',
     'usd_per_mmbtu_to_usd_per_kg', 'usd_per_kg_to_usd_per_mmbtu',
+    'disposal_avoided_credit_usd_per_yr', 'apply_revenue_credit',
 )
 
 _TEA_DEFAULTS = load_assumptions("tea.yaml")["tea"]
@@ -168,4 +169,35 @@ def solve_product_msp(
         result["usd_per_mmbtu"] = usd_per_kg_to_usd_per_mmbtu(usd_per_kg, energy_content_mmbtu_per_kg)
         result["annual_product_mmbtu"] = annual_product_kg * energy_content_mmbtu_per_kg
 
+    return result
+
+
+def disposal_avoided_credit_usd_per_yr(
+    waste_stream, disposal_price_usd_per_kg: float, tea,
+) -> float:
+    """
+    Annual value (USD/yr) of NOT paying to dispose of waste_stream at
+    disposal_price_usd_per_kg (a baseline disposal cost -- see data/tea.yaml
+    `price.disposal_solid`/`disposal_wastewater`, stored as a negative
+    USD/kg) because it's diverted to a productive downstream use (e.g. as
+    AD feedstock) instead of being landfilled/disposed. A tipping-fee
+    credit for whichever system takes it on.
+    """
+    return -disposal_price_usd_per_kg * float(waste_stream.F_mass) * tea.operating_days * 24
+
+
+def apply_revenue_credit(msp: dict, credit_usd_per_yr: float) -> dict:
+    """
+    Apply a fixed annual revenue credit (e.g. disposal_avoided_credit_usd_per_yr)
+    to an already-solved solve_product_msp() result, returning a new dict.
+
+    Valid because tea.solve_price() is linear in any additional fixed
+    annual cashflow: adding credit_usd_per_yr of revenue lowers the solved
+    product's own required price by exactly
+    credit_usd_per_yr / annual_product_units, holding volumes fixed.
+    """
+    result = dict(msp)
+    result["usd_per_kg"] -= credit_usd_per_yr / msp["annual_product_kg"]
+    if msp["annual_product_mmbtu"] == msp["annual_product_mmbtu"]:  # not NaN
+        result["usd_per_mmbtu"] -= credit_usd_per_yr / msp["annual_product_mmbtu"]
     return result

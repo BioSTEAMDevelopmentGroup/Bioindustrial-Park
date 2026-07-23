@@ -24,6 +24,8 @@ call and uses the shared preprocessing built here instead) -- so this
 integrated system and the standalone AD systems never drift apart.
 """
 
+from pathlib import Path
+
 import biosteam as bst
 
 from biorefineries.sabre._chemicals import create_chemicals
@@ -164,3 +166,9 @@ def create_ad_integrated_system(
 if __name__ == '__main__':
     sys = create_ad_integrated_system(feedstock="pelagic")
     sys.simulate()
+
+    figures_dir = Path(__file__).resolve().parent.parent / "results" / "figures"
+    figures_dir.mkdir(parents=True, exist_ok=True)
+    diagram_path = figures_dir / f"{sys.ID}.svg"
+    sys.diagram(file=str(figures_dir / sys.ID), format="svg")
+    print(f"System diagram saved to: {diagram_path}")
