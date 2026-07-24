@@ -130,36 +130,36 @@ def compute_product_purity(sys: bst.System, label: str) -> float:
 def summarize_mass_fractions(sys: bst.System, label: str) -> dict:
     """
     For a simulated pathway system, return:
-      - biostimulant_yield_wt_pct: biostimulant_product mass as a % of the
-        initial (wet) sargassum_feed mass
-      - product_yield_dry_pct: for AD pathways only (see
-        PRODUCT_STREAM_BY_LABEL), the pathway's final product mass as a %
-        of the initial dry (moisture-free) sargassum_feed mass
+      - product_yield_dry_pct: the pathway's final product mass as a % of
+        the initial dry (moisture-free) sargassum_feed mass, for AD
+        pathways (see PRODUCT_STREAM_BY_LABEL); for the Biostimulant
+        pathway, this is instead biostimulant_product mass as a % of the
+        initial *wet* sargassum_feed mass (product_yield_is_wet is set to
+        flag the differing basis)
       - product_purity_frac: see compute_product_purity()
     """
     fw = sys.flowsheet.stream
     feed = fw.sargassum_feed
-    biostim = fw.biostimulant_product
 
     feed_mass = float(feed.F_mass)
     feed_water = float(feed.imass["Water"]) if "Water" in feed.chemicals.IDs else 0.0
     feed_dry_mass = feed_mass - feed_water
 
-    biostim_mass = float(biostim.F_mass)
+    result = {"label": label}
 
-    result = {
-        "label": label,
-        "biostimulant_yield_wt_pct": (
-            biostim_mass / feed_mass * 100 if feed_mass else float("nan")
-        ),
-    }
-
-    product_stream_name = PRODUCT_STREAM_BY_LABEL.get(label)
-    if product_stream_name is not None:
-        product = getattr(fw, product_stream_name)
+    if label == "Biostimulant":
+        biostim_mass = float(fw.biostimulant_product.F_mass)
         result["product_yield_dry_pct"] = (
-            float(product.F_mass) / feed_dry_mass * 100 if feed_dry_mass else float("nan")
+            biostim_mass / feed_mass * 100 if feed_mass else float("nan")
         )
+        result["product_yield_is_wet"] = True
+    else:
+        product_stream_name = PRODUCT_STREAM_BY_LABEL.get(label)
+        if product_stream_name is not None:
+            product = getattr(fw, product_stream_name)
+            result["product_yield_dry_pct"] = (
+                float(product.F_mass) / feed_dry_mass * 100 if feed_dry_mass else float("nan")
+            )
 
     result["product_purity_frac"] = compute_product_purity(sys, label)
 
@@ -312,18 +312,19 @@ def run_msp_comparison(credit_tipping_fee: bool) -> None:
     # ── Mass-yield summary ──────────────────────────────────────────────────
     print(f"\nMass-yield summary ({scenario_desc}):")
     header = (
-        f"  {'Pathway':<38}{'biostimulant yield (wt% of feed)':>36}"
+        f"  {'Pathway':<38}"
         f"{'product yield (wt% of dry feed)':>34}{'product purity':>18}"
     )
     print(header)
     for row in summary_rows:
-        product_str = (
-            f"{row['product_yield_dry_pct']:.2f}%"
-            if "product_yield_dry_pct" in row else "n/a"
-        )
+        if "product_yield_dry_pct" in row:
+            product_str = f"{row['product_yield_dry_pct']:.2f}%"
+            if row.get("product_yield_is_wet"):
+                product_str += " (wet)"
+        else:
+            product_str = "n/a"
         print(
             f"  {row['label']:<38}"
-            f"{row['biostimulant_yield_wt_pct']:>35.2f}%"
             f"{product_str:>34}"
             f"{row['product_purity_frac'] * 100:>17.2f}%"
         )
