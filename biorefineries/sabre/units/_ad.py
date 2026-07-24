@@ -17,7 +17,7 @@ from biorefineries.sabre.utils import (
 )
 
 __all__ = (
-    'AnaerobicDigester', 'AcidogenicDigester',
+    'AnaerobicDigester', 'MethanogenicAD', 'AcidogenicAD',
     'H2SRemoval', 'BiogasUpgrading',
     'DigestateDecanterCentrifuge', 'DigestateScrewPress',
 )
@@ -117,6 +117,179 @@ def _resolve_dilution_water_kgph(feed, target_feed_moisture_frac):
 
 class AnaerobicDigester(bst.Unit):
     """
+    Base class for anaerobic digestion units.
+
+    Holds the calculations shared by all AD pathways: dilution-water feed
+    conditioning, parallel-train reactor sizing (HRT + headspace), influent
+    heating via an auxiliary heat exchanger, and ADBC-based CAPEX
+    interpolation. Subclasses implement `_run` (the conversion chemistry)
+    and `_design` (extending the shared sizing/heating helpers below with
+    their own product calculations) -- see `MethanogenicAD` and
+    `AcidogenicAD`.
+
+    Parameters
+    ----------
+    ins : stream
+        Feed slurry.
+    outs : tuple[stream, stream]
+        Gas/offgas stream and liquid digestate/broth stream.
+    hrt_days : float
+        Hydraulic retention time, used to size total liquid digester
+        volume.
+    headspace_frac : float
+        Fraction of total digester volume reserved for gas headspace.
+    max_single_digester_volume_MG : float
+        Maximum volume (million US gallons) of a single digester train;
+        larger required volumes are split across parallel trains.
+    mixing_W_per_m3 : float
+        Mixing power intensity per m3 of liquid volume.
+    target_temperature_K : float
+        Digester operating temperature (mesophilic/thermophilic).
+    target_feed_moisture_frac : float, optional
+        If given, water is added to the feed to reach this moisture
+        fraction before digestion. If None, no dilution water is added.
+        Must be >= the feed's own moisture fraction (dilution can only
+        add water, not remove it); raises ValueError otherwise.
+    maintenance_usd_per_m3_yr : float, optional
+        Annual maintenance cost per m3 of total digester volume, added
+        to `add_OPEX`. If None, no maintenance OPEX is added.
+    **kwargs
+        Forwarded to `bst.Unit.__init__`.
+
+    See Also
+    --------
+    Refer to data/ad.yaml and data/pretreatment.yaml for the default values and references.
+    """
+
+    _N_ins = 1
+    _N_outs = 2
+    auxiliary_unit_names = ("heat_exchanger",)
+
+    #: `baseline_purchase_costs`/`_F_BM_default` key; must be set by subclasses.
+    _capex_cost_item = None
+
+    def __init__(
+        self,
+        ID="",
+        ins=None,
+        outs=(),
+        *,
+        hrt_days,
+        headspace_frac,
+        max_single_digester_volume_MG,
+        mixing_W_per_m3,
+        target_temperature_K,
+        target_feed_moisture_frac=None,
+        maintenance_usd_per_m3_yr=None,
+        **kwargs,
+    ):
+        super().__init__(ID, ins, outs, **kwargs)
+
+        self.hrt_days = float(hrt_days)
+        self.headspace_frac = float(headspace_frac)
+        self.max_single_digester_volume_m3 = float(max_single_digester_volume_MG) * 1e6 * GAL_TO_M3
+        self.mixing_W_per_m3 = float(mixing_W_per_m3)
+        self.target_temperature_K = float(target_temperature_K)
+        self.target_feed_moisture_frac = (
+            float(target_feed_moisture_frac) if target_feed_moisture_frac is not None else None
+        )
+        self.maintenance_usd_per_m3_yr = maintenance_usd_per_m3_yr
+
+    def _run(self):
+        raise NotImplementedError(
+            f"{type(self).__name__} is a base class; use MethanogenicAD or "
+            "AcidogenicAD, which implement the conversion chemistry."
+        )
+
+    def _size_digester(self, feed):
+        """
+        Shared parallel-train reactor sizing (HRT + headspace). Populates
+        the common `design_results` sizing entries and the mixing-power
+        utility. Returns `(dilution_water_kgph, V_liquid, V_each, N)` for
+        use by subclasses.
+        """
+        dilution_water_kgph = _resolve_dilution_water_kgph(feed, self.target_feed_moisture_frac)
+
+        slurry_m3_per_hr = feed.F_vol + _dilution_water_volume_m3ph(feed, dilution_water_kgph)
+        V_liquid = slurry_m3_per_hr * 24.0 * self.hrt_days
+
+        hf = min(max(self.headspace_frac, 0.0), 0.95)
+        V_total = V_liquid / (1.0 - hf)
+
+        V_max = self.max_single_digester_volume_m3
+        N = max(1, math.ceil(V_total / V_max))
+        V_each = V_total / N
+
+        self.design_results["Slurry flow (m3/hr)"] = slurry_m3_per_hr
+        self.design_results["HRT (days)"] = self.hrt_days
+        self.design_results["Headspace frac"] = hf
+        self.design_results["Total digester volume (m3)"] = V_total
+        self.design_results["Max single digester (m3)"] = V_max
+        self.design_results["Number of digesters"] = N
+        self.design_results["Digester volume each (m3)"] = V_each
+
+        mixing_kW = (self.mixing_W_per_m3 * V_liquid) / 1000.0
+        self.design_results["Mixing power (kW)"] = mixing_kW
+        self.power_utility(mixing_kW)
+
+        return dilution_water_kgph, V_liquid, V_each, N
+
+    def _heat_influent(self, feed, dilution_water_kgph):
+        """
+        Build and simulate the auxiliary `heat_exchanger` that brings the
+        feed (+ dilution water) up to `target_temperature_K`. Populates
+        the common heating `design_results` entries. Returns the
+        auxiliary HXutility unit.
+        """
+        influent = feed.copy()
+        if dilution_water_kgph > 0:
+            influent.imass["Water"] += dilution_water_kgph
+        hx = self.auxiliary("heat_exchanger", bst.HXutility, ins=influent, T=self.target_temperature_K)
+        hx.simulate()
+
+        self.design_results["Influent T (K)"] = float(feed.T)
+        self.design_results["Target T (K)"] = self.target_temperature_K
+        self.design_results["Heating duty (kJ/h)"] = hx.net_duty
+
+        return hx
+
+    def _design(self):
+        raise NotImplementedError(
+            f"{type(self).__name__} is a base class; use MethanogenicAD or "
+            "AcidogenicAD, which implement the conversion chemistry."
+        )
+
+    def _cost(self):
+        V_each = self.design_results["Digester volume each (m3)"]
+        N = int(self.design_results["Number of digesters"])
+
+        C_each = interp_ad_capex(V_each)
+        C_total = N * C_each
+
+        self.design_results["ADBC CAPEX each ($)"] = C_each
+        self.design_results["ADBC CAPEX total ($)"] = C_total
+        self.baseline_purchase_costs[self._capex_cost_item] = C_total
+
+        # ADBC digester CAPEX is assumed to already include heating equipment.
+        # Zero out the auxiliary heat_exchanger's
+        # own capital cost here to avoid double-counting.
+        self.heat_exchanger.baseline_purchase_costs.clear()
+        self.heat_exchanger.purchase_costs.clear()
+        self.heat_exchanger.installed_costs.clear()
+
+        if self.maintenance_usd_per_m3_yr is not None:
+            total_volume = self.design_results["Total digester volume (m3)"]
+            annual_maintenance = self.maintenance_usd_per_m3_yr * total_volume
+            self.design_results["Annual maintenance ($/yr)"] = annual_maintenance
+
+            if annual_maintenance > 0:
+                self.add_OPEX = {
+                    "Digester maintenance": annual_maintenance / OPERATING_HOURS_PER_YEAR
+                }
+
+
+class MethanogenicAD(AnaerobicDigester):
+    """
     Convert a biodegradable fraction of Sargassum organics into raw biogas
     using component-specific biodegradability factors. The digestate contains
     undegraded material.
@@ -127,9 +300,8 @@ class AnaerobicDigester(bst.Unit):
     - Different components can have different biodegradability factors
     - Biodegradability + vs_destruction determine digestate solids reduction
     - Raw biogas composition is imposed from target mole fractions
-    - Paralle-train, reactor sized using HRT and headspace
-    - Enforce a maximum single-digester size and model parallel digesters
-    - Estimate CAPEX using ADBC-based interpolation
+    - Parallel-train reactor sizing and ADBC-based CAPEX are handled by
+      `AnaerobicDigester`
 
     Parameters
     ----------
@@ -151,38 +323,21 @@ class AnaerobicDigester(bst.Unit):
         Per-component biodegradability factor (0-1) for IDs in
         `digestible_IDs`; components not listed default to 0
         (unavailable).
-    hrt_days : float
-        Hydraulic retention time, used to size total liquid digester
-        volume.
-    headspace_frac : float
-        Fraction of total digester volume reserved for gas headspace.
-    max_single_digester_volume_MG : float
-        Maximum volume (million US gallons) of a single digester train;
-        larger required volumes are split across parallel trains.
-    maintenance_usd_per_m3_yr : float, optional
-        Annual maintenance cost per m3 of total digester volume, added
-        to `add_OPEX`. If None, no maintenance OPEX is added.
-    mixing_W_per_m3 : float
-        Mixing power intensity per m3 of liquid volume.
-    target_temperature_K : float
-        Digester operating temperature (mesophilic/thermophilic).
-    target_feed_moisture_frac : float, optional
-        If given, water is added to the feed to reach this moisture
-        fraction before digestion. If None, no dilution water is added.
-        Must be >= the feed's own moisture fraction (dilution can only
-        add water, not remove it); raises ValueError otherwise.
+    hrt_days, headspace_frac, max_single_digester_volume_MG,
+    maintenance_usd_per_m3_yr, mixing_W_per_m3, target_temperature_K,
+    target_feed_moisture_frac
+        See `AnaerobicDigester`.
     **kwargs
-        Forwarded to `bst.Unit.__init__`.
+        Forwarded to `AnaerobicDigester.__init__`/`bst.Unit.__init__`.
 
     See Also
     --------
     Refer to data/ad.yaml and data/pretreatment.yaml for the default values and references.
     """
 
-    _N_ins = 1
     _N_outs = 2  # biogas, digestate
     _F_BM_default = {"Anaerobic digester": _AD_COST["F_BM"]}
-    auxiliary_unit_names = ("heat_exchanger",)
+    _capex_cost_item = "Anaerobic digester"
 
     def __init__(
         self,
@@ -208,22 +363,23 @@ class AnaerobicDigester(bst.Unit):
         target_feed_moisture_frac=_AD_METHANOGENIC.get("target_feed_moisture_frac"),
         **kwargs,
     ):
-        super().__init__(ID, ins, outs, **kwargs)
+        super().__init__(
+            ID, ins, outs,
+            hrt_days=hrt_days,
+            headspace_frac=headspace_frac,
+            max_single_digester_volume_MG=max_single_digester_volume_MG,
+            mixing_W_per_m3=mixing_W_per_m3,
+            target_temperature_K=target_temperature_K,
+            target_feed_moisture_frac=target_feed_moisture_frac,
+            maintenance_usd_per_m3_yr=maintenance_usd_per_m3_yr,
+            **kwargs,
+        )
 
         self.vs_destruction = float(vs_destruction)
         self.ch4_kg_per_kg_vs_fed = float(ch4_kg_per_kg_vs_fed)
         self.raw_biogas_molfrac = dict(raw_biogas_molfrac)
         self.digestible_IDs = tuple(digestible_IDs)
         self.biodegradability = dict(biodegradability)
-        self.mixing_W_per_m3 = float(mixing_W_per_m3)
-        self.target_temperature_K = float(target_temperature_K)
-        self.hrt_days = float(hrt_days)
-        self.headspace_frac = float(headspace_frac)
-        self.max_single_digester_volume_m3 = float(max_single_digester_volume_MG) * 1e6 * GAL_TO_M3
-        self.maintenance_usd_per_m3_yr = maintenance_usd_per_m3_yr
-        self.target_feed_moisture_frac = (
-            float(target_feed_moisture_frac) if target_feed_moisture_frac is not None else None
-        )
 
     def _available_digestible_pool(self, stream):
         thermo_ids = set(self.chemicals.IDs)
@@ -353,39 +509,8 @@ class AnaerobicDigester(bst.Unit):
         feed = self.ins[0]
         biogas, digestate = self.outs
 
-        dilution_water_kgph = _resolve_dilution_water_kgph(feed, self.target_feed_moisture_frac)
-
-        slurry_m3_per_hr = feed.F_vol + _dilution_water_volume_m3ph(feed, dilution_water_kgph)
-        V_liquid = slurry_m3_per_hr * 24.0 * self.hrt_days
-
-        hf = min(max(self.headspace_frac, 0.0), 0.95)
-        V_total = V_liquid / (1.0 - hf)
-
-        V_max = self.max_single_digester_volume_m3
-        N = max(1, math.ceil(V_total / V_max))
-        V_each = V_total / N
-
-        self.design_results["Slurry flow (m3/hr)"] = slurry_m3_per_hr
-        self.design_results["HRT (days)"] = self.hrt_days
-        self.design_results["Headspace frac"] = self.headspace_frac
-        self.design_results["Total digester volume (m3)"] = V_total
-        self.design_results["Max single digester (m3)"] = V_max
-        self.design_results["Number of digesters"] = N
-        self.design_results["Digester volume each (m3)"] = V_each
-
-        mixing_kW = (self.mixing_W_per_m3 * V_liquid) / 1000.0
-
-        # Influent = feed + dilution water, heated via an auxiliary HXutility.
-        influent = feed.copy()
-        if dilution_water_kgph > 0:
-            influent.imass["Water"] += dilution_water_kgph
-        hx = self.auxiliary("heat_exchanger", bst.HXutility, ins=influent, T=self.target_temperature_K)
-        hx.simulate()
-
-        self.design_results["Mixing power (kW)"] = mixing_kW
-        self.design_results["Influent T (K)"] = float(feed.T)
-        self.design_results["Target T (K)"] = self.target_temperature_K
-        self.design_results["Heating duty (kJ/h)"] = hx.net_duty
+        dilution_water_kgph, V_liquid, V_each, N = self._size_digester(feed)
+        self._heat_influent(feed, dilution_water_kgph)
 
         ids = set(self.chemicals.IDs)
 
@@ -418,44 +543,17 @@ class AnaerobicDigester(bst.Unit):
         self.design_results["Organic loading proxy (kg/m3-h)"] = biodegradable_pool / V_liquid
         self.design_results["Methane productivity (kg/m3-h)"] = methane_kgph / V_liquid
         self.design_results["CH4 yield (kg/kg VS fed)"] = methane_kgph / VS_in
-        self.power_utility(mixing_kW)
-
-    def _cost(self):
-        V_each = self.design_results["Digester volume each (m3)"]
-        N = int(self.design_results["Number of digesters"])
-
-        C_each = interp_ad_capex(V_each)
-        C_total = N * C_each
-
-        self.design_results["ADBC CAPEX each ($)"] = C_each
-        self.design_results["ADBC CAPEX total ($)"] = C_total
-        self.baseline_purchase_costs["Anaerobic digester"] = C_total
-
-        # ADBC digester CAPEX is assumed to already include heating equipment.
-        # Zero out the auxiliary heat_exchanger's
-        # own capital cost here to avoid double-counting.
-        self.heat_exchanger.baseline_purchase_costs.clear()
-        self.heat_exchanger.purchase_costs.clear()
-        self.heat_exchanger.installed_costs.clear()
-
-        if self.maintenance_usd_per_m3_yr is not None:
-            total_volume = self.design_results["Total digester volume (m3)"]
-            annual_maintenance = self.maintenance_usd_per_m3_yr * total_volume
-            self.design_results["Annual maintenance ($/yr)"] = annual_maintenance
-
-            if annual_maintenance > 0:
-                self.add_OPEX = {
-                    "Digester maintenance": annual_maintenance / OPERATING_HOURS_PER_YEAR
-                }
 
 
-class AcidogenicDigester(bst.Unit):
+class AcidogenicAD(AnaerobicDigester):
     """
     Acidogenic / arrested AD unit for VFA platform modeling. Structurally
-    parallel to `AnaerobicDigester` but produces a VFA-rich broth instead of biogas.
-    There is no biodegradability weighting per component, all mass in `digestible_IDs`
-    is treated as equally available for VS destruction. VS destroyed but not
-    converted to VFA is sent to the offgas as CarbonDioxide.
+    parallel to `MethanogenicAD` but produces a VFA-rich broth instead of
+    biogas (shared parallel-train reactor sizing and ADBC-based CAPEX are
+    handled by `AnaerobicDigester`). There is no biodegradability weighting
+    per component, all mass in `digestible_IDs` is treated as equally
+    available for VS destruction. VS destroyed but not converted to VFA is
+    sent to the offgas as CarbonDioxide.
 
     Parameters
     ----------
@@ -473,23 +571,6 @@ class AcidogenicDigester(bst.Unit):
         sum to 1.
     digestible_IDs : Iterable[str]
         Chemical IDs eligible for VS destruction.
-    hrt_days : float
-        Hydraulic retention time, used to size total liquid digester
-        volume.
-    headspace_frac : float
-        Fraction of total digester volume reserved for gas headspace.
-    max_single_digester_volume_MG : float
-        Maximum volume (million US gallons) of a single digester train;
-        larger required volumes are split across parallel trains.
-    mixing_W_per_m3 : float
-        Mixing power intensity per m3 of liquid volume.
-    target_temperature_K : float
-        Digester operating temperature.
-    target_feed_moisture_frac : float, optional
-        If given, water is added to the feed to reach this moisture
-        fraction before digestion. If None, no dilution water is added.
-        Must be >= the feed's own moisture fraction (dilution can only
-        add water, not remove it); raises ValueError otherwise.
     enable_heat_shock : bool
         If True, adds a periodic heat-shock duty on top of the base
         heating duty.
@@ -502,8 +583,11 @@ class AcidogenicDigester(bst.Unit):
     hs_duration_min : float
         Duration of each heat-shock event; recorded in design_results,
         not used in the duty calculation itself.
+    hrt_days, headspace_frac, max_single_digester_volume_MG,
+    mixing_W_per_m3, target_temperature_K, target_feed_moisture_frac
+        See `AnaerobicDigester`.
     **kwargs
-        Forwarded to `bst.Unit.__init__`.
+        Forwarded to `AnaerobicDigester.__init__`/`bst.Unit.__init__`.
 
     See Also
     --------
@@ -513,6 +597,7 @@ class AcidogenicDigester(bst.Unit):
     _N_ins = 1
     _N_outs = 2  # offgas, acidogenic_broth
     _F_BM_default = {"Acidogenic digester": _AD_COST["F_BM"]}
+    _capex_cost_item = "Acidogenic digester"
     auxiliary_unit_names = ("heat_exchanger", "heat_shock_exchanger")
 
     def __init__(
@@ -538,20 +623,21 @@ class AcidogenicDigester(bst.Unit):
         hs_duration_min: float = _AD_ACIDOGENIC["heat_shock"]["duration_min"],
         **kwargs,
     ):
-        super().__init__(ID, ins, outs, **kwargs)
+        super().__init__(
+            ID, ins, outs,
+            hrt_days=hrt_days,
+            headspace_frac=headspace_frac,
+            max_single_digester_volume_MG=max_single_digester_volume_MG,
+            mixing_W_per_m3=mixing_W_per_m3,
+            target_temperature_K=target_temperature_K,
+            target_feed_moisture_frac=target_feed_moisture_frac,
+            **kwargs,
+        )
 
         self.vs_destruction = float(vs_destruction)
         self.vfa_kg_per_kg_vs = float(vfa_kg_per_kg_vs)
         self.vfa_split = dict(vfa_split)
         self.digestible_IDs = tuple(digestible_IDs)
-        self.hrt_days = float(hrt_days)
-        self.headspace_frac = float(headspace_frac)
-        self.max_single_digester_volume_m3 = float(max_single_digester_volume_MG) * 1e6 * GAL_TO_M3
-        self.mixing_W_per_m3 = float(mixing_W_per_m3)
-        self.target_temperature_K = float(target_temperature_K)
-        self.target_feed_moisture_frac = (
-            float(target_feed_moisture_frac) if target_feed_moisture_frac is not None else None
-        )
         self.enable_heat_shock = bool(enable_heat_shock)
         self.hs_target_temperature_K = float(hs_target_temperature_K)
         self.hs_events_per_day = float(hs_events_per_day)
@@ -637,42 +723,8 @@ class AcidogenicDigester(bst.Unit):
         feed = self.ins[0]
         broth = self.outs[1]
 
-        dilution_water_kgph = _resolve_dilution_water_kgph(feed, self.target_feed_moisture_frac)
-
-        slurry_m3_per_hr = feed.F_vol + _dilution_water_volume_m3ph(feed, dilution_water_kgph)
-        V_liquid = slurry_m3_per_hr * 24.0 * self.hrt_days
-
-        hf = min(max(self.headspace_frac, 0.0), 0.95)
-        V_total = V_liquid / (1.0 - hf)
-
-        V_max = self.max_single_digester_volume_m3
-        N = max(1, math.ceil(V_total / V_max))
-        V_each = V_total / N
-
-        self.design_results["Slurry flow (m3/hr)"] = slurry_m3_per_hr
-        self.design_results["HRT (days)"] = self.hrt_days
-        self.design_results["Headspace frac"] = hf
-        self.design_results["Total digester volume (m3)"] = V_total
-        self.design_results["Number of digesters"] = N
-        self.design_results["Digester volume each (m3)"] = V_each
-
-        mixing_kW = (self.mixing_W_per_m3 * V_liquid) / 1000.0
-        self.design_results["Mixing power (kW)"] = mixing_kW
-        self.power_utility(mixing_kW)
-
-        T_in = float(feed.T)
-        T_base = self.target_temperature_K
-
-        # Influent = feed + dilution water, heated via an auxiliary HXutility.
-        influent = feed.copy()
-        if dilution_water_kgph > 0:
-            influent.imass["Water"] += dilution_water_kgph
-        hx = self.auxiliary("heat_exchanger", bst.HXutility, ins=influent, T=T_base)
-        hx.simulate()
-
-        self.design_results["Influent T (K)"] = T_in
-        self.design_results["Base target T (K)"] = T_base
-        self.design_results["Base heating duty (kJ/h)"] = hx.net_duty
+        dilution_water_kgph, V_liquid, V_each, N = self._size_digester(feed)
+        hx = self._heat_influent(feed, dilution_water_kgph)
 
         # Heat-shock reheats a periodic slipstream of resident liquid (not the
         # main feed), represented as an equivalent continuous slipstream split
@@ -738,26 +790,6 @@ class AcidogenicDigester(bst.Unit):
         for chem_id, frac in split.items():
             self.design_results[f"{chem_id} produced (kg/h)"] = vfa_total * frac
 
-    def _cost(self):
-        V_each = self.design_results["Digester volume each (m3)"]
-        N = int(self.design_results["Number of digesters"])
-
-        C_each = interp_ad_capex(V_each)
-        C_total = N * C_each
-
-        self.design_results["ADBC_capex_each_$"] = C_each
-        self.baseline_purchase_costs["Acidogenic digester"] = C_total
-
-        # ADBC digester CAPEX already include heating equipment (continuous
-        # jacket/coil/external HX loop). Zero out the base auxiliary
-        # heat_exchanger's own capital cost here to avoid double-counting.
-        # Periodic thermal-shock treatment is not obviously part of a standard
-        # digester cost correlation, so heat_shock_exchanger's own capital cost
-        # (when heat shock is enabled) is left in place, not zeroed.
-        self.heat_exchanger.baseline_purchase_costs.clear()
-        self.heat_exchanger.purchase_costs.clear()
-        self.heat_exchanger.installed_costs.clear()
-        
 
 @cost('Raw biogas flow (Nm3/h)', 'H2S removal (iron sponge)', units='Nm3/h',
       CE=567.5, cost=_H2S_REMOVAL["ref_installed_cost_usd"],

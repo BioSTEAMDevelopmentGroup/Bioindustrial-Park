@@ -15,7 +15,7 @@ import biosteam as bst
 from biorefineries.sabre._chemicals import create_chemicals
 from biorefineries.sabre.utils import load_assumptions
 from biorefineries.sabre.units import (
-    AcidogenicDigester,
+    AcidogenicAD,
     DigestateScrewPress,
     Mill,
     VFAMicrofilter,
@@ -91,7 +91,7 @@ def create_ad_vfa_system(
         ad_inlet = feedstock
 
     # AD.outs[0] (acidogenic_offgas) is a gas waste stream -- no price needed.
-    AD = AcidogenicDigester("VFA_AD", ins=ad_inlet, outs=("acidogenic_offgas", "acidogenic_broth"))
+    AD = AcidogenicAD("VFA_AD", ins=ad_inlet, outs=("acidogenic_offgas", "acidogenic_broth"))
     SP = DigestateScrewPress(ID="SP_VFA", ins=AD - 1, outs=("acidogenic_solid_digestate", "raw_vfa_broth"))
     SP.outs[0].price = _TEA_PRICE["disposal_solid"]["baseline"]
     MF = VFAMicrofilter("MF", ins=SP - 1, outs=("vfa_broth", "vfa_cake"))

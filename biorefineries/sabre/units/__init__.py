@@ -9,7 +9,8 @@
 .. contents:: :local:
 
 .. autoclass:: biorefineries.sabre.units.AnaerobicDigester
-.. autoclass:: biorefineries.sabre.units.AcidogenicDigester
+.. autoclass:: biorefineries.sabre.units.MethanogenicAD
+.. autoclass:: biorefineries.sabre.units.AcidogenicAD
 .. autoclass:: biorefineries.sabre.units.Press
 .. autoclass:: biorefineries.sabre.units.Mill
 .. autoclass:: biorefineries.sabre.units.DigestateScrewPress

@@ -16,7 +16,7 @@ import biosteam as bst
 from biorefineries.sabre._chemicals import create_chemicals
 from biorefineries.sabre.utils import load_assumptions, get_ad_temperature_K
 from biorefineries.sabre.units import (
-    AnaerobicDigester, BiogasUpgrading, H2SRemoval, DigestateScrewPress,
+    MethanogenicAD, BiogasUpgrading, H2SRemoval, DigestateScrewPress,
     Mill, HeatingPretreatment, EnzymaticPretreatment, PeroxidePretreatment,
 )
 from biorefineries.sabre.systems._biostimulant_system import create_biostimulant_system, BIOSTIMULANT_UNIT_IDS
@@ -118,7 +118,7 @@ def create_ad_biomethane_system(
     pt_case = pretreatments[pretreatment_case]
     ad_effects = pt_case["ad_effects"]
 
-    AD = AnaerobicDigester(
+    AD = MethanogenicAD(
         "AD", ins=ad_feed, outs=("biogas", "digestate"),
         vs_destruction=float(ad_effects["vs_destruction"]),
         ch4_kg_per_kg_vs_fed=float(ad_effects["ch4_kg_per_kg_vs_fed"]),
