@@ -32,7 +32,7 @@ from biorefineries import isobutanol
 
 import math
 
-fbs_spec = isobutanol.models.fbs_spec
+# fbs_spec = isobutanol.models.fbs_spec
 
 #%%
 EtOH_market_range=np.array([
@@ -221,25 +221,28 @@ if plot_all_generic:
     #                   ]
     
     metrics_to_opt = [
-                      'Cell loading',
-                      'EtOH Titer', 
-                      'EtOH Productivity', 
-                      'EtOH Yield',
-                      'IBO Titer', 
-                      'IBO Productivity', 
-                      'IBO Yield',
-                      'Combined Yield', 
-                      'Total Q sugar evap',
-                      'Actual aeration required',
-                      'TCI',
-                      'AOC',
-                      'MPSP', 
+                      # 'Cell loading',
+                      # 'EtOH Titer', 
+                      # 'EtOH Productivity', 
+                      # 'EtOH Yield',
+                      # 'IBO Titer', 
+                      # 'IBO Productivity', 
+                      # 'IBO Yield',
+                      # 'Combined Yield', 
+                      # 'Total Q sugar evap',
+                      # 'Actual aeration required',
+                      # 'TCI',
+                      # 'AOC',
+                      # 'MPSP', 
                       ]
     
     if not scenario=='B':
         metrics_plot_names["Combined Yield"] = "Ethanol Yield"
         for i in ['EtOH Yield', 'IBO Titer', 'IBO Productivity', 'IBO Yield']:
-            metrics_to_opt.remove(i)
+            try:
+                metrics_to_opt.remove(i)
+            except:
+                pass
             
     opt_coords = {}
     for m in  metrics_to_opt:
@@ -488,7 +491,7 @@ contourplots.animated_contourplot(w_data_vs_x_y_at_multiple_z=results[curr_metri
                                 z_marker_color='g', # default matplotlib color names
                                 fps=fps, # animation frames (z values traversed) per second
                                 n_loops='inf', # the number of times the animated contourplot should loop animation over z; infinite by default
-                                animated_contourplot_filename=file_to_load+f'_{curr_metric}', # file name to save animated contourplot as (no extensions)
+                                animated_contourplot_filename=file_to_load+f'_{curr_metric}1', # file name to save animated contourplot as (no extensions)
                                 keep_frames=keep_frames, # leaves frame PNG files undeleted after running; False by default
                                 keep_gifs=keep_gifs,
                                 axis_title_fonts=axis_title_fonts,

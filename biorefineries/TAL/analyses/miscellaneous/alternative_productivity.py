@@ -286,6 +286,16 @@ if simulate_and_plot:
     MPSPs, ferm_ICs, sys_ICs, ferm_pows, sys_pows =\
         np.array(MPSPs), np.array(ferm_ICs), np.array(sys_ICs), np.array(ferm_pows), np.array(sys_pows)
     
+    metrics_vs_prods = {'Productivity [g-fp/L/h]' : productivities,
+                           'MPSP [$/kg-p]': MPSPs,
+                           'Fermentation bioreactors installed cost [MM$]': ferm_ICs/1e6,
+                           'Total installed cost excluding fermentation bioreactors [MM$]': (sys_ICs - ferm_ICs)/1e6,
+                           'Fermentation bioreactors electricity demand [MW]': ferm_pows/1e3,
+                           'Total positive electricity demand excluding fermentation bioreactors [MW]': (sys_pows - ferm_pows)/1e3}
+    
+    metrics_vs_prods_df = pd.DataFrame.from_dict(metrics_vs_prods)
+    metrics_vs_prods_df.to_excel('metrics_vs_prods_TAL_sugarcane.xlsx')
+    
 #%%
 
     plot_multiple_metrics(productivities,
