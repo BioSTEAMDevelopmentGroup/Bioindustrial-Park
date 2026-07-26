@@ -246,15 +246,32 @@ def run_msp_comparison(credit_tipping_fee: bool) -> None:
 
     fig, (ax_kg, ax_biomethane) = plt.subplots(1, 2, figsize=(11.5, 5.2))
 
-    def _label_bars(ax, bars, vals):
+    def _fmt_usd_per_yr(v: float) -> str:
+        """Format an annual USD figure with a K/M/B suffix, e.g. '$4.20M'."""
+        av = abs(v)
+        if av >= 1e9:
+            return f"${v / 1e9:,.2f}B"
+        if av >= 1e6:
+            return f"${v / 1e6:,.2f}M"
+        if av >= 1e3:
+            return f"${v / 1e3:,.1f}K"
+        return f"${v:,.0f}"
+
+    def _label_bars(ax, bars, vals, sales_vals):
         span = max(vals + [0]) - min(vals + [0]) or 1
-        for bar, val in zip(bars, vals):
+        for bar, val, sales in zip(bars, vals, sales_vals):
             above = val >= 0
+            x = bar.get_x() + bar.get_width() / 2
+            msp_y = bar.get_height() + (span * 0.015 if above else -span * 0.015)
+            sales_y = bar.get_height() + (span * 0.075 if above else -span * 0.075)
             ax.text(
-                bar.get_x() + bar.get_width() / 2,
-                bar.get_height() + (span * 0.015 if above else -span * 0.015),
-                f"${val:,.2f}",
+                x, msp_y, f"${val:,.2f}",
                 ha="center", va="bottom" if above else "top", fontsize=9,
+            )
+            ax.text(
+                x, sales_y, f"{_fmt_usd_per_yr(sales)}/yr sales",
+                ha="center", va="bottom" if above else "top", fontsize=7,
+                color="#444444",
             )
 
     # -- Left panel: single-case, $/kg pathways ------------------------------
@@ -262,9 +279,10 @@ def run_msp_comparison(credit_tipping_fee: bool) -> None:
         f"{r['label']}\n({UNIT_SUBLABELS[r['label']]})" for r in kg_results
     ]
     kg_vals = [r["msp_usd_per_kg"] for r in kg_results]
+    kg_sales = [r["msp_usd_per_kg"] * r["annual_product_kg"] for r in kg_results]
 
     bars = ax_kg.bar(kg_tick_labels, kg_vals, edgecolor="black", linewidth=0.8, zorder=3)
-    _label_bars(ax_kg, bars, kg_vals)
+    _label_bars(ax_kg, bars, kg_vals, kg_sales)
 
     ax_kg.set_ylabel("Minimum selling price ($/kg product)")
     ax_kg.set_title("Biostimulant, AD-VFA, AD-fermentation", fontsize=10)
@@ -272,7 +290,7 @@ def run_msp_comparison(credit_tipping_fee: bool) -> None:
     ax_kg.grid(axis="y", linewidth=0.4, color="#D3D1C7", zorder=0)
     ax_kg.axhline(0, color="black", linewidth=0.8, zorder=3)
     kg_lo, kg_hi = min(0, min(kg_vals)), max(0, max(kg_vals))
-    pad = (kg_hi - kg_lo) * 0.15 or 1
+    pad = (kg_hi - kg_lo) * 0.22 or 1
     ax_kg.set_ylim(kg_lo - pad, kg_hi + pad)
 
     # -- Right panel: AD-biomethane by pretreatment case, $/mmbtu ------------
@@ -280,12 +298,15 @@ def run_msp_comparison(credit_tipping_fee: bool) -> None:
         PRETREATMENT_LABELS[r["pretreatment_case"]] for r in biomethane_results
     ]
     mmbtu_vals = [r["msp_usd_per_mmbtu"] for r in biomethane_results]
+    mmbtu_sales = [
+        r["msp_usd_per_mmbtu"] * r["annual_product_mmbtu"] for r in biomethane_results
+    ]
 
     bars = ax_biomethane.bar(
         pt_tick_labels, mmbtu_vals, edgecolor="black", linewidth=0.8, zorder=3,
         color="#C86E5A",
     )
-    _label_bars(ax_biomethane, bars, mmbtu_vals)
+    _label_bars(ax_biomethane, bars, mmbtu_vals, mmbtu_sales)
 
     ax_biomethane.set_ylabel("Minimum selling price ($/mmbtu biomethane)")
     ax_biomethane.set_title("AD-biomethane, by pretreatment case", fontsize=10)
@@ -293,7 +314,7 @@ def run_msp_comparison(credit_tipping_fee: bool) -> None:
     ax_biomethane.grid(axis="y", linewidth=0.4, color="#D3D1C7", zorder=0)
     ax_biomethane.axhline(0, color="black", linewidth=0.8, zorder=3)
     mmbtu_lo, mmbtu_hi = min(0, min(mmbtu_vals)), max(0, max(mmbtu_vals))
-    pad = (mmbtu_hi - mmbtu_lo) * 0.15 or 1
+    pad = (mmbtu_hi - mmbtu_lo) * 0.22 or 1
     ax_biomethane.set_ylim(mmbtu_lo - pad, mmbtu_hi + pad)
     ax_biomethane.tick_params(axis="x", labelrotation=15)
 
