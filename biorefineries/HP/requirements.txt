@@ -21,4 +21,4 @@ pyyaml==6.0.1
 # In your command prompt, simply navigate to the folder 
 # that this file (requirements.txt) is in, 
 # and run the following command:
-# pip install -r requirements.txt
+# pip install -r requirements.txt 
