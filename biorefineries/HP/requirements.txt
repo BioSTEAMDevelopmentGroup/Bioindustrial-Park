@@ -7,6 +7,8 @@ pyglet==2.0.15
 pint==0.23
 scipy==1.13.1
 thermo==0.2.27
+chemicals==1.2.0
+fluids==1.0.26
 colorpalette==0.3.3
 pandas==2.2.2
 matplotlib==3.5.2
