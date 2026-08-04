@@ -47,14 +47,14 @@ from biorefineries import isobutanol
 # -----------------------------------------------------------------------------
 # User inputs
 # -----------------------------------------------------------------------------
-metric = 'AOC'
+metric = 'MPSP'
 z_label = 'Spike feed glucose concentration'
 steps = (25, 25, 1)
 
 _row_parameter_pairs = [
-    ('k_1e', 'k_1ie'),
+    # ('k_1e', 'k_1ie'),
     ('k_1e', 'k_7ie'),
-    ('k_13', 'k_7ii'),
+    # ('k_13', 'k_7ii'),
 ]
 
 _strategies = [
@@ -68,14 +68,14 @@ _strategies = [
 #%% Global variables
 metrics_units = {
     'MPSP': r"$\mathrm{\$}\cdot\mathrm{kg}^{-1}$",
-    'AOC': r'MM\$/y',
+    # 'AOC': r'MM\$/y',
     'TCI': r'MM\$',
     'Combined Yield': 'g-EtOH-and-IBO/g-sugars',
     'EtOH Titer': 'g-EtOH/L-broth',
     'EtOH Productivity': 'g-EtOH/L-broth/h',
     'Number of glucose spikes': '',
     'Fermentation time': 'h',
-    'Total Q sugar evap': 'kJ/h',
+    # 'Total Q sugar evap': 'kJ/h',
     'Target sugars concentration': 'g-sugars/L-broth',
     'Cell loading': 'g-cell/L-broth',
     'Active cell loading': 'g-cell/L-broth',
@@ -83,12 +83,12 @@ metrics_units = {
     'IBO Yield': 'g-IBO/g-sugars',
     'IBO Titer': 'g-IBO/L-broth',
     'IBO Productivity': 'g-IBO/L-broth/h',
-    'Actual aeration required': 'kmol-O2/h',
+    # 'Actual aeration required': 'kmol-O2/h',
 }
     
 #%%
 def plot_save_kinetic_multipanel(metric, row_parameter_pairs=None, strategies=None, steps=None,
-                                 z_label=None, show_optima=False):
+                                 z_label=None, show_optima=True):
     if z_label is None:
         z_label = 'Spike feed glucose concentration'
     if steps is None:
@@ -170,10 +170,10 @@ def plot_save_kinetic_multipanel(metric, row_parameter_pairs=None, strategies=No
                 'EtOH Titer',
                 'EtOH Productivity',
                 'Combined Yield',
-                'Total Q sugar evap',
-                'Actual aeration required',
+                # 'Total Q sugar evap',
+                # 'Actual aeration required',
                 'TCI',
-                'AOC',
+                # 'AOC',
                 'MPSP',
             ]
         if x_label == 'k_13':
@@ -186,10 +186,10 @@ def plot_save_kinetic_multipanel(metric, row_parameter_pairs=None, strategies=No
                 'IBO Productivity',
                 'IBO Yield',
                 'Combined Yield',
-                'Total Q sugar evap',
-                'Actual aeration required',
+                # 'Total Q sugar evap',
+                # 'Actual aeration required',
                 'TCI',
-                'AOC',
+                # 'AOC',
                 'MPSP',
             ]
         return []
