@@ -20,7 +20,3 @@ numba==0.59.1
 graphviz==0.20.3
 chaospy==4.3.15
 pyyaml==6.0.1
-# In your command prompt, simply navigate to the folder 
-# that this file (requirements.txt) is in, 
-# and run the following command:
-# pip install -r requirements.txt 
