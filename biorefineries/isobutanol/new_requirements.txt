@@ -1,0 +1,4 @@
+# python 3.14
+biosteam==2.53.11
+contourplots==0.3.4
+
