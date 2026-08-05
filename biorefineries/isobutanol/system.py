@@ -582,19 +582,22 @@ recovery_units = [S404,
 # HP-style create_facilities layer (Task 5) can own process water, cooling, and steam.
 corn_facilities_to_remove = [f.T608, f.other_facilities]
 
-# The net process wastewater currently leaves T608 as its `wastewater` outlet.
-net_wastewater_stream = f.wastewater  # ~87,052 kg/hr, pure Water at baseline
+# NOTE: corn's T608 ProcessWaterCenter also emits a `wastewater` outlet
+# (`f.wastewater`), but that stream is an internal process-water balance term of
+# the removed corn facility layer, not a real aqueous waste of this biorefinery.
+# T608 is no longer a needed unit operation, so its `wastewater` outlet is
+# deliberately NOT routed to the WWT mixer (M501) below.
 
 # Streams that consume process water (used to size the new ProcessWaterCenter makeup).
 process_water_consumers = [f.recycled_process_water, f.scrubber_water, f.dilution_water]
 
 #%% Mix aqueous wastes for wastewater treatment
-# Real aqueous wastes currently discharged: net process wastewater (from T608),
-# backwater (S1, water+organics), F302_P1 evaporator condensate (s85), and the
-# S403 solvent purge (nonzero only when purging isopentyl acetate).
+# Real aqueous wastes currently discharged: backwater (S1, water+organics),
+# F302_P1 evaporator condensate (s85), and the S403 solvent purge (nonzero only
+# when purging isopentyl acetate). T608's `wastewater` outlet is intentionally
+# excluded (see NOTE above) — it is not a real aqueous waste of the new system.
 M501 = bst.Mixer('M501',
-                 ins=(net_wastewater_stream,
-                      f.backwater,
+                 ins=(f.backwater,
                       f.s85,
                       f.S403_purge),
                  outs='mixed_wastewater_to_WWT')
