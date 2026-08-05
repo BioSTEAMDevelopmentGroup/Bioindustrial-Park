@@ -13,6 +13,7 @@ import thermosteam as tmo
 import numpy as np
 from matplotlib import pyplot as plt
 from biorefineries import corn
+from biorefineries.cellulosic import create_facilities
 from biorefineries.isobutanol import units
 from nskinetics.examples.s_cerevisiae_ferm_fb_inhib_mod_ibo import te_r, reset_kinetic_reaction_system
 from scipy.optimize import differential_evolution, minimize, brute
@@ -668,6 +669,32 @@ def M510_spec():
 # M510.outs[0] for downstream use until Task 5 wires M510 into the system
 # properly (at which point this disconnection no longer occurs).
 M510.simulate()
+
+
+#%% HP-style facilities: boiler turbogenerator, cooling, process water, CIP, air, fire water
+# Instantiates a BoilerTurbogenerator (BT_area=800) plus ChilledWaterPackage,
+# CoolingTower, ProcessWaterCenter, CIPpackage, AirDistributionPackage, and
+# FireWaterTank (area=900) on the current flowsheet. These replace corn's T608
+# ProcessWaterCenter and `other_facilities` (PlantAir/CIP/WasteWater), which were
+# detached in Task 1 and are dropped from the reassembled system in Task 6.
+#
+# `create_facilities` only ADDS units (it returns None); it does not rebuild the
+# system. It consumes the boiler solids from M510 (M510-0), the WWT biogas
+# (wastewater_treatment_sys.outs[1]) as boiler gas, the RO-treated water
+# (wastewater_treatment_sys.outs[3]) as ProcessWaterCenter ins[0], the recovered
+# process-water recycle (f.recycle_process_water) as ProcessWaterCenter ins[2],
+# and process_water_consumers as the process-water demand. Integer area args make
+# BioSTEAM auto-assign unique IDs within the 800/900 buckets.
+create_facilities(
+    solids_to_boiler=M510-0,
+    gas_to_boiler=wastewater_treatment_sys.outs[1],   # biogas
+    process_water_streams=process_water_consumers,
+    feedstock=f.corn,
+    RO_water=wastewater_treatment_sys.outs[3],         # RO_treated_water
+    recycle_process_water=f.recycle_process_water,     # ethanol-purification recycle
+    BT_area=800,
+    area=900,
+)
 
 
 #%% Set prices
