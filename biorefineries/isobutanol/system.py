@@ -748,6 +748,10 @@ f.makeup_isopentyl_acetate.price = 3.2 # https://www.alibaba.com/product-detail/
 
 #%% Create TEA object
 
+# NOTE: BoilerTurbogenerator capital + steam/power credits are captured by the
+# existing ConventionalEthanolTEA via unit purchase cost and utility accounting.
+# A boiler-aware TEA (separate steam-power depreciation, e.g. CellulosicEthanolTEA)
+# would be a financial-assumption change requiring separate sign-off; not done here.
 corn_EtOH_IBO_sys._TEA = corn_EtOH_IBO_sys_tea = corn.tea.create_tea(corn_EtOH_IBO_sys)
 
 #%% Set baseline specifications
