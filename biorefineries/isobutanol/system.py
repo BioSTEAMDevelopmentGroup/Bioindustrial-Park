@@ -1339,11 +1339,17 @@ fermentation_group = bst.UnitGroup('fermentation', units=[u.V406, u.K330, u.V330
                                                           u.V403, 
                                                           u.P404,])
 
-# define IBO separation units
+# define wastewater treatment units (aqueous-waste mixer + high-rate WWT train)
+wastewater_treatment_group = bst.UnitGroup('wastewater treatment',
+                                           units=[M501] + list(wastewater_treatment_sys.units))
+
+# define IBO separation units (exclude the WWT train + M510 solids mixer so they
+# are not swept into this catch-all; they are bucketed as WWT / other facilities)
 IBO_separation_units = [i for i in corn_EtOH_IBO_sys.units
                         if not i in list(corn_EtOH_IBO_sys.facilities) + corn_EtOH_IBO_sys_no_IBO_recovery.units
                                     + feedstock_acquisition_group.units + feedstock_saccharification_group.units
                                     + sugar_solution_preparation_group.units + fermentation_group.units
+                                    + wastewater_treatment_group.units + [M510]
                                     + [f.H402, f.V514]]
 
 isobutanol_separation_group = bst.UnitGroup('isobutanol separation', units=IBO_separation_units)
@@ -1354,9 +1360,11 @@ storage_and_handling_group = bst.UnitGroup('storage and handling',
                                                     or isinstance(i, corn.units.DDGSHandling)]
                                                  + [f.P510, f.MX4])
 
-DDGS_recovery_group = bst.UnitGroup('DDGS recovery', 
+DDGS_recovery_group = bst.UnitGroup('DDGS recovery',
                                     units = [i for i in list(f.M403.get_downstream_units())
-                                             if not i in [f.MX5, f.T608, f.MH612]])
+                                             if not i in [f.MX5, f.T608, f.MH612]
+                                                       + list(corn_EtOH_IBO_sys.facilities)
+                                                       + wastewater_treatment_group.units + [M510]])
 
 ethanol_separation_group = bst.UnitGroup('ethanol separation', 
                              units= [i for i in corn_EtOH_IBO_sys.units
@@ -1364,15 +1372,17 @@ ethanol_separation_group = bst.UnitGroup('ethanol separation',
                                         + feedstock_acquisition_group.units + feedstock_saccharification_group.units
                                         + sugar_solution_preparation_group.units + fermentation_group.units
                                         + isobutanol_separation_group.units + storage_and_handling_group.units
-                                        + DDGS_recovery_group.units]
+                                        + DDGS_recovery_group.units
+                                        + wastewater_treatment_group.units + [M510]]
                              )
 
 heat_exchanger_network_group = bst.UnitGroup('heat exchanger network', 
                                                  units=(u.HXN1001,))
 
-other_facilities_group = bst.UnitGroup('other facilities', 
+other_facilities_group = bst.UnitGroup('other facilities',
                                     units=[i for i in list(corn_EtOH_IBO_sys.facilities)
-                                           if not i in heat_exchanger_network_group.units])
+                                           if not i in heat_exchanger_network_group.units]
+                                         + [M510])
 unit_groups = [
     feedstock_acquisition_group,
     feedstock_saccharification_group,
@@ -1382,6 +1392,7 @@ unit_groups = [
     ethanol_separation_group,
     storage_and_handling_group,
     DDGS_recovery_group,
+    wastewater_treatment_group,
     heat_exchanger_network_group,
     other_facilities_group,
     ]
