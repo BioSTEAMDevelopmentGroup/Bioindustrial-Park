@@ -587,6 +587,23 @@ net_wastewater_stream = f.wastewater  # ~87,052 kg/hr, pure Water at baseline
 # Streams that consume process water (used to size the new ProcessWaterCenter makeup).
 process_water_consumers = [f.recycled_process_water, f.scrubber_water, f.dilution_water]
 
+#%% Mix aqueous wastes for wastewater treatment
+# Real aqueous wastes currently discharged: net process wastewater (from T608),
+# backwater (S1, water+organics), F302_P1 evaporator condensate (s85), and the
+# S403 solvent purge (nonzero only when purging isopentyl acetate).
+M501 = bst.Mixer('M501',
+                 ins=(net_wastewater_stream,
+                      f.backwater,
+                      f.s85,
+                      f.S403_purge),
+                 outs='mixed_wastewater_to_WWT')
+
+@M501.add_specification(run=False)
+def M501_spec():
+    for i in M501.ins: i.phase = 'l'
+    M501._run()
+    M501.outs[0].phase = 'l'
+
 HXN = bst.HeatExchangerNetwork('HXN1001', ignored=keep_non_rigorous)
 
 
