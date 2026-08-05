@@ -616,6 +616,39 @@ corn_EtOH_IBO_sys.set_tolerance(mol=1e-3, rmol=1e-3, subsystems=True)
 corn_EtOH_IBO_sys.simulate(update_configuration=True)
 
 
+#%% High-rate wastewater treatment (adds WWT chemicals to the thermo)
+# Fed by the Task 2 aqueous-waste mixer (M501-0). Placed after the corn+IBO
+# system is built and simulated so that the main flowsheet (incl. HXN1001) is
+# assembled and converged under the ORIGINAL thermo, before this call augments
+# the GLOBAL chemical set via `append_wwt_chemicals` (adds H2S, NH4OH, HCl, ...
+# and re-sets thermo). `append_wwt_chemicals` compiles a superset
+# ([*existing_chemicals, *new_wwt_chemicals]), so recovery-train chemicals
+# (Isobutanol, Isopentyl acetate) are preserved by construction.
+#
+# The high-rate WWT digestion units (IC/AnMBR/AeF) build anaerobic growth
+# reactions as parsed strings of the form `f'{chem.ID} -> ...'` for every
+# digestable chemical in the influent. The extraction solvent's chemical ID
+# (`solvent_chem`, e.g. 'Isopentyl acetate') contains a space, which the
+# reaction-string parser mangles ('Isopentylacetate') and then cannot resolve,
+# raising UndefinedChemicalAlias during unit construction. Registering the
+# solvent as an "insoluble" makes get_(BMP|COD)_stoichiometry return zero for
+# it, so all digestion units skip it (its digestion is negligible anyway: it
+# only reaches WWT via the near-zero S403 solvent purge). This mutates a shared
+# biosteam runtime set at import time; no read-only file is edited.
+from biosteam.wastewater.high_rate.utils import default_insolubles as _wwt_default_insolubles
+_wwt_default_insolubles.add(solvent_chem)
+# process_ID='7' -> units land in the free 700 bucket (600 is taken by DDGS units).
+wastewater_treatment_sys = bst.create_high_rate_wastewater_treatment_system(
+    ins=M501-0,
+    process_ID='7',
+    mockup=False,
+)
+# BoilerTurbogenerator expects a 'BoilerChems' handle; map to DAP as HP does.
+if 'DAP' in [c.ID for c in bst.settings.chemicals] and \
+   'BoilerChems' not in bst.settings.chemicals.IDs:
+    bst.settings.thermo.chemicals.set_synonym('BoilerChems', 'DAP')
+
+
 #%% Set prices
 f.isobutanol.price = 1.49 # initial value; updated on purity basis using V514.isobutanol_price https://www.alibaba.com/product-detail/High-Purity-Industrial-Organic-Solvent-Textile_1601609307567.html?spm=a2700.7724857.0.0.6b071f52XisbBQ
 
