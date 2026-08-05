@@ -697,6 +697,50 @@ create_facilities(
 )
 
 
+#%% Reassemble the full system (process + recovery + WWT + HP-style facilities)
+# The L611 `corn_EtOH_IBO_sys` build predates Tasks 3-5: it does NOT contain the
+# WWT train, the M510 solids mixer, or the 7 HP-style facility units, and it still
+# carries the detached corn facilities (T608 + other_facilities). Rebuild it here,
+# once every downstream unit exists on the flowsheet, so that `corn_EtOH_IBO_sys`
+# is the FULL system:
+#   corn+IBO process (no_IBO_recovery) + recovery train + M501/M510
+#   + every WWT unit + the 7 HP facilities + HXN1001,
+# with the corn facilities in `corn_facilities_to_remove` (T608, other_facilities)
+# and the reconnected HXprocess units dropped.
+#
+# create_facilities attaches the facility units to the flowsheet with the IDs
+# BT_area=800 -> BT801 and area=900 -> {CWP,CT,PWC,CIP,ADP,FWT}901. They are listed
+# explicitly (rather than relying on stream-connectivity auto-inclusion) so the
+# assembly is deterministic regardless of how facility streams happen to be wired.
+facility_units = [f.unit.BT801, f.unit.CWP901, f.unit.CT901,
+                  f.unit.PWC901, f.unit.CIP901, f.unit.ADP901, f.unit.FWT901]
+
+corn_EtOH_IBO_sys = bst.System.from_units(
+    'corn_EtOH_IBO_sys',
+    units=[i for i in (corn_EtOH_IBO_sys_no_IBO_recovery.units
+                       + recovery_units
+                       + [M501, M510]
+                       + list(wastewater_treatment_sys.units)
+                       + facility_units
+                       + [HXN])
+           if i not in HXprocess_units
+           and i not in corn_facilities_to_remove],
+)
+
+corn_EtOH_IBO_sys.set_tolerance(mol=1e-3, rmol=1e-3, subsystems=True)
+
+# Establish the full-system network configuration (recycles introduced by the WWT
+# train and the BT/CT -> ProcessWaterCenter water loops). Final convergence is
+# owned by the late-stage `corn_EtOH_IBO_sys.simulate()` + baseline
+# `model_specification(**baseline)` call, which carry the run_bugfix_barrage
+# robustness scaffolding; a failure here must not crash the import, so it is
+# guarded and the late stage is left to converge the system.
+try:
+    corn_EtOH_IBO_sys.simulate(update_configuration=True)
+except Exception as e:
+    print(f"[reassembly] deferred convergence to late stage ({type(e).__name__}: {e})")
+
+
 #%% Set prices
 f.isobutanol.price = 1.49 # initial value; updated on purity basis using V514.isobutanol_price https://www.alibaba.com/product-detail/High-Purity-Industrial-Organic-Solvent-Textile_1601609307567.html?spm=a2700.7724857.0.0.6b071f52XisbBQ
 
