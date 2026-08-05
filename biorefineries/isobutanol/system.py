@@ -570,10 +570,22 @@ for i in corn_EtOH_IBO_sys_no_IBO_recovery.units + []:
         i.rigorous = True
     
 recovery_units = [S404,
-                  M401, S401, M402, D401, D401_0_P, S402, 
-                  S403, H401, 
-                  M403, H402, 
+                  M401, S401, M402, D401, D401_0_P, S402,
+                  S403, H401,
+                  M403, H402,
                   V514]
+
+#%% Detach corn base facilities (replaced by HP-style WWT + boiler facilities)
+# Corn ships a light facility layer: T608 ProcessWaterCenter (emits `wastewater`)
+# and `other_facilities` (PlantAir/CIP/WasteWater). These are removed here so the
+# HP-style create_facilities layer (Task 5) can own process water, cooling, and steam.
+corn_facilities_to_remove = [f.T608, f.other_facilities]
+
+# The net process wastewater currently leaves T608 as its `wastewater` outlet.
+net_wastewater_stream = f.wastewater  # ~87,052 kg/hr, pure Water at baseline
+
+# Streams that consume process water (used to size the new ProcessWaterCenter makeup).
+process_water_consumers = [f.recycled_process_water, f.scrubber_water, f.dilution_water]
 
 HXN = bst.HeatExchangerNetwork('HXN1001', ignored=keep_non_rigorous)
 
