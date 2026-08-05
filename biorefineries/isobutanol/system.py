@@ -649,6 +649,27 @@ if 'DAP' in [c.ID for c in bst.settings.chemicals] and \
     bst.settings.thermo.chemicals.set_synonym('BoilerChems', 'DAP')
 
 
+#%% Mix solid wastes for the boiler turbogenerator
+M510 = bst.Mixer('M510',
+                 ins=(f.s4,),  # MH103 CleaningSystem solids reject
+                 outs='solids_to_boiler_turbogenerator')
+
+@M510.add_specification(run=True)
+def M510_spec():
+    for i in M510.ins: i.phase = 'l'
+
+# M510 is intentionally left out of `corn_EtOH_IBO_sys`'s unit list (see Task
+# 5/6). Its inlet (f.s4) is the outlet of MH103, which IS part of that system;
+# since MH103's outlet has no in-system sink, `corn_EtOH_IBO_sys.simulate()`
+# (further below) treats it as one of the system's product streams and clears
+# any tracked external sink, leaving `M510.ins[0]` a zero-flow placeholder
+# after that point. Simulating M510 once now, while f.s4 still carries
+# MH103's correct output, freezes the correct ~139 kg/hr result in
+# M510.outs[0] for downstream use until Task 5 wires M510 into the system
+# properly (at which point this disconnection no longer occurs).
+M510.simulate()
+
+
 #%% Set prices
 f.isobutanol.price = 1.49 # initial value; updated on purity basis using V514.isobutanol_price https://www.alibaba.com/product-detail/High-Purity-Industrial-Organic-Solvent-Textile_1601609307567.html?spm=a2700.7724857.0.0.6b071f52XisbBQ
 
