@@ -13,6 +13,7 @@ from . import (
     system, 
     units,
     utils,
+    process_settings
     )
 
 __all__ = [
@@ -21,6 +22,7 @@ __all__ = [
             *system.__all__,
             *units.__all__,
             *utils.__all__,
+            *process_settings.__all__,
 ]
 
 from .models import *
@@ -28,6 +30,7 @@ from .plots import *
 from .system import *
 from .units import *
 from .utils import *
+from .process_settings import *
 
 # def load(*args, **kwargs):
 #     br = Biorefinery(*args, **kwargs)

@@ -18,6 +18,7 @@ from biorefineries.isobutanol import units
 from nskinetics.examples.s_cerevisiae_ferm_fb_inhib_mod_ibo import te_r, reset_kinetic_reaction_system
 from scipy.optimize import differential_evolution, minimize, brute
 from matplotlib.ticker import AutoMinorLocator
+from biorefineries.isobutanol.process_settings import load_process_settings
 
 from warnings import filterwarnings
 filterwarnings('ignore')

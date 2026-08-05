@@ -9,6 +9,8 @@
 import biosteam as bst
 import thermosteam as tmo
 
+__all__ = ('load_process_settings',)
+
 def load_process_settings():
     import sys
     if sys.version_info.major==3:
