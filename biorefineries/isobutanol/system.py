@@ -176,16 +176,6 @@ def H302_spec():
 #%%
 V405_old = f.V405
 
-# V406 = units.SSFEtOHIBO(ID='V405', ins=(f.E402-0, f.P404-0), outs=('CO2', ''), V=1.9e3,
-#                             kinetic_reaction_system=te_r,
-#                             n_simulation_steps=1000,
-#                             f_reset_kinetic_reaction_system=reset_kinetic_reaction_system,
-#                             map_chemicals_nsk_to_bst = {'s_glu': 'Glucose',
-#                                                         'x': 'Yeast',
-#                                                         's_EtOH': 'Ethanol',
-#                                                         's_IBO': 'Isobutanol'}
-#                             )
-
 V406 = nsk.units.NSKFermentation('V406', 
                                  ins=(H301-0, f.P404-0, H302-0, ), 
                                  kinetic_reaction_system=te_r,
