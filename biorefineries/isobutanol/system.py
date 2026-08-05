@@ -1160,7 +1160,7 @@ simulate_baseline = True
 if simulate_baseline:
     model_specification(**fbs_spec.baseline_specifications,
         n_sims=3,
-        plot=True,
+        plot=False,
         )
     # print(get_purity_adj_price(ethanol, ['Ethanol']))
     
