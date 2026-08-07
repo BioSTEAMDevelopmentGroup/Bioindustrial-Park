@@ -15,7 +15,7 @@ from matplotlib import pyplot as plt
 from biorefineries import corn
 from biorefineries.cellulosic import create_facilities
 from biorefineries.isobutanol import units
-from nskinetics.examples.s_cerevisiae_ferm_fb_inhib_mod_ibo import te_r, reset_kinetic_reaction_system
+from nskinetics.examples.s_cerevisiae_ferm_fb_inhib_mod_ibo import te_r
 from scipy.optimize import differential_evolution, minimize, brute
 from matplotlib.ticker import AutoMinorLocator
 from biorefineries.isobutanol.process_settings import load_process_settings
@@ -200,7 +200,6 @@ V406 = nsk.units.NSKFermentation('V406',
                                                'prod_EtOH',
                                                'curr_tot_vol_glu_feed_added',
                                                'curr_env',],
-                                 f_reset_kinetic_reaction_system=reset_kinetic_reaction_system,
                                  tau=3*24,
                                  tau_max=3*24,
                                  sugar_IDs=('Glucose',),
