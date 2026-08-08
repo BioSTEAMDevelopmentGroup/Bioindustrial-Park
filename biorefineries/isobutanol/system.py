@@ -15,7 +15,7 @@ from matplotlib import pyplot as plt
 from biorefineries import corn
 from biorefineries.cellulosic import create_facilities
 from biorefineries.isobutanol import units
-from nskinetics.examples.s_cerevisiae_ferm_fb_inhib_mod_ibo import te_r
+from nskinetics.models.s_cerevisiae_ferm_fb_inhib_mod_ibo import te_r
 from scipy.optimize import differential_evolution, minimize, brute
 from matplotlib.ticker import AutoMinorLocator
 from biorefineries.isobutanol.process_settings import load_process_settings
