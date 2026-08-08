@@ -54,7 +54,7 @@ dateTimeObj = datetime.now()
 ig = np.seterr(invalid='ignore')
 
 ferm_reactor = f.V406
-r = ferm_reactor.kinetic_reaction_system._te
+r = ferm_reactor.nsk_kinetic_model._te
 
 sugar_sol_evaporators = [f.F301, f.F302]
 
@@ -92,8 +92,8 @@ baseline_initial = model.metrics_at_baseline()
 #%% Baseline -- simulate and solve TEA
 
 #!!!
-# ferm_reactor.kinetic_reaction_system._te.max_n_glu_spikes = 0 # initial val, changed during optimization
-# ferm_reactor.kinetic_reaction_system.default_max_n_glu_spikes = 0 # initial val, changed during optimization
+# ferm_reactor.nsk_kinetic_model._te.max_n_glu_spikes = 0 # initial val, changed during optimization
+# ferm_reactor.nsk_kinetic_model.default_max_n_glu_spikes = 0 # initial val, changed during optimization
 
 model_specification(
     n_sims=3,
@@ -762,7 +762,7 @@ if plot:
         # if 'spike' in lccm or 'duty' in lccm or 'target sugars' in lccm:
         #     # else: 
         #     if 'spike' in lccm:
-        #         if ferm_reactor.kinetic_reaction_system.default_max_n_glu_spikes == 0.:
+        #         if ferm_reactor.nsk_kinetic_model.default_max_n_glu_spikes == 0.:
         #             continue
         #     else:
         #         pass

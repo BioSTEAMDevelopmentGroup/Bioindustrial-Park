@@ -13,10 +13,10 @@ import csv
 __all__ = ('generate_save_kinetic_parameter_distributions',)
 
 
-def generate_save_kinetic_parameter_distributions(kinetic_reaction_system, filename, 
+def generate_save_kinetic_parameter_distributions(nsk_kinetic_model, filename, 
                                                   fermentation_reactor_ID='V406',
                                                   shape='triangular', factors=(0.8, 1.0, 1.2)):
-    r_te = kinetic_reaction_system._te
+    r_te = nsk_kinetic_model._te
     all_params = r_te.getGlobalParameterIds()
     kinetic_params = [i for i in all_params if i[:2].lower()=='k_']
     
@@ -35,7 +35,7 @@ def generate_save_kinetic_parameter_distributions(kinetic_reaction_system, filen
         baseline = r_te.__getattribute__(k)
         data.append([k, 'Fermentation Kinetics', 'coupled', units,
                      baseline, shape, baseline*factors[0], baseline*factors[1], baseline*factors[2], 
-                     None, f'{fermentation_reactor_ID}.kinetic_reaction_system._te.{k} = x'])
+                     None, f'{fermentation_reactor_ID}.nsk_kinetic_model._te.{k} = x'])
     
     with open(filename, "w", newline="") as csvfile:
         writer = csv.writer(csvfile)

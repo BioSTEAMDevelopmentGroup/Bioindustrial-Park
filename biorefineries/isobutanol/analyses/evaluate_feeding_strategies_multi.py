@@ -53,7 +53,7 @@ dateTimeObj = datetime.now()
 ig = np.seterr(invalid='ignore')
 
 ferm_reactor = f.V406
-r = ferm_reactor.kinetic_reaction_system._te
+r = ferm_reactor.nsk_kinetic_model._te
 
 sugar_sol_evaporators = [f.F301, f.F302]
 
@@ -89,8 +89,8 @@ baseline_initial = model.metrics_at_baseline()
 #%% Baseline -- simulate and solve TEA
 
 #!!!
-# ferm_reactor.kinetic_reaction_system._te.max_n_glu_spikes = 0 # initial val, changed during optimization
-# ferm_reactor.kinetic_reaction_system.default_max_n_glu_spikes = 0 # initial val, changed during optimization
+# ferm_reactor.nsk_kinetic_model._te.max_n_glu_spikes = 0 # initial val, changed during optimization
+# ferm_reactor.nsk_kinetic_model.default_max_n_glu_spikes = 0 # initial val, changed during optimization
 
 # ferm_reactor.stage_1_time = 5.0
 # ferm_reactor.stage_1_time = 10.0
@@ -106,8 +106,8 @@ model_specification(
 
 #%% Parameter load functions
 def load_max_n_glu_spikes(val):
-    ferm_reactor.kinetic_reaction_system._te.max_n_glu_spikes = val 
-    ferm_reactor.kinetic_reaction_system.default_max_n_glu_spikes = val
+    ferm_reactor.nsk_kinetic_model._te.max_n_glu_spikes = val 
+    ferm_reactor.nsk_kinetic_model.default_max_n_glu_spikes = val
 
 #%%  Metrics
 product_chemical_IDs = ['Ethanol',]
@@ -389,8 +389,8 @@ for s3 in spec_3:
     # Save generated data
     for k, v in results.items():
         
-        max_n = ferm_reactor.kinetic_reaction_system._te.max_n_glu_spikes
-        s1t = ferm_reactor.kinetic_reaction_system._te.stage_1_time
+        max_n = ferm_reactor.nsk_kinetic_model._te.max_n_glu_spikes
+        s1t = ferm_reactor.nsk_kinetic_model._te.stage_1_time
         
         csv_file_to_save = file_to_save + f's1t={s1t}_' + f'max_n={max_n}_' + f'_{k}'
         pd.DataFrame(v[-1]).to_csv(isobutanol_results_filepath+csv_file_to_save+'.csv')
@@ -767,7 +767,7 @@ if plot:
         # if 'spike' in lccm or 'duty' in lccm or 'target sugars' in lccm:
         #     # else: 
         #     if 'spike' in lccm:
-        #         if ferm_reactor.kinetic_reaction_system.default_max_n_glu_spikes == 0.:
+        #         if ferm_reactor.nsk_kinetic_model.default_max_n_glu_spikes == 0.:
         #             continue
         #     else:
         #         pass

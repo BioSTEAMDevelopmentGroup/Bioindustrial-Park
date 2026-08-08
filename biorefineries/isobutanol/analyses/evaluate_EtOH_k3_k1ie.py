@@ -52,7 +52,7 @@ dateTimeObj = datetime.now()
 ig = np.seterr(invalid='ignore')
 
 ferm_reactor = f.V406
-r = ferm_reactor.kinetic_reaction_system._te
+r = ferm_reactor.nsk_kinetic_model._te
 
 sugar_sol_evaporators = [f.F301, f.F302]
 
@@ -84,8 +84,8 @@ model.load_parameter_distributions(parameter_distributions_filename, namespace_d
 
 
 # !!!
-# ferm_reactor.kinetic_reaction_system._te.max_n_glu_spikes = 0
-# ferm_reactor.kinetic_reaction_system.default_max_n_glu_spikes = 0  
+# ferm_reactor.nsk_kinetic_model._te.max_n_glu_spikes = 0
+# ferm_reactor.nsk_kinetic_model.default_max_n_glu_spikes = 0  
 perform_feeding_strategy_opt = True
 
 model_specification(
@@ -246,7 +246,7 @@ def tickmarks(dmin, dmax, accuracy=50, N_points=5):
 #%%
 minute = '0' + str(dateTimeObj.minute) if len(str(dateTimeObj.minute))==1 else str(dateTimeObj.minute)
 # file_to_save = f'_{steps}_steps_'+'etoh_fbs_%s.%s.%s-%s.%s'%(dateTimeObj.year, dateTimeObj.month, dateTimeObj.day, dateTimeObj.hour, minute)
-file_to_save = f'_ibo_{steps}_{x_label[:5]}_{y_label[:5]}_{z_label[:5]}_opt={perform_feeding_strategy_opt}_max_n={ferm_reactor.kinetic_reaction_system.default_max_n_glu_spikes}_'
+file_to_save = f'_ibo_{steps}_{x_label[:5]}_{y_label[:5]}_{z_label[:5]}_opt={perform_feeding_strategy_opt}_max_n={ferm_reactor.nsk_kinetic_model.default_max_n_glu_spikes}_'
 
 #%% Initial simulation
 

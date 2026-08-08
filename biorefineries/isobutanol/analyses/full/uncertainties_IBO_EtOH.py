@@ -93,12 +93,12 @@ parameter_distributions_filenames = {i: 'parameter-distributions_corn_IBO_EtOH_'
 #%%
 V406 = f.V406
 if scenario=='A':
-    V406.kinetic_reaction_system._te.max_n_glu_spikes = 16
-    V406.kinetic_reaction_system.default_max_n_glu_spikes = 16  
+    V406.nsk_kinetic_model._te.max_n_glu_spikes = 16
+    V406.nsk_kinetic_model.default_max_n_glu_spikes = 16  
     model.specification(threshold_conc=217.125, target_conc=221.25)
 elif scenario=='B':
-    V406.kinetic_reaction_system._te.max_n_glu_spikes = 13
-    V406.kinetic_reaction_system.default_max_n_glu_spikes = 13  
+    V406.nsk_kinetic_model._te.max_n_glu_spikes = 13
+    V406.nsk_kinetic_model.default_max_n_glu_spikes = 13  
     model.specification(threshold_conc=216.3, target_conc=226.3)
     
 #%%

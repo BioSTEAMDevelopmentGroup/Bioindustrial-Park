@@ -180,7 +180,7 @@ V405_old = f.V405
 
 V406 = nsk.units.FermentationSaccharomycesEthanolIsobutanol('V406', 
                                  ins=(H301-0, f.P404-0, H302-0, ), 
-                                 kinetic_reaction_system=te_r,
+                                 nsk_kinetic_model=te_r,
                                  n_simulation_steps=1000,
                                  map_chemicals_nsk_to_bst = {'[s_glu]': 'Glucose',
                                                              '[x]': 'Yeast',
@@ -327,7 +327,7 @@ M401 = bst.Mixer('M401', ins=('', makeup_isopentyl_acetate), outs=('isopentyl_ac
 M401_design = M401._design
 M401_cost = M401._cost
 
-# M401.bypass_IBO_separation_conditions = [lambda: V406.kinetic_reaction_system._te.k_13==0.0] # if any return True, don't try to recover Isobutanol
+# M401.bypass_IBO_separation_conditions = [lambda: V406.nsk_kinetic_model._te.k_13==0.0] # if any return True, don't try to recover Isobutanol
 
 M401.bypass_IBO_separation_conditions = [lambda: V406.outs[1].imass['Isobutanol']/V406.outs[1].F_vol < 2.0] # if any return True, don't try to recover Isobutanol
 
@@ -911,7 +911,7 @@ def plot_kinetic_results(xlim=None, ylim=None,
         ax.set_ylim((0.0, 20.0 + max([v.max()for k, v in V406.nsk_results_dict.items()
                              if '[' in k and ']' in k])))
     if show_stage_1_time:
-        ax.vlines(x=[V406.kinetic_reaction_system._te.stage_1_time], 
+        ax.vlines(x=[V406.nsk_kinetic_model._te.stage_1_time], 
                   ymin=[ax.get_ylim()[0]], ymax=[ax.get_ylim()[1]],
                   linestyles='dashed', linewidth=1.0, color='gray',
                   )
@@ -1161,7 +1161,7 @@ def optimize_stage_1_time_and_max_n_glu_spikes_for_MPSP(bounds=((5, 40), (0, 40)
                                           model_kwargs={},
                                           method_kwargs={},
                                           **kwargs):
-    nsk_r = V406.kinetic_reaction_system
+    nsk_r = V406.nsk_kinetic_model
     r_te = nsk_r._te
     model_specification(**model_kwargs)
     def f(x):
@@ -1218,7 +1218,7 @@ def optimize_max_n_glu_spikes_for_MPSP(bounds=(0, 40),
                                           model_kwargs={},
                                           method_kwargs={},
                                           **kwargs):
-    nsk_r = V406.kinetic_reaction_system
+    nsk_r = V406.nsk_kinetic_model
     r_te = nsk_r._te
     model_specification(**model_kwargs)
     def f(x):
@@ -1316,7 +1316,7 @@ def optimize_2D_feeding_strategy_for_MPSP(bounds=(20.0, 400.0), Ns=5, **kwargs):
     return opt_conc
 
 #%% Initialize 
-r = V406.kinetic_reaction_system._te
+r = V406.nsk_kinetic_model._te
 corn_EtOH_IBO_sys.simulate()
 
 #%% Baseline -- simulate and solve TEA

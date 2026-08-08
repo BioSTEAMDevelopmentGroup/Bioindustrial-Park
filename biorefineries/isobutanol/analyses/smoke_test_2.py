@@ -19,7 +19,7 @@ unit_groups_dict = isobutanol.models.unit_groups_dict
 model_specification = model.specification
 f = model.system.flowsheet
 V406 = f.V406
-r = V406.kinetic_reaction_system
+r = V406.nsk_kinetic_model
 IBO_filepath = isobutanol.__file__.replace('\\__init__.py', '')
 
 def load_simulate_baseline(scenario='B', # 'A' or 'B'
@@ -36,15 +36,15 @@ def load_simulate_baseline(scenario='B', # 'A' or 'B'
     model_specification()
     
     # for forced batch mode:
-    # V406.kinetic_reaction_system._te.max_n_glu_spikes = 0
-    # V406.kinetic_reaction_system.default_max_n_glu_spikes = 0  
+    # V406.nsk_kinetic_model._te.max_n_glu_spikes = 0
+    # V406.nsk_kinetic_model.default_max_n_glu_spikes = 0  
     if scenario=='A':
-        V406.kinetic_reaction_system._te.max_n_glu_spikes = 16
-        V406.kinetic_reaction_system.default_max_n_glu_spikes = 16 
+        V406.nsk_kinetic_model._te.max_n_glu_spikes = 16
+        V406.nsk_kinetic_model.default_max_n_glu_spikes = 16 
         model_specification(threshold_conc=217.125, target_conc=221.25)
     elif scenario=='B':
-        V406.kinetic_reaction_system._te.max_n_glu_spikes = 13
-        V406.kinetic_reaction_system.default_max_n_glu_spikes = 13  
+        V406.nsk_kinetic_model._te.max_n_glu_spikes = 13
+        V406.nsk_kinetic_model.default_max_n_glu_spikes = 13  
         model_specification(threshold_conc=216.3, target_conc=226.3)
     else:
         raise ValueError(f'Scenario {scenario} not found.')
