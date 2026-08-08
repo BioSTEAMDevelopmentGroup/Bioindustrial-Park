@@ -78,150 +78,28 @@ def refresh_feed_specifications():
     MH101._run()
 
 
-#%% Add splitter and feed & spike evaporators, mixers, and heat exchangers
-
-## Splitter
-S301 = bst.Splitter('S301', ins=f.E402-0,
-                    outs = ('fermentation_initial_feed', 'fermentation_spike'),
-                    split = 0.8, # initial value, updated in FeedStrategySpecification object
-                    )
-
-## Initial feed evaporator, pumps, mixer, and hx
-F301 = bst.MultiEffectEvaporator('F301', ins=S301-0, outs=('F301_l', 'F301_g'),
-                                        P = (101325, 73581, 50892, 32777, 20000), V = 0.1,
-                                        flash=False)
-F301.V = 0.1 # initial value, updated in FeedStrategySpecification object
-F301_design = F301._design
-F301_cost = F301._cost
-
-@F301.add_specification(run=False)
-def F301_spec():
-    feed = F301.ins[0]
-    if feed.F_mol:
-        # and feed.imass['Water']/feed.F_mass > 0.2:
-        F301._run()
-        F301._design = F301_design
-        F301._cost = F301_cost
-    else:
-        F301.outs[1].empty()
-        F301.outs[0].copy_like(feed)
-        F301._design = lambda:0
-        F301._cost = lambda:0
-
-F301_P0 = bst.units.Pump('F301_P0', ins=F301-0, outs='', P=101325.)
-F301_P1 = bst.units.Pump('F301_P1', ins=F301-1, outs='', P=101325.)
-
-M301 = bst.units.Mixer('M301', ins=(F301_P0-0, 'dilution_water'))
-M301.water_to_sugar_mol_ratio = 100. # initial value, updated in FeedStrategySpecification object
-
-@M301.add_specification(run=False)
-def adjust_M301_water():
-    M301_ins_1 = M301.ins[1]
-    M301_ins_1.imol['Water'] = M301.water_to_sugar_mol_ratio * M301.ins[0].imol[V406.sugar_IDs].sum()
-    M301._run()
-    
-H301 = bst.units.HXutility('H301', ins=M301-0, outs=('glucose_initial_feed',), T=32+273.15, rigorous=True)
-
-@H301.add_specification(run=False)
-def H301_spec():
-    H301._run()
-    H301.outs[0].phase = 'l'
-    
-## Spike evaporator, pumps, mixer, and hx
-F302 = bst.MultiEffectEvaporator('F302', ins=S301-1, outs=('F302_l', 'F302_g'),
-                                        P = (101325, 73581, 50892, 32777, 20000), V = 0.1,
-                                        flash=False)
-F302.V = 0.1 # initial value, updated in FeedStrategySpecification object
-F302_design = F302._design
-F302_cost = F302._cost
-
-@F302.add_specification(run=False)
-def F302_spec():
-    feed = F302.ins[0]
-    if feed.F_mol:
-    # and feed.imass['Water']/feed.F_mass > 0.2:
-        F302._run()
-        F302._design = F302_design
-        F302._cost = F302_cost
-    else:
-        F302.outs[1].empty()
-        F302.outs[0].copy_like(feed)
-        F302._design = lambda:0
-        F302._cost = lambda:0
-
-def F302_design_extended():
-    try:
-        F302_design()
-    except:
-        F302._V_overall(F302._V_first_effect)
-        F302_design()
-        
-F302_P0 = bst.units.Pump('F302_P0', ins=F302-0, outs='', P=101325.)
-F302_P1 = bst.units.Pump('F302_P1', ins=F302-1, outs='', P=101325.)
-
-M302 = bst.units.Mixer('M302', ins=(F302_P0-0, 'dilution_water'))
-M302.water_to_sugar_mol_ratio = 100. # initial value
-
-@M302.add_specification(run=False)
-def adjust_M302_water():
-    M302_ins_1 = M302.ins[1]
-    M302_ins_1.imol['Water'] = M302.water_to_sugar_mol_ratio * M302.ins[0].imol[V406.sugar_IDs].sum()
-    M302._run()
-    
-H302 = bst.units.HXutility('H302', ins=M302-0, outs=('glucose_spike_feed',), T=32+273.15, rigorous=True)
-
-@H302.add_specification(run=False)
-def H302_spec():
-    H302._run()
-    H302.outs[0].phase = 'l'
-    
-#%%
+#%% Sugar-solution preparation and fed-batch fermentation
+# Splitter, initial-feed and spike-feed conditioning trains (evaporator, pumps,
+# dilution-water mixer, heat exchanger), fermentor, and compressed-air aeration
+# loop, built by the nskinetics system factory with the same unit IDs and
+# initial settings as the former inline construction. The factory also builds
+# the fed-batch strategy specification and attaches it to the fermentor
+# (V406.fbs_spec) without imposing it. Caller-side couplings re-added below:
+# vent/effluent docking to V409/P406 and the feed-flow-correction
+# specification (which re-simulates the aeration loop).
 V405_old = f.V405
 
-V406 = nsk.units.FermentationSaccharomycesEthanolIsobutanol('V406', 
-                                 ins=(H301-0, f.P404-0, H302-0, ), 
-                                 nsk_kinetic_model=te_r,
-                                 n_simulation_steps=1000,
-                                 map_chemicals_nsk_to_bst = {'[s_glu]': 'Glucose',
-                                                             '[x]': 'Yeast',
-                                                             '[s_EtOH]': 'Ethanol',
-                                                             '[s_IBO]': 'Isobutanol',
-                                                             '[s_acetate]': 'AceticAcid',
-                                                             # '[s_acetald]': 'Acetaldehyde',
-                                                             },
-                                 track_vars = ['y_EtOH_glu_added', 
-                                               'y_EtOH_glu_consumed',
-                                               'y_IBO_glu_added', 
-                                               'y_IBO_glu_consumed',
-                                               'y_EtOH_IBO_glu_added',
-                                               'curr_n_glu_spikes',
-                                               'curr_a',
-                                               # 'tot_mass_glu', 
-                                               'prod_EtOH',
-                                               'curr_tot_vol_glu_feed_added',
-                                               'curr_env',],
-                                 tau=3*24,
-                                 tau_max=3*24,
-                                 sugar_IDs=('Glucose',),
-                                 # tau_update_policy=None,
-                                 tau_update_policy=('max', '[s_EtOH]'),
-                                 # tau_update_policy=('max', 'y_EtOH_IBO_glu_added'),
-                                 # tau_update_policy=('min', '[s_glu]'),
-                                 # tau_update_policy=('equals', '[s_glu]', 0.0),
-                                 n_decimal_places_for_tau_update_policy=0,
-                                 try_fewer_n_spikes_until=lambda r_te: round(r_te.s_glu, 2)==0.0,
-                                 perform_hydrolysis=False,
-                                 
-                                 # !!!
-                                 
-                                 # # Option i
-                                 # stop_aeration_when_cell_density_plateaus = True
-                                 
-                                 # Option ii
-                                 stage_1_max_x=5.0,
-                                 stage_1_max_time=25.0,
-                                 
-                                 )
+sugar_prep_and_fermentation_sys = nsk.processes.create_sugar_prep_and_fermentation_system(
+    ins=(f.E402-0, f.P404-0),
+    nsk_kinetic_model=te_r,
+    mockup=True,
+)
+
+S301 = f.S301
+F301, F301_P0, F301_P1, M301, H301 = f.F301, f.F301_P0, f.F301_P1, f.M301, f.H301
+F302, F302_P0, F302_P1, M302, H302 = f.F302, f.F302_P0, f.F302_P1, f.M302, f.H302
+V406 = f.V406
+K330, V330 = f.K330, f.V330
 
 V406-0-1-f.V409
 V406-1-0-f.P406
@@ -237,44 +115,13 @@ def correct_saccharification_feed_flows():
     mash_dry_flow = mash_flow - mash.imass['Water']
     yeast.F_mass = max(1e-2, parameters['yeast_loading'] * mash_flow)
     gluco_amylase.F_mass = max(1e-2, parameters['saccharification_gluco_amylase_loading'] * mash_dry_flow)
-    
+
     effluent = V406.outs[1]
     ammonia.imass['NH3'] = parameters['NH3_per_Yeast'] * effluent.imass['Yeast']
-    
+
     V406.simulate()
     K330.simulate()
     V330.simulate()
-    
-# V406.simulate()
-
-#%% Compressed air system
-K330 = bst.units.IsothermalCompressor('K330', ins='atmospheric_air', outs=('pressurized_air'), 
-                                P=3e7,
-                                # vle=True,
-                                eta=0.6,
-                                driver='Electric motor',
-                                )
-
-@K330.add_specification(run=False)
-def K330_spec():
-    K330_ins_0 = K330.ins[0]
-    K330_ins_0.T = V406.T
-    # K330.P = R302.air_pressure
-    K330_ins_0.phase = 'g'
-    K330_ins_0.mol[:] = K330.outs[0].mol[:]
-    K330._run()
-
-V330 = bst.units.IsenthalpicValve('V330', ins=K330-0,
-                                  P=101325.,
-                                  vle=False,
-                                  )
-V330.line = 'Valve'
-@V330.add_specification(run=False)
-def V330_spec():
-    V330.ins[0].mol[:] = V330.outs[0].mol[:]
-    V330._run()
-    
-V330-0-3-V406
 
 #%%
 
@@ -307,11 +154,7 @@ def update_scrubber_wash_water():
 corn_EtOH_IBO_sys_no_IBO_recovery = bst.System.from_units('corn_EtOH_IBO_sys_no_IBO_recovery', 
                                           units = [i for i in corn_EtOH_sys.units 
                                                    if not (i.ID=='V405')]
-                                                  + [S301,
-                                                     F301, F301_P0, F301_P1, M301, H301,
-                                                     F302, F302_P0, F302_P1, M302, H302,
-                                                     V406,
-                                                     K330, V330])
+                                                  + list(sugar_prep_and_fermentation_sys.units))
 corn_EtOH_IBO_sys_no_IBO_recovery.simulate()
 
 #%% Add isobutanol recovery system - stage 1/2
@@ -593,12 +436,12 @@ process_water_consumers = [f.recycled_process_water, f.scrubber_water, f.dilutio
 
 #%% Mix aqueous wastes for wastewater treatment
 # Real aqueous wastes currently discharged: backwater (S1, water+organics),
-# F302_P1 evaporator condensate (s85), and the S403 solvent purge (nonzero only
+# F302_P1 evaporator condensate (spike_feed_condensate), and the S403 solvent purge (nonzero only
 # when purging isopentyl acetate). T608's `wastewater` outlet is intentionally
 # excluded (see NOTE above) — it is not a real aqueous waste of the new system.
 M501 = bst.Mixer('M501',
                  ins=(f.backwater,
-                      f.s85,
+                      f.spike_feed_condensate,
                       f.S403_purge),
                  outs='mixed_wastewater_to_WWT')
 
@@ -759,14 +602,6 @@ corn_EtOH_IBO_sys._TEA = corn_EtOH_IBO_sys_tea = corn.tea.create_tea(corn_EtOH_I
 
 #%% Set baseline specifications
 
-baseline_spec = {
-                 # 'target_conc': 220.0,
-                 # 'threshold_conc': 210.0,
-                 'target_conc': 221.25,
-                 'threshold_conc': 217.125,
-                 'spike_conc': 600.0,
-                 'tau_max': 120.0,}
-
 # V406.stage_1_time = 15.0
 # te_r._te.max_n_glu_spikes = 10
 # te_r.default_max_n_glu_spikes = 10
@@ -774,29 +609,12 @@ baseline_spec = {
 te_r._te.max_n_glu_spikes = 16
 te_r.default_max_n_glu_spikes = 16
 
-#% Create fed-batch strategy specification object
-fbs_spec = nsk.units.FedBatchStrategySpecification(
-    target_conc=220.0,
-    threshold_conc=210.0,
-    spike_conc=600.0,
-    tau_max=72,
-    fermentation_reactor=V406,
-    splitter=S301,
-    control_variables=nsk.units.SpikeControlVariables(
-        spike_conc_var='conc_glu_feed_spike',
-        target_conc_var='target_conc_glu_spike',
-        threshold_conc_var='threshold_conc_glu_spike',
-        ),
-    feed_concentrator=nsk.units.ConcentrationActuator(F301, 'V', 0.0, 0.8),
-    feed_diluter=nsk.units.ConcentrationActuator(M301, 'water_to_sugar_mol_ratio', 0.0, 100_000),
-    spike_concentrator=nsk.units.ConcentrationActuator(F302, 'V', 0.0, 0.8),
-    spike_diluter=nsk.units.ConcentrationActuator(M302, 'water_to_sugar_mol_ratio', 0.0, 100_000),
-    feed_units_sequential=[F301, F301_P0, F301_P1, M301, H301],
-    spike_units_sequential=[F302, F302_P0, F302_P1, M302, H302],
-    species_IDs=['Glucose'],
-    solvent_ID='Water',
-    baseline_specifications=baseline_spec,
-    )
+#% Fed-batch strategy specification: built by the factory and attached to the
+#% fermentor. Its constructor initial values and default baseline
+#% specifications reproduce the former inline construction (the scenario
+#% baselines deliberately differ from the constructor initial values).
+fbs_spec = V406.fbs_spec
+baseline_spec = fbs_spec.baseline_specifications
 
 #%%
 
