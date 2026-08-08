@@ -41,11 +41,11 @@ def load_simulate_baseline(scenario='B', # 'A' or 'B'
     if scenario=='A':
         V406.kinetic_reaction_system._te.max_n_glu_spikes = 16
         V406.kinetic_reaction_system.default_max_n_glu_spikes = 16 
-        model_specification(threshold_conc_sugars=217.125, target_conc_sugars=221.25)
+        model_specification(threshold_conc=217.125, target_conc=221.25)
     elif scenario=='B':
         V406.kinetic_reaction_system._te.max_n_glu_spikes = 13
         V406.kinetic_reaction_system.default_max_n_glu_spikes = 13  
-        model_specification(threshold_conc_sugars=216.3, target_conc_sugars=226.3)
+        model_specification(threshold_conc=216.3, target_conc=226.3)
     else:
         raise ValueError(f'Scenario {scenario} not found.')
         

@@ -100,9 +100,9 @@ s1t = 15.0
 steps = (25, 25, 1)
 
 #
-spec_1 = threshold_conc_sugarses = np.linspace(1., 400., steps[0])
+spec_1 = threshold_conces = np.linspace(1., 400., steps[0])
 
-spec_2 = target_conc_sugarses = np.linspace(10., 400., steps[1])
+spec_2 = target_conces = np.linspace(10., 400., steps[1])
 
 # spec_3 = max_n_glu_spikes = np.linspace(0, 20, steps[2])
 spec_3 = max_n_glu_spikes = [20]

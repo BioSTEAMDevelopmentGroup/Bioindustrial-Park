@@ -237,7 +237,7 @@ def plot_save_kinetic_multipanel(metric, row_parameter_pairs=None, strategies=No
             raise ValueError(f'Unsupported y_label: {y_label}')
     
         if z_label == 'Spike feed glucose concentration':
-            # spec_3 = np.array([fbs_spec.conc_sugars_feed_spike])
+            # spec_3 = np.array([fbs_spec.spike_conc])
             spec_3 = np.array([600.])
             z_units = r"$\mathrm{g} \cdot \mathrm{L}^{-1}$"
             z_ticks = [0, 200, 400, 600, 800]

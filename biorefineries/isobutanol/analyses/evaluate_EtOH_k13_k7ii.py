@@ -94,11 +94,11 @@ scenario = 'B'
 if scenario=='A':
     ferm_reactor.kinetic_reaction_system._te.max_n_glu_spikes = 16
     ferm_reactor.kinetic_reaction_system.default_max_n_glu_spikes = 16 
-    model_specification(threshold_conc_sugars=217.125, target_conc_sugars=221.25)
+    model_specification(threshold_conc=217.125, target_conc=221.25)
 elif scenario=='B':
     ferm_reactor.kinetic_reaction_system._te.max_n_glu_spikes = 13
     ferm_reactor.kinetic_reaction_system.default_max_n_glu_spikes = 13  
-    model_specification(threshold_conc_sugars=216.3, target_conc_sugars=226.3)
+    model_specification(threshold_conc=216.3, target_conc=226.3)
     
 # !!!
 # ferm_reactor.kinetic_reaction_system._te.max_n_glu_spikes = 0
@@ -149,7 +149,7 @@ metrics = {'MPSP': {'f': get_product_MPSP, 'units': '$/kg'},
             'Number of glucose spikes': {'f': get_curr_n_glu_spikes, 'units': ''},
             'Fermentation time': {'f': get_tau, 'units': 'h'},
             'Total Q sugar evap': {'f': get_sugar_sol_evap_duty, 'units': 'kJ/h'},
-            'Target sugars concentration': {'f': lambda: fbs_spec.target_conc_sugars, 'units': 'g-sugars/L-broth'},
+            'Target sugars concentration': {'f': lambda: fbs_spec.target_conc, 'units': 'g-sugars/L-broth'},
             'Cell loading': {'f': get_cell_loading, 'units': 'g-cell/L-broth'},
             'Active cell loading': {'f': get_active_cell_loading, 'units': 'g-cell/L-broth'},
             'EtOH Yield': {'f': lambda: ferm_reactor.nsk_results_specific_tau_dict['y_EtOH_glu_added'], 'units': 'g-EtOH/g-sugars'},
@@ -170,10 +170,10 @@ spec_1 = nsk_k_13es = np.linspace(0.0, 40.0, steps[0])
 spec_2 = nsk_k_7iies = np.linspace(0.0001, 0.5, steps[1])
 
 
-spec_3 = conc_sugars_feed_spikes =\
+spec_3 = spike_concs =\
     np.array([
-              # 1.*baseline_spec['conc_sugars_feed_spike'],
-              fbs_spec.conc_sugars_feed_spike,
+              # 1.*baseline_spec['spike_conc'],
+              fbs_spec.spike_conc,
               ])
 
 #%% Plot stuff
@@ -324,7 +324,7 @@ for s3 in spec_3:
                 curr_spec = {k: v for k,v in fbs_spec.current_specifications.items()}
                 r.k_13 = s1
                 r.k_7ii = s2
-                curr_spec.update({'conc_sugars_feed_spike':s3,})
+                curr_spec.update({'spike_conc':s3,})
                 
                 if perform_feeding_strategy_opt:
                     optimize_1D_feeding_strategy_for_MPSP(Ns=20, model_kwargs=curr_spec)

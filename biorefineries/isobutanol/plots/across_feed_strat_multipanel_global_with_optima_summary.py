@@ -43,9 +43,9 @@ z_ticks = [0, 5, 10, 15, 20]
 
 steps = (25, 25, 5)
 
-spec_1 = threshold_conc_sugarses = np.linspace(1., 400., steps[0])
+spec_1 = threshold_conces = np.linspace(1., 400., steps[0])
 
-spec_2 = target_conc_sugarses = np.linspace(10., 400., steps[1])
+spec_2 = target_conces = np.linspace(10., 400., steps[1])
 
 spec_3 = row_max_ns = max_n_glu_spikes = np.linspace(0, 20, steps[2])
 

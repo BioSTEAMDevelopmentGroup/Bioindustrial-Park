@@ -178,7 +178,7 @@ def H302_spec():
 #%%
 V405_old = f.V405
 
-V406 = nsk.units.NSKFermentation('V406', 
+V406 = nsk.units.FermentationSaccharomycesEthanolIsobutanol('V406', 
                                  ins=(H301-0, f.P404-0, H302-0, ), 
                                  kinetic_reaction_system=te_r,
                                  n_simulation_steps=1000,
@@ -760,11 +760,11 @@ corn_EtOH_IBO_sys._TEA = corn_EtOH_IBO_sys_tea = corn.tea.create_tea(corn_EtOH_I
 #%% Set baseline specifications
 
 baseline_spec = {
-                 # 'target_conc_sugars': 220.0,
-                 # 'threshold_conc_sugars': 210.0,
-                 'target_conc_sugars': 221.25,
-                 'threshold_conc_sugars': 217.125,
-                 'conc_sugars_feed_spike': 600.0,
+                 # 'target_conc': 220.0,
+                 # 'threshold_conc': 210.0,
+                 'target_conc': 221.25,
+                 'threshold_conc': 217.125,
+                 'spike_conc': 600.0,
                  'tau_max': 120.0,}
 
 # V406.stage_1_time = 15.0
@@ -776,19 +776,25 @@ te_r.default_max_n_glu_spikes = 16
 
 #% Create fed-batch strategy specification object
 fbs_spec = nsk.units.FedBatchStrategySpecification(
-    target_conc_sugars=220.0,
-    threshold_conc_sugars=210.0,
-    conc_sugars_feed_spike=600.0,
+    target_conc=220.0,
+    threshold_conc=210.0,
+    spike_conc=600.0,
     tau_max=72,
     fermentation_reactor=V406,
     splitter=S301,
-    feed_evaporator=F301,
-    feed_mixer=M301,
+    control_variables=nsk.units.SpikeControlVariables(
+        spike_conc_var='conc_glu_feed_spike',
+        target_conc_var='target_conc_glu_spike',
+        threshold_conc_var='threshold_conc_glu_spike',
+        ),
+    feed_concentrator=nsk.units.ConcentrationActuator(F301, 'V', 0.0, 0.8),
+    feed_diluter=nsk.units.ConcentrationActuator(M301, 'water_to_sugar_mol_ratio', 0.0, 100_000),
+    spike_concentrator=nsk.units.ConcentrationActuator(F302, 'V', 0.0, 0.8),
+    spike_diluter=nsk.units.ConcentrationActuator(M302, 'water_to_sugar_mol_ratio', 0.0, 100_000),
     feed_units_sequential=[F301, F301_P0, F301_P1, M301, H301],
     spike_units_sequential=[F302, F302_P0, F302_P1, M302, H302],
-    spike_evaporator=F302,
-    spike_mixer=M302,
-    sugar_IDs=['Glucose',],
+    species_IDs=['Glucose'],
+    solvent_ID='Water',
     baseline_specifications=baseline_spec,
     )
 
@@ -800,23 +806,23 @@ fbs_spec.n_tea_solves = 3
 def get_purity_adj_price(stream, chem_IDs):
     return stream.price * stream.F_mass/sum([stream.imass[ID] for ID in chem_IDs])
 
-def load_simulate_get_MPSP(target_conc_sugars=None,
-    threshold_conc_sugars=None,
-    conc_sugars_feed_spike=None,
+def load_simulate_get_MPSP(target_conc=None,
+    threshold_conc=None,
+    spike_conc=None,
     tau_max=None,
     n_sims=3,
     n_tea_solves=None,
     plot=False,
     ):
     
-    if target_conc_sugars is None:
-        target_conc_sugars = fbs_spec.target_conc_sugars
+    if target_conc is None:
+        target_conc = fbs_spec.target_conc
     
-    if threshold_conc_sugars is None:
-        threshold_conc_sugars = fbs_spec.threshold_conc_sugars
+    if threshold_conc is None:
+        threshold_conc = fbs_spec.threshold_conc
     
-    if conc_sugars_feed_spike is None:
-        conc_sugars_feed_spike = fbs_spec.conc_sugars_feed_spike
+    if spike_conc is None:
+        spike_conc = fbs_spec.spike_conc
     
     if tau_max is None:
         tau_max = fbs_spec.tau_max
@@ -824,9 +830,9 @@ def load_simulate_get_MPSP(target_conc_sugars=None,
     ethanol = f.ethanol
     
     for i in range(n_sims):
-        fbs_spec.load_specifications(target_conc_sugars=target_conc_sugars,
-        threshold_conc_sugars=threshold_conc_sugars,
-        conc_sugars_feed_spike=conc_sugars_feed_spike,
+        fbs_spec.load_specifications(target_conc=target_conc,
+        threshold_conc=threshold_conc,
+        spike_conc=spike_conc,
         tau_max=tau_max,)
         
         corn_EtOH_IBO_sys.simulate()
@@ -1123,8 +1129,8 @@ def optimize_1D_feeding_strategy_for_MPSP(bounds=(100.0, 400.0), threshold_diff=
     model_specification(**model_kwargs)
     def f(x):
         try:
-            model_kwargs.update({'target_conc_sugars': x[0],
-                                 'threshold_conc_sugars': x[0] - threshold_diff})
+            model_kwargs.update({'target_conc': x[0],
+                                 'threshold_conc': x[0] - threshold_diff})
             model_specification(**model_kwargs)
             MPSP = get_purity_adj_price(ethanol, ['Ethanol'])
             # print(MPSP)
@@ -1259,8 +1265,8 @@ def optimize_split_1D_2D_feeding_strategy_for_MPSP(bounds=(20.0, 400.0), thresho
     def f(x):
         try:
             model_specification(
-                                target_conc_sugars=x[0],
-                                threshold_conc_sugars=x[0]-threshold_diff, )
+                                target_conc=x[0],
+                                threshold_conc=x[0]-threshold_diff, )
             MPSP = get_purity_adj_price(ethanol, ['Ethanol'])
             # print(MPSP)
             return MPSP
@@ -1287,8 +1293,8 @@ def optimize_2D_feeding_strategy_for_MPSP(bounds=(20.0, 400.0), Ns=5, **kwargs):
     def f(x):
         try:
             model_specification(
-                                target_conc_sugars=x[0],
-                                threshold_conc_sugars=x[0]-10, )
+                                target_conc=x[0],
+                                threshold_conc=x[0]-10, )
             MPSP = get_purity_adj_price(ethanol, ['Ethanol'])
             # print(MPSP)
             return MPSP

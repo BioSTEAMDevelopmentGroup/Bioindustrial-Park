@@ -130,7 +130,7 @@ metrics = {'MPSP': {'f': get_product_MPSP, 'units': '$/kg'},
             'Number of glucose spikes': {'f': get_curr_n_glu_spikes, 'units': ''},
             'Fermentation time': {'f': get_tau, 'units': 'h'},
             'Total heating duty for sugar sol evap': {'f': get_sugar_sol_evap_duty, 'units': 'kJ/h'},
-            'Target sugars concentration': {'f': lambda: fbs_spec.target_conc_sugars, 'units': 'g-sugars/L'},
+            'Target sugars concentration': {'f': lambda: fbs_spec.target_conc, 'units': 'g-sugars/L'},
             }
 
 #%%
@@ -144,10 +144,10 @@ spec_1 = nsk_k_3es = np.linspace(1., 20., steps[0])
 spec_2 = nsk_k_1iees = np.linspace(0.0001, 0.5, steps[1])
 
 
-spec_3 = conc_sugars_feed_spikes =\
+spec_3 = spike_concs =\
     np.array([
-              # 1.*baseline_spec['conc_sugars_feed_spike'],
-              fbs_spec.conc_sugars_feed_spike,
+              # 1.*baseline_spec['spike_conc'],
+              fbs_spec.spike_conc,
               ])
 
 #%% Plot stuff
@@ -297,7 +297,7 @@ for s3 in spec_3:
                 curr_spec = {k: v for k,v in fbs_spec.current_specifications.items()}
                 r.k_3 = s1
                 r.k_1ie = s2
-                curr_spec.update({'conc_sugars_feed_spike':s3,})
+                curr_spec.update({'spike_conc':s3,})
                 
                 if perform_feeding_strategy_opt:
                     optimize_1D_feeding_strategy_for_MPSP(Ns=5, **curr_spec)

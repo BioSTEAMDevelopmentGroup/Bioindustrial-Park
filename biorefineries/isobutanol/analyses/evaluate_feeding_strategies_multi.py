@@ -148,7 +148,7 @@ metrics = {'MPSP': {'f': get_product_MPSP, 'units': '$/kg'},
             'Number of glucose spikes': {'f': get_curr_n_glu_spikes, 'units': 'g-EtOH/L-broth/h'},
             'Fermentation time': {'f': get_tau, 'units': 'h'},
             'Total Q sugar evap': {'f': get_sugar_sol_evap_duty, 'units': 'kJ/h'},
-            'Target sugars concentration': {'f': lambda: fbs_spec.target_conc_sugars, 'units': 'g-sugars/L-broth'},
+            'Target sugars concentration': {'f': lambda: fbs_spec.target_conc, 'units': 'g-sugars/L-broth'},
             'Cell loading': {'f': get_cell_loading, 'units': 'g-cell/L-broth'},
             'Active cell loading': {'f': get_active_cell_loading, 'units': 'g-cell/L-broth'},
             'Actual aeration required': {'f': lambda: ferm_reactor.compressed_air.imol['O2'], 'units': 'kmol-O2/h'},
@@ -162,9 +162,9 @@ results = {i: [] for i in metrics.keys()}
 
 steps = (25, 25, 5)
 
-spec_1 = threshold_conc_sugarses = np.linspace(1., 400., steps[0])
+spec_1 = threshold_conces = np.linspace(1., 400., steps[0])
 
-spec_2 = target_conc_sugarses = np.linspace(10., 400., steps[1])
+spec_2 = target_conces = np.linspace(10., 400., steps[1])
 
 spec_3 = max_n_glu_spikes = np.linspace(0, 20, steps[2])
     
@@ -284,8 +284,8 @@ chdir(isobutanol_results_filepath)
 
 print('\n\nSimulating the initial point to avoid bugs ...')
 curr_spec = {}
-curr_spec.update({'threshold_conc_sugars':threshold_conc_sugarses[0],})
-curr_spec.update({'target_conc_sugars':target_conc_sugarses[0],})
+curr_spec.update({'threshold_conc':threshold_conces[0],})
+curr_spec.update({'target_conc':target_conces[0],})
 
 model_specification(**curr_spec,
     n_sims=3,
@@ -329,9 +329,9 @@ for s3 in spec_3:
                 # if round(s1,2)==round(spec_1[1],2) and round(s2,2)==round(spec_2[4],2):
                 #     breakpoint()
                 curr_spec = {k: v for k,v in fbs_spec.current_specifications.items()}
-                curr_spec.update({'threshold_conc_sugars':s1,})
-                curr_spec.update({'target_conc_sugars':s2,})
-                # curr_spec.update({'conc_sugars_feed_spike':s3,})
+                curr_spec.update({'threshold_conc':s1,})
+                curr_spec.update({'target_conc':s2,})
+                # curr_spec.update({'spike_conc':s3,})
                 load_max_n_glu_spikes(s3)
                 
                 
@@ -411,7 +411,7 @@ print(f'Max HXN Q bal error was {round(max_HXN_qbal_percent_error, 3)} %.')
     
 #     if len(frames)>1:
 #         try:
-#             imageio.mimsave(f'animated_threshold_conc_sugars_{i}' + '.gif',
+#             imageio.mimsave(f'animated_threshold_conc_{i}' + '.gif',
 #                             frames,
 #                             fps=1,
 #                             loop=20,
@@ -427,7 +427,7 @@ print(f'Max HXN Q bal error was {round(max_HXN_qbal_percent_error, 3)} %.')
 #             frames.append(image)
 #     if len(frames)>1:
 #         try:
-#             imageio.mimsave(f'animated_target_conc_sugars_{j}' + '.gif',
+#             imageio.mimsave(f'animated_target_conc_{j}' + '.gif',
 #                             frames,
 #                             fps=1,
 #                             loop=20,

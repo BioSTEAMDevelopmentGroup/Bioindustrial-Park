@@ -106,9 +106,9 @@ if y_label in ('k_1ie', 'k_1ii', 'k_7ie', 'k_7ii',):
 
 # spec_3
 if z_label in ('Spike feed glucose concentration',):
-    spec_3 = conc_sugars_feed_spikes =\
+    spec_3 = spike_concs =\
         np.array([
-                  fbs_spec.conc_sugars_feed_spike,
+                  fbs_spec.spike_conc,
                   ])
     z_units = r"$\mathrm{g} \cdot \mathrm{L}^{-1}$"
     z_ticks = [0, 200, 400, 600, 800]
