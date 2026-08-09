@@ -663,9 +663,11 @@ def load_simulate_get_MPSP(target_conc=None,
     # be a fixed point of the composite load+simulate map — converging
     # bare simulate() alone can park on a spurious branch (observed as an
     # HXN1001 flip on the next call). Repeat/near-repeat calls exit after
-    # 1 sweep; real spec or parameter changes typically need 2 (the
+    # 1 sweep; real spec or parameter changes need 2-4 (measured: 4 for
+    # 28/30 Monte Carlo samples, 5 for the rest — the
     # V406-spec -> V307-spec feed-flow coupling and the WWT/facility
-    # response relax one pass per sweep). The cap is 5 because large
+    # response relax one pass per sweep, and the BT801 utility-cost term
+    # takes the last sweeps to settle below rtol). The cap is 5 because large
     # scenario jumps can traverse a transient HXN1001 double-flip
     # (measured scenario-B drifts: 0.186, 3.4e-3, 0.134, 0.153, 4.2e-6 —
     # the wrong branch at sweep 3 is unstable under this composite map
