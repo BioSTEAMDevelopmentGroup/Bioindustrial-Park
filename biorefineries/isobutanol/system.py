@@ -116,12 +116,19 @@ def correct_saccharification_feed_flows():
     yeast.F_mass = max(1e-2, parameters['yeast_loading'] * mash_flow)
     gluco_amylase.F_mass = max(1e-2, parameters['saccharification_gluco_amylase_loading'] * mash_dry_flow)
 
+    V406.simulate()
+    # NH3 demand must be based on the freshly simulated effluent's Yeast mass;
+    # setting it from the previous run's effluent lags MPSP by one full-system
+    # simulation.
     effluent = V406.outs[1]
     ammonia.imass['NH3'] = parameters['NH3_per_Yeast'] * effluent.imass['Yeast']
-
-    V406.simulate()
-    K330.simulate()
+    # Air demand propagates backward: V406's aeration writes it into V330's
+    # outlet, V330's specification pulls it onto its inlet (= K330's outlet),
+    # and only then can K330 pull the fresh demand onto its own inlet — so
+    # V330 must be simulated before K330, or the compressor is sized and
+    # costed at the previous simulation's air demand.
     V330.simulate()
+    K330.simulate()
 
 #%%
 
@@ -628,7 +635,14 @@ def load_simulate_get_MPSP(target_conc=None,
     threshold_conc=None,
     spike_conc=None,
     tau_max=None,
-    n_sims=3,
+    # One [load_specifications + simulate] converges MPSP to ~1.5e-4 now that
+    # correct_saccharification_feed_flows updates ammonia from the fresh
+    # effluent and simulates V330 before K330 (both were one-simulation-stale,
+    # which is why 3 sims used to be needed). A second sim (~5e-5) covers the
+    # inherent one-pass lag of facility->process couplings (e.g. PWC901's
+    # recycled process water into V307) after large spec/parameter changes
+    # (scenario B moves ~1.5e-3 in sim 2).
+    n_sims=2,
     n_tea_solves=None,
     plot=False,
     ):
