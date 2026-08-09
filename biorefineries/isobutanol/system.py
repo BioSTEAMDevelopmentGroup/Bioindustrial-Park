@@ -665,8 +665,13 @@ def load_simulate_get_MPSP(target_conc=None,
     # HXN1001 flip on the next call). Repeat/near-repeat calls exit after
     # 1 sweep; real spec or parameter changes typically need 2 (the
     # V406-spec -> V307-spec feed-flow coupling and the WWT/facility
-    # response relax one pass per sweep).
-    n_sims=3,
+    # response relax one pass per sweep). The cap is 5 because large
+    # scenario jumps can traverse a transient HXN1001 double-flip
+    # (measured scenario-B drifts: 0.186, 3.4e-3, 0.134, 0.153, 4.2e-6 —
+    # the wrong branch at sweep 3 is unstable under this composite map
+    # and sweep 4 escapes it); a cap of 3-4 can stop mid-excursion on
+    # the wrong utility-network branch.
+    n_sims=5,
     sim_rtol=1e-4,
     n_tea_solves=None,
     plot=False,
