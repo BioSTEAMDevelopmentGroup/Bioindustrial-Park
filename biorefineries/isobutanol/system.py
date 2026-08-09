@@ -84,9 +84,11 @@ def refresh_feed_specifications():
 # loop, built by the nskinetics system factory with the same unit IDs and
 # initial settings as the former inline construction. The factory also builds
 # the fed-batch strategy specification and attaches it to the fermentor
-# (V406.fbs_spec) without imposing it. Caller-side couplings re-added below:
+# (V406.fbs_spec) without imposing it. The fermentor converges its own
+# aeration loop (V330 then K330) at the end of every run via NSKBatchReactor's
+# converge_air_supply behavior. Caller-side couplings re-added below:
 # vent/effluent docking to V409/P406 and the feed-flow-correction
-# specification (which re-simulates the aeration loop).
+# specification.
 V405_old = f.V405
 
 sugar_prep_and_fermentation_sys = nsk.processes.create_sugar_prep_and_fermentation_system(
@@ -122,13 +124,9 @@ def correct_saccharification_feed_flows():
     # simulation.
     effluent = V406.outs[1]
     ammonia.imass['NH3'] = parameters['NH3_per_Yeast'] * effluent.imass['Yeast']
-    # Air demand propagates backward: V406's aeration writes it into V330's
-    # outlet, V330's specification pulls it onto its inlet (= K330's outlet),
-    # and only then can K330 pull the fresh demand onto its own inlet — so
-    # V330 must be simulated before K330, or the compressor is sized and
-    # costed at the previous simulation's air demand.
-    V330.simulate()
-    K330.simulate()
+    # Aeration-loop convergence (V330 then K330 pulling the fresh air demand)
+    # is handled inside the fermentor's own run by NSKBatchReactor's
+    # converge_air_supply behavior; no re-simulation is needed here.
 
 #%%
 
