@@ -631,44 +631,81 @@ fbs_spec.n_tea_solves = 3
 def get_purity_adj_price(stream, chem_IDs):
     return stream.price * stream.F_mass/sum([stream.imass[ID] for ID in chem_IDs])
 
+#: list of (n_sims_run, per-sweep max relative drifts) — one entry per
+#: load_simulate_get_MPSP call. Diagnostic for convergence behavior.
+convergence_log = []
+
+def _simulation_drift_state():
+    # Flows/costs through which the cross-system couplings relax:
+    # product flow; V307's computed dilution water (its specification,
+    # corn/systems.py correct_recycle_dilution_water, consumes the
+    # ammonia/gluco_amylase flows that V406's specification sets one pass
+    # later); ammonia itself; boiler fuel; and BT801 utility cost, which
+    # catches HXN1001 network flips that barely move process flows.
+    return np.array([
+        f.ethanol.F_mass,
+        f.recycled_process_water.F_mass,
+        f.ammonia.F_mass,
+        f.natural_gas.F_mass,
+        f.unit.BT801.utility_cost or 0.0,
+    ])
+
 def load_simulate_get_MPSP(target_conc=None,
     threshold_conc=None,
     spike_conc=None,
     tau_max=None,
-    # One [load_specifications + simulate] converges MPSP to ~1.5e-4 now that
-    # correct_saccharification_feed_flows updates ammonia from the fresh
-    # effluent and simulates V330 before K330 (both were one-simulation-stale,
-    # which is why 3 sims used to be needed). A second sim (~5e-5) covers the
-    # inherent one-pass lag of facility->process couplings (e.g. PWC901's
-    # recycled process water into V307) after large spec/parameter changes
-    # (scenario B moves ~1.5e-3 in sim 2).
-    n_sims=2,
+    # n_sims is an UPPER BOUND on convergence sweeps: each sweep is one
+    # [load_specifications + simulate], repeated until the tracked state
+    # (_simulation_drift_state) moves by <= sim_rtol (relative) in a
+    # sweep. load_specifications stays INSIDE the loop because it is
+    # state-dependent (it re-solves feed actuators and the initial/spike
+    # split against current stream states), so the converged point must
+    # be a fixed point of the composite load+simulate map — converging
+    # bare simulate() alone can park on a spurious branch (observed as an
+    # HXN1001 flip on the next call). Repeat/near-repeat calls exit after
+    # 1 sweep; real spec or parameter changes typically need 2 (the
+    # V406-spec -> V307-spec feed-flow coupling and the WWT/facility
+    # response relax one pass per sweep).
+    n_sims=3,
+    sim_rtol=1e-4,
     n_tea_solves=None,
     plot=False,
     ):
-    
+
     if target_conc is None:
         target_conc = fbs_spec.target_conc
-    
+
     if threshold_conc is None:
         threshold_conc = fbs_spec.threshold_conc
-    
+
     if spike_conc is None:
         spike_conc = fbs_spec.spike_conc
-    
+
     if tau_max is None:
         tau_max = fbs_spec.tau_max
-        
+
     ethanol = f.ethanol
-    
-    for i in range(n_sims):
+
+    n_sims_run = 0
+    drifts = []
+    prev = _simulation_drift_state()
+    while n_sims_run < n_sims:
         fbs_spec.load_specifications(target_conc=target_conc,
         threshold_conc=threshold_conc,
         spike_conc=spike_conc,
         tau_max=tau_max,)
-        
+
         corn_EtOH_IBO_sys.simulate()
-    
+        n_sims_run += 1
+        curr = _simulation_drift_state()
+        drift = float(np.max(np.abs(curr - prev)
+                             / np.maximum(np.abs(prev), 1e-12)))
+        drifts.append(drift)
+        prev = curr
+        if drift <= sim_rtol:
+            break
+    convergence_log.append((n_sims_run, tuple(drifts)))
+
     product_stream = fbs_spec.product_stream
     n_tea_solves = n_tea_solves if n_tea_solves is not None else fbs_spec.n_tea_solves
     for i in range(n_tea_solves):
@@ -1158,7 +1195,6 @@ ethanol = f.ethanol
 simulate_baseline = True
 if simulate_baseline:
     model_specification(**fbs_spec.baseline_specifications,
-        n_sims=3,
         plot=False,
         )
     # print(get_purity_adj_price(ethanol, ['Ethanol']))
