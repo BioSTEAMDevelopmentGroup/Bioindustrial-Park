@@ -94,6 +94,7 @@ V405_old = f.V405
 sugar_prep_and_fermentation_sys = nsk.processes.create_sugar_prep_and_fermentation_system(
     ins=(f.E402-0, f.P404-0),
     nsk_kinetic_model=te_r,
+    max_n_spikes=16,
     mockup=True,
 )
 
@@ -608,11 +609,6 @@ corn_EtOH_IBO_sys._TEA = corn_EtOH_IBO_sys_tea = corn.tea.create_tea(corn_EtOH_I
 #%% Set baseline specifications
 
 # V406.stage_1_time = 15.0
-# te_r._te.max_n_glu_spikes = 10
-# te_r.default_max_n_glu_spikes = 10
-
-te_r._te.max_n_glu_spikes = 16
-te_r.default_max_n_glu_spikes = 16
 
 #% Fed-batch strategy specification: built by the factory and attached to the
 #% fermentor. Its constructor initial values and default baseline
@@ -620,6 +616,11 @@ te_r.default_max_n_glu_spikes = 16
 #% baselines deliberately differ from the constructor initial values).
 fbs_spec = V406.fbs_spec
 baseline_spec = fbs_spec.baseline_specifications
+
+# The spike cap (16) is now owned by the specification (passed to the factory
+# above). Impose it eagerly here so any simulation run before the first
+# load_specifications call sees it, as the former direct te_r assignment did.
+fbs_spec.load_max_n_spikes(fbs_spec.max_n_spikes)
 
 #%%
 
@@ -652,6 +653,7 @@ def load_simulate_get_MPSP(target_conc=None,
     threshold_conc=None,
     spike_conc=None,
     tau_max=None,
+    max_n_spikes=None,
     # n_sims is an UPPER BOUND on convergence sweeps: each sweep is one
     # [load_specifications + simulate], repeated until the tracked state
     # (_simulation_drift_state) moves by <= sim_rtol (relative) in a
@@ -689,6 +691,9 @@ def load_simulate_get_MPSP(target_conc=None,
     if tau_max is None:
         tau_max = fbs_spec.tau_max
 
+    if max_n_spikes is None:
+        max_n_spikes = fbs_spec.max_n_spikes
+
     ethanol = f.ethanol
 
     n_sims_run = 0
@@ -698,7 +703,8 @@ def load_simulate_get_MPSP(target_conc=None,
         fbs_spec.load_specifications(target_conc=target_conc,
         threshold_conc=threshold_conc,
         spike_conc=spike_conc,
-        tau_max=tau_max,)
+        tau_max=tau_max,
+        max_n_spikes=max_n_spikes,)
 
         corn_EtOH_IBO_sys.simulate()
         n_sims_run += 1
@@ -1041,9 +1047,12 @@ def optimize_stage_1_time_and_max_n_glu_spikes_for_MPSP(bounds=((5, 40), (0, 40)
     def f(x):
         try:
             V406.stage_1_time = x[0]
-            r_te.max_n_glu_spikes = x[1]
-            nsk_r.default_max_n_glu_spikes = x[1]  
-            model_specification(**model_kwargs)
+            # Sweep the cap through the model specification rather than setting
+            # fbs_spec.max_n_spikes directly: the model specification is the top
+            # of the precedence hierarchy, so merging over model_kwargs also
+            # beats a stale max_n_spikes carried by a snapshot of
+            # current_specifications. load_specifications stores the value.
+            model_specification(**{**model_kwargs, 'max_n_spikes': x[1]})
             MPSP = get_purity_adj_price(ethanol, ['Ethanol'])
             # print(MPSP)
             return MPSP
@@ -1097,9 +1106,12 @@ def optimize_max_n_glu_spikes_for_MPSP(bounds=(0, 40),
     model_specification(**model_kwargs)
     def f(x):
         try:
-            r_te.max_n_glu_spikes = x[0]
-            nsk_r.default_max_n_glu_spikes = x[0]  
-            model_specification(**model_kwargs)
+            # Sweep the cap through the model specification rather than setting
+            # fbs_spec.max_n_spikes directly: the model specification is the top
+            # of the precedence hierarchy, so merging over model_kwargs also
+            # beats a stale max_n_spikes carried by a snapshot of
+            # current_specifications. load_specifications stores the value.
+            model_specification(**{**model_kwargs, 'max_n_spikes': x[0]})
             MPSP = get_purity_adj_price(ethanol, ['Ethanol'])
             # print(MPSP)
             return MPSP

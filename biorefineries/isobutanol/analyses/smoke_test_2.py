@@ -36,15 +36,12 @@ def load_simulate_baseline(scenario='B', # 'A' or 'B'
     model_specification()
     
     # for forced batch mode:
-    # V406.nsk_kinetic_model._te.max_n_glu_spikes = 0
-    # V406.nsk_kinetic_model.default_max_n_glu_spikes = 0  
+    # fbs_spec.max_n_spikes = 0
     if scenario=='A':
-        V406.nsk_kinetic_model._te.max_n_glu_spikes = 16
-        V406.nsk_kinetic_model.default_max_n_glu_spikes = 16 
+        fbs_spec.max_n_spikes = 16
         model_specification(threshold_conc=217.125, target_conc=221.25)
     elif scenario=='B':
-        V406.nsk_kinetic_model._te.max_n_glu_spikes = 13
-        V406.nsk_kinetic_model.default_max_n_glu_spikes = 13  
+        fbs_spec.max_n_spikes = 13
         model_specification(threshold_conc=216.3, target_conc=226.3)
     else:
         raise ValueError(f'Scenario {scenario} not found.')

@@ -85,8 +85,7 @@ baseline_initial = model.metrics_at_baseline()
 
 
 # !!!
-ferm_reactor.nsk_kinetic_model._te.max_n_glu_spikes = 0
-ferm_reactor.nsk_kinetic_model.default_max_n_glu_spikes = 0  
+fbs_spec.max_n_spikes = 0
 perform_feeding_strategy_opt = False
 
 model_specification(

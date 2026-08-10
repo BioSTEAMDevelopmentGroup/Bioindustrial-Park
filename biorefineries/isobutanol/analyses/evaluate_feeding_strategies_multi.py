@@ -89,8 +89,7 @@ baseline_initial = model.metrics_at_baseline()
 #%% Baseline -- simulate and solve TEA
 
 #!!!
-# ferm_reactor.nsk_kinetic_model._te.max_n_glu_spikes = 0 # initial val, changed during optimization
-# ferm_reactor.nsk_kinetic_model.default_max_n_glu_spikes = 0 # initial val, changed during optimization
+# fbs_spec.max_n_spikes = 0 # initial val, changed during optimization
 
 # ferm_reactor.stage_1_time = 5.0
 # ferm_reactor.stage_1_time = 10.0
@@ -106,8 +105,7 @@ model_specification(
 
 #%% Parameter load functions
 def load_max_n_glu_spikes(val):
-    ferm_reactor.nsk_kinetic_model._te.max_n_glu_spikes = val 
-    ferm_reactor.nsk_kinetic_model.default_max_n_glu_spikes = val
+    fbs_spec.max_n_spikes = val
 
 #%%  Metrics
 product_chemical_IDs = ['Ethanol',]

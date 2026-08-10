@@ -86,17 +86,14 @@ baseline_initial = model.metrics_at_baseline()
 scenario = 'A'
 
 if scenario=='A':
-    ferm_reactor.nsk_kinetic_model._te.max_n_glu_spikes = 16
-    ferm_reactor.nsk_kinetic_model.default_max_n_glu_spikes = 16 
+    fbs_spec.max_n_spikes = 16
     model_specification(threshold_conc=217.125, target_conc=221.25)
 elif scenario=='B':
-    ferm_reactor.nsk_kinetic_model._te.max_n_glu_spikes = 13
-    ferm_reactor.nsk_kinetic_model.default_max_n_glu_spikes = 13  
+    fbs_spec.max_n_spikes = 13
     model_specification(threshold_conc=216.3, target_conc=226.3)
     
 # !!!
-# ferm_reactor.nsk_kinetic_model._te.max_n_glu_spikes = 0
-# ferm_reactor.nsk_kinetic_model.default_max_n_glu_spikes = 0  
+# fbs_spec.max_n_spikes = 0
 perform_feeding_strategy_opt = False
 
 model_specification(
