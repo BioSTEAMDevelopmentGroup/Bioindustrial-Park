@@ -160,7 +160,7 @@ metrics = {'MPSP': {'f': get_product_MPSP, 'units': '$/kg'},
 # results = {i: [] for i in range(len(metrics.values()))}
 results = {i: [] for i in metrics.keys()}
 
-steps = (25, 25, 1)
+steps = (20, 20, 1)
 
 spec_1 = nsk_k_13es = np.linspace(0.0, 40.0, steps[0])
 
