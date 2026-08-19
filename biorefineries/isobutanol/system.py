@@ -48,6 +48,29 @@ tmo.settings.set_thermo(chems)
 
 settings = corn.process_settings.BiorefinerySettings()
 
+#%% biosteam 2.53 compatibility shims for the (read-only) corn / cellulosic builds
+# biosteam 2.53's BatchBioreactor (nrel_bioreactor.py) fixes _N_ins = 1, but
+# corn's SSF genuinely takes 2 inlets (its _run does effluent.mix_from(self.ins)
+# over (E402-0, P404-0)). corn is read-only, so restore SSF's true inlet count
+# here on the class before create_system builds V405.
+corn.units.SimultaneousSaccharificationFermentation._N_ins = 2
+
+# biosteam 2.53's FireWaterTank dropped its stream inlet (_N_ins = 0) and now
+# sizes from a fixed `fire_water_flow_rate` attribute. cellulosic's (read-only)
+# create_facilities still constructs it as `FireWaterTank('FT', fire_water)` and
+# attaches a specification scaling that inlet to `feedstock.F_mass * 0.08`.
+# Restore the 1-inlet, inlet-sized behavior with a compat subclass and point
+# bst.FireWaterTank at it before create_facilities runs, so the fire-water tank
+# stays feedstock-scaled as the shipped spec intends.
+class _FireWaterTank_compat(bst.FireWaterTank):
+    ticket_name = 'FWT'  # keep the FWT<area> auto-ID the assembly looks up
+    _N_ins = 1
+    _N_outs = 0
+    def _run(self): pass  # stored fire water; no stream transformation
+    def _design(self):
+        self.design_results['Flow rate'] = self.ins[0].F_mass
+bst.FireWaterTank = bst.facilities.FireWaterTank = _FireWaterTank_compat
+
 #%%
 
 corn_EtOH_sys = corn.systems.create_system(biorefinery_settings=settings)
@@ -439,7 +462,14 @@ corn_facilities_to_remove = [f.T608, f.other_facilities]
 # deliberately NOT routed to the WWT mixer (M501) below.
 
 # Streams that consume process water (used to size the new ProcessWaterCenter makeup).
-process_water_consumers = [f.recycled_process_water, f.scrubber_water, f.dilution_water]
+# The M301/M302 fed-batch dilution-water mixers both create their makeup inlet with
+# the ID 'dilution_water'. Under the old stack a duplicate stream ID silently
+# replaced the earlier one in the registry, so `f.dilution_water` resolved to M302's
+# inlet only. biosteam 2.53 instead auto-suffixes duplicates (-> 'dilution_water_1'
+# for M301, 'dilution_water_2' for M302), so `f.dilution_water` no longer exists.
+# Reference M302's dilution-water inlet directly (`f.M302.ins[1]`) to preserve the
+# old behavior faithfully across the migration.
+process_water_consumers = [f.recycled_process_water, f.scrubber_water, f.M302.ins[1]]
 
 #%% Mix aqueous wastes for wastewater treatment
 # Real aqueous wastes currently discharged: backwater (S1, water+organics),
