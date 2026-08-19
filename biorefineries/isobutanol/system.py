@@ -95,6 +95,7 @@ sugar_prep_and_fermentation_sys = nsk.processes.create_sugar_prep_and_fermentati
     ins=(f.E402-0, f.P404-0),
     nsk_kinetic_model=te_r,
     max_n_spikes=16,
+    tau_update_policy=['min', '[s_glu]'],
     mockup=True,
 )
 
