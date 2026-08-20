@@ -460,6 +460,12 @@ corn_facilities_to_remove = [f.T608, f.other_facilities]
 # the removed corn facility layer, not a real aqueous waste of this biorefinery.
 # T608 is no longer a needed unit operation, so its `wastewater` outlet is
 # deliberately NOT routed to the WWT mixer (M501) below.
+#
+# T608's INLET, however, received the corn-side MX5 mixer outlet — the DDGS
+# stillage-evaporator vapor (Ev607) plus the fermentation-vent scrubber effluent
+# (V409 -> P410). With T608 detached, that stream would simply be dropped, so it
+# is instead re-routed to the WWT mixer M501 below (a real aqueous waste that
+# should be treated).
 
 # Streams that consume process water (used to size the new ProcessWaterCenter makeup).
 # The M301/M302 fed-batch dilution-water mixers both create their makeup inlet with
@@ -473,13 +479,22 @@ process_water_consumers = [f.recycled_process_water, f.scrubber_water, f.M302.in
 
 #%% Mix aqueous wastes for wastewater treatment
 # Real aqueous wastes currently discharged: backwater (S1, water+organics),
-# F302_P1 evaporator condensate (spike_feed_condensate), and the S403 solvent purge (nonzero only
-# when purging isopentyl acetate). T608's `wastewater` outlet is intentionally
-# excluded (see NOTE above) — it is not a real aqueous waste of the new system.
+# F302_P1 evaporator condensate (spike_feed_condensate), the S403 solvent purge (nonzero only
+# when purging isopentyl acetate), and the MX5 outlet (DDGS stillage-evaporator
+# vapor + fermentation-vent scrubber effluent) re-routed off the detached T608
+# (see NOTE above). T608's `wastewater` outlet remains excluded — it is not a real
+# aqueous waste of the new system.
+#
+# Passing MX5's outlet (currently sunk into the detached T608) into M501's ins
+# reassigns its sink to M501, disconnecting it from T608. Give it a descriptive
+# ID now that it is a named WWT inlet rather than an internal process-water term.
+MX5_effluent = f.MX5.outs[0]
+MX5_effluent.ID = 'evap_vapor_and_vent_scrubber_effluent'
 M501 = bst.Mixer('M501',
                  ins=(f.backwater,
                       f.spike_feed_condensate,
-                      f.S403_purge),
+                      f.S403_purge,
+                      MX5_effluent),
                  outs='mixed_wastewater_to_WWT')
 
 @M501.add_specification(run=False)
