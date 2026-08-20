@@ -153,37 +153,37 @@ spec_3 = spike_concs =\
 
 # Parameters analyzed across
 
-x_label = r"$\bfk_3$" # title of the x axis
+x_label = "k_3" # title of the x axis
 x_units = r"$\mathrm{g} \cdot \mathrm{L}^{-1} \cdot \mathrm{h}^{-1}$"
 x_ticks = [0, 5, 10, 15, 20]
 
-y_label = r"$\bfk_1ie$" # title of the y axis
+y_label = "k_1ie" # title of the y axis
 y_units = r"$\mathrm{g} \cdot \mathrm{L}^{-1} \cdot \mathrm{h}^{-1}$"
 y_ticks = [0.0, 0.1, 0.2, 0.3, 0.4, 0.5]
 
-z_label = r"$\bfSpike feed glucose concentration$" # title of the x axis
+z_label = "Spike feed glucose concentration" # title of the x axis
 z_units =r"$\mathrm{g} \cdot \mathrm{L}^{-1}$"
 z_ticks = [0, 200, 400, 600, 800]
 
 # Metrics
-MPSP_w_label = r"$\bfMPSP$" # title of the color axis
+MPSP_w_label = r"$\mathbf{MPSP}$" # title of the color axis
 MPSP_units = r"$\mathrm{\$}\cdot\mathrm{kg}^{-1}$"
 # MPSP_units = r"$\mathrm{\$/kg}$"
 
-AOC_w_label = r"$\bfAOC$" # title of the color axis
+AOC_w_label = r"$\mathbf{AOC}$" # title of the color axis
 AOC_units = r"$\mathrm{MM\$}\cdot\mathrm{y}^{-1}$"
 # AOC_units = r"$\mathrm{MM\$/y}$"
 
-TCI_w_label = r"$\bfTCI$" # title of the color axis
+TCI_w_label = r"$\mathbf{TCI}$" # title of the color axis
 TCI_units = r"$\mathrm{MM\$}$"
 
-Yield_w_label = r"$\bfYield$" # title of the color axis
+Yield_w_label = r"$\mathbf{Yield}$" # title of the color axis
 Yield_units = r"$\mathrm{g}\cdot\mathrm{g}^{-1}$"
 
-Titer_w_label = r"$\bfTiter$" # title of the color axis
+Titer_w_label = r"$\mathbf{Titer}$" # title of the color axis
 Titer_units = r"$\mathrm{g}\cdot\mathrm{L}^{-1}$"
 
-Productivity_w_label = r"$\bfProductivity$" # title of the color axis
+Productivity_w_label = r"$\mathbf{Productivity}$" # title of the color axis
 Productivity_units = r"$\mathrm{g}\cdot\mathrm{L}^{-1}\cdot\mathrm{h}^{-1}$"
 
 #%% Colors
