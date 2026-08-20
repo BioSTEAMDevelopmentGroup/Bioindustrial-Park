@@ -1,5 +1,5 @@
 # python 3.14
 # nskinetics commit d8591e50fb006ff570edfc3991bd434725041fc6
-biosteam==2.53.11
+biosteam>=2.53.11,<2.55.0
 contourplots>=0.4.0
 
