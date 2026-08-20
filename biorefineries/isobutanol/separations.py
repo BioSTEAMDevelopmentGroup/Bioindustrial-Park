@@ -39,7 +39,7 @@ Flowsheet::
       |   (LHK = (Ethanol, Water), y_top = 0.80805;    MS201 EtOH-rich
       |    IBO is a heavy non-key -> bottoms)          --> H201 --> ethanol
       v
-    D103 IBO stripper ------ bottoms -------------> wastewater (~IBO-free)
+    D103 IBO stripper ------ bottoms -------------> D103_bottoms (~IBO-free)
       |  (LHK = (Isobutanol, Water), y_IBO = 0.25)
       v distillate
     M301 --> H301 (40 C) --> S301 decanter
@@ -139,7 +139,7 @@ def create_scenario_B_feed(ID='broth', EtOH_mult=1.0, IBO_mult=1.0):
     outs=[dict(ID='ethanol_product'),
           dict(ID='isobutanol_product'),
           dict(ID='stillage'),
-          dict(ID='wastewater')],
+          dict(ID='D103_bottoms')],
 )
 def create_IBO_EtOH_separation_system(
         ins, outs,
@@ -157,7 +157,7 @@ def create_IBO_EtOH_separation_system(
         product_T=305.15,
     ):
     broth, = ins
-    ethanol_product, isobutanol_product, stillage, wastewater = outs
+    ethanol_product, isobutanol_product, stillage, D103_bottoms = outs
 
     # Beer column: both alcohols overhead, solids/heavies to stillage.
     # LHK = (Isobutanol, Water) makes ethanol (Tb below both keys) a light
@@ -211,7 +211,7 @@ def create_IBO_EtOH_separation_system(
     # toward the azeotrope; any residual ethanol is a light non-key ->
     # overhead, so the bottoms leave essentially alcohol-free.
     D103 = bst.BinaryDistillation(
-        'D103', ins=D102-1, outs=('D103_distillate', wastewater),
+        'D103', ins=D102-1, outs=('D103_distillate', D103_bottoms),
         LHK=('Isobutanol', 'Water'),
         y_top=stripper_y_top_IBO, x_bot=stripper_x_bot_IBO,
         k=1.2, P=P,
