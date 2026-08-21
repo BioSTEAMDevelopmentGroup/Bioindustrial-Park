@@ -24,31 +24,37 @@ IBO_filepath = isobutanol.__file__.replace('\\__init__.py', '')
 
 def load_simulate_baseline(scenario='B', # 'A' or 'B'
                            plot=False,
+                           **tea_kwargs, # TEA-solve kwargs forwarded to
+                                         # load_simulate_solve_TEA via
+                                         # model_specification: solve_for
+                                         # ('MPSP'|'IRR'|'NPV'),
+                                         # product_stream, IRR, NPV,
+                                         # n_tea_solves
                            ):
     parameter_distributions_filename = IBO_filepath+\
         '\\analyses\\full\\parameter_distributions\\'+\
         f'parameter-distributions_corn_IBO_EtOH_{scenario}.xlsx'
-            
+
     model.parameters = ()
     model.load_parameter_distributions(parameter_distributions_filename, namespace_dict)
     baseline_initial = model.metrics_at_baseline()
-    
-    model_specification()
-    
+
+    model_specification(**tea_kwargs)
+
     # for forced batch mode:
     # fbs_spec.max_n_spikes = 0
     if scenario=='A':
         fbs_spec.max_n_spikes = 16
-        model_specification(threshold_conc=217.125, target_conc=221.25)
+        result = model_specification(threshold_conc=217.125, target_conc=221.25, **tea_kwargs)
     elif scenario=='B':
         fbs_spec.max_n_spikes = 13
-        model_specification(threshold_conc=216.3, target_conc=226.3)
+        result = model_specification(threshold_conc=216.3, target_conc=226.3, **tea_kwargs)
     else:
         raise ValueError(f'Scenario {scenario} not found.')
-        
-    
+
+
     if plot:
         # Plot conc v time
         fig, ax = plot_kinetic_results(xlim=(0,80), ylim=(0,250))
-    
-    return f.ethanol.price * f.ethanol.F_mass/f.ethanol.imass['Ethanol'] # MPSP
+
+    return result # purity-adjusted MPSP, IRR, or NPV per solve_for (default: ethanol MPSP)

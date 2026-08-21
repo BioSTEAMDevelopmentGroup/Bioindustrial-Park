@@ -520,8 +520,30 @@ fbs_spec.n_tea_solves = 3
 def get_purity_adj_price(stream, chem_IDs):
     return stream.price * stream.F_mass/sum([stream.imass[ID] for ID in chem_IDs])
 
+def get_current_TEA_solution(solve_for='MPSP', product_stream=None):
+    """Read the current TEA solution off the flowsheet/TEA state without
+    re-solving: the purity-adjusted price of `product_stream` ('MPSP'), the
+    TEA's IRR ('IRR'), or the TEA's NPV at its current IRR ('NPV')."""
+    if solve_for == 'MPSP':
+        if product_stream is None: product_stream = fbs_spec.product_stream
+        prod_chem = ('Isobutanol'
+                     if product_stream.imass['Isobutanol']
+                        > product_stream.imass['Ethanol']
+                     else 'Ethanol')
+        return get_purity_adj_price(product_stream, [prod_chem])
+    elif solve_for == 'IRR':
+        return corn_EtOH_IBO_sys_tea.IRR
+    elif solve_for == 'NPV':
+        return corn_EtOH_IBO_sys_tea.NPV
+    raise ValueError(f"solve_for must be 'MPSP', 'IRR', or 'NPV'; got {solve_for!r}")
+
+#: keyword arguments of load_simulate_solve_TEA that configure the TEA solve
+#: rather than the feeding strategy; model_specification forwards these so
+#: every retry in its recovery paths re-solves the same TEA problem.
+TEA_solve_keys = ('solve_for', 'product_stream', 'IRR', 'NPV', 'n_tea_solves')
+
 #: list of (n_sims_run, per-sweep max relative drifts) — one entry per
-#: load_simulate_get_MPSP call. Diagnostic for convergence behavior.
+#: load_simulate_solve_TEA call. Diagnostic for convergence behavior.
 convergence_log = []
 
 def _simulation_drift_state():
@@ -539,7 +561,7 @@ def _simulation_drift_state():
         f.unit.BT801.utility_cost or 0.0,
     ])
 
-def load_simulate_get_MPSP(target_conc=None,
+def load_simulate_solve_TEA(target_conc=None,
     threshold_conc=None,
     spike_conc=None,
     tau_max=None,
@@ -565,6 +587,10 @@ def load_simulate_get_MPSP(target_conc=None,
     # the wrong utility-network branch.
     n_sims=5,
     sim_rtol=1e-4,
+    solve_for='MPSP',      # 'MPSP' | 'IRR' | 'NPV'
+    product_stream=None,   # stream whose MPSP is solved; default fbs_spec.product_stream
+    IRR=0.15,              # fixed IRR when solving MPSP or NPV; initial guess when solving IRR
+    NPV=0.0,               # fixed NPV when solving MPSP or IRR (only the break-even point 0 is supported)
     n_tea_solves=None,
     plot=False,
     ):
@@ -584,7 +610,24 @@ def load_simulate_get_MPSP(target_conc=None,
     if max_n_spikes is None:
         max_n_spikes = fbs_spec.max_n_spikes
 
-    ethanol = f.ethanol
+    if solve_for not in ('MPSP', 'IRR', 'NPV'):
+        raise ValueError(f"solve_for must be 'MPSP', 'IRR', or 'NPV'; got {solve_for!r}")
+    if solve_for in ('MPSP', 'IRR') and NPV != 0.:
+        raise ValueError(f"solve_for={solve_for!r} supports only the break-even point NPV=0; got NPV={NPV!r}")
+    if product_stream is None:
+        product_stream = fbs_spec.product_stream
+
+    # Fix what is NOT being solved for (product prices only feed the TEA,
+    # never the mass/energy balances, so flipping these flags mid-session is
+    # safe): solving a stream's MPSP leaves that stream's price to
+    # solve_price and holds the other product at its purity-based set price;
+    # solving IRR or NPV holds BOTH products at their purity-based set
+    # prices. The flags take effect inside the convergence sweep below (the
+    # V513/V514 specifications run on every system simulation).
+    V513.update_ethanol_price = not (solve_for == 'MPSP'
+                                     and product_stream is f.ethanol)
+    V514.update_isobutanol_price = not (solve_for == 'MPSP'
+                                        and product_stream is f.isobutanol)
 
     n_sims_run = 0
     drifts = []
@@ -607,21 +650,24 @@ def load_simulate_get_MPSP(target_conc=None,
             break
     convergence_log.append((n_sims_run, tuple(drifts)))
 
-    product_stream = fbs_spec.product_stream
     n_tea_solves = n_tea_solves if n_tea_solves is not None else fbs_spec.n_tea_solves
-    for i in range(n_tea_solves):
-        product_stream.price = corn_EtOH_IBO_sys_tea.solve_price(product_stream)
+    if n_tea_solves > 0:
+        corn_EtOH_IBO_sys_tea.IRR = IRR
+        if solve_for == 'MPSP':
+            for i in range(n_tea_solves):
+                product_stream.price = corn_EtOH_IBO_sys_tea.solve_price(product_stream)
+        elif solve_for == 'IRR':
+            for i in range(n_tea_solves):
+                corn_EtOH_IBO_sys_tea.IRR = corn_EtOH_IBO_sys_tea.solve_IRR()
+        # solve_for == 'NPV': nothing to solve; the TEA's NPV at the given
+        # IRR and set prices is read off by get_current_TEA_solution below.
 
     if plot:
         plot_kinetic_results()
-    
+
     if n_tea_solves > 0:
-        prod_chem = None
-        if product_stream.imol['Ethanol']>0:
-            prod_chem = 'Ethanol'
-        elif product_stream.imol['Isobutanol']>0:
-            prod_chem = 'Isobutanol'
-        return get_purity_adj_price(product_stream, [prod_chem])
+        return get_current_TEA_solution(solve_for=solve_for,
+                                        product_stream=product_stream)
 
 def plot_kinetic_results(xlim=None, ylim=None, 
                          show_stage_1_time=False, 
@@ -717,10 +763,10 @@ def reset_and_reload(**curr_spec):
     print('Loading and simulating with baseline specifications ...')
     # curr_spec = {i: fbs_spec.__getattribute__(i) for i in baseline_spec.keys()}
     corn_EtOH_IBO_sys.simulate()
-    load_simulate_get_MPSP(**fbs_spec.baseline_specifications)
+    load_simulate_solve_TEA(**fbs_spec.baseline_specifications)
     print('Loading and simulating with required specifications ...')
-    # load_simulate_get_MPSP(**curr_spec)
-    load_simulate_get_MPSP(**curr_spec)
+    # load_simulate_solve_TEA(**curr_spec)
+    load_simulate_solve_TEA(**curr_spec)
     
 def reset_and_switch_solver(solver_ID, **curr_spec):
     corn_EtOH_IBO_sys.reset_cache()
@@ -728,7 +774,7 @@ def reset_and_switch_solver(solver_ID, **curr_spec):
     corn_EtOH_IBO_sys.converge_method = solver_ID
     print(f"Trying {solver_ID} ...")
     corn_EtOH_IBO_sys.simulate()
-    load_simulate_get_MPSP(**curr_spec)
+    load_simulate_solve_TEA(**curr_spec)
 
 # F403 = u.F403
 def run_bugfix_barrage(**curr_spec):
@@ -741,7 +787,7 @@ def run_bugfix_barrage(**curr_spec):
                 corn_EtOH_IBO_sys.reset_cache()
                 corn_EtOH_IBO_sys.empty_recycles()
                 corn_EtOH_IBO_sys.simulate()
-                load_simulate_get_MPSP(**curr_spec)
+                load_simulate_solve_TEA(**curr_spec)
             except:
                 print(str(e))
                 raise e
@@ -757,7 +803,7 @@ def run_bugfix_barrage(**curr_spec):
         #                         j.outs[1].T = j.T
         #                     except:
         #                         pass
-        #         load_simulate_get_MPSP()
+        #         load_simulate_solve_TEA()
                 
         #     except:
         #         print(str(e))
@@ -781,8 +827,12 @@ def run_bugfix_barrage(**curr_spec):
 def model_specification(**kwargs):
     curr_spec = {k: v for k,v in fbs_spec.current_specifications.items()}
     curr_spec.update(kwargs)
+    # TEA-solve kwargs (solve_for/product_stream/IRR/NPV/n_tea_solves) ride
+    # along with the feeding specs in curr_spec; keep them separate too so
+    # partial-spec retries below re-solve the same TEA problem.
+    tea_spec = {k: curr_spec[k] for k in TEA_solve_keys if k in curr_spec}
     try:
-        load_simulate_get_MPSP(**curr_spec)
+        load_simulate_solve_TEA(**curr_spec)
     except Exception as e:
         str_e = str(e).lower()
         print('Error in model spec: %s'%str_e)
@@ -799,7 +849,7 @@ def model_specification(**kwargs):
                 tau_maxes_to_try.reverse()
                 for tm in tau_maxes_to_try:
                     try:
-                        load_simulate_get_MPSP(tau_max=tm)
+                        load_simulate_solve_TEA(tau_max=tm, **tea_spec)
                         success = True
                         break
                     except Exception as e:
@@ -821,7 +871,7 @@ def model_specification(**kwargs):
                             r.integrator.relative_tolerance = 1e-7
                             print('Re-simulating fermentation unit with lower integrator rtol ...')
                             V406.simulate()
-                            load_simulate_get_MPSP(**curr_spec)
+                            load_simulate_solve_TEA(**curr_spec)
                             success = True
                         except Exception as e:
                             print(str(e))
@@ -833,7 +883,7 @@ def model_specification(**kwargs):
                                     print('Re-running fermentation unit with rk45 ...')
                                     V406.simulate()
                                     success = True
-                                    load_simulate_get_MPSP(**curr_spec)
+                                    load_simulate_solve_TEA(**curr_spec)
                                 except Exception as e:
                                     print(str(e))
                                     raise e
@@ -849,7 +899,7 @@ def model_specification(**kwargs):
                         if 'massbalerror' in str_e:
                             try:
                                 print('Trying again ...')
-                                load_simulate_get_MPSP(**curr_spec)
+                                load_simulate_solve_TEA(**curr_spec)
                             except Exception as e:
                                 print(str(e))
                                 raise e
@@ -865,11 +915,18 @@ def model_specification(**kwargs):
             # breakpoint()
             try:
                 print('Trying again ...')
-                load_simulate_get_MPSP(**curr_spec)
+                load_simulate_solve_TEA(**curr_spec)
             except Exception as e:
                 str_e = str(e).lower()
                 print('Error in model spec: %s'%str_e)
                 run_bugfix_barrage(**curr_spec)
+
+    # Whichever recovery path succeeded, the flowsheet/TEA state now carries
+    # the solution; read it off rather than threading returns through the
+    # recovery scaffolding.
+    return get_current_TEA_solution(
+        solve_for=tea_spec.get('solve_for', 'MPSP'),
+        product_stream=tea_spec.get('product_stream'))
 
 
 def optimize_tau_for_MPSP(threshold_s_EtOH=5, **kwargs):
