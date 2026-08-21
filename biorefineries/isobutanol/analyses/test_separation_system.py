@@ -16,7 +16,15 @@ Verification of the standalone IBO/EtOH/water separation system
 4. >95 wt% purity of the isobutanol product stream.
 5. Material & energy flows stable across 3 consecutive re-simulations.
 6. Criteria 1-5 hold for the scenario B ``P301-0`` baseline feed and for
-   variations with higher/lower isobutanol and ethanol flows.
+   variations of the isobutanol and ethanol flows spanning ~0-200 g/L
+   titer equivalents. At very low titers (multiplier <= 0.05) reduced
+   recovery of the diminished alcohol is acceptable (floor of 60%), but
+   product purities must hold whenever the product stream exists, and at
+   exactly zero titer the corresponding product stream must be empty.
+
+Variants are simulated SEQUENTIALLY on one system (no cache resets), like
+a titer sweep would, so state carried between operating points is part of
+what is being tested.
 
 Loads separations.py by file path (fresh kernel; does not trigger the
 package's import-time baseline simulation). Exits non-zero on any failure.
@@ -48,6 +56,10 @@ sep_sys.set_tolerance(rmol=1e-5, mol=1e-3, subsystems=True)
 f = bst.main_flowsheet
 ref_flows = dict(separations.scenario_B_P301_flows)
 
+#: Product stream counts as "empty" below this total mass flow [kg/hr];
+#: the reference feed carries ~1e5 kg/hr of water.
+EMPTY_F_MASS = 1e-2
+
 def set_feed(EtOH_mult, IBO_mult):
     for ID, m in ref_flows.items():
         feed.imass[ID] = m
@@ -57,14 +69,22 @@ def set_feed(EtOH_mult, IBO_mult):
 
 def snapshot():
     mat = np.array([s.mol for s in sep_sys.streams], float).flatten()
+    # Aggregate duty per unit (heat-utility lists can change length when a
+    # unit's design is skipped at zero throughput; per-unit sums keep the
+    # vector alignment fixed).
     duties = []
     for u in sorted(sep_sys.units, key=lambda u: u.ID):
-        duties.extend(hu.duty for hu in u.heat_utilities)
+        duties.append(sum([hu.duty for hu in u.heat_utilities]))
         duties.append(u.power_utility.rate)
     return mat, np.array(duties, float)
 
 #%% Criteria checker
-def check(name, EtOH_mult, IBO_mult):
+def check(name, EtOH_mult, IBO_mult,
+          rec_EtOH_min=0.90, pur_EtOH_min=0.99,
+          rec_IBO_min=0.90, pur_IBO_min=0.95):
+    """Simulate the variant thrice and check its criteria. A recovery
+    minimum of None means the corresponding product stream must be empty
+    (zero-titer feed); purity is only checked on nonempty products."""
     print(f'\n===== {name} (EtOH x{EtOH_mult}, IBO x{IBO_mult}) =====',
           flush=True)
     set_feed(EtOH_mult, IBO_mult)
@@ -80,24 +100,34 @@ def check(name, EtOH_mult, IBO_mult):
         ma, da = snaps[a]
         mb, db = snaps[b]
         drift_mat = max(drift_mat, np.abs(ma - mb).max() / np.abs(ma).max())
+        # 1e3 kJ/hr (~0.3 kW) normalization floor: sub-kW absolute duty
+        # differences on an (almost) all-zero duty vector are noise, not
+        # instability (normal-operation duties here are >=1e7 kJ/hr).
         drift_duty = max(drift_duty,
-                         np.abs(da - db).max() / max(np.abs(da).max(), 1.0))
+                         np.abs(da - db).max() / max(np.abs(da).max(), 1e3))
 
     etoh = f.stream.ethanol_product
     ibo = f.stream.isobutanol_product
-    rec_EtOH = etoh.imass['Ethanol'] / feed_EtOH
-    pur_EtOH = etoh.imass['Ethanol'] / etoh.F_mass
-    rec_IBO = ibo.imass['Isobutanol'] / feed_IBO
-    pur_IBO = ibo.imass['Isobutanol'] / ibo.F_mass
-
-    checks = [
-        ('EtOH recovery > 0.90', rec_EtOH, rec_EtOH > 0.90),
-        ('EtOH purity   > 0.99', pur_EtOH, pur_EtOH > 0.99),
-        ('IBO  recovery > 0.90', rec_IBO, rec_IBO > 0.90),
-        ('IBO  purity   > 0.95', pur_IBO, pur_IBO > 0.95),
+    checks = []
+    for label, product, product_chem, feed_mass, rec_min, pur_min in (
+            ('EtOH', etoh, 'Ethanol', feed_EtOH, rec_EtOH_min, pur_EtOH_min),
+            ('IBO ', ibo, 'Isobutanol', feed_IBO, rec_IBO_min, pur_IBO_min),
+            ):
+        if rec_min is None:
+            checks.append((f'{label} product empty ', product.F_mass,
+                           product.F_mass < EMPTY_F_MASS))
+        else:
+            rec = product.imass[product_chem] / feed_mass
+            checks.append((f'{label} recovery > {rec_min:.2f}', rec,
+                           rec > rec_min))
+            if product.F_mass > EMPTY_F_MASS:
+                pur = product.imass[product_chem] / product.F_mass
+                checks.append((f'{label} purity   > {pur_min:.2f}', pur,
+                               pur > pur_min))
+    checks.extend((
         ('mol drift    < 1e-3', drift_mat, drift_mat < 1e-3),
         ('energy drift < 1e-3', drift_duty, drift_duty < 1e-3),
-    ]
+    ))
     ok = all(c[2] for c in checks)
     for label, val, passed in checks:
         print(f'  {label}: {val:.6g}  [{"ok" if passed else "FAIL"}]')
@@ -106,18 +136,34 @@ def check(name, EtOH_mult, IBO_mult):
 
 #%% Run all feed variants
 def main():
+    low = dict(rec_min=0.60)  # relaxed recovery floor for very low titers
     variants = [
-        ('baseline scenario B', 1.0, 1.0),
-        ('higher IBO (x2)', 1.0, 2.0),
-        ('lower IBO (x0.5)', 1.0, 0.5),
-        ('lower EtOH (x0.5)', 0.5, 1.0),
-        ('higher EtOH (x1.5)', 1.5, 1.0),
-        ('higher IBO, lower EtOH', 0.5, 2.0),
+        # name, EtOH_mult, IBO_mult, criteria overrides
+        ('baseline scenario B', 1.0, 1.0, {}),
+        ('higher IBO (x2)', 1.0, 2.0, {}),
+        ('lower IBO (x0.5)', 1.0, 0.5, {}),
+        ('lower EtOH (x0.5)', 0.5, 1.0, {}),
+        ('higher EtOH (x1.5)', 1.5, 1.0, {}),
+        ('higher IBO, lower EtOH', 0.5, 2.0, {}),
+        # ~200 g/L titer equivalents
+        ('EtOH 200 g/L (x3.33)', 3.33, 1.0, {}),
+        ('IBO 200 g/L (x4.2)', 1.0, 4.2, {}),
+        ('both 200 g/L', 3.33, 4.2, {}),
+        # low-titer continuity range (reduced IBO recovery acceptable)
+        ('low IBO (x0.05)', 1.0, 0.05, dict(rec_IBO_min=low['rec_min'])),
+        ('low IBO (x0.01)', 1.0, 0.01, dict(rec_IBO_min=low['rec_min'])),
+        ('low IBO (x0.001)', 1.0, 0.001, dict(rec_IBO_min=low['rec_min'])),
+        ('low EtOH (x0.01)', 0.01, 1.0, dict(rec_EtOH_min=low['rec_min'])),
+        ('low EtOH (x0.001)', 0.001, 1.0, dict(rec_EtOH_min=low['rec_min'])),
+        # zero titers: corresponding product stream must be empty
+        ('zero IBO', 1.0, 0.0, dict(rec_IBO_min=None)),
+        ('zero EtOH', 0.0, 1.0, dict(rec_EtOH_min=None)),
+        ('zero both', 0.0, 0.0, dict(rec_EtOH_min=None, rec_IBO_min=None)),
     ]
     results = {}
-    for name, em, im in variants:
+    for name, em, im, criteria in variants:
         try:
-            results[name] = check(name, em, im)
+            results[name] = check(name, em, im, **criteria)
         except Exception:
             traceback.print_exc()
             results[name] = False
