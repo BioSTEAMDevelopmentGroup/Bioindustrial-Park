@@ -113,7 +113,21 @@ model_specification(
 
 #%%  Metrics
 product_chemical_IDs = ['Ethanol',]
-get_product_MPSP = lambda: solve_TEA(stream_IDs=(product.ID,))['MPSPs'][product.ID] # USD / pure-kg; purity-adjusted, at the default 15% IRR
+IBO_product = f.isobutanol
+
+# One side-effect-free TEA solve per simulated point, shared by the MPSP and
+# IRR metrics below: ethanol MPSP and isobutanol MPSP (each purity-adjusted
+# USD / pure-kg at the default 15% IRR, with the other product at its default
+# price; NaN when the product stream is empty) and the IRR at both products'
+# default prices. `latest_TEA_solution` is refreshed right after each
+# successful model_specification call in the sweep loop.
+latest_TEA_solution = {'IRR': np.nan, 'MPSPs': {product.ID: np.nan, IBO_product.ID: np.nan}}
+def refresh_TEA_solution():
+    latest_TEA_solution.update(solve_TEA(stream_IDs=(product.ID, IBO_product.ID)))
+    return latest_TEA_solution
+get_product_MPSP = lambda: latest_TEA_solution['MPSPs'][product.ID]
+get_IBO_MPSP = lambda: latest_TEA_solution['MPSPs'][IBO_product.ID]
+get_IRR = lambda: latest_TEA_solution['IRR']
 get_product_purity = lambda: sum([product.imass[i] for i in product_chemical_IDs])/product.F_mass
 get_production = lambda: sum([product.imass[i] for i in product_chemical_IDs])
 get_product_recovery = lambda: sum([product.imol[i] for i in product_chemical_IDs])/sum([broth.imol[i] for i in product_chemical_IDs])
@@ -140,7 +154,9 @@ get_active_cell_loading = lambda: ferm_reactor.nsk_results_specific_tau_dict['cu
 #             get_prod_nsk,
 #             get_curr_n_glu_spikes,]
 
-metrics = {'MPSP': {'f': get_product_MPSP, 'units': '$/kg'},
+metrics = {'MPSP': {'f': get_product_MPSP, 'units': '$/kg'}, # ethanol MPSP
+            'IBO MPSP': {'f': get_IBO_MPSP, 'units': '$/kg'},
+            'IRR': {'f': get_IRR, 'units': ''},
             'AOC': {'f': get_AOC, 'units': 'MM$/y'},
             'TCI': {'f': get_TCI, 'units': 'MM$'},
             'Combined Yield': {'f': get_yield_nsk, 'units': 'g-EtOH-and-IBO/g-sugars'},
@@ -330,6 +346,7 @@ for s3 in spec_3:
                 else:
                     model_specification(**curr_spec)
                 # plot_kinetic_results()
+                refresh_TEA_solution()
                 
                 
                 for k, v in list(results.items()): 
@@ -711,7 +728,7 @@ if plot:
                         continue
                 else:
                     pass
-        elif 'yield' in lccm or 'titer' in lccm or 'productivity' in lccm or 'loading' in lccm:
+        elif 'yield' in lccm or 'titer' in lccm or 'productivity' in lccm or 'loading' in lccm or 'irr' in lccm:
             cmap = JBEI_UCB_colormap(reverse=True)
             cmap_over_color = colors.yellow_tint.RGBn
         
@@ -738,10 +755,15 @@ if plot:
         curr_metric_w_ticks.sort(reverse=False)
         # curr_metric_w_levels = np.arange(0., 15.5, 0.5)
         
-        if 'mpsp' in lccm:
+        if 'mpsp' in lccm: # ethanol and isobutanol MPSPs share the same scale
             curr_metric_w_levels = np.arange(0.25, 5.001, 0.1)
             curr_metric_cbar_ticks = np.arange(0.25, 5.001, 0.25)
             curr_metric_w_ticks = [0.4, 0.9, 2.5, 5.0]
+            cbar_n_minor_ticks = 4
+        elif 'irr' in lccm:
+            curr_metric_w_levels = np.arange(-0.1, 0.5001, 0.01)
+            curr_metric_cbar_ticks = np.arange(-0.1, 0.5001, 0.05)
+            curr_metric_w_ticks = [0.0, 0.10, 0.15, 0.20, 0.30]
             cbar_n_minor_ticks = 4
         # else:
         #     break
