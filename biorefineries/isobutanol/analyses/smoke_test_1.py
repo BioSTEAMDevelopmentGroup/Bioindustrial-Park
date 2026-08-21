@@ -15,6 +15,7 @@ optimize_1D_feeding_strategy_for_MPSP = isobutanol.models.optimize_1D_feeding_st
 optimize_stage_1_time_and_max_n_glu_spikes_for_MPSP =  isobutanol.models.optimize_stage_1_time_and_max_n_glu_spikes_for_MPSP
 optimize_max_n_glu_spikes_for_MPSP = isobutanol.models.optimize_max_n_glu_spikes_for_MPSP
 plot_kinetic_results = isobutanol.models.plot_kinetic_results
+solve_TEA = isobutanol.system.solve_TEA
 unit_groups_dict = isobutanol.models.unit_groups_dict
 model_specification = model.specification
 f = model.system.flowsheet
@@ -25,12 +26,8 @@ IBO_filepath = isobutanol.__file__.replace('\\__init__.py', '')
 
 def load_simulate_baseline(scenario='A', # 'A' or 'B'
                            plot=False,
-                           **tea_kwargs, # TEA-solve kwargs forwarded to
-                                         # load_simulate_solve_TEA via
-                                         # model_specification: solve_for
-                                         # ('MPSP'|'IRR'|'NPV'),
-                                         # product_stream, IRR, NPV,
-                                         # n_tea_solves
+                           stream_IDs=('ethanol', 'isobutanol'), # products whose MPSPs are solved
+                           IRR_for_MPSP=0.15, # fixed IRR at which MPSPs are solved
                            ):
     parameter_distributions_filename = IBO_filepath+\
         '\\analyses\\full\\parameter_distributions\\'+\
@@ -40,16 +37,16 @@ def load_simulate_baseline(scenario='A', # 'A' or 'B'
     model.load_parameter_distributions(parameter_distributions_filename, namespace_dict)
     baseline_initial = model.metrics_at_baseline()
 
-    model_specification(**tea_kwargs)
+    model_specification()
 
     # for forced batch mode:
     # fbs_spec.max_n_spikes = 0
     if scenario=='A':
         fbs_spec.max_n_spikes = 16
-        result = model_specification(threshold_conc=217.125, target_conc=221.25, **tea_kwargs)
+        model_specification(threshold_conc=217.125, target_conc=221.25)
     elif scenario=='B':
         fbs_spec.max_n_spikes = 13
-        result = model_specification(threshold_conc=216.3, target_conc=226.3, **tea_kwargs)
+        model_specification(threshold_conc=216.3, target_conc=226.3)
     else:
         raise ValueError(f'Scenario {scenario} not found.')
 
@@ -58,4 +55,7 @@ def load_simulate_baseline(scenario='A', # 'A' or 'B'
         # Plot conc v time
         fig, ax = plot_kinetic_results(xlim=(0,80), ylim=(0,250))
 
-    return result # purity-adjusted MPSP, IRR, or NPV per solve_for (default: ethanol MPSP)
+    # {'IRR': <solved IRR at default product prices>,
+    #  'MPSPs': {ID: <purity-adjusted MPSP at IRR_for_MPSP>, ...}} (NaN for an
+    # empty product, e.g. isobutanol in scenario A); no simulation, prices restored
+    return solve_TEA(stream_IDs=stream_IDs, IRR_for_MPSP=IRR_for_MPSP)

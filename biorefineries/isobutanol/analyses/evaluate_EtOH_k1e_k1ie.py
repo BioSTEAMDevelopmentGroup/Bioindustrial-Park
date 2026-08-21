@@ -39,6 +39,7 @@ fbs_spec = isobutanol.models.models_EtOH_IBO_corn.fbs_spec
 namespace_dict = isobutanol.models.namespace_dict
 optimize_1D_feeding_strategy_for_MPSP = isobutanol.models.optimize_1D_feeding_strategy_for_MPSP
 plot_kinetic_results = isobutanol.models.plot_kinetic_results
+solve_TEA = isobutanol.system.solve_TEA
 model_specification = model.specification
 system = model.system
 tea = model.system.TEA
@@ -98,13 +99,12 @@ perform_feeding_strategy_opt = False
 
 model_specification(
     n_sims=3,
-    n_tea_solves=3,
     plot=True,
     )
 
 #%%  Metrics
 product_chemical_IDs = ['Ethanol',]
-get_product_MPSP = lambda: tea.solve_price(product) / get_product_purity() # USD / pure-kg
+get_product_MPSP = lambda: solve_TEA(stream_IDs=(product.ID,))['MPSPs'][product.ID] # USD / pure-kg; purity-adjusted, at the default 15% IRR
 get_product_purity = lambda: sum([product.imass[i] for i in product_chemical_IDs])/product.F_mass
 get_production = lambda: sum([product.imass[i] for i in product_chemical_IDs])
 get_product_recovery = lambda: sum([product.imol[i] for i in product_chemical_IDs])/sum([broth.imol[i] for i in product_chemical_IDs])
@@ -270,7 +270,6 @@ r.k_1e = nsk_k_1ees[1]
 r.k_1ie = nsk_k_1iees[0]
 model_specification(**curr_spec,
     n_sims=3,
-    n_tea_solves=3,
     plot=True,
     )
 

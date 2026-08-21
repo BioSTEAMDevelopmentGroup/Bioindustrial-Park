@@ -26,7 +26,7 @@ filterwarnings('ignore')
 
 MultiEffectEvaporator = bst.MultiEffectEvaporator
 
-__all__ = ('corn_EtOH_IBO_sys',)
+__all__ = ('corn_EtOH_IBO_sys', 'solve_TEA')
 
 corn_chems_compiled = corn.chemicals.create_chemicals()
 chems = [c for c in corn_chems_compiled]
@@ -271,11 +271,11 @@ def V514_update_IBO_price():
         ibo = V514.outs[0]
         if ibo.F_mol: ibo.price = V514.isobutanol_price * ibo.imass['Isobutanol']/ibo.F_mass
 
-#%% Add ethanol storage specification for optional purity-based price update (when solving IRR rather than MPSP)
+#%% Add ethanol storage specification for optional purity-based price update
 V513 = f.V513
 V513.ethanol_price = 0.835 # mean of ends of market price range (0.52 - 1.15) # Jan 2021 - Dec 2025 5-year low and high from https://tradingeconomics.com/commodity/ethanol
 
-V513.update_ethanol_price = False # False by default when solving for ethanol MPSP rather than IRR or NPV
+V513.update_ethanol_price = False # a simulation leaves f.ethanol.price untouched by default; solve_TEA sets/restores prices itself
 @V513.add_specification(run=False)
 def V513_update_etoh_price():
     V513._run()
@@ -520,29 +520,76 @@ fbs_spec.n_tea_solves = 3
 def get_purity_adj_price(stream, chem_IDs):
     return stream.price * stream.F_mass/sum([stream.imass[ID] for ID in chem_IDs])
 
-def get_current_TEA_solution(solve_for='MPSP', product_stream=None):
-    """Read the current TEA solution off the flowsheet/TEA state without
-    re-solving: the purity-adjusted price of `product_stream` ('MPSP'), the
-    TEA's IRR ('IRR'), or the TEA's NPV at its current IRR ('NPV')."""
-    if solve_for == 'MPSP':
-        if product_stream is None: product_stream = fbs_spec.product_stream
-        prod_chem = ('Isobutanol'
-                     if product_stream.imass['Isobutanol']
-                        > product_stream.imass['Ethanol']
-                     else 'Ethanol')
-        return get_purity_adj_price(product_stream, [prod_chem])
-    elif solve_for == 'IRR':
-        return corn_EtOH_IBO_sys_tea.IRR
-    elif solve_for == 'NPV':
-        return corn_EtOH_IBO_sys_tea.NPV
-    raise ValueError(f"solve_for must be 'MPSP', 'IRR', or 'NPV'; got {solve_for!r}")
+def get_main_chemical_ID(stream):
+    """ID of the chemical carrying the largest mass flow in `stream` -- the
+    purity basis of its MPSP (Ethanol for the denatured ethanol product,
+    Isobutanol for the isobutanol product)."""
+    mass = stream.imass
+    return max(stream.chemicals.IDs, key=lambda ID: mass[ID])
 
-#: keyword arguments of load_simulate_solve_TEA that configure the TEA solve
-#: rather than the feeding strategy; model_specification forwards these so
-#: every retry in its recovery paths re-solves the same TEA problem.
-TEA_solve_keys = ('solve_for', 'product_stream', 'IRR', 'NPV', 'n_tea_solves')
+def get_default_product_prices():
+    """{stream: price} for the two products at their purity-based DEFAULT
+    prices -- the rule the V513/V514 specifications apply during simulation
+    (set price x main-chemical mass fraction) -- computed off the current
+    stream states without simulating. Empty products are omitted."""
+    prices = {}
+    etoh, ibo = f.ethanol, f.isobutanol
+    if etoh.F_mass:
+        prices[etoh] = V513.ethanol_price * etoh.imass['Ethanol']/etoh.F_mass
+    if ibo.F_mass:
+        prices[ibo] = V514.isobutanol_price * ibo.imass['Isobutanol']/ibo.F_mass
+    return prices
 
-#: list of (n_sims_run, per-sweep max relative drifts) — one entry per
+def solve_TEA(stream_IDs=('ethanol', 'isobutanol'),
+              IRR_for_MPSP=0.15,
+              n_tea_solves=3):
+    """Solve the TEA on the CURRENT flowsheet state -- no simulation.
+
+    Returns {'IRR': <solved IRR>, 'MPSPs': {stream_ID: <purity-adjusted
+    MPSP, $/kg of the stream's main chemical>, ...}} where
+
+    * each MPSP is the minimum selling price of that stream at the fixed
+      IRR `IRR_for_MPSP`, with every OTHER product held at its
+      purity-based default price (V513.ethanol_price, V514.isobutanol_price
+      x mass fraction); a stream that carries no flow under the current
+      scenario (e.g. isobutanol in scenario A) has no solvable price and is
+      reported as NaN;
+    * 'IRR' is the IRR solved with BOTH products at their purity-based
+      default prices (the state the V513/V514 specifications produce with
+      update_ethanol_price = update_isobutanol_price = True).
+
+    Every stream price and the TEA IRR touched here are restored to their
+    entry values before returning, so calling this is side-effect free.
+    `n_tea_solves` is the number of successive solve passes per quantity
+    (independent of fbs_spec.n_tea_solves, which only gates whether
+    load_simulate_solve_TEA calls this at all).
+    """
+    tea = corn_EtOH_IBO_sys_tea
+    streams = [f.stream[ID] for ID in stream_IDs]
+    default_prices = get_default_product_prices()
+    original_prices = {s: s.price for s in [*streams, *default_prices]}
+    original_IRR = tea.IRR
+    try:
+        MPSPs = {}
+        tea.IRR = IRR_for_MPSP
+        for s in streams:
+            if s.isempty():
+                MPSPs[s.ID] = np.nan
+                continue
+            for o, price in default_prices.items(): o.price = price
+            for i in range(n_tea_solves):
+                s.price = tea.solve_price(s)
+            MPSPs[s.ID] = get_purity_adj_price(s, [get_main_chemical_ID(s)])
+        for o, price in default_prices.items(): o.price = price
+        for i in range(n_tea_solves):
+            tea.IRR = tea.solve_IRR()
+        IRR = tea.IRR
+    finally:
+        for s, price in original_prices.items(): s.price = price
+        tea.IRR = original_IRR
+    return {'IRR': IRR, 'MPSPs': MPSPs}
+
+#: list of (n_sims_run, per-sweep max relative drifts) -- one entry per
 #: load_simulate_solve_TEA call. Diagnostic for convergence behavior.
 convergence_log = []
 
@@ -572,28 +619,29 @@ def load_simulate_solve_TEA(target_conc=None,
     # sweep. load_specifications stays INSIDE the loop because it is
     # state-dependent (it re-solves feed actuators and the initial/spike
     # split against current stream states), so the converged point must
-    # be a fixed point of the composite load+simulate map — converging
+    # be a fixed point of the composite load+simulate map -- converging
     # bare simulate() alone can park on a spurious branch (observed as an
     # HXN1001 flip on the next call). Repeat/near-repeat calls exit after
     # 1 sweep; real spec or parameter changes need 2-4 (measured: 4 for
-    # 28/30 Monte Carlo samples, 5 for the rest — the
+    # 28/30 Monte Carlo samples, 5 for the rest -- the
     # V406-spec -> V307-spec feed-flow coupling and the WWT/facility
     # response relax one pass per sweep, and the BT801 utility-cost term
     # takes the last sweeps to settle below rtol). The cap is 5 because large
     # scenario jumps can traverse a transient HXN1001 double-flip
-    # (measured scenario-B drifts: 0.186, 3.4e-3, 0.134, 0.153, 4.2e-6 —
+    # (measured scenario-B drifts: 0.186, 3.4e-3, 0.134, 0.153, 4.2e-6 --
     # the wrong branch at sweep 3 is unstable under this composite map
     # and sweep 4 escapes it); a cap of 3-4 can stop mid-excursion on
     # the wrong utility-network branch.
     n_sims=5,
     sim_rtol=1e-4,
-    solve_for='MPSP',      # 'MPSP' | 'IRR' | 'NPV'
-    product_stream=None,   # stream whose MPSP is solved; default fbs_spec.product_stream
-    IRR=0.15,              # fixed IRR when solving MPSP or NPV; initial guess when solving IRR
-    NPV=0.0,               # fixed NPV when solving MPSP or IRR (only the break-even point 0 is supported)
     n_tea_solves=None,
     plot=False,
     ):
+    """Load the feeding specifications and simulate to convergence. If
+    `n_tea_solves` (default fbs_spec.n_tea_solves) is > 0, finish with a
+    side-effect-free solve_TEA() and return its dict; otherwise return None.
+    Product prices never enter the mass/energy balances, so the TEA solve
+    is independent of, and performed after, the convergence sweeps."""
 
     if target_conc is None:
         target_conc = fbs_spec.target_conc
@@ -609,25 +657,6 @@ def load_simulate_solve_TEA(target_conc=None,
 
     if max_n_spikes is None:
         max_n_spikes = fbs_spec.max_n_spikes
-
-    if solve_for not in ('MPSP', 'IRR', 'NPV'):
-        raise ValueError(f"solve_for must be 'MPSP', 'IRR', or 'NPV'; got {solve_for!r}")
-    if solve_for in ('MPSP', 'IRR') and NPV != 0.:
-        raise ValueError(f"solve_for={solve_for!r} supports only the break-even point NPV=0; got NPV={NPV!r}")
-    if product_stream is None:
-        product_stream = fbs_spec.product_stream
-
-    # Fix what is NOT being solved for (product prices only feed the TEA,
-    # never the mass/energy balances, so flipping these flags mid-session is
-    # safe): solving a stream's MPSP leaves that stream's price to
-    # solve_price and holds the other product at its purity-based set price;
-    # solving IRR or NPV holds BOTH products at their purity-based set
-    # prices. The flags take effect inside the convergence sweep below (the
-    # V513/V514 specifications run on every system simulation).
-    V513.update_ethanol_price = not (solve_for == 'MPSP'
-                                     and product_stream is f.ethanol)
-    V514.update_isobutanol_price = not (solve_for == 'MPSP'
-                                        and product_stream is f.isobutanol)
 
     n_sims_run = 0
     drifts = []
@@ -650,33 +679,12 @@ def load_simulate_solve_TEA(target_conc=None,
             break
     convergence_log.append((n_sims_run, tuple(drifts)))
 
-    n_tea_solves = n_tea_solves if n_tea_solves is not None else fbs_spec.n_tea_solves
-    if n_tea_solves > 0:
-        corn_EtOH_IBO_sys_tea.IRR = IRR
-        if solve_for == 'MPSP':
-            if product_stream.isempty():
-                # Deterministic infeasibility (e.g. solving isobutanol MPSP
-                # under a scenario whose broth carries no isobutanol);
-                # model_specification re-raises this immediately instead of
-                # entering its retry/barrage scaffolding.
-                raise ValueError(
-                    f"cannot solve price of empty stream "
-                    f"{product_stream.ID!r}: the current "
-                    "scenario/specifications produce none of it")
-            for i in range(n_tea_solves):
-                product_stream.price = corn_EtOH_IBO_sys_tea.solve_price(product_stream)
-        elif solve_for == 'IRR':
-            for i in range(n_tea_solves):
-                corn_EtOH_IBO_sys_tea.IRR = corn_EtOH_IBO_sys_tea.solve_IRR()
-        # solve_for == 'NPV': nothing to solve; the TEA's NPV at the given
-        # IRR and set prices is read off by get_current_TEA_solution below.
-
     if plot:
         plot_kinetic_results()
 
+    n_tea_solves = n_tea_solves if n_tea_solves is not None else fbs_spec.n_tea_solves
     if n_tea_solves > 0:
-        return get_current_TEA_solution(solve_for=solve_for,
-                                        product_stream=product_stream)
+        return solve_TEA(n_tea_solves=n_tea_solves)
 
 def plot_kinetic_results(xlim=None, ylim=None, 
                          show_stage_1_time=False, 
@@ -834,12 +842,12 @@ def run_bugfix_barrage(**curr_spec):
 
 #%%
 def model_specification(**kwargs):
+    """Main entry point to simulate the biorefinery: load the feeding
+    specifications (current ones updated with `kwargs`) and simulate to
+    convergence, with the convergence-recovery scaffolding below. Returns
+    None -- follow a call with solve_TEA() to read the TEA solution."""
     curr_spec = {k: v for k,v in fbs_spec.current_specifications.items()}
     curr_spec.update(kwargs)
-    # TEA-solve kwargs (solve_for/product_stream/IRR/NPV/n_tea_solves) ride
-    # along with the feeding specs in curr_spec; keep them separate too so
-    # partial-spec retries below re-solve the same TEA problem.
-    tea_spec = {k: curr_spec[k] for k in TEA_solve_keys if k in curr_spec}
     try:
         load_simulate_solve_TEA(**curr_spec)
     except Exception as e:
@@ -858,7 +866,7 @@ def model_specification(**kwargs):
                 tau_maxes_to_try.reverse()
                 for tm in tau_maxes_to_try:
                     try:
-                        load_simulate_solve_TEA(tau_max=tm, **tea_spec)
+                        load_simulate_solve_TEA(tau_max=tm)
                         success = True
                         break
                     except Exception as e:
@@ -920,10 +928,6 @@ def model_specification(**kwargs):
             raise e
         elif 'argument 3 of type' in str_e:
             raise e
-        elif 'cannot solve price of empty' in str_e:
-            # deterministic: the product stream carries no flow under the
-            # current scenario/specifications; retrying cannot change that.
-            raise e
         else:
             # breakpoint()
             try:
@@ -934,13 +938,12 @@ def model_specification(**kwargs):
                 print('Error in model spec: %s'%str_e)
                 run_bugfix_barrage(**curr_spec)
 
-    # Whichever recovery path succeeded, the flowsheet/TEA state now carries
-    # the solution; read it off rather than threading returns through the
-    # recovery scaffolding.
-    return get_current_TEA_solution(
-        solve_for=tea_spec.get('solve_for', 'MPSP'),
-        product_stream=tea_spec.get('product_stream'))
 
+def get_ethanol_MPSP(IRR_for_MPSP=0.15):
+    """Purity-adjusted ethanol MPSP of the current flowsheet state
+    (side-effect free; see solve_TEA). Objective of the optimizers below."""
+    return solve_TEA(stream_IDs=('ethanol',),
+                     IRR_for_MPSP=IRR_for_MPSP)['MPSPs']['ethanol']
 
 def optimize_tau_for_MPSP(threshold_s_EtOH=5, **kwargs):
     original_run_type = V406.run_type
@@ -954,7 +957,7 @@ def optimize_tau_for_MPSP(threshold_s_EtOH=5, **kwargs):
         try:
             # corn_EtOH_IBO_sys.simulate()
             model_specification(**kwargs)
-            return get_purity_adj_price(ethanol, ['Ethanol'])
+            return get_ethanol_MPSP()
         except:
             return np.inf
     res = differential_evolution(f, bounds=(bounds_tau,), atol=1e-2)
@@ -972,7 +975,7 @@ def optimize_1D_feeding_strategy_for_MPSP(bounds=(100.0, 400.0), threshold_diff=
             model_kwargs.update({'target_conc': x[0],
                                  'threshold_conc': x[0] - threshold_diff})
             model_specification(**model_kwargs)
-            MPSP = get_purity_adj_price(ethanol, ['Ethanol'])
+            MPSP = get_ethanol_MPSP()
             # print(MPSP)
             return MPSP
         except:
@@ -1013,7 +1016,7 @@ def optimize_stage_1_time_and_max_n_glu_spikes_for_MPSP(bounds=((5, 40), (0, 40)
             # beats a stale max_n_spikes carried by a snapshot of
             # current_specifications. load_specifications stores the value.
             model_specification(**{**model_kwargs, 'max_n_spikes': x[1]})
-            MPSP = get_purity_adj_price(ethanol, ['Ethanol'])
+            MPSP = get_ethanol_MPSP()
             # print(MPSP)
             return MPSP
         except:
@@ -1072,7 +1075,7 @@ def optimize_max_n_glu_spikes_for_MPSP(bounds=(0, 40),
             # beats a stale max_n_spikes carried by a snapshot of
             # current_specifications. load_specifications stores the value.
             model_specification(**{**model_kwargs, 'max_n_spikes': x[0]})
-            MPSP = get_purity_adj_price(ethanol, ['Ethanol'])
+            MPSP = get_ethanol_MPSP()
             # print(MPSP)
             return MPSP
         except:
@@ -1113,7 +1116,7 @@ def optimize_split_1D_2D_feeding_strategy_for_MPSP(bounds=(20.0, 400.0), thresho
             model_specification(
                                 target_conc=x[0],
                                 threshold_conc=x[0]-threshold_diff, )
-            MPSP = get_purity_adj_price(ethanol, ['Ethanol'])
+            MPSP = get_ethanol_MPSP()
             # print(MPSP)
             return MPSP
         except:
@@ -1141,7 +1144,7 @@ def optimize_2D_feeding_strategy_for_MPSP(bounds=(20.0, 400.0), Ns=5, **kwargs):
             model_specification(
                                 target_conc=x[0],
                                 threshold_conc=x[0]-10, )
-            MPSP = get_purity_adj_price(ethanol, ['Ethanol'])
+            MPSP = get_ethanol_MPSP()
             # print(MPSP)
             return MPSP
         except:
