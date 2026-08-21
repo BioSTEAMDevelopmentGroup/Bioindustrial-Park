@@ -87,7 +87,10 @@ baseline_initial = model.metrics_at_baseline()
 
 # !!!
 V406 = f.V406
-f.M401.bypass_IBO_separation_conditions[0] = lambda: V406.outs[1].imass['Isobutanol']/V406.outs[1].F_vol < 10.0
+# The former M401 bypass-threshold override (skip IBO recovery below 10 g/L)
+# is gone with the solvent-extraction train: the integrated separation train
+# adapts to any feed titer (0-200 g/L) natively, shutting the IBO side off
+# when the broth carries no isobutanol.
 
 scenario = 'B'
 

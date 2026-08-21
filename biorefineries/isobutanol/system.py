@@ -19,6 +19,7 @@ from nskinetics.models.s_cerevisiae_ferm_fb_inhib_mod_ibo import te_r
 from scipy.optimize import differential_evolution, minimize, brute
 from matplotlib.ticker import AutoMinorLocator
 from biorefineries.isobutanol.process_settings import load_process_settings
+from biorefineries.isobutanol.separations import create_IBO_EtOH_separation_system
 
 from warnings import filterwarnings
 filterwarnings('ignore')
@@ -30,12 +31,6 @@ __all__ = ('corn_EtOH_IBO_sys',)
 corn_chems_compiled = corn.chemicals.create_chemicals()
 chems = [c for c in corn_chems_compiled]
 chems.append(tmo.Chemical('Isobutanol'))
-
-solvent_chem = 'Isopentyl acetate' # 1
-# solvent_chem = 'Valeraldehyde' # 2
-# solvent_chem = '2-ethyl hexanol' # 3
-
-chems.append(tmo.Chemical(solvent_chem))
 chems.append(tmo.Chemical('AceticAcid'))
 chems.append(tmo.Chemical('Acetaldehyde'))
 tmo.settings.set_thermo(chems)
@@ -187,235 +182,11 @@ corn_EtOH_IBO_sys_no_IBO_recovery = bst.System.from_units('corn_EtOH_IBO_sys_no_
                                                   + list(sugar_prep_and_fermentation_sys.units))
 corn_EtOH_IBO_sys_no_IBO_recovery.simulate()
 
-#%% Add isobutanol recovery system - stage 1/2
-stillage = f.stillage
-
-S404 = bst.Splitter('S404', ins=stillage, outs=('to_IBO_recovery', 'direct_to_DDGS_recovery'), 
-                    split=0.999)
-
-makeup_isopentyl_acetate = tmo.Stream('makeup_isopentyl_acetate')
-
-M401 = bst.Mixer('M401', ins=('', makeup_isopentyl_acetate), outs=('isopentyl_acetate_solvent'))
-
-M401_design = M401._design
-M401_cost = M401._cost
-
-# M401.bypass_IBO_separation_conditions = [lambda: V406.nsk_kinetic_model._te.k_13==0.0] # if any return True, don't try to recover Isobutanol
-
-M401.bypass_IBO_separation_conditions = [lambda: V406.outs[1].imass['Isobutanol']/V406.outs[1].F_vol < 2.0] # if any return True, don't try to recover Isobutanol
-
-# M401.bypass_IBO_separation_conditions = [lambda: True]
-
-@M401.add_specification(run=False)
-def M401_adjust_makeup_solvent():
-    if not np.any([i() for i in M401.bypass_IBO_separation_conditions]):
-        M401._design = M401_design
-        M401._cost = M401_cost
-        req = S401.mol_solvent_per_mol_carrier*S401.ins[0].imol['Water']
-        recycle = M401.ins[0]
-        makeup = M401.ins[1]
-        makeup.imol[solvent_chem] = max(0, req-recycle.imol[solvent_chem])
-        M401._run()
-    else:
-        M401._design = lambda: 0
-        M401._cost = lambda: 0
-        M401.ins[1].empty()
-        M401._run()
-        
-# solvent_extraction_thermo = tmo.Thermo(chemicals=[i for i in chems if i.ID in ('Water', 'Isobutanol', solvent_chem)])
-
-S401 = bst.MultiStageMixerSettlers('S401', 
-                                    ins=(S404-0, M401.outs[0]), 
-                                    outs=('S401_extract', 'S401_raffinate'), N_stages=5,
-                                    top_chemical=solvent_chem,
-                                    )
-S401.mol_solvent_per_mol_carrier = 0.2
-
-S401_design = S401._design
-S401_cost = S401._cost
-
-@S401.add_specification(run=False)
-def S401_partial_chems():
-    if not np.any([i() for i in M401.bypass_IBO_separation_conditions]):
-        S401._design = S401_design
-        S401._cost = S401_cost
-        M401.simulate()
-        feed = S401.ins[0]
-        raffinate = S401.outs[1]
-        chems_included_lle = ('Water', 'Isobutanol', solvent_chem)
-        chems_excluded_lle = {}
-        for i in feed.chemicals:
-            if i.ID not in chems_included_lle:
-                chems_excluded_lle[i.ID] = feed.imol[i.ID]
-                feed.imol[i.ID] = 0.0
-        
-        S401._run()
-        
-        for k, v in chems_excluded_lle.items():
-            for stream in (feed, raffinate):
-                stream.imol[k] = v
-        
-    else:
-        S401._design = lambda: 0
-        S401._cost = lambda: 0
-        S401.ins[1].empty()
-        S401.outs[0].empty() # extract
-        S401.outs[1].copy_like(S401.ins[0]) # raffinate
-    
-
-# M401.simulate()
-# S401.simulate()
-# S401.show(N=100)
-
-M402 = bst.Mixer('M402', ins=(S401.extract, ''),)
-
-# @M402.add_specification(run=False)
-# def M402_spec():
-#     for i in range(2):
-#         M402._run()
-#         D401.specifications[0]()
-#         M401.specifications[0]()
-#         S401.specifications[0]()
-    
-D401 = bst.BinaryDistillation('D401', ins=M402-0, outs=('D401_t', 'D401_b'), LHK=('Isobutanol', solvent_chem), 
-                              Lr=0.999, Hr=0.999, 
-                              k=1.2, P=101325.0,
-                              partial_condenser=False)
-D401-1-0-M401 # recycle
-
-D401_design = D401._design
-D401_cost = D401._cost
-@D401.add_specification(run=False)
-def D401_bypass_spec():
-    if D401.ins[0].F_mol:
-        D401._design = D401_design
-        D401._cost = D401_cost
-        D401._run()
-    else:
-        D401._design = lambda: 0
-        D401._cost = lambda: 0
-        D401.outs[0].empty()
-        D401.outs[1].copy_like(D401.ins[0])
-        
-# M402.simulate()
-# D401.simulate()
-# D401.show(N=100)
-
-D401_0_P = bst.Pump('D401_0_P', ins=D401-0, P=101325.)
-
-# D401_0_P.simulate()
-
-#%% Continue adding isobutanol recovery system - stage 2/2
-stage_2_feed = D401_0_P-0
-
-S402 = bst.units.MolecularSieve('S402', ins=stage_2_feed, 
-                                # split=(1280.06/1383.85, 2165.14/13356.04),
-                                split=(0.99, 2165.14/13356.04), # !!! water split assumed
-                                order=('Water', 'Isobutanol'))
-
-S403 = bst.units.Splitter('S403', ins=S402-0, outs=('S403_recycle', 'S403_purge'), split=0.0)
-
-S403-0-1-M402
-
-H401 = bst.HXutility('H401', ins=S402-1, T=273.15+25, rigorous=True)
-
-#%% add HX to cool and reconnect to DDGS units
-
-H402 = bst.HXutility('H402', ins=S401-1, T=360.15, rigorous=True)
-
-M403 = bst.Mixer('M403', ins=(S404-1, H402-0), outs='mixed_stream_to_DDGS_recovery')
-
-M403-0-0-f.V601
-
-#%% Add storage for isobutanol product
-V514 = bst.StorageTank('V514', ins=H401-0, outs=('isobutanol'), tau=7*24)
-
-# V514.isobutanol_price = 1.725 # https://www.alibaba.com/product-detail/China-Isobutanol-CAS-NO-78-83_1600225311840.html?spm=a2700.7724857.0.0.6b071f52Jodf8p
-V514.isobutanol_price = 1.49 # https://www.alibaba.com/product-detail/High-Purity-Industrial-Organic-Solvent-Textile_1601609307567.html?spm=a2700.7724857.0.0.6b071f52XisbBQ
-# V514.isobutanol_price = 0.95 # https://www.alibaba.com/product-detail/High-Quality-for-Industrial-Grade-Isobutanol_1601289128791.html?spm=a2700.7724857.0.0.6b071f52XisbBQ
-V514.update_isobutanol_price = True
-@V514.add_specification(run=False)
-def V514_update_IBO_price():
-    if np.any([i() for i in M401.bypass_IBO_separation_conditions]):
-        V514.ins[0].empty()
-        V514.outs[0].empty()
-    else:
-        V514._run()
-        if V514.update_isobutanol_price:
-            ibo = V514.outs[0]
-            if ibo.F_mol: ibo.price = V514.isobutanol_price * ibo.imass['Isobutanol']/ibo.F_mass
-
-#%% Add ethanol storage specification for optional purity-based price update (when solving IRR rather than MPSP)
-V513 = f.V513
-V513.ethanol_price = 0.835 # mean of ends of market price range (0.52 - 1.15) # Jan 2021 - Dec 2025 5-year low and high from https://tradingeconomics.com/commodity/ethanol
-
-V513.update_ethanol_price = False # False by default when solving for ethanol MPSP rather than IRR or NPV
-@V513.add_specification(run=False)
-def V513_update_etoh_price():
-    if np.any([i() for i in T501.bypass_EtOH_separation_conditions]):
-        V513.ins[0].empty()
-        V513.outs[0].empty()
-    else:
-        V513._run()
-        if V513.update_ethanol_price:
-            etoh = V513.outs[0]
-            if etoh.F_mol: etoh.price = V513.ethanol_price * etoh.imass['Ethanol']/etoh.F_mass
-        
-#%% Add bypass option for ethanol separation
-T501 = f.T501
-P301 = f.P301
-T501.bypass_EtOH_separation_conditions = [lambda: P301.outs[0].imass['Ethanol']/P301.outs[0].F_vol <= 0.0] # if any return True, don't try to recover Ethanol
-
-T501_design = T501._design
-T501_cost = T501._cost
-
-@T501.add_specification(run=False)
-def T501_ethanol_separation_bypass_spec():
-    if not np.any([i() for i in T501.bypass_EtOH_separation_conditions]):
-        T501._design = T501_design
-        T501._cost = T501_cost
-        T501._run()
-    else:
-        T501._design = lambda: 0
-        T501._cost = lambda: 0
-        T501.outs[0].empty()
-        T501.outs[1].copy_like(T501.ins[0])
-        
-MX3 = f.MX3
-MX3_design = MX3._design
-MX3_cost = MX3._cost
-@MX3.add_specification(run=False)
-def MX3_ethanol_separation_bypass_spec():
-    if not np.any([i() for i in T501.bypass_EtOH_separation_conditions]):
-        MX3._design = MX3_design
-        MX3._cost = MX3_cost
-        MX3._run()
-    else:
-        MX3._design = lambda: 0
-        MX3._cost = lambda: 0
-        MX3.ins[0].empty()
-        MX3.ins[1].empty()
-        MX3.outs[0].empty()
-
-T503_T507 = f.T503_T507
-
-T503_T507_design = T503_T507._design
-T503_T507_cost = T503_T507._cost
-
-@T503_T507.add_specification(run=False)
-def T503_T507_ethanol_separation_bypass_spec():
-    if not np.any([i() for i in T501.bypass_EtOH_separation_conditions]):
-        T503_T507._design = T503_T507_design
-        T503_T507._cost = T503_T507_cost
-        T503_T507._run()
-    else:
-        T503_T507._design = lambda: 0
-        T503_T507._cost = lambda: 0
-        T503_T507.outs[0].empty()
-        T503_T507.outs[1].copy_like(T503_T507.ins[0])
-        
-        
 #%% Remove all existing HXprocess units
+# Runs BEFORE the separation-train construction: with E413 (and the other
+# HXprocess units) reconnected out, P301-0 docks directly into the
+# to-be-orphaned corn beer column T501 (and P502-0 into V601), so the factory
+# call below can cleanly re-dock P301-0 into the new train's D101.
 
 def reconnect_without_HXprocess_unit(HXprocess_unit):
     for i in [0,1]:
@@ -436,18 +207,105 @@ for i in corn_EtOH_sys.units:
     if isinstance(i, HXprocess):
         reconnect_without_HXprocess_unit(i)
         HXprocess_units.append(i)
-        
+
+#%% Integrated solvent-free IBO/EtOH/water separation train
+# Replaces BOTH the corn ethanol purification train (T501/P502/MX3/T503_T507/
+# HX500/X504/HX501/P508 -- dropped from the reassembled systems below and left
+# orphaned on the flowsheet, same accepted pattern as the detached T608) AND
+# the former solvent-extraction isobutanol recovery train (S404/M401/S401/
+# M402/D401/D401_0_P/S402/S403/H401/M403/H402 -- no longer constructed).
+# Heteroazeotropic distillation + decanter; no extraction solvent and no
+# isobutanol molecular sieve. The factory defaults are the configuration
+# verified standalone in analyses/test_separation_system.py.
+#
+# area=200 is unused in this flowsheet (corn: 100/300-600, WWT 700, boiler
+# 800, facilities 900), so rename_units gives every factory unit a
+# collision-free 2xx ID. With `area` given, the factory untracks pre-existing
+# units while it builds, so `sep_udct` is keyed by the factory's ORIGINAL
+# unit IDs (D101, M201, D102, H202, MS201, H201, D103, M301, H301, S301,
+# D104, H302) even where those IDs also exist in the sugar-prep train. The
+# on-flowsheet 2xx IDs are assigned per-letter in unit order and do NOT
+# correspond mnemonically to the originals -- ALWAYS reference the train
+# through sep_udct (or the factory outs), never through flowsheet unit IDs.
+#
+# The stillage outlet is renamed 'sep_stillage' because corn's orphaned train
+# keeps the registered stream IDs 'stillage' and 'recycle_process_water'; the
+# other three outlet IDs have no collisions.
+P301 = f.P301
+
+IBO_EtOH_separation_sys, sep_udct = create_IBO_EtOH_separation_system(
+    ins=[P301-0],
+    outs=['ethanol_product', 'isobutanol_product', 'sep_stillage', 'D103_bottoms'],
+    mockup=True,
+    area=200,
+    udct=True,
+)
+
+# D103 bottoms (near-pure water, ~1e-5 IBO): recovered process water. Passed
+# to create_facilities below as `recycle_process_water` (ProcessWaterCenter
+# ins[2]), mirroring the old rectifier-bottoms (P508) role. NOT sent to WWT.
+D103_bottoms_to_PWC = sep_udct['D103'].outs[1]
+
+# Ethanol product (~99.2 wt%) -> existing denaturant chain: V511 day tank ->
+# P512 -> MX4 (+4.345% octane denaturant via V509/P510) -> V513 product tank
+# -> f.ethanol. Preserves the fuel-ethanol product definition and MPSP
+# comparability.
+sep_udct['H201']-0-0-f.V511
+
+# Stillage (D101 bottoms, solids/heavies) -> cooled to the old H402 duty
+# point -> V601 (DDGS train).
+H601 = bst.HXutility('H601', ins=sep_udct['D101'].outs[1], T=360.15, rigorous=True)
+H601-0-0-f.V601
+
+#%% Add storage for isobutanol product
+V514 = bst.StorageTank('V514', ins=sep_udct['H302']-0, outs=('isobutanol'), tau=7*24)
+
+# V514.isobutanol_price = 1.725 # https://www.alibaba.com/product-detail/China-Isobutanol-CAS-NO-78-83_1600225311840.html?spm=a2700.7724857.0.0.6b071f52Jodf8p
+V514.isobutanol_price = 1.49 # https://www.alibaba.com/product-detail/High-Purity-Industrial-Organic-Solvent-Textile_1601609307567.html?spm=a2700.7724857.0.0.6b071f52XisbBQ
+# V514.isobutanol_price = 0.95 # https://www.alibaba.com/product-detail/High-Quality-for-Industrial-Grade-Isobutanol_1601289128791.html?spm=a2700.7724857.0.0.6b071f52XisbBQ
+V514.update_isobutanol_price = True
+@V514.add_specification(run=False)
+def V514_update_IBO_price():
+    V514._run()
+    if V514.update_isobutanol_price:
+        ibo = V514.outs[0]
+        if ibo.F_mol: ibo.price = V514.isobutanol_price * ibo.imass['Isobutanol']/ibo.F_mass
+
+#%% Add ethanol storage specification for optional purity-based price update (when solving IRR rather than MPSP)
+V513 = f.V513
+V513.ethanol_price = 0.835 # mean of ends of market price range (0.52 - 1.15) # Jan 2021 - Dec 2025 5-year low and high from https://tradingeconomics.com/commodity/ethanol
+
+V513.update_ethanol_price = False # False by default when solving for ethanol MPSP rather than IRR or NPV
+@V513.add_specification(run=False)
+def V513_update_etoh_price():
+    V513._run()
+    if V513.update_ethanol_price:
+        etoh = V513.outs[0]
+        if etoh.F_mol: etoh.price = V513.ethanol_price * etoh.imass['Ethanol']/etoh.F_mass
+
 #%% Create corn to ethanol + isobutanol system
-keep_non_rigorous = [f.HX101, f.HX500, f.HX501]
+# In the non-rigorous/HXN-ignored list, the factory's H202 (molecular-sieve
+# superheater, heat_only) mirrors the old HX500 and its H201 (EtOH product
+# condenser) mirrors the old HX501. Factory units are not in the
+# `no_IBO_recovery` loop below, so they keep their factory-set rigor
+# (H201 rigorous; H301/H302 non-rigorous; H202 heat-only); all other
+# new-train heat exchangers and column condensers/reboilers participate in
+# HXN. The loop still touches the orphaned corn-train HXutilities
+# (HX500/HX501) -- harmless, they are never simulated again.
+keep_non_rigorous = [f.HX101, sep_udct['H202'], sep_udct['H201']]
 for i in corn_EtOH_IBO_sys_no_IBO_recovery.units + []:
-    if isinstance(i, bst.HXutility) and not i in keep_non_rigorous: 
+    if isinstance(i, bst.HXutility) and not i in keep_non_rigorous:
         i.rigorous = True
-    
-recovery_units = [S404,
-                  M401, S401, M402, D401, D401_0_P, S402,
-                  S403, H401,
-                  M403, H402,
-                  V514]
+
+# Corn's ethanol purification train, replaced by the integrated train above.
+# Dropped from every reassembled system below; left orphaned on the
+# flowsheet. KEPT from that area: the beer pump P301 and the denaturant/
+# product chain (V511, P512, V509, P510, MX4, V513). (E413 is already
+# removed by the HXprocess sweep.)
+corn_ethanol_train_units = [f.T501, f.P502, f.MX3, f.T503_T507,
+                            f.HX500, f.X504, f.HX501, f.P508]
+
+recovery_units = list(IBO_EtOH_separation_sys.units) + [H601, V514]
 
 #%% Detach corn base facilities (replaced by HP-style WWT + boiler facilities)
 # Corn ships a light facility layer: T608 ProcessWaterCenter (emits `wastewater`)
@@ -479,11 +337,12 @@ process_water_consumers = [f.recycled_process_water, f.scrubber_water, f.M302.in
 
 #%% Mix aqueous wastes for wastewater treatment
 # Real aqueous wastes currently discharged: backwater (S1, water+organics),
-# F302_P1 evaporator condensate (spike_feed_condensate), the S403 solvent purge (nonzero only
-# when purging isopentyl acetate), and the MX5 outlet (DDGS stillage-evaporator
-# vapor + fermentation-vent scrubber effluent) re-routed off the detached T608
-# (see NOTE above). T608's `wastewater` outlet remains excluded — it is not a real
-# aqueous waste of the new system.
+# F302_P1 evaporator condensate (spike_feed_condensate), and the MX5 outlet
+# (DDGS stillage-evaporator vapor + fermentation-vent scrubber effluent)
+# re-routed off the detached T608 (see NOTE above). T608's `wastewater` outlet
+# remains excluded — it is not a real aqueous waste of the new system. The
+# separation train's D103 bottoms is near-pure water and goes to the
+# ProcessWaterCenter (create_facilities below), not to WWT.
 #
 # Passing MX5's outlet (currently sunk into the detached T608) into M501's ins
 # reassigns its sink to M501, disconnecting it from T608. Give it a descriptive
@@ -493,7 +352,6 @@ MX5_effluent.ID = 'evap_vapor_and_vent_scrubber_effluent'
 M501 = bst.Mixer('M501',
                  ins=(f.backwater,
                       f.spike_feed_condensate,
-                      f.S403_purge,
                       MX5_effluent),
                  outs='mixed_wastewater_to_WWT')
 
@@ -506,9 +364,9 @@ def M501_spec():
 HXN = bst.HeatExchangerNetwork('HXN1001', ignored=keep_non_rigorous)
 
 
-corn_EtOH_IBO_sys = bst.System.from_units('corn_EtOH_IBO_sys', 
+corn_EtOH_IBO_sys = bst.System.from_units('corn_EtOH_IBO_sys',
                                           units = [i for i in corn_EtOH_IBO_sys_no_IBO_recovery.units + recovery_units + [HXN]
-                                                   if not i in HXprocess_units]
+                                                   if not i in HXprocess_units + corn_ethanol_train_units]
                                           )
 
 corn_EtOH_IBO_sys.set_tolerance(mol=1e-3, rmol=1e-3, subsystems=True)
@@ -522,20 +380,7 @@ corn_EtOH_IBO_sys.simulate(update_configuration=True)
 # the GLOBAL chemical set via `append_wwt_chemicals` (adds H2S, NH4OH, HCl, ...
 # and re-sets thermo). `append_wwt_chemicals` compiles a superset
 # ([*existing_chemicals, *new_wwt_chemicals]), so recovery-train chemicals
-# (Isobutanol, Isopentyl acetate) are preserved by construction.
-#
-# The high-rate WWT digestion units (IC/AnMBR/AeF) build anaerobic growth
-# reactions as parsed strings of the form `f'{chem.ID} -> ...'` for every
-# digestable chemical in the influent. The extraction solvent's chemical ID
-# (`solvent_chem`, e.g. 'Isopentyl acetate') contains a space, which the
-# reaction-string parser mangles ('Isopentylacetate') and then cannot resolve,
-# raising UndefinedChemicalAlias during unit construction. Registering the
-# solvent as an "insoluble" makes get_(BMP|COD)_stoichiometry return zero for
-# it, so all digestion units skip it (its digestion is negligible anyway: it
-# only reaches WWT via the near-zero S403 solvent purge). This mutates a shared
-# biosteam runtime set at import time; no read-only file is edited.
-from biosteam.wastewater.high_rate.utils import default_insolubles as _wwt_default_insolubles
-_wwt_default_insolubles.add(solvent_chem)
+# (Isobutanol) are preserved by construction.
 # process_ID='7' -> units land in the free 700 bucket (600 is taken by DDGS units).
 wastewater_treatment_sys = bst.create_high_rate_wastewater_treatment_system(
     ins=M501-0,
@@ -580,7 +425,7 @@ M510.simulate()
 # system. It consumes the boiler solids from M510 (M510-0), the WWT biogas
 # (wastewater_treatment_sys.outs[1]) as boiler gas, the RO-treated water
 # (wastewater_treatment_sys.outs[3]) as ProcessWaterCenter ins[0], the recovered
-# process-water recycle (f.recycle_process_water) as ProcessWaterCenter ins[2],
+# process-water recycle (separation-train D103 bottoms) as ProcessWaterCenter ins[2],
 # and process_water_consumers as the process-water demand. Integer area args make
 # BioSTEAM auto-assign unique IDs within the 800/900 buckets.
 create_facilities(
@@ -589,7 +434,7 @@ create_facilities(
     process_water_streams=process_water_consumers,
     feedstock=f.corn,
     RO_water=wastewater_treatment_sys.outs[3],         # RO_treated_water
-    recycle_process_water=f.recycle_process_water,     # ethanol-purification recycle
+    recycle_process_water=D103_bottoms_to_PWC,         # separation-train D103 bottoms (near-pure water)
     BT_area=800,
     area=900,
 )
@@ -622,7 +467,8 @@ corn_EtOH_IBO_sys = bst.System.from_units(
                        + facility_units
                        + [HXN])
            if i not in HXprocess_units
-           and i not in corn_facilities_to_remove],
+           and i not in corn_facilities_to_remove
+           and i not in corn_ethanol_train_units],
 )
 
 corn_EtOH_IBO_sys.set_tolerance(mol=1e-3, rmol=1e-3, subsystems=True)
@@ -641,8 +487,6 @@ except Exception as e:
 
 #%% Set prices
 f.isobutanol.price = 1.49 # initial value; updated on purity basis using V514.isobutanol_price https://www.alibaba.com/product-detail/High-Purity-Industrial-Organic-Solvent-Textile_1601609307567.html?spm=a2700.7724857.0.0.6b071f52XisbBQ
-
-f.makeup_isopentyl_acetate.price = 3.2 # https://www.alibaba.com/product-detail/High-Quality-Colorless-Liquid-99-min_1600206242747.html?spm=a2700.galleryofferlist.normal_offer.d_price.2ed613a0wyq5n8
 
 #%% Create TEA object
 
@@ -1283,16 +1127,13 @@ fermentation_group = bst.UnitGroup('fermentation', units=[u.V406, u.K330, u.V330
 wastewater_treatment_group = bst.UnitGroup('wastewater treatment',
                                            units=[M501] + list(wastewater_treatment_sys.units))
 
-# define IBO separation units (exclude the WWT train + M510 solids mixer so they
-# are not swept into this catch-all; they are bucketed as WWT / other facilities)
-IBO_separation_units = [i for i in corn_EtOH_IBO_sys.units
-                        if not i in list(corn_EtOH_IBO_sys.facilities) + corn_EtOH_IBO_sys_no_IBO_recovery.units
-                                    + feedstock_acquisition_group.units + feedstock_saccharification_group.units
-                                    + sugar_solution_preparation_group.units + fermentation_group.units
-                                    + wastewater_treatment_group.units + [M510]
-                                    + [f.H402, f.V514]]
-
-isobutanol_separation_group = bst.UnitGroup('isobutanol separation', units=IBO_separation_units)
+# define IBO separation units EXPLICITLY (a leftover-based definition would
+# sweep the entire integrated separation train here): the stripper ->
+# decanter-loop -> drying-column chain that finishes the isobutanol product.
+isobutanol_separation_group = bst.UnitGroup('isobutanol separation',
+                                            units=[sep_udct['D103'], sep_udct['M301'],
+                                                   sep_udct['H301'], sep_udct['S301'],
+                                                   sep_udct['D104'], sep_udct['H302']])
 
 storage_and_handling_group = bst.UnitGroup('storage and handling', 
                                            units = [i for i in corn_EtOH_IBO_sys.units
@@ -1301,12 +1142,16 @@ storage_and_handling_group = bst.UnitGroup('storage and handling',
                                                  + [f.P510, f.MX4])
 
 DDGS_recovery_group = bst.UnitGroup('DDGS recovery',
-                                    units = [i for i in list(f.M403.get_downstream_units())
+                                    units = [i for i in [H601] + list(H601.get_downstream_units())
                                              if not i in [f.MX5, f.T608, f.MH612]
                                                        + list(corn_EtOH_IBO_sys.facilities)
                                                        + wastewater_treatment_group.units + [M510]])
 
-ethanol_separation_group = bst.UnitGroup('ethanol separation', 
+# leftover-based: resolves to the EtOH side of the integrated train (P301,
+# D101 beer column, M201, D102 rectifier, H202, MS201, H201) + P512, plus the
+# long-standing strays PX, V409, P410, MX5 (kept here so every in-system unit
+# stays covered by exactly one group).
+ethanol_separation_group = bst.UnitGroup('ethanol separation',
                              units= [i for i in corn_EtOH_IBO_sys.units
                             if not i in list(corn_EtOH_IBO_sys.facilities)
                                         + feedstock_acquisition_group.units + feedstock_saccharification_group.units
