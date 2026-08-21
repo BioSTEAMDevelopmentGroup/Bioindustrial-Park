@@ -738,6 +738,11 @@ if plot:
             
         # curr_metric_w_levels, curr_metric_w_ticks, curr_metric_cbar_ticks = get_contour_info_from_metric_data(results_metric_1, lb=3)
         curr_metric_non_nans = np.array(results[curr_metric])[np.where(~np.isnan(np.array(results[curr_metric])))]
+        if curr_metric_non_nans.size == 0 or curr_metric_non_nans.min() == curr_metric_non_nans.max():
+            # e.g. IBO MPSP (all NaN) or IBO yield/titer (all zero) in a
+            # scenario that makes no isobutanol: no range to contour
+            print(f'Skipping contour plot for {curr_metric}: all values are NaN or identical.')
+            continue
         
         curr_metric_w_levels = np.arange(curr_metric_non_nans.min(), 
                                       curr_metric_non_nans.max()*1.001, 
