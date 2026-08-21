@@ -776,6 +776,8 @@ if plot:
     
     #%% All metrics
     for curr_metric, val in metrics.items():
+        extend_cmap = 'max'
+        cmap_under_color = None
         lccm = curr_metric.lower()
         # if 'spike' in lccm or 'duty' in lccm or 'target sugars' in lccm:
         #     # else: 
@@ -825,6 +827,10 @@ if plot:
             curr_metric_w_levels = np.arange(-0.1, 0.5001, 0.01)
             curr_metric_cbar_ticks = np.arange(-0.1, 0.5001, 0.05)
             curr_metric_w_ticks = [0.0, 0.10, 0.15, 0.20, 0.30]
+            # IRR can fall far below the lowest level (money-losing corners);
+            # fill those cells rather than leaving them blank
+            extend_cmap = 'both'
+            cmap_under_color = colors.grey_dark.shade(40).RGBn
         curr_metric_w_ticks = np.round(np.array(curr_metric_w_ticks), 2)
         # curr_metric_w_levels = np.arange(0., 15.5, 0.5)
         
@@ -852,7 +858,8 @@ if plot:
                                         cmap=cmap, # can use 'viridis' or other default matplotlib colormaps
                                         # cmap_over_color = colors.grey_dark.shade(8).RGBn,
                                         cmap_over_color=cmap_over_color,
-                                        extend_cmap='max',
+                                        cmap_under_color=cmap_under_color,
+                                        extend_cmap=extend_cmap,
                                         cbar_ticks=curr_metric_cbar_ticks,
                                         z_marker_color='g', # default matplotlib color names
                                         fps=fps, # animation frames (z values traversed) per second
