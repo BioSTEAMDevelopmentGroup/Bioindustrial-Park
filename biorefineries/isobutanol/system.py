@@ -654,6 +654,15 @@ def load_simulate_solve_TEA(target_conc=None,
     if n_tea_solves > 0:
         corn_EtOH_IBO_sys_tea.IRR = IRR
         if solve_for == 'MPSP':
+            if product_stream.isempty():
+                # Deterministic infeasibility (e.g. solving isobutanol MPSP
+                # under a scenario whose broth carries no isobutanol);
+                # model_specification re-raises this immediately instead of
+                # entering its retry/barrage scaffolding.
+                raise ValueError(
+                    f"cannot solve price of empty stream "
+                    f"{product_stream.ID!r}: the current "
+                    "scenario/specifications produce none of it")
             for i in range(n_tea_solves):
                 product_stream.price = corn_EtOH_IBO_sys_tea.solve_price(product_stream)
         elif solve_for == 'IRR':
@@ -910,6 +919,10 @@ def model_specification(**kwargs):
             # flowsheet('AcrylicAcid').F_mass /= 1000.
             raise e
         elif 'argument 3 of type' in str_e:
+            raise e
+        elif 'cannot solve price of empty' in str_e:
+            # deterministic: the product stream carries no flow under the
+            # current scenario/specifications; retrying cannot change that.
             raise e
         else:
             # breakpoint()
