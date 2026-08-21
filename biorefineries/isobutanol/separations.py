@@ -137,9 +137,11 @@ def create_separation_chemicals():
     return chems
 
 #: Fermentation effluent P301-0 of the isobutanol biorefinery at the
-#: scenario B baseline (kg/hr; snapshot of the IBO_2026 stack, 2026-08-20;
-#: purity-adjusted ethanol MPSP = 0.943 $/kg). EtOH titer 60.0 g/L,
-#: IBO titer 47.7 g/L.
+#: scenario B baseline (kg/hr; snapshot of the IBO_2026 stack, 2026-08-20,
+#: taken under the former solvent-extraction recovery train, whose
+#: purity-adjusted ethanol MPSP was 0.943 $/kg -- NOT the current baseline,
+#: which is ~0.396 $/kg with this train integrated; commit 2797aa80).
+#: EtOH titer 60.0 g/L, IBO titer 47.7 g/L.
 scenario_B_P301_flows = {
     'Water':            116979.09,
     'Ethanol':            8946.50,
