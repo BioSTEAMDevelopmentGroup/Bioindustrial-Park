@@ -515,7 +515,6 @@ fbs_spec.load_max_n_spikes(fbs_spec.max_n_spikes)
 #%%
 
 fbs_spec.product_stream = f.ethanol
-fbs_spec.n_tea_solves = 3
 
 def get_purity_adj_price(stream, chem_IDs):
     return stream.price * stream.F_mass/sum([stream.imass[ID] for ID in chem_IDs])
@@ -560,9 +559,7 @@ def solve_TEA(stream_IDs=('ethanol', 'isobutanol'),
 
     Every stream price and the TEA IRR touched here are restored to their
     entry values before returning, so calling this is side-effect free.
-    `n_tea_solves` is the number of successive solve passes per quantity
-    (independent of fbs_spec.n_tea_solves, which only gates whether
-    load_simulate_solve_TEA calls this at all).
+    `n_tea_solves` is the number of successive solve passes per quantity.
     """
     tea = corn_EtOH_IBO_sys_tea
     streams = [f.stream[ID] for ID in stream_IDs]
@@ -590,7 +587,7 @@ def solve_TEA(stream_IDs=('ethanol', 'isobutanol'),
     return {'IRR': IRR, 'MPSPs': MPSPs}
 
 #: list of (n_sims_run, per-sweep max relative drifts) -- one entry per
-#: load_simulate_solve_TEA call. Diagnostic for convergence behavior.
+#: load_simulate call. Diagnostic for convergence behavior.
 convergence_log = []
 
 def _simulation_drift_state():
@@ -608,7 +605,7 @@ def _simulation_drift_state():
         f.unit.BT801.utility_cost or 0.0,
     ])
 
-def load_simulate_solve_TEA(target_conc=None,
+def load_simulate(target_conc=None,
     threshold_conc=None,
     spike_conc=None,
     tau_max=None,
@@ -634,14 +631,11 @@ def load_simulate_solve_TEA(target_conc=None,
     # the wrong utility-network branch.
     n_sims=5,
     sim_rtol=1e-4,
-    n_tea_solves=None,
     plot=False,
     ):
-    """Load the feeding specifications and simulate to convergence. If
-    `n_tea_solves` (default fbs_spec.n_tea_solves) is > 0, finish with a
-    side-effect-free solve_TEA() and return its dict; otherwise return None.
-    Product prices never enter the mass/energy balances, so the TEA solve
-    is independent of, and performed after, the convergence sweeps."""
+    """Load the feeding specifications and simulate to convergence. Does
+    not solve the TEA (product prices never enter the mass/energy balances);
+    read it afterwards with solve_TEA()."""
 
     if target_conc is None:
         target_conc = fbs_spec.target_conc
@@ -681,10 +675,6 @@ def load_simulate_solve_TEA(target_conc=None,
 
     if plot:
         plot_kinetic_results()
-
-    n_tea_solves = n_tea_solves if n_tea_solves is not None else fbs_spec.n_tea_solves
-    if n_tea_solves > 0:
-        return solve_TEA(n_tea_solves=n_tea_solves)
 
 def plot_kinetic_results(xlim=None, ylim=None, 
                          show_stage_1_time=False, 
@@ -780,10 +770,10 @@ def reset_and_reload(**curr_spec):
     print('Loading and simulating with baseline specifications ...')
     # curr_spec = {i: fbs_spec.__getattribute__(i) for i in baseline_spec.keys()}
     corn_EtOH_IBO_sys.simulate()
-    load_simulate_solve_TEA(**fbs_spec.baseline_specifications)
+    load_simulate(**fbs_spec.baseline_specifications)
     print('Loading and simulating with required specifications ...')
-    # load_simulate_solve_TEA(**curr_spec)
-    load_simulate_solve_TEA(**curr_spec)
+    # load_simulate(**curr_spec)
+    load_simulate(**curr_spec)
     
 def reset_and_switch_solver(solver_ID, **curr_spec):
     corn_EtOH_IBO_sys.reset_cache()
@@ -791,7 +781,7 @@ def reset_and_switch_solver(solver_ID, **curr_spec):
     corn_EtOH_IBO_sys.converge_method = solver_ID
     print(f"Trying {solver_ID} ...")
     corn_EtOH_IBO_sys.simulate()
-    load_simulate_solve_TEA(**curr_spec)
+    load_simulate(**curr_spec)
 
 # F403 = u.F403
 def run_bugfix_barrage(**curr_spec):
@@ -804,7 +794,7 @@ def run_bugfix_barrage(**curr_spec):
                 corn_EtOH_IBO_sys.reset_cache()
                 corn_EtOH_IBO_sys.empty_recycles()
                 corn_EtOH_IBO_sys.simulate()
-                load_simulate_solve_TEA(**curr_spec)
+                load_simulate(**curr_spec)
             except:
                 print(str(e))
                 raise e
@@ -820,7 +810,7 @@ def run_bugfix_barrage(**curr_spec):
         #                         j.outs[1].T = j.T
         #                     except:
         #                         pass
-        #         load_simulate_solve_TEA()
+        #         load_simulate()
                 
         #     except:
         #         print(str(e))
@@ -849,7 +839,7 @@ def model_specification(**kwargs):
     curr_spec = {k: v for k,v in fbs_spec.current_specifications.items()}
     curr_spec.update(kwargs)
     try:
-        load_simulate_solve_TEA(**curr_spec)
+        load_simulate(**curr_spec)
     except Exception as e:
         str_e = str(e).lower()
         print('Error in model spec: %s'%str_e)
@@ -866,7 +856,7 @@ def model_specification(**kwargs):
                 tau_maxes_to_try.reverse()
                 for tm in tau_maxes_to_try:
                     try:
-                        load_simulate_solve_TEA(tau_max=tm)
+                        load_simulate(tau_max=tm)
                         success = True
                         break
                     except Exception as e:
@@ -888,7 +878,7 @@ def model_specification(**kwargs):
                             r.integrator.relative_tolerance = 1e-7
                             print('Re-simulating fermentation unit with lower integrator rtol ...')
                             V406.simulate()
-                            load_simulate_solve_TEA(**curr_spec)
+                            load_simulate(**curr_spec)
                             success = True
                         except Exception as e:
                             print(str(e))
@@ -900,7 +890,7 @@ def model_specification(**kwargs):
                                     print('Re-running fermentation unit with rk45 ...')
                                     V406.simulate()
                                     success = True
-                                    load_simulate_solve_TEA(**curr_spec)
+                                    load_simulate(**curr_spec)
                                 except Exception as e:
                                     print(str(e))
                                     raise e
@@ -916,7 +906,7 @@ def model_specification(**kwargs):
                         if 'massbalerror' in str_e:
                             try:
                                 print('Trying again ...')
-                                load_simulate_solve_TEA(**curr_spec)
+                                load_simulate(**curr_spec)
                             except Exception as e:
                                 print(str(e))
                                 raise e
@@ -932,7 +922,7 @@ def model_specification(**kwargs):
             # breakpoint()
             try:
                 print('Trying again ...')
-                load_simulate_solve_TEA(**curr_spec)
+                load_simulate(**curr_spec)
             except Exception as e:
                 str_e = str(e).lower()
                 print('Error in model spec: %s'%str_e)

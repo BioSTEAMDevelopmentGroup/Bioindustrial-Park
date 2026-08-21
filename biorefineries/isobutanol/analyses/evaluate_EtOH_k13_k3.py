@@ -97,7 +97,6 @@ V406 = f.V406
 fbs_spec.max_n_spikes = 0
 perform_feeding_strategy_opt = False
 
-fbs_spec.n_tea_solves = 0 # no TEA solve inside model_specification; the IRR metric below calls solve_TEA
 
 model_specification(
     n_sims=3,
