@@ -2,7 +2,7 @@
 sabre: Sargassum Biorefinery (SaBRe)
 ====================================
 
-`Sargassum BioRefinery (SaBRe) <https://sabreproject.org/>` is a virtual institute-sponsored research center tasked to transform *Sargassum* seaweed into a future renewable feedstock for sustainable biomanufacturing.
+`Sargassum BioRefinery (SaBRe) <https://sabreproject.org/>`_ is a virtual institute-sponsored research center tasked to transform *Sargassum* seaweed into a future renewable feedstock for sustainable biomanufacturing.
 
 Work in progress
 -----------------
@@ -12,8 +12,7 @@ Razin's senior thesis (below), plus a standalone biostimulant pathway:
 - Methanogenic anaerobic digestion (AD) for biomethane production.
 - Acidogenic AD for volatile fatty acid (VFA) production
 - Acidogenic AD with VFA fermentation to product microbial oil.
-- Integrated systesm splitting between the biomethane and microbial oil
-  product pathways.
+- Integrated systesm splitting between the biomethane and microbial oil product pathways.
 
 Additional flowsheets are expected to be added here over time
 as more of that work is incorporated.
