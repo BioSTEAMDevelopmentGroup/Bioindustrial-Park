@@ -561,41 +561,6 @@ class Biorefinery(bst.ProcessModel):
                 raise ValueError('invalid hydrogen price')
         
         return model
-
-    def key_flows(self):
-        def total(s):
-            return s.get_total_flow('kg/s')
-        
-        def comps(s, components=None):
-            if components is None: components = [i.ID for i in s.available_chemicals]
-            total = s.get_total_flow('kg/s')
-            dct = {'total': total}
-            for i in components: 
-                flow = s.get_flow('kg/s', i)
-                if flow: dct[i] = round(flow / total, 3) * 100
-            return dct
-        
-        def biomass(s):
-            return {'total': s.get_total_flow('kg/s'),
-                    'Moisture content': s.imass['Water'] / s.F_mass}
-        
-        return {
-            'Flue gas': comps(self.emissions, ['CO2', 'H2O', 'O2', 'N2']),
-            'Exhaust': comps(self.CC.outs[1], ['H2O', 'O2', 'N2']),
-            'CO2': total(self.CO2),
-            'Recycled CO2': comps(self.oleochemical_production.outs[0], ['CO2', 'H2O', 'O2', 'N2']),
-            'H2': total(self.system.flowsheet.stream.hydrogen),
-            'Unreacted H2': comps(self.AcOH_production.outs[0], ['H2', 'CO2', 'H2O', 'O2', 'N2']),
-            'Dilute AcOH': comps(self.AcOH_production.outs[1], ['AceticAcid', 'H2O']),
-            'Ethyl acetate': total(self.ethyl_acetate),
-            'AcOH-Wastewater': comps(self.raffinate_distiller.outs[1]),
-            'Glacial AcOH': comps(self.extract_distiller.outs[1]),
-            'Air': total(self.air),
-            'Wastewater': comps(self.M5.outs[1] + self.C2.outs[1]),
-            'Biogas': comps(self.biogas),
-            'Biogenic emissions': comps(self.biogenic_emissions),
-            'Biomass': biomass(self.BT.fuel),
-        }
     
     def MSP_contributions(self):
         total_cost = self.MSP() * self.product.F_mass * self.tea.operating_hours
