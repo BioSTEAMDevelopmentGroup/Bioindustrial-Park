@@ -555,9 +555,11 @@ def solve_TEA(stream_IDs=('ethanol', 'isobutanol'),
       reported as NaN;
     * 'IRR' is the IRR solved with BOTH products at their purity-based
       default prices (the state the V513/V514 specifications produce with
-      update_ethanol_price = update_isobutanol_price = True); NaN when no
-      real IRR exists (NPV is negative at every discount rate, e.g. deep
-      money-losing kinetic-sweep corners).
+      update_ethanol_price = update_isobutanol_price = True). Negative
+      IRRs above -100% are genuine solutions and are reported; NaN only
+      when no real IRR exists on the valid domain IRR > -1 (NPV is
+      negative at every valid discount rate, e.g. deep money-losing
+      kinetic-sweep corners).
 
     Every stream price and the TEA IRR touched here are restored to their
     entry values before returning, so calling this is side-effect free.
@@ -580,18 +582,26 @@ def solve_TEA(stream_IDs=('ethanol', 'isobutanol'),
                 s.price = tea.solve_price(s)
             MPSPs[s.ID] = get_purity_adj_price(s, [get_main_chemical_ID(s)])
         for o, price in default_prices.items(): o.price = price
+        # A solved IRR (positive or negative) is accepted only if it is a
+        # genuine root (|NPV| far below railed magnitudes, which are O(TCI))
+        # at a valid discount rate (IRR > -1: below -100%, (1+IRR)^-t
+        # alternates sign each period, so NPV oscillates through zero and any
+        # "root" there is a discounting artifact, not an IRR).
+        valid_IRR = lambda: tea.IRR > -1.0 and abs(tea.NPV) < 1e-3 * tea.TCI
         for i in range(n_tea_solves):
             tea.IRR = tea.solve_IRR()
-        # solve_IRR's root finder (ytol=10 $, checkiter=False) returns its
-        # last iterate even when NPV never crosses zero on the valid domain,
-        # railing to spurious values around +2/-2.5; accept the solution only
-        # if it is a genuine root (|NPV| far below railed magnitudes, which
-        # are O(TCI)) AND a valid discount rate (IRR > -1: below -100%,
-        # (1+IRR)^-t alternates sign each period, so NPV oscillates through
-        # zero and the "root" is a discounting artifact, not an IRR).
-        IRR = (tea.IRR
-               if tea.IRR > -1.0 and abs(tea.NPV) < 1e-3 * tea.TCI
-               else np.nan)
+        if not valid_IRR():
+            # solve_IRR's unconstrained secant (ytol=10 $, checkiter=False)
+            # can run off to spurious values around +2/-2.5, skipping past a
+            # genuine negative IRR in (-1, 0); retry bracketed to the valid
+            # domain to recover it. The bracketed solver raises when NPV has
+            # no sign change between the bounds (no root to recover).
+            try:
+                for i in range(n_tea_solves):
+                    tea.IRR = tea.solve_IRR(bounds=[-0.99, 10.0])
+            except Exception:
+                pass
+        IRR = tea.IRR if valid_IRR() else np.nan
     finally:
         for s, price in original_prices.items(): s.price = price
         tea.IRR = original_IRR
