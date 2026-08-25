@@ -583,10 +583,15 @@ def solve_TEA(stream_IDs=('ethanol', 'isobutanol'),
         for i in range(n_tea_solves):
             tea.IRR = tea.solve_IRR()
         # solve_IRR's root finder (ytol=10 $, checkiter=False) returns its
-        # last iterate even when NPV never crosses zero, railing to spurious
-        # values around +2/-2.5; accept the solution only if it is a genuine
-        # root (|NPV| far below railed magnitudes, which are O(TCI)).
-        IRR = tea.IRR if abs(tea.NPV) < 1e-3 * tea.TCI else np.nan
+        # last iterate even when NPV never crosses zero on the valid domain,
+        # railing to spurious values around +2/-2.5; accept the solution only
+        # if it is a genuine root (|NPV| far below railed magnitudes, which
+        # are O(TCI)) AND a valid discount rate (IRR > -1: below -100%,
+        # (1+IRR)^-t alternates sign each period, so NPV oscillates through
+        # zero and the "root" is a discounting artifact, not an IRR).
+        IRR = (tea.IRR
+               if tea.IRR > -1.0 and abs(tea.NPV) < 1e-3 * tea.TCI
+               else np.nan)
     finally:
         for s, price in original_prices.items(): s.price = price
         tea.IRR = original_IRR
