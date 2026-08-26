@@ -98,20 +98,12 @@ with open(os.path.join(results_dir, 'kinetic_params_baseline_B.csv'),
 print(f'\n{len(kinetic_params)} kinetic parameters: {kinetic_params}\n',
       flush=True)
 
-#%% Baseline TEA solution (sanity check: scenario-B ethanol MPSP ~ 0.396)
-baseline_TEA = solve_TEA(stream_IDs=('ethanol', 'isobutanol'))
-print(f'Scenario B baseline TEA: {baseline_TEA}\n', flush=True)
-with open(os.path.join(results_dir, 'baseline_TEA_B.csv'),
-          'w', newline='') as csvfile:
-    writer = csv.writer(csvfile)
-    writer.writerow(['IRR', 'MPSP_ethanol', 'MPSP_isobutanol'])
-    writer.writerow([baseline_TEA['IRR'],
-                     baseline_TEA['MPSPs']['ethanol'],
-                     baseline_TEA['MPSPs']['isobutanol']])
-
 #%% Sweep
 CSV_HEADER = ['index', 'value', 'IRR', 'MPSP_ethanol', 'MPSP_isobutanol',
-              'EtOH_titer', 'IBO_titer', 'error']
+              'EtOH_titer', 'IBO_titer', 'cell_titer',
+              'EtOH_yield', 'IBO_yield',
+              'EtOH_productivity', 'IBO_productivity', 'tau', 'error']
+N_METRICS = len(CSV_HEADER) - 3  # minus index, value, error
 
 def sweep_csv_name(p):
     """Case-safe per-parameter CSV name: Windows filenames are
@@ -120,20 +112,42 @@ def sweep_csv_name(p):
     return f'OAT_B_{p}_cap.csv' if p[0] == 'K' else f'OAT_B_{p}.csv'
 
 def n_completed_rows(csv_path):
+    """Completed data rows in an existing sweep CSV; 0 if absent or if its
+    header does not match CSV_HEADER (stale schema -> redo the sweep)."""
     if not os.path.exists(csv_path): return 0
     with open(csv_path, newline='') as csvfile:
         rows = list(csv.reader(csvfile))
+    if not rows or rows[0] != CSV_HEADER: return 0
     return max(0, len(rows) - 1)  # minus header
 
 def evaluate_point():
     """Metrics of the current (already simulated) flowsheet state."""
     TEA_solution = solve_TEA(stream_IDs=('ethanol', 'isobutanol'))
     nsk_res = ferm_reactor.nsk_results_specific_tau_dict
+    tau = nsk_res.get('time', np.nan)  # the selected fermentation time, h
+    IBO_titer = nsk_res.get('[s_IBO]', np.nan)
     return [TEA_solution['IRR'],
             TEA_solution['MPSPs']['ethanol'],
             TEA_solution['MPSPs']['isobutanol'],
             nsk_res.get('[s_EtOH]', np.nan),
-            nsk_res.get('[s_IBO]', np.nan)]
+            IBO_titer,
+            nsk_res.get('[x]', np.nan),
+            nsk_res.get('y_EtOH_glu_added', np.nan),
+            nsk_res.get('y_IBO_glu_added', np.nan),
+            nsk_res.get('prod_EtOH', np.nan),  # = [s_EtOH]/time
+            IBO_titer/tau if tau else np.nan,
+            tau]
+
+#%% Baseline metrics at the current (already simulated) scenario-B state
+#   (sanity check: ethanol MPSP ~ 0.396)
+baseline_metrics = evaluate_point()
+print('Scenario B baseline metrics:', flush=True)
+print(dict(zip(CSV_HEADER[2:-1], baseline_metrics)), flush=True)
+with open(os.path.join(results_dir, 'baseline_TEA_B.csv'),
+          'w', newline='') as csvfile:
+    writer = csv.writer(csvfile)
+    writer.writerow(CSV_HEADER[2:-1])
+    writer.writerow(baseline_metrics)
 
 curr_spec = {k: v for k, v in fbs_spec.current_specifications.items()}
 total_no = len(kinetic_params) * N_STEPS
@@ -160,7 +174,7 @@ for i_p, p in enumerate(kinetic_params):
         v = values[i_v]
         curr_no += 1
         error_message = None
-        row_metrics = [np.nan]*5
+        row_metrics = [np.nan]*N_METRICS
         try:
             setattr(r, p, v)
             model_specification(**curr_spec)
