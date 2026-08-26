@@ -35,7 +35,7 @@ from biorefineries.isobutanol.models import models_EtOH_IBO_corn as models
 
 print('\nLoaded system.')
 from datetime import datetime
-from biosteam.utils import TicToc
+from biosteam.utils import Timer # biosteam 2.53 renamed TicToc -> Timer (tic() -> start())
 import os
 
 dateTimeObj = datetime.now()
@@ -66,7 +66,7 @@ plot_spearman_matrix = isobutanol.plots.spearman_matrix.plot_spearman_matrix
 
 #%%
 
-scenario = 'A'
+scenario = 'B'
 
 modes=[
        scenario, 
@@ -104,8 +104,8 @@ elif scenario=='B':
     
 #%%
 
-timer = TicToc('timer')
-timer.tic()
+timer = Timer('timer')
+timer.start()
 
 # Set seed to make sure each time the same set of random numbers will be used
 np.random.seed(3221) # 3221
