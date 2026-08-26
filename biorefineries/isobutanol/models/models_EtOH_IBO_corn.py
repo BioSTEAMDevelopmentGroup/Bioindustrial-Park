@@ -14,9 +14,10 @@
 # =============================================================================
 
 import biosteam as bst
+import numpy as np
 from biosteam.evaluation import Model, Metric
 # from biorefineries.isobutanol.system import corn_EtOH_IBO_sys, fbs_spec, corn_EtOH_IBO_sys_tea, model_specification, unit_groups, unit_groups_dict
-from ..system import  corn_EtOH_IBO_sys, fbs_spec, corn_EtOH_IBO_sys_tea, model_specification, unit_groups, unit_groups_dict, plot_kinetic_results, optimize_1D_feeding_strategy_for_MPSP, optimize_stage_1_time_and_max_n_glu_spikes_for_MPSP, optimize_max_n_glu_spikes_for_MPSP
+from ..system import  corn_EtOH_IBO_sys, fbs_spec, corn_EtOH_IBO_sys_tea, model_specification, unit_groups, unit_groups_dict, plot_kinetic_results, optimize_1D_feeding_strategy_for_MPSP, optimize_stage_1_time_and_max_n_glu_spikes_for_MPSP, optimize_max_n_glu_spikes_for_MPSP, solve_TEA
 IBO_sys = corn_EtOH_IBO_sys
 IBO_tea = corn_EtOH_IBO_sys_tea
 
@@ -302,11 +303,42 @@ metrics.append(Metric('Crude oil sale revenue',
                       ))
 
 isobutanol = f.isobutanol
-metrics.append(Metric('Isobutanol sale revenue', 
+metrics.append(Metric('Isobutanol sale revenue',
                       lambda: isobutanol.cost * IBO_tea.operating_hours,
-                      '$/y', 
+                      '$/y',
                       'Coproducts',
                       ))
+
+#%% TEA metrics at default product prices (shared side-effect-free solve)
+
+# One solve_TEA call per simulation, shared by the three metrics below: the
+# IRR metric refreshes the cache (model metrics are evaluated in list order),
+# and the two MPSP metrics read it. Each MPSP is purity-adjusted ($/kg of the
+# stream's main chemical at the default 15% IRR, with the other product held
+# at its purity-based default price); isobutanol MPSP is NaN when the stream
+# is empty (e.g. scenario A). The cache is reset to NaN before each solve so
+# a failed solve can never leak the previous simulation's values.
+_latest_TEA_solution = {'IRR': np.nan,
+                        'MPSPs': {'ethanol': np.nan, 'isobutanol': np.nan}}
+
+def _refresh_TEA_solution_get_IRR():
+    _latest_TEA_solution['IRR'] = np.nan
+    _latest_TEA_solution['MPSPs'] = {'ethanol': np.nan, 'isobutanol': np.nan}
+    try:
+        _latest_TEA_solution.update(solve_TEA(stream_IDs=('ethanol', 'isobutanol')))
+    except Exception:
+        pass
+    return _latest_TEA_solution['IRR']
+
+metrics.append(Metric('IRR', _refresh_TEA_solution_get_IRR, '-', 'Biorefinery'))
+
+metrics.append(Metric('Ethanol MPSP',
+                      lambda: _latest_TEA_solution['MPSPs']['ethanol'],
+                      '$/kg', 'Biorefinery'))
+
+metrics.append(Metric('Isobutanol MPSP',
+                      lambda: _latest_TEA_solution['MPSPs']['isobutanol'],
+                      '$/kg', 'Biorefinery'))
 
 #%% Generate the required namespace
 namespace_dict = {}
