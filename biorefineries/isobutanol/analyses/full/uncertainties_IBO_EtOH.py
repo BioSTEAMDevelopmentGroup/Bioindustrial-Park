@@ -310,6 +310,19 @@ for mode in modes:
 # %% Plots
 print('\n\nCreating and saving plots ...')
 
+def df_from_groups_positive_fraction(unit_groups):
+    """Local stand-in for bst.UnitGroup.df_from_groups(fraction=True,
+    scale_fractions_to_positive_values=True). biosteam 2.53's classmethod does
+    the scaling in place as `df.values *= ...`, but under numpy 2.x df.values is
+    a read-only view, so that raises 'output array is read-only'. Same math on a
+    writable copy; biosteam is read-only, so the fix lives here."""
+    data = [ug.to_series(False) for ug in unit_groups]
+    df = pd.DataFrame(data)
+    values = np.array(df.values, dtype=float)  # writable copy of the view
+    positive_values = np.where(values > 0., values, 0.)
+    values *= 100 / positive_values.sum(axis=0, keepdims=True)
+    return pd.DataFrame(values, index=df.index, columns=df.columns)
+
 MPSP_units = r"$\mathrm{\$}\cdot\mathrm{kg}^{-1}$"
 GWP_units = r"$\mathrm{kg}$"+" "+ r"$\mathrm{CO}_{2}\mathrm{-eq.}\cdot\mathrm{kg}^{-1}$"
 FEC_units = r"$\mathrm{MJ}\cdot\mathrm{kg}^{-1}$"
@@ -400,10 +413,7 @@ if len(modes)==1:
             i.name='natural gas\n(for product drying)'
     ######
     
-    df_TEA_breakdown = bst.UnitGroup.df_from_groups(
-        unit_groups, fraction=True,
-        scale_fractions_to_positive_values=True,
-    )
+    df_TEA_breakdown = df_from_groups_positive_fraction(unit_groups)
     
     # totals=[sum([ui.metrics[i]() for ui in unit_groups])
     #         for i in range(len(unit_groups[0].metrics))]
