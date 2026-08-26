@@ -162,7 +162,18 @@ for i in range(len(modes)):
     
     #%%
     print('\n\nEvaluating ...')
-    model.evaluate(notify=notification_interval, autoload=None, autosave=None, file=None)
+    # Autosave/resume: the fermentation-coupled system intermittently dies
+    # inside native integrator code (nondeterministic segfault, exit 139 --
+    # not a model regression). Checkpoint the evaluation state every
+    # `notification_interval` samples and resume from the pickle on relaunch
+    # (np.random.seed above makes the samples identical across launches, so
+    # resuming is valid; a table-layout mismatch makes autoload start fresh).
+    # The checkpoint is deleted after the raw results are saved below.
+    autosave_file = IBO_results_filepath + f'uncertainties_{mode}_autosave.pickle'
+    model.evaluate(notify=notification_interval,
+                   autoload=True,
+                   autosave=notification_interval,
+                   file=autosave_file)
     print('\nFinished evaluation.')
     
     # Baseline results
@@ -276,6 +287,9 @@ for i in range(len(modes)):
     results_dict['Sensitivity']['p-val Spearman']['EtOH Productivity'][mode] = df_p['Fermentation', 'Et OH productivity [g-EtOH/L-water/h]']
     
     print('\n\nSaved raw results.')
+    # Raw results are on disk -- drop the crash-recovery checkpoint so a
+    # future fresh evaluation cannot silently resume from a completed one.
+    if os.path.exists(autosave_file): os.remove(autosave_file)
     print('---------------------------------\n\n')
     
 #%% Clean up NaN values for plotting
