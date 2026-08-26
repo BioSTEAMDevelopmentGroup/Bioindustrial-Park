@@ -190,13 +190,17 @@ for i in range(len(modes)):
  
     table = model.table
     
-    # Drop failed simulations (NaN metric rows) -- but never on the
-    # isobutanol MPSP column, which is legitimately NaN in every row of a
-    # scenario with no isobutanol product (scenario A) and would otherwise
-    # empty the table.
+    # Drop failed simulations (NaN metric rows) -- but never on the three
+    # TEA metric columns, which can be legitimately NaN on an otherwise
+    # valid simulation: isobutanol MPSP in every row of a scenario with no
+    # isobutanol product (scenario A), and IRR when the NPV has no real
+    # root at any discount rate (deep money-losing samples). Genuinely
+    # failed simulations still drop -- they are NaN in every column.
     model.table = model.table.dropna(
         subset=[c for c in model.table.columns
-                if c[1] != 'Isobutanol MPSP [$/kg]'])
+                if c[1] not in ('IRR [-]',
+                                'Ethanol MPSP [$/kg]',
+                                'Isobutanol MPSP [$/kg]')])
     
     spearman_results, spearman_p_values = model.spearman_r()
     
