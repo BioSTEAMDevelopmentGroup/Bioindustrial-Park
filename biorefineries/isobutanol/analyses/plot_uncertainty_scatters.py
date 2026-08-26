@@ -277,7 +277,7 @@ def plot_one_metric(label, units, y, params_df, param_baselines,
             lo, hi = lo - 1.0, hi + 1.0
         pad = 0.05*(hi - lo)
         axs[0][0].set_ylim(lo - pad, hi + pad)
-    cmap = JBEI_UCB_colormap()
+    cmap = JBEI_UCB_colormap(reverse=True)
     n_baseline_markers = 0
     for i, col in enumerate(params_df.columns):
         ax = axs[i//ncols][i % ncols]
