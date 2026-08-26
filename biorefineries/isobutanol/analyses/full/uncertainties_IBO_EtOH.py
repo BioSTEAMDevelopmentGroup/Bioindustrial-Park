@@ -73,8 +73,8 @@ modes=[
         # 'B', 
         # 'C', 'D',
        ]
-N_simulations_per_mode=6000
-notification_interval=200
+N_simulations_per_mode=200
+notification_interval=50
 plot_TOC_fig=False
 
 percentiles = [0, 0.05, 0.1, 0.25, 0.5, 0.75, 0.9, 0.95, 1]
@@ -365,7 +365,7 @@ fig, axs = contourplots.box_and_whiskers_plot(uncertainty_data=MPSP_uncertainty,
                           show_x_ticks=True,
                           x_tick_labels=[scenario_names[i] for i in modes],
                           x_tick_wrap_width=14,
-                          y_label=r"$\bfMPSP$",
+                          y_label=r"$\mathbf{MPSP}$", # matplotlib 3.11 dropped legacy mathtext \bf
                           y_units=MPSP_units,
                           y_ticks=np.arange(0., 1.26, 0.25),
                           save_file=False,
@@ -425,7 +425,7 @@ if len(modes)==1:
     
     contourplots.stacked_bar_plot(dataframe=df_TEA_breakdown, 
                      y_ticks = [-25, 0, 25, 50, 75, 100],
-                     y_label=r"$\bfCost$" + " " + r"$\bfand$" + " " +  r"$\bfUtility$" + " " +  r"$\bfBreakdown$", 
+                     y_label=r"$\mathbf{Cost}$" + " " + r"$\mathbf{and}$" + " " +  r"$\mathbf{Utility}$" + " " +  r"$\mathbf{Breakdown}$",
                      y_units = "%", 
                      colors=['#7BBD84', 
                              '#E58835', 
@@ -459,7 +459,7 @@ if len(modes)==1:
                      totals=totals,
                      sig_figs_for_totals=3,
                      units_list=[i.units for i in unit_groups[0].metrics],
-                     totals_label_text=r"$\bfsum:$",
+                     totals_label_text=r"$\mathbf{sum:}$",
                      xticks_fontsize = 17,
                      ylabel_fontsize = 18,
                      yticks_fontsize = 17,
