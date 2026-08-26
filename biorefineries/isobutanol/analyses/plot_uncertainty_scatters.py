@@ -29,7 +29,6 @@ Usage:
 
 import os
 import re
-import glob
 import argparse
 import textwrap
 from math import ceil
@@ -139,8 +138,7 @@ def load_uncertainty_results(results_file):
     inserted 'Probability*' columns); the 'Blank parameter' placeholder is
     dropped from `param_cols`. If 'Raw data' is empty (a scenario whose
     all-NaN isobutanol MPSP column emptied the dropna'd table), fall back to
-    joining the 'Parameters' values with 'TEA results' (which truncates the
-    final metric column -- a warning is printed).
+    joining the 'Parameters' values with 'TEA results' (a warning is printed).
     """
     pars_header = pd.read_excel(results_file, sheet_name='Parameters',
                                 header=[0, 1], index_col=0, nrows=0)
@@ -152,8 +150,7 @@ def load_uncertainty_results(results_file):
                         header=[0, 1], index_col=0)
     if raw.empty:
         print("WARNING: 'Raw data' sheet is empty; falling back to "
-              "'Parameters' + 'TEA results' (the final metric column is "
-              "absent from 'TEA results').")
+              "'Parameters' + 'TEA results'.")
         pars = pd.read_excel(results_file, sheet_name='Parameters',
                              header=[0, 1], index_col=0)
         pars = pars[param_cols_sheet]
