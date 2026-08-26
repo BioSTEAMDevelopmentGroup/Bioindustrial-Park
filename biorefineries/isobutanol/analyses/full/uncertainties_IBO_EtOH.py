@@ -49,7 +49,10 @@ system = IBO_sys = models.IBO_sys
 unit_groups = models.unit_groups
 
 tea = models.IBO_tea
-get_adjusted_MSP = models.get_adjusted_MSP
+# (element, 'name [units]') keys of the shared-solve TEA metrics (baseline
+# Series / model.table columns). The reported "MPSP" is the purity-adjusted
+# ethanol MPSP, solved at the baseline IRR (0.15) via solve_TEA_at_IRR.
+adjusted_ethanol_MPSP_key = ('Biorefinery', 'Purity-adjusted ethanol MPSP [$/kg]')
 # per_kg_KSA_to_per_kg_SA = models.per_kg_KSA_to_per_kg_SA
 
 f = bst.main_flowsheet
@@ -119,7 +122,16 @@ for i in range(len(modes)):
     print(f'\n\nLoading parameter distributions ({mode}) ...')
     model.parameters = ()
     model.load_parameter_distributions(parameter_distributions_filename, models.namespace_dict)
-    
+
+    # IRR is deliberately NOT an independent uncertain parameter: drop it if
+    # the distributions workbook still carries a row for it. tea.IRR then
+    # stays at its baseline (0.15, set in system.py) throughout; every MPSP
+    # metric is solved at that baseline IRR, and IRR is itself reported as a
+    # metric (solved at default product prices) by the shared
+    # solve_TEA_at_IRR metrics in models_EtOH_IBO_corn.py.
+    model.parameters = tuple(p for p in model.get_parameters()
+                             if p.name != 'Internal rate of return')
+
     # load_additional_params()
     print(f'\nLoaded parameter distributions ({mode}).')
     
@@ -144,8 +156,8 @@ for i in range(len(modes)):
     baseline = pd.DataFrame(data=np.array([[i for i in baseline_initial.values],]), 
                             columns=baseline_initial.keys())
     
-    results_dict['Baseline']['MPSP'][mode] = get_adjusted_MSP()
-        
+    results_dict['Baseline']['MPSP'][mode] = baseline_initial[adjusted_ethanol_MPSP_key]
+
     print(f"\nSimulated baseline. MPSP = ${round(results_dict['Baseline']['MPSP'][mode],2)}/kg.")
     
     #%%
@@ -160,7 +172,7 @@ for i in range(len(modes)):
     model.specification()
     baseline_end = model.metrics_at_baseline()
     
-    print(f"\nRe-simulated baseline. MPSP = ${round(get_adjusted_MSP(),2)}/kg.")
+    print(f"\nRe-simulated baseline. MPSP = ${round(baseline_end[adjusted_ethanol_MPSP_key],2)}/kg.")
     
     minute = '0' + str(dateTimeObj.minute) if len(str(dateTimeObj.minute))==1 else str(dateTimeObj.minute)
     file_to_save = IBO_results_filepath+\
@@ -190,17 +202,20 @@ for i in range(len(modes)):
  
     table = model.table
     
-    # Drop failed simulations (NaN metric rows) -- but never on the three
-    # TEA metric columns, which can be legitimately NaN on an otherwise
-    # valid simulation: isobutanol MPSP in every row of a scenario with no
-    # isobutanol product (scenario A), and IRR when the NPV has no real
-    # root at any discount rate (deep money-losing samples). Genuinely
-    # failed simulations still drop -- they are NaN in every column.
+    # Drop failed simulations (NaN metric rows) -- but never on the five
+    # shared-solve TEA metric columns, which can be legitimately NaN on an
+    # otherwise valid simulation: the isobutanol MPSPs in every row of a
+    # scenario with no isobutanol product (scenario A), and IRR when the
+    # NPV has no real root at any discount rate (deep money-losing
+    # samples). Genuinely failed simulations still drop -- they are NaN in
+    # every column.
     model.table = model.table.dropna(
         subset=[c for c in model.table.columns
                 if c[1] not in ('IRR [-]',
                                 'Ethanol MPSP [$/kg]',
-                                'Isobutanol MPSP [$/kg]')])
+                                'Purity-adjusted ethanol MPSP [$/kg]',
+                                'Isobutanol MPSP [$/kg]',
+                                'Purity-adjusted isobutanol MPSP [$/kg]')])
     
     spearman_results, spearman_p_values = model.spearman_r()
     
@@ -237,12 +252,12 @@ for i in range(len(modes)):
         model.table.to_excel(writer, sheet_name='Raw data')
     
     
-    results_dict['Uncertainty']['MPSP'][mode] = model.table.Biorefinery['Adjusted minimum selling price [$/kg IBO]']
-    
+    results_dict['Uncertainty']['MPSP'][mode] = model.table.Biorefinery[adjusted_ethanol_MPSP_key[1]]
+
     df_rho, df_p = model.spearman_r()
-    
-    results_dict['Sensitivity']['Spearman']['MPSP'][mode] = df_rho['Biorefinery', 'Adjusted minimum selling price [$/kg IBO]']
-    results_dict['Sensitivity']['p-val Spearman']['MPSP'][mode] = df_p['Biorefinery', 'Adjusted minimum selling price [$/kg IBO]']
+
+    results_dict['Sensitivity']['Spearman']['MPSP'][mode] = df_rho[adjusted_ethanol_MPSP_key]
+    results_dict['Sensitivity']['p-val Spearman']['MPSP'][mode] = df_p[adjusted_ethanol_MPSP_key]
     
     
     results_dict['Sensitivity']['Spearman']['EtOH Yield'] = {}
@@ -649,7 +664,7 @@ if len(modes)==1:
     
     for i in metrics:
         str_i_lower = str(i).lower()
-        if 'total' in str_i_lower or 'adjusted minimum selling price' in str_i_lower:
+        if 'total' in str_i_lower or 'purity-adjusted' in str_i_lower:
             print(f"\n\nThe parameters to which the metric {i[1]} is most significantly sensitive (i.e., p-value < {cutoff_p_value} and Spearman's rho >= {cutoff_rho_value}) are as follows:")
             print("Parameter\t\t\t\t\t\t\t\tSpearman's rho\t\t\t\t\t\t\t\tp-value")
             sig_sens_parameters[i] = []

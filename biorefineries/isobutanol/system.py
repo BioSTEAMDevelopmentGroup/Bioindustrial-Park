@@ -26,7 +26,7 @@ filterwarnings('ignore')
 
 MultiEffectEvaporator = bst.MultiEffectEvaporator
 
-__all__ = ('corn_EtOH_IBO_sys', 'solve_TEA')
+__all__ = ('corn_EtOH_IBO_sys', 'solve_TEA', 'solve_TEA_at_IRR')
 
 corn_chems_compiled = corn.chemicals.create_chemicals()
 chems = [c for c in corn_chems_compiled]
@@ -275,7 +275,7 @@ def V514_update_IBO_price():
 V513 = f.V513
 V513.ethanol_price = 0.835 # mean of ends of market price range (0.52 - 1.15) # Jan 2021 - Dec 2025 5-year low and high from https://tradingeconomics.com/commodity/ethanol
 
-V513.update_ethanol_price = False # a simulation leaves f.ethanol.price untouched by default; solve_TEA sets/restores prices itself
+V513.update_ethanol_price = False # a simulation leaves f.ethanol.price untouched by default; solve_TEA_at_IRR/solve_TEA set product prices themselves (and leave them at their purity-based defaults)
 @V513.add_specification(run=False)
 def V513_update_etoh_price():
     V513._run()
@@ -539,48 +539,58 @@ def get_default_product_prices():
         prices[ibo] = V514.isobutanol_price * ibo.imass['Isobutanol']/ibo.F_mass
     return prices
 
-def solve_TEA(stream_IDs=('ethanol', 'isobutanol'),
-              IRR_for_MPSP=0.15,
-              n_tea_solves=3):
+def solve_TEA_at_IRR(stream_IDs=('ethanol', 'isobutanol'),
+                     IRR_for_MPSP=None,
+                     n_tea_solves=3):
     """Solve the TEA on the CURRENT flowsheet state -- no simulation.
 
-    Returns {'IRR': <solved IRR>, 'MPSPs': {stream_ID: <purity-adjusted
-    MPSP, $/kg of the stream's main chemical>, ...}} where
+    Returns {'IRR': <solved IRR>,
+             'MPSPs': {stream_ID: <MPSP, $/kg of the stream>, ...},
+             'purity_adjusted_MPSPs': {stream_ID: <MPSP, $/kg of the
+             stream's main chemical>, ...}} where
 
     * each MPSP is the minimum selling price of that stream at the fixed
-      IRR `IRR_for_MPSP`, with every OTHER product held at its
-      purity-based default price (V513.ethanol_price, V514.isobutanol_price
-      x mass fraction); a stream that carries no flow under the current
-      scenario (e.g. isobutanol in scenario A) has no solvable price and is
-      reported as NaN;
-    * 'IRR' is the IRR solved with BOTH products at their purity-based
-      default prices (the state the V513/V514 specifications produce with
-      update_ethanol_price = update_isobutanol_price = True). Negative
-      IRRs above -100% are genuine solutions and are reported; NaN only
-      when no real IRR exists on the valid domain IRR > -1 (NPV is
-      negative at every valid discount rate, e.g. deep money-losing
+      IRR `IRR_for_MPSP` (default None: the TEA's current IRR, i.e. the
+      baseline 0.15 set at TEA creation -- IRR is not an uncertain
+      parameter), with every OTHER product held at its purity-based
+      default price (V513.ethanol_price, V514.isobutanol_price x mass
+      fraction); the purity-adjusted variant divides the solved stream
+      price by the main-chemical mass fraction. A stream that carries no
+      flow under the current scenario (e.g. isobutanol in scenario A) has
+      no solvable price and is reported as NaN in both dicts;
+    * 'IRR' is solved AFTER all MPSPs, with ALL products reset to their
+      purity-based default prices (the state the V513/V514 specifications
+      produce with update_ethanol_price = update_isobutanol_price = True).
+      Negative IRRs above -100% are genuine solutions and are reported;
+      NaN only when no real IRR exists on the valid domain IRR > -1 (NPV
+      is negative at every valid discount rate, e.g. deep money-losing
       kinetic-sweep corners).
 
-    Every stream price and the TEA IRR touched here are restored to their
-    entry values before returning, so calling this is side-effect free.
-    `n_tea_solves` is the number of successive solve passes per quantity.
+    Exit state (guaranteed even on an exception): every product with a
+    purity-based default price is left AT that default price, any other
+    stream in `stream_IDs` is restored to its entry price, and tea.IRR is
+    restored to its entry (baseline) value. `n_tea_solves` is the number
+    of successive solve passes per quantity.
     """
     tea = corn_EtOH_IBO_sys_tea
     streams = [f.stream[ID] for ID in stream_IDs]
     default_prices = get_default_product_prices()
     original_prices = {s: s.price for s in [*streams, *default_prices]}
     original_IRR = tea.IRR
+    if IRR_for_MPSP is None: IRR_for_MPSP = original_IRR
     try:
-        MPSPs = {}
+        MPSPs, purity_adjusted_MPSPs = {}, {}
         tea.IRR = IRR_for_MPSP
         for s in streams:
             if s.isempty():
-                MPSPs[s.ID] = np.nan
+                MPSPs[s.ID] = purity_adjusted_MPSPs[s.ID] = np.nan
                 continue
             for o, price in default_prices.items(): o.price = price
             for i in range(n_tea_solves):
                 s.price = tea.solve_price(s)
-            MPSPs[s.ID] = get_purity_adj_price(s, [get_main_chemical_ID(s)])
+            MPSPs[s.ID] = s.price
+            purity_adjusted_MPSPs[s.ID] =\
+                get_purity_adj_price(s, [get_main_chemical_ID(s)])
         for o, price in default_prices.items(): o.price = price
         # A solved IRR (positive or negative) is accepted only if it is a
         # genuine root (|NPV| far below railed magnitudes, which are O(TCI))
@@ -603,9 +613,27 @@ def solve_TEA(stream_IDs=('ethanol', 'isobutanol'),
                 pass
         IRR = tea.IRR if valid_IRR() else np.nan
     finally:
-        for s, price in original_prices.items(): s.price = price
+        # Products with a default price are left AT that default price (not
+        # their entry price); anything else touched is restored to entry.
+        for s, price in original_prices.items():
+            s.price = default_prices.get(s, price)
         tea.IRR = original_IRR
-    return {'IRR': IRR, 'MPSPs': MPSPs}
+    return {'IRR': IRR, 'MPSPs': MPSPs,
+            'purity_adjusted_MPSPs': purity_adjusted_MPSPs}
+
+def solve_TEA(stream_IDs=('ethanol', 'isobutanol'),
+              IRR_for_MPSP=0.15,
+              n_tea_solves=3):
+    """Back-compat wrapper around solve_TEA_at_IRR, keeping the historical
+    return shape used by the smoke tests, optimizers, and kinetic sweeps:
+    {'IRR': <solved IRR>, 'MPSPs': {stream_ID: <PURITY-ADJUSTED MPSP,
+    $/kg of the stream's main chemical>, ...}}, with MPSPs solved at the
+    fixed `IRR_for_MPSP` (0.15 by default)."""
+    solution = solve_TEA_at_IRR(stream_IDs=stream_IDs,
+                                IRR_for_MPSP=IRR_for_MPSP,
+                                n_tea_solves=n_tea_solves)
+    return {'IRR': solution['IRR'],
+            'MPSPs': solution['purity_adjusted_MPSPs']}
 
 #: list of (n_sims_run, per-sweep max relative drifts) -- one entry per
 #: load_simulate call. Diagnostic for convergence behavior.
