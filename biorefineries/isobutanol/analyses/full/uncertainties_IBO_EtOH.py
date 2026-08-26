@@ -190,7 +190,13 @@ for i in range(len(modes)):
  
     table = model.table
     
-    model.table = model.table.dropna()
+    # Drop failed simulations (NaN metric rows) -- but never on the
+    # isobutanol MPSP column, which is legitimately NaN in every row of a
+    # scenario with no isobutanol product (scenario A) and would otherwise
+    # empty the table.
+    model.table = model.table.dropna(
+        subset=[c for c in model.table.columns
+                if c[1] != 'Isobutanol MPSP [$/kg]'])
     
     spearman_results, spearman_p_values = model.spearman_r()
     
