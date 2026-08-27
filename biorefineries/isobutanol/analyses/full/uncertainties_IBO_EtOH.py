@@ -170,9 +170,13 @@ for i in range(len(modes)):
     # resuming is valid; a table-layout mismatch makes autoload start fresh).
     # The checkpoint is deleted after the raw results are saved below.
     autosave_file = IBO_results_filepath + f'uncertainties_{mode}_autosave.pickle'
+    # autosave interval kept small (and decoupled from the notify interval):
+    # the segfault often recurs within a single notify window, so a coarse
+    # checkpoint can get stuck and never ratchet forward. 10 preserves
+    # progress every 10 sims across relaunches.
     model.evaluate(notify=notification_interval,
                    autoload=True,
-                   autosave=notification_interval,
+                   autosave=10,
                    file=autosave_file)
     print('\nFinished evaluation.')
     
