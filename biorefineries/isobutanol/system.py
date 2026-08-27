@@ -9,6 +9,7 @@
 
 import nskinetics as nsk
 import biosteam as bst
+import hensmith
 import thermosteam as tmo
 import numpy as np
 from matplotlib import pyplot as plt
@@ -361,7 +362,7 @@ def M501_spec():
     M501._run()
     M501.outs[0].phase = 'l'
 
-HXN = bst.HeatExchangerNetwork('HXN1001', ignored=keep_non_rigorous)
+HXN = hensmith.HeatExchangerNetwork('HXN1001', ignored=keep_non_rigorous)
 
 
 corn_EtOH_IBO_sys = bst.System.from_units('corn_EtOH_IBO_sys',
