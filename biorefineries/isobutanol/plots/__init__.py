@@ -9,19 +9,22 @@
 
 from . import (
     spearman_matrix,
-    # system, 
+    trajectory_contourplot,
+    # system,
     # units,
     # utils,
     )
 
 __all__ = [
             *spearman_matrix.__all__,
+            *trajectory_contourplot.__all__,
             # *system.__all__,
             # *units.__all__,
             # *utils.__all__,
 ]
 
 from .spearman_matrix import *
+from .trajectory_contourplot import *
 # from .system import *
 # from .units import *
 # from .utils import *
