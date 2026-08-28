@@ -38,10 +38,13 @@ def _load_module():
 def _load_metric_csv(prefix, metric):
     # sweep CSVs are saved as '<prefix>_<metric>.csv' with a leading index col;
     # the 2-D block is the remaining columns.
-    matches = glob.glob(os.path.join(RESULTS_DIR, f'*{metric}.csv'))
-    matches = [m for m in matches if metric in os.path.basename(m)]
+    matches = glob.glob(os.path.join(RESULTS_DIR, f'{prefix}*{metric}.csv'))
+    matches = [m for m in matches if os.path.basename(m).endswith(f'_{metric}.csv')]
     if not matches:
         return None
+    # Prefer (20, 20, 1) grid size; sort deterministically as tiebreaker
+    matches = sorted(matches, key=lambda m: ('(20, 20, 1)' not in m, m))
+    print(f"  {metric}: {os.path.basename(matches[0])}")
     df = pd.read_csv(matches[0])
     arr = df[df.columns[1:]].to_numpy(dtype='float', na_value=np.nan)
     return arr[None, :, :]
