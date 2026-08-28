@@ -113,7 +113,87 @@ HELPER_TESTS = [
     test_greedy_climb_invalid_sense_raises,
 ]
 
-PLOT_TESTS = []  # populated in Task 2
+def _synthetic_results():
+    # 6x7 grid (ny=6 over spec_2, nx=7 over spec_1). MPSP-like bowl (min at a
+    # corner), IRR-like plane (max at the opposite corner), plus a constant.
+    spec_1 = np.linspace(0.0, 30.0, 7)   # x
+    spec_2 = np.linspace(0.0, 0.5, 6)    # y
+    iy, ix = np.mgrid[0:6, 0:7]
+    mpsp = (iy - 0.0) ** 2 + (ix - 0.0) ** 2 + 1.0   # min at (0,0)
+    irr = iy.astype(float) + ix.astype(float)         # max at (5,6)
+    const = np.full((6, 7), 3.0)
+    results = {
+        'MPSP': mpsp[None, :, :],
+        'IRR': irr[None, :, :],
+        'Const': const[None, :, :],
+    }
+    return results, spec_1, spec_2
+
+
+def test_derive_levels_ranges_and_errors():
+    lv, ct = tc._derive_levels(np.array([1.0, np.nan, 3.0]))
+    assert lv[0] == 1.0 and lv[-1] == 3.0
+    assert ct[0] == 1.0 and ct[-1] == 3.0
+    for bad in (np.array([np.nan, np.nan]), np.array([2.0, 2.0])):
+        try:
+            tc._derive_levels(bad)
+        except ValueError:
+            pass
+        else:
+            raise AssertionError("expected ValueError from _derive_levels")
+
+
+def test_plot_returns_fig_ax_and_trajectory_data():
+    results, s1, s2 = _synthetic_results()
+    fig, ax, traj = tc.plot_metric_with_trajectories(
+        results, s1, s2, color_metric='MPSP', baseline_point=(30.0, 0.5),
+        trajectory_metrics=['MPSP', 'IRR'], senses={'MPSP': 'min', 'IRR': 'max'})
+    assert set(traj) == {'MPSP', 'IRR'}
+    # baseline snapped to the far corner (ix=6, iy=5)
+    assert traj['MPSP']['path_ij'][0] == (5, 6)
+    assert traj['MPSP']['optimum_xy'] == (0.0, 0.0)      # min bowl corner
+    assert traj['IRR']['n_steps'] == 0                    # baseline already max
+    # each path strictly improves per its sense
+    mpsp = tc._squeeze_grid(results['MPSP'])
+    vals = [mpsp[c] for c in traj['MPSP']['path_ij']]
+    assert all(b < a for a, b in zip(vals, vals[1:]))
+    # at least one trajectory polyline was drawn, plus a legend
+    assert len(ax.lines) >= 1
+    assert ax.get_legend() is not None
+    import matplotlib.pyplot as plt
+    plt.close(fig)
+
+
+def test_plot_missing_sense_raises():
+    results, s1, s2 = _synthetic_results()
+    try:
+        tc.plot_metric_with_trajectories(
+            results, s1, s2, color_metric='MPSP', baseline_point=(0.0, 0.0),
+            trajectory_metrics=['IRR'], senses={})
+    except KeyError:
+        pass
+    else:
+        raise AssertionError("expected KeyError for missing sense")
+
+
+def test_plot_constant_color_metric_raises():
+    results, s1, s2 = _synthetic_results()
+    try:
+        tc.plot_metric_with_trajectories(
+            results, s1, s2, color_metric='Const', baseline_point=(0.0, 0.0),
+            trajectory_metrics=['MPSP'], senses={'MPSP': 'min'})
+    except ValueError:
+        pass
+    else:
+        raise AssertionError("expected ValueError for constant color metric")
+
+
+PLOT_TESTS = [
+    test_derive_levels_ranges_and_errors,
+    test_plot_returns_fig_ax_and_trajectory_data,
+    test_plot_missing_sense_raises,
+    test_plot_constant_color_metric_raises,
+]
 
 
 def _run(tests):
