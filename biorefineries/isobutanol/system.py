@@ -56,14 +56,25 @@ def load(simulate_baseline=True,
     names."""
     global _loaded, _published
     if _loaded:
-        print('biorefineries.isobutanol is already loaded; '
-              'rebuilding in the same process is unsupported (no-op).')
+        msg = ('biorefineries.isobutanol is already loaded; '
+               'rebuilding in the same process is unsupported (no-op).')
+        active = _published.get('separation_processes')
+        if tuple(separation_processes) != active:
+            msg += (f' Requested separation_processes '
+                    f'{tuple(separation_processes)!r} ignored; active '
+                    f'configuration: {active!r}.')
+        print(msg)
         return _published
     # Validate BEFORE any build state is touched (thermo, flowsheet,
     # process settings): a failed validation leaves _loaded False and the
     # process clean, so a corrected load() in the same kernel still works.
     # (create_separation_system re-validates downstream; this early check
     # is what guarantees no half-built flowsheet.)
+    if isinstance(separation_processes, str):
+        raise TypeError(
+            "separation_processes must be an iterable of process names "
+            "(e.g. ('IBO_EtOH',)), not a bare string; "
+            f"got {separation_processes!r}")
     separation_processes = tuple(separation_processes)
     if not separation_processes or any(
             p not in ('IBO_EtOH', 'ethanol') for p in separation_processes):
@@ -247,10 +258,12 @@ def load(simulate_baseline=True,
             HXprocess_units.append(i)
 
     #%% Separation trains (process-gated factory)
-    # Two parallel trains behind the gating splitter S201 (baseline split
-    # 1.0 -> ALL broth to the IBO/EtOH train; the ethanol-primary train
-    # idles at zero flow with design/cost skipped, so the baselines are
-    # unchanged; re-gate via sep_udct['S201'].split = x):
+    # In the default both-trains mode: two parallel trains behind the
+    # gating splitter S201 (baseline split 1.0 -> ALL broth to the IBO/EtOH
+    # train; the ethanol-primary train idles at zero flow with design/cost
+    # skipped, so the baselines are unchanged; re-gate via
+    # sep_udct['S201'].split = x). In single-process modes there is no S201
+    # (the broth connects directly to the lone train; see the notes below):
     #
     # 1. 'IBO_EtOH' -- the integrated solvent-free heteroazeotropic train
     #    (unchanged; replaced corn's purification + the old solvent-

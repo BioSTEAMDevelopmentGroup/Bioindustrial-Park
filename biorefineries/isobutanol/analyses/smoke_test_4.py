@@ -19,13 +19,12 @@ full flow. All broth IBO leaves via the rectifier bottoms to WWT
 Gates (asserted inside ``load_simulate_baseline`` before it returns, so a
 violation exits non-zero exactly like a traceback):
 
-- purity-adjusted ethanol MPSP > 0.396 (IBO revenue lost; its burden
-  shifts to ethanol, so the both-trains B baseline is a floor)
-- purity-adjusted ethanol MPSP < 1.5 (generous pathology cap)
+- purity-adjusted ethanol MPSP within 1% of 1.41371 (the reference baseline
+  for this configuration, set 3-run-stable to full precision by the
+  2026-08-30 toggle-feature verification runs and recorded in CLAUDE.md;
+  well above the both-trains B baseline 0.39536 because the IBO revenue is
+  lost and its burden shifts to ethanol)
 - isobutanol MPSP is nan (empty product)
-
-No pinned reference value yet: once 3-run-stable, the observed ethanol MPSP
-is recorded in CLAUDE.md as this configuration's reference baseline.
 
 Must run in a FRESH kernel/process: ``isobutanol.load(...)`` runs at import
 below, rebuilds are unsupported, and the separation configuration is fixed
@@ -66,10 +65,8 @@ def load_simulate_baseline(stream_IDs=('ethanol', 'isobutanol'), # products whos
     results = solve_TEA(stream_IDs=stream_IDs, IRR_for_MPSP=IRR_for_MPSP)
     MPSP_ethanol = results['MPSPs']['ethanol']
     MPSP_isobutanol = results['MPSPs']['isobutanol']
-    assert MPSP_ethanol > 0.396, \
-        f'ethanol MPSP {MPSP_ethanol} <= 0.396 (should exceed the both-trains B baseline: IBO revenue is lost)'
-    assert MPSP_ethanol < 1.5, \
-        f'ethanol MPSP {MPSP_ethanol} >= 1.5 (pathology cap)'
+    assert abs(MPSP_ethanol - 1.41371)/1.41371 < 0.01, \
+        f'ethanol MPSP {MPSP_ethanol} not within 1% of 1.41371'
     assert math.isnan(MPSP_isobutanol), \
         f'isobutanol MPSP {MPSP_isobutanol} expected nan (empty product)'
     return results
