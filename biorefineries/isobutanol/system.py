@@ -32,19 +32,47 @@ __all__ = ('load', 'solve_TEA', 'solve_TEA_at_IRR')
 _loaded = False
 _published = None
 
-def load(simulate_baseline=True):
+def load(simulate_baseline=True,
+         separation_processes=('IBO_EtOH', 'ethanol')):
     """Build the corn -> ethanol + isobutanol biorefinery, simulate it to the
     baseline state, and publish every built object (corn_EtOH_IBO_sys,
     corn_EtOH_IBO_sys_tea, fbs_spec, f, V406, r, unit_groups_dict, ...) into
     this module's namespace, exactly reproducing the former import-time build.
-    Idempotent: a repeat call in the same process is a no-op (rebuild is
-    unsupported -- the WWT step appends chemicals to the global thermo and
-    flowsheet IDs would collide). Returns the dict of published names."""
+
+    separation_processes : Iterable[str]
+        Non-empty subset of ('IBO_EtOH', 'ethanol'): which separation
+        train(s) to build (see separations.create_separation_system). The
+        default builds both (the gated-parallel baseline configuration).
+        Whatever a mode does not build is represented by an empty, zero-cost
+        placeholder (empty dangling `isobutanol` feed into V514, empty
+        'isobutanol separation' unit group), so the public surface --
+        registered product streams, unit-group keys, solve_TEA behavior
+        (nan MPSP for an empty product) -- is identical in every mode.
+
+    Idempotent: a repeat call in the same process is a no-op that IGNORES a
+    different `separation_processes` (rebuild is unsupported -- the WWT step
+    appends chemicals to the global thermo and flowsheet IDs would collide;
+    one separation configuration per kernel). Returns the dict of published
+    names."""
     global _loaded, _published
     if _loaded:
         print('biorefineries.isobutanol is already loaded; '
               'rebuilding in the same process is unsupported (no-op).')
         return _published
+    # Validate BEFORE any build state is touched (thermo, flowsheet,
+    # process settings): a failed validation leaves _loaded False and the
+    # process clean, so a corrected load() in the same kernel still works.
+    # (create_separation_system re-validates downstream; this early check
+    # is what guarantees no half-built flowsheet.)
+    separation_processes = tuple(separation_processes)
+    if not separation_processes or any(
+            p not in ('IBO_EtOH', 'ethanol') for p in separation_processes):
+        raise ValueError(
+            "separation_processes must be a non-empty subset of "
+            f"['IBO_EtOH', 'ethanol']; got {separation_processes!r}")
+    # The two locals driving every mode conditional below.
+    has_IBO_EtOH = 'IBO_EtOH' in separation_processes
+    has_EtOH_primary = 'ethanol' in separation_processes
     load_process_settings()
 
     corn_chems_compiled = corn.chemicals.create_chemicals()
@@ -251,12 +279,18 @@ def load(simulate_baseline=True):
     # 'stillage' and 'recycle_process_water'.
     P301 = f.P301
 
+    # The outs list always passes all 7 IDs regardless of mode; the wrapper
+    # trims the absent branch's streams from the system outs (its standard
+    # conditional-outlet behavior), leaving that branch's registered stream
+    # IDs as harmless dangling empties. In single-process modes sep_udct
+    # holds only the built branch's keys and there is NO 'S201' (the broth
+    # connects directly), so every sep_udct access below is mode-guarded.
     separation_sys, sep_udct = create_separation_system(
         ins=[P301-0],
         outs=['ethanol_product', 'isobutanol_product', 'sep_stillage',
               'D103_bottoms', 'ethanol_product_2', 'sep_stillage_2',
               'rectifier_bottoms_water'],
-        processes=('IBO_EtOH', 'ethanol'),
+        processes=separation_processes,
         mockup=True,
         area=200,
         udct=True,
@@ -267,7 +301,11 @@ def load(simulate_baseline=True):
     # (ProcessWaterCenter ins[2]), mirroring the old rectifier-bottoms
     # (P508) role. NOT sent to WWT. (The ethanol-primary train's rectifier
     # bottoms, by contrast, carry that train's IBO and DO go to WWT.)
-    D103_bottoms_to_PWC = sep_udct['D103'].outs[1]
+    # In ('ethanol',)-only mode there is no D103: ProcessWaterCenter ins[2]
+    # gets a permanently-empty placeholder instead (that train's water
+    # leaves via WWT: P303-0 -> M501), so the PWC draws more makeup water.
+    D103_bottoms_to_PWC = (sep_udct['D103'].outs[1] if has_IBO_EtOH
+                           else tmo.Stream('recovered_process_water_none'))
 
     # Ethanol products of BOTH trains -> merge mixer -> existing denaturant
     # chain: V511 day tank -> P512 -> MX4 (+4.345% octane denaturant via
@@ -277,19 +315,33 @@ def load(simulate_baseline=True):
     # storage/denaturant tail (T302/P304/T303/P305/M304/T304), which is
     # orphaned off the assembled system below (corn-train pattern) so
     # storage and denaturant are not double-counted.
-    MX6 = bst.Mixer('MX6', ins=(sep_udct['H201']-0, sep_udct['H304']-0))
+    # Only the ethanol outlets of the trains actually built (a 1-inlet
+    # Mixer is valid).
+    MX6_ins = []
+    if has_IBO_EtOH: MX6_ins.append(sep_udct['H201']-0)
+    if has_EtOH_primary: MX6_ins.append(sep_udct['H304']-0)
+    MX6 = bst.Mixer('MX6', ins=tuple(MX6_ins))
     MX6-0-0-f.V511
 
     # Stillages of BOTH trains (D101 bottoms; ethanol-train beer-column
     # bottoms via P302) -> merge mixer -> cooled to the old H402 duty
     # point -> V601 (DDGS train).
-    MX7 = bst.Mixer('MX7', ins=(sep_udct['D101'].outs[1],
-                                sep_udct['P302']-0))
+    MX7_ins = []
+    if has_IBO_EtOH: MX7_ins.append(sep_udct['D101'].outs[1])
+    if has_EtOH_primary: MX7_ins.append(sep_udct['P302']-0)
+    MX7 = bst.Mixer('MX7', ins=tuple(MX7_ins))
     H601 = bst.HXutility('H601', ins=MX7-0, T=360.15, rigorous=True)
     H601-0-0-f.V601
 
     #%% Add storage for isobutanol product
-    V514 = bst.StorageTank('V514', ins=sep_udct['H302']-0, outs=('isobutanol'), tau=7*24)
+    # V514, its price spec, and the registered 'isobutanol' outlet exist in
+    # EVERY mode; without the IBO/EtOH train it is fed a permanently-empty
+    # dangling stream (zero size/cost; solve_TEA reports nan MPSP for the
+    # empty product, and the price spec already guards on ibo.F_mol).
+    V514 = bst.StorageTank('V514',
+                           ins=(sep_udct['H302']-0 if has_IBO_EtOH
+                                else tmo.Stream('isobutanol_from_separation_none')),
+                           outs=('isobutanol'), tau=7*24)
 
     # V514.isobutanol_price = 1.725 # https://www.alibaba.com/product-detail/China-Isobutanol-CAS-NO-78-83_1600225311840.html?spm=a2700.7724857.0.0.6b071f52Jodf8p
     V514.isobutanol_price = 1.49 # https://www.alibaba.com/product-detail/High-Purity-Industrial-Organic-Solvent-Textile_1601609307567.html?spm=a2700.7724857.0.0.6b071f52XisbBQ
@@ -324,8 +376,11 @@ def load(simulate_baseline=True):
     # (HX500/HX501) -- harmless, they are never simulated again.
     # Branch-2 analogs mirror branch 1's HXN treatment: H303 (mol-sieve
     # superheater, heat_only) ~ H202; H304 (EtOH condenser) ~ H201.
-    keep_non_rigorous = [f.HX101, sep_udct['H202'], sep_udct['H201'],
-                         sep_udct['H303'], sep_udct['H304']]
+    keep_non_rigorous = [f.HX101]
+    if has_IBO_EtOH:
+        keep_non_rigorous += [sep_udct['H202'], sep_udct['H201']]
+    if has_EtOH_primary:
+        keep_non_rigorous += [sep_udct['H303'], sep_udct['H304']]
     for i in corn_EtOH_IBO_sys_no_IBO_recovery.units + []:
         if isinstance(i, bst.HXutility) and not i in keep_non_rigorous:
             i.rigorous = True
@@ -342,9 +397,10 @@ def load(simulate_baseline=True):
     # ethanol is re-docked into MX6 above; V511/V513 provide storage and
     # denaturant for the merged product) -- same accepted pattern as the
     # orphaned corn train.
-    EtOH_train_storage_tail = [sep_udct[i] for i in
-                               ('T302', 'P304', 'T303', 'P305',
-                                'M304', 'T304')]
+    EtOH_train_storage_tail = ([sep_udct[i] for i in
+                                ('T302', 'P304', 'T303', 'P305',
+                                 'M304', 'T304')]
+                               if has_EtOH_primary else [])
     recovery_units = [i for i in separation_sys.units
                       if i not in EtOH_train_storage_tail] \
                      + [MX6, MX7, H601, V514]
@@ -396,11 +452,10 @@ def load(simulate_baseline=True):
     # azeotrope) at far-below-decantable concentration: recovery is
     # infeasible, so the stream is treated, not recycled to process water
     # (zero-flow at the baseline split).
+    M501_ins = [f.backwater, f.spike_feed_condensate, MX5_effluent]
+    if has_EtOH_primary: M501_ins.append(sep_udct['P303']-0)
     M501 = bst.Mixer('M501',
-                     ins=(f.backwater,
-                          f.spike_feed_condensate,
-                          MX5_effluent,
-                          sep_udct['P303']-0),
+                     ins=tuple(M501_ins),
                      outs='mixed_wastewater_to_WWT')
 
     @M501.add_specification(run=False)
@@ -597,10 +652,13 @@ def load(simulate_baseline=True):
     # define IBO separation units EXPLICITLY (a leftover-based definition would
     # sweep the entire integrated separation train here): the stripper ->
     # decanter-loop -> drying-column chain that finishes the isobutanol product.
+    # Always registered (stable unit_groups_dict keys / metrics-table shape
+    # across modes); empty when the IBO/EtOH train is absent.
     isobutanol_separation_group = bst.UnitGroup('isobutanol separation',
-                                                units=[sep_udct['D103'], sep_udct['M301'],
-                                                       sep_udct['H301'], sep_udct['S301'],
-                                                       sep_udct['D104'], sep_udct['H302']])
+                                                units=([sep_udct['D103'], sep_udct['M301'],
+                                                        sep_udct['H301'], sep_udct['S301'],
+                                                        sep_udct['D104'], sep_udct['H302']]
+                                                       if has_IBO_EtOH else []))
 
     storage_and_handling_group = bst.UnitGroup('storage and handling', 
                                                units = [i for i in corn_EtOH_IBO_sys.units
