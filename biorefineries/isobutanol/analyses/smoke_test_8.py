@@ -12,9 +12,9 @@ Smoke test 8 -- scenario B baseline with BOTH separation trains built
 default) but the gating splitter re-gated to send ALL broth to the
 ethanol-primary train: ``sep_udct['S201'].split = 0.0``.
 
-The scenario-B analog of smoke_test_6, and the first re-gated integrated
+The scenario-B twin of smoke_test_7, and the first re-gated integrated
 run with NONZERO broth isobutanol: the idle zero-flow IBO/EtOH train must
-be economically equivalent to an absent one (smoke_test_4's ethanol-only
+be economically equivalent to an absent one (smoke_test_6's ethanol-only
 build) while HXN/WWT carry branch-2 duties for the full B-feed IBO, which
 leaves via the rectifier (D303) bottoms to WWT unrecovered
 (sub-decantable), so the isobutanol product is empty.
@@ -22,7 +22,7 @@ leaves via the rectifier (D303) bottoms to WWT unrecovered
 Gates (asserted inside ``load_simulate_baseline`` before it returns, so a
 violation exits non-zero exactly like a traceback):
 
-- purity-adjusted ethanol MPSP within 1% of 1.41371 (the smoke_test_4
+- purity-adjusted ethanol MPSP within 1% of 1.41371 (the smoke_test_6
   reference; the 2026-08-30 verification run gave 1.4137094435, matching
   the ethanol-only build to ~6 sig figs)
 - isobutanol MPSP is nan (empty product)

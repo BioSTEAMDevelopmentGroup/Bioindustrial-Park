@@ -21,7 +21,7 @@ Gates (asserted inside ``load_simulate_baseline`` before it returns, so a
 violation exits non-zero exactly like a traceback):
 
 - purity-adjusted ethanol MPSP within 1% of 0.79796 (the reference baseline
-  for this configuration, set 3-run-stable by the 2026-08-30 smoke_test_5/6
+  for this configuration, set 3-run-stable by the 2026-08-30
   verification runs; slightly below the both-trains A baseline 0.818 -- the
   stock corn-ethanol purification train is marginally cheaper than the
   IBO/EtOH train for a zero-IBO broth)
