@@ -20,7 +20,7 @@ from nskinetics.models.s_cerevisiae_ferm_fb_inhib_mod_ibo import te_r
 from scipy.optimize import differential_evolution, minimize, brute
 from matplotlib.ticker import AutoMinorLocator
 from biorefineries.isobutanol.process_settings import load_process_settings
-from biorefineries.isobutanol.separations import create_IBO_EtOH_separation_system
+from biorefineries.isobutanol.separations import create_separation_system
 
 from warnings import filterwarnings
 filterwarnings('ignore')
@@ -218,53 +218,74 @@ def load(simulate_baseline=True):
             reconnect_without_HXprocess_unit(i)
             HXprocess_units.append(i)
 
-    #%% Integrated solvent-free IBO/EtOH/water separation train
-    # Replaces BOTH the corn ethanol purification train (T501/P502/MX3/T503_T507/
-    # HX500/X504/HX501/P508 -- dropped from the reassembled systems below and left
-    # orphaned on the flowsheet, same accepted pattern as the detached T608) AND
-    # the former solvent-extraction isobutanol recovery train (S404/M401/S401/
-    # M402/D401/D401_0_P/S402/S403/H401/M403/H402 -- no longer constructed).
-    # Heteroazeotropic distillation + decanter; no extraction solvent and no
-    # isobutanol molecular sieve. The factory defaults are the configuration
-    # verified standalone in analyses/test_separation_system.py.
+    #%% Separation trains (process-gated factory)
+    # Two parallel trains behind the gating splitter S201 (baseline split
+    # 1.0 -> ALL broth to the IBO/EtOH train; the ethanol-primary train
+    # idles at zero flow with design/cost skipped, so the baselines are
+    # unchanged; re-gate via sep_udct['S201'].split = x):
     #
-    # area=200 is unused in this flowsheet (corn: 100/300-600, WWT 700, boiler
-    # 800, facilities 900), so rename_units gives every factory unit a
-    # collision-free 2xx ID. With `area` given, the factory untracks pre-existing
-    # units while it builds, so `sep_udct` is keyed by the factory's ORIGINAL
-    # unit IDs (D101, M201, D102, H202, MS201, H201, D103, M301, H301, S301,
-    # D104, H302) even where those IDs also exist in the sugar-prep train. The
-    # on-flowsheet 2xx IDs are assigned per-letter in unit order and do NOT
-    # correspond mnemonically to the originals -- ALWAYS reference the train
-    # through sep_udct (or the factory outs), never through flowsheet unit IDs.
+    # 1. 'IBO_EtOH' -- the integrated solvent-free heteroazeotropic train
+    #    (unchanged; replaced corn's purification + the old solvent-
+    #    extraction IBO train at commit 2797aa80, whose orphaned units
+    #    remain off-system).
+    # 2. 'ethanol' -- the stock corn-ethanol purification train
+    #    (biorefineries.ethanol) wrapped with feed-adaptive, zero-flow-safe
+    #    specs and physical IBO routing: IBO travels overhead in its beer
+    #    column, is retained in its rectifier (D303) bottoms, and leaves
+    #    via 'rectifier_bottoms_water' -- too dilute to decant (recovery
+    #    infeasible), so that stream is a WWT-mixer (M501) inlet below.
     #
-    # The stillage outlet is renamed 'sep_stillage' because corn's orphaned train
-    # keeps the registered stream IDs 'stillage' and 'recycle_process_water'; the
-    # other three outlet IDs have no collisions.
+    # area=200 renaming: the factory untracks pre-existing units while it
+    # builds, so `sep_udct` is keyed by the factories' ORIGINAL unit IDs
+    # (branch 1: D101, M201, D102, H202, MS201, H201, D103, M301, H301,
+    # S301, D104, H302; branch 2: P301, D302, P302, M303, D303, P303,
+    # H303, U301, H304, T302, P304, T303, P305, M304, T304; plus S201)
+    # even where those IDs also exist elsewhere on the flowsheet. The
+    # on-flowsheet 2xx IDs are assigned per-letter in unit order and do
+    # NOT correspond mnemonically to the originals -- ALWAYS reference the
+    # trains through sep_udct (or the factory outs), never through
+    # flowsheet unit IDs.
+    #
+    # The stillage outlets are renamed 'sep_stillage'/'sep_stillage_2'
+    # because corn's orphaned train keeps the registered stream IDs
+    # 'stillage' and 'recycle_process_water'.
     P301 = f.P301
 
-    IBO_EtOH_separation_sys, sep_udct = create_IBO_EtOH_separation_system(
+    separation_sys, sep_udct = create_separation_system(
         ins=[P301-0],
-        outs=['ethanol_product', 'isobutanol_product', 'sep_stillage', 'D103_bottoms'],
+        outs=['ethanol_product', 'isobutanol_product', 'sep_stillage',
+              'D103_bottoms', 'ethanol_product_2', 'sep_stillage_2',
+              'rectifier_bottoms_water'],
+        processes=('IBO_EtOH', 'ethanol'),
         mockup=True,
         area=200,
         udct=True,
     )
 
-    # D103 bottoms (near-pure water, ~1e-5 IBO): recovered process water. Passed
-    # to create_facilities below as `recycle_process_water` (ProcessWaterCenter
-    # ins[2]), mirroring the old rectifier-bottoms (P508) role. NOT sent to WWT.
+    # D103 bottoms (near-pure water, ~1e-5 IBO): recovered process water.
+    # Passed to create_facilities below as `recycle_process_water`
+    # (ProcessWaterCenter ins[2]), mirroring the old rectifier-bottoms
+    # (P508) role. NOT sent to WWT. (The ethanol-primary train's rectifier
+    # bottoms, by contrast, carry that train's IBO and DO go to WWT.)
     D103_bottoms_to_PWC = sep_udct['D103'].outs[1]
 
-    # Ethanol product (~99.2 wt%) -> existing denaturant chain: V511 day tank ->
-    # P512 -> MX4 (+4.345% octane denaturant via V509/P510) -> V513 product tank
-    # -> f.ethanol. Preserves the fuel-ethanol product definition and MPSP
-    # comparability.
-    sep_udct['H201']-0-0-f.V511
+    # Ethanol products of BOTH trains -> merge mixer -> existing denaturant
+    # chain: V511 day tank -> P512 -> MX4 (+4.345% octane denaturant via
+    # V509/P510) -> V513 product tank -> f.ethanol. Preserves the
+    # fuel-ethanol product definition and MPSP comparability. Docking
+    # H304-0 into MX6 re-pipes it away from the ethanol-primary train's own
+    # storage/denaturant tail (T302/P304/T303/P305/M304/T304), which is
+    # orphaned off the assembled system below (corn-train pattern) so
+    # storage and denaturant are not double-counted.
+    MX6 = bst.Mixer('MX6', ins=(sep_udct['H201']-0, sep_udct['H304']-0))
+    MX6-0-0-f.V511
 
-    # Stillage (D101 bottoms, solids/heavies) -> cooled to the old H402 duty
+    # Stillages of BOTH trains (D101 bottoms; ethanol-train beer-column
+    # bottoms via P302) -> merge mixer -> cooled to the old H402 duty
     # point -> V601 (DDGS train).
-    H601 = bst.HXutility('H601', ins=sep_udct['D101'].outs[1], T=360.15, rigorous=True)
+    MX7 = bst.Mixer('MX7', ins=(sep_udct['D101'].outs[1],
+                                sep_udct['P302']-0))
+    H601 = bst.HXutility('H601', ins=MX7-0, T=360.15, rigorous=True)
     H601-0-0-f.V601
 
     #%% Add storage for isobutanol product
@@ -301,7 +322,10 @@ def load(simulate_baseline=True):
     # new-train heat exchangers and column condensers/reboilers participate in
     # HXN. The loop still touches the orphaned corn-train HXutilities
     # (HX500/HX501) -- harmless, they are never simulated again.
-    keep_non_rigorous = [f.HX101, sep_udct['H202'], sep_udct['H201']]
+    # Branch-2 analogs mirror branch 1's HXN treatment: H303 (mol-sieve
+    # superheater, heat_only) ~ H202; H304 (EtOH condenser) ~ H201.
+    keep_non_rigorous = [f.HX101, sep_udct['H202'], sep_udct['H201'],
+                         sep_udct['H303'], sep_udct['H304']]
     for i in corn_EtOH_IBO_sys_no_IBO_recovery.units + []:
         if isinstance(i, bst.HXutility) and not i in keep_non_rigorous:
             i.rigorous = True
@@ -314,7 +338,16 @@ def load(simulate_baseline=True):
     corn_ethanol_train_units = [f.T501, f.P502, f.MX3, f.T503_T507,
                                 f.HX500, f.X504, f.HX501, f.P508]
 
-    recovery_units = list(IBO_EtOH_separation_sys.units) + [H601, V514]
+    # The ethanol-primary train's storage/denaturant tail is orphaned (its
+    # ethanol is re-docked into MX6 above; V511/V513 provide storage and
+    # denaturant for the merged product) -- same accepted pattern as the
+    # orphaned corn train.
+    EtOH_train_storage_tail = [sep_udct[i] for i in
+                               ('T302', 'P304', 'T303', 'P305',
+                                'M304', 'T304')]
+    recovery_units = [i for i in separation_sys.units
+                      if i not in EtOH_train_storage_tail] \
+                     + [MX6, MX7, H601, V514]
 
     #%% Detach corn base facilities (replaced by HP-style WWT + boiler facilities)
     # Corn ships a light facility layer: T608 ProcessWaterCenter (emits `wastewater`)
@@ -358,10 +391,16 @@ def load(simulate_baseline=True):
     # ID now that it is a named WWT inlet rather than an internal process-water term.
     MX5_effluent = f.MX5.outs[0]
     MX5_effluent.ID = 'evap_vapor_and_vent_scrubber_effluent'
+    # The ethanol-primary train's rectifier bottoms carry ALL of that
+    # train's isobutanol (physically retained there near the ethanol
+    # azeotrope) at far-below-decantable concentration: recovery is
+    # infeasible, so the stream is treated, not recycled to process water
+    # (zero-flow at the baseline split).
     M501 = bst.Mixer('M501',
                      ins=(f.backwater,
                           f.spike_feed_condensate,
-                          MX5_effluent),
+                          MX5_effluent,
+                          sep_udct['P303']-0),
                      outs='mixed_wastewater_to_WWT')
 
     @M501.add_specification(run=False)
@@ -576,9 +615,11 @@ def load(simulate_baseline=True):
                                                            + wastewater_treatment_group.units + [M510]])
 
     # leftover-based: resolves to the EtOH side of the integrated train (P301,
-    # D101 beer column, M201, D102 rectifier, H202, MS201, H201) + P512, plus the
-    # long-standing strays PX, V409, P410, MX5 (kept here so every in-system unit
-    # stays covered by exactly one group).
+    # D101 beer column, M201, D102 rectifier, H202, MS201, H201) + P512, the
+    # gating splitter S201 and the whole in-system ethanol-primary train
+    # (beer pump/column, rectifier, sieve, condenser) + MX6/MX7, plus the
+    # long-standing strays PX, V409, P410, MX5 (kept here so every in-system
+    # unit stays covered by exactly one group).
     ethanol_separation_group = bst.UnitGroup('ethanol separation',
                                  units= [i for i in corn_EtOH_IBO_sys.units
                                 if not i in list(corn_EtOH_IBO_sys.facilities)
