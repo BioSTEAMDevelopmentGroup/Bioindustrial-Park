@@ -39,5 +39,3 @@ def load_process_settings():
         i.heat_transfer_price = i.regeneration_price = 0
         # if i == _cooling: continue
         # i.heat_transfer_efficiency = 0.85
-    
-load_process_settings()

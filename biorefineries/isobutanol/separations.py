@@ -109,8 +109,9 @@ Usage (standalone, without importing the biorefinery package)::
     sys = separations.create_IBO_EtOH_separation_system(ins=feed)
     sys.simulate()
 
-(``from biorefineries.isobutanol import separations`` also works, but
-triggers the package's import-time baseline simulation.)
+(``from biorefineries.isobutanol import separations`` also works; the package
+import is build-free — the biorefinery build + baseline simulation run only at
+an explicit ``isobutanol.load()`` call.)
 """
 
 import numpy as np

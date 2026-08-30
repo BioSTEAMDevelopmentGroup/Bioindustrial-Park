@@ -6,6 +6,7 @@ Created on Sun Jan 11 18:10:51 2026
 """
 import biosteam as bst
 from biorefineries import isobutanol
+isobutanol.load()
 from matplotlib import pyplot as plt
 
 model = isobutanol.models.models_EtOH_IBO_corn.model
