@@ -35,6 +35,7 @@ from warnings import filterwarnings
 filterwarnings('ignore')
 
 from biorefineries import isobutanol
+isobutanol.load()
 
 model = isobutanol.models.models_EtOH_IBO_corn.model
 fbs_spec = isobutanol.models.models_EtOH_IBO_corn.fbs_spec

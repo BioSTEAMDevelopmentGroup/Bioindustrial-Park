@@ -19,6 +19,7 @@ animated contour plots. Mirrors evaluate_EtOH_k2_k13.py.
 
 import numpy as np
 from biorefineries import isobutanol
+isobutanol.load()
 
 from matplotlib import pyplot as plt
 

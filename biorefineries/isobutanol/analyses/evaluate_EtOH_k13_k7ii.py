@@ -9,6 +9,7 @@
 
 import numpy as np
 from biorefineries import isobutanol
+isobutanol.load()
 
 from matplotlib import pyplot as plt
 

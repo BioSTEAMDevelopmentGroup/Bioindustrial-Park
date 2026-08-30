@@ -14,6 +14,7 @@ Modeled on evaluate_EtOH_k13_k7ii.py.
 
 import numpy as np
 from biorefineries import isobutanol
+isobutanol.load()
 
 from matplotlib import pyplot as plt
 

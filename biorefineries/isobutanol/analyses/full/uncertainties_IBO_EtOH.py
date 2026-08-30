@@ -29,6 +29,7 @@ print('\n\nLoading system ...')
 # from biorefineries
 # from biorefineries import isobutanol
 from biorefineries import isobutanol
+isobutanol.load()
 from biorefineries.isobutanol.models import models_EtOH_IBO_corn as models
 # models = isobutanol.models
 # from . import models
