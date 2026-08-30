@@ -169,6 +169,50 @@ def create_scenario_B_feed(ID='broth', EtOH_mult=1.0, IBO_mult=1.0):
     feed.imass['Isobutanol'] *= IBO_mult
     return feed
 
+#%% Shared feed-adaptive specification helpers
+# Used by both separation-train factories below. Where a stream genuinely
+# vanishes (a light key absent, or a unit fed nothing) a unit is run as
+# nonexistent: outlets emptied / feed passed through, design and cost
+# skipped. `Unit._setup` clears utilities and cost dictionaries at the
+# start of every simulation, so a skipped unit reports all-zero results
+# with nothing stale.
+
+def _design_and_cost_toggle(unit, _no_op=lambda: None):
+    """Return a setter that enables/disables `unit`'s design & costing."""
+    design, cost = unit._design, unit._cost
+    def set_active(active):
+        if active:
+            unit._design, unit._cost = design, cost
+        else:
+            unit._design = unit._cost = _no_op
+    return set_active
+
+def _empty_outs(unit):
+    # BinaryDistillation's mass balance only assigns the chemical
+    # indices of its CURRENT light/heavy(-non)key classification, so
+    # outlet entries from a previous classification (an LHK switch, or
+    # a bypass pass-through) would survive as stale flows -- observed
+    # as the distillate "creating" the previous operating point's IBO
+    # after D101 switched to ethanol-water mode. Start every active
+    # run from empty outlets.
+    for i in unit.outs: i.empty()
+
+def _add_low_flow_guard(unit, min_key_flow):
+    """Run `unit` as nonexistent (outlets emptied, design/cost skipped)
+    when fed less than `min_key_flow` in total: zero-throughput
+    equipment has no duty, and draining recycle loops (e.g. the
+    decanter loop after D103 shuts off) reach exactly zero instead of
+    parking dust at the flow tolerance."""
+    set_active = _design_and_cost_toggle(unit)
+    @unit.add_specification(run=False)
+    def low_flow_guard():
+        if sum([i.F_mol for i in unit.ins]) > min_key_flow:
+            set_active(True)
+            unit._run()
+        else:
+            set_active(False)
+            for i in unit.outs: i.empty()
+
 #%% Separation system factory
 
 @bst.SystemFactory(
@@ -304,29 +348,9 @@ def create_IBO_EtOH_separation_system(
     # every simulation, so a skipped unit reports all-zero results with
     # nothing stale.
 
-    def _design_and_cost_toggle(unit, _no_op=lambda: None):
-        """Return a setter that enables/disables `unit`'s design & costing."""
-        design, cost = unit._design, unit._cost
-        def set_active(active):
-            if active:
-                unit._design, unit._cost = design, cost
-            else:
-                unit._design = unit._cost = _no_op
-        return set_active
-
     D101_set_active = _design_and_cost_toggle(D101)
     D102_set_active = _design_and_cost_toggle(D102)
     D103_set_active = _design_and_cost_toggle(D103)
-
-    def _empty_outs(unit):
-        # BinaryDistillation's mass balance only assigns the chemical
-        # indices of its CURRENT light/heavy(-non)key classification, so
-        # outlet entries from a previous classification (an LHK switch, or
-        # a bypass pass-through) would survive as stale flows -- observed
-        # as the distillate "creating" the previous operating point's IBO
-        # after D101 switched to ethanol-water mode. Start every active
-        # run from empty outlets.
-        for i in unit.outs: i.empty()
 
     # Overhead-water demands per kmol of each alcohol taken overhead in D101:
     # enough to hold the distillate at/below the keys-basis IBO ceiling, AND
@@ -450,21 +474,5 @@ def create_IBO_EtOH_separation_system(
             D103.outs[0].empty()
             D103.outs[1].copy_like(stripper_feed)
 
-    def _add_low_flow_guard(unit):
-        """Run `unit` as nonexistent (outlets emptied, design/cost skipped)
-        when fed less than `min_key_flow` in total: zero-throughput
-        equipment has no duty, and draining recycle loops (e.g. the
-        decanter loop after D103 shuts off) reach exactly zero instead of
-        parking dust at the flow tolerance."""
-        set_active = _design_and_cost_toggle(unit)
-        @unit.add_specification(run=False)
-        def low_flow_guard():
-            if sum([i.F_mol for i in unit.ins]) > min_key_flow:
-                set_active(True)
-                unit._run()
-            else:
-                set_active(False)
-                for i in unit.outs: i.empty()
-
     for unit in (H202, MS201, H201, H301, S301, D104, H302):
-        _add_low_flow_guard(unit)
+        _add_low_flow_guard(unit, min_key_flow)
