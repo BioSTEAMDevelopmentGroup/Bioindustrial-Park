@@ -605,3 +605,90 @@ def create_EtOH_primary_separation_system(
     for key in ('P301', 'P302', 'M303', 'P303', 'H303', 'U301', 'H304',
                 'T302', 'P304', 'T303', 'P305', 'M304', 'T304'):
         _add_low_flow_guard(udct[key], min_key_flow)
+
+
+#%% Top-level separation-system factory (process-gated)
+
+@bst.SystemFactory(
+    ID='separation_sys',
+    ins=[dict(ID='broth')],
+    outs=[dict(ID='ethanol_product'),
+          dict(ID='isobutanol_product'),
+          dict(ID='stillage'),
+          dict(ID='D103_bottoms'),
+          dict(ID='ethanol_product_2'),
+          dict(ID='stillage_2'),
+          dict(ID='bottoms_water_2')],
+)
+def create_separation_system(
+        ins, outs,
+        processes=('IBO_EtOH',),
+        split_to_IBO_EtOH=1.0,
+        IBO_EtOH_options=None,
+        EtOH_primary_options=None,
+    ):
+    """Build the requested separation process(es) on the broth.
+
+    processes : Iterable[str]
+        Non-empty subset of {'IBO_EtOH', 'ethanol'}. 'IBO_EtOH' is the
+        solvent-free heteroazeotropic IBO/EtOH train
+        (``create_IBO_EtOH_separation_system``); 'ethanol' is the
+        ethanol-primary train (``create_EtOH_primary_separation_system``).
+        With both, a gating splitter S201 feeds them in parallel
+        (``split_to_IBO_EtOH`` = fraction of broth to the IBO/EtOH train;
+        re-gate later via ``udct['S201'].split = x``). With one, the broth
+        connects directly and the other branch's outlets are removed from
+        ``outs`` (the standard conditional-outlet factory pattern), so the
+        built system exposes 4 ('IBO_EtOH'), 3 ('ethanol'), or all 7 outs.
+        Access outlets through the returned stream objects or ``udct``,
+        not ``system.get_outlet`` (name->index maps do not survive
+        trimming).
+    IBO_EtOH_options / EtOH_primary_options : dict, optional
+        Extra keyword arguments forwarded to the respective sub-factory.
+    """
+    broth, = ins
+    (ethanol_product, isobutanol_product, stillage, D103_bottoms,
+     ethanol_product_2, stillage_2, bottoms_water_2) = outs
+
+    valid = {'IBO_EtOH', 'ethanol'}
+    process_set = set(processes)
+    if not process_set or not process_set <= valid:
+        raise ValueError(
+            'processes must be a non-empty subset of '
+            f'{sorted(valid)}; got {processes!r}')
+
+    if process_set == valid:
+        # Gating splitter: split fraction to outs[0] = the IBO/EtOH train.
+        S201 = bst.Splitter('S201', ins=broth,
+                            outs=('S201_to_IBO_EtOH',
+                                  'S201_to_EtOH_primary'),
+                            split=split_to_IBO_EtOH)
+        IBO_EtOH_feed, EtOH_primary_feed = S201.outs
+    elif 'IBO_EtOH' in process_set:
+        IBO_EtOH_feed = broth
+    else:
+        EtOH_primary_feed = broth
+
+    if 'IBO_EtOH' in process_set:
+        create_IBO_EtOH_separation_system(
+            ins=[IBO_EtOH_feed],
+            outs=[ethanol_product, isobutanol_product, stillage,
+                  D103_bottoms],
+            mockup=True,
+            **(IBO_EtOH_options or {}),
+        )
+    else:
+        for s in (ethanol_product, isobutanol_product, stillage,
+                  D103_bottoms):
+            outs.remove(s)
+
+    if 'ethanol' in process_set:
+        create_EtOH_primary_separation_system(
+            ins=[EtOH_primary_feed],
+            outs=[ethanol_product_2, stillage_2, bottoms_water_2],
+            mockup=True,
+            **(EtOH_primary_options or {}),
+        )
+    else:
+        for s in (ethanol_product_2, stillage_2, bottoms_water_2):
+            outs.remove(s)
