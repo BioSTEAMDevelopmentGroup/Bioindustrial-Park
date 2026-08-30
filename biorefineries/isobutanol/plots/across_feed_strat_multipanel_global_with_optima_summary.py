@@ -19,6 +19,7 @@ from matplotlib.cm import ScalarMappable
 import contourplots
 from biosteam.utils import colors
 from biorefineries import isobutanol
+isobutanol.load()
 
 #%%
 # -----------------------------------------------------------------------------

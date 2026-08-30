@@ -26,8 +26,9 @@ Variants are simulated SEQUENTIALLY on one system (no cache resets), like
 a titer sweep would, so state carried between operating points is part of
 what is being tested.
 
-Loads separations.py by file path (fresh kernel; does not trigger the
-package's import-time baseline simulation). Exits non-zero on any failure.
+Loads separations.py by file path (fresh kernel; avoids importing the
+package at all -- though the package import is itself build-free since the
+2026-08-30 lazy-load refactor). Exits non-zero on any failure.
 """
 
 import os

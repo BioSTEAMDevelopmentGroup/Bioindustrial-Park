@@ -29,6 +29,7 @@ import os
 import biosteam as bst
 
 from biorefineries import isobutanol
+isobutanol.load()
 
 fbs_spec = isobutanol.models.fbs_spec
 
