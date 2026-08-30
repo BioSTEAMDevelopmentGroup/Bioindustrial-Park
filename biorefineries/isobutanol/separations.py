@@ -112,6 +112,16 @@ Usage (standalone, without importing the biorefinery package)::
 (``from biorefineries.isobutanol import separations`` also works; the package
 import is build-free — the biorefinery build + baseline simulation run only at
 an explicit ``isobutanol.load()`` call.)
+
+Two additional factories extend this module:
+
+* ``create_EtOH_primary_separation_system`` -- the stock corn-ethanol
+  purification train (``biorefineries.ethanol``) wrapped with feed-adaptive,
+  zero-flow-safe, IBO-aware caller-side specifications (see its docstring).
+* ``create_separation_system(processes=...)`` -- top-level wrapper building
+  any non-empty subset of {'IBO_EtOH', 'ethanol'}; with both, a gating
+  splitter S201 (split fraction to the IBO/EtOH train, default 1.0) feeds
+  the two trains in parallel.
 """
 
 import numpy as np
@@ -124,6 +134,8 @@ __all__ = (
     'create_scenario_B_feed',
     'scenario_B_P301_flows',
     'create_IBO_EtOH_separation_system',
+    'create_EtOH_primary_separation_system',
+    'create_separation_system',
 )
 
 #%% Chemicals and reference feed
@@ -476,3 +488,120 @@ def create_IBO_EtOH_separation_system(
 
     for unit in (H202, MS201, H201, H301, S301, D104, H302):
         _add_low_flow_guard(unit, min_key_flow)
+
+#%% Ethanol-primary separation branch factory
+
+@bst.SystemFactory(
+    ID='EtOH_primary_separation_sys',
+    ins=[dict(ID='broth')],
+    outs=[dict(ID='ethanol_product'),
+          dict(ID='stillage'),
+          dict(ID='bottoms_water')],
+)
+def create_EtOH_primary_separation_system(
+        ins, outs,
+        beer_column_x_bot_EtOH=3.9106e-6, # stock ethanol-factory spec; ceiling,
+                                          # scaled down with the feed at low titers
+        rectifier_x_bot_EtOH=3.9106e-6,   # ceiling; scaled down with the feed
+        bottoms_key_loss_frac=0.10,       # x_bot cap as a fraction of feed keys-composition
+        min_key_flow=1e-2,                # kmol/hr; see create_IBO_EtOH_separation_system
+    ):
+    """Ethanol-primary separation train: the stock corn-ethanol purification
+    train (``biorefineries.ethanol.create_ethanol_purification_system``,
+    read-only, wrapped as a mockup) with caller-side specifications that make
+    it feed-adaptive, zero-flow-safe, and physically correct for feeds that
+    also carry isobutanol.
+
+    Designed for a PRIMARILY-ETHANOL broth. Isobutanol handling (no
+    physics-breaking assumptions): ``BinaryDistillation``'s boiling-point
+    non-key classification would send IBO (Tb 108 C > water) to the beer
+    column bottoms, but dilute IBO in water (gamma ~ 50, alpha ~ 26 vs.
+    water) travels overhead -- a specification moves it to the distillate
+    (idealized 100% routing, the mirror image of the routings documented in
+    the module docstring). In the rectifier, ethanol approaching its
+    azeotrope collapses IBO's activity coefficient, so the default heavy-
+    non-key -> bottoms routing there IS physical: all feed IBO leaves with
+    the rectifier bottoms (``bottoms_water``), far too dilute to decant
+    (< the ~10.7 wt% miscibility gap for any primarily-ethanol feed), i.e.
+    recovery is infeasible and the integrator diverts this stream to WWT.
+    Consequently no IBO ever reaches the molecular sieve or the ethanol
+    product. A feed with ethanol below ``min_key_flow`` bypasses the train
+    entirely (everything to ``stillage``; outside the design basis).
+
+    ``beer_column_heat_integration=False``: the integrated biorefinery
+    removes all HXprocess units in favor of the heat exchanger network.
+    """
+    broth, = ins
+    ethanol_product, stillage, bottoms_water = outs
+
+    from biorefineries.ethanol import create_ethanol_purification_system
+
+    denaturant = tmo.Stream('EtOH_train_denaturant')
+    _, udct = create_ethanol_purification_system(
+        ins=[broth, denaturant],
+        outs=[ethanol_product, stillage, bottoms_water],
+        beer_column_heat_integration=False,
+        mockup=True,
+        udct=True,
+    )
+    D302 = udct['D302']  # beer column (LHK = (Ethanol, Water), y_top = 0.28)
+    D303 = udct['D303']  # rectifier  (LHK = (Ethanol, Water), y_top = 0.80805)
+
+    # Duty approximation disabled as in biorefineries.corn (u.X504): the
+    # built-in approximation assumes outs[1] is the small water-rich stream.
+    udct['U301'].approx_duty = False
+
+    D302_set_active = _design_and_cost_toggle(D302)
+    D303_set_active = _design_and_cost_toggle(D303)
+
+    @D302.add_specification(run=False)
+    def adapt_EtOH_beer_column_to_feed():
+        feed, = D302.ins
+        E = feed.imol['Ethanol']
+        W = feed.imol['Water']
+        if E > min_key_flow:
+            D302.x_bot = min(beer_column_x_bot_EtOH,
+                             bottoms_key_loss_frac*E/(E + W))
+            D302_set_active(True)
+            _empty_outs(D302)
+            D302._run()
+            # Physical IBO routing (see factory docstring): dilute IBO
+            # travels overhead with the alcohols, not down with the solids.
+            distillate, bottoms = D302.outs
+            IBO = bottoms.imol['Isobutanol']
+            if IBO:
+                distillate.imol['Isobutanol'] += IBO
+                bottoms.imol['Isobutanol'] = 0.0
+        else:
+            # No ethanol: no beer column duty; feed passes to stillage.
+            D302_set_active(False)
+            D302.outs[0].empty()
+            D302.outs[1].copy_like(feed)
+
+    @D303.add_specification(run=False)
+    def adapt_EtOH_rectifier_to_feed():
+        feed, = D303.ins
+        E = feed.imol['Ethanol']
+        W = feed.imol['Water']
+        if E > min_key_flow:
+            D303.x_bot = min(rectifier_x_bot_EtOH,
+                             bottoms_key_loss_frac*E/(E + W))
+            D303_set_active(True)
+            _empty_outs(D303)
+            D303._run()
+            # IBO is a heavy non-key here -> 100% to the bottoms; physical
+            # near the ethanol azeotrope (gamma_IBO suppressed), and it keeps
+            # the molecular sieve and the ethanol product IBO-free.
+        else:
+            # No ethanol: no rectifier; feed leaves with the bottoms.
+            D303_set_active(False)
+            D303.outs[0].empty()
+            D303.outs[1].copy_like(feed)
+
+    # Zero-flow guards on every other train unit (the integrated baseline
+    # parks this branch at exactly zero feed). M304 keeps its stock
+    # denaturant specification (runs first, sets zero denaturant at zero
+    # flow); the guard then runs after it.
+    for key in ('P301', 'P302', 'M303', 'P303', 'H303', 'U301', 'H304',
+                'T302', 'P304', 'T303', 'P305', 'M304', 'T304'):
+        _add_low_flow_guard(udct[key], min_key_flow)
