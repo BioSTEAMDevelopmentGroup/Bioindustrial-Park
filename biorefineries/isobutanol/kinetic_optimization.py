@@ -33,6 +33,7 @@ import numpy as np
 
 __all__ = ('OBJECTIVE_REGISTRY', 'TRACKED_METRICS',
            'discover_kinetic_parameters', 'build_search_space',
+           'baseline_decision_point',
            'trajectory_columns', 'append_trajectory_row', 'load_trajectory',
            'get_handles', 'run_kinetic_optimization', 'restore_baseline',
            'plot_optimization_trajectories', 'plot_parameter_trajectory',
@@ -208,6 +209,33 @@ def build_search_space(kinetic_baselines,
                                      high=int(max_n_spikes_bounds[1]),
                                      log=False, int=True)
     return space, excluded
+
+def baseline_decision_point(search_space, kinetic_baselines,
+                            baseline_model_kwargs,
+                            baseline_max_n_spikes=None):
+    """The scenario baseline expressed in decision-variable coordinates
+    for `search_space` (either feeding parameterization) -- suitable for
+    study.enqueue_trial, so a fresh study evaluates the baseline itself
+    as trial 0. Only names present in the search space are included;
+    with an unusual param_bounds_override a baseline value may lie
+    outside its override bounds (Optuna enqueues fixed values without
+    validating them)."""
+    point = {name: kinetic_baselines[name]
+             for name in search_space if name in kinetic_baselines}
+    thr = baseline_model_kwargs['threshold_conc']
+    tgt = baseline_model_kwargs['target_conc']
+    spk = baseline_model_kwargs['spike_conc']
+    if 'threshold_conc' in search_space:  # threshold-anchored scheme
+        point['threshold_conc'] = thr
+        point['target_delta'] = tgt - thr
+        point['spike_delta'] = spk - tgt
+    elif 'target_conc' in search_space:  # legacy target-anchored scheme
+        point['target_conc'] = tgt
+        point['threshold_delta'] = tgt - thr
+        point['spike_conc'] = spk
+    if 'max_n_spikes' in search_space and baseline_max_n_spikes is not None:
+        point['max_n_spikes'] = int(baseline_max_n_spikes)
+    return point
 
 #%% Trajectory recording
 
@@ -478,7 +506,9 @@ def run_kinetic_optimization(objective='IRR',
 
     `n_trials` is the TOTAL budget of the study: rerunning with the same
     study_name resumes from the on-disk SQLite store and runs only the
-    remainder (crash/segfault recovery). Trials execute STRICTLY
+    remainder (crash/segfault recovery). A FRESH study evaluates the
+    scenario baseline configuration as trial 0 (see
+    baseline_decision_point); resumes never re-enqueue it. Trials execute STRICTLY
     sequentially (n_jobs=1; one simulation in flight at a time). Every
     trial appends one row to the trajectory CSV (same stable name as the
     study, '_trajectory.csv' suffix) whether it completes, fails
@@ -557,6 +587,13 @@ def run_kinetic_optimization(objective='IRR',
     study.sampler = optuna.samplers.TPESampler(
         multivariate=True, seed=seed + n_done,
         n_startup_trials=max(10, n_trials//10))
+    if n_done == 0:
+        # Fresh study: evaluate the scenario baseline itself as trial 0,
+        # so the baseline provably participates and TPE learns from it.
+        study.enqueue_trial(baseline_decision_point(
+            search_space, kinetic_baselines, baseline_model_kwargs,
+            baseline_max_n_spikes))
+        print('Enqueued the scenario baseline configuration as trial 0.')
 
     def _objective(trial):
         values = {name: (trial.suggest_int(name, sp['low'], sp['high'])

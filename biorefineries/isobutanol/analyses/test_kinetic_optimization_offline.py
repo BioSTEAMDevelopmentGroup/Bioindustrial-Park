@@ -166,4 +166,24 @@ ko.append_trajectory_row(csv_path, columns, rec)  # matching header still OK
 assert len(ko.load_trajectory(csv_path)) == 3
 PASS('append_trajectory_row: mismatched existing header raises ValueError')
 
+#%% 9. baseline_decision_point: both feeding parameterizations
+bmk = dict(target_conc=226.3, threshold_conc=216.3, spike_conc=632.0)
+kb = {'k_1e': 47.1, 'K_1e': 0.12}
+space9, _ = ko.build_search_space(kb)  # current threshold-anchored scheme
+pt = ko.baseline_decision_point(space9, kb, bmk, baseline_max_n_spikes=13)
+assert pt['k_1e'] == 47.1 and pt['K_1e'] == 0.12
+assert pt['threshold_conc'] == 216.3
+assert abs(pt['target_delta'] - 10.0) < 1e-12
+assert abs(pt['spike_delta'] - (632.0 - 226.3)) < 1e-12
+assert pt['max_n_spikes'] == 13
+assert set(pt) == set(space9)  # exactly the decision variables, no extras
+space9L, _ = ko.build_search_space(  # legacy target-anchored scheme
+    kb, max_n_spikes_bounds=None, target_conc_bounds=(180.0, 300.0))
+ptL = ko.baseline_decision_point(space9L, kb, bmk)
+assert ptL['target_conc'] == 226.3
+assert abs(ptL['threshold_delta'] - 10.0) < 1e-12
+assert ptL['spike_conc'] == 632.0
+assert 'max_n_spikes' not in ptL and set(ptL) == set(space9L)
+PASS('baseline_decision_point: both feeding parameterizations')
+
 print(f'\nALL {n_pass} CHECKS PASSED')
