@@ -108,4 +108,36 @@ assert df['state'].tolist() == ['COMPLETE', 'FAIL']
 assert df['objective'][0] == 0.2 and np.isnan(df['objective'][1])
 PASS('trajectory CSV: columns, header-once, append, round-trip')
 
+#%% 6. plot functions on a synthetic trajectory
+rng = np.random.default_rng(0)
+n = 60
+synth = pd.DataFrame({'trial_number': np.arange(n)})
+synth['state'] = ['FAIL' if i % 10 == 3 else 'COMPLETE' for i in range(n)]
+synth['objective'] = rng.normal(0.15, 0.05, n)
+for name, sp in space.items():
+    synth[name] = rng.uniform(sp['low'], sp['high'], n)
+for m in ko.TRACKED_METRICS:
+    synth[m] = rng.normal(1.0, 0.1, n)
+synth['error'] = ''
+synth.loc[synth['state'] == 'FAIL', 'objective'] = np.nan
+
+f1 = os.path.join(outdir, 'trajectories.png')
+f2 = os.path.join(outdir, 'param_trajectory.png')
+f3 = os.path.join(outdir, 'best_vs_baseline.png')
+fig1, _ = ko.plot_optimization_trajectories(
+    synth, objective_name='IRR', direction='maximize', filename=f1)
+fig2, _ = ko.plot_parameter_trajectory(
+    synth, baselines, direction='maximize', filename=f2)
+fig3, _ = ko.plot_best_vs_baseline(
+    synth, baselines, direction='maximize', filename=f3)
+for p in (f1, f2, f3):
+    assert os.path.isfile(p) and os.path.getsize(p) > 0, p
+PASS('three plot functions save non-empty PNGs from synthetic data')
+
+#%% 7. best-so-far
+s = pd.Series([1.0, 0.5, 2.0, 1.5])
+assert ko._best_so_far(s, 'maximize').tolist() == [1.0, 1.0, 2.0, 2.0]
+assert ko._best_so_far(s, 'minimize').tolist() == [1.0, 0.5, 0.5, 0.5]
+PASS('_best_so_far: cummax / cummin by direction')
+
 print(f'\nALL {n_pass} CHECKS PASSED')

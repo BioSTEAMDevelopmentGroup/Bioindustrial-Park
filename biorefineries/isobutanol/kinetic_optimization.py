@@ -183,3 +183,140 @@ def load_trajectory(csv_path):
     parsed; blank cells -> NaN)."""
     import pandas as pd
     return pd.read_csv(csv_path)
+
+#%% Post-run plots
+# All three take the trajectory DataFrame (load_trajectory(csv_path)), so
+# plots can be regenerated from a saved CSV without re-running anything.
+# matplotlib/pandas are imported lazily (headless Agg per the environment).
+
+def _best_so_far(objective_series, direction):
+    """Best-so-far series: cumulative max ('maximize') or min
+    ('minimize') of the objective, NaNs carried over."""
+    return (objective_series.cummax() if direction == 'maximize'
+            else objective_series.cummin())
+
+def _completed(df):
+    ok = df[df['state'] == 'COMPLETE'].reset_index(drop=True)
+    if ok.empty:
+        raise ValueError('No completed trials in the trajectory -- '
+                         'nothing to plot.')
+    return ok
+
+def plot_optimization_trajectories(df, objective_name, direction,
+                                   objective_units='', filename=None):
+    """Multipanel trajectory figure: the objective (all completed trials
+    as scatter + best-so-far line) and every tracked metric vs trial
+    number. Failed/pruned trials are omitted. Returns (fig, axes)."""
+    import matplotlib.pyplot as plt
+    ok = _completed(df)
+    metric_names = [m for m in TRACKED_METRICS if m in ok.columns]
+    n_panels = 1 + len(metric_names)
+    ncols = 4
+    nrows = math.ceil(n_panels/ncols)
+    fig, axes = plt.subplots(nrows, ncols, figsize=(4*ncols, 3*nrows),
+                             squeeze=False)
+    flat = axes.ravel()
+    ax = flat[0]
+    ax.scatter(ok['trial_number'], ok['objective'], s=8, alpha=0.4,
+               color='tab:gray', label='trials')
+    ax.plot(ok['trial_number'], _best_so_far(ok['objective'], direction),
+            color='tab:red', lw=1.5, label='best so far')
+    title = f'Objective: {objective_name}'
+    if objective_units:
+        title += f' ({objective_units})'
+    ax.set_title(title)
+    ax.set_xlabel('trial')
+    ax.legend(fontsize=8)
+    for ax, m in zip(flat[1:], metric_names):
+        ax.scatter(ok['trial_number'], ok[m], s=8, alpha=0.4,
+                   color='tab:blue')
+        ax.set_title(m)
+        ax.set_xlabel('trial')
+    for ax in flat[n_panels:]:
+        ax.axis('off')
+    fig.tight_layout()
+    if filename:
+        fig.savefig(filename, dpi=200)
+    return fig, axes
+
+def _best_row_indices(ok, direction):
+    """Row index (into `ok`) of the incumbent-best trial as of each
+    completed trial."""
+    best_idx, cur = [], None
+    values = ok['objective'].to_list()
+    for i, v in enumerate(values):
+        if cur is None or (direction == 'maximize' and v > values[cur]) \
+                or (direction == 'minimize' and v < values[cur]):
+            cur = i
+        best_idx.append(cur)
+    return best_idx
+
+def plot_parameter_trajectory(df, kinetic_baselines, direction,
+                              filename=None):
+    """Best-so-far kinetic CONFIGURATION vs trial number: for each kinetic
+    parameter, the incumbent's multiplier (value/baseline, log y) at every
+    completed trial, plus a companion panel with the three feeding
+    concentrations in absolute units (threshold shown as
+    target - threshold_delta). Parameters with nonpositive baselines
+    (multiplier undefined; e.g. absolute-bounds overrides of zero-baseline
+    params) are skipped here -- they still live in the CSV. Returns
+    (fig, axes)."""
+    import matplotlib.pyplot as plt
+    ok = _completed(df)
+    best_rows = ok.iloc[_best_row_indices(ok, direction)].reset_index(
+        drop=True)
+    x = ok['trial_number']
+    fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(12, 9), sharex=True,
+                                   height_ratios=[3, 1])
+    for pname, baseline in kinetic_baselines.items():
+        if pname not in ok.columns or baseline <= 0:
+            continue
+        ax1.plot(x, best_rows[pname]/baseline, lw=1, label=pname)
+    ax1.set_yscale('log')
+    ax1.axhline(1.0, color='k', lw=0.8, ls='--')
+    ax1.set_ylabel('best-so-far multiplier vs baseline')
+    ax1.legend(fontsize=6, ncol=8, loc='upper center',
+               bbox_to_anchor=(0.5, -0.08))
+    if 'target_conc' in ok.columns:
+        ax2.plot(x, best_rows['target_conc'], label='target_conc')
+        ax2.plot(x, best_rows['target_conc'] - best_rows['threshold_delta'],
+                 label='threshold_conc')
+        ax2.plot(x, best_rows['spike_conc'], label='spike_conc')
+        ax2.legend(fontsize=7)
+    ax2.set_ylabel('g/L')
+    ax2.set_xlabel('trial')
+    fig.tight_layout()
+    if filename:
+        fig.savefig(filename, dpi=200, bbox_inches='tight')
+    return fig, (ax1, ax2)
+
+def plot_best_vs_baseline(df, kinetic_baselines, direction, filename=None):
+    """The research-prioritization headline: horizontal bars of the FINAL
+    incumbent's kinetic-parameter multipliers (log x, baseline = 1 dashed
+    line), sorted by multiplier, with the optimal feeding concentrations
+    and objective value in the title. Nonpositive-baseline parameters are
+    skipped (see plot_parameter_trajectory). Returns (fig, ax)."""
+    import matplotlib.pyplot as plt
+    ok = _completed(df)
+    i_best = (ok['objective'].idxmax() if direction == 'maximize'
+              else ok['objective'].idxmin())
+    best = ok.loc[i_best]
+    names = [p for p, b in kinetic_baselines.items()
+             if p in ok.columns and b > 0]
+    multipliers = np.array([best[p]/kinetic_baselines[p] for p in names])
+    order = np.argsort(multipliers)
+    fig, ax = plt.subplots(figsize=(7, 0.28*len(names) + 2))
+    ax.barh([names[i] for i in order], multipliers[order],
+            color='tab:blue')
+    ax.set_xscale('log')
+    ax.axvline(1.0, color='k', ls='--', lw=0.8)
+    ax.set_xlabel('best/baseline multiplier')
+    ax.set_title(f"objective = {best['objective']:.4g} at trial "
+                 f"{int(best['trial_number'])}; target = "
+                 f"{best['target_conc']:.1f}, threshold = "
+                 f"{best['target_conc'] - best['threshold_delta']:.1f}, "
+                 f"spike = {best['spike_conc']:.1f} g/L", fontsize=8)
+    fig.tight_layout()
+    if filename:
+        fig.savefig(filename, dpi=200)
+    return fig, ax
