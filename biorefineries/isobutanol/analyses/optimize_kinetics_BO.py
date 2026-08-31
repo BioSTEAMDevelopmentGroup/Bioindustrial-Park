@@ -79,7 +79,8 @@ def run(scenario='B',  # 'A' or 'B'
         objective_name = (objective if isinstance(objective, str)
                           else engine_kwargs.get('objective_name', 'custom'))
         objective_units = (ko.OBJECTIVE_REGISTRY[objective]['units']
-                           if isinstance(objective, str) else '')
+                           if isinstance(objective, str)
+                           else engine_kwargs.get('objective_units', ''))
         df = ko.load_trajectory(csv_path)
         stamp = datetime.now().strftime('%Y.%m.%d-%H.%M')
         base = csv_path[:-len('_trajectory.csv')]
