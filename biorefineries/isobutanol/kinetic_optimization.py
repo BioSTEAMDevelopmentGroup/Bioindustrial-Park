@@ -8,9 +8,9 @@
 # for license details.
 """Bayesian (Optuna TPE) global optimization of all fermentation kinetic
 parameters (k_*/K_* on V406's tellurium model) plus the feeding-strategy
-sugar concentrations (target_conc, threshold_conc via threshold_delta,
-spike_conc), against a named or custom objective -- to prioritize
-metabolic-engineering / bioprocess research directions.
+variables (target_conc, threshold_conc via threshold_delta, spike_conc,
+and the integer max_n_spikes cap), against a named or custom objective --
+to prioritize metabolic-engineering / bioprocess research directions.
 
 Import is free of side effects and does not require optuna (imported lazily
 inside run_kinetic_optimization); the pure logic here is exercised by
@@ -37,7 +37,8 @@ __all__ = ('OBJECTIVE_REGISTRY', 'TRACKED_METRICS',
            'plot_optimization_trajectories', 'plot_parameter_trajectory',
            'plot_best_vs_baseline')
 
-FEEDING_VARIABLES = ('target_conc', 'threshold_delta', 'spike_conc')
+FEEDING_VARIABLES = ('target_conc', 'threshold_delta', 'spike_conc',
+                     'max_n_spikes')
 
 #%% Objective registry and tracked metrics
 # Getters are callables over a `handles` dict (see get_handles below):
@@ -117,8 +118,10 @@ def build_search_space(kinetic_baselines,
                        target_conc_bounds=(180.0, 300.0),
                        threshold_delta_bounds=(0.5, 30.0),
                        spike_conc_bounds=(200.0, 800.0),
+                       max_n_spikes_bounds=(0, 20),
                        ):
-    """Build the decision-variable space: {name: {'low', 'high', 'log'}}.
+    """Build the decision-variable space: {name: {'low', 'high', 'log'}}
+    (integer variables additionally carry 'int': True).
 
     Kinetic parameters default to [m_lo*baseline, m_hi*baseline] sampled
     log-scale (research-opportunity width); entries in
@@ -126,10 +129,13 @@ def build_search_space(kinetic_baselines,
     bounds instead (log-scale only if low > 0). A parameter with a
     nonpositive baseline and no override cannot use the multiplier band
     and is EXCLUDED with a printed warning. `exclude_params` names are
-    always excluded (silently). The three feeding variables are appended
-    with absolute linear bounds; threshold_conc is optimized as
+    always excluded (silently). The feeding variables are appended with
+    absolute linear bounds; threshold_conc is optimized as
     threshold_delta = target_conc - threshold_conc, which guarantees
-    threshold < target by construction.
+    threshold < target by construction. max_n_spikes (the glucose-spike
+    cap, fbs_spec.max_n_spikes) is an INTEGER variable (0 = forced batch);
+    pass max_n_spikes_bounds=None to pin it at the scenario baseline
+    instead (pre-2026-08-31 search-space behavior).
 
     Returns (space, excluded_parameter_names)."""
     param_bounds_override = dict(param_bounds_override or {})
@@ -156,6 +162,10 @@ def build_search_space(kinetic_baselines,
                                     log=False)
     space['spike_conc'] = dict(low=spike_conc_bounds[0],
                                high=spike_conc_bounds[1], log=False)
+    if max_n_spikes_bounds is not None:
+        space['max_n_spikes'] = dict(low=int(max_n_spikes_bounds[0]),
+                                     high=int(max_n_spikes_bounds[1]),
+                                     log=False, int=True)
     return space, excluded
 
 #%% Trajectory recording
@@ -363,15 +373,19 @@ def get_handles():
                 'MPSPs': {'ethanol': np.nan, 'isobutanol': np.nan}},
             }
 
-def restore_baseline(handles, kinetic_baselines, baseline_model_kwargs):
-    """Reset every kinetic parameter to its recorded baseline, re-simulate
-    at the baseline feeding specifications, and refresh the TEA solution
-    -- leaving the process in a clean scenario-baseline state. Called in
-    run_kinetic_optimization's `finally` (success, exception, or
-    KeyboardInterrupt alike)."""
+def restore_baseline(handles, kinetic_baselines, baseline_model_kwargs,
+                     baseline_max_n_spikes=None):
+    """Reset every kinetic parameter to its recorded baseline (and, when
+    `baseline_max_n_spikes` is given, the glucose-spike cap
+    fbs_spec.max_n_spikes), re-simulate at the baseline feeding
+    specifications, and refresh the TEA solution -- leaving the process in
+    a clean scenario-baseline state. Called in run_kinetic_optimization's
+    `finally` (success, exception, or KeyboardInterrupt alike)."""
     r_te = handles['r_te']
     for pname, baseline in kinetic_baselines.items():
         setattr(r_te, pname, baseline)
+    if baseline_max_n_spikes is not None:
+        handles['fbs_spec'].max_n_spikes = baseline_max_n_spikes
     handles['model_specification'](**baseline_model_kwargs)
     handles['latest_TEA_solution'].update(
         handles['solve_TEA'](stream_IDs=('ethanol', 'isobutanol')))
@@ -390,6 +404,7 @@ def run_kinetic_optimization(objective='IRR',
                              target_conc_bounds=(180.0, 300.0),
                              threshold_delta_bounds=(0.5, 30.0),
                              spike_conc_bounds=(200.0, 800.0),
+                             max_n_spikes_bounds=(0, 20),
                              study_name=None, results_dir=None,
                              handles=None, print_status_every=1,
                              ):
@@ -437,10 +452,12 @@ def run_kinetic_optimization(objective='IRR',
         exclude_params=exclude_params,
         target_conc_bounds=target_conc_bounds,
         threshold_delta_bounds=threshold_delta_bounds,
-        spike_conc_bounds=spike_conc_bounds)
-    n_kinetic = len(search_space) - len(FEEDING_VARIABLES)
+        spike_conc_bounds=spike_conc_bounds,
+        max_n_spikes_bounds=max_n_spikes_bounds)
+    n_kinetic = sum(1 for name in search_space if name in kinetic_baselines)
+    n_feeding = len(search_space) - n_kinetic
     print(f'Search space: {len(search_space)} decision variables '
-          f'({n_kinetic} kinetic + {len(FEEDING_VARIABLES)} feeding); '
+          f'({n_kinetic} kinetic + {n_feeding} feeding); '
           f'{len(excluded)} kinetic parameters excluded: {excluded}')
 
     # Scenario baseline snapshot for restoration (the driver has already
@@ -449,6 +466,7 @@ def run_kinetic_optimization(objective='IRR',
     baseline_model_kwargs = {
         k: fbs_spec.current_specifications[k]
         for k in ('target_conc', 'threshold_conc', 'spike_conc')}
+    baseline_max_n_spikes = fbs_spec.max_n_spikes
 
     if results_dir is None:
         results_dir = os.path.join(
@@ -475,8 +493,10 @@ def run_kinetic_optimization(objective='IRR',
         n_startup_trials=max(10, n_trials//10))
 
     def _objective(trial):
-        values = {name: trial.suggest_float(name, sp['low'], sp['high'],
-                                            log=sp['log'])
+        values = {name: (trial.suggest_int(name, sp['low'], sp['high'])
+                         if sp.get('int') else
+                         trial.suggest_float(name, sp['low'], sp['high'],
+                                             log=sp['log']))
                   for name, sp in search_space.items()}
         model_kwargs = dict(
             target_conc=values['target_conc'],
@@ -487,6 +507,8 @@ def run_kinetic_optimization(objective='IRR',
             for pname in kinetic_baselines:
                 if pname in values:
                     setattr(r_te, pname, values[pname])
+            if 'max_n_spikes' in values:
+                fbs_spec.max_n_spikes = values['max_n_spikes']
             handles['model_specification'](**model_kwargs)
             handles['latest_TEA_solution'].update(
                 handles['solve_TEA'](
@@ -535,5 +557,6 @@ def run_kinetic_optimization(objective='IRR',
                        gc_after_trial=True)
     finally:
         restore_baseline(handles, kinetic_baselines,
-                         baseline_model_kwargs)
+                         baseline_model_kwargs,
+                         baseline_max_n_spikes=baseline_max_n_spikes)
     return study, csv_path, kinetic_baselines
