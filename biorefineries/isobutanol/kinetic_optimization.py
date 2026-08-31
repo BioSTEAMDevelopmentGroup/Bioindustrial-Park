@@ -320,3 +320,195 @@ def plot_best_vs_baseline(df, kinetic_baselines, direction, filename=None):
     if filename:
         fig.savefig(filename, dpi=200)
     return fig, ax
+
+#%% Engine
+
+def get_handles():
+    """Resolve the live flowsheet objects the getters and engine need.
+    Requires biorefineries.isobutanol.load() to have run in this kernel
+    (the system module raises an informative error otherwise)."""
+    from biorefineries.isobutanol import system as ibo_system
+    f = ibo_system.f
+    V406 = f.V406
+    return {'f': f,
+            'V406': V406,
+            'r_te': V406.nsk_kinetic_model._te,
+            'fbs_spec': V406.fbs_spec,
+            'tea': ibo_system.corn_EtOH_IBO_sys_tea,
+            'HXN': f.HXN1001,
+            'model_specification': ibo_system.model_specification,
+            'solve_TEA': ibo_system.solve_TEA,
+            'latest_TEA_solution': {
+                'IRR': np.nan,
+                'MPSPs': {'ethanol': np.nan, 'isobutanol': np.nan}},
+            }
+
+def restore_baseline(handles, kinetic_baselines, baseline_model_kwargs):
+    """Reset every kinetic parameter to its recorded baseline, re-simulate
+    at the baseline feeding specifications, and refresh the TEA solution
+    -- leaving the process in a clean scenario-baseline state. Called in
+    run_kinetic_optimization's `finally` (success, exception, or
+    KeyboardInterrupt alike)."""
+    r_te = handles['r_te']
+    for pname, baseline in kinetic_baselines.items():
+        setattr(r_te, pname, baseline)
+    handles['model_specification'](**baseline_model_kwargs)
+    handles['latest_TEA_solution'].update(
+        handles['solve_TEA'](stream_IDs=('ethanol', 'isobutanol')))
+    print('Restored kinetic parameters and feeding specifications to '
+          'baseline. Baseline TEA solution: '
+          f"{handles['latest_TEA_solution']}")
+
+def run_kinetic_optimization(objective='IRR',
+                             direction=None, level=None,
+                             objective_units=None, objective_name=None,
+                             scenario_label='B',
+                             n_trials=2000, seed=3221,
+                             multiplier_bounds=(0.1, 10.0),
+                             param_bounds_override=None,
+                             exclude_params=(),
+                             target_conc_bounds=(180.0, 300.0),
+                             threshold_delta_bounds=(0.5, 30.0),
+                             spike_conc_bounds=(200.0, 800.0),
+                             study_name=None, results_dir=None,
+                             handles=None, print_status_every=1,
+                             ):
+    """Run the Bayesian optimization. `objective` is a name in
+    OBJECTIVE_REGISTRY (direction/level/units filled from the entry) or a
+    custom callable(handles)->float (then `direction`, and ideally
+    `objective_name`/`level`/`objective_units`, must be given).
+
+    `n_trials` is the TOTAL budget of the study: rerunning with the same
+    study_name resumes from the on-disk SQLite store and runs only the
+    remainder (crash/segfault recovery). Trials execute STRICTLY
+    sequentially (n_jobs=1; one simulation in flight at a time). Every
+    trial appends one row to the trajectory CSV (same stable name as the
+    study, '_trajectory.csv' suffix) whether it completes, fails
+    (state='FAIL', pruned), or yields a NaN objective (state='NAN',
+    pruned). Kinetic parameters and feeding specs are restored to the
+    scenario baseline in a `finally`.
+
+    Returns (study, csv_path, kinetic_baselines)."""
+    import optuna
+    if handles is None:
+        handles = get_handles()
+    r_te, fbs_spec = handles['r_te'], handles['fbs_spec']
+
+    if isinstance(objective, str):
+        entry = OBJECTIVE_REGISTRY[objective]
+        objective_getter = entry['getter']
+        objective_name = objective_name or objective
+        direction = direction or entry['direction']
+        level = level or entry['level']
+        if objective_units is None:
+            objective_units = entry['units']
+    else:
+        objective_getter = objective
+        objective_name = objective_name or 'custom'
+        if direction not in ('maximize', 'minimize'):
+            raise ValueError("A custom objective callable requires "
+                             "direction='maximize' or 'minimize'.")
+
+    kinetic_baselines = discover_kinetic_parameters(r_te)
+    search_space, excluded = build_search_space(
+        kinetic_baselines,
+        multiplier_bounds=multiplier_bounds,
+        param_bounds_override=param_bounds_override,
+        exclude_params=exclude_params,
+        target_conc_bounds=target_conc_bounds,
+        threshold_delta_bounds=threshold_delta_bounds,
+        spike_conc_bounds=spike_conc_bounds)
+    n_kinetic = len(search_space) - len(FEEDING_VARIABLES)
+    print(f'Search space: {len(search_space)} decision variables '
+          f'({n_kinetic} kinetic + {len(FEEDING_VARIABLES)} feeding); '
+          f'{len(excluded)} kinetic parameters excluded: {excluded}')
+
+    # Scenario baseline snapshot for restoration (the driver has already
+    # baseline-simulated the scenario, so current_specifications IS the
+    # scenario baseline).
+    baseline_model_kwargs = {
+        k: fbs_spec.current_specifications[k]
+        for k in ('target_conc', 'threshold_conc', 'spike_conc')}
+
+    if results_dir is None:
+        results_dir = os.path.join(
+            os.path.dirname(os.path.abspath(__file__)),
+            'analyses', 'results')
+    os.makedirs(results_dir, exist_ok=True)
+    slug = objective_name.lower().replace(' ', '_')
+    if study_name is None:
+        study_name = f'kin_opt_{scenario_label}_{slug}'
+    csv_path = os.path.join(results_dir, study_name + '_trajectory.csv')
+    storage = ('sqlite:///'
+               + os.path.join(results_dir, study_name + '.db')
+               .replace('\\', '/'))
+    columns = trajectory_columns(search_space)
+
+    sampler = optuna.samplers.TPESampler(
+        multivariate=True, seed=seed,
+        n_startup_trials=max(10, n_trials//10))
+    study = optuna.create_study(study_name=study_name, storage=storage,
+                                direction=direction, sampler=sampler,
+                                load_if_exists=True)
+
+    def _objective(trial):
+        values = {name: trial.suggest_float(name, sp['low'], sp['high'],
+                                            log=sp['log'])
+                  for name, sp in search_space.items()}
+        for pname in kinetic_baselines:
+            if pname in values:
+                setattr(r_te, pname, values[pname])
+        model_kwargs = dict(
+            target_conc=values['target_conc'],
+            threshold_conc=values['target_conc']-values['threshold_delta'],
+            spike_conc=values['spike_conc'])
+        record = {'trial_number': trial.number, **values}
+        try:
+            handles['model_specification'](**model_kwargs)
+            handles['latest_TEA_solution'].update(
+                handles['solve_TEA'](
+                    stream_IDs=('ethanol', 'isobutanol')))
+            for mname, getter in TRACKED_METRICS.items():
+                record[mname] = getter(handles)
+            obj = float(objective_getter(handles))
+            record['objective'] = obj
+        except Exception as e:
+            record['state'] = 'FAIL'
+            record['error'] = repr(e)[:300]
+            append_trajectory_row(csv_path, columns, record)
+            print(f'Trial {trial.number}: FAILED ({repr(e)[:120]})')
+            raise optuna.TrialPruned() from e
+        if math.isnan(obj):
+            record['state'] = 'NAN'
+            append_trajectory_row(csv_path, columns, record)
+            print(f'Trial {trial.number}: objective is NaN; pruned.')
+            raise optuna.TrialPruned()
+        record['state'] = 'COMPLETE'
+        append_trajectory_row(csv_path, columns, record)
+        for mname in TRACKED_METRICS:
+            trial.set_user_attr(mname, record[mname])
+        if trial.number % print_status_every == 0:
+            try:
+                best = study.best_value
+            except Exception:  # no completed trial stored yet
+                best = np.nan
+            print(f'\nTrial {trial.number}/{n_trials}: '
+                  f'{objective_name} = {obj:.6g} '
+                  f'(best so far {best:.6g})\n'
+                  f'integrator: {r_te.integrator.getName()}; '
+                  'HXN Qbal error = '
+                  f"{handles['HXN'].energy_balance_percent_error:.2f} %")
+        return obj
+
+    n_done = len(study.trials)
+    n_remaining = max(0, n_trials - n_done)
+    if n_done:
+        print(f'Resuming study {study_name}: {n_done} trials stored; '
+              f'running {n_remaining} more (budget {n_trials}).')
+    try:
+        study.optimize(_objective, n_trials=n_remaining, n_jobs=1,
+                       gc_after_trial=True)
+    finally:
+        restore_baseline(handles, kinetic_baselines,
+                         baseline_model_kwargs)
+    return study, csv_path, kinetic_baselines
