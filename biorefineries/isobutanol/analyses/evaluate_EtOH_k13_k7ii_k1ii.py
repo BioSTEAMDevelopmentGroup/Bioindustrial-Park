@@ -10,6 +10,23 @@
 2-D kinetic sweep: k_13 on the x axis vs a combined (k_7ii, k_1ii) on the
 y axis -- both k_7ii and k_1ii are set to the same value at each y grid point.
 Modeled on evaluate_EtOH_k13_k7ii.py.
+
+At every grid point TWO separation-gating configurations are simulated (the
+default both-trains build, re-gated at runtime via splitter S201 -- whose
+split is the fraction of broth sent to the IBO/EtOH train):
+
+  (i)  ``config_i_ethanol``   -- ``S201.split = 0.0``: all broth to the
+       ethanol-primary train (broth isobutanol goes to WWT unrecovered).
+  (ii) ``config_ii_IBO_EtOH`` -- ``S201.split = 1.0``: all broth to the
+       integrated IBO/EtOH train (the baseline gating).
+
+Every metric CSV is saved separately for each configuration
+(``..._<config_tag>_<metric>.csv``). After the sweep, a third IRR-only CSV
+(``..._IRR_max_of_two_configs.csv``) holds the elementwise larger of the two
+configurations' IRRs (``np.fmax``: NaN only where BOTH configs failed), and
+its contour plot carries a white line -- the zero level-set of
+IRR(i) - IRR(ii) -- separating the region where configuration (i) has the
+larger IRR from the region where configuration (ii) does.
 """
 
 import numpy as np
@@ -99,6 +116,19 @@ V406 = f.V406
 # adapts to any feed titer (0-200 g/L) natively, shutting the IBO side off
 # when the broth carries no isobutanol.
 
+# Separation-train gating (default both-trains build): S201.split is the
+# fraction of broth sent to the IBO/EtOH train (baseline 1.0). Both binary
+# gatings are simulated at every grid point; re-gated integrated runs were
+# verified 2026-08-30 (smoke tests 7-8: idle zero-flow branch == absent
+# branch to ~6 sig figs). Configuration (ii) is listed last so each point --
+# and the finished sweep -- leaves the process at the baseline gating.
+sep_udct = isobutanol.system.sep_udct
+S201 = sep_udct['S201']
+configs = (
+    ('config_i_ethanol', 0.0),   # (i)  all broth to the ethanol-primary train
+    ('config_ii_IBO_EtOH', 1.0), # (ii) all broth to the IBO/EtOH train (baseline)
+    )
+
 scenario = 'B'
 
 if scenario=='A':
@@ -175,7 +205,10 @@ metrics = {'MPSP': {'f': get_product_MPSP, 'units': '$/kg'}, # ethanol MPSP
             }
 
 #%%
-results = {i: [] for i in metrics.keys()}
+# One full results structure (metric -> z-list of 2D y-x lists/arrays) per
+# separation-gating configuration.
+results_per_config = {config_tag: {i: [] for i in metrics.keys()}
+                      for config_tag, S201_split in configs}
 
 steps = (20, 20, 1)
 
@@ -256,22 +289,26 @@ file_to_save = f'ibo_{steps}_k_13_k_7ii_eq_k_1ii_{z_label[:5]}_opt={perform_feed
 
 #%% Initial simulation
 
-print('\n\nSimulating the initial point to avoid bugs ...')
+print('\n\nSimulating the initial point in each configuration to avoid bugs ...')
 curr_spec = fbs_spec.current_specifications
 r.k_13 = nsk_k_13es[1]
 r.k_7ii = nsk_k_7ii_k_1iies[0]
 r.k_1ii = nsk_k_7ii_k_1iies[0]
-model_specification(**curr_spec,
-    n_sims=3,
-    plot=True,
-    )
+for config_tag, S201_split in configs:
+    print(f'\n{config_tag} (S201.split = {S201_split}) ...')
+    S201.split = S201_split
+    model_specification(**curr_spec,
+        n_sims=3,
+        plot=True,
+        )
 
 # %% Run analysis
 
-def print_status(curr_no, total_no, s1, s2, s3, HXN_qbal_error, results=None, exception_str=None,):
+def print_status(curr_no, total_no, config, s1, s2, s3, HXN_qbal_error, results=None, exception_str=None,):
     print('\n\n')
     print(f'{curr_no}/{total_no}')
     print('\n')
+    print(f'configuration: {config}')
     print(f'integrator: {r.integrator.getName()}')
     print(s1, s2, s3)
     print('\n')
@@ -283,64 +320,85 @@ def print_status(curr_no, total_no, s1, s2, s3, HXN_qbal_error, results=None, ex
 max_HXN_qbal_percent_error = 0.
 
 curr_no = 0
-total_no = len(spec_1)*len(spec_2)*len(spec_3)
+total_no = len(spec_1)*len(spec_2)*len(spec_3)*len(configs)
 
 print_status_every_n_simulations = 1
 
 errors_dict = {}
 
 for s3 in spec_3:
-    for v in list(results.values()): v.append([])
+    for res in results_per_config.values():
+        for v in list(res.values()): v.append([])
 
     for s2 in spec_2:
-        for v in list(results.values()): v[-1].append([])
+        for res in results_per_config.values():
+            for v in list(res.values()): v[-1].append([])
         for s1 in spec_1:
-            curr_no +=1
-            error_message = None
-            try:
-                curr_spec = {k: v for k,v in fbs_spec.current_specifications.items()}
-                r.k_13 = s1
-                r.k_7ii = s2
-                r.k_1ii = s2
-                curr_spec.update({'spike_conc':s3,})
+            r.k_13 = s1
+            r.k_7ii = s2
+            r.k_1ii = s2
+            for config_tag, S201_split in configs:
+                curr_no +=1
+                error_message = None
+                res = results_per_config[config_tag]
+                try:
+                    curr_spec = {k: v for k,v in fbs_spec.current_specifications.items()}
+                    curr_spec.update({'spike_conc':s3,})
+                    S201.split = S201_split
 
-                if perform_feeding_strategy_opt:
-                    optimize_1D_feeding_strategy_for_MPSP(Ns=20, model_kwargs=curr_spec)
-                else:
-                    model_specification(**curr_spec)
-                # plot_kinetic_results()
-                refresh_TEA_solution()
+                    if perform_feeding_strategy_opt:
+                        optimize_1D_feeding_strategy_for_MPSP(Ns=20, model_kwargs=curr_spec)
+                    else:
+                        model_specification(**curr_spec)
+                    # plot_kinetic_results()
+                    refresh_TEA_solution()
 
 
-                for k, v in list(results.items()):
-                    v[-1][-1].append(metrics[k]['f']())
+                    for k, v in list(res.items()):
+                        v[-1][-1].append(metrics[k]['f']())
 
-                HXN_qbal_error = HXN.energy_balance_percent_error
-                if abs(max_HXN_qbal_percent_error)<abs(HXN_qbal_error): max_HXN_qbal_percent_error = HXN_qbal_error
+                    HXN_qbal_error = HXN.energy_balance_percent_error
+                    if abs(max_HXN_qbal_percent_error)<abs(HXN_qbal_error): max_HXN_qbal_percent_error = HXN_qbal_error
 
-            except Exception as e:
-                str_e = str(e).lower()
-                print('Error in model spec: %s'%str_e)
-                for v in list(results.values()): v[-1][-1].append(np.nan)
-                error_message = str_e
-                if not 'specifications do not meet required' in str_e:
-                    errors_dict[(s1, s2, s3)] = str_e
+                except Exception as e:
+                    str_e = str(e).lower()
+                    print('Error in model spec: %s'%str_e)
+                    for v in list(res.values()): v[-1][-1].append(np.nan)
+                    error_message = str_e
+                    if not 'specifications do not meet required' in str_e:
+                        errors_dict[(config_tag, s1, s2, s3)] = str_e
 
-            if curr_no%print_status_every_n_simulations==0 or error_message:
-                print_status(curr_no, total_no,
-                             s1, s2, s3,
-                             results=[v[-1][-1][-1] for v in list(results.values())],
-                             HXN_qbal_error=HXN.energy_balance_percent_error,
-                             exception_str=error_message)
+                if curr_no%print_status_every_n_simulations==0 or error_message:
+                    print_status(curr_no, total_no,
+                                 config_tag,
+                                 s1, s2, s3,
+                                 results=[v[-1][-1][-1] for v in list(res.values())],
+                                 HXN_qbal_error=HXN.energy_balance_percent_error,
+                                 exception_str=error_message)
 
     # Convert last 2D list to array
-    for k in results.keys():
-        results[k][-1] = np.array(results[k][-1])
+    for res in results_per_config.values():
+        for k in res.keys():
+            res[k][-1] = np.array(res[k][-1])
 
-    # Save generated data
-    for k, v in results.items():
-        csv_file_to_save = file_to_save + f'_{k}'
-        pd.DataFrame(v[-1]).to_csv(isobutanol_results_filepath+csv_file_to_save+'.csv')
+    # Save generated data (one CSV per metric per configuration)
+    for config_tag, S201_split in configs:
+        res = results_per_config[config_tag]
+        for k, v in res.items():
+            csv_file_to_save = file_to_save + f'_{config_tag}_{k}'
+            pd.DataFrame(v[-1]).to_csv(isobutanol_results_filepath+csv_file_to_save+'.csv')
+
+#%% Larger-of-two-configurations IRR
+# Elementwise larger of the two configurations' IRRs at each grid point
+# (np.fmax ignores a NaN in one configuration: NaN only where BOTH failed).
+IRR_max_results = []
+for z_index in range(len(spec_3)):
+    IRR_config_i = np.array(results_per_config['config_i_ethanol']['IRR'][z_index], dtype=float)
+    IRR_config_ii = np.array(results_per_config['config_ii_IBO_EtOH']['IRR'][z_index], dtype=float)
+    IRR_max = np.fmax(IRR_config_i, IRR_config_ii)
+    IRR_max_results.append(IRR_max)
+    pd.DataFrame(IRR_max).to_csv(isobutanol_results_filepath
+                                 + file_to_save + '_IRR_max_of_two_configs.csv')
 
 #%% Report maximum HXN energy balance error
 print(f'Max HXN Q bal error was {round(max_HXN_qbal_percent_error, 3)} %.')
@@ -365,101 +423,173 @@ plot = True
 
 if plot:
 
-    #%% All metrics
-    for curr_metric, val in metrics.items():
-        cbar_n_minor_ticks = 3
-        extend_cmap = 'max'
-        cmap_under_color = None
-        lccm = curr_metric.lower()
-        if 'spike' in lccm or 'q sugar' in lccm or 'target sugars' in lccm:
-            if not perform_feeding_strategy_opt:
-                continue
-            else:
-                if 'spike' in lccm:
-                    if ferm_reactor.nsk_kinetic_model.default_max_n_glu_spikes == 0.:
-                        continue
+    #%% All metrics, each configuration
+    for config_tag, S201_split in configs:
+        results = results_per_config[config_tag]
+        for curr_metric, val in metrics.items():
+            cbar_n_minor_ticks = 3
+            extend_cmap = 'max'
+            cmap_under_color = None
+            lccm = curr_metric.lower()
+            if 'spike' in lccm or 'q sugar' in lccm or 'target sugars' in lccm:
+                if not perform_feeding_strategy_opt:
+                    continue
                 else:
-                    pass
-        elif 'yield' in lccm or 'titer' in lccm or 'productivity' in lccm or 'loading' in lccm or 'irr' in lccm:
-            cmap = JBEI_UCB_colormap(reverse=True)
-            cmap_over_color = colors.yellow_tint.RGBn
+                    if 'spike' in lccm:
+                        if ferm_reactor.nsk_kinetic_model.default_max_n_glu_spikes == 0.:
+                            continue
+                    else:
+                        pass
+            elif 'yield' in lccm or 'titer' in lccm or 'productivity' in lccm or 'loading' in lccm or 'irr' in lccm:
+                cmap = JBEI_UCB_colormap(reverse=True)
+                cmap_over_color = colors.yellow_tint.RGBn
 
-        else:
-            cmap = JBEI_UCB_colormap(reverse=False)
-            cmap_over_color = colors.grey_dark.shade(8).RGBn
+            else:
+                cmap = JBEI_UCB_colormap(reverse=False)
+                cmap_over_color = colors.grey_dark.shade(8).RGBn
 
-        curr_metric_non_nans = np.array(results[curr_metric])[np.where(~np.isnan(np.array(results[curr_metric])))]
-        if curr_metric_non_nans.size == 0 or curr_metric_non_nans.min() == curr_metric_non_nans.max():
-            # e.g. IBO MPSP (all NaN) or IBO yield/titer (all zero) in a
-            # scenario that makes no isobutanol: no range to contour
-            print(f'Skipping contour plot for {curr_metric}: all values are NaN or identical.')
-            continue
+            curr_metric_non_nans = np.array(results[curr_metric])[np.where(~np.isnan(np.array(results[curr_metric])))]
+            if curr_metric_non_nans.size == 0 or curr_metric_non_nans.min() == curr_metric_non_nans.max():
+                # e.g. IBO MPSP (all NaN) or IBO yield/titer (all zero) in a
+                # scenario/configuration that makes no isobutanol: no range to contour
+                print(f'Skipping contour plot for {curr_metric} ({config_tag}): all values are NaN or identical.')
+                continue
 
-        curr_metric_w_levels = np.arange(curr_metric_non_nans.min(),
-                                      curr_metric_non_nans.max()*1.001,
-                                      (curr_metric_non_nans.max()-curr_metric_non_nans.min())/80
-                                      )
-        curr_metric_cbar_ticks = np.arange(curr_metric_non_nans.min(),
-                                      curr_metric_non_nans.max()*1.001,
-                                      (curr_metric_non_nans.max()-curr_metric_non_nans.min())/5
-                                      )
+            curr_metric_w_levels = np.arange(curr_metric_non_nans.min(),
+                                          curr_metric_non_nans.max()*1.001,
+                                          (curr_metric_non_nans.max()-curr_metric_non_nans.min())/80
+                                          )
+            curr_metric_cbar_ticks = np.arange(curr_metric_non_nans.min(),
+                                          curr_metric_non_nans.max()*1.001,
+                                          (curr_metric_non_nans.max()-curr_metric_non_nans.min())/5
+                                          )
 
-        curr_metric_w_ticks = list(set([np.percentile(curr_metric_non_nans, 25),
-                            np.percentile(curr_metric_non_nans, 50),
-                            np.percentile(curr_metric_non_nans, 75),
-                            curr_metric_non_nans.max()]))
-        curr_metric_w_ticks.sort(reverse=False)
+            curr_metric_w_ticks = list(set([np.percentile(curr_metric_non_nans, 25),
+                                np.percentile(curr_metric_non_nans, 50),
+                                np.percentile(curr_metric_non_nans, 75),
+                                curr_metric_non_nans.max()]))
+            curr_metric_w_ticks.sort(reverse=False)
 
-        if 'mpsp' in lccm: # ethanol and isobutanol MPSPs share the same scale
-            curr_metric_w_levels = np.arange(0.25, 5.001, 0.1)
-            curr_metric_cbar_ticks = np.arange(0.25, 5.001, 0.25)
-            curr_metric_w_ticks = [0.4, 0.9, 2.5, 5.0]
-            cbar_n_minor_ticks = 4
-        elif 'irr' in lccm:
-            curr_metric_w_levels = np.arange(-0.1, 0.5001, 0.01)
-            curr_metric_cbar_ticks = np.arange(-0.1, 0.5001, 0.05)
-            curr_metric_w_ticks = [0.0, 0.10, 0.15, 0.20, 0.30]
-            cbar_n_minor_ticks = 4
-            # IRR can fall far below the lowest level (money-losing corners);
-            # fill those cells rather than leaving them blank
-            extend_cmap = 'both'
-            cmap_under_color = colors.grey_dark.shade(40).RGBn
+            if 'mpsp' in lccm: # ethanol and isobutanol MPSPs share the same scale
+                curr_metric_w_levels = np.arange(0.25, 5.001, 0.1)
+                curr_metric_cbar_ticks = np.arange(0.25, 5.001, 0.25)
+                curr_metric_w_ticks = [0.4, 0.9, 2.5, 5.0]
+                cbar_n_minor_ticks = 4
+            elif 'irr' in lccm:
+                curr_metric_w_levels = np.arange(-0.1, 0.5001, 0.01)
+                curr_metric_cbar_ticks = np.arange(-0.1, 0.5001, 0.05)
+                curr_metric_w_ticks = [0.0, 0.10, 0.15, 0.20, 0.30]
+                cbar_n_minor_ticks = 4
+                # IRR can fall far below the lowest level (money-losing corners);
+                # fill those cells rather than leaving them blank
+                extend_cmap = 'both'
+                cmap_under_color = colors.grey_dark.shade(40).RGBn
 
-        contourplots.animated_contourplot(w_data_vs_x_y_at_multiple_z=results[curr_metric], # shape = z * x * y # values of the metric you want to plot on the color axis; e.g., curr_metric
-                                        x_data=spec_1, # x axis values
-                                        y_data=spec_2, # y axis values
-                                        z_data=spec_3, # z axis values
-                                        x_label=x_label, # title of the x axis
-                                        y_label=y_label, # title of the y axis
-                                        z_label=z_label, # title of the z axis
-                                        w_label=f'{curr_metric}', # title of the color axis
+            contourplots.animated_contourplot(w_data_vs_x_y_at_multiple_z=results[curr_metric], # shape = z * x * y # values of the metric you want to plot on the color axis; e.g., curr_metric
+                                            x_data=spec_1, # x axis values
+                                            y_data=spec_2, # y axis values
+                                            z_data=spec_3, # z axis values
+                                            x_label=x_label, # title of the x axis
+                                            y_label=y_label, # title of the y axis
+                                            z_label=z_label, # title of the z axis
+                                            w_label=f'{curr_metric}', # title of the color axis
+                                            x_ticks=x_ticks,
+                                            y_ticks=y_ticks,
+                                            z_ticks=z_ticks,
+                                            w_levels=curr_metric_w_levels, # levels for unlabeled, filled contour areas (labeled and ticked only on color bar)
+                                            w_ticks=curr_metric_w_ticks, # labeled, lined contours; a subset of w_levels
+                                            x_units=x_units,
+                                            y_units=y_units,
+                                            z_units=z_units,
+                                            w_units=val['units'],
+                                            fmt_clabel = lambda cvalue: get_rounded_str(cvalue, 3),
+                                            cmap=cmap, # can use 'viridis' or other default matplotlib colormaps
+                                            cmap_over_color=cmap_over_color,
+                                            cmap_under_color=cmap_under_color,
+                                            extend_cmap=extend_cmap,
+                                            cbar_ticks=curr_metric_cbar_ticks,
+                                            z_marker_color='g', # default matplotlib color names
+                                            fps=fps, # animation frames (z values traversed) per second
+                                            n_loops='inf', # the number of times the animated contourplot should loop animation over z; infinite by default
+                                            animated_contourplot_filename=f'{curr_metric}_{config_tag}_animated_contourplot_'+file_to_save, # file name to save animated contourplot as (no extensions)
+                                            keep_frames=keep_frames, # leaves frame PNG files undeleted after running; False by default
+                                            axis_title_fonts=axis_title_fonts,
+                                            clabel_fontsize = clabel_fontsize,
+                                            default_fontsize = default_fontsize,
+                                            axis_tick_fontsize = axis_tick_fontsize,
+                                            n_minor_ticks = 1,
+                                            cbar_n_minor_ticks = cbar_n_minor_ticks,
+                                            units_on_newline = (False, False, False, False), # x,y,z,w
+                                            units_opening_brackets = [" (",] * 4,
+                                            units_closing_brackets = [")",] * 4,
+                                            round_yticks_to = 1, # default 0 renders every 0-0.5 y tick as "0"
+                                            )
+
+    #%% Larger-of-two-configurations IRR, with a white boundary line
+    # separating the config-(i)-larger region from the config-(ii)-larger
+    # region (zero level-set of IRR(i) - IRR(ii)). Drawn through
+    # animated_contourplot's fig_ax_to_use path (include_top_bar=False) so
+    # the filled contours match the per-config IRR plots exactly; the
+    # overlay and savefig happen here (fig_ax_to_use skips auto-saving).
+    print('\nCreating and saving the larger-of-two-configurations IRR contour plot ...\n')
+
+    for z_index in range(len(spec_3)):
+        IRR_config_i = np.array(results_per_config['config_i_ethanol']['IRR'][z_index], dtype=float)
+        IRR_config_ii = np.array(results_per_config['config_ii_IBO_EtOH']['IRR'][z_index], dtype=float)
+        IRR_max = IRR_max_results[z_index]
+
+        fig, ax = plt.subplots(1, 1, constrained_layout=True)
+        contourplots.animated_contourplot(w_data_vs_x_y_at_multiple_z=[IRR_max], # single frame
+                                        x_data=spec_1,
+                                        y_data=spec_2,
+                                        z_data=[spec_3[z_index]],
+                                        x_label=x_label,
+                                        y_label=y_label,
+                                        z_label=z_label,
+                                        w_label='Larger-of-two-configs. IRR',
                                         x_ticks=x_ticks,
                                         y_ticks=y_ticks,
                                         z_ticks=z_ticks,
-                                        w_levels=curr_metric_w_levels, # levels for unlabeled, filled contour areas (labeled and ticked only on color bar)
-                                        w_ticks=curr_metric_w_ticks, # labeled, lined contours; a subset of w_levels
+                                        w_levels=np.arange(-0.1, 0.5001, 0.01), # IRR scale, as in the per-config IRR plots
+                                        w_ticks=[0.0, 0.10, 0.15, 0.20, 0.30],
                                         x_units=x_units,
                                         y_units=y_units,
                                         z_units=z_units,
-                                        w_units=val['units'],
+                                        w_units='',
                                         fmt_clabel = lambda cvalue: get_rounded_str(cvalue, 3),
-                                        cmap=cmap, # can use 'viridis' or other default matplotlib colormaps
-                                        cmap_over_color=cmap_over_color,
-                                        cmap_under_color=cmap_under_color,
-                                        extend_cmap=extend_cmap,
-                                        cbar_ticks=curr_metric_cbar_ticks,
-                                        z_marker_color='g', # default matplotlib color names
-                                        fps=fps, # animation frames (z values traversed) per second
-                                        n_loops='inf', # the number of times the animated contourplot should loop animation over z; infinite by default
-                                        animated_contourplot_filename=f'{curr_metric}_animated_contourplot_'+file_to_save, # file name to save animated contourplot as (no extensions)
-                                        keep_frames=keep_frames, # leaves frame PNG files undeleted after running; False by default
+                                        cmap=JBEI_UCB_colormap(reverse=True),
+                                        cmap_over_color=colors.yellow_tint.RGBn,
+                                        cmap_under_color=colors.grey_dark.shade(40).RGBn,
+                                        extend_cmap='both',
+                                        cbar_ticks=np.arange(-0.1, 0.5001, 0.05),
                                         axis_title_fonts=axis_title_fonts,
                                         clabel_fontsize = clabel_fontsize,
                                         default_fontsize = default_fontsize,
                                         axis_tick_fontsize = axis_tick_fontsize,
                                         n_minor_ticks = 1,
-                                        cbar_n_minor_ticks = cbar_n_minor_ticks,
+                                        cbar_n_minor_ticks = 4,
                                         units_on_newline = (False, False, False, False), # x,y,z,w
                                         units_opening_brackets = [" (",] * 4,
                                         units_closing_brackets = [")",] * 4,
+                                        round_yticks_to = 1, # default 0 renders every 0-0.5 y tick as "0"
+                                        include_top_bar=False,
+                                        fig_ax_to_use=(fig, ax),
                                         )
+        IRR_diff = IRR_config_i - IRR_config_ii
+        finite_diff = IRR_diff[np.isfinite(IRR_diff)]
+        if finite_diff.size and finite_diff.min() < 0. < finite_diff.max():
+            ax.contour(spec_1, spec_2, IRR_diff,
+                       levels=[0.],
+                       colors='white',
+                       linewidths=1.0,
+                       zorder=600)
+        else:
+            print('No config-(i)/(ii) IRR crossover in this frame; '
+                  'skipping the white boundary line.')
+        fig.savefig(f'IRR_max_of_two_configs_contourplot_{file_to_save}_z{z_index}.png',
+                    transparent=False,
+                    facecolor='white',
+                    bbox_inches='tight',
+                    dpi=600,
+                    )
+        plt.close(fig)
