@@ -575,16 +575,29 @@ if plot:
                                         include_top_bar=False,
                                         fig_ax_to_use=(fig, ax),
                                         )
+        # Winner field for the boundary: the true IRR difference where both
+        # configurations solved, +/- a fallback magnitude where exactly one
+        # did (that configuration wins by default -- matching np.fmax's
+        # selection above), NaN where neither did. The 5x5 trial showed the
+        # bare difference alone leaves the line undrawable wherever one
+        # config failed to simulate/solve (e.g. config (i) at high-broth-IBO
+        # points).
         IRR_diff = IRR_config_i - IRR_config_ii
         finite_diff = IRR_diff[np.isfinite(IRR_diff)]
-        if finite_diff.size and finite_diff.min() < 0. < finite_diff.max():
+        fallback_magnitude = max(np.abs(finite_diff).max(), 1e-6) if finite_diff.size else 1.0
+        only_i = np.isfinite(IRR_config_i) & np.isnan(IRR_config_ii)
+        only_ii = np.isnan(IRR_config_i) & np.isfinite(IRR_config_ii)
+        IRR_diff = np.where(only_i, fallback_magnitude, IRR_diff)
+        IRR_diff = np.where(only_ii, -fallback_magnitude, IRR_diff)
+        finite_diff = IRR_diff[np.isfinite(IRR_diff)]
+        if finite_diff.size and (finite_diff > 0.).any() and (finite_diff < 0.).any():
             ax.contour(spec_1, spec_2, IRR_diff,
                        levels=[0.],
                        colors='white',
                        linewidths=1.0,
                        zorder=600)
         else:
-            print('No config-(i)/(ii) IRR crossover in this frame; '
+            print('One configuration wins everywhere in this frame; '
                   'skipping the white boundary line.')
         fig.savefig(f'IRR_max_of_two_configs_contourplot_{file_to_save}_z{z_index}.png',
                     transparent=False,
