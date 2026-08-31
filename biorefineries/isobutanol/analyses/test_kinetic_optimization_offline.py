@@ -35,9 +35,9 @@ assert excluded == ['k_16'] and 'k_16' not in space
 assert space['k_13'] == dict(low=0.0, high=40.0, log=False)  # lo==0 -> linear
 assert space['k_1e'] == dict(low=0.1*47.1, high=10.0*47.1, log=True)
 assert space['K_1e'] == dict(low=0.1*0.12, high=10.0*0.12, log=True)
-assert space['target_conc'] == dict(low=180.0, high=300.0, log=False)
-assert space['threshold_delta'] == dict(low=0.5, high=30.0, log=False)
-assert space['spike_conc'] == dict(low=200.0, high=800.0, log=False)
+assert space['target_conc'] == dict(low=5.0, high=500.0, log=False)
+assert space['threshold_delta'] == dict(low=0.5, high=500.0, log=False)
+assert space['spike_conc'] == dict(low=50.0, high=600.0, log=False)
 assert space['max_n_spikes'] == dict(low=0, high=20, log=False, int=True)
 space_pinned, _ = ko.build_search_space(
     baselines, param_bounds_override={'k_13': (0.0, 40.0)},

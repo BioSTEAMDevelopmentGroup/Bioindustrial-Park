@@ -115,9 +115,9 @@ def build_search_space(kinetic_baselines,
                        multiplier_bounds=(0.1, 10.0),
                        param_bounds_override=None,
                        exclude_params=(),
-                       target_conc_bounds=(180.0, 300.0),
-                       threshold_delta_bounds=(0.5, 30.0),
-                       spike_conc_bounds=(200.0, 800.0),
+                       target_conc_bounds=(5.0, 500.0),
+                       threshold_delta_bounds=(0.5, 500.0),
+                       spike_conc_bounds=(50.0, 600.0),
                        max_n_spikes_bounds=(0, 20),
                        ):
     """Build the decision-variable space: {name: {'low', 'high', 'log'}}
@@ -132,10 +132,14 @@ def build_search_space(kinetic_baselines,
     always excluded (silently). The feeding variables are appended with
     absolute linear bounds; threshold_conc is optimized as
     threshold_delta = target_conc - threshold_conc, which guarantees
-    threshold < target by construction. max_n_spikes (the glucose-spike
-    cap, fbs_spec.max_n_spikes) is an INTEGER variable (0 = forced batch);
-    pass max_n_spikes_bounds=None to pin it at the scenario baseline
-    instead (pre-2026-08-31 search-space behavior).
+    threshold < target by construction (the applied threshold is floored
+    at 0.0, so wide deltas map to threshold_conc = 0 -- feeding never
+    triggered). Note the model itself requires target < spike; draws
+    violating it fail the specification check pre-simulation and are
+    pruned. max_n_spikes (the glucose-spike cap, fbs_spec.max_n_spikes)
+    is an INTEGER variable (0 = forced batch); pass
+    max_n_spikes_bounds=None to pin it at the scenario baseline instead
+    (pre-2026-08-31 search-space behavior).
 
     Returns (space, excluded_parameter_names)."""
     param_bounds_override = dict(param_bounds_override or {})
@@ -309,7 +313,8 @@ def plot_parameter_trajectory(df, kinetic_baselines, direction,
                bbox_to_anchor=(0.5, -0.08))
     if 'target_conc' in ok.columns:
         ax2.plot(x, best_rows['target_conc'], label='target_conc')
-        ax2.plot(x, best_rows['target_conc'] - best_rows['threshold_delta'],
+        ax2.plot(x, (best_rows['target_conc']
+                     - best_rows['threshold_delta']).clip(lower=0.0),
                  label='threshold_conc')
         ax2.plot(x, best_rows['spike_conc'], label='spike_conc')
         ax2.legend(fontsize=7)
@@ -401,9 +406,9 @@ def run_kinetic_optimization(objective='IRR',
                              multiplier_bounds=(0.1, 10.0),
                              param_bounds_override=None,
                              exclude_params=(),
-                             target_conc_bounds=(180.0, 300.0),
-                             threshold_delta_bounds=(0.5, 30.0),
-                             spike_conc_bounds=(200.0, 800.0),
+                             target_conc_bounds=(5.0, 500.0),
+                             threshold_delta_bounds=(0.5, 500.0),
+                             spike_conc_bounds=(50.0, 600.0),
                              max_n_spikes_bounds=(0, 20),
                              study_name=None, results_dir=None,
                              handles=None, print_status_every=1,
@@ -500,7 +505,8 @@ def run_kinetic_optimization(objective='IRR',
                   for name, sp in search_space.items()}
         model_kwargs = dict(
             target_conc=values['target_conc'],
-            threshold_conc=values['target_conc']-values['threshold_delta'],
+            threshold_conc=max(
+                0.0, values['target_conc']-values['threshold_delta']),
             spike_conc=values['spike_conc'])
         record = {'trial_number': trial.number, **values}
         try:
