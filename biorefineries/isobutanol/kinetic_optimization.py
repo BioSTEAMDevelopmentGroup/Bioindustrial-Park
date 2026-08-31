@@ -219,9 +219,13 @@ def plot_optimization_trajectories(df, objective_name, direction,
                                    objective_units='', filename=None):
     """Multipanel trajectory figure: the objective (all completed trials
     as scatter + best-so-far line) and every tracked metric vs trial
-    number. Failed/pruned trials are omitted. Returns (fig, axes)."""
+    number, each metric panel overlaying the metric's value in the
+    incumbent best-objective-so-far configuration (NOT that metric's own
+    best-so-far). Failed/pruned trials are omitted. Returns (fig, axes)."""
     import matplotlib.pyplot as plt
     ok = _completed(df)
+    best_rows = ok.iloc[_best_row_indices(ok, direction)].reset_index(
+        drop=True)
     metric_names = [m for m in TRACKED_METRICS if m in ok.columns]
     n_panels = 1 + len(metric_names)
     ncols = 4
@@ -243,8 +247,11 @@ def plot_optimization_trajectories(df, objective_name, direction,
     for ax, m in zip(flat[1:], metric_names):
         ax.scatter(ok['trial_number'], ok[m], s=8, alpha=0.4,
                    color='tab:blue')
+        ax.plot(ok['trial_number'], best_rows[m], color='tab:red', lw=1.5,
+                label='at best-so-far objective')
         ax.set_title(m)
         ax.set_xlabel('trial')
+        ax.legend(fontsize=7)
     for ax in flat[n_panels:]:
         ax.axis('off')
     fig.tight_layout()
