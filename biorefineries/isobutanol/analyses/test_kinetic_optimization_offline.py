@@ -35,14 +35,24 @@ assert excluded == ['k_16'] and 'k_16' not in space
 assert space['k_13'] == dict(low=0.0, high=40.0, log=False)  # lo==0 -> linear
 assert space['k_1e'] == dict(low=0.1*47.1, high=10.0*47.1, log=True)
 assert space['K_1e'] == dict(low=0.1*0.12, high=10.0*0.12, log=True)
-assert space['target_conc'] == dict(low=5.0, high=500.0, log=False)
-assert space['threshold_delta'] == dict(low=0.5, high=500.0, log=False)
-assert space['spike_conc'] == dict(low=50.0, high=600.0, log=False)
+assert space['threshold_conc'] == dict(low=0.0, high=500.0, log=False)
+assert space['target_delta'] == dict(low=5.0, high=500.0, log=False)
+assert space['spike_delta'] == dict(low=0.5, high=595.0, log=False)
 assert space['max_n_spikes'] == dict(low=0, high=20, log=False, int=True)
 space_pinned, _ = ko.build_search_space(
     baselines, param_bounds_override={'k_13': (0.0, 40.0)},
     max_n_spikes_bounds=None)
 assert 'max_n_spikes' not in space_pinned  # None -> pinned at baseline
+# Any legacy kwarg -> legacy target-anchored scheme (unspecified legacy
+# bounds fall back to the pre-2026-08-31 defaults).
+space_legacy, _ = ko.build_search_space(
+    baselines, param_bounds_override={'k_13': (0.0, 40.0)},
+    target_conc_bounds=(180.0, 300.0))
+assert space_legacy['target_conc'] == dict(low=180.0, high=300.0, log=False)
+assert space_legacy['threshold_delta'] == dict(low=0.5, high=30.0, log=False)
+assert space_legacy['spike_conc'] == dict(low=200.0, high=800.0, log=False)
+assert 'threshold_conc' not in space_legacy
+assert 'target_delta' not in space_legacy and 'spike_delta' not in space_legacy
 PASS('build_search_space: multiplier band, zero-baseline exclusion, override, feeding vars')
 
 #%% 2. explicit exclusion
