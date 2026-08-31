@@ -444,26 +444,29 @@ def run_kinetic_optimization(objective='IRR',
                .replace('\\', '/'))
     columns = trajectory_columns(search_space)
 
-    sampler = optuna.samplers.TPESampler(
-        multivariate=True, seed=seed,
-        n_startup_trials=max(10, n_trials//10))
     study = optuna.create_study(study_name=study_name, storage=storage,
-                                direction=direction, sampler=sampler,
+                                direction=direction,
                                 load_if_exists=True)
+    n_done = len(study.trials)
+    # Offset the seed by the number of stored trials so a resumed study
+    # draws fresh points instead of replaying the original RNG stream.
+    study.sampler = optuna.samplers.TPESampler(
+        multivariate=True, seed=seed + n_done,
+        n_startup_trials=max(10, n_trials//10))
 
     def _objective(trial):
         values = {name: trial.suggest_float(name, sp['low'], sp['high'],
                                             log=sp['log'])
                   for name, sp in search_space.items()}
-        for pname in kinetic_baselines:
-            if pname in values:
-                setattr(r_te, pname, values[pname])
         model_kwargs = dict(
             target_conc=values['target_conc'],
             threshold_conc=values['target_conc']-values['threshold_delta'],
             spike_conc=values['spike_conc'])
         record = {'trial_number': trial.number, **values}
         try:
+            for pname in kinetic_baselines:
+                if pname in values:
+                    setattr(r_te, pname, values[pname])
             handles['model_specification'](**model_kwargs)
             handles['latest_TEA_solution'].update(
                 handles['solve_TEA'](
@@ -492,15 +495,17 @@ def run_kinetic_optimization(objective='IRR',
                 best = study.best_value
             except Exception:  # no completed trial stored yet
                 best = np.nan
-            print(f'\nTrial {trial.number}/{n_trials}: '
-                  f'{objective_name} = {obj:.6g} '
-                  f'(best so far {best:.6g})\n'
-                  f'integrator: {r_te.integrator.getName()}; '
-                  'HXN Qbal error = '
-                  f"{handles['HXN'].energy_balance_percent_error:.2f} %")
+            try:
+                print(f'\nTrial {trial.number}/{n_trials}: '
+                      f'{objective_name} = {obj:.6g} '
+                      f'(best so far {best:.6g})\n'
+                      f'integrator: {r_te.integrator.getName()}; '
+                      'HXN Qbal error = '
+                      f"{handles['HXN'].energy_balance_percent_error:.2f} %")
+            except Exception:  # cosmetic only -- never abort the study
+                pass
         return obj
 
-    n_done = len(study.trials)
     n_remaining = max(0, n_trials - n_done)
     if n_done:
         print(f'Resuming study {study_name}: {n_done} trials stored; '
