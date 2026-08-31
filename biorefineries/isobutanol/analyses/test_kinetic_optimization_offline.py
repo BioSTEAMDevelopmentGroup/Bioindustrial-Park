@@ -140,4 +140,15 @@ assert ko._best_so_far(s, 'maximize').tolist() == [1.0, 1.0, 2.0, 2.0]
 assert ko._best_so_far(s, 'minimize').tolist() == [1.0, 0.5, 0.5, 0.5]
 PASS('_best_so_far: cummax / cummin by direction')
 
+#%% 8. changed search space rejected on append to an existing trajectory
+try:
+    ko.append_trajectory_row(csv_path, ['trial_number', 'state', 'bogus'],
+                             rec)
+    raise AssertionError('append with changed columns should have raised')
+except ValueError as e:
+    assert 'search space' in str(e) and 'study_name' in str(e)
+ko.append_trajectory_row(csv_path, columns, rec)  # matching header still OK
+assert len(ko.load_trajectory(csv_path)) == 3
+PASS('append_trajectory_row: mismatched existing header raises ValueError')
+
 print(f'\nALL {n_pass} CHECKS PASSED')

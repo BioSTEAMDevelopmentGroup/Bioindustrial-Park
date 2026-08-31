@@ -167,9 +167,22 @@ def trajectory_columns(search_space):
 
 def append_trajectory_row(csv_path, columns, record):
     """Append one row (dict; missing keys become '') to `csv_path`,
-    writing the header first if the file does not exist. Flushed
-    immediately, so a crash/segfault loses at most the in-flight trial."""
+    writing the header first if the file does not exist. An existing
+    file's header must match `columns` exactly -- otherwise the search
+    space changed since the trajectory was started, and appending would
+    silently misalign the rows. Flushed immediately, so a crash/segfault
+    loses at most the in-flight trial."""
     exists = os.path.isfile(csv_path)
+    if exists:
+        with open(csv_path, newline='') as csvfile:
+            existing_header = next(csv.reader(csvfile), None)
+        if existing_header != list(columns):
+            raise ValueError(
+                f'Trajectory CSV {csv_path} has a different column set '
+                'than the current search space -- the search space '
+                'changed since this trajectory was started. Use a new '
+                'study_name (or move the old CSV and .db) to start '
+                'fresh.')
     with open(csv_path, 'a', newline='') as csvfile:
         writer = csv.DictWriter(csvfile, fieldnames=columns,
                                 extrasaction='ignore')

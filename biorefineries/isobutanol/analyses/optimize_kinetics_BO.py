@@ -72,28 +72,32 @@ def run(scenario='B',  # 'A' or 'B'
         **engine_kwargs)
 
     if make_plots:
-        import optuna
-        direction = ('maximize'
-                     if study.direction == optuna.study.StudyDirection.MAXIMIZE
-                     else 'minimize')
-        objective_name = (objective if isinstance(objective, str)
-                          else engine_kwargs.get('objective_name', 'custom'))
-        objective_units = (ko.OBJECTIVE_REGISTRY[objective]['units']
-                           if isinstance(objective, str)
-                           else engine_kwargs.get('objective_units', ''))
-        df = ko.load_trajectory(csv_path)
-        stamp = datetime.now().strftime('%Y.%m.%d-%H.%M')
-        base = csv_path[:-len('_trajectory.csv')]
-        ko.plot_optimization_trajectories(
-            df, objective_name=objective_name, direction=direction,
-            objective_units=objective_units,
-            filename=base + f'_trajectories_{stamp}.png')
-        ko.plot_parameter_trajectory(
-            df, kinetic_baselines, direction=direction,
-            filename=base + f'_param_trajectory_{stamp}.png')
-        ko.plot_best_vs_baseline(
-            df, kinetic_baselines, direction=direction,
-            filename=base + f'_best_vs_baseline_{stamp}.png')
-        print(f'Plots saved next to {csv_path}')
+        try:
+            import optuna
+            direction = ('maximize'
+                         if study.direction == optuna.study.StudyDirection.MAXIMIZE
+                         else 'minimize')
+            objective_name = (objective if isinstance(objective, str)
+                              else engine_kwargs.get('objective_name', 'custom'))
+            objective_units = (ko.OBJECTIVE_REGISTRY[objective]['units']
+                               if isinstance(objective, str)
+                               else engine_kwargs.get('objective_units', ''))
+            df = ko.load_trajectory(csv_path)
+            stamp = datetime.now().strftime('%Y.%m.%d-%H.%M')
+            base = csv_path[:-len('_trajectory.csv')]
+            ko.plot_optimization_trajectories(
+                df, objective_name=objective_name, direction=direction,
+                objective_units=objective_units,
+                filename=base + f'_trajectories_{stamp}.png')
+            ko.plot_parameter_trajectory(
+                df, kinetic_baselines, direction=direction,
+                filename=base + f'_param_trajectory_{stamp}.png')
+            ko.plot_best_vs_baseline(
+                df, kinetic_baselines, direction=direction,
+                filename=base + f'_best_vs_baseline_{stamp}.png')
+            print(f'Plots saved next to {csv_path}')
+        except Exception as e:
+            print('Plotting failed (the trajectory CSV and study are '
+                  f'intact on disk): {repr(e)[:300]}')
 
     return study, csv_path
