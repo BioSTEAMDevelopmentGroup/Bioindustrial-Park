@@ -38,7 +38,7 @@ assert space['K_1e'] == dict(low=0.1*0.12, high=10.0*0.12, log=True)
 assert space['threshold_conc'] == dict(low=0.0, high=500.0, log=False)
 assert space['target_delta'] == dict(low=5.0, high=500.0, log=False)
 assert space['spike_delta'] == dict(low=0.5, high=595.0, log=False)
-assert space['max_n_spikes'] == dict(low=0, high=20, log=False, int=True)
+assert space['max_n_spikes'] == dict(low=0, high=50, log=False, int=True)
 space_pinned, _ = ko.build_search_space(
     baselines, param_bounds_override={'k_13': (0.0, 40.0)},
     max_n_spikes_bounds=None)
@@ -198,12 +198,12 @@ space10, excl10 = ko.build_search_space(
 assert not excl10 and space10['k_13'] == dict(low=0.581, high=58.1, log=True)
 bmk10 = dict(target_conc=221.25, threshold_conc=217.125, spike_conc=600.0)
 pt10 = ko.baseline_decision_point(space10, kb10, bmk10,
-                                  baseline_max_n_spikes=25)
+                                  baseline_max_n_spikes=55)
 assert pt10['k_13'] == 0.581           # zero baseline -> clipped to low bound
 assert pt10['k_1e'] == 47.1            # in-bounds baseline untouched
 assert pt10['threshold_conc'] == 217.125
 assert abs(pt10['target_delta'] - 5.0) < 1e-12   # 4.125 -> clipped to low 5.0
-assert pt10['max_n_spikes'] == 20      # above high bound -> clipped, stays int
+assert pt10['max_n_spikes'] == 50      # above high bound -> clipped, stays int
 assert isinstance(pt10['max_n_spikes'], int)
 PASS('baseline_decision_point: out-of-bounds baselines clipped into bounds')
 
