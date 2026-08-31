@@ -186,4 +186,25 @@ assert ptL['spike_conc'] == 632.0
 assert 'max_n_spikes' not in ptL and set(ptL) == set(space9L)
 PASS('baseline_decision_point: both feeding parameterizations')
 
+#%% 10. baseline_decision_point: out-of-bounds baselines clipped into the space
+# The scenario-A-with-B-bounds case: a zero-baseline kinetic parameter given
+# absolute (log-scale) override bounds must enqueue at its low bound -- an
+# enqueued 0.0 on a log distribution is a hard optuna ValueError at
+# suggest_float, and an out-of-range linear value is silently replaced by a
+# random draw. Same for a baseline feeding delta below its bound.
+kb10 = {'k_13': 0.0, 'k_1e': 47.1}
+space10, excl10 = ko.build_search_space(
+    kb10, param_bounds_override={'k_13': (0.581, 58.1)})
+assert not excl10 and space10['k_13'] == dict(low=0.581, high=58.1, log=True)
+bmk10 = dict(target_conc=221.25, threshold_conc=217.125, spike_conc=600.0)
+pt10 = ko.baseline_decision_point(space10, kb10, bmk10,
+                                  baseline_max_n_spikes=25)
+assert pt10['k_13'] == 0.581           # zero baseline -> clipped to low bound
+assert pt10['k_1e'] == 47.1            # in-bounds baseline untouched
+assert pt10['threshold_conc'] == 217.125
+assert abs(pt10['target_delta'] - 5.0) < 1e-12   # 4.125 -> clipped to low 5.0
+assert pt10['max_n_spikes'] == 20      # above high bound -> clipped, stays int
+assert isinstance(pt10['max_n_spikes'], int)
+PASS('baseline_decision_point: out-of-bounds baselines clipped into bounds')
+
 print(f'\nALL {n_pass} CHECKS PASSED')

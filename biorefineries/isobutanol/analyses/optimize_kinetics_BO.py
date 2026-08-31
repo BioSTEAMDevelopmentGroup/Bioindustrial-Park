@@ -33,17 +33,64 @@ model_specification = model.specification
 IBO_filepath = isobutanol.__file__.replace('\\__init__.py', '')
 
 
+def kinetic_bounds_from_scenario(bounds_scenario,
+                                 multiplier_bounds=(0.1, 10.0)):
+    """Absolute (low, high) bounds -- the multiplier band around
+    `bounds_scenario`'s baseline -- for every positive-baseline kinetic
+    parameter row (load statement `V406.nsk_kinetic_model._te.<name> = x`)
+    of that scenario's parameter-distributions workbook, keyed by te
+    parameter name. Read directly from the workbook (no simulation), so
+    it can parameterize a run of a DIFFERENT scenario: passed as
+    param_bounds_override, it reproduces the bounds a `bounds_scenario`
+    run would build for those parameters -- in particular giving the
+    IBO-pathway rates zeroed in scenario A their scenario-B search bands
+    instead of degenerate zero-baseline exclusion."""
+    import re
+    import pandas as pd
+    filename = IBO_filepath+\
+        '\\analyses\\full\\parameter_distributions\\'+\
+        f'parameter-distributions_corn_IBO_EtOH_{bounds_scenario}.xlsx'
+    pattern = re.compile(
+        r'V406\.nsk_kinetic_model\._te\.([A-Za-z0-9_]+)\s*=\s*x')
+    m_lo, m_hi = multiplier_bounds
+    override = {}
+    for _, row in pd.read_excel(filename).iterrows():
+        match = pattern.fullmatch(str(row['Load statement']).strip())
+        if match:
+            baseline = float(row['Baseline'])
+            if baseline > 0.0:
+                override[match.group(1)] = (m_lo*baseline, m_hi*baseline)
+    return override
+
+
 def run(scenario='B',  # 'A' or 'B'
         objective='IRR',  # name in ko.OBJECTIVE_REGISTRY, or a callable
         n_trials=2000,  # TOTAL study budget (resume-aware)
         seed=3221,
         make_plots=True,
         study_name=None,  # default: kin_opt_{scenario}_{objective slug}
+        kinetic_bounds_scenario=None,  # e.g. 'B': kinetic bounds from THAT
+        # scenario's workbook baselines (see kinetic_bounds_from_scenario);
+        # explicit param_bounds_override entries win over the derived ones,
+        # and the default study_name gains a _kb{scenario} tag.
         **engine_kwargs,  # bounds/overrides/etc. -> run_kinetic_optimization
         ):
     """Set up the scenario baseline (same recipe as the smoke tests), run
     the Bayesian optimization, and (optionally) save the three trajectory
     plots next to the trajectory CSV. Returns (study, csv_path)."""
+    if kinetic_bounds_scenario is not None:
+        derived = kinetic_bounds_from_scenario(
+            kinetic_bounds_scenario,
+            multiplier_bounds=engine_kwargs.get('multiplier_bounds',
+                                                (0.1, 10.0)))
+        derived.update(engine_kwargs.get('param_bounds_override') or {})
+        engine_kwargs['param_bounds_override'] = derived
+        if study_name is None:
+            slug = (objective if isinstance(objective, str)
+                    else engine_kwargs.get('objective_name', 'custom')
+                    ).lower().replace(' ', '_')
+            study_name = (f'kin_opt_{scenario}_'
+                          f'kb{kinetic_bounds_scenario}_{slug}')
     parameter_distributions_filename = IBO_filepath+\
         '\\analyses\\full\\parameter_distributions\\'+\
         f'parameter-distributions_corn_IBO_EtOH_{scenario}.xlsx'

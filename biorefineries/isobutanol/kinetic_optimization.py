@@ -216,10 +216,13 @@ def baseline_decision_point(search_space, kinetic_baselines,
     """The scenario baseline expressed in decision-variable coordinates
     for `search_space` (either feeding parameterization) -- suitable for
     study.enqueue_trial, so a fresh study evaluates the baseline itself
-    as trial 0. Only names present in the search space are included;
-    with an unusual param_bounds_override a baseline value may lie
-    outside its override bounds (Optuna enqueues fixed values without
-    validating them)."""
+    as trial 0. Only names present in the search space are included.
+    Every value is CLIPPED into its [low, high] bounds: an out-of-range
+    enqueued value is a hard optuna ValueError on a log-scale variable
+    and is silently replaced by a random draw on a linear one, so when a
+    baseline lies outside the space (e.g. a zero-baseline kinetic
+    parameter under absolute param_bounds_override bounds), trial 0
+    evaluates the nearest in-bounds point to the baseline instead."""
     point = {name: kinetic_baselines[name]
              for name in search_space if name in kinetic_baselines}
     thr = baseline_model_kwargs['threshold_conc']
@@ -235,6 +238,10 @@ def baseline_decision_point(search_space, kinetic_baselines,
         point['spike_conc'] = spk
     if 'max_n_spikes' in search_space and baseline_max_n_spikes is not None:
         point['max_n_spikes'] = int(baseline_max_n_spikes)
+    for name, value in point.items():
+        sp = search_space[name]
+        clipped = min(max(value, sp['low']), sp['high'])
+        point[name] = int(clipped) if sp.get('int') else clipped
     return point
 
 #%% Trajectory recording
