@@ -132,6 +132,20 @@ def load(simulate_baseline=True,
 
     parameters = settings.process_parameters
 
+    # Fermentation-vent scrubber (V409) wash water: molar liquid-to-gas ratio
+    # on the non-condensable vent gas (CO2 + O2 + N2), replacing corn's
+    # 1.21 g water / g vent mass ratio (left in the dict, unused). Derivation:
+    # absorption factor A = L/(m*G) = 2 for isobutanol, the harder-to-absorb
+    # product, with m = gamma_inf*Psat/P at the vent T (305.1 K, 1 atm; Dortmund
+    # UNIFAC via thermosteam): gamma_inf_IBO = 42.4, Psat_IBO = 2.39 kPa ->
+    # m_IBO ~ 1.00 (m_EtOH = 4.95*11.66 kPa/101.3 kPa ~ 0.57). Kremser: A = 2
+    # gives 99.2 % capture with 6 equilibrium stages (99.8 % with 8), so the
+    # VentScrubber's 100 % capture idealization stays defensible. Corn's ratio
+    # corresponds to L/G ~ 3.0 molar (A_IBO ~ 3), ~50 % more water than needed;
+    # the bottoms are recycled to the separation feed (MX8 below), so excess
+    # water is paid for twice (scrubber makeup + beer-column reboiler).
+    parameters['scrubber_L_over_G_molar'] = 2.0
+
     parameters['NH3_per_Yeast'] = 0.1097 # 0.16*14/(12 + 1.6 + 0.56*16 + 0.16*14) *17/14
 
     #%% Update MH101 specification
@@ -217,13 +231,17 @@ def load(simulate_baseline=True,
     scrubber_water = V409.ins[0]
 
     V409.specifications = []
+    # Treat the aeration N2 as a scrubber gas too (corn declared only CO2/O2),
+    # so it leaves in the vent exit rather than being moved out of the bottoms
+    # by hand.
+    V409.gas = ('CO2', 'O2', 'N2')
 
     @V409.add_specification(run=False)
     def update_scrubber_wash_water():
-        scrubber_water.imass['Water'] =  V409.ins[1].F_mass * parameters['scrubber_wash_water_over_vent']
+        vent_in = V409.ins[1]
+        G_gas = vent_in.imol['CO2', 'O2', 'N2'].sum()  # kmol/hr non-condensables
+        scrubber_water.imol['Water'] = parameters['scrubber_L_over_G_molar'] * G_gas
         V409._run()
-        V409.outs[0].imol['N2'] = V409.outs[1].imol['N2']
-        V409.outs[1].imol['N2'] = 0.0
 
     corn_EtOH_IBO_sys_no_IBO_recovery = bst.System.from_units('corn_EtOH_IBO_sys_no_IBO_recovery', 
                                               units = [i for i in corn_EtOH_sys.units 
