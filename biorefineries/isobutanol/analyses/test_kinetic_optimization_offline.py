@@ -256,4 +256,39 @@ ko.plot_pca_projection(synth11, 'maximize', log_columns=log_cols,
 assert os.path.isfile(f4) and os.path.getsize(f4) > 0
 PASS('pca_decision_matrix + plot_pca_projection: transform, mask, EVR, plot')
 
+#%% 12. StallGuard / attempt_outcome + supervised-runner helpers
+g = ko.StallGuard(stall_timeout_s=100.0)
+assert g.update(10, 0.0) is None                 # first poll initializes
+assert g.update(10, 50.0) is None                # quiet but within timeout
+assert g.update(11, 99.0) is None                # progress resets the clock
+assert g.update(11, 150.0) is None
+assert g.update(11, 199.0) == 'stalled'          # 100 s after last progress
+g.reset()
+assert g.update(11, 500.0) is None               # reset re-initializes
+try:
+    ko.StallGuard(stall_timeout_s=0.0)
+    raise AssertionError('StallGuard(0.0) should have raised')
+except ValueError:
+    pass
+assert ko.attempt_outcome(0, 5, 5) == 'complete'
+assert ko.attempt_outcome(0, 5, 9, killed_for_stall=True) == 'resume'
+assert ko.attempt_outcome(139, 5, 9) == 'resume'
+assert ko.attempt_outcome(139, 5, 5) == 'abort'
+assert ko.attempt_outcome(1, 5, 5, killed_for_stall=True) == 'abort'
+# Supervised-runner helpers (run by file path -- stdlib-only module; its
+# study naming MUST mirror the driver's or a resume forks the study).
+import runpy as _runpy
+sup = _runpy.run_path(os.path.join(
+    os.path.dirname(os.path.abspath(__file__)),
+    'optimize_kinetics_BO_supervised.py'))
+assert sup['default_study_name']('A', 'IRR', 'B') == 'kin_opt_A_kbB_irr'
+assert sup['default_study_name']('B', 'IRR', None) == 'kin_opt_B_irr'
+assert sup['default_study_name']('B', 'IBO titer', None) == 'kin_opt_B_ibo_titer'
+assert sup['row_count'](os.path.join(outdir, 'nonexistent.csv')) == 0
+assert sup['row_count'](csv_path) == 3           # check-5/8 trajectory
+code12 = sup['child_code']('A', 'IRR', 2000, 'B', False, 'kin_opt_A_kbB_irr')
+assert 'runpy' in code12 and "scenario='A'" in code12
+assert "study_name='kin_opt_A_kbB_irr'" in code12
+PASS('StallGuard / attempt_outcome / supervised-runner helpers')
+
 print(f'\nALL {n_pass} CHECKS PASSED')

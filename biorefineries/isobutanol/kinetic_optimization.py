@@ -38,7 +38,8 @@ __all__ = ('OBJECTIVE_REGISTRY', 'TRACKED_METRICS',
            'get_handles', 'run_kinetic_optimization', 'restore_baseline',
            'plot_optimization_trajectories', 'plot_parameter_trajectory',
            'plot_best_vs_baseline',
-           'pca_decision_matrix', 'plot_pca_projection')
+           'pca_decision_matrix', 'plot_pca_projection',
+           'StallGuard', 'attempt_outcome')
 
 FEEDING_VARIABLES = ('threshold_conc', 'target_delta', 'spike_delta',
                      'max_n_spikes')
@@ -600,6 +601,59 @@ def plot_pca_projection(df, direction, log_columns=(),
     if filename:
         fig.savefig(filename, dpi=200)
     return fig, (ax_main, ax_scree, ax_load, ax_time)
+
+#%% Process-level trial-timeout supervision (pure logic)
+# A pathological kinetic draw can hang the simulation INSIDE a native
+# CVODE/roadrunner integrator call (observed 2026-08-31: one trial at
+# 100% of a core for ~2.7 h with no output). No in-process mechanism can
+# reliably interrupt that on Windows -- watchdog threads and
+# PyThreadState_SetAsyncExc only act at Python bytecode boundaries -- so
+# the per-trial wall-clock timeout is implemented one level up: a
+# supervisor process (analyses/optimize_kinetics_BO_supervised.py) polls
+# the crash-safe trajectory CSV, kills the run when no trial has been
+# recorded for the timeout, and relaunches the resumable study (the
+# in-flight trial is lost, exactly as in a segfault crash; its RUNNING
+# optuna record still counts toward the total budget). The decision
+# logic lives here, dependency-free, so the offline test covers it.
+
+class StallGuard:
+    """Stall detector over trajectory-CSV row counts. Feed it one
+    (rows, now) observation per poll; `update` returns 'stalled' once no
+    new row has appeared for `stall_timeout_s` (progress resets the
+    clock), else None. Timebase: any monotonic seconds. Call `reset()`
+    before each new supervised attempt."""
+    def __init__(self, stall_timeout_s=1500.0):
+        if stall_timeout_s <= 0:
+            raise ValueError('stall_timeout_s must be positive; '
+                             f'got {stall_timeout_s!r}')
+        self.stall_timeout_s = stall_timeout_s
+        self.reset()
+
+    def reset(self):
+        self._last_rows = None
+        self._last_progress_t = None
+
+    def update(self, rows, now):
+        if self._last_rows is None or rows > self._last_rows:
+            self._last_rows = rows
+            self._last_progress_t = now
+            return None
+        if now - self._last_progress_t >= self.stall_timeout_s:
+            return 'stalled'
+        return None
+
+def attempt_outcome(exit_code, rows_before, rows_after,
+                    killed_for_stall=False):
+    """Supervisor decision after one attempt exits: 'complete' (clean
+    exit 0), 'resume' (crash or stall-kill, but the attempt recorded new
+    trials -- relaunch the resumable study), or 'abort' (an attempt that
+    added no rows; resuming would loop on the same failure, a human
+    should look)."""
+    if exit_code == 0 and not killed_for_stall:
+        return 'complete'
+    if rows_after > rows_before:
+        return 'resume'
+    return 'abort'
 
 #%% Engine
 
