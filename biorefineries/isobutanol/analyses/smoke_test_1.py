@@ -39,6 +39,22 @@ def _assert_MPSPs_stable(reference, current, sim_number, rel_tol=5e-3):
                 (f'sim {sim_number}: {ID} MPSP {cur} drifted from first-sim '
                  f'value {ref} beyond rel tol {rel_tol}')
 
+def _assert_MPSPs_pinned(expected, current, sim_number, rel_tol=0.01):
+    """Verify the current simulation's MPSPs against the pinned baseline
+    values (within rel_tol, 1% by default; nan stays nan). Pinned
+    2026-09-01 after (a) the kinetics-synced parameter xlsx (d467f0aa /
+    3720fa21) and (b) the vent-scrubber-bottoms recycle to the separation
+    feed (MX8) with molar L/G = 2.0 wash water; before that these tests
+    asserted in-process stability only (A ~0.818 / B ~0.396 pre-sync)."""
+    for ID, ref in expected.items():
+        cur = current['MPSPs'][ID]
+        if math.isnan(ref):
+            assert math.isnan(cur), \
+                f'sim {sim_number}: {ID} MPSP {cur} expected nan (empty product)'
+        else:
+            assert abs(cur - ref)/ref < rel_tol, \
+                f'sim {sim_number}: {ID} MPSP {cur} not within 1% of {ref}'
+
 def load_simulate_baseline(scenario='A', # 'A' or 'B'
                            plot=False,
                            stream_IDs=('ethanol', 'isobutanol'), # products whose MPSPs are solved
@@ -60,9 +76,13 @@ def load_simulate_baseline(scenario='A', # 'A' or 'B'
     if scenario=='A':
         fbs_spec.max_n_spikes = 16
         sim_kwargs = dict(threshold_conc=217.125, target_conc=221.25)
+        # both-trains scenario-A baseline (isobutanol product empty)
+        expected_MPSPs = {'ethanol': 0.84057, 'isobutanol': math.nan}
     elif scenario=='B':
         fbs_spec.max_n_spikes = 13
         sim_kwargs = dict(threshold_conc=216.3, target_conc=226.3)
+        # both-trains scenario-B baseline
+        expected_MPSPs = {'ethanol': 1.0521, 'isobutanol': 1.7538}
     else:
         raise ValueError(f'Scenario {scenario} not found.')
 
@@ -71,11 +91,13 @@ def load_simulate_baseline(scenario='A', # 'A' or 'B'
     #  'MPSPs': {ID: <purity-adjusted MPSP at IRR_for_MPSP>, ...}} (NaN for an
     # empty product, e.g. isobutanol in scenario A); no simulation inside
     # solve_TEA, prices restored. After each simulation the MPSPs are
-    # verified stable against the first simulation's.
+    # verified against the pinned baseline (1%) and stable against the
+    # first simulation's.
     all_results = []
     for i in range(n_sims):
         model_specification(**sim_kwargs)
         results = solve_TEA(stream_IDs=stream_IDs, IRR_for_MPSP=IRR_for_MPSP)
+        _assert_MPSPs_pinned(expected_MPSPs, results, i+1)
         if all_results:
             _assert_MPSPs_stable(all_results[0], results, i+1)
         all_results.append(results)
