@@ -316,8 +316,21 @@ def load(simulate_baseline=True,
     # IDs as harmless dangling empties. In single-process modes sep_udct
     # holds only the built branch's keys and there is NO 'S201' (the broth
     # connects directly), so every sep_udct access below is mode-guarded.
+    # Fermentation-vent scrubber bottoms (V409-1 -> P410): the product the
+    # scrubber captures from the CO2-saturated vent (scenario B ~1.2 % of the
+    # ethanol and ~1.9 % of the isobutanol produced; wash water at molar
+    # L/G = 2.0, ~4.8 % of the broth mass) is recycled into the separation
+    # feed instead of being discarded via MX5 -> M501 (WWT). Docking P410-0
+    # here detaches it from MX5 (which keeps the DDGS evaporator vapor and
+    # corn's orphaned P508-0). MX8 sits upstream of the gating splitter
+    # S201 / the lone train, so the recycle follows the gate split and is
+    # identical in every build mode. Feed-forward path (V406 -> V409 -> P410
+    # -> MX8 -> train): no new recycle loop.
+    MX8 = bst.Mixer('MX8', ins=(P301-0, f.P410-0),
+                    outs='broth_with_scrubber_recycle')
+
     separation_sys, sep_udct = create_separation_system(
-        ins=[P301-0],
+        ins=[MX8-0],
         outs=['ethanol_product', 'isobutanol_product', 'sep_stillage',
               'D103_bottoms', 'ethanol_product_2', 'sep_stillage_2',
               'rectifier_bottoms_water'],
@@ -432,8 +445,13 @@ def load(simulate_baseline=True,
                                 ('T302', 'P304', 'T303', 'P305',
                                  'M304', 'T304')]
                                if has_EtOH_primary else [])
-    recovery_units = [i for i in separation_sys.units
-                      if i not in EtOH_train_storage_tail] \
+    # MX8 (broth + vent-scrubber-bottoms mixer feeding the train) is listed
+    # explicitly: the systems below are assembled from these unit lists, and
+    # a unit missing from them is never simulated (the train would then see
+    # an empty feed and the DDGS evaporator Ev607 an empty stillage).
+    recovery_units = [MX8] \
+                     + [i for i in separation_sys.units
+                        if i not in EtOH_train_storage_tail] \
                      + [MX6, MX7, H601, V514]
 
     #%% Detach corn base facilities (replaced by HP-style WWT + boiler facilities)
@@ -449,10 +467,11 @@ def load(simulate_baseline=True,
     # deliberately NOT routed to the WWT mixer (M501) below.
     #
     # T608's INLET, however, received the corn-side MX5 mixer outlet — the DDGS
-    # stillage-evaporator vapor (Ev607) plus the fermentation-vent scrubber effluent
-    # (V409 -> P410). With T608 detached, that stream would simply be dropped, so it
-    # is instead re-routed to the WWT mixer M501 below (a real aqueous waste that
-    # should be treated).
+    # stillage-evaporator vapor (Ev607) (the fermentation-vent scrubber effluent
+    # V409 -> P410 used to join it here too, but is now recycled to the
+    # separation feed via MX8 above). With T608 detached, that stream would
+    # simply be dropped, so it is instead re-routed to the WWT mixer M501 below
+    # (a real aqueous waste that should be treated).
 
     # Streams that consume process water (used to size the new ProcessWaterCenter makeup).
     # The M301/M302 fed-batch dilution-water mixers both create their makeup inlet with
@@ -467,7 +486,8 @@ def load(simulate_baseline=True,
     #%% Mix aqueous wastes for wastewater treatment
     # Real aqueous wastes currently discharged: backwater (S1, water+organics),
     # F302_P1 evaporator condensate (spike_feed_condensate), and the MX5 outlet
-    # (DDGS stillage-evaporator vapor + fermentation-vent scrubber effluent)
+    # (DDGS stillage-evaporator vapor; the vent-scrubber effluent no longer
+    # joins it -- recycled via MX8)
     # re-routed off the detached T608 (see NOTE above). T608's `wastewater` outlet
     # remains excluded — it is not a real aqueous waste of the new system. The
     # separation train's D103 bottoms is near-pure water and goes to the
@@ -706,9 +726,10 @@ def load(simulate_baseline=True,
     # leftover-based: resolves to the EtOH side of the integrated train (P301,
     # D101 beer column, M201, D102 rectifier, H202, MS201, H201) + P512, the
     # gating splitter S201 and the whole in-system ethanol-primary train
-    # (beer pump/column, rectifier, sieve, condenser) + MX6/MX7, plus the
-    # long-standing strays PX, V409, P410, MX5 (kept here so every in-system
-    # unit stays covered by exactly one group).
+    # (beer pump/column, rectifier, sieve, condenser) + MX6/MX7, the
+    # vent-scrubber-recycle mixer MX8, plus the long-standing strays PX,
+    # V409, P410, MX5 (kept here so every in-system unit stays covered by
+    # exactly one group).
     ethanol_separation_group = bst.UnitGroup('ethanol separation',
                                  units= [i for i in corn_EtOH_IBO_sys.units
                                 if not i in list(corn_EtOH_IBO_sys.facilities)
