@@ -15,10 +15,14 @@ Smoke test 4 -- scenario B baseline with ONLY the IBO/EtOH separation train:
 EACH simulation. Gates (a violation exits non-zero exactly like a
 traceback):
 
-- purity-adjusted ethanol MPSP within 1% of 0.39536 (the both-trains
+- purity-adjusted ethanol MPSP within 1% of 1.0521 (the both-trains
   scenario-B baseline; dropping the pass-through gating splitter S201 must
   not move results beyond simulation tolerance)
-- purity-adjusted isobutanol MPSP within 1% of 0.93321
+- purity-adjusted isobutanol MPSP within 1% of 1.7538
+  (Both re-pinned 2026-09-01 after (a) the kinetics-synced parameter xlsx
+  (d467f0aa / 3720fa21) and (b) the vent-scrubber-bottoms recycle to the
+  separation feed (MX8) with molar L/G = 2.0 wash water; the previous
+  pinned values were 0.39536 / 0.93321.)
 - every MPSP stable against the first simulation's (relative drift
   < 5e-3, ~3 significant figures; nan stays nan)
 
@@ -77,10 +81,10 @@ def load_simulate_baseline(stream_IDs=('ethanol', 'isobutanol'), # products whos
         results = solve_TEA(stream_IDs=stream_IDs, IRR_for_MPSP=IRR_for_MPSP)
         MPSP_ethanol = results['MPSPs']['ethanol']
         MPSP_isobutanol = results['MPSPs']['isobutanol']
-        assert abs(MPSP_ethanol - 0.39536)/0.39536 < 0.01, \
-            f'sim {i+1}: ethanol MPSP {MPSP_ethanol} not within 1% of 0.39536'
-        assert abs(MPSP_isobutanol - 0.93321)/0.93321 < 0.01, \
-            f'sim {i+1}: isobutanol MPSP {MPSP_isobutanol} not within 1% of 0.93321'
+        assert abs(MPSP_ethanol - 1.0521)/1.0521 < 0.01, \
+            f'sim {i+1}: ethanol MPSP {MPSP_ethanol} not within 1% of 1.0521'
+        assert abs(MPSP_isobutanol - 1.7538)/1.7538 < 0.01, \
+            f'sim {i+1}: isobutanol MPSP {MPSP_isobutanol} not within 1% of 1.7538'
         if all_results:
             _assert_MPSPs_stable(all_results[0], results, i+1)
         all_results.append(results)

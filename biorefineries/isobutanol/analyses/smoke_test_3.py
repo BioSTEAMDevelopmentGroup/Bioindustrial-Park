@@ -22,9 +22,12 @@ beer-column mode and the isobutanol product is empty.
 EACH simulation. Gates (a violation exits non-zero exactly like a
 traceback):
 
-- purity-adjusted ethanol MPSP within 1% of 0.81733 (the both-trains
-  scenario-A baseline; the 2026-08-30 verification run reproduced it to
-  full precision, 0.8173294638658914)
+- purity-adjusted ethanol MPSP within 1% of 0.84057 (the both-trains
+  scenario-A baseline, reproduced to full precision by the 2026-09-01
+  re-pin run, 0.8405655960118952. Re-pinned 2026-09-01 after (a) the
+  kinetics-synced parameter xlsx (d467f0aa / 3720fa21) and (b) the
+  vent-scrubber-bottoms recycle to the separation feed (MX8) with molar
+  L/G = 2.0 wash water; the previous pinned value was 0.81733)
 - isobutanol MPSP is nan (empty product)
 - every MPSP stable against the first simulation's (relative drift
   < 5e-3, ~3 significant figures; nan stays nan)
@@ -84,8 +87,8 @@ def load_simulate_baseline(stream_IDs=('ethanol', 'isobutanol'), # products whos
         results = solve_TEA(stream_IDs=stream_IDs, IRR_for_MPSP=IRR_for_MPSP)
         MPSP_ethanol = results['MPSPs']['ethanol']
         MPSP_isobutanol = results['MPSPs']['isobutanol']
-        assert abs(MPSP_ethanol - 0.81733)/0.81733 < 0.01, \
-            f'sim {i+1}: ethanol MPSP {MPSP_ethanol} not within 1% of 0.81733'
+        assert abs(MPSP_ethanol - 0.84057)/0.84057 < 0.01, \
+            f'sim {i+1}: ethanol MPSP {MPSP_ethanol} not within 1% of 0.84057'
         assert math.isnan(MPSP_isobutanol), \
             f'sim {i+1}: isobutanol MPSP {MPSP_isobutanol} expected nan (empty product)'
         if all_results:

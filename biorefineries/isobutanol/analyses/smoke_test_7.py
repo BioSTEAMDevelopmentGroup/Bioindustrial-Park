@@ -19,17 +19,20 @@ verification event. With all flow on branch 2, the IBO/EtOH train idles at
 zero flow (design/cost skipped), D103 bottoms is empty (ProcessWaterCenter
 draws more makeup water), and the isobutanol product is empty. Results are
 expected to track smoke_test_5 (ethanol-only build, same scenario-A flow
-routing) closely -- the 2026-08-30 verification runs agreed to ~6
-significant figures (0.7979571 here vs 0.7979563 there).
+routing) closely -- the 2026-09-01 re-pin runs agreed to ~6
+significant figures (0.8194343 here vs 0.8194335 there).
 
 ``load_simulate_baseline`` loads once (at import) and simulates
 ``n_sims`` (default 3) times via ``model_specification``, verifying after
 EACH simulation. Gates (a violation exits non-zero exactly like a
 traceback):
 
-- purity-adjusted ethanol MPSP within 1% of 0.79796 (matching the
+- purity-adjusted ethanol MPSP within 1% of 0.81943 (matching the
   smoke_test_5 reference: an idle zero-flow IBO/EtOH branch must be
-  economically equivalent to an absent one)
+  economically equivalent to an absent one. Re-pinned 2026-09-01 after
+  (a) the kinetics-synced parameter xlsx (d467f0aa / 3720fa21) and (b) the
+  vent-scrubber-bottoms recycle to the separation feed (MX8) with molar
+  L/G = 2.0 wash water; the previous pinned value was 0.79796)
 - isobutanol MPSP is nan (empty product)
 - every MPSP stable against the first simulation's (relative drift
   < 5e-3, ~3 significant figures; nan stays nan)
@@ -95,8 +98,8 @@ def load_simulate_baseline(stream_IDs=('ethanol', 'isobutanol'), # products whos
         results = solve_TEA(stream_IDs=stream_IDs, IRR_for_MPSP=IRR_for_MPSP)
         MPSP_ethanol = results['MPSPs']['ethanol']
         MPSP_isobutanol = results['MPSPs']['isobutanol']
-        assert abs(MPSP_ethanol - 0.79796)/0.79796 < 0.01, \
-            f'sim {i+1}: ethanol MPSP {MPSP_ethanol} not within 1% of 0.79796'
+        assert abs(MPSP_ethanol - 0.81943)/0.81943 < 0.01, \
+            f'sim {i+1}: ethanol MPSP {MPSP_ethanol} not within 1% of 0.81943'
         assert math.isnan(MPSP_isobutanol), \
             f'sim {i+1}: isobutanol MPSP {MPSP_isobutanol} expected nan (empty product)'
         if all_results:
