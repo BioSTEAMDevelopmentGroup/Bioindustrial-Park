@@ -180,7 +180,7 @@ results = {i: [] for i in metrics.keys()}
 
 steps = (10, 10, 1)
 
-spec_1 = nsk_k_13es = np.linspace(0.0, 40.0, steps[0])
+spec_1 = nsk_k_13es = np.linspace(0.0, 20.0, steps[0])
 
 spec_2 = nsk_k_3es = np.linspace(0.0, 40.0, steps[1])
 
@@ -197,7 +197,7 @@ spec_3 = spike_concs =\
 
 x_label = "k_13" # title of the x axis
 x_units = r"$\mathrm{g} \cdot \mathrm{L}^{-1} \cdot \mathrm{h}^{-1}$"
-x_ticks = [0, 10, 20, 30, 40]
+x_ticks = [0, 5, 10, 15, 20]
 
 y_label = "k_3" # title of the y axis
 y_units = r"$\mathrm{g} \cdot \mathrm{L}^{-1} \cdot \mathrm{h}^{-1}$"

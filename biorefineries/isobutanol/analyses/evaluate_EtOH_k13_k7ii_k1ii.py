@@ -216,10 +216,10 @@ results_per_config = {config_tag: {i: [] for i in metrics.keys()}
 
 steps = (20, 20, 1)
 
-spec_1 = nsk_k_13es = np.linspace(0.0, 40.0, steps[0])
+spec_1 = nsk_k_13es = np.linspace(0.0, 20.0, steps[0])
 
 # combined y-axis parameter: k_7ii and k_1ii are both set to each of these values
-spec_2 = nsk_k_7ii_k_1iies = np.linspace(0.0001, 0.5, steps[1])
+spec_2 = nsk_k_7ii_k_1iies = np.linspace(0.0001, 0.2, steps[1])
 
 
 spec_3 = spike_concs =\
@@ -234,11 +234,11 @@ spec_3 = spike_concs =\
 
 x_label = "k_13" # title of the x axis
 x_units = r"$\mathrm{g} \cdot \mathrm{L}^{-1} \cdot \mathrm{h}^{-1}$"
-x_ticks = [0, 10, 20, 30, 40]
+x_ticks = [0, 5, 10, 15, 20]
 
 y_label = "k_7ii = k_1ii" # title of the y axis
 y_units = r"$\mathrm{g} \cdot \mathrm{L}^{-1} \cdot \mathrm{h}^{-1}$"
-y_ticks = [0.0, 0.1, 0.2, 0.3, 0.4, 0.5]
+y_ticks = [0.0, 0.05, 0.1, 0.15, 0.2]
 
 z_label = "Spike feed glucose concentration" # title of the x axis
 z_units =r"$\mathrm{g} \cdot \mathrm{L}^{-1}$"
@@ -526,7 +526,7 @@ if plot:
                                             units_on_newline = (False, False, False, False), # x,y,z,w
                                             units_opening_brackets = [" (",] * 4,
                                             units_closing_brackets = [")",] * 4,
-                                            round_yticks_to = 1, # default 0 renders every 0-0.5 y tick as "0"
+                                            round_yticks_to = 1, # default 0 renders every 0-0.2 y tick as "0"
                                             )
 
     #%% Larger-of-two-configurations IRR, with a white boundary line
@@ -575,7 +575,7 @@ if plot:
                                         units_on_newline = (False, False, False, False), # x,y,z,w
                                         units_opening_brackets = [" (",] * 4,
                                         units_closing_brackets = [")",] * 4,
-                                        round_yticks_to = 1, # default 0 renders every 0-0.5 y tick as "0"
+                                        round_yticks_to = 1, # default 0 renders every 0-0.2 y tick as "0"
                                         include_top_bar=False,
                                         fig_ax_to_use=(fig, ax),
                                         )

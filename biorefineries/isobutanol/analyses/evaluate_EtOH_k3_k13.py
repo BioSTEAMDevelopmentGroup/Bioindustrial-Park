@@ -9,8 +9,9 @@
 """
 2-D kinetic sweep of k_3 (x axis) x k_13 (y axis) under scenario B.
 
-Both parameters are swept over np.linspace(0, 10*baseline, 20); the scenario-B
-baseline of each is 5.81 g L^-1 h^-1, so each sweep spans 0-58.1. At every
+k_3 is swept over np.linspace(0, 10*baseline, 20) (scenario-B baseline
+5.81 g L^-1 h^-1, so 0-58.1); k_13 (same baseline) over np.linspace(0, 20, 20),
+the common k_13 upper bound used across the kinetic sweeps. At every
 (k_3, k_13) point the full biorefinery is simulated at the scenario-B feeding
 strategy and, via the side-effect-free solve_TEA(), ethanol MPSP, isobutanol
 MPSP, and IRR are recorded (plus fermentation/TEA metrics), then plotted as
@@ -183,7 +184,7 @@ steps = (20, 20, 1)
 
 spec_1 = nsk_k_3es = np.linspace(0.0, 58.1, steps[0])   # 10x scenario-B baseline (5.81)
 
-spec_2 = nsk_k_13es = np.linspace(0.0, 58.1, steps[1])  # 10x scenario-B baseline (5.81)
+spec_2 = nsk_k_13es = np.linspace(0.0, 20.0, steps[1])  # ~3.4x scenario-B baseline (5.81); common k_13 upper bound across the sweeps
 
 
 spec_3 = spike_concs =\
@@ -202,7 +203,7 @@ x_ticks = [0, 10, 20, 30, 40, 50]
 
 y_label = "k_13" # title of the y axis
 y_units = r"$\mathrm{g} \cdot \mathrm{L}^{-1} \cdot \mathrm{h}^{-1}$"
-y_ticks = [0, 10, 20, 30, 40, 50]
+y_ticks = [0, 5, 10, 15, 20]
 
 z_label = "Spike feed glucose concentration" # title of the x axis
 z_units =r"$\mathrm{g} \cdot \mathrm{L}^{-1}$"

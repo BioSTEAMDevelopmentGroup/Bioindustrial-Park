@@ -188,7 +188,7 @@ steps = (20, 20, 1)
 
 spec_1 = nsk_k_2es = np.linspace(0.0, 5.01, steps[0])  # 10x scenario-B baseline (0.501)
 
-spec_2 = nsk_k_13es = np.linspace(0.0, 40.0, steps[1])
+spec_2 = nsk_k_13es = np.linspace(0.0, 20.0, steps[1])
 
 
 spec_3 = spike_concs =\
@@ -207,7 +207,7 @@ x_ticks = [0, 1, 2, 3, 4, 5]
 
 y_label = "k_13" # title of the y axis
 y_units = r"$\mathrm{g} \cdot \mathrm{L}^{-1} \cdot \mathrm{h}^{-1}$"
-y_ticks = [0, 10, 20, 30, 40]
+y_ticks = [0, 5, 10, 15, 20]
 
 z_label = "Spike feed glucose concentration" # title of the x axis
 z_units =r"$\mathrm{g} \cdot \mathrm{L}^{-1}$"
