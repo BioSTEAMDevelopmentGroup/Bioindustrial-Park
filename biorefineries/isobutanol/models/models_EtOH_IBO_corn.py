@@ -70,9 +70,12 @@ def create_model():
     get_purity = lambda: product_stream.imass['Ethanol']/product_stream.F_mass
     # Adjust for purity
     get_adjusted_yield = lambda: get_yield() * get_purity()
-    # Recovery (%) = recovered/amount in fermentation broth
+    # Recovery (%) = recovered/amount leaving the fermentor (broth + vent).
+    # The vent ethanol is captured by the scrubber V409 and recycled to the
+    # separation feed via MX8, so it is part of the recoverable amount; a
+    # broth-only denominator would report >100 %.
     get_recovery = lambda: product_stream.imol['Ethanol']\
-        /(V406.outs[1].imol['Ethanol'])
+        /(V406.outs[1].imol['Ethanol'] + V406.outs[0].imol['Ethanol'])
     get_overall_TCI = lambda: IBO_tea.TCI/1e6
 
     get_overall_installed_cost = lambda: IBO_tea.installed_equipment_cost/1e6
