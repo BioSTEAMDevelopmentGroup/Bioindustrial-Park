@@ -749,10 +749,18 @@ if plot:
                             np.percentile(curr_metric_non_nans, 75),
                             curr_metric_non_nans.max()]))
         curr_metric_w_ticks.sort(reverse=False)
-        if 'irr' in lccm:
-            curr_metric_w_levels = np.arange(-0.1, 0.5001, 0.01)
-            curr_metric_cbar_ticks = np.arange(-0.1, 0.5001, 0.05)
-            curr_metric_w_ticks = [0.0, 0.10, 0.15, 0.20, 0.30]
+        if 'mpsp' in lccm: # ethanol and isobutanol MPSPs share the same scale
+            # bounds shared with evaluate_EtOH_k13_k7ii.py (fitted to its 20x20
+            # scenario-B grid: EtOH MPSP 0.70-3.49 $/kg, IBO MPSP 1.13-2.43)
+            curr_metric_w_levels = np.arange(0.5, 3.5001, 0.05)
+            curr_metric_cbar_ticks = np.arange(0.5, 3.5001, 0.5)
+            curr_metric_w_ticks = [0.75, 0.9, 1.2, 1.5, 2.0, 3.0]
+        elif 'irr' in lccm:
+            # shared with evaluate_EtOH_k13_k7ii.py (grid IRR -0.12 to 0.19);
+            # the under-color catches anything below -0.1
+            curr_metric_w_levels = np.arange(-0.1, 0.2001, 0.005)
+            curr_metric_cbar_ticks = np.arange(-0.1, 0.2001, 0.05)
+            curr_metric_w_ticks = [0.0, 0.05, 0.10, 0.15, 0.18]
             # IRR can fall far below the lowest level (money-losing corners);
             # fill those cells rather than leaving them blank
             extend_cmap = 'both'
