@@ -296,16 +296,23 @@ minute = '0' + str(dateTimeObj.minute) if len(str(dateTimeObj.minute))==1 else s
 
 file_to_save = f'ibo_{steps}_{x_label[:5]}_{y_label[:5]}_{z_label[:5]}_opt={perform_feeding_strategy_opt}_max_n={ferm_reactor.nsk_kinetic_model.default_max_n_glu_spikes}_'
 
+# Set IBO_SWEEP_REPLOT_FROM_CSV=1 to skip the grid simulations and rebuild
+# the contour plots from the per-metric CSVs a previous run of this script
+# (same steps / scenario / feeding settings, i.e. same `file_to_save` prefix)
+# saved under analyses/results/. Only the plot styling below then matters.
+replot_from_csv = os.environ.get('IBO_SWEEP_REPLOT_FROM_CSV', '') == '1'
+
 #%% Initial simulation
 
-print('\n\nSimulating the initial point to avoid bugs ...')
-curr_spec = fbs_spec.current_specifications
-r.k_13 = nsk_k_13es[1]
-r.k_7ii = nsk_k_7iies[0]
-model_specification(**curr_spec,
-    n_sims=3,
-    plot=True,
-    )
+if not replot_from_csv:
+    print('\n\nSimulating the initial point to avoid bugs ...')
+    curr_spec = fbs_spec.current_specifications
+    r.k_13 = nsk_k_13es[1]
+    r.k_7ii = nsk_k_7iies[0]
+    model_specification(**curr_spec,
+        n_sims=3,
+        plot=True,
+        )
 
 # %% Run analysis 
 
@@ -330,7 +337,16 @@ print_status_every_n_simulations = 1
 
 errors_dict = {}
 
-for s3 in spec_3:
+if replot_from_csv:
+    print(f'\nReplotting from saved CSVs: {isobutanol_results_filepath}{file_to_save}_<metric>.csv')
+    for k in results.keys():
+        results[k] = [pd.read_csv(isobutanol_results_filepath+file_to_save+f'_{k}.csv',
+                                  index_col=0).to_numpy()]
+    spec_3_to_run = []
+else:
+    spec_3_to_run = spec_3
+
+for s3 in spec_3_to_run:
     for v in list(results.values()): v.append([])
     
     for s2 in spec_2:
@@ -562,6 +578,7 @@ if plot:
                                     # comparison_range=EtOH_market_range,
                                     n_minor_ticks = 1,
                                     cbar_n_minor_ticks = 4,
+                                    round_yticks_to = 2,
                                     units_on_newline = (False, False, False, False), # x,y,z,w
                                     units_opening_brackets = [" (",] * 4,
                                     units_closing_brackets = [")",] * 4,
@@ -768,14 +785,16 @@ if plot:
         # curr_metric_w_levels = np.arange(0., 15.5, 0.5)
         
         if 'mpsp' in lccm: # ethanol and isobutanol MPSPs share the same scale
-            curr_metric_w_levels = np.arange(0.25, 5.001, 0.1)
-            curr_metric_cbar_ticks = np.arange(0.25, 5.001, 0.25)
-            curr_metric_w_ticks = [0.4, 0.9, 2.5, 5.0]
+            # 20x20 scenario-B grid spans 0.70-3.49 $/kg (EtOH) / 1.13-2.43 (IBO)
+            curr_metric_w_levels = np.arange(0.5, 3.5001, 0.05)
+            curr_metric_cbar_ticks = np.arange(0.5, 3.5001, 0.5)
+            curr_metric_w_ticks = [0.75, 0.9, 1.2, 1.5, 2.0, 3.0]
             cbar_n_minor_ticks = 4
         elif 'irr' in lccm:
-            curr_metric_w_levels = np.arange(-0.1, 0.5001, 0.01)
-            curr_metric_cbar_ticks = np.arange(-0.1, 0.5001, 0.05)
-            curr_metric_w_ticks = [0.0, 0.10, 0.15, 0.20, 0.30]
+            # grid spans -0.12 to 0.19; the under-color catches the sub -0.1 corner
+            curr_metric_w_levels = np.arange(-0.1, 0.2001, 0.005)
+            curr_metric_cbar_ticks = np.arange(-0.1, 0.2001, 0.05)
+            curr_metric_w_ticks = [0.0, 0.05, 0.10, 0.15, 0.18]
             cbar_n_minor_ticks = 4
             # IRR can fall far below the lowest level (money-losing corners);
             # fill those cells rather than leaving them blank
@@ -822,6 +841,7 @@ if plot:
                                         # comparison_range=EtOH_market_range,
                                         n_minor_ticks = 1,
                                         cbar_n_minor_ticks = cbar_n_minor_ticks,
+                                        round_yticks_to = 2,
                                         units_on_newline = (False, False, False, False), # x,y,z,w
                                         units_opening_brackets = [" (",] * 4,
                                         units_closing_brackets = [")",] * 4,
