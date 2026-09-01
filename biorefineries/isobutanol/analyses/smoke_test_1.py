@@ -53,7 +53,8 @@ def _assert_MPSPs_pinned(expected, current, sim_number, rel_tol=0.01):
                 f'sim {sim_number}: {ID} MPSP {cur} expected nan (empty product)'
         else:
             assert abs(cur - ref)/ref < rel_tol, \
-                f'sim {sim_number}: {ID} MPSP {cur} not within 1% of {ref}'
+                (f'sim {sim_number}: {ID} MPSP {cur} not within rel tol '
+                 f'{rel_tol} of pinned {ref}')
 
 def load_simulate_baseline(scenario='A', # 'A' or 'B'
                            plot=False,
