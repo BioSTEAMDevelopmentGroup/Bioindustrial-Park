@@ -207,4 +207,53 @@ assert pt10['max_n_spikes'] == 50      # above high bound -> clipped, stays int
 assert isinstance(pt10['max_n_spikes'], int)
 PASS('baseline_decision_point: out-of-bounds baselines clipped into bounds')
 
+#%% 11. pca_decision_matrix + plot_pca_projection on synthetic trajectories
+# Reorder the synthetic trajectory into the real CSV column order --
+# decision columns are inferred as everything between 'state' and
+# 'objective' (trajectory_columns construction).
+synth11 = synth[ko.trajectory_columns(space)].copy()
+log_cols = {'k_1e', 'K_1e'}  # the log-sampled kinetic bands of `space`
+coords, evr, load11, kept, valid = ko.pca_decision_matrix(synth11, log_cols)
+assert valid.all() and valid.shape == (n,)
+assert kept == list(space)                      # all columns vary
+assert coords.shape == (n, len(space))
+assert load11.shape == (len(space), len(space))
+assert abs(evr.sum() - 1.0) < 1e-9
+assert all(evr[i] >= evr[i+1] for i in range(len(evr) - 1))
+# Zero-variance drop + missing-value mask
+synth11b = synth11.copy()
+synth11b['max_n_spikes'] = 7                    # pinned -> dropped
+synth11b.loc[5, 'k_1e'] = np.nan                # incomplete row -> masked
+c2, evr2, l2, kept2, valid2 = ko.pca_decision_matrix(synth11b, log_cols)
+assert 'max_n_spikes' not in kept2 and set(kept2) < set(space)
+assert not valid2[5] and valid2.sum() == n - 1 and c2.shape[0] == n - 1
+# Known 1-D structure: two log-columns perfectly correlated after log10
+# -> PC1 carries ~all variance; sign stabilized (max-|loading| positive);
+# a nonpositive value in a log column invalidates its row (no crash).
+n12 = 30
+u = rng.uniform(-1.0, 1.0, n12)
+df12 = pd.DataFrame({'trial_number': np.arange(n12),
+                     'state': 'COMPLETE',
+                     'k_1e': 10.0**u,
+                     'K_1e': 10.0**(2.0*u),
+                     'objective': u})
+c3, evr3, l3, kept3, valid3 = ko.pca_decision_matrix(df12, log_cols)
+assert evr3[0] > 0.999
+assert l3[0][np.argmax(np.abs(l3[0]))] > 0.0
+df12.loc[0, 'k_1e'] = 0.0                       # log10 -> -inf -> masked
+_, _, _, _, valid3b = ko.pca_decision_matrix(df12, log_cols)
+assert not valid3b[0] and valid3b.sum() == n12 - 1
+# Too few rows -> ValueError
+try:
+    ko.pca_decision_matrix(df12.iloc[:2], log_cols)
+    raise AssertionError('pca_decision_matrix on 2 rows should have raised')
+except ValueError as e:
+    assert 'Fewer than 3' in str(e)
+# Plot smoke test (FAIL rows, baseline trial 0, best marker all exercised)
+f4 = os.path.join(outdir, 'pca.png')
+ko.plot_pca_projection(synth11, 'maximize', log_columns=log_cols,
+                       objective_name='IRR', filename=f4)
+assert os.path.isfile(f4) and os.path.getsize(f4) > 0
+PASS('pca_decision_matrix + plot_pca_projection: transform, mask, EVR, plot')
+
 print(f'\nALL {n_pass} CHECKS PASSED')

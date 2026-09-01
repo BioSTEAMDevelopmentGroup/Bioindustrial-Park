@@ -37,7 +37,8 @@ __all__ = ('OBJECTIVE_REGISTRY', 'TRACKED_METRICS',
            'trajectory_columns', 'append_trajectory_row', 'load_trajectory',
            'get_handles', 'run_kinetic_optimization', 'restore_baseline',
            'plot_optimization_trajectories', 'plot_parameter_trajectory',
-           'plot_best_vs_baseline')
+           'plot_best_vs_baseline',
+           'pca_decision_matrix', 'plot_pca_projection')
 
 FEEDING_VARIABLES = ('threshold_conc', 'target_delta', 'spike_delta',
                      'max_n_spikes')
@@ -445,6 +446,160 @@ def plot_best_vs_baseline(df, kinetic_baselines, direction, filename=None):
     if filename:
         fig.savefig(filename, dpi=200)
     return fig, ax
+
+#%% PCA projection of the sampled decision space
+
+def pca_decision_matrix(df, log_columns=(), decision_columns=None):
+    """PCA of the decision vectors of EVERY recorded trial (COMPLETE, FAIL
+    and NAN rows alike -- each records its full decision vector), from a
+    trajectory DataFrame (load_trajectory(csv_path)).
+
+    `decision_columns` defaults to the columns between 'state' and
+    'objective' -- exactly the search-space variables, by
+    trajectory_columns construction. Columns named in `log_columns` (the
+    log-sampled kinetic multiplier bands) are log10-transformed; all are
+    then z-scored, zero-variance columns dropped (e.g. pinned variables),
+    and the PCA computed by SVD (no sklearn). Component signs are
+    stabilized (largest-|loading| entry positive) so successive mid-run
+    figures do not flip axes.
+
+    Returns (coords, explained_var_ratio, loadings, kept_columns, valid):
+    `coords` (n_valid x n_components) are the trial scores, `loadings`
+    (n_components x n_kept) the variable weights, and `valid` a boolean
+    mask aligned with df's rows (False where any decision value is
+    missing/non-finite after transformation)."""
+    if decision_columns is None:
+        cols = list(df.columns)
+        decision_columns = cols[cols.index('state') + 1:
+                                cols.index('objective')]
+    # .copy(): pandas may hand back a read-only zero-copy view here, and
+    # the log10 transform below writes in place.
+    T = df[list(decision_columns)].to_numpy(dtype=float).copy()
+    with np.errstate(divide='ignore', invalid='ignore'):
+        for j, name in enumerate(decision_columns):
+            if name in log_columns:
+                T[:, j] = np.log10(T[:, j])
+    valid = np.isfinite(T).all(axis=1)
+    if valid.sum() < 3:
+        raise ValueError('Fewer than 3 trials with complete decision '
+                         'vectors -- nothing to project.')
+    Tv = T[valid]
+    kept, columns_z = [], []
+    for j, name in enumerate(decision_columns):
+        col = Tv[:, j]
+        std = col.std()
+        if std > 0.0 and np.isfinite(std):
+            columns_z.append((col - col.mean())/std)
+            kept.append(name)
+    if len(kept) < 2:
+        raise ValueError('Fewer than 2 non-degenerate decision variables '
+                         '-- nothing to project.')
+    Z = np.column_stack(columns_z)
+    U, S, Vt = np.linalg.svd(Z, full_matrices=False)
+    signs = np.sign(Vt[np.arange(Vt.shape[0]),
+                       np.argmax(np.abs(Vt), axis=1)])
+    signs[signs == 0] = 1.0
+    Vt = Vt*signs[:, None]
+    coords = U*S*signs[None, :]
+    explained_var_ratio = S**2/(S**2).sum()
+    return coords, explained_var_ratio, Vt, kept, valid
+
+def plot_pca_projection(df, direction, log_columns=(),
+                        objective_name='objective', objective_units='',
+                        filename=None):
+    """Four-panel PCA view of the sampled decision space: (1) the PC1 x
+    PC2 landscape -- completed trials colored by objective, FAIL/NAN
+    trials as gray/red crosses, the incumbent best-so-far path, the
+    enqueued baseline (trial 0) and the current best marked; (2) the
+    explained-variance scree of the top 10 PCs; (3) the top-|loading|
+    variables on PC1/PC2; (4) PC1 and PC2 of every sampled point vs trial
+    number (the sampler-contraction diagnostic). Works with zero
+    completed trials (landscape shows only pruned points). Returns
+    (fig, axes)."""
+    import matplotlib.pyplot as plt
+    coords, evr, loadings, kept, valid = pca_decision_matrix(
+        df, log_columns=log_columns)
+    dfv = df[valid].reset_index(drop=True)
+    fig = plt.figure(figsize=(14, 10))
+    gs = fig.add_gridspec(3, 3, width_ratios=[1.2, 1.2, 1],
+                          height_ratios=[1, 1, 0.7])
+    ax_main = fig.add_subplot(gs[0:2, 0:2])
+    ax_scree = fig.add_subplot(gs[0, 2])
+    ax_load = fig.add_subplot(gs[1:3, 2])
+    ax_time = fig.add_subplot(gs[2, 0:2])
+
+    pc1, pc2 = coords[:, 0], coords[:, 1]
+    state = dfv['state']
+    for st, color, label in (('FAIL', 'tab:gray', 'failed (pruned)'),
+                             ('NAN', 'tab:red', 'NaN objective (pruned)')):
+        m = (state == st).to_numpy()
+        if m.any():
+            ax_main.scatter(pc1[m], pc2[m], marker='x', s=18, alpha=0.35,
+                            color=color, label=label)
+    ok = (state == 'COMPLETE').to_numpy()
+    if ok.any():
+        sc = ax_main.scatter(pc1[ok], pc2[ok], c=dfv['objective'][ok],
+                             cmap='viridis', s=16, alpha=0.85,
+                             label='completed')
+        clabel = objective_name + (f' ({objective_units})'
+                                   if objective_units else '')
+        fig.colorbar(sc, ax=ax_main, label=clabel)
+        ok_df = dfv[ok].reset_index(drop=True)
+        best_path = np.unique(_best_row_indices(ok_df, direction))
+        ax_main.plot(pc1[ok][best_path], pc2[ok][best_path], ls='--',
+                     color='tab:red', lw=1.2, marker='D', ms=4,
+                     label='best-so-far path')
+        i_best = (ok_df['objective'].idxmax() if direction == 'maximize'
+                  else ok_df['objective'].idxmin())
+        ax_main.scatter(pc1[ok][i_best], pc2[ok][i_best], marker='*',
+                        s=260, color='gold', edgecolor='k', zorder=5,
+                        label='current best')
+    m0 = (dfv['trial_number'] == 0).to_numpy()
+    if m0.any():
+        ax_main.scatter(pc1[m0], pc2[m0], marker='*', s=200, color='k',
+                        zorder=5, label='baseline (trial 0)')
+    ax_main.set_xlabel(f'PC1 ({100*evr[0]:.1f}% var)')
+    ax_main.set_ylabel(f'PC2 ({100*evr[1]:.1f}% var)')
+    ax_main.set_title(f'Sampled decision space ({len(kept)} variables), '
+                      f'{len(dfv)} trials')
+    ax_main.legend(fontsize=7, loc='best')
+
+    n_show = min(10, len(evr))
+    ax_scree.bar(np.arange(1, n_show + 1), evr[:n_show],
+                 color='tab:blue', alpha=0.8)
+    ax_scree.plot(np.arange(1, n_show + 1), np.cumsum(evr[:n_show]),
+                  color='tab:red', marker='.', lw=1, label='cumulative')
+    ax_scree.set_xlabel('PC')
+    ax_scree.set_title('explained variance', fontsize=9)
+    ax_scree.legend(fontsize=7)
+
+    strength = np.hypot(loadings[0], loadings[1])
+    top = np.argsort(strength)[::-1][:12][::-1]
+    y = np.arange(len(top))
+    ax_load.barh(y + 0.2, loadings[0][top], height=0.4,
+                 color='tab:blue', label='PC1')
+    ax_load.barh(y - 0.2, loadings[1][top], height=0.4,
+                 color='tab:orange', label='PC2')
+    ax_load.set_yticks(y)
+    ax_load.set_yticklabels([kept[i] for i in top], fontsize=7)
+    ax_load.axvline(0.0, color='k', lw=0.8)
+    ax_load.set_title('top loadings', fontsize=9)
+    ax_load.legend(fontsize=7)
+
+    x = dfv['trial_number']
+    ax_time.scatter(x, pc1, s=6, alpha=0.4, color='tab:blue',
+                    label='PC1')
+    ax_time.scatter(x, pc2, s=6, alpha=0.4, color='tab:orange',
+                    label='PC2')
+    ax_time.set_xlabel('trial')
+    ax_time.set_ylabel('PC coordinate')
+    ax_time.set_title('sampler contraction', fontsize=9)
+    ax_time.legend(fontsize=7)
+
+    fig.tight_layout()
+    if filename:
+        fig.savefig(filename, dpi=200)
+    return fig, (ax_main, ax_scree, ax_load, ax_time)
 
 #%% Engine
 

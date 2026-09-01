@@ -142,6 +142,18 @@ def run(scenario='B',  # 'A' or 'B'
             ko.plot_best_vs_baseline(
                 df, kinetic_baselines, direction=direction,
                 filename=base + f'_best_vs_baseline_{stamp}.png')
+            # Log-sampled columns mirror build_search_space: kinetic
+            # params are log-scale unless a param_bounds_override entry
+            # has low <= 0.
+            override = engine_kwargs.get('param_bounds_override') or {}
+            log_columns = {
+                p for p in kinetic_baselines if p in df.columns
+                and (override[p][0] > 0.0 if p in override else True)}
+            ko.plot_pca_projection(
+                df, direction=direction, log_columns=log_columns,
+                objective_name=objective_name,
+                objective_units=objective_units,
+                filename=base + f'_pca_{stamp}.png')
             print(f'Plots saved next to {csv_path}')
         except Exception as e:
             print('Plotting failed (the trajectory CSV and study are '
