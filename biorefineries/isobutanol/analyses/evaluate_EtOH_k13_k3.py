@@ -62,6 +62,10 @@ HXN = f.HXN1001
 
 product = f.ethanol
 broth = ferm_reactor.outs[1]
+# Vent EtOH/IBO (stripped by the fermentation CO2) is captured by the
+# scrubber V409 and recycled to the separation feed via MX8, so it is
+# part of the recoverable product (a broth-only denominator reads >100 %).
+vent = ferm_reactor.outs[0]
 
 EtOH_market_range=np.array([0.7, 1.0]) 
                 
@@ -123,7 +127,7 @@ get_IBO_MPSP = lambda: latest_TEA_solution['MPSPs'][IBO_product.ID]
 get_IRR = lambda: latest_TEA_solution['IRR']
 get_product_purity = lambda: sum([product.imass[i] for i in product_chemical_IDs])/product.F_mass
 get_production = lambda: sum([product.imass[i] for i in product_chemical_IDs])
-get_product_recovery = lambda: sum([product.imol[i] for i in product_chemical_IDs])/sum([broth.imol[i] for i in product_chemical_IDs])
+get_product_recovery = lambda: sum([product.imol[i] for i in product_chemical_IDs])/sum([broth.imol[i] + vent.imol[i] for i in product_chemical_IDs])
 get_AOC = lambda: tea.AOC / 1e6 # million USD / y
 get_TCI = lambda: tea.TCI / 1e6 # million USD
 
