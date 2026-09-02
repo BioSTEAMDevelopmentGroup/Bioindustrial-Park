@@ -129,9 +129,10 @@ def plot_metric_with_trajectories(
         cmap=None, w_levels=None, cbar_ticks=None, w_ticks=None,
         extend_cmap='max', cmap_over_color=None,
         trajectory_colors=None,
+        trajectory_linestyles=None, trajectory_linewidths=None,
         baseline_marker=('D', 'gray', 6),
         optimum_marker='*', optimum_marker_size=12,
-        show_legend=True, fig_ax=None,
+        show_legend=True, legend_kwargs=None, fig_ax=None,
         **contourplot_kwargs):
     """Filled contour of `color_metric` over (`spec_1`, `spec_2`), with a
     baseline marker and one greedy 8-neighbor trajectory (+ optimum marker)
@@ -152,6 +153,13 @@ def plot_metric_with_trajectories(
         Metrics to hill-climb and draw.
     senses : dict
         {metric_name: 'min' | 'max'} for every metric in `trajectory_metrics`.
+    trajectory_colors, trajectory_linestyles, trajectory_linewidths : dict, optional
+        {metric_name: value} overrides for each trajectory's polyline (and its
+        legend entry); defaults cycle a fixed color list, solid, 1.6 pt.
+        Distinct styles/widths keep coincident path segments distinguishable.
+    legend_kwargs : dict, optional
+        Overrides for `ax.legend` (default loc='upper right', fontsize=8,
+        framealpha=0.9), e.g. {'loc': 'center right'}.
 
     Returns
     -------
@@ -230,11 +238,13 @@ def plot_metric_with_trajectories(
         path_ij = _greedy_climb(grid, (iy0, ix0), senses[m])
         path_xy = [(float(spec_1[ix]), float(spec_2[iy])) for (iy, ix) in path_ij]
         color = trajectory_colors[m]
+        linestyle = (trajectory_linestyles or {}).get(m, '-')
+        linewidth = (trajectory_linewidths or {}).get(m, 1.6)
         xs = [p[0] for p in path_xy]
         ys = [p[1] for p in path_xy]
         if len(path_xy) > 1:
-            ax.plot(xs, ys, '-', color=color, linewidth=1.6,
-                    zorder=400, clip_on=False)
+            ax.plot(xs, ys, linestyle=linestyle, color=color,
+                    linewidth=linewidth, zorder=400, clip_on=False)
         ax.plot(xs[-1], ys[-1], linestyle='None', marker=optimum_marker,
                 markerfacecolor=color, markeredgecolor='k', markeredgewidth=0.6,
                 markersize=optimum_marker_size, zorder=600, clip_on=False)
@@ -248,7 +258,8 @@ def plot_metric_with_trajectories(
         }
         legend_handles.append(Line2D(
             [0], [0], color=color, marker=optimum_marker, markerfacecolor=color,
-            markeredgecolor='k', linewidth=1.6, label=m))
+            markeredgecolor='k', linestyle=linestyle, linewidth=linewidth,
+            label=m))
 
     b_shape, b_color, b_size = baseline_marker
     ax.plot(float(spec_1[ix0]), float(spec_2[iy0]), linestyle='None',
@@ -259,7 +270,9 @@ def plot_metric_with_trajectories(
         markeredgecolor='k', linestyle='None', label='baseline')
 
     if show_legend:
-        ax.legend(handles=[baseline_handle, *legend_handles],
-                  loc='upper right', fontsize=8, framealpha=0.9)
+        legend_kw = dict(loc='upper right', fontsize=8, framealpha=0.9)
+        if legend_kwargs:
+            legend_kw.update(legend_kwargs)
+        ax.legend(handles=[baseline_handle, *legend_handles], **legend_kw)
 
     return fig, ax, trajectory_data

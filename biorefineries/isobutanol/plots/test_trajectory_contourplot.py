@@ -188,7 +188,31 @@ def test_plot_constant_color_metric_raises():
         raise AssertionError("expected ValueError for constant color metric")
 
 
+def test_plot_trajectory_styles_and_legend_kwargs():
+    results, s1, s2 = _synthetic_results()
+    fig, ax, traj = tc.plot_metric_with_trajectories(
+        results, s1, s2, color_metric='MPSP', baseline_point=(30.0, 0.5),
+        trajectory_metrics=['MPSP', 'IRR'], senses={'MPSP': 'min', 'IRR': 'max'},
+        trajectory_linestyles={'MPSP': '--'}, trajectory_linewidths={'MPSP': 3.0},
+        legend_kwargs={'loc': 'lower left'})
+    # the MPSP polyline (multi-point line) carries the requested style/width
+    polylines = [l for l in ax.lines if len(l.get_xdata()) > 1]
+    assert len(polylines) == 1                       # IRR has n_steps == 0
+    assert polylines[0].get_linestyle() == '--'
+    assert polylines[0].get_linewidth() == 3.0
+    # legend entry mirrors the style; unspecified metric keeps the defaults
+    by_label = {h.get_label(): h for h in ax.get_legend().legend_handles}
+    assert by_label['MPSP'].get_linestyle() == '--'
+    assert by_label['MPSP'].get_linewidth() == 3.0
+    assert by_label['IRR'].get_linestyle() == '-'
+    assert by_label['IRR'].get_linewidth() == 1.6
+    assert ax.get_legend()._loc == 3                 # matplotlib code for 'lower left'
+    import matplotlib.pyplot as plt
+    plt.close(fig)
+
+
 PLOT_TESTS = [
+    test_plot_trajectory_styles_and_legend_kwargs,
     test_derive_levels_ranges_and_errors,
     test_plot_returns_fig_ax_and_trajectory_data,
     test_plot_missing_sense_raises,
