@@ -58,7 +58,7 @@ SENSES = {m: 'max' for m in TRAJECTORY_METRICS}
 # lines are dashed at the same width; greedy climbs from one start share their
 # first segment, so the IRR dashes are phase-shifted by one dash length
 # against the grey ones and the two alternate where the paths coincide.
-_GREY = '#8a8a8a'
+_GREY = '#a0a0a0'
 TRAJECTORY_COLORS = {'IRR': '#ffffff', 'IBO Titer': _GREY,
                      'IBO Yield': _GREY, 'IBO Productivity': _GREY}
 _DASH_IRR, _DASH_OTHER = (0, (4, 4)), (4, (4, 4))   # (offset, (on, off)) in pt
@@ -84,7 +84,8 @@ y_ticks = [0.0, 0.05, 0.1, 0.15, 0.2]
 # 0-20 % and the extend arrows catch both ends beyond that
 IRR_w_levels = np.arange(0.0, 20.001, 0.5)
 IRR_cbar_ticks = np.arange(0.0, 20.001, 5.0)
-IRR_w_ticks = [5.0, 10.0, 15.0, 18.0]
+IRR_w_ticks = [5.0, 10.0, 18.0]          # black labeled contour lines
+IRR_white_lines = [0.0, 15.0]            # white labeled contour lines
 fmt_percent = lambda v, pos=None: f'{v:g}%'
 
 axis_title_fonts = {'size': {'x': 11, 'y': 11, 'z': 11, 'w': 11}}
@@ -129,7 +130,7 @@ def main():
     fig, ax, traj = tc.plot_metric_with_trajectories(
         results, SPEC_1, SPEC_2,
         color_metric=COLOR_METRIC,
-        color_metric_label=r"$\mathbf{IRR}$",
+        color_metric_label=r"$\mathbf{Internal\ Rate\ of\ Return}$",
         color_metric_units='',
         baseline_point=(BASELINE_K13, BASELINE_K7II),
         trajectory_metrics=TRAJECTORY_METRICS,
@@ -159,6 +160,7 @@ def main():
         cmap_under_color=colors.grey_dark.shade(40).RGBn,
         # passed through to contourplots.animated_contourplot
         fmt_clabel=fmt_percent,
+        comparison_lines=IRR_white_lines, comparison_lines_colors='white',
         axis_title_fonts=axis_title_fonts,
         clabel_fontsize=clabel_fontsize,
         default_fontsize=default_fontsize,
