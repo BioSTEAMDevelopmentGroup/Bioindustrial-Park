@@ -8,8 +8,8 @@
 # for license details.
 """
 IRR contour of the scenario-B k_13 x k_7ii kinetic sweep, overlaid with greedy
-(8-neighbor hill-climb) trajectories from the scenario-B baseline kinetics to
-the local maxima of IRR and of the isobutanol and ethanol titer, yield and
+(8-neighbor hill-climb) trajectories from an ethanol-only start point (k_13 = 0
+at the scenario-B baseline k_7ii) to the local maxima of IRR and of the isobutanol and ethanol titer, yield and
 productivity (seven trajectories; the metric set is configurable below).
 
 Consumes the per-metric CSVs written by analyses/evaluate_EtOH_k13_k7ii.py
@@ -41,10 +41,12 @@ STEPS = (20, 20)
 SPEC_1 = np.linspace(0.0, 20.0, STEPS[0])       # k_13  (x axis, sweep spec_1)
 SPEC_2 = np.linspace(0.0001, 0.2, STEPS[1])     # k_7ii (y axis, sweep spec_2)
 
-# Scenario-B baseline kinetics (Baseline column of
-# analyses/full/parameter_distributions/parameter-distributions_corn_IBO_EtOH_B.xlsx);
-# snapped to the nearest grid cell by the plotting function.
-BASELINE_K13 = 5.81
+# Trajectory start point, snapped to the nearest grid cell by the plotting
+# function: the scenario-B baseline k_7ii (Baseline column of analyses/full/
+# parameter_distributions/parameter-distributions_corn_IBO_EtOH_B.xlsx) with
+# the isobutanol pathway switched off (k_13 = 0), i.e. the ethanol-only
+# strain; the workbook's own k_13 baseline is 5.81.
+BASELINE_K13 = 0.0
 BASELINE_K7II = 0.15
 
 COLOR_METRIC = 'IRR'
@@ -133,6 +135,10 @@ def main():
         trajectory_colors=TRAJECTORY_COLORS,
         trajectory_linestyles=TRAJECTORY_LINESTYLES,
         trajectory_linewidths=TRAJECTORY_LINEWIDTHS,
+        # a step must beat the sweep's own convergence tolerance (sim_rtol =
+        # 1e-4); e.g. the ethanol metrics along k_13 = 0 differ by ~4e-8
+        # relative, which the strict greedy rule would otherwise "climb"
+        min_rel_improvement=1e-4,
         # eight entries: park the legend below the axes, three columns; the
         # mid-grey face keeps both the black and the white lines visible
         legend_kwargs={'loc': 'upper center', 'bbox_to_anchor': (0.5, -0.16),

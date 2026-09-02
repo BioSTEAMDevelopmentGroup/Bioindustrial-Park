@@ -102,8 +102,30 @@ def test_greedy_climb_invalid_sense_raises():
         raise AssertionError("expected ValueError for invalid sense")
 
 
+def test_greedy_climb_min_rel_improvement_ignores_round_off_plateau():
+    # a flat column (differences ~1e-8 relative, like a converged simulation's
+    # noise) next to a genuinely better cell two columns away that the climb
+    # cannot reach without first taking a noise-level step.
+    grid = np.full((3, 3), 100.0)
+    grid[:, 0] = [100.0, 100.0 + 1e-6, 100.0 + 2e-6]   # plateau, rising "up"
+    grid[2, 1] = 100.0 + 3e-6
+    grid[2, 2] = 150.0
+    # default (any strict improvement): walks the plateau and reaches 150
+    path = tc._greedy_climb(grid, (0, 0), 'max')
+    assert path[-1] == (2, 2)
+    # with a threshold above the noise the start is already a local optimum
+    # ((1, 1) is exactly equal, the plateau cells are within tolerance)
+    assert tc._greedy_climb(grid, (0, 0), 'max', min_rel_improvement=1e-4) == [(0, 0)]
+    # a real improvement still passes the threshold
+    assert tc._greedy_climb(grid, (2, 1), 'max', min_rel_improvement=1e-4) == [(2, 1), (2, 2)]
+    # zero current value: any strict improvement counts
+    grid0 = np.zeros((1, 2)); grid0[0, 1] = 1e-9
+    assert tc._greedy_climb(grid0, (0, 0), 'max', min_rel_improvement=1e-4) == [(0, 0), (0, 1)]
+
+
 HELPER_TESTS = [
     test_squeeze_grid_accepts_2d_and_3d,
+    test_greedy_climb_min_rel_improvement_ignores_round_off_plateau,
     test_snap_index_picks_nearest,
     test_greedy_climb_walks_diagonally_to_min,
     test_greedy_climb_max_sense,

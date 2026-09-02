@@ -74,7 +74,7 @@ def _snap_index(spec, value):
     return int(np.argmin(np.abs(spec - value)))
 
 
-def _greedy_climb(grid, start, sense, max_steps=None):
+def _greedy_climb(grid, start, sense, max_steps=None, min_rel_improvement=0.0):
     """8-neighbor (Moore) hill-climb over a 2-D `grid`, returning the list of
     visited `(iy, ix)` cells from `start` to the greedy local optimum.
 
@@ -83,6 +83,11 @@ def _greedy_climb(grid, start, sense, max_steps=None):
     the climb stops when no neighbor improves. `sense` is 'min' or 'max'. Ties
     are broken toward the smallest `(iy, ix)` for determinism. Raises
     ValueError if `sense` is invalid or the start cell is NaN.
+
+    `min_rel_improvement` (default 0, i.e. any strict improvement) is the
+    smallest |neighbor - current| / |current| that counts as an improvement,
+    so a climb does not wander across a plateau whose cells differ only by
+    simulation round-off; a zero current value accepts any strict change.
     """
     grid = np.asarray(grid, dtype=float)
     ny, nx = grid.shape
@@ -100,6 +105,7 @@ def _greedy_climb(grid, start, sense, max_steps=None):
     for _ in range(max_steps):
         best = None
         best_val = grid[iy, ix]
+        threshold = min_rel_improvement * abs(best_val)
         for diy in (-1, 0, 1):
             for dix in (-1, 0, 1):
                 if diy == 0 and dix == 0:
@@ -110,7 +116,7 @@ def _greedy_climb(grid, start, sense, max_steps=None):
                 v = grid[jy, jx]
                 if np.isnan(v):
                     continue
-                if improves(v, best_val):
+                if improves(v, best_val) and abs(v - grid[iy, ix]) > threshold:
                     best_val = v
                     best = (jy, jx)
         if best is None:
@@ -133,6 +139,7 @@ def plot_metric_with_trajectories(
         baseline_marker=('D', 'gray', 6),
         optimum_marker='*', optimum_marker_size=12,
         show_legend=True, legend_kwargs=None, fig_ax=None,
+        min_rel_improvement=0.0,
         **contourplot_kwargs):
     """Filled contour of `color_metric` over (`spec_1`, `spec_2`), with a
     baseline marker and one greedy 8-neighbor trajectory (+ optimum marker)
@@ -160,6 +167,10 @@ def plot_metric_with_trajectories(
     legend_kwargs : dict, optional
         Overrides for `ax.legend` (default loc='upper right', fontsize=8,
         framealpha=0.9), e.g. {'loc': 'center right'}.
+    min_rel_improvement : float, optional
+        Relative improvement a climb step must achieve (see `_greedy_climb`);
+        set it to the sweep's simulation tolerance so plateaus of round-off
+        do not read as trajectories. Default 0 (any strict improvement).
 
     Returns
     -------
@@ -235,7 +246,8 @@ def plot_metric_with_trajectories(
     legend_handles = []
     for m in trajectory_metrics:
         grid = _squeeze_grid(results[m])
-        path_ij = _greedy_climb(grid, (iy0, ix0), senses[m])
+        path_ij = _greedy_climb(grid, (iy0, ix0), senses[m],
+                                min_rel_improvement=min_rel_improvement)
         path_xy = [(float(spec_1[ix]), float(spec_2[iy])) for (iy, ix) in path_ij]
         color = trajectory_colors[m]
         linestyle = (trajectory_linestyles or {}).get(m, '-')
