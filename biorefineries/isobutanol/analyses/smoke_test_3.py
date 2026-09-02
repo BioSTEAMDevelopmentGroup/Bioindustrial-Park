@@ -22,11 +22,13 @@ beer-column mode and the isobutanol product is empty.
 EACH simulation. Gates (a violation exits non-zero exactly like a
 traceback):
 
-- purity-adjusted ethanol MPSP within 1% of 0.76073 (the both-trains
+- purity-adjusted ethanol MPSP within 1% of 0.85293 (the both-trains
   scenario-A baseline, reproduced to full precision by the 2026-09-02
-  re-pin run, 0.7607266189197822. Re-pinned 2026-09-02 for the Lang
-  factor 3.0 TEA (Huang et al. 2016; previous pin 0.84057 under corn's
-  uncited Lang factor 4), and 2026-09-01 after (a) the
+  re-pin run, 0.852926601221243. Re-pinned 2026-09-02 for the 2023
+  CEPCI 797.9 (bst.CE had been biosteam's 567.5 default; pin under Lang
+  3.0 alone was 0.76073) and, earlier that day, the Lang factor 3.0 TEA
+  (Huang et al. 2016; previous pin 0.84057 under corn's uncited Lang
+  factor 4), and 2026-09-01 after (a) the
   kinetics-synced parameter xlsx (d467f0aa / 3720fa21) and (b) the
   vent-scrubber-bottoms recycle to the separation feed (MX8) with molar
   L/G = 2.0 wash water; the pin before that was 0.81733)
@@ -89,8 +91,8 @@ def load_simulate_baseline(stream_IDs=('ethanol', 'isobutanol'), # products whos
         results = solve_TEA(stream_IDs=stream_IDs, IRR_for_MPSP=IRR_for_MPSP)
         MPSP_ethanol = results['MPSPs']['ethanol']
         MPSP_isobutanol = results['MPSPs']['isobutanol']
-        assert abs(MPSP_ethanol - 0.76073)/0.76073 < 0.01, \
-            f'sim {i+1}: ethanol MPSP {MPSP_ethanol} not within 1% of 0.76073'
+        assert abs(MPSP_ethanol - 0.85293)/0.85293 < 0.01, \
+            f'sim {i+1}: ethanol MPSP {MPSP_ethanol} not within 1% of 0.85293'
         assert math.isnan(MPSP_isobutanol), \
             f'sim {i+1}: isobutanol MPSP {MPSP_isobutanol} expected nan (empty product)'
         if all_results:

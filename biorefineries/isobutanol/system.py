@@ -19,7 +19,7 @@ from biorefineries.isobutanol import units
 from nskinetics.models.s_cerevisiae_ferm_fb_inhib_mod_ibo import te_r
 from scipy.optimize import differential_evolution, minimize, brute
 from matplotlib.ticker import AutoMinorLocator
-from biorefineries.isobutanol.process_settings import load_process_settings
+from biorefineries.isobutanol.process_settings import load_process_settings, CEPCI
 from biorefineries.isobutanol.separations import create_separation_system
 
 from warnings import filterwarnings
@@ -99,7 +99,11 @@ def load(simulate_baseline=True,
     # corn.system.simulate()
     # corn.system.diagram('cluster')
 
-    settings = corn.process_settings.BiorefinerySettings()
+    # Keep corn's settings object on the same cost index as bst.CE (set by
+    # load_process_settings above). corn.systems.create_system never calls
+    # settings.load_process_settings() (only corn.Biorefinery does), so this
+    # is for consistency only; bst.CE is what the unit costing actually reads.
+    settings = corn.process_settings.BiorefinerySettings(CEPCI=CEPCI)
 
     #%% biosteam 2.53 compatibility shims for the (read-only) corn / cellulosic builds
     # biosteam 2.53's BatchBioreactor (nrel_bioreactor.py) fixes _N_ins = 1, but

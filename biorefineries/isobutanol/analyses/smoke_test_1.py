@@ -42,9 +42,11 @@ def _assert_MPSPs_stable(reference, current, sim_number, rel_tol=5e-3):
 def _assert_MPSPs_pinned(expected, current, sim_number, rel_tol=0.01):
     """Verify the current simulation's MPSPs against the pinned baseline
     values (within rel_tol, 1% by default; nan stays nan). Re-pinned
-    2026-09-02 for the Lang factor 3.0 TEA (Huang et al. 2016; the
-    previous pins under corn's uncited Lang factor 4 were A 0.84057 /
-    B 1.0521 + 1.7538). Those 2026-09-01 pins followed (a) the
+    2026-09-02 for the 2023 CEPCI 797.9 (bst.CE had been biosteam's
+    567.5 default; pins under Lang 3.0 alone were A 0.76073 / B 0.81176
+    + 1.4618) and, earlier that day, the Lang factor 3.0 TEA (Huang et
+    al. 2016; the previous pins under corn's uncited Lang factor 4 were
+    A 0.84057 / B 1.0521 + 1.7538). Those 2026-09-01 pins followed (a) the
     kinetics-synced parameter xlsx (d467f0aa /
     3720fa21) and (b) the vent-scrubber-bottoms recycle to the separation
     feed (MX8) with molar L/G = 2.0 wash water; before that these tests
@@ -81,12 +83,12 @@ def load_simulate_baseline(scenario='A', # 'A' or 'B'
         fbs_spec.max_n_spikes = 16
         sim_kwargs = dict(threshold_conc=217.125, target_conc=221.25)
         # both-trains scenario-A baseline (isobutanol product empty)
-        expected_MPSPs = {'ethanol': 0.76073, 'isobutanol': math.nan}
+        expected_MPSPs = {'ethanol': 0.85293, 'isobutanol': math.nan}
     elif scenario=='B':
         fbs_spec.max_n_spikes = 13
         sim_kwargs = dict(threshold_conc=216.3, target_conc=226.3)
         # both-trains scenario-B baseline
-        expected_MPSPs = {'ethanol': 0.81176, 'isobutanol': 1.4618}
+        expected_MPSPs = {'ethanol': 1.0870, 'isobutanol': 1.7961}
     else:
         raise ValueError(f'Scenario {scenario} not found.')
 

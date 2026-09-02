@@ -15,11 +15,13 @@ Smoke test 4 -- scenario B baseline with ONLY the IBO/EtOH separation train:
 EACH simulation. Gates (a violation exits non-zero exactly like a
 traceback):
 
-- purity-adjusted ethanol MPSP within 1% of 0.81176 (the both-trains
+- purity-adjusted ethanol MPSP within 1% of 1.0870 (the both-trains
   scenario-B baseline; dropping the pass-through gating splitter S201 must
   not move results beyond simulation tolerance)
-- purity-adjusted isobutanol MPSP within 1% of 1.4618
-  (Both re-pinned 2026-09-02 for the Lang factor 3.0 TEA (Huang et al.
+- purity-adjusted isobutanol MPSP within 1% of 1.7961
+  (Both re-pinned 2026-09-02 for the 2023 CEPCI 797.9 (bst.CE had been
+  biosteam's 567.5 default; pins under Lang 3.0 alone were 0.81176 /
+  1.4618) and, earlier that day, the Lang factor 3.0 TEA (Huang et al.
   2016; previous pins 1.0521 / 1.7538 under corn's uncited Lang factor
   4), and 2026-09-01 after (a) the kinetics-synced parameter xlsx
   (d467f0aa / 3720fa21) and (b) the vent-scrubber-bottoms recycle to the
@@ -83,10 +85,10 @@ def load_simulate_baseline(stream_IDs=('ethanol', 'isobutanol'), # products whos
         results = solve_TEA(stream_IDs=stream_IDs, IRR_for_MPSP=IRR_for_MPSP)
         MPSP_ethanol = results['MPSPs']['ethanol']
         MPSP_isobutanol = results['MPSPs']['isobutanol']
-        assert abs(MPSP_ethanol - 0.81176)/0.81176 < 0.01, \
-            f'sim {i+1}: ethanol MPSP {MPSP_ethanol} not within 1% of 0.81176'
-        assert abs(MPSP_isobutanol - 1.4618)/1.4618 < 0.01, \
-            f'sim {i+1}: isobutanol MPSP {MPSP_isobutanol} not within 1% of 1.4618'
+        assert abs(MPSP_ethanol - 1.0870)/1.0870 < 0.01, \
+            f'sim {i+1}: ethanol MPSP {MPSP_ethanol} not within 1% of 1.0870'
+        assert abs(MPSP_isobutanol - 1.7961)/1.7961 < 0.01, \
+            f'sim {i+1}: isobutanol MPSP {MPSP_isobutanol} not within 1% of 1.7961'
         if all_results:
             _assert_MPSPs_stable(all_results[0], results, i+1)
         all_results.append(results)
