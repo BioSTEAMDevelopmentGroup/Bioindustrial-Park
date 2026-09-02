@@ -276,7 +276,7 @@ def plot_metric_with_trajectories(
     b_shape, b_color, b_size = baseline_marker
     ax.plot(float(spec_1[ix0]), float(spec_2[iy0]), linestyle='None',
             marker=b_shape, markerfacecolor=b_color, markeredgecolor='k',
-            markeredgewidth=0.8, markersize=b_size, zorder=550, clip_on=False)
+            markeredgewidth=0.8, markersize=b_size, zorder=650, clip_on=False)  # above optimum stars (600): visible when a climb has 0 steps
     baseline_handle = Line2D(
         [0], [0], color='none', marker=b_shape, markerfacecolor=b_color,
         markeredgecolor='k', linestyle='None', label='baseline')
