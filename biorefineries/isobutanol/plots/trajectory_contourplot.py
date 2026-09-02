@@ -136,6 +136,7 @@ def plot_metric_with_trajectories(
         extend_cmap='max', cmap_over_color=None,
         trajectory_colors=None,
         trajectory_linestyles=None, trajectory_linewidths=None,
+        trajectory_markers=None,
         baseline_marker=('D', 'gray', 6),
         optimum_marker='*', optimum_marker_size=12,
         show_legend=True, legend_kwargs=None, fig_ax=None,
@@ -164,6 +165,9 @@ def plot_metric_with_trajectories(
         {metric_name: value} overrides for each trajectory's polyline (and its
         legend entry); defaults cycle a fixed color list, solid, 1.6 pt.
         Distinct styles/widths keep coincident path segments distinguishable.
+    trajectory_markers : dict, optional
+        {metric_name: marker} for each trajectory's optimum marker (and legend
+        entry); default `optimum_marker` for all.
     legend_kwargs : dict, optional
         Overrides for `ax.legend` (default loc='upper right', fontsize=8,
         framealpha=0.9), e.g. {'loc': 'center right'}.
@@ -252,12 +256,13 @@ def plot_metric_with_trajectories(
         color = trajectory_colors[m]
         linestyle = (trajectory_linestyles or {}).get(m, '-')
         linewidth = (trajectory_linewidths or {}).get(m, 1.6)
+        marker = (trajectory_markers or {}).get(m, optimum_marker)
         xs = [p[0] for p in path_xy]
         ys = [p[1] for p in path_xy]
         if len(path_xy) > 1:
             ax.plot(xs, ys, linestyle=linestyle, color=color,
                     linewidth=linewidth, zorder=400, clip_on=False)
-        ax.plot(xs[-1], ys[-1], linestyle='None', marker=optimum_marker,
+        ax.plot(xs[-1], ys[-1], linestyle='None', marker=marker,
                 markerfacecolor=color, markeredgecolor='k', markeredgewidth=0.6,
                 markersize=optimum_marker_size, zorder=600, clip_on=False)
         opt_iy, opt_ix = path_ij[-1]
@@ -269,7 +274,7 @@ def plot_metric_with_trajectories(
             'n_steps': len(path_xy) - 1,
         }
         legend_handles.append(Line2D(
-            [0], [0], color=color, marker=optimum_marker, markerfacecolor=color,
+            [0], [0], color=color, marker=marker, markerfacecolor=color,
             markeredgecolor='k', linestyle=linestyle, linewidth=linewidth,
             label=m))
 

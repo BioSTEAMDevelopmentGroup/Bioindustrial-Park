@@ -26,6 +26,7 @@ import importlib.util
 
 import matplotlib
 matplotlib.use('Agg')
+from matplotlib.ticker import FuncFormatter
 import numpy as np
 import pandas as pd
 from biosteam.utils import colors
@@ -52,31 +53,37 @@ BASELINE_K7II = 0.15
 COLOR_METRIC = 'IRR'
 TRAJECTORY_METRICS = ['IRR', 'IBO Titer', 'IBO Yield', 'IBO Productivity']
 SENSES = {m: 'max' for m in TRAJECTORY_METRICS}
-# Styling on the reversed (yellow = high IRR) colormap. Greedy climbs from one
-# baseline share their first segments, so every trajectory needs a distinct
-# look even where it lies on top of another:
-#   color = metric  (cyan IRR, black titer, white yield, magenta productivity)
-#   width = draw order (IRR widest and first, then titer > yield > productivity,
-#                       so each narrower line stays visible inside a wider
-#                       coincident one); all dashed, thin
-TRAJECTORY_COLORS = {'IRR': '#00bfff', 'IBO Titer': '#1a1a1a',
-                     'IBO Yield': '#ffffff', 'IBO Productivity': '#ff1aff'}
-TRAJECTORY_LINESTYLES = {m: '--' for m in TRAJECTORY_METRICS}
-TRAJECTORY_LINEWIDTHS = {'IRR': 2.5, 'IBO Titer': 1.8,
-                         'IBO Yield': 1.2, 'IBO Productivity': 0.8}
+# Styling on the reversed (yellow = high IRR) colormap: IRR white, the three
+# fermentation metrics one grey and told apart by their optimum markers. All
+# lines are dashed at the same width; greedy climbs from one start share their
+# first segment, so the IRR dashes are phase-shifted by one dash length
+# against the grey ones and the two alternate where the paths coincide.
+_GREY = '#5a5a5a'
+TRAJECTORY_COLORS = {'IRR': '#ffffff', 'IBO Titer': _GREY,
+                     'IBO Yield': _GREY, 'IBO Productivity': _GREY}
+_DASH_IRR, _DASH_OTHER = (0, (4, 4)), (4, (4, 4))   # (offset, (on, off)) in pt
+TRAJECTORY_LINESTYLES = {m: (_DASH_IRR if m == 'IRR' else _DASH_OTHER)
+                         for m in TRAJECTORY_METRICS}
+TRAJECTORY_LINEWIDTHS = {m: 1.5 for m in TRAJECTORY_METRICS}
+TRAJECTORY_MARKERS = {'IRR': '*', 'IBO Titer': 'o',
+                      'IBO Yield': 's', 'IBO Productivity': '^'}
+BASELINE_MARKER = ('D', 'white', 6)   # (shape, fill color, size)
 
 #%% Plot styling (shared with the sweep script's IRR contour)
 
 x_label = r"$\mathbf{k}_{13}$"
 y_label = r"$\mathbf{k}_{7ii}$"
-xy_units = r"$\mathrm{g} \cdot \mathrm{L}^{-1} \cdot \mathrm{h}^{-1}$"
+x_units = r"$\mathrm{g} \cdot \mathrm{L}^{-1} \cdot \mathrm{h}^{-1}$"
+y_units = r"$\mathrm{L} \cdot \mathrm{g}^{-1}$"
 x_ticks = [0, 5, 10, 15, 20]
 y_ticks = [0.0, 0.05, 0.1, 0.15, 0.2]
 
-# same bounds as evaluate_EtOH_k13_k7ii.py (grid IRR spans -0.12 to 0.19)
-IRR_w_levels = np.arange(-0.1, 0.2001, 0.005)
-IRR_cbar_ticks = np.arange(-0.1, 0.2001, 0.05)
-IRR_w_ticks = [0.0, 0.05, 0.10, 0.15, 0.18]
+# IRR is plotted in percent (grid spans -12 % to 19 %); the colorbar covers
+# 0-20 % and the extend arrows catch both ends beyond that
+IRR_w_levels = np.arange(0.0, 20.001, 0.5)
+IRR_cbar_ticks = np.arange(0.0, 20.001, 5.0)
+IRR_w_ticks = [5.0, 10.0, 15.0, 18.0]
+fmt_percent = lambda v, pos=None: f'{v:g}%'
 
 axis_title_fonts = {'size': {'x': 11, 'y': 11, 'z': 11, 'w': 11}}
 default_fontsize = 11.
@@ -115,6 +122,7 @@ def main():
     tc = _load_module()
     results = {m: _load_metric_csv(m)
                for m in dict.fromkeys([COLOR_METRIC, *TRAJECTORY_METRICS])}
+    results['IRR'] = 100. * results['IRR']   # fraction -> percent
 
     fig, ax, traj = tc.plot_metric_with_trajectories(
         results, SPEC_1, SPEC_2,
@@ -127,17 +135,19 @@ def main():
         trajectory_colors=TRAJECTORY_COLORS,
         trajectory_linestyles=TRAJECTORY_LINESTYLES,
         trajectory_linewidths=TRAJECTORY_LINEWIDTHS,
+        trajectory_markers=TRAJECTORY_MARKERS,
+        baseline_marker=BASELINE_MARKER,
         # a step must beat the sweep's own convergence tolerance (sim_rtol =
         # 1e-4); e.g. the ethanol metrics along k_13 = 0 differ by ~4e-8
         # relative, which the strict greedy rule would otherwise "climb"
         min_rel_improvement=1e-4,
-        # legend below the axes in one row; the mid-grey face keeps both the
-        # black and the white lines visible
+        # legend below the axes in one row; the light-grey face keeps both the
+        # white and the grey lines visible
         legend_kwargs={'loc': 'upper center', 'bbox_to_anchor': (0.5, -0.16),
                        'ncol': 5, 'fontsize': 8.5, 'framealpha': 1.0,
-                       'facecolor': '#a9a9a9', 'edgecolor': 'k'},
+                       'facecolor': '#c8c8c8', 'edgecolor': 'k'},
         x_label=x_label, y_label=y_label,
-        x_units=xy_units, y_units=xy_units,
+        x_units=x_units, y_units=y_units,
         x_ticks=x_ticks, y_ticks=y_ticks,
         cmap=tc.JBEI_UCB_colormap(reverse=True),
         w_levels=IRR_w_levels, cbar_ticks=IRR_cbar_ticks, w_ticks=IRR_w_ticks,
@@ -145,7 +155,7 @@ def main():
         cmap_over_color=colors.yellow_tint.RGBn,
         cmap_under_color=colors.grey_dark.shade(40).RGBn,
         # passed through to contourplots.animated_contourplot
-        fmt_clabel=lambda cvalue: f'{cvalue:.2f}',
+        fmt_clabel=fmt_percent,
         axis_title_fonts=axis_title_fonts,
         clabel_fontsize=clabel_fontsize,
         default_fontsize=default_fontsize,
@@ -158,6 +168,9 @@ def main():
         units_opening_brackets=[" (", " (", " (", ""],
         units_closing_brackets=[")", ")", ")", ""],
     )
+    # percent ticks on the colorbar (the last axes contourplots added)
+    cbar_ax = [a for a in fig.axes if a is not ax][-1]
+    cbar_ax.yaxis.set_major_formatter(FuncFormatter(fmt_percent))
 
     stem = f'{COLOR_METRIC}_greedy_trajectories_{SWEEP_PREFIX}'
     png = os.path.join(RESULTS_DIR, stem + '.png')
@@ -178,7 +191,8 @@ def main():
     ix0 = tc._snap_index(SPEC_1, BASELINE_K13)
     iy0 = tc._snap_index(SPEC_2, BASELINE_K7II)
     print(f'\nBaseline (k_13, k_7ii) = ({BASELINE_K13}, {BASELINE_K7II}) '
-          f'snapped to grid cell ({SPEC_1[ix0]:.4g}, {SPEC_2[iy0]:.4g})')
+          f'snapped to grid cell ({SPEC_1[ix0]:.4g}, {SPEC_2[iy0]:.4g}); '
+          f'IRR values in %')
     for m in TRAJECTORY_METRICS:
         print(f'  {m:18s} {SENSES[m]}: {results[m][0][iy0, ix0]:.4g} at baseline')
     print()
