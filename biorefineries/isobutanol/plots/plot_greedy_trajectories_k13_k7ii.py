@@ -9,8 +9,8 @@
 """
 IRR contour of the scenario-B k_13 x k_7ii kinetic sweep, overlaid with greedy
 (8-neighbor hill-climb) trajectories from an ethanol-only start point (k_13 = 0
-at the scenario-B baseline k_7ii) to the local maxima of IRR and of the isobutanol and ethanol titer, yield and
-productivity (seven trajectories; the metric set is configurable below).
+at the scenario-B baseline k_7ii) to the local maxima of IRR and of the isobutanol titer, yield and productivity
+(four trajectories; the metric set is configurable below).
 
 Consumes the per-metric CSVs written by analyses/evaluate_EtOH_k13_k7ii.py
 (20 x 20 grid, scenario B, no feeding-strategy optimization) and runs no
@@ -50,28 +50,20 @@ BASELINE_K13 = 0.0
 BASELINE_K7II = 0.15
 
 COLOR_METRIC = 'IRR'
-TRAJECTORY_METRICS = ['IRR',
-                      'IBO Titer', 'IBO Yield', 'IBO Productivity',
-                      'EtOH Titer', 'EtOH Yield', 'EtOH Productivity']
+TRAJECTORY_METRICS = ['IRR', 'IBO Titer', 'IBO Yield', 'IBO Productivity']
 SENSES = {m: 'max' for m in TRAJECTORY_METRICS}
 # Styling on the reversed (yellow = high IRR) colormap. Greedy climbs from one
 # baseline share their first segments, so every trajectory needs a distinct
 # look even where it lies on top of another:
-#   color      = metric type   (black titer, white yield, magenta productivity)
-#   line style = product       (solid isobutanol, dashed ethanol)
-#   width      = draw order    (IRR widest and first, then titer > yield >
-#                               productivity, so each narrower line stays
-#                               visible inside a wider coincident one)
-_TITER, _YIELD, _PROD = '#1a1a1a', '#ffffff', '#ff1aff'
-TRAJECTORY_COLORS = {'IRR': '#00bfff',
-                     'IBO Titer': _TITER, 'IBO Yield': _YIELD, 'IBO Productivity': _PROD,
-                     'EtOH Titer': _TITER, 'EtOH Yield': _YIELD, 'EtOH Productivity': _PROD}
-TRAJECTORY_LINESTYLES = {'IRR': '-',
-                         'IBO Titer': '-', 'IBO Yield': '-', 'IBO Productivity': '-',
-                         'EtOH Titer': '--', 'EtOH Yield': '--', 'EtOH Productivity': '--'}
-TRAJECTORY_LINEWIDTHS = {'IRR': 5.0,
-                         'IBO Titer': 3.4, 'IBO Yield': 2.0, 'IBO Productivity': 1.2,
-                         'EtOH Titer': 3.4, 'EtOH Yield': 2.0, 'EtOH Productivity': 1.2}
+#   color = metric  (cyan IRR, black titer, white yield, magenta productivity)
+#   width = draw order (IRR widest and first, then titer > yield > productivity,
+#                       so each narrower line stays visible inside a wider
+#                       coincident one)
+TRAJECTORY_COLORS = {'IRR': '#00bfff', 'IBO Titer': '#1a1a1a',
+                     'IBO Yield': '#ffffff', 'IBO Productivity': '#ff1aff'}
+TRAJECTORY_LINESTYLES = {m: '-' for m in TRAJECTORY_METRICS}
+TRAJECTORY_LINEWIDTHS = {'IRR': 5.0, 'IBO Titer': 3.4,
+                         'IBO Yield': 2.0, 'IBO Productivity': 1.2}
 
 #%% Plot styling (shared with the sweep script's IRR contour)
 
@@ -139,10 +131,10 @@ def main():
         # 1e-4); e.g. the ethanol metrics along k_13 = 0 differ by ~4e-8
         # relative, which the strict greedy rule would otherwise "climb"
         min_rel_improvement=1e-4,
-        # eight entries: park the legend below the axes, three columns; the
-        # mid-grey face keeps both the black and the white lines visible
+        # legend below the axes in one row; the mid-grey face keeps both the
+        # black and the white lines visible
         legend_kwargs={'loc': 'upper center', 'bbox_to_anchor': (0.5, -0.16),
-                       'ncol': 3, 'fontsize': 8.5, 'framealpha': 1.0,
+                       'ncol': 5, 'fontsize': 8.5, 'framealpha': 1.0,
                        'facecolor': '#a9a9a9', 'edgecolor': 'k'},
         x_label=x_label, y_label=y_label,
         x_units=xy_units, y_units=xy_units,
