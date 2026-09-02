@@ -84,8 +84,7 @@ y_ticks = [0.0, 0.05, 0.1, 0.15, 0.2]
 # 0-20 % and the extend arrows catch both ends beyond that
 IRR_w_levels = np.arange(0.0, 20.001, 0.5)
 IRR_cbar_ticks = np.arange(0.0, 20.001, 5.0)
-IRR_w_ticks = [5.0, 10.0, 18.0]          # black labeled contour lines
-IRR_white_lines = [0.0, 15.0]            # white labeled contour lines
+IRR_w_ticks = [0.0, 5.0, 10.0, 15.0, 18.0]   # black labeled contour lines
 fmt_percent = lambda v, pos=None: f'{v:g}%'
 
 axis_title_fonts = {'size': {'x': 11, 'y': 11, 'z': 11, 'w': 11}}
@@ -160,7 +159,6 @@ def main():
         cmap_under_color=colors.grey_dark.shade(40).RGBn,
         # passed through to contourplots.animated_contourplot
         fmt_clabel=fmt_percent,
-        comparison_lines=IRR_white_lines, comparison_lines_colors='white',
         axis_title_fonts=axis_title_fonts,
         clabel_fontsize=clabel_fontsize,
         default_fontsize=default_fontsize,
