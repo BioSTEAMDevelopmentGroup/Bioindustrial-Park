@@ -216,7 +216,7 @@ def test_plot_trajectory_styles_and_legend_kwargs():
         results, s1, s2, color_metric='MPSP', baseline_point=(30.0, 0.5),
         trajectory_metrics=['MPSP', 'IRR'], senses={'MPSP': 'min', 'IRR': 'max'},
         trajectory_linestyles={'MPSP': '--'}, trajectory_linewidths={'MPSP': 3.0},
-        trajectory_markers={'MPSP': 'o'},
+        trajectory_markers={'MPSP': 'o'}, trajectory_marker_sizes={'MPSP': 7.0},
         legend_kwargs={'loc': 'lower left'})
     # the MPSP polyline (multi-point line) carries the requested style/width
     polylines = [l for l in ax.lines if len(l.get_xdata()) > 1]
@@ -231,8 +231,11 @@ def test_plot_trajectory_styles_and_legend_kwargs():
     assert by_label['IRR'].get_linewidth() == 1.6
     assert by_label['MPSP'].get_marker() == 'o'
     assert by_label['IRR'].get_marker() == '*'      # default optimum_marker
-    # the optimum marker drawn on the axes uses the per-metric marker too
-    assert 'o' in {l.get_marker() for l in ax.lines}
+    # the optimum marker drawn on the axes uses the per-metric marker/size too
+    circles = [l for l in ax.lines if l.get_marker() == 'o']
+    assert circles and all(l.get_markersize() == 7.0 for l in circles)
+    assert by_label['MPSP'].get_markersize() == 7.0
+    assert by_label['IRR'].get_markersize() == 12   # default optimum_marker_size
     assert ax.get_legend()._loc == 3                 # matplotlib code for 'lower left'
     import matplotlib.pyplot as plt
     plt.close(fig)

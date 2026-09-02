@@ -58,7 +58,7 @@ SENSES = {m: 'max' for m in TRAJECTORY_METRICS}
 # lines are dashed at the same width; greedy climbs from one start share their
 # first segment, so the IRR dashes are phase-shifted by one dash length
 # against the grey ones and the two alternate where the paths coincide.
-_GREY = '#5a5a5a'
+_GREY = '#8a8a8a'
 TRAJECTORY_COLORS = {'IRR': '#ffffff', 'IBO Titer': _GREY,
                      'IBO Yield': _GREY, 'IBO Productivity': _GREY}
 _DASH_IRR, _DASH_OTHER = (0, (4, 4)), (4, (4, 4))   # (offset, (on, off)) in pt
@@ -67,6 +67,8 @@ TRAJECTORY_LINESTYLES = {m: (_DASH_IRR if m == 'IRR' else _DASH_OTHER)
 TRAJECTORY_LINEWIDTHS = {m: 1.5 for m in TRAJECTORY_METRICS}
 TRAJECTORY_MARKERS = {'IRR': '*', 'IBO Titer': 'o',
                       'IBO Yield': 's', 'IBO Productivity': '^'}
+TRAJECTORY_MARKER_SIZES = {'IRR': 12, 'IBO Titer': 7,
+                           'IBO Yield': 6.5, 'IBO Productivity': 7.5}   # pt
 BASELINE_MARKER = ('D', 'white', 6)   # (shape, fill color, size)
 
 #%% Plot styling (shared with the sweep script's IRR contour)
@@ -136,6 +138,7 @@ def main():
         trajectory_linestyles=TRAJECTORY_LINESTYLES,
         trajectory_linewidths=TRAJECTORY_LINEWIDTHS,
         trajectory_markers=TRAJECTORY_MARKERS,
+        trajectory_marker_sizes=TRAJECTORY_MARKER_SIZES,
         baseline_marker=BASELINE_MARKER,
         # a step must beat the sweep's own convergence tolerance (sim_rtol =
         # 1e-4); e.g. the ethanol metrics along k_13 = 0 differ by ~4e-8
