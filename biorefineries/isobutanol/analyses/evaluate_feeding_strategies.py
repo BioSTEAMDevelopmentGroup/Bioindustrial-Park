@@ -90,6 +90,12 @@ scenario = os.environ.get('IBO_SWEEP_SCENARIO', 'B')
 if scenario not in ('A', 'B'):
     raise ValueError(f'Scenario {scenario} not found.')
 
+# Set IBO_SWEEP_REPLOT_FROM_CSV=1 to skip every simulation and rebuild the
+# contour plots from the per-metric CSVs a previous run of this script (same
+# steps / scenario, i.e. same `file_to_save` prefix) saved under
+# analyses/results/. Only the plot styling below then matters.
+replot_from_csv = os.environ.get('IBO_SWEEP_REPLOT_FROM_CSV', '') == '1'
+
 parameter_distributions_filename = isobutanol_filepath+\
     '\\analyses\\full\\parameter_distributions\\'+\
     f'parameter-distributions_corn_IBO_EtOH_{scenario}.xlsx'
@@ -108,15 +114,18 @@ baseline_initial = model.metrics_at_baseline()
 # optimizes the spike cap at each.
 if scenario=='A':
     fbs_spec.max_n_spikes = 16
-    model_specification(threshold_conc=217.125, target_conc=221.25)
+    if not replot_from_csv:
+        model_specification(threshold_conc=217.125, target_conc=221.25)
 elif scenario=='B':
     fbs_spec.max_n_spikes = 13
-    model_specification(threshold_conc=216.3, target_conc=226.3)
+    if not replot_from_csv:
+        model_specification(threshold_conc=216.3, target_conc=226.3)
 
-model_specification(
-    n_sims=3,
-    plot=True,
-    )
+if not replot_from_csv:
+    model_specification(
+        n_sims=3,
+        plot=True,
+        )
 
 #%%  Metrics
 product_chemical_IDs = ['Ethanol',]
@@ -314,15 +323,16 @@ chdir(isobutanol_results_filepath)
 
 #%% Initial simulation
 
-print('\n\nSimulating the initial point to avoid bugs ...')
-curr_spec = {}
-curr_spec.update({'threshold_conc':threshold_conces[0],})
-curr_spec.update({'target_conc':target_conces[0],})
+if not replot_from_csv:
+    print('\n\nSimulating the initial point to avoid bugs ...')
+    curr_spec = {}
+    curr_spec.update({'threshold_conc':threshold_conces[0],})
+    curr_spec.update({'target_conc':target_conces[0],})
 
-model_specification(**curr_spec,
-    n_sims=3,
-    plot=True,
-    )
+    model_specification(**curr_spec,
+        n_sims=3,
+        plot=True,
+        )
 
 # %% Run analysis 
 
@@ -347,7 +357,16 @@ print_status_every_n_simulations = 1
 
 errors_dict = {}
 
-for s3 in spec_3:
+if replot_from_csv:
+    print(f'\nReplotting from saved CSVs: {isobutanol_results_filepath}{file_to_save}_<metric>.csv')
+    for k in results.keys():
+        results[k] = [pd.read_csv(isobutanol_results_filepath+file_to_save+f'_{k}.csv',
+                                  index_col=0).to_numpy()]
+    spec_3_to_run = []
+else:
+    spec_3_to_run = spec_3
+
+for s3 in spec_3_to_run:
     for v in list(results.values()): v.append([])
     i = 0
     for s2 in spec_2:
@@ -593,14 +612,19 @@ if plot:
         MPSP_cbar_ticks = np.arange(0.625, 0.9251, 0.05)
         MPSP_w_ticks = [0.75,]
     else:
-        # Fit the ethanol-MPSP colorbar to the simulated grid (bounds rounded
-        # outward to 0.05 $/kg); scenario B's baseline sits near 1.05 $/kg.
+        # Fit the ethanol-MPSP colorbar to the simulated grid: the finest
+        # level step (from the candidates below) that keeps the filled
+        # contours within the colormap's 90 colors, bounds rounded outward to
+        # that step, colorbar ticks every 10 steps. Scenario B spans ~0.6-2.0
+        # $/kg (baseline ~1.05), so this lands on a 0.02 step / 0.2 ticks.
         _MPSP_finite = np.array(results['MPSP'])
         _MPSP_finite = _MPSP_finite[np.isfinite(_MPSP_finite)]
-        _MPSP_lb = np.floor(_MPSP_finite.min()/0.05)*0.05
-        _MPSP_ub = np.ceil(_MPSP_finite.max()/0.05)*0.05
-        MPSP_w_levels = np.arange(_MPSP_lb, _MPSP_ub+0.0001, 0.005)
-        MPSP_cbar_ticks = np.arange(_MPSP_lb, _MPSP_ub+0.0001, 0.05)
+        for _MPSP_step in (0.005, 0.01, 0.02, 0.025, 0.05, 0.1):
+            _MPSP_lb = np.floor(_MPSP_finite.min()/_MPSP_step)*_MPSP_step
+            _MPSP_ub = np.ceil(_MPSP_finite.max()/_MPSP_step)*_MPSP_step
+            if (_MPSP_ub-_MPSP_lb)/_MPSP_step <= 80: break
+        MPSP_w_levels = np.arange(_MPSP_lb, _MPSP_ub+_MPSP_step/10, _MPSP_step)
+        MPSP_cbar_ticks = np.arange(_MPSP_lb, _MPSP_ub+_MPSP_step/10, 10*_MPSP_step)
         MPSP_w_ticks = list(np.round(np.percentile(_MPSP_finite, (25, 50, 75)), 2))
     # MPSP_w_levels = np.arange(0., 15.5, 0.5)
     
