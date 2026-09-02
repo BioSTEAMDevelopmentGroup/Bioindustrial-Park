@@ -85,7 +85,10 @@ isobutanol_results_filepath = isobutanol_filepath + '\\analyses\\results\\'
 
 
 #%% Load parameter distributions
-scenario = 'A'
+# Scenario to sweep ('A' or 'B'); override with IBO_SWEEP_SCENARIO=A|B.
+scenario = os.environ.get('IBO_SWEEP_SCENARIO', 'B')
+if scenario not in ('A', 'B'):
+    raise ValueError(f'Scenario {scenario} not found.')
 
 parameter_distributions_filename = isobutanol_filepath+\
     '\\analyses\\full\\parameter_distributions\\'+\
@@ -99,6 +102,16 @@ baseline_initial = model.metrics_at_baseline()
 
 #!!!
 # fbs_spec.max_n_spikes = 0 # initial val, changed during optimization
+
+# Scenario baseline feeding strategy (matches the smoke tests / kinetic
+# sweeps); the grid loop below overrides threshold/target per point and
+# optimizes the spike cap at each.
+if scenario=='A':
+    fbs_spec.max_n_spikes = 16
+    model_specification(threshold_conc=217.125, target_conc=221.25)
+elif scenario=='B':
+    fbs_spec.max_n_spikes = 13
+    model_specification(threshold_conc=216.3, target_conc=226.3)
 
 model_specification(
     n_sims=3,
@@ -575,9 +588,20 @@ if plot:
     #%% MPSP
     
     # MPSP_w_levels, MPSP_w_ticks, MPSP_cbar_ticks = get_contour_info_from_metric_data(results_metric_1, lb=3)
-    MPSP_w_levels = np.arange(0.625, 0.9251, 0.005)
-    MPSP_cbar_ticks = np.arange(0.625, 0.9251, 0.05)
-    MPSP_w_ticks = [0.75,]
+    if scenario=='A':
+        MPSP_w_levels = np.arange(0.625, 0.9251, 0.005)
+        MPSP_cbar_ticks = np.arange(0.625, 0.9251, 0.05)
+        MPSP_w_ticks = [0.75,]
+    else:
+        # Fit the ethanol-MPSP colorbar to the simulated grid (bounds rounded
+        # outward to 0.05 $/kg); scenario B's baseline sits near 1.05 $/kg.
+        _MPSP_finite = np.array(results['MPSP'])
+        _MPSP_finite = _MPSP_finite[np.isfinite(_MPSP_finite)]
+        _MPSP_lb = np.floor(_MPSP_finite.min()/0.05)*0.05
+        _MPSP_ub = np.ceil(_MPSP_finite.max()/0.05)*0.05
+        MPSP_w_levels = np.arange(_MPSP_lb, _MPSP_ub+0.0001, 0.005)
+        MPSP_cbar_ticks = np.arange(_MPSP_lb, _MPSP_ub+0.0001, 0.05)
+        MPSP_w_ticks = list(np.round(np.percentile(_MPSP_finite, (25, 50, 75)), 2))
     # MPSP_w_levels = np.arange(0., 15.5, 0.5)
     
     
