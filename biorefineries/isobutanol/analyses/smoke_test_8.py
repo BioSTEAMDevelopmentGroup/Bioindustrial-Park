@@ -24,12 +24,14 @@ leaves via the rectifier (D303) bottoms to WWT unrecovered
 EACH simulation. Gates (a violation exits non-zero exactly like a
 traceback):
 
-- purity-adjusted ethanol MPSP within 1% of 2.1278 (the smoke_test_6
-  reference; the 2026-09-01 re-pin run gave 2.1277615317, matching
-  the ethanol-only build to ~6 sig figs. Re-pinned 2026-09-01 after
+- purity-adjusted ethanol MPSP within 1% of 1.8149 (the smoke_test_6
+  reference; the 2026-09-02 re-pin run gave 1.8149206141, matching
+  the ethanol-only build to ~6 sig figs. Re-pinned 2026-09-02 for the
+  Lang factor 3.0 TEA (Huang et al. 2016; previous pin 2.1278 under
+  corn's uncited Lang factor 4), and 2026-09-01 after
   (a) the kinetics-synced parameter xlsx (d467f0aa / 3720fa21) and (b) the
   vent-scrubber-bottoms recycle to the separation feed (MX8) with molar
-  L/G = 2.0 wash water; the previous pinned value was 1.41371)
+  L/G = 2.0 wash water; the previous pin before that was 1.41371)
 - isobutanol MPSP is nan (empty product)
 - every MPSP stable against the first simulation's (relative drift
   < 5e-3, ~3 significant figures; nan stays nan)
@@ -95,8 +97,8 @@ def load_simulate_baseline(stream_IDs=('ethanol', 'isobutanol'), # products whos
         results = solve_TEA(stream_IDs=stream_IDs, IRR_for_MPSP=IRR_for_MPSP)
         MPSP_ethanol = results['MPSPs']['ethanol']
         MPSP_isobutanol = results['MPSPs']['isobutanol']
-        assert abs(MPSP_ethanol - 2.1278)/2.1278 < 0.01, \
-            f'sim {i+1}: ethanol MPSP {MPSP_ethanol} not within 1% of 2.1278'
+        assert abs(MPSP_ethanol - 1.8149)/1.8149 < 0.01, \
+            f'sim {i+1}: ethanol MPSP {MPSP_ethanol} not within 1% of 1.8149'
         assert math.isnan(MPSP_isobutanol), \
             f'sim {i+1}: isobutanol MPSP {MPSP_isobutanol} expected nan (empty product)'
         if all_results:
