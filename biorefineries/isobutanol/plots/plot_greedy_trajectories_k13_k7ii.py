@@ -58,12 +58,12 @@ SENSES = {m: 'max' for m in TRAJECTORY_METRICS}
 #   color = metric  (cyan IRR, black titer, white yield, magenta productivity)
 #   width = draw order (IRR widest and first, then titer > yield > productivity,
 #                       so each narrower line stays visible inside a wider
-#                       coincident one)
+#                       coincident one); all dashed, thin
 TRAJECTORY_COLORS = {'IRR': '#00bfff', 'IBO Titer': '#1a1a1a',
                      'IBO Yield': '#ffffff', 'IBO Productivity': '#ff1aff'}
-TRAJECTORY_LINESTYLES = {m: '-' for m in TRAJECTORY_METRICS}
-TRAJECTORY_LINEWIDTHS = {'IRR': 5.0, 'IBO Titer': 3.4,
-                         'IBO Yield': 2.0, 'IBO Productivity': 1.2}
+TRAJECTORY_LINESTYLES = {m: '--' for m in TRAJECTORY_METRICS}
+TRAJECTORY_LINEWIDTHS = {'IRR': 2.5, 'IBO Titer': 1.8,
+                         'IBO Yield': 1.2, 'IBO Productivity': 0.8}
 
 #%% Plot styling (shared with the sweep script's IRR contour)
 
