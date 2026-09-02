@@ -53,7 +53,8 @@ spec_2 = target_conces = np.linspace(10., 400., steps[1])
 # at every threshold/target point) saved, copied into
 # analyses/results/publication/Feed-strat/ under their
 # 'ibo_(25, 25, 1)_Thres_Targe_Max n_<scenario>_' prefix.
-scenarios = ['B']
+scenarios = ['B'] # override with IBO_FEED_STRAT_SCENARIOS=A or =A,B
+scenarios = os.environ.get('IBO_FEED_STRAT_SCENARIOS', ','.join(scenarios)).split(',')
 
 output_filename = f'{metric}_multi_panel_feed_strat_{"".join(scenarios)}.png'
 
