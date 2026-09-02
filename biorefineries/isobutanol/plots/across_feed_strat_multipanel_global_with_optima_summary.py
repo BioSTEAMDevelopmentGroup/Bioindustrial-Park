@@ -60,9 +60,10 @@ output_filename = f'{metric}_multi_panel_feed_strat_{"".join(scenarios)}.png'
 
 # Optional: set to None to auto-compute from all loaded panels.
 if metric == 'MPSP' and scenarios == ['A']:
-    manual_w_levels = np.arange(0.65, 1.2, 0.01)
-    manual_cbar_ticks = np.arange(0.65, 1.2, 0.05)
-    manual_w_ticks = [0.8, 1.2]
+    # scenario A spans ~0.84-1.07 $/kg (optimum = the 0.84 baseline strategy)
+    manual_w_levels = np.arange(0.80, 1.1001, 0.005)
+    manual_cbar_ticks = np.arange(0.80, 1.1001, 0.05)
+    manual_w_ticks = [0.85, 0.90, 1.00]
 elif metric == 'MPSP':
     # scenario B spans ~0.64-2.02 $/kg (baseline ~1.05); keep the level count
     # within the colormap's 90 colors

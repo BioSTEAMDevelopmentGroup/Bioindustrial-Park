@@ -607,7 +607,7 @@ if plot:
     #%% MPSP
     
     # MPSP_w_levels, MPSP_w_ticks, MPSP_cbar_ticks = get_contour_info_from_metric_data(results_metric_1, lb=3)
-    if scenario=='A':
+    if False: # former fixed scenario-A band (pre-2026-09-01 model; A now spans ~0.84-1.07)
         MPSP_w_levels = np.arange(0.625, 0.9251, 0.005)
         MPSP_cbar_ticks = np.arange(0.625, 0.9251, 0.05)
         MPSP_w_ticks = [0.75,]
@@ -616,7 +616,8 @@ if plot:
         # level step (from the candidates below) that keeps the filled
         # contours within the colormap's 90 colors, bounds rounded outward to
         # that step, colorbar ticks every 10 steps. Scenario B spans ~0.6-2.0
-        # $/kg (baseline ~1.05), so this lands on a 0.02 step / 0.2 ticks.
+        # $/kg (baseline ~1.05; 0.02 step / 0.2 ticks); scenario A ~0.84-1.07
+        # (baseline 0.84; 0.005 step / 0.05 ticks).
         _MPSP_finite = np.array(results['MPSP'])
         _MPSP_finite = _MPSP_finite[np.isfinite(_MPSP_finite)]
         for _MPSP_step in (0.005, 0.01, 0.02, 0.025, 0.05, 0.1):
