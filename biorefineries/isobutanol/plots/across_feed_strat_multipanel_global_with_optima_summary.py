@@ -324,13 +324,24 @@ def compute_levels_from_arrays(arrays, metric_name, manual_w_levels=None,
         # cell takes the flat "under zero" colour (choose_metric_colormap),
         # and the 0.00 level is the boundary of that region. Scenario A
         # spans ~-0.17-0.12, B ~-0.7-0.21.
+        # Both bounds sit on colorbar major ticks, so the ends of the bar are
+        # labelled (scenario A's bar used to end at 0.125, five unlabelled
+        # levels above the last 0.10 tick); the major spacing is the finest
+        # of the two-decimal candidates (matching fmt_clabel) that spans the
+        # bar in at most 6 intervals.
         floor = 0.0
         for step in (0.005, 0.01, 0.02, 0.025, 0.05, 0.1):
-            lb = max(np.floor(min_val/step)*step, floor)
-            ub = np.ceil(max_val/step)*step
+            lb0 = max(np.floor(min_val/step)*step, floor)
+            ub0 = np.ceil(max_val/step)*step
+            for major in (0.01, 0.02, 0.05, 0.1, 0.2, 0.5):
+                if major < step or not np.isclose(round(major/step)*step, major):
+                    continue
+                lb = max(np.floor(lb0/major + 1e-9)*major, floor)
+                ub = np.ceil(ub0/major - 1e-9)*major
+                if (ub - lb)/major <= 6: break
             if (ub - lb)/step <= 80: break
         levels = np.arange(lb, ub + step/10, step)
-        cbar_ticks = np.arange(lb, ub + step/10, 10*step)
+        cbar_ticks = np.arange(lb, ub + step/10, major)
         # labeled contours at the colorbar ticks inside the data range
         # (break-even 0.00 included); quartile-based labels sit too close
         # together for scenario A's narrow 0.04-0.12 spread
