@@ -60,38 +60,47 @@ spec_1 = threshold_conces = np.linspace(1., 400., steps[0])
 
 spec_2 = target_conces = np.linspace(10., 400., steps[1])
 
-# Panels: one column per scenario. Each reads the per-metric CSVs that a run of
-# analyses/evaluate_feeding_strategies.py (spike cap optimized for ethanol MPSP
-# at every threshold/target point) saved, copied into
+# Figures: one single-panel figure per scenario (the combined two-panel A/B
+# figure was dropped 2026-09-03; levels and optimum markers are per scenario).
+# Each reads the per-metric CSVs that a run of
+# analyses/evaluate_feeding_strategies.py (spike cap optimized for ethanol
+# MPSP at every threshold/target point) saved, copied into
 # analyses/results/publication/Feed-strat/ under their
 # 'ibo_(25, 25, 1)_Thres_Targe_Max n_<scenario>_' prefix.
-scenarios = ['B'] # override with IBO_FEED_STRAT_SCENARIOS=A or =A,B
+scenarios = ['A', 'B'] # override with IBO_FEED_STRAT_SCENARIOS=A or =B
 scenarios = os.environ.get('IBO_FEED_STRAT_SCENARIOS', ','.join(scenarios)).split(',')
 
-output_filename = f'{metric}_multi_panel_feed_strat_{"".join(scenarios)}.png'
+def get_output_filename(scenario):
+    return f'{metric}_multi_panel_feed_strat_{scenario}.png'
 
-# Optional: set to None to auto-compute from all loaded panels.
-if metric == 'MPSP' and scenarios == ['A']:
-    # scenario A spans ~0.87-1.10 $/kg on the 2026-09-02 model (optimum = the
-    # 0.866 baseline strategy)
-    manual_w_levels = np.arange(0.85, 1.1001, 0.005)
-    manual_cbar_ticks = np.arange(0.85, 1.1001, 0.05)
-    manual_w_ticks = [0.90, 0.95, 1.00]
-elif metric == 'MPSP':
-    # scenario B spans ~0.66-2.06 $/kg (baseline ~1.08); keep the level count
-    # within the colormap's 90 colors
-    manual_w_levels = np.arange(0.6, 2.0001, 0.02)
-    manual_cbar_ticks = np.arange(0.6, 2.0001, 0.2)
-    manual_w_ticks = [0.8, 1.2, 1.6]
-elif metric == 'IBO MPSP':
-    # scenario B spans ~1.29-3.01 $/kg (baseline ~1.80); A makes no isobutanol
-    manual_w_levels = np.arange(1.2, 3.0001, 0.025)
-    manual_cbar_ticks = np.arange(1.2, 3.0001, 0.3)
-    manual_w_ticks = [1.5, 2.0, 2.5]
-else:
-    # IRR (and any other metric): fitted to the loaded panels in
-    # compute_levels_from_arrays
-    manual_w_levels = manual_cbar_ticks = manual_w_ticks = None
+
+def get_manual_levels(scenario):
+    """Preset contour levels, colorbar ticks and labelled levels for the
+    metric in this scenario; (None, None, None) fits them to the data in
+    compute_levels_from_arrays."""
+    # Optional: set to None to auto-compute from all loaded panels.
+    if metric == 'MPSP' and scenario == 'A':
+        # scenario A spans ~0.87-1.10 $/kg on the 2026-09-02 model (optimum = the
+        # 0.866 baseline strategy)
+        manual_w_levels = np.arange(0.85, 1.1001, 0.005)
+        manual_cbar_ticks = np.arange(0.85, 1.1001, 0.05)
+        manual_w_ticks = [0.90, 0.95, 1.00]
+    elif metric == 'MPSP':
+        # scenario B spans ~0.66-2.06 $/kg (baseline ~1.08); keep the level count
+        # within the colormap's 90 colors
+        manual_w_levels = np.arange(0.6, 2.0001, 0.02)
+        manual_cbar_ticks = np.arange(0.6, 2.0001, 0.2)
+        manual_w_ticks = [0.8, 1.2, 1.6]
+    elif metric == 'IBO MPSP':
+        # scenario B spans ~1.29-3.01 $/kg (baseline ~1.80); A makes no isobutanol
+        manual_w_levels = np.arange(1.2, 3.0001, 0.025)
+        manual_cbar_ticks = np.arange(1.2, 3.0001, 0.3)
+        manual_w_ticks = [1.5, 2.0, 2.5]
+    else:
+        # IRR (and any other metric): fitted to the loaded panels in
+        # compute_levels_from_arrays
+        manual_w_levels = manual_cbar_ticks = manual_w_ticks = None
+    return manual_w_levels, manual_cbar_ticks, manual_w_ticks
 
 comparison_range = []
 # if metric == 'MPSP':
@@ -285,7 +294,8 @@ def choose_metric_colormap(metric_name):
     return cmap, cmap_over_color, cmap_under_color, extend_cmap
 
 
-def compute_levels_from_arrays(arrays, metric_name):
+def compute_levels_from_arrays(arrays, metric_name, manual_w_levels=None,
+                               manual_cbar_ticks=None, manual_w_ticks=None):
     valid = []
     for arr in arrays:
         if arr is None:
@@ -637,267 +647,239 @@ metrics_to_opt = [
 
 metric_marker_styles, _metric_legend_labels = build_metric_marker_styles(metrics_to_opt)
 
-global_optima, missing_opt_metric_files = compute_global_optima(
-    metrics_to_opt, scenarios, steps
-)
-
-opt_coords_metric_values, missing_opt_value_files = get_optima_metric_values(
-    global_optima, metrics_to_opt, steps
-)
-
-# -----------------------------------------------------------------------------
-# Load panel data for the plotted metric.
-# -----------------------------------------------------------------------------
-panel_data = {}
-all_arrays = []
-missing_files = []
-for scenario in scenarios:
+def plot_scenario(scenario):
+    """Build and save the single-panel figure for one scenario: its own
+    optima markers, contour levels and colorbar. Skips a scenario without
+    data for the metric (e.g. isobutanol MPSP in scenario A, which makes no
+    isobutanol)."""
+    # -----------------------------------------------------------------------------
+    # Load the plotted metric.
+    # -----------------------------------------------------------------------------
     arr, filepath = load_metric_array(x_label, y_label, scenario, metric, steps)
-    panel_data[scenario] = arr
     if arr is None:
-        missing_files.append(filepath)
-    else:
-        all_arrays.append(arr)
+        print(f'Skipping scenario {scenario}: no {metric!r} CSV ({filepath}).')
+        return
+    if not np.isfinite(arr).any():
+        print(f'Skipping scenario {scenario}: no finite {metric!r} values ({filepath}).')
+        return
+    w_levels, cbar_ticks, w_ticks = compute_levels_from_arrays(
+        [arr], metric, *get_manual_levels(scenario))
+    cmap, cmap_over_color, cmap_under_color, extend_cmap = choose_metric_colormap(metric)
 
-if not all_arrays:
-    raise FileNotFoundError('No matching metric CSV files were found for the requested row/column layout.')
+    global_optima, missing_opt_metric_files = compute_global_optima(
+        metrics_to_opt, [scenario], steps
+    )
+    opt_coords_metric_values, missing_opt_value_files = get_optima_metric_values(
+        global_optima, metrics_to_opt, steps
+    )
 
-w_levels, cbar_ticks, w_ticks = compute_levels_from_arrays(all_arrays, metric)
-cmap, cmap_over_color, cmap_under_color, extend_cmap = choose_metric_colormap(metric)
+    # -----------------------------------------------------------------------------
+    # Figure layout
+    # -----------------------------------------------------------------------------
+    apply_font_rcparams()
+    fig, ax = plt.subplots(constrained_layout=True)
 
-# -----------------------------------------------------------------------------
-# Figure layout
-# -----------------------------------------------------------------------------
-nrows = 1
-ncols = len(scenarios)
-apply_font_rcparams()
-fig, axs = plt.subplots(nrows, ncols, constrained_layout=True)
-if nrows == 1 and ncols == 1:
-    axs = np.array([[axs]])
-elif nrows == 1:
-    axs = np.array([axs])
-elif ncols == 1:
-    axs = np.array([[ax] for ax in axs])
+    axis_title_fonts={'size': {k: FONTS['axis_title'] for k in 'xyzw'},}
+    default_fontsize = FONTS['tick']
+    clabel_fontsize = FONTS['clabel']
+    axis_tick_fontsize = FONTS['tick']
 
-axis_title_fonts={'size': {k: FONTS['axis_title'] for k in 'xyzw'},}
-default_fontsize = FONTS['tick']
-clabel_fontsize = FONTS['clabel']
-axis_tick_fontsize = FONTS['tick']
-
-for i in range(nrows):
     x_label_for_plot = format_param_label(x_label)
     y_label_for_plot = format_param_label(y_label)
     w_label = r"$\bf" + get_metric_plot_name(metric, x_label).replace(' ', '\\ ') + "$"
 
-    for j, scenario in enumerate(scenarios):
-        ax = axs[i, j]
-        arr = panel_data[scenario]
+    if 'irr' in metric.lower():
+        # unsolvable IRRs (-inf: no real root on the valid domain) belong
+        # in the under-zero region, but contourf masks non-finite cells;
+        # draw them just below the lower bound instead
+        arr = np.where(np.isneginf(arr),
+                       w_levels[0] - (w_levels[1] - w_levels[0]), arr)
 
-        if arr is None:
-            ax.set_axis_off()
-            ax.text(0.5, 0.5, 'File not found', transform=ax.transAxes, ha='center', va='center', fontsize=10)
+    # Optima sharing a grid point are fanned out on the page after the
+    # library call (draw_fanned_markers); singletons go through the
+    # library's additional_points. Overlaps are also listed by
+    # get_optima_comparisons.
+    markers_at = {}
+    for opt_metric in metrics_to_opt:
+        opt_record = global_optima.get(opt_metric)
+        if opt_record is None or opt_record['scenario'] != scenario:
             continue
-        if 'irr' in metric.lower():
-            # unsolvable IRRs (-inf: no real root on the valid domain) belong
-            # in the under-zero region, but contourf masks non-finite cells;
-            # draw them just below the lower bound instead
-            arr = np.where(np.isneginf(arr),
-                           w_levels[0] - (w_levels[1] - w_levels[0]), arr)
+        markers_at.setdefault((opt_record['x'], opt_record['y']), []).append(
+            metric_marker_styles[opt_metric])
+    additional_points = {xy: styles[0] for xy, styles in markers_at.items() if len(styles) == 1}
+    fanned_points = {xy: styles for xy, styles in markers_at.items() if len(styles) > 1}
 
-        # Optima sharing a grid point are fanned out on the page after the
-        # library call (draw_fanned_markers); singletons go through the
-        # library's additional_points. Overlaps are also listed by
-        # get_optima_comparisons.
-        markers_at = {}
-        for opt_metric in metrics_to_opt:
-            opt_record = global_optima.get(opt_metric)
-            if opt_record is None or opt_record['scenario'] != scenario:
-                continue
-            markers_at.setdefault((opt_record['x'], opt_record['y']), []).append(
-                metric_marker_styles[opt_metric])
-        additional_points = {xy: styles[0] for xy, styles in markers_at.items() if len(styles) == 1}
-        fanned_points = {xy: styles for xy, styles in markers_at.items() if len(styles) > 1}
+    # White line: for each threshold, the lowest target at which the
+    # MPSP-optimized spike cap lands on batch mode (zero spikes).
+    add_lines = {}
+    arr_n_spikes, filepath = load_metric_array(x_label, y_label, scenario, 'Number of glucose spikes', steps)
+    if arr_n_spikes is not None:
+        line_first_app_n_glu_spikes_0 = tuple(get_zeroth_spec_2_val_for_condition_for_all_spec_1_vals(arr_n_spikes[0],
+                                                                          condition = lambda i: i==0))
+        add_lines = {line_first_app_n_glu_spikes_0: {'color': 'white', 'linewidth': 1.0, 'alpha': 1.0}}
 
-        # White line: for each threshold, the lowest target at which the
-        # MPSP-optimized spike cap lands on batch mode (zero spikes).
-        add_lines = {}
-        arr_n_spikes, filepath = load_metric_array(x_label, y_label, scenario, 'Number of glucose spikes', steps)
-        if arr_n_spikes is not None:
-            line_first_app_n_glu_spikes_0 = tuple(get_zeroth_spec_2_val_for_condition_for_all_spec_1_vals(arr_n_spikes[0],
-                                                                              condition = lambda i: i==0))
-            add_lines = {line_first_app_n_glu_spikes_0: {'color': 'white', 'linewidth': 1.0, 'alpha': 1.0}}
+    # One label per labelled level, placed clear of markers, other labels,
+    # the panel edges and the white line (the library's automatic
+    # placement repeated levels and stacked labels on steep gradients).
+    marker_xy = [(rec['x'], rec['y']) for rec in global_optima.values()
+                 if rec['scenario'] == scenario]
+    manual_clabels = place_contour_labels(
+        arr[0], w_ticks, marker_xy,
+        line_first_app_n_glu_spikes_0 if arr_n_spikes is not None else None)
 
-        # One label per labelled level, placed clear of markers, other labels,
-        # the panel edges and the white line (the library's automatic
-        # placement repeated levels and stacked labels on steep gradients).
-        marker_xy = [(rec['x'], rec['y']) for rec in global_optima.values()
-                     if rec['scenario'] == scenario]
-        manual_clabels = place_contour_labels(
-            arr[0], w_ticks, marker_xy,
-            line_first_app_n_glu_spikes_0 if arr_n_spikes is not None else None)
+    contourplots.animated_contourplot(
+        w_data_vs_x_y_at_multiple_z=arr,
+        x_data=spec_1,
+        y_data=spec_2,
+        z_data=[0.,],
+        x_label=x_label_for_plot,
+        y_label=y_label_for_plot,
+        z_label=r"$\bf" + z_label + "$",
+        w_label=w_label,
+        x_ticks=x_ticks,
+        y_ticks=y_ticks,
+        z_ticks=z_ticks,
+        w_levels=w_levels,
+        w_ticks=list(manual_clabels.keys()), # only levels present in this panel
+        manual_clabels_regular=manual_clabels,
+        x_units=x_units,
+        y_units=y_units,
+        z_units=z_units,
+        w_units=metrics_units[metric],
+        fmt_clabel=fmt_clabel,
+        cmap=cmap,
+        cmap_over_color=cmap_over_color,
+        cmap_under_color=cmap_under_color,
+        extend_cmap=extend_cmap,
+        cbar_ticks=cbar_ticks,
+        fontname={'fontname': FONT_FAMILY},
+        z_marker_color='g',
+        fps=1,
+        n_loops='inf',
+        animated_contourplot_filename='ignore_this_filename',
+        keep_frames=False,
+        keep_gifs=False,
+        axis_title_fonts=axis_title_fonts,
+        clabel_fontsize=clabel_fontsize,
+        default_fontsize=default_fontsize,
+        axis_tick_fontsize=axis_tick_fontsize,
+        n_minor_ticks=3,
+        cbar_n_minor_ticks=3,
+        units_on_newline=(False, False, False, False),
+        units_opening_brackets=[' ['] * 4,
+        units_closing_brackets=[']'] * 4,
+        round_xticks_to=0,
+        round_yticks_to=1,
+        include_top_bar=False,
+        include_cbar=False,
+        include_axis_labels=False,
+        include_x_axis_ticklabels=True,
+        include_last_x_axis_ticklabel=True, # panels are visibly separated (layout wspace below)
+        include_y_axis_ticklabels=True,
+        include_last_y_axis_ticklabel=True,
+        additional_points=additional_points,
+        fig_ax_to_use=(fig, ax),
+        comparison_range=comparison_range,
+        inline_spacing=0.,
+        label_over_color='black',
+        add_lines=add_lines,
+    )
+    apply_font_rcparams()
+    restyle_panel_text(ax)
+    for (xp, yp), styles in fanned_points.items():
+        draw_fanned_markers(ax, xp, yp, styles)
 
-        contourplots.animated_contourplot(
-            w_data_vs_x_y_at_multiple_z=arr,
-            x_data=spec_1,
-            y_data=spec_2,
-            z_data=[0.,],
-            x_label=x_label_for_plot,
-            y_label=y_label_for_plot,
-            z_label=r"$\bf" + z_label + "$",
-            w_label=w_label,
-            x_ticks=x_ticks,
-            y_ticks=y_ticks,
-            z_ticks=z_ticks,
-            w_levels=w_levels,
-            w_ticks=list(manual_clabels.keys()), # only levels present in this panel
-            manual_clabels_regular=manual_clabels,
-            x_units=x_units,
-            y_units=y_units,
-            z_units=z_units,
-            w_units=metrics_units[metric],
-            fmt_clabel=fmt_clabel,
-            cmap=cmap,
-            cmap_over_color=cmap_over_color,
-            cmap_under_color=cmap_under_color,
-            extend_cmap=extend_cmap,
-            cbar_ticks=cbar_ticks,
-            fontname={'fontname': FONT_FAMILY},
-            z_marker_color='g',
-            fps=1,
-            n_loops='inf',
-            animated_contourplot_filename='ignore_this_filename',
-            keep_frames=False,
-            keep_gifs=False,
-            axis_title_fonts=axis_title_fonts,
-            clabel_fontsize=clabel_fontsize,
-            default_fontsize=default_fontsize,
-            axis_tick_fontsize=axis_tick_fontsize,
-            n_minor_ticks=3,
-            cbar_n_minor_ticks=3,
-            units_on_newline=(False, False, False, False),
-            units_opening_brackets=[' ['] * 4,
-            units_closing_brackets=[']'] * 4,
-            round_xticks_to=0,
-            round_yticks_to=1,
-            include_top_bar=False,
-            include_cbar=False,
-            include_axis_labels=False,
-            include_x_axis_ticklabels=(i == nrows - 1),
-            include_last_x_axis_ticklabel=True, # panels are visibly separated (layout wspace below)
-            include_y_axis_ticklabels=(j == 0),
-            include_last_y_axis_ticklabel=(i==0),
-            additional_points=additional_points,
-            fig_ax_to_use=(fig, ax),
-            comparison_range=comparison_range,
-            inline_spacing=0.,
-            label_over_color='black',
-            add_lines=add_lines,
-        )
-        apply_font_rcparams()
-        restyle_panel_text(ax)
-        for (xp, yp), styles in fanned_points.items():
-            draw_fanned_markers(ax, xp, yp, styles)
+    ax.set_title('') # drop the library's blank 20 pt spacer title
 
-        if ncols > 1:
-            # pad keeps the title clear of optimum markers sitting on the top
-            # edge (a vertical fan reaches ~10 pt above the axes)
-            ax.set_title(f'Scenario {scenario}', fontsize=FONTS['panel_title'],
-                         fontweight='bold', pad=13)
-        else:
-            ax.set_title('') # drop the library's blank 20 pt spacer title
+    # -----------------------------------------------------------------------------
+    # Shared colorbar and layout
+    # -----------------------------------------------------------------------------
 
-# -----------------------------------------------------------------------------
-# Shared colorbar and layout
-# -----------------------------------------------------------------------------
-# (plt.subplots_adjust is a no-op under constrained layout; set the gap here)
-fig.get_layout_engine().set(wspace=0.08, hspace=0.)
+    # The bar uses the panels' own discrete levels (BoundaryNorm, as in the
+    # library's colorbar), so its bands are the panels' bands and every tick
+    # below sits on a level boundary.
+    norm = BoundaryNorm(w_levels, cmap.N, extend=extend_cmap)
+    # carry the panels' under/over colours onto the shared colorbar as extension
+    # triangles (e.g. IRR's flat "under zero" grey, MPSP's dark over-range grey)
+    cbar_cmap = cmap.copy()
+    if cmap_under_color is not None:
+        cbar_cmap.set_under(cmap_under_color)
+    if cmap_over_color is not None:
+        cbar_cmap.set_over(cmap_over_color)
+    sm = ScalarMappable(norm=norm, cmap=cbar_cmap)
+    sm.set_array([])
+    cbar = fig.colorbar(sm, ax=ax, shrink=0.95, pad=0.02,
+                        extend=extend_cmap, spacing='proportional')
+    _cbar_name = get_metric_plot_name(metric, x_label)
+    if not _cbar_name.isupper(): # capitalize plain names; keep acronyms (MPSP, TCI, AOC) intact
+        _cbar_name = _cbar_name[0].upper() + _cbar_name[1:]
+    _cbar_units = metrics_units[metric]
+    cbar.set_label(f"{_cbar_name} [{_cbar_units}]" if _cbar_units else _cbar_name,
+                   fontsize=FONTS['cbar_title'])
+    cbar.set_ticks(cbar_ticks)
+    cbar.set_ticklabels([fmt_clabel(t) for t in cbar_ticks]) # same precision as the inline labels
 
-# The bar uses the panels' own discrete levels (BoundaryNorm, as in the
-# library's colorbar), so its bands are the panels' bands and every tick
-# below sits on a level boundary.
-norm = BoundaryNorm(w_levels, cmap.N, extend=extend_cmap)
-# carry the panels' under/over colours onto the shared colorbar as extension
-# triangles (e.g. IRR's flat "under zero" grey, MPSP's dark over-range grey)
-cbar_cmap = cmap.copy()
-if cmap_under_color is not None:
-    cbar_cmap.set_under(cmap_under_color)
-if cmap_over_color is not None:
-    cbar_cmap.set_over(cmap_over_color)
-sm = ScalarMappable(norm=norm, cmap=cbar_cmap)
-sm.set_array([])
-cbar = fig.colorbar(sm, ax=axs.ravel().tolist(), shrink=0.95, pad=0.02,
-                    extend=extend_cmap, spacing='proportional')
-_cbar_name = get_metric_plot_name(metric, x_label)
-if not _cbar_name.isupper(): # capitalize plain names; keep acronyms (MPSP, TCI, AOC) intact
-    _cbar_name = _cbar_name[0].upper() + _cbar_name[1:]
-_cbar_units = metrics_units[metric]
-cbar.set_label(f"{_cbar_name} [{_cbar_units}]" if _cbar_units else _cbar_name,
-               fontsize=FONTS['cbar_title'])
-cbar.set_ticks(cbar_ticks)
-cbar.set_ticklabels([fmt_clabel(t) for t in cbar_ticks]) # same precision as the inline labels
+    # Minor ticks on the level boundaries between the major ticks: every k-th
+    # level, with k a divisor of the levels-per-major count (so minors stay
+    # aligned with both the levels and the majors) and at most ~40 minors.
+    level_step = float(w_levels[1] - w_levels[0])
+    per_major = (int(round((cbar_ticks[1] - cbar_ticks[0]) / level_step))
+                 if len(cbar_ticks) > 1 else 1)
+    k = next((k for k in range(1, per_major + 1)
+              if per_major % k == 0 and len(w_levels) / k <= 40), per_major)
+    cbar_minor_ticks = [float(v) for i, v in enumerate(w_levels)
+                        if i % k == 0 and i % per_major != 0]
+    cbar.ax.yaxis.set_minor_locator(FixedLocator(cbar_minor_ticks))
+    cbar.ax.tick_params(which='major', labelsize=FONTS['tick'], length=TICK_LEN['major'])
+    cbar.ax.tick_params(which='minor', length=TICK_LEN['minor'])
+    restyle_panel_text(cbar.ax)
 
-# Minor ticks on the level boundaries between the major ticks: every k-th
-# level, with k a divisor of the levels-per-major count (so minors stay
-# aligned with both the levels and the majors) and at most ~40 minors.
-level_step = float(w_levels[1] - w_levels[0])
-per_major = (int(round((cbar_ticks[1] - cbar_ticks[0]) / level_step))
-             if len(cbar_ticks) > 1 else 1)
-k = next((k for k in range(1, per_major + 1)
-          if per_major % k == 0 and len(w_levels) / k <= 40), per_major)
-cbar_minor_ticks = [float(v) for i, v in enumerate(w_levels)
-                    if i % k == 0 and i % per_major != 0]
-cbar.ax.yaxis.set_minor_locator(FixedLocator(cbar_minor_ticks))
-cbar.ax.tick_params(which='major', labelsize=FONTS['tick'], length=TICK_LEN['major'])
-cbar.ax.tick_params(which='minor', length=TICK_LEN['minor'])
-restyle_panel_text(cbar.ax)
+    fig.supxlabel(f"{x_label} [{x_units}]", fontsize=FONTS['axis_title'])
+    fig.supylabel(f"{y_label} [{y_units}]", fontsize=FONTS['axis_title'])
 
-fig.supxlabel(f"{x_label} [{x_units}]", fontsize=FONTS['axis_title'])
-fig.supylabel(f"{y_label} [{y_units}]", fontsize=FONTS['axis_title'])
+    add_optima_legend(fig, [m for m in metrics_to_opt if m in global_optima], ncol=2)
 
-add_optima_legend(fig, [m for m in metrics_to_opt if m in global_optima
-                        and global_optima[m]['scenario'] in scenarios],
-                  ncol=4 if ncols > 1 else 2)
+    fig.set_figwidth(3.2 + 1.2)
+    fig.set_figheight(2.7 + 1.6)
 
-fig.set_figwidth(3.2 * ncols + 1.2)
-fig.set_figheight(2.7 * nrows + 1.6)
-
-fig.canvas.draw() # materialize every tick before restyling them
-for ax in axs.ravel():
+    fig.canvas.draw() # materialize every tick before restyling them
     style_ticks(ax)
 
-output_filepath = os.path.join(isobutanol_results_pub_filepath, 'Feed-strat', output_filename)
-plt.savefig(output_filepath, transparent=False, facecolor='white', bbox_inches='tight', dpi=600)
-plt.close(fig)
+    output_filepath = os.path.join(isobutanol_results_pub_filepath, 'Feed-strat',
+                                   get_output_filename(scenario))
+    plt.savefig(output_filepath, transparent=False, facecolor='white', bbox_inches='tight', dpi=600)
+    plt.close(fig)
 
-print(f'Saved multi-panel figure to: {output_filepath}')
-if global_optima:
-    print('\nGlobal optima used for markers:')
-    for metric_name in metrics_to_opt:
-        if metric_name not in global_optima:
-            continue
-        opt_record = global_optima[metric_name]
-        print(
-            '  {metric}: value={value}, x={x}, y={y}, panel=({xl}, {yl}, scenario={sc})'.format(
-                metric=metric_name,
-                value=get_rounded_str(opt_record['value'], 6),
-                x=get_rounded_str(opt_record['x'], 6),
-                y=get_rounded_str(opt_record['y'], 6),
-                xl=opt_record['x_label'],
-                yl=opt_record['y_label'],
-                sc=opt_record['scenario'],
+    print(f'Saved scenario-{scenario} figure to: {output_filepath}')
+    if global_optima:
+        print('\nGlobal optima used for markers:')
+        for metric_name in metrics_to_opt:
+            if metric_name not in global_optima:
+                continue
+            opt_record = global_optima[metric_name]
+            print(
+                '  {metric}: value={value}, x={x}, y={y}, panel=({xl}, {yl}, scenario={sc})'.format(
+                    metric=metric_name,
+                    value=get_rounded_str(opt_record['value'], 6),
+                    x=get_rounded_str(opt_record['x'], 6),
+                    y=get_rounded_str(opt_record['y'], 6),
+                    xl=opt_record['x_label'],
+                    yl=opt_record['y_label'],
+                    sc=opt_record['scenario'],
+                )
             )
-        )
-if missing_files:
-    print('\nMissing plotted-metric files:')
-    for fp in sorted(set(missing_files)):
-        print(f'  - {fp}')
-if missing_opt_metric_files:
-    print('\nMissing optimization-metric files:')
-    for fp in missing_opt_metric_files:
-        print(f'  - {fp}')
-if missing_opt_value_files:
-    print('\nMissing comparison-value files:')
-    for fp in missing_opt_value_files:
-        print(f'  - {fp}')
+    if missing_opt_metric_files:
+        print('\nMissing optimization-metric files:')
+        for fp in missing_opt_metric_files:
+            print(f'  - {fp}')
+    if missing_opt_value_files:
+        print('\nMissing comparison-value files:')
+        for fp in missing_opt_value_files:
+            print(f'  - {fp}')
 
-get_optima_comparisons(opt_coords_metric_values, rel_to_m='MPSP')
+    get_optima_comparisons(opt_coords_metric_values, rel_to_m='MPSP')
+
+
+for scenario in scenarios:
+    print(f'\n===== Scenario {scenario} =====')
+    plot_scenario(scenario)
