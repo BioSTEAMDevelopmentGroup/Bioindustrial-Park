@@ -13,8 +13,9 @@ import os
 import numpy as np
 import pandas as pd
 from matplotlib import pyplot as plt
-from matplotlib.colors import LinearSegmentedColormap, Normalize
+from matplotlib.colors import LinearSegmentedColormap, BoundaryNorm
 from matplotlib.cm import ScalarMappable
+from matplotlib.ticker import FixedLocator
 from matplotlib.lines import Line2D, TICKDOWN, TICKLEFT
 from matplotlib.transforms import ScaledTranslation
 import matplotlib.text
@@ -811,7 +812,10 @@ for i in range(nrows):
 # (plt.subplots_adjust is a no-op under constrained layout; set the gap here)
 fig.get_layout_engine().set(wspace=0.08, hspace=0.)
 
-norm = Normalize(vmin=float(w_levels[0]), vmax=float(w_levels[-1]))
+# The bar uses the panels' own discrete levels (BoundaryNorm, as in the
+# library's colorbar), so its bands are the panels' bands and every tick
+# below sits on a level boundary.
+norm = BoundaryNorm(w_levels, cmap.N, extend=extend_cmap)
 # carry the panels' under/over colours onto the shared colorbar as extension
 # triangles (e.g. IRR's flat "under zero" grey, MPSP's dark over-range grey)
 cbar_cmap = cmap.copy()
@@ -822,7 +826,7 @@ if cmap_over_color is not None:
 sm = ScalarMappable(norm=norm, cmap=cbar_cmap)
 sm.set_array([])
 cbar = fig.colorbar(sm, ax=axs.ravel().tolist(), shrink=0.95, pad=0.02,
-                    extend=extend_cmap)
+                    extend=extend_cmap, spacing='proportional')
 _cbar_name = get_metric_plot_name(metric, x_label)
 if not _cbar_name.isupper(): # capitalize plain names; keep acronyms (MPSP, TCI, AOC) intact
     _cbar_name = _cbar_name[0].upper() + _cbar_name[1:]
@@ -831,7 +835,20 @@ cbar.set_label(f"{_cbar_name} [{_cbar_units}]" if _cbar_units else _cbar_name,
                fontsize=FONTS['cbar_title'])
 cbar.set_ticks(cbar_ticks)
 cbar.set_ticklabels([fmt_clabel(t) for t in cbar_ticks]) # same precision as the inline labels
-cbar.ax.tick_params(labelsize=FONTS['tick'])
+
+# Minor ticks on the level boundaries between the major ticks: every k-th
+# level, with k a divisor of the levels-per-major count (so minors stay
+# aligned with both the levels and the majors) and at most ~40 minors.
+level_step = float(w_levels[1] - w_levels[0])
+per_major = (int(round((cbar_ticks[1] - cbar_ticks[0]) / level_step))
+             if len(cbar_ticks) > 1 else 1)
+k = next((k for k in range(1, per_major + 1)
+          if per_major % k == 0 and len(w_levels) / k <= 40), per_major)
+cbar_minor_ticks = [float(v) for i, v in enumerate(w_levels)
+                    if i % k == 0 and i % per_major != 0]
+cbar.ax.yaxis.set_minor_locator(FixedLocator(cbar_minor_ticks))
+cbar.ax.tick_params(which='major', labelsize=FONTS['tick'], length=TICK_LEN['major'])
+cbar.ax.tick_params(which='minor', length=TICK_LEN['minor'])
 restyle_panel_text(cbar.ax)
 
 fig.supxlabel(f"{x_label} [{x_units}]", fontsize=FONTS['axis_title'])
