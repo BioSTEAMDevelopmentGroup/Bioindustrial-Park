@@ -760,6 +760,7 @@ def run_kinetic_optimization(objective='IRR',
                              multiplier_bounds=(0.1, 10.0),
                              param_bounds_override=None,
                              exclude_params=(),
+                             include_params=None,
                              threshold_conc_bounds=(0.0, 500.0),
                              target_delta_bounds=(5.0, 500.0),
                              spike_delta_bounds=(0.5, 595.0),
@@ -787,6 +788,15 @@ def run_kinetic_optimization(objective='IRR',
     pruned). Kinetic parameters and feeding specs are restored to the
     scenario baseline in a `finally`.
 
+    `include_params` (None = every k_*/K_* on the model) restricts the
+    kinetic decision variables to the named parameters (see
+    build_search_space); the driver passes the scenario workbook's rows
+    (kinetic_param_names_from_scenario). Names not on the model are
+    ignored with a printed warning. A restricted study has a different
+    search space than an unrestricted one of the same study_name -- the
+    trajectory-CSV header guard raises rather than misaligning columns,
+    so use a fresh study_name.
+
     Returns (study, csv_path, kinetic_baselines)."""
     import optuna
     if handles is None:
@@ -809,11 +819,18 @@ def run_kinetic_optimization(objective='IRR',
                              "direction='maximize' or 'minimize'.")
 
     kinetic_baselines = discover_kinetic_parameters(r_te)
+    if include_params is not None:
+        missing = [p for p in include_params if p not in kinetic_baselines]
+        if missing:
+            print(f'Warning: {len(missing)} include_params names are not '
+                  f'kinetic parameters of the model and are ignored: '
+                  f'{missing}')
     search_space, excluded = build_search_space(
         kinetic_baselines,
         multiplier_bounds=multiplier_bounds,
         param_bounds_override=param_bounds_override,
         exclude_params=exclude_params,
+        include_params=include_params,
         threshold_conc_bounds=threshold_conc_bounds,
         target_delta_bounds=target_delta_bounds,
         spike_delta_bounds=spike_delta_bounds,
@@ -823,8 +840,10 @@ def run_kinetic_optimization(objective='IRR',
         spike_conc_bounds=spike_conc_bounds)
     n_kinetic = sum(1 for name in search_space if name in kinetic_baselines)
     n_feeding = len(search_space) - n_kinetic
+    restriction = ('' if include_params is None else
+                   f', restricted to {len(include_params)} named parameters')
     print(f'Search space: {len(search_space)} decision variables '
-          f'({n_kinetic} kinetic + {n_feeding} feeding); '
+          f'({n_kinetic} kinetic + {n_feeding} feeding{restriction}); '
           f'{len(excluded)} kinetic parameters excluded: {excluded}')
 
     # Scenario baseline snapshot for restoration (the driver has already

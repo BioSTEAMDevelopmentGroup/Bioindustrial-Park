@@ -346,4 +346,10 @@ if os.path.isfile(wb_A) and os.path.isfile(wb_B):
 else:
     print('SKIP 14: parameter-distribution workbooks not found')
 
+#%% 15. run_kinetic_optimization: include_params kwarg plumbed (engine not run offline)
+import inspect as _inspect
+_sig = _inspect.signature(ko.run_kinetic_optimization).parameters
+assert 'include_params' in _sig and _sig['include_params'].default is None
+PASS('run_kinetic_optimization: include_params kwarg present, default None')
+
 print(f'\nALL {n_pass} CHECKS PASSED')

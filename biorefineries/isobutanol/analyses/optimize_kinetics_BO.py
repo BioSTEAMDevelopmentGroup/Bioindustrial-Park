@@ -6,8 +6,9 @@
 # This module is under the UIUC open-source license. See
 # github.com/BioSTEAMDevelopmentGroup/biosteam/blob/master/LICENSE.txt
 # for license details.
-"""Bayesian global optimization of all fermentation kinetic parameters +
-feeding sugar concentrations (see kinetic_optimization.py), run against a
+"""Bayesian global optimization of the scenario workbook's fermentation
+kinetic parameters + feeding sugar concentrations and glucose-spike cap
+(see kinetic_optimization.py), run against a
 scenario baseline. Smoke-test convention: importing this file loads and
 baseline-simulates the biorefinery; the optimization itself runs only when
 a runner calls run(...). Long-running at the default budget (2000 trials)
@@ -58,15 +59,41 @@ def run(scenario='B',  # 'A' or 'B'
         seed=3221,
         make_plots=True,
         study_name=None,  # default: kin_opt_{scenario}_{objective slug}
-        kinetic_bounds_scenario=None,  # e.g. 'B': kinetic bounds from THAT
-        # scenario's workbook baselines (see kinetic_bounds_from_scenario);
-        # explicit param_bounds_override entries win over the derived ones,
-        # and the default study_name gains a _kb{scenario} tag.
+        kinetic_bounds_scenario=None,  # e.g. 'B': the kinetic search SET
+        # (restrict_to_workbook) AND its bounds come from THAT scenario's
+        # workbook (see kinetic_bounds_from_scenario); explicit
+        # param_bounds_override entries win over the derived ones, and the
+        # default study_name gains a _kb{scenario} tag.
+        restrict_to_workbook=True,  # kinetic decision variables = the
+        # kinetic rows of the (kinetic_bounds_scenario or scenario)
+        # workbook; False = every k_*/K_* on the model (the pre-2026-09-03
+        # behaviour, for reproducing older studies). An explicit
+        # include_params in engine_kwargs wins.
         **engine_kwargs,  # bounds/overrides/etc. -> run_kinetic_optimization
         ):
     """Set up the scenario baseline (same recipe as the smoke tests), run
-    the Bayesian optimization, and (optionally) save the three trajectory
-    plots next to the trajectory CSV. Returns (study, csv_path)."""
+    the Bayesian optimization, and (optionally) save the trajectory plots
+    next to the trajectory CSV. Returns (study, csv_path).
+
+    Two independent scenario knobs: `scenario` is the STARTING state
+    (its workbook distributions are loaded, its feeding baseline set, it
+    is enqueued as trial 0, and it is restored in the finally);
+    `kinetic_bounds_scenario or scenario` is the workbook that defines
+    WHICH kinetic parameters are decision variables (when
+    restrict_to_workbook, the default) and centers their multiplier
+    bands. run(scenario='A', kinetic_bounds_scenario='B') therefore
+    starts at the A baseline over B's 56-parameter set (IBO pathway
+    included, trial 0 clipped into B's bands). A restricted study has a
+    different search space than a pre-2026-09-03 full-set study of the
+    same name: reusing its trajectory CSV raises in
+    append_trajectory_row -- use a fresh study_name."""
+    param_set_scenario = kinetic_bounds_scenario or scenario
+    if restrict_to_workbook:
+        names = ko.kinetic_param_names_from_scenario(param_set_scenario)
+        engine_kwargs.setdefault('include_params', names)
+        print(f'Kinetic search set: the {len(names)} kinetic rows of the '
+              f'scenario-{param_set_scenario} parameter-distributions '
+              'workbook.')
     if kinetic_bounds_scenario is not None:
         derived = kinetic_bounds_from_scenario(
             kinetic_bounds_scenario,
