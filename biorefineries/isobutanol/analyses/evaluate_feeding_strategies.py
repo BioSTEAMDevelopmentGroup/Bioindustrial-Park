@@ -848,7 +848,11 @@ if plot:
             continue
         
         # curr_metric_w_levels, curr_metric_w_ticks, curr_metric_cbar_ticks = get_contour_info_from_metric_data(results_metric_1, lb=3)
-        curr_metric_non_nans = np.array(results[curr_metric])[np.where(~np.isnan(np.array(results[curr_metric])))]
+        # finite values only: NaN = not simulated / not solved, and IRR is
+        # -inf where no real IRR exists (solve_TEA, since 2026-09-03)
+        curr_metric_plot_data = results[curr_metric]
+        curr_metric_non_nans = np.array(results[curr_metric], dtype=float)
+        curr_metric_non_nans = curr_metric_non_nans[np.isfinite(curr_metric_non_nans)]
         if curr_metric_non_nans.size == 0 or curr_metric_non_nans.min() == curr_metric_non_nans.max():
             # e.g. IBO MPSP (all NaN) or IBO yield/titer (all zero) in a
             # scenario that makes no isobutanol: no range to contour
@@ -898,6 +902,12 @@ if plot:
             curr_metric_w_ticks = sorted(set(
                 [0.0] + [float(round(t, 3)) for t in curr_metric_cbar_ticks
                          if _IRR_lb < t < _IRR_finite.max()]))
+            # unsolvable IRRs (-inf: no real root on the valid domain) belong
+            # in the under-zero region, but contourf masks non-finite cells;
+            # draw them just below the lower bound instead
+            _IRR_all = np.array(results[curr_metric], dtype=float)
+            curr_metric_plot_data = np.where(np.isneginf(_IRR_all),
+                                             _IRR_lb - _IRR_step, _IRR_all)
             # "under zero" colour: IRR < 0 cells (below the 0 lower bound)
             # are filled light grey, distinct from the map's dark-grey low
             # end, rather than left blank
@@ -907,7 +917,7 @@ if plot:
         # curr_metric_w_levels = np.arange(0., 15.5, 0.5)
         
         
-        contourplots.animated_contourplot(w_data_vs_x_y_at_multiple_z=results[curr_metric], # shape = z * x * y # values of the metric you want to plot on the color axis; e.g., curr_metric
+        contourplots.animated_contourplot(w_data_vs_x_y_at_multiple_z=curr_metric_plot_data, # shape = z * x * y # values of the metric you want to plot on the color axis; e.g., curr_metric
                                         x_data=spec_1, # x axis values
                                         # x_data = curr_metrics/theoretical_max_g_HP_acid_per_g_glucose,
                                         y_data=spec_2, # y axis values

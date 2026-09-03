@@ -233,7 +233,9 @@ def compute_levels_from_arrays(arrays, metric_name):
     for arr in arrays:
         if arr is None:
             continue
-        vals = arr[np.where(~np.isnan(arr))]
+        # finite values only: NaN = not simulated / not solved, and IRR is
+        # -inf where no real IRR exists (solve_TEA, since 2026-09-03)
+        vals = arr[np.isfinite(arr)]
         if vals.size:
             valid.append(vals)
     if not valid:
@@ -429,7 +431,10 @@ def get_optima_comparisons(opt_coords_metric_values, rel_to_m='MPSP'):
             if np.isnan(curr_val):
                 print(f"'{m2}' is unavailable.")
                 continue
-            if np.isnan(ref_val):
+            if np.isinf(curr_val):
+                print(f"'{m2}' is {curr_val} (no real IRR on the valid domain).")
+                continue
+            if not np.isfinite(ref_val):
                 print(f"'{m2}' is {round_off(curr_val, 3)}.")
                 continue
             if np.isclose(ref_val, 0.0):
@@ -535,6 +540,12 @@ for i in range(nrows):
             ax.set_axis_off()
             ax.text(0.5, 0.5, 'File not found', transform=ax.transAxes, ha='center', va='center', fontsize=10)
             continue
+        if 'irr' in metric.lower():
+            # unsolvable IRRs (-inf: no real root on the valid domain) belong
+            # in the under-zero region, but contourf masks non-finite cells;
+            # draw them just below the lower bound instead
+            arr = np.where(np.isneginf(arr),
+                           w_levels[0] - (w_levels[1] - w_levels[0]), arr)
 
         # Optima sharing a grid point keep the first metric's marker (in
         # metrics_to_opt order), so the MPSP star is never hidden under a

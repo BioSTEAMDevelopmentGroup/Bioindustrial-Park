@@ -851,10 +851,14 @@ def run_kinetic_optimization(objective='IRR',
             append_trajectory_row(csv_path, columns, record)
             print(f'Trial {trial.number}: FAILED ({repr(e)[:120]})')
             raise optuna.TrialPruned() from e
-        if math.isnan(obj):
+        if not math.isfinite(obj):
+            # NaN (not solved) or +-inf (solve_TEA reports an IRR with no
+            # real root on the valid domain as -inf since 2026-09-03; the
+            # sampler needs finite values, so such trials are pruned like
+            # NaN ones -- the CSV keeps the raw value in 'objective')
             record['state'] = 'NAN'
             append_trajectory_row(csv_path, columns, record)
-            print(f'Trial {trial.number}: objective is NaN; pruned.')
+            print(f'Trial {trial.number}: objective is non-finite ({obj}); pruned.')
             raise optuna.TrialPruned()
         record['state'] = 'COMPLETE'
         append_trajectory_row(csv_path, columns, record)

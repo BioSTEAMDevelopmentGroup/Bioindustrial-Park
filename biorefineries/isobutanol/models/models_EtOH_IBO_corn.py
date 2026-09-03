@@ -108,9 +108,11 @@ def create_model():
     # with all products at their default prices; solve_TEA_at_IRR then leaves
     # the products at those default prices and tea.IRR at the baseline. The
     # isobutanol MPSPs are NaN when the stream is empty (e.g. scenario A), and
-    # IRR is NaN when NPV has no real root at any valid discount rate. The cache
-    # is reset to NaN before each solve so a failed solve can never leak the
-    # previous simulation's values.
+    # IRR is -inf when NPV has no real root at any valid discount rate (the
+    # project loses money at every discount rate; +inf in the unrealistic
+    # opposite case). The cache is reset to NaN before each solve so a failed
+    # solve can never leak the previous simulation's values -- NaN therefore
+    # means "not solved", never "unsolvable".
     _nan_MPSPs = lambda: {'ethanol': np.nan, 'isobutanol': np.nan}
     _latest_TEA_solution = {'IRR': np.nan,
                             'MPSPs': _nan_MPSPs(),

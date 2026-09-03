@@ -868,10 +868,14 @@ def solve_TEA_at_IRR(stream_IDs=('ethanol', 'isobutanol'),
     * 'IRR' is solved AFTER all MPSPs, with ALL products reset to their
       purity-based default prices (the state the V513/V514 specifications
       produce with update_ethanol_price = update_isobutanol_price = True).
-      Negative IRRs above -100% are genuine solutions and are reported;
-      NaN only when no real IRR exists on the valid domain IRR > -1 (NPV
-      is negative at every valid discount rate, e.g. deep money-losing
-      kinetic-sweep corners).
+      Negative IRRs above -100% are genuine solutions and are reported.
+      When no real IRR exists on the valid domain IRR > -1, a signed
+      infinity is reported: -inf when NPV is negative at every valid
+      discount rate (the project loses money however cheaply it is
+      financed, e.g. deep money-losing kinetic-sweep corners; this was
+      NaN before 2026-09-03), +inf in the (unrealistic) opposite case.
+      NaN is thereby reserved for "not solved" (a failed simulation, or
+      the models' cache placeholder).
 
     Exit state (guaranteed even on an exception): every product with a
     purity-based default price is left AT that default price, any other
@@ -918,7 +922,18 @@ def solve_TEA_at_IRR(stream_IDs=('ethanol', 'isobutanol'),
                     tea.IRR = tea.solve_IRR(bounds=[-0.99, 10.0])
             except Exception:
                 pass
-        IRR = tea.IRR if valid_IRR() else np.nan
+        if valid_IRR():
+            IRR = tea.IRR
+        else:
+            # No genuine root on the valid domain (the bracketed solve found
+            # no NPV sign change on [-0.99, 10]): report a signed infinity
+            # from the sign of NPV at the low end of the domain. NPV still
+            # negative at -99 % means the project loses money at every valid
+            # discount rate (IRR "too low" -> -inf); NPV positive there (and
+            # hence everywhere up to +1000 %) would be +inf. NaN is reserved
+            # for "not solved". tea.IRR is restored in the finally block.
+            tea.IRR = -0.99
+            IRR = -np.inf if tea.NPV < 0.0 else np.inf
     finally:
         # Products with a default price are left AT that default price (not
         # their entry price); anything else touched is restored to entry.

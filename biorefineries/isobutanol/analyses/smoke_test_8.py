@@ -31,7 +31,8 @@ traceback):
   with 2023$ prices was 2.3817), earlier that day for the 2023 price
   year (stream/utility prices indexed to 2023$ with the BLS chemicals
   PPI; pin under the 2023 CEPCI with unindexed prices was 2.1569; the
-  IRR at default product prices has been unsolvable, nan, since then),
+  IRR at default product prices has been unsolvable since then -- reported
+  as -inf by solve_TEA from 2026-09-03, nan before),
   then for the 2023 CEPCI 797.9 (bst.CE had been biosteam's
   567.5 default; pin under Lang 3.0 alone was 1.8149) and, earlier that day, the Lang factor
   3.0 TEA (Huang et al. 2016; previous pin 2.1278 under corn's uncited
