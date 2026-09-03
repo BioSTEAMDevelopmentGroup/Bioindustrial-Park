@@ -98,7 +98,14 @@ V406 = f.V406
 # adapts to any feed titer (0-200 g/L) natively, shutting the IBO side off
 # when the broth carries no isobutanol.
 
-scenario = 'B'
+# NOTE: the kinetics workbook stays scenario B (loaded above, ~line 84);
+# only the FEEDING strategy follows scenario A here -- a feeding-strategy
+# swap on the B (IBO-producing) k_13 x k_7ii kinetic sweep (user request
+# 2026-09-03). The A branch sets max_n_spikes=16, so `file_to_save` carries
+# max_n=16, keeping this run's outputs distinct from the scenario-B (max_n=0)
+# run rather than overwriting them. This is a `scenario` FEEDING selector
+# only -- do not read it as also switching the kinetics workbook.
+scenario = 'A'
 
 if scenario=='A':
     fbs_spec.max_n_spikes = 16
