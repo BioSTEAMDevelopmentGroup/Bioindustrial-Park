@@ -910,10 +910,10 @@ if plot:
                                              _IRR_lb - _IRR_step, _IRR_all)
             # "under zero" colour: IRR < 0 cells (below the 0 lower bound,
             # incl. -inf = unsolvable) are filled with a grey darker than
-            # the map's darkest colour (grey_dark, 0.28 -> shade(50), 0.14)
+            # the map's darkest colour (grey_dark, 0.28 -> shade(20), 0.23)
             # rather than left blank
             extend_cmap = 'both'
-            cmap_under_color = colors.grey_dark.shade(50).RGBn
+            cmap_under_color = colors.grey_dark.shade(20).RGBn
         curr_metric_w_ticks = np.round(np.array(curr_metric_w_ticks), 2)
         # curr_metric_w_levels = np.arange(0., 15.5, 0.5)
         
