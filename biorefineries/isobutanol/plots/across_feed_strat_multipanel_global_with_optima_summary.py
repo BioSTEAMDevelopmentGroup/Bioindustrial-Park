@@ -436,6 +436,66 @@ def get_zeroth_spec_2_val_for_condition_for_all_spec_1_vals(metric_arr, conditio
 
 round_off = contourplots.utils.round_off
 
+# minimum clearance a label wants from each obstacle class, in axes-span units
+# (a 10 pt "0.20" label is ~0.1 of a 3.2 in panel wide, a 9 pt marker ~0.04)
+CLEARANCE = {'marker': 0.13, 'label': 0.12, 'edge': 0.06, 'line': 0.05}
+
+def place_contour_labels(arr2d, levels, marker_xy=(), line_y=None):
+    """One inline label per level: the contour vertex with the largest
+    clearance (distance / CLEARANCE, in axes-span units) from the optimum
+    markers, the labels already placed, the panel edges and the white
+    line. Vertices within 6 % of arc length of a segment end are skipped so
+    the label is not cut by the feasible-region edge. Returns
+    {level: (x, y)} for the levels that have a contour in this panel (the
+    others are dropped, so the library draws no automatic labels)."""
+    x0, x1 = x_ticks[0], x_ticks[-1]
+    y0, y1 = y_ticks[0], y_ticks[-1]
+    to_n = lambda x, y: np.array([(x - x0)/(x1 - x0), (y - y0)/(y1 - y0)])
+    markers = [to_n(*p) for p in marker_xy]
+    line_pts = []
+    if line_y is not None:
+        line_pts = [to_n(x, y) for x, y in zip(spec_1, line_y) if np.isfinite(y)]
+    gen = contourpy.contour_generator(spec_1, spec_2, np.ma.masked_invalid(arr2d))
+    placed, positions = [], {}
+
+    def clearance(p):
+        d = min(p[0], 1 - p[0], p[1], 1 - p[1]) / CLEARANCE['edge']
+        for cls, pts in (('marker', markers), ('label', placed), ('line', line_pts)):
+            for q in pts:
+                d = min(d, np.hypot(*(p - q)) / CLEARANCE[cls])
+        return d
+
+    for level in levels:
+        segs = [seg for seg in gen.lines(level) if len(seg) >= 2]
+        seg_npts = [np.array([to_n(x, y) for x, y in seg]) for seg in segs]
+        seg_arcs = [np.concatenate([[0.], np.cumsum(np.hypot(*np.diff(npts, axis=0).T))])
+                    for npts in seg_npts]
+        # candidates: only segments at least half as long as the level's
+        # longest one (and never shorter than a ~0.12-wide label when a
+        # proper segment exists), so a clear little loop never outranks the
+        # main contour line
+        longest = max((arc[-1] for arc in seg_arcs), default=0.)
+        best_seg, best_k, best_score = None, None, -np.inf
+        for seg, npts, arc in zip(segs, seg_npts, seg_arcs):
+            if arc[-1] == 0 or arc[-1] < 0.5*longest or (arc[-1] < 0.12 and longest >= 0.12):
+                continue
+            frac = arc / arc[-1]
+            inner = (frac >= 0.06) & (frac <= 0.94)
+            if not inner.any():
+                inner[len(inner)//2] = True
+            for k in np.flatnonzero(inner):
+                # clearance first, then a preference for long segments and
+                # for the middle of a segment
+                score = (clearance(npts[k]) + 0.5*min(arc[-1], 0.5)
+                         + 0.05*(1 - abs(frac[k] - 0.5)*2))
+                if score > best_score:
+                    best_seg, best_k, best_score = seg, k, score
+        if best_seg is not None:
+            positions[level] = (float(best_seg[best_k][0]), float(best_seg[best_k][1]))
+            placed.append(to_n(*positions[level]))
+    return positions
+
+
 def get_optima_metric_values(global_optima, metrics_to_opt, steps):
     opt_coords_metric_values = {}
     missing_metric_value_files = []
@@ -624,6 +684,15 @@ for i in range(nrows):
                                                                               condition = lambda i: i==0))
             add_lines = {line_first_app_n_glu_spikes_0: {'color': 'white', 'linewidth': 1.0, 'alpha': 1.0}}
 
+        # One label per labelled level, placed clear of markers, other labels,
+        # the panel edges and the white line (the library's automatic
+        # placement repeated levels and stacked labels on steep gradients).
+        marker_xy = [(rec['x'], rec['y']) for rec in global_optima.values()
+                     if rec['scenario'] == scenario]
+        manual_clabels = place_contour_labels(
+            arr[0], w_ticks, marker_xy,
+            line_first_app_n_glu_spikes_0 if arr_n_spikes is not None else None)
+
         contourplots.animated_contourplot(
             w_data_vs_x_y_at_multiple_z=arr,
             x_data=spec_1,
@@ -637,7 +706,8 @@ for i in range(nrows):
             y_ticks=y_ticks,
             z_ticks=z_ticks,
             w_levels=w_levels,
-            w_ticks=w_ticks,
+            w_ticks=list(manual_clabels.keys()), # only levels present in this panel
+            manual_clabels_regular=manual_clabels,
             x_units=x_units,
             y_units=y_units,
             z_units=z_units,
