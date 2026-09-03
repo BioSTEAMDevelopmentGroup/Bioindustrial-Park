@@ -89,11 +89,16 @@ def run(scenario='B',  # 'A' or 'B'
     append_trajectory_row -- use a fresh study_name."""
     param_set_scenario = kinetic_bounds_scenario or scenario
     if restrict_to_workbook:
-        names = ko.kinetic_param_names_from_scenario(param_set_scenario)
-        engine_kwargs.setdefault('include_params', names)
-        print(f'Kinetic search set: the {len(names)} kinetic rows of the '
-              f'scenario-{param_set_scenario} parameter-distributions '
-              'workbook.')
+        if 'include_params' in engine_kwargs:
+            print('Kinetic search set: the '
+                  f'{len(engine_kwargs["include_params"])} explicitly passed '
+                  'include_params (the workbook set is not derived).')
+        else:
+            names = ko.kinetic_param_names_from_scenario(param_set_scenario)
+            engine_kwargs['include_params'] = names
+            print(f'Kinetic search set: the {len(names)} kinetic rows of the '
+                  f'scenario-{param_set_scenario} parameter-distributions '
+                  'workbook.')
     if kinetic_bounds_scenario is not None:
         derived = kinetic_bounds_from_scenario(
             kinetic_bounds_scenario,

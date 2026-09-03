@@ -289,6 +289,13 @@ assert sup['row_count'](csv_path) == 3           # check-5/8 trajectory
 code12 = sup['child_code']('A', 'IRR', 2000, 'B', False, 'kin_opt_A_kbB_irr')
 assert 'runpy' in code12 and "scenario='A'" in code12
 assert "study_name='kin_opt_A_kbB_irr'" in code12
+import inspect as _inspect12
+assert _inspect12.signature(sup['child_code']).parameters['restrict_to_workbook'].default is True
+assert _inspect12.signature(sup['supervise']).parameters['restrict_to_workbook'].default is True
+assert 'restrict_to_workbook=False' in sup['child_code'](
+    'B', 'IRR', 5, None, False, 'x', restrict_to_workbook=False)
+assert 'restrict_to_workbook=True' in sup['child_code'](
+    'B', 'IRR', 5, None, False, 'x')
 PASS('StallGuard / attempt_outcome / supervised-runner helpers')
 
 #%% 13. include_params: whitelist restricts the kinetic set; feeding vars untouched

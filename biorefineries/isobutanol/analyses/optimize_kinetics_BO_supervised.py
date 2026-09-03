@@ -74,7 +74,7 @@ def row_count(csv_path):
 
 
 def child_code(scenario, objective, n_trials, kinetic_bounds_scenario,
-               make_plots, study_name):
+               make_plots, study_name, restrict_to_workbook=True):
     """The -c program for one supervised attempt of the driver."""
     return (
         'import runpy\n'
@@ -83,15 +83,20 @@ def child_code(scenario, objective, n_trials, kinetic_bounds_scenario,
         f'          n_trials={n_trials!r},\n'
         f'          kinetic_bounds_scenario={kinetic_bounds_scenario!r},\n'
         f'          make_plots={make_plots!r},\n'
-        f'          study_name={study_name!r})\n')
+        f'          study_name={study_name!r},\n'
+        f'          restrict_to_workbook={restrict_to_workbook!r})\n')
 
 
 def supervise(scenario='B', objective='IRR', n_trials=2000,
               kinetic_bounds_scenario=None, make_plots=True,
               study_name=None, stall_timeout_min=25.0, poll_s=30.0,
-              settle_s=10.0, python=None, log_path=None):
+              settle_s=10.0, python=None, log_path=None,
+              restrict_to_workbook=True):
     """Run attempts until 'complete' or 'abort'; returns the final
-    outcome string ('complete' or 'abort')."""
+    outcome string ('complete' or 'abort'). `restrict_to_workbook`
+    (default True) is forwarded to the driver's run(); pass False to
+    reproduce the pre-2026-09-03 all-model-k_* search set (e.g. for
+    resuming an older study)."""
     if study_name is None:
         study_name = default_study_name(scenario, objective,
                                         kinetic_bounds_scenario)
@@ -102,7 +107,8 @@ def supervise(scenario='B', objective='IRR', n_trials=2000,
         os.makedirs(RESULTS_DIR, exist_ok=True)
         log_path = os.path.join(RESULTS_DIR, study_name + '_run.log')
     code = child_code(scenario, objective, n_trials,
-                      kinetic_bounds_scenario, make_plots, study_name)
+                      kinetic_bounds_scenario, make_plots, study_name,
+                      restrict_to_workbook=restrict_to_workbook)
     guard = ko.StallGuard(stall_timeout_s=60.0*stall_timeout_min)
 
     def event(msg):
@@ -174,6 +180,11 @@ if __name__ == '__main__':
     parser.add_argument('--stall-timeout-min', type=float, default=25.0)
     parser.add_argument('--poll-s', type=float, default=30.0)
     parser.add_argument('--settle-s', type=float, default=10.0)
+    parser.add_argument('--no-restrict-to-workbook',
+                        dest='restrict_to_workbook', action='store_false',
+                        help='sample every k_*/K_* on the model instead of '
+                             "the scenario workbook's rows (pre-2026-09-03 "
+                             'behaviour, for resuming older studies)')
     args = parser.parse_args()
     outcome = supervise(scenario=args.scenario, objective=args.objective,
                         n_trials=args.n_trials,
@@ -181,5 +192,6 @@ if __name__ == '__main__':
                         make_plots=not args.no_plots,
                         study_name=args.study_name,
                         stall_timeout_min=args.stall_timeout_min,
-                        poll_s=args.poll_s, settle_s=args.settle_s)
+                        poll_s=args.poll_s, settle_s=args.settle_s,
+                        restrict_to_workbook=args.restrict_to_workbook)
     sys.exit(0 if outcome == 'complete' else 1)
