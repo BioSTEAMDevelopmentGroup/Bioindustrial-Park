@@ -768,7 +768,11 @@ if plot:
             cmap_over_color = colors.grey_dark.shade(8).RGBn
             
         # curr_metric_w_levels, curr_metric_w_ticks, curr_metric_cbar_ticks = get_contour_info_from_metric_data(results_metric_1, lb=3)
-        curr_metric_non_nans = np.array(results[curr_metric])[np.where(~np.isnan(np.array(results[curr_metric])))]
+        # Use only FINITE values to derive levels/ticks: solve_TEA reports an
+        # unsolvable (money-losing) IRR as -inf, and np.isnan does NOT catch
+        # +/-inf -- an -inf leaking into np.arange(min, ...) below raises
+        # "arange: cannot compute length" and aborts all remaining plots.
+        curr_metric_non_nans = np.array(results[curr_metric])[np.isfinite(np.array(results[curr_metric]))]
         if curr_metric_non_nans.size == 0 or curr_metric_non_nans.min() == curr_metric_non_nans.max():
             # e.g. IBO MPSP (all NaN) or IBO yield/titer (all zero) in a
             # scenario that makes no isobutanol: no range to contour
@@ -809,8 +813,20 @@ if plot:
             cmap_under_color = colors.grey_dark.shade(40).RGBn
         # else:
         #     break
-        
-        contourplots.animated_contourplot(w_data_vs_x_y_at_multiple_z=results[curr_metric], # shape = z * x * y # values of the metric you want to plot on the color axis; e.g., curr_metric
+
+        # contourf masks non-finite cells (they render blank). For a metric
+        # drawn with an under-color extend (IRR), push -inf (unsolvable,
+        # money-losing points) to just below the lowest level so those cells
+        # fill with cmap_under_color instead of vanishing.
+        plot_data = results[curr_metric]
+        if cmap_under_color is not None:
+            _pd = np.array(plot_data, dtype=float)
+            if np.isneginf(_pd).any():
+                _step = curr_metric_w_levels[1] - curr_metric_w_levels[0]
+                _pd[np.isneginf(_pd)] = curr_metric_w_levels[0] - _step
+                plot_data = _pd
+
+        contourplots.animated_contourplot(w_data_vs_x_y_at_multiple_z=plot_data, # shape = z * x * y # values of the metric you want to plot on the color axis; e.g., curr_metric
                                         x_data=spec_1, # x axis values
                                         # x_data = curr_metrics/theoretical_max_g_HP_acid_per_g_glucose,
                                         y_data=spec_2, # y axis values
