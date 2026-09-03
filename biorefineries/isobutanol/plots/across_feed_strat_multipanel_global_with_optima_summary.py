@@ -15,6 +15,11 @@ import pandas as pd
 from matplotlib import pyplot as plt
 from matplotlib.colors import LinearSegmentedColormap, Normalize
 from matplotlib.cm import ScalarMappable
+from matplotlib.lines import Line2D, TICKDOWN, TICKLEFT
+from matplotlib.transforms import ScaledTranslation
+import matplotlib.text
+import matplotlib.patheffects
+import contourpy
 
 import contourplots
 from biosteam.utils import colors
@@ -30,13 +35,16 @@ from biorefineries import isobutanol
 # Metric to plot; override with IBO_FEED_STRAT_METRIC=IRR (or 'IBO MPSP', ...).
 metric = os.environ.get('IBO_FEED_STRAT_METRIC', 'MPSP')
 x_label = "Threshold glucose concentration" # title of the x axis
-x_units =r"$\mathrm{g} \cdot \mathrm{L}^{-1}$"
+# units stay in mathtext (rendered in the figure typeface, see
+# apply_font_rcparams) with a middle dot: Arial has no dot operator (\cdot,
+# U+22C5) or superscript minus, which would fall back to another face
+x_units =r"$\mathrm{g·L}^{-1}$"
 x_ticks = [0, 100, 200, 300, 400,
            # 300, 400, 500,
            ]
 
 y_label = "Target glucose concentration" # title of the y axis
-y_units =r"$\mathrm{g} \cdot \mathrm{L}^{-1}$"
+y_units =r"$\mathrm{g·L}^{-1}$"
 y_ticks = [0, 100, 200, 300, 400,
            # 300, 400, 500,
            ]
@@ -92,16 +100,63 @@ comparison_range = []
 #         ]) # Jan 2021 - Dec 2025 5-year low and high from https://tradingeconomics.com/commodity/ethanol
 
 get_rounded_str = contourplots.utils.get_rounded_str
-fmt_clabel = lambda cvalue: get_rounded_str(cvalue, 3)
-# if metric == 'MPSP':
-#     fmt_clabel = lambda cvalue: rf"$\${cvalue:.2f}\cdot\mathrm{{kg}}^{{-1}}$"
-    
+if metric in ('MPSP', 'IBO MPSP', 'IRR'):
+    # fixed two decimals: the colorbar ticks use the same formatter, so the
+    # bar and the inline labels agree (0.80 on both, not 0.8 vs 0.80)
+    fmt_clabel = lambda cvalue: f"{cvalue:.2f}"
+else:
+    fmt_clabel = lambda cvalue: get_rounded_str(cvalue, 3)
+
+# -----------------------------------------------------------------------------
+# Typeface, font sizes, tick style
+# -----------------------------------------------------------------------------
+FONT_FAMILY = 'Arial'
+FONTS = {'tick': 12, 'axis_title': 12, 'panel_title': 12, 'cbar_title': 12,
+         'clabel': 10, 'legend': 9}
+TICK_LEN = {'major': 4.0, 'minor': 2.0} # pt; left/bottom ticks extend this far in AND out
+
+
+def apply_font_rcparams():
+    # contourplots resets font.sans-serif to the uninstalled 'Arial Unicode'
+    # (silent DejaVu Sans fallback) and font.size on every call, so this is
+    # applied before the figure is made and again after each panel call.
+    plt.rcParams['font.family'] = 'sans-serif'
+    plt.rcParams['font.sans-serif'] = [FONT_FAMILY, 'DejaVu Sans']
+    plt.rcParams['font.size'] = FONTS['tick']
+    plt.rcParams['mathtext.fontset'] = 'custom'
+    plt.rcParams['mathtext.rm'] = FONT_FAMILY
+    plt.rcParams['mathtext.it'] = f'{FONT_FAMILY}:italic'
+    plt.rcParams['mathtext.bf'] = f'{FONT_FAMILY}:bold'
+    plt.rcParams['mathtext.fallback'] = 'stixsans'
+
+
+def restyle_panel_text(ax):
+    # text created inside animated_contourplot (tick labels, contour labels)
+    # picked up the library's rcParams; force the figure typeface on it
+    for t in ax.findobj(matplotlib.text.Text):
+        t.set_fontfamily(FONT_FAMILY)
+
+
+def style_ticks(ax):
+    # top/right: inward only; left/bottom: in and out, the same length each
+    # way. Call after fig.canvas.draw() so every tick object exists.
+    for which, L in TICK_LEN.items():
+        ax.tick_params(axis='both', which=which, direction='inout', length=2*L,
+                       top=True, right=True, labelsize=FONTS['tick'])
+        get = 'get_major_ticks' if which == 'major' else 'get_minor_ticks'
+        for tick in getattr(ax.xaxis, get)():
+            tick.tick2line.set_marker(TICKDOWN)
+            tick.tick2line.set_markersize(L)
+        for tick in getattr(ax.yaxis, get)():
+            tick.tick2line.set_marker(TICKLEFT)
+            tick.tick2line.set_markersize(L)
+
 # -----------------------------------------------------------------------------
 # Shared metadata from across_kinetic_params.py
 # -----------------------------------------------------------------------------
 metrics_units = {
-    'MPSP': r"$\mathrm{\$}\cdot\mathrm{kg}^{-1}$",
-    'IBO MPSP': r"$\mathrm{\$}\cdot\mathrm{kg}^{-1}$",
+    'MPSP': r"$\mathrm{\$·kg}^{-1}$",
+    'IBO MPSP': r"$\mathrm{\$·kg}^{-1}$",
     'IRR': '',
     'AOC': r'MM\$/y',
     'TCI': r'MM\$',
@@ -515,6 +570,7 @@ cmap, cmap_over_color, cmap_under_color, extend_cmap = choose_metric_colormap(me
 # -----------------------------------------------------------------------------
 nrows = 1
 ncols = len(scenarios)
+apply_font_rcparams()
 fig, axs = plt.subplots(nrows, ncols, constrained_layout=True)
 if nrows == 1 and ncols == 1:
     axs = np.array([[axs]])
@@ -523,10 +579,10 @@ elif nrows == 1:
 elif ncols == 1:
     axs = np.array([[ax] for ax in axs])
 
-axis_title_fonts={'size': {'x': 11, 'y':11, 'z':11, 'w':11},}
-default_fontsize = 15.
-clabel_fontsize = 12
-axis_tick_fontsize = 15
+axis_title_fonts={'size': {k: FONTS['axis_title'] for k in 'xyzw'},}
+default_fontsize = FONTS['tick']
+clabel_fontsize = FONTS['clabel']
+axis_tick_fontsize = FONTS['tick']
 
 for i in range(nrows):
     x_label_for_plot = format_param_label(x_label)
@@ -592,6 +648,7 @@ for i in range(nrows):
             cmap_under_color=cmap_under_color,
             extend_cmap=extend_cmap,
             cbar_ticks=cbar_ticks,
+            fontname={'fontname': FONT_FAMILY},
             z_marker_color='g',
             fps=1,
             n_loops='inf',
@@ -613,9 +670,7 @@ for i in range(nrows):
             include_cbar=False,
             include_axis_labels=False,
             include_x_axis_ticklabels=(i == nrows - 1),
-            # include_x_axis_ticklabels=True,
-            include_last_x_axis_ticklabel=(j==ncols-1),
-            # include_last_x_axis_ticklabel=True,
+            include_last_x_axis_ticklabel=True, # panels are visibly separated (layout wspace below)
             include_y_axis_ticklabels=(j == 0),
             include_last_y_axis_ticklabel=(i==0),
             additional_points=additional_points,
@@ -625,14 +680,21 @@ for i in range(nrows):
             label_over_color='black',
             add_lines=add_lines,
         )
+        apply_font_rcparams()
+        restyle_panel_text(ax)
 
         if ncols > 1:
-            ax.set_title(f'Scenario {scenario}', fontsize=11, fontweight='bold')
+            # pad keeps the title clear of optimum markers sitting on the top edge
+            ax.set_title(f'Scenario {scenario}', fontsize=FONTS['panel_title'],
+                         fontweight='bold', pad=8)
+        else:
+            ax.set_title('') # drop the library's blank 20 pt spacer title
 
 # -----------------------------------------------------------------------------
 # Shared colorbar and layout
 # -----------------------------------------------------------------------------
-plt.subplots_adjust(wspace=0., hspace=0.)
+# (plt.subplots_adjust is a no-op under constrained layout; set the gap here)
+fig.get_layout_engine().set(wspace=0.08, hspace=0.)
 
 norm = Normalize(vmin=float(w_levels[0]), vmax=float(w_levels[-1]))
 # carry the panels' under/over colours onto the shared colorbar as extension
@@ -650,14 +712,22 @@ _cbar_name = get_metric_plot_name(metric, x_label)
 if not _cbar_name.isupper(): # capitalize plain names; keep acronyms (MPSP, TCI, AOC) intact
     _cbar_name = _cbar_name[0].upper() + _cbar_name[1:]
 _cbar_units = metrics_units[metric]
-cbar.set_label(f"{_cbar_name} [{_cbar_units}]" if _cbar_units else _cbar_name, fontsize=11)
+cbar.set_label(f"{_cbar_name} [{_cbar_units}]" if _cbar_units else _cbar_name,
+               fontsize=FONTS['cbar_title'])
 cbar.set_ticks(cbar_ticks)
+cbar.set_ticklabels([fmt_clabel(t) for t in cbar_ticks]) # same precision as the inline labels
+cbar.ax.tick_params(labelsize=FONTS['tick'])
+restyle_panel_text(cbar.ax)
 
-fig.supxlabel(f"{x_label} [{x_units}]", fontsize=11)
-fig.supylabel(f"{y_label} [{y_units}]", fontsize=11)
+fig.supxlabel(f"{x_label} [{x_units}]", fontsize=FONTS['axis_title'])
+fig.supylabel(f"{y_label} [{y_units}]", fontsize=FONTS['axis_title'])
 
 fig.set_figwidth(3.2 * ncols + 1.2)
 fig.set_figheight(2.7 * nrows + 1.6)
+
+fig.canvas.draw() # materialize every tick before restyling them
+for ax in axs.ravel():
+    style_ticks(ax)
 
 output_filepath = os.path.join(isobutanol_results_pub_filepath, 'Feed-strat', output_filename)
 plt.savefig(output_filepath, transparent=False, facecolor='white', bbox_inches='tight', dpi=600)
