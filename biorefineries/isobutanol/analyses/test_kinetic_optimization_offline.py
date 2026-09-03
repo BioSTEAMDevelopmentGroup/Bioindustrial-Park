@@ -291,4 +291,38 @@ assert 'runpy' in code12 and "scenario='A'" in code12
 assert "study_name='kin_opt_A_kbB_irr'" in code12
 PASS('StallGuard / attempt_outcome / supervised-runner helpers')
 
+#%% 13. include_params: whitelist restricts the kinetic set; feeding vars untouched
+kb13 = {'k_1e': 47.1, 'K_1e': 0.12, 'k_6r': 3.0, 'K_2': 0.5, 'k_13': 0.0}
+space13, excl13 = ko.build_search_space(
+    kb13, include_params=['k_1e', 'K_1e', 'k_13'],
+    param_bounds_override={'k_13': (0.581, 58.1)})
+assert set(space13) == {'k_1e', 'K_1e', 'k_13', *ko.FEEDING_VARIABLES}
+assert excl13 == ['k_6r', 'K_2']            # silent, model order preserved
+assert space13['k_13'] == dict(low=0.581, high=58.1, log=True)  # override honored
+assert space13['k_1e'] == dict(low=0.1*47.1, high=10.0*47.1, log=True)
+# Composes with exclude_params (within the included set); a whitelisted
+# name absent from the model is simply never placed; a non-whitelisted
+# zero-baseline parameter is excluded by the whitelist (no warning path).
+space13b, excl13b = ko.build_search_space(
+    kb13, include_params=('k_1e', 'K_1e', 'k_6r', 'not_on_model'),
+    exclude_params=('K_1e',))
+assert set(space13b) == {'k_1e', 'k_6r', *ko.FEEDING_VARIABLES}
+assert excl13b == ['K_1e', 'K_2', 'k_13']
+assert 'not_on_model' not in space13b
+# include_params=None -> no restriction (pre-2026-09-03 behaviour)
+space13c, _ = ko.build_search_space(
+    kb13, include_params=None,
+    param_bounds_override={'k_13': (0.581, 58.1)})
+assert set(space13c) == set(kb13) | set(ko.FEEDING_VARIABLES)
+# baseline_decision_point on the restricted space: only in-space names,
+# clipped into bounds (the start-at-A / set-from-B case: k_13 = 0 -> low)
+pt13 = ko.baseline_decision_point(
+    space13, kb13,
+    dict(target_conc=221.25, threshold_conc=217.125, spike_conc=600.0),
+    baseline_max_n_spikes=16)
+assert set(pt13) == set(space13)
+assert pt13['k_13'] == 0.581 and pt13['k_1e'] == 47.1
+assert pt13['max_n_spikes'] == 16 and 'k_6r' not in pt13
+PASS('build_search_space: include_params whitelist composes with override/exclude; restricted baseline point')
+
 print(f'\nALL {n_pass} CHECKS PASSED')

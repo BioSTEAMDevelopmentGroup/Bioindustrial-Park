@@ -6,8 +6,10 @@
 # This module is under the UIUC open-source license. See
 # github.com/BioSTEAMDevelopmentGroup/biosteam/blob/master/LICENSE.txt
 # for license details.
-"""Bayesian (Optuna TPE) global optimization of all fermentation kinetic
-parameters (k_*/K_* on V406's tellurium model) plus the feeding-strategy
+"""Bayesian (Optuna TPE) global optimization of the fermentation kinetic
+parameters (k_*/K_* on V406's tellurium model; by default the driver
+restricts the set to the scenario workbook's rows via include_params) plus
+the feeding-strategy
 variables (threshold_conc, target_conc via target_delta, spike_conc via
 spike_delta -- feasible-by-construction threshold < target < spike --
 and the integer max_n_spikes cap), against a named or custom objective --
@@ -131,6 +133,7 @@ def build_search_space(kinetic_baselines,
                        multiplier_bounds=(0.1, 10.0),
                        param_bounds_override=None,
                        exclude_params=(),
+                       include_params=None,
                        threshold_conc_bounds=(0.0, 500.0),
                        target_delta_bounds=(5.0, 500.0),
                        spike_delta_bounds=(0.5, 595.0),
@@ -148,7 +151,13 @@ def build_search_space(kinetic_baselines,
     bounds instead (log-scale only if low > 0). A parameter with a
     nonpositive baseline and no override cannot use the multiplier band
     and is EXCLUDED with a printed warning. `exclude_params` names are
-    always excluded (silently). The feeding variables (all linear) make
+    always excluded (silently). `include_params`
+    (None = no restriction) is a WHITELIST: a kinetic parameter is placed
+    in the space only if its name is in it, and every other kinetic
+    parameter is excluded silently -- the driver passes the kinetic rows
+    of a scenario's parameter-distributions workbook here so the search
+    set matches the curated uncertainty set. The feeding variables below
+    are never filtered by it. The feeding variables (all linear) make
     the required ordering threshold < target < spike feasible BY
     CONSTRUCTION: threshold_conc is sampled absolutely, the target is
     sampled as target_delta above the threshold
@@ -174,7 +183,9 @@ def build_search_space(kinetic_baselines,
     m_lo, m_hi = multiplier_bounds
     space, excluded = {}, []
     for name, baseline in kinetic_baselines.items():
-        if name in exclude_params:
+        if include_params is not None and name not in include_params:
+            excluded.append(name)
+        elif name in exclude_params:
             excluded.append(name)
         elif name in param_bounds_override:
             lo, hi = param_bounds_override[name]
