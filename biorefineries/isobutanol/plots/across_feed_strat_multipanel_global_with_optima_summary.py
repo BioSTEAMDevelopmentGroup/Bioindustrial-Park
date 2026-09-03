@@ -211,11 +211,12 @@ def choose_metric_colormap(metric_name):
     if 'irr' in lccm:
         # higher is better (reversed map: yellow = high, dark grey = 0). The
         # colorbar starts at 0 (compute_levels_from_arrays), so every
-        # money-losing point (IRR < 0) is painted in one flat "under zero"
-        # colour -- light grey, distinct from the map's dark-grey low end.
+        # money-losing point (IRR < 0, incl. -inf = unsolvable) is painted
+        # in one flat "under zero" colour: a grey darker than the map's
+        # darkest colour (grey_dark, 0.28 -> shade(50), 0.14).
         cmap = JBEI_UCB_colormap(reverse=True)
         cmap_over_color = colors.yellow_tint.RGBn
-        cmap_under_color = colors.grey_tint.RGBn
+        cmap_under_color = colors.grey_dark.shade(50).RGBn
         extend_cmap = 'both'
     elif any(key in lccm for key in ('yield', 'titer', 'productivity', 'loading')):
         cmap = JBEI_UCB_colormap(reverse=True)

@@ -908,11 +908,12 @@ if plot:
             _IRR_all = np.array(results[curr_metric], dtype=float)
             curr_metric_plot_data = np.where(np.isneginf(_IRR_all),
                                              _IRR_lb - _IRR_step, _IRR_all)
-            # "under zero" colour: IRR < 0 cells (below the 0 lower bound)
-            # are filled light grey, distinct from the map's dark-grey low
-            # end, rather than left blank
+            # "under zero" colour: IRR < 0 cells (below the 0 lower bound,
+            # incl. -inf = unsolvable) are filled with a grey darker than
+            # the map's darkest colour (grey_dark, 0.28 -> shade(50), 0.14)
+            # rather than left blank
             extend_cmap = 'both'
-            cmap_under_color = colors.grey_tint.RGBn
+            cmap_under_color = colors.grey_dark.shade(50).RGBn
         curr_metric_w_ticks = np.round(np.array(curr_metric_w_ticks), 2)
         # curr_metric_w_levels = np.arange(0., 15.5, 0.5)
         
