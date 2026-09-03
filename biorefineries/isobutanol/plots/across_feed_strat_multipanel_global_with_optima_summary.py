@@ -19,13 +19,16 @@ from matplotlib.cm import ScalarMappable
 import contourplots
 from biosteam.utils import colors
 from biorefineries import isobutanol
-isobutanol.load()
+# No isobutanol.load() here: this script only reads the sweep CSVs and needs
+# the package path, and the import is build-free (2026-08-30 lazy-load
+# refactor), so it never touches the simulation / numba cache.
 
 #%%
 # -----------------------------------------------------------------------------
 # User inputs
 # -----------------------------------------------------------------------------
-metric = 'MPSP'
+# Metric to plot; override with IBO_FEED_STRAT_METRIC=IRR (or 'IBO MPSP', ...).
+metric = os.environ.get('IBO_FEED_STRAT_METRIC', 'MPSP')
 x_label = "Threshold glucose concentration" # title of the x axis
 x_units =r"$\mathrm{g} \cdot \mathrm{L}^{-1}$"
 x_ticks = [0, 100, 200, 300, 400,
@@ -60,17 +63,25 @@ output_filename = f'{metric}_multi_panel_feed_strat_{"".join(scenarios)}.png'
 
 # Optional: set to None to auto-compute from all loaded panels.
 if metric == 'MPSP' and scenarios == ['A']:
-    # scenario A spans ~0.84-1.07 $/kg (optimum = the 0.84 baseline strategy)
-    manual_w_levels = np.arange(0.80, 1.1001, 0.005)
-    manual_cbar_ticks = np.arange(0.80, 1.1001, 0.05)
-    manual_w_ticks = [0.85, 0.90, 1.00]
+    # scenario A spans ~0.87-1.10 $/kg on the 2026-09-02 model (optimum = the
+    # 0.866 baseline strategy)
+    manual_w_levels = np.arange(0.85, 1.1001, 0.005)
+    manual_cbar_ticks = np.arange(0.85, 1.1001, 0.05)
+    manual_w_ticks = [0.90, 0.95, 1.00]
 elif metric == 'MPSP':
-    # scenario B spans ~0.64-2.02 $/kg (baseline ~1.05); keep the level count
+    # scenario B spans ~0.66-2.06 $/kg (baseline ~1.08); keep the level count
     # within the colormap's 90 colors
     manual_w_levels = np.arange(0.6, 2.0001, 0.02)
     manual_cbar_ticks = np.arange(0.6, 2.0001, 0.2)
     manual_w_ticks = [0.8, 1.2, 1.6]
+elif metric == 'IBO MPSP':
+    # scenario B spans ~1.29-3.01 $/kg (baseline ~1.80); A makes no isobutanol
+    manual_w_levels = np.arange(1.2, 3.0001, 0.025)
+    manual_cbar_ticks = np.arange(1.2, 3.0001, 0.3)
+    manual_w_ticks = [1.5, 2.0, 2.5]
 else:
+    # IRR (and any other metric): fitted to the loaded panels in
+    # compute_levels_from_arrays
     manual_w_levels = manual_cbar_ticks = manual_w_ticks = None
 
 comparison_range = []
@@ -88,8 +99,6 @@ fmt_clabel = lambda cvalue: get_rounded_str(cvalue, 3)
 # -----------------------------------------------------------------------------
 # Shared metadata from across_kinetic_params.py
 # -----------------------------------------------------------------------------
-fbs_spec = isobutanol.models.fbs_spec
-
 metrics_units = {
     'MPSP': r"$\mathrm{\$}\cdot\mathrm{kg}^{-1}$",
     'IBO MPSP': r"$\mathrm{\$}\cdot\mathrm{kg}^{-1}$",
@@ -146,7 +155,7 @@ def get_metric_plot_name(metric_name, x_label):
     name = metrics_plot_names[metric_name]
     if x_label == 'k_1e' and metric_name == 'Combined Yield':
         name = 'Ethanol Yield'
-    if metric_name not in ('TCI', 'AOC', 'MPSP'):
+    if metric_name not in ('TCI', 'AOC', 'MPSP', 'IBO MPSP', 'IRR'):
         name = name.lower()
     return name
 
@@ -198,7 +207,15 @@ def load_metric_array(x_label, y_label, scenario, metric_name, steps):
 
 def choose_metric_colormap(metric_name):
     lccm = metric_name.lower()
-    if any(key in lccm for key in ('yield', 'titer', 'productivity', 'loading')):
+    cmap_under_color = None
+    if 'irr' in lccm:
+        # higher is better (reversed map: yellow = high); money-losing corners
+        # below the fitted lower bound go to the under-color
+        cmap = JBEI_UCB_colormap(reverse=True)
+        cmap_over_color = colors.yellow_tint.RGBn
+        cmap_under_color = colors.grey_dark.shade(40).RGBn
+        extend_cmap = 'both'
+    elif any(key in lccm for key in ('yield', 'titer', 'productivity', 'loading')):
         cmap = JBEI_UCB_colormap(reverse=True)
         cmap_over_color = colors.yellow_tint.RGBn
         extend_cmap = 'neither'
@@ -206,7 +223,7 @@ def choose_metric_colormap(metric_name):
         cmap = JBEI_UCB_colormap(reverse=False)
         cmap_over_color = colors.grey_dark.shade(8).RGBn
         extend_cmap = 'max'
-    return cmap, cmap_over_color, extend_cmap
+    return cmap, cmap_over_color, cmap_under_color, extend_cmap
 
 
 def compute_levels_from_arrays(arrays, metric_name):
@@ -226,6 +243,28 @@ def compute_levels_from_arrays(arrays, metric_name):
     lccm = metric_name.lower()
     min_val = float(np.nanmin(values))
     max_val = float(np.nanmax(values))
+    if 'irr' in lccm:
+        # Fit the IRR colorbar to the loaded panels (same recipe as the
+        # sweep script's IRR block): finest level step that keeps the filled
+        # contours within the colormap's 90 colors, bounds rounded outward
+        # to that step, colorbar ticks every 10 steps. The lower bound is
+        # floored at -0.05 so the money-losing corners (IRR reaches -0.7 at
+        # high target concs in scenario B) don't stretch the scale; they
+        # fall into the under-color, and the 0.00 break-even contour stays
+        # inside the range. Scenario A spans ~-0.17-0.12, B ~-0.7-0.21.
+        floor = -0.05
+        for step in (0.005, 0.01, 0.02, 0.025, 0.05, 0.1):
+            lb = max(np.floor(min_val/step)*step, floor)
+            ub = np.ceil(max_val/step)*step
+            if (ub - lb)/step <= 80: break
+        levels = np.arange(lb, ub + step/10, step)
+        cbar_ticks = np.arange(lb, ub + step/10, 10*step)
+        # labeled contours at the colorbar ticks inside the data range
+        # (break-even 0.00 included); quartile-based labels sit too close
+        # together for scenario A's narrow 0.04-0.12 spread
+        w_ticks = sorted(set(
+            [0.0] + [float(round(t, 3)) for t in cbar_ticks if lb < t < max_val]))
+        return levels, cbar_ticks, w_ticks
     if any(key in lccm for key in ('yield', 'titer', 'productivity', 'cell loading')):
         top_val = max_val
     else:
@@ -460,7 +499,7 @@ if not all_arrays:
     raise FileNotFoundError('No matching metric CSV files were found for the requested row/column layout.')
 
 w_levels, cbar_ticks, w_ticks = compute_levels_from_arrays(all_arrays, metric)
-cmap, cmap_over_color, extend_cmap = choose_metric_colormap(metric)
+cmap, cmap_over_color, cmap_under_color, extend_cmap = choose_metric_colormap(metric)
 
 # -----------------------------------------------------------------------------
 # Figure layout
@@ -535,6 +574,7 @@ for i in range(nrows):
             fmt_clabel=fmt_clabel,
             cmap=cmap,
             cmap_over_color=cmap_over_color,
+            cmap_under_color=cmap_under_color,
             extend_cmap=extend_cmap,
             cbar_ticks=cbar_ticks,
             z_marker_color='g',
@@ -586,7 +626,8 @@ cbar = fig.colorbar(sm, ax=axs.ravel().tolist(), shrink=0.95, pad=0.02)
 _cbar_name = get_metric_plot_name(metric, x_label)
 if not _cbar_name.isupper(): # capitalize plain names; keep acronyms (MPSP, TCI, AOC) intact
     _cbar_name = _cbar_name[0].upper() + _cbar_name[1:]
-cbar.set_label(f"{_cbar_name} [{metrics_units[metric]}]", fontsize=11)
+_cbar_units = metrics_units[metric]
+cbar.set_label(f"{_cbar_name} [{_cbar_units}]" if _cbar_units else _cbar_name, fontsize=11)
 cbar.set_ticks(cbar_ticks)
 
 fig.supxlabel(f"{x_label} [{x_units}]", fontsize=11)

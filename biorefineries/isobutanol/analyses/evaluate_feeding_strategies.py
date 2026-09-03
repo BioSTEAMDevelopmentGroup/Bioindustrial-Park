@@ -874,9 +874,30 @@ if plot:
                             curr_metric_non_nans.max()]))
         curr_metric_w_ticks.sort(reverse=False)
         if 'irr' in lccm:
-            curr_metric_w_levels = np.arange(-0.1, 0.5001, 0.01)
-            curr_metric_cbar_ticks = np.arange(-0.1, 0.5001, 0.05)
-            curr_metric_w_ticks = [0.0, 0.10, 0.15, 0.20, 0.30]
+            # Fit the IRR colorbar to the simulated grid (same recipe as the
+            # ethanol-MPSP block): finest level step that keeps the filled
+            # contours within the colormap's 90 colors, bounds rounded
+            # outward to that step, colorbar ticks every 10 steps. The lower
+            # bound is floored at -0.05 so the money-losing corners (IRR can
+            # reach -0.7 at high target concs) don't stretch the scale; they
+            # fall into the under-color instead, and the 0.00 break-even
+            # contour stays inside the range. Scenario A spans ~0.04-0.12 on
+            # the current baseline, scenario B ~-0.7-0.21.
+            _IRR_finite = np.array(results[curr_metric], dtype=float)
+            _IRR_finite = _IRR_finite[np.isfinite(_IRR_finite)]
+            _IRR_floor = -0.05
+            for _IRR_step in (0.005, 0.01, 0.02, 0.025, 0.05, 0.1):
+                _IRR_lb = max(np.floor(_IRR_finite.min()/_IRR_step)*_IRR_step, _IRR_floor)
+                _IRR_ub = np.ceil(_IRR_finite.max()/_IRR_step)*_IRR_step
+                if (_IRR_ub-_IRR_lb)/_IRR_step <= 80: break
+            curr_metric_w_levels = np.arange(_IRR_lb, _IRR_ub+_IRR_step/10, _IRR_step)
+            curr_metric_cbar_ticks = np.arange(_IRR_lb, _IRR_ub+_IRR_step/10, 10*_IRR_step)
+            # labeled contours at the colorbar ticks inside the data range
+            # (break-even 0.00 included; quartile-based labels sit too close
+            # together for scenario A's narrow 0.04-0.12 spread)
+            curr_metric_w_ticks = sorted(set(
+                [0.0] + [float(round(t, 3)) for t in curr_metric_cbar_ticks
+                         if _IRR_lb < t < _IRR_finite.max()]))
             # IRR can fall far below the lowest level (money-losing corners);
             # fill those cells rather than leaving them blank
             extend_cmap = 'both'
