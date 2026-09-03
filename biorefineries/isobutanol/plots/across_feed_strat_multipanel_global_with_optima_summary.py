@@ -353,32 +353,33 @@ def build_metric_marker_styles(metrics_to_opt):
     styles = {}
     legend_labels = {}
     generic_i = 0
+    # 9 pt markers (13 pt stars): one grid step is ~9.6 pt on a 3.2 in panel,
+    # so optima at neighbouring grid points no longer overlap
     for metric_name in metrics_to_opt:
         if metric_name == 'MPSP':
-            style = ('*', '#33ccff', 16)
+            style = ('*', '#33ccff', 13)
         elif metric_name == 'IBO MPSP':
-            style = ('*', 'w', 16)
+            style = ('*', 'w', 13)
         elif metric_name == 'IRR':
-            style = ('D', '#33ccff', 12)
+            style = ('D', '#33ccff', 9)
         elif metric_name == 'TCI':
-            style = ('s', '#33ccff', 12)
+            style = ('s', '#33ccff', 9)
         elif metric_name == 'AOC':
-            style = ('p', '#33ccff', 12)
+            style = ('p', '#33ccff', 9)
         elif metric_name == 'Total Q sugar evap':
-            style = ('P', 'w', 12)
+            style = ('P', 'w', 9)
         elif metric_name == 'Actual aeration required':
-            style = ('X', 'w', 12)
+            style = ('X', 'w', 9)
         else:
-            style = (opt_marker_shapes[generic_i], 'w', 12)
+            style = (opt_marker_shapes[generic_i], 'w', 9)
             generic_i += 1
         styles[metric_name] = style
 
         label = metrics_plot_names[metric_name]
         if metric_name == 'Combined Yield' and x_label == 'Threshold glucose concentration':
             label = 'Ethanol Yield'
-        if label not in ('TCI', 'AOC', 'MPSP'):
-            label = label.lower()
-        legend_labels[metric_name] = label
+        # lower-case except acronyms: 'Isobutanol MPSP' -> 'isobutanol MPSP', 'IRR' stays
+        legend_labels[metric_name] = ' '.join(w if w.isupper() else w.lower() for w in label.split(' '))
     return styles, legend_labels
 
 
@@ -494,6 +495,44 @@ def place_contour_labels(arr2d, levels, marker_xy=(), line_y=None):
             positions[level] = (float(best_seg[best_k][0]), float(best_seg[best_k][1]))
             placed.append(to_n(*positions[level]))
     return positions
+
+
+def draw_fanned_markers(ax, x, y, styles):
+    """Optima sharing one grid point: draw each shape offset a few points on
+    the page so every shape stays visible; the true point is the centre of
+    the fan. The fan runs along y on the top/bottom edge (where a neighbour
+    one grid step along x would otherwise be hit), along x elsewhere."""
+    step_pt = max(s[2] for s in styles) + 1.0
+    vertical = np.isclose(y, y_ticks[0]) or np.isclose(y, y_ticks[-1])
+    for k, (shape, color, size) in enumerate(styles):
+        d_in = (k - (len(styles) - 1)/2) * step_pt / 72.
+        dx_in, dy_in = (0., d_in) if vertical else (d_in, 0.)
+        ax.plot(x, y, c='k', marker=shape, markersize=size, markerfacecolor=color,
+                markeredgewidth=0.8, zorder=500, clip_on=False,
+                transform=ax.transData + ScaledTranslation(dx_in, dy_in, ax.figure.dpi_scale_trans))
+
+
+def add_optima_legend(fig, metrics, ncol):
+    """Horizontal marker legend under the panels (the empty lower-right
+    triangle is too small for a dozen entries), plus the white batch-mode
+    line."""
+    handles = []
+    for m in metrics:
+        shape, color, size = metric_marker_styles[m]
+        goal = 'min.' if metric_is_minimized(m) else 'max.'
+        handles.append(Line2D([0], [0], linestyle='None', marker=shape, markersize=size*0.8,
+                              markerfacecolor=color, markeredgecolor='black', markeredgewidth=0.8,
+                              label=f"{goal} {_metric_legend_labels[m]}"))
+    handles.append(Line2D([0], [0], color='white', linewidth=1.0,
+                          path_effects=[matplotlib.patheffects.withStroke(linewidth=2.2, foreground='0.55')],
+                          label='0 glucose spikes above line'))
+    # hung from the figure's bottom edge, below the shared x-axis title;
+    # savefig's bbox_inches='tight' grows the saved area to include it
+    return fig.legend(handles=handles, loc='upper center', bbox_to_anchor=(0.5, 0.),
+                      ncol=ncol, frameon=False, fontsize=FONTS['legend'],
+                      title='Optimum for:', title_fontsize=FONTS['legend'],
+                      handletextpad=0.4, labelspacing=0.3, columnspacing=1.2,
+                      handlelength=1.6)
 
 
 def get_optima_metric_values(global_optima, metrics_to_opt, steps):
@@ -664,16 +703,19 @@ for i in range(nrows):
             arr = np.where(np.isneginf(arr),
                            w_levels[0] - (w_levels[1] - w_levels[0]), arr)
 
-        # Optima sharing a grid point keep the first metric's marker (in
-        # metrics_to_opt order), so the MPSP star is never hidden under a
-        # later co-located marker; overlaps are listed by get_optima_comparisons.
-        additional_points = {}
+        # Optima sharing a grid point are fanned out on the page after the
+        # library call (draw_fanned_markers); singletons go through the
+        # library's additional_points. Overlaps are also listed by
+        # get_optima_comparisons.
+        markers_at = {}
         for opt_metric in metrics_to_opt:
             opt_record = global_optima.get(opt_metric)
             if opt_record is None or opt_record['scenario'] != scenario:
                 continue
-            additional_points.setdefault((opt_record['x'], opt_record['y']),
-                                         metric_marker_styles[opt_metric])
+            markers_at.setdefault((opt_record['x'], opt_record['y']), []).append(
+                metric_marker_styles[opt_metric])
+        additional_points = {xy: styles[0] for xy, styles in markers_at.items() if len(styles) == 1}
+        fanned_points = {xy: styles for xy, styles in markers_at.items() if len(styles) > 1}
 
         # White line: for each threshold, the lowest target at which the
         # MPSP-optimized spike cap lands on batch mode (zero spikes).
@@ -752,11 +794,14 @@ for i in range(nrows):
         )
         apply_font_rcparams()
         restyle_panel_text(ax)
+        for (xp, yp), styles in fanned_points.items():
+            draw_fanned_markers(ax, xp, yp, styles)
 
         if ncols > 1:
-            # pad keeps the title clear of optimum markers sitting on the top edge
+            # pad keeps the title clear of optimum markers sitting on the top
+            # edge (a vertical fan reaches ~10 pt above the axes)
             ax.set_title(f'Scenario {scenario}', fontsize=FONTS['panel_title'],
-                         fontweight='bold', pad=8)
+                         fontweight='bold', pad=13)
         else:
             ax.set_title('') # drop the library's blank 20 pt spacer title
 
@@ -791,6 +836,10 @@ restyle_panel_text(cbar.ax)
 
 fig.supxlabel(f"{x_label} [{x_units}]", fontsize=FONTS['axis_title'])
 fig.supylabel(f"{y_label} [{y_units}]", fontsize=FONTS['axis_title'])
+
+add_optima_legend(fig, [m for m in metrics_to_opt if m in global_optima
+                        and global_optima[m]['scenario'] in scenarios],
+                  ncol=4 if ncols > 1 else 2)
 
 fig.set_figwidth(3.2 * ncols + 1.2)
 fig.set_figheight(2.7 * nrows + 1.6)
