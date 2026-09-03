@@ -37,30 +37,19 @@ def kinetic_bounds_from_scenario(bounds_scenario,
                                  multiplier_bounds=(0.1, 10.0)):
     """Absolute (low, high) bounds -- the multiplier band around
     `bounds_scenario`'s baseline -- for every positive-baseline kinetic
-    parameter row (load statement `V406.nsk_kinetic_model._te.<name> = x`)
-    of that scenario's parameter-distributions workbook, keyed by te
-    parameter name. Read directly from the workbook (no simulation), so
-    it can parameterize a run of a DIFFERENT scenario: passed as
-    param_bounds_override, it reproduces the bounds a `bounds_scenario`
-    run would build for those parameters -- in particular giving the
-    IBO-pathway rates zeroed in scenario A their scenario-B search bands
-    instead of degenerate zero-baseline exclusion."""
-    import re
-    import pandas as pd
-    filename = IBO_filepath+\
-        '\\analyses\\full\\parameter_distributions\\'+\
-        f'parameter-distributions_corn_IBO_EtOH_{bounds_scenario}.xlsx'
-    pattern = re.compile(
-        r'V406\.nsk_kinetic_model\._te\.([A-Za-z0-9_]+)\s*=\s*x')
+    parameter row of that scenario's parameter-distributions workbook
+    (ko.workbook_kinetic_baselines), keyed by te parameter name. Read
+    directly from the workbook (no simulation), so it can parameterize a
+    run of a DIFFERENT scenario: passed as param_bounds_override, it
+    reproduces the bounds a `bounds_scenario` run would build for those
+    parameters -- in particular giving the IBO-pathway rates zeroed in
+    scenario A their scenario-B search bands instead of degenerate
+    zero-baseline exclusion."""
     m_lo, m_hi = multiplier_bounds
-    override = {}
-    for _, row in pd.read_excel(filename).iterrows():
-        match = pattern.fullmatch(str(row['Load statement']).strip())
-        if match:
-            baseline = float(row['Baseline'])
-            if baseline > 0.0:
-                override[match.group(1)] = (m_lo*baseline, m_hi*baseline)
-    return override
+    return {name: (m_lo*baseline, m_hi*baseline)
+            for name, baseline
+            in ko.workbook_kinetic_baselines(bounds_scenario).items()
+            if baseline > 0.0}
 
 
 def run(scenario='B',  # 'A' or 'B'

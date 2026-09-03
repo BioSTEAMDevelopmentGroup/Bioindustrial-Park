@@ -30,11 +30,14 @@ their scenario baselines in a `finally` after every run.
 import csv
 import math
 import os
+import re
 
 import numpy as np
 
 __all__ = ('OBJECTIVE_REGISTRY', 'TRACKED_METRICS',
            'discover_kinetic_parameters', 'build_search_space',
+           'parameter_distributions_workbook', 'workbook_kinetic_baselines',
+           'kinetic_param_names_from_scenario',
            'baseline_decision_point',
            'trajectory_columns', 'append_trajectory_row', 'load_trajectory',
            'get_handles', 'run_kinetic_optimization', 'restore_baseline',
@@ -256,6 +259,47 @@ def baseline_decision_point(search_space, kinetic_baselines,
         clipped = min(max(value, sp['low']), sp['high'])
         point[name] = int(clipped) if sp.get('int') else clipped
     return point
+
+#%% Scenario parameter-distribution workbooks
+
+#: Load-statement pattern of a kinetic parameter row in the scenario
+#: parameter-distributions workbooks (written by
+#: utils.generate_save_kinetic_parameter_distributions).
+_TE_LOAD_STATEMENT = re.compile(
+    r'V406\.nsk_kinetic_model\._te\.([A-Za-z0-9_]+)\s*=\s*x')
+
+def parameter_distributions_workbook(scenario):
+    """Absolute path of the scenario's parameter-distributions workbook
+    (analyses/full/parameter_distributions/
+    parameter-distributions_corn_IBO_EtOH_{scenario}.xlsx)."""
+    return os.path.join(
+        os.path.dirname(os.path.abspath(__file__)),
+        'analyses', 'full', 'parameter_distributions',
+        f'parameter-distributions_corn_IBO_EtOH_{scenario}.xlsx')
+
+def workbook_kinetic_baselines(scenario):
+    """Ordered {te parameter name: workbook Baseline} for every kinetic
+    parameter row (load statement `V406.nsk_kinetic_model._te.<name> = x`)
+    of the scenario's parameter-distributions workbook -- the curated set
+    of kinetic parameters treated as free/uncertain (the physically
+    constrained k_6r, k_16r, K_2, K_9 are absent since commit 1e4efee1).
+    A plain file read, no simulation, so it can describe a scenario other
+    than the loaded one (the driver's start-at-A / set-from-B mode)."""
+    import pandas as pd
+    baselines = {}
+    for _, row in pd.read_excel(
+            parameter_distributions_workbook(scenario)).iterrows():
+        match = _TE_LOAD_STATEMENT.fullmatch(
+            str(row['Load statement']).strip())
+        if match:
+            baselines[match.group(1)] = float(row['Baseline'])
+    return baselines
+
+def kinetic_param_names_from_scenario(scenario):
+    """The kinetic parameter names of the scenario's workbook, in workbook
+    order (see workbook_kinetic_baselines) -- the include_params of a
+    workbook-restricted search space."""
+    return list(workbook_kinetic_baselines(scenario))
 
 #%% Trajectory recording
 

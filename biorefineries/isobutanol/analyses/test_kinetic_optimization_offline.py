@@ -325,4 +325,25 @@ assert pt13['k_13'] == 0.581 and pt13['k_1e'] == 47.1
 assert pt13['max_n_spikes'] == 16 and 'k_6r' not in pt13
 PASS('build_search_space: include_params whitelist composes with override/exclude; restricted baseline point')
 
+#%% 14. workbook readers (plain file reads; skipped cleanly if the workbooks are absent)
+wb_A = ko.parameter_distributions_workbook('A')
+wb_B = ko.parameter_distributions_workbook('B')
+assert wb_B.endswith('parameter-distributions_corn_IBO_EtOH_B.xlsx')
+if os.path.isfile(wb_A) and os.path.isfile(wb_B):
+    names_A = ko.kinetic_param_names_from_scenario('A')
+    names_B = ko.kinetic_param_names_from_scenario('B')
+    assert len(names_B) == 56 and len(names_A) == 40, (len(names_B), len(names_A))
+    assert all(n[:2].lower() == 'k_' for n in names_A + names_B)
+    assert len(set(names_B)) == len(names_B) and len(set(names_A)) == len(names_A)
+    assert names_B[:5] == ['k_1l', 'K_1l', 'k_1h', 'K_1h', 'k_1e']  # workbook order
+    for dropped in ('k_6r', 'k_16r', 'K_2', 'K_9'):   # commit 1e4efee1
+        assert dropped not in names_B and dropped not in names_A, dropped
+    assert 'k_13' in names_B and 'k_13' not in names_A  # IBO pathway: B only
+    wb_baselines = ko.workbook_kinetic_baselines('B')
+    assert list(wb_baselines) == names_B
+    assert all(v > 0.0 for v in wb_baselines.values())
+    PASS('workbook readers: 56 B / 40 A kinetic names in workbook order; constrained params absent')
+else:
+    print('SKIP 14: parameter-distribution workbooks not found')
+
 print(f'\nALL {n_pass} CHECKS PASSED')
