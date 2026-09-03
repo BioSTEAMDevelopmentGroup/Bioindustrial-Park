@@ -209,11 +209,13 @@ def choose_metric_colormap(metric_name):
     lccm = metric_name.lower()
     cmap_under_color = None
     if 'irr' in lccm:
-        # higher is better (reversed map: yellow = high); money-losing corners
-        # below the fitted lower bound go to the under-color
+        # higher is better (reversed map: yellow = high, dark grey = 0). The
+        # colorbar starts at 0 (compute_levels_from_arrays), so every
+        # money-losing point (IRR < 0) is painted in one flat "under zero"
+        # colour -- light grey, distinct from the map's dark-grey low end.
         cmap = JBEI_UCB_colormap(reverse=True)
         cmap_over_color = colors.yellow_tint.RGBn
-        cmap_under_color = colors.grey_dark.shade(40).RGBn
+        cmap_under_color = colors.grey_tint.RGBn
         extend_cmap = 'both'
     elif any(key in lccm for key in ('yield', 'titer', 'productivity', 'loading')):
         cmap = JBEI_UCB_colormap(reverse=True)
@@ -248,11 +250,12 @@ def compute_levels_from_arrays(arrays, metric_name):
         # sweep script's IRR block): finest level step that keeps the filled
         # contours within the colormap's 90 colors, bounds rounded outward
         # to that step, colorbar ticks every 10 steps. The lower bound is
-        # floored at -0.05 so the money-losing corners (IRR reaches -0.7 at
-        # high target concs in scenario B) don't stretch the scale; they
-        # fall into the under-color, and the 0.00 break-even contour stays
-        # inside the range. Scenario A spans ~-0.17-0.12, B ~-0.7-0.21.
-        floor = -0.05
+        # floored at 0 so the money-losing corners (IRR reaches -0.7 at high
+        # target concs in scenario B) don't stretch the scale: every IRR < 0
+        # cell takes the flat "under zero" colour (choose_metric_colormap),
+        # and the 0.00 level is the boundary of that region. Scenario A
+        # spans ~-0.17-0.12, B ~-0.7-0.21.
+        floor = 0.0
         for step in (0.005, 0.01, 0.02, 0.025, 0.05, 0.1):
             lb = max(np.floor(min_val/step)*step, floor)
             ub = np.ceil(max_val/step)*step
@@ -620,9 +623,17 @@ for i in range(nrows):
 plt.subplots_adjust(wspace=0., hspace=0.)
 
 norm = Normalize(vmin=float(w_levels[0]), vmax=float(w_levels[-1]))
-sm = ScalarMappable(norm=norm, cmap=cmap)
+# carry the panels' under/over colours onto the shared colorbar as extension
+# triangles (e.g. IRR's flat "under zero" grey, MPSP's dark over-range grey)
+cbar_cmap = cmap.copy()
+if cmap_under_color is not None:
+    cbar_cmap.set_under(cmap_under_color)
+if cmap_over_color is not None:
+    cbar_cmap.set_over(cmap_over_color)
+sm = ScalarMappable(norm=norm, cmap=cbar_cmap)
 sm.set_array([])
-cbar = fig.colorbar(sm, ax=axs.ravel().tolist(), shrink=0.95, pad=0.02)
+cbar = fig.colorbar(sm, ax=axs.ravel().tolist(), shrink=0.95, pad=0.02,
+                    extend=extend_cmap)
 _cbar_name = get_metric_plot_name(metric, x_label)
 if not _cbar_name.isupper(): # capitalize plain names; keep acronyms (MPSP, TCI, AOC) intact
     _cbar_name = _cbar_name[0].upper() + _cbar_name[1:]

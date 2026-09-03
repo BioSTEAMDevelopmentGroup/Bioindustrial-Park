@@ -878,14 +878,14 @@ if plot:
             # ethanol-MPSP block): finest level step that keeps the filled
             # contours within the colormap's 90 colors, bounds rounded
             # outward to that step, colorbar ticks every 10 steps. The lower
-            # bound is floored at -0.05 so the money-losing corners (IRR can
-            # reach -0.7 at high target concs) don't stretch the scale; they
-            # fall into the under-color instead, and the 0.00 break-even
-            # contour stays inside the range. Scenario A spans ~0.04-0.12 on
-            # the current baseline, scenario B ~-0.7-0.21.
+            # bound is floored at 0 so the money-losing corners (IRR can
+            # reach -0.7 at high target concs) don't stretch the scale: every
+            # IRR < 0 cell takes the flat "under zero" colour set below, and
+            # the 0.00 level is the boundary of that region. Scenario A spans
+            # ~-0.17-0.12 on the current baseline, scenario B ~-0.7-0.21.
             _IRR_finite = np.array(results[curr_metric], dtype=float)
             _IRR_finite = _IRR_finite[np.isfinite(_IRR_finite)]
-            _IRR_floor = -0.05
+            _IRR_floor = 0.0
             for _IRR_step in (0.005, 0.01, 0.02, 0.025, 0.05, 0.1):
                 _IRR_lb = max(np.floor(_IRR_finite.min()/_IRR_step)*_IRR_step, _IRR_floor)
                 _IRR_ub = np.ceil(_IRR_finite.max()/_IRR_step)*_IRR_step
@@ -898,10 +898,11 @@ if plot:
             curr_metric_w_ticks = sorted(set(
                 [0.0] + [float(round(t, 3)) for t in curr_metric_cbar_ticks
                          if _IRR_lb < t < _IRR_finite.max()]))
-            # IRR can fall far below the lowest level (money-losing corners);
-            # fill those cells rather than leaving them blank
+            # "under zero" colour: IRR < 0 cells (below the 0 lower bound)
+            # are filled light grey, distinct from the map's dark-grey low
+            # end, rather than left blank
             extend_cmap = 'both'
-            cmap_under_color = colors.grey_dark.shade(40).RGBn
+            cmap_under_color = colors.grey_tint.RGBn
         curr_metric_w_ticks = np.round(np.array(curr_metric_w_ticks), 2)
         # curr_metric_w_levels = np.arange(0., 15.5, 0.5)
         
