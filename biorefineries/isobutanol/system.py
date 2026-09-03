@@ -663,22 +663,21 @@ def load(simulate_baseline=True,
     # existing ConventionalEthanolTEA via unit purchase cost and utility accounting.
     # A boiler-aware TEA (separate steam-power depreciation, e.g. CellulosicEthanolTEA)
     # would be a financial-assumption change requiring separate sign-off; not done here.
-    # Lang factor 3.0 (FCI = 3.0 x total purchase cost) instead of corn's
-    # uncited 4: the value ConventionalEthanolTEA's own reference uses --
-    # Huang, H., Long, S. & Singh, V. (2016). Techno-economic analysis of
-    # biodiesel and ethanol co-production from lipid-producing sugarcane.
-    # Biofuels, Bioprod. Bioref. 10(3), 299-315, doi:10.1002/bbb.1640 --
-    # which sets 3.0 "in agreement with" Haas et al. 2006 (Bioresour.
-    # Technol. 97, 671-678), Humbird et al. 2011 (NREL/TP-5100-47764) and
-    # Kwiatkowski et al. 2006 (Ind. Crops Prod. 23, 288-296; the corn
-    # dry-grind model this biorefinery is built on). FCI here includes both
-    # direct (installation, piping, warehouses) and indirect (proratable,
-    # field, construction, contingency) costs, as in that reference.
-    # Note biosteam ignores per-unit F_BM factors whenever a Lang
-    # factor is set. create_tea() replaces ALL defaults when any kwarg is
-    # passed, so the corn defaults are spread in explicitly.
+    # lang_factor=None (set 2026-09-02): capital is costed per unit from each
+    # unit's own bare-module factors -- System.installed_equipment_cost sums
+    # unit.installed_cost = purchase cost x (F_BM + F_D*F_P*F_M - 1) -- instead
+    # of one Lang factor on the total purchase cost (biosteam ignores every
+    # unit's F_BM whenever a Lang factor is set). ConventionalEthanolTEA's
+    # _DPI/_TDC/_FCI are identities, so FCI = the bare-module installed-cost
+    # sum with NO separate indirect (proratable, field, construction,
+    # contingency) or site costs; a unit without F_BM data counts at its
+    # purchase cost. History: corn's default was an uncited 4; 3.0 (Huang,
+    # Long & Singh 2016, doi:10.1002/bbb.1640, "in agreement with" Haas et
+    # al. 2006, Humbird et al. 2011 and Kwiatkowski et al. 2006) was used
+    # earlier on 2026-09-02. create_tea() replaces ALL defaults when any
+    # kwarg is passed, so the corn defaults are spread in explicitly.
     corn_EtOH_IBO_sys._TEA = corn_EtOH_IBO_sys_tea = corn.tea.create_tea(
-        corn_EtOH_IBO_sys, **{**corn.tea.default_tea_parameters, 'lang_factor': 3.0})
+        corn_EtOH_IBO_sys, **{**corn.tea.default_tea_parameters, 'lang_factor': None})
 
     #%% Set baseline specifications
 
