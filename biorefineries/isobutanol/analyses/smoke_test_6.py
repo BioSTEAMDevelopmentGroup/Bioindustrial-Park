@@ -21,16 +21,20 @@ full flow. All broth IBO leaves via the rectifier bottoms to WWT
 EACH simulation. Gates (a violation exits non-zero exactly like a
 traceback):
 
-- purity-adjusted ethanol MPSP within 1% of 1.8820 (the reference baseline
+- purity-adjusted ethanol MPSP within 1% of 1.4868 (the reference baseline
   for this configuration, set 3-sim-stable by the 2026-09-02 re-pin run
-  and recorded in CLAUDE.md; well above the both-trains B baseline 1.0784
+  and recorded in CLAUDE.md; well above the both-trains B baseline 0.6642
   because the IBO revenue is lost and its burden shifts to ethanol.
-  Re-pinned 2026-09-02 for lang_factor=None (per-unit bare-module
+  Re-pinned 2026-09-03 for the IRR-optimal batch feeding strategy from
+  the 25x25 feeding-strategy sweep (target 140 g/L, threshold 34.25 g/L,
+  max_n_spikes 0; pin under the 216.3/226.3/13-spike fed-batch strategy
+  was 1.8820), 2026-09-02 for lang_factor=None (per-unit bare-module
   capital; pin under Lang 3.0 with 2023$ prices was 2.3817), earlier
   that day for the 2023 price year (stream/utility prices indexed to
   2023$ with the BLS chemicals PPI; pin under the 2023 CEPCI with
   unindexed prices was 2.1569; the IRR at default product prices has
-  been unsolvable, nan, since then), then for the 2023 CEPCI 797.9
+  been unsolvable since then -- reported as -inf by solve_TEA from
+  2026-09-03, nan before), then for the 2023 CEPCI 797.9
   (bst.CE had been biosteam's 567.5 default; pin under Lang 3.0 alone
   was 1.8149) and,
   earlier that day, the Lang factor 3.0 TEA (Huang et al. 2016;
@@ -91,15 +95,15 @@ def load_simulate_baseline(stream_IDs=('ethanol', 'isobutanol'), # products whos
 
     model_specification()
 
-    fbs_spec.max_n_spikes = 13
+    fbs_spec.max_n_spikes = 0  # batch: no glucose spikes
     all_results = []
     for i in range(n_sims):
-        model_specification(threshold_conc=216.3, target_conc=226.3)
+        model_specification(threshold_conc=34.25, target_conc=140.0)
         results = solve_TEA(stream_IDs=stream_IDs, IRR_for_MPSP=IRR_for_MPSP)
         MPSP_ethanol = results['MPSPs']['ethanol']
         MPSP_isobutanol = results['MPSPs']['isobutanol']
-        assert abs(MPSP_ethanol - 1.8820)/1.8820 < 0.01, \
-            f'sim {i+1}: ethanol MPSP {MPSP_ethanol} not within 1% of 1.8820'
+        assert abs(MPSP_ethanol - 1.4868)/1.4868 < 0.01, \
+            f'sim {i+1}: ethanol MPSP {MPSP_ethanol} not within 1% of 1.4868'
         assert math.isnan(MPSP_isobutanol), \
             f'sim {i+1}: isobutanol MPSP {MPSP_isobutanol} expected nan (empty product)'
         if all_results:

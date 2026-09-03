@@ -869,13 +869,20 @@ def solve_TEA_at_IRR(stream_IDs=('ethanol', 'isobutanol'),
       purity-based default prices (the state the V513/V514 specifications
       produce with update_ethanol_price = update_isobutanol_price = True).
       Negative IRRs above -100% are genuine solutions and are reported.
-      When no real IRR exists on the valid domain IRR > -1, a signed
-      infinity is reported: -inf when NPV is negative at every valid
-      discount rate (the project loses money however cheaply it is
-      financed, e.g. deep money-losing kinetic-sweep corners; this was
-      NaN before 2026-09-03), +inf in the (unrealistic) opposite case.
-      NaN is thereby reserved for "not solved" (a failed simulation, or
-      the models' cache placeholder).
+      When no genuine IRR can be resolved on the valid domain IRR > -1, a
+      signed infinity is reported from the sign of the UNDISCOUNTED NPV
+      (NPV at IRR = 0, the plain sum of the cash flows): -inf when it is
+      negative (the project loses money outright, e.g. the ethanol-only
+      scenario-B builds and deep money-losing kinetic-sweep corners; this
+      was NaN before 2026-09-03), +inf in the (unrealistic) opposite
+      case. The sign is NOT read at the low end of the domain: below
+      about -50 % the terminal working-capital recovery, compounded at
+      (1+IRR)^-30, swamps NPV, so a money-losing project shows a hugely
+      positive NPV near -99 % and an unresolvable "root" around -0.7
+      (the bracketed solve cannot meet the NPV tolerance on that slope);
+      reading the sign there mislabelled such projects +inf. NaN is
+      thereby reserved for "not solved" (a failed simulation, or the
+      models' cache placeholder).
 
     Exit state (guaranteed even on an exception): every product with a
     purity-based default price is left AT that default price, any other
@@ -926,13 +933,17 @@ def solve_TEA_at_IRR(stream_IDs=('ethanol', 'isobutanol'),
             IRR = tea.IRR
         else:
             # No genuine root on the valid domain (the bracketed solve found
-            # no NPV sign change on [-0.99, 10]): report a signed infinity
-            # from the sign of NPV at the low end of the domain. NPV still
-            # negative at -99 % means the project loses money at every valid
-            # discount rate (IRR "too low" -> -inf); NPV positive there (and
-            # hence everywhere up to +1000 %) would be +inf. NaN is reserved
-            # for "not solved". tea.IRR is restored in the finally block.
-            tea.IRR = -0.99
+            # no NPV sign change on [-0.99, 10], or only the unresolvable
+            # artifact root below about -50 % where the terminal
+            # working-capital recovery compounded at (1+IRR)^-30 swamps NPV):
+            # report a signed infinity from the sign of the UNDISCOUNTED NPV
+            # (IRR = 0). Negative means the project loses money outright
+            # (IRR "too low" -> -inf); positive would be +inf (unrealistic:
+            # NPV is negative at +1000 %, so a positive undiscounted NPV
+            # implies a genuine root in (0, 10) the solve would have found).
+            # NaN is reserved for "not solved". tea.IRR is restored in the
+            # finally block.
+            tea.IRR = 0.0
             IRR = -np.inf if tea.NPV < 0.0 else np.inf
     finally:
         # Products with a default price are left AT that default price (not

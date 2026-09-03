@@ -24,9 +24,12 @@ leaves via the rectifier (D303) bottoms to WWT unrecovered
 EACH simulation. Gates (a violation exits non-zero exactly like a
 traceback):
 
-- purity-adjusted ethanol MPSP within 1% of 1.8820 (the smoke_test_6
-  reference; the 2026-09-02 re-pin run gave 1.8819597838, matching
-  the ethanol-only build to ~6 sig figs. Re-pinned 2026-09-02 for
+- purity-adjusted ethanol MPSP within 1% of 1.4868 (the smoke_test_6
+  reference; the 2026-09-03 re-pin run gave 1.4868429277, matching
+  the ethanol-only build to ~6 sig figs. Re-pinned 2026-09-03 for the
+  IRR-optimal batch feeding strategy from the 25x25 feeding-strategy
+  sweep (target 140 g/L, threshold 34.25 g/L, max_n_spikes 0; pin under
+  the 216.3/226.3/13-spike fed-batch strategy was 1.8820), 2026-09-02 for
   lang_factor=None (per-unit bare-module capital; pin under Lang 3.0
   with 2023$ prices was 2.3817), earlier that day for the 2023 price
   year (stream/utility prices indexed to 2023$ with the BLS chemicals
@@ -98,15 +101,15 @@ def load_simulate_baseline(stream_IDs=('ethanol', 'isobutanol'), # products whos
 
     model_specification()
 
-    fbs_spec.max_n_spikes = 13
+    fbs_spec.max_n_spikes = 0  # batch: no glucose spikes
     all_results = []
     for i in range(n_sims):
-        model_specification(threshold_conc=216.3, target_conc=226.3)
+        model_specification(threshold_conc=34.25, target_conc=140.0)
         results = solve_TEA(stream_IDs=stream_IDs, IRR_for_MPSP=IRR_for_MPSP)
         MPSP_ethanol = results['MPSPs']['ethanol']
         MPSP_isobutanol = results['MPSPs']['isobutanol']
-        assert abs(MPSP_ethanol - 1.8820)/1.8820 < 0.01, \
-            f'sim {i+1}: ethanol MPSP {MPSP_ethanol} not within 1% of 1.8820'
+        assert abs(MPSP_ethanol - 1.4868)/1.4868 < 0.01, \
+            f'sim {i+1}: ethanol MPSP {MPSP_ethanol} not within 1% of 1.4868'
         assert math.isnan(MPSP_isobutanol), \
             f'sim {i+1}: isobutanol MPSP {MPSP_isobutanol} expected nan (empty product)'
         if all_results:

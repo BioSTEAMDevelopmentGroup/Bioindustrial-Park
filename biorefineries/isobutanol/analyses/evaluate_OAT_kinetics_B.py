@@ -68,8 +68,8 @@ model.load_parameter_distributions(parameter_distributions_filename, namespace_d
 baseline_initial = model.metrics_at_baseline()
 
 model_specification()
-fbs_spec.max_n_spikes = 13
-model_specification(threshold_conc=216.3, target_conc=226.3)
+fbs_spec.max_n_spikes = 0  # batch: no glucose spikes
+model_specification(threshold_conc=34.25, target_conc=140.0)
 
 #%% Enumerate the non-discrete kinetic parameters (same filter as
 #   utils.generate_save_kinetic_parameter_distributions) and their

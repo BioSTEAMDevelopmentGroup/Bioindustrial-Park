@@ -15,11 +15,14 @@ Smoke test 4 -- scenario B baseline with ONLY the IBO/EtOH separation train:
 EACH simulation. Gates (a violation exits non-zero exactly like a
 traceback):
 
-- purity-adjusted ethanol MPSP within 1% of 1.0784 (the both-trains
+- purity-adjusted ethanol MPSP within 1% of 0.6642 (the both-trains
   scenario-B baseline; dropping the pass-through gating splitter S201 must
   not move results beyond simulation tolerance)
-- purity-adjusted isobutanol MPSP within 1% of 1.7960
-  (Both re-pinned 2026-09-02 for lang_factor=None (per-unit bare-module
+- purity-adjusted isobutanol MPSP within 1% of 1.2924
+  (Both re-pinned 2026-09-03 for the IRR-optimal batch feeding strategy
+  from the 25x25 feeding-strategy sweep (target 140 g/L, threshold 34.25
+  g/L, max_n_spikes 0; pins under the 216.3/226.3/13-spike fed-batch
+  strategy were 1.0784 / 1.7960), earlier 2026-09-02 for lang_factor=None (per-unit bare-module
   capital; pins under Lang 3.0 with 2023$ prices were 1.4479 / 2.2448),
   earlier that day for the 2023 price year (stream/utility prices
   indexed to 2023$ with the BLS chemicals PPI; pins under the 2023 CEPCI
@@ -81,17 +84,17 @@ def load_simulate_baseline(stream_IDs=('ethanol', 'isobutanol'), # products whos
 
     model_specification()
 
-    fbs_spec.max_n_spikes = 13
+    fbs_spec.max_n_spikes = 0  # batch: no glucose spikes
     all_results = []
     for i in range(n_sims):
-        model_specification(threshold_conc=216.3, target_conc=226.3)
+        model_specification(threshold_conc=34.25, target_conc=140.0)
         results = solve_TEA(stream_IDs=stream_IDs, IRR_for_MPSP=IRR_for_MPSP)
         MPSP_ethanol = results['MPSPs']['ethanol']
         MPSP_isobutanol = results['MPSPs']['isobutanol']
-        assert abs(MPSP_ethanol - 1.0784)/1.0784 < 0.01, \
-            f'sim {i+1}: ethanol MPSP {MPSP_ethanol} not within 1% of 1.0784'
-        assert abs(MPSP_isobutanol - 1.7960)/1.7960 < 0.01, \
-            f'sim {i+1}: isobutanol MPSP {MPSP_isobutanol} not within 1% of 1.7960'
+        assert abs(MPSP_ethanol - 0.6642)/0.6642 < 0.01, \
+            f'sim {i+1}: ethanol MPSP {MPSP_ethanol} not within 1% of 0.6642'
+        assert abs(MPSP_isobutanol - 1.2924)/1.2924 < 0.01, \
+            f'sim {i+1}: isobutanol MPSP {MPSP_isobutanol} not within 1% of 1.2924'
         if all_results:
             _assert_MPSPs_stable(all_results[0], results, i+1)
         all_results.append(results)

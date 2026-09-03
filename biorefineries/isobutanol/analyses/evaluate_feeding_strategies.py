@@ -117,9 +117,9 @@ if scenario=='A':
     if not replot_from_csv:
         model_specification(threshold_conc=217.125, target_conc=221.25)
 elif scenario=='B':
-    fbs_spec.max_n_spikes = 13
+    fbs_spec.max_n_spikes = 0  # batch: no glucose spikes
     if not replot_from_csv:
-        model_specification(threshold_conc=216.3, target_conc=226.3)
+        model_specification(threshold_conc=34.25, target_conc=140.0)
 
 if not replot_from_csv:
     model_specification(

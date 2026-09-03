@@ -104,8 +104,8 @@ if scenario=='A':
     fbs_spec.max_n_spikes = 16
     model_specification(threshold_conc=217.125, target_conc=221.25)
 elif scenario=='B':
-    fbs_spec.max_n_spikes = 13
-    model_specification(threshold_conc=216.3, target_conc=226.3)
+    fbs_spec.max_n_spikes = 0  # batch: no glucose spikes
+    model_specification(threshold_conc=34.25, target_conc=140.0)
     
 # !!!
 # fbs_spec.max_n_spikes = 0

@@ -41,7 +41,12 @@ def _assert_MPSPs_stable(reference, current, sim_number, rel_tol=5e-3):
 
 def _assert_MPSPs_pinned(expected, current, sim_number, rel_tol=0.01):
     """Verify the current simulation's MPSPs against the pinned baseline
-    values (within rel_tol, 1% by default; nan stays nan). Re-pinned
+    values (within rel_tol, 1% by default; nan stays nan). Scenario-B pins
+    re-pinned 2026-09-03 for the IRR-optimal batch feeding strategy from the
+    25x25 feeding-strategy sweep (target 140 g/L, threshold 34.25 g/L,
+    max_n_spikes 0; scenario A's fed-batch 217.125/221.25/16 was already
+    its sweep optimum; B pins under the 216.3/226.3/13-spike strategy were
+    1.0784 + 1.7960). Both scenarios re-pinned
     2026-09-02 for lang_factor=None (capital from each unit's own
     bare-module factors, no separate indirects; pins under Lang 3.0
     with 2023$ prices were A 0.98872 / B 1.4479 + 2.2448), earlier
@@ -93,10 +98,10 @@ def load_simulate_baseline(scenario='A', # 'A' or 'B'
         # both-trains scenario-A baseline (isobutanol product empty)
         expected_MPSPs = {'ethanol': 0.86604, 'isobutanol': math.nan}
     elif scenario=='B':
-        fbs_spec.max_n_spikes = 13
-        sim_kwargs = dict(threshold_conc=216.3, target_conc=226.3)
+        fbs_spec.max_n_spikes = 0  # batch: no glucose spikes
+        sim_kwargs = dict(threshold_conc=34.25, target_conc=140.0)
         # both-trains scenario-B baseline
-        expected_MPSPs = {'ethanol': 1.0784, 'isobutanol': 1.7960}
+        expected_MPSPs = {'ethanol': 0.6642, 'isobutanol': 1.2924}
     else:
         raise ValueError(f'Scenario {scenario} not found.')
 
