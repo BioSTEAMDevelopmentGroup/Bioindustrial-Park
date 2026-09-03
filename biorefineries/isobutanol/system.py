@@ -19,7 +19,8 @@ from biorefineries.isobutanol import units
 from nskinetics.models.s_cerevisiae_ferm_fb_inhib_mod_ibo import te_r
 from scipy.optimize import differential_evolution, minimize, brute
 from matplotlib.ticker import AutoMinorLocator
-from biorefineries.isobutanol.process_settings import load_process_settings, CEPCI
+from biorefineries.isobutanol.process_settings import (
+    load_process_settings, CEPCI, PRICE_YEAR, index_prices_to_price_year)
 from biorefineries.isobutanol.separations import create_separation_system
 
 from warnings import filterwarnings
@@ -391,6 +392,9 @@ def load(simulate_baseline=True,
                                 else tmo.Stream('isobutanol_from_separation_none')),
                            outs=('isobutanol'), tau=7*24)
 
+    # Entered in source-year dollars (Alibaba listing accessed 2026-02; taken as
+    # 2025$) and converted to PRICE_YEAR dollars by index_prices_to_price_year
+    # in the 'Set prices' block below.
     # V514.isobutanol_price = 1.725 # https://www.alibaba.com/product-detail/China-Isobutanol-CAS-NO-78-83_1600225311840.html?spm=a2700.7724857.0.0.6b071f52Jodf8p
     V514.isobutanol_price = 1.49 # https://www.alibaba.com/product-detail/High-Purity-Industrial-Organic-Solvent-Textile_1601609307567.html?spm=a2700.7724857.0.0.6b071f52XisbBQ
     # V514.isobutanol_price = 0.95 # https://www.alibaba.com/product-detail/High-Quality-for-Industrial-Grade-Isobutanol_1601289128791.html?spm=a2700.7724857.0.0.6b071f52XisbBQ
@@ -403,6 +407,8 @@ def load(simulate_baseline=True,
             if ibo.F_mol: ibo.price = V514.isobutanol_price * ibo.imass['Isobutanol']/ibo.F_mass
 
     V513 = f.V513
+    # Source-year dollars (midpoint year 2023 of the 2021-2025 range); converted to
+    # PRICE_YEAR dollars by index_prices_to_price_year in the 'Set prices' block.
     V513.ethanol_price = 0.835 # mean of ends of market price range (0.52 - 1.15) # Jan 2021 - Dec 2025 5-year low and high from https://tradingeconomics.com/commodity/ethanol
 
     V513.update_ethanol_price = False # a simulation leaves f.ethanol.price untouched by default; solve_TEA_at_IRR/solve_TEA set product prices themselves (and leave them at their purity-based defaults)
@@ -637,8 +643,19 @@ def load(simulate_baseline=True,
     except Exception as e:
         print(f"[reassembly] deferred convergence to late stage ({type(e).__name__}: {e})")
 
-    #%% Set prices
-    f.isobutanol.price = 1.49 # initial value; updated on purity basis using V514.isobutanol_price https://www.alibaba.com/product-detail/High-Purity-Industrial-Organic-Solvent-Textile_1601609307567.html?spm=a2700.7724857.0.0.6b071f52XisbBQ
+    #%% Set prices, then index every stream and utility price to PRICE_YEAR
+    f.isobutanol.price = V514.isobutanol_price # initial value; updated on purity basis using V514.isobutanol_price https://www.alibaba.com/product-detail/High-Purity-Industrial-Organic-Solvent-Textile_1601609307567.html?spm=a2700.7724857.0.0.6b071f52XisbBQ
+
+    # Every price above (corn-package stream defaults, biosteam facility/WWT
+    # defaults, the V513/V514 product prices) is in the dollars of its source
+    # year; convert all of them, plus the utility prices (electricity, the
+    # boiler turbogenerator's natural_gas_price, ash disposal, RO/process
+    # water), to PRICE_YEAR (2023) dollars with the BLS chemicals PPI ratio --
+    # the HP-biorefinery pattern. Source years are tabulated in
+    # process_settings (a priced stream without a declared year raises). The
+    # parameter workbooks carry their price rows already in PRICE_YEAR dollars.
+    price_index_report = index_prices_to_price_year(
+        f, BT=f.unit.BT801, V513=V513, V514=V514)
 
     #%% Create TEA object
 

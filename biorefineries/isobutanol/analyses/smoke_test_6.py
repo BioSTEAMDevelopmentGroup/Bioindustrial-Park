@@ -21,12 +21,16 @@ full flow. All broth IBO leaves via the rectifier bottoms to WWT
 EACH simulation. Gates (a violation exits non-zero exactly like a
 traceback):
 
-- purity-adjusted ethanol MPSP within 1% of 2.1569 (the reference baseline
+- purity-adjusted ethanol MPSP within 1% of 2.3817 (the reference baseline
   for this configuration, set 3-sim-stable by the 2026-09-02 re-pin run
-  and recorded in CLAUDE.md; well above the both-trains B baseline 1.0870
+  and recorded in CLAUDE.md; well above the both-trains B baseline 1.4479
   because the IBO revenue is lost and its burden shifts to ethanol.
-  Re-pinned 2026-09-02 for the 2023 CEPCI 797.9 (bst.CE had been
-  biosteam's 567.5 default; pin under Lang 3.0 alone was 1.8149) and,
+  Re-pinned 2026-09-02 for the 2023 price year (stream/utility prices
+  indexed to 2023$ with the BLS chemicals PPI; pin under the 2023 CEPCI
+  with unindexed prices was 2.1569; the IRR at default product prices
+  is now unsolvable, nan), earlier that day for the 2023 CEPCI 797.9
+  (bst.CE had been biosteam's 567.5 default; pin under Lang 3.0 alone
+  was 1.8149) and,
   earlier that day, the Lang factor 3.0 TEA (Huang et al. 2016;
   previous pin 2.1278 under corn's uncited Lang factor 4), and 2026-09-01
   after (a) the kinetics-synced parameter xlsx
@@ -92,8 +96,8 @@ def load_simulate_baseline(stream_IDs=('ethanol', 'isobutanol'), # products whos
         results = solve_TEA(stream_IDs=stream_IDs, IRR_for_MPSP=IRR_for_MPSP)
         MPSP_ethanol = results['MPSPs']['ethanol']
         MPSP_isobutanol = results['MPSPs']['isobutanol']
-        assert abs(MPSP_ethanol - 2.1569)/2.1569 < 0.01, \
-            f'sim {i+1}: ethanol MPSP {MPSP_ethanol} not within 1% of 2.1569'
+        assert abs(MPSP_ethanol - 2.3817)/2.3817 < 0.01, \
+            f'sim {i+1}: ethanol MPSP {MPSP_ethanol} not within 1% of 2.3817'
         assert math.isnan(MPSP_isobutanol), \
             f'sim {i+1}: isobutanol MPSP {MPSP_isobutanol} expected nan (empty product)'
         if all_results:
