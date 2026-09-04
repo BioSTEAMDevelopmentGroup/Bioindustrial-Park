@@ -35,7 +35,7 @@ assert excluded == ['k_16'] and 'k_16' not in space
 assert space['k_13'] == dict(low=0.0, high=40.0, log=False)  # lo==0 -> linear
 assert space['k_1e'] == dict(low=0.1*47.1, high=10.0*47.1, log=True)
 assert space['K_1e'] == dict(low=0.1*0.12, high=10.0*0.12, log=True)
-assert space['threshold_conc'] == dict(low=0.0, high=500.0, log=False)
+assert space['threshold_conc'] == dict(low=0.0, high=300.0, log=False)
 assert space['target_delta'] == dict(low=5.0, high=500.0, log=False)
 assert space['spike_delta'] == dict(low=0.5, high=595.0, log=False)
 assert space['max_n_spikes'] == dict(low=0, high=50, log=False, int=True)

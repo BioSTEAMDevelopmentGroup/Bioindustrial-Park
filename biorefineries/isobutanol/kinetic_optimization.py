@@ -57,7 +57,7 @@ LEGACY_FEEDING_VARIABLES = ('target_conc', 'threshold_delta', 'spike_conc')
 #: target_conc = min(TARGET_CONC_MAX, threshold_conc + target_delta);
 #: spike_conc = clip(target_conc + spike_delta, SPIKE_CONC_MIN,
 #: SPIKE_CONC_MAX).
-TARGET_CONC_MAX = 500.0
+TARGET_CONC_MAX = 300.0
 SPIKE_CONC_MIN = 50.0
 SPIKE_CONC_MAX = 600.0
 
@@ -141,7 +141,7 @@ def build_search_space(kinetic_baselines,
                        param_bounds_override=None,
                        exclude_params=(),
                        include_params=None,
-                       threshold_conc_bounds=(0.0, 500.0),
+                       threshold_conc_bounds=(0.0, 300.0),
                        target_delta_bounds=(5.0, 500.0),
                        spike_delta_bounds=(0.5, 595.0),
                        max_n_spikes_bounds=(0, 50),
@@ -171,8 +171,8 @@ def build_search_space(kinetic_baselines,
     (target_conc = min(TARGET_CONC_MAX, threshold_conc + target_delta)),
     and the spike as spike_delta above the target
     (spike_conc = clip(target_conc + spike_delta, SPIKE_CONC_MIN,
-    SPIKE_CONC_MAX)) -- spanning the applied envelope threshold [0, 500],
-    target [5, 500], spike [50, 600] g/L at the default bounds.
+    SPIKE_CONC_MAX)) -- spanning the applied envelope threshold [0, 300],
+    target [5, 300], spike [50, 600] g/L at the default bounds.
     max_n_spikes (the glucose-spike cap, fbs_spec.max_n_spikes) is an
     INTEGER variable (0 = forced batch); pass max_n_spikes_bounds=None to
     pin it at the scenario baseline instead.
@@ -765,7 +765,7 @@ def run_kinetic_optimization(objective='IRR',
                              param_bounds_override=None,
                              exclude_params=(),
                              include_params=None,
-                             threshold_conc_bounds=(0.0, 500.0),
+                             threshold_conc_bounds=(0.0, 300.0),
                              target_delta_bounds=(5.0, 500.0),
                              spike_delta_bounds=(0.5, 595.0),
                              max_n_spikes_bounds=(0, 50),
