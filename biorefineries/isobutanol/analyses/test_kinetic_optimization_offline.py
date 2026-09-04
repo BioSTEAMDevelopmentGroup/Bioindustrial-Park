@@ -528,7 +528,40 @@ else:
         assert np.isclose(side['record']['k_1e'], df17['k_1e'][i17 + 1],
                           rtol=1e-12, atol=0.0)
     assert not os.path.isfile(side17) and not os.path.isfile(side17 + '.tmp')
-    PASS('engine bracket: sidecar holds the full vector during each trial, cleared on COMPLETE/FAIL/NAN, orphan recovered at start')
+
+    # An INTERRUPTED trial (KeyboardInterrupt during the simulation -- a
+    # manual abort) writes no terminal row: the sidecar must survive so the
+    # next engine start recovers it as a LOST row (otherwise the trial
+    # number is consumed and silently missing).
+    outdir17b = tempfile.mkdtemp()
+    study17b = 'offline_bracket_interrupt'
+    csv17b = os.path.join(outdir17b, study17b + '_trajectory.csv')
+    side17b = ko.inflight_path_for(outdir17b, study17b)
+    def _model_specification_interrupt(**kw):
+        raise KeyboardInterrupt
+    handles17b = dict(handles17, model_specification=_model_specification_interrupt,
+                      latest_TEA_solution={'IRR': np.nan,
+                                           'MPSPs': {'ethanol': np.nan,
+                                                     'isobutanol': np.nan}})
+    try:
+        ko.run_kinetic_optimization(
+            objective='IRR', scenario_label='X', n_trials=2, seed=1,
+            study_name=study17b, results_dir=outdir17b, handles=handles17b,
+            print_status_every=1)
+    except KeyboardInterrupt:
+        pass
+    else:
+        raise AssertionError('KeyboardInterrupt did not propagate out of the engine')
+    assert os.path.isfile(side17b), 'sidecar was cleared although no terminal row was written'
+    assert not os.path.isfile(csv17b) or len(ko.load_trajectory(csv17b)) == 0
+    # The next start of the same study recovers it as a LOST row for trial 0
+    assert ko.recover_inflight(csv17b, side17b, state='LOST',
+                               error='recovered at engine startup (no terminal row)') == 0
+    df17b = ko.load_trajectory(csv17b)
+    assert df17b['trial_number'].tolist() == [0] and df17b['state'].tolist() == ['LOST']
+    assert not os.path.isfile(side17b)
+
+    PASS('engine bracket: sidecar holds the full vector during each trial, cleared on COMPLETE/FAIL/NAN, orphan recovered at start, survives an interrupted trial')
 
 #%% 18. plot safety with LOST rows: excluded from completed-only plots, drawn in the PCA landscape
 synth18 = synth11.copy()

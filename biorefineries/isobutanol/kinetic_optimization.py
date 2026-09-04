@@ -862,7 +862,9 @@ def run_kinetic_optimization(objective='IRR',
     supervisor on a stall, or a native segfault) cannot write its row;
     its decision vector is kept in a per-study sidecar
     ('_inflight.json', written before the simulation starts and removed
-    on every in-process outcome) and appended as a state='LOST' row --
+    once the trial's terminal row has been written; an interrupted trial
+    that wrote no row -- e.g. a KeyboardInterrupt during the simulation --
+    leaves it for recovery) and appended as a state='LOST' row --
     with its own trial_number, so the CSV has no gaps -- by the
     supervisor as soon as the child ends, or here at the next start of
     the study (recover_inflight). Kinetic parameters and feeding specs
@@ -999,9 +1001,12 @@ def run_kinetic_optimization(objective='IRR',
         # and the hang-prone simulation has not started: record it, so a
         # hard kill / segfault during this trial leaves the sidecar for
         # recover_inflight (the supervisor, or the next engine start) to
-        # log as a LOST row. Cleared in the finally on every in-process
-        # outcome (COMPLETE return, FAIL/NAN prune).
+        # log as a LOST row. Cleared in the finally only once this trial's
+        # terminal row has been written (COMPLETE return, FAIL/NAN prune);
+        # an interrupted trial (e.g. KeyboardInterrupt) that wrote no row
+        # leaves the sidecar in place for recovery.
         write_inflight(inflight_path, columns, record)
+        row_written = False
         try:
             try:
                 for pname in kinetic_baselines:
@@ -1021,6 +1026,7 @@ def run_kinetic_optimization(objective='IRR',
                 record['state'] = 'FAIL'
                 record['error'] = repr(e)[:300]
                 append_trajectory_row(csv_path, columns, record)
+                row_written = True
                 print(f'Trial {trial.number}: FAILED ({repr(e)[:120]})')
                 raise optuna.TrialPruned() from e
             if not math.isfinite(obj):
@@ -1031,11 +1037,13 @@ def run_kinetic_optimization(objective='IRR',
                 # value in 'objective')
                 record['state'] = 'NAN'
                 append_trajectory_row(csv_path, columns, record)
+                row_written = True
                 print(f'Trial {trial.number}: objective is non-finite '
                       f'({obj}); pruned.')
                 raise optuna.TrialPruned()
             record['state'] = 'COMPLETE'
             append_trajectory_row(csv_path, columns, record)
+            row_written = True
             for mname in TRACKED_METRICS:
                 trial.set_user_attr(mname, record[mname])
             if trial.number % print_status_every == 0:
@@ -1054,7 +1062,15 @@ def run_kinetic_optimization(objective='IRR',
                     pass
             return obj
         finally:
-            clear_inflight(inflight_path)
+            # Clear the sidecar only once this trial's terminal row exists.
+            # A KeyboardInterrupt (manual abort) during the simulation, or
+            # an exception escaping the FAIL branch's own row append, hits
+            # this finally with row_written still False -- leave the
+            # sidecar in place so recover_inflight logs it as a LOST row
+            # at the next engine start (or the supervisor), rather than
+            # silently losing the trial number.
+            if row_written:
+                clear_inflight(inflight_path)
 
     n_remaining = max(0, n_trials - n_done)
     if n_done:
