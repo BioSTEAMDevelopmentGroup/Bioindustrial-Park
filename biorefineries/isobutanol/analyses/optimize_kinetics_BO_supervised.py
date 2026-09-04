@@ -74,13 +74,15 @@ def row_count(csv_path):
 
 
 def child_code(scenario, objective, n_trials, kinetic_bounds_scenario,
-               make_plots, study_name, restrict_to_workbook=True):
+               make_plots, study_name, restrict_to_workbook=True,
+               seed=3221):
     """The -c program for one supervised attempt of the driver."""
     return (
         'import runpy\n'
         f'ns = runpy.run_path({DRIVER!r})\n'
         f"ns['run'](scenario={scenario!r}, objective={objective!r},\n"
         f'          n_trials={n_trials!r},\n'
+        f'          seed={seed!r},\n'
         f'          kinetic_bounds_scenario={kinetic_bounds_scenario!r},\n'
         f'          make_plots={make_plots!r},\n'
         f'          study_name={study_name!r},\n'
@@ -91,7 +93,7 @@ def supervise(scenario='B', objective='IRR', n_trials=2000,
               kinetic_bounds_scenario=None, make_plots=True,
               study_name=None, stall_timeout_min=25.0, poll_s=30.0,
               settle_s=10.0, python=None, log_path=None,
-              restrict_to_workbook=True):
+              restrict_to_workbook=True, seed=3221):
     """Run attempts until 'complete' or 'abort'; returns the final
     outcome string ('complete' or 'abort'). `restrict_to_workbook`
     (default True) is forwarded to the driver's run(); pass False to
@@ -108,7 +110,7 @@ def supervise(scenario='B', objective='IRR', n_trials=2000,
         log_path = os.path.join(RESULTS_DIR, study_name + '_run.log')
     code = child_code(scenario, objective, n_trials,
                       kinetic_bounds_scenario, make_plots, study_name,
-                      restrict_to_workbook=restrict_to_workbook)
+                      restrict_to_workbook=restrict_to_workbook, seed=seed)
     guard = ko.StallGuard(stall_timeout_s=60.0*stall_timeout_min)
 
     def event(msg):
@@ -168,6 +170,12 @@ if __name__ == '__main__':
                         help='name in OBJECTIVE_REGISTRY (callables: use '
                              'the unsupervised driver)')
     parser.add_argument('--n-trials', type=int, default=2000)
+    parser.add_argument('--seed', type=int, default=3221,
+                        help='sampler seed forwarded to the driver run(); '
+                             'give parallel studies distinct seeds so their '
+                             'objective-independent startup draws differ '
+                             '(avoids lockstep stalls on the same '
+                             'pathological kinetic draw)')
     parser.add_argument('--kinetic-bounds-scenario', default=None,
                         choices=('A', 'B'),
                         help="derive kinetic bounds from this scenario's "
@@ -193,5 +201,6 @@ if __name__ == '__main__':
                         study_name=args.study_name,
                         stall_timeout_min=args.stall_timeout_min,
                         poll_s=args.poll_s, settle_s=args.settle_s,
-                        restrict_to_workbook=args.restrict_to_workbook)
+                        restrict_to_workbook=args.restrict_to_workbook,
+                        seed=args.seed)
     sys.exit(0 if outcome == 'complete' else 1)
