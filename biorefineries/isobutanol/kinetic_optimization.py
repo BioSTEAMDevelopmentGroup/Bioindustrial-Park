@@ -28,6 +28,7 @@ tag is metadata). Kinetic parameters and feeding specs are restored to
 their scenario baselines in a `finally` after every run.
 """
 import csv
+import json
 import math
 import os
 import re
@@ -40,6 +41,8 @@ __all__ = ('OBJECTIVE_REGISTRY', 'TRACKED_METRICS',
            'kinetic_param_names_from_scenario',
            'baseline_decision_point',
            'trajectory_columns', 'append_trajectory_row', 'load_trajectory',
+           'inflight_path_for', 'write_inflight', 'clear_inflight',
+           'recover_inflight',
            'get_handles', 'run_kinetic_optimization', 'restore_baseline',
            'plot_optimization_trajectories', 'plot_parameter_trajectory',
            'plot_best_vs_baseline',
@@ -343,6 +346,70 @@ def load_trajectory(csv_path):
     parsed; blank cells -> NaN)."""
     import pandas as pd
     return pd.read_csv(csv_path)
+
+#%% In-flight sidecar (lost-trial recovery)
+# A trial that hangs inside the native integrator is hard-killed by the
+# supervisor (analyses/optimize_kinetics_BO_supervised.py), or dies in the
+# known CVODE segfault, and can never write its own terminal CSV row. Its
+# trial_number is consumed anyway (optuna leaves the trial RUNNING and the
+# resume numbers the next one afresh), so the trajectory CSV ends up with a
+# gap -- 33 of 500 trials on kin_opt_A_kbB_irr_20260904 (2026-09-04). The
+# engine therefore records each trial's decision vector to a per-study
+# sidecar JSON the instant it is known (after every suggest_*, before the
+# simulation) and deletes it on every in-process outcome; a sidecar still
+# present after the child has ended IS the lost trial, and recover_inflight
+# appends it as a state='LOST' row -- with its own trial_number, filling
+# the gap. stdlib-only, so the supervisor can call it.
+
+def inflight_path_for(results_dir, study_name):
+    """Path of the per-study in-flight sidecar (next to the trajectory
+    CSV); the one place the name is defined, shared by the engine (writer)
+    and the supervisor (reader)."""
+    return os.path.join(results_dir, study_name + '_inflight.json')
+
+def write_inflight(inflight_path, columns, record):
+    """Atomically write the in-flight trial as {'columns': [...],
+    'record': {...}} (tmp file + os.replace: a kill mid-write leaves either
+    the previous sidecar or the new one, never a partial file). `columns`
+    is the trajectory column order, `record` the trial's
+    {'trial_number': ..., <decision variables>} dict."""
+    tmp = inflight_path + '.tmp'
+    with open(tmp, 'w') as f:
+        json.dump({'columns': list(columns), 'record': record}, f)
+    os.replace(tmp, inflight_path)
+
+def clear_inflight(inflight_path):
+    """Remove the sidecar if present (no error when already gone)."""
+    try:
+        os.remove(inflight_path)
+    except FileNotFoundError:
+        pass
+
+def recover_inflight(csv_path, inflight_path, state='LOST', error=''):
+    """If a sidecar is present (the child ended without writing that
+    trial's terminal row), append it to the trajectory CSV as one row with
+    the given `state`/`error` -- decision vector as recorded, objective and
+    tracked metrics blank (NaN on read-back) -- clear the sidecar and
+    return the recovered trial_number. Returns None when there is nothing
+    to recover. A sidecar that does not parse or lacks the expected keys
+    is reported, cleared and treated as nothing to recover, so a corrupt
+    file never aborts the supervisor."""
+    if not os.path.isfile(inflight_path):
+        return None
+    try:
+        with open(inflight_path) as f:
+            sidecar = json.load(f)
+        columns, record = sidecar['columns'], sidecar['record']
+        trial_number = record['trial_number']
+    except (OSError, ValueError, KeyError, TypeError) as e:
+        print(f'Warning: unreadable in-flight sidecar {inflight_path} '
+              f'({repr(e)[:120]}); discarded, nothing recovered.')
+        clear_inflight(inflight_path)
+        return None
+    append_trajectory_row(csv_path, columns,
+                          {**record, 'state': state, 'error': error})
+    clear_inflight(inflight_path)
+    return trial_number
 
 #%% Post-run plots
 # All three take the trajectory DataFrame (load_trajectory(csv_path)), so

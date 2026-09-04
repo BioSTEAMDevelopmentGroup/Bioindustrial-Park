@@ -360,4 +360,56 @@ _sig = _inspect.signature(ko.run_kinetic_optimization).parameters
 assert 'include_params' in _sig and _sig['include_params'].default is None
 PASS('run_kinetic_optimization: include_params kwarg present, default None')
 
+#%% 16. in-flight sidecar helpers: path, atomic write, LOST-row recovery, no-op, corrupt
+# A hard-killed/segfaulted child cannot write its trial's terminal row; the
+# sidecar it wrote beforehand is appended as ONE state='LOST' row carrying
+# the trial's OWN trial_number (so the CSV has no gap), decision vector
+# intact, objective/metrics blank (NaN on read-back), cause in 'error'.
+outdir16 = tempfile.mkdtemp()
+csv16 = os.path.join(outdir16, 'kin_opt_x_trajectory.csv')
+side16 = ko.inflight_path_for(outdir16, 'kin_opt_x')
+assert side16 == os.path.join(outdir16, 'kin_opt_x_inflight.json')
+cols16 = ko.trajectory_columns(space)
+rec16 = {'trial_number': 7, 'k_1e': 50.0, 'K_1e': 0.1, 'k_13': 5.0,
+         'threshold_conc': 210.0, 'target_delta': 10.0, 'spike_delta': 300.0,
+         'max_n_spikes': 3}
+# Nothing pending: recovery and clearing are no-ops (no CSV created)
+assert ko.recover_inflight(csv16, side16) is None
+assert not os.path.isfile(csv16)
+ko.clear_inflight(side16)
+# Round trip
+ko.write_inflight(side16, cols16, rec16)
+assert os.path.isfile(side16) and not os.path.isfile(side16 + '.tmp')
+assert ko.recover_inflight(
+    csv16, side16, state='LOST',
+    error='stall-killed after 25 min (no terminal row)') == 7
+assert not os.path.isfile(side16)
+df16 = ko.load_trajectory(csv16)
+assert list(df16.columns) == cols16 and len(df16) == 1
+row16 = df16.iloc[0]
+assert row16['trial_number'] == 7 and row16['state'] == 'LOST'
+for k16, v16 in rec16.items():
+    assert row16[k16] == v16, (k16, row16[k16], v16)
+assert np.isnan(row16['objective']) and np.isnan(row16['IRR'])
+assert row16['error'] == 'stall-killed after 25 min (no terminal row)'
+# Recovering again with nothing pending appends nothing
+assert ko.recover_inflight(csv16, side16) is None
+assert len(ko.load_trajectory(csv16)) == 1
+# Corrupt / partial sidecars: warned, cleared, nothing appended, no raise
+with open(side16, 'w') as f16:
+    f16.write('{"columns": ["trial_number", "st')            # truncated JSON
+assert ko.recover_inflight(csv16, side16) is None
+assert not os.path.isfile(side16) and len(ko.load_trajectory(csv16)) == 1
+with open(side16, 'w') as f16:
+    f16.write('{"columns": ["trial_number"]}')               # no 'record'
+assert ko.recover_inflight(csv16, side16) is None
+assert not os.path.isfile(side16) and len(ko.load_trajectory(csv16)) == 1
+# A later terminal row appends after the LOST row under the same header
+ko.append_trajectory_row(csv16, cols16, dict(rec16, trial_number=8,
+                                              state='COMPLETE', objective=0.2))
+assert ko.load_trajectory(csv16)['state'].tolist() == ['LOST', 'COMPLETE']
+assert set(ko.__all__) >= {'inflight_path_for', 'write_inflight',
+                           'clear_inflight', 'recover_inflight'}
+PASS('in-flight sidecar: path, atomic write, LOST-row recovery fills the gap, no-op, corrupt handled')
+
 print(f'\nALL {n_pass} CHECKS PASSED')
