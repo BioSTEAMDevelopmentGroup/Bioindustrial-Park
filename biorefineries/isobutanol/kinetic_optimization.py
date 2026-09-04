@@ -577,8 +577,8 @@ def plot_best_vs_baseline(df, kinetic_baselines, direction, filename=None):
 #%% PCA projection of the sampled decision space
 
 def pca_decision_matrix(df, log_columns=(), decision_columns=None):
-    """PCA of the decision vectors of EVERY recorded trial (COMPLETE, FAIL
-    and NAN rows alike -- each records its full decision vector), from a
+    """PCA of the decision vectors of EVERY recorded trial (COMPLETE, FAIL,
+    NAN and LOST rows alike -- each records its full decision vector), from a
     trajectory DataFrame (load_trajectory(csv_path)).
 
     `decision_columns` defaults to the columns between 'state' and
@@ -635,8 +635,9 @@ def plot_pca_projection(df, direction, log_columns=(),
                         objective_name='objective', objective_units='',
                         filename=None):
     """Four-panel PCA view of the sampled decision space: (1) the PC1 x
-    PC2 landscape -- completed trials colored by objective, FAIL/NAN
-    trials as gray/red crosses, the incumbent best-so-far path, the
+    PC2 landscape -- completed trials colored by objective, FAIL/NAN/LOST
+    trials as gray/red/brown crosses (LOST = stall-killed or crashed
+    before writing its row, recovered from the in-flight sidecar), the incumbent best-so-far path, the
     enqueued baseline (trial 0) and the current best marked; (2) the
     explained-variance scree of the top 10 PCs; (3) the top-|loading|
     variables on PC1/PC2; (4) PC1 and PC2 of every sampled point vs trial
@@ -658,7 +659,8 @@ def plot_pca_projection(df, direction, log_columns=(),
     pc1, pc2 = coords[:, 0], coords[:, 1]
     state = dfv['state']
     for st, color, label in (('FAIL', 'tab:gray', 'failed (pruned)'),
-                             ('NAN', 'tab:red', 'NaN objective (pruned)')):
+                             ('NAN', 'tab:red', 'NaN objective (pruned)'),
+                             ('LOST', 'tab:brown', 'lost (stalled/crashed)')):
         m = (state == st).to_numpy()
         if m.any():
             ax_main.scatter(pc1[m], pc2[m], marker='x', s=18, alpha=0.35,

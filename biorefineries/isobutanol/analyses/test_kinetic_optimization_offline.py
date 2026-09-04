@@ -530,4 +530,38 @@ else:
     assert not os.path.isfile(side17) and not os.path.isfile(side17 + '.tmp')
     PASS('engine bracket: sidecar holds the full vector during each trial, cleared on COMPLETE/FAIL/NAN, orphan recovered at start')
 
+#%% 18. plot safety with LOST rows: excluded from completed-only plots, drawn in the PCA landscape
+synth18 = synth11.copy()
+lost18 = synth18['trial_number'].isin([7, 22])
+synth18.loc[lost18, 'state'] = 'LOST'
+synth18.loc[lost18, ['objective', *ko.TRACKED_METRICS]] = np.nan  # blank cells on read-back
+synth18.loc[lost18, 'error'] = 'stall-killed after 25 min (no terminal row)'
+ok18 = ko._completed(synth18)
+assert (ok18['state'] == 'COMPLETE').all()
+assert len(ok18) == int((synth18['state'] == 'COMPLETE').sum())
+assert not ok18['trial_number'].isin([7, 22]).any()
+f18 = [os.path.join(outdir, f'lost_{i}.png') for i in range(4)]
+ko.plot_optimization_trajectories(synth18, objective_name='IRR',
+                                  direction='maximize', filename=f18[0])
+ko.plot_parameter_trajectory(synth18, baselines, direction='maximize',
+                             filename=f18[1])
+ko.plot_best_vs_baseline(synth18, baselines, direction='maximize',
+                         filename=f18[2])
+# LOST rows keep a finite decision vector -> they join the PCA fit and are
+# drawn as their own crosses (legend entry present).
+_, _, _, _, valid18 = ko.pca_decision_matrix(synth18, log_cols)
+assert valid18.all()
+fig18, axes18 = ko.plot_pca_projection(synth18, 'maximize',
+                                       log_columns=log_cols,
+                                       objective_name='IRR', filename=f18[3])
+labels18 = axes18[0].get_legend_handles_labels()[1]
+assert 'lost (stalled/crashed)' in labels18, labels18
+assert 'failed (pruned)' in labels18 and 'completed' in labels18
+for p in f18:
+    assert os.path.isfile(p) and os.path.getsize(p) > 0, p
+# A LOST-free trajectory draws no LOST legend entry
+_, axes18b = ko.plot_pca_projection(synth11, 'maximize', log_columns=log_cols)
+assert 'lost (stalled/crashed)' not in axes18b[0].get_legend_handles_labels()[1]
+PASS('LOST rows: excluded by _completed, drawn as crosses in the PCA landscape, other plots unaffected')
+
 print(f'\nALL {n_pass} CHECKS PASSED')
