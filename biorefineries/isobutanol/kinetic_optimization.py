@@ -82,6 +82,10 @@ OBJECTIVE_REGISTRY = {
     'IBO productivity': dict(
         getter=lambda h: _nsk(h)['[s_IBO]']/_nsk(h)['time'],
         direction='maximize', level='kinetic', units='g-IBO/L-broth/h'),
+    'IBO yield x titer': dict(
+        getter=lambda h: _nsk(h)['y_IBO_glu_added']*_nsk(h)['[s_IBO]'],
+        direction='maximize', level='kinetic',
+        units='(g-IBO/g-sugars)(g-IBO/L-broth)'),
     'EtOH yield': dict(
         getter=lambda h: _nsk(h)['y_EtOH_glu_added'],
         direction='maximize', level='kinetic', units='g-EtOH/g-sugars'),

@@ -89,6 +89,7 @@ handles = {'V406': SimpleNamespace(nsk_results_specific_tau_dict=nsk, tau=55.0),
                                    'MPSPs': {'ethanol': 0.4, 'isobutanol': 0.9}}}
 assert ko.OBJECTIVE_REGISTRY['IBO yield']['getter'](handles) == 0.1
 assert ko.OBJECTIVE_REGISTRY['IBO productivity']['getter'](handles) == 0.5
+assert ko.OBJECTIVE_REGISTRY['IBO yield x titer']['getter'](handles) == 0.1*20.0
 assert ko.OBJECTIVE_REGISTRY['EtOH productivity']['getter'](handles) == 2.0
 assert ko.OBJECTIVE_REGISTRY['Cell density']['getter'](handles) == 30.0
 assert ko.OBJECTIVE_REGISTRY['IRR']['getter'](handles) == 0.21
