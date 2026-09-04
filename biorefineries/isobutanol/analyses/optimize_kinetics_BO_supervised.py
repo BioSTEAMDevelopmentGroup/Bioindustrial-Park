@@ -18,11 +18,19 @@ processes and, until the study's total trial budget completes cleanly:
   Windows, so the timeout is enforced by polling the crash-safe
   trajectory CSV and killing the child when no trial has been recorded
   for --stall-timeout-min (default 25 min, comfortably above the ~15 min
-  worst self-resolving trial observed in production). The in-flight
-  trial is lost, as in a segfault; its RUNNING optuna record still
-  counts toward the budget;
-- aborts (exit 1) after any attempt that recorded no new trials --
-  resuming would loop on the same failure.
+  worst self-resolving trial observed in production);
+- logs the in-flight trial of a killed or crashed child to the
+  trajectory CSV IMMEDIATELY as a state='LOST' row: the child records
+  each trial's decision vector to <study>_inflight.json before
+  simulating and removes it on every in-process outcome, so a sidecar
+  still present after the child ends is the lost trial
+  (kinetic_optimization.recover_inflight; the row keeps the trial's own
+  trial_number, so the CSV has no gaps -- before 2026-09-04, 33 of 500
+  trials of kin_opt_A_kbB_irr_20260904 were simply missing). Its RUNNING
+  optuna record still counts toward the budget;
+- aborts (exit 1) after any attempt that recorded no new terminal
+  trials -- resuming would loop on the same failure. The LOST row is
+  logged after that decision, so it never masks a stuck study.
 
 Decision logic (StallGuard, attempt_outcome) lives in
 kinetic_optimization.py and is covered by the offline test. This
@@ -73,6 +81,15 @@ def row_count(csv_path):
         return 0
 
 
+def lost_cause(killed_for_stall, stall_timeout_min, returncode):
+    """The 'error' text of a recovered LOST row: what the supervisor
+    knows about why the in-flight trial never wrote its terminal row."""
+    if killed_for_stall:
+        return (f'stall-killed after {stall_timeout_min:g} min '
+                '(no terminal row)')
+    return f'child exited with code {returncode} (no terminal row)'
+
+
 def child_code(scenario, objective, n_trials, kinetic_bounds_scenario,
                make_plots, study_name, restrict_to_workbook=True,
                seed=3221):
@@ -103,6 +120,7 @@ def supervise(scenario='B', objective='IRR', n_trials=2000,
         study_name = default_study_name(scenario, objective,
                                         kinetic_bounds_scenario)
     csv_path = os.path.join(RESULTS_DIR, study_name + '_trajectory.csv')
+    inflight_path = ko.inflight_path_for(RESULTS_DIR, study_name)
     if python is None:
         python = sys.executable
     if log_path is None:
@@ -118,6 +136,15 @@ def supervise(scenario='B', objective='IRR', n_trials=2000,
         print(line, flush=True)
         with open(log_path, 'a') as f:
             f.write(line + '\n')
+
+    # A sidecar left by a previous supervised session that itself died
+    # before recovering it: log it now, before the first child starts.
+    lost = ko.recover_inflight(
+        csv_path, inflight_path, state='LOST',
+        error='recovered at supervisor startup (no terminal row)')
+    if lost is not None:
+        event(f'recovered orphaned in-flight trial {lost} from a previous '
+              'session as a LOST row')
 
     attempt = 0
     while True:
@@ -137,7 +164,7 @@ def supervise(scenario='B', objective='IRR', n_trials=2000,
                     event(f'attempt {attempt}: no new trial in '
                           f'{stall_timeout_min:g} min -- killing stalled '
                           'child (per-trial timeout; in-flight trial '
-                          'lost, study resumes)')
+                          'logged as LOST, study resumes)')
                     child.kill()
                     child.wait()
                     killed = True
@@ -145,9 +172,20 @@ def supervise(scenario='B', objective='IRR', n_trials=2000,
         rows_after = row_count(csv_path)
         outcome = ko.attempt_outcome(child.returncode, rows_before,
                                      rows_after, killed_for_stall=killed)
+        # Log the lost in-flight trial NOW (at kill / crash detection),
+        # but only AFTER the outcome was decided from genuine terminal
+        # rows: the recovered LOST row must never count as this attempt's
+        # progress, or a trial that always stalls first would resume
+        # forever instead of aborting.
+        lost = ko.recover_inflight(
+            csv_path, inflight_path, state='LOST',
+            error=lost_cause(killed, stall_timeout_min, child.returncode))
+        if lost is not None:
+            event(f'attempt {attempt}: in-flight trial {lost} logged as '
+                  'LOST (its trial_number gap is filled)')
         if outcome == 'complete':
             event(f'clean exit after attempt {attempt} '
-                  f'({rows_after} trials logged)')
+                  f'({row_count(csv_path)} trials logged)')
             return outcome
         if outcome == 'abort':
             event(f'attempt {attempt} (exit {child.returncode}, '
@@ -156,8 +194,8 @@ def supervise(scenario='B', objective='IRR', n_trials=2000,
                   'relaunching')
             return outcome
         event(f'attempt {attempt} ended (exit {child.returncode}, '
-              f'stall-killed={killed}) at {rows_after} rows; resuming '
-              f'in {settle_s:g} s')
+              f'stall-killed={killed}) at {row_count(csv_path)} rows; '
+              f'resuming in {settle_s:g} s')
         time.sleep(settle_s)
 
 

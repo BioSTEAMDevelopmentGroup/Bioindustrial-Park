@@ -299,6 +299,35 @@ assert 'restrict_to_workbook=False' in sup['child_code'](
     'B', 'IRR', 5, None, False, 'x', restrict_to_workbook=False)
 assert 'restrict_to_workbook=True' in sup['child_code'](
     'B', 'IRR', 5, None, False, 'x')
+# Lost-trial recovery wiring (2026-09-04): the supervisor logs the child's
+# in-flight sidecar as a LOST row immediately after every attempt (and
+# once at startup); the cause text is a pure helper.
+assert sup['lost_cause'](True, 25.0, 1) == 'stall-killed after 25 min (no terminal row)'
+assert sup['lost_cause'](True, 2.5, 1) == 'stall-killed after 2.5 min (no terminal row)'
+assert sup['lost_cause'](False, 25.0, 3221225477) == \
+    'child exited with code 3221225477 (no terminal row)'
+assert callable(sup['ko'].recover_inflight) and callable(sup['ko'].inflight_path_for)
+_src12 = _inspect12.getsource(sup['supervise'])
+assert _src12.count('recover_inflight(') == 2               # startup + per attempt
+assert _src12.index('attempt_outcome(') < _src12.rindex('recover_inflight(')  # decided BEFORE recovery
+assert 'lost_cause(' in _src12 and 'inflight_path_for(' in _src12
+# Abort-guard invariant on the building blocks, in the supervisor's order:
+# a sidecar left by an attempt that added no terminal rows still yields
+# 'abort' (decided on the pre-recovery count) and is THEN logged, so the
+# trial is not silently lost.
+outdir12 = tempfile.mkdtemp()
+csv12 = os.path.join(outdir12, 's_trajectory.csv')
+side12 = sup['ko'].inflight_path_for(outdir12, 's')
+ko.append_trajectory_row(csv12, columns, rec)
+rows_before12 = sup['row_count'](csv12)
+ko.write_inflight(side12, columns, dict(rec, trial_number=1))
+rows_after12 = sup['row_count'](csv12)
+assert ko.attempt_outcome(1, rows_before12, rows_after12,
+                          killed_for_stall=True) == 'abort'
+assert ko.recover_inflight(csv12, side12, state='LOST',
+                           error=sup['lost_cause'](True, 25.0, 1)) == 1
+assert sup['row_count'](csv12) == rows_before12 + 1
+assert ko.load_trajectory(csv12)['state'].tolist() == ['COMPLETE', 'LOST']
 PASS('StallGuard / attempt_outcome / supervised-runner helpers')
 
 #%% 13. include_params: whitelist restricts the kinetic set; feeding vars untouched
