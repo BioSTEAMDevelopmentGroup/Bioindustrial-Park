@@ -856,8 +856,15 @@ def run_kinetic_optimization(objective='IRR',
     trial appends one row to the trajectory CSV (same stable name as the
     study, '_trajectory.csv' suffix) whether it completes, fails
     (state='FAIL', pruned), or yields a NaN objective (state='NAN',
-    pruned). Kinetic parameters and feeding specs are restored to the
-    scenario baseline in a `finally`.
+    pruned). A trial the PROCESS never finishes (hard-killed by the
+    supervisor on a stall, or a native segfault) cannot write its row;
+    its decision vector is kept in a per-study sidecar
+    ('_inflight.json', written before the simulation starts and removed
+    on every in-process outcome) and appended as a state='LOST' row --
+    with its own trial_number, so the CSV has no gaps -- by the
+    supervisor as soon as the child ends, or here at the next start of
+    the study (recover_inflight). Kinetic parameters and feeding specs
+    are restored to the scenario baseline in a `finally`.
 
     `include_params` (None = every k_*/K_* on the model) restricts the
     kinetic decision variables to the named parameters (see
@@ -934,10 +941,20 @@ def run_kinetic_optimization(objective='IRR',
     if study_name is None:
         study_name = f'kin_opt_{scenario_label}_{slug}'
     csv_path = os.path.join(results_dir, study_name + '_trajectory.csv')
+    inflight_path = inflight_path_for(results_dir, study_name)
     storage = ('sqlite:///'
                + os.path.join(results_dir, study_name + '.db')
                .replace('\\', '/'))
     columns = trajectory_columns(search_space)
+    # An orphaned sidecar means a previous run of this study died
+    # mid-trial without writing that trial's row (unsupervised
+    # crash-resume; under the supervisor it has already been recovered).
+    # Log it before trial 0's own sidecar could overwrite it.
+    lost = recover_inflight(csv_path, inflight_path, state='LOST',
+                            error='recovered at engine startup (no terminal row)')
+    if lost is not None:
+        print(f'Recovered orphaned in-flight trial {lost} from a previous '
+              'run as a LOST row (no terminal row had been written).')
 
     study = optuna.create_study(study_name=study_name, storage=storage,
                                 direction=direction,
@@ -976,54 +993,66 @@ def run_kinetic_optimization(objective='IRR',
         model_kwargs = dict(target_conc=target, threshold_conc=threshold,
                             spike_conc=spike)
         record = {'trial_number': trial.number, **values}
+        # The decision vector is complete here (every suggest_* has run)
+        # and the hang-prone simulation has not started: record it, so a
+        # hard kill / segfault during this trial leaves the sidecar for
+        # recover_inflight (the supervisor, or the next engine start) to
+        # log as a LOST row. Cleared in the finally on every in-process
+        # outcome (COMPLETE return, FAIL/NAN prune).
+        write_inflight(inflight_path, columns, record)
         try:
-            for pname in kinetic_baselines:
-                if pname in values:
-                    setattr(r_te, pname, values[pname])
-            if 'max_n_spikes' in values:
-                fbs_spec.max_n_spikes = values['max_n_spikes']
-            handles['model_specification'](**model_kwargs)
-            handles['latest_TEA_solution'].update(
-                handles['solve_TEA'](
-                    stream_IDs=('ethanol', 'isobutanol')))
-            for mname, getter in TRACKED_METRICS.items():
-                record[mname] = getter(handles)
-            obj = float(objective_getter(handles))
-            record['objective'] = obj
-        except Exception as e:
-            record['state'] = 'FAIL'
-            record['error'] = repr(e)[:300]
-            append_trajectory_row(csv_path, columns, record)
-            print(f'Trial {trial.number}: FAILED ({repr(e)[:120]})')
-            raise optuna.TrialPruned() from e
-        if not math.isfinite(obj):
-            # NaN (not solved) or +-inf (solve_TEA reports an IRR with no
-            # real root on the valid domain as -inf since 2026-09-03; the
-            # sampler needs finite values, so such trials are pruned like
-            # NaN ones -- the CSV keeps the raw value in 'objective')
-            record['state'] = 'NAN'
-            append_trajectory_row(csv_path, columns, record)
-            print(f'Trial {trial.number}: objective is non-finite ({obj}); pruned.')
-            raise optuna.TrialPruned()
-        record['state'] = 'COMPLETE'
-        append_trajectory_row(csv_path, columns, record)
-        for mname in TRACKED_METRICS:
-            trial.set_user_attr(mname, record[mname])
-        if trial.number % print_status_every == 0:
             try:
-                best = study.best_value
-            except Exception:  # no completed trial stored yet
-                best = np.nan
-            try:
-                print(f'\nTrial {trial.number}/{n_trials}: '
-                      f'{objective_name} = {obj:.6g} '
-                      f'(best so far {best:.6g})\n'
-                      f'integrator: {r_te.integrator.getName()}; '
-                      'HXN Qbal error = '
-                      f"{handles['HXN'].energy_balance_percent_error:.2f} %")
-            except Exception:  # cosmetic only -- never abort the study
-                pass
-        return obj
+                for pname in kinetic_baselines:
+                    if pname in values:
+                        setattr(r_te, pname, values[pname])
+                if 'max_n_spikes' in values:
+                    fbs_spec.max_n_spikes = values['max_n_spikes']
+                handles['model_specification'](**model_kwargs)
+                handles['latest_TEA_solution'].update(
+                    handles['solve_TEA'](
+                        stream_IDs=('ethanol', 'isobutanol')))
+                for mname, getter in TRACKED_METRICS.items():
+                    record[mname] = getter(handles)
+                obj = float(objective_getter(handles))
+                record['objective'] = obj
+            except Exception as e:
+                record['state'] = 'FAIL'
+                record['error'] = repr(e)[:300]
+                append_trajectory_row(csv_path, columns, record)
+                print(f'Trial {trial.number}: FAILED ({repr(e)[:120]})')
+                raise optuna.TrialPruned() from e
+            if not math.isfinite(obj):
+                # NaN (not solved) or +-inf (solve_TEA reports an IRR with
+                # no real root on the valid domain as -inf since
+                # 2026-09-03; the sampler needs finite values, so such
+                # trials are pruned like NaN ones -- the CSV keeps the raw
+                # value in 'objective')
+                record['state'] = 'NAN'
+                append_trajectory_row(csv_path, columns, record)
+                print(f'Trial {trial.number}: objective is non-finite '
+                      f'({obj}); pruned.')
+                raise optuna.TrialPruned()
+            record['state'] = 'COMPLETE'
+            append_trajectory_row(csv_path, columns, record)
+            for mname in TRACKED_METRICS:
+                trial.set_user_attr(mname, record[mname])
+            if trial.number % print_status_every == 0:
+                try:
+                    best = study.best_value
+                except Exception:  # no completed trial stored yet
+                    best = np.nan
+                try:
+                    print(f'\nTrial {trial.number}/{n_trials}: '
+                          f'{objective_name} = {obj:.6g} '
+                          f'(best so far {best:.6g})\n'
+                          f'integrator: {r_te.integrator.getName()}; '
+                          'HXN Qbal error = '
+                          f"{handles['HXN'].energy_balance_percent_error:.2f} %")
+                except Exception:  # cosmetic only -- never abort the study
+                    pass
+            return obj
+        finally:
+            clear_inflight(inflight_path)
 
     n_remaining = max(0, n_trials - n_done)
     if n_done:

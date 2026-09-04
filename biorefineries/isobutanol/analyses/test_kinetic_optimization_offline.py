@@ -7,8 +7,10 @@
 # github.com/BioSTEAMDevelopmentGroup/biosteam/blob/master/LICENSE.txt
 # for license details.
 """Offline verification of kinetic_optimization's pure logic -- search-space
-construction, objective registry, trajectory-CSV round-trip, and (from check 6)
-plotting on synthetic data. No isobutanol.load(), no simulation, no optuna.
+construction, objective registry, trajectory-CSV round-trip, (from check 6)
+plotting on synthetic data, and (checks 16-18) the lost-trial sidecar. No
+isobutanol.load(), no simulation; optuna only in check 17, which drives the
+real engine with fake handles (SKIP if optuna is absent).
 Run in a fresh kernel; exit 0 + 'ALL ... CHECKS PASSED' = clean."""
 import os
 import tempfile
@@ -411,5 +413,92 @@ assert ko.load_trajectory(csv16)['state'].tolist() == ['LOST', 'COMPLETE']
 assert set(ko.__all__) >= {'inflight_path_for', 'write_inflight',
                            'clear_inflight', 'recover_inflight'}
 PASS('in-flight sidecar: path, atomic write, LOST-row recovery fills the gap, no-op, corrupt handled')
+
+#%% 17. engine bracket: sidecar present DURING every trial, gone after; orphan recovered at start
+# The real run_kinetic_optimization driven by FAKE handles (no biorefinery,
+# no simulation): a scripted model_specification records whether the
+# sidecar exists at call time and captures its content, raises on trial 1
+# (FAIL path) and yields a NaN IRR on trial 2 (NAN path). optuna is used
+# only here (skipped cleanly if absent).
+try:
+    import optuna as _optuna
+except ImportError:
+    _optuna = None
+if _optuna is None:
+    print('SKIP 17: optuna not installed')
+else:
+    import json as _json
+    outdir17 = tempfile.mkdtemp()
+    study17 = 'offline_bracket'
+    csv17 = os.path.join(outdir17, study17 + '_trajectory.csv')
+    side17 = ko.inflight_path_for(outdir17, study17)
+
+    class _FakeTE:
+        k_1e = 47.1
+        K_1e = 0.12
+        def getGlobalParameterIds(self):
+            return ['k_1e', 'K_1e', 'not_kinetic']
+    fbs17 = SimpleNamespace(
+        current_specifications=dict(target_conc=221.25,
+                                    threshold_conc=217.125,
+                                    spike_conc=600.0),
+        max_n_spikes=16)
+    seen17 = []      # (sidecar present?, parsed sidecar or None) per call
+    st17 = {'n': 0, 'irr': 0.2}
+    def _model_specification(**kw):
+        present = os.path.isfile(side17)
+        with open(side17) if present else open(os.devnull) as f17:
+            content = _json.load(f17) if present else None
+        seen17.append((present, content))
+        st17['n'] += 1
+        if st17['n'] == 2:
+            raise RuntimeError('boom')                          # trial 1 -> FAIL
+        st17['irr'] = float('nan') if st17['n'] == 3 else 0.2  # trial 2 -> NAN
+    def _solve_TEA(stream_IDs=None):
+        return {'IRR': st17['irr'],
+                'MPSPs': {'ethanol': 0.5, 'isobutanol': 1.0}}
+    handles17 = {
+        'r_te': _FakeTE(), 'fbs_spec': fbs17,
+        'V406': SimpleNamespace(nsk_results_specific_tau_dict=nsk, tau=55.0),
+        'tea': SimpleNamespace(TCI=350e6), 'HXN': SimpleNamespace(),
+        'model_specification': _model_specification,
+        'solve_TEA': _solve_TEA,
+        'latest_TEA_solution': {'IRR': np.nan,
+                                'MPSPs': {'ethanol': np.nan,
+                                          'isobutanol': np.nan}}}
+    # An orphan left by a "previous run" that died mid-trial 99 (the
+    # unsupervised driver's crash-resume case): must be logged, not
+    # overwritten by trial 0's own sidecar.
+    space17, _ = ko.build_search_space({'k_1e': 47.1, 'K_1e': 0.12})
+    cols17 = ko.trajectory_columns(space17)
+    ko.write_inflight(side17, cols17,
+                      {'trial_number': 99, 'k_1e': 1.0, 'K_1e': 0.01,
+                       'threshold_conc': 100.0, 'target_delta': 50.0,
+                       'spike_delta': 100.0, 'max_n_spikes': 2})
+    _optuna.logging.set_verbosity(_optuna.logging.WARNING)
+    study17_obj, csv17_out, kb17 = ko.run_kinetic_optimization(
+        objective='IRR', scenario_label='X', n_trials=3, seed=1,
+        study_name=study17, results_dir=outdir17, handles=handles17,
+        print_status_every=1)
+    assert csv17_out == csv17 and kb17 == {'k_1e': 47.1, 'K_1e': 0.12}
+    df17 = ko.load_trajectory(csv17)
+    assert df17['trial_number'].tolist() == [99, 0, 1, 2]
+    assert df17['state'].tolist() == ['LOST', 'COMPLETE', 'FAIL', 'NAN']
+    assert df17['error'][0] == 'recovered at engine startup (no terminal row)'
+    assert df17['k_1e'][0] == 1.0 and np.isnan(df17['objective'][0])
+    # 3 trials, then the restore_baseline call in the engine's finally
+    assert [p for p, _ in seen17] == [True, True, True, False], seen17
+    for i17 in range(3):
+        side = seen17[i17][1]
+        assert side['columns'] == cols17
+        assert side['record']['trial_number'] == i17
+        assert set(side['record']) == {'trial_number', 'k_1e', 'K_1e',
+                                       *ko.FEEDING_VARIABLES}
+        assert all(np.isfinite(v) for v in side['record'].values())
+        # the sidecar held the SAME vector the CSV row later recorded
+        assert np.isclose(side['record']['k_1e'], df17['k_1e'][i17 + 1],
+                          rtol=1e-12, atol=0.0)
+    assert not os.path.isfile(side17) and not os.path.isfile(side17 + '.tmp')
+    PASS('engine bracket: sidecar holds the full vector during each trial, cleared on COMPLETE/FAIL/NAN, orphan recovered at start')
 
 print(f'\nALL {n_pass} CHECKS PASSED')
