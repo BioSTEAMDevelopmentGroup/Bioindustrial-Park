@@ -343,3 +343,81 @@ class BurdenModel:
         applied['k_7'] = result.k_7_eff
         applied['k_8'] = result.k_8_eff
         return applied
+
+    def describe_point(self, values, label=''):
+        """Printable burden report of the decision point `values`: every
+        step's pool and its multiple of the wild type, Phi_M, F_flex,
+        phi_T, the burden factor d with the effective growth capacities,
+        a FEASIBLE / INFEASIBLE status line and the sigma diagnostic.
+        The driver prints it for the scenario-A reference and for the
+        scenario-B Ehrlich constants (the Q11 sanity report)."""
+        result = self.evaluate(values)
+        title = 'Enzyme burden report' + (f' -- {label}' if label else '')
+        lines = [f'{title} (g enzyme / gDCW)',
+                 f'  {"step":<5}{"pool":>10}{"x wild type":>13}   capacities']
+        for step, (pool_wt, capacities) in NATIVE_STEPS.items():
+            caps = ', '.join(f'{c}={self._value(values, c):.4g}'
+                             for c in capacities) or 'fixed (k_4 burden-free)'
+            lines.append(f'  {step:<5}{result.pools[step]:>10.4f}'
+                         f'{result.pools[step]/pool_wt:>13.2f}   {caps}')
+        for step, (capacity, _, enzymes) in EHRLICH_STEPS.items():
+            names = '+'.join(name for name, _, _ in enzymes)
+            lines.append(f'  {step:<5}{result.pools[step]:>10.4f}{"-":>13}   '
+                         f'{capacity}={self._value(values, capacity):.4g} '
+                         f'({names}; {ehrlich_unit_cost(step, self.sigma_eff):.4f} '
+                         f'per unit at sigma_eff {self.sigma_eff:g})')
+        lines.append(f'  Phi_M = {result.Phi_M:.4f} (wild type {self.Phi_M_wt:.4f}); '
+                     f'F_flex = {result.F_flex:.4f}; phi_T = {result.phi_T:.4f} '
+                     f'(wild type {self.phi_T_wt:.4f}, '
+                     f'g = {result.phi_T/self.phi_T_wt:.2f})')
+        k_7 = self._value(values, 'k_7')
+        k_8 = self._value(values, 'k_8')
+        lines.append(f'  burden factor d = {result.burden_factor:.4f} -> '
+                     f'k_7_eff = {result.k_7_eff:.4g} (sampled {k_7:.4g}), '
+                     f'k_8_eff = {result.k_8_eff:.4g} (sampled {k_8:.4g})')
+        if result.feasible:
+            lines.append(f'  status: FEASIBLE (Phi_M - F_flex = {result.violation:+.4f}; '
+                         'reallocation slack at undiminished growth '
+                         f'{result.F_flex - result.Phi_M - result.phi_T:+.4f})')
+        else:
+            lines.append(f'  status: INFEASIBLE (Phi_M exceeds F_flex by '
+                         f'{result.violation:.4f}; growth capacity zero -- such '
+                         'a trial is pruned before simulating)')
+        sd = self.sigma_diagnostic
+        lines.append('  sigma diagnostic (native anchors): '
+                     f'sigma_r3 = {sd["r3"]:.2f}, sigma_r6 = {sd["r6"]:.3f}, '
+                     f'geometric mean {sd["geomean"]:.2f} vs SIGMA_EFF = {SIGMA_EFF:g}')
+        return '\n'.join(lines)
+
+#%% nskinetics scenario presets (read by file path)
+
+#: Path of scenarios.py relative to the nskinetics package directory.
+_SCENARIOS_RELPATH = ('models', 's_cerevisiae_ferm_fb_inhib_mod_ibo',
+                      'scenarios.py')
+
+def scenarios_path():
+    """Absolute path of nskinetics' scenarios.py for the shipped
+    S. cerevisiae ethanol/isobutanol model, located via the package's
+    spec WITHOUT importing it (importlib.util.find_spec only resolves
+    the file) -- the kinetic_optimization.kinetic_parameter_roles_path
+    pattern."""
+    spec = importlib.util.find_spec('nskinetics')
+    if spec is None or not spec.origin:
+        raise ImportError('nskinetics is not installed (needed for the '
+                          'scenario-B Ehrlich constants).')
+    return os.path.join(os.path.dirname(spec.origin), *_SCENARIOS_RELPATH)
+
+def scenario_b_ehrlich(path=None):
+    """A copy of nskinetics' SCENARIO_B_EHRLICH ({'k_13': 5.81, 'k_14':
+    4.8, 'k_15': 4.8, 'k_16': 2.82, 'k_16r': 0.0125}) -- the Ehrlich
+    constants of scenario B, whose implied burden the driver reports (Q11).
+    The file is executed BY PATH (spec_from_file_location + exec_module):
+    it imports nothing, whereas importing it through the package pulls
+    tellurium/roadrunner/biosteam, which the offline tests and the
+    stdlib-only supervisor must never do. `path` overrides the located
+    file (tests)."""
+    spec = importlib.util.spec_from_file_location(
+        '_nskinetics_scenarios', scenarios_path() if path is None else path)
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return dict(module.SCENARIO_B_EHRLICH)

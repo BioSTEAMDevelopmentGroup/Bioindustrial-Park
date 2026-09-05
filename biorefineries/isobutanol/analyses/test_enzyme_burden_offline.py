@@ -225,4 +225,66 @@ bm1 = eb.BurdenModel.from_reference(K_REF, sigma_eff=1.0)
 assert close(bm1.evaluate({'k_13': 5.0}).pools['r13'], 0.5*partial.pools['r13'])
 PASS('missing keys -> reference, unknown keys ignored/passed through, construction guards')
 
+#%% 13. scenario_b_ehrlich: SCENARIO_B_EHRLICH read from nskinetics BY FILE PATH (no package import)
+path13 = eb.scenarios_path()
+assert path13.endswith(os.path.join('models', 's_cerevisiae_ferm_fb_inhib_mod_ibo',
+                                    'scenarios.py')) and os.path.isfile(path13), path13
+B = eb.scenario_b_ehrlich()
+assert B == {'k_13': 5.81, 'k_14': 4.8, 'k_15': 4.8, 'k_16': 2.82, 'k_16r': 0.0125}, B
+assert eb.scenario_b_ehrlich(path=path13) == B and eb.scenario_b_ehrlich() is not B
+# The no-heavy-import guarantee is probed in a FRESH interpreter that loads
+# enzyme_burden.py by file path (as the stdlib-only supervisor would): this
+# script imports it through the biorefineries.isobutanol package, whose
+# system.py imports nskinetics at module top, so sys.modules here proves
+# nothing.
+probe13 = (
+    "import importlib.util, sys\n"
+    f"spec = importlib.util.spec_from_file_location('eb_probe', {eb.__file__!r})\n"
+    "m = importlib.util.module_from_spec(spec); spec.loader.exec_module(m)\n"
+    "b = m.scenario_b_ehrlich()\n"
+    "heavy = sorted(k for k in sys.modules if k.split('.')[0] in\n"
+    "               ('nskinetics', 'tellurium', 'roadrunner', 'biosteam',\n"
+    "                'thermosteam'))\n"
+    "print(b['k_13'], heavy)\n")
+out13 = subprocess.run([sys.executable, '-c', probe13], capture_output=True, text=True)
+assert out13.returncode == 0, out13.stderr
+assert out13.stdout.strip() == '5.81 []', out13.stdout + out13.stderr
+PASS('scenario_b_ehrlich read by file path; enzyme_burden loads with no heavy import in a fresh interpreter')
+
+#%% 14. reports (spec 4.5 / Q11): the A reference is feasible, the B point is infeasible
+report_A = bm.describe_point(bm.reference, label='scenario-A reference')
+print(report_A)
+assert 'scenario-A reference' in report_A and 'status: FEASIBLE' in report_A
+assert 'INFEASIBLE' not in report_A
+assert 'sigma_r3 = 2.21' in report_A and 'sigma_r6 = 0.091' in report_A
+assert 'Phi_M = 0.0637' in report_A and 'F_flex = 0.2250' in report_A
+assert 'd = 1.0000' in report_A
+point_B = {**bm.reference, **B}
+res_B = bm.evaluate(point_B)
+ehrlich_B = sum(res_B.pools[s] for s in eb.EHRLICH_STEPS)
+assert close(ehrlich_B, pool_B) and close(ehrlich_B, 0.2169, rel=0.01)
+assert close(res_B.Phi_M, 0.2806, rel=0.01) and res_B.violation > 0.05
+assert not res_B.feasible and res_B.burden_factor == 0.0
+assert res_B.k_7_eff == 0.0 and res_B.k_8_eff == 0.0
+report_B = bm.describe_point(point_B, label='scenario-B Ehrlich constants')
+print(report_B)
+assert 'status: INFEASIBLE' in report_B and 'Phi_M = 0.2806' in report_B
+assert 'pruned' in report_B
+# k_16r is not a burden capacity: it is ignored (and passed through by apply)
+assert bm.apply(point_B)['k_16r'] == 0.0125
+# A B-start reference cannot build a burden model (Q11: reported, not repaired)
+try:
+    eb.BurdenModel.from_reference(point_B)
+except ValueError as e:
+    assert 'infeasible' in str(e) and '--no-burden' in str(e)
+else:
+    raise AssertionError('an infeasible reference did not raise')
+# a tenth of B is free, two-thirds is derated, three-quarters is pruned (spec 4.5)
+def frac_B(f):
+    return bm.evaluate({**bm.reference, **{k: f*v for k, v in B.items()}})
+assert frac_B(0.10).burden_factor == 1.0
+assert 0.1 < frac_B(0.65).burden_factor < 0.2
+assert not frac_B(0.75).feasible
+PASS('describe_point: A reference FEASIBLE, B point INFEASIBLE (Phi_M 0.281 > 0.225); B-start reference raises')
+
 print(f'\nALL {n_pass} CHECKS PASSED')
