@@ -38,7 +38,9 @@ import numpy as np
 __all__ = ('OBJECTIVE_REGISTRY', 'TRACKED_METRICS',
            'discover_kinetic_parameters', 'build_search_space',
            'parameter_distributions_workbook', 'workbook_kinetic_baselines',
-           'kinetic_param_names_from_scenario',
+           'kinetic_param_names_from_scenario', 'workbook_kinetic_bounds',
+           'DEFAULT_RATE_MULTIPLIER_BOUNDS',
+           'DEFAULT_SATURATION_MULTIPLIER_BOUNDS',
            'baseline_decision_point',
            'trajectory_columns', 'append_trajectory_row', 'load_trajectory',
            'inflight_path_for', 'write_inflight', 'clear_inflight',
@@ -63,6 +65,16 @@ LEGACY_FEEDING_VARIABLES = ('target_conc', 'threshold_delta', 'spike_conc')
 TARGET_CONC_MAX = 300.0
 SPIKE_CONC_MIN = 50.0
 SPIKE_CONC_MAX = 600.0
+
+#: Default log-scale multiplier bands (× the workbook baseline) of the
+#: named study presets (resolve_study_preset): rate constants k_* may go
+#: to an effective knock-out (floor 1e-5×, still log-uniform below and
+#: above baseline); saturation/inhibition constants K_* keep the 0.1×
+#: floor (a zero saturation constant has no engineering meaning). The
+#: legacy single band of build_search_space's multiplier_bounds default,
+#: (0.1, 10.0), is unchanged.
+DEFAULT_RATE_MULTIPLIER_BOUNDS = (1e-5, 10.0)
+DEFAULT_SATURATION_MULTIPLIER_BOUNDS = (0.1, 10.0)
 
 #%% Objective registry and tracked metrics
 # Getters are callables over a `handles` dict (see get_handles below):
@@ -151,6 +163,7 @@ def build_search_space(kinetic_baselines,
                        target_conc_bounds=None,
                        threshold_delta_bounds=None,
                        spike_conc_bounds=None,
+                       rate_multiplier_bounds=None,
                        ):
     """Build the decision-variable space: {name: {'low', 'high', 'log'}}
     (integer variables additionally carry 'int': True).
@@ -160,7 +173,17 @@ def build_search_space(kinetic_baselines,
     `param_bounds_override` ({name: (low, high)}) use those absolute
     bounds instead (log-scale only if low > 0). A parameter with a
     nonpositive baseline and no override cannot use the multiplier band
-    and is EXCLUDED with a printed warning. `exclude_params` names are
+    and is EXCLUDED with a printed warning.
+
+    `rate_multiplier_bounds` (None = use `multiplier_bounds` for every
+    name, the single-band behaviour of studies started before
+    2026-09-04) is a separate (m_lo, m_hi) band for the RATE constants --
+    names starting with lowercase 'k_' -- so the study presets can let a
+    rate reach an effective knock-out (DEFAULT_RATE_MULTIPLIER_BOUNDS)
+    while the saturation constants K_* keep `multiplier_bounds`. It
+    applies only where the band applies (after include/exclude/override).
+
+    `exclude_params` names are
     always excluded (silently). `include_params`
     (None = no restriction) is a WHITELIST: a kinetic parameter is placed
     in the space only if its name is in it, and every other kinetic
@@ -191,6 +214,8 @@ def build_search_space(kinetic_baselines,
     Returns (space, excluded_parameter_names)."""
     param_bounds_override = dict(param_bounds_override or {})
     m_lo, m_hi = multiplier_bounds
+    r_lo, r_hi = (multiplier_bounds if rate_multiplier_bounds is None
+                  else rate_multiplier_bounds)
     space, excluded = {}, []
     for name, baseline in kinetic_baselines.items():
         if include_params is not None and name not in include_params:
@@ -206,7 +231,8 @@ def build_search_space(kinetic_baselines,
                   'entry; excluding it from the search space.')
             excluded.append(name)
         else:
-            space[name] = dict(low=m_lo*baseline, high=m_hi*baseline,
+            lo_m, hi_m = (r_lo, r_hi) if name.startswith('k_') else (m_lo, m_hi)
+            space[name] = dict(low=lo_m*baseline, high=hi_m*baseline,
                                log=True)
     if (target_conc_bounds is not None or threshold_delta_bounds is not None
             or spike_conc_bounds is not None):
@@ -307,6 +333,30 @@ def kinetic_param_names_from_scenario(scenario):
     order (see workbook_kinetic_baselines) -- the include_params of a
     workbook-restricted search space."""
     return list(workbook_kinetic_baselines(scenario))
+
+def workbook_kinetic_bounds(scenario, multiplier_bounds=(0.1, 10.0),
+                            rate_multiplier_bounds=None):
+    """Absolute (low, high) bounds -- the multiplier band around the
+    scenario workbook's baseline -- for every positive-baseline kinetic
+    row of that workbook (workbook_kinetic_baselines), keyed by te name
+    and in workbook order. Same per-prefix rule as build_search_space:
+    names starting with lowercase 'k_' use `rate_multiplier_bounds` when
+    it is given, every other name (K_*) uses `multiplier_bounds`. A plain
+    file read (no simulation), so it can parameterize a run of a
+    DIFFERENT scenario: passed as param_bounds_override it gives the
+    IBO-pathway rates zeroed on the model under scenario A their
+    scenario-B search bands instead of degenerate zero-baseline
+    exclusion (the driver's start-at-A / set-from-B mode and every study
+    preset)."""
+    m_lo, m_hi = multiplier_bounds
+    r_lo, r_hi = (multiplier_bounds if rate_multiplier_bounds is None
+                  else rate_multiplier_bounds)
+    bounds = {}
+    for name, baseline in workbook_kinetic_baselines(scenario).items():
+        if baseline > 0.0:
+            lo_m, hi_m = (r_lo, r_hi) if name.startswith('k_') else (m_lo, m_hi)
+            bounds[name] = (lo_m*baseline, hi_m*baseline)
+    return bounds
 
 #%% Trajectory recording
 
@@ -834,6 +884,7 @@ def run_kinetic_optimization(objective='IRR',
                              param_bounds_override=None,
                              exclude_params=(),
                              include_params=None,
+                             rate_multiplier_bounds=None,
                              threshold_conc_bounds=(0.0, 300.0),
                              target_delta_bounds=(5.0, 500.0),
                              spike_delta_bounds=(0.5, 595.0),
@@ -879,6 +930,11 @@ def run_kinetic_optimization(objective='IRR',
     trajectory-CSV header guard raises rather than misaligning columns,
     so use a fresh study_name.
 
+    `rate_multiplier_bounds` (None = single band) is the separate k_*
+    band of build_search_space; the study presets pass
+    DEFAULT_RATE_MULTIPLIER_BOUNDS (their absolute bands actually arrive
+    via param_bounds_override, see workbook_kinetic_bounds).
+
     Returns (study, csv_path, kinetic_baselines)."""
     import optuna
     if handles is None:
@@ -913,6 +969,7 @@ def run_kinetic_optimization(objective='IRR',
         param_bounds_override=param_bounds_override,
         exclude_params=exclude_params,
         include_params=include_params,
+        rate_multiplier_bounds=rate_multiplier_bounds,
         threshold_conc_bounds=threshold_conc_bounds,
         target_delta_bounds=target_delta_bounds,
         spike_delta_bounds=spike_delta_bounds,

@@ -597,4 +597,54 @@ _, axes18b = ko.plot_pca_projection(synth11, 'maximize', log_columns=log_cols)
 assert 'lost (stalled/crashed)' not in axes18b[0].get_legend_handles_labels()[1]
 PASS('LOST rows: excluded by _completed, drawn as crosses in the PCA landscape, other plots unaffected')
 
+#%% 19. rate_multiplier_bounds: k_* band separate from the K_* band; None = legacy single band
+kb19 = {'k_1e': 47.1, 'K_1e': 0.12, 'k_7': 0.5, 'K_1i': 2.0, 'k_13': 0.0}
+assert ko.DEFAULT_RATE_MULTIPLIER_BOUNDS == (1e-5, 10.0)
+assert ko.DEFAULT_SATURATION_MULTIPLIER_BOUNDS == (0.1, 10.0)
+space19, excl19 = ko.build_search_space(
+    kb19, multiplier_bounds=ko.DEFAULT_SATURATION_MULTIPLIER_BOUNDS,
+    rate_multiplier_bounds=ko.DEFAULT_RATE_MULTIPLIER_BOUNDS)
+assert space19['k_1e'] == dict(low=1e-5*47.1, high=10.0*47.1, log=True)
+assert space19['k_7'] == dict(low=1e-5*0.5, high=10.0*0.5, log=True)
+assert space19['K_1e'] == dict(low=0.1*0.12, high=10.0*0.12, log=True)   # uppercase: saturation band
+assert space19['K_1i'] == dict(low=0.1*2.0, high=10.0*2.0, log=True)
+assert excl19 == ['k_13']                       # zero baseline still excluded
+# Precedence unchanged: override beats the band, whitelist beats everything.
+space19b, _ = ko.build_search_space(
+    kb19, rate_multiplier_bounds=(1e-5, 10.0),
+    param_bounds_override={'k_1e': (1.0, 2.0)}, include_params=['k_1e', 'K_1e'])
+assert space19b['k_1e'] == dict(low=1.0, high=2.0, log=True)
+assert set(space19b) == {'k_1e', 'K_1e', *ko.FEEDING_VARIABLES}
+# rate_multiplier_bounds=None reproduces the previous single-band space EXACTLY.
+space19c, excl19c = ko.build_search_space(kb19)
+expected19c = {
+    'k_1e': dict(low=0.1*47.1, high=10.0*47.1, log=True),
+    'K_1e': dict(low=0.1*0.12, high=10.0*0.12, log=True),
+    'k_7': dict(low=0.1*0.5, high=10.0*0.5, log=True),
+    'K_1i': dict(low=0.1*2.0, high=10.0*2.0, log=True),
+    'threshold_conc': dict(low=0.0, high=300.0, log=False),
+    'target_delta': dict(low=5.0, high=500.0, log=False),
+    'spike_delta': dict(low=0.5, high=595.0, log=False),
+    'max_n_spikes': dict(low=0, high=50, log=False, int=True)}
+assert space19c == expected19c and excl19c == ['k_13']
+assert ko.build_search_space(kb19, rate_multiplier_bounds=None)[0] == expected19c
+# Engine kwarg plumbed (default None).
+_sig19 = _inspect.signature(ko.run_kinetic_optimization).parameters
+assert 'rate_multiplier_bounds' in _sig19 and _sig19['rate_multiplier_bounds'].default is None
+# workbook_kinetic_bounds: absolute per-prefix bands around the workbook baselines.
+if os.path.isfile(wb_A) and os.path.isfile(wb_B):
+    wbb19 = ko.workbook_kinetic_bounds('B', multiplier_bounds=(0.1, 10.0),
+                                       rate_multiplier_bounds=(1e-5, 10.0))
+    base19 = ko.workbook_kinetic_baselines('B')
+    assert list(wbb19) == list(base19)                    # workbook order, every row (all > 0)
+    for n19, b19 in base19.items():
+        lo19, hi19 = wbb19[n19]
+        assert hi19 == 10.0*b19
+        assert lo19 == (1e-5*b19 if n19.startswith('k_') else 0.1*b19), n19
+    wbb19_legacy = ko.workbook_kinetic_bounds('B')
+    assert all(wbb19_legacy[n] == (0.1*b, 10.0*b) for n, b in base19.items())
+else:
+    print('SKIP 19b: parameter-distribution workbooks not found')
+PASS('rate_multiplier_bounds: per-prefix bands, precedence, None = legacy space; workbook_kinetic_bounds')
+
 print(f'\nALL {n_pass} CHECKS PASSED')
