@@ -15,6 +15,16 @@ spike_delta -- feasible-by-construction threshold < target < spike --
 and the integer max_n_spikes cap), against a named or custom objective --
 to prioritize metabolic-engineering / bioprocess research directions.
 
+Named study presets (resolve_study_preset) pick the search set and bands
+on two axes: study_target_products ('ethanol_only' = scenario-A workbook
+rows; 'ethanol_isobutanol' = scenario-B rows, i.e. plus the Ehrlich block
+and the isobutanol-inhibition coefficients; both start at the A baseline)
+and study_type ('metabolic' = capacity, product-inhibition, lethality and
+substrate-regulation roles; 'metabolic_protein' = plus affinity and
+product self-inhibition), with k_* on [1e-5x, 10x] and K_* on [0.1x, 10x]
+log bands. Roles come from nskinetics' parameter_categories table, read
+by file path.
+
 Import is free of side effects and does not require optuna (imported lazily
 inside run_kinetic_optimization); the pure logic here is exercised by
 analyses/test_kinetic_optimization_offline.py without a biorefinery load.
@@ -43,6 +53,9 @@ __all__ = ('OBJECTIVE_REGISTRY', 'TRACKED_METRICS',
            'DEFAULT_RATE_MULTIPLIER_BOUNDS',
            'DEFAULT_SATURATION_MULTIPLIER_BOUNDS',
            'kinetic_parameter_roles_path', 'kinetic_parameter_roles',
+           'STUDY_TARGET_PRODUCTS', 'STUDY_TYPE_ROLES',
+           'DEFAULT_STUDY_TARGET_PRODUCTS', 'DEFAULT_STUDY_TYPE',
+           'resolve_study_preset', 'default_study_name',
            'baseline_decision_point',
            'trajectory_columns', 'append_trajectory_row', 'load_trajectory',
            'inflight_path_for', 'write_inflight', 'clear_inflight',
@@ -404,6 +417,91 @@ def kinetic_parameter_roles(path=None):
     if path is None:
         _kinetic_parameter_roles_cache = roles
     return roles
+
+#%% Study presets
+
+#: `study_target_products` axis: which products the strain is engineered
+#: for. Both presets START at the scenario-A baseline (the current
+#: ethanol strain); the parameter SET comes from the named workbook
+#: (A: native pathways only -- no Ehrlich block, no isobutanol-inhibition
+#: coefficients; B: plus both). Exclusions (k_6r, k_16r, K_2, K_9, P_10*,
+#: docs/reports/kinetic-parameter-exclusions.md) are inherited from the
+#: workbooks and never re-enter.
+STUDY_TARGET_PRODUCTS = {
+    'ethanol_only': {'scenario': 'A', 'parameter_set_scenario': 'A'},
+    'ethanol_isobutanol': {'scenario': 'A', 'parameter_set_scenario': 'B'},
+}
+
+#: `study_type` axis: which kinetic-parameter ROLES (nskinetics
+#: parameter_categories) are decision variables. 'metabolic' = expression
+#: and tolerance engineering: enzyme abundance (capacities incl. the
+#: growth rate), whole-cell product tolerance (exponential inhibition and
+#: lethality coefficients) and regulatory wiring (glucose/acetaldehyde
+#: repression constants K_1i, K_2i, K_5i, K_9i) -- no change to any
+#: enzyme's intrinsic kinetics. 'metabolic_protein' additionally allows
+#: enzyme redesign: substrate affinities and competitive product
+#: self-inhibition constants. Membership is by ROLE, not name prefix.
+STUDY_TYPE_ROLES = {
+    'metabolic': ('capacity', 'product_inhibition', 'lethality',
+                  'substrate_regulation'),
+    'metabolic_protein': ('capacity', 'product_inhibition', 'lethality',
+                          'substrate_regulation', 'affinity',
+                          'product_self_inhibition'),
+}
+
+DEFAULT_STUDY_TARGET_PRODUCTS = 'ethanol_isobutanol'
+DEFAULT_STUDY_TYPE = 'metabolic_protein'
+
+def resolve_study_preset(study_target_products, study_type, roles=None):
+    """The driver run() kwargs of a named study preset (sim-free):
+    dict(scenario='A', kinetic_bounds_scenario=<A|B>,
+    include_params=[workbook rows of that scenario whose role is in
+    STUDY_TYPE_ROLES[study_type], in workbook order],
+    multiplier_bounds=DEFAULT_SATURATION_MULTIPLIER_BOUNDS,
+    rate_multiplier_bounds=DEFAULT_RATE_MULTIPLIER_BOUNDS).
+    Set sizes: ethanol_only 29 (metabolic) / 40 (metabolic_protein);
+    ethanol_isobutanol 40 / 56. `roles` (default
+    kinetic_parameter_roles()) is the {name: role} table; a workbook row
+    absent from it raises KeyError(name) so a future workbook/model change
+    can never leak a parameter into a set silently. Unknown axis values
+    raise ValueError."""
+    if study_target_products not in STUDY_TARGET_PRODUCTS:
+        raise ValueError(
+            f'Unknown study_target_products {study_target_products!r}; '
+            f'expected one of {sorted(STUDY_TARGET_PRODUCTS)}.')
+    if study_type not in STUDY_TYPE_ROLES:
+        raise ValueError(f'Unknown study_type {study_type!r}; expected one '
+                         f'of {sorted(STUDY_TYPE_ROLES)}.')
+    target = STUDY_TARGET_PRODUCTS[study_target_products]
+    allowed_roles = set(STUDY_TYPE_ROLES[study_type])
+    if roles is None:
+        roles = kinetic_parameter_roles()
+    set_scenario = target['parameter_set_scenario']
+    include_params = []
+    for name in workbook_kinetic_baselines(set_scenario):
+        if name not in roles:
+            raise KeyError(
+                f'{name!r} (scenario-{set_scenario} workbook row) has no '
+                'entry in the nskinetics kinetic-parameter role table; '
+                'refusing to build the study preset.')
+        if roles[name] in allowed_roles:
+            include_params.append(name)
+    return dict(scenario=target['scenario'],
+                kinetic_bounds_scenario=set_scenario,
+                include_params=include_params,
+                multiplier_bounds=DEFAULT_SATURATION_MULTIPLIER_BOUNDS,
+                rate_multiplier_bounds=DEFAULT_RATE_MULTIPLIER_BOUNDS)
+
+def default_study_name(objective, study_target_products, study_type):
+    """Stable study name of a preset study:
+    kin_opt_{study_target_products}_{study_type}_{objective slug}
+    (slug = lower-cased, spaces -> '_'), e.g.
+    kin_opt_ethanol_isobutanol_metabolic_protein_irr. New names, so a
+    preset study can never collide with the CSV/SQLite of a legacy
+    kin_opt_{scenario}[_kb{X}]_{slug} study. The driver and the supervisor
+    both derive it from here."""
+    slug = objective.lower().replace(' ', '_')
+    return f'kin_opt_{study_target_products}_{study_type}_{slug}'
 
 #%% Trajectory recording
 

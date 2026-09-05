@@ -685,4 +685,102 @@ assert ko.kinetic_parameter_roles(path=roles_path20) == roles20   # explicit pat
 assert ko.kinetic_parameter_roles(path=roles_path20) is not roles20
 PASS('kinetic_parameter_roles: role table loaded by file path, no heavy import in a fresh interpreter, counts pinned, cached')
 
+#%% 21. resolve_study_preset: set sizes by (target products x study type), roles, errors
+assert ko.DEFAULT_STUDY_TARGET_PRODUCTS == 'ethanol_isobutanol'
+assert ko.DEFAULT_STUDY_TYPE == 'metabolic_protein'
+assert set(ko.STUDY_TARGET_PRODUCTS) == {'ethanol_only', 'ethanol_isobutanol'}
+assert set(ko.STUDY_TYPE_ROLES) == {'metabolic', 'metabolic_protein'}
+assert set(ko.STUDY_TYPE_ROLES['metabolic']) == {
+    'capacity', 'product_inhibition', 'lethality', 'substrate_regulation'}
+assert set(ko.STUDY_TYPE_ROLES['metabolic_protein']) == (
+    set(ko.STUDY_TYPE_ROLES['metabolic']) | {'affinity', 'product_self_inhibition'})
+assert ko.default_study_name('IRR', 'ethanol_isobutanol', 'metabolic_protein') \
+    == 'kin_opt_ethanol_isobutanol_metabolic_protein_irr'
+assert ko.default_study_name('IBO titer', 'ethanol_only', 'metabolic') \
+    == 'kin_opt_ethanol_only_metabolic_ibo_titer'
+for bad21 in (('ethanol', 'metabolic'), ('ethanol_only', 'protein')):
+    try:
+        ko.resolve_study_preset(*bad21)
+    except ValueError as e21:
+        assert 'ethanol_only' in str(e21) or 'metabolic_protein' in str(e21)
+    else:
+        raise AssertionError(f'unknown preset {bad21} did not raise ValueError')
+if os.path.isfile(wb_A) and os.path.isfile(wb_B):
+    expected21 = {('ethanol_only', 'metabolic'): 29,
+                  ('ethanol_only', 'metabolic_protein'): 40,
+                  ('ethanol_isobutanol', 'metabolic'): 40,
+                  ('ethanol_isobutanol', 'metabolic_protein'): 56}
+    roles21 = ko.kinetic_parameter_roles()
+    for (stp21, st21), n21 in expected21.items():
+        p21 = ko.resolve_study_preset(stp21, st21)
+        assert set(p21) == {'scenario', 'kinetic_bounds_scenario', 'include_params',
+                            'multiplier_bounds', 'rate_multiplier_bounds'}
+        assert p21['scenario'] == 'A'                       # both start at the A baseline
+        assert p21['kinetic_bounds_scenario'] == ('A' if stp21 == 'ethanol_only' else 'B')
+        assert p21['multiplier_bounds'] == (0.1, 10.0)
+        assert p21['rate_multiplier_bounds'] == (1e-5, 10.0)
+        inc21 = p21['include_params']
+        assert len(inc21) == n21, (stp21, st21, len(inc21))
+        wb21 = ko.kinetic_param_names_from_scenario(p21['kinetic_bounds_scenario'])
+        assert inc21 == [n for n in wb21 if n in inc21]     # workbook order, no extras
+        assert all(roles21[n] in ko.STUDY_TYPE_ROLES[st21] for n in inc21)
+        if st21 == 'metabolic':
+            assert [n for n in inc21 if n.startswith('K_')] == ['K_1i', 'K_2i', 'K_5i', 'K_9i']
+            assert all(n.startswith('k_') or n.startswith('K_') for n in inc21)
+        else:
+            assert inc21 == wb21                            # every workbook row
+    p21_eo = ko.resolve_study_preset('ethanol_only', 'metabolic_protein')['include_params']
+    for ibo21 in ('k_13', 'K_16i', 'k_1ii', 'k_7ii', 'k_10ii', 'k_16ie'):
+        assert ibo21 not in p21_eo, ibo21
+    # A workbook row missing from the role table must raise, not leak.
+    roles_missing21 = dict(roles21); del roles_missing21['k_7']
+    try:
+        ko.resolve_study_preset('ethanol_only', 'metabolic', roles=roles_missing21)
+    except KeyError as e21:
+        assert 'k_7' in str(e21)
+    else:
+        raise AssertionError('missing role-table entry did not raise KeyError')
+    PASS('resolve_study_preset: 29/40/40/56 sets, role filter, A start, workbook order, errors')
+else:
+    print('SKIP 21: parameter-distribution workbooks not found')
+
+#%% 22. trial 0 of (ethanol_isobutanol, metabolic_protein): A baseline clipped into the preset bands
+if os.path.isfile(wb_A) and os.path.isfile(wb_B):
+    p22 = ko.resolve_study_preset('ethanol_isobutanol', 'metabolic_protein')
+    base22_A = ko.workbook_kinetic_baselines('A')
+    base22_B = ko.workbook_kinetic_baselines('B')
+    # What discover_kinetic_parameters returns on the model under A's
+    # distributions: A's baselines, and 0 for the Ehrlich capacities that
+    # A leaves switched off (the other B-only rows keep the model's value,
+    # which equals B's baseline).
+    ehrlich22 = ('k_13', 'k_14', 'k_15', 'k_16')
+    model22 = {n: (0.0 if n in ehrlich22 else base22_A.get(n, base22_B[n]))
+               for n in base22_B}
+    override22 = ko.workbook_kinetic_bounds(
+        p22['kinetic_bounds_scenario'],
+        multiplier_bounds=p22['multiplier_bounds'],
+        rate_multiplier_bounds=p22['rate_multiplier_bounds'])
+    space22, excl22 = ko.build_search_space(
+        model22, multiplier_bounds=p22['multiplier_bounds'],
+        rate_multiplier_bounds=p22['rate_multiplier_bounds'],
+        param_bounds_override=override22, include_params=p22['include_params'])
+    assert excl22 == [] and len(space22) == 56 + 4
+    assert all(space22[n]['log'] for n in base22_B)
+    for n22, b22 in base22_B.items():
+        assert space22[n22]['high'] == 10.0*b22
+        assert space22[n22]['low'] == (1e-5*b22 if n22.startswith('k_') else 0.1*b22)
+    pt22 = ko.baseline_decision_point(
+        space22, model22,
+        dict(target_conc=221.25, threshold_conc=217.125, spike_conc=600.0),
+        baseline_max_n_spikes=16)
+    for n22 in ehrlich22:
+        assert pt22[n22] == 1e-5*base22_B[n22], n22       # clipped to the floor, exactly
+    for n22, v22 in model22.items():
+        if n22 not in ehrlich22:
+            assert pt22[n22] == v22, n22                  # nonzero baselines untouched
+    assert pt22['threshold_conc'] == 217.125 and pt22['max_n_spikes'] == 16
+    PASS('preset trial 0: Ehrlich rates clipped to exactly 1e-5 x b_B, every other baseline unchanged')
+else:
+    print('SKIP 22: parameter-distribution workbooks not found')
+
 print(f'\nALL {n_pass} CHECKS PASSED')
