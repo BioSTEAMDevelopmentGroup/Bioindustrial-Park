@@ -40,9 +40,16 @@ __init__ pulls biosteam -> eager numba compilation, which corrupts the
 shared numba cache when concurrent with the child's own load()).
 
 Long-running, one simulation at a time (children run strictly
-sequentially) -- ask-first, like the unsupervised driver. Example:
+sequentially) -- ask-first, like the unsupervised driver. Examples:
 
-    python optimize_kinetics_BO_supervised.py --scenario A \\
+    # default preset (ethanol_isobutanol x metabolic_protein; start at A,
+    # B workbook's 56 rows, k_* 1e-5x-10x, K_* 0.1x-10x):
+    python optimize_kinetics_BO_supervised.py --objective IRR --n-trials 2000
+    # ethanol-only strain, expression/tolerance engineering only (29):
+    python optimize_kinetics_BO_supervised.py --study-target-products \\
+        ethanol_only --study-type metabolic
+    # resume a pre-2026-09-04 study under its old flags and name:
+    python optimize_kinetics_BO_supervised.py --legacy-flags --scenario A \\
         --kinetic-bounds-scenario B --objective IRR --n-trials 2000
 """
 import argparse
@@ -63,9 +70,18 @@ ko = importlib.util.module_from_spec(_spec)
 _spec.loader.exec_module(ko)
 
 
-def default_study_name(scenario, objective, kinetic_bounds_scenario):
+def default_study_name(scenario, objective, kinetic_bounds_scenario,
+                       study_target_products=None, study_type=None):
     """Mirror the driver's stable study naming (resume finds the same
-    study)."""
+    study): the preset convention
+    kin_opt_{study_target_products}_{study_type}_{slug} whenever a
+    target-products preset is in force (the scenario flags do not enter
+    the name), else the legacy kin_opt_{scenario}[_kb{X}]_{slug} with the
+    driver's legacy default scenario 'B'."""
+    if study_target_products is not None:
+        return ko.default_study_name(objective, study_target_products,
+                                     study_type)
+    scenario = scenario or 'B'
     slug = objective.lower().replace(' ', '_')
     if kinetic_bounds_scenario:
         return f'kin_opt_{scenario}_kb{kinetic_bounds_scenario}_{slug}'
@@ -92,8 +108,9 @@ def lost_cause(killed_for_stall, stall_timeout_min, returncode):
 
 def child_code(scenario, objective, n_trials, kinetic_bounds_scenario,
                make_plots, study_name, restrict_to_workbook=True,
-               seed=3221):
-    """The -c program for one supervised attempt of the driver."""
+               seed=3221, study_target_products=None, study_type=None):
+    """The -c program for one supervised attempt of the driver.
+    `study_target_products=None` selects the driver's legacy flag path."""
     return (
         'import runpy\n'
         f'ns = runpy.run_path({DRIVER!r})\n'
@@ -103,22 +120,32 @@ def child_code(scenario, objective, n_trials, kinetic_bounds_scenario,
         f'          kinetic_bounds_scenario={kinetic_bounds_scenario!r},\n'
         f'          make_plots={make_plots!r},\n'
         f'          study_name={study_name!r},\n'
-        f'          restrict_to_workbook={restrict_to_workbook!r})\n')
+        f'          restrict_to_workbook={restrict_to_workbook!r},\n'
+        f'          study_target_products={study_target_products!r},\n'
+        f'          study_type={study_type!r})\n')
 
 
-def supervise(scenario='B', objective='IRR', n_trials=2000,
+def supervise(scenario=None, objective='IRR', n_trials=2000,
               kinetic_bounds_scenario=None, make_plots=True,
               study_name=None, stall_timeout_min=25.0, poll_s=30.0,
               settle_s=10.0, python=None, log_path=None,
-              restrict_to_workbook=True, seed=3221):
+              restrict_to_workbook=True, seed=3221,
+              study_target_products=ko.DEFAULT_STUDY_TARGET_PRODUCTS,
+              study_type=ko.DEFAULT_STUDY_TYPE):
     """Run attempts until 'complete' or 'abort'; returns the final
-    outcome string ('complete' or 'abort'). `restrict_to_workbook`
-    (default True) is forwarded to the driver's run(); pass False to
-    reproduce the pre-2026-09-03 all-model-k_* search set (e.g. for
-    resuming an older study)."""
+    outcome string ('complete' or 'abort'). `study_target_products` /
+    `study_type` name the driver's study preset (defaults = the engine's;
+    `scenario` / `kinetic_bounds_scenario` left None = the preset's, an
+    explicit value overrides it); study_target_products=None is the
+    legacy flag path (--legacy-flags), required to resume studies
+    started before 2026-09-04. `restrict_to_workbook` (default True) is
+    forwarded to the driver's run(); pass False (legacy path only) to
+    reproduce the pre-2026-09-03 all-model-k_* search set."""
     if study_name is None:
         study_name = default_study_name(scenario, objective,
-                                        kinetic_bounds_scenario)
+                                        kinetic_bounds_scenario,
+                                        study_target_products=study_target_products,
+                                        study_type=study_type)
     csv_path = os.path.join(RESULTS_DIR, study_name + '_trajectory.csv')
     inflight_path = ko.inflight_path_for(RESULTS_DIR, study_name)
     if python is None:
@@ -128,7 +155,9 @@ def supervise(scenario='B', objective='IRR', n_trials=2000,
         log_path = os.path.join(RESULTS_DIR, study_name + '_run.log')
     code = child_code(scenario, objective, n_trials,
                       kinetic_bounds_scenario, make_plots, study_name,
-                      restrict_to_workbook=restrict_to_workbook, seed=seed)
+                      restrict_to_workbook=restrict_to_workbook, seed=seed,
+                      study_target_products=study_target_products,
+                      study_type=study_type)
     guard = ko.StallGuard(stall_timeout_s=60.0*stall_timeout_min)
 
     def event(msg):
@@ -203,7 +232,30 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser(
         description='Supervised (crash- and stall-resilient) kinetic BO '
                     'run; see module docstring.')
-    parser.add_argument('--scenario', default='B', choices=('A', 'B'))
+    parser.add_argument('--scenario', default=None, choices=('A', 'B'),
+                        help="starting scenario; default = the preset's "
+                             "('A'), or 'B' under --legacy-flags")
+    parser.add_argument('--study-target-products', default='ethanol_isobutanol',
+                        choices=('ethanol_only', 'ethanol_isobutanol'),
+                        help='study preset axis 1: the parameter SET '
+                             '(ethanol_only = scenario-A workbook rows; '
+                             'ethanol_isobutanol = scenario-B rows, i.e. plus '
+                             'the Ehrlich block and isobutanol-inhibition '
+                             'coefficients); both start at the A baseline')
+    parser.add_argument('--study-type', default='metabolic_protein',
+                        choices=('metabolic', 'metabolic_protein'),
+                        help='study preset axis 2: metabolic = capacity, '
+                             'product-inhibition, lethality and '
+                             'substrate-regulation roles (all k_* + K_1i, '
+                             'K_2i, K_5i, K_9i); metabolic_protein = every '
+                             'workbook row (plus affinity and product '
+                             'self-inhibition)')
+    parser.add_argument('--legacy-flags', action='store_true',
+                        help='ignore the presets: --scenario (default B) / '
+                             '--kinetic-bounds-scenario / single 0.1x-10x '
+                             'band and the kin_opt_{scenario}[_kb{X}]_{slug} '
+                             'name, exactly as before 2026-09-04 -- required '
+                             'to resume older studies')
     parser.add_argument('--objective', default='IRR',
                         help='name in OBJECTIVE_REGISTRY (callables: use '
                              'the unsupervised driver)')
@@ -240,5 +292,8 @@ if __name__ == '__main__':
                         stall_timeout_min=args.stall_timeout_min,
                         poll_s=args.poll_s, settle_s=args.settle_s,
                         restrict_to_workbook=args.restrict_to_workbook,
-                        seed=args.seed)
+                        seed=args.seed,
+                        study_target_products=(None if args.legacy_flags
+                                               else args.study_target_products),
+                        study_type=args.study_type)
     sys.exit(0 if outcome == 'complete' else 1)

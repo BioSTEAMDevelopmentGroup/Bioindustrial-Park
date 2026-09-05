@@ -287,6 +287,7 @@ sup = _runpy.run_path(os.path.join(
 assert sup['default_study_name']('A', 'IRR', 'B') == 'kin_opt_A_kbB_irr'
 assert sup['default_study_name']('B', 'IRR', None) == 'kin_opt_B_irr'
 assert sup['default_study_name']('B', 'IBO titer', None) == 'kin_opt_B_ibo_titer'
+assert sup['default_study_name'](None, 'IRR', None) == 'kin_opt_B_irr'   # legacy default scenario
 assert sup['row_count'](os.path.join(outdir, 'nonexistent.csv')) == 0
 assert sup['row_count'](csv_path) == 3           # check-5/8 trajectory
 code12 = sup['child_code']('A', 'IRR', 2000, 'B', False, 'kin_opt_A_kbB_irr')
@@ -782,5 +783,79 @@ if os.path.isfile(wb_A) and os.path.isfile(wb_B):
     PASS('preset trial 0: Ehrlich rates clipped to exactly 1e-5 x b_B, every other baseline unchanged')
 else:
     print('SKIP 22: parameter-distribution workbooks not found')
+
+#%% 23. supervisor: preset flags forwarded to the driver; naming mirrors the engine; legacy switch
+sup23 = _runpy.run_path(os.path.join(
+    os.path.dirname(os.path.abspath(__file__)),
+    'optimize_kinetics_BO_supervised.py'))
+# Naming: preset convention when a target-products preset is in force,
+# the legacy convention otherwise (what --legacy-flags selects).
+assert sup23['default_study_name'](None, 'IRR', None,
+                                   study_target_products='ethanol_isobutanol',
+                                   study_type='metabolic_protein') \
+    == 'kin_opt_ethanol_isobutanol_metabolic_protein_irr'
+assert sup23['default_study_name']('A', 'IBO titer', 'B',
+                                   study_target_products='ethanol_only',
+                                   study_type='metabolic') \
+    == 'kin_opt_ethanol_only_metabolic_ibo_titer'          # preset name ignores scenario flags
+assert sup23['default_study_name']('A', 'IRR', 'B', study_target_products=None,
+                                   study_type='metabolic') == 'kin_opt_A_kbB_irr'
+# child_code forwards both kwargs (and None under --legacy-flags).
+code23 = sup23['child_code'](None, 'IRR', 2000, None, False, 'x',
+                             study_target_products='ethanol_only',
+                             study_type='metabolic')
+assert "study_target_products='ethanol_only'" in code23
+assert "study_type='metabolic'" in code23 and 'scenario=None' in code23
+code23_legacy = sup23['child_code']('A', 'IRR', 2000, 'B', False, 'kin_opt_A_kbB_irr',
+                                    study_target_products=None, study_type='metabolic_protein')
+assert 'study_target_products=None' in code23_legacy and "scenario='A'" in code23_legacy
+# Defaults: supervise() and child_code() agree with the engine's constants;
+# the supervisor's scenario default is None (a preset picks it).
+_p23 = _inspect.signature(sup23['supervise']).parameters
+assert _p23['study_target_products'].default == ko.DEFAULT_STUDY_TARGET_PRODUCTS
+assert _p23['study_type'].default == ko.DEFAULT_STUDY_TYPE
+assert _p23['scenario'].default is None
+_c23 = _inspect.signature(sup23['child_code']).parameters
+assert 'study_target_products' in _c23 and 'study_type' in _c23
+# The argparse choices are literal strings mirroring the engine's tables
+# (the supervisor never imports biorefineries/optuna).
+src23 = open(os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                          'optimize_kinetics_BO_supervised.py')).read()
+assert '--study-target-products' in src23 and '--study-type' in src23
+assert '--legacy-flags' in src23
+assert "'ethanol_only', 'ethanol_isobutanol'" in src23
+assert "'metabolic', 'metabolic_protein'" in src23
+assert 'import biorefineries' not in src23 and 'import optuna' not in src23
+# supervise() derives the SAME csv path the child will write: the preset
+# name, from the study_name computed before any child launches.
+assert 'default_study_name(scenario, objective,' in _inspect.getsource(sup23['supervise'])
+assert 'study_target_products=study_target_products' in _inspect.getsource(sup23['supervise'])
+# The engine kwarg the driver forwards is accepted by the real engine with
+# fake handles: the k_* band reaches optuna's distributions (optuna only).
+if _optuna is not None:
+    outdir23 = tempfile.mkdtemp()
+    st23 = {'irr': 0.2}
+    def _model_specification23(**kw):
+        pass
+    def _solve_TEA23(stream_IDs=None):
+        return {'IRR': st23['irr'], 'MPSPs': {'ethanol': 0.5, 'isobutanol': 1.0}}
+    handles23 = dict(handles17, model_specification=_model_specification23,
+                     solve_TEA=_solve_TEA23,
+                     latest_TEA_solution={'IRR': np.nan,
+                                          'MPSPs': {'ethanol': np.nan,
+                                                    'isobutanol': np.nan}})
+    study23, _, _ = ko.run_kinetic_optimization(
+        objective='IRR', scenario_label='X', n_trials=1, seed=1,
+        study_name='offline_rate_band', results_dir=outdir23, handles=handles23,
+        rate_multiplier_bounds=(1e-5, 10.0), print_status_every=1)
+    d23 = study23.trials[0].distributions
+    assert np.isclose(d23['k_1e'].low, 1e-5*47.1) and np.isclose(d23['k_1e'].high, 10.0*47.1)
+    assert np.isclose(d23['K_1e'].low, 0.1*0.12) and np.isclose(d23['K_1e'].high, 10.0*0.12)
+    assert d23['k_1e'].log and d23['K_1e'].log
+    # trial 0 = the baseline (in-bounds, so unclipped)
+    assert np.isclose(study23.trials[0].params['k_1e'], 47.1)
+else:
+    print('SKIP 23b: optuna not installed')
+PASS('supervisor: preset flags/defaults forwarded, naming mirrors the engine, legacy switch; k_* band reaches optuna')
 
 print(f'\nALL {n_pass} CHECKS PASSED')
