@@ -98,4 +98,131 @@ assert 0.25 <= sig['geomean'] <= 1.0                      # within 2x of SIGMA_E
 assert close(sig['geomean'], 0.45, rel=0.02)
 PASS('sigma diagnostic: sigma_r3 2.2, sigma_r6 0.091, geometric mean 0.45 in [0.25, 1.0]')
 
+#%% 4. inert at the reference (spec 4.5): d = 1, Phi_M = Phi_M,wt, apply is the identity on k_7/k_8
+bm = eb.BurdenModel.from_reference(K_REF)
+assert isinstance(bm, eb.BurdenModel) and bm.sigma_eff == eb.SIGMA_EFF
+assert bm.required_capacities() == ('k_1h', 'k_1l', 'k_1e', 'k_2', 'k_3',
+                                    'k_5', 'k_5e', 'k_6',
+                                    'k_13', 'k_14', 'k_15', 'k_16',
+                                    'k_7', 'k_8')
+assert 'k_4' not in bm.reference and bm.reference['k_7'] == 1.203
+assert close(bm.Phi_M_wt, phi_M_wt) and bm.F_flex == eb.F_FLEX and bm.phi_T_wt == eb.PHI_T_WT
+ref = bm.evaluate(K_REF)
+assert isinstance(ref, eb.BurdenResult)
+assert ref.burden_factor == 1.0 and ref.feasible
+assert close(ref.Phi_M, phi_M_wt) and close(ref.phi_T, eb.PHI_T_WT) and ref.F_flex == eb.F_FLEX
+assert ref.k_7_eff == 1.203 and ref.k_8_eff == 0.589          # exact: d == 1.0
+assert close(ref.violation, phi_M_wt - eb.F_FLEX)
+assert all(close(ref.pools[s], eb.NATIVE_STEPS[s][0]) for s in eb.NATIVE_STEPS)
+assert all(ref.pools[s] == 0.0 for s in eb.EHRLICH_STEPS)     # A: Ehrlich off
+assert bm.reference_result.burden_factor == 1.0
+applied = bm.apply(K_REF)
+assert applied == K_REF and applied is not K_REF               # identity, a copy
+rec = ref.as_record()
+assert tuple(rec) == eb.BURDEN_COLUMNS
+assert rec['pool_r1'] == ref.pools['r1'] and rec['burden_factor'] == 1.0
+assert rec['k_7_eff'] == 1.203 and rec['F_flex'] == eb.F_FLEX
+assert bm.sigma_diagnostic == eb.anchor_sigma(K_REF)
+PASS('inert at the reference: d = 1, pools = wild type, apply identity, record keyed by BURDEN_COLUMNS')
+
+#%% 5. Phi_M is monotone non-decreasing in every capacity; k_7/k_8 do not enter Phi_M
+base = bm.evaluate(K_REF).Phi_M
+for name in bm.required_capacities():
+    if name in eb.GROWTH_CAPACITIES:
+        continue
+    up = {**K_REF, name: 2.0*K_REF[name] if K_REF[name] > 0.0 else 1.0}
+    down = {**K_REF, name: 0.5*K_REF[name]}
+    assert bm.evaluate(up).Phi_M > base + 1e-12, name
+    assert bm.evaluate(down).Phi_M <= base + 1e-15, name
+assert bm.evaluate({**K_REF, 'k_7': 12.03, 'k_8': 5.89}).Phi_M == base
+PASS('Phi_M monotone in every native and Ehrlich capacity; growth capacities do not enter it')
+
+#%% 6. max-multiplier rule for the multi-capacity steps r1 and r5 (Q9)
+r1 = bm.evaluate({**K_REF, 'k_1h': 3.0*0.584, 'k_1l': 2.0*1.43}).pools['r1']
+assert close(r1, 3.0*0.044)                                   # sized by the most-raised term
+assert close(bm.evaluate({**K_REF, 'k_1h': 0.1*0.584}).pools['r1'], 0.044)   # one term down: block unchanged
+assert close(bm.evaluate({**K_REF, 'k_1h': 0.1*0.584, 'k_1l': 0.1*1.43,
+                          'k_1e': 0.1*47.1}).pools['r1'], 0.1*0.044)          # all down: block shrinks
+assert close(bm.evaluate({**K_REF, 'k_5e': 5.0*0.775}).pools['r5'], 5.0*0.0008)
+assert close(bm.evaluate({**K_REF, 'k_5': 5.0*0.0104}).pools['r5'], 5.0*0.0008)
+PASS('max-multiplier rule: r1 and r5 sized by their most-raised capacity')
+
+#%% 7. r4 is fixed (Q10): 10x k_4 costs nothing
+r4 = bm.evaluate({**K_REF, 'k_4': 48.0})
+assert r4.pools['r4'] == 0.0032 and r4.Phi_M == base
+PASS('r4 pool fixed at wild type; k_4 burden-free')
+
+#%% 8. r16 sums the KDC and the ADH, both on the KIV molar flux
+r16 = bm.evaluate({**K_REF, 'k_16': 2.82}).pools['r16']
+expected16 = 2.82*(71384.0/(19.0*eb.SIGMA_EFF*3600.0*116.12)
+                   + 39618.0/(296.0*eb.SIGMA_EFF*3600.0*116.12))
+assert close(r16, expected16)
+assert close(r16, 2.82*eb.ehrlich_unit_cost('r16'))
+PASS('r16 = Aro10 + Adh6 pools on the KIV flux')
+
+#%% 9. linear squeeze (Q4/Q5d): d = 1 inside the slack, 0.5 halfway, exactly 0 at Phi_M = F_flex
+cost13 = eb.ehrlich_unit_cost('r13')
+slack = eb.F_FLEX - bm.Phi_M_wt - eb.PHI_T_WT                 # 0.0263
+assert bm.evaluate({**K_REF, 'k_13': 0.9*slack/cost13}).burden_factor == 1.0
+half = bm.evaluate({**K_REF, 'k_13': (slack + 0.5*eb.PHI_T_WT)/cost13})
+assert close(half.burden_factor, 0.5, rel=1e-9) and half.feasible
+assert close(half.k_7_eff, 0.5*1.203) and close(half.k_8_eff, 0.5*0.589)
+k13_star = (eb.F_FLEX - bm.Phi_M_wt)/cost13                   # Phi_M == F_flex
+at_cap = bm.evaluate({**K_REF, 'k_13': k13_star})
+assert abs(at_cap.violation) < 1e-12 and abs(at_cap.burden_factor) < 1e-12
+# (feasibility is not asserted AT the cap: rounding may land d at +-1e-16)
+just_below = bm.evaluate({**K_REF, 'k_13': k13_star*(1.0 - 1e-6)})
+assert just_below.feasible and 0.0 < just_below.burden_factor < 1e-4
+just_over = bm.evaluate({**K_REF, 'k_13': k13_star*(1.0 + 1e-6)})
+assert not just_over.feasible and just_over.burden_factor == 0.0
+assert just_over.k_7_eff == 0.0 and just_over.k_8_eff == 0.0
+over = bm.evaluate({**K_REF, 'k_13': 2.0*k13_star})
+assert not over.feasible and over.burden_factor == 0.0 and over.violation > 0.0
+PASS('d = 1 inside the slack, linear to 0, zero exactly at Phi_M = F_flex and flagged infeasible')
+
+#%% 10. k_8 alone inflates phi_T (Q8); one machinery sized by the larger demand
+k8 = bm.evaluate({**K_REF, 'k_8': 4.0*0.589})
+assert close(k8.phi_T, 4.0*eb.PHI_T_WT)
+assert close(k8.burden_factor, (eb.F_FLEX - phi_M_wt)/(4.0*eb.PHI_T_WT))   # 0.2987
+assert close(k8.k_7_eff, k8.burden_factor*1.203) and close(k8.k_8_eff, k8.burden_factor*4.0*0.589)
+both = bm.evaluate({**K_REF, 'k_7': 2.0*1.203, 'k_8': 4.0*0.589})
+assert close(both.phi_T, 4.0*eb.PHI_T_WT)                     # max, not sum
+assert close(bm.evaluate({**K_REF, 'k_7': 0.5*1.203, 'k_8': 0.5*0.589}).burden_factor, 1.0)
+PASS('phi_T = phi_T,wt * max(k_7/k_7,ref, k_8/k_8,ref); both growth capacities derated by d')
+
+#%% 11. 10x k_7 at wild-type enzymes is derated by the burden itself (spec 1-close)
+ten = bm.evaluate({**K_REF, 'k_7': 10.0*1.203})
+assert ten.feasible and close(ten.burden_factor, (eb.F_FLEX - phi_M_wt)/(10.0*eb.PHI_T_WT))
+assert close(ten.burden_factor, 0.1195, rel=1e-3)
+assert close(ten.k_7_eff, 1.4374, rel=1e-3)                   # = (F_flex - Phi_M)/phi_T,wt * k_7,ref
+applied10 = bm.apply({**K_REF, 'k_7': 10.0*1.203})
+assert close(applied10['k_7'], ten.k_7_eff) and close(applied10['k_8'], ten.k_8_eff)
+assert applied10['k_3'] == 5.81 and applied10['k_13'] == 0.0     # nothing else touched
+PASS('10x k_7 with wild-type enzymes: d = 0.12, k_7_eff = 1.44 (growth capped by the burden)')
+
+#%% 12. missing keys fall back to the reference; unknown keys are ignored and passed through
+empty = bm.evaluate({})
+assert empty.as_record() == ref.as_record()
+assert bm.apply({}) == {'k_7': 1.203, 'k_8': 0.589}
+partial = bm.evaluate({'k_13': 5.0, 'K_1e': 0.12, 'k_16r': 0.0125})
+assert close(partial.pools['r13'], 5.0*cost13) and close(partial.pools['r1'], 0.044)
+assert bm.apply({'k_16r': 0.0125}) == {'k_16r': 0.0125, 'k_7': 1.203, 'k_8': 0.589}
+# construction guards
+try:
+    eb.BurdenModel.from_reference({k: v for k, v in K_REF.items() if k != 'k_6'})
+except KeyError as e:
+    assert 'k_6' in str(e)
+else:
+    raise AssertionError('missing capacity did not raise')
+try:
+    eb.BurdenModel.from_reference({**K_REF, 'k_3': 0.0})
+except ValueError as e:
+    assert 'k_3' in str(e)
+else:
+    raise AssertionError('non-positive native reference did not raise')
+# sigma_eff override scales the Ehrlich pools inversely
+bm1 = eb.BurdenModel.from_reference(K_REF, sigma_eff=1.0)
+assert close(bm1.evaluate({'k_13': 5.0}).pools['r13'], 0.5*partial.pools['r13'])
+PASS('missing keys -> reference, unknown keys ignored/passed through, construction guards')
+
 print(f'\nALL {n_pass} CHECKS PASSED')

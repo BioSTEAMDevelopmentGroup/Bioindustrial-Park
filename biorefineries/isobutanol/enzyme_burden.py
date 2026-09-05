@@ -188,3 +188,158 @@ def anchor_sigma(k_ref):
     sigmas['geomean'] = math.exp(sum(math.log(v) for v in sigmas.values())
                                  /len(ANCHOR_STEPS))
     return sigmas
+
+#%% Burden model
+
+@dataclass(frozen=True)
+class BurdenResult:
+    """One evaluated decision point. `pools` maps every step of
+    STEP_ORDER to its enzyme mass fraction (g/gDCW); `burden_factor` is
+    the growth derating d in [0, 1]; `k_7_eff` / `k_8_eff` are the
+    derated growth capacities the model receives. `violation` =
+    Phi_M - F_flex (<= 0 feasible) is what the sampler constraint
+    reads; `feasible` <=> d > 0 <=> Phi_M < F_flex."""
+    pools: dict
+    Phi_M: float
+    phi_T: float
+    F_flex: float
+    burden_factor: float
+    k_7_eff: float
+    k_8_eff: float
+
+    @property
+    def violation(self):
+        return self.Phi_M - self.F_flex
+
+    @property
+    def feasible(self):
+        return self.burden_factor > 0.0
+
+    def as_record(self):
+        """{column: value} over BURDEN_COLUMNS (the trajectory-CSV
+        columns of a burden study)."""
+        record = {f'pool_{step}': self.pools[step] for step in STEP_ORDER}
+        record.update(Phi_M=self.Phi_M, phi_T=self.phi_T, F_flex=self.F_flex,
+                      burden_factor=self.burden_factor,
+                      k_7_eff=self.k_7_eff, k_8_eff=self.k_8_eff)
+        return record
+
+
+class BurdenModel:
+    """The burden evaluated against a snapshot of the model's reference
+    capacities `k_ref` ({name: value}; every name of
+    required_capacities() must be present -- the engine passes its
+    kinetic_baselines, i.e. the live values after the scenario workbook
+    was loaded). Native steps are charged by ratio to the reference (so
+    the burden is exactly inert there), Ehrlich steps by kcat + MW at
+    `sigma_eff` (module default SIGMA_EFF).
+
+    Construction raises KeyError on a missing capacity, ValueError on a
+    non-positive native or growth reference (the ratio route is
+    undefined), on a constant set that makes the wild type itself
+    infeasible (Phi_M,wt + phi_T,wt > F_flex), and on a reference point
+    that is infeasible under the burden (e.g. the scenario-B Ehrlich
+    constants, spec 4.5 / Q11): a burden study must start from a
+    burden-feasible reference -- use burden=False / --no-burden for a
+    burden-free study from such a point."""
+
+    def __init__(self, k_ref, sigma_eff=SIGMA_EFF):
+        self.sigma_eff = float(sigma_eff)
+        if self.sigma_eff <= 0.0:
+            raise ValueError('sigma_eff must be positive.')
+        required = self.required_capacities()
+        missing = [name for name in required if name not in k_ref]
+        if missing:
+            raise KeyError(f'k_ref lacks the capacities {missing} needed by '
+                           'the enzyme burden (pass the engine\'s full '
+                           'kinetic_baselines).')
+        self.reference = {name: float(k_ref[name]) for name in required}
+        nonpositive = [name for name in (*self._native_capacities(),
+                                         *GROWTH_CAPACITIES)
+                       if self.reference[name] <= 0.0]
+        if nonpositive:
+            raise ValueError('reference capacities charged by ratio must be '
+                             f'positive; got {nonpositive}.')
+        self.F_flex = F_FLEX
+        self.phi_T_wt = PHI_T_WT
+        self.Phi_M_wt = sum(pool_wt for pool_wt, _ in NATIVE_STEPS.values())
+        if self.Phi_M_wt + self.phi_T_wt > self.F_flex:
+            raise ValueError(
+                'the sector constants make the wild type infeasible: '
+                f'Phi_M,wt {self.Phi_M_wt:.4f} + phi_T,wt {self.phi_T_wt:.4f} '
+                f'> F_flex {self.F_flex:.4f} g/gDCW.')
+        self.sigma_diagnostic = anchor_sigma(self.reference)
+        self.reference_result = self.evaluate(self.reference)
+        if not self.reference_result.feasible:
+            ehrlich = sum(self.reference_result.pools[s] for s in EHRLICH_STEPS)
+            raise ValueError(
+                'the reference point is infeasible under the enzyme burden '
+                f'(Phi_M {self.reference_result.Phi_M:.4f} >= F_flex '
+                f'{self.F_flex:.4f} g/gDCW; its Ehrlich capacities alone need '
+                f'{ehrlich:.4f}). A burden study must start from a '
+                'burden-feasible reference (the scenario-A baseline); pass '
+                'burden=False / --no-burden for a burden-free study from '
+                'this point.')
+
+    @classmethod
+    def from_reference(cls, k_ref, sigma_eff=SIGMA_EFF):
+        """Snapshot `k_ref` (see the class docstring)."""
+        return cls(k_ref, sigma_eff=sigma_eff)
+
+    @staticmethod
+    def _native_capacities():
+        return tuple(c for _, caps in NATIVE_STEPS.values() for c in caps)
+
+    @classmethod
+    def required_capacities(cls):
+        """Every capacity the burden reads, in table order: the native
+        ratio-route capacities, the Ehrlich capacities, then k_7, k_8."""
+        return (*cls._native_capacities(),
+                *(cap for cap, _, _ in EHRLICH_STEPS.values()),
+                *GROWTH_CAPACITIES)
+
+    def _value(self, values, name):
+        """`values[name]`, or the reference when the key is absent (a
+        study that excludes some capacities still evaluates)."""
+        return float(values[name]) if name in values else self.reference[name]
+
+    def pools(self, values):
+        """{step: g enzyme/gDCW} over STEP_ORDER at the decision point
+        `values` ({name: value}; missing names -> reference)."""
+        pools = {}
+        for step, (pool_wt, capacities) in NATIVE_STEPS.items():
+            multiplier = max((self._value(values, c)/self.reference[c]
+                              for c in capacities), default=1.0)
+            pools[step] = pool_wt*multiplier
+        for step, (capacity, _, _) in EHRLICH_STEPS.items():
+            pools[step] = (self._value(values, capacity)
+                           *ehrlich_unit_cost(step, self.sigma_eff))
+        return pools
+
+    def evaluate(self, values):
+        """BurdenResult at the decision point `values` (see pools)."""
+        pools = self.pools(values)
+        Phi_M = sum(pools.values())
+        k_7 = self._value(values, 'k_7')
+        k_8 = self._value(values, 'k_8')
+        g = max(k_7/self.reference['k_7'], k_8/self.reference['k_8'])
+        phi_T = self.phi_T_wt*g
+        if phi_T > 0.0:
+            d = min(1.0, max(0.0, (self.F_flex - Phi_M)/phi_T))
+        else:  # both growth capacities sampled at zero: nothing to derate
+            d = 1.0 if Phi_M < self.F_flex else 0.0
+        return BurdenResult(pools=pools, Phi_M=Phi_M, phi_T=phi_T,
+                            F_flex=self.F_flex, burden_factor=d,
+                            k_7_eff=d*k_7, k_8_eff=d*k_8)
+
+    def apply(self, values):
+        """Copy of `values` with k_7 and k_8 set to their derated
+        effective values (both keys are always present in the result,
+        from the reference when not in `values`, so the engine's setattr
+        loop writes the derating even when growth is not a decision
+        variable); nothing else is touched."""
+        result = self.evaluate(values)
+        applied = dict(values)
+        applied['k_7'] = result.k_7_eff
+        applied['k_8'] = result.k_8_eff
+        return applied
