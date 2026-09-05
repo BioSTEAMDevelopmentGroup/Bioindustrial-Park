@@ -56,6 +56,7 @@ __all__ = ('OBJECTIVE_REGISTRY', 'TRACKED_METRICS',
            'STUDY_TARGET_PRODUCTS', 'STUDY_TYPE_ROLES',
            'DEFAULT_STUDY_TARGET_PRODUCTS', 'DEFAULT_STUDY_TYPE',
            'resolve_study_preset', 'default_study_name',
+           'BURDEN_STUDY_SUFFIX',
            'baseline_decision_point',
            'trajectory_columns', 'append_trajectory_row', 'load_trajectory',
            'inflight_path_for', 'write_inflight', 'clear_inflight',
@@ -492,8 +493,17 @@ def resolve_study_preset(study_target_products, study_type, roles=None):
                 multiplier_bounds=DEFAULT_SATURATION_MULTIPLIER_BOUNDS,
                 rate_multiplier_bounds=DEFAULT_RATE_MULTIPLIER_BOUNDS)
 
+#: Study-name suffix of a burden-enabled study (enzyme_burden.py): it
+#: records extra columns and a different physiology, so it must never
+#: share a trajectory CSV or SQLite store with a burden-free study. Both
+#: naming paths append it (default_study_name; the driver's and the
+#: engine's legacy fallbacks); the CSV header guard is the second line
+#: of defence.
+BURDEN_STUDY_SUFFIX = '_burden'
+
 def default_study_name(objective, study_target_products, study_type,
-                       scenario=None, kinetic_bounds_scenario=None):
+                       scenario=None, kinetic_bounds_scenario=None,
+                       burden=False):
     """Stable study name of a preset study:
     kin_opt_{study_target_products}_{study_type}_{objective slug}
     (slug = lower-cased, spaces -> '_'), e.g.
@@ -514,7 +524,12 @@ def default_study_name(objective, study_target_products, study_type,
     and still cannot collide with the legacy family. Without this tag, an
     explicit scenario override under a preset (e.g. run(scenario='B'))
     silently resumed the default-scenario study instead (same search-space
-    columns, so the CSV header guard could not catch the mix)."""
+    columns, so the CSV header guard could not catch the mix).
+
+    `burden=True` appends BURDEN_STUDY_SUFFIX ('_burden') after every
+    other tag: a burden study (enzyme_burden.py; the driver's default)
+    can never resume a burden-free study's CSV/SQLite, or vice versa.
+    """
     slug = objective.lower().replace(' ', '_')
     name = f'kin_opt_{study_target_products}_{study_type}_{slug}'
     if scenario is not None and scenario != 'A':
@@ -524,14 +539,21 @@ def default_study_name(objective, study_target_products, study_type,
     if (kinetic_bounds_scenario is not None
             and kinetic_bounds_scenario != preset_kinetic_bounds_scenario):
         name += f'_kb{kinetic_bounds_scenario}'
+    if burden:
+        name += BURDEN_STUDY_SUFFIX
     return name
 
 #%% Trajectory recording
 
-def trajectory_columns(search_space):
-    """Column order of the trajectory CSV for a given search space."""
+def trajectory_columns(search_space, extra_columns=()):
+    """Column order of the trajectory CSV for a given search space.
+    `extra_columns` (a burden study passes enzyme_burden.BURDEN_COLUMNS)
+    go after the tracked metrics and before 'error', so the decision
+    columns (between 'state' and 'objective', pca_decision_matrix) are
+    unchanged and the header guard of append_trajectory_row separates
+    burden from burden-free trajectories."""
     return ['trial_number', 'state', *search_space.keys(), 'objective',
-            *TRACKED_METRICS.keys(), 'error']
+            *TRACKED_METRICS.keys(), *extra_columns, 'error']
 
 def append_trajectory_row(csv_path, columns, record):
     """Append one row (dict; missing keys become '') to `csv_path`,
@@ -853,9 +875,10 @@ def plot_pca_projection(df, direction, log_columns=(),
                         objective_name='objective', objective_units='',
                         filename=None):
     """Four-panel PCA view of the sampled decision space: (1) the PC1 x
-    PC2 landscape -- completed trials colored by objective, FAIL/NAN/LOST
-    trials as gray/red/brown crosses (LOST = stall-killed or crashed
-    before writing its row, recovered from the in-flight sidecar), the incumbent best-so-far path, the
+    PC2 landscape -- completed trials colored by objective, FAIL/NAN/LOST/INFEASIBLE
+    trials as gray/red/brown/purple crosses (LOST = stall-killed or crashed
+    before writing its row, recovered from the in-flight sidecar;
+    INFEASIBLE = over the enzyme-burden cap, pruned before simulating), the incumbent best-so-far path, the
     enqueued baseline (trial 0) and the current best marked; (2) the
     explained-variance scree of the top 10 PCs; (3) the top-|loading|
     variables on PC1/PC2; (4) PC1 and PC2 of every sampled point vs trial
@@ -878,7 +901,9 @@ def plot_pca_projection(df, direction, log_columns=(),
     state = dfv['state']
     for st, color, label in (('FAIL', 'tab:gray', 'failed (pruned)'),
                              ('NAN', 'tab:red', 'NaN objective (pruned)'),
-                             ('LOST', 'tab:brown', 'lost (stalled/crashed)')):
+                             ('LOST', 'tab:brown', 'lost (stalled/crashed)'),
+                             ('INFEASIBLE', 'tab:purple',
+                              'infeasible (enzyme burden, pruned)')):
         m = (state == st).to_numpy()
         if m.any():
             ax_main.scatter(pc1[m], pc2[m], marker='x', s=18, alpha=0.35,
@@ -1062,6 +1087,7 @@ def run_kinetic_optimization(objective='IRR',
                              spike_conc_bounds=None,
                              study_name=None, results_dir=None,
                              handles=None, print_status_every=1,
+                             burden_model='auto',
                              ):
     """Run the Bayesian optimization. `objective` is a name in
     OBJECTIVE_REGISTRY (direction/level/units filled from the entry) or a
@@ -1076,8 +1102,9 @@ def run_kinetic_optimization(objective='IRR',
     sequentially (n_jobs=1; one simulation in flight at a time). Every
     trial appends one row to the trajectory CSV (same stable name as the
     study, '_trajectory.csv' suffix) whether it completes, fails
-    (state='FAIL', pruned), or yields a NaN objective (state='NAN',
-    pruned). A trial the PROCESS never finishes (hard-killed by the
+    (state='FAIL', pruned), yields a NaN objective (state='NAN',
+    pruned), or exceeds the enzyme-burden cap (state='INFEASIBLE',
+    pruned before simulating). A trial the PROCESS never finishes (hard-killed by the
     supervisor on a stall, or a native segfault) cannot write its row;
     its decision vector is kept in a per-study sidecar
     ('_inflight.json', written before the simulation starts and removed
@@ -1103,6 +1130,24 @@ def run_kinetic_optimization(objective='IRR',
     DEFAULT_RATE_MULTIPLIER_BOUNDS (their absolute bands actually arrive
     via param_bounds_override, see workbook_kinetic_bounds).
 
+    `burden_model` (default 'auto') is the enzyme-burden (proteome-
+    allocation) constraint of enzyme_burden.py: 'auto' builds
+    BurdenModel.from_reference(kinetic_baselines) -- the live values
+    after the scenario workbook load, so the burden is exactly inert at
+    trial 0 -- None disables it (the legacy burden-free study; older
+    studies), and a BurdenModel instance is used as given (the driver
+    builds one to print its reports first). With the burden on, every
+    trial's sampled vector is evaluated BEFORE the sidecar and the
+    simulation: its burden quantities (enzyme_burden.BURDEN_COLUMNS) are
+    recorded in the CSV, `burden_violation` (= Phi_M - F_flex, <= 0
+    feasible) is set as a trial user attr and fed to the TPE sampler's
+    constraints_func, an over-cap point is logged as state='INFEASIBLE'
+    and pruned without simulating, and a feasible point reaches the
+    model with the DERATED growth capacities k_7_eff/k_8_eff while the
+    CSV keeps the sampled k_7/k_8 as the decision. The default study
+    name gains BURDEN_STUDY_SUFFIX; restore_baseline is unchanged
+    (sampled-space baselines are written back).
+
     Returns (study, csv_path, kinetic_baselines)."""
     import optuna
     if handles is None:
@@ -1125,6 +1170,22 @@ def run_kinetic_optimization(objective='IRR',
                              "direction='maximize' or 'minimize'.")
 
     kinetic_baselines = discover_kinetic_parameters(r_te)
+    if isinstance(burden_model, str):
+        if burden_model != 'auto':
+            raise ValueError("burden_model must be 'auto', None or a "
+                             f"BurdenModel; got {burden_model!r}.")
+        from biorefineries.isobutanol.enzyme_burden import BurdenModel
+        burden_model = BurdenModel.from_reference(kinetic_baselines)
+    burden_on = burden_model is not None
+    if burden_on:
+        from biorefineries.isobutanol.enzyme_burden import BURDEN_COLUMNS
+        print('Enzyme burden ON (enzyme_burden.py): F_flex = '
+              f'{burden_model.F_flex:.4f}, Phi_M,wt = {burden_model.Phi_M_wt:.4f}, '
+              f'phi_T,wt = {burden_model.phi_T_wt:.4f} g/gDCW; over-cap trials '
+              'are logged INFEASIBLE and pruned before simulating.')
+    else:
+        BURDEN_COLUMNS = ()
+        print('Enzyme burden OFF (burden_model=None): legacy burden-free study.')
     if include_params is not None:
         missing = [p for p in include_params if p not in kinetic_baselines]
         if missing:
@@ -1169,12 +1230,14 @@ def run_kinetic_optimization(objective='IRR',
     slug = objective_name.lower().replace(' ', '_')
     if study_name is None:
         study_name = f'kin_opt_{scenario_label}_{slug}'
+        if burden_on:
+            study_name += BURDEN_STUDY_SUFFIX
     csv_path = os.path.join(results_dir, study_name + '_trajectory.csv')
     inflight_path = inflight_path_for(results_dir, study_name)
     storage = ('sqlite:///'
                + os.path.join(results_dir, study_name + '.db')
                .replace('\\', '/'))
-    columns = trajectory_columns(search_space)
+    columns = trajectory_columns(search_space, extra_columns=BURDEN_COLUMNS)
     # An orphaned sidecar means a previous run of this study died
     # mid-trial without writing that trial's row (unsupervised
     # crash-resume; under the supervisor it has already been recovered).
@@ -1191,9 +1254,17 @@ def run_kinetic_optimization(objective='IRR',
     n_done = len(study.trials)
     # Offset the seed by the number of stored trials so a resumed study
     # draws fresh points instead of replaying the original RNG stream.
+    def _burden_constraints(frozen_trial):
+        # <= 0 feasible. optuna evaluates this for COMPLETE and PRUNED
+        # trials (samplers/_base._process_constraints_after_trial), so
+        # the pruned INFEASIBLE trials populate the sampler's infeasible
+        # set and steer sampling toward the feasible region. The attr is
+        # set on every trial right after sampling, before any prune.
+        return (frozen_trial.user_attrs.get('burden_violation', 0.0),)
     study.sampler = optuna.samplers.TPESampler(
         multivariate=True, seed=seed + n_done,
-        n_startup_trials=max(10, n_trials//10))
+        n_startup_trials=max(10, n_trials//10),
+        constraints_func=_burden_constraints if burden_on else None)
     if n_done == 0:
         # Fresh study: evaluate the scenario baseline itself as trial 0,
         # so the baseline provably participates and TPE learns from it.
@@ -1222,6 +1293,28 @@ def run_kinetic_optimization(objective='IRR',
         model_kwargs = dict(target_conc=target, threshold_conc=threshold,
                             spike_conc=spike)
         record = {'trial_number': trial.number, **values}
+        if burden_on:
+            # Proteome-allocation burden (enzyme_burden.py): known from the
+            # sampled values alone, so an over-cap point is logged and
+            # pruned BEFORE the sidecar and the ~20 s simulation, and no
+            # baseline state is disturbed. The CSV keeps the sampled
+            # k_7/k_8 as the decision; the model receives the derated
+            # k_7_eff/k_8_eff through `applied` below.
+            burden = burden_model.evaluate(values)
+            record.update(burden.as_record())
+            trial.set_user_attr('burden_violation', burden.violation)
+            if not burden.feasible:
+                record['state'] = 'INFEASIBLE'
+                record['error'] = (f'enzyme burden: Phi_M {burden.Phi_M:.4f} '
+                                   f'> F_flex {burden.F_flex:.4f} g/gDCW')
+                append_trajectory_row(csv_path, columns, record)
+                print(f'Trial {trial.number}: INFEASIBLE under the enzyme '
+                      f'burden (Phi_M {burden.Phi_M:.4f} > F_flex '
+                      f'{burden.F_flex:.4f} g/gDCW); pruned before simulating.')
+                raise optuna.TrialPruned()
+            applied = burden_model.apply(values)
+        else:
+            applied = values
         # The decision vector is complete here (every suggest_* has run)
         # and the hang-prone simulation has not started: record it, so a
         # hard kill / segfault during this trial leaves the sidecar for
@@ -1235,8 +1328,8 @@ def run_kinetic_optimization(objective='IRR',
         try:
             try:
                 for pname in kinetic_baselines:
-                    if pname in values:
-                        setattr(r_te, pname, values[pname])
+                    if pname in applied:
+                        setattr(r_te, pname, applied[pname])
                 if 'max_n_spikes' in values:
                     fbs_spec.max_n_spikes = values['max_n_spikes']
                 handles['model_specification'](**model_kwargs)

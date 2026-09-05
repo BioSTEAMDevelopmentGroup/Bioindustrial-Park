@@ -509,7 +509,7 @@ else:
     study17_obj, csv17_out, kb17 = ko.run_kinetic_optimization(
         objective='IRR', scenario_label='X', n_trials=3, seed=1,
         study_name=study17, results_dir=outdir17, handles=handles17,
-        print_status_every=1)
+        print_status_every=1, burden_model=None)
     assert csv17_out == csv17 and kb17 == {'k_1e': 47.1, 'K_1e': 0.12}
     df17 = ko.load_trajectory(csv17)
     assert df17['trial_number'].tolist() == [99, 0, 1, 2]
@@ -548,7 +548,7 @@ else:
         ko.run_kinetic_optimization(
             objective='IRR', scenario_label='X', n_trials=2, seed=1,
             study_name=study17b, results_dir=outdir17b, handles=handles17b,
-            print_status_every=1)
+            print_status_every=1, burden_model=None)
     except KeyboardInterrupt:
         pass
     else:
@@ -889,7 +889,8 @@ if _optuna is not None:
     study23, _, _ = ko.run_kinetic_optimization(
         objective='IRR', scenario_label='X', n_trials=1, seed=1,
         study_name='offline_rate_band', results_dir=outdir23, handles=handles23,
-        rate_multiplier_bounds=(1e-5, 10.0), print_status_every=1)
+        rate_multiplier_bounds=(1e-5, 10.0), print_status_every=1,
+        burden_model=None)
     d23 = study23.trials[0].distributions
     assert np.isclose(d23['k_1e'].low, 1e-5*47.1) and np.isclose(d23['k_1e'].high, 10.0*47.1)
     assert np.isclose(d23['K_1e'].low, 0.1*0.12) and np.isclose(d23['K_1e'].high, 10.0*0.12)
@@ -899,5 +900,183 @@ if _optuna is not None:
 else:
     print('SKIP 23b: optuna not installed')
 PASS('supervisor: preset flags/defaults forwarded, naming mirrors the engine, legacy switch; k_* band reaches optuna')
+
+#%% 24. burden plumbing: _burden suffix, extra trajectory columns, header guard, INFEASIBLE colour
+from biorefineries.isobutanol import enzyme_burden as eb
+assert ko.BURDEN_STUDY_SUFFIX == '_burden'
+assert ko.default_study_name('IRR', 'ethanol_isobutanol', 'metabolic_protein') \
+    == 'kin_opt_ethanol_isobutanol_metabolic_protein_irr'            # default: unchanged
+assert ko.default_study_name('IRR', 'ethanol_isobutanol', 'metabolic_protein',
+                             burden=True) \
+    == 'kin_opt_ethanol_isobutanol_metabolic_protein_irr_burden'
+assert ko.default_study_name('IBO titer', 'ethanol_only', 'metabolic',
+                             scenario='B', kinetic_bounds_scenario='B', burden=True) \
+    == 'kin_opt_ethanol_only_metabolic_ibo_titer_scB_kbB_burden'    # suffix goes last
+cols24 = ko.trajectory_columns(space, extra_columns=eb.BURDEN_COLUMNS)
+assert cols24 == ['trial_number', 'state', *space, 'objective',
+                  *ko.TRACKED_METRICS, *eb.BURDEN_COLUMNS, 'error']
+assert ko.trajectory_columns(space) == ko.trajectory_columns(space, extra_columns=())
+# The header guard keeps a burden run out of a burden-free CSV and vice versa.
+csv24 = os.path.join(outdir, 'burden_guard.csv')
+ko.append_trajectory_row(csv24, cols24, {'trial_number': 0, 'state': 'COMPLETE',
+                                         'objective': 0.1, 'Phi_M': 0.0637})
+try:
+    ko.append_trajectory_row(csv24, ko.trajectory_columns(space),
+                             {'trial_number': 1, 'state': 'COMPLETE'})
+except ValueError as e:
+    assert 'different column set' in str(e)
+else:
+    raise AssertionError('header guard did not refuse the burden-free column set')
+# PCA decision columns are still the search-space variables (burden columns sit after objective)
+df24 = ko.load_trajectory(csv24)
+assert list(df24.columns) == cols24
+assert list(df24.columns)[list(df24.columns).index('state') + 1:
+                          list(df24.columns).index('objective')] == list(space)
+# INFEASIBLE rows: excluded from completed-only plots, drawn in the PCA landscape
+synth24 = synth11.copy()
+inf24 = synth24['trial_number'].isin([5, 13, 21])
+synth24.loc[inf24, 'state'] = 'INFEASIBLE'
+synth24.loc[inf24, ['objective', *ko.TRACKED_METRICS]] = np.nan
+synth24.loc[inf24, 'error'] = 'enzyme burden: Phi_M 0.2806 > F_flex 0.2250 g/gDCW'
+ok24 = ko._completed(synth24)
+assert not ok24['trial_number'].isin([5, 13, 21]).any()
+f24 = [os.path.join(outdir, f'infeasible_{i}.png') for i in range(4)]
+ko.plot_optimization_trajectories(synth24, objective_name='IRR',
+                                  direction='maximize', filename=f24[0])
+ko.plot_parameter_trajectory(synth24, baselines, direction='maximize', filename=f24[1])
+ko.plot_best_vs_baseline(synth24, baselines, direction='maximize', filename=f24[2])
+_, axes24 = ko.plot_pca_projection(synth24, 'maximize', log_columns=log_cols,
+                                   objective_name='IRR', filename=f24[3])
+labels24 = axes24[0].get_legend_handles_labels()[1]
+assert 'infeasible (enzyme burden, pruned)' in labels24, labels24
+assert 'completed' in labels24
+for p in f24:
+    assert os.path.isfile(p) and os.path.getsize(p) > 0, p
+_, axes24b = ko.plot_pca_projection(synth11, 'maximize', log_columns=log_cols)
+assert 'infeasible (enzyme burden, pruned)' not in axes24b[0].get_legend_handles_labels()[1]
+PASS('burden plumbing: _burden suffix, BURDEN_COLUMNS after the metrics, header guard, INFEASIBLE in the PCA legend')
+
+#%% 25. engine hook: INFEASIBLE pruned before the sidecar/simulation; effective k_7 written, sampled k_7 recorded
+if _optuna is None:
+    print('SKIP 25: optuna not installed')
+else:
+    outdir25 = tempfile.mkdtemp()
+    study25 = 'offline_burden'
+    csv25 = os.path.join(outdir25, study25 + '_trajectory.csv')
+    side25 = ko.inflight_path_for(outdir25, study25)
+
+    class _FakeTE25:
+        # the model's reference capacities (scenario A: Ehrlich off)
+        k_1h = 0.584; k_1l = 1.43; k_1e = 47.1; k_2 = 0.501; k_3 = 5.81
+        k_4 = 4.8; k_5 = 0.0104; k_5e = 0.775; k_6 = 2.82
+        k_7 = 1.203; k_8 = 0.589
+        k_13 = 0.0; k_14 = 0.0; k_15 = 0.0; k_16 = 0.0
+        K_1e = 0.12
+        def getGlobalParameterIds(self):
+            return ['k_1h', 'k_1l', 'k_1e', 'k_2', 'k_3', 'k_4', 'k_5',
+                    'k_5e', 'k_6', 'k_7', 'k_8', 'k_13', 'k_14', 'k_15',
+                    'k_16', 'K_1e', 'not_kinetic']
+    te25 = _FakeTE25()
+    seen_k7 = []          # k_7 on the fake model at each model_specification call
+    def _model_specification25(**kw):
+        seen_k7.append(te25.k_7)
+    def _solve_TEA25(stream_IDs=None):
+        return {'IRR': 0.2, 'MPSPs': {'ethanol': 0.5, 'isobutanol': 1.0}}
+    handles25 = dict(handles17, r_te=te25,
+                     model_specification=_model_specification25,
+                     solve_TEA=_solve_TEA25,
+                     latest_TEA_solution={'IRR': np.nan,
+                                          'MPSPs': {'ethanol': np.nan,
+                                                    'isobutanol': np.nan}})
+    baselines25 = ko.discover_kinetic_parameters(te25)
+    override25 = {'k_13': (0.0, 60.0), 'k_14': (0.0, 50.0),
+                  'k_15': (0.0, 50.0), 'k_16': (0.0, 30.0)}
+    space25, _ = ko.build_search_space(baselines25, param_bounds_override=override25,
+                                       rate_multiplier_bounds=(1e-5, 10.0))
+    base25 = ko.baseline_decision_point(
+        space25, baselines25, fbs17.current_specifications, fbs17.max_n_spikes)
+    # Pre-enqueue three scripted trials in the study the engine will resume
+    # (same storage URL as the engine builds): 0 = infeasible (k_13 = 60 ->
+    # Phi_M ~ 0.40 > F_flex), 1 = feasible but derated (9x k_7 at wild-type
+    # enzymes), 2 = the exact reference (inert). study.trials counts the
+    # WAITING trials, so n_trials=6 runs exactly these three, FIFO.
+    storage25 = ('sqlite:///' + os.path.join(outdir25, study25 + '.db')
+                 .replace('\\', '/'))
+    pre25 = _optuna.create_study(study_name=study25, storage=storage25,
+                                 direction='maximize')
+    pre25.enqueue_trial({**base25, 'k_13': 60.0})
+    pre25.enqueue_trial({**base25, 'k_7': 9.0*1.203})
+    pre25.enqueue_trial(dict(base25))
+    n_sidecar25 = []
+    _orig_write_inflight = ko.write_inflight
+    def _counting_write_inflight(path, columns, record):
+        n_sidecar25.append(record['trial_number'])
+        return _orig_write_inflight(path, columns, record)
+    ko.write_inflight = _counting_write_inflight
+    try:
+        study25_obj, csv25_out, kb25 = ko.run_kinetic_optimization(
+            objective='IRR', scenario_label='X', n_trials=6, seed=1,
+            study_name=study25, results_dir=outdir25, handles=handles25,
+            param_bounds_override=override25,
+            rate_multiplier_bounds=(1e-5, 10.0), print_status_every=1)
+    finally:
+        ko.write_inflight = _orig_write_inflight
+    assert csv25_out == csv25 and kb25 == baselines25
+    df25 = ko.load_trajectory(csv25)
+    assert list(df25.columns) == ko.trajectory_columns(space25, extra_columns=eb.BURDEN_COLUMNS)
+    assert df25['trial_number'].tolist() == [0, 1, 2]
+    assert df25['state'].tolist() == ['INFEASIBLE', 'COMPLETE', 'COMPLETE']
+    # trial 0: burden columns recorded, no objective, no sidecar, no simulation
+    assert df25['k_13'][0] == 60.0 and df25['burden_factor'][0] == 0.0
+    assert df25['Phi_M'][0] > df25['F_flex'][0] == 0.225
+    assert np.isnan(df25['objective'][0]) and np.isnan(df25['IRR'][0])
+    assert df25['error'][0].startswith('enzyme burden: Phi_M ')
+    assert n_sidecar25 == [1, 2], n_sidecar25
+    # trial 1: the CSV keeps the SAMPLED k_7, the model received the EFFECTIVE k_7
+    assert np.isclose(df25['k_7'][1], 9.0*1.203)
+    assert np.isclose(df25['burden_factor'][1], 0.13276, rtol=1e-3)
+    assert np.isclose(df25['k_7_eff'][1], 1.4374, rtol=1e-3)
+    assert np.isclose(df25['k_8_eff'][1], 0.13276*0.589, rtol=1e-3)
+    assert np.isclose(df25['Phi_M'][1], 0.0637) and np.isclose(df25['phi_T'][1], 9.0*0.135)
+    assert df25['objective'][1] == 0.2
+    # trial 2: the reference is inert
+    assert df25['burden_factor'][2] == 1.0 and df25['k_7_eff'][2] == 1.203
+    assert df25['pool_r1'][2] == 0.044 and df25['pool_r13'][2] == 0.0
+    # model_specification saw trial 1's effective k_7, trial 2's reference k_7,
+    # then restore_baseline's reference k_7 (2 simulations + the finally)
+    assert len(seen_k7) == 3, seen_k7
+    assert np.isclose(seen_k7[0], 1.4374, rtol=1e-3) and seen_k7[1] == 1.203 and seen_k7[2] == 1.203
+    assert te25.k_7 == 1.203 and te25.k_8 == 0.589                  # restored
+    assert not os.path.isfile(side25)
+    # optuna side: the infeasible trial is PRUNED, its violation reached the
+    # sampler constraint (system attr 'constraints'); feasible trials <= 0
+    t25 = study25_obj.trials
+    TS = _optuna.trial.TrialState
+    assert [t.state for t in t25] == [TS.PRUNED, TS.COMPLETE, TS.COMPLETE]
+    assert t25[0].user_attrs['burden_violation'] > 0.0
+    assert t25[1].user_attrs['burden_violation'] < 0.0 and t25[2].user_attrs['burden_violation'] < 0.0
+    assert list(t25[0].system_attrs['constraints'])[0] > 0.0, t25[0].system_attrs
+    assert list(t25[1].system_attrs['constraints'])[0] < 0.0
+    # burden off: no burden columns, k_7 written as sampled
+    outdir25b = tempfile.mkdtemp()
+    seen_k7.clear()
+    study25b_obj, csv25b, _ = ko.run_kinetic_optimization(
+        objective='IRR', scenario_label='X', n_trials=1, seed=1,
+        study_name='offline_no_burden', results_dir=outdir25b, handles=handles25,
+        param_bounds_override=override25, rate_multiplier_bounds=(1e-5, 10.0),
+        print_status_every=1, burden_model=None)
+    df25b = ko.load_trajectory(csv25b)
+    assert 'Phi_M' not in df25b.columns and df25b['state'].tolist() == ['COMPLETE']
+    assert 'burden_violation' not in study25b_obj.trials[0].user_attrs
+    # the engine's fallback name carries the suffix only when the burden is on
+    assert os.path.isfile(os.path.join(outdir25b, 'offline_no_burden_trajectory.csv'))
+    outdir25c = tempfile.mkdtemp()
+    _, csv25c, _ = ko.run_kinetic_optimization(
+        objective='IRR', scenario_label='X', n_trials=1, seed=1,
+        results_dir=outdir25c, handles=handles25,
+        param_bounds_override=override25, rate_multiplier_bounds=(1e-5, 10.0),
+        print_status_every=1)
+    assert csv25c == os.path.join(outdir25c, 'kin_opt_X_irr_burden_trajectory.csv'), csv25c
+    PASS('engine hook: INFEASIBLE pruned pre-sidecar with burden columns; effective k_7 to the model, sampled k_7 in the CSV; constraint reaches optuna; burden off unchanged')
 
 print(f'\nALL {n_pass} CHECKS PASSED')
