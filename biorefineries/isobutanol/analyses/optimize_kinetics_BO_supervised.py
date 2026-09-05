@@ -75,12 +75,15 @@ def default_study_name(scenario, objective, kinetic_bounds_scenario,
     """Mirror the driver's stable study naming (resume finds the same
     study): the preset convention
     kin_opt_{study_target_products}_{study_type}_{slug} whenever a
-    target-products preset is in force (the scenario flags do not enter
-    the name), else the legacy kin_opt_{scenario}[_kb{X}]_{slug} with the
-    driver's legacy default scenario 'B'."""
+    target-products preset is in force, tagged with _sc{scenario} /
+    _kb{X} only when scenario / kinetic_bounds_scenario is an explicit
+    override that differs from the preset's own values (see the engine's
+    default_study_name); else the legacy kin_opt_{scenario}[_kb{X}]_{slug}
+    with the driver's legacy default scenario 'B'."""
     if study_target_products is not None:
         return ko.default_study_name(objective, study_target_products,
-                                     study_type)
+                                     study_type, scenario=scenario,
+                                     kinetic_bounds_scenario=kinetic_bounds_scenario)
     scenario = scenario or 'B'
     slug = objective.lower().replace(' ', '_')
     if kinetic_bounds_scenario:
@@ -234,16 +237,20 @@ if __name__ == '__main__':
                     'run; see module docstring.')
     parser.add_argument('--scenario', default=None, choices=('A', 'B'),
                         help="starting scenario; default = the preset's "
-                             "('A'), or 'B' under --legacy-flags")
-    parser.add_argument('--study-target-products', default='ethanol_isobutanol',
-                        choices=('ethanol_only', 'ethanol_isobutanol'),
+                             "('A'), or 'B' under --legacy-flags. Under a "
+                             "preset, a value other than 'A' tags the "
+                             "derived study name with _sc{scenario} so it "
+                             "can never silently resume the default-scenario "
+                             "study")
+    parser.add_argument('--study-target-products', default=ko.DEFAULT_STUDY_TARGET_PRODUCTS,
+                        choices=tuple(ko.STUDY_TARGET_PRODUCTS),
                         help='study preset axis 1: the parameter SET '
                              '(ethanol_only = scenario-A workbook rows; '
                              'ethanol_isobutanol = scenario-B rows, i.e. plus '
                              'the Ehrlich block and isobutanol-inhibition '
                              'coefficients); both start at the A baseline')
-    parser.add_argument('--study-type', default='metabolic_protein',
-                        choices=('metabolic', 'metabolic_protein'),
+    parser.add_argument('--study-type', default=ko.DEFAULT_STUDY_TYPE,
+                        choices=tuple(ko.STUDY_TYPE_ROLES),
                         help='study preset axis 2: metabolic = capacity, '
                              'product-inhibition, lethality and '
                              'substrate-regulation roles (all k_* + K_1i, '
@@ -270,7 +277,10 @@ if __name__ == '__main__':
                         choices=('A', 'B'),
                         help="derive kinetic bounds from this scenario's "
                              'workbook (e.g. B for a scenario-A run '
-                             'without zero-baseline exclusions)')
+                             'without zero-baseline exclusions). Under a '
+                             "preset, a value other than the preset's own "
+                             'workbook scenario tags the derived study name '
+                             'with _kb{kinetic_bounds_scenario}')
     parser.add_argument('--study-name', default=None,
                         help='override the derived stable study name')
     parser.add_argument('--no-plots', action='store_true',
@@ -284,6 +294,9 @@ if __name__ == '__main__':
                              "the scenario workbook's rows (pre-2026-09-03 "
                              'behaviour, for resuming older studies)')
     args = parser.parse_args()
+    if not args.restrict_to_workbook and not args.legacy_flags:
+        parser.error('--no-restrict-to-workbook requires --legacy-flags '
+                     '(presets always use the workbook set)')
     outcome = supervise(scenario=args.scenario, objective=args.objective,
                         n_trials=args.n_trials,
                         kinetic_bounds_scenario=args.kinetic_bounds_scenario,

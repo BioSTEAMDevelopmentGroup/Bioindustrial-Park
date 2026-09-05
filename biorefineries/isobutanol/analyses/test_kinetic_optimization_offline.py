@@ -699,6 +699,21 @@ assert ko.default_study_name('IRR', 'ethanol_isobutanol', 'metabolic_protein') \
     == 'kin_opt_ethanol_isobutanol_metabolic_protein_irr'
 assert ko.default_study_name('IBO titer', 'ethanol_only', 'metabolic') \
     == 'kin_opt_ethanol_only_metabolic_ibo_titer'
+# An explicit scenario / kinetic_bounds_scenario tags the name ONLY when
+# it differs from the preset's own values (Finding 1: an override that
+# matches silently used to look identical to a genuine override too).
+assert ko.default_study_name('IRR', 'ethanol_isobutanol', 'metabolic_protein',
+                             scenario='A', kinetic_bounds_scenario='B') \
+    == 'kin_opt_ethanol_isobutanol_metabolic_protein_irr'   # preset's own values: no tag
+assert ko.default_study_name('IRR', 'ethanol_isobutanol', 'metabolic_protein',
+                             scenario='B') \
+    == 'kin_opt_ethanol_isobutanol_metabolic_protein_irr_scB'
+assert ko.default_study_name('IRR', 'ethanol_isobutanol', 'metabolic_protein',
+                             kinetic_bounds_scenario='A') \
+    == 'kin_opt_ethanol_isobutanol_metabolic_protein_irr_kbA'
+assert ko.default_study_name('IRR', 'ethanol_only', 'metabolic',
+                             scenario='B', kinetic_bounds_scenario='B') \
+    == 'kin_opt_ethanol_only_metabolic_irr_scB_kbB'
 for bad21 in (('ethanol', 'metabolic'), ('ethanol_only', 'protein')):
     try:
         ko.resolve_study_preset(*bad21)
@@ -797,9 +812,26 @@ assert sup23['default_study_name'](None, 'IRR', None,
 assert sup23['default_study_name']('A', 'IBO titer', 'B',
                                    study_target_products='ethanol_only',
                                    study_type='metabolic') \
-    == 'kin_opt_ethanol_only_metabolic_ibo_titer'          # preset name ignores scenario flags
+    == 'kin_opt_ethanol_only_metabolic_ibo_titer_kbB'
+    # ethanol_only's own kinetic_bounds_scenario is 'A' (STUDY_TARGET_PRODUCTS);
+    # the explicit 'B' here differs, so it IS tagged (Finding 1 fix -- this
+    # name used to silently drop the override and collide with the default).
 assert sup23['default_study_name']('A', 'IRR', 'B', study_target_products=None,
                                    study_type='metabolic') == 'kin_opt_A_kbB_irr'
+# Legacy result (study_target_products=None, positional) is untouched.
+assert sup23['default_study_name']('A', 'IRR', 'B') == 'kin_opt_A_kbB_irr'
+# Mirror of the engine's tag rule (Finding 1): only a differing override
+# is tagged; matching the preset's own scenario / kinetic_bounds_scenario
+# is silent.
+assert sup23['default_study_name']('B', 'IRR', None,
+                                   'ethanol_isobutanol', 'metabolic_protein') \
+    == 'kin_opt_ethanol_isobutanol_metabolic_protein_irr_scB'
+assert sup23['default_study_name'](None, 'IRR', 'A',
+                                   'ethanol_isobutanol', 'metabolic_protein') \
+    == 'kin_opt_ethanol_isobutanol_metabolic_protein_irr_kbA'
+assert sup23['default_study_name']('A', 'IRR', 'B',
+                                   'ethanol_isobutanol', 'metabolic_protein') \
+    == 'kin_opt_ethanol_isobutanol_metabolic_protein_irr'  # both match the preset: no tag
 # child_code forwards both kwargs (and None under --legacy-flags).
 code23 = sup23['child_code'](None, 'IRR', 2000, None, False, 'x',
                              study_target_products='ethanol_only',
@@ -817,15 +849,25 @@ assert _p23['study_type'].default == ko.DEFAULT_STUDY_TYPE
 assert _p23['scenario'].default is None
 _c23 = _inspect.signature(sup23['child_code']).parameters
 assert 'study_target_products' in _c23 and 'study_type' in _c23
-# The argparse choices are literal strings mirroring the engine's tables
-# (the supervisor never imports biorefineries/optuna).
+# The argparse choices/defaults are derived from the engine's tables, not
+# re-typed as literals (Finding 2), even though the parser itself is built
+# only under `if __name__ == '__main__':` (runpy.run_path's default
+# run_name is not '__main__', so sup23 has no live parser/args to
+# introspect -- these are pinned as source-text checks instead).
 src23 = open(os.path.join(os.path.dirname(os.path.abspath(__file__)),
                           'optimize_kinetics_BO_supervised.py')).read()
 assert '--study-target-products' in src23 and '--study-type' in src23
 assert '--legacy-flags' in src23
-assert "'ethanol_only', 'ethanol_isobutanol'" in src23
-assert "'metabolic', 'metabolic_protein'" in src23
+assert 'choices=tuple(ko.STUDY_TARGET_PRODUCTS)' in src23
+assert 'choices=tuple(ko.STUDY_TYPE_ROLES)' in src23
+assert "'--study-target-products', default=ko.DEFAULT_STUDY_TARGET_PRODUCTS" in src23
+assert "'--study-type', default=ko.DEFAULT_STUDY_TYPE" in src23
 assert 'import biorefineries' not in src23 and 'import optuna' not in src23
+# Finding 3: --no-restrict-to-workbook without --legacy-flags must fail at
+# argparse time (parser.error), not after a full child load.
+assert 'args = parser.parse_args()' in src23
+assert 'not args.restrict_to_workbook' in src23 and 'not args.legacy_flags' in src23
+assert "parser.error('--no-restrict-to-workbook requires --legacy-flags" in src23
 # supervise() derives the SAME csv path the child will write: the preset
 # name, from the study_name computed before any child launches.
 assert 'default_study_name(scenario, objective,' in _inspect.getsource(sup23['supervise'])

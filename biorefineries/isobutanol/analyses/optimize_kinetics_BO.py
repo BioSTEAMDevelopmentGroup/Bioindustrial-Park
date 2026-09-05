@@ -74,8 +74,10 @@ def run(scenario=None,  # 'A' or 'B'; None = the preset's start scenario
         seed=3221,
         make_plots=True,
         study_name=None,  # default: preset convention
-        # kin_opt_{study_target_products}_{study_type}_{objective slug};
-        # legacy path: kin_opt_{scenario}[_kb{X}]_{objective slug}
+        # kin_opt_{study_target_products}_{study_type}_{objective slug},
+        # plus _sc{scenario} / _kb{X} only when an explicit override
+        # differs from the preset; legacy path:
+        # kin_opt_{scenario}[_kb{X}]_{objective slug}
         kinetic_bounds_scenario=None,  # e.g. 'B': the kinetic search SET
         # (restrict_to_workbook) AND its bounds come from THAT scenario's
         # workbook (see kinetic_bounds_from_scenario); explicit
@@ -145,7 +147,8 @@ def run(scenario=None,  # 'A' or 'B'; None = the preset's start scenario
             study_name = ko.default_study_name(
                 objective if isinstance(objective, str)
                 else engine_kwargs.get('objective_name', 'custom'),
-                study_target_products, study_type)
+                study_target_products, study_type,
+                scenario=scenario, kinetic_bounds_scenario=kinetic_bounds_scenario)
         print(f'Study preset: study_target_products={study_target_products!r}, '
               f'study_type={study_type!r} -> start at scenario {scenario}, '
               f'{len(engine_kwargs["include_params"])} kinetic parameters '

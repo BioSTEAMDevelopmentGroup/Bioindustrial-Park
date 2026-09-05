@@ -492,16 +492,39 @@ def resolve_study_preset(study_target_products, study_type, roles=None):
                 multiplier_bounds=DEFAULT_SATURATION_MULTIPLIER_BOUNDS,
                 rate_multiplier_bounds=DEFAULT_RATE_MULTIPLIER_BOUNDS)
 
-def default_study_name(objective, study_target_products, study_type):
+def default_study_name(objective, study_target_products, study_type,
+                       scenario=None, kinetic_bounds_scenario=None):
     """Stable study name of a preset study:
     kin_opt_{study_target_products}_{study_type}_{objective slug}
     (slug = lower-cased, spaces -> '_'), e.g.
     kin_opt_ethanol_isobutanol_metabolic_protein_irr. New names, so a
     preset study can never collide with the CSV/SQLite of a legacy
     kin_opt_{scenario}[_kb{X}]_{slug} study. The driver and the supervisor
-    both derive it from here."""
+    both derive it from here.
+
+    `scenario` / `kinetic_bounds_scenario` tag the name ONLY when an
+    explicit override differs from the preset's own values -- every
+    preset starts at scenario 'A' and its kinetic_bounds_scenario is
+    STUDY_TARGET_PRODUCTS[study_target_products]['parameter_set_scenario']
+    -- so the tags appear only for a genuine override: `_sc{scenario}`
+    when scenario is given and != 'A', `_kb{kinetic_bounds_scenario}` when
+    it is given and differs from the preset's own workbook scenario.
+    Passing back the preset's own values (or leaving both None) reproduces
+    the base name above exactly, so default preset names are unchanged
+    and still cannot collide with the legacy family. Without this tag, an
+    explicit scenario override under a preset (e.g. run(scenario='B'))
+    silently resumed the default-scenario study instead (same search-space
+    columns, so the CSV header guard could not catch the mix)."""
     slug = objective.lower().replace(' ', '_')
-    return f'kin_opt_{study_target_products}_{study_type}_{slug}'
+    name = f'kin_opt_{study_target_products}_{study_type}_{slug}'
+    if scenario is not None and scenario != 'A':
+        name += f'_sc{scenario}'
+    preset_kinetic_bounds_scenario = STUDY_TARGET_PRODUCTS.get(
+        study_target_products, {}).get('parameter_set_scenario')
+    if (kinetic_bounds_scenario is not None
+            and kinetic_bounds_scenario != preset_kinetic_bounds_scenario):
+        name += f'_kb{kinetic_bounds_scenario}'
+    return name
 
 #%% Trajectory recording
 
