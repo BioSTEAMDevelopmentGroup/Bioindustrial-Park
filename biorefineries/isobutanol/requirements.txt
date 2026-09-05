@@ -3,3 +3,4 @@
 biosteam>=2.53.11,<2.55.0
 contourplots>=0.4.0
 optuna>=4.9
+SALib>=1.5
