@@ -28,6 +28,7 @@ tag is metadata). Kinetic parameters and feeding specs are restored to
 their scenario baselines in a `finally` after every run.
 """
 import csv
+import importlib.util
 import json
 import math
 import os
@@ -41,6 +42,7 @@ __all__ = ('OBJECTIVE_REGISTRY', 'TRACKED_METRICS',
            'kinetic_param_names_from_scenario', 'workbook_kinetic_bounds',
            'DEFAULT_RATE_MULTIPLIER_BOUNDS',
            'DEFAULT_SATURATION_MULTIPLIER_BOUNDS',
+           'kinetic_parameter_roles_path', 'kinetic_parameter_roles',
            'baseline_decision_point',
            'trajectory_columns', 'append_trajectory_row', 'load_trajectory',
            'inflight_path_for', 'write_inflight', 'clear_inflight',
@@ -357,6 +359,51 @@ def workbook_kinetic_bounds(scenario, multiplier_bounds=(0.1, 10.0),
             lo_m, hi_m = (r_lo, r_hi) if name.startswith('k_') else (m_lo, m_hi)
             bounds[name] = (lo_m*baseline, hi_m*baseline)
     return bounds
+
+#%% nskinetics parameter roles (read by file path)
+
+#: Path of the role table relative to the nskinetics package directory.
+_ROLE_TABLE_RELPATH = ('models', 's_cerevisiae_ferm_fb_inhib_mod_ibo',
+                       'parameter_categories.py')
+_kinetic_parameter_roles_cache = None
+
+def kinetic_parameter_roles_path():
+    """Absolute path of nskinetics' parameter_categories.py for the shipped
+    S. cerevisiae ethanol/isobutanol model (the source of truth for each
+    kinetic parameter's role: capacity, affinity, substrate_regulation,
+    product_inhibition, product_self_inhibition, lethality,
+    lethality_threshold, initial_state). Located via the package's spec
+    WITHOUT importing it (importlib.util.find_spec only resolves the
+    file)."""
+    spec = importlib.util.find_spec('nskinetics')
+    if spec is None or not spec.origin:
+        raise ImportError('nskinetics is not installed (needed for the '
+                          'kinetic-parameter role table).')
+    return os.path.join(os.path.dirname(spec.origin), *_ROLE_TABLE_RELPATH)
+
+def kinetic_parameter_roles(path=None):
+    """{kinetic parameter name: role} from nskinetics'
+    parameter_categories.KINETIC_PARAMETERS, in table order. The file is
+    executed BY PATH (spec_from_file_location + exec_module): it is pure
+    Python (stdlib math + dataclasses only) and documented as readable
+    without loading the model, whereas importing it through the package
+    pulls tellurium/roadrunner/biosteam (~15 s) -- which the stdlib-only
+    supervisor and the offline test must never do. The default-path
+    result is cached after the first call; an explicit `path` (tests)
+    is always read afresh and never cached."""
+    global _kinetic_parameter_roles_cache
+    if path is None and _kinetic_parameter_roles_cache is not None:
+        return _kinetic_parameter_roles_cache
+    table_path = kinetic_parameter_roles_path() if path is None else path
+    spec = importlib.util.spec_from_file_location(
+        '_nskinetics_parameter_categories', table_path)
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    roles = {name: info.role
+             for name, info in module.KINETIC_PARAMETERS.items()}
+    if path is None:
+        _kinetic_parameter_roles_cache = roles
+    return roles
 
 #%% Trajectory recording
 

@@ -647,4 +647,42 @@ else:
     print('SKIP 19b: parameter-distribution workbooks not found')
 PASS('rate_multiplier_bounds: per-prefix bands, precedence, None = legacy space; workbook_kinetic_bounds')
 
+#%% 20. kinetic_parameter_roles: nskinetics role table read by FILE PATH (no package import)
+import subprocess as _subprocess
+import sys as _sys
+roles_path20 = ko.kinetic_parameter_roles_path()
+assert roles_path20.endswith(os.path.join(
+    'models', 's_cerevisiae_ferm_fb_inhib_mod_ibo', 'parameter_categories.py'))
+assert os.path.isfile(roles_path20), roles_path20
+# The no-heavy-import guarantee is probed in a FRESH interpreter that loads
+# the engine by file path (as the stdlib-only supervisor does): this script
+# imports ko through the biorefineries.isobutanol package, whose system.py
+# imports nskinetics at module top, so sys.modules here proves nothing.
+_probe20 = (
+    "import importlib.util, sys\n"
+    f"spec = importlib.util.spec_from_file_location('ko_probe', {ko.__file__!r})\n"
+    "m = importlib.util.module_from_spec(spec); spec.loader.exec_module(m)\n"
+    "roles = m.kinetic_parameter_roles()\n"
+    "heavy = sorted(k for k in sys.modules if k.split('.')[0] in\n"
+    "               ('nskinetics', 'tellurium', 'roadrunner', 'biosteam', 'thermosteam'))\n"
+    "print(len(roles), heavy)\n")
+_out20 = _subprocess.run([_sys.executable, '-c', _probe20],
+                         capture_output=True, text=True)
+assert _out20.returncode == 0, _out20.stderr
+assert _out20.stdout.strip() == '65 []', _out20.stdout + _out20.stderr
+roles20 = ko.kinetic_parameter_roles()
+from collections import Counter as _Counter
+assert _Counter(roles20.values()) == {
+    'capacity': 20, 'affinity': 16, 'product_inhibition': 13,
+    'substrate_regulation': 4, 'product_self_inhibition': 4,
+    'lethality': 3, 'lethality_threshold': 3, 'initial_state': 2}
+assert roles20['k_7'] == 'capacity' and roles20['K_1i'] == 'substrate_regulation'
+assert roles20['K_6e'] == 'product_self_inhibition' and roles20['k_10ii'] == 'lethality'
+assert roles20['K_13'] == 'affinity' and roles20['k_16ie'] == 'product_inhibition'
+assert list(roles20)[:3] == ['k_1h', 'k_1l', 'k_1e']          # table order kept
+assert ko.kinetic_parameter_roles() is roles20               # cached
+assert ko.kinetic_parameter_roles(path=roles_path20) == roles20   # explicit path: fresh, equal
+assert ko.kinetic_parameter_roles(path=roles_path20) is not roles20
+PASS('kinetic_parameter_roles: role table loaded by file path, no heavy import in a fresh interpreter, counts pinned, cached')
+
 print(f'\nALL {n_pass} CHECKS PASSED')
