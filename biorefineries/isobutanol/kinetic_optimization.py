@@ -1565,6 +1565,7 @@ def run_kinetic_optimization(objective='IRR',
                              burden_model='auto',
                              enqueue_knockouts=True,
                              n_startup_trials=None,
+                             feasible_sampling=True,
                              ):
     """Run the Bayesian optimization. `objective` is a name in
     OBJECTIVE_REGISTRY (direction/level/units filled from the entry) or a
@@ -1656,6 +1657,22 @@ def run_kinetic_optimization(objective='IRR',
     CSV keeps the sampled k_7/k_8 as the decision. The default study
     name gains BURDEN_STUDY_SUFFIX; restore_baseline is unchanged
     (sampled-space baselines are written back).
+
+    `feasible_sampling` (default True; since 2026-09-06) makes the
+    sampler feasibility-aware when the burden is on: feasible_tpe_sampler
+    binds FeasibleTPESampler to `burden_model.evaluate(values).feasible`
+    (exactly the cap Phi_M < F_flex), so the random start-up draws are
+    joint uniform-feasible vectors and every TPE candidate is filtered
+    before it is scored -- no sampled trial should ever be INFEASIBLE
+    (the 2026-09-06 production study proposed 118 of 200 start-up and
+    261 of 1060 TPE trials over the cap). The in-objective INFEASIBLE
+    guard and the constraints_func stay as the safety net (a resumed
+    study already holds INFEASIBLE rows), and the counters are printed
+    at the end of the run (`unfiltered draws` > 0 means the feasible
+    region was too small for max_uniform_draws to find; expected 0).
+    False (or burden_model=None, where there is no predicate) keeps the
+    plain TPESampler. A sampler setting like n_startup_trials: no
+    column or study-name change, free to change on a resume.
 
     Returns (study, csv_path, kinetic_baselines)."""
     import optuna
@@ -1830,13 +1847,30 @@ def run_kinetic_optimization(objective='IRR',
                              f'integer or None; got {n_startup_trials!r}')
         n_startup = int(n_startup_trials)
         startup_rule = 'explicit'
+    feasible_on = bool(burden_on and feasible_sampling)
     print(f'TPE random start-up: {n_startup} trials ({startup_rule}); '
           f'{n_done} trials already stored, so guidance begins '
-          f'{"now" if n_done >= n_startup else f"after trial {n_startup - 1}"}.')
-    study.sampler = optuna.samplers.TPESampler(
-        multivariate=True, seed=seed + n_done,
-        n_startup_trials=n_startup,
-        constraints_func=_burden_constraints if burden_on else None)
+          f'{"now" if n_done >= n_startup else f"after trial {n_startup - 1}"}'
+          + (' (feasibility-aware: joint uniform-feasible draws)'
+             if feasible_on else '') + '.')
+    if feasible_on:
+        study.sampler = feasible_tpe_sampler(
+            search_space,
+            lambda values: burden_model.evaluate(values).feasible,
+            multivariate=True, seed=seed + n_done,
+            n_startup_trials=n_startup,
+            constraints_func=_burden_constraints)
+        print('Sampler: feasibility-aware TPE (FeasibleTPESampler): every '
+              'start-up draw and TPE candidate is checked against the '
+              'enzyme-burden cap before it is proposed.')
+    else:
+        study.sampler = optuna.samplers.TPESampler(
+            multivariate=True, seed=seed + n_done,
+            n_startup_trials=n_startup,
+            constraints_func=_burden_constraints if burden_on else None)
+        print('Sampler: plain TPESampler '
+              + ('(feasible_sampling=False).' if burden_on
+                 else '(burden off: no feasibility predicate).'))
     if n_done == 0:
         # Fresh study: evaluate the scenario baseline itself as trial 0,
         # so the baseline provably participates and TPE learns from it.
@@ -1992,4 +2026,9 @@ def run_kinetic_optimization(objective='IRR',
         restore_baseline(handles, kinetic_baselines,
                          baseline_model_kwargs,
                          baseline_max_n_spikes=baseline_max_n_spikes)
+        if feasible_on:
+            s = study.sampler
+            print(f'Feasible sampling: rejected {s.n_rejected} '
+                  f'draws/candidates, {s.n_uniform_fallbacks} uniform '
+                  f'fallbacks, {s.n_unfiltered} unfiltered draws.')
     return study, csv_path, kinetic_baselines

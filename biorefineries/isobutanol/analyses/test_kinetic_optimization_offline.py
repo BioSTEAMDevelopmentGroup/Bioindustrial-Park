@@ -2132,4 +2132,82 @@ else:
     assert rel34 == dists34, rel34
     PASS('feasible sampling fallbacks: uniform fallback, raw-batch last resort, partial-batch concatenation, exact counters on a real sampler; factory guards; full relative space')
 
+#%% 35. engine wiring: feasible_sampling=True (default) with the burden on
+# installs a FeasibleTPESampler and the study samples NO infeasible point
+# (every sampled trial is COMPLETE with Phi_M < F_flex, n_unfiltered = 0);
+# feasible_sampling=False, or burden off, installs the plain TPESampler;
+# the printed sampler / summary lines; the kwarg never reaches the study
+# name.
+if _optuna is None:
+    print('SKIP 35: optuna not installed')
+else:
+    _sig35 = _inspect.signature(ko.run_kinetic_optimization).parameters
+    assert 'feasible_sampling' in _sig35 and _sig35['feasible_sampling'].default is True
+    assert 'feasible_sampling' not in _inspect.signature(ko.default_study_name).parameters
+    class _FakeTE35:
+        # the model's reference capacities (scenario A: Ehrlich off), so
+        # BurdenModel.from_reference is inert at the baseline
+        k_1h = 0.584; k_1l = 1.43; k_1e = 47.1; k_2 = 0.501; k_3 = 5.81
+        k_4 = 4.8; k_5 = 0.0104; k_5e = 0.775; k_6 = 2.82
+        k_7 = 1.203; k_8 = 0.589
+        k_13 = 0.0; k_14 = 0.0; k_15 = 0.0; k_16 = 0.0
+        K_1e = 0.12
+        def getGlobalParameterIds(self):
+            return ['k_1h', 'k_1l', 'k_1e', 'k_2', 'k_3', 'k_4', 'k_5',
+                    'k_5e', 'k_6', 'k_7', 'k_8', 'k_13', 'k_14', 'k_15',
+                    'k_16', 'K_1e', 'not_kinetic']
+    def _solve_TEA35(stream_IDs=None):
+        return {'IRR': 0.2, 'MPSPs': {'ethanol': 0.5, 'isobutanol': 1.0}}
+    handles35 = dict(handles17, r_te=_FakeTE35(),
+                     model_specification=lambda **kw: None, solve_TEA=_solve_TEA35,
+                     latest_TEA_solution={'IRR': np.nan,
+                                          'MPSPs': {'ethanol': np.nan,
+                                                    'isobutanol': np.nan}})
+    outdir35 = tempfile.mkdtemp()
+    override35 = {'k_13': (0.0, 60.0), 'k_14': (0.0, 50.0),
+                  'k_15': (0.0, 50.0), 'k_16': (0.0, 30.0)}
+    common35 = dict(objective='IRR', scenario_label='X', seed=1,
+                    study_name='offline_feasible', results_dir=outdir35,
+                    handles=handles35, print_status_every=10,
+                    param_bounds_override=override35,
+                    rate_multiplier_bounds=(1e-3, 10.0),
+                    enqueue_knockouts=False)
+    buf35 = _io.StringIO()
+    with _contextlib.redirect_stdout(buf35):
+        st35, csv35, _ = ko.run_kinetic_optimization(n_trials=10, n_startup_trials=4,
+                                                     **common35)   # burden 'auto', feasible_sampling default
+    out35 = buf35.getvalue()
+    assert type(st35.sampler).__name__ == 'FeasibleTPESampler', type(st35.sampler)
+    assert st35.sampler._n_startup_trials == 4
+    assert 'Sampler: feasibility-aware TPE' in out35, out35
+    assert 'feasibility-aware: joint uniform-feasible draws' in out35, out35
+    assert 'Feasible sampling: rejected ' in out35 and ' 0 unfiltered draws.' in out35, out35
+    df35 = ko.load_trajectory(csv35)
+    assert len(df35) == 10 and df35['state'].tolist() == ['COMPLETE']*10, df35['state'].tolist()
+    assert (df35['Phi_M'] < df35['F_flex']).all()
+    assert df35['trial_number'].tolist() == list(range(10))
+    # in this space a 10x k_1e alone (0.44 g/gDCW on the 0.044 r1 pool)
+    # breaks the cap, so the 9 sampled trials rejected at least one draw
+    assert st35.sampler.n_rejected > 0 and st35.sampler.n_unfiltered == 0
+    # the objective's guard never fired: no INFEASIBLE row, no pruned trial
+    assert all(t.state == _optuna.trial.TrialState.COMPLETE for t in st35.trials)
+    # resume with feasible_sampling=False -> the plain TPESampler, same study
+    buf35b = _io.StringIO()
+    with _contextlib.redirect_stdout(buf35b):
+        st35b, _, _ = ko.run_kinetic_optimization(n_trials=12, n_startup_trials=4,
+                                                  feasible_sampling=False, **common35)
+    assert type(st35b.sampler) is _optuna.samplers.TPESampler
+    assert 'Sampler: plain TPESampler (feasible_sampling=False)' in buf35b.getvalue()
+    assert 'Feasible sampling: rejected' not in buf35b.getvalue()
+    assert len(ko.load_trajectory(csv35)) == 12
+    # burden off + feasible_sampling=True -> plain sampler (no predicate)
+    buf35c = _io.StringIO()
+    with _contextlib.redirect_stdout(buf35c):
+        st35c, _, _ = ko.run_kinetic_optimization(
+            n_trials=3, n_startup_trials=2, feasible_sampling=True,
+            burden_model=None, **{**common35, 'study_name': 'offline_feasible_noburden'})
+    assert type(st35c.sampler) is _optuna.samplers.TPESampler
+    assert 'Sampler: plain TPESampler (burden off' in buf35c.getvalue()
+    PASS('engine: feasible_sampling=True + burden on installs FeasibleTPESampler (all sampled trials feasible, n_unfiltered 0, summary line); False or burden off = plain TPESampler; not in the study name')
+
 print(f'\nALL {n_pass} CHECKS PASSED')
