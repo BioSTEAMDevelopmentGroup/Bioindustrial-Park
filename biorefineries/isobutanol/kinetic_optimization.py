@@ -51,6 +51,7 @@ __all__ = ('OBJECTIVE_REGISTRY', 'TRACKED_METRICS',
            'parameter_distributions_workbook', 'workbook_kinetic_baselines',
            'kinetic_param_names_from_scenario', 'workbook_kinetic_bounds',
            'DEFAULT_RATE_MULTIPLIER_BOUNDS',
+           'DEFAULT_PARAMETER_MULTIPLIER_BOUNDS',
            'DEFAULT_SATURATION_MULTIPLIER_BOUNDS',
            'RATE_CONSTANT_ROLES', 'INHIBITION_COEFFICIENT_ROLES',
            'kinetic_parameter_roles_path', 'kinetic_parameter_roles',
@@ -89,7 +90,8 @@ SPIKE_CONC_MAX = 600.0
 #: named study presets (resolve_study_preset), assigned by nskinetics
 #: ROLE (kinetic_parameter_roles) since 2026-09-06:
 #:   1. RATE CONSTANTS (role capacity: k_1h, k_2, ..., k_13-k_16) --
-#:      DEFAULT_RATE_MULTIPLIER_BOUNDS, [1e-5×, 10×]: an effective
+#:      DEFAULT_RATE_MULTIPLIER_BOUNDS, [1e-3×, 10×] (1e-5× until later
+#:      on 2026-09-06): an effective
 #:      knock-out is reachable (still log-uniform below and above the
 #:      baseline).
 #:   2. INHIBITION COEFFICIENTS (roles product_inhibition and lethality:
@@ -104,8 +106,22 @@ SPIKE_CONC_MAX = 600.0
 #: and older-study resumes). The legacy single band of
 #: build_search_space's multiplier_bounds default, (0.1, 10.0), is
 #: unchanged.
-DEFAULT_RATE_MULTIPLIER_BOUNDS = (1e-5, 10.0)
+DEFAULT_RATE_MULTIPLIER_BOUNDS = (1e-3, 10.0)
 DEFAULT_SATURATION_MULTIPLIER_BOUNDS = (0.1, 10.0)
+
+#: Per-parameter multiplier bands of the study presets, {name: (m_lo,
+#: m_hi)} x baseline, taking precedence over the ROLE band of that name
+#: (build_search_space / workbook_kinetic_bounds `parameter_multiplier_
+#: bounds`; an absolute param_bounds_override entry still wins). k_10 is
+#: the capacity of r10, the ACTIVE-BIOMASS DECAY step: it is a rate
+#: constant by role, but a near-zero decay rate (the 1e-3x floor of the
+#: rate band, an effectively immortal culture) is not an engineering
+#: target, so it keeps the saturation band [0.1×, 10×] (its knockout
+#: probe therefore sits at 0.1x, a knock-down). The presets hand each
+#: study a COPY of this table; changing an entry changes the sampled
+#: space of every preset without changing its columns, so a changed
+#: table needs a fresh study name (the header guard cannot tell).
+DEFAULT_PARAMETER_MULTIPLIER_BOUNDS = {'k_10': (0.1, 10.0)}
 
 #: nskinetics roles (parameter_categories.ROLES) that make a parameter a
 #: RATE CONSTANT -- the only names the k_* rate band applies to under the
@@ -215,6 +231,7 @@ def build_search_space(kinetic_baselines,
                        spike_conc_bounds=None,
                        rate_multiplier_bounds=None,
                        rate_params=None,
+                       parameter_multiplier_bounds=None,
                        ):
     """Build the decision-variable space: {name: {'low', 'high', 'log'}}
     (integer variables additionally carry 'int': True).
@@ -239,6 +256,17 @@ def build_search_space(kinetic_baselines,
     'k_' -- required to resume a study started under it. Either way the
     rate band applies only where a band applies at all (after
     include/exclude/override).
+
+    `parameter_multiplier_bounds` ({name: (m_lo, m_hi)}, None/{} = none)
+    is a PER-PARAMETER multiplier band that takes precedence over the
+    role band of that name (rate or saturation, under either rate
+    rule) -- the presets pass DEFAULT_PARAMETER_MULTIPLIER_BOUNDS, which
+    keeps k_10 (active-biomass decay) on [0.1x, 10x] while the other
+    rate constants take DEFAULT_RATE_MULTIPLIER_BOUNDS. Precedence:
+    include/exclude > absolute `param_bounds_override` > per-parameter
+    band > role band; an entry for a name that is absent, excluded or
+    overridden is ignored, and a nonpositive baseline is still excluded
+    (a multiplier band needs one).
 
     `exclude_params` names are
     always excluded (silently). `include_params`
@@ -270,6 +298,7 @@ def build_search_space(kinetic_baselines,
 
     Returns (space, excluded_parameter_names)."""
     param_bounds_override = dict(param_bounds_override or {})
+    parameter_multiplier_bounds = dict(parameter_multiplier_bounds or {})
     m_lo, m_hi = multiplier_bounds
     r_lo, r_hi = (multiplier_bounds if rate_multiplier_bounds is None
                   else rate_multiplier_bounds)
@@ -289,7 +318,10 @@ def build_search_space(kinetic_baselines,
                   'entry; excluding it from the search space.')
             excluded.append(name)
         else:
-            lo_m, hi_m = (r_lo, r_hi) if is_rate(name) else (m_lo, m_hi)
+            if name in parameter_multiplier_bounds:
+                lo_m, hi_m = parameter_multiplier_bounds[name]
+            else:
+                lo_m, hi_m = (r_lo, r_hi) if is_rate(name) else (m_lo, m_hi)
             space[name] = dict(low=lo_m*baseline, high=hi_m*baseline,
                                log=True)
     if (target_conc_bounds is not None or threshold_delta_bounds is not None
@@ -371,8 +403,9 @@ def knockout_probe_points(search_space, baseline_point, rate_prefix='k_',
     The probe value is the floor of the study's own band, so it is always
     in range (an out-of-range enqueued value is a hard optuna error on a
     log variable): under the preset band (DEFAULT_RATE_MULTIPLIER_BOUNDS,
-    1e-5x) it is an effective knock-out, under a 0.1x band a 10x
-    knock-down. Saturation constants K_*, the feeding variables, integer
+    1e-3x) it is an effective knock-out, under a 0.1x band a 10x
+    knock-down (so the probe of a rate on a per-parameter band --
+    k_10 under DEFAULT_PARAMETER_MULTIPLIER_BOUNDS -- is a knock-down). Saturation constants K_*, the feeding variables, integer
     and linear-scale variables get no probe. A rate whose baseline already
     sits at (or below) its floor -- e.g. the Ehrlich rates of the
     ethanol_isobutanol preset, clipped up to the floor from scenario A's
@@ -437,7 +470,8 @@ def kinetic_param_names_from_scenario(scenario):
     return list(workbook_kinetic_baselines(scenario))
 
 def workbook_kinetic_bounds(scenario, multiplier_bounds=(0.1, 10.0),
-                            rate_multiplier_bounds=None, rate_params=None):
+                            rate_multiplier_bounds=None, rate_params=None,
+                            parameter_multiplier_bounds=None):
     """Absolute (low, high) bounds -- the multiplier band around the
     scenario workbook's baseline -- for every positive-baseline kinetic
     row of that workbook (workbook_kinetic_baselines), keyed by te name
@@ -446,7 +480,10 @@ def workbook_kinetic_bounds(scenario, multiplier_bounds=(0.1, 10.0),
     rate_constant_names of the workbook rows), else every name starting
     with lowercase 'k_' (the pre-2026-09-06 rule) -- use
     `rate_multiplier_bounds` when it is given, every other name
-    (inhibition coefficients k_*i*, K_*) uses `multiplier_bounds`. A plain
+    (inhibition coefficients k_*i*, K_*) uses `multiplier_bounds`; a
+    name in `parameter_multiplier_bounds` ({name: (m_lo, m_hi)}, the
+    presets' DEFAULT_PARAMETER_MULTIPLIER_BOUNDS -- k_10 on 0.1x-10x)
+    uses that band instead of either. A plain
     file read (no simulation), so it can parameterize a run of a
     DIFFERENT scenario: passed as param_bounds_override it gives the
     IBO-pathway rates zeroed on the model under scenario A their
@@ -457,10 +494,14 @@ def workbook_kinetic_bounds(scenario, multiplier_bounds=(0.1, 10.0),
     r_lo, r_hi = (multiplier_bounds if rate_multiplier_bounds is None
                   else rate_multiplier_bounds)
     is_rate = _rate_predicate(rate_params)
+    parameter_multiplier_bounds = dict(parameter_multiplier_bounds or {})
     bounds = {}
     for name, baseline in workbook_kinetic_baselines(scenario).items():
         if baseline > 0.0:
-            lo_m, hi_m = (r_lo, r_hi) if is_rate(name) else (m_lo, m_hi)
+            if name in parameter_multiplier_bounds:
+                lo_m, hi_m = parameter_multiplier_bounds[name]
+            else:
+                lo_m, hi_m = (r_lo, r_hi) if is_rate(name) else (m_lo, m_hi)
             bounds[name] = (lo_m*baseline, hi_m*baseline)
     return bounds
 
@@ -574,7 +615,10 @@ def resolve_study_preset(study_target_products, study_type, roles=None):
     rate_params=[the workbook's RATE CONSTANTS -- rate_constant_names,
     role capacity; 16 in A's workbook, 20 in B's -- the only names the
     rate band applies to, so the inhibition coefficients k_*i* sample
-    the saturation band like the K_* terms]).
+    the saturation band like the K_* terms],
+    parameter_multiplier_bounds=a COPY of
+    DEFAULT_PARAMETER_MULTIPLIER_BOUNDS [k_10, the active-biomass decay
+    capacity, on 0.1x-10x instead of the rate band]).
     Set sizes: ethanol_only 29 (metabolic) / 40 (metabolic_protein);
     ethanol_isobutanol 40 / 56. `roles` (default
     kinetic_parameter_roles()) is the {name: role} table; a workbook row
@@ -608,7 +652,9 @@ def resolve_study_preset(study_target_products, study_type, roles=None):
                 include_params=include_params,
                 multiplier_bounds=DEFAULT_SATURATION_MULTIPLIER_BOUNDS,
                 rate_multiplier_bounds=DEFAULT_RATE_MULTIPLIER_BOUNDS,
-                rate_params=rate_constant_names(workbook_rows, roles=roles))
+                rate_params=rate_constant_names(workbook_rows, roles=roles),
+                parameter_multiplier_bounds=dict(
+                    DEFAULT_PARAMETER_MULTIPLIER_BOUNDS))
 
 #: Study-name suffix of a burden-enabled study (enzyme_burden.py): it
 #: records extra columns and a different physiology, so it must never
@@ -645,12 +691,20 @@ def default_study_name(objective, study_target_products, study_type,
     columns, so the CSV header guard could not catch the mix).
 
     `rate_multiplier_bounds` (the k_* band, (m_lo, m_hi) x baseline) tags
-    the name `_rb{m_lo:g}-{m_hi:g}` (e.g. `_rb0.1-10`) ONLY when it is
-    given and differs from the presets' own DEFAULT_RATE_MULTIPLIER_BOUNDS:
-    a narrower band samples a different space over the SAME columns, so
-    without the tag a narrow-band run would silently resume the wide-band
-    study of the same objective (the CSV header guard cannot tell them
-    apart). None, or the default band, leaves the name unchanged.
+    the name `_rb{m_lo:g}-{m_hi:g}` (e.g. `_rb0.001-10` at the presets'
+    own DEFAULT_RATE_MULTIPLIER_BOUNDS, `_rb0.1-10`) WHENEVER it is
+    given: a different band samples a different space over the SAME
+    columns, so without the tag a run would silently resume the study
+    of the same objective under another band (the CSV header guard
+    cannot tell them apart). Until the band moved 1e-5x -> 1e-3x later
+    on 2026-09-06 only a band DIFFERING from the default was tagged, so
+    the 1e-5x studies carry no `_rb` tag (e.g.
+    kin_opt_ethanol_isobutanol_metabolic_irr_ib0.1-10_burden); the driver
+    and supervisor now pass the EFFECTIVE band on every preset-derived
+    name, and only an explicit --study-name / study_name can resume
+    those. None (older callers) leaves the name unchanged. The presets'
+    per-parameter bands (DEFAULT_PARAMETER_MULTIPLIER_BOUNDS, k_10) are
+    part of the preset's identity and are NOT tagged.
 
     `inhibition_multiplier_bounds` (the band of the inhibition
     coefficients k_*i*, (m_lo, m_hi) x baseline) tags the name
@@ -676,8 +730,7 @@ def default_study_name(objective, study_target_products, study_type,
     if (kinetic_bounds_scenario is not None
             and kinetic_bounds_scenario != preset_kinetic_bounds_scenario):
         name += f'_kb{kinetic_bounds_scenario}'
-    if (rate_multiplier_bounds is not None
-            and tuple(rate_multiplier_bounds) != tuple(DEFAULT_RATE_MULTIPLIER_BOUNDS)):
+    if rate_multiplier_bounds is not None:
         lo, hi = rate_multiplier_bounds
         name += f'_rb{lo:g}-{hi:g}'
     if inhibition_multiplier_bounds is not None:
@@ -1238,6 +1291,7 @@ def run_kinetic_optimization(objective='IRR',
                              include_params=None,
                              rate_multiplier_bounds=None,
                              rate_params=None,
+                             parameter_multiplier_bounds=None,
                              threshold_conc_bounds=(0.0, 300.0),
                              target_delta_bounds=(5.0, 500.0),
                              spike_delta_bounds=(0.5, 595.0),
@@ -1304,6 +1358,10 @@ def run_kinetic_optimization(objective='IRR',
     probes -- apply to; the presets pass their workbook's capacity-role
     rows (rate_constant_names), leaving the inhibition coefficients
     k_*i* on `multiplier_bounds` with no probe.
+    `parameter_multiplier_bounds` ({name: (m_lo, m_hi)}, None = none) is
+    the per-parameter band of build_search_space, taking precedence over
+    the role band; the presets pass DEFAULT_PARAMETER_MULTIPLIER_BOUNDS
+    (k_10 on 0.1x-10x; its probe is then a knock-down at 0.1x).
 
     `burden_model` (default 'auto') is the enzyme-burden (proteome-
     allocation) constraint of enzyme_burden.py: 'auto' builds
@@ -1399,6 +1457,7 @@ def run_kinetic_optimization(objective='IRR',
         include_params=include_params,
         rate_multiplier_bounds=rate_multiplier_bounds,
         rate_params=rate_params,
+        parameter_multiplier_bounds=parameter_multiplier_bounds,
         threshold_conc_bounds=threshold_conc_bounds,
         target_delta_bounds=target_delta_bounds,
         spike_delta_bounds=spike_delta_bounds,
@@ -1424,6 +1483,12 @@ def run_kinetic_optimization(objective='IRR',
               f'{n_kinetic - n_rate} kinetic parameters (inhibition '
               f'coefficients, K_* terms) on {tuple(multiplier_bounds)} x '
               'baseline (where no override applies).')
+    if parameter_multiplier_bounds:
+        applied = {name: tuple(band)
+                   for name, band in parameter_multiplier_bounds.items()
+                   if name in search_space and name in kinetic_baselines
+                   and name not in (param_bounds_override or {})}
+        print(f'Per-parameter bands (x baseline) in force: {applied}')
 
     # Scenario baseline snapshot for restoration (the driver has already
     # baseline-simulated the scenario, so current_specifications IS the

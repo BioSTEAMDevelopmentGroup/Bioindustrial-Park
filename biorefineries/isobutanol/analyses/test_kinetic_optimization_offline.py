@@ -600,13 +600,13 @@ PASS('LOST rows: excluded by _completed, drawn as crosses in the PCA landscape, 
 
 #%% 19. rate_multiplier_bounds: k_* band separate from the K_* band; None = legacy single band
 kb19 = {'k_1e': 47.1, 'K_1e': 0.12, 'k_7': 0.5, 'K_1i': 2.0, 'k_13': 0.0}
-assert ko.DEFAULT_RATE_MULTIPLIER_BOUNDS == (1e-5, 10.0)
+assert ko.DEFAULT_RATE_MULTIPLIER_BOUNDS == (1e-3, 10.0)   # 1e-5 before 2026-09-06 (pm)
 assert ko.DEFAULT_SATURATION_MULTIPLIER_BOUNDS == (0.1, 10.0)
 space19, excl19 = ko.build_search_space(
     kb19, multiplier_bounds=ko.DEFAULT_SATURATION_MULTIPLIER_BOUNDS,
     rate_multiplier_bounds=ko.DEFAULT_RATE_MULTIPLIER_BOUNDS)
-assert space19['k_1e'] == dict(low=1e-5*47.1, high=10.0*47.1, log=True)
-assert space19['k_7'] == dict(low=1e-5*0.5, high=10.0*0.5, log=True)
+assert space19['k_1e'] == dict(low=1e-3*47.1, high=10.0*47.1, log=True)
+assert space19['k_7'] == dict(low=1e-3*0.5, high=10.0*0.5, log=True)
 assert space19['K_1e'] == dict(low=0.1*0.12, high=10.0*0.12, log=True)   # uppercase: saturation band
 assert space19['K_1i'] == dict(low=0.1*2.0, high=10.0*2.0, log=True)
 assert excl19 == ['k_13']                       # zero baseline still excluded
@@ -731,11 +731,16 @@ if os.path.isfile(wb_A) and os.path.isfile(wb_B):
         p21 = ko.resolve_study_preset(stp21, st21)
         assert set(p21) == {'scenario', 'kinetic_bounds_scenario', 'include_params',
                             'multiplier_bounds', 'rate_multiplier_bounds',
-                            'rate_params'}
+                            'rate_params', 'parameter_multiplier_bounds'}
         assert p21['scenario'] == 'A'                       # both start at the A baseline
         assert p21['kinetic_bounds_scenario'] == ('A' if stp21 == 'ethanol_only' else 'B')
         assert p21['multiplier_bounds'] == (0.1, 10.0)
-        assert p21['rate_multiplier_bounds'] == (1e-5, 10.0)
+        assert p21['rate_multiplier_bounds'] == (1e-3, 10.0)
+        # k_10 (active-biomass decay capacity, r10) keeps a 0.1x floor:
+        # a near-zero decay rate is not an engineering target.
+        assert p21['parameter_multiplier_bounds'] == {'k_10': (0.1, 10.0)}
+        assert p21['parameter_multiplier_bounds'] is not ko.DEFAULT_PARAMETER_MULTIPLIER_BOUNDS
+        assert 'k_10' in p21['rate_params'] and 'k_10' in p21['include_params']
         inc21 = p21['include_params']
         assert len(inc21) == n21, (stp21, st21, len(inc21))
         wb21 = ko.kinetic_param_names_from_scenario(p21['kinetic_bounds_scenario'])
@@ -788,36 +793,43 @@ if os.path.isfile(wb_A) and os.path.isfile(wb_B):
         p22['kinetic_bounds_scenario'],
         multiplier_bounds=p22['multiplier_bounds'],
         rate_multiplier_bounds=p22['rate_multiplier_bounds'],
-        rate_params=p22['rate_params'])
+        rate_params=p22['rate_params'],
+        parameter_multiplier_bounds=p22['parameter_multiplier_bounds'])
     space22, excl22 = ko.build_search_space(
         model22, multiplier_bounds=p22['multiplier_bounds'],
         rate_multiplier_bounds=p22['rate_multiplier_bounds'],
         rate_params=p22['rate_params'],
+        parameter_multiplier_bounds=p22['parameter_multiplier_bounds'],
         param_bounds_override=override22, include_params=p22['include_params'])
     assert excl22 == [] and len(space22) == 56 + 4
     assert all(space22[n]['log'] for n in base22_B)
-    # Bands by ROLE (2026-09-06): rate constants (capacity) 1e-5x-10x;
+    # Bands by ROLE (2026-09-06): rate constants (capacity) 1e-3x-10x
+    # (1e-5x until later that day), EXCEPT k_10 (active-biomass decay)
+    # on its own 0.1x-10x band (DEFAULT_PARAMETER_MULTIPLIER_BOUNDS);
     # inhibition coefficients (k_*i*: product_inhibition, lethality) and
     # the K_* terms (regulation, affinity, self-inhibition) 0.1x-10x.
     for n22, b22 in base22_B.items():
         assert space22[n22]['high'] == 10.0*b22
-        assert space22[n22]['low'] == (1e-5*b22 if n22 in p22['rate_params']
+        assert space22[n22]['low'] == (1e-3*b22 if (n22 in p22['rate_params']
+                                                    and n22 != 'k_10')
                                        else 0.1*b22), n22
     for inh22 in ('k_1ie', 'k_1ii', 'k_7ii', 'k_10ie', 'k_10ii', 'k_16ie'):
         assert space22[inh22]['low'] == 0.1*base22_B[inh22], inh22
     for rate22 in ('k_1h', 'k_2', 'k_7', 'k_13'):
-        assert space22[rate22]['low'] == 1e-5*base22_B[rate22], rate22
+        assert space22[rate22]['low'] == 1e-3*base22_B[rate22], rate22
+    assert space22['k_10'] == dict(low=0.1*0.06, high=10.0*0.06, log=True)
+    assert override22['k_10'] == (0.1*0.06, 10.0*0.06)
     pt22 = ko.baseline_decision_point(
         space22, model22,
         dict(target_conc=221.25, threshold_conc=217.125, spike_conc=600.0),
         baseline_max_n_spikes=16)
     for n22 in ehrlich22:
-        assert pt22[n22] == 1e-5*base22_B[n22], n22       # clipped to the floor, exactly
+        assert pt22[n22] == 1e-3*base22_B[n22], n22       # clipped to the floor, exactly
     for n22, v22 in model22.items():
         if n22 not in ehrlich22:
             assert pt22[n22] == v22, n22                  # nonzero baselines untouched
     assert pt22['threshold_conc'] == 217.125 and pt22['max_n_spikes'] == 16
-    PASS('preset trial 0: role-based bands (capacity 1e-5x, inhibition/K_* 0.1x); Ehrlich rates clipped to exactly 1e-5 x b_B, every other baseline unchanged')
+    PASS('preset trial 0: role-based bands (capacity 1e-3x, k_10 0.1x, inhibition/K_* 0.1x); Ehrlich rates clipped to exactly 1e-3 x b_B, every other baseline unchanged')
 else:
     print('SKIP 22: parameter-distribution workbooks not found')
 
@@ -827,18 +839,22 @@ sup23 = _runpy.run_path(os.path.join(
     'optimize_kinetics_BO_supervised.py'))
 # Naming: preset convention when a target-products preset is in force,
 # the legacy convention otherwise (what --legacy-flags selects). Every
-# preset-derived name carries the inhibition-coefficient band tag
-# _ib{lo}-{hi} (the supervisor passes the presets' K_* band; since
-# 2026-09-06, when the inhibition coefficients k_*i* left the k_* rate
-# band), so a new-scheme study never resumes a pre-change one.
+# preset-derived name carries the EFFECTIVE rate band tag _rb{lo}-{hi}
+# (the preset's DEFAULT_RATE_MULTIPLIER_BOUNDS unless overridden; always
+# tagged since the band moved 1e-5x -> 1e-3x on 2026-09-06, so a
+# new-band study never resumes the 1e-5x study of the same objective,
+# e.g. kin_opt_ethanol_isobutanol_metabolic_irr_ib0.1-10_burden) and the
+# inhibition-coefficient band tag _ib{lo}-{hi} (the supervisor passes
+# the presets' K_* band; since 2026-09-06, when the inhibition
+# coefficients k_*i* left the k_* rate band).
 assert sup23['default_study_name'](None, 'IRR', None,
                                    study_target_products='ethanol_isobutanol',
                                    study_type='metabolic_protein') \
-    == 'kin_opt_ethanol_isobutanol_metabolic_protein_irr_ib0.1-10'
+    == 'kin_opt_ethanol_isobutanol_metabolic_protein_irr_rb0.001-10_ib0.1-10'
 assert sup23['default_study_name']('A', 'IBO titer', 'B',
                                    study_target_products='ethanol_only',
                                    study_type='metabolic') \
-    == 'kin_opt_ethanol_only_metabolic_ibo_titer_kbB_ib0.1-10'
+    == 'kin_opt_ethanol_only_metabolic_ibo_titer_kbB_rb0.001-10_ib0.1-10'
     # ethanol_only's own kinetic_bounds_scenario is 'A' (STUDY_TARGET_PRODUCTS);
     # the explicit 'B' here differs, so it IS tagged (Finding 1 fix -- this
     # name used to silently drop the override and collide with the default).
@@ -851,13 +867,13 @@ assert sup23['default_study_name']('A', 'IRR', 'B') == 'kin_opt_A_kbB_irr'
 # is silent.
 assert sup23['default_study_name']('B', 'IRR', None,
                                    'ethanol_isobutanol', 'metabolic_protein') \
-    == 'kin_opt_ethanol_isobutanol_metabolic_protein_irr_scB_ib0.1-10'
+    == 'kin_opt_ethanol_isobutanol_metabolic_protein_irr_scB_rb0.001-10_ib0.1-10'
 assert sup23['default_study_name'](None, 'IRR', 'A',
                                    'ethanol_isobutanol', 'metabolic_protein') \
-    == 'kin_opt_ethanol_isobutanol_metabolic_protein_irr_kbA_ib0.1-10'
+    == 'kin_opt_ethanol_isobutanol_metabolic_protein_irr_kbA_rb0.001-10_ib0.1-10'
 assert sup23['default_study_name']('A', 'IRR', 'B',
                                    'ethanol_isobutanol', 'metabolic_protein') \
-    == 'kin_opt_ethanol_isobutanol_metabolic_protein_irr_ib0.1-10'  # both match the preset: no sc/kb tag
+    == 'kin_opt_ethanol_isobutanol_metabolic_protein_irr_rb0.001-10_ib0.1-10'  # both match the preset: no sc/kb tag
 # child_code forwards both kwargs (and None under --legacy-flags).
 code23 = sup23['child_code'](None, 'IRR', 2000, None, False, 'x',
                              study_target_products='ethanol_only',
@@ -1263,11 +1279,11 @@ assert sup26['default_study_name'](None, 'IRR', None, burden=True) == 'kin_opt_B
 assert sup26['default_study_name'](None, 'IRR', None,
                                    study_target_products='ethanol_isobutanol',
                                    study_type='metabolic_protein', burden=True) \
-    == 'kin_opt_ethanol_isobutanol_metabolic_protein_irr_ib0.1-10_burden'
+    == 'kin_opt_ethanol_isobutanol_metabolic_protein_irr_rb0.001-10_ib0.1-10_burden'
 assert sup26['default_study_name']('B', 'IRR', None,
                                    study_target_products='ethanol_isobutanol',
                                    study_type='metabolic_protein', burden=True) \
-    == 'kin_opt_ethanol_isobutanol_metabolic_protein_irr_scB_ib0.1-10_burden'
+    == 'kin_opt_ethanol_isobutanol_metabolic_protein_irr_scB_rb0.001-10_ib0.1-10_burden'
 # child_code forwards the flag both ways; supervise()'s default is ON and it
 # derives the study name WITH the flag (so resume/stall-kill hit the store
 # the child writes).
@@ -1402,16 +1418,21 @@ else:
     _e27 = _inspect.signature(ko.run_kinetic_optimization).parameters
     assert _e27['enqueue_knockouts'].default is True
 
-# Naming: a rate band differing from the preset's own is tagged _rb{lo}-{hi}
-# (same columns as the preset-band study, so the header guard cannot tell
-# them apart); the preset's own band, or None, leaves the name unchanged.
+# Naming: the rate band is tagged _rb{lo}-{hi} WHENEVER it is given (the
+# preset's own band included -- since the default moved 1e-5x -> 1e-3x a
+# new default-band study must never resume the untagged 1e-5x study of
+# the same objective: same columns, so the header guard cannot tell them
+# apart); None leaves the name unchanged (older callers).
 assert ko.default_study_name('IRR', 'ethanol_isobutanol', 'metabolic',
                              burden=True, rate_multiplier_bounds=(0.1, 10.0)) \
     == 'kin_opt_ethanol_isobutanol_metabolic_irr_rb0.1-10_burden'
 assert ko.default_study_name('IRR', 'ethanol_isobutanol', 'metabolic',
                              burden=True,
                              rate_multiplier_bounds=ko.DEFAULT_RATE_MULTIPLIER_BOUNDS) \
-    == 'kin_opt_ethanol_isobutanol_metabolic_irr_burden'
+    == 'kin_opt_ethanol_isobutanol_metabolic_irr_rb0.001-10_burden'
+assert ko.default_study_name('IRR', 'ethanol_isobutanol', 'metabolic',
+                             burden=True, rate_multiplier_bounds=(1e-5, 10.0)) \
+    == 'kin_opt_ethanol_isobutanol_metabolic_irr_rb1e-05-10_burden'
 assert ko.default_study_name('IRR', 'ethanol_isobutanol', 'metabolic', burden=True) \
     == 'kin_opt_ethanol_isobutanol_metabolic_irr_burden'
 assert ko.default_study_name('IBO titer', 'ethanol_only', 'metabolic_protein',
@@ -1453,7 +1474,7 @@ drv27 = open(os.path.join(os.path.dirname(os.path.abspath(__file__)),
                           'optimize_kinetics_BO.py')).read()
 assert 'enqueue_knockouts=True,' in drv27                          # run() kwarg, default on
 assert 'enqueue_knockouts=enqueue_knockouts' in drv27              # forwarded to the engine
-assert 'rate_multiplier_bounds=explicit_rate_bounds' in drv27      # naming sees the override only
+assert "rate_multiplier_bounds=engine_kwargs['rate_multiplier_bounds']" in drv27  # naming sees the EFFECTIVE band
 PASS('single-knockout probes: floor points per k_*, enqueued after trial 0 on a fresh study only, identifiable, off switch, _rb naming tag, driver/supervisor flags')
 
 #%% 28. role-based bands (2026-09-06): the k_* rate band applies to RATE
@@ -1614,6 +1635,151 @@ else:
     dist28 = tr28[5].distributions
     assert np.isclose(dist28['k_1ie'].low, 0.1*0.05) and dist28['k_1ie'].log
     assert np.isclose(dist28['k_1e'].low, 1e-5*47.1) and dist28['k_1e'].log
-PASS('role-based bands: rate constants 1e-5x-10x, inhibition coefficients and K_* 0.1x-10x; rate_params threaded (None = legacy prefix rule); probes only for rate constants; _ib naming tag; driver/supervisor plumbing')
+PASS('role-based bands: rate constants on the rate band, inhibition coefficients and K_* 0.1x-10x; rate_params threaded (None = legacy prefix rule); probes only for rate constants; _ib naming tag; driver/supervisor plumbing')
+
+#%% 29. per-parameter multiplier bands (2026-09-06 pm): the rate band is
+# 1e-3x-10x and k_10 (active-biomass decay capacity, r10) keeps 0.1x-10x
+# via DEFAULT_PARAMETER_MULTIPLIER_BOUNDS; parameter_multiplier_bounds
+# threaded through build_search_space / workbook_kinetic_bounds / the
+# engine / the driver; precedence absolute override > per-parameter band
+# > role band; every preset name tags the effective rate band.
+assert ko.DEFAULT_RATE_MULTIPLIER_BOUNDS == (1e-3, 10.0)
+assert ko.DEFAULT_PARAMETER_MULTIPLIER_BOUNDS == {'k_10': (0.1, 10.0)}
+assert 'DEFAULT_PARAMETER_MULTIPLIER_BOUNDS' in ko.__all__
+kb29 = {'k_1e': 47.1, 'k_10': 0.06, 'k_10ie': 0.04, 'K_1e': 0.12, 'k_7': 1.203}
+roles29 = {'k_1e': 'capacity', 'k_10': 'capacity', 'k_10ie': 'lethality',
+           'K_1e': 'affinity', 'k_7': 'capacity'}
+rp29 = ko.rate_constant_names(kb29, roles=roles29)
+assert rp29 == ['k_1e', 'k_10', 'k_7']
+space29, excl29 = ko.build_search_space(
+    kb29, multiplier_bounds=(0.1, 10.0), rate_multiplier_bounds=(1e-3, 10.0),
+    rate_params=rp29, parameter_multiplier_bounds={'k_10': (0.1, 10.0)})
+assert excl29 == []
+assert space29['k_1e'] == dict(low=1e-3*47.1, high=10.0*47.1, log=True)
+assert space29['k_7'] == dict(low=1e-3*1.203, high=10.0*1.203, log=True)
+assert space29['k_10'] == dict(low=0.1*0.06, high=10.0*0.06, log=True)     # per-parameter band
+assert space29['k_10ie'] == dict(low=0.1*0.04, high=10.0*0.04, log=True)   # untouched
+assert space29['K_1e'] == dict(low=0.1*0.12, high=10.0*0.12, log=True)
+# Per-parameter band applies regardless of the rate rule (a K_* too), and
+# under the legacy prefix rule (rate_params=None).
+space29b, _ = ko.build_search_space(
+    kb29, multiplier_bounds=(0.1, 10.0), rate_multiplier_bounds=(1e-3, 10.0),
+    parameter_multiplier_bounds={'k_10': (0.5, 2.0), 'K_1e': (0.01, 100.0)})
+assert space29b['k_10'] == dict(low=0.5*0.06, high=2.0*0.06, log=True)
+assert space29b['K_1e'] == dict(low=0.01*0.12, high=100.0*0.12, log=True)
+assert space29b['k_10ie']['low'] == 1e-3*0.04                              # prefix rule
+# Precedence: absolute override > per-parameter band; whitelist/exclude
+# still win over both; a per-parameter entry for an absent/excluded name
+# is ignored; None / {} = no per-parameter band (the pre-change space).
+space29c, _ = ko.build_search_space(
+    kb29, rate_multiplier_bounds=(1e-3, 10.0), rate_params=rp29,
+    parameter_multiplier_bounds={'k_10': (0.1, 10.0), 'k_1e': (0.2, 5.0),
+                                 'k_99': (0.1, 10.0)},
+    param_bounds_override={'k_10': (0.001, 0.002)},
+    include_params=['k_10', 'k_1e', 'k_7'], exclude_params=('k_7',))
+assert space29c['k_10'] == dict(low=0.001, high=0.002, log=True)
+assert space29c['k_1e'] == dict(low=0.2*47.1, high=5.0*47.1, log=True)
+assert set(space29c) == {'k_10', 'k_1e', *ko.FEEDING_VARIABLES}
+space29d, _ = ko.build_search_space(
+    kb29, multiplier_bounds=(0.1, 10.0), rate_multiplier_bounds=(1e-3, 10.0),
+    rate_params=rp29, parameter_multiplier_bounds=None)
+assert space29d['k_10'] == dict(low=1e-3*0.06, high=10.0*0.06, log=True)
+assert ko.build_search_space(
+    kb29, multiplier_bounds=(0.1, 10.0), rate_multiplier_bounds=(1e-3, 10.0),
+    rate_params=rp29, parameter_multiplier_bounds={})[0] == space29d
+# A nonpositive baseline is still excluded (a multiplier band needs one).
+space29e, excl29e = ko.build_search_space(
+    dict(kb29, k_10=0.0), rate_multiplier_bounds=(1e-3, 10.0), rate_params=rp29,
+    parameter_multiplier_bounds={'k_10': (0.1, 10.0)})
+assert excl29e == ['k_10'] and 'k_10' not in space29e
+# Legacy single-band space (no rate band, no per-parameter band) EXACTLY as before.
+assert ko.build_search_space(kb29)[0] == {
+    'k_1e': dict(low=0.1*47.1, high=10.0*47.1, log=True),
+    'k_10': dict(low=0.1*0.06, high=10.0*0.06, log=True),
+    'k_10ie': dict(low=0.1*0.04, high=10.0*0.04, log=True),
+    'K_1e': dict(low=0.1*0.12, high=10.0*0.12, log=True),
+    'k_7': dict(low=0.1*1.203, high=10.0*1.203, log=True),
+    'threshold_conc': dict(low=0.0, high=300.0, log=False),
+    'target_delta': dict(low=5.0, high=500.0, log=False),
+    'spike_delta': dict(low=0.5, high=595.0, log=False),
+    'max_n_spikes': dict(low=0, high=50, log=False, int=True)}
+# knockout probes: k_10's probe sits at ITS floor (0.1x, a knock-down).
+base29 = ko.baseline_decision_point(space29, kb29,
+                                    fbs17.current_specifications, 16)
+probes29, at_floor29 = ko.knockout_probe_points(space29, base29, rate_params=rp29)
+assert list(probes29) == ['k_1e', 'k_10', 'k_7'] and at_floor29 == []
+assert probes29['k_10']['k_10'] == 0.1*0.06 and probes29['k_1e']['k_1e'] == 1e-3*47.1
+# Engine kwarg plumbed (default None) and forwarded to build_search_space.
+_sig29 = _inspect.signature(ko.run_kinetic_optimization).parameters
+assert 'parameter_multiplier_bounds' in _sig29 \
+    and _sig29['parameter_multiplier_bounds'].default is None
+assert 'parameter_multiplier_bounds=parameter_multiplier_bounds' \
+    in _inspect.getsource(ko.run_kinetic_optimization)
+# workbook_kinetic_bounds: the per-parameter band on the real workbooks.
+if os.path.isfile(wb_A) and os.path.isfile(wb_B):
+    roles29_real = ko.kinetic_parameter_roles()
+    assert roles29_real['k_10'] == 'capacity'
+    for sc29 in ('A', 'B'):
+        base29_wb = ko.workbook_kinetic_baselines(sc29)
+        rp29_wb = ko.rate_constant_names(base29_wb, roles=roles29_real)
+        assert 'k_10' in rp29_wb
+        wbb29 = ko.workbook_kinetic_bounds(
+            sc29, multiplier_bounds=(0.1, 10.0),
+            rate_multiplier_bounds=(1e-3, 10.0), rate_params=rp29_wb,
+            parameter_multiplier_bounds=ko.DEFAULT_PARAMETER_MULTIPLIER_BOUNDS)
+        assert list(wbb29) == list(base29_wb)
+        for n29, b29 in base29_wb.items():
+            if n29 == 'k_10':
+                assert wbb29[n29] == (0.1*b29, 10.0*b29)
+            else:
+                assert wbb29[n29] == ((1e-3*b29, 10.0*b29) if n29 in rp29_wb
+                                      else (0.1*b29, 10.0*b29)), n29
+        # Without the table, k_10 is an ordinary rate constant (pre-change).
+        wbb29_none = ko.workbook_kinetic_bounds(
+            sc29, multiplier_bounds=(0.1, 10.0),
+            rate_multiplier_bounds=(1e-3, 10.0), rate_params=rp29_wb)
+        assert wbb29_none['k_10'] == (1e-3*base29_wb['k_10'], 10.0*base29_wb['k_10'])
+        assert all(wbb29_none[n] == wbb29[n] for n in base29_wb if n != 'k_10')
+    # Every preset carries a COPY of the default table.
+    for stp29, st29 in (('ethanol_only', 'metabolic'),
+                        ('ethanol_isobutanol', 'metabolic_protein')):
+        p29 = ko.resolve_study_preset(stp29, st29)
+        assert p29['parameter_multiplier_bounds'] == ko.DEFAULT_PARAMETER_MULTIPLIER_BOUNDS
+        assert p29['parameter_multiplier_bounds'] is not ko.DEFAULT_PARAMETER_MULTIPLIER_BOUNDS
+        assert p29['rate_multiplier_bounds'] == (1e-3, 10.0)
+else:
+    print('SKIP 29 (workbook part): parameter-distribution workbooks not found')
+# Naming: the EFFECTIVE rate band is always tagged on preset names (engine
+# rule: whenever given), before _ib; the legacy path never encodes it.
+assert ko.default_study_name('IRR', 'ethanol_isobutanol', 'metabolic_protein',
+                             rate_multiplier_bounds=(1e-3, 10.0),
+                             inhibition_multiplier_bounds=(0.1, 10.0), burden=True) \
+    == 'kin_opt_ethanol_isobutanol_metabolic_protein_irr_rb0.001-10_ib0.1-10_burden'
+sup29 = _runpy.run_path(os.path.join(
+    os.path.dirname(os.path.abspath(__file__)),
+    'optimize_kinetics_BO_supervised.py'))
+assert sup29['default_study_name'](None, 'IRR', None,
+                                   study_target_products='ethanol_isobutanol',
+                                   study_type='metabolic_protein', burden=True) \
+    == 'kin_opt_ethanol_isobutanol_metabolic_protein_irr_rb0.001-10_ib0.1-10_burden'
+assert sup29['default_study_name'](None, 'IRR', None,
+                                   study_target_products='ethanol_isobutanol',
+                                   study_type='metabolic_protein', burden=True,
+                                   rate_multiplier_bounds=(1e-5, 10.0)) \
+    == 'kin_opt_ethanol_isobutanol_metabolic_protein_irr_rb1e-05-10_ib0.1-10_burden'
+assert sup29['default_study_name']('A', 'IRR', 'B', burden=True) == 'kin_opt_A_kbB_irr_burden'
+src29_sup = open(os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                              'optimize_kinetics_BO_supervised.py')).read()
+assert 'ko.DEFAULT_RATE_MULTIPLIER_BOUNDS' in _inspect.getsource(sup29['default_study_name'])
+assert "1e-5 10" not in src29_sup                          # stale help text
+# Driver: the preset's table is defaulted into engine_kwargs, forwarded to
+# the workbook bounds, and the study name sees the EFFECTIVE rate band.
+drv29 = open(os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                          'optimize_kinetics_BO.py')).read()
+assert "'rate_multiplier_bounds', 'rate_params',\n                    'parameter_multiplier_bounds')" in drv29
+assert "parameter_multiplier_bounds=engine_kwargs.get('parameter_multiplier_bounds')" in drv29
+assert "rate_multiplier_bounds=engine_kwargs['rate_multiplier_bounds']" in drv29
+assert 'explicit_rate_bounds' not in drv29
+PASS('per-parameter bands: rate band 1e-3x-10x, k_10 0.1x-10x via DEFAULT_PARAMETER_MULTIPLIER_BOUNDS; precedence override > per-parameter > role; probes at own floor; workbook/preset/engine/driver plumbing; _rb always tagged')
 
 print(f'\nALL {n_pass} CHECKS PASSED')

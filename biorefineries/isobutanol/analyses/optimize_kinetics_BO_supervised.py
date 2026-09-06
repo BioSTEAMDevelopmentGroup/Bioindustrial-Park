@@ -90,10 +90,13 @@ def default_study_name(scenario, objective, kinetic_bounds_scenario,
     default_study_name); else the legacy kin_opt_{scenario}[_kb{X}]_{slug}
     with the driver's legacy default scenario 'B'.
     `burden=True` appends ko.BURDEN_STUDY_SUFFIX on both paths (the
-    driver's convention). `rate_multiplier_bounds` (an explicit k_* band)
-    is tagged `_rb{lo}-{hi}` on the preset path only when it differs from
-    the presets' default band (the engine's rule); the legacy path never
-    encoded the band. Every preset name also carries the inhibition-
+    driver's convention). `rate_multiplier_bounds` (an explicit k_* band;
+    None = the presets' ko.DEFAULT_RATE_MULTIPLIER_BOUNDS, which the
+    driver defaults in) is tagged `_rb{lo}-{hi}` on EVERY preset name --
+    the effective band, always, since the default moved 1e-5x -> 1e-3x
+    (the 1e-5x studies are untagged: only a differing band was tagged
+    then, so they can only be resumed via --study-name); the legacy path
+    never encoded the band. Every preset name also carries the inhibition-
     coefficient band tag `_ib{lo}-{hi}` (the presets' saturation band,
     ko.DEFAULT_SATURATION_MULTIPLIER_BOUNDS -- the supervisor exposes no
     flag for it, matching the driver's default `multiplier_bounds`):
@@ -104,7 +107,10 @@ def default_study_name(scenario, objective, kinetic_bounds_scenario,
                                      study_type, scenario=scenario,
                                      kinetic_bounds_scenario=kinetic_bounds_scenario,
                                      burden=burden,
-                                     rate_multiplier_bounds=rate_multiplier_bounds,
+                                     rate_multiplier_bounds=(
+                                         ko.DEFAULT_RATE_MULTIPLIER_BOUNDS
+                                         if rate_multiplier_bounds is None
+                                         else rate_multiplier_bounds),
                                      inhibition_multiplier_bounds=
                                          ko.DEFAULT_SATURATION_MULTIPLIER_BOUNDS)
     scenario = scenario or 'B'
@@ -211,8 +217,11 @@ def supervise(scenario=None, objective='IRR', n_trials=2000,
     un-suffixed name. `enqueue_knockouts` (default True) is the driver's
     single-knockout-probe flag (--no-enqueue-knockouts turns it off);
     `rate_multiplier_bounds` (None = the preset's k_* band) is an
-    explicit (m_lo, m_hi) k_* band (--rate-multiplier-bounds LO HI),
-    tagged into the derived study name when it differs from the preset's."""
+    explicit (m_lo, m_hi) k_* band (--rate-multiplier-bounds LO HI); the
+    effective band (explicit or the preset's) is always tagged into the
+    derived study name. k_10 keeps the preset's per-parameter 0.1x-10x
+    band either way (the driver's parameter_multiplier_bounds default;
+    the supervisor exposes no flag for it)."""
     if study_name is None:
         study_name = default_study_name(scenario, objective,
                                         kinetic_bounds_scenario,
@@ -382,11 +391,14 @@ if __name__ == '__main__':
                         default=None, metavar=('LO', 'HI'),
                         help='explicit RATE-CONSTANT band (x baseline, '
                              "log-scale; role capacity: k_1h, k_2, ..., "
-                             "k_13-k_16) overriding the preset's 1e-5 10; "
+                             "k_13-k_16) overriding the preset's 0.001 10; "
+                             'k_10 (active-biomass decay) keeps its '
+                             'per-parameter 0.1 10 band either way, and '
                              'inhibition coefficients (k_1ie, k_1ii, ...) '
-                             'and K_* terms stay on 0.1 10; a differing '
-                             'band tags the derived study name _rb{LO}-{HI} '
-                             'so it never resumes the preset-band study')
+                             'and K_* terms stay on 0.1 10; the effective '
+                             'band is always tagged into the derived study '
+                             'name _rb{LO}-{HI}, so a study never resumes '
+                             'one of the same name under another band')
     args = parser.parse_args()
     if not args.restrict_to_workbook and not args.legacy_flags:
         parser.error('--no-restrict-to-workbook requires --legacy-flags '
