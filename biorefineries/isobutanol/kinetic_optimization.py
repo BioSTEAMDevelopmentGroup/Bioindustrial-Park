@@ -69,7 +69,9 @@ __all__ = ('OBJECTIVE_REGISTRY', 'TRACKED_METRICS',
            'plot_optimization_trajectories', 'plot_parameter_trajectory',
            'plot_best_vs_baseline',
            'pca_decision_matrix', 'plot_pca_projection',
-           'StallGuard', 'attempt_outcome')
+           'StallGuard', 'attempt_outcome',
+           'search_space_distributions', 'draw_uniform_feasible',
+           'feasible_candidate_mask', 'feasible_tpe_sampler')
 
 FEEDING_VARIABLES = ('threshold_conc', 'target_delta', 'spike_delta',
                      'max_n_spikes')
@@ -1260,6 +1262,91 @@ def attempt_outcome(exit_code, rows_before, rows_after,
     if empty_streak + 1 >= max_empty_attempts:
         return 'abort'
     return 'resume' if inflight_lost else 'abort'
+
+#%% Feasibility-aware TPE sampling (2026-09-06)
+# The enzyme-burden cap (enzyme_burden.BurdenModel.evaluate(values).feasible,
+# i.e. Phi_M < F_flex) is a closed-form function of the sampled values, so
+# the sampler can reject over-cap proposals before they cost a trial
+# number. The helpers below are optuna-free at import (optuna is imported
+# inside); the sampler subclass is built lazily by
+# _feasible_tpe_sampler_class and instantiated by feasible_tpe_sampler.
+
+def search_space_distributions(search_space):
+    """{name: optuna distribution} for an engine search space
+    ({name: {'low', 'high', 'log'[, 'int']}}, see build_search_space):
+    FloatDistribution(low, high, log=) for float entries and
+    IntDistribution(low, high) for 'int': True entries -- exactly what the
+    objective's suggest_float(..., log=) / suggest_int(...) calls record,
+    so optuna accepts the sampler's values as relative parameters."""
+    from optuna.distributions import FloatDistribution, IntDistribution
+    distributions = {}
+    for name, sp in search_space.items():
+        if sp.get('int'):
+            distributions[name] = IntDistribution(int(sp['low']), int(sp['high']))
+        else:
+            distributions[name] = FloatDistribution(float(sp['low']),
+                                                    float(sp['high']),
+                                                    log=bool(sp['log']))
+    return distributions
+
+def _uniform_internal_draw(rng, dist):
+    """One value of `dist` (an optuna Float/IntDistribution), uniform in
+    optuna's internal representation: log-uniform for log floats,
+    uniform for linear floats, integer-uniform for ints. Returned as the
+    internal-repr float (ints are integer-valued floats)."""
+    from optuna.distributions import IntDistribution
+    if isinstance(dist, IntDistribution):
+        return float(rng.randint(dist.low, dist.high + 1))
+    if dist.log:
+        x = math.exp(rng.uniform(math.log(dist.low), math.log(dist.high)))
+        return float(min(dist.high, max(dist.low, x)))   # exp() round-off
+    return float(rng.uniform(dist.low, dist.high))
+
+def _to_external(internal, distributions):
+    """{name: external value} of an internal-repr point; a value outside
+    its distribution is a programming error (RuntimeError)."""
+    values = {}
+    for name, dist in distributions.items():
+        x = internal[name]
+        if not dist._contains(x):
+            raise RuntimeError(f'sampled value {x!r} for {name} is outside '
+                               f'its distribution {dist}')
+        values[name] = dist.to_external_repr(x)
+    return values
+
+def draw_uniform_feasible(rng, distributions, is_feasible, max_draws=10_000):
+    """Joint uniform draw over `distributions` (search_space_distributions),
+    redrawn until `is_feasible(values)` (values in EXTERNAL repr: floats,
+    ints for IntDistribution) is true. Returns (values, n_draws,
+    feasible): the first feasible draw, or after `max_draws` draws the
+    LAST draw with feasible=False. Uniform in optuna's internal repr, so
+    the accepted points are exactly uniform on the feasible set under the
+    measure the study already uses for its random start-up."""
+    max_draws = int(max_draws)
+    if max_draws < 1:
+        raise ValueError(f'max_draws must be >= 1; got {max_draws!r}')
+    values = None
+    for n_draws in range(1, max_draws + 1):
+        internal = {name: _uniform_internal_draw(rng, dist)
+                    for name, dist in distributions.items()}
+        values = _to_external(internal, distributions)
+        if is_feasible(values):
+            return values, n_draws, True
+    return values, max_draws, False
+
+def feasible_candidate_mask(samples, distributions, is_feasible):
+    """Boolean array over a Parzen candidate batch (`samples` = {name:
+    ndarray} in internal repr, as returned by the estimator's sample()):
+    candidate i is converted to external values with to_external_repr
+    and passed to `is_feasible`."""
+    names = list(samples)
+    size = len(samples[names[0]])
+    mask = np.zeros(size, dtype=bool)
+    for i in range(size):
+        values = {name: distributions[name].to_external_repr(float(samples[name][i]))
+                  for name in names}
+        mask[i] = bool(is_feasible(values))
+    return mask
 
 #%% Engine
 

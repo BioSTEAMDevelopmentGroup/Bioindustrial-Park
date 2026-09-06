@@ -1901,4 +1901,78 @@ file31 = open(os.path.join(os.path.dirname(os.path.abspath(__file__)),
 assert "'--max-empty-attempts'" in file31 and 'max_empty_attempts=args.max_empty_attempts' in file31
 PASS('empty-attempt abort rule: first-draw hang resumes (sidecar present), never-simulated aborts, streak cap; supervisor streak + flag')
 
+#%% 32. feasibility-aware sampling helpers (2026-09-06, spec
+# docs/superpowers/specs/2026-09-06-feasible-tpe-sampler-design.md):
+# search_space_distributions reproduces the distributions a real suggest_*
+# trial records; draw_uniform_feasible is uniform in optuna's internal repr
+# (log-uniform for log floats, integer-uniform for ints), in bounds, typed,
+# and gives up after exactly max_draws; feasible_candidate_mask converts a
+# Parzen batch to external values per candidate.
+space32 = {'a': dict(low=0.01, high=100.0, log=True),
+           'b': dict(low=0.0, high=5.0, log=False),
+           'n': dict(low=0, high=10, log=False, int=True)}
+if _optuna is None:
+    print('SKIP 32: optuna not installed')
+else:
+    dists32 = ko.search_space_distributions(space32)
+    assert list(dists32) == ['a', 'b', 'n']
+    def _obj32(trial):
+        trial.suggest_float('a', 0.01, 100.0, log=True)
+        trial.suggest_float('b', 0.0, 5.0)
+        trial.suggest_int('n', 0, 10)
+        return 0.0
+    st32 = _optuna.create_study(sampler=_optuna.samplers.RandomSampler(seed=0))
+    st32.optimize(_obj32, n_trials=1)
+    assert st32.trials[0].distributions == dists32, (st32.trials[0].distributions, dists32)
+    # uniform-feasible draw: bounds, types, log-uniformity, draw count
+    rng32 = np.random.RandomState(0)
+    n_calls32 = []
+    def _always32(values):
+        n_calls32.append(values)
+        return True
+    decades32 = np.zeros(4, dtype=int)     # [0.01,0.1) [0.1,1) [1,10) [10,100]
+    for _ in range(4000):
+        values32, n_draws32, ok32 = ko.draw_uniform_feasible(rng32, dists32, _always32)
+        assert ok32 and n_draws32 == 1
+        assert set(values32) == {'a', 'b', 'n'}
+        assert 0.01 <= values32['a'] <= 100.0 and 0.0 <= values32['b'] <= 5.0
+        assert isinstance(values32['a'], float) and isinstance(values32['b'], float)
+        assert isinstance(values32['n'], int) and 0 <= values32['n'] <= 10
+        decades32[min(3, int(np.floor(np.log10(values32['a'])) + 2))] += 1
+    assert len(n_calls32) == 4000
+    frac32 = decades32/4000.0
+    assert np.all(np.abs(frac32 - 0.25) < 0.03), frac32           # log-uniform in a
+    seen_n32 = {v['n'] for v in n_calls32}
+    assert seen_n32 == set(range(11)), seen_n32                   # every int reached
+    # always-false predicate: exactly max_draws draws, feasible=False
+    n_false32 = []
+    def _never32(values):
+        n_false32.append(values)
+        return False
+    values32f, n_draws32f, ok32f = ko.draw_uniform_feasible(
+        np.random.RandomState(1), dists32, _never32, max_draws=7)
+    assert (not ok32f) and n_draws32f == 7 and len(n_false32) == 7
+    assert values32f == n_false32[-1]                              # the LAST draw is returned
+    try:
+        ko.draw_uniform_feasible(np.random.RandomState(1), dists32, _never32, max_draws=0)
+    except ValueError as e32:
+        assert 'max_draws' in str(e32)
+    else:
+        raise AssertionError('max_draws=0 did not raise')
+    # candidate mask over a Parzen-style batch (internal repr: floats)
+    batch32 = {'a': np.array([1.0, 50.0, 2.0]),
+               'b': np.array([1.0, 1.0, 4.0]),
+               'n': np.array([0.0, 3.0, 10.0])}
+    types32 = []
+    def _cap32(values):
+        types32.append(type(values['n']))
+        return values['a'] + values['b'] < 5.0
+    mask32 = ko.feasible_candidate_mask(batch32, dists32, _cap32)
+    assert mask32.dtype == bool and mask32.tolist() == [True, False, False]
+    assert types32 == [int, int, int]                              # ints converted per candidate
+    for name in ('search_space_distributions', 'draw_uniform_feasible',
+                 'feasible_candidate_mask'):
+        assert name in ko.__all__, name
+    PASS('feasible-sampling helpers: distributions match suggest_*; uniform-feasible draw in bounds, typed, log-uniform, max_draws; candidate mask')
+
 print(f'\nALL {n_pass} CHECKS PASSED')
