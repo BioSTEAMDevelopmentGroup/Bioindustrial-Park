@@ -80,7 +80,7 @@ _spec.loader.exec_module(ko)
 
 def default_study_name(scenario, objective, kinetic_bounds_scenario,
                        study_target_products=None, study_type=None,
-                       burden=False):
+                       burden=False, rate_multiplier_bounds=None):
     """Mirror the driver's stable study naming (resume finds the same
     study): the preset convention
     kin_opt_{study_target_products}_{study_type}_{slug} whenever a
@@ -90,12 +90,16 @@ def default_study_name(scenario, objective, kinetic_bounds_scenario,
     default_study_name); else the legacy kin_opt_{scenario}[_kb{X}]_{slug}
     with the driver's legacy default scenario 'B'.
     `burden=True` appends ko.BURDEN_STUDY_SUFFIX on both paths (the
-    driver's convention)."""
+    driver's convention). `rate_multiplier_bounds` (an explicit k_* band)
+    is tagged `_rb{lo}-{hi}` on the preset path only when it differs from
+    the presets' default band (the engine's rule); the legacy path never
+    encoded the band."""
     if study_target_products is not None:
         return ko.default_study_name(objective, study_target_products,
                                      study_type, scenario=scenario,
                                      kinetic_bounds_scenario=kinetic_bounds_scenario,
-                                     burden=burden)
+                                     burden=burden,
+                                     rate_multiplier_bounds=rate_multiplier_bounds)
     scenario = scenario or 'B'
     slug = objective.lower().replace(' ', '_')
     suffix = ko.BURDEN_STUDY_SUFFIX if burden else ''
@@ -152,9 +156,14 @@ def lost_cause(killed_for_stall, stall_timeout_min, returncode):
 def child_code(scenario, objective, n_trials, kinetic_bounds_scenario,
                make_plots, study_name, restrict_to_workbook=True,
                seed=3221, study_target_products=None, study_type=None,
-               burden=True):
+               burden=True, enqueue_knockouts=True,
+               rate_multiplier_bounds=None):
     """The -c program for one supervised attempt of the driver.
-    `study_target_products=None` selects the driver's legacy flag path."""
+    `study_target_products=None` selects the driver's legacy flag path.
+    `rate_multiplier_bounds=None` leaves the k_* band to the preset (the
+    driver's engine_kwargs default); a tuple overrides it."""
+    rate_kw = ('' if rate_multiplier_bounds is None else
+               f'          rate_multiplier_bounds={tuple(rate_multiplier_bounds)!r},\n')
     return (
         'import runpy\n'
         f'ns = runpy.run_path({DRIVER!r})\n'
@@ -167,7 +176,10 @@ def child_code(scenario, objective, n_trials, kinetic_bounds_scenario,
         f'          restrict_to_workbook={restrict_to_workbook!r},\n'
         f'          study_target_products={study_target_products!r},\n'
         f'          study_type={study_type!r},\n'
-        f'          burden={burden!r})\n')
+        f'          burden={burden!r},\n'
+        f'          enqueue_knockouts={enqueue_knockouts!r},\n'
+        f'{rate_kw}'
+        f'          )\n')
 
 
 def supervise(scenario=None, objective='IRR', n_trials=2000,
@@ -176,7 +188,8 @@ def supervise(scenario=None, objective='IRR', n_trials=2000,
               settle_s=10.0, python=None, log_path=None,
               restrict_to_workbook=True, seed=3221,
               study_target_products=ko.DEFAULT_STUDY_TARGET_PRODUCTS,
-              study_type=ko.DEFAULT_STUDY_TYPE, burden=True):
+              study_type=ko.DEFAULT_STUDY_TYPE, burden=True,
+              enqueue_knockouts=True, rate_multiplier_bounds=None):
     """Run attempts until 'complete' or 'abort'; returns the final
     outcome string ('complete' or 'abort'). `study_target_products` /
     `study_type` name the driver's study preset (defaults = the engine's;
@@ -188,12 +201,17 @@ def supervise(scenario=None, objective='IRR', n_trials=2000,
     reproduce the pre-2026-09-03 all-model-k_* search set. `burden`
     (default True) is the driver's enzyme-burden flag; False
     (--no-burden) runs/resumes a burden-free study under the
-    un-suffixed name."""
+    un-suffixed name. `enqueue_knockouts` (default True) is the driver's
+    single-knockout-probe flag (--no-enqueue-knockouts turns it off);
+    `rate_multiplier_bounds` (None = the preset's k_* band) is an
+    explicit (m_lo, m_hi) k_* band (--rate-multiplier-bounds LO HI),
+    tagged into the derived study name when it differs from the preset's."""
     if study_name is None:
         study_name = default_study_name(scenario, objective,
                                         kinetic_bounds_scenario,
                                         study_target_products=study_target_products,
-                                        study_type=study_type, burden=burden)
+                                        study_type=study_type, burden=burden,
+                                        rate_multiplier_bounds=rate_multiplier_bounds)
     csv_path = os.path.join(RESULTS_DIR, study_name + '_trajectory.csv')
     inflight_path = ko.inflight_path_for(RESULTS_DIR, study_name)
     if python is None:
@@ -205,7 +223,9 @@ def supervise(scenario=None, objective='IRR', n_trials=2000,
                       kinetic_bounds_scenario, make_plots, study_name,
                       restrict_to_workbook=restrict_to_workbook, seed=seed,
                       study_target_products=study_target_products,
-                      study_type=study_type, burden=burden)
+                      study_type=study_type, burden=burden,
+                      enqueue_knockouts=enqueue_knockouts,
+                      rate_multiplier_bounds=rate_multiplier_bounds)
     guard = ko.StallGuard(stall_timeout_s=60.0*stall_timeout_min)
 
     def event(msg):
@@ -344,6 +364,19 @@ if __name__ == '__main__':
                              'burden-free study under the un-suffixed study '
                              'name (required to resume any study started '
                              'before 2026-09-05; the default adds _burden)')
+    parser.add_argument('--no-enqueue-knockouts', dest='enqueue_knockouts',
+                        action='store_false',
+                        help='do not enqueue the single-knockout probes '
+                             '(one k_* alone at its band floor, the rest at '
+                             'the baseline) after trial 0 of a fresh study; '
+                             'the default enqueues one per rate constant so '
+                             'TPE learns the lethality map first')
+    parser.add_argument('--rate-multiplier-bounds', nargs=2, type=float,
+                        default=None, metavar=('LO', 'HI'),
+                        help="explicit k_* band (x baseline, log-scale) "
+                             "overriding the preset's 1e-5 10; a differing "
+                             'band tags the derived study name _rb{LO}-{HI} '
+                             'so it never resumes the preset-band study')
     args = parser.parse_args()
     if not args.restrict_to_workbook and not args.legacy_flags:
         parser.error('--no-restrict-to-workbook requires --legacy-flags '
@@ -360,5 +393,9 @@ if __name__ == '__main__':
                         study_target_products=(None if args.legacy_flags
                                                else args.study_target_products),
                         study_type=args.study_type,
-                        burden=args.burden)
+                        burden=args.burden,
+                        enqueue_knockouts=args.enqueue_knockouts,
+                        rate_multiplier_bounds=(
+                            None if args.rate_multiplier_bounds is None
+                            else tuple(args.rate_multiplier_bounds)))
     sys.exit(0 if outcome == 'complete' else 1)

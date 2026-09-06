@@ -1280,4 +1280,154 @@ assert 'eb.scenario_b_ehrlich()' in drv26 and 'describe_point(' in drv26
 assert "'burden_model' in engine_kwargs" in drv26                 # ambiguity guard
 PASS('driver/supervisor: burden on by default, --no-burden, _burden naming on both paths, A/B reports wired')
 
+#%% 27. single-knockout probes: pure points; engine enqueues them right after trial 0 (fresh study only); _rb naming tag; driver/supervisor plumbing
+# Pure: one probe per log-scale RATE constant (k_*) of the space, at that
+# variable's floor, every other decision variable at the baseline point.
+# K_*, the feeding variables and a rate whose baseline already sits at its
+# floor (the preset's clipped Ehrlich rates: a probe would duplicate trial
+# 0) get none.
+kb27 = {'k_1e': 47.1, 'k_7': 1.203, 'k_13': 0.0, 'K_1e': 0.12}
+override27 = {'k_13': (1e-5*5.81, 10.0*5.81)}   # the preset's Ehrlich band
+space27, excl27 = ko.build_search_space(kb27, param_bounds_override=override27,
+                                        rate_multiplier_bounds=(0.1, 10.0))
+assert excl27 == [] and space27['k_1e']['low'] == 4.71
+base27 = ko.baseline_decision_point(space27, kb27,
+                                    fbs17.current_specifications, 16)
+assert base27['k_13'] == 1e-5*5.81                       # clipped to the floor
+probes27, at_floor27 = ko.knockout_probe_points(space27, base27)
+assert list(probes27) == ['k_1e', 'k_7'], list(probes27)   # space order; K_1e, feeding, k_13 skipped
+assert at_floor27 == ['k_13']
+for n27, p27 in probes27.items():
+    assert p27 is not base27 and p27[n27] == space27[n27]['low']
+    assert {k: v for k, v in p27.items() if k != n27} \
+        == {k: v for k, v in base27.items() if k != n27}
+assert base27['k_1e'] == 47.1 and base27['k_7'] == 1.203  # inputs untouched
+# A space without rate constants yields no probes; a linear (override with
+# low <= 0) rate is not a log-scale variable and gets none either.
+assert ko.knockout_probe_points({'K_1e': space27['K_1e']}, {'K_1e': 0.12}) == ({}, [])
+space27b, _ = ko.build_search_space({'k_13': 0.0},
+                                    param_bounds_override={'k_13': (0.0, 58.1)})
+assert ko.knockout_probe_points(space27b, {'k_13': 0.0}) == ({}, [])
+
+if _optuna is None:
+    print('SKIP 27 (engine part): optuna not installed')
+else:
+    class _FakeTE27:
+        k_1e = 47.1; k_7 = 1.203; k_13 = 0.0; K_1e = 0.12
+        def getGlobalParameterIds(self):
+            return ['k_1e', 'k_7', 'k_13', 'K_1e', 'not_kinetic']
+    te27 = _FakeTE27()
+    seen27 = []      # (k_1e, k_7, k_13) on the fake model at each simulation
+    def _model_specification27(**kw):
+        seen27.append((te27.k_1e, te27.k_7, te27.k_13))
+    def _solve_TEA27(stream_IDs=None):
+        return {'IRR': 0.2, 'MPSPs': {'ethanol': 0.5, 'isobutanol': 1.0}}
+    def _handles27():
+        return dict(handles17, r_te=te27,
+                    model_specification=_model_specification27,
+                    solve_TEA=_solve_TEA27,
+                    latest_TEA_solution={'IRR': np.nan,
+                                         'MPSPs': {'ethanol': np.nan,
+                                                   'isobutanol': np.nan}})
+    outdir27 = tempfile.mkdtemp()
+    study27 = 'offline_knockouts'
+    # Default ON: trial 0 = baseline, trials 1-2 = the k_1e / k_7 probes
+    # (k_13 sits at its floor -> no probe), trial 3 = the first sampled
+    # point. The engine's own baseline point is what the probes copy.
+    st27, csv27, kb27_out = ko.run_kinetic_optimization(
+        objective='IRR', scenario_label='X', n_trials=4, seed=1,
+        study_name=study27, results_dir=outdir27, handles=_handles27(),
+        param_bounds_override=override27, rate_multiplier_bounds=(0.1, 10.0),
+        print_status_every=1, burden_model=None)
+    df27 = ko.load_trajectory(csv27)
+    assert df27['trial_number'].tolist() == [0, 1, 2, 3]
+    assert df27['state'].tolist() == ['COMPLETE']*4
+    assert np.isclose(df27['k_1e'][0], 47.1) and np.isclose(df27['k_7'][0], 1.203)
+    assert np.isclose(df27['k_1e'][1], 4.71) and np.isclose(df27['k_7'][1], 1.203)
+    assert np.isclose(df27['k_1e'][2], 47.1) and np.isclose(df27['k_7'][2], 0.1203)
+    assert np.allclose(df27['k_13'][:3], 1e-5*5.81)          # floor-clipped, never probed
+    for c27 in ('K_1e', *ko.FEEDING_VARIABLES):               # everything else pinned at baseline
+        assert len(set(df27[c27][:3].round(12))) == 1, c27
+    # The model actually received the knocked-down capacities.
+    assert np.isclose(seen27[1][0], 4.71) and np.isclose(seen27[1][1], 1.203)
+    assert np.isclose(seen27[2][0], 47.1) and np.isclose(seen27[2][1], 0.1203)
+    # The probes are identifiable in the store (user attr), trial 0 / 3 are not.
+    tr27 = sorted(st27.trials, key=lambda t: t.number)
+    assert [t.user_attrs.get('knockout_probe') for t in tr27] \
+        == [None, 'k_1e', 'k_7', None]
+    # Resume: no re-enqueue (nothing WAITING, no duplicate probes).
+    st27r, _, _ = ko.run_kinetic_optimization(
+        objective='IRR', scenario_label='X', n_trials=5, seed=1,
+        study_name=study27, results_dir=outdir27, handles=_handles27(),
+        param_bounds_override=override27, rate_multiplier_bounds=(0.1, 10.0),
+        print_status_every=1, burden_model=None)
+    assert len(st27r.trials) == 5
+    assert sum(1 for t in st27r.trials if t.user_attrs.get('knockout_probe')) == 2
+    # OFF: trial 1 is a sampled point, not a probe.
+    outdir27b = tempfile.mkdtemp()
+    st27b, csv27b, _ = ko.run_kinetic_optimization(
+        objective='IRR', scenario_label='X', n_trials=2, seed=1,
+        study_name=study27, results_dir=outdir27b, handles=_handles27(),
+        param_bounds_override=override27, rate_multiplier_bounds=(0.1, 10.0),
+        enqueue_knockouts=False, print_status_every=1, burden_model=None)
+    df27b = ko.load_trajectory(csv27b)
+    assert not np.isclose(df27b['k_1e'][1], 4.71) or not np.isclose(df27b['k_7'][1], 1.203)
+    assert all(t.user_attrs.get('knockout_probe') is None for t in st27b.trials)
+    _e27 = _inspect.signature(ko.run_kinetic_optimization).parameters
+    assert _e27['enqueue_knockouts'].default is True
+
+# Naming: a rate band differing from the preset's own is tagged _rb{lo}-{hi}
+# (same columns as the preset-band study, so the header guard cannot tell
+# them apart); the preset's own band, or None, leaves the name unchanged.
+assert ko.default_study_name('IRR', 'ethanol_isobutanol', 'metabolic',
+                             burden=True, rate_multiplier_bounds=(0.1, 10.0)) \
+    == 'kin_opt_ethanol_isobutanol_metabolic_irr_rb0.1-10_burden'
+assert ko.default_study_name('IRR', 'ethanol_isobutanol', 'metabolic',
+                             burden=True,
+                             rate_multiplier_bounds=ko.DEFAULT_RATE_MULTIPLIER_BOUNDS) \
+    == 'kin_opt_ethanol_isobutanol_metabolic_irr_burden'
+assert ko.default_study_name('IRR', 'ethanol_isobutanol', 'metabolic', burden=True) \
+    == 'kin_opt_ethanol_isobutanol_metabolic_irr_burden'
+assert ko.default_study_name('IBO titer', 'ethanol_only', 'metabolic_protein',
+                             scenario='B', rate_multiplier_bounds=(0.01, 10.0)) \
+    == 'kin_opt_ethanol_only_metabolic_protein_ibo_titer_scB_rb0.01-10'
+# Supervisor: mirrors the tag, exposes both flags, forwards them to the driver.
+sup27 = _runpy.run_path(os.path.join(
+    os.path.dirname(os.path.abspath(__file__)),
+    'optimize_kinetics_BO_supervised.py'))
+assert sup27['default_study_name'](None, 'IRR', None,
+                                   study_target_products='ethanol_isobutanol',
+                                   study_type='metabolic', burden=True,
+                                   rate_multiplier_bounds=(0.1, 10.0)) \
+    == 'kin_opt_ethanol_isobutanol_metabolic_irr_rb0.1-10_burden'
+assert sup27['default_study_name']('A', 'IRR', 'B', rate_multiplier_bounds=(0.1, 10.0)) \
+    == 'kin_opt_A_kbB_irr'                                    # legacy path: band not encoded
+code27 = sup27['child_code'](None, 'IRR', 200, None, False, 'x',
+                             study_target_products='ethanol_isobutanol',
+                             study_type='metabolic',
+                             rate_multiplier_bounds=(0.1, 10.0))
+assert 'enqueue_knockouts=True' in code27 and 'rate_multiplier_bounds=(0.1, 10.0)' in code27
+code27b = sup27['child_code'](None, 'IRR', 200, None, False, 'x',
+                              study_target_products='ethanol_isobutanol',
+                              study_type='metabolic', enqueue_knockouts=False)
+# No explicit band -> the kwarg is OMITTED (passing None would defeat the
+# driver's engine_kwargs.setdefault of the preset band).
+assert 'enqueue_knockouts=False' in code27b and 'rate_multiplier_bounds' not in code27b
+_s27 = _inspect.signature(sup27['supervise']).parameters
+assert _s27['enqueue_knockouts'].default is True and _s27['rate_multiplier_bounds'].default is None
+src27_sup = _inspect.getsource(sup27['supervise'])
+assert 'rate_multiplier_bounds=rate_multiplier_bounds' in src27_sup
+assert 'enqueue_knockouts=enqueue_knockouts' in src27_sup
+src27 = open(os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                          'optimize_kinetics_BO_supervised.py')).read()
+assert "'--no-enqueue-knockouts'" in src27 and "dest='enqueue_knockouts'" in src27
+assert "'--rate-multiplier-bounds'" in src27 and 'nargs=2' in src27
+assert 'enqueue_knockouts=args.enqueue_knockouts' in src27
+drv27 = open(os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                          'optimize_kinetics_BO.py')).read()
+assert 'enqueue_knockouts=True,' in drv27                          # run() kwarg, default on
+assert 'enqueue_knockouts=enqueue_knockouts' in drv27              # forwarded to the engine
+assert 'rate_multiplier_bounds=explicit_rate_bounds' in drv27      # naming sees the override only
+PASS('single-knockout probes: floor points per k_*, enqueued after trial 0 on a fresh study only, identifiable, off switch, _rb naming tag, driver/supervisor flags')
+
 print(f'\nALL {n_pass} CHECKS PASSED')

@@ -57,7 +57,7 @@ __all__ = ('OBJECTIVE_REGISTRY', 'TRACKED_METRICS',
            'DEFAULT_STUDY_TARGET_PRODUCTS', 'DEFAULT_STUDY_TYPE',
            'resolve_study_preset', 'default_study_name',
            'BURDEN_STUDY_SUFFIX',
-           'baseline_decision_point',
+           'baseline_decision_point', 'knockout_probe_points',
            'trajectory_columns', 'check_trajectory_header',
            'append_trajectory_row', 'load_trajectory',
            'inflight_path_for', 'write_inflight', 'clear_inflight',
@@ -310,6 +310,44 @@ def baseline_decision_point(search_space, kinetic_baselines,
         point[name] = int(clipped) if sp.get('int') else clipped
     return point
 
+def knockout_probe_points(search_space, baseline_point, rate_prefix='k_'):
+    """The single-knockout probes of a study: for every log-scale RATE
+    constant (name starting with `rate_prefix`) of `search_space`, a copy
+    of `baseline_point` with that one variable at its band FLOOR
+    (search_space[name]['low']) and every other decision variable at the
+    baseline. Enqueued right after trial 0 by run_kinetic_optimization
+    (enqueue_knockouts=True, the default), they teach the TPE sampler
+    the single-parameter lethality map explicitly -- which rate can be
+    knocked down alone and which cannot -- before it starts drawing
+    multi-parameter points, instead of relying on random startup draws
+    that (under a wide band) knock out many rates at once.
+
+    The probe value is the floor of the study's own band, so it is always
+    in range (an out-of-range enqueued value is a hard optuna error on a
+    log variable): under the preset band (DEFAULT_RATE_MULTIPLIER_BOUNDS,
+    1e-5x) it is an effective knock-out, under a 0.1x band a 10x
+    knock-down. Saturation constants K_*, the feeding variables, integer
+    and linear-scale variables get no probe. A rate whose baseline already
+    sits at (or below) its floor -- e.g. the Ehrlich rates of the
+    ethanol_isobutanol preset, clipped up to the floor from scenario A's
+    zeros by baseline_decision_point -- is skipped too (its probe would
+    duplicate trial 0) and reported in the second return value.
+
+    Returns ({name: point}, [names skipped as already at the floor]), both
+    in search-space order; `baseline_point` is not modified."""
+    probes, at_floor = {}, []
+    for name, sp in search_space.items():
+        if (not name.startswith(rate_prefix) or not sp.get('log')
+                or sp.get('int') or name not in baseline_point):
+            continue
+        if baseline_point[name] <= sp['low']:
+            at_floor.append(name)
+            continue
+        point = dict(baseline_point)
+        point[name] = sp['low']
+        probes[name] = point
+    return probes, at_floor
+
 #%% Scenario parameter-distribution workbooks
 
 #: Load-statement pattern of a kinetic parameter row in the scenario
@@ -504,7 +542,7 @@ BURDEN_STUDY_SUFFIX = '_burden'
 
 def default_study_name(objective, study_target_products, study_type,
                        scenario=None, kinetic_bounds_scenario=None,
-                       burden=False):
+                       burden=False, rate_multiplier_bounds=None):
     """Stable study name of a preset study:
     kin_opt_{study_target_products}_{study_type}_{objective slug}
     (slug = lower-cased, spaces -> '_'), e.g.
@@ -527,6 +565,14 @@ def default_study_name(objective, study_target_products, study_type,
     silently resumed the default-scenario study instead (same search-space
     columns, so the CSV header guard could not catch the mix).
 
+    `rate_multiplier_bounds` (the k_* band, (m_lo, m_hi) x baseline) tags
+    the name `_rb{m_lo:g}-{m_hi:g}` (e.g. `_rb0.1-10`) ONLY when it is
+    given and differs from the presets' own DEFAULT_RATE_MULTIPLIER_BOUNDS:
+    a narrower band samples a different space over the SAME columns, so
+    without the tag a narrow-band run would silently resume the wide-band
+    study of the same objective (the CSV header guard cannot tell them
+    apart). None, or the default band, leaves the name unchanged.
+
     `burden=True` appends BURDEN_STUDY_SUFFIX ('_burden') after every
     other tag: a burden study (enzyme_burden.py; the driver's default)
     can never resume a burden-free study's CSV/SQLite, or vice versa.
@@ -540,6 +586,10 @@ def default_study_name(objective, study_target_products, study_type,
     if (kinetic_bounds_scenario is not None
             and kinetic_bounds_scenario != preset_kinetic_bounds_scenario):
         name += f'_kb{kinetic_bounds_scenario}'
+    if (rate_multiplier_bounds is not None
+            and tuple(rate_multiplier_bounds) != tuple(DEFAULT_RATE_MULTIPLIER_BOUNDS)):
+        lo, hi = rate_multiplier_bounds
+        name += f'_rb{lo:g}-{hi:g}'
     if burden:
         name += BURDEN_STUDY_SUFFIX
     return name
@@ -1104,6 +1154,7 @@ def run_kinetic_optimization(objective='IRR',
                              study_name=None, results_dir=None,
                              handles=None, print_status_every=1,
                              burden_model='auto',
+                             enqueue_knockouts=True,
                              ):
     """Run the Bayesian optimization. `objective` is a name in
     OBJECTIVE_REGISTRY (direction/level/units filled from the entry) or a
@@ -1114,7 +1165,16 @@ def run_kinetic_optimization(objective='IRR',
     study_name resumes from the on-disk SQLite store and runs only the
     remainder (crash/segfault recovery). A FRESH study evaluates the
     scenario baseline configuration as trial 0 (see
-    baseline_decision_point); resumes never re-enqueue it. Trials execute STRICTLY
+    baseline_decision_point) and then -- `enqueue_knockouts=True`, the
+    default -- the single-knockout probes of knockout_probe_points
+    (trials 1..N: one log-scale rate constant k_* at its band floor, all
+    else at the baseline; a rate already at its floor gets none), each
+    tagged with the optuna user attr 'knockout_probe' = its parameter
+    name; optuna stores enqueued trials as WAITING, so a resume finishes
+    any probes a crash interrupted without re-enqueueing (resumes never
+    re-enqueue anything). The probes count toward TPE's n_startup_trials
+    (max(10, n_trials//10)), so TPE guidance starts as soon as the
+    lethality map is in. Trials execute STRICTLY
     sequentially (n_jobs=1; one simulation in flight at a time). Every
     trial appends one row to the trajectory CSV (same stable name as the
     study, '_trajectory.csv' suffix) whether it completes, fails
@@ -1314,10 +1374,28 @@ def run_kinetic_optimization(objective='IRR',
     if n_done == 0:
         # Fresh study: evaluate the scenario baseline itself as trial 0,
         # so the baseline provably participates and TPE learns from it.
-        study.enqueue_trial(baseline_decision_point(
+        baseline_point = baseline_decision_point(
             search_space, kinetic_baselines, baseline_model_kwargs,
-            baseline_max_n_spikes))
+            baseline_max_n_spikes)
+        study.enqueue_trial(baseline_point)
         print('Enqueued the scenario baseline configuration as trial 0.')
+        if enqueue_knockouts:
+            # Then the single-knockout probes (one k_* at its floor, all
+            # else at the baseline), FIFO in search-space order, so the
+            # sampler learns which rates tolerate a lone knock-down
+            # before it draws multi-parameter points. Stored WAITING in
+            # the optuna DB: a crash mid-probes resumes them without any
+            # re-enqueue (this block runs on a fresh study only).
+            probes, at_floor = knockout_probe_points(search_space,
+                                                    baseline_point)
+            for pname, point in probes.items():
+                study.enqueue_trial(point,
+                                    user_attrs={'knockout_probe': pname})
+            skipped = (f'; {len(at_floor)} already at the floor, no probe: '
+                       f'{at_floor}' if at_floor else '')
+            print(f'Enqueued {len(probes)} single-knockout probes as trials '
+                  f'1-{len(probes)} (each k_* alone at its band floor, the '
+                  f'rest at the baseline){skipped}.')
 
     def _objective(trial):
         values = {name: (trial.suggest_int(name, sp['low'], sp['high'])

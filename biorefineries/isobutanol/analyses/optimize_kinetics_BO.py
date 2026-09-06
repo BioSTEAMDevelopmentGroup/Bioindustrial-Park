@@ -108,6 +108,11 @@ def run(scenario=None,  # 'A' or 'B'; None = the preset's start scenario
         # enzyme_burden.py: default ON (study name + '_burden'); False =
         # legacy burden-free study (older studies). Do not pass the
         # engine's burden_model in engine_kwargs -- this flag owns it.
+        enqueue_knockouts=True,  # a FRESH study evaluates, right after
+        # the baseline (trial 0), one single-knockout probe per rate
+        # constant k_* of the search space (that rate alone at its band
+        # floor; ko.knockout_probe_points), so TPE learns the lethality
+        # map before sampling; False = baseline only (pre-2026-09-06).
         **engine_kwargs,  # bounds/overrides/etc. -> run_kinetic_optimization
         ):
     """Set up the scenario baseline (same recipe as the smoke tests), run
@@ -155,11 +160,26 @@ def run(scenario=None,  # 'A' or 'B'; None = the preset's start scenario
     enzyme and exceed F_flex, so a burden study explores lower Ehrlich
     capacities and lower growth than the unburdened kin_opt_B_irr did.
     A burden study cannot START from an infeasible reference (e.g.
-    scenario='B'): BurdenModel.from_reference raises; pass burden=False."""
+    scenario='B'): BurdenModel.from_reference raises; pass burden=False.
+
+    SINGLE-KNOCKOUT PROBES (`enqueue_knockouts`, default True; since
+    2026-09-06). A fresh study enqueues, after trial 0, one probe per
+    rate constant k_* of the search space -- that rate alone at the floor
+    of its band, everything else at the scenario baseline
+    (ko.knockout_probe_points; a rate already at its floor, such as the
+    ethanol_isobutanol preset's clipped Ehrlich rates, gets none). Under
+    the preset band the floor is an effective knock-out (1e-5x); under a
+    narrower `rate_multiplier_bounds` a knock-down. An explicit
+    `rate_multiplier_bounds` that differs from the preset's band tags the
+    derived study name `_rb{lo}-{hi}` (ko.default_study_name), so a
+    narrow-band study never resumes the wide-band one of the same name."""
     if 'burden_model' in engine_kwargs:
         raise ValueError("pass burden=True/False to run(), not the engine's "
                          'burden_model (run() builds it so the reports can '
                          'be printed first).')
+    # The caller's own k_* band (before the preset fills the default in):
+    # only an explicit override is encoded in the derived study name.
+    explicit_rate_bounds = engine_kwargs.get('rate_multiplier_bounds')
     slug = (objective if isinstance(objective, str)
             else engine_kwargs.get('objective_name', 'custom')
             ).lower().replace(' ', '_')
@@ -183,7 +203,7 @@ def run(scenario=None,  # 'A' or 'B'; None = the preset's start scenario
                 else engine_kwargs.get('objective_name', 'custom'),
                 study_target_products, study_type,
                 scenario=scenario, kinetic_bounds_scenario=kinetic_bounds_scenario,
-                burden=burden)
+                burden=burden, rate_multiplier_bounds=explicit_rate_bounds)
         print(f'Study preset: study_target_products={study_target_products!r}, '
               f'study_type={study_type!r} -> start at scenario {scenario}, '
               f'{len(engine_kwargs["include_params"])} kinetic parameters '
@@ -259,6 +279,7 @@ def run(scenario=None,  # 'A' or 'B'; None = the preset's start scenario
         seed=seed,
         study_name=study_name,
         burden_model=burden_model,
+        enqueue_knockouts=enqueue_knockouts,
         **engine_kwargs)
 
     if make_plots:
