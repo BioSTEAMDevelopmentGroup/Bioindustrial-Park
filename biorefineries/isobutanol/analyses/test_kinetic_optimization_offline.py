@@ -1152,19 +1152,37 @@ else:
         raise AssertionError('burden_model=True was not refused')
     assert len(seen_k7) == n_seen25_before                     # no simulation in either
     # Offline resume of the burden study (F3): same name / sqlite store /
-    # CSV, a budget of ONE more trial (the store holds 3, so 4): exactly
-    # one new row (no header error), the new trial carries the sampler
-    # constraint, optuna never warns that a stored trial "does not have
-    # constraint values", and the baseline is restored afterwards.
+    # CSV, a budget of ONE more trial (the store holds 3, so 4). The store
+    # holds only 3 trials -- fewer than TPE's n_startup_trials -- so a
+    # freely-sampled resumed trial would just be a random startup draw;
+    # enqueue a known-feasible point on the SAME study object (pre25,
+    # loaded from the same storage URL) so the resumed trial is forced to
+    # that exact point and deterministically exercises the sidecar ->
+    # simulate -> COMPLETE path with burden columns on a resumed study:
+    # exactly one new row (no header error), the new trial COMPLETE and
+    # feasible, carrying the sampler constraint, and the baseline restored
+    # afterwards.
     import warnings as _warnings
     n_rows25_before = len(ko.load_trajectory(csv25))
     n_trials25_before = len(study25_obj.trials)
     assert n_trials25_before == 3
+    pre25.enqueue_trial(dict(base25))          # exact reference: feasible, inert
     seen_k7.clear()
+    # Belt-and-braces guard, not the proof: optuna's "does not have
+    # constraint values" warning only fires when the sampler actually
+    # samples (rather than dequeues) over stored trials lacking
+    # constraints, so it cannot fire here regardless of scenario. The
+    # property it would guard -- every stored trial carries a sampler
+    # constraint -- is verified directly below via the trials'
+    # system_attrs['constraints'].
     with _warnings.catch_warnings(record=True) as w25:
         _warnings.simplefilter('always')
+        # +2, not +1: the enqueue above already added a WAITING trial to
+        # storage, so the store holds 4 by the time the engine reads it;
+        # a budget of n_trials25_before + 2 (5) is what makes the engine
+        # run exactly that one already-queued trial (5 - 4 stored = 1).
         study25r, csv25r, kb25r = ko.run_kinetic_optimization(
-            objective='IRR', scenario_label='X', n_trials=n_trials25_before + 1,
+            objective='IRR', scenario_label='X', n_trials=n_trials25_before + 2,
             seed=1, study_name=study25, results_dir=outdir25, handles=handles25,
             param_bounds_override=override25,
             rate_multiplier_bounds=(1e-5, 10.0), print_status_every=1)
@@ -1172,15 +1190,18 @@ else:
     df25r = ko.load_trajectory(csv25)
     assert len(df25r) == n_rows25_before + 1, len(df25r)
     assert df25r['trial_number'].tolist() == [0, 1, 2, 3]
-    assert df25r['state'].iloc[-1] in ('COMPLETE', 'INFEASIBLE'), df25r['state'].tolist()
+    assert df25r['state'].iloc[-1] == 'COMPLETE', df25r['state'].tolist()
     assert list(df25r.columns) == ko.trajectory_columns(space25, extra_columns=eb.BURDEN_COLUMNS)
     t25r = study25r.trials
     assert len(t25r) == n_trials25_before + 1
+    assert t25r[-1].state == TS.COMPLETE, t25r[-1].state
     assert 'constraints' in t25r[-1].system_attrs, t25r[-1].system_attrs
+    assert list(t25r[-1].system_attrs['constraints'])[0] <= 0.0    # feasible
     assert 'burden_violation' in t25r[-1].user_attrs
     bad25 = [str(x.message) for x in w25 if 'does not have constraint values' in str(x.message)]
     assert not bad25, bad25
     assert te25.k_7 == 1.203 and te25.k_8 == 0.589                  # restored
+    assert seen_k7[0] == 1.203                                      # the resumed trial itself
     assert seen_k7[-1] == 1.203                                     # the restore reached the model
     assert not os.path.isfile(side25)
     # burden off: no burden columns, k_7 written as sampled
