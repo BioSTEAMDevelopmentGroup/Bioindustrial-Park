@@ -1151,9 +1151,9 @@ else:
     assert n_sidecar25 == [1, 2], n_sidecar25
     # trial 1: the CSV keeps the SAMPLED k_7, the model received the EFFECTIVE k_7
     assert np.isclose(df25['k_7'][1], 9.0*1.203)
-    assert np.isclose(df25['burden_factor'][1], 0.13276, rtol=1e-3)
-    assert np.isclose(df25['k_7_eff'][1], 1.4374, rtol=1e-3)
-    assert np.isclose(df25['k_8_eff'][1], 0.13276*0.589, rtol=1e-3)
+    assert np.isclose(df25['burden_factor'][1], 0.17701, rtol=1e-3)   # 0.13276 at TRANSLATION_FRACTION_WT = 0.30
+    assert np.isclose(df25['k_7_eff'][1], 1.9165, rtol=1e-3)          # 1.4374 at 0.30
+    assert np.isclose(df25['k_8_eff'][1], 0.17701*0.589, rtol=1e-3)
     # Phi_M,wt = the report's 0.0637 (at P = 0.45) x PROTEIN_CONTENT/0.45
     assert np.isclose(df25['Phi_M'][1], 0.0637*eb.PROTEIN_CONTENT/eb.POOL_TABLE_PROTEIN_CONTENT)
     assert np.isclose(df25['phi_T'][1], 9.0*eb.PHI_T_WT)
@@ -1164,7 +1164,7 @@ else:
     # model_specification saw trial 1's effective k_7, trial 2's reference k_7,
     # then restore_baseline's reference k_7 (2 simulations + the finally)
     assert len(seen_k7) == 3, seen_k7
-    assert np.isclose(seen_k7[0], 1.4374, rtol=1e-3) and seen_k7[1] == 1.203 and seen_k7[2] == 1.203
+    assert np.isclose(seen_k7[0], 1.9165, rtol=1e-3) and seen_k7[1] == 1.203 and seen_k7[2] == 1.203
     assert te25.k_7 == 1.203 and te25.k_8 == 0.589                  # restored
     assert not os.path.isfile(side25)
     # optuna side: the infeasible trial is PRUNED, its violation reached the

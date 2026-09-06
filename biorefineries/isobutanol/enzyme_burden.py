@@ -74,10 +74,20 @@ POOL_TABLE_PROTEIN_CONTENT = 0.45
 #: (Scott et al. 2010 zero-growth intercept ~ half the proteome;
 #: Metzl-Raz et al. 2017; Xia et al. 2022).
 HOUSEKEEPING_FRACTION = 0.50
-#: phi_T,wt / P: the ribosomal/translation sector of fast-growing yeast
-#: at the wild-type growth capacity (Metzl-Raz 2017; Xia 2022;
-#: Bjorkeroth 2020).
-TRANSLATION_FRACTION_WT = 0.30
+#: phi_T,wt / P: the ACTIVE ribosomal/translation sector of fast-growing
+#: yeast at the wild-type growth capacity. Metzl-Raz, Kafri, Yaari,
+#: Shreberk-Shaked, Eldar & Barkai 2017, eLife 6:e28034: the ribosomal
+#: proteins are ~30 % of the proteome of rapidly growing S. cerevisiae
+#: (~8 % in the slowest-growing cells; Warner 1999, Trends Biochem. Sci.
+#: 24:437 gives the same ~30 %), of which ~25 % does not contribute to
+#: translation (an ~8 %-of-proteome reserve, constant across growth
+#: rates) -- 0.30 x (1 - 0.25) = 0.225 is the translating part, the
+#: sector the proportional ribosome law scales with k_7 (0.30, the whole
+#: ribosomal fraction, until 2026-09-06). The housekeeping fraction was
+#: deliberately left at 0.50 (the reserve is NOT re-booked there), so the
+#: change frees 0.037 g/gDCW of reallocation slack at wild-type growth
+#: (0.0286 -> 0.0654) and leaves the hard cap F_flex unchanged.
+TRANSLATION_FRACTION_WT = 0.225
 #: Average in-vivo enzyme saturation of the kcat route -- the fraction of
 #: its in-vitro kcat an enzyme delivers in vivo. GECKO's fitted value for
 #: S. cerevisiae (Sanchez et al. 2017, Mol. Syst. Biol. 13:935; kept as
@@ -90,8 +100,8 @@ SIGMA_EFF = 0.50
 #: Flexible protein sector (g/gDCW): the zero-growth point of the modeled
 #: pool. ~ 0.245 (0.225 at the pre-2026-09-06 PROTEIN_CONTENT of 0.45).
 F_FLEX = PROTEIN_CONTENT*(1.0 - HOUSEKEEPING_FRACTION)
-#: Translation sector at the wild-type growth capacity (g/gDCW). ~ 0.147
-#: (0.135 at 0.45).
+#: Translation sector at the wild-type growth capacity (g/gDCW). ~ 0.110
+#: (0.147 at TRANSLATION_FRACTION_WT = 0.30, 0.135 at 0.30 and P = 0.45).
 PHI_T_WT = PROTEIN_CONTENT*TRANSLATION_FRACTION_WT
 
 #%% Wild-type pool table (spec 4.2; enzyme-abundance report 1)

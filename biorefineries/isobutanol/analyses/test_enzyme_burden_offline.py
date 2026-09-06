@@ -36,15 +36,15 @@ K_REF = {'k_1h': 0.584, 'k_1l': 1.43, 'k_1e': 47.1, 'k_2': 0.501,
          'k_6': 2.82, 'k_7': 1.203, 'k_8': 0.589,
          'k_13': 0.0, 'k_14': 0.0, 'k_15': 0.0, 'k_16': 0.0}
 
-#%% 1. sector constants and closure (spec 4.1, amended 2026-09-06): 0.029 g/gDCW of slack at wild-type growth
+#%% 1. sector constants and closure (spec 4.1, amended 2026-09-06 twice): 0.065 g/gDCW of slack at wild-type growth
 assert eb.PROTEIN_CONTENT == 0.49 and eb.HOUSEKEEPING_FRACTION == 0.50   # Jach et al. 2022, Table 1
 assert eb.POOL_TABLE_PROTEIN_CONTENT == 0.45                            # the pool table's basis
-assert eb.TRANSLATION_FRACTION_WT == 0.30 and eb.SIGMA_EFF == 0.50
-assert close(eb.F_FLEX, 0.245) and close(eb.PHI_T_WT, 0.147)
+assert eb.TRANSLATION_FRACTION_WT == 0.225 and eb.SIGMA_EFF == 0.50    # Metzl-Raz 2017: 0.30 x (1 - 0.25)
+assert close(eb.F_FLEX, 0.245) and close(eb.PHI_T_WT, 0.11025)
 SCALE = eb.PROTEIN_CONTENT/eb.POOL_TABLE_PROTEIN_CONTENT                # 1.0889
 phi_M_wt = sum(pool for pool, _ in eb.NATIVE_STEPS.values())
 assert close(phi_M_wt, 0.0637*SCALE, rel=1e-9) and close(phi_M_wt, 0.06936, rel=1e-4)
-assert close(eb.F_FLEX - phi_M_wt - eb.PHI_T_WT, 0.028638, rel=1e-4)   # > 0: reference feasible
+assert close(eb.F_FLEX - phi_M_wt - eb.PHI_T_WT, 0.065388, rel=1e-4)   # > 0: reference feasible (0.0286 at 0.30)
 assert list(eb.NATIVE_STEPS) == ['r1', 'r2', 'r3', 'r4', 'r5', 'r6']
 # the pools are the report's 0.45-basis values x SCALE (report 3: linear in the protein content)
 R1, R4, R5 = (eb.NATIVE_STEPS[s][0] for s in ('r1', 'r4', 'r5'))
@@ -59,7 +59,7 @@ assert eb.BURDEN_COLUMNS == (
     'pool_r1', 'pool_r2', 'pool_r3', 'pool_r4', 'pool_r5', 'pool_r6',
     'pool_r13', 'pool_r14', 'pool_r15', 'pool_r16',
     'Phi_M', 'phi_T', 'F_flex', 'burden_factor', 'k_7_eff', 'k_8_eff')
-PASS('sector constants (P = 0.49), closure slack 0.0286 g/gDCW, tables (0.45-basis x 1.089) and column order')
+PASS('sector constants (P = 0.49, phi_T,wt/P = 0.225), closure slack 0.0654 g/gDCW, tables (0.45-basis x 1.089) and column order')
 
 #%% 2. Ehrlich per-unit costs (spec 4.3) at SIGMA_EFF, to two significant figures
 # kcat per mole of the substrate k_i is written on; r13 counts two pyruvate
@@ -167,7 +167,7 @@ PASS('r16 = Aro10 + Adh6 pools on the KIV flux')
 
 #%% 9. linear squeeze (Q4/Q5d): d = 1 inside the slack, 0.5 halfway, exactly 0 at Phi_M = F_flex
 cost13 = eb.ehrlich_unit_cost('r13')
-slack = eb.F_FLEX - bm.Phi_M_wt - eb.PHI_T_WT                 # 0.0286
+slack = eb.F_FLEX - bm.Phi_M_wt - eb.PHI_T_WT                 # 0.0654
 assert bm.evaluate({**K_REF, 'k_13': 0.9*slack/cost13}).burden_factor == 1.0
 half = bm.evaluate({**K_REF, 'k_13': (slack + 0.5*eb.PHI_T_WT)/cost13})
 assert close(half.burden_factor, 0.5, rel=1e-9) and half.feasible
@@ -188,7 +188,7 @@ PASS('d = 1 inside the slack, linear to 0, zero exactly at Phi_M = F_flex and fl
 #%% 10. k_8 alone inflates phi_T (Q8); one machinery sized by the larger demand
 k8 = bm.evaluate({**K_REF, 'k_8': 4.0*0.589})
 assert close(k8.phi_T, 4.0*eb.PHI_T_WT)
-assert close(k8.burden_factor, (eb.F_FLEX - phi_M_wt)/(4.0*eb.PHI_T_WT))   # 0.2987
+assert close(k8.burden_factor, (eb.F_FLEX - phi_M_wt)/(4.0*eb.PHI_T_WT))   # 0.3983 (0.2987 at 0.30)
 assert close(k8.k_7_eff, k8.burden_factor*1.203) and close(k8.k_8_eff, k8.burden_factor*4.0*0.589)
 both = bm.evaluate({**K_REF, 'k_7': 2.0*1.203, 'k_8': 4.0*0.589})
 assert close(both.phi_T, 4.0*eb.PHI_T_WT)                     # max, not sum
@@ -198,8 +198,8 @@ PASS('phi_T = phi_T,wt * max(k_7/k_7,ref, k_8/k_8,ref); both growth capacities d
 #%% 11. 10x k_7 at wild-type enzymes is derated by the burden itself (spec 1-close)
 ten = bm.evaluate({**K_REF, 'k_7': 10.0*1.203})
 assert ten.feasible and close(ten.burden_factor, (eb.F_FLEX - phi_M_wt)/(10.0*eb.PHI_T_WT))
-assert close(ten.burden_factor, 0.1195, rel=1e-3)
-assert close(ten.k_7_eff, 1.4374, rel=1e-3)                   # = (F_flex - Phi_M)/phi_T,wt * k_7,ref
+assert close(ten.burden_factor, 0.1593, rel=1e-3)             # 0.1195 at TRANSLATION_FRACTION_WT = 0.30
+assert close(ten.k_7_eff, 1.9165, rel=1e-3)                   # = (F_flex - Phi_M)/phi_T,wt * k_7,ref (1.4374 at 0.30)
 applied10 = bm.apply({**K_REF, 'k_7': 10.0*1.203})
 assert close(applied10['k_7'], ten.k_7_eff) and close(applied10['k_8'], ten.k_8_eff)
 assert applied10['k_3'] == 5.81 and applied10['k_13'] == 0.0     # nothing else touched
@@ -284,13 +284,14 @@ except ValueError as e:
     assert 'infeasible' in str(e) and '--no-burden' in str(e)
 else:
     raise AssertionError('an infeasible reference did not raise')
-# a tenth of B is free, two-thirds is derated (d ~ 0.24), the cap sits at
+# up to 0.30 x B is free (a tenth at phi_T,wt/P = 0.30), two-thirds is derated (d ~ 0.31; ~0.24 at 0.30), the cap sits at
 # 0.81 x B ((F_flex - Phi_M,wt)/pool_B; ~0.67 x B at P = 0.45, where 0.75 x B
 # was already pruned), so 0.85 x B is pruned (spec 4.5, amended 2026-09-06)
 def frac_B(f):
     return bm.evaluate({**bm.reference, **{k: f*v for k, v in B.items()}})
 assert frac_B(0.10).burden_factor == 1.0
-assert 0.2 < frac_B(0.65).burden_factor < 0.3
+assert frac_B(0.30).burden_factor == 1.0 and frac_B(0.31).burden_factor < 1.0
+assert 0.3 < frac_B(0.65).burden_factor < 0.33
 assert close((eb.F_FLEX - bm.Phi_M_wt)/pool_B, 0.81, rel=0.01)
 assert frac_B(0.75).feasible and not frac_B(0.85).feasible
 PASS('describe_point: A reference FEASIBLE, B point INFEASIBLE (Phi_M 0.286 > 0.245); B-start reference raises')
