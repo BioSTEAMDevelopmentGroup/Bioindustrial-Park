@@ -153,6 +153,21 @@ def load(simulate_baseline=True,
 
     parameters['NH3_per_Yeast'] = 0.1097 # 0.16*14/(12 + 1.6 + 0.56*16 + 0.16*14) *17/14
 
+    # Fed-batch working-volume envelope (2026-09-06): the largest allowed ratio
+    # of the final working volume to the initial charge, i.e. the initial
+    # charge must be >= 1/20 = 5 % of the final volume. nskinetics' FeedSpike
+    # adds env*(target - s)/(spike - target) per glucose spike, so the volume
+    # multiplies by (spike_conc - threshold)/(spike_conc - target) per spike
+    # with no cap of its own; a point with the spike concentration barely
+    # above the target compounds to 1e6-1e12x (the kinetic-BO stalls: the
+    # reactor emits a ~1e14 m3/hr effluent on the first flowsheet pass, the
+    # WWT membrane bioreactor's O(F_vol) tank-count loop runs for hours, and
+    # the collapsed S301.split poisons the next run with the "could not reach
+    # desired concentration ... F301" actuator error). Enforced by
+    # load_simulate right after the feeding spec runs, before the flowsheet
+    # simulate. Scenario-A baseline ratio ~1.11; a batch (no spikes) is 1.
+    parameters['max_fed_batch_volume_ratio'] = 20.0
+
     #%% Update MH101 specification
     feedstock = f.corn
     lime = f.lime
@@ -987,6 +1002,36 @@ def _simulation_drift_state():
         f.unit.BT801.utility_cost or 0.0,
     ])
 
+def _check_fed_batch_volume_ratio(splitter, split_before):
+    """Fed-batch working-volume guard, run by load_simulate right after
+    fbs_spec.load_specifications (i.e. after the kinetic run, BEFORE the
+    flowsheet simulate). Raises nskinetics' FeedingStrategyError when the
+    batch's final/initial working-volume ratio exceeds
+    parameters['max_fed_batch_volume_ratio'] (initial charge too small a
+    fraction of the final volume), first restoring the feed/spike splitter
+    to `split_before` so the rejected run leaves no collapsed split behind.
+    See the parameter's comment in load() for the mechanism it prevents."""
+    cap = parameters['max_fed_batch_volume_ratio']
+    reactor = fbs_spec.fermentation_reactor
+    cv = fbs_spec.control_variables
+    d = reactor.nsk_results_specific_tau_dict
+    env = d[cv.resolve_volume_col(reactor)]
+    added = d[cv.resolve_feed_volume_added_col(reactor)]
+    initial = env - added
+    ratio = env/initial if initial > 0 else np.inf
+    if ratio > cap:
+        splitter.split = split_before
+        n_spikes = d.get('curr_n_glu_spikes', float('nan'))
+        raise nsk.exceptions.FeedingStrategyError(
+            f'Fed-batch working volume grew {ratio:.4g}x over the batch '
+            f'(initial charge {100.0/ratio:.3g} % of the final volume; '
+            f'{n_spikes:g} spikes at target {fbs_spec.target_conc:.4g} g/L, '
+            f'threshold {fbs_spec.threshold_conc:.4g} g/L, spike feed '
+            f'{fbs_spec.spike_conc:.4g} g/L, i.e. x'
+            f'{(fbs_spec.spike_conc - fbs_spec.threshold_conc)/(fbs_spec.spike_conc - fbs_spec.target_conc):.3g} '
+            f'per spike); exceeds parameters["max_fed_batch_volume_ratio"] = '
+            f'{cap:g} (initial charge >= {100.0/cap:.3g} %).')
+
 def load_simulate(target_conc=None,
     threshold_conc=None,
     spike_conc=None,
@@ -1038,11 +1083,17 @@ def load_simulate(target_conc=None,
     drifts = []
     prev = _simulation_drift_state()
     while n_sims_run < n_sims:
+        # load_specifications ends by setting the feed/spike splitter from the
+        # kinetic run it just made; snapshot the split so a rejected run can
+        # be undone (a collapsed split would otherwise poison the next call).
+        splitter = fbs_spec.splitter
+        split_before = np.array(splitter.split, copy=True)
         fbs_spec.load_specifications(target_conc=target_conc,
         threshold_conc=threshold_conc,
         spike_conc=spike_conc,
         tau_max=tau_max,
         max_n_spikes=max_n_spikes,)
+        _check_fed_batch_volume_ratio(splitter, split_before)
 
         corn_EtOH_IBO_sys.simulate()
         n_sims_run += 1
@@ -1297,6 +1348,11 @@ def model_specification(**kwargs):
         
         elif 'specifications do not meet required condition' in str_e:
             # flowsheet('AcrylicAcid').F_mass /= 1000.
+            raise e
+        elif 'max_fed_batch_volume_ratio' in str_e:
+            # Fed-batch volume guard (load_simulate): the feeding point itself
+            # is infeasible, so re-simulating it through the recovery barrage
+            # cannot help and would only cost four more simulations.
             raise e
         elif 'argument 3 of type' in str_e:
             raise e
