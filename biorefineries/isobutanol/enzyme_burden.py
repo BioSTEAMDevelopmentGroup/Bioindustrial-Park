@@ -72,10 +72,10 @@ PROTEIN_CONTENT = 0.49
 POOL_TABLE_PROTEIN_CONTENT = 0.45
 #: Fraction of protein unavailable to the modeled + translation sectors
 #: (Scott et al. 2010 zero-growth intercept ~ half the proteome;
-#: Metzl-Raz et al. 2017; Xia et al. 2021).
+#: Metzl-Raz et al. 2017; Xia et al. 2022).
 HOUSEKEEPING_FRACTION = 0.50
 #: phi_T,wt / P: the ribosomal/translation sector of fast-growing yeast
-#: at the wild-type growth capacity (Metzl-Raz 2017; Xia 2021;
+#: at the wild-type growth capacity (Metzl-Raz 2017; Xia 2022;
 #: Bjorkeroth 2020).
 TRANSLATION_FRACTION_WT = 0.30
 #: Average in-vivo enzyme saturation of the kcat route -- the fraction of
