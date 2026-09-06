@@ -889,6 +889,9 @@ _p23 = _inspect.signature(sup23['supervise']).parameters
 assert _p23['study_target_products'].default == ko.DEFAULT_STUDY_TARGET_PRODUCTS
 assert _p23['study_type'].default == ko.DEFAULT_STUDY_TYPE
 assert _p23['scenario'].default is None
+# Stall timeout default 3 min (2026-09-06; 25 before) in supervise() and
+# the CLI (source-text check, the parser lives under __main__).
+assert _p23['stall_timeout_min'].default == 3.0
 _c23 = _inspect.signature(sup23['child_code']).parameters
 assert 'study_target_products' in _c23 and 'study_type' in _c23
 # The argparse choices/defaults are derived from the engine's tables, not
@@ -904,6 +907,7 @@ assert 'choices=tuple(ko.STUDY_TARGET_PRODUCTS)' in src23
 assert 'choices=tuple(ko.STUDY_TYPE_ROLES)' in src23
 assert "'--study-target-products', default=ko.DEFAULT_STUDY_TARGET_PRODUCTS" in src23
 assert "'--study-type', default=ko.DEFAULT_STUDY_TYPE" in src23
+assert "'--stall-timeout-min', type=float, default=3.0" in src23
 assert 'import biorefineries' not in src23 and 'import optuna' not in src23
 # Finding 3: --no-restrict-to-workbook without --legacy-flags must fail at
 # argparse time (parser.error), not after a full child load.

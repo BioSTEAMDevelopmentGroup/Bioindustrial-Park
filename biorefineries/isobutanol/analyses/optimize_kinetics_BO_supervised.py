@@ -17,8 +17,14 @@ processes and, until the study's total trial budget completes cleanly:
   CVODE/roadrunner call, which nothing in-process can interrupt on
   Windows, so the timeout is enforced by polling the crash-safe
   trajectory CSV and killing the child when no trial has been recorded
-  for --stall-timeout-min (default 25 min, comfortably above the ~15 min
-  worst self-resolving trial observed in production);
+  for --stall-timeout-min (default 3 min since 2026-09-06; 25 min
+  before. A stall-killed trial is merely logged LOST and the study
+  resumes after an ~18 s reload, so a short timeout trades the rare
+  legitimately slow trial -- ~15 min worst case observed -- for not
+  idling through every pathological draw: the 2026-09-06 production
+  study lost ~25 min per stall at 10 min. 3 min clears the reload plus
+  a normal 10-30 s trial with margin; well under ~1 min the reload
+  itself gets killed in a loop and attempt_outcome aborts the study);
 - logs the in-flight trial of a killed or crashed child to the
   trajectory CSV IMMEDIATELY as a state='LOST' row: the child records
   each trial's decision vector to <study>_inflight.json before
@@ -202,7 +208,7 @@ def child_code(scenario, objective, n_trials, kinetic_bounds_scenario,
 
 def supervise(scenario=None, objective='IRR', n_trials=2000,
               kinetic_bounds_scenario=None, make_plots=True,
-              study_name=None, stall_timeout_min=25.0, poll_s=30.0,
+              study_name=None, stall_timeout_min=3.0, poll_s=30.0,
               settle_s=10.0, python=None, log_path=None,
               restrict_to_workbook=True, seed=3221,
               study_target_products=ko.DEFAULT_STUDY_TARGET_PRODUCTS,
@@ -376,7 +382,14 @@ if __name__ == '__main__':
                         help='override the derived stable study name')
     parser.add_argument('--no-plots', action='store_true',
                         help='skip the final driver plots')
-    parser.add_argument('--stall-timeout-min', type=float, default=25.0)
+    parser.add_argument('--stall-timeout-min', type=float, default=3.0,
+                        help='kill and relaunch a child that has logged '
+                             'no trial for this many minutes (the '
+                             'in-flight trial is logged LOST and the study '
+                             'resumes); default 3 (25 before 2026-09-06); '
+                             'keep it well above the ~18 s reload + a '
+                             'normal trial or the reload itself gets '
+                             'killed in a loop')
     parser.add_argument('--poll-s', type=float, default=30.0)
     parser.add_argument('--settle-s', type=float, default=10.0)
     parser.add_argument('--no-restrict-to-workbook',
