@@ -2210,4 +2210,35 @@ else:
     assert 'Sampler: plain TPESampler (burden off' in buf35c.getvalue()
     PASS('engine: feasible_sampling=True + burden on installs FeasibleTPESampler (all sampled trials feasible, n_unfiltered 0, summary line); False or burden off = plain TPESampler; not in the study name')
 
+#%% 36. driver run(feasible_sampling=True) forwarded to the engine; supervisor
+# --no-feasible-sampling (store_false, default on) forwarded through
+# supervise() and child_code() on every attempt, shown in the settings
+# event; never part of the study name.
+drv36 = open(os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                          'optimize_kinetics_BO.py')).read()
+assert 'feasible_sampling=True,' in drv36                          # run() kwarg, default on
+assert 'feasible_sampling=feasible_sampling' in drv36              # forwarded to the engine
+sup36 = _runpy.run_path(os.path.join(
+    os.path.dirname(os.path.abspath(__file__)),
+    'optimize_kinetics_BO_supervised.py'))
+assert _inspect.signature(sup36['supervise']).parameters['feasible_sampling'].default is True
+assert _inspect.signature(sup36['child_code']).parameters['feasible_sampling'].default is True
+code36 = sup36['child_code'](None, 'IRR', 200, None, False, 'x',
+                             study_target_products='ethanol_isobutanol',
+                             study_type='metabolic')
+assert 'feasible_sampling=True,' in code36
+code36b = sup36['child_code'](None, 'IRR', 200, None, False, 'x',
+                              study_target_products='ethanol_isobutanol',
+                              study_type='metabolic', feasible_sampling=False)
+assert 'feasible_sampling=False,' in code36b
+src36_sup = _inspect.getsource(sup36['supervise'])
+assert 'feasible_sampling=feasible_sampling' in src36_sup
+assert 'feasible_sampling={feasible_sampling!r}' in src36_sup     # settings event line
+assert 'feasible_sampling' not in _inspect.signature(sup36['default_study_name']).parameters
+src36 = open(os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                          'optimize_kinetics_BO_supervised.py')).read()
+assert "'--no-feasible-sampling'" in src36 and "dest='feasible_sampling'" in src36
+assert 'feasible_sampling=args.feasible_sampling' in src36
+PASS('feasible_sampling: driver run() kwarg (default on) forwarded; supervisor --no-feasible-sampling through supervise()/child_code(), settings event; study name untouched')
+
 print(f'\nALL {n_pass} CHECKS PASSED')

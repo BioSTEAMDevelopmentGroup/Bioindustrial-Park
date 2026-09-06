@@ -132,6 +132,12 @@ def run(scenario=None,  # 'A' or 'B'; None = the preset's start scenario
         # 183 random draws completed in the burden-constrained preset
         # space on 2026-09-06); e.g. 20-30 shortens it. Not part of the
         # study name; a resume may change it.
+        feasible_sampling=True,  # with the burden on, sample under the
+        # feasibility-aware TPE (ko.feasible_tpe_sampler): start-up draws
+        # and TPE candidates are checked against the burden cap BEFORE
+        # they are proposed, so no sampled trial is INFEASIBLE; False =
+        # the plain TPESampler (pre-2026-09-06 behaviour). Not part of
+        # the study name; a resume may change it.
         **engine_kwargs,  # bounds/overrides/etc. -> run_kinetic_optimization
         ):
     """Set up the scenario baseline (same recipe as the smoke tests), run
@@ -221,7 +227,19 @@ def run(scenario=None,  # 'A' or 'B'; None = the preset's start scenario
     engine's rule max(10, n_trials//10). Forwarded to
     ko.run_kinetic_optimization; compared with the trials already
     stored, so it can be changed on a resume and never tags the study
-    name (supervisor --n-startup-trials)."""
+    name (supervisor --n-startup-trials).
+
+    FEASIBLE SAMPLING (`feasible_sampling`, default True; since
+    2026-09-06). With the burden on, the engine samples under
+    ko.feasible_tpe_sampler: the random start-up draws are joint
+    uniform-feasible vectors and every TPE candidate is filtered by the
+    cap Phi_M < F_flex before it is scored, so no sampled trial should
+    ever be logged INFEASIBLE (the 2026-09-06 production study proposed
+    118 of 200 start-up and 261 of 1060 TPE trials over the cap). The
+    in-objective guard stays as the safety net and the engine prints the
+    rejection counters at the end. Meaningless with burden=False. A
+    sampler setting: same columns, no study-name tag, so the production
+    study resumes under it (supervisor --no-feasible-sampling)."""
     if 'burden_model' in engine_kwargs:
         raise ValueError("pass burden=True/False to run(), not the engine's "
                          'burden_model (run() builds it so the reports can '
@@ -343,6 +361,7 @@ def run(scenario=None,  # 'A' or 'B'; None = the preset's start scenario
         burden_model=burden_model,
         enqueue_knockouts=enqueue_knockouts,
         n_startup_trials=n_startup_trials,
+        feasible_sampling=feasible_sampling,
         **engine_kwargs)
 
     if make_plots:

@@ -176,13 +176,16 @@ def child_code(scenario, objective, n_trials, kinetic_bounds_scenario,
                make_plots, study_name, restrict_to_workbook=True,
                seed=3221, study_target_products=None, study_type=None,
                burden=True, enqueue_knockouts=True,
-               rate_multiplier_bounds=None, n_startup_trials=None):
+               rate_multiplier_bounds=None, n_startup_trials=None,
+               feasible_sampling=True):
     """The -c program for one supervised attempt of the driver.
     `study_target_products=None` selects the driver's legacy flag path.
     `rate_multiplier_bounds=None` leaves the k_* band to the preset (the
     driver's engine_kwargs default); a tuple overrides it.
     `n_startup_trials=None` leaves the TPE random start-up length to the
-    engine's rule (the kwarg is omitted); an int is forwarded."""
+    engine's rule (the kwarg is omitted); an int is forwarded.
+    `feasible_sampling` (default True) is the driver's feasibility-aware
+    sampler flag, always forwarded explicitly."""
     rate_kw = ('' if rate_multiplier_bounds is None else
                f'          rate_multiplier_bounds={tuple(rate_multiplier_bounds)!r},\n')
     startup_kw = ('' if n_startup_trials is None else
@@ -201,6 +204,7 @@ def child_code(scenario, objective, n_trials, kinetic_bounds_scenario,
         f'          study_type={study_type!r},\n'
         f'          burden={burden!r},\n'
         f'          enqueue_knockouts={enqueue_knockouts!r},\n'
+        f'          feasible_sampling={feasible_sampling!r},\n'
         f'{rate_kw}'
         f'{startup_kw}'
         f'          )\n')
@@ -214,7 +218,8 @@ def supervise(scenario=None, objective='IRR', n_trials=2000,
               study_target_products=ko.DEFAULT_STUDY_TARGET_PRODUCTS,
               study_type=ko.DEFAULT_STUDY_TYPE, burden=True,
               enqueue_knockouts=True, rate_multiplier_bounds=None,
-              n_startup_trials=None, max_empty_attempts=5):
+              n_startup_trials=None, max_empty_attempts=5,
+              feasible_sampling=True):
     """Run attempts until 'complete' or 'abort'; returns the final
     outcome string ('complete' or 'abort'). `study_target_products` /
     `study_type` name the driver's study preset (defaults = the engine's;
@@ -242,7 +247,12 @@ def supervise(scenario=None, objective='IRR', n_trials=2000,
     child had started a simulation (its in-flight sidecar exists) is a
     hung/crashed first draw and is resumed reseeded; one whose child
     never got that far (kill-loop, broken load) aborts at once, and the
-    cap aborts either way (ko.attempt_outcome)."""
+    cap aborts either way (ko.attempt_outcome). `feasible_sampling`
+    (default True; --no-feasible-sampling) is the driver's
+    feasibility-aware sampler flag (with the burden on, start-up draws
+    and TPE candidates are checked against the burden cap before they
+    are proposed, so no sampled trial is INFEASIBLE); forwarded on
+    every attempt, never part of the study name."""
     if study_name is None:
         study_name = default_study_name(scenario, objective,
                                         kinetic_bounds_scenario,
@@ -263,7 +273,8 @@ def supervise(scenario=None, objective='IRR', n_trials=2000,
                       study_type=study_type, burden=burden,
                       enqueue_knockouts=enqueue_knockouts,
                       rate_multiplier_bounds=rate_multiplier_bounds,
-                      n_startup_trials=n_startup_trials)
+                      n_startup_trials=n_startup_trials,
+                      feasible_sampling=feasible_sampling)
     guard = ko.StallGuard(stall_timeout_s=60.0*stall_timeout_min)
 
     def event(msg):
@@ -281,6 +292,13 @@ def supervise(scenario=None, objective='IRR', n_trials=2000,
         event(f'recovered orphaned in-flight trial {lost} from a previous '
               'session as a LOST row')
 
+    event(f'settings: study {study_name}; burden={burden!r}, '
+          f'enqueue_knockouts={enqueue_knockouts!r}, '
+          f'feasible_sampling={feasible_sampling!r}, '
+          f'n_startup_trials={n_startup_trials!r}, '
+          f'rate_multiplier_bounds={rate_multiplier_bounds!r}, '
+          f'stall_timeout_min={stall_timeout_min:g}, '
+          f'max_empty_attempts={max_empty_attempts!r}')
     attempt = 0
     empty_streak = 0   # consecutive attempts that logged no new trial
     while True:
@@ -466,6 +484,17 @@ if __name__ == '__main__':
                              'child never reached a simulation (stall '
                              'timeout below the ~18 s reload, broken load) '
                              'aborts at once')
+    parser.add_argument('--no-feasible-sampling', dest='feasible_sampling',
+                        action='store_false',
+                        help='sample under the plain TPESampler instead of '
+                             'the feasibility-aware one (the default, with '
+                             'the burden on, checks every start-up draw and '
+                             'TPE candidate against the enzyme-burden cap '
+                             'before proposing it, so no sampled trial is '
+                             'INFEASIBLE; the 2026-09-06 production study '
+                             'proposed 379 of 1260 trials over the cap). '
+                             'Meaningless with --no-burden. Not part of '
+                             'the study name, so a resume may change it')
     args = parser.parse_args()
     if not args.restrict_to_workbook and not args.legacy_flags:
         parser.error('--no-restrict-to-workbook requires --legacy-flags '
@@ -488,5 +517,6 @@ if __name__ == '__main__':
                             None if args.rate_multiplier_bounds is None
                             else tuple(args.rate_multiplier_bounds)),
                         n_startup_trials=args.n_startup_trials,
-                        max_empty_attempts=args.max_empty_attempts)
+                        max_empty_attempts=args.max_empty_attempts,
+                        feasible_sampling=args.feasible_sampling)
     sys.exit(0 if outcome == 'complete' else 1)
