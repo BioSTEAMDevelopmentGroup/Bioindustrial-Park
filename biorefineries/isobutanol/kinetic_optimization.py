@@ -52,7 +52,9 @@ __all__ = ('OBJECTIVE_REGISTRY', 'TRACKED_METRICS',
            'kinetic_param_names_from_scenario', 'workbook_kinetic_bounds',
            'DEFAULT_RATE_MULTIPLIER_BOUNDS',
            'DEFAULT_SATURATION_MULTIPLIER_BOUNDS',
+           'RATE_CONSTANT_ROLES', 'INHIBITION_COEFFICIENT_ROLES',
            'kinetic_parameter_roles_path', 'kinetic_parameter_roles',
+           'rate_constant_names',
            'STUDY_TARGET_PRODUCTS', 'STUDY_TYPE_ROLES',
            'DEFAULT_STUDY_TARGET_PRODUCTS', 'DEFAULT_STUDY_TYPE',
            'resolve_study_preset', 'default_study_name',
@@ -84,14 +86,36 @@ SPIKE_CONC_MIN = 50.0
 SPIKE_CONC_MAX = 600.0
 
 #: Default log-scale multiplier bands (× the workbook baseline) of the
-#: named study presets (resolve_study_preset): rate constants k_* may go
-#: to an effective knock-out (floor 1e-5×, still log-uniform below and
-#: above baseline); saturation/inhibition constants K_* keep the 0.1×
-#: floor (a zero saturation constant has no engineering meaning). The
-#: legacy single band of build_search_space's multiplier_bounds default,
-#: (0.1, 10.0), is unchanged.
+#: named study presets (resolve_study_preset), assigned by nskinetics
+#: ROLE (kinetic_parameter_roles) since 2026-09-06:
+#:   1. RATE CONSTANTS (role capacity: k_1h, k_2, ..., k_13-k_16) --
+#:      DEFAULT_RATE_MULTIPLIER_BOUNDS, [1e-5×, 10×]: an effective
+#:      knock-out is reachable (still log-uniform below and above the
+#:      baseline).
+#:   2. INHIBITION COEFFICIENTS (roles product_inhibition and lethality:
+#:      k_1ie, k_1ii, k_7ii, k_10ie, ...) -- DEFAULT_SATURATION_
+#:      MULTIPLIER_BOUNDS, [0.1×, 10×].
+#:   3. REGULATION, AFFINITY and SELF-INHIBITION TERMS (K_1i, K_2i, ...,
+#:      K_1e, ..., K_6e, K_16i) -- [0.1×, 10×] (a zero saturation constant
+#:      has no engineering meaning).
+#: Before 2026-09-06 the rate band applied to every lowercase 'k_' name
+#: (inhibition coefficients included); that prefix rule is what
+#: build_search_space still applies when `rate_params` is None (legacy
+#: and older-study resumes). The legacy single band of
+#: build_search_space's multiplier_bounds default, (0.1, 10.0), is
+#: unchanged.
 DEFAULT_RATE_MULTIPLIER_BOUNDS = (1e-5, 10.0)
 DEFAULT_SATURATION_MULTIPLIER_BOUNDS = (0.1, 10.0)
+
+#: nskinetics roles (parameter_categories.ROLES) that make a parameter a
+#: RATE CONSTANT -- the only names the k_* rate band applies to under the
+#: study presets (rate_constant_names) -- and the roles of the
+#: INHIBITION COEFFICIENTS (documentation / reporting; they simply take
+#: the saturation band). Every other role (affinity,
+#: substrate_regulation, product_self_inhibition) is a K_* term on the
+#: saturation band too.
+RATE_CONSTANT_ROLES = ('capacity',)
+INHIBITION_COEFFICIENT_ROLES = ('product_inhibition', 'lethality')
 
 #%% Objective registry and tracked metrics
 # Getters are callables over a `handles` dict (see get_handles below):
@@ -168,6 +192,15 @@ def discover_kinetic_parameters(r_te):
             for p in r_te.getGlobalParameterIds()
             if p[:2].lower() == 'k_'}
 
+def _rate_predicate(rate_params, rate_prefix='k_'):
+    """name -> bool: does the k_* RATE band apply to `name`? An explicit
+    `rate_params` (any iterable of names, possibly empty) is the exact
+    set; None is the pre-2026-09-06 lowercase-prefix rule."""
+    if rate_params is None:
+        return lambda name: name.startswith(rate_prefix)
+    rate_set = frozenset(rate_params)
+    return lambda name: name in rate_set
+
 def build_search_space(kinetic_baselines,
                        multiplier_bounds=(0.1, 10.0),
                        param_bounds_override=None,
@@ -181,6 +214,7 @@ def build_search_space(kinetic_baselines,
                        threshold_delta_bounds=None,
                        spike_conc_bounds=None,
                        rate_multiplier_bounds=None,
+                       rate_params=None,
                        ):
     """Build the decision-variable space: {name: {'low', 'high', 'log'}}
     (integer variables additionally carry 'int': True).
@@ -194,11 +228,17 @@ def build_search_space(kinetic_baselines,
 
     `rate_multiplier_bounds` (None = use `multiplier_bounds` for every
     name, the single-band behaviour of studies started before
-    2026-09-04) is a separate (m_lo, m_hi) band for the RATE constants --
-    names starting with lowercase 'k_' -- so the study presets can let a
-    rate reach an effective knock-out (DEFAULT_RATE_MULTIPLIER_BOUNDS)
-    while the saturation constants K_* keep `multiplier_bounds`. It
-    applies only where the band applies (after include/exclude/override).
+    2026-09-04) is a separate (m_lo, m_hi) band for the RATE constants,
+    so the study presets can let a rate reach an effective knock-out
+    (DEFAULT_RATE_MULTIPLIER_BOUNDS) while every other kinetic
+    parameter keeps `multiplier_bounds`. WHICH names are rate constants
+    is `rate_params` (an iterable of names; the presets pass the
+    capacity-role rows of the workbook, rate_constant_names, so the
+    inhibition coefficients k_*i* stay on `multiplier_bounds`); None
+    keeps the pre-2026-09-06 rule -- every name starting with lowercase
+    'k_' -- required to resume a study started under it. Either way the
+    rate band applies only where a band applies at all (after
+    include/exclude/override).
 
     `exclude_params` names are
     always excluded (silently). `include_params`
@@ -233,6 +273,7 @@ def build_search_space(kinetic_baselines,
     m_lo, m_hi = multiplier_bounds
     r_lo, r_hi = (multiplier_bounds if rate_multiplier_bounds is None
                   else rate_multiplier_bounds)
+    is_rate = _rate_predicate(rate_params)
     space, excluded = {}, []
     for name, baseline in kinetic_baselines.items():
         if include_params is not None and name not in include_params:
@@ -248,7 +289,7 @@ def build_search_space(kinetic_baselines,
                   'entry; excluding it from the search space.')
             excluded.append(name)
         else:
-            lo_m, hi_m = (r_lo, r_hi) if name.startswith('k_') else (m_lo, m_hi)
+            lo_m, hi_m = (r_lo, r_hi) if is_rate(name) else (m_lo, m_hi)
             space[name] = dict(low=lo_m*baseline, high=hi_m*baseline,
                                log=True)
     if (target_conc_bounds is not None or threshold_delta_bounds is not None
@@ -310,9 +351,14 @@ def baseline_decision_point(search_space, kinetic_baselines,
         point[name] = int(clipped) if sp.get('int') else clipped
     return point
 
-def knockout_probe_points(search_space, baseline_point, rate_prefix='k_'):
+def knockout_probe_points(search_space, baseline_point, rate_prefix='k_',
+                          rate_params=None):
     """The single-knockout probes of a study: for every log-scale RATE
-    constant (name starting with `rate_prefix`) of `search_space`, a copy
+    constant of `search_space` -- the names in `rate_params` when given
+    (the presets' capacity-role rows, so inhibition coefficients k_*i*
+    get no probe: their 0.1x floor is a knock-down, not a knock-out),
+    else every name starting with `rate_prefix` (the pre-2026-09-06
+    rule) -- a copy
     of `baseline_point` with that one variable at its band FLOOR
     (search_space[name]['low']) and every other decision variable at the
     baseline. Enqueued right after trial 0 by run_kinetic_optimization
@@ -335,9 +381,10 @@ def knockout_probe_points(search_space, baseline_point, rate_prefix='k_'):
 
     Returns ({name: point}, [names skipped as already at the floor]), both
     in search-space order; `baseline_point` is not modified."""
+    is_rate = _rate_predicate(rate_params, rate_prefix)
     probes, at_floor = {}, []
     for name, sp in search_space.items():
-        if (not name.startswith(rate_prefix) or not sp.get('log')
+        if (not is_rate(name) or not sp.get('log')
                 or sp.get('int') or name not in baseline_point):
             continue
         if baseline_point[name] <= sp['low']:
@@ -390,13 +437,16 @@ def kinetic_param_names_from_scenario(scenario):
     return list(workbook_kinetic_baselines(scenario))
 
 def workbook_kinetic_bounds(scenario, multiplier_bounds=(0.1, 10.0),
-                            rate_multiplier_bounds=None):
+                            rate_multiplier_bounds=None, rate_params=None):
     """Absolute (low, high) bounds -- the multiplier band around the
     scenario workbook's baseline -- for every positive-baseline kinetic
     row of that workbook (workbook_kinetic_baselines), keyed by te name
-    and in workbook order. Same per-prefix rule as build_search_space:
-    names starting with lowercase 'k_' use `rate_multiplier_bounds` when
-    it is given, every other name (K_*) uses `multiplier_bounds`. A plain
+    and in workbook order. Same rule as build_search_space: the RATE
+    constants -- the names in `rate_params` when given (the presets pass
+    rate_constant_names of the workbook rows), else every name starting
+    with lowercase 'k_' (the pre-2026-09-06 rule) -- use
+    `rate_multiplier_bounds` when it is given, every other name
+    (inhibition coefficients k_*i*, K_*) uses `multiplier_bounds`. A plain
     file read (no simulation), so it can parameterize a run of a
     DIFFERENT scenario: passed as param_bounds_override it gives the
     IBO-pathway rates zeroed on the model under scenario A their
@@ -406,10 +456,11 @@ def workbook_kinetic_bounds(scenario, multiplier_bounds=(0.1, 10.0),
     m_lo, m_hi = multiplier_bounds
     r_lo, r_hi = (multiplier_bounds if rate_multiplier_bounds is None
                   else rate_multiplier_bounds)
+    is_rate = _rate_predicate(rate_params)
     bounds = {}
     for name, baseline in workbook_kinetic_baselines(scenario).items():
         if baseline > 0.0:
-            lo_m, hi_m = (r_lo, r_hi) if name.startswith('k_') else (m_lo, m_hi)
+            lo_m, hi_m = (r_lo, r_hi) if is_rate(name) else (m_lo, m_hi)
             bounds[name] = (lo_m*baseline, hi_m*baseline)
     return bounds
 
@@ -458,6 +509,27 @@ def kinetic_parameter_roles(path=None):
         _kinetic_parameter_roles_cache = roles
     return roles
 
+def rate_constant_names(names, roles=None):
+    """The RATE CONSTANTS among `names` (role in RATE_CONSTANT_ROLES, i.e.
+    the capacities k_1h, k_2, ..., k_13-k_16), in input order -- the names
+    the presets' k_* band (DEFAULT_RATE_MULTIPLIER_BOUNDS) applies to;
+    inhibition coefficients (k_1ie, k_1ii, k_10ie, ...) and every K_*
+    term are left on the saturation band. `roles` (default
+    kinetic_parameter_roles()) is the {name: role} table; a name absent
+    from it raises KeyError(name) so an unclassified parameter can never
+    silently land on the wrong band."""
+    if roles is None:
+        roles = kinetic_parameter_roles()
+    out = []
+    for name in names:
+        if name not in roles:
+            raise KeyError(f'{name!r} has no entry in the nskinetics '
+                           'kinetic-parameter role table; cannot assign '
+                           'its multiplier band.')
+        if roles[name] in RATE_CONSTANT_ROLES:
+            out.append(name)
+    return out
+
 #%% Study presets
 
 #: `study_target_products` axis: which products the strain is engineered
@@ -498,7 +570,11 @@ def resolve_study_preset(study_target_products, study_type, roles=None):
     include_params=[workbook rows of that scenario whose role is in
     STUDY_TYPE_ROLES[study_type], in workbook order],
     multiplier_bounds=DEFAULT_SATURATION_MULTIPLIER_BOUNDS,
-    rate_multiplier_bounds=DEFAULT_RATE_MULTIPLIER_BOUNDS).
+    rate_multiplier_bounds=DEFAULT_RATE_MULTIPLIER_BOUNDS,
+    rate_params=[the workbook's RATE CONSTANTS -- rate_constant_names,
+    role capacity; 16 in A's workbook, 20 in B's -- the only names the
+    rate band applies to, so the inhibition coefficients k_*i* sample
+    the saturation band like the K_* terms]).
     Set sizes: ethanol_only 29 (metabolic) / 40 (metabolic_protein);
     ethanol_isobutanol 40 / 56. `roles` (default
     kinetic_parameter_roles()) is the {name: role} table; a workbook row
@@ -518,7 +594,8 @@ def resolve_study_preset(study_target_products, study_type, roles=None):
         roles = kinetic_parameter_roles()
     set_scenario = target['parameter_set_scenario']
     include_params = []
-    for name in workbook_kinetic_baselines(set_scenario):
+    workbook_rows = list(workbook_kinetic_baselines(set_scenario))
+    for name in workbook_rows:
         if name not in roles:
             raise KeyError(
                 f'{name!r} (scenario-{set_scenario} workbook row) has no '
@@ -530,7 +607,8 @@ def resolve_study_preset(study_target_products, study_type, roles=None):
                 kinetic_bounds_scenario=set_scenario,
                 include_params=include_params,
                 multiplier_bounds=DEFAULT_SATURATION_MULTIPLIER_BOUNDS,
-                rate_multiplier_bounds=DEFAULT_RATE_MULTIPLIER_BOUNDS)
+                rate_multiplier_bounds=DEFAULT_RATE_MULTIPLIER_BOUNDS,
+                rate_params=rate_constant_names(workbook_rows, roles=roles))
 
 #: Study-name suffix of a burden-enabled study (enzyme_burden.py): it
 #: records extra columns and a different physiology, so it must never
@@ -542,7 +620,8 @@ BURDEN_STUDY_SUFFIX = '_burden'
 
 def default_study_name(objective, study_target_products, study_type,
                        scenario=None, kinetic_bounds_scenario=None,
-                       burden=False, rate_multiplier_bounds=None):
+                       burden=False, rate_multiplier_bounds=None,
+                       inhibition_multiplier_bounds=None):
     """Stable study name of a preset study:
     kin_opt_{study_target_products}_{study_type}_{objective slug}
     (slug = lower-cased, spaces -> '_'), e.g.
@@ -573,6 +652,17 @@ def default_study_name(objective, study_target_products, study_type,
     study of the same objective (the CSV header guard cannot tell them
     apart). None, or the default band, leaves the name unchanged.
 
+    `inhibition_multiplier_bounds` (the band of the inhibition
+    coefficients k_*i*, (m_lo, m_hi) x baseline) tags the name
+    `_ib{m_lo:g}-{m_hi:g}` (e.g. `_ib0.1-10`) WHENEVER it is given,
+    after `_rb`: since 2026-09-06 the presets assign bands by role
+    (rate constants alone on the k_* band; inhibition coefficients on
+    the saturation band, `multiplier_bounds`), and the driver and
+    supervisor pass that band here on every preset-derived name, so a
+    role-band study never resumes the CSV/SQLite of a study started
+    under the old prefix rule (same columns, so the header guard cannot
+    tell them apart). None (older callers) leaves the name unchanged.
+
     `burden=True` appends BURDEN_STUDY_SUFFIX ('_burden') after every
     other tag: a burden study (enzyme_burden.py; the driver's default)
     can never resume a burden-free study's CSV/SQLite, or vice versa.
@@ -590,6 +680,9 @@ def default_study_name(objective, study_target_products, study_type,
             and tuple(rate_multiplier_bounds) != tuple(DEFAULT_RATE_MULTIPLIER_BOUNDS)):
         lo, hi = rate_multiplier_bounds
         name += f'_rb{lo:g}-{hi:g}'
+    if inhibition_multiplier_bounds is not None:
+        lo, hi = inhibition_multiplier_bounds
+        name += f'_ib{lo:g}-{hi:g}'
     if burden:
         name += BURDEN_STUDY_SUFFIX
     return name
@@ -1144,6 +1237,7 @@ def run_kinetic_optimization(objective='IRR',
                              exclude_params=(),
                              include_params=None,
                              rate_multiplier_bounds=None,
+                             rate_params=None,
                              threshold_conc_bounds=(0.0, 300.0),
                              target_delta_bounds=(5.0, 500.0),
                              spike_delta_bounds=(0.5, 595.0),
@@ -1205,6 +1299,11 @@ def run_kinetic_optimization(objective='IRR',
     band of build_search_space; the study presets pass
     DEFAULT_RATE_MULTIPLIER_BOUNDS (their absolute bands actually arrive
     via param_bounds_override, see workbook_kinetic_bounds).
+    `rate_params` (None = every lowercase 'k_' name, the pre-2026-09-06
+    rule) names the RATE CONSTANTS that band -- and the single-knockout
+    probes -- apply to; the presets pass their workbook's capacity-role
+    rows (rate_constant_names), leaving the inhibition coefficients
+    k_*i* on `multiplier_bounds` with no probe.
 
     `burden_model` (default 'auto') is the enzyme-burden (proteome-
     allocation) constraint of enzyme_burden.py: 'auto' builds
@@ -1299,6 +1398,7 @@ def run_kinetic_optimization(objective='IRR',
         exclude_params=exclude_params,
         include_params=include_params,
         rate_multiplier_bounds=rate_multiplier_bounds,
+        rate_params=rate_params,
         threshold_conc_bounds=threshold_conc_bounds,
         target_delta_bounds=target_delta_bounds,
         spike_delta_bounds=spike_delta_bounds,
@@ -1313,6 +1413,17 @@ def run_kinetic_optimization(objective='IRR',
     print(f'Search space: {len(search_space)} decision variables '
           f'({n_kinetic} kinetic + {n_feeding} feeding{restriction}); '
           f'{len(excluded)} kinetic parameters excluded: {excluded}')
+    if rate_multiplier_bounds is not None:
+        _is_rate = _rate_predicate(rate_params)
+        n_rate = sum(1 for name in search_space
+                     if name in kinetic_baselines and _is_rate(name))
+        rule = ('by role (rate_params)' if rate_params is not None
+                else "by the lowercase 'k_' prefix (legacy rule)")
+        print(f'Rate band {tuple(rate_multiplier_bounds)} x baseline on '
+              f'{n_rate} rate constants {rule}; the other '
+              f'{n_kinetic - n_rate} kinetic parameters (inhibition '
+              f'coefficients, K_* terms) on {tuple(multiplier_bounds)} x '
+              'baseline (where no override applies).')
 
     # Scenario baseline snapshot for restoration (the driver has already
     # baseline-simulated the scenario, so current_specifications IS the
@@ -1387,7 +1498,8 @@ def run_kinetic_optimization(objective='IRR',
             # the optuna DB: a crash mid-probes resumes them without any
             # re-enqueue (this block runs on a fresh study only).
             probes, at_floor = knockout_probe_points(search_space,
-                                                    baseline_point)
+                                                    baseline_point,
+                                                    rate_params=rate_params)
             for pname, point in probes.items():
                 study.enqueue_trial(point,
                                     user_attrs={'knockout_probe': pname})

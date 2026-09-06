@@ -17,9 +17,13 @@ crashed/interrupted study and runs only the remaining trials.
 
 Search set and bands come from a named STUDY PRESET (default
 study_target_products='ethanol_isobutanol', study_type='metabolic_protein':
-start at the scenario-A baseline, the B workbook's 56 kinetic rows, k_* on
-[1e-5x, 10x] and K_* on [0.1x, 10x] log bands; see ko.resolve_study_preset
-and run()'s docstring). study_target_products=None is the legacy flag path
+start at the scenario-A baseline, the B workbook's 56 kinetic rows; log
+bands by nskinetics ROLE since 2026-09-06 -- rate constants (capacity:
+k_1h, k_2, ..., k_13-k_16) on [1e-5x, 10x], inhibition coefficients
+(k_1ie, k_1ii, k_10ie, ...) and the regulation / affinity / self-
+inhibition terms K_* on [0.1x, 10x]; see ko.resolve_study_preset and
+run()'s docstring; the derived study name carries the inhibition band
+tag `_ib0.1-10`). study_target_products=None is the legacy flag path
 (scenario / kinetic_bounds_scenario / single band) for resuming older
 studies.
 
@@ -63,12 +67,15 @@ IBO_filepath = isobutanol.__file__.replace('\\__init__.py', '')
 
 def kinetic_bounds_from_scenario(bounds_scenario,
                                  multiplier_bounds=(0.1, 10.0),
-                                 rate_multiplier_bounds=None):
+                                 rate_multiplier_bounds=None,
+                                 rate_params=None):
     """Absolute (low, high) bounds -- the multiplier band(s) around
     `bounds_scenario`'s workbook baseline -- for every positive-baseline
     kinetic row of that scenario's parameter-distributions workbook,
-    keyed by te parameter name (ko.workbook_kinetic_bounds; k_* names use
-    `rate_multiplier_bounds` when given, K_* use `multiplier_bounds`).
+    keyed by te parameter name (ko.workbook_kinetic_bounds; the rate
+    constants -- `rate_params` when given (the presets' capacity-role
+    rows), else every lowercase k_* name -- use `rate_multiplier_bounds`
+    when given, every other row uses `multiplier_bounds`).
     Read directly from the workbook (no simulation), so it can
     parameterize a run of a DIFFERENT scenario: passed as
     param_bounds_override it gives the IBO-pathway rates zeroed in
@@ -76,7 +83,8 @@ def kinetic_bounds_from_scenario(bounds_scenario,
     zero-baseline exclusion."""
     return ko.workbook_kinetic_bounds(
         bounds_scenario, multiplier_bounds=multiplier_bounds,
-        rate_multiplier_bounds=rate_multiplier_bounds)
+        rate_multiplier_bounds=rate_multiplier_bounds,
+        rate_params=rate_params)
 
 
 def run(scenario=None,  # 'A' or 'B'; None = the preset's start scenario
@@ -127,12 +135,21 @@ def run(scenario=None,  # 'A' or 'B'; None = the preset's start scenario
     A baseline with the zero Ehrlich rates clipped up to 1e-5 x their B
     baseline); 'metabolic' keeps the capacity / product-inhibition /
     lethality / substrate-regulation roles (all k_* + K_1i, K_2i, K_5i,
-    K_9i), 'metabolic_protein' every row. Bands: k_* [1e-5x, 10x], K_*
-    [0.1x, 10x], log-scale. Each preset entry is applied ONLY where the
-    caller passed nothing: an explicit `scenario`,
-    `kinetic_bounds_scenario`, `include_params`, `multiplier_bounds` or
-    `rate_multiplier_bounds` wins over the preset. A preset is itself a
-    workbook restriction, so restrict_to_workbook=False raises.
+    K_9i), 'metabolic_protein' every row. Bands (log-scale, x baseline)
+    by nskinetics ROLE since 2026-09-06: rate constants (role capacity;
+    the preset's `rate_params`, ko.rate_constant_names) [1e-5x, 10x];
+    inhibition coefficients (product_inhibition, lethality: k_1ie,
+    k_1ii, k_7ii, k_10ie, ...) [0.1x, 10x]; regulation / affinity /
+    self-inhibition terms K_* [0.1x, 10x]. Each preset entry is applied
+    ONLY where the caller passed nothing: an explicit `scenario`,
+    `kinetic_bounds_scenario`, `include_params`, `multiplier_bounds`,
+    `rate_multiplier_bounds` or `rate_params` wins over the preset. A
+    preset is itself a workbook restriction, so restrict_to_workbook=False
+    raises. Every preset-derived study name carries the inhibition band
+    tag `_ib{lo}-{hi}` (`_ib0.1-10` at the default; ko.default_study_name),
+    so a role-band study never resumes one started under the pre-change
+    prefix rule (e.g. the aborted 2026-09-05
+    kin_opt_ethanol_isobutanol_metabolic_irr_burden).
 
     LEGACY PATH (`study_target_products=None`): exactly the pre-preset
     behaviour, for resuming older studies. `scenario` (default 'B') is
@@ -164,7 +181,9 @@ def run(scenario=None,  # 'A' or 'B'; None = the preset's start scenario
 
     SINGLE-KNOCKOUT PROBES (`enqueue_knockouts`, default True; since
     2026-09-06). A fresh study enqueues, after trial 0, one probe per
-    rate constant k_* of the search space -- that rate alone at the floor
+    RATE CONSTANT of the search space (the preset's `rate_params`, role
+    capacity; inhibition coefficients k_*i* get none -- their 0.1x floor
+    is a knock-down, not a knock-out) -- that rate alone at the floor
     of its band, everything else at the scenario baseline
     (ko.knockout_probe_points; a rate already at its floor, such as the
     ethanol_isobutanol preset's clipped Ehrlich rates, gets none). Under
@@ -195,7 +214,7 @@ def run(scenario=None,  # 'A' or 'B'; None = the preset's start scenario
         if kinetic_bounds_scenario is None:
             kinetic_bounds_scenario = preset['kinetic_bounds_scenario']
         for key in ('include_params', 'multiplier_bounds',
-                    'rate_multiplier_bounds'):
+                    'rate_multiplier_bounds', 'rate_params'):
             engine_kwargs.setdefault(key, preset[key])
         if study_name is None:
             study_name = ko.default_study_name(
@@ -203,13 +222,20 @@ def run(scenario=None,  # 'A' or 'B'; None = the preset's start scenario
                 else engine_kwargs.get('objective_name', 'custom'),
                 study_target_products, study_type,
                 scenario=scenario, kinetic_bounds_scenario=kinetic_bounds_scenario,
-                burden=burden, rate_multiplier_bounds=explicit_rate_bounds)
+                burden=burden, rate_multiplier_bounds=explicit_rate_bounds,
+                # The inhibition coefficients k_*i* sample the saturation
+                # band; tagged on EVERY preset name (role-band scheme).
+                inhibition_multiplier_bounds=engine_kwargs['multiplier_bounds'])
+        n_rate = sum(1 for n in engine_kwargs['include_params']
+                     if n in engine_kwargs['rate_params'])
         print(f'Study preset: study_target_products={study_target_products!r}, '
               f'study_type={study_type!r} -> start at scenario {scenario}, '
               f'{len(engine_kwargs["include_params"])} kinetic parameters '
-              f'from the scenario-{kinetic_bounds_scenario} workbook, bands '
-              f'k_* {engine_kwargs["rate_multiplier_bounds"]} / K_* '
-              f'{engine_kwargs["multiplier_bounds"]} (x baseline, log).')
+              f'from the scenario-{kinetic_bounds_scenario} workbook; bands '
+              f'(x baseline, log) by role: {n_rate} rate constants '
+              f'{engine_kwargs["rate_multiplier_bounds"]}, the other '
+              f'{len(engine_kwargs["include_params"]) - n_rate} (inhibition '
+              f'coefficients, K_* terms) {engine_kwargs["multiplier_bounds"]}.')
     elif scenario is None:
         scenario = 'B'  # legacy default
     param_set_scenario = kinetic_bounds_scenario or scenario
@@ -231,7 +257,8 @@ def run(scenario=None,  # 'A' or 'B'; None = the preset's start scenario
             kinetic_bounds_scenario,
             multiplier_bounds=engine_kwargs.get('multiplier_bounds',
                                                 (0.1, 10.0)),
-            rate_multiplier_bounds=engine_kwargs.get('rate_multiplier_bounds'))
+            rate_multiplier_bounds=engine_kwargs.get('rate_multiplier_bounds'),
+            rate_params=engine_kwargs.get('rate_params'))
         derived.update(engine_kwargs.get('param_bounds_override') or {})
         engine_kwargs['param_bounds_override'] = derived
         if study_name is None:  # legacy path only (presets set it above)

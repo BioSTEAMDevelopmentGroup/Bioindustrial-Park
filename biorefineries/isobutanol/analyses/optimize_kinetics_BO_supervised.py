@@ -93,13 +93,20 @@ def default_study_name(scenario, objective, kinetic_bounds_scenario,
     driver's convention). `rate_multiplier_bounds` (an explicit k_* band)
     is tagged `_rb{lo}-{hi}` on the preset path only when it differs from
     the presets' default band (the engine's rule); the legacy path never
-    encoded the band."""
+    encoded the band. Every preset name also carries the inhibition-
+    coefficient band tag `_ib{lo}-{hi}` (the presets' saturation band,
+    ko.DEFAULT_SATURATION_MULTIPLIER_BOUNDS -- the supervisor exposes no
+    flag for it, matching the driver's default `multiplier_bounds`):
+    since 2026-09-06 the presets assign bands by role, and the tag keeps a
+    role-band study from resuming a pre-change study of the same name."""
     if study_target_products is not None:
         return ko.default_study_name(objective, study_target_products,
                                      study_type, scenario=scenario,
                                      kinetic_bounds_scenario=kinetic_bounds_scenario,
                                      burden=burden,
-                                     rate_multiplier_bounds=rate_multiplier_bounds)
+                                     rate_multiplier_bounds=rate_multiplier_bounds,
+                                     inhibition_multiplier_bounds=
+                                         ko.DEFAULT_SATURATION_MULTIPLIER_BOUNDS)
     scenario = scenario or 'B'
     slug = objective.lower().replace(' ', '_')
     suffix = ko.BURDEN_STUDY_SUFFIX if burden else ''
@@ -373,8 +380,11 @@ if __name__ == '__main__':
                              'TPE learns the lethality map first')
     parser.add_argument('--rate-multiplier-bounds', nargs=2, type=float,
                         default=None, metavar=('LO', 'HI'),
-                        help="explicit k_* band (x baseline, log-scale) "
-                             "overriding the preset's 1e-5 10; a differing "
+                        help='explicit RATE-CONSTANT band (x baseline, '
+                             "log-scale; role capacity: k_1h, k_2, ..., "
+                             "k_13-k_16) overriding the preset's 1e-5 10; "
+                             'inhibition coefficients (k_1ie, k_1ii, ...) '
+                             'and K_* terms stay on 0.1 10; a differing '
                              'band tags the derived study name _rb{LO}-{HI} '
                              'so it never resumes the preset-band study')
     args = parser.parse_args()
