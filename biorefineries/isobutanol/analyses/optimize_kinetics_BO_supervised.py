@@ -214,7 +214,7 @@ def supervise(scenario=None, objective='IRR', n_trials=2000,
               study_target_products=ko.DEFAULT_STUDY_TARGET_PRODUCTS,
               study_type=ko.DEFAULT_STUDY_TYPE, burden=True,
               enqueue_knockouts=True, rate_multiplier_bounds=None,
-              n_startup_trials=None):
+              n_startup_trials=None, max_empty_attempts=5):
     """Run attempts until 'complete' or 'abort'; returns the final
     outcome string ('complete' or 'abort'). `study_target_products` /
     `study_type` name the driver's study preset (defaults = the engine's;
@@ -236,7 +236,13 @@ def supervise(scenario=None, objective='IRR', n_trials=2000,
     the supervisor exposes no flag for it). `n_startup_trials` (None =
     the engine's rule max(10, n_trials//10)) is the TPE random start-up
     length (--n-startup-trials N); forwarded on every attempt, never
-    part of the study name, so a resume may change it."""
+    part of the study name, so a resume may change it.
+    `max_empty_attempts` (default 5; --max-empty-attempts) caps the
+    CONSECUTIVE attempts that log no new trial: an empty attempt whose
+    child had started a simulation (its in-flight sidecar exists) is a
+    hung/crashed first draw and is resumed reseeded; one whose child
+    never got that far (kill-loop, broken load) aborts at once, and the
+    cap aborts either way (ko.attempt_outcome)."""
     if study_name is None:
         study_name = default_study_name(scenario, objective,
                                         kinetic_bounds_scenario,
@@ -276,6 +282,7 @@ def supervise(scenario=None, objective='IRR', n_trials=2000,
               'session as a LOST row')
 
     attempt = 0
+    empty_streak = 0   # consecutive attempts that logged no new trial
     while True:
         attempt += 1
         rows_before = row_count(csv_path)
@@ -299,8 +306,18 @@ def supervise(scenario=None, objective='IRR', n_trials=2000,
                     killed = True
                     break
         rows_after = row_count(csv_path)
+        # The sidecar's presence -- checked BEFORE it is recovered below,
+        # so the LOST row still never counts as progress -- proves the
+        # child reloaded and STARTED a simulation: an empty attempt that
+        # got that far hung/crashed on a pathological first draw and is
+        # resumed (reseeded), not aborted; see ko.attempt_outcome.
+        inflight_lost = os.path.isfile(inflight_path)
         outcome = ko.attempt_outcome(child.returncode, rows_before,
-                                     rows_after, killed_for_stall=killed)
+                                     rows_after, killed_for_stall=killed,
+                                     inflight_lost=inflight_lost,
+                                     empty_streak=empty_streak,
+                                     max_empty_attempts=max_empty_attempts)
+        empty_streak = 0 if rows_after > rows_before else empty_streak + 1
         # Log the lost in-flight trial NOW (at kill / crash detection),
         # but only AFTER the outcome was decided from genuine terminal
         # rows: the recovered LOST row must never count as this attempt's
@@ -319,12 +336,17 @@ def supervise(scenario=None, objective='IRR', n_trials=2000,
         if outcome == 'abort':
             event(f'attempt {attempt} (exit {child.returncode}, '
                   f'stall-killed={killed}) recorded no new trials '
-                  f'(rows={rows_after}); aborting -- investigate before '
-                  'relaunching')
+                  f'(rows={rows_after}; child '
+                  f'{"started a simulation" if inflight_lost else "never reached a simulation"}; '
+                  f'empty streak {empty_streak}/{max_empty_attempts}); '
+                  'aborting -- investigate before relaunching')
             return outcome
+        empty_note = ('' if rows_after > rows_before else
+                      ' (no new trial this attempt: first draw lost; '
+                      f'empty streak {empty_streak}/{max_empty_attempts})')
         event(f'attempt {attempt} ended (exit {child.returncode}, '
               f'stall-killed={killed}) at {row_count(csv_path)} rows; '
-              f'resuming in {settle_s:g} s')
+              f'resuming in {settle_s:g} s{empty_note}')
         time.sleep(settle_s)
 
 
@@ -434,6 +456,16 @@ if __name__ == '__main__':
                              'choice there); compared with the trials '
                              'already stored, never part of the study '
                              'name, so a resume may change it')
+    parser.add_argument('--max-empty-attempts', type=int, default=5,
+                        metavar='N',
+                        help='abort after N CONSECUTIVE attempts that log '
+                             'no new trial (default 5). An empty attempt '
+                             'whose child had started a simulation (its '
+                             'in-flight sidecar exists) is a hung/crashed '
+                             'first draw and is resumed reseeded; one whose '
+                             'child never reached a simulation (stall '
+                             'timeout below the ~18 s reload, broken load) '
+                             'aborts at once')
     args = parser.parse_args()
     if not args.restrict_to_workbook and not args.legacy_flags:
         parser.error('--no-restrict-to-workbook requires --legacy-flags '
@@ -455,5 +487,6 @@ if __name__ == '__main__':
                         rate_multiplier_bounds=(
                             None if args.rate_multiplier_bounds is None
                             else tuple(args.rate_multiplier_bounds)),
-                        n_startup_trials=args.n_startup_trials)
+                        n_startup_trials=args.n_startup_trials,
+                        max_empty_attempts=args.max_empty_attempts)
     sys.exit(0 if outcome == 'complete' else 1)

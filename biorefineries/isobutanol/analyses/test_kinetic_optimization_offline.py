@@ -1854,4 +1854,51 @@ src30 = open(os.path.join(os.path.dirname(os.path.abspath(__file__)),
 assert "'--n-startup-trials'" in src30 and 'n_startup_trials=args.n_startup_trials' in src30
 PASS('n_startup_trials: engine kwarg (None = max(10, n_trials//10)), validated, resume-safe; driver run() kwarg; supervisor --n-startup-trials; study name untouched')
 
+#%% 31. empty-attempt abort rule (2026-09-06): an attempt that logged no
+# new row but whose child had already STARTED a simulation (in-flight
+# sidecar present => the reload worked, the first draw hung) resumes; abort
+# only when the child never reached a simulation (kill-loop / broken load)
+# or after `max_empty_attempts` consecutive empty attempts (safety net).
+# Legacy defaults (no inflight flag, max 1) reproduce the old rule exactly.
+assert ko.attempt_outcome(1, 5, 5, killed_for_stall=True) == 'abort'           # legacy
+assert ko.attempt_outcome(1, 5, 5, killed_for_stall=True, inflight_lost=True) \
+    == 'abort'                                                                 # max 1: still abort
+assert ko.attempt_outcome(1, 5, 5, killed_for_stall=True, inflight_lost=True,
+                          empty_streak=0, max_empty_attempts=5) == 'resume'
+assert ko.attempt_outcome(1, 5, 5, killed_for_stall=True, inflight_lost=True,
+                          empty_streak=3, max_empty_attempts=5) == 'resume'
+assert ko.attempt_outcome(1, 5, 5, killed_for_stall=True, inflight_lost=True,
+                          empty_streak=4, max_empty_attempts=5) == 'abort'     # 5th consecutive
+assert ko.attempt_outcome(1, 5, 5, killed_for_stall=True, inflight_lost=False,
+                          empty_streak=0, max_empty_attempts=5) == 'abort'     # never simulated
+assert ko.attempt_outcome(3221225477, 5, 5, inflight_lost=True,
+                          max_empty_attempts=5) == 'resume'                    # crash on first draw
+assert ko.attempt_outcome(3221225477, 5, 5, inflight_lost=False,
+                          max_empty_attempts=5) == 'abort'
+assert ko.attempt_outcome(1, 5, 8, killed_for_stall=True, empty_streak=4,
+                          max_empty_attempts=5) == 'resume'                    # progress: streak irrelevant
+assert ko.attempt_outcome(0, 5, 5, empty_streak=4, max_empty_attempts=5) == 'complete'
+try:
+    ko.attempt_outcome(1, 5, 5, max_empty_attempts=0)
+except ValueError as e31:
+    assert 'max_empty_attempts' in str(e31)
+else:
+    raise AssertionError('max_empty_attempts=0 did not raise')
+# Supervisor: tracks the streak across attempts, checks the sidecar BEFORE
+# recovering it (the LOST row still never counts as progress), exposes
+# max_empty_attempts (default 5) on supervise() and --max-empty-attempts.
+sup31 = _runpy.run_path(os.path.join(
+    os.path.dirname(os.path.abspath(__file__)),
+    'optimize_kinetics_BO_supervised.py'))
+assert _inspect.signature(sup31['supervise']).parameters['max_empty_attempts'].default == 5
+src31 = _inspect.getsource(sup31['supervise'])
+assert 'inflight_lost=' in src31 and 'empty_streak' in src31
+assert 'max_empty_attempts=max_empty_attempts' in src31
+assert src31.index('attempt_outcome(') < src31.rindex('recover_inflight(')     # still decided before recovery
+assert src31.index('os.path.isfile(inflight_path)') < src31.index('attempt_outcome(')
+file31 = open(os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                           'optimize_kinetics_BO_supervised.py')).read()
+assert "'--max-empty-attempts'" in file31 and 'max_empty_attempts=args.max_empty_attempts' in file31
+PASS('empty-attempt abort rule: first-draw hang resumes (sidecar present), never-simulated aborts, streak cap; supervisor streak + flag')
+
 print(f'\nALL {n_pass} CHECKS PASSED')

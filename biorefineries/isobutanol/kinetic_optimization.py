@@ -1226,17 +1226,40 @@ class StallGuard:
         return None
 
 def attempt_outcome(exit_code, rows_before, rows_after,
-                    killed_for_stall=False):
+                    killed_for_stall=False, inflight_lost=False,
+                    empty_streak=0, max_empty_attempts=1):
     """Supervisor decision after one attempt exits: 'complete' (clean
     exit 0), 'resume' (crash or stall-kill, but the attempt recorded new
-    trials -- relaunch the resumable study), or 'abort' (an attempt that
-    added no rows; resuming would loop on the same failure, a human
-    should look)."""
+    trials -- relaunch the resumable study), or 'abort'.
+
+    An attempt that added NO rows (rows_after == rows_before) is judged
+    by what its child got to do (2026-09-06; before that every empty
+    attempt aborted, which is what the legacy defaults still do):
+    `inflight_lost=True` means the child's in-flight sidecar existed when
+    it ended -- it reloaded, sampled and STARTED simulating a trial, so
+    the failure was a pathological first draw (a hung native integrator
+    call, or a crash) and a reseeded resume will draw a different point:
+    'resume'. `inflight_lost=False` means the child never reached a
+    simulation (a stall timeout shorter than the ~18 s reload, a broken
+    load): 'abort'. `empty_streak` is the number of consecutive empty
+    attempts BEFORE this one; once this one makes it
+    `max_empty_attempts` (a positive int; the supervisor's default is 5,
+    --max-empty-attempts) the study aborts regardless -- the safety net
+    against a systematically hanging state (the 2026-09-06 production
+    study aborted at trial 763 under the legacy rule after ONE first-draw
+    hang under the new 3-min timeout; simulated trials there take 2 s
+    median, < 16 s at the 99th percentile, so such a hang is genuine).
+    Progress resets the streak (the supervisor tracks it)."""
+    if not isinstance(max_empty_attempts, int) or max_empty_attempts < 1:
+        raise ValueError('max_empty_attempts must be a positive int; '
+                         f'got {max_empty_attempts!r}')
     if exit_code == 0 and not killed_for_stall:
         return 'complete'
     if rows_after > rows_before:
         return 'resume'
-    return 'abort'
+    if empty_streak + 1 >= max_empty_attempts:
+        return 'abort'
+    return 'resume' if inflight_lost else 'abort'
 
 #%% Engine
 
