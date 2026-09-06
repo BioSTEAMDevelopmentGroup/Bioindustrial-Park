@@ -1782,4 +1782,72 @@ assert "rate_multiplier_bounds=engine_kwargs['rate_multiplier_bounds']" in drv29
 assert 'explicit_rate_bounds' not in drv29
 PASS('per-parameter bands: rate band 1e-3x-10x, k_10 0.1x-10x via DEFAULT_PARAMETER_MULTIPLIER_BOUNDS; precedence override > per-parameter > role; probes at own floor; workbook/preset/engine/driver plumbing; _rb always tagged')
 
+#%% 30. n_startup_trials: the TPE random start-up length is an engine kwarg
+# (None = the legacy rule max(10, n_trials//10)), forwarded by the driver's
+# run() and the supervisor's --n-startup-trials; not part of the study name.
+_sig30 = _inspect.signature(ko.run_kinetic_optimization).parameters
+assert 'n_startup_trials' in _sig30 and _sig30['n_startup_trials'].default is None
+assert 'n_startup_trials' not in _inspect.signature(ko.default_study_name).parameters
+class _FakeTE30:
+    k_1e = 47.1; k_7 = 1.203; K_1e = 0.12
+    def getGlobalParameterIds(self):
+        return ['k_1e', 'k_7', 'K_1e']
+def _solve_TEA30(stream_IDs=None):
+    return {'IRR': 0.2, 'MPSPs': {'ethanol': 0.5, 'isobutanol': 1.0}}
+handles30 = dict(handles17, r_te=_FakeTE30(),
+                 model_specification=lambda **kw: None, solve_TEA=_solve_TEA30,
+                 latest_TEA_solution={'IRR': np.nan,
+                                      'MPSPs': {'ethanol': np.nan,
+                                                'isobutanol': np.nan}})
+outdir30 = tempfile.mkdtemp()
+common30 = dict(objective='IRR', scenario_label='X', seed=1,
+                study_name='offline_startup', results_dir=outdir30,
+                handles=handles30, print_status_every=10, burden_model=None,
+                enqueue_knockouts=False)
+st30, csv30, _ = ko.run_kinetic_optimization(n_trials=12, n_startup_trials=3,
+                                             **common30)
+assert st30.sampler._n_startup_trials == 3
+assert len(ko.load_trajectory(csv30)) == 12
+# Resume (nothing left to run) with None: the legacy rule, floor 10.
+st30b, _, _ = ko.run_kinetic_optimization(n_trials=12, **common30)
+assert st30b.sampler._n_startup_trials == 10 == max(10, 12//10)
+assert len(ko.load_trajectory(csv30)) == 12                  # no new trials
+st30c, _, _ = ko.run_kinetic_optimization(n_trials=12, n_startup_trials=0,
+                                          **common30)
+assert st30c.sampler._n_startup_trials == 0
+try:
+    ko.run_kinetic_optimization(n_trials=12, n_startup_trials=-1, **common30)
+except ValueError as e30:
+    assert 'n_startup_trials' in str(e30)
+else:
+    raise AssertionError('negative n_startup_trials did not raise')
+# Driver: explicit run() kwarg (default None), forwarded to the engine.
+drv30 = open(os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                          'optimize_kinetics_BO.py')).read()
+assert 'n_startup_trials=None,' in drv30
+assert 'n_startup_trials=n_startup_trials' in drv30
+# Supervisor: --n-startup-trials, forwarded through supervise() and
+# child_code() (the kwarg is OMITTED when None, so the driver's default
+# rule applies); no effect on the study name.
+sup30 = _runpy.run_path(os.path.join(
+    os.path.dirname(os.path.abspath(__file__)),
+    'optimize_kinetics_BO_supervised.py'))
+_s30 = _inspect.signature(sup30['supervise']).parameters
+_c30 = _inspect.signature(sup30['child_code']).parameters
+assert _s30['n_startup_trials'].default is None and _c30['n_startup_trials'].default is None
+code30 = sup30['child_code'](None, 'IRR', 200, None, False, 'x',
+                             study_target_products='ethanol_isobutanol',
+                             study_type='metabolic', n_startup_trials=25)
+assert 'n_startup_trials=25' in code30
+code30b = sup30['child_code'](None, 'IRR', 200, None, False, 'x',
+                              study_target_products='ethanol_isobutanol',
+                              study_type='metabolic')
+assert 'n_startup_trials' not in code30b
+assert 'n_startup_trials=n_startup_trials' in _inspect.getsource(sup30['supervise'])
+assert 'n_startup_trials' not in _inspect.signature(sup30['default_study_name']).parameters
+src30 = open(os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                          'optimize_kinetics_BO_supervised.py')).read()
+assert "'--n-startup-trials'" in src30 and 'n_startup_trials=args.n_startup_trials' in src30
+PASS('n_startup_trials: engine kwarg (None = max(10, n_trials//10)), validated, resume-safe; driver run() kwarg; supervisor --n-startup-trials; study name untouched')
+
 print(f'\nALL {n_pass} CHECKS PASSED')

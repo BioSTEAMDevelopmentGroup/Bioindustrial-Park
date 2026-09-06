@@ -1303,6 +1303,7 @@ def run_kinetic_optimization(objective='IRR',
                              handles=None, print_status_every=1,
                              burden_model='auto',
                              enqueue_knockouts=True,
+                             n_startup_trials=None,
                              ):
     """Run the Bayesian optimization. `objective` is a name in
     OBJECTIVE_REGISTRY (direction/level/units filled from the entry) or a
@@ -1320,9 +1321,23 @@ def run_kinetic_optimization(objective='IRR',
     tagged with the optuna user attr 'knockout_probe' = its parameter
     name; optuna stores enqueued trials as WAITING, so a resume finishes
     any probes a crash interrupted without re-enqueueing (resumes never
-    re-enqueue anything). The probes count toward TPE's n_startup_trials
-    (max(10, n_trials//10)), so TPE guidance starts as soon as the
-    lethality map is in. Trials execute STRICTLY
+    re-enqueue anything). The probes count toward TPE's random
+    start-up phase, so TPE guidance starts as soon as the lethality map
+    is in.
+
+    `n_startup_trials` (default None) is the length of that random
+    start-up phase (optuna TPESampler n_startup_trials: trials drawn
+    uniformly at random, enqueued trials included, before TPE's density
+    guidance begins). None applies the rule the engine always used,
+    max(10, n_trials//10) -- 200 for a 2000-trial study, which in the
+    burden-constrained preset space completed 0 of 183 random draws on
+    2026-09-06 -- so an explicit value (e.g. 20-30, the probes already
+    cover the single-parameter directions) is the way to shorten it; a
+    non-negative integer, ValueError otherwise. It is compared with the
+    number of trials already stored, so a resumed study past the
+    start-up count starts in TPE mode at once, and a resume may change
+    it freely: it is not part of the study's identity (no study-name
+    tag, same columns). Trials execute STRICTLY
     sequentially (n_jobs=1; one simulation in flight at a time). Every
     trial appends one row to the trajectory CSV (same stable name as the
     study, '_trajectory.csv' suffix) whether it completes, fails
@@ -1543,9 +1558,23 @@ def run_kinetic_optimization(objective='IRR',
         # set and steer sampling toward the feasible region. The attr is
         # set on every trial right after sampling, before any prune.
         return (frozen_trial.user_attrs.get('burden_violation', 0.0),)
+    if n_startup_trials is None:
+        n_startup = max(10, n_trials//10)
+        startup_rule = 'default rule max(10, n_trials//10)'
+    else:
+        if (isinstance(n_startup_trials, bool)
+                or int(n_startup_trials) != n_startup_trials
+                or n_startup_trials < 0):
+            raise ValueError('n_startup_trials must be a non-negative '
+                             f'integer or None; got {n_startup_trials!r}')
+        n_startup = int(n_startup_trials)
+        startup_rule = 'explicit'
+    print(f'TPE random start-up: {n_startup} trials ({startup_rule}); '
+          f'{n_done} trials already stored, so guidance begins '
+          f'{"now" if n_done >= n_startup else f"after trial {n_startup - 1}"}.')
     study.sampler = optuna.samplers.TPESampler(
         multivariate=True, seed=seed + n_done,
-        n_startup_trials=max(10, n_trials//10),
+        n_startup_trials=n_startup,
         constraints_func=_burden_constraints if burden_on else None)
     if n_done == 0:
         # Fresh study: evaluate the scenario baseline itself as trial 0,

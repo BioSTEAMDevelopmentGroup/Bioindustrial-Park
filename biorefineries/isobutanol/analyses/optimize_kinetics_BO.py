@@ -126,6 +126,12 @@ def run(scenario=None,  # 'A' or 'B'; None = the preset's start scenario
         # constant k_* of the search space (that rate alone at its band
         # floor; ko.knockout_probe_points), so TPE learns the lethality
         # map before sampling; False = baseline only (pre-2026-09-06).
+        n_startup_trials=None,  # TPE random start-up length (trials drawn
+        # at random, probes included, before TPE guidance); None = the
+        # engine's rule max(10, n_trials//10) (200 for 2000 trials -- 0 of
+        # 183 random draws completed in the burden-constrained preset
+        # space on 2026-09-06); e.g. 20-30 shortens it. Not part of the
+        # study name; a resume may change it.
         **engine_kwargs,  # bounds/overrides/etc. -> run_kinetic_optimization
         ):
     """Set up the scenario baseline (same recipe as the smoke tests), run
@@ -207,7 +213,15 @@ def run(scenario=None,  # 'A' or 'B'; None = the preset's start scenario
     per-parameter band, a knock-down. The effective
     `rate_multiplier_bounds` (explicit or the preset's) is always tagged
     into the derived study name `_rb{lo}-{hi}` (ko.default_study_name),
-    so a study never resumes one of the same name under another band."""
+    so a study never resumes one of the same name under another band.
+
+    TPE START-UP (`n_startup_trials`, default None). The number of
+    trials optuna draws uniformly at random (the baseline and the
+    probes count) before TPE's density guidance starts; None keeps the
+    engine's rule max(10, n_trials//10). Forwarded to
+    ko.run_kinetic_optimization; compared with the trials already
+    stored, so it can be changed on a resume and never tags the study
+    name (supervisor --n-startup-trials)."""
     if 'burden_model' in engine_kwargs:
         raise ValueError("pass burden=True/False to run(), not the engine's "
                          'burden_model (run() builds it so the reports can '
@@ -328,6 +342,7 @@ def run(scenario=None,  # 'A' or 'B'; None = the preset's start scenario
         study_name=study_name,
         burden_model=burden_model,
         enqueue_knockouts=enqueue_knockouts,
+        n_startup_trials=n_startup_trials,
         **engine_kwargs)
 
     if make_plots:

@@ -170,13 +170,17 @@ def child_code(scenario, objective, n_trials, kinetic_bounds_scenario,
                make_plots, study_name, restrict_to_workbook=True,
                seed=3221, study_target_products=None, study_type=None,
                burden=True, enqueue_knockouts=True,
-               rate_multiplier_bounds=None):
+               rate_multiplier_bounds=None, n_startup_trials=None):
     """The -c program for one supervised attempt of the driver.
     `study_target_products=None` selects the driver's legacy flag path.
     `rate_multiplier_bounds=None` leaves the k_* band to the preset (the
-    driver's engine_kwargs default); a tuple overrides it."""
+    driver's engine_kwargs default); a tuple overrides it.
+    `n_startup_trials=None` leaves the TPE random start-up length to the
+    engine's rule (the kwarg is omitted); an int is forwarded."""
     rate_kw = ('' if rate_multiplier_bounds is None else
                f'          rate_multiplier_bounds={tuple(rate_multiplier_bounds)!r},\n')
+    startup_kw = ('' if n_startup_trials is None else
+                  f'          n_startup_trials={int(n_startup_trials)!r},\n')
     return (
         'import runpy\n'
         f'ns = runpy.run_path({DRIVER!r})\n'
@@ -192,6 +196,7 @@ def child_code(scenario, objective, n_trials, kinetic_bounds_scenario,
         f'          burden={burden!r},\n'
         f'          enqueue_knockouts={enqueue_knockouts!r},\n'
         f'{rate_kw}'
+        f'{startup_kw}'
         f'          )\n')
 
 
@@ -202,7 +207,8 @@ def supervise(scenario=None, objective='IRR', n_trials=2000,
               restrict_to_workbook=True, seed=3221,
               study_target_products=ko.DEFAULT_STUDY_TARGET_PRODUCTS,
               study_type=ko.DEFAULT_STUDY_TYPE, burden=True,
-              enqueue_knockouts=True, rate_multiplier_bounds=None):
+              enqueue_knockouts=True, rate_multiplier_bounds=None,
+              n_startup_trials=None):
     """Run attempts until 'complete' or 'abort'; returns the final
     outcome string ('complete' or 'abort'). `study_target_products` /
     `study_type` name the driver's study preset (defaults = the engine's;
@@ -221,7 +227,10 @@ def supervise(scenario=None, objective='IRR', n_trials=2000,
     effective band (explicit or the preset's) is always tagged into the
     derived study name. k_10 keeps the preset's per-parameter 0.1x-10x
     band either way (the driver's parameter_multiplier_bounds default;
-    the supervisor exposes no flag for it)."""
+    the supervisor exposes no flag for it). `n_startup_trials` (None =
+    the engine's rule max(10, n_trials//10)) is the TPE random start-up
+    length (--n-startup-trials N); forwarded on every attempt, never
+    part of the study name, so a resume may change it."""
     if study_name is None:
         study_name = default_study_name(scenario, objective,
                                         kinetic_bounds_scenario,
@@ -241,7 +250,8 @@ def supervise(scenario=None, objective='IRR', n_trials=2000,
                       study_target_products=study_target_products,
                       study_type=study_type, burden=burden,
                       enqueue_knockouts=enqueue_knockouts,
-                      rate_multiplier_bounds=rate_multiplier_bounds)
+                      rate_multiplier_bounds=rate_multiplier_bounds,
+                      n_startup_trials=n_startup_trials)
     guard = ko.StallGuard(stall_timeout_s=60.0*stall_timeout_min)
 
     def event(msg):
@@ -399,6 +409,18 @@ if __name__ == '__main__':
                              'band is always tagged into the derived study '
                              'name _rb{LO}-{HI}, so a study never resumes '
                              'one of the same name under another band')
+    parser.add_argument('--n-startup-trials', type=int, default=None,
+                        metavar='N',
+                        help='TPE random start-up length: trials drawn '
+                             'uniformly at random (baseline and probes '
+                             'count) before TPE guidance begins; default '
+                             "None = the engine's rule max(10, n_trials//10) "
+                             '(200 for 2000 trials; 0 of 183 random draws '
+                             'completed in the burden-constrained preset '
+                             'space on 2026-09-06, so 20-30 is a better '
+                             'choice there); compared with the trials '
+                             'already stored, never part of the study '
+                             'name, so a resume may change it')
     args = parser.parse_args()
     if not args.restrict_to_workbook and not args.legacy_flags:
         parser.error('--no-restrict-to-workbook requires --legacy-flags '
@@ -419,5 +441,6 @@ if __name__ == '__main__':
                         enqueue_knockouts=args.enqueue_knockouts,
                         rate_multiplier_bounds=(
                             None if args.rate_multiplier_bounds is None
-                            else tuple(args.rate_multiplier_bounds)))
+                            else tuple(args.rate_multiplier_bounds)),
+                        n_startup_trials=args.n_startup_trials)
     sys.exit(0 if outcome == 'complete' else 1)
