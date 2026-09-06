@@ -31,6 +31,10 @@ processes and, until the study's total trial budget completes cleanly:
 - aborts (exit 1) after any attempt that recorded no new terminal
   trials -- resuming would loop on the same failure. The LOST row is
   logged after that decision, so it never masks a stuck study.
+- forwards the enzyme-burden flag (default ON; --no-burden = the legacy
+  burden-free study) and derives the same '_burden'-suffixed study name
+  the driver uses, so resume / stall-kill / LOST recovery target the
+  store the child actually writes.
 
 Decision logic (StallGuard, attempt_outcome) lives in
 kinetic_optimization.py and is covered by the offline test. This
@@ -51,6 +55,9 @@ sequentially) -- ask-first, like the unsupervised driver. Examples:
     # resume a pre-2026-09-04 study under its old flags and name:
     python optimize_kinetics_BO_supervised.py --legacy-flags --scenario A \\
         --kinetic-bounds-scenario B --objective IRR --n-trials 2000
+    # burden-free legacy study (any study started before 2026-09-05):
+    python optimize_kinetics_BO_supervised.py --no-burden --legacy-flags \\
+        --scenario A --kinetic-bounds-scenario B --objective IRR
 """
 import argparse
 import importlib.util
@@ -71,7 +78,8 @@ _spec.loader.exec_module(ko)
 
 
 def default_study_name(scenario, objective, kinetic_bounds_scenario,
-                       study_target_products=None, study_type=None):
+                       study_target_products=None, study_type=None,
+                       burden=False):
     """Mirror the driver's stable study naming (resume finds the same
     study): the preset convention
     kin_opt_{study_target_products}_{study_type}_{slug} whenever a
@@ -79,16 +87,20 @@ def default_study_name(scenario, objective, kinetic_bounds_scenario,
     _kb{X} only when scenario / kinetic_bounds_scenario is an explicit
     override that differs from the preset's own values (see the engine's
     default_study_name); else the legacy kin_opt_{scenario}[_kb{X}]_{slug}
-    with the driver's legacy default scenario 'B'."""
+    with the driver's legacy default scenario 'B'.
+    `burden=True` appends ko.BURDEN_STUDY_SUFFIX on both paths (the
+    driver's convention)."""
     if study_target_products is not None:
         return ko.default_study_name(objective, study_target_products,
                                      study_type, scenario=scenario,
-                                     kinetic_bounds_scenario=kinetic_bounds_scenario)
+                                     kinetic_bounds_scenario=kinetic_bounds_scenario,
+                                     burden=burden)
     scenario = scenario or 'B'
     slug = objective.lower().replace(' ', '_')
+    suffix = ko.BURDEN_STUDY_SUFFIX if burden else ''
     if kinetic_bounds_scenario:
-        return f'kin_opt_{scenario}_kb{kinetic_bounds_scenario}_{slug}'
-    return f'kin_opt_{scenario}_{slug}'
+        return f'kin_opt_{scenario}_kb{kinetic_bounds_scenario}_{slug}{suffix}'
+    return f'kin_opt_{scenario}_{slug}{suffix}'
 
 
 def row_count(csv_path):
@@ -111,7 +123,8 @@ def lost_cause(killed_for_stall, stall_timeout_min, returncode):
 
 def child_code(scenario, objective, n_trials, kinetic_bounds_scenario,
                make_plots, study_name, restrict_to_workbook=True,
-               seed=3221, study_target_products=None, study_type=None):
+               seed=3221, study_target_products=None, study_type=None,
+               burden=True):
     """The -c program for one supervised attempt of the driver.
     `study_target_products=None` selects the driver's legacy flag path."""
     return (
@@ -125,7 +138,8 @@ def child_code(scenario, objective, n_trials, kinetic_bounds_scenario,
         f'          study_name={study_name!r},\n'
         f'          restrict_to_workbook={restrict_to_workbook!r},\n'
         f'          study_target_products={study_target_products!r},\n'
-        f'          study_type={study_type!r})\n')
+        f'          study_type={study_type!r},\n'
+        f'          burden={burden!r})\n')
 
 
 def supervise(scenario=None, objective='IRR', n_trials=2000,
@@ -134,7 +148,7 @@ def supervise(scenario=None, objective='IRR', n_trials=2000,
               settle_s=10.0, python=None, log_path=None,
               restrict_to_workbook=True, seed=3221,
               study_target_products=ko.DEFAULT_STUDY_TARGET_PRODUCTS,
-              study_type=ko.DEFAULT_STUDY_TYPE):
+              study_type=ko.DEFAULT_STUDY_TYPE, burden=True):
     """Run attempts until 'complete' or 'abort'; returns the final
     outcome string ('complete' or 'abort'). `study_target_products` /
     `study_type` name the driver's study preset (defaults = the engine's;
@@ -143,12 +157,15 @@ def supervise(scenario=None, objective='IRR', n_trials=2000,
     legacy flag path (--legacy-flags), required to resume studies
     started before 2026-09-04. `restrict_to_workbook` (default True) is
     forwarded to the driver's run(); pass False (legacy path only) to
-    reproduce the pre-2026-09-03 all-model-k_* search set."""
+    reproduce the pre-2026-09-03 all-model-k_* search set. `burden`
+    (default True) is the driver's enzyme-burden flag; False
+    (--no-burden) runs/resumes a burden-free study under the
+    un-suffixed name."""
     if study_name is None:
         study_name = default_study_name(scenario, objective,
                                         kinetic_bounds_scenario,
                                         study_target_products=study_target_products,
-                                        study_type=study_type)
+                                        study_type=study_type, burden=burden)
     csv_path = os.path.join(RESULTS_DIR, study_name + '_trajectory.csv')
     inflight_path = ko.inflight_path_for(RESULTS_DIR, study_name)
     if python is None:
@@ -160,7 +177,7 @@ def supervise(scenario=None, objective='IRR', n_trials=2000,
                       kinetic_bounds_scenario, make_plots, study_name,
                       restrict_to_workbook=restrict_to_workbook, seed=seed,
                       study_target_products=study_target_products,
-                      study_type=study_type)
+                      study_type=study_type, burden=burden)
     guard = ko.StallGuard(stall_timeout_s=60.0*stall_timeout_min)
 
     def event(msg):
@@ -293,6 +310,12 @@ if __name__ == '__main__':
                         help='sample every k_*/K_* on the model instead of '
                              "the scenario workbook's rows (pre-2026-09-03 "
                              'behaviour, for resuming older studies)')
+    parser.add_argument('--no-burden', dest='burden', action='store_false',
+                        help='disable the enzyme-burden (proteome-allocation) '
+                             'constraint of enzyme_burden.py: a legacy '
+                             'burden-free study under the un-suffixed study '
+                             'name (required to resume any study started '
+                             'before 2026-09-05; the default adds _burden)')
     args = parser.parse_args()
     if not args.restrict_to_workbook and not args.legacy_flags:
         parser.error('--no-restrict-to-workbook requires --legacy-flags '
@@ -308,5 +331,6 @@ if __name__ == '__main__':
                         seed=args.seed,
                         study_target_products=(None if args.legacy_flags
                                                else args.study_target_products),
-                        study_type=args.study_type)
+                        study_type=args.study_type,
+                        burden=args.burden)
     sys.exit(0 if outcome == 'complete' else 1)

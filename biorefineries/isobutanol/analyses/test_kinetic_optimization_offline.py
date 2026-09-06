@@ -1079,4 +1079,58 @@ else:
     assert csv25c == os.path.join(outdir25c, 'kin_opt_X_irr_burden_trajectory.csv'), csv25c
     PASS('engine hook: INFEASIBLE pruned pre-sidecar with burden columns; effective k_7 to the model, sampled k_7 in the CSV; constraint reaches optuna; burden off unchanged')
 
+#%% 26. driver / supervisor: burden default on, --no-burden, naming mirrors the engine, reports printed
+sup26 = _runpy.run_path(os.path.join(
+    os.path.dirname(os.path.abspath(__file__)),
+    'optimize_kinetics_BO_supervised.py'))
+# Naming: the suffix on both paths, only when asked; legacy defaults untouched.
+assert sup26['default_study_name']('A', 'IRR', 'B') == 'kin_opt_A_kbB_irr'
+assert sup26['default_study_name']('A', 'IRR', 'B', burden=True) == 'kin_opt_A_kbB_irr_burden'
+assert sup26['default_study_name'](None, 'IRR', None, burden=True) == 'kin_opt_B_irr_burden'
+assert sup26['default_study_name'](None, 'IRR', None,
+                                   study_target_products='ethanol_isobutanol',
+                                   study_type='metabolic_protein', burden=True) \
+    == 'kin_opt_ethanol_isobutanol_metabolic_protein_irr_burden'
+assert sup26['default_study_name']('B', 'IRR', None,
+                                   study_target_products='ethanol_isobutanol',
+                                   study_type='metabolic_protein', burden=True) \
+    == 'kin_opt_ethanol_isobutanol_metabolic_protein_irr_scB_burden'
+# child_code forwards the flag both ways; supervise()'s default is ON and it
+# derives the study name WITH the flag (so resume/stall-kill hit the store
+# the child writes).
+code26 = sup26['child_code'](None, 'IRR', 2000, None, False, 'x',
+                             study_target_products='ethanol_isobutanol',
+                             study_type='metabolic_protein', burden=False)
+assert 'burden=False' in code26
+code26b = sup26['child_code'](None, 'IRR', 2000, None, False, 'x',
+                              study_target_products='ethanol_isobutanol',
+                              study_type='metabolic_protein')
+assert 'burden=True' in code26b
+_p26 = _inspect.signature(sup26['supervise']).parameters
+assert _p26['burden'].default is True
+_c26 = _inspect.signature(sup26['child_code']).parameters
+assert _c26['burden'].default is True
+_n26 = _inspect.signature(sup26['default_study_name']).parameters
+assert _n26['burden'].default is False
+src26_sup = _inspect.getsource(sup26['supervise'])
+assert 'burden=burden' in src26_sup                       # into default_study_name and child_code
+src26 = open(os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                          'optimize_kinetics_BO_supervised.py')).read()
+assert "'--no-burden'" in src26 and "dest='burden'" in src26
+assert "action='store_false'" in src26 and 'burden=args.burden' in src26
+assert 'import biorefineries' not in src26 and 'import optuna' not in src26
+assert 'enzyme_burden' not in src26.replace('enzyme_burden.py', '')   # stdlib-only: never imports it
+# The driver cannot be imported offline (it loads the biorefinery): pin its
+# plumbing as source text.
+drv26 = open(os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                          'optimize_kinetics_BO.py')).read()
+assert 'burden=True,' in drv26                                    # run() kwarg, default on
+assert 'burden_model=burden_model' in drv26                       # forwarded to the engine
+assert 'ko.default_study_name(' in drv26 and 'burden=burden' in drv26
+assert 'ko.BURDEN_STUDY_SUFFIX if burden else' in drv26           # legacy _kb path
+assert 'eb.BurdenModel.from_reference(' in drv26
+assert 'eb.scenario_b_ehrlich()' in drv26 and 'describe_point(' in drv26
+assert "'burden_model' in engine_kwargs" in drv26                 # ambiguity guard
+PASS('driver/supervisor: burden on by default, --no-burden, _burden naming on both paths, A/B reports wired')
+
 print(f'\nALL {n_pass} CHECKS PASSED')

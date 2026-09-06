@@ -23,6 +23,16 @@ and run()'s docstring). study_target_products=None is the legacy flag path
 (scenario / kinetic_bounds_scenario / single band) for resuming older
 studies.
 
+The enzyme-burden (proteome-allocation) constraint of enzyme_burden.py
+is ON by default (burden=True): sampled capacities are charged to the
+cell's flexible protein sector, growth (k_7/k_8) is derated linearly as
+it fills, and over-cap trials are logged INFEASIBLE and pruned before
+simulating; the study name gains a '_burden' suffix, and run() prints
+the burden report of the scenario-A reference and of the scenario-B
+Ehrlich constants (which exceed the cap -- a finding, not repaired)
+before the study starts. burden=False is the legacy burden-free study
+(required to resume any study started before 2026-09-05).
+
 Runner pattern (fresh kernel, one process):
     import runpy
     ns = runpy.run_path(r'<this file>')
@@ -34,6 +44,8 @@ Runner pattern (fresh kernel, one process):
     # legacy: resume a pre-2026-09-04 study under its old name/space
     study, csv_path = ns['run'](scenario='A', kinetic_bounds_scenario='B',
                                 study_target_products=None)
+    # burden-free legacy study (older names have no _burden suffix)
+    study, csv_path = ns['run'](objective='IRR', burden=False)
 """
 from datetime import datetime
 
@@ -92,6 +104,10 @@ def run(scenario=None,  # 'A' or 'B'; None = the preset's start scenario
         # 'ethanol_only' | 'ethanol_isobutanol' | None (= legacy path)
         study_type=ko.DEFAULT_STUDY_TYPE,
         # 'metabolic' | 'metabolic_protein'
+        burden=True,  # enzyme-burden (proteome-allocation) constraint,
+        # enzyme_burden.py: default ON (study name + '_burden'); False =
+        # legacy burden-free study (older studies). Do not pass the
+        # engine's burden_model in engine_kwargs -- this flag owns it.
         **engine_kwargs,  # bounds/overrides/etc. -> run_kinetic_optimization
         ):
     """Set up the scenario baseline (same recipe as the smoke tests), run
@@ -125,7 +141,25 @@ def run(scenario=None,  # 'A' or 'B'; None = the preset's start scenario
     B's 56-parameter set. A restricted study has a different search
     space than a pre-2026-09-03 full-set study of the same name: reusing
     its trajectory CSV raises in append_trajectory_row -- use a fresh
-    study_name."""
+    study_name.
+
+    ENZYME BURDEN (`burden`, default True). The engine's
+    run_kinetic_optimization(burden_model=...) receives a BurdenModel
+    snapshotted from the live kinetic parameters right after the
+    scenario baseline is set (so it is exactly inert at trial 0); the
+    study name carries ko.BURDEN_STUDY_SUFFIX on both naming paths.
+    Before the study starts, the burden reports of (a) the scenario
+    reference and (b) the scenario-B Ehrlich constants
+    (eb.scenario_b_ehrlich()) on that reference are printed -- (b) is
+    the Q11 sanity report: B's constants need ~0.22 g/gDCW of Ehrlich
+    enzyme and exceed F_flex, so a burden study explores lower Ehrlich
+    capacities and lower growth than the unburdened kin_opt_B_irr did.
+    A burden study cannot START from an infeasible reference (e.g.
+    scenario='B'): BurdenModel.from_reference raises; pass burden=False."""
+    if 'burden_model' in engine_kwargs:
+        raise ValueError("pass burden=True/False to run(), not the engine's "
+                         'burden_model (run() builds it so the reports can '
+                         'be printed first).')
     slug = (objective if isinstance(objective, str)
             else engine_kwargs.get('objective_name', 'custom')
             ).lower().replace(' ', '_')
@@ -148,7 +182,8 @@ def run(scenario=None,  # 'A' or 'B'; None = the preset's start scenario
                 objective if isinstance(objective, str)
                 else engine_kwargs.get('objective_name', 'custom'),
                 study_target_products, study_type,
-                scenario=scenario, kinetic_bounds_scenario=kinetic_bounds_scenario)
+                scenario=scenario, kinetic_bounds_scenario=kinetic_bounds_scenario,
+                burden=burden)
         print(f'Study preset: study_target_products={study_target_products!r}, '
               f'study_type={study_type!r} -> start at scenario {scenario}, '
               f'{len(engine_kwargs["include_params"])} kinetic parameters '
@@ -181,7 +216,8 @@ def run(scenario=None,  # 'A' or 'B'; None = the preset's start scenario
         engine_kwargs['param_bounds_override'] = derived
         if study_name is None:  # legacy path only (presets set it above)
             study_name = (f'kin_opt_{scenario}_'
-                          f'kb{kinetic_bounds_scenario}_{slug}')
+                          f'kb{kinetic_bounds_scenario}_{slug}'
+                          + (ko.BURDEN_STUDY_SUFFIX if burden else ''))
     parameter_distributions_filename = IBO_filepath+\
         '\\analyses\\full\\parameter_distributions\\'+\
         f'parameter-distributions_corn_IBO_EtOH_{scenario}.xlsx'
@@ -201,12 +237,28 @@ def run(scenario=None,  # 'A' or 'B'; None = the preset's start scenario
         raise ValueError(f'Scenario {scenario} not found.')
     model_specification(**baseline_kwargs)
 
+    if burden:
+        from biorefineries.isobutanol import enzyme_burden as eb
+        k_ref = ko.discover_kinetic_parameters(ko.get_handles()['r_te'])
+        burden_model = eb.BurdenModel.from_reference(k_ref)
+        print(burden_model.describe_point(
+            burden_model.reference,
+            label=f'scenario-{scenario} reference (trial 0)'))
+        print(burden_model.describe_point(
+            {**burden_model.reference, **eb.scenario_b_ehrlich()},
+            label='scenario-B Ehrlich constants on this reference '
+                  '(Q11 sanity report; infeasible by design, not repaired)'))
+    else:
+        burden_model = None
+        print('Enzyme burden OFF (burden=False): legacy burden-free study.')
+
     study, csv_path, kinetic_baselines = ko.run_kinetic_optimization(
         objective=objective,
         scenario_label=scenario,
         n_trials=n_trials,
         seed=seed,
         study_name=study_name,
+        burden_model=burden_model,
         **engine_kwargs)
 
     if make_plots:
