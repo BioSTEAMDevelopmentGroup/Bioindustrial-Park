@@ -1054,7 +1054,7 @@ synth24 = synth11.copy()
 inf24 = synth24['trial_number'].isin([5, 13, 21])
 synth24.loc[inf24, 'state'] = 'INFEASIBLE'
 synth24.loc[inf24, ['objective', *ko.TRACKED_METRICS]] = np.nan
-synth24.loc[inf24, 'error'] = 'enzyme burden: Phi_M 0.2806 > F_flex 0.2250 g/gDCW'
+synth24.loc[inf24, 'error'] = 'enzyme burden: Phi_M 0.2862 > F_flex 0.2450 g/gDCW'
 ok24 = ko._completed(synth24)
 assert not ok24['trial_number'].isin([5, 13, 21]).any()
 f24 = [os.path.join(outdir, f'infeasible_{i}.png') for i in range(4)]
@@ -1145,7 +1145,7 @@ else:
     assert df25['state'].tolist() == ['INFEASIBLE', 'COMPLETE', 'COMPLETE']
     # trial 0: burden columns recorded, no objective, no sidecar, no simulation
     assert df25['k_13'][0] == 60.0 and df25['burden_factor'][0] == 0.0
-    assert df25['Phi_M'][0] > df25['F_flex'][0] == 0.225
+    assert df25['Phi_M'][0] > df25['F_flex'][0] == eb.F_FLEX == 0.245
     assert np.isnan(df25['objective'][0]) and np.isnan(df25['IRR'][0])
     assert df25['error'][0].startswith('enzyme burden: Phi_M ')
     assert n_sidecar25 == [1, 2], n_sidecar25
@@ -1154,11 +1154,13 @@ else:
     assert np.isclose(df25['burden_factor'][1], 0.13276, rtol=1e-3)
     assert np.isclose(df25['k_7_eff'][1], 1.4374, rtol=1e-3)
     assert np.isclose(df25['k_8_eff'][1], 0.13276*0.589, rtol=1e-3)
-    assert np.isclose(df25['Phi_M'][1], 0.0637) and np.isclose(df25['phi_T'][1], 9.0*0.135)
+    # Phi_M,wt = the report's 0.0637 (at P = 0.45) x PROTEIN_CONTENT/0.45
+    assert np.isclose(df25['Phi_M'][1], 0.0637*eb.PROTEIN_CONTENT/eb.POOL_TABLE_PROTEIN_CONTENT)
+    assert np.isclose(df25['phi_T'][1], 9.0*eb.PHI_T_WT)
     assert df25['objective'][1] == 0.2
     # trial 2: the reference is inert
     assert df25['burden_factor'][2] == 1.0 and df25['k_7_eff'][2] == 1.203
-    assert df25['pool_r1'][2] == 0.044 and df25['pool_r13'][2] == 0.0
+    assert np.isclose(df25['pool_r1'][2], eb.NATIVE_STEPS['r1'][0]) and df25['pool_r13'][2] == 0.0
     # model_specification saw trial 1's effective k_7, trial 2's reference k_7,
     # then restore_baseline's reference k_7 (2 simulations + the finally)
     assert len(seen_k7) == 3, seen_k7

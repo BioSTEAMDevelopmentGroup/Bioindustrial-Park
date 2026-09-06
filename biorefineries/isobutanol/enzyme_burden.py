@@ -47,7 +47,7 @@ import importlib.util
 import math
 import os
 
-__all__ = ('PROTEIN_CONTENT', 'HOUSEKEEPING_FRACTION',
+__all__ = ('PROTEIN_CONTENT', 'POOL_TABLE_PROTEIN_CONTENT', 'HOUSEKEEPING_FRACTION',
            'TRANSLATION_FRACTION_WT', 'SIGMA_EFF', 'F_FLEX', 'PHI_T_WT',
            'NATIVE_STEPS', 'EHRLICH_STEPS', 'ANCHOR_STEPS',
            'GROWTH_CAPACITIES', 'STEP_ORDER', 'BURDEN_COLUMNS',
@@ -57,8 +57,19 @@ __all__ = ('PROTEIN_CONTENT', 'HOUSEKEEPING_FRACTION',
 
 #%% Sector constants (spec 4.1; never change without asking)
 
-#: g protein / gDCW (enzyme-abundance report 3; central of 0.40-0.50).
-PROTEIN_CONTENT = 0.45
+#: g protein / gDCW. 0.49 = the crude-protein content of S. cerevisiae
+#: biomass from the beer manufacturing process (Jach, Serefko, Ziaja &
+#: Kieliszek 2022, Metabolites 12:63, doi:10.3390/metabo12010063, Table 1:
+#: 49 % of dry weight) -- the upper end of the 0.40-0.50 range of the
+#: enzyme-abundance report 3, whose central 0.45 was used until
+#: 2026-09-06. The wild-type pool table NATIVE_STEPS was tabulated at
+#: POOL_TABLE_PROTEIN_CONTENT and is rescaled to this value (report 3:
+#: every pool is a proteome mass fraction x the protein content, so it
+#: scales linearly with it).
+PROTEIN_CONTENT = 0.49
+#: g protein / gDCW at which the NATIVE_STEPS pools were tabulated
+#: (enzyme-abundance report 3: proteome mass fraction x 0.45).
+POOL_TABLE_PROTEIN_CONTENT = 0.45
 #: Fraction of protein unavailable to the modeled + translation sectors
 #: (Scott et al. 2010 zero-growth intercept ~ half the proteome;
 #: Metzl-Raz et al. 2017; Xia et al. 2021).
@@ -72,14 +83,15 @@ TRANSLATION_FRACTION_WT = 0.30
 #: S. cerevisiae (Sanchez et al. 2017, Mol. Syst. Biol. 13:935; kept as
 #: the GECKO 3 default, Chen et al. 2024). Scales every Ehrlich pool
 #: inversely, so it is the single largest lever on the Ehrlich cost. The
-#: two native single-enzyme steps give sigma_r3 ~ 2.2 and sigma_r6 ~ 0.09
-#: (geometric mean 0.45; anchor_sigma) -- a diagnostic, not a calibration.
+#: two native single-enzyme steps give sigma_r3 ~ 2.0 and sigma_r6 ~ 0.08
+#: (geometric mean 0.41; anchor_sigma) -- a diagnostic, not a calibration.
 SIGMA_EFF = 0.50
 
 #: Flexible protein sector (g/gDCW): the zero-growth point of the modeled
-#: pool. ~ 0.225.
+#: pool. ~ 0.245 (0.225 at the pre-2026-09-06 PROTEIN_CONTENT of 0.45).
 F_FLEX = PROTEIN_CONTENT*(1.0 - HOUSEKEEPING_FRACTION)
-#: Translation sector at the wild-type growth capacity (g/gDCW). ~ 0.135.
+#: Translation sector at the wild-type growth capacity (g/gDCW). ~ 0.147
+#: (0.135 at 0.45).
 PHI_T_WT = PROTEIN_CONTENT*TRANSLATION_FRACTION_WT
 
 #%% Wild-type pool table (spec 4.2; enzyme-abundance report 1)
@@ -88,15 +100,26 @@ PHI_T_WT = PROTEIN_CONTENT*TRANSLATION_FRACTION_WT
 # synthesized by r9 at the cost of active biomass, so k_4 is a turnover
 # number here (Q10). r7/r8 are growth (translation sector); r9-r11 are
 # the AcDH synthesis/decay law itself. Sources: Ho, Baryshnikova & Brown
-# 2018 (per-cell medians), PaxDB, Kulak 2014; protein content 0.45.
+# 2018 (per-cell medians), PaxDB, Kulak 2014; tabulated at the report's
+# protein content POOL_TABLE_PROTEIN_CONTENT (0.45) and rescaled to
+# PROTEIN_CONTENT below.
 
-NATIVE_STEPS = {
+_NATIVE_STEPS_TABLE = {
     'r1': (0.044, ('k_1h', 'k_1l', 'k_1e')),   # glycolysis lump (17 genes)
     'r2': (0.0032, ('k_2',)),                   # PDH complex + TCA
     'r3': (0.0085, ('k_3',)),                   # Pdc1 (+Pdc5/6)
     'r4': (0.0032, ()),                         # Ald6 (AcDH pool; fixed)
     'r5': (0.0008, ('k_5', 'k_5e')),            # Acs2 (+Acs1)
     'r6': (0.0040, ('k_6',)),                   # Adh1 (+Adh2-5)
+}
+
+#: The pool table at PROTEIN_CONTENT: pool_wt = tabulated pool x
+#: PROTEIN_CONTENT / POOL_TABLE_PROTEIN_CONTENT (the identity at 0.45;
+#: x 1.089 at 0.49 -- r1 0.0479, r2 0.00348, r3 0.00926, r4 0.00348,
+#: r5 0.000871, r6 0.00436 g/gDCW; Phi_M,wt 0.0694).
+NATIVE_STEPS = {
+    step: (pool*PROTEIN_CONTENT/POOL_TABLE_PROTEIN_CONTENT, capacities)
+    for step, (pool, capacities) in _NATIVE_STEPS_TABLE.items()
 }
 
 #%% Ehrlich enzyme table (spec 4.3; UniProt reviewed S288C masses)
@@ -177,10 +200,11 @@ def anchor_sigma(k_ref):
     """Implied in-vivo saturation of the two native single-enzyme steps,
     sigma_i = k_ref,i * MW_enz / (kcat * 3600 * MW_sub * pool_wt,i), and
     their geometric mean -- {'r3': ..., 'r6': ..., 'geomean': ...}. With
-    the model's reference capacities: r3 ~ 2.2 (the fitted k_3 exceeds
+    the model's reference capacities: r3 ~ 2.0 (the fitted k_3 exceeds
     what the tag-biased-low Pdc1 pool delivers at its in-vitro kcat), r6
-    ~ 0.09 (Adh1 is expressed in ten-fold excess); geometric mean ~ 0.45,
-    consistent with SIGMA_EFF. A diagnostic, not a calibration."""
+    ~ 0.08 (Adh1 is expressed in ten-fold excess); geometric mean ~ 0.41
+    (0.45 at the pre-2026-09-06 protein content of 0.45), consistent with
+    SIGMA_EFF. A diagnostic, not a calibration."""
     sigmas = {}
     for step, (capacity, mw_sub, mw_enz, kcat) in ANCHOR_STEPS.items():
         pool_wt = NATIVE_STEPS[step][0]
