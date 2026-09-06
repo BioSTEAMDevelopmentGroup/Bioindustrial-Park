@@ -899,7 +899,37 @@ if _optuna is not None:
     assert np.isclose(study23.trials[0].params['k_1e'], 47.1)
 else:
     print('SKIP 23b: optuna not installed')
-PASS('supervisor: preset flags/defaults forwarded, naming mirrors the engine, legacy switch; k_* band reaches optuna')
+# The supervisor's own recover_inflight wrapper never lets the trajectory
+# header guard crash the supervisor (a sidecar whose columns mismatch the
+# CSV, e.g. a burden sidecar next to a burden-free CSV): it warns with the
+# FULL sidecar record (so the lost trial survives in the supervisor log),
+# clears the sidecar (so the next start does not hit it again) and
+# recovers nothing. supervise() routes both recoveries through it.
+import io as _io
+import contextlib as _contextlib
+outdir23s = tempfile.mkdtemp()
+csv23s = os.path.join(outdir23s, 's_trajectory.csv')
+side23s = ko.inflight_path_for(outdir23s, 's')
+ko.append_trajectory_row(csv23s, columns, rec)
+ko.write_inflight(side23s, [*columns, 'Phi_M'],
+                  dict(rec, trial_number=7, Phi_M=0.31))
+buf23 = _io.StringIO()
+with _contextlib.redirect_stdout(buf23):
+    got23 = sup23['recover_inflight'](csv23s, side23s, state='LOST', error='x')
+assert got23 is None
+assert not os.path.isfile(side23s)
+out23 = buf23.getvalue()
+assert 'different column set' in out23, out23
+assert "'trial_number': 7" in out23 and "'Phi_M': 0.31" in out23, out23
+assert sup23['row_count'](csv23s) == 1                       # nothing appended
+assert ko.load_trajectory(csv23s)['state'].tolist() == ['COMPLETE']
+src23_sup = _inspect.getsource(sup23['supervise'])
+assert 'ko.recover_inflight(' not in src23_sup and src23_sup.count('recover_inflight(') == 2
+# and the wrapper is transparent when the header matches
+ko.write_inflight(side23s, columns, dict(rec, trial_number=8))
+assert sup23['recover_inflight'](csv23s, side23s, state='LOST', error='y') == 8
+assert ko.load_trajectory(csv23s)['state'].tolist() == ['COMPLETE', 'LOST']
+PASS('supervisor: preset flags/defaults forwarded, naming mirrors the engine, legacy switch; k_* band reaches optuna; header-mismatch recovery warns, clears, never raises')
 
 #%% 24. burden plumbing: _burden suffix, extra trajectory columns, header guard, INFEASIBLE colour
 from biorefineries.isobutanol import enzyme_burden as eb
@@ -927,6 +957,19 @@ except ValueError as e:
     assert 'different column set' in str(e)
 else:
     raise AssertionError('header guard did not refuse the burden-free column set')
+# The same guard as a standalone pre-flight check (run_kinetic_optimization
+# calls it before creating the optuna study, so a study name colliding with
+# a store of a different column set fails before any sidecar or
+# simulation): raises on a mismatch, passes on a match and on an absent CSV.
+assert 'check_trajectory_header' in ko.__all__
+ko.check_trajectory_header(csv24, cols24)
+ko.check_trajectory_header(os.path.join(outdir, 'no_such_trajectory.csv'), cols24)
+try:
+    ko.check_trajectory_header(csv24, ko.trajectory_columns(space))
+except ValueError as e:
+    assert 'different column set' in str(e)
+else:
+    raise AssertionError('check_trajectory_header did not refuse the burden-free column set')
 # PCA decision columns are still the search-space variables (burden columns sit after objective)
 df24 = ko.load_trajectory(csv24)
 assert list(df24.columns) == cols24
@@ -1057,6 +1100,89 @@ else:
     assert t25[1].user_attrs['burden_violation'] < 0.0 and t25[2].user_attrs['burden_violation'] < 0.0
     assert list(t25[0].system_attrs['constraints'])[0] > 0.0, t25[0].system_attrs
     assert list(t25[1].system_attrs['constraints'])[0] < 0.0
+    # Pre-flight header guard (F1): resuming the burden study's name / CSV
+    # with the burden OFF (a different column set, e.g. --study-name of a
+    # legacy study without --no-burden, or vice versa) fails BEFORE any
+    # sidecar is written or any simulation runs -- not at the first row
+    # append after a full ~20 s simulation.
+    n_sidecar25_before = list(n_sidecar25)
+    n_seen25_before = len(seen_k7)
+    ko.write_inflight = _counting_write_inflight
+    try:
+        ko.run_kinetic_optimization(
+            objective='IRR', scenario_label='X', n_trials=6, seed=1,
+            study_name=study25, results_dir=outdir25, handles=handles25,
+            param_bounds_override=override25,
+            rate_multiplier_bounds=(1e-5, 10.0), print_status_every=1,
+            burden_model=None)
+    except ValueError as e:
+        assert 'different column set' in str(e), e
+    else:
+        raise AssertionError('burden-free resume of the burden study was not refused')
+    finally:
+        ko.write_inflight = _orig_write_inflight
+    assert n_sidecar25 == n_sidecar25_before and len(seen_k7) == n_seen25_before
+    assert not os.path.isfile(side25)
+    assert ko.load_trajectory(csv25)['trial_number'].tolist() == [0, 1, 2]   # untouched
+    # A caller-supplied BurdenModel (F2) must be a snapshot of the LIVE
+    # baselines: one perturbed reference capacity is named with both values.
+    bm25_stale = eb.BurdenModel.from_reference({**baselines25, 'k_3': 6.0})
+    try:
+        ko.run_kinetic_optimization(
+            objective='IRR', scenario_label='X', n_trials=1, seed=1,
+            study_name='offline_stale_reference', results_dir=tempfile.mkdtemp(),
+            handles=handles25, param_bounds_override=override25,
+            rate_multiplier_bounds=(1e-5, 10.0), print_status_every=1,
+            burden_model=bm25_stale)
+    except ValueError as e:
+        assert 'k_3' in str(e) and '6.0' in str(e) and '5.81' in str(e), e
+    else:
+        raise AssertionError('a stale BurdenModel reference was not refused')
+    # ... and a burden_model that is neither 'auto', None nor a model is a TypeError
+    try:
+        ko.run_kinetic_optimization(
+            objective='IRR', scenario_label='X', n_trials=1, seed=1,
+            study_name='offline_bad_burden', results_dir=tempfile.mkdtemp(),
+            handles=handles25, param_bounds_override=override25,
+            rate_multiplier_bounds=(1e-5, 10.0), print_status_every=1,
+            burden_model=True)
+    except TypeError as e:
+        assert 'burden_model' in str(e), e
+    else:
+        raise AssertionError('burden_model=True was not refused')
+    assert len(seen_k7) == n_seen25_before                     # no simulation in either
+    # Offline resume of the burden study (F3): same name / sqlite store /
+    # CSV, a budget of ONE more trial (the store holds 3, so 4): exactly
+    # one new row (no header error), the new trial carries the sampler
+    # constraint, optuna never warns that a stored trial "does not have
+    # constraint values", and the baseline is restored afterwards.
+    import warnings as _warnings
+    n_rows25_before = len(ko.load_trajectory(csv25))
+    n_trials25_before = len(study25_obj.trials)
+    assert n_trials25_before == 3
+    seen_k7.clear()
+    with _warnings.catch_warnings(record=True) as w25:
+        _warnings.simplefilter('always')
+        study25r, csv25r, kb25r = ko.run_kinetic_optimization(
+            objective='IRR', scenario_label='X', n_trials=n_trials25_before + 1,
+            seed=1, study_name=study25, results_dir=outdir25, handles=handles25,
+            param_bounds_override=override25,
+            rate_multiplier_bounds=(1e-5, 10.0), print_status_every=1)
+    assert csv25r == csv25 and kb25r == baselines25
+    df25r = ko.load_trajectory(csv25)
+    assert len(df25r) == n_rows25_before + 1, len(df25r)
+    assert df25r['trial_number'].tolist() == [0, 1, 2, 3]
+    assert df25r['state'].iloc[-1] in ('COMPLETE', 'INFEASIBLE'), df25r['state'].tolist()
+    assert list(df25r.columns) == ko.trajectory_columns(space25, extra_columns=eb.BURDEN_COLUMNS)
+    t25r = study25r.trials
+    assert len(t25r) == n_trials25_before + 1
+    assert 'constraints' in t25r[-1].system_attrs, t25r[-1].system_attrs
+    assert 'burden_violation' in t25r[-1].user_attrs
+    bad25 = [str(x.message) for x in w25 if 'does not have constraint values' in str(x.message)]
+    assert not bad25, bad25
+    assert te25.k_7 == 1.203 and te25.k_8 == 0.589                  # restored
+    assert seen_k7[-1] == 1.203                                     # the restore reached the model
+    assert not os.path.isfile(side25)
     # burden off: no burden columns, k_7 written as sampled
     outdir25b = tempfile.mkdtemp()
     seen_k7.clear()
@@ -1077,7 +1203,7 @@ else:
         param_bounds_override=override25, rate_multiplier_bounds=(1e-5, 10.0),
         print_status_every=1)
     assert csv25c == os.path.join(outdir25c, 'kin_opt_X_irr_burden_trajectory.csv'), csv25c
-    PASS('engine hook: INFEASIBLE pruned pre-sidecar with burden columns; effective k_7 to the model, sampled k_7 in the CSV; constraint reaches optuna; burden off unchanged')
+    PASS('engine hook: INFEASIBLE pruned pre-sidecar with burden columns; effective k_7 to the model, sampled k_7 in the CSV; constraint reaches optuna; pre-flight header guard, stale/invalid burden_model refused, resume clean; burden off unchanged')
 
 #%% 26. driver / supervisor: burden default on, --no-burden, naming mirrors the engine, reports printed
 sup26 = _runpy.run_path(os.path.join(

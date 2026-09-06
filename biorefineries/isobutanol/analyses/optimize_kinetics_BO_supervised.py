@@ -61,6 +61,7 @@ sequentially) -- ask-first, like the unsupervised driver. Examples:
 """
 import argparse
 import importlib.util
+import json
 import os
 import subprocess
 import sys
@@ -110,6 +111,33 @@ def row_count(csv_path):
             return max(0, sum(1 for _ in f) - 1)
     except OSError:
         return 0
+
+
+def recover_inflight(csv_path, inflight_path, state='LOST', error=''):
+    """ko.recover_inflight that never crashes the supervisor: when the
+    sidecar's column set differs from the trajectory CSV's header (the
+    engine's header guard raises ValueError -- e.g. a burden sidecar next
+    to a burden-free CSV after a study-name collision), the full sidecar
+    is printed as a labelled warning so the lost trial survives in the
+    supervisor log, the sidecar is cleared so the next start does not
+    trip over it again, and None is returned (nothing recovered)."""
+    try:
+        return ko.recover_inflight(csv_path, inflight_path, state=state,
+                                   error=error)
+    except ValueError as e:
+        try:
+            with open(inflight_path) as f:
+                sidecar = json.load(f)
+        except (OSError, ValueError) as read_error:
+            sidecar = f'<unreadable: {read_error!r}>'
+        print('SUPERVISOR WARNING: in-flight trial NOT logged to '
+              f'{csv_path} -- {e}\n'
+              f'SUPERVISOR WARNING: lost in-flight record (state={state!r}, '
+              f'error={error!r}): {sidecar!r}\n'
+              f'SUPERVISOR WARNING: sidecar {inflight_path} discarded.',
+              flush=True)
+        ko.clear_inflight(inflight_path)
+        return None
 
 
 def lost_cause(killed_for_stall, stall_timeout_min, returncode):
@@ -188,7 +216,7 @@ def supervise(scenario=None, objective='IRR', n_trials=2000,
 
     # A sidecar left by a previous supervised session that itself died
     # before recovering it: log it now, before the first child starts.
-    lost = ko.recover_inflight(
+    lost = recover_inflight(
         csv_path, inflight_path, state='LOST',
         error='recovered at supervisor startup (no terminal row)')
     if lost is not None:
@@ -226,7 +254,7 @@ def supervise(scenario=None, objective='IRR', n_trials=2000,
         # rows: the recovered LOST row must never count as this attempt's
         # progress, or a trial that always stalls first would resume
         # forever instead of aborting.
-        lost = ko.recover_inflight(
+        lost = recover_inflight(
             csv_path, inflight_path, state='LOST',
             error=lost_cause(killed, stall_timeout_min, child.returncode))
         if lost is not None:

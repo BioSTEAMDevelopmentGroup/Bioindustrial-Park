@@ -58,7 +58,8 @@ __all__ = ('OBJECTIVE_REGISTRY', 'TRACKED_METRICS',
            'resolve_study_preset', 'default_study_name',
            'BURDEN_STUDY_SUFFIX',
            'baseline_decision_point',
-           'trajectory_columns', 'append_trajectory_row', 'load_trajectory',
+           'trajectory_columns', 'check_trajectory_header',
+           'append_trajectory_row', 'load_trajectory',
            'inflight_path_for', 'write_inflight', 'clear_inflight',
            'recover_inflight',
            'get_handles', 'run_kinetic_optimization', 'restore_baseline',
@@ -555,24 +556,39 @@ def trajectory_columns(search_space, extra_columns=()):
     return ['trial_number', 'state', *search_space.keys(), 'objective',
             *TRACKED_METRICS.keys(), *extra_columns, 'error']
 
+def check_trajectory_header(csv_path, columns):
+    """Raise ValueError if an existing trajectory CSV at `csv_path` has a
+    header other than `columns` (the search space -- or the burden
+    column set -- changed since the trajectory was started, so appending
+    would silently misalign the rows). A missing or empty file passes.
+    The guard of append_trajectory_row; run_kinetic_optimization also
+    calls it up front, before the optuna study is opened, so a study
+    name colliding with a store of a different column set fails before
+    any sidecar or simulation."""
+    if not os.path.isfile(csv_path):
+        return
+    with open(csv_path, newline='') as csvfile:
+        existing_header = next(csv.reader(csvfile), None)
+    if existing_header is not None and existing_header != list(columns):
+        raise ValueError(
+            f'Trajectory CSV {csv_path} has a different column set '
+            'than the current search space -- the search space '
+            'changed since this trajectory was started. Use a new '
+            'study_name (or move the old CSV and .db) to start '
+            'fresh.')
+
 def append_trajectory_row(csv_path, columns, record):
     """Append one row (dict; missing keys become '') to `csv_path`,
     writing the header first if the file does not exist. An existing
-    file's header must match `columns` exactly -- otherwise the search
-    space changed since the trajectory was started, and appending would
-    silently misalign the rows. Flushed immediately, so a crash/segfault
-    loses at most the in-flight trial."""
-    exists = os.path.isfile(csv_path)
-    if exists:
-        with open(csv_path, newline='') as csvfile:
-            existing_header = next(csv.reader(csvfile), None)
-        if existing_header != list(columns):
-            raise ValueError(
-                f'Trajectory CSV {csv_path} has a different column set '
-                'than the current search space -- the search space '
-                'changed since this trajectory was started. Use a new '
-                'study_name (or move the old CSV and .db) to start '
-                'fresh.')
+    file's header must match `columns` exactly (check_trajectory_header)
+    -- otherwise the search space changed since the trajectory was
+    started, and appending would silently misalign the rows. Flushed
+    immediately, so a crash/segfault loses at most the in-flight
+    trial."""
+    # An empty file passes the header check; treat it as absent so the
+    # header is written before its first row.
+    exists = os.path.isfile(csv_path) and os.path.getsize(csv_path) > 0
+    check_trajectory_header(csv_path, columns)
     with open(csv_path, 'a', newline='') as csvfile:
         writer = csv.DictWriter(csvfile, fieldnames=columns,
                                 extrasaction='ignore')
@@ -1176,15 +1192,39 @@ def run_kinetic_optimization(objective='IRR',
                              f"BurdenModel; got {burden_model!r}.")
         from biorefineries.isobutanol.enzyme_burden import BurdenModel
         burden_model = BurdenModel.from_reference(kinetic_baselines)
+    elif burden_model is not None:
+        if not all(hasattr(burden_model, a)
+                   for a in ('evaluate', 'apply', 'reference')):
+            raise TypeError("burden_model must be 'auto', None or a "
+                            'BurdenModel (an object with evaluate, apply '
+                            f'and reference); got {burden_model!r}.')
+        # A caller-built model must be a snapshot of the LIVE baselines
+        # (the values on the model now, after the scenario workbook load),
+        # or the ratio route is not inert at trial 0 and every native
+        # step is mis-charged. Exact equality: both sides are
+        # float(getattr(r_te, name)).
+        stale = [(name, ref, kinetic_baselines.get(name))
+                 for name, ref in burden_model.reference.items()
+                 if kinetic_baselines.get(name) != ref]
+        if stale:
+            raise ValueError(
+                'burden_model.reference differs from the live kinetic '
+                'baselines of the model for '
+                + ', '.join(f'{name} (model reference {ref!r}, live '
+                            f'baseline {live!r})'
+                            for name, ref, live in stale)
+                + '; build the BurdenModel from the same kinetic_baselines '
+                "(discover_kinetic_parameters(r_te)) or pass 'auto'.")
     burden_on = burden_model is not None
     if burden_on:
         from biorefineries.isobutanol.enzyme_burden import BURDEN_COLUMNS
+        extra_columns = BURDEN_COLUMNS
         print('Enzyme burden ON (enzyme_burden.py): F_flex = '
               f'{burden_model.F_flex:.4f}, Phi_M,wt = {burden_model.Phi_M_wt:.4f}, '
               f'phi_T,wt = {burden_model.phi_T_wt:.4f} g/gDCW; over-cap trials '
               'are logged INFEASIBLE and pruned before simulating.')
     else:
-        BURDEN_COLUMNS = ()
+        extra_columns = ()
         print('Enzyme burden OFF (burden_model=None): legacy burden-free study.')
     if include_params is not None:
         missing = [p for p in include_params if p not in kinetic_baselines]
@@ -1237,7 +1277,13 @@ def run_kinetic_optimization(objective='IRR',
     storage = ('sqlite:///'
                + os.path.join(results_dir, study_name + '.db')
                .replace('\\', '/'))
-    columns = trajectory_columns(search_space, extra_columns=BURDEN_COLUMNS)
+    columns = trajectory_columns(search_space, extra_columns=extra_columns)
+    # Pre-flight: a study name colliding with a trajectory of a different
+    # column set (search space or burden on/off changed, e.g. a legacy
+    # study_name resumed without burden_model=None) must fail HERE --
+    # before the sidecar recovery, the optuna store and any ~20 s
+    # simulation -- not at the first row append.
+    check_trajectory_header(csv_path, columns)
     # An orphaned sidecar means a previous run of this study died
     # mid-trial without writing that trial's row (unsupervised
     # crash-resume; under the supervisor it has already been recovered).

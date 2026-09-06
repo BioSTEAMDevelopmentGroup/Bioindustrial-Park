@@ -244,7 +244,7 @@ probe13 = (
     "b = m.scenario_b_ehrlich()\n"
     "heavy = sorted(k for k in sys.modules if k.split('.')[0] in\n"
     "               ('nskinetics', 'tellurium', 'roadrunner', 'biosteam',\n"
-    "                'thermosteam'))\n"
+    "                'thermosteam', 'numpy', 'optuna'))\n"
     "print(b['k_13'], heavy)\n")
 out13 = subprocess.run([sys.executable, '-c', probe13], capture_output=True, text=True)
 assert out13.returncode == 0, out13.stderr
