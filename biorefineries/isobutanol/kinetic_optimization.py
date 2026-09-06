@@ -1348,6 +1348,157 @@ def feasible_candidate_mask(samples, distributions, is_feasible):
         mask[i] = bool(is_feasible(values))
     return mask
 
+class _FeasibleParzenEstimator:
+    """Wraps TPE's 'below' Parzen estimator so its candidate batch holds
+    only feasible points: sample(rng, size) draws batches of `size` from
+    the wrapped estimator, keeps the candidates `is_feasible` accepts, and
+    redraws until `size` feasible candidates are collected or
+    `sampler.max_parzen_batches` batches have been drawn; then it falls
+    back to ONE uniform-feasible draw (draw_uniform_feasible, at most
+    `sampler.max_uniform_draws` draws; returned as a size-1 batch in
+    internal repr), and if that fails too, returns the last raw batch so
+    the engine's in-objective INFEASIBLE guard prunes the trial instead
+    of the study crashing. log_pdf delegates unchanged, so optuna's
+    expected-improvement scoring and _compare pick among feasible
+    candidates only. Counters on `sampler`: n_rejected (candidates and
+    uniform draws rejected), n_uniform_fallbacks (batches exhausted),
+    n_unfiltered (raw batch returned). Relies on optuna 4.9.0's
+    TPESampler._sample using only sample() and log_pdf() of the object
+    _build_parzen_estimator returns."""
+
+    def __init__(self, mpe, distributions, is_feasible, sampler):
+        self._mpe = mpe
+        self._distributions = distributions
+        self._is_feasible = is_feasible
+        self._sampler = sampler
+
+    def log_pdf(self, samples_dict):
+        return self._mpe.log_pdf(samples_dict)
+
+    def sample(self, rng, size):
+        kept = {name: [] for name in self._distributions}
+        n_kept, last = 0, None
+        for _ in range(self._sampler.max_parzen_batches):
+            batch = self._mpe.sample(rng, size)
+            last = batch
+            mask = feasible_candidate_mask(batch, self._distributions,
+                                           self._is_feasible)
+            self._sampler.n_rejected += int((~mask).sum())
+            for name in kept:
+                kept[name].append(np.asarray(batch[name])[mask])
+            n_kept += int(mask.sum())
+            if n_kept >= size:
+                break
+        if n_kept:
+            return {name: np.concatenate(parts)[:size]
+                    for name, parts in kept.items()}
+        self._sampler.n_uniform_fallbacks += 1
+        values, n_draws, feasible = draw_uniform_feasible(
+            rng, self._distributions, self._is_feasible,
+            self._sampler.max_uniform_draws)
+        self._sampler.n_rejected += n_draws - (1 if feasible else 0)
+        if feasible:
+            return {name: np.array([dist.to_internal_repr(values[name])])
+                    for name, dist in self._distributions.items()}
+        self._sampler.n_unfiltered += 1
+        return last
+
+_FEASIBLE_TPE_CLASS = {}
+
+def _feasible_tpe_sampler_class():
+    """The FeasibleTPESampler class (optuna imported here; memoized)."""
+    if 'cls' in _FEASIBLE_TPE_CLASS:
+        return _FEASIBLE_TPE_CLASS['cls']
+    import optuna
+    from optuna.trial import TrialState
+
+    class FeasibleTPESampler(optuna.samplers.TPESampler):
+        """TPESampler that never proposes a point `is_feasible` rejects
+        (values in external repr, the objective's suggest_* values).
+        Start-up phase (fewer finished COMPLETE+PRUNED trials than
+        n_startup_trials): a JOINT uniform-feasible draw over the full
+        engine search space (draw_uniform_feasible; at most
+        max_uniform_draws draws, the last raw draw otherwise). TPE phase:
+        the base _sample with the 'below' estimator wrapped in
+        _FeasibleParzenEstimator (candidates filtered; at most
+        max_parzen_batches batches). infer_relative_search_space returns
+        the full search space, so every parameter is sampled jointly from
+        the first sampled trial on (optuna's intersection space is empty
+        until a trial with every parameter completes). Enqueued trials
+        never reach the sampler. Counters: n_rejected,
+        n_uniform_fallbacks, n_unfiltered (see _FeasibleParzenEstimator).
+        group=True and constant_liar=True are refused (both alter
+        sample_relative's control flow)."""
+
+        def __init__(self, search_space, is_feasible, *,
+                     max_uniform_draws=10_000, max_parzen_batches=20,
+                     **tpe_kwargs):
+            if tpe_kwargs.get('group'):
+                raise ValueError('FeasibleTPESampler does not support group=True')
+            if tpe_kwargs.get('constant_liar'):
+                raise ValueError('FeasibleTPESampler does not support '
+                                 'constant_liar=True')
+            if not callable(is_feasible):
+                raise TypeError('is_feasible must be callable(values) -> bool; '
+                                f'got {is_feasible!r}')
+            if int(max_uniform_draws) < 1:
+                raise ValueError('max_uniform_draws must be >= 1; got '
+                                 f'{max_uniform_draws!r}')
+            if int(max_parzen_batches) < 1:
+                raise ValueError('max_parzen_batches must be >= 1; got '
+                                 f'{max_parzen_batches!r}')
+            tpe_kwargs.setdefault('multivariate', True)
+            super().__init__(**tpe_kwargs)
+            self._feasible_distributions = search_space_distributions(search_space)
+            self._is_feasible = is_feasible
+            self.max_uniform_draws = int(max_uniform_draws)
+            self.max_parzen_batches = int(max_parzen_batches)
+            self.n_rejected = 0
+            self.n_uniform_fallbacks = 0
+            self.n_unfiltered = 0
+
+        def infer_relative_search_space(self, study, trial):
+            return {name: dist
+                    for name, dist in self._feasible_distributions.items()
+                    if not dist.single()}
+
+        def _sample_relative(self, study, trial, search_space):
+            if search_space == {}:
+                return {}
+            states = (TrialState.COMPLETE, TrialState.PRUNED)
+            trials = study._get_trials(deepcopy=False, states=states,
+                                       use_cache=True)
+            if len(trials) < self._n_startup_trials:
+                values, n_draws, feasible = draw_uniform_feasible(
+                    self._rng.rng, search_space, self._is_feasible,
+                    self.max_uniform_draws)
+                self.n_rejected += n_draws - (1 if feasible else 0)
+                if not feasible:
+                    self.n_unfiltered += 1
+                return values
+            return self._sample(study, trial, search_space)
+
+        def _build_parzen_estimator(self, study, search_space, trials,
+                                    handle_below):
+            mpe = super()._build_parzen_estimator(study, search_space,
+                                                  trials, handle_below)
+            if handle_below:
+                return _FeasibleParzenEstimator(mpe, search_space,
+                                                self._is_feasible, self)
+            return mpe
+
+    _FEASIBLE_TPE_CLASS['cls'] = FeasibleTPESampler
+    return FeasibleTPESampler
+
+def feasible_tpe_sampler(search_space, is_feasible, **kwargs):
+    """A FeasibleTPESampler over the engine `search_space`
+    (build_search_space format) with the predicate `is_feasible(values)
+    -> bool` (external values). `kwargs`: max_uniform_draws (10_000),
+    max_parzen_batches (20), and any optuna TPESampler keyword (seed,
+    n_startup_trials, constraints_func, ...; multivariate defaults to
+    True; group / constant_liar refused)."""
+    return _feasible_tpe_sampler_class()(search_space, is_feasible, **kwargs)
+
 #%% Engine
 
 def get_handles():

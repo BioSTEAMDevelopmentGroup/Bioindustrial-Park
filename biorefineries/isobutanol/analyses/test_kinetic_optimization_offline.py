@@ -1975,4 +1975,161 @@ else:
         assert name in ko.__all__, name
     PASS('feasible-sampling helpers: distributions match suggest_*; uniform-feasible draw in bounds, typed, log-uniform, max_draws; candidate mask')
 
+#%% 33. FeasibleTPESampler end to end on a toy capped problem: zero sampled
+# infeasible trials (a plain TPESampler with the same seed samples some),
+# enqueued trials bypass the sampler, the objective still improves,
+# counters consistent, resume with a second sampler instance, seed
+# determinism.
+if _optuna is None:
+    print('SKIP 33: optuna not installed')
+else:
+    _optuna.logging.set_verbosity(_optuna.logging.WARNING)
+    space33 = {'a': dict(low=0.01, high=100.0, log=True),
+               'b': dict(low=0.01, high=100.0, log=True),
+               'n': dict(low=0, high=10, log=False, int=True)}
+    def feas33(values):                       # the cap: a + b < 5 (~40 % of log-uniform draws)
+        return values['a'] + values['b'] < 5.0
+    def cons33(frozen_trial):
+        return (frozen_trial.user_attrs.get('violation', 0.0),)
+    def _toy33(trial):
+        a = trial.suggest_float('a', 0.01, 100.0, log=True)
+        b = trial.suggest_float('b', 0.01, 100.0, log=True)
+        n = trial.suggest_int('n', 0, 10)
+        violation = a + b - 5.0
+        trial.set_user_attr('violation', violation)
+        if violation >= 0.0:                  # the engine's INFEASIBLE guard
+            raise _optuna.TrialPruned()
+        return -((a - 3.0)**2 + (b - 1.0)**2) - n     # optimum 0 at (3, 1, 0)
+    TS33 = _optuna.trial.TrialState
+    def _sampled_infeasible33(study):
+        return [t.number for t in study.trials
+                if t.state == TS33.PRUNED and 'enqueued' not in t.user_attrs]
+    def _fresh33(sampler):
+        study = _optuna.create_study(direction='maximize', sampler=sampler)
+        study.enqueue_trial({'a': 50.0, 'b': 50.0, 'n': 3},
+                            user_attrs={'enqueued': True})
+        return study
+    tpe_kw33 = dict(multivariate=True, n_startup_trials=10, constraints_func=cons33)
+    samp33 = ko.feasible_tpe_sampler(space33, feas33, seed=11, **tpe_kw33)
+    assert type(samp33).__name__ == 'FeasibleTPESampler'
+    assert isinstance(samp33, _optuna.samplers.TPESampler)
+    st33 = _fresh33(samp33)
+    st33.optimize(_toy33, n_trials=60)
+    assert len(st33.trials) == 60
+    # the enqueued infeasible trial 0 reached the objective untouched (bypass)
+    assert st33.trials[0].state == TS33.PRUNED and st33.trials[0].params == {'a': 50.0, 'b': 50.0, 'n': 3}
+    assert _sampled_infeasible33(st33) == [], _sampled_infeasible33(st33)
+    assert all(t.state == TS33.COMPLETE for t in st33.trials[1:])
+    assert all(feas33(t.params) for t in st33.trials[1:])
+    assert st33.best_value > -10.0, st33.best_value          # random feasible points score ~ -30
+    assert samp33.n_rejected > 0 and samp33.n_uniform_fallbacks == 0 and samp33.n_unfiltered == 0
+    # the same seed under a plain TPESampler proposes infeasible points
+    # (expected ~5 of the 9 sampled start-up draws alone)
+    plain33 = _optuna.samplers.TPESampler(seed=11, **tpe_kw33)
+    stp33 = _fresh33(plain33)
+    stp33.optimize(_toy33, n_trials=60)
+    assert len(_sampled_infeasible33(stp33)) >= 1, _sampled_infeasible33(stp33)
+    # resume: a second sampler instance on the study (which holds a pruned
+    # infeasible trial with constraints attrs) keeps sampling feasibly
+    assert list(st33.trials[0].system_attrs['constraints'])[0] > 0.0
+    samp33b = ko.feasible_tpe_sampler(space33, feas33, seed=12, **tpe_kw33)
+    st33.sampler = samp33b
+    st33.optimize(_toy33, n_trials=10)
+    assert len(st33.trials) == 70 and _sampled_infeasible33(st33) == []
+    assert samp33b.n_unfiltered == 0 and all(feas33(t.params) for t in st33.trials[60:])
+    # determinism: same seed -> same first sampled trial (start-up path) and
+    # same first TPE-phase trial
+    def _run33(seed, n):
+        s = ko.feasible_tpe_sampler(space33, feas33, seed=seed, **tpe_kw33)
+        st = _optuna.create_study(direction='maximize', sampler=s)
+        st.optimize(_toy33, n_trials=n)
+        return [t.params for t in st.trials]
+    assert _run33(5, 11) == _run33(5, 11)
+    assert _run33(5, 1) != _run33(6, 1)
+    PASS('FeasibleTPESampler: zero sampled infeasible trials on a capped toy (plain TPE samples some), enqueued bypass, improvement, counters, resume, seed determinism')
+
+#%% 34. fallbacks and factory guards: the wrapped "below" estimator falls
+# back to one uniform-feasible draw when every Parzen batch is infeasible,
+# returns the raw last batch (counted) when the predicate never accepts,
+# concatenates partial batches to exactly `size`; the real sampler under an
+# always-false predicate never raises and counts exactly; group /
+# constant_liar / bad caps / non-callable predicate raise in the factory.
+if _optuna is None:
+    print('SKIP 34: optuna not installed')
+else:
+    cls34 = ko._feasible_tpe_sampler_class()
+    assert cls34 is ko._feasible_tpe_sampler_class()               # memoized
+    dists34 = ko.search_space_distributions(space33)
+    class _FakeMPE34:
+        def __init__(self, batches):
+            self.batches, self.calls = list(batches), 0
+        def sample(self, rng, size):
+            self.calls += 1
+            return self.batches[min(self.calls, len(self.batches)) - 1]
+        def log_pdf(self, samples):
+            return np.zeros(len(next(iter(samples.values()))))
+    def _counters34():
+        return SimpleNamespace(max_uniform_draws=200, max_parzen_batches=3,
+                               n_rejected=0, n_uniform_fallbacks=0, n_unfiltered=0)
+    bad34 = {'a': np.full(4, 50.0), 'b': np.full(4, 50.0), 'n': np.zeros(4)}
+    mixed34 = {'a': np.array([1.0, 50.0, 2.0, 60.0]),
+               'b': np.array([1.0, 1.0, 1.0, 1.0]),
+               'n': np.array([0.0, 1.0, 2.0, 3.0])}
+    # (a) every batch infeasible, region reachable -> uniform fallback, size-1 batch
+    mpe_a, s_a = _FakeMPE34([bad34]), _counters34()
+    out_a = ko._FeasibleParzenEstimator(mpe_a, dists34, feas33, s_a).sample(np.random.RandomState(0), 4)
+    assert mpe_a.calls == 3 and s_a.n_uniform_fallbacks == 1 and s_a.n_unfiltered == 0
+    assert list(out_a) == ['a', 'b', 'n'] and all(len(v) == 1 for v in out_a.values())
+    assert feas33({k: dists34[k].to_external_repr(float(v[0])) for k, v in out_a.items()})
+    assert float(out_a['n'][0]).is_integer()
+    assert s_a.n_rejected >= 3*4                                     # 12 candidates + the uniform misses
+    # (b) predicate never accepts -> raw last batch, unfiltered counted, no raise
+    mpe_b, s_b = _FakeMPE34([bad34]), _counters34()
+    out_b = ko._FeasibleParzenEstimator(mpe_b, dists34, lambda v: False, s_b).sample(np.random.RandomState(0), 4)
+    assert out_b is bad34 and s_b.n_uniform_fallbacks == 1 and s_b.n_unfiltered == 1
+    assert s_b.n_rejected == 3*4 + 200
+    # (c) half-feasible batches concatenate to exactly `size`, no fallback
+    mpe_c, s_c = _FakeMPE34([mixed34]), _counters34()
+    w_c = ko._FeasibleParzenEstimator(mpe_c, dists34, feas33, s_c)
+    out_c = w_c.sample(np.random.RandomState(0), 4)
+    assert mpe_c.calls == 2 and s_c.n_uniform_fallbacks == 0 and s_c.n_unfiltered == 0
+    assert out_c['a'].tolist() == [1.0, 2.0, 1.0, 2.0] and out_c['n'].tolist() == [0.0, 2.0, 0.0, 2.0]
+    assert s_c.n_rejected == 4
+    assert w_c.log_pdf(mixed34).tolist() == [0.0]*4                 # delegates
+    # (d) the real sampler under an always-false predicate: 2 raw start-up
+    # draws (max_uniform_draws=50 each), then one TPE trial whose 20 Parzen
+    # batches of 24 (optuna's n_ei_candidates default) are all rejected,
+    # the uniform fallback misses 50 times, and the raw batch is used.
+    samp34 = ko.feasible_tpe_sampler(space33, lambda v: False, max_uniform_draws=50,
+                                     multivariate=True, seed=3, n_startup_trials=2)
+    st34 = _optuna.create_study(direction='maximize', sampler=samp34)
+    st34.optimize(lambda t: (t.suggest_float('a', 0.01, 100.0, log=True)
+                             + t.suggest_float('b', 0.01, 100.0, log=True)
+                             + t.suggest_int('n', 0, 10)), n_trials=3)
+    assert len(st34.trials) == 3 and all(t.state == _optuna.trial.TrialState.COMPLETE for t in st34.trials)
+    assert samp34.n_unfiltered == 3 and samp34.n_uniform_fallbacks == 1
+    assert samp34.n_rejected == 2*50 + 20*24 + 50, samp34.n_rejected
+    # factory guards
+    for bad_kw in (dict(group=True), dict(constant_liar=True),
+                   dict(max_uniform_draws=0), dict(max_parzen_batches=0)):
+        try:
+            ko.feasible_tpe_sampler(space33, feas33, **bad_kw)
+        except ValueError:
+            pass
+        else:
+            raise AssertionError(f'{bad_kw} did not raise')
+    try:
+        ko.feasible_tpe_sampler(space33, None)
+    except TypeError:
+        pass
+    else:
+        raise AssertionError('non-callable predicate did not raise')
+    # the relative search space is the FULL engine space (not optuna's
+    # intersection of stored trials), single() entries dropped
+    st34b = _optuna.create_study(sampler=ko.feasible_tpe_sampler(
+        {**space33, 'c': dict(low=1.0, high=1.0, log=False)}, feas33, seed=0))
+    rel34 = st34b.sampler.infer_relative_search_space(st34b, None)
+    assert rel34 == dists34, rel34
+    PASS('feasible sampling fallbacks: uniform fallback, raw-batch last resort, partial-batch concatenation, exact counters on a real sampler; factory guards; full relative space')
+
 print(f'\nALL {n_pass} CHECKS PASSED')
