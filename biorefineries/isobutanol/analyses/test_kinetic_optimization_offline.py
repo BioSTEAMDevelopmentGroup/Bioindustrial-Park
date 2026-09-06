@@ -731,8 +731,14 @@ if os.path.isfile(wb_A) and os.path.isfile(wb_B):
         p21 = ko.resolve_study_preset(stp21, st21)
         assert set(p21) == {'scenario', 'kinetic_bounds_scenario', 'include_params',
                             'multiplier_bounds', 'rate_multiplier_bounds',
-                            'rate_params', 'parameter_multiplier_bounds'}
+                            'rate_params', 'parameter_multiplier_bounds',
+                            'exclude_params'}
         assert p21['scenario'] == 'A'                       # both start at the A baseline
+        # k_10 is excluded from every preset by default (2026-09-06 pm): a
+        # lower decay rate is a free lunch; it stays in include_params (the
+        # workbook set) and is removed by build_search_space.
+        assert p21['exclude_params'] == ('k_10',)
+        assert p21['exclude_params'] == ko.DEFAULT_EXCLUDED_PARAMETERS
         assert p21['kinetic_bounds_scenario'] == ('A' if stp21 == 'ethanol_only' else 'B')
         assert p21['multiplier_bounds'] == (0.1, 10.0)
         assert p21['rate_multiplier_bounds'] == (1e-3, 10.0)
@@ -800,36 +806,57 @@ if os.path.isfile(wb_A) and os.path.isfile(wb_B):
         rate_multiplier_bounds=p22['rate_multiplier_bounds'],
         rate_params=p22['rate_params'],
         parameter_multiplier_bounds=p22['parameter_multiplier_bounds'],
-        param_bounds_override=override22, include_params=p22['include_params'])
-    assert excl22 == [] and len(space22) == 56 + 4
-    assert all(space22[n]['log'] for n in base22_B)
+        param_bounds_override=override22, include_params=p22['include_params'],
+        exclude_params=p22['exclude_params'])
+    # k_10 (active-biomass decay) is excluded by default (2026-09-06 pm):
+    # 55 sampled kinetic parameters, no k_10 column, no k_10 probe.
+    assert excl22 == ['k_10'] and len(space22) == 55 + 4
+    assert 'k_10' not in space22
+    assert all(space22[n]['log'] for n in base22_B if n != 'k_10')
     # Bands by ROLE (2026-09-06): rate constants (capacity) 1e-3x-10x
-    # (1e-5x until later that day), EXCEPT k_10 (active-biomass decay)
-    # on its own 0.1x-10x band (DEFAULT_PARAMETER_MULTIPLIER_BOUNDS);
-    # inhibition coefficients (k_*i*: product_inhibition, lethality) and
-    # the K_* terms (regulation, affinity, self-inhibition) 0.1x-10x.
+    # (1e-5x until later that day); inhibition coefficients (k_*i*:
+    # product_inhibition, lethality) and the K_* terms (regulation,
+    # affinity, self-inhibition) 0.1x-10x.
     for n22, b22 in base22_B.items():
+        if n22 == 'k_10':
+            continue
         assert space22[n22]['high'] == 10.0*b22
-        assert space22[n22]['low'] == (1e-3*b22 if (n22 in p22['rate_params']
-                                                    and n22 != 'k_10')
+        assert space22[n22]['low'] == (1e-3*b22 if n22 in p22['rate_params']
                                        else 0.1*b22), n22
     for inh22 in ('k_1ie', 'k_1ii', 'k_7ii', 'k_10ie', 'k_10ii', 'k_16ie'):
         assert space22[inh22]['low'] == 0.1*base22_B[inh22], inh22
     for rate22 in ('k_1h', 'k_2', 'k_7', 'k_13'):
         assert space22[rate22]['low'] == 1e-3*base22_B[rate22], rate22
-    assert space22['k_10'] == dict(low=0.1*0.06, high=10.0*0.06, log=True)
+    # The workbook bounds still carry k_10's per-parameter band (in force
+    # only when a caller re-includes it with exclude_params=()).
     assert override22['k_10'] == (0.1*0.06, 10.0*0.06)
+    space22_k10, excl22_k10 = ko.build_search_space(
+        model22, multiplier_bounds=p22['multiplier_bounds'],
+        rate_multiplier_bounds=p22['rate_multiplier_bounds'],
+        rate_params=p22['rate_params'],
+        parameter_multiplier_bounds=p22['parameter_multiplier_bounds'],
+        param_bounds_override=override22, include_params=p22['include_params'],
+        exclude_params=())
+    assert excl22_k10 == [] and len(space22_k10) == 56 + 4
+    assert space22_k10['k_10'] == dict(low=0.1*0.06, high=10.0*0.06, log=True)
+    assert {n: v for n, v in space22_k10.items() if n != 'k_10'} == space22
     pt22 = ko.baseline_decision_point(
         space22, model22,
         dict(target_conc=221.25, threshold_conc=217.125, spike_conc=600.0),
         baseline_max_n_spikes=16)
+    assert 'k_10' not in pt22
     for n22 in ehrlich22:
         assert pt22[n22] == 1e-3*base22_B[n22], n22       # clipped to the floor, exactly
     for n22, v22 in model22.items():
-        if n22 not in ehrlich22:
+        if n22 not in ehrlich22 and n22 != 'k_10':
             assert pt22[n22] == v22, n22                  # nonzero baselines untouched
     assert pt22['threshold_conc'] == 217.125 and pt22['max_n_spikes'] == 16
-    PASS('preset trial 0: role-based bands (capacity 1e-3x, k_10 0.1x, inhibition/K_* 0.1x); Ehrlich rates clipped to exactly 1e-3 x b_B, every other baseline unchanged')
+    probes22, at_floor22 = ko.knockout_probe_points(space22, pt22,
+                                                    rate_params=p22['rate_params'])
+    assert 'k_10' not in probes22 and 'k_10' not in at_floor22
+    assert set(at_floor22) == set(ehrlich22)
+    assert len(probes22) == 20 - 1 - len(ehrlich22)       # 20 rate constants - k_10 - 4 clipped
+    PASS('preset trial 0: role-based bands (capacity 1e-3x, inhibition/K_* 0.1x); k_10 excluded (55 sampled, no probe; re-included on 0.1x-10x with exclude_params=()); Ehrlich rates clipped to exactly 1e-3 x b_B, every other baseline unchanged')
 else:
     print('SKIP 22: parameter-distribution workbooks not found')
 
@@ -846,15 +873,16 @@ sup23 = _runpy.run_path(os.path.join(
 # e.g. kin_opt_ethanol_isobutanol_metabolic_irr_ib0.1-10_burden) and the
 # inhibition-coefficient band tag _ib{lo}-{hi} (the supervisor passes
 # the presets' K_* band; since 2026-09-06, when the inhibition
-# coefficients k_*i* left the k_* rate band).
+# coefficients k_*i* left the k_* rate band), and the exclusion tag
+# _xk10 (the presets' DEFAULT_EXCLUDED_PARAMETERS; since 2026-09-06 pm).
 assert sup23['default_study_name'](None, 'IRR', None,
                                    study_target_products='ethanol_isobutanol',
                                    study_type='metabolic_protein') \
-    == 'kin_opt_ethanol_isobutanol_metabolic_protein_irr_rb0.001-10_ib0.1-10'
+    == 'kin_opt_ethanol_isobutanol_metabolic_protein_irr_rb0.001-10_ib0.1-10_xk10'
 assert sup23['default_study_name']('A', 'IBO titer', 'B',
                                    study_target_products='ethanol_only',
                                    study_type='metabolic') \
-    == 'kin_opt_ethanol_only_metabolic_ibo_titer_kbB_rb0.001-10_ib0.1-10'
+    == 'kin_opt_ethanol_only_metabolic_ibo_titer_kbB_rb0.001-10_ib0.1-10_xk10'
     # ethanol_only's own kinetic_bounds_scenario is 'A' (STUDY_TARGET_PRODUCTS);
     # the explicit 'B' here differs, so it IS tagged (Finding 1 fix -- this
     # name used to silently drop the override and collide with the default).
@@ -867,13 +895,13 @@ assert sup23['default_study_name']('A', 'IRR', 'B') == 'kin_opt_A_kbB_irr'
 # is silent.
 assert sup23['default_study_name']('B', 'IRR', None,
                                    'ethanol_isobutanol', 'metabolic_protein') \
-    == 'kin_opt_ethanol_isobutanol_metabolic_protein_irr_scB_rb0.001-10_ib0.1-10'
+    == 'kin_opt_ethanol_isobutanol_metabolic_protein_irr_scB_rb0.001-10_ib0.1-10_xk10'
 assert sup23['default_study_name'](None, 'IRR', 'A',
                                    'ethanol_isobutanol', 'metabolic_protein') \
-    == 'kin_opt_ethanol_isobutanol_metabolic_protein_irr_kbA_rb0.001-10_ib0.1-10'
+    == 'kin_opt_ethanol_isobutanol_metabolic_protein_irr_kbA_rb0.001-10_ib0.1-10_xk10'
 assert sup23['default_study_name']('A', 'IRR', 'B',
                                    'ethanol_isobutanol', 'metabolic_protein') \
-    == 'kin_opt_ethanol_isobutanol_metabolic_protein_irr_rb0.001-10_ib0.1-10'  # both match the preset: no sc/kb tag
+    == 'kin_opt_ethanol_isobutanol_metabolic_protein_irr_rb0.001-10_ib0.1-10_xk10'  # both match the preset: no sc/kb tag
 # child_code forwards both kwargs (and None under --legacy-flags).
 code23 = sup23['child_code'](None, 'IRR', 2000, None, False, 'x',
                              study_target_products='ethanol_only',
@@ -1283,11 +1311,11 @@ assert sup26['default_study_name'](None, 'IRR', None, burden=True) == 'kin_opt_B
 assert sup26['default_study_name'](None, 'IRR', None,
                                    study_target_products='ethanol_isobutanol',
                                    study_type='metabolic_protein', burden=True) \
-    == 'kin_opt_ethanol_isobutanol_metabolic_protein_irr_rb0.001-10_ib0.1-10_burden'
+    == 'kin_opt_ethanol_isobutanol_metabolic_protein_irr_rb0.001-10_ib0.1-10_xk10_burden'
 assert sup26['default_study_name']('B', 'IRR', None,
                                    study_target_products='ethanol_isobutanol',
                                    study_type='metabolic_protein', burden=True) \
-    == 'kin_opt_ethanol_isobutanol_metabolic_protein_irr_scB_rb0.001-10_ib0.1-10_burden'
+    == 'kin_opt_ethanol_isobutanol_metabolic_protein_irr_scB_rb0.001-10_ib0.1-10_xk10_burden'
 # child_code forwards the flag both ways; supervise()'s default is ON and it
 # derives the study name WITH the flag (so resume/stall-kill hit the store
 # the child writes).
@@ -1450,7 +1478,7 @@ assert sup27['default_study_name'](None, 'IRR', None,
                                    study_target_products='ethanol_isobutanol',
                                    study_type='metabolic', burden=True,
                                    rate_multiplier_bounds=(0.1, 10.0)) \
-    == 'kin_opt_ethanol_isobutanol_metabolic_irr_rb0.1-10_ib0.1-10_burden'
+    == 'kin_opt_ethanol_isobutanol_metabolic_irr_rb0.1-10_ib0.1-10_xk10_burden'
 assert sup27['default_study_name']('A', 'IRR', 'B', rate_multiplier_bounds=(0.1, 10.0)) \
     == 'kin_opt_A_kbB_irr'                                    # legacy path: band not encoded
 code27 = sup27['child_code'](None, 'IRR', 200, None, False, 'x',
@@ -1765,12 +1793,12 @@ sup29 = _runpy.run_path(os.path.join(
 assert sup29['default_study_name'](None, 'IRR', None,
                                    study_target_products='ethanol_isobutanol',
                                    study_type='metabolic_protein', burden=True) \
-    == 'kin_opt_ethanol_isobutanol_metabolic_protein_irr_rb0.001-10_ib0.1-10_burden'
+    == 'kin_opt_ethanol_isobutanol_metabolic_protein_irr_rb0.001-10_ib0.1-10_xk10_burden'
 assert sup29['default_study_name'](None, 'IRR', None,
                                    study_target_products='ethanol_isobutanol',
                                    study_type='metabolic_protein', burden=True,
                                    rate_multiplier_bounds=(1e-5, 10.0)) \
-    == 'kin_opt_ethanol_isobutanol_metabolic_protein_irr_rb1e-05-10_ib0.1-10_burden'
+    == 'kin_opt_ethanol_isobutanol_metabolic_protein_irr_rb1e-05-10_ib0.1-10_xk10_burden'
 assert sup29['default_study_name']('A', 'IRR', 'B', burden=True) == 'kin_opt_A_kbB_irr_burden'
 src29_sup = open(os.path.join(os.path.dirname(os.path.abspath(__file__)),
                               'optimize_kinetics_BO_supervised.py')).read()
@@ -2240,5 +2268,116 @@ src36 = open(os.path.join(os.path.dirname(os.path.abspath(__file__)),
 assert "'--no-feasible-sampling'" in src36 and "dest='feasible_sampling'" in src36
 assert 'feasible_sampling=args.feasible_sampling' in src36
 PASS('feasible_sampling: driver run() kwarg (default on) forwarded; supervisor --no-feasible-sampling through supervise()/child_code(), settings event; study name untouched')
+
+#%% 37. k_10 (active-biomass decay capacity) excluded from every study
+# preset by default (2026-09-06 pm): DEFAULT_EXCLUDED_PARAMETERS, the
+# preset's exclude_params, the _x{names} study-name tag (an exclusion drops
+# a CSV column, so the header guard blocks a resume of the old set and the
+# tag keeps the default name off those studies), no knockout probe for an
+# excluded rate, driver setdefault + naming, supervisor --exclude-params
+# through supervise()/child_code()/default_study_name.
+assert ko.DEFAULT_EXCLUDED_PARAMETERS == ('k_10',)
+assert 'DEFAULT_EXCLUDED_PARAMETERS' in ko.__all__ and 'excluded_parameters_tag' in ko.__all__
+assert ko.excluded_parameters_tag(('k_10',)) == '_xk10'
+assert ko.excluded_parameters_tag(['k_10', 'k_7']) == '_xk10+k7'
+assert ko.excluded_parameters_tag(()) == '' and ko.excluded_parameters_tag(None) == ''
+# Engine naming: tagged after _ib, before _burden; None / () untouched.
+_sig37 = _inspect.signature(ko.default_study_name).parameters
+assert 'exclude_params' in _sig37 and _sig37['exclude_params'].default is None
+assert ko.default_study_name('IRR', 'ethanol_isobutanol', 'metabolic_protein',
+                             rate_multiplier_bounds=(1e-3, 10.0),
+                             inhibition_multiplier_bounds=(0.1, 10.0),
+                             exclude_params=('k_10',), burden=True) \
+    == 'kin_opt_ethanol_isobutanol_metabolic_protein_irr_rb0.001-10_ib0.1-10_xk10_burden'
+assert ko.default_study_name('IRR', 'ethanol_isobutanol', 'metabolic_protein',
+                             exclude_params=('k_10',)) \
+    == 'kin_opt_ethanol_isobutanol_metabolic_protein_irr_xk10'
+assert ko.default_study_name('IRR', 'ethanol_isobutanol', 'metabolic_protein',
+                             rate_multiplier_bounds=(1e-3, 10.0),
+                             inhibition_multiplier_bounds=(0.1, 10.0),
+                             exclude_params=(), burden=True) \
+    == 'kin_opt_ethanol_isobutanol_metabolic_protein_irr_rb0.001-10_ib0.1-10_burden'  # re-included: the old name
+assert ko.default_study_name('IRR', 'ethanol_isobutanol', 'metabolic_protein') \
+    == 'kin_opt_ethanol_isobutanol_metabolic_protein_irr'                             # None: untouched
+# Search space: excluded name absent, no probe, everything else identical.
+kb37 = {'k_1e': 47.1, 'k_10': 0.06, 'k_10ie': 0.04, 'K_1e': 0.12, 'k_7': 1.203}
+roles37 = {'k_1e': 'capacity', 'k_10': 'capacity', 'k_10ie': 'lethality',
+           'K_1e': 'affinity', 'k_7': 'capacity'}
+rp37 = ko.rate_constant_names(kb37, roles=roles37)
+space37, excl37 = ko.build_search_space(
+    kb37, multiplier_bounds=(0.1, 10.0), rate_multiplier_bounds=(1e-3, 10.0),
+    rate_params=rp37, parameter_multiplier_bounds=dict(ko.DEFAULT_PARAMETER_MULTIPLIER_BOUNDS),
+    exclude_params=ko.DEFAULT_EXCLUDED_PARAMETERS)
+assert excl37 == ['k_10'] and 'k_10' not in space37
+assert set(space37) == {'k_1e', 'k_10ie', 'K_1e', 'k_7', *ko.FEEDING_VARIABLES}
+assert space37['k_1e'] == dict(low=1e-3*47.1, high=10.0*47.1, log=True)
+assert space37['k_10ie'] == dict(low=0.1*0.04, high=10.0*0.04, log=True)
+base37 = ko.baseline_decision_point(space37, kb37, fbs17.current_specifications, 16)
+probes37, at_floor37 = ko.knockout_probe_points(space37, base37, rate_params=rp37)
+assert list(probes37) == ['k_1e', 'k_7'] and at_floor37 == []
+assert ko.trajectory_columns(space37)[2:2 + len(space37)] == list(space37)  # no k_10 column
+# Every preset returns a COPY of the default set (and its band table
+# stays, for a re-included k_10).
+if os.path.isfile(wb_A) and os.path.isfile(wb_B):
+    for stp37, st37 in (('ethanol_only', 'metabolic'),
+                        ('ethanol_isobutanol', 'metabolic_protein')):
+        p37 = ko.resolve_study_preset(stp37, st37)
+        assert p37['exclude_params'] == ko.DEFAULT_EXCLUDED_PARAMETERS
+        assert isinstance(p37['exclude_params'], tuple)
+        assert 'k_10' in p37['include_params'] and 'k_10' in p37['rate_params']
+        assert p37['parameter_multiplier_bounds'] == {'k_10': (0.1, 10.0)}
+# Driver: exclude_params is a preset key defaulted into engine_kwargs and
+# the EFFECTIVE set reaches the study name; the preset print reports the
+# effective (include minus exclude) set.
+drv37 = open(os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                          'optimize_kinetics_BO.py')).read()
+assert "for key in ('include_params', 'exclude_params', 'multiplier_bounds'," in drv37
+assert "exclude_params=engine_kwargs['exclude_params'])" in drv37
+assert "excluded = tuple(engine_kwargs['exclude_params'] or ())" in drv37
+assert 'if n not in excluded]' in drv37
+# Supervisor: --exclude-params (nargs='*', default None = the preset's;
+# bare = () re-includes k_10), threaded through supervise() -> child_code()
+# (kwarg omitted when None, forwarded as a tuple otherwise) and the naming
+# mirror (None -> ko.DEFAULT_EXCLUDED_PARAMETERS), shown in the settings
+# event.
+sup37 = _runpy.run_path(os.path.join(
+    os.path.dirname(os.path.abspath(__file__)),
+    'optimize_kinetics_BO_supervised.py'))
+assert _inspect.signature(sup37['supervise']).parameters['exclude_params'].default is None
+assert _inspect.signature(sup37['child_code']).parameters['exclude_params'].default is None
+assert _inspect.signature(sup37['default_study_name']).parameters['exclude_params'].default is None
+code37 = sup37['child_code'](None, 'IRR', 200, None, False, 'x',
+                             study_target_products='ethanol_isobutanol',
+                             study_type='metabolic')
+assert 'exclude_params' not in code37                                  # None: preset default
+code37b = sup37['child_code'](None, 'IRR', 200, None, False, 'x',
+                              study_target_products='ethanol_isobutanol',
+                              study_type='metabolic', exclude_params=())
+assert 'exclude_params=(),' in code37b                                 # re-include k_10
+code37c = sup37['child_code'](None, 'IRR', 200, None, False, 'x',
+                              study_target_products='ethanol_isobutanol',
+                              study_type='metabolic', exclude_params=['k_10', 'k_7'])
+assert "exclude_params=('k_10', 'k_7')," in code37c
+assert sup37['default_study_name'](None, 'IRR', None,
+                                   study_target_products='ethanol_isobutanol',
+                                   study_type='metabolic', burden=True,
+                                   exclude_params=()) \
+    == 'kin_opt_ethanol_isobutanol_metabolic_irr_rb0.001-10_ib0.1-10_burden'   # the production study's name
+assert sup37['default_study_name'](None, 'IRR', None,
+                                   study_target_products='ethanol_isobutanol',
+                                   study_type='metabolic', burden=True,
+                                   exclude_params=('k_10', 'k_7')) \
+    == 'kin_opt_ethanol_isobutanol_metabolic_irr_rb0.001-10_ib0.1-10_xk10+k7_burden'
+assert sup37['default_study_name']('A', 'IRR', 'B', exclude_params=('k_10',)) \
+    == 'kin_opt_A_kbB_irr'                                             # legacy path: never tagged
+src37_sup = _inspect.getsource(sup37['supervise'])
+assert 'exclude_params=exclude_params' in src37_sup
+assert 'exclude_params={exclude_params!r}' in src37_sup                # settings event line
+assert 'ko.DEFAULT_EXCLUDED_PARAMETERS' in _inspect.getsource(sup37['default_study_name'])
+src37 = open(os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                          'optimize_kinetics_BO_supervised.py')).read()
+assert "'--exclude-params', nargs='*', default=None" in src37
+assert 'else tuple(args.exclude_params)' in src37
+PASS('k_10 excluded by default: DEFAULT_EXCLUDED_PARAMETERS, preset exclude_params, _xk10 tag (None/() untouched), no column/probe; driver setdefault + naming; supervisor --exclude-params plumbing')
 
 print(f'\nALL {n_pass} CHECKS PASSED')

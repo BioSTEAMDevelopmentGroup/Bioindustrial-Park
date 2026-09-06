@@ -53,8 +53,11 @@ Long-running, one simulation at a time (children run strictly
 sequentially) -- ask-first, like the unsupervised driver. Examples:
 
     # default preset (ethanol_isobutanol x metabolic_protein; start at A,
-    # B workbook's 56 rows, k_* 1e-5x-10x, K_* 0.1x-10x):
+    # B workbook's 56 rows minus k_10 (excluded by default), rate constants
+    # 1e-3x-10x, inhibition coefficients and K_* 0.1x-10x):
     python optimize_kinetics_BO_supervised.py --objective IRR --n-trials 2000
+    # re-include k_10 (no _xk10 tag; it samples its 0.1x-10x band):
+    python optimize_kinetics_BO_supervised.py --objective IRR --exclude-params
     # ethanol-only strain, expression/tolerance engineering only (29):
     python optimize_kinetics_BO_supervised.py --study-target-products \\
         ethanol_only --study-type metabolic
@@ -86,7 +89,8 @@ _spec.loader.exec_module(ko)
 
 def default_study_name(scenario, objective, kinetic_bounds_scenario,
                        study_target_products=None, study_type=None,
-                       burden=False, rate_multiplier_bounds=None):
+                       burden=False, rate_multiplier_bounds=None,
+                       exclude_params=None):
     """Mirror the driver's stable study naming (resume finds the same
     study): the preset convention
     kin_opt_{study_target_products}_{study_type}_{slug} whenever a
@@ -107,7 +111,13 @@ def default_study_name(scenario, objective, kinetic_bounds_scenario,
     ko.DEFAULT_SATURATION_MULTIPLIER_BOUNDS -- the supervisor exposes no
     flag for it, matching the driver's default `multiplier_bounds`):
     since 2026-09-06 the presets assign bands by role, and the tag keeps a
-    role-band study from resuming a pre-change study of the same name."""
+    role-band study from resuming a pre-change study of the same name.
+    `exclude_params` (None = the presets' ko.DEFAULT_EXCLUDED_PARAMETERS,
+    ('k_10',), which the driver defaults in; a tuple overrides it, () =
+    nothing excluded) is tagged after `_ib` whenever the effective set is
+    non-empty (`_xk10`; ko.excluded_parameters_tag): an exclusion drops a
+    CSV column, and the tag keeps the default name off the studies that
+    still sampled k_10 (e.g. the 2026-09-06 production study)."""
     if study_target_products is not None:
         return ko.default_study_name(objective, study_target_products,
                                      study_type, scenario=scenario,
@@ -118,7 +128,11 @@ def default_study_name(scenario, objective, kinetic_bounds_scenario,
                                          if rate_multiplier_bounds is None
                                          else rate_multiplier_bounds),
                                      inhibition_multiplier_bounds=
-                                         ko.DEFAULT_SATURATION_MULTIPLIER_BOUNDS)
+                                         ko.DEFAULT_SATURATION_MULTIPLIER_BOUNDS,
+                                     exclude_params=(
+                                         ko.DEFAULT_EXCLUDED_PARAMETERS
+                                         if exclude_params is None
+                                         else tuple(exclude_params)))
     scenario = scenario or 'B'
     slug = objective.lower().replace(' ', '_')
     suffix = ko.BURDEN_STUDY_SUFFIX if burden else ''
@@ -177,7 +191,7 @@ def child_code(scenario, objective, n_trials, kinetic_bounds_scenario,
                seed=3221, study_target_products=None, study_type=None,
                burden=True, enqueue_knockouts=True,
                rate_multiplier_bounds=None, n_startup_trials=None,
-               feasible_sampling=True):
+               feasible_sampling=True, exclude_params=None):
     """The -c program for one supervised attempt of the driver.
     `study_target_products=None` selects the driver's legacy flag path.
     `rate_multiplier_bounds=None` leaves the k_* band to the preset (the
@@ -185,11 +199,16 @@ def child_code(scenario, objective, n_trials, kinetic_bounds_scenario,
     `n_startup_trials=None` leaves the TPE random start-up length to the
     engine's rule (the kwarg is omitted); an int is forwarded.
     `feasible_sampling` (default True) is the driver's feasibility-aware
-    sampler flag, always forwarded explicitly."""
+    sampler flag, always forwarded explicitly. `exclude_params=None`
+    leaves the exclusion set to the preset (ko.DEFAULT_EXCLUDED_PARAMETERS,
+    k_10; the kwarg is omitted); a tuple -- () included, which re-includes
+    k_10 -- is forwarded."""
     rate_kw = ('' if rate_multiplier_bounds is None else
                f'          rate_multiplier_bounds={tuple(rate_multiplier_bounds)!r},\n')
     startup_kw = ('' if n_startup_trials is None else
                   f'          n_startup_trials={int(n_startup_trials)!r},\n')
+    exclude_kw = ('' if exclude_params is None else
+                  f'          exclude_params={tuple(exclude_params)!r},\n')
     return (
         'import runpy\n'
         f'ns = runpy.run_path({DRIVER!r})\n'
@@ -207,6 +226,7 @@ def child_code(scenario, objective, n_trials, kinetic_bounds_scenario,
         f'          feasible_sampling={feasible_sampling!r},\n'
         f'{rate_kw}'
         f'{startup_kw}'
+        f'{exclude_kw}'
         f'          )\n')
 
 
@@ -219,7 +239,7 @@ def supervise(scenario=None, objective='IRR', n_trials=2000,
               study_type=ko.DEFAULT_STUDY_TYPE, burden=True,
               enqueue_knockouts=True, rate_multiplier_bounds=None,
               n_startup_trials=None, max_empty_attempts=5,
-              feasible_sampling=True):
+              feasible_sampling=True, exclude_params=None):
     """Run attempts until 'complete' or 'abort'; returns the final
     outcome string ('complete' or 'abort'). `study_target_products` /
     `study_type` name the driver's study preset (defaults = the engine's;
@@ -236,9 +256,12 @@ def supervise(scenario=None, objective='IRR', n_trials=2000,
     `rate_multiplier_bounds` (None = the preset's k_* band) is an
     explicit (m_lo, m_hi) k_* band (--rate-multiplier-bounds LO HI); the
     effective band (explicit or the preset's) is always tagged into the
-    derived study name. k_10 keeps the preset's per-parameter 0.1x-10x
-    band either way (the driver's parameter_multiplier_bounds default;
-    the supervisor exposes no flag for it). `n_startup_trials` (None =
+    derived study name. `exclude_params` (None = the preset's
+    ko.DEFAULT_EXCLUDED_PARAMETERS, k_10 -- the active-biomass decay
+    capacity is not a decision variable by default; --exclude-params
+    [NAME ...], bare = () re-includes it, on its per-parameter 0.1x-10x
+    band) is the exclusion set, tagged `_x...` into the derived study
+    name whenever non-empty. `n_startup_trials` (None =
     the engine's rule max(10, n_trials//10)) is the TPE random start-up
     length (--n-startup-trials N); forwarded on every attempt, never
     part of the study name, so a resume may change it.
@@ -258,7 +281,8 @@ def supervise(scenario=None, objective='IRR', n_trials=2000,
                                         kinetic_bounds_scenario,
                                         study_target_products=study_target_products,
                                         study_type=study_type, burden=burden,
-                                        rate_multiplier_bounds=rate_multiplier_bounds)
+                                        rate_multiplier_bounds=rate_multiplier_bounds,
+                                        exclude_params=exclude_params)
     csv_path = os.path.join(RESULTS_DIR, study_name + '_trajectory.csv')
     inflight_path = ko.inflight_path_for(RESULTS_DIR, study_name)
     if python is None:
@@ -274,7 +298,8 @@ def supervise(scenario=None, objective='IRR', n_trials=2000,
                       enqueue_knockouts=enqueue_knockouts,
                       rate_multiplier_bounds=rate_multiplier_bounds,
                       n_startup_trials=n_startup_trials,
-                      feasible_sampling=feasible_sampling)
+                      feasible_sampling=feasible_sampling,
+                      exclude_params=exclude_params)
     guard = ko.StallGuard(stall_timeout_s=60.0*stall_timeout_min)
 
     def event(msg):
@@ -297,6 +322,7 @@ def supervise(scenario=None, objective='IRR', n_trials=2000,
           f'feasible_sampling={feasible_sampling!r}, '
           f'n_startup_trials={n_startup_trials!r}, '
           f'rate_multiplier_bounds={rate_multiplier_bounds!r}, '
+          f'exclude_params={exclude_params!r}, '
           f'stall_timeout_min={stall_timeout_min:g}, '
           f'max_empty_attempts={max_empty_attempts!r}')
     attempt = 0
@@ -462,6 +488,20 @@ if __name__ == '__main__':
                              'band is always tagged into the derived study '
                              'name _rb{LO}-{HI}, so a study never resumes '
                              'one of the same name under another band')
+    parser.add_argument('--exclude-params', nargs='*', default=None,
+                        metavar='NAME',
+                        help='kinetic parameters kept OUT of the search '
+                             'space (they stay at the scenario baseline and '
+                             "get no knockout probe); default = the preset's "
+                             'ko.DEFAULT_EXCLUDED_PARAMETERS (k_10, the '
+                             'active-biomass decay capacity -- a lower decay '
+                             'rate is a free lunch, not an engineering '
+                             'target); a bare --exclude-params re-includes '
+                             'k_10 (on its per-parameter 0.1 10 band). The '
+                             'effective set is tagged into the derived study '
+                             'name (_xk10 at the default; nothing when '
+                             'empty) -- an exclusion drops a CSV column, so '
+                             'a study of another set can never be resumed')
     parser.add_argument('--n-startup-trials', type=int, default=None,
                         metavar='N',
                         help='TPE random start-up length: trials drawn '
@@ -518,5 +558,7 @@ if __name__ == '__main__':
                             else tuple(args.rate_multiplier_bounds)),
                         n_startup_trials=args.n_startup_trials,
                         max_empty_attempts=args.max_empty_attempts,
-                        feasible_sampling=args.feasible_sampling)
+                        feasible_sampling=args.feasible_sampling,
+                        exclude_params=(None if args.exclude_params is None
+                                        else tuple(args.exclude_params)))
     sys.exit(0 if outcome == 'complete' else 1)

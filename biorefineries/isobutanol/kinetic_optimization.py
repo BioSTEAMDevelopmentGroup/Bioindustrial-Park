@@ -21,9 +21,12 @@ rows; 'ethanol_isobutanol' = scenario-B rows, i.e. plus the Ehrlich block
 and the isobutanol-inhibition coefficients; both start at the A baseline)
 and study_type ('metabolic' = capacity, product-inhibition, lethality and
 substrate-regulation roles; 'metabolic_protein' = plus affinity and
-product self-inhibition), with k_* on [1e-5x, 10x] and K_* on [0.1x, 10x]
-log bands. Roles come from nskinetics' parameter_categories table, read
-by file path.
+product self-inhibition), with the rate constants on [1e-3x, 10x] and the
+inhibition coefficients / K_* terms on [0.1x, 10x] log bands; k_10 (the
+active-biomass decay capacity) is excluded from every preset by default
+(DEFAULT_EXCLUDED_PARAMETERS -- a lower decay rate is a free lunch, not an
+engineering target; study-name tag `_xk10`). Roles come from nskinetics'
+parameter_categories table, read by file path.
 
 Import is free of side effects and does not require optuna (imported lazily
 inside run_kinetic_optimization); the pure logic here is exercised by
@@ -53,6 +56,7 @@ __all__ = ('OBJECTIVE_REGISTRY', 'TRACKED_METRICS',
            'DEFAULT_RATE_MULTIPLIER_BOUNDS',
            'DEFAULT_PARAMETER_MULTIPLIER_BOUNDS',
            'DEFAULT_SATURATION_MULTIPLIER_BOUNDS',
+           'DEFAULT_EXCLUDED_PARAMETERS', 'excluded_parameters_tag',
            'RATE_CONSTANT_ROLES', 'INHIBITION_COEFFICIENT_ROLES',
            'kinetic_parameter_roles_path', 'kinetic_parameter_roles',
            'rate_constant_names',
@@ -124,6 +128,34 @@ DEFAULT_SATURATION_MULTIPLIER_BOUNDS = (0.1, 10.0)
 #: space of every preset without changing its columns, so a changed
 #: table needs a fresh study name (the header guard cannot tell).
 DEFAULT_PARAMETER_MULTIPLIER_BOUNDS = {'k_10': (0.1, 10.0)}
+
+#: Kinetic parameters every study preset keeps OUT of the search space
+#: (resolve_study_preset `exclude_params`; since 2026-09-06 pm). k_10, the
+#: active-biomass decay capacity, is a free lunch for the optimizer -- a
+#: lower decay rate is a longer-lived culture with no engineering lever
+#: behind it (the best trial of the aborted 2026-09-06 role-band study was
+#: its 0.1x knock-down probe) -- so it stays at the scenario baseline and
+#: gets no knockout probe (the probes follow the search space). The
+#: workbook set of include_params is unchanged (29/40/40/56); the
+#: effective sampled set is include minus exclude (28/39/39/55). A caller
+#: re-includes k_10 with exclude_params=() (driver run(exclude_params=()),
+#: supervisor bare --exclude-params); it then lands on the
+#: DEFAULT_PARAMETER_MULTIPLIER_BOUNDS band above, which is kept for that
+#: case. An exclusion REMOVES a trajectory-CSV column, so a study of the
+#: old set cannot be resumed silently (the header guard raises); the
+#: effective exclusion set is tagged into every preset-derived study name
+#: (excluded_parameters_tag, `_xk10`) so the default name can launch next
+#: to the older studies at all.
+DEFAULT_EXCLUDED_PARAMETERS = ('k_10',)
+
+def excluded_parameters_tag(names):
+    """Study-name tag of an exclusion set: '_x' + the names joined by '+'
+    with their underscores dropped, in input order (('k_10',) -> '_xk10';
+    ('k_10', 'k_7') -> '_xk10+k7'); '' for None or an empty set."""
+    names = tuple(names or ())
+    if not names:
+        return ''
+    return '_x' + '+'.join(name.replace('_', '') for name in names)
 
 #: nskinetics roles (parameter_categories.ROLES) that make a parameter a
 #: RATE CONSTANT -- the only names the k_* rate band applies to under the
@@ -620,9 +652,15 @@ def resolve_study_preset(study_target_products, study_type, roles=None):
     the saturation band like the K_* terms],
     parameter_multiplier_bounds=a COPY of
     DEFAULT_PARAMETER_MULTIPLIER_BOUNDS [k_10, the active-biomass decay
-    capacity, on 0.1x-10x instead of the rate band]).
-    Set sizes: ethanol_only 29 (metabolic) / 40 (metabolic_protein);
-    ethanol_isobutanol 40 / 56. `roles` (default
+    capacity, on 0.1x-10x instead of the rate band -- in force only when
+    k_10 is re-included],
+    exclude_params=a COPY of DEFAULT_EXCLUDED_PARAMETERS [('k_10',): the
+    decay capacity is NOT a decision variable by default -- it stays at
+    the scenario baseline and gets no knockout probe; the driver tags the
+    effective exclusion into the study name, `_xk10`]).
+    Set sizes (include_params, the workbook rows): ethanol_only 29
+    (metabolic) / 40 (metabolic_protein); ethanol_isobutanol 40 / 56 --
+    one fewer each in the sampled space after the exclusion. `roles` (default
     kinetic_parameter_roles()) is the {name: role} table; a workbook row
     absent from it raises KeyError(name) so a future workbook/model change
     can never leak a parameter into a set silently. Unknown axis values
@@ -656,7 +694,8 @@ def resolve_study_preset(study_target_products, study_type, roles=None):
                 rate_multiplier_bounds=DEFAULT_RATE_MULTIPLIER_BOUNDS,
                 rate_params=rate_constant_names(workbook_rows, roles=roles),
                 parameter_multiplier_bounds=dict(
-                    DEFAULT_PARAMETER_MULTIPLIER_BOUNDS))
+                    DEFAULT_PARAMETER_MULTIPLIER_BOUNDS),
+                exclude_params=tuple(DEFAULT_EXCLUDED_PARAMETERS))
 
 #: Study-name suffix of a burden-enabled study (enzyme_burden.py): it
 #: records extra columns and a different physiology, so it must never
@@ -669,7 +708,8 @@ BURDEN_STUDY_SUFFIX = '_burden'
 def default_study_name(objective, study_target_products, study_type,
                        scenario=None, kinetic_bounds_scenario=None,
                        burden=False, rate_multiplier_bounds=None,
-                       inhibition_multiplier_bounds=None):
+                       inhibition_multiplier_bounds=None,
+                       exclude_params=None):
     """Stable study name of a preset study:
     kin_opt_{study_target_products}_{study_type}_{objective slug}
     (slug = lower-cased, spaces -> '_'), e.g.
@@ -719,6 +759,18 @@ def default_study_name(objective, study_target_products, study_type,
     under the old prefix rule (same columns, so the header guard cannot
     tell them apart). None (older callers) leaves the name unchanged.
 
+    `exclude_params` (the kinetic parameters kept OUT of the search
+    space; the presets' DEFAULT_EXCLUDED_PARAMETERS, ('k_10',), since
+    2026-09-06 pm) tags the name with excluded_parameters_tag after
+    `_ib` (`_xk10`) whenever it is non-empty. An exclusion removes a
+    trajectory-CSV column, so the header guard already refuses to resume
+    a study of the old set -- the tag is what lets the default name
+    launch next to those studies at all (e.g. the 2026-09-06 production
+    study kin_opt_ethanol_isobutanol_metabolic_irr_rb0.001-10_ib0.1-10_
+    burden, which sampled k_10). None or an empty set (older callers; a
+    run that re-includes k_10 with exclude_params=()) leaves the name
+    unchanged -- same columns, so resuming those studies is legitimate.
+
     `burden=True` appends BURDEN_STUDY_SUFFIX ('_burden') after every
     other tag: a burden study (enzyme_burden.py; the driver's default)
     can never resume a burden-free study's CSV/SQLite, or vice versa.
@@ -738,6 +790,7 @@ def default_study_name(objective, study_target_products, study_type,
     if inhibition_multiplier_bounds is not None:
         lo, hi = inhibition_multiplier_bounds
         name += f'_ib{lo:g}-{hi:g}'
+    name += excluded_parameters_tag(exclude_params)
     if burden:
         name += BURDEN_STUDY_SUFFIX
     return name
@@ -1638,7 +1691,10 @@ def run_kinetic_optimization(objective='IRR',
     `parameter_multiplier_bounds` ({name: (m_lo, m_hi)}, None = none) is
     the per-parameter band of build_search_space, taking precedence over
     the role band; the presets pass DEFAULT_PARAMETER_MULTIPLIER_BOUNDS
-    (k_10 on 0.1x-10x; its probe is then a knock-down at 0.1x).
+    (k_10 on 0.1x-10x; its probe is then a knock-down at 0.1x) -- in
+    force only when k_10 is in the space: the presets also pass
+    `exclude_params` = DEFAULT_EXCLUDED_PARAMETERS (('k_10',), since
+    2026-09-06 pm), so by default k_10 is not sampled and has no probe.
 
     `burden_model` (default 'auto') is the enzyme-burden (proteome-
     allocation) constraint of enzyme_burden.py: 'auto' builds
