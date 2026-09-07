@@ -172,11 +172,13 @@ def run(scenario=None,  # 'A' or 'B'; None = the preset's start scenario
         # still derived from the baseline either way. Not part of the
         # study name (like enqueue_knockouts); a resume is unaffected
         # (only fresh studies enqueue).
-        enqueue_knockouts=True,  # a FRESH study evaluates, right after
-        # the baseline (trial 0), one single-knockout probe per rate
-        # constant k_* of the search space (that rate alone at its band
-        # floor; ko.knockout_probe_points), so TPE learns the lethality
-        # map before sampling; False = baseline only (pre-2026-09-06).
+        enqueue_knockouts=False,  # default OFF since 2026-09-07 (together
+        # with enqueue_baseline, so a default fresh study enqueues NO point
+        # at all). True = a FRESH study evaluates, right after the baseline
+        # (if enqueued), one single-knockout probe per rate constant k_* of
+        # the search space (that rate alone at its band floor, the rest at
+        # the baseline; ko.knockout_probe_points), so TPE learns the
+        # lethality map before sampling. Off the study name.
         n_startup_trials=None,  # TPE random start-up length (trials drawn
         # at random, probes included, before TPE guidance); None = the
         # engine's rule max(10, n_trials//10) (200 for 2000 trials -- 0 of

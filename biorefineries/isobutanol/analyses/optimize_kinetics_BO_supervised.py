@@ -242,7 +242,7 @@ def lost_cause(killed_for_stall, stall_timeout_min, returncode):
 def child_code(scenario, objective, n_trials, kinetic_bounds_scenario,
                make_plots, study_name, restrict_to_workbook=True,
                seed=3221, study_target_products=None, study_type=None,
-               burden=True, enqueue_baseline=False, enqueue_knockouts=True,
+               burden=True, enqueue_baseline=False, enqueue_knockouts=False,
                rate_multiplier_bounds=None, n_startup_trials=None,
                feasible_sampling=True, exclude_params=None,
                stage_1_max_x_bounds=_UNSET, seed_from=None):
@@ -308,7 +308,7 @@ def supervise(scenario=None, objective='IRR', n_trials=2000,
               restrict_to_workbook=True, seed=3221,
               study_target_products=ko.DEFAULT_STUDY_TARGET_PRODUCTS,
               study_type=ko.DEFAULT_STUDY_TYPE, burden=True,
-              enqueue_baseline=False, enqueue_knockouts=True,
+              enqueue_baseline=False, enqueue_knockouts=False,
               rate_multiplier_bounds=None,
               n_startup_trials=None, max_empty_attempts=5,
               feasible_sampling=True, exclude_params=None,
@@ -587,13 +587,16 @@ if __name__ == '__main__':
                              'study). Not part of the study name; '
                              'meaningful only for a fresh study (a resume '
                              'enqueues nothing regardless)')
-    parser.add_argument('--no-enqueue-knockouts', dest='enqueue_knockouts',
-                        action='store_false',
-                        help='do not enqueue the single-knockout probes '
-                             '(one k_* alone at its band floor, the rest at '
-                             'the baseline) after trial 0 of a fresh study; '
-                             'the default enqueues one per rate constant so '
-                             'TPE learns the lethality map first')
+    parser.add_argument('--enqueue-knockouts', dest='enqueue_knockouts',
+                        action='store_true',
+                        help='enqueue the single-knockout probes (one k_* '
+                             'alone at its band floor, the rest at the '
+                             'baseline), one per rate constant, on a fresh '
+                             'study so TPE learns the lethality map first. '
+                             'OFF by default since 2026-09-07 (together '
+                             'with the baseline, so a default fresh study '
+                             'enqueues no point at all). Not part of the '
+                             'study name')
     parser.add_argument('--rate-multiplier-bounds', nargs=2, type=float,
                         default=None, metavar=('LO', 'HI'),
                         help='explicit RATE-CONSTANT band (x baseline, '

@@ -780,7 +780,7 @@ def knockout_probe_points(search_space, baseline_point, rate_prefix='k_',
     of `baseline_point` with that one variable at its band FLOOR
     (search_space[name]['low']) and every other decision variable at the
     baseline. Enqueued right after trial 0 by run_kinetic_optimization
-    (enqueue_knockouts=True, the default), they teach the TPE sampler
+    (enqueue_knockouts=True; default False since 2026-09-07), they teach the TPE sampler
     the single-parameter lethality map explicitly -- which rate can be
     knocked down alone and which cannot -- before it starts drawing
     multi-parameter points, instead of relying on random startup draws
@@ -2299,7 +2299,7 @@ def run_kinetic_optimization(objective='IRR',
                              handles=None, print_status_every=1,
                              burden_model='auto',
                              enqueue_baseline=False,
-                             enqueue_knockouts=True,
+                             enqueue_knockouts=False,
                              n_startup_trials=None,
                              feasible_sampling=True,
                              seed_from=None,
@@ -2320,8 +2320,9 @@ def run_kinetic_optimization(objective='IRR',
     earlier IRR study. `enqueue_baseline=True` evaluates the scenario
     baseline configuration as trial 0 instead (see
     baseline_decision_point; baseline_point is computed either way, since
-    the probes are derived from it). Then -- `enqueue_knockouts=True`, the
-    default -- the single-knockout probes of knockout_probe_points
+    the probes are derived from it). Then -- `enqueue_knockouts=True`
+    (default False since 2026-09-07, so by default NO point at all is
+    enqueued) -- the single-knockout probes of knockout_probe_points
     (trials 1..N: one log-scale rate constant k_* at its band floor, all
     else at the baseline; a rate already at its floor gets none), each
     tagged with the optuna user attr 'knockout_probe' = its parameter

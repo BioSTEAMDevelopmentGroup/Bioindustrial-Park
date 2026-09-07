@@ -506,7 +506,7 @@ else:
                        'threshold_conc': 100.0, 'target_delta': 50.0,
                        'spike_delta': 100.0, 'max_n_spikes': 2})
     _optuna.logging.set_verbosity(_optuna.logging.WARNING)
-    study17_obj, csv17_out, kb17 = ko.run_kinetic_optimization(enqueue_baseline=True, 
+    study17_obj, csv17_out, kb17 = ko.run_kinetic_optimization(enqueue_baseline=True, enqueue_knockouts=True, 
         objective='IRR', scenario_label='X', n_trials=3, seed=1,
         study_name=study17, results_dir=outdir17, handles=handles17,
         print_status_every=1, burden_model=None)
@@ -545,7 +545,7 @@ else:
                                            'MPSPs': {'ethanol': np.nan,
                                                      'isobutanol': np.nan}})
     try:
-        ko.run_kinetic_optimization(enqueue_baseline=True, 
+        ko.run_kinetic_optimization(enqueue_baseline=True, enqueue_knockouts=True, 
             objective='IRR', scenario_label='X', n_trials=2, seed=1,
             study_name=study17b, results_dir=outdir17b, handles=handles17b,
             print_status_every=1, burden_model=None)
@@ -971,7 +971,7 @@ if _optuna is not None:
                      latest_TEA_solution={'IRR': np.nan,
                                           'MPSPs': {'ethanol': np.nan,
                                                     'isobutanol': np.nan}})
-    study23, _, _ = ko.run_kinetic_optimization(enqueue_baseline=True, 
+    study23, _, _ = ko.run_kinetic_optimization(enqueue_baseline=True, enqueue_knockouts=True, 
         objective='IRR', scenario_label='X', n_trials=1, seed=1,
         study_name='offline_rate_band', results_dir=outdir23, handles=handles23,
         rate_multiplier_bounds=(1e-5, 10.0), print_status_every=1,
@@ -1142,7 +1142,7 @@ else:
         return _orig_write_inflight(path, columns, record)
     ko.write_inflight = _counting_write_inflight
     try:
-        study25_obj, csv25_out, kb25 = ko.run_kinetic_optimization(enqueue_baseline=True, 
+        study25_obj, csv25_out, kb25 = ko.run_kinetic_optimization(enqueue_baseline=True, enqueue_knockouts=True, 
             objective='IRR', scenario_label='X', n_trials=6, seed=1,
             study_name=study25, results_dir=outdir25, handles=handles25,
             param_bounds_override=override25,
@@ -1196,7 +1196,7 @@ else:
     n_seen25_before = len(seen_k7)
     ko.write_inflight = _counting_write_inflight
     try:
-        ko.run_kinetic_optimization(enqueue_baseline=True, 
+        ko.run_kinetic_optimization(enqueue_baseline=True, enqueue_knockouts=True, 
             objective='IRR', scenario_label='X', n_trials=6, seed=1,
             study_name=study25, results_dir=outdir25, handles=handles25,
             param_bounds_override=override25,
@@ -1215,7 +1215,7 @@ else:
     # baselines: one perturbed reference capacity is named with both values.
     bm25_stale = eb.BurdenModel.from_reference({**baselines25, 'k_3': 6.0})
     try:
-        ko.run_kinetic_optimization(enqueue_baseline=True, 
+        ko.run_kinetic_optimization(enqueue_baseline=True, enqueue_knockouts=True, 
             objective='IRR', scenario_label='X', n_trials=1, seed=1,
             study_name='offline_stale_reference', results_dir=tempfile.mkdtemp(),
             handles=handles25, param_bounds_override=override25,
@@ -1227,7 +1227,7 @@ else:
         raise AssertionError('a stale BurdenModel reference was not refused')
     # ... and a burden_model that is neither 'auto', None nor a model is a TypeError
     try:
-        ko.run_kinetic_optimization(enqueue_baseline=True, 
+        ko.run_kinetic_optimization(enqueue_baseline=True, enqueue_knockouts=True, 
             objective='IRR', scenario_label='X', n_trials=1, seed=1,
             study_name='offline_bad_burden', results_dir=tempfile.mkdtemp(),
             handles=handles25, param_bounds_override=override25,
@@ -1268,7 +1268,7 @@ else:
         # storage, so the store holds 4 by the time the engine reads it;
         # a budget of n_trials25_before + 2 (5) is what makes the engine
         # run exactly that one already-queued trial (5 - 4 stored = 1).
-        study25r, csv25r, kb25r = ko.run_kinetic_optimization(enqueue_baseline=True, 
+        study25r, csv25r, kb25r = ko.run_kinetic_optimization(enqueue_baseline=True, enqueue_knockouts=True, 
             objective='IRR', scenario_label='X', n_trials=n_trials25_before + 2,
             seed=1, study_name=study25, results_dir=outdir25, handles=handles25,
             param_bounds_override=override25,
@@ -1294,7 +1294,7 @@ else:
     # burden off: no burden columns, k_7 written as sampled
     outdir25b = tempfile.mkdtemp()
     seen_k7.clear()
-    study25b_obj, csv25b, _ = ko.run_kinetic_optimization(enqueue_baseline=True, 
+    study25b_obj, csv25b, _ = ko.run_kinetic_optimization(enqueue_baseline=True, enqueue_knockouts=True, 
         objective='IRR', scenario_label='X', n_trials=1, seed=1,
         study_name='offline_no_burden', results_dir=outdir25b, handles=handles25,
         param_bounds_override=override25, rate_multiplier_bounds=(1e-5, 10.0),
@@ -1305,7 +1305,7 @@ else:
     # the engine's fallback name carries the suffix only when the burden is on
     assert os.path.isfile(os.path.join(outdir25b, 'offline_no_burden_trajectory.csv'))
     outdir25c = tempfile.mkdtemp()
-    _, csv25c, _ = ko.run_kinetic_optimization(enqueue_baseline=True, 
+    _, csv25c, _ = ko.run_kinetic_optimization(enqueue_baseline=True, enqueue_knockouts=True, 
         objective='IRR', scenario_label='X', n_trials=1, seed=1,
         results_dir=outdir25c, handles=handles25,
         param_bounds_override=override25, rate_multiplier_bounds=(1e-5, 10.0),
@@ -1418,10 +1418,11 @@ else:
                                                    'isobutanol': np.nan}})
     outdir27 = tempfile.mkdtemp()
     study27 = 'offline_knockouts'
-    # Default ON: trial 0 = baseline, trials 1-2 = the k_1e / k_7 probes
+    # Opted in (both enqueue defaults are OFF since 2026-09-07): trial 0 =
+    # baseline, trials 1-2 = the k_1e / k_7 probes
     # (k_13 sits at its floor -> no probe), trial 3 = the first sampled
     # point. The engine's own baseline point is what the probes copy.
-    st27, csv27, kb27_out = ko.run_kinetic_optimization(enqueue_baseline=True, 
+    st27, csv27, kb27_out = ko.run_kinetic_optimization(enqueue_baseline=True, enqueue_knockouts=True, 
         objective='IRR', scenario_label='X', n_trials=4, seed=1,
         study_name=study27, results_dir=outdir27, handles=_handles27(),
         param_bounds_override=override27, rate_multiplier_bounds=(0.1, 10.0),
@@ -1443,7 +1444,7 @@ else:
     assert [t.user_attrs.get('knockout_probe') for t in tr27] \
         == [None, 'k_1e', 'k_7', None]
     # Resume: no re-enqueue (nothing WAITING, no duplicate probes).
-    st27r, _, _ = ko.run_kinetic_optimization(enqueue_baseline=True, 
+    st27r, _, _ = ko.run_kinetic_optimization(enqueue_baseline=True, enqueue_knockouts=True, 
         objective='IRR', scenario_label='X', n_trials=5, seed=1,
         study_name=study27, results_dir=outdir27, handles=_handles27(),
         param_bounds_override=override27, rate_multiplier_bounds=(0.1, 10.0),
@@ -1461,7 +1462,7 @@ else:
     assert not np.isclose(df27b['k_1e'][1], 4.71) or not np.isclose(df27b['k_7'][1], 1.203)
     assert all(t.user_attrs.get('knockout_probe') is None for t in st27b.trials)
     _e27 = _inspect.signature(ko.run_kinetic_optimization).parameters
-    assert _e27['enqueue_knockouts'].default is True
+    assert _e27['enqueue_knockouts'].default is False   # off by default since 2026-09-07
 
 # Naming: the rate band is tagged _rb{lo}-{hi} WHENEVER it is given (the
 # preset's own band included -- since the default moved 1e-5x -> 1e-3x a
@@ -1497,7 +1498,8 @@ assert sup27['default_study_name']('A', 'IRR', 'B', rate_multiplier_bounds=(0.1,
 code27 = sup27['child_code'](None, 'IRR', 200, None, False, 'x',
                              study_target_products='ethanol_isobutanol',
                              study_type='metabolic',
-                             rate_multiplier_bounds=(0.1, 10.0))
+                             rate_multiplier_bounds=(0.1, 10.0),
+                             enqueue_knockouts=True)           # opt in (default off)
 assert 'enqueue_knockouts=True' in code27 and 'rate_multiplier_bounds=(0.1, 10.0)' in code27
 code27b = sup27['child_code'](None, 'IRR', 200, None, False, 'x',
                               study_target_products='ethanol_isobutanol',
@@ -1506,18 +1508,18 @@ code27b = sup27['child_code'](None, 'IRR', 200, None, False, 'x',
 # driver's engine_kwargs.setdefault of the preset band).
 assert 'enqueue_knockouts=False' in code27b and 'rate_multiplier_bounds' not in code27b
 _s27 = _inspect.signature(sup27['supervise']).parameters
-assert _s27['enqueue_knockouts'].default is True and _s27['rate_multiplier_bounds'].default is None
+assert _s27['enqueue_knockouts'].default is False and _s27['rate_multiplier_bounds'].default is None
 src27_sup = _inspect.getsource(sup27['supervise'])
 assert 'rate_multiplier_bounds=rate_multiplier_bounds' in src27_sup
 assert 'enqueue_knockouts=enqueue_knockouts' in src27_sup
 src27 = open(os.path.join(os.path.dirname(os.path.abspath(__file__)),
                           'optimize_kinetics_BO_supervised.py')).read()
-assert "'--no-enqueue-knockouts'" in src27 and "dest='enqueue_knockouts'" in src27
+assert "'--enqueue-knockouts'" in src27 and "dest='enqueue_knockouts'" in src27   # opt-in since 2026-09-07
 assert "'--rate-multiplier-bounds'" in src27 and 'nargs=2' in src27
 assert 'enqueue_knockouts=args.enqueue_knockouts' in src27
 drv27 = open(os.path.join(os.path.dirname(os.path.abspath(__file__)),
                           'optimize_kinetics_BO.py')).read()
-assert 'enqueue_knockouts=True,' in drv27                          # run() kwarg, default on
+assert 'enqueue_knockouts=False,' in drv27                          # run() kwarg, default off since 2026-09-07
 assert 'enqueue_knockouts=enqueue_knockouts' in drv27              # forwarded to the engine
 assert "rate_multiplier_bounds=engine_kwargs['rate_multiplier_bounds']" in drv27  # naming sees the EFFECTIVE band
 PASS('single-knockout probes: floor points per k_*, enqueued after trial 0 on a fresh study only, identifiable, off switch, _rb naming tag, driver/supervisor flags')
@@ -1661,7 +1663,7 @@ else:
                                           'MPSPs': {'ethanol': np.nan,
                                                     'isobutanol': np.nan}})
     outdir28 = tempfile.mkdtemp()
-    st28, csv28, _ = ko.run_kinetic_optimization(enqueue_baseline=True, 
+    st28, csv28, _ = ko.run_kinetic_optimization(enqueue_baseline=True, enqueue_knockouts=True, 
         objective='IRR', scenario_label='X', n_trials=30, seed=1,
         study_name='offline_role_bands', results_dir=outdir28,
         handles=handles28, multiplier_bounds=(0.1, 10.0),
@@ -2500,7 +2502,7 @@ else:
     _optuna.logging.set_verbosity(_optuna.logging.WARNING)
     # 4 trials: 0 = baseline, 1 = the k_1e knockout probe (stage_1_max_x
     # stays at the baseline), 2-3 = sampled.
-    study39_obj, csv39_out, kb39 = ko.run_kinetic_optimization(enqueue_baseline=True, 
+    study39_obj, csv39_out, kb39 = ko.run_kinetic_optimization(enqueue_baseline=True, enqueue_knockouts=True, 
         objective='IRR', scenario_label='X', n_trials=4, seed=1,
         study_name=study39, results_dir=outdir39, handles=handles39,
         print_status_every=1, burden_model=None,
@@ -2530,7 +2532,7 @@ else:
                       latest_TEA_solution={'IRR': np.nan,
                                            'MPSPs': {'ethanol': np.nan,
                                                      'isobutanol': np.nan}})
-    _, csv39b, _ = ko.run_kinetic_optimization(enqueue_baseline=True, 
+    _, csv39b, _ = ko.run_kinetic_optimization(enqueue_baseline=True, enqueue_knockouts=True, 
         objective='IRR', scenario_label='X', n_trials=2, seed=1,
         study_name=study39 + '_off', results_dir=outdir39b, handles=handles39b,
         print_status_every=1, burden_model=None)
@@ -2694,7 +2696,7 @@ else:
                                 'MPSPs': {'ethanol': np.nan,
                                           'isobutanol': np.nan}}}
     _optuna.logging.set_verbosity(_optuna.logging.WARNING)
-    study41, csv41, _ = ko.run_kinetic_optimization(enqueue_baseline=True, 
+    study41, csv41, _ = ko.run_kinetic_optimization(enqueue_baseline=True, enqueue_knockouts=True, 
         objective='IRR', scenario_label='X', n_trials=3, seed=1,
         study_name='offline_seeded', results_dir=outdir41, handles=handles41,
         print_status_every=1, burden_model=None,
@@ -2711,7 +2713,7 @@ else:
     assert 'seed' not in study41.trials[1].user_attrs
     # Resume (one more trial): seeds are NOT re-enqueued -- trial 3 is a
     # sampled point without the attr.
-    study41b, _, _ = ko.run_kinetic_optimization(enqueue_baseline=True, 
+    study41b, _, _ = ko.run_kinetic_optimization(enqueue_baseline=True, enqueue_knockouts=True, 
         objective='IRR', scenario_label='X', n_trials=4, seed=1,
         study_name='offline_seeded', results_dir=outdir41, handles=handles41,
         print_status_every=1, burden_model=None,
@@ -2722,7 +2724,7 @@ else:
     assert ko.load_trajectory(csv41)['k_1e'][3] != 100.0
     # A bad donor fails BEFORE the store is opened (no .db / CSV created).
     try:
-        ko.run_kinetic_optimization(enqueue_baseline=True, 
+        ko.run_kinetic_optimization(enqueue_baseline=True, enqueue_knockouts=True, 
             objective='IRR', scenario_label='X', n_trials=3, seed=1,
             study_name='offline_seeded_bad', results_dir=outdir41,
             handles=handles41, burden_model=None,
@@ -3181,7 +3183,7 @@ else:
     groups44 = {'inhib_ethanol': ['k_1ie', 'k_4ie']}
     _optuna.logging.set_verbosity(_optuna.logging.WARNING)
     # 3 trials: 0 = baseline (multiplier 1.0), 1 = the k_1e probe, 2 = sampled.
-    study44_obj, csv44_out, kb44 = ko.run_kinetic_optimization(enqueue_baseline=True, 
+    study44_obj, csv44_out, kb44 = ko.run_kinetic_optimization(enqueue_baseline=True, enqueue_knockouts=True, 
         objective='IRR', scenario_label='X', n_trials=3, seed=1,
         study_name=study44, results_dir=outdir44, handles=handles44,
         print_status_every=1, burden_model=None,
@@ -3338,7 +3340,7 @@ else:
     # would inflate seen_evaluate with calls unrelated to _objective; off
     # here isolates the one evaluate()/apply() pair per trial this check
     # targets (the objective's own hook, unconditionally exercised either way).
-    study44g_obj, csv44g_out, kb44g = ko.run_kinetic_optimization(enqueue_baseline=True, 
+    study44g_obj, csv44g_out, kb44g = ko.run_kinetic_optimization(enqueue_baseline=True, enqueue_knockouts=True, 
         objective='IRR', scenario_label='X', n_trials=3, seed=1,
         study_name=study44g, results_dir=outdir44g, handles=handles44g,
         print_status_every=1, burden_model=burden44g, feasible_sampling=False,
@@ -3654,6 +3656,7 @@ PASS('metabolic_minimal_subset preset: explicit constants in __all__, empty role
 # enqueue_knockouts; not part of any study name; resumes unaffected.
 _e46 = _inspect.signature(ko.run_kinetic_optimization).parameters
 assert 'enqueue_baseline' in _e46 and _e46['enqueue_baseline'].default is False
+assert _e46['enqueue_knockouts'].default is False      # both enqueue flags off by default
 _src46_eng = _inspect.getsource(ko.run_kinetic_optimization)
 assert 'if enqueue_baseline:' in _src46_eng
 assert 'baseline_point = baseline_decision_point(' in _src46_eng
@@ -3662,6 +3665,7 @@ assert 'enqueue_baseline' not in _inspect.getsource(ko.default_study_name)
 drv46 = open(os.path.join(os.path.dirname(os.path.abspath(__file__)),
                           'optimize_kinetics_BO.py')).read()
 assert 'enqueue_baseline=False,' in drv46
+assert 'enqueue_knockouts=False,' in drv46
 assert 'enqueue_baseline=enqueue_baseline,' in drv46
 # Supervisor: supervise()/child_code() accept it (default False); child_code
 # forwards it both ways into the child program; the opt-in
@@ -3672,6 +3676,8 @@ sup46 = _runpy.run_path(os.path.join(
     'optimize_kinetics_BO_supervised.py'))
 assert _inspect.signature(sup46['supervise']).parameters['enqueue_baseline'].default is False
 assert _inspect.signature(sup46['child_code']).parameters['enqueue_baseline'].default is False
+assert _inspect.signature(sup46['supervise']).parameters['enqueue_knockouts'].default is False
+assert _inspect.signature(sup46['child_code']).parameters['enqueue_knockouts'].default is False
 code46 = sup46['child_code'](None, 'IRR', 2000, None, False, 'x',
                              study_target_products='ethanol_isobutanol',
                              study_type='metabolic_minimal_subset',
@@ -3680,11 +3686,12 @@ assert 'enqueue_baseline=True' in code46
 code46b = sup46['child_code'](None, 'IRR', 2000, None, False, 'x',
                               study_target_products='ethanol_isobutanol',
                               study_type='metabolic_minimal_subset')
-assert 'enqueue_baseline=False' in code46b          # the default: no baseline
+assert 'enqueue_baseline=False' in code46b and 'enqueue_knockouts=False' in code46b   # the defaults: no baseline, no probes
 src46_sup = open(os.path.join(os.path.dirname(os.path.abspath(__file__)),
                               'optimize_kinetics_BO_supervised.py')).read()
 assert "'--enqueue-baseline'" in src46_sup and "dest='enqueue_baseline'" in src46_sup
 assert "'--no-enqueue-baseline'" not in src46_sup    # the old opt-out is gone
+assert "'--enqueue-knockouts'" in src46_sup and "'--no-enqueue-knockouts'" not in src46_sup
 assert 'enqueue_baseline=args.enqueue_baseline' in src46_sup
 assert 'enqueue_baseline=enqueue_baseline' in _inspect.getsource(sup46['supervise'])
 # Engine-level, with the real engine on fake handles (check-23 pattern):
@@ -3707,8 +3714,8 @@ if _optuna is not None:
         objective='IRR', scenario_label='X', n_trials=1, seed=1,
         study_name='offline_no_baseline_default',
         results_dir=tempfile.mkdtemp(), handles=handles46,
-        enqueue_knockouts=False, print_status_every=1,
-        burden_model=None)                    # default enqueue_baseline=False
+        print_status_every=1,
+        burden_model=None)    # PURE defaults: enqueue_baseline=False, enqueue_knockouts=False
     assert 'fixed_params' not in study46.trials[0].system_attrs   # sampled, not enqueued
     assert not np.isclose(study46.trials[0].params['k_1e'], 47.1)
     study46b, _, _ = ko.run_kinetic_optimization(
@@ -3721,6 +3728,6 @@ if _optuna is not None:
     assert np.isclose(study46b.trials[0].params['k_1e'], 47.1)
 else:
     print('SKIP 46 (engine part): optuna not installed')
-PASS('enqueue_baseline flag: engine kwarg default FALSE (no enqueued baseline for all studies) gates the trial-0 baseline enqueue -- a default fresh study has no fixed_params on trial 0, opt-in restores the enqueued baseline; driver run() and supervisor supervise()/child_code() thread it; opt-in --enqueue-baseline; off study name')
+PASS('enqueue_baseline + enqueue_knockouts: BOTH default FALSE for all studies (a default fresh study enqueues NO point: pure-defaults engine run has no fixed_params on trial 0; opt-in restores the enqueued baseline); driver run() and supervisor supervise()/child_code() thread both; opt-in --enqueue-baseline / --enqueue-knockouts, the --no-* opt-outs gone; off study name')
 
 print(f'\nALL {n_pass} CHECKS PASSED')
