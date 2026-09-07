@@ -86,11 +86,16 @@ _spec = importlib.util.spec_from_file_location(
 ko = importlib.util.module_from_spec(_spec)
 _spec.loader.exec_module(ko)
 
+#: "Leave stage_1_max_x_bounds to the preset" marker: distinguishes an
+#: omitted --stage-1-max-x-bounds (the preset's band, kwarg not forwarded
+#: to the driver) from a bare flag (None = pin at the baseline, forwarded).
+_UNSET = object()
+
 
 def default_study_name(scenario, objective, kinetic_bounds_scenario,
                        study_target_products=None, study_type=None,
                        burden=False, rate_multiplier_bounds=None,
-                       exclude_params=None):
+                       exclude_params=None, stage_1_max_x_bounds=_UNSET):
     """Mirror the driver's stable study naming (resume finds the same
     study): the preset convention
     kin_opt_{study_target_products}_{study_type}_{slug} whenever a
@@ -117,7 +122,11 @@ def default_study_name(scenario, objective, kinetic_bounds_scenario,
     nothing excluded) is tagged after `_ib` whenever the effective set is
     non-empty (`_xk10`; ko.excluded_parameters_tag): an exclusion drops a
     CSV column, and the tag keeps the default name off the studies that
-    still sampled k_10 (e.g. the 2026-09-06 production study)."""
+    still sampled k_10 (e.g. the 2026-09-06 production study).
+    `stage_1_max_x_bounds` (_UNSET = the presets'
+    ko.DEFAULT_STAGE_1_MAX_X_BOUNDS, which the driver defaults in; None =
+    pinned, no tag; a tuple = an explicit band) is tagged `_s1x{lo}-{hi}`
+    after the exclusion tag (ko.default_study_name)."""
     if study_target_products is not None:
         return ko.default_study_name(objective, study_target_products,
                                      study_type, scenario=scenario,
@@ -132,7 +141,12 @@ def default_study_name(scenario, objective, kinetic_bounds_scenario,
                                      exclude_params=(
                                          ko.DEFAULT_EXCLUDED_PARAMETERS
                                          if exclude_params is None
-                                         else tuple(exclude_params)))
+                                         else tuple(exclude_params)),
+                                     stage_1_max_x_bounds=(
+                                         ko.DEFAULT_STAGE_1_MAX_X_BOUNDS
+                                         if stage_1_max_x_bounds is _UNSET
+                                         else (None if stage_1_max_x_bounds is None
+                                               else tuple(stage_1_max_x_bounds))))
     scenario = scenario or 'B'
     slug = objective.lower().replace(' ', '_')
     suffix = ko.BURDEN_STUDY_SUFFIX if burden else ''
@@ -191,7 +205,8 @@ def child_code(scenario, objective, n_trials, kinetic_bounds_scenario,
                seed=3221, study_target_products=None, study_type=None,
                burden=True, enqueue_knockouts=True,
                rate_multiplier_bounds=None, n_startup_trials=None,
-               feasible_sampling=True, exclude_params=None):
+               feasible_sampling=True, exclude_params=None,
+               stage_1_max_x_bounds=_UNSET):
     """The -c program for one supervised attempt of the driver.
     `study_target_products=None` selects the driver's legacy flag path.
     `rate_multiplier_bounds=None` leaves the k_* band to the preset (the
@@ -202,13 +217,20 @@ def child_code(scenario, objective, n_trials, kinetic_bounds_scenario,
     sampler flag, always forwarded explicitly. `exclude_params=None`
     leaves the exclusion set to the preset (ko.DEFAULT_EXCLUDED_PARAMETERS,
     k_10; the kwarg is omitted); a tuple -- () included, which re-includes
-    k_10 -- is forwarded."""
+    k_10 -- is forwarded. `stage_1_max_x_bounds=_UNSET` leaves the
+    operating variable's band to the preset (the kwarg is omitted); None
+    (pin at the baseline) or a tuple is forwarded."""
     rate_kw = ('' if rate_multiplier_bounds is None else
                f'          rate_multiplier_bounds={tuple(rate_multiplier_bounds)!r},\n')
     startup_kw = ('' if n_startup_trials is None else
                   f'          n_startup_trials={int(n_startup_trials)!r},\n')
     exclude_kw = ('' if exclude_params is None else
                   f'          exclude_params={tuple(exclude_params)!r},\n')
+    s1x_value = (None if stage_1_max_x_bounds is None
+                 else None if stage_1_max_x_bounds is _UNSET
+                 else tuple(stage_1_max_x_bounds))
+    s1x_kw = ('' if stage_1_max_x_bounds is _UNSET else
+              f'          stage_1_max_x_bounds={s1x_value!r},\n')
     return (
         'import runpy\n'
         f'ns = runpy.run_path({DRIVER!r})\n'
@@ -227,6 +249,7 @@ def child_code(scenario, objective, n_trials, kinetic_bounds_scenario,
         f'{rate_kw}'
         f'{startup_kw}'
         f'{exclude_kw}'
+        f'{s1x_kw}'
         f'          )\n')
 
 
@@ -239,7 +262,8 @@ def supervise(scenario=None, objective='IRR', n_trials=2000,
               study_type=ko.DEFAULT_STUDY_TYPE, burden=True,
               enqueue_knockouts=True, rate_multiplier_bounds=None,
               n_startup_trials=None, max_empty_attempts=5,
-              feasible_sampling=True, exclude_params=None):
+              feasible_sampling=True, exclude_params=None,
+              stage_1_max_x_bounds=_UNSET):
     """Run attempts until 'complete' or 'abort'; returns the final
     outcome string ('complete' or 'abort'). `study_target_products` /
     `study_type` name the driver's study preset (defaults = the engine's;
@@ -275,14 +299,19 @@ def supervise(scenario=None, objective='IRR', n_trials=2000,
     feasibility-aware sampler flag (with the burden on, start-up draws
     and TPE candidates are checked against the burden cap before they
     are proposed, so no sampled trial is INFEASIBLE); forwarded on
-    every attempt, never part of the study name."""
+    every attempt, never part of the study name. `stage_1_max_x_bounds`
+    (_UNSET = the preset's (1, 50) g/L band; None = pin at the baseline,
+    --stage-1-max-x-bounds bare; a tuple = explicit LO HI) is the
+    operating variable's band, forwarded to the driver only when given
+    and tagged `_s1x{lo}-{hi}` into the derived study name."""
     if study_name is None:
         study_name = default_study_name(scenario, objective,
                                         kinetic_bounds_scenario,
                                         study_target_products=study_target_products,
                                         study_type=study_type, burden=burden,
                                         rate_multiplier_bounds=rate_multiplier_bounds,
-                                        exclude_params=exclude_params)
+                                        exclude_params=exclude_params,
+                                        stage_1_max_x_bounds=stage_1_max_x_bounds)
     csv_path = os.path.join(RESULTS_DIR, study_name + '_trajectory.csv')
     inflight_path = ko.inflight_path_for(RESULTS_DIR, study_name)
     if python is None:
@@ -299,7 +328,8 @@ def supervise(scenario=None, objective='IRR', n_trials=2000,
                       rate_multiplier_bounds=rate_multiplier_bounds,
                       n_startup_trials=n_startup_trials,
                       feasible_sampling=feasible_sampling,
-                      exclude_params=exclude_params)
+                      exclude_params=exclude_params,
+                      stage_1_max_x_bounds=stage_1_max_x_bounds)
     guard = ko.StallGuard(stall_timeout_s=60.0*stall_timeout_min)
 
     def event(msg):
@@ -323,6 +353,7 @@ def supervise(scenario=None, objective='IRR', n_trials=2000,
           f'n_startup_trials={n_startup_trials!r}, '
           f'rate_multiplier_bounds={rate_multiplier_bounds!r}, '
           f'exclude_params={exclude_params!r}, '
+          f'stage_1_max_x_bounds={stage_1_max_x_bounds!r}, '
           f'stall_timeout_min={stall_timeout_min:g}, '
           f'max_empty_attempts={max_empty_attempts!r}')
     attempt = 0
@@ -535,10 +566,30 @@ if __name__ == '__main__':
                              'proposed 379 of 1260 trials over the cap). '
                              'Meaningless with --no-burden. Not part of '
                              'the study name, so a resume may change it')
+    parser.add_argument('--stage-1-max-x-bounds', nargs='*', type=float,
+                        default=None, metavar='G_PER_L',
+                        help='band of the operating variable stage_1_max_x '
+                             '(the aerobic stage-1 biomass cutoff, g/L, '
+                             'log-scale; V406.stage_1_max_x, baseline 5): '
+                             "omitted = the preset's 1 50; LO HI = an "
+                             'explicit band; bare = pin it at the baseline '
+                             '(not sampled, no tag). The effective band is '
+                             'tagged _s1x{LO}-{HI} into the derived study '
+                             'name -- a new decision column, so a study '
+                             'with it never resumes one without it')
     args = parser.parse_args()
     if not args.restrict_to_workbook and not args.legacy_flags:
         parser.error('--no-restrict-to-workbook requires --legacy-flags '
                      '(presets always use the workbook set)')
+    if args.stage_1_max_x_bounds is None:
+        stage_1_max_x_bounds = _UNSET
+    elif len(args.stage_1_max_x_bounds) == 0:
+        stage_1_max_x_bounds = None
+    elif len(args.stage_1_max_x_bounds) == 2:
+        stage_1_max_x_bounds = tuple(args.stage_1_max_x_bounds)
+    else:
+        parser.error('--stage-1-max-x-bounds takes LO HI (two numbers) or '
+                     'nothing (pin at the baseline)')
     outcome = supervise(scenario=args.scenario, objective=args.objective,
                         n_trials=args.n_trials,
                         kinetic_bounds_scenario=args.kinetic_bounds_scenario,
@@ -560,5 +611,6 @@ if __name__ == '__main__':
                         max_empty_attempts=args.max_empty_attempts,
                         feasible_sampling=args.feasible_sampling,
                         exclude_params=(None if args.exclude_params is None
-                                        else tuple(args.exclude_params)))
+                                        else tuple(args.exclude_params)),
+                        stage_1_max_x_bounds=stage_1_max_x_bounds)
     sys.exit(0 if outcome == 'complete' else 1)

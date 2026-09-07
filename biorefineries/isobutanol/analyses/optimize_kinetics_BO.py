@@ -260,7 +260,25 @@ def run(scenario=None,  # 'A' or 'B'; None = the preset's start scenario
     in-objective guard stays as the safety net and the engine prints the
     rejection counters at the end. Meaningless with burden=False. A
     sampler setting: same columns, no study-name tag, so the production
-    study resumes under it (supervisor --no-feasible-sampling)."""
+    study resumes under it (supervisor --no-feasible-sampling).
+
+    STAGE-1 CUTOFF (`stage_1_max_x_bounds`, an engine kwarg defaulted
+    from the preset since 2026-09-06 pm). Every preset samples the
+    fermentor's aerobic stage-1 biomass cutoff V406.stage_1_max_x
+    (ko.OPERATING_VARIABLES) log-scale on ko.DEFAULT_STAGE_1_MAX_X_BOUNDS
+    = (1.0, 50.0) g/L (baseline 5.0 g/L, the nskinetics factory default;
+    stage 1 also ends at stage_1_max_time = 25 h, whichever fires first).
+    The engine sets the V406 property -- which mirrors onto the kinetic
+    model and the aeration spec -- before every simulation and restores
+    it in its finally; no knockout probe (not a rate constant). Pass
+    run(stage_1_max_x_bounds=None) to pin it at the baseline (the
+    variable is then absent and the name carries no tag, so an older
+    study resumes as before) or an explicit (lo, hi). The effective band
+    is tagged `_s1x{lo}-{hi}` into the derived study name (a new decision
+    COLUMN: the header guard refuses to resume a study without it, and
+    the tag is what lets the default name launch next to the existing
+    `..._xk10_burden` studies). Legacy path (study_target_products=None):
+    not sampled unless passed explicitly."""
     if 'burden_model' in engine_kwargs:
         raise ValueError("pass burden=True/False to run(), not the engine's "
                          'burden_model (run() builds it so the reports can '
@@ -281,7 +299,7 @@ def run(scenario=None,  # 'A' or 'B'; None = the preset's start scenario
             kinetic_bounds_scenario = preset['kinetic_bounds_scenario']
         for key in ('include_params', 'exclude_params', 'multiplier_bounds',
                     'rate_multiplier_bounds', 'rate_params',
-                    'parameter_multiplier_bounds'):
+                    'parameter_multiplier_bounds', 'stage_1_max_x_bounds'):
             engine_kwargs.setdefault(key, preset[key])
         if study_name is None:
             study_name = ko.default_study_name(
@@ -301,7 +319,11 @@ def run(scenario=None,  # 'A' or 'B'; None = the preset's start scenario
                 # DEFAULT_EXCLUDED_PARAMETERS): an excluded name is a
                 # missing CSV column, so the tag keeps the default name
                 # off the studies that still sampled it.
-                exclude_params=engine_kwargs['exclude_params'])
+                exclude_params=engine_kwargs['exclude_params'],
+                # The operating variable's band (the preset's, an explicit
+                # one, or None = pinned -> no tag): a new column, tagged
+                # so the default name launches next to the older studies.
+                stage_1_max_x_bounds=engine_kwargs['stage_1_max_x_bounds'])
         excluded = tuple(engine_kwargs['exclude_params'] or ())
         effective = [n for n in engine_kwargs['include_params']
                      if n not in excluded]
@@ -318,7 +340,13 @@ def run(scenario=None,  # 'A' or 'B'; None = the preset's start scenario
               f'{len(effective) - n_rate} (inhibition '
               f'coefficients, K_* terms) {engine_kwargs["multiplier_bounds"]}; '
               'per-parameter bands '
-              f'{engine_kwargs["parameter_multiplier_bounds"] or "none"}.')
+              f'{engine_kwargs["parameter_multiplier_bounds"] or "none"}; '
+              'operating variable stage_1_max_x (aerobic stage-1 biomass '
+              'cutoff, log-scale, g/L) '
+              + ('pinned at the baseline'
+                 if engine_kwargs['stage_1_max_x_bounds'] is None else
+                 f'on {tuple(engine_kwargs["stage_1_max_x_bounds"])}')
+              + '.')
     elif scenario is None:
         scenario = 'B'  # legacy default
     param_set_scenario = kinetic_bounds_scenario or scenario
