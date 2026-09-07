@@ -39,6 +39,21 @@ feeding/operating variables with the spike feed pinned at the baseline
 600 g/L (no spike_delta column) -- 24 / 19 decision variables; name
 kin_opt_ethanol_isobutanol_metabolic_minimal_irr_rb0.001-10_ib0.2-2_xk10+k7+k8_s1x1-50_burden.
 
+study_type='metabolic_minimal_subset' (2026-09-07) is a STANDALONE
+explicit set, not derived from metabolic_minimal: 9 listed rate
+constants (k_1l, k_1h, k_1e, k_3, k_6, k_13, k_14, k_15, k_16;
+ko.METABOLIC_MINIMAL_SUBSET_RATES) on the rate band, the three
+inhibition-effector multipliers (ko.METABOLIC_MINIMAL_SUBSET_GROUPS,
+0.2x-2x) and the three feeding variables threshold_conc / target_delta
+/ max_n_spikes, with BOTH the spike feed and stage_1_max_x pinned at
+the baseline (no spike_delta / stage_1_max_x column) -- 15 decision
+variables for ethanol_isobutanol, 10 for ethanol_only (the listed set
+intersected with the A workbook: no k_13-k_16, no isobutanol
+coefficients); nothing excluded (the other rates and every K_* stay at
+the baseline with no probe); name
+kin_opt_ethanol_isobutanol_metabolic_minimal_subset_irr_rb0.001-10_ib0.2-2_burden
+(no _x / _s1x tag).
+
 The enzyme-burden (proteome-allocation) constraint of enzyme_burden.py
 is ON by default (burden=True): sampled capacities are charged to the
 cell's flexible protein sector, growth (k_7/k_8) is derated linearly as
@@ -63,6 +78,9 @@ Runner pattern (fresh kernel, one process):
     # compact 24-variable space (rates minus k_10/k_7/k_8 + 3 effector
     # multipliers + 4 feeding/operating; spike pinned)
     study, csv_path = ns['run'](objective='IRR', study_type='metabolic_minimal')
+    # standalone 15-variable set (9 listed rates + 3 effector multipliers
+    # + 3 feeding; spike AND stage_1_max_x pinned; no _x / _s1x tag)
+    study, csv_path = ns['run'](objective='IRR', study_type='metabolic_minimal_subset')
     # legacy: resume a pre-2026-09-04 study under its old name/space
     study, csv_path = ns['run'](scenario='A', kinetic_bounds_scenario='B',
                                 study_target_products=None)
@@ -140,6 +158,7 @@ def run(scenario=None,  # 'A' or 'B'; None = the preset's start scenario
         # 'ethanol_only' | 'ethanol_isobutanol' | None (= legacy path)
         study_type=ko.DEFAULT_STUDY_TYPE,
         # 'metabolic' | 'metabolic_protein' | 'metabolic_minimal'
+        # | 'metabolic_minimal_subset'
         burden=True,  # enzyme-burden (proteome-allocation) constraint,
         # enzyme_burden.py: default ON (study name + '_burden'); False =
         # legacy burden-free study (older studies). Do not pass the
@@ -188,6 +207,12 @@ def run(scenario=None,  # 'A' or 'B'; None = the preset's start scenario
     columns) and no K_* terms, spike pinned (spike_delta_bounds=None);
     run(parameter_groups=..., group_multiplier_bounds=...,
     spike_delta_bounds=...) override the preset's like the other keys.
+    'metabolic_minimal_subset' the standalone explicit 15-variable set
+    (ko.METABOLIC_MINIMAL_SUBSET_RATES / _GROUPS intersected with the
+    workbook; 10 for ethanol_only), no exclusions, spike and
+    stage_1_max_x pinned (the preset's stage_1_max_x_bounds=None; an
+    explicit run(stage_1_max_x_bounds=(lo, hi)) re-samples it and tags
+    `_s1x`).
     Bands (log-scale, x baseline)
     by nskinetics ROLE since 2026-09-06: rate constants (role capacity;
     the preset's `rate_params`, ko.rate_constant_names) [1e-3x, 10x]

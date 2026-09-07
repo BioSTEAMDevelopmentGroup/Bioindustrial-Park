@@ -65,6 +65,11 @@ sequentially) -- ask-first, like the unsupervised driver. Examples:
     # inhibition effector, spike pinned (name ..._ib0.2-2_xk10+k7+k8_...):
     python optimize_kinetics_BO_supervised.py --objective IRR \\
         --study-type metabolic_minimal
+    # standalone 15-variable set: 9 listed rates + 3 effector multipliers
+    # + 3 feeding, spike and stage_1_max_x pinned (name
+    # ..._metabolic_minimal_subset_irr_rb0.001-10_ib0.2-2_burden):
+    python optimize_kinetics_BO_supervised.py --objective IRR \\
+        --study-type metabolic_minimal_subset
     # resume a pre-2026-09-04 study under its old flags and name:
     python optimize_kinetics_BO_supervised.py --legacy-flags --scenario A \\
         --kinetic-bounds-scenario B --objective IRR --n-trials 2000
@@ -508,7 +513,14 @@ if __name__ == '__main__':
                              'multiplier per inhibition-effector family '
                              '(inhib_ethanol/isobutanol/acetate), no K_* '
                              'terms, spike feed pinned at the baseline '
-                             '(24 variables; name tags _ib0.2-2_xk10+k7+k8)')
+                             '(24 variables; name tags _ib0.2-2_xk10+k7+k8); '
+                             'metabolic_minimal_subset = the standalone '
+                             'explicit set: 9 listed rates (k_1l, k_1h, '
+                             'k_1e, k_3, k_6, k_13-k_16) + the 3 effector '
+                             'multipliers + 3 feeding variables, spike AND '
+                             'stage_1_max_x pinned, nothing excluded (15 '
+                             'variables; 10 for ethanol_only; tags _ib0.2-2 '
+                             'only)')
     parser.add_argument('--legacy-flags', action='store_true',
                         help='ignore the presets: --scenario (default B) / '
                              '--kinetic-bounds-scenario / single 0.1x-10x '
@@ -631,7 +643,8 @@ if __name__ == '__main__':
                         help='band of the operating variable stage_1_max_x '
                              '(the aerobic stage-1 biomass cutoff, g/L, '
                              'log-scale; V406.stage_1_max_x, baseline 5): '
-                             "omitted = the preset's 1 50; LO HI = an "
+                             "omitted = the preset's 1 50 (pinned for "
+                             'metabolic_minimal_subset); LO HI = an '
                              'explicit band; bare = pin it at the baseline '
                              '(not sampled, no tag). The effective band is '
                              'tagged _s1x{LO}-{HI} into the derived study '

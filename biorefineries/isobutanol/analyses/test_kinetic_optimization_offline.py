@@ -3636,6 +3636,14 @@ if os.path.isfile(wb_A) and os.path.isfile(wb_B):
     assert _driver_name43('ethanol_isobutanol', 'metabolic_minimal_subset') == NAME45
 else:
     print('SKIP 45 (space part): parameter-distribution workbooks not found')
+# Driver: no logic change (every returned key is already setdefault'ed,
+# the print reports both pins); its docstring and runner example name
+# the type. Supervisor: help text names it.
+drv45 = open(os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                          'optimize_kinetics_BO.py')).read()
+assert "ns['run'](objective='IRR', study_type='metabolic_minimal_subset')" in drv45
+assert "'metabolic_minimal_subset'" in drv45 and 'standalone' in drv45.lower()
+assert 'metabolic_minimal_subset = ' in src43_sup          # --study-type help text
 PASS('metabolic_minimal_subset preset: explicit constants in __all__, empty role entry, options entry with the new stage_1_max_x_bounds key, name defaults (group band, no exclusions, stage_1_max_x pinned; older types keep (1, 50))')
 
 print(f'\nALL {n_pass} CHECKS PASSED')
