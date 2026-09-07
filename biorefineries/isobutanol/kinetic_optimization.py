@@ -65,6 +65,7 @@ __all__ = ('OBJECTIVE_REGISTRY', 'TRACKED_METRICS',
            'rate_constant_names',
            'STUDY_TARGET_PRODUCTS', 'STUDY_TYPE_ROLES',
            'STUDY_TYPE_OPTIONS', 'EFFECTOR_ORDER',
+           'METABOLIC_MINIMAL_SUBSET_RATES', 'METABOLIC_MINIMAL_SUBSET_GROUPS',
            'kinetic_parameter_effectors', 'study_type_name_defaults',
            'DEFAULT_STUDY_TARGET_PRODUCTS', 'DEFAULT_STUDY_TYPE',
            'resolve_study_preset', 'default_study_name',
@@ -1024,11 +1025,49 @@ STUDY_TYPE_ROLES = {
     # substrate-regulation terms, with the inhibition coefficients
     # sampled as ONE multiplier per effector family (STUDY_TYPE_OPTIONS).
     'metabolic_minimal': ('capacity', 'product_inhibition', 'lethality'),
+    # 'metabolic_minimal_subset' (2026-09-07): NO role filter -- the set
+    # is listed outright (METABOLIC_MINIMAL_SUBSET_RATES / _GROUPS via
+    # STUDY_TYPE_OPTIONS; the empty tuple would otherwise select no
+    # rows, so it cannot be mistaken for a role-filtered type). The
+    # table stays the registry of valid study_type values.
+    'metabolic_minimal_subset': (),
+}
+
+#: The STANDALONE metabolic_minimal_subset preset (2026-09-07): its
+#: variables are listed outright here, NOT derived from metabolic_minimal
+#: (every one of them also appears there, but nothing in the code relates
+#: the two). The rate constants, in this order, each on the rate band
+#: (DEFAULT_RATE_MULTIPLIER_BOUNDS); resolve_study_preset intersects the
+#: list with the target's workbook (ethanol_only lacks k_13-k_16).
+METABOLIC_MINIMAL_SUBSET_RATES = ('k_1l', 'k_1h', 'k_1e', 'k_3', 'k_6',
+                                  'k_13', 'k_14', 'k_15', 'k_16')
+#: Its inhibition-effector groups: ONE log multiplier per group on
+#: (0.2, 2.0) x every member's LIVE baseline (expand_grouped_values),
+#: group and member order as written; a member absent from the target's
+#: workbook is dropped and an emptied group omitted (ethanol_only has no
+#: isobutanol coefficients). The rest of the definition: the three
+#: feeding variables threshold_conc / target_delta / max_n_spikes on the
+#: engine's default bands; the spike feed (spike_delta_bounds=None,
+#: 600 g/L) and the aerobic stage-1 cutoff (stage_1_max_x_bounds=None,
+#: 5.0 g/L) PINNED at the scenario baseline (k_2, k_4,
+#: k_5, k_5e, k_7, k_8, k_9, k_9e, k_9c, k_10, k_11 and every K_* term
+#: are simply not in the set -- baseline values, no knockout probe).
+METABOLIC_MINIMAL_SUBSET_GROUPS = {
+    'inhib_ethanol':    ('k_1ie', 'k_4ie', 'k_7ie', 'k_10ie', 'k_16ie'),
+    'inhib_isobutanol': ('k_1ii', 'k_4ii', 'k_6ii', 'k_7ii', 'k_10ii'),
+    'inhib_acetate':    ('k_1ia', 'k_4ia', 'k_6ia', 'k_7ia', 'k_10ia', 'k_16ia'),
 }
 
 #: Per-study_type options beyond the role filter (a type absent here
 #: takes the defaults: DEFAULT_EXCLUDED_PARAMETERS, no groups,
-#: DEFAULT_GROUP_MULTIPLIER_BOUNDS, DEFAULT_SPIKE_DELTA_BOUNDS).
+#: DEFAULT_GROUP_MULTIPLIER_BOUNDS, DEFAULT_SPIKE_DELTA_BOUNDS,
+#: DEFAULT_STAGE_1_MAX_X_BOUNDS). Keys: exclude_params, group_roles (the
+#: roles grouped by effector), group_multiplier_bounds, spike_delta_bounds
+#: (None = pinned), stage_1_max_x_bounds (None = pinned; since the
+#: metabolic_minimal_subset preset -- honoured for every type), and the
+#: EXPLICIT-definition pair rate_params + parameter_groups (present =
+#: the set is listed outright and intersected with the workbook;
+#: group_roles absent).
 #: 'metabolic_minimal' = the compact, interpretable space (24 variables
 #: for ethanol_isobutanol, 19 for ethanol_only): exclude_params = k_10
 #: (decay, as everywhere) + k_7 and k_8 (the growth capacities, so the
@@ -1048,6 +1087,21 @@ STUDY_TYPE_OPTIONS = {
         group_multiplier_bounds=(0.2, 2.0),
         spike_delta_bounds=None,
     ),
+    # The standalone explicit set (METABOLIC_MINIMAL_SUBSET_*): 9 rates +
+    # 3 groups + 3 feeding variables = 15 for ethanol_isobutanol (10 for
+    # ethanol_only after the workbook intersection); no exclusions, spike
+    # and stage_1_max_x pinned; default name
+    # kin_opt_ethanol_isobutanol_metabolic_minimal_subset_irr_rb0.001-10_ib0.2-2_burden
+    # (no _x / _s1x tag). Its column set differs from every other study's,
+    # so the CSV header guard refuses any cross-resume regardless.
+    'metabolic_minimal_subset': dict(
+        rate_params=METABOLIC_MINIMAL_SUBSET_RATES,
+        parameter_groups=METABOLIC_MINIMAL_SUBSET_GROUPS,
+        group_multiplier_bounds=(0.2, 2.0),
+        exclude_params=(),
+        spike_delta_bounds=None,
+        stage_1_max_x_bounds=None,
+    ),
 }
 #: Order of the effector groups of a grouped preset (group name
 #: `inhib_{effector}`); effectors with no rows in the workbook set are
@@ -1056,24 +1110,32 @@ EFFECTOR_ORDER = ('ethanol', 'isobutanol', 'acetate')
 
 def study_type_name_defaults(study_type):
     """The per-study_type defaults that ENTER THE STUDY NAME, as
-    dict(inhibition_multiplier_bounds=(lo, hi), exclude_params=(names)):
-    the STUDY_TYPE_OPTIONS entry's group_multiplier_bounds and
-    exclude_params when the type has one (metabolic_minimal: (0.2, 2.0)
-    and ('k_10', 'k_7', 'k_8')), else DEFAULT_SATURATION_MULTIPLIER_BOUNDS
-    and DEFAULT_EXCLUDED_PARAMETERS. resolve_study_preset builds its
-    multiplier_bounds / exclude_params from here and the supervisor's
-    default_study_name reads its `_ib` / `_x` tags from here, so the
-    two names can never drift (the supervisor's stall watchdog counts
-    rows of the name IT derives). Unknown study_type: ValueError."""
+    dict(inhibition_multiplier_bounds=(lo, hi), exclude_params=(names),
+    stage_1_max_x_bounds=(lo, hi) or None):
+    the STUDY_TYPE_OPTIONS entry's group_multiplier_bounds, exclude_params
+    and stage_1_max_x_bounds when the type has them (metabolic_minimal:
+    (0.2, 2.0) and ('k_10', 'k_7', 'k_8'); metabolic_minimal_subset:
+    (0.2, 2.0), () and None = pinned), else
+    DEFAULT_SATURATION_MULTIPLIER_BOUNDS, DEFAULT_EXCLUDED_PARAMETERS and
+    DEFAULT_STAGE_1_MAX_X_BOUNDS. resolve_study_preset builds its
+    multiplier_bounds / exclude_params / stage_1_max_x_bounds from here
+    and the supervisor's default_study_name reads its `_ib` / `_x` /
+    `_s1x` tags from here, so the two names can never drift (the
+    supervisor's stall watchdog counts rows of the name IT derives).
+    Unknown study_type: ValueError."""
     if study_type not in STUDY_TYPE_ROLES:
         raise ValueError(f'Unknown study_type {study_type!r}; expected one '
                          f'of {sorted(STUDY_TYPE_ROLES)}.')
     options = STUDY_TYPE_OPTIONS.get(study_type, {})
+    stage_1_max_x_bounds = options.get('stage_1_max_x_bounds',
+                                       DEFAULT_STAGE_1_MAX_X_BOUNDS)
     return dict(
         inhibition_multiplier_bounds=tuple(options.get(
             'group_multiplier_bounds', DEFAULT_SATURATION_MULTIPLIER_BOUNDS)),
         exclude_params=tuple(options.get('exclude_params',
-                                         DEFAULT_EXCLUDED_PARAMETERS)))
+                                         DEFAULT_EXCLUDED_PARAMETERS)),
+        stage_1_max_x_bounds=(None if stage_1_max_x_bounds is None
+                              else tuple(stage_1_max_x_bounds)))
 
 DEFAULT_STUDY_TARGET_PRODUCTS = 'ethanol_isobutanol'
 DEFAULT_STUDY_TYPE = 'metabolic_protein'

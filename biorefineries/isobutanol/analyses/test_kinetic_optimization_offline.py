@@ -690,7 +690,8 @@ PASS('kinetic_parameter_roles: role table loaded by file path, no heavy import i
 assert ko.DEFAULT_STUDY_TARGET_PRODUCTS == 'ethanol_isobutanol'
 assert ko.DEFAULT_STUDY_TYPE == 'metabolic_protein'
 assert set(ko.STUDY_TARGET_PRODUCTS) == {'ethanol_only', 'ethanol_isobutanol'}
-assert set(ko.STUDY_TYPE_ROLES) == {'metabolic', 'metabolic_protein', 'metabolic_minimal'}
+assert set(ko.STUDY_TYPE_ROLES) == {'metabolic', 'metabolic_protein', 'metabolic_minimal',
+                                    'metabolic_minimal_subset'}
 assert set(ko.STUDY_TYPE_ROLES['metabolic_minimal']) == {
     'capacity', 'product_inhibition', 'lethality'}
 assert set(ko.STUDY_TYPE_ROLES['metabolic']) == {
@@ -2917,18 +2918,26 @@ assert ko.STUDY_TYPE_OPTIONS == {
     'metabolic_minimal': dict(exclude_params=('k_10', 'k_7', 'k_8'),
                               group_roles=('product_inhibition', 'lethality'),
                               group_multiplier_bounds=(0.2, 2.0),
-                              spike_delta_bounds=None)}
+                              spike_delta_bounds=None),
+    'metabolic_minimal_subset': dict(rate_params=ko.METABOLIC_MINIMAL_SUBSET_RATES,
+                                     parameter_groups=ko.METABOLIC_MINIMAL_SUBSET_GROUPS,
+                                     group_multiplier_bounds=(0.2, 2.0),
+                                     exclude_params=(),
+                                     spike_delta_bounds=None,
+                                     stage_1_max_x_bounds=None)}
 assert {'STUDY_TYPE_OPTIONS', 'EFFECTOR_ORDER', 'kinetic_parameter_effectors',
         'study_type_name_defaults'} <= set(ko.__all__)
 # Naming defaults per study type (workbook-free): the minimal type's group
 # band stands in for the inhibition band (_ib0.2-2) and its exclusion set
 # is k_10 + k_7 + k_8; every other type keeps the module defaults.
 assert ko.study_type_name_defaults('metabolic_minimal') == dict(
-    inhibition_multiplier_bounds=(0.2, 2.0), exclude_params=('k_10', 'k_7', 'k_8'))
+    inhibition_multiplier_bounds=(0.2, 2.0), exclude_params=('k_10', 'k_7', 'k_8'),
+    stage_1_max_x_bounds=(1.0, 50.0))
 for st43 in ('metabolic', 'metabolic_protein'):
     assert ko.study_type_name_defaults(st43) == dict(
         inhibition_multiplier_bounds=ko.DEFAULT_SATURATION_MULTIPLIER_BOUNDS,
-        exclude_params=ko.DEFAULT_EXCLUDED_PARAMETERS)
+        exclude_params=ko.DEFAULT_EXCLUDED_PARAMETERS,
+        stage_1_max_x_bounds=(1.0, 50.0))
 try:
     ko.study_type_name_defaults('protein')
 except ValueError as e43:
@@ -3423,5 +3432,40 @@ else:
     assert 'k_1ie (0.02), k_4ie (0.04)' in out44f, out44f
     assert 'Spike feed pinned at the scenario baseline (600 g/L' in out44f, out44f
     PASS('engine: group multiplier applied to every member before each simulation, excluded k_10 untouched, spike pinned at the baseline, applied_* columns after the metrics (sidecar/LOST complete), baseline restored; seeds resolve grouped members through applied_*, the reverse raises; a fake burden_model receives the EXPANDED member values (not the group multiplier) at evaluate()/apply(), never the excluded k_10, with BURDEN_COLUMNS ahead of applied_* in the header, and the feasible-TPE predicate expanding them too; the group print records each member baseline')
+
+#%% 45. metabolic_minimal_subset preset (2026-09-07): a STANDALONE explicit
+# set -- 9 listed rate constants + 3 listed inhibition-effector groups
+# (0.2x-2x) + 3 feeding variables, spike feed AND stage_1_max_x pinned;
+# intersected with the target's workbook (ethanol_only: 5 rates + 2
+# groups = 10); typo guard on the role table BEFORE the intersection;
+# stage_1_max_x_bounds is a per-type option key surfaced by
+# study_type_name_defaults, so the driver's and the supervisor's names
+# agree (no _x tag, no _s1x tag); existing presets and names untouched.
+assert ko.METABOLIC_MINIMAL_SUBSET_RATES == (
+    'k_1l', 'k_1h', 'k_1e', 'k_3', 'k_6', 'k_13', 'k_14', 'k_15', 'k_16')
+assert ko.METABOLIC_MINIMAL_SUBSET_GROUPS == {
+    'inhib_ethanol': ('k_1ie', 'k_4ie', 'k_7ie', 'k_10ie', 'k_16ie'),
+    'inhib_isobutanol': ('k_1ii', 'k_4ii', 'k_6ii', 'k_7ii', 'k_10ii'),
+    'inhib_acetate': ('k_1ia', 'k_4ia', 'k_6ia', 'k_7ia', 'k_10ia', 'k_16ia')}
+assert list(ko.METABOLIC_MINIMAL_SUBSET_GROUPS) == [
+    'inhib_ethanol', 'inhib_isobutanol', 'inhib_acetate']
+assert {'METABOLIC_MINIMAL_SUBSET_RATES',
+        'METABOLIC_MINIMAL_SUBSET_GROUPS'} <= set(ko.__all__)
+assert ko.STUDY_TYPE_ROLES['metabolic_minimal_subset'] == ()       # no role filter: explicit set
+opt45 = ko.STUDY_TYPE_OPTIONS['metabolic_minimal_subset']
+assert opt45 == dict(rate_params=ko.METABOLIC_MINIMAL_SUBSET_RATES,
+                     parameter_groups=ko.METABOLIC_MINIMAL_SUBSET_GROUPS,
+                     group_multiplier_bounds=(0.2, 2.0), exclude_params=(),
+                     spike_delta_bounds=None, stage_1_max_x_bounds=None)
+assert 'group_roles' not in opt45                                   # explicit, not role-grouped
+# Name defaults: the subset pins stage_1_max_x (None -> no _s1x tag), has
+# no exclusions (no _x tag) and reports the group band as the inhibition
+# band; the three older types keep the default (1, 50) g/L band.
+assert ko.study_type_name_defaults('metabolic_minimal_subset') == dict(
+    inhibition_multiplier_bounds=(0.2, 2.0), exclude_params=(),
+    stage_1_max_x_bounds=None)
+for st45 in ('metabolic', 'metabolic_protein', 'metabolic_minimal'):
+    assert ko.study_type_name_defaults(st45)['stage_1_max_x_bounds'] == (1.0, 50.0), st45
+PASS('metabolic_minimal_subset preset: explicit constants in __all__, empty role entry, options entry with the new stage_1_max_x_bounds key, name defaults (group band, no exclusions, stage_1_max_x pinned; older types keep (1, 50))')
 
 print(f'\nALL {n_pass} CHECKS PASSED')
