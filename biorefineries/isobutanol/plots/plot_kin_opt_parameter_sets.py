@@ -42,13 +42,11 @@ best:IBO titer trials of the default minimal-subset IRR campaign against
 the baseline. Writes <stem>_<stamp>.png and .pdf to --out-dir.
 """
 import os
-import sys
 import argparse
 import importlib.util
 from datetime import datetime
 
 import numpy as np
-import pandas as pd
 import matplotlib
 matplotlib.use('Agg')
 from matplotlib import pyplot as plt
@@ -409,13 +407,6 @@ def apply_fonts():
     plt.rcParams['mathtext.fallback'] = 'stixsans'
 
 
-def sub(name):
-    if '_' in name and name[0] in 'kK':
-        head, tail = name.split('_', 1)
-        return rf'$\mathit{{{head}}}_{{\mathrm{{{tail}}}}}$'
-    return name
-
-
 def fmt(v):
     if v is None or (isinstance(v, float) and not np.isfinite(v)):
         return 'n/a'
@@ -540,6 +531,13 @@ def tint(color, t):
 
 _STUDY_STEPS = ['r1', 'r3', 'r6', 'r13', 'r14', 'r15', 'r16']
 _UNSAMPLED_STEPS = ['r2', 'r4', 'r5']   # never sampled; folded into "other"
+
+if set(_STUDY_STEPS) | set(_UNSAMPLED_STEPS) != set(eb.STEP_ORDER):
+    raise AssertionError(
+        'burden step partition drift: _STUDY_STEPS | _UNSAMPLED_STEPS != '
+        'eb.STEP_ORDER (%r vs %r)'
+        % (sorted(set(_STUDY_STEPS) | set(_UNSAMPLED_STEPS)),
+           sorted(eb.STEP_ORDER)))
 
 
 def draw_burden(ax, sets, colors):
