@@ -240,6 +240,10 @@ INHIBITION_COEFFICIENT_ROLES = ('product_inhibition', 'lethality')
 def _nsk(handles):
     return handles['V406'].nsk_results_specific_tau_dict
 
+# 'level' ('kinetic' vs 'system') is metadata only: every trial runs the full
+# system simulation AND one TEA solve regardless (the system-level metrics
+# IRR/TCI/... in TRACKED_METRICS are always recorded), so a 'kinetic' objective
+# costs the same per trial as a 'system' one -- it does not skip the TEA solve.
 OBJECTIVE_REGISTRY = {
     'IBO yield': dict(
         getter=lambda h: _nsk(h)['y_IBO_glu_added'],
