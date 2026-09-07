@@ -603,3 +603,113 @@ def draw_burden(ax, sets, colors):
     ax.tick_params(axis='x', direction='inout', top=False, length=4)
     for sp in ('left', 'right', 'top'):
         ax.spines[sp].set_visible(False)
+
+
+def plot(sets, band, out_stem, dpi=300):
+    apply_fonts()
+    fig = plt.figure(figsize=(9.5, 13.5))
+    gs = fig.add_gridspec(6, 1,
+                          height_ratios=[1.0, 1.15, 1.15, 1.15, 1.15, 2.2],
+                          hspace=0.95, left=0.19, right=0.97, top=0.94,
+                          bottom=0.05)
+    colors = set_colors(sets)
+    draw_outcomes(fig, gs[0], sets, colors)
+    draw_parameters(fig, [gs[1], gs[2], gs[3], gs[4]], sets, colors, band)
+    axc = fig.add_subplot(gs[5]); draw_burden(axc, sets, colors)
+    fig.text(0.03, 0.955, 'a', fontsize=FONTS['panel'], fontweight='bold')
+    fig.text(0.03, 0.86, 'b', fontsize=FONTS['panel'], fontweight='bold')
+    fig.text(0.03, axc.get_position().y1 + 0.005, 'c',
+             fontsize=FONTS['panel'], fontweight='bold')
+    handles = []
+    for s in sets:
+        lab = s['label'] if s.get('is_baseline') \
+            else f'{s["label"]} (trial {int(s["trial_number"])})'
+        handles.append(plt.Rectangle((0, 0), 1, 1, fc=colors[id(s)],
+                                     label=lab))
+    fig.legend(handles=handles, loc='upper center',
+               bbox_to_anchor=(0.56, 0.99), ncol=len(sets), frameon=False,
+               fontsize=FONTS['legend'], columnspacing=1.2, handlelength=1.4)
+    for ext in ('png', 'pdf'):
+        fig.savefig(f'{out_stem}.{ext}', dpi=dpi)
+    plt.close(fig)
+    return out_stem
+
+
+def console_report(sets, band_campaign):
+    print(f'band source (campaign): {band_campaign}')
+    rank = sorted(_STUDY_STEPS,
+                  key=lambda st: -max(s[f'pool_{st}'] for s in sets))[:5]
+    for s in sets:
+        tag = 'baseline' if s.get('is_baseline') \
+            else f'{s["campaign"]} trial {int(s["trial_number"])}'
+        print(f'[{s["label"]}] {tag}')
+        print(f'    IRR {s.get("IRR")!s:>8}  EtOH {s.get("EtOH titer")!s:>7}'
+              f'  IBO {s.get("IBO titer")!s:>7}  tau {s.get("tau")!s:>6}')
+        print(f'    Phi_M {s["Phi_M"]:.4f}  d {s["burden_factor"]:.2f}  pools: '
+              + ', '.join(f'{st} {s[f"pool_{st}"]:.4f}' for st in rank))
+        if s.get('extra_sampled'):
+            print(f'    campaign {s["campaign"]}: also sampled '
+                  f'{s["extra_sampled"]} (not shown)')
+
+
+def build_sets(set_specs, include_baseline):
+    sets = [baseline_set()] if include_baseline else []
+    band = band_campaign = None
+    for label, campaign, trial in set_specs:
+        sets.append(load_set(label, campaign, trial))
+        if band is None:
+            band = campaign_band(campaign); band_campaign = campaign
+        else:
+            other = campaign_band(campaign)
+            if other != band:
+                print(f'  WARNING campaign {campaign}: searched band differs '
+                      f'from the first campaign ({band_campaign}); keeping '
+                      'the first campaign band for shading')
+    if not sets:
+        raise ValueError('no sets to plot (use --set or drop --no-baseline)')
+    return sets, band, band_campaign
+
+
+def main(argv=None):
+    ap = argparse.ArgumentParser(description='Kinetic-optimization '
+                                 'parameter-set comparison figure.')
+    ap.add_argument('--set', dest='sets', action='append', nargs=3,
+                    metavar=('LABEL', 'CAMPAIGN', 'TRIAL'), default=None,
+                    help='a set to plot; repeatable, in bar order after the '
+                         'baseline. TRIAL is an int, "best", or "best:COL".')
+    ap.add_argument('--no-baseline', action='store_true',
+                    help='drop the scenario-A baseline row')
+    ap.add_argument('--out-dir', default=RESULTS_DIR)
+    ap.add_argument('--stem', default=None)
+    ap.add_argument('--dpi', type=int, default=300)
+    args = ap.parse_args(argv)
+
+    def norm_trial(t):
+        if isinstance(t, str) and t.startswith('best'):
+            return t
+        return int(t)
+
+    if args.sets:
+        specs = [(lab, camp, norm_trial(tr)) for lab, camp, tr in args.sets]
+    else:  # default: three trials of the default minimal-subset campaign
+        specs = [('Best IRR', DEFAULT_STUDY, 'best'),
+                 ('Best ethanol titer', DEFAULT_STUDY, 'best:EtOH titer'),
+                 ('Best isobutanol titer', DEFAULT_STUDY, 'best:IBO titer')]
+
+    if len(specs) + (0 if args.no_baseline else 1) > MAX_SETS:
+        raise ValueError(f'at most {MAX_SETS} sets (baseline + '
+                         f'{len(HUE_COLORS)} campaign sets)')
+
+    sets, band, band_campaign = build_sets(specs, not args.no_baseline)
+    stem = args.stem or f'{os.path.basename(specs[0][1]).replace(".csv", "")}' \
+                        '_parameter_sets'
+    stamp = datetime.now().strftime('%Y.%m.%d-%H.%M')
+    out_stem = os.path.join(args.out_dir, f'{stem}_{stamp}')
+    plot(sets, band, out_stem, dpi=args.dpi)
+    console_report(sets, band_campaign)
+    print(f'wrote {out_stem}.png / .pdf')
+    return out_stem
+
+
+if __name__ == '__main__':
+    main()
