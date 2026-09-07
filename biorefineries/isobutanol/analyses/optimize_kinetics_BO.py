@@ -227,7 +227,8 @@ def run(scenario=None,  # 'A' or 'B'; None = the preset's start scenario
     ko.DEFAULT_EXCLUDED_PARAMETERS = ('k_10',), since 2026-09-06 pm): a
     lower decay rate is a free lunch for the optimizer, not an
     engineering target, so it stays at the scenario baseline and gets no
-    knockout probe; the sampled set is the workbook rows minus it
+    knockout probe (the metabolic_minimal_subset preset excludes
+    nothing); the sampled set is the workbook rows minus it
     (28/39/39/55). Each preset entry is applied ONLY where the caller
     passed nothing: an explicit `scenario`, `kinetic_bounds_scenario`,
     `include_params`, `exclude_params` (pass () to re-include k_10 -- it
@@ -318,8 +319,9 @@ def run(scenario=None,  # 'A' or 'B'; None = the preset's start scenario
     study resumes under it (supervisor --no-feasible-sampling).
 
     STAGE-1 CUTOFF (`stage_1_max_x_bounds`, an engine kwarg defaulted
-    from the preset since 2026-09-06 pm). Every preset samples the
-    fermentor's aerobic stage-1 biomass cutoff V406.stage_1_max_x
+    from the preset since 2026-09-06 pm). Every preset but
+    metabolic_minimal_subset samples the fermentor's aerobic stage-1
+    biomass cutoff V406.stage_1_max_x
     (ko.OPERATING_VARIABLES) log-scale on ko.DEFAULT_STAGE_1_MAX_X_BOUNDS
     = (1.0, 50.0) g/L (baseline 5.0 g/L, the nskinetics factory default;
     stage 1 also ends at stage_1_max_time = 25 h, whichever fires first).

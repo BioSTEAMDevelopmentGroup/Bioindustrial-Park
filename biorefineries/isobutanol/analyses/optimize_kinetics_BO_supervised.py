@@ -347,7 +347,8 @@ def supervise(scenario=None, objective='IRR', n_trials=2000,
     and TPE candidates are checked against the burden cap before they
     are proposed, so no sampled trial is INFEASIBLE); forwarded on
     every attempt, never part of the study name. `stage_1_max_x_bounds`
-    (_UNSET = the preset's (1, 50) g/L band; None = pin at the baseline,
+    (_UNSET = the preset's band -- (1, 50) g/L, or pinned for
+    metabolic_minimal_subset; None = pin at the baseline,
     --stage-1-max-x-bounds bare; a tuple = explicit LO HI) is the
     operating variable's band, forwarded to the driver only when given
     and tagged `_s1x{lo}-{hi}` into the derived study name. `seed_from`
@@ -597,7 +598,8 @@ if __name__ == '__main__':
                              '(ko.study_type_name_defaults: k_10, the '
                              'active-biomass decay capacity -- a lower decay '
                              'rate is a free lunch, not an engineering '
-                             'target; plus k_7 and k_8 under metabolic_minimal); a '
+                             'target; plus k_7 and k_8 under metabolic_minimal; '
+                             'nothing for metabolic_minimal_subset); a '
                              'bare --exclude-params re-includes them (k_10 on '
                              'its per-parameter 0.1 10 band). The '
                              'effective set is tagged into the derived study '
