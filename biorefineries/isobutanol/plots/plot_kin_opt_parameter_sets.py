@@ -280,3 +280,114 @@ def load_set(label, campaign, trial):
     known |= {c for c in df.columns if c.startswith('applied_')}
     rec['extra_sampled'] = [c for c in df.columns if c not in known]
     return rec
+
+
+# --- searched-band shading, from the driver's own preset -> search-space
+# construction -----------------------------------------------------------
+_DEFAULT_AXES = ('ethanol_isobutanol', 'metabolic_minimal_subset')
+_TARGET_PRODUCTS = ('ethanol_isobutanol', 'ethanol_only')
+_STUDY_TYPES = ('metabolic_minimal_subset', 'metabolic_minimal',
+                'metabolic_protein', 'metabolic')   # longest-first
+
+
+def campaign_axes_from_name(campaign):
+    """(study_target_products, study_type) parsed from a study name;
+    default to the minimal-subset ethanol+isobutanol preset (with a
+    warning) for a bare CSV path or an unrecognised name."""
+    stem = os.path.basename(campaign)
+    if stem.endswith('.csv') or 'kin_opt_' not in stem:
+        print(f'  WARNING campaign {campaign}: band source not inferrable '
+              'from the name; assuming the metabolic_minimal_subset preset')
+        return _DEFAULT_AXES
+    tp = next((t for t in _TARGET_PRODUCTS if t in stem), _DEFAULT_AXES[0])
+    ty = next((t for t in _STUDY_TYPES if t in stem), _DEFAULT_AXES[1])
+    return tp, ty
+
+
+def campaign_band(campaign):
+    """{var: (lo, hi)} searched band for the 15 decision vars, exactly as
+    the driver built it: ko.resolve_study_preset -> ko.build_search_space
+    on the scenario-A baselines. Feeding vars from the engine defaults.
+
+    ko.build_search_space returns (space, excluded_parameter_names), and
+    it needs a `kinetic_baselines` dict that already carries a value for
+    EVERY name it should place in the space -- it iterates
+    kinetic_baselines.items(), never preset['include_params'] on its own
+    -- and, for a `parameter_groups` member, a value that is POSITIVE
+    (the group-forming loop checks kinetic_baselines[member] directly,
+    before param_bounds_override is even consulted). The scenario-A
+    workbook (ko.workbook_kinetic_baselines('A')) alone is not enough:
+    - the Ehrlich-branch rate constants (k_13..k_16, role `capacity`)
+      are absent from it because they are genuinely ZERO in the live
+      scenario-A model (the branch is off); a zero/absent baseline with
+      no override is EXCLUDED by build_search_space, so the driver's own
+      real run (which discovers every parameter off the LIVE model,
+      still 0 there) supplies a `param_bounds_override` derived from the
+      scenario-B workbook instead (`kinetic_bounds_from_scenario` in
+      analyses/optimize_kinetics_BO.py, ko.workbook_kinetic_bounds here)
+      so those rates still get a positive, B-baseline-derived band.
+    - the inhibition-coefficient group members (k_1ie, k_4ie, ...) are
+      likewise absent from the A workbook, but -- unlike the Ehrlich
+      rates -- they are NOT zero in the live A model: A's workbook simply
+      doesn't curate them, so they carry the shipped Antimony default,
+      which is numerically the scenario-B workbook value (see
+      plot_kin_opt_best_vs_baseline_heatmap.py's `build_rows`, same
+      fallback). A group member needs that positive value in
+      `kinetic_baselines` itself, not just an override.
+    Every name shared by both workbooks (k_1l, k_1h, k_1e, k_3, k_6) has
+    the identical baseline in each, so folding in the B-derived override
+    changes nothing for those -- the shared-baseline rate band is exact.
+    """
+    tp, ty = campaign_axes_from_name(campaign)
+    preset = ko.resolve_study_preset(tp, ty)
+    kb_scenario = preset['kinetic_bounds_scenario']
+    A = ko.workbook_kinetic_baselines('A')
+    A_bounds_wb = ko.workbook_kinetic_baselines(kb_scenario)
+    kinetic_baselines = dict(A)
+    group_members = {m for members in (preset['parameter_groups'] or {}).values()
+                     for m in members}
+    for name in group_members:
+        if name not in kinetic_baselines:
+            # inherited (nonzero) Antimony-default value; see docstring
+            kinetic_baselines[name] = A_bounds_wb[name]
+    for name in preset['include_params']:
+        if name not in kinetic_baselines:
+            # genuinely zero in the live scenario-A model (e.g. k_13..k_16)
+            kinetic_baselines[name] = 0.0
+    # the scenario-B-derived absolute bounds that let a zero-baseline
+    # Ehrlich rate stay in the space instead of being excluded; identical
+    # in value to the A-baseline band for every name the two workbooks share
+    param_bounds_override = ko.workbook_kinetic_bounds(
+        kb_scenario,
+        multiplier_bounds=preset['multiplier_bounds'],
+        rate_multiplier_bounds=preset['rate_multiplier_bounds'],
+        rate_params=preset['rate_params'],
+        parameter_multiplier_bounds=preset['parameter_multiplier_bounds'],
+    )
+    space, _excluded = ko.build_search_space(
+        kinetic_baselines,
+        multiplier_bounds=preset['multiplier_bounds'],
+        param_bounds_override=param_bounds_override,
+        include_params=preset['include_params'],
+        exclude_params=preset['exclude_params'],
+        rate_multiplier_bounds=preset['rate_multiplier_bounds'],
+        rate_params=preset['rate_params'],
+        parameter_multiplier_bounds=preset['parameter_multiplier_bounds'],
+        parameter_groups=preset['parameter_groups'],
+        group_multiplier_bounds=preset['group_multiplier_bounds'],
+        spike_delta_bounds=preset['spike_delta_bounds'],
+        stage_1_max_x_bounds=preset['stage_1_max_x_bounds'],
+    )
+    band = {}
+    for v in DECISION_VARS:
+        if v in space:
+            band[v] = (space[v]['low'], space[v]['high'])
+        elif v in GROUP_VARS:
+            # fallback, in case a future preset groups differently and the
+            # group itself doesn't end up as its own entry in `space`
+            band[v] = tuple(preset['group_multiplier_bounds'])
+    # feeding fallbacks (build_search_space always emits these, but be safe)
+    band.setdefault('threshold_conc', (0.0, 300.0))
+    band.setdefault('target_delta', (5.0, 500.0))
+    band.setdefault('max_n_spikes', (0, 50))
+    return band
