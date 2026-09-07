@@ -242,7 +242,7 @@ def lost_cause(killed_for_stall, stall_timeout_min, returncode):
 def child_code(scenario, objective, n_trials, kinetic_bounds_scenario,
                make_plots, study_name, restrict_to_workbook=True,
                seed=3221, study_target_products=None, study_type=None,
-               burden=True, enqueue_knockouts=True,
+               burden=True, enqueue_baseline=True, enqueue_knockouts=True,
                rate_multiplier_bounds=None, n_startup_trials=None,
                feasible_sampling=True, exclude_params=None,
                stage_1_max_x_bounds=_UNSET, seed_from=None):
@@ -290,6 +290,7 @@ def child_code(scenario, objective, n_trials, kinetic_bounds_scenario,
         f'          study_target_products={study_target_products!r},\n'
         f'          study_type={study_type!r},\n'
         f'          burden={burden!r},\n'
+        f'          enqueue_baseline={enqueue_baseline!r},\n'
         f'          enqueue_knockouts={enqueue_knockouts!r},\n'
         f'          feasible_sampling={feasible_sampling!r},\n'
         f'{rate_kw}'
@@ -307,7 +308,8 @@ def supervise(scenario=None, objective='IRR', n_trials=2000,
               restrict_to_workbook=True, seed=3221,
               study_target_products=ko.DEFAULT_STUDY_TARGET_PRODUCTS,
               study_type=ko.DEFAULT_STUDY_TYPE, burden=True,
-              enqueue_knockouts=True, rate_multiplier_bounds=None,
+              enqueue_baseline=True, enqueue_knockouts=True,
+              rate_multiplier_bounds=None,
               n_startup_trials=None, max_empty_attempts=5,
               feasible_sampling=True, exclude_params=None,
               stage_1_max_x_bounds=_UNSET, seed_from=None):
@@ -381,6 +383,7 @@ def supervise(scenario=None, objective='IRR', n_trials=2000,
                       restrict_to_workbook=restrict_to_workbook, seed=seed,
                       study_target_products=study_target_products,
                       study_type=study_type, burden=burden,
+                      enqueue_baseline=enqueue_baseline,
                       enqueue_knockouts=enqueue_knockouts,
                       rate_multiplier_bounds=rate_multiplier_bounds,
                       n_startup_trials=n_startup_trials,
@@ -406,6 +409,7 @@ def supervise(scenario=None, objective='IRR', n_trials=2000,
               'session as a LOST row')
 
     event(f'settings: study {study_name}; burden={burden!r}, '
+          f'enqueue_baseline={enqueue_baseline!r}, '
           f'enqueue_knockouts={enqueue_knockouts!r}, '
           f'feasible_sampling={feasible_sampling!r}, '
           f'n_startup_trials={n_startup_trials!r}, '
@@ -571,6 +575,15 @@ if __name__ == '__main__':
                              'burden-free study under the un-suffixed study '
                              'name (required to resume any study started '
                              'before 2026-09-05; the default adds _burden)')
+    parser.add_argument('--no-enqueue-baseline', dest='enqueue_baseline',
+                        action='store_false',
+                        help='do not enqueue the scenario baseline as trial '
+                             '0 of a fresh study; the sampler then draws '
+                             'EVERY trial (no point is pre-seeded). The '
+                             'default enqueues the baseline so it provably '
+                             'participates. Not part of the study name; '
+                             'meaningful only for a fresh study (a resume '
+                             'enqueues nothing regardless)')
     parser.add_argument('--no-enqueue-knockouts', dest='enqueue_knockouts',
                         action='store_false',
                         help='do not enqueue the single-knockout probes '
@@ -703,6 +716,7 @@ if __name__ == '__main__':
                                                else args.study_target_products),
                         study_type=args.study_type,
                         burden=args.burden,
+                        enqueue_baseline=args.enqueue_baseline,
                         enqueue_knockouts=args.enqueue_knockouts,
                         rate_multiplier_bounds=(
                             None if args.rate_multiplier_bounds is None

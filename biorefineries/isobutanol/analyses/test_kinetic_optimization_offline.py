@@ -3646,4 +3646,43 @@ assert "'metabolic_minimal_subset'" in drv45 and 'standalone' in drv45.lower()
 assert 'metabolic_minimal_subset = ' in src43_sup          # --study-type help text
 PASS('metabolic_minimal_subset preset: explicit constants in __all__, empty role entry, options entry with the new stage_1_max_x_bounds key, name defaults (group band, no exclusions, stage_1_max_x pinned; older types keep (1, 50))')
 
+#%% 46. enqueue_baseline flag: engine kwarg (default True) gates the trial-0
+# baseline enqueue; a fresh study with it False enqueues NO baseline point so
+# the sampler draws every trial. Threaded engine -> driver -> supervisor,
+# mirroring enqueue_knockouts; not part of any study name; resumes unaffected.
+_e46 = _inspect.signature(ko.run_kinetic_optimization).parameters
+assert 'enqueue_baseline' in _e46 and _e46['enqueue_baseline'].default is True
+_src46_eng = _inspect.getsource(ko.run_kinetic_optimization)
+assert 'if enqueue_baseline:' in _src46_eng
+assert 'baseline_point = baseline_decision_point(' in _src46_eng
+assert 'enqueue_baseline' not in _inspect.getsource(ko.default_study_name)
+# Driver: run() accepts it (default True) and forwards it to the engine.
+drv46 = open(os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                          'optimize_kinetics_BO.py')).read()
+assert 'enqueue_baseline=True,' in drv46
+assert 'enqueue_baseline=enqueue_baseline,' in drv46
+# Supervisor: supervise()/child_code() accept it (default True); child_code
+# forwards it both ways into the child program; --no-enqueue-baseline parses
+# to dest enqueue_baseline; main forwards args.enqueue_baseline.
+sup46 = _runpy.run_path(os.path.join(
+    os.path.dirname(os.path.abspath(__file__)),
+    'optimize_kinetics_BO_supervised.py'))
+assert _inspect.signature(sup46['supervise']).parameters['enqueue_baseline'].default is True
+assert _inspect.signature(sup46['child_code']).parameters['enqueue_baseline'].default is True
+code46 = sup46['child_code'](None, 'IRR', 2000, None, False, 'x',
+                             study_target_products='ethanol_isobutanol',
+                             study_type='metabolic_minimal_subset',
+                             enqueue_baseline=False)
+assert 'enqueue_baseline=False' in code46
+code46b = sup46['child_code'](None, 'IRR', 2000, None, False, 'x',
+                              study_target_products='ethanol_isobutanol',
+                              study_type='metabolic_minimal_subset')
+assert 'enqueue_baseline=True' in code46b
+src46_sup = open(os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                              'optimize_kinetics_BO_supervised.py')).read()
+assert "'--no-enqueue-baseline'" in src46_sup and "dest='enqueue_baseline'" in src46_sup
+assert 'enqueue_baseline=args.enqueue_baseline' in src46_sup
+assert 'enqueue_baseline=enqueue_baseline' in _inspect.getsource(sup46['supervise'])
+PASS('enqueue_baseline flag: engine kwarg (default True) gates the trial-0 baseline enqueue; driver run() and supervisor supervise()/child_code() thread it; --no-enqueue-baseline; off study name')
+
 print(f'\nALL {n_pass} CHECKS PASSED')
