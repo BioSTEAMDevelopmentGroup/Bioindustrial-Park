@@ -204,32 +204,14 @@ def plot(rows, best, study_name, out_stem):
         for i in range(1, n):                       # 2px surface gaps
             ax.axvline(i, color='white', lw=2)
         ax.axhline(1, color='white', lw=2)
+        # Cells are pure color (values/multipliers read off the colorbars);
+        # the only in-cell mark kept is the "(B)" baseline-source tag.
         for i, (label, base, bv, tag) in enumerate(cells):
-            for r, v in enumerate((base, bv)):
-                yc = n_sub - r - 0.5                # row 0 on top
-                if v > 0:
-                    tc = text_color_on(CMAP(norm(v)))
-                    ax.text(i + 0.5, yc + (0.1 if r == 1 else 0.08),
-                            fmt(v), ha='center', va='center', color=tc,
-                            fontsize=FONTS['cell'],
-                            fontweight='bold' if r == 1 else 'normal')
-                else:
-                    ax.text(i + 0.5, yc + 0.08, '0', ha='center',
-                            va='center', color='#666666',
-                            fontsize=FONTS['cell'])
-                    tc = '#666666'
-                if r == 0 and tag:
-                    ax.text(i + 0.5, yc - 0.22, tag, ha='center',
-                            va='center', color=tc,
-                            fontsize=FONTS['cell_sub'])
-                if r == 1 and base > 0:
-                    ax.text(i + 0.5, yc - 0.22, f'{bv/base:.2g}×',
-                            ha='center', va='center', color=tc,
-                            fontsize=FONTS['cell_sub'], style='italic')
-                elif r == 1:
-                    ax.text(i + 0.5, yc - 0.22, 'on', ha='center',
-                            va='center', color=tc,
-                            fontsize=FONTS['cell_sub'], style='italic')
+            if tag:
+                tc = (text_color_on(CMAP(norm(base))) if base > 0
+                      else '#666666')
+                ax.text(i + 0.5, n_sub - 0.5, tag, ha='center', va='center',
+                        color=tc, fontsize=FONTS['cell_sub'])
         ax.set_xlim(0, n)
         ax.set_ylim(0, n_sub)
         ax.set_yticks([1.5, 0.5])
