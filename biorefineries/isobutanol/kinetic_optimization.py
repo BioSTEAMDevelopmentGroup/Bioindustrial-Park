@@ -1002,16 +1002,36 @@ def _completed(df):
 def plot_optimization_trajectories(df, objective_name, direction,
                                    objective_units='', filename=None):
     """Multipanel trajectory figure: the objective (all completed trials
-    as scatter + best-so-far line) and every tracked metric vs trial
-    number, each metric panel overlaying the metric's value in the
-    incumbent best-objective-so-far configuration (NOT that metric's own
-    best-so-far). Failed/pruned trials are omitted. Returns (fig, axes)."""
+    as scatter + best-so-far line), then every tracked metric and the
+    feeding/operating decision variables -- the applied target, threshold
+    and spike sugar concentrations (from _applied_feeding) and the aerobic
+    stage-1 biomass cutoff stage_1_max_x -- vs trial number, each panel
+    overlaying that quantity's value in the incumbent best-objective-so-far
+    configuration (NOT its own best-so-far). Failed/pruned trials are
+    omitted; the concentration panels appear whenever the feeding columns
+    are present and the stage_1_max_x panel whenever that column is (older
+    trajectories without it are unaffected). Returns (fig, axes)."""
     import matplotlib.pyplot as plt
     ok = _completed(df)
     best_rows = ok.iloc[_best_row_indices(ok, direction)].reset_index(
         drop=True)
     metric_names = [m for m in TRACKED_METRICS if m in ok.columns]
-    n_panels = 1 + len(metric_names)
+    # Non-objective panels, each (title, sampled series, incumbent series):
+    # every tracked metric, then the applied feeding concentrations
+    # (target/threshold/spike, derived from the feeding decision variables
+    # via _applied_feeding) and the operating variable stage_1_max_x. All
+    # share the metric-panel style (sampled scatter + best-so-far overlay).
+    panels = [(m, ok[m], best_rows[m]) for m in metric_names]
+    if 'threshold_conc' in ok.columns or 'target_conc' in ok.columns:
+        t_s, th_s, sp_s = _applied_feeding(ok)
+        t_b, th_b, sp_b = _applied_feeding(best_rows)
+        panels += [('target_conc (g/L)', t_s, t_b),
+                   ('threshold_conc (g/L)', th_s, th_b),
+                   ('spike_conc (g/L)', sp_s, sp_b)]
+    if 'stage_1_max_x' in ok.columns:
+        panels.append(('stage_1_max_x (g/L)',
+                       ok['stage_1_max_x'], best_rows['stage_1_max_x']))
+    n_panels = 1 + len(panels)
     ncols = 4
     nrows = math.ceil(n_panels/ncols)
     fig, axes = plt.subplots(nrows, ncols, figsize=(4*ncols, 3*nrows),
@@ -1028,12 +1048,12 @@ def plot_optimization_trajectories(df, objective_name, direction,
     ax.set_title(title)
     ax.set_xlabel('trial')
     ax.legend(fontsize=8)
-    for ax, m in zip(flat[1:], metric_names):
-        ax.scatter(ok['trial_number'], ok[m], s=8, alpha=0.4,
+    for ax, (title, y_sampled, y_incumbent) in zip(flat[1:], panels):
+        ax.scatter(ok['trial_number'], y_sampled, s=8, alpha=0.4,
                    color='tab:blue')
-        ax.plot(ok['trial_number'], best_rows[m], color='tab:red', lw=1.5,
+        ax.plot(ok['trial_number'], y_incumbent, color='tab:red', lw=1.5,
                 label='at best-so-far objective')
-        ax.set_title(m)
+        ax.set_title(title)
         ax.set_xlabel('trial')
         ax.legend(fontsize=7)
     for ax in flat[n_panels:]:
