@@ -371,7 +371,16 @@ def run(scenario=None,  # 'A' or 'B'; None = the preset's start scenario
                 # objective) and the inhibition coefficients' saturation
                 # band (role-band scheme).
                 rate_multiplier_bounds=engine_kwargs['rate_multiplier_bounds'],
-                inhibition_multiplier_bounds=engine_kwargs['multiplier_bounds'],
+                # Under a GROUPED study type the band that actually sizes
+                # the inhibition entries is group_multiplier_bounds (the
+                # members are not sampled individually), so an explicit
+                # group band must get its own study: same columns, same
+                # numeric-range-tolerant optuna store, so only the name
+                # keeps it off the preset-band study.
+                inhibition_multiplier_bounds=(
+                    engine_kwargs['group_multiplier_bounds']
+                    if engine_kwargs['parameter_groups'] else
+                    engine_kwargs['multiplier_bounds']),
                 # The effective exclusion set (explicit or the preset's
                 # DEFAULT_EXCLUDED_PARAMETERS): an excluded name is a
                 # missing CSV column, so the tag keeps the default name

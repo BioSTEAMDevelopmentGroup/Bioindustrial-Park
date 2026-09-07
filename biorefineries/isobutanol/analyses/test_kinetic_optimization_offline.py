@@ -2909,7 +2909,9 @@ PASS('parameter groups: one log multiplier per group after the kinetics, members
 #%% 43. metabolic_minimal preset (2026-09-07): 17 rates + one multiplier per
 # inhibition-effector family + 4 feeding/operating variables; effector
 # table by file path; study_type_name_defaults shared by driver and
-# supervisor; the exact study name; existing presets untouched.
+# supervisor; the exact study name (the _ib tag from the GROUP band, so an
+# explicit band gets its own study); the ethanol_only 19-variable space;
+# existing presets untouched.
 assert ko.EFFECTOR_ORDER == ('ethanol', 'isobutanol', 'acetate')
 assert ko.STUDY_TYPE_OPTIONS == {
     'metabolic_minimal': dict(exclude_params=('k_10', 'k_7', 'k_8'),
@@ -2949,6 +2951,12 @@ assert "'parameter_groups', 'group_multiplier_bounds'," in drv43
 assert "'spike_delta_bounds'):" in drv43
 assert 'engine_kwargs.setdefault(key, preset[key])' in drv43
 assert "Parameter groups" in drv43 and 'spike feed pinned at the baseline' in drv43
+# The _ib tag follows the band that actually SIZES the inhibition entries:
+# group_multiplier_bounds under a grouped study type (the members are not
+# sampled individually), multiplier_bounds otherwise.
+assert 'inhibition_multiplier_bounds=(' in drv43
+assert "engine_kwargs['group_multiplier_bounds']" in drv43
+assert "if engine_kwargs['parameter_groups'] else" in drv43
 assert "plot_baselines" in drv43                    # group multipliers plotted at baseline 1.0
 assert "| set(engine_kwargs.get('parameter_groups') or ())" in drv43   # PCA log columns
 assert 'metabolic_minimal' in drv43
@@ -3034,8 +3042,30 @@ if os.path.isfile(wb_A) and os.path.isfile(wb_B):
         'inhib_acetate': ['k_1ia', 'k_4ia', 'k_6ia', 'k_7ia', 'k_10ia']}
     inc43_eo = p43_eo['include_params']
     grouped43_eo = {m for ms in p43_eo['parameter_groups'].values() for m in ms}
-    assert len([n for n in inc43_eo if n not in grouped43_eo
-                and n not in p43_eo['exclude_params']]) == 13
+    individual43_eo = [n for n in inc43_eo if n not in grouped43_eo
+                       and n not in p43_eo['exclude_params']]
+    assert len(individual43_eo) == 13
+    # ... and the space it builds (live baselines = the A workbook values
+    # here): 13 rates + 2 group multipliers + 4 feeding/operating = 19,
+    # spike_delta pinned out.
+    kb43_eo = ko.workbook_kinetic_baselines('A')
+    space43_eo, excl43_eo = ko.build_search_space(
+        kb43_eo, include_params=inc43_eo,
+        exclude_params=p43_eo['exclude_params'],
+        rate_multiplier_bounds=p43_eo['rate_multiplier_bounds'],
+        rate_params=p43_eo['rate_params'],
+        parameter_multiplier_bounds=p43_eo['parameter_multiplier_bounds'],
+        parameter_groups=p43_eo['parameter_groups'],
+        group_multiplier_bounds=p43_eo['group_multiplier_bounds'],
+        spike_delta_bounds=p43_eo['spike_delta_bounds'],
+        stage_1_max_x_bounds=p43_eo['stage_1_max_x_bounds'])
+    assert len(space43_eo) == 19, len(space43_eo)
+    assert list(space43_eo)[:13] == individual43_eo
+    assert list(space43_eo)[13:] == ['inhib_ethanol', 'inhib_acetate',
+                                     'threshold_conc', 'target_delta',
+                                     'max_n_spikes', 'stage_1_max_x']
+    assert 'spike_delta' not in space43_eo
+    assert set(excl43_eo) == set(kb43_eo) - set(individual43_eo) - grouped43_eo
     # The four existing presets: parameter_groups None, everything else as
     # in check 21 (their multiplier_bounds / exclude_params come through
     # study_type_name_defaults now, same values).
@@ -3056,19 +3086,42 @@ if os.path.isfile(wb_A) and os.path.isfile(wb_B):
     else:
         raise AssertionError('grouped row without an effector did not raise KeyError')
     # Supervisor name == driver name (the driver's exact default_study_name
-    # call on the preset's effective values) for all six presets.
+    # call on the preset's effective values, _driver_name43 mirroring its
+    # inhibition-band choice) for all six presets.
+    def _driver_name43(stp, st, **overrides):
+        """The driver's derived study name for a preset, with `overrides`
+        standing in for explicit run() engine kwargs (the driver
+        setdefault's the preset into engine_kwargs, then names from the
+        EFFECTIVE values)."""
+        kw = dict(ko.resolve_study_preset(stp, st))
+        kw.update(overrides)
+        return ko.default_study_name(
+            'IRR', stp, st, scenario=kw['scenario'],
+            kinetic_bounds_scenario=kw['kinetic_bounds_scenario'], burden=True,
+            rate_multiplier_bounds=kw['rate_multiplier_bounds'],
+            # the band that sizes the inhibition entries: the group band
+            # under a grouped preset, multiplier_bounds otherwise
+            inhibition_multiplier_bounds=(kw['group_multiplier_bounds']
+                                          if kw['parameter_groups'] else
+                                          kw['multiplier_bounds']),
+            exclude_params=kw['exclude_params'],
+            stage_1_max_x_bounds=kw['stage_1_max_x_bounds'], n_seeds=0)
     for stp43, st43 in ((a, b) for a in ko.STUDY_TARGET_PRODUCTS for b in ko.STUDY_TYPE_ROLES):
-        q43 = ko.resolve_study_preset(stp43, st43)
-        driver_name43 = ko.default_study_name(
-            'IRR', stp43, st43, scenario=q43['scenario'],
-            kinetic_bounds_scenario=q43['kinetic_bounds_scenario'], burden=True,
-            rate_multiplier_bounds=q43['rate_multiplier_bounds'],
-            inhibition_multiplier_bounds=q43['multiplier_bounds'],
-            exclude_params=q43['exclude_params'],
-            stage_1_max_x_bounds=q43['stage_1_max_x_bounds'], n_seeds=0)
+        driver_name43 = _driver_name43(stp43, st43)
         assert sup43['default_study_name'](None, 'IRR', None, study_target_products=stp43,
                                            study_type=st43, burden=True) == driver_name43, (stp43, st43)
-    PASS('metabolic_minimal preset: 3 effector groups (5/5/6) + 17 rates + 4 = 24 (ethanol_only 2 groups + 13 + 4 = 19), K_* out, spike pinned, _ib0.2-2 / _xk10+k7+k8 naming via study_type_name_defaults, effector table by file path, existing presets untouched')
+    # An EXPLICIT group band must get its own study: it sizes the same
+    # columns, and optuna accepts a changed numeric range on a resume, so
+    # only the name keeps a 0.5x-3x run off the preset's 0.2x-2x store.
+    assert _driver_name43('ethanol_isobutanol', 'metabolic_minimal') == NAME43
+    name43_wide = _driver_name43('ethanol_isobutanol', 'metabolic_minimal',
+                                 group_multiplier_bounds=(0.5, 3.0))
+    assert '_ib0.5-3' in name43_wide and name43_wide != NAME43, name43_wide
+    # ... while an ungrouped preset ignores group_multiplier_bounds entirely.
+    assert _driver_name43('ethanol_isobutanol', 'metabolic_protein',
+                          group_multiplier_bounds=(0.5, 3.0)) \
+        == _driver_name43('ethanol_isobutanol', 'metabolic_protein')
+    PASS('metabolic_minimal preset: 3 effector groups (5/5/6) + 17 rates + 4 = 24 and the ethanol_only space built too (2 groups + 13 + 4 = 19, no spike_delta), K_* out, spike pinned, _ib0.2-2 / _xk10+k7+k8 naming via study_type_name_defaults (the _ib tag reads the GROUP band under a grouped preset, so an explicit 0.5-3 renames the study), effector table by file path, existing presets untouched')
 else:
     print('SKIP 43 (preset part): parameter-distribution workbooks not found')
     PASS('metabolic_minimal naming + effector table (workbook-free part)')
@@ -3218,6 +3271,9 @@ else:
         ko.seed_points_from_trajectory(csv44, [2], space44_spk)
     except ValueError as e44:
         assert 'spike_delta' in str(e44)
+        # ... and the message says the DONOR pinned it (a feeding variable
+        # is never a column), not that a group multiplier has no inverse.
+        assert 'PINNED' in str(e44) and 'no unique inverse' not in str(e44), e44
     else:
         raise AssertionError('pinned-spike donor into a spike-sampling space did not raise')
     # Burden x groups: the burden model must be called with the EXPANDED
@@ -3320,6 +3376,52 @@ else:
         assert k10_44g == 0.01
     assert seen44g[3] == (600.0, 0.02, 0.04, 0.01)      # restore_baseline
     assert te44g.k_1ie == 0.02 and te44g.k_4ie == 0.04 and te44g.k_1e == 47.1
-    PASS('engine: group multiplier applied to every member before each simulation, excluded k_10 untouched, spike pinned at the baseline, applied_* columns after the metrics (sidecar/LOST complete), baseline restored; seeds resolve grouped members through applied_*, the reverse raises; a fake burden_model receives the EXPANDED member values (not the group multiplier) at evaluate()/apply(), never the excluded k_10, with BURDEN_COLUMNS ahead of applied_* in the header')
+    # Feasibility-aware sampling x groups: the FeasibleTPESampler's
+    # predicate shares this burden model, so it too must be handed the
+    # EXPANDED members -- a group multiplier reaching burden_model.evaluate()
+    # would be scored as if it were a rate constant. A separate fake/study
+    # (the run above is pinned with feasible_sampling=False so its
+    # evaluate/apply counts stay exactly one pair per trial).
+    outdir44f = tempfile.mkdtemp()
+    burden44f = _FakeBurden44()
+    te44f = _FakeTE44()
+    fbs44f = SimpleNamespace(
+        current_specifications=dict(target_conc=221.25,
+                                    threshold_conc=217.125,
+                                    spike_conc=600.0),
+        max_n_spikes=16)
+    handles44f = dict(handles44, r_te=te44f, fbs_spec=fbs44f,
+                      model_specification=lambda **kw: None,
+                      latest_TEA_solution={'IRR': np.nan,
+                                          'MPSPs': {'ethanol': np.nan,
+                                                    'isobutanol': np.nan}})
+    buf44f = _io.StringIO()
+    with _contextlib.redirect_stdout(buf44f):
+        st44f, _, _ = ko.run_kinetic_optimization(
+            objective='IRR', scenario_label='X', n_trials=3, seed=1,
+            study_name='offline_grouped_feasible', results_dir=outdir44f,
+            handles=handles44f, print_status_every=1, burden_model=burden44f,
+            feasible_sampling=True, n_startup_trials=1, enqueue_knockouts=False,
+            exclude_params=('k_10',), parameter_groups=groups44,
+            spike_delta_bounds=None)
+    out44f = buf44f.getvalue()
+    assert type(st44f.sampler).__name__ == 'FeasibleTPESampler', type(st44f.sampler)
+    # more evaluate() calls than the 3 objective ones = the sampler's own
+    # feasibility checks ran ...
+    assert len(burden44f.seen_evaluate) > 3, len(burden44f.seen_evaluate)
+    # ... and EVERY dict the burden model saw (predicate or objective) has
+    # the members at baseline x multiplier, never the group key.
+    for seen44f in burden44f.seen_evaluate:
+        assert 'inhib_ethanol' not in seen44f, seen44f
+        assert {'k_1ie', 'k_4ie'} <= set(seen44f), seen44f
+        assert np.isclose(seen44f['k_4ie']/0.04, seen44f['k_1ie']/0.02,
+                          rtol=1e-9)      # one multiplier, both members
+        assert 0.2 <= seen44f['k_1ie']/0.02 <= 2.0
+    # The group line records each member's LIVE baseline (the basis of its
+    # applied_* column), and the pinned-spike line reads the snapshot.
+    assert 'Parameter group inhib_ethanol' in out44f, out44f
+    assert 'k_1ie (0.02), k_4ie (0.04)' in out44f, out44f
+    assert 'Spike feed pinned at the scenario baseline (600 g/L' in out44f, out44f
+    PASS('engine: group multiplier applied to every member before each simulation, excluded k_10 untouched, spike pinned at the baseline, applied_* columns after the metrics (sidecar/LOST complete), baseline restored; seeds resolve grouped members through applied_*, the reverse raises; a fake burden_model receives the EXPANDED member values (not the group multiplier) at evaluate()/apply(), never the excluded k_10, with BURDEN_COLUMNS ahead of applied_* in the header, and the feasible-TPE predicate expanding them too; the group print records each member baseline')
 
 print(f'\nALL {n_pass} CHECKS PASSED')

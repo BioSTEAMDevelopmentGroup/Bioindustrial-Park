@@ -584,7 +584,8 @@ if __name__ == '__main__':
                              'bare --exclude-params re-includes them (k_10 on '
                              'its per-parameter 0.1 10 band). The '
                              'effective set is tagged into the derived study '
-                             'name (_xk10 at the default; nothing when '
+                             'name (at the default: _xk10, or _xk10+k7+k8 '
+                             'under metabolic_minimal; nothing when '
                              'empty) -- an exclusion drops a CSV column, so '
                              'a study of another set can never be resumed')
     parser.add_argument('--n-startup-trials', type=int, default=None,

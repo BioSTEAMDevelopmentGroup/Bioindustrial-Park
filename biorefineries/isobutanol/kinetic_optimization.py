@@ -605,7 +605,7 @@ def clip_to_search_space(point, search_space):
     return clipped, moved
 
 def seed_points_from_trajectory(csv_path, trial_numbers, search_space,
-                                label=None):
+                                label=None, parameter_groups=None):
     """Decision points of the trials `trial_numbers` of a DONOR study's
     trajectory CSV, in `search_space` coordinates -- the SEED points a
     fresh study enqueues right after its knockout probes (see
@@ -633,6 +633,14 @@ def seed_points_from_trajectory(csv_path, trial_numbers, search_space,
     (metabolic_minimal) study can seed a study that samples those members
     individually; the reverse raises. A donor without spike_delta (pinned
     spike) can only seed a space without it.
+
+    The ValueError names WHY each missing column is missing: a feeding /
+    operating variable of this space (spike_delta, stage_1_max_x) means
+    the DONOR pinned it (its value is never a column), while a group
+    multiplier means the donor sampled the members individually (no
+    unique inverse). `parameter_groups` ({group: [members]} of this
+    space, optional) is what tells the two apart; without it a missing
+    non-feeding name keeps the group wording.
 
     Returns ({label: point}, [notes]): labels are
     '{label or the CSV's study name}#{trial_number}' (the donor study
@@ -668,13 +676,46 @@ def seed_points_from_trajectory(csv_path, trial_numbers, search_space,
             else:
                 missing.append(name)
         if missing:
+            # Why the donor has no column, per missing name: a FEEDING /
+            # OPERATING variable this space samples means the donor PINNED
+            # it (e.g. spike_delta under spike_delta_bounds=None: pinned at
+            # the donor's own scenario baseline, which the CSV never
+            # records); a group multiplier of this space means the donor
+            # sampled its members individually, and a group multiplier has
+            # no unique inverse. `parameter_groups` (when given) names this
+            # space's groups; without it a missing non-feeding name keeps
+            # the group wording.
+            pinned = [name for name in missing
+                      if name in FEEDING_VARIABLES
+                      or name in LEGACY_FEEDING_VARIABLES
+                      or name in OPERATING_VARIABLES]
+            groups_here = dict(parameter_groups or {})
+            grouped_missing = [name for name in missing
+                               if name not in pinned
+                               and (name in groups_here
+                                    or parameter_groups is None)]
+            reasons = []
+            if pinned:
+                reasons.append(
+                    f'{pinned}: the donor PINNED these (no column -- e.g. '
+                    'spike_delta under spike_delta_bounds=None, pinned at '
+                    'the donor scenario baseline), so it cannot seed a '
+                    'study that samples them')
+            if grouped_missing:
+                reasons.append(
+                    f'{grouped_missing}: a group multiplier has no unique '
+                    'inverse in a donor that sampled its members '
+                    'individually')
+            other = [name for name in missing
+                     if name not in pinned and name not in grouped_missing]
+            if other:
+                reasons.append(f'{other}: the donor sampled a different '
+                               'search space')
             raise ValueError(
                 f'seed_from {csv_path}: the donor study has no decision '
-                f'column for {missing} -- it sampled a different search '
-                'space; seeds must come from a study of the same columns '
-                '(or one that recorded the name as an applied_<name> '
-                'column: a group multiplier has no unique inverse in a '
-                'donor that sampled its members individually) '
+                f'column for {missing} -- ' + '; '.join(reasons)
+                + '. Seeds must come from a study of the same columns (or '
+                'one that recorded the name as an applied_<name> column) '
                 f'(donor decision columns: {decision})')
         rows = {}
         i_trial, i_state = header.index('trial_number'), header.index('state')
@@ -1085,6 +1126,11 @@ def resolve_study_preset(study_target_products, study_type, roles=None,
     members in workbook order, effectors without rows omitted; so the
     sampled space is 17 rates + 3 multipliers (+ 4 feeding/operating)
     for ethanol_isobutanol and 13 + 2 (+ 4) for ethanol_only.
+    Every group member is scaled from its LIVE baseline -- the model value
+    at study start (for a row absent from the scenario-A workbook, the
+    nskinetics model default), NOT the workbook value; the engine prints
+    each member's baseline next to its name and records the products as
+    the applied_<member> columns.
     """
     if study_target_products not in STUDY_TARGET_PRODUCTS:
         raise ValueError(
@@ -2403,14 +2449,15 @@ def run_kinetic_optimization(objective='IRR',
           f'{len(excluded)} kinetic parameters excluded: {excluded}')
     for group, members in parameter_groups.items():
         sp = search_space[group]
+        # Each member's LIVE baseline is printed next to its name: the
+        # multiplier is applied to it, so this line is the log's record of
+        # the basis of every applied_<member> column.
+        listed = ', '.join(f'{member} ({kinetic_baselines[member]:g})'
+                           for member in members)
         print(f"Parameter group {group}: one log-scale multiplier on "
               f"[{sp['low']:g}, {sp['high']:g}] x baseline applied to "
-              f"{len(members)} members {members} (baseline 1.0; recorded as "
+              f"{len(members)} members {listed} (baseline 1.0; recorded as "
               f"applied_<member> columns).")
-    if 'threshold_conc' in search_space and 'spike_delta' not in search_space:
-        print('Spike feed pinned at the scenario baseline '
-              f"({fbs_spec.current_specifications['spike_conc']:g} g/L; "
-              'spike_delta_bounds=None).')
     if 'stage_1_max_x' in search_space:
         sp = search_space['stage_1_max_x']
         print(f"Operating variable stage_1_max_x (aerobic stage-1 biomass "
@@ -2442,6 +2489,12 @@ def run_kinetic_optimization(objective='IRR',
         k: fbs_spec.current_specifications[k]
         for k in ('target_conc', 'threshold_conc', 'spike_conc')}
     baseline_max_n_spikes = fbs_spec.max_n_spikes
+    if 'threshold_conc' in search_space and 'spike_delta' not in search_space:
+        # Read the snapshot, not the live spec: the snapshot is what
+        # _objective actually applies as the pinned spike concentration.
+        print('Spike feed pinned at the scenario baseline '
+              f"({baseline_model_kwargs['spike_conc']:g} g/L; "
+              'spike_delta_bounds=None).')
     # The live cutoff IS the scenario baseline (never set by the build);
     # read only when the variable is sampled, so handles without the
     # attribute (older callers, offline fakes) keep working.
@@ -2475,8 +2528,9 @@ def run_kinetic_optimization(objective='IRR',
         if not os.path.isfile(donor_csv):
             raise ValueError(f'seed_from donor {donor!r}: no trajectory CSV '
                              f'at {donor_csv}')
-        points, notes = seed_points_from_trajectory(donor_csv, trial_numbers,
-                                                    search_space)
+        points, notes = seed_points_from_trajectory(
+            donor_csv, trial_numbers, search_space,
+            parameter_groups=parameter_groups)
         seed_points.update(points)
         seed_notes.extend(notes)
     # Pre-flight: a study name colliding with a trajectory of a different
@@ -2528,7 +2582,13 @@ def run_kinetic_optimization(objective='IRR',
     if feasible_on:
         study.sampler = feasible_tpe_sampler(
             search_space,
-            lambda values: burden_model.evaluate(values).feasible,
+            # The predicate must see what the burden model will actually be
+            # given in _objective: the EXPANDED member values (baseline x
+            # the sampled group multiplier), never the group key itself.
+            # Without groups expand_grouped_values is an identity copy.
+            lambda values: burden_model.evaluate(
+                expand_grouped_values(values, parameter_groups,
+                                      kinetic_baselines)).feasible,
             multivariate=True, seed=seed + n_done,
             n_startup_trials=n_startup,
             constraints_func=_burden_constraints)
@@ -2614,6 +2674,9 @@ def run_kinetic_optimization(objective='IRR',
         model_kwargs = dict(target_conc=target, threshold_conc=threshold,
                             spike_conc=spike)
         record = {'trial_number': trial.number, **values}
+        # applied_<member> is the SAMPLED member value (its live baseline x
+        # the group multiplier), recorded BEFORE any burden derating -- the
+        # derated capacities are the burden columns (k_7_eff / k_8_eff).
         for members in parameter_groups.values():
             for member in members:
                 record[f'applied_{member}'] = applied_kinetics[member]
