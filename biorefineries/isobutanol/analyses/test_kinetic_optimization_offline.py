@@ -2756,4 +2756,141 @@ assert "'--seed-from', nargs='+', action='append'" in src41
 assert "parser.error('--seed-from takes STUDY TRIAL [TRIAL ...]')" in src41
 PASS('seed points: clip_to_search_space, seed_points_from_trajectory (labels, clipping, int cast, LOST note, column guard, extra column dropped), _seed{n} tag, engine enqueues after the probes on a fresh study only / bad donor fails pre-store, driver + supervisor --seed-from plumbing')
 
+#%% 42. parameter groups (2026-09-07, metabolic_minimal spec): one log-scale
+# multiplier per group of kinetic parameters, members removed from the
+# individual space; expand_grouped_values; spike_delta_bounds=None pins the
+# spike (no column); baseline point 1.0 per group; no knockout probe for a
+# group; every validation ValueError; plots tolerate a pinned spike.
+assert ko.DEFAULT_GROUP_MULTIPLIER_BOUNDS == (0.2, 2.0)
+assert ko.DEFAULT_SPIKE_DELTA_BOUNDS == (0.5, 595.0)
+assert {'DEFAULT_GROUP_MULTIPLIER_BOUNDS', 'DEFAULT_SPIKE_DELTA_BOUNDS',
+        'expand_grouped_values'} <= set(ko.__all__)
+kb42 = {'k_1e': 47.1, 'k_1ie': 0.02, 'k_4ie': 0.04, 'k_1ia': 0.06,
+        'k_10': 0.01, 'K_1e': 0.12}
+groups42 = {'inhib_ethanol': ['k_1ie', 'k_4ie'], 'inhib_acetate': ['k_1ia']}
+# Off by default: byte-identical to the pre-change space.
+space42_off, excl42_off = ko.build_search_space(kb42)
+assert list(space42_off) == ['k_1e', 'k_1ie', 'k_4ie', 'k_1ia', 'k_10', 'K_1e',
+                             *ko.FEEDING_VARIABLES]
+assert excl42_off == []
+# Groups on: members gone, group entries after the kinetics and before the
+# feeding variables (input order), band (0.2, 2.0) log; grouped members are
+# NOT listed in `excluded` (they are sampled, through their group).
+space42, excl42 = ko.build_search_space(kb42, parameter_groups=groups42,
+                                        exclude_params=('k_10',),
+                                        spike_delta_bounds=None,
+                                        stage_1_max_x_bounds=(1.0, 50.0))
+assert list(space42) == ['k_1e', 'K_1e', 'inhib_ethanol', 'inhib_acetate',
+                         'threshold_conc', 'target_delta', 'max_n_spikes',
+                         'stage_1_max_x'], list(space42)
+assert space42['inhib_ethanol'] == dict(low=0.2, high=2.0, log=True)
+assert space42['inhib_acetate'] == dict(low=0.2, high=2.0, log=True)
+assert excl42 == ['k_10']
+assert 'spike_delta' not in space42
+# A list of pairs is accepted like a dict; a custom band applies to every group.
+space42_pairs, _ = ko.build_search_space(
+    kb42, parameter_groups=[('inhib_ethanol', ('k_1ie', 'k_4ie'))],
+    group_multiplier_bounds=(0.5, 3.0))
+assert space42_pairs['inhib_ethanol'] == dict(low=0.5, high=3.0, log=True)
+assert 'k_1ia' in space42_pairs and 'k_1ie' not in space42_pairs
+# A grouped member's param_bounds_override entry is IGNORED (the driver's
+# preset path passes absolute workbook bounds for every row); an
+# include_params whitelist that omits a member still groups it.
+space42_ov, _ = ko.build_search_space(
+    kb42, parameter_groups=groups42, include_params=['k_1e'],
+    param_bounds_override={'k_1ie': (0.001, 0.1), 'k_1e': (1.0, 100.0)})
+assert list(space42_ov) == ['k_1e', 'inhib_ethanol', 'inhib_acetate',
+                            *ko.FEEDING_VARIABLES]
+assert space42_ov['k_1e'] == dict(low=1.0, high=100.0, log=True)
+# expand_grouped_values: member = baseline x multiplier, group key dropped,
+# everything else passed through; identity copy without groups.
+vals42 = {'k_1e': 50.0, 'K_1e': 0.1, 'inhib_ethanol': 0.5, 'inhib_acetate': 2.0,
+          'threshold_conc': 100.0, 'target_delta': 50.0, 'max_n_spikes': 3,
+          'stage_1_max_x': 5.0}
+exp42 = ko.expand_grouped_values(vals42, groups42, kb42)
+assert exp42 == {'k_1e': 50.0, 'K_1e': 0.1, 'k_1ie': 0.01, 'k_4ie': 0.02,
+                 'k_1ia': 0.12, 'threshold_conc': 100.0, 'target_delta': 50.0,
+                 'max_n_spikes': 3, 'stage_1_max_x': 5.0}, exp42
+assert 'inhib_ethanol' not in exp42
+ident42 = ko.expand_grouped_values(vals42, None, kb42)
+assert ident42 == vals42 and ident42 is not vals42
+assert ko.expand_grouped_values(vals42, {}, kb42) == vals42
+# Baseline point: 1.0 per group, members absent, no spike_delta when pinned.
+spec42 = dict(target_conc=221.25, threshold_conc=217.125, spike_conc=600.0)
+base42 = ko.baseline_decision_point(space42, kb42, spec42, 16,
+                                    baseline_stage_1_max_x=5.0,
+                                    parameter_groups=groups42)
+assert base42 == {'k_1e': 47.1, 'K_1e': 0.12, 'inhib_ethanol': 1.0,
+                  'inhib_acetate': 1.0, 'threshold_conc': 217.125,
+                  'target_delta': 5.0,  # 221.25-217.125=4.125 -> clipped to
+                                        # the default target_delta low bound
+                                        # 5.0 (same clip as check 10)
+                  'max_n_spikes': 16,
+                  'stage_1_max_x': 5.0}, base42
+# ... and unchanged without groups (spike_delta present as before).
+base42_off = ko.baseline_decision_point(space42_off, kb42, spec42, 16)
+assert base42_off['spike_delta'] == 600.0 - 221.25 and 'inhib_ethanol' not in base42_off
+# Knockout probes: a group is not a rate constant -- no probe under either
+# rule; the k_1e probe carries the groups at 1.0.
+probes42, at_floor42 = ko.knockout_probe_points(space42, base42)
+assert list(probes42) == ['k_1e'] and at_floor42 == []
+assert probes42['k_1e']['inhib_ethanol'] == 1.0
+probes42r, _ = ko.knockout_probe_points(space42, base42, rate_params=['k_1e', 'inhib_ethanol'])
+assert list(probes42r) == ['k_1e', 'inhib_ethanol']   # explicit rate_params wins (never the presets' case)
+# Trajectory columns: the group IS a decision column (between state and objective).
+cols42 = ko.trajectory_columns(space42)
+assert cols42[2:2 + len(space42)] == list(space42)
+# Validation ValueErrors, each naming the offender.
+def _raises42(msg, **kw):
+    try:
+        ko.build_search_space(kb42, **kw)
+    except ValueError as e:
+        assert msg in str(e), (msg, str(e))
+    else:
+        raise AssertionError(f'no ValueError for {kw} (expected {msg!r})')
+_raises42('k_1e', parameter_groups={'k_1e': ['k_1ie']})                    # collides with a kinetic name
+_raises42('threshold_conc', parameter_groups={'threshold_conc': ['k_1ie']})  # ... a feeding variable
+_raises42('stage_1_max_x', parameter_groups={'stage_1_max_x': ['k_1ie']})   # ... an operating variable
+_raises42('k_9', parameter_groups={'g': ['k_9']})                          # unknown member
+_raises42('k_1ie', parameter_groups={'g1': ['k_1ie'], 'g2': ['k_1ie']})    # member in two groups
+_raises42('k_1ie', parameter_groups={'g': ['k_1ie']}, exclude_params=('k_1ie',))  # excluded member
+_raises42('g', parameter_groups={'g': []})                                 # empty group
+_raises42('k_z', parameter_groups={'g': ['k_z']})                          # nonpositive baseline (below)
+for bad42 in ((0.0, 2.0), (-1.0, 2.0), (2.0, 0.2), (1.0, 1.0)):
+    _raises42('group_multiplier_bounds', parameter_groups=groups42,
+              group_multiplier_bounds=bad42)
+_raises42('spike_delta_bounds', spike_delta_bounds=None, target_conc_bounds=(180.0, 300.0))  # legacy mix
+try:
+    ko.build_search_space({**kb42, 'k_z': 0.0}, parameter_groups={'g': ['k_z']})
+except ValueError as e42:
+    assert 'k_z' in str(e42) and 'nonpositive' in str(e42)
+else:
+    raise AssertionError('nonpositive grouped baseline did not raise')
+# Plots on a synthetic trajectory WITHOUT spike_delta (pinned spike): the
+# applied spike is NaN, the spike panel is omitted, nothing raises.
+df42 = pd.DataFrame([dict(trial_number=i, state='COMPLETE', k_1e=47.1*(1 + i),
+                          K_1e=0.12, inhib_ethanol=1.0 + 0.1*i, inhib_acetate=1.0,
+                          threshold_conc=200.0, target_delta=20.0, max_n_spikes=5,
+                          stage_1_max_x=5.0, objective=0.1*(i + 1),
+                          **{m: np.nan for m in ko.TRACKED_METRICS},
+                          error='') for i in range(3)])
+t42, th42, sp42 = ko._applied_feeding(df42)
+assert np.allclose(t42, 220.0) and np.allclose(th42, 200.0) and np.isnan(sp42).all()
+t42s, th42s, sp42s = ko._applied_feeding(df42.iloc[0])
+assert t42s == 220.0 and np.isnan(sp42s)
+fig42, axes42 = ko.plot_optimization_trajectories(df42, 'IRR', 'maximize')
+assert not any(ax.get_title().startswith('spike_conc') for ax in axes42.ravel())
+assert any(ax.get_title().startswith('target_conc') for ax in axes42.ravel())
+fig42b, (ax42b1, ax42b2) = ko.plot_parameter_trajectory(
+    df42, {**kb42, 'inhib_ethanol': 1.0, 'inhib_acetate': 1.0}, 'maximize')
+labels42 = [line.get_label() for line in ax42b1.get_lines()]
+assert 'inhib_ethanol' in labels42 and 'k_1e' in labels42 and 'k_1ie' not in labels42
+assert 'spike_conc' not in [line.get_label() for line in ax42b2.get_lines()]
+fig42c, ax42c = ko.plot_best_vs_baseline(
+    df42, {**kb42, 'inhib_ethanol': 1.0, 'inhib_acetate': 1.0}, 'maximize')
+assert 'spike = pinned' in ax42c.get_title(), ax42c.get_title()
+import matplotlib.pyplot as _plt42
+_plt42.close('all')
+PASS('parameter groups: one log multiplier per group after the kinetics, members removed, override ignored, expand_grouped_values, baseline 1.0, no probe, spike_delta_bounds=None pins the spike, every validation ValueError, plots tolerate a pinned spike')
+
 print(f'\nALL {n_pass} CHECKS PASSED')

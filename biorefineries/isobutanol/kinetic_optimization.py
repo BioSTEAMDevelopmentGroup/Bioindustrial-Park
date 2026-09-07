@@ -58,6 +58,8 @@ __all__ = ('OBJECTIVE_REGISTRY', 'TRACKED_METRICS',
            'DEFAULT_SATURATION_MULTIPLIER_BOUNDS',
            'DEFAULT_EXCLUDED_PARAMETERS', 'excluded_parameters_tag',
            'OPERATING_VARIABLES', 'DEFAULT_STAGE_1_MAX_X_BOUNDS',
+           'DEFAULT_SPIKE_DELTA_BOUNDS', 'DEFAULT_GROUP_MULTIPLIER_BOUNDS',
+           'expand_grouped_values',
            'RATE_CONSTANT_ROLES', 'INHIBITION_COEFFICIENT_ROLES',
            'kinetic_parameter_roles_path', 'kinetic_parameter_roles',
            'rate_constant_names',
@@ -114,6 +116,40 @@ DEFAULT_STAGE_1_MAX_X_BOUNDS = (1.0, 50.0)
 TARGET_CONC_MAX = 300.0
 SPIKE_CONC_MIN = 50.0
 SPIKE_CONC_MAX = 600.0
+#: Default band of the spike_delta feeding variable (build_search_space /
+#: run_kinetic_optimization `spike_delta_bounds`); the presets return it
+#: too, except metabolic_minimal, which pins the spike (None).
+DEFAULT_SPIKE_DELTA_BOUNDS = (0.5, 595.0)
+
+#: Default log-scale band of a PARAMETER GROUP multiplier (x every
+#: member's baseline; build_search_space `group_multiplier_bounds`): the
+#: metabolic_minimal preset samples one multiplier per inhibition-effector
+#: family on it (0.2x-2x, baseline 1.0), so a family's intra-family
+#: ratios are preserved while its overall strength varies.
+DEFAULT_GROUP_MULTIPLIER_BOUNDS = (0.2, 2.0)
+
+def expand_grouped_values(values, parameter_groups, kinetic_baselines):
+    """Copy of the decision dict `values` with every PARAMETER-GROUP
+    multiplier replaced by its members' applied values (member baseline x
+    multiplier, from `kinetic_baselines`), the group key dropped and every
+    other entry (individual kinetics, feeding and operating variables)
+    passed through unchanged. `parameter_groups` is the
+    {group_name: [member names]} mapping given to build_search_space;
+    None / {} gives a plain copy. Pure: used by the engine's objective
+    (what reaches the model and the burden), by the `applied_<member>`
+    trajectory columns and by the offline test. The inverse for the
+    baseline point is trivial (every group multiplier = 1.0)."""
+    if not parameter_groups:
+        return dict(values)
+    groups = dict(parameter_groups)
+    out = {}
+    for name, value in values.items():
+        if name in groups:
+            for member in groups[name]:
+                out[member] = kinetic_baselines[member]*value
+        else:
+            out[name] = value
+    return out
 
 #: Default log-scale multiplier bands (× the workbook baseline) of the
 #: named study presets (resolve_study_preset), assigned by nskinetics
@@ -281,7 +317,7 @@ def build_search_space(kinetic_baselines,
                        include_params=None,
                        threshold_conc_bounds=(0.0, 300.0),
                        target_delta_bounds=(5.0, 500.0),
-                       spike_delta_bounds=(0.5, 595.0),
+                       spike_delta_bounds=DEFAULT_SPIKE_DELTA_BOUNDS,
                        max_n_spikes_bounds=(0, 50),
                        target_conc_bounds=None,
                        threshold_delta_bounds=None,
@@ -290,6 +326,8 @@ def build_search_space(kinetic_baselines,
                        rate_params=None,
                        parameter_multiplier_bounds=None,
                        stage_1_max_x_bounds=None,
+                       parameter_groups=None,
+                       group_multiplier_bounds=DEFAULT_GROUP_MULTIPLIER_BOUNDS,
                        ):
     """Build the decision-variable space: {name: {'low', 'high', 'log'}}
     (integer variables additionally carry 'int': True).
@@ -361,6 +399,34 @@ def build_search_space(kinetic_baselines,
     threshold_delta), spike_conc absolute) -- required to resume a study
     started under it.
 
+    `spike_delta_bounds=None` (since 2026-09-07; a tuple by default,
+    DEFAULT_SPIKE_DELTA_BOUNDS) REMOVES spike_delta from the space: the
+    spike concentration is then pinned at the engine's scenario-baseline
+    snapshot (600 g/L on both scenarios), like max_n_spikes_bounds=None /
+    stage_1_max_x_bounds=None pin theirs. Threshold-anchored scheme only
+    (ValueError with a legacy kwarg). A missing column, so the header
+    guard refuses to resume a study that sampled it.
+
+    `parameter_groups` (None = none; since 2026-09-07) is a
+    {group_name: [member kinetic names]} mapping (or a list of pairs).
+    Each group is ONE decision variable, a log-scale MULTIPLIER on
+    `group_multiplier_bounds` (0 < lo < hi; DEFAULT_GROUP_MULTIPLIER_
+    BOUNDS) applied to every member's baseline (expand_grouped_values;
+    baseline value 1.0), so the members move together and keep their
+    ratios. Members are REMOVED from the individual kinetic space (never
+    sampled on their own; not listed in `excluded`); groups are appended
+    after the individual kinetic entries and before the feeding
+    variables, in input order. ValueError: a group name colliding with a
+    kinetic parameter, feeding, legacy-feeding or operating variable; an
+    empty group; a member not in `kinetic_baselines`, listed in two
+    groups, in `exclude_params`, or with a nonpositive baseline. A
+    member absent from `include_params` is still grouped (the whitelist
+    governs INDIVIDUAL sampling; the group is the explicit instruction),
+    and a member's `param_bounds_override` entry is ignored (the
+    driver's preset path passes absolute workbook bounds for every row).
+    The metabolic_minimal preset groups the inhibition coefficients by
+    effector (resolve_study_preset).
+
     Returns (space, excluded_parameter_names)."""
     param_bounds_override = dict(param_bounds_override or {})
     parameter_multiplier_bounds = dict(parameter_multiplier_bounds or {})
@@ -368,8 +434,47 @@ def build_search_space(kinetic_baselines,
     r_lo, r_hi = (multiplier_bounds if rate_multiplier_bounds is None
                   else rate_multiplier_bounds)
     is_rate = _rate_predicate(rate_params)
+    parameter_groups = {str(group): list(members)
+                        for group, members in dict(parameter_groups or {}).items()}
+    grouped = {}  # member name -> group name
+    if parameter_groups:
+        g_lo, g_hi = group_multiplier_bounds
+        if not (0.0 < g_lo < g_hi):
+            raise ValueError('group_multiplier_bounds must satisfy 0 < lo < hi '
+                             '(a log-scale multiplier band); got '
+                             f'{tuple(group_multiplier_bounds)!r}')
+        reserved = (set(kinetic_baselines) | set(FEEDING_VARIABLES)
+                    | set(LEGACY_FEEDING_VARIABLES) | set(OPERATING_VARIABLES))
+        for group, members in parameter_groups.items():
+            if group in reserved:
+                raise ValueError(f'parameter group name {group!r} collides '
+                                 'with a kinetic parameter, feeding or '
+                                 'operating variable name')
+            if not members:
+                raise ValueError(f'parameter group {group!r} is empty')
+            for member in members:
+                if member not in kinetic_baselines:
+                    raise ValueError(f'parameter group {group!r}: member '
+                                     f'{member!r} is not a kinetic parameter '
+                                     'of the model')
+                if member in grouped:
+                    raise ValueError(f'kinetic parameter {member!r} is listed '
+                                     f'in two parameter groups ({grouped[member]!r} '
+                                     f'and {group!r})')
+                if member in exclude_params:
+                    raise ValueError(f'kinetic parameter {member!r} is both in '
+                                     f'parameter group {group!r} and in '
+                                     'exclude_params')
+                if kinetic_baselines[member] <= 0.0:
+                    raise ValueError(f'parameter group {group!r}: member '
+                                     f'{member!r} has a nonpositive baseline '
+                                     f'({kinetic_baselines[member]}); a group '
+                                     'multiplier needs a positive one')
+                grouped[member] = group
     space, excluded = {}, []
     for name, baseline in kinetic_baselines.items():
+        if name in grouped:
+            continue  # sampled through its group, never individually
         if include_params is not None and name not in include_params:
             excluded.append(name)
         elif name in exclude_params:
@@ -389,10 +494,18 @@ def build_search_space(kinetic_baselines,
                 lo_m, hi_m = (r_lo, r_hi) if is_rate(name) else (m_lo, m_hi)
             space[name] = dict(low=lo_m*baseline, high=hi_m*baseline,
                                log=True)
+    for group in parameter_groups:
+        space[group] = dict(low=float(g_lo), high=float(g_hi), log=True)
     if (target_conc_bounds is not None or threshold_delta_bounds is not None
             or spike_conc_bounds is not None):
         # Legacy target-anchored parameterization (resumes of studies
         # started before 2026-08-31).
+        if spike_delta_bounds is None:
+            raise ValueError('spike_delta_bounds=None (spike pinned at the '
+                             'baseline) is only supported by the '
+                             'threshold-anchored scheme; do not combine it '
+                             'with target_conc_bounds / threshold_delta_bounds '
+                             '/ spike_conc_bounds')
         tcb = target_conc_bounds or (180.0, 300.0)
         tdb = threshold_delta_bounds or (0.5, 30.0)
         scb = spike_conc_bounds or (200.0, 800.0)
@@ -406,8 +519,9 @@ def build_search_space(kinetic_baselines,
         space['target_delta'] = dict(low=target_delta_bounds[0],
                                      high=target_delta_bounds[1],
                                      log=False)
-        space['spike_delta'] = dict(low=spike_delta_bounds[0],
-                                    high=spike_delta_bounds[1], log=False)
+        if spike_delta_bounds is not None:  # None = spike pinned at the baseline
+            space['spike_delta'] = dict(low=spike_delta_bounds[0],
+                                        high=spike_delta_bounds[1], log=False)
     if max_n_spikes_bounds is not None:
         space['max_n_spikes'] = dict(low=int(max_n_spikes_bounds[0]),
                                      high=int(max_n_spikes_bounds[1]),
@@ -424,7 +538,8 @@ def build_search_space(kinetic_baselines,
 def baseline_decision_point(search_space, kinetic_baselines,
                             baseline_model_kwargs,
                             baseline_max_n_spikes=None,
-                            baseline_stage_1_max_x=None):
+                            baseline_stage_1_max_x=None,
+                            parameter_groups=None):
     """The scenario baseline expressed in decision-variable coordinates
     for `search_space` (either feeding parameterization) -- suitable for
     study.enqueue_trial, so a fresh study evaluates the baseline itself
@@ -438,16 +553,24 @@ def baseline_decision_point(search_space, kinetic_baselines,
     `baseline_stage_1_max_x` (the live V406.stage_1_max_x, 5.0 g/L at
     the factory default) fills point['stage_1_max_x'] when that
     operating variable is in the space and a value is given (clipped
-    into its band like every other entry)."""
+    into its band like every other entry).
+
+    `parameter_groups` (the build_search_space mapping; None = none)
+    gives every group in the space its baseline multiplier 1.0. A space
+    without spike_delta (spike_delta_bounds=None) gets no such entry."""
     point = {name: kinetic_baselines[name]
              for name in search_space if name in kinetic_baselines}
+    for group in dict(parameter_groups or {}):
+        if group in search_space:
+            point[group] = 1.0
     thr = baseline_model_kwargs['threshold_conc']
     tgt = baseline_model_kwargs['target_conc']
     spk = baseline_model_kwargs['spike_conc']
     if 'threshold_conc' in search_space:  # threshold-anchored scheme
         point['threshold_conc'] = thr
         point['target_delta'] = tgt - thr
-        point['spike_delta'] = spk - tgt
+        if 'spike_delta' in search_space:  # absent = spike pinned at the baseline
+            point['spike_delta'] = spk - tgt
     elif 'target_conc' in search_space:  # legacy target-anchored scheme
         point['target_conc'] = tgt
         point['threshold_delta'] = tgt - thr
@@ -1154,8 +1277,9 @@ def plot_optimization_trajectories(df, objective_name, direction,
         t_s, th_s, sp_s = _applied_feeding(ok)
         t_b, th_b, sp_b = _applied_feeding(best_rows)
         panels += [('target_conc (g/L)', t_s, t_b),
-                   ('threshold_conc (g/L)', th_s, th_b),
-                   ('spike_conc (g/L)', sp_s, sp_b)]
+                   ('threshold_conc (g/L)', th_s, th_b)]
+        if 'spike_delta' in ok.columns or 'spike_conc' in ok.columns:
+            panels.append(('spike_conc (g/L)', sp_s, sp_b))  # absent = pinned
     if 'stage_1_max_x' in ok.columns:
         panels.append(('stage_1_max_x (g/L)',
                        ok['stage_1_max_x'], best_rows['stage_1_max_x']))
@@ -1196,14 +1320,21 @@ def _applied_feeding(rows):
     rows (a DataFrame or a single-row Series), handling both the current
     threshold-anchored parameterization (threshold_conc/target_delta/
     spike_delta) and the legacy target-anchored one (target_conc/
-    threshold_delta/spike_conc)."""
+    threshold_delta/spike_conc). A trajectory without spike_delta (the
+    spike pinned at the baseline, spike_delta_bounds=None) gets NaN for
+    the spike."""
     if 'threshold_conc' in rows:
         threshold = rows['threshold_conc']
         target = np.minimum(TARGET_CONC_MAX,
                             threshold + rows['target_delta'])
-        spike = np.minimum(SPIKE_CONC_MAX,
-                           np.maximum(SPIKE_CONC_MIN,
-                                      target + rows['spike_delta']))
+        if 'spike_delta' in rows:
+            spike = np.minimum(SPIKE_CONC_MAX,
+                               np.maximum(SPIKE_CONC_MIN,
+                                          target + rows['spike_delta']))
+        else:
+            # spike pinned at the scenario baseline (spike_delta_bounds=
+            # None): not a column, so its value is unknown here -> NaN.
+            spike = target*np.nan
     else:
         target = rows['target_conc']
         threshold = np.maximum(0.0, target - rows['threshold_delta'])
@@ -1230,8 +1361,10 @@ def plot_parameter_trajectory(df, kinetic_baselines, direction,
     concentrations in absolute units (threshold shown as
     target - threshold_delta). Parameters with nonpositive baselines
     (multiplier undefined; e.g. absolute-bounds overrides of zero-baseline
-    params) are skipped here -- they still live in the CSV. Returns
-    (fig, axes)."""
+    params) are skipped here -- they still live in the CSV. A
+    parameter-group multiplier column plots directly when the caller
+    passes it in `kinetic_baselines` with baseline 1.0 (the driver does).
+    Returns (fig, axes)."""
     import matplotlib.pyplot as plt
     ok = _completed(df)
     best_rows = ok.iloc[_best_row_indices(ok, direction)].reset_index(
@@ -1252,7 +1385,8 @@ def plot_parameter_trajectory(df, kinetic_baselines, direction,
         target, threshold, spike = _applied_feeding(best_rows)
         ax2.plot(x, target, label='target_conc')
         ax2.plot(x, threshold, label='threshold_conc')
-        ax2.plot(x, spike, label='spike_conc')
+        if np.isfinite(np.asarray(spike, dtype=float)).any():  # NaN = pinned
+            ax2.plot(x, spike, label='spike_conc')
         ax2.legend(fontsize=7)
     ax2.set_ylabel('g/L')
     ax2.set_xlabel('trial')
@@ -1266,7 +1400,9 @@ def plot_best_vs_baseline(df, kinetic_baselines, direction, filename=None):
     incumbent's kinetic-parameter multipliers (log x, baseline = 1 dashed
     line), sorted by multiplier, with the optimal feeding concentrations
     and objective value in the title. Nonpositive-baseline parameters are
-    skipped (see plot_parameter_trajectory). Returns (fig, ax)."""
+    skipped (see plot_parameter_trajectory). A parameter-group multiplier
+    column plots directly when the caller passes it in `kinetic_baselines`
+    with baseline 1.0 (the driver does). Returns (fig, ax)."""
     import matplotlib.pyplot as plt
     ok = _completed(df)
     i_best = (ok['objective'].idxmax() if direction == 'maximize'
@@ -1283,10 +1419,12 @@ def plot_best_vs_baseline(df, kinetic_baselines, direction, filename=None):
     ax.axvline(1.0, color='k', ls='--', lw=0.8)
     ax.set_xlabel('best/baseline multiplier')
     target, threshold, spike = _applied_feeding(best)
+    spike_text = (f'{spike:.1f} g/L' if np.isfinite(spike)
+                  else 'pinned')  # NaN = spike_delta not sampled
     ax.set_title(f"objective = {best['objective']:.4g} at trial "
                  f"{int(best['trial_number'])}; target = {target:.1f}, "
                  f"threshold = {threshold:.1f}, "
-                 f"spike = {spike:.1f} g/L", fontsize=8)
+                 f"spike = {spike_text}", fontsize=8)
     fig.tight_layout()
     if filename:
         fig.savefig(filename, dpi=200)
