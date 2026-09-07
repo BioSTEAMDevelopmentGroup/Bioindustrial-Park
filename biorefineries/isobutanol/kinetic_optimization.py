@@ -66,6 +66,8 @@ __all__ = ('OBJECTIVE_REGISTRY', 'TRACKED_METRICS',
            'resolve_study_preset', 'default_study_name',
            'BURDEN_STUDY_SUFFIX',
            'baseline_decision_point', 'knockout_probe_points',
+           'clip_to_search_space', 'seed_points_from_trajectory',
+           'seed_points_tag',
            'trajectory_columns', 'check_trajectory_header',
            'append_trajectory_row', 'load_trajectory',
            'inflight_path_for', 'write_inflight', 'clear_inflight',
@@ -454,11 +456,126 @@ def baseline_decision_point(search_space, kinetic_baselines,
         point['max_n_spikes'] = int(baseline_max_n_spikes)
     if 'stage_1_max_x' in search_space and baseline_stage_1_max_x is not None:
         point['stage_1_max_x'] = float(baseline_stage_1_max_x)
-    for name, value in point.items():
-        sp = search_space[name]
-        clipped = min(max(value, sp['low']), sp['high'])
-        point[name] = int(clipped) if sp.get('int') else clipped
+    point, _ = clip_to_search_space(point, search_space)
     return point
+
+def clip_to_search_space(point, search_space):
+    """Clip every entry of `point` (a {name: value} decision point; only
+    names in `search_space` are kept) into its [low, high] bounds, integer
+    variables cast to int. Returns (clipped point, [names that moved]).
+    The clipping rule of baseline_decision_point, shared with the seed
+    points: an out-of-range enqueued value is a hard optuna ValueError on
+    a log-scale variable and is silently replaced by a random draw on a
+    linear one."""
+    clipped, moved = {}, []
+    for name, value in point.items():
+        if name not in search_space:
+            continue
+        sp = search_space[name]
+        new = min(max(value, sp['low']), sp['high'])
+        new = int(new) if sp.get('int') else new
+        if new != value:
+            moved.append(name)
+        clipped[name] = new
+    return clipped, moved
+
+def seed_points_from_trajectory(csv_path, trial_numbers, search_space,
+                                label=None):
+    """Decision points of the trials `trial_numbers` of a DONOR study's
+    trajectory CSV, in `search_space` coordinates -- the SEED points a
+    fresh study enqueues right after its knockout probes (see
+    run_kinetic_optimization(seed_from=...)), so TPE starts with a
+    foothold in a basin another study found instead of having to hit it
+    by chance (the 2026-09-06 IRR study's 575 completed trials had none
+    with an isobutanol titer above 10 g/L, while the IBO-yield-x-titer
+    study's trial 1553 in that basin scores a higher IRR than the IRR
+    study's own optimum: the ethanol-only optimum was a local one).
+
+    Read sim-free with the stdlib csv module (the driver builds the seeds
+    inside the child, the offline test on a temp file). The decision
+    columns are the CSV columns between 'state' and 'objective'
+    (trajectory_columns). Every name of `search_space` must be a donor
+    decision column (ValueError otherwise -- the donor sampled a
+    different space; a donor column NOT in the space, e.g. a k_10 the new
+    study pins, is dropped and noted); every value is clipped into the
+    new study's bounds by clip_to_search_space (a donor under wider bands
+    seeds the nearest in-bounds point; noted). A trial number absent from
+    the CSV is a ValueError; a seed of any state is accepted (a LOST/FAIL
+    row still has a decision vector) but a non-COMPLETE state is noted.
+
+    Returns ({label: point}, [notes]): labels are
+    '{label or the CSV's study name}#{trial_number}' (the donor study
+    name = the file name minus '_trajectory.csv'), stored as the optuna
+    user attr 'seed' of the enqueued trial; notes are human-readable
+    lines for the engine to print."""
+    stem = os.path.basename(csv_path)
+    if stem.endswith('_trajectory.csv'):
+        stem = stem[:-len('_trajectory.csv')]
+    label = label or stem
+    wanted = {int(n) for n in trial_numbers}
+    if not wanted:
+        raise ValueError(f'seed_from {csv_path}: no trial numbers given')
+    with open(csv_path, newline='') as csvfile:
+        reader = csv.reader(csvfile)
+        header = next(reader, None)
+        if header is None or 'state' not in header or 'objective' not in header:
+            raise ValueError(f'{csv_path} is not a trajectory CSV (no '
+                             "'state'/'objective' columns)")
+        decision = header[header.index('state') + 1:header.index('objective')]
+        missing = [name for name in search_space if name not in decision]
+        if missing:
+            raise ValueError(
+                f'seed_from {csv_path}: the donor study has no decision '
+                f'column for {missing} -- it sampled a different search '
+                'space; seeds must come from a study of the same columns '
+                f'(donor decision columns: {decision})')
+        rows = {}
+        i_trial, i_state = header.index('trial_number'), header.index('state')
+        for row in reader:
+            if not row:
+                continue
+            try:
+                n = int(float(row[i_trial]))
+            except ValueError:
+                continue
+            if n in wanted and n not in rows:
+                rows[n] = row
+    absent = sorted(wanted - set(rows))
+    if absent:
+        raise ValueError(f'seed_from {csv_path}: trial_number {absent} not '
+                         'in the trajectory')
+    dropped = [name for name in decision if name not in search_space]
+    points, notes = {}, []
+    if dropped:
+        notes.append(f'{label}: donor decision columns not in this '
+                     f'search space are ignored: {dropped}')
+    for n in sorted(rows):
+        row = rows[n]
+        raw = {}
+        for name in search_space:
+            cell = row[header.index(name)]
+            if cell == '':
+                raise ValueError(f'seed_from {csv_path}: trial {n} has no '
+                                 f'value for {name}')
+            raw[name] = float(cell)
+        point, moved = clip_to_search_space(raw, search_space)
+        key = f'{label}#{n}'
+        points[key] = point
+        state = row[i_state]
+        if state != 'COMPLETE':
+            notes.append(f'{key}: donor state {state!r} (not COMPLETE)')
+        if moved:
+            notes.append(f'{key}: clipped into this study\'s bounds: {moved}')
+    return points, notes
+
+def seed_points_tag(n_seeds):
+    """Study-name tag of a seeded study: `_seed{n}` for n > 0 seed points
+    (default_study_name / the driver), nothing for 0 / None. Seeds change
+    a study's trajectory but not its columns, so the header guard cannot
+    tell a seeded study from the unseeded one of the same name -- the tag
+    is what launches it next to that study. It carries only the COUNT: a
+    different panel of the same size needs an explicit study_name."""
+    return f'_seed{int(n_seeds)}' if n_seeds else ''
 
 def knockout_probe_points(search_space, baseline_point, rate_prefix='k_',
                           rate_params=None):
@@ -758,7 +875,8 @@ def default_study_name(objective, study_target_products, study_type,
                        scenario=None, kinetic_bounds_scenario=None,
                        burden=False, rate_multiplier_bounds=None,
                        inhibition_multiplier_bounds=None,
-                       exclude_params=None, stage_1_max_x_bounds=None):
+                       exclude_params=None, stage_1_max_x_bounds=None,
+                       n_seeds=None):
     """Stable study name of a preset study:
     kin_opt_{study_target_products}_{study_type}_{objective slug}
     (slug = lower-cased, spaces -> '_'), e.g.
@@ -831,6 +949,15 @@ def default_study_name(objective, study_target_products, study_type,
     leaves the name unchanged -- same columns, so resuming those studies
     is legitimate.
 
+    `n_seeds` (the number of seed points enqueued from donor studies,
+    run_kinetic_optimization(seed_from=...); since 2026-09-07) tags the
+    name `_seed{n}` (seed_points_tag) after `_s1x` whenever it is > 0.
+    Seeds change the trajectory but not the columns, so without the tag
+    a seeded run would silently resume the unseeded study of the same
+    name; the count alone is tagged, so a different panel of the same
+    size needs an explicit study_name. None / 0 leaves the name
+    unchanged.
+
     `burden=True` appends BURDEN_STUDY_SUFFIX ('_burden') after every
     other tag: a burden study (enzyme_burden.py; the driver's default)
     can never resume a burden-free study's CSV/SQLite, or vice versa.
@@ -854,6 +981,7 @@ def default_study_name(objective, study_target_products, study_type,
     if stage_1_max_x_bounds is not None:
         lo, hi = stage_1_max_x_bounds
         name += f'_s1x{lo:g}-{hi:g}'
+    name += seed_points_tag(n_seeds)
     if burden:
         name += BURDEN_STUDY_SUFFIX
     return name
@@ -1708,6 +1836,7 @@ def run_kinetic_optimization(objective='IRR',
                              enqueue_knockouts=True,
                              n_startup_trials=None,
                              feasible_sampling=True,
+                             seed_from=None,
                              ):
     """Run the Bayesian optimization. `objective` is a name in
     OBJECTIVE_REGISTRY (direction/level/units filled from the entry) or a
@@ -1832,6 +1961,22 @@ def run_kinetic_optimization(objective='IRR',
     False (or burden_model=None, where there is no predicate) keeps the
     plain TPESampler. A sampler setting like n_startup_trials: no
     column or study-name change, free to change on a resume.
+
+    `seed_from` (default None; since 2026-09-07) is a sequence of
+    (donor, trial_numbers) pairs -- `donor` a trajectory-CSV path or a
+    study name resolved to '{results_dir}/{donor}_trajectory.csv' -- whose
+    decision points a FRESH study enqueues right after the knockout
+    probes (seed_points_from_trajectory: same columns required, values
+    clipped into this study's bounds; optuna user attr 'seed' = the
+    '{donor study}#{trial}' label; stored WAITING like the probes, so a
+    crash mid-seeds resumes them and a resume never re-enqueues). Seeds
+    give TPE a foothold in a basin another study found -- e.g. a
+    high-isobutanol cell from an IBO-objective study in an IRR study
+    whose own sampling never reached that basin (a local optimum) --
+    and count toward the random start-up phase. The seed points are
+    resolved BEFORE the optuna store is opened, so a bad donor fails
+    before any simulation. Same columns as the unseeded study: the
+    driver tags `_seed{n}` into the study name (seed_points_tag).
 
     Returns (study, csv_path, kinetic_baselines)."""
     import optuna
@@ -1980,6 +2125,20 @@ def run_kinetic_optimization(objective='IRR',
                + os.path.join(results_dir, study_name + '.db')
                .replace('\\', '/'))
     columns = trajectory_columns(search_space, extra_columns=extra_columns)
+    # Seed points from donor studies: resolved now (sim-free), so a donor
+    # of another column set / a missing trial fails before the store and
+    # the first ~20 s simulation; enqueued below on a fresh study only.
+    seed_points, seed_notes = {}, []
+    for donor, trial_numbers in (seed_from or ()):
+        donor_csv = (donor if os.path.isfile(donor) else
+                     os.path.join(results_dir, donor + '_trajectory.csv'))
+        if not os.path.isfile(donor_csv):
+            raise ValueError(f'seed_from donor {donor!r}: no trajectory CSV '
+                             f'at {donor_csv}')
+        points, notes = seed_points_from_trajectory(donor_csv, trial_numbers,
+                                                    search_space)
+        seed_points.update(points)
+        seed_notes.extend(notes)
     # Pre-flight: a study name colliding with a trajectory of a different
     # column set (search space or burden on/off changed, e.g. a legacy
     # study_name resumed without burden_model=None) must fail HERE --
@@ -2071,6 +2230,19 @@ def run_kinetic_optimization(objective='IRR',
             print(f'Enqueued {len(probes)} single-knockout probes as trials '
                   f'1-{len(probes)} (each k_* alone at its band floor, the '
                   f'rest at the baseline){skipped}.')
+        if seed_points:
+            # Then the seed points of the donor studies (seed_from), after
+            # the probes: a foothold in a basin another study found. Same
+            # WAITING-store semantics as the probes.
+            for label, point in seed_points.items():
+                study.enqueue_trial(point, user_attrs={'seed': label})
+            for note in seed_notes:
+                print(f'Seed note: {note}')
+            print(f'Enqueued {len(seed_points)} seed points from donor '
+                  f'studies as the next trials: {list(seed_points)}.')
+    elif seed_points:
+        print(f'Resumed study: the {len(seed_points)} seed points are NOT '
+              're-enqueued (a fresh study enqueues them once).')
 
     def _objective(trial):
         values = {name: (trial.suggest_int(name, sp['low'], sp['high'])

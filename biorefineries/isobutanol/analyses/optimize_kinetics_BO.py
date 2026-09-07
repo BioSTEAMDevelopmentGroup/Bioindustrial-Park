@@ -55,6 +55,10 @@ Runner pattern (fresh kernel, one process):
                                 study_target_products=None)
     # burden-free legacy study (older names have no _burden suffix)
     study, csv_path = ns['run'](objective='IRR', burden=False)
+    # seeded: enqueue donor trials after the probes (name gains _seed3)
+    study, csv_path = ns['run'](objective='IRR', study_type='metabolic',
+                                seed_from=[('<donor study name>', [1553, 1914]),
+                                           ('<other donor>', [1162])])
 """
 from datetime import datetime
 
@@ -144,6 +148,13 @@ def run(scenario=None,  # 'A' or 'B'; None = the preset's start scenario
         # they are proposed, so no sampled trial is INFEASIBLE; False =
         # the plain TPESampler (pre-2026-09-06 behaviour). Not part of
         # the study name; a resume may change it.
+        seed_from=None,  # [(donor study name or trajectory-CSV path,
+        # [trial numbers]), ...]: decision points of those donor trials
+        # are enqueued after the knockout probes of a FRESH study
+        # (ko.seed_points_from_trajectory; same decision columns required,
+        # values clipped into this study's bands), giving TPE a foothold
+        # in a basin another study found; the derived study name gains
+        # `_seed{n}` (n = total seed count). None = no seeds.
         **engine_kwargs,  # bounds/overrides/etc. -> run_kinetic_optimization
         ):
     """Set up the scenario baseline (same recipe as the smoke tests), run
@@ -278,7 +289,29 @@ def run(scenario=None,  # 'A' or 'B'; None = the preset's start scenario
     COLUMN: the header guard refuses to resume a study without it, and
     the tag is what lets the default name launch next to the existing
     `..._xk10_burden` studies). Legacy path (study_target_products=None):
-    not sampled unless passed explicitly."""
+    not sampled unless passed explicitly.
+
+    SEED POINTS (`seed_from`, default None; since 2026-09-07). A fresh
+    study enqueues, right after its knockout probes, the decision points
+    of the named trials of DONOR studies: seed_from = [(donor, [trial,
+    ...]), ...], donor = a study name (resolved to
+    analyses/results/{donor}_trajectory.csv) or a CSV path
+    (ko.seed_points_from_trajectory). The donor must have sampled the
+    SAME decision columns (ValueError otherwise); values are clipped into
+    this study's bands; each seed trial carries the optuna user attr
+    'seed' = '{donor}#{trial}'. Motivation: the 2026-09-06 IRR study of
+    the metabolic preset converged on a pure-ethanol cell (IRR 0.174)
+    without ever sampling an isobutanol titer above 10 g/L, while the
+    IBO-yield-x-titer study's trial 1553 (IBO 72 g/L) scores IRR 0.186 on
+    the same model -- a local optimum TPE could not leave because it had
+    no foothold in the narrow burden-feasible IBO basin. Pick seeds by
+    re-scoring the donor's rows under the NEW objective (its tracked
+    metrics are in the CSV), plus the donor's own optimum and the other
+    product-mix corner; a seed that scores below the incumbent basin only
+    teaches TPE to avoid its region. Same columns as the unseeded study,
+    so the derived name is tagged `_seed{n}` (n = the total seed count;
+    ko.seed_points_tag) -- a different panel of the same size needs an
+    explicit study_name. Resumes never re-enqueue."""
     if 'burden_model' in engine_kwargs:
         raise ValueError("pass burden=True/False to run(), not the engine's "
                          'burden_model (run() builds it so the reports can '
@@ -286,6 +319,9 @@ def run(scenario=None,  # 'A' or 'B'; None = the preset's start scenario
     slug = (objective if isinstance(objective, str)
             else engine_kwargs.get('objective_name', 'custom')
             ).lower().replace(' ', '_')
+    seed_from = [(donor, tuple(int(n) for n in trials))
+                 for donor, trials in (seed_from or ())]
+    n_seeds = sum(len(trials) for _, trials in seed_from)
     if study_target_products is not None:
         if not restrict_to_workbook:
             raise ValueError(
@@ -323,7 +359,10 @@ def run(scenario=None,  # 'A' or 'B'; None = the preset's start scenario
                 # The operating variable's band (the preset's, an explicit
                 # one, or None = pinned -> no tag): a new column, tagged
                 # so the default name launches next to the older studies.
-                stage_1_max_x_bounds=engine_kwargs['stage_1_max_x_bounds'])
+                stage_1_max_x_bounds=engine_kwargs['stage_1_max_x_bounds'],
+                # The seed count: same columns as the unseeded study, so
+                # the tag is what keeps a seeded run off its store.
+                n_seeds=n_seeds)
         excluded = tuple(engine_kwargs['exclude_params'] or ())
         effective = [n for n in engine_kwargs['include_params']
                      if n not in excluded]
@@ -376,7 +415,11 @@ def run(scenario=None,  # 'A' or 'B'; None = the preset's start scenario
         if study_name is None:  # legacy path only (presets set it above)
             study_name = (f'kin_opt_{scenario}_'
                           f'kb{kinetic_bounds_scenario}_{slug}'
+                          + ko.seed_points_tag(n_seeds)
                           + (ko.BURDEN_STUDY_SUFFIX if burden else ''))
+    if seed_from:
+        print(f'Seed points: {n_seeds} donor trials enqueued after the '
+              f'probes of a fresh study: {seed_from}')
     parameter_distributions_filename = IBO_filepath+\
         '\\analyses\\full\\parameter_distributions\\'+\
         f'parameter-distributions_corn_IBO_EtOH_{scenario}.xlsx'
@@ -421,6 +464,7 @@ def run(scenario=None,  # 'A' or 'B'; None = the preset's start scenario
         enqueue_knockouts=enqueue_knockouts,
         n_startup_trials=n_startup_trials,
         feasible_sampling=feasible_sampling,
+        seed_from=seed_from,
         **engine_kwargs)
 
     if make_plots:

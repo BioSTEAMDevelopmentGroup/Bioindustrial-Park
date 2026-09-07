@@ -2539,7 +2539,7 @@ else:
 drv40 = open(os.path.join(os.path.dirname(os.path.abspath(__file__)),
                           'optimize_kinetics_BO.py')).read()
 assert "'parameter_multiplier_bounds', 'stage_1_max_x_bounds'):" in drv40
-assert "stage_1_max_x_bounds=engine_kwargs['stage_1_max_x_bounds'])" in drv40
+assert "stage_1_max_x_bounds=engine_kwargs['stage_1_max_x_bounds']," in drv40
 sup40 = _runpy.run_path(os.path.join(
     os.path.dirname(os.path.abspath(__file__)),
     'optimize_kinetics_BO_supervised.py'))
@@ -2586,5 +2586,174 @@ src40 = open(os.path.join(os.path.dirname(os.path.abspath(__file__)),
 assert "'--stage-1-max-x-bounds', nargs='*', type=float" in src40
 assert "parser.error('--stage-1-max-x-bounds takes" in src40
 PASS('stage_1_max_x: driver setdefault + _s1x naming; supervisor _UNSET sentinel, child_code omit/None/tuple, naming mirror, --stage-1-max-x-bounds [LO HI]')
+
+#%% 41. seed points from donor studies (2026-09-07): sim-free reader, clipping,
+# column guard, _seed{n} tag; engine enqueues them after the probes of a
+# FRESH study only; driver / supervisor plumbing (--seed-from).
+kb41 = {'k_1e': 47.1, 'K_1e': 0.12}
+space41, _ = ko.build_search_space(kb41, stage_1_max_x_bounds=(1.0, 50.0))
+outdir41 = tempfile.mkdtemp()
+donor41 = os.path.join(outdir41, 'donor41_trajectory.csv')
+cols41 = ko.trajectory_columns(space41)
+donor_row41 = dict(trial_number=7, state='COMPLETE', k_1e=100.0, K_1e=5.0,
+                   threshold_conc=200.0, target_delta=20.0, spike_delta=300.0,
+                   max_n_spikes=12, stage_1_max_x=3.0, objective=0.3)
+ko.append_trajectory_row(donor41, cols41, donor_row41)
+ko.append_trajectory_row(donor41, cols41, dict(donor_row41, trial_number=8,
+                                               state='LOST', objective=''))
+# clip_to_search_space: shared clipping rule (int cast, names outside the
+# space dropped, moved names reported).
+clipped41, moved41 = ko.clip_to_search_space(
+    dict(k_1e=1e4, K_1e=0.5, max_n_spikes=60.0, not_a_var=1.0), space41)
+assert clipped41 == dict(k_1e=471.0, K_1e=0.5, max_n_spikes=50)
+assert moved41 == ['k_1e', 'max_n_spikes']
+# Reader: label = the donor study name (file stem), K_1e clipped to its
+# 10x ceiling, integer column cast, LOST row accepted with a note.
+seeds41, notes41 = ko.seed_points_from_trajectory(donor41, [7, 8], space41)
+assert list(seeds41) == ['donor41#7', 'donor41#8']
+assert seeds41['donor41#7'] == dict(k_1e=100.0, K_1e=1.2, threshold_conc=200.0,
+                                    target_delta=20.0, spike_delta=300.0,
+                                    max_n_spikes=12, stage_1_max_x=3.0)
+assert isinstance(seeds41['donor41#7']['max_n_spikes'], int)
+assert any('donor41#7: clipped' in n and "['K_1e']" in n for n in notes41)
+assert any("donor41#8: donor state 'LOST'" in n for n in notes41)
+# Guards: absent trial; donor of another column set (no stage_1_max_x).
+for bad41, msg41 in (([9], 'not in the trajectory'),):
+    try:
+        ko.seed_points_from_trajectory(donor41, bad41, space41)
+    except ValueError as e41:
+        assert msg41 in str(e41), e41
+    else:
+        raise AssertionError('absent seed trial did not raise')
+space41_off, _ = ko.build_search_space(kb41)
+donor41_off = os.path.join(outdir41, 'donor41off_trajectory.csv')
+ko.append_trajectory_row(donor41_off, ko.trajectory_columns(space41_off),
+                         dict(donor_row41))
+try:
+    ko.seed_points_from_trajectory(donor41_off, [7], space41)
+except ValueError as e41:
+    assert 'no decision column for' in str(e41) and 'stage_1_max_x' in str(e41)
+else:
+    raise AssertionError('donor of another column set did not raise')
+# A donor with an EXTRA decision column (e.g. it sampled k_10) is fine:
+# the extra column is dropped and noted.
+seeds41_x, notes41_x = ko.seed_points_from_trajectory(donor41, [7], space41_off)
+assert 'stage_1_max_x' not in seeds41_x['donor41#7']
+assert any('ignored' in n and 'stage_1_max_x' in n for n in notes41_x)
+# Naming tag: after _s1x, before _burden; nothing for 0 / None.
+assert ko.seed_points_tag(3) == '_seed3' and ko.seed_points_tag(0) == '' \
+    and ko.seed_points_tag(None) == ''
+assert ko.default_study_name('IRR', 'ethanol_isobutanol', 'metabolic',
+                             burden=True, rate_multiplier_bounds=(1e-3, 10.0),
+                             inhibition_multiplier_bounds=(0.1, 10.0),
+                             exclude_params=('k_10',),
+                             stage_1_max_x_bounds=(1.0, 50.0), n_seeds=3) \
+    == 'kin_opt_ethanol_isobutanol_metabolic_irr_rb0.001-10_ib0.1-10_xk10_s1x1-50_seed3_burden'
+assert ko.default_study_name('IRR', 'ethanol_isobutanol', 'metabolic',
+                             burden=True, n_seeds=0) \
+    == 'kin_opt_ethanol_isobutanol_metabolic_irr_burden'
+# Engine: fresh study of 3 trials = baseline, the k_1e probe, the seed
+# (donor given as a STUDY NAME resolved under results_dir); the seed's
+# decision vector is the clipped donor point and carries the 'seed' attr.
+if _optuna is None:
+    print('SKIP 41 (engine part): optuna not installed')
+else:
+    class _FakeTE41:
+        k_1e = 47.1
+        K_1e = 0.12
+        def getGlobalParameterIds(self):
+            return ['k_1e', 'K_1e', 'not_kinetic']
+    fbs41 = SimpleNamespace(
+        current_specifications=dict(target_conc=221.25,
+                                    threshold_conc=217.125,
+                                    spike_conc=600.0),
+        max_n_spikes=16)
+    V406_41 = SimpleNamespace(nsk_results_specific_tau_dict=nsk, tau=55.0,
+                              stage_1_max_x=5.0)
+    handles41 = {
+        'r_te': _FakeTE41(), 'fbs_spec': fbs41, 'V406': V406_41,
+        'tea': SimpleNamespace(TCI=350e6), 'HXN': SimpleNamespace(),
+        'model_specification': lambda **kw: None,
+        'solve_TEA': lambda stream_IDs=None: {
+            'IRR': 0.2, 'MPSPs': {'ethanol': 0.5, 'isobutanol': 1.0}},
+        'latest_TEA_solution': {'IRR': np.nan,
+                                'MPSPs': {'ethanol': np.nan,
+                                          'isobutanol': np.nan}}}
+    _optuna.logging.set_verbosity(_optuna.logging.WARNING)
+    study41, csv41, _ = ko.run_kinetic_optimization(
+        objective='IRR', scenario_label='X', n_trials=3, seed=1,
+        study_name='offline_seeded', results_dir=outdir41, handles=handles41,
+        print_status_every=1, burden_model=None,
+        stage_1_max_x_bounds=(1.0, 50.0),
+        seed_from=[('donor41', [7])])
+    df41 = ko.load_trajectory(csv41)
+    assert df41['trial_number'].tolist() == [0, 1, 2]
+    assert df41['state'].tolist() == ['COMPLETE']*3
+    assert df41['k_1e'][0] == 47.1 and np.isclose(df41['k_1e'][1], 4.71)
+    assert df41['k_1e'][2] == 100.0 and df41['K_1e'][2] == 1.2
+    assert df41['max_n_spikes'][2] == 12 and df41['stage_1_max_x'][2] == 3.0
+    assert df41['threshold_conc'][2] == 200.0
+    assert study41.trials[2].user_attrs.get('seed') == 'donor41#7'
+    assert 'seed' not in study41.trials[1].user_attrs
+    # Resume (one more trial): seeds are NOT re-enqueued -- trial 3 is a
+    # sampled point without the attr.
+    study41b, _, _ = ko.run_kinetic_optimization(
+        objective='IRR', scenario_label='X', n_trials=4, seed=1,
+        study_name='offline_seeded', results_dir=outdir41, handles=handles41,
+        print_status_every=1, burden_model=None,
+        stage_1_max_x_bounds=(1.0, 50.0),
+        seed_from=[('donor41', [7])])
+    assert len(study41b.trials) == 4
+    assert 'seed' not in study41b.trials[3].user_attrs
+    assert ko.load_trajectory(csv41)['k_1e'][3] != 100.0
+    # A bad donor fails BEFORE the store is opened (no .db / CSV created).
+    try:
+        ko.run_kinetic_optimization(
+            objective='IRR', scenario_label='X', n_trials=3, seed=1,
+            study_name='offline_seeded_bad', results_dir=outdir41,
+            handles=handles41, burden_model=None,
+            stage_1_max_x_bounds=(1.0, 50.0),
+            seed_from=[('no_such_study', [7])])
+    except ValueError as e41:
+        assert 'no trajectory CSV' in str(e41)
+    else:
+        raise AssertionError('missing donor did not raise')
+    assert not os.path.exists(os.path.join(outdir41, 'offline_seeded_bad.db'))
+# Driver / supervisor plumbing.
+drv41 = open(os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                          'optimize_kinetics_BO.py')).read()
+assert 'seed_from=None,' in drv41 and 'seed_from=seed_from,' in drv41
+assert 'n_seeds=n_seeds)' in drv41
+assert "+ ko.seed_points_tag(n_seeds)" in drv41          # legacy-path name
+sup41 = _runpy.run_path(os.path.join(
+    os.path.dirname(os.path.abspath(__file__)),
+    'optimize_kinetics_BO_supervised.py'))
+seeds41_cli = [('donor_a', (1553, 1914)), ('donor_b', (1162,))]
+assert sup41['seed_count'](seeds41_cli) == 3 and sup41['seed_count'](None) == 0
+assert sup41['default_study_name'](None, 'IRR', None,
+                                   study_target_products='ethanol_isobutanol',
+                                   study_type='metabolic', burden=True,
+                                   seed_from=seeds41_cli) \
+    == 'kin_opt_ethanol_isobutanol_metabolic_irr_rb0.001-10_ib0.1-10_xk10_s1x1-50_seed3_burden'
+assert sup41['default_study_name']('A', 'IRR', 'B', seed_from=seeds41_cli) \
+    == 'kin_opt_A_kbB_irr_seed3'
+assert sup41['default_study_name']('A', 'IRR', 'B') == 'kin_opt_A_kbB_irr'
+code41 = sup41['child_code'](None, 'IRR', 200, None, False, 'x',
+                             study_target_products='ethanol_isobutanol',
+                             study_type='metabolic')
+assert 'seed_from' not in code41
+code41b = sup41['child_code'](None, 'IRR', 200, None, False, 'x',
+                              study_target_products='ethanol_isobutanol',
+                              study_type='metabolic',
+                              seed_from=[('donor_a', [1553, 1914]), ('donor_b', [1162])])
+assert "seed_from=[('donor_a', (1553, 1914)), ('donor_b', (1162,))]," in code41b
+src41_sup = _inspect.getsource(sup41['supervise'])
+assert 'seed_from=seed_from' in src41_sup
+assert 'seed_from={seed_from!r}' in src41_sup   # settings event line
+src41 = open(os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                          'optimize_kinetics_BO_supervised.py')).read()
+assert "'--seed-from', nargs='+', action='append'" in src41
+assert "parser.error('--seed-from takes STUDY TRIAL [TRIAL ...]')" in src41
+PASS('seed points: clip_to_search_space, seed_points_from_trajectory (labels, clipping, int cast, LOST note, column guard, extra column dropped), _seed{n} tag, engine enqueues after the probes on a fresh study only / bad donor fails pre-store, driver + supervisor --seed-from plumbing')
 
 print(f'\nALL {n_pass} CHECKS PASSED')

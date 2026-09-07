@@ -67,6 +67,11 @@ sequentially) -- ask-first, like the unsupervised driver. Examples:
     # burden-free legacy study (any study started before 2026-09-05):
     python optimize_kinetics_BO_supervised.py --no-burden --legacy-flags \\
         --scenario A --kinetic-bounds-scenario B --objective IRR
+    # seeded: enqueue donor trials (decision points of other studies of the
+    # SAME columns) after the probes; the name gains _seed{n}:
+    python optimize_kinetics_BO_supervised.py --objective IRR \\
+        --study-type metabolic --seed-from <donor study> 1553 1914 \\
+        --seed-from <other donor> 1162
 """
 import argparse
 import importlib.util
@@ -92,10 +97,17 @@ _spec.loader.exec_module(ko)
 _UNSET = object()
 
 
+def seed_count(seed_from):
+    """Total seed points of a `seed_from` list ([(donor, [trials]), ...];
+    None = 0) -- the n of the `_seed{n}` study-name tag."""
+    return sum(len(trials) for _, trials in (seed_from or ()))
+
+
 def default_study_name(scenario, objective, kinetic_bounds_scenario,
                        study_target_products=None, study_type=None,
                        burden=False, rate_multiplier_bounds=None,
-                       exclude_params=None, stage_1_max_x_bounds=_UNSET):
+                       exclude_params=None, stage_1_max_x_bounds=_UNSET,
+                       seed_from=None):
     """Mirror the driver's stable study naming (resume finds the same
     study): the preset convention
     kin_opt_{study_target_products}_{study_type}_{slug} whenever a
@@ -126,7 +138,12 @@ def default_study_name(scenario, objective, kinetic_bounds_scenario,
     `stage_1_max_x_bounds` (_UNSET = the presets'
     ko.DEFAULT_STAGE_1_MAX_X_BOUNDS, which the driver defaults in; None =
     pinned, no tag; a tuple = an explicit band) is tagged `_s1x{lo}-{hi}`
-    after the exclusion tag (ko.default_study_name)."""
+    after the exclusion tag (ko.default_study_name). `seed_from`
+    ([(donor, [trials]), ...]; None = none) tags the seed COUNT
+    `_seed{n}` after `_s1x` on both paths (ko.seed_points_tag): seeds
+    change the trajectory, not the columns, so the tag is what keeps a
+    seeded run off the unseeded study's store."""
+    n_seeds = seed_count(seed_from)
     if study_target_products is not None:
         return ko.default_study_name(objective, study_target_products,
                                      study_type, scenario=scenario,
@@ -146,10 +163,11 @@ def default_study_name(scenario, objective, kinetic_bounds_scenario,
                                          ko.DEFAULT_STAGE_1_MAX_X_BOUNDS
                                          if stage_1_max_x_bounds is _UNSET
                                          else (None if stage_1_max_x_bounds is None
-                                               else tuple(stage_1_max_x_bounds))))
+                                               else tuple(stage_1_max_x_bounds))),
+                                     n_seeds=n_seeds)
     scenario = scenario or 'B'
     slug = objective.lower().replace(' ', '_')
-    suffix = ko.BURDEN_STUDY_SUFFIX if burden else ''
+    suffix = ko.seed_points_tag(n_seeds) + (ko.BURDEN_STUDY_SUFFIX if burden else '')
     if kinetic_bounds_scenario:
         return f'kin_opt_{scenario}_kb{kinetic_bounds_scenario}_{slug}{suffix}'
     return f'kin_opt_{scenario}_{slug}{suffix}'
@@ -206,7 +224,7 @@ def child_code(scenario, objective, n_trials, kinetic_bounds_scenario,
                burden=True, enqueue_knockouts=True,
                rate_multiplier_bounds=None, n_startup_trials=None,
                feasible_sampling=True, exclude_params=None,
-               stage_1_max_x_bounds=_UNSET):
+               stage_1_max_x_bounds=_UNSET, seed_from=None):
     """The -c program for one supervised attempt of the driver.
     `study_target_products=None` selects the driver's legacy flag path.
     `rate_multiplier_bounds=None` leaves the k_* band to the preset (the
@@ -219,7 +237,14 @@ def child_code(scenario, objective, n_trials, kinetic_bounds_scenario,
     k_10; the kwarg is omitted); a tuple -- () included, which re-includes
     k_10 -- is forwarded. `stage_1_max_x_bounds=_UNSET` leaves the
     operating variable's band to the preset (the kwarg is omitted); None
-    (pin at the baseline) or a tuple is forwarded."""
+    (pin at the baseline) or a tuple is forwarded. `seed_from=None`
+    (no seeds) omits the kwarg; a non-empty [(donor, [trials]), ...]
+    list is forwarded as a list of (str, tuple-of-int) pairs (the driver
+    enqueues the seeds on a fresh study only)."""
+    seeds = [(str(donor), tuple(int(n) for n in trials))
+             for donor, trials in (seed_from or ())]
+    seed_kw = ('' if not seeds else
+               f'          seed_from={seeds!r},\n')
     rate_kw = ('' if rate_multiplier_bounds is None else
                f'          rate_multiplier_bounds={tuple(rate_multiplier_bounds)!r},\n')
     startup_kw = ('' if n_startup_trials is None else
@@ -250,6 +275,7 @@ def child_code(scenario, objective, n_trials, kinetic_bounds_scenario,
         f'{startup_kw}'
         f'{exclude_kw}'
         f'{s1x_kw}'
+        f'{seed_kw}'
         f'          )\n')
 
 
@@ -263,7 +289,7 @@ def supervise(scenario=None, objective='IRR', n_trials=2000,
               enqueue_knockouts=True, rate_multiplier_bounds=None,
               n_startup_trials=None, max_empty_attempts=5,
               feasible_sampling=True, exclude_params=None,
-              stage_1_max_x_bounds=_UNSET):
+              stage_1_max_x_bounds=_UNSET, seed_from=None):
     """Run attempts until 'complete' or 'abort'; returns the final
     outcome string ('complete' or 'abort'). `study_target_products` /
     `study_type` name the driver's study preset (defaults = the engine's;
@@ -303,7 +329,15 @@ def supervise(scenario=None, objective='IRR', n_trials=2000,
     (_UNSET = the preset's (1, 50) g/L band; None = pin at the baseline,
     --stage-1-max-x-bounds bare; a tuple = explicit LO HI) is the
     operating variable's band, forwarded to the driver only when given
-    and tagged `_s1x{lo}-{hi}` into the derived study name."""
+    and tagged `_s1x{lo}-{hi}` into the derived study name. `seed_from`
+    (None = none; --seed-from STUDY TRIAL [TRIAL ...], repeatable) is the
+    driver's seed-point list [(donor study name or CSV path, [trial
+    numbers]), ...]: the decision points of those donor trials are
+    enqueued after the knockout probes of a fresh study (a resume never
+    re-enqueues), and the seed COUNT is tagged `_seed{n}` into the
+    derived study name."""
+    seed_from = [(donor, tuple(int(n) for n in trials))
+                 for donor, trials in (seed_from or ())]
     if study_name is None:
         study_name = default_study_name(scenario, objective,
                                         kinetic_bounds_scenario,
@@ -311,7 +345,8 @@ def supervise(scenario=None, objective='IRR', n_trials=2000,
                                         study_type=study_type, burden=burden,
                                         rate_multiplier_bounds=rate_multiplier_bounds,
                                         exclude_params=exclude_params,
-                                        stage_1_max_x_bounds=stage_1_max_x_bounds)
+                                        stage_1_max_x_bounds=stage_1_max_x_bounds,
+                                        seed_from=seed_from)
     csv_path = os.path.join(RESULTS_DIR, study_name + '_trajectory.csv')
     inflight_path = ko.inflight_path_for(RESULTS_DIR, study_name)
     if python is None:
@@ -329,7 +364,8 @@ def supervise(scenario=None, objective='IRR', n_trials=2000,
                       n_startup_trials=n_startup_trials,
                       feasible_sampling=feasible_sampling,
                       exclude_params=exclude_params,
-                      stage_1_max_x_bounds=stage_1_max_x_bounds)
+                      stage_1_max_x_bounds=stage_1_max_x_bounds,
+                      seed_from=seed_from)
     guard = ko.StallGuard(stall_timeout_s=60.0*stall_timeout_min)
 
     def event(msg):
@@ -354,6 +390,7 @@ def supervise(scenario=None, objective='IRR', n_trials=2000,
           f'rate_multiplier_bounds={rate_multiplier_bounds!r}, '
           f'exclude_params={exclude_params!r}, '
           f'stage_1_max_x_bounds={stage_1_max_x_bounds!r}, '
+          f'seed_from={seed_from!r}, '
           f'stall_timeout_min={stall_timeout_min:g}, '
           f'max_empty_attempts={max_empty_attempts!r}')
     attempt = 0
@@ -577,7 +614,32 @@ if __name__ == '__main__':
                              'tagged _s1x{LO}-{HI} into the derived study '
                              'name -- a new decision column, so a study '
                              'with it never resumes one without it')
+    parser.add_argument('--seed-from', nargs='+', action='append',
+                        default=None, metavar='STUDY_OR_TRIAL',
+                        help='STUDY TRIAL [TRIAL ...]: enqueue the decision '
+                             'points of those trials of the donor STUDY (a '
+                             'study name under analyses/results, or a '
+                             'trajectory-CSV path; same decision columns '
+                             'required) after the knockout probes of a '
+                             'fresh study, so TPE starts with a foothold '
+                             'in a basin another study found (e.g. a '
+                             'high-isobutanol cell in an IRR study); '
+                             'repeatable for several donors. The seed '
+                             'COUNT is tagged _seed{n} into the derived '
+                             'study name; a resume never re-enqueues')
     args = parser.parse_args()
+    seed_from = None
+    if args.seed_from:
+        seed_from = []
+        for group in args.seed_from:
+            if len(group) < 2:
+                parser.error('--seed-from takes STUDY TRIAL [TRIAL ...]')
+            try:
+                trials = tuple(int(n) for n in group[1:])
+            except ValueError:
+                parser.error(f'--seed-from {group[0]}: trial numbers must '
+                             f'be integers, got {group[1:]}')
+            seed_from.append((group[0], trials))
     if not args.restrict_to_workbook and not args.legacy_flags:
         parser.error('--no-restrict-to-workbook requires --legacy-flags '
                      '(presets always use the workbook set)')
@@ -612,5 +674,6 @@ if __name__ == '__main__':
                         feasible_sampling=args.feasible_sampling,
                         exclude_params=(None if args.exclude_params is None
                                         else tuple(args.exclude_params)),
-                        stage_1_max_x_bounds=stage_1_max_x_bounds)
+                        stage_1_max_x_bounds=stage_1_max_x_bounds,
+                        seed_from=seed_from)
     sys.exit(0 if outcome == 'complete' else 1)
