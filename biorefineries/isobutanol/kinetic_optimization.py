@@ -64,6 +64,8 @@ __all__ = ('OBJECTIVE_REGISTRY', 'TRACKED_METRICS',
            'kinetic_parameter_roles_path', 'kinetic_parameter_roles',
            'rate_constant_names',
            'STUDY_TARGET_PRODUCTS', 'STUDY_TYPE_ROLES',
+           'STUDY_TYPE_OPTIONS', 'EFFECTOR_ORDER',
+           'kinetic_parameter_effectors', 'study_type_name_defaults',
            'DEFAULT_STUDY_TARGET_PRODUCTS', 'DEFAULT_STUDY_TYPE',
            'resolve_study_preset', 'default_study_name',
            'BURDEN_STUDY_SUFFIX',
@@ -827,7 +829,6 @@ def workbook_kinetic_bounds(scenario, multiplier_bounds=(0.1, 10.0),
 #: Path of the role table relative to the nskinetics package directory.
 _ROLE_TABLE_RELPATH = ('models', 's_cerevisiae_ferm_fb_inhib_mod_ibo',
                        'parameter_categories.py')
-_kinetic_parameter_roles_cache = None
 
 def kinetic_parameter_roles_path():
     """Absolute path of nskinetics' parameter_categories.py for the shipped
@@ -843,29 +844,65 @@ def kinetic_parameter_roles_path():
                           'kinetic-parameter role table).')
     return os.path.join(os.path.dirname(spec.origin), *_ROLE_TABLE_RELPATH)
 
-def kinetic_parameter_roles(path=None):
-    """{kinetic parameter name: role} from nskinetics'
-    parameter_categories.KINETIC_PARAMETERS, in table order. The file is
-    executed BY PATH (spec_from_file_location + exec_module): it is pure
-    Python (stdlib math + dataclasses only) and documented as readable
-    without loading the model, whereas importing it through the package
-    pulls tellurium/roadrunner/biosteam (~15 s) -- which the stdlib-only
+_kinetic_parameter_table_cache = None
+
+def _kinetic_parameter_table(path=None):
+    """nskinetics' parameter_categories.KINETIC_PARAMETERS ({name:
+    ParameterInfo(role, reactions, modules, effector)}) executed BY PATH
+    (spec_from_file_location + exec_module): the file is pure Python
+    (stdlib math + dataclasses only) and documented as readable without
+    loading the model, whereas importing it through the package pulls
+    tellurium/roadrunner/biosteam (~15 s) -- which the stdlib-only
     supervisor and the offline test must never do. The default-path
-    result is cached after the first call; an explicit `path` (tests)
-    is always read afresh and never cached."""
-    global _kinetic_parameter_roles_cache
-    if path is None and _kinetic_parameter_roles_cache is not None:
-        return _kinetic_parameter_roles_cache
+    table is cached after the first call; an explicit `path` (tests) is
+    always read afresh and never cached."""
+    global _kinetic_parameter_table_cache
+    if path is None and _kinetic_parameter_table_cache is not None:
+        return _kinetic_parameter_table_cache
     table_path = kinetic_parameter_roles_path() if path is None else path
     spec = importlib.util.spec_from_file_location(
         '_nskinetics_parameter_categories', table_path)
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
+    table = dict(module.KINETIC_PARAMETERS)
+    if path is None:
+        _kinetic_parameter_table_cache = table
+    return table
+
+_kinetic_parameter_roles_cache = None
+
+def kinetic_parameter_roles(path=None):
+    """{kinetic parameter name: role} from nskinetics'
+    parameter_categories.KINETIC_PARAMETERS, in table order, read by
+    file path (_kinetic_parameter_table; cached for the default path,
+    same pattern as kinetic_parameter_effectors)."""
+    global _kinetic_parameter_roles_cache
+    if path is None and _kinetic_parameter_roles_cache is not None:
+        return _kinetic_parameter_roles_cache
     roles = {name: info.role
-             for name, info in module.KINETIC_PARAMETERS.items()}
+             for name, info in _kinetic_parameter_table(path).items()}
     if path is None:
         _kinetic_parameter_roles_cache = roles
     return roles
+
+_kinetic_parameter_effectors_cache = None
+
+def kinetic_parameter_effectors(path=None):
+    """{kinetic parameter name: effector or None} from the same table
+    (the `effector` attribute: 'ethanol' / 'isobutanol' / 'acetate' on
+    the inhibition, lethality and self-inhibition rows, 'glucose' /
+    'acetaldehyde' on the regulation rows, None on capacities and
+    affinities), in table order; cached for the default path like the
+    roles. The metabolic_minimal preset groups the inhibition
+    coefficients by it (resolve_study_preset)."""
+    global _kinetic_parameter_effectors_cache
+    if path is None and _kinetic_parameter_effectors_cache is not None:
+        return _kinetic_parameter_effectors_cache
+    effectors = {name: getattr(info, 'effector', None)
+                 for name, info in _kinetic_parameter_table(path).items()}
+    if path is None:
+        _kinetic_parameter_effectors_cache = effectors
+    return effectors
 
 def rate_constant_names(names, roles=None):
     """The RATE CONSTANTS among `names` (role in RATE_CONSTANT_ROLES, i.e.
@@ -917,12 +954,66 @@ STUDY_TYPE_ROLES = {
     'metabolic_protein': ('capacity', 'product_inhibition', 'lethality',
                           'substrate_regulation', 'affinity',
                           'product_self_inhibition'),
+    # 'metabolic_minimal' (2026-09-07): the 'metabolic' roles minus the
+    # substrate-regulation terms, with the inhibition coefficients
+    # sampled as ONE multiplier per effector family (STUDY_TYPE_OPTIONS).
+    'metabolic_minimal': ('capacity', 'product_inhibition', 'lethality'),
 }
+
+#: Per-study_type options beyond the role filter (a type absent here
+#: takes the defaults: DEFAULT_EXCLUDED_PARAMETERS, no groups,
+#: DEFAULT_GROUP_MULTIPLIER_BOUNDS, DEFAULT_SPIKE_DELTA_BOUNDS).
+#: 'metabolic_minimal' = the compact, interpretable space (24 variables
+#: for ethanol_isobutanol, 19 for ethanol_only): exclude_params = k_10
+#: (decay, as everywhere) + k_7 and k_8 (the growth capacities, so the
+#: burden's phi_T stays at wild type); group_roles = the inhibition
+#: coefficients, grouped by the role table's effector into
+#: inhib_ethanol / inhib_isobutanol / inhib_acetate (EFFECTOR_ORDER),
+#: each ONE log multiplier on group_multiplier_bounds (0.2x-2x); and
+#: spike_delta_bounds = None, the spike feed pinned at the scenario
+#: baseline (600 g/L). The driver tags the group band as the inhibition
+#: band (`_ib0.2-2`) and the exclusion set as `_xk10+k7+k8`
+#: (study_type_name_defaults); the group columns and the missing
+#: spike_delta column keep the header guard from any cross-resume.
+STUDY_TYPE_OPTIONS = {
+    'metabolic_minimal': dict(
+        exclude_params=('k_10', 'k_7', 'k_8'),
+        group_roles=('product_inhibition', 'lethality'),
+        group_multiplier_bounds=(0.2, 2.0),
+        spike_delta_bounds=None,
+    ),
+}
+#: Order of the effector groups of a grouped preset (group name
+#: `inhib_{effector}`); effectors with no rows in the workbook set are
+#: omitted (ethanol_only has no isobutanol coefficients).
+EFFECTOR_ORDER = ('ethanol', 'isobutanol', 'acetate')
+
+def study_type_name_defaults(study_type):
+    """The per-study_type defaults that ENTER THE STUDY NAME, as
+    dict(inhibition_multiplier_bounds=(lo, hi), exclude_params=(names)):
+    the STUDY_TYPE_OPTIONS entry's group_multiplier_bounds and
+    exclude_params when the type has one (metabolic_minimal: (0.2, 2.0)
+    and ('k_10', 'k_7', 'k_8')), else DEFAULT_SATURATION_MULTIPLIER_BOUNDS
+    and DEFAULT_EXCLUDED_PARAMETERS. resolve_study_preset builds its
+    multiplier_bounds / exclude_params from here and the supervisor's
+    default_study_name reads its `_ib` / `_x` tags from here, so the
+    two names can never drift (the supervisor's stall watchdog counts
+    rows of the name IT derives). Unknown study_type: ValueError."""
+    if study_type not in STUDY_TYPE_ROLES:
+        raise ValueError(f'Unknown study_type {study_type!r}; expected one '
+                         f'of {sorted(STUDY_TYPE_ROLES)}.')
+    options = STUDY_TYPE_OPTIONS.get(study_type, {})
+    return dict(
+        inhibition_multiplier_bounds=tuple(options.get(
+            'group_multiplier_bounds', DEFAULT_SATURATION_MULTIPLIER_BOUNDS)),
+        exclude_params=tuple(options.get('exclude_params',
+                                         DEFAULT_EXCLUDED_PARAMETERS)))
 
 DEFAULT_STUDY_TARGET_PRODUCTS = 'ethanol_isobutanol'
 DEFAULT_STUDY_TYPE = 'metabolic_protein'
 
-def resolve_study_preset(study_target_products, study_type, roles=None):
+def resolve_study_preset(study_target_products, study_type, roles=None,
+                         effectors=None):
     """The driver run() kwargs of a named study preset (sim-free):
     dict(scenario='A', kinetic_bounds_scenario=<A|B>,
     include_params=[workbook rows of that scenario whose role is in
@@ -952,7 +1043,24 @@ def resolve_study_preset(study_target_products, study_type, roles=None):
     kinetic_parameter_roles()) is the {name: role} table; a workbook row
     absent from it raises KeyError(name) so a future workbook/model change
     can never leak a parameter into a set silently. Unknown axis values
-    raise ValueError."""
+    raise ValueError.
+
+    Since 2026-09-07 every preset also returns `parameter_groups`
+    ({group: [members]} for a grouped study_type, None otherwise),
+    `group_multiplier_bounds` and `spike_delta_bounds` (a tuple, or None
+    = spike pinned at the baseline), and its `multiplier_bounds` /
+    `exclude_params` come from study_type_name_defaults(study_type).
+    'metabolic_minimal' (STUDY_TYPE_OPTIONS): include_params = the
+    capacity + product_inhibition + lethality rows (36 for the B
+    workbook, 25 for A's); exclude_params ('k_10', 'k_7', 'k_8'); the
+    inhibition rows grouped by the role table's effector (`effectors`,
+    default kinetic_parameter_effectors(); a grouped row whose effector
+    is None or not in EFFECTOR_ORDER raises KeyError) into
+    inhib_ethanol / inhib_isobutanol / inhib_acetate in EFFECTOR_ORDER,
+    members in workbook order, effectors without rows omitted; so the
+    sampled space is 17 rates + 3 multipliers (+ 4 feeding/operating)
+    for ethanol_isobutanol and 13 + 2 (+ 4) for ethanol_only.
+    """
     if study_target_products not in STUDY_TARGET_PRODUCTS:
         raise ValueError(
             f'Unknown study_target_products {study_target_products!r}; '
@@ -975,16 +1083,48 @@ def resolve_study_preset(study_target_products, study_type, roles=None):
                 'refusing to build the study preset.')
         if roles[name] in allowed_roles:
             include_params.append(name)
+    options = STUDY_TYPE_OPTIONS.get(study_type, {})
+    name_defaults = study_type_name_defaults(study_type)
+    group_roles = set(options.get('group_roles', ()))
+    parameter_groups = None
+    if group_roles:
+        if effectors is None:
+            effectors = kinetic_parameter_effectors()
+        families = {effector: [] for effector in EFFECTOR_ORDER}
+        for name in include_params:
+            if roles[name] not in group_roles:
+                continue
+            effector = effectors.get(name)
+            if effector is None:
+                raise KeyError(
+                    f'{name!r} (role {roles[name]!r}, to be grouped by '
+                    'effector) has no effector in the nskinetics '
+                    'kinetic-parameter table; refusing to build the '
+                    f'{study_type!r} preset.')
+            if effector not in families:
+                raise KeyError(
+                    f'{name!r} has effector {effector!r}, not in '
+                    f'EFFECTOR_ORDER {EFFECTOR_ORDER}; refusing to build '
+                    f'the {study_type!r} preset.')
+            families[effector].append(name)
+        parameter_groups = {f'inhib_{effector}': members
+                            for effector, members in families.items()
+                            if members}
     return dict(scenario=target['scenario'],
                 kinetic_bounds_scenario=set_scenario,
                 include_params=include_params,
-                multiplier_bounds=DEFAULT_SATURATION_MULTIPLIER_BOUNDS,
+                multiplier_bounds=name_defaults['inhibition_multiplier_bounds'],
                 rate_multiplier_bounds=DEFAULT_RATE_MULTIPLIER_BOUNDS,
                 rate_params=rate_constant_names(workbook_rows, roles=roles),
                 parameter_multiplier_bounds=dict(
                     DEFAULT_PARAMETER_MULTIPLIER_BOUNDS),
-                exclude_params=tuple(DEFAULT_EXCLUDED_PARAMETERS),
-                stage_1_max_x_bounds=tuple(DEFAULT_STAGE_1_MAX_X_BOUNDS))
+                exclude_params=name_defaults['exclude_params'],
+                stage_1_max_x_bounds=tuple(DEFAULT_STAGE_1_MAX_X_BOUNDS),
+                parameter_groups=parameter_groups,
+                group_multiplier_bounds=tuple(options.get(
+                    'group_multiplier_bounds', DEFAULT_GROUP_MULTIPLIER_BOUNDS)),
+                spike_delta_bounds=options.get('spike_delta_bounds',
+                                               DEFAULT_SPIKE_DELTA_BOUNDS))
 
 #: Study-name suffix of a burden-enabled study (enzyme_burden.py): it
 #: records extra columns and a different physiology, so it must never

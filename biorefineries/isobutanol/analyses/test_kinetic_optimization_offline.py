@@ -690,7 +690,9 @@ PASS('kinetic_parameter_roles: role table loaded by file path, no heavy import i
 assert ko.DEFAULT_STUDY_TARGET_PRODUCTS == 'ethanol_isobutanol'
 assert ko.DEFAULT_STUDY_TYPE == 'metabolic_protein'
 assert set(ko.STUDY_TARGET_PRODUCTS) == {'ethanol_only', 'ethanol_isobutanol'}
-assert set(ko.STUDY_TYPE_ROLES) == {'metabolic', 'metabolic_protein'}
+assert set(ko.STUDY_TYPE_ROLES) == {'metabolic', 'metabolic_protein', 'metabolic_minimal'}
+assert set(ko.STUDY_TYPE_ROLES['metabolic_minimal']) == {
+    'capacity', 'product_inhibition', 'lethality'}
 assert set(ko.STUDY_TYPE_ROLES['metabolic']) == {
     'capacity', 'product_inhibition', 'lethality', 'substrate_regulation'}
 assert set(ko.STUDY_TYPE_ROLES['metabolic_protein']) == (
@@ -732,7 +734,13 @@ if os.path.isfile(wb_A) and os.path.isfile(wb_B):
         assert set(p21) == {'scenario', 'kinetic_bounds_scenario', 'include_params',
                             'multiplier_bounds', 'rate_multiplier_bounds',
                             'rate_params', 'parameter_multiplier_bounds',
-                            'exclude_params', 'stage_1_max_x_bounds'}
+                            'exclude_params', 'stage_1_max_x_bounds',
+                            'parameter_groups', 'group_multiplier_bounds',
+                            'spike_delta_bounds'}
+        # The three 2026-09-07 keys are inert on every pre-existing preset.
+        assert p21['parameter_groups'] is None
+        assert p21['group_multiplier_bounds'] == ko.DEFAULT_GROUP_MULTIPLIER_BOUNDS
+        assert p21['spike_delta_bounds'] == ko.DEFAULT_SPIKE_DELTA_BOUNDS
         assert p21['scenario'] == 'A'                       # both start at the A baseline
         # k_10 is excluded from every preset by default (2026-09-06 pm): a
         # lower decay rate is a free lunch; it stays in include_params (the
@@ -2892,5 +2900,124 @@ assert 'spike = pinned' in ax42c.get_title(), ax42c.get_title()
 import matplotlib.pyplot as _plt42
 _plt42.close('all')
 PASS('parameter groups: one log multiplier per group after the kinetics, members removed, override ignored, expand_grouped_values, baseline 1.0, no probe, spike_delta_bounds=None pins the spike, every validation ValueError, plots tolerate a pinned spike')
+
+#%% 43. metabolic_minimal preset (2026-09-07): 17 rates + one multiplier per
+# inhibition-effector family + 4 feeding/operating variables; effector
+# table by file path; study_type_name_defaults shared by driver and
+# supervisor; the exact study name; existing presets untouched.
+assert ko.EFFECTOR_ORDER == ('ethanol', 'isobutanol', 'acetate')
+assert ko.STUDY_TYPE_OPTIONS == {
+    'metabolic_minimal': dict(exclude_params=('k_10', 'k_7', 'k_8'),
+                              group_roles=('product_inhibition', 'lethality'),
+                              group_multiplier_bounds=(0.2, 2.0),
+                              spike_delta_bounds=None)}
+assert {'STUDY_TYPE_OPTIONS', 'EFFECTOR_ORDER', 'kinetic_parameter_effectors',
+        'study_type_name_defaults'} <= set(ko.__all__)
+# Naming defaults per study type (workbook-free): the minimal type's group
+# band stands in for the inhibition band (_ib0.2-2) and its exclusion set
+# is k_10 + k_7 + k_8; every other type keeps the module defaults.
+assert ko.study_type_name_defaults('metabolic_minimal') == dict(
+    inhibition_multiplier_bounds=(0.2, 2.0), exclude_params=('k_10', 'k_7', 'k_8'))
+for st43 in ('metabolic', 'metabolic_protein'):
+    assert ko.study_type_name_defaults(st43) == dict(
+        inhibition_multiplier_bounds=ko.DEFAULT_SATURATION_MULTIPLIER_BOUNDS,
+        exclude_params=ko.DEFAULT_EXCLUDED_PARAMETERS)
+try:
+    ko.study_type_name_defaults('protein')
+except ValueError as e43:
+    assert 'protein' in str(e43)
+else:
+    raise AssertionError('unknown study_type did not raise')
+NAME43 = ('kin_opt_ethanol_isobutanol_metabolic_minimal_irr'
+          '_rb0.001-10_ib0.2-2_xk10+k7+k8_s1x1-50_burden')
+assert ko.default_study_name('IRR', 'ethanol_isobutanol', 'metabolic_minimal',
+                             rate_multiplier_bounds=(1e-3, 10.0),
+                             inhibition_multiplier_bounds=(0.2, 2.0),
+                             exclude_params=('k_10', 'k_7', 'k_8'),
+                             stage_1_max_x_bounds=(1.0, 50.0), burden=True) == NAME43
+# Effector table read by FILE PATH, cached like the roles; a table row
+# without an effector gives None.
+eff43 = ko.kinetic_parameter_effectors()
+assert eff43 is ko.kinetic_parameter_effectors()            # cached
+assert set(eff43) == set(ko.kinetic_parameter_roles())
+assert eff43['k_1ie'] == 'ethanol' and eff43['k_1ii'] == 'isobutanol' \
+    and eff43['k_16ia'] == 'acetate' and eff43['k_10ie'] == 'ethanol'
+assert eff43['k_1e'] is None and eff43['k_7'] is None
+assert ko.kinetic_parameter_effectors(ko.kinetic_parameter_roles_path()) == eff43
+if os.path.isfile(wb_A) and os.path.isfile(wb_B):
+    roles43 = ko.kinetic_parameter_roles()
+    p43 = ko.resolve_study_preset('ethanol_isobutanol', 'metabolic_minimal')
+    assert p43['scenario'] == 'A' and p43['kinetic_bounds_scenario'] == 'B'
+    assert p43['exclude_params'] == ('k_10', 'k_7', 'k_8')
+    assert p43['multiplier_bounds'] == (0.2, 2.0)             # -> the _ib0.2-2 tag
+    assert p43['group_multiplier_bounds'] == (0.2, 2.0)
+    assert p43['spike_delta_bounds'] is None
+    assert p43['rate_multiplier_bounds'] == ko.DEFAULT_RATE_MULTIPLIER_BOUNDS
+    assert p43['parameter_multiplier_bounds'] == {'k_10': (0.1, 10.0)}
+    assert p43['stage_1_max_x_bounds'] == (1.0, 50.0)
+    assert p43['parameter_groups'] == {
+        'inhib_ethanol': ['k_1ie', 'k_4ie', 'k_7ie', 'k_10ie', 'k_16ie'],
+        'inhib_isobutanol': ['k_1ii', 'k_4ii', 'k_6ii', 'k_7ii', 'k_10ii'],
+        'inhib_acetate': ['k_1ia', 'k_4ia', 'k_6ia', 'k_7ia', 'k_10ia', 'k_16ia']}
+    assert list(p43['parameter_groups']) == ['inhib_ethanol', 'inhib_isobutanol', 'inhib_acetate']
+    inc43 = p43['include_params']
+    assert len(inc43) == 36                                    # 20 capacities + 16 inhibition rows
+    assert all(roles43[n] in ('capacity', 'product_inhibition', 'lethality') for n in inc43)
+    assert not any(n.startswith('K_') for n in inc43)         # K_1i etc. are OUT
+    grouped43 = {m for ms in p43['parameter_groups'].values() for m in ms}
+    individual43 = [n for n in inc43 if n not in grouped43 and n not in p43['exclude_params']]
+    assert len(individual43) == 17 and all(roles43[n] == 'capacity' for n in individual43)
+    assert not {'k_10', 'k_7', 'k_8'} & set(individual43)
+    assert len(p43['rate_params']) == 20                       # the workbook's capacities, as before
+    # The resulting space (live baselines = the B workbook values here):
+    # 17 + 3 + 4 = 24 decision variables, in the documented order.
+    kb43 = ko.workbook_kinetic_baselines('B')
+    space43, excl43 = ko.build_search_space(
+        kb43, include_params=inc43, exclude_params=p43['exclude_params'],
+        rate_multiplier_bounds=p43['rate_multiplier_bounds'],
+        rate_params=p43['rate_params'],
+        parameter_multiplier_bounds=p43['parameter_multiplier_bounds'],
+        parameter_groups=p43['parameter_groups'],
+        group_multiplier_bounds=p43['group_multiplier_bounds'],
+        spike_delta_bounds=p43['spike_delta_bounds'],
+        stage_1_max_x_bounds=p43['stage_1_max_x_bounds'])
+    assert len(space43) == 24, len(space43)
+    assert list(space43)[:17] == individual43
+    assert list(space43)[17:] == ['inhib_ethanol', 'inhib_isobutanol', 'inhib_acetate',
+                                  'threshold_conc', 'target_delta', 'max_n_spikes',
+                                  'stage_1_max_x']
+    assert set(excl43) == set(kb43) - set(individual43) - grouped43
+    # ethanol_only: 13 rates (16 - 3), 2 groups (no isobutanol rows), 4 = 19.
+    p43_eo = ko.resolve_study_preset('ethanol_only', 'metabolic_minimal')
+    assert p43_eo['parameter_groups'] == {
+        'inhib_ethanol': ['k_1ie', 'k_4ie', 'k_7ie', 'k_10ie'],
+        'inhib_acetate': ['k_1ia', 'k_4ia', 'k_6ia', 'k_7ia', 'k_10ia']}
+    inc43_eo = p43_eo['include_params']
+    grouped43_eo = {m for ms in p43_eo['parameter_groups'].values() for m in ms}
+    assert len([n for n in inc43_eo if n not in grouped43_eo
+                and n not in p43_eo['exclude_params']]) == 13
+    # The four existing presets: parameter_groups None, everything else as
+    # in check 21 (their multiplier_bounds / exclude_params come through
+    # study_type_name_defaults now, same values).
+    for stp43, st43 in (('ethanol_only', 'metabolic'), ('ethanol_only', 'metabolic_protein'),
+                        ('ethanol_isobutanol', 'metabolic'),
+                        ('ethanol_isobutanol', 'metabolic_protein')):
+        q43 = ko.resolve_study_preset(stp43, st43)
+        assert q43['parameter_groups'] is None
+        assert q43['multiplier_bounds'] == (0.1, 10.0) and q43['exclude_params'] == ('k_10',)
+        assert q43['spike_delta_bounds'] == (0.5, 595.0)
+    # A grouped row with no effector in the (injected) table must raise.
+    eff_missing43 = dict(eff43); eff_missing43['k_1ie'] = None
+    try:
+        ko.resolve_study_preset('ethanol_isobutanol', 'metabolic_minimal',
+                                effectors=eff_missing43)
+    except KeyError as e43:
+        assert 'k_1ie' in str(e43)
+    else:
+        raise AssertionError('grouped row without an effector did not raise KeyError')
+    PASS('metabolic_minimal preset: 3 effector groups (5/5/6) + 17 rates + 4 = 24 (ethanol_only 2 groups + 13 + 4 = 19), K_* out, spike pinned, _ib0.2-2 / _xk10+k7+k8 naming via study_type_name_defaults, effector table by file path, existing presets untouched')
+else:
+    print('SKIP 43 (preset part): parameter-distribution workbooks not found')
+    PASS('metabolic_minimal naming + effector table (workbook-free part)')
 
 print(f'\nALL {n_pass} CHECKS PASSED')
