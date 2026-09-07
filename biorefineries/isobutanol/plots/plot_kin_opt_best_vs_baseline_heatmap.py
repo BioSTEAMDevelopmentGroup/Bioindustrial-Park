@@ -17,11 +17,11 @@ The best-trial cells also carry the fold change vs. the baseline in small
 italics.
 
 Inhibition coefficients are shown per member (the applied_<member> CSV
-columns of a grouped study), not per group multiplier. A member absent
-from the scenario-A workbook (the isobutanol coefficients and the r16
-terms) took its scenario-B value as the study baseline (the ethanol_
-isobutanol preset samples the B workbook's rows starting at A); those
-baseline cells are tagged "(B)".
+columns of a grouped study), not per group multiplier. The isobutanol and
+r16 coefficients are not curated in the scenario-A workbook, so the
+baseline for those falls back to the scenario-B workbook -- which equals
+the value in the shipped Antimony model, i.e. the scenario-A model value
+too (it simply has no effect in A, where no isobutanol is made).
 
 Sim-safe: kinetic_optimization.py is loaded by file path (no biosteam
 import, no load()), the trajectory CSV and the parameter-distribution
@@ -138,16 +138,19 @@ def build_rows(best, A, B):
         cells=[(sub(n), 0.0, float(best[n]), None)
                for n in ('k_13', 'k_14', 'k_15', 'k_16')])
 
+    # Every product-inhibition coefficient carries the same value in both
+    # scenarios (it is at that value in the shipped Antimony model; it just
+    # has no effect in A, where no isobutanol is made). The A workbook does
+    # not curate the isobutanol/r16 rows, so fall back to the B workbook,
+    # which equals the Antimony default.
     inh = []
     for gname, members in ko.METABOLIC_MINIMAL_SUBSET_GROUPS.items():
         for m in members:
-            in_A = A.get(m) is not None
-            base = A[m] if in_A else B[m]
-            inh.append((sub(m), base, float(best[f'applied_{m}']),
-                        None if in_A else '(B)'))
+            base = A[m] if A.get(m) is not None else B[m]
+            inh.append((sub(m), base, float(best[f'applied_{m}']), None))
     row_inh = dict(
         title='Inhibition coefficients (one multiplier per effector family '
-              'in the study; "(B)": absent in A, baseline = scenario B value)',
+              'in the study)',
         cbar_label='inhibition coefficient', cells=inh, extra_bottom=0.3,
         group_spans=[(g, len(ms)) for g, ms in
                      ko.METABOLIC_MINIMAL_SUBSET_GROUPS.items()])
@@ -204,14 +207,7 @@ def plot(rows, best, study_name, out_stem):
         for i in range(1, n):                       # 2px surface gaps
             ax.axvline(i, color='white', lw=2)
         ax.axhline(1, color='white', lw=2)
-        # Cells are pure color (values/multipliers read off the colorbars);
-        # the only in-cell mark kept is the "(B)" baseline-source tag.
-        for i, (label, base, bv, tag) in enumerate(cells):
-            if tag:
-                tc = (text_color_on(CMAP(norm(base))) if base > 0
-                      else '#666666')
-                ax.text(i + 0.5, n_sub - 0.5, tag, ha='center', va='center',
-                        color=tc, fontsize=FONTS['cell_sub'])
+        # Cells are pure color; values/multipliers read off the colorbars.
         ax.set_xlim(0, n)
         ax.set_ylim(0, n_sub)
         ax.set_yticks([1.5, 0.5])
