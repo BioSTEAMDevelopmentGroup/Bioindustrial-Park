@@ -143,3 +143,45 @@ BASELINE_A = {
     'TCI': 139.6, 'threshold_conc': 217.125, 'target_delta': 4.125,
     'max_n_spikes': 16,
 }
+
+
+# --- data assembly -----------------------------------------------------------
+def baseline_set():
+    """Scenario-A baseline as a flat record shaped like a campaign row.
+
+    Kinetics: the scenario-A workbook rows (the four Ehrlich rates are
+    absent from the A workbook == zero in the live A model); effector
+    multipliers 1.0; feeding from BASELINE_A. Burden pools from
+    eb.BurdenModel at that point (r13-r16 == 0). Outcomes are the
+    hard-coded BASELINE_A constants (spec decision b).
+    """
+    A = ko.workbook_kinetic_baselines('A')
+    # k_ref for the burden model: every required capacity, Ehrlich at 0
+    k_ref = dict(A)
+    for k in ('k_13', 'k_14', 'k_15', 'k_16'):
+        k_ref.setdefault(k, 0.0)
+    missing = [c for c in eb.BurdenModel.required_capacities()
+               if c not in k_ref]
+    if missing:
+        raise KeyError('scenario-A workbook is missing burden capacities '
+                       f'{missing}')
+    res = eb.BurdenModel(k_ref).evaluate(k_ref)
+
+    rec = {'label': 'Scenario A baseline', 'campaign': None,
+           'trial_number': None, 'is_baseline': True, 'extra_sampled': []}
+    for k in RATE_VARS:
+        rec[k] = float(k_ref[k])
+    for g in GROUP_VARS:
+        rec[g] = 1.0
+    rec['threshold_conc'] = BASELINE_A['threshold_conc']
+    rec['target_delta'] = BASELINE_A['target_delta']
+    rec['max_n_spikes'] = BASELINE_A['max_n_spikes']
+    for col in ('IRR', 'EtOH titer', 'IBO titer', 'tau', 'n_glu_spikes'):
+        rec[col] = BASELINE_A[col]
+    for st, pool in res.pools.items():
+        rec[f'pool_{st}'] = float(pool)
+    rec['Phi_M'] = float(res.Phi_M)
+    rec['phi_T'] = float(res.phi_T)
+    rec['F_flex'] = float(res.F_flex)
+    rec['burden_factor'] = float(res.burden_factor)
+    return rec
