@@ -3020,4 +3020,151 @@ else:
     print('SKIP 43 (preset part): parameter-distribution workbooks not found')
     PASS('metabolic_minimal naming + effector table (workbook-free part)')
 
+#%% 44. engine end to end with a parameter group and a pinned spike (the
+# check-17 / 39 fake-handle pattern): members set on r_te = baseline x
+# multiplier, excluded k_10 untouched, spike_conc = the baseline at every
+# call, applied_* columns after the metrics (before 'error'), sidecar
+# carries them, baseline restored in the finally; seeding a space that
+# samples the members individually resolves them through applied_*, the
+# reverse direction raises.
+if _optuna is None:
+    print('SKIP 44: optuna not installed')
+else:
+    outdir44 = tempfile.mkdtemp()
+    study44 = 'offline_grouped'
+    csv44 = os.path.join(outdir44, study44 + '_trajectory.csv')
+
+    class _FakeTE44:
+        k_1e = 47.1
+        k_1ie = 0.02
+        k_4ie = 0.04
+        k_10 = 0.01
+        K_1e = 0.12
+        def getGlobalParameterIds(self):
+            return ['k_1e', 'k_1ie', 'k_4ie', 'k_10', 'K_1e', 'not_kinetic']
+    te44 = _FakeTE44()
+    fbs44 = SimpleNamespace(
+        current_specifications=dict(target_conc=221.25,
+                                    threshold_conc=217.125,
+                                    spike_conc=600.0),
+        max_n_spikes=16)
+    seen44 = []   # (spike_conc kwarg, k_1ie, k_4ie, k_10) at every model_specification call
+    def _model_specification44(**kw):
+        seen44.append((kw['spike_conc'], te44.k_1ie, te44.k_4ie, te44.k_10))
+    handles44 = {
+        'r_te': te44, 'fbs_spec': fbs44,
+        'V406': SimpleNamespace(nsk_results_specific_tau_dict=nsk, tau=55.0),
+        'tea': SimpleNamespace(TCI=350e6), 'HXN': SimpleNamespace(),
+        'model_specification': _model_specification44,
+        'solve_TEA': lambda stream_IDs=None: {
+            'IRR': 0.2, 'MPSPs': {'ethanol': 0.5, 'isobutanol': 1.0}},
+        'latest_TEA_solution': {'IRR': np.nan,
+                                'MPSPs': {'ethanol': np.nan,
+                                          'isobutanol': np.nan}}}
+    groups44 = {'inhib_ethanol': ['k_1ie', 'k_4ie']}
+    _optuna.logging.set_verbosity(_optuna.logging.WARNING)
+    # 3 trials: 0 = baseline (multiplier 1.0), 1 = the k_1e probe, 2 = sampled.
+    study44_obj, csv44_out, kb44 = ko.run_kinetic_optimization(
+        objective='IRR', scenario_label='X', n_trials=3, seed=1,
+        study_name=study44, results_dir=outdir44, handles=handles44,
+        print_status_every=1, burden_model=None,
+        exclude_params=('k_10',), parameter_groups=groups44,
+        spike_delta_bounds=None)
+    assert kb44 == {'k_1e': 47.1, 'k_1ie': 0.02, 'k_4ie': 0.04, 'k_10': 0.01, 'K_1e': 0.12}
+    df44 = ko.load_trajectory(csv44)
+    cols44 = list(df44.columns)
+    assert cols44 == ['trial_number', 'state', 'k_1e', 'K_1e', 'inhib_ethanol',
+                      'threshold_conc', 'target_delta', 'max_n_spikes', 'objective',
+                      *ko.TRACKED_METRICS, 'applied_k_1ie', 'applied_k_4ie', 'error'], cols44
+    assert df44['trial_number'].tolist() == [0, 1, 2]
+    assert df44['state'].tolist() == ['COMPLETE']*3
+    assert df44['inhib_ethanol'][0] == 1.0 and df44['inhib_ethanol'][1] == 1.0
+    assert np.isclose(df44['k_1e'][1], 0.1*47.1)              # the k_1e probe at the floor of the default 0.1x band
+    assert 0.2 <= df44['inhib_ethanol'][2] <= 2.0
+    # The model saw baseline x multiplier for every member, the excluded
+    # k_10 untouched, the baseline spike at every call (3 trials + restore).
+    assert len(seen44) == 4, seen44
+    for i44 in range(3):
+        spike44, k1ie44, k4ie44, k10_44 = seen44[i44]
+        assert spike44 == 600.0
+        assert np.isclose(k1ie44, 0.02*df44['inhib_ethanol'][i44], rtol=1e-12, atol=0.0)
+        assert np.isclose(k4ie44, 0.04*df44['inhib_ethanol'][i44], rtol=1e-12, atol=0.0)
+        assert k10_44 == 0.01
+        assert np.isclose(df44['applied_k_1ie'][i44], k1ie44, rtol=1e-12, atol=0.0)
+        assert np.isclose(df44['applied_k_4ie'][i44], k4ie44, rtol=1e-12, atol=0.0)
+    assert seen44[3] == (600.0, 0.02, 0.04, 0.01)             # restore_baseline
+    assert te44.k_1ie == 0.02 and te44.k_4ie == 0.04 and te44.k_1e == 47.1
+    # The sidecar written before each simulation carried the applied_*
+    # columns too (so a LOST row is complete): replay one trial's record
+    # through write_inflight/recover_inflight with the engine's columns.
+    side44 = ko.inflight_path_for(outdir44, study44)
+    cols44_engine = ko.trajectory_columns(
+        ko.build_search_space(kb44, exclude_params=('k_10',),
+                              parameter_groups=groups44, spike_delta_bounds=None)[0],
+        extra_columns=['applied_k_1ie', 'applied_k_4ie'])
+    assert cols44_engine == cols44
+    ko.write_inflight(side44, cols44_engine,
+                      {'trial_number': 3, 'k_1e': 47.1, 'K_1e': 0.12, 'inhib_ethanol': 0.5,
+                       'threshold_conc': 200.0, 'target_delta': 20.0, 'max_n_spikes': 2,
+                       'applied_k_1ie': 0.01, 'applied_k_4ie': 0.02})
+    assert ko.recover_inflight(csv44, side44, state='LOST', error='x') == 3
+    df44b = ko.load_trajectory(csv44)
+    assert df44b['state'].tolist()[-1] == 'LOST' and df44b['applied_k_1ie'].tolist()[-1] == 0.01
+    # Seeds: minimal -> individually sampled members (same pinned spike)
+    # resolve k_1ie / k_4ie through applied_*; the reverse direction (a
+    # donor that sampled the members individually into a grouped space)
+    # raises the column error, naming the group.
+    space44_full, _ = ko.build_search_space(kb44, exclude_params=('k_10',),
+                                            spike_delta_bounds=None)
+    assert {'k_1ie', 'k_4ie'} <= set(space44_full)
+    seeds44, notes44 = ko.seed_points_from_trajectory(csv44, [2], space44_full)
+    pt44 = seeds44[f'{study44}#2']
+    assert np.isclose(pt44['k_1ie'], df44['applied_k_1ie'][2]) \
+        and np.isclose(pt44['k_4ie'], df44['applied_k_4ie'][2])
+    # (isclose, not ==: the reader round-trips the CSV cell exactly through
+    # float(), while pandas' default parser can land 1 ULP away.)
+    assert np.isclose(pt44['k_1e'], df44['k_1e'][2], rtol=1e-12, atol=0.0) \
+        and np.isclose(pt44['threshold_conc'], df44['threshold_conc'][2],
+                       rtol=1e-12, atol=0.0)
+    assert any('applied_' in n and 'k_1ie' in n for n in notes44), notes44
+    donor44_full = os.path.join(outdir44, 'full44_trajectory.csv')
+    ko.append_trajectory_row(donor44_full, ko.trajectory_columns(space44_full),
+                             dict(trial_number=1, state='COMPLETE', k_1e=47.1, K_1e=0.12,
+                                  k_1ie=0.02, k_4ie=0.04, threshold_conc=200.0,
+                                  target_delta=20.0, max_n_spikes=2, objective=0.1))
+    space44_min, _ = ko.build_search_space(kb44, exclude_params=('k_10',),
+                                           parameter_groups=groups44, spike_delta_bounds=None)
+    try:
+        ko.seed_points_from_trajectory(donor44_full, [1], space44_min)
+    except ValueError as e44:
+        assert 'inhib_ethanol' in str(e44) and 'no decision column' in str(e44)
+        assert 'no unique inverse' in str(e44)
+    else:
+        raise AssertionError('full -> grouped seeding did not raise')
+    # spike_delta has no applied_ column, so the pin only seeds one way:
+    # a donor that SAMPLED spike_delta into a pinned-spike space drops the
+    # column (noted); a pinned-spike donor into a space that samples it
+    # raises (the documented limitation).
+    space44_spk_full, _ = ko.build_search_space(kb44, exclude_params=('k_10',))  # members individual, spike_delta sampled
+    donor44_spk = os.path.join(outdir44, 'spk44_trajectory.csv')
+    ko.append_trajectory_row(donor44_spk, ko.trajectory_columns(space44_spk_full),
+                             dict(trial_number=1, state='COMPLETE', k_1e=47.1, K_1e=0.12,
+                                  k_1ie=0.02, k_4ie=0.04, threshold_conc=200.0,
+                                  target_delta=20.0, spike_delta=300.0, max_n_spikes=2,
+                                  objective=0.1))
+    seeds44_drop, notes44_drop = ko.seed_points_from_trajectory(
+        donor44_spk, [1], space44_full)
+    assert 'spike_delta' not in seeds44_drop['spk44#1']
+    assert seeds44_drop['spk44#1']['k_1ie'] == 0.02
+    assert any('ignored' in n and 'spike_delta' in n for n in notes44_drop)
+    space44_spk, _ = ko.build_search_space(kb44, exclude_params=('k_10',),
+                                           parameter_groups=groups44)   # spike_delta sampled
+    try:
+        ko.seed_points_from_trajectory(csv44, [2], space44_spk)
+    except ValueError as e44:
+        assert 'spike_delta' in str(e44)
+    else:
+        raise AssertionError('pinned-spike donor into a spike-sampling space did not raise')
+    PASS('engine: group multiplier applied to every member before each simulation, excluded k_10 untouched, spike pinned at the baseline, applied_* columns after the metrics (sidecar/LOST complete), baseline restored; seeds resolve grouped members through applied_*, the reverse raises')
+
 print(f'\nALL {n_pass} CHECKS PASSED')

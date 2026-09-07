@@ -627,6 +627,12 @@ def seed_points_from_trajectory(csv_path, trial_numbers, search_space,
     seeds the nearest in-bounds point; noted). A trial number absent from
     the CSV is a ValueError; a seed of any state is accepted (a LOST/FAIL
     row still has a decision vector) but a non-COMPLETE state is noted.
+    Since 2026-09-07 a space name absent from the donor's decision
+    columns is read from the donor's derived `applied_<name>` column when
+    there is one (the donor grouped it; noted), so a grouped
+    (metabolic_minimal) study can seed a study that samples those members
+    individually; the reverse raises. A donor without spike_delta (pinned
+    spike) can only seed a space without it.
 
     Returns ({label: point}, [notes]): labels are
     '{label or the CSV's study name}#{trial_number}' (the donor study
@@ -647,12 +653,28 @@ def seed_points_from_trajectory(csv_path, trial_numbers, search_space,
             raise ValueError(f'{csv_path} is not a trajectory CSV (no '
                              "'state'/'objective' columns)")
         decision = header[header.index('state') + 1:header.index('objective')]
-        missing = [name for name in search_space if name not in decision]
+        # A name the donor did not sample individually may still be
+        # recorded as a DERIVED applied_<name> column (a member of one of
+        # the donor's parameter groups): read it from there. The reverse
+        # (a group multiplier of this space, sampled individually by the
+        # donor) has no unique inverse and stays an error.
+        column_for, via_applied, missing = {}, [], []
+        for name in search_space:
+            if name in decision:
+                column_for[name] = name
+            elif f'applied_{name}' in header:
+                column_for[name] = f'applied_{name}'
+                via_applied.append(name)
+            else:
+                missing.append(name)
         if missing:
             raise ValueError(
                 f'seed_from {csv_path}: the donor study has no decision '
                 f'column for {missing} -- it sampled a different search '
                 'space; seeds must come from a study of the same columns '
+                '(or one that recorded the name as an applied_<name> '
+                'column: a group multiplier has no unique inverse in a '
+                'donor that sampled its members individually) '
                 f'(donor decision columns: {decision})')
         rows = {}
         i_trial, i_state = header.index('trial_number'), header.index('state')
@@ -674,11 +696,14 @@ def seed_points_from_trajectory(csv_path, trial_numbers, search_space,
     if dropped:
         notes.append(f'{label}: donor decision columns not in this '
                      f'search space are ignored: {dropped}')
+    if via_applied:
+        notes.append(f'{label}: read from the donor\'s derived applied_* '
+                     f'columns (members of its parameter groups): {via_applied}')
     for n in sorted(rows):
         row = rows[n]
         raw = {}
         for name in search_space:
-            cell = row[header.index(name)]
+            cell = row[header.index(column_for[name])]
             if cell == '':
                 raise ValueError(f'seed_from {csv_path}: trial {n} has no '
                                  f'value for {name}')
@@ -2102,7 +2127,7 @@ def run_kinetic_optimization(objective='IRR',
                              parameter_multiplier_bounds=None,
                              threshold_conc_bounds=(0.0, 300.0),
                              target_delta_bounds=(5.0, 500.0),
-                             spike_delta_bounds=(0.5, 595.0),
+                             spike_delta_bounds=DEFAULT_SPIKE_DELTA_BOUNDS,
                              max_n_spikes_bounds=(0, 50),
                              stage_1_max_x_bounds=None,
                              target_conc_bounds=None,
@@ -2115,6 +2140,8 @@ def run_kinetic_optimization(objective='IRR',
                              n_startup_trials=None,
                              feasible_sampling=True,
                              seed_from=None,
+                             parameter_groups=None,
+                             group_multiplier_bounds=DEFAULT_GROUP_MULTIPLIER_BOUNDS,
                              ):
     """Run the Bayesian optimization. `objective` is a name in
     OBJECTIVE_REGISTRY (direction/level/units filled from the entry) or a
@@ -2256,6 +2283,22 @@ def run_kinetic_optimization(objective='IRR',
     before any simulation. Same columns as the unseeded study: the
     driver tags `_seed{n}` into the study name (seed_points_tag).
 
+    `parameter_groups` / `group_multiplier_bounds` (since 2026-09-07;
+    None = none) are build_search_space's PARAMETER GROUPS: each group
+    is one log-scale multiplier decision variable whose members (removed
+    from the individual space) receive baseline x multiplier
+    (expand_grouped_values) right after sampling -- what the burden
+    model evaluates and what is set on the kinetic model. The CSV keeps
+    the group multiplier as the DECISION column and adds one derived
+    `applied_<member>` column per member after the burden columns
+    (before 'error'), so pca_decision_matrix still sees exactly the
+    search space and a seed reader can recover the members. Trial 0 has
+    every multiplier at 1.0; a group is no rate constant, so it gets no
+    knockout probe. `spike_delta_bounds=None` pins the spike
+    concentration at the scenario-baseline snapshot (fbs_spec.spike_conc
+    at study start; no spike_delta column). The metabolic_minimal preset
+    passes all three (resolve_study_preset).
+
     Returns (study, csv_path, kinetic_baselines)."""
     import optuna
     if handles is None:
@@ -2340,16 +2383,34 @@ def run_kinetic_optimization(objective='IRR',
         target_conc_bounds=target_conc_bounds,
         threshold_delta_bounds=threshold_delta_bounds,
         spike_conc_bounds=spike_conc_bounds,
-        stage_1_max_x_bounds=stage_1_max_x_bounds)
+        stage_1_max_x_bounds=stage_1_max_x_bounds,
+        parameter_groups=parameter_groups,
+        group_multiplier_bounds=group_multiplier_bounds)
+    parameter_groups = {str(group): list(members)
+                        for group, members in dict(parameter_groups or {}).items()}
+    applied_columns = [f'applied_{member}'
+                       for members in parameter_groups.values()
+                       for member in members]
     n_kinetic = sum(1 for name in search_space if name in kinetic_baselines)
+    n_group = sum(1 for name in search_space if name in parameter_groups)
     n_operating = sum(1 for name in search_space if name in OPERATING_VARIABLES)
-    n_feeding = len(search_space) - n_kinetic - n_operating
+    n_feeding = len(search_space) - n_kinetic - n_group - n_operating
     restriction = ('' if include_params is None else
                    f', restricted to {len(include_params)} named parameters')
     print(f'Search space: {len(search_space)} decision variables '
-          f'({n_kinetic} kinetic + {n_feeding} feeding + {n_operating} '
-          f'operating{restriction}); '
+          f'({n_kinetic} kinetic + {n_group} group multipliers + '
+          f'{n_feeding} feeding + {n_operating} operating{restriction}); '
           f'{len(excluded)} kinetic parameters excluded: {excluded}')
+    for group, members in parameter_groups.items():
+        sp = search_space[group]
+        print(f"Parameter group {group}: one log-scale multiplier on "
+              f"[{sp['low']:g}, {sp['high']:g}] x baseline applied to "
+              f"{len(members)} members {members} (baseline 1.0; recorded as "
+              f"applied_<member> columns).")
+    if 'threshold_conc' in search_space and 'spike_delta' not in search_space:
+        print('Spike feed pinned at the scenario baseline '
+              f"({fbs_spec.current_specifications['spike_conc']:g} g/L; "
+              'spike_delta_bounds=None).')
     if 'stage_1_max_x' in search_space:
         sp = search_space['stage_1_max_x']
         print(f"Operating variable stage_1_max_x (aerobic stage-1 biomass "
@@ -2402,7 +2463,8 @@ def run_kinetic_optimization(objective='IRR',
     storage = ('sqlite:///'
                + os.path.join(results_dir, study_name + '.db')
                .replace('\\', '/'))
-    columns = trajectory_columns(search_space, extra_columns=extra_columns)
+    columns = trajectory_columns(search_space,
+                                 extra_columns=[*extra_columns, *applied_columns])
     # Seed points from donor studies: resolved now (sim-free), so a donor
     # of another column set / a missing trial fails before the store and
     # the first ~20 s simulation; enqueued below on a fresh study only.
@@ -2487,7 +2549,8 @@ def run_kinetic_optimization(objective='IRR',
         baseline_point = baseline_decision_point(
             search_space, kinetic_baselines, baseline_model_kwargs,
             baseline_max_n_spikes,
-            baseline_stage_1_max_x=baseline_stage_1_max_x)
+            baseline_stage_1_max_x=baseline_stage_1_max_x,
+            parameter_groups=parameter_groups)
         study.enqueue_trial(baseline_point)
         print('Enqueued the scenario baseline configuration as trial 0.')
         if enqueue_knockouts:
@@ -2528,13 +2591,22 @@ def run_kinetic_optimization(objective='IRR',
                          trial.suggest_float(name, sp['low'], sp['high'],
                                              log=sp['log']))
                   for name, sp in search_space.items()}
+        # Group multipliers -> individual member values (baseline x m):
+        # what the burden model evaluates and what reaches the model. The
+        # CSV keeps the multipliers as the decision columns and records
+        # the members as applied_<member>.
+        applied_kinetics = expand_grouped_values(values, parameter_groups,
+                                                 kinetic_baselines)
         if 'threshold_conc' in values:  # current threshold-anchored scheme
             threshold = values['threshold_conc']
             target = min(TARGET_CONC_MAX,
                          threshold + values['target_delta'])
-            spike = min(SPIKE_CONC_MAX,
-                        max(SPIKE_CONC_MIN,
-                            target + values['spike_delta']))
+            if 'spike_delta' in values:
+                spike = min(SPIKE_CONC_MAX,
+                            max(SPIKE_CONC_MIN,
+                                target + values['spike_delta']))
+            else:  # spike pinned at the scenario baseline
+                spike = baseline_model_kwargs['spike_conc']
         else:  # legacy target-anchored scheme
             target = values['target_conc']
             threshold = max(0.0, target - values['threshold_delta'])
@@ -2542,6 +2614,9 @@ def run_kinetic_optimization(objective='IRR',
         model_kwargs = dict(target_conc=target, threshold_conc=threshold,
                             spike_conc=spike)
         record = {'trial_number': trial.number, **values}
+        for members in parameter_groups.values():
+            for member in members:
+                record[f'applied_{member}'] = applied_kinetics[member]
         if burden_on:
             # Proteome-allocation burden (enzyme_burden.py): known from the
             # sampled values alone, so an over-cap point is logged and
@@ -2549,7 +2624,7 @@ def run_kinetic_optimization(objective='IRR',
             # baseline state is disturbed. The CSV keeps the sampled
             # k_7/k_8 as the decision; the model receives the derated
             # k_7_eff/k_8_eff through `applied` below.
-            burden = burden_model.evaluate(values)
+            burden = burden_model.evaluate(applied_kinetics)
             record.update(burden.as_record())
             trial.set_user_attr('burden_violation', burden.violation)
             if not burden.feasible:
@@ -2561,9 +2636,9 @@ def run_kinetic_optimization(objective='IRR',
                       f'burden (Phi_M {burden.Phi_M:.4f} > F_flex '
                       f'{burden.F_flex:.4f} g/gDCW); pruned before simulating.')
                 raise optuna.TrialPruned()
-            applied = burden_model.apply(values)
+            applied = burden_model.apply(applied_kinetics)
         else:
-            applied = values
+            applied = applied_kinetics
         # The decision vector is complete here (every suggest_* has run)
         # and the hang-prone simulation has not started: record it, so a
         # hard kill / segfault during this trial leaves the sidecar for
