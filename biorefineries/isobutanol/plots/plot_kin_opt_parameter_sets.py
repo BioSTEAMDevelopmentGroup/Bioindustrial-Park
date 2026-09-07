@@ -185,3 +185,98 @@ def baseline_set():
     rec['F_flex'] = float(res.F_flex)
     rec['burden_factor'] = float(res.burden_factor)
     return rec
+
+
+# objective slugs, longest first so "IBO yield x titer" beats "IBO yield"
+_OBJ_SLUGS = sorted(ko.OBJECTIVE_REGISTRY, key=len, reverse=True)
+
+
+def resolve_campaign_csv(campaign):
+    """A study name -> RESULTS_DIR/<name>_trajectory.csv, or a literal
+    path to a trajectory CSV used as-is."""
+    if campaign.lower().endswith('.csv'):
+        path = campaign
+    else:
+        path = os.path.join(RESULTS_DIR, f'{campaign}_trajectory.csv')
+    if not os.path.isfile(path):
+        raise FileNotFoundError(f'campaign trajectory CSV not found: {path}')
+    return path
+
+
+def campaign_objective(campaign):
+    """The objective slug embedded in a study name (the token the driver
+    slugged in), or None. Matches an OBJECTIVE_REGISTRY key with spaces
+    turned to underscores, e.g. ..._minimal_subset_irr_... -> 'IRR'."""
+    stem = os.path.basename(campaign)
+    if stem.endswith('.csv'):
+        return None
+    low = stem.lower()
+    for obj in _OBJ_SLUGS:
+        if f'_{obj.lower().replace(" ", "_")}_' in low or \
+           low.endswith('_' + obj.lower().replace(' ', '_')):
+            return obj
+    return None
+
+
+def resolve_trial(df, trial, campaign):
+    """Return the requested COMPLETE row as a Series."""
+    ok = df[df['state'] == 'COMPLETE']
+    if isinstance(trial, str) and trial.startswith('best'):
+        if ':' in trial:
+            col = trial.split(':', 1)[1]
+            if col not in df.columns:
+                raise ValueError(
+                    f'campaign {campaign}: no metric column {col!r} for '
+                    f'"best:{col}"')
+            return ok.loc[ok[col].idxmax()]
+        obj = campaign_objective(campaign)
+        if obj is None or obj not in ko.OBJECTIVE_REGISTRY:
+            print(f'  WARNING campaign {campaign}: objective slug not in the '
+                  'registry; "best" maximizes the objective column')
+            direction = 'maximize'
+        else:
+            direction = ko.OBJECTIVE_REGISTRY[obj]['direction']
+        idx = ok['objective'].idxmin() if direction == 'minimize' \
+            else ok['objective'].idxmax()
+        return ok.loc[idx]
+    # explicit integer trial_number
+    n = int(trial)
+    hit = df[df['trial_number'] == n]
+    if hit.empty:
+        raise ValueError(f'campaign {campaign}: trial {n} not found')
+    row = hit.iloc[0]
+    if row['state'] != 'COMPLETE':
+        raise ValueError(f'campaign {campaign}: trial {n} is '
+                         f'{row["state"]}, not COMPLETE (no outcomes/pools)')
+    return row
+
+
+def load_set(label, campaign, trial):
+    """A campaign trial as a flat record (CSV row + metadata)."""
+    df = ko.load_trajectory(resolve_campaign_csv(campaign))
+    missing = [c for c in DECISION_VARS if c not in df.columns]
+    if missing:
+        raise ValueError(
+            f'campaign {campaign}: not a metabolic_minimal_subset campaign '
+            f'(missing decision columns {missing}). A metabolic / '
+            'metabolic_protein campaign samples the inhibition coefficients '
+            'individually and has no inhib_* group columns.')
+    missing_b = [c for c in eb.BURDEN_COLUMNS if c not in df.columns]
+    if missing_b:
+        raise ValueError(f'campaign {campaign}: missing burden columns '
+                         f'{missing_b}')
+    row = resolve_trial(df, trial, campaign)
+    rec = row.to_dict()
+    rec['label'] = label
+    rec['campaign'] = campaign
+    rec['trial_number'] = int(row['trial_number'])
+    rec['is_baseline'] = False
+    # decision columns beyond the 15 (e.g. a metabolic_minimal campaign's
+    # extra rates + stage_1_max_x); reported, not drawn
+    known = set(DECISION_VARS) | {'trial_number', 'state', 'objective',
+                                  'error'}
+    known |= set(eb.BURDEN_COLUMNS)
+    known |= set(ko.TRACKED_METRICS)
+    known |= {c for c in df.columns if c.startswith('applied_')}
+    rec['extra_sampled'] = [c for c in df.columns if c not in known]
+    return rec
