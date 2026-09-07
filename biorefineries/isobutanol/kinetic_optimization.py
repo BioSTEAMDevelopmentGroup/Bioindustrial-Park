@@ -1160,11 +1160,13 @@ def resolve_study_preset(study_target_products, study_type, roles=None,
     decay capacity is NOT a decision variable by default -- it stays at
     the scenario baseline and gets no knockout probe; the driver tags the
     effective exclusion into the study name, `_xk10`]).
-    Also stage_1_max_x_bounds=a tuple COPY of DEFAULT_STAGE_1_MAX_X_BOUNDS
-    [(1.0, 50.0) g/L, log-scale: the fermentor's aerobic stage-1 biomass
-    cutoff, an OPERATING variable (OPERATING_VARIABLES) applied via
-    V406.stage_1_max_x; the driver tags it `_s1x1-50` into the study
-    name].
+    Also stage_1_max_x_bounds=study_type_name_defaults(study_type)
+    ['stage_1_max_x_bounds'] [a tuple COPY of DEFAULT_STAGE_1_MAX_X_BOUNDS,
+    (1.0, 50.0) g/L, log-scale, for every type but
+    metabolic_minimal_subset, which pins it (None): the fermentor's
+    aerobic stage-1 biomass cutoff, an OPERATING variable
+    (OPERATING_VARIABLES) applied via V406.stage_1_max_x; the driver
+    tags a band `_s1x1-50` into the study name, nothing when pinned].
     Set sizes (include_params, the workbook rows): ethanol_only 29
     (metabolic) / 40 (metabolic_protein); ethanol_isobutanol 40 / 56 --
     one fewer each in the sampled space after the exclusion. `roles` (default
@@ -1252,7 +1254,7 @@ def resolve_study_preset(study_target_products, study_type, roles=None,
                 parameter_multiplier_bounds=dict(
                     DEFAULT_PARAMETER_MULTIPLIER_BOUNDS),
                 exclude_params=name_defaults['exclude_params'],
-                stage_1_max_x_bounds=tuple(DEFAULT_STAGE_1_MAX_X_BOUNDS),
+                stage_1_max_x_bounds=name_defaults['stage_1_max_x_bounds'],
                 parameter_groups=parameter_groups,
                 group_multiplier_bounds=tuple(options.get(
                     'group_multiplier_bounds', DEFAULT_GROUP_MULTIPLIER_BOUNDS)),

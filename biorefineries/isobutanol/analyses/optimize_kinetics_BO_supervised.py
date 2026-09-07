@@ -96,8 +96,9 @@ ko = importlib.util.module_from_spec(_spec)
 _spec.loader.exec_module(ko)
 
 #: "Leave stage_1_max_x_bounds to the preset" marker: distinguishes an
-#: omitted --stage-1-max-x-bounds (the preset's band, kwarg not forwarded
-#: to the driver) from a bare flag (None = pin at the baseline, forwarded).
+#: omitted --stage-1-max-x-bounds (the preset's band -- or its pin, for
+#: metabolic_minimal_subset -- kwarg not forwarded to the driver) from a
+#: bare flag (None = pin at the baseline, forwarded).
 _UNSET = object()
 
 
@@ -141,20 +142,24 @@ def default_study_name(scenario, objective, kinetic_bounds_scenario,
     non-empty (`_xk10`; ko.excluded_parameters_tag): an exclusion drops a
     CSV column, and the tag keeps the default name off the studies that
     still sampled k_10 (e.g. the 2026-09-06 production study).
-    `stage_1_max_x_bounds` (_UNSET = the presets'
-    ko.DEFAULT_STAGE_1_MAX_X_BOUNDS, which the driver defaults in; None =
-    pinned, no tag; a tuple = an explicit band) is tagged `_s1x{lo}-{hi}`
-    after the exclusion tag (ko.default_study_name). `seed_from`
+    `stage_1_max_x_bounds` (_UNSET = the study type's default from
+    ko.study_type_name_defaults -- (1.0, 50.0) g/L for every type but
+    metabolic_minimal_subset, which pins it (None) -- which the driver
+    defaults in; None = pinned, no tag; a tuple = an explicit band) is
+    tagged `_s1x{lo}-{hi}` after the exclusion tag
+    (ko.default_study_name). `seed_from`
     ([(donor, [trials]), ...]; None = none) tags the seed COUNT
     `_seed{n}` after `_s1x` on both paths (ko.seed_points_tag): seeds
     change the trajectory, not the columns, so the tag is what keeps a
     seeded run off the unseeded study's store."""
     n_seeds = seed_count(seed_from)
     if study_target_products is not None:
-        # The _ib / _x tags of the preset's own values come from the SAME
-        # table the driver's resolve_study_preset uses (metabolic_minimal
-        # tags its group band _ib0.2-2 and _xk10+k7+k8), so the name the
-        # stall watchdog polls is the name the child writes.
+        # The _ib / _x / _s1x tags of the preset's own values come from
+        # the SAME table the driver's resolve_study_preset uses
+        # (metabolic_minimal tags its group band _ib0.2-2 and
+        # _xk10+k7+k8; metabolic_minimal_subset pins stage_1_max_x, so
+        # no _s1x tag), so the name the stall watchdog polls is the name
+        # the child writes.
         name_defaults = ko.study_type_name_defaults(study_type)
         return ko.default_study_name(objective, study_target_products,
                                      study_type, scenario=scenario,
@@ -171,7 +176,7 @@ def default_study_name(scenario, objective, kinetic_bounds_scenario,
                                          if exclude_params is None
                                          else tuple(exclude_params)),
                                      stage_1_max_x_bounds=(
-                                         ko.DEFAULT_STAGE_1_MAX_X_BOUNDS
+                                         name_defaults['stage_1_max_x_bounds']
                                          if stage_1_max_x_bounds is _UNSET
                                          else (None if stage_1_max_x_bounds is None
                                                else tuple(stage_1_max_x_bounds))),

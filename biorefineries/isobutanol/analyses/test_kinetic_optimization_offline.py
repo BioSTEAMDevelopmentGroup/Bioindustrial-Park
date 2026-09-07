@@ -3466,6 +3466,59 @@ assert ko.study_type_name_defaults('metabolic_minimal_subset') == dict(
     stage_1_max_x_bounds=None)
 for st45 in ('metabolic', 'metabolic_protein', 'metabolic_minimal'):
     assert ko.study_type_name_defaults(st45)['stage_1_max_x_bounds'] == (1.0, 50.0), st45
+# The default name: the rate band, the group band as _ib, NO exclusion
+# tag (empty set) and NO _s1x tag (pinned); driver (ko.default_study_name
+# on the preset's effective values) and supervisor (bounds omitted =
+# _UNSET -> the type's name default, no longer the hard-coded (1, 50))
+# agree; an EXPLICIT --stage-1-max-x-bounds is still tagged; NAME43 and
+# the metabolic_protein default are untouched.
+NAME45 = 'kin_opt_ethanol_isobutanol_metabolic_minimal_subset_irr_rb0.001-10_ib0.2-2_burden'
+assert ko.default_study_name('IRR', 'ethanol_isobutanol', 'metabolic_minimal_subset',
+                             rate_multiplier_bounds=(1e-3, 10.0),
+                             inhibition_multiplier_bounds=(0.2, 2.0),
+                             exclude_params=(), stage_1_max_x_bounds=None,
+                             burden=True) == NAME45
+assert sup43['default_study_name'](None, 'IRR', None,
+                                   study_target_products='ethanol_isobutanol',
+                                   study_type='metabolic_minimal_subset',
+                                   burden=True) == NAME45
+assert sup43['default_study_name'](None, 'IRR', None,
+                                   study_target_products='ethanol_isobutanol',
+                                   study_type='metabolic_minimal_subset',
+                                   burden=True, stage_1_max_x_bounds=(2.0, 30.0)) \
+    == NAME45.replace('_burden', '_s1x2-30_burden')
+assert sup43['default_study_name'](None, 'IRR', None,
+                                   study_target_products='ethanol_isobutanol',
+                                   study_type='metabolic_minimal_subset',
+                                   burden=True, stage_1_max_x_bounds=None) == NAME45
+assert sup43['default_study_name'](None, 'IRR', None,
+                                   study_target_products='ethanol_isobutanol',
+                                   study_type='metabolic_minimal', burden=True) == NAME43
+assert sup43['default_study_name'](None, 'IRR', None,
+                                   study_target_products='ethanol_isobutanol',
+                                   study_type='metabolic_protein', burden=True) \
+    == 'kin_opt_ethanol_isobutanol_metabolic_protein_irr_rb0.001-10_ib0.1-10_xk10_s1x1-50_burden'
+# Source guard: the omitted-flag default reads the name-defaults table,
+# not ko.DEFAULT_STAGE_1_MAX_X_BOUNDS.
+src45_sup_name = _inspect.getsource(sup43['default_study_name'])
+assert "name_defaults['stage_1_max_x_bounds']" in src45_sup_name
+assert 'ko.DEFAULT_STAGE_1_MAX_X_BOUNDS' not in src45_sup_name
+assert 'metabolic_minimal_subset' in src43_sup
+# The 232-character plot-path budget: the longest plot file name of the
+# results dir stays under Windows' 260-character limit (long paths are
+# disabled on this machine; the mechanical _x tag of an exclusion-based
+# definition would have reached 271).
+assert len(NAME45) == 81, len(NAME45)
+if os.path.isfile(wb_A) and os.path.isfile(wb_B):
+    p45 = ko.resolve_study_preset('ethanol_isobutanol', 'metabolic_minimal_subset')
+    assert p45['stage_1_max_x_bounds'] is None
+    for stp45, st45 in (('ethanol_only', 'metabolic'), ('ethanol_only', 'metabolic_protein'),
+                        ('ethanol_isobutanol', 'metabolic'),
+                        ('ethanol_isobutanol', 'metabolic_protein'),
+                        ('ethanol_isobutanol', 'metabolic_minimal')):
+        assert ko.resolve_study_preset(stp45, st45)['stage_1_max_x_bounds'] == (1.0, 50.0), (stp45, st45)
+else:
+    print('SKIP 45 (preset part): parameter-distribution workbooks not found')
 PASS('metabolic_minimal_subset preset: explicit constants in __all__, empty role entry, options entry with the new stage_1_max_x_bounds key, name defaults (group band, no exclusions, stage_1_max_x pinned; older types keep (1, 50))')
 
 print(f'\nALL {n_pass} CHECKS PASSED')
