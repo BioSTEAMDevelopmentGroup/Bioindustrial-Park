@@ -3519,6 +3519,123 @@ if os.path.isfile(wb_A) and os.path.isfile(wb_B):
         assert ko.resolve_study_preset(stp45, st45)['stage_1_max_x_bounds'] == (1.0, 50.0), (stp45, st45)
 else:
     print('SKIP 45 (preset part): parameter-distribution workbooks not found')
+if os.path.isfile(wb_A) and os.path.isfile(wb_B):
+    roles45 = ko.kinetic_parameter_roles()
+    # ethanol_isobutanol: the whole explicit set is in the B workbook.
+    p45 = ko.resolve_study_preset('ethanol_isobutanol', 'metabolic_minimal_subset')
+    assert p45['scenario'] == 'A' and p45['kinetic_bounds_scenario'] == 'B'
+    assert p45['include_params'] == list(ko.METABOLIC_MINIMAL_SUBSET_RATES)
+    assert p45['parameter_groups'] == {
+        g: list(ms) for g, ms in ko.METABOLIC_MINIMAL_SUBSET_GROUPS.items()}
+    assert list(p45['parameter_groups']) == ['inhib_ethanol', 'inhib_isobutanol', 'inhib_acetate']
+    assert p45['exclude_params'] == ()
+    assert p45['multiplier_bounds'] == (0.2, 2.0)              # -> the _ib0.2-2 tag
+    assert p45['group_multiplier_bounds'] == (0.2, 2.0)
+    assert p45['spike_delta_bounds'] is None
+    assert p45['stage_1_max_x_bounds'] is None
+    assert p45['rate_multiplier_bounds'] == ko.DEFAULT_RATE_MULTIPLIER_BOUNDS
+    assert p45['parameter_multiplier_bounds'] == {'k_10': (0.1, 10.0)}
+    assert len(p45['rate_params']) == 20                       # the B workbook's capacities, as for every preset
+    assert set(p45['include_params']) <= set(p45['rate_params'])
+    assert all(roles45[n] == 'capacity' for n in p45['include_params'])
+    assert all(roles45[m] in ('product_inhibition', 'lethality')
+               for ms in p45['parameter_groups'].values() for m in ms)
+    assert set(p45) == set(ko.resolve_study_preset('ethanol_isobutanol', 'metabolic_minimal'))
+    # The space it builds (live baselines = the B workbook values here, so
+    # every listed rate sits above its floor): 9 rates (rate band, log)
+    # + 3 groups (0.2-2, log) + 3 feeding variables = 15; spike_delta and
+    # stage_1_max_x absent; the group members are not individual entries;
+    # 9 knockout probes (a live ethanol_isobutanol study starts at A with
+    # k_13-k_16 clipped to the floor, so it gets 5 -- not tested here).
+    kb45 = ko.workbook_kinetic_baselines('B')
+    space45, excl45 = ko.build_search_space(
+        kb45, include_params=p45['include_params'],
+        exclude_params=p45['exclude_params'],
+        rate_multiplier_bounds=p45['rate_multiplier_bounds'],
+        rate_params=p45['rate_params'],
+        parameter_multiplier_bounds=p45['parameter_multiplier_bounds'],
+        parameter_groups=p45['parameter_groups'],
+        group_multiplier_bounds=p45['group_multiplier_bounds'],
+        spike_delta_bounds=p45['spike_delta_bounds'],
+        stage_1_max_x_bounds=p45['stage_1_max_x_bounds'])
+    assert len(space45) == 15, list(space45)
+    assert set(list(space45)[:9]) == set(ko.METABOLIC_MINIMAL_SUBSET_RATES)   # workbook order
+    assert list(space45)[9:] == ['inhib_ethanol', 'inhib_isobutanol', 'inhib_acetate',
+                                 'threshold_conc', 'target_delta', 'max_n_spikes']
+    assert 'spike_delta' not in space45 and 'stage_1_max_x' not in space45
+    for r45 in ko.METABOLIC_MINIMAL_SUBSET_RATES:
+        assert space45[r45] == dict(low=1e-3*kb45[r45], high=10.0*kb45[r45], log=True), r45
+    for g45 in ko.METABOLIC_MINIMAL_SUBSET_GROUPS:
+        assert space45[g45] == dict(low=0.2, high=2.0, log=True), g45
+    grouped45 = {m for ms in p45['parameter_groups'].values() for m in ms}
+    assert set(excl45) == set(kb45) - set(ko.METABOLIC_MINIMAL_SUBSET_RATES) - grouped45
+    assert 'k_10' in excl45 and 'k_7' in excl45 and 'k_2' in excl45     # not in the set: at baseline
+    bmk45 = dict(target_conc=221.25, threshold_conc=217.125, spike_conc=600.0)
+    pt45 = ko.baseline_decision_point(space45, kb45, bmk45, baseline_max_n_spikes=16,
+                                      parameter_groups=p45['parameter_groups'])
+    assert all(pt45[g45] == 1.0 for g45 in ko.METABOLIC_MINIMAL_SUBSET_GROUPS)
+    probes45, at_floor45 = ko.knockout_probe_points(space45, pt45,
+                                                    rate_params=p45['rate_params'])
+    assert set(probes45) == set(ko.METABOLIC_MINIMAL_SUBSET_RATES) and at_floor45 == []
+    # ethanol_only: intersected with the A workbook -- no k_13-k_16, no
+    # isobutanol coefficients: 5 rates + 2 groups + 3 = 10.
+    p45_eo = ko.resolve_study_preset('ethanol_only', 'metabolic_minimal_subset')
+    assert p45_eo['scenario'] == 'A' and p45_eo['kinetic_bounds_scenario'] == 'A'
+    assert p45_eo['include_params'] == ['k_1l', 'k_1h', 'k_1e', 'k_3', 'k_6']
+    assert p45_eo['parameter_groups'] == {
+        'inhib_ethanol': ['k_1ie', 'k_4ie', 'k_7ie', 'k_10ie'],
+        'inhib_acetate': ['k_1ia', 'k_4ia', 'k_6ia', 'k_7ia', 'k_10ia']}
+    assert p45_eo['exclude_params'] == () and p45_eo['stage_1_max_x_bounds'] is None
+    assert len(p45_eo['rate_params']) == 16
+    kb45_eo = ko.workbook_kinetic_baselines('A')
+    space45_eo, excl45_eo = ko.build_search_space(
+        kb45_eo, include_params=p45_eo['include_params'],
+        exclude_params=p45_eo['exclude_params'],
+        rate_multiplier_bounds=p45_eo['rate_multiplier_bounds'],
+        rate_params=p45_eo['rate_params'],
+        parameter_multiplier_bounds=p45_eo['parameter_multiplier_bounds'],
+        parameter_groups=p45_eo['parameter_groups'],
+        group_multiplier_bounds=p45_eo['group_multiplier_bounds'],
+        spike_delta_bounds=p45_eo['spike_delta_bounds'],
+        stage_1_max_x_bounds=p45_eo['stage_1_max_x_bounds'])
+    assert len(space45_eo) == 10, list(space45_eo)
+    assert set(list(space45_eo)[:5]) == {'k_1l', 'k_1h', 'k_1e', 'k_3', 'k_6'}
+    assert list(space45_eo)[5:] == ['inhib_ethanol', 'inhib_acetate',
+                                    'threshold_conc', 'target_delta', 'max_n_spikes']
+    # Typo guard, BEFORE the intersection: a misspelt rate (k_1x is in no
+    # workbook, so an intersection-first design would drop it silently), a
+    # rate with a non-capacity role, and a group member with a capacity
+    # role each raise KeyError naming the parameter and the preset.
+    good45 = ko.STUDY_TYPE_OPTIONS['metabolic_minimal_subset']
+    bad45_groups = dict(good45['parameter_groups'])
+    bad45_groups['inhib_ethanol'] = bad45_groups['inhib_ethanol'] + ('k_3',)
+    for bad45, label45 in (
+            (dict(good45, rate_params=good45['rate_params'] + ('k_1x',)), 'k_1x'),
+            (dict(good45, rate_params=good45['rate_params'] + ('k_1ie',)), 'k_1ie'),
+            (dict(good45, parameter_groups=bad45_groups), 'k_3')):
+        ko.STUDY_TYPE_OPTIONS['metabolic_minimal_subset'] = bad45
+        try:
+            ko.resolve_study_preset('ethanol_isobutanol', 'metabolic_minimal_subset')
+        except KeyError as e45:
+            assert label45 in str(e45) and 'metabolic_minimal_subset' in str(e45), e45
+        else:
+            raise AssertionError(f'{label45}: the typo guard did not raise')
+        finally:
+            ko.STUDY_TYPE_OPTIONS['metabolic_minimal_subset'] = good45
+    assert ko.STUDY_TYPE_OPTIONS['metabolic_minimal_subset'] is good45
+    # The role-filtered presets are untouched (same values as check 43).
+    p45_mm = ko.resolve_study_preset('ethanol_isobutanol', 'metabolic_minimal')
+    assert len(p45_mm['include_params']) == 36 and p45_mm['exclude_params'] == ('k_10', 'k_7', 'k_8')
+    assert p45_mm['stage_1_max_x_bounds'] == (1.0, 50.0)
+    # Driver name == supervisor name for the subset on both targets
+    # (_driver_name43 mirrors the driver's inhibition-band choice).
+    for stp45 in ko.STUDY_TARGET_PRODUCTS:
+        assert sup43['default_study_name'](None, 'IRR', None, study_target_products=stp45,
+                                           study_type='metabolic_minimal_subset', burden=True) \
+            == _driver_name43(stp45, 'metabolic_minimal_subset'), stp45
+    assert _driver_name43('ethanol_isobutanol', 'metabolic_minimal_subset') == NAME45
+else:
+    print('SKIP 45 (space part): parameter-distribution workbooks not found')
 PASS('metabolic_minimal_subset preset: explicit constants in __all__, empty role entry, options entry with the new stage_1_max_x_bounds key, name defaults (group band, no exclusions, stage_1_max_x pinned; older types keep (1, 50))')
 
 print(f'\nALL {n_pass} CHECKS PASSED')

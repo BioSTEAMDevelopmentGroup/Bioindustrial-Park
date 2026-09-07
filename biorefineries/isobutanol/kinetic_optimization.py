@@ -1195,6 +1195,24 @@ def resolve_study_preset(study_target_products, study_type, roles=None,
     nskinetics model default), NOT the workbook value; the engine prints
     each member's baseline next to its name and records the products as
     the applied_<member> columns.
+
+    'metabolic_minimal_subset' (2026-09-07) is the STANDALONE explicit
+    preset: STUDY_TYPE_ROLES has no roles for it (the empty tuple) and
+    its STUDY_TYPE_OPTIONS entry lists the set outright -- rate_params
+    = METABOLIC_MINIMAL_SUBSET_RATES (9), parameter_groups =
+    METABOLIC_MINIMAL_SUBSET_GROUPS (3 effector groups), no exclusions,
+    spike AND stage_1_max_x pinned. Every listed rate must be a
+    capacity row and every member a product_inhibition / lethality row
+    of the role table (KeyError naming the parameter and the preset,
+    checked BEFORE the intersection so a typo can never be dropped
+    silently); then include_params = the listed rates that are rows of
+    the target's workbook (list order) and parameter_groups = the
+    members that are (empty groups omitted; None if all are), so
+    ethanol_isobutanol samples 9 rates + 3 multipliers + 3 feeding
+    variables = 15 and ethanol_only (no k_13-k_16, no isobutanol
+    coefficients in the A workbook) 5 + 2 + 3 = 10. The returned
+    rate_params is still the workbook's every capacity row (the listed
+    rates are a subset); `effectors` is not consulted.
     """
     if study_target_products not in STUDY_TARGET_PRODUCTS:
         raise ValueError(
@@ -1222,7 +1240,41 @@ def resolve_study_preset(study_target_products, study_type, roles=None,
     name_defaults = study_type_name_defaults(study_type)
     group_roles = set(options.get('group_roles', ()))
     parameter_groups = None
-    if group_roles:
+    if options.get('rate_params') is not None:
+        # EXPLICIT preset (metabolic_minimal_subset): the set is listed
+        # outright. (1) Typo guard against the role table FIRST -- a
+        # misspelt name must never be dropped silently by the
+        # intersection below; (2) the listed rates present in the
+        # target's workbook, list order; (3) the groups' members present
+        # in it, empty groups omitted (None if every group is).
+        explicit_rates = tuple(options['rate_params'])
+        explicit_groups = dict(options['parameter_groups'])
+        for name in explicit_rates:
+            if roles.get(name) not in RATE_CONSTANT_ROLES:
+                raise KeyError(
+                    f'{name!r} (listed rate constant of the {study_type!r} '
+                    'preset) is not a capacity-role row of the nskinetics '
+                    'kinetic-parameter role table (role '
+                    f'{roles.get(name)!r}); refusing to build the preset.')
+        for group, members in explicit_groups.items():
+            for name in members:
+                if roles.get(name) not in INHIBITION_COEFFICIENT_ROLES:
+                    raise KeyError(
+                        f'{name!r} (member of group {group!r} of the '
+                        f'{study_type!r} preset) is not a product_inhibition '
+                        '/ lethality row of the nskinetics kinetic-parameter '
+                        f'role table (role {roles.get(name)!r}); refusing '
+                        'to build the preset.')
+        workbook_set = set(workbook_rows)
+        include_params = [name for name in explicit_rates
+                          if name in workbook_set]
+        parameter_groups = {
+            group: [name for name in members if name in workbook_set]
+            for group, members in explicit_groups.items()}
+        parameter_groups = {group: members
+                            for group, members in parameter_groups.items()
+                            if members} or None
+    elif group_roles:
         if effectors is None:
             effectors = kinetic_parameter_effectors()
         families = {effector: [] for effector in EFFECTOR_ORDER}
