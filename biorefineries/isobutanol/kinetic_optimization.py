@@ -57,6 +57,7 @@ __all__ = ('OBJECTIVE_REGISTRY', 'TRACKED_METRICS',
            'DEFAULT_PARAMETER_MULTIPLIER_BOUNDS',
            'DEFAULT_SATURATION_MULTIPLIER_BOUNDS',
            'DEFAULT_EXCLUDED_PARAMETERS', 'excluded_parameters_tag',
+           'OPERATING_VARIABLES', 'DEFAULT_STAGE_1_MAX_X_BOUNDS',
            'RATE_CONSTANT_ROLES', 'INHIBITION_COEFFICIENT_ROLES',
            'kinetic_parameter_roles_path', 'kinetic_parameter_roles',
            'rate_constant_names',
@@ -83,6 +84,26 @@ FEEDING_VARIABLES = ('threshold_conc', 'target_delta', 'spike_delta',
 #: (target-anchored parameterization); resumable via the legacy bounds
 #: kwargs of build_search_space / run_kinetic_optimization.
 LEGACY_FEEDING_VARIABLES = ('target_conc', 'threshold_delta', 'spike_conc')
+
+#: Non-feeding OPERATING decision variables of the study presets (since
+#: 2026-09-06 pm): stage_1_max_x, the fermentor's aerobic stage-1 biomass
+#: cutoff [g/L] -- the nskinetics event `x >= stage_1_max_x` sets
+#: is_aerobic = 0 (whichever of it and `time >= stage_1_max_time`, 25 h,
+#: fires first ends stage 1). It is an nskinetics OPERATION parameter,
+#: not a kinetic role, so it is never in kinetic_baselines / the burden
+#: model and gets no knockout probe. It is applied through the
+#: V406.stage_1_max_x PROPERTY -- whose setter mirrors the value onto the
+#: kinetic model (r_te.stage_1_max_x) AND the AerationSpec that sizes
+#: the air supply (K330/V330) -- never by setattr on r_te, which would
+#: leave aeration sizing on the stale cutoff. Baseline = the nskinetics
+#: factory default 5.0 g/L (system.py never passes it). Sampled
+#: log-scale on DEFAULT_STAGE_1_MAX_X_BOUNDS; in the space only when
+#: build_search_space is given stage_1_max_x_bounds (None = absent, so
+#: every study started before it keeps its columns; the presets pass the
+#: default); tagged `_s1x{lo}-{hi}` into preset study names by
+#: default_study_name.
+OPERATING_VARIABLES = ('stage_1_max_x',)
+DEFAULT_STAGE_1_MAX_X_BOUNDS = (1.0, 50.0)
 
 #: Applied-concentration envelope (g/L) for the current parameterization:
 #: target_conc = min(TARGET_CONC_MAX, threshold_conc + target_delta);
@@ -266,6 +287,7 @@ def build_search_space(kinetic_baselines,
                        rate_multiplier_bounds=None,
                        rate_params=None,
                        parameter_multiplier_bounds=None,
+                       stage_1_max_x_bounds=None,
                        ):
     """Build the decision-variable space: {name: {'low', 'high', 'log'}}
     (integer variables additionally carry 'int': True).
@@ -321,6 +343,13 @@ def build_search_space(kinetic_baselines,
     max_n_spikes (the glucose-spike cap, fbs_spec.max_n_spikes) is an
     INTEGER variable (0 = forced batch); pass max_n_spikes_bounds=None to
     pin it at the scenario baseline instead.
+    `stage_1_max_x_bounds` (None, the default = NOT in the space) adds the
+    OPERATING variable stage_1_max_x (see OPERATING_VARIABLES), sampled
+    LOG-scale on the given (lo, hi) g/L (0 < lo < hi, ValueError
+    otherwise), after max_n_spikes; the presets pass
+    DEFAULT_STAGE_1_MAX_X_BOUNDS. Like the feeding variables it is never
+    filtered by include_params / exclude_params. Absent by default so
+    every study started before 2026-09-06 pm keeps its columns.
 
     Passing any of the LEGACY kwargs (target_conc_bounds,
     threshold_delta_bounds, spike_conc_bounds; unspecified ones fall back
@@ -381,11 +410,19 @@ def build_search_space(kinetic_baselines,
         space['max_n_spikes'] = dict(low=int(max_n_spikes_bounds[0]),
                                      high=int(max_n_spikes_bounds[1]),
                                      log=False, int=True)
+    if stage_1_max_x_bounds is not None:
+        lo, hi = stage_1_max_x_bounds
+        if not (0.0 < lo < hi):
+            raise ValueError('stage_1_max_x_bounds must satisfy 0 < lo < hi '
+                             f'(a log-scale band, g/L); got '
+                             f'{tuple(stage_1_max_x_bounds)!r}')
+        space['stage_1_max_x'] = dict(low=float(lo), high=float(hi), log=True)
     return space, excluded
 
 def baseline_decision_point(search_space, kinetic_baselines,
                             baseline_model_kwargs,
-                            baseline_max_n_spikes=None):
+                            baseline_max_n_spikes=None,
+                            baseline_stage_1_max_x=None):
     """The scenario baseline expressed in decision-variable coordinates
     for `search_space` (either feeding parameterization) -- suitable for
     study.enqueue_trial, so a fresh study evaluates the baseline itself
@@ -395,7 +432,11 @@ def baseline_decision_point(search_space, kinetic_baselines,
     and is silently replaced by a random draw on a linear one, so when a
     baseline lies outside the space (e.g. a zero-baseline kinetic
     parameter under absolute param_bounds_override bounds), trial 0
-    evaluates the nearest in-bounds point to the baseline instead."""
+    evaluates the nearest in-bounds point to the baseline instead.
+    `baseline_stage_1_max_x` (the live V406.stage_1_max_x, 5.0 g/L at
+    the factory default) fills point['stage_1_max_x'] when that
+    operating variable is in the space and a value is given (clipped
+    into its band like every other entry)."""
     point = {name: kinetic_baselines[name]
              for name in search_space if name in kinetic_baselines}
     thr = baseline_model_kwargs['threshold_conc']
@@ -411,6 +452,8 @@ def baseline_decision_point(search_space, kinetic_baselines,
         point['spike_conc'] = spk
     if 'max_n_spikes' in search_space and baseline_max_n_spikes is not None:
         point['max_n_spikes'] = int(baseline_max_n_spikes)
+    if 'stage_1_max_x' in search_space and baseline_stage_1_max_x is not None:
+        point['stage_1_max_x'] = float(baseline_stage_1_max_x)
     for name, value in point.items():
         sp = search_space[name]
         clipped = min(max(value, sp['low']), sp['high'])
@@ -658,6 +701,11 @@ def resolve_study_preset(study_target_products, study_type, roles=None):
     decay capacity is NOT a decision variable by default -- it stays at
     the scenario baseline and gets no knockout probe; the driver tags the
     effective exclusion into the study name, `_xk10`]).
+    Also stage_1_max_x_bounds=a tuple COPY of DEFAULT_STAGE_1_MAX_X_BOUNDS
+    [(1.0, 50.0) g/L, log-scale: the fermentor's aerobic stage-1 biomass
+    cutoff, an OPERATING variable (OPERATING_VARIABLES) applied via
+    V406.stage_1_max_x; the driver tags it `_s1x1-50` into the study
+    name].
     Set sizes (include_params, the workbook rows): ethanol_only 29
     (metabolic) / 40 (metabolic_protein); ethanol_isobutanol 40 / 56 --
     one fewer each in the sampled space after the exclusion. `roles` (default
@@ -695,7 +743,8 @@ def resolve_study_preset(study_target_products, study_type, roles=None):
                 rate_params=rate_constant_names(workbook_rows, roles=roles),
                 parameter_multiplier_bounds=dict(
                     DEFAULT_PARAMETER_MULTIPLIER_BOUNDS),
-                exclude_params=tuple(DEFAULT_EXCLUDED_PARAMETERS))
+                exclude_params=tuple(DEFAULT_EXCLUDED_PARAMETERS),
+                stage_1_max_x_bounds=tuple(DEFAULT_STAGE_1_MAX_X_BOUNDS))
 
 #: Study-name suffix of a burden-enabled study (enzyme_burden.py): it
 #: records extra columns and a different physiology, so it must never
@@ -709,7 +758,7 @@ def default_study_name(objective, study_target_products, study_type,
                        scenario=None, kinetic_bounds_scenario=None,
                        burden=False, rate_multiplier_bounds=None,
                        inhibition_multiplier_bounds=None,
-                       exclude_params=None):
+                       exclude_params=None, stage_1_max_x_bounds=None):
     """Stable study name of a preset study:
     kin_opt_{study_target_products}_{study_type}_{objective slug}
     (slug = lower-cased, spaces -> '_'), e.g.
@@ -771,6 +820,17 @@ def default_study_name(objective, study_target_products, study_type,
     run that re-includes k_10 with exclude_params=()) leaves the name
     unchanged -- same columns, so resuming those studies is legitimate.
 
+    `stage_1_max_x_bounds` (the (lo, hi) g/L band of the operating
+    variable stage_1_max_x; the presets' DEFAULT_STAGE_1_MAX_X_BOUNDS,
+    since 2026-09-06 pm) tags the name `_s1x{lo:g}-{hi:g}` (`_s1x1-50`)
+    after the exclusion tag whenever it is given. The variable is a new
+    decision COLUMN, so the header guard already refuses to resume a
+    study without it -- the tag is what lets the default name launch
+    next to the existing `..._xk10_burden` studies at all. None (older
+    callers; a run that pins the variable with stage_1_max_x_bounds=None)
+    leaves the name unchanged -- same columns, so resuming those studies
+    is legitimate.
+
     `burden=True` appends BURDEN_STUDY_SUFFIX ('_burden') after every
     other tag: a burden study (enzyme_burden.py; the driver's default)
     can never resume a burden-free study's CSV/SQLite, or vice versa.
@@ -791,6 +851,9 @@ def default_study_name(objective, study_target_products, study_type,
         lo, hi = inhibition_multiplier_bounds
         name += f'_ib{lo:g}-{hi:g}'
     name += excluded_parameters_tag(exclude_params)
+    if stage_1_max_x_bounds is not None:
+        lo, hi = stage_1_max_x_bounds
+        name += f'_s1x{lo:g}-{hi:g}'
     if burden:
         name += BURDEN_STUDY_SUFFIX
     return name

@@ -732,7 +732,7 @@ if os.path.isfile(wb_A) and os.path.isfile(wb_B):
         assert set(p21) == {'scenario', 'kinetic_bounds_scenario', 'include_params',
                             'multiplier_bounds', 'rate_multiplier_bounds',
                             'rate_params', 'parameter_multiplier_bounds',
-                            'exclude_params'}
+                            'exclude_params', 'stage_1_max_x_bounds'}
         assert p21['scenario'] == 'A'                       # both start at the A baseline
         # k_10 is excluded from every preset by default (2026-09-06 pm): a
         # lower decay rate is a free lunch; it stays in include_params (the
@@ -2381,5 +2381,71 @@ src37 = open(os.path.join(os.path.dirname(os.path.abspath(__file__)),
 assert "'--exclude-params', nargs='*', default=None" in src37
 assert 'else tuple(args.exclude_params)' in src37
 PASS('k_10 excluded by default: DEFAULT_EXCLUDED_PARAMETERS, preset exclude_params, _xk10 tag (None/() untouched), no column/probe; driver setdefault + naming; supervisor --exclude-params plumbing')
+
+#%% 38. stage_1_max_x operating variable: search space, baseline point, no probe, name tag, preset key
+assert ko.OPERATING_VARIABLES == ('stage_1_max_x',)
+assert ko.DEFAULT_STAGE_1_MAX_X_BOUNDS == (1.0, 50.0)
+assert {'OPERATING_VARIABLES', 'DEFAULT_STAGE_1_MAX_X_BOUNDS'} <= set(ko.__all__)
+kb38 = {'k_1e': 47.1, 'K_1e': 0.12}
+# Default: ABSENT (every study started before it keeps its columns).
+space38_off, _ = ko.build_search_space(kb38)
+assert 'stage_1_max_x' not in space38_off
+assert set(space38_off) == {'k_1e', 'K_1e', *ko.FEEDING_VARIABLES}
+# Bounds given: a log-scale float after max_n_spikes; include_params never
+# filters it (an operating variable, like the feeding variables).
+space38, _ = ko.build_search_space(kb38, include_params=['k_1e'],
+                                   stage_1_max_x_bounds=(1.0, 50.0))
+assert space38['stage_1_max_x'] == dict(low=1.0, high=50.0, log=True)
+assert list(space38) == ['k_1e', *ko.FEEDING_VARIABLES, 'stage_1_max_x']
+assert ko.trajectory_columns(space38)[2:2 + len(space38)] == list(space38)
+assert ko.trajectory_columns(space38)[2 + len(space38)] == 'objective'
+for bad38 in ((0.0, 50.0), (-1.0, 50.0), (50.0, 1.0), (5.0, 5.0)):
+    try:
+        ko.build_search_space(kb38, stage_1_max_x_bounds=bad38)
+    except ValueError as e38:
+        assert 'stage_1_max_x_bounds' in str(e38)
+    else:
+        raise AssertionError(f'stage_1_max_x_bounds={bad38} did not raise')
+# Baseline point: the live V406 value when given (clipped into the band);
+# absent when not given or when the variable is not in the space.
+spec38 = dict(target_conc=221.25, threshold_conc=217.125, spike_conc=600.0)
+base38 = ko.baseline_decision_point(space38, kb38, spec38, 16,
+                                    baseline_stage_1_max_x=5.0)
+assert base38['stage_1_max_x'] == 5.0
+assert ko.baseline_decision_point(space38, kb38, spec38, 16,
+                                  baseline_stage_1_max_x=60.0)['stage_1_max_x'] == 50.0
+assert 'stage_1_max_x' not in ko.baseline_decision_point(space38, kb38, spec38, 16)
+assert 'stage_1_max_x' not in ko.baseline_decision_point(
+    space38_off, kb38, spec38, 16, baseline_stage_1_max_x=5.0)
+# No knockout probe (not a rate constant) under either rate rule, although
+# it is a log-scale variable above its floor.
+probes38, at_floor38 = ko.knockout_probe_points(space38, base38)
+assert list(probes38) == ['k_1e'] and at_floor38 == []
+assert probes38['k_1e']['stage_1_max_x'] == 5.0
+probes38r, _ = ko.knockout_probe_points(space38, base38, rate_params=['k_1e'])
+assert list(probes38r) == ['k_1e']
+# Study-name tag after the exclusion tag, before _burden; None untouched.
+assert ko.default_study_name('IRR', 'ethanol_isobutanol', 'metabolic_protein',
+                             rate_multiplier_bounds=(1e-3, 10.0),
+                             inhibition_multiplier_bounds=(0.1, 10.0),
+                             exclude_params=('k_10',), burden=True,
+                             stage_1_max_x_bounds=(1.0, 50.0)) \
+    == 'kin_opt_ethanol_isobutanol_metabolic_protein_irr_rb0.001-10_ib0.1-10_xk10_s1x1-50_burden'
+assert ko.default_study_name('IRR', 'ethanol_isobutanol', 'metabolic_protein',
+                             stage_1_max_x_bounds=(0.5, 20.0)) \
+    == 'kin_opt_ethanol_isobutanol_metabolic_protein_irr_s1x0.5-20'
+assert ko.default_study_name('IRR', 'ethanol_isobutanol', 'metabolic_protein',
+                             rate_multiplier_bounds=(1e-3, 10.0),
+                             inhibition_multiplier_bounds=(0.1, 10.0),
+                             exclude_params=('k_10',), burden=True) \
+    == 'kin_opt_ethanol_isobutanol_metabolic_protein_irr_rb0.001-10_ib0.1-10_xk10_burden'  # None: untouched
+# Every preset carries the band (an immutable tuple equal to the default).
+if os.path.isfile(wb_A) and os.path.isfile(wb_B):
+    for stp38, st38 in (('ethanol_only', 'metabolic'),
+                        ('ethanol_isobutanol', 'metabolic_protein')):
+        p38 = ko.resolve_study_preset(stp38, st38)
+        assert p38['stage_1_max_x_bounds'] == ko.DEFAULT_STAGE_1_MAX_X_BOUNDS
+        assert isinstance(p38['stage_1_max_x_bounds'], tuple)
+PASS('stage_1_max_x: OPERATING_VARIABLES/DEFAULT_STAGE_1_MAX_X_BOUNDS, opt-in log-scale space entry, ValueError on bad bounds, baseline point (clipped), no probe, _s1x tag, preset key')
 
 print(f'\nALL {n_pass} CHECKS PASSED')
