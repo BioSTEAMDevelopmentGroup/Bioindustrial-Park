@@ -268,8 +268,9 @@ def run(scenario=None,  # 'A' or 'B'; None = the preset's start scenario
     LEGACY PATH (`study_target_products=None`): exactly the pre-preset
     behaviour, for resuming older studies. `scenario` (default 'B') is
     the STARTING state (its workbook distributions are loaded, its
-    feeding baseline set, it is enqueued as trial 0, and it is restored
-    in the finally); `kinetic_bounds_scenario or scenario` is the
+    feeding baseline set, enqueued as trial 0 only when
+    enqueue_baseline=True, and restored in the finally);
+    `kinetic_bounds_scenario or scenario` is the
     workbook that defines WHICH kinetic parameters are decision
     variables (when restrict_to_workbook, the default) and centers their
     single multiplier band. run(scenario='A', kinetic_bounds_scenario='B',
@@ -282,7 +283,8 @@ def run(scenario=None,  # 'A' or 'B'; None = the preset's start scenario
     ENZYME BURDEN (`burden`, default True). The engine's
     run_kinetic_optimization(burden_model=...) receives a BurdenModel
     snapshotted from the live kinetic parameters right after the
-    scenario baseline is set (so it is exactly inert at trial 0); the
+    scenario baseline is set (so it is exactly inert at the scenario
+    baseline); the
     study name carries ko.BURDEN_STUDY_SUFFIX on both naming paths.
     Before the study starts, the burden reports of (a) the scenario
     reference and (b) the scenario-B Ehrlich constants
@@ -293,8 +295,18 @@ def run(scenario=None,  # 'A' or 'B'; None = the preset's start scenario
     A burden study cannot START from an infeasible reference (e.g.
     scenario='B'): BurdenModel.from_reference raises; pass burden=False.
 
-    SINGLE-KNOCKOUT PROBES (`enqueue_knockouts`, default True; since
-    2026-09-06). A fresh study enqueues, after trial 0, one probe per
+    BASELINE ENQUEUE (`enqueue_baseline`, default False since
+    2026-09-07). By default a fresh study enqueues NO baseline point, so
+    the sampler draws every trial from trial 0 (an enqueued scenario-A
+    baseline anchored TPE in the pure-ethanol basin in every earlier IRR
+    study). enqueue_baseline=True evaluates the scenario baseline as
+    trial 0 so it provably participates (forwarded to
+    ko.run_kinetic_optimization; supervisor --enqueue-baseline). Not part
+    of the study name; only a fresh study enqueues.
+
+    SINGLE-KNOCKOUT PROBES (`enqueue_knockouts`, default False since
+    2026-09-07; probes added 2026-09-06). A fresh study enqueues, after
+    the baseline (if any), one probe per
     RATE CONSTANT of the search space (the preset's `rate_params`, role
     capacity; inhibition coefficients k_*i* get none -- their 0.1x floor
     is a knock-down, not a knock-out) -- that rate alone at the floor
@@ -527,7 +539,8 @@ def run(scenario=None,  # 'A' or 'B'; None = the preset's start scenario
         burden_model = eb.BurdenModel.from_reference(k_ref)
         print(burden_model.describe_point(
             burden_model.reference,
-            label=f'scenario-{scenario} reference (trial 0)'))
+            label=f'scenario-{scenario} reference'
+                  + (' (trial 0)' if enqueue_baseline else '')))
         print(burden_model.describe_point(
             {**burden_model.reference, **eb.scenario_b_ehrlich()},
             label='scenario-B Ehrlich constants on this reference '
@@ -591,7 +604,10 @@ def run(scenario=None,  # 'A' or 'B'; None = the preset's start scenario
                 df, direction=direction, log_columns=log_columns,
                 objective_name=objective_name,
                 objective_units=objective_units,
-                filename=base + f'_pca_{stamp}.png')
+                filename=base + f'_pca_{stamp}.png',
+                # Trial 0 is the baseline ONLY when it was enqueued;
+                # otherwise it is a sampled draw and gets no marker.
+                baseline_trial=(0 if enqueue_baseline else None))
             print(f'Plots saved next to {csv_path}')
         except Exception as e:
             print('Plotting failed (the trajectory CSV and study are '

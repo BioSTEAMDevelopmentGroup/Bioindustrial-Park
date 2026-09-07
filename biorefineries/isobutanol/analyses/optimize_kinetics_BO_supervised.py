@@ -324,9 +324,14 @@ def supervise(scenario=None, objective='IRR', n_trials=2000,
     reproduce the pre-2026-09-03 all-model-k_* search set. `burden`
     (default True) is the driver's enzyme-burden flag; False
     (--no-burden) runs/resumes a burden-free study under the
-    un-suffixed name. `enqueue_knockouts` (default True) is the driver's
-    single-knockout-probe flag (--no-enqueue-knockouts turns it off);
-    `rate_multiplier_bounds` (None = the preset's k_* band) is an
+    un-suffixed name. `enqueue_knockouts` (default False since
+    2026-09-07) is the driver's single-knockout-probe flag (opt in with
+    --enqueue-knockouts); `enqueue_baseline` (default False) enqueues the
+    scenario baseline as trial 0 of a fresh study (opt in with
+    --enqueue-baseline), and with both off a fresh study enqueues no
+    point at all (neither flag is part of the study name; only a fresh
+    study enqueues). `rate_multiplier_bounds` (None = the preset's k_*
+    band) is an
     explicit (m_lo, m_hi) k_* band (--rate-multiplier-bounds LO HI); the
     effective band (explicit or the preset's) is always tagged into the
     derived study name. `exclude_params` (None = the preset's

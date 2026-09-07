@@ -796,7 +796,7 @@ def knockout_probe_points(search_space, baseline_point, rate_prefix='k_',
     sits at (or below) its floor -- e.g. the Ehrlich rates of the
     ethanol_isobutanol preset, clipped up to the floor from scenario A's
     zeros by baseline_decision_point -- is skipped too (its probe would
-    duplicate trial 0) and reported in the second return value.
+    duplicate the baseline point) and reported in the second return value.
 
     Returns ({name: point}, [names skipped as already at the floor]), both
     in search-space order; `baseline_point` is not modified."""
@@ -1816,13 +1816,16 @@ def pca_decision_matrix(df, log_columns=(), decision_columns=None):
 
 def plot_pca_projection(df, direction, log_columns=(),
                         objective_name='objective', objective_units='',
-                        filename=None):
+                        filename=None, baseline_trial=None):
     """Four-panel PCA view of the sampled decision space: (1) the PC1 x
     PC2 landscape -- completed trials colored by objective, FAIL/NAN/LOST/INFEASIBLE
     trials as gray/red/brown/purple crosses (LOST = stall-killed or crashed
     before writing its row, recovered from the in-flight sidecar;
     INFEASIBLE = over the enzyme-burden cap, pruned before simulating), the incumbent best-so-far path, the
-    enqueued baseline (trial 0) and the current best marked; (2) the
+    enqueued baseline (only when `baseline_trial` is given -- its
+    trial_number; None, the default, marks no baseline, since a study run
+    with enqueue_baseline=False has no baseline trial and its trial 0 is
+    just a sampled draw) and the current best marked; (2) the
     explained-variance scree of the top 10 PCs; (3) the top-|loading|
     variables on PC1/PC2; (4) PC1 and PC2 of every sampled point vs trial
     number (the sampler-contraction diagnostic). Works with zero
@@ -1869,10 +1872,12 @@ def plot_pca_projection(df, direction, log_columns=(),
         ax_main.scatter(pc1[ok][i_best], pc2[ok][i_best], marker='*',
                         s=260, color='gold', edgecolor='k', zorder=5,
                         label='current best')
-    m0 = (dfv['trial_number'] == 0).to_numpy()
-    if m0.any():
-        ax_main.scatter(pc1[m0], pc2[m0], marker='*', s=200, color='k',
-                        zorder=5, label='baseline (trial 0)')
+    if baseline_trial is not None:
+        m0 = (dfv['trial_number'] == baseline_trial).to_numpy()
+        if m0.any():
+            ax_main.scatter(pc1[m0], pc2[m0], marker='*', s=200, color='k',
+                            zorder=5,
+                            label=f'baseline (trial {baseline_trial})')
     ax_main.set_xlabel(f'PC1 ({100*evr[0]:.1f}% var)')
     ax_main.set_ylabel(f'PC2 ({100*evr[1]:.1f}% var)')
     ax_main.set_title(f'Sampled decision space ({len(kept)} variables), '
@@ -2323,8 +2328,9 @@ def run_kinetic_optimization(objective='IRR',
     the probes are derived from it). Then -- `enqueue_knockouts=True`
     (default False since 2026-09-07, so by default NO point at all is
     enqueued) -- the single-knockout probes of knockout_probe_points
-    (trials 1..N: one log-scale rate constant k_* at its band floor, all
-    else at the baseline; a rate already at its floor gets none), each
+    (one log-scale rate constant k_* at its band floor, all else at the
+    baseline; a rate already at its floor gets none), enqueued right
+    after the baseline (if any), each
     tagged with the optuna user attr 'knockout_probe' = its parameter
     name; optuna stores enqueued trials as WAITING, so a resume finishes
     any probes a crash interrupted without re-enqueueing (resumes never
@@ -2338,8 +2344,8 @@ def run_kinetic_optimization(objective='IRR',
     guidance begins). None applies the rule the engine always used,
     max(10, n_trials//10) -- 200 for a 2000-trial study, which in the
     burden-constrained preset space completed 0 of 183 random draws on
-    2026-09-06 -- so an explicit value (e.g. 20-30, the probes already
-    cover the single-parameter directions) is the way to shorten it; a
+    2026-09-06 -- so an explicit value (e.g. 20-30) is the way to shorten
+    it; a
     non-negative integer, ValueError otherwise. It is compared with the
     number of trials already stored, so a resumed study past the
     start-up count starts in TPE mode at once, and a resume may change
@@ -2760,9 +2766,15 @@ def run_kinetic_optimization(objective='IRR',
                                     user_attrs={'knockout_probe': pname})
             skipped = (f'; {len(at_floor)} already at the floor, no probe: '
                        f'{at_floor}' if at_floor else '')
-            print(f'Enqueued {len(probes)} single-knockout probes as trials '
-                  f'1-{len(probes)} (each k_* alone at its band floor, the '
-                  f'rest at the baseline){skipped}.')
+            # The probes follow the baseline only when it was enqueued, so
+            # they start at trial 1 with enqueue_baseline and at trial 0
+            # without it.
+            first = 1 if enqueue_baseline else 0
+            span = (f'as trials {first}-{first + len(probes) - 1} '
+                    if probes else '')
+            print(f'Enqueued {len(probes)} single-knockout probes {span}'
+                  f'(each k_* alone at its band floor, the rest at the '
+                  f'baseline){skipped}.')
         if seed_points:
             # Then the seed points of the donor studies (seed_from), after
             # the probes: a foothold in a basin another study found. Same
