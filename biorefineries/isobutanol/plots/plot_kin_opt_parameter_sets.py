@@ -531,3 +531,75 @@ def draw_parameters(fig, gs_rows, sets, colors, band):
                 bar_cell(ax, sets, colors, p, 'feed', t, ylim=rng)
         fig.text(0.19, last_ax.get_position().y1 + 0.043, title,
                  fontsize=FONTS['band'], fontweight='bold', va='bottom')
+
+
+def tint(color, t):
+    r, g, b = to_rgb(color)
+    return (r + (1 - r) * t, g + (1 - g) * t, b + (1 - b) * t)
+
+
+_STUDY_STEPS = ['r1', 'r3', 'r6', 'r13', 'r14', 'r15', 'r16']
+_UNSAMPLED_STEPS = ['r2', 'r4', 'r5']   # never sampled; folded into "other"
+
+
+def draw_burden(ax, sets, colors):
+    rank = sorted(_STUDY_STEPS,
+                  key=lambda st: -max(s[f'pool_{st}'] for s in sets))
+    top5, rest = rank[:5], rank[5:]
+    other_steps = rest + _UNSAMPLED_STEPS
+    tints = [0.0, 0.25, 0.45, 0.62, 0.78]   # darkest = largest pool
+    n = len(sets)
+    F = sets[0]['F_flex']
+    h = 0.6
+    ypos = {id(s): n - i for i, s in enumerate(sets)}
+    seg_centers = {}
+    for s in sets:
+        y = ypos[id(s)]; x = 0.0; c = colors[id(s)]; centers = []
+        segs = [(s[f'pool_{st}'], tint(c, tints[i]), None)
+                for i, st in enumerate(top5)]
+        segs.append((sum(s[f'pool_{st}'] for st in other_steps), c, '////'))
+        for w, fc, hatch in segs:
+            ax.barh(y, w, left=x, height=h,
+                    color=('none' if hatch else fc),
+                    edgecolor=c, lw=0.5, hatch=hatch, zorder=2)
+            centers.append(x + w / 2); x += w
+        ax.barh(y, s['phi_T'], left=x, height=h, color='none',
+                edgecolor=c, lw=0.6, hatch='....', zorder=2)
+        end = x + s['phi_T']
+        ax.text(max(end, F) + 0.005, y, f'd = {s["burden_factor"]:.2f}',
+                va='center', fontsize=FONTS['tick'])
+        seg_centers[id(s)] = centers
+    # callouts once, leaders to the FIRST campaign set (all seven study
+    # pools non-zero there; the baseline's Ehrlich pools are zero)
+    campaign_sets = [s for s in sets if not s.get('is_baseline')]
+    anchor = campaign_sets[0] if campaign_sets else sets[0]
+    y = ypos[id(anchor)]
+    labels = [f'{STEP_ENZYME[st]}\n({STEP_PARAMS[st]})' for st in top5] + \
+             ['other enzymes']
+    xs = np.linspace(0.01, 0.235, len(labels))
+    for i, (lab, cx) in enumerate(zip(labels, seg_centers[id(anchor)])):
+        row = n + 1.0 if i % 2 == 0 else n + 2.1
+        ax.annotate(lab, xy=(cx, y + h / 2), xytext=(xs[i], row),
+                    fontsize=FONTS['callout'], ha='center', va='bottom',
+                    arrowprops=dict(arrowstyle='-', lw=0.5, color='0.35',
+                                    shrinkA=0, shrinkB=0))
+    xt = anchor['Phi_M'] + anchor['phi_T'] * 0.8
+    ax.annotate('translation sector φ$_T$ (ribosomes):\ngrowth derated '
+                'by d where the\nbar crosses the F$_{flex}$ cap',
+                xy=(xt, y + h / 2), xytext=(0.328, n + 2.1),
+                fontsize=FONTS['callout'], ha='right', va='bottom',
+                arrowprops=dict(arrowstyle='-', lw=0.5, color='0.35',
+                                shrinkA=0, shrinkB=0))
+    ax.axvline(F, color='k', ls='--', lw=0.9, zorder=3)
+    ax.text(F + 0.004, -0.15, 'F$_{flex}$ = %.3f' % F, ha='left',
+            va='center', fontsize=FONTS['callout'])
+    ax.set_ylim(-0.7, n + 3.3)
+    ax.set_yticks([ypos[id(s)] for s in sets])
+    ax.set_yticklabels([s['label'] for s in sets], fontsize=FONTS['tick'])
+    ax.set_xlim(0, 0.33)
+    ax.set_xlabel('Enzyme burden Φ$_M$ (g enzyme / g DCW)',
+                  fontsize=FONTS['axis'])
+    ax.tick_params(axis='y', right=False, length=0)
+    ax.tick_params(axis='x', direction='inout', top=False, length=4)
+    for sp in ('left', 'right', 'top'):
+        ax.spines[sp].set_visible(False)
