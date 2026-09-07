@@ -29,6 +29,16 @@ exclusion tag `_xk10`). study_target_products=None is the legacy flag
 path (scenario / kinetic_bounds_scenario / single band, k_10 sampled)
 for resuming older studies.
 
+study_type='metabolic_minimal' (2026-09-07) is the compact preset: the
+capacities minus k_10, k_7 and k_8 (17 for ethanol_isobutanol, 13 for
+ethanol_only) on the rate band, ONE 0.2x-2x log multiplier per
+inhibition-effector family (inhib_ethanol / inhib_isobutanol /
+inhib_acetate, scaling every coefficient of that effector together;
+recorded as applied_<member> CSV columns), no K_* terms, and the four
+feeding/operating variables with the spike feed pinned at the baseline
+600 g/L (no spike_delta column) -- 24 / 19 decision variables; name
+kin_opt_ethanol_isobutanol_metabolic_minimal_irr_rb0.001-10_ib0.2-2_xk10+k7+k8_s1x1-50_burden.
+
 The enzyme-burden (proteome-allocation) constraint of enzyme_burden.py
 is ON by default (burden=True): sampled capacities are charged to the
 cell's flexible protein sector, growth (k_7/k_8) is derated linearly as
@@ -50,6 +60,9 @@ Runner pattern (fresh kernel, one process):
     # ethanol-only strain, expression/tolerance engineering only (29 params)
     study, csv_path = ns['run'](study_target_products='ethanol_only',
                                 study_type='metabolic')
+    # compact 24-variable space (rates minus k_10/k_7/k_8 + 3 effector
+    # multipliers + 4 feeding/operating; spike pinned)
+    study, csv_path = ns['run'](objective='IRR', study_type='metabolic_minimal')
     # legacy: resume a pre-2026-09-04 study under its old name/space
     study, csv_path = ns['run'](scenario='A', kinetic_bounds_scenario='B',
                                 study_target_products=None)
@@ -126,7 +139,7 @@ def run(scenario=None,  # 'A' or 'B'; None = the preset's start scenario
         study_target_products=ko.DEFAULT_STUDY_TARGET_PRODUCTS,
         # 'ethanol_only' | 'ethanol_isobutanol' | None (= legacy path)
         study_type=ko.DEFAULT_STUDY_TYPE,
-        # 'metabolic' | 'metabolic_protein'
+        # 'metabolic' | 'metabolic_protein' | 'metabolic_minimal'
         burden=True,  # enzyme-burden (proteome-allocation) constraint,
         # enzyme_burden.py: default ON (study name + '_burden'); False =
         # legacy burden-free study (older studies). Do not pass the
@@ -169,7 +182,13 @@ def run(scenario=None,  # 'A' or 'B'; None = the preset's start scenario
     A baseline with the zero Ehrlich rates clipped up to 1e-3 x their B
     baseline); 'metabolic' keeps the capacity / product-inhibition /
     lethality / substrate-regulation roles (all k_* + K_1i, K_2i, K_5i,
-    K_9i), 'metabolic_protein' every row. Bands (log-scale, x baseline)
+    K_9i), 'metabolic_protein' every row. 'metabolic_minimal' the
+    capacities minus k_10/k_7/k_8 plus one 0.2x-2x multiplier per
+    inhibition-effector family (parameter_groups; applied_<member>
+    columns) and no K_* terms, spike pinned (spike_delta_bounds=None);
+    run(parameter_groups=..., group_multiplier_bounds=...,
+    spike_delta_bounds=...) override the preset's like the other keys.
+    Bands (log-scale, x baseline)
     by nskinetics ROLE since 2026-09-06: rate constants (role capacity;
     the preset's `rate_params`, ko.rate_constant_names) [1e-3x, 10x]
     (1e-5x until later that day) EXCEPT k_10, the active-biomass decay
@@ -335,7 +354,9 @@ def run(scenario=None,  # 'A' or 'B'; None = the preset's start scenario
             kinetic_bounds_scenario = preset['kinetic_bounds_scenario']
         for key in ('include_params', 'exclude_params', 'multiplier_bounds',
                     'rate_multiplier_bounds', 'rate_params',
-                    'parameter_multiplier_bounds', 'stage_1_max_x_bounds'):
+                    'parameter_multiplier_bounds', 'stage_1_max_x_bounds',
+                    'parameter_groups', 'group_multiplier_bounds',
+                    'spike_delta_bounds'):
             engine_kwargs.setdefault(key, preset[key])
         if study_name is None:
             study_name = ko.default_study_name(
@@ -364,16 +385,18 @@ def run(scenario=None,  # 'A' or 'B'; None = the preset's start scenario
                 # the tag is what keeps a seeded run off its store.
                 n_seeds=n_seeds)
         excluded = tuple(engine_kwargs['exclude_params'] or ())
+        groups = dict(engine_kwargs['parameter_groups'] or {})
+        grouped = {m for members in groups.values() for m in members}
         effective = [n for n in engine_kwargs['include_params']
-                     if n not in excluded]
+                     if n not in excluded and n not in grouped]
         n_rate = sum(1 for n in effective if n in engine_kwargs['rate_params'])
         print(f'Study preset: study_target_products={study_target_products!r}, '
               f'study_type={study_type!r} -> start at scenario {scenario}, '
-              f'{len(effective)} kinetic parameters '
+              f'{len(effective)} individually sampled kinetic parameters '
               f'from the scenario-{kinetic_bounds_scenario} workbook '
               f'({len(engine_kwargs["include_params"])} rows minus the '
               f'excluded {list(excluded) or "none"}, which stay at the '
-              'baseline); bands '
+              f'baseline, minus the {len(grouped)} grouped ones below); bands '
               f'(x baseline, log) by role: {n_rate} rate constants '
               f'{engine_kwargs["rate_multiplier_bounds"]}, the other '
               f'{len(effective) - n_rate} (inhibition '
@@ -385,7 +408,19 @@ def run(scenario=None,  # 'A' or 'B'; None = the preset's start scenario
               + ('pinned at the baseline'
                  if engine_kwargs['stage_1_max_x_bounds'] is None else
                  f'on {tuple(engine_kwargs["stage_1_max_x_bounds"])}')
+              + '; spike feed '
+              + ('pinned at the baseline (spike_delta_bounds=None)'
+                 if engine_kwargs['spike_delta_bounds'] is None else
+                 f'sampled as spike_delta on '
+                 f'{tuple(engine_kwargs["spike_delta_bounds"])}')
               + '.')
+        if groups:
+            print('Parameter groups (one log-scale multiplier each on '
+                  f'{tuple(engine_kwargs["group_multiplier_bounds"])} x '
+                  'baseline, preserving intra-group ratios): '
+                  + '; '.join(f'{g}[{len(m)}]: {", ".join(m)}'
+                              for g, m in groups.items())
+                  + '.')
     elif scenario is None:
         scenario = 'B'  # legacy default
     param_set_scenario = kinetic_bounds_scenario or scenario
@@ -485,11 +520,16 @@ def run(scenario=None,  # 'A' or 'B'; None = the preset's start scenario
                 df, objective_name=objective_name, direction=direction,
                 objective_units=objective_units,
                 filename=base + f'_trajectories_{stamp}.png')
+            # Group multipliers are plotted directly (baseline 1.0); the
+            # grouped members are not decision columns and are skipped.
+            plot_baselines = {**kinetic_baselines,
+                              **{g: 1.0 for g in
+                                 (engine_kwargs.get('parameter_groups') or {})}}
             ko.plot_parameter_trajectory(
-                df, kinetic_baselines, direction=direction,
+                df, plot_baselines, direction=direction,
                 filename=base + f'_param_trajectory_{stamp}.png')
             ko.plot_best_vs_baseline(
-                df, kinetic_baselines, direction=direction,
+                df, plot_baselines, direction=direction,
                 filename=base + f'_best_vs_baseline_{stamp}.png')
             # Log-sampled columns mirror build_search_space: kinetic
             # params are log-scale unless a param_bounds_override entry
@@ -497,7 +537,8 @@ def run(scenario=None,  # 'A' or 'B'; None = the preset's start scenario
             override = engine_kwargs.get('param_bounds_override') or {}
             log_columns = {
                 p for p in kinetic_baselines if p in df.columns
-                and (override[p][0] > 0.0 if p in override else True)}
+                and (override[p][0] > 0.0 if p in override else True)
+            } | set(engine_kwargs.get('parameter_groups') or ())  # log multipliers
             ko.plot_pca_projection(
                 df, direction=direction, log_columns=log_columns,
                 objective_name=objective_name,

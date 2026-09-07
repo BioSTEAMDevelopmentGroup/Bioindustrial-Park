@@ -61,6 +61,10 @@ sequentially) -- ask-first, like the unsupervised driver. Examples:
     # ethanol-only strain, expression/tolerance engineering only (29):
     python optimize_kinetics_BO_supervised.py --study-target-products \\
         ethanol_only --study-type metabolic
+    # compact 24-variable space: rates minus k_10/k_7/k_8, one multiplier per
+    # inhibition effector, spike pinned (name ..._ib0.2-2_xk10+k7+k8_...):
+    python optimize_kinetics_BO_supervised.py --objective IRR \\
+        --study-type metabolic_minimal
     # resume a pre-2026-09-04 study under its old flags and name:
     python optimize_kinetics_BO_supervised.py --legacy-flags --scenario A \\
         --kinetic-bounds-scenario B --objective IRR --n-trials 2000
@@ -124,13 +128,15 @@ def default_study_name(scenario, objective, kinetic_bounds_scenario,
     (the 1e-5x studies are untagged: only a differing band was tagged
     then, so they can only be resumed via --study-name); the legacy path
     never encoded the band. Every preset name also carries the inhibition-
-    coefficient band tag `_ib{lo}-{hi}` (the presets' saturation band,
-    ko.DEFAULT_SATURATION_MULTIPLIER_BOUNDS -- the supervisor exposes no
-    flag for it, matching the driver's default `multiplier_bounds`):
+    coefficient band tag `_ib{lo}-{hi}` (the study type's band from
+    ko.study_type_name_defaults -- the saturation band, or the group
+    band 0.2-2 of metabolic_minimal; the supervisor exposes no flag for
+    it, matching the driver's default `multiplier_bounds`):
     since 2026-09-06 the presets assign bands by role, and the tag keeps a
     role-band study from resuming a pre-change study of the same name.
-    `exclude_params` (None = the presets' ko.DEFAULT_EXCLUDED_PARAMETERS,
-    ('k_10',), which the driver defaults in; a tuple overrides it, () =
+    `exclude_params` (None = the study type's default from
+    ko.study_type_name_defaults -- ('k_10',), or ('k_10', 'k_7', 'k_8')
+    for metabolic_minimal -- which the driver defaults in; a tuple overrides it, () =
     nothing excluded) is tagged after `_ib` whenever the effective set is
     non-empty (`_xk10`; ko.excluded_parameters_tag): an exclusion drops a
     CSV column, and the tag keeps the default name off the studies that
@@ -145,6 +151,11 @@ def default_study_name(scenario, objective, kinetic_bounds_scenario,
     seeded run off the unseeded study's store."""
     n_seeds = seed_count(seed_from)
     if study_target_products is not None:
+        # The _ib / _x tags of the preset's own values come from the SAME
+        # table the driver's resolve_study_preset uses (metabolic_minimal
+        # tags its group band _ib0.2-2 and _xk10+k7+k8), so the name the
+        # stall watchdog polls is the name the child writes.
+        name_defaults = ko.study_type_name_defaults(study_type)
         return ko.default_study_name(objective, study_target_products,
                                      study_type, scenario=scenario,
                                      kinetic_bounds_scenario=kinetic_bounds_scenario,
@@ -154,9 +165,9 @@ def default_study_name(scenario, objective, kinetic_bounds_scenario,
                                          if rate_multiplier_bounds is None
                                          else rate_multiplier_bounds),
                                      inhibition_multiplier_bounds=
-                                         ko.DEFAULT_SATURATION_MULTIPLIER_BOUNDS,
+                                         name_defaults['inhibition_multiplier_bounds'],
                                      exclude_params=(
-                                         ko.DEFAULT_EXCLUDED_PARAMETERS
+                                         name_defaults['exclude_params']
                                          if exclude_params is None
                                          else tuple(exclude_params)),
                                      stage_1_max_x_bounds=(
@@ -487,7 +498,12 @@ if __name__ == '__main__':
                              'substrate-regulation roles (all k_* + K_1i, '
                              'K_2i, K_5i, K_9i); metabolic_protein = every '
                              'workbook row (plus affinity and product '
-                             'self-inhibition)')
+                             'self-inhibition); metabolic_minimal = the '
+                             'capacities minus k_10/k_7/k_8 + ONE 0.2x-2x '
+                             'multiplier per inhibition-effector family '
+                             '(inhib_ethanol/isobutanol/acetate), no K_* '
+                             'terms, spike feed pinned at the baseline '
+                             '(24 variables; name tags _ib0.2-2_xk10+k7+k8)')
     parser.add_argument('--legacy-flags', action='store_true',
                         help='ignore the presets: --scenario (default B) / '
                              '--kinetic-bounds-scenario / single 0.1x-10x '
@@ -560,12 +576,13 @@ if __name__ == '__main__':
                         metavar='NAME',
                         help='kinetic parameters kept OUT of the search '
                              'space (they stay at the scenario baseline and '
-                             "get no knockout probe); default = the preset's "
-                             'ko.DEFAULT_EXCLUDED_PARAMETERS (k_10, the '
+                             "get no knockout probe); default = the study type's "
+                             '(ko.study_type_name_defaults: k_10, the '
                              'active-biomass decay capacity -- a lower decay '
                              'rate is a free lunch, not an engineering '
-                             'target); a bare --exclude-params re-includes '
-                             'k_10 (on its per-parameter 0.1 10 band). The '
+                             'target; plus k_7 and k_8 under metabolic_minimal); a '
+                             'bare --exclude-params re-includes them (k_10 on '
+                             'its per-parameter 0.1 10 band). The '
                              'effective set is tagged into the derived study '
                              'name (_xk10 at the default; nothing when '
                              'empty) -- an exclusion drops a CSV column, so '

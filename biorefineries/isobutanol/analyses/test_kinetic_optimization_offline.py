@@ -1820,7 +1820,10 @@ assert "1e-5 10" not in src29_sup                          # stale help text
 # the workbook bounds, and the study name sees the EFFECTIVE rate band.
 drv29 = open(os.path.join(os.path.dirname(os.path.abspath(__file__)),
                           'optimize_kinetics_BO.py')).read()
-assert "'rate_multiplier_bounds', 'rate_params',\n                    'parameter_multiplier_bounds', 'stage_1_max_x_bounds')" in drv29
+assert ("'rate_multiplier_bounds', 'rate_params',\n"
+        "                    'parameter_multiplier_bounds', 'stage_1_max_x_bounds',\n"
+        "                    'parameter_groups', 'group_multiplier_bounds',\n"
+        "                    'spike_delta_bounds'):") in drv29
 assert "parameter_multiplier_bounds=engine_kwargs.get('parameter_multiplier_bounds')" in drv29
 assert "rate_multiplier_bounds=engine_kwargs['rate_multiplier_bounds']" in drv29
 assert 'explicit_rate_bounds' not in drv29
@@ -2346,7 +2349,7 @@ drv37 = open(os.path.join(os.path.dirname(os.path.abspath(__file__)),
 assert "for key in ('include_params', 'exclude_params', 'multiplier_bounds'," in drv37
 assert "exclude_params=engine_kwargs['exclude_params']," in drv37
 assert "excluded = tuple(engine_kwargs['exclude_params'] or ())" in drv37
-assert 'if n not in excluded]' in drv37
+assert 'if n not in excluded and n not in grouped]' in drv37
 # Supervisor: --exclude-params (nargs='*', default None = the preset's;
 # bare = () re-includes k_10), threaded through supervise() -> child_code()
 # (kwarg omitted when None, forwarded as a tuple otherwise) and the naming
@@ -2385,7 +2388,7 @@ assert sup37['default_study_name']('A', 'IRR', 'B', exclude_params=('k_10',)) \
 src37_sup = _inspect.getsource(sup37['supervise'])
 assert 'exclude_params=exclude_params' in src37_sup
 assert 'exclude_params={exclude_params!r}' in src37_sup                # settings event line
-assert 'ko.DEFAULT_EXCLUDED_PARAMETERS' in _inspect.getsource(sup37['default_study_name'])
+assert 'ko.study_type_name_defaults(study_type)' in _inspect.getsource(sup37['default_study_name'])
 src37 = open(os.path.join(os.path.dirname(os.path.abspath(__file__)),
                           'optimize_kinetics_BO_supervised.py')).read()
 assert "'--exclude-params', nargs='*', default=None" in src37
@@ -2546,7 +2549,9 @@ else:
 #%% 40. driver + supervisor: stage_1_max_x_bounds preset default, naming, --stage-1-max-x-bounds plumbing
 drv40 = open(os.path.join(os.path.dirname(os.path.abspath(__file__)),
                           'optimize_kinetics_BO.py')).read()
-assert "'parameter_multiplier_bounds', 'stage_1_max_x_bounds'):" in drv40
+assert ("'parameter_multiplier_bounds', 'stage_1_max_x_bounds',\n"
+        "                    'parameter_groups', 'group_multiplier_bounds',\n"
+        "                    'spike_delta_bounds'):") in drv40
 assert "stage_1_max_x_bounds=engine_kwargs['stage_1_max_x_bounds']," in drv40
 sup40 = _runpy.run_path(os.path.join(
     os.path.dirname(os.path.abspath(__file__)),
@@ -2935,6 +2940,41 @@ assert ko.default_study_name('IRR', 'ethanol_isobutanol', 'metabolic_minimal',
                              inhibition_multiplier_bounds=(0.2, 2.0),
                              exclude_params=('k_10', 'k_7', 'k_8'),
                              stage_1_max_x_bounds=(1.0, 50.0), burden=True) == NAME43
+# Driver: the three new keys are setdefault'ed like the others and the
+# preset summary reports the groups / pinned spike (source-text pins, the
+# driver cannot be imported offline).
+drv43 = open(os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                          'optimize_kinetics_BO.py')).read()
+assert "'parameter_groups', 'group_multiplier_bounds'," in drv43
+assert "'spike_delta_bounds'):" in drv43
+assert 'engine_kwargs.setdefault(key, preset[key])' in drv43
+assert "Parameter groups" in drv43 and 'spike feed pinned at the baseline' in drv43
+assert "plot_baselines" in drv43                    # group multipliers plotted at baseline 1.0
+assert "| set(engine_kwargs.get('parameter_groups') or ())" in drv43   # PCA log columns
+assert 'metabolic_minimal' in drv43
+# Supervisor: the _ib / _x tags come from ko.study_type_name_defaults, so
+# its derived name equals the driver's under metabolic_minimal (it used to
+# hardcode DEFAULT_SATURATION_MULTIPLIER_BOUNDS / DEFAULT_EXCLUDED_PARAMETERS).
+sup43 = _runpy.run_path(os.path.join(
+    os.path.dirname(os.path.abspath(__file__)),
+    'optimize_kinetics_BO_supervised.py'))
+assert sup43['default_study_name'](None, 'IRR', None,
+                                   study_target_products='ethanol_isobutanol',
+                                   study_type='metabolic_minimal', burden=True) == NAME43
+assert sup43['default_study_name'](None, 'IRR', None,
+                                   study_target_products='ethanol_isobutanol',
+                                   study_type='metabolic_minimal', burden=True,
+                                   exclude_params=('k_10',)) \
+    == 'kin_opt_ethanol_isobutanol_metabolic_minimal_irr_rb0.001-10_ib0.2-2_xk10_s1x1-50_burden'
+assert sup43['default_study_name'](None, 'IRR', None,
+                                   study_target_products='ethanol_isobutanol',
+                                   study_type='metabolic_protein', burden=True) \
+    == 'kin_opt_ethanol_isobutanol_metabolic_protein_irr_rb0.001-10_ib0.1-10_xk10_s1x1-50_burden'
+src43_sup = open(os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                              'optimize_kinetics_BO_supervised.py')).read()
+assert 'ko.study_type_name_defaults(study_type)' in src43_sup
+assert 'ko.DEFAULT_SATURATION_MULTIPLIER_BOUNDS' not in _inspect.getsource(sup43['default_study_name'])
+assert 'metabolic_minimal' in src43_sup
 # Effector table read by FILE PATH, cached like the roles; a table row
 # without an effector gives None.
 eff43 = ko.kinetic_parameter_effectors()
@@ -3015,6 +3055,19 @@ if os.path.isfile(wb_A) and os.path.isfile(wb_B):
         assert 'k_1ie' in str(e43)
     else:
         raise AssertionError('grouped row without an effector did not raise KeyError')
+    # Supervisor name == driver name (the driver's exact default_study_name
+    # call on the preset's effective values) for all six presets.
+    for stp43, st43 in ((a, b) for a in ko.STUDY_TARGET_PRODUCTS for b in ko.STUDY_TYPE_ROLES):
+        q43 = ko.resolve_study_preset(stp43, st43)
+        driver_name43 = ko.default_study_name(
+            'IRR', stp43, st43, scenario=q43['scenario'],
+            kinetic_bounds_scenario=q43['kinetic_bounds_scenario'], burden=True,
+            rate_multiplier_bounds=q43['rate_multiplier_bounds'],
+            inhibition_multiplier_bounds=q43['multiplier_bounds'],
+            exclude_params=q43['exclude_params'],
+            stage_1_max_x_bounds=q43['stage_1_max_x_bounds'], n_seeds=0)
+        assert sup43['default_study_name'](None, 'IRR', None, study_target_products=stp43,
+                                           study_type=st43, burden=True) == driver_name43, (stp43, st43)
     PASS('metabolic_minimal preset: 3 effector groups (5/5/6) + 17 rates + 4 = 24 (ethanol_only 2 groups + 13 + 4 = 19), K_* out, spike pinned, _ib0.2-2 / _xk10+k7+k8 naming via study_type_name_defaults, effector table by file path, existing presets untouched')
 else:
     print('SKIP 43 (preset part): parameter-distribution workbooks not found')
