@@ -3026,7 +3026,9 @@ else:
 # call, applied_* columns after the metrics (before 'error'), sidecar
 # carries them, baseline restored in the finally; seeding a space that
 # samples the members individually resolves them through applied_*, the
-# reverse direction raises.
+# reverse raises; and (burden x groups) a fake burden_model's evaluate/apply
+# receive the EXPANDED member values, never the group multiplier, with the
+# BURDEN_COLUMNS ahead of the applied_* columns in the header.
 if _optuna is None:
     print('SKIP 44: optuna not installed')
 else:
@@ -3165,6 +3167,106 @@ else:
         assert 'spike_delta' in str(e44)
     else:
         raise AssertionError('pinned-spike donor into a spike-sampling space did not raise')
-    PASS('engine: group multiplier applied to every member before each simulation, excluded k_10 untouched, spike pinned at the baseline, applied_* columns after the metrics (sidecar/LOST complete), baseline restored; seeds resolve grouped members through applied_*, the reverse raises')
+    # Burden x groups: the burden model must be called with the EXPANDED
+    # member values (baseline x sampled multiplier), never the raw group
+    # multiplier -- a fake burden_model captures exactly what evaluate()/
+    # apply() receive at every trial. Fresh handles/study (te44/fbs44 above
+    # were already exercised and restored, but a fresh fixture avoids any
+    # cross-run coupling).
+    outdir44g = tempfile.mkdtemp()
+    study44g = 'offline_grouped_burden'
+    csv44g = os.path.join(outdir44g, study44g + '_trajectory.csv')
+
+    class _FakeBurden44:
+        # Minimal stand-in for enzyme_burden.BurdenModel: the engine reads
+        # F_flex/Phi_M_wt/phi_T_wt unconditionally at start-up (the 'Enzyme
+        # burden ON' banner) and `reference` for the stale-snapshot guard
+        # (empty -> nothing to compare -> never stale); every trial is kept
+        # feasible so evaluate()/apply() run on every one of the 3 trials.
+        F_flex = 0.245
+        Phi_M_wt = 0.05
+        phi_T_wt = 0.05
+        reference = {}
+        def __init__(self):
+            self.seen_evaluate = []   # dicts passed to evaluate(), in order
+            self.seen_apply = []      # dicts passed to apply(), in order
+        def evaluate(self, values):
+            self.seen_evaluate.append(dict(values))
+            record = {col: 0.0 for col in eb.BURDEN_COLUMNS}
+            return SimpleNamespace(feasible=True, violation=-1.0, Phi_M=0.01,
+                                   F_flex=self.F_flex, k_7_eff=0.0, k_8_eff=0.0,
+                                   as_record=lambda: record)
+        def apply(self, values):
+            self.seen_apply.append(dict(values))
+            return dict(values)   # no k_7/k_8 sampled here -- pass through
+    burden44g = _FakeBurden44()
+    te44g = _FakeTE44()
+    fbs44g = SimpleNamespace(
+        current_specifications=dict(target_conc=221.25,
+                                    threshold_conc=217.125,
+                                    spike_conc=600.0),
+        max_n_spikes=16)
+    seen44g = []
+    def _model_specification44g(**kw):
+        seen44g.append((kw['spike_conc'], te44g.k_1ie, te44g.k_4ie, te44g.k_10))
+    handles44g = dict(handles44, r_te=te44g, fbs_spec=fbs44g,
+                      model_specification=_model_specification44g,
+                      latest_TEA_solution={'IRR': np.nan,
+                                          'MPSPs': {'ethanol': np.nan,
+                                                    'isobutanol': np.nan}})
+    # feasible_sampling=False: burden on + feasible_sampling on (the
+    # default, check 35) also calls burden_model.evaluate() from the
+    # FeasibleTPESampler's own start-up/candidate feasibility checks, which
+    # would inflate seen_evaluate with calls unrelated to _objective; off
+    # here isolates the one evaluate()/apply() pair per trial this check
+    # targets (the objective's own hook, unconditionally exercised either way).
+    study44g_obj, csv44g_out, kb44g = ko.run_kinetic_optimization(
+        objective='IRR', scenario_label='X', n_trials=3, seed=1,
+        study_name=study44g, results_dir=outdir44g, handles=handles44g,
+        print_status_every=1, burden_model=burden44g, feasible_sampling=False,
+        exclude_params=('k_10',), parameter_groups=groups44,
+        spike_delta_bounds=None)
+    assert csv44g_out == csv44g and kb44g == kb44
+    df44g = ko.load_trajectory(csv44g)
+    cols44g = list(df44g.columns)
+    space44g, _ = ko.build_search_space(kb44, exclude_params=('k_10',),
+                                        parameter_groups=groups44,
+                                        spike_delta_bounds=None)
+    assert cols44g == ko.trajectory_columns(
+        space44g, extra_columns=[*eb.BURDEN_COLUMNS, 'applied_k_1ie', 'applied_k_4ie'])
+    # BURDEN_COLUMNS precede every applied_* column; 'error' is last.
+    burden_idx44g = [cols44g.index(c) for c in eb.BURDEN_COLUMNS]
+    applied_idx44g = [cols44g.index(c) for c in ('applied_k_1ie', 'applied_k_4ie')]
+    assert max(burden_idx44g) < min(applied_idx44g)
+    assert cols44g[-1] == 'error'
+    assert df44g['trial_number'].tolist() == [0, 1, 2]
+    assert df44g['state'].tolist() == ['COMPLETE']*3
+    # The burden model ran on every trial (feasible -> evaluate then apply),
+    # and NOT on the finally's restore_baseline (which never touches burden).
+    assert len(burden44g.seen_evaluate) == 3 and len(burden44g.seen_apply) == 3
+    for i44g in range(3):
+        seen_e = burden44g.seen_evaluate[i44g]
+        seen_a = burden44g.seen_apply[i44g]
+        assert seen_e == seen_a           # apply() saw exactly what evaluate() saw
+        assert 'inhib_ethanol' not in seen_e         # the group key never reaches the burden model
+        assert 'k_10' not in seen_e                  # excluded param: not sampled, not expanded, not passed
+        assert {'k_1ie', 'k_4ie'} <= set(seen_e)      # the expanded members ARE passed
+        mult44g = df44g['inhib_ethanol'][i44g]        # the sampled multiplier, read from the CSV
+        assert np.isclose(seen_e['k_1ie'], 0.02*mult44g, rtol=1e-12, atol=0.0)
+        assert np.isclose(seen_e['k_4ie'], 0.04*mult44g, rtol=1e-12, atol=0.0)
+        assert np.isclose(df44g['applied_k_1ie'][i44g], seen_e['k_1ie'], rtol=1e-12, atol=0.0)
+        assert np.isclose(df44g['applied_k_4ie'][i44g], seen_e['k_4ie'], rtol=1e-12, atol=0.0)
+    # The model itself also received the expanded values (via apply()), the
+    # excluded k_10 untouched, the baseline restored afterwards.
+    assert len(seen44g) == 4, seen44g   # 3 trials + the finally's restore
+    for i44g in range(3):
+        spike44g, k1ie44g, k4ie44g, k10_44g = seen44g[i44g]
+        assert spike44g == 600.0
+        assert np.isclose(k1ie44g, df44g['applied_k_1ie'][i44g], rtol=1e-12, atol=0.0)
+        assert np.isclose(k4ie44g, df44g['applied_k_4ie'][i44g], rtol=1e-12, atol=0.0)
+        assert k10_44g == 0.01
+    assert seen44g[3] == (600.0, 0.02, 0.04, 0.01)      # restore_baseline
+    assert te44g.k_1ie == 0.02 and te44g.k_4ie == 0.04 and te44g.k_1e == 47.1
+    PASS('engine: group multiplier applied to every member before each simulation, excluded k_10 untouched, spike pinned at the baseline, applied_* columns after the metrics (sidecar/LOST complete), baseline restored; seeds resolve grouped members through applied_*, the reverse raises; a fake burden_model receives the EXPANDED member values (not the group multiplier) at evaluate()/apply(), never the excluded k_10, with BURDEN_COLUMNS ahead of applied_* in the header')
 
 print(f'\nALL {n_pass} CHECKS PASSED')
