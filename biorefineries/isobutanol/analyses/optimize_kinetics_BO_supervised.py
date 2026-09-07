@@ -242,7 +242,7 @@ def lost_cause(killed_for_stall, stall_timeout_min, returncode):
 def child_code(scenario, objective, n_trials, kinetic_bounds_scenario,
                make_plots, study_name, restrict_to_workbook=True,
                seed=3221, study_target_products=None, study_type=None,
-               burden=True, enqueue_baseline=True, enqueue_knockouts=True,
+               burden=True, enqueue_baseline=False, enqueue_knockouts=True,
                rate_multiplier_bounds=None, n_startup_trials=None,
                feasible_sampling=True, exclude_params=None,
                stage_1_max_x_bounds=_UNSET, seed_from=None):
@@ -308,7 +308,7 @@ def supervise(scenario=None, objective='IRR', n_trials=2000,
               restrict_to_workbook=True, seed=3221,
               study_target_products=ko.DEFAULT_STUDY_TARGET_PRODUCTS,
               study_type=ko.DEFAULT_STUDY_TYPE, burden=True,
-              enqueue_baseline=True, enqueue_knockouts=True,
+              enqueue_baseline=False, enqueue_knockouts=True,
               rate_multiplier_bounds=None,
               n_startup_trials=None, max_empty_attempts=5,
               feasible_sampling=True, exclude_params=None,
@@ -575,13 +575,16 @@ if __name__ == '__main__':
                              'burden-free study under the un-suffixed study '
                              'name (required to resume any study started '
                              'before 2026-09-05; the default adds _burden)')
-    parser.add_argument('--no-enqueue-baseline', dest='enqueue_baseline',
-                        action='store_false',
-                        help='do not enqueue the scenario baseline as trial '
-                             '0 of a fresh study; the sampler then draws '
-                             'EVERY trial (no point is pre-seeded). The '
-                             'default enqueues the baseline so it provably '
-                             'participates. Not part of the study name; '
+    parser.add_argument('--enqueue-baseline', dest='enqueue_baseline',
+                        action='store_true',
+                        help='enqueue the scenario baseline as trial 0 of '
+                             'a fresh study so it provably participates. '
+                             'OFF by default since 2026-09-07: a fresh '
+                             'study enqueues no baseline point and the '
+                             'sampler draws EVERY trial (an enqueued '
+                             'scenario-A baseline anchored TPE in the '
+                             'pure-ethanol basin in every earlier IRR '
+                             'study). Not part of the study name; '
                              'meaningful only for a fresh study (a resume '
                              'enqueues nothing regardless)')
     parser.add_argument('--no-enqueue-knockouts', dest='enqueue_knockouts',

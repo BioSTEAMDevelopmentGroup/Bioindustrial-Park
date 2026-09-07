@@ -506,7 +506,7 @@ else:
                        'threshold_conc': 100.0, 'target_delta': 50.0,
                        'spike_delta': 100.0, 'max_n_spikes': 2})
     _optuna.logging.set_verbosity(_optuna.logging.WARNING)
-    study17_obj, csv17_out, kb17 = ko.run_kinetic_optimization(
+    study17_obj, csv17_out, kb17 = ko.run_kinetic_optimization(enqueue_baseline=True, 
         objective='IRR', scenario_label='X', n_trials=3, seed=1,
         study_name=study17, results_dir=outdir17, handles=handles17,
         print_status_every=1, burden_model=None)
@@ -545,7 +545,7 @@ else:
                                            'MPSPs': {'ethanol': np.nan,
                                                      'isobutanol': np.nan}})
     try:
-        ko.run_kinetic_optimization(
+        ko.run_kinetic_optimization(enqueue_baseline=True, 
             objective='IRR', scenario_label='X', n_trials=2, seed=1,
             study_name=study17b, results_dir=outdir17b, handles=handles17b,
             print_status_every=1, burden_model=None)
@@ -971,7 +971,7 @@ if _optuna is not None:
                      latest_TEA_solution={'IRR': np.nan,
                                           'MPSPs': {'ethanol': np.nan,
                                                     'isobutanol': np.nan}})
-    study23, _, _ = ko.run_kinetic_optimization(
+    study23, _, _ = ko.run_kinetic_optimization(enqueue_baseline=True, 
         objective='IRR', scenario_label='X', n_trials=1, seed=1,
         study_name='offline_rate_band', results_dir=outdir23, handles=handles23,
         rate_multiplier_bounds=(1e-5, 10.0), print_status_every=1,
@@ -1142,7 +1142,7 @@ else:
         return _orig_write_inflight(path, columns, record)
     ko.write_inflight = _counting_write_inflight
     try:
-        study25_obj, csv25_out, kb25 = ko.run_kinetic_optimization(
+        study25_obj, csv25_out, kb25 = ko.run_kinetic_optimization(enqueue_baseline=True, 
             objective='IRR', scenario_label='X', n_trials=6, seed=1,
             study_name=study25, results_dir=outdir25, handles=handles25,
             param_bounds_override=override25,
@@ -1196,7 +1196,7 @@ else:
     n_seen25_before = len(seen_k7)
     ko.write_inflight = _counting_write_inflight
     try:
-        ko.run_kinetic_optimization(
+        ko.run_kinetic_optimization(enqueue_baseline=True, 
             objective='IRR', scenario_label='X', n_trials=6, seed=1,
             study_name=study25, results_dir=outdir25, handles=handles25,
             param_bounds_override=override25,
@@ -1215,7 +1215,7 @@ else:
     # baselines: one perturbed reference capacity is named with both values.
     bm25_stale = eb.BurdenModel.from_reference({**baselines25, 'k_3': 6.0})
     try:
-        ko.run_kinetic_optimization(
+        ko.run_kinetic_optimization(enqueue_baseline=True, 
             objective='IRR', scenario_label='X', n_trials=1, seed=1,
             study_name='offline_stale_reference', results_dir=tempfile.mkdtemp(),
             handles=handles25, param_bounds_override=override25,
@@ -1227,7 +1227,7 @@ else:
         raise AssertionError('a stale BurdenModel reference was not refused')
     # ... and a burden_model that is neither 'auto', None nor a model is a TypeError
     try:
-        ko.run_kinetic_optimization(
+        ko.run_kinetic_optimization(enqueue_baseline=True, 
             objective='IRR', scenario_label='X', n_trials=1, seed=1,
             study_name='offline_bad_burden', results_dir=tempfile.mkdtemp(),
             handles=handles25, param_bounds_override=override25,
@@ -1268,7 +1268,7 @@ else:
         # storage, so the store holds 4 by the time the engine reads it;
         # a budget of n_trials25_before + 2 (5) is what makes the engine
         # run exactly that one already-queued trial (5 - 4 stored = 1).
-        study25r, csv25r, kb25r = ko.run_kinetic_optimization(
+        study25r, csv25r, kb25r = ko.run_kinetic_optimization(enqueue_baseline=True, 
             objective='IRR', scenario_label='X', n_trials=n_trials25_before + 2,
             seed=1, study_name=study25, results_dir=outdir25, handles=handles25,
             param_bounds_override=override25,
@@ -1294,7 +1294,7 @@ else:
     # burden off: no burden columns, k_7 written as sampled
     outdir25b = tempfile.mkdtemp()
     seen_k7.clear()
-    study25b_obj, csv25b, _ = ko.run_kinetic_optimization(
+    study25b_obj, csv25b, _ = ko.run_kinetic_optimization(enqueue_baseline=True, 
         objective='IRR', scenario_label='X', n_trials=1, seed=1,
         study_name='offline_no_burden', results_dir=outdir25b, handles=handles25,
         param_bounds_override=override25, rate_multiplier_bounds=(1e-5, 10.0),
@@ -1305,7 +1305,7 @@ else:
     # the engine's fallback name carries the suffix only when the burden is on
     assert os.path.isfile(os.path.join(outdir25b, 'offline_no_burden_trajectory.csv'))
     outdir25c = tempfile.mkdtemp()
-    _, csv25c, _ = ko.run_kinetic_optimization(
+    _, csv25c, _ = ko.run_kinetic_optimization(enqueue_baseline=True, 
         objective='IRR', scenario_label='X', n_trials=1, seed=1,
         results_dir=outdir25c, handles=handles25,
         param_bounds_override=override25, rate_multiplier_bounds=(1e-5, 10.0),
@@ -1421,7 +1421,7 @@ else:
     # Default ON: trial 0 = baseline, trials 1-2 = the k_1e / k_7 probes
     # (k_13 sits at its floor -> no probe), trial 3 = the first sampled
     # point. The engine's own baseline point is what the probes copy.
-    st27, csv27, kb27_out = ko.run_kinetic_optimization(
+    st27, csv27, kb27_out = ko.run_kinetic_optimization(enqueue_baseline=True, 
         objective='IRR', scenario_label='X', n_trials=4, seed=1,
         study_name=study27, results_dir=outdir27, handles=_handles27(),
         param_bounds_override=override27, rate_multiplier_bounds=(0.1, 10.0),
@@ -1443,7 +1443,7 @@ else:
     assert [t.user_attrs.get('knockout_probe') for t in tr27] \
         == [None, 'k_1e', 'k_7', None]
     # Resume: no re-enqueue (nothing WAITING, no duplicate probes).
-    st27r, _, _ = ko.run_kinetic_optimization(
+    st27r, _, _ = ko.run_kinetic_optimization(enqueue_baseline=True, 
         objective='IRR', scenario_label='X', n_trials=5, seed=1,
         study_name=study27, results_dir=outdir27, handles=_handles27(),
         param_bounds_override=override27, rate_multiplier_bounds=(0.1, 10.0),
@@ -1452,7 +1452,7 @@ else:
     assert sum(1 for t in st27r.trials if t.user_attrs.get('knockout_probe')) == 2
     # OFF: trial 1 is a sampled point, not a probe.
     outdir27b = tempfile.mkdtemp()
-    st27b, csv27b, _ = ko.run_kinetic_optimization(
+    st27b, csv27b, _ = ko.run_kinetic_optimization(enqueue_baseline=True, 
         objective='IRR', scenario_label='X', n_trials=2, seed=1,
         study_name=study27, results_dir=outdir27b, handles=_handles27(),
         param_bounds_override=override27, rate_multiplier_bounds=(0.1, 10.0),
@@ -1661,7 +1661,7 @@ else:
                                           'MPSPs': {'ethanol': np.nan,
                                                     'isobutanol': np.nan}})
     outdir28 = tempfile.mkdtemp()
-    st28, csv28, _ = ko.run_kinetic_optimization(
+    st28, csv28, _ = ko.run_kinetic_optimization(enqueue_baseline=True, 
         objective='IRR', scenario_label='X', n_trials=30, seed=1,
         study_name='offline_role_bands', results_dir=outdir28,
         handles=handles28, multiplier_bounds=(0.1, 10.0),
@@ -1852,19 +1852,19 @@ common30 = dict(objective='IRR', scenario_label='X', seed=1,
                 study_name='offline_startup', results_dir=outdir30,
                 handles=handles30, print_status_every=10, burden_model=None,
                 enqueue_knockouts=False)
-st30, csv30, _ = ko.run_kinetic_optimization(n_trials=12, n_startup_trials=3,
+st30, csv30, _ = ko.run_kinetic_optimization(enqueue_baseline=True, n_trials=12, n_startup_trials=3,
                                              **common30)
 assert st30.sampler._n_startup_trials == 3
 assert len(ko.load_trajectory(csv30)) == 12
 # Resume (nothing left to run) with None: the legacy rule, floor 10.
-st30b, _, _ = ko.run_kinetic_optimization(n_trials=12, **common30)
+st30b, _, _ = ko.run_kinetic_optimization(enqueue_baseline=True, n_trials=12, **common30)
 assert st30b.sampler._n_startup_trials == 10 == max(10, 12//10)
 assert len(ko.load_trajectory(csv30)) == 12                  # no new trials
-st30c, _, _ = ko.run_kinetic_optimization(n_trials=12, n_startup_trials=0,
+st30c, _, _ = ko.run_kinetic_optimization(enqueue_baseline=True, n_trials=12, n_startup_trials=0,
                                           **common30)
 assert st30c.sampler._n_startup_trials == 0
 try:
-    ko.run_kinetic_optimization(n_trials=12, n_startup_trials=-1, **common30)
+    ko.run_kinetic_optimization(enqueue_baseline=True, n_trials=12, n_startup_trials=-1, **common30)
 except ValueError as e30:
     assert 'n_startup_trials' in str(e30)
 else:
@@ -2218,7 +2218,7 @@ else:
                     enqueue_knockouts=False)
     buf35 = _io.StringIO()
     with _contextlib.redirect_stdout(buf35):
-        st35, csv35, _ = ko.run_kinetic_optimization(n_trials=10, n_startup_trials=4,
+        st35, csv35, _ = ko.run_kinetic_optimization(enqueue_baseline=True, n_trials=10, n_startup_trials=4,
                                                      **common35)   # burden 'auto', feasible_sampling default
     out35 = buf35.getvalue()
     assert type(st35.sampler).__name__ == 'FeasibleTPESampler', type(st35.sampler)
@@ -2238,7 +2238,7 @@ else:
     # resume with feasible_sampling=False -> the plain TPESampler, same study
     buf35b = _io.StringIO()
     with _contextlib.redirect_stdout(buf35b):
-        st35b, _, _ = ko.run_kinetic_optimization(n_trials=12, n_startup_trials=4,
+        st35b, _, _ = ko.run_kinetic_optimization(enqueue_baseline=True, n_trials=12, n_startup_trials=4,
                                                   feasible_sampling=False, **common35)
     assert type(st35b.sampler) is _optuna.samplers.TPESampler
     assert 'Sampler: plain TPESampler (feasible_sampling=False)' in buf35b.getvalue()
@@ -2247,7 +2247,7 @@ else:
     # burden off + feasible_sampling=True -> plain sampler (no predicate)
     buf35c = _io.StringIO()
     with _contextlib.redirect_stdout(buf35c):
-        st35c, _, _ = ko.run_kinetic_optimization(
+        st35c, _, _ = ko.run_kinetic_optimization(enqueue_baseline=True, 
             n_trials=3, n_startup_trials=2, feasible_sampling=True,
             burden_model=None, **{**common35, 'study_name': 'offline_feasible_noburden'})
     assert type(st35c.sampler) is _optuna.samplers.TPESampler
@@ -2500,7 +2500,7 @@ else:
     _optuna.logging.set_verbosity(_optuna.logging.WARNING)
     # 4 trials: 0 = baseline, 1 = the k_1e knockout probe (stage_1_max_x
     # stays at the baseline), 2-3 = sampled.
-    study39_obj, csv39_out, kb39 = ko.run_kinetic_optimization(
+    study39_obj, csv39_out, kb39 = ko.run_kinetic_optimization(enqueue_baseline=True, 
         objective='IRR', scenario_label='X', n_trials=4, seed=1,
         study_name=study39, results_dir=outdir39, handles=handles39,
         print_status_every=1, burden_model=None,
@@ -2530,7 +2530,7 @@ else:
                       latest_TEA_solution={'IRR': np.nan,
                                            'MPSPs': {'ethanol': np.nan,
                                                      'isobutanol': np.nan}})
-    _, csv39b, _ = ko.run_kinetic_optimization(
+    _, csv39b, _ = ko.run_kinetic_optimization(enqueue_baseline=True, 
         objective='IRR', scenario_label='X', n_trials=2, seed=1,
         study_name=study39 + '_off', results_dir=outdir39b, handles=handles39b,
         print_status_every=1, burden_model=None)
@@ -2694,7 +2694,7 @@ else:
                                 'MPSPs': {'ethanol': np.nan,
                                           'isobutanol': np.nan}}}
     _optuna.logging.set_verbosity(_optuna.logging.WARNING)
-    study41, csv41, _ = ko.run_kinetic_optimization(
+    study41, csv41, _ = ko.run_kinetic_optimization(enqueue_baseline=True, 
         objective='IRR', scenario_label='X', n_trials=3, seed=1,
         study_name='offline_seeded', results_dir=outdir41, handles=handles41,
         print_status_every=1, burden_model=None,
@@ -2711,7 +2711,7 @@ else:
     assert 'seed' not in study41.trials[1].user_attrs
     # Resume (one more trial): seeds are NOT re-enqueued -- trial 3 is a
     # sampled point without the attr.
-    study41b, _, _ = ko.run_kinetic_optimization(
+    study41b, _, _ = ko.run_kinetic_optimization(enqueue_baseline=True, 
         objective='IRR', scenario_label='X', n_trials=4, seed=1,
         study_name='offline_seeded', results_dir=outdir41, handles=handles41,
         print_status_every=1, burden_model=None,
@@ -2722,7 +2722,7 @@ else:
     assert ko.load_trajectory(csv41)['k_1e'][3] != 100.0
     # A bad donor fails BEFORE the store is opened (no .db / CSV created).
     try:
-        ko.run_kinetic_optimization(
+        ko.run_kinetic_optimization(enqueue_baseline=True, 
             objective='IRR', scenario_label='X', n_trials=3, seed=1,
             study_name='offline_seeded_bad', results_dir=outdir41,
             handles=handles41, burden_model=None,
@@ -3181,7 +3181,7 @@ else:
     groups44 = {'inhib_ethanol': ['k_1ie', 'k_4ie']}
     _optuna.logging.set_verbosity(_optuna.logging.WARNING)
     # 3 trials: 0 = baseline (multiplier 1.0), 1 = the k_1e probe, 2 = sampled.
-    study44_obj, csv44_out, kb44 = ko.run_kinetic_optimization(
+    study44_obj, csv44_out, kb44 = ko.run_kinetic_optimization(enqueue_baseline=True, 
         objective='IRR', scenario_label='X', n_trials=3, seed=1,
         study_name=study44, results_dir=outdir44, handles=handles44,
         print_status_every=1, burden_model=None,
@@ -3338,7 +3338,7 @@ else:
     # would inflate seen_evaluate with calls unrelated to _objective; off
     # here isolates the one evaluate()/apply() pair per trial this check
     # targets (the objective's own hook, unconditionally exercised either way).
-    study44g_obj, csv44g_out, kb44g = ko.run_kinetic_optimization(
+    study44g_obj, csv44g_out, kb44g = ko.run_kinetic_optimization(enqueue_baseline=True, 
         objective='IRR', scenario_label='X', n_trials=3, seed=1,
         study_name=study44g, results_dir=outdir44g, handles=handles44g,
         print_status_every=1, burden_model=burden44g, feasible_sampling=False,
@@ -3406,7 +3406,7 @@ else:
                                                     'isobutanol': np.nan}})
     buf44f = _io.StringIO()
     with _contextlib.redirect_stdout(buf44f):
-        st44f, _, _ = ko.run_kinetic_optimization(
+        st44f, _, _ = ko.run_kinetic_optimization(enqueue_baseline=True, 
             objective='IRR', scenario_label='X', n_trials=3, seed=1,
             study_name='offline_grouped_feasible', results_dir=outdir44f,
             handles=handles44f, print_status_every=1, burden_model=burden44f,
@@ -3646,43 +3646,81 @@ assert "'metabolic_minimal_subset'" in drv45 and 'standalone' in drv45.lower()
 assert 'metabolic_minimal_subset = ' in src43_sup          # --study-type help text
 PASS('metabolic_minimal_subset preset: explicit constants in __all__, empty role entry, options entry with the new stage_1_max_x_bounds key, name defaults (group band, no exclusions, stage_1_max_x pinned; older types keep (1, 50))')
 
-#%% 46. enqueue_baseline flag: engine kwarg (default True) gates the trial-0
-# baseline enqueue; a fresh study with it False enqueues NO baseline point so
-# the sampler draws every trial. Threaded engine -> driver -> supervisor,
-# mirroring enqueue_knockouts; not part of any study name; resumes unaffected.
+#%% 46. enqueue_baseline flag: engine kwarg gates the trial-0 baseline
+# enqueue. Default FALSE since 2026-09-07 (no enqueued baseline for ALL
+# studies): a fresh study enqueues NO baseline point so the sampler draws
+# every trial; True evaluates the baseline as trial 0. Threaded engine ->
+# driver -> supervisor (opt-in --enqueue-baseline), mirroring
+# enqueue_knockouts; not part of any study name; resumes unaffected.
 _e46 = _inspect.signature(ko.run_kinetic_optimization).parameters
-assert 'enqueue_baseline' in _e46 and _e46['enqueue_baseline'].default is True
+assert 'enqueue_baseline' in _e46 and _e46['enqueue_baseline'].default is False
 _src46_eng = _inspect.getsource(ko.run_kinetic_optimization)
 assert 'if enqueue_baseline:' in _src46_eng
 assert 'baseline_point = baseline_decision_point(' in _src46_eng
 assert 'enqueue_baseline' not in _inspect.getsource(ko.default_study_name)
-# Driver: run() accepts it (default True) and forwards it to the engine.
+# Driver: run() accepts it (default False) and forwards it to the engine.
 drv46 = open(os.path.join(os.path.dirname(os.path.abspath(__file__)),
                           'optimize_kinetics_BO.py')).read()
-assert 'enqueue_baseline=True,' in drv46
+assert 'enqueue_baseline=False,' in drv46
 assert 'enqueue_baseline=enqueue_baseline,' in drv46
-# Supervisor: supervise()/child_code() accept it (default True); child_code
-# forwards it both ways into the child program; --no-enqueue-baseline parses
-# to dest enqueue_baseline; main forwards args.enqueue_baseline.
+# Supervisor: supervise()/child_code() accept it (default False); child_code
+# forwards it both ways into the child program; the opt-in
+# --enqueue-baseline (store_true) parses to dest enqueue_baseline; main
+# forwards args.enqueue_baseline.
 sup46 = _runpy.run_path(os.path.join(
     os.path.dirname(os.path.abspath(__file__)),
     'optimize_kinetics_BO_supervised.py'))
-assert _inspect.signature(sup46['supervise']).parameters['enqueue_baseline'].default is True
-assert _inspect.signature(sup46['child_code']).parameters['enqueue_baseline'].default is True
+assert _inspect.signature(sup46['supervise']).parameters['enqueue_baseline'].default is False
+assert _inspect.signature(sup46['child_code']).parameters['enqueue_baseline'].default is False
 code46 = sup46['child_code'](None, 'IRR', 2000, None, False, 'x',
                              study_target_products='ethanol_isobutanol',
                              study_type='metabolic_minimal_subset',
-                             enqueue_baseline=False)
-assert 'enqueue_baseline=False' in code46
+                             enqueue_baseline=True)
+assert 'enqueue_baseline=True' in code46
 code46b = sup46['child_code'](None, 'IRR', 2000, None, False, 'x',
                               study_target_products='ethanol_isobutanol',
                               study_type='metabolic_minimal_subset')
-assert 'enqueue_baseline=True' in code46b
+assert 'enqueue_baseline=False' in code46b          # the default: no baseline
 src46_sup = open(os.path.join(os.path.dirname(os.path.abspath(__file__)),
                               'optimize_kinetics_BO_supervised.py')).read()
-assert "'--no-enqueue-baseline'" in src46_sup and "dest='enqueue_baseline'" in src46_sup
+assert "'--enqueue-baseline'" in src46_sup and "dest='enqueue_baseline'" in src46_sup
+assert "'--no-enqueue-baseline'" not in src46_sup    # the old opt-out is gone
 assert 'enqueue_baseline=args.enqueue_baseline' in src46_sup
 assert 'enqueue_baseline=enqueue_baseline' in _inspect.getsource(sup46['supervise'])
-PASS('enqueue_baseline flag: engine kwarg (default True) gates the trial-0 baseline enqueue; driver run() and supervisor supervise()/child_code() thread it; --no-enqueue-baseline; off study name')
+# Engine-level, with the real engine on fake handles (check-23 pattern):
+# under the DEFAULT a fresh study enqueues NO point at all (probes off too),
+# so trial 0 is a sampled draw -- optuna marks an enqueued trial with
+# system_attrs['fixed_params']; a sampled one has none. enqueue_baseline=True
+# restores the enqueued baseline (k_1e 47.1). RNG-independent either way.
+if _optuna is not None:
+    st46 = {'irr': 0.2}
+    def _model_specification46(**kw):
+        pass
+    def _solve_TEA46(stream_IDs=None):
+        return {'IRR': st46['irr'], 'MPSPs': {'ethanol': 0.5, 'isobutanol': 1.0}}
+    handles46 = dict(handles17, model_specification=_model_specification46,
+                     solve_TEA=_solve_TEA46,
+                     latest_TEA_solution={'IRR': np.nan,
+                                          'MPSPs': {'ethanol': np.nan,
+                                                    'isobutanol': np.nan}})
+    study46, _, _ = ko.run_kinetic_optimization(
+        objective='IRR', scenario_label='X', n_trials=1, seed=1,
+        study_name='offline_no_baseline_default',
+        results_dir=tempfile.mkdtemp(), handles=handles46,
+        enqueue_knockouts=False, print_status_every=1,
+        burden_model=None)                    # default enqueue_baseline=False
+    assert 'fixed_params' not in study46.trials[0].system_attrs   # sampled, not enqueued
+    assert not np.isclose(study46.trials[0].params['k_1e'], 47.1)
+    study46b, _, _ = ko.run_kinetic_optimization(
+        objective='IRR', scenario_label='X', n_trials=1, seed=1,
+        study_name='offline_baseline_opt_in',
+        results_dir=tempfile.mkdtemp(), handles=handles46,
+        enqueue_baseline=True, enqueue_knockouts=False,
+        print_status_every=1, burden_model=None)
+    assert np.isclose(study46b.trials[0].system_attrs['fixed_params']['k_1e'], 47.1)
+    assert np.isclose(study46b.trials[0].params['k_1e'], 47.1)
+else:
+    print('SKIP 46 (engine part): optuna not installed')
+PASS('enqueue_baseline flag: engine kwarg default FALSE (no enqueued baseline for all studies) gates the trial-0 baseline enqueue -- a default fresh study has no fixed_params on trial 0, opt-in restores the enqueued baseline; driver run() and supervisor supervise()/child_code() thread it; opt-in --enqueue-baseline; off study name')
 
 print(f'\nALL {n_pass} CHECKS PASSED')

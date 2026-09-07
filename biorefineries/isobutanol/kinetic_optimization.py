@@ -2298,7 +2298,7 @@ def run_kinetic_optimization(objective='IRR',
                              study_name=None, results_dir=None,
                              handles=None, print_status_every=1,
                              burden_model='auto',
-                             enqueue_baseline=True,
+                             enqueue_baseline=False,
                              enqueue_knockouts=True,
                              n_startup_trials=None,
                              feasible_sampling=True,
@@ -2313,12 +2313,14 @@ def run_kinetic_optimization(objective='IRR',
 
     `n_trials` is the TOTAL budget of the study: rerunning with the same
     study_name resumes from the on-disk SQLite store and runs only the
-    remainder (crash/segfault recovery). A FRESH study evaluates the
-    scenario baseline configuration as trial 0 (see
-    baseline_decision_point) -- unless `enqueue_baseline=False`, which
-    enqueues NO baseline point so the sampler draws every trial from
-    trial 0 (baseline_point is still computed, since the probes are
-    derived from it) -- and then -- `enqueue_knockouts=True`, the
+    remainder (crash/segfault recovery). A FRESH study enqueues NO
+    baseline point by default (`enqueue_baseline=False`, the default since
+    2026-09-07): the sampler draws every trial from trial 0 -- an enqueued
+    scenario-A baseline anchored TPE in the pure-ethanol basin in every
+    earlier IRR study. `enqueue_baseline=True` evaluates the scenario
+    baseline configuration as trial 0 instead (see
+    baseline_decision_point; baseline_point is computed either way, since
+    the probes are derived from it). Then -- `enqueue_knockouts=True`, the
     default -- the single-knockout probes of knockout_probe_points
     (trials 1..N: one log-scale rate constant k_* at its band floor, all
     else at the baseline; a rate already at its floor gets none), each
@@ -2724,10 +2726,13 @@ def run_kinetic_optimization(objective='IRR',
               + ('(feasible_sampling=False).' if burden_on
                  else '(burden off: no feasibility predicate).'))
     if n_done == 0:
-        # Fresh study: evaluate the scenario baseline itself as trial 0,
-        # so the baseline provably participates and TPE learns from it
-        # (enqueue_baseline=True, the default). baseline_point is computed
-        # either way -- the knockout probes below are derived from it.
+        # Fresh study. By default (enqueue_baseline=False, since
+        # 2026-09-07) NO baseline point is enqueued, so the sampler draws
+        # every trial from trial 0 -- an enqueued scenario-A baseline
+        # anchored TPE in the pure-ethanol basin in every earlier IRR
+        # study. enqueue_baseline=True evaluates the baseline as trial 0
+        # so it provably participates. baseline_point is computed either
+        # way -- the knockout probes below are derived from it.
         baseline_point = baseline_decision_point(
             search_space, kinetic_baselines, baseline_model_kwargs,
             baseline_max_n_spikes,

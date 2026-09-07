@@ -163,13 +163,15 @@ def run(scenario=None,  # 'A' or 'B'; None = the preset's start scenario
         # enzyme_burden.py: default ON (study name + '_burden'); False =
         # legacy burden-free study (older studies). Do not pass the
         # engine's burden_model in engine_kwargs -- this flag owns it.
-        enqueue_baseline=True,  # a FRESH study evaluates the scenario
-        # baseline configuration as trial 0 (ko.baseline_decision_point);
-        # False = enqueue NO baseline point, so the sampler draws every
-        # trial from trial 0 (the knockout probes, if on, are still
-        # derived from the baseline). Not part of the study name (like
-        # enqueue_knockouts); a resume is unaffected (only fresh studies
-        # enqueue).
+        enqueue_baseline=False,  # default OFF since 2026-09-07: a FRESH
+        # study enqueues NO baseline point, so the sampler draws every
+        # trial from trial 0 (an enqueued scenario-A baseline anchored TPE
+        # in the pure-ethanol basin in every earlier IRR study). True =
+        # evaluate the scenario baseline configuration as trial 0
+        # (ko.baseline_decision_point). The knockout probes, if on, are
+        # still derived from the baseline either way. Not part of the
+        # study name (like enqueue_knockouts); a resume is unaffected
+        # (only fresh studies enqueue).
         enqueue_knockouts=True,  # a FRESH study evaluates, right after
         # the baseline (trial 0), one single-knockout probe per rate
         # constant k_* of the search space (that rate alone at its band
