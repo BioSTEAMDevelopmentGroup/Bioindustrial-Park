@@ -391,3 +391,143 @@ def campaign_band(campaign):
     band.setdefault('target_delta', (5.0, 500.0))
     band.setdefault('max_n_spikes', (0, 50))
     return band
+
+
+# --- drawing -----------------------------------------------------------------
+def apply_fonts():
+    plt.rcParams['font.family'] = 'sans-serif'
+    plt.rcParams['font.sans-serif'] = ['Arial', 'DejaVu Sans']
+    plt.rcParams['font.size'] = FONTS['tick']
+    plt.rcParams['xtick.labelsize'] = FONTS['tick']
+    plt.rcParams['ytick.labelsize'] = FONTS['tick']
+    plt.rcParams['axes.linewidth'] = 0.8
+    plt.rcParams['hatch.linewidth'] = 0.6
+    plt.rcParams['mathtext.fontset'] = 'custom'
+    plt.rcParams['mathtext.rm'] = 'Arial'
+    plt.rcParams['mathtext.it'] = 'Arial:italic'
+    plt.rcParams['mathtext.bf'] = 'Arial:bold'
+    plt.rcParams['mathtext.fallback'] = 'stixsans'
+
+
+def sub(name):
+    if '_' in name and name[0] in 'kK':
+        head, tail = name.split('_', 1)
+        return rf'$\mathit{{{head}}}_{{\mathrm{{{tail}}}}}$'
+    return name
+
+
+def fmt(v):
+    if v is None or (isinstance(v, float) and not np.isfinite(v)):
+        return 'n/a'
+    return f'{v:.2g}' if v < 1000 else f'{v:.0f}'
+
+
+def set_colors(sets):
+    colors, hue = {}, 0
+    for s in sets:
+        if s.get('is_baseline'):
+            colors[id(s)] = BASELINE_COLOR
+        else:
+            if hue >= len(HUE_COLORS):
+                n_campaign = len([x for x in sets if not x.get('is_baseline')])
+                raise ValueError(
+                    f'too many campaign sets ({n_campaign}); at most '
+                    f'{len(HUE_COLORS)} plus the baseline (six total)')
+            colors[id(s)] = HUE_COLORS[hue]
+            hue += 1
+    return colors
+
+
+def style_cell_axes(ax):
+    ax.tick_params(axis='y', which='both', direction='inout', right=False,
+                   length=4)
+    ax.tick_params(axis='x', which='both', top=False, bottom=False,
+                   labelbottom=False)
+    for sp in ('right', 'top'):
+        ax.spines[sp].set_visible(False)
+
+
+def _baseline_value(sets, var):
+    for s in sets:
+        if s.get('is_baseline'):
+            return s.get(var)
+    return None
+
+
+def bar_cell(ax, sets, colors, var, kind, title, ylim=None, band=None):
+    n = len(sets)
+    base = _baseline_value(sets, var)
+    if kind == 'rate':
+        lo, hi = band[var]
+        floor = lo / 6
+        ax.set_yscale('log')
+        ax.set_ylim(floor, hi * 2.5)
+        ax.axhspan(lo, hi, color='0.92', zorder=0)
+        ticks, labels = [lo, hi], [fmt(lo), fmt(hi)]
+        if base and base > 0:
+            ax.axhline(base, color='k', lw=0.8, ls='--', zorder=1)
+            ticks.insert(1, base); labels.insert(1, fmt(base))
+        ax.set_yticks(ticks); ax.set_yticklabels(labels)
+        ax.set_yticks([], minor=True)
+        bottom = floor
+    elif kind == 'group':
+        lo, hi = band[var]
+        ax.set_yscale('log'); ax.set_ylim(lo * 0.7, hi * 1.4)
+        ax.axhspan(lo, hi, color='0.92', zorder=0)
+        ax.axhline(1.0, color='k', lw=0.8, ls='--', zorder=1)
+        ax.set_yticks([lo, 1, hi]); ax.set_yticklabels([fmt(lo), '1', fmt(hi)])
+        ax.set_yticks([], minor=True)
+        bottom = lo * 0.7
+    elif kind == 'feed':
+        lo, hi = ylim
+        ax.set_ylim(lo, hi * 1.06); ax.axhspan(lo, hi, color='0.92', zorder=0)
+        if base is not None:
+            ax.axhline(base, color='k', lw=0.8, ls='--', zorder=1)
+        bottom = 0
+    else:  # outcome
+        lo, hi = ylim
+        vmax = max([s.get(var, 0) or 0 for s in sets] + [hi])
+        ax.set_ylim(lo, vmax * 1.1 if vmax > hi else hi)
+        if base:
+            ax.axhline(base, color='k', lw=0.8, ls='--', zorder=1)
+        bottom = 0
+    ax.set_title(title, fontsize=FONTS['cell'], pad=4)
+    for j, s in enumerate(sets):
+        v = s.get(var)
+        c = colors[id(s)]
+        if v is not None and np.isfinite(v) and v > 0:
+            ax.bar(j, v - bottom, bottom=bottom, width=0.72, color=c, zorder=2)
+        else:
+            top = ax.get_ylim()[1]
+            y = bottom * 1.25 if bottom else 0.01 * top
+            label = 'n/a' if (v is None or (isinstance(v, float)
+                                            and not np.isfinite(v))) else '0'
+            ax.text(j, y, label, ha='center', va='bottom',
+                    fontsize=FONTS['tick'], color=c)
+    ax.set_xlim(-0.6, n - 0.4); style_cell_axes(ax)
+
+
+def draw_outcomes(fig, gs_cell, sets, colors):
+    sub_gs = gs_cell.subgridspec(1, len(OUTCOMES), wspace=0.55)
+    for i, (col, label, yl) in enumerate(OUTCOMES):
+        ax = fig.add_subplot(sub_gs[0, i])
+        bar_cell(ax, sets, colors, col, 'outcome', label, ylim=yl)
+
+
+def draw_parameters(fig, gs_rows, sets, colors, band):
+    for gs_row, (title, params) in zip(gs_rows, BANDS):
+        sub_gs = gs_row.subgridspec(1, 5, wspace=0.55)
+        last_ax = None
+        for i, p in enumerate(params):
+            ax = fig.add_subplot(sub_gs[0, i]); last_ax = ax
+            if p in RATE_VARS:
+                bar_cell(ax, sets, colors, p, 'rate',
+                         REACTION_LABELS[p], band=band)
+            elif p in GROUP_VARS:
+                bar_cell(ax, sets, colors, p, 'group',
+                         GROUP_LABELS[p], band=band)
+            else:
+                t, rng = FEED_LABELS[p]
+                bar_cell(ax, sets, colors, p, 'feed', t, ylim=rng)
+        fig.text(0.19, last_ax.get_position().y1 + 0.043, title,
+                 fontsize=FONTS['band'], fontweight='bold', va='bottom')
