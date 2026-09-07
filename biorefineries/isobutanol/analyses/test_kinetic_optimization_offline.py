@@ -2448,4 +2448,89 @@ if os.path.isfile(wb_A) and os.path.isfile(wb_B):
         assert isinstance(p38['stage_1_max_x_bounds'], tuple)
 PASS('stage_1_max_x: OPERATING_VARIABLES/DEFAULT_STAGE_1_MAX_X_BOUNDS, opt-in log-scale space entry, ValueError on bad bounds, baseline point (clipped), no probe, _s1x tag, preset key')
 
+#%% 39. engine applies stage_1_max_x via the V406 property per trial and restores the baseline
+# Fake handles (no biorefinery, no simulation), the check-17 pattern: the
+# scripted model_specification records V406.stage_1_max_x at call time.
+if _optuna is None:
+    print('SKIP 39: optuna not installed')
+else:
+    outdir39 = tempfile.mkdtemp()
+    study39 = 'offline_stage_1_max_x'
+    csv39 = os.path.join(outdir39, study39 + '_trajectory.csv')
+
+    class _FakeTE39:
+        k_1e = 47.1
+        K_1e = 0.12
+        def getGlobalParameterIds(self):
+            return ['k_1e', 'K_1e', 'not_kinetic']
+    fbs39 = SimpleNamespace(
+        current_specifications=dict(target_conc=221.25,
+                                    threshold_conc=217.125,
+                                    spike_conc=600.0),
+        max_n_spikes=16)
+    V406_39 = SimpleNamespace(nsk_results_specific_tau_dict=nsk, tau=55.0,
+                              stage_1_max_x=5.0)
+    seen39 = []   # V406.stage_1_max_x at every model_specification call
+    def _model_specification39(**kw):
+        seen39.append(V406_39.stage_1_max_x)
+    def _solve_TEA39(stream_IDs=None):
+        return {'IRR': 0.2, 'MPSPs': {'ethanol': 0.5, 'isobutanol': 1.0}}
+    handles39 = {
+        'r_te': _FakeTE39(), 'fbs_spec': fbs39, 'V406': V406_39,
+        'tea': SimpleNamespace(TCI=350e6), 'HXN': SimpleNamespace(),
+        'model_specification': _model_specification39,
+        'solve_TEA': _solve_TEA39,
+        'latest_TEA_solution': {'IRR': np.nan,
+                                'MPSPs': {'ethanol': np.nan,
+                                          'isobutanol': np.nan}}}
+    _optuna.logging.set_verbosity(_optuna.logging.WARNING)
+    # 4 trials: 0 = baseline, 1 = the k_1e knockout probe (stage_1_max_x
+    # stays at the baseline), 2-3 = sampled.
+    study39_obj, csv39_out, kb39 = ko.run_kinetic_optimization(
+        objective='IRR', scenario_label='X', n_trials=4, seed=1,
+        study_name=study39, results_dir=outdir39, handles=handles39,
+        print_status_every=1, burden_model=None,
+        stage_1_max_x_bounds=(1.0, 50.0))
+    df39 = ko.load_trajectory(csv39)
+    assert 'stage_1_max_x' in df39.columns
+    cols39 = list(df39.columns)
+    assert cols39.index('state') < cols39.index('stage_1_max_x') < cols39.index('objective')
+    assert df39['trial_number'].tolist() == [0, 1, 2, 3]
+    assert df39['state'].tolist() == ['COMPLETE']*4
+    assert df39['stage_1_max_x'][0] == 5.0                    # trial 0 = baseline
+    assert df39['stage_1_max_x'][1] == 5.0                    # probe leaves it at baseline
+    assert np.isclose(df39['k_1e'][1], 0.1*47.1)              # ...and knocks k_1e down
+    assert ((df39['stage_1_max_x'] >= 1.0) & (df39['stage_1_max_x'] <= 50.0)).all()
+    # The property was set BEFORE each simulation to the trial's value, and
+    # the finally put the baseline back (one extra call at the baseline).
+    assert len(seen39) == 5, seen39
+    assert np.allclose(seen39[:4], df39['stage_1_max_x'].to_numpy(dtype=float),
+                       rtol=1e-12, atol=0.0)
+    assert seen39[4] == 5.0 and V406_39.stage_1_max_x == 5.0
+    assert fbs39.max_n_spikes == 16
+    # Without bounds the engine never touches the attribute (a fake V406
+    # WITHOUT stage_1_max_x, as in check 17, keeps working).
+    outdir39b = tempfile.mkdtemp()
+    V406_39b = SimpleNamespace(nsk_results_specific_tau_dict=nsk, tau=55.0)
+    handles39b = dict(handles39, V406=V406_39b,
+                      latest_TEA_solution={'IRR': np.nan,
+                                           'MPSPs': {'ethanol': np.nan,
+                                                     'isobutanol': np.nan}})
+    _, csv39b, _ = ko.run_kinetic_optimization(
+        objective='IRR', scenario_label='X', n_trials=2, seed=1,
+        study_name=study39 + '_off', results_dir=outdir39b, handles=handles39b,
+        print_status_every=1, burden_model=None)
+    assert 'stage_1_max_x' not in ko.load_trajectory(csv39b).columns
+    assert not hasattr(V406_39b, 'stage_1_max_x')
+    # restore_baseline: sets the property only when a value is given.
+    V406_39.stage_1_max_x = 12.0
+    ko.restore_baseline(handles39, kb39, fbs39.current_specifications,
+                        baseline_max_n_spikes=16, baseline_stage_1_max_x=5.0)
+    assert V406_39.stage_1_max_x == 5.0
+    V406_39.stage_1_max_x = 12.0
+    ko.restore_baseline(handles39, kb39, fbs39.current_specifications,
+                        baseline_max_n_spikes=16)
+    assert V406_39.stage_1_max_x == 12.0
+    PASS('engine: stage_1_max_x sampled in-band, set on V406 before every simulation, baseline in trial 0 and the probe, restored in the finally; absent/untouched without bounds')
+
 print(f'\nALL {n_pass} CHECKS PASSED')

@@ -1638,10 +1638,13 @@ def get_handles():
             }
 
 def restore_baseline(handles, kinetic_baselines, baseline_model_kwargs,
-                     baseline_max_n_spikes=None):
+                     baseline_max_n_spikes=None, baseline_stage_1_max_x=None):
     """Reset every kinetic parameter to its recorded baseline (and, when
     `baseline_max_n_spikes` is given, the glucose-spike cap
-    fbs_spec.max_n_spikes), re-simulate at the baseline feeding
+    fbs_spec.max_n_spikes; when `baseline_stage_1_max_x` is given, the
+    fermentor's aerobic stage-1 biomass cutoff through the
+    V406.stage_1_max_x property, which mirrors it onto the kinetic model
+    and the aeration spec), re-simulate at the baseline feeding
     specifications, and refresh the TEA solution -- leaving the process in
     a clean scenario-baseline state. Called in run_kinetic_optimization's
     `finally` (success, exception, or KeyboardInterrupt alike)."""
@@ -1650,6 +1653,8 @@ def restore_baseline(handles, kinetic_baselines, baseline_model_kwargs,
         setattr(r_te, pname, baseline)
     if baseline_max_n_spikes is not None:
         handles['fbs_spec'].max_n_spikes = baseline_max_n_spikes
+    if baseline_stage_1_max_x is not None:
+        handles['V406'].stage_1_max_x = baseline_stage_1_max_x
     handles['model_specification'](**baseline_model_kwargs)
     handles['latest_TEA_solution'].update(
         handles['solve_TEA'](stream_IDs=('ethanol', 'isobutanol')))
@@ -1673,6 +1678,7 @@ def run_kinetic_optimization(objective='IRR',
                              target_delta_bounds=(5.0, 500.0),
                              spike_delta_bounds=(0.5, 595.0),
                              max_n_spikes_bounds=(0, 50),
+                             stage_1_max_x_bounds=None,
                              target_conc_bounds=None,
                              threshold_delta_bounds=None,
                              spike_conc_bounds=None,
@@ -1758,6 +1764,20 @@ def run_kinetic_optimization(objective='IRR',
     force only when k_10 is in the space: the presets also pass
     `exclude_params` = DEFAULT_EXCLUDED_PARAMETERS (('k_10',), since
     2026-09-06 pm), so by default k_10 is not sampled and has no probe.
+
+    `stage_1_max_x_bounds` (None = not sampled; the driver passes the
+    preset's DEFAULT_STAGE_1_MAX_X_BOUNDS, (1.0, 50.0) g/L) adds the
+    OPERATING variable stage_1_max_x -- the fermentor's aerobic stage-1
+    biomass cutoff, log-scale -- to the space (build_search_space). Its
+    baseline is read off handles['V406'].stage_1_max_x at study start
+    (5.0 g/L at the nskinetics factory default) and enters trial 0; each
+    trial sets handles['V406'].stage_1_max_x (the property mirrors onto
+    the kinetic model and the AerationSpec) right before
+    model_specification, and restore_baseline puts it back in the
+    `finally`. Not a rate constant: no knockout probe; not a kinetic
+    name: ignored by the burden model. A new decision column, so a study
+    with it can never resume one without it (header guard); the driver
+    tags `_s1x{lo}-{hi}` into the study name.
 
     `burden_model` (default 'auto') is the enzyme-burden (proteome-
     allocation) constraint of enzyme_burden.py: 'auto' builds
@@ -1876,14 +1896,23 @@ def run_kinetic_optimization(objective='IRR',
         max_n_spikes_bounds=max_n_spikes_bounds,
         target_conc_bounds=target_conc_bounds,
         threshold_delta_bounds=threshold_delta_bounds,
-        spike_conc_bounds=spike_conc_bounds)
+        spike_conc_bounds=spike_conc_bounds,
+        stage_1_max_x_bounds=stage_1_max_x_bounds)
     n_kinetic = sum(1 for name in search_space if name in kinetic_baselines)
-    n_feeding = len(search_space) - n_kinetic
+    n_operating = sum(1 for name in search_space if name in OPERATING_VARIABLES)
+    n_feeding = len(search_space) - n_kinetic - n_operating
     restriction = ('' if include_params is None else
                    f', restricted to {len(include_params)} named parameters')
     print(f'Search space: {len(search_space)} decision variables '
-          f'({n_kinetic} kinetic + {n_feeding} feeding{restriction}); '
+          f'({n_kinetic} kinetic + {n_feeding} feeding + {n_operating} '
+          f'operating{restriction}); '
           f'{len(excluded)} kinetic parameters excluded: {excluded}')
+    if 'stage_1_max_x' in search_space:
+        sp = search_space['stage_1_max_x']
+        print(f"Operating variable stage_1_max_x (aerobic stage-1 biomass "
+              f"cutoff) sampled log-scale on [{sp['low']:g}, {sp['high']:g}] "
+              f"g/L via V406.stage_1_max_x (baseline "
+              f"{handles['V406'].stage_1_max_x:g} g/L).")
     if rate_multiplier_bounds is not None:
         _is_rate = _rate_predicate(rate_params)
         n_rate = sum(1 for name in search_space
@@ -1909,6 +1938,11 @@ def run_kinetic_optimization(objective='IRR',
         k: fbs_spec.current_specifications[k]
         for k in ('target_conc', 'threshold_conc', 'spike_conc')}
     baseline_max_n_spikes = fbs_spec.max_n_spikes
+    # The live cutoff IS the scenario baseline (never set by the build);
+    # read only when the variable is sampled, so handles without the
+    # attribute (older callers, offline fakes) keep working.
+    baseline_stage_1_max_x = (float(handles['V406'].stage_1_max_x)
+                              if 'stage_1_max_x' in search_space else None)
 
     if results_dir is None:
         results_dir = os.path.join(
@@ -1995,7 +2029,8 @@ def run_kinetic_optimization(objective='IRR',
         # so the baseline provably participates and TPE learns from it.
         baseline_point = baseline_decision_point(
             search_space, kinetic_baselines, baseline_model_kwargs,
-            baseline_max_n_spikes)
+            baseline_max_n_spikes,
+            baseline_stage_1_max_x=baseline_stage_1_max_x)
         study.enqueue_trial(baseline_point)
         print('Enqueued the scenario baseline configuration as trial 0.')
         if enqueue_knockouts:
@@ -2076,6 +2111,10 @@ def run_kinetic_optimization(objective='IRR',
                         setattr(r_te, pname, applied[pname])
                 if 'max_n_spikes' in values:
                     fbs_spec.max_n_spikes = values['max_n_spikes']
+                if 'stage_1_max_x' in values:
+                    # The V406 property mirrors onto r_te AND the
+                    # AerationSpec (air-supply sizing); never setattr r_te.
+                    handles['V406'].stage_1_max_x = values['stage_1_max_x']
                 handles['model_specification'](**model_kwargs)
                 handles['latest_TEA_solution'].update(
                     handles['solve_TEA'](
@@ -2144,7 +2183,8 @@ def run_kinetic_optimization(objective='IRR',
     finally:
         restore_baseline(handles, kinetic_baselines,
                          baseline_model_kwargs,
-                         baseline_max_n_spikes=baseline_max_n_spikes)
+                         baseline_max_n_spikes=baseline_max_n_spikes,
+                         baseline_stage_1_max_x=baseline_stage_1_max_x)
         if feasible_on:
             s = study.sampler
             print(f'Feasible sampling: rejected {s.n_rejected} '
