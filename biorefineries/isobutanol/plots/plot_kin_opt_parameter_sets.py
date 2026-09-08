@@ -116,7 +116,6 @@ GROUP_LABELS = {'inhib_ethanol': 'Ethanol\ninhibition',
 # g·L^-1·h^-1 for all nine. Effector multipliers are dimensionless fold-changes
 # relative to the per-family baseline (1 = baseline).
 RATE_UNIT = 'g·L$^{-1}$·h$^{-1}$'
-GROUP_UNIT = '× baseline'
 # feeding cell: (title, (shaded-range low, high)) -- engine default bounds
 FEED_LABELS = {'threshold_conc': ('Feed threshold\n(g·L$^{-1}$)', (0, 300)),
                'target_delta': ('Target − threshold\n(g·L$^{-1}$)', (5, 500)),
@@ -661,8 +660,9 @@ def draw_parameters(fig, gs_rows, sets, colors, band):
                 bar_cell(ax, sets, colors, p, 'rate', f'{sym}\n({RATE_UNIT})',
                          subtitle=sub, band=band)
             elif p in GROUP_VARS:
+                # the "relative to baseline" unit lives in the band title now
                 bar_cell(ax, sets, colors, p, 'group',
-                         f'{GROUP_LABELS[p]}\n({GROUP_UNIT})', band=band)
+                         GROUP_LABELS[p], band=band)
             else:
                 t, rng = FEED_LABELS[p]
                 bar_cell(ax, sets, colors, p, 'feed', t, ylim=rng)
