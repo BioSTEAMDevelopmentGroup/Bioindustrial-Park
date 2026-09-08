@@ -185,7 +185,7 @@ CLAMP_NEG_TO_ZERO = {'IRR'}
 # takes the grey and the five campaigns take blue/orange/green/purple/yellow in
 # order (red is the spare sixth hue).
 BASELINE_COLOR = '#90918e'
-HUE_COLORS = ['#60c1cf', '#f98f60', '#79bf82', '#a280b9', '#f3c354', '#ED586F']
+HUE_COLORS = ['#18C4DC', '#f98f60', '#79bf82', '#a280b9', '#f3c354', '#ED586F']
 MAX_SETS = 1 + len(HUE_COLORS)   # 7
 
 FONTS = {'band': 12, 'cell': 10, 'tick': 9, 'callout': 9,
