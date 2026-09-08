@@ -95,7 +95,7 @@ DECISION_VARS = RATE_VARS + GROUP_VARS + FEED_VARS
 # TARGET_CONC_MAX, threshold_conc + target_delta), via ko._applied_feeding) for
 # target_delta, and the realized spike count (n_glu_spikes, a tracked metric)
 # for the max_n_spikes cap.
-FEED_DRAW_VARS = ['threshold_conc', 'target_conc', 'n_glu_spikes']
+FEED_DRAW_VARS = ['target_conc', 'threshold_conc', 'n_glu_spikes']
 
 BANDS = [
     ('Glycolysis / fermentation capacities   r1 → r3 → r6',
