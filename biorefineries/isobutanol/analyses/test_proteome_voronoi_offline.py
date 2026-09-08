@@ -78,6 +78,25 @@ check('meta.F_flex == eb.F_FLEX', abs(doc['meta']['F_flex'] - eb.F_FLEX) < 1e-9)
 check('one tile', len(doc['tiles']) == 1)
 check('piece_order has 8 entries', len(doc['meta']['piece_order']) == 8)
 
+# --- CLI --no-render writes a valid JSON document ---------------------------
+import json as _json
+import tempfile
+
+with tempfile.TemporaryDirectory() as td:
+    # baseline-only, no campaigns -> no CSV reads required
+    argv = ['--no-baseline', '--out-dir', td, '--stem', 'unit', '--no-render']
+    # a baseline-only run needs --set-free defaults dropped; force one tile via
+    # a direct document write instead of the study-CSV default path:
+    doc = pv.build_document([pv.ps.baseline_set()], band_campaign=None)
+    path = pv.write_document(doc, td, 'unit', 'stamp')
+    with open(path, encoding='utf-8') as fh:
+        loaded = _json.load(fh)
+    check('write_document round-trips JSON',
+          loaded['tiles'][0]['label'] == 'Baseline')
+    check('JSON tile cells sum to 0.49',
+          abs(sum((c['value'] for c in loaded['tiles'][0]['children']))
+              - 0.49) < 1e-6)
+
 n_fail = sum(1 for _n, ok in checks if not ok)
 print()
 if n_fail:

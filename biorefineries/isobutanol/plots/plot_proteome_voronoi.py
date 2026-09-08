@@ -168,3 +168,101 @@ def build_document(sets, band_campaign):
         },
         'tiles': [tile_from_record(s) for s in sets],
     }
+
+
+# --- default studies (mirror the parameter-sets figure) ---------------------
+DEFAULT_SPECS = (
+    ('Financial attractiveness', ps.DEFAULT_STUDY, 'best'),
+    ('Isobutanol titer', ps.IBO_TITER_STUDY, 'best'),
+    ('Ethanol titer', ps.ETOH_TITER_STUDY, 'best'),
+    ('Isobutanol yield', ps.IBO_YIELD_STUDY, 'best'),
+    ('Ethanol yield', ps.ETOH_YIELD_STUDY, 'best'),
+)
+
+
+def _norm_trial(t):
+    if isinstance(t, str) and t.startswith('best'):
+        return t
+    return int(t)
+
+
+def resolve_specs(args):
+    """(specs, include_baseline) from parsed CLI args, mirroring
+    plot_kin_opt_parameter_sets.main."""
+    if args.sets:
+        specs = [(lab, camp, _norm_trial(tr)) for lab, camp, tr in args.sets]
+    else:
+        specs = list(DEFAULT_SPECS)
+    include_baseline = not args.no_baseline
+    if len(specs) + (1 if include_baseline else 0) > ps.MAX_SETS:
+        raise ValueError(
+            f'at most {ps.MAX_SETS} tiles (baseline + {len(ps.HUE_COLORS)} '
+            'campaign sets)')
+    return specs, include_baseline
+
+
+def write_document(doc, out_dir, stem, stamp):
+    os.makedirs(out_dir, exist_ok=True)
+    path = os.path.join(out_dir, f'{stem}_{stamp}.json')
+    with open(path, 'w', encoding='utf-8') as fh:
+        json.dump(doc, fh, indent=2)
+    return path
+
+
+def console_report(doc):
+    m = doc['meta']
+    print(f'band source (campaign): {m["band_campaign"]}')
+    print(f'proteome cap {m["protein_content"]:.3f}  housekeeping '
+          f'{m["housekeeping"]:.3f}  F_flex {m["F_flex"]:.3f}')
+    for t in doc['tiles']:
+        kind = 'baseline' if t['is_baseline'] \
+            else f'{t["campaign"]} trial {t["trial_number"]}'
+        slack = next(c['value'] for c in t['children'] if c['piece'] == 'slack')
+        print(f'[{t["label"]}] {kind}: Phi_M {t["Phi_M"]:.4f}  phi_T '
+              f'{t["phi_T"]:.4f}  d {t["burden_factor"]:.2f}  slack {slack:.4f}'
+              + ('  !! ' + t['warning'] if 'warning' in t else ''))
+
+
+def build_parser():
+    ap = argparse.ArgumentParser(
+        description='Proteome-allocation Voronoi treemap (small multiples).')
+    ap.add_argument('--set', dest='sets', action='append', nargs=3,
+                    metavar=('LABEL', 'CAMPAIGN', 'TRIAL'), default=None,
+                    help='a tile to plot; repeatable, in grid order after the '
+                         'baseline. TRIAL is an int, "best", or "best:COL".')
+    ap.add_argument('--no-baseline', action='store_true',
+                    help='drop the scenario-A baseline tile')
+    ap.add_argument('--out-dir', default=RESULTS_DIR)
+    ap.add_argument('--stem', default=None)
+    ap.add_argument('--cols', type=int, default=None,
+                    help='grid columns (default: chosen from the tile count)')
+    ap.add_argument('--scale', type=float, default=2.0,
+                    help='PNG device scale factor (default 2)')
+    ap.add_argument('--node', default=None,
+                    help='path to the voronoi-treemaps node.exe '
+                         '(overrides VORONOI_NODE)')
+    ap.add_argument('--no-render', action='store_true',
+                    help='write only the JSON (skip the Node/Puppeteer render)')
+    return ap
+
+
+def main(argv=None):
+    args = build_parser().parse_args(argv)
+    specs, include_baseline = resolve_specs(args)
+    sets, _band, band_campaign = ps.build_sets(specs, include_baseline)
+    doc = build_document(sets, band_campaign)
+    stem = args.stem or (
+        f'{os.path.basename(specs[0][1]).replace(".csv", "")}_proteome_voronoi')
+    stamp = datetime.now().strftime('%Y.%m.%d-%H.%M')
+    json_path = write_document(doc, args.out_dir, stem, stamp)
+    console_report(doc)
+    print(f'wrote {json_path}')
+    if args.no_render:
+        return json_path
+    # Stage 2 render wired in Task 6.
+    render(json_path, args)          # noqa: F821 (defined in Task 6)
+    return json_path
+
+
+if __name__ == '__main__':
+    main()
