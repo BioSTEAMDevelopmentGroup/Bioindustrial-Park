@@ -1,0 +1,170 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+# Bioindustrial-Park: BioSTEAM's Premier Biorefinery Models and Results
+# Copyright (C) 2021-, Sarang Bhagwat <sarangbhagwat.developer@gmail.com>
+#
+# This module is under the UIUC open-source license. See
+# github.com/BioSTEAMDevelopmentGroup/biosteam/blob/master/LICENSE.txt
+# for license details.
+"""Proteome-allocation Voronoi treemap -- static publication figure.
+
+A small-multiples grid of amCharts5 Voronoi treemaps, one tile per
+parameter set (scenario-A baseline + a handful of kinetic-optimization
+campaign trials). Each tile partitions the modeled proteome (cap
+eb.PROTEIN_CONTENT = 0.49 g protein/gDCW) into: Housekeeping (fixed),
+Metabolic Phi_M (subdivided into the five pathway categories of
+plot_kin_opt_parameter_sets.py panel C), Translation phi_T (the model's
+active, growth-scaled ribosomal sector -- the "reduced" translation
+value), and Unallocated flexible slack. Every tile's cells sum to 0.49.
+
+Two stages: this script (Stage 1, IBO_2026, sim-safe) computes the
+allocation and writes JSON, then invokes the voronoi-treemaps conda env's
+node on plots/voronoi/render_treemap.mjs (Stage 2) to render PNG/SVG/PDF.
+Use --no-render to write only the JSON.
+
+Sim-safe: plot_kin_opt_parameter_sets.py (ps) -- and through it ko and eb
+-- are loaded by file path (no biosteam import, no load()); campaign CSVs
+and workbooks are plain pandas reads. Runnable while a campaign is in
+flight. Run:
+
+    python plots/plot_proteome_voronoi.py \
+        --set "Best IRR" <campaign> best \
+        --set "Best isobutanol titer" <campaign> "best:IBO titer"
+
+With no --set arguments it plots the same five-study default as the
+parameter-sets figure (one optimum per objective) against the baseline
+-> 6 tiles.
+"""
+import os
+import sys
+import json
+import argparse
+import importlib.util
+import subprocess
+from datetime import datetime
+
+PKG_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+PLOTS_DIR = os.path.join(PKG_DIR, 'plots')
+RESULTS_DIR = os.path.join(PKG_DIR, 'analyses', 'results')  # matches ps
+VORONOI_DIR = os.path.join(PLOTS_DIR, 'voronoi')
+
+TOL = 1e-6
+
+
+def _load(name, path):
+    spec = importlib.util.spec_from_file_location(name, path)
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    return mod
+
+
+# The existing sim-safe plotter -- single source of truth for set
+# selection and burden pools. Loading it by file path triggers its own
+# by-file-path loads of ko and eb (still sim-safe).
+ps = _load('plot_kin_opt_parameter_sets',
+           os.path.join(PLOTS_DIR, 'plot_kin_opt_parameter_sets.py'))
+eb = ps.eb
+
+# map each of ps.BURDEN_CATEGORIES' names to a stable palette key (piece).
+# Asserted against ps.BURDEN_CATEGORIES below so a category rename/drift in
+# the reused plotter raises here at import.
+CATEGORY_PIECES = {
+    'Glycolysis': 'cat_glycolysis',
+    'TCA cycle': 'cat_tca',
+    'Acetate / acetyl-CoA\nproduction': 'cat_acetate',
+    'Ethanol production': 'cat_ethanol',
+    'Isobutanol production': 'cat_isobutanol',
+}
+_ps_cat_names = [name for name, _steps in ps.BURDEN_CATEGORIES]
+if set(_ps_cat_names) != set(CATEGORY_PIECES):
+    raise AssertionError(
+        'BURDEN_CATEGORIES drift: ps names %r != CATEGORY_PIECES keys %r'
+        % (sorted(_ps_cat_names), sorted(CATEGORY_PIECES)))
+
+# legend / color order (top-level pieces with the five metabolic cats
+# nested where "metabolic" would sit)
+PIECE_ORDER = ('housekeeping', 'cat_glycolysis', 'cat_tca', 'cat_acetate',
+               'cat_ethanol', 'cat_isobutanol', 'translation', 'slack')
+
+
+def tile_from_record(rec):
+    """One set record -> one JSON tile (spec schema).
+
+    Housekeeping and F_flex come from eb constants / the record; the five
+    metabolic children are the ps.BURDEN_CATEGORIES pool sums; Phi_M is
+    their total (checked against rec['Phi_M']); translation is rec['phi_T'];
+    slack = PROTEIN_CONTENT - housekeeping - Phi_M - phi_T. A
+    burden-infeasible set (slack < -TOL) clamps slack to 0 and records a
+    `warning` rather than emitting a negative cell.
+    """
+    PC = float(eb.PROTEIN_CONTENT)
+    housekeeping = PC * float(eb.HOUSEKEEPING_FRACTION)
+
+    children_metabolic = []
+    Phi_M = 0.0
+    for name, steps in ps.BURDEN_CATEGORIES:
+        w = sum(float(rec[f'pool_{st}']) for st in steps)
+        children_metabolic.append(
+            {'name': name.replace('\n', ' '),
+             'piece': CATEGORY_PIECES[name],
+             'value': w})
+        Phi_M += w
+    if abs(Phi_M - float(rec['Phi_M'])) > 1e-4:
+        raise AssertionError(
+            f'{rec.get("label")!r}: category-sum Phi_M {Phi_M:.6f} != '
+            f'record Phi_M {float(rec["Phi_M"]):.6f}')
+
+    phi_T = float(rec['phi_T'])
+    slack = PC - housekeeping - Phi_M - phi_T
+    warning = None
+    if slack < -TOL:
+        warning = (f'burden-infeasible: slack {slack:.5f} < 0 '
+                   f'(Phi_M {Phi_M:.5f} + phi_T {phi_T:.5f} over F_flex '
+                   f'{float(rec["F_flex"]):.5f})')
+        slack = 0.0
+    else:
+        total = housekeeping + Phi_M + phi_T + slack
+        if abs(total - PC) > 1e-4:
+            raise AssertionError(
+                f'{rec.get("label")!r}: cells sum to {total:.6f}, not '
+                f'PROTEIN_CONTENT {PC:.6f}')
+
+    tile = {
+        'label': rec['label'],
+        'is_baseline': bool(rec.get('is_baseline')),
+        'campaign': rec.get('campaign'),
+        'trial_number': (None if rec.get('trial_number') is None
+                         else int(rec['trial_number'])),
+        'Phi_M': Phi_M,
+        'phi_T': phi_T,
+        'burden_factor': float(rec['burden_factor']),
+        'children': [
+            {'name': 'Housekeeping', 'piece': 'housekeeping',
+             'value': housekeeping},
+            {'name': 'Metabolic', 'piece': 'metabolic', 'value': Phi_M,
+             'children': children_metabolic},
+            {'name': 'Translation', 'piece': 'translation', 'value': phi_T},
+            {'name': 'Unallocated flexible', 'piece': 'slack',
+             'value': slack},
+        ],
+    }
+    if warning:
+        tile['warning'] = warning
+    return tile
+
+
+def build_document(sets, band_campaign):
+    """All sets -> the render document (meta + tiles)."""
+    return {
+        'meta': {
+            'protein_content': float(eb.PROTEIN_CONTENT),
+            'housekeeping': float(eb.PROTEIN_CONTENT
+                                  * eb.HOUSEKEEPING_FRACTION),
+            'F_flex': float(eb.F_FLEX),
+            'phi_T_wt': float(eb.PHI_T_WT),
+            'generated': datetime.now().isoformat(timespec='seconds'),
+            'band_campaign': band_campaign,
+            'piece_order': list(PIECE_ORDER),
+        },
+        'tiles': [tile_from_record(s) for s in sets],
+    }
