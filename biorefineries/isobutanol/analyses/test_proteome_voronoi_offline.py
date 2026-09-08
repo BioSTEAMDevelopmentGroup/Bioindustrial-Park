@@ -118,6 +118,16 @@ check('meta.F_flex == eb.F_FLEX', abs(doc['meta']['F_flex'] - eb.F_FLEX) < 1e-9)
 check('one tile', len(doc['tiles']) == 1)
 check('piece_order has 8 entries', len(doc['meta']['piece_order']) == 8)
 
+# --- per-tile base color (matches the parameter-sets figure) ----------------
+check('baseline tile base_color == ps.BASELINE_COLOR',
+      doc['tiles'][0]['base_color'] == pv.ps.BASELINE_COLOR)
+two = pv.build_document([pv.ps.baseline_set(),
+                         _synthetic(0.20, 0.10, 'Campaign')], band_campaign=None)
+check('baseline tile keeps the grey base_color',
+      two['tiles'][0]['base_color'] == pv.ps.BASELINE_COLOR)
+check('first campaign tile base_color == ps.HUE_COLORS[0]',
+      two['tiles'][1]['base_color'] == pv.ps.HUE_COLORS[0])
+
 # --- CLI --no-render writes a valid JSON document ---------------------------
 import json as _json
 import tempfile

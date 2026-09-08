@@ -171,7 +171,21 @@ def tile_from_record(rec):
 
 
 def build_document(sets, band_campaign):
-    """All sets -> the render document (meta + tiles)."""
+    """All sets -> the render document (meta + tiles).
+
+    Each tile carries a single `base_color` -- the same per-set color the
+    parameter-sets figure uses (baseline grey, campaigns from the hue
+    palette, in set order). Computed via ps.set_colors so the two figures
+    can never drift; Stage 2 renders every piece of a tile as a shade of
+    that one color (metabolic dark->light, housekeeping/translation/slack
+    at their own fixed lightnesses).
+    """
+    colors = ps.set_colors(sets)
+    tiles = []
+    for s in sets:
+        tile = tile_from_record(s)
+        tile['base_color'] = colors[id(s)]
+        tiles.append(tile)
     return {
         'meta': {
             'protein_content': float(eb.PROTEIN_CONTENT),
@@ -183,7 +197,7 @@ def build_document(sets, band_campaign):
             'band_campaign': band_campaign,
             'piece_order': list(PIECE_ORDER),
         },
-        'tiles': [tile_from_record(s) for s in sets],
+        'tiles': tiles,
     }
 
 

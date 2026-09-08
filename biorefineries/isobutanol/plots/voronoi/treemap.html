@@ -3,17 +3,7 @@
 <head>
 <meta charset="utf-8">
 <style>
-  :root {
-    --fg: #1a1a1a;
-    --housekeeping: #8a8a8a;
-    --cat_glycolysis: #123f5a;
-    --cat_tca: #1c6a8f;
-    --cat_acetate: #2e93b8;
-    --cat_ethanol: #6fbcd6;
-    --cat_isobutanol: #b9e0ec;
-    --translation: #7b5aa6;
-    --slack: #f0f0ee;
-  }
+  :root { --fg: #1a1a1a; }
   html, body { margin: 0; background: #ffffff; color: var(--fg);
     font-family: Arial, "DejaVu Sans", sans-serif; }
   #figure { padding: 16px; }
@@ -22,35 +12,44 @@
   .cell .title { font-size: 13px; font-weight: bold; margin: 2px 0 0; }
   .cell .subtitle { font-size: 11px; color: #444; margin: 0 0 4px; }
   .chart { width: 300px; height: 300px; }
-  #legend { display: flex; flex-wrap: wrap; gap: 12px 18px;
-    justify-content: center; margin: 14px 8px 2px; font-size: 12px; }
-  #legend .item { display: flex; align-items: center; gap: 6px; }
-  #legend .swatch { width: 14px; height: 14px; border: 0.5px solid #999; }
 </style>
 </head>
 <body>
 <div id="figure">
   <div id="grid"></div>
-  <div id="legend"></div>
 </div>
 <script src="./vendor/am5.bundle.js"></script>
 <script>
 /* eslint-disable */
 (async function () {
-  const PIECE_LABELS = {
-    housekeeping: "Housekeeping",
-    cat_glycolysis: "Glycolysis",
-    cat_tca: "TCA cycle",
-    cat_acetate: "Acetate / acetyl-CoA",
-    cat_ethanol: "Ethanol production",
-    cat_isobutanol: "Isobutanol production",
-    translation: "Translation (ribosomes)",
-    slack: "Unallocated flexible",
+  // Each tile is a single hue (its campaign color, from Stage 1); every
+  // piece is a shade of that one hue. The five metabolic categories form a
+  // dark->light ramp (glycolysis darkest -> isobutanol lightest, echoing
+  // parameter-sets panel C); housekeeping, translation and slack each get
+  // their own fixed lightness. t > 0 lightens toward white, t < 0 darkens
+  // toward black; the metabolic ramp reuses panel C's linspace(0, 0.66, 5).
+  const PIECE_SHADE = {
+    housekeeping: -0.25,
+    cat_glycolysis: 0.00,
+    cat_tca: 0.165,
+    cat_acetate: 0.33,
+    cat_ethanol: 0.495,
+    cat_isobutanol: 0.66,
+    translation: 0.78,
+    slack: 0.90,
   };
-  function cssColor(piece) {
-    const v = getComputedStyle(document.documentElement)
-      .getPropertyValue("--" + piece).trim();
-    return am5.color(v || "#cccccc");
+  function shade(hex, t) {
+    const h = hex.replace("#", "");
+    let r = parseInt(h.slice(0, 2), 16),
+        g = parseInt(h.slice(2, 4), 16),
+        b = parseInt(h.slice(4, 6), 16);
+    if (t >= 0) {
+      r += (255 - r) * t; g += (255 - g) * t; b += (255 - b) * t;
+    } else {
+      const k = 1 + t; r *= k; g *= k; b *= k;
+    }
+    return am5.color((Math.round(r) << 16) | (Math.round(g) << 8)
+      | Math.round(b));
   }
 
   let doc = window.TREEMAP_DOC;
@@ -98,11 +97,11 @@
       })
     );
 
-    // fixed color per piece (identical across tiles)
+    // one hue per tile; each piece is a shade of tile.base_color
     series.polygons.template.adapters.add("fill", function (fill, target) {
       const dc = target.dataItem && target.dataItem.dataContext;
-      return (dc && dc.piece && PIECE_LABELS[dc.piece])
-        ? cssColor(dc.piece) : fill;
+      return (dc && dc.piece && dc.piece in PIECE_SHADE)
+        ? shade(tile.base_color, PIECE_SHADE[dc.piece]) : fill;
     });
     series.polygons.template.setAll({
       stroke: am5.color(0xffffff), strokeWidth: 1.2, strokeOpacity: 1,
@@ -132,20 +131,8 @@
     }]);
   });
 
-  // shared legend
-  const legend = document.getElementById("legend");
-  (doc.meta.piece_order || Object.keys(PIECE_LABELS)).forEach(function (piece) {
-    const item = document.createElement("div");
-    item.className = "item";
-    const sw = document.createElement("span");
-    sw.className = "swatch";
-    sw.style.background = getComputedStyle(document.documentElement)
-      .getPropertyValue("--" + piece).trim();
-    const lab = document.createElement("span");
-    lab.textContent = PIECE_LABELS[piece] || piece;
-    item.appendChild(sw); item.appendChild(lab);
-    legend.appendChild(item);
-  });
+  // no shared legend: hue = campaign (per-tile title), shade = sector
+  // (leaf-cell labels inside each treemap)
 
   // safety net: if no series fired (e.g. empty doc), still resolve
   if (tiles.length === 0) { window.__RENDER_DONE__ = true; }
