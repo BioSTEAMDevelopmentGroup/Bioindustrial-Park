@@ -794,7 +794,7 @@ def outcome_cell(ax, sets, colors, col, title, ylim, xmax):
         if s.get('scatter') is None or s.get('objective') != col:
             continue
         sx, sy, cc = s['scatter_x'], _yv(s['scatter'][col]), colors[id(s)]
-        ax.scatter(sx, sy, s=9, color=cc, alpha=0.16, linewidths=0, zorder=1)
+        ax.scatter(sx, sy, s=9, color=cc, alpha=0.25, linewidths=0, zorder=1)
     for s in sets:
         if s.get('traj') is None:
             continue
