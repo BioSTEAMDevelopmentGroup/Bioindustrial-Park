@@ -182,7 +182,7 @@ CLAMP_NEG_TO_ZERO = {'IRR'}
 
 # one color per set: baseline dark grey, campaigns from the hue palette
 BASELINE_COLOR = '0.25'
-HUE_COLORS = ['#1f77b4', '#ff7f0e', '#2ca02c', '#9467bd', '#8c564b']
+HUE_COLORS = ['#1f77b4', '#ff7f0e', '#2ca02c', '#9467bd', '#d62728']
 MAX_SETS = 1 + len(HUE_COLORS)   # 6
 
 FONTS = {'band': 12, 'cell': 10, 'tick': 9, 'callout': 9,
