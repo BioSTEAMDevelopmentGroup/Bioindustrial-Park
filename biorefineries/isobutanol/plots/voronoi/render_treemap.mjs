@@ -56,8 +56,19 @@ try {
   // amCharts animates polygons in; give the tessellation a beat to settle
   await new Promise((r) => setTimeout(r, 800));
 
-  const figure = await page.$("#figure");
-  const box = await figure.boundingBox();
+  let figure = await page.$("#figure");
+  let box = await figure.boundingBox();
+
+  // The gutters that hold the leader-line callouts make the figure wider than
+  // the default viewport; grow the viewport to the full figure so the last
+  // grid column is not clipped, then re-measure.
+  await page.setViewport({
+    width: Math.ceil(box.x * 2 + box.width),
+    height: Math.ceil(box.y * 2 + box.height),
+    deviceScaleFactor: scale,
+  });
+  figure = await page.$("#figure");
+  box = await figure.boundingBox();
 
   // PNG (raster, high-DPI)
   await figure.screenshot({ path: outStem + ".png" });
