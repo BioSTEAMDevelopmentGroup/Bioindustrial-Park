@@ -665,9 +665,14 @@ def draw_parameters(fig, gs_rows, sets, colors, band):
             else:
                 t, rng = FEED_LABELS[p]
                 bar_cell(ax, sets, colors, p, 'feed', t, ylim=rng)
-        # sits in the tight inter-band gap: low enough to clear the previous
-        # band's cells above, high enough to clear this band's own subtitles
-        fig.text(0.19, last_ax.get_position().y1 + 0.032, title,
+        # A band title is a header for the band BELOW it, so it should hug its
+        # own cells and leave the larger gap to the band above. Rate cells add
+        # a set_title subtitle that rises ~0.025 fig above the cell box, so
+        # those bands need a taller offset to clear it; group/feeding cells
+        # have nothing above the box and take a tight offset that pins the
+        # title to its own band.
+        offset = 0.030 if any(p in RATE_VARS for p in params) else 0.010
+        fig.text(0.19, last_ax.get_position().y1 + offset, title,
                  fontsize=FONTS['band'], fontweight='bold', va='bottom')
     return axes
 
@@ -767,7 +772,7 @@ def plot(sets, band, out_stem, dpi=300):
     outer = fig.add_gridspec(2, 1, height_ratios=[6.05, 2.2], hspace=0.11,
                              left=0.19, right=0.97, top=0.945, bottom=0.055)
     top_gs = outer[0].subgridspec(2, 1, height_ratios=[1.45, 4.60], hspace=0.34)
-    band_gs = top_gs[1].subgridspec(4, 1, hspace=0.82)
+    band_gs = top_gs[1].subgridspec(4, 1, hspace=0.95)
     colors = set_colors(sets)
     a_axes = draw_outcomes(fig, top_gs[0], sets, colors)
     b_axes = draw_parameters(fig, [band_gs[0], band_gs[1], band_gs[2],
