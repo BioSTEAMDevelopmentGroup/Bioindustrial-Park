@@ -24,12 +24,13 @@ objective). Three stacked panels:
      pathway order (glycolysis/fermentation r1->r3->r6, Ehrlich branch
      r13->r16, product-inhibition effector multipliers, feeding), one
      bar per set with the searched band shaded.
-  c  enzyme burden -- one horizontal stacked bar per set: the five
-     reaction steps with the largest pool (named by callouts), one
-     hatched "other enzymes" lump (every remaining step, sampled or
-     not: r2, r4, r5 and any study step outside the top five), and the
-     translation sector phi_T as a dotted tail; the F_flex cap and the
-     growth-derating factor d are marked.
+  c  enzyme burden -- one horizontal stacked bar per set with the SAME
+     five fixed pathway categories on every bar (a partition of the
+     Phi_M pools: glycolysis r1; TCA cycle r2; acetate / acetyl-CoA
+     production r4->r5; ethanol production r3+r6; isobutanol production
+     r13->r16), plus the translation sector phi_T as a dotted final-
+     category tail; the F_flex cap and the growth-derating factor d are
+     marked.
 
 "campaign" is this figure's word for a kinetic-optimization study; code,
 CSV, and study names keep "study".
@@ -58,8 +59,9 @@ import matplotlib
 matplotlib.use('Agg')
 from matplotlib import pyplot as plt
 from matplotlib.colors import to_rgb
-from matplotlib.ticker import (AutoMinorLocator, FuncFormatter, LogLocator,
-                               MultipleLocator, NullFormatter, PercentFormatter)
+from matplotlib.ticker import (AutoMinorLocator, FixedLocator, FuncFormatter,
+                               LogLocator, MultipleLocator, NullFormatter,
+                               NullLocator, PercentFormatter)
 
 # --- sim-safe module loads (by file path; never import the package) ----------
 PKG_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -87,6 +89,9 @@ eb = _load('eb', 'enzyme_burden.py')
 
 # --- the 15 decision variables, in figure order -----------------------------
 RATE_VARS = list(ko.METABOLIC_MINIMAL_SUBSET_RATES)          # 9
+# Ehrlich-branch capacities: genuinely zero (branch off) at the scenario-A
+# baseline, so their baseline "0" bar labels are suppressed (see bar_cell)
+EHRLICH_RATE_VARS = ('k_13', 'k_14', 'k_15', 'k_16')
 GROUP_VARS = list(ko.METABOLIC_MINIMAL_SUBSET_GROUPS)        # 3
 FEED_VARS = ['threshold_conc', 'target_delta', 'max_n_spikes']  # 3 CSV columns
 DECISION_VARS = RATE_VARS + GROUP_VARS + FEED_VARS
@@ -547,46 +552,146 @@ def _baseline_value(sets, var):
     return None
 
 
+# --- nice, tick-aligned axis caps: every quantitative axis is bounded on
+# both ends by a labeled tick (like the IRR cell's 0 -> 30) ------------------
+_NICE_MANTISSAS = (1.0, 1.2, 1.5, 2.0, 2.5, 3.0, 4.0, 5.0, 6.0, 8.0, 10.0)
+
+
+def _nice_ceiling(x):
+    """Smallest 'nice' number (mantissa in _NICE_MANTISSAS) >= x."""
+    if x <= 0:
+        return 1.0
+    e = np.floor(np.log10(x))
+    scale = 10.0 ** e
+    m = x / scale
+    for cand in _NICE_MANTISSAS:
+        if m <= cand * (1 + 1e-9):
+            return cand * scale
+    return 10.0 * scale
+
+
+def _linear_cap(vmax, floor_hi=0.0):
+    """(hi, step) for a linear axis based at 0 with both 0 and hi as major
+    ticks. hi is the nice ceiling of max(vmax, floor_hi); step = hi / k for
+    the fewest-tick k in (3, 4, 5, 6, 8) that lands on a clean 1/2/2.5/5
+    mantissa (falling back to hi / 5). hi is an integer multiple of step, so
+    a MultipleLocator(step) labels both ends."""
+    hi = _nice_ceiling(max(vmax, floor_hi))
+    for k in (3, 4, 5, 6, 8):
+        step = hi / k
+        e = np.floor(np.log10(step))
+        m = step / 10.0 ** e
+        if min(abs(m - t) for t in (1.0, 2.0, 2.5, 5.0)) < 0.03:
+            return hi, step
+    return hi, hi / 5.0
+
+
+def _log_stop_below(x):
+    """Largest 1/2/5-decade stop strictly below x (e.g. 0.2 -> 0.1)."""
+    e = np.floor(np.log10(x))
+    for m in (5.0, 2.0, 1.0):
+        v = m * 10.0 ** e
+        if v < x * (1 - 1e-9):
+            return v
+    return 10.0 ** (e - 1) * 5.0
+
+
+def _log_stop_above(x):
+    """Smallest 1/2/5-decade stop strictly above x (e.g. 2 -> 5)."""
+    e = np.floor(np.log10(x))
+    for m in (1.0, 2.0, 5.0):
+        v = m * 10.0 ** e
+        if v > x * (1 + 1e-9):
+            return v
+    return 10.0 ** (e + 1)
+
+
+def _decade_floor(lo):
+    """Enclosing decade at or below lo, dropped one more when the band would
+    otherwise touch the bottom edge (keeps ~>=0.3 decade headroom for the
+    '0'/absent bar labels); the result is a decade, so it carries a tick."""
+    a = np.floor(np.log10(lo))
+    if 10.0 ** a > lo * 0.5:
+        a -= 1
+    return 10.0 ** a
+
+
+def _decade_ceil(hi):
+    """Enclosing decade at or above hi, raised one more when the band would
+    otherwise touch the top edge; the result is a decade (a tick)."""
+    b = np.ceil(np.log10(hi))
+    if 10.0 ** b < hi * 2:
+        b += 1
+    return 10.0 ** b
+
+
 def bar_cell(ax, sets, colors, var, kind, ylabel, subtitle=None, ylim=None,
              band=None):
     """One parameter cell: colored bars per set with the searched band
     shaded and the baseline dashed. `ylabel` names the value axis (the
     parameter symbol / group / feeding quantity); `subtitle`, if given, is
     a smaller descriptor above the cell (reaction + enzyme). Value axes get
-    conventional ticks -- log decade majors + minor subdivisions on the
-    rate/group cells, linear major + minor on the feeding cells."""
+    conventional ticks -- linear major + minor on the rate and feeding cells,
+    a narrow log axis with plain-number stops on the group cells."""
     n = len(sets)
     base = _baseline_value(sets, var)
     if kind == 'rate':
-        lo, hi = band[var]
-        floor = lo / 6
-        ax.set_yscale('log')
-        ax.set_ylim(floor, hi * 2.5)
-        ax.axhspan(lo, hi, color='0.92', zorder=0)
+        # linear value axis from 0 to a nice ceiling just above the largest
+        # bar (both edges on labeled ticks); no search-band shading
+        data_max = 0.0
+        for s in sets:
+            v = s.get(var)
+            if v is not None and np.isfinite(v):
+                data_max = max(data_max, float(v))
+        if base and base > 0:
+            data_max = max(data_max, base)
+        cap, step = _linear_cap(data_max)
+        bottom = 0
+        ax.set_ylim(bottom, cap)
         if base and base > 0:
             ax.axhline(base, color='k', lw=0.8, ls='--', zorder=1)
-        bottom = floor
+        ax.yaxis.set_major_locator(MultipleLocator(step))
+        ax.yaxis.set_minor_locator(AutoMinorLocator())
     elif kind == 'group':
-        lo, hi = band[var]
-        ax.set_yscale('log'); ax.set_ylim(lo * 0.7, hi * 1.4)
-        ax.axhspan(lo, hi, color='0.92', zorder=0)
+        # narrow log axis hugging the data with plain-number 1/2/5 stops at
+        # both edges (baseline 1.0 always in view); no search-band shading
+        stops_all = (0.05, 0.1, 0.2, 0.5, 1.0, 2.0, 5.0, 10.0)
+        vals = [float(s[var]) for s in sets
+                if s.get(var) is not None and np.isfinite(s.get(var))]
+        vals.append(1.0)   # keep the baseline reference framed
+        dmin, dmax = min(vals), max(vals)
+        # floor a full stop BELOW the stop nearest the smallest value, so a
+        # bar sitting at the data minimum still has visible height on the log
+        # axis; ceiling at the smallest stop at/above the data max
+        s0 = max([s for s in stops_all if s <= dmin * (1 + 1e-6)],
+                 default=stops_all[0])
+        bottom = max([s for s in stops_all if s < s0 * (1 - 1e-6)],
+                     default=s0)
+        top = min([s for s in stops_all if s >= dmax * (1 - 1e-6)],
+                  default=stops_all[-1])
+        ax.set_yscale('log'); ax.set_ylim(bottom, top)
         ax.axhline(1.0, color='k', lw=0.8, ls='--', zorder=1)
-        # narrow (<2 decade) log axis: plain-number majors at nice log stops,
-        # the remaining log subdivisions as unlabeled minor ticks (default
-        # log labeling would sci-notate every minor here)
-        ax.yaxis.set_major_locator(
-            LogLocator(base=10.0, subs=(0.2, 0.5, 1.0, 2.0), numticks=12))
+        stops = [s for s in stops_all
+                 if bottom * (1 - 1e-9) <= s <= top * (1 + 1e-9)]
+        ax.yaxis.set_major_locator(FixedLocator(stops))
         ax.yaxis.set_major_formatter(FuncFormatter(lambda v, _: f'{v:g}'))
-        ax.yaxis.set_minor_locator(LogLocator(
-            base=10.0, subs=(0.3, 0.4, 0.6, 0.7, 0.8, 0.9), numticks=12))
-        ax.yaxis.set_minor_formatter(NullFormatter())
-        bottom = lo * 0.7
+        ax.yaxis.set_minor_locator(NullLocator())
     else:  # feed
-        lo, hi = ylim
-        ax.set_ylim(lo, hi * 1.06); ax.axhspan(lo, hi, color='0.92', zorder=0)
+        lo, _ = ylim
+        # linear axis from the declared floor to a nice ceiling just above the
+        # largest bar (both edges on labeled ticks); no search-band shading
+        data_max = 0.0
+        for s in sets:
+            v = s.get(var)
+            if v is not None and np.isfinite(v):
+                data_max = max(data_max, float(v))
+        if base is not None and np.isfinite(base):
+            data_max = max(data_max, base)
+        cap, step = _linear_cap(data_max)
+        ax.set_ylim(lo, cap)
         if base is not None:
             ax.axhline(base, color='k', lw=0.8, ls='--', zorder=1)
-        ax.yaxis.set_major_locator(plt.MaxNLocator(4))
+        ax.yaxis.set_major_locator(MultipleLocator(step))
         ax.yaxis.set_minor_locator(AutoMinorLocator())
         bottom = 0
     ax.set_ylabel(ylabel, fontsize=FONTS['cell'], labelpad=3)
@@ -602,8 +707,12 @@ def bar_cell(ax, sets, colors, var, kind, ylabel, subtitle=None, ylim=None,
             y = bottom * 1.25 if bottom else 0.01 * top
             label = 'n/a' if (v is None or (isinstance(v, float)
                                             and not np.isfinite(v))) else '0'
-            ax.text(j, y, label, ha='center', va='bottom',
-                    fontsize=FONTS['tick'], color=c)
+            # the baseline's Ehrlich branch is genuinely off (zero flux); its
+            # "0" labels only clutter the four Ehrlich cells, so drop them
+            if not (s.get('is_baseline') and var in EHRLICH_RATE_VARS
+                    and label == '0'):
+                ax.text(j, y, label, ha='center', va='bottom',
+                        fontsize=FONTS['tick'], color=c)
     ax.set_xlim(-0.6, n - 0.4); style_cell_axes(ax)
 
 
@@ -618,8 +727,11 @@ def outcome_cell(ax, sets, colors, col, title, ylim, xmax):
               for v in s['traj'][col] if np.isfinite(v)]
     if base is not None and np.isfinite(base):
         finite.append(base)
-    vmax = max(finite + [hi]) if finite else hi
-    ax.set_ylim(lo, vmax * 1.08 if vmax > hi else hi)
+    vmax = max(finite) if finite else hi
+    # bound the value axis top and bottom by labeled ticks (like IRR's 0->30):
+    # a nice ceiling >= the data, no ~8% auto-overshoot past the last tick
+    cap, step = _linear_cap(vmax, floor_hi=hi)
+    ax.set_ylim(lo, cap)
     ax.set_xlim(0, xmax * 1.02)
     if base is not None and np.isfinite(base):
         ax.axhline(base, color=BASELINE_COLOR, lw=0.9, ls='--', zorder=1)
@@ -634,12 +746,10 @@ def outcome_cell(ax, sets, colors, col, title, ylim, xmax):
     # narrow cells: 4-digit trial numbers crowd, so cap at two majors
     ax.xaxis.set_major_locator(plt.MaxNLocator(2))
     ax.xaxis.set_minor_locator(AutoMinorLocator())
+    ax.yaxis.set_major_locator(MultipleLocator(step))
     if col == 'IRR':   # fraction stored; show the value axis in percent
-        ax.yaxis.set_major_locator(MultipleLocator(0.1))   # 10% steps
         ax.yaxis.set_major_formatter(
             PercentFormatter(xmax=1.0, decimals=0, symbol=''))
-    else:
-        ax.yaxis.set_major_locator(plt.MaxNLocator(4))
     ax.yaxis.set_minor_locator(AutoMinorLocator())
     ax.tick_params(axis='y', which='major', direction='inout', right=False,
                    length=4)
@@ -690,10 +800,17 @@ def draw_parameters(fig, gs_rows, sets, colors, band):
         # A band title is a header for the band BELOW it, so it should hug its
         # own cells and leave the larger gap to the band above. Rate cells add
         # a set_title subtitle that rises ~0.025 fig above the cell box, so
-        # those bands need a taller offset to clear it; group/feeding cells
-        # have nothing above the box and take a tight offset that pins the
-        # title to its own band.
-        offset = 0.030 if any(p in RATE_VARS for p in params) else 0.010
+        # those bands need a taller offset to clear it; the feeding cells carry
+        # long two-line vertical ylabels ("Threshold sugar conc. ...") that
+        # overflow the short cell and poke above its top box, so that band
+        # takes a middling offset to clear them; the group cells have short
+        # ylabels and take the tight offset that pins the title to its band.
+        if any(p in RATE_VARS for p in params):
+            offset = 0.030
+        elif any(p in FEED_DRAW_VARS for p in params):
+            offset = 0.022
+        else:
+            offset = 0.010
         # left-aligned with the plot boxes (the gridspec left margin)
         fig.text(0.083, last_ax.get_position().y1 + offset, title,
                  fontsize=FONTS['band'], fontweight='bold', va='bottom')
@@ -715,13 +832,34 @@ if set(_STUDY_STEPS) | set(_UNSAMPLED_STEPS) != set(eb.STEP_ORDER):
         % (sorted(set(_STUDY_STEPS) | set(_UNSAMPLED_STEPS)),
            sorted(eb.STEP_ORDER)))
 
+# Panel c: a FIXED set of pathway categories drawn as the same stacked
+# segments on every bar (a partition of the Phi_M pools), with the
+# translation sector phi_T as the dotted final-category tail. r2 is the
+# PDH complex (TCA cycle); r4 (Ald6) -> r5 (Acs2) are the acetate bypass
+# that regenerates cytosolic acetyl-CoA (its own category). The partition
+# is asserted against eb.STEP_ORDER so a table drift raises at import.
+BURDEN_CATEGORIES = (
+    ('Glycolysis', ['r1']),
+    ('TCA cycle', ['r2']),
+    ('Acetate / acetyl-CoA\nproduction', ['r4', 'r5']),
+    ('Ethanol production', ['r3', 'r6']),
+    ('Isobutanol production', ['r13', 'r14', 'r15', 'r16']),
+)
+_CAT_STEPS = [st for _, steps in BURDEN_CATEGORIES for st in steps]
+if sorted(_CAT_STEPS) != sorted(eb.STEP_ORDER) \
+        or len(_CAT_STEPS) != len(set(_CAT_STEPS)):
+    raise AssertionError(
+        'burden category partition drift: BURDEN_CATEGORIES steps != '
+        'eb.STEP_ORDER (%r vs %r)' % (sorted(_CAT_STEPS),
+                                      sorted(eb.STEP_ORDER)))
+
 
 def draw_burden(ax, sets, colors):
-    rank = sorted(_STUDY_STEPS,
-                  key=lambda st: -max(s[f'pool_{st}'] for s in sets))
-    top5, rest = rank[:5], rank[5:]
-    other_steps = rest + _UNSAMPLED_STEPS
-    tints = [0.0, 0.25, 0.45, 0.62, 0.78]   # darkest = largest pool
+    # the four modeled categories share one tint ramp per bar colour
+    # (darkest = glycolysis, lightest = isobutanol production); translation
+    # is the dotted 5th-category tail
+    cats = BURDEN_CATEGORIES
+    tints = np.linspace(0.0, 0.66, len(cats))
     n = len(sets)
     F = sets[0]['F_flex']
     h = 0.6
@@ -729,51 +867,49 @@ def draw_burden(ax, sets, colors):
     seg_centers = {}
     for s in sets:
         y = ypos[id(s)]; x = 0.0; c = colors[id(s)]; centers = []
-        segs = [(s[f'pool_{st}'], tint(c, tints[i]), None)
-                for i, st in enumerate(top5)]
-        segs.append((sum(s[f'pool_{st}'] for st in other_steps), c, '////'))
-        for w, fc, hatch in segs:
-            ax.barh(y, w, left=x, height=h,
-                    color=('none' if hatch else fc),
-                    edgecolor=c, lw=0.5, hatch=hatch, zorder=2)
+        for i, (_, steps) in enumerate(cats):
+            w = sum(s[f'pool_{st}'] for st in steps)
+            ax.barh(y, w, left=x, height=h, color=tint(c, tints[i]),
+                    edgecolor=c, lw=0.5, zorder=2)
             centers.append(x + w / 2); x += w
+        # translation sector phi_T -- the 5th fixed category (dotted)
         ax.barh(y, s['phi_T'], left=x, height=h, color='none',
                 edgecolor=c, lw=0.6, hatch='....', zorder=2)
+        centers.append(x + s['phi_T'] / 2)
         end = x + s['phi_T']
         ax.text(max(end, F) + 0.005, y, f'd = {s["burden_factor"]:.2f}',
                 va='center', fontsize=FONTS['tick'])
         seg_centers[id(s)] = centers
-    # callouts once, leaders to the FIRST campaign set (all seven study
+    # category callouts once, leaders to the FIRST campaign set (all study
     # pools non-zero there; the baseline's Ehrlich pools are zero)
     campaign_sets = [s for s in sets if not s.get('is_baseline')]
     anchor = campaign_sets[0] if campaign_sets else sets[0]
     y = ypos[id(anchor)]
-    labels = [f'{STEP_ENZYME[st]}\n({STEP_PARAMS[st]})' for st in top5] + \
-             ['other enzymes']
-    xs = np.linspace(0.01, 0.235, len(labels))
-    for i, (lab, cx) in enumerate(zip(labels, seg_centers[id(anchor)])):
-        row = n + 1.0 if i % 2 == 0 else n + 2.1
+    labels = [name for name, _ in cats] + ['Translation (ribosomes);\n'
+                                           'growth derated by d']
+    centers = seg_centers[id(anchor)]
+    xs = np.linspace(0.015, 0.30, len(labels))
+    for i, (lab, cx) in enumerate(zip(labels, centers)):
+        row = n + 0.45 if i % 2 == 0 else n + 1.25
         ax.annotate(lab, xy=(cx, y + h / 2), xytext=(xs[i], row),
                     fontsize=FONTS['callout'], ha='center', va='bottom',
                     arrowprops=dict(arrowstyle='-', lw=0.5, color='0.35',
                                     shrinkA=0, shrinkB=0))
-    xt = anchor['Phi_M'] + anchor['phi_T'] * 0.8
-    ax.annotate('translation sector φ$_T$ (ribosomes):\ngrowth derated '
-                'by d where the\nbar crosses the F$_{flex}$ cap',
-                xy=(xt, y + h / 2), xytext=(0.328, n + 2.1),
-                fontsize=FONTS['callout'], ha='right', va='bottom',
-                arrowprops=dict(arrowstyle='-', lw=0.5, color='0.35',
-                                shrinkA=0, shrinkB=0))
     ax.axvline(F, color='k', ls='--', lw=0.9, zorder=3)
-    ax.text(F + 0.004, -0.15, 'F$_{flex}$ = %.3f' % F, ha='left',
-            va='center', fontsize=FONTS['callout'])
-    ax.set_ylim(-0.7, n + 3.3)
+    # F_flex rides its own dashed cap line, rotated 90 deg to run along it,
+    # just below the lowest bar -- no separate empty row for it any more
+    ax.text(F, 0.62, 'F$_{flex}$', rotation=90, ha='center', va='top',
+            fontsize=FONTS['callout'])
+    ax.set_ylim(0.05, n + 1.9)
     # rows are keyed by color through the legend, so the categorical y axis
     # carries no labels of its own
     ax.set_yticks([])
-    ax.set_xlim(0, 0.33)
+    # bounded on both ends by a labeled tick: 0 -> 0.35 in 0.05 steps
+    # (0.35 clears the tallest bar + phi_T tail and the right-hand callouts)
+    ax.set_xlim(0, 0.35)
     ax.set_xlabel('Enzyme burden Φ$_M$ [g enzyme·(g DCW)$^{-1}$]',
                   fontsize=FONTS['axis'])
+    ax.xaxis.set_major_locator(MultipleLocator(0.05))
     ax.xaxis.set_minor_locator(AutoMinorLocator())
     ax.tick_params(axis='y', right=False, length=0)
     ax.tick_params(axis='x', which='major', direction='inout', top=False,
@@ -806,11 +942,11 @@ def plot(sets, band, out_stem, dpi=300):
     # baseline; the panel title (13 pt) outranks the band sub-titles (12 pt).
     # Panel b's letter is lifted into the panel-a -> b gap so its title clears
     # the first band title below it.
-    panels = ((a_axes[0].get_position().y1 + 0.012, 'a',
+    panels = ((a_axes[0].get_position().y1 + 0.012, 'A',
                'Optimization incumbent trajectories'),
-              (b_axes[0].get_position().y1 + 0.060, 'b',
+              (b_axes[0].get_position().y1 + 0.060, 'B',
                'Optimized kinetic and process parameters'),
-              (axc.get_position().y1 + 0.005, 'c', 'Enzyme-burden allocation'))
+              (axc.get_position().y1 + 0.005, 'C', 'Enzyme-burden allocation'))
     for y, letter, title in panels:
         fig.text(0.03, y, letter, fontsize=FONTS['panel'], fontweight='bold',
                  va='baseline')
