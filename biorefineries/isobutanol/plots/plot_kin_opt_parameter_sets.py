@@ -90,7 +90,8 @@ BANDS = [
      ['k_1l', 'k_1h', 'k_1e', 'k_3', 'k_6']),
     ('Ehrlich-branch capacities   r13 → r14 → r15 → r16',
      ['k_13', 'k_14', 'k_15', 'k_16']),
-    ('Product-inhibition effector multipliers (× baseline family)',
+    ('Product inhibition relative to baseline '
+     '(applied to r1, r4, r6, r7, r10, r16)',
      GROUP_VARS),
     ('Feeding strategy', FEED_VARS),
 ]
