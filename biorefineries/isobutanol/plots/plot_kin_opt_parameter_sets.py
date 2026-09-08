@@ -159,12 +159,10 @@ for _s in STEP_ENZYME:
 # Titles are rotated y-axis labels in narrow cells -- keep each to <=2 lines
 # so the label stays out of the neighbouring cell's plot box.
 OUTCOMES = (('IRR', 'Financial attractiveness\nas IRR [%]', (0, 0.3)),
-            ('TCI', 'Total capital\ninvestment [MM$]', (0, 200)),
             ('IBO titer', 'Isobutanol titer\n[g·L$^{-1}$]', (0, 100)),
             ('IBO yield', 'Isobutanol yield\n[g·g$^{-1}$]', (0, 0.4)),
             ('EtOH titer', 'Ethanol titer\n[g·L$^{-1}$]', (0, 300)),
-            ('EtOH yield', 'Ethanol yield\n[g·g$^{-1}$]', (0, 0.5)),
-            ('tau', 'Batch time\n[h]', (0, 80)))
+            ('EtOH yield', 'Ethanol yield\n[g·g$^{-1}$]', (0, 0.5)))
 
 # one color per set: baseline dark grey, campaigns from the hue palette
 BASELINE_COLOR = '0.25'
