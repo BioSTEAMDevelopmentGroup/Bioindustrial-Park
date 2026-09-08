@@ -134,6 +134,7 @@ for _s in STEP_ENZYME:
 
 # outcomes panel: (CSV column, cell title, (y-low, y-high)), in draw order
 OUTCOMES = (('IRR', 'Financial attractiveness,\nas IRR [%]', (0, 0.3)),
+            ('TCI', 'Total capital\ninvestment\n(MM$)', (0, 200)),
             ('IBO titer', 'Isobutanol titer\n(g/L)', (0, 100)),
             ('IBO yield', 'Isobutanol yield\n(g/g)', (0, 0.4)),
             ('EtOH titer', 'Ethanol titer\n(g/L)', (0, 300)),
@@ -191,8 +192,8 @@ def baseline_set():
     rec['threshold_conc'] = BASELINE_A['threshold_conc']
     rec['target_delta'] = BASELINE_A['target_delta']
     rec['max_n_spikes'] = BASELINE_A['max_n_spikes']
-    for col in ('IRR', 'EtOH titer', 'IBO titer', 'EtOH yield', 'IBO yield',
-                'tau', 'n_glu_spikes'):
+    for col in ('IRR', 'TCI', 'EtOH titer', 'IBO titer', 'EtOH yield',
+                'IBO yield', 'tau', 'n_glu_spikes'):
         rec[col] = BASELINE_A[col]
     for st, pool in res.pools.items():
         rec[f'pool_{st}'] = float(pool)
