@@ -788,10 +788,18 @@ def draw_outcomes(fig, gs_cell, sets, colors):
         tx = s.get('traj_x')
         if tx is not None and len(tx):
             xmax = max(xmax, float(tx[-1]))
-    sub_gs = gs_cell.subgridspec(1, len(OUTCOMES), wspace=1.32)
+    # 2x4 grid: IRR (the headline outcome) fills the left 2x2 block and is the
+    # largest cell; the remaining four outcomes fill the right 2x2 block, one
+    # per cell (top row IBO titer / IBO yield, bottom row EtOH titer / yield).
+    sub_gs = gs_cell.subgridspec(2, 4, wspace=0.62, hspace=0.62)
     axes = []
-    for i, (col, label, yl) in enumerate(OUTCOMES):
-        ax = fig.add_subplot(sub_gs[0, i])
+    big, rest = OUTCOMES[0], OUTCOMES[1:]
+    ax_big = fig.add_subplot(sub_gs[0:2, 0:2])
+    outcome_cell(ax_big, sets, colors, big[0], big[1], big[2], xmax)
+    axes.append(ax_big)
+    for (col, label, yl), (r, c) in zip(rest,
+                                        ((0, 2), (0, 3), (1, 2), (1, 3))):
+        ax = fig.add_subplot(sub_gs[r, c])
         outcome_cell(ax, sets, colors, col, label, yl, xmax)
         axes.append(ax)
     return axes
@@ -950,7 +958,7 @@ def plot(sets, band, out_stem, dpi=300):
     # below the bands, freeing space at the bottom of the canvas. Each region
     # is its own gridspec so the three vertical positions are set directly.
     LEFT, RIGHT = 0.083, 0.97
-    a_gs = fig.add_gridspec(1, 1, left=LEFT, right=RIGHT, top=0.945, bottom=0.824)
+    a_gs = fig.add_gridspec(1, 1, left=LEFT, right=RIGHT, top=0.945, bottom=0.775)
     band_gs = fig.add_gridspec(4, 1, left=LEFT, right=RIGHT, top=0.709,
                                bottom=0.425, hspace=1.49)
     c_gs = fig.add_gridspec(1, 1, left=LEFT, right=RIGHT, top=0.379, bottom=0.154)
