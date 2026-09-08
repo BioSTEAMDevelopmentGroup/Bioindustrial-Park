@@ -672,7 +672,8 @@ def draw_parameters(fig, gs_rows, sets, colors, band):
         # have nothing above the box and take a tight offset that pins the
         # title to its own band.
         offset = 0.030 if any(p in RATE_VARS for p in params) else 0.010
-        fig.text(0.19, last_ax.get_position().y1 + offset, title,
+        # left-aligned with the plot boxes (the gridspec left margin)
+        fig.text(0.083, last_ax.get_position().y1 + offset, title,
                  fontsize=FONTS['band'], fontweight='bold', va='bottom')
     return axes
 
@@ -771,7 +772,7 @@ def plot(sets, band, out_stem, dpi=300):
     # panel c, with panel a and the bands nested inside the first region, and
     # the four bands nested again so band-to-band stays compact.
     outer = fig.add_gridspec(2, 1, height_ratios=[6.05, 2.2], hspace=0.11,
-                             left=0.19, right=0.97, top=0.945, bottom=0.055)
+                             left=0.083, right=0.97, top=0.945, bottom=0.055)
     top_gs = outer[0].subgridspec(2, 1, height_ratios=[1.45, 4.60], hspace=0.46)
     band_gs = top_gs[1].subgridspec(4, 1, hspace=0.95)
     colors = set_colors(sets)
