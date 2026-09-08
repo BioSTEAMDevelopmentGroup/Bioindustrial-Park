@@ -169,6 +169,12 @@ OUTCOMES = (('IRR', 'Financial attractiveness\nas IRR [%]', (0, 0.3)),
 # isobutanol titer reads cleaner on 0/40/80/120 than the default 0/20/.../120.
 OUTCOME_TICK_STEP = {'IRR': 0.05, 'IBO titer': 40.0}
 
+# outcomes whose negative values are drawn at zero: a loss-making IRR (finite
+# negative) and an unsolvable IRR (-inf) both read as 0 rather than diving
+# below the axis floor / being omitted. Only nan (never solved) stays
+# non-finite and is omitted.
+CLAMP_NEG_TO_ZERO = {'IRR'}
+
 # one color per set: baseline dark grey, campaigns from the hue palette
 BASELINE_COLOR = '0.25'
 HUE_COLORS = ['#1f77b4', '#ff7f0e', '#2ca02c', '#9467bd', '#8c564b']
@@ -753,6 +759,16 @@ def outcome_cell(ax, sets, colors, col, title, ylim, xmax):
     in its panel-b/c color), the scenario-A baseline as a dashed reference.
     """
     lo, hi = ylim
+
+    def _yv(y):
+        # draw negatives at zero for the flagged outcomes (e.g. IRR): y < 0 is
+        # True for finite losses and for -inf, False for nan -- so both go to 0
+        # while nan stays nan and is still broken/omitted
+        if col not in CLAMP_NEG_TO_ZERO:
+            return y
+        y = np.asarray(y, dtype=float)
+        return np.where(y < 0, 0.0, y)
+
     base = _baseline_value(sets, col)
     finite = [v for s in sets if s.get('traj') is not None
               for v in s['traj'][col] if np.isfinite(v)]
@@ -774,14 +790,14 @@ def outcome_cell(ax, sets, colors, col, title, ylim, xmax):
     for s in sets:
         if s.get('scatter') is None or s.get('objective') != col:
             continue
-        sx, sy, cc = s['scatter_x'], s['scatter'][col], colors[id(s)]
+        sx, sy, cc = s['scatter_x'], _yv(s['scatter'][col]), colors[id(s)]
         good = np.isfinite(sy)
         ax.scatter(sx[good], sy[good], s=9, color=cc, alpha=0.16,
                    linewidths=0, zorder=1)
     for s in sets:
         if s.get('traj') is None:
             continue
-        ax.step(s['traj_x'], s['traj'][col], where='post',
+        ax.step(s['traj_x'], _yv(s['traj'][col]), where='post',
                 color=colors[id(s)], lw=1.4, zorder=2)
     # metric name next to the value axis itself (not a title above the cell)
     ax.set_ylabel(title, fontsize=FONTS['cell'], labelpad=3)
