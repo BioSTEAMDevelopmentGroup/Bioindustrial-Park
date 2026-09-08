@@ -169,6 +169,11 @@ OUTCOMES = (('IRR', 'Financial attractiveness\nas IRR [%]', (0, 0.3)),
 # isobutanol titer reads cleaner on 0/40/80/120 than the default 0/20/.../120.
 OUTCOME_TICK_STEP = {'IRR': 0.05, 'IBO titer': 40.0}
 
+# per-outcome value-axis ceiling override (fraction/native units), used in place
+# of the auto nice-ceiling. IRR tops out at 25 % rather than the auto 30 % so the
+# top major tick is 25; the best incumbent (23.5 %) still fits below it.
+OUTCOME_TICK_CAP = {'IRR': 0.25}
+
 # outcomes whose negative values are drawn at zero: a loss-making IRR (finite
 # negative) and an unsolvable IRR (-inf) both read as 0 rather than diving
 # below the axis floor / being omitted. Only nan (never solved) stays
@@ -782,6 +787,7 @@ def outcome_cell(ax, sets, colors, col, title, ylim, xmax):
     # a nice ceiling >= the data, no ~8% auto-overshoot past the last tick
     cap, step = _linear_cap(vmax, floor_hi=hi)
     step = OUTCOME_TICK_STEP.get(col, step)
+    cap = OUTCOME_TICK_CAP.get(col, cap)
     ax.set_ylim(lo, cap)
     ax.set_xlim(0, xmax * 1.02)
     if base is not None and np.isfinite(base):
