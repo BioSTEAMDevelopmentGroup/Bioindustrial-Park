@@ -47,6 +47,10 @@ PKG_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 PLOTS_DIR = os.path.join(PKG_DIR, 'plots')
 RESULTS_DIR = os.path.join(PKG_DIR, 'analyses', 'results')  # matches ps
 VORONOI_DIR = os.path.join(PLOTS_DIR, 'voronoi')
+# the voronoi-treemaps conda env's node; override with --node or $VORONOI_NODE
+DEFAULT_VORONOI_NODE = (r'C:\Users\saran\anaconda3\envs\voronoi-treemaps'
+                        r'\node.exe')
+RENDER_SCRIPT = os.path.join(VORONOI_DIR, 'render_treemap.mjs')
 
 TOL = 1e-6
 
@@ -258,6 +262,33 @@ def build_parser():
     ap.add_argument('--no-render', action='store_true',
                     help='write only the JSON (skip the Node/Puppeteer render)')
     return ap
+
+
+def resolve_node(cli_node=None):
+    """Path to the voronoi-treemaps node.exe: --node, else $VORONOI_NODE,
+    else DEFAULT_VORONOI_NODE. Errors clearly if it does not exist."""
+    node = cli_node or os.environ.get('VORONOI_NODE') or DEFAULT_VORONOI_NODE
+    if not os.path.isfile(node):
+        raise FileNotFoundError(
+            f'voronoi-treemaps node not found at {node!r}. Create the env '
+            '(conda create -n voronoi-treemaps -c conda-forge nodejs; '
+            'npm --prefix plots/voronoi install) or pass --node / set '
+            '$VORONOI_NODE. Use --no-render to write only the JSON.')
+    return node
+
+
+def render(json_path, args):
+    """Invoke Stage 2 (Node/Puppeteer) on a written allocation JSON."""
+    node = resolve_node(args.node)
+    out_stem = os.path.splitext(json_path)[0]   # <out-dir>/<stem>_<stamp>
+    cmd = [node, RENDER_SCRIPT, '--doc', json_path, '--out', out_stem,
+           '--scale', str(args.scale)]
+    if args.cols:
+        cmd += ['--cols', str(args.cols)]
+    print('rendering: ' + ' '.join(f'"{c}"' if ' ' in c else c for c in cmd))
+    subprocess.run(cmd, check=True)
+    print(f'wrote {out_stem}.png / .svg / .pdf')
+    return out_stem
 
 
 def main(argv=None):
