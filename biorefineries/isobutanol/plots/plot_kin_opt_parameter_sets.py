@@ -389,6 +389,13 @@ def load_set(label, campaign, trial):
     rec['sel_dir'] = sel_dir
     rec['traj_x'] = tx
     rec['traj'] = traj
+    # full per-trial cloud for panel a, drawn only on the cell whose metric
+    # this campaign optimized: every trial's number, its completion flag and
+    # each outcome value (non-COMPLETE / unsolved -> NaN via the CSV).
+    rec['objective'] = campaign_objective(campaign)
+    rec['scatter_x'] = df['trial_number'].to_numpy(dtype=float)
+    rec['scatter_complete'] = (df['state'] == 'COMPLETE').to_numpy()
+    rec['scatter'] = {c: df[c].to_numpy(dtype=float) for c, _, _ in OUTCOMES}
     return rec
 
 
@@ -754,6 +761,26 @@ def outcome_cell(ax, sets, colors, col, title, ylim, xmax):
     ax.set_xlim(0, xmax * 1.02)
     if base is not None and np.isfinite(base):
         ax.axhline(base, color=BASELINE_COLOR, lw=0.9, ls='--', zorder=1)
+    # individual trial cloud from the ONE campaign that optimized THIS metric:
+    # every solved trial as a translucent dot at its value, every failed /
+    # unsolved trial as an x-marker pinned to the axis floor. In the campaign's
+    # own color, highly transparent, and behind the incumbent lines (zorder 1).
+    for s in sets:
+        if s.get('scatter') is None or s.get('objective') != col:
+            continue
+        sx, sy, cc = s['scatter_x'], s['scatter'][col], colors[id(s)]
+        good = np.isfinite(sy)
+        ax.scatter(sx[good], sy[good], s=9, color=cc, alpha=0.16,
+                   linewidths=0, zorder=1)
+        bad = ~good
+        if bad.any():
+            # failed / unsolved trials have no value -> a row of x-markers just
+            # above the axis floor (lifted clear of the spine so they read)
+            top = ax.get_ylim()[1]
+            y_fail = lo + 0.02 * (top - lo)
+            ax.scatter(sx[bad], np.full(int(bad.sum()), y_fail), s=13,
+                       color=cc, alpha=0.18, marker='x', linewidths=0.8,
+                       zorder=1)
     for s in sets:
         if s.get('traj') is None:
             continue
