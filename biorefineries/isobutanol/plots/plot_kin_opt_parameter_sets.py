@@ -64,8 +64,14 @@ from matplotlib.ticker import (AutoMinorLocator, FuncFormatter, LogLocator,
 # --- sim-safe module loads (by file path; never import the package) ----------
 PKG_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 RESULTS_DIR = os.path.join(PKG_DIR, 'analyses', 'results')
-DEFAULT_STUDY = ('kin_opt_ethanol_isobutanol_metabolic_minimal_subset_irr'
-                 '_rb0.001-10_ib0.2-2_burden')
+# The three most recent minimal-subset studies share one search space
+# (rb0.001-10_ib0.2-2_burden) and differ only in the optimized objective,
+# so each set is that study's own "best" trial (max of its objective).
+_MINIMAL_SUBSET_STUDY = ('kin_opt_ethanol_isobutanol_metabolic_minimal_subset'
+                         '_%s_rb0.001-10_ib0.2-2_burden')
+DEFAULT_STUDY = _MINIMAL_SUBSET_STUDY % 'irr'          # financial (IRR) optimum
+ETOH_TITER_STUDY = _MINIMAL_SUBSET_STUDY % 'etoh_titer'  # ethanol-titer optimum
+IBO_TITER_STUDY = _MINIMAL_SUBSET_STUDY % 'ibo_titer'    # isobutanol-titer optimum
 
 
 def _load(name, filename):
@@ -870,10 +876,10 @@ def main(argv=None):
 
     if args.sets:
         specs = [(lab, camp, norm_trial(tr)) for lab, camp, tr in args.sets]
-    else:  # default: three trials of the default minimal-subset campaign
+    else:  # default: each optimum from the study that optimized it
         specs = [('Financial attractiveness optimum', DEFAULT_STUDY, 'best'),
-                 ('Ethanol titer optimum', DEFAULT_STUDY, 'best:EtOH titer'),
-                 ('Isobutanol titer optimum', DEFAULT_STUDY, 'best:IBO titer')]
+                 ('Ethanol titer optimum', ETOH_TITER_STUDY, 'best'),
+                 ('Isobutanol titer optimum', IBO_TITER_STUDY, 'best')]
 
     if len(specs) + (0 if args.no_baseline else 1) > MAX_SETS:
         raise ValueError(f'at most {MAX_SETS} sets (baseline + '
