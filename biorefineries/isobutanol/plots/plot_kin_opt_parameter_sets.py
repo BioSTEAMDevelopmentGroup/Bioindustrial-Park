@@ -625,6 +625,19 @@ def _decade_ceil(hi):
     return 10.0 ** b
 
 
+# hand-tuned major y-ticks for a few rate cells (readability): an explicit
+# tick list overrides the auto _linear_cap ticks and sets the axis top to its
+# largest tick. A uniform list keeps half-step minor ticks (so e.g. k_14's
+# dropped 0.5/1.5 survive as unlabeled minors); a non-uniform list (k_1h)
+# drops the removed values outright.
+RATE_YTICKS = {
+    'k_1h': [0.0, 0.5, 1.0],        # even 0.5 steps (drop 0.25, 0.75)
+    'k_14': [0.0, 1.0, 2.0],        # drop 0.5, 1.5
+    'k_15': [0.0, 1.0, 2.0],        # drop 0.5, 1.5
+    'k_16': [0.0, 1.0, 2.0, 3.0],   # re-cap 2.5 -> 3.0, whole-number steps
+}
+
+
 def bar_cell(ax, sets, colors, var, kind, ylabel, subtitle=None, ylim=None,
              band=None):
     """One parameter cell: colored bars per set with the searched band
@@ -645,13 +658,21 @@ def bar_cell(ax, sets, colors, var, kind, ylabel, subtitle=None, ylim=None,
                 data_max = max(data_max, float(v))
         if base and base > 0:
             data_max = max(data_max, base)
-        cap, step = _linear_cap(data_max)
         bottom = 0
-        ax.set_ylim(bottom, cap)
+        if var in RATE_YTICKS:
+            ticks = RATE_YTICKS[var]
+            ax.set_ylim(bottom, ticks[-1])
+            ax.yaxis.set_major_locator(FixedLocator(ticks))
+            uniform = len(set(np.round(np.diff(ticks), 6))) == 1
+            ax.yaxis.set_minor_locator(
+                AutoMinorLocator(2) if uniform else NullLocator())
+        else:
+            cap, step = _linear_cap(data_max)
+            ax.set_ylim(bottom, cap)
+            ax.yaxis.set_major_locator(MultipleLocator(step))
+            ax.yaxis.set_minor_locator(AutoMinorLocator(2))
         if base and base > 0:
             ax.axhline(base, color='k', lw=0.8, ls='--', zorder=1)
-        ax.yaxis.set_major_locator(MultipleLocator(step))
-        ax.yaxis.set_minor_locator(AutoMinorLocator())
     elif kind == 'group':
         # narrow log axis hugging the data with plain-number 1/2/5 stops at
         # both edges (baseline 1.0 always in view); no search-band shading
@@ -675,7 +696,11 @@ def bar_cell(ax, sets, colors, var, kind, ylabel, subtitle=None, ylim=None,
                  if bottom * (1 - 1e-9) <= s <= top * (1 + 1e-9)]
         ax.yaxis.set_major_locator(FixedLocator(stops))
         ax.yaxis.set_major_formatter(FuncFormatter(lambda v, _: f'{v:g}'))
-        ax.yaxis.set_minor_locator(NullLocator())
+        # one unlabeled minor tick centered (geometric mean) between each pair
+        # of adjacent major stops on the log axis
+        mids = [float(np.sqrt(a * b)) for a, b in zip(stops[:-1], stops[1:])]
+        ax.yaxis.set_minor_locator(FixedLocator(mids))
+        ax.yaxis.set_minor_formatter(NullFormatter())
     else:  # feed
         lo, _ = ylim
         # linear axis from the declared floor to a nice ceiling just above the
@@ -692,7 +717,7 @@ def bar_cell(ax, sets, colors, var, kind, ylabel, subtitle=None, ylim=None,
         if base is not None:
             ax.axhline(base, color='k', lw=0.8, ls='--', zorder=1)
         ax.yaxis.set_major_locator(MultipleLocator(step))
-        ax.yaxis.set_minor_locator(AutoMinorLocator())
+        ax.yaxis.set_minor_locator(AutoMinorLocator(2))
         bottom = 0
     ax.set_ylabel(ylabel, fontsize=FONTS['cell'], labelpad=3)
     if subtitle:
@@ -923,21 +948,24 @@ def draw_burden(ax, sets, colors):
 def plot(sets, band, out_stem, dpi=300):
     apply_fonts()
     fig = plt.figure(figsize=(9.5, 12.4))
-    # The panel a -> bands and bands -> panel c junctions need different gaps
-    # (panel a carries Trial labels and band 1 a title above it; the feeding
-    # row has no bottom labels and panel c's callouts sit near its own top),
-    # so they get independent hspace: an outer split of {panel a + bands} vs
-    # panel c, with panel a and the bands nested inside the first region, and
-    # the four bands nested again so band-to-band stays compact.
-    outer = fig.add_gridspec(2, 1, height_ratios=[6.05, 2.2], hspace=0.11,
-                             left=0.083, right=0.97, top=0.945, bottom=0.055)
-    top_gs = outer[0].subgridspec(2, 1, height_ratios=[1.45, 4.60], hspace=0.46)
-    band_gs = top_gs[1].subgridspec(4, 1, hspace=0.95)
+    # Top-anchored vertical layout, figure fractions. Panel a and the wide
+    # a -> b gap (which carries panel b's letter/title and the first band
+    # title) are unchanged. Panel b's four band cells are ~40% shorter than
+    # before (cell height ~0.0335 vs ~0.0558), so the band block ends higher;
+    # the band -> band gaps stay ~0.05 (hspace 1.49 x the shorter cell) to keep
+    # room for the rate-band titles. Panel c keeps its height and rides up just
+    # below the bands, freeing space at the bottom of the canvas. Each region
+    # is its own gridspec so the three vertical positions are set directly.
+    LEFT, RIGHT = 0.083, 0.97
+    a_gs = fig.add_gridspec(1, 1, left=LEFT, right=RIGHT, top=0.945, bottom=0.824)
+    band_gs = fig.add_gridspec(4, 1, left=LEFT, right=RIGHT, top=0.709,
+                               bottom=0.425, hspace=1.49)
+    c_gs = fig.add_gridspec(1, 1, left=LEFT, right=RIGHT, top=0.379, bottom=0.154)
     colors = set_colors(sets)
-    a_axes = draw_outcomes(fig, top_gs[0], sets, colors)
+    a_axes = draw_outcomes(fig, a_gs[0], sets, colors)
     b_axes = draw_parameters(fig, [band_gs[0], band_gs[1], band_gs[2],
                                    band_gs[3]], sets, colors, band)
-    axc = fig.add_subplot(outer[1]); draw_burden(axc, sets, colors)
+    axc = fig.add_subplot(c_gs[0]); draw_burden(axc, sets, colors)
     # each panel gets a bold letter and a descriptive title on the same
     # baseline; the panel title (13 pt) outranks the band sub-titles (12 pt).
     # Panel b's letter is lifted into the panel-a -> b gap so its title clears
@@ -954,14 +982,15 @@ def plot(sets, band, out_stem, dpi=300):
                  fontweight='bold', va='baseline')
     handles = [plt.Rectangle((0, 0), 1, 1, fc=colors[id(s)], label=s['label'])
                for s in sets]
-    # the legend lives in the empty lower-right of panel b (bands 3-4, the
-    # unused 4th/5th cell columns) and doubles as the row key for panel c,
-    # whose categorical y axis is now unlabelled
+    # the legend sits in the empty right columns of panel b's lower bands and
+    # doubles as the row key for panel c (whose categorical y axis is
+    # unlabelled). Raised above panel c -- which now rides higher after the
+    # bands were shortened -- so the two no longer overlap.
     leg = fig.legend(handles=handles, loc='center left',
-                     bbox_to_anchor=(0.635, 0.413), ncol=1, frameon=True,
+                     bbox_to_anchor=(0.635, 0.470), ncol=1, frameon=True,
                      fontsize=FONTS['legend'] + 1, title='Parameter set',
-                     labelspacing=0.75, handlelength=1.7, handleheight=1.3,
-                     borderpad=0.85, edgecolor='0.6', fancybox=False)
+                     labelspacing=0.5, handlelength=1.7, handleheight=1.1,
+                     borderpad=0.6, edgecolor='0.6', fancybox=False)
     leg.get_title().set_fontweight('bold')
     leg.get_title().set_fontsize(FONTS['legend'] + 2)
     for ext in ('png', 'pdf'):
@@ -1028,9 +1057,9 @@ def main(argv=None):
     if args.sets:
         specs = [(lab, camp, norm_trial(tr)) for lab, camp, tr in args.sets]
     else:  # default: each optimum from the study that optimized it
-        specs = [('Financial attractiveness optimum', DEFAULT_STUDY, 'best'),
-                 ('Ethanol titer optimum', ETOH_TITER_STUDY, 'best'),
-                 ('Isobutanol titer optimum', IBO_TITER_STUDY, 'best')]
+        specs = [('Financial attractiveness', DEFAULT_STUDY, 'best'),
+                 ('Ethanol titer', ETOH_TITER_STUDY, 'best'),
+                 ('Isobutanol titer', IBO_TITER_STUDY, 'best')]
 
     if len(specs) + (0 if args.no_baseline else 1) > MAX_SETS:
         raise ValueError(f'at most {MAX_SETS} sets (baseline + '
