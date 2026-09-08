@@ -24,13 +24,17 @@ objective). Three stacked panels:
      pathway order (glycolysis/fermentation r1->r3->r6, Ehrlich branch
      r13->r16, product-inhibition effector multipliers, feeding), one
      bar per set with the searched band shaded.
-  c  enzyme burden -- one horizontal stacked bar per set with the SAME
-     five fixed pathway categories on every bar (a partition of the
-     Phi_M pools: glycolysis r1; TCA cycle r2; acetate / acetyl-CoA
-     production r4->r5; ethanol production r3+r6; isobutanol production
-     r13->r16), plus the translation sector phi_T as a dotted final-
-     category tail; the F_flex cap and the growth-derating factor d are
-     marked.
+  c  full proteome allocation -- one horizontal stacked bar per set, each
+     summing to the proteome cap eb.PROTEIN_CONTENT (0.49 g protein/gDCW).
+     Sectors left to right: the fixed housekeeping block; the modeled
+     metabolic pool Phi_M split into four fixed pathway categories
+     (glycolysis r1; TCA cycle + acetate / acetyl-CoA production r2+r4+r5;
+     ethanol production r3+r6; isobutanol production r13->r16); the
+     unallocated flexible slack; and the growth-derated translation sector
+     phi_T, flush against the cap on the right. Categories share the set's
+     colour and are told apart by hatch. A single vertical dashed line marks
+     the un-derated translation demand (its extent measured right-to-left
+     from the cap).
 
 "campaign" is this figure's word for a kinetic-optimization study; code,
 CSV, and study names keep "study".
@@ -59,7 +63,7 @@ import numpy as np
 import matplotlib
 matplotlib.use('Agg')
 from matplotlib import pyplot as plt
-from matplotlib.colors import to_rgb
+from matplotlib.lines import Line2D
 from matplotlib.ticker import (AutoMinorLocator, FixedLocator, FuncFormatter,
                                LogLocator, MultipleLocator, NullFormatter,
                                NullLocator, PercentFormatter)
@@ -894,11 +898,6 @@ def draw_parameters(fig, gs_rows, sets, colors, band):
     return axes
 
 
-def tint(color, t):
-    r, g, b = to_rgb(color)
-    return (r + (1 - r) * t, g + (1 - g) * t, b + (1 - b) * t)
-
-
 _STUDY_STEPS = ['r1', 'r3', 'r6', 'r13', 'r14', 'r15', 'r16']
 _UNSAMPLED_STEPS = ['r2', 'r4', 'r5']   # never sampled; folded into "other"
 
@@ -910,15 +909,14 @@ if set(_STUDY_STEPS) | set(_UNSAMPLED_STEPS) != set(eb.STEP_ORDER):
            sorted(eb.STEP_ORDER)))
 
 # Panel c: a FIXED set of pathway categories drawn as the same stacked
-# segments on every bar (a partition of the Phi_M pools), with the
-# translation sector phi_T as the dotted final-category tail. r2 is the
-# PDH complex (TCA cycle); r4 (Ald6) -> r5 (Acs2) are the acetate bypass
-# that regenerates cytosolic acetyl-CoA (its own category). The partition
-# is asserted against eb.STEP_ORDER so a table drift raises at import.
+# segments on every bar (a partition of the Phi_M pools). r2 is the PDH
+# complex (TCA cycle); r4 (Ald6) -> r5 (Acs2) is the acetate bypass that
+# regenerates cytosolic acetyl-CoA -- merged with the TCA category here.
+# The partition is asserted against eb.STEP_ORDER so a table drift raises
+# at import.
 BURDEN_CATEGORIES = (
     ('Glycolysis', ['r1']),
-    ('TCA cycle', ['r2']),
-    ('Acetate / acetyl-CoA\nproduction', ['r4', 'r5']),
+    ('TCA cycle + acetate /\nacetyl-CoA production', ['r2', 'r4', 'r5']),
     ('Ethanol production', ['r3', 'r6']),
     ('Isobutanol production', ['r13', 'r14', 'r15', 'r16']),
 )
@@ -930,61 +928,76 @@ if sorted(_CAT_STEPS) != sorted(eb.STEP_ORDER) \
         'eb.STEP_ORDER (%r vs %r)' % (sorted(_CAT_STEPS),
                                       sorted(eb.STEP_ORDER)))
 
+# hatch per metabolic category (same on every bar; the fill colour keys the
+# campaign). Housekeeping is left solid as the fixed, non-modeled anchor,
+# the unallocated flexible slack is drawn as empty room (no fill, no hatch),
+# and translation takes its own hatch.
+_METABOLIC_HATCHES = ('///', '\\\\\\', 'xxx', '...')
+_TRANSLATION_HATCH = 'ooo'
+if len(_METABOLIC_HATCHES) != len(BURDEN_CATEGORIES):
+    raise AssertionError('one hatch per BURDEN_CATEGORIES entry required')
+
 
 def draw_burden(ax, sets, colors):
-    # the four modeled categories share one tint ramp per bar colour
-    # (darkest = glycolysis, lightest = isobutanol production); translation
-    # is the dotted 5th-category tail
+    # full proteome allocation: each bar sums to the proteome cap PC (0.49).
+    # Sectors left to right -- housekeeping | four metabolic categories | the
+    # unallocated flexible slack | the growth-derated translation sector,
+    # flush against the cap on the right. Within a bar every sector is the
+    # set's colour; hatches (not tints) tell the sectors apart. Translation is
+    # derated: metabolism fills the flexible sector F_flex first and the cell
+    # builds only d * phi_T,demand = min(phi_T,demand, F_flex - Phi_M) of it,
+    # so a single dashed line at PC - phi_T,demand marks how far translation
+    # would reach un-derated, measured right-to-left from the cap.
     cats = BURDEN_CATEGORIES
-    tints = np.linspace(0.0, 0.66, len(cats))
     n = len(sets)
-    F = sets[0]['F_flex']
-    h = 0.6
+    PC = float(eb.PROTEIN_CONTENT)
+    housekeeping = PC * float(eb.HOUSEKEEPING_FRACTION)
+    h = 0.62
     ypos = {id(s): n - i for i, s in enumerate(sets)}
-    seg_centers = {}
+
+    def seg(y, x, w, c, hatch=None, fill=True):
+        ax.barh(y, w, left=x, height=h,
+                facecolor=(c if fill else 'white'),
+                edgecolor=('0.15' if fill else '0.6'),
+                lw=0.5, hatch=hatch, zorder=2)
+
+    # k_7/k_8 are pinned in this study, so the translation demand phi_T is the
+    # same for every set and the un-derated marker is one vertical line.
+    demands = [float(s['phi_T']) for s in sets]
+    if max(demands) - min(demands) > 1e-4:
+        raise ValueError('panel c assumes a shared translation demand phi_T '
+                         '(k_7/k_8 pinned); sets differ: %r' % demands)
+    demand_x = PC - demands[0]
+
     for s in sets:
-        y = ypos[id(s)]; x = 0.0; c = colors[id(s)]; centers = []
-        for i, (_, steps) in enumerate(cats):
+        y = ypos[id(s)]; c = colors[id(s)]; x = 0.0
+        seg(y, x, housekeeping, c); x += housekeeping            # housekeeping
+        for (_, steps), hatch in zip(cats, _METABOLIC_HATCHES):  # metabolic
             w = sum(s[f'pool_{st}'] for st in steps)
-            ax.barh(y, w, left=x, height=h, color=tint(c, tints[i]),
-                    edgecolor=c, lw=0.5, zorder=2)
-            centers.append(x + w / 2); x += w
-        # translation sector phi_T -- the 5th fixed category (dotted)
-        ax.barh(y, s['phi_T'], left=x, height=h, color='none',
-                edgecolor=c, lw=0.6, hatch='....', zorder=2)
-        centers.append(x + s['phi_T'] / 2)
-        end = x + s['phi_T']
-        ax.text(max(end, F) + 0.005, y, f'd = {s["burden_factor"]:.2f}',
-                va='center', fontsize=FONTS['tick'])
-        seg_centers[id(s)] = centers
-    # category callouts once, leaders to the FIRST campaign set (all study
-    # pools non-zero there; the baseline's Ehrlich pools are zero)
-    campaign_sets = [s for s in sets if not s.get('is_baseline')]
-    anchor = campaign_sets[0] if campaign_sets else sets[0]
-    y = ypos[id(anchor)]
-    labels = [name for name, _ in cats] + ['Translation (ribosomes);\n'
-                                           'growth derated by d']
-    centers = seg_centers[id(anchor)]
-    xs = np.linspace(0.015, 0.30, len(labels))
-    for i, (lab, cx) in enumerate(zip(labels, centers)):
-        row = n + 0.45 if i % 2 == 0 else n + 1.25
-        ax.annotate(lab, xy=(cx, y + h / 2), xytext=(xs[i], row),
-                    fontsize=FONTS['callout'], ha='center', va='bottom',
-                    arrowprops=dict(arrowstyle='-', lw=0.5, color='0.35',
-                                    shrinkA=0, shrinkB=0))
-    ax.axvline(F, color='k', ls='--', lw=0.9, zorder=3)
-    # F_flex rides its own dashed cap line, rotated 90 deg to run along it,
-    # just below the lowest bar -- no separate empty row for it any more
-    ax.text(F, 0.62, 'F$_{flex}$', rotation=90, ha='center', va='top',
-            fontsize=FONTS['callout'])
-    ax.set_ylim(0.05, n + 1.9)
-    # rows are keyed by color through the legend, so the categorical y axis
-    # carries no labels of its own
+            if w > 0:
+                seg(y, x, w, c, hatch)
+            x += w
+        Phi_M = float(s['Phi_M'])
+        phi_T_built = float(s['burden_factor']) * float(s['phi_T'])
+        slack = max(0.0, PC - housekeeping - Phi_M - phi_T_built)
+        if slack > 0:                                            # empty slack
+            seg(y, x, slack, c, fill=False)
+        x += slack
+        if phi_T_built > 0:                                      # translation
+            seg(y, x, phi_T_built, c, _TRANSLATION_HATCH)
+
+    # un-derated translation demand, spanning just the bar rows (not the
+    # legend headroom above them)
+    ax.plot([demand_x, demand_x], [0.5, n + 0.6], color='0.15', ls='--',
+            lw=1.0, zorder=3)
+
+    ax.set_ylim(0.4, n + 3.0)
+    # rows are keyed by colour through the campaign legend, so the categorical
+    # y axis carries no labels of its own
     ax.set_yticks([])
-    # bounded on both ends by a labeled tick: 0 -> 0.35 in 0.05 steps
-    # (0.35 clears the tallest bar + phi_T tail and the right-hand callouts)
-    ax.set_xlim(0, 0.35)
-    ax.set_xlabel('Enzyme burden Φ$_M$ [g enzyme·(g DCW)$^{-1}$]',
+    # the whole proteome: 0 -> PC (0.49), the bars flush against the cap
+    ax.set_xlim(0, PC + 0.005)
+    ax.set_xlabel('Proteome allocation [g protein·(g DCW)$^{-1}$]',
                   fontsize=FONTS['axis'])
     ax.xaxis.set_major_locator(MultipleLocator(0.05))
     ax.xaxis.set_minor_locator(AutoMinorLocator())
@@ -995,6 +1008,28 @@ def draw_burden(ax, sets, colors):
                    length=2.2)
     for sp in ('left', 'right', 'top'):
         ax.spines[sp].set_visible(False)
+
+    # sector key: neutral-grey swatches so the hatches read independent of the
+    # campaign colours; the dashed line explains the translation marker.
+    handles = [plt.Rectangle((0, 0), 1, 1, facecolor='0.72', edgecolor='0.15',
+                             lw=0.5, label='Housekeeping')]
+    for (name, _), hatch in zip(cats, _METABOLIC_HATCHES):
+        handles.append(plt.Rectangle((0, 0), 1, 1, facecolor='0.72',
+                                     edgecolor='0.15', lw=0.5, hatch=hatch,
+                                     label=name))
+    handles.append(plt.Rectangle((0, 0), 1, 1, facecolor='white',
+                                 edgecolor='0.6', lw=0.5,
+                                 label='Unallocated flexible'))
+    handles.append(plt.Rectangle((0, 0), 1, 1, facecolor='0.72',
+                                 edgecolor='0.15', lw=0.5,
+                                 hatch=_TRANSLATION_HATCH,
+                                 label='Translation (ribosomes)'))
+    handles.append(Line2D([0], [0], color='0.15', ls='--', lw=1.0,
+                          label='Un-derated translation demand'))
+    ax.legend(handles=handles, loc='upper center', bbox_to_anchor=(0.5, 1.0),
+              ncol=4, frameon=False, fontsize=FONTS['callout'] - 1,
+              handlelength=1.6, handleheight=1.3, columnspacing=1.4,
+              labelspacing=0.8, borderpad=0.2)
 
 
 def plot(sets, band, out_stem, dpi=300):
@@ -1026,7 +1061,7 @@ def plot(sets, band, out_stem, dpi=300):
                'Optimization incumbent trajectories'),
               (b_axes[0].get_position().y1 + 0.035, 'B',
                'Final kinetic and process parameters'),
-              (axc.get_position().y1 + 0.005, 'C', 'Final enzyme-burden allocation'))
+              (axc.get_position().y1 + 0.005, 'C', 'Final proteome allocation'))
     for y, letter, title in panels:
         fig.text(0.03, y, letter, fontsize=FONTS['panel'], fontweight='bold',
                  va='baseline')
