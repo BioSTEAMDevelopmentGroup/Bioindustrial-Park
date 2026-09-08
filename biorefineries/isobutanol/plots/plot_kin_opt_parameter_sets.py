@@ -132,9 +132,11 @@ for _s in STEP_ENZYME:
     if _s not in eb.NATIVE_STEPS and _s not in eb.EHRLICH_STEPS:
         raise KeyError(f'STEP_ENZYME step {_s!r} not in eb tables')
 
-# outcomes panel: (CSV column, cell title, (y-low, y-high)), in draw order
-OUTCOMES = (('IRR', 'Financial attractiveness,\nas IRR [%]', (0, 0.3)),
-            ('TCI', 'Total capital\ninvestment\n(MM$)', (0, 200)),
+# outcomes panel: (CSV column, cell title, (y-low, y-high)), in draw order.
+# Titles are rotated y-axis labels in narrow cells -- keep each to <=2 lines
+# so the label stays out of the neighbouring cell's plot box.
+OUTCOMES = (('IRR', 'Financial attractiveness\n(IRR, %)', (0, 0.3)),
+            ('TCI', 'Total capital\ninvestment (MM$)', (0, 200)),
             ('IBO titer', 'Isobutanol titer\n(g·L$^{-1}$)', (0, 100)),
             ('IBO yield', 'Isobutanol yield\n(g·g$^{-1}$)', (0, 0.4)),
             ('EtOH titer', 'Ethanol titer\n(g·L$^{-1}$)', (0, 300)),
@@ -608,7 +610,8 @@ def outcome_cell(ax, sets, colors, col, title, ylim, xmax):
     # metric name next to the value axis itself (not a title above the cell)
     ax.set_ylabel(title, fontsize=FONTS['cell'], labelpad=3)
     ax.set_xlabel('Trial', fontsize=FONTS['tick'], labelpad=2)
-    ax.xaxis.set_major_locator(plt.MaxNLocator(3))
+    # narrow cells: 4-digit trial numbers crowd, so cap at two majors
+    ax.xaxis.set_major_locator(plt.MaxNLocator(2))
     ax.xaxis.set_minor_locator(AutoMinorLocator())
     if col == 'IRR':   # fraction stored; show the value axis in percent
         ax.yaxis.set_major_locator(MultipleLocator(0.1))   # 10% steps
@@ -635,7 +638,7 @@ def draw_outcomes(fig, gs_cell, sets, colors):
         tx = s.get('traj_x')
         if tx is not None and len(tx):
             xmax = max(xmax, float(tx[-1]))
-    sub_gs = gs_cell.subgridspec(1, len(OUTCOMES), wspace=0.85)
+    sub_gs = gs_cell.subgridspec(1, len(OUTCOMES), wspace=1.32)
     axes = []
     for i, (col, label, yl) in enumerate(OUTCOMES):
         ax = fig.add_subplot(sub_gs[0, i])
@@ -662,7 +665,9 @@ def draw_parameters(fig, gs_rows, sets, colors, band):
             else:
                 t, rng = FEED_LABELS[p]
                 bar_cell(ax, sets, colors, p, 'feed', t, ylim=rng)
-        fig.text(0.19, last_ax.get_position().y1 + 0.043, title,
+        # sits in the tight inter-band gap: low enough to clear the previous
+        # band's cells above, high enough to clear this band's own subtitles
+        fig.text(0.19, last_ax.get_position().y1 + 0.032, title,
                  fontsize=FONTS['band'], fontweight='bold', va='bottom')
     return axes
 
@@ -752,16 +757,20 @@ def draw_burden(ax, sets, colors):
 
 def plot(sets, band, out_stem, dpi=300):
     apply_fonts()
-    fig = plt.figure(figsize=(9.5, 14.0))
-    gs = fig.add_gridspec(6, 1,
-                          height_ratios=[1.45, 1.15, 1.15, 1.15, 1.15, 2.2],
-                          hspace=1.0, left=0.19, right=0.97, top=0.94,
-                          bottom=0.05)
+    fig = plt.figure(figsize=(9.5, 12.4))
+    # Outer regions (panel a / the four parameter bands / panel c) are spaced
+    # comfortably so the band-1 title clears panel a's Trial labels and panel
+    # c's callouts clear the feeding row; the four bands are nested in their
+    # own tighter gridspec so band-to-band stays compact.
+    outer = fig.add_gridspec(3, 1, height_ratios=[1.45, 4.60, 2.2],
+                             hspace=0.34, left=0.19, right=0.97, top=0.945,
+                             bottom=0.055)
+    band_gs = outer[1].subgridspec(4, 1, hspace=0.82)
     colors = set_colors(sets)
-    a_axes = draw_outcomes(fig, gs[0], sets, colors)
-    b_axes = draw_parameters(fig, [gs[1], gs[2], gs[3], gs[4]], sets, colors,
-                             band)
-    axc = fig.add_subplot(gs[5]); draw_burden(axc, sets, colors)
+    a_axes = draw_outcomes(fig, outer[0], sets, colors)
+    b_axes = draw_parameters(fig, [band_gs[0], band_gs[1], band_gs[2],
+                                   band_gs[3]], sets, colors, band)
+    axc = fig.add_subplot(outer[2]); draw_burden(axc, sets, colors)
     fig.text(0.03, a_axes[0].get_position().y1 + 0.012, 'a',
              fontsize=FONTS['panel'], fontweight='bold')
     fig.text(0.03, b_axes[0].get_position().y1 + 0.03, 'b',
