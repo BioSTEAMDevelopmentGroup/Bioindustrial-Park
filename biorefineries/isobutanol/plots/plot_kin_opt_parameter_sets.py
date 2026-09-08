@@ -1000,9 +1000,9 @@ def plot(sets, band, out_stem, dpi=300):
     # is its own gridspec so the three vertical positions are set directly.
     LEFT, RIGHT = 0.083, 0.97
     a_gs = fig.add_gridspec(1, 1, left=LEFT, right=RIGHT, top=0.945, bottom=0.775)
-    band_gs = fig.add_gridspec(4, 1, left=LEFT, right=RIGHT, top=0.709,
-                               bottom=0.425, hspace=1.49)
-    c_gs = fig.add_gridspec(1, 1, left=LEFT, right=RIGHT, top=0.379, bottom=0.154)
+    band_gs = fig.add_gridspec(4, 1, left=LEFT, right=RIGHT, top=0.689,
+                               bottom=0.405, hspace=1.49)
+    c_gs = fig.add_gridspec(1, 1, left=LEFT, right=RIGHT, top=0.359, bottom=0.134)
     colors = set_colors(sets)
     a_axes = draw_outcomes(fig, a_gs[0], sets, colors)
     b_axes = draw_parameters(fig, [band_gs[0], band_gs[1], band_gs[2],
@@ -1029,7 +1029,7 @@ def plot(sets, band, out_stem, dpi=300):
     # unlabelled). Raised above panel c -- which now rides higher after the
     # bands were shortened -- so the two no longer overlap.
     leg = fig.legend(handles=handles, loc='center left',
-                     bbox_to_anchor=(0.635, 0.470), ncol=1, frameon=True,
+                     bbox_to_anchor=(0.635, 0.450), ncol=1, frameon=True,
                      fontsize=FONTS['legend'] + 1, title='Optimization campaign',
                      labelspacing=0.5, handlelength=1.7, handleheight=1.1,
                      borderpad=0.6, edgecolor='0.6', fancybox=False)
