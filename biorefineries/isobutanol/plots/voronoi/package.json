@@ -1,0 +1,11 @@
+{
+  "name": "proteome-voronoi-treemap",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Static Voronoi-treemap renderer for the isobutanol biorefinery proteome-allocation figure (amCharts5 + Puppeteer).",
+  "dependencies": {
+    "@amcharts/amcharts5": "^5.10.0",
+    "puppeteer": "^23.0.0"
+  }
+}
