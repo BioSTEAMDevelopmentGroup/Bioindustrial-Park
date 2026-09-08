@@ -772,19 +772,27 @@ def plot(sets, band, out_stem, dpi=300):
     # the four bands nested again so band-to-band stays compact.
     outer = fig.add_gridspec(2, 1, height_ratios=[6.05, 2.2], hspace=0.11,
                              left=0.19, right=0.97, top=0.945, bottom=0.055)
-    top_gs = outer[0].subgridspec(2, 1, height_ratios=[1.45, 4.60], hspace=0.34)
+    top_gs = outer[0].subgridspec(2, 1, height_ratios=[1.45, 4.60], hspace=0.46)
     band_gs = top_gs[1].subgridspec(4, 1, hspace=0.95)
     colors = set_colors(sets)
     a_axes = draw_outcomes(fig, top_gs[0], sets, colors)
     b_axes = draw_parameters(fig, [band_gs[0], band_gs[1], band_gs[2],
                                    band_gs[3]], sets, colors, band)
     axc = fig.add_subplot(outer[1]); draw_burden(axc, sets, colors)
-    fig.text(0.03, a_axes[0].get_position().y1 + 0.012, 'a',
-             fontsize=FONTS['panel'], fontweight='bold')
-    fig.text(0.03, b_axes[0].get_position().y1 + 0.03, 'b',
-             fontsize=FONTS['panel'], fontweight='bold')
-    fig.text(0.03, axc.get_position().y1 + 0.005, 'c',
-             fontsize=FONTS['panel'], fontweight='bold')
+    # each panel gets a bold letter and a descriptive title on the same
+    # baseline; the panel title (13 pt) outranks the band sub-titles (12 pt).
+    # Panel b's letter is lifted into the panel-a -> b gap so its title clears
+    # the first band title below it.
+    panels = ((a_axes[0].get_position().y1 + 0.012, 'a',
+               'Optimization incumbent trajectories'),
+              (b_axes[0].get_position().y1 + 0.060, 'b',
+               'Optimized decision variables'),
+              (axc.get_position().y1 + 0.005, 'c', 'Enzyme-burden allocation'))
+    for y, letter, title in panels:
+        fig.text(0.03, y, letter, fontsize=FONTS['panel'], fontweight='bold',
+                 va='baseline')
+        fig.text(0.055, y, title, fontsize=FONTS['panel'] - 1,
+                 fontweight='bold', va='baseline')
     handles = [plt.Rectangle((0, 0), 1, 1, fc=colors[id(s)], label=s['label'])
                for s in sets]
     # the legend lives in the empty lower-right of panel b (bands 3-4, the
