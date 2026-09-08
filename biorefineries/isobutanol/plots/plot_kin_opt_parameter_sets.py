@@ -45,9 +45,10 @@ while a campaign is in flight. Run:
         --set "Best ethanol titer" <campaign> "best:EtOH titer" \
         --set "Best isobutanol titer" <campaign> "best:IBO titer"
 
-With no --set arguments it plots the three best/best:EtOH titer/
-best:IBO titer trials of the default minimal-subset IRR campaign against
-the baseline. Writes <stem>_<stamp>.png and .pdf to --out-dir.
+With no --set arguments it plots the "best" trial of each of the five most
+recent minimal-subset campaigns -- one per objective (IRR / ethanol titer /
+isobutanol titer / ethanol yield / isobutanol yield) -- against the
+baseline. Writes <stem>_<stamp>.png and .pdf to --out-dir.
 """
 import os
 import argparse
@@ -74,6 +75,8 @@ _MINIMAL_SUBSET_STUDY = ('kin_opt_ethanol_isobutanol_metabolic_minimal_subset'
 DEFAULT_STUDY = _MINIMAL_SUBSET_STUDY % 'irr'          # financial (IRR) optimum
 ETOH_TITER_STUDY = _MINIMAL_SUBSET_STUDY % 'etoh_titer'  # ethanol-titer optimum
 IBO_TITER_STUDY = _MINIMAL_SUBSET_STUDY % 'ibo_titer'    # isobutanol-titer optimum
+IBO_YIELD_STUDY = _MINIMAL_SUBSET_STUDY % 'ibo_yield'    # isobutanol-yield optimum
+ETOH_YIELD_STUDY = _MINIMAL_SUBSET_STUDY % 'etoh_yield'  # ethanol-yield optimum
 
 
 def _load(name, filename):
@@ -137,9 +140,9 @@ RATE_UNIT = 'g·L$^{-1}$·h$^{-1}$'
 # target_conc shares the threshold cell's 0-300 g/L axis (it is clipped at
 # TARGET_CONC_MAX = 300, and always sits at or above the threshold), so the two
 # feeding concentrations read on the same scale.
-FEED_LABELS = {'threshold_conc': ('Threshold sugar\nconc. [g·L$^{-1}$]', (0, 300)),
+FEED_LABELS = {'threshold_conc': ('Thresh. sugar\nconc. [g·L$^{-1}$]', (0, 300)),
                'target_conc': ('Target sugar\nconc. [g·L$^{-1}$]', (0, 300)),
-               'n_glu_spikes': ('Number of spikes', (0, 50))}
+               'n_glu_spikes': ('No. of spikes', (0, 50))}
 
 # the seven study steps -> enzyme name and charging parameter(s); read
 # against the eb tables so a table drift here raises at import
@@ -644,8 +647,8 @@ def bar_cell(ax, sets, colors, var, kind, ylabel, subtitle=None, ylim=None,
     shaded and the baseline dashed. `ylabel` names the value axis (the
     parameter symbol / group / feeding quantity); `subtitle`, if given, is
     a smaller descriptor above the cell (reaction + enzyme). Value axes get
-    conventional ticks -- linear major + minor on the rate and feeding cells,
-    a narrow log axis with plain-number stops on the group cells."""
+    conventional linear ticks (major + one minor between) on the rate,
+    feeding and group cells alike."""
     n = len(sets)
     base = _baseline_value(sets, var)
     if kind == 'rate':
@@ -674,33 +677,23 @@ def bar_cell(ax, sets, colors, var, kind, ylabel, subtitle=None, ylim=None,
         if base and base > 0:
             ax.axhline(base, color='k', lw=0.8, ls='--', zorder=1)
     elif kind == 'group':
-        # narrow log axis hugging the data with plain-number 1/2/5 stops at
-        # both edges (baseline 1.0 always in view); no search-band shading
-        stops_all = (0.05, 0.1, 0.2, 0.5, 1.0, 2.0, 5.0, 10.0)
-        vals = [float(s[var]) for s in sets
-                if s.get(var) is not None and np.isfinite(s.get(var))]
-        vals.append(1.0)   # keep the baseline reference framed
-        dmin, dmax = min(vals), max(vals)
-        # floor a full stop BELOW the stop nearest the smallest value, so a
-        # bar sitting at the data minimum still has visible height on the log
-        # axis; ceiling at the smallest stop at/above the data max
-        s0 = max([s for s in stops_all if s <= dmin * (1 + 1e-6)],
-                 default=stops_all[0])
-        bottom = max([s for s in stops_all if s < s0 * (1 - 1e-6)],
-                     default=s0)
-        top = min([s for s in stops_all if s >= dmax * (1 - 1e-6)],
-                  default=stops_all[-1])
-        ax.set_yscale('log'); ax.set_ylim(bottom, top)
+        # linear value axis from 0 to a nice ceiling just above the largest
+        # bar (both edges on labeled ticks), baseline 1.0 dashed; no
+        # search-band shading -- one minor tick between majors like the rates
+        data_max = 0.0
+        for s in sets:
+            v = s.get(var)
+            if v is not None and np.isfinite(v):
+                data_max = max(data_max, float(v))
+        data_max = max(data_max, 1.0)   # keep the baseline reference framed
+        bottom = 0
+        cap, _ = _linear_cap(data_max)
+        # exactly three major ticks (0, cap/2, cap) with one minor between,
+        # e.g. 0 / 0.5 / 1.0 on the ethanol cell, 0 / 1.0 / 2.0 elsewhere
+        ax.set_ylim(bottom, cap)
+        ax.yaxis.set_major_locator(FixedLocator([0.0, cap / 2.0, cap]))
+        ax.yaxis.set_minor_locator(AutoMinorLocator(2))
         ax.axhline(1.0, color='k', lw=0.8, ls='--', zorder=1)
-        stops = [s for s in stops_all
-                 if bottom * (1 - 1e-9) <= s <= top * (1 + 1e-9)]
-        ax.yaxis.set_major_locator(FixedLocator(stops))
-        ax.yaxis.set_major_formatter(FuncFormatter(lambda v, _: f'{v:g}'))
-        # one unlabeled minor tick centered (geometric mean) between each pair
-        # of adjacent major stops on the log axis
-        mids = [float(np.sqrt(a * b)) for a, b in zip(stops[:-1], stops[1:])]
-        ax.yaxis.set_minor_locator(FixedLocator(mids))
-        ax.yaxis.set_minor_formatter(NullFormatter())
     else:  # feed
         lo, _ = ylim
         # linear axis from the declared floor to a nice ceiling just above the
@@ -812,9 +805,11 @@ def draw_parameters(fig, gs_rows, sets, colors, band):
             ax = fig.add_subplot(sub_gs[0, i]); last_ax = ax
             axes.append(ax)
             if p in RATE_VARS:
-                sym, _, sub = REACTION_LABELS[p].partition('\n')
+                # reaction/enzyme descriptors go in the figure caption, not
+                # above each cell -- keep only the rate symbol on the ylabel
+                sym = REACTION_LABELS[p].partition('\n')[0]
                 bar_cell(ax, sets, colors, p, 'rate', f'{sym}\n[{RATE_UNIT}]',
-                         subtitle=sub, band=band)
+                         band=band)
             elif p in GROUP_VARS:
                 # the "relative to baseline" unit lives in the band title now
                 bar_cell(ax, sets, colors, p, 'group',
@@ -823,16 +818,13 @@ def draw_parameters(fig, gs_rows, sets, colors, band):
                 t, rng = FEED_LABELS[p]
                 bar_cell(ax, sets, colors, p, 'feed', t, ylim=rng)
         # A band title is a header for the band BELOW it, so it should hug its
-        # own cells and leave the larger gap to the band above. Rate cells add
-        # a set_title subtitle that rises ~0.025 fig above the cell box, so
-        # those bands need a taller offset to clear it; the feeding cells carry
-        # long two-line vertical ylabels ("Threshold sugar conc. ...") that
-        # overflow the short cell and poke above its top box, so that band
-        # takes a middling offset to clear them; the group cells have short
-        # ylabels and take the tight offset that pins the title to its band.
-        if any(p in RATE_VARS for p in params):
-            offset = 0.030
-        elif any(p in FEED_DRAW_VARS for p in params):
+        # own cells and leave the larger gap to the band above. The feeding
+        # cells carry long two-line vertical ylabels ("Threshold sugar
+        # conc. ...") that overflow the short cell and poke above its top box,
+        # so that band takes a middling offset to clear them; the rate and
+        # group cells have short ylabels and take the tight offset that pins
+        # the title to its band.
+        if any(p in FEED_DRAW_VARS for p in params):
             offset = 0.022
         else:
             offset = 0.010
@@ -1056,10 +1048,13 @@ def main(argv=None):
 
     if args.sets:
         specs = [(lab, camp, norm_trial(tr)) for lab, camp, tr in args.sets]
-    else:  # default: each optimum from the study that optimized it
+    else:  # default: each optimum from the study that optimized it -- the
+        # five most recent minimal-subset campaigns, one per objective
         specs = [('Financial attractiveness', DEFAULT_STUDY, 'best'),
+                 ('Isobutanol titer', IBO_TITER_STUDY, 'best'),
                  ('Ethanol titer', ETOH_TITER_STUDY, 'best'),
-                 ('Isobutanol titer', IBO_TITER_STUDY, 'best')]
+                 ('Isobutanol yield', IBO_YIELD_STUDY, 'best'),
+                 ('Ethanol yield', ETOH_YIELD_STUDY, 'best')]
 
     if len(specs) + (0 if args.no_baseline else 1) > MAX_SETS:
         raise ValueError(f'at most {MAX_SETS} sets (baseline + '
