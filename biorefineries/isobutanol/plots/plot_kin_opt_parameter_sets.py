@@ -112,13 +112,13 @@ GROUP_LABELS = {'inhib_ethanol': 'Ethanol\ninhibition',
                 'inhib_acetate': 'Acetate\ninhibition'}
 # value-axis units. Rate constants: every sampled capacity carries the
 # Antimony unit g_per_l_per_h (gram/(litre*hour)) in the shipped model, so
-# g/L/h for all nine. Effector multipliers are dimensionless fold-changes
+# g·L^-1·h^-1 for all nine. Effector multipliers are dimensionless fold-changes
 # relative to the per-family baseline (1 = baseline).
-RATE_UNIT = 'g/L/h'
+RATE_UNIT = 'g·L$^{-1}$·h$^{-1}$'
 GROUP_UNIT = '× baseline'
 # feeding cell: (title, (shaded-range low, high)) -- engine default bounds
-FEED_LABELS = {'threshold_conc': ('Feed threshold\n(g/L)', (0, 300)),
-               'target_delta': ('Target − threshold\n(g/L)', (5, 500)),
+FEED_LABELS = {'threshold_conc': ('Feed threshold\n(g·L$^{-1}$)', (0, 300)),
+               'target_delta': ('Target − threshold\n(g·L$^{-1}$)', (5, 500)),
                'max_n_spikes': ('Max. glucose\nspikes\n(count)', (0, 50))}
 
 # the seven study steps -> enzyme name and charging parameter(s); read
@@ -135,10 +135,10 @@ for _s in STEP_ENZYME:
 # outcomes panel: (CSV column, cell title, (y-low, y-high)), in draw order
 OUTCOMES = (('IRR', 'Financial attractiveness,\nas IRR [%]', (0, 0.3)),
             ('TCI', 'Total capital\ninvestment\n(MM$)', (0, 200)),
-            ('IBO titer', 'Isobutanol titer\n(g/L)', (0, 100)),
-            ('IBO yield', 'Isobutanol yield\n(g/g)', (0, 0.4)),
-            ('EtOH titer', 'Ethanol titer\n(g/L)', (0, 300)),
-            ('EtOH yield', 'Ethanol yield\n(g/g)', (0, 0.5)),
+            ('IBO titer', 'Isobutanol titer\n(g·L$^{-1}$)', (0, 100)),
+            ('IBO yield', 'Isobutanol yield\n(g·g$^{-1}$)', (0, 0.4)),
+            ('EtOH titer', 'Ethanol titer\n(g·L$^{-1}$)', (0, 300)),
+            ('EtOH yield', 'Ethanol yield\n(g·g$^{-1}$)', (0, 0.5)),
             ('tau', 'Batch time\n(h)', (0, 80)))
 
 # one color per set: baseline dark grey, campaigns from the hue palette
@@ -738,7 +738,7 @@ def draw_burden(ax, sets, colors):
     ax.set_yticks([ypos[id(s)] for s in sets])
     ax.set_yticklabels([s['label'] for s in sets], fontsize=FONTS['tick'])
     ax.set_xlim(0, 0.33)
-    ax.set_xlabel('Enzyme burden Φ$_M$ (g enzyme / g DCW)',
+    ax.set_xlabel('Enzyme burden Φ$_M$ (g enzyme·(g DCW)$^{-1}$)',
                   fontsize=FONTS['axis'])
     ax.xaxis.set_minor_locator(AutoMinorLocator())
     ax.tick_params(axis='y', right=False, length=0)
