@@ -132,7 +132,7 @@ with tempfile.TemporaryDirectory() as td:
     with open(path, encoding='utf-8') as fh:
         loaded = _json.load(fh)
     check('write_document round-trips JSON',
-          loaded['tiles'][0]['label'] == 'Baseline')
+          loaded['tiles'][0]['label'] == pv.ps.baseline_set()['label'])
     check('JSON tile cells sum to 0.49',
           abs(sum((c['value'] for c in loaded['tiles'][0]['children']))
               - 0.49) < 1e-6)
