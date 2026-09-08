@@ -90,11 +90,12 @@ RATE_VARS = list(ko.METABOLIC_MINIMAL_SUBSET_RATES)          # 9
 GROUP_VARS = list(ko.METABOLIC_MINIMAL_SUBSET_GROUPS)        # 3
 FEED_VARS = ['threshold_conc', 'target_delta', 'max_n_spikes']  # 3 CSV columns
 DECISION_VARS = RATE_VARS + GROUP_VARS + FEED_VARS
-# feeding cells DRAW the applied target sugar concentration
-# (target_conc = min(TARGET_CONC_MAX, threshold_conc + target_delta); a derived
-# quantity reconstructed via ko._applied_feeding) in place of the raw
-# target_delta decision column.
-FEED_DRAW_VARS = ['threshold_conc', 'target_conc', 'max_n_spikes']
+# feeding cells DRAW derived / realized quantities in place of two raw decision
+# columns: the applied target sugar concentration (target_conc = min(
+# TARGET_CONC_MAX, threshold_conc + target_delta), via ko._applied_feeding) for
+# target_delta, and the realized spike count (n_glu_spikes, a tracked metric)
+# for the max_n_spikes cap.
+FEED_DRAW_VARS = ['threshold_conc', 'target_conc', 'n_glu_spikes']
 
 BANDS = [
     ('Glycolysis / fermentation capacities   r1 → r3 → r6',
@@ -133,7 +134,7 @@ RATE_UNIT = 'g·L$^{-1}$·h$^{-1}$'
 # feeding concentrations read on the same scale.
 FEED_LABELS = {'threshold_conc': ('Threshold sugar\nconc. (g·L$^{-1}$)', (0, 300)),
                'target_conc': ('Target sugar\nconc. (g·L$^{-1}$)', (0, 300)),
-               'max_n_spikes': ('Max. glucose\nspikes\n(count)', (0, 50))}
+               'n_glu_spikes': ('Glucose spikes\nused (count)', (0, 50))}
 
 # the seven study steps -> enzyme name and charging parameter(s); read
 # against the eb tables so a table drift here raises at import
