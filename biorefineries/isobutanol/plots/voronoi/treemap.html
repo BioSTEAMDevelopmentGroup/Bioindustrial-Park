@@ -1,0 +1,155 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<style>
+  :root {
+    --fg: #1a1a1a;
+    --housekeeping: #8a8a8a;
+    --cat_glycolysis: #123f5a;
+    --cat_tca: #1c6a8f;
+    --cat_acetate: #2e93b8;
+    --cat_ethanol: #6fbcd6;
+    --cat_isobutanol: #b9e0ec;
+    --translation: #7b5aa6;
+    --slack: #f0f0ee;
+  }
+  html, body { margin: 0; background: #ffffff; color: var(--fg);
+    font-family: Arial, "DejaVu Sans", sans-serif; }
+  #figure { padding: 16px; }
+  #grid { display: grid; gap: 14px; }
+  .cell { display: flex; flex-direction: column; align-items: center; }
+  .cell .title { font-size: 13px; font-weight: bold; margin: 2px 0 0; }
+  .cell .subtitle { font-size: 11px; color: #444; margin: 0 0 4px; }
+  .chart { width: 300px; height: 300px; }
+  #legend { display: flex; flex-wrap: wrap; gap: 12px 18px;
+    justify-content: center; margin: 14px 8px 2px; font-size: 12px; }
+  #legend .item { display: flex; align-items: center; gap: 6px; }
+  #legend .swatch { width: 14px; height: 14px; border: 0.5px solid #999; }
+</style>
+</head>
+<body>
+<div id="figure">
+  <div id="grid"></div>
+  <div id="legend"></div>
+</div>
+<script src="./vendor/am5.bundle.js"></script>
+<script>
+/* eslint-disable */
+(async function () {
+  const PIECE_LABELS = {
+    housekeeping: "Housekeeping",
+    cat_glycolysis: "Glycolysis",
+    cat_tca: "TCA cycle",
+    cat_acetate: "Acetate / acetyl-CoA",
+    cat_ethanol: "Ethanol production",
+    cat_isobutanol: "Isobutanol production",
+    translation: "Translation (ribosomes)",
+    slack: "Unallocated flexible",
+  };
+  function cssColor(piece) {
+    const v = getComputedStyle(document.documentElement)
+      .getPropertyValue("--" + piece).trim();
+    return am5.color(v || "#cccccc");
+  }
+
+  let doc = window.TREEMAP_DOC;
+  if (!doc) { doc = await (await fetch("./doc.json")).json(); }
+
+  const tiles = doc.tiles;
+  const nCols = window.__COLS__ ||
+    (tiles.length <= 3 ? tiles.length : Math.ceil(Math.sqrt(tiles.length)));
+  const grid = document.getElementById("grid");
+  grid.style.gridTemplateColumns = "repeat(" + nCols + ", auto)";
+
+  let pending = tiles.length;
+  const roots = [];
+
+  tiles.forEach(function (tile, i) {
+    const cell = document.createElement("div");
+    cell.className = "cell";
+    const chartDiv = document.createElement("div");
+    chartDiv.className = "chart";
+    chartDiv.id = "chart" + i;
+    const title = document.createElement("div");
+    title.className = "title";
+    title.textContent = tile.label;
+    const sub = document.createElement("div");
+    sub.className = "subtitle";
+    sub.textContent = "\u03A6\u2098 = " + tile.Phi_M.toFixed(3)
+      + " g\u00b7gDCW\u207b\u00b9,  d = " + tile.burden_factor.toFixed(2);
+    cell.appendChild(title);
+    cell.appendChild(sub);
+    cell.appendChild(chartDiv);
+    grid.appendChild(cell);
+
+    const root = am5.Root.new(chartDiv.id);
+    root._logo && root._logo.dispose();
+    roots.push(root);
+
+    const series = root.container.children.push(
+      am5hierarchy.VoronoiTreemap.new(root, {
+        shapeType: "polygon",
+        valueField: "value",
+        categoryField: "name",
+        childDataField: "children",
+        topDepth: 1,        // the four top-level pieces tessellate the area
+        initialDepth: 2,    // ... and Metabolic is subdivided into its five
+      })
+    );
+
+    // fixed color per piece (identical across tiles)
+    series.polygons.template.adapters.add("fill", function (fill, target) {
+      const dc = target.dataItem && target.dataItem.dataContext;
+      return (dc && dc.piece && PIECE_LABELS[dc.piece])
+        ? cssColor(dc.piece) : fill;
+    });
+    series.polygons.template.setAll({
+      stroke: am5.color(0xffffff), strokeWidth: 1.2, strokeOpacity: 1,
+    });
+
+    // labels: leaf-cell name only, hidden when the slice is tiny. The
+    // internal "Metabolic" grouping node (and the undrawn root) must NOT be
+    // labeled -- otherwise "root"/"Metabolic" text overlaps the leaf labels
+    // (seen in the Task-1 PoC). Hide any label whose data item has children.
+    series.labels.template.setAll({
+      text: "{category}", fontSize: 10, fill: am5.color(0x1a1a1a),
+      oversizedBehavior: "hide",
+    });
+    series.labels.template.adapters.add("forceHidden", function (hidden, target) {
+      const dc = target.dataItem && target.dataItem.dataContext;
+      return (dc && dc.children && dc.children.length) ? true : hidden;
+    });
+
+    series.events.on("datavalidated", function () {
+      pending -= 1;
+      if (pending === 0) { window.__RENDER_DONE__ = true; }
+    });
+
+    series.data.setAll([{
+      name: tile.label,
+      children: tile.children,
+    }]);
+  });
+
+  // shared legend
+  const legend = document.getElementById("legend");
+  (doc.meta.piece_order || Object.keys(PIECE_LABELS)).forEach(function (piece) {
+    const item = document.createElement("div");
+    item.className = "item";
+    const sw = document.createElement("span");
+    sw.className = "swatch";
+    sw.style.background = getComputedStyle(document.documentElement)
+      .getPropertyValue("--" + piece).trim();
+    const lab = document.createElement("span");
+    lab.textContent = PIECE_LABELS[piece] || piece;
+    item.appendChild(sw); item.appendChild(lab);
+    legend.appendChild(item);
+  });
+
+  // safety net: if no series fired (e.g. empty doc), still resolve
+  if (tiles.length === 0) { window.__RENDER_DONE__ = true; }
+})();
+</script>
+</body>
+</html>
