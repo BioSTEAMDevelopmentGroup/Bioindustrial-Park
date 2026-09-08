@@ -150,7 +150,7 @@ for _s in STEP_ENZYME:
 # outcomes panel: (CSV column, cell title, (y-low, y-high)), in draw order.
 # Titles are rotated y-axis labels in narrow cells -- keep each to <=2 lines
 # so the label stays out of the neighbouring cell's plot box.
-OUTCOMES = (('IRR', 'Financial attractiveness\n[IRR, %]', (0, 0.3)),
+OUTCOMES = (('IRR', 'Financial attractiveness\nas IRR [%]', (0, 0.3)),
             ('TCI', 'Total capital\ninvestment [MM$]', (0, 200)),
             ('IBO titer', 'Isobutanol titer\n[g·L$^{-1}$]', (0, 100)),
             ('IBO yield', 'Isobutanol yield\n[g·g$^{-1}$]', (0, 0.4)),
