@@ -180,10 +180,13 @@ OUTCOME_TICK_CAP = {'IRR': 0.25}
 # non-finite and is omitted.
 CLAMP_NEG_TO_ZERO = {'IRR'}
 
-# one color per set: baseline dark grey, campaigns from the hue palette
-BASELINE_COLOR = '0.25'
-HUE_COLORS = ['#1f77b4', '#ff7f0e', '#2ca02c', '#9467bd', '#d62728']
-MAX_SETS = 1 + len(HUE_COLORS)   # 6
+# one color per set: baseline grey, campaigns from the hue palette. Fixed
+# 7-color palette (blue, orange, green, purple, red, grey, yellow); the baseline
+# takes the grey and the five campaigns take blue/orange/green/purple/red in
+# order (yellow is the spare sixth hue).
+BASELINE_COLOR = '#90918e'
+HUE_COLORS = ['#60c1cf', '#f98f60', '#79bf82', '#a280b9', '#ED586F', '#f3c354']
+MAX_SETS = 1 + len(HUE_COLORS)   # 7
 
 FONTS = {'band': 12, 'cell': 10, 'tick': 9, 'callout': 9,
          'legend': 10, 'axis': 11, 'panel': 14}
