@@ -185,7 +185,7 @@ def baseline_set():
                        f'{missing}')
     res = eb.BurdenModel(k_ref).evaluate(k_ref)
 
-    rec = {'label': 'Scenario A baseline', 'campaign': None,
+    rec = {'label': 'Baseline', 'campaign': None,
            'trial_number': None, 'is_baseline': True, 'extra_sampled': []}
     for k in RATE_VARS:
         rec[k] = float(k_ref[k])
@@ -745,8 +745,9 @@ def draw_burden(ax, sets, colors):
     ax.text(F + 0.004, -0.15, 'F$_{flex}$ = %.3f' % F, ha='left',
             va='center', fontsize=FONTS['callout'])
     ax.set_ylim(-0.7, n + 3.3)
-    ax.set_yticks([ypos[id(s)] for s in sets])
-    ax.set_yticklabels([s['label'] for s in sets], fontsize=FONTS['tick'])
+    # rows are keyed by color through the legend, so the categorical y axis
+    # carries no labels of its own
+    ax.set_yticks([])
     ax.set_xlim(0, 0.33)
     ax.set_xlabel('Enzyme burden Φ$_M$ (g enzyme·(g DCW)$^{-1}$)',
                   fontsize=FONTS['axis'])
@@ -784,13 +785,18 @@ def plot(sets, band, out_stem, dpi=300):
              fontsize=FONTS['panel'], fontweight='bold')
     fig.text(0.03, axc.get_position().y1 + 0.005, 'c',
              fontsize=FONTS['panel'], fontweight='bold')
-    handles = []
-    for s in sets:
-        handles.append(plt.Rectangle((0, 0), 1, 1, fc=colors[id(s)],
-                                     label=s['label']))
-    fig.legend(handles=handles, loc='upper center',
-               bbox_to_anchor=(0.56, 0.99), ncol=len(sets), frameon=False,
-               fontsize=FONTS['legend'], columnspacing=1.2, handlelength=1.4)
+    handles = [plt.Rectangle((0, 0), 1, 1, fc=colors[id(s)], label=s['label'])
+               for s in sets]
+    # the legend lives in the empty lower-right of panel b (bands 3-4, the
+    # unused 4th/5th cell columns) and doubles as the row key for panel c,
+    # whose categorical y axis is now unlabelled
+    leg = fig.legend(handles=handles, loc='center left',
+                     bbox_to_anchor=(0.635, 0.413), ncol=1, frameon=True,
+                     fontsize=FONTS['legend'] + 1, title='Parameter set',
+                     labelspacing=0.75, handlelength=1.7, handleheight=1.3,
+                     borderpad=0.85, edgecolor='0.6', fancybox=False)
+    leg.get_title().set_fontweight('bold')
+    leg.get_title().set_fontsize(FONTS['legend'] + 2)
     for ext in ('png', 'pdf'):
         fig.savefig(f'{out_stem}.{ext}', dpi=dpi)
     plt.close(fig)
