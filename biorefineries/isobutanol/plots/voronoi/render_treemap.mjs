@@ -80,7 +80,7 @@ try {
       const clone = s.cloneNode(true);
       clone.removeAttribute("style");
       const cols = getComputedStyle(document.getElementById("grid"))
-        .gridTemplateColumn.split(" ").length;
+        .gridTemplateColumns.split(" ").length;
       const r = Math.floor(i / cols), c = i % cols;
       const x = c * (cellW + pad), y = r * (cellW + titleH + pad);
       return '<g transform="translate(' + x + ',' + y + ')">'
