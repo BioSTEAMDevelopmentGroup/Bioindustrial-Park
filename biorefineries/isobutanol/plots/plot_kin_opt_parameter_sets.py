@@ -182,10 +182,10 @@ CLAMP_NEG_TO_ZERO = {'IRR'}
 
 # one color per set: baseline grey, campaigns from the hue palette. Fixed
 # 7-color palette (blue, orange, green, purple, red, grey, yellow); the baseline
-# takes the grey and the five campaigns take blue/orange/green/purple/red in
-# order (yellow is the spare sixth hue).
+# takes the grey and the five campaigns take blue/orange/green/purple/yellow in
+# order (red is the spare sixth hue).
 BASELINE_COLOR = '#90918e'
-HUE_COLORS = ['#60c1cf', '#f98f60', '#79bf82', '#a280b9', '#ED586F', '#f3c354']
+HUE_COLORS = ['#60c1cf', '#f98f60', '#79bf82', '#a280b9', '#f3c354', '#ED586F']
 MAX_SETS = 1 + len(HUE_COLORS)   # 7
 
 FONTS = {'band': 12, 'cell': 10, 'tick': 9, 'callout': 9,
