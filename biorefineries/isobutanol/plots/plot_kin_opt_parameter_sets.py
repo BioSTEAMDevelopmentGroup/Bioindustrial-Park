@@ -134,7 +134,7 @@ RATE_UNIT = 'g·L$^{-1}$·h$^{-1}$'
 # feeding concentrations read on the same scale.
 FEED_LABELS = {'threshold_conc': ('Threshold sugar\nconc. (g·L$^{-1}$)', (0, 300)),
                'target_conc': ('Target sugar\nconc. (g·L$^{-1}$)', (0, 300)),
-               'n_glu_spikes': ('Glucose spikes', (0, 50))}
+               'n_glu_spikes': ('Number of spikes', (0, 50))}
 
 # the seven study steps -> enzyme name and charging parameter(s); read
 # against the eb tables so a table drift here raises at import
