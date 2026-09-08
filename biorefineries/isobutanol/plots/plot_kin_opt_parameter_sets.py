@@ -165,15 +165,17 @@ OUTCOMES = (('IRR', 'Financial attractiveness\nas IRR [%]', (0, 0.3)),
             ('EtOH yield', 'Ethanol yield\n[g·g$^{-1}$]', (0, 0.5)))
 
 # per-outcome override for the major-tick step (else _linear_cap's step).
-# IRR is stored as a fraction shown in percent, so 0.05 -> 0/5/.../30 %;
-# isobutanol titer reads cleaner on 0/40/80/120 than the default 0/20/.../120.
-OUTCOME_TICK_STEP = {'IRR': 0.05, 'IBO titer': 40.0}
+# IRR is stored as a fraction shown in percent, so 0.10 -> -80/-70/.../30 %
+# over the broken axis span below (a 5 % step would crowd 23 labels onto the
+# cell); isobutanol titer reads cleaner on 0/40/80/120 than 0/20/.../120.
+OUTCOME_TICK_STEP = {'IRR': 0.10, 'IBO titer': 40.0}
 
-# outcomes whose negative values are drawn at zero: a loss-making IRR (finite
-# negative) and an unsolvable IRR (-inf) both read as 0 rather than diving
-# below the axis floor / being omitted. Only nan (never solved) stays
-# non-finite and is omitted.
-CLAMP_NEG_TO_ZERO = {'IRR'}
+# IRR gets a BROKEN value axis: a main panel spanning IRR_MAIN_SPAN (finite
+# losses drawn as-is, below zero) and, below an axis break, a short band that
+# collects the -inf (unsolvable) and nan (failed) trials of the optimizing
+# campaign -- both have no finite value, so they cannot sit on the linear axis.
+BROKEN_AXIS_OUTCOMES = {'IRR'}
+IRR_MAIN_SPAN = (-0.80, 0.30)
 
 # one color per set: baseline dark grey, campaigns from the hue palette
 BASELINE_COLOR = '0.25'
@@ -753,22 +755,59 @@ def bar_cell(ax, sets, colors, var, kind, ylabel, subtitle=None, ylim=None,
     ax.set_xlim(-0.6, n - 0.4); style_cell_axes(ax)
 
 
+def _draw_outcome_series(ax, sets, colors, col, base):
+    """Shared body of an outcome cell on ONE value axis: the scenario-A
+    baseline as a dashed reference, the optimizing campaign's finite trial
+    cloud (translucent dots behind the lines), and one incumbent step line per
+    campaign. Non-finite cloud values (-inf/nan) are dropped here -- the caller
+    either omits them or routes them to a break band."""
+    if base is not None and np.isfinite(base):
+        ax.axhline(base, color=BASELINE_COLOR, lw=0.9, ls='--', zorder=1)
+    for s in sets:
+        if s.get('scatter') is None or s.get('objective') != col:
+            continue
+        sx, sy, cc = s['scatter_x'], s['scatter'][col], colors[id(s)]
+        good = np.isfinite(sy)
+        ax.scatter(sx[good], sy[good], s=9, color=cc, alpha=0.16,
+                   linewidths=0, zorder=1)
+    for s in sets:
+        if s.get('traj') is None:
+            continue
+        ax.step(s['traj_x'], s['traj'][col], where='post',
+                color=colors[id(s)], lw=1.4, zorder=2)
+
+
+def _style_value_axis(ax, col, step):
+    """Value-axis (y) ticks/format shared by every outcome cell."""
+    ax.yaxis.set_major_locator(MultipleLocator(step))
+    if col == 'IRR':   # fraction stored; show the value axis in percent
+        ax.yaxis.set_major_formatter(
+            PercentFormatter(xmax=1.0, decimals=0, symbol=''))
+    ax.yaxis.set_minor_locator(AutoMinorLocator())
+    ax.tick_params(axis='y', which='major', direction='inout', right=False,
+                   length=4)
+    ax.tick_params(axis='y', which='minor', direction='inout', right=False,
+                   length=2.2)
+
+
+def _style_trial_axis(ax):
+    """Trial-number (x) ticks shared by every outcome cell; 4-digit trial
+    numbers crowd a narrow cell, so cap at two majors."""
+    ax.xaxis.set_major_locator(plt.MaxNLocator(2))
+    ax.xaxis.set_minor_locator(AutoMinorLocator())
+    ax.tick_params(axis='x', which='major', top=False, bottom=True,
+                   labelbottom=True, direction='inout', length=4)
+    ax.tick_params(axis='x', which='minor', top=False, bottom=True,
+                   direction='inout', length=2.2)
+
+
 def outcome_cell(ax, sets, colors, col, title, ylim, xmax):
-    """One outcome metric as incumbent trajectories over trial_number: one
-    step line per campaign set (the metric at that set's running incumbent,
-    in its panel-b/c color), the scenario-A baseline as a dashed reference.
+    """One outcome metric as a per-trial cloud + incumbent step lines over
+    trial_number: one step line per campaign set (the metric at that set's
+    running incumbent, in its panel-b/c color), the optimizing campaign's
+    trial cloud, the scenario-A baseline as a dashed reference.
     """
     lo, hi = ylim
-
-    def _yv(y):
-        # draw negatives at zero for the flagged outcomes (e.g. IRR): y < 0 is
-        # True for finite losses and for -inf, False for nan -- so both go to 0
-        # while nan stays nan and is still broken/omitted
-        if col not in CLAMP_NEG_TO_ZERO:
-            return y
-        y = np.asarray(y, dtype=float)
-        return np.where(y < 0, 0.0, y)
-
     base = _baseline_value(sets, col)
     finite = [v for s in sets if s.get('traj') is not None
               for v in s['traj'][col] if np.isfinite(v)]
@@ -781,45 +820,65 @@ def outcome_cell(ax, sets, colors, col, title, ylim, xmax):
     step = OUTCOME_TICK_STEP.get(col, step)
     ax.set_ylim(lo, cap)
     ax.set_xlim(0, xmax * 1.02)
-    if base is not None and np.isfinite(base):
-        ax.axhline(base, color=BASELINE_COLOR, lw=0.9, ls='--', zorder=1)
-    # individual trial cloud from the ONE campaign that optimized THIS metric:
-    # every solved trial as a translucent dot at its value, in the campaign's
-    # own color and behind the incumbent lines (zorder 1). Failed / unsolved
-    # trials (no finite value) are omitted.
-    for s in sets:
-        if s.get('scatter') is None or s.get('objective') != col:
-            continue
-        sx, sy, cc = s['scatter_x'], _yv(s['scatter'][col]), colors[id(s)]
-        good = np.isfinite(sy)
-        ax.scatter(sx[good], sy[good], s=9, color=cc, alpha=0.16,
-                   linewidths=0, zorder=1)
-    for s in sets:
-        if s.get('traj') is None:
-            continue
-        ax.step(s['traj_x'], _yv(s['traj'][col]), where='post',
-                color=colors[id(s)], lw=1.4, zorder=2)
+    _draw_outcome_series(ax, sets, colors, col, base)
     # metric name next to the value axis itself (not a title above the cell)
     ax.set_ylabel(title, fontsize=FONTS['cell'], labelpad=3)
     ax.set_xlabel('Trial', fontsize=FONTS['tick'], labelpad=2)
-    # narrow cells: 4-digit trial numbers crowd, so cap at two majors
-    ax.xaxis.set_major_locator(plt.MaxNLocator(2))
-    ax.xaxis.set_minor_locator(AutoMinorLocator())
-    ax.yaxis.set_major_locator(MultipleLocator(step))
-    if col == 'IRR':   # fraction stored; show the value axis in percent
-        ax.yaxis.set_major_formatter(
-            PercentFormatter(xmax=1.0, decimals=0, symbol=''))
-    ax.yaxis.set_minor_locator(AutoMinorLocator())
-    ax.tick_params(axis='y', which='major', direction='inout', right=False,
-                   length=4)
-    ax.tick_params(axis='y', which='minor', direction='inout', right=False,
-                   length=2.2)
-    ax.tick_params(axis='x', which='major', top=False, bottom=True,
-                   labelbottom=True, direction='inout', length=4)
-    ax.tick_params(axis='x', which='minor', top=False, bottom=True,
-                   direction='inout', length=2.2)
+    _style_value_axis(ax, col, step)
+    _style_trial_axis(ax)
     for sp in ('right', 'top'):
         ax.spines[sp].set_visible(False)
+
+
+def outcome_cell_broken(fig, gs, sets, colors, col, title, ylim, xmax):
+    """IRR outcome cell with a BROKEN value axis. The main panel spans
+    IRR_MAIN_SPAN with finite losses drawn as-is below zero; a short band
+    below the break collects the optimizing campaign's -inf (unsolvable) and
+    nan (failed) trials at a fixed row (they have no finite value). Returns
+    the main axis (used for the panel-A letter placement)."""
+    lo, hi = ylim
+    inner = gs.subgridspec(2, 1, height_ratios=[9, 1], hspace=0.14)
+    ax = fig.add_subplot(inner[0])
+    axb = fig.add_subplot(inner[1], sharex=ax)
+    base = _baseline_value(sets, col)
+    step = OUTCOME_TICK_STEP.get(col, 0.10)
+    ax.set_ylim(*IRR_MAIN_SPAN)      # user-fixed -80 % .. +30 %
+    ax.set_xlim(0, xmax * 1.02)
+    _draw_outcome_series(ax, sets, colors, col, base)
+    # break band: the optimizing campaign's -inf / nan trials at a fixed y,
+    # in its color, translucent, so their density across trials still reads
+    axb.set_ylim(0, 1)
+    for s in sets:
+        if s.get('scatter') is None or s.get('objective') != col:
+            continue
+        sx, sy, cc = s['scatter_x'], s['scatter'][col], colors[id(s)]
+        bad = ~np.isfinite(sy)
+        if bad.any():
+            axb.scatter(sx[bad], np.full(int(bad.sum()), 0.5), s=9, color=cc,
+                        alpha=0.16, linewidths=0, zorder=1)
+    ax.set_ylabel(title, fontsize=FONTS['cell'], labelpad=3)
+    _style_value_axis(ax, col, step)
+    # the break band gets a single labelled row and no minor ticks
+    axb.set_yticks([0.5])
+    axb.set_yticklabels(['$-\\infty$/\nnan'], fontsize=FONTS['tick'] - 1)
+    axb.yaxis.set_minor_locator(NullLocator())
+    axb.tick_params(axis='y', which='major', right=False, length=0)
+    # the trial (x) axis lives on the lower band; the main panel hides its x
+    axb.set_xlabel('Trial', fontsize=FONTS['tick'], labelpad=2)
+    _style_trial_axis(axb)
+    ax.tick_params(axis='x', which='both', bottom=False, top=False,
+                   labelbottom=False)
+    # diagonal break marks at the boundary of the two panels
+    dk = dict(marker=[(-1, -0.5), (1, 0.5)], markersize=7, linestyle='none',
+              color='k', mec='k', mew=1, clip_on=False)
+    ax.plot([0, 1], [0, 0], transform=ax.transAxes, **dk)
+    axb.plot([0, 1], [1, 1], transform=axb.transAxes, **dk)
+    # main panel keeps only its left spine at the break; band drops top/right
+    for sp in ('right', 'top', 'bottom'):
+        ax.spines[sp].set_visible(False)
+    for sp in ('right', 'top'):
+        axb.spines[sp].set_visible(False)
+    return ax
 
 
 def draw_outcomes(fig, gs_cell, sets, colors):
@@ -834,8 +893,12 @@ def draw_outcomes(fig, gs_cell, sets, colors):
     sub_gs = gs_cell.subgridspec(2, 4, wspace=0.62, hspace=0.62)
     axes = []
     big, rest = OUTCOMES[0], OUTCOMES[1:]
-    ax_big = fig.add_subplot(sub_gs[0:2, 0:2])
-    outcome_cell(ax_big, sets, colors, big[0], big[1], big[2], xmax)
+    if big[0] in BROKEN_AXIS_OUTCOMES:
+        ax_big = outcome_cell_broken(fig, sub_gs[0:2, 0:2], sets, colors,
+                                     big[0], big[1], big[2], xmax)
+    else:
+        ax_big = fig.add_subplot(sub_gs[0:2, 0:2])
+        outcome_cell(ax_big, sets, colors, big[0], big[1], big[2], xmax)
     axes.append(ax_big)
     for (col, label, yl), (r, c) in zip(rest,
                                         ((0, 2), (0, 3), (1, 2), (1, 3))):
