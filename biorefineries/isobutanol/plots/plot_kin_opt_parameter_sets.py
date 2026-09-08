@@ -110,10 +110,16 @@ REACTION_LABELS = {
 GROUP_LABELS = {'inhib_ethanol': 'Ethanol\ninhibition',
                 'inhib_isobutanol': 'Isobutanol\ninhibition',
                 'inhib_acetate': 'Acetate\ninhibition'}
+# value-axis units. Rate constants: every sampled capacity carries the
+# Antimony unit g_per_l_per_h (gram/(litre*hour)) in the shipped model, so
+# g/L/h for all nine. Effector multipliers are dimensionless fold-changes
+# relative to the per-family baseline (1 = baseline).
+RATE_UNIT = 'g/L/h'
+GROUP_UNIT = '× baseline'
 # feeding cell: (title, (shaded-range low, high)) -- engine default bounds
 FEED_LABELS = {'threshold_conc': ('Feed threshold\n(g/L)', (0, 300)),
                'target_delta': ('Target − threshold\n(g/L)', (5, 500)),
-               'max_n_spikes': ('Max. glucose\nspikes', (0, 50))}
+               'max_n_spikes': ('Max. glucose\nspikes\n(count)', (0, 50))}
 
 # the seven study steps -> enzyme name and charging parameter(s); read
 # against the eb tables so a table drift here raises at import
@@ -647,11 +653,11 @@ def draw_parameters(fig, gs_rows, sets, colors, band):
             axes.append(ax)
             if p in RATE_VARS:
                 sym, _, sub = REACTION_LABELS[p].partition('\n')
-                bar_cell(ax, sets, colors, p, 'rate', sym, subtitle=sub,
-                         band=band)
+                bar_cell(ax, sets, colors, p, 'rate', f'{sym}\n({RATE_UNIT})',
+                         subtitle=sub, band=band)
             elif p in GROUP_VARS:
-                bar_cell(ax, sets, colors, p, 'group', GROUP_LABELS[p],
-                         band=band)
+                bar_cell(ax, sets, colors, p, 'group',
+                         f'{GROUP_LABELS[p]}\n({GROUP_UNIT})', band=band)
             else:
                 t, rng = FEED_LABELS[p]
                 bar_cell(ax, sets, colors, p, 'feed', t, ylim=rng)
