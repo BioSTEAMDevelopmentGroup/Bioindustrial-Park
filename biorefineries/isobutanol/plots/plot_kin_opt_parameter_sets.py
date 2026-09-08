@@ -758,19 +758,21 @@ def draw_burden(ax, sets, colors):
 def plot(sets, band, out_stem, dpi=300):
     apply_fonts()
     fig = plt.figure(figsize=(9.5, 12.4))
-    # Outer regions (panel a / the four parameter bands / panel c) are spaced
-    # comfortably so the band-1 title clears panel a's Trial labels and panel
-    # c's callouts clear the feeding row; the four bands are nested in their
-    # own tighter gridspec so band-to-band stays compact.
-    outer = fig.add_gridspec(3, 1, height_ratios=[1.45, 4.60, 2.2],
-                             hspace=0.34, left=0.19, right=0.97, top=0.945,
-                             bottom=0.055)
-    band_gs = outer[1].subgridspec(4, 1, hspace=0.82)
+    # The panel a -> bands and bands -> panel c junctions need different gaps
+    # (panel a carries Trial labels and band 1 a title above it; the feeding
+    # row has no bottom labels and panel c's callouts sit near its own top),
+    # so they get independent hspace: an outer split of {panel a + bands} vs
+    # panel c, with panel a and the bands nested inside the first region, and
+    # the four bands nested again so band-to-band stays compact.
+    outer = fig.add_gridspec(2, 1, height_ratios=[6.05, 2.2], hspace=0.11,
+                             left=0.19, right=0.97, top=0.945, bottom=0.055)
+    top_gs = outer[0].subgridspec(2, 1, height_ratios=[1.45, 4.60], hspace=0.34)
+    band_gs = top_gs[1].subgridspec(4, 1, hspace=0.82)
     colors = set_colors(sets)
-    a_axes = draw_outcomes(fig, outer[0], sets, colors)
+    a_axes = draw_outcomes(fig, top_gs[0], sets, colors)
     b_axes = draw_parameters(fig, [band_gs[0], band_gs[1], band_gs[2],
                                    band_gs[3]], sets, colors, band)
-    axc = fig.add_subplot(outer[2]); draw_burden(axc, sets, colors)
+    axc = fig.add_subplot(outer[1]); draw_burden(axc, sets, colors)
     fig.text(0.03, a_axes[0].get_position().y1 + 0.012, 'a',
              fontsize=FONTS['panel'], fontweight='bold')
     fig.text(0.03, b_axes[0].get_position().y1 + 0.03, 'b',
