@@ -164,6 +164,11 @@ OUTCOMES = (('IRR', 'Financial attractiveness\nas IRR [%]', (0, 0.3)),
             ('EtOH titer', 'Ethanol titer\n[g·L$^{-1}$]', (0, 300)),
             ('EtOH yield', 'Ethanol yield\n[g·g$^{-1}$]', (0, 0.5)))
 
+# per-outcome override for the major-tick step (else _linear_cap's step).
+# IRR is stored as a fraction shown in percent, so 0.05 -> 0/5/.../30 %;
+# isobutanol titer reads cleaner on 0/40/80/120 than the default 0/20/.../120.
+OUTCOME_TICK_STEP = {'IRR': 0.05, 'IBO titer': 40.0}
+
 # one color per set: baseline dark grey, campaigns from the hue palette
 BASELINE_COLOR = '0.25'
 HUE_COLORS = ['#1f77b4', '#ff7f0e', '#2ca02c', '#9467bd', '#8c564b']
@@ -757,6 +762,7 @@ def outcome_cell(ax, sets, colors, col, title, ylim, xmax):
     # bound the value axis top and bottom by labeled ticks (like IRR's 0->30):
     # a nice ceiling >= the data, no ~8% auto-overshoot past the last tick
     cap, step = _linear_cap(vmax, floor_hi=hi)
+    step = OUTCOME_TICK_STEP.get(col, step)
     ax.set_ylim(lo, cap)
     ax.set_xlim(0, xmax * 1.02)
     if base is not None and np.isfinite(base):
