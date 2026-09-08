@@ -36,7 +36,6 @@ parameter-sets figure (one optimum per objective) against the baseline
 -> 6 tiles.
 """
 import os
-import sys
 import json
 import argparse
 import importlib.util
@@ -287,7 +286,7 @@ def render(json_path, args):
         cmd += ['--cols', str(args.cols)]
     print('rendering: ' + ' '.join(f'"{c}"' if ' ' in c else c for c in cmd))
     subprocess.run(cmd, check=True)
-    print(f'wrote {out_stem}.png / .svg / .pdf')
+    print(f'wrote {out_stem}.png / .pdf')
     return out_stem
 
 
@@ -304,8 +303,7 @@ def main(argv=None):
     print(f'wrote {json_path}')
     if args.no_render:
         return json_path
-    # Stage 2 render wired in Task 6.
-    render(json_path, args)          # noqa: F821 (defined in Task 6)
+    render(json_path, args)
     return json_path
 
 
