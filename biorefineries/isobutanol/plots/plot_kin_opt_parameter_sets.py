@@ -132,8 +132,8 @@ RATE_UNIT = 'g·L$^{-1}$·h$^{-1}$'
 # target_conc shares the threshold cell's 0-300 g/L axis (it is clipped at
 # TARGET_CONC_MAX = 300, and always sits at or above the threshold), so the two
 # feeding concentrations read on the same scale.
-FEED_LABELS = {'threshold_conc': ('Threshold sugar\nconc. (g·L$^{-1}$)', (0, 300)),
-               'target_conc': ('Target sugar\nconc. (g·L$^{-1}$)', (0, 300)),
+FEED_LABELS = {'threshold_conc': ('Threshold sugar\nconc. [g·L$^{-1}$]', (0, 300)),
+               'target_conc': ('Target sugar\nconc. [g·L$^{-1}$]', (0, 300)),
                'n_glu_spikes': ('Number of spikes', (0, 50))}
 
 # the seven study steps -> enzyme name and charging parameter(s); read
@@ -150,13 +150,13 @@ for _s in STEP_ENZYME:
 # outcomes panel: (CSV column, cell title, (y-low, y-high)), in draw order.
 # Titles are rotated y-axis labels in narrow cells -- keep each to <=2 lines
 # so the label stays out of the neighbouring cell's plot box.
-OUTCOMES = (('IRR', 'Financial attractiveness\n(IRR, %)', (0, 0.3)),
-            ('TCI', 'Total capital\ninvestment (MM$)', (0, 200)),
-            ('IBO titer', 'Isobutanol titer\n(g·L$^{-1}$)', (0, 100)),
-            ('IBO yield', 'Isobutanol yield\n(g·g$^{-1}$)', (0, 0.4)),
-            ('EtOH titer', 'Ethanol titer\n(g·L$^{-1}$)', (0, 300)),
-            ('EtOH yield', 'Ethanol yield\n(g·g$^{-1}$)', (0, 0.5)),
-            ('tau', 'Batch time\n(h)', (0, 80)))
+OUTCOMES = (('IRR', 'Financial attractiveness\n[IRR, %]', (0, 0.3)),
+            ('TCI', 'Total capital\ninvestment [MM$]', (0, 200)),
+            ('IBO titer', 'Isobutanol titer\n[g·L$^{-1}$]', (0, 100)),
+            ('IBO yield', 'Isobutanol yield\n[g·g$^{-1}$]', (0, 0.4)),
+            ('EtOH titer', 'Ethanol titer\n[g·L$^{-1}$]', (0, 300)),
+            ('EtOH yield', 'Ethanol yield\n[g·g$^{-1}$]', (0, 0.5)),
+            ('tau', 'Batch time\n[h]', (0, 80)))
 
 # one color per set: baseline dark grey, campaigns from the hue palette
 BASELINE_COLOR = '0.25'
@@ -678,7 +678,7 @@ def draw_parameters(fig, gs_rows, sets, colors, band):
             axes.append(ax)
             if p in RATE_VARS:
                 sym, _, sub = REACTION_LABELS[p].partition('\n')
-                bar_cell(ax, sets, colors, p, 'rate', f'{sym}\n({RATE_UNIT})',
+                bar_cell(ax, sets, colors, p, 'rate', f'{sym}\n[{RATE_UNIT}]',
                          subtitle=sub, band=band)
             elif p in GROUP_VARS:
                 # the "relative to baseline" unit lives in the band title now
@@ -772,7 +772,7 @@ def draw_burden(ax, sets, colors):
     # carries no labels of its own
     ax.set_yticks([])
     ax.set_xlim(0, 0.33)
-    ax.set_xlabel('Enzyme burden Φ$_M$ (g enzyme·(g DCW)$^{-1}$)',
+    ax.set_xlabel('Enzyme burden Φ$_M$ [g enzyme·(g DCW)$^{-1}$]',
                   fontsize=FONTS['axis'])
     ax.xaxis.set_minor_locator(AutoMinorLocator())
     ax.tick_params(axis='y', right=False, length=0)
