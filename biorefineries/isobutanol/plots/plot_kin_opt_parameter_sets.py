@@ -58,8 +58,8 @@ import matplotlib
 matplotlib.use('Agg')
 from matplotlib import pyplot as plt
 from matplotlib.colors import to_rgb
-from matplotlib.ticker import (AutoMinorLocator, MultipleLocator,
-                               PercentFormatter)
+from matplotlib.ticker import (AutoMinorLocator, FuncFormatter, LogLocator,
+                               MultipleLocator, NullFormatter, PercentFormatter)
 
 # --- sim-safe module loads (by file path; never import the package) ----------
 PKG_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -483,12 +483,6 @@ def apply_fonts():
     plt.rcParams['mathtext.fallback'] = 'stixsans'
 
 
-def fmt(v):
-    if v is None or (isinstance(v, float) and not np.isfinite(v)):
-        return 'n/a'
-    return f'{v:.2g}' if v < 1000 else f'{v:.0f}'
-
-
 def set_colors(sets):
     colors, hue = {}, 0
     for s in sets:
@@ -506,8 +500,10 @@ def set_colors(sets):
 
 
 def style_cell_axes(ax):
-    ax.tick_params(axis='y', which='both', direction='inout', right=False,
+    ax.tick_params(axis='y', which='major', direction='inout', right=False,
                    length=4)
+    ax.tick_params(axis='y', which='minor', direction='inout', right=False,
+                   length=2.2)
     ax.tick_params(axis='x', which='both', top=False, bottom=False,
                    labelbottom=False)
     for sp in ('right', 'top'):
@@ -521,7 +517,14 @@ def _baseline_value(sets, var):
     return None
 
 
-def bar_cell(ax, sets, colors, var, kind, title, ylim=None, band=None):
+def bar_cell(ax, sets, colors, var, kind, ylabel, subtitle=None, ylim=None,
+             band=None):
+    """One parameter cell: colored bars per set with the searched band
+    shaded and the baseline dashed. `ylabel` names the value axis (the
+    parameter symbol / group / feeding quantity); `subtitle`, if given, is
+    a smaller descriptor above the cell (reaction + enzyme). Value axes get
+    conventional ticks -- log decade majors + minor subdivisions on the
+    rate/group cells, linear major + minor on the feeding cells."""
     n = len(sets)
     base = _baseline_value(sets, var)
     if kind == 'rate':
@@ -530,28 +533,35 @@ def bar_cell(ax, sets, colors, var, kind, title, ylim=None, band=None):
         ax.set_yscale('log')
         ax.set_ylim(floor, hi * 2.5)
         ax.axhspan(lo, hi, color='0.92', zorder=0)
-        ticks, labels = [lo, hi], [fmt(lo), fmt(hi)]
         if base and base > 0:
             ax.axhline(base, color='k', lw=0.8, ls='--', zorder=1)
-            ticks.insert(1, base); labels.insert(1, fmt(base))
-        ax.set_yticks(ticks); ax.set_yticklabels(labels)
-        ax.set_yticks([], minor=True)
         bottom = floor
     elif kind == 'group':
         lo, hi = band[var]
         ax.set_yscale('log'); ax.set_ylim(lo * 0.7, hi * 1.4)
         ax.axhspan(lo, hi, color='0.92', zorder=0)
         ax.axhline(1.0, color='k', lw=0.8, ls='--', zorder=1)
-        ax.set_yticks([lo, 1, hi]); ax.set_yticklabels([fmt(lo), '1', fmt(hi)])
-        ax.set_yticks([], minor=True)
+        # narrow (<2 decade) log axis: plain-number majors at nice log stops,
+        # the remaining log subdivisions as unlabeled minor ticks (default
+        # log labeling would sci-notate every minor here)
+        ax.yaxis.set_major_locator(
+            LogLocator(base=10.0, subs=(0.2, 0.5, 1.0, 2.0), numticks=12))
+        ax.yaxis.set_major_formatter(FuncFormatter(lambda v, _: f'{v:g}'))
+        ax.yaxis.set_minor_locator(LogLocator(
+            base=10.0, subs=(0.3, 0.4, 0.6, 0.7, 0.8, 0.9), numticks=12))
+        ax.yaxis.set_minor_formatter(NullFormatter())
         bottom = lo * 0.7
     else:  # feed
         lo, hi = ylim
         ax.set_ylim(lo, hi * 1.06); ax.axhspan(lo, hi, color='0.92', zorder=0)
         if base is not None:
             ax.axhline(base, color='k', lw=0.8, ls='--', zorder=1)
+        ax.yaxis.set_major_locator(plt.MaxNLocator(4))
+        ax.yaxis.set_minor_locator(AutoMinorLocator())
         bottom = 0
-    ax.set_title(title, fontsize=FONTS['cell'], pad=4)
+    ax.set_ylabel(ylabel, fontsize=FONTS['cell'], labelpad=3)
+    if subtitle:
+        ax.set_title(subtitle, fontsize=FONTS['tick'], pad=4)
     for j, s in enumerate(sets):
         v = s.get(var)
         c = colors[id(s)]
@@ -592,6 +602,7 @@ def outcome_cell(ax, sets, colors, col, title, ylim, xmax):
     ax.set_ylabel(title, fontsize=FONTS['cell'], labelpad=3)
     ax.set_xlabel('Trial', fontsize=FONTS['tick'], labelpad=2)
     ax.xaxis.set_major_locator(plt.MaxNLocator(3))
+    ax.xaxis.set_minor_locator(AutoMinorLocator())
     if col == 'IRR':   # fraction stored; show the value axis in percent
         ax.yaxis.set_major_locator(MultipleLocator(0.1))   # 10% steps
         ax.yaxis.set_major_formatter(
@@ -603,8 +614,10 @@ def outcome_cell(ax, sets, colors, col, title, ylim, xmax):
                    length=4)
     ax.tick_params(axis='y', which='minor', direction='inout', right=False,
                    length=2.2)
-    ax.tick_params(axis='x', which='both', top=False, bottom=True,
-                   labelbottom=True, length=3)
+    ax.tick_params(axis='x', which='major', top=False, bottom=True,
+                   labelbottom=True, direction='inout', length=4)
+    ax.tick_params(axis='x', which='minor', top=False, bottom=True,
+                   direction='inout', length=2.2)
     for sp in ('right', 'top'):
         ax.spines[sp].set_visible(False)
 
@@ -627,17 +640,18 @@ def draw_outcomes(fig, gs_cell, sets, colors):
 def draw_parameters(fig, gs_rows, sets, colors, band):
     axes = []
     for gs_row, (title, params) in zip(gs_rows, BANDS):
-        sub_gs = gs_row.subgridspec(1, 5, wspace=0.55)
+        sub_gs = gs_row.subgridspec(1, 5, wspace=0.75)
         last_ax = None
         for i, p in enumerate(params):
             ax = fig.add_subplot(sub_gs[0, i]); last_ax = ax
             axes.append(ax)
             if p in RATE_VARS:
-                bar_cell(ax, sets, colors, p, 'rate',
-                         REACTION_LABELS[p], band=band)
+                sym, _, sub = REACTION_LABELS[p].partition('\n')
+                bar_cell(ax, sets, colors, p, 'rate', sym, subtitle=sub,
+                         band=band)
             elif p in GROUP_VARS:
-                bar_cell(ax, sets, colors, p, 'group',
-                         GROUP_LABELS[p], band=band)
+                bar_cell(ax, sets, colors, p, 'group', GROUP_LABELS[p],
+                         band=band)
             else:
                 t, rng = FEED_LABELS[p]
                 bar_cell(ax, sets, colors, p, 'feed', t, ylim=rng)
@@ -719,8 +733,12 @@ def draw_burden(ax, sets, colors):
     ax.set_xlim(0, 0.33)
     ax.set_xlabel('Enzyme burden Φ$_M$ (g enzyme / g DCW)',
                   fontsize=FONTS['axis'])
+    ax.xaxis.set_minor_locator(AutoMinorLocator())
     ax.tick_params(axis='y', right=False, length=0)
-    ax.tick_params(axis='x', direction='inout', top=False, length=4)
+    ax.tick_params(axis='x', which='major', direction='inout', top=False,
+                   length=4)
+    ax.tick_params(axis='x', which='minor', direction='inout', top=False,
+                   length=2.2)
     for sp in ('left', 'right', 'top'):
         ax.spines[sp].set_visible(False)
 
