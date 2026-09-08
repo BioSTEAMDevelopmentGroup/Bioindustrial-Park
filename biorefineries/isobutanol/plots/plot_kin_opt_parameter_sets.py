@@ -88,8 +88,13 @@ eb = _load('eb', 'enzyme_burden.py')
 # --- the 15 decision variables, in figure order -----------------------------
 RATE_VARS = list(ko.METABOLIC_MINIMAL_SUBSET_RATES)          # 9
 GROUP_VARS = list(ko.METABOLIC_MINIMAL_SUBSET_GROUPS)        # 3
-FEED_VARS = ['threshold_conc', 'target_delta', 'max_n_spikes']  # 3
+FEED_VARS = ['threshold_conc', 'target_delta', 'max_n_spikes']  # 3 CSV columns
 DECISION_VARS = RATE_VARS + GROUP_VARS + FEED_VARS
+# feeding cells DRAW the applied target sugar concentration
+# (target_conc = min(TARGET_CONC_MAX, threshold_conc + target_delta); a derived
+# quantity reconstructed via ko._applied_feeding) in place of the raw
+# target_delta decision column.
+FEED_DRAW_VARS = ['threshold_conc', 'target_conc', 'max_n_spikes']
 
 BANDS = [
     ('Glycolysis / fermentation capacities   r1 → r3 → r6',
@@ -99,7 +104,7 @@ BANDS = [
     ('Product inhibition relative to baseline '
      '(applied to r1, r4, r6, r7, r10, r16)',
      GROUP_VARS),
-    ('Feeding strategy', FEED_VARS),
+    ('Feeding strategy', FEED_DRAW_VARS),
 ]
 
 # cell titles: parameter on the first line, reaction index + enzyme below
@@ -123,8 +128,11 @@ GROUP_LABELS = {'inhib_ethanol': 'Ethanol\ninhibition',
 # relative to the per-family baseline (1 = baseline).
 RATE_UNIT = 'g·L$^{-1}$·h$^{-1}$'
 # feeding cell: (title, (shaded-range low, high)) -- engine default bounds
+# target_conc shares the threshold cell's 0-300 g/L axis (it is clipped at
+# TARGET_CONC_MAX = 300, and always sits at or above the threshold), so the two
+# feeding concentrations read on the same scale.
 FEED_LABELS = {'threshold_conc': ('Feed threshold\n(g·L$^{-1}$)', (0, 300)),
-               'target_delta': ('Target − threshold\n(g·L$^{-1}$)', (5, 500)),
+               'target_conc': ('Target sugar\nconc. (g·L$^{-1}$)', (0, 300)),
                'max_n_spikes': ('Max. glucose\nspikes\n(count)', (0, 50))}
 
 # the seven study steps -> enzyme name and charging parameter(s); read
@@ -200,6 +208,9 @@ def baseline_set():
     rec['threshold_conc'] = BASELINE_A['threshold_conc']
     rec['target_delta'] = BASELINE_A['target_delta']
     rec['max_n_spikes'] = BASELINE_A['max_n_spikes']
+    # applied target sugar concentration (clip at TARGET_CONC_MAX), drawn
+    # in place of target_delta
+    rec['target_conc'] = float(ko._applied_feeding(rec)[0])
     for col in ('IRR', 'TCI', 'EtOH titer', 'IBO titer', 'EtOH yield',
                 'IBO yield', 'tau', 'n_glu_spikes'):
         rec[col] = BASELINE_A[col]
@@ -354,6 +365,9 @@ def load_set(label, campaign, trial):
     rec['campaign'] = campaign
     rec['trial_number'] = int(row['trial_number'])
     rec['is_baseline'] = False
+    # applied target sugar concentration (clip at TARGET_CONC_MAX), drawn
+    # in place of the raw target_delta decision column
+    rec['target_conc'] = float(ko._applied_feeding(rec)[0])
     # decision columns beyond the 15 (e.g. a metabolic_minimal campaign's
     # extra rates + stage_1_max_x); reported, not drawn
     known = set(DECISION_VARS) | {'trial_number', 'state', 'objective',
