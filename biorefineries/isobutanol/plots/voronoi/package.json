@@ -4,6 +4,9 @@
   "private": true,
   "type": "module",
   "description": "Static Voronoi-treemap renderer for the isobutanol biorefinery proteome-allocation figure (amCharts5 + Puppeteer).",
+  "engines": {
+    "node": ">=22 <23"
+  },
   "scripts": {
     "build": "node build_amcharts.mjs",
     "postinstall": "node build_amcharts.mjs"
