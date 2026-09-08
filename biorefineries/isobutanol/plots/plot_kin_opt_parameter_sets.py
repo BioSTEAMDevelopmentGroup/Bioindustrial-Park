@@ -106,9 +106,9 @@ DECISION_VARS = RATE_VARS + GROUP_VARS + FEED_VARS
 FEED_DRAW_VARS = ['target_conc', 'threshold_conc', 'n_glu_spikes']
 
 BANDS = [
-    ('Glycolysis / fermentation capacities   r1 → r3 → r6',
+    ('Glycolysis (r1) + ethanol production (r3 → r6)',
      ['k_1l', 'k_1h', 'k_1e', 'k_3', 'k_6']),
-    ('Ehrlich-branch capacities   r13 → r14 → r15 → r16',
+    ('Isobutanol production (Ehrlich pathway, r13 → r14 → r15 → r16)',
      ['k_13', 'k_14', 'k_15', 'k_16']),
     ('Product inhibition relative to baseline '
      '(applied to r1, r4, r6, r7, r10, r16)',
@@ -725,10 +725,13 @@ def bar_cell(ax, sets, colors, var, kind, ylabel, subtitle=None, ylim=None,
             y = bottom * 1.25 if bottom else 0.01 * top
             label = 'n/a' if (v is None or (isinstance(v, float)
                                             and not np.isfinite(v))) else '0'
-            # the baseline's Ehrlich branch is genuinely off (zero flux); its
-            # "0" labels only clutter the four Ehrlich cells, so drop them
-            if not (s.get('is_baseline') and var in EHRLICH_RATE_VARS
-                    and label == '0'):
+            # the baseline's Ehrlich branch is genuinely off (zero flux) and a
+            # batch set runs zero glucose spikes; those "0" labels only clutter
+            # the four Ehrlich cells and the spikes cell, so drop them
+            drop = label == '0' and (
+                (s.get('is_baseline') and var in EHRLICH_RATE_VARS)
+                or var == 'n_glu_spikes')
+            if not drop:
                 ax.text(j, y, label, ha='center', va='bottom',
                         fontsize=FONTS['tick'], color=c)
     ax.set_xlim(-0.6, n - 0.4); style_cell_axes(ax)
@@ -964,7 +967,7 @@ def plot(sets, band, out_stem, dpi=300):
     # the first band title below it.
     panels = ((a_axes[0].get_position().y1 + 0.012, 'A',
                'Optimization incumbent trajectories'),
-              (b_axes[0].get_position().y1 + 0.060, 'B',
+              (b_axes[0].get_position().y1 + 0.035, 'B',
                'Optimized kinetic and process parameters'),
               (axc.get_position().y1 + 0.005, 'C', 'Enzyme-burden allocation'))
     for y, letter, title in panels:
