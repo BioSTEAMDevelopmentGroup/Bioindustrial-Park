@@ -131,7 +131,7 @@ RATE_UNIT = 'g·L$^{-1}$·h$^{-1}$'
 # target_conc shares the threshold cell's 0-300 g/L axis (it is clipped at
 # TARGET_CONC_MAX = 300, and always sits at or above the threshold), so the two
 # feeding concentrations read on the same scale.
-FEED_LABELS = {'threshold_conc': ('Feed threshold\n(g·L$^{-1}$)', (0, 300)),
+FEED_LABELS = {'threshold_conc': ('Threshold sugar\nconc. (g·L$^{-1}$)', (0, 300)),
                'target_conc': ('Target sugar\nconc. (g·L$^{-1}$)', (0, 300)),
                'max_n_spikes': ('Max. glucose\nspikes\n(count)', (0, 50))}
 
