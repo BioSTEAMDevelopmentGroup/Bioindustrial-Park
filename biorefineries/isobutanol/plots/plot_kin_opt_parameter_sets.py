@@ -58,6 +58,8 @@ import matplotlib
 matplotlib.use('Agg')
 from matplotlib import pyplot as plt
 from matplotlib.colors import to_rgb
+from matplotlib.ticker import (AutoMinorLocator, MultipleLocator,
+                               PercentFormatter)
 
 # --- sim-safe module loads (by file path; never import the package) ----------
 PKG_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -125,7 +127,7 @@ for _s in STEP_ENZYME:
         raise KeyError(f'STEP_ENZYME step {_s!r} not in eb tables')
 
 # outcomes panel: (CSV column, cell title, (y-low, y-high)), in draw order
-OUTCOMES = (('IRR', 'IRR', (0, 0.3)),
+OUTCOMES = (('IRR', 'Financial attractiveness,\nas IRR [%]', (0, 0.3)),
             ('IBO titer', 'Isobutanol titer\n(g/L)', (0, 100)),
             ('IBO yield', 'Isobutanol yield\n(g/g)', (0, 0.4)),
             ('EtOH titer', 'Ethanol titer\n(g/L)', (0, 300)),
@@ -586,11 +588,21 @@ def outcome_cell(ax, sets, colors, col, title, ylim, xmax):
             continue
         ax.step(s['traj_x'], s['traj'][col], where='post',
                 color=colors[id(s)], lw=1.4, zorder=2)
-    ax.set_title(title, fontsize=FONTS['cell'], pad=4)
+    # metric name next to the value axis itself (not a title above the cell)
+    ax.set_ylabel(title, fontsize=FONTS['cell'], labelpad=3)
     ax.set_xlabel('Trial', fontsize=FONTS['tick'], labelpad=2)
     ax.xaxis.set_major_locator(plt.MaxNLocator(3))
-    ax.tick_params(axis='y', which='both', direction='inout', right=False,
+    if col == 'IRR':   # fraction stored; show the value axis in percent
+        ax.yaxis.set_major_locator(MultipleLocator(0.1))   # 10% steps
+        ax.yaxis.set_major_formatter(
+            PercentFormatter(xmax=1.0, decimals=0, symbol=''))
+    else:
+        ax.yaxis.set_major_locator(plt.MaxNLocator(4))
+    ax.yaxis.set_minor_locator(AutoMinorLocator())
+    ax.tick_params(axis='y', which='major', direction='inout', right=False,
                    length=4)
+    ax.tick_params(axis='y', which='minor', direction='inout', right=False,
+                   length=2.2)
     ax.tick_params(axis='x', which='both', top=False, bottom=True,
                    labelbottom=True, length=3)
     for sp in ('right', 'top'):
@@ -603,7 +615,7 @@ def draw_outcomes(fig, gs_cell, sets, colors):
         tx = s.get('traj_x')
         if tx is not None and len(tx):
             xmax = max(xmax, float(tx[-1]))
-    sub_gs = gs_cell.subgridspec(1, len(OUTCOMES), wspace=0.55)
+    sub_gs = gs_cell.subgridspec(1, len(OUTCOMES), wspace=0.85)
     axes = []
     for i, (col, label, yl) in enumerate(OUTCOMES):
         ax = fig.add_subplot(sub_gs[0, i])
@@ -733,10 +745,8 @@ def plot(sets, band, out_stem, dpi=300):
              fontsize=FONTS['panel'], fontweight='bold')
     handles = []
     for s in sets:
-        lab = s['label'] if s.get('is_baseline') \
-            else f'{s["label"]} (trial {int(s["trial_number"])})'
         handles.append(plt.Rectangle((0, 0), 1, 1, fc=colors[id(s)],
-                                     label=lab))
+                                     label=s['label']))
     fig.legend(handles=handles, loc='upper center',
                bbox_to_anchor=(0.56, 0.99), ncol=len(sets), frameon=False,
                fontsize=FONTS['legend'], columnspacing=1.2, handlelength=1.4)
@@ -804,9 +814,9 @@ def main(argv=None):
     if args.sets:
         specs = [(lab, camp, norm_trial(tr)) for lab, camp, tr in args.sets]
     else:  # default: three trials of the default minimal-subset campaign
-        specs = [('Best IRR', DEFAULT_STUDY, 'best'),
-                 ('Best ethanol titer', DEFAULT_STUDY, 'best:EtOH titer'),
-                 ('Best isobutanol titer', DEFAULT_STUDY, 'best:IBO titer')]
+        specs = [('Financial attractiveness optimum', DEFAULT_STUDY, 'best'),
+                 ('Ethanol titer optimum', DEFAULT_STUDY, 'best:EtOH titer'),
+                 ('Isobutanol titer optimum', DEFAULT_STUDY, 'best:IBO titer')]
 
     if len(specs) + (0 if args.no_baseline else 1) > MAX_SETS:
         raise ValueError(f'at most {MAX_SETS} sets (baseline + '
