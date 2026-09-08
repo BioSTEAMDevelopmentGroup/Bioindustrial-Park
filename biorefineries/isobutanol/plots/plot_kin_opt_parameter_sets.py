@@ -12,7 +12,14 @@ scenario-A baseline and a handful of hand-picked campaign trials (each
 trial optionally from a different campaign -- one trajectory CSV per
 objective). Three stacked panels:
 
-  a  outcomes -- IRR, ethanol titer, isobutanol titer, batch time.
+  a  outcome incumbent trajectories -- IRR, ethanol titer, isobutanol
+     titer, batch time. One step line per set: the metric evaluated at
+     that set's running optimization incumbent vs trial_number, where the
+     incumbent is the arg-best of the set's own selection metric (its
+     objective for a "best" trial, COL for "best:COL"). So the IRR panel
+     shows best-so-far IRR for an IRR study and the at-best-titer IRR for
+     a titer study. The scenario-A baseline (no study) is a dashed
+     reference line.
   b  the 15 parameter values, grouped by nskinetics role and arranged in
      pathway order (glycolysis/fermentation r1->r3->r6, Ehrlich branch
      r13->r16, product-inhibition effector multipliers, feeding), one
@@ -182,6 +189,11 @@ def baseline_set():
     rec['phi_T'] = float(res.phi_T)
     rec['F_flex'] = float(res.F_flex)
     rec['burden_factor'] = float(res.burden_factor)
+    # no study -> no incumbent trajectory; drawn as a dashed reference line
+    rec['sel_col'] = None
+    rec['sel_dir'] = None
+    rec['traj_x'] = None
+    rec['traj'] = None
     return rec
 
 
@@ -216,26 +228,37 @@ def campaign_objective(campaign):
     return None
 
 
+def selection_spec(df, trial, campaign, warn=False):
+    """(selection column, direction) defining the running incumbent for a
+    set -- the same rule resolve_trial uses to pick its representative row:
+    "best:COL" -> (COL, 'maximize'); "best" and an explicit integer trial
+    (a placeholder while its study runs) -> the 'objective' column with the
+    campaign objective's registry direction ('maximize' if the slug is
+    unknown). Factored out so the representative row (resolve_trial) and the
+    panel-a incumbent trajectory (incumbent_trajectory) cannot drift."""
+    if isinstance(trial, str) and trial.startswith('best') and ':' in trial:
+        col = trial.split(':', 1)[1]
+        if col not in df.columns:
+            raise ValueError(
+                f'campaign {campaign}: no metric column {col!r} for '
+                f'"best:{col}"')
+        return col, 'maximize'
+    obj = campaign_objective(campaign)
+    if obj is None or obj not in ko.OBJECTIVE_REGISTRY:
+        if warn:
+            print(f'  WARNING campaign {campaign}: objective slug not in the '
+                  'registry; "best" maximizes the objective column')
+        return 'objective', 'maximize'
+    return 'objective', ko.OBJECTIVE_REGISTRY[obj]['direction']
+
+
 def resolve_trial(df, trial, campaign):
     """Return the requested COMPLETE row as a Series."""
     ok = df[df['state'] == 'COMPLETE']
     if isinstance(trial, str) and trial.startswith('best'):
-        if ':' in trial:
-            col = trial.split(':', 1)[1]
-            if col not in df.columns:
-                raise ValueError(
-                    f'campaign {campaign}: no metric column {col!r} for '
-                    f'"best:{col}"')
-            return ok.loc[ok[col].idxmax()]
-        obj = campaign_objective(campaign)
-        if obj is None or obj not in ko.OBJECTIVE_REGISTRY:
-            print(f'  WARNING campaign {campaign}: objective slug not in the '
-                  'registry; "best" maximizes the objective column')
-            direction = 'maximize'
-        else:
-            direction = ko.OBJECTIVE_REGISTRY[obj]['direction']
-        idx = ok['objective'].idxmin() if direction == 'minimize' \
-            else ok['objective'].idxmax()
+        sel_col, direction = selection_spec(df, trial, campaign, warn=True)
+        idx = ok[sel_col].idxmin() if direction == 'minimize' \
+            else ok[sel_col].idxmax()
         return ok.loc[idx]
     # explicit integer trial_number
     n = int(trial)
@@ -249,8 +272,50 @@ def resolve_trial(df, trial, campaign):
     return row
 
 
+def incumbent_trajectory(df, sel_col, direction):
+    """Running-incumbent trajectory over a study's COMPLETE trials.
+
+    Walking COMPLETE trials in trial_number order, keep the arg-best of
+    `sel_col` under `direction` (non-finite selection values never win;
+    before the first finite one the incumbent is undefined). Return
+    (x, {outcome_col: y}): x is the trial_number of every COMPLETE trial
+    (plus the study's final trial_number so the step reaches the right
+    edge), and each y is that outcome column evaluated at the running
+    incumbent -- non-finite -> NaN, so the line breaks rather than diving
+    to a floor (e.g. an unsolvable-IRR trial that is a titer incumbent)."""
+    ok = df[df['state'] == 'COMPLETE'].sort_values('trial_number')
+    n = len(ok)
+    x = ok['trial_number'].to_numpy(dtype=float)
+    sel = ok[sel_col].to_numpy(dtype=float)
+    inc = np.full(n, -1, dtype=int)
+    best_pos, best_val = -1, None
+    for i in range(n):
+        v = sel[i]
+        if np.isfinite(v) and (best_pos < 0 or
+                               (v > best_val if direction == 'maximize'
+                                else v < best_val)):
+            best_pos, best_val = i, v
+        inc[i] = best_pos
+    mask = inc >= 0
+    traj = {}
+    for col, _, _ in OUTCOMES:
+        vals = ok[col].to_numpy(dtype=float)
+        y = np.full(n, np.nan)
+        y[mask] = vals[inc[mask]]
+        y[~np.isfinite(y)] = np.nan
+        traj[col] = y
+    if n:
+        x_end = float(df['trial_number'].max())
+        if x_end > x[-1]:
+            x = np.append(x, x_end)
+            for col in traj:
+                traj[col] = np.append(traj[col], traj[col][-1])
+    return x, traj
+
+
 def load_set(label, campaign, trial):
-    """A campaign trial as a flat record (CSV row + metadata)."""
+    """A campaign trial as a flat record (CSV row + metadata + the panel-a
+    incumbent trajectory)."""
     df = ko.load_trajectory(resolve_campaign_csv(campaign))
     missing = [c for c in DECISION_VARS if c not in df.columns]
     if missing:
@@ -277,6 +342,12 @@ def load_set(label, campaign, trial):
     known |= set(ko.TRACKED_METRICS)
     known |= {c for c in df.columns if c.startswith('applied_')}
     rec['extra_sampled'] = [c for c in df.columns if c not in known]
+    sel_col, sel_dir = selection_spec(df, trial, campaign)
+    tx, traj = incumbent_trajectory(df, sel_col, sel_dir)
+    rec['sel_col'] = sel_col
+    rec['sel_dir'] = sel_dir
+    rec['traj_x'] = tx
+    rec['traj'] = traj
     return rec
 
 
@@ -469,17 +540,10 @@ def bar_cell(ax, sets, colors, var, kind, title, ylim=None, band=None):
         ax.set_yticks([lo, 1, hi]); ax.set_yticklabels([fmt(lo), '1', fmt(hi)])
         ax.set_yticks([], minor=True)
         bottom = lo * 0.7
-    elif kind == 'feed':
+    else:  # feed
         lo, hi = ylim
         ax.set_ylim(lo, hi * 1.06); ax.axhspan(lo, hi, color='0.92', zorder=0)
         if base is not None:
-            ax.axhline(base, color='k', lw=0.8, ls='--', zorder=1)
-        bottom = 0
-    else:  # outcome
-        lo, hi = ylim
-        vmax = max([s.get(var, 0) or 0 for s in sets] + [hi])
-        ax.set_ylim(lo, vmax * 1.1 if vmax > hi else hi)
-        if base:
             ax.axhline(base, color='k', lw=0.8, ls='--', zorder=1)
         bottom = 0
     ax.set_title(title, fontsize=FONTS['cell'], pad=4)
@@ -498,19 +562,61 @@ def bar_cell(ax, sets, colors, var, kind, title, ylim=None, band=None):
     ax.set_xlim(-0.6, n - 0.4); style_cell_axes(ax)
 
 
+def outcome_cell(ax, sets, colors, col, title, ylim, xmax):
+    """One outcome metric as incumbent trajectories over trial_number: one
+    step line per campaign set (the metric at that set's running incumbent,
+    in its panel-b/c color), the scenario-A baseline as a dashed reference.
+    """
+    lo, hi = ylim
+    base = _baseline_value(sets, col)
+    finite = [v for s in sets if s.get('traj') is not None
+              for v in s['traj'][col] if np.isfinite(v)]
+    if base is not None and np.isfinite(base):
+        finite.append(base)
+    vmax = max(finite + [hi]) if finite else hi
+    ax.set_ylim(lo, vmax * 1.08 if vmax > hi else hi)
+    ax.set_xlim(0, xmax * 1.02)
+    if base is not None and np.isfinite(base):
+        ax.axhline(base, color=BASELINE_COLOR, lw=0.9, ls='--', zorder=1)
+    for s in sets:
+        if s.get('traj') is None:
+            continue
+        ax.step(s['traj_x'], s['traj'][col], where='post',
+                color=colors[id(s)], lw=1.4, zorder=2)
+    ax.set_title(title, fontsize=FONTS['cell'], pad=4)
+    ax.set_xlabel('Trial', fontsize=FONTS['tick'], labelpad=2)
+    ax.xaxis.set_major_locator(plt.MaxNLocator(4))
+    ax.tick_params(axis='y', which='both', direction='inout', right=False,
+                   length=4)
+    ax.tick_params(axis='x', which='both', top=False, bottom=True,
+                   labelbottom=True, length=3)
+    for sp in ('right', 'top'):
+        ax.spines[sp].set_visible(False)
+
+
 def draw_outcomes(fig, gs_cell, sets, colors):
+    xmax = 1.0
+    for s in sets:
+        tx = s.get('traj_x')
+        if tx is not None and len(tx):
+            xmax = max(xmax, float(tx[-1]))
     sub_gs = gs_cell.subgridspec(1, len(OUTCOMES), wspace=0.55)
+    axes = []
     for i, (col, label, yl) in enumerate(OUTCOMES):
         ax = fig.add_subplot(sub_gs[0, i])
-        bar_cell(ax, sets, colors, col, 'outcome', label, ylim=yl)
+        outcome_cell(ax, sets, colors, col, label, yl, xmax)
+        axes.append(ax)
+    return axes
 
 
 def draw_parameters(fig, gs_rows, sets, colors, band):
+    axes = []
     for gs_row, (title, params) in zip(gs_rows, BANDS):
         sub_gs = gs_row.subgridspec(1, 5, wspace=0.55)
         last_ax = None
         for i, p in enumerate(params):
             ax = fig.add_subplot(sub_gs[0, i]); last_ax = ax
+            axes.append(ax)
             if p in RATE_VARS:
                 bar_cell(ax, sets, colors, p, 'rate',
                          REACTION_LABELS[p], band=band)
@@ -522,6 +628,7 @@ def draw_parameters(fig, gs_rows, sets, colors, band):
                 bar_cell(ax, sets, colors, p, 'feed', t, ylim=rng)
         fig.text(0.19, last_ax.get_position().y1 + 0.043, title,
                  fontsize=FONTS['band'], fontweight='bold', va='bottom')
+    return axes
 
 
 def tint(color, t):
@@ -605,17 +712,20 @@ def draw_burden(ax, sets, colors):
 
 def plot(sets, band, out_stem, dpi=300):
     apply_fonts()
-    fig = plt.figure(figsize=(9.5, 13.5))
+    fig = plt.figure(figsize=(9.5, 14.0))
     gs = fig.add_gridspec(6, 1,
-                          height_ratios=[1.0, 1.15, 1.15, 1.15, 1.15, 2.2],
-                          hspace=0.95, left=0.19, right=0.97, top=0.94,
+                          height_ratios=[1.45, 1.15, 1.15, 1.15, 1.15, 2.2],
+                          hspace=1.0, left=0.19, right=0.97, top=0.94,
                           bottom=0.05)
     colors = set_colors(sets)
-    draw_outcomes(fig, gs[0], sets, colors)
-    draw_parameters(fig, [gs[1], gs[2], gs[3], gs[4]], sets, colors, band)
+    a_axes = draw_outcomes(fig, gs[0], sets, colors)
+    b_axes = draw_parameters(fig, [gs[1], gs[2], gs[3], gs[4]], sets, colors,
+                             band)
     axc = fig.add_subplot(gs[5]); draw_burden(axc, sets, colors)
-    fig.text(0.03, 0.955, 'a', fontsize=FONTS['panel'], fontweight='bold')
-    fig.text(0.03, 0.86, 'b', fontsize=FONTS['panel'], fontweight='bold')
+    fig.text(0.03, a_axes[0].get_position().y1 + 0.012, 'a',
+             fontsize=FONTS['panel'], fontweight='bold')
+    fig.text(0.03, b_axes[0].get_position().y1 + 0.03, 'b',
+             fontsize=FONTS['panel'], fontweight='bold')
     fig.text(0.03, axc.get_position().y1 + 0.005, 'c',
              fontsize=FONTS['panel'], fontweight='bold')
     handles = []
@@ -639,7 +749,8 @@ def console_report(sets, band_campaign):
                   key=lambda st: -max(s[f'pool_{st}'] for s in sets))[:5]
     for s in sets:
         tag = 'baseline' if s.get('is_baseline') \
-            else f'{s["campaign"]} trial {int(s["trial_number"])}'
+            else (f'{s["campaign"]} trial {int(s["trial_number"])}; '
+                  f'panel-a incumbent by {s["sel_col"]} ({s["sel_dir"]})')
         print(f'[{s["label"]}] {tag}')
         print(f'    IRR {s.get("IRR")!s:>8}  EtOH {s.get("EtOH titer")!s:>7}'
               f'  IBO {s.get("IBO titer")!s:>7}  tau {s.get("tau")!s:>6}')
