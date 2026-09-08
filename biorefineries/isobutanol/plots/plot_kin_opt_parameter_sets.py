@@ -124,11 +124,13 @@ for _s in STEP_ENZYME:
     if _s not in eb.NATIVE_STEPS and _s not in eb.EHRLICH_STEPS:
         raise KeyError(f'STEP_ENZYME step {_s!r} not in eb tables')
 
-# outcomes panel: (CSV column, axis label, (y-low, y-high))
+# outcomes panel: (CSV column, cell title, (y-low, y-high)), in draw order
 OUTCOMES = (('IRR', 'IRR', (0, 0.3)),
-            ('EtOH titer', 'Ethanol titer (g/L)', (0, 300)),
-            ('IBO titer', 'Isobutanol titer (g/L)', (0, 100)),
-            ('tau', 'Batch time (h)', (0, 80)))
+            ('IBO titer', 'Isobutanol titer\n(g/L)', (0, 100)),
+            ('IBO yield', 'Isobutanol yield\n(g/g)', (0, 0.4)),
+            ('EtOH titer', 'Ethanol titer\n(g/L)', (0, 300)),
+            ('EtOH yield', 'Ethanol yield\n(g/g)', (0, 0.5)),
+            ('tau', 'Batch time\n(h)', (0, 80)))
 
 # one color per set: baseline dark grey, campaigns from the hue palette
 BASELINE_COLOR = '0.25'
@@ -144,9 +146,9 @@ FONTS = {'band': 12, 'cell': 10, 'tick': 9, 'callout': 9,
 # dict with the cached read.
 BASELINE_A = {
     'IRR': 0.1230, 'EtOH titer': 118.4, 'IBO titer': 0.0, 'tau': 45.4,
-    'n_glu_spikes': 10, 'EtOH yield': 0.455, 'Cell density': 15.7,
-    'TCI': 139.6, 'threshold_conc': 217.125, 'target_delta': 4.125,
-    'max_n_spikes': 16,
+    'n_glu_spikes': 10, 'EtOH yield': 0.455, 'IBO yield': 0.0,
+    'Cell density': 15.7, 'TCI': 139.6, 'threshold_conc': 217.125,
+    'target_delta': 4.125, 'max_n_spikes': 16,
 }
 
 
@@ -181,7 +183,8 @@ def baseline_set():
     rec['threshold_conc'] = BASELINE_A['threshold_conc']
     rec['target_delta'] = BASELINE_A['target_delta']
     rec['max_n_spikes'] = BASELINE_A['max_n_spikes']
-    for col in ('IRR', 'EtOH titer', 'IBO titer', 'tau', 'n_glu_spikes'):
+    for col in ('IRR', 'EtOH titer', 'IBO titer', 'EtOH yield', 'IBO yield',
+                'tau', 'n_glu_spikes'):
         rec[col] = BASELINE_A[col]
     for st, pool in res.pools.items():
         rec[f'pool_{st}'] = float(pool)
@@ -585,7 +588,7 @@ def outcome_cell(ax, sets, colors, col, title, ylim, xmax):
                 color=colors[id(s)], lw=1.4, zorder=2)
     ax.set_title(title, fontsize=FONTS['cell'], pad=4)
     ax.set_xlabel('Trial', fontsize=FONTS['tick'], labelpad=2)
-    ax.xaxis.set_major_locator(plt.MaxNLocator(4))
+    ax.xaxis.set_major_locator(plt.MaxNLocator(3))
     ax.tick_params(axis='y', which='both', direction='inout', right=False,
                    length=4)
     ax.tick_params(axis='x', which='both', top=False, bottom=True,
