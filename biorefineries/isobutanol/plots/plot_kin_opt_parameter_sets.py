@@ -1025,7 +1025,7 @@ def plot(sets, band, out_stem, dpi=300):
     panels = ((a_axes[0].get_position().y1 + 0.012, 'A',
                'Optimization incumbent trajectories'),
               (b_axes[0].get_position().y1 + 0.035, 'B',
-               'Optimized kinetic and process parameters'),
+               'Final kinetic and process parameters'),
               (axc.get_position().y1 + 0.005, 'C', 'Enzyme-burden allocation'))
     for y, letter, title in panels:
         fig.text(0.03, y, letter, fontsize=FONTS['panel'], fontweight='bold',
