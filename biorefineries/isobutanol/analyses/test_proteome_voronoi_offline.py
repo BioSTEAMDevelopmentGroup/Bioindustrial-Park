@@ -71,6 +71,46 @@ total = (kids['housekeeping']['value'] + metabolic['value']
 check('all cells sum to PROTEIN_CONTENT (0.49)', abs(total - PC) < 1e-6)
 check('no warning on the feasible baseline', 'warning' not in tile)
 
+
+def _synthetic(phi_m, phi_t_demand, label):
+    """A record shaped like a set row with all metabolic pool in Glycolysis
+    (r1) so category-sum Phi_M == phi_m, and burden_factor = the model's
+    derating d = clip((F_flex - Phi_M)/phi_T, 0, 1)."""
+    s = dict(rec)
+    for st in eb.STEP_ORDER:
+        s[f'pool_{st}'] = 0.0
+    s['pool_r1'] = phi_m
+    s['Phi_M'] = phi_m
+    s['phi_T'] = phi_t_demand
+    s['F_flex'] = eb.F_FLEX
+    d = (eb.F_FLEX - phi_m) / phi_t_demand
+    s['burden_factor'] = max(0.0, min(1.0, d))
+    s['label'] = label
+    s['is_baseline'] = False
+    return s
+
+
+# --- derated-growth trial (feasible: Phi_M < F_flex, but Phi_M + demand >
+#     F_flex so d < 1): translation cell is the derated allocation, slack 0,
+#     no warning, cells still sum to 0.49 ---------------------------------------
+dr = pv.tile_from_record(_synthetic(0.20, 0.10, 'Derated'))
+dk = {c['piece']: c for c in dr['children']}
+check('derated translation == F_flex - Phi_M (d*phi_T,demand)',
+      abs(dk['translation']['value'] - (eb.F_FLEX - 0.20)) < 1e-9)
+check('derated translation < demand', dk['translation']['value'] < 0.10 - 1e-9)
+check('derated slack == 0', abs(dk['slack']['value']) < 1e-9)
+check('derated tile has no warning (feasible)', 'warning' not in dr)
+check('derated cells sum to PROTEIN_CONTENT (0.49)',
+      abs(sum(c['value'] for c in dr['children']) - PC) < 1e-6)
+
+# --- truly infeasible trial (Phi_M >= F_flex, d = 0): no room for any
+#     translation; slack clamped to 0 + warning ---------------------------------
+inf = pv.tile_from_record(_synthetic(0.30, 0.10, 'Infeasible'))
+ik = {c['piece']: c for c in inf['children']}
+check('infeasible translation == 0', abs(ik['translation']['value']) < 1e-12)
+check('infeasible slack clamped to 0', abs(ik['slack']['value']) < 1e-12)
+check('infeasible tile carries a warning', 'warning' in inf)
+
 # --- document shape ---------------------------------------------------------
 doc = pv.build_document([rec], band_campaign=None)
 check('meta.protein_content == 0.49', abs(doc['meta']['protein_content'] - 0.49) < 1e-9)

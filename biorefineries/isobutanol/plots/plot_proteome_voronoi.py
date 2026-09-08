@@ -92,10 +92,16 @@ def tile_from_record(rec):
 
     Housekeeping and F_flex come from eb constants / the record; the five
     metabolic children are the ps.BURDEN_CATEGORIES pool sums; Phi_M is
-    their total (checked against rec['Phi_M']); translation is rec['phi_T'];
-    slack = PROTEIN_CONTENT - housekeeping - Phi_M - phi_T. A
-    burden-infeasible set (slack < -TOL) clamps slack to 0 and records a
-    `warning` rather than emitting a negative cell.
+    their total (checked against rec['Phi_M']). The translation cell is the
+    translation the cell can actually build after metabolism -- the derated
+    allocation min(phi_T,demand, F_flex - Phi_M) = d * phi_T,demand, not the
+    full demand rec['phi_T'] -- so slack = PROTEIN_CONTENT - housekeeping -
+    Phi_M - phi_T stays >= 0 and a feasible tile's cells sum to exactly
+    PROTEIN_CONTENT. A derated-growth trial (burden_factor d < 1) shows a
+    smaller translation cell and zero slack; growth is throttled, not
+    infeasible. Only a truly infeasible point (Phi_M >= F_flex, d = 0:
+    metabolism alone overruns the flexible sector) clamps slack to 0 and
+    records a `warning` rather than emitting a negative cell.
     """
     PC = float(eb.PROTEIN_CONTENT)
     housekeeping = PC * float(eb.HOUSEKEEPING_FRACTION)
@@ -114,13 +120,21 @@ def tile_from_record(rec):
             f'{rec.get("label")!r}: category-sum Phi_M {Phi_M:.6f} != '
             f'record Phi_M {float(rec["Phi_M"]):.6f}')
 
-    phi_T = float(rec['phi_T'])
+    # Translation actually built: the burden model derates growth linearly as
+    # the flexible sector fills, so a trial with Phi_M + phi_T,demand > F_flex
+    # builds only what it can afford, d * phi_T,demand = F_flex - Phi_M, and
+    # grows slower. Draw that allocated translation, not the full demand, so a
+    # feasible tile's cells sum to exactly PROTEIN_CONTENT with slack >= 0.
+    F_flex = float(rec['F_flex'])
+    phi_T_demand = float(rec['phi_T'])
+    phi_T = max(0.0, min(phi_T_demand, F_flex - Phi_M))
     slack = PC - housekeeping - Phi_M - phi_T
     warning = None
     if slack < -TOL:
-        warning = (f'burden-infeasible: slack {slack:.5f} < 0 '
-                   f'(Phi_M {Phi_M:.5f} + phi_T {phi_T:.5f} over F_flex '
-                   f'{float(rec["F_flex"]):.5f})')
+        warning = (f'burden-infeasible: metabolic pool Phi_M {Phi_M:.5f} '
+                   f'>= F_flex {F_flex:.5f} (d '
+                   f'{float(rec["burden_factor"]):.3f}); no room for '
+                   f'translation (demand phi_T {phi_T_demand:.5f})')
         slack = 0.0
     else:
         total = housekeeping + Phi_M + phi_T + slack
