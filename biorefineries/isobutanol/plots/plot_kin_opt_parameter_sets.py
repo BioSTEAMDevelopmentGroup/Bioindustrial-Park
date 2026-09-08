@@ -761,13 +761,16 @@ def outcome_cell(ax, sets, colors, col, title, ylim, xmax):
     lo, hi = ylim
 
     def _yv(y):
-        # draw negatives at zero for the flagged outcomes (e.g. IRR): y < 0 is
-        # True for finite losses and for -inf, False for nan -- so both go to 0
-        # while nan stays nan and is still broken/omitted
-        if col not in CLAMP_NEG_TO_ZERO:
-            return y
+        # every value is drawn at the axis floor lo when it has no finite
+        # position: failures (no finite value: nan / +-inf) drop to lo instead
+        # of being omitted (cloud) or gapping (line), and for the flagged
+        # outcomes (IRR) finite losses (< lo) are drawn at lo too. So both the
+        # cloud and the incumbent line dip to zero on a failure, no hole.
         y = np.asarray(y, dtype=float)
-        return np.where(y < 0, 0.0, y)
+        out = np.where(np.isfinite(y), y, lo)
+        if col in CLAMP_NEG_TO_ZERO:
+            out = np.where(out < lo, lo, out)
+        return out
 
     base = _baseline_value(sets, col)
     finite = [v for s in sets if s.get('traj') is not None
@@ -784,16 +787,14 @@ def outcome_cell(ax, sets, colors, col, title, ylim, xmax):
     if base is not None and np.isfinite(base):
         ax.axhline(base, color=BASELINE_COLOR, lw=0.9, ls='--', zorder=1)
     # individual trial cloud from the ONE campaign that optimized THIS metric:
-    # every solved trial as a translucent dot at its value, in the campaign's
-    # own color and behind the incumbent lines (zorder 1). Failed / unsolved
-    # trials (no finite value) are omitted.
+    # every trial as a translucent dot in the campaign's own color, behind the
+    # incumbent lines (zorder 1). Failed / unsolved trials (no finite value)
+    # are drawn at the axis floor rather than omitted.
     for s in sets:
         if s.get('scatter') is None or s.get('objective') != col:
             continue
         sx, sy, cc = s['scatter_x'], _yv(s['scatter'][col]), colors[id(s)]
-        good = np.isfinite(sy)
-        ax.scatter(sx[good], sy[good], s=9, color=cc, alpha=0.16,
-                   linewidths=0, zorder=1)
+        ax.scatter(sx, sy, s=9, color=cc, alpha=0.16, linewidths=0, zorder=1)
     for s in sets:
         if s.get('traj') is None:
             continue
