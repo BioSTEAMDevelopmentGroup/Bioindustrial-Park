@@ -225,7 +225,7 @@ def baseline_set():
                        f'{missing}')
     res = eb.BurdenModel(k_ref).evaluate(k_ref)
 
-    rec = {'label': 'Baseline', 'campaign': None,
+    rec = {'label': 'Baseline (no optimization)', 'campaign': None,
            'trial_number': None, 'is_baseline': True, 'extra_sampled': []}
     for k in RATE_VARS:
         rec[k] = float(k_ref[k])
