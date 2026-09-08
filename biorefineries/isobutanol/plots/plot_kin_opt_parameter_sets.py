@@ -803,9 +803,10 @@ def outcome_cell(ax, sets, colors, col, title, ylim, xmax):
     # metric name next to the value axis itself (not a title above the cell)
     ax.set_ylabel(title, fontsize=FONTS['cell'], labelpad=3)
     ax.set_xlabel('Trial', fontsize=FONTS['tick'], labelpad=2)
-    # narrow cells: 4-digit trial numbers crowd, so cap at two majors
-    ax.xaxis.set_major_locator(plt.MaxNLocator(2))
-    ax.xaxis.set_minor_locator(AutoMinorLocator())
+    # the wide IRR cell fits five majors (0..2000 by 500); the narrow cells
+    # take three (0, 1000, 2000). One minor tick sits between each major pair.
+    ax.xaxis.set_major_locator(MultipleLocator(500 if col == 'IRR' else 1000))
+    ax.xaxis.set_minor_locator(AutoMinorLocator(2))
     ax.yaxis.set_major_locator(MultipleLocator(step))
     if col == 'IRR':   # fraction stored; show the value axis in percent
         ax.yaxis.set_major_formatter(
