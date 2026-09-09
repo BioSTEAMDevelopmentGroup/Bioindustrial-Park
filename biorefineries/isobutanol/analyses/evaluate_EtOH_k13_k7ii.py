@@ -78,14 +78,19 @@ isobutanol_filepath = isobutanol.__file__.replace('\\__init__.py', '')
 isobutanol_results_filepath = isobutanol_filepath + '\\analyses\\results\\'
 
 
-#%% Load parameter distributions
-parameter_distributions_filename = isobutanol_filepath+\
-    '\\analyses\\full\\parameter_distributions\\'+\
-    'parameter-distributions_corn_IBO_EtOH_B.xlsx'
-        
-model.parameters = ()
-model.load_parameter_distributions(parameter_distributions_filename, namespace_dict)
-baseline_initial = model.metrics_at_baseline()
+#%% Load scenario (kinetics workbook + baseline feeding strategy)
+# This sweep defaults to the opt_IRR scenario in full: its kinetics workbook
+# sets the baseline for every kinetic parameter NOT swept here (k_13, k_7ii),
+# and its feeding strategy is applied too. scenarios.load_scenario is the
+# single source of truth (scenarios.SCENARIOS['opt_IRR']) -- it loads the
+# workbook, sets the kinetics via metrics_at_baseline(), sets
+# fbs_spec.max_n_spikes, and runs one baseline model_specification with the
+# scenario's threshold/target. Change the `scenario` string below to re-point
+# BOTH kinetics and feeding.
+from biorefineries.isobutanol import scenarios
+
+scenario = 'opt_IRR'
+_scenario_bundle = scenarios.load_scenario(scenario)
 
 # f.V406.aeration_safety_factor = 0.0
 
@@ -98,21 +103,14 @@ V406 = f.V406
 # adapts to any feed titer (0-200 g/L) natively, shutting the IBO side off
 # when the broth carries no isobutanol.
 
-# NOTE: the kinetics workbook stays scenario B (loaded above, ~line 84);
-# only the FEEDING strategy follows scenario A here -- a feeding-strategy
-# swap on the B (IBO-producing) k_13 x k_7ii kinetic sweep (user request
-# 2026-09-03). The A branch sets max_n_spikes=16, so `file_to_save` carries
-# max_n=16, keeping this run's outputs distinct from the scenario-B (max_n=0)
-# run rather than overwriting them. This is a `scenario` FEEDING selector
-# only -- do not read it as also switching the kinetics workbook.
-scenario = 'A'
-
-if scenario=='A':
-    fbs_spec.max_n_spikes = 16
-    model_specification(threshold_conc=217.125, target_conc=221.25)
-elif scenario=='B':
-    fbs_spec.max_n_spikes = 0  # batch: no glucose spikes
-    model_specification(threshold_conc=34.25, target_conc=140.0)
+# The scenario's kinetics workbook AND feeding strategy were both applied by
+# scenarios.load_scenario(scenario) above (opt_IRR -> workbook +
+# max_n_spikes=18, threshold_conc=286.767..., target_conc=300.0), which also
+# ran one baseline model_specification. No manual per-scenario feeding block is
+# needed here anymore -- edit the `scenario` string above to switch scenarios.
+# `file_to_save` picks up max_n=18 (from fbs_spec.max_n_spikes), keeping this
+# run's outputs distinct from the earlier scenario-A (max_n=16) / scenario-B
+# (max_n=0) runs.
     
 # !!!
 # fbs_spec.max_n_spikes = 0
