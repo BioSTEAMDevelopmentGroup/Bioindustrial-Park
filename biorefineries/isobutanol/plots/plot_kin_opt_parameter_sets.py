@@ -1017,17 +1017,20 @@ def draw_burden(fig, gs_cell, sets, colors):
     axL = fig.add_subplot(sub[0, 0])                     # housekeeping stub
     axR = fig.add_subplot(sub[0, 1], sharey=axL)         # rest of the proteome
 
-    def seg(ax, y, x, w, c, hatch=None, fill=True, outline=None):
+    def seg(ax, y, x, w, c, hatch=None, fill=True, outline=None, zorder=2):
         # fill=False draws empty room (white, faint grey outline). `outline`,
         # when given, sets the edge colour explicitly -- with fill=False this
         # draws a sector HOLLOW but keyed to the campaign: no fill, campaign-
         # coloured outline and (the hatch colour follows the edge) campaign-
-        # coloured hatch.
+        # coloured hatch. The solid metabolic sectors are drawn at a higher
+        # zorder than the hollow ones so their black outlines render ON TOP of
+        # a neighbouring hollow sector's campaign/grey outline at the shared
+        # edge (not the other way round).
         ax.barh(y, w, left=x, height=h,
                 facecolor=(c if fill else 'white'),
                 edgecolor=(outline if outline is not None
                            else ('0.15' if fill else '0.6')),
-                lw=0.5, hatch=hatch, zorder=2)
+                lw=0.5, hatch=hatch, zorder=zorder)
 
     # k_7/k_8 are pinned in this study, so the translation demand phi_T is the
     # same for every set and the un-derated marker is one vertical line.
@@ -1045,7 +1048,7 @@ def draw_burden(fig, gs_cell, sets, colors):
         for (_, steps), hatch in zip(cats, _METABOLIC_HATCHES):  # metabolic
             w = sum(s[f'pool_{st}'] for st in steps)
             if w > 0:
-                seg(ax, y, x, w, c, hatch)
+                seg(ax, y, x, w, c, hatch, zorder=3)   # black edge on top
             x += w
         Phi_M = float(s['Phi_M'])
         phi_T_built = float(s['burden_factor']) * float(s['phi_T'])
@@ -1065,7 +1068,7 @@ def draw_burden(fig, gs_cell, sets, colors):
     # un-derated translation demand (in the right window), spanning just the
     # bar rows -- not the legend headroom above them
     axR.plot([demand_x, demand_x], [0.5, n + 0.6], color='0.15', ls='--',
-             lw=1.0, zorder=3)
+             lw=1.0, zorder=4)   # above the raised metabolic sectors (zorder 3)
 
     axL.set_ylim(0.4, n + 0.9)                       # shared: sets both windows
     for ax in (axL, axR):
