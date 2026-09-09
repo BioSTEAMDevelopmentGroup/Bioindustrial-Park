@@ -1073,7 +1073,7 @@ def draw_burden(fig, gs_cell, sets, colors):
                                  label='Housekeeping'))
     handles.append(plt.Rectangle((0, 0), 1, 1, facecolor='white',
                                  edgecolor='0.6', lw=0.5,
-                                 label='Unallocated flexible'))
+                                 label='Unallocated'))
     handles.append(Line2D([0], [0], color='0.15', ls='--', lw=1.0,
                           label='Un-derated translation demand'))
     c_mid_y = 0.5 * (box_l.y0 + box_l.y1)                     # panel-c centre
