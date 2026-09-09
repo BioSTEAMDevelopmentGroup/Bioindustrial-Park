@@ -1070,6 +1070,25 @@ def draw_burden(fig, gs_cell, sets, colors):
     axR.plot([demand_x, demand_x], [0.5, n + 0.6], color='0.15', ls='--',
              lw=1.0, zorder=4)   # above the raised metabolic sectors (zorder 3)
 
+    # penalty-free metabolic-budget bracket, hovering just above the top bar:
+    # metabolism grows from the start of glycolysis (the housekeeping edge) and
+    # only starts derating translation once it passes the un-derated demand
+    # line, so that span (F_flex - phi_T,demand) is the room it can take for
+    # free. A double-headed arrow with square end caps, |<--- ... --->|.
+    bx0, bx1 = housekeeping, demand_x
+    by = n + 0.55                          # clear of the top bar (top edge n+0.31)
+    cap = 0.10                             # end-cap half-height
+    axR.annotate('', xy=(bx1, by), xytext=(bx0, by), annotation_clip=False,
+                 arrowprops=dict(arrowstyle='<->', color='0.15', lw=1.0,
+                                 shrinkA=0.0, shrinkB=0.0), zorder=5)
+    for bx in (bx0, bx1):                   # vertical end caps ('|')
+        axR.plot([bx, bx], [by - cap, by + cap], color='0.15', lw=1.0,
+                 solid_capstyle='butt', clip_on=False, zorder=5)
+    axR.text(0.5 * (bx0 + bx1), by + cap + 0.06,
+             'penalty-free metabolic\nsector budget', ha='center', va='bottom',
+             fontsize=FONTS['callout'] - 1, color='0.15', linespacing=0.95,
+             clip_on=False, zorder=5)
+
     axL.set_ylim(0.4, n + 0.9)                       # shared: sets both windows
     for ax in (axL, axR):
         # rows are keyed by colour through the campaign legend, so the
