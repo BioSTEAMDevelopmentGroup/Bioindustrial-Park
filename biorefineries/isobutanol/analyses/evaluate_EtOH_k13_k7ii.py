@@ -767,6 +767,9 @@ if plot:
         extend_cmap = 'max'
         cmap_under_color = None
         white_comparison_lines = []  # white, labeled contour line(s); IRR only
+        w_scale = 1.0            # multiply metric data + levels/ticks (IRR -> %)
+        curr_w_units = val['units']
+        curr_fmt_clabel = lambda cvalue: get_rounded_str(cvalue, 3)
         lccm = curr_metric.lower()
         if 'spike' in lccm or 'q sugar' in lccm or 'target sugars' in lccm:
             if not perform_feeding_strategy_opt: 
@@ -828,20 +831,26 @@ if plot:
                 curr_metric_w_ticks = [0.75, 1.0, 1.5, 2.0, 2.5]
             cbar_n_minor_ticks = 4
         elif 'irr' in lccm:
-            # opt_IRR grid: color bar 0-25%. Everything below 0% (money-losing
-            # finite IRRs AND the unsolvable -inf cells) collapses into the gray
-            # under-color; the scale is capped at 0.25 (no over-color).
-            curr_metric_w_levels = np.arange(0.0, 0.2501, 0.005)
-            curr_metric_cbar_ticks = np.arange(0.0, 0.2501, 0.05)
-            curr_metric_w_ticks = [0.05, 0.10, 0.15, 0.20]
+            # opt_IRR grid: plot IRR as a PERCENTAGE (e.g. 20%, not 0.20) --
+            # scale the fractional data + all levels/ticks by 100, label the
+            # colorbar in % and give the contour labels a % sign. Color bar
+            # 0-25%. Everything below 0% (money-losing finite IRRs AND the
+            # unsolvable -inf cells) collapses into the gray under-color; the
+            # scale is capped at 25% (no over-color).
+            w_scale = 100.0
+            curr_w_units = '%'
+            curr_fmt_clabel = lambda cvalue: f'{cvalue:.0f}%'
+            curr_metric_w_levels = np.arange(0.0, 25.001, 0.5)
+            curr_metric_cbar_ticks = np.arange(0.0, 25.001, 5.0)
+            curr_metric_w_ticks = [5.0, 10.0, 15.0, 20.0]
             cbar_n_minor_ticks = 4
             # Keep the under-color (IRR < 0, incl. -inf money-losing corners);
             # cap at 25% with no over-color.
             extend_cmap = 'min'
             cmap_under_color = colors.grey_dark.shade(40).RGBn
             cmap_over_color = None
-            # White break-even contour + label at IRR = 0 (boundary between the
-            # profitable colored region and the gray under-color).
+            # White break-even contour + label at IRR = 0% (boundary between
+            # the profitable colored region and the gray under-color).
             white_comparison_lines = [0.0]
         # else:
         #     break
@@ -851,6 +860,8 @@ if plot:
         # money-losing points) to just below the lowest level so those cells
         # fill with cmap_under_color instead of vanishing.
         plot_data = results[curr_metric]
+        if w_scale != 1.0:  # e.g. IRR fraction -> percent (levels/ticks already scaled)
+            plot_data = np.array(plot_data, dtype=float) * w_scale
         if cmap_under_color is not None:
             _pd = np.array(plot_data, dtype=float)
             if np.isneginf(_pd).any():
@@ -875,9 +886,9 @@ if plot:
                                         x_units=x_units,
                                         y_units=y_units,
                                         z_units=z_units,
-                                        w_units=val['units'],
+                                        w_units=curr_w_units,
                                         # fmt_clabel=lambda cvalue: r"$\mathrm{\$}$"+" {:.1f} ".format(cvalue)+r"$\cdot\mathrm{kg}^{-1}$", # format of contour labels
-                                        fmt_clabel = lambda cvalue: get_rounded_str(cvalue, 3),
+                                        fmt_clabel = curr_fmt_clabel,
                                         cmap=cmap, # can use 'viridis' or other default matplotlib colormaps
                                         # cmap_over_color = colors.grey_dark.shade(8).RGBn,
                                         cmap_over_color=cmap_over_color,
