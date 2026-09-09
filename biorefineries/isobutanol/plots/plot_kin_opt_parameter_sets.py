@@ -1089,9 +1089,11 @@ def draw_burden(fig, gs_cell, sets, colors):
     # of the panel (just under the title) rather than centring it -- centring
     # pushed its head into the panel title. It runs down the free left column.
     leg_c = fig.legend(handles=handles, loc='upper left',
-                       bbox_to_anchor=(0.02, box_l.y1), ncol=1, frameon=False,
-                       fontsize=FONTS['legend'] + 1, handlelength=1.6,
-                       handleheight=1.1, labelspacing=0.5, borderpad=0.2)
+                       bbox_to_anchor=(0.02, box_l.y1), ncol=1, frameon=True,
+                       fontsize=FONTS['legend'] + 1, title='Sectors',
+                       handlelength=1.6, handleheight=1.1, labelspacing=0.5,
+                       borderpad=0.6, edgecolor='0.6', fancybox=False)
+    leg_c.get_title().set_fontweight('bold')
     for t in leg_c.get_texts():                               # bold the headers
         if t.get_text() in ('Metabolic', 'Translation', 'Housekeeping'):
             t.set_fontweight('bold')
@@ -1113,10 +1115,10 @@ def plot(sets, band, out_stem, dpi=300):
     a_gs = fig.add_gridspec(1, 1, left=LEFT, right=RIGHT, top=0.945, bottom=0.775)
     band_gs = fig.add_gridspec(4, 1, left=LEFT, right=RIGHT, top=0.689,
                                bottom=0.405, hspace=1.49)
-    # panel c is narrowed on the left (left=0.285 vs LEFT) to clear a column for
-    # its sector legend, which now sits in that margin rather than above the bars
-    # (wide enough for the longest metabolic label + its reaction ids)
-    c_gs = fig.add_gridspec(1, 1, left=0.285, right=RIGHT, top=0.359, bottom=0.134)
+    # panel c is narrowed on the left (left=0.32 vs LEFT) to clear a column for
+    # its framed sector legend, which sits in that margin rather than above the
+    # bars (wide enough for the box + the longest label, clear of the 0.00 tick)
+    c_gs = fig.add_gridspec(1, 1, left=0.32, right=RIGHT, top=0.359, bottom=0.134)
     colors = set_colors(sets)
     a_axes = draw_outcomes(fig, a_gs[0], sets, colors)
     b_axes = draw_parameters(fig, [band_gs[0], band_gs[1], band_gs[2],
