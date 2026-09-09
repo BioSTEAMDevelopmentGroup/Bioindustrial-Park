@@ -1017,7 +1017,7 @@ def draw_burden(fig, gs_cell, sets, colors):
     axR.plot([demand_x, demand_x], [0.5, n + 0.6], color='0.15', ls='--',
              lw=1.0, zorder=3)
 
-    axL.set_ylim(0.4, n + 3.0)                       # shared: sets both windows
+    axL.set_ylim(0.4, n + 0.9)                       # shared: sets both windows
     for ax in (axL, axR):
         # rows are keyed by colour through the campaign legend, so the
         # categorical y axis carries no labels of its own
@@ -1052,28 +1052,34 @@ def draw_burden(fig, gs_cell, sets, colors):
              'Proteome allocation [g protein·(g DCW)$^{-1}$]',
              ha='center', va='top', fontsize=FONTS['axis'])
 
-    # sector key: neutral-grey swatches so the hatches read independent of the
-    # campaign colours; the dashed line explains the translation marker.
-    handles = [plt.Rectangle((0, 0), 1, 1, facecolor='0.72', edgecolor='0.15',
-                             lw=0.5, label='Housekeeping')]
-    for (name, _), hatch in zip(cats, _METABOLIC_HATCHES):
+    # sector key, in the margin to the left of the narrowed panel: neutral-grey
+    # swatches so the hatches read independent of the campaign colours. Grouped
+    # under a bold 'Metabolic' header, then Translation and Housekeeping, with
+    # the two flexible-sector annotations (slack, un-derated demand) last.
+    handles = [Line2D([], [], linestyle='none', marker='none',
+                      label='Metabolic')]                     # section header
+    for (name, _), hatch in zip(cats, _METABOLIC_HATCHES):    # indented members
         handles.append(plt.Rectangle((0, 0), 1, 1, facecolor='0.72',
                                      edgecolor='0.15', lw=0.5, hatch=hatch,
-                                     label=name))
-    handles.append(plt.Rectangle((0, 0), 1, 1, facecolor='white',
-                                 edgecolor='0.6', lw=0.5,
-                                 label='Unallocated flexible'))
+                                     label='  ' + name.replace('\n', '\n  ')))
     handles.append(plt.Rectangle((0, 0), 1, 1, facecolor='0.72',
                                  edgecolor='0.15', lw=0.5,
                                  hatch=_TRANSLATION_HATCH,
                                  label='Translation (ribosomes)'))
+    handles.append(plt.Rectangle((0, 0), 1, 1, facecolor='0.72',
+                                 edgecolor='0.15', lw=0.5,
+                                 label='Housekeeping'))
+    handles.append(plt.Rectangle((0, 0), 1, 1, facecolor='white',
+                                 edgecolor='0.6', lw=0.5,
+                                 label='Unallocated flexible'))
     handles.append(Line2D([0], [0], color='0.15', ls='--', lw=1.0,
                           label='Un-derated translation demand'))
-    fig.legend(handles=handles, loc='upper center',
-               bbox_to_anchor=(mid, box_l.y1 - 0.004), ncol=4, frameon=False,
-               fontsize=FONTS['callout'] - 1, handlelength=1.6,
-               handleheight=1.3, columnspacing=1.4, labelspacing=0.8,
-               borderpad=0.2)
+    c_mid_y = 0.5 * (box_l.y0 + box_l.y1)                     # panel-c centre
+    leg_c = fig.legend(handles=handles, loc='center left',
+                       bbox_to_anchor=(0.02, c_mid_y), ncol=1, frameon=False,
+                       fontsize=FONTS['callout'] - 1, handlelength=1.6,
+                       handleheight=1.3, labelspacing=0.8, borderpad=0.2)
+    leg_c.get_texts()[0].set_fontweight('bold')               # 'Metabolic'
     return axR
 
 
@@ -1092,7 +1098,9 @@ def plot(sets, band, out_stem, dpi=300):
     a_gs = fig.add_gridspec(1, 1, left=LEFT, right=RIGHT, top=0.945, bottom=0.775)
     band_gs = fig.add_gridspec(4, 1, left=LEFT, right=RIGHT, top=0.689,
                                bottom=0.405, hspace=1.49)
-    c_gs = fig.add_gridspec(1, 1, left=LEFT, right=RIGHT, top=0.359, bottom=0.134)
+    # panel c is narrowed on the left (left=0.32 vs LEFT) to clear a column for
+    # its sector legend, which now sits in that margin rather than above the bars
+    c_gs = fig.add_gridspec(1, 1, left=0.32, right=RIGHT, top=0.359, bottom=0.134)
     colors = set_colors(sets)
     a_axes = draw_outcomes(fig, a_gs[0], sets, colors)
     b_axes = draw_parameters(fig, [band_gs[0], band_gs[1], band_gs[2],
