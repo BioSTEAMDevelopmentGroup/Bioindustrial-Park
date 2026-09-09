@@ -1092,23 +1092,29 @@ def draw_burden(fig, gs_cell, sets, colors):
              ha='center', va='center', rotation=90, rotation_mode='anchor',
              fontsize=11, color='0.15', clip_on=False, zorder=5)
 
-    # penalty-free metabolic-budget bracket, hovering just above the top bar:
-    # metabolism grows from the start of glycolysis (the origin) and only starts
-    # derating translation once it passes the un-derated demand line, so that
-    # span (F_flex - phi_T,demand) is the room it can take for free. A double-
-    # headed arrow with square end caps, |<--- ... --->|.
-    bx0, bx1 = 0.0, demand_x
+    # sector-demand brackets, hovering just above the top bar: double-headed
+    # arrows with square end caps and a centred label (as |<--- ... --->|).
+    #  * penalty-free metabolic budget -- metabolism grows from the start of
+    #    glycolysis (the origin) and only derates translation once it passes the
+    #    un-derated demand line, so that span (F_flex - phi_T,demand) is free;
+    #  * translation demand -- from the demand line to the housekeeping edge;
+    #  * housekeeping demand -- the fixed housekeeping block (drawn further down,
+    #    as it straddles the break and spans both windows).
     by = n + 0.55                          # clear of the top bar (top edge n+0.31)
     cap = 0.10                             # end-cap half-height
-    axL.annotate('', xy=(bx1, by), xytext=(bx0, by), annotation_clip=False,
-                 arrowprops=dict(arrowstyle='<->', color='0.15', lw=1.0,
-                                 shrinkA=0.0, shrinkB=0.0), zorder=5)
-    for bx in (bx0, bx1):                   # vertical end caps ('|')
-        axL.plot([bx, bx], [by - cap, by + cap], color='0.15', lw=1.0,
-                 solid_capstyle='butt', clip_on=False, zorder=5)
-    axL.text(0.5 * (bx0 + bx1), by + cap + 0.06,
-             'penalty-free metabolic sector budget', ha='center', va='bottom',
-             fontsize=11, color='0.15', clip_on=False, zorder=5)
+
+    def bracket(ax, x0, x1, label):
+        ax.annotate('', xy=(x1, by), xytext=(x0, by), annotation_clip=False,
+                    arrowprops=dict(arrowstyle='<->', color='0.15', lw=1.0,
+                                    shrinkA=0.0, shrinkB=0.0), zorder=5)
+        for bx in (x0, x1):                 # vertical end caps ('|')
+            ax.plot([bx, bx], [by - cap, by + cap], color='0.15', lw=1.0,
+                    solid_capstyle='butt', clip_on=False, zorder=5)
+        ax.text(0.5 * (x0 + x1), by + cap + 0.06, label, ha='center',
+                va='bottom', fontsize=11, color='0.15', clip_on=False, zorder=5)
+
+    bracket(axL, 0.0, demand_x, 'penalty-free metabolic budget')
+    bracket(axL, demand_x, hk_start, 'translation demand')
 
     axL.set_ylim(0.4, n + 0.9)                       # shared: sets both windows
     for ax in (axL, axR):
@@ -1128,6 +1134,26 @@ def draw_burden(fig, gs_cell, sets, colors):
         ax.spines['right'].set_visible(False)
     axL.set_xlim(0, BREAK_L)
     axR.set_xlim(BREAK_R, xmax)
+    # housekeeping-demand bracket -- the housekeeping block straddles the break,
+    # so it spans both windows: one arrow from the housekeeping edge (left
+    # window) to the proteome cap (right stub), each end in its window's own data
+    # transform, with the label centred on the figure-space midpoint. Drawn here,
+    # after the limits are set, so the data->figure transforms are final.
+    axL.annotate('', xy=(PC, by), xycoords=axR.transData,
+                 xytext=(hk_start, by), textcoords=axL.transData,
+                 arrowprops=dict(arrowstyle='<->', color='0.15', lw=1.0,
+                                 shrinkA=0.0, shrinkB=0.0),
+                 annotation_clip=False, zorder=5)
+    axL.plot([hk_start, hk_start], [by - cap, by + cap], color='0.15', lw=1.0,
+             solid_capstyle='butt', clip_on=False, zorder=5)
+    axR.plot([PC, PC], [by - cap, by + cap], color='0.15', lw=1.0,
+             solid_capstyle='butt', clip_on=False, zorder=5)
+    inv = fig.transFigure.inverted()
+    fx0 = inv.transform(axL.transData.transform((hk_start, by)))[0]
+    fx1 = inv.transform(axR.transData.transform((PC, by)))[0]
+    fy = inv.transform(axL.transData.transform((0.0, by + cap + 0.06)))[1]
+    fig.text(0.5 * (fx0 + fx1), fy, 'housekeeping demand', ha='center',
+             va='bottom', fontsize=11, color='0.15', zorder=5)
     # neither break edge lands on a 0.05 major tick, so no tick label sits at the
     # cut to collide across the gap; the default formatter suffices.
     # diagonal break marks at the cut, fixed physical size (point markers) so
