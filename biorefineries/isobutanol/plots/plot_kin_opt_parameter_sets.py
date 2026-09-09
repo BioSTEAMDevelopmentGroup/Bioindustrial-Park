@@ -1085,9 +1085,8 @@ def draw_burden(fig, gs_cell, sets, colors):
         axR.plot([bx, bx], [by - cap, by + cap], color='0.15', lw=1.0,
                  solid_capstyle='butt', clip_on=False, zorder=5)
     axR.text(0.5 * (bx0 + bx1), by + cap + 0.06,
-             'penalty-free metabolic\nsector budget', ha='center', va='bottom',
-             fontsize=FONTS['callout'] - 1, color='0.15', linespacing=0.95,
-             clip_on=False, zorder=5)
+             'penalty-free metabolic sector budget', ha='center', va='bottom',
+             fontsize=11, color='0.15', clip_on=False, zorder=5)
 
     axL.set_ylim(0.4, n + 0.9)                       # shared: sets both windows
     for ax in (axL, axR):
