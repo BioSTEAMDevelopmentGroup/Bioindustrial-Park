@@ -1013,7 +1013,7 @@ def draw_burden(fig, gs_cell, sets, colors):
     # the cut, strictly inside housekeeping (0.245 < BREAK_L < BREAK_R < 0.49):
     # the left window runs from the origin through the start of housekeeping,
     # the right stub shows housekeeping filling to the cap.
-    BREAK_L, BREAK_R = 0.26, 0.48
+    BREAK_L, BREAK_R = 0.27, 0.47
     xmax = 0.5                       # end the right window on the 0.5 major tick
     # equal scale on both windows <=> width ratios == their data ranges
     sub = gs_cell.subgridspec(1, 2, width_ratios=[BREAK_L, xmax - BREAK_R],
