@@ -1102,9 +1102,9 @@ def plot(sets, band, out_stem, dpi=300):
     a_gs = fig.add_gridspec(1, 1, left=LEFT, right=RIGHT, top=0.945, bottom=0.775)
     band_gs = fig.add_gridspec(4, 1, left=LEFT, right=RIGHT, top=0.689,
                                bottom=0.405, hspace=1.49)
-    # panel c is narrowed on the left (left=0.32 vs LEFT) to clear a column for
+    # panel c is narrowed on the left (left=0.25 vs LEFT) to clear a column for
     # its sector legend, which now sits in that margin rather than above the bars
-    c_gs = fig.add_gridspec(1, 1, left=0.32, right=RIGHT, top=0.359, bottom=0.134)
+    c_gs = fig.add_gridspec(1, 1, left=0.25, right=RIGHT, top=0.359, bottom=0.134)
     colors = set_colors(sets)
     a_axes = draw_outcomes(fig, a_gs[0], sets, colors)
     b_axes = draw_parameters(fig, [band_gs[0], band_gs[1], band_gs[2],
