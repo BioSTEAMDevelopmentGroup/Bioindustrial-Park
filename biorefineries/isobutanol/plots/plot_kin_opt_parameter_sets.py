@@ -1087,17 +1087,6 @@ def draw_burden(fig, gs_cell, sets, colors):
     axR.text(0.5 * (bx0 + bx1), by + cap + 0.06,
              'penalty-free metabolic sector budget', ha='center', va='bottom',
              fontsize=11, color='0.15', clip_on=False, zorder=5)
-    # ... and past the demand line, growing the metabolic sector eats into
-    # translation's demand and derates growth: a rightward arrow + note, level
-    # with the bracket label. Two short lines keep it inside the right window.
-    g_y = by + cap + 0.24                  # ~centre of the bracket label line
-    gx0, gx1 = demand_x + 0.006, demand_x + 0.028
-    axR.annotate('', xy=(gx1, g_y), xytext=(gx0, g_y), annotation_clip=False,
-                 arrowprops=dict(arrowstyle='->', color='0.15', lw=1.0,
-                                 shrinkA=0.0, shrinkB=0.0), zorder=5)
-    axR.text(gx1 + 0.006, g_y, 'larger metabolic sector\npenalizes cell growth',
-             ha='left', va='center', fontsize=11, color='0.15',
-             linespacing=0.95, clip_on=False, zorder=5)
 
     axL.set_ylim(0.4, n + 0.9)                       # shared: sets both windows
     for ax in (axL, axR):
