@@ -1078,6 +1078,11 @@ def draw_burden(fig, gs_cell, sets, colors):
     # bar rows -- not the legend headroom above them
     axL.plot([demand_x, demand_x], [0.5, n + 0.6], color='0.15', ls='--',
              lw=1.0, zorder=4)   # above the raised metabolic sectors (zorder 3)
+    # a second dashed line where the housekeeping sector begins (the flexible
+    # sector edge, F_flex = PC - housekeeping); also in the left window
+    hk_start = PC - housekeeping
+    axL.plot([hk_start, hk_start], [0.5, n + 0.6], color='0.15', ls='--',
+             lw=1.0, zorder=4)
 
     # penalty-free metabolic-budget bracket, hovering just above the top bar:
     # metabolism grows from the start of glycolysis (the origin) and only starts
