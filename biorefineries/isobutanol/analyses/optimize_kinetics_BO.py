@@ -97,6 +97,7 @@ from biorefineries import isobutanol
 isobutanol.load()
 
 from biorefineries.isobutanol import kinetic_optimization as ko
+from biorefineries.isobutanol import scenarios
 
 model = isobutanol.models.models_EtOH_IBO_corn.model
 namespace_dict = isobutanol.models.namespace_dict
@@ -514,24 +515,10 @@ def run(scenario=None,  # 'A' or 'B'; None = the preset's start scenario
     if seed_from:
         print(f'Seed points: {n_seeds} donor trials enqueued after the '
               f'probes of a fresh study: {seed_from}')
-    parameter_distributions_filename = IBO_filepath+\
-        '\\analyses\\full\\parameter_distributions\\'+\
-        f'parameter-distributions_corn_IBO_EtOH_{scenario}.xlsx'
-
-    model.parameters = ()
-    model.load_parameter_distributions(parameter_distributions_filename,
-                                       namespace_dict)
-    model.metrics_at_baseline()
-
-    if scenario == 'A':
-        fbs_spec.max_n_spikes = 16
-        baseline_kwargs = dict(threshold_conc=217.125, target_conc=221.25)
-    elif scenario == 'B':
-        fbs_spec.max_n_spikes = 0  # batch: no glucose spikes
-        baseline_kwargs = dict(threshold_conc=34.25, target_conc=140.0)
-    else:
-        raise ValueError(f'Scenario {scenario} not found.')
-    model_specification(**baseline_kwargs)
+    # Consolidated scenario baseline: workbook kinetics + distributions +
+    # feeding strategy + one baseline model_specification (single source of
+    # truth in scenarios.SCENARIOS). The BO samples on top of this baseline.
+    scenarios.load_scenario(scenario)
 
     if burden:
         from biorefineries.isobutanol import enzyme_burden as eb
