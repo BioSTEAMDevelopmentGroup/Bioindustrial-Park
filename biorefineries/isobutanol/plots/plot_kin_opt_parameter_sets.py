@@ -1087,8 +1087,7 @@ def draw_burden(fig, gs_cell, sets, colors):
     # the right stub, labelled parallel to it (rotated 90 deg) in the empty gap
     # between the cap and the 0.5 edge
     axR.plot([PC, PC], [0.5, n + 0.6], color='0.15', ls='--', lw=1.0, zorder=4)
-    axR.text(0.5 * (PC + xmax), 0.5 * (0.5 + n + 0.6),
-             'proteome cap, %.2f g protein·(g DCW)$^{-1}$' % PC,
+    axR.text(0.5 * (PC + xmax), 0.5 * (0.5 + n + 0.6), 'proteome cap',
              ha='center', va='center', rotation=90, rotation_mode='anchor',
              fontsize=11, color='0.15', clip_on=False, zorder=5)
 
