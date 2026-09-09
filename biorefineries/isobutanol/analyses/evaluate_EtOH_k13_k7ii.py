@@ -766,6 +766,7 @@ if plot:
         cbar_n_minor_ticks = 3
         extend_cmap = 'max'
         cmap_under_color = None
+        white_comparison_lines = []  # white, labeled contour line(s); IRR only
         lccm = curr_metric.lower()
         if 'spike' in lccm or 'q sugar' in lccm or 'target sugars' in lccm:
             if not perform_feeding_strategy_opt: 
@@ -839,6 +840,9 @@ if plot:
             extend_cmap = 'min'
             cmap_under_color = colors.grey_dark.shade(40).RGBn
             cmap_over_color = None
+            # White break-even contour + label at IRR = 0 (boundary between the
+            # profitable colored region and the gray under-color).
+            white_comparison_lines = [0.0]
         # else:
         #     break
 
@@ -893,6 +897,8 @@ if plot:
                                         n_minor_ticks = 1,
                                         cbar_n_minor_ticks = cbar_n_minor_ticks,
                                         additional_points = baseline_marker_points,
+                                        comparison_lines = white_comparison_lines,
+                                        comparison_lines_colors = 'white',
                                         round_yticks_to = 2,
                                         units_on_newline = (False, False, False, False), # x,y,z,w
                                         units_opening_brackets = [" (",] * 4,
