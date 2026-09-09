@@ -1059,10 +1059,16 @@ def draw_burden(fig, gs_cell, sets, colors):
     handles = [Line2D([], [], linestyle='none', marker='none',
                       label='Metabolic')]                     # section header
     for (name, steps), hatch in zip(cats, _METABOLIC_HATCHES):  # indented members
-        ids = ' (%s)' % ', '.join(steps)                       # reaction ids
+        ids = '(%s)' % ', '.join(steps)                        # reaction ids
+        lines = name.split('\n')
+        if len(lines[-1]) + 1 + len(ids) <= 28:                # ids fit inline
+            lines[-1] += ' ' + ids
+        else:                                                  # else wrap below
+            lines.append(ids)
+        label = '\n'.join('  ' + ln for ln in lines)           # 2-space indent
         handles.append(plt.Rectangle((0, 0), 1, 1, facecolor='0.72',
                                      edgecolor='0.15', lw=0.5, hatch=hatch,
-                                     label='  ' + name.replace('\n', '\n  ') + ids))
+                                     label=label))
     handles.append(Line2D([], [], linestyle='none', marker='none',
                           label=' '))                          # spacer row
     handles.append(plt.Rectangle((0, 0), 1, 1, facecolor='0.72',
@@ -1078,12 +1084,14 @@ def draw_burden(fig, gs_cell, sets, colors):
                                  edgecolor='0.6', lw=0.5,
                                  label='Unallocated'))
     handles.append(Line2D([0], [0], color='0.15', ls='--', lw=1.0,
-                          label='Un-derated translation demand'))
-    c_mid_y = 0.5 * (box_l.y0 + box_l.y1)                     # panel-c centre
-    leg_c = fig.legend(handles=handles, loc='center left',
-                       bbox_to_anchor=(0.02, c_mid_y), ncol=1, frameon=False,
-                       fontsize=FONTS['callout'] - 1, handlelength=1.6,
-                       handleheight=1.3, labelspacing=0.8, borderpad=0.2)
+                          label='Un-derated translation\ndemand'))
+    # at panel-b's larger font the wrapped key is tall, so hang it from the top
+    # of the panel (just under the title) rather than centring it -- centring
+    # pushed its head into the panel title. It runs down the free left column.
+    leg_c = fig.legend(handles=handles, loc='upper left',
+                       bbox_to_anchor=(0.02, box_l.y1), ncol=1, frameon=False,
+                       fontsize=FONTS['legend'] + 1, handlelength=1.6,
+                       handleheight=1.1, labelspacing=0.5, borderpad=0.2)
     for t in leg_c.get_texts():                               # bold the headers
         if t.get_text() in ('Metabolic', 'Translation', 'Housekeeping'):
             t.set_fontweight('bold')
