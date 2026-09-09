@@ -49,59 +49,28 @@ runner must call ``load_simulate_baseline()`` and print the returned list
 (one solve_TEA dict per simulation).
 """
 import math
-import biosteam as bst
 from biorefineries import isobutanol
 isobutanol.load(separation_processes=('ethanol',))
+from biorefineries.isobutanol import scenarios
 
-model = isobutanol.models.models_EtOH_IBO_corn.model
-namespace_dict = isobutanol.models.namespace_dict
-fbs_spec = isobutanol.models.fbs_spec
-solve_TEA = isobutanol.system.solve_TEA
-model_specification = model.specification
-f = model.system.flowsheet
-V406 = f.V406
-IBO_filepath = isobutanol.__file__.replace('\\__init__.py', '')
 
-def _assert_MPSPs_stable(reference, current, sim_number, rel_tol=5e-3):
-    """Verify the current simulation's MPSPs match the first simulation's to
-    ~3 significant figures (relative drift < rel_tol; nan stays nan)."""
-    for ID, ref in reference['MPSPs'].items():
-        cur = current['MPSPs'][ID]
-        if math.isnan(ref) or math.isnan(cur):
-            assert math.isnan(ref) and math.isnan(cur), \
-                f'sim {sim_number}: {ID} MPSP {cur} vs first-sim {ref} (nan mismatch)'
-        else:
-            assert abs(cur - ref)/abs(ref) < rel_tol, \
-                (f'sim {sim_number}: {ID} MPSP {cur} drifted from first-sim '
-                 f'value {ref} beyond rel tol {rel_tol}')
-
-def load_simulate_baseline(stream_IDs=('ethanol', 'isobutanol'), # products whose MPSPs are solved
-                           IRR_for_MPSP=0.15, # fixed IRR at which MPSPs are solved
-                           n_sims=3, # simulations in this kernel (in-process stability check)
+def load_simulate_baseline(stream_IDs=('ethanol', 'isobutanol'),
+                           IRR_for_MPSP=0.15,
+                           n_sims=3,
                            ):
-    # Scenario-A body, mirroring smoke_test_1.py.
-    parameter_distributions_filename = IBO_filepath+\
-        '\\analyses\\full\\parameter_distributions\\'+\
-        'parameter-distributions_corn_IBO_EtOH_A.xlsx'
+    # Ethanol-only build: config-specific pins (NOT the registry A pins).
+    bundle = scenarios.load_scenario('A')
+    model_specification = bundle['model_specification']
+    solve_TEA = bundle['solve_TEA']
+    feeding_kwargs = bundle['feeding_kwargs']
+    expected_MPSPs = {'ethanol': 0.84458, 'isobutanol': math.nan}
 
-    model.parameters = ()
-    model.load_parameter_distributions(parameter_distributions_filename, namespace_dict)
-    baseline_initial = model.metrics_at_baseline()
-
-    model_specification()
-
-    fbs_spec.max_n_spikes = 16
     all_results = []
     for i in range(n_sims):
-        model_specification(threshold_conc=217.125, target_conc=221.25)
+        model_specification(**feeding_kwargs)
         results = solve_TEA(stream_IDs=stream_IDs, IRR_for_MPSP=IRR_for_MPSP)
-        MPSP_ethanol = results['MPSPs']['ethanol']
-        MPSP_isobutanol = results['MPSPs']['isobutanol']
-        assert abs(MPSP_ethanol - 0.84458)/0.84458 < 0.01, \
-            f'sim {i+1}: ethanol MPSP {MPSP_ethanol} not within 1% of 0.84458'
-        assert math.isnan(MPSP_isobutanol), \
-            f'sim {i+1}: isobutanol MPSP {MPSP_isobutanol} expected nan (empty product)'
+        scenarios.assert_MPSPs_pinned(expected_MPSPs, results, i+1)
         if all_results:
-            _assert_MPSPs_stable(all_results[0], results, i+1)
+            scenarios.assert_MPSPs_stable(all_results[0], results, i+1)
         all_results.append(results)
     return all_results
