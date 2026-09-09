@@ -769,7 +769,7 @@ def bar_cell(ax, sets, colors, var, kind, ylabel, subtitle=None, ylim=None,
     ax.set_xlim(-0.6, n - 0.4); style_cell_axes(ax)
 
 
-def outcome_cell(ax, sets, colors, col, title, ylim, xmax):
+def outcome_cell(ax, sets, colors, col, title, ylim, xmax, point_size=9):
     """One outcome metric as incumbent trajectories over trial_number: one
     step line per campaign set (the metric at that set's running incumbent,
     in its panel-b/c color), the scenario-A baseline as a dashed reference.
@@ -811,7 +811,8 @@ def outcome_cell(ax, sets, colors, col, title, ylim, xmax):
         if s.get('scatter') is None or s.get('objective') != col:
             continue
         sx, sy, cc = s['scatter_x'], _yv(s['scatter'][col]), colors[id(s)]
-        ax.scatter(sx, sy, s=9, color=cc, alpha=0.25, linewidths=0, zorder=1)
+        ax.scatter(sx, sy, s=point_size, color=cc, alpha=0.25, linewidths=0,
+                   zorder=1)
     for s in sets:
         if s.get('traj') is None:
             continue
@@ -856,10 +857,17 @@ def draw_outcomes(fig, gs_cell, sets, colors):
     ax_big = fig.add_subplot(sub_gs[0:2, 0:2])
     outcome_cell(ax_big, sets, colors, big[0], big[1], big[2], xmax)
     axes.append(ax_big)
+    big_w = ax_big.get_position().width
     for (col, label, yl), (r, c) in zip(rest,
                                         ((0, 2), (0, 3), (1, 2), (1, 3))):
         ax = fig.add_subplot(sub_gs[r, c])
-        outcome_cell(ax, sets, colors, col, label, yl, xmax)
+        # these cells are ~0.38x the linear size of the IRR cell (1 of 4 columns
+        # vs 2 columns + a wspace), so shrink the trial-cloud marker to match:
+        # scale its AREA by (cell width / IRR width)^2, i.e. its diameter by the
+        # linear ratio, from the actual rendered widths (robust to layout tweaks)
+        ratio = ax.get_position().width / big_w
+        outcome_cell(ax, sets, colors, col, label, yl, xmax,
+                     point_size=9 * ratio ** 2)
         axes.append(ax)
     return axes
 
