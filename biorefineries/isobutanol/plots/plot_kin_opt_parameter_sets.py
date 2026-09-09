@@ -1097,9 +1097,7 @@ def draw_burden(fig, gs_cell, sets, colors):
     #  * penalty-free metabolic budget -- metabolism grows from the start of
     #    glycolysis (the origin) and only derates translation once it passes the
     #    un-derated demand line, so that span (F_flex - phi_T,demand) is free;
-    #  * translation demand -- from the demand line to the housekeeping edge;
-    #  * housekeeping demand -- the fixed housekeeping block (drawn further down,
-    #    as it straddles the break and spans both windows).
+    #  * translation demand -- from the demand line to the housekeeping edge.
     by = n + 0.55                          # clear of the top bar (top edge n+0.31)
     cap = 0.10                             # end-cap half-height
 
@@ -1143,26 +1141,6 @@ def draw_burden(fig, gs_cell, sets, colors):
                              '' if abs(x - edge) < 1e-9 else f'{x:.2f}')
     axL.xaxis.set_major_formatter(_blank_at(BREAK_L))
     axR.xaxis.set_major_formatter(_blank_at(BREAK_R))
-    # housekeeping-demand bracket -- the housekeeping block straddles the break,
-    # so it spans both windows: one arrow from the housekeeping edge (left
-    # window) to the proteome cap (right stub), each end in its window's own data
-    # transform, with the label centred on the figure-space midpoint. Drawn here,
-    # after the limits are set, so the data->figure transforms are final.
-    axL.annotate('', xy=(PC, by), xycoords=axR.transData,
-                 xytext=(hk_start, by), textcoords=axL.transData,
-                 arrowprops=dict(arrowstyle='<->', color='0.15', lw=1.0,
-                                 shrinkA=0.0, shrinkB=0.0),
-                 annotation_clip=False, zorder=5)
-    axL.plot([hk_start, hk_start], [by - cap, by + cap], color='0.15', lw=1.0,
-             solid_capstyle='butt', clip_on=False, zorder=5)
-    axR.plot([PC, PC], [by - cap, by + cap], color='0.15', lw=1.0,
-             solid_capstyle='butt', clip_on=False, zorder=5)
-    inv = fig.transFigure.inverted()
-    fx0 = inv.transform(axL.transData.transform((hk_start, by)))[0]
-    fx1 = inv.transform(axR.transData.transform((PC, by)))[0]
-    fy = inv.transform(axL.transData.transform((0.0, by + cap + 0.06)))[1]
-    fig.text(0.5 * (fx0 + fx1), fy, 'housekeeping demand', ha='center',
-             va='bottom', fontsize=11, color='0.15', zorder=5)
     # diagonal break marks at the cut, fixed physical size (point markers) so
     # the unequal panel widths do not skew them
     mk = dict(marker=[(-1, -3.2), (1, 3.2)], markersize=7, linestyle='none',
