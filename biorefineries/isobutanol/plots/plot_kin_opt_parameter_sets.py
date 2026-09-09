@@ -1069,8 +1069,10 @@ def draw_burden(fig, gs_cell, sets, colors):
         handles.append(plt.Rectangle((0, 0), 1, 1, facecolor='0.72',
                                      edgecolor='0.15', lw=0.5, hatch=hatch,
                                      label=label))
-    handles.append(Line2D([], [], linestyle='none', marker='none',
-                          label=' '))                          # spacer row
+    # the metabolic members, translation and housekeeping run at the plain
+    # labelspacing (no blank spacer rows): the bold, un-indented headers already
+    # mark the group breaks, and dropping the two spacers pulls the box bottom up
+    # to sit roughly level with the x-axis title.
     handles.append(plt.Rectangle((0, 0), 1, 1, facecolor='0.72',
                                  edgecolor='0.15', lw=0.5,
                                  hatch=_TRANSLATION_HATCH,
@@ -1078,8 +1080,6 @@ def draw_burden(fig, gs_cell, sets, colors):
     handles.append(plt.Rectangle((0, 0), 1, 1, facecolor='0.72',
                                  edgecolor='0.15', lw=0.5,
                                  label='Housekeeping'))
-    handles.append(Line2D([], [], linestyle='none', marker='none',
-                          label=' '))                          # spacer row
     handles.append(plt.Rectangle((0, 0), 1, 1, facecolor='white',
                                  edgecolor='0.6', lw=0.5,
                                  label='Unallocated'))
