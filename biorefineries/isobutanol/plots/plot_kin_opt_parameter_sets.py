@@ -971,7 +971,7 @@ if sorted(_CAT_STEPS) != sorted(eb.STEP_ORDER) \
 # colour (matplotlib ties a patch's hatch colour to its edge colour), so they
 # read as the fixed non-metabolic anchors while still keying to the campaign.
 # The unallocated flexible slack stays empty room (no fill, no hatch).
-_METABOLIC_HATCHES = ('///', None, 'xxx', '...')
+_METABOLIC_HATCHES = ('///', None, '...', 'xxx')
 _TRANSLATION_HATCH = 'ooo'
 _HOUSEKEEPING_HATCH = '++'
 if len(_METABOLIC_HATCHES) != len(BURDEN_CATEGORIES):
