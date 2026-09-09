@@ -1152,10 +1152,15 @@ def draw_burden(fig, gs_cell, sets, colors):
         handles.append(plt.Rectangle((0, 0), 1, 1, facecolor='0.72',
                                      edgecolor='0.15', lw=0.5, hatch=hatch,
                                      label=label))
-    # the metabolic members, translation and housekeeping run at the plain
-    # labelspacing (no blank spacer rows): the bold, un-indented headers already
-    # mark the group breaks, and dropping the two spacers pulls the box bottom up
-    # to sit roughly level with the x-axis title.
+    # the metabolic members, unallocated, translation and housekeeping run at
+    # the plain labelspacing (no blank spacer rows): the bold, un-indented
+    # headers already mark the group breaks, and dropping the two spacers pulls
+    # the box bottom up to sit roughly level with the x-axis title. Unallocated
+    # sits before Translation to follow the new bar order (metabolic |
+    # unallocated | translation | housekeeping).
+    handles.append(plt.Rectangle((0, 0), 1, 1, facecolor='white',
+                                 edgecolor='0.6', lw=0.5,
+                                 label='Unallocated'))
     handles.append(plt.Rectangle((0, 0), 1, 1, facecolor='white',
                                  edgecolor='0.15', lw=0.5,
                                  hatch=_TRANSLATION_HATCH,
@@ -1164,11 +1169,6 @@ def draw_burden(fig, gs_cell, sets, colors):
                                  edgecolor='0.15', lw=0.5,
                                  hatch=_HOUSEKEEPING_HATCH,
                                  label='Housekeeping'))
-    handles.append(plt.Rectangle((0, 0), 1, 1, facecolor='white',
-                                 edgecolor='0.6', lw=0.5,
-                                 label='Unallocated'))
-    handles.append(Line2D([0], [0], color='0.15', ls='--', lw=1.0,
-                          label='Un-derated translation\ndemand'))
     # at panel-b's larger font the wrapped key is tall, so hang it from the top
     # of the panel (just under the title) rather than centring it -- centring
     # pushed its head into the panel title. It runs down the free left column.
