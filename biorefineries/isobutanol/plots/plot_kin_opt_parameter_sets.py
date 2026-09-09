@@ -1013,7 +1013,7 @@ def draw_burden(fig, gs_cell, sets, colors):
     # the cut, strictly inside housekeeping (0.245 < BREAK_L < BREAK_R < 0.49):
     # the left window runs from the origin through the start of housekeeping,
     # the right stub shows housekeeping filling to the cap.
-    BREAK_L, BREAK_R = 0.28, 0.45
+    BREAK_L, BREAK_R = 0.28, 0.46
     xmax = 0.5                       # end the right window on the 0.5 major tick
     # equal scale on both windows <=> width ratios == their data ranges
     sub = gs_cell.subgridspec(1, 2, width_ratios=[BREAK_L, xmax - BREAK_R],
@@ -1132,10 +1132,11 @@ def draw_burden(fig, gs_cell, sets, colors):
         ax.spines['right'].set_visible(False)
     axL.set_xlim(0, BREAK_L)
     axR.set_xlim(BREAK_R, xmax)
-    # BREAK_R (0.45) lands on a 0.05 major tick, so a "0.45" label would sit
-    # right at the right stub's left edge, crowding the break marks -- blank any
-    # label that falls exactly on a break edge (here just 0.45; BREAK_L 0.28 has
-    # no tick) so the axis reads ... 0.25 // 0.50 while the tick marks stay.
+    # if a break edge happens to land on a 0.05 major tick, its label would sit
+    # right at the cut and crowd the break marks (or collide across the narrow
+    # gap), so blank any label falling exactly on a break edge while the tick
+    # marks stay. At the current 0.28/0.46 edges neither is on a tick, so this is
+    # a no-op and the axis reads ... 0.25 // 0.50.
     def _blank_at(edge):
         return FuncFormatter(lambda x, pos:
                              '' if abs(x - edge) < 1e-9 else f'{x:.2f}')
