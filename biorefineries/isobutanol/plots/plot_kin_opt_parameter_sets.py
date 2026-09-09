@@ -195,6 +195,10 @@ MAX_SETS = 1 + len(HUE_COLORS)   # 7
 FONTS = {'band': 12, 'cell': 10, 'tick': 9, 'callout': 9,
          'legend': 10, 'axis': 11, 'panel': 14}
 
+# light-grey backing for panel b, so it reads as a distinct block from the
+# white panels a and c
+PANEL_B_BG = '0.93'
+
 # --- scenario-A baseline outcomes: HARD-CODED (spec decision b).
 # Simulated 2026-09-07 (smoke_test_1 protocol, IBO_2026). A cached one-off
 # baseline simulation (option a) is a later change; when done, replace this
@@ -867,6 +871,7 @@ def draw_parameters(fig, gs_rows, sets, colors, band):
         last_ax = None
         for i, p in enumerate(params):
             ax = fig.add_subplot(sub_gs[0, i]); last_ax = ax
+            ax.set_facecolor(PANEL_B_BG)     # panel-b block colour (see backing)
             axes.append(ax)
             if p in RATE_VARS:
                 # reaction/enzyme descriptors go in the figure caption, not
@@ -1124,6 +1129,17 @@ def plot(sets, band, out_stem, dpi=300):
     a_axes = draw_outcomes(fig, a_gs[0], sets, colors)
     b_axes = draw_parameters(fig, [band_gs[0], band_gs[1], band_gs[2],
                                    band_gs[3]], sets, colors, band)
+    # light-grey backing behind the whole of panel b (band cells, their titles,
+    # the panel-b letter/title and the campaign legend), so the panel reads as
+    # one block set off from the white panels a and c. Drawn at zorder 0 so the
+    # cells, bars, text and legend all sit on top; the band cells share its
+    # colour (set in draw_parameters) so the fill is seamless across the gaps.
+    b_top = b_axes[0].get_position().y1
+    b_bot = b_axes[-1].get_position().y0
+    fig.add_artist(plt.Rectangle(
+        (0.02, b_bot - 0.030), 0.985 - 0.02, (b_top + 0.058) - (b_bot - 0.030),
+        transform=fig.transFigure, facecolor=PANEL_B_BG, edgecolor='none',
+        zorder=0))
     axc = draw_burden(fig, c_gs[0], sets, colors)
     # each panel gets a bold letter and a descriptive title on the same
     # baseline; the panel title (13 pt) outranks the band sub-titles (12 pt).
