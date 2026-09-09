@@ -197,9 +197,9 @@ results = {i: [] for i in metrics.keys()}
 
 steps = (20, 20, 1)
 
-spec_1 = nsk_k_13es = np.linspace(0.0, 20.0, steps[0])
+spec_1 = nsk_k_13es = np.linspace(0.0, 6.0, steps[0])
 
-spec_2 = nsk_k_7iies = np.linspace(0.0001, 0.2, steps[1])
+spec_2 = nsk_k_7iies = np.linspace(0.0001, 0.12, steps[1])
 
 
 spec_3 = spike_concs =\
@@ -214,11 +214,11 @@ spec_3 = spike_concs =\
 
 x_label = "k_13" # title of the x axis
 x_units = r"$\mathrm{g} \cdot \mathrm{L}^{-1} \cdot \mathrm{h}^{-1}$"
-x_ticks = [0, 5, 10, 15, 20]
+x_ticks = [0, 1, 2, 3, 4, 5, 6]
 
 y_label = "k_7ii" # title of the y axis
 y_units = r"$\mathrm{g} \cdot \mathrm{L}^{-1} \cdot \mathrm{h}^{-1}$"
-y_ticks = [0.0, 0.05, 0.1, 0.15, 0.2]
+y_ticks = [0.0, 0.03, 0.06, 0.09, 0.12]
 
 z_label = "Spike feed glucose concentration" # title of the x axis
 z_units =r"$\mathrm{g} \cdot \mathrm{L}^{-1}$"
@@ -827,17 +827,18 @@ if plot:
                 curr_metric_w_ticks = [0.75, 1.0, 1.5, 2.0, 2.5]
             cbar_n_minor_ticks = 4
         elif 'irr' in lccm:
-            # opt_IRR grid: finite IRR spans -0.727 to 0.190, and 260/400 cells
-            # are unsolvable (-inf, money-losing). Show the profitable 0-0.19
-            # corner; the under-color catches everything below -0.1 (incl. -inf).
-            curr_metric_w_levels = np.arange(-0.1, 0.2001, 0.005)
-            curr_metric_cbar_ticks = np.arange(-0.1, 0.2001, 0.05)
-            curr_metric_w_ticks = [0.0, 0.05, 0.10, 0.15, 0.18]
+            # opt_IRR grid: color bar 0-25%. Everything below 0% (money-losing
+            # finite IRRs AND the unsolvable -inf cells) collapses into the gray
+            # under-color; the scale is capped at 0.25 (no over-color).
+            curr_metric_w_levels = np.arange(0.0, 0.2501, 0.005)
+            curr_metric_cbar_ticks = np.arange(0.0, 0.2501, 0.05)
+            curr_metric_w_ticks = [0.05, 0.10, 0.15, 0.20]
             cbar_n_minor_ticks = 4
-            # IRR can fall far below the lowest level (money-losing corners);
-            # fill those cells rather than leaving them blank
-            extend_cmap = 'both'
+            # Keep the under-color (IRR < 0, incl. -inf money-losing corners);
+            # cap at 25% with no over-color.
+            extend_cmap = 'min'
             cmap_under_color = colors.grey_dark.shade(40).RGBn
+            cmap_over_color = None
         # else:
         #     break
 
