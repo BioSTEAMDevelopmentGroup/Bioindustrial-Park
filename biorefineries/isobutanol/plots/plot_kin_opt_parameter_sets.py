@@ -1062,10 +1062,12 @@ def draw_burden(fig, gs_cell, sets, colors):
         handles.append(plt.Rectangle((0, 0), 1, 1, facecolor='0.72',
                                      edgecolor='0.15', lw=0.5, hatch=hatch,
                                      label='  ' + name.replace('\n', '\n  ')))
+    handles.append(Line2D([], [], linestyle='none', marker='none',
+                          label=' '))                          # spacer row
     handles.append(plt.Rectangle((0, 0), 1, 1, facecolor='0.72',
                                  edgecolor='0.15', lw=0.5,
                                  hatch=_TRANSLATION_HATCH,
-                                 label='Translation (ribosomes)'))
+                                 label='Translation'))
     handles.append(plt.Rectangle((0, 0), 1, 1, facecolor='0.72',
                                  edgecolor='0.15', lw=0.5,
                                  label='Housekeeping'))
@@ -1079,7 +1081,9 @@ def draw_burden(fig, gs_cell, sets, colors):
                        bbox_to_anchor=(0.02, c_mid_y), ncol=1, frameon=False,
                        fontsize=FONTS['callout'] - 1, handlelength=1.6,
                        handleheight=1.3, labelspacing=0.8, borderpad=0.2)
-    leg_c.get_texts()[0].set_fontweight('bold')               # 'Metabolic'
+    for t in leg_c.get_texts():                               # bold the headers
+        if t.get_text() in ('Metabolic', 'Translation', 'Housekeeping'):
+            t.set_fontweight('bold')
     return axR
 
 
