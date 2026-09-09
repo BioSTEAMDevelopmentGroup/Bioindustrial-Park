@@ -64,7 +64,7 @@ import matplotlib
 matplotlib.use('Agg')
 from matplotlib import pyplot as plt
 from matplotlib.lines import Line2D
-from matplotlib.ticker import (AutoMinorLocator, FixedLocator,
+from matplotlib.ticker import (AutoMinorLocator, FixedLocator, FuncFormatter,
                                LogLocator, MultipleLocator, NullFormatter,
                                NullLocator, PercentFormatter)
 
@@ -1013,7 +1013,7 @@ def draw_burden(fig, gs_cell, sets, colors):
     # the cut, strictly inside housekeeping (0.245 < BREAK_L < BREAK_R < 0.49):
     # the left window runs from the origin through the start of housekeeping,
     # the right stub shows housekeeping filling to the cap.
-    BREAK_L, BREAK_R = 0.27, 0.47
+    BREAK_L, BREAK_R = 0.28, 0.45
     xmax = 0.5                       # end the right window on the 0.5 major tick
     # equal scale on both windows <=> width ratios == their data ranges
     sub = gs_cell.subgridspec(1, 2, width_ratios=[BREAK_L, xmax - BREAK_R],
@@ -1134,6 +1134,15 @@ def draw_burden(fig, gs_cell, sets, colors):
         ax.spines['right'].set_visible(False)
     axL.set_xlim(0, BREAK_L)
     axR.set_xlim(BREAK_R, xmax)
+    # BREAK_R (0.45) lands on a 0.05 major tick, so a "0.45" label would sit
+    # right at the right stub's left edge, crowding the break marks -- blank any
+    # label that falls exactly on a break edge (here just 0.45; BREAK_L 0.28 has
+    # no tick) so the axis reads ... 0.25 // 0.50 while the tick marks stay.
+    def _blank_at(edge):
+        return FuncFormatter(lambda x, pos:
+                             '' if abs(x - edge) < 1e-9 else f'{x:.2f}')
+    axL.xaxis.set_major_formatter(_blank_at(BREAK_L))
+    axR.xaxis.set_major_formatter(_blank_at(BREAK_R))
     # housekeeping-demand bracket -- the housekeeping block straddles the break,
     # so it spans both windows: one arrow from the housekeeping edge (left
     # window) to the proteome cap (right stub), each end in its window's own data
@@ -1154,8 +1163,6 @@ def draw_burden(fig, gs_cell, sets, colors):
     fy = inv.transform(axL.transData.transform((0.0, by + cap + 0.06)))[1]
     fig.text(0.5 * (fx0 + fx1), fy, 'housekeeping demand', ha='center',
              va='bottom', fontsize=11, color='0.15', zorder=5)
-    # neither break edge lands on a 0.05 major tick, so no tick label sits at the
-    # cut to collide across the gap; the default formatter suffices.
     # diagonal break marks at the cut, fixed physical size (point markers) so
     # the unequal panel widths do not skew them
     mk = dict(marker=[(-1, -3.2), (1, 3.2)], markersize=7, linestyle='none',
