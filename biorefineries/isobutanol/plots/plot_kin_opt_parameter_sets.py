@@ -967,7 +967,7 @@ def draw_burden(fig, gs_cell, sets, colors):
     ypos = {id(s): n - i for i, s in enumerate(sets)}
 
     # the cut, strictly inside housekeeping (0 < BREAK_L < BREAK_R < 0.245)
-    BREAK_L, BREAK_R = 0.03, 0.23
+    BREAK_L, BREAK_R = 0.02, 0.23
     xmax = PC + 0.005
     # equal scale on both windows <=> width ratios == their data ranges
     sub = gs_cell.subgridspec(1, 2, width_ratios=[BREAK_L, xmax - BREAK_R],
