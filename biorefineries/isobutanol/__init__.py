@@ -10,7 +10,8 @@
 from . import (
     models,
     plots,
-    system, 
+    scenarios,
+    system,
     units,
     utils,
     process_settings
@@ -19,6 +20,7 @@ from . import (
 __all__ = [
             *models.__all__,
             *plots.__all__,
+            *scenarios.__all__,
             *system.__all__,
             *units.__all__,
             *utils.__all__,
@@ -27,6 +29,7 @@ __all__ = [
 
 from .models import *
 from .plots import *
+from .scenarios import *
 from .system import *
 from .units import *
 from .utils import *
@@ -49,7 +52,7 @@ def load(simulate_baseline=True,
     models.__dict__.update(published_models)
     merged = {**published, **published_models}
     _submodules = {'system', 'models', 'plots', 'units', 'utils',
-                   'process_settings', 'separations'}
+                   'process_settings', 'separations', 'scenarios'}
     globals().update({k: v for k, v in merged.items()
                       if k not in _submodules})
     return merged
