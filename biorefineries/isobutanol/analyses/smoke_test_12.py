@@ -17,10 +17,13 @@ held/non-sampled params + the sampled rates + expanded inhibition
 coefficients + burden-derated k_7/k_8), and the registry carries the
 trial's feeding strategy and reproduced pins. IBO_EtOH-only == both-trains
 at S201 split 1.0 (the studies' build), so the pins transfer exactly.
-This trial is anti-economic by design (IRR ~= 0.002; the objective is
-EtOH titer, not IRR). The isobutanol titer is near zero -- the registry
-`expected['isobutanol']` is the recorded value verbatim (a real, negative
-MPSP).
+The objective is EtOH titer (~270 g/L, a near-ceiling artifact), not IRR,
+so only the titer and the MPSPs are pinned. (The BO trajectory recorded a
+near-zero IRR for this late trial, but that reflected end-of-run baseline
+drift; a clean fresh-load reproduction is modestly profitable. IRR is
+neither the objective nor pinned here.) The isobutanol titer is near zero
+-- the registry `expected['isobutanol']` is the recorded value verbatim (a
+real, negative MPSP).
 
 Loads once (at import) and simulates n_sims (default 3) times, verifying
 after EACH simulation: MPSPs pinned (1%) + stable vs the first sim (5e-3),
