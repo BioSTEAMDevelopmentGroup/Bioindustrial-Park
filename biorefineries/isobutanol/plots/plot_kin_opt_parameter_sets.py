@@ -1083,6 +1083,14 @@ def draw_burden(fig, gs_cell, sets, colors):
     hk_start = PC - housekeeping
     axL.plot([hk_start, hk_start], [0.5, n + 0.6], color='0.15', ls='--',
              lw=1.0, zorder=4)
+    # the proteome cap at PC (the right end of every bar) -- a dashed line in
+    # the right stub, labelled parallel to it (rotated 90 deg) in the empty gap
+    # between the cap and the 0.5 edge
+    axR.plot([PC, PC], [0.5, n + 0.6], color='0.15', ls='--', lw=1.0, zorder=4)
+    axR.text(0.5 * (PC + xmax), 0.5 * (0.5 + n + 0.6),
+             'proteome cap (%.2f g·(g DCW)$^{-1}$)' % PC,
+             ha='center', va='center', rotation=90, rotation_mode='anchor',
+             fontsize=11, color='0.15', clip_on=False, zorder=5)
 
     # penalty-free metabolic-budget bracket, hovering just above the top bar:
     # metabolism grows from the start of glycolysis (the origin) and only starts
