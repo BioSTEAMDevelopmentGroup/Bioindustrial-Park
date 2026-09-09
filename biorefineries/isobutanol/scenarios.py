@@ -26,7 +26,7 @@ importing this module is build-free.
 """
 import os
 import math
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 
 __all__ = ('ScenarioSpec', 'SCENARIOS', 'load_scenario',
            'assert_MPSPs_pinned', 'assert_MPSPs_stable',
@@ -132,6 +132,9 @@ def load_scenario(scenario, *, apply=True):
     one baseline `model_specification`. Returns a bundle the caller reuses
     for its stability loop. Requires the model to be built already
     (isobutanol.load(...))."""
+    if scenario not in SCENARIOS:
+        raise ValueError(f'scenario {scenario!r} not in SCENARIOS: '
+                         f'{sorted(SCENARIOS)}')
     spec = SCENARIOS[scenario]
     h = _handles()
     model = h['model']

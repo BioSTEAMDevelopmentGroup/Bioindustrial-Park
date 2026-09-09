@@ -23,7 +23,6 @@ after EACH simulation: MPSPs pinned (1%) + stable vs the first sim (5e-3),
 and the study objective (EtOH yield) reproduced within the registry
 tolerance. Exit 0 = pass. Must run in a FRESH kernel.
 """
-import math
 from biorefineries import isobutanol
 isobutanol.load(separation_processes=('IBO_EtOH',))
 from biorefineries.isobutanol import scenarios

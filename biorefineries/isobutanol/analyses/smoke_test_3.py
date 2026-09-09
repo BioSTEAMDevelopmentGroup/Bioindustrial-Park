@@ -46,7 +46,6 @@ for the kernel's lifetime. Running the file directly prints nothing -- a
 runner must call ``load_simulate_baseline()`` and print the returned list
 (one solve_TEA dict per simulation).
 """
-import math
 from biorefineries import isobutanol
 isobutanol.load(separation_processes=('IBO_EtOH',))
 from biorefineries.isobutanol import scenarios
