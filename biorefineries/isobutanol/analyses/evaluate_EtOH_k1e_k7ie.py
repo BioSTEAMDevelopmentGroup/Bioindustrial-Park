@@ -282,16 +282,23 @@ minute = '0' + str(dateTimeObj.minute) if len(str(dateTimeObj.minute))==1 else s
 # file_to_save = f'_{steps}_steps_'+'etoh_fbs_%s.%s.%s-%s.%s'%(dateTimeObj.year, dateTimeObj.month, dateTimeObj.day, dateTimeObj.hour, minute)
 file_to_save = f'ibo_{steps}_{x_label[:5]}_{y_label[:5]}_{z_label[:5]}_opt={perform_feeding_strategy_opt}_max_n={ferm_reactor.nsk_kinetic_model.default_max_n_glu_spikes}_'
 
+# Set IBO_SWEEP_REPLOT_FROM_CSV=1 to skip the grid simulations and rebuild
+# the contour plots from the per-metric CSVs a previous run of this script
+# (same steps / scenario / feeding settings, i.e. same `file_to_save` prefix)
+# saved under analyses/results/. Only the plot styling below then matters.
+replot_from_csv = os.environ.get('IBO_SWEEP_REPLOT_FROM_CSV', '') == '1'
+
 #%% Initial simulation
 
-print('\n\nSimulating the initial point to avoid bugs ...')
-curr_spec = fbs_spec.current_specifications
-r.k_1e = nsk_k_1ees[1]
-r.k_7ie = nsk_k_7iees[0]
-model_specification(**curr_spec,
-    n_sims=3,
-    plot=True,
-    )
+if not replot_from_csv:
+    print('\n\nSimulating the initial point to avoid bugs ...')
+    curr_spec = fbs_spec.current_specifications
+    r.k_1e = nsk_k_1ees[1]
+    r.k_7ie = nsk_k_7iees[0]
+    model_specification(**curr_spec,
+        n_sims=3,
+        plot=True,
+        )
 
 # %% Run analysis 
 
@@ -316,7 +323,16 @@ print_status_every_n_simulations = 1
 
 errors_dict = {}
 
-for s3 in spec_3:
+if replot_from_csv:
+    print(f'\nReplotting from saved CSVs: {isobutanol_results_filepath}{file_to_save}_<metric>.csv')
+    for k in results.keys():
+        results[k] = [pd.read_csv(isobutanol_results_filepath+file_to_save+f'_{k}.csv',
+                                  index_col=0).to_numpy()]
+    spec_3_to_run = []
+else:
+    spec_3_to_run = spec_3
+
+for s3 in spec_3_to_run:
     for v in list(results.values()): v.append([])
     
     for s2 in spec_2:
@@ -729,7 +745,11 @@ if plot:
             cmap_over_color = colors.grey_dark.shade(8).RGBn
             
         # curr_metric_w_levels, curr_metric_w_ticks, curr_metric_cbar_ticks = get_contour_info_from_metric_data(results_metric_1, lb=3)
-        curr_metric_non_nans = np.array(results[curr_metric])[np.where(~np.isnan(np.array(results[curr_metric])))]
+        # Use only FINITE values to derive levels/ticks: solve_TEA reports an
+        # unsolvable (money-losing) IRR as -inf, and np.isnan does NOT catch
+        # +/-inf -- an -inf leaking into np.arange(min, ...) below raises
+        # "arange: cannot compute length" and aborts all remaining plots.
+        curr_metric_non_nans = np.array(results[curr_metric])[np.isfinite(np.array(results[curr_metric]))]
         if curr_metric_non_nans.size == 0 or curr_metric_non_nans.min() == curr_metric_non_nans.max():
             # e.g. IBO MPSP (all NaN) or IBO yield/titer (all zero) in a
             # scenario that makes no isobutanol: no range to contour
@@ -769,7 +789,19 @@ if plot:
         # curr_metric_w_levels = np.arange(0., 15.5, 0.5)
         
         
-        contourplots.animated_contourplot(w_data_vs_x_y_at_multiple_z=results[curr_metric], # shape = z * x * y # values of the metric you want to plot on the color axis; e.g., curr_metric
+        # contourf masks non-finite cells (they render blank). For a metric
+        # drawn with an under-color extend (IRR), push -inf (unsolvable,
+        # money-losing points) to just below the lowest level so those cells
+        # fill with cmap_under_color instead of vanishing.
+        plot_data = results[curr_metric]
+        if cmap_under_color is not None:
+            _pd = np.array(plot_data, dtype=float)
+            if np.isneginf(_pd).any():
+                _step = curr_metric_w_levels[1] - curr_metric_w_levels[0]
+                _pd[np.isneginf(_pd)] = curr_metric_w_levels[0] - _step
+                plot_data = _pd
+
+        contourplots.animated_contourplot(w_data_vs_x_y_at_multiple_z=plot_data, # shape = z * x * y # values of the metric you want to plot on the color axis; e.g., curr_metric
                                         x_data=spec_1, # x axis values
                                         # x_data = curr_metrics/theoretical_max_g_HP_acid_per_g_glucose,
                                         y_data=spec_2, # y axis values
