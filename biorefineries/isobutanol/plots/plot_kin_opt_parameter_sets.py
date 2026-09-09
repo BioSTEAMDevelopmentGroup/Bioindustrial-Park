@@ -816,12 +816,12 @@ def outcome_cell(ax, sets, colors, col, title, ylim, xmax, point_size=9):
     for s in sets:
         if s.get('traj') is None:
             continue
-        # the campaign that optimized THIS metric gets a ~1.6x-thick line so
+        # the campaign that optimized THIS metric gets a ~2.25x-thick line so
         # its own trajectory stands out among the cross-plotted campaigns; the
         # thinner lines are drawn on top of it so none is hidden underneath
         own = s.get('objective') == col
         ax.step(s['traj_x'], _yv(s['traj'][col]), where='post',
-                color=colors[id(s)], lw=2.24 if own else 1.4,
+                color=colors[id(s)], lw=3.15 if own else 1.4,
                 zorder=2 if own else 3)
     # metric name next to the value axis itself (not a title above the cell)
     ax.set_ylabel(title, fontsize=FONTS['cell'], labelpad=3)
