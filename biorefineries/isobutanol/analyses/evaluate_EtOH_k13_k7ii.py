@@ -541,9 +541,13 @@ if plot:
     #%% MPSP
     
     # MPSP_w_levels, MPSP_w_ticks, MPSP_cbar_ticks = get_contour_info_from_metric_data(results_metric_1, lb=3)
-    MPSP_w_levels = np.arange(0.6, 1.4001, 0.01)
-    MPSP_cbar_ticks = np.arange(0.6, 1.4001, 0.05)
-    MPSP_w_ticks = [0.4, 0.6, 0.8]
+    # opt_IRR: ethanol is a trace co-product across this k_13 x k_7ii grid
+    # (EtOH titer median ~0.1 g/L), so its purity-adjusted MPSP is astronomically
+    # high (median ~365, max ~8552 $/kg) almost everywhere; focus the color scale
+    # on the EtOH-producing low corner (min ~0.55) and let the rest over-color.
+    MPSP_w_levels = np.arange(0.5, 3.0001, 0.05)
+    MPSP_cbar_ticks = np.arange(0.5, 3.0001, 0.5)
+    MPSP_w_ticks = [0.75, 1.0, 1.5, 2.0, 2.5]
     # MPSP_w_levels = np.arange(0., 15.5, 0.5)
     
     
@@ -793,14 +797,24 @@ if plot:
         curr_metric_w_ticks.sort(reverse=False)
         # curr_metric_w_levels = np.arange(0., 15.5, 0.5)
         
-        if 'mpsp' in lccm: # ethanol and isobutanol MPSPs share the same scale
-            # 20x20 scenario-B grid spans 0.70-3.49 $/kg (EtOH) / 1.13-2.43 (IBO)
-            curr_metric_w_levels = np.arange(0.5, 3.5001, 0.05)
-            curr_metric_cbar_ticks = np.arange(0.5, 3.5001, 0.5)
-            curr_metric_w_ticks = [0.75, 0.9, 1.2, 1.5, 2.0, 3.0]
+        if 'mpsp' in lccm:
+            # opt_IRR 20x20 k_13 x k_7ii grid: IBO MPSP spans 1.41-2.92 $/kg
+            # (isobutanol is the primary product here); ethanol MPSP spans
+            # 0.55-8552 (ethanol is a trace co-product, MPSP median ~365).
+            # Give each its own scale rather than a shared one.
+            if 'ibo' in lccm:
+                curr_metric_w_levels = np.arange(1.4, 3.0001, 0.02)
+                curr_metric_cbar_ticks = np.arange(1.4, 3.0001, 0.2)
+                curr_metric_w_ticks = [1.5, 1.8, 2.1, 2.4, 2.7]
+            else: # ethanol: focus on the EtOH-producing low corner, rest over-colors
+                curr_metric_w_levels = np.arange(0.5, 3.0001, 0.05)
+                curr_metric_cbar_ticks = np.arange(0.5, 3.0001, 0.5)
+                curr_metric_w_ticks = [0.75, 1.0, 1.5, 2.0, 2.5]
             cbar_n_minor_ticks = 4
         elif 'irr' in lccm:
-            # grid spans -0.12 to 0.19; the under-color catches the sub -0.1 corner
+            # opt_IRR grid: finite IRR spans -0.727 to 0.190, and 260/400 cells
+            # are unsolvable (-inf, money-losing). Show the profitable 0-0.19
+            # corner; the under-color catches everything below -0.1 (incl. -inf).
             curr_metric_w_levels = np.arange(-0.1, 0.2001, 0.005)
             curr_metric_cbar_ticks = np.arange(-0.1, 0.2001, 0.05)
             curr_metric_w_ticks = [0.0, 0.05, 0.10, 0.15, 0.18]
