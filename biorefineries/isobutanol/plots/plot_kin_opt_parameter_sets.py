@@ -938,7 +938,7 @@ if len(_METABOLIC_HATCHES) != len(BURDEN_CATEGORIES):
     raise AssertionError('one hatch per BURDEN_CATEGORIES entry required')
 
 
-def draw_burden(ax, sets, colors):
+def draw_burden(fig, gs_cell, sets, colors):
     # full proteome allocation: each bar sums to the proteome cap PC (0.49).
     # Sectors left to right -- housekeeping | four metabolic categories | the
     # unallocated flexible slack | the growth-derated translation sector,
@@ -948,6 +948,12 @@ def draw_burden(ax, sets, colors):
     # builds only d * phi_T,demand = min(phi_T,demand, F_flex - Phi_M) of it,
     # so a single dashed line at PC - phi_T,demand marks how far translation
     # would reach un-derated, measured right-to-left from the cap.
+    #
+    # Housekeeping is the SAME fixed 0.245-wide block on every bar (half the
+    # proteome), so a broken x-axis compresses it into a narrow left panel and
+    # gives the informative flexible sector the full-width right panel. Nothing
+    # straddles the cut: housekeeping is entirely <= PC*HOUSEKEEPING_FRACTION,
+    # every other sector entirely above it, so the split needs no clipping.
     cats = BURDEN_CATEGORIES
     n = len(sets)
     PC = float(eb.PROTEIN_CONTENT)
@@ -955,7 +961,11 @@ def draw_burden(ax, sets, colors):
     h = 0.62
     ypos = {id(s): n - i for i, s in enumerate(sets)}
 
-    def seg(y, x, w, c, hatch=None, fill=True):
+    sub = gs_cell.subgridspec(1, 2, width_ratios=[1, 8], wspace=0.03)
+    axL = fig.add_subplot(sub[0, 0])                     # housekeeping (narrow)
+    axR = fig.add_subplot(sub[0, 1], sharey=axL)         # flexible sector (wide)
+
+    def seg(ax, y, x, w, c, hatch=None, fill=True):
         ax.barh(y, w, left=x, height=h,
                 facecolor=(c if fill else 'white'),
                 edgecolor=('0.15' if fill else '0.6'),
@@ -970,44 +980,64 @@ def draw_burden(ax, sets, colors):
     demand_x = PC - demands[0]
 
     for s in sets:
-        y = ypos[id(s)]; c = colors[id(s)]; x = 0.0
-        seg(y, x, housekeeping, c); x += housekeeping            # housekeeping
+        y = ypos[id(s)]; c = colors[id(s)]
+        seg(axL, y, 0.0, housekeeping, c)                        # housekeeping
+        x = housekeeping
         for (_, steps), hatch in zip(cats, _METABOLIC_HATCHES):  # metabolic
             w = sum(s[f'pool_{st}'] for st in steps)
             if w > 0:
-                seg(y, x, w, c, hatch)
+                seg(axR, y, x, w, c, hatch)
             x += w
         Phi_M = float(s['Phi_M'])
         phi_T_built = float(s['burden_factor']) * float(s['phi_T'])
         slack = max(0.0, PC - housekeeping - Phi_M - phi_T_built)
         if slack > 0:                                            # empty slack
-            seg(y, x, slack, c, fill=False)
+            seg(axR, y, x, slack, c, fill=False)
         x += slack
         if phi_T_built > 0:                                      # translation
-            seg(y, x, phi_T_built, c, _TRANSLATION_HATCH)
+            seg(axR, y, x, phi_T_built, c, _TRANSLATION_HATCH)
 
     # un-derated translation demand, spanning just the bar rows (not the
     # legend headroom above them)
-    ax.plot([demand_x, demand_x], [0.5, n + 0.6], color='0.15', ls='--',
-            lw=1.0, zorder=3)
+    axR.plot([demand_x, demand_x], [0.5, n + 0.6], color='0.15', ls='--',
+             lw=1.0, zorder=3)
 
-    ax.set_ylim(0.4, n + 3.0)
-    # rows are keyed by colour through the campaign legend, so the categorical
-    # y axis carries no labels of its own
-    ax.set_yticks([])
-    # the whole proteome: 0 -> PC (0.49), the bars flush against the cap
-    ax.set_xlim(0, PC + 0.005)
-    ax.set_xlabel('Proteome allocation [g protein·(g DCW)$^{-1}$]',
-                  fontsize=FONTS['axis'])
-    ax.xaxis.set_major_locator(MultipleLocator(0.05))
-    ax.xaxis.set_minor_locator(AutoMinorLocator())
-    ax.tick_params(axis='y', right=False, length=0)
-    ax.tick_params(axis='x', which='major', direction='inout', top=False,
-                   length=4)
-    ax.tick_params(axis='x', which='minor', direction='inout', top=False,
-                   length=2.2)
-    for sp in ('left', 'right', 'top'):
-        ax.spines[sp].set_visible(False)
+    axL.set_ylim(0.4, n + 3.0)                       # shared: sets both panels
+    for ax in (axL, axR):
+        # rows are keyed by colour through the campaign legend, so the
+        # categorical y axis carries no labels of its own
+        ax.set_yticks([])
+        ax.tick_params(axis='y', right=False, length=0)
+        ax.tick_params(axis='x', which='major', direction='inout', top=False,
+                       length=4)
+        ax.tick_params(axis='x', which='minor', direction='inout', top=False,
+                       length=2.2)
+        ax.spines['top'].set_visible(False)
+    axL.set_xlim(0, housekeeping)
+    axR.set_xlim(housekeeping, PC + 0.005)
+    axL.xaxis.set_major_locator(FixedLocator([0.0, 0.20]))
+    axL.xaxis.set_minor_locator(MultipleLocator(0.05))
+    axR.xaxis.set_major_locator(MultipleLocator(0.05))
+    axR.xaxis.set_minor_locator(AutoMinorLocator())
+    # drop the spines flanking the break; keep each panel's outer + bottom
+    axL.spines['left'].set_visible(False)
+    axL.spines['right'].set_visible(False)
+    axR.spines['left'].set_visible(False)
+    axR.spines['right'].set_visible(False)
+    # diagonal break marks at the cut, fixed physical size (point markers) so
+    # the unequal panel widths do not skew them
+    mk = dict(marker=[(-1, -3.2), (1, 3.2)], markersize=7, linestyle='none',
+              color='0.15', mec='0.15', mew=1.1, clip_on=False)
+    axL.plot([1], [0], transform=axL.transAxes, **mk)
+    axR.plot([0], [0], transform=axR.transAxes, **mk)
+
+    # one x-axis label and one sector legend, both centred over the whole
+    # (broken) panel rather than either sub-panel
+    box_l = axL.get_position(); box_r = axR.get_position()
+    mid = 0.5 * (box_l.x0 + box_r.x1)
+    fig.text(mid, box_l.y0 - 0.030,
+             'Proteome allocation [g protein·(g DCW)$^{-1}$]',
+             ha='center', va='top', fontsize=FONTS['axis'])
 
     # sector key: neutral-grey swatches so the hatches read independent of the
     # campaign colours; the dashed line explains the translation marker.
@@ -1026,10 +1056,12 @@ def draw_burden(ax, sets, colors):
                                  label='Translation (ribosomes)'))
     handles.append(Line2D([0], [0], color='0.15', ls='--', lw=1.0,
                           label='Un-derated translation demand'))
-    ax.legend(handles=handles, loc='upper center', bbox_to_anchor=(0.5, 1.0),
-              ncol=4, frameon=False, fontsize=FONTS['callout'] - 1,
-              handlelength=1.6, handleheight=1.3, columnspacing=1.4,
-              labelspacing=0.8, borderpad=0.2)
+    fig.legend(handles=handles, loc='upper center',
+               bbox_to_anchor=(mid, box_l.y1 - 0.004), ncol=4, frameon=False,
+               fontsize=FONTS['callout'] - 1, handlelength=1.6,
+               handleheight=1.3, columnspacing=1.4, labelspacing=0.8,
+               borderpad=0.2)
+    return axR
 
 
 def plot(sets, band, out_stem, dpi=300):
@@ -1052,7 +1084,7 @@ def plot(sets, band, out_stem, dpi=300):
     a_axes = draw_outcomes(fig, a_gs[0], sets, colors)
     b_axes = draw_parameters(fig, [band_gs[0], band_gs[1], band_gs[2],
                                    band_gs[3]], sets, colors, band)
-    axc = fig.add_subplot(c_gs[0]); draw_burden(axc, sets, colors)
+    axc = draw_burden(fig, c_gs[0], sets, colors)
     # each panel gets a bold letter and a descriptive title on the same
     # baseline; the panel title (13 pt) outranks the band sub-titles (12 pt).
     # Panel b's letter is lifted into the panel-a -> b gap so its title clears
