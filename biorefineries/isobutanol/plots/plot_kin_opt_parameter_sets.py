@@ -64,7 +64,7 @@ import matplotlib
 matplotlib.use('Agg')
 from matplotlib import pyplot as plt
 from matplotlib.lines import Line2D
-from matplotlib.ticker import (AutoMinorLocator, FixedLocator, FuncFormatter,
+from matplotlib.ticker import (AutoMinorLocator, FixedLocator,
                                LogLocator, MultipleLocator, NullFormatter,
                                NullLocator, PercentFormatter)
 
@@ -967,11 +967,11 @@ def draw_burden(fig, gs_cell, sets, colors):
     ypos = {id(s): n - i for i, s in enumerate(sets)}
 
     # the cut, strictly inside housekeeping (0 < BREAK_L < BREAK_R < 0.245)
-    BREAK_L, BREAK_R = 0.10, 0.20
+    BREAK_L, BREAK_R = 0.03, 0.23
     xmax = PC + 0.005
     # equal scale on both windows <=> width ratios == their data ranges
     sub = gs_cell.subgridspec(1, 2, width_ratios=[BREAK_L, xmax - BREAK_R],
-                              wspace=0.06)
+                              wspace=0.025)
     axL = fig.add_subplot(sub[0, 0])                     # housekeeping stub
     axR = fig.add_subplot(sub[0, 1], sharey=axL)         # rest of the proteome
 
@@ -1035,11 +1035,8 @@ def draw_burden(fig, gs_cell, sets, colors):
         ax.spines['right'].set_visible(False)
     axL.set_xlim(0, BREAK_L)
     axR.set_xlim(BREAK_R, xmax)
-    # the left stub's BREAK_L tick sits right against the right window's BREAK_R
-    # label; keep the tick but blank its label so the two do not collide
-    axL.xaxis.set_major_formatter(
-        FuncFormatter(lambda v, _: '' if abs(v - BREAK_L) < 1e-9
-                      else f'{v:.2f}'))
+    # neither break edge lands on a 0.05 major tick, so no tick label sits at the
+    # cut to collide across the gap; the default formatter suffices.
     # diagonal break marks at the cut, fixed physical size (point markers) so
     # the unequal panel widths do not skew them
     mk = dict(marker=[(-1, -3.2), (1, 3.2)], markersize=7, linestyle='none',
