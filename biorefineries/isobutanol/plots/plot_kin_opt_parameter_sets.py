@@ -1094,6 +1094,7 @@ def draw_burden(fig, gs_cell, sets, colors):
                        handlelength=1.6, handleheight=1.1, labelspacing=0.5,
                        borderpad=0.6, edgecolor='0.6', fancybox=False)
     leg_c.get_title().set_fontweight('bold')
+    leg_c.get_title().set_fontsize(FONTS['legend'] + 2)       # match panel-b title
     for t in leg_c.get_texts():                               # bold the headers
         if t.get_text() in ('Metabolic', 'Translation', 'Housekeeping'):
             t.set_fontweight('bold')
