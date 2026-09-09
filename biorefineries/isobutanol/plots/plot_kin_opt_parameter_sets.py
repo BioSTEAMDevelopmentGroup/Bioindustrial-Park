@@ -980,23 +980,25 @@ if len(_METABOLIC_HATCHES) != len(BURDEN_CATEGORIES):
 
 def draw_burden(fig, gs_cell, sets, colors):
     # full proteome allocation: each bar sums to the proteome cap PC (0.49).
-    # Sectors left to right -- housekeeping | four metabolic categories | the
-    # unallocated flexible slack | the growth-derated translation sector,
+    # Sectors left to right -- four metabolic categories | the unallocated
+    # flexible slack | the growth-derated translation sector | housekeeping,
     # flush against the cap on the right. The four metabolic sectors are filled
     # in the set's colour and told apart by hatch (TCA fill-only); housekeeping
     # and translation are drawn hollow -- no fill, campaign-coloured outline and
     # hatch -- as the fixed non-metabolic anchors. Translation is
     # derated: metabolism fills the flexible sector F_flex first and the cell
     # builds only d * phi_T,demand = min(phi_T,demand, F_flex - Phi_M) of it,
-    # so a single dashed line at PC - phi_T,demand marks how far translation
-    # would reach un-derated, measured right-to-left from the cap.
+    # so a single dashed line at F_flex - phi_T,demand marks how far translation
+    # would reach un-derated, measured leftward from the housekeeping edge.
     #
     # Housekeeping is the SAME fixed 0.245-wide block on every bar (half the
-    # proteome). A broken x-axis cuts a chunk out of the MIDDLE of it: the left
-    # window keeps [0, BREAK_L], the right window resumes at BREAK_R and runs to
-    # the cap, with BREAK_L and BREAK_R both strictly inside housekeeping. So
-    # the reader still sees where housekeeping ends -- its boundary with
-    # metabolism at 0.245 sits in the right window, a little past BREAK_R. Both
+    # proteome), now on the RIGHT, flush against the cap: it spans [0.245, 0.49].
+    # A broken x-axis cuts a chunk out of the MIDDLE of it: the left (wide)
+    # window keeps [0, BREAK_L], the right (stub) window resumes at BREAK_R and
+    # runs to the cap, with BREAK_L and BREAK_R both strictly inside
+    # housekeeping. So the reader still sees where housekeeping begins -- its
+    # boundary with translation at 0.245 sits in the left window, a little
+    # before BREAK_L -- and that it fills to the cap, in the right stub. Both
     # windows share ONE scale: their column width ratios equal their data
     # ranges, so a 0.05 tick step is the same physical distance on each side.
     # Housekeeping straddles the cut, so the full stack is drawn on BOTH windows
@@ -1008,8 +1010,10 @@ def draw_burden(fig, gs_cell, sets, colors):
     h = 0.62
     ypos = {id(s): n - i for i, s in enumerate(sets)}
 
-    # the cut, strictly inside housekeeping (0 < BREAK_L < BREAK_R < 0.245)
-    BREAK_L, BREAK_R = 0.02, 0.23
+    # the cut, strictly inside housekeeping (0.245 < BREAK_L < BREAK_R < 0.49):
+    # the left window runs from the origin through the start of housekeeping,
+    # the right stub shows housekeeping filling to the cap.
+    BREAK_L, BREAK_R = 0.26, 0.48
     xmax = 0.5                       # end the right window on the 0.5 major tick
     # equal scale on both windows <=> width ratios == their data ranges
     sub = gs_cell.subgridspec(1, 2, width_ratios=[BREAK_L, xmax - BREAK_R],
@@ -1038,13 +1042,15 @@ def draw_burden(fig, gs_cell, sets, colors):
     if max(demands) - min(demands) > 1e-4:
         raise ValueError('panel c assumes a shared translation demand phi_T '
                          '(k_7/k_8 pinned); sets differ: %r' % demands)
-    demand_x = PC - demands[0]
+    # translation now sits against the housekeeping edge (F_flex = PC -
+    # housekeeping), so the un-derated demand line falls F_flex - phi_T,demand
+    # from the origin -- in the left window.
+    demand_x = PC - housekeeping - demands[0]
 
     def draw_stack(ax, s, y, c):
-        # the whole proteome bar; the axis window clips it to its own range
-        seg(ax, y, 0.0, housekeeping, c, _HOUSEKEEPING_HATCH,    # housekeeping
-            fill=False, outline=c)                               # (hollow)
-        x = housekeeping
+        # the whole proteome bar; the axis window clips it to its own range.
+        # order left->right: metabolic | slack | translation | housekeeping
+        x = 0.0
         for (_, steps), hatch in zip(cats, _METABOLIC_HATCHES):  # metabolic
             w = sum(s[f'pool_{st}'] for st in steps)
             if w > 0:
@@ -1059,32 +1065,35 @@ def draw_burden(fig, gs_cell, sets, colors):
         if phi_T_built > 0:                                      # translation
             seg(ax, y, x, phi_T_built, c, _TRANSLATION_HATCH,    # (hollow)
                 fill=False, outline=c)
+        x += phi_T_built
+        seg(ax, y, x, housekeeping, c, _HOUSEKEEPING_HATCH,      # housekeeping
+            fill=False, outline=c)                               # (hollow, at cap)
 
     for s in sets:
         y = ypos[id(s)]; c = colors[id(s)]
         draw_stack(axL, s, y, c)
         draw_stack(axR, s, y, c)
 
-    # un-derated translation demand (in the right window), spanning just the
+    # un-derated translation demand (in the left window), spanning just the
     # bar rows -- not the legend headroom above them
-    axR.plot([demand_x, demand_x], [0.5, n + 0.6], color='0.15', ls='--',
+    axL.plot([demand_x, demand_x], [0.5, n + 0.6], color='0.15', ls='--',
              lw=1.0, zorder=4)   # above the raised metabolic sectors (zorder 3)
 
     # penalty-free metabolic-budget bracket, hovering just above the top bar:
-    # metabolism grows from the start of glycolysis (the housekeeping edge) and
-    # only starts derating translation once it passes the un-derated demand
-    # line, so that span (F_flex - phi_T,demand) is the room it can take for
-    # free. A double-headed arrow with square end caps, |<--- ... --->|.
-    bx0, bx1 = housekeeping, demand_x
+    # metabolism grows from the start of glycolysis (the origin) and only starts
+    # derating translation once it passes the un-derated demand line, so that
+    # span (F_flex - phi_T,demand) is the room it can take for free. A double-
+    # headed arrow with square end caps, |<--- ... --->|.
+    bx0, bx1 = 0.0, demand_x
     by = n + 0.55                          # clear of the top bar (top edge n+0.31)
     cap = 0.10                             # end-cap half-height
-    axR.annotate('', xy=(bx1, by), xytext=(bx0, by), annotation_clip=False,
+    axL.annotate('', xy=(bx1, by), xytext=(bx0, by), annotation_clip=False,
                  arrowprops=dict(arrowstyle='<->', color='0.15', lw=1.0,
                                  shrinkA=0.0, shrinkB=0.0), zorder=5)
     for bx in (bx0, bx1):                   # vertical end caps ('|')
-        axR.plot([bx, bx], [by - cap, by + cap], color='0.15', lw=1.0,
+        axL.plot([bx, bx], [by - cap, by + cap], color='0.15', lw=1.0,
                  solid_capstyle='butt', clip_on=False, zorder=5)
-    axR.text(0.5 * (bx0 + bx1), by + cap + 0.06,
+    axL.text(0.5 * (bx0 + bx1), by + cap + 0.06,
              'penalty-free metabolic sector budget', ha='center', va='bottom',
              fontsize=11, color='0.15', clip_on=False, zorder=5)
 
