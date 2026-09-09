@@ -92,6 +92,12 @@ from biorefineries.isobutanol import scenarios
 scenario = 'opt_IRR'
 _scenario_bundle = scenarios.load_scenario(scenario)
 
+# Capture the scenario baseline's (k_13, k_7ii) -- the swept axes -- right here,
+# before the initial-simulation block and the sweep loop overwrite r.k_13 /
+# r.k_7ii. Marked on every contour below (auto-tracks the selected scenario).
+baseline_k_13 = r.k_13
+baseline_k_7ii = r.k_7ii
+
 # f.V406.aeration_safety_factor = 0.0
 
 #%% Baseline -- simulate and solve TEA
@@ -536,7 +542,15 @@ if smoothing:
 #%% Plots
 plot = True
 
-if plot: 
+# Marker for the selected scenario's baseline in the swept (k_13, k_7ii) plane,
+# passed to every animated_contourplot below via `additional_points`
+# ({(x, y): (markershape, markerfacecolor, markersize)}; drawn with a black
+# edge at zorder 500). White star for contrast against every colormap here.
+baseline_marker_points = {
+    (baseline_k_13, baseline_k_7ii): ('*', 'white', 13),
+    }
+
+if plot:
     
     #%% MPSP
     
@@ -587,6 +601,7 @@ if plot:
                                     # comparison_range=EtOH_market_range,
                                     n_minor_ticks = 1,
                                     cbar_n_minor_ticks = 4,
+                                    additional_points = baseline_marker_points,
                                     round_yticks_to = 2,
                                     units_on_newline = (False, False, False, False), # x,y,z,w
                                     units_opening_brackets = [" (",] * 4,
@@ -876,6 +891,7 @@ if plot:
                                         # comparison_range=EtOH_market_range,
                                         n_minor_ticks = 1,
                                         cbar_n_minor_ticks = cbar_n_minor_ticks,
+                                        additional_points = baseline_marker_points,
                                         round_yticks_to = 2,
                                         units_on_newline = (False, False, False, False), # x,y,z,w
                                         units_opening_brackets = [" (",] * 4,
