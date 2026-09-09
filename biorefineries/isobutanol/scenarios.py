@@ -168,7 +168,7 @@ def assert_MPSPs_pinned(expected, current, sim_number, rel_tol=0.01):
             assert math.isnan(cur), \
                 f'sim {sim_number}: {ID} MPSP {cur} expected nan (empty product)'
         else:
-            assert abs(cur - ref)/ref < rel_tol, \
+            assert abs(cur - ref)/abs(ref) < rel_tol, \
                 (f'sim {sim_number}: {ID} MPSP {cur} not within rel tol '
                  f'{rel_tol} of pinned {ref}')
 
