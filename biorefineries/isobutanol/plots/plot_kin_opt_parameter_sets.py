@@ -964,12 +964,16 @@ if sorted(_CAT_STEPS) != sorted(eb.STEP_ORDER) \
         'eb.STEP_ORDER (%r vs %r)' % (sorted(_CAT_STEPS),
                                       sorted(eb.STEP_ORDER)))
 
-# hatch per metabolic category (same on every bar; the fill colour keys the
-# campaign). Housekeeping is left solid as the fixed, non-modeled anchor,
-# the unallocated flexible slack is drawn as empty room (no fill, no hatch),
-# and translation takes its own hatch.
-_METABOLIC_HATCHES = ('///', '\\\\\\', 'xxx', '...')
+# sector styling for panel c. The four metabolic categories are filled in the
+# campaign colour; a hatch tells them apart, EXCEPT the TCA category, which is
+# drawn fill-only (hatch None). Housekeeping and translation are instead drawn
+# HOLLOW -- no fill, with the bar's outline AND hatch both in the campaign
+# colour (matplotlib ties a patch's hatch colour to its edge colour), so they
+# read as the fixed non-metabolic anchors while still keying to the campaign.
+# The unallocated flexible slack stays empty room (no fill, no hatch).
+_METABOLIC_HATCHES = ('///', None, 'xxx', '...')
 _TRANSLATION_HATCH = 'ooo'
+_HOUSEKEEPING_HATCH = '++'
 if len(_METABOLIC_HATCHES) != len(BURDEN_CATEGORIES):
     raise AssertionError('one hatch per BURDEN_CATEGORIES entry required')
 
@@ -978,8 +982,10 @@ def draw_burden(fig, gs_cell, sets, colors):
     # full proteome allocation: each bar sums to the proteome cap PC (0.49).
     # Sectors left to right -- housekeeping | four metabolic categories | the
     # unallocated flexible slack | the growth-derated translation sector,
-    # flush against the cap on the right. Within a bar every sector is the
-    # set's colour; hatches (not tints) tell the sectors apart. Translation is
+    # flush against the cap on the right. The four metabolic sectors are filled
+    # in the set's colour and told apart by hatch (TCA fill-only); housekeeping
+    # and translation are drawn hollow -- no fill, campaign-coloured outline and
+    # hatch -- as the fixed non-metabolic anchors. Translation is
     # derated: metabolism fills the flexible sector F_flex first and the cell
     # builds only d * phi_T,demand = min(phi_T,demand, F_flex - Phi_M) of it,
     # so a single dashed line at PC - phi_T,demand marks how far translation
@@ -1011,10 +1017,16 @@ def draw_burden(fig, gs_cell, sets, colors):
     axL = fig.add_subplot(sub[0, 0])                     # housekeeping stub
     axR = fig.add_subplot(sub[0, 1], sharey=axL)         # rest of the proteome
 
-    def seg(ax, y, x, w, c, hatch=None, fill=True):
+    def seg(ax, y, x, w, c, hatch=None, fill=True, outline=None):
+        # fill=False draws empty room (white, faint grey outline). `outline`,
+        # when given, sets the edge colour explicitly -- with fill=False this
+        # draws a sector HOLLOW but keyed to the campaign: no fill, campaign-
+        # coloured outline and (the hatch colour follows the edge) campaign-
+        # coloured hatch.
         ax.barh(y, w, left=x, height=h,
                 facecolor=(c if fill else 'white'),
-                edgecolor=('0.15' if fill else '0.6'),
+                edgecolor=(outline if outline is not None
+                           else ('0.15' if fill else '0.6')),
                 lw=0.5, hatch=hatch, zorder=2)
 
     # k_7/k_8 are pinned in this study, so the translation demand phi_T is the
@@ -1027,7 +1039,8 @@ def draw_burden(fig, gs_cell, sets, colors):
 
     def draw_stack(ax, s, y, c):
         # the whole proteome bar; the axis window clips it to its own range
-        seg(ax, y, 0.0, housekeeping, c)                         # housekeeping
+        seg(ax, y, 0.0, housekeeping, c, _HOUSEKEEPING_HATCH,    # housekeeping
+            fill=False, outline=c)                               # (hollow)
         x = housekeeping
         for (_, steps), hatch in zip(cats, _METABOLIC_HATCHES):  # metabolic
             w = sum(s[f'pool_{st}'] for st in steps)
@@ -1041,7 +1054,8 @@ def draw_burden(fig, gs_cell, sets, colors):
             seg(ax, y, x, slack, c, fill=False)
         x += slack
         if phi_T_built > 0:                                      # translation
-            seg(ax, y, x, phi_T_built, c, _TRANSLATION_HATCH)
+            seg(ax, y, x, phi_T_built, c, _TRANSLATION_HATCH,    # (hollow)
+                fill=False, outline=c)
 
     for s in sets:
         y = ypos[id(s)]; c = colors[id(s)]
@@ -1088,8 +1102,10 @@ def draw_burden(fig, gs_cell, sets, colors):
              'Proteome allocation [g protein·(g DCW)$^{-1}$]',
              ha='center', va='top', fontsize=FONTS['axis'])
 
-    # sector key, in the margin to the left of the narrowed panel: neutral-grey
-    # swatches so the hatches read independent of the campaign colours. Grouped
+    # sector key, in the margin to the left of the narrowed panel: neutral
+    # swatches so the hatches read independent of the campaign colours (metabolic
+    # sectors grey-filled; the hollow housekeeping/translation sectors white with
+    # a grey outline + hatch, matching how they are drawn on the bars). Grouped
     # under a bold 'Metabolic' header, then Translation and Housekeeping, with
     # the two flexible-sector annotations (slack, un-derated demand) last.
     handles = [Line2D([], [], linestyle='none', marker='none',
@@ -1110,12 +1126,13 @@ def draw_burden(fig, gs_cell, sets, colors):
     # labelspacing (no blank spacer rows): the bold, un-indented headers already
     # mark the group breaks, and dropping the two spacers pulls the box bottom up
     # to sit roughly level with the x-axis title.
-    handles.append(plt.Rectangle((0, 0), 1, 1, facecolor='0.72',
+    handles.append(plt.Rectangle((0, 0), 1, 1, facecolor='white',
                                  edgecolor='0.15', lw=0.5,
                                  hatch=_TRANSLATION_HATCH,
                                  label='Translation'))
-    handles.append(plt.Rectangle((0, 0), 1, 1, facecolor='0.72',
+    handles.append(plt.Rectangle((0, 0), 1, 1, facecolor='white',
                                  edgecolor='0.15', lw=0.5,
+                                 hatch=_HOUSEKEEPING_HATCH,
                                  label='Housekeeping'))
     handles.append(plt.Rectangle((0, 0), 1, 1, facecolor='white',
                                  edgecolor='0.6', lw=0.5,
