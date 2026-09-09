@@ -110,12 +110,13 @@ DECISION_VARS = RATE_VARS + GROUP_VARS + FEED_VARS
 FEED_DRAW_VARS = ['target_conc', 'threshold_conc', 'n_glu_spikes']
 
 BANDS = [
-    ('Glycolysis (r1) + ethanol production (r3 → r6)',
+    ('Glycolysis ($r_1$) + ethanol production ($r_3$ → $r_6$)',
      ['k_1l', 'k_1h', 'k_1e', 'k_3', 'k_6']),
-    ('Isobutanol production (Ehrlich pathway, r13 → r14 → r15 → r16)',
+    ('Isobutanol production (Ehrlich pathway, '
+     '$r_{13}$ → $r_{14}$ → $r_{15}$ → $r_{16}$)',
      ['k_13', 'k_14', 'k_15', 'k_16']),
     ('Product inhibition relative to baseline '
-     '(applied to r1, r4, r6, r7, r10, r16)',
+     '(applied to $r_1$, $r_4$, $r_6$, $r_7$, $r_{10}$, $r_{16}$)',
      GROUP_VARS),
     ('Feeding strategy', FEED_DRAW_VARS),
 ]
@@ -673,6 +674,21 @@ RATE_YTICKS = {
 }
 
 
+def _mathify(token):
+    """Render a parameter / reaction token ('k_1l', 'k_13', 'r1', 'r13') as a
+    matplotlib mathtext symbol: an italic base letter with the trailing
+    identifier as a subscript. mathtext styles each subscript character by its
+    class on its own -- digits upright, letters italic -- so '$k_{1l}$' yields
+    an italic k with an upright '1' and an italic 'l'."""
+    base, _, sub = token.partition('_')
+    if not sub:                       # no underscore ('r13'): split off the digits
+        i = 0
+        while i < len(token) and not token[i].isdigit():
+            i += 1
+        base, sub = token[:i], token[i:]
+    return f'${base}_{{{sub}}}$'
+
+
 def bar_cell(ax, sets, colors, var, kind, ylabel, subtitle=None, ylim=None,
              band=None):
     """One parameter cell: colored bars per set with the searched band
@@ -889,7 +905,9 @@ def draw_parameters(fig, gs_rows, sets, colors, band):
             if p in RATE_VARS:
                 # reaction/enzyme descriptors go in the figure caption, not
                 # above each cell -- keep only the rate symbol on the ylabel
-                sym = REACTION_LABELS[p].partition('\n')[0]
+                # (mathtext: italic base, subscript numbers upright / letters
+                # italic)
+                sym = _mathify(p)
                 bar_cell(ax, sets, colors, p, 'rate', f'{sym}\n[{RATE_UNIT}]',
                          band=band)
             elif p in GROUP_VARS:
@@ -1077,9 +1095,10 @@ def draw_burden(fig, gs_cell, sets, colors):
     handles = [Line2D([], [], linestyle='none', marker='none',
                       label='Metabolic')]                     # section header
     for (name, steps), hatch in zip(cats, _METABOLIC_HATCHES):  # indented members
-        ids = '(%s)' % ', '.join(steps)                        # reaction ids
+        plain_ids = '(%s)' % ', '.join(steps)                  # width test (unrendered)
+        ids = '(%s)' % ', '.join(_mathify(st) for st in steps)  # rendered (mathtext)
         lines = name.split('\n')
-        if len(lines[-1]) + 1 + len(ids) <= 28:                # ids fit inline
+        if len(lines[-1]) + 1 + len(plain_ids) <= 28:          # ids fit inline
             lines[-1] += ' ' + ids
         else:                                                  # else wrap below
             lines.append(ids)
