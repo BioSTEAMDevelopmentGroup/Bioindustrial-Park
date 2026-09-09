@@ -950,10 +950,15 @@ def draw_burden(fig, gs_cell, sets, colors):
     # would reach un-derated, measured right-to-left from the cap.
     #
     # Housekeeping is the SAME fixed 0.245-wide block on every bar (half the
-    # proteome), so a broken x-axis compresses it into a narrow left panel and
-    # gives the informative flexible sector the full-width right panel. Nothing
-    # straddles the cut: housekeeping is entirely <= PC*HOUSEKEEPING_FRACTION,
-    # every other sector entirely above it, so the split needs no clipping.
+    # proteome). A broken x-axis cuts a chunk out of the MIDDLE of it: the left
+    # window keeps [0, BREAK_L], the right window resumes at BREAK_R and runs to
+    # the cap, with BREAK_L and BREAK_R both strictly inside housekeeping. So
+    # the reader still sees where housekeeping ends -- its boundary with
+    # metabolism at 0.245 sits in the right window, a little past BREAK_R. Both
+    # windows share ONE scale: their column width ratios equal their data
+    # ranges, so a 0.05 tick step is the same physical distance on each side.
+    # Housekeeping straddles the cut, so the full stack is drawn on BOTH windows
+    # and each one clips it to its own range.
     cats = BURDEN_CATEGORIES
     n = len(sets)
     PC = float(eb.PROTEIN_CONTENT)
@@ -961,9 +966,14 @@ def draw_burden(fig, gs_cell, sets, colors):
     h = 0.62
     ypos = {id(s): n - i for i, s in enumerate(sets)}
 
-    sub = gs_cell.subgridspec(1, 2, width_ratios=[1, 8], wspace=0.03)
-    axL = fig.add_subplot(sub[0, 0])                     # housekeeping (narrow)
-    axR = fig.add_subplot(sub[0, 1], sharey=axL)         # flexible sector (wide)
+    # the cut, strictly inside housekeeping (0 < BREAK_L < BREAK_R < 0.245)
+    BREAK_L, BREAK_R = 0.10, 0.20
+    xmax = PC + 0.005
+    # equal scale on both windows <=> width ratios == their data ranges
+    sub = gs_cell.subgridspec(1, 2, width_ratios=[BREAK_L, xmax - BREAK_R],
+                              wspace=0.06)
+    axL = fig.add_subplot(sub[0, 0])                     # housekeeping stub
+    axR = fig.add_subplot(sub[0, 1], sharey=axL)         # rest of the proteome
 
     def seg(ax, y, x, w, c, hatch=None, fill=True):
         ax.barh(y, w, left=x, height=h,
@@ -979,30 +989,35 @@ def draw_burden(fig, gs_cell, sets, colors):
                          '(k_7/k_8 pinned); sets differ: %r' % demands)
     demand_x = PC - demands[0]
 
-    for s in sets:
-        y = ypos[id(s)]; c = colors[id(s)]
-        seg(axL, y, 0.0, housekeeping, c)                        # housekeeping
+    def draw_stack(ax, s, y, c):
+        # the whole proteome bar; the axis window clips it to its own range
+        seg(ax, y, 0.0, housekeeping, c)                         # housekeeping
         x = housekeeping
         for (_, steps), hatch in zip(cats, _METABOLIC_HATCHES):  # metabolic
             w = sum(s[f'pool_{st}'] for st in steps)
             if w > 0:
-                seg(axR, y, x, w, c, hatch)
+                seg(ax, y, x, w, c, hatch)
             x += w
         Phi_M = float(s['Phi_M'])
         phi_T_built = float(s['burden_factor']) * float(s['phi_T'])
         slack = max(0.0, PC - housekeeping - Phi_M - phi_T_built)
         if slack > 0:                                            # empty slack
-            seg(axR, y, x, slack, c, fill=False)
+            seg(ax, y, x, slack, c, fill=False)
         x += slack
         if phi_T_built > 0:                                      # translation
-            seg(axR, y, x, phi_T_built, c, _TRANSLATION_HATCH)
+            seg(ax, y, x, phi_T_built, c, _TRANSLATION_HATCH)
 
-    # un-derated translation demand, spanning just the bar rows (not the
-    # legend headroom above them)
+    for s in sets:
+        y = ypos[id(s)]; c = colors[id(s)]
+        draw_stack(axL, s, y, c)
+        draw_stack(axR, s, y, c)
+
+    # un-derated translation demand (in the right window), spanning just the
+    # bar rows -- not the legend headroom above them
     axR.plot([demand_x, demand_x], [0.5, n + 0.6], color='0.15', ls='--',
              lw=1.0, zorder=3)
 
-    axL.set_ylim(0.4, n + 3.0)                       # shared: sets both panels
+    axL.set_ylim(0.4, n + 3.0)                       # shared: sets both windows
     for ax in (axL, axR):
         # rows are keyed by colour through the campaign legend, so the
         # categorical y axis carries no labels of its own
@@ -1012,18 +1027,19 @@ def draw_burden(fig, gs_cell, sets, colors):
                        length=4)
         ax.tick_params(axis='x', which='minor', direction='inout', top=False,
                        length=2.2)
+        # equal scale, so one tick cadence matches physically across the break
+        ax.xaxis.set_major_locator(MultipleLocator(0.05))
+        ax.xaxis.set_minor_locator(AutoMinorLocator())
         ax.spines['top'].set_visible(False)
-    axL.set_xlim(0, housekeeping)
-    axR.set_xlim(housekeeping, PC + 0.005)
-    axL.xaxis.set_major_locator(FixedLocator([0.0, 0.20]))
-    axL.xaxis.set_minor_locator(MultipleLocator(0.05))
-    axR.xaxis.set_major_locator(MultipleLocator(0.05))
-    axR.xaxis.set_minor_locator(AutoMinorLocator())
-    # drop the spines flanking the break; keep each panel's outer + bottom
-    axL.spines['left'].set_visible(False)
-    axL.spines['right'].set_visible(False)
-    axR.spines['left'].set_visible(False)
-    axR.spines['right'].set_visible(False)
+        ax.spines['left'].set_visible(False)
+        ax.spines['right'].set_visible(False)
+    axL.set_xlim(0, BREAK_L)
+    axR.set_xlim(BREAK_R, xmax)
+    # the left stub's BREAK_L tick sits right against the right window's BREAK_R
+    # label; keep the tick but blank its label so the two do not collide
+    axL.xaxis.set_major_formatter(
+        FuncFormatter(lambda v, _: '' if abs(v - BREAK_L) < 1e-9
+                      else f'{v:.2f}'))
     # diagonal break marks at the cut, fixed physical size (point markers) so
     # the unequal panel widths do not skew them
     mk = dict(marker=[(-1, -3.2), (1, 3.2)], markersize=7, linestyle='none',
