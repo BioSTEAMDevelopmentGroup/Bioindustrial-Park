@@ -1058,10 +1058,11 @@ def draw_burden(fig, gs_cell, sets, colors):
     # the two flexible-sector annotations (slack, un-derated demand) last.
     handles = [Line2D([], [], linestyle='none', marker='none',
                       label='Metabolic')]                     # section header
-    for (name, _), hatch in zip(cats, _METABOLIC_HATCHES):    # indented members
+    for (name, steps), hatch in zip(cats, _METABOLIC_HATCHES):  # indented members
+        ids = ' (%s)' % ', '.join(steps)                       # reaction ids
         handles.append(plt.Rectangle((0, 0), 1, 1, facecolor='0.72',
                                      edgecolor='0.15', lw=0.5, hatch=hatch,
-                                     label='  ' + name.replace('\n', '\n  ')))
+                                     label='  ' + name.replace('\n', '\n  ') + ids))
     handles.append(Line2D([], [], linestyle='none', marker='none',
                           label=' '))                          # spacer row
     handles.append(plt.Rectangle((0, 0), 1, 1, facecolor='0.72',
@@ -1104,9 +1105,10 @@ def plot(sets, band, out_stem, dpi=300):
     a_gs = fig.add_gridspec(1, 1, left=LEFT, right=RIGHT, top=0.945, bottom=0.775)
     band_gs = fig.add_gridspec(4, 1, left=LEFT, right=RIGHT, top=0.689,
                                bottom=0.405, hspace=1.49)
-    # panel c is narrowed on the left (left=0.25 vs LEFT) to clear a column for
+    # panel c is narrowed on the left (left=0.285 vs LEFT) to clear a column for
     # its sector legend, which now sits in that margin rather than above the bars
-    c_gs = fig.add_gridspec(1, 1, left=0.25, right=RIGHT, top=0.359, bottom=0.134)
+    # (wide enough for the longest metabolic label + its reaction ids)
+    c_gs = fig.add_gridspec(1, 1, left=0.285, right=RIGHT, top=0.359, bottom=0.134)
     colors = set_colors(sets)
     a_axes = draw_outcomes(fig, a_gs[0], sets, colors)
     b_axes = draw_parameters(fig, [band_gs[0], band_gs[1], band_gs[2],
