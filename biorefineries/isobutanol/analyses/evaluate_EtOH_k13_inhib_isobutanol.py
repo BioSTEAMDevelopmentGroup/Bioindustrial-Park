@@ -193,6 +193,16 @@ get_yield_nsk = lambda: ferm_reactor.nsk_results_specific_tau_dict['y_EtOH_IBO_g
 get_titer_nsk = lambda: ferm_reactor.nsk_results_specific_tau_dict['[s_EtOH]']
 get_prod_nsk = lambda: ferm_reactor.nsk_results_specific_tau_dict['prod_EtOH']
 
+# Per-product yield/titer/productivity (needed as greedy-trajectory targets on
+# the IRR plot; getters mirror evaluate_EtOH_k13_k7ii.py). At k_13 = 0 the
+# broth makes no isobutanol, so the IBO metrics read 0 (not NaN), keeping the
+# ethanol-only (k_13 = 0) trajectory start valid for them.
+get_EtOH_yield_nsk = lambda: ferm_reactor.nsk_results_specific_tau_dict['y_EtOH_glu_added']
+get_IBO_yield_nsk = lambda: ferm_reactor.nsk_results_specific_tau_dict['y_IBO_glu_added']
+get_IBO_titer_nsk = lambda: ferm_reactor.nsk_results_specific_tau_dict['[s_IBO]']
+get_IBO_prod_nsk = lambda: (ferm_reactor.nsk_results_specific_tau_dict['[s_IBO]']
+                            / ferm_reactor.nsk_results_specific_tau_dict['time'])
+
 get_curr_n_glu_spikes = lambda: ferm_reactor.nsk_results_specific_tau_dict['curr_n_glu_spikes']
 
 get_tau = lambda: ferm_reactor.tau
@@ -223,6 +233,10 @@ metrics = {'MPSP': {'f': get_product_MPSP, 'units': '$/kg'}, # ethanol MPSP
             'Target sugars concentration': {'f': lambda: fbs_spec.target_conc, 'units': 'g-sugars/L-broth'},
             'Cell loading': {'f': get_cell_loading, 'units': 'g-cell/L-broth'},
             'Active cell loading': {'f': get_active_cell_loading, 'units': 'g-cell/L-broth'},
+            'EtOH Yield': {'f': get_EtOH_yield_nsk, 'units': 'g-EtOH/g-sugars'},
+            'IBO Yield': {'f': get_IBO_yield_nsk, 'units': 'g-IBO/g-sugars'},
+            'IBO Titer': {'f': get_IBO_titer_nsk, 'units': 'g-IBO/L-broth'},
+            'IBO Productivity': {'f': get_IBO_prod_nsk, 'units': 'g-IBO/L-broth/h'},
             'Actual aeration required': {'f': lambda: ferm_reactor.compressed_air.imol['O2'], 'units': 'kmol-O2/h'},
             }
 
