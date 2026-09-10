@@ -518,15 +518,14 @@ def run(scenario=None,  # 'A' or 'B'; None = the preset's start scenario
     # Consolidated scenario baseline: workbook kinetics + distributions +
     # feeding strategy + one baseline model_specification (single source of
     # truth in scenarios.SCENARIOS). The BO samples on top of this baseline.
-    scenarios.load_scenario(scenario)
+    bundle = scenarios.load_scenario(scenario, burden=burden)
 
     if burden:
         from biorefineries.isobutanol import enzyme_burden as eb
-        k_ref = ko.discover_kinetic_parameters(ko.get_handles()['r_te'])
-        burden_model = eb.BurdenModel.from_reference(k_ref)
+        burden_model = bundle['burden_model']   # A-referenced, installed active
         print(burden_model.describe_point(
             burden_model.reference,
-            label=f'scenario-{scenario} reference'
+            label=f'scenario-{scenario} reference (A-calibrated)'
                   + (' (trial 0)' if enqueue_baseline else '')))
         print(burden_model.describe_point(
             {**burden_model.reference, **eb.scenario_b_ehrlich()},
