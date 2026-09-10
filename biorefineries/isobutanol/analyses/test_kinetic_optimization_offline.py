@@ -1368,7 +1368,8 @@ assert 'burden=True,' in drv26                                    # run() kwarg,
 assert 'burden_model=burden_model' in drv26                       # forwarded to the engine
 assert 'ko.default_study_name(' in drv26 and 'burden=burden' in drv26
 assert 'ko.BURDEN_STUDY_SUFFIX if burden else' in drv26           # legacy _kb path
-assert 'eb.BurdenModel.from_reference(' in drv26
+assert 'scenarios.load_scenario(scenario, burden=burden)' in drv26   # A-referenced burden from the bundle
+assert "bundle['burden_model']" in drv26                             # consumed, not rebuilt in the driver
 assert 'eb.scenario_b_ehrlich()' in drv26 and 'describe_point(' in drv26
 assert "'burden_model' in engine_kwargs" in drv26                 # ambiguity guard
 PASS('driver/supervisor: burden on by default, --no-burden, _burden naming on both paths, A/B reports wired')
