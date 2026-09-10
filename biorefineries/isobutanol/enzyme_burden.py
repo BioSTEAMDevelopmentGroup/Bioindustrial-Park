@@ -52,7 +52,7 @@ __all__ = ('PROTEIN_CONTENT', 'POOL_TABLE_PROTEIN_CONTENT', 'HOUSEKEEPING_FRACTI
            'NATIVE_STEPS', 'EHRLICH_STEPS', 'ANCHOR_STEPS',
            'GROWTH_CAPACITIES', 'STEP_ORDER', 'BURDEN_COLUMNS',
            'ehrlich_unit_cost', 'anchor_sigma',
-           'BurdenResult', 'BurdenModel',
+           'BurdenResult', 'BurdenModel', 'BurdenInfeasibleError',
            'scenarios_path', 'scenario_b_ehrlich')
 
 #%% Sector constants (spec 4.1; never change without asking)
@@ -225,6 +225,14 @@ def anchor_sigma(k_ref):
 
 #%% Burden model
 
+class BurdenInfeasibleError(ValueError):
+    """Raised at the simulate choke point (system._apply_enzyme_burden) when
+    the live kinetic point exceeds the proteome cap (Phi_M >= F_flex, growth
+    derating d = 0). A ValueError subclass so callers that already catch
+    ValueError keep working; system.py re-exports it as
+    EnzymeBurdenInfeasibleError. The sweep / uncertainty try/except -> NaN
+    wrappers turn it into a blank cell."""
+
 @dataclass(frozen=True)
 class BurdenResult:
     """One evaluated decision point. `pools` maps every step of
@@ -377,6 +385,38 @@ class BurdenModel:
         applied['k_7'] = result.k_7_eff
         applied['k_8'] = result.k_8_eff
         return applied
+
+    def derate_r_te(self, r_te):
+        """Enforce the burden on a live kinetic object in place. Read every
+        required capacity off `r_te` (getattr), evaluate the burden, and:
+        if infeasible, raise BurdenInfeasibleError WITHOUT touching r_te;
+        else set r_te.k_7 / r_te.k_8 to the derated k_7_eff / k_8_eff.
+        Returns the intended {'k_7', 'k_8'} snapshot (their values BEFORE
+        derating) for restore_r_te. `r_te` is the tellurium model
+        (V406.nsk_kinetic_model._te) or any object with getattr/setattr on
+        the capacity names (a test double)."""
+        intended = {name: float(getattr(r_te, name))
+                    for name in GROWTH_CAPACITIES}
+        values = {name: float(getattr(r_te, name))
+                  for name in self.required_capacities()}
+        result = self.evaluate(values)
+        if not result.feasible:
+            ehrlich = sum(result.pools[s] for s in EHRLICH_STEPS)
+            raise BurdenInfeasibleError(
+                'enzyme burden: the live kinetic point exceeds the proteome '
+                f'cap (Phi_M {result.Phi_M:.4f} >= F_flex {result.F_flex:.4f} '
+                f'g/gDCW; its Ehrlich capacities alone need {ehrlich:.4f}); '
+                'growth derating d = 0. Point skipped (NaN in sweeps / '
+                'uncertainty; pruned in the optimizer).')
+        setattr(r_te, 'k_7', result.k_7_eff)
+        setattr(r_te, 'k_8', result.k_8_eff)
+        return intended
+
+    def restore_r_te(self, r_te, snapshot):
+        """Write a derate_r_te snapshot back onto `r_te` (restore intended
+        k_7 / k_8). Idempotent."""
+        for name, value in snapshot.items():
+            setattr(r_te, name, value)
 
     def describe_point(self, values, label=''):
         """Printable burden report of the decision point `values`: every

@@ -17,6 +17,7 @@ import math
 import os
 import subprocess
 import sys
+import types
 
 from biorefineries.isobutanol import enzyme_burden as eb
 
@@ -295,5 +296,43 @@ assert 0.3 < frac_B(0.65).burden_factor < 0.33
 assert close((eb.F_FLEX - bm.Phi_M_wt)/pool_B, 0.81, rel=0.01)
 assert frac_B(0.75).feasible and not frac_B(0.85).feasible
 PASS('describe_point: A reference FEASIBLE, B point INFEASIBLE (Phi_M 0.286 > 0.245); B-start reference raises')
+
+#%% 15. derate_r_te / restore_r_te: A reference is inert (d = 1), snapshot returned
+import types
+bm15 = eb.BurdenModel.from_reference(K_REF)
+r = types.SimpleNamespace(**K_REF)
+snap = bm15.derate_r_te(r)
+assert snap == {'k_7': K_REF['k_7'], 'k_8': K_REF['k_8']}       # intended captured
+assert close(r.k_7, K_REF['k_7']) and close(r.k_8, K_REF['k_8'])  # d = 1, inert
+bm15.restore_r_te(r, snap)
+assert r.k_7 == K_REF['k_7'] and r.k_8 == K_REF['k_8']
+PASS('derate_r_te inert at the A reference (d=1); restore_r_te round-trips')
+
+#%% 16. idempotency: repeated derate/restore never compounds; a feasible high-IBO
+# point derates growth by the SAME factor each pass (crux of the choke-point rule)
+point16 = {**K_REF, 'k_13': 4.0, 'k_14': 3.0, 'k_15': 3.0, 'k_16': 2.0}  # burdened, feasible
+res16 = bm15.evaluate(point16)
+assert res16.feasible and res16.burden_factor < 1.0          # growth is derated
+k7s, k8s = [], []
+for _ in range(3):
+    r16 = types.SimpleNamespace(**point16)                    # fresh 'intended' each call
+    snap16 = bm15.derate_r_te(r16)
+    k7s.append(r16.k_7); k8s.append(r16.k_8)
+    bm15.restore_r_te(r16, snap16)
+    assert r16.k_7 == point16['k_7'] and r16.k_8 == point16['k_8']  # restored to intended
+assert close(k7s[0], res16.k_7_eff) and close(k8s[0], res16.k_8_eff)
+assert k7s[0] == k7s[1] == k7s[2] and k8s[0] == k8s[1] == k8s[2]    # no compounding
+PASS('derate_r_te is idempotent across repeated calls (d never compounds; intended restored)')
+
+#%% 17. infeasible point -> BurdenInfeasibleError, r_te left untouched
+r17 = types.SimpleNamespace(**{**K_REF, **B})                 # scenario-B Ehrlich: over cap
+try:
+    bm15.derate_r_te(r17)
+except eb.BurdenInfeasibleError as e:
+    assert 'F_flex' in str(e) and r17.k_7 == K_REF['k_7'] and r17.k_8 == K_REF['k_8']
+else:
+    raise AssertionError('an infeasible point did not raise BurdenInfeasibleError')
+assert issubclass(eb.BurdenInfeasibleError, ValueError)
+PASS('derate_r_te raises BurdenInfeasibleError on an over-cap point and leaves r_te unchanged')
 
 print(f'\nALL {n_pass} CHECKS PASSED')
