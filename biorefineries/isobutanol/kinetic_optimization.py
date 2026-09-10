@@ -2950,15 +2950,18 @@ def run_kinetic_optimization(objective='IRR',
         # restore_baseline re-simulates the scenario baseline; keep the
         # burden active for that (inert at the scenario-A reference), then
         # clear it so a later burden-free caller in the same kernel is not
-        # silently constrained.
-        restore_baseline(handles, kinetic_baselines,
-                         baseline_model_kwargs,
-                         baseline_max_n_spikes=baseline_max_n_spikes,
-                         baseline_stage_1_max_x=baseline_stage_1_max_x)
-        if feasible_on:
-            s = study.sampler
-            print(f'Feasible sampling: rejected {s.n_rejected} '
-                  f'draws/candidates, {s.n_uniform_fallbacks} uniform '
-                  f'fallbacks, {s.n_unfiltered} unfiltered draws.')
-        _system.set_active_burden(None)
+        # silently constrained. The nested finally guarantees the clear even
+        # if restore_baseline or the sampler-print raises.
+        try:
+            restore_baseline(handles, kinetic_baselines,
+                             baseline_model_kwargs,
+                             baseline_max_n_spikes=baseline_max_n_spikes,
+                             baseline_stage_1_max_x=baseline_stage_1_max_x)
+            if feasible_on:
+                s = study.sampler
+                print(f'Feasible sampling: rejected {s.n_rejected} '
+                      f'draws/candidates, {s.n_uniform_fallbacks} uniform '
+                      f'fallbacks, {s.n_unfiltered} unfiltered draws.')
+        finally:
+            _system.set_active_burden(None)
     return study, csv_path, kinetic_baselines
