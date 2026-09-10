@@ -14,7 +14,9 @@ separation train: ``isobutanol.load(separation_processes=('IBO_EtOH',))``.
 Reproduces the study's best-objective trial: the workbook's Baseline
 column carries the trial's exact simulated kinetic state (scenario-A
 held/non-sampled params + the sampled rates + expanded inhibition
-coefficients + burden-derated k_7/k_8), and the registry carries the
+coefficients + INTENDED (non-derated) k_7/k_8, which the
+A-referenced enzyme burden derates at the load_simulate choke
+point), and the registry carries the
 trial's feeding strategy and reproduced pins. IBO_EtOH-only == both-trains
 at S201 split 1.0 (the studies' build), so the pins transfer exactly.
 This trial is anti-economic by design (IRR ~= -0.011; the objective is
