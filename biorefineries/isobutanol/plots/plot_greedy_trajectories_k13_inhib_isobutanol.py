@@ -8,18 +8,15 @@
 # for license details.
 """
 IRR contour of the opt_IRR k_13 x inhib_isobutanol-multiplier kinetic sweep
-(enzyme burden ON), overlaid with the local-optimum MARKERS of six metrics:
-isobutanol yield/titer/productivity and ethanol yield/titer/productivity (all
-sense 'max'). Each optimum is found by a greedy 8-neighbor hill-climb from the
-ethanol-only start (k_13 = 0, inhib_isobutanol multiplier = 1.0), but only the
-optimum marker is drawn -- no connecting trajectory line. The six optima share
-one light-gray marker fill (told apart by shape) so the blue opt_IRR marker
-stands out. The financial (IRR) optimum is NOT hill-climbed -- a greedy IRR
-climb is trapped at the money-losing ethanol-only start (every 8-neighbor is
-also money-losing) -- so instead the opt_IRR point (k_13 = opt_IRR baseline,
-multiplier = 1.0) is marked with a star in the same blue the
+(enzyme burden ON), marked with the opt_IRR point (k_13 = opt_IRR baseline,
+multiplier = 1.0) -- the financial optimum -- as a star in the same blue the
 kinetic-optimization parameter-sets figure gives the IRR study (HUE_COLORS[0]
-in plot_kin_opt_parameter_sets.py).
+in plot_kin_opt_parameter_sets.py). The view is capped at k_13 = 5 (the grid
+runs to 6.5) and the multiplier axis spans 0-2 (the grid starts at 0.2).
+
+The machinery to overlay greedy 8-neighbor optimum markers for the fermentation
+metrics (isobutanol/ethanol yield/titer/productivity) is retained but disabled
+(TRAJECTORY_METRICS is empty); re-populate that list to draw them again.
 
 Consumes the per-metric CSVs written by
 analyses/evaluate_EtOH_k13_inhib_isobutanol.py (20 x 20 grid, opt_IRR baseline,
@@ -68,10 +65,9 @@ BASELINE_K13 = 0.0
 BASELINE_MULT = 1.0
 
 COLOR_METRIC = 'IRR'
-# IRR is the contour color metric but is NOT hill-climbed (see the module
-# docstring); only the six fermentation metrics get greedy trajectories.
-TRAJECTORY_METRICS = ['IBO Yield', 'IBO Titer', 'IBO Productivity',
-                      'EtOH Yield', 'EtOH Titer', 'EtOH Productivity']
+# Only the opt_IRR optimum is marked (see the module docstring); no metric is
+# hill-climbed. Leave this list empty to draw no fermentation-optimum markers.
+TRAJECTORY_METRICS = []
 SENSES = {m: 'max' for m in TRAJECTORY_METRICS}
 
 # Only the OPTIMA are drawn (no connecting hill-climb lines). The six
@@ -105,8 +101,10 @@ x_label = r"$\mathbf{k}_{13}$"
 y_label = r"$\mathbf{inhib\_isobutanol\ multiplier}$"
 x_units = r"$\mathrm{g} \cdot \mathrm{L}^{-1} \cdot \mathrm{h}^{-1}$"
 y_units = r""   # dimensionless (x opt_IRR baseline of each family member)
-x_ticks = [0, 1, 2, 3, 4, 5, 6]
-y_ticks = [0.2, 0.6, 1.0, 1.4, 1.8, 2.0]
+x_ticks = [0, 1, 2, 3, 4, 5]   # x-axis capped at 5 (see XLIM below)
+y_ticks = [0.0, 0.5, 1.0, 1.5, 2.0]
+XLIM = (0.0, 5.0)   # view limit on k_13 (the grid runs to 6.5)
+YLIM = (0.0, 2.0)   # view limit on the multiplier (the grid runs 0.2 -> 2.0)
 
 # IRR in percent on a HARD 0-25 % scale (matches the sweep's IRR branch):
 #  - money-losing cells (< 0 %, incl. -inf) render with the grey under-color;
@@ -224,9 +222,15 @@ def main():
             markerfacecolor=om_color, markeredgecolor='k', markeredgewidth=0.8,
             markersize=om_size, zorder=700, clip_on=False)
 
-    # Legend below the axes (7 marker-only handles: opt_IRR + 6 optima) in two
-    # rows; the very-light-grey face keeps the light-grey optima markers and the
-    # blue opt_IRR marker legible.
+    # cap the k_13 view at 5 (the grid runs to 6.5); the cropped region is the
+    # money-losing dark corner. The multiplier view spans 0-2 (the grid starts
+    # at 0.2, so 0-0.2 shows as blank ground).
+    ax.set_xlim(*XLIM)
+    ax.set_ylim(*YLIM)
+
+    # Legend below the axes: the opt_IRR marker, plus any fermentation-optimum
+    # markers still enabled (none by default). The very-light-grey face keeps
+    # the blue opt_IRR marker (and any light-grey optima markers) legible.
     legend_handles = [
         Line2D([0], [0], color='none', linestyle='None', marker=om_shape,
                markerfacecolor=om_color, markeredgecolor='k',
@@ -240,8 +244,8 @@ def main():
             linestyle=TRAJECTORY_LINESTYLES[m],
             linewidth=TRAJECTORY_LINEWIDTHS[m], label=m))
     ax.legend(handles=legend_handles, loc='upper center',
-              bbox_to_anchor=(0.5, -0.20), ncol=4, fontsize=8, framealpha=1.0,
-              facecolor='#eeeeee', edgecolor='k')
+              bbox_to_anchor=(0.5, -0.14), ncol=len(legend_handles), fontsize=8,
+              framealpha=1.0, facecolor='#eeeeee', edgecolor='k')
 
     stem = f'{COLOR_METRIC}_greedy_trajectories_{SWEEP_PREFIX}'
     png = os.path.join(RESULTS_DIR, stem + '.png')
