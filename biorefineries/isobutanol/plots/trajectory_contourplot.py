@@ -137,7 +137,7 @@ def plot_metric_with_trajectories(
         trajectory_colors=None,
         trajectory_linestyles=None, trajectory_linewidths=None,
         trajectory_markers=None, trajectory_marker_sizes=None,
-        baseline_marker=('D', 'gray', 6),
+        baseline_marker=('D', 'gray', 6), show_baseline_marker=True,
         optimum_marker='*', optimum_marker_size=12,
         show_legend=True, legend_kwargs=None, fig_ax=None,
         min_rel_improvement=0.0,
@@ -280,18 +280,20 @@ def plot_metric_with_trajectories(
             markeredgecolor='k', markersize=marker_size,
             linestyle=linestyle, linewidth=linewidth, label=m))
 
-    b_shape, b_color, b_size = baseline_marker
-    ax.plot(float(spec_1[ix0]), float(spec_2[iy0]), linestyle='None',
-            marker=b_shape, markerfacecolor=b_color, markeredgecolor='k',
-            markeredgewidth=0.8, markersize=b_size, zorder=650, clip_on=False)  # above optimum stars (600): visible when a climb has 0 steps
-    baseline_handle = Line2D(
-        [0], [0], color='none', marker=b_shape, markerfacecolor=b_color,
-        markeredgecolor='k', linestyle='None', label='baseline')
+    leading_handles = []
+    if show_baseline_marker:
+        b_shape, b_color, b_size = baseline_marker
+        ax.plot(float(spec_1[ix0]), float(spec_2[iy0]), linestyle='None',
+                marker=b_shape, markerfacecolor=b_color, markeredgecolor='k',
+                markeredgewidth=0.8, markersize=b_size, zorder=650, clip_on=False)  # above optimum stars (600): visible when a climb has 0 steps
+        leading_handles.append(Line2D(
+            [0], [0], color='none', marker=b_shape, markerfacecolor=b_color,
+            markeredgecolor='k', linestyle='None', label='baseline'))
 
     if show_legend:
         legend_kw = dict(loc='upper right', fontsize=8, framealpha=0.9)
         if legend_kwargs:
             legend_kw.update(legend_kwargs)
-        ax.legend(handles=[baseline_handle, *legend_handles], **legend_kw)
+        ax.legend(handles=[*leading_handles, *legend_handles], **legend_kw)
 
     return fig, ax, trajectory_data

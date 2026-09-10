@@ -181,7 +181,9 @@ def main():
         trajectory_linewidths=TRAJECTORY_LINEWIDTHS,
         trajectory_markers=TRAJECTORY_MARKERS,
         trajectory_marker_sizes=TRAJECTORY_MARKER_SIZES,
-        baseline_marker=BASELINE_MARKER,
+        # the ethanol-only baseline is still the greedy start point, but its
+        # marker is not drawn
+        show_baseline_marker=False,
         # a step must beat the sweep's own convergence tolerance (sim_rtol =
         # 1e-4) so a climb does not wander across a round-off plateau
         min_rel_improvement=1e-4,
@@ -222,14 +224,10 @@ def main():
             markerfacecolor=om_color, markeredgecolor='k', markeredgewidth=0.8,
             markersize=om_size, zorder=700, clip_on=False)
 
-    # Legend below the axes (8 marker-only handles: baseline + opt_IRR + 6
-    # optima) in two rows; the very-light-grey face keeps the light-grey optima
-    # markers, the white baseline marker and the blue opt_IRR marker all legible.
-    b_shape, b_color, b_size = BASELINE_MARKER
+    # Legend below the axes (7 marker-only handles: opt_IRR + 6 optima) in two
+    # rows; the very-light-grey face keeps the light-grey optima markers and the
+    # blue opt_IRR marker legible.
     legend_handles = [
-        Line2D([0], [0], color='none', linestyle='None', marker=b_shape,
-               markerfacecolor=b_color, markeredgecolor='k',
-               markersize=b_size, label='baseline (ethanol-only)'),
         Line2D([0], [0], color='none', linestyle='None', marker=om_shape,
                markerfacecolor=om_color, markeredgecolor='k',
                markersize=om_size, label='opt_IRR optimum'),
