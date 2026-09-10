@@ -642,11 +642,32 @@ if plot:
                             np.percentile(curr_metric_non_nans, 75),
                             curr_metric_non_nans.max()]))
         curr_metric_w_ticks.sort(reverse=False)
+
+        # Per-metric plot formatting (defaults; the IRR branch overrides).
+        curr_fmt_clabel = lambda cvalue: get_rounded_str(cvalue, 3)
+        curr_w_units = val['units']
+        curr_comparison_lines = []   # extra, distinctly-coloured labeled lines
+        scale_percent = False
+
         if 'irr' in lccm:
-            # IRR can fall far below the lowest level (money-losing corners);
-            # fill those cells rather than leaving them blank
-            extend_cmap = 'both'
+            # IRR is shown as a PERCENTAGE (x100) on a HARD 0-25% colour scale:
+            #  - gray UNDER-colour for money-losing cells (< 0%, incl. the
+            #    -inf unsolvable corners), extend_cmap='min';
+            #  - NO over-colour: the grid max (~23%) is below 25%, so nothing
+            #    extends past the top of the bar;
+            #  - break-even (0%) drawn as a WHITE labeled contour line via
+            #    comparison_lines; black labeled lines mark 5/10/15/20%;
+            #  - every contour label carries the % symbol.
+            scale_percent = True
+            curr_w_units = '%'
+            curr_fmt_clabel = lambda cvalue: f'{cvalue:.0f}%'
+            curr_metric_w_levels = np.arange(0.0, 25.0001, 25.0/80)
+            curr_metric_cbar_ticks = np.arange(0.0, 25.0001, 5.0)
+            curr_metric_w_ticks = [5.0, 10.0, 15.0, 20.0]
+            extend_cmap = 'min'
             cmap_under_color = colors.grey_dark.shade(40).RGBn
+            cmap_over_color = None
+            curr_comparison_lines = [0.0]
         # curr_metric_w_levels = np.arange(0., 15.5, 0.5)
 
 
@@ -654,7 +675,9 @@ if plot:
         # drawn with an under-color extend (IRR), push -inf (unsolvable,
         # money-losing points) to just below the lowest level so those cells
         # fill with cmap_under_color instead of vanishing.
-        plot_data = results[curr_metric]
+        plot_data = np.array(results[curr_metric], dtype=float)
+        if scale_percent:
+            plot_data = plot_data * 100.0  # fractions -> percent (-inf/nan preserved)
         if cmap_under_color is not None:
             _pd = np.array(plot_data, dtype=float)
             if np.isneginf(_pd).any():
@@ -679,14 +702,16 @@ if plot:
                                         x_units=x_units,
                                         y_units=y_units,
                                         z_units=z_units,
-                                        w_units=val['units'],
+                                        w_units=curr_w_units,
                                         # fmt_clabel=lambda cvalue: r"$\mathrm{\$}$"+" {:.1f} ".format(cvalue)+r"$\cdot\mathrm{kg}^{-1}$", # format of contour labels
-                                        fmt_clabel = lambda cvalue: get_rounded_str(cvalue, 3),
+                                        fmt_clabel = curr_fmt_clabel,
                                         cmap=cmap, # can use 'viridis' or other default matplotlib colormaps
                                         # cmap_over_color = colors.grey_dark.shade(8).RGBn,
                                         cmap_over_color=cmap_over_color,
                                         cmap_under_color=cmap_under_color,
                                         extend_cmap=extend_cmap,
+                                        comparison_lines=curr_comparison_lines, # white 0% break-even line for IRR
+                                        comparison_lines_colors='white',
                                         cbar_ticks=curr_metric_cbar_ticks,
                                         z_marker_color='g', # default matplotlib color names
                                         fps=fps, # animation frames (z values traversed) per second
