@@ -23,12 +23,63 @@ from biorefineries.isobutanol.process_settings import (
     load_process_settings, CEPCI, PRICE_YEAR, index_prices_to_price_year)
 from biorefineries.isobutanol.separations import create_separation_system
 
+from contextlib import contextmanager as _contextmanager
+from biorefineries.isobutanol import enzyme_burden as _eb
+
 from warnings import filterwarnings
 filterwarnings('ignore')
 
 MultiEffectEvaporator = bst.MultiEffectEvaporator
 
-__all__ = ('load', 'solve_TEA', 'solve_TEA_at_IRR')
+__all__ = ('load', 'solve_TEA', 'solve_TEA_at_IRR',
+           'set_active_burden', 'get_active_burden',
+           'EnzymeBurdenInfeasibleError')
+
+#: The enzyme burden enforced at the simulate choke point, or None (off).
+#: Set by scenarios.load_scenario (policy) / the kinetic optimizer; read by
+#: _apply_enzyme_burden inside load_simulate. Module state because every
+#: simulate path (smoke tests, sweeps, uncertainty, optimizer) flows through
+#: load_simulate but not through a shared object.
+_active_burden = None
+
+#: Re-export so callers catch a system-level name (it IS the enzyme_burden
+#: exception, so an except in either module matches).
+EnzymeBurdenInfeasibleError = _eb.BurdenInfeasibleError
+
+
+def set_active_burden(burden_model):
+    """Install (or clear, with None) the enzyme burden enforced by
+    load_simulate. See _apply_enzyme_burden."""
+    global _active_burden
+    _active_burden = burden_model
+
+
+def get_active_burden():
+    """The currently active enzyme BurdenModel, or None."""
+    return _active_burden
+
+
+@_contextmanager
+def _apply_enzyme_burden():
+    """Enforce the active enzyme burden across a load_simulate convergence
+    loop. When a burden is active, snapshot the intended (k_7, k_8) on the
+    kinetic model, set them to their burden-derated values for the duration
+    of the loop, and restore the intended values on exit (success or error)
+    -- the snapshot-at-top / restore-in-finally idempotency rule, so d never
+    compounds across repeated load_simulate calls (the recovery barrage) and
+    r_te shows intended k_7/k_8 between calls. A no-op when no burden is
+    active. Raises EnzymeBurdenInfeasibleError (before simulating) on an
+    over-cap point."""
+    burden = _active_burden
+    if burden is None:
+        yield
+        return
+    r_te = V406.nsk_kinetic_model._te
+    snapshot = burden.derate_r_te(r_te)   # may raise EnzymeBurdenInfeasibleError
+    try:
+        yield
+    finally:
+        burden.restore_r_te(r_te, snapshot)
 
 _loaded = False
 _published = None
@@ -1082,28 +1133,29 @@ def load_simulate(target_conc=None,
     n_sims_run = 0
     drifts = []
     prev = _simulation_drift_state()
-    while n_sims_run < n_sims:
-        # load_specifications ends by setting the feed/spike splitter from the
-        # kinetic run it just made; snapshot the split so a rejected run can
-        # be undone (a collapsed split would otherwise poison the next call).
-        splitter = fbs_spec.splitter
-        split_before = np.array(splitter.split, copy=True)
-        fbs_spec.load_specifications(target_conc=target_conc,
-        threshold_conc=threshold_conc,
-        spike_conc=spike_conc,
-        tau_max=tau_max,
-        max_n_spikes=max_n_spikes,)
-        _check_fed_batch_volume_ratio(splitter, split_before)
+    with _apply_enzyme_burden():
+      while n_sims_run < n_sims:
+          # load_specifications ends by setting the feed/spike splitter from the
+          # kinetic run it just made; snapshot the split so a rejected run can
+          # be undone (a collapsed split would otherwise poison the next call).
+          splitter = fbs_spec.splitter
+          split_before = np.array(splitter.split, copy=True)
+          fbs_spec.load_specifications(target_conc=target_conc,
+          threshold_conc=threshold_conc,
+          spike_conc=spike_conc,
+          tau_max=tau_max,
+          max_n_spikes=max_n_spikes,)
+          _check_fed_batch_volume_ratio(splitter, split_before)
 
-        corn_EtOH_IBO_sys.simulate()
-        n_sims_run += 1
-        curr = _simulation_drift_state()
-        drift = float(np.max(np.abs(curr - prev)
-                             / np.maximum(np.abs(prev), 1e-12)))
-        drifts.append(drift)
-        prev = curr
-        if drift <= sim_rtol:
-            break
+          corn_EtOH_IBO_sys.simulate()
+          n_sims_run += 1
+          curr = _simulation_drift_state()
+          drift = float(np.max(np.abs(curr - prev)
+                               / np.maximum(np.abs(prev), 1e-12)))
+          drifts.append(drift)
+          prev = curr
+          if drift <= sim_rtol:
+              break
     convergence_log.append((n_sims_run, tuple(drifts)))
 
     if plot:
@@ -1274,6 +1326,11 @@ def model_specification(**kwargs):
     try:
         load_simulate(**curr_spec)
     except Exception as e:
+        if isinstance(e, _eb.BurdenInfeasibleError):
+            # Enzyme burden (load_simulate choke point): the point itself is
+            # over the proteome cap, so re-simulating it cannot help and the
+            # sweep/uncertainty caller wants a NaN. Re-raise at once.
+            raise
         str_e = str(e).lower()
         print('Error in model spec: %s'%str_e)
         # raise e
