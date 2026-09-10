@@ -241,7 +241,7 @@ def lost_cause(killed_for_stall, stall_timeout_min, returncode):
 
 def child_code(scenario, objective, n_trials, kinetic_bounds_scenario,
                make_plots, study_name, restrict_to_workbook=True,
-               seed=3221, study_target_products=None, study_type=None,
+               seed=None, study_target_products=None, study_type=None,
                burden=True, enqueue_baseline=False, enqueue_knockouts=False,
                rate_multiplier_bounds=None, n_startup_trials=None,
                feasible_sampling=True, exclude_params=None,
@@ -305,7 +305,7 @@ def supervise(scenario=None, objective='IRR', n_trials=2000,
               kinetic_bounds_scenario=None, make_plots=True,
               study_name=None, stall_timeout_min=3.0, poll_s=30.0,
               settle_s=10.0, python=None, log_path=None,
-              restrict_to_workbook=True, seed=3221,
+              restrict_to_workbook=True, seed=None,
               study_target_products=ko.DEFAULT_STUDY_TARGET_PRODUCTS,
               study_type=ko.DEFAULT_STUDY_TYPE, burden=True,
               enqueue_baseline=False, enqueue_knockouts=False,
@@ -541,12 +541,15 @@ if __name__ == '__main__':
                         help='name in OBJECTIVE_REGISTRY (callables: use '
                              'the unsupervised driver)')
     parser.add_argument('--n-trials', type=int, default=2000)
-    parser.add_argument('--seed', type=int, default=3221,
+    parser.add_argument('--seed', type=int, default=None,
                         help='sampler seed forwarded to the driver run(); '
-                             'give parallel studies distinct seeds so their '
-                             'objective-independent startup draws differ '
-                             '(avoids lockstep stalls on the same '
-                             'pathological kinetic draw)')
+                             "default None = the engine's launch-datetime "
+                             'seed (year/day**2)*month*((hour+1)/10)*((minute+1)/10). '
+                             'Give parallel studies distinct explicit seeds '
+                             'so their objective-independent startup draws '
+                             'differ (avoids lockstep stalls on the same '
+                             'pathological kinetic draw; same-minute launches '
+                             'get the same datetime seed)')
     parser.add_argument('--kinetic-bounds-scenario', default=None,
                         choices=('A', 'B'),
                         help="derive kinetic bounds from this scenario's "

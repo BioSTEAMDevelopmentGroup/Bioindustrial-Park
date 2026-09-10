@@ -41,6 +41,7 @@ tag is metadata). Kinetic parameters and feeding specs are restored to
 their scenario baselines in a `finally` after every run.
 """
 import csv
+import datetime
 import importlib.util
 import json
 import math
@@ -84,7 +85,8 @@ __all__ = ('OBJECTIVE_REGISTRY', 'TRACKED_METRICS',
            'StallGuard', 'attempt_outcome',
            'search_space_distributions', 'draw_uniform_feasible',
            'feasible_candidate_mask', 'feasible_tpe_sampler',
-           'DEFAULT_GAMMA_FRACTION', 'DEFAULT_GAMMA_CAP', 'default_tpe_gamma')
+           'DEFAULT_GAMMA_FRACTION', 'DEFAULT_GAMMA_CAP', 'default_tpe_gamma',
+           'default_seed_from_datetime')
 
 FEEDING_VARIABLES = ('threshold_conc', 'target_delta', 'spike_delta',
                      'max_n_spikes')
@@ -2255,6 +2257,30 @@ def default_tpe_gamma(n_trials):
     optuna's default min(ceil(0.10 * n_trials), 25)."""
     return min(math.ceil(DEFAULT_GAMMA_FRACTION * n_trials), DEFAULT_GAMMA_CAP)
 
+def default_seed_from_datetime(when=None):
+    """Default sampler seed derived from a study's start date and time
+    (set 2026-09-10, replacing the fixed 3221):
+
+        seed = int((year / day**2) * month
+                   * ((hour + 1) / 10) * ((minute + 1) / 10))
+
+    `when` is a datetime; None -> datetime.datetime.now() (local time), i.e.
+    the moment the study is LAUNCHED, which for a fresh study is its start.
+    Used by run_kinetic_optimization when its `seed` argument is None.
+
+    Caveats: a RESUMED launch recomputes the base seed from the resume time
+    (the engine already offsets the seed by the number of stored trials, so
+    resumes draw fresh points regardless); the result can still be 0 for a
+    late-month, low hour/minute launch (the small product truncates to 0;
+    optuna accepts a 0 seed); and two studies launched in the same
+    clock-minute get the SAME seed -- pass an explicit seed to parallel
+    studies that must differ."""
+    if when is None:
+        when = datetime.datetime.now()
+    seed = ((when.year / (when.day**2)) * when.month
+            * ((when.hour + 1) / 10) * ((when.minute + 1) / 10))
+    return int(seed)
+
 #%% Engine
 
 def get_handles():
@@ -2306,7 +2332,7 @@ def run_kinetic_optimization(objective='IRR',
                              direction=None, level=None,
                              objective_units=None, objective_name=None,
                              scenario_label='B',
-                             n_trials=2000, seed=3221,
+                             n_trials=2000, seed=None,
                              multiplier_bounds=(0.1, 10.0),
                              param_bounds_override=None,
                              exclude_params=(),
@@ -2705,6 +2731,10 @@ def run_kinetic_optimization(objective='IRR',
                                 direction=direction,
                                 load_if_exists=True)
     n_done = len(study.trials)
+    if seed is None:
+        seed = default_seed_from_datetime()
+        print(f'Default sampler seed from the launch datetime: {seed} '
+              '((year/day**2)*month*((hour+1)/10)*((minute+1)/10)).')
     # Offset the seed by the number of stored trials so a resumed study
     # draws fresh points instead of replaying the original RNG stream.
     def _burden_constraints(frozen_trial):

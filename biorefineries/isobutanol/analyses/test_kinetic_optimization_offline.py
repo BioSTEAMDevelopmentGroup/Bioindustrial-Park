@@ -3751,4 +3751,31 @@ else:
     print('SKIP 46 (engine part): optuna not installed')
 PASS('enqueue_baseline + enqueue_knockouts: BOTH default FALSE for all studies (a default fresh study enqueues NO point: pure-defaults engine run has no fixed_params on trial 0; opt-in restores the enqueued baseline); driver run() and supervisor supervise()/child_code() thread both; opt-in --enqueue-baseline / --enqueue-knockouts, the --no-* opt-outs gone; off study name')
 
+#%% 47. default seed from the study's launch datetime (set 2026-09-10,
+# replacing the fixed 3221):
+# seed = int((year/day**2)*month*((hour+1)/10)*((minute+1)/10)), computed by
+# the engine (ko.default_seed_from_datetime) whenever seed is None -- the new
+# default across the engine, the driver run() and the supervisor.
+import datetime as _dt47
+assert 'default_seed_from_datetime' in ko.__all__
+# The exact equation on fixed datetimes.
+assert ko.default_seed_from_datetime(_dt47.datetime(2026, 9, 10, 14, 30)) == 847
+assert ko.default_seed_from_datetime(_dt47.datetime(2024, 3, 6, 20, 50)) == 1806
+# +1 on hour/minute lifts the hour==0/minute==0 corner off 0 ...
+assert ko.default_seed_from_datetime(_dt47.datetime(2020, 1, 1, 0, 0)) == 20
+# ... but a late-month, low hour/minute launch still truncates to 0 (documented).
+assert ko.default_seed_from_datetime(_dt47.datetime(2025, 1, 31, 0, 0)) == 0
+_s47 = ko.default_seed_from_datetime()                # when=None -> now()
+assert isinstance(_s47, int) and _s47 >= 0
+# seed default is the None sentinel in the engine, driver and supervisor.
+assert _inspect.signature(ko.run_kinetic_optimization).parameters['seed'].default is None
+assert 'seed=None,' in drv30                          # driver run() default
+assert _inspect.signature(sup30['supervise']).parameters['seed'].default is None
+assert _inspect.signature(sup30['child_code']).parameters['seed'].default is None
+assert "'--seed', type=int, default=None" in src30    # supervisor CLI default
+PASS('default seed from launch datetime: int((year/day**2)*month*((hour+1)/10)*((minute+1)/10)) '
+     'via ko.default_seed_from_datetime (exported), computed by the engine when seed '
+     'is None; +1 lifts the hour/minute-0 corner (late-month low h/m still 0); seed '
+     'default None across engine + driver run() + supervisor supervise()/child_code()/--seed')
+
 print(f'\nALL {n_pass} CHECKS PASSED')
