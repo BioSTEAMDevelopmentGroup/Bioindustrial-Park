@@ -89,12 +89,17 @@ y_units = r""    # dimensionless (x scenario-A baseline of each member)
 x_ticks = [0, 100, 200, 300]
 y_ticks = [0.2, 0.6, 1.0, 1.4, 1.8]
 
-# IRR is plotted in percent. The grid's finite range is ~ -68 % to 13 %; the
-# colorbar covers -10 % to 14 % and the extend arrows catch both ends (the
-# under-color also absorbs the -inf money-losing cells cleaned in main()).
-IRR_w_levels = np.arange(-10.0, 14.001, 0.5)
-IRR_cbar_ticks = np.arange(-10.0, 14.001, 5.0)     # -10, -5, 0, 5, 10
-IRR_w_ticks = [-5.0, 0.0, 5.0, 10.0, 12.0]         # black labeled contour lines
+# IRR is plotted in percent. Colorbar/levels span 0 % (lower bound) to 25 %
+# (upper bound): everything below 0 % falls in the gray under-color, and there
+# is NO over-color above 25 % (the grid maxes near 13 %). 0 % is drawn as a
+# white labeled contour (added in main), 10-20 % is a white hatched comparison
+# band (contourplots comparison_range, with white edge labels), and the only
+# black labeled contour is 5 %.
+IRR_w_levels = np.arange(0.0, 25.001, 0.5)
+IRR_cbar_ticks = np.arange(0.0, 25.001, 5.0)       # 0, 5, 10, 15, 20, 25
+IRR_w_ticks = [5.0]                                # black labeled contour line(s)
+IRR_UNDER_GRAY = (0.5, 0.5, 0.5)                   # under-color for IRR < 0 %
+IRR_COMPARISON_RANGE = [10.0, 20.0]                # white hatched comparison band
 fmt_percent = lambda v, pos=None: f'{v:g}%'
 
 axis_title_fonts = {'size': {'x': 11, 'y': 11, 'z': 11, 'w': 11}}
@@ -137,10 +142,11 @@ def main():
                for m in dict.fromkeys([COLOR_METRIC, *TRAJECTORY_METRICS])}
     results['IRR'] = 100. * results['IRR']   # fraction -> percent
 
-    # Money-losing cells solve_TEA reports as IRR = -inf: push them just below
-    # the lowest level so contourf fills them with the under-color instead of
-    # tripping on a non-finite value. For a max-climb they never improve, so
-    # cleaning them to a finite low value leaves every trajectory unchanged.
+    # Money-losing cells solve_TEA reports as IRR = -inf: contourf masks any
+    # non-finite value as BLANK (not under-color), so push them just below the
+    # lowest level (0 %) to make them render in the gray under-color like the
+    # finite negatives. For a max-climb they never improve, so cleaning them to
+    # a finite low value leaves every trajectory unchanged.
     irr = results['IRR']
     if np.isneginf(irr).any():
         irr[np.isneginf(irr)] = IRR_w_levels[0] - (IRR_w_levels[1] - IRR_w_levels[0])
@@ -172,9 +178,13 @@ def main():
         x_ticks=x_ticks, y_ticks=y_ticks,
         cmap=tc.JBEI_UCB_colormap(reverse=True),
         w_levels=IRR_w_levels, cbar_ticks=IRR_cbar_ticks, w_ticks=IRR_w_ticks,
-        extend_cmap='both',
-        cmap_over_color=colors.yellow_tint.RGBn,
-        cmap_under_color=colors.grey_dark.shade(40).RGBn,
+        # lower bound 0 % (gray under-color), upper bound 25 % (no over-color)
+        extend_cmap='min',
+        cmap_over_color=None,
+        cmap_under_color=IRR_UNDER_GRAY,
+        # NB: the 10-20 % white hatched comparison band is drawn manually in
+        # main() (contourplots 0.4.0's own comparison_range uses the removed
+        # QuadContourSet.collections and breaks on matplotlib >= 3.8).
         # passed through to contourplots.animated_contourplot
         fmt_clabel=fmt_percent,
         axis_title_fonts=axis_title_fonts,
@@ -192,6 +202,40 @@ def main():
     # percent ticks on the colorbar (the last axes contourplots added)
     cbar_ax = [a for a in fig.axes if a is not ax][-1]
     cbar_ax.yaxis.set_major_formatter(FuncFormatter(fmt_percent))
+
+    Xg, Yg = np.meshgrid(SPEC_1, SPEC_2)
+    irr_grid = results['IRR'][0]
+    _WHITE = (1, 1, 1, 0.9)
+
+    # White hatched comparison band, 10-20 % IRR (drawn manually; see the note
+    # at the engine call). The grid maxes near 13 %, so the hatch appears where
+    # IRR in [10 %, data max] and the 20 % edge simply has no cells.
+    with matplotlib.rc_context({'hatch.color': _WHITE, 'hatch.linewidth': 0.6}):
+        band = ax.contourf(Xg, Yg, irr_grid, levels=IRR_COMPARISON_RANGE,
+                           colors='none', hatches=['///'], zorder=300)
+    try:
+        band.set_facecolor('none')
+        band.set_edgecolor(_WHITE)
+    except Exception:
+        pass
+    band_lines = ax.contour(Xg, Yg, irr_grid, levels=IRR_COMPARISON_RANGE,
+                            colors=[_WHITE], linewidths=1.0, zorder=301)
+    ax.clabel(band_lines, IRR_COMPARISON_RANGE, fmt=fmt_percent, colors='white',
+              fontsize=clabel_fontsize, inline=True, inline_spacing=6, zorder=500)
+    # mirror the hatched band onto the colorbar (data coords in %, axis-frac x)
+    with matplotlib.rc_context({'hatch.color': _WHITE, 'hatch.linewidth': 0.6}):
+        cbar_ax.fill_betweenx(IRR_COMPARISON_RANGE, 0, 1,
+                              transform=cbar_ax.get_yaxis_transform(),
+                              facecolor='none', edgecolor=_WHITE,
+                              hatch='///', linewidth=0.6, zorder=5)
+
+    # White 0 % contour line + label (the profitability boundary between the
+    # gray IRR < 0 region and the colormap). Drawn manually so both the line
+    # and its label are white (contourplots draws the w_ticks contours black).
+    zero_cs = ax.contour(Xg, Yg, irr_grid, levels=[0.0],
+                         colors='white', linewidths=1.3, zorder=350)
+    ax.clabel(zero_cs, [0.0], fmt=lambda v, pos=None: '0%', colors='white',
+              fontsize=clabel_fontsize, inline=True, inline_spacing=6, zorder=500)
 
     stem = f'{COLOR_METRIC}_greedy_trajectories_{SWEEP_PREFIX}'
     png = os.path.join(RESULTS_DIR, stem + '.png')
