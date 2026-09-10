@@ -2833,8 +2833,9 @@ def run_kinetic_optimization(objective='IRR',
             # sampled values alone, so an over-cap point is logged and
             # pruned BEFORE the sidecar and the ~20 s simulation, and no
             # baseline state is disturbed. The CSV keeps the sampled
-            # k_7/k_8 as the decision; the model receives the derated
-            # k_7_eff/k_8_eff through `applied` below.
+            # k_7/k_8 as the decision; the model receives the INTENDED
+            # k_7/k_8 through `applied` below (see the comment further
+            # down for where the derating actually happens).
             burden = burden_model.evaluate(applied_kinetics)
             record.update(burden.as_record())
             trial.set_user_attr('burden_violation', burden.violation)
@@ -2847,7 +2848,13 @@ def run_kinetic_optimization(objective='IRR',
                       f'burden (Phi_M {burden.Phi_M:.4f} > F_flex '
                       f'{burden.F_flex:.4f} g/gDCW); pruned before simulating.')
                 raise optuna.TrialPruned()
-            applied = burden_model.apply(applied_kinetics)
+            # Feasible: the k_7/k_8 derating is applied by the shared
+            # load_simulate choke point (system._apply_enzyme_burden) using
+            # the active burden installed below, so the model receives the
+            # INTENDED capacities here and the choke point derates growth.
+            # (The pre-sim evaluate above still records the burden columns
+            # and prunes over-cap points before the ~20 s simulation.)
+            applied = applied_kinetics
         else:
             applied = applied_kinetics
         # The decision vector is complete here (every suggest_* has run)
@@ -2933,10 +2940,17 @@ def run_kinetic_optimization(objective='IRR',
     if n_done:
         print(f'Resuming study {study_name}: {n_done} trials stored; '
               f'running {n_remaining} more (budget {n_trials}).')
+    from biorefineries.isobutanol import system as _system
+    if burden_on:
+        _system.set_active_burden(burden_model)
     try:
         study.optimize(_objective, n_trials=n_remaining, n_jobs=1,
                        gc_after_trial=True)
     finally:
+        # restore_baseline re-simulates the scenario baseline; keep the
+        # burden active for that (inert at the scenario-A reference), then
+        # clear it so a later burden-free caller in the same kernel is not
+        # silently constrained.
         restore_baseline(handles, kinetic_baselines,
                          baseline_model_kwargs,
                          baseline_max_n_spikes=baseline_max_n_spikes,
@@ -2946,4 +2960,5 @@ def run_kinetic_optimization(objective='IRR',
             print(f'Feasible sampling: rejected {s.n_rejected} '
                   f'draws/candidates, {s.n_uniform_fallbacks} uniform '
                   f'fallbacks, {s.n_unfiltered} unfiltered draws.')
+        _system.set_active_burden(None)
     return study, csv_path, kinetic_baselines

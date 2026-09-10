@@ -1160,7 +1160,11 @@ else:
     assert np.isnan(df25['objective'][0]) and np.isnan(df25['IRR'][0])
     assert df25['error'][0].startswith('enzyme burden: Phi_M ')
     assert n_sidecar25 == [1, 2], n_sidecar25
-    # trial 1: the CSV keeps the SAMPLED k_7, the model received the EFFECTIVE k_7
+    # trial 1: the CSV keeps the SAMPLED k_7; the model now receives the
+    # INTENDED (sampled) k_7 too -- the k_7/k_8 derating is delegated to the
+    # load_simulate choke point (system._apply_enzyme_burden), which this
+    # offline no-load harness does not exercise. The burden columns
+    # (k_7_eff etc.) are still recorded by the pre-sim evaluate.
     assert np.isclose(df25['k_7'][1], 9.0*1.203)
     assert np.isclose(df25['burden_factor'][1], 0.17701, rtol=1e-3)   # 0.13276 at TRANSLATION_FRACTION_WT = 0.30
     assert np.isclose(df25['k_7_eff'][1], 1.9165, rtol=1e-3)          # 1.4374 at 0.30
@@ -1172,10 +1176,12 @@ else:
     # trial 2: the reference is inert
     assert df25['burden_factor'][2] == 1.0 and df25['k_7_eff'][2] == 1.203
     assert np.isclose(df25['pool_r1'][2], eb.NATIVE_STEPS['r1'][0]) and df25['pool_r13'][2] == 0.0
-    # model_specification saw trial 1's effective k_7, trial 2's reference k_7,
+    # model_specification saw trial 1's INTENDED (sampled) k_7 -- the
+    # optimizer no longer derates it in-place; that happens at the
+    # load_simulate choke point instead -- then trial 2's reference k_7,
     # then restore_baseline's reference k_7 (2 simulations + the finally)
     assert len(seen_k7) == 3, seen_k7
-    assert np.isclose(seen_k7[0], 1.9165, rtol=1e-3) and seen_k7[1] == 1.203 and seen_k7[2] == 1.203
+    assert np.isclose(seen_k7[0], 9.0*1.203) and seen_k7[1] == 1.203 and seen_k7[2] == 1.203
     assert te25.k_7 == 1.203 and te25.k_8 == 0.589                  # restored
     assert not os.path.isfile(side25)
     # optuna side: the infeasible trial is PRUNED, its violation reached the
@@ -3365,13 +3371,12 @@ else:
     assert cols44g[-1] == 'error'
     assert df44g['trial_number'].tolist() == [0, 1, 2]
     assert df44g['state'].tolist() == ['COMPLETE']*3
-    # The burden model ran on every trial (feasible -> evaluate then apply),
-    # and NOT on the finally's restore_baseline (which never touches burden).
-    assert len(burden44g.seen_evaluate) == 3 and len(burden44g.seen_apply) == 3
+    # The burden model's evaluate() ran on every feasible trial (to record
+    # columns + prune); apply() is no longer called -- the k_7/k_8 derating
+    # moved to the load_simulate choke point.
+    assert len(burden44g.seen_evaluate) == 3 and burden44g.seen_apply == []
     for i44g in range(3):
         seen_e = burden44g.seen_evaluate[i44g]
-        seen_a = burden44g.seen_apply[i44g]
-        assert seen_e == seen_a           # apply() saw exactly what evaluate() saw
         assert 'inhib_ethanol' not in seen_e         # the group key never reaches the burden model
         assert 'k_10' not in seen_e                  # excluded param: not sampled, not expanded, not passed
         assert {'k_1ie', 'k_4ie'} <= set(seen_e)      # the expanded members ARE passed
@@ -3380,8 +3385,9 @@ else:
         assert np.isclose(seen_e['k_4ie'], 0.04*mult44g, rtol=1e-12, atol=0.0)
         assert np.isclose(df44g['applied_k_1ie'][i44g], seen_e['k_1ie'], rtol=1e-12, atol=0.0)
         assert np.isclose(df44g['applied_k_4ie'][i44g], seen_e['k_4ie'], rtol=1e-12, atol=0.0)
-    # The model itself also received the expanded values (via apply()), the
-    # excluded k_10 untouched, the baseline restored afterwards.
+    # The model itself also received the expanded values (via the setattr
+    # loop / `applied` -- apply() is gone), the excluded k_10 untouched, the
+    # baseline restored afterwards.
     assert len(seen44g) == 4, seen44g   # 3 trials + the finally's restore
     for i44g in range(3):
         spike44g, k1ie44g, k4ie44g, k10_44g = seen44g[i44g]
