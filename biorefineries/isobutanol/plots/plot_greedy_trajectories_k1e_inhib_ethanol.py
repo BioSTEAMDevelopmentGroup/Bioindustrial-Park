@@ -91,15 +91,14 @@ y_ticks = [0.2, 0.6, 1.0, 1.4, 1.8]
 
 # IRR is plotted in percent. Colorbar/levels span 0 % (lower bound) to 25 %
 # (upper bound): everything below 0 % falls in the gray under-color, and there
-# is NO over-color above 25 % (the grid maxes near 13 %). 0 % is drawn as a
-# white labeled contour (added in main), 10-20 % is a white hatched comparison
-# band (contourplots comparison_range, with white edge labels), and the only
-# black labeled contour is 5 %.
+# is NO over-color above 25 % (the grid maxes near 13 %). 0 % and 10 % are
+# drawn as white labeled contours (added in main); the only black labeled
+# contour is 5 %.
 IRR_w_levels = np.arange(0.0, 25.001, 0.5)
 IRR_cbar_ticks = np.arange(0.0, 25.001, 5.0)       # 0, 5, 10, 15, 20, 25
 IRR_w_ticks = [5.0]                                # black labeled contour line(s)
 IRR_UNDER_GRAY = (0.5, 0.5, 0.5)                   # under-color for IRR < 0 %
-IRR_COMPARISON_RANGE = [10.0, 20.0]                # white hatched comparison band
+IRR_WHITE_CONTOURS = [0.0, 10.0]                   # white labeled contour lines
 fmt_percent = lambda v, pos=None: f'{v:g}%'
 
 axis_title_fonts = {'size': {'x': 11, 'y': 11, 'z': 11, 'w': 11}}
@@ -182,9 +181,9 @@ def main():
         extend_cmap='min',
         cmap_over_color=None,
         cmap_under_color=IRR_UNDER_GRAY,
-        # NB: the 10-20 % white hatched comparison band is drawn manually in
-        # main() (contourplots 0.4.0's own comparison_range uses the removed
-        # QuadContourSet.collections and breaks on matplotlib >= 3.8).
+        # NB: the white 0 % and 10 % contour lines/labels are drawn manually in
+        # main() so both the line and its label are white (contourplots draws
+        # the w_ticks contours in black).
         # passed through to contourplots.animated_contourplot
         fmt_clabel=fmt_percent,
         axis_title_fonts=axis_title_fonts,
@@ -205,36 +204,14 @@ def main():
 
     Xg, Yg = np.meshgrid(SPEC_1, SPEC_2)
     irr_grid = results['IRR'][0]
-    _WHITE = (1, 1, 1, 0.9)
 
-    # White hatched comparison band, 10-20 % IRR (drawn manually; see the note
-    # at the engine call). The grid maxes near 13 %, so the hatch appears where
-    # IRR in [10 %, data max] and the 20 % edge simply has no cells.
-    with matplotlib.rc_context({'hatch.color': _WHITE, 'hatch.linewidth': 0.6}):
-        band = ax.contourf(Xg, Yg, irr_grid, levels=IRR_COMPARISON_RANGE,
-                           colors='none', hatches=['///'], zorder=300)
-    try:
-        band.set_facecolor('none')
-        band.set_edgecolor(_WHITE)
-    except Exception:
-        pass
-    band_lines = ax.contour(Xg, Yg, irr_grid, levels=IRR_COMPARISON_RANGE,
-                            colors=[_WHITE], linewidths=1.0, zorder=301)
-    ax.clabel(band_lines, IRR_COMPARISON_RANGE, fmt=fmt_percent, colors='white',
-              fontsize=clabel_fontsize, inline=True, inline_spacing=6, zorder=500)
-    # mirror the hatched band onto the colorbar (data coords in %, axis-frac x)
-    with matplotlib.rc_context({'hatch.color': _WHITE, 'hatch.linewidth': 0.6}):
-        cbar_ax.fill_betweenx(IRR_COMPARISON_RANGE, 0, 1,
-                              transform=cbar_ax.get_yaxis_transform(),
-                              facecolor='none', edgecolor=_WHITE,
-                              hatch='///', linewidth=0.6, zorder=5)
-
-    # White 0 % contour line + label (the profitability boundary between the
-    # gray IRR < 0 region and the colormap). Drawn manually so both the line
-    # and its label are white (contourplots draws the w_ticks contours black).
-    zero_cs = ax.contour(Xg, Yg, irr_grid, levels=[0.0],
-                         colors='white', linewidths=1.3, zorder=350)
-    ax.clabel(zero_cs, [0.0], fmt=lambda v, pos=None: '0%', colors='white',
+    # White contour lines + labels at 0 % (the profitability boundary between
+    # the gray IRR < 0 region and the colormap) and 10 %. Drawn manually so
+    # both the lines and their labels are white (contourplots draws the
+    # w_ticks contours in black).
+    white_cs = ax.contour(Xg, Yg, irr_grid, levels=IRR_WHITE_CONTOURS,
+                          colors='white', linewidths=1.3, zorder=350)
+    ax.clabel(white_cs, IRR_WHITE_CONTOURS, fmt=fmt_percent, colors='white',
               fontsize=clabel_fontsize, inline=True, inline_spacing=6, zorder=500)
 
     stem = f'{COLOR_METRIC}_greedy_trajectories_{SWEEP_PREFIX}'
