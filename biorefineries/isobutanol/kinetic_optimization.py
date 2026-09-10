@@ -83,7 +83,8 @@ __all__ = ('OBJECTIVE_REGISTRY', 'TRACKED_METRICS',
            'pca_decision_matrix', 'plot_pca_projection',
            'StallGuard', 'attempt_outcome',
            'search_space_distributions', 'draw_uniform_feasible',
-           'feasible_candidate_mask', 'feasible_tpe_sampler')
+           'feasible_candidate_mask', 'feasible_tpe_sampler',
+           'DEFAULT_GAMMA_FRACTION', 'DEFAULT_GAMMA_CAP', 'default_tpe_gamma')
 
 FEEDING_VARIABLES = ('threshold_conc', 'target_delta', 'spike_delta',
                      'max_n_spikes')
@@ -2233,9 +2234,26 @@ def feasible_tpe_sampler(search_space, is_feasible, **kwargs):
     (build_search_space format) with the predicate `is_feasible(values)
     -> bool` (external values). `kwargs`: max_uniform_draws (10_000),
     max_parzen_batches (20), and any optuna TPESampler keyword (seed,
-    n_startup_trials, constraints_func, ...; multivariate defaults to
+    n_startup_trials, constraints_func, gamma, ...; multivariate defaults to
     True; group / constant_liar refused)."""
     return _feasible_tpe_sampler_class()(search_space, is_feasible, **kwargs)
+
+#: Default TPE `gamma`, the quantile that splits finished trials into the
+#: "good" (below) and "bad" (above) sets the sampler builds its densities
+#: from. optuna's own default is min(ceil(0.10 * n), 25) -- the top 10 %,
+#: capped at 25 good trials, so the cap already binds past ~250 trials and a
+#: 2000-trial study freezes its good set at 25. We widen this to the top 25 %
+#: capped at 500 good trials by default (set 2026-09-10), so the good set
+#: keeps growing with study size instead of pinning at 25.
+DEFAULT_GAMMA_FRACTION = 0.25
+DEFAULT_GAMMA_CAP = 500
+
+def default_tpe_gamma(n_trials):
+    """Number of "good" (below) trials for the TPE split at `n_trials`
+    finished trials: ceil(DEFAULT_GAMMA_FRACTION * n_trials) capped at
+    DEFAULT_GAMMA_CAP. Passed as optuna TPESampler(gamma=...), replacing
+    optuna's default min(ceil(0.10 * n_trials), 25)."""
+    return min(math.ceil(DEFAULT_GAMMA_FRACTION * n_trials), DEFAULT_GAMMA_CAP)
 
 #%% Engine
 
@@ -2723,7 +2741,7 @@ def run_kinetic_optimization(objective='IRR',
                 expand_grouped_values(values, parameter_groups,
                                       kinetic_baselines)).feasible,
             multivariate=True, seed=seed + n_done,
-            n_startup_trials=n_startup,
+            n_startup_trials=n_startup, gamma=default_tpe_gamma,
             constraints_func=_burden_constraints)
         print('Sampler: feasibility-aware TPE (FeasibleTPESampler): every '
               'start-up draw and TPE candidate is checked against the '
@@ -2731,11 +2749,14 @@ def run_kinetic_optimization(objective='IRR',
     else:
         study.sampler = optuna.samplers.TPESampler(
             multivariate=True, seed=seed + n_done,
-            n_startup_trials=n_startup,
+            n_startup_trials=n_startup, gamma=default_tpe_gamma,
             constraints_func=_burden_constraints if burden_on else None)
         print('Sampler: plain TPESampler '
               + ('(feasible_sampling=False).' if burden_on
                  else '(burden off: no feasibility predicate).'))
+    print(f'TPE gamma: top {DEFAULT_GAMMA_FRACTION:.0%} of finished trials, '
+          f'capped at {DEFAULT_GAMMA_CAP} "good" trials '
+          f'(vs optuna default top 10 % capped at 25).')
     if n_done == 0:
         # Fresh study. By default (enqueue_baseline=False, since
         # 2026-09-07) NO baseline point is enqueued, so the sampler draws
