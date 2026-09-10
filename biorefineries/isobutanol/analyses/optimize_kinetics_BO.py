@@ -137,7 +137,7 @@ def run(scenario=None,  # 'A' or 'B'; None = the preset's start scenario
         objective='IRR',  # name in ko.OBJECTIVE_REGISTRY, or a callable
         n_trials=2000,  # TOTAL study budget (resume-aware)
         seed=None,  # None = the engine's launch-datetime default seed,
-        # ko.default_seed_from_datetime: (year/day**2)*month*((hour+1)/10)*((minute+1)/10);
+        # ko.default_seed_from_datetime: (year/day**2)*month*(hour+1)*(minute+1);
         # give parallel studies distinct explicit seeds (same-minute launches
         # collide). See ko.run_kinetic_optimization.
         make_plots=True,

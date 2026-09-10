@@ -2261,8 +2261,7 @@ def default_seed_from_datetime(when=None):
     """Default sampler seed derived from a study's start date and time
     (set 2026-09-10, replacing the fixed 3221):
 
-        seed = int((year / day**2) * month
-                   * ((hour + 1) / 10) * ((minute + 1) / 10))
+        seed = int((year / day**2) * month * (hour + 1) * (minute + 1))
 
     `when` is a datetime; None -> datetime.datetime.now() (local time), i.e.
     the moment the study is LAUNCHED, which for a fresh study is its start.
@@ -2270,15 +2269,13 @@ def default_seed_from_datetime(when=None):
 
     Caveats: a RESUMED launch recomputes the base seed from the resume time
     (the engine already offsets the seed by the number of stored trials, so
-    resumes draw fresh points regardless); the result can still be 0 for a
-    late-month, low hour/minute launch (the small product truncates to 0;
-    optuna accepts a 0 seed); and two studies launched in the same
-    clock-minute get the SAME seed -- pass an explicit seed to parallel
+    resumes draw fresh points regardless); and two studies launched in the
+    same clock-minute get the SAME seed -- pass an explicit seed to parallel
     studies that must differ."""
     if when is None:
         when = datetime.datetime.now()
     seed = ((when.year / (when.day**2)) * when.month
-            * ((when.hour + 1) / 10) * ((when.minute + 1) / 10))
+            * (when.hour + 1) * (when.minute + 1))
     return int(seed)
 
 #%% Engine
@@ -2734,7 +2731,7 @@ def run_kinetic_optimization(objective='IRR',
     if seed is None:
         seed = default_seed_from_datetime()
         print(f'Default sampler seed from the launch datetime: {seed} '
-              '((year/day**2)*month*((hour+1)/10)*((minute+1)/10)).')
+              '((year/day**2)*month*(hour+1)*(minute+1)).')
     # Offset the seed by the number of stored trials so a resumed study
     # draws fresh points instead of replaying the original RNG stream.
     def _burden_constraints(frozen_trial):

@@ -544,7 +544,7 @@ if __name__ == '__main__':
     parser.add_argument('--seed', type=int, default=None,
                         help='sampler seed forwarded to the driver run(); '
                              "default None = the engine's launch-datetime "
-                             'seed (year/day**2)*month*((hour+1)/10)*((minute+1)/10). '
+                             'seed (year/day**2)*month*(hour+1)*(minute+1). '
                              'Give parallel studies distinct explicit seeds '
                              'so their objective-independent startup draws '
                              'differ (avoids lockstep stalls on the same '
