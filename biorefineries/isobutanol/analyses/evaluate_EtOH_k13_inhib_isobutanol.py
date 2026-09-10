@@ -34,12 +34,18 @@ burden=True)`` (the ``BurdenModel`` is ALWAYS built from scenario A's kinetics,
 never from ``opt_IRR``'s own baseline; ``system.set_active_burden``), so the
 ``load_simulate`` choke point derates ``k_7``/``k_8`` for every simulated point.
 ``k_13`` keys the Ehrlich step ``r13`` in ``enzyme_burden.EHRLICH_STEPS``, so it
-IS a proteome pool: raising ``k_13`` raises the modeled pool ``Phi_M`` past the
-flexible-sector cap ``F_flex`` and the point becomes burden-INFEASIBLE
-(``EnzymeBurdenInfeasibleError`` -> caught -> NaN); the ``inhib_isobutanol``
-coefficients are product-inhibition / lethality terms, not pools, so they do
-not enter the burden -- expect a roughly vertical infeasible (NaN) band at high
-``k_13``.
+IS a proteome pool: raising ``k_13`` raises the modeled pool ``Phi_M``, which
+derates growth (``k_7``/``k_8``); the ``inhib_isobutanol`` coefficients are
+product-inhibition / lethality terms, not pools, so they do not enter the
+burden.
+
+Empirical result (2026-09-10 20x20 run): across ``k_13`` in [0, 6.5] (~10x the
+opt_IRR baseline 0.642) the r13 pool never pushed ``Phi_M`` over ``F_flex``, so
+NO point was burden-INFEASIBLE (0 exceptions) -- the anticipated vertical
+infeasible (NaN) band did NOT appear. Instead the high-``k_13`` /
+high-multiplier corner is uneconomic: 137/400 cells have an unsolvable,
+money-losing IRR (reported -inf) and 155/400 are profitable (IRR > 0). The
+``k_13 = 0`` column makes no isobutanol, so its IBO MPSP is NaN (20 cells).
 """
 
 import numpy as np
