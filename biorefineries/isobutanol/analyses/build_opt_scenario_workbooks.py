@@ -10,6 +10,13 @@
 One-shot generator (ASK-FIRST to run; it simulates) for the five opt_*
 kinetic-optimum scenario workbooks.
 
+Must be run under the `IBO_2026` conda environment. Installs the
+enzyme-burden constraint referenced against scenario A (the wild-type
+calibration point) for the whole run, via `system.set_active_burden` --
+this is the SAME burden every opt_* scenario runs under via
+`scenarios.load_scenario` (burden_default=True), so the workbook's stored
+kinetics and the live choke-point derating agree.
+
 For each of the last five metabolic_minimal_subset studies (IRR, IBO
 titer, IBO yield, EtOH titer, EtOH yield), it:
   1. Snapshots scenario A's full live kinetic state + isobutanol price.
@@ -17,17 +24,22 @@ titer, IBO yield, EtOH titer, EtOH yield), it:
      study's trajectory CSV and re-verifies its trial number against the
      spec table.
   3. Reproduces the trial's exact model state (A snapshot + 9 sampled
-     rates + 16 applied_* inhibition coefficients + k_7<-k_7_eff,
-     k_8<-k_8_eff), sets feeding (threshold, target=min(300,threshold+
-     target_delta), max_n_spikes; spike 600 / stage_1_max_x 5.0 pinned),
-     simulates (default both-trains build == IBO_EtOH-only at S201 split
-     1.0), and cross-checks the reproduced objective against the CSV.
+     rates + 16 applied_* inhibition coefficients; k_7/k_8 are left at
+     their A-snapshot INTENDED values -- the active enzyme burden derates
+     them to the trial's original operating point at simulate time),
+     sets feeding (threshold, target=min(300,threshold+target_delta),
+     max_n_spikes; spike 600 / stage_1_max_x 5.0 pinned), simulates
+     (default both-trains build == IBO_EtOH-only at S201 split 1.0)
+     under the active burden, and cross-checks the reproduced objective
+     against the CSV.
   4. Writes the workbook: copies scenario B, sets every kinetic row's
-     Baseline to the reproduced value with a Triangular +/-20%
-     distribution, sets the isobutanol-price row to the scenario-A value
-     (B's relative spread preserved), keeps all other B rows.
-  5. Reloads the written workbook and re-simulates to confirm it
-     reproduces (defends against openpyxl save issues).
+     Baseline to the reproduced (intended, non-derated for k_7/k_8) value
+     with a Triangular +/-20% distribution, sets the isobutanol-price row
+     to the scenario-A value (B's relative spread preserved), keeps all
+     other B rows.
+  5. Reloads the written workbook and re-simulates (still under the
+     active burden) to confirm it reproduces (defends against openpyxl
+     save issues).
 
 Finally prints a ScenarioSpec block to paste into scenarios.SCENARIOS.
 
@@ -100,16 +112,18 @@ def select_best_trial(csv_path, expected_trial):
 
 
 def apply_trial(r_te, a_snapshot, row):
-    """Set the model's kinetic state to the trial's exact simulated state.
-    Returns the applied {name: value} dict."""
+    """Set the model's kinetic state to the trial's kinetic decision state
+    with INTENDED (non-derated) k_7/k_8; the active enzyme burden derates
+    growth at simulate time. Returns the applied {name: value} dict."""
     applied = dict(a_snapshot)                 # reset held/non-sampled params
     for name in RATE_COLS:
         applied[name] = float(row[name])
     for col, val in row.items():
         if col.startswith('applied_'):
             applied[col[len('applied_'):]] = float(val)
-    applied['k_7'] = float(row['k_7_eff'])     # burden-derated, baked in
-    applied['k_8'] = float(row['k_8_eff'])
+    # k_7/k_8 are NOT sampled by metabolic_minimal_subset -> they keep their
+    # a_snapshot (scenario-A intended) values; the active burden (installed
+    # in main()) derates them at simulate time, same as any other scenario.
     for name, value in applied.items():
         setattr(r_te, name, value)
     return applied
@@ -214,6 +228,14 @@ def main():
     print(f'Scenario-A snapshot: {len(a_snapshot)} kinetic params; '
           f'isobutanol price {ibo_price_A:.6g}')
 
+    from biorefineries.isobutanol import enzyme_burden as eb
+    from biorefineries.isobutanol import system as ibo_system
+    burden = eb.BurdenModel.from_reference(a_snapshot)   # A calibration
+    ibo_system.set_active_burden(burden)                 # choke point derates k_7/k_8
+    print(f'Enzyme burden active (A-referenced): F_flex {burden.F_flex:.4f}, '
+          f'Phi_M,wt {burden.Phi_M_wt:.4f} g/gDCW; opt_* baselines store '
+          'intended k_7/k_8, derated at simulate.')
+
     emitted = []
     for name, objective_name, csv_name, expected_trial in STUDIES:
         csv_path = os.path.join(RESULTS_DIR, csv_name)
@@ -253,6 +275,8 @@ def main():
             f"'isobutanol': {e['isobutanol']!r}}},\n"
             f"        objective_name={e['objective_name']!r}, "
             f"objective_value={e['objective_value']!r}),")
+
+    ibo_system.set_active_burden(None)   # cleanliness -- nothing runs after this
 
 
 def model_V514_price(bundle):
