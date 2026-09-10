@@ -10,8 +10,13 @@
 IRR contour of the opt_IRR k_13 x inhib_isobutanol-multiplier kinetic sweep
 (enzyme burden ON), overlaid with greedy (8-neighbor hill-climb) trajectories
 from an ethanol-only start point (k_13 = 0, inhib_isobutanol multiplier = 1.0)
-to the local maxima of seven metrics: IRR, isobutanol yield/titer/productivity
-and ethanol yield/titer/productivity (all sense 'max').
+to the local maxima of six metrics: isobutanol yield/titer/productivity and
+ethanol yield/titer/productivity (all sense 'max'). The financial (IRR) optimum
+is NOT hill-climbed -- a greedy IRR climb is trapped at the money-losing
+ethanol-only start (every 8-neighbor is also money-losing) -- so instead the
+opt_IRR point (k_13 = opt_IRR baseline, multiplier = 1.0) is marked with a star
+in the same blue the kinetic-optimization parameter-sets figure gives the IRR
+study (HUE_COLORS[0] in plot_kin_opt_parameter_sets.py).
 
 Consumes the per-metric CSVs written by
 analyses/evaluate_EtOH_k13_inhib_isobutanol.py (20 x 20 grid, opt_IRR baseline,
@@ -34,6 +39,7 @@ import importlib.util
 import matplotlib
 matplotlib.use('Agg')
 from matplotlib.ticker import FuncFormatter
+from matplotlib.lines import Line2D
 import numpy as np
 import pandas as pd
 from biosteam.utils import colors
@@ -59,32 +65,42 @@ BASELINE_K13 = 0.0
 BASELINE_MULT = 1.0
 
 COLOR_METRIC = 'IRR'
-TRAJECTORY_METRICS = ['IRR',
-                      'IBO Yield', 'IBO Titer', 'IBO Productivity',
+# IRR is the contour color metric but is NOT hill-climbed (see the module
+# docstring); only the six fermentation metrics get greedy trajectories.
+TRAJECTORY_METRICS = ['IBO Yield', 'IBO Titer', 'IBO Productivity',
                       'EtOH Yield', 'EtOH Titer', 'EtOH Productivity']
 SENSES = {m: 'max' for m in TRAJECTORY_METRICS}
 
-# IRR (the color metric) is the black star; the six fermentation metrics take
-# distinct high-contrast colors that read against the grey->blue->orange->yellow
-# map, each with its own optimum marker. All lines are dashed at one width with
-# staggered dash offsets, so where greedy climbs share a segment (they all start
-# at the same cell) the colors interleave rather than one hiding the rest.
-TRAJECTORY_COLORS = {'IRR': '#111111',
-                     'IBO Yield': '#66dd55', 'IBO Titer': '#33ccff',
+# The six fermentation metrics take distinct high-contrast colors that read
+# against the grey->blue->orange->yellow map, each with its own optimum marker.
+# All lines are dashed at one width with staggered dash offsets, so where greedy
+# climbs share a segment (they all start at the same cell) the colors interleave
+# rather than one hiding the rest.
+# EtOH Productivity is black (not teal) to stay clear of the opt_IRR marker's
+# blue (#18C4DC), which the requested styling fixes.
+TRAJECTORY_COLORS = {'IBO Yield': '#66dd55', 'IBO Titer': '#33ccff',
                      'IBO Productivity': '#b266ff',
                      'EtOH Yield': '#ff66b3', 'EtOH Titer': '#ff4d4d',
-                     'EtOH Productivity': '#1de0c0'}
-TRAJECTORY_MARKERS = {'IRR': '*',
-                      'IBO Yield': 's', 'IBO Titer': 'o', 'IBO Productivity': '^',
+                     'EtOH Productivity': '#111111'}
+TRAJECTORY_MARKERS = {'IBO Yield': 's', 'IBO Titer': 'o', 'IBO Productivity': '^',
                       'EtOH Yield': 'D', 'EtOH Titer': 'v', 'EtOH Productivity': 'P'}
-TRAJECTORY_MARKER_SIZES = {'IRR': 14,
-                           'IBO Yield': 6.5, 'IBO Titer': 7, 'IBO Productivity': 7.5,
+TRAJECTORY_MARKER_SIZES = {'IBO Yield': 6.5, 'IBO Titer': 7, 'IBO Productivity': 7.5,
                            'EtOH Yield': 6, 'EtOH Titer': 7, 'EtOH Productivity': 7.5}
 _PERIOD = 8.0   # dash period (4 on + 4 off), pt
 TRAJECTORY_LINESTYLES = {m: (i * _PERIOD / len(TRAJECTORY_METRICS), (4, 4))
                          for i, m in enumerate(TRAJECTORY_METRICS)}
 TRAJECTORY_LINEWIDTHS = {m: 1.6 for m in TRAJECTORY_METRICS}
 BASELINE_MARKER = ('D', 'white', 7)   # (shape, fill color, size)
+
+# The financial (IRR) optimum: the opt_IRR point at (opt_IRR baseline k_13,
+# multiplier 1.0), drawn as a star in the IRR study's blue from the
+# kinetic-optimization parameter-sets figure (HUE_COLORS[0]). Not hill-climbed;
+# k_13 is opt_IRR's live baseline printed by the sweep (scenarios' opt_IRR
+# workbook), placed at its true data coordinates (not snapped to a grid cell).
+OPT_IRR_K13 = 0.6421409697576548
+OPT_IRR_MULT = 1.0
+OPT_IRR_COLOR = '#18C4DC'
+OPT_IRR_MARKER = ('*', OPT_IRR_COLOR, 15)   # (shape, fill color, size)
 
 #%% Plot styling (shared with the sweep script's IRR contour)
 
@@ -172,12 +188,9 @@ def main():
         # a step must beat the sweep's own convergence tolerance (sim_rtol =
         # 1e-4) so a climb does not wander across a round-off plateau
         min_rel_improvement=1e-4,
-        # legend below the axes (8 handles: baseline + 7 metrics) in two rows;
-        # the light-grey face keeps the black IRR line and the white baseline
-        # marker visible
-        legend_kwargs={'loc': 'upper center', 'bbox_to_anchor': (0.5, -0.20),
-                       'ncol': 4, 'fontsize': 8, 'framealpha': 1.0,
-                       'facecolor': '#c8c8c8', 'edgecolor': 'k'},
+        # the legend is built below (it must include the opt_IRR marker, which
+        # the helper does not know about), so suppress the helper's own legend
+        show_legend=False,
         x_label=x_label, y_label=y_label,
         x_units=x_units, y_units=y_units,
         x_ticks=x_ticks, y_ticks=y_ticks,
@@ -204,6 +217,35 @@ def main():
     # percent ticks on the colorbar (the last axes contourplots added)
     cbar_ax = [a for a in fig.axes if a is not ax][-1]
     cbar_ax.yaxis.set_major_formatter(FuncFormatter(fmt_percent))
+
+    # opt_IRR point (the financial optimum) at its true data coordinates, above
+    # the trajectory lines/markers
+    om_shape, om_color, om_size = OPT_IRR_MARKER
+    ax.plot(OPT_IRR_K13, OPT_IRR_MULT, linestyle='None', marker=om_shape,
+            markerfacecolor=om_color, markeredgecolor='k', markeredgewidth=0.8,
+            markersize=om_size, zorder=700, clip_on=False)
+
+    # Legend below the axes (8 handles: baseline + opt_IRR + 6 metrics) in two
+    # rows; the light-grey face keeps the white baseline marker visible.
+    b_shape, b_color, b_size = BASELINE_MARKER
+    legend_handles = [
+        Line2D([0], [0], color='none', linestyle='None', marker=b_shape,
+               markerfacecolor=b_color, markeredgecolor='k',
+               markersize=b_size, label='baseline (ethanol-only)'),
+        Line2D([0], [0], color='none', linestyle='None', marker=om_shape,
+               markerfacecolor=om_color, markeredgecolor='k',
+               markersize=om_size, label='opt_IRR optimum'),
+    ]
+    for m in TRAJECTORY_METRICS:
+        c = TRAJECTORY_COLORS[m]
+        legend_handles.append(Line2D(
+            [0], [0], color=c, marker=TRAJECTORY_MARKERS[m], markerfacecolor=c,
+            markeredgecolor='k', markersize=TRAJECTORY_MARKER_SIZES[m],
+            linestyle=TRAJECTORY_LINESTYLES[m],
+            linewidth=TRAJECTORY_LINEWIDTHS[m], label=m))
+    ax.legend(handles=legend_handles, loc='upper center',
+              bbox_to_anchor=(0.5, -0.20), ncol=4, fontsize=8, framealpha=1.0,
+              facecolor='#c8c8c8', edgecolor='k')
 
     stem = f'{COLOR_METRIC}_greedy_trajectories_{SWEEP_PREFIX}'
     png = os.path.join(RESULTS_DIR, stem + '.png')
