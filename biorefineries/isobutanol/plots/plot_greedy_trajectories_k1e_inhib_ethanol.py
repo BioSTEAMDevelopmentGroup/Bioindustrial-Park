@@ -97,7 +97,8 @@ y_ticks = [0.2, 0.6, 1.0, 1.4, 1.8]
 IRR_w_levels = np.arange(0.0, 25.001, 0.5)
 IRR_cbar_ticks = np.arange(0.0, 25.001, 5.0)       # 0, 5, 10, 15, 20, 25
 IRR_w_ticks = [5.0]                                # black labeled contour line(s)
-IRR_UNDER_GRAY = (0.5, 0.5, 0.5)                   # under-color for IRR < 0 %
+IRR_UNDER_GRAY = colors.grey_dark.shade(40).RGBn   # under-color for IRR < 0 %
+#   (the same gray the other kinetic sweep scripts use for the IRR under-color)
 IRR_WHITE_CONTOURS = [0.0, 10.0]                   # white labeled contour lines
 fmt_percent = lambda v, pos=None: f'{v:g}%'
 
