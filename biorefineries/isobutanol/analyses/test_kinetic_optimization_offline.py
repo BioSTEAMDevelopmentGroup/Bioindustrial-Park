@@ -1844,7 +1844,7 @@ assert 'explicit_rate_bounds' not in drv29
 PASS('per-parameter bands: rate band 1e-3x-10x, k_10 0.1x-10x via DEFAULT_PARAMETER_MULTIPLIER_BOUNDS; precedence override > per-parameter > role; probes at own floor; workbook/preset/engine/driver plumbing; _rb always tagged')
 
 #%% 30. n_startup_trials: the TPE random start-up length is an engine kwarg
-# (None = the legacy rule max(10, n_trials//10)), forwarded by the driver's
+# (None = the default rule max(10, n_trials//4)), forwarded by the driver's
 # run() and the supervisor's --n-startup-trials; not part of the study name.
 _sig30 = _inspect.signature(ko.run_kinetic_optimization).parameters
 assert 'n_startup_trials' in _sig30 and _sig30['n_startup_trials'].default is None
@@ -1869,9 +1869,9 @@ st30, csv30, _ = ko.run_kinetic_optimization(enqueue_baseline=True, n_trials=12,
                                              **common30)
 assert st30.sampler._n_startup_trials == 3
 assert len(ko.load_trajectory(csv30)) == 12
-# Resume (nothing left to run) with None: the legacy rule, floor 10.
+# Resume (nothing left to run) with None: the default rule, floor 10.
 st30b, _, _ = ko.run_kinetic_optimization(enqueue_baseline=True, n_trials=12, **common30)
-assert st30b.sampler._n_startup_trials == 10 == max(10, 12//10)
+assert st30b.sampler._n_startup_trials == 10 == max(10, 12//4)
 assert len(ko.load_trajectory(csv30)) == 12                  # no new trials
 st30c, _, _ = ko.run_kinetic_optimization(enqueue_baseline=True, n_trials=12, n_startup_trials=0,
                                           **common30)
@@ -1909,7 +1909,13 @@ assert 'n_startup_trials' not in _inspect.signature(sup30['default_study_name'])
 src30 = open(os.path.join(os.path.dirname(os.path.abspath(__file__)),
                           'optimize_kinetics_BO_supervised.py')).read()
 assert "'--n-startup-trials'" in src30 and 'n_startup_trials=args.n_startup_trials' in src30
-PASS('n_startup_trials: engine kwarg (None = max(10, n_trials//10)), validated, resume-safe; driver run() kwarg; supervisor --n-startup-trials; study name untouched')
+# Default rule is 25% of the budget floored at 10 (set 2026-09-10; was
+# n_trials//10). The n_trials=12 resume above floors to 10 and can't tell
+# the two apart, so pin the rule at the source and at a distinguishing n.
+_eng_src30 = _inspect.getsource(ko.run_kinetic_optimization)
+assert 'n_startup = max(10, n_trials//4)' in _eng_src30      # the active rule
+assert max(10, 2000//4) == 500 and max(10, 2000//10) == 200   # 25% vs old 10%
+PASS('n_startup_trials: engine kwarg (None = max(10, n_trials//4), 25% floored at 10), validated, resume-safe; driver run() kwarg; supervisor --n-startup-trials; study name untouched')
 
 #%% 31. empty-attempt abort rule (2026-09-06): an attempt that logged no
 # new row but whose child had already STARTED a simulation (in-flight

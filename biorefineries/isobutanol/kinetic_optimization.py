@@ -2363,11 +2363,12 @@ def run_kinetic_optimization(objective='IRR',
     `n_startup_trials` (default None) is the length of that random
     start-up phase (optuna TPESampler n_startup_trials: trials drawn
     uniformly at random, enqueued trials included, before TPE's density
-    guidance begins). None applies the rule the engine always used,
-    max(10, n_trials//10) -- 200 for a 2000-trial study, which in the
-    burden-constrained preset space completed 0 of 183 random draws on
-    2026-09-06 -- so an explicit value (e.g. 20-30) is the way to shorten
-    it; a
+    guidance begins). None applies the engine default rule
+    max(10, n_trials//4) -- 25 % of the trial budget floored at 10, so
+    500 for a 2000-trial study (set 2026-09-10; was max(10, n_trials//10),
+    200 for 2000 trials, which in the burden-constrained preset space
+    completed 0 of 183 random draws on 2026-09-06). An explicit value
+    (e.g. 20-30) is the way to shorten it; a
     non-negative integer, ValueError otherwise. It is compared with the
     number of trials already stored, so a resumed study past the
     start-up count starts in TPE mode at once, and a resume may change
@@ -2714,8 +2715,8 @@ def run_kinetic_optimization(objective='IRR',
         # set on every trial right after sampling, before any prune.
         return (frozen_trial.user_attrs.get('burden_violation', 0.0),)
     if n_startup_trials is None:
-        n_startup = max(10, n_trials//10)
-        startup_rule = 'default rule max(10, n_trials//10)'
+        n_startup = max(10, n_trials//4)
+        startup_rule = 'default rule max(10, n_trials//4)'
     else:
         if (isinstance(n_startup_trials, bool)
                 or int(n_startup_trials) != n_startup_trials

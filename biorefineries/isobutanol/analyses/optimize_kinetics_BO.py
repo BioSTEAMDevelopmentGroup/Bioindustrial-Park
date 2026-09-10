@@ -182,7 +182,8 @@ def run(scenario=None,  # 'A' or 'B'; None = the preset's start scenario
         # lethality map before sampling. Off the study name.
         n_startup_trials=None,  # TPE random start-up length (trials drawn
         # at random, probes included, before TPE guidance); None = the
-        # engine's rule max(10, n_trials//10) (200 for 2000 trials -- 0 of
+        # engine's rule max(10, n_trials//4) (25 % of the budget floored at
+        # 10, so 500 for 2000 trials; was n_trials//10 = 200, of which 0 of
         # 183 random draws completed in the burden-constrained preset
         # space on 2026-09-06); e.g. 20-30 shortens it. Not part of the
         # study name; a resume may change it.
@@ -325,7 +326,7 @@ def run(scenario=None,  # 'A' or 'B'; None = the preset's start scenario
     TPE START-UP (`n_startup_trials`, default None). The number of
     trials optuna draws uniformly at random (the baseline and the
     probes count) before TPE's density guidance starts; None keeps the
-    engine's rule max(10, n_trials//10). Forwarded to
+    engine's rule max(10, n_trials//4). Forwarded to
     ko.run_kinetic_optimization; compared with the trials already
     stored, so it can be changed on a resume and never tags the study
     name (supervisor --n-startup-trials).

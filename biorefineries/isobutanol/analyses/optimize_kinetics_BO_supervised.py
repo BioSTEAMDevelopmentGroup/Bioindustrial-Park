@@ -340,7 +340,7 @@ def supervise(scenario=None, objective='IRR', n_trials=2000,
     [NAME ...], bare = () re-includes it, on its per-parameter 0.1x-10x
     band) is the exclusion set, tagged `_x...` into the derived study
     name whenever non-empty. `n_startup_trials` (None =
-    the engine's rule max(10, n_trials//10)) is the TPE random start-up
+    the engine's rule max(10, n_trials//4)) is the TPE random start-up
     length (--n-startup-trials N); forwarded on every attempt, never
     part of the study name, so a resume may change it.
     `max_empty_attempts` (default 5; --max-empty-attempts) caps the
@@ -636,11 +636,13 @@ if __name__ == '__main__':
                         help='TPE random start-up length: trials drawn '
                              'uniformly at random (baseline and probes '
                              'count) before TPE guidance begins; default '
-                             "None = the engine's rule max(10, n_trials//10) "
-                             '(200 for 2000 trials; 0 of 183 random draws '
-                             'completed in the burden-constrained preset '
-                             'space on 2026-09-06, so 20-30 is a better '
-                             'choice there); compared with the trials '
+                             "None = the engine's rule max(10, n_trials//4) "
+                             '(25%% of the budget floored at 10, so 500 for '
+                             '2000 trials; was n_trials//10 = 200, of which '
+                             '0 of 183 random draws completed in the '
+                             'burden-constrained preset space on 2026-09-06, '
+                             'so 20-30 is a better choice there); compared '
+                             'with the trials '
                              'already stored, never part of the study '
                              'name, so a resume may change it')
     parser.add_argument('--max-empty-attempts', type=int, default=5,
