@@ -89,13 +89,13 @@ y_units = r""    # dimensionless (x scenario-A baseline of each member)
 x_ticks = [0, 100, 200, 300]
 y_ticks = [0.2, 0.6, 1.0, 1.4, 1.8]
 
-# IRR is plotted in percent. Colorbar/levels span 0 % (lower bound) to 25 %
+# IRR is plotted in percent. Colorbar/levels span 0 % (lower bound) to 20 %
 # (upper bound): everything below 0 % falls in the gray under-color, and there
-# is NO over-color above 25 % (the grid maxes near 13 %). 0 % and 10 % are
+# is NO over-color above 20 % (the grid maxes near 13 %). 0 % and 10 % are
 # drawn as white labeled contours (added in main); the only black labeled
 # contour is 5 %.
-IRR_w_levels = np.arange(0.0, 25.001, 0.5)
-IRR_cbar_ticks = np.arange(0.0, 25.001, 5.0)       # 0, 5, 10, 15, 20, 25
+IRR_w_levels = np.arange(0.0, 20.001, 0.5)
+IRR_cbar_ticks = np.arange(0.0, 20.001, 5.0)       # 0, 5, 10, 15, 20
 IRR_w_ticks = [5.0]                                # black labeled contour line(s)
 IRR_UNDER_GRAY = colors.grey_dark.shade(40).RGBn   # under-color for IRR < 0 %
 #   (the same gray the other kinetic sweep scripts use for the IRR under-color)
