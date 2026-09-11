@@ -70,6 +70,8 @@ sequentially) -- ask-first, like the unsupervised driver. Examples:
     # ..._metabolic_minimal_subset_irr_rb0.001-10_ib0.2-2_burden):
     python optimize_kinetics_BO_supervised.py --objective IRR \\
         --study-type metabolic_minimal_subset
+    # scipy dual annealing instead of TPE (name ..._irr_da_rb0.001-10_ib0.2-2_burden)
+    python optimize_kinetics_BO_supervised.py --objective IRR --study-type metabolic_minimal_subset --method dual_annealing
     # resume a pre-2026-09-04 study under its old flags and name:
     python optimize_kinetics_BO_supervised.py --legacy-flags --scenario A \\
         --kinetic-bounds-scenario B --objective IRR --n-trials 2000
@@ -117,7 +119,7 @@ def default_study_name(scenario, objective, kinetic_bounds_scenario,
                        study_target_products=None, study_type=None,
                        burden=False, rate_multiplier_bounds=None,
                        exclude_params=None, stage_1_max_x_bounds=_UNSET,
-                       seed_from=None):
+                       seed_from=None, method='tpe'):
     """Mirror the driver's stable study naming (resume finds the same
     study): the preset convention
     kin_opt_{study_target_products}_{study_type}_{slug} whenever a
@@ -156,7 +158,10 @@ def default_study_name(scenario, objective, kinetic_bounds_scenario,
     ([(donor, [trials]), ...]; None = none) tags the seed COUNT
     `_seed{n}` after `_s1x` on both paths (ko.seed_points_tag): seeds
     change the trajectory, not the columns, so the tag is what keeps a
-    seeded run off the unseeded study's store."""
+    seeded run off the unseeded study's store.
+    `method` ('tpe' default; 'dual_annealing') inserts ko.method_study_tag
+    (`_da`) right after the objective slug on both paths, exactly as the
+    driver does."""
     n_seeds = seed_count(seed_from)
     if study_target_products is not None:
         # The _ib / _x / _s1x tags of the preset's own values come from
@@ -185,13 +190,15 @@ def default_study_name(scenario, objective, kinetic_bounds_scenario,
                                          if stage_1_max_x_bounds is _UNSET
                                          else (None if stage_1_max_x_bounds is None
                                                else tuple(stage_1_max_x_bounds))),
-                                     n_seeds=n_seeds)
+                                     n_seeds=n_seeds,
+                                     method=method)
     scenario = scenario or 'B'
     slug = objective.lower().replace(' ', '_')
+    tag = ko.method_study_tag(method)
     suffix = ko.seed_points_tag(n_seeds) + (ko.BURDEN_STUDY_SUFFIX if burden else '')
     if kinetic_bounds_scenario:
-        return f'kin_opt_{scenario}_kb{kinetic_bounds_scenario}_{slug}{suffix}'
-    return f'kin_opt_{scenario}_{slug}{suffix}'
+        return f'kin_opt_{scenario}_kb{kinetic_bounds_scenario}_{slug}{tag}{suffix}'
+    return f'kin_opt_{scenario}_{slug}{tag}{suffix}'
 
 
 def row_count(csv_path):
@@ -247,7 +254,8 @@ def child_code(scenario, objective, n_trials, kinetic_bounds_scenario,
                feasible_sampling=True, startup_sampling='lhs',
                volume_feasibility=True,
                exclude_params=None,
-               stage_1_max_x_bounds=_UNSET, seed_from=None):
+               stage_1_max_x_bounds=_UNSET, seed_from=None,
+               method='tpe', annealing_kwargs=None):
     """The -c program for one supervised attempt of the driver.
     `study_target_products=None` selects the driver's legacy flag path.
     `rate_multiplier_bounds=None` leaves the k_* band to the preset (the
@@ -263,7 +271,9 @@ def child_code(scenario, objective, n_trials, kinetic_bounds_scenario,
     (pin at the baseline) or a tuple is forwarded. `seed_from=None`
     (no seeds) omits the kwarg; a non-empty [(donor, [trials]), ...]
     list is forwarded as a list of (str, tuple-of-int) pairs (the driver
-    enqueues the seeds on a fresh study only)."""
+    enqueues the seeds on a fresh study only). `method` is always
+    forwarded; `annealing_kwargs` (None/{} = the engine defaults) is
+    forwarded only when non-empty."""
     seeds = [(str(donor), tuple(int(n) for n in trials))
              for donor, trials in (seed_from or ())]
     seed_kw = ('' if not seeds else
@@ -281,6 +291,8 @@ def child_code(scenario, objective, n_trials, kinetic_bounds_scenario,
                  else tuple(stage_1_max_x_bounds))
     s1x_kw = ('' if stage_1_max_x_bounds is _UNSET else
               f'          stage_1_max_x_bounds={s1x_value!r},\n')
+    annealing_kw = ('' if not annealing_kwargs else
+                    f'          annealing_kwargs={dict(annealing_kwargs)!r},\n')
     return (
         'import runpy\n'
         f'ns = runpy.run_path({DRIVER!r})\n'
@@ -298,6 +310,8 @@ def child_code(scenario, objective, n_trials, kinetic_bounds_scenario,
         f'          enqueue_knockouts={enqueue_knockouts!r},\n'
         f'          feasible_sampling={feasible_sampling!r},\n'
         f'          volume_feasibility={volume_feasibility!r},\n'
+        f'          method={method!r},\n'
+        f'{annealing_kw}'
         f'{startup_sampling_kw}'
         f'{rate_kw}'
         f'{startup_kw}'
@@ -320,7 +334,8 @@ def supervise(scenario=None, objective='IRR', n_trials=2000,
               feasible_sampling=True, startup_sampling='lhs',
               volume_feasibility=True,
               exclude_params=None,
-              stage_1_max_x_bounds=_UNSET, seed_from=None):
+              stage_1_max_x_bounds=_UNSET, seed_from=None,
+              method='tpe', annealing_kwargs=None):
     """Run attempts until 'complete' or 'abort'; returns the final
     outcome string ('complete' or 'abort'). `study_target_products` /
     `study_type` name the driver's study preset (defaults = the engine's;
@@ -372,7 +387,15 @@ def supervise(scenario=None, objective='IRR', n_trials=2000,
     numbers]), ...]: the decision points of those donor trials are
     enqueued after the knockout probes of a fresh study (a resume never
     re-enqueues), and the seed COUNT is tagged `_seed{n}` into the
-    derived study name."""
+    derived study name. `method` ('tpe' | 'dual_annealing'; --method)
+    selects the driver's engine; the derived study name carries `_da` for
+    dual annealing, so the stall guard polls the DA CSV. A DA child that
+    finishes its budget exits 0 ('complete'); a stall-killed or crashed
+    one is relaunched and resumes from the CSV's best COMPLETE row
+    (best-so-far restart) with the remaining budget. `annealing_kwargs`
+    (--initial-temp / --energy-scale / --max-calls-factor / --local-search;
+    None = the engine defaults) is forwarded to the driver on every
+    attempt (a schedule setting, not part of the study name)."""
     seed_from = [(donor, tuple(int(n) for n in trials))
                  for donor, trials in (seed_from or ())]
     if study_name is None:
@@ -383,7 +406,8 @@ def supervise(scenario=None, objective='IRR', n_trials=2000,
                                         rate_multiplier_bounds=rate_multiplier_bounds,
                                         exclude_params=exclude_params,
                                         stage_1_max_x_bounds=stage_1_max_x_bounds,
-                                        seed_from=seed_from)
+                                        seed_from=seed_from,
+                                        method=method)
     csv_path = os.path.join(RESULTS_DIR, study_name + '_trajectory.csv')
     inflight_path = ko.inflight_path_for(RESULTS_DIR, study_name)
     if python is None:
@@ -405,7 +429,8 @@ def supervise(scenario=None, objective='IRR', n_trials=2000,
                       startup_sampling=startup_sampling,
                       exclude_params=exclude_params,
                       stage_1_max_x_bounds=stage_1_max_x_bounds,
-                      seed_from=seed_from)
+                      seed_from=seed_from,
+                      method=method, annealing_kwargs=annealing_kwargs)
     guard = ko.StallGuard(stall_timeout_s=60.0*stall_timeout_min)
 
     def event(msg):
@@ -423,7 +448,9 @@ def supervise(scenario=None, objective='IRR', n_trials=2000,
         event(f'recovered orphaned in-flight trial {lost} from a previous '
               'session as a LOST row')
 
-    event(f'settings: study {study_name}; burden={burden!r}, '
+    event(f'settings: study {study_name}; '
+          f'method={method!r}, annealing_kwargs={annealing_kwargs!r}, '
+          f'burden={burden!r}, '
           f'enqueue_baseline={enqueue_baseline!r}, '
           f'enqueue_knockouts={enqueue_knockouts!r}, '
           f'feasible_sampling={feasible_sampling!r}, '
@@ -721,6 +748,41 @@ if __name__ == '__main__':
                              'repeatable for several donors. The seed '
                              'COUNT is tagged _seed{n} into the derived '
                              'study name; a resume never re-enqueues')
+    parser.add_argument('--method', default='tpe', choices=ko.OPTIMIZATION_METHODS,
+                        help="optimizer: 'tpe' (optuna TPE, default) or "
+                             "'dual_annealing' (scipy dual annealing over the "
+                             'same search space / burden / volume checks / '
+                             'trajectory protocol; the derived study name '
+                             'gains _da right after the objective slug; a '
+                             'killed or crashed child resumes from the '
+                             "CSV's best COMPLETE row with the remaining "
+                             'budget). Under dual_annealing '
+                             '--enqueue-knockouts and --seed-from are '
+                             'refused and --n-startup-trials / '
+                             '--no-feasible-sampling / --random-startup are '
+                             'ignored')
+    parser.add_argument('--initial-temp', type=float, default=None,
+                        metavar='T',
+                        help='dual annealing initial temperature (scipy '
+                             'default 5230; the energy scale is set per '
+                             'objective, so leave this alone unless you '
+                             'know why)')
+    parser.add_argument('--energy-scale', type=float, default=None,
+                        metavar='S',
+                        help='dual annealing: the objective difference worth '
+                             "one energy unit (default = the objective's "
+                             'ko.OBJECTIVE_REGISTRY entry, e.g. 0.01 for IRR, '
+                             '2 g/L for the titers)')
+    parser.add_argument('--max-calls-factor', type=int, default=None,
+                        metavar='N',
+                        help='dual annealing safety cap: at most N x the '
+                             'remaining trial budget objective calls, '
+                             'INFEASIBLE proposals included (default 20)')
+    parser.add_argument('--local-search', action='store_true',
+                        help="dual annealing: enable scipy's L-BFGS-B local "
+                             'search after improvements (default OFF: its '
+                             'finite-difference gradients cost ~d '
+                             'simulations each on a non-smooth landscape)')
     args = parser.parse_args()
     seed_from = None
     if args.seed_from:
@@ -746,6 +808,21 @@ if __name__ == '__main__':
     else:
         parser.error('--stage-1-max-x-bounds takes LO HI (two numbers) or '
                      'nothing (pin at the baseline)')
+    annealing_kwargs = {}
+    if args.initial_temp is not None:
+        annealing_kwargs['initial_temp'] = args.initial_temp
+    if args.energy_scale is not None:
+        annealing_kwargs['energy_scale'] = args.energy_scale
+    if args.max_calls_factor is not None:
+        annealing_kwargs['max_calls_factor'] = args.max_calls_factor
+    if args.local_search:
+        annealing_kwargs['no_local_search'] = False
+    if annealing_kwargs and args.method != 'dual_annealing':
+        parser.error('--initial-temp / --energy-scale / --max-calls-factor / '
+                     '--local-search require --method dual_annealing')
+    if args.method == 'dual_annealing' and (args.enqueue_knockouts or seed_from):
+        parser.error('--enqueue-knockouts and --seed-from have no '
+                     'dual-annealing counterpart (optuna enqueue)')
     outcome = supervise(scenario=args.scenario, objective=args.objective,
                         n_trials=args.n_trials,
                         kinetic_bounds_scenario=args.kinetic_bounds_scenario,
@@ -772,5 +849,7 @@ if __name__ == '__main__':
                         exclude_params=(None if args.exclude_params is None
                                         else tuple(args.exclude_params)),
                         stage_1_max_x_bounds=stage_1_max_x_bounds,
-                        seed_from=seed_from)
+                        seed_from=seed_from,
+                        method=args.method,
+                        annealing_kwargs=annealing_kwargs or None)
     sys.exit(0 if outcome == 'complete' else 1)

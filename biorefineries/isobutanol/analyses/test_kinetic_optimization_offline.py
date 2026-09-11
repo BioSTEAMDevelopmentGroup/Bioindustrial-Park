@@ -4711,4 +4711,61 @@ assert 'study.direction' not in drv69            # plots take a string direction
 assert "engine_kwargs.get('direction')" in drv69
 PASS('method naming (_da after the slug on both paths) + check_method_kwargs guards; driver dispatch plumbed')
 
+#%% 70. Supervisor --method + annealing flags (spec §6.2): default_study_name
+# mirrors the driver's `_da` placement on BOTH paths; child_code always
+# emits method= and emits annealing_kwargs= only when given; supervise()
+# threads both; the CLI exposes --method / --initial-temp / --energy-scale /
+# --max-calls-factor / --local-search.
+sup70 = _runpy.run_path(os.path.join(
+    os.path.dirname(os.path.abspath(__file__)),
+    'optimize_kinetics_BO_supervised.py'))
+_n70 = _inspect.signature(sup70['default_study_name']).parameters
+assert _n70['method'].default == 'tpe'
+assert sup70['default_study_name'](None, 'IRR', None,
+                                   study_target_products='ethanol_isobutanol',
+                                   study_type='metabolic_minimal_subset',
+                                   burden=True, method='dual_annealing') == \
+    'kin_opt_ethanol_isobutanol_metabolic_minimal_subset_irr_da_rb0.001-10_ib0.2-2_burden'
+assert sup70['default_study_name']('A', 'IRR', 'B', burden=True,
+                                   method='dual_annealing') == 'kin_opt_A_kbB_irr_da_burden'
+assert sup70['default_study_name']('B', 'IBO titer', None,
+                                   method='dual_annealing') == 'kin_opt_B_ibo_titer_da'
+assert sup70['default_study_name']('B', 'IBO titer', None) == 'kin_opt_B_ibo_titer'
+_c70 = _inspect.signature(sup70['child_code']).parameters
+_s70 = _inspect.signature(sup70['supervise']).parameters
+assert _c70['method'].default == 'tpe' and _c70['annealing_kwargs'].default is None
+assert _s70['method'].default == 'tpe' and _s70['annealing_kwargs'].default is None
+code70 = sup70['child_code'](None, 'IRR', 200, None, False, 'x',
+                             study_target_products='ethanol_isobutanol',
+                             study_type='metabolic_minimal_subset',
+                             method='dual_annealing',
+                             annealing_kwargs={'initial_temp': 1000.0,
+                                               'energy_scale': 0.02,
+                                               'max_calls_factor': 10,
+                                               'no_local_search': False})
+assert "method='dual_annealing'," in code70
+assert "annealing_kwargs={'initial_temp': 1000.0, 'energy_scale': 0.02, " \
+       "'max_calls_factor': 10, 'no_local_search': False}," in code70
+code70t = sup70['child_code'](None, 'IRR', 200, None, False, 'x',
+                              study_target_products='ethanol_isobutanol',
+                              study_type='metabolic_minimal_subset')
+assert "method='tpe'," in code70t and 'annealing_kwargs' not in code70t
+code70d = sup70['child_code'](None, 'IRR', 200, None, False, 'x',
+                              study_target_products='ethanol_isobutanol',
+                              study_type='metabolic_minimal_subset',
+                              method='dual_annealing')
+assert "method='dual_annealing'," in code70d and 'annealing_kwargs' not in code70d
+compile(code70, '<child70>', 'exec')        # the emitted program parses
+src70 = _inspect.getsource(sup70['supervise'])
+assert 'method=method' in src70 and 'annealing_kwargs=annealing_kwargs' in src70
+assert 'method={method!r}' in src70          # logged in the settings: event line
+cli70 = open(os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                          'optimize_kinetics_BO_supervised.py')).read()
+for flag70 in ("'--method'", "'--initial-temp'", "'--energy-scale'",
+               "'--max-calls-factor'", "'--local-search'"):
+    assert flag70 in cli70, flag70
+assert 'choices=ko.OPTIMIZATION_METHODS' in cli70
+assert 'method=args.method' in cli70 and 'annealing_kwargs=annealing_kwargs' in cli70
+PASS('supervisor: --method + annealing flags -> default_study_name(_da) / child_code(method=, annealing_kwargs=) / supervise()')
+
 print(f'\nALL {n_pass} CHECKS PASSED')
