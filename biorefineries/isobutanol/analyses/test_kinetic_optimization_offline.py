@@ -3844,4 +3844,31 @@ else:
          'integer-valued approx-uniform int column, monotone small-n floor, empty '
          'design raises on index, log-IntDistribution guarded')
 
+#%% 49. Trial-count helpers: _n_startup_finished counts ALL COMPLETE|PRUNED
+# (enqueued included); _n_sampler_drawn_finished excludes fixed_params trials
+# (enqueued baseline/probe/seed), giving the LHS row index k (2026-09-10).
+if _optuna is None:
+    print('SKIP 49: optuna not installed')
+else:
+    TS49 = _optuna.trial.TrialState
+    st49 = _optuna.create_study()
+    # two enqueued (fixed_params) trials + three plain sampler-drawn trials
+    st49.enqueue_trial({'x': 0.1})
+    st49.enqueue_trial({'x': 0.2})
+    st49.optimize(lambda t: t.suggest_float('x', 0.0, 1.0), n_trials=5)
+    assert len(st49.trials) == 5
+    n_enqueued49 = sum(1 for t in st49.trials if 'fixed_params' in t.system_attrs)
+    assert n_enqueued49 == 2
+    assert ko._n_startup_finished(st49) == 5
+    assert ko._n_sampler_drawn_finished(st49) == 3
+    assert (ko._n_startup_finished(st49)
+            - ko._n_sampler_drawn_finished(st49)) == n_enqueued49
+    # nothing enqueued -> the two counts coincide
+    st49b = _optuna.create_study()
+    st49b.optimize(lambda t: t.suggest_float('x', 0.0, 1.0), n_trials=4)
+    assert ko._n_startup_finished(st49b) == ko._n_sampler_drawn_finished(st49b) == 4
+    PASS('trial-count helpers: _n_startup_finished counts enqueued trials, '
+         '_n_sampler_drawn_finished excludes fixed_params (row index k); '
+         'they differ by n_enqueued and coincide when nothing is enqueued')
+
 print(f'\nALL {n_pass} CHECKS PASSED')

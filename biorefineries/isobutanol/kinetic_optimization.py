@@ -2335,6 +2335,27 @@ class LHSDesign:
     def column(self, k, name):
         return self._distributions[name].to_external_repr(self._rows[k][name])
 
+def _finished_trials(study):
+    """The COMPLETE|PRUNED trials of `study` -- the exact call
+    FeasibleTPESampler._sample_relative uses for the start-up gate."""
+    from optuna.trial import TrialState
+    return study._get_trials(deepcopy=False,
+                             states=(TrialState.COMPLETE, TrialState.PRUNED),
+                             use_cache=True)
+
+def _n_startup_finished(study):
+    """Total COMPLETE|PRUNED count (enqueued trials included) -- optuna's own
+    start-up-vs-TPE quantity (TPESampler: len(trials) < n_startup_trials)."""
+    return len(_finished_trials(study))
+
+def _n_sampler_drawn_finished(study):
+    """The LHS row index k: COMPLETE|PRUNED trials the SAMPLER drew, i.e. minus
+    enqueued trials. Enqueued baseline/probe/seed points carry
+    system_attrs['fixed_params'], bypass the sampler (optuna 4.9 Trial._suggest:
+    fixed -> relative -> independent), and consume no design row."""
+    return sum(1 for t in _finished_trials(study)
+               if 'fixed_params' not in t.system_attrs)
+
 def default_seed_from_datetime(when=None):
     """Default sampler seed derived from a study's start date and time
     (set 2026-09-10, replacing the fixed 3221):
