@@ -2266,7 +2266,7 @@ else:
     with _contextlib.redirect_stdout(buf35b):
         st35b, _, _ = ko.run_kinetic_optimization(enqueue_baseline=True, n_trials=12, n_startup_trials=4,
                                                   feasible_sampling=False, **common35)
-    assert type(st35b.sampler).__name__ in ('TPESampler', 'LHSStartupTPESampler')
+    assert type(st35b.sampler).__name__ == 'LHSStartupTPESampler'
     assert 'Sampler: plain TPESampler (feasible_sampling=False)' in buf35b.getvalue()
     assert 'Feasible sampling: rejected' not in buf35b.getvalue()
     assert len(ko.load_trajectory(csv35)) == 12
@@ -2277,7 +2277,7 @@ else:
         st35c, _, _ = ko.run_kinetic_optimization(enqueue_baseline=True,
             n_trials=3, n_startup_trials=2, feasible_sampling=True,
             burden_model=None, **{**common35, 'study_name': 'offline_feasible_noburden'})
-    assert type(st35c.sampler).__name__ in ('TPESampler', 'LHSStartupTPESampler')
+    assert type(st35c.sampler).__name__ == 'LHSStartupTPESampler'
     assert 'Sampler: plain TPESampler (burden off' in buf35c.getvalue()
     PASS('engine: feasible_sampling=True + burden on installs FeasibleTPESampler (all sampled trials feasible, n_unfiltered 0, summary line); False or burden off = plain TPESampler; not in the study name')
 
