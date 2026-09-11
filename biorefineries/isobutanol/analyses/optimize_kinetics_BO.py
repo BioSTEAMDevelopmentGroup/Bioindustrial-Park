@@ -69,27 +69,27 @@ Runner pattern (fresh kernel, one process):
     ns = runpy.run_path(r'<this file>')
     # default preset: kin_opt_ethanol_isobutanol_metabolic_protein_irr
     #   _rb0.001-10_ib0.1-10_xk10_burden
-    study, csv_path = ns['run'](objective='IRR')
+    result, csv_path = ns['run'](objective='IRR')
     # re-include k_10 (its 0.1x-10x band; no _xk10 tag)
-    study, csv_path = ns['run'](objective='IRR', exclude_params=())
+    result, csv_path = ns['run'](objective='IRR', exclude_params=())
     # ethanol-only strain, expression/tolerance engineering only (29 params)
-    study, csv_path = ns['run'](study_target_products='ethanol_only',
-                                study_type='metabolic')
+    result, csv_path = ns['run'](study_target_products='ethanol_only',
+                                 study_type='metabolic')
     # compact 24-variable space (rates minus k_10/k_7/k_8 + 3 effector
     # multipliers + 4 feeding/operating; spike pinned)
-    study, csv_path = ns['run'](objective='IRR', study_type='metabolic_minimal')
+    result, csv_path = ns['run'](objective='IRR', study_type='metabolic_minimal')
     # standalone 15-variable set (9 listed rates + 3 effector multipliers
     # + 3 feeding; spike AND stage_1_max_x pinned; no _x / _s1x tag)
-    study, csv_path = ns['run'](objective='IRR', study_type='metabolic_minimal_subset')
+    result, csv_path = ns['run'](objective='IRR', study_type='metabolic_minimal_subset')
     # legacy: resume a pre-2026-09-04 study under its old name/space
-    study, csv_path = ns['run'](scenario='A', kinetic_bounds_scenario='B',
-                                study_target_products=None)
+    result, csv_path = ns['run'](scenario='A', kinetic_bounds_scenario='B',
+                                 study_target_products=None)
     # burden-free legacy study (older names have no _burden suffix)
-    study, csv_path = ns['run'](objective='IRR', burden=False)
+    result, csv_path = ns['run'](objective='IRR', burden=False)
     # seeded: enqueue donor trials after the probes (name gains _seed3)
-    study, csv_path = ns['run'](objective='IRR', study_type='metabolic',
-                                seed_from=[('<donor study name>', [1553, 1914]),
-                                           ('<other donor>', [1162])])
+    result, csv_path = ns['run'](objective='IRR', study_type='metabolic',
+                                 seed_from=[('<donor study name>', [1553, 1914]),
+                                            ('<other donor>', [1162])])
     # dual annealing instead of TPE (name ..._irr_da_rb0.001-10_ib0.2-2_burden)
     result, csv_path = ns['run'](objective='IRR', study_type='metabolic_minimal_subset', method='dual_annealing')
 """
