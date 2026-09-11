@@ -4270,4 +4270,68 @@ assert 'volume_feasibility=args.volume_feasibility' in _src61
 PASS('supervisor --no-volume-feasibility -> volume_feasibility, emitted into '
      'the child call, threaded through supervise()/child_code()')
 
+#%% 62. GOLDEN refactor check (2026-09-11, dual-annealing spec §3.4): the
+# check-17 scenario (baseline enqueued, one knockout probe, one LHS draw;
+# trial 1 FAIL, trial 2 NAN; orphan sidecar for trial 99; seed=1) through the
+# TPE engine must write a trajectory CSV IDENTICAL to the fixture captured
+# from the pre-refactor engine (commit 9f6003ac) -- the shared-core refactor
+# (_prepare_optimization / evaluate_decision_point) must change NOTHING a
+# TPE study writes. Line endings are normalized (csv writes \r\n; git may
+# check the fixture out either way). Regenerate the fixture ONLY for a
+# deliberate protocol change:
+#     IBO_KO_WRITE_GOLDEN=1 python test_kinetic_optimization_offline.py
+if _optuna is None:
+    print('SKIP 62: optuna not installed')
+else:
+    golden62 = os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                            'fixtures', 'kin_opt_golden_check17_trajectory.csv')
+    outdir62 = tempfile.mkdtemp()
+    study62 = 'offline_bracket'
+    csv62 = os.path.join(outdir62, study62 + '_trajectory.csv')
+    side62 = ko.inflight_path_for(outdir62, study62)
+    st62 = {'n': 0, 'irr': 0.2}
+    def _model_specification62(**kw):
+        st62['n'] += 1
+        if st62['n'] == 2:
+            raise RuntimeError('boom')                          # trial 1 -> FAIL
+        st62['irr'] = float('nan') if st62['n'] == 3 else 0.2  # trial 2 -> NAN
+    def _solve_TEA62(stream_IDs=None):
+        return {'IRR': st62['irr'],
+                'MPSPs': {'ethanol': 0.5, 'isobutanol': 1.0}}
+    handles62 = dict(handles17, model_specification=_model_specification62,
+                     solve_TEA=_solve_TEA62,
+                     latest_TEA_solution={'IRR': np.nan,
+                                          'MPSPs': {'ethanol': np.nan,
+                                                    'isobutanol': np.nan}})
+    ko.write_inflight(side62, cols17,
+                      {'trial_number': 99, 'k_1e': 1.0, 'K_1e': 0.01,
+                       'threshold_conc': 100.0, 'target_delta': 50.0,
+                       'spike_delta': 100.0, 'max_n_spikes': 2})
+    ko.run_kinetic_optimization(
+        enqueue_baseline=True, enqueue_knockouts=True,
+        objective='IRR', scenario_label='X', n_trials=3, seed=1,
+        study_name=study62, results_dir=outdir62, handles=handles62,
+        print_status_every=1, burden_model=None, volume_feasibility=False)
+    with open(csv62, 'rb') as f62:
+        produced62 = f62.read().replace(b'\r\n', b'\n')
+    if os.environ.get('IBO_KO_WRITE_GOLDEN') == '1':
+        os.makedirs(os.path.dirname(golden62), exist_ok=True)
+        with open(golden62, 'wb') as f62:
+            f62.write(produced62)
+        print(f'WROTE golden fixture {golden62}')
+    assert os.path.isfile(golden62), (
+        f'golden fixture missing: {golden62} (capture it from the '
+        'pre-refactor engine with IBO_KO_WRITE_GOLDEN=1)')
+    with open(golden62, 'rb') as f62:
+        expected62 = f62.read().replace(b'\r\n', b'\n')
+    assert produced62 == expected62, (
+        'TPE trajectory CSV differs from the golden fixture -- the shared-'
+        'core refactor changed what a TPE study writes:\n--- produced ---\n'
+        f'{produced62.decode()}\n--- golden ---\n{expected62.decode()}')
+    df62 = ko.load_trajectory(csv62)
+    assert df62['trial_number'].tolist() == [99, 0, 1, 2]
+    assert df62['state'].tolist() == ['LOST', 'COMPLETE', 'FAIL', 'NAN']
+    PASS('GOLDEN: check-17 scenario through the TPE engine is byte-identical '
+         '(line endings normalized) to the pre-refactor fixture')
+
 print(f'\nALL {n_pass} CHECKS PASSED')

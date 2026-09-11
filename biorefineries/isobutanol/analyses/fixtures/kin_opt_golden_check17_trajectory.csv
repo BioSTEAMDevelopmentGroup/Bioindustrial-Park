@@ -1,0 +1,5 @@
+trial_number,state,k_1e,K_1e,threshold_conc,target_delta,spike_delta,max_n_spikes,objective,IBO yield,IBO titer,IBO productivity,EtOH yield,EtOH titer,EtOH productivity,Cell density,IRR,TCI,tau,n_glu_spikes,error
+99,LOST,1.0,0.01,100.0,50.0,100.0,2,,,,,,,,,,,,,recovered at engine startup (no terminal row)
+0,COMPLETE,47.1,0.12,217.125,5.0,378.75,16,0.2,0.1,20.0,0.5,0.3,90.0,2.0,30.0,0.2,350.0,55.0,7,
+1,FAIL,4.71,0.12,217.125,5.0,378.75,16,,,,,,,,,,,,,RuntimeError('boom')
+2,NAN,9.34666295666046,0.3083816350711268,115.67521161841098,7.541852366706429,398.11162017797665,23,nan,0.1,20.0,0.5,0.3,90.0,2.0,30.0,nan,350.0,55.0,7,
