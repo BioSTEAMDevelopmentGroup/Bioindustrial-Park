@@ -4419,4 +4419,117 @@ for st64 in ('FAIL', 'NAN', 'INFEASIBLE', 'LOST'):
     assert ko.annealing_energy(st64, 0.3, 'minimize', 0.01) == ko.PENALTY_ENERGY
 PASS('energy scale: registry field, resolve_energy_scale precedence + guards, annealing_energy signs + finite penalty')
 
+#%% 65. Dual-annealing engine, FRESH run + budget accounting (spec §4.3-4.4,
+# test 3): n_trials counts SIMULATED rows only (COMPLETE/FAIL/NAN); the
+# volume prune logs INFEASIBLE rows that take a trial number but no budget
+# (trial 0 = the enqueued baseline is over the cap 1.01 by construction:
+# baseline_decision_point clips the cap 16 into max_n_spikes_bounds (0, 2),
+# so ((600-217.125)/(600-221.25))**2 = 1.022 > 1.01; a uniform draw with
+# max_n_spikes = 0 has ratio 1.0 and is feasible, so ~1/3 of the proposals
+# simulate and the 120-call safety cap is never reached); numbering is gap-free; the
+# scripted model_specification FAILs every 3rd TRIAL call (the sidecar is
+# present during a trial, absent for restore_baseline's call); the result
+# reports the argmax COMPLETE row and stop_reason 'budget'.
+if _optuna is None:
+    print('SKIP 65: optuna not installed')
+else:
+    outdir65 = tempfile.mkdtemp()
+    study65 = 'offline_da'
+    csv65 = os.path.join(outdir65, study65 + '_trajectory.csv')
+    side65 = ko.inflight_path_for(outdir65, study65)
+    st65 = {'trial_calls': 0, 'all_calls': 0, 'irr': 0.1}
+    def _model_specification65(**kw):
+        st65['all_calls'] += 1
+        if not os.path.isfile(side65):      # restore_baseline: never fails
+            return
+        st65['trial_calls'] += 1
+        st65['irr'] = 0.1 + 0.01 * st65['trial_calls']   # strictly increasing
+        if st65['trial_calls'] % 3 == 0:
+            raise RuntimeError('boom65')
+    def _solve_TEA65(stream_IDs=None):
+        return {'IRR': st65['irr'],
+                'MPSPs': {'ethanol': 0.5, 'isobutanol': 1.0}}
+    handles65 = dict(handles17, model_specification=_model_specification65,
+                     solve_TEA=_solve_TEA65,
+                     latest_TEA_solution={'IRR': np.nan,
+                                          'MPSPs': {'ethanol': np.nan,
+                                                    'isobutanol': np.nan}})
+    res65, csv65_out, kb65 = ko.run_kinetic_dual_annealing(
+        objective='IRR', scenario_label='X', n_trials=6, seed=3,
+        study_name=study65, results_dir=outdir65, handles=handles65,
+        print_status_every=1, burden_model=None, enqueue_baseline=True,
+        volume_feasibility=True, volume_cap=1.01, max_n_spikes_bounds=(0, 2),
+        max_calls_factor=20)
+    assert csv65_out == csv65 and kb65 == {'k_1e': 47.1, 'K_1e': 0.12}
+    df65 = ko.load_trajectory(csv65)
+    states65 = df65['state'].tolist()
+    assert states65[0] == 'INFEASIBLE' and 'volume' in str(df65['error'][0])
+    assert df65['max_n_spikes'][0] == 2 and np.isclose(df65['k_1e'][0], 47.1)
+    n_sim65 = sum(s in ko.SIMULATED_STATES for s in states65)
+    assert n_sim65 == 6 and res65.n_simulated == 6
+    assert st65['trial_calls'] == 6 and st65['all_calls'] == 7   # + restore_baseline
+    assert df65['trial_number'].tolist() == list(range(len(df65)))   # gap-free
+    assert res65.n_calls == len(df65)
+    assert res65.n_infeasible == states65.count('INFEASIBLE') >= 1
+    assert [s for s in states65 if s != 'INFEASIBLE'] == \
+        ['COMPLETE', 'COMPLETE', 'FAIL', 'COMPLETE', 'COMPLETE', 'FAIL']
+    assert res65.stop_reason == 'budget' and res65.direction == 'maximize'
+    ok65 = df65[df65['state'] == 'COMPLETE']
+    best65 = ok65.loc[ok65['objective'].idxmax()]
+    assert res65.best_trial_number == int(best65['trial_number'])
+    assert res65.best_value == float(best65['objective']) == 0.15   # 5th trial call
+    assert set(res65.best_params) == set(cols17[2:8])   # the 6 decision columns
+    assert np.isclose(res65.best_params['k_1e'], best65['k_1e'])
+    assert res65.best_params['max_n_spikes'] == int(best65['max_n_spikes'])
+    # every non-INFEASIBLE row has the tracked metrics / burden-free columns
+    assert list(df65.columns) == cols17
+    assert not os.path.isfile(side65)          # sidecar cleared after each trial
+    # restore_baseline ran in the finally: fake model back at the baseline
+    assert handles65['r_te'].k_1e == 47.1 and fbs17.max_n_spikes == 16
+    PASS('dual annealing: fresh run -- n_trials = simulated rows, INFEASIBLE rows '
+         'numbered but unbudgeted, gap-free numbering, best = argmax COMPLETE, '
+         "stop_reason 'budget', baseline restored")
+
+#%% 66. Dual-annealing enqueue_baseline (spec §4.5, test 4): with it, trial 0
+# IS the scenario baseline point (unit-cube round trip: floats to round-off,
+# the int cap exactly); without it, trial 0 is scipy's uniform draw.
+if _optuna is None:
+    print('SKIP 66: optuna not installed')
+else:
+    # The scenario baseline target_delta is 221.25 - 217.125 = 4.125, which is
+    # BELOW the default target_delta_bounds lower bound (5.0). Reconstructing
+    # the baseline into the search space (baseline_decision_point +
+    # external_to_unit) clips it up to that bound, so trial 0's representable
+    # target_delta is 5.0, not 4.125 (empirically confirmed: same clip as
+    # Task 1's golden baseline row via the TPE engine, same handles17 + default
+    # bounds). "trial 0 IS the scenario baseline" means the baseline AS
+    # REPRESENTABLE in the search space -- so base66 uses the clipped value.
+    _target_delta_lo66 = 5.0   # default target_delta_bounds lower bound
+    base66 = {'k_1e': 47.1, 'K_1e': 0.12, 'threshold_conc': 217.125,
+              'target_delta': max(221.25 - 217.125, _target_delta_lo66),
+              'spike_delta': 600.0 - 221.25,
+              'max_n_spikes': 16}
+    def _ms66(**kw):
+        pass
+    def _tea66(stream_IDs=None):
+        return {'IRR': 0.2, 'MPSPs': {'ethanol': 0.5, 'isobutanol': 1.0}}
+    handles66 = dict(handles17, model_specification=_ms66, solve_TEA=_tea66,
+                     latest_TEA_solution={'IRR': np.nan,
+                                          'MPSPs': {'ethanol': np.nan,
+                                                    'isobutanol': np.nan}})
+    for enq66 in (True, False):
+        outdir66 = tempfile.mkdtemp()
+        res66, csv66, _ = ko.run_kinetic_dual_annealing(
+            objective='IRR', scenario_label='X', n_trials=2, seed=5,
+            study_name='offline_da_base', results_dir=outdir66,
+            handles=handles66, burden_model=None, enqueue_baseline=enq66,
+            volume_feasibility=False)
+        row66 = ko.load_trajectory(csv66).iloc[0]
+        assert row66['trial_number'] == 0 and row66['state'] == 'COMPLETE'
+        matches66 = all(np.isclose(row66[k], v, rtol=1e-9, atol=0.0)
+                        for k, v in base66.items())
+        assert matches66 is enq66, (enq66, row66.to_dict())
+        assert res66.n_simulated == 2 and res66.stop_reason == 'budget'
+    PASS('dual annealing: enqueue_baseline=True makes trial 0 the scenario baseline; False does not')
+
 print(f'\nALL {n_pass} CHECKS PASSED')

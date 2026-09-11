@@ -14,6 +14,11 @@ variables (threshold_conc, target_conc via target_delta, spike_conc via
 spike_delta -- feasible-by-construction threshold < target < spike --
 and the integer max_n_spikes cap), against a named or custom objective --
 to prioritize metabolic-engineering / bioprocess research directions.
+Since 2026-09-11 a second engine, run_kinetic_dual_annealing
+(scipy.optimize.dual_annealing over a unit cube), shares the search space,
+the burden/volume checks and the trajectory-CSV protocol through
+_prepare_optimization / evaluate_decision_point; a DA study's default name
+carries a `_da` tag after the objective slug.
 
 Named study presets (resolve_study_preset) pick the search set and bands
 on two axes: study_target_products ('ethanol_only' = scenario-A workbook
@@ -90,7 +95,9 @@ __all__ = ('OBJECTIVE_REGISTRY', 'TRACKED_METRICS',
            'DEFAULT_GAMMA_FRACTION', 'DEFAULT_GAMMA_CAP', 'default_tpe_gamma',
            'default_seed_from_datetime',
            'unit_to_internal', 'unit_to_external', 'external_to_unit',
-           'PENALTY_ENERGY', 'resolve_energy_scale', 'annealing_energy',)
+           'PENALTY_ENERGY', 'resolve_energy_scale', 'annealing_energy',
+           'SIMULATED_STATES', 'trajectory_resume_state', 'AnnealingResult',
+           'run_kinetic_dual_annealing',)
 
 FEEDING_VARIABLES = ('threshold_conc', 'target_delta', 'spike_delta',
                      'max_n_spikes')
@@ -1554,6 +1561,45 @@ def load_trajectory(csv_path):
     parsed; blank cells -> NaN)."""
     import pandas as pd
     return pd.read_csv(csv_path)
+
+#: States of a trajectory row that reached (or was lost inside) the
+#: simulator -- what the trial budget `n_trials` of both engines counts.
+#: INFEASIBLE rows (pre-sim burden / volume prune) take a trial number only.
+SIMULATED_STATES = ('COMPLETE', 'FAIL', 'NAN', 'LOST')
+
+def trajectory_resume_state(csv_path, search_space, direction):
+    """What a relaunch of a study needs from its trajectory CSV alone
+    (the dual-annealing engine's resume store; spec §4.5): `n_rows`,
+    `n_done_sim` (rows in SIMULATED_STATES), `next_trial_number`
+    (max stored + 1, LOST rows included -- optuna's numbering), and the best
+    COMPLETE row's `best_trial_number` / `best_value` / `best_values` (its
+    decision columns in EXTERNAL repr, ints as int; all three None when no
+    COMPLETE row has a finite objective). A missing or empty CSV is a fresh
+    study."""
+    empty = dict(n_rows=0, n_done_sim=0, next_trial_number=0,
+                 best_trial_number=None, best_value=None, best_values=None)
+    if not (os.path.isfile(csv_path) and os.path.getsize(csv_path) > 0):
+        return empty
+    import pandas as pd
+    df = load_trajectory(csv_path)
+    if len(df) == 0:
+        return empty
+    states = df['state'].astype(str)
+    out = dict(n_rows=int(len(df)),
+               n_done_sim=int(states.isin(SIMULATED_STATES).sum()),
+               next_trial_number=int(df['trial_number'].max()) + 1,
+               best_trial_number=None, best_value=None, best_values=None)
+    obj = pd.to_numeric(df['objective'], errors='coerce')
+    ok = (states == 'COMPLETE') & np.isfinite(obj)
+    if ok.any():
+        idx = obj[ok].idxmax() if direction == 'maximize' else obj[ok].idxmin()
+        row = df.loc[idx]
+        out['best_trial_number'] = int(row['trial_number'])
+        out['best_value'] = float(row['objective'])
+        out['best_values'] = {
+            name: (int(row[name]) if sp.get('int') else float(row[name]))
+            for name, sp in search_space.items()}
+    return out
 
 #%% In-flight sidecar (lost-trial recovery)
 # A trial that hangs inside the native integrator is hard-killed by the
@@ -3617,3 +3663,328 @@ def run_kinetic_optimization(objective='IRR',
         finally:
             _system.set_active_burden(None)
     return study, csv_path, kinetic_baselines
+
+#%% Dual-annealing engine (2026-09-11)
+
+@dataclasses.dataclass
+class AnnealingResult:
+    """Return value of run_kinetic_dual_annealing (scipy's OptimizeResult is
+    not returned: the engine tracks its own best -- scipy's callback fires
+    only on improvements and its result is lost when the run is stopped by
+    the budget exception). `stop_reason`: 'budget' (n_trials simulated
+    evaluations reached), 'max_calls' (max_calls_factor x remaining objective
+    calls, INFEASIBLE included -- the all-infeasible safety cap), 'scipy'
+    (scipy returned on its own; `message` is its text), or 'complete' (the
+    stored trajectory already met n_trials -- nothing was run)."""
+    direction: str
+    best_trial_number: object
+    best_value: object
+    best_params: object
+    n_simulated: int
+    n_calls: int
+    n_infeasible: int
+    stop_reason: str
+    message: str = ''
+
+
+class _BudgetExhausted(Exception):
+    """Raised by the annealing objective wrapper once `n_trials` simulated
+    evaluations are logged (scipy exposes no other early stop: its callback
+    fires only on improvements). Caught around dual_annealing."""
+
+
+def run_kinetic_dual_annealing(objective='IRR',
+                               direction=None, level=None,
+                               objective_units=None, objective_name=None,
+                               scenario_label='B',
+                               n_trials=2000, seed=None,
+                               multiplier_bounds=(0.1, 10.0),
+                               param_bounds_override=None,
+                               exclude_params=(),
+                               include_params=None,
+                               rate_multiplier_bounds=None,
+                               rate_params=None,
+                               parameter_multiplier_bounds=None,
+                               threshold_conc_bounds=(0.0, 300.0),
+                               target_delta_bounds=(5.0, 500.0),
+                               spike_delta_bounds=DEFAULT_SPIKE_DELTA_BOUNDS,
+                               max_n_spikes_bounds=(0, 50),
+                               stage_1_max_x_bounds=None,
+                               target_conc_bounds=None,
+                               threshold_delta_bounds=None,
+                               spike_conc_bounds=None,
+                               study_name=None, results_dir=None,
+                               handles=None, print_status_every=1,
+                               burden_model='auto',
+                               enqueue_baseline=False,
+                               volume_feasibility=True,
+                               volume_cap=None,
+                               parameter_groups=None,
+                               group_multiplier_bounds=DEFAULT_GROUP_MULTIPLIER_BOUNDS,
+                               initial_temp=5230.0,
+                               restart_temp_ratio=2e-5,
+                               visit=2.62,
+                               accept=-5.0,
+                               no_local_search=True,
+                               energy_scale=None,
+                               max_calls_factor=20,
+                               ):
+    """Generalized simulated annealing (scipy.optimize.dual_annealing) over
+    the SAME search space, burden / volume checks, trajectory-CSV protocol
+    and in-flight sidecar as run_kinetic_optimization -- the alternative to
+    the TPE sampler (spec docs/superpowers/specs/2026-09-11-dual-annealing-
+    kinetic-optimization-design.md). The shared kwargs mean exactly what
+    they mean there (search space, bands, groups, burden_model 'auto'/None/
+    instance, volume_feasibility / volume_cap, enqueue_baseline, handles,
+    results_dir); there are NO n_startup_trials / feasible_sampling /
+    startup_sampling / enqueue_knockouts / seed_from (optuna sampler and
+    enqueue concepts with no annealing counterpart).
+
+    Coordinates: scipy anneals over the unit cube [0, 1]**d in search-space
+    order (its visiting step is one absolute scale for every coordinate);
+    unit_to_external maps a point to decision values (log-uniform for log
+    floats, uniform bins for ints, linear otherwise -- the LHS start-up
+    measure of the TPE engine), external_to_unit the inverse.
+
+    Energy: sign * objective / energy_scale (sign -1 to maximize), where
+    `energy_scale` (None = the objective's OBJECTIVE_REGISTRY entry; a
+    custom callable must pass one) is the objective difference worth one
+    annealing energy unit under scipy's default schedule (initial_temp,
+    restart_temp_ratio, visit, accept are passed through). Every
+    non-COMPLETE evaluation (FAIL / NAN / INFEASIBLE) returns the finite
+    PENALTY_ENERGY; the CSV keeps the raw objective. `no_local_search=True`
+    (default) skips scipy's L-BFGS-B polish, whose finite-difference
+    gradients cost ~d simulations each on a non-smooth landscape.
+
+    Budget: `n_trials` counts SIMULATED evaluations (COMPLETE / FAIL / NAN,
+    plus stored LOST rows on a resume); INFEASIBLE rows take a trial number
+    (gap-free CSV, and the supervisor's row-count stall guard sees progress)
+    but no budget. Once the remaining budget is spent the wrapper raises a
+    private exception that ends the scipy call (stop_reason 'budget').
+    `maxfun = max_calls_factor x remaining` caps the TOTAL objective calls,
+    INFEASIBLE included, so an all-infeasible region ends the run
+    ('max_calls', with a printed warning); maxiter is 10**6 so nothing else
+    stops it; scipy returning on its own is 'scipy' with its message.
+
+    Start point and resume (best-so-far restart): a FRESH study (no CSV rows)
+    starts at the scenario baseline when enqueue_baseline=True (trial 0 is
+    exactly the baseline, as in TPE) or at scipy's uniform draw otherwise. A
+    RESUMED study (the CSV exists -- the sole store; there is no scipy state
+    to replay) takes x0 = the best COMPLETE row's decision point (re-evaluated
+    as the attempt's first trial: one simulation, a consistency check), or a
+    uniform draw if no COMPLETE row exists; numbers its trials from
+    max stored + 1 (LOST rows included); anneals the REMAINING budget with a
+    fresh RNG seed (`seed + n_done_sim`; seed None = the launch-datetime
+    default, as in TPE), reheated from initial_temp. A remaining budget <= 0
+    returns at once without annealing (stop_reason 'complete'), so a
+    supervisor relaunch after a clean finish exits 0. The default study name
+    is kin_opt_{scenario_label}_{slug}_da[_burden] -- the `_da` tag keeps a
+    DA campaign off the TPE CSV of the same objective (same columns, so the
+    header guard could not); no SQLite store is created.
+
+    Kinetic parameters and feeding specs are restored to the scenario
+    baseline in a nested `finally` (restore_baseline, then
+    set_active_burden(None)), exactly as in the TPE engine. Returns
+    (AnnealingResult, csv_path, kinetic_baselines)."""
+    from scipy.optimize import dual_annealing
+    if isinstance(n_trials, bool) or int(n_trials) != n_trials or n_trials < 1:
+        raise ValueError(f'n_trials must be a positive integer; got {n_trials!r}')
+    n_trials = int(n_trials)
+    if (isinstance(max_calls_factor, bool) or int(max_calls_factor) != max_calls_factor
+            or max_calls_factor < 1):
+        raise ValueError('max_calls_factor must be a positive integer; got '
+                         f'{max_calls_factor!r}')
+    max_calls_factor = int(max_calls_factor)
+    energy_scale = resolve_energy_scale(objective, energy_scale)
+    ctx = _prepare_optimization(
+        objective, direction=direction, level=level,
+        objective_units=objective_units, objective_name=objective_name,
+        scenario_label=scenario_label, multiplier_bounds=multiplier_bounds,
+        param_bounds_override=param_bounds_override,
+        exclude_params=exclude_params, include_params=include_params,
+        rate_multiplier_bounds=rate_multiplier_bounds, rate_params=rate_params,
+        parameter_multiplier_bounds=parameter_multiplier_bounds,
+        threshold_conc_bounds=threshold_conc_bounds,
+        target_delta_bounds=target_delta_bounds,
+        spike_delta_bounds=spike_delta_bounds,
+        max_n_spikes_bounds=max_n_spikes_bounds,
+        stage_1_max_x_bounds=stage_1_max_x_bounds,
+        target_conc_bounds=target_conc_bounds,
+        threshold_delta_bounds=threshold_delta_bounds,
+        spike_conc_bounds=spike_conc_bounds,
+        study_name=study_name, results_dir=results_dir, handles=handles,
+        burden_model=burden_model, volume_feasibility=volume_feasibility,
+        volume_cap=volume_cap, seed_from=None,
+        parameter_groups=parameter_groups,
+        group_multiplier_bounds=group_multiplier_bounds,
+        method_tag='_da')
+    handles, r_te = ctx.handles, ctx.r_te
+    search_space, direction = ctx.search_space, ctx.direction
+    names = list(search_space)
+    resume = trajectory_resume_state(ctx.csv_path, search_space, direction)
+    n_done_sim = resume['n_done_sim']
+    remaining = n_trials - n_done_sim
+    if seed is None:
+        seed = default_seed_from_datetime()
+        print(f'Default annealing seed from the launch datetime: {seed} '
+              '((year/day**2)*month*(hour+1)*(minute+1)).')
+    print(f'Dual annealing over the {len(names)}-dimensional unit cube: '
+          f'{ctx.objective_name} ({direction}), energy = '
+          f'{"-" if direction == "maximize" else "+"}objective/{energy_scale:g}, '
+          f'penalty {PENALTY_ENERGY:g} for FAIL/NAN/INFEASIBLE; initial_temp '
+          f'{initial_temp:g}, restart_temp_ratio {restart_temp_ratio:g}, visit '
+          f'{visit:g}, accept {accept:g}, local search '
+          f'{"off" if no_local_search else "ON (L-BFGS-B polish)"}.')
+    if remaining <= 0:
+        print(f'Study {ctx.study_name} complete: {n_done_sim} simulated trials '
+              f'stored >= budget {n_trials}; nothing to run.')
+        result = AnnealingResult(
+            direction=direction,
+            best_trial_number=resume['best_trial_number'],
+            best_value=resume['best_value'], best_params=resume['best_values'],
+            n_simulated=0, n_calls=0, n_infeasible=0, stop_reason='complete')
+        return result, ctx.csv_path, ctx.kinetic_baselines
+    if resume['n_rows'] == 0:
+        if enqueue_baseline:
+            baseline_point = baseline_decision_point(
+                search_space, ctx.kinetic_baselines, ctx.baseline_model_kwargs,
+                ctx.baseline_max_n_spikes,
+                baseline_stage_1_max_x=ctx.baseline_stage_1_max_x,
+                parameter_groups=ctx.parameter_groups)
+            x0 = external_to_unit(baseline_point, search_space)
+            print('Fresh study: annealing starts at the scenario baseline '
+                  '(trial 0 = the baseline configuration).')
+        else:
+            x0 = None
+            print('Fresh study: annealing starts at a uniform draw in the '
+                  'unit cube (enqueue_baseline=False).')
+    else:
+        if resume['best_values'] is not None:
+            x0 = external_to_unit(resume['best_values'], search_space)
+            print(f'Resuming study {ctx.study_name}: {n_done_sim} simulated '
+                  f'trials stored ({resume["n_rows"]} rows); annealing '
+                  f'{remaining} more (budget {n_trials}) from the best '
+                  f'COMPLETE trial {resume["best_trial_number"]} '
+                  f'({ctx.objective_name} = {resume["best_value"]:.6g}), '
+                  'reheated from initial_temp; next trial number '
+                  f'{resume["next_trial_number"]}.')
+        else:
+            x0 = None
+            print(f'Resuming study {ctx.study_name}: {n_done_sim} simulated '
+                  f'trials stored ({resume["n_rows"]} rows), none COMPLETE; '
+                  f'annealing {remaining} more (budget {n_trials}) from a '
+                  'uniform draw; next trial number '
+                  f'{resume["next_trial_number"]}.')
+    maxfun = max_calls_factor * remaining
+    state = dict(trial_number=resume['next_trial_number'],
+                 n_simulated=0, n_calls=0, n_infeasible=0,
+                 best_trial_number=resume['best_trial_number'],
+                 best_value=resume['best_value'],
+                 best_params=resume['best_values'])
+
+    def _is_better(obj):
+        best = state['best_value']
+        if best is None:
+            return True
+        return obj > best if direction == 'maximize' else obj < best
+
+    def _energy(u):
+        if state['n_simulated'] >= remaining:
+            raise _BudgetExhausted()
+        trial_number = state['trial_number']
+        state['trial_number'] += 1
+        state['n_calls'] += 1
+        values = unit_to_external(u, search_space)
+        ev = evaluate_decision_point(ctx, values, trial_number)
+        if ev.state == 'INFEASIBLE':
+            state['n_infeasible'] += 1
+            return PENALTY_ENERGY
+        state['n_simulated'] += 1
+        if ev.state == 'COMPLETE':
+            if _is_better(ev.objective):
+                state['best_trial_number'] = trial_number
+                state['best_value'] = ev.objective
+                state['best_params'] = dict(values)
+            if state['n_simulated'] % print_status_every == 0:
+                try:
+                    print(f'\nTrial {trial_number} '
+                          f'({state["n_simulated"]}/{remaining} simulated this '
+                          f'attempt, budget {n_trials}): {ctx.objective_name} '
+                          f'= {ev.objective:.6g} (best so far '
+                          f'{state["best_value"]:.6g}, trial '
+                          f'{state["best_trial_number"]})\n'
+                          f'integrator: {r_te.integrator.getName()}; '
+                          'HXN Qbal error = '
+                          f"{handles['HXN'].energy_balance_percent_error:.2f} %")
+                except Exception:  # cosmetic only -- never abort the run
+                    pass
+        return annealing_energy(ev.state, ev.objective, direction, energy_scale)
+
+    from biorefineries.isobutanol import system as _system
+    if ctx.burden_on:
+        _system.set_active_burden(ctx.burden_model)
+    stop_reason, message = 'scipy', ''
+    try:
+        try:
+            res = dual_annealing(_energy, bounds=[(0.0, 1.0)] * len(names),
+                                 maxiter=10**6, initial_temp=initial_temp,
+                                 restart_temp_ratio=restart_temp_ratio,
+                                 visit=visit, accept=accept, maxfun=maxfun,
+                                 rng=seed + n_done_sim,
+                                 no_local_search=no_local_search, x0=x0)
+            msg = getattr(res, 'message', '')
+            message = ('; '.join(str(m) for m in msg)
+                       if isinstance(msg, (list, tuple)) else str(msg))
+        except _BudgetExhausted:
+            stop_reason = 'budget'
+        if stop_reason == 'scipy':
+            if state['n_simulated'] >= remaining:
+                stop_reason = 'budget'
+            elif state['n_calls'] >= maxfun:
+                stop_reason = 'max_calls'
+                frac = (state['n_infeasible'] / state['n_calls']
+                        if state['n_calls'] else 0.0)
+                print(f'WARNING: dual annealing stopped at the safety cap of '
+                      f'{maxfun} objective calls (max_calls_factor '
+                      f'{max_calls_factor} x {remaining} remaining trials) with '
+                      f'only {state["n_simulated"]} simulated: {frac:.0%} of '
+                      'the proposals were INFEASIBLE (burden / volume prune). '
+                      'Narrow the space or raise max_calls_factor.')
+        print(f'Dual annealing ended ({stop_reason}'
+              + (f': {message}' if message else '') + f'): {state["n_calls"]} '
+              f'objective calls, {state["n_simulated"]} simulated, '
+              f'{state["n_infeasible"]} INFEASIBLE; best '
+              f'{ctx.objective_name} = '
+              + (f'{state["best_value"]:.6g} at trial {state["best_trial_number"]}'
+                 if state['best_value'] is not None else 'none (no COMPLETE trial)')
+              + '.')
+    finally:
+        # restore_baseline re-simulates the scenario baseline; keep the
+        # burden active for that (inert at the scenario-A reference), then
+        # clear it so a later burden-free caller in the same kernel is not
+        # silently constrained. Nested finally: the clear happens even if
+        # restore_baseline raises.
+        try:
+            restore_baseline(handles, ctx.kinetic_baselines,
+                             ctx.baseline_model_kwargs,
+                             baseline_max_n_spikes=ctx.baseline_max_n_spikes,
+                             baseline_stage_1_max_x=ctx.baseline_stage_1_max_x)
+        finally:
+            _system.set_active_burden(None)
+    # Report the best from the trajectory CSV (the authoritative store), so a
+    # fresh run reports EXACTLY what a later resume of the same study would --
+    # the `remaining <= 0` 'complete' early-return above already sources its
+    # best from trajectory_resume_state, and this makes the annealed path
+    # consistent with it. The in-loop `state` best drives _is_better and the
+    # status prints only; its raw ev.objective can differ from the persisted
+    # value by the CSV float round-trip (pandas' fast parser), so it is not
+    # the reported best.
+    final = trajectory_resume_state(ctx.csv_path, search_space, direction)
+    result = AnnealingResult(
+        direction=direction,
+        best_trial_number=final['best_trial_number'],
+        best_value=final['best_value'], best_params=final['best_values'],
+        n_simulated=state['n_simulated'], n_calls=state['n_calls'],
+        n_infeasible=state['n_infeasible'], stop_reason=stop_reason,
+        message=message)
+    return result, ctx.csv_path, ctx.kinetic_baselines
