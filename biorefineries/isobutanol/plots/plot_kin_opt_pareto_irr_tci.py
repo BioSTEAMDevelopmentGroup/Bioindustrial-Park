@@ -153,9 +153,8 @@ def make_figure(csv_path, show_baseline=True):
     # Pareto frontier: joined line + outlined markers
     fx = front['TCI'].to_numpy()
     fy = front['IRR'].to_numpy()
-    ax.plot(fx, fy, color='crimson', lw=1.6, zorder=3, solid_capstyle='round')
-    ax.scatter(fx, fy, s=68, facecolor='white', edgecolor='crimson',
-               linewidths=1.8, zorder=4)
+    ax.plot(fx, fy, color='crimson', lw=1.6, ls=(0, (6, 4)), zorder=3,
+            solid_capstyle='round')
     # stagger the trial labels above/below so close frontier points
     # (e.g. #400 and #1242) do not collide
     label_offsets = {925: (7, -3, 'left', 'top'),
@@ -173,8 +172,8 @@ def make_figure(csv_path, show_baseline=True):
     handles = [
         Line2D([], [], marker='o', ls='none', mfc='0.7', mec='0.7', ms=6,
                label='Optimization trial (colour = IBO titer)'),
-        Line2D([], [], marker='o', ls='-', color='crimson', mfc='white',
-               mec='crimson', mew=1.8, ms=8, label='Pareto frontier'),
+        Line2D([], [], ls=(0, (6, 4)), color='crimson', lw=1.6,
+               label='Pareto frontier'),
     ]
     if show_baseline:
         ax.scatter([BASELINE_A['TCI']], [BASELINE_A['IRR']], marker='*',
