@@ -4888,4 +4888,57 @@ else:
     print('SKIP 72 (preset part): parameter-distribution workbooks not found')
 PASS('per-group group_multiplier_bounds: {inhib_ethanol: (0.3, 2.0)} floors only inhib_ethanol at 0.3 (others 0.2), tuple still broadcasts, group_bounds_for normalizes/validates both forms, default_study_name renders _ibe0.3-2 (EFFECTOR_ORDER codes) vs _ib0.2-2, both minimal presets carry the dict + distinct name tag')
 
+#%% 73. Supervisor --group-multiplier-bounds LO HI (2026-09-11): an explicit
+# SHARED effector-family band overriding the grouped presets' per-group dict
+# ({inhib_ethanol: (0.3, 2.0)}), threaded through supervise() ->
+# default_study_name() / child_code(), emitted into the child call ONLY when
+# given, tagged into the derived name exactly as the driver tags an explicit
+# group_multiplier_bounds (ko._inhibition_bounds_tag: (0.2, 2.0) re-derives
+# the pre-9bb9cd61 _ib0.2-2 name -- the 2026-09-07 IRR replicate's reason
+# for --study-name), and refused up front for ungrouped types / legacy flags.
+sup73 = _runpy.run_path(os.path.join(
+    os.path.dirname(os.path.abspath(__file__)),
+    'optimize_kinetics_BO_supervised.py'))
+for _fn73 in ('supervise', 'child_code', 'default_study_name'):
+    assert _inspect.signature(sup73[_fn73]).parameters['group_multiplier_bounds'].default is None, _fn73
+_nm73 = lambda **kw: sup73['default_study_name'](
+    None, 'IRR', None, study_target_products='ethanol_isobutanol',
+    study_type='metabolic_minimal_subset', burden=True, **kw)
+assert _nm73() == 'kin_opt_ethanol_isobutanol_metabolic_minimal_subset_irr_rb0.001-10_ibe0.3-2_burden'
+assert _nm73(group_multiplier_bounds=(0.2, 2.0)) \
+    == 'kin_opt_ethanol_isobutanol_metabolic_minimal_subset_irr_rb0.001-10_ib0.2-2_burden'
+assert _nm73(group_multiplier_bounds=(0.5, 3.0)) \
+    == 'kin_opt_ethanol_isobutanol_metabolic_minimal_subset_irr_rb0.001-10_ib0.5-3_burden'
+# legacy naming ignores it (no groups on that path)
+assert sup73['default_study_name']('A', 'IRR', 'B', group_multiplier_bounds=(0.2, 2.0)) == 'kin_opt_A_kbB_irr'
+_code73 = sup73['child_code'](None, 'IRR', 5, None, False, 'x',
+                              study_target_products='ethanol_isobutanol',
+                              study_type='metabolic_minimal_subset',
+                              group_multiplier_bounds=(0.2, 2.0))
+assert 'group_multiplier_bounds=(0.2, 2.0),' in _code73
+assert 'group_multiplier_bounds' not in sup73['child_code'](
+    None, 'IRR', 5, None, False, 'x',
+    study_target_products='ethanol_isobutanol',
+    study_type='metabolic_minimal_subset')
+# Refused BEFORE any side effect (no log, no child) for an ungrouped study
+# type and for the legacy path.
+for _bad73 in (dict(study_target_products='ethanol_isobutanol', study_type='metabolic_protein'),
+               dict(study_target_products=None, study_type='metabolic')):
+    try:
+        sup73['supervise'](group_multiplier_bounds=(0.2, 2.0),
+                           study_name='never_launched_73', **_bad73)
+        raise AssertionError(f'supervise() must refuse group_multiplier_bounds for {_bad73}')
+    except ValueError as e73:
+        assert 'group_multiplier_bounds' in str(e73), str(e73)
+assert not os.path.exists(os.path.join(sup73['RESULTS_DIR'], 'never_launched_73_run.log'))
+_src73 = _inspect.getsource(sup73['supervise'])
+assert _src73.count('group_multiplier_bounds=group_multiplier_bounds') == 2  # -> default_study_name + child_code
+assert _src73.index('STUDY_TYPE_OPTIONS') < _src73.index('default_study_name(')  # guard runs first
+_file73 = open(os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                            'optimize_kinetics_BO_supervised.py')).read()
+assert "'--group-multiplier-bounds'" in _file73 and "metavar=('LO', 'HI')" in _file73
+assert 'args.group_multiplier_bounds' in _file73        # forwarded by main
+assert 'group_multiplier_bounds={group_multiplier_bounds!r}' in _file73  # settings: line
+PASS('supervisor --group-multiplier-bounds LO HI -> shared group band: name tag mirrors the driver (_ib0.2-2 / _ib0.5-3 vs preset _ibe0.3-2), emitted into the child call only when given, refused up front for ungrouped / legacy')
+
 print(f'\nALL {n_pass} CHECKS PASSED')

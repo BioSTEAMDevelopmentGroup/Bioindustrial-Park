@@ -120,7 +120,8 @@ def default_study_name(scenario, objective, kinetic_bounds_scenario,
                        study_target_products=None, study_type=None,
                        burden=False, rate_multiplier_bounds=None,
                        exclude_params=None, stage_1_max_x_bounds=_UNSET,
-                       seed_from=None, method='tpe'):
+                       seed_from=None, method='tpe',
+                       group_multiplier_bounds=None):
     """Mirror the driver's stable study naming (resume finds the same
     study): the preset convention
     kin_opt_{study_target_products}_{study_type}_{slug} whenever a
@@ -142,11 +143,16 @@ def default_study_name(scenario, objective, kinetic_bounds_scenario,
     band `_ib{lo}-{hi}`, or -- for the grouped metabolic_minimal /
     metabolic_minimal_subset types -- the per-effector-family GROUP band,
     which floors inhib_ethanol at 0.3x and leaves the others at 0.2x, so
-    the tag reads `_ibe0.3-2`. The supervisor exposes no flag for it,
-    matching the driver's default `group_multiplier_bounds` /
-    `multiplier_bounds`: since 2026-09-06 the presets assign bands by
-    role, and the tag keeps a role-band or per-group-floored study from
-    resuming a pre-change study of the same name.
+    the tag reads `_ibe0.3-2`. `group_multiplier_bounds` (None = that
+    preset band; an explicit (lo, hi) tuple = ONE shared band for every
+    effector-family group, `--group-multiplier-bounds LO HI`, the
+    driver's `group_multiplier_bounds` override) replaces the per-group
+    dict in the tag exactly as the driver does (an all-default (0.2, 2.0)
+    therefore re-derives the pre-2026-09-11 `_ib0.2-2` name of the same
+    objective -- pass --study-name for a fresh study): since 2026-09-06
+    the presets assign bands by role, and the tag keeps a role-band or
+    per-group-floored study from resuming a pre-change study of the same
+    name. Ignored on the legacy path (no groups).
     `exclude_params` (None = the study type's default from
     ko.study_type_name_defaults -- ('k_10',), or ('k_10', 'k_7', 'k_8')
     for metabolic_minimal -- which the driver defaults in; a tuple overrides it, () =
@@ -185,8 +191,10 @@ def default_study_name(scenario, objective, kinetic_bounds_scenario,
                                          ko.DEFAULT_RATE_MULTIPLIER_BOUNDS
                                          if rate_multiplier_bounds is None
                                          else rate_multiplier_bounds),
-                                     inhibition_multiplier_bounds=
-                                         name_defaults['inhibition_multiplier_bounds'],
+                                     inhibition_multiplier_bounds=(
+                                         name_defaults['inhibition_multiplier_bounds']
+                                         if group_multiplier_bounds is None
+                                         else tuple(group_multiplier_bounds)),
                                      exclude_params=(
                                          name_defaults['exclude_params']
                                          if exclude_params is None
@@ -261,7 +269,8 @@ def child_code(scenario, objective, n_trials, kinetic_bounds_scenario,
                volume_feasibility=True,
                exclude_params=None,
                stage_1_max_x_bounds=_UNSET, seed_from=None,
-               method='tpe', annealing_kwargs=None):
+               method='tpe', annealing_kwargs=None,
+               group_multiplier_bounds=None):
     """The -c program for one supervised attempt of the driver.
     `study_target_products=None` selects the driver's legacy flag path.
     `rate_multiplier_bounds=None` leaves the k_* band to the preset (the
@@ -279,13 +288,18 @@ def child_code(scenario, objective, n_trials, kinetic_bounds_scenario,
     list is forwarded as a list of (str, tuple-of-int) pairs (the driver
     enqueues the seeds on a fresh study only). `method` is always
     forwarded; `annealing_kwargs` (None/{} = the engine defaults) is
-    forwarded only when non-empty."""
+    forwarded only when non-empty. `group_multiplier_bounds=None` leaves
+    the effector-family group band to the preset (the kwarg is omitted;
+    the grouped presets' per-group dict floors inhib_ethanol at 0.3x); a
+    (lo, hi) tuple is forwarded as ONE shared band for every group."""
     seeds = [(str(donor), tuple(int(n) for n in trials))
              for donor, trials in (seed_from or ())]
     seed_kw = ('' if not seeds else
                f'          seed_from={seeds!r},\n')
     rate_kw = ('' if rate_multiplier_bounds is None else
                f'          rate_multiplier_bounds={tuple(rate_multiplier_bounds)!r},\n')
+    group_kw = ('' if group_multiplier_bounds is None else
+                f'          group_multiplier_bounds={tuple(group_multiplier_bounds)!r},\n')
     startup_kw = ('' if n_startup_trials is None else
                   f'          n_startup_trials={int(n_startup_trials)!r},\n')
     startup_sampling_kw = ('' if startup_sampling == 'lhs' else
@@ -320,6 +334,7 @@ def child_code(scenario, objective, n_trials, kinetic_bounds_scenario,
         f'{annealing_kw}'
         f'{startup_sampling_kw}'
         f'{rate_kw}'
+        f'{group_kw}'
         f'{startup_kw}'
         f'{exclude_kw}'
         f'{s1x_kw}'
@@ -341,7 +356,8 @@ def supervise(scenario=None, objective='IRR', n_trials=2000,
               volume_feasibility=True,
               exclude_params=None,
               stage_1_max_x_bounds=_UNSET, seed_from=None,
-              method='tpe', annealing_kwargs=None):
+              method='tpe', annealing_kwargs=None,
+              group_multiplier_bounds=None):
     """Run attempts until 'complete' or 'abort'; returns the final
     outcome string ('complete' or 'abort'). `study_target_products` /
     `study_type` name the driver's study preset (defaults = the engine's;
@@ -404,6 +420,22 @@ def supervise(scenario=None, objective='IRR', n_trials=2000,
     attempt (a schedule setting, not part of the study name)."""
     seed_from = [(donor, tuple(int(n) for n in trials))
                  for donor, trials in (seed_from or ())]
+    if group_multiplier_bounds is not None:
+        # An explicit shared effector-family band only means something
+        # under a GROUPED preset (parameter_groups in the study type's
+        # STUDY_TYPE_OPTIONS entry); refuse it up front -- before the
+        # name, the log and any child -- rather than silently derive a
+        # name the driver would never write.
+        grouped = (study_target_products is not None
+                   and bool(ko.STUDY_TYPE_OPTIONS.get(study_type, {})
+                            .get('parameter_groups')))
+        if not grouped:
+            raise ValueError(
+                'group_multiplier_bounds (--group-multiplier-bounds) applies '
+                'only to a grouped study type under a preset (metabolic_'
+                'minimal / metabolic_minimal_subset); got study_target_'
+                f'products={study_target_products!r}, study_type={study_type!r}')
+        group_multiplier_bounds = tuple(float(x) for x in group_multiplier_bounds)
     if study_name is None:
         study_name = default_study_name(scenario, objective,
                                         kinetic_bounds_scenario,
@@ -413,7 +445,8 @@ def supervise(scenario=None, objective='IRR', n_trials=2000,
                                         exclude_params=exclude_params,
                                         stage_1_max_x_bounds=stage_1_max_x_bounds,
                                         seed_from=seed_from,
-                                        method=method)
+                                        method=method,
+                                        group_multiplier_bounds=group_multiplier_bounds)
     csv_path = os.path.join(RESULTS_DIR, study_name + '_trajectory.csv')
     inflight_path = ko.inflight_path_for(RESULTS_DIR, study_name)
     if python is None:
@@ -436,7 +469,8 @@ def supervise(scenario=None, objective='IRR', n_trials=2000,
                       exclude_params=exclude_params,
                       stage_1_max_x_bounds=stage_1_max_x_bounds,
                       seed_from=seed_from,
-                      method=method, annealing_kwargs=annealing_kwargs)
+                      method=method, annealing_kwargs=annealing_kwargs,
+                      group_multiplier_bounds=group_multiplier_bounds)
     guard = ko.StallGuard(stall_timeout_s=60.0*stall_timeout_min)
 
     def event(msg):
@@ -464,6 +498,7 @@ def supervise(scenario=None, objective='IRR', n_trials=2000,
           f'startup_sampling={startup_sampling!r}, '
           f'n_startup_trials={n_startup_trials!r}, '
           f'rate_multiplier_bounds={rate_multiplier_bounds!r}, '
+          f'group_multiplier_bounds={group_multiplier_bounds!r}, '
           f'exclude_params={exclude_params!r}, '
           f'stage_1_max_x_bounds={stage_1_max_x_bounds!r}, '
           f'seed_from={seed_from!r}, '
@@ -663,6 +698,20 @@ if __name__ == '__main__':
                              'band is always tagged into the derived study '
                              'name _rb{LO}-{HI}, so a study never resumes '
                              'one of the same name under another band')
+    parser.add_argument('--group-multiplier-bounds', nargs=2, type=float,
+                        default=None, metavar=('LO', 'HI'),
+                        help='explicit band (x baseline, log-scale) shared '
+                             'by EVERY inhibition-effector-family group '
+                             'multiplier of a grouped study type '
+                             '(metabolic_minimal / metabolic_minimal_subset), '
+                             "overriding the preset's per-group dict that "
+                             'floors inhib_ethanol at 0.3 (others 0.2-2). '
+                             'Tagged into the derived study name like the '
+                             'driver does (_ib{LO}-{HI}; 0.2 2 re-derives '
+                             'the pre-2026-09-11 _ib0.2-2 name of the same '
+                             'objective, so pass --study-name for a fresh '
+                             'study). Refused for ungrouped study types and '
+                             '--legacy-flags')
     parser.add_argument('--exclude-params', nargs='*', default=None,
                         metavar='NAME',
                         help='kinetic parameters kept OUT of the search '
@@ -858,5 +907,8 @@ if __name__ == '__main__':
                         stage_1_max_x_bounds=stage_1_max_x_bounds,
                         seed_from=seed_from,
                         method=args.method,
-                        annealing_kwargs=annealing_kwargs or None)
+                        annealing_kwargs=annealing_kwargs or None,
+                        group_multiplier_bounds=(
+                            None if args.group_multiplier_bounds is None
+                            else tuple(args.group_multiplier_bounds)))
     sys.exit(0 if outcome == 'complete' else 1)
