@@ -2307,19 +2307,20 @@ def lhs_startup_tpe_sampler(lhs_design, **kwargs):
 
 #: Default TPE `gamma`, the quantile that splits finished trials into the
 #: "good" (below) and "bad" (above) sets the sampler builds its densities
-#: from. optuna's own default is min(ceil(0.10 * n), 25) -- the top 10 %,
-#: capped at 25 good trials, so the cap already binds past ~250 trials and a
-#: 2000-trial study freezes its good set at 25. We widen this to the top 25 %
-#: capped at 500 good trials by default (set 2026-09-10), so the good set
-#: keeps growing with study size instead of pinning at 25.
-DEFAULT_GAMMA_FRACTION = 0.25
-DEFAULT_GAMMA_CAP = 500
+#: from. Set to the top 10 % capped at 25 good trials -- these are exactly the
+#: defaults in optuna's out-of-box TPESampler too (min(ceil(0.10 * n), 25)),
+#: so the cap binds past ~250 finished trials and a large study's good set
+#: stays at 25, concentrating the densities on the best trials rather than the
+#: bulk volume. (Briefly widened to 25 %/500 on 2026-09-10; reverted to
+#: optuna's defaults on 2026-09-11.)
+DEFAULT_GAMMA_FRACTION = 0.10  # optuna TPESampler out-of-box default
+DEFAULT_GAMMA_CAP = 25         # optuna TPESampler out-of-box default
 
 def default_tpe_gamma(n_trials):
     """Number of "good" (below) trials for the TPE split at `n_trials`
     finished trials: ceil(DEFAULT_GAMMA_FRACTION * n_trials) capped at
-    DEFAULT_GAMMA_CAP. Passed as optuna TPESampler(gamma=...), replacing
-    optuna's default min(ceil(0.10 * n_trials), 25)."""
+    DEFAULT_GAMMA_CAP. Passed as optuna TPESampler(gamma=...); with these
+    defaults it equals optuna's own default min(ceil(0.10 * n_trials), 25)."""
     return min(math.ceil(DEFAULT_GAMMA_FRACTION * n_trials), DEFAULT_GAMMA_CAP)
 
 #%% Latin hypercube start-up design (2026-09-10)
