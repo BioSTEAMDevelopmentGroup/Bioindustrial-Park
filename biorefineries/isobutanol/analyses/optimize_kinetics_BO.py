@@ -90,6 +90,8 @@ Runner pattern (fresh kernel, one process):
     study, csv_path = ns['run'](objective='IRR', study_type='metabolic',
                                 seed_from=[('<donor study name>', [1553, 1914]),
                                            ('<other donor>', [1162])])
+    # dual annealing instead of TPE (name ..._irr_da_rb0.001-10_ib0.2-2_burden)
+    result, csv_path = ns['run'](objective='IRR', study_type='metabolic_minimal_subset', method='dual_annealing')
 """
 from datetime import datetime
 
@@ -215,11 +217,20 @@ def run(scenario=None,  # 'A' or 'B'; None = the preset's start scenario
         # values clipped into this study's bands), giving TPE a foothold
         # in a basin another study found; the derived study name gains
         # `_seed{n}` (n = total seed count). None = no seeds.
+        method='tpe',  # 'tpe' (optuna TPE, ko.run_kinetic_optimization) or
+        # 'dual_annealing' (scipy dual annealing, ko.run_kinetic_dual_annealing)
+        # over the same preset/scenario/burden set-up and trajectory protocol.
+        # The derived study name gains `_da` right after the objective slug.
+        annealing_kwargs=None,  # dict of ko.run_kinetic_dual_annealing knobs
+        # (initial_temp, restart_temp_ratio, visit, accept, no_local_search,
+        # energy_scale, max_calls_factor); ignored under 'tpe'.
         **engine_kwargs,  # bounds/overrides/etc. -> run_kinetic_optimization
         ):
     """Set up the scenario baseline (same recipe as the smoke tests), run
-    the Bayesian optimization, and (optionally) save the trajectory plots
-    next to the trajectory CSV. Returns (study, csv_path).
+    the optimization (`method`: optuna TPE or scipy dual annealing), and
+    (optionally) save the trajectory plots next to the trajectory CSV.
+    Returns (result, csv_path) -- result is the optuna Study (tpe) or a
+    ko.AnnealingResult (dual_annealing).
 
     STUDY PRESETS (default). `study_target_products` x `study_type` name
     the search set and bands (ko.resolve_study_preset): both target
@@ -406,7 +417,23 @@ def run(scenario=None,  # 'A' or 'B'; None = the preset's start scenario
     teaches TPE to avoid its region. Same columns as the unseeded study,
     so the derived name is tagged `_seed{n}` (n = the total seed count;
     ko.seed_points_tag) -- a different panel of the same size needs an
-    explicit study_name. Resumes never re-enqueue."""
+    explicit study_name. Resumes never re-enqueue.
+
+    METHOD (`method`, default 'tpe'; since 2026-09-11). 'dual_annealing'
+    runs ko.run_kinetic_dual_annealing (scipy.optimize.dual_annealing over
+    the unit cube of the same search space, energy = sign*objective/
+    energy_scale, finite penalty for FAIL/NAN/INFEASIBLE, budget = simulated
+    evaluations, best-so-far restart from the trajectory CSV; no SQLite
+    store) with the same preset / scenario / burden / volume set-up; the
+    derived study name gains `_da` right after the objective slug on both
+    naming paths (kin_opt_ethanol_isobutanol_metabolic_minimal_subset_irr_
+    da_rb0.001-10_ib0.2-2_burden). `annealing_kwargs` (dict) forwards the
+    annealing knobs (initial_temp 5230, restart_temp_ratio 2e-5, visit 2.62,
+    accept -5.0, no_local_search True, energy_scale None = the registry's,
+    max_calls_factor 20). Under DA, enqueue_knockouts=True or a non-empty
+    seed_from raise (optuna enqueue concepts), and n_startup_trials /
+    feasible_sampling / startup_sampling are ignored with one printed line
+    (ko.check_method_kwargs)."""
     if 'burden_model' in engine_kwargs:
         raise ValueError("pass burden=True/False to run(), not the engine's "
                          'burden_model (run() builds it so the reports can '
@@ -417,6 +444,13 @@ def run(scenario=None,  # 'A' or 'B'; None = the preset's start scenario
     seed_from = [(donor, tuple(int(n) for n in trials))
                  for donor, trials in (seed_from or ())]
     n_seeds = sum(len(trials) for _, trials in seed_from)
+    method_tag = ko.method_study_tag(method)        # ValueError on a bad method
+    method_note = ko.check_method_kwargs(
+        method, enqueue_knockouts=enqueue_knockouts, seed_from=seed_from,
+        n_startup_trials=n_startup_trials, feasible_sampling=feasible_sampling,
+        startup_sampling=startup_sampling)
+    if method_note:
+        print(method_note)
     if study_target_products is not None:
         if not restrict_to_workbook:
             raise ValueError(
@@ -468,7 +502,8 @@ def run(scenario=None,  # 'A' or 'B'; None = the preset's start scenario
                 stage_1_max_x_bounds=engine_kwargs['stage_1_max_x_bounds'],
                 # The seed count: same columns as the unseeded study, so
                 # the tag is what keeps a seeded run off its store.
-                n_seeds=n_seeds)
+                n_seeds=n_seeds,
+                method=method)
         excluded = tuple(engine_kwargs['exclude_params'] or ())
         groups = dict(engine_kwargs['parameter_groups'] or {})
         grouped = {m for members in groups.values() for m in members}
@@ -535,6 +570,7 @@ def run(scenario=None,  # 'A' or 'B'; None = the preset's start scenario
         if study_name is None:  # legacy path only (presets set it above)
             study_name = (f'kin_opt_{scenario}_'
                           f'kb{kinetic_bounds_scenario}_{slug}'
+                          + method_tag
                           + ko.seed_points_tag(n_seeds)
                           + (ko.BURDEN_STUDY_SUFFIX if burden else ''))
     if seed_from:
@@ -560,28 +596,44 @@ def run(scenario=None,  # 'A' or 'B'; None = the preset's start scenario
         burden_model = None
         print('Enzyme burden OFF (burden=False): legacy burden-free study.')
 
-    study, csv_path, kinetic_baselines = ko.run_kinetic_optimization(
-        objective=objective,
-        scenario_label=scenario,
-        n_trials=n_trials,
-        seed=seed,
-        study_name=study_name,
-        burden_model=burden_model,
-        enqueue_baseline=enqueue_baseline,
-        enqueue_knockouts=enqueue_knockouts,
-        n_startup_trials=n_startup_trials,
-        feasible_sampling=feasible_sampling,
-        volume_feasibility=volume_feasibility,
-        startup_sampling=startup_sampling,
-        seed_from=seed_from,
-        **engine_kwargs)
+    if method == 'tpe':
+        result, csv_path, kinetic_baselines = ko.run_kinetic_optimization(
+            objective=objective,
+            scenario_label=scenario,
+            n_trials=n_trials,
+            seed=seed,
+            study_name=study_name,
+            burden_model=burden_model,
+            enqueue_baseline=enqueue_baseline,
+            enqueue_knockouts=enqueue_knockouts,
+            n_startup_trials=n_startup_trials,
+            feasible_sampling=feasible_sampling,
+            volume_feasibility=volume_feasibility,
+            startup_sampling=startup_sampling,
+            seed_from=seed_from,
+            **engine_kwargs)
+    else:
+        result, csv_path, kinetic_baselines = ko.run_kinetic_dual_annealing(
+            objective=objective,
+            scenario_label=scenario,
+            n_trials=n_trials,
+            seed=seed,
+            study_name=study_name,
+            burden_model=burden_model,
+            enqueue_baseline=enqueue_baseline,
+            volume_feasibility=volume_feasibility,
+            **engine_kwargs,
+            **(annealing_kwargs or {}))
 
     if make_plots:
         try:
-            import optuna
-            direction = ('maximize'
-                         if study.direction == optuna.study.StudyDirection.MAXIMIZE
-                         else 'minimize')
+            direction = (engine_kwargs.get('direction')
+                         or (ko.OBJECTIVE_REGISTRY[objective]['direction']
+                             if isinstance(objective, str) else None))
+            if direction not in ('maximize', 'minimize'):
+                raise ValueError('cannot derive the objective direction for '
+                                 'the plots (custom objective without '
+                                 "engine_kwargs['direction'])")
             objective_name = (objective if isinstance(objective, str)
                               else engine_kwargs.get('objective_name', 'custom'))
             objective_units = (ko.OBJECTIVE_REGISTRY[objective]['units']
@@ -626,4 +678,4 @@ def run(scenario=None,  # 'A' or 'B'; None = the preset's start scenario
             print('Plotting failed (the trajectory CSV and study are '
                   f'intact on disk): {repr(e)[:300]}')
 
-    return study, csv_path
+    return result, csv_path

@@ -77,6 +77,7 @@ __all__ = ('OBJECTIVE_REGISTRY', 'TRACKED_METRICS',
            'DEFAULT_STUDY_TARGET_PRODUCTS', 'DEFAULT_STUDY_TYPE',
            'resolve_study_preset', 'default_study_name',
            'BURDEN_STUDY_SUFFIX',
+           'OPTIMIZATION_METHODS', 'method_study_tag', 'check_method_kwargs',
            'baseline_decision_point', 'knockout_probe_points',
            'clip_to_search_space', 'seed_points_from_trajectory',
            'seed_points_tag',
@@ -1388,12 +1389,52 @@ def resolve_study_preset(study_target_products, study_type, roles=None,
 #: of defence.
 BURDEN_STUDY_SUFFIX = '_burden'
 
+OPTIMIZATION_METHODS = ('tpe', 'dual_annealing')
+
+def method_study_tag(method):
+    """Study-name tag of an optimization method (since 2026-09-11): '' for
+    'tpe' (every study before that date), '_da' for 'dual_annealing'
+    (run_kinetic_dual_annealing). Inserted right after the objective slug
+    on both naming paths: a DA study samples the SAME columns as the TPE
+    study of the same objective, so only the name keeps the two CSVs
+    apart (the header guard cannot). ValueError for any other value."""
+    if method not in OPTIMIZATION_METHODS:
+        raise ValueError(f'method must be one of {OPTIMIZATION_METHODS}; '
+                         f'got {method!r}')
+    return '_da' if method == 'dual_annealing' else ''
+
+def check_method_kwargs(method, *, enqueue_knockouts=False, seed_from=None,
+                        n_startup_trials=None, feasible_sampling=True,
+                        startup_sampling='lhs'):
+    """Validate the driver's TPE-only kwargs against `method`. Under 'tpe'
+    everything is allowed ('' returned). Under 'dual_annealing' the optuna
+    ENQUEUE concepts have no counterpart and are refused (ValueError):
+    enqueue_knockouts=True, a non-empty seed_from. The SAMPLER settings
+    (n_startup_trials, feasible_sampling, startup_sampling) are merely
+    ignored: one printable line naming them is returned, so the driver and
+    the supervisor (which forwards them explicitly) can say so once."""
+    if not method_study_tag(method):
+        return ''
+    if enqueue_knockouts:
+        raise ValueError("enqueue_knockouts=True has no dual-annealing "
+                         "counterpart (optuna enqueue); pass method='tpe' "
+                         'or enqueue_knockouts=False.')
+    if seed_from:
+        raise ValueError('seed_from (donor-study seed points) has no '
+                         "dual-annealing counterpart (optuna enqueue); pass "
+                         "method='tpe' or seed_from=None.")
+    return (f"method='{method}': TPE-only sampler settings ignored -- "
+            f'n_startup_trials={n_startup_trials!r}, '
+            f'feasible_sampling={feasible_sampling!r}, '
+            f'startup_sampling={startup_sampling!r} (the burden / volume '
+            'checks still prune INFEASIBLE proposals before simulating).')
+
 def default_study_name(objective, study_target_products, study_type,
                        scenario=None, kinetic_bounds_scenario=None,
                        burden=False, rate_multiplier_bounds=None,
                        inhibition_multiplier_bounds=None,
                        exclude_params=None, stage_1_max_x_bounds=None,
-                       n_seeds=None):
+                       n_seeds=None, method='tpe'):
     """Stable study name of a preset study:
     kin_opt_{study_target_products}_{study_type}_{objective slug}
     (slug = lower-cased, spaces -> '_'), e.g.
@@ -1475,12 +1516,19 @@ def default_study_name(objective, study_target_products, study_type,
     size needs an explicit study_name. None / 0 leaves the name
     unchanged.
 
+    `method` ('tpe', the default and every pre-2026-09-11 study; or
+    'dual_annealing') inserts method_study_tag right after the objective
+    slug (`..._irr_da_rb0.001-10_...`): a dual-annealing study has the
+    same columns as the TPE study of the same objective, so the tag is
+    the only thing keeping it off that study's CSV.
+
     `burden=True` appends BURDEN_STUDY_SUFFIX ('_burden') after every
     other tag: a burden study (enzyme_burden.py; the driver's default)
     can never resume a burden-free study's CSV/SQLite, or vice versa.
     """
     slug = objective.lower().replace(' ', '_')
-    name = f'kin_opt_{study_target_products}_{study_type}_{slug}'
+    name = (f'kin_opt_{study_target_products}_{study_type}_{slug}'
+            + method_study_tag(method))
     if scenario is not None and scenario != 'A':
         name += f'_sc{scenario}'
     preset_kinetic_bounds_scenario = STUDY_TARGET_PRODUCTS.get(

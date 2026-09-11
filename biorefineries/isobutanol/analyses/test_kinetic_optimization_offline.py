@@ -2767,7 +2767,7 @@ else:
 drv41 = open(os.path.join(os.path.dirname(os.path.abspath(__file__)),
                           'optimize_kinetics_BO.py')).read()
 assert 'seed_from=None,' in drv41 and 'seed_from=seed_from,' in drv41
-assert 'n_seeds=n_seeds)' in drv41
+assert 'n_seeds=n_seeds,' in drv41            # method=method follows on the preset path
 assert "+ ko.seed_points_tag(n_seeds)" in drv41          # legacy-path name
 sup41 = _runpy.run_path(os.path.join(
     os.path.dirname(os.path.abspath(__file__)),
@@ -4645,5 +4645,70 @@ else:
     assert res68.best_trial_number is None and res68.best_value is None
     assert 'Maximum number of function call reached' in res68.message
     PASS("dual annealing: all-INFEASIBLE space stops at max_calls_factor x n_trials calls, 'max_calls', zero simulations")
+
+#%% 69. Method naming + TPE-only guards (spec §6.1, test 8): the `_da` tag
+# sits right after the objective slug on the preset path (before _rb/_ib/_x/
+# _s1x/_seed/_burden) and, via the driver, on the legacy path; the driver
+# dispatches on method= and rejects the TPE-only enqueue_knockouts /
+# seed_from under DA through ko.check_method_kwargs (the driver load()s the
+# biorefinery at import, so its guard logic lives in ko and is exercised
+# here; the driver is checked by source text like checks 46/60).
+assert ko.OPTIMIZATION_METHODS == ('tpe', 'dual_annealing')
+assert ko.method_study_tag('tpe') == '' and ko.method_study_tag('dual_annealing') == '_da'
+for bad69 in ('DA', 'annealing', None, ''):
+    try:
+        ko.method_study_tag(bad69)
+    except ValueError:
+        pass
+    else:
+        raise AssertionError(f'method {bad69!r} accepted')
+name69 = ko.default_study_name('IRR', 'ethanol_isobutanol', 'metabolic_minimal_subset',
+                               burden=True, rate_multiplier_bounds=(1e-3, 10.0),
+                               inhibition_multiplier_bounds=(0.2, 2.0),
+                               exclude_params=(), stage_1_max_x_bounds=None,
+                               method='dual_annealing')
+assert name69 == ('kin_opt_ethanol_isobutanol_metabolic_minimal_subset_irr_da'
+                  '_rb0.001-10_ib0.2-2_burden'), name69
+name69t = ko.default_study_name('IRR', 'ethanol_isobutanol', 'metabolic_minimal_subset',
+                                burden=True, rate_multiplier_bounds=(1e-3, 10.0),
+                                inhibition_multiplier_bounds=(0.2, 2.0),
+                                exclude_params=(), stage_1_max_x_bounds=None)
+assert name69t == name69.replace('_da', '')          # default method='tpe': unchanged
+name69x = ko.default_study_name('IBO titer', 'ethanol_only', 'metabolic_protein',
+                                scenario='B', kinetic_bounds_scenario='B',
+                                burden=False, rate_multiplier_bounds=(1e-3, 10.0),
+                                inhibition_multiplier_bounds=(0.1, 10.0),
+                                exclude_params=('k_10',),
+                                stage_1_max_x_bounds=(1.0, 50.0), n_seeds=2,
+                                method='dual_annealing')
+assert name69x == ('kin_opt_ethanol_only_metabolic_protein_ibo_titer_da_scB_kbB'
+                   '_rb0.001-10_ib0.1-10_xk10_s1x1-50_seed2'), name69x
+# guards
+assert ko.check_method_kwargs('tpe', enqueue_knockouts=True,
+                              seed_from=[('d', (1,))], n_startup_trials=5) == ''
+note69 = ko.check_method_kwargs('dual_annealing')
+assert note69 and 'n_startup_trials' in note69 and 'feasible_sampling' in note69 \
+    and 'startup_sampling' in note69 and 'ignored' in note69
+for kw69 in (dict(enqueue_knockouts=True), dict(seed_from=[('donor', (1, 2))])):
+    try:
+        ko.check_method_kwargs('dual_annealing', **kw69)
+    except ValueError as e69:
+        assert next(iter(kw69)) in str(e69)
+    else:
+        raise AssertionError(f'{kw69} accepted under dual_annealing')
+assert ko.check_method_kwargs('dual_annealing', seed_from=[]) == note69   # empty list = none
+# driver: method= / annealing_kwargs= plumbed, dispatch, string direction for plots
+drv69 = open(os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                          'optimize_kinetics_BO.py')).read()
+assert "method='tpe',  #" in drv69 or "method='tpe'," in drv69
+assert 'annealing_kwargs=None,' in drv69
+assert 'ko.method_study_tag(method)' in drv69
+assert 'ko.check_method_kwargs(' in drv69
+assert 'ko.run_kinetic_dual_annealing(' in drv69
+assert '**(annealing_kwargs or {})' in drv69
+assert 'method=method' in drv69                  # forwarded to default_study_name
+assert 'study.direction' not in drv69            # plots take a string direction
+assert "engine_kwargs.get('direction')" in drv69
+PASS('method naming (_da after the slug on both paths) + check_method_kwargs guards; driver dispatch plumbed')
 
 print(f'\nALL {n_pass} CHECKS PASSED')
