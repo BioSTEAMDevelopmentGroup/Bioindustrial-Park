@@ -4138,4 +4138,17 @@ assert ko._resolve_feeding_concs(
 PASS('_resolve_feeding_concs: parity across threshold-anchored (+clips), '
      'pinned-spike, and legacy target-anchored schemes')
 
+#%% 57. feasibility_constraints_func: one term per ENABLED check, ordered
+# (burden, volume), each read from user_attrs and defaulting to 0.0.
+_ft57 = SimpleNamespace(user_attrs={'burden_violation': 0.3,
+                                    'volume_violation': -1.0})
+assert ko.feasibility_constraints_func(burden_on=True, volume_on=True)(_ft57) == (0.3, -1.0)
+assert ko.feasibility_constraints_func(burden_on=True, volume_on=False)(_ft57) == (0.3,)
+assert ko.feasibility_constraints_func(burden_on=False, volume_on=True)(_ft57) == (-1.0,)
+assert ko.feasibility_constraints_func(burden_on=False, volume_on=False)(_ft57) == ()
+# missing attrs default to 0.0 (feasible)
+_ft57b = SimpleNamespace(user_attrs={})
+assert ko.feasibility_constraints_func(burden_on=True, volume_on=True)(_ft57b) == (0.0, 0.0)
+PASS('feasibility_constraints_func: ordered per-enabled-check terms, missing -> 0.0')
+
 print(f'\nALL {n_pass} CHECKS PASSED')

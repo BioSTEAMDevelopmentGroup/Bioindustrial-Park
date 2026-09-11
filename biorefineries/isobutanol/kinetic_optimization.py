@@ -2550,6 +2550,20 @@ def _resolve_feeding_concs(values, baseline_model_kwargs):
         spike = values['spike_conc']
     return threshold, target, spike
 
+def feasibility_constraints_func(*, burden_on, volume_on):
+    """optuna constraints_func: one term per ENABLED check, ordered
+    (burden, volume), each read from the trial's user_attr and defaulting to
+    0.0 (feasible) when absent. <= 0 feasible. Ragged lengths across trials
+    are fine -- optuna reduces each trial's vector independently."""
+    def _constraints(frozen_trial):
+        c = []
+        if burden_on:
+            c.append(frozen_trial.user_attrs.get('burden_violation', 0.0))
+        if volume_on:
+            c.append(frozen_trial.user_attrs.get('volume_violation', 0.0))
+        return tuple(c)
+    return _constraints
+
 def run_kinetic_optimization(objective='IRR',
                              direction=None, level=None,
                              objective_units=None, objective_name=None,
@@ -2974,13 +2988,12 @@ def run_kinetic_optimization(objective='IRR',
               '((year/day**2)*month*(hour+1)*(minute+1)).')
     # Offset the seed by the number of stored trials so a resumed study
     # draws fresh points instead of replaying the original RNG stream.
-    def _burden_constraints(frozen_trial):
-        # <= 0 feasible. optuna evaluates this for COMPLETE and PRUNED
-        # trials (samplers/_base._process_constraints_after_trial), so
-        # the pruned INFEASIBLE trials populate the sampler's infeasible
-        # set and steer sampling toward the feasible region. The attr is
-        # set on every trial right after sampling, before any prune.
-        return (frozen_trial.user_attrs.get('burden_violation', 0.0),)
+    # <= 0 feasible; optuna evaluates it for COMPLETE and PRUNED trials
+    # (samplers/_base._process_constraints_after_trial), so pruned INFEASIBLE
+    # trials populate the sampler's infeasible set. volume_on is False until
+    # the volume check is wired (see the volume_feasibility task).
+    constraints = feasibility_constraints_func(burden_on=burden_on,
+                                               volume_on=False)
     if startup_sampling not in ('lhs', 'random'):
         raise ValueError("startup_sampling must be 'lhs' or 'random'; "
                          f'got {startup_sampling!r}')
@@ -3038,7 +3051,7 @@ def run_kinetic_optimization(objective='IRR',
                                       kinetic_baselines)).feasible,
             multivariate=True, seed=seed + n_done,
             n_startup_trials=n_startup, gamma=default_tpe_gamma,
-            constraints_func=_burden_constraints,
+            constraints_func=constraints,
             lhs_design=lhs_design)
         print('Sampler: feasibility-aware TPE (FeasibleTPESampler): every '
               'start-up draw and TPE candidate is checked against the '
@@ -3051,12 +3064,12 @@ def run_kinetic_optimization(objective='IRR',
                 lhs_design,
                 multivariate=True, seed=seed + n_done,
                 n_startup_trials=n_startup, gamma=default_tpe_gamma,
-                constraints_func=_burden_constraints if burden_on else None)
+                constraints_func=constraints if burden_on else None)
         else:
             study.sampler = optuna.samplers.TPESampler(
                 multivariate=True, seed=seed + n_done,
                 n_startup_trials=n_startup, gamma=default_tpe_gamma,
-                constraints_func=_burden_constraints if burden_on else None)
+                constraints_func=constraints if burden_on else None)
         print('Sampler: plain TPESampler '
               + ('(feasible_sampling=False).' if burden_on
                  else '(burden off: no feasibility predicate).'))
