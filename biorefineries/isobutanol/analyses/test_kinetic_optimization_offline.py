@@ -4373,4 +4373,50 @@ assert ko.external_to_unit({'k_1e': 1e-3, 'k_13': 99.0, 'max_n_spikes': 80,
 # LHS checks 48-53 still cover the design itself; here only its equivalence.
 PASS('unit cube: unit_to_internal/external == LHSDesign rows, external_to_unit inverts, corners exact')
 
+#%% 64. Energy scale + penalty (dual-annealing spec §5): every registry entry
+# carries a positive finite energy_scale; resolve_energy_scale prefers an
+# explicit positive value, falls back to the registry for a named objective
+# and REFUSES a custom callable without one; annealing_energy is
+# sign*objective/energy_scale for COMPLETE (minimize +, maximize -) and the
+# finite PENALTY_ENERGY for every other state.
+for name64, entry64 in ko.OBJECTIVE_REGISTRY.items():
+    es64 = entry64['energy_scale']
+    assert isinstance(es64, float) and es64 > 0 and np.isfinite(es64), name64
+assert ko.OBJECTIVE_REGISTRY['IRR']['energy_scale'] == 0.01
+assert ko.OBJECTIVE_REGISTRY['EtOH MPSP']['energy_scale'] == 0.02
+assert ko.OBJECTIVE_REGISTRY['IBO MPSP']['energy_scale'] == 0.02
+assert ko.OBJECTIVE_REGISTRY['IBO titer']['energy_scale'] == 2.0
+assert ko.OBJECTIVE_REGISTRY['EtOH titer']['energy_scale'] == 2.0
+assert ko.OBJECTIVE_REGISTRY['TCI']['energy_scale'] == 2.0
+assert ko.OBJECTIVE_REGISTRY['IBO yield']['energy_scale'] == 0.01
+assert ko.OBJECTIVE_REGISTRY['EtOH yield']['energy_scale'] == 0.01
+assert ko.OBJECTIVE_REGISTRY['Combined yield']['energy_scale'] == 0.01
+assert ko.OBJECTIVE_REGISTRY['Cell density']['energy_scale'] == 1.0
+assert ko.OBJECTIVE_REGISTRY['IBO productivity']['energy_scale'] == 0.05
+assert ko.OBJECTIVE_REGISTRY['EtOH productivity']['energy_scale'] == 0.05
+assert ko.OBJECTIVE_REGISTRY['IBO yield x titer']['energy_scale'] == 0.5
+assert ko.resolve_energy_scale('IRR') == 0.01
+assert ko.resolve_energy_scale('IRR', 0.5) == 0.5          # explicit wins
+assert ko.resolve_energy_scale(lambda h: 1.0, 3) == 3.0    # callable + explicit
+for bad64 in (0, -1.0, float('nan'), float('inf')):
+    try:
+        ko.resolve_energy_scale('IRR', bad64)
+    except ValueError:
+        pass
+    else:
+        raise AssertionError(f'energy_scale={bad64!r} accepted')
+try:
+    ko.resolve_energy_scale(lambda h: 1.0)
+except ValueError as e64:
+    assert 'energy_scale' in str(e64)
+else:
+    raise AssertionError('custom callable without energy_scale accepted')
+assert ko.PENALTY_ENERGY == 1e6 and np.isfinite(ko.PENALTY_ENERGY)
+assert ko.annealing_energy('COMPLETE', 0.25, 'maximize', 0.01) == -25.0
+assert ko.annealing_energy('COMPLETE', 0.8, 'minimize', 0.02) == 40.0
+for st64 in ('FAIL', 'NAN', 'INFEASIBLE', 'LOST'):
+    assert ko.annealing_energy(st64, None, 'maximize', 0.01) == ko.PENALTY_ENERGY
+    assert ko.annealing_energy(st64, 0.3, 'minimize', 0.01) == ko.PENALTY_ENERGY
+PASS('energy scale: registry field, resolve_energy_scale precedence + guards, annealing_energy signs + finite penalty')
+
 print(f'\nALL {n_pass} CHECKS PASSED')

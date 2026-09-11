@@ -89,7 +89,8 @@ __all__ = ('OBJECTIVE_REGISTRY', 'TRACKED_METRICS',
            'feasible_candidate_mask', 'feasible_tpe_sampler',
            'DEFAULT_GAMMA_FRACTION', 'DEFAULT_GAMMA_CAP', 'default_tpe_gamma',
            'default_seed_from_datetime',
-           'unit_to_internal', 'unit_to_external', 'external_to_unit')
+           'unit_to_internal', 'unit_to_external', 'external_to_unit',
+           'PENALTY_ENERGY', 'resolve_energy_scale', 'annealing_energy',)
 
 FEEDING_VARIABLES = ('threshold_conc', 'target_delta', 'spike_delta',
                      'max_n_spikes')
@@ -250,47 +251,59 @@ def _nsk(handles):
 # system simulation AND one TEA solve regardless (the system-level metrics
 # IRR/TCI/... in TRACKED_METRICS are always recorded), so a 'kinetic' objective
 # costs the same per trial as a 'system' one -- it does not skip the TEA solve.
+# 'energy_scale' (since 2026-09-11) is the dual-annealing engine's objective
+# normalization: the objective difference that becomes ONE annealing energy
+# unit (run_kinetic_dual_annealing; ~1-2 % of each metric's observed campaign
+# range). Not part of any study name.
 OBJECTIVE_REGISTRY = {
     'IBO yield': dict(
         getter=lambda h: _nsk(h)['y_IBO_glu_added'],
-        direction='maximize', level='kinetic', units='g-IBO/g-sugars'),
+        direction='maximize', level='kinetic', units='g-IBO/g-sugars',
+        energy_scale=0.01),
     'IBO titer': dict(
         getter=lambda h: _nsk(h)['[s_IBO]'],
-        direction='maximize', level='kinetic', units='g-IBO/L-broth'),
+        direction='maximize', level='kinetic', units='g-IBO/L-broth',
+        energy_scale=2.0),
     'IBO productivity': dict(
         getter=lambda h: _nsk(h)['[s_IBO]']/_nsk(h)['time'],
-        direction='maximize', level='kinetic', units='g-IBO/L-broth/h'),
+        direction='maximize', level='kinetic', units='g-IBO/L-broth/h',
+        energy_scale=0.05),
     'IBO yield x titer': dict(
         getter=lambda h: _nsk(h)['y_IBO_glu_added']*_nsk(h)['[s_IBO]'],
         direction='maximize', level='kinetic',
-        units='(g-IBO/g-sugars)(g-IBO/L-broth)'),
+        units='(g-IBO/g-sugars)(g-IBO/L-broth)', energy_scale=0.5),
     'EtOH yield': dict(
         getter=lambda h: _nsk(h)['y_EtOH_glu_added'],
-        direction='maximize', level='kinetic', units='g-EtOH/g-sugars'),
+        direction='maximize', level='kinetic', units='g-EtOH/g-sugars',
+        energy_scale=0.01),
     'EtOH titer': dict(
         getter=lambda h: _nsk(h)['[s_EtOH]'],
-        direction='maximize', level='kinetic', units='g-EtOH/L-broth'),
+        direction='maximize', level='kinetic', units='g-EtOH/L-broth',
+        energy_scale=2.0),
     'EtOH productivity': dict(
         getter=lambda h: _nsk(h)['prod_EtOH'],
-        direction='maximize', level='kinetic', units='g-EtOH/L-broth/h'),
+        direction='maximize', level='kinetic', units='g-EtOH/L-broth/h',
+        energy_scale=0.05),
     'Combined yield': dict(
         getter=lambda h: _nsk(h)['y_EtOH_IBO_glu_added'],
-        direction='maximize', level='kinetic', units='g-EtOH-and-IBO/g-sugars'),
+        direction='maximize', level='kinetic', units='g-EtOH-and-IBO/g-sugars',
+        energy_scale=0.01),
     'Cell density': dict(
         getter=lambda h: _nsk(h)['[x]'],
-        direction='maximize', level='kinetic', units='g-cell/L-broth'),
+        direction='maximize', level='kinetic', units='g-cell/L-broth',
+        energy_scale=1.0),
     'IRR': dict(
         getter=lambda h: h['latest_TEA_solution']['IRR'],
-        direction='maximize', level='system', units=''),
+        direction='maximize', level='system', units='', energy_scale=0.01),
     'EtOH MPSP': dict(
         getter=lambda h: h['latest_TEA_solution']['MPSPs']['ethanol'],
-        direction='minimize', level='system', units='$/kg'),
+        direction='minimize', level='system', units='$/kg', energy_scale=0.02),
     'IBO MPSP': dict(
         getter=lambda h: h['latest_TEA_solution']['MPSPs']['isobutanol'],
-        direction='minimize', level='system', units='$/kg'),
+        direction='minimize', level='system', units='$/kg', energy_scale=0.02),
     'TCI': dict(
         getter=lambda h: h['tea'].TCI/1e6,
-        direction='minimize', level='system', units='MM$'),
+        direction='minimize', level='system', units='MM$', energy_scale=2.0),
     }
 
 #: Metrics recorded for EVERY trial (spec trajectory (ii)-(vi) + extras).
@@ -300,6 +313,43 @@ TRACKED_METRICS = {name: OBJECTIVE_REGISTRY[name]['getter'] for name in
                     'Cell density', 'IRR', 'TCI')}
 TRACKED_METRICS['tau'] = lambda h: h['V406'].tau
 TRACKED_METRICS['n_glu_spikes'] = lambda h: _nsk(h)['curr_n_glu_spikes']
+
+#: Annealing energy of every non-COMPLETE evaluation (FAIL / NAN /
+#: INFEASIBLE). FINITE by necessity: scipy's EnergyState.reset re-randomizes
+#: the start point only on a non-finite energy, and the Metropolis step
+#: treats a finite 1e6 as "always reject". Never written to the CSV (the
+#: 'objective' column keeps the raw value or blank).
+PENALTY_ENERGY = 1e6
+
+def resolve_energy_scale(objective, energy_scale=None):
+    """The dual-annealing objective normalization (spec §5): an explicit
+    `energy_scale` (positive, finite) wins; a registry objective name falls
+    back to its OBJECTIVE_REGISTRY['energy_scale']; a custom callable MUST
+    pass one (ValueError, like `direction`)."""
+    if energy_scale is not None:
+        if isinstance(energy_scale, bool):
+            raise ValueError(f'energy_scale must be a positive number; got '
+                             f'{energy_scale!r}')
+        es = float(energy_scale)
+        if not (math.isfinite(es) and es > 0.0):
+            raise ValueError('energy_scale must be a positive finite number; '
+                             f'got {energy_scale!r}')
+        return es
+    if isinstance(objective, str):
+        return float(OBJECTIVE_REGISTRY[objective]['energy_scale'])
+    raise ValueError('A custom objective callable requires energy_scale=<the '
+                     'objective difference worth one annealing energy unit> '
+                     '(see OBJECTIVE_REGISTRY for the named objectives\' '
+                     'values).')
+
+def annealing_energy(state, objective, direction, energy_scale):
+    """Energy scipy minimizes for one evaluation: sign * objective /
+    energy_scale for a COMPLETE evaluation (sign -1 for 'maximize', +1 for
+    'minimize'); PENALTY_ENERGY for every other state."""
+    if state != 'COMPLETE':
+        return PENALTY_ENERGY
+    sign = -1.0 if direction == 'maximize' else 1.0
+    return sign * float(objective) / float(energy_scale)
 
 #%% Search space
 
