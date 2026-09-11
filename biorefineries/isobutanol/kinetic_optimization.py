@@ -2564,6 +2564,27 @@ def feasibility_constraints_func(*, burden_on, volume_on):
         return tuple(c)
     return _constraints
 
+def feasibility_predicate(*, burden_on, volume_on, burden_model,
+                          parameter_groups, kinetic_baselines,
+                          baseline_model_kwargs, baseline_max_n_spikes,
+                          volume_cap):
+    """values (EXTERNAL repr) -> bool. AND of the enabled checks. The burden
+    check evaluates the EXPANDED member values (baseline x the sampled group
+    multiplier); the volume check reads the feeding values directly. When
+    burden_on is False, burden_model may be None and is never dereferenced."""
+    def _feasible(values):
+        if burden_on and not burden_model.evaluate(
+                expand_grouped_values(values, parameter_groups,
+                                      kinetic_baselines)).feasible:
+            return False
+        if volume_on:
+            thr, tgt, spk = _resolve_feeding_concs(values, baseline_model_kwargs)
+            n = int(values.get('max_n_spikes', baseline_max_n_spikes))
+            if fed_batch_volume_ratio_bound(thr, tgt, spk, n) > volume_cap:
+                return False
+        return True
+    return _feasible
+
 def run_kinetic_optimization(objective='IRR',
                              direction=None, level=None,
                              objective_units=None, objective_name=None,
@@ -3046,9 +3067,14 @@ def run_kinetic_optimization(objective='IRR',
             # given in _objective: the EXPANDED member values (baseline x
             # the sampled group multiplier), never the group key itself.
             # Without groups expand_grouped_values is an identity copy.
-            lambda values: burden_model.evaluate(
-                expand_grouped_values(values, parameter_groups,
-                                      kinetic_baselines)).feasible,
+            feasibility_predicate(
+                burden_on=burden_on, volume_on=False,
+                burden_model=burden_model,
+                parameter_groups=parameter_groups,
+                kinetic_baselines=kinetic_baselines,
+                baseline_model_kwargs=baseline_model_kwargs,
+                baseline_max_n_spikes=baseline_max_n_spikes,
+                volume_cap=None),
             multivariate=True, seed=seed + n_done,
             n_startup_trials=n_startup, gamma=default_tpe_gamma,
             constraints_func=constraints,

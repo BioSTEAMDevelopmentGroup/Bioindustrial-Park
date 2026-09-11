@@ -4151,4 +4151,37 @@ _ft57b = SimpleNamespace(user_attrs={})
 assert ko.feasibility_constraints_func(burden_on=True, volume_on=True)(_ft57b) == (0.0, 0.0)
 PASS('feasibility_constraints_func: ordered per-enabled-check terms, missing -> 0.0')
 
+#%% 58. feasibility_predicate: AND of the enabled checks across the four
+# (burden_on, volume_on) combinations; burden_model untouched when burden off.
+_feasible_bm58 = SimpleNamespace(evaluate=lambda d: SimpleNamespace(feasible=True))
+_infeasible_bm58 = SimpleNamespace(evaluate=lambda d: SimpleNamespace(feasible=False))
+_bmk58 = dict(spike_conc=600.0, target_conc=221.25, threshold_conc=217.125)
+# feasible volume geometry: x=(550-100)/(550-150)=1.125, ^10 ~ 3.25 < 20
+_vok58 = {'threshold_conc': 100.0, 'target_delta': 50.0,
+          'spike_delta': 400.0, 'max_n_spikes': 10}
+# infeasible volume geometry: x=21, ^50 >> 20
+_vbad58 = {'threshold_conc': 200.0, 'target_delta': 10.0,
+           'spike_delta': 0.5, 'max_n_spikes': 50}
+_common58 = dict(parameter_groups={}, kinetic_baselines={'k_1e': 47.1},
+                 baseline_model_kwargs=_bmk58, baseline_max_n_spikes=16,
+                 volume_cap=20.0)
+# both on
+_p_both = ko.feasibility_predicate(burden_on=True, volume_on=True,
+                                   burden_model=_feasible_bm58, **_common58)
+assert _p_both(_vok58) is True
+assert _p_both(_vbad58) is False               # volume fails
+_p_both_bi = ko.feasibility_predicate(burden_on=True, volume_on=True,
+                                      burden_model=_infeasible_bm58, **_common58)
+assert _p_both_bi(_vok58) is False             # burden fails
+# volume only (burden off; burden_model=None must NOT be dereferenced)
+_p_vol = ko.feasibility_predicate(burden_on=False, volume_on=True,
+                                  burden_model=None, **_common58)
+assert _p_vol(_vok58) is True and _p_vol(_vbad58) is False
+# burden only (volume off) -> volume geometry ignored
+_p_bur = ko.feasibility_predicate(burden_on=True, volume_on=False,
+                                  burden_model=_feasible_bm58, **_common58)
+assert _p_bur(_vbad58) is True
+PASS('feasibility_predicate: AND across the four toggle combinations; '
+     'burden_model not dereferenced when burden off')
+
 print(f'\nALL {n_pass} CHECKS PASSED')
