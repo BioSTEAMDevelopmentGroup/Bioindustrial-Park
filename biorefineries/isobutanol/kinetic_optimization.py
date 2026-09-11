@@ -41,6 +41,7 @@ tag is metadata). Kinetic parameters and feeding specs are restored to
 their scenario baselines in a `finally` after every run.
 """
 import csv
+import dataclasses
 import datetime
 import importlib.util
 import json
@@ -79,6 +80,7 @@ __all__ = ('OBJECTIVE_REGISTRY', 'TRACKED_METRICS',
            'inflight_path_for', 'write_inflight', 'clear_inflight',
            'recover_inflight',
            'get_handles', 'run_kinetic_optimization', 'restore_baseline',
+           'OptimizationContext', 'Evaluation', 'evaluate_decision_point',
            'plot_optimization_trajectories', 'plot_parameter_trajectory',
            'plot_best_vs_baseline',
            'pca_decision_matrix', 'plot_pca_projection',
@@ -2586,6 +2588,448 @@ def feasibility_predicate(*, burden_on, volume_on, burden_model,
         return True
     return _feasible
 
+@dataclasses.dataclass
+class OptimizationContext:
+    """Everything an optimization engine needs after the shared set-up of
+    _prepare_optimization: the live handles, the resolved objective, the
+    search space and its bookkeeping, the scenario-baseline snapshot, the
+    study's file paths and CSV columns. No optimizer object lives here (the
+    TPE engine builds its SQLite storage string from results_dir/study_name;
+    the dual-annealing engine has no store)."""
+    handles: dict
+    r_te: object
+    fbs_spec: object
+    objective_getter: object
+    objective_name: str
+    direction: str
+    level: object
+    objective_units: object
+    kinetic_baselines: dict
+    burden_model: object
+    burden_on: bool
+    volume_on: bool
+    volume_cap: object
+    search_space: dict
+    excluded: list
+    parameter_groups: dict
+    applied_columns: list
+    baseline_model_kwargs: dict
+    baseline_max_n_spikes: object
+    baseline_stage_1_max_x: object
+    results_dir: str
+    study_name: str
+    csv_path: str
+    inflight_path: str
+    columns: list
+    seed_points: dict
+    seed_notes: list
+
+
+@dataclasses.dataclass
+class Evaluation:
+    """Outcome of evaluate_decision_point. `state` is the CSV state written
+    ('COMPLETE' | 'FAIL' | 'NAN' | 'INFEASIBLE'); `record` the row dict;
+    `objective` the raw objective for COMPLETE (None otherwise -- a NAN row
+    keeps its non-finite value in record['objective']); the violations are
+    the burden / volume constraint values (None when that check is off or
+    was not reached); `exception` is the FAIL exception."""
+    state: str
+    record: dict
+    objective: object = None
+    burden_violation: object = None
+    volume_violation: object = None
+    exception: object = None
+
+
+def _prepare_optimization(objective, *, direction, level, objective_units,
+                          objective_name, scenario_label, multiplier_bounds,
+                          param_bounds_override, exclude_params,
+                          include_params, rate_multiplier_bounds, rate_params,
+                          parameter_multiplier_bounds, threshold_conc_bounds,
+                          target_delta_bounds, spike_delta_bounds,
+                          max_n_spikes_bounds, stage_1_max_x_bounds,
+                          target_conc_bounds, threshold_delta_bounds,
+                          spike_conc_bounds, study_name, results_dir, handles,
+                          burden_model, volume_feasibility, volume_cap,
+                          seed_from, parameter_groups, group_multiplier_bounds,
+                          method_tag=''):
+    """Shared set-up of both engines (run_kinetic_optimization and
+    run_kinetic_dual_annealing), in the order and with the prints the TPE
+    engine always had: objective resolution -> kinetic baselines -> burden
+    model ('auto' / validation) -> live volume cap -> build_search_space +
+    group / applied_<member> bookkeeping and the summary prints -> scenario
+    baseline snapshot -> results dir -> default study name
+    kin_opt_{scenario_label}_{slug}{method_tag}[_burden] (`method_tag` is
+    '' for TPE and '_da' for dual annealing; an explicit study_name is used
+    as given) -> csv/inflight paths + columns -> seed_from resolution ->
+    trajectory header guard -> orphan-sidecar recovery. Returns an
+    OptimizationContext."""
+    if handles is None:
+        handles = get_handles()
+    r_te, fbs_spec = handles['r_te'], handles['fbs_spec']
+
+    if isinstance(objective, str):
+        entry = OBJECTIVE_REGISTRY[objective]
+        objective_getter = entry['getter']
+        objective_name = objective_name or objective
+        direction = direction or entry['direction']
+        level = level or entry['level']
+        if objective_units is None:
+            objective_units = entry['units']
+    else:
+        objective_getter = objective
+        objective_name = objective_name or 'custom'
+        if direction not in ('maximize', 'minimize'):
+            raise ValueError("A custom objective callable requires "
+                             "direction='maximize' or 'minimize'.")
+
+    kinetic_baselines = discover_kinetic_parameters(r_te)
+    if isinstance(burden_model, str):
+        if burden_model != 'auto':
+            raise ValueError("burden_model must be 'auto', None or a "
+                             f"BurdenModel; got {burden_model!r}.")
+        from biorefineries.isobutanol.enzyme_burden import BurdenModel
+        burden_model = BurdenModel.from_reference(kinetic_baselines)
+    elif burden_model is not None:
+        if not all(hasattr(burden_model, a)
+                   for a in ('evaluate', 'apply', 'reference')):
+            raise TypeError("burden_model must be 'auto', None or a "
+                            'BurdenModel (an object with evaluate, apply '
+                            f'and reference); got {burden_model!r}.')
+        # A caller-built model must be a snapshot of the LIVE baselines
+        # (the values on the model now, after the scenario workbook load),
+        # or the ratio route is not inert at trial 0 and every native
+        # step is mis-charged. Exact equality: both sides are
+        # float(getattr(r_te, name)).
+        stale = [(name, ref, kinetic_baselines.get(name))
+                 for name, ref in burden_model.reference.items()
+                 if kinetic_baselines.get(name) != ref]
+        if stale:
+            raise ValueError(
+                'burden_model.reference differs from the live kinetic '
+                'baselines of the model for '
+                + ', '.join(f'{name} (model reference {ref!r}, live '
+                            f'baseline {live!r})'
+                            for name, ref, live in stale)
+                + '; build the BurdenModel from the same kinetic_baselines '
+                "(discover_kinetic_parameters(r_te)) or pass 'auto'.")
+    burden_on = burden_model is not None
+    if burden_on:
+        from biorefineries.isobutanol.enzyme_burden import BURDEN_COLUMNS
+        extra_columns = BURDEN_COLUMNS
+        print('Enzyme burden ON (enzyme_burden.py): F_flex = '
+              f'{burden_model.F_flex:.4f}, Phi_M,wt = {burden_model.Phi_M_wt:.4f}, '
+              f'phi_T,wt = {burden_model.phi_T_wt:.4f} g/gDCW; over-cap trials '
+              'are logged INFEASIBLE and pruned before simulating.')
+    else:
+        extra_columns = ()
+        print('Enzyme burden OFF (burden_model=None): legacy burden-free study.')
+    volume_on = bool(volume_feasibility)
+    if volume_on:
+        if volume_cap is None:
+            # Production path: isobutanol.load() has run, so the runtime
+            # guard's cap is published; the pre-filter and the guard share it.
+            from biorefineries.isobutanol import system as _system
+            volume_cap = float(_system.parameters['max_fed_batch_volume_ratio'])
+        print('Fed-batch volume-ratio check ON: pre-sim prune + '
+              f'constraints_func + sampler predicate, cap {volume_cap:g}x.')
+    else:
+        print('Fed-batch volume-ratio check OFF.')
+    if include_params is not None:
+        missing = [p for p in include_params if p not in kinetic_baselines]
+        if missing:
+            print(f'Warning: {len(missing)} include_params names are not '
+                  f'kinetic parameters of the model and are ignored: '
+                  f'{missing}')
+    search_space, excluded = build_search_space(
+        kinetic_baselines,
+        multiplier_bounds=multiplier_bounds,
+        param_bounds_override=param_bounds_override,
+        exclude_params=exclude_params,
+        include_params=include_params,
+        rate_multiplier_bounds=rate_multiplier_bounds,
+        rate_params=rate_params,
+        parameter_multiplier_bounds=parameter_multiplier_bounds,
+        threshold_conc_bounds=threshold_conc_bounds,
+        target_delta_bounds=target_delta_bounds,
+        spike_delta_bounds=spike_delta_bounds,
+        max_n_spikes_bounds=max_n_spikes_bounds,
+        target_conc_bounds=target_conc_bounds,
+        threshold_delta_bounds=threshold_delta_bounds,
+        spike_conc_bounds=spike_conc_bounds,
+        stage_1_max_x_bounds=stage_1_max_x_bounds,
+        parameter_groups=parameter_groups,
+        group_multiplier_bounds=group_multiplier_bounds)
+    parameter_groups = {str(group): list(members)
+                        for group, members in dict(parameter_groups or {}).items()}
+    applied_columns = [f'applied_{member}'
+                       for members in parameter_groups.values()
+                       for member in members]
+    n_kinetic = sum(1 for name in search_space if name in kinetic_baselines)
+    n_group = sum(1 for name in search_space if name in parameter_groups)
+    n_operating = sum(1 for name in search_space if name in OPERATING_VARIABLES)
+    n_feeding = len(search_space) - n_kinetic - n_group - n_operating
+    restriction = ('' if include_params is None else
+                   f', restricted to {len(include_params)} named parameters')
+    print(f'Search space: {len(search_space)} decision variables '
+          f'({n_kinetic} kinetic + {n_group} group multipliers + '
+          f'{n_feeding} feeding + {n_operating} operating{restriction}); '
+          f'{len(excluded)} kinetic parameters excluded: {excluded}')
+    for group, members in parameter_groups.items():
+        sp = search_space[group]
+        # Each member's LIVE baseline is printed next to its name: the
+        # multiplier is applied to it, so this line is the log's record of
+        # the basis of every applied_<member> column.
+        listed = ', '.join(f'{member} ({kinetic_baselines[member]:g})'
+                           for member in members)
+        print(f"Parameter group {group}: one log-scale multiplier on "
+              f"[{sp['low']:g}, {sp['high']:g}] x baseline applied to "
+              f"{len(members)} members {listed} (baseline 1.0; recorded as "
+              f"applied_<member> columns).")
+    if 'stage_1_max_x' in search_space:
+        sp = search_space['stage_1_max_x']
+        print(f"Operating variable stage_1_max_x (aerobic stage-1 biomass "
+              f"cutoff) sampled log-scale on [{sp['low']:g}, {sp['high']:g}] "
+              f"g/L via V406.stage_1_max_x (baseline "
+              f"{handles['V406'].stage_1_max_x:g} g/L).")
+    if rate_multiplier_bounds is not None:
+        _is_rate = _rate_predicate(rate_params)
+        n_rate = sum(1 for name in search_space
+                     if name in kinetic_baselines and _is_rate(name))
+        rule = ('by role (rate_params)' if rate_params is not None
+                else "by the lowercase 'k_' prefix (legacy rule)")
+        print(f'Rate band {tuple(rate_multiplier_bounds)} x baseline on '
+              f'{n_rate} rate constants {rule}; the other '
+              f'{n_kinetic - n_rate} kinetic parameters (inhibition '
+              f'coefficients, K_* terms) on {tuple(multiplier_bounds)} x '
+              'baseline (where no override applies).')
+    if parameter_multiplier_bounds:
+        applied = {name: tuple(band)
+                   for name, band in parameter_multiplier_bounds.items()
+                   if name in search_space and name in kinetic_baselines
+                   and name not in (param_bounds_override or {})}
+        print(f'Per-parameter bands (x baseline) in force: {applied}')
+
+    # Scenario baseline snapshot for restoration (the driver has already
+    # baseline-simulated the scenario, so current_specifications IS the
+    # scenario baseline).
+    baseline_model_kwargs = {
+        k: fbs_spec.current_specifications[k]
+        for k in ('target_conc', 'threshold_conc', 'spike_conc')}
+    baseline_max_n_spikes = fbs_spec.max_n_spikes
+    if 'threshold_conc' in search_space and 'spike_delta' not in search_space:
+        # Read the snapshot, not the live spec: the snapshot is what
+        # _objective actually applies as the pinned spike concentration.
+        print('Spike feed pinned at the scenario baseline '
+              f"({baseline_model_kwargs['spike_conc']:g} g/L; "
+              'spike_delta_bounds=None).')
+    # The live cutoff IS the scenario baseline (never set by the build);
+    # read only when the variable is sampled, so handles without the
+    # attribute (older callers, offline fakes) keep working.
+    baseline_stage_1_max_x = (float(handles['V406'].stage_1_max_x)
+                              if 'stage_1_max_x' in search_space else None)
+
+    if results_dir is None:
+        results_dir = os.path.join(
+            os.path.dirname(os.path.abspath(__file__)),
+            'analyses', 'results')
+    os.makedirs(results_dir, exist_ok=True)
+    slug = objective_name.lower().replace(' ', '_')
+    if study_name is None:
+        study_name = f'kin_opt_{scenario_label}_{slug}{method_tag}'
+        if burden_on:
+            study_name += BURDEN_STUDY_SUFFIX
+    csv_path = os.path.join(results_dir, study_name + '_trajectory.csv')
+    inflight_path = inflight_path_for(results_dir, study_name)
+    columns = trajectory_columns(search_space,
+                                 extra_columns=[*extra_columns, *applied_columns])
+    # Seed points from donor studies: resolved now (sim-free), so a donor
+    # of another column set / a missing trial fails before the store and
+    # the first ~20 s simulation; enqueued below on a fresh study only.
+    seed_points, seed_notes = {}, []
+    for donor, trial_numbers in (seed_from or ()):
+        donor_csv = (donor if os.path.isfile(donor) else
+                     os.path.join(results_dir, donor + '_trajectory.csv'))
+        if not os.path.isfile(donor_csv):
+            raise ValueError(f'seed_from donor {donor!r}: no trajectory CSV '
+                             f'at {donor_csv}')
+        points, notes = seed_points_from_trajectory(
+            donor_csv, trial_numbers, search_space,
+            parameter_groups=parameter_groups)
+        seed_points.update(points)
+        seed_notes.extend(notes)
+    # Pre-flight: a study name colliding with a trajectory of a different
+    # column set (search space or burden on/off changed, e.g. a legacy
+    # study_name resumed without burden_model=None) must fail HERE --
+    # before the sidecar recovery, the optuna store and any ~20 s
+    # simulation -- not at the first row append.
+    check_trajectory_header(csv_path, columns)
+    # An orphaned sidecar means a previous run of this study died
+    # mid-trial without writing that trial's row (unsupervised
+    # crash-resume; under the supervisor it has already been recovered).
+    # Log it before trial 0's own sidecar could overwrite it.
+    lost = recover_inflight(csv_path, inflight_path, state='LOST',
+                            error='recovered at engine startup (no terminal row)')
+    if lost is not None:
+        print(f'Recovered orphaned in-flight trial {lost} from a previous '
+              'run as a LOST row (no terminal row had been written).')
+    return OptimizationContext(
+        handles=handles, r_te=r_te, fbs_spec=fbs_spec,
+        objective_getter=objective_getter, objective_name=objective_name,
+        direction=direction, level=level, objective_units=objective_units,
+        kinetic_baselines=kinetic_baselines,
+        burden_model=burden_model, burden_on=burden_on,
+        volume_on=volume_on, volume_cap=volume_cap,
+        search_space=search_space, excluded=excluded,
+        parameter_groups=parameter_groups, applied_columns=applied_columns,
+        baseline_model_kwargs=baseline_model_kwargs,
+        baseline_max_n_spikes=baseline_max_n_spikes,
+        baseline_stage_1_max_x=baseline_stage_1_max_x,
+        results_dir=results_dir, study_name=study_name,
+        csv_path=csv_path, inflight_path=inflight_path, columns=columns,
+        seed_points=seed_points, seed_notes=seed_notes)
+
+
+def evaluate_decision_point(ctx, values, trial_number):
+    """The ONE evaluation site of both engines: `values` (a decision dict in
+    EXTERNAL repr, search-space order) for trial `trial_number` -> group
+    expansion -> feeding reconstruction -> enzyme-burden prune (INFEASIBLE
+    row, no simulation) -> fed-batch volume-ratio prune (same) -> in-flight
+    sidecar -> set the kinetic parameters / spike cap / stage_1_max_x ->
+    model_specification -> solve_TEA -> tracked metrics -> FAIL / NAN /
+    COMPLETE row. Every outcome appends exactly one trajectory row; the
+    sidecar is cleared only once that terminal row exists (a
+    KeyboardInterrupt during the simulation leaves it for recover_inflight).
+    The k_7/k_8 derating happens in the load_simulate choke point of
+    system.py through the active burden the engine installs -- never here.
+    Returns an Evaluation."""
+    handles, r_te, fbs_spec = ctx.handles, ctx.r_te, ctx.fbs_spec
+    csv_path, columns = ctx.csv_path, ctx.columns
+    # Group multipliers -> individual member values (baseline x m):
+    # what the burden model evaluates and what reaches the model. The
+    # CSV keeps the multipliers as the decision columns and records
+    # the members as applied_<member>.
+    applied_kinetics = expand_grouped_values(values, ctx.parameter_groups,
+                                             ctx.kinetic_baselines)
+    threshold, target, spike = _resolve_feeding_concs(
+        values, ctx.baseline_model_kwargs)
+    model_kwargs = dict(target_conc=target, threshold_conc=threshold,
+                        spike_conc=spike)
+    record = {'trial_number': trial_number, **values}
+    # applied_<member> is the SAMPLED member value (its live baseline x
+    # the group multiplier), recorded BEFORE any burden derating -- the
+    # derated capacities are the burden columns (k_7_eff / k_8_eff).
+    for members in ctx.parameter_groups.values():
+        for member in members:
+            record[f'applied_{member}'] = applied_kinetics[member]
+    burden_violation = None
+    volume_violation = None
+    if ctx.burden_on:
+        # Proteome-allocation burden (enzyme_burden.py): known from the
+        # sampled values alone, so an over-cap point is logged and
+        # pruned BEFORE the sidecar and the ~20 s simulation, and no
+        # baseline state is disturbed. The CSV keeps the sampled
+        # k_7/k_8 as the decision; the model receives the INTENDED
+        # k_7/k_8 (the load_simulate choke point derates them).
+        burden = ctx.burden_model.evaluate(applied_kinetics)
+        record.update(burden.as_record())
+        burden_violation = burden.violation
+        if not burden.feasible:
+            record['state'] = 'INFEASIBLE'
+            record['error'] = (f'enzyme burden: Phi_M {burden.Phi_M:.4f} '
+                               f'> F_flex {burden.F_flex:.4f} g/gDCW')
+            append_trajectory_row(csv_path, columns, record)
+            print(f'Trial {trial_number}: INFEASIBLE under the enzyme '
+                  f'burden (Phi_M {burden.Phi_M:.4f} > F_flex '
+                  f'{burden.F_flex:.4f} g/gDCW); pruned before simulating.')
+            return Evaluation('INFEASIBLE', record,
+                              burden_violation=burden_violation)
+    applied = applied_kinetics
+    if ctx.volume_on:
+        n_spikes = int(values.get('max_n_spikes', ctx.baseline_max_n_spikes))
+        ratio = fed_batch_volume_ratio_bound(threshold, target, spike,
+                                             n_spikes)
+        # log-space: ratio can reach ~1e12; the samplers only need the sign.
+        # ratio == inf gives inf, which optuna stores/compares fine.
+        volume_violation = math.log(ratio) - math.log(ctx.volume_cap)
+        if ratio > ctx.volume_cap:
+            record['state'] = 'INFEASIBLE'
+            per_spike = ((spike - threshold) / (spike - target)
+                         if spike > target else math.inf)
+            record['error'] = (f'fed-batch volume ratio bound {ratio:.4g}x '
+                               f'> cap {ctx.volume_cap:g} ({n_spikes} spikes, '
+                               f'x{per_spike:.3g}/spike)')
+            append_trajectory_row(csv_path, columns, record)
+            print(f'Trial {trial_number}: INFEASIBLE fed-batch volume '
+                  f'ratio bound {ratio:.4g}x > cap {ctx.volume_cap:g}; '
+                  'pruned before simulating.')
+            return Evaluation('INFEASIBLE', record,
+                              burden_violation=burden_violation,
+                              volume_violation=volume_violation)
+    # The decision vector is complete here and the hang-prone simulation
+    # has not started: record it, so a hard kill / segfault during this
+    # trial leaves the sidecar for recover_inflight (the supervisor, or the
+    # next engine start) to log as a LOST row. Cleared in the finally only
+    # once this trial's terminal row has been written.
+    write_inflight(ctx.inflight_path, columns, record)
+    row_written = False
+    try:
+        try:
+            for pname in ctx.kinetic_baselines:
+                if pname in applied:
+                    setattr(r_te, pname, applied[pname])
+            if 'max_n_spikes' in values:
+                fbs_spec.max_n_spikes = values['max_n_spikes']
+            if 'stage_1_max_x' in values:
+                # The V406 property mirrors onto r_te AND the
+                # AerationSpec (air-supply sizing); never setattr r_te.
+                handles['V406'].stage_1_max_x = values['stage_1_max_x']
+            handles['model_specification'](**model_kwargs)
+            handles['latest_TEA_solution'].update(
+                handles['solve_TEA'](
+                    stream_IDs=('ethanol', 'isobutanol')))
+            for mname, getter in TRACKED_METRICS.items():
+                record[mname] = getter(handles)
+            obj = float(ctx.objective_getter(handles))
+            record['objective'] = obj
+        except Exception as e:
+            record['state'] = 'FAIL'
+            record['error'] = repr(e)[:300]
+            append_trajectory_row(csv_path, columns, record)
+            row_written = True
+            print(f'Trial {trial_number}: FAILED ({repr(e)[:120]})')
+            return Evaluation('FAIL', record,
+                              burden_violation=burden_violation,
+                              volume_violation=volume_violation,
+                              exception=e)
+        if not math.isfinite(obj):
+            # NaN (not solved) or +-inf (solve_TEA reports an IRR with
+            # no real root on the valid domain as -inf since
+            # 2026-09-03); the CSV keeps the raw value in 'objective'.
+            record['state'] = 'NAN'
+            append_trajectory_row(csv_path, columns, record)
+            row_written = True
+            print(f'Trial {trial_number}: objective is non-finite '
+                  f'({obj}); pruned.')
+            return Evaluation('NAN', record,
+                              burden_violation=burden_violation,
+                              volume_violation=volume_violation)
+        record['state'] = 'COMPLETE'
+        append_trajectory_row(csv_path, columns, record)
+        row_written = True
+        return Evaluation('COMPLETE', record, objective=obj,
+                          burden_violation=burden_violation,
+                          volume_violation=volume_violation)
+    finally:
+        # Clear the sidecar only once this trial's terminal row exists.
+        # A KeyboardInterrupt (manual abort) during the simulation, or
+        # an exception escaping the FAIL branch's own row append, hits
+        # this finally with row_written still False -- leave the
+        # sidecar in place so recover_inflight logs it as a LOST row.
+        if row_written:
+            clear_inflight(ctx.inflight_path)
+
+
 def run_kinetic_optimization(objective='IRR',
                              direction=None, level=None,
                              objective_units=None, objective_name=None,
@@ -2800,218 +3244,44 @@ def run_kinetic_optimization(objective='IRR',
 
     Returns (study, csv_path, kinetic_baselines)."""
     import optuna
-    if handles is None:
-        handles = get_handles()
-    r_te, fbs_spec = handles['r_te'], handles['fbs_spec']
-
-    if isinstance(objective, str):
-        entry = OBJECTIVE_REGISTRY[objective]
-        objective_getter = entry['getter']
-        objective_name = objective_name or objective
-        direction = direction or entry['direction']
-        level = level or entry['level']
-        if objective_units is None:
-            objective_units = entry['units']
-    else:
-        objective_getter = objective
-        objective_name = objective_name or 'custom'
-        if direction not in ('maximize', 'minimize'):
-            raise ValueError("A custom objective callable requires "
-                             "direction='maximize' or 'minimize'.")
-
-    kinetic_baselines = discover_kinetic_parameters(r_te)
-    if isinstance(burden_model, str):
-        if burden_model != 'auto':
-            raise ValueError("burden_model must be 'auto', None or a "
-                             f"BurdenModel; got {burden_model!r}.")
-        from biorefineries.isobutanol.enzyme_burden import BurdenModel
-        burden_model = BurdenModel.from_reference(kinetic_baselines)
-    elif burden_model is not None:
-        if not all(hasattr(burden_model, a)
-                   for a in ('evaluate', 'apply', 'reference')):
-            raise TypeError("burden_model must be 'auto', None or a "
-                            'BurdenModel (an object with evaluate, apply '
-                            f'and reference); got {burden_model!r}.')
-        # A caller-built model must be a snapshot of the LIVE baselines
-        # (the values on the model now, after the scenario workbook load),
-        # or the ratio route is not inert at trial 0 and every native
-        # step is mis-charged. Exact equality: both sides are
-        # float(getattr(r_te, name)).
-        stale = [(name, ref, kinetic_baselines.get(name))
-                 for name, ref in burden_model.reference.items()
-                 if kinetic_baselines.get(name) != ref]
-        if stale:
-            raise ValueError(
-                'burden_model.reference differs from the live kinetic '
-                'baselines of the model for '
-                + ', '.join(f'{name} (model reference {ref!r}, live '
-                            f'baseline {live!r})'
-                            for name, ref, live in stale)
-                + '; build the BurdenModel from the same kinetic_baselines '
-                "(discover_kinetic_parameters(r_te)) or pass 'auto'.")
-    burden_on = burden_model is not None
-    if burden_on:
-        from biorefineries.isobutanol.enzyme_burden import BURDEN_COLUMNS
-        extra_columns = BURDEN_COLUMNS
-        print('Enzyme burden ON (enzyme_burden.py): F_flex = '
-              f'{burden_model.F_flex:.4f}, Phi_M,wt = {burden_model.Phi_M_wt:.4f}, '
-              f'phi_T,wt = {burden_model.phi_T_wt:.4f} g/gDCW; over-cap trials '
-              'are logged INFEASIBLE and pruned before simulating.')
-    else:
-        extra_columns = ()
-        print('Enzyme burden OFF (burden_model=None): legacy burden-free study.')
-    volume_on = bool(volume_feasibility)
-    if volume_on:
-        if volume_cap is None:
-            # Production path: isobutanol.load() has run, so the runtime
-            # guard's cap is published; the pre-filter and the guard share it.
-            from biorefineries.isobutanol import system as _system
-            volume_cap = float(_system.parameters['max_fed_batch_volume_ratio'])
-        print('Fed-batch volume-ratio check ON: pre-sim prune + '
-              f'constraints_func + sampler predicate, cap {volume_cap:g}x.')
-    else:
-        print('Fed-batch volume-ratio check OFF.')
-    if include_params is not None:
-        missing = [p for p in include_params if p not in kinetic_baselines]
-        if missing:
-            print(f'Warning: {len(missing)} include_params names are not '
-                  f'kinetic parameters of the model and are ignored: '
-                  f'{missing}')
-    search_space, excluded = build_search_space(
-        kinetic_baselines,
-        multiplier_bounds=multiplier_bounds,
+    ctx = _prepare_optimization(
+        objective, direction=direction, level=level,
+        objective_units=objective_units, objective_name=objective_name,
+        scenario_label=scenario_label, multiplier_bounds=multiplier_bounds,
         param_bounds_override=param_bounds_override,
-        exclude_params=exclude_params,
-        include_params=include_params,
-        rate_multiplier_bounds=rate_multiplier_bounds,
-        rate_params=rate_params,
+        exclude_params=exclude_params, include_params=include_params,
+        rate_multiplier_bounds=rate_multiplier_bounds, rate_params=rate_params,
         parameter_multiplier_bounds=parameter_multiplier_bounds,
         threshold_conc_bounds=threshold_conc_bounds,
         target_delta_bounds=target_delta_bounds,
         spike_delta_bounds=spike_delta_bounds,
         max_n_spikes_bounds=max_n_spikes_bounds,
+        stage_1_max_x_bounds=stage_1_max_x_bounds,
         target_conc_bounds=target_conc_bounds,
         threshold_delta_bounds=threshold_delta_bounds,
         spike_conc_bounds=spike_conc_bounds,
-        stage_1_max_x_bounds=stage_1_max_x_bounds,
+        study_name=study_name, results_dir=results_dir, handles=handles,
+        burden_model=burden_model, volume_feasibility=volume_feasibility,
+        volume_cap=volume_cap, seed_from=seed_from,
         parameter_groups=parameter_groups,
-        group_multiplier_bounds=group_multiplier_bounds)
-    parameter_groups = {str(group): list(members)
-                        for group, members in dict(parameter_groups or {}).items()}
-    applied_columns = [f'applied_{member}'
-                       for members in parameter_groups.values()
-                       for member in members]
-    n_kinetic = sum(1 for name in search_space if name in kinetic_baselines)
-    n_group = sum(1 for name in search_space if name in parameter_groups)
-    n_operating = sum(1 for name in search_space if name in OPERATING_VARIABLES)
-    n_feeding = len(search_space) - n_kinetic - n_group - n_operating
-    restriction = ('' if include_params is None else
-                   f', restricted to {len(include_params)} named parameters')
-    print(f'Search space: {len(search_space)} decision variables '
-          f'({n_kinetic} kinetic + {n_group} group multipliers + '
-          f'{n_feeding} feeding + {n_operating} operating{restriction}); '
-          f'{len(excluded)} kinetic parameters excluded: {excluded}')
-    for group, members in parameter_groups.items():
-        sp = search_space[group]
-        # Each member's LIVE baseline is printed next to its name: the
-        # multiplier is applied to it, so this line is the log's record of
-        # the basis of every applied_<member> column.
-        listed = ', '.join(f'{member} ({kinetic_baselines[member]:g})'
-                           for member in members)
-        print(f"Parameter group {group}: one log-scale multiplier on "
-              f"[{sp['low']:g}, {sp['high']:g}] x baseline applied to "
-              f"{len(members)} members {listed} (baseline 1.0; recorded as "
-              f"applied_<member> columns).")
-    if 'stage_1_max_x' in search_space:
-        sp = search_space['stage_1_max_x']
-        print(f"Operating variable stage_1_max_x (aerobic stage-1 biomass "
-              f"cutoff) sampled log-scale on [{sp['low']:g}, {sp['high']:g}] "
-              f"g/L via V406.stage_1_max_x (baseline "
-              f"{handles['V406'].stage_1_max_x:g} g/L).")
-    if rate_multiplier_bounds is not None:
-        _is_rate = _rate_predicate(rate_params)
-        n_rate = sum(1 for name in search_space
-                     if name in kinetic_baselines and _is_rate(name))
-        rule = ('by role (rate_params)' if rate_params is not None
-                else "by the lowercase 'k_' prefix (legacy rule)")
-        print(f'Rate band {tuple(rate_multiplier_bounds)} x baseline on '
-              f'{n_rate} rate constants {rule}; the other '
-              f'{n_kinetic - n_rate} kinetic parameters (inhibition '
-              f'coefficients, K_* terms) on {tuple(multiplier_bounds)} x '
-              'baseline (where no override applies).')
-    if parameter_multiplier_bounds:
-        applied = {name: tuple(band)
-                   for name, band in parameter_multiplier_bounds.items()
-                   if name in search_space and name in kinetic_baselines
-                   and name not in (param_bounds_override or {})}
-        print(f'Per-parameter bands (x baseline) in force: {applied}')
-
-    # Scenario baseline snapshot for restoration (the driver has already
-    # baseline-simulated the scenario, so current_specifications IS the
-    # scenario baseline).
-    baseline_model_kwargs = {
-        k: fbs_spec.current_specifications[k]
-        for k in ('target_conc', 'threshold_conc', 'spike_conc')}
-    baseline_max_n_spikes = fbs_spec.max_n_spikes
-    if 'threshold_conc' in search_space and 'spike_delta' not in search_space:
-        # Read the snapshot, not the live spec: the snapshot is what
-        # _objective actually applies as the pinned spike concentration.
-        print('Spike feed pinned at the scenario baseline '
-              f"({baseline_model_kwargs['spike_conc']:g} g/L; "
-              'spike_delta_bounds=None).')
-    # The live cutoff IS the scenario baseline (never set by the build);
-    # read only when the variable is sampled, so handles without the
-    # attribute (older callers, offline fakes) keep working.
-    baseline_stage_1_max_x = (float(handles['V406'].stage_1_max_x)
-                              if 'stage_1_max_x' in search_space else None)
-
-    if results_dir is None:
-        results_dir = os.path.join(
-            os.path.dirname(os.path.abspath(__file__)),
-            'analyses', 'results')
-    os.makedirs(results_dir, exist_ok=True)
-    slug = objective_name.lower().replace(' ', '_')
-    if study_name is None:
-        study_name = f'kin_opt_{scenario_label}_{slug}'
-        if burden_on:
-            study_name += BURDEN_STUDY_SUFFIX
-    csv_path = os.path.join(results_dir, study_name + '_trajectory.csv')
-    inflight_path = inflight_path_for(results_dir, study_name)
+        group_multiplier_bounds=group_multiplier_bounds,
+        method_tag='')
+    # Local names for the sampler / enqueue / finally code below (unchanged).
+    handles, r_te = ctx.handles, ctx.r_te
+    objective_name, direction = ctx.objective_name, ctx.direction
+    kinetic_baselines = ctx.kinetic_baselines
+    burden_model, burden_on = ctx.burden_model, ctx.burden_on
+    volume_on, volume_cap = ctx.volume_on, ctx.volume_cap
+    search_space, parameter_groups = ctx.search_space, ctx.parameter_groups
+    baseline_model_kwargs = ctx.baseline_model_kwargs
+    baseline_max_n_spikes = ctx.baseline_max_n_spikes
+    baseline_stage_1_max_x = ctx.baseline_stage_1_max_x
+    results_dir, study_name = ctx.results_dir, ctx.study_name
+    csv_path = ctx.csv_path
+    seed_points, seed_notes = ctx.seed_points, ctx.seed_notes
     storage = ('sqlite:///'
                + os.path.join(results_dir, study_name + '.db')
                .replace('\\', '/'))
-    columns = trajectory_columns(search_space,
-                                 extra_columns=[*extra_columns, *applied_columns])
-    # Seed points from donor studies: resolved now (sim-free), so a donor
-    # of another column set / a missing trial fails before the store and
-    # the first ~20 s simulation; enqueued below on a fresh study only.
-    seed_points, seed_notes = {}, []
-    for donor, trial_numbers in (seed_from or ()):
-        donor_csv = (donor if os.path.isfile(donor) else
-                     os.path.join(results_dir, donor + '_trajectory.csv'))
-        if not os.path.isfile(donor_csv):
-            raise ValueError(f'seed_from donor {donor!r}: no trajectory CSV '
-                             f'at {donor_csv}')
-        points, notes = seed_points_from_trajectory(
-            donor_csv, trial_numbers, search_space,
-            parameter_groups=parameter_groups)
-        seed_points.update(points)
-        seed_notes.extend(notes)
-    # Pre-flight: a study name colliding with a trajectory of a different
-    # column set (search space or burden on/off changed, e.g. a legacy
-    # study_name resumed without burden_model=None) must fail HERE --
-    # before the sidecar recovery, the optuna store and any ~20 s
-    # simulation -- not at the first row append.
-    check_trajectory_header(csv_path, columns)
-    # An orphaned sidecar means a previous run of this study died
-    # mid-trial without writing that trial's row (unsupervised
-    # crash-resume; under the supervisor it has already been recovered).
-    # Log it before trial 0's own sidecar could overwrite it.
-    lost = recover_inflight(csv_path, inflight_path, state='LOST',
-                            error='recovered at engine startup (no terminal row)')
-    if lost is not None:
-        print(f'Recovered orphaned in-flight trial {lost} from a previous '
-              'run as a LOST row (no terminal row had been written).')
 
     study = optuna.create_study(study_name=study_name, storage=storage,
                                 direction=direction,
@@ -3178,150 +3448,35 @@ def run_kinetic_optimization(objective='IRR',
                          trial.suggest_float(name, sp['low'], sp['high'],
                                              log=sp['log']))
                   for name, sp in search_space.items()}
-        # Group multipliers -> individual member values (baseline x m):
-        # what the burden model evaluates and what reaches the model. The
-        # CSV keeps the multipliers as the decision columns and records
-        # the members as applied_<member>.
-        applied_kinetics = expand_grouped_values(values, parameter_groups,
-                                                 kinetic_baselines)
-        threshold, target, spike = _resolve_feeding_concs(
-            values, baseline_model_kwargs)
-        model_kwargs = dict(target_conc=target, threshold_conc=threshold,
-                            spike_conc=spike)
-        record = {'trial_number': trial.number, **values}
-        # applied_<member> is the SAMPLED member value (its live baseline x
-        # the group multiplier), recorded BEFORE any burden derating -- the
-        # derated capacities are the burden columns (k_7_eff / k_8_eff).
-        for members in parameter_groups.values():
-            for member in members:
-                record[f'applied_{member}'] = applied_kinetics[member]
-        if burden_on:
-            # Proteome-allocation burden (enzyme_burden.py): known from the
-            # sampled values alone, so an over-cap point is logged and
-            # pruned BEFORE the sidecar and the ~20 s simulation, and no
-            # baseline state is disturbed. The CSV keeps the sampled
-            # k_7/k_8 as the decision; the model receives the INTENDED
-            # k_7/k_8 through `applied` below (see the comment further
-            # down for where the derating actually happens).
-            burden = burden_model.evaluate(applied_kinetics)
-            record.update(burden.as_record())
-            trial.set_user_attr('burden_violation', burden.violation)
-            if not burden.feasible:
-                record['state'] = 'INFEASIBLE'
-                record['error'] = (f'enzyme burden: Phi_M {burden.Phi_M:.4f} '
-                                   f'> F_flex {burden.F_flex:.4f} g/gDCW')
-                append_trajectory_row(csv_path, columns, record)
-                print(f'Trial {trial.number}: INFEASIBLE under the enzyme '
-                      f'burden (Phi_M {burden.Phi_M:.4f} > F_flex '
-                      f'{burden.F_flex:.4f} g/gDCW); pruned before simulating.')
-                raise optuna.TrialPruned()
-            # Feasible: the k_7/k_8 derating is applied by the shared
-            # load_simulate choke point (system._apply_enzyme_burden) using
-            # the active burden installed below, so the model receives the
-            # INTENDED capacities here and the choke point derates growth.
-            # (The pre-sim evaluate above still records the burden columns
-            # and prunes over-cap points before the ~20 s simulation.)
-            applied = applied_kinetics
-        else:
-            applied = applied_kinetics
-        # The decision vector is complete here (every suggest_* has run)
-        # and the hang-prone simulation has not started: record it, so a
-        # hard kill / segfault during this trial leaves the sidecar for
-        # recover_inflight (the supervisor, or the next engine start) to
-        # log as a LOST row. Cleared in the finally only once this trial's
-        # terminal row has been written (COMPLETE return, FAIL/NAN prune);
-        # an interrupted trial (e.g. KeyboardInterrupt) that wrote no row
-        # leaves the sidecar in place for recovery.
-        if volume_on:
-            n_spikes = int(values.get('max_n_spikes', baseline_max_n_spikes))
-            ratio = fed_batch_volume_ratio_bound(threshold, target, spike,
-                                                 n_spikes)
-            # log-space: ratio can reach ~1e12; TPE only needs the sign.
-            # ratio == inf gives inf, which optuna stores/compares fine.
-            volume_violation = math.log(ratio) - math.log(volume_cap)
-            trial.set_user_attr('volume_violation', volume_violation)
-            if ratio > volume_cap:
-                record['state'] = 'INFEASIBLE'
-                per_spike = ((spike - threshold) / (spike - target)
-                             if spike > target else math.inf)
-                record['error'] = (f'fed-batch volume ratio bound {ratio:.4g}x '
-                                   f'> cap {volume_cap:g} ({n_spikes} spikes, '
-                                   f'x{per_spike:.3g}/spike)')
-                append_trajectory_row(csv_path, columns, record)
-                print(f'Trial {trial.number}: INFEASIBLE fed-batch volume '
-                      f'ratio bound {ratio:.4g}x > cap {volume_cap:g}; '
-                      'pruned before simulating.')
-                raise optuna.TrialPruned()
-        write_inflight(inflight_path, columns, record)
-        row_written = False
-        try:
+        ev = evaluate_decision_point(ctx, values, trial.number)
+        # Constraint values for the TPE constraints_func / feasible sampler
+        # (set even for pruned trials, as before).
+        if ev.burden_violation is not None:
+            trial.set_user_attr('burden_violation', ev.burden_violation)
+        if ev.volume_violation is not None:
+            trial.set_user_attr('volume_violation', ev.volume_violation)
+        if ev.state == 'FAIL':
+            raise optuna.TrialPruned() from ev.exception
+        if ev.state != 'COMPLETE':      # INFEASIBLE / NAN
+            raise optuna.TrialPruned()
+        obj = ev.objective
+        for mname in TRACKED_METRICS:
+            trial.set_user_attr(mname, ev.record[mname])
+        if trial.number % print_status_every == 0:
             try:
-                for pname in kinetic_baselines:
-                    if pname in applied:
-                        setattr(r_te, pname, applied[pname])
-                if 'max_n_spikes' in values:
-                    fbs_spec.max_n_spikes = values['max_n_spikes']
-                if 'stage_1_max_x' in values:
-                    # The V406 property mirrors onto r_te AND the
-                    # AerationSpec (air-supply sizing); never setattr r_te.
-                    handles['V406'].stage_1_max_x = values['stage_1_max_x']
-                handles['model_specification'](**model_kwargs)
-                handles['latest_TEA_solution'].update(
-                    handles['solve_TEA'](
-                        stream_IDs=('ethanol', 'isobutanol')))
-                for mname, getter in TRACKED_METRICS.items():
-                    record[mname] = getter(handles)
-                obj = float(objective_getter(handles))
-                record['objective'] = obj
-            except Exception as e:
-                record['state'] = 'FAIL'
-                record['error'] = repr(e)[:300]
-                append_trajectory_row(csv_path, columns, record)
-                row_written = True
-                print(f'Trial {trial.number}: FAILED ({repr(e)[:120]})')
-                raise optuna.TrialPruned() from e
-            if not math.isfinite(obj):
-                # NaN (not solved) or +-inf (solve_TEA reports an IRR with
-                # no real root on the valid domain as -inf since
-                # 2026-09-03; the sampler needs finite values, so such
-                # trials are pruned like NaN ones -- the CSV keeps the raw
-                # value in 'objective')
-                record['state'] = 'NAN'
-                append_trajectory_row(csv_path, columns, record)
-                row_written = True
-                print(f'Trial {trial.number}: objective is non-finite '
-                      f'({obj}); pruned.')
-                raise optuna.TrialPruned()
-            record['state'] = 'COMPLETE'
-            append_trajectory_row(csv_path, columns, record)
-            row_written = True
-            for mname in TRACKED_METRICS:
-                trial.set_user_attr(mname, record[mname])
-            if trial.number % print_status_every == 0:
-                try:
-                    best = study.best_value
-                except Exception:  # no completed trial stored yet
-                    best = np.nan
-                try:
-                    print(f'\nTrial {trial.number}/{n_trials}: '
-                          f'{objective_name} = {obj:.6g} '
-                          f'(best so far {best:.6g})\n'
-                          f'integrator: {r_te.integrator.getName()}; '
-                          'HXN Qbal error = '
-                          f"{handles['HXN'].energy_balance_percent_error:.2f} %")
-                except Exception:  # cosmetic only -- never abort the study
-                    pass
-            return obj
-        finally:
-            # Clear the sidecar only once this trial's terminal row exists.
-            # A KeyboardInterrupt (manual abort) during the simulation, or
-            # an exception escaping the FAIL branch's own row append, hits
-            # this finally with row_written still False -- leave the
-            # sidecar in place so recover_inflight logs it as a LOST row
-            # at the next engine start (or the supervisor), rather than
-            # silently losing the trial number.
-            if row_written:
-                clear_inflight(inflight_path)
+                best = study.best_value
+            except Exception:  # no completed trial stored yet
+                best = np.nan
+            try:
+                print(f'\nTrial {trial.number}/{n_trials}: '
+                      f'{objective_name} = {obj:.6g} '
+                      f'(best so far {best:.6g})\n'
+                      f'integrator: {r_te.integrator.getName()}; '
+                      'HXN Qbal error = '
+                      f"{handles['HXN'].energy_balance_percent_error:.2f} %")
+            except Exception:  # cosmetic only -- never abort the study
+                pass
+        return obj
 
     n_remaining = max(0, n_trials - n_done)
     if n_done:
