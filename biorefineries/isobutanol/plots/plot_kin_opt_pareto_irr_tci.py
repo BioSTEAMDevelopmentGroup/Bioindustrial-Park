@@ -8,20 +8,19 @@
 # for license details.
 """Two-objective Pareto-frontier scatter across kinetic-optimization
 campaigns. The COMPLETE trials (finite IRR and TCI) of one or more studies
-are POOLED into one scatter cloud coloured by a third metric; the
-non-dominated frontier of the pool is drawn as a red dashed line with each
-frontier point labelled <campaign>#<trial>. The scenario-A baseline
-(hard-coded outcomes, simulated 2026-09-07) is a star, and an IRR = 0
+are POOLED into one scatter cloud, each point coloured by which campaign it
+came from (the same per-campaign hues as plot_kin_opt_parameter_sets.py);
+the non-dominated frontier of the pool is drawn as a red dashed line with
+each frontier point labelled <campaign>#<trial>. The scenario-A baseline
+(hard-coded outcomes, simulated 2026-09-07) is a grey star, and an IRR = 0
 break-even reference is drawn whenever IRR is an axis.
 
-Selectable via --view:
+Selectable via --view (both axes; colour is always the campaign):
 
   irr_tci  (default)  x = total capital investment (minimized)
-                      y = IRR (maximized), colour = isobutanol titer.
-  ibo_irr             x = isobutanol titer (maximized)
-                      y = IRR (maximized), colour = total capital investment.
-  iboyield_irr        x = isobutanol yield (maximized)
-                      y = IRR (maximized), colour = total capital investment.
+                      y = IRR (maximized).
+  ibo_irr             x = isobutanol titer (maximized), y = IRR (maximized).
+  iboyield_irr        x = isobutanol yield (maximized), y = IRR (maximized).
 
 Sim-safe: plain pandas reads of trajectory CSVs under analyses/results. No
 biosteam import, no load(); runnable while a study is in flight. Run:
@@ -61,6 +60,20 @@ STUDY_TAGS = {'irr': 'IRR', 'etoh_titer': 'EtT', 'ibo_titer': 'IBT',
               'ibo_yield': 'IBY', 'etoh_yield': 'EtY'}
 DEFAULT_STUDIES = [_MINIMAL_SUBSET_STUDY % o for o in STUDY_TAGS]
 
+# Per-campaign categorical colours, tag -> colour, matching the hue order
+# plot_kin_opt_parameter_sets.py assigns its default sets (baseline grey,
+# then irr / ibo_titer / etoh_titer / ibo_yield / etoh_yield taking
+# HUE_COLORS[0..4]); trials are coloured by which campaign they came from.
+CAMPAIGN_ORDER = ['IRR', 'IBT', 'EtT', 'IBY', 'EtY']
+CAMPAIGN_COLORS = {'IRR': '#18C4DC', 'IBT': '#f98f60', 'EtT': '#79bf82',
+                   'IBY': '#a280b9', 'EtY': '#f3c354'}
+CAMPAIGN_LABELS = {'IRR': 'IRR', 'IBT': 'IBO titer', 'EtT': 'EtOH titer',
+                   'IBY': 'IBO yield', 'EtY': 'EtOH yield'}
+_UNKNOWN_CAMPAIGN_COLOR = '0.6'
+# scenario-A baseline marker colour (plot_kin_opt_parameter_sets.py's
+# BASELINE_COLOR) -- a neutral grey, distinct from the campaign hues
+BASELINE_COLOR = '#90918e'
+
 # Scenario-A baseline outcomes -- HARD-CODED (simulated 2026-09-07,
 # smoke_test_1 protocol, IBO_2026), matching plot_kin_opt_parameter_sets.py.
 BASELINE_A = {'IRR': 0.1230, 'TCI': 139.6, 'IBO titer': 0.0, 'IBO yield': 0.0}
@@ -70,26 +83,23 @@ _IRR_LABEL = 'Internal rate of return (IRR)'
 _IBO_LABEL = r'Isobutanol titer ($\mathrm{g·L}^{-1}$)'
 _IBOY_LABEL = r'Isobutanol yield ($\mathrm{g·g}^{-1}$)'
 
-# One entry per --view. `dir` is the optimization direction of each axis
-# ('max'/'min'); the frontier is the set non-dominated under those. `cvmin`
-# pins the colorbar floor (None = autoscale from data). `legend_loc` is the
-# in-axes legend anchor.
+# One entry per --view. `xdir`/`ydir` are the optimization directions
+# ('max'/'min'); the frontier is the set non-dominated under those.
+# `legend_loc` is the in-axes legend anchor. Points are always coloured by
+# source campaign (see CAMPAIGN_COLORS), so there is no colour metric here.
 VIEWS = {
     'irr_tci': dict(
         x='TCI', xdir='min', xlabel=_TCI_LABEL,
         y='IRR', ydir='max', ylabel=_IRR_LABEL,
-        color='IBO titer', clabel=_IBO_LABEL, cshort='IBO titer', cvmin=0.0,
         title='IRR – capital Pareto frontier', legend_loc='lower right'),
     'ibo_irr': dict(
         x='IBO titer', xdir='max', xlabel=_IBO_LABEL,
         y='IRR', ydir='max', ylabel=_IRR_LABEL,
-        color='TCI', clabel=_TCI_LABEL, cshort='TCI', cvmin=None,
         title='IRR – isobutanol titer Pareto frontier',
         legend_loc='lower right'),
     'iboyield_irr': dict(
         x='IBO yield', xdir='max', xlabel=_IBOY_LABEL,
         y='IRR', ydir='max', ylabel=_IRR_LABEL,
-        color='TCI', clabel=_TCI_LABEL, cshort='TCI', cvmin=None,
         title='IRR – isobutanol yield Pareto frontier',
         legend_loc='lower right'),
 }
@@ -257,7 +267,6 @@ def make_figure(pool, view, show_baseline=True, show_frontier=True):
     n_studies = d['study'].nunique()
     x = d[v['x']].to_numpy()
     y = d[v['y']].to_numpy()
-    c = d[v['color']].to_numpy()
 
     keep = pareto_mask(x, v['xdir'], y, v['ydir'])
     # order the frontier along x so the connecting line is monotone
@@ -268,17 +277,23 @@ def make_figure(pool, view, show_baseline=True, show_frontier=True):
     # a little breathing room so edge frontier labels/stars are not clipped
     ax.margins(x=0.07, y=0.08)
 
-    # robust colour cap for a TCI colorbar (see _tukey_upper)
-    cvmin = v['cvmin'] if v['cvmin'] is not None else float(np.nanmin(c))
-    cvmax = float(np.nanmax(c))
-    cextend = 'neither'
-    if v['color'] == 'TCI':
-        cap = _tukey_upper(c)
-        if cap < cvmax:
-            cvmax, cextend = cap, 'max'
-
-    sc = ax.scatter(x, y, c=c, cmap='viridis', s=22, alpha=0.55,
-                    linewidths=0, zorder=2, vmin=cvmin, vmax=cvmax)
+    # colour each point by its source campaign (categorical). Plot the
+    # larger campaigns first so the sparse ones stay visible on top; build
+    # the legend in the canonical CAMPAIGN_ORDER regardless of plot order.
+    tags_present = list(d['study'].unique())
+    ordered = ([t for t in CAMPAIGN_ORDER if t in tags_present]
+               + [t for t in tags_present if t not in CAMPAIGN_ORDER])
+    by_size = sorted(ordered, key=lambda t: int((d['study'] == t).sum()),
+                     reverse=True)
+    for t in by_size:
+        sub = d[d['study'] == t]
+        ax.scatter(sub[v['x']], sub[v['y']],
+                   color=CAMPAIGN_COLORS.get(t, _UNKNOWN_CAMPAIGN_COLOR),
+                   s=18, alpha=0.55, linewidths=0, zorder=2)
+    campaign_handles = [
+        Line2D([], [], marker='o', ls='none', ms=7, mec='none',
+               mfc=CAMPAIGN_COLORS.get(t, _UNKNOWN_CAMPAIGN_COLOR),
+               label=CAMPAIGN_LABELS.get(t, t)) for t in ordered]
 
     # break-even reference whenever IRR is an axis
     if v['y'] == 'IRR':
@@ -290,11 +305,7 @@ def make_figure(pool, view, show_baseline=True, show_frontier=True):
     elif v['x'] == 'IRR':
         ax.axvline(0.0, color='0.55', lw=0.9, ls=(0, (5, 4)), zorder=1)
 
-    prov = f'; {n_studies} campaigns' if n_studies > 1 else ''
-    handles = [
-        Line2D([], [], marker='o', ls='none', mfc='0.7', mec='0.7', ms=6,
-               label=f"Trial (colour = {v['cshort']}{prov})"),
-    ]
+    handles = list(campaign_handles)
 
     # Pareto frontier: red dashed line, no markers. The trial labels are
     # placed further below (once the axis limits are final) so they can be
@@ -308,12 +319,12 @@ def make_figure(pool, view, show_baseline=True, show_frontier=True):
                        lw=1.6, label='Pareto frontier'))
     if show_baseline:
         bx, by = BASELINE_A[v['x']], BASELINE_A[v['y']]
-        ax.scatter([bx], [by], marker='*', s=230, facecolor='#1f77b4',
-                   edgecolor='k', linewidths=0.8, zorder=5)
+        ax.scatter([bx], [by], marker='*', s=230, facecolor=BASELINE_COLOR,
+                   edgecolor='k', linewidths=0.8, zorder=6)
         ax.annotate('Scenario-A\nbaseline', xy=(bx, by), xytext=(8, 8),
                     textcoords='offset points', ha='left', va='bottom',
-                    fontsize=FONTS['callout'], color='#1f77b4')
-        handles.append(Line2D([], [], marker='*', ls='none', mfc='#1f77b4',
+                    fontsize=FONTS['callout'], color='0.35')
+        handles.append(Line2D([], [], marker='*', ls='none', mfc=BASELINE_COLOR,
                        mec='k', ms=13, label='Scenario-A baseline'))
 
     # robust cap for a TCI x-axis: crop the detached high-TCI artifact
@@ -347,13 +358,9 @@ def make_figure(pool, view, show_baseline=True, show_frontier=True):
     ax.set_title(title, fontsize=FONTS['title'])
     style_ticks(ax)
 
-    cbar = fig.colorbar(sc, ax=ax, pad=0.02, extend=cextend)
-    cbar.set_label(v['clabel'], fontsize=FONTS['axis'])
-    cbar.ax.tick_params(labelsize=FONTS['tick'])
-
     ax.legend(handles=handles, loc=v['legend_loc'], fontsize=FONTS['legend'],
               frameon=True, framealpha=0.9, edgecolor='0.8',
-              handletextpad=0.5)
+              handletextpad=0.5, title='Campaign', title_fontsize=FONTS['legend'])
     fig.tight_layout()
     return fig, front
 
@@ -361,7 +368,7 @@ def make_figure(pool, view, show_baseline=True, show_frontier=True):
 def main():
     p = argparse.ArgumentParser(description=__doc__)
     p.add_argument('--view', default='irr_tci', choices=sorted(VIEWS),
-                   help='which two objectives / colour metric to plot')
+                   help='which two objectives to plot (colour is the campaign)')
     p.add_argument('--studies', nargs='+', default=DEFAULT_STUDIES,
                    metavar='STUDY',
                    help='one or more study names, bare CSV filenames, or '
