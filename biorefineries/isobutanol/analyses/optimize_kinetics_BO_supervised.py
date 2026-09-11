@@ -245,6 +245,7 @@ def child_code(scenario, objective, n_trials, kinetic_bounds_scenario,
                burden=True, enqueue_baseline=False, enqueue_knockouts=False,
                rate_multiplier_bounds=None, n_startup_trials=None,
                feasible_sampling=True, startup_sampling='lhs',
+               volume_feasibility=True,
                exclude_params=None,
                stage_1_max_x_bounds=_UNSET, seed_from=None):
     """The -c program for one supervised attempt of the driver.
@@ -296,6 +297,7 @@ def child_code(scenario, objective, n_trials, kinetic_bounds_scenario,
         f'          enqueue_baseline={enqueue_baseline!r},\n'
         f'          enqueue_knockouts={enqueue_knockouts!r},\n'
         f'          feasible_sampling={feasible_sampling!r},\n'
+        f'          volume_feasibility={volume_feasibility!r},\n'
         f'{startup_sampling_kw}'
         f'{rate_kw}'
         f'{startup_kw}'
@@ -316,6 +318,7 @@ def supervise(scenario=None, objective='IRR', n_trials=2000,
               rate_multiplier_bounds=None,
               n_startup_trials=None, max_empty_attempts=5,
               feasible_sampling=True, startup_sampling='lhs',
+              volume_feasibility=True,
               exclude_params=None,
               stage_1_max_x_bounds=_UNSET, seed_from=None):
     """Run attempts until 'complete' or 'abort'; returns the final
@@ -398,6 +401,7 @@ def supervise(scenario=None, objective='IRR', n_trials=2000,
                       rate_multiplier_bounds=rate_multiplier_bounds,
                       n_startup_trials=n_startup_trials,
                       feasible_sampling=feasible_sampling,
+                      volume_feasibility=volume_feasibility,
                       startup_sampling=startup_sampling,
                       exclude_params=exclude_params,
                       stage_1_max_x_bounds=stage_1_max_x_bounds,
@@ -423,6 +427,7 @@ def supervise(scenario=None, objective='IRR', n_trials=2000,
           f'enqueue_baseline={enqueue_baseline!r}, '
           f'enqueue_knockouts={enqueue_knockouts!r}, '
           f'feasible_sampling={feasible_sampling!r}, '
+          f'volume_feasibility={volume_feasibility!r}, '
           f'startup_sampling={startup_sampling!r}, '
           f'n_startup_trials={n_startup_trials!r}, '
           f'rate_multiplier_bounds={rate_multiplier_bounds!r}, '
@@ -676,6 +681,14 @@ if __name__ == '__main__':
                              'proposed 379 of 1260 trials over the cap). '
                              'Meaningless with --no-burden. Not part of '
                              'the study name, so a resume may change it')
+    parser.add_argument('--no-volume-feasibility', dest='volume_feasibility',
+                        action='store_false',
+                        help='skip the fed-batch volume-ratio feasibility '
+                             'check (default ON: pre-sim prune of blow-up '
+                             'feeding strategies + a constraints_func term + '
+                             'a sampler predicate term, symmetric with the '
+                             'enzyme-burden check). Not part of the study '
+                             'name, so a resume may change it')
     parser.add_argument('--random-startup', action='store_const',
                         const='random', dest='startup_sampling', default='lhs',
                         help='fill the TPE random start-up phase with iid '
@@ -754,6 +767,7 @@ if __name__ == '__main__':
                         n_startup_trials=args.n_startup_trials,
                         max_empty_attempts=args.max_empty_attempts,
                         feasible_sampling=args.feasible_sampling,
+                        volume_feasibility=args.volume_feasibility,
                         startup_sampling=args.startup_sampling,
                         exclude_params=(None if args.exclude_params is None
                                         else tuple(args.exclude_params)),

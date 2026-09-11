@@ -4246,4 +4246,28 @@ assert 'volume_feasibility=True,' in _drv60           # run() signature default
 assert 'volume_feasibility=volume_feasibility,' in _drv60  # forwarded to the engine
 PASS('driver run(volume_feasibility=True) forwarded to run_kinetic_optimization')
 
+#%% 61. Supervisor: volume_feasibility (default True) threaded through
+# supervise()/child_code(), emitted into the child call, --no-volume-feasibility.
+_sv61 = _inspect.signature(sup30['supervise']).parameters
+_cc61 = _inspect.signature(sup30['child_code']).parameters
+assert _sv61['volume_feasibility'].default is True
+assert _cc61['volume_feasibility'].default is True
+# emitted into the generated driver call, both truth values
+_code61 = sup30['child_code'](None, 'IRR', 200, None, False, 'x',
+                              study_target_products='ethanol_isobutanol',
+                              study_type='metabolic', volume_feasibility=False)
+assert 'volume_feasibility=False,' in _code61
+_code61t = sup30['child_code'](None, 'IRR', 200, None, False, 'x',
+                               study_target_products='ethanol_isobutanol',
+                               study_type='metabolic')
+assert 'volume_feasibility=True,' in _code61t
+assert 'volume_feasibility=volume_feasibility' in _inspect.getsource(sup30['supervise'])
+_src61 = open(os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                           'optimize_kinetics_BO_supervised.py')).read()
+assert "'--no-volume-feasibility'" in _src61
+assert "dest='volume_feasibility'" in _src61 and 'action=' in _src61
+assert 'volume_feasibility=args.volume_feasibility' in _src61
+PASS('supervisor --no-volume-feasibility -> volume_feasibility, emitted into '
+     'the child call, threaded through supervise()/child_code()')
+
 print(f'\nALL {n_pass} CHECKS PASSED')
