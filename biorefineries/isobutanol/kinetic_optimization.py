@@ -2612,6 +2612,8 @@ def run_kinetic_optimization(objective='IRR',
                              enqueue_knockouts=False,
                              n_startup_trials=None,
                              feasible_sampling=True,
+                             volume_feasibility=True,
+                             volume_cap=None,
                              startup_sampling='lhs',
                              seed_from=None,
                              parameter_groups=None,
@@ -2857,6 +2859,17 @@ def run_kinetic_optimization(objective='IRR',
     else:
         extra_columns = ()
         print('Enzyme burden OFF (burden_model=None): legacy burden-free study.')
+    volume_on = bool(volume_feasibility)
+    if volume_on:
+        if volume_cap is None:
+            # Production path: isobutanol.load() has run, so the runtime
+            # guard's cap is published; the pre-filter and the guard share it.
+            from biorefineries.isobutanol import system as _system
+            volume_cap = float(_system.parameters['max_fed_batch_volume_ratio'])
+        print('Fed-batch volume-ratio check ON: pre-sim prune + '
+              f'constraints_func + sampler predicate, cap {volume_cap:g}x.')
+    else:
+        print('Fed-batch volume-ratio check OFF.')
     if include_params is not None:
         missing = [p for p in include_params if p not in kinetic_baselines]
         if missing:
@@ -3011,10 +3024,9 @@ def run_kinetic_optimization(objective='IRR',
     # draws fresh points instead of replaying the original RNG stream.
     # <= 0 feasible; optuna evaluates it for COMPLETE and PRUNED trials
     # (samplers/_base._process_constraints_after_trial), so pruned INFEASIBLE
-    # trials populate the sampler's infeasible set. volume_on is False until
-    # the volume check is wired (see the volume_feasibility task).
+    # trials populate the sampler's infeasible set.
     constraints = feasibility_constraints_func(burden_on=burden_on,
-                                               volume_on=False)
+                                               volume_on=volume_on)
     if startup_sampling not in ('lhs', 'random'):
         raise ValueError("startup_sampling must be 'lhs' or 'random'; "
                          f'got {startup_sampling!r}')
@@ -3054,7 +3066,7 @@ def run_kinetic_optimization(objective='IRR',
               'no start-up phase.')
     else:
         print('Start-up sampling: uniform random.')
-    feasible_on = bool(burden_on and feasible_sampling)
+    feasible_on = bool(feasible_sampling and (burden_on or volume_on))
     print(f'TPE random start-up: {n_startup} trials ({startup_rule}); '
           f'{n_done} trials already stored, so guidance begins '
           f'{"now" if n_done >= n_startup else f"after trial {n_startup - 1}"}'
@@ -3068,13 +3080,13 @@ def run_kinetic_optimization(objective='IRR',
             # the sampled group multiplier), never the group key itself.
             # Without groups expand_grouped_values is an identity copy.
             feasibility_predicate(
-                burden_on=burden_on, volume_on=False,
+                burden_on=burden_on, volume_on=volume_on,
                 burden_model=burden_model,
                 parameter_groups=parameter_groups,
                 kinetic_baselines=kinetic_baselines,
                 baseline_model_kwargs=baseline_model_kwargs,
                 baseline_max_n_spikes=baseline_max_n_spikes,
-                volume_cap=None),
+                volume_cap=volume_cap),
             multivariate=True, seed=seed + n_done,
             n_startup_trials=n_startup, gamma=default_tpe_gamma,
             constraints_func=constraints,
@@ -3090,12 +3102,12 @@ def run_kinetic_optimization(objective='IRR',
                 lhs_design,
                 multivariate=True, seed=seed + n_done,
                 n_startup_trials=n_startup, gamma=default_tpe_gamma,
-                constraints_func=constraints if burden_on else None)
+                constraints_func=constraints if (burden_on or volume_on) else None)
         else:
             study.sampler = optuna.samplers.TPESampler(
                 multivariate=True, seed=seed + n_done,
                 n_startup_trials=n_startup, gamma=default_tpe_gamma,
-                constraints_func=constraints if burden_on else None)
+                constraints_func=constraints if (burden_on or volume_on) else None)
         print('Sampler: plain TPESampler '
               + ('(feasible_sampling=False).' if burden_on
                  else '(burden off: no feasibility predicate).'))
@@ -3219,6 +3231,26 @@ def run_kinetic_optimization(objective='IRR',
         # terminal row has been written (COMPLETE return, FAIL/NAN prune);
         # an interrupted trial (e.g. KeyboardInterrupt) that wrote no row
         # leaves the sidecar in place for recovery.
+        if volume_on:
+            n_spikes = int(values.get('max_n_spikes', baseline_max_n_spikes))
+            ratio = fed_batch_volume_ratio_bound(threshold, target, spike,
+                                                 n_spikes)
+            # log-space: ratio can reach ~1e12; TPE only needs the sign.
+            # ratio == inf gives inf, which optuna stores/compares fine.
+            volume_violation = math.log(ratio) - math.log(volume_cap)
+            trial.set_user_attr('volume_violation', volume_violation)
+            if ratio > volume_cap:
+                record['state'] = 'INFEASIBLE'
+                per_spike = ((spike - threshold) / (spike - target)
+                             if spike > target else math.inf)
+                record['error'] = (f'fed-batch volume ratio bound {ratio:.4g}x '
+                                   f'> cap {volume_cap:g} ({n_spikes} spikes, '
+                                   f'x{per_spike:.3g}/spike)')
+                append_trajectory_row(csv_path, columns, record)
+                print(f'Trial {trial.number}: INFEASIBLE fed-batch volume '
+                      f'ratio bound {ratio:.4g}x > cap {volume_cap:g}; '
+                      'pruned before simulating.')
+                raise optuna.TrialPruned()
         write_inflight(inflight_path, columns, record)
         row_written = False
         try:

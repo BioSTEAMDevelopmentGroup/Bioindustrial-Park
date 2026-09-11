@@ -509,7 +509,7 @@ else:
     study17_obj, csv17_out, kb17 = ko.run_kinetic_optimization(enqueue_baseline=True, enqueue_knockouts=True,
         objective='IRR', scenario_label='X', n_trials=3, seed=1,
         study_name=study17, results_dir=outdir17, handles=handles17,
-        print_status_every=1, burden_model=None)
+        print_status_every=1, burden_model=None, volume_feasibility=False)
     assert csv17_out == csv17 and kb17 == {'k_1e': 47.1, 'K_1e': 0.12}
     df17 = ko.load_trajectory(csv17)
     assert df17['trial_number'].tolist() == [99, 0, 1, 2]
@@ -548,7 +548,7 @@ else:
         ko.run_kinetic_optimization(enqueue_baseline=True, enqueue_knockouts=True,
             objective='IRR', scenario_label='X', n_trials=2, seed=1,
             study_name=study17b, results_dir=outdir17b, handles=handles17b,
-            print_status_every=1, burden_model=None)
+            print_status_every=1, burden_model=None, volume_feasibility=False)
     except KeyboardInterrupt:
         pass
     else:
@@ -975,7 +975,7 @@ if _optuna is not None:
         objective='IRR', scenario_label='X', n_trials=1, seed=1,
         study_name='offline_rate_band', results_dir=outdir23, handles=handles23,
         rate_multiplier_bounds=(1e-5, 10.0), print_status_every=1,
-        burden_model=None)
+        burden_model=None, volume_feasibility=False)
     d23 = study23.trials[0].distributions
     assert np.isclose(d23['k_1e'].low, 1e-5*47.1) and np.isclose(d23['k_1e'].high, 10.0*47.1)
     assert np.isclose(d23['K_1e'].low, 0.1*0.12) and np.isclose(d23['K_1e'].high, 10.0*0.12)
@@ -1146,7 +1146,8 @@ else:
             objective='IRR', scenario_label='X', n_trials=6, seed=1,
             study_name=study25, results_dir=outdir25, handles=handles25,
             param_bounds_override=override25,
-            rate_multiplier_bounds=(1e-5, 10.0), print_status_every=1)
+            rate_multiplier_bounds=(1e-5, 10.0), print_status_every=1,
+            volume_feasibility=False)
     finally:
         ko.write_inflight = _orig_write_inflight
     assert csv25_out == csv25 and kb25 == baselines25
@@ -1207,7 +1208,7 @@ else:
             study_name=study25, results_dir=outdir25, handles=handles25,
             param_bounds_override=override25,
             rate_multiplier_bounds=(1e-5, 10.0), print_status_every=1,
-            burden_model=None)
+            burden_model=None, volume_feasibility=False)
     except ValueError as e:
         assert 'different column set' in str(e), e
     else:
@@ -1226,7 +1227,7 @@ else:
             study_name='offline_stale_reference', results_dir=tempfile.mkdtemp(),
             handles=handles25, param_bounds_override=override25,
             rate_multiplier_bounds=(1e-5, 10.0), print_status_every=1,
-            burden_model=bm25_stale)
+            burden_model=bm25_stale, volume_feasibility=False)
     except ValueError as e:
         assert 'k_3' in str(e) and '6.0' in str(e) and '5.81' in str(e), e
     else:
@@ -1238,7 +1239,7 @@ else:
             study_name='offline_bad_burden', results_dir=tempfile.mkdtemp(),
             handles=handles25, param_bounds_override=override25,
             rate_multiplier_bounds=(1e-5, 10.0), print_status_every=1,
-            burden_model=True)
+            burden_model=True, volume_feasibility=False)
     except TypeError as e:
         assert 'burden_model' in str(e), e
     else:
@@ -1278,7 +1279,8 @@ else:
             objective='IRR', scenario_label='X', n_trials=n_trials25_before + 2,
             seed=1, study_name=study25, results_dir=outdir25, handles=handles25,
             param_bounds_override=override25,
-            rate_multiplier_bounds=(1e-5, 10.0), print_status_every=1)
+            rate_multiplier_bounds=(1e-5, 10.0), print_status_every=1,
+            volume_feasibility=False)
     assert csv25r == csv25 and kb25r == baselines25
     df25r = ko.load_trajectory(csv25)
     assert len(df25r) == n_rows25_before + 1, len(df25r)
@@ -1304,7 +1306,7 @@ else:
         objective='IRR', scenario_label='X', n_trials=1, seed=1,
         study_name='offline_no_burden', results_dir=outdir25b, handles=handles25,
         param_bounds_override=override25, rate_multiplier_bounds=(1e-5, 10.0),
-        print_status_every=1, burden_model=None)
+        print_status_every=1, burden_model=None, volume_feasibility=False)
     df25b = ko.load_trajectory(csv25b)
     assert 'Phi_M' not in df25b.columns and df25b['state'].tolist() == ['COMPLETE']
     assert 'burden_violation' not in study25b_obj.trials[0].user_attrs
@@ -1315,7 +1317,7 @@ else:
         objective='IRR', scenario_label='X', n_trials=1, seed=1,
         results_dir=outdir25c, handles=handles25,
         param_bounds_override=override25, rate_multiplier_bounds=(1e-5, 10.0),
-        print_status_every=1)
+        print_status_every=1, volume_feasibility=False)
     assert csv25c == os.path.join(outdir25c, 'kin_opt_X_irr_burden_trajectory.csv'), csv25c
     PASS('engine hook: INFEASIBLE pruned pre-sidecar with burden columns; effective k_7 to the model, sampled k_7 in the CSV; constraint reaches optuna; pre-flight header guard, stale/invalid burden_model refused, resume clean; burden off unchanged')
 
@@ -1433,7 +1435,7 @@ else:
         objective='IRR', scenario_label='X', n_trials=4, seed=1,
         study_name=study27, results_dir=outdir27, handles=_handles27(),
         param_bounds_override=override27, rate_multiplier_bounds=(0.1, 10.0),
-        print_status_every=1, burden_model=None)
+        print_status_every=1, burden_model=None, volume_feasibility=False)
     df27 = ko.load_trajectory(csv27)
     assert df27['trial_number'].tolist() == [0, 1, 2, 3]
     assert df27['state'].tolist() == ['COMPLETE']*4
@@ -1455,7 +1457,7 @@ else:
         objective='IRR', scenario_label='X', n_trials=5, seed=1,
         study_name=study27, results_dir=outdir27, handles=_handles27(),
         param_bounds_override=override27, rate_multiplier_bounds=(0.1, 10.0),
-        print_status_every=1, burden_model=None)
+        print_status_every=1, burden_model=None, volume_feasibility=False)
     assert len(st27r.trials) == 5
     assert sum(1 for t in st27r.trials if t.user_attrs.get('knockout_probe')) == 2
     # OFF: trial 1 is a sampled point, not a probe.
@@ -1464,7 +1466,8 @@ else:
         objective='IRR', scenario_label='X', n_trials=2, seed=1,
         study_name=study27, results_dir=outdir27b, handles=_handles27(),
         param_bounds_override=override27, rate_multiplier_bounds=(0.1, 10.0),
-        enqueue_knockouts=False, print_status_every=1, burden_model=None)
+        enqueue_knockouts=False, print_status_every=1, burden_model=None,
+        volume_feasibility=False)
     df27b = ko.load_trajectory(csv27b)
     assert not np.isclose(df27b['k_1e'][1], 4.71) or not np.isclose(df27b['k_7'][1], 1.203)
     assert all(t.user_attrs.get('knockout_probe') is None for t in st27b.trials)
@@ -1679,7 +1682,7 @@ else:
         study_name='offline_role_bands', results_dir=outdir28,
         handles=handles28, multiplier_bounds=(0.1, 10.0),
         rate_multiplier_bounds=(1e-5, 10.0), rate_params=['k_1e', 'k_7'],
-        print_status_every=10, burden_model=None)
+        print_status_every=10, burden_model=None, volume_feasibility=False)
     df28 = ko.load_trajectory(csv28)
     tr28 = sorted(st28.trials, key=lambda t: t.number)
     assert [t.user_attrs.get('knockout_probe') for t in tr28[:3]] \
@@ -1864,7 +1867,7 @@ outdir30 = tempfile.mkdtemp()
 common30 = dict(objective='IRR', scenario_label='X', seed=1,
                 study_name='offline_startup', results_dir=outdir30,
                 handles=handles30, print_status_every=10, burden_model=None,
-                enqueue_knockouts=False)
+                enqueue_knockouts=False, volume_feasibility=False)
 st30, csv30, _ = ko.run_kinetic_optimization(enqueue_baseline=True, n_trials=12, n_startup_trials=3,
                                              **common30)
 assert st30.sampler._n_startup_trials == 3
@@ -2234,7 +2237,7 @@ else:
                     handles=handles35, print_status_every=10,
                     param_bounds_override=override35,
                     rate_multiplier_bounds=(1e-3, 10.0),
-                    enqueue_knockouts=False)
+                    enqueue_knockouts=False, volume_feasibility=False)
     buf35 = _io.StringIO()
     with _contextlib.redirect_stdout(buf35):
         st35, csv35, _ = ko.run_kinetic_optimization(enqueue_baseline=True, n_trials=10, n_startup_trials=4,
@@ -2530,7 +2533,7 @@ else:
     study39_obj, csv39_out, kb39 = ko.run_kinetic_optimization(enqueue_baseline=True, enqueue_knockouts=True,
         objective='IRR', scenario_label='X', n_trials=4, seed=1,
         study_name=study39, results_dir=outdir39, handles=handles39,
-        print_status_every=1, burden_model=None,
+        print_status_every=1, burden_model=None, volume_feasibility=False,
         stage_1_max_x_bounds=(1.0, 50.0))
     df39 = ko.load_trajectory(csv39)
     assert 'stage_1_max_x' in df39.columns
@@ -2560,7 +2563,7 @@ else:
     _, csv39b, _ = ko.run_kinetic_optimization(enqueue_baseline=True, enqueue_knockouts=True,
         objective='IRR', scenario_label='X', n_trials=2, seed=1,
         study_name=study39 + '_off', results_dir=outdir39b, handles=handles39b,
-        print_status_every=1, burden_model=None)
+        print_status_every=1, burden_model=None, volume_feasibility=False)
     assert 'stage_1_max_x' not in ko.load_trajectory(csv39b).columns
     assert not hasattr(V406_39b, 'stage_1_max_x')
     # restore_baseline: sets the property only when a value is given.
@@ -2724,7 +2727,7 @@ else:
     study41, csv41, _ = ko.run_kinetic_optimization(enqueue_baseline=True, enqueue_knockouts=True,
         objective='IRR', scenario_label='X', n_trials=3, seed=1,
         study_name='offline_seeded', results_dir=outdir41, handles=handles41,
-        print_status_every=1, burden_model=None,
+        print_status_every=1, burden_model=None, volume_feasibility=False,
         stage_1_max_x_bounds=(1.0, 50.0),
         seed_from=[('donor41', [7])])
     df41 = ko.load_trajectory(csv41)
@@ -2741,7 +2744,7 @@ else:
     study41b, _, _ = ko.run_kinetic_optimization(enqueue_baseline=True, enqueue_knockouts=True,
         objective='IRR', scenario_label='X', n_trials=4, seed=1,
         study_name='offline_seeded', results_dir=outdir41, handles=handles41,
-        print_status_every=1, burden_model=None,
+        print_status_every=1, burden_model=None, volume_feasibility=False,
         stage_1_max_x_bounds=(1.0, 50.0),
         seed_from=[('donor41', [7])])
     assert len(study41b.trials) == 4
@@ -2752,7 +2755,7 @@ else:
         ko.run_kinetic_optimization(enqueue_baseline=True, enqueue_knockouts=True,
             objective='IRR', scenario_label='X', n_trials=3, seed=1,
             study_name='offline_seeded_bad', results_dir=outdir41,
-            handles=handles41, burden_model=None,
+            handles=handles41, burden_model=None, volume_feasibility=False,
             stage_1_max_x_bounds=(1.0, 50.0),
             seed_from=[('no_such_study', [7])])
     except ValueError as e41:
@@ -3211,7 +3214,7 @@ else:
     study44_obj, csv44_out, kb44 = ko.run_kinetic_optimization(enqueue_baseline=True, enqueue_knockouts=True,
         objective='IRR', scenario_label='X', n_trials=3, seed=1,
         study_name=study44, results_dir=outdir44, handles=handles44,
-        print_status_every=1, burden_model=None,
+        print_status_every=1, burden_model=None, volume_feasibility=False,
         exclude_params=('k_10',), parameter_groups=groups44,
         spike_delta_bounds=None)
     assert kb44 == {'k_1e': 47.1, 'k_1ie': 0.02, 'k_4ie': 0.04, 'k_10': 0.01, 'K_1e': 0.12}
@@ -3369,6 +3372,7 @@ else:
         objective='IRR', scenario_label='X', n_trials=3, seed=1,
         study_name=study44g, results_dir=outdir44g, handles=handles44g,
         print_status_every=1, burden_model=burden44g, feasible_sampling=False,
+        volume_feasibility=False,
         exclude_params=('k_10',), parameter_groups=groups44,
         spike_delta_bounds=None)
     assert csv44g_out == csv44g and kb44g == kb44
@@ -3438,6 +3442,7 @@ else:
             study_name='offline_grouped_feasible', results_dir=outdir44f,
             handles=handles44f, print_status_every=1, burden_model=burden44f,
             feasible_sampling=True, n_startup_trials=1, enqueue_knockouts=False,
+            volume_feasibility=False,
             exclude_params=('k_10',), parameter_groups=groups44,
             spike_delta_bounds=None)
     out44f = buf44f.getvalue()
@@ -3744,7 +3749,7 @@ if _optuna is not None:
         study_name='offline_no_baseline_default',
         results_dir=tempfile.mkdtemp(), handles=handles46,
         print_status_every=1,
-        burden_model=None)    # PURE defaults: enqueue_baseline=False, enqueue_knockouts=False
+        burden_model=None, volume_feasibility=False)    # PURE defaults: enqueue_baseline=False, enqueue_knockouts=False
     assert 'fixed_params' not in study46.trials[0].system_attrs   # sampled, not enqueued
     assert not np.isclose(study46.trials[0].params['k_1e'], 47.1)
     study46b, _, _ = ko.run_kinetic_optimization(
@@ -3752,7 +3757,7 @@ if _optuna is not None:
         study_name='offline_baseline_opt_in',
         results_dir=tempfile.mkdtemp(), handles=handles46,
         enqueue_baseline=True, enqueue_knockouts=False,
-        print_status_every=1, burden_model=None)
+        print_status_every=1, burden_model=None, volume_feasibility=False)
     assert np.isclose(study46b.trials[0].system_attrs['fixed_params']['k_1e'], 47.1)
     assert np.isclose(study46b.trials[0].params['k_1e'], 47.1)
 else:
@@ -3981,7 +3986,7 @@ assert 'startup_sampling' not in _inspect.signature(ko.default_study_name).param
 outdir52 = tempfile.mkdtemp()
 common52 = dict(objective='IRR', scenario_label='X', results_dir=outdir52,
                 handles=handles30, print_status_every=10, burden_model=None,
-                enqueue_knockouts=False)
+                enqueue_knockouts=False, volume_feasibility=False)
 # burden_model=None -> plain path. 'random' -> plain TPESampler, no lhs_seed.
 st_r, _, _ = ko.run_kinetic_optimization(
     n_trials=12, n_startup_trials=3, startup_sampling='random', seed=1,
@@ -4183,5 +4188,55 @@ _p_bur = ko.feasibility_predicate(burden_on=True, volume_on=False,
 assert _p_bur(_vbad58) is True
 PASS('feasibility_predicate: AND across the four toggle combinations; '
      'burden_model not dereferenced when burden off')
+
+#%% 59. Engine volume-ratio prune (volume_feasibility ON, explicit volume_cap).
+# The default is ON and reads system.parameters (production); offline injects
+# volume_cap=20.0 (no load(), so system.parameters does not exist here).
+_sig59 = _inspect.signature(ko.run_kinetic_optimization).parameters
+assert _sig59['volume_feasibility'].default is True
+assert _sig59['volume_cap'].default is None
+if _optuna is None:
+    print('SKIP 59: optuna not installed')
+else:
+    outdir59 = tempfile.mkdtemp()
+    fbs59 = SimpleNamespace(
+        current_specifications=dict(threshold_conc=200.0, target_conc=210.0,
+                                    spike_conc=210.5),
+        max_n_spikes=50)                      # baseline geometry x=21, ^50 >> 20
+    calls59 = {'n': 0}
+    def _ms59(**kw):
+        calls59['n'] += 1
+    handles59 = dict(handles30, fbs_spec=fbs59, model_specification=_ms59)
+    # volume ON, baseline enqueued -> trial 0 is the over-cap baseline -> pruned
+    _optuna.logging.set_verbosity(_optuna.logging.WARNING)
+    st59, csv59, _ = ko.run_kinetic_optimization(
+        objective='IRR', scenario_label='X', n_trials=1, seed=1,
+        study_name='offline_volume', results_dir=outdir59, handles=handles59,
+        print_status_every=1, burden_model=None, enqueue_baseline=True,
+        enqueue_knockouts=False, volume_feasibility=True, volume_cap=20.0)
+    df59 = ko.load_trajectory(csv59)
+    assert df59['state'].tolist() == ['INFEASIBLE'], df59['state'].tolist()
+    assert 'volume' in str(df59['error'][0]).lower(), df59['error'][0]
+    # The over-cap trial is pruned BEFORE its own simulation. The one
+    # model_specification call here is the engine's finally restore_baseline
+    # (it always re-simulates the scenario baseline once), NOT the trial.
+    assert calls59['n'] == 1, ('over-cap trial must be pruned BEFORE '
+                               'simulating (the 1 call is restore_baseline)')
+    # same baseline simulates when the volume check is OFF
+    outdir59b = tempfile.mkdtemp()
+    calls59['n'] = 0
+    st59b, csv59b, _ = ko.run_kinetic_optimization(
+        objective='IRR', scenario_label='X', n_trials=1, seed=1,
+        study_name='offline_volume_off', results_dir=outdir59b,
+        handles=handles59, print_status_every=1, burden_model=None,
+        enqueue_baseline=True, enqueue_knockouts=False,
+        volume_feasibility=False)
+    assert ko.load_trajectory(csv59b)['state'].tolist() == ['COMPLETE']
+    # With the check OFF the baseline simulates (1) and restore_baseline
+    # re-simulates it in the finally (1): 2 model_specification calls, one
+    # more than the pruned ON run above.
+    assert calls59['n'] == 2
+    PASS('engine: volume_feasibility default True + volume_cap escape hatch; '
+         'over-cap baseline pruned INFEASIBLE before simulating; OFF simulates it')
 
 print(f'\nALL {n_pass} CHECKS PASSED')
