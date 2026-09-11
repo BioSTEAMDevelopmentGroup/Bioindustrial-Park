@@ -4109,4 +4109,33 @@ assert ko.fed_batch_volume_ratio_bound(200.0, 210.0, 600.0, 50) < 20.0   # x ~ 1
 PASS('fed_batch_volume_ratio_bound: x**n, n=0 -> 1.0, spike<=target -> inf, '
      'monotone in n, small-spike_delta corner exceeds a 20x cap')
 
+#%% 56. _resolve_feeding_concs: parity with _objective's inline reconstruction
+# across the three feeding schemes, including the envelope clips.
+_bmk56 = dict(spike_conc=600.0, target_conc=221.25, threshold_conc=217.125)
+# threshold-anchored with an explicit spike_delta
+assert ko._resolve_feeding_concs(
+    {'threshold_conc': 100.0, 'target_delta': 50.0, 'spike_delta': 100.0},
+    _bmk56) == (100.0, 150.0, 250.0)
+# target_delta clipped at TARGET_CONC_MAX
+assert ko._resolve_feeding_concs(
+    {'threshold_conc': 280.0, 'target_delta': 100.0, 'spike_delta': 100.0},
+    _bmk56) == (280.0, ko.TARGET_CONC_MAX, ko.TARGET_CONC_MAX + 100.0)
+# spike clipped up to SPIKE_CONC_MIN when target + spike_delta is tiny
+assert ko._resolve_feeding_concs(
+    {'threshold_conc': 0.0, 'target_delta': 5.0, 'spike_delta': 0.5},
+    _bmk56) == (0.0, 5.0, ko.SPIKE_CONC_MIN)
+# pinned spike (no spike_delta) -> baseline snapshot spike_conc
+assert ko._resolve_feeding_concs(
+    {'threshold_conc': 100.0, 'target_delta': 50.0}, _bmk56) == (100.0, 150.0, 600.0)
+# legacy target-anchored scheme
+assert ko._resolve_feeding_concs(
+    {'target_conc': 220.0, 'threshold_delta': 30.0, 'spike_conc': 555.0},
+    _bmk56) == (190.0, 220.0, 555.0)
+# legacy threshold floored at 0.0
+assert ko._resolve_feeding_concs(
+    {'target_conc': 10.0, 'threshold_delta': 30.0, 'spike_conc': 555.0},
+    _bmk56) == (0.0, 10.0, 555.0)
+PASS('_resolve_feeding_concs: parity across threshold-anchored (+clips), '
+     'pinned-spike, and legacy target-anchored schemes')
+
 print(f'\nALL {n_pass} CHECKS PASSED')

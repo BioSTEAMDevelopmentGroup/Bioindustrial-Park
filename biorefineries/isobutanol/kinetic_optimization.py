@@ -2531,6 +2531,25 @@ def fed_batch_volume_ratio_bound(threshold_conc, target_conc,
     per_spike = (spike_conc - threshold_conc) / (spike_conc - target_conc)
     return per_spike ** n
 
+def _resolve_feeding_concs(values, baseline_model_kwargs):
+    """(threshold_conc, target_conc, spike_conc) from the sampled decision
+    dict `values` (EXTERNAL repr), applying the same envelope clips
+    (TARGET_CONC_MAX / SPIKE_CONC_MIN / SPIKE_CONC_MAX) and pinned-spike
+    fallback the objective uses. Mirrors _objective's reconstruction."""
+    if 'threshold_conc' in values:  # current threshold-anchored scheme
+        threshold = values['threshold_conc']
+        target = min(TARGET_CONC_MAX, threshold + values['target_delta'])
+        if 'spike_delta' in values:
+            spike = min(SPIKE_CONC_MAX,
+                        max(SPIKE_CONC_MIN, target + values['spike_delta']))
+        else:  # spike pinned at the scenario baseline
+            spike = baseline_model_kwargs['spike_conc']
+    else:  # legacy target-anchored scheme
+        target = values['target_conc']
+        threshold = max(0.0, target - values['threshold_delta'])
+        spike = values['spike_conc']
+    return threshold, target, spike
+
 def run_kinetic_optimization(objective='IRR',
                              direction=None, level=None,
                              objective_units=None, objective_name=None,
@@ -3113,20 +3132,8 @@ def run_kinetic_optimization(objective='IRR',
         # the members as applied_<member>.
         applied_kinetics = expand_grouped_values(values, parameter_groups,
                                                  kinetic_baselines)
-        if 'threshold_conc' in values:  # current threshold-anchored scheme
-            threshold = values['threshold_conc']
-            target = min(TARGET_CONC_MAX,
-                         threshold + values['target_delta'])
-            if 'spike_delta' in values:
-                spike = min(SPIKE_CONC_MAX,
-                            max(SPIKE_CONC_MIN,
-                                target + values['spike_delta']))
-            else:  # spike pinned at the scenario baseline
-                spike = baseline_model_kwargs['spike_conc']
-        else:  # legacy target-anchored scheme
-            target = values['target_conc']
-            threshold = max(0.0, target - values['threshold_delta'])
-            spike = values['spike_conc']
+        threshold, target, spike = _resolve_feeding_concs(
+            values, baseline_model_kwargs)
         model_kwargs = dict(target_conc=target, threshold_conc=threshold,
                             spike_conc=spike)
         record = {'trial_number': trial.number, **values}
