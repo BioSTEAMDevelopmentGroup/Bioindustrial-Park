@@ -2255,6 +2255,53 @@ def feasible_tpe_sampler(search_space, is_feasible, **kwargs):
     True; group / constant_liar refused)."""
     return _feasible_tpe_sampler_class()(search_space, is_feasible, **kwargs)
 
+_LHS_STARTUP_TPE_CLASS = {}
+
+def _lhs_startup_tpe_sampler_class():
+    """The LHSStartupTPESampler class (optuna imported here; memoized)."""
+    if 'cls' in _LHS_STARTUP_TPE_CLASS:
+        return _LHS_STARTUP_TPE_CLASS['cls']
+    import optuna
+
+    class LHSStartupTPESampler(optuna.samplers.TPESampler):
+        """Plain TPESampler whose random start-up phase returns Latin-hypercube
+        design columns instead of iid-uniform draws, leaving the TPE phase
+        byte-for-byte identical to optuna's TPESampler. LHS applies only while
+        optuna's OWN start-up condition holds (_n_startup_finished(study) <
+        n_startup_trials -- the same predicate the base sampler uses to switch
+        to TPE), so the TPE boundary is identical in every enqueue
+        configuration (B1). The row index k excludes enqueued trials
+        (_n_sampler_drawn_finished); k < size holds under the gate. A parameter
+        not in the design, or the TPE phase, falls through to super(). LHS
+        columns are independent per dimension, so reconstructing the joint row
+        via per-parameter calls (all sharing k within a trial -- stable because
+        trials run sequentially, n_jobs=1, the running trial is uncounted) is
+        equivalent to a joint LHS row; during start-up TPESampler._sample_relative
+        returns {}, so every parameter routes here."""
+
+        def __init__(self, lhs_design, **tpe_kwargs):
+            super().__init__(**tpe_kwargs)
+            self._lhs_design = lhs_design
+
+        def sample_independent(self, study, trial, param_name,
+                               param_distribution):
+            if (_n_startup_finished(study) < self._n_startup_trials
+                    and param_name in self._lhs_design):
+                k = _n_sampler_drawn_finished(study)
+                return self._lhs_design.column(k, param_name)
+            return super().sample_independent(study, trial, param_name,
+                                              param_distribution)
+
+    _LHS_STARTUP_TPE_CLASS['cls'] = LHSStartupTPESampler
+    return LHSStartupTPESampler
+
+def lhs_startup_tpe_sampler(lhs_design, **kwargs):
+    """A TPESampler whose random start-up draws come from `lhs_design` (an
+    LHSDesign) instead of iid uniform; `kwargs` are TPESampler keywords
+    (multivariate, seed, n_startup_trials, gamma, constraints_func, ...). The
+    TPE phase is byte-for-byte plain TPESampler."""
+    return _lhs_startup_tpe_sampler_class()(lhs_design, **kwargs)
+
 #: Default TPE `gamma`, the quantile that splits finished trials into the
 #: "good" (below) and "bad" (above) sets the sampler builds its densities
 #: from. optuna's own default is min(ceil(0.10 * n), 25) -- the top 10 %,

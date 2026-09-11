@@ -3913,4 +3913,55 @@ else:
          'infeasible rows fall back to uniform-feasible (counter matches), zero '
          'sampled INFEASIBLE; lhs_design=None reproduces the uniform start-up')
 
+#%% 51. LHSStartupTPESampler (plain path): start-up trials reproduce the design
+# rows in order; TPE phase falls through to super().sample_independent; B1
+# regression -- with enqueued trials, TPE begins at total COMPLETE|PRUNED ==
+# n_startup (identical to plain TPESampler) and only design-row prefix
+# 0..n_startup-n_enqueued-1 is used (2026-09-10).
+if _optuna is None:
+    print('SKIP 51: optuna not installed')
+else:
+    space51 = {'a': dict(low=0.01, high=100.0, log=True),
+               'b': dict(low=2.0, high=8.0, log=False)}
+    def _toy51(trial):
+        a = trial.suggest_float('a', 0.01, 100.0, log=True)
+        b = trial.suggest_float('b', 2.0, 8.0)
+        return -((a - 3.0)**2 + (b - 5.0)**2)
+    d51 = ko.LHSDesign(space51, n_startup=8, seed=5)
+    samp51 = ko.lhs_startup_tpe_sampler(d51, multivariate=True, seed=1,
+                                        n_startup_trials=8)
+    assert type(samp51).__name__ == 'LHSStartupTPESampler'
+    assert isinstance(samp51, _optuna.samplers.TPESampler)
+    st51 = _optuna.create_study(direction='maximize', sampler=samp51)
+    st51.optimize(_toy51, n_trials=8)           # nothing enqueued: k == trial number
+    # the first n_startup sampler-drawn trials reproduce the design rows in order
+    for k in range(8):
+        assert st51.trials[k].params == d51.external_point(k), k
+    # TPE phase: run more trials; they no longer equal design rows (guidance on)
+    st51.optimize(_toy51, n_trials=6)
+    assert len(st51.trials) == 14
+    d51_big = ko.LHSDesign(space51, 8, 5)        # same design, rows 8+ don't exist
+    assert st51.trials[8].params != (d51.external_point(7))  # not stuck on last row
+    # B1 regression: two enqueued (fixed_params) trials. TPE must still begin at
+    # total COMPLETE|PRUNED == n_startup (== 8), using only design rows 0..5.
+    d51b = ko.LHSDesign(space51, 8, 5)
+    samp51b = ko.lhs_startup_tpe_sampler(d51b, multivariate=True, seed=1,
+                                         n_startup_trials=8)
+    st51b = _optuna.create_study(direction='maximize', sampler=samp51b)
+    st51b.enqueue_trial({'a': 50.0, 'b': 7.0})
+    st51b.enqueue_trial({'a': 40.0, 'b': 6.0})
+    st51b.optimize(_toy51, n_trials=8)
+    # trials 0,1 are the enqueued fixed_params points (bypass the sampler)
+    assert st51b.trials[0].params == {'a': 50.0, 'b': 7.0}
+    assert st51b.trials[1].params == {'a': 40.0, 'b': 6.0}
+    # the 6 sampler-drawn start-up trials (2..7) reproduce design rows 0..5
+    for k in range(6):
+        assert st51b.trials[2 + k].params == d51b.external_point(k), k
+    # one more trial: total finished is now 8 == n_startup, so TPE takes over
+    st51b.optimize(_toy51, n_trials=1)
+    assert st51b.trials[8].params != d51b.external_point(6)   # NOT design row 6
+    PASS('LHSStartupTPESampler: start-up trials reproduce design rows in order, '
+         'TPE phase falls through to super(); B1 -- with enqueued trials TPE '
+         'begins at total finished == n_startup, only the row prefix is used')
+
 print(f'\nALL {n_pass} CHECKS PASSED')
