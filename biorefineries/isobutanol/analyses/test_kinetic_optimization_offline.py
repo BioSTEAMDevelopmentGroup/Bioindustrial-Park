@@ -3871,4 +3871,46 @@ else:
          '_n_sampler_drawn_finished excludes fixed_params (row index k); '
          'they differ by n_enqueued and coincide when nothing is enqueued')
 
+#%% 50. FeasibleTPESampler with an LHSDesign: start-up rows come from the design
+# when feasible, infeasible rows fall back to draw_uniform_feasible, zero sampled
+# INFEASIBLE trials, n_lhs_infeasible_fallbacks matches the infeasible rows, and
+# lhs_design=None reproduces today's uniform-feasible start-up (2026-09-10).
+if _optuna is None:
+    print('SKIP 50: optuna not installed')
+else:
+    d50 = ko.LHSDesign(space33, n_startup=10, seed=4)
+    samp50 = ko.feasible_tpe_sampler(space33, feas33, seed=11,
+                                     lhs_design=d50, **tpe_kw33)
+    assert type(samp50).__name__ == 'FeasibleTPESampler'
+    assert samp50.n_lhs_infeasible_fallbacks == 0
+    st50 = _optuna.create_study(direction='maximize', sampler=samp50)
+    st50.optimize(_toy33, n_trials=40)          # no enqueued trials: k == trial number
+    # zero sampled INFEASIBLE trials and every trial feasible
+    assert [t.number for t in st50.trials if t.state == TS33.PRUNED] == []
+    assert all(feas33(t.params) for t in st50.trials)
+    # the fallback counter equals the number of infeasible design rows over the
+    # start-up phase (the first 10 sampler-drawn trials)
+    n_infeasible_rows = sum(0 if feas33(d50.external_point(k)) else 1
+                            for k in range(10))
+    assert samp50.n_lhs_infeasible_fallbacks == n_infeasible_rows
+    # a FEASIBLE early row was used verbatim (find the first feasible design row)
+    first_feasible = next(k for k in range(10) if feas33(d50.external_point(k)))
+    assert st50.trials[first_feasible].params == d50.external_point(first_feasible)
+    # lhs_design=None -> byte-for-byte today's uniform-feasible start-up
+    import copy as _copy50
+    samp50n = ko.feasible_tpe_sampler(space33, feas33, seed=11, **tpe_kw33)
+    assert not hasattr(samp50n, '_lhs_design') or samp50n._lhs_design is None
+    assert samp50n.n_lhs_infeasible_fallbacks == 0
+    st50n = _fresh33(samp50n)
+    st50n.optimize(_toy33, n_trials=40)
+    samp50n2 = ko.feasible_tpe_sampler(space33, feas33, seed=11, lhs_design=None,
+                                       **tpe_kw33)
+    st50n2 = _fresh33(samp50n2)
+    st50n2.optimize(_toy33, n_trials=40)
+    assert ([t.params for t in st50n.trials]
+            == [t.params for t in st50n2.trials])
+    PASS('FeasibleTPESampler + LHSDesign: LHS start-up rows used when feasible, '
+         'infeasible rows fall back to uniform-feasible (counter matches), zero '
+         'sampled INFEASIBLE; lhs_design=None reproduces the uniform start-up')
+
 print(f'\nALL {n_pass} CHECKS PASSED')

@@ -2169,11 +2169,15 @@ def _feasible_tpe_sampler_class():
         never reach the sampler. Counters: n_rejected,
         n_uniform_fallbacks, n_unfiltered (see _FeasibleParzenEstimator).
         group=True and constant_liar=True are refused (both alter
-        sample_relative's control flow)."""
+        sample_relative's control flow).
+        When lhs_design is given, each start-up trial takes LHSDesign row k
+        (k = sampler-drawn finished trials) if it is feasible, else falls
+        back to draw_uniform_feasible; n_lhs_infeasible_fallbacks counts the
+        fallbacks. lhs_design=None reproduces the uniform-feasible start-up."""
 
         def __init__(self, search_space, is_feasible, *,
                      max_uniform_draws=10_000, max_parzen_batches=20,
-                     **tpe_kwargs):
+                     lhs_design=None, **tpe_kwargs):
             if tpe_kwargs.get('group'):
                 raise ValueError('FeasibleTPESampler does not support group=True')
             if tpe_kwargs.get('constant_liar'):
@@ -2197,6 +2201,8 @@ def _feasible_tpe_sampler_class():
             self.n_rejected = 0
             self.n_uniform_fallbacks = 0
             self.n_unfiltered = 0
+            self._lhs_design = lhs_design
+            self.n_lhs_infeasible_fallbacks = 0
 
         def infer_relative_search_space(self, study, trial):
             return {name: dist
@@ -2210,6 +2216,15 @@ def _feasible_tpe_sampler_class():
             trials = study._get_trials(deepcopy=False, states=states,
                                        use_cache=True)
             if len(trials) < self._n_startup_trials:
+                if self._lhs_design is not None:
+                    k = _n_sampler_drawn_finished(study)
+                    if k < self._lhs_design.size:
+                        values = self._lhs_design.external_point(k)
+                        if self._is_feasible(values):
+                            return values
+                    # LHS row infeasible (or k >= size, unreachable under the
+                    # gate): replace THIS trial with a uniform-feasible draw.
+                    self.n_lhs_infeasible_fallbacks += 1
                 values, n_draws, feasible = draw_uniform_feasible(
                     self._rng.rng, search_space, self._is_feasible,
                     self.max_uniform_draws)
