@@ -2514,6 +2514,23 @@ def restore_baseline(handles, kinetic_baselines, baseline_model_kwargs,
           'baseline. Baseline TEA solution: '
           f"{handles['latest_TEA_solution']}")
 
+def fed_batch_volume_ratio_bound(threshold_conc, target_conc,
+                                 spike_conc, max_n_spikes):
+    """Closed-form UPPER BOUND on the fed-batch final/initial working-volume
+    ratio: the per-spike multiplier (spike-threshold)/(spike-target) raised
+    to the spike CAP. Equals the actual ratio only if every capped spike
+    fires; vs the runtime guard's actual-spike count it is generally loose
+    (a conservative feasibility filter -- never admits a blow-up). Returns
+    math.inf for degenerate geometry (spike_conc <= target_conc, which the
+    FeedSpike cannot satisfy); 1.0 for max_n_spikes == 0."""
+    n = int(max_n_spikes)
+    if n <= 0:
+        return 1.0
+    if spike_conc <= target_conc:
+        return math.inf
+    per_spike = (spike_conc - threshold_conc) / (spike_conc - target_conc)
+    return per_spike ** n
+
 def run_kinetic_optimization(objective='IRR',
                              direction=None, level=None,
                              objective_units=None, objective_name=None,

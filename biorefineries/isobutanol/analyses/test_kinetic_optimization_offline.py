@@ -4087,4 +4087,26 @@ else:
          '(stall-killed) rows and excludes the current live trial, so k advances '
          'past a killed design row instead of re-proposing it (20260910c deadlock)')
 
+#%% 55. fed_batch_volume_ratio_bound: closed-form UPPER BOUND on the fed-batch
+# final/initial working-volume ratio (per-spike multiplier ^ spike cap).
+import math as _math55
+# Scenario-A baseline geometry: x = (600-217.125)/(600-221.25) = 1.010891..., ^16
+_x55 = (600.0 - 217.125) / (600.0 - 221.25)
+assert _math55.isclose(ko.fed_batch_volume_ratio_bound(217.125, 221.25, 600.0, 16),
+                       _x55 ** 16, rel_tol=1e-12)
+# n == 0 -> batch, no spikes -> ratio 1.0 (independent of concentrations)
+assert ko.fed_batch_volume_ratio_bound(200.0, 210.0, 210.5, 0) == 1.0
+# spike_conc <= target_conc -> degenerate geometry -> inf
+assert ko.fed_batch_volume_ratio_bound(100.0, 250.0, 200.0, 5) == _math55.inf
+assert ko.fed_batch_volume_ratio_bound(100.0, 200.0, 200.0, 5) == _math55.inf  # spike == target
+# monotone increasing in n for x > 1
+assert (ko.fed_batch_volume_ratio_bound(200.0, 210.0, 550.0, 3)
+        < ko.fed_batch_volume_ratio_bound(200.0, 210.0, 550.0, 5))
+# small-spike_delta corner (spike barely above target) blows past a 20x cap ...
+assert ko.fed_batch_volume_ratio_bound(200.0, 210.0, 210.5, 50) > 20.0   # x = 21
+# ... a concentrated spike stays under it at the same target and cap
+assert ko.fed_batch_volume_ratio_bound(200.0, 210.0, 600.0, 50) < 20.0   # x ~ 1.026
+PASS('fed_batch_volume_ratio_bound: x**n, n=0 -> 1.0, spike<=target -> inf, '
+     'monotone in n, small-spike_delta corner exceeds a 20x cap')
+
 print(f'\nALL {n_pass} CHECKS PASSED')
