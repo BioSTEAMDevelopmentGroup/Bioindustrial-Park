@@ -4050,4 +4050,41 @@ PASS('driver run(startup_sampling=lhs) forwarded to the engine; supervisor '
      '--random-startup -> startup_sampling=random, emitted into the child call '
      'only when random, threaded through supervise()/child_code()')
 
+#%% 54. LHS row index advances past ORPHANED RUNNING trials (stall-kill
+# deadlock regression, 2026-09-10). A child killed mid-simulation leaves its
+# optuna trial in RUNNING forever; _n_sampler_drawn_finished counts only
+# COMPLETE|PRUNED, so the LHS row index k would NOT advance and the SAME design
+# row is re-proposed on every resume (study 20260910c looped on row 164 six
+# times before the supervisor aborted). _n_sampler_drawn_consumed counts
+# CONSUMED rows -- sampler-drawn COMPLETE|PRUNED|FAIL + orphaned RUNNING,
+# excluding the current live trial -- so k advances past a killed row. In the
+# healthy path it equals _n_sampler_drawn_finished (the start-up gate).
+if _optuna is None:
+    print('SKIP 54: optuna not installed')
+else:
+    st54 = _optuna.create_study()
+    st54.optimize(lambda t: t.suggest_float('x', 0.0, 1.0), n_trials=4)
+    orphan54 = st54.ask()          # a child died mid-trial: orphaned RUNNING (row 4 consumed)
+    cur54 = st54.ask()             # the live trial now being sampled (row 5)
+    # the start-up gate / old row index still see only the 4 COMPLETE trials
+    assert ko._n_startup_finished(st54) == 4
+    assert ko._n_sampler_drawn_finished(st54) == 4
+    # consumed count includes the orphan and excludes the current live trial:
+    # k advances to 5 instead of re-proposing row 4 (the deadlock)
+    assert ko._n_sampler_drawn_consumed(st54, cur54) == 5
+    # from the orphan's own POV the current trial is the other running one: also 5
+    assert ko._n_sampler_drawn_consumed(st54, orphan54) == 5
+    # current_trial=None counts every non-enqueued sampler-drawn trial (both running)
+    assert ko._n_sampler_drawn_consumed(st54) == 6
+    # enqueued (fixed_params) trials never consume a design row
+    st54b = _optuna.create_study()
+    st54b.enqueue_trial({'x': 0.3})
+    st54b.optimize(lambda t: t.suggest_float('x', 0.0, 1.0), n_trials=3)
+    orphan54b = st54b.ask()
+    cur54b = st54b.ask()
+    assert ko._n_sampler_drawn_consumed(st54b, cur54b) == 3  # 2 finished + 1 orphan, enqueued excluded
+    PASS('LHS row index: _n_sampler_drawn_consumed counts orphaned RUNNING '
+         '(stall-killed) rows and excludes the current live trial, so k advances '
+         'past a killed design row instead of re-proposing it (20260910c deadlock)')
+
 print(f'\nALL {n_pass} CHECKS PASSED')

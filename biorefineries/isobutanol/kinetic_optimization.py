@@ -2217,7 +2217,7 @@ def _feasible_tpe_sampler_class():
                                        use_cache=True)
             if len(trials) < self._n_startup_trials:
                 if self._lhs_design is not None:
-                    k = _n_sampler_drawn_finished(study)
+                    k = _n_sampler_drawn_consumed(study, trial)
                     if k < self._lhs_design.size:
                         values = self._lhs_design.external_point(k)
                         if self._is_feasible(values):
@@ -2270,8 +2270,11 @@ def _lhs_startup_tpe_sampler_class():
         optuna's OWN start-up condition holds (_n_startup_finished(study) <
         n_startup_trials -- the same predicate the base sampler uses to switch
         to TPE), so the TPE boundary is identical in every enqueue
-        configuration (B1). The row index k excludes enqueued trials
-        (_n_sampler_drawn_finished); k < size holds under the gate. A parameter
+        configuration (B1). The row index k counts CONSUMED design rows
+        (_n_sampler_drawn_consumed): sampler-drawn trials excluding enqueued
+        trials AND the current live trial, but INCLUDING rows orphaned in
+        RUNNING by a stall-killed/crashed child, so a killed row is not
+        re-proposed on resume; k < size holds under the gate. A parameter
         not in the design, or the TPE phase, falls through to super(). LHS
         columns are independent per dimension, so reconstructing the joint row
         via per-parameter calls (all sharing k within a trial -- stable because
@@ -2287,7 +2290,7 @@ def _lhs_startup_tpe_sampler_class():
                                param_distribution):
             if (_n_startup_finished(study) < self._n_startup_trials
                     and param_name in self._lhs_design):
-                k = _n_sampler_drawn_finished(study)
+                k = _n_sampler_drawn_consumed(study, trial)
                 return self._lhs_design.column(k, param_name)
             return super().sample_independent(study, trial, param_name,
                                               param_distribution)
@@ -2417,6 +2420,31 @@ def _n_sampler_drawn_finished(study):
     fixed -> relative -> independent), and consume no design row."""
     return sum(1 for t in _finished_trials(study)
                if 'fixed_params' not in t.system_attrs)
+
+def _n_sampler_drawn_consumed(study, current_trial=None):
+    """The LHS row index k: design rows already handed out to sampler-drawn
+    trials. A trial CONSUMES its design row the moment it is created, whatever
+    its outcome -- so a trial killed mid-simulation (left orphaned in RUNNING by
+    a stall-killed or crashed child) has still consumed its row. Counting only
+    COMPLETE|PRUNED (_n_sampler_drawn_finished) would re-hand the SAME row on
+    every resume and deadlock the LHS start-up (study ..._20260910c looped on
+    design row 164 six times before the supervisor aborted). This counts
+    COMPLETE|PRUNED|FAIL|RUNNING sampler-drawn trials (no fixed_params, so
+    enqueued baseline/probe/seed points still consume no row), excluding
+    `current_trial` -- the live trial being sampled, itself RUNNING. In the
+    healthy path -- no FAIL, exactly one RUNNING (the current trial) -- this
+    equals _n_sampler_drawn_finished, so the start-up gate (_n_startup_finished)
+    and every existing study are unaffected; it only advances k past a row whose
+    trial was orphaned. `current_trial=None` counts every non-enqueued
+    sampler-drawn trial (used for diagnostics/tests)."""
+    from optuna.trial import TrialState
+    states = (TrialState.COMPLETE, TrialState.PRUNED,
+              TrialState.FAIL, TrialState.RUNNING)
+    trials = study._get_trials(deepcopy=False, states=states, use_cache=False)
+    current = None if current_trial is None else current_trial.number
+    return sum(1 for t in trials
+               if 'fixed_params' not in t.system_attrs
+               and t.number != current)
 
 def default_seed_from_datetime(when=None):
     """Default sampler seed derived from a study's start date and time
