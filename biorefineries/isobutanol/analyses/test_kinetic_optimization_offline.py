@@ -4020,4 +4020,34 @@ PASS('engine: startup_sampling default lhs builds LHSStartupTPESampler and '
      '(no lhs_seed, plain TPESampler); n_startup 0 builds no design; bad value '
      'raises; no study-name tag or CSV column')
 
+#%% 53. Driver + supervisor: startup_sampling flag (default 'lhs') forwarded to
+# the engine; supervisor --random-startup maps to startup_sampling='random' and
+# is emitted into the generated child call only when 'random' (2026-09-10).
+# Driver run(): explicit kwarg default 'lhs', forwarded to the engine.
+assert "startup_sampling='lhs'," in drv30
+assert 'startup_sampling=startup_sampling' in drv30
+# Supervisor: signature defaults, conditional emission, CLI flag, forwarding.
+_ss53 = _inspect.signature(sup30['supervise']).parameters
+_cc53 = _inspect.signature(sup30['child_code']).parameters
+assert _ss53['startup_sampling'].default == 'lhs'
+assert _cc53['startup_sampling'].default == 'lhs'
+# 'random' is emitted into the generated call; 'lhs' (default) is omitted.
+code53r = sup30['child_code'](None, 'IRR', 200, None, False, 'x',
+                              study_target_products='ethanol_isobutanol',
+                              study_type='metabolic', startup_sampling='random')
+assert "startup_sampling='random'" in code53r
+code53l = sup30['child_code'](None, 'IRR', 200, None, False, 'x',
+                              study_target_products='ethanol_isobutanol',
+                              study_type='metabolic')
+assert 'startup_sampling' not in code53l
+assert 'startup_sampling=startup_sampling' in _inspect.getsource(sup30['supervise'])
+src53 = open(os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                          'optimize_kinetics_BO_supervised.py')).read()
+assert "'--random-startup'" in src53
+assert "const='random'" in src53 and "dest='startup_sampling'" in src53
+assert 'startup_sampling=args.startup_sampling' in src53
+PASS('driver run(startup_sampling=lhs) forwarded to the engine; supervisor '
+     '--random-startup -> startup_sampling=random, emitted into the child call '
+     'only when random, threaded through supervise()/child_code()')
+
 print(f'\nALL {n_pass} CHECKS PASSED')

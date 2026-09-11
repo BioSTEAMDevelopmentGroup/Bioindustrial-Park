@@ -244,7 +244,8 @@ def child_code(scenario, objective, n_trials, kinetic_bounds_scenario,
                seed=None, study_target_products=None, study_type=None,
                burden=True, enqueue_baseline=False, enqueue_knockouts=False,
                rate_multiplier_bounds=None, n_startup_trials=None,
-               feasible_sampling=True, exclude_params=None,
+               feasible_sampling=True, startup_sampling='lhs',
+               exclude_params=None,
                stage_1_max_x_bounds=_UNSET, seed_from=None):
     """The -c program for one supervised attempt of the driver.
     `study_target_products=None` selects the driver's legacy flag path.
@@ -270,6 +271,8 @@ def child_code(scenario, objective, n_trials, kinetic_bounds_scenario,
                f'          rate_multiplier_bounds={tuple(rate_multiplier_bounds)!r},\n')
     startup_kw = ('' if n_startup_trials is None else
                   f'          n_startup_trials={int(n_startup_trials)!r},\n')
+    startup_sampling_kw = ('' if startup_sampling == 'lhs' else
+                           f'          startup_sampling={startup_sampling!r},\n')
     exclude_kw = ('' if exclude_params is None else
                   f'          exclude_params={tuple(exclude_params)!r},\n')
     s1x_value = (None if stage_1_max_x_bounds is None
@@ -293,6 +296,7 @@ def child_code(scenario, objective, n_trials, kinetic_bounds_scenario,
         f'          enqueue_baseline={enqueue_baseline!r},\n'
         f'          enqueue_knockouts={enqueue_knockouts!r},\n'
         f'          feasible_sampling={feasible_sampling!r},\n'
+        f'{startup_sampling_kw}'
         f'{rate_kw}'
         f'{startup_kw}'
         f'{exclude_kw}'
@@ -311,7 +315,8 @@ def supervise(scenario=None, objective='IRR', n_trials=2000,
               enqueue_baseline=False, enqueue_knockouts=False,
               rate_multiplier_bounds=None,
               n_startup_trials=None, max_empty_attempts=5,
-              feasible_sampling=True, exclude_params=None,
+              feasible_sampling=True, startup_sampling='lhs',
+              exclude_params=None,
               stage_1_max_x_bounds=_UNSET, seed_from=None):
     """Run attempts until 'complete' or 'abort'; returns the final
     outcome string ('complete' or 'abort'). `study_target_products` /
@@ -393,6 +398,7 @@ def supervise(scenario=None, objective='IRR', n_trials=2000,
                       rate_multiplier_bounds=rate_multiplier_bounds,
                       n_startup_trials=n_startup_trials,
                       feasible_sampling=feasible_sampling,
+                      startup_sampling=startup_sampling,
                       exclude_params=exclude_params,
                       stage_1_max_x_bounds=stage_1_max_x_bounds,
                       seed_from=seed_from)
@@ -417,6 +423,7 @@ def supervise(scenario=None, objective='IRR', n_trials=2000,
           f'enqueue_baseline={enqueue_baseline!r}, '
           f'enqueue_knockouts={enqueue_knockouts!r}, '
           f'feasible_sampling={feasible_sampling!r}, '
+          f'startup_sampling={startup_sampling!r}, '
           f'n_startup_trials={n_startup_trials!r}, '
           f'rate_multiplier_bounds={rate_multiplier_bounds!r}, '
           f'exclude_params={exclude_params!r}, '
@@ -669,6 +676,13 @@ if __name__ == '__main__':
                              'proposed 379 of 1260 trials over the cap). '
                              'Meaningless with --no-burden. Not part of '
                              'the study name, so a resume may change it')
+    parser.add_argument('--random-startup', action='store_const',
+                        const='random', dest='startup_sampling', default='lhs',
+                        help='fill the TPE random start-up phase with iid '
+                             'uniform draws instead of the default Latin '
+                             'hypercube design (feasibility-filtered on the '
+                             'feasible path). Not part of the study name, so '
+                             'a resume may change it')
     parser.add_argument('--stage-1-max-x-bounds', nargs='*', type=float,
                         default=None, metavar='G_PER_L',
                         help='band of the operating variable stage_1_max_x '
@@ -740,6 +754,7 @@ if __name__ == '__main__':
                         n_startup_trials=args.n_startup_trials,
                         max_empty_attempts=args.max_empty_attempts,
                         feasible_sampling=args.feasible_sampling,
+                        startup_sampling=args.startup_sampling,
                         exclude_params=(None if args.exclude_params is None
                                         else tuple(args.exclude_params)),
                         stage_1_max_x_bounds=stage_1_max_x_bounds,

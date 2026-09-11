@@ -196,6 +196,11 @@ def run(scenario=None,  # 'A' or 'B'; None = the preset's start scenario
         # they are proposed, so no sampled trial is INFEASIBLE; False =
         # the plain TPESampler (pre-2026-09-06 behaviour). Not part of
         # the study name; a resume may change it.
+        startup_sampling='lhs',  # 'lhs' (default) fills the random start-up
+        # phase with a Latin hypercube design (feasibility-filtered on the
+        # feasible path); 'random' restores iid uniform draws. Sampler setting:
+        # no study-name tag, no CSV column, free on resume (supervisor
+        # --random-startup).
         seed_from=None,  # [(donor study name or trajectory-CSV path,
         # [trial numbers]), ...]: decision points of those donor trials
         # are enqueued after the knockout probes of a FRESH study
@@ -345,6 +350,15 @@ def run(scenario=None,  # 'A' or 'B'; None = the preset's start scenario
     rejection counters at the end. Meaningless with burden=False. A
     sampler setting: same columns, no study-name tag, so the production
     study resumes under it (supervisor --no-feasible-sampling).
+
+    START-UP SAMPLING (`startup_sampling`, default 'lhs'; since 2026-09-10).
+    The random start-up draws come from a Latin hypercube design instead of
+    iid uniform -- feasibility-filtered on the feasible path (LHS rows over
+    the burden cap fall back to a uniform-feasible draw). 'random' restores
+    the iid draws (supervisor --random-startup). A sampler setting: no
+    study-name tag, no CSV column, so a resume may change it; the LHS design
+    seed is persisted as the study's 'lhs_seed' system-attr for stability
+    across resumes. Forwarded to ko.run_kinetic_optimization.
 
     STAGE-1 CUTOFF (`stage_1_max_x_bounds`, an engine kwarg defaulted
     from the preset since 2026-09-06 pm). Every preset but
@@ -550,6 +564,7 @@ def run(scenario=None,  # 'A' or 'B'; None = the preset's start scenario
         enqueue_knockouts=enqueue_knockouts,
         n_startup_trials=n_startup_trials,
         feasible_sampling=feasible_sampling,
+        startup_sampling=startup_sampling,
         seed_from=seed_from,
         **engine_kwargs)
 
