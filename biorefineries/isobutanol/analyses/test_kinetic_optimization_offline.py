@@ -4532,4 +4532,118 @@ else:
         assert res66.n_simulated == 2 and res66.stop_reason == 'budget'
     PASS('dual annealing: enqueue_baseline=True makes trial 0 the scenario baseline; False does not')
 
+#%% 67. Dual-annealing RESUME (spec §4.5, test 5): a second launch with a
+# larger n_trials re-evaluates the stored best COMPLETE point as its first
+# trial, a hand-written LOST row counts toward n_done_sim, numbering
+# continues from max stored + 1, and n_trials <= stored returns at once
+# (no row, no simulation, stop_reason 'complete').
+if _optuna is None:
+    print('SKIP 67: optuna not installed')
+else:
+    outdir67 = tempfile.mkdtemp()
+    study67 = 'offline_da_resume'
+    csv67 = os.path.join(outdir67, study67 + '_trajectory.csv')
+    side67 = ko.inflight_path_for(outdir67, study67)
+    st67 = {'trial_calls': 0, 'all_calls': 0, 'irr': 0.1}
+    def _ms67(**kw):
+        st67['all_calls'] += 1
+        if not os.path.isfile(side67):
+            return
+        st67['trial_calls'] += 1
+        st67['irr'] = 0.1 + 0.01 * st67['trial_calls']
+    def _tea67(stream_IDs=None):
+        return {'IRR': st67['irr'], 'MPSPs': {'ethanol': 0.5, 'isobutanol': 1.0}}
+    handles67 = dict(handles17, model_specification=_ms67, solve_TEA=_tea67,
+                     latest_TEA_solution={'IRR': np.nan,
+                                          'MPSPs': {'ethanol': np.nan,
+                                                    'isobutanol': np.nan}})
+    kw67 = dict(objective='IRR', scenario_label='X', seed=9, study_name=study67,
+                results_dir=outdir67, handles=handles67, burden_model=None,
+                volume_feasibility=False)
+    res67a, _, _ = ko.run_kinetic_dual_annealing(n_trials=3, **kw67)
+    df67a = ko.load_trajectory(csv67)
+    assert df67a['trial_number'].tolist() == [0, 1, 2]
+    assert res67a.best_trial_number == 2 and res67a.best_value == 0.13
+    # a stall-killed trial 3, logged LOST by the supervisor
+    ko.append_trajectory_row(csv67, cols17,
+                             {'trial_number': 3, 'state': 'LOST', 'k_1e': 10.0,
+                              'K_1e': 0.05, 'threshold_conc': 50.0,
+                              'target_delta': 20.0, 'spike_delta': 300.0,
+                              'max_n_spikes': 4, 'error': 'stall-killed'})
+    rs67 = ko.trajectory_resume_state(csv67, ko.build_search_space(
+        {'k_1e': 47.1, 'K_1e': 0.12})[0], 'maximize')
+    assert rs67['n_rows'] == 4 and rs67['n_done_sim'] == 4        # LOST counts
+    assert rs67['next_trial_number'] == 4 and rs67['best_trial_number'] == 2
+    assert rs67['best_values']['max_n_spikes'] == int(df67a['max_n_spikes'][2])
+    assert isinstance(rs67['best_values']['max_n_spikes'], int)
+    # relaunch with budget 6: 4 stored -> 2 more, numbered 4 and 5, trial 4 =
+    # the stored best point (trial 2) re-evaluated
+    res67b, _, _ = ko.run_kinetic_dual_annealing(n_trials=6, **kw67)
+    df67b = ko.load_trajectory(csv67)
+    assert df67b['trial_number'].tolist() == [0, 1, 2, 3, 4, 5]
+    assert df67b['state'].tolist() == ['COMPLETE'] * 3 + ['LOST'] + ['COMPLETE'] * 2
+    for c67 in cols17[2:8]:
+        assert np.isclose(df67b[c67][4], df67b[c67][2], rtol=1e-9, atol=0.0), c67
+    assert res67b.n_simulated == 2 and res67b.stop_reason == 'budget'
+    assert res67b.best_value == 0.15 and res67b.best_trial_number == 5
+    assert st67['trial_calls'] == 5
+    # a fresh relaunch's seed differs from the first launch's: the second
+    # NEW trial (5) is not the first launch's trial 1
+    assert not np.isclose(df67b['k_1e'][5], df67b['k_1e'][1])
+    # budget already met: immediate return, no row, no simulation
+    calls67 = st67['all_calls']
+    res67c, csv67c, kb67c = ko.run_kinetic_dual_annealing(n_trials=6, **kw67)
+    assert res67c.stop_reason == 'complete' and res67c.n_simulated == 0
+    assert res67c.best_trial_number == 5 and res67c.best_value == 0.15
+    assert res67c.best_params['max_n_spikes'] == int(df67b['max_n_spikes'][5])
+    assert csv67c == csv67 and kb67c == {'k_1e': 47.1, 'K_1e': 0.12}
+    assert len(ko.load_trajectory(csv67)) == 6 and st67['all_calls'] == calls67
+    # no COMPLETE row yet: resume from a uniform draw, numbering still
+    # continues (INFEASIBLE-only / LOST-only trajectories)
+    outdir67d = tempfile.mkdtemp()
+    csv67d = os.path.join(outdir67d, study67 + '_trajectory.csv')
+    ko.append_trajectory_row(csv67d, cols17,
+                             {'trial_number': 7, 'state': 'LOST', 'k_1e': 10.0,
+                              'K_1e': 0.05, 'threshold_conc': 50.0,
+                              'target_delta': 20.0, 'spike_delta': 300.0,
+                              'max_n_spikes': 4, 'error': 'stall-killed'})
+    res67d, _, _ = ko.run_kinetic_dual_annealing(
+        n_trials=2, **dict(kw67, results_dir=outdir67d))
+    df67d = ko.load_trajectory(csv67d)
+    assert df67d['trial_number'].tolist() == [7, 8] and res67d.n_simulated == 1
+    PASS('dual annealing: resume from the best COMPLETE row, LOST rows budgeted, '
+         "numbering continues from max+1, met budget returns 'complete' without simulating")
+
+#%% 68. Dual-annealing safety cap (spec §4.4, test 7): an all-INFEASIBLE space
+# (volume cap 0.5 < the batch ratio 1.0, so every point is pruned) stops at
+# max_calls_factor x n_trials objective calls with zero simulations and
+# stop_reason 'max_calls'; the CSV holds exactly those INFEASIBLE rows.
+if _optuna is None:
+    print('SKIP 68: optuna not installed')
+else:
+    outdir68 = tempfile.mkdtemp()
+    calls68 = {'n': 0}
+    def _ms68(**kw):
+        calls68['n'] += 1
+    def _tea68(stream_IDs=None):
+        return {'IRR': 0.2, 'MPSPs': {'ethanol': 0.5, 'isobutanol': 1.0}}
+    handles68 = dict(handles17, model_specification=_ms68, solve_TEA=_tea68,
+                     latest_TEA_solution={'IRR': np.nan,
+                                          'MPSPs': {'ethanol': np.nan,
+                                                    'isobutanol': np.nan}})
+    res68, csv68, _ = ko.run_kinetic_dual_annealing(
+        objective='IRR', scenario_label='X', n_trials=3, seed=2,
+        study_name='offline_da_cap', results_dir=outdir68, handles=handles68,
+        burden_model=None, volume_feasibility=True, volume_cap=0.5,
+        max_calls_factor=4)
+    df68 = ko.load_trajectory(csv68)
+    assert res68.stop_reason == 'max_calls', res68
+    assert res68.n_simulated == 0 and res68.n_infeasible == res68.n_calls == 12
+    assert df68['state'].tolist() == ['INFEASIBLE'] * 12
+    assert df68['trial_number'].tolist() == list(range(12))
+    assert calls68['n'] == 1                     # restore_baseline only
+    assert res68.best_trial_number is None and res68.best_value is None
+    assert 'Maximum number of function call reached' in res68.message
+    PASS("dual annealing: all-INFEASIBLE space stops at max_calls_factor x n_trials calls, 'max_calls', zero simulations")
+
 print(f'\nALL {n_pass} CHECKS PASSED')
