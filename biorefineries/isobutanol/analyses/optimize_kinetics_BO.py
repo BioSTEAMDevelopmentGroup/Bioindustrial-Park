@@ -196,6 +196,13 @@ def run(scenario=None,  # 'A' or 'B'; None = the preset's start scenario
         # they are proposed, so no sampled trial is INFEASIBLE; False =
         # the plain TPESampler (pre-2026-09-06 behaviour). Not part of
         # the study name; a resume may change it.
+        volume_feasibility=True,  # fed-batch working-volume-ratio check
+        # (ko.fed_batch_volume_ratio_bound): pre-sim prune of blow-up feeding
+        # strategies + a constraints_func term + a sampler predicate term,
+        # symmetric with the burden check and independently toggleable. The
+        # driver always load()s, so the engine reads the live cap
+        # (system.parameters['max_fed_batch_volume_ratio'] = 20). Not part of
+        # the study name / not a CSV column; a resume may change it.
         startup_sampling='lhs',  # 'lhs' (default) fills the random start-up
         # phase with a Latin hypercube design (feasibility-filtered on the
         # feasible path); 'random' restores iid uniform draws. Sampler setting:
@@ -564,6 +571,7 @@ def run(scenario=None,  # 'A' or 'B'; None = the preset's start scenario
         enqueue_knockouts=enqueue_knockouts,
         n_startup_trials=n_startup_trials,
         feasible_sampling=feasible_sampling,
+        volume_feasibility=volume_feasibility,
         startup_sampling=startup_sampling,
         seed_from=seed_from,
         **engine_kwargs)

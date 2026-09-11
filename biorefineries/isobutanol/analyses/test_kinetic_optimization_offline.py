@@ -4239,4 +4239,11 @@ else:
     PASS('engine: volume_feasibility default True + volume_cap escape hatch; '
          'over-cap baseline pruned INFEASIBLE before simulating; OFF simulates it')
 
+#%% 60. Driver run(): volume_feasibility kwarg (default True) forwarded to the engine.
+_drv60 = open(os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                           'optimize_kinetics_BO.py')).read()
+assert 'volume_feasibility=True,' in _drv60           # run() signature default
+assert 'volume_feasibility=volume_feasibility,' in _drv60  # forwarded to the engine
+PASS('driver run(volume_feasibility=True) forwarded to run_kinetic_optimization')
+
 print(f'\nALL {n_pass} CHECKS PASSED')
