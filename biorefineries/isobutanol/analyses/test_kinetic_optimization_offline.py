@@ -3778,4 +3778,70 @@ PASS('default seed from launch datetime: int((year/day**2)*month*(hour+1)*(minut
      'is None; +1 keeps the midnight corner positive; seed default None across engine '
      '+ driver run() + supervisor supervise()/child_code()/--seed')
 
+#%% 48. LHSDesign: shape, determinism, one-per-stratum (continuous), int column,
+# empty design, and the no-log-IntDistribution guard (2026-09-10, LHS start-up).
+if _optuna is None:
+    print('SKIP 48: optuna not installed')
+else:
+    space48 = {'a': dict(low=0.01, high=100.0, log=True),
+               'b': dict(low=2.0, high=8.0, log=False),
+               'n': dict(low=0, high=50, log=False, int=True)}
+    d48 = ko.LHSDesign(space48, n_startup=500, seed=7)
+    assert d48.size == 500 == len(d48)
+    assert 'a' in d48 and 'z' not in d48
+    # determinism: same seed -> identical rows; different seed -> different
+    d48b = ko.LHSDesign(space48, 500, 7)
+    d48c = ko.LHSDesign(space48, 500, 8)
+    assert d48.external_point(0) == d48b.external_point(0)
+    assert d48.external_point(0) != d48c.external_point(0)
+    # every external point carries exactly the space's keys, in-bounds
+    for k in (0, 123, 499):
+        pt = d48.external_point(k)
+        assert set(pt) == {'a', 'b', 'n'}
+        assert 0.01 <= pt['a'] <= 100.0 and 2.0 <= pt['b'] <= 8.0
+        assert isinstance(pt['n'], int) and 0 <= pt['n'] <= 50
+    # one-per-stratum for the LINEAR float column: the 500 internal values of
+    # 'b' fall one into each of 500 equal-width bins on [2, 8]
+    import numpy as _np48
+    b_int = _np48.array([d48.internal_point(k)['b'] for k in range(500)])
+    b_bins = _np48.floor((b_int - 2.0) / (8.0 - 2.0) * 500).astype(int)
+    b_bins = _np48.clip(b_bins, 0, 499)
+    assert sorted(b_bins.tolist()) == list(range(500))
+    # one-per-stratum for the LOG float column: log10('a') stratified evenly
+    a_int = _np48.array([d48.internal_point(k)['a'] for k in range(500)])
+    a_log = _np48.log(a_int)
+    a_bins = _np48.floor((a_log - _np48.log(0.01))
+                         / (_np48.log(100.0) - _np48.log(0.01)) * 500).astype(int)
+    a_bins = _np48.clip(a_bins, 0, 499)
+    assert sorted(a_bins.tolist()) == list(range(500))
+    # the int column: integer-valued, in range, approximately uniform (floor of
+    # a stratified unit-cube column; 500 draws over 51 integers)
+    n_vals = _np48.array([d48.internal_point(k)['n'] for k in range(500)])
+    assert _np48.all(n_vals == _np48.floor(n_vals)) and n_vals.min() >= 0 and n_vals.max() <= 50
+    counts48 = _np48.bincount(n_vals.astype(int), minlength=51)
+    assert counts48.min() >= 3 and counts48.max() <= 20   # ~500/51 ≈ 9.8 per value
+    # small n_startup <= (high-low+1): the int floor map is monotone/correct
+    d48s = ko.LHSDesign({'n': dict(low=0, high=9, log=False, int=True)}, 10, 3)
+    small = sorted(d48s.external_point(k)['n'] for k in range(10))
+    assert small == list(range(10))
+    # empty design: size 0, indexing raises
+    d48e = ko.LHSDesign(space48, 0, 1)
+    assert d48e.size == 0 and len(d48e) == 0
+    try:
+        d48e.external_point(0)
+    except IndexError:
+        pass
+    else:
+        raise AssertionError('empty LHSDesign did not raise on indexing')
+    # a log-scale IntDistribution would be silently linear-floored: guarded
+    try:
+        ko.LHSDesign({'m': dict(low=1, high=100, log=True, int=True)}, 5, 0)
+    except AssertionError:
+        pass
+    else:
+        raise AssertionError('log IntDistribution was not rejected')
+    PASS('LHSDesign: shape/determinism, one-per-stratum for linear & log floats, '
+         'integer-valued approx-uniform int column, monotone small-n floor, empty '
+         'design raises on index, log-IntDistribution guarded')
+
 print(f'\nALL {n_pass} CHECKS PASSED')

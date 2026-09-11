@@ -2257,6 +2257,84 @@ def default_tpe_gamma(n_trials):
     optuna's default min(ceil(0.10 * n_trials), 25)."""
     return min(math.ceil(DEFAULT_GAMMA_FRACTION * n_trials), DEFAULT_GAMMA_CAP)
 
+#%% Latin hypercube start-up design (2026-09-10)
+# The random start-up phase seeds TPE with a spread of outcomes before density
+# guidance begins; iid-uniform draws (RandomSampler / draw_uniform_feasible)
+# cluster and leave gaps at 15-24 dimensions. LHSDesign replaces them with a
+# Latin hypercube design stratified in optuna's INTERNAL representation
+# (log-uniform for log floats, linear for linear floats, integer-floor for
+# ints -- the same measure _uniform_internal_draw uses), so every dimension
+# gets one point per equal-probability stratum. Both sampler paths consume it
+# (feasibility-filtered on the feasible path). scipy is imported inside
+# __init__, so the module stays import-light (as the rest of this block does).
+
+class LHSDesign:
+    """Deterministic Latin-hypercube start-up design over an engine search
+    space (build_search_space format: {name: {'low','high','log'[, 'int']}}).
+    Row k -- internal_point(k) / external_point(k) / column(k, name) -- is the
+    design point for the k-th sampler-drawn trial. `n_startup <= 0` -> an empty
+    design (size 0); any point/column access then raises IndexError (callers
+    never index an empty design -- start-up is already over). Stratifies in
+    optuna's internal repr, matching _uniform_internal_draw, so the design fills
+    the same measure the current uniform start-up draws already use."""
+
+    def __init__(self, search_space, n_startup, seed):
+        # search_space_distributions() silently drops 'log' for 'int' entries
+        # (IntDistribution is always built log=False, matching the objective's
+        # own trial.suggest_int(...) calls, which never pass log= either) --
+        # so a log-scale int intent survives only in the raw search_space dict
+        # here, not in the built distribution. Guard against it before that
+        # information is lost, or it would be silently linear-floored below.
+        for name, sp in search_space.items():
+            if sp.get('int'):
+                assert not sp.get('log'), (
+                    f'log-scale IntDistribution {name!r} would be silently '
+                    'linear-floored by LHSDesign; not supported')
+        self._distributions = search_space_distributions(search_space)
+        self._names = list(self._distributions)          # dict insertion order
+        self._n_startup = max(0, int(n_startup))
+        self._rows = []
+        if self._n_startup <= 0:
+            return
+        from scipy.stats.qmc import LatinHypercube
+        from optuna.distributions import IntDistribution
+        unit = LatinHypercube(d=len(self._names),
+                              seed=seed).random(self._n_startup)
+        for r in range(self._n_startup):
+            row = {}
+            for j, name in enumerate(self._names):
+                dist = self._distributions[name]
+                u = float(unit[r, j])
+                if isinstance(dist, IntDistribution):
+                    x = dist.low + math.floor(u * (dist.high - dist.low + 1))
+                    row[name] = float(min(dist.high, x))
+                elif dist.log:
+                    x = math.exp(math.log(dist.low)
+                                 + u * (math.log(dist.high) - math.log(dist.low)))
+                    row[name] = float(min(dist.high, max(dist.low, x)))
+                else:
+                    row[name] = float(dist.low + u * (dist.high - dist.low))
+            self._rows.append(row)
+
+    @property
+    def size(self):
+        return self._n_startup
+
+    def __len__(self):
+        return self._n_startup
+
+    def __contains__(self, name):
+        return name in self._distributions
+
+    def internal_point(self, k):
+        return dict(self._rows[k])
+
+    def external_point(self, k):
+        return _to_external(self._rows[k], self._distributions)
+
+    def column(self, k, name):
+        return self._distributions[name].to_external_repr(self._rows[k][name])
+
 def default_seed_from_datetime(when=None):
     """Default sampler seed derived from a study's start date and time
     (set 2026-09-10, replacing the fixed 3221):
