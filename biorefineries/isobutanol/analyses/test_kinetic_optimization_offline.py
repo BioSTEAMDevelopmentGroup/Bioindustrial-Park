@@ -2244,7 +2244,10 @@ else:
     assert st35.sampler._n_startup_trials == 4
     assert 'Sampler: feasibility-aware TPE' in out35, out35
     assert 'feasibility-aware: joint uniform-feasible draws' in out35, out35
-    assert 'Feasible sampling: rejected ' in out35 and ' 0 unfiltered draws.' in out35, out35
+    # LHS is now the default start-up (Task 5): the summary line may carry a
+    # trailing ', N LHS infeasible fallbacks' -- check the invariant substring
+    # rather than requiring the line to end right after 'unfiltered draws'.
+    assert 'Feasible sampling: rejected ' in out35 and ' 0 unfiltered draws' in out35, out35
     df35 = ko.load_trajectory(csv35)
     assert len(df35) == 10 and df35['state'].tolist() == ['COMPLETE']*10, df35['state'].tolist()
     assert (df35['Phi_M'] < df35['F_flex']).all()
@@ -2254,22 +2257,27 @@ else:
     assert st35.sampler.n_rejected > 0 and st35.sampler.n_unfiltered == 0
     # the objective's guard never fired: no INFEASIBLE row, no pruned trial
     assert all(t.state == _optuna.trial.TrialState.COMPLETE for t in st35.trials)
-    # resume with feasible_sampling=False -> the plain TPESampler, same study
+    # resume with feasible_sampling=False -> the plain path, same study.
+    # startup_sampling defaults to 'lhs' (Task 5): the plain-path sampler is
+    # LHSStartupTPESampler (n_startup_trials=4 > 0), not bare TPESampler --
+    # still on the "plain" (non-FeasibleTPESampler) branch, which is the
+    # invariant this check cares about.
     buf35b = _io.StringIO()
     with _contextlib.redirect_stdout(buf35b):
         st35b, _, _ = ko.run_kinetic_optimization(enqueue_baseline=True, n_trials=12, n_startup_trials=4,
                                                   feasible_sampling=False, **common35)
-    assert type(st35b.sampler) is _optuna.samplers.TPESampler
+    assert type(st35b.sampler).__name__ in ('TPESampler', 'LHSStartupTPESampler')
     assert 'Sampler: plain TPESampler (feasible_sampling=False)' in buf35b.getvalue()
     assert 'Feasible sampling: rejected' not in buf35b.getvalue()
     assert len(ko.load_trajectory(csv35)) == 12
-    # burden off + feasible_sampling=True -> plain sampler (no predicate)
+    # burden off + feasible_sampling=True -> plain sampler (no predicate);
+    # again LHSStartupTPESampler under the new 'lhs' default (n_startup=2>0).
     buf35c = _io.StringIO()
     with _contextlib.redirect_stdout(buf35c):
         st35c, _, _ = ko.run_kinetic_optimization(enqueue_baseline=True,
             n_trials=3, n_startup_trials=2, feasible_sampling=True,
             burden_model=None, **{**common35, 'study_name': 'offline_feasible_noburden'})
-    assert type(st35c.sampler) is _optuna.samplers.TPESampler
+    assert type(st35c.sampler).__name__ in ('TPESampler', 'LHSStartupTPESampler')
     assert 'Sampler: plain TPESampler (burden off' in buf35c.getvalue()
     PASS('engine: feasible_sampling=True + burden on installs FeasibleTPESampler (all sampled trials feasible, n_unfiltered 0, summary line); False or burden off = plain TPESampler; not in the study name')
 
@@ -3963,5 +3971,53 @@ else:
     PASS('LHSStartupTPESampler: start-up trials reproduce design rows in order, '
          'TPE phase falls through to super(); B1 -- with enqueued trials TPE '
          'begins at total finished == n_startup, only the row prefix is used')
+
+#%% 52. Engine wiring: startup_sampling kwarg (default 'lhs'), lhs_seed
+# persistence via the storage-level API, resume reuses the stored seed, 'random'
+# is inert (no lhs_seed, plain sampler), bad value raises (2026-09-10).
+_sig52 = _inspect.signature(ko.run_kinetic_optimization).parameters
+assert _sig52['startup_sampling'].default == 'lhs'
+assert 'startup_sampling' not in _inspect.signature(ko.default_study_name).parameters
+outdir52 = tempfile.mkdtemp()
+common52 = dict(objective='IRR', scenario_label='X', results_dir=outdir52,
+                handles=handles30, print_status_every=10, burden_model=None,
+                enqueue_knockouts=False)
+# burden_model=None -> plain path. 'random' -> plain TPESampler, no lhs_seed.
+st_r, _, _ = ko.run_kinetic_optimization(
+    n_trials=12, n_startup_trials=3, startup_sampling='random', seed=1,
+    study_name='offline_startup_random', **common52)
+assert type(st_r.sampler).__name__ == 'TPESampler'
+assert 'lhs_seed' not in st_r._storage.get_study_system_attrs(st_r._study_id)
+# 'lhs' (default) -> LHSStartupTPESampler; lhs_seed persisted = base seed
+st_l, _, _ = ko.run_kinetic_optimization(
+    n_trials=12, n_startup_trials=3, seed=1,
+    study_name='offline_startup_lhs', **common52)
+assert type(st_l.sampler).__name__ == 'LHSStartupTPESampler'
+assert st_l._storage.get_study_system_attrs(st_l._study_id)['lhs_seed'] == 1
+# resume with a DIFFERENT base seed reuses the stored lhs_seed (design stable)
+st_l2, _, _ = ko.run_kinetic_optimization(
+    n_trials=12, n_startup_trials=3, seed=999,
+    study_name='offline_startup_lhs', **common52)
+assert st_l2._storage.get_study_system_attrs(st_l2._study_id)['lhs_seed'] == 1
+# n_startup 0 -> no design, sampler is plain (nothing to stratify)
+st_l0, _, _ = ko.run_kinetic_optimization(
+    n_trials=12, n_startup_trials=0, seed=1,
+    study_name='offline_startup_lhs0', **common52)
+assert type(st_l0.sampler).__name__ == 'TPESampler'
+# bad value raises ValueError naming the kwarg
+try:
+    ko.run_kinetic_optimization(n_trials=12, startup_sampling='bogus', seed=1,
+                                study_name='offline_startup_bad', **common52)
+except ValueError as e52:
+    assert 'startup_sampling' in str(e52)
+else:
+    raise AssertionError('bad startup_sampling did not raise')
+# not a study-name tag / no new CSV column: the trajectory columns are unchanged
+assert 'startup_sampling' not in ''.join(ko.load_trajectory(
+    os.path.join(outdir52, 'offline_startup_lhs_trajectory.csv')).columns)
+PASS('engine: startup_sampling default lhs builds LHSStartupTPESampler and '
+     'persists lhs_seed (reused across a reseeded resume); random is inert '
+     '(no lhs_seed, plain TPESampler); n_startup 0 builds no design; bad value '
+     'raises; no study-name tag or CSV column')
 
 print(f'\nALL {n_pass} CHECKS PASSED')

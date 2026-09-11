@@ -2513,6 +2513,7 @@ def run_kinetic_optimization(objective='IRR',
                              enqueue_knockouts=False,
                              n_startup_trials=None,
                              feasible_sampling=True,
+                             startup_sampling='lhs',
                              seed_from=None,
                              parameter_groups=None,
                              group_multiplier_bounds=DEFAULT_GROUP_MULTIPLIER_BOUNDS,
@@ -2648,6 +2649,20 @@ def run_kinetic_optimization(objective='IRR',
     False (or burden_model=None, where there is no predicate) keeps the
     plain TPESampler. A sampler setting like n_startup_trials: no
     column or study-name change, free to change on a resume.
+
+    `startup_sampling` (default 'lhs') controls the random start-up draws.
+    'lhs' fills the search space with a Latin hypercube design (LHSDesign,
+    stratified in optuna's internal repr) instead of iid uniform: the plain
+    path uses LHSStartupTPESampler, the feasible path takes LHS rows that
+    satisfy the burden cap and falls back to a uniform-feasible draw for any
+    infeasible row (so retained-LHS coverage is the feasible fraction of the
+    design; still zero sampled INFEASIBLE trials). 'random' restores the iid
+    draws. The LHS design seed is persisted as the study system-attr
+    'lhs_seed' (the base seed, NOT the +n_done sampler seed) so the design is
+    stable across resumes. It is a sampler setting -- NOT part of study
+    identity: no study-name tag, no CSV column, freely changeable on resume;
+    a 'random' run never reads or writes 'lhs_seed', so existing studies
+    resume unaffected. TPE-phase sampling is unchanged on both paths.
 
     `seed_from` (default None; since 2026-09-07) is a sequence of
     (donor, trial_numbers) pairs -- `donor` a trajectory-CSV path or a
@@ -2902,6 +2917,9 @@ def run_kinetic_optimization(objective='IRR',
         # set and steer sampling toward the feasible region. The attr is
         # set on every trial right after sampling, before any prune.
         return (frozen_trial.user_attrs.get('burden_violation', 0.0),)
+    if startup_sampling not in ('lhs', 'random'):
+        raise ValueError("startup_sampling must be 'lhs' or 'random'; "
+                         f'got {startup_sampling!r}')
     if n_startup_trials is None:
         n_startup = max(10, n_trials//4)
         startup_rule = 'default rule max(10, n_trials//4)'
@@ -2913,6 +2931,31 @@ def run_kinetic_optimization(objective='IRR',
                              f'integer or None; got {n_startup_trials!r}')
         n_startup = int(n_startup_trials)
         startup_rule = 'explicit'
+    # Latin hypercube start-up design (startup_sampling='lhs', default). The
+    # LHS seed is persisted as a study system-attr so the design is STABLE
+    # across crash/segfault resumes -- distinct from the sampler seed
+    # (seed + n_done), which is deliberately fresh per resume. Persisted the
+    # first time an 'lhs' launch finds it absent (fresh study OR a random->lhs
+    # switch on resume; the pre-switch rows already drawn are not corrected),
+    # read back thereafter. A 'random' run never touches study system-attrs.
+    # Use the STORAGE-level API: study.set_system_attr/system_attrs are
+    # @deprecated_func (3.1.0 -> removal 5.0.0) and warn on every launch.
+    lhs_design = None
+    if startup_sampling == 'lhs' and n_startup > 0:
+        stored = study._storage.get_study_system_attrs(
+            study._study_id).get('lhs_seed')
+        lhs_seed = stored if stored is not None else seed
+        if stored is None:
+            study._storage.set_study_system_attr(
+                study._study_id, 'lhs_seed', lhs_seed)
+        lhs_design = LHSDesign(search_space, n_startup, lhs_seed)
+        print(f'Start-up sampling: Latin hypercube ({n_startup}-row design, '
+              f'lhs_seed {lhs_seed}).')
+    elif startup_sampling == 'lhs':
+        print('Start-up sampling: Latin hypercube requested but n_startup=0; '
+              'no start-up phase.')
+    else:
+        print('Start-up sampling: uniform random.')
     feasible_on = bool(burden_on and feasible_sampling)
     print(f'TPE random start-up: {n_startup} trials ({startup_rule}); '
           f'{n_done} trials already stored, so guidance begins '
@@ -2931,15 +2974,25 @@ def run_kinetic_optimization(objective='IRR',
                                       kinetic_baselines)).feasible,
             multivariate=True, seed=seed + n_done,
             n_startup_trials=n_startup, gamma=default_tpe_gamma,
-            constraints_func=_burden_constraints)
+            constraints_func=_burden_constraints,
+            lhs_design=lhs_design)
         print('Sampler: feasibility-aware TPE (FeasibleTPESampler): every '
               'start-up draw and TPE candidate is checked against the '
-              'enzyme-burden cap before it is proposed.')
+              'enzyme-burden cap before it is proposed.'
+              + (' Start-up rows come from the LHS design (feasibility-'
+                 'filtered).' if lhs_design is not None else ''))
     else:
-        study.sampler = optuna.samplers.TPESampler(
-            multivariate=True, seed=seed + n_done,
-            n_startup_trials=n_startup, gamma=default_tpe_gamma,
-            constraints_func=_burden_constraints if burden_on else None)
+        if lhs_design is not None:
+            study.sampler = lhs_startup_tpe_sampler(
+                lhs_design,
+                multivariate=True, seed=seed + n_done,
+                n_startup_trials=n_startup, gamma=default_tpe_gamma,
+                constraints_func=_burden_constraints if burden_on else None)
+        else:
+            study.sampler = optuna.samplers.TPESampler(
+                multivariate=True, seed=seed + n_done,
+                n_startup_trials=n_startup, gamma=default_tpe_gamma,
+                constraints_func=_burden_constraints if burden_on else None)
         print('Sampler: plain TPESampler '
               + ('(feasible_sampling=False).' if burden_on
                  else '(burden off: no feasibility predicate).'))
@@ -3169,9 +3222,13 @@ def run_kinetic_optimization(objective='IRR',
                              baseline_stage_1_max_x=baseline_stage_1_max_x)
             if feasible_on:
                 s = study.sampler
+                extra = ('' if getattr(s, '_lhs_design', None) is None
+                         else f', {s.n_lhs_infeasible_fallbacks} LHS infeasible '
+                              'fallbacks')
                 print(f'Feasible sampling: rejected {s.n_rejected} '
                       f'draws/candidates, {s.n_uniform_fallbacks} uniform '
-                      f'fallbacks, {s.n_unfiltered} unfiltered draws.')
+                      f'fallbacks, {s.n_unfiltered} unfiltered draws' + extra
+                      + '.')
         finally:
             _system.set_active_burden(None)
     return study, csv_path, kinetic_baselines
