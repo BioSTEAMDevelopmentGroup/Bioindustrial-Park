@@ -88,7 +88,8 @@ __all__ = ('OBJECTIVE_REGISTRY', 'TRACKED_METRICS',
            'search_space_distributions', 'draw_uniform_feasible',
            'feasible_candidate_mask', 'feasible_tpe_sampler',
            'DEFAULT_GAMMA_FRACTION', 'DEFAULT_GAMMA_CAP', 'default_tpe_gamma',
-           'default_seed_from_datetime')
+           'default_seed_from_datetime',
+           'unit_to_internal', 'unit_to_external', 'external_to_unit')
 
 FEEDING_VARIABLES = ('threshold_conc', 'target_delta', 'spike_delta',
                      'max_n_spikes')
@@ -2336,6 +2337,72 @@ def default_tpe_gamma(n_trials):
 # (feasibility-filtered on the feasible path). scipy is imported inside
 # __init__, so the module stays import-light (as the rest of this block does).
 
+def _unit_clip(u):
+    return min(1.0, max(0.0, float(u)))
+
+def unit_to_internal(u, search_space):
+    """Unit-cube coordinates `u` (a sequence in search-space insertion order,
+    each in [0, 1]; values outside are clipped) -> {name: value} in optuna's
+    INTERNAL repr (ints as integer-valued floats): log floats
+    exp(ln lo + u (ln hi - ln lo)) clipped into [lo, hi]; ints
+    lo + floor(u (hi - lo + 1)) clipped to hi (uniform bins); linear floats
+    lo + u (hi - lo). The ONE definition of the measure the LHS start-up
+    design (LHSDesign) and the dual-annealing engine both use."""
+    point = {}
+    for j, (name, sp) in enumerate(search_space.items()):
+        uj = _unit_clip(u[j])
+        lo, hi = sp['low'], sp['high']
+        if sp.get('int'):
+            lo, hi = int(lo), int(hi)
+            x = lo + math.floor(uj * (hi - lo + 1))
+            point[name] = float(min(hi, x))
+        elif sp['log']:
+            # Snap the exact corners (uj in {0, 1}) to the bounds: on some
+            # libm, exp(log(hi)) rounds just below hi (e.g. exp(log(50.0)) ==
+            # 49.99999999999999), which would leave a cube corner short of the
+            # bound. LHS interior draws never hit uj in {0, 1}, so this is
+            # inert for LHSDesign rows; it only makes corner evaluation exact.
+            if uj <= 0.0:
+                point[name] = float(lo)
+            elif uj >= 1.0:
+                point[name] = float(hi)
+            else:
+                x = math.exp(math.log(lo) + uj * (math.log(hi) - math.log(lo)))
+                point[name] = float(min(hi, max(lo, x)))
+        else:
+            point[name] = float(lo + uj * (hi - lo))
+    return point
+
+def unit_to_external(u, search_space):
+    """unit_to_internal in EXTERNAL repr: int entries become int, the rest
+    stay float -- the dict evaluate_decision_point takes."""
+    internal = unit_to_internal(u, search_space)
+    return {name: (int(round(internal[name])) if sp.get('int')
+                   else internal[name])
+            for name, sp in search_space.items()}
+
+def external_to_unit(values, search_space):
+    """Inverse of unit_to_external: {name: external value} -> unit-cube
+    ndarray in search-space order. An int lands at its bin centre
+    (x - lo + 0.5)/(hi - lo + 1), so the forward map returns the same int;
+    every coordinate is clipped into [0, 1] (an out-of-space value maps to
+    the nearer bound); a zero-width bound maps to 0.5."""
+    u = np.empty(len(search_space))
+    for j, (name, sp) in enumerate(search_space.items()):
+        x = values[name]
+        lo, hi = sp['low'], sp['high']
+        if sp.get('int'):
+            lo, hi = int(lo), int(hi)
+            uj = (float(x) - lo + 0.5) / (hi - lo + 1)
+        elif sp['log']:
+            span = math.log(hi) - math.log(lo)
+            uj = 0.5 if span == 0.0 else (math.log(x) - math.log(lo)) / span
+        else:
+            span = hi - lo
+            uj = 0.5 if span == 0.0 else (x - lo) / span
+        u[j] = _unit_clip(uj)
+    return u
+
 class LHSDesign:
     """Deterministic Latin-hypercube start-up design over an engine search
     space (build_search_space format: {name: {'low','high','log'[, 'int']}}).
@@ -2365,24 +2432,13 @@ class LHSDesign:
         if self._n_startup <= 0:
             return
         from scipy.stats.qmc import LatinHypercube
-        from optuna.distributions import IntDistribution
         unit = LatinHypercube(d=len(self._names),
                               seed=seed).random(self._n_startup)
+        # Row construction lives in unit_to_internal (shared with the
+        # dual-annealing engine): log floats log-uniform, ints floor-binned,
+        # linear floats uniform -- all in optuna's internal repr.
         for r in range(self._n_startup):
-            row = {}
-            for j, name in enumerate(self._names):
-                dist = self._distributions[name]
-                u = float(unit[r, j])
-                if isinstance(dist, IntDistribution):
-                    x = dist.low + math.floor(u * (dist.high - dist.low + 1))
-                    row[name] = float(min(dist.high, x))
-                elif dist.log:
-                    x = math.exp(math.log(dist.low)
-                                 + u * (math.log(dist.high) - math.log(dist.low)))
-                    row[name] = float(min(dist.high, max(dist.low, x)))
-                else:
-                    row[name] = float(dist.low + u * (dist.high - dist.low))
-            self._rows.append(row)
+            self._rows.append(unit_to_internal(unit[r], search_space))
 
     @property
     def size(self):

@@ -4334,4 +4334,43 @@ else:
     PASS('GOLDEN: check-17 scenario through the TPE engine is byte-identical '
          '(line endings normalized) to the pre-refactor fixture')
 
+#%% 63. Unit-cube coordinates (dual-annealing spec §4.2): unit_to_internal is
+# LHSDesign's row construction (one definition of the internal measure);
+# unit_to_external == LHSDesign.external_point row for row; external_to_unit
+# inverts it (floats exactly up to round-off, ints to their bin centre);
+# cube corners hit the bounds exactly.
+space63 = {'k_1e': dict(low=4.71, high=471.0, log=True),          # log float
+           'k_13': dict(low=0.0, high=40.0, log=False),           # linear float
+           'max_n_spikes': dict(low=0, high=50, log=False, int=True),
+           'stage_1_max_x': dict(low=1.0, high=50.0, log=True)}
+from scipy.stats.qmc import LatinHypercube as _LHC63
+unit63 = _LHC63(d=4, seed=11).random(40)
+d63 = ko.LHSDesign(space63, n_startup=40, seed=11)
+for k63 in range(40):
+    assert ko.unit_to_internal(unit63[k63], space63) == d63.internal_point(k63), k63
+    assert ko.unit_to_external(unit63[k63], space63) == d63.external_point(k63), k63
+    ext63 = ko.unit_to_external(unit63[k63], space63)
+    assert isinstance(ext63['max_n_spikes'], int)
+    back63 = ko.external_to_unit(ext63, space63)
+    assert back63.shape == (4,)
+    # floats round-trip; the int lands at its bin centre, whose forward map
+    # is the same int again
+    assert np.allclose(back63[[0, 1, 3]], unit63[k63][[0, 1, 3]], rtol=0, atol=1e-12)
+    assert ko.unit_to_external(back63, space63) == ext63
+# corners
+lo63 = ko.unit_to_external([0.0, 0.0, 0.0, 0.0], space63)
+hi63 = ko.unit_to_external([1.0, 1.0, 1.0, 1.0], space63)
+assert lo63 == {'k_1e': 4.71, 'k_13': 0.0, 'max_n_spikes': 0, 'stage_1_max_x': 1.0}
+assert hi63 == {'k_1e': 471.0, 'k_13': 40.0, 'max_n_spikes': 50, 'stage_1_max_x': 50.0}
+# int bins are uniform: u in [k/51, (k+1)/51) -> k
+assert [ko.unit_to_external([0, 0, u, 0], space63)['max_n_spikes']
+        for u in (0.0, 1/51 - 1e-9, 1/51, 0.5, 50/51, 0.999999)] == [0, 0, 1, 25, 50, 50]
+assert ko.external_to_unit({'k_1e': 47.1, 'k_13': 40.0, 'max_n_spikes': 16,
+                            'stage_1_max_x': 5.0}, space63)[2] == (16 + 0.5)/51
+# out-of-space values are clipped into the cube, never raise
+assert ko.external_to_unit({'k_1e': 1e-3, 'k_13': 99.0, 'max_n_spikes': 80,
+                            'stage_1_max_x': 5.0}, space63).tolist()[:3] == [0.0, 1.0, 1.0]
+# LHS checks 48-53 still cover the design itself; here only its equivalence.
+PASS('unit cube: unit_to_internal/external == LHSDesign rows, external_to_unit inverts, corners exact')
+
 print(f'\nALL {n_pass} CHECKS PASSED')
