@@ -36,22 +36,25 @@ inhibition-effector family (inhib_ethanol / inhib_isobutanol /
 inhib_acetate, scaling every coefficient of that effector together;
 recorded as applied_<member> CSV columns), no K_* terms, and the four
 feeding/operating variables with the spike feed pinned at the baseline
-600 g/L (no spike_delta column) -- 24 / 19 decision variables; name
-kin_opt_ethanol_isobutanol_metabolic_minimal_irr_rb0.001-10_ib0.2-2_xk10+k7+k8_s1x1-50_burden.
+600 g/L (no spike_delta column) -- 24 / 19 decision variables. The
+per-effector-family band floors ONLY inhib_ethanol at 0.3x (others
+0.2x), so the inhibition tag is _ibe0.3-2; name
+kin_opt_ethanol_isobutanol_metabolic_minimal_irr_rb0.001-10_ibe0.3-2_xk10+k7+k8_s1x1-50_burden.
 
 study_type='metabolic_minimal_subset' (2026-09-07) is a STANDALONE
 explicit set, not derived from metabolic_minimal: 9 listed rate
 constants (k_1l, k_1h, k_1e, k_3, k_6, k_13, k_14, k_15, k_16;
 ko.METABOLIC_MINIMAL_SUBSET_RATES) on the rate band, the three
 inhibition-effector multipliers (ko.METABOLIC_MINIMAL_SUBSET_GROUPS,
-0.2x-2x) and the three feeding variables threshold_conc / target_delta
-/ max_n_spikes, with BOTH the spike feed and stage_1_max_x pinned at
-the baseline (no spike_delta / stage_1_max_x column) -- 15 decision
-variables for ethanol_isobutanol, 10 for ethanol_only (the listed set
-intersected with the A workbook: no k_13-k_16, no isobutanol
-coefficients); nothing excluded (the other rates and every K_* stay at
-the baseline with no probe); name
-kin_opt_ethanol_isobutanol_metabolic_minimal_subset_irr_rb0.001-10_ib0.2-2_burden
+inhib_ethanol floored at 0.3x, the others 0.2x-2x) and the three
+feeding variables threshold_conc / target_delta / max_n_spikes, with
+BOTH the spike feed and stage_1_max_x pinned at the baseline (no
+spike_delta / stage_1_max_x column) -- 15 decision variables for
+ethanol_isobutanol, 10 for ethanol_only (the listed set intersected
+with the A workbook: no k_13-k_16, no isobutanol coefficients); nothing
+excluded (the other rates and every K_* stay at the baseline with no
+probe); name
+kin_opt_ethanol_isobutanol_metabolic_minimal_subset_irr_rb0.001-10_ibe0.3-2_burden
 (no _x / _s1x tag).
 
 The enzyme-burden (proteome-allocation) constraint of enzyme_burden.py
@@ -90,7 +93,7 @@ Runner pattern (fresh kernel, one process):
     result, csv_path = ns['run'](objective='IRR', study_type='metabolic',
                                  seed_from=[('<donor study name>', [1553, 1914]),
                                             ('<other donor>', [1162])])
-    # dual annealing instead of TPE (name ..._irr_da_rb0.001-10_ib0.2-2_burden)
+    # dual annealing instead of TPE (name ..._irr_da_rb0.001-10_ibe0.3-2_burden)
     result, csv_path = ns['run'](objective='IRR', study_type='metabolic_minimal_subset', method='dual_annealing')
 """
 from datetime import datetime
@@ -427,7 +430,7 @@ def run(scenario=None,  # 'A' or 'B'; None = the preset's start scenario
     store) with the same preset / scenario / burden / volume set-up; the
     derived study name gains `_da` right after the objective slug on both
     naming paths (kin_opt_ethanol_isobutanol_metabolic_minimal_subset_irr_
-    da_rb0.001-10_ib0.2-2_burden). `annealing_kwargs` (dict) forwards the
+    da_rb0.001-10_ibe0.3-2_burden). `annealing_kwargs` (dict) forwards the
     annealing knobs (initial_temp 5230, restart_temp_ratio 2e-5, visit 2.62,
     accept -5.0, no_local_search True, energy_scale None = the registry's,
     max_calls_factor 20). Under DA, enqueue_knockouts=True or a non-empty
@@ -535,10 +538,16 @@ def run(scenario=None,  # 'A' or 'B'; None = the preset's start scenario
                  f'{tuple(engine_kwargs["spike_delta_bounds"])}')
               + '.')
         if groups:
-            print('Parameter groups (one log-scale multiplier each on '
-                  f'{tuple(engine_kwargs["group_multiplier_bounds"])} x '
-                  'baseline, preserving intra-group ratios): '
-                  + '; '.join(f'{g}[{len(m)}]: {", ".join(m)}'
+            # group_multiplier_bounds is polymorphic (a shared (lo, hi)
+            # tuple or a {group: (lo, hi)} dict of per-group bands);
+            # ko.group_bounds_for resolves each group's own band, so this
+            # line reports the true per-group band and never chokes on a
+            # dict.
+            gmb = engine_kwargs['group_multiplier_bounds']
+            print('Parameter groups (one log-scale multiplier each on its '
+                  'own band x baseline, preserving intra-group ratios): '
+                  + '; '.join(f'{g}[{len(m)}] on {ko.group_bounds_for(g, gmb)}: '
+                              f'{", ".join(m)}'
                               for g, m in groups.items())
                   + '.')
     elif scenario is None:

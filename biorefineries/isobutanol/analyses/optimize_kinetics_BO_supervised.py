@@ -62,15 +62,16 @@ sequentially) -- ask-first, like the unsupervised driver. Examples:
     python optimize_kinetics_BO_supervised.py --study-target-products \\
         ethanol_only --study-type metabolic
     # compact 24-variable space: rates minus k_10/k_7/k_8, one multiplier per
-    # inhibition effector, spike pinned (name ..._ib0.2-2_xk10+k7+k8_...):
+    # inhibition effector (inhib_ethanol floored at 0.3x), spike pinned
+    # (name ..._ibe0.3-2_xk10+k7+k8_...):
     python optimize_kinetics_BO_supervised.py --objective IRR \\
         --study-type metabolic_minimal
     # standalone 15-variable set: 9 listed rates + 3 effector multipliers
     # + 3 feeding, spike and stage_1_max_x pinned (name
-    # ..._metabolic_minimal_subset_irr_rb0.001-10_ib0.2-2_burden):
+    # ..._metabolic_minimal_subset_irr_rb0.001-10_ibe0.3-2_burden):
     python optimize_kinetics_BO_supervised.py --objective IRR \\
         --study-type metabolic_minimal_subset
-    # scipy dual annealing instead of TPE (name ..._irr_da_rb0.001-10_ib0.2-2_burden)
+    # scipy dual annealing instead of TPE (name ..._irr_da_rb0.001-10_ibe0.3-2_burden)
     python optimize_kinetics_BO_supervised.py --objective IRR --study-type metabolic_minimal_subset --method dual_annealing
     # resume a pre-2026-09-04 study under its old flags and name:
     python optimize_kinetics_BO_supervised.py --legacy-flags --scenario A \\
@@ -136,12 +137,16 @@ def default_study_name(scenario, objective, kinetic_bounds_scenario,
     (the 1e-5x studies are untagged: only a differing band was tagged
     then, so they can only be resumed via --study-name); the legacy path
     never encoded the band. Every preset name also carries the inhibition-
-    coefficient band tag `_ib{lo}-{hi}` (the study type's band from
-    ko.study_type_name_defaults -- the saturation band, or the group
-    band 0.2-2 of metabolic_minimal; the supervisor exposes no flag for
-    it, matching the driver's default `multiplier_bounds`):
-    since 2026-09-06 the presets assign bands by role, and the tag keeps a
-    role-band study from resuming a pre-change study of the same name.
+    coefficient band tag from ko.study_type_name_defaults, passed straight
+    to ko.default_study_name (ko._inhibition_bounds_tag): the saturation
+    band `_ib{lo}-{hi}`, or -- for the grouped metabolic_minimal /
+    metabolic_minimal_subset types -- the per-effector-family GROUP band,
+    which floors inhib_ethanol at 0.3x and leaves the others at 0.2x, so
+    the tag reads `_ibe0.3-2`. The supervisor exposes no flag for it,
+    matching the driver's default `group_multiplier_bounds` /
+    `multiplier_bounds`: since 2026-09-06 the presets assign bands by
+    role, and the tag keeps a role-band or per-group-floored study from
+    resuming a pre-change study of the same name.
     `exclude_params` (None = the study type's default from
     ko.study_type_name_defaults -- ('k_10',), or ('k_10', 'k_7', 'k_8')
     for metabolic_minimal -- which the driver defaults in; a tuple overrides it, () =
@@ -166,10 +171,11 @@ def default_study_name(scenario, objective, kinetic_bounds_scenario,
     if study_target_products is not None:
         # The _ib / _x / _s1x tags of the preset's own values come from
         # the SAME table the driver's resolve_study_preset uses
-        # (metabolic_minimal tags its group band _ib0.2-2 and
-        # _xk10+k7+k8; metabolic_minimal_subset pins stage_1_max_x, so
-        # no _s1x tag), so the name the stall watchdog polls is the name
-        # the child writes.
+        # (metabolic_minimal tags its per-group band _ibe0.3-2 -- only
+        # inhib_ethanol floored at 0.3x -- and _xk10+k7+k8;
+        # metabolic_minimal_subset pins stage_1_max_x, so no _s1x tag),
+        # so the name the stall watchdog polls is the name the child
+        # writes.
         name_defaults = ko.study_type_name_defaults(study_type)
         return ko.default_study_name(objective, study_target_products,
                                      study_type, scenario=scenario,
@@ -558,17 +564,18 @@ if __name__ == '__main__':
                              'K_2i, K_5i, K_9i); metabolic_protein = every '
                              'workbook row (plus affinity and product '
                              'self-inhibition); metabolic_minimal = the '
-                             'capacities minus k_10/k_7/k_8 + ONE 0.2x-2x '
+                             'capacities minus k_10/k_7/k_8 + ONE '
                              'multiplier per inhibition-effector family '
-                             '(inhib_ethanol/isobutanol/acetate), no K_* '
+                             '(inhib_ethanol floored at 0.3x-2x, isobutanol/'
+                             'acetate 0.2x-2x), no K_* '
                              'terms, spike feed pinned at the baseline '
-                             '(24 variables; name tags _ib0.2-2_xk10+k7+k8); '
+                             '(24 variables; name tags _ibe0.3-2_xk10+k7+k8); '
                              'metabolic_minimal_subset = the standalone '
                              'explicit set: 9 listed rates (k_1l, k_1h, '
                              'k_1e, k_3, k_6, k_13-k_16) + the 3 effector '
                              'multipliers + 3 feeding variables, spike AND '
                              'stage_1_max_x pinned, nothing excluded (15 '
-                             'variables; 10 for ethanol_only; tags _ib0.2-2 '
+                             'variables; 10 for ethanol_only; tags _ibe0.3-2 '
                              'only)')
     parser.add_argument('--legacy-flags', action='store_true',
                         help='ignore the presets: --scenario (default B) / '

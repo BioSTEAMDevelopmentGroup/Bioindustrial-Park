@@ -66,7 +66,7 @@ __all__ = ('OBJECTIVE_REGISTRY', 'TRACKED_METRICS',
            'DEFAULT_EXCLUDED_PARAMETERS', 'excluded_parameters_tag',
            'OPERATING_VARIABLES', 'DEFAULT_STAGE_1_MAX_X_BOUNDS',
            'DEFAULT_SPIKE_DELTA_BOUNDS', 'DEFAULT_GROUP_MULTIPLIER_BOUNDS',
-           'expand_grouped_values',
+           'group_bounds_for', 'expand_grouped_values',
            'RATE_CONSTANT_ROLES', 'INHIBITION_COEFFICIENT_ROLES',
            'kinetic_parameter_roles_path', 'kinetic_parameter_roles',
            'rate_constant_names',
@@ -146,6 +146,39 @@ DEFAULT_SPIKE_DELTA_BOUNDS = (0.5, 595.0)
 #: family on it (0.2x-2x, baseline 1.0), so a family's intra-family
 #: ratios are preserved while its overall strength varies.
 DEFAULT_GROUP_MULTIPLIER_BOUNDS = (0.2, 2.0)
+
+def group_bounds_for(group, group_multiplier_bounds):
+    """(lo, hi) log-scale multiplier band for ONE parameter group.
+    `group_multiplier_bounds` is polymorphic: EITHER a (lo, hi) 2-tuple
+    applied to EVERY group (the historical form), OR a
+    {group_name: (lo, hi)} dict of per-group bands (a group absent from
+    the dict falls back to DEFAULT_GROUP_MULTIPLIER_BOUNDS). Validates
+    0 < lo < hi (a log-scale band) and returns (float, float). ValueError
+    otherwise (mirrors build_search_space's message). Pure; used by
+    build_search_space (validation + the group entries) and the offline
+    test."""
+    if isinstance(group_multiplier_bounds, dict):
+        g_lo, g_hi = group_multiplier_bounds.get(
+            group, DEFAULT_GROUP_MULTIPLIER_BOUNDS)
+    else:
+        g_lo, g_hi = group_multiplier_bounds
+    if not (0.0 < g_lo < g_hi):
+        raise ValueError('group_multiplier_bounds must satisfy 0 < lo < hi '
+                         '(a log-scale multiplier band); got '
+                         f'{(g_lo, g_hi)!r} for group {group!r}')
+    return float(g_lo), float(g_hi)
+
+def _as_group_multiplier_bounds(value):
+    """Normalize a STUDY_TYPE_OPTIONS `group_multiplier_bounds` entry for
+    resolve_study_preset / study_type_name_defaults, preserving its
+    polymorphism (see group_bounds_for): a {group_name: (lo, hi)} dict of
+    per-group bands passes through as a dict (each band a (lo, hi) tuple);
+    a 2-sequence of numbers becomes a (lo, hi) tuple (the all-groups
+    band). So a dict reaches build_search_space and default_study_name
+    intact, and a plain tuple is coerced exactly as before."""
+    if isinstance(value, dict):
+        return {group: tuple(band) for group, band in value.items()}
+    return tuple(value)
 
 def expand_grouped_values(values, parameter_groups, kinetic_baselines):
     """Copy of the decision dict `values` with every PARAMETER-GROUP
@@ -482,8 +515,11 @@ def build_search_space(kinetic_baselines,
     `parameter_groups` (None = none; since 2026-09-07) is a
     {group_name: [member kinetic names]} mapping (or a list of pairs).
     Each group is ONE decision variable, a log-scale MULTIPLIER on
-    `group_multiplier_bounds` (0 < lo < hi; DEFAULT_GROUP_MULTIPLIER_
-    BOUNDS) applied to every member's baseline (expand_grouped_values;
+    `group_multiplier_bounds` -- EITHER a (lo, hi) tuple applied to every
+    group, OR a {group_name: (lo, hi)} dict of per-group bands (a group
+    absent from the dict falls back to DEFAULT_GROUP_MULTIPLIER_BOUNDS);
+    group_bounds_for resolves and validates each (0 < lo < hi) -- applied
+    to every member's baseline (expand_grouped_values;
     baseline value 1.0), so the members move together and keep their
     ratios. Members are REMOVED from the individual kinetic space (never
     sampled on their own; not listed in `excluded`); groups are appended
@@ -510,14 +546,13 @@ def build_search_space(kinetic_baselines,
                         for group, members in dict(parameter_groups or {}).items()}
     grouped = {}  # member name -> group name
     if parameter_groups:
-        g_lo, g_hi = group_multiplier_bounds
-        if not (0.0 < g_lo < g_hi):
-            raise ValueError('group_multiplier_bounds must satisfy 0 < lo < hi '
-                             '(a log-scale multiplier band); got '
-                             f'{tuple(group_multiplier_bounds)!r}')
         reserved = (set(kinetic_baselines) | set(FEEDING_VARIABLES)
                     | set(LEGACY_FEEDING_VARIABLES) | set(OPERATING_VARIABLES))
         for group, members in parameter_groups.items():
+            # Validate this group's band up front (group_multiplier_bounds
+            # is a shared (lo, hi) tuple or a per-group dict; group_bounds_
+            # for normalizes both and checks 0 < lo < hi).
+            group_bounds_for(group, group_multiplier_bounds)
             if group in reserved:
                 raise ValueError(f'parameter group name {group!r} collides '
                                  'with a kinetic parameter, feeding or '
@@ -567,7 +602,8 @@ def build_search_space(kinetic_baselines,
             space[name] = dict(low=lo_m*baseline, high=hi_m*baseline,
                                log=True)
     for group in parameter_groups:
-        space[group] = dict(low=float(g_lo), high=float(g_hi), log=True)
+        g_lo, g_hi = group_bounds_for(group, group_multiplier_bounds)
+        space[group] = dict(low=g_lo, high=g_hi, log=True)
     if (target_conc_bounds is not None or threshold_delta_bounds is not None
             or spike_conc_bounds is not None):
         # Legacy target-anchored parameterization (resumes of studies
@@ -1143,30 +1179,35 @@ METABOLIC_MINIMAL_SUBSET_GROUPS = {
 #: burden's phi_T stays at wild type); group_roles = the inhibition
 #: coefficients, grouped by the role table's effector into
 #: inhib_ethanol / inhib_isobutanol / inhib_acetate (EFFECTOR_ORDER),
-#: each ONE log multiplier on group_multiplier_bounds (0.2x-2x); and
-#: spike_delta_bounds = None, the spike feed pinned at the scenario
-#: baseline (600 g/L). The driver tags the group band as the inhibition
-#: band (`_ib0.2-2`) and the exclusion set as `_xk10+k7+k8`
-#: (study_type_name_defaults); the group columns and the missing
-#: spike_delta column keep the header guard from any cross-resume.
+#: each ONE log multiplier on group_multiplier_bounds -- a per-group dict
+#: that floors ONLY inhib_ethanol at 0.3x (inhib_isobutanol / inhib_
+#: acetate keep the 0.2x default); and spike_delta_bounds = None, the
+#: spike feed pinned at the scenario baseline (600 g/L). The driver tags
+#: the per-group band as the inhibition band (`_ibe0.3-2`, the effector
+#: code of every group whose band differs from the default) and the
+#: exclusion set as `_xk10+k7+k8` (study_type_name_defaults); the group
+#: columns and the missing spike_delta column keep the header guard from
+#: any cross-resume, and the distinct `_ibe0.3-2` tag keeps a 0.3-floored
+#: study off an old 0.2 study's CSV.
 STUDY_TYPE_OPTIONS = {
     'metabolic_minimal': dict(
         exclude_params=('k_10', 'k_7', 'k_8'),
         group_roles=('product_inhibition', 'lethality'),
-        group_multiplier_bounds=(0.2, 2.0),
+        group_multiplier_bounds={'inhib_ethanol': (0.3, 2.0)},
         spike_delta_bounds=None,
     ),
     # The standalone explicit set (METABOLIC_MINIMAL_SUBSET_*): 9 rates +
     # 3 groups + 3 feeding variables = 15 for ethanol_isobutanol (10 for
     # ethanol_only after the workbook intersection); no exclusions, spike
-    # and stage_1_max_x pinned; default name
-    # kin_opt_ethanol_isobutanol_metabolic_minimal_subset_irr_rb0.001-10_ib0.2-2_burden
+    # and stage_1_max_x pinned; the per-group band floors ONLY inhib_
+    # ethanol at 0.3x (others 0.2x), default name
+    # kin_opt_ethanol_isobutanol_metabolic_minimal_subset_irr_rb0.001-10_ibe0.3-2_burden
     # (no _x / _s1x tag). Its column set differs from every other study's,
     # so the CSV header guard refuses any cross-resume regardless.
     'metabolic_minimal_subset': dict(
         rate_params=METABOLIC_MINIMAL_SUBSET_RATES,
         parameter_groups=METABOLIC_MINIMAL_SUBSET_GROUPS,
-        group_multiplier_bounds=(0.2, 2.0),
+        group_multiplier_bounds={'inhib_ethanol': (0.3, 2.0)},
         exclude_params=(),
         spike_delta_bounds=None,
         stage_1_max_x_bounds=None,
@@ -1179,12 +1220,15 @@ EFFECTOR_ORDER = ('ethanol', 'isobutanol', 'acetate')
 
 def study_type_name_defaults(study_type):
     """The per-study_type defaults that ENTER THE STUDY NAME, as
-    dict(inhibition_multiplier_bounds=(lo, hi), exclude_params=(names),
-    stage_1_max_x_bounds=(lo, hi) or None):
-    the STUDY_TYPE_OPTIONS entry's group_multiplier_bounds, exclude_params
-    and stage_1_max_x_bounds when the type has them (metabolic_minimal:
-    (0.2, 2.0) and ('k_10', 'k_7', 'k_8'); metabolic_minimal_subset:
-    (0.2, 2.0), () and None = pinned), else
+    dict(inhibition_multiplier_bounds=(lo, hi) OR {group: (lo, hi)},
+    exclude_params=(names), stage_1_max_x_bounds=(lo, hi) or None):
+    the STUDY_TYPE_OPTIONS entry's group_multiplier_bounds (surfaced
+    verbatim through _as_group_multiplier_bounds, so a per-group dict is
+    preserved -- default_study_name's `_ib` tag understands both forms),
+    exclude_params and stage_1_max_x_bounds when the type has them
+    (metabolic_minimal: {'inhib_ethanol': (0.3, 2.0)} and
+    ('k_10', 'k_7', 'k_8'); metabolic_minimal_subset:
+    {'inhib_ethanol': (0.3, 2.0)}, () and None = pinned), else
     DEFAULT_SATURATION_MULTIPLIER_BOUNDS, DEFAULT_EXCLUDED_PARAMETERS and
     DEFAULT_STAGE_1_MAX_X_BOUNDS. resolve_study_preset builds its
     multiplier_bounds / exclude_params / stage_1_max_x_bounds from here
@@ -1199,7 +1243,7 @@ def study_type_name_defaults(study_type):
     stage_1_max_x_bounds = options.get('stage_1_max_x_bounds',
                                        DEFAULT_STAGE_1_MAX_X_BOUNDS)
     return dict(
-        inhibition_multiplier_bounds=tuple(options.get(
+        inhibition_multiplier_bounds=_as_group_multiplier_bounds(options.get(
             'group_multiplier_bounds', DEFAULT_SATURATION_MULTIPLIER_BOUNDS)),
         exclude_params=tuple(options.get('exclude_params',
                                          DEFAULT_EXCLUDED_PARAMETERS)),
@@ -1366,10 +1410,22 @@ def resolve_study_preset(study_target_products, study_type, roles=None,
         parameter_groups = {f'inhib_{effector}': members
                             for effector, members in families.items()
                             if members}
+    # multiplier_bounds is the (lo, hi) SATURATION band for individually
+    # sampled inhibition coefficients / K_* terms and MUST stay a plain
+    # tuple (build_search_space unpacks it unconditionally). Under a
+    # grouped preset whose per-effector band is a dict, every inhibition
+    # coefficient is sampled through its group (none individually), so
+    # multiplier_bounds is inert -- fall back to the default group band
+    # tuple. group_multiplier_bounds passes through with its dict/tuple
+    # form intact (build_search_space and default_study_name handle both).
+    inhib_name_default = name_defaults['inhibition_multiplier_bounds']
+    multiplier_bounds = (DEFAULT_GROUP_MULTIPLIER_BOUNDS
+                         if isinstance(inhib_name_default, dict)
+                         else inhib_name_default)
     return dict(scenario=target['scenario'],
                 kinetic_bounds_scenario=set_scenario,
                 include_params=include_params,
-                multiplier_bounds=name_defaults['inhibition_multiplier_bounds'],
+                multiplier_bounds=multiplier_bounds,
                 rate_multiplier_bounds=DEFAULT_RATE_MULTIPLIER_BOUNDS,
                 rate_params=rate_constant_names(workbook_rows, roles=roles),
                 parameter_multiplier_bounds=dict(
@@ -1377,8 +1433,9 @@ def resolve_study_preset(study_target_products, study_type, roles=None,
                 exclude_params=name_defaults['exclude_params'],
                 stage_1_max_x_bounds=name_defaults['stage_1_max_x_bounds'],
                 parameter_groups=parameter_groups,
-                group_multiplier_bounds=tuple(options.get(
-                    'group_multiplier_bounds', DEFAULT_GROUP_MULTIPLIER_BOUNDS)),
+                group_multiplier_bounds=_as_group_multiplier_bounds(
+                    options.get('group_multiplier_bounds',
+                                DEFAULT_GROUP_MULTIPLIER_BOUNDS)),
                 spike_delta_bounds=options.get('spike_delta_bounds',
                                                DEFAULT_SPIKE_DELTA_BOUNDS))
 
@@ -1430,6 +1487,43 @@ def check_method_kwargs(method, *, enqueue_knockouts=False, seed_from=None,
             f'startup_sampling={startup_sampling!r} (the burden / volume '
             'checks still prune INFEASIBLE proposals before simulating).')
 
+def _inhibition_bounds_tag(inhibition_multiplier_bounds):
+    """The `_ib...` study-name fragment for default_study_name's
+    `inhibition_multiplier_bounds`, which is polymorphic:
+
+    - a (lo, hi) tuple (one band for every inhibition entry) ->
+      `_ib{lo:g}-{hi:g}` (the historical form, unchanged).
+    - a {group_name: (lo, hi)} dict of per-effector-family bands ->
+      `_ib` followed, in EFFECTOR_ORDER, by `{code}{lo:g}-{hi:g}` for each
+      group whose band DIFFERS from DEFAULT_GROUP_MULTIPLIER_BOUNDS, where
+      `code` is the effector's first letter (group `inhib_{effector}`;
+      inhib_ethanol -> 'e', inhib_isobutanol -> 'i', inhib_acetate ->
+      'a'; derived from EFFECTOR_ORDER). A group absent from the dict
+      (or equal to the default) is at the default band and is not tagged;
+      a dict with NO differing group collapses to the all-default
+      `_ib{lo:g}-{hi:g}` (identical to the all-default tuple). So
+      {'inhib_ethanol': (0.3, 2.0)} -> `_ibe0.3-2`.
+
+    A distinct fragment for a distinct sampled band is what keeps the CSV
+    header guard from letting a 0.3-floored study resume an old 0.2
+    study (same columns)."""
+    if not isinstance(inhibition_multiplier_bounds, dict):
+        lo, hi = inhibition_multiplier_bounds
+        return f'_ib{lo:g}-{hi:g}'
+    d_lo, d_hi = DEFAULT_GROUP_MULTIPLIER_BOUNDS
+    parts = []
+    for effector in EFFECTOR_ORDER:
+        band = inhibition_multiplier_bounds.get(f'inhib_{effector}')
+        if band is None:
+            continue
+        lo, hi = band
+        if (lo, hi) == (d_lo, d_hi):
+            continue
+        parts.append(f'{effector[0]}{lo:g}-{hi:g}')
+    if not parts:
+        return f'_ib{d_lo:g}-{d_hi:g}'
+    return '_ib' + ''.join(parts)
+
 def default_study_name(objective, study_target_products, study_type,
                        scenario=None, kinetic_bounds_scenario=None,
                        burden=False, rate_multiplier_bounds=None,
@@ -1475,15 +1569,23 @@ def default_study_name(objective, study_target_products, study_type,
     part of the preset's identity and are NOT tagged.
 
     `inhibition_multiplier_bounds` (the band of the inhibition
-    coefficients k_*i*, (m_lo, m_hi) x baseline) tags the name
-    `_ib{m_lo:g}-{m_hi:g}` (e.g. `_ib0.1-10`) WHENEVER it is given,
-    after `_rb`: since 2026-09-06 the presets assign bands by role
-    (rate constants alone on the k_* band; inhibition coefficients on
-    the saturation band, `multiplier_bounds`), and the driver and
-    supervisor pass that band here on every preset-derived name, so a
-    role-band study never resumes the CSV/SQLite of a study started
-    under the old prefix rule (same columns, so the header guard cannot
-    tell them apart). None (older callers) leaves the name unchanged.
+    coefficients k_*i*, (m_lo, m_hi) x baseline) tags the name after
+    `_rb` WHENEVER it is given, via _inhibition_bounds_tag. It is
+    polymorphic: a (lo, hi) TUPLE (one band for every inhibition entry)
+    -> `_ib{m_lo:g}-{m_hi:g}` (e.g. `_ib0.1-10`); a
+    {group_name: (lo, hi)} DICT of per-effector-family GROUP bands ->
+    `_ib` then, in EFFECTOR_ORDER, `{effector_code}{lo:g}-{hi:g}` for
+    each group whose band differs from DEFAULT_GROUP_MULTIPLIER_BOUNDS
+    (so {'inhib_ethanol': (0.3, 2.0)} -> `_ibe0.3-2`; an all-default
+    dict collapses to `_ib{default}`). Since 2026-09-06 the presets
+    assign bands by role (rate constants alone on the k_* band;
+    inhibition coefficients on the saturation band, `multiplier_bounds`,
+    or -- under a grouped preset -- the per-group band), and the driver
+    and supervisor pass that band here on every preset-derived name, so
+    a role-band or per-group-floored study never resumes the CSV/SQLite
+    of a study started under the old prefix rule or a different band
+    (same columns, so the header guard cannot tell them apart). None
+    (older callers) leaves the name unchanged.
 
     `exclude_params` (the kinetic parameters kept OUT of the search
     space; the presets' DEFAULT_EXCLUDED_PARAMETERS, ('k_10',), since
@@ -1541,8 +1643,7 @@ def default_study_name(objective, study_target_products, study_type,
         lo, hi = rate_multiplier_bounds
         name += f'_rb{lo:g}-{hi:g}'
     if inhibition_multiplier_bounds is not None:
-        lo, hi = inhibition_multiplier_bounds
-        name += f'_ib{lo:g}-{hi:g}'
+        name += _inhibition_bounds_tag(inhibition_multiplier_bounds)
     name += excluded_parameters_tag(exclude_params)
     if stage_1_max_x_bounds is not None:
         lo, hi = stage_1_max_x_bounds

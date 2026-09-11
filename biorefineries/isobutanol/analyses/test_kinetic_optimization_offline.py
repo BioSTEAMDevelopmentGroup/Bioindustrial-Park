@@ -2947,21 +2947,23 @@ assert ko.EFFECTOR_ORDER == ('ethanol', 'isobutanol', 'acetate')
 assert ko.STUDY_TYPE_OPTIONS == {
     'metabolic_minimal': dict(exclude_params=('k_10', 'k_7', 'k_8'),
                               group_roles=('product_inhibition', 'lethality'),
-                              group_multiplier_bounds=(0.2, 2.0),
+                              group_multiplier_bounds={'inhib_ethanol': (0.3, 2.0)},
                               spike_delta_bounds=None),
     'metabolic_minimal_subset': dict(rate_params=ko.METABOLIC_MINIMAL_SUBSET_RATES,
                                      parameter_groups=ko.METABOLIC_MINIMAL_SUBSET_GROUPS,
-                                     group_multiplier_bounds=(0.2, 2.0),
+                                     group_multiplier_bounds={'inhib_ethanol': (0.3, 2.0)},
                                      exclude_params=(),
                                      spike_delta_bounds=None,
                                      stage_1_max_x_bounds=None)}
 assert {'STUDY_TYPE_OPTIONS', 'EFFECTOR_ORDER', 'kinetic_parameter_effectors',
         'study_type_name_defaults'} <= set(ko.__all__)
 # Naming defaults per study type (workbook-free): the minimal type's group
-# band stands in for the inhibition band (_ib0.2-2) and its exclusion set
-# is k_10 + k_7 + k_8; every other type keeps the module defaults.
+# band (a per-effector-family dict flooring inhib_ethanol at 0.3x) stands
+# in for the inhibition band (_ibe0.3-2) and its exclusion set is
+# k_10 + k_7 + k_8; every other type keeps the module defaults.
 assert ko.study_type_name_defaults('metabolic_minimal') == dict(
-    inhibition_multiplier_bounds=(0.2, 2.0), exclude_params=('k_10', 'k_7', 'k_8'),
+    inhibition_multiplier_bounds={'inhib_ethanol': (0.3, 2.0)},
+    exclude_params=('k_10', 'k_7', 'k_8'),
     stage_1_max_x_bounds=(1.0, 50.0))
 for st43 in ('metabolic', 'metabolic_protein'):
     assert ko.study_type_name_defaults(st43) == dict(
@@ -2975,10 +2977,10 @@ except ValueError as e43:
 else:
     raise AssertionError('unknown study_type did not raise')
 NAME43 = ('kin_opt_ethanol_isobutanol_metabolic_minimal_irr'
-          '_rb0.001-10_ib0.2-2_xk10+k7+k8_s1x1-50_burden')
+          '_rb0.001-10_ibe0.3-2_xk10+k7+k8_s1x1-50_burden')
 assert ko.default_study_name('IRR', 'ethanol_isobutanol', 'metabolic_minimal',
                              rate_multiplier_bounds=(1e-3, 10.0),
-                             inhibition_multiplier_bounds=(0.2, 2.0),
+                             inhibition_multiplier_bounds={'inhib_ethanol': (0.3, 2.0)},
                              exclude_params=('k_10', 'k_7', 'k_8'),
                              stage_1_max_x_bounds=(1.0, 50.0), burden=True) == NAME43
 # Driver: the three new keys are setdefault'ed like the others and the
@@ -3012,7 +3014,7 @@ assert sup43['default_study_name'](None, 'IRR', None,
                                    study_target_products='ethanol_isobutanol',
                                    study_type='metabolic_minimal', burden=True,
                                    exclude_params=('k_10',)) \
-    == 'kin_opt_ethanol_isobutanol_metabolic_minimal_irr_rb0.001-10_ib0.2-2_xk10_s1x1-50_burden'
+    == 'kin_opt_ethanol_isobutanol_metabolic_minimal_irr_rb0.001-10_ibe0.3-2_xk10_s1x1-50_burden'
 assert sup43['default_study_name'](None, 'IRR', None,
                                    study_target_products='ethanol_isobutanol',
                                    study_type='metabolic_protein', burden=True) \
@@ -3036,8 +3038,11 @@ if os.path.isfile(wb_A) and os.path.isfile(wb_B):
     p43 = ko.resolve_study_preset('ethanol_isobutanol', 'metabolic_minimal')
     assert p43['scenario'] == 'A' and p43['kinetic_bounds_scenario'] == 'B'
     assert p43['exclude_params'] == ('k_10', 'k_7', 'k_8')
-    assert p43['multiplier_bounds'] == (0.2, 2.0)             # -> the _ib0.2-2 tag
-    assert p43['group_multiplier_bounds'] == (0.2, 2.0)
+    # multiplier_bounds is the inert saturation-band tuple for a grouped
+    # preset (every inhibition coefficient is grouped); the _ib tag comes
+    # from the per-group dict below (-> _ibe0.3-2), not from this.
+    assert p43['multiplier_bounds'] == (0.2, 2.0)
+    assert p43['group_multiplier_bounds'] == {'inhib_ethanol': (0.3, 2.0)}
     assert p43['spike_delta_bounds'] is None
     assert p43['rate_multiplier_bounds'] == ko.DEFAULT_RATE_MULTIPLIER_BOUNDS
     assert p43['parameter_multiplier_bounds'] == {'k_10': (0.1, 10.0)}
@@ -3160,7 +3165,7 @@ if os.path.isfile(wb_A) and os.path.isfile(wb_B):
     assert _driver_name43('ethanol_isobutanol', 'metabolic_protein',
                           group_multiplier_bounds=(0.5, 3.0)) \
         == _driver_name43('ethanol_isobutanol', 'metabolic_protein')
-    PASS('metabolic_minimal preset: 3 effector groups (5/5/6) + 17 rates + 4 = 24 and the ethanol_only space built too (2 groups + 13 + 4 = 19, no spike_delta), K_* out, spike pinned, _ib0.2-2 / _xk10+k7+k8 naming via study_type_name_defaults (the _ib tag reads the GROUP band under a grouped preset, so an explicit 0.5-3 renames the study), effector table by file path, existing presets untouched')
+    PASS('metabolic_minimal preset: 3 effector groups (5/5/6) + 17 rates + 4 = 24 and the ethanol_only space built too (2 groups + 13 + 4 = 19, no spike_delta), K_* out, spike pinned, _ibe0.3-2 / _xk10+k7+k8 naming via study_type_name_defaults (the _ib tag reads the per-group GROUP band under a grouped preset -- inhib_ethanol floored at 0.3 -- so an explicit 0.5-3 renames the study), effector table by file path, existing presets untouched')
 else:
     print('SKIP 43 (preset part): parameter-distribution workbooks not found')
     PASS('metabolic_minimal naming + effector table (workbook-free part)')
@@ -3487,14 +3492,15 @@ assert ko.STUDY_TYPE_ROLES['metabolic_minimal_subset'] == ()       # no role fil
 opt45 = ko.STUDY_TYPE_OPTIONS['metabolic_minimal_subset']
 assert opt45 == dict(rate_params=ko.METABOLIC_MINIMAL_SUBSET_RATES,
                      parameter_groups=ko.METABOLIC_MINIMAL_SUBSET_GROUPS,
-                     group_multiplier_bounds=(0.2, 2.0), exclude_params=(),
+                     group_multiplier_bounds={'inhib_ethanol': (0.3, 2.0)},
+                     exclude_params=(),
                      spike_delta_bounds=None, stage_1_max_x_bounds=None)
 assert 'group_roles' not in opt45                                   # explicit, not role-grouped
 # Name defaults: the subset pins stage_1_max_x (None -> no _s1x tag), has
 # no exclusions (no _x tag) and reports the group band as the inhibition
 # band; the three older types keep the default (1, 50) g/L band.
 assert ko.study_type_name_defaults('metabolic_minimal_subset') == dict(
-    inhibition_multiplier_bounds=(0.2, 2.0), exclude_params=(),
+    inhibition_multiplier_bounds={'inhib_ethanol': (0.3, 2.0)}, exclude_params=(),
     stage_1_max_x_bounds=None)
 for st45 in ('metabolic', 'metabolic_protein', 'metabolic_minimal'):
     assert ko.study_type_name_defaults(st45)['stage_1_max_x_bounds'] == (1.0, 50.0), st45
@@ -3504,10 +3510,10 @@ for st45 in ('metabolic', 'metabolic_protein', 'metabolic_minimal'):
 # _UNSET -> the type's name default, no longer the hard-coded (1, 50))
 # agree; an EXPLICIT --stage-1-max-x-bounds is still tagged; NAME43 and
 # the metabolic_protein default are untouched.
-NAME45 = 'kin_opt_ethanol_isobutanol_metabolic_minimal_subset_irr_rb0.001-10_ib0.2-2_burden'
+NAME45 = 'kin_opt_ethanol_isobutanol_metabolic_minimal_subset_irr_rb0.001-10_ibe0.3-2_burden'
 assert ko.default_study_name('IRR', 'ethanol_isobutanol', 'metabolic_minimal_subset',
                              rate_multiplier_bounds=(1e-3, 10.0),
-                             inhibition_multiplier_bounds=(0.2, 2.0),
+                             inhibition_multiplier_bounds={'inhib_ethanol': (0.3, 2.0)},
                              exclude_params=(), stage_1_max_x_bounds=None,
                              burden=True) == NAME45
 assert sup43['default_study_name'](None, 'IRR', None,
@@ -3540,7 +3546,7 @@ assert 'metabolic_minimal_subset' in src43_sup
 # results dir stays under Windows' 260-character limit (long paths are
 # disabled on this machine; the mechanical _x tag of an exclusion-based
 # definition would have reached 271).
-assert len(NAME45) == 81, len(NAME45)
+assert len(NAME45) == 82, len(NAME45)   # _ibe0.3-2 (per-group tag) is one char over _ib0.2-2
 if os.path.isfile(wb_A) and os.path.isfile(wb_B):
     p45 = ko.resolve_study_preset('ethanol_isobutanol', 'metabolic_minimal_subset')
     assert p45['stage_1_max_x_bounds'] is None
@@ -3561,8 +3567,10 @@ if os.path.isfile(wb_A) and os.path.isfile(wb_B):
         g: list(ms) for g, ms in ko.METABOLIC_MINIMAL_SUBSET_GROUPS.items()}
     assert list(p45['parameter_groups']) == ['inhib_ethanol', 'inhib_isobutanol', 'inhib_acetate']
     assert p45['exclude_params'] == ()
-    assert p45['multiplier_bounds'] == (0.2, 2.0)              # -> the _ib0.2-2 tag
-    assert p45['group_multiplier_bounds'] == (0.2, 2.0)
+    # multiplier_bounds is the inert saturation-band tuple (all inhibition
+    # coefficients are grouped); the _ib tag comes from the per-group dict.
+    assert p45['multiplier_bounds'] == (0.2, 2.0)
+    assert p45['group_multiplier_bounds'] == {'inhib_ethanol': (0.3, 2.0)}
     assert p45['spike_delta_bounds'] is None
     assert p45['stage_1_max_x_bounds'] is None
     assert p45['rate_multiplier_bounds'] == ko.DEFAULT_RATE_MULTIPLIER_BOUNDS
@@ -3597,8 +3605,11 @@ if os.path.isfile(wb_A) and os.path.isfile(wb_B):
     assert 'spike_delta' not in space45 and 'stage_1_max_x' not in space45
     for r45 in ko.METABOLIC_MINIMAL_SUBSET_RATES:
         assert space45[r45] == dict(low=1e-3*kb45[r45], high=10.0*kb45[r45], log=True), r45
+    # The per-group band floors ONLY inhib_ethanol at 0.3x; the other two
+    # families keep the 0.2x default (group_bounds_for on the dict).
     for g45 in ko.METABOLIC_MINIMAL_SUBSET_GROUPS:
-        assert space45[g45] == dict(low=0.2, high=2.0, log=True), g45
+        lo45 = 0.3 if g45 == 'inhib_ethanol' else 0.2
+        assert space45[g45] == dict(low=lo45, high=2.0, log=True), g45
     grouped45 = {m for ms in p45['parameter_groups'].values() for m in ms}
     assert set(excl45) == set(kb45) - set(ko.METABOLIC_MINIMAL_SUBSET_RATES) - grouped45
     assert 'k_10' in excl45 and 'k_7' in excl45 and 'k_2' in excl45     # not in the set: at baseline
@@ -4725,7 +4736,7 @@ assert sup70['default_study_name'](None, 'IRR', None,
                                    study_target_products='ethanol_isobutanol',
                                    study_type='metabolic_minimal_subset',
                                    burden=True, method='dual_annealing') == \
-    'kin_opt_ethanol_isobutanol_metabolic_minimal_subset_irr_da_rb0.001-10_ib0.2-2_burden'
+    'kin_opt_ethanol_isobutanol_metabolic_minimal_subset_irr_da_rb0.001-10_ibe0.3-2_burden'
 assert sup70['default_study_name']('A', 'IRR', 'B', burden=True,
                                    method='dual_annealing') == 'kin_opt_A_kbB_irr_da_burden'
 assert sup70['default_study_name']('B', 'IBO titer', None,
@@ -4796,5 +4807,85 @@ assert "record_seed_used(ctx.csv_path, method='dual_annealing'" in _daeng71
 assert ko.record_seed_used(os.path.join(_td71, 'gone', 'x_trajectory.csv'),
                            method='tpe', seed=1, n_done=0) is None
 PASS('seed sidecar: record_seed_used appends <study>_seeds.txt; both engines log the resolved base seed; best-effort on I/O error')
+
+#%% 72. Per-group group_multiplier_bounds (2026-09-11): a {group: (lo, hi)}
+# dict floors ONLY inhib_ethanol at 0.3x in the metabolic_minimal /
+# metabolic_minimal_subset presets, leaving inhib_isobutanol / inhib_acetate
+# at 0.2x; a plain (lo, hi) tuple still applies to every group (backward
+# compat); default_study_name renders the dict as the effector-coded _ibe0.3-2
+# tag (in EFFECTOR_ORDER) so a 0.3-floored study never resumes an old 0.2
+# study; the group_bounds_for helper normalizes and validates both forms.
+assert 'group_bounds_for' in ko.__all__
+# group_bounds_for: dict lookup, missing-group fallback to the default,
+# tuple broadcast, float return, and 0 < lo < hi validation.
+assert ko.group_bounds_for('inhib_ethanol', {'inhib_ethanol': (0.3, 2.0)}) == (0.3, 2.0)
+assert ko.group_bounds_for('inhib_acetate', {'inhib_ethanol': (0.3, 2.0)}) \
+    == ko.DEFAULT_GROUP_MULTIPLIER_BOUNDS                       # absent -> default (0.2, 2.0)
+assert ko.group_bounds_for('anything', (0.5, 3.0)) == (0.5, 3.0)   # tuple broadcasts to every group
+_lo72, _hi72 = ko.group_bounds_for('inhib_ethanol', {'inhib_ethanol': (0.3, 2.0)})
+assert isinstance(_lo72, float) and isinstance(_hi72, float)
+for bad72 in ((0.0, 2.0), (-1.0, 2.0), (2.0, 0.2), (1.0, 1.0)):
+    try:
+        ko.group_bounds_for('g', bad72)                        # tuple form
+    except ValueError as e72:
+        assert 'group_multiplier_bounds' in str(e72)
+    else:
+        raise AssertionError(f'group_bounds_for accepted bad tuple {bad72}')
+    try:
+        ko.group_bounds_for('g', {'g': bad72})                 # dict form, offending group
+    except ValueError as e72:
+        assert 'group_multiplier_bounds' in str(e72)
+    else:
+        raise AssertionError(f'group_bounds_for accepted bad dict band {bad72}')
+# ... a bad band for a DIFFERENT group is never resolved (fallback is valid).
+assert ko.group_bounds_for('other', {'g': (2.0, 0.2)}) == ko.DEFAULT_GROUP_MULTIPLIER_BOUNDS
+# build_search_space: the dict floors inhib_ethanol at 0.3, others at 0.2.
+_members72 = [m for ms in ko.METABOLIC_MINIMAL_SUBSET_GROUPS.values() for m in ms]
+kb72 = {'k_1e': 47.1, **{m: 0.05 for m in _members72}}
+groups72 = {g: list(ms) for g, ms in ko.METABOLIC_MINIMAL_SUBSET_GROUPS.items()}
+space72, _ = ko.build_search_space(
+    kb72, parameter_groups=groups72,
+    group_multiplier_bounds={'inhib_ethanol': (0.3, 2.0)})
+assert space72['inhib_ethanol'] == dict(low=0.3, high=2.0, log=True)
+assert space72['inhib_isobutanol'] == dict(low=0.2, high=2.0, log=True)
+assert space72['inhib_acetate'] == dict(low=0.2, high=2.0, log=True)
+# backward compat: a plain (0.2, 2.0) tuple floors all three at 0.2.
+space72t, _ = ko.build_search_space(
+    kb72, parameter_groups=groups72, group_multiplier_bounds=(0.2, 2.0))
+for g72 in groups72:
+    assert space72t[g72] == dict(low=0.2, high=2.0, log=True), g72
+# default_study_name: dict -> _ibe0.3-2, tuple -> _ib0.2-2, all-default dict
+# -> _ib0.2-2; a multi-group dict codes each differing group in EFFECTOR_ORDER.
+def _name72(ib):
+    return ko.default_study_name(
+        'IRR', 'ethanol_isobutanol', 'metabolic_minimal_subset',
+        rate_multiplier_bounds=(1e-3, 10.0), inhibition_multiplier_bounds=ib,
+        exclude_params=(), stage_1_max_x_bounds=None, burden=True)
+assert _name72({'inhib_ethanol': (0.3, 2.0)}).endswith('_ibe0.3-2_burden')
+assert _name72((0.2, 2.0)).endswith('_ib0.2-2_burden')
+assert _name72({'inhib_isobutanol': (0.2, 2.0)}) == _name72((0.2, 2.0))   # all-default dict collapses
+# EFFECTOR_ORDER (ethanol, isobutanol, acetate); codes are the effector's
+# first letter, derived from EFFECTOR_ORDER (not a hard-coded map).
+assert '_ibe0.3-2a0.5-3_' in _name72({'inhib_acetate': (0.5, 3.0),
+                                      'inhib_ethanol': (0.3, 2.0)})
+# resolve_study_preset: both grouped presets carry the per-group dict and
+# derive a name with the distinct _ibe0.3-2 tag (never _ib0.2-2).
+if os.path.isfile(wb_A) and os.path.isfile(wb_B):
+    for st72 in ('metabolic_minimal', 'metabolic_minimal_subset'):
+        for tp72 in ('ethanol_isobutanol', 'ethanol_only'):
+            pp72 = ko.resolve_study_preset(tp72, st72)
+            assert pp72['group_multiplier_bounds'] == {'inhib_ethanol': (0.3, 2.0)}, (tp72, st72)
+            assert isinstance(pp72['multiplier_bounds'], tuple)      # stays a plain tuple
+            nm72 = ko.default_study_name(
+                'IRR', tp72, st72, scenario=pp72['scenario'],
+                kinetic_bounds_scenario=pp72['kinetic_bounds_scenario'], burden=True,
+                rate_multiplier_bounds=pp72['rate_multiplier_bounds'],
+                inhibition_multiplier_bounds=pp72['group_multiplier_bounds'],
+                exclude_params=pp72['exclude_params'],
+                stage_1_max_x_bounds=pp72['stage_1_max_x_bounds'])
+            assert '_ibe0.3-2' in nm72 and '_ib0.2-2' not in nm72, (tp72, st72, nm72)
+else:
+    print('SKIP 72 (preset part): parameter-distribution workbooks not found')
+PASS('per-group group_multiplier_bounds: {inhib_ethanol: (0.3, 2.0)} floors only inhib_ethanol at 0.3 (others 0.2), tuple still broadcasts, group_bounds_for normalizes/validates both forms, default_study_name renders _ibe0.3-2 (EFFECTOR_ORDER codes) vs _ib0.2-2, both minimal presets carry the dict + distinct name tag')
 
 print(f'\nALL {n_pass} CHECKS PASSED')
