@@ -4768,4 +4768,33 @@ assert 'choices=ko.OPTIMIZATION_METHODS' in cli70
 assert 'method=args.method' in cli70 and 'annealing_kwargs=annealing_kwargs' in cli70
 PASS('supervisor: --method + annealing flags -> default_study_name(_da) / child_code(method=, annealing_kwargs=) / supervise()')
 
+#%% 71. Seed sidecar: record_seed_used appends the resolved base seed to a
+# <study>_seeds.txt file beside the trajectory CSV (the seed is NOT part of
+# the resume-stable study name, so it is recorded in the outputs this way; a
+# supervised study relaunched after a crash/stall appends one line per
+# per-attempt seed). Both engines call it right after resolving the seed.
+assert ko.seed_sidecar_path('a/b/study_trajectory.csv') == 'a/b/study_seeds.txt'
+assert ko.seed_sidecar_path('x/plain.csv') == 'x/plain_seeds.txt'
+assert ko.seed_sidecar_path('x/other.txt') == 'x/other.txt_seeds.txt'  # fallback appends
+assert ko.seed_sidecar_path('') is None and ko.seed_sidecar_path(None) is None
+with tempfile.TemporaryDirectory() as _td71:
+    _csv71 = os.path.join(_td71, 'kin_opt_demo_da_trajectory.csv')
+    _side71 = os.path.join(_td71, 'kin_opt_demo_da_seeds.txt')
+    _p71 = ko.record_seed_used(_csv71, method='dual_annealing', seed=12345, n_done=0)
+    assert _p71 == _side71 and os.path.isfile(_side71)
+    ko.record_seed_used(_csv71, method='dual_annealing', seed=67890, n_done=37)
+    _lines71 = open(_side71, encoding='utf-8').read().splitlines()
+    assert len(_lines71) == 2                       # appends, never overwrites
+    assert 'seed=12345' in _lines71[0] and 'method=dual_annealing' in _lines71[0]
+    assert 'seed=67890' in _lines71[1] and 'n_stored_at_launch=37' in _lines71[1]
+_koeng71 = _inspect.getsource(ko.run_kinetic_optimization)
+_daeng71 = _inspect.getsource(ko.run_kinetic_dual_annealing)
+assert "record_seed_used(csv_path, method='tpe'" in _koeng71
+assert "record_seed_used(ctx.csv_path, method='dual_annealing'" in _daeng71
+# best-effort: an unwritable path is swallowed (never aborts an optimization);
+# _td71 is now removed, so a path under it raises OSError inside the helper
+assert ko.record_seed_used(os.path.join(_td71, 'gone', 'x_trajectory.csv'),
+                           method='tpe', seed=1, n_done=0) is None
+PASS('seed sidecar: record_seed_used appends <study>_seeds.txt; both engines log the resolved base seed; best-effort on I/O error')
+
 print(f'\nALL {n_pass} CHECKS PASSED')

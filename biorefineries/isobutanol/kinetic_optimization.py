@@ -95,6 +95,7 @@ __all__ = ('OBJECTIVE_REGISTRY', 'TRACKED_METRICS',
            'feasible_candidate_mask', 'feasible_tpe_sampler',
            'DEFAULT_GAMMA_FRACTION', 'DEFAULT_GAMMA_CAP', 'default_tpe_gamma',
            'default_seed_from_datetime',
+           'seed_sidecar_path', 'record_seed_used',
            'unit_to_internal', 'unit_to_external', 'external_to_unit',
            'PENALTY_ENERGY', 'resolve_energy_scale', 'annealing_energy',
            'SIMULATED_STATES', 'trajectory_resume_state', 'AnnealingResult',
@@ -2670,6 +2671,45 @@ def default_seed_from_datetime(when=None):
             * (when.hour + 1) * (when.minute + 1))
     return int(seed)
 
+
+def seed_sidecar_path(csv_path):
+    """The `<study>_seeds.txt` sidecar path for a trajectory-CSV path
+    (`…_trajectory.csv` -> `…_seeds.txt`, else a `.csv` suffix is replaced,
+    else `_seeds.txt` is appended); None if `csv_path` is falsy. Keeps the
+    seed log beside the study's other outputs (see record_seed_used)."""
+    if not csv_path:
+        return None
+    path = str(csv_path)
+    suffix = '_trajectory.csv'
+    if path.endswith(suffix):
+        return path[:-len(suffix)] + '_seeds.txt'
+    if path.lower().endswith('.csv'):
+        return path[:-4] + '_seeds.txt'
+    return path + '_seeds.txt'
+
+
+def record_seed_used(csv_path, *, method, seed, n_done):
+    """Append this launch attempt's resolved base seed to the study's
+    `<study>_seeds.txt` sidecar (beside the trajectory CSV), so every run's
+    seed is recorded in the outputs even though the seed is deliberately NOT
+    part of the resume-stable study name -- and a supervised study relaunched
+    after a crash/stall legitimately uses several per-attempt seeds, one
+    tab-separated line each (timestamp, method, seed, trials stored at launch).
+    Best-effort: any I/O error is swallowed, since a seed-logging failure must
+    never abort an optimization. Returns the sidecar path written, else None."""
+    path = seed_sidecar_path(csv_path)
+    if path is None:
+        return None
+    when = datetime.datetime.now().isoformat(timespec='seconds')
+    line = (f'{when}\tmethod={method}\tseed={seed}\t'
+            f'n_stored_at_launch={n_done}\n')
+    try:
+        with open(path, 'a', encoding='utf-8') as f:
+            f.write(line)
+    except OSError:
+        return None
+    return path
+
 #%% Engine
 
 def get_handles():
@@ -3491,6 +3531,7 @@ def run_kinetic_optimization(objective='IRR',
         seed = default_seed_from_datetime()
         print(f'Default sampler seed from the launch datetime: {seed} '
               '((year/day**2)*month*(hour+1)*(minute+1)).')
+    record_seed_used(csv_path, method='tpe', seed=seed, n_done=n_done)
     # Offset the seed by the number of stored trials so a resumed study
     # draws fresh points instead of replaying the original RNG stream.
     # <= 0 feasible; optuna evaluates it for COMPLETE and PRUNED trials
@@ -3876,6 +3917,8 @@ def run_kinetic_dual_annealing(objective='IRR',
         seed = default_seed_from_datetime()
         print(f'Default annealing seed from the launch datetime: {seed} '
               '((year/day**2)*month*(hour+1)*(minute+1)).')
+    record_seed_used(ctx.csv_path, method='dual_annealing', seed=seed,
+                     n_done=n_done_sim)
     print(f'Dual annealing over the {len(names)}-dimensional unit cube: '
           f'{ctx.objective_name} ({direction}), energy = '
           f'{"-" if direction == "maximize" else "+"}objective/{energy_scale:g}, '
