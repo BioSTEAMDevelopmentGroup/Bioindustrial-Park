@@ -4807,7 +4807,7 @@ with tempfile.TemporaryDirectory() as _td71:
     assert 'seed=67890' in _lines71[1] and 'n_stored_at_launch=37' in _lines71[1]
 _koeng71 = _inspect.getsource(ko.run_kinetic_optimization)
 _daeng71 = _inspect.getsource(ko.run_kinetic_dual_annealing)
-assert "record_seed_used(csv_path, method='tpe'" in _koeng71
+assert "record_seed_used(csv_path, method=method" in _koeng71
 assert "record_seed_used(ctx.csv_path, method='dual_annealing'" in _daeng71
 # best-effort: an unwritable path is swallowed (never aborts an optimization);
 # _td71 is now removed, so a path under it raises OSError inside the helper
@@ -5330,5 +5330,146 @@ else:
     PASS('FeasibleGPSampler fallbacks: never-accepting predicate returns raw draws / '
          'raw proposals with exact counters (no crash); optuna COMPLETE-only gate {} '
          'replaced by a joint uniform-feasible draw (n_uniform_fallbacks)')
+
+#%% 79. Engine method='gp' (GP spec §3): the derived legacy name carries `_gp`
+# (kin_opt_X_irr_gp), the seeds sidecar logs method=gp, the sampler is a
+# FeasibleGPSampler with the GP start-up rule max(10, 2*d) (explicit value
+# honoured), the LHS design is consumed on the None-predicate path (no cap
+# active -> no predicate, learned constraints inert); under an ACTIVE cap
+# (volume on) the predicate is installed and learned_constraints on/off maps
+# to study.sampler._constraints_func; feasible_sampling=False keeps the LHS
+# start-up with no predicate; a study whose stored trials carry no constraint
+# values cannot switch learned constraints ON (engine falls back, prints);
+# the >15-dimension guard raises before any store/CSV exists while TPE runs
+# the same space; bad method / gp_kwargs under tpe / unknown key raise.
+if _optuna is None:
+    print('SKIP 79: optuna not installed')
+else:
+    _optuna.logging.set_verbosity(_optuna.logging.WARNING)
+    outdir79 = tempfile.mkdtemp()
+    common79 = dict(objective='IRR', scenario_label='X', seed=1,
+                    results_dir=outdir79, handles=handles30,
+                    print_status_every=10, burden_model=None,
+                    enqueue_knockouts=False, volume_feasibility=False)
+    buf79 = _io.StringIO()
+    with _contextlib.redirect_stdout(buf79):
+        st79, csv79, _ = ko.run_kinetic_optimization(method='gp', n_trials=8,
+                                                     **common79)
+    out79 = buf79.getvalue()
+    assert os.path.basename(csv79) == 'kin_opt_X_irr_gp_trajectory.csv', csv79
+    assert st79.study_name == 'kin_opt_X_irr_gp'
+    assert type(st79.sampler).__name__ == 'FeasibleGPSampler'
+    d79 = len(st79.trials[0].params)               # 3 kinetic + 4 feeding
+    assert d79 == 7, d79
+    assert st79.sampler._n_startup_trials == max(10, 2*d79) == 14
+    assert 'GP random start-up: 14 trials (GP default rule max(10, 2*d))' in out79, out79
+    assert 'Sampler: Gaussian process (FeasibleGPSampler' in out79, out79
+    assert 'TPE gamma' not in out79
+    assert 'GP sampling: rejected' in out79                   # end-of-run counters
+    assert st79.sampler._is_feasible is None                  # no cap -> no predicate
+    assert st79.sampler._constraints_func is None             # no cap -> learned inert
+    assert st79.sampler._lhs_design is not None               # LHS start-up kept
+    df79 = ko.load_trajectory(csv79)
+    assert len(df79) == 8 and df79['state'].tolist() == ['COMPLETE']*8
+    # the 8 start-up trials ARE the LHS design rows (lhs_seed = base seed 1, 14 rows)
+    assert st79._storage.get_study_system_attrs(st79._study_id)['lhs_seed'] == 1
+    space79, _ = ko.build_search_space({'k_1e': 47.1, 'k_7': 1.203, 'K_1e': 0.12})
+    design79 = ko.LHSDesign(space79, 14, 1)
+    assert [t.params for t in st79.trials] == [design79.external_point(k) for k in range(8)]
+    # seeds sidecar logs method=gp
+    with open(ko.seed_sidecar_path(csv79), encoding='utf-8') as f79:
+        lines79 = f79.read().splitlines()
+    assert len(lines79) == 1 and '\tmethod=gp\t' in lines79[0] and 'seed=1' in lines79[0], lines79
+    # resume with an explicit start-up length (honoured) into the GP phase
+    buf79b = _io.StringIO()
+    with _contextlib.redirect_stdout(buf79b):
+        st79b, _, _ = ko.run_kinetic_optimization(method='gp', n_trials=12,
+                                                  n_startup_trials=8, **common79)
+    assert st79b.sampler._n_startup_trials == 8
+    assert 'GP random start-up: 8 trials (explicit)' in buf79b.getvalue()
+    assert len(ko.load_trajectory(csv79)) == 12
+    assert all(t.state == TS33.COMPLETE for t in st79b.trials[8:])   # GP-phase trials simulated
+    assert len(open(ko.seed_sidecar_path(csv79), encoding='utf-8').read().splitlines()) == 2
+    # ACTIVE cap (volume on, handles59 geometry): predicate installed, learned
+    # constraints wired by default, no INFEASIBLE row
+    outdir79c = tempfile.mkdtemp()
+    common79c = dict(objective='IRR', scenario_label='X', seed=1,
+                     results_dir=outdir79c, handles=handles59,
+                     print_status_every=10, burden_model=None,
+                     enqueue_knockouts=False, volume_feasibility=True,
+                     volume_cap=20.0)
+    st79c, csv79c, _ = ko.run_kinetic_optimization(method='gp', n_trials=4,
+                                                   n_startup_trials=3, **common79c)
+    assert callable(st79c.sampler._is_feasible)
+    assert st79c.sampler._constraints_func is not None
+    assert st79c.sampler._deterministic is False
+    assert st79c.sampler.n_fallback_candidates == 2048 and st79c.sampler.max_fallback_batches == 20
+    assert ko.load_trajectory(csv79c)['state'].tolist() == ['COMPLETE']*4
+    assert all('constraints' in t.system_attrs for t in st79c.trials)
+    # learned_constraints=False -> plain log-EI; deterministic + fallback knobs forwarded
+    st79d, _, _ = ko.run_kinetic_optimization(
+        method='gp', n_trials=4, n_startup_trials=3,
+        gp_kwargs={'learned_constraints': False, 'deterministic_objective': True,
+                   'n_fallback_candidates': 64, 'max_fallback_batches': 3},
+        **common79c)
+    assert st79d.sampler._constraints_func is None and st79d.sampler._deterministic is True
+    assert st79d.sampler.n_fallback_candidates == 64 and st79d.sampler.max_fallback_batches == 3
+    # feasible_sampling=False under an active cap: no predicate, LHS kept, learned still wired
+    st79e, _, _ = ko.run_kinetic_optimization(
+        method='gp', n_trials=3, n_startup_trials=3, feasible_sampling=False,
+        **dict(common79c, results_dir=tempfile.mkdtemp()))
+    assert st79e.sampler._is_feasible is None and st79e.sampler._lhs_design is not None
+    assert st79e.sampler._constraints_func is not None
+    # stored COMPLETE trials without constraint values: learned constraints
+    # cannot be switched ON later (optuna would raise on the constraint count)
+    common79f = dict(common79c, results_dir=tempfile.mkdtemp())
+    ko.run_kinetic_optimization(method='gp', n_trials=3, n_startup_trials=3,
+                                gp_kwargs={'learned_constraints': False}, **common79f)
+    buf79f = _io.StringIO()
+    with _contextlib.redirect_stdout(buf79f):
+        st79f, _, _ = ko.run_kinetic_optimization(method='gp', n_trials=5,
+                                                  n_startup_trials=3, **common79f)
+    assert st79f.sampler._constraints_func is None
+    assert 'continuing with learned_constraints=False' in buf79f.getvalue()
+    assert len(st79f.trials) == 5 and all(t.state == TS33.COMPLETE for t in st79f.trials)
+    # dimension guard: 12 kinetic + 4 feeding = 16 > GP_MAX_DIMENSIONS
+    class _FakeTE79:
+        def getGlobalParameterIds(self):
+            return [f'k_{i}' for i in range(1, 13)]
+    for i79 in range(1, 13):
+        setattr(_FakeTE79, f'k_{i79}', 1.0)
+    handles79g = dict(handles30, r_te=_FakeTE79())
+    outdir79g = tempfile.mkdtemp()
+    try:
+        ko.run_kinetic_optimization(method='gp', n_trials=2,
+                                    **dict(common79, handles=handles79g,
+                                           results_dir=outdir79g))
+    except ValueError as e79:
+        assert ('16' in str(e79) and '15' in str(e79)
+                and 'kin_opt_X_irr_gp' in str(e79)), str(e79)
+    else:
+        raise AssertionError('16-dimension GP study accepted')
+    assert not os.path.isfile(os.path.join(outdir79g, 'kin_opt_X_irr_gp.db'))
+    assert not os.path.isfile(os.path.join(outdir79g, 'kin_opt_X_irr_gp_trajectory.csv'))
+    st79t, csv79t, _ = ko.run_kinetic_optimization(
+        method='tpe', n_trials=1, n_startup_trials=1,
+        **dict(common79, handles=handles79g, results_dir=outdir79g))
+    assert os.path.basename(csv79t) == 'kin_opt_X_irr_trajectory.csv'      # TPE: no limit, no tag
+    assert type(st79t.sampler).__name__ != 'FeasibleGPSampler'
+    # guards
+    for bad79 in (dict(method='dual_annealing'), dict(method='bogus'),
+                  dict(method='tpe', gp_kwargs={'learned_constraints': False}),
+                  dict(method='gp', gp_kwargs={'bogus': 1})):
+        try:
+            ko.run_kinetic_optimization(n_trials=1, **bad79,
+                                        **dict(common79, results_dir=tempfile.mkdtemp()))
+        except ValueError as e79:
+            assert 'method' in str(e79) or 'gp_kwargs' in str(e79) or 'bogus' in str(e79), str(e79)
+        else:
+            raise AssertionError(f'run_kinetic_optimization accepted {bad79}')
+    PASS('engine method=gp: _gp legacy name, seeds sidecar method=gp, FeasibleGPSampler '
+         'with max(10, 2*d) start-up + LHS rows, predicate / learned constraints wired '
+         'under an active cap (toggle, deterministic, fallback knobs), feasible_sampling=False '
+         'path, learned-on-after-off fallback, 16-dim guard before any store, bad-kwarg guards')
 
 print(f'\nALL {n_pass} CHECKS PASSED')

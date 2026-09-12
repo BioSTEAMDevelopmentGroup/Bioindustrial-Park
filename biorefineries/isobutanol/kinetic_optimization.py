@@ -3701,6 +3701,8 @@ def run_kinetic_optimization(objective='IRR',
                              seed_from=None,
                              parameter_groups=None,
                              group_multiplier_bounds=DEFAULT_GROUP_MULTIPLIER_BOUNDS,
+                             method='tpe',
+                             gp_kwargs=None,
                              ):
     """Run the Bayesian optimization. `objective` is a name in
     OBJECTIVE_REGISTRY (direction/level/units filled from the entry) or a
@@ -3880,8 +3882,45 @@ def run_kinetic_optimization(objective='IRR',
     at study start; no spike_delta column). The metabolic_minimal preset
     passes all three (resolve_study_preset).
 
+    `method` ('tpe', the default, or 'gp'; since 2026-09-11 pm; dual
+    annealing has its own entry point, run_kinetic_dual_annealing) selects
+    the optuna sampler. 'gp' = FeasibleGPSampler (feasible_gp_sampler):
+    optuna's GPSampler (Matern-5/2 ARD GP, log-EI) made feasibility-aware
+    with the SAME predicate the feasible TPE path uses (every start-up draw
+    and every GP proposal checked against the active burden / volume caps;
+    an infeasible proposal replaced by the best feasible point of a
+    filtered QMC batch). The derived study name gains `_gp` right after the
+    objective slug (method_study_tag), so a GP campaign never resumes a TPE
+    study; the seeds sidecar logs method=gp. Only for compact spaces:
+    more than GP_MAX_DIMENSIONS (15) decision variables raise ValueError
+    before the store is opened. n_startup_trials=None means max(10, 2*d)
+    under 'gp' (d = decision variables; 30 for the 15-variable preset)
+    instead of TPE's max(10, n_trials//4). Every other optuna concept
+    (enqueue_baseline / enqueue_knockouts / seed_from / feasible_sampling /
+    startup_sampling / resume) works as under TPE; FAIL / NAN / INFEASIBLE
+    trials stay PRUNED and invisible to the GP. `gp_kwargs` (dict; only
+    under 'gp', else ValueError; keys = GP_KWARGS_DEFAULTS):
+    learned_constraints (True: fit optuna's constraint GP on the burden /
+    volume violations, ConstrainedLogEI; False: plain log-EI; inert with no
+    active cap; it can be switched OFF on a resume but not back ON for a
+    study whose stored COMPLETE trials carry no constraint values -- the
+    engine then prints a note and continues with it off),
+    deterministic_objective (False), n_fallback_candidates (2048) and
+    max_fallback_batches (20). A GP proposal costs seconds and grows with
+    the number of COMPLETE trials (O(n^3) fit); the supervisor's 3-min stall
+    timeout covers it at the 2000-trial budget.
+
     Returns (study, csv_path, kinetic_baselines)."""
     import optuna
+    if method not in ('tpe', 'gp'):
+        raise ValueError("run_kinetic_optimization: method must be 'tpe' or "
+                         "'gp' (dual annealing has its own entry point, "
+                         f'run_kinetic_dual_annealing); got {method!r}')
+    if gp_kwargs and method != 'gp':
+        raise ValueError(f'gp_kwargs={gp_kwargs!r} given with method='
+                         f"{method!r}; gp_kwargs is only meaningful under "
+                         "method='gp'")
+    gp_options = resolve_gp_kwargs(gp_kwargs)     # validates even the defaults
     ctx = _prepare_optimization(
         objective, direction=direction, level=level,
         objective_units=objective_units, objective_name=objective_name,
@@ -3903,7 +3942,7 @@ def run_kinetic_optimization(objective='IRR',
         volume_cap=volume_cap, seed_from=seed_from,
         parameter_groups=parameter_groups,
         group_multiplier_bounds=group_multiplier_bounds,
-        method_tag='')
+        method_tag=method_study_tag(method))
     # Local names for the sampler / enqueue / finally code below (unchanged).
     handles, r_te = ctx.handles, ctx.r_te
     objective_name, direction = ctx.objective_name, ctx.direction
@@ -3917,6 +3956,12 @@ def run_kinetic_optimization(objective='IRR',
     results_dir, study_name = ctx.results_dir, ctx.study_name
     csv_path = ctx.csv_path
     seed_points, seed_notes = ctx.seed_points, ctx.seed_notes
+    if method == 'gp' and len(search_space) > GP_MAX_DIMENSIONS:
+        raise ValueError(
+            f"method='gp' accepts at most {GP_MAX_DIMENSIONS} decision "
+            f'variables; study {study_name!r} has {len(search_space)}: '
+            f'{list(search_space)}. Use a compact preset (e.g. '
+            "metabolic_minimal_subset, 15 variables) or method='tpe'.")
     storage = ('sqlite:///'
                + os.path.join(results_dir, study_name + '.db')
                .replace('\\', '/'))
@@ -3929,7 +3974,7 @@ def run_kinetic_optimization(objective='IRR',
         seed = default_seed_from_datetime()
         print(f'Default sampler seed from the launch datetime: {seed} '
               '((year/day**2)*month*(hour+1)*(minute+1)).')
-    record_seed_used(csv_path, method='tpe', seed=seed, n_done=n_done)
+    record_seed_used(csv_path, method=method, seed=seed, n_done=n_done)
     # Offset the seed by the number of stored trials so a resumed study
     # draws fresh points instead of replaying the original RNG stream.
     # <= 0 feasible; optuna evaluates it for COMPLETE and PRUNED trials
@@ -3941,8 +3986,15 @@ def run_kinetic_optimization(objective='IRR',
         raise ValueError("startup_sampling must be 'lhs' or 'random'; "
                          f'got {startup_sampling!r}')
     if n_startup_trials is None:
-        n_startup = max(10, n_trials//4)
-        startup_rule = 'default rule max(10, n_trials//4)'
+        if method == 'gp':
+            # A GP needs only a space-filling seed set: 2 points per
+            # dimension (30 for the 15-variable preset), not a quarter of
+            # the budget.
+            n_startup = max(10, 2*len(search_space))
+            startup_rule = 'GP default rule max(10, 2*d)'
+        else:
+            n_startup = max(10, n_trials//4)
+            startup_rule = 'default rule max(10, n_trials//4)'
     else:
         if (isinstance(n_startup_trials, bool)
                 or int(n_startup_trials) != n_startup_trials
@@ -3977,26 +4029,68 @@ def run_kinetic_optimization(objective='IRR',
     else:
         print('Start-up sampling: uniform random.')
     feasible_on = bool(feasible_sampling and (burden_on or volume_on))
-    print(f'TPE random start-up: {n_startup} trials ({startup_rule}); '
-          f'{n_done} trials already stored, so guidance begins '
+    print(f'{"GP" if method == "gp" else "TPE"} random start-up: {n_startup} '
+          f'trials ({startup_rule}); {n_done} trials already stored, so '
+          'guidance begins '
           f'{"now" if n_done >= n_startup else f"after trial {n_startup - 1}"}'
           + (' (feasibility-aware: joint uniform-feasible draws)'
              if feasible_on else '') + '.')
+    predicate = None
     if feasible_on:
+        # The predicate must see what the burden model will actually be
+        # given in _objective: the EXPANDED member values (baseline x
+        # the sampled group multiplier), never the group key itself.
+        # Without groups expand_grouped_values is an identity copy.
+        predicate = feasibility_predicate(
+            burden_on=burden_on, volume_on=volume_on,
+            burden_model=burden_model,
+            parameter_groups=parameter_groups,
+            kinetic_baselines=kinetic_baselines,
+            baseline_model_kwargs=baseline_model_kwargs,
+            baseline_max_n_spikes=baseline_max_n_spikes,
+            volume_cap=volume_cap)
+    if method == 'gp':
+        learned = bool(gp_options['learned_constraints']
+                       and (burden_on or volume_on))
+        if learned and n_done:
+            # optuna's constraint GP needs the 'constraints' system attr on
+            # EVERY stored COMPLETE trial (it raises 'The number of
+            # constraints must be the same for all trials' otherwise), so a
+            # study whose earlier attempts ran with learned_constraints=False
+            # cannot switch it on: fall back, loudly.
+            from optuna.trial import TrialState as _TS
+            missing = [t.number for t in
+                       study.get_trials(deepcopy=False, states=(_TS.COMPLETE,))
+                       if 'constraints' not in t.system_attrs]
+            if missing:
+                print(f'learned_constraints=True requested but {len(missing)} '
+                      'stored COMPLETE trial(s) carry no constraint values '
+                      '(earlier attempts ran without it); continuing with '
+                      'learned_constraints=False.')
+                learned = False
+        study.sampler = feasible_gp_sampler(
+            search_space, predicate, lhs_design=lhs_design,
+            seed=seed + n_done, n_startup_trials=n_startup,
+            constraints_func=constraints if learned else None,
+            deterministic_objective=gp_options['deterministic_objective'],
+            n_fallback_candidates=gp_options['n_fallback_candidates'],
+            max_fallback_batches=gp_options['max_fallback_batches'])
+        print('Sampler: Gaussian process (FeasibleGPSampler over optuna '
+              'GPSampler: Matern-5/2 ARD, log-EI'
+              + (', learned constraint GP on the burden/volume violations '
+                 '(ConstrainedLogEI)' if learned else ', learned constraints off')
+              + '); '
+              + ('feasibility-aware: every start-up draw and GP proposal is '
+                 'checked against the active cap(s)' if predicate is not None
+                 else 'no feasibility predicate')
+              + '; start-up '
+              + ('rows from the LHS design.' if lhs_design is not None
+                 else 'uniform draws.')
+              + (' deterministic_objective=True.'
+                 if gp_options['deterministic_objective'] else ''))
+    elif feasible_on:
         study.sampler = feasible_tpe_sampler(
-            search_space,
-            # The predicate must see what the burden model will actually be
-            # given in _objective: the EXPANDED member values (baseline x
-            # the sampled group multiplier), never the group key itself.
-            # Without groups expand_grouped_values is an identity copy.
-            feasibility_predicate(
-                burden_on=burden_on, volume_on=volume_on,
-                burden_model=burden_model,
-                parameter_groups=parameter_groups,
-                kinetic_baselines=kinetic_baselines,
-                baseline_model_kwargs=baseline_model_kwargs,
-                baseline_max_n_spikes=baseline_max_n_spikes,
-                volume_cap=volume_cap),
+            search_space, predicate,
             multivariate=True, seed=seed + n_done,
             n_startup_trials=n_startup, gamma=default_tpe_gamma,
             constraints_func=constraints,
@@ -4021,9 +4115,10 @@ def run_kinetic_optimization(objective='IRR',
         print('Sampler: plain TPESampler '
               + ('(feasible_sampling=False).' if burden_on
                  else '(burden off: no feasibility predicate).'))
-    print(f'TPE gamma: top {DEFAULT_GAMMA_FRACTION:.0%} of finished trials, '
-          f'capped at {DEFAULT_GAMMA_CAP} "good" trials '
-          f'(vs optuna default top 10 % capped at 25).')
+    if method == 'tpe':
+        print(f'TPE gamma: top {DEFAULT_GAMMA_FRACTION:.0%} of finished trials, '
+              f'capped at {DEFAULT_GAMMA_CAP} "good" trials '
+              f'(vs optuna default top 10 % capped at 25).')
     if n_done == 0:
         # Fresh study. By default (enqueue_baseline=False, since
         # 2026-09-07) NO baseline point is enqueued, so the sampler draws
@@ -4138,7 +4233,15 @@ def run_kinetic_optimization(objective='IRR',
                              baseline_model_kwargs,
                              baseline_max_n_spikes=baseline_max_n_spikes,
                              baseline_stage_1_max_x=baseline_stage_1_max_x)
-            if feasible_on:
+            if method == 'gp':
+                s = study.sampler
+                print(f'GP sampling: rejected {s.n_rejected} draws/candidates, '
+                      f'{s.n_uniform_fallbacks} uniform fallbacks (optuna '
+                      'COMPLETE-only gate / too little data), '
+                      f'{s.n_gp_fallbacks} GP-proposal fallbacks, '
+                      f'{s.n_lhs_infeasible_fallbacks} LHS infeasible fallbacks, '
+                      f'{s.n_unfiltered} unfiltered draws.')
+            elif feasible_on:
                 s = study.sampler
                 extra = ('' if getattr(s, '_lhs_design', None) is None
                          else f', {s.n_lhs_infeasible_fallbacks} LHS infeasible '
