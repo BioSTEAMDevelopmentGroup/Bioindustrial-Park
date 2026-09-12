@@ -95,6 +95,12 @@ Runner pattern (fresh kernel, one process):
                                             ('<other donor>', [1162])])
     # dual annealing instead of TPE (name ..._irr_da_rb0.001-10_ibe0.3-2_burden)
     result, csv_path = ns['run'](objective='IRR', study_type='metabolic_minimal_subset', method='dual_annealing')
+    # Gaussian-process sampler (feasibility-aware optuna GPSampler; <= 15
+    # variables; name ..._irr_gp_rb0.001-10_ibe0.3-2_burden); learned
+    # constraint GP on by default, off via gp_kwargs
+    result, csv_path = ns['run'](objective='IRR', study_type='metabolic_minimal_subset', method='gp')
+    result, csv_path = ns['run'](objective='IRR', study_type='metabolic_minimal_subset', method='gp',
+                                 gp_kwargs={'learned_constraints': False})
 """
 from datetime import datetime
 
@@ -220,13 +226,19 @@ def run(scenario=None,  # 'A' or 'B'; None = the preset's start scenario
         # values clipped into this study's bands), giving TPE a foothold
         # in a basin another study found; the derived study name gains
         # `_seed{n}` (n = total seed count). None = no seeds.
-        method='tpe',  # 'tpe' (optuna TPE, ko.run_kinetic_optimization) or
+        method='tpe',  # 'tpe' (optuna TPE, ko.run_kinetic_optimization),
+        # 'gp' (feasibility-aware optuna Gaussian process, the same engine
+        # entry point; <= ko.GP_MAX_DIMENSIONS = 15 variables) or
         # 'dual_annealing' (scipy dual annealing, ko.run_kinetic_dual_annealing)
         # over the same preset/scenario/burden set-up and trajectory protocol.
-        # The derived study name gains `_da` right after the objective slug.
+        # The derived study name gains `_gp` / `_da` right after the slug.
         annealing_kwargs=None,  # dict of ko.run_kinetic_dual_annealing knobs
         # (initial_temp, restart_temp_ratio, visit, accept, no_local_search,
-        # energy_scale, max_calls_factor); ignored under 'tpe'.
+        # energy_scale, max_calls_factor); ignored under 'tpe' / 'gp'.
+        gp_kwargs=None,  # dict of the GP sampler's knobs under method='gp'
+        # (ko.GP_KWARGS_DEFAULTS: learned_constraints True,
+        # deterministic_objective False, n_fallback_candidates 2048,
+        # max_fallback_batches 20); ValueError under any other method.
         **engine_kwargs,  # bounds/overrides/etc. -> run_kinetic_optimization
         ):
     """Set up the scenario baseline (same recipe as the smoke tests), run
@@ -436,7 +448,20 @@ def run(scenario=None,  # 'A' or 'B'; None = the preset's start scenario
     max_calls_factor 20). Under DA, enqueue_knockouts=True or a non-empty
     seed_from raise (optuna enqueue concepts), and n_startup_trials /
     feasible_sampling / startup_sampling are ignored with one printed line
-    (ko.check_method_kwargs)."""
+    (ko.check_method_kwargs). 'gp' (since 2026-09-11 pm) runs the same
+    optuna engine under ko.feasible_gp_sampler -- optuna's GPSampler
+    (Matern-5/2 ARD GP, log-EI) with the exact burden / volume feasibility
+    filter of the feasible TPE path on every start-up draw and GP proposal,
+    plus optuna's learned constraint GP (ConstrainedLogEI) on the violations
+    by default; the derived name gains `_gp` right after the objective slug
+    (kin_opt_ethanol_isobutanol_metabolic_minimal_subset_irr_gp_rb0.001-10_
+    ibe0.3-2_burden); more than 15 decision variables raise before any study
+    is touched, so use it with metabolic_minimal_subset / metabolic_14d.
+    n_startup_trials=None means max(10, 2*d) under 'gp'; every enqueue /
+    seed / sampler setting is honoured as under TPE. `gp_kwargs` (dict;
+    ValueError under any other method) forwards learned_constraints (True),
+    deterministic_objective (False), n_fallback_candidates (2048),
+    max_fallback_batches (20)."""
     if 'burden_model' in engine_kwargs:
         raise ValueError("pass burden=True/False to run(), not the engine's "
                          'burden_model (run() builds it so the reports can '
@@ -454,6 +479,9 @@ def run(scenario=None,  # 'A' or 'B'; None = the preset's start scenario
         startup_sampling=startup_sampling)
     if method_note:
         print(method_note)
+    if gp_kwargs and method != 'gp':
+        raise ValueError(f'gp_kwargs={gp_kwargs!r} requires method=\'gp\'; '
+                         f'got method={method!r}')
     if study_target_products is not None:
         if not restrict_to_workbook:
             raise ValueError(
@@ -605,8 +633,10 @@ def run(scenario=None,  # 'A' or 'B'; None = the preset's start scenario
         burden_model = None
         print('Enzyme burden OFF (burden=False): legacy burden-free study.')
 
-    if method == 'tpe':
+    if method in ('tpe', 'gp'):
         result, csv_path, kinetic_baselines = ko.run_kinetic_optimization(
+            method=method,
+            gp_kwargs=gp_kwargs,
             objective=objective,
             scenario_label=scenario,
             n_trials=n_trials,

@@ -5472,4 +5472,25 @@ else:
          'under an active cap (toggle, deterministic, fallback knobs), feasible_sampling=False '
          'path, learned-on-after-off fallback, 16-dim guard before any store, bad-kwarg guards')
 
+#%% 80. Driver run(): method='gp' (GP spec §4) dispatches to
+# ko.run_kinetic_optimization with method= / gp_kwargs= forwarded; gp_kwargs
+# under any other method is refused up front, before the preset resolution
+# and the scenario load; the runner docstring documents it. Source-level:
+# the driver load()s the model at import.
+drv80 = open(os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                          'optimize_kinetics_BO.py')).read()
+assert 'gp_kwargs=None,' in drv80
+assert "if method in ('tpe', 'gp'):" in drv80
+assert 'method=method,' in drv80 and 'gp_kwargs=gp_kwargs,' in drv80
+assert "if gp_kwargs and method != 'gp':" in drv80
+assert "method='gp')" in drv80                     # runner example
+assert "gp_kwargs={'learned_constraints': False}" in drv80
+body80 = drv80[drv80.index('def run('):]
+assert (body80.index("if gp_kwargs and method != 'gp':")
+        < body80.index('ko.resolve_study_preset(')
+        < body80.index('scenarios.load_scenario('))
+assert "if method == 'tpe':" not in body80            # the old two-way dispatch is gone
+PASS('driver: method=gp forwards method=/gp_kwargs= to the engine; gp_kwargs refused '
+     'under other methods before any preset/scenario work; runner example documented')
+
 print(f'\nALL {n_pass} CHECKS PASSED')
