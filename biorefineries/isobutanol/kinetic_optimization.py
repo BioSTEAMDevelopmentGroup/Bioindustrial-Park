@@ -486,8 +486,12 @@ def build_search_space(kinetic_baselines,
     (target_conc = min(TARGET_CONC_MAX, threshold_conc + target_delta)),
     and the spike as spike_delta above the target
     (spike_conc = clip(target_conc + spike_delta, SPIKE_CONC_MIN,
-    SPIKE_CONC_MAX)) -- spanning the applied envelope threshold [0, 300],
-    target [5, 300], spike [50, 600] g/L at the default bounds.
+    SPIKE_CONC_MAX)) -- spanning the applied envelope threshold [0, 295],
+    target [5, 300], spike [50, 600] g/L at the default bounds. The
+    threshold upper bound is capped at TARGET_CONC_MAX - target_delta_low
+    (295 at the defaults), strictly below TARGET_CONC_MAX, so the target
+    clamp can never make target == threshold (an infeasible spec that a
+    deterministic GP hard-locks on).
     max_n_spikes (the glucose-spike cap, fbs_spec.max_n_spikes) is an
     INTEGER variable (0 = forced batch); pass max_n_spikes_bounds=None to
     pin it at the scenario baseline instead.
@@ -624,8 +628,19 @@ def build_search_space(kinetic_baselines,
         space['threshold_delta'] = dict(low=tdb[0], high=tdb[1], log=False)
         space['spike_conc'] = dict(low=scb[0], high=scb[1], log=False)
     else:
+        # Feasible BY CONSTRUCTION: target_conc = min(TARGET_CONC_MAX,
+        # threshold + target_delta), so a threshold AT TARGET_CONC_MAX clamps
+        # target down to threshold (threshold == target: the FeedSpike spec
+        # threshold < target < spike then fails, and a deterministic GP
+        # hard-locks on that boundary -- every proposal FAILs pre-sim, is
+        # pruned and thus invisible to the GP, and is re-proposed forever).
+        # Cap the threshold upper bound below TARGET_CONC_MAX, keeping at
+        # least target_delta_bounds[0] of headroom so target > threshold
+        # strictly for every sampled point.
+        threshold_high = min(threshold_conc_bounds[1],
+                             TARGET_CONC_MAX - target_delta_bounds[0])
         space['threshold_conc'] = dict(low=threshold_conc_bounds[0],
-                                       high=threshold_conc_bounds[1],
+                                       high=threshold_high,
                                        log=False)
         space['target_delta'] = dict(low=target_delta_bounds[0],
                                      high=target_delta_bounds[1],

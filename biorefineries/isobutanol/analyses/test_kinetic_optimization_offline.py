@@ -37,7 +37,7 @@ assert excluded == ['k_16'] and 'k_16' not in space
 assert space['k_13'] == dict(low=0.0, high=40.0, log=False)  # lo==0 -> linear
 assert space['k_1e'] == dict(low=0.1*47.1, high=10.0*47.1, log=True)
 assert space['K_1e'] == dict(low=0.1*0.12, high=10.0*0.12, log=True)
-assert space['threshold_conc'] == dict(low=0.0, high=300.0, log=False)
+assert space['threshold_conc'] == dict(low=0.0, high=295.0, log=False)  # capped below TARGET_CONC_MAX (feasible by construction; see check 82)
 assert space['target_delta'] == dict(low=5.0, high=500.0, log=False)
 assert space['spike_delta'] == dict(low=0.5, high=595.0, log=False)
 assert space['max_n_spikes'] == dict(low=0, high=50, log=False, int=True)
@@ -623,7 +623,7 @@ expected19c = {
     'K_1e': dict(low=0.1*0.12, high=10.0*0.12, log=True),
     'k_7': dict(low=0.1*0.5, high=10.0*0.5, log=True),
     'K_1i': dict(low=0.1*2.0, high=10.0*2.0, log=True),
-    'threshold_conc': dict(low=0.0, high=300.0, log=False),
+    'threshold_conc': dict(low=0.0, high=295.0, log=False),  # capped below TARGET_CONC_MAX
     'target_delta': dict(low=5.0, high=500.0, log=False),
     'spike_delta': dict(low=0.5, high=595.0, log=False),
     'max_n_spikes': dict(low=0, high=50, log=False, int=True)}
@@ -1760,7 +1760,7 @@ assert ko.build_search_space(kb29)[0] == {
     'k_10ie': dict(low=0.1*0.04, high=10.0*0.04, log=True),
     'K_1e': dict(low=0.1*0.12, high=10.0*0.12, log=True),
     'k_7': dict(low=0.1*1.203, high=10.0*1.203, log=True),
-    'threshold_conc': dict(low=0.0, high=300.0, log=False),
+    'threshold_conc': dict(low=0.0, high=295.0, log=False),  # capped below TARGET_CONC_MAX
     'target_delta': dict(low=5.0, high=500.0, log=False),
     'spike_delta': dict(low=0.5, high=595.0, log=False),
     'max_n_spikes': dict(low=0, high=50, log=False, int=True)}
@@ -5540,5 +5540,34 @@ assert 'gp_kwargs=gp_kwargs or None' in cli81
 assert '--method gp' in cli81                      # usage example in the module docstring
 PASS('supervisor: --method gp -> _gp name on both paths; child_code emits gp_kwargs= '
      'only when given; supervise() threads + logs it; GP flags refused without --method gp')
+
+#%% 82. build_search_space: the threshold-anchored feeding space is feasible
+# BY CONSTRUCTION -- threshold_conc's upper bound stays strictly below
+# TARGET_CONC_MAX, so target_conc = min(TARGET_CONC_MAX, threshold + delta)
+# can never collapse to threshold. Guards the deterministic-GP hard-lock at
+# the threshold_conc=300 boundary (2026-09-12): there target clamped to
+# 300 == threshold, every proposal FAILed the threshold < target < spike
+# spec, was pruned (invisible to the GP), and was re-proposed forever.
+kb82 = {'k_1e': 47.1}
+space82, _ = ko.build_search_space(kb82)          # default threshold-anchored bounds
+assert space82['threshold_conc']['high'] < ko.TARGET_CONC_MAX, \
+    space82['threshold_conc']
+# The worst corner (max threshold, min target rise, pinned spike) must
+# reconstruct to a STRICT threshold < target < spike ordering.
+worst82 = {'threshold_conc': space82['threshold_conc']['high'],
+           'target_delta': space82['target_delta']['low'],
+           'max_n_spikes': 10}
+thr82, tgt82, spk82 = ko._resolve_feeding_concs(
+    worst82, {'spike_conc': ko.SPIKE_CONC_MAX})
+assert thr82 < tgt82 < spk82, (thr82, tgt82, spk82)
+# An explicitly widened threshold band is still clamped strictly feasible.
+space82b, _ = ko.build_search_space(kb82, threshold_conc_bounds=(0.0, 400.0))
+assert space82b['threshold_conc']['high'] < ko.TARGET_CONC_MAX
+# A narrower user band is left untouched (the clamp is a min, not a hard cap).
+space82c, _ = ko.build_search_space(kb82, threshold_conc_bounds=(0.0, 120.0))
+assert space82c['threshold_conc']['high'] == 120.0
+PASS('build_search_space: threshold-anchored feeding space feasible by '
+     'construction (threshold_conc high < TARGET_CONC_MAX; worst corner '
+     'keeps threshold < target < spike)')
 
 print(f'\nALL {n_pass} CHECKS PASSED')
