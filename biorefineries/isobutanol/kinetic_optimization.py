@@ -284,7 +284,9 @@ INHIBITION_COEFFICIENT_ROLES = ('product_inhibition', 'lethality')
 #%% Objective registry and tracked metrics
 # Getters are callables over a `handles` dict (see get_handles below):
 #   'V406': the fermentation unit (.nsk_results_specific_tau_dict, .tau)
-#   'tea': the system TEA (.TCI)
+#   'tea': the system TEA (.TCI, .NPV -- read AFTER solve_TEA, whose exit
+#          state leaves every product at its default price and tea.IRR at
+#          the fixed 0.15 hurdle, so .NPV is the NPV at the hurdle rate)
 #   'latest_TEA_solution': {'IRR': ..., 'MPSPs': {'ethanol': ..,
 #                           'isobutanol': ..}}, refreshed once per trial.
 # This indirection keeps every getter testable offline with fakes.
@@ -349,13 +351,25 @@ OBJECTIVE_REGISTRY = {
     'TCI': dict(
         getter=lambda h: h['tea'].TCI/1e6,
         direction='minimize', level='system', units='MM$', energy_scale=2.0),
+    # Profitability index (2026-09-12; docs/reports/profitability-index-
+    # objective.md): NPV at the fixed 15 % hurdle with every product at its
+    # default price, per $ of TCI. Defined for EVERY simulated point (no
+    # root-finding, no NaN at a zero-flow coproduct, no -inf plateau where
+    # IRR rails), continuous and unbounded through the loss region, and
+    # scale-invariant: PI > 0 iff IRR > 0.15, and monotone in IRR for the
+    # common cash-flow shape every trial of a study shares, so it prefers a
+    # small high-IRR plant over a large low-IRR one where plain NPV would
+    # not. Net PI (break-even 0), not the gross PV(inflows)/investment form.
+    'PI': dict(
+        getter=lambda h: h['tea'].NPV/h['tea'].TCI,
+        direction='maximize', level='system', units='', energy_scale=0.01),
     }
 
 #: Metrics recorded for EVERY trial (spec trajectory (ii)-(vi) + extras).
 TRACKED_METRICS = {name: OBJECTIVE_REGISTRY[name]['getter'] for name in
                    ('IBO yield', 'IBO titer', 'IBO productivity',
                     'EtOH yield', 'EtOH titer', 'EtOH productivity',
-                    'Cell density', 'IRR', 'TCI')}
+                    'Cell density', 'IRR', 'TCI', 'PI')}
 TRACKED_METRICS['tau'] = lambda h: h['V406'].tau
 TRACKED_METRICS['n_glu_spikes'] = lambda h: _nsk(h)['curr_n_glu_spikes']
 

@@ -68,7 +68,7 @@ PASS('build_search_space: exclude_params honored')
 required = {'IBO yield', 'IBO titer', 'IBO productivity',
             'EtOH yield', 'EtOH titer', 'EtOH productivity',
             'Combined yield', 'Cell density',
-            'IRR', 'EtOH MPSP', 'IBO MPSP', 'TCI'}
+            'IRR', 'EtOH MPSP', 'IBO MPSP', 'TCI', 'PI'}
 assert required <= set(ko.OBJECTIVE_REGISTRY), required - set(ko.OBJECTIVE_REGISTRY)
 for name, entry in ko.OBJECTIVE_REGISTRY.items():
     assert entry['direction'] in ('maximize', 'minimize'), name
@@ -79,6 +79,13 @@ assert ko.OBJECTIVE_REGISTRY['EtOH MPSP']['direction'] == 'minimize'
 assert ko.OBJECTIVE_REGISTRY['TCI']['direction'] == 'minimize'
 assert ko.OBJECTIVE_REGISTRY['IBO yield']['level'] == 'kinetic'
 assert ko.OBJECTIVE_REGISTRY['IRR']['level'] == 'system'
+# 'PI' (profitability index, NPV at the fixed hurdle IRR / TCI; 2026-09-12,
+# docs/reports/profitability-index-objective.md): maximized, system-level,
+# dimensionless, DA energy scale like IRR's.
+assert ko.OBJECTIVE_REGISTRY['PI']['direction'] == 'maximize'
+assert ko.OBJECTIVE_REGISTRY['PI']['level'] == 'system'
+assert ko.OBJECTIVE_REGISTRY['PI']['units'] == ''
+assert ko.OBJECTIVE_REGISTRY['PI']['energy_scale'] == 0.01
 PASS('OBJECTIVE_REGISTRY: names, directions, levels, units')
 
 #%% 4. getters against fake handles
@@ -86,7 +93,7 @@ nsk = {'y_IBO_glu_added': 0.1, '[s_IBO]': 20.0, 'time': 40.0,
        'y_EtOH_glu_added': 0.3, '[s_EtOH]': 90.0, 'prod_EtOH': 2.0,
        'y_EtOH_IBO_glu_added': 0.4, '[x]': 30.0, 'curr_n_glu_spikes': 7}
 handles = {'V406': SimpleNamespace(nsk_results_specific_tau_dict=nsk, tau=55.0),
-           'tea': SimpleNamespace(TCI=350e6),
+           'tea': SimpleNamespace(TCI=350e6, NPV=35e6),
            'latest_TEA_solution': {'IRR': 0.21,
                                    'MPSPs': {'ethanol': 0.4, 'isobutanol': 0.9}}}
 assert ko.OBJECTIVE_REGISTRY['IBO yield']['getter'](handles) == 0.1
@@ -98,11 +105,13 @@ assert ko.OBJECTIVE_REGISTRY['IRR']['getter'](handles) == 0.21
 assert ko.OBJECTIVE_REGISTRY['EtOH MPSP']['getter'](handles) == 0.4
 assert ko.OBJECTIVE_REGISTRY['IBO MPSP']['getter'](handles) == 0.9
 assert ko.OBJECTIVE_REGISTRY['TCI']['getter'](handles) == 350.0
+assert ko.OBJECTIVE_REGISTRY['PI']['getter'](handles) == 35e6/350e6   # NPV / TCI
+assert ko.TRACKED_METRICS['PI'](handles) == 35e6/350e6
 assert ko.TRACKED_METRICS['tau'](handles) == 55.0
 assert ko.TRACKED_METRICS['n_glu_spikes'](handles) == 7
 assert set(ko.TRACKED_METRICS) == {'IBO yield', 'IBO titer', 'IBO productivity',
                                    'EtOH yield', 'EtOH titer', 'EtOH productivity',
-                                   'Cell density', 'IRR', 'TCI',
+                                   'Cell density', 'IRR', 'TCI', 'PI',
                                    'tau', 'n_glu_spikes'}
 PASS('getters read the handles contract correctly')
 
@@ -490,7 +499,7 @@ else:
     handles17 = {
         'r_te': _FakeTE(), 'fbs_spec': fbs17,
         'V406': SimpleNamespace(nsk_results_specific_tau_dict=nsk, tau=55.0),
-        'tea': SimpleNamespace(TCI=350e6), 'HXN': SimpleNamespace(),
+        'tea': SimpleNamespace(TCI=350e6, NPV=35e6), 'HXN': SimpleNamespace(),
         'model_specification': _model_specification,
         'solve_TEA': _solve_TEA,
         'latest_TEA_solution': {'IRR': np.nan,
@@ -2521,7 +2530,7 @@ else:
         return {'IRR': 0.2, 'MPSPs': {'ethanol': 0.5, 'isobutanol': 1.0}}
     handles39 = {
         'r_te': _FakeTE39(), 'fbs_spec': fbs39, 'V406': V406_39,
-        'tea': SimpleNamespace(TCI=350e6), 'HXN': SimpleNamespace(),
+        'tea': SimpleNamespace(TCI=350e6, NPV=35e6), 'HXN': SimpleNamespace(),
         'model_specification': _model_specification39,
         'solve_TEA': _solve_TEA39,
         'latest_TEA_solution': {'IRR': np.nan,
@@ -2716,7 +2725,7 @@ else:
                               stage_1_max_x=5.0)
     handles41 = {
         'r_te': _FakeTE41(), 'fbs_spec': fbs41, 'V406': V406_41,
-        'tea': SimpleNamespace(TCI=350e6), 'HXN': SimpleNamespace(),
+        'tea': SimpleNamespace(TCI=350e6, NPV=35e6), 'HXN': SimpleNamespace(),
         'model_specification': lambda **kw: None,
         'solve_TEA': lambda stream_IDs=None: {
             'IRR': 0.2, 'MPSPs': {'ethanol': 0.5, 'isobutanol': 1.0}},
@@ -3213,7 +3222,7 @@ else:
     handles44 = {
         'r_te': te44, 'fbs_spec': fbs44,
         'V406': SimpleNamespace(nsk_results_specific_tau_dict=nsk, tau=55.0),
-        'tea': SimpleNamespace(TCI=350e6), 'HXN': SimpleNamespace(),
+        'tea': SimpleNamespace(TCI=350e6, NPV=35e6), 'HXN': SimpleNamespace(),
         'model_specification': _model_specification44,
         'solve_TEA': lambda stream_IDs=None: {
             'IRR': 0.2, 'MPSPs': {'ethanol': 0.5, 'isobutanol': 1.0}},
