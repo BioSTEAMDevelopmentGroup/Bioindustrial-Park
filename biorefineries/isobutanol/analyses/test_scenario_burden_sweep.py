@@ -46,8 +46,8 @@ assert math.isnan(over), f'over-cap point returned {over}, expected NaN'
 PASS('burden ON: an over-cap swept k_1e yields NaN (not a crash)')
 b['model_specification'](**b['feeding_kwargs'])              # restore baseline sim
 feasible_on = swept_MPSP(b, r, base_k1e)                     # baseline value
-assert math.isfinite(feasible_on) and abs(feasible_on - 0.86604)/0.86604 < 0.01
-PASS('burden ON: the feasible baseline k_1e yields a finite MPSP (0.86604)')
+assert math.isfinite(feasible_on) and abs(feasible_on - 0.86680)/0.86680 < 0.01
+PASS('burden ON: the feasible baseline k_1e yields a finite MPSP (0.86680)')
 
 # Burden OFF: same feasible baseline point is identical (A is inert either way)
 b_off = scenarios.load_scenario('A', burden=False)

@@ -24,7 +24,8 @@ leaves via the rectifier (D303) bottoms to WWT unrecovered
 EACH simulation. Gates (a violation exits non-zero exactly like a
 traceback):
 
-- purity-adjusted ethanol MPSP within 1% of 1.4868 (the smoke_test_6
+- purity-adjusted ethanol MPSP within 1% of 1.48848 (was 1.4868 before the
+  2026-09-12 nskinetics anaerobic_growth_mult 1.0 -> 0.75 re-pin; the smoke_test_6
   reference; the 2026-09-03 re-pin run gave 1.4868429277, matching
   the ethanol-only build to ~6 sig figs. Re-pinned 2026-09-03 for the
   IRR-optimal batch feeding strategy from the 25x25 feeding-strategy
@@ -73,7 +74,7 @@ def load_simulate_baseline(stream_IDs=('ethanol', 'isobutanol'),
     model_specification = bundle['model_specification']
     solve_TEA = bundle['solve_TEA']
     feeding_kwargs = bundle['feeding_kwargs']
-    expected_MPSPs = {'ethanol': 1.4868, 'isobutanol': math.nan}
+    expected_MPSPs = {'ethanol': 1.48848, 'isobutanol': math.nan}
 
     all_results = []
     for i in range(n_sims):

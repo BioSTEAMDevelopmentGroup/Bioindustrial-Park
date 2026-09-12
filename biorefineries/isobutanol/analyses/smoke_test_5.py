@@ -22,9 +22,10 @@ placeholder, so the isobutanol product is empty.
 EACH simulation. Gates (a violation exits non-zero exactly like a
 traceback):
 
-- purity-adjusted ethanol MPSP within 1% of 0.84458 (the reference baseline
+- purity-adjusted ethanol MPSP within 1% of 0.84321 (was 0.84458 before the
+  2026-09-12 nskinetics anaerobic_growth_mult 1.0 -> 0.75 re-pin; the reference baseline
   for this configuration, set 3-sim-stable by the 2026-09-02 re-pin run;
-  slightly below the both-trains A baseline 0.86604 -- the stock
+  slightly below the both-trains A baseline 0.86680 -- the stock
   corn-ethanol purification train is marginally cheaper than the IBO/EtOH
   train for a zero-IBO broth. Re-pinned 2026-09-02 for
   lang_factor=None (per-unit bare-module capital; pin under Lang 3.0
@@ -63,7 +64,7 @@ def load_simulate_baseline(stream_IDs=('ethanol', 'isobutanol'),
     model_specification = bundle['model_specification']
     solve_TEA = bundle['solve_TEA']
     feeding_kwargs = bundle['feeding_kwargs']
-    expected_MPSPs = {'ethanol': 0.84458, 'isobutanol': math.nan}
+    expected_MPSPs = {'ethanol': 0.84321, 'isobutanol': math.nan}
 
     all_results = []
     for i in range(n_sims):

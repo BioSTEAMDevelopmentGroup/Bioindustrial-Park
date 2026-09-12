@@ -21,9 +21,10 @@ full flow. All broth IBO leaves via the rectifier bottoms to WWT
 EACH simulation. Gates (a violation exits non-zero exactly like a
 traceback):
 
-- purity-adjusted ethanol MPSP within 1% of 1.4868 (the reference baseline
+- purity-adjusted ethanol MPSP within 1% of 1.48848 (was 1.4868 before the
+  2026-09-12 nskinetics anaerobic_growth_mult 1.0 -> 0.75 re-pin; the reference baseline
   for this configuration, set 3-sim-stable by the 2026-09-02 re-pin run
-  and recorded in CLAUDE.md; well above the both-trains B baseline 0.6642
+  and recorded in CLAUDE.md; well above the both-trains B baseline 0.66834
   because the IBO revenue is lost and its burden shifts to ethanol.
   Re-pinned 2026-09-03 for the IRR-optimal batch feeding strategy from
   the 25x25 feeding-strategy sweep (target 140 g/L, threshold 34.25 g/L,
@@ -69,7 +70,7 @@ def load_simulate_baseline(stream_IDs=('ethanol', 'isobutanol'),
     model_specification = bundle['model_specification']
     solve_TEA = bundle['solve_TEA']
     feeding_kwargs = bundle['feeding_kwargs']
-    expected_MPSPs = {'ethanol': 1.4868, 'isobutanol': math.nan}
+    expected_MPSPs = {'ethanol': 1.48848, 'isobutanol': math.nan}
 
     all_results = []
     for i in range(n_sims):

@@ -71,7 +71,7 @@ model.metrics_at_baseline()
 model_specification()
 fbs_spec.max_n_spikes = 16
 A_KWARGS = dict(threshold_conc=217.125, target_conc=221.25)
-A_ETHANOL_MPSP = 0.86604
+A_ETHANOL_MPSP = 0.86680
 model_specification(**A_KWARGS)
 baseline_TEA = solve_TEA()
 assert abs(baseline_TEA['MPSPs']['ethanol'] - A_ETHANOL_MPSP)/A_ETHANOL_MPSP < 0.01, baseline_TEA

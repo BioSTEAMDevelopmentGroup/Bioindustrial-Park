@@ -28,8 +28,8 @@ b = scenarios.load_scenario('A')
 assert b['burden_on'] is True and b['burden_model'] is not None
 assert system.get_active_burden() is b['burden_model']
 res = b['solve_TEA'](stream_IDs=('ethanol', 'isobutanol'), IRR_for_MPSP=0.15)
-assert abs(res['MPSPs']['ethanol'] - 0.86604)/0.86604 < 0.01
-PASS('scenario A burden ON by default, active, and inert (ethanol MPSP 0.86604)')
+assert abs(res['MPSPs']['ethanol'] - 0.86680)/0.86680 < 0.01
+PASS('scenario A burden ON by default, active, and inert (ethanol MPSP 0.86680)')
 
 # (2) an over-cap point -> EnzymeBurdenInfeasibleError; a feasible one simulates
 r = b['V406'].nsk_kinetic_model._te
@@ -47,7 +47,7 @@ finally:
     setattr(r, 'k_1e', base_k1e)
 b['model_specification'](**b['feeding_kwargs'])   # feasible again
 res2 = b['solve_TEA'](stream_IDs=('ethanol', 'isobutanol'), IRR_for_MPSP=0.15)
-assert abs(res2['MPSPs']['ethanol'] - 0.86604)/0.86604 < 0.01
+assert abs(res2['MPSPs']['ethanol'] - 0.86680)/0.86680 < 0.01
 PASS('feasible neighbour simulates cleanly after the infeasible point')
 
 # (3) burden=False installs no active burden

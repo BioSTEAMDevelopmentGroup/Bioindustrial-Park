@@ -15,10 +15,12 @@ Smoke test 4 -- scenario B baseline with ONLY the IBO/EtOH separation train:
 EACH simulation. Gates (a violation exits non-zero exactly like a
 traceback):
 
-- purity-adjusted ethanol MPSP within 1% of 0.6642 (the both-trains
+- purity-adjusted ethanol MPSP within 1% of 0.66834 (was 0.6642 before the
+  2026-09-12 nskinetics anaerobic_growth_mult 1.0 -> 0.75 re-pin; the both-trains
   scenario-B baseline; dropping the pass-through gating splitter S201 must
   not move results beyond simulation tolerance)
-- purity-adjusted isobutanol MPSP within 1% of 1.2924
+- purity-adjusted isobutanol MPSP within 1% of 1.2976 (was 1.2924 before
+  the 2026-09-12 anaerobic_growth_mult re-pin)
   (Both re-pinned 2026-09-03 for the IRR-optimal batch feeding strategy
   from the 25x25 feeding-strategy sweep (target 140 g/L, threshold 34.25
   g/L, max_n_spikes 0; pins under the 216.3/226.3/13-spike fed-batch

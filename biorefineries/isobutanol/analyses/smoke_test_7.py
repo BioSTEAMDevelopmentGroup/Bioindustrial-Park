@@ -27,7 +27,8 @@ significant figures (0.8445818 here vs 0.8445811 there).
 EACH simulation. Gates (a violation exits non-zero exactly like a
 traceback):
 
-- purity-adjusted ethanol MPSP within 1% of 0.84458 (matching the
+- purity-adjusted ethanol MPSP within 1% of 0.84321 (was 0.84458 before the
+  2026-09-12 nskinetics anaerobic_growth_mult 1.0 -> 0.75 re-pin; matching the
   smoke_test_5 reference: an idle zero-flow IBO/EtOH branch must be
   economically equivalent to an absent one. Re-pinned 2026-09-02 for
   lang_factor=None (per-unit bare-module capital; pin under Lang 3.0
@@ -71,7 +72,7 @@ def load_simulate_baseline(stream_IDs=('ethanol', 'isobutanol'),
     model_specification = bundle['model_specification']
     solve_TEA = bundle['solve_TEA']
     feeding_kwargs = bundle['feeding_kwargs']
-    expected_MPSPs = {'ethanol': 0.84458, 'isobutanol': math.nan}
+    expected_MPSPs = {'ethanol': 0.84321, 'isobutanol': math.nan}
 
     all_results = []
     for i in range(n_sims):

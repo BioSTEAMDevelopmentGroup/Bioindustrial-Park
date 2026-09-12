@@ -22,7 +22,8 @@ beer-column mode and the isobutanol product is empty.
 EACH simulation. Gates (a violation exits non-zero exactly like a
 traceback):
 
-- purity-adjusted ethanol MPSP within 1% of 0.86604 (the both-trains
+- purity-adjusted ethanol MPSP within 1% of 0.86680 (was 0.86604 before the
+  2026-09-12 nskinetics anaerobic_growth_mult 1.0 -> 0.75 re-pin; the both-trains
   scenario-A baseline, reproduced to full precision by the 2026-09-02
   re-pin run, 0.866036453655084. Re-pinned 2026-09-02 for
   lang_factor=None (per-unit bare-module capital; pin under Lang 3.0
