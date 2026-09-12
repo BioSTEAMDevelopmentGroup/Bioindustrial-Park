@@ -5493,4 +5493,52 @@ assert "if method == 'tpe':" not in body80            # the old two-way dispatch
 PASS('driver: method=gp forwards method=/gp_kwargs= to the engine; gp_kwargs refused '
      'under other methods before any preset/scenario work; runner example documented')
 
+#%% 81. Supervisor --method gp + GP flags (GP spec §4): default_study_name
+# mirrors the `_gp` tag on both paths (so the stall guard polls the GP CSV);
+# child_code emits gp_kwargs= only when given; supervise() threads gp_kwargs
+# and logs it; the CLI exposes --gp-no-learned-constraints /
+# --gp-deterministic, refused without --method gp.
+sup81 = _runpy.run_path(os.path.join(
+    os.path.dirname(os.path.abspath(__file__)),
+    'optimize_kinetics_BO_supervised.py'))
+assert sup81['default_study_name'](None, 'IRR', None,
+                                   study_target_products='ethanol_isobutanol',
+                                   study_type='metabolic_minimal_subset',
+                                   burden=True, method='gp') == \
+    'kin_opt_ethanol_isobutanol_metabolic_minimal_subset_irr_gp_rb0.001-10_ibe0.3-2_burden'
+assert sup81['default_study_name']('A', 'IRR', 'B', burden=True,
+                                   method='gp') == 'kin_opt_A_kbB_irr_gp_burden'
+assert sup81['default_study_name']('B', 'IBO titer', None, method='gp') == 'kin_opt_B_ibo_titer_gp'
+_c81 = _inspect.signature(sup81['child_code']).parameters
+_s81 = _inspect.signature(sup81['supervise']).parameters
+assert _c81['gp_kwargs'].default is None and _s81['gp_kwargs'].default is None
+code81 = sup81['child_code'](None, 'IRR', 200, None, False, 'x',
+                             study_target_products='ethanol_isobutanol',
+                             study_type='metabolic_minimal_subset',
+                             method='gp',
+                             gp_kwargs={'learned_constraints': False,
+                                        'deterministic_objective': True})
+assert "method='gp'," in code81
+assert "gp_kwargs={'learned_constraints': False, 'deterministic_objective': True}," in code81
+compile(code81, '<child81>', 'exec')             # the emitted program parses
+code81g = sup81['child_code'](None, 'IRR', 200, None, False, 'x',
+                              study_target_products='ethanol_isobutanol',
+                              study_type='metabolic_minimal_subset', method='gp')
+assert "method='gp'," in code81g and 'gp_kwargs' not in code81g
+code81t = sup81['child_code'](None, 'IRR', 200, None, False, 'x',
+                              study_target_products='ethanol_isobutanol',
+                              study_type='metabolic_minimal_subset')
+assert "method='tpe'," in code81t and 'gp_kwargs' not in code81t
+src81 = _inspect.getsource(sup81['supervise'])
+assert 'gp_kwargs=gp_kwargs' in src81 and 'gp_kwargs={gp_kwargs!r}' in src81
+cli81 = open(os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                          'optimize_kinetics_BO_supervised.py')).read()
+for flag81 in ("'--gp-no-learned-constraints'", "'--gp-deterministic'"):
+    assert flag81 in cli81, flag81
+assert 'require --method gp' in cli81
+assert 'gp_kwargs=gp_kwargs or None' in cli81
+assert '--method gp' in cli81                      # usage example in the module docstring
+PASS('supervisor: --method gp -> _gp name on both paths; child_code emits gp_kwargs= '
+     'only when given; supervise() threads + logs it; GP flags refused without --method gp')
+
 print(f'\nALL {n_pass} CHECKS PASSED')

@@ -73,6 +73,10 @@ sequentially) -- ask-first, like the unsupervised driver. Examples:
         --study-type metabolic_minimal_subset
     # scipy dual annealing instead of TPE (name ..._irr_da_rb0.001-10_ibe0.3-2_burden)
     python optimize_kinetics_BO_supervised.py --objective IRR --study-type metabolic_minimal_subset --method dual_annealing
+    # feasibility-aware Gaussian-process sampler (<= 15 variables; name
+    # ..._irr_gp_rb0.001-10_ibe0.3-2_burden); learned constraint GP off:
+    python optimize_kinetics_BO_supervised.py --objective IRR --study-type metabolic_minimal_subset --method gp
+    python optimize_kinetics_BO_supervised.py --objective IRR --study-type metabolic_minimal_subset --method gp --gp-no-learned-constraints
     # resume a pre-2026-09-04 study under its old flags and name:
     python optimize_kinetics_BO_supervised.py --legacy-flags --scenario A \\
         --kinetic-bounds-scenario B --objective IRR --n-trials 2000
@@ -170,9 +174,9 @@ def default_study_name(scenario, objective, kinetic_bounds_scenario,
     `_seed{n}` after `_s1x` on both paths (ko.seed_points_tag): seeds
     change the trajectory, not the columns, so the tag is what keeps a
     seeded run off the unseeded study's store.
-    `method` ('tpe' default; 'dual_annealing') inserts ko.method_study_tag
-    (`_da`) right after the objective slug on both paths, exactly as the
-    driver does."""
+    `method` ('tpe' default; 'gp'; 'dual_annealing') inserts
+    ko.method_study_tag (`_gp` / `_da`) right after the objective slug on
+    both paths, exactly as the driver does."""
     n_seeds = seed_count(seed_from)
     if study_target_products is not None:
         # The _ib / _x / _s1x tags of the preset's own values come from
@@ -269,7 +273,7 @@ def child_code(scenario, objective, n_trials, kinetic_bounds_scenario,
                volume_feasibility=True,
                exclude_params=None,
                stage_1_max_x_bounds=_UNSET, seed_from=None,
-               method='tpe', annealing_kwargs=None,
+               method='tpe', annealing_kwargs=None, gp_kwargs=None,
                group_multiplier_bounds=None):
     """The -c program for one supervised attempt of the driver.
     `study_target_products=None` selects the driver's legacy flag path.
@@ -288,7 +292,8 @@ def child_code(scenario, objective, n_trials, kinetic_bounds_scenario,
     list is forwarded as a list of (str, tuple-of-int) pairs (the driver
     enqueues the seeds on a fresh study only). `method` is always
     forwarded; `annealing_kwargs` (None/{} = the engine defaults) is
-    forwarded only when non-empty. `group_multiplier_bounds=None` leaves
+    forwarded only when non-empty; `gp_kwargs` (None/{} = the engine's
+    GP defaults) likewise only when non-empty. `group_multiplier_bounds=None` leaves
     the effector-family group band to the preset (the kwarg is omitted;
     the grouped presets' per-group dict floors inhib_ethanol at 0.3x); a
     (lo, hi) tuple is forwarded as ONE shared band for every group."""
@@ -313,6 +318,8 @@ def child_code(scenario, objective, n_trials, kinetic_bounds_scenario,
               f'          stage_1_max_x_bounds={s1x_value!r},\n')
     annealing_kw = ('' if not annealing_kwargs else
                     f'          annealing_kwargs={dict(annealing_kwargs)!r},\n')
+    gp_kw = ('' if not gp_kwargs else
+             f'          gp_kwargs={dict(gp_kwargs)!r},\n')
     return (
         'import runpy\n'
         f'ns = runpy.run_path({DRIVER!r})\n'
@@ -332,6 +339,7 @@ def child_code(scenario, objective, n_trials, kinetic_bounds_scenario,
         f'          volume_feasibility={volume_feasibility!r},\n'
         f'          method={method!r},\n'
         f'{annealing_kw}'
+        f'{gp_kw}'
         f'{startup_sampling_kw}'
         f'{rate_kw}'
         f'{group_kw}'
@@ -356,7 +364,7 @@ def supervise(scenario=None, objective='IRR', n_trials=2000,
               volume_feasibility=True,
               exclude_params=None,
               stage_1_max_x_bounds=_UNSET, seed_from=None,
-              method='tpe', annealing_kwargs=None,
+              method='tpe', annealing_kwargs=None, gp_kwargs=None,
               group_multiplier_bounds=None):
     """Run attempts until 'complete' or 'abort'; returns the final
     outcome string ('complete' or 'abort'). `study_target_products` /
@@ -417,7 +425,13 @@ def supervise(scenario=None, objective='IRR', n_trials=2000,
     (best-so-far restart) with the remaining budget. `annealing_kwargs`
     (--initial-temp / --energy-scale / --max-calls-factor / --local-search;
     None = the engine defaults) is forwarded to the driver on every
-    attempt (a schedule setting, not part of the study name)."""
+    attempt (a schedule setting, not part of the study name). `method='gp'`
+    (--method gp) is an optuna study like TPE (crash/stall relaunch resumes
+    it), named with `_gp`; `gp_kwargs` (--gp-no-learned-constraints /
+    --gp-deterministic; None = the engine defaults) is forwarded on every
+    attempt (a sampler setting, not part of the study name; note that
+    learned constraints cannot be switched back ON for a study whose stored
+    trials ran without them -- the engine falls back and prints)."""
     seed_from = [(donor, tuple(int(n) for n in trials))
                  for donor, trials in (seed_from or ())]
     if group_multiplier_bounds is not None:
@@ -470,6 +484,7 @@ def supervise(scenario=None, objective='IRR', n_trials=2000,
                       stage_1_max_x_bounds=stage_1_max_x_bounds,
                       seed_from=seed_from,
                       method=method, annealing_kwargs=annealing_kwargs,
+                      gp_kwargs=gp_kwargs,
                       group_multiplier_bounds=group_multiplier_bounds)
     guard = ko.StallGuard(stall_timeout_s=60.0*stall_timeout_min)
 
@@ -490,6 +505,7 @@ def supervise(scenario=None, objective='IRR', n_trials=2000,
 
     event(f'settings: study {study_name}; '
           f'method={method!r}, annealing_kwargs={annealing_kwargs!r}, '
+          f'gp_kwargs={gp_kwargs!r}, '
           f'burden={burden!r}, '
           f'enqueue_baseline={enqueue_baseline!r}, '
           f'enqueue_knockouts={enqueue_knockouts!r}, '
@@ -805,7 +821,13 @@ if __name__ == '__main__':
                              'COUNT is tagged _seed{n} into the derived '
                              'study name; a resume never re-enqueues')
     parser.add_argument('--method', default='tpe', choices=ko.OPTIMIZATION_METHODS,
-                        help="optimizer: 'tpe' (optuna TPE, default) or "
+                        help="optimizer: 'tpe' (optuna TPE, default), 'gp' "
+                             '(feasibility-aware optuna Gaussian process over '
+                             'the same search space / caps / trajectory '
+                             'protocol, <= 15 decision variables, name tagged '
+                             '_gp; every enqueue/seed/sampler flag honoured; '
+                             'see --gp-no-learned-constraints / '
+                             "--gp-deterministic) or "
                              "'dual_annealing' (scipy dual annealing over the "
                              'same search space / burden / volume checks / '
                              'trajectory protocol; the derived study name '
@@ -839,6 +861,18 @@ if __name__ == '__main__':
                              'search after improvements (default OFF: its '
                              'finite-difference gradients cost ~d '
                              'simulations each on a non-smooth landscape)')
+    parser.add_argument('--gp-no-learned-constraints', dest='gp_learned_constraints',
+                        action='store_false', default=True,
+                        help="method gp: do NOT fit optuna's learned constraint "
+                             'GP on the burden / volume violations (plain '
+                             'log-EI; the default fits it, ConstrainedLogEI). '
+                             'The exact feasibility filter is unaffected. '
+                             'Cannot be switched back ON for a study whose '
+                             'stored trials ran without it')
+    parser.add_argument('--gp-deterministic', action='store_true',
+                        help='method gp: tell the GP the objective is '
+                             'noise-free (optuna deterministic_objective=True; '
+                             'default False)')
     args = parser.parse_args()
     seed_from = None
     if args.seed_from:
@@ -876,6 +910,14 @@ if __name__ == '__main__':
     if annealing_kwargs and args.method != 'dual_annealing':
         parser.error('--initial-temp / --energy-scale / --max-calls-factor / '
                      '--local-search require --method dual_annealing')
+    gp_kwargs = {}
+    if not args.gp_learned_constraints:
+        gp_kwargs['learned_constraints'] = False
+    if args.gp_deterministic:
+        gp_kwargs['deterministic_objective'] = True
+    if gp_kwargs and args.method != 'gp':
+        parser.error('--gp-no-learned-constraints / --gp-deterministic '
+                     'require --method gp')
     if args.method == 'dual_annealing' and (args.enqueue_knockouts or seed_from):
         parser.error('--enqueue-knockouts and --seed-from have no '
                      'dual-annealing counterpart (optuna enqueue)')
@@ -908,6 +950,7 @@ if __name__ == '__main__':
                         seed_from=seed_from,
                         method=args.method,
                         annealing_kwargs=annealing_kwargs or None,
+                        gp_kwargs=gp_kwargs or None,
                         group_multiplier_bounds=(
                             None if args.group_multiplier_bounds is None
                             else tuple(args.group_multiplier_bounds)))
