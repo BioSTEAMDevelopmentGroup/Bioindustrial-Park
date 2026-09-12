@@ -691,7 +691,7 @@ assert ko.DEFAULT_STUDY_TARGET_PRODUCTS == 'ethanol_isobutanol'
 assert ko.DEFAULT_STUDY_TYPE == 'metabolic_protein'
 assert set(ko.STUDY_TARGET_PRODUCTS) == {'ethanol_only', 'ethanol_isobutanol'}
 assert set(ko.STUDY_TYPE_ROLES) == {'metabolic', 'metabolic_protein', 'metabolic_minimal',
-                                    'metabolic_minimal_subset'}
+                                    'metabolic_minimal_subset', 'metabolic_14d'}
 assert set(ko.STUDY_TYPE_ROLES['metabolic_minimal']) == {
     'capacity', 'product_inhibition', 'lethality'}
 assert set(ko.STUDY_TYPE_ROLES['metabolic']) == {
@@ -2954,7 +2954,14 @@ assert ko.STUDY_TYPE_OPTIONS == {
                                      group_multiplier_bounds={'inhib_ethanol': (0.3, 2.0)},
                                      exclude_params=(),
                                      spike_delta_bounds=None,
-                                     stage_1_max_x_bounds=None)}
+                                     stage_1_max_x_bounds=None),
+    'metabolic_14d': dict(rate_params=ko.METABOLIC_14D_RATES,
+                          parameter_groups=ko.METABOLIC_MINIMAL_SUBSET_GROUPS,
+                          rate_parameter_groups=ko.METABOLIC_14D_RATE_GROUPS,
+                          group_multiplier_bounds={'glycolysis': (0.2, 5.0),
+                                                   'inhib_ethanol': (0.3, 2.0)},
+                          exclude_params=(),
+                          spike_delta_bounds=None)}
 assert {'STUDY_TYPE_OPTIONS', 'EFFECTOR_ORDER', 'kinetic_parameter_effectors',
         'study_type_name_defaults'} <= set(ko.__all__)
 # Naming defaults per study type (workbook-free): the minimal type's group
@@ -4940,5 +4947,151 @@ assert "'--group-multiplier-bounds'" in _file73 and "metavar=('LO', 'HI')" in _f
 assert 'args.group_multiplier_bounds' in _file73        # forwarded by main
 assert 'group_multiplier_bounds={group_multiplier_bounds!r}' in _file73  # settings: line
 PASS('supervisor --group-multiplier-bounds LO HI -> shared group band: name tag mirrors the driver (_ib0.2-2 / _ib0.5-3 vs preset _ibe0.3-2), emitted into the child call only when given, refused up front for ungrouped / legacy')
+
+#%% 74. metabolic_14d preset (2026-09-11): metabolic_minimal_subset with the
+# glycolysis rate family (k_1l / k_1h / k_1e) sampled as ONE capacity-group
+# multiplier (0.2x-5x) and stage_1_max_x a decision variable. Adds the
+# rate_parameter_groups options key -> validated against RATE_CONSTANT_ROLES
+# (capacity) and merged glycolysis-FIRST into parameter_groups. 14 decision
+# variables for ethanol_isobutanol, 9 for ethanol_only; no glycolysis band tag.
+assert ko.METABOLIC_14D_RATES == ('k_3', 'k_6', 'k_13', 'k_14', 'k_15', 'k_16')
+assert ko.METABOLIC_14D_RATE_GROUPS == {'glycolysis': ('k_1l', 'k_1h', 'k_1e')}
+assert {'METABOLIC_14D_RATES', 'METABOLIC_14D_RATE_GROUPS'} <= set(ko.__all__)
+assert ko.STUDY_TYPE_ROLES['metabolic_14d'] == ()                  # no role filter
+opt74 = ko.STUDY_TYPE_OPTIONS['metabolic_14d']
+assert opt74 == dict(
+    rate_params=ko.METABOLIC_14D_RATES,
+    parameter_groups=ko.METABOLIC_MINIMAL_SUBSET_GROUPS,
+    rate_parameter_groups=ko.METABOLIC_14D_RATE_GROUPS,
+    group_multiplier_bounds={'glycolysis': (0.2, 5.0), 'inhib_ethanol': (0.3, 2.0)},
+    exclude_params=(),
+    spike_delta_bounds=None)
+assert 'stage_1_max_x_bounds' not in opt74                         # omitted -> sampled (1,50)
+# Name defaults: stage_1_max_x sampled at the default (1,50) g/L; no exclusions;
+# the inhibition band = the group dict (glycolysis rides along, ignored by _ib).
+assert ko.study_type_name_defaults('metabolic_14d') == dict(
+    inhibition_multiplier_bounds={'glycolysis': (0.2, 5.0), 'inhib_ethanol': (0.3, 2.0)},
+    exclude_params=(), stage_1_max_x_bounds=(1.0, 50.0))
+# The default name: rate band, _ibe0.3-2 (only inhib_ethanol differs from the
+# 0.2 default; glycolysis is NOT tagged), no _x tag, _s1x1-50 (sampled), burden.
+NAME74 = 'kin_opt_ethanol_isobutanol_metabolic_14d_irr_rb0.001-10_ibe0.3-2_s1x1-50_burden'
+assert ko.default_study_name(
+    'IRR', 'ethanol_isobutanol', 'metabolic_14d',
+    rate_multiplier_bounds=(1e-3, 10.0),
+    inhibition_multiplier_bounds={'glycolysis': (0.2, 5.0), 'inhib_ethanol': (0.3, 2.0)},
+    exclude_params=(), stage_1_max_x_bounds=(1.0, 50.0), burden=True) == NAME74
+# The supervisor derives the SAME name from the study_type alone.
+sup74 = _runpy.run_path(os.path.join(
+    os.path.dirname(os.path.abspath(__file__)),
+    'optimize_kinetics_BO_supervised.py'))
+assert sup74['default_study_name'](None, 'IRR', None,
+                                   study_target_products='ethanol_isobutanol',
+                                   study_type='metabolic_14d', burden=True) == NAME74
+# Typo guard: a rate_parameter_groups member that is NOT a capacity row is
+# rejected up front (KeyError naming the parameter and the preset), and the
+# inhibition-group guard is preserved for a parameter_groups member that is
+# NOT an inhibition row. Inject throwaway presets and clean up in finally.
+ko.STUDY_TYPE_ROLES['_bad_rate_group_74'] = ()
+ko.STUDY_TYPE_OPTIONS['_bad_rate_group_74'] = dict(
+    rate_params=('k_3',), parameter_groups={},
+    rate_parameter_groups={'glycolysis': ('k_1ie',)},   # inhibition coeff, not a capacity
+    group_multiplier_bounds={}, exclude_params=(),
+    spike_delta_bounds=None, stage_1_max_x_bounds=None)
+ko.STUDY_TYPE_ROLES['_bad_inhib_group_74'] = ()
+ko.STUDY_TYPE_OPTIONS['_bad_inhib_group_74'] = dict(
+    rate_params=('k_3',), parameter_groups={'inhib_ethanol': ('k_1l',)},  # capacity, not an inhib coeff
+    group_multiplier_bounds={}, exclude_params=(),
+    spike_delta_bounds=None, stage_1_max_x_bounds=None)
+try:
+    try:
+        ko.resolve_study_preset('ethanol_isobutanol', '_bad_rate_group_74')
+        raise AssertionError('rate_parameter_groups typo guard did not fire')
+    except KeyError as e74:
+        assert 'k_1ie' in str(e74) and '_bad_rate_group_74' in str(e74), str(e74)
+    try:
+        ko.resolve_study_preset('ethanol_isobutanol', '_bad_inhib_group_74')
+        raise AssertionError('parameter_groups typo guard did not fire')
+    except KeyError as e74b:
+        assert 'k_1l' in str(e74b) and '_bad_inhib_group_74' in str(e74b), str(e74b)
+finally:
+    del ko.STUDY_TYPE_ROLES['_bad_rate_group_74']
+    del ko.STUDY_TYPE_OPTIONS['_bad_rate_group_74']
+    del ko.STUDY_TYPE_ROLES['_bad_inhib_group_74']
+    del ko.STUDY_TYPE_OPTIONS['_bad_inhib_group_74']
+# The resolved preset + built search space (needs the workbooks).
+if os.path.isfile(wb_A) and os.path.isfile(wb_B):
+    roles74 = ko.kinetic_parameter_roles()
+    # ethanol_isobutanol: every listed name is in the B workbook.
+    p74 = ko.resolve_study_preset('ethanol_isobutanol', 'metabolic_14d')
+    assert p74['scenario'] == 'A' and p74['kinetic_bounds_scenario'] == 'B'
+    assert p74['include_params'] == list(ko.METABOLIC_14D_RATES)   # 6 individual rates, glycolysis NOT among them
+    assert list(p74['parameter_groups']) == ['glycolysis', 'inhib_ethanol',
+                                             'inhib_isobutanol', 'inhib_acetate']
+    assert p74['parameter_groups']['glycolysis'] == ['k_1l', 'k_1h', 'k_1e']
+    assert p74['parameter_groups']['inhib_ethanol'] == list(
+        ko.METABOLIC_MINIMAL_SUBSET_GROUPS['inhib_ethanol'])
+    assert p74['exclude_params'] == ()
+    assert p74['multiplier_bounds'] == (0.2, 2.0)                  # inert tuple (all inhib grouped)
+    assert p74['group_multiplier_bounds'] == {'glycolysis': (0.2, 5.0),
+                                              'inhib_ethanol': (0.3, 2.0)}
+    assert p74['spike_delta_bounds'] is None
+    assert p74['stage_1_max_x_bounds'] == (1.0, 50.0)             # sampled
+    assert p74['rate_multiplier_bounds'] == ko.DEFAULT_RATE_MULTIPLIER_BOUNDS
+    assert all(roles74[n] == 'capacity' for n in p74['parameter_groups']['glycolysis'])
+    assert all(roles74[m] in ('product_inhibition', 'lethality')
+               for g, ms in p74['parameter_groups'].items() if g != 'glycolysis'
+               for m in ms)
+    kb74 = ko.workbook_kinetic_baselines('B')
+    space74, excl74 = ko.build_search_space(
+        kb74, include_params=p74['include_params'],
+        exclude_params=p74['exclude_params'],
+        rate_multiplier_bounds=p74['rate_multiplier_bounds'],
+        rate_params=p74['rate_params'],
+        parameter_multiplier_bounds=p74['parameter_multiplier_bounds'],
+        parameter_groups=p74['parameter_groups'],
+        group_multiplier_bounds=p74['group_multiplier_bounds'],
+        spike_delta_bounds=p74['spike_delta_bounds'],
+        stage_1_max_x_bounds=p74['stage_1_max_x_bounds'])
+    assert len(space74) == 14, list(space74)
+    assert list(space74)[:6] == ['k_3', 'k_6', 'k_13', 'k_14', 'k_15', 'k_16']
+    assert list(space74)[6:] == ['glycolysis', 'inhib_ethanol', 'inhib_isobutanol',
+                                 'inhib_acetate', 'threshold_conc', 'target_delta',
+                                 'max_n_spikes', 'stage_1_max_x']
+    for m74 in ('k_1l', 'k_1h', 'k_1e'):
+        assert m74 not in space74                                  # grouped, not individual
+    assert 'spike_delta' not in space74
+    assert space74['glycolysis'] == dict(low=0.2, high=5.0, log=True)
+    assert space74['inhib_ethanol'] == dict(low=0.3, high=2.0, log=True)
+    assert space74['inhib_isobutanol'] == dict(low=0.2, high=2.0, log=True)
+    assert space74['inhib_acetate'] == dict(low=0.2, high=2.0, log=True)
+    assert space74['stage_1_max_x'] == dict(low=1.0, high=50.0, log=True)
+    for r74 in ('k_3', 'k_6', 'k_13', 'k_14', 'k_15', 'k_16'):
+        assert space74[r74] == dict(low=1e-3*kb74[r74], high=10.0*kb74[r74], log=True), r74
+    # ethanol_only: no k_13-k_16, no isobutanol coefficients in the A workbook.
+    # 2 rates + glycolysis + inhib_ethanol + inhib_acetate + 3 feeding + stage_1_max_x = 9.
+    p74_eo = ko.resolve_study_preset('ethanol_only', 'metabolic_14d')
+    assert p74_eo['include_params'] == ['k_3', 'k_6']
+    assert list(p74_eo['parameter_groups']) == ['glycolysis', 'inhib_ethanol', 'inhib_acetate']
+    assert p74_eo['parameter_groups']['glycolysis'] == ['k_1l', 'k_1h', 'k_1e']
+    kb74_eo = ko.workbook_kinetic_baselines('A')
+    space74_eo, _ = ko.build_search_space(
+        kb74_eo, include_params=p74_eo['include_params'],
+        exclude_params=p74_eo['exclude_params'],
+        rate_multiplier_bounds=p74_eo['rate_multiplier_bounds'],
+        rate_params=p74_eo['rate_params'],
+        parameter_multiplier_bounds=p74_eo['parameter_multiplier_bounds'],
+        parameter_groups=p74_eo['parameter_groups'],
+        group_multiplier_bounds=p74_eo['group_multiplier_bounds'],
+        spike_delta_bounds=p74_eo['spike_delta_bounds'],
+        stage_1_max_x_bounds=p74_eo['stage_1_max_x_bounds'])
+    assert len(space74_eo) == 9, list(space74_eo)
+    assert list(space74_eo)[:2] == ['k_3', 'k_6']
+    assert list(space74_eo)[2:] == ['glycolysis', 'inhib_ethanol', 'inhib_acetate',
+                                    'threshold_conc', 'target_delta', 'max_n_spikes',
+                                    'stage_1_max_x']
+    assert space74_eo['glycolysis'] == dict(low=0.2, high=5.0, log=True)
+else:
+    print('SKIP 74 (preset part): parameter-distribution workbooks not found')
+PASS('metabolic_14d preset: 14/9 vars, glycolysis capacity group (0.2-5x) merged glycolysis-first, stage_1_max_x sampled, rate_parameter_groups typo guard (capacity) + inhibition guard preserved, name _ibe0.3-2_s1x1-50 (no glycolysis tag), supervisor agrees')
 
 print(f'\nALL {n_pass} CHECKS PASSED')

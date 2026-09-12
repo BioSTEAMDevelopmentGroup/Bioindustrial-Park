@@ -73,6 +73,7 @@ __all__ = ('OBJECTIVE_REGISTRY', 'TRACKED_METRICS',
            'STUDY_TARGET_PRODUCTS', 'STUDY_TYPE_ROLES',
            'STUDY_TYPE_OPTIONS', 'EFFECTOR_ORDER',
            'METABOLIC_MINIMAL_SUBSET_RATES', 'METABOLIC_MINIMAL_SUBSET_GROUPS',
+           'METABOLIC_14D_RATES', 'METABOLIC_14D_RATE_GROUPS',
            'kinetic_parameter_effectors', 'study_type_name_defaults',
            'DEFAULT_STUDY_TARGET_PRODUCTS', 'DEFAULT_STUDY_TYPE',
            'resolve_study_preset', 'default_study_name',
@@ -1136,6 +1137,11 @@ STUDY_TYPE_ROLES = {
     # rows, so it cannot be mistaken for a role-filtered type). The
     # table stays the registry of valid study_type values.
     'metabolic_minimal_subset': (),
+    # 'metabolic_14d' (2026-09-11): NO role filter -- a STANDALONE explicit
+    # set like metabolic_minimal_subset, listed outright via STUDY_TYPE_OPTIONS
+    # (METABOLIC_14D_RATES + METABOLIC_14D_RATE_GROUPS + the shared inhibition
+    # groups). The name encodes the ethanol_isobutanol decision-var count, 14.
+    'metabolic_14d': (),
 }
 
 #: The STANDALONE metabolic_minimal_subset preset (2026-09-07): its
@@ -1163,6 +1169,22 @@ METABOLIC_MINIMAL_SUBSET_GROUPS = {
     'inhib_acetate':    ('k_1ia', 'k_4ia', 'k_6ia', 'k_7ia', 'k_10ia', 'k_16ia'),
 }
 
+#: The metabolic_14d preset (2026-09-11): metabolic_minimal_subset with the
+#: glycolysis rate family grouped and stage_1_max_x sampled. Its INDIVIDUAL
+#: rate constants are the metabolic_minimal_subset rates minus the three
+#: glycolysis rates (k_1l / k_1h / k_1e), which move into the capacity group
+#: below; each on the rate band (DEFAULT_RATE_MULTIPLIER_BOUNDS), intersected
+#: with the target's workbook (ethanol_only lacks k_13-k_16).
+METABOLIC_14D_RATES = ('k_3', 'k_6', 'k_13', 'k_14', 'k_15', 'k_16')
+#: Its CAPACITY group (declared under the STUDY_TYPE_OPTIONS rate_parameter_
+#: groups key so resolve_study_preset validates the members as capacity rows,
+#: not inhibition coefficients): ONE log multiplier on (0.2, 5.0) x every
+#: member's LIVE baseline (expand_grouped_values), preserving the glycolysis
+#: family's intra-ratio. Merged glycolysis-FIRST into parameter_groups, so the
+#: search-space / CSV column order after the individual rates is glycolysis,
+#: then the three inhibition groups.
+METABOLIC_14D_RATE_GROUPS = {'glycolysis': ('k_1l', 'k_1h', 'k_1e')}
+
 #: Per-study_type options beyond the role filter (a type absent here
 #: takes the defaults: DEFAULT_EXCLUDED_PARAMETERS, no groups,
 #: DEFAULT_GROUP_MULTIPLIER_BOUNDS, DEFAULT_SPIKE_DELTA_BOUNDS,
@@ -1170,9 +1192,11 @@ METABOLIC_MINIMAL_SUBSET_GROUPS = {
 #: roles grouped by effector), group_multiplier_bounds, spike_delta_bounds
 #: (None = pinned), stage_1_max_x_bounds (None = pinned; since the
 #: metabolic_minimal_subset preset -- honoured for every type), and the
-#: EXPLICIT-definition pair rate_params + parameter_groups (present =
+#: EXPLICIT-definition keys rate_params + parameter_groups (present =
 #: the set is listed outright and intersected with the workbook;
-#: group_roles absent).
+#: group_roles absent), plus the optional rate_parameter_groups
+#: (metabolic_14d): CAPACITY groups whose members resolve_study_preset
+#: validates as capacity rows and merges FIRST into parameter_groups.
 #: 'metabolic_minimal' = the compact, interpretable space (24 variables
 #: for ethanol_isobutanol, 19 for ethanol_only): exclude_params = k_10
 #: (decay, as everywhere) + k_7 and k_8 (the growth capacities, so the
@@ -1211,6 +1235,26 @@ STUDY_TYPE_OPTIONS = {
         exclude_params=(),
         spike_delta_bounds=None,
         stage_1_max_x_bounds=None,
+    ),
+    # metabolic_14d = metabolic_minimal_subset with (a) the glycolysis rates
+    # k_1l/k_1h/k_1e grouped as ONE capacity multiplier (rate_parameter_groups
+    # -- validated as capacity rows and merged glycolysis-first into
+    # parameter_groups) on 0.2x-5x, and (b) stage_1_max_x SAMPLED
+    # (stage_1_max_x_bounds omitted -> the default (1.0, 50.0) g/L). 14
+    # decision variables for ethanol_isobutanol (6 individual rates + 1
+    # glycolysis + 3 inhibition groups + 3 feeding + stage_1_max_x), 9 for
+    # ethanol_only. The glycolysis band rides in group_multiplier_bounds and is
+    # ignored by the _ib name tag (only inhib_* keys are tagged), so the name
+    # gains no glycolysis tag: the distinct glycolysis column already blocks any
+    # cross-study CSV resume. Default name
+    # kin_opt_ethanol_isobutanol_metabolic_14d_irr_rb0.001-10_ibe0.3-2_s1x1-50_burden.
+    'metabolic_14d': dict(
+        rate_params=METABOLIC_14D_RATES,
+        parameter_groups=METABOLIC_MINIMAL_SUBSET_GROUPS,
+        rate_parameter_groups=METABOLIC_14D_RATE_GROUPS,
+        group_multiplier_bounds={'glycolysis': (0.2, 5.0), 'inhib_ethanol': (0.3, 2.0)},
+        exclude_params=(),
+        spike_delta_bounds=None,
     ),
 }
 #: Order of the effector groups of a grouped preset (group name
@@ -1326,6 +1370,17 @@ def resolve_study_preset(study_target_products, study_type, roles=None,
     coefficients in the A workbook) 5 + 2 + 3 = 10. The returned
     rate_params is still the workbook's every capacity row (the listed
     rates are a subset); `effectors` is not consulted.
+
+    'metabolic_14d' (2026-09-11) is metabolic_minimal_subset with the
+    glycolysis rate family grouped and stage_1_max_x sampled: its
+    STUDY_TYPE_OPTIONS entry adds a rate_parameter_groups dict
+    ({'glycolysis': ('k_1l', 'k_1h', 'k_1e')}) whose members are validated
+    as CAPACITY rows (KeyError naming the parameter and the preset if not)
+    and merged FIRST into parameter_groups, ahead of the inhibition groups;
+    every member is scaled from its LIVE baseline exactly like an inhibition
+    group's. So ethanol_isobutanol samples 6 rates + 1 glycolysis + 3
+    inhibition multipliers + 3 feeding + stage_1_max_x = 14, and ethanol_only
+    (no k_13-k_16, no isobutanol coefficients) 2 + 1 + 2 + 3 + 1 = 9.
     """
     if study_target_products not in STUDY_TARGET_PRODUCTS:
         raise ValueError(
@@ -1354,13 +1409,20 @@ def resolve_study_preset(study_target_products, study_type, roles=None,
     group_roles = set(options.get('group_roles', ()))
     parameter_groups = None
     if options.get('rate_params') is not None:
-        # EXPLICIT preset (metabolic_minimal_subset): the set is listed
-        # outright. (1) Typo guard against the role table FIRST -- a
-        # misspelt name must never be dropped silently by the
-        # intersection below; (2) the listed rates present in the
-        # target's workbook, list order; (3) the groups' members present
-        # in it, empty groups omitted (None if every group is).
+        # EXPLICIT preset (metabolic_minimal_subset, metabolic_14d): the set
+        # is listed outright. (1) Typo guard against the role table FIRST --
+        # a misspelt name must never be dropped silently by the workbook
+        # intersection below: every listed rate a capacity row, every
+        # rate_parameter_groups member a capacity row (a CAPACITY group,
+        # e.g. metabolic_14d's glycolysis), every parameter_groups member a
+        # product_inhibition / lethality row. (2) the listed rates present in
+        # the target's workbook, list order; (3) each group's members present
+        # in it -- capacity (rate) groups merged FIRST, then the inhibition
+        # groups, so the built search-space / CSV column order after the
+        # individual rates is the rate group(s), then the inhibition groups;
+        # empty groups omitted (None if every group is).
         explicit_rates = tuple(options['rate_params'])
+        explicit_rate_groups = dict(options.get('rate_parameter_groups', {}))
         explicit_groups = dict(options['parameter_groups'])
         for name in explicit_rates:
             if roles.get(name) not in RATE_CONSTANT_ROLES:
@@ -1369,6 +1431,15 @@ def resolve_study_preset(study_target_products, study_type, roles=None,
                     'preset) is not a capacity-role row of the nskinetics '
                     'kinetic-parameter role table (role '
                     f'{roles.get(name)!r}); refusing to build the preset.')
+        for group, members in explicit_rate_groups.items():
+            for name in members:
+                if roles.get(name) not in RATE_CONSTANT_ROLES:
+                    raise KeyError(
+                        f'{name!r} (member of capacity group {group!r} of '
+                        f'the {study_type!r} preset) is not a capacity-role '
+                        'row of the nskinetics kinetic-parameter role table '
+                        f'(role {roles.get(name)!r}); refusing to build the '
+                        'preset.')
         for group, members in explicit_groups.items():
             for name in members:
                 if roles.get(name) not in INHIBITION_COEFFICIENT_ROLES:
@@ -1381,12 +1452,16 @@ def resolve_study_preset(study_target_products, study_type, roles=None,
         workbook_set = set(workbook_rows)
         include_params = [name for name in explicit_rates
                           if name in workbook_set]
-        parameter_groups = {
-            group: [name for name in members if name in workbook_set]
-            for group, members in explicit_groups.items()}
-        parameter_groups = {group: members
-                            for group, members in parameter_groups.items()
-                            if members} or None
+        parameter_groups = {}
+        for group, members in explicit_rate_groups.items():
+            kept = [name for name in members if name in workbook_set]
+            if kept:
+                parameter_groups[group] = kept
+        for group, members in explicit_groups.items():
+            kept = [name for name in members if name in workbook_set]
+            if kept:
+                parameter_groups[group] = kept
+        parameter_groups = parameter_groups or None
     elif group_roles:
         if effectors is None:
             effectors = kinetic_parameter_effectors()
