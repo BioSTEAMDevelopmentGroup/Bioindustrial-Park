@@ -79,6 +79,7 @@ __all__ = ('OBJECTIVE_REGISTRY', 'TRACKED_METRICS',
            'resolve_study_preset', 'default_study_name',
            'BURDEN_STUDY_SUFFIX',
            'OPTIMIZATION_METHODS', 'method_study_tag', 'check_method_kwargs',
+           'GP_MAX_DIMENSIONS', 'GP_KWARGS_DEFAULTS', 'resolve_gp_kwargs',
            'baseline_decision_point', 'knockout_probe_points',
            'clip_to_search_space', 'seed_points_from_trajectory',
            'seed_points_tag',
@@ -1522,31 +1523,44 @@ def resolve_study_preset(study_target_products, study_type, roles=None,
 #: of defence.
 BURDEN_STUDY_SUFFIX = '_burden'
 
-OPTIMIZATION_METHODS = ('tpe', 'dual_annealing')
+OPTIMIZATION_METHODS = ('tpe', 'gp', 'dual_annealing')
+
+#: Study-name tag per method (method_study_tag). TPE is untagged (every
+#: study before 2026-09-11); the later engines/samplers are tagged so a
+#: campaign of one method never resumes another's store -- all three
+#: sample the SAME columns, so the name is the only thing keeping the
+#: CSVs apart (the header guard cannot).
+_METHOD_STUDY_TAGS = {'tpe': '', 'gp': '_gp', 'dual_annealing': '_da'}
 
 def method_study_tag(method):
     """Study-name tag of an optimization method (since 2026-09-11): '' for
-    'tpe' (every study before that date), '_da' for 'dual_annealing'
-    (run_kinetic_dual_annealing). Inserted right after the objective slug
-    on both naming paths: a DA study samples the SAME columns as the TPE
-    study of the same objective, so only the name keeps the two CSVs
-    apart (the header guard cannot). ValueError for any other value."""
+    'tpe' (every study before that date), '_gp' for the Gaussian-process
+    sampler (run_kinetic_optimization(method='gp'), 2026-09-11 pm), '_da'
+    for 'dual_annealing' (run_kinetic_dual_annealing). Inserted right after
+    the objective slug on both naming paths: a GP or DA study samples the
+    SAME columns as the TPE study of the same objective, so only the name
+    keeps the CSVs apart (the header guard cannot). ValueError for any
+    other value."""
     if method not in OPTIMIZATION_METHODS:
         raise ValueError(f'method must be one of {OPTIMIZATION_METHODS}; '
                          f'got {method!r}')
-    return '_da' if method == 'dual_annealing' else ''
+    return _METHOD_STUDY_TAGS[method]
 
 def check_method_kwargs(method, *, enqueue_knockouts=False, seed_from=None,
                         n_startup_trials=None, feasible_sampling=True,
                         startup_sampling='lhs'):
-    """Validate the driver's TPE-only kwargs against `method`. Under 'tpe'
-    everything is allowed ('' returned). Under 'dual_annealing' the optuna
-    ENQUEUE concepts have no counterpart and are refused (ValueError):
-    enqueue_knockouts=True, a non-empty seed_from. The SAMPLER settings
-    (n_startup_trials, feasible_sampling, startup_sampling) are merely
-    ignored: one printable line naming them is returned, so the driver and
-    the supervisor (which forwards them explicitly) can say so once."""
-    if not method_study_tag(method):
+    """Validate the driver's optuna-only kwargs against `method`. Under
+    'tpe' AND 'gp' (both optuna studies) everything is allowed ('' returned:
+    enqueue_baseline / enqueue_knockouts / seed_from / n_startup_trials /
+    feasible_sampling / startup_sampling are all honoured). Under
+    'dual_annealing' the optuna ENQUEUE concepts have no counterpart and are
+    refused (ValueError): enqueue_knockouts=True, a non-empty seed_from. The
+    SAMPLER settings (n_startup_trials, feasible_sampling, startup_sampling)
+    are merely ignored: one printable line naming them is returned, so the
+    driver and the supervisor (which forwards them explicitly) can say so
+    once. An unknown method raises (method_study_tag)."""
+    method_study_tag(method)            # ValueError on an unknown method
+    if method != 'dual_annealing':
         return ''
     if enqueue_knockouts:
         raise ValueError("enqueue_knockouts=True has no dual-annealing "
@@ -1561,6 +1575,49 @@ def check_method_kwargs(method, *, enqueue_knockouts=False, seed_from=None,
             f'feasible_sampling={feasible_sampling!r}, '
             f'startup_sampling={startup_sampling!r} (the burden / volume '
             'checks still prune INFEASIBLE proposals before simulating).')
+
+#: Gaussian-process sampler (method='gp', since 2026-09-11 pm): the largest
+#: search space run_kinetic_optimization accepts under it. A GP's O(n^3) fit
+#: and its acquisition optimization over a Matern-5/2 ARD kernel are meant
+#: for compact spaces (metabolic_minimal_subset = 15 variables for
+#: ethanol_isobutanol, metabolic_14d = 14); larger presets stay on TPE. The
+#: guard raises before any study store or CSV row is written.
+GP_MAX_DIMENSIONS = 15
+
+#: Defaults of run_kinetic_optimization's `gp_kwargs` (resolve_gp_kwargs).
+#: learned_constraints: fit optuna's constraint GP on the burden / volume
+#: violations (ConstrainedLogEI) -- inert with no active cap; toggleable,
+#: default on. deterministic_objective: optuna's noise switch (default
+#: off). n_fallback_candidates / max_fallback_batches: the feasibility
+#: fallback search of FeasibleGPSampler._optimize_acqf (QMC batch size and
+#: the number of batches tried before the raw proposal is returned).
+GP_KWARGS_DEFAULTS = {'learned_constraints': True,
+                      'deterministic_objective': False,
+                      'n_fallback_candidates': 2048,
+                      'max_fallback_batches': 20}
+
+def resolve_gp_kwargs(gp_kwargs):
+    """A fresh copy of GP_KWARGS_DEFAULTS updated with `gp_kwargs` (a dict
+    or None). An unknown key raises ValueError naming it;
+    n_fallback_candidates / max_fallback_batches must be positive integers
+    (bool refused); the two flags are coerced to bool."""
+    options = dict(GP_KWARGS_DEFAULTS)
+    given = dict(gp_kwargs or {})
+    unknown = sorted(set(given) - set(options))
+    if unknown:
+        raise ValueError(f'unknown gp_kwargs key(s) {unknown}; allowed keys: '
+                         f'{sorted(options)}')
+    options.update(given)
+    for key in ('n_fallback_candidates', 'max_fallback_batches'):
+        value = options[key]
+        if (isinstance(value, bool) or not isinstance(value, (int, float))
+                or int(value) != value or value < 1):
+            raise ValueError(f'gp_kwargs[{key!r}] must be a positive integer; '
+                             f'got {value!r}')
+        options[key] = int(value)
+    options['learned_constraints'] = bool(options['learned_constraints'])
+    options['deterministic_objective'] = bool(options['deterministic_objective'])
+    return options
 
 def _inhibition_bounds_tag(inhibition_multiplier_bounds):
     """The `_ib...` study-name fragment for default_study_name's

@@ -4671,7 +4671,7 @@ else:
 # seed_from under DA through ko.check_method_kwargs (the driver load()s the
 # biorefinery at import, so its guard logic lives in ko and is exercised
 # here; the driver is checked by source text like checks 46/60).
-assert ko.OPTIMIZATION_METHODS == ('tpe', 'dual_annealing')
+assert ko.OPTIMIZATION_METHODS == ('tpe', 'gp', 'dual_annealing')
 assert ko.method_study_tag('tpe') == '' and ko.method_study_tag('dual_annealing') == '_da'
 for bad69 in ('DA', 'annealing', None, ''):
     try:
@@ -5093,5 +5093,65 @@ if os.path.isfile(wb_A) and os.path.isfile(wb_B):
 else:
     print('SKIP 74 (preset part): parameter-distribution workbooks not found')
 PASS('metabolic_14d preset: 14/9 vars, glycolysis capacity group (0.2-5x) merged glycolysis-first, stage_1_max_x sampled, rate_parameter_groups typo guard (capacity) + inhibition guard preserved, name _ibe0.3-2_s1x1-50 (no glycolysis tag), supervisor agrees')
+
+#%% 75. GP method surface (GP spec 2026-09-11, §1): 'gp' is the third
+# OPTIMIZATION_METHODS value, tagged `_gp` right after the objective slug on
+# both naming paths (like `_da`); check_method_kwargs honours every optuna
+# concept under 'gp' (returns '' without raising) and keeps refusing them
+# under dual annealing; GP_MAX_DIMENSIONS / GP_KWARGS_DEFAULTS /
+# resolve_gp_kwargs (defaults, unknown key, positive-int guards).
+assert ko.OPTIMIZATION_METHODS == ('tpe', 'gp', 'dual_annealing')
+assert ko.method_study_tag('gp') == '_gp'
+assert ko.method_study_tag('tpe') == '' and ko.method_study_tag('dual_annealing') == '_da'
+name75 = ko.default_study_name('IRR', 'ethanol_isobutanol', 'metabolic_minimal_subset',
+                               burden=True, rate_multiplier_bounds=(1e-3, 10.0),
+                               inhibition_multiplier_bounds=(0.2, 2.0),
+                               exclude_params=(), stage_1_max_x_bounds=None,
+                               method='gp')
+assert name75 == ('kin_opt_ethanol_isobutanol_metabolic_minimal_subset_irr_gp'
+                  '_rb0.001-10_ib0.2-2_burden'), name75
+assert ko.check_method_kwargs('gp', enqueue_knockouts=True,
+                              seed_from=[('d', (1,))], n_startup_trials=5,
+                              feasible_sampling=False,
+                              startup_sampling='random') == ''
+note75 = ko.check_method_kwargs('dual_annealing')            # DA note unchanged
+assert note75 and 'ignored' in note75 and 'n_startup_trials' in note75
+try:
+    ko.check_method_kwargs('dual_annealing', enqueue_knockouts=True)
+except ValueError as e75:
+    assert 'enqueue_knockouts' in str(e75)
+else:
+    raise AssertionError('enqueue_knockouts accepted under dual_annealing')
+try:
+    ko.check_method_kwargs('bogus')
+except ValueError as e75:
+    assert 'bogus' in str(e75)
+else:
+    raise AssertionError('unknown method accepted by check_method_kwargs')
+assert ko.GP_MAX_DIMENSIONS == 15
+assert ko.GP_KWARGS_DEFAULTS == {'learned_constraints': True,
+                                 'deterministic_objective': False,
+                                 'n_fallback_candidates': 2048,
+                                 'max_fallback_batches': 20}
+assert ko.resolve_gp_kwargs(None) == ko.GP_KWARGS_DEFAULTS
+assert ko.resolve_gp_kwargs({}) == ko.GP_KWARGS_DEFAULTS
+assert ko.resolve_gp_kwargs(None) is not ko.GP_KWARGS_DEFAULTS         # a copy
+assert ko.resolve_gp_kwargs({'learned_constraints': False,
+                             'n_fallback_candidates': 64}) == {
+    'learned_constraints': False, 'deterministic_objective': False,
+    'n_fallback_candidates': 64, 'max_fallback_batches': 20}
+for bad75 in ({'bogus': 1}, {'n_fallback_candidates': 0},
+              {'max_fallback_batches': 2.5}, {'max_fallback_batches': True}):
+    try:
+        ko.resolve_gp_kwargs(bad75)
+    except ValueError as e75:
+        assert next(iter(bad75)) in str(e75), str(e75)
+    else:
+        raise AssertionError(f'resolve_gp_kwargs accepted {bad75}')
+assert {'GP_MAX_DIMENSIONS', 'GP_KWARGS_DEFAULTS',
+        'resolve_gp_kwargs'} <= set(ko.__all__)
+PASS('GP surface: OPTIMIZATION_METHODS gains gp, _gp tag after the slug on the '
+     'preset path, check_method_kwargs honours optuna concepts under gp (DA guards '
+     'unchanged), resolve_gp_kwargs defaults / unknown key / positive-int guards')
 
 print(f'\nALL {n_pass} CHECKS PASSED')
