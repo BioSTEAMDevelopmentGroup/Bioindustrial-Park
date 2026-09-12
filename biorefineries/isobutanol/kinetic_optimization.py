@@ -95,6 +95,7 @@ __all__ = ('OBJECTIVE_REGISTRY', 'TRACKED_METRICS',
            'StallGuard', 'attempt_outcome',
            'search_space_distributions', 'draw_uniform_feasible',
            'feasible_candidate_mask', 'feasible_tpe_sampler',
+           'feasible_gp_sampler',
            'DEFAULT_GAMMA_FRACTION', 'DEFAULT_GAMMA_CAP', 'default_tpe_gamma',
            'default_seed_from_datetime',
            'seed_sidecar_path', 'record_seed_used',
@@ -2685,6 +2686,170 @@ def lhs_startup_tpe_sampler(lhs_design, **kwargs):
     (multivariate, seed, n_startup_trials, gamma, constraints_func, ...). The
     TPE phase is byte-for-byte plain TPESampler."""
     return _lhs_startup_tpe_sampler_class()(lhs_design, **kwargs)
+
+_FEASIBLE_GP_CLASS = {}
+
+def _feasible_gp_sampler_class():
+    """The FeasibleGPSampler class (optuna + torch imported here; memoized)."""
+    if 'cls' in _FEASIBLE_GP_CLASS:
+        return _FEASIBLE_GP_CLASS['cls']
+    from optuna.samplers import GPSampler
+
+    class FeasibleGPSampler(GPSampler):
+        """optuna's GPSampler (Matern-5/2 ARD GP, log-EI, ConstrainedLogEI
+        when constraints_func is given) made feasibility-aware for the
+        kinetic BO (method='gp', since 2026-09-11 pm). `is_feasible(values)
+        -> bool` takes EXTERNAL values (the objective's suggest_* values) or
+        is None (no predicate: feasible_sampling off or no cap active -- the
+        LHS start-up then behaves exactly as on the TPE paths).
+
+        START-UP -- fewer finished COMPLETE+PRUNED trials than
+        n_startup_trials (_n_startup_finished, the count the TPE wrappers
+        use, so an LHS design is consumed identically): LHSDesign row
+        k = _n_sampler_drawn_consumed(study, trial) when a design is given,
+        k < size and the row is feasible; otherwise
+        (n_lhs_infeasible_fallbacks += 1) ONE draw_uniform_feasible draw over
+        the full engine space (a None predicate accepts the first draw).
+
+        GP PHASE -- super().sample_relative (GP fit on COMPLETE trials,
+        acquisition optimized through _optimize_acqf below, relative-params
+        system attr). optuna applies its OWN gate inside (COMPLETE count <
+        n_startup_trials -> {}); PRUNED trials count for our gate but not
+        optuna's, so {} is possible past our gate (and whenever there is too
+        little data to fit). It would fall through to the per-parameter
+        RandomSampler (not feasibility-aware), so whenever super() returns {}
+        the same uniform(-feasible) joint draw as start-up is substituted
+        (n_uniform_fallbacks += 1).
+
+        _optimize_acqf -- the base optimizer's normalized proposal x is
+        accepted when there is no predicate or it unnormalizes to a feasible
+        point; otherwise (n_gp_fallbacks += 1) up to max_fallback_batches
+        batches of n_fallback_candidates QMC points
+        (acqf.search_space.sample_normalized_params) are predicate-masked
+        (n_rejected += rejected) and the feasible candidate with the largest
+        acquisition value (acqf.eval_acqf_no_grad) is returned; no survivor
+        in any batch -> n_unfiltered += 1 and the raw x is returned (the
+        engine's pre-sim INFEASIBLE prune handles it; never a crash).
+
+        infer_relative_search_space returns the full engine search space, so
+        every parameter is drawn jointly from trial 0 (optuna's intersection
+        space is empty until a trial with every parameter completes).
+        Enqueued trials (fixed_params) never reach the sampler. Relies on
+        optuna 4.9.0's GPSampler routing every proposal through
+        _optimize_acqf(acqf, best_params) -> normalized ndarray, documented
+        as overridable with no backward-compatibility promise -- the same
+        kind of private hook FeasibleTPESampler relies on."""
+
+        def __init__(self, search_space, is_feasible, *, lhs_design=None,
+                     n_fallback_candidates=2048, max_fallback_batches=20,
+                     max_uniform_draws=10_000, **gp_kwargs):
+            if is_feasible is not None and not callable(is_feasible):
+                raise TypeError('is_feasible must be callable(values) -> bool '
+                                f'or None; got {is_feasible!r}')
+            for name, value in (('n_fallback_candidates', n_fallback_candidates),
+                                ('max_fallback_batches', max_fallback_batches),
+                                ('max_uniform_draws', max_uniform_draws)):
+                if (isinstance(value, bool) or not isinstance(value, (int, float))
+                        or int(value) != value or value < 1):
+                    raise ValueError(f'{name} must be a positive integer; '
+                                     f'got {value!r}')
+            super().__init__(**gp_kwargs)
+            self._feasible_distributions = search_space_distributions(search_space)
+            self._is_feasible = is_feasible
+            self._lhs_design = lhs_design
+            self.n_fallback_candidates = int(n_fallback_candidates)
+            self.max_fallback_batches = int(max_fallback_batches)
+            self.max_uniform_draws = int(max_uniform_draws)
+            self.n_rejected = 0
+            self.n_uniform_fallbacks = 0
+            self.n_unfiltered = 0
+            self.n_lhs_infeasible_fallbacks = 0
+            self.n_gp_fallbacks = 0
+
+        def _accepts(self, values):
+            return self._is_feasible is None or bool(self._is_feasible(values))
+
+        def infer_relative_search_space(self, study, trial):
+            return {name: dist
+                    for name, dist in self._feasible_distributions.items()
+                    if not dist.single()}
+
+        def _uniform_draw(self, search_space):
+            """One joint uniform(-feasible) draw over `search_space` (external
+            values); a None predicate accepts the first draw. Counters as the
+            TPE wrapper: rejected draws, and n_unfiltered when max_uniform_draws
+            draws never satisfied the predicate (the last raw draw is returned
+            so the engine's pre-sim prune, not the study, handles it)."""
+            if self._is_feasible is None:
+                values, n_draws, feasible = draw_uniform_feasible(
+                    self._rng.rng, search_space, lambda values: True, 1)
+            else:
+                values, n_draws, feasible = draw_uniform_feasible(
+                    self._rng.rng, search_space, self._is_feasible,
+                    self.max_uniform_draws)
+            self.n_rejected += n_draws - (1 if feasible else 0)
+            if not feasible:
+                self.n_unfiltered += 1
+            return values
+
+        def sample_relative(self, study, trial, search_space):
+            if search_space == {}:
+                return {}
+            if _n_startup_finished(study) < self._n_startup_trials:
+                if self._lhs_design is not None:
+                    k = _n_sampler_drawn_consumed(study, trial)
+                    if k < self._lhs_design.size:
+                        values = self._lhs_design.external_point(k)
+                        if self._accepts(values):
+                            return values
+                    # LHS row infeasible (or k >= size, unreachable under the
+                    # gate): replace THIS trial with a uniform-feasible draw.
+                    self.n_lhs_infeasible_fallbacks += 1
+                return self._uniform_draw(search_space)
+            params = super().sample_relative(study, trial, search_space)
+            if params == {}:
+                # optuna's own COMPLETE-only start-up gate, or too little data
+                # to fit: never fall through to the per-parameter RandomSampler
+                # (not feasibility-aware) -- substitute the joint draw.
+                self.n_uniform_fallbacks += 1
+                return self._uniform_draw(search_space)
+            return params
+
+        def _optimize_acqf(self, acqf, best_params):
+            x = super()._optimize_acqf(acqf, best_params)
+            if self._is_feasible is None:
+                return x
+            if self._is_feasible(acqf.search_space.get_unnormalized_param(x)):
+                return x
+            self.n_gp_fallbacks += 1
+            for _ in range(self.max_fallback_batches):
+                X = acqf.search_space.sample_normalized_params(
+                    self.n_fallback_candidates, self._rng.rng)
+                mask = np.fromiter(
+                    (bool(self._is_feasible(
+                        acqf.search_space.get_unnormalized_param(row)))
+                     for row in X), dtype=bool, count=len(X))
+                self.n_rejected += int((~mask).sum())
+                if mask.any():
+                    feasible = np.ascontiguousarray(X[mask])
+                    values = acqf.eval_acqf_no_grad(feasible)
+                    return feasible[int(np.argmax(values))]
+            self.n_unfiltered += 1
+            return x
+
+    _FEASIBLE_GP_CLASS['cls'] = FeasibleGPSampler
+    return FeasibleGPSampler
+
+def feasible_gp_sampler(search_space, is_feasible, **kwargs):
+    """A FeasibleGPSampler over the engine `search_space` (build_search_space
+    format) with the predicate `is_feasible(values) -> bool` (external
+    values) or None (no predicate). `kwargs`: lhs_design (None),
+    n_fallback_candidates (2048), max_fallback_batches (20),
+    max_uniform_draws (10_000), and any optuna GPSampler keyword (seed,
+    n_startup_trials, constraints_func, deterministic_objective, ...).
+    Importing this module never imports optuna or torch; the class is built
+    on first use."""
+    return _feasible_gp_sampler_class()(search_space, is_feasible, **kwargs)
 
 #: Default TPE `gamma`, the quantile that splits finished trials into the
 #: "good" (below) and "bad" (above) sets the sampler builds its densities

@@ -5154,4 +5154,181 @@ PASS('GP surface: OPTIMIZATION_METHODS gains gp, _gp tag after the slug on the '
      'preset path, check_method_kwargs honours optuna concepts under gp (DA guards '
      'unchanged), resolve_gp_kwargs defaults / unknown key / positive-int guards')
 
+#%% 76. FeasibleGPSampler start-up (GP spec §2): a subclass of optuna's
+# GPSampler built lazily (feasible_gp_sampler); every start-up draw satisfies
+# the predicate (feas33 rejects ~60 % of log-uniform draws) and consumes the
+# LHS design rows in order -- a feasible row verbatim, an infeasible row
+# replaced by a uniform-feasible draw and counted in
+# n_lhs_infeasible_fallbacks; is_feasible=None takes every row verbatim; no
+# design -> uniform-feasible draws; seed determinism; factory guards.
+if _optuna is None:
+    print('SKIP 76: optuna not installed')
+else:
+    import warnings as _warnings76
+    _warnings76.filterwarnings('ignore', category=_optuna.exceptions.ExperimentalWarning)
+    _optuna.logging.set_verbosity(_optuna.logging.WARNING)
+    d76 = ko.LHSDesign(space33, n_startup=10, seed=4)
+    samp76 = ko.feasible_gp_sampler(space33, feas33, seed=11, lhs_design=d76,
+                                    n_startup_trials=10, constraints_func=cons33)
+    assert type(samp76).__name__ == 'FeasibleGPSampler'
+    assert isinstance(samp76, _optuna.samplers.GPSampler)
+    assert samp76._constraints_func is cons33 and samp76._n_startup_trials == 10
+    assert (samp76.n_rejected, samp76.n_uniform_fallbacks, samp76.n_unfiltered,
+            samp76.n_lhs_infeasible_fallbacks, samp76.n_gp_fallbacks) == (0,)*5
+    st76 = _optuna.create_study(direction='maximize', sampler=samp76)
+    st76.optimize(_toy33, n_trials=10)     # start-up only; no enqueued trials: k == trial number
+    assert all(t.state == TS33.COMPLETE for t in st76.trials), [t.state for t in st76.trials]
+    assert all(feas33(t.params) for t in st76.trials)
+    n_infeasible_rows76 = sum(0 if feas33(d76.external_point(k)) else 1 for k in range(10))
+    assert n_infeasible_rows76 >= 1                # the design must exercise the fallback
+    assert samp76.n_lhs_infeasible_fallbacks == n_infeasible_rows76
+    for k76 in range(10):
+        if feas33(d76.external_point(k76)):
+            assert st76.trials[k76].params == d76.external_point(k76), k76
+    assert samp76.n_gp_fallbacks == 0 and samp76.n_unfiltered == 0
+    assert all('constraints' in t.system_attrs for t in st76.trials)   # after_trial stored them
+    # is_feasible=None: every design row verbatim (PRUNED or not), no fallback
+    samp76n = ko.feasible_gp_sampler(space33, None, seed=11, lhs_design=d76,
+                                     n_startup_trials=10)
+    st76n = _optuna.create_study(direction='maximize', sampler=samp76n)
+    st76n.optimize(_toy33, n_trials=10)
+    assert [t.params for t in st76n.trials] == [d76.external_point(k) for k in range(10)]
+    assert samp76n.n_lhs_infeasible_fallbacks == 0 and samp76n.n_rejected == 0
+    # no design: uniform-feasible start-up draws, all feasible
+    samp76u = ko.feasible_gp_sampler(space33, feas33, seed=11, n_startup_trials=10)
+    assert samp76u._lhs_design is None
+    st76u = _optuna.create_study(direction='maximize', sampler=samp76u)
+    st76u.optimize(_toy33, n_trials=10)
+    assert all(t.state == TS33.COMPLETE and feas33(t.params) for t in st76u.trials)
+    assert samp76u.n_rejected > 0 and samp76u.n_lhs_infeasible_fallbacks == 0
+    # determinism: same seed -> same trials; different seed -> different first trial
+    def _run76(seed, n):
+        s = ko.feasible_gp_sampler(space33, feas33, seed=seed, n_startup_trials=10)
+        st = _optuna.create_study(direction='maximize', sampler=s)
+        st.optimize(_toy33, n_trials=n)
+        return [t.params for t in st.trials]
+    assert _run76(5, 6) == _run76(5, 6) and _run76(5, 1) != _run76(6, 1)
+    # factory guards
+    for bad76 in (dict(is_feasible=42), dict(n_fallback_candidates=0),
+                  dict(max_fallback_batches=1.5), dict(max_uniform_draws=0)):
+        kw76 = dict(is_feasible=feas33)
+        kw76.update(bad76)
+        try:
+            ko.feasible_gp_sampler(space33, kw76.pop('is_feasible'), **kw76)
+        except (TypeError, ValueError) as e76:
+            assert next(iter(bad76)) in str(e76), str(e76)
+        else:
+            raise AssertionError(f'feasible_gp_sampler accepted {bad76}')
+    assert 'feasible_gp_sampler' in ko.__all__
+    PASS('FeasibleGPSampler start-up: GPSampler subclass, LHS rows used when feasible, '
+         'infeasible rows fall back to uniform-feasible (counter matches), '
+         'is_feasible=None takes rows verbatim, no-design uniform-feasible draws, '
+         'seed determinism, factory guards')
+
+#%% 77. FeasibleGPSampler GP phase (GP spec §2): past start-up every proposal
+# comes through _optimize_acqf and satisfies the predicate; a toy whose
+# unconstrained optimum (30, 30) lies OUTSIDE the cap a + b < 5 makes the base
+# optimizer's proposal infeasible, so the filtered-QMC fallback runs
+# (n_gp_fallbacks > 0) and returns the best feasible candidate; the plain
+# GPSampler on the same toy proposes infeasible points; the learned-constraint
+# path (constraints_func -> ConstrainedLogEI) works with the fallback; a
+# second sampler instance resuming the study keeps filtering.
+if _optuna is None:
+    print('SKIP 77: optuna not installed')
+else:
+    def _toy77(trial):
+        a = trial.suggest_float('a', 0.01, 100.0, log=True)
+        b = trial.suggest_float('b', 0.01, 100.0, log=True)
+        n = trial.suggest_int('n', 0, 10)
+        violation = a + b - 5.0
+        trial.set_user_attr('violation', violation)
+        if violation >= 0.0:                     # the engine's INFEASIBLE guard
+            raise _optuna.TrialPruned()
+        return (-((np.log(a) - np.log(30.0))**2 + (np.log(b) - np.log(30.0))**2)
+                - 0.1*n)
+    samp77 = ko.feasible_gp_sampler(space33, feas33, seed=3, n_startup_trials=6,
+                                    n_fallback_candidates=256, max_fallback_batches=5)
+    st77 = _optuna.create_study(direction='maximize', sampler=samp77)
+    st77.optimize(_toy77, n_trials=20)
+    assert len(st77.trials) == 20
+    assert all(t.state == TS33.COMPLETE for t in st77.trials), [t.state for t in st77.trials]
+    assert all(feas33(t.params) for t in st77.trials)
+    assert samp77.n_gp_fallbacks > 0, samp77.n_gp_fallbacks
+    assert samp77.n_unfiltered == 0 and samp77.n_rejected > 0
+    print(f'   check 77: {samp77.n_gp_fallbacks} of 14 GP proposals needed the '
+          f'feasibility fallback; best {st77.best_value:.4g} at trial '
+          f'{st77.best_trial.number}')
+    # the plain GPSampler on the same toy proposes infeasible points
+    plain77 = _optuna.samplers.GPSampler(seed=3, n_startup_trials=6)
+    stp77 = _optuna.create_study(direction='maximize', sampler=plain77)
+    stp77.optimize(_toy77, n_trials=20)
+    assert any(t.state == TS33.PRUNED for t in stp77.trials), 'plain GP never infeasible?'
+    # learned constraints (ConstrainedLogEI) + fallback
+    samp77c = ko.feasible_gp_sampler(space33, feas33, seed=3, n_startup_trials=6,
+                                     constraints_func=cons33,
+                                     n_fallback_candidates=256, max_fallback_batches=5)
+    st77c = _optuna.create_study(direction='maximize', sampler=samp77c)
+    st77c.optimize(_toy77, n_trials=14)
+    assert all(t.state == TS33.COMPLETE and feas33(t.params) for t in st77c.trials)
+    assert all('constraints' in t.system_attrs for t in st77c.trials)
+    # resume: a second sampler instance on the study keeps filtering
+    samp77b = ko.feasible_gp_sampler(space33, feas33, seed=4, n_startup_trials=6,
+                                     n_fallback_candidates=256, max_fallback_batches=5)
+    st77.sampler = samp77b
+    st77.optimize(_toy77, n_trials=5)
+    assert len(st77.trials) == 25
+    assert all(t.state == TS33.COMPLETE and feas33(t.params) for t in st77.trials[20:])
+    PASS('FeasibleGPSampler GP phase: every proposal feasible, filtered-QMC fallback '
+         'exercised (n_gp_fallbacks > 0) while plain GPSampler proposes infeasible '
+         'points, ConstrainedLogEI path works, resume keeps filtering')
+
+#%% 78. FeasibleGPSampler fallbacks (GP spec §2): under a predicate that never
+# accepts, start-up draws return the last raw draw and GP-phase proposals
+# return the raw base proposal after every fallback batch is rejected
+# (n_unfiltered; the engine's pre-sim prune handles them) -- never a crash,
+# exact counters; optuna's own COMPLETE-only gate returning {} past OUR
+# COMPLETE+PRUNED gate is replaced by a joint uniform-feasible draw
+# (n_uniform_fallbacks), never by the per-parameter RandomSampler.
+if _optuna is None:
+    print('SKIP 78: optuna not installed')
+else:
+    def _toy78(trial):           # never prunes: COMPLETE whatever the predicate says
+        a = trial.suggest_float('a', 0.01, 100.0, log=True)
+        b = trial.suggest_float('b', 0.01, 100.0, log=True)
+        n = trial.suggest_int('n', 0, 10)
+        return -((a - 3.0)**2 + (b - 1.0)**2) - n
+    samp78 = ko.feasible_gp_sampler(space33, lambda values: False, seed=2,
+                                    n_startup_trials=3, max_uniform_draws=5,
+                                    n_fallback_candidates=8, max_fallback_batches=2)
+    st78 = _optuna.create_study(direction='maximize', sampler=samp78)
+    st78.optimize(_toy78, n_trials=6)
+    assert len(st78.trials) == 6 and all(t.state == TS33.COMPLETE for t in st78.trials)
+    assert all(set(t.params) == {'a', 'b', 'n'} for t in st78.trials)
+    # 3 start-up draws: 5 rejected uniform draws each, raw last draw returned;
+    # 3 GP-phase proposals: 2 batches x 8 rejected candidates each, raw x returned
+    assert samp78.n_gp_fallbacks == 3, samp78.n_gp_fallbacks
+    assert samp78.n_unfiltered == 6, samp78.n_unfiltered
+    assert samp78.n_rejected == 3*5 + 3*2*8, samp78.n_rejected
+    assert samp78.n_lhs_infeasible_fallbacks == 0 and samp78.n_uniform_fallbacks == 0
+    # optuna's COMPLETE-only gate: 4 PRUNED + 0 COMPLETE finished trials pass OUR
+    # gate (n_startup_trials=4) but not optuna's -> super() returns {} -> a joint
+    # uniform-feasible draw (n_uniform_fallbacks), every parameter still drawn
+    # jointly and the predicate honoured; no GP proposal was made.
+    def _prune78(trial):
+        trial.suggest_float('a', 0.01, 100.0, log=True)
+        trial.suggest_float('b', 0.01, 100.0, log=True)
+        trial.suggest_int('n', 0, 10)
+        raise _optuna.TrialPruned()
+    samp78g = ko.feasible_gp_sampler(space33, feas33, seed=2, n_startup_trials=4)
+    st78g = _optuna.create_study(direction='maximize', sampler=samp78g)
+    st78g.optimize(_prune78, n_trials=4)              # 4 PRUNED, 0 COMPLETE
+    assert samp78g.n_uniform_fallbacks == 0
+    st78g.optimize(_toy33, n_trials=3)                # past our gate, before optuna's
+    assert samp78g.n_uniform_fallbacks == 3, samp78g.n_uniform_fallbacks
+    assert all(t.state == TS33.COMPLETE and feas33(t.params) for t in st78g.trials[4:])
+    assert samp78g.n_gp_fallbacks == 0
+    PASS('FeasibleGPSampler fallbacks: never-accepting predicate returns raw draws / '
+         'raw proposals with exact counters (no crash); optuna COMPLETE-only gate {} '
+         'replaced by a joint uniform-feasible draw (n_uniform_fallbacks)')
+
 print(f'\nALL {n_pass} CHECKS PASSED')
