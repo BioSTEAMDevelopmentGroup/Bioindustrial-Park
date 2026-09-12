@@ -666,7 +666,13 @@ if __name__ == '__main__':
                              'resumes); default 3 (25 before 2026-09-06); '
                              'keep it well above the ~18 s reload + a '
                              'normal trial or the reload itself gets '
-                             'killed in a loop')
+                             'killed in a loop; under --method gp a '
+                             'proposal slower than this timeout is killed '
+                             'before the in-flight sidecar exists and '
+                             'ABORTS the study rather than just slowing '
+                             'it, so use ~10 or more for a GP study '
+                             'expected to pass a few hundred COMPLETE '
+                             'trials')
     parser.add_argument('--poll-s', type=float, default=30.0)
     parser.add_argument('--settle-s', type=float, default=10.0)
     parser.add_argument('--no-restrict-to-workbook',
@@ -865,7 +871,10 @@ if __name__ == '__main__':
                         action='store_false', default=True,
                         help="method gp: do NOT fit optuna's learned constraint "
                              'GP on the burden / volume violations (plain '
-                             'log-EI; the default fits it, ConstrainedLogEI). '
+                             'log-EI; the default fits it, ConstrainedLogEI; '
+                             'that constraint GP is fit on COMPLETE (hence '
+                             'feasible, under the pre-sim INFEASIBLE prune) '
+                             'trials only). '
                              'The exact feasibility filter is unaffected. '
                              'Cannot be switched back ON for a study whose '
                              'stored trials ran without it')

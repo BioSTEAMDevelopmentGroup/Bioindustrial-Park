@@ -3906,9 +3906,19 @@ def run_kinetic_optimization(objective='IRR',
     study whose stored COMPLETE trials carry no constraint values -- the
     engine then prints a note and continues with it off),
     deterministic_objective (False), n_fallback_candidates (2048) and
-    max_fallback_batches (20). A GP proposal costs seconds and grows with
-    the number of COMPLETE trials (O(n^3) fit); the supervisor's 3-min stall
-    timeout covers it at the 2000-trial budget.
+    max_fallback_batches (20). Optuna's constraint GP (when
+    learned_constraints is True) is fit on COMPLETE trials only -- every
+    COMPLETE trial is feasible under the engine's pre-sim INFEASIBLE prune,
+    so it regresses the signed slack of feasible points only; an
+    INFEASIBLE-pruned trial's violation informs the exact feasibility
+    predicate (the start-up/proposal filter), not the constraint GP. A GP
+    proposal costs seconds and grows O(n^3) with the number of COMPLETE
+    trials; proposal time has not been measured on a real campaign. Because
+    a proposal slower than the supervisor's stall timeout (default 3 min,
+    minus the ~18 s reload) is killed before the in-flight sidecar exists
+    -- which ABORTS the study rather than merely slowing it -- pass a
+    `--stall-timeout-min` of about 10 or more to the supervisor for a GP
+    study expected to pass a few hundred COMPLETE trials.
 
     Returns (study, csv_path, kinetic_baselines)."""
     import optuna
@@ -3979,7 +3989,11 @@ def run_kinetic_optimization(objective='IRR',
     # draws fresh points instead of replaying the original RNG stream.
     # <= 0 feasible; optuna evaluates it for COMPLETE and PRUNED trials
     # (samplers/_base._process_constraints_after_trial), so pruned INFEASIBLE
-    # trials populate the sampler's infeasible set.
+    # trials populate the sampler's infeasible set. This is TPE-specific:
+    # under method='gp' the constraint GP is fit on COMPLETE (hence
+    # feasible, under the pre-sim INFEASIBLE prune) trials only -- a
+    # PRUNED/INFEASIBLE trial's violation informs the exact feasibility
+    # predicate (the start-up/proposal filter), not the constraint GP.
     constraints = feasibility_constraints_func(burden_on=burden_on,
                                                volume_on=volume_on)
     if startup_sampling not in ('lhs', 'random'):

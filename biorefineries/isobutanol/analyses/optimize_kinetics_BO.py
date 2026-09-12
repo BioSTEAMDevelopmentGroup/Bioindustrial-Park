@@ -242,10 +242,11 @@ def run(scenario=None,  # 'A' or 'B'; None = the preset's start scenario
         **engine_kwargs,  # bounds/overrides/etc. -> run_kinetic_optimization
         ):
     """Set up the scenario baseline (same recipe as the smoke tests), run
-    the optimization (`method`: optuna TPE or scipy dual annealing), and
-    (optionally) save the trajectory plots next to the trajectory CSV.
-    Returns (result, csv_path) -- result is the optuna Study (tpe) or a
-    ko.AnnealingResult (dual_annealing).
+    the optimization (`method`: optuna TPE, optuna GP, or scipy dual
+    annealing), and (optionally) save the trajectory plots next to the
+    trajectory CSV.
+    Returns (result, csv_path) -- result is the optuna Study (tpe and gp)
+    or a ko.AnnealingResult (dual_annealing).
 
     STUDY PRESETS (default). `study_target_products` x `study_type` name
     the search set and bands (ko.resolve_study_preset): both target
@@ -453,7 +454,8 @@ def run(scenario=None,  # 'A' or 'B'; None = the preset's start scenario
     (Matern-5/2 ARD GP, log-EI) with the exact burden / volume feasibility
     filter of the feasible TPE path on every start-up draw and GP proposal,
     plus optuna's learned constraint GP (ConstrainedLogEI) on the violations
-    by default; the derived name gains `_gp` right after the objective slug
+    by default -- fit on COMPLETE (hence feasible, under the pre-sim
+    INFEASIBLE prune) trials only; the derived name gains `_gp` right after the objective slug
     (kin_opt_ethanol_isobutanol_metabolic_minimal_subset_irr_gp_rb0.001-10_
     ibe0.3-2_burden); more than 15 decision variables raise before any study
     is touched, so use it with metabolic_minimal_subset / metabolic_14d.
