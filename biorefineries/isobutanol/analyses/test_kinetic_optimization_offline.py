@@ -381,17 +381,17 @@ assert wb_B.endswith('parameter-distributions_corn_IBO_EtOH_B.xlsx')
 if os.path.isfile(wb_A) and os.path.isfile(wb_B):
     names_A = ko.kinetic_param_names_from_scenario('A')
     names_B = ko.kinetic_param_names_from_scenario('B')
-    assert len(names_B) == 56 and len(names_A) == 40, (len(names_B), len(names_A))
+    assert len(names_B) == 55 and len(names_A) == 40, (len(names_B), len(names_A))   # 55 since the 2026-09-13 K_16i drop (nskinetics b61360e)
     assert all(n[:2].lower() == 'k_' for n in names_A + names_B)
     assert len(set(names_B)) == len(names_B) and len(set(names_A)) == len(names_A)
     assert names_B[:5] == ['k_1l', 'K_1l', 'k_1h', 'K_1h', 'k_1e']  # workbook order
-    for dropped in ('k_6r', 'k_16r', 'K_2', 'K_9'):   # commit 1e4efee1
+    for dropped in ('k_6r', 'k_16r', 'K_2', 'K_9', 'K_16i'):   # commit 1e4efee1; K_16i 2026-09-13
         assert dropped not in names_B and dropped not in names_A, dropped
     assert 'k_13' in names_B and 'k_13' not in names_A  # IBO pathway: B only
     wb_baselines = ko.workbook_kinetic_baselines('B')
     assert list(wb_baselines) == names_B
     assert all(v > 0.0 for v in wb_baselines.values())
-    PASS('workbook readers: 56 B / 40 A kinetic names in workbook order; constrained params absent')
+    PASS('workbook readers: 55 B / 40 A kinetic names in workbook order; constrained params absent')
 else:
     print('SKIP 14: parameter-distribution workbooks not found')
 
@@ -737,7 +737,7 @@ if os.path.isfile(wb_A) and os.path.isfile(wb_B):
     expected21 = {('ethanol_only', 'metabolic'): 29,
                   ('ethanol_only', 'metabolic_protein'): 40,
                   ('ethanol_isobutanol', 'metabolic'): 40,
-                  ('ethanol_isobutanol', 'metabolic_protein'): 56}
+                  ('ethanol_isobutanol', 'metabolic_protein'): 55}   # 56 before the 2026-09-13 K_16i drop
     roles21 = ko.kinetic_parameter_roles()
     for (stp21, st21), n21 in expected21.items():
         p21 = ko.resolve_study_preset(stp21, st21)
@@ -787,7 +787,7 @@ if os.path.isfile(wb_A) and os.path.isfile(wb_B):
         else:
             assert inc21 == wb21                            # every workbook row
     p21_eo = ko.resolve_study_preset('ethanol_only', 'metabolic_protein')['include_params']
-    for ibo21 in ('k_13', 'K_16i', 'k_1ii', 'k_7ii', 'k_10ii', 'k_16ie'):
+    for ibo21 in ('k_13', 'K_16', 'k_1ii', 'k_7ii', 'k_10ii', 'k_16ie'):
         assert ibo21 not in p21_eo, ibo21
     # A workbook row missing from the role table must raise, not leak.
     roles_missing21 = dict(roles21); del roles_missing21['k_7']
@@ -797,7 +797,7 @@ if os.path.isfile(wb_A) and os.path.isfile(wb_B):
         assert 'k_7' in str(e21)
     else:
         raise AssertionError('missing role-table entry did not raise KeyError')
-    PASS('resolve_study_preset: 29/40/40/56 sets, role filter, A start, workbook order, errors')
+    PASS('resolve_study_preset: 29/40/40/55 sets, role filter, A start, workbook order, errors')
 else:
     print('SKIP 21: parameter-distribution workbooks not found')
 
@@ -828,7 +828,7 @@ if os.path.isfile(wb_A) and os.path.isfile(wb_B):
         exclude_params=p22['exclude_params'])
     # k_10 (active-biomass decay) is excluded by default (2026-09-06 pm):
     # 55 sampled kinetic parameters, no k_10 column, no k_10 probe.
-    assert excl22 == ['k_10'] and len(space22) == 55 + 4
+    assert excl22 == ['k_10'] and len(space22) == 54 + 4   # 55 B rows minus k_10, + 4 feeding
     assert 'k_10' not in space22
     assert all(space22[n]['log'] for n in base22_B if n != 'k_10')
     # Bands by ROLE (2026-09-06): rate constants (capacity) 1e-3x-10x
@@ -855,7 +855,7 @@ if os.path.isfile(wb_A) and os.path.isfile(wb_B):
         parameter_multiplier_bounds=p22['parameter_multiplier_bounds'],
         param_bounds_override=override22, include_params=p22['include_params'],
         exclude_params=())
-    assert excl22_k10 == [] and len(space22_k10) == 56 + 4
+    assert excl22_k10 == [] and len(space22_k10) == 55 + 4
     assert space22_k10['k_10'] == dict(low=0.1*0.06, high=10.0*0.06, log=True)
     assert {n: v for n, v in space22_k10.items() if n != 'k_10'} == space22
     pt22 = ko.baseline_decision_point(

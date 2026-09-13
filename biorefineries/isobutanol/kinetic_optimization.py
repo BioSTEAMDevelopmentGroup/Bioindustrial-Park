@@ -218,8 +218,12 @@ def expand_grouped_values(values, parameter_groups, kinetic_baselines):
 #:      k_1ie, k_1ii, k_7ii, k_10ie, ...) -- DEFAULT_SATURATION_
 #:      MULTIPLIER_BOUNDS, [0.1×, 10×].
 #:   3. REGULATION, AFFINITY and SELF-INHIBITION TERMS (K_1i, K_2i, ...,
-#:      K_1e, ..., K_6e, K_16i) -- [0.1×, 10×] (a zero saturation constant
-#:      has no engineering meaning).
+#:      K_1e, ..., K_6e, K_13-K_16) -- [0.1×, 10×] (a zero saturation
+#:      constant has no engineering meaning). K_16i left the set on
+#:      2026-09-13 (nskinetics b61360e): r16 no longer carries an
+#:      isobutanol product term, so K_16i is inert at a zero baseline and
+#:      a multiplier band around zero is degenerate -- its row was dropped
+#:      from the B / opt_* workbooks (the sweep set IS the workbook set).
 #: Before 2026-09-06 the rate band applied to every lowercase 'k_' name
 #: (inhibition coefficients included); that prefix rule is what
 #: build_search_space still applies when `rate_params` is None (legacy
@@ -250,8 +254,10 @@ DEFAULT_PARAMETER_MULTIPLIER_BOUNDS = {'k_10': (0.1, 10.0)}
 #: behind it (the best trial of the aborted 2026-09-06 role-band study was
 #: its 0.1x knock-down probe) -- so it stays at the scenario baseline and
 #: gets no knockout probe (the probes follow the search space). The
-#: workbook set of include_params is unchanged (29/40/40/56); the
-#: effective sampled set is include minus exclude (28/39/39/55). A caller
+#: workbook set of include_params is unchanged (29/40/40/55 since the
+#: 2026-09-13 K_16i drop; 56 for the ethanol_isobutanol metabolic_protein
+#: set before it); the effective sampled set is include minus exclude
+#: (28/39/39/54). A caller
 #: re-includes k_10 with exclude_params=() (driver run(exclude_params=()),
 #: supervisor bare --exclude-params); it then lands on the
 #: DEFAULT_PARAMETER_MULTIPLIER_BOUNDS band above, which is kept for that
@@ -973,7 +979,10 @@ def workbook_kinetic_baselines(scenario):
     parameter row (load statement `V406.nsk_kinetic_model._te.<name> = x`)
     of the scenario's parameter-distributions workbook -- the curated set
     of kinetic parameters treated as free/uncertain (the physically
-    constrained k_6r, k_16r, K_2, K_9 are absent since commit 1e4efee1).
+    constrained k_6r, k_16r, K_2, K_9 are absent since commit 1e4efee1;
+    K_16i since 2026-09-13, inert at 0 under nskinetics b61360e's
+    irreversible r16 -- a metabolic_protein study started before that
+    carries a K_16i column and cannot be resumed under the new set).
     A plain file read, no simulation, so it can describe a scenario other
     than the loaded one (the driver's start-at-A / set-from-B mode)."""
     import pandas as pd
