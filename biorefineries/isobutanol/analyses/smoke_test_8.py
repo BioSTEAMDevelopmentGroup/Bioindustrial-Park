@@ -24,7 +24,9 @@ leaves via the rectifier (D303) bottoms to WWT unrecovered
 EACH simulation. Gates (a violation exits non-zero exactly like a
 traceback):
 
-- purity-adjusted ethanol MPSP within 1% of 1.4920 (was 1.48848 before the
+- purity-adjusted ethanol MPSP within 1% of 1.6521 (was 1.4920 before the
+  2026-09-13 r13 rate-law re-pin -- acetolactate synthase Michaelis-Menten in
+  pyruvate, K_13 = 0.10 g/L, nskinetics a2b001c -- and 1.48848 before the
   2026-09-12 DDGS-dryer acid-split re-pin -- broth acetic acid routed to the
   dryer exhaust / X611 instead of the DDGS product -- and 1.4868 before the
   2026-09-12 nskinetics anaerobic_growth_mult 1.0 -> 0.75 re-pin; the smoke_test_6
@@ -76,7 +78,7 @@ def load_simulate_baseline(stream_IDs=('ethanol', 'isobutanol'),
     model_specification = bundle['model_specification']
     solve_TEA = bundle['solve_TEA']
     feeding_kwargs = bundle['feeding_kwargs']
-    expected_MPSPs = {'ethanol': 1.4920, 'isobutanol': math.nan}
+    expected_MPSPs = {'ethanol': 1.6521, 'isobutanol': math.nan}
 
     all_results = []
     for i in range(n_sims):

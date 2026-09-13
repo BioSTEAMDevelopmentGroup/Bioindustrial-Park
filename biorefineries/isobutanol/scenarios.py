@@ -76,7 +76,7 @@ SCENARIOS = {
         name='B',
         workbook='parameter-distributions_corn_IBO_EtOH_B.xlsx',
         max_n_spikes=0, threshold_conc=34.25, target_conc=140.0,
-        expected={'ethanol': 0.67182, 'isobutanol': 1.3018},
+        expected={'ethanol': 0.60727, 'isobutanol': 1.2864},
         burden_default=False),
     # opt_* scenarios reproduce the best-objective trial of the last five
     # metabolic_minimal_subset kinetic-optimization studies. The workbooks
@@ -108,36 +108,48 @@ SCENARIOS = {
     # economic objective 0.19276 -> 0.18830 (all re-pinned above); the
     # titer/yield objectives are fermentation-side and unchanged. These
     # values are the pre-change baseline of the r16 Ehrlich split.
+    # RE-PINNED 2026-09-13 for the r13 rate law (nskinetics a2b001c; see
+    # docs/reports/r13-rate-law.md): acetolactate synthase r13 is now
+    # Michaelis-Menten in pyruvate with K_13 = 0.10 g/L instead of a copy
+    # of r3's Hill n=4 form with K_13 = 5e-7. B moved (ethanol 0.67182 ->
+    # 0.60727 / isobutanol 1.3018 -> 1.2864, IRR 0.2042 -> 0.2153; the
+    # branch split is now pyruvate-responsive and B's pyruvate pool rises
+    # above the old Hill saturation point, so r13 gains share); the opt_*
+    # pins moved < 1 % (their objectives: IRR 0.18830 -> 0.18717, IBO
+    # titer 78.32 -> 78.43, IBO yield 0.25477 -> 0.25210, EtOH titer
+    # 254.94 -> 255.03, EtOH yield 0.33246 -> 0.33242), except the
+    # near-zero-IBO opt_EtOH_titer / opt_EtOH_yield isobutanol artifacts
+    # (-1.79 -> -2.91, 493.6 -> 1442.7). A is unaffected (k_13 = 0).
     'opt_IRR': ScenarioSpec(
         name='opt_IRR',
         workbook='parameter-distributions_corn_IBO_EtOH_opt_IRR.xlsx',
         max_n_spikes=18, threshold_conc=286.7667298838977, target_conc=300.0,
-        expected={'ethanol': 0.636286520913502, 'isobutanol': 1.398376710126786},
-        objective_name='IRR', objective_value=0.18829944012951208),
+        expected={'ethanol': 0.6424476087434273, 'isobutanol': 1.4014926818351758},
+        objective_name='IRR', objective_value=0.18716691178598602),
     'opt_IBO_titer': ScenarioSpec(
         name='opt_IBO_titer',
         workbook='parameter-distributions_corn_IBO_EtOH_opt_IBO_titer.xlsx',
         max_n_spikes=39, threshold_conc=219.5386688951894, target_conc=300.0,
-        expected={'ethanol': 11.796279541209598, 'isobutanol': 1.9541438476505895},
-        objective_name='IBO titer', objective_value=78.32423133561271),
+        expected={'ethanol': 11.721178947366116, 'isobutanol': 1.9516808754862816},
+        objective_name='IBO titer', objective_value=78.43239080254027),
     'opt_IBO_yield': ScenarioSpec(
         name='opt_IBO_yield',
         workbook='parameter-distributions_corn_IBO_EtOH_opt_IBO_yield.xlsx',
         max_n_spikes=0, threshold_conc=270.0889834284513, target_conc=300.0,
-        expected={'ethanol': 8.814794526122846, 'isobutanol': 1.71803958556877},
-        objective_name='IBO yield', objective_value=0.25477397975435956),
+        expected={'ethanol': -0.23934742712172555, 'isobutanol': 1.391898651409106},
+        objective_name='IBO yield', objective_value=0.25209860847900517),
     'opt_EtOH_titer': ScenarioSpec(
         name='opt_EtOH_titer',
         workbook='parameter-distributions_corn_IBO_EtOH_opt_EtOH_titer.xlsx',
         max_n_spikes=35, threshold_conc=253.62164932574294, target_conc=300.0,
-        expected={'ethanol': 0.8305535031526765, 'isobutanol': -1.788154290387932},
-        objective_name='EtOH titer', objective_value=254.94014372106864),
+        expected={'ethanol': 0.8305407090576425, 'isobutanol': -2.9112371323543855},
+        objective_name='EtOH titer', objective_value=255.02974766832637),
     'opt_EtOH_yield': ScenarioSpec(
         name='opt_EtOH_yield',
         workbook='parameter-distributions_corn_IBO_EtOH_opt_EtOH_yield.xlsx',
         max_n_spikes=22, threshold_conc=295.08474402550377, target_conc=300.0,
-        expected={'ethanol': 1.0570830853920696, 'isobutanol': 493.61335486612603},
-        objective_name='EtOH yield', objective_value=0.33246145408590305),
+        expected={'ethanol': 1.0573321788040009, 'isobutanol': 1442.7035178423305},
+        objective_name='EtOH yield', objective_value=0.33241570146813676),
 }
 
 
