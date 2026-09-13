@@ -483,7 +483,8 @@ def scenarios_path():
 
 def scenario_b_ehrlich(path=None):
     """A copy of nskinetics' SCENARIO_B_EHRLICH ({'k_13': 5.81, 'k_14':
-    4.8, 'k_15': 4.8, 'k_16': 2.82, 'k_16r': 0.0125}) -- the Ehrlich
+    4.8, 'k_15': 4.8, 'k_16': 2.82}; the former fifth key k_16r went away
+    with the irreversible r16 of nskinetics b61360e) -- the Ehrlich
     constants of scenario B, whose implied burden the driver reports (Q11).
     The file is executed BY PATH (spec_from_file_location + exec_module):
     it imports nothing, whereas importing it through the package pulls

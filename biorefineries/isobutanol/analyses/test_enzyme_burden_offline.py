@@ -236,7 +236,7 @@ path13 = eb.scenarios_path()
 assert path13.endswith(os.path.join('models', 's_cerevisiae_ferm_fb_inhib_mod_ibo',
                                     'scenarios.py')) and os.path.isfile(path13), path13
 B = eb.scenario_b_ehrlich()
-assert B == {'k_13': 5.81, 'k_14': 4.8, 'k_15': 4.8, 'k_16': 2.82, 'k_16r': 0.0125}, B
+assert B == {'k_13': 5.81, 'k_14': 4.8, 'k_15': 4.8, 'k_16': 2.82}, B   # 4 keys since nskinetics b61360e (r16 irreversible: no k_16r)
 assert eb.scenario_b_ehrlich(path=path13) == B and eb.scenario_b_ehrlich() is not B
 # The no-heavy-import guarantee is probed in a FRESH interpreter that loads
 # enzyme_burden.py by file path (as the stdlib-only supervisor would): this
@@ -276,8 +276,11 @@ report_B = bm.describe_point(point_B, label='scenario-B Ehrlich constants')
 print(report_B)
 assert 'status: INFEASIBLE' in report_B and 'Phi_M = 0.2862' in report_B
 assert 'pruned' in report_B
-# k_16r is not a burden capacity: it is ignored (and passed through by apply)
-assert bm.apply(point_B)['k_16r'] == 0.0125
+# the preset carries only the four Ehrlich capacities: apply derates k_7/k_8 and
+# passes every other key through untouched (no k_16r since nskinetics b61360e)
+applied_B = bm.apply(point_B)
+assert applied_B.keys() == point_B.keys() and applied_B['k_13'] == 5.81
+assert applied_B['k_7'] == 0.0 and applied_B['k_8'] == 0.0
 # A B-start reference cannot build a burden model (Q11: reported, not repaired)
 try:
     eb.BurdenModel.from_reference(point_B)
