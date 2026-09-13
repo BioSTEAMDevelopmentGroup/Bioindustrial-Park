@@ -33,7 +33,7 @@ MultiEffectEvaporator = bst.MultiEffectEvaporator
 
 __all__ = ('load', 'solve_TEA', 'solve_TEA_at_IRR',
            'set_active_burden', 'get_active_burden',
-           'EnzymeBurdenInfeasibleError')
+           'EnzymeBurdenInfeasibleError', 'DDGS_DRYER_OVERHEAD_ACIDS')
 
 #: The enzyme burden enforced at the simulate choke point, or None (off).
 #: Set by scenarios.load_scenario (policy) / the kinetic optimizer; read by
@@ -45,6 +45,13 @@ _active_burden = None
 #: Re-export so callers catch a system-level name (it IS the enzyme_burden
 #: exception, so an except in either module matches).
 EnzymeBurdenInfeasibleError = _eb.BurdenInfeasibleError
+
+#: Broth acids the DDGS dryer (D610) sends to its exhaust (burned in the
+#: thermal oxidizer X611) instead of the DDGS product, like ethanol; set on
+#: D610.isplit in load(). Extended by the r16 Ehrlich split
+#: ('IsobutyricAcid'). Spec: docs/superpowers/specs/
+#: 2026-09-12-ddgs-dryer-acid-split-design.md.
+DDGS_DRYER_OVERHEAD_ACIDS = ('AceticAcid',)
 
 
 def set_active_burden(burden_model):
@@ -590,6 +597,24 @@ def load(simulate_baseline=True,
         for i in M501.ins: i.phase = 'l'
         M501._run()
         M501.outs[0].phase = 'l'
+
+    #%% DDGS dryer: broth acids to the exhaust, not the DDGS product
+    # Corn builds D610 (bst.DrumDryer) with split=dict(Ethanol=1.0): every
+    # other non-water chemical in the syrup + wet cake (acetic acid today;
+    # isobutyric acid after the r16 Ehrlich split) stays in the dried solids
+    # and would be sold at the DDGS price. Route the acids like ethanol --
+    # 1.0 to the hot gas, D610-1 -> X611 (thermal oxidizer), which burns
+    # them. Set through isplit (the chemical indexer over `split`) rather
+    # than rebuilding the unit, so corn's Ethanol split is kept. The
+    # membership guard keeps the r16 commit order free: that change appends
+    # 'IsobutyricAcid' to DDGS_DRYER_OVERHEAD_ACIDS in the same commit that
+    # registers the chemical. The Ev607 vapor share of the acids that
+    # reaches WWT (MX5 -> M501) is unchanged by design. Spec:
+    # docs/superpowers/specs/2026-09-12-ddgs-dryer-acid-split-design.md.
+    D610 = f.D610
+    for ID in DDGS_DRYER_OVERHEAD_ACIDS:
+        if ID in D610.chemicals:
+            D610.isplit[ID] = 1.0
 
     HXN = hensmith.HeatExchangerNetwork('HXN1001', ignored=keep_non_rigorous)
 

@@ -22,7 +22,9 @@ beer-column mode and the isobutanol product is empty.
 EACH simulation. Gates (a violation exits non-zero exactly like a
 traceback):
 
-- purity-adjusted ethanol MPSP within 1% of 0.86680 (was 0.86604 before the
+- purity-adjusted ethanol MPSP within 1% of 0.86867 (was 0.86680 before the
+  2026-09-12 DDGS-dryer acid-split re-pin -- broth acetic acid routed to the
+  dryer exhaust / X611 instead of the DDGS product -- and 0.86604 before the
   2026-09-12 nskinetics anaerobic_growth_mult 1.0 -> 0.75 re-pin; the both-trains
   scenario-A baseline, reproduced to full precision by the 2026-09-02
   re-pin run, 0.866036453655084. Re-pinned 2026-09-02 for
@@ -57,7 +59,7 @@ def load_simulate_baseline(stream_IDs=('ethanol', 'isobutanol'),
                            n_sims=3,
                            ):
     # IBO_EtOH-only build reproduces the both-trains scenario-A baseline
-    # (0.86604) to full precision; pins from the registry.
+    # (0.86867) to full precision; pins from the registry.
     bundle = scenarios.load_scenario('A')
     model_specification = bundle['model_specification']
     solve_TEA = bundle['solve_TEA']

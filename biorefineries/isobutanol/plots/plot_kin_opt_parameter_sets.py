@@ -204,10 +204,12 @@ PANEL_B_BG = '0.93'
 # Simulated 2026-09-07 (smoke_test_1 protocol, IBO_2026). A cached one-off
 # baseline simulation (option a) is a later change; when done, replace this
 # dict with the cached read.
+# TEA entries (IRR, TCI) re-recorded 2026-09-12 for the DDGS-dryer acid
+# split (test-1 smoke run; the 2026-09-07 values were 0.1230 / 139.6).
 BASELINE_A = {
-    'IRR': 0.1230, 'EtOH titer': 118.4, 'IBO titer': 0.0, 'tau': 45.4,
+    'IRR': 0.1210, 'EtOH titer': 118.4, 'IBO titer': 0.0, 'tau': 45.4,
     'n_glu_spikes': 10, 'EtOH yield': 0.455, 'IBO yield': 0.0,
-    'Cell density': 15.7, 'TCI': 139.6, 'threshold_conc': 217.125,
+    'Cell density': 15.7, 'TCI': 142.8, 'threshold_conc': 217.125,
     'target_delta': 4.125, 'max_n_spikes': 16,
 }
 
