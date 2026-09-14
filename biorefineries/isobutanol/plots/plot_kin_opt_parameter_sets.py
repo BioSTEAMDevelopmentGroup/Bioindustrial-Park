@@ -213,9 +213,9 @@ PANEL_B_BG = '0.93'
 # the DDGS-dryer acid split (the 2026-09-07 values were 0.1230 / 139.6) and
 # unchanged on 2026-09-13.
 BASELINE_A = {
-    'IRR': 0.1210, 'EtOH titer': 114.5, 'IBO titer': 0.0, 'tau': 61.6,
+    'IRR': 0.1260, 'EtOH titer': 114.5, 'IBO titer': 0.0, 'tau': 61.6,
     'n_glu_spikes': 7, 'EtOH yield': 0.460, 'IBO yield': 0.0,
-    'Cell density': 13.0, 'TCI': 142.8, 'threshold_conc': 217.125,
+    'Cell density': 13.0, 'TCI': 139.3, 'threshold_conc': 217.125,
     'target_delta': 4.125, 'max_n_spikes': 16,
 }
 

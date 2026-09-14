@@ -399,8 +399,8 @@ def load(simulate_baseline=True,
     # ethanol and ~1.9 % of the isobutanol produced; wash water at molar
     # L/G = 2.0, ~4.8 % of the broth mass) is recycled into the separation
     # feed instead of being discarded via MX5 -> M501 (WWT). Docking P410-0
-    # here detaches it from MX5 (which keeps the DDGS evaporator vapor and
-    # corn's orphaned P508-0). MX8 sits upstream of the gating splitter
+    # here detaches it from MX5 (which keeps only the DDGS evaporator vapor
+    # once corn's orphaned P508-0 is detached below). MX8 sits upstream of the gating splitter
     # S201 / the lone train, so the recycle follows the gate split and is
     # identical in every build mode. Feed-forward path (V406 -> V409 -> P410
     # -> MX8 -> train): no new recycle loop.
@@ -575,6 +575,19 @@ def load(simulate_baseline=True,
     # remains excluded — it is not a real aqueous waste of the new system. The
     # separation train's D103 bottoms is near-pure water and goes to the
     # ProcessWaterCenter (create_facilities below), not to WWT.
+    #
+    # Corn's rectifier-bottoms pump P508 belongs to the orphaned corn ethanol
+    # purification train (see `corn_ethanol_train_units` above): it is in no
+    # assembled system and never re-simulates, but its outlet P508-0 was still
+    # docked into MX5 (corn wires MX5 = Ev607-1 + P410-0 + P508-0), carrying
+    # the STALE rectifier bottoms of the build-time `corn_EtOH_sys.simulate()`
+    # (~14,160 kg/hr, essentially water) into M501/WWT on every simulation --
+    # a phantom WWT feed with no live source (found 2026-09-13 while fixing
+    # feeding-strategy mass balances in nskinetics). Detach it, so MX5 carries
+    # only the live Ev607 vapor. `disconnect_sink` leaves a MissingStream in
+    # MX5's slot, exactly as re-docking P410-0 into MX8 did.
+    f.P508.outs[0].disconnect_sink()
+    assert f.P508.outs[0].sink is None and f.P508.outs[0] not in f.MX5.ins
     #
     # Passing MX5's outlet (currently sunk into the detached T608) into M501's ins
     # reassigns its sink to M501, disconnecting it from T608. Give it a descriptive

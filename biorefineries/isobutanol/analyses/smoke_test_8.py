@@ -24,7 +24,10 @@ leaves via the rectifier (D303) bottoms to WWT unrecovered
 EACH simulation. Gates (a violation exits non-zero exactly like a
 traceback):
 
-- purity-adjusted ethanol MPSP within 1% of 1.6814 (was 1.6521 before
+- purity-adjusted ethanol MPSP within 1% of 1.6625 (was 1.6814 before the
+  2026-09-13 P508 detach re-pin -- corn's orphaned rectifier-bottoms pump P508
+  no longer feeds its stale build-time outlet (~14,160 kg/hr, essentially
+  water) into MX5 -> M501 / WWT on every simulation -- 1.6521 before
   the 2026-09-13 r14-r16 re-pin (nskinetics b61360e / 623ff6f: r16 irreversible
   Michaelis-Menten in KIV with no k_16r / K_16i terms, r16 redox 0.363 -> 0.138
   $Red per g KIV, r14 charged one NADPH, K_14/K_15/K_16 anchored 2.64e-4/2.64e-4/
@@ -82,7 +85,7 @@ def load_simulate_baseline(stream_IDs=('ethanol', 'isobutanol'),
     model_specification = bundle['model_specification']
     solve_TEA = bundle['solve_TEA']
     feeding_kwargs = bundle['feeding_kwargs']
-    expected_MPSPs = {'ethanol': 1.6814, 'isobutanol': math.nan}
+    expected_MPSPs = {'ethanol': 1.6625, 'isobutanol': math.nan}
 
     all_results = []
     for i in range(n_sims):

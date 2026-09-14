@@ -60,8 +60,8 @@ _spec.loader.exec_module(ko)
 # --- scenario-A baseline operating point (CLAUDE.md "Baseline feeding
 # strategies"; hardcoded in every analysis script, no central constant) --------
 BASELINE_A = {'threshold_conc': 217.125, 'target_conc': 221.25,
-              'spike_conc': 600.0, 'max_n_spikes': 16, 'n_glu_spikes': 10,
-              'IRR': 0.1225}
+              'spike_conc': 600.0, 'max_n_spikes': 16, 'n_glu_spikes': 7,
+              'IRR': 0.1260}
 
 # --- typography (plot-formatting preferences: Arial, 12/12/10/9 hierarchy) ---
 FONT_FAMILY = 'Arial'

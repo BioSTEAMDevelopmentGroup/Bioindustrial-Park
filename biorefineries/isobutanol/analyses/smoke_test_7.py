@@ -27,7 +27,10 @@ significant figures (0.8445818 here vs 0.8445811 there).
 EACH simulation. Gates (a violation exits non-zero exactly like a
 traceback):
 
-- purity-adjusted ethanol MPSP within 1% of 0.84508 (was 0.84321 before the
+- purity-adjusted ethanol MPSP within 1% of 0.83855 (was 0.84508 before the
+  2026-09-13 P508 detach re-pin -- corn's orphaned rectifier-bottoms pump P508
+  no longer feeds its stale build-time outlet (~14,160 kg/hr, essentially
+  water) into MX5 -> M501 / WWT on every simulation -- 0.84321 before the
   2026-09-12 DDGS-dryer acid-split re-pin -- broth acetic acid routed to the
   dryer exhaust / X611 instead of the DDGS product -- and 0.84458 before the
   2026-09-12 nskinetics anaerobic_growth_mult 1.0 -> 0.75 re-pin; matching the
@@ -74,7 +77,7 @@ def load_simulate_baseline(stream_IDs=('ethanol', 'isobutanol'),
     model_specification = bundle['model_specification']
     solve_TEA = bundle['solve_TEA']
     feeding_kwargs = bundle['feeding_kwargs']
-    expected_MPSPs = {'ethanol': 0.84508, 'isobutanol': math.nan}
+    expected_MPSPs = {'ethanol': 0.83855, 'isobutanol': math.nan}
 
     all_results = []
     for i in range(n_sims):
