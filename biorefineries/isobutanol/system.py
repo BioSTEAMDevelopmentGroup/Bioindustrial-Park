@@ -33,7 +33,8 @@ MultiEffectEvaporator = bst.MultiEffectEvaporator
 
 __all__ = ('load', 'solve_TEA', 'solve_TEA_at_IRR',
            'set_active_burden', 'get_active_burden',
-           'EnzymeBurdenInfeasibleError', 'DDGS_DRYER_OVERHEAD_ACIDS')
+           'EnzymeBurdenInfeasibleError', 'SimulationConvergenceError',
+           'last_convergence', 'DDGS_DRYER_OVERHEAD_ACIDS')
 
 #: The enzyme burden enforced at the simulate choke point, or None (off).
 #: Set by scenarios.load_scenario (policy) / the kinetic optimizer; read by
@@ -1076,19 +1077,69 @@ def solve_TEA(stream_IDs=('ethanol', 'isobutanol'),
 #: load_simulate call. Diagnostic for convergence behavior.
 convergence_log = []
 
+#: Diagnostics of the LATEST load_simulate call, updated IN PLACE (never
+#: rebound), so a handle to this dict -- kinetic_optimization.get_handles
+#: passes it to the tracked-metric getters behind the n_sims_run /
+#: final_drift trajectory columns -- always reads the most recent call.
+#: Reset at the start of every call, so a call that raised before its loop
+#: finished never reports its predecessor's convergence. Keys: n_sims_run,
+#: drifts (per-sweep), final_drift, converged (final_drift <= sim_rtol),
+#: cap_hit (not converged), spike_feed_residual,
+#: n_spike_feed_reconciliation_passes (both from V406, see below).
+last_convergence = dict(n_sims_run=0, drifts=(), final_drift=np.nan,
+                        converged=False, cap_hit=False,
+                        spike_feed_residual=np.nan,
+                        n_spike_feed_reconciliation_passes=0)
+
+class SimulationConvergenceError(RuntimeError):
+    """load_simulate hit its sweep cap (n_sims) with the tracked state still
+    moving by more than max_final_drift in the last sweep: the flowsheet is
+    NOT at a fixed point of the load+simulate map (typically parked
+    mid-excursion on the wrong HXN1001 utility-network branch), so a TEA
+    read afterwards would describe no converged design. model_specification
+    retries the sweeps once from where they stopped and then propagates it
+    (sweeps / uncertainty -> NaN, kinetic BO -> FAIL row, smoke test ->
+    traceback). 2026-09-13; nskinetics report
+    docs/reports/fed-batch-spike-feed-reconciliation.md section 6.5."""
+
+def _spike_feed_residual():
+    """V406's spike-feed residual, (implied - delivered)/|delivered| of the
+    spiked species at the reactor boundary of the ACCEPTED kinetic run
+    (nskinetics NSKBatchReactor.spike_feed_residual, closed to
+    spike_feed_reconciliation_tol = 1e-3 by the reactor's reconciler, i.e.
+    fbs_spec; None when the reconciler hook is off -> 0.0, so the drift
+    term is inert). Dimensionless."""
+    residual = getattr(f.unit.V406, 'spike_feed_residual', None)
+    return 0.0 if residual is None else float(residual)
+
+#: Per-term floors of the drift denominator max(|prev|, floor): the flow /
+#: cost terms are compared relatively (floor 1e-12); the spike-feed residual
+#: is already a fraction of the delivered spike mass and sits at ~1e-4
+#: (scenario A) or exactly 0 (a batch), so it is compared ABSOLUTELY
+#: (floor 1.0) -- a sweep passes when the residual moved by <= sim_rtol of
+#: the delivered spike mass. Measured between-sweep jitter at the
+#: baselines is ~1e-11.
+_DRIFT_DENOMINATOR_FLOORS = np.array([1e-12]*5 + [1.0])
+
 def _simulation_drift_state():
     # Flows/costs through which the cross-system couplings relax:
     # product flow; V307's computed dilution water (its specification,
     # corn/systems.py correct_recycle_dilution_water, consumes the
     # ammonia/gluco_amylase flows that V406's specification sets one pass
-    # later); ammonia itself; boiler fuel; and BT801 utility cost, which
-    # catches HXN1001 network flips that barely move process flows.
+    # later); ammonia itself; boiler fuel; BT801 utility cost, which
+    # catches HXN1001 network flips that barely move process flows; and
+    # (2026-09-13, nskinetics report fed-batch-spike-feed-reconciliation.md
+    # section 6.5) V406's reactor-boundary spike-feed residual, so a sweep
+    # whose reconciled feed/spike split is still moving cannot pass as
+    # converged on the flow terms alone. Keep _DRIFT_DENOMINATOR_FLOORS in
+    # step with this vector.
     return np.array([
         f.ethanol.F_mass,
         f.recycled_process_water.F_mass,
         f.ammonia.F_mass,
         f.natural_gas.F_mass,
         f.unit.BT801.utility_cost or 0.0,
+        _spike_feed_residual(),
     ])
 
 def _check_fed_batch_volume_ratio(splitter, split_before):
@@ -1147,6 +1198,12 @@ def load_simulate(target_conc=None,
     # the wrong utility-network branch.
     n_sims=5,
     sim_rtol=1e-4,
+    # A cap hit (n_sims sweeps run, last drift still > sim_rtol) is
+    # tolerated only while the last drift is <= max_final_drift (nearly
+    # converged; last_convergence['cap_hit'] flags it, and the kinetic BO
+    # records n_sims_run / final_drift per trial); beyond it the call
+    # raises SimulationConvergenceError (2026-09-13; report section 6.5).
+    max_final_drift=1e-2,
     plot=False,
     ):
     """Load the feeding specifications and simulate to convergence. Does
@@ -1170,6 +1227,10 @@ def load_simulate(target_conc=None,
 
     n_sims_run = 0
     drifts = []
+    last_convergence.update(n_sims_run=0, drifts=(), final_drift=np.nan,
+                            converged=False, cap_hit=False,
+                            spike_feed_residual=np.nan,
+                            n_spike_feed_reconciliation_passes=0)
     prev = _simulation_drift_state()
     with _apply_enzyme_burden():
       while n_sims_run < n_sims:
@@ -1189,12 +1250,30 @@ def load_simulate(target_conc=None,
           n_sims_run += 1
           curr = _simulation_drift_state()
           drift = float(np.max(np.abs(curr - prev)
-                               / np.maximum(np.abs(prev), 1e-12)))
+                               / np.maximum(np.abs(prev),
+                                            _DRIFT_DENOMINATOR_FLOORS)))
           drifts.append(drift)
           prev = curr
           if drift <= sim_rtol:
               break
     convergence_log.append((n_sims_run, tuple(drifts)))
+    final_drift = drifts[-1] if drifts else np.nan
+    converged = bool(final_drift <= sim_rtol)
+    residual = _spike_feed_residual()
+    last_convergence.update(
+        n_sims_run=n_sims_run, drifts=tuple(drifts), final_drift=final_drift,
+        converged=converged, cap_hit=not converged,
+        spike_feed_residual=residual,
+        n_spike_feed_reconciliation_passes=getattr(
+            f.unit.V406, 'n_spike_feed_reconciliation_passes', 0))
+    if not converged and final_drift > max_final_drift:
+        drift_str = ', '.join(f'{d:.3g}' for d in drifts)
+        raise SimulationConvergenceError(
+            f'load_simulate hit its sweep cap n_sims = {n_sims} with the '
+            f'tracked state still moving {final_drift:.3g} (relative; '
+            f'sim_rtol {sim_rtol:g}, max_final_drift {max_final_drift:g}) '
+            f'in the last sweep; per-sweep drifts ({drift_str}); '
+            f'spike-feed residual {residual:+.3e}.')
 
     if plot:
         plot_kinetic_results()
@@ -1369,6 +1448,20 @@ def model_specification(**kwargs):
             # over the proteome cap, so re-simulating it cannot help and the
             # sweep/uncertainty caller wants a NaN. Re-raise at once.
             raise
+        if isinstance(e, SimulationConvergenceError):
+            # Sweep cap hit with the tracked state still moving (see
+            # load_simulate's max_final_drift): the flowsheet is mid-
+            # excursion, not broken, so the recovery barrage (solver /
+            # integrator switches) is the wrong tool -- give the same
+            # composite map ONE more bounded pass from where it stopped
+            # (a transient HXN1001 excursion escapes within a few sweeps);
+            # still moving -> the second call raises, which propagates
+            # (sweeps / uncertainty -> NaN, kinetic BO -> FAIL row, smoke
+            # test -> traceback).
+            print('Error in model spec: %s'%str(e))
+            print('Retrying the convergence sweeps once ...')
+            load_simulate(**curr_spec)
+            return
         str_e = str(e).lower()
         print('Error in model spec: %s'%str_e)
         # raise e

@@ -109,10 +109,30 @@ assert ko.OBJECTIVE_REGISTRY['PI']['getter'](handles) == 35e6/350e6   # NPV / TC
 assert ko.TRACKED_METRICS['PI'](handles) == 35e6/350e6
 assert ko.TRACKED_METRICS['tau'](handles) == 55.0
 assert ko.TRACKED_METRICS['n_glu_spikes'](handles) == 7
+# Convergence diagnostics (2026-09-13): NaN without the optional handles /
+# attributes, the live values with them.
+assert np.isnan(ko.TRACKED_METRICS['spike_feed_residual'](handles))
+assert np.isnan(ko.TRACKED_METRICS['n_sims_run'](handles))
+assert np.isnan(ko.TRACKED_METRICS['final_drift'](handles))
+handles_conv = dict(handles,
+                    V406=SimpleNamespace(nsk_results_specific_tau_dict=nsk,
+                                         tau=55.0, spike_feed_residual=-1.57e-4),
+                    last_convergence={'n_sims_run': 2, 'final_drift': 3.4e-5})
+assert ko.TRACKED_METRICS['spike_feed_residual'](handles_conv) == -1.57e-4
+assert ko.TRACKED_METRICS['n_sims_run'](handles_conv) == 2
+assert ko.TRACKED_METRICS['final_drift'](handles_conv) == 3.4e-5
+handles_none = dict(handles_conv,
+                    V406=SimpleNamespace(nsk_results_specific_tau_dict=nsk,
+                                         tau=55.0, spike_feed_residual=None))
+assert np.isnan(ko.TRACKED_METRICS['spike_feed_residual'](handles_none))
 assert set(ko.TRACKED_METRICS) == {'IBO yield', 'IBO titer', 'IBO productivity',
                                    'EtOH yield', 'EtOH titer', 'EtOH productivity',
                                    'Cell density', 'IRR', 'TCI', 'PI',
-                                   'tau', 'n_glu_spikes'}
+                                   'tau', 'n_glu_spikes',
+                                   'spike_feed_residual', 'n_sims_run',
+                                   'final_drift'}
+assert list(ko.TRACKED_METRICS)[-3:] == ['spike_feed_residual', 'n_sims_run',
+                                         'final_drift']   # CSV column order
 PASS('getters read the handles contract correctly')
 
 #%% 5. trajectory CSV: header, append, round-trip

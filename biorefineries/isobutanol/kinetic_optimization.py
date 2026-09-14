@@ -295,6 +295,9 @@ INHIBITION_COEFFICIENT_ROLES = ('product_inhibition', 'lethality')
 #          the fixed 0.15 hurdle, so .NPV is the NPV at the hurdle rate)
 #   'latest_TEA_solution': {'IRR': ..., 'MPSPs': {'ethanol': ..,
 #                           'isobutanol': ..}}, refreshed once per trial.
+#   'last_convergence': system.last_convergence, the dict load_simulate
+#          updates IN PLACE after every call (n_sims_run, final_drift, ...);
+#          optional -- the convergence getters read NaN without it.
 # This indirection keeps every getter testable offline with fakes.
 
 def _nsk(handles):
@@ -378,6 +381,34 @@ TRACKED_METRICS = {name: OBJECTIVE_REGISTRY[name]['getter'] for name in
                     'Cell density', 'IRR', 'TCI', 'PI')}
 TRACKED_METRICS['tau'] = lambda h: h['V406'].tau
 TRACKED_METRICS['n_glu_spikes'] = lambda h: _nsk(h)['curr_n_glu_spikes']
+
+# Convergence diagnostics of the simulation behind each trial (2026-09-13;
+# nskinetics report docs/reports/fed-batch-spike-feed-reconciliation.md
+# section 6.5): V406's reactor-boundary spike-feed residual, (implied -
+# delivered)/|delivered| of the accepted kinetic run (NaN when the reactor
+# has none, e.g. the reconciler hook is off), and system.load_simulate's
+# sweep count / last-sweep drift, read from the system.last_convergence
+# dict that get_handles passes as handles['last_convergence']. A cap hit
+# with a large final drift raises system.SimulationConvergenceError -> a
+# FAIL row after model_specification's one retry, so a COMPLETE row with
+# n_sims_run at the cap (5) and final_drift > sim_rtol (1e-4) is the
+# "flagged", nearly-converged case. Three NEW trajectory-CSV columns after
+# n_glu_spikes, so the header guard REFUSES to resume any study started
+# before 2026-09-13 (start a fresh study name; old CSVs stay plottable, their
+# rows simply lack the columns). The getters tolerate handles without the
+# diagnostics (NaN) so every fake-handle test runs unchanged.
+def _convergence(handles):
+    return handles.get('last_convergence') or {}
+
+def _spike_feed_residual(handles):
+    residual = getattr(handles['V406'], 'spike_feed_residual', None)
+    return np.nan if residual is None else float(residual)
+
+TRACKED_METRICS['spike_feed_residual'] = _spike_feed_residual
+TRACKED_METRICS['n_sims_run'] = lambda h: _convergence(h).get('n_sims_run',
+                                                             np.nan)
+TRACKED_METRICS['final_drift'] = lambda h: _convergence(h).get('final_drift',
+                                                              np.nan)
 
 #: Annealing energy of every non-COMPLETE evaluation (FAIL / NAN /
 #: INFEASIBLE). FINITE by necessity: scipy's EnergyState.reset re-randomizes
@@ -3161,6 +3192,7 @@ def get_handles():
             'fbs_spec': V406.fbs_spec,
             'tea': ibo_system.corn_EtOH_IBO_sys_tea,
             'HXN': f.HXN1001,
+            'last_convergence': ibo_system.last_convergence,
             'model_specification': ibo_system.model_specification,
             'solve_TEA': ibo_system.solve_TEA,
             'latest_TEA_solution': {
