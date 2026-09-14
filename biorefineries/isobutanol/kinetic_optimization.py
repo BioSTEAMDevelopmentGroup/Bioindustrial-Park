@@ -3206,6 +3206,8 @@ def get_handles():
             'last_convergence': ibo_system.last_convergence,
             'model_specification': ibo_system.model_specification,
             'solve_TEA': ibo_system.solve_TEA,
+            'snapshot_flowsheet_state': ibo_system.snapshot_flowsheet_state,
+            'restore_flowsheet_state': ibo_system.restore_flowsheet_state,
             'latest_TEA_solution': {
                 'IRR': np.nan,
                 'MPSPs': {'ethanol': np.nan, 'isobutanol': np.nan}},
@@ -3314,7 +3316,12 @@ class OptimizationContext:
     search space and its bookkeeping, the scenario-baseline snapshot, the
     study's file paths and CSV columns. No optimizer object lives here (the
     TPE engine builds its SQLite storage string from results_dir/study_name;
-    the dual-annealing engine has no store)."""
+    the dual-annealing engine has no store). `state_snapshot` is the
+    flowsheet state (system.snapshot_flowsheet_state) of the last converged
+    simulation -- taken at set-up and refreshed by evaluate_decision_point
+    after every COMPLETE / NAN trial, restored after every FAIL trial so a
+    failed simulation leaves no trace for the next trial (None when the
+    handles carry no snapshot function, e.g. offline fakes)."""
     handles: dict
     r_te: object
     fbs_spec: object
@@ -3342,6 +3349,7 @@ class OptimizationContext:
     columns: list
     seed_points: dict
     seed_notes: list
+    state_snapshot: object = None
 
 
 @dataclasses.dataclass
@@ -3592,6 +3600,10 @@ def _prepare_optimization(objective, *, direction, level, objective_units,
     if lost is not None:
         print(f'Recovered orphaned in-flight trial {lost} from a previous '
               'run as a LOST row (no terminal row had been written).')
+    # The flowsheet is converged here (the driver's load_scenario / the
+    # caller's baseline simulation): the first FAIL trial restores this.
+    snapshot_state = handles.get('snapshot_flowsheet_state')
+    state_snapshot = snapshot_state() if snapshot_state is not None else None
     return OptimizationContext(
         handles=handles, r_te=r_te, fbs_spec=fbs_spec,
         objective_getter=objective_getter, objective_name=objective_name,
@@ -3606,7 +3618,33 @@ def _prepare_optimization(objective, *, direction, level, objective_units,
         baseline_stage_1_max_x=baseline_stage_1_max_x,
         results_dir=results_dir, study_name=study_name,
         csv_path=csv_path, inflight_path=inflight_path, columns=columns,
-        seed_points=seed_points, seed_notes=seed_notes)
+        seed_points=seed_points, seed_notes=seed_notes,
+        state_snapshot=state_snapshot)
+
+
+def _snapshot_flowsheet(ctx):
+    """Refresh ctx.state_snapshot from the (converged) live flowsheet;
+    a no-op for handles without the snapshot function."""
+    snapshot_state = ctx.handles.get('snapshot_flowsheet_state')
+    if snapshot_state is not None:
+        ctx.state_snapshot = snapshot_state()
+
+
+def _restore_flowsheet_after_fail(ctx, trial_number):
+    """Undo a FAIL trial's simulation: put the flowsheet back to the
+    last converged snapshot so the next trial does not start from
+    diverged recycles / a switched solver / a collapsed split. A restore
+    that itself raises is reported and swallowed -- the next trial then
+    starts from the failed state, exactly as before 2026-09-14."""
+    restore_state = ctx.handles.get('restore_flowsheet_state')
+    if restore_state is None or ctx.state_snapshot is None:
+        return
+    try:
+        restore_state(ctx.state_snapshot)
+    except Exception as e:
+        print(f'Trial {trial_number}: WARNING -- could not restore the '
+              f'flowsheet snapshot after the FAIL ({repr(e)[:120]}); the '
+              'next trial starts from the failed state.')
 
 
 def evaluate_decision_point(ctx, values, trial_number):
@@ -3621,6 +3659,9 @@ def evaluate_decision_point(ctx, values, trial_number):
     KeyboardInterrupt during the simulation leaves it for recover_inflight).
     The k_7/k_8 derating happens in the load_simulate choke point of
     system.py through the active burden the engine installs -- never here.
+    Flowsheet state (2026-09-14): a COMPLETE / NAN trial refreshes
+    ctx.state_snapshot (a converged flowsheet); a FAIL trial restores it, so
+    the next trial never starts from what a failed simulation left behind.
     Returns an Evaluation."""
     handles, r_te, fbs_spec = ctx.handles, ctx.r_te, ctx.fbs_spec
     csv_path, columns = ctx.csv_path, ctx.columns
@@ -3717,6 +3758,7 @@ def evaluate_decision_point(ctx, values, trial_number):
             append_trajectory_row(csv_path, columns, record)
             row_written = True
             print(f'Trial {trial_number}: FAILED ({repr(e)[:120]})')
+            _restore_flowsheet_after_fail(ctx, trial_number)
             return Evaluation('FAIL', record,
                               burden_violation=burden_violation,
                               volume_violation=volume_violation,
@@ -3730,12 +3772,14 @@ def evaluate_decision_point(ctx, values, trial_number):
             row_written = True
             print(f'Trial {trial_number}: objective is non-finite '
                   f'({obj}); pruned.')
+            _snapshot_flowsheet(ctx)
             return Evaluation('NAN', record,
                               burden_violation=burden_violation,
                               volume_violation=volume_violation)
         record['state'] = 'COMPLETE'
         append_trajectory_row(csv_path, columns, record)
         row_written = True
+        _snapshot_flowsheet(ctx)
         return Evaluation('COMPLETE', record, objective=obj,
                           burden_violation=burden_violation,
                           volume_violation=volume_violation)

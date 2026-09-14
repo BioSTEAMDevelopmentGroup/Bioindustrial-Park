@@ -34,7 +34,8 @@ MultiEffectEvaporator = bst.MultiEffectEvaporator
 __all__ = ('load', 'solve_TEA', 'solve_TEA_at_IRR',
            'set_active_burden', 'get_active_burden',
            'EnzymeBurdenInfeasibleError', 'SimulationConvergenceError',
-           'last_convergence', 'DDGS_DRYER_OVERHEAD_ACIDS')
+           'last_convergence', 'DDGS_DRYER_OVERHEAD_ACIDS',
+           'snapshot_flowsheet_state', 'restore_flowsheet_state')
 
 #: The enzyme burden enforced at the simulate choke point, or None (off).
 #: Set by scenarios.load_scenario (policy) / the kinetic optimizer; read by
@@ -1400,6 +1401,48 @@ def plot_kinetic_results(xlim=None, ylim=None,
     # plt.close()
     return fig, ax
     
+def _all_systems(system):
+    yield system
+    for subsystem in system.subsystems:
+        yield from _all_systems(subsystem)
+
+def snapshot_flowsheet_state():
+    """Capture the flowsheet state a simulation starts from, so a failed
+    simulation can be undone (restore_flowsheet_state): every stream of
+    corn_EtOH_IBO_sys as a thermosteam StreamData (flows, T, P, phases --
+    the recycle tear streams included), the feed/spike splitter split that
+    fbs_spec.load_specifications writes from each kinetic run (state the
+    load_simulate loop converges, like a recycle), and the convergence
+    method of the system and of every subsystem (reset_and_switch_solver
+    changes the top-level one and never changes it back). Cheap: array
+    copies, no simulation. Take it on a CONVERGED flowsheet -- after a
+    successful load_simulate / model_specification.
+
+    Motivation (2026-09-14): in the kinetic BO a FAIL trial (a SYS14
+    recycle non-convergence, a failed recovery barrage) left diverged
+    recycles, a switched solver and a collapsed split for the next trial
+    to start from; the two garbage PI rows 1401 / 1768 and the 4x
+    FAIL-after-FAIL clustering of the 09-14 studies both trace to that.
+    ko.evaluate_decision_point snapshots after every COMPLETE / NAN trial
+    and restores after every FAIL. Regression:
+    analyses/test_reset_after_fail.py."""
+    return {'streams': [(s, s.get_data()) for s in corn_EtOH_IBO_sys.streams],
+            'split': np.array(fbs_spec.splitter.split, copy=True),
+            'methods': [(s, s.converge_method)
+                        for s in _all_systems(corn_EtOH_IBO_sys)]}
+
+def restore_flowsheet_state(snapshot):
+    """Write a snapshot_flowsheet_state() capture back: every stream's
+    data, the feed/spike splitter split, every (sub)system's convergence
+    method; then reset the unit / stream caches so nothing computed on the
+    discarded state survives. Idempotent; no simulation."""
+    for stream, data in snapshot['streams']:
+        stream.set_data(data)
+    fbs_spec.splitter.split = snapshot['split']
+    for system, method in snapshot['methods']:
+        system.converge_method = method
+    corn_EtOH_IBO_sys.reset_cache()
+
 def reset_and_reload(**curr_spec):
     # !!! Resetting might cause yeast stream problems
     print('Resetting cache and emptying recycles ...')
