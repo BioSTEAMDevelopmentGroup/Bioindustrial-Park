@@ -303,6 +303,17 @@ INHIBITION_COEFFICIENT_ROLES = ('product_inhibition', 'lethality')
 def _nsk(handles):
     return handles['V406'].nsk_results_specific_tau_dict
 
+def _productivity(amount, time):
+    """amount/time, or 0.0 at time 0 (nothing produced in no time). A
+    tau-row at t = 0 -- a stalled culture (glucose never depleted) before
+    nskinetics' flat-trace tau fallback, or any degenerate row -- must not
+    raise: flexsolve sets np.seterr(invalid='raise') globally at import, so
+    a numpy-scalar 0/0 is a FloatingPointError there (a Python-float 0/0 a
+    ZeroDivisionError). The 2026-09-13 metabolic_14d PI GP study lost 958
+    of 1000 trials to that raise -- logged FAIL, hence invisible to the GP,
+    which re-proposed the same point ~800 times."""
+    return amount/time if time > 0 else 0.0
+
 # 'level' ('kinetic' vs 'system') is metadata only: every trial runs the full
 # system simulation AND one TEA solve regardless (the system-level metrics
 # IRR/TCI/... in TRACKED_METRICS are always recorded), so a 'kinetic' objective
@@ -321,7 +332,7 @@ OBJECTIVE_REGISTRY = {
         direction='maximize', level='kinetic', units='g-IBO/L-broth',
         energy_scale=2.0),
     'IBO productivity': dict(
-        getter=lambda h: _nsk(h)['[s_IBO]']/_nsk(h)['time'],
+        getter=lambda h: _productivity(_nsk(h)['[s_IBO]'], _nsk(h)['time']),
         direction='maximize', level='kinetic', units='g-IBO/L-broth/h',
         energy_scale=0.05),
     'IBO yield x titer': dict(

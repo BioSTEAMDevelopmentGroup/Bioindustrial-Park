@@ -109,6 +109,18 @@ assert ko.OBJECTIVE_REGISTRY['PI']['getter'](handles) == 35e6/350e6   # NPV / TC
 assert ko.TRACKED_METRICS['PI'](handles) == 35e6/350e6
 assert ko.TRACKED_METRICS['tau'](handles) == 55.0
 assert ko.TRACKED_METRICS['n_glu_spikes'](handles) == 7
+# A tau-row at time 0 -- a stalled culture (glucose never depleted) before
+# nskinetics' flat-trace tau fallback, or any degenerate row: 'IBO
+# productivity' is 0.0 (nothing produced), never a 0/0. flexsolve sets
+# np.seterr(invalid='raise') globally at import, which turned that 0/0 into
+# the FloatingPointError that failed 958 of 1000 trials of the 2026-09-13
+# metabolic_14d PI GP study (the GP re-proposed the invisible FAIL point).
+nsk_t0 = dict(nsk, **{'[s_IBO]': 0.0, 'time': 0.0})
+handles_t0 = dict(handles, V406=SimpleNamespace(
+    nsk_results_specific_tau_dict=nsk_t0, tau=0.0))
+with np.errstate(divide='raise', invalid='raise'):
+    assert ko.OBJECTIVE_REGISTRY['IBO productivity']['getter'](handles_t0) == 0.0
+    assert ko.TRACKED_METRICS['IBO productivity'](handles_t0) == 0.0
 # Convergence diagnostics (2026-09-13): NaN without the optional handles /
 # attributes, the live values with them.
 assert np.isnan(ko.TRACKED_METRICS['spike_feed_residual'](handles))
