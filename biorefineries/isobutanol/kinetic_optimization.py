@@ -329,27 +329,27 @@ OBJECTIVE_REGISTRY = {
         energy_scale=0.01),
     'IBO titer': dict(
         getter=lambda h: _nsk(h)['[s_IBO]'],
-        direction='maximize', level='kinetic', units='g-IBO/L-broth',
+        direction='maximize', level='kinetic', units='g-IBO/L-water',
         energy_scale=2.0),
     'IBO productivity': dict(
         getter=lambda h: _productivity(_nsk(h)['[s_IBO]'], _nsk(h)['time']),
-        direction='maximize', level='kinetic', units='g-IBO/L-broth/h',
+        direction='maximize', level='kinetic', units='g-IBO/L-water/h',
         energy_scale=0.05),
     'IBO yield x titer': dict(
         getter=lambda h: _nsk(h)['y_IBO_glu_added']*_nsk(h)['[s_IBO]'],
         direction='maximize', level='kinetic',
-        units='(g-IBO/g-sugars)(g-IBO/L-broth)', energy_scale=0.5),
+        units='(g-IBO/g-sugars)(g-IBO/L-water)', energy_scale=0.5),
     'EtOH yield': dict(
         getter=lambda h: _nsk(h)['y_EtOH_glu_added'],
         direction='maximize', level='kinetic', units='g-EtOH/g-sugars',
         energy_scale=0.01),
     'EtOH titer': dict(
         getter=lambda h: _nsk(h)['[s_EtOH]'],
-        direction='maximize', level='kinetic', units='g-EtOH/L-broth',
+        direction='maximize', level='kinetic', units='g-EtOH/L-water',
         energy_scale=2.0),
     'EtOH productivity': dict(
         getter=lambda h: _nsk(h)['prod_EtOH'],
-        direction='maximize', level='kinetic', units='g-EtOH/L-broth/h',
+        direction='maximize', level='kinetic', units='g-EtOH/L-water/h',
         energy_scale=0.05),
     'Combined yield': dict(
         getter=lambda h: _nsk(h)['y_EtOH_IBO_glu_added'],
@@ -357,7 +357,7 @@ OBJECTIVE_REGISTRY = {
         energy_scale=0.01),
     'Cell density': dict(
         getter=lambda h: _nsk(h)['[x]'],
-        direction='maximize', level='kinetic', units='g-cell/L-broth',
+        direction='maximize', level='kinetic', units='g-cell/L-water',
         energy_scale=1.0),
     'IRR': dict(
         getter=lambda h: h['latest_TEA_solution']['IRR'],
