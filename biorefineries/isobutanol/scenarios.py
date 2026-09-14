@@ -30,7 +30,8 @@ from dataclasses import dataclass
 
 __all__ = ('ScenarioSpec', 'SCENARIOS', 'load_scenario',
            'assert_MPSPs_pinned', 'assert_MPSPs_stable',
-           'assert_objective_reproduced')
+           'assert_objective_reproduced', 'assert_spike_feed_residual',
+           'SPIKE_FEED_RESIDUAL_TOL')
 
 _PKG_DIR = os.path.dirname(os.path.abspath(__file__))
 _WORKBOOK_DIR = os.path.join(_PKG_DIR, 'analyses', 'full',
@@ -330,6 +331,37 @@ def assert_MPSPs_stable(reference, current, sim_number, rel_tol=5e-3):
             assert abs(cur - ref)/abs(ref) < rel_tol, \
                 (f'sim {sim_number}: {ID} MPSP {cur} drifted from first-sim '
                  f'value {ref} beyond rel tol {rel_tol}')
+
+
+#: Pin on the fermentor's reactor-boundary spike-feed residual, |(implied -
+#: delivered)/delivered| of the spiked species (nskinetics
+#: NSKBatchReactor.spike_feed_residual): the reconciler's own closure
+#: tolerance (spike_feed_reconciliation_tol = 1e-3). nskinetics report
+#: docs/reports/fed-batch-spike-feed-reconciliation.md section 6.4.4: a
+#: flowsheet-level yield ceiling (ethanol/glucose <= 0.511) lets a 20 %
+#: phantom feed through at a 0.40 g/g yield; a 0.1 % residual pin does not.
+#: Baseline values: A -1.6e-4 (7 spikes), opt_* -2.7e-5..-8.1e-5, batches
+#: (B, opt_IBO_yield) exactly 0.
+SPIKE_FEED_RESIDUAL_TOL = 1e-3
+
+def assert_spike_feed_residual(sim_number, abs_tol=SPIKE_FEED_RESIDUAL_TOL):
+    """Verify the live fermentor V406 closed its spike-feed balance on the
+    simulation just run: the reconciler hook is on (residual is not None --
+    the factory installs fbs_spec as the reconciler) and |residual| <=
+    abs_tol. Reads the built system, so valid only after load()."""
+    from biorefineries.isobutanol import system as _system
+    reactor = _system.f.unit.V406
+    residual = getattr(reactor, 'spike_feed_residual', None)
+    assert residual is not None, \
+        (f'sim {sim_number}: V406.spike_feed_residual is None -- the '
+         'spike-feed reconciler hook is off (V406.spike_feed_reconciler = '
+         f'{getattr(reactor, "spike_feed_reconciler", None)!r})')
+    assert abs(residual) <= abs_tol, \
+        (f'sim {sim_number}: V406 spike-feed residual {residual:+.3e} '
+         f'exceeds {abs_tol:g} (implied {reactor.spike_feed_implied:.6g} '
+         f'vs delivered {reactor.spike_feed_delivered:.6g} kg/hr after '
+         f'{reactor.n_spike_feed_reconciliation_passes} reconciliation '
+         'pass(es))')
 
 
 def assert_objective_reproduced(spec, results, bundle, sim_number, rel_tol=None):

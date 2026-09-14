@@ -81,6 +81,7 @@ def load_simulate_baseline(stream_IDs=('ethanol', 'isobutanol'),
         model_specification(**feeding_kwargs)
         results = solve_TEA(stream_IDs=stream_IDs, IRR_for_MPSP=IRR_for_MPSP)
         scenarios.assert_MPSPs_pinned(expected_MPSPs, results, i+1)
+        scenarios.assert_spike_feed_residual(i+1)
         if all_results:
             scenarios.assert_MPSPs_stable(all_results[0], results, i+1)
         all_results.append(results)
