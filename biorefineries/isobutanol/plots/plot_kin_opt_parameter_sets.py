@@ -201,15 +201,21 @@ FONTS = {'band': 12, 'cell': 10, 'tick': 9, 'callout': 9,
 PANEL_B_BG = '0.93'
 
 # --- scenario-A baseline outcomes: HARD-CODED (spec decision b).
-# Simulated 2026-09-07 (smoke_test_1 protocol, IBO_2026). A cached one-off
-# baseline simulation (option a) is a later change; when done, replace this
-# dict with the cached read.
-# TEA entries (IRR, TCI) re-recorded 2026-09-12 for the DDGS-dryer acid
-# split (test-1 smoke run; the 2026-09-07 values were 0.1230 / 139.6).
+# Re-simulated 2026-09-13 (smoke_test_1 protocol, IBO_2026: load(),
+# scenarios.load_scenario('A'), model_specification, solve_TEA; ethanol MPSP
+# 0.86867) on the current nskinetics dev (anaerobic_growth_mult 0.75, r13 /
+# r14-r16 rate laws -- the latter inert for A). A cached one-off baseline
+# simulation (option a) is a later change; when done, replace this dict with
+# the cached read.
+# History: fermentation entries first recorded 2026-09-07 (EtOH titer 118.4,
+# tau 45.4, 10 spikes, EtOH yield 0.455, cell density 15.7) under
+# anaerobic_growth_mult 1.0; TEA entries (IRR, TCI) re-recorded 2026-09-12 for
+# the DDGS-dryer acid split (the 2026-09-07 values were 0.1230 / 139.6) and
+# unchanged on 2026-09-13.
 BASELINE_A = {
-    'IRR': 0.1210, 'EtOH titer': 118.4, 'IBO titer': 0.0, 'tau': 45.4,
-    'n_glu_spikes': 10, 'EtOH yield': 0.455, 'IBO yield': 0.0,
-    'Cell density': 15.7, 'TCI': 142.8, 'threshold_conc': 217.125,
+    'IRR': 0.1210, 'EtOH titer': 114.5, 'IBO titer': 0.0, 'tau': 61.6,
+    'n_glu_spikes': 7, 'EtOH yield': 0.460, 'IBO yield': 0.0,
+    'Cell density': 13.0, 'TCI': 142.8, 'threshold_conc': 217.125,
     'target_delta': 4.125, 'max_n_spikes': 16,
 }
 
