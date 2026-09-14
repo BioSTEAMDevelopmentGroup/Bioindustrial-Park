@@ -42,6 +42,7 @@ __all__ = ('load', 'solve_TEA', 'solve_TEA_at_IRR',
 #: simulate path (smoke tests, sweeps, uncertainty, optimizer) flows through
 #: load_simulate but not through a shared object.
 _active_burden = None
+_burden_depth = 0      # re-entrancy depth of _apply_enzyme_burden (see below)
 
 #: Re-export so callers catch a system-level name (it IS the enzyme_burden
 #: exception, so an except in either module matches).
@@ -69,25 +70,59 @@ def get_active_burden():
 
 @_contextmanager
 def _apply_enzyme_burden():
-    """Enforce the active enzyme burden across a load_simulate convergence
-    loop. When a burden is active, snapshot the intended (k_7, k_8) on the
-    kinetic model, set them to their burden-derated values for the duration
-    of the loop, and restore the intended values on exit (success or error)
-    -- the snapshot-at-top / restore-in-finally idempotency rule, so d never
-    compounds across repeated load_simulate calls (the recovery barrage) and
-    r_te shows intended k_7/k_8 between calls. A no-op when no burden is
-    active. Raises EnzymeBurdenInfeasibleError (before simulating) on an
-    over-cap point."""
+    """Enforce the active enzyme burden around a kinetic run. When a burden
+    is active, snapshot the intended (k_7, k_8) on the kinetic model, set
+    them to their burden-derated values for the duration of the block, and
+    restore the intended values on exit (success or error) -- the
+    snapshot-at-top / restore-in-finally idempotency rule, so d never
+    compounds across repeated calls (the recovery barrage) and r_te shows
+    intended k_7/k_8 between calls. A no-op when no burden is active.
+    Raises EnzymeBurdenInfeasibleError (before simulating) on an over-cap
+    point.
+
+    Re-entrant (2026-09-14): entered by load_simulate around its whole
+    convergence loop AND by the fermentor's own _run (see
+    _guard_fermentor_run), so the inner level is a plain pass-through --
+    the outermost application owns the derate/restore and every kinetic
+    run is derated exactly once. (derate_r_te is also arithmetically
+    idempotent -- on an already-derated point phi_T has shrunk by the same
+    d, so it finds d = 1 -- but exactly-once is made explicit here rather
+    than left as a property of the current burden model.)"""
+    global _burden_depth
     burden = _active_burden
-    if burden is None:
+    if burden is None or _burden_depth:
         yield
         return
     r_te = V406.nsk_kinetic_model._te
     snapshot = burden.derate_r_te(r_te)   # may raise EnzymeBurdenInfeasibleError
+    _burden_depth += 1
     try:
         yield
     finally:
+        _burden_depth -= 1
         burden.restore_r_te(r_te, snapshot)
+
+
+def _guard_fermentor_run(reactor):
+    """Bind an instance-level `_run` on the fermentor that runs the class's
+    `_run` inside _apply_enzyme_burden(), so the active burden derates the
+    kinetics on EVERY path that runs them -- a bare `V406.simulate()`, a bare
+    `corn_EtOH_IBO_sys.simulate()` (the recovery barrage, ad-hoc probes) and
+    fbs_spec.load_specifications' own reactor.simulate() -- not only inside
+    load_simulate. Motivation (2026-09-14): biosteam's TEA re-simulates the
+    system BARE when it meets a NaN in the cashflow array (biosteam/_tea.py,
+    `self.system.simulate()` before raising 'nan encountered in cashflow
+    array'); for a burden-ON point that re-ran V406 at the INTENDED k_7 and
+    the kinetic-BO PI study logged the un-derated fermentation with a garbage
+    TEA (trials 1401 / 1768: PI -4.8e6 / -1.0e8, TCI 14 / 6.9 MM$; true
+    values PI -3.7, TCI ~105 MM$). biosteam dispatches `self._run()`, so the
+    instance attribute is honoured by Unit.simulate and the System converge
+    loop alike. Regression: analyses/test_v406_burden_guard.py."""
+    class_run = type(reactor)._run
+    def _run():
+        with _apply_enzyme_burden():
+            return class_run(reactor)
+    reactor._run = _run
 
 _loaded = False
 _published = None
@@ -269,6 +304,7 @@ def load(simulate_baseline=True,
     F301, F301_P0, F301_P1, M301, H301 = f.F301, f.F301_P0, f.F301_P1, f.M301, f.H301
     F302, F302_P0, F302_P1, M302, H302 = f.F302, f.F302_P0, f.F302_P1, f.M302, f.H302
     V406 = f.V406
+    _guard_fermentor_run(V406)
     K330, V330 = f.K330, f.V330
 
     V406-0-1-f.V409
