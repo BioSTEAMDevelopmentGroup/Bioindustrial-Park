@@ -6,9 +6,11 @@
 # This module is under the UIUC open-source license. See
 # github.com/BioSTEAMDevelopmentGroup/biosteam/blob/master/LICENSE.txt
 # for license details.
-"""Sim-based regression of the kinetic optimization's V406-effluent
-(g/L-BROTH) and acetate metrics -- kinetic_optimization._broth_conc and the
-five TRACKED_METRICS columns added 2026-09-14 -- read exactly as the
+"""Sim-based regression of the kinetic optimization's V406 POST-VENT
+broth-effluent (g/L-BROTH) and acetate metrics -- kinetic_optimization.
+_broth_conc on outs[1], the liquid that leaves AFTER the CO2 vent outs[0]
+has stripped its share of each volatile, and the five TRACKED_METRICS
+columns added 2026-09-14 -- read exactly as the
 kinetic BO reads them: ko.get_handles() on the live flowsheet, every
 TRACKED_METRICS getter evaluated as the engine's per-trial recording loop
 does. One load(), scenario B (nonzero ethanol, isobutanol, cells AND

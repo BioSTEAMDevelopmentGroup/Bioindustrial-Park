@@ -111,8 +111,11 @@ assert ko.TRACKED_METRICS['PI'](handles) == 35e6/350e6
 assert ko.TRACKED_METRICS['tau'](handles) == 55.0
 assert ko.TRACKED_METRICS['n_glu_spikes'](handles) == 7
 # '(broth)' twins + acetate (2026-09-14): the kinetic g/L-water titers read
-# nsk_results_specific_tau_dict; the g/L-broth ones read the V406 effluent
-# (outs[1]) as imass/F_vol (kg/hr over m3/hr = g/L). Fake handles with NO
+# nsk_results_specific_tau_dict; the g/L-broth ones read the V406 POST-VENT
+# broth effluent (outs[1]; the CO2 vent outs[0] has already stripped ~1-2 %
+# of each volatile) as imass/F_vol (kg/hr over m3/hr = g/L) -- what leaves
+# in the broth, pinned live by test_kin_opt_effluent_metrics.py. Fake
+# handles with NO
 # effluent -> NaN (never a raise), so every fake-handle engine run above
 # and below keeps working; the kinetic acetate titer needs only the dict.
 for _bname in ('EtOH titer (broth)', 'IBO titer (broth)',

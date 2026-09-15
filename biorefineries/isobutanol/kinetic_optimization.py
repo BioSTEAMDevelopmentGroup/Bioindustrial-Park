@@ -327,21 +327,29 @@ def _productivity(amount, time):
     return amount/time if time > 0 else 0.0
 
 def _effluent(handles):
-    """The V406 broth effluent stream (outs[1]; the vent is outs[0], see
-    system.py) -- its imass (kg/hr) over F_vol (m3/hr) is a g/L-BROTH
-    concentration, the per-broth-volume counterpart of the kinetic model's
-    g/L-water titers (nsk_results_specific_tau_dict). None when the (fake /
-    partial) handles of the offline tests carry no effluent stream, so
-    _broth_conc reads NaN there (mirrors the optional convergence getters
-    below)."""
+    """The V406 broth effluent stream, outs[1] -- the POST-VENT liquid. V406
+    has two outlets: outs[0] is the fermentation CO2 vent (to the scrubber
+    V409), outs[1] the broth (to P406, see system.py). The vent has ALREADY
+    stripped a species-specific share of each volatile before the broth
+    leaves (scenario-B baseline: ~1.2 % of the ethanol, ~1.8 % of the
+    isobutanol, ~0.2 % of the acetate, none of the cells), so a g/L-BROTH
+    concentration from this stream (imass in kg/hr over F_vol in m3/hr) is
+    the kinetic model's g/L-water titer (nsk_results_specific_tau_dict) x
+    the water-volume fraction x (1 - that vent fraction): what actually
+    leaves in the broth, NOT the in-reactor titer re-based per broth volume
+    (analyses/test_kin_opt_effluent_metrics.py pins the identity). None when
+    the (fake / partial) handles of the offline tests carry no effluent
+    stream, so _broth_conc reads NaN there (mirrors the optional convergence
+    getters below)."""
     outs = getattr(handles['V406'], 'outs', None)
     if not outs or len(outs) < 2:
         return None
     return outs[1]
 
 def _broth_conc(handles, chemical_ID):
-    """g/L-broth of `chemical_ID` in the V406 effluent (imass/F_vol: kg/hr
-    over m3/hr = kg/m3 = g/L). NaN when the effluent is absent (offline
+    """g/L-broth of `chemical_ID` in the V406 POST-VENT broth effluent
+    (outs[1], see _effluent; imass/F_vol: kg/hr over m3/hr = kg/m3 = g/L).
+    NaN when the effluent is absent (offline
     fakes) or has no volume (F_vol <= 0): an undefined concentration is
     honestly NaN, and a 0/0 would be a FloatingPointError under flexsolve's
     global np.seterr(invalid='raise') -- the _productivity lesson."""
@@ -369,8 +377,11 @@ OBJECTIVE_REGISTRY = {
         direction='maximize', level='kinetic', units='g-IBO/L-water',
         energy_scale=2.0),
     # '(broth)' twins (2026-09-14): the same fermentation outcome read off
-    # the V406 effluent per BROTH volume (imass/F_vol, _broth_conc) instead
-    # of the kinetic model's per-WATER volume; energy_scale mirrors the twin.
+    # the V406 POST-VENT broth effluent (outs[1]; the CO2 vent outs[0] has
+    # already stripped ~1-2 % of each volatile) per BROTH volume
+    # (imass/F_vol, _broth_conc) instead of the kinetic model's in-reactor
+    # per-WATER volume -- what leaves in the broth, not a unit conversion
+    # of the water-basis twin. energy_scale mirrors the twin.
     'IBO titer (broth)': dict(
         getter=lambda h: _broth_conc(h, 'Isobutanol'),
         direction='maximize', level='kinetic', units='g-IBO/L-broth',
@@ -451,8 +462,9 @@ TRACKED_METRICS = {name: OBJECTIVE_REGISTRY[name]['getter'] for name in
 TRACKED_METRICS['tau'] = lambda h: h['V406'].tau
 TRACKED_METRICS['n_glu_spikes'] = lambda h: _nsk(h)['curr_n_glu_spikes']
 # Acetate -- a byproduct, tracked but not an objective: the kinetic model's
-# g/L-water titer ('[s_acetate]') and the V406-effluent g/L-broth estimate
-# (chemical AceticAcid), the acetate counterparts of the titer pairs above.
+# in-reactor g/L-water titer ('[s_acetate]') and the g/L-broth estimate from
+# the V406 POST-VENT broth effluent (outs[1], chemical AceticAcid; see
+# _effluent), the acetate counterparts of the titer pairs above.
 TRACKED_METRICS['Acetate titer'] = lambda h: _nsk(h)['[s_acetate]']
 TRACKED_METRICS['Acetate titer (broth)'] = lambda h: _broth_conc(h, 'AceticAcid')
 
