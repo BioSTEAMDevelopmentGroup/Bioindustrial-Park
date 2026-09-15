@@ -156,6 +156,19 @@ def main():
         ('low IBO (x0.001)', 1.0, 0.001, dict(rec_IBO_min=low['rec_min'])),
         ('low EtOH (x0.01)', 0.01, 1.0, dict(rec_EtOH_min=low['rec_min'])),
         ('low EtOH (x0.001)', 0.001, 1.0, dict(rec_EtOH_min=low['rec_min'])),
+        # trace ethanol BELOW the rectifier's min_key_flow toggle (1e-2
+        # kmol/hr ~ 0.46 kg/hr; the reference feed carries 8946.5 kg/hr,
+        # so x2e-5 ~ 0.18 kg/hr and x5e-5 ~ 0.45 kg/hr) with high IBO --
+        # the all-IBO kinetic-BO regime (2026-09-14 metabolic_14d studies,
+        # e.g. ibo_titer trial 552: 0.0033 kmol/hr EtOH with 129 kmol/hr
+        # IBO). Ethanol is "absent at plant scale" here, so the ethanol
+        # product must be empty; the IBO train must still converge and
+        # recover. Before the 2026-09-14 fix these hung SYS14 in a D102
+        # on/off limit cycle (ethanol had no exit from the decanter loop
+        # while the rectifier was bypassed).
+        ('trace EtOH (x2e-5), IBO x2.7', 2e-5, 2.7, dict(rec_EtOH_min=None)),
+        ('trace EtOH (x5e-5), IBO x2.7', 5e-5, 2.7, dict(rec_EtOH_min=None)),
+        ('trace EtOH (x2e-5), IBO x1', 2e-5, 1.0, dict(rec_EtOH_min=None)),
         # zero titers: corresponding product stream must be empty
         ('zero IBO', 1.0, 0.0, dict(rec_IBO_min=None)),
         ('zero EtOH', 0.0, 1.0, dict(rec_EtOH_min=None)),

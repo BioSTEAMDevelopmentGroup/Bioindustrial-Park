@@ -84,10 +84,13 @@ titer range without infeasible specs:
   ethanol-water beer column
   (LHK = (Ethanol, Water), same overhead water -- the continuous limit of
   the IBO-mode design), while D102/D103 pass their feed to the bottoms
-  outlet with design/cost skipped. Zero-throughput auxiliaries (decanter
-  loop, ethanol polish train) are likewise skipped when their feeds
-  vanish; recoveries at very low titers plateau near 1 - 2*(0.1) rather
-  than collapsing.
+  outlet with design/cost skipped -- D102 takes its trace ethanol overhead
+  even so (the ethanol polish train's guards then drop it), because ethanol
+  passed to D103 would have no exit from the D103 -> decanter -> M201 loop
+  and would trip the D102 toggle on and off forever. Zero-throughput
+  auxiliaries (decanter loop, ethanol polish train) are likewise skipped
+  when their feeds vanish; recoveries at very low titers plateau near
+  1 - 2*(0.1) rather than collapsing.
 
 Known model idealizations (inherited from ``BinaryDistillation``'s
 boiling-point-based non-key routing): ethanol (light non-key in D101/D103)
@@ -460,10 +463,27 @@ def create_IBO_EtOH_separation_system(
             _empty_outs(D102)
             D102._run()
         else:
-            # No ethanol: no rectifier; feed continues to the IBO stripper.
+            # No ethanol at plant scale: no rectifier; the feed continues to
+            # the IBO stripper -- EXCEPT the trace ethanol, which is taken
+            # overhead with no column duty. It must NOT pass through to the
+            # stripper: D103 and D104 route ethanol 100 % to their
+            # distillates (light non-key), so ethanol handed to D103 has no
+            # exit from the D103 -> decanter -> M201 loop while the
+            # rectifier is off. It then grows by the fresh-feed amount every
+            # pass (already above the 1e-3 kmol/hr tolerance) until it trips
+            # this toggle, the rectifier purges it, and the toggle flips back
+            # -- a limit cycle the recycle solver can never close (the
+            # 2026-09-14 kinetic-BO all-IBO regime: ~0.003 kmol/hr broth
+            # ethanol with ~130 kmol/hr IBO, 98 % of that study's FAILs).
+            # Overhead, the trace enters the ethanol polish train, whose
+            # low-flow guards (H202, MS201) drop it as absent at plant
+            # scale (< min_key_flow ~ 0.5 kg/hr), so the loop drains to
+            # exactly zero ethanol and the toggle stays off.
             D102_set_active(False)
             D102.outs[0].empty()
             D102.outs[1].copy_like(rectifier_feed)
+            D102.outs[0].imol['Ethanol'] = E
+            D102.outs[1].imol['Ethanol'] = 0.0
 
     @D103.add_specification(run=False)
     def adapt_stripper_to_feed():
