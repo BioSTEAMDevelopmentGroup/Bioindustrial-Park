@@ -130,6 +130,15 @@ assert ko.OBJECTIVE_REGISTRY['IRR']['getter'](handles) == 0.21
 assert ko.OBJECTIVE_REGISTRY['EtOH MPSP']['getter'](handles) == 0.4
 assert ko.OBJECTIVE_REGISTRY['IBO MPSP']['getter'](handles) == 0.9
 assert ko.OBJECTIVE_REGISTRY['TCI']['getter'](handles) == 350.0
+# 'NPV' (raw NPV in MM$; maximized, system-level): NPV / 1e6, objective-only
+# (not tracked -> no new CSV column), slug carries no parentheses.
+assert ko.OBJECTIVE_REGISTRY['NPV']['getter'](handles) == 35.0
+assert ko.OBJECTIVE_REGISTRY['NPV']['direction'] == 'maximize'
+assert ko.OBJECTIVE_REGISTRY['NPV']['level'] == 'system'
+assert ko.OBJECTIVE_REGISTRY['NPV']['units'] == 'MM$'
+assert ko.OBJECTIVE_REGISTRY['NPV']['energy_scale'] == 2.0
+assert 'NPV' not in ko.TRACKED_METRICS
+assert ko.objective_slug('NPV') == 'npv'
 assert ko.OBJECTIVE_REGISTRY['PI']['getter'](handles) == 35e6/350e6   # NPV / TCI
 assert ko.TRACKED_METRICS['PI'](handles) == 35e6/350e6
 # PI (log-tail): positive branch is the identity (PI = 0.1 >= 0), so it

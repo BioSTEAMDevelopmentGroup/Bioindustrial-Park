@@ -469,6 +469,17 @@ OBJECTIVE_REGISTRY = {
     'TCI': dict(
         getter=lambda h: h['tea'].TCI/1e6,
         direction='minimize', level='system', units='MM$', energy_scale=2.0),
+    # Net present value at the fixed 15 % hurdle IRR with every product at
+    # its default price -- the same TEA exit state PI reads -- in MM$. This
+    # is the RAW NPV, not PI's per-TCI ratio: unlike PI it is NOT
+    # scale-invariant (it rewards a larger plant at equal return), and its
+    # MM$ magnitude with deep-loss tails is exactly what can distort a GP
+    # surrogate's target standardization (PI / PI (log-tail) were introduced
+    # to avoid that). Registered on explicit request. energy_scale mirrors
+    # TCI's (MM$; used only by dual annealing, not GP).
+    'NPV': dict(
+        getter=lambda h: h['tea'].NPV/1e6,
+        direction='maximize', level='system', units='MM$', energy_scale=2.0),
     # Profitability index (2026-09-12; docs/reports/profitability-index-
     # objective.md): NPV at the fixed 15 % hurdle with every product at its
     # default price, per $ of TCI. Defined for EVERY simulated point (no
