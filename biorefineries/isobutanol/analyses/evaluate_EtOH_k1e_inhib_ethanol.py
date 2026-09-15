@@ -11,14 +11,30 @@
 grouped ``inhib_ethanol`` family MULTIPLIER (y-axis), on the scenario-A
 baseline, WITH the enzyme burden turned ON.
 
-The y-axis multiplier is the same grouped decision variable the kinetic
-optimizer's ``metabolic_minimal_subset`` study uses
-(``kinetic_optimization.METABOLIC_MINIMAL_SUBSET_GROUPS['inhib_ethanol']`` =
-k_1ie, k_4ie, k_7ie, k_10ie, k_16ie): every member is set to its scenario-A
-baseline x the multiplier, so intra-family ratios are preserved (exactly
-``kinetic_optimization.expand_grouped_values`` for a single group). At
-``(k_1e = A baseline, multiplier = 1.0)`` the grid reproduces the scenario-A
-baseline point.
+Both axes span the SAME bounds the kinetic optimizer's ``metabolic_14d``
+study uses:
+
+* **k_1e (x-axis):** in ``metabolic_14d`` k_1e is not an individual decision
+  variable -- it belongs to the grouped ``glycolysis`` CAPACITY family
+  (``kinetic_optimization.METABOLIC_14D_RATE_GROUPS['glycolysis']`` = k_1l,
+  k_1h, k_1e) on a **0.2x-5x** multiplier band
+  (``STUDY_TYPE_OPTIONS['metabolic_14d']['group_multiplier_bounds']
+  ['glycolysis']``). Here k_1e alone is swept over its own scenario-A
+  baseline x [0.2, 5.0] (k_1l / k_1h held at baseline), so the axis covers
+  exactly the range k_1e can take in that study.
+* **inhib_ethanol multiplier (y-axis):** the same grouped decision variable
+  the study uses (``METABOLIC_MINIMAL_SUBSET_GROUPS['inhib_ethanol']`` =
+  k_1ie, k_4ie, k_7ie, k_10ie, k_16ie), which in ``metabolic_14d`` takes the
+  default group band **0.5x-2x**
+  (``kinetic_optimization.DEFAULT_GROUP_MULTIPLIER_BOUNDS``). Every member is
+  set to its scenario-A baseline x the multiplier, so intra-family ratios are
+  preserved (exactly ``kinetic_optimization.expand_grouped_values`` for a
+  single group).
+
+Both axes are linear grids over the metabolic_14d bounds (the optimizer draws
+them log-uniform; a contour sweep spaces them evenly, matching the sibling
+``evaluate_*`` scripts). ``(k_1e = A baseline, multiplier = 1.0)`` lies on the
+grid interior and reproduces the scenario-A baseline point.
 
 Enzyme burden: installed A-referenced via ``scenarios.load_scenario('A',
 burden=True)`` (``system.set_active_burden``), so the ``load_simulate`` choke
@@ -212,9 +228,19 @@ results = {i: [] for i in metrics.keys()}
 
 steps = (20, 20, 1)
 
-spec_1 = nsk_k_1ees = np.linspace(1., 300., steps[0])
+# metabolic_14d glycolysis-group band (0.2x-5x) x the scenario-A baseline k_1e:
+# the range k_1e spans inside that study's glycolysis capacity multiplier.
+K_1E_GLYCOLYSIS_MULTIPLIER_BOUNDS = ko.STUDY_TYPE_OPTIONS['metabolic_14d'][
+    'group_multiplier_bounds']['glycolysis']  # (0.2, 5.0)
+spec_1 = nsk_k_1ees = np.linspace(K_1E_GLYCOLYSIS_MULTIPLIER_BOUNDS[0]*baseline_k_1e,
+                                  K_1E_GLYCOLYSIS_MULTIPLIER_BOUNDS[1]*baseline_k_1e,
+                                  steps[0])
 
-spec_2 = inhib_ethanol_multipliers = np.linspace(0.2, 2.0, steps[1])
+# metabolic_14d inhibition-family band = the default group band (0.5x-2x).
+INHIB_ETHANOL_MULTIPLIER_BOUNDS = ko.DEFAULT_GROUP_MULTIPLIER_BOUNDS  # (0.5, 2.0)
+spec_2 = inhib_ethanol_multipliers = np.linspace(INHIB_ETHANOL_MULTIPLIER_BOUNDS[0],
+                                                 INHIB_ETHANOL_MULTIPLIER_BOUNDS[1],
+                                                 steps[1])
 
 
 spec_3 = spike_concs =\
@@ -229,11 +255,12 @@ spec_3 = spike_concs =\
 
 x_label = "k_1e" # title of the x axis
 x_units = r"$\mathrm{g} \cdot \mathrm{L}^{-1} \cdot \mathrm{h}^{-1}$"
-x_ticks = [0, 100, 200, 300]
+# k_1e range is baseline-dependent (0.2x-5x baseline); derive round ticks.
+x_ticks = [float(np.round(t, 1)) for t in np.linspace(spec_1[0], spec_1[-1], 5)]
 
 y_label = "inhib_ethanol multiplier" # title of the y axis
 y_units = r"" # dimensionless (x scenario-A baseline of each member)
-y_ticks = [0.2, 0.6, 1.0, 1.4, 1.8, 2.0]
+y_ticks = [0.5, 1.0, 1.5, 2.0]
 
 z_label = "Spike feed glucose concentration" # title of the x axis
 z_units =r"$\mathrm{g} \cdot \mathrm{L}^{-1}$"
