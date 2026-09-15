@@ -21,7 +21,10 @@ Colour + pattern scheme (Stage 2, treemap.html) mirrors panel C: one
 base colour per set, pieces told apart by hatch -- the metabolic
 categories filled in the set colour with a dark hatch, translation and
 housekeeping drawn hollow (white, set-colour hatch + outline), slack
-empty. See treemap.html's PIECE_STYLE.
+empty. See treemap.html's PIECE_STYLE. Pieces are identified by ONE
+common panel-C-style sector key drawn beside the grid (meta.legend, built
+from ps.BURDEN_CATEGORIES), not by per-cell labels or leader-line
+callouts.
 
 Two stages: this script (Stage 1, IBO_2026, sim-safe) computes the
 allocation and writes JSON, then invokes the voronoi-treemaps conda env's
@@ -95,6 +98,24 @@ if set(_ps_cat_names) != set(CATEGORY_PIECES):
 # nested where "metabolic" would sit)
 PIECE_ORDER = ('housekeeping', 'cat_glycolysis', 'cat_tca_acetate',
                'cat_ethanol', 'cat_isobutanol', 'translation', 'slack')
+
+# panel C's sector key, reproduced by Stage 2 as ONE common legend for the
+# whole grid (in place of per-cell labels / leader-line callouts): the four
+# metabolic categories -- name + reaction steps straight from
+# ps.BURDEN_CATEGORIES, so the two figures' keys cannot drift -- under a
+# 'Metabolic' header, then unallocated slack, translation and housekeeping,
+# in panel C's row order. Names keep ps's embedded newline so Stage 2 wraps
+# them the way panel C does.
+LEGEND_TAIL = (('slack', 'Unallocated'), ('translation', 'Translation'),
+               ('housekeeping', 'Housekeeping'))
+
+
+def legend_entries():
+    rows = [{'piece': CATEGORY_PIECES[name], 'name': name,
+             'steps': list(steps)} for name, steps in ps.BURDEN_CATEGORIES]
+    rows += [{'piece': piece, 'name': name, 'steps': None}
+             for piece, name in LEGEND_TAIL]
+    return rows
 
 
 def tile_from_record(rec):
@@ -203,6 +224,7 @@ def build_document(sets, band_campaign):
             'generated': datetime.now().isoformat(timespec='seconds'),
             'band_campaign': band_campaign,
             'piece_order': list(PIECE_ORDER),
+            'legend': legend_entries(),
         },
         'tiles': tiles,
     }

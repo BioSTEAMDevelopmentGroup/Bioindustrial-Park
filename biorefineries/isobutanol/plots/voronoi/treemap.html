@@ -3,39 +3,35 @@
 <head>
 <meta charset="utf-8">
 <style>
-  :root { --fg: #1a1a1a; --leader: #6a6a6a; }
+  :root { --fg: #1a1a1a; }
   html, body { margin: 0; background: #ffffff; color: var(--fg);
     font-family: Arial, "DejaVu Sans", sans-serif; }
-  /* size to content so the rendered boundingBox spans the full grid (incl.
-     the callout gutters); a plain block would stay viewport-wide and clip
-     the last column on capture. */
-  #figure { padding: 16px; width: max-content; }
+  /* size to content so the rendered boundingBox spans the full figure (the
+     tile grid + the common legend); a plain block would stay viewport-wide
+     and clip on capture. */
+  #figure { padding: 16px; width: max-content; display: flex;
+    flex-direction: row; align-items: center; gap: 28px; }
   #grid { display: grid; gap: 14px; }
   .cell { display: flex; flex-direction: column; align-items: center; }
   .cell .title { font-size: 13px; font-weight: bold; margin: 2px 0 0; }
   .cell .subtitle { font-size: 11px; color: #444; margin: 0 0 4px; }
-  /* .plot wraps the 300x300 tessellation in left/right gutters that hold
-     the leader-line callout labels for small cells. */
-  .plot { position: relative; }
-  .chart { position: absolute; top: 0; width: 300px; height: 300px; }
-  .callouts { position: absolute; top: 0; left: 0; pointer-events: none; }
+  .chart { width: 300px; height: 300px; }
+  /* the one common sector key (panel-C style) beside the grid: its own
+     amCharts root, so the swatches carry the very same fillPatterns as the
+     cells. Sized generously; the framed box inside fits its content. */
+  #legend { width: 250px; height: 320px; }
 </style>
 </head>
 <body>
 <div id="figure">
   <div id="grid"></div>
+  <div id="legend"></div>
 </div>
 <script src="./vendor/am5.bundle.js"></script>
 <script>
 /* eslint-disable */
 (async function () {
-  const SVG_NS = "http://www.w3.org/2000/svg";
   const CHART = 300;      // tessellation square (px)
-  const GUT = 96;         // callout gutter each side (px)
-  const PLOTW = CHART + 2 * GUT;
-  const LABEL_FS = 9;     // callout label font size
-  const LH = 10;          // callout line height
-  const CELL_FS = 10;     // in-cell label font size
 
   // Colour + pattern scheme, mirroring parameter-sets panel C: each tile is
   // a single base colour (its campaign colour, from Stage 1) and pieces are
@@ -133,138 +129,74 @@
     return out;
   }
 
-  // text metrics (shared canvas) for the fit test and callout wrapping
-  const _mctx = document.createElement("canvas").getContext("2d");
-  function textWidth(s, fs) { _mctx.font = fs + "px Arial"; return _mctx.measureText(s).width; }
-
-  // greedily wrap a name to <= maxW px at the callout font size
-  function wrapLabel(name, maxW) {
-    const words = name.split(/\s+/);
-    const lines = [];
-    let cur = "";
-    for (const w of words) {
-      const trial = cur ? cur + " " + w : w;
-      if (textWidth(trial, LABEL_FS) <= maxW || !cur) {
-        cur = trial;
-      } else {
-        lines.push(cur); cur = w;
-      }
-    }
-    if (cur) lines.push(cur);
-    return lines;
+  // --- the common sector key ---------------------------------------------
+  // ONE legend for the whole grid, mirroring parameter-sets panel C, in place
+  // of per-cell labels / leader-line callouts: neutral swatches (metabolic
+  // grey-filled with the dark hatch; the hollow translation / housekeeping
+  // white with a dark outline + hatch; unallocated white with a grey outline)
+  // so the hatches read independent of the campaign colours, grouped under a
+  // bold 'Metabolic' header with the reaction steps, then Unallocated,
+  // Translation, Housekeeping. Rows come from Stage 1 (doc.meta.legend, built
+  // from ps.BURDEN_CATEGORIES). Drawn as its own amCharts root so every swatch
+  // is built by the SAME makePattern as the cells (one pattern source).
+  const SUBSCRIPT = "₀₁₂₃₄₅₆₇₈₉";
+  function stepLabel(st) {          // 'r13' -> italic r, subscript 13
+    const sub = st.replace(/^r/, "").split("")
+      .map(function (d) { return SUBSCRIPT[+d]; }).join("");
+    return "[fontStyle: italic]r[/]" + sub;
   }
-
-  // Stack callout labels of one gutter so they don't overlap: seed each near
-  // its cell's centroid y, then push down to clear the previous label, and if
-  // the stack overruns the bottom, shift the whole column up.
-  function stack(items, top, bottom, gap) {
-    items.sort(function (a, b) { return a.cy - b.cy; });
-    let y = top;
-    for (const it of items) {
-      it.top = Math.max(it.cy - it.h / 2, y);
-      it.mid = it.top + it.h / 2;
-      y = it.top + it.h + gap;
+  // panel C's wrap rule: the step ids sit on the name's last line when that
+  // still fits in ~28 characters, else on a line of their own
+  function legendText(e) {
+    if (!e.steps) return e.name;
+    const plain = "(" + e.steps.join(", ") + ")";
+    const ids = "(" + e.steps.map(stepLabel).join(", ") + ")";
+    const lines = e.name.split("\n");
+    if (lines[lines.length - 1].length + 1 + plain.length <= 28) {
+      lines[lines.length - 1] += " " + ids;
+    } else {
+      lines.push(ids);
     }
-    if (items.length) {
-      const last = items[items.length - 1];
-      const overflow = (last.top + last.h) - bottom;
-      if (overflow > 0) {
-        for (const it of items) { it.top -= overflow; it.mid -= overflow; }
-      }
-    }
-    return items;
+    return lines.join("\n");
   }
-
-  function drawCallout(svg, it, side) {
-    // leader line: cell centroid -> label anchor (just outside the tile edge)
-    const edge = side === "L" ? GUT : GUT + CHART;      // tile edge x in plot px
-    const tx = side === "L" ? GUT - 8 : GUT + CHART + 8; // text anchor x
-    const line = document.createElementNS(SVG_NS, "polyline");
-    line.setAttribute("points",
-      it.cx + "," + it.cy + " " + edge + "," + it.mid + " "
-      + (side === "L" ? tx + 3 : tx - 3) + "," + it.mid);
-    line.setAttribute("fill", "none");
-    line.setAttribute("stroke", "var(--leader)");
-    line.setAttribute("stroke-width", "0.6");
-    svg.appendChild(line);
-
-    const dot = document.createElementNS(SVG_NS, "circle");
-    dot.setAttribute("cx", it.cx); dot.setAttribute("cy", it.cy);
-    dot.setAttribute("r", "1.4"); dot.setAttribute("fill", "var(--leader)");
-    svg.appendChild(dot);
-
-    const text = document.createElementNS(SVG_NS, "text");
-    text.setAttribute("x", tx);
-    text.setAttribute("y", it.top + LABEL_FS);
-    text.setAttribute("font-size", LABEL_FS);
-    text.setAttribute("font-family", "Arial, sans-serif");
-    text.setAttribute("fill", "var(--fg)");
-    text.setAttribute("text-anchor", side === "L" ? "end" : "start");
-    it.lines.forEach(function (ln, i) {
-      const ts = document.createElementNS(SVG_NS, "tspan");
-      ts.setAttribute("x", tx);
-      if (i > 0) ts.setAttribute("dy", LH);
-      ts.textContent = ln;
-      text.appendChild(ts);
+  function buildLegend(entries) {
+    const root = am5.Root.new("legend");
+    root._logo && root._logo.dispose();
+    const dark = am5.color(DARK);
+    const box = root.container.children.push(am5.Container.new(root, {
+      layout: root.verticalLayout,
+      paddingTop: 8, paddingBottom: 8, paddingLeft: 10, paddingRight: 14,
+      background: am5.Rectangle.new(root, {
+        fill: am5.color(0xffffff), stroke: am5.color(GREY), strokeWidth: 1,
+      }),
+    }));
+    function text(s, fs, bold, padLeft) {
+      return am5.Label.new(root, {
+        text: s, fontSize: fs, fontFamily: "Arial",
+        fontWeight: bold ? "bold" : "normal", fill: dark,
+        paddingLeft: padLeft || 0, paddingTop: 2, paddingBottom: 2,
+      });
+    }
+    box.children.push(text("Sectors", 13, true));
+    box.children.push(text("Metabolic", 12, true));
+    entries.forEach(function (e) {
+      const st = PIECE_STYLE[e.piece];
+      // neutral swatch body: metabolic grey ('0.72'), the rest white
+      const body = am5.color(st.body === "white" ? 0xffffff : 0xb8b8b8);
+      const row = am5.Container.new(root, {
+        layout: root.horizontalLayout,
+        paddingLeft: e.steps ? 10 : 0, paddingTop: 2, paddingBottom: 2,
+      });
+      row.children.push(am5.Rectangle.new(root, {
+        width: 32, height: 18, fill: body,
+        fillPattern: makePattern(root, st.hatch, body, dark),   // 'set' -> dark
+        stroke: st.outline === "grey" ? am5.color(GREY) : dark,
+        strokeWidth: 0.8,
+      }));
+      row.children.push(text(legendText(e), 11, false, 7));
+      box.children.push(row);
     });
-    svg.appendChild(text);
-  }
-
-  // ray-cast point-in-polygon; poly is [[ux,uy],...] in unit coords, scaled
-  // by d to match the (x, y) test point in the node-local pixel frame.
-  function inPoly(x, y, poly, d) {
-    let inside = false;
-    for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) {
-      const xi = poly[i][0] * d, yi = poly[i][1] * d,
-            xj = poly[j][0] * d, yj = poly[j][1] * d;
-      if (((yi > y) !== (yj > y))
-          && (x < (xj - xi) * (y - yi) / (yj - yi) + xi)) inside = !inside;
-    }
-    return inside;
-  }
-
-  // For one tile: measure each leaf cell, keep the in-cell label when its
-  // text box fits fully inside the polygon, otherwise hide it and emit a
-  // leader-line callout in the gutter.
-  function buildCallouts(ctx) {
-    const series = ctx.series, svg = ctx.svg;
-    const d = Math.min(series.innerWidth(), series.innerHeight()) / 2;
-    const cx0 = series.innerWidth() / 2;   // chart-local center (~150)
-    const maxLabelW = GUT - 12;
-    const lefts = [], rights = [];
-
-    // amCharts nests child DataItems under di.get("children"); walk to leaves.
-    function visit(di) {
-      const kids = di.get("children");
-      if (kids && kids.length) { for (let i = 0; i < kids.length; i++) visit(kids[i]); return; }
-      const dc = di.dataContext;
-      const d3n = di.get("d3HierarchyNode");
-      const label = di.get("label");
-      if (!dc || !d3n || !d3n.polygon || !label) return;
-      const coords = d3n.polygon, site = coords.site;
-      if (!site) return;
-
-      // does the label's box, centered at the cell site, sit inside the cell?
-      const tw = textWidth(dc.name, CELL_FS);
-      const sx = site.x * d, sy = site.y * d;
-      const hw = tw / 2 + 2, hh = 6;
-      const pts = [[sx - hw, sy - hh], [sx + hw, sy - hh], [sx + hw, sy + hh],
-                   [sx - hw, sy + hh], [sx, sy - hh], [sx, sy + hh],
-                   [sx - hw, sy], [sx + hw, sy]];
-      let fits = true;
-      for (const p of pts) { if (!inPoly(p[0], p[1], coords, d)) { fits = false; break; } }
-      if (fits) return;  // keep amCharts' in-cell label
-
-      label.set("forceHidden", true);
-      const g = label.toGlobal({ x: 0, y: 0 });   // site, chart-div px
-      const it = { name: dc.name, cx: GUT + g.x, cy: g.y };
-      it.lines = wrapLabel(dc.name, maxLabelW);
-      it.h = it.lines.length * LH + 2;
-      (g.x < cx0 ? lefts : rights).push(it);
-    }
-    series.dataItems.forEach(visit);
-    stack(lefts, 6, CHART - 6, 5).forEach(function (it) { drawCallout(svg, it, "L"); });
-    stack(rights, 6, CHART - 6, 5).forEach(function (it) { drawCallout(svg, it, "R"); });
+    return root;
   }
 
   let doc = window.TREEMAP_DOC;
@@ -276,9 +208,8 @@
   const grid = document.getElementById("grid");
   grid.style.gridTemplateColumns = "repeat(" + nCols + ", auto)";
 
+  const roots = [buildLegend(doc.meta.legend)];
   let pending = tiles.length;
-  const roots = [];
-  const ctxs = [];
 
   tiles.forEach(function (tile, i) {
     const cell = document.createElement("div");
@@ -290,26 +221,12 @@
     sub.className = "subtitle";
     sub.textContent = "Φₘ = " + tile.Phi_M.toFixed(3)
       + " g·gDCW⁻¹,  d = " + tile.burden_factor.toFixed(2);
-
-    // plot = chart (offset by the gutter) + a full-width callout overlay
-    const plot = document.createElement("div");
-    plot.className = "plot";
-    plot.style.width = PLOTW + "px";
-    plot.style.height = CHART + "px";
     const chartDiv = document.createElement("div");
     chartDiv.className = "chart";
     chartDiv.id = "chart" + i;
-    chartDiv.style.left = GUT + "px";
-    const svg = document.createElementNS(SVG_NS, "svg");
-    svg.setAttribute("class", "callouts");
-    svg.setAttribute("width", PLOTW);
-    svg.setAttribute("height", CHART);
-    plot.appendChild(chartDiv);
-    plot.appendChild(svg);
-
     cell.appendChild(title);
     cell.appendChild(sub);
-    cell.appendChild(plot);
+    cell.appendChild(chartDiv);
     grid.appendChild(cell);
 
     const root = am5.Root.new(chartDiv.id);
@@ -326,7 +243,6 @@
         initialDepth: 2,    // ... and Metabolic is subdivided into its four
       })
     );
-    ctxs.push({ series: series, svg: svg, chartDiv: chartDiv });
 
     // one base colour per tile; each piece is that colour + a hatch (panel C
     // scheme). Precompute the body colour, fillPattern and outline for every
@@ -359,28 +275,16 @@
     });
     series.polygons.template.setAll({ strokeWidth: 0.9, strokeOpacity: 1 });
 
-    // in-cell labels: every leaf keeps its name where it fits (buildCallouts
-    // hides the ones that don't and draws them as gutter callouts instead).
-    // The internal "Metabolic" grouping node (and the undrawn root) must NOT
-    // be labeled -- their text would overlap the leaf labels.
-    series.labels.template.setAll({
-      text: "{category}", fontSize: CELL_FS, fill: am5.color(0x1a1a1a),
-      oversizedBehavior: "none",
-    });
-    series.labels.template.adapters.add("forceHidden", function (hidden, target) {
-      const dc = target.dataItem && target.dataItem.dataContext;
-      // parent grouping nodes ("Metabolic" / root) are never labeled
-      return (dc && dc.children && dc.children.length) ? true : hidden;
-    });
+    // pieces are identified by the common legend (hatch), not per-cell text:
+    // no in-cell labels at all
+    series.labels.template.setAll({ forceHidden: true });
 
     series.events.on("datavalidated", function () {
       pending -= 1;
       if (pending === 0) {
-        // one settle frame so label.toGlobal / cell geometry are final,
-        // then measure every tile and draw its callouts.
+        // one settle frame so the tessellation and the legend are final
         requestAnimationFrame(function () {
           requestAnimationFrame(function () {
-            ctxs.forEach(buildCallouts);
             window.__RENDER_DONE__ = true;
           });
         });
@@ -393,8 +297,8 @@
     }]);
   });
 
-  // base colour = campaign (per-tile title), hatch = sector (in-cell + callout
-  // labels name each piece); see PIECE_STYLE
+  // base colour = campaign (per-tile title), hatch = sector (the common
+  // legend); see PIECE_STYLE
 
   // safety net: if no series fired (e.g. empty doc), still resolve
   if (tiles.length === 0) { window.__RENDER_DONE__ = true; }

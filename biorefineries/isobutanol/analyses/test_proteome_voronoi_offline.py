@@ -117,6 +117,18 @@ check('meta.protein_content == 0.49', abs(doc['meta']['protein_content'] - 0.49)
 check('meta.F_flex == eb.F_FLEX', abs(doc['meta']['F_flex'] - eb.F_FLEX) < 1e-9)
 check('one tile', len(doc['tiles']) == 1)
 check('piece_order has 7 entries', len(doc['meta']['piece_order']) == 7)
+leg = doc['meta']['legend']
+check('meta.legend has 7 rows', len(leg) == 7)
+check('legend: the four metabolic categories first, in ps.BURDEN_CATEGORIES '
+      'order, each with its steps',
+      [e['piece'] for e in leg[:4]]
+      == [pv.CATEGORY_PIECES[n] for n, _ in pv.ps.BURDEN_CATEGORIES]
+      and all(e['steps'] for e in leg[:4]))
+check('legend: then unallocated / translation / housekeeping (panel-C order)',
+      [e['piece'] for e in leg[4:]] == ['slack', 'translation', 'housekeeping']
+      and all(e['steps'] is None for e in leg[4:]))
+check('legend steps partition eb.STEP_ORDER',
+      sorted(st for e in leg[:4] for st in e['steps']) == sorted(eb.STEP_ORDER))
 
 # --- per-tile base color (matches the parameter-sets figure) ----------------
 check('baseline tile base_color == ps.BASELINE_COLOR',
