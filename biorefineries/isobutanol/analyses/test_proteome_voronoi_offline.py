@@ -51,8 +51,8 @@ check('baseline translation ~= 0.110 (PHI_T_WT, g=1)',
 
 metabolic = kids['metabolic']
 mkids = {c['piece']: c for c in metabolic['children']}
-check('metabolic has five categories', len(metabolic['children']) == 5)
-check('metabolic value == sum of five categories',
+check('metabolic has four categories', len(metabolic['children']) == 4)
+check('metabolic value == sum of four categories',
       abs(metabolic['value'] - sum(c['value'] for c in metabolic['children']))
       < 1e-12)
 check('metabolic value == record Phi_M',
@@ -116,7 +116,7 @@ doc = pv.build_document([rec], band_campaign=None)
 check('meta.protein_content == 0.49', abs(doc['meta']['protein_content'] - 0.49) < 1e-9)
 check('meta.F_flex == eb.F_FLEX', abs(doc['meta']['F_flex'] - eb.F_FLEX) < 1e-9)
 check('one tile', len(doc['tiles']) == 1)
-check('piece_order has 8 entries', len(doc['meta']['piece_order']) == 8)
+check('piece_order has 7 entries', len(doc['meta']['piece_order']) == 7)
 
 # --- per-tile base color (matches the parameter-sets figure) ----------------
 check('baseline tile base_color == ps.BASELINE_COLOR',

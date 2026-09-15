@@ -12,10 +12,16 @@ A small-multiples grid of amCharts5 Voronoi treemaps, one tile per
 parameter set (scenario-A baseline + a handful of kinetic-optimization
 campaign trials). Each tile partitions the modeled proteome (cap
 eb.PROTEIN_CONTENT = 0.49 g protein/gDCW) into: Housekeeping (fixed),
-Metabolic Phi_M (subdivided into the five pathway categories of
+Metabolic Phi_M (subdivided into the four pathway categories of
 plot_kin_opt_parameter_sets.py panel C), Translation phi_T (the model's
 active, growth-scaled ribosomal sector -- the "reduced" translation
 value), and Unallocated flexible slack. Every tile's cells sum to 0.49.
+
+Colour + pattern scheme (Stage 2, treemap.html) mirrors panel C: one
+base colour per set, pieces told apart by hatch -- the metabolic
+categories filled in the set colour with a dark hatch, translation and
+housekeeping drawn hollow (white, set-colour hatch + outline), slack
+empty. See treemap.html's PIECE_STYLE.
 
 Two stages: this script (Stage 1, IBO_2026, sim-safe) computes the
 allocation and writes JSON, then invokes the voronoi-treemaps conda env's
@@ -70,11 +76,12 @@ eb = ps.eb
 
 # map each of ps.BURDEN_CATEGORIES' names to a stable palette key (piece).
 # Asserted against ps.BURDEN_CATEGORIES below so a category rename/drift in
-# the reused plotter raises here at import.
+# the reused plotter raises here at import. The four categories mirror panel
+# C's partition exactly (TCA cycle + acetate merged), so both figures tell
+# the same pieces apart with the same hatch language (see treemap.html).
 CATEGORY_PIECES = {
     'Glycolysis': 'cat_glycolysis',
-    'TCA cycle': 'cat_tca',
-    'Acetate / acetyl-CoA\nproduction': 'cat_acetate',
+    'TCA cycle + acetate /\nacetyl-CoA production': 'cat_tca_acetate',
     'Ethanol production': 'cat_ethanol',
     'Isobutanol production': 'cat_isobutanol',
 }
@@ -84,9 +91,9 @@ if set(_ps_cat_names) != set(CATEGORY_PIECES):
         'BURDEN_CATEGORIES drift: ps names %r != CATEGORY_PIECES keys %r'
         % (sorted(_ps_cat_names), sorted(CATEGORY_PIECES)))
 
-# legend / color order (top-level pieces with the five metabolic cats
+# legend / color order (top-level pieces with the four metabolic cats
 # nested where "metabolic" would sit)
-PIECE_ORDER = ('housekeeping', 'cat_glycolysis', 'cat_tca', 'cat_acetate',
+PIECE_ORDER = ('housekeeping', 'cat_glycolysis', 'cat_tca_acetate',
                'cat_ethanol', 'cat_isobutanol', 'translation', 'slack')
 
 
