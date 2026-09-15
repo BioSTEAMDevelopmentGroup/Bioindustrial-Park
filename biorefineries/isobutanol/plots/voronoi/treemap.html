@@ -37,34 +37,83 @@
   const LH = 10;          // callout line height
   const CELL_FS = 10;     // in-cell label font size
 
-  // Each tile is a single hue (its campaign color, from Stage 1); every
-  // piece is a shade of that one hue. The five metabolic categories form a
-  // dark->light ramp (glycolysis darkest -> isobutanol lightest, echoing
-  // parameter-sets panel C); housekeeping, translation and slack each get
-  // their own fixed lightness. t > 0 lightens toward white, t < 0 darkens
-  // toward black; the metabolic ramp reuses panel C's linspace(0, 0.66, 5).
-  const PIECE_SHADE = {
-    housekeeping: -0.25,
-    cat_glycolysis: 0.00,
-    cat_tca: 0.165,
-    cat_acetate: 0.33,
-    cat_ethanol: 0.495,
-    cat_isobutanol: 0.66,
-    translation: 0.78,
-    slack: 0.90,
+  // Colour + pattern scheme, mirroring parameter-sets panel C: each tile is
+  // a single base colour (its campaign colour, from Stage 1) and pieces are
+  // told apart by HATCH, not lightness. Three tiers, exactly as panel C:
+  //  * the four metabolic categories are drawn SOLID in the set colour with a
+  //    dark hatch (glycolysis diagonal lines / TCA+acetate fill-only /
+  //    ethanol dots / isobutanol crosshatch);
+  //  * translation and housekeeping are drawn HOLLOW -- white body, set-colour
+  //    hatch (circles / plus-grid) and set-colour outline -- the fixed
+  //    non-metabolic anchors;
+  //  * unallocated slack is empty room (white, faint-grey outline, no hatch).
+  // Patterns are amCharts fillPattern objects (LinePattern / CirclePattern /
+  // PathPattern) so they render into the canvas that the PNG/PDF capture.
+  const DARK = 0x262626;   // panel C's '0.15' hatch/outline on filled cells
+  const GREY = 0x999999;   // panel C's '0.6' faint outline on empty slack
+
+  // piece -> {body, hatch, outline}
+  //   body    'set'   fill the cell in the set's base colour
+  //           'white' hollow cell (white body)
+  //   hatch   null | {type, color}  overlaid pattern; color 'dark' (metabolic,
+  //           on the coloured fill) or 'set' (translation / housekeeping, on
+  //           the white hollow body)
+  //   outline 'dark' | 'set' | 'grey'  polygon edge colour
+  const PIECE_STYLE = {
+    cat_glycolysis:  { body: "set",   hatch: { type: "lines",   color: "dark" }, outline: "dark" },
+    cat_tca_acetate: { body: "set",   hatch: null,                               outline: "dark" },
+    cat_ethanol:     { body: "set",   hatch: { type: "dots",    color: "dark" }, outline: "dark" },
+    cat_isobutanol:  { body: "set",   hatch: { type: "cross",   color: "dark" }, outline: "dark" },
+    translation:     { body: "white", hatch: { type: "circles", color: "set"  }, outline: "set"  },
+    housekeeping:    { body: "white", hatch: { type: "plus",    color: "set"  }, outline: "set"  },
+    slack:           { body: "white", hatch: null,                               outline: "grey" },
   };
-  function shade(hex, t) {
-    const h = hex.replace("#", "");
-    let r = parseInt(h.slice(0, 2), 16),
-        g = parseInt(h.slice(2, 4), 16),
-        b = parseInt(h.slice(4, 6), 16);
-    if (t >= 0) {
-      r += (255 - r) * t; g += (255 - g) * t; b += (255 - b) * t;
-    } else {
-      const k = 1 + t; r *= k; g *= k; b *= k;
+
+  function outlineColor(which, setColor) {
+    return which === "set" ? setColor
+      : am5.color(which === "grey" ? GREY : DARK);
+  }
+
+  // Build one amCharts fillPattern for a hatch spec. `body` fills the gaps
+  // (so a hollow white piece stays white), `color` draws the hatch shapes
+  // (dark on metabolic fills, the set colour on the hollow anchors). Dots
+  // and circles are filled CirclePatterns (the practical stand-in for
+  // matplotlib's '.' / 'o'). Cross and plus are PathPattern motifs tiled at
+  // gap 0 so adjacent motifs meet and read as continuous crossed / grid
+  // hatching, like matplotlib's 'x' / '+'. NB PathPattern *fills* its svgPath
+  // (ctx.fill, never stroke), so the motifs are closed FILLED bars, not open
+  // strokes -- an open line path would have zero area and render nothing.
+  // Two crossed bars (each a thin quad spanning the tile corner-to-corner)
+  // make the 'x'; a filled plus polygon (arms reaching the tile edges) makes
+  // the '+'.
+  const CROSS_PATH = "M0.5 -0.5 L10.5 9.5 L9.5 10.5 L-0.5 0.5 Z"
+    + " M0.5 10.5 L10.5 0.5 L9.5 -0.5 L-0.5 9.5 Z";
+  const PLUS_PATH = "M4.1 0 H5.9 V4.1 H10 V5.9 H5.9 V10 H4.1 V5.9 H0 V4.1 H4.1 Z";
+
+  function makePattern(root, hatch, body, setColor) {
+    if (!hatch) return undefined;
+    const color = hatch.color === "set" ? setColor : am5.color(DARK);
+    const common = { color: color, colorOpacity: 1, fill: body, fillOpacity: 1 };
+    switch (hatch.type) {
+      case "lines":                                   // '///' diagonal lines
+        return am5.LinePattern.new(root, Object.assign({}, common,
+          { gap: 5, rotation: -45, strokeWidth: 1.0 }));
+      case "dots":                                    // '...' fine dots
+        return am5.CirclePattern.new(root, Object.assign({}, common,
+          { gap: 4, radius: 1.2 }));
+      case "circles":                                 // 'oo' circles
+        return am5.CirclePattern.new(root, Object.assign({}, common,
+          { gap: 5, radius: 2.2 }));
+      case "cross":                                   // 'xxx' crosshatch
+        return am5.PathPattern.new(root, Object.assign({}, common,
+          { svgPath: CROSS_PATH, gap: 0, maxWidth: 10, maxHeight: 10,
+            centered: true }));
+      case "plus":                                    // '++' plus grid
+        return am5.PathPattern.new(root, Object.assign({}, common,
+          { svgPath: PLUS_PATH, gap: 0, maxWidth: 10, maxHeight: 10,
+            centered: true }));
     }
-    return am5.color((Math.round(r) << 16) | (Math.round(g) << 8)
-      | Math.round(b));
+    return undefined;
   }
 
   // Drop empty (value ~0) leaves before tessellation: a zero-value site
@@ -274,20 +323,41 @@
         categoryField: "name",
         childDataField: "children",
         topDepth: 1,        // the four top-level pieces tessellate the area
-        initialDepth: 2,    // ... and Metabolic is subdivided into its five
+        initialDepth: 2,    // ... and Metabolic is subdivided into its four
       })
     );
     ctxs.push({ series: series, svg: svg, chartDiv: chartDiv });
 
-    // one hue per tile; each piece is a shade of tile.base_color
+    // one base colour per tile; each piece is that colour + a hatch (panel C
+    // scheme). Precompute the body colour, fillPattern and outline for every
+    // piece once per tile (7 entries) so the polygon adapters just look them
+    // up rather than rebuilding a Pattern on each redraw.
+    const setColor = am5.color(tile.base_color);
+    const bodyFor = {}, patternFor = {}, outlineFor = {};
+    for (const piece in PIECE_STYLE) {
+      const st = PIECE_STYLE[piece];
+      const body = st.body === "white" ? am5.color(0xffffff) : setColor;
+      bodyFor[piece] = body;
+      patternFor[piece] = makePattern(root, st.hatch, body, setColor);
+      outlineFor[piece] = outlineColor(st.outline, setColor);
+    }
     series.polygons.template.adapters.add("fill", function (fill, target) {
       const dc = target.dataItem && target.dataItem.dataContext;
-      return (dc && dc.piece && dc.piece in PIECE_SHADE)
-        ? shade(tile.base_color, PIECE_SHADE[dc.piece]) : fill;
+      return (dc && dc.piece && dc.piece in bodyFor) ? bodyFor[dc.piece] : fill;
     });
-    series.polygons.template.setAll({
-      stroke: am5.color(0xffffff), strokeWidth: 1.2, strokeOpacity: 1,
+    series.polygons.template.adapters.add("fillPattern", function (pat, target) {
+      const dc = target.dataItem && target.dataItem.dataContext;
+      // a piece with no hatch (TCA+acetate, slack) maps to undefined -> the
+      // plain body fill shows through
+      return (dc && dc.piece && dc.piece in patternFor)
+        ? patternFor[dc.piece] : pat;
     });
+    series.polygons.template.adapters.add("stroke", function (stroke, target) {
+      const dc = target.dataItem && target.dataItem.dataContext;
+      return (dc && dc.piece && dc.piece in outlineFor)
+        ? outlineFor[dc.piece] : stroke;
+    });
+    series.polygons.template.setAll({ strokeWidth: 0.9, strokeOpacity: 1 });
 
     // in-cell labels: every leaf keeps its name where it fits (buildCallouts
     // hides the ones that don't and draws them as gutter callouts instead).
@@ -323,7 +393,8 @@
     }]);
   });
 
-  // hue = campaign (per-tile title), shade = sector (in-cell + callout labels)
+  // base colour = campaign (per-tile title), hatch = sector (in-cell + callout
+  // labels name each piece); see PIECE_STYLE
 
   // safety net: if no series fired (e.g. empty doc), still resolve
   if (tiles.length === 0) { window.__RENDER_DONE__ = true; }
