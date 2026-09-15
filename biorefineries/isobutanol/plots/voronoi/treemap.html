@@ -74,16 +74,23 @@
   // (so a hollow white piece stays white), `color` draws the hatch shapes
   // (dark on metabolic fills, the set colour on the hollow anchors). Dots
   // and circles are filled CirclePatterns (the practical stand-in for
-  // matplotlib's '.' / 'o'). Cross and plus are PathPattern motifs tiled at
-  // gap 0 so adjacent motifs meet and read as continuous crossed / grid
-  // hatching, like matplotlib's 'x' / '+'. NB PathPattern *fills* its svgPath
-  // (ctx.fill, never stroke), so the motifs are closed FILLED bars, not open
-  // strokes -- an open line path would have zero area and render nothing.
-  // Two crossed bars (each a thin quad spanning the tile corner-to-corner)
-  // make the 'x'; a filled plus polygon (arms reaching the tile edges) makes
-  // the '+'.
+  // matplotlib's '.' / 'o'). Lines, cross and plus are all PathPattern motifs
+  // tiled at gap 0 so adjacent motifs meet and read as continuous diagonal /
+  // crossed / grid hatching, like matplotlib's '/' / 'x' / '+'. NB PathPattern
+  // *fills* its svgPath (ctx.fill, never stroke), so the motifs are closed
+  // FILLED bars, not open strokes -- an open line path would have zero area and
+  // render nothing. One diagonal bar (a thin quad corner-to-corner) makes the
+  // '/', two crossed bars the 'x', a filled plus polygon the '+'.
+  //
+  // The '/' lines are PathPattern, NOT LinePattern, on purpose: a rotated
+  // LinePattern tile does not translate-tile seamlessly -- its line phase jumps
+  // at each 100x100 tile edge, so one sector's fill reads as a patchwork of
+  // rectangular tiles instead of continuous diagonals. Each bar overshoots the
+  // tile corners (-0.5 .. 10.5) so it joins its diagonal neighbours, exactly as
+  // the 'x' bars do (which is why the crosshatch already renders continuous).
+  const LINES_PATH = "M0.5 10.5 L10.5 0.5 L9.5 -0.5 L-0.5 9.5 Z";
   const CROSS_PATH = "M0.5 -0.5 L10.5 9.5 L9.5 10.5 L-0.5 0.5 Z"
-    + " M0.5 10.5 L10.5 0.5 L9.5 -0.5 L-0.5 9.5 Z";
+    + " " + LINES_PATH;
   const PLUS_PATH = "M4.1 0 H5.9 V4.1 H10 V5.9 H5.9 V10 H4.1 V5.9 H0 V4.1 H4.1 Z";
 
   function makePattern(root, hatch, body, setColor) {
@@ -92,8 +99,9 @@
     const common = { color: color, colorOpacity: 1, fill: body, fillOpacity: 1 };
     switch (hatch.type) {
       case "lines":                                   // '///' diagonal lines
-        return am5.LinePattern.new(root, Object.assign({}, common,
-          { gap: 5, rotation: -45, strokeWidth: 1.0 }));
+        return am5.PathPattern.new(root, Object.assign({}, common,
+          { svgPath: LINES_PATH, gap: 0, maxWidth: 10, maxHeight: 10,
+            centered: true }));
       case "dots":                                    // '...' fine dots
         return am5.CirclePattern.new(root, Object.assign({}, common,
           { gap: 4, radius: 1.2 }));
