@@ -670,9 +670,9 @@ if __name__ == '__main__':
                              'proposal slower than this timeout is killed '
                              'before the in-flight sidecar exists and '
                              'ABORTS the study rather than just slowing '
-                             'it, so use ~10 or more for a GP study '
-                             'expected to pass a few hundred COMPLETE '
-                             'trials')
+                             'it, but 3 min has been sufficient for every '
+                             'GP study so far (no stalled trials observed), '
+                             'so it is the default under gp too')
     parser.add_argument('--poll-s', type=float, default=30.0)
     parser.add_argument('--settle-s', type=float, default=10.0)
     parser.add_argument('--no-restrict-to-workbook',
