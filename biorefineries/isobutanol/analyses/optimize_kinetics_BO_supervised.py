@@ -54,7 +54,7 @@ sequentially) -- ask-first, like the unsupervised driver. Examples:
 
     # default preset (ethanol_isobutanol x metabolic_protein; start at A,
     # B workbook's 56 rows minus k_10 (excluded by default), rate constants
-    # 1e-3x-10x, inhibition coefficients and K_* 0.1x-10x):
+    # 1e-3x-4x, inhibition coefficients and K_* 0.1x-10x):
     python optimize_kinetics_BO_supervised.py --objective IRR --n-trials 2000
     # re-include k_10 (no _xk10 tag; it samples its 0.1x-10x band):
     python optimize_kinetics_BO_supervised.py --objective IRR --exclude-params
@@ -68,13 +68,13 @@ sequentially) -- ask-first, like the unsupervised driver. Examples:
         --study-type metabolic_minimal
     # standalone 15-variable set: 9 listed rates + 3 effector multipliers
     # + 3 feeding, spike and stage_1_max_x pinned (name
-    # ..._metabolic_minimal_subset_irr_rb0.001-10_ib0.75-1.5_burden):
+    # ..._metabolic_minimal_subset_irr_rb0.001-4_ib0.75-1.5_burden):
     python optimize_kinetics_BO_supervised.py --objective IRR \\
         --study-type metabolic_minimal_subset
-    # scipy dual annealing instead of TPE (name ..._irr_da_rb0.001-10_ib0.75-1.5_burden)
+    # scipy dual annealing instead of TPE (name ..._irr_da_rb0.001-4_ib0.75-1.5_burden)
     python optimize_kinetics_BO_supervised.py --objective IRR --study-type metabolic_minimal_subset --method dual_annealing
     # feasibility-aware Gaussian-process sampler (<= 15 variables; name
-    # ..._irr_gp_rb0.001-10_ib0.75-1.5_burden); learned constraint GP off:
+    # ..._irr_gp_rb0.001-4_ib0.75-1.5_burden); learned constraint GP off:
     python optimize_kinetics_BO_supervised.py --objective IRR --study-type metabolic_minimal_subset --method gp
     python optimize_kinetics_BO_supervised.py --objective IRR --study-type metabolic_minimal_subset --method gp --gp-no-learned-constraints
     # resume a pre-2026-09-04 study under its old flags and name:

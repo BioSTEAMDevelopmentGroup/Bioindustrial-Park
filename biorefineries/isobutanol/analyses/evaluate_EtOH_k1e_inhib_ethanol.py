@@ -17,10 +17,10 @@ study uses:
 * **k_1e (x-axis):** in ``metabolic_14d`` k_1e is not an individual decision
   variable -- it belongs to the grouped ``glycolysis`` CAPACITY family
   (``kinetic_optimization.METABOLIC_14D_RATE_GROUPS['glycolysis']`` = k_1l,
-  k_1h, k_1e) on a **0.2x-5x** multiplier band
+  k_1h, k_1e) on a **0.2x-4x** multiplier band
   (``STUDY_TYPE_OPTIONS['metabolic_14d']['group_multiplier_bounds']
   ['glycolysis']``). Here k_1e alone is swept over its own scenario-A
-  baseline x [0.2, 5.0] (k_1l / k_1h held at baseline), so the axis covers
+  baseline x [0.2, 4.0] (k_1l / k_1h held at baseline), so the axis covers
   exactly the range k_1e can take in that study.
 * **inhib_ethanol multiplier (y-axis):** the same grouped decision variable
   the study uses (``METABOLIC_MINIMAL_SUBSET_GROUPS['inhib_ethanol']`` =
@@ -228,10 +228,10 @@ results = {i: [] for i in metrics.keys()}
 
 steps = (20, 20, 1)
 
-# metabolic_14d glycolysis-group band (0.2x-5x) x the scenario-A baseline k_1e:
+# metabolic_14d glycolysis-group band (0.2x-4x) x the scenario-A baseline k_1e:
 # the range k_1e spans inside that study's glycolysis capacity multiplier.
 K_1E_GLYCOLYSIS_MULTIPLIER_BOUNDS = ko.STUDY_TYPE_OPTIONS['metabolic_14d'][
-    'group_multiplier_bounds']['glycolysis']  # (0.2, 5.0)
+    'group_multiplier_bounds']['glycolysis']  # (0.2, 4.0)
 spec_1 = nsk_k_1ees = np.linspace(K_1E_GLYCOLYSIS_MULTIPLIER_BOUNDS[0]*baseline_k_1e,
                                   K_1E_GLYCOLYSIS_MULTIPLIER_BOUNDS[1]*baseline_k_1e,
                                   steps[0])
@@ -255,7 +255,7 @@ spec_3 = spike_concs =\
 
 x_label = "k_1e" # title of the x axis
 x_units = r"$\mathrm{g} \cdot \mathrm{L}^{-1} \cdot \mathrm{h}^{-1}$"
-# k_1e range is baseline-dependent (0.2x-5x baseline); derive round ticks.
+# k_1e range is baseline-dependent (0.2x-4x baseline); derive round ticks.
 x_ticks = [float(np.round(t, 1)) for t in np.linspace(spec_1[0], spec_1[-1], 5)]
 
 y_label = "inhib_ethanol multiplier" # title of the y axis

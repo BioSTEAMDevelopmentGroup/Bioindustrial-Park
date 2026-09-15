@@ -19,12 +19,12 @@ Search set and bands come from a named STUDY PRESET (default
 study_target_products='ethanol_isobutanol', study_type='metabolic_protein':
 start at the scenario-A baseline, the B workbook's 56 kinetic rows; log
 bands by nskinetics ROLE since 2026-09-06 -- rate constants (capacity:
-k_1h, k_2, ..., k_13-k_16) on [1e-3x, 10x], inhibition coefficients
+k_1h, k_2, ..., k_13-k_16) on [1e-3x, 4x], inhibition coefficients
 (k_1ie, k_1ii, k_10ie, ...) and the regulation / affinity / self-
 inhibition terms K_* on [0.1x, 10x]; k_10 (active-biomass decay) is
 EXCLUDED by default -- a free lunch, not an engineering target -- so the
 sampled set is 55; see ko.resolve_study_preset and run()'s docstring; the
-derived study name carries the band tags `_rb0.001-10_ib0.1-10` and the
+derived study name carries the band tags `_rb0.001-4_ib0.1-10` and the
 exclusion tag `_xk10`). study_target_products=None is the legacy flag
 path (scenario / kinetic_bounds_scenario / single band, k_10 sampled)
 for resuming older studies.
@@ -39,7 +39,7 @@ feeding/operating variables with the spike feed pinned at the baseline
 600 g/L (no spike_delta column) -- 24 / 19 decision variables. Every
 effector family takes the default band, so the inhibition tag is
 _ib0.75-1.5; name
-kin_opt_ethanol_isobutanol_metabolic_minimal_irr_rb0.001-10_ib0.75-1.5_xk10+k7+k8_s1x1-50_burden.
+kin_opt_ethanol_isobutanol_metabolic_minimal_irr_rb0.001-4_ib0.75-1.5_xk10+k7+k8_s1x1-50_burden.
 
 study_type='metabolic_minimal_subset' (2026-09-07) is a STANDALONE
 explicit set, not derived from metabolic_minimal: 9 listed rate
@@ -54,7 +54,7 @@ ethanol_isobutanol, 10 for ethanol_only (the listed set intersected
 with the A workbook: no k_13-k_16, no isobutanol coefficients); nothing
 excluded (the other rates and every K_* stay at the baseline with no
 probe); name
-kin_opt_ethanol_isobutanol_metabolic_minimal_subset_irr_rb0.001-10_ib0.75-1.5_burden
+kin_opt_ethanol_isobutanol_metabolic_minimal_subset_irr_rb0.001-4_ib0.75-1.5_burden
 (no _x / _s1x tag).
 
 The enzyme-burden (proteome-allocation) constraint of enzyme_burden.py
@@ -71,7 +71,7 @@ Runner pattern (fresh kernel, one process):
     import runpy
     ns = runpy.run_path(r'<this file>')
     # default preset: kin_opt_ethanol_isobutanol_metabolic_protein_irr
-    #   _rb0.001-10_ib0.1-10_xk10_burden
+    #   _rb0.001-4_ib0.1-10_xk10_burden
     result, csv_path = ns['run'](objective='IRR')
     # re-include k_10 (its 0.1x-10x band; no _xk10 tag)
     result, csv_path = ns['run'](objective='IRR', exclude_params=())
@@ -93,10 +93,10 @@ Runner pattern (fresh kernel, one process):
     result, csv_path = ns['run'](objective='IRR', study_type='metabolic',
                                  seed_from=[('<donor study name>', [1553, 1914]),
                                             ('<other donor>', [1162])])
-    # dual annealing instead of TPE (name ..._irr_da_rb0.001-10_ib0.75-1.5_burden)
+    # dual annealing instead of TPE (name ..._irr_da_rb0.001-4_ib0.75-1.5_burden)
     result, csv_path = ns['run'](objective='IRR', study_type='metabolic_minimal_subset', method='dual_annealing')
     # Gaussian-process sampler (feasibility-aware optuna GPSampler; <= 15
-    # variables; name ..._irr_gp_rb0.001-10_ib0.75-1.5_burden); learned
+    # variables; name ..._irr_gp_rb0.001-4_ib0.75-1.5_burden); learned
     # constraint GP on by default, off via gp_kwargs
     result, csv_path = ns['run'](objective='IRR', study_type='metabolic_minimal_subset', method='gp')
     result, csv_path = ns['run'](objective='IRR', study_type='metabolic_minimal_subset', method='gp',
@@ -270,7 +270,7 @@ def run(scenario=None,  # 'A' or 'B'; None = the preset's start scenario
     `_s1x`).
     Bands (log-scale, x baseline)
     by nskinetics ROLE since 2026-09-06: rate constants (role capacity;
-    the preset's `rate_params`, ko.rate_constant_names) [1e-3x, 10x]
+    the preset's `rate_params`, ko.rate_constant_names) [1e-3x, 4x]
     (1e-5x until later that day) EXCEPT k_10, the active-biomass decay
     capacity, on [0.1x, 10x] (the preset's `parameter_multiplier_bounds`,
     a copy of ko.DEFAULT_PARAMETER_MULTIPLIER_BOUNDS -- a near-zero
@@ -293,7 +293,7 @@ def run(scenario=None,  # 'A' or 'B'; None = the preset's start scenario
     the rate band) wins over the preset. A preset is itself a
     workbook restriction, so restrict_to_workbook=False raises. Every
     preset-derived study name carries the EFFECTIVE rate band tag
-    `_rb{lo}-{hi}` (`_rb0.001-10` at the default), the inhibition band
+    `_rb{lo}-{hi}` (`_rb0.001-4` at the default), the inhibition band
     tag `_ib{lo}-{hi}` (`_ib0.1-10`) and the exclusion tag of the
     effective `exclude_params` (`_xk10` at the default, nothing for an
     empty set; ko.default_study_name / ko.excluded_parameters_tag), so a
@@ -443,7 +443,7 @@ def run(scenario=None,  # 'A' or 'B'; None = the preset's start scenario
     store) with the same preset / scenario / burden / volume set-up; the
     derived study name gains `_da` right after the objective slug on both
     naming paths (kin_opt_ethanol_isobutanol_metabolic_minimal_subset_irr_
-    da_rb0.001-10_ib0.75-1.5_burden). `annealing_kwargs` (dict) forwards the
+    da_rb0.001-4_ib0.75-1.5_burden). `annealing_kwargs` (dict) forwards the
     annealing knobs (initial_temp 5230, restart_temp_ratio 2e-5, visit 2.62,
     accept -5.0, no_local_search True, energy_scale None = the registry's,
     max_calls_factor 20). Under DA, enqueue_knockouts=True or a non-empty
@@ -456,7 +456,7 @@ def run(scenario=None,  # 'A' or 'B'; None = the preset's start scenario
     plus optuna's learned constraint GP (ConstrainedLogEI) on the violations
     by default -- fit on COMPLETE (hence feasible, under the pre-sim
     INFEASIBLE prune) trials only; the derived name gains `_gp` right after the objective slug
-    (kin_opt_ethanol_isobutanol_metabolic_minimal_subset_irr_gp_rb0.001-10_
+    (kin_opt_ethanol_isobutanol_metabolic_minimal_subset_irr_gp_rb0.001-4_
     ib0.75-1.5_burden); more than 15 decision variables raise before any study
     is touched, so use it with metabolic_minimal_subset / metabolic_14d.
     n_startup_trials=None means max(10, 2*d) under 'gp'; every enqueue /

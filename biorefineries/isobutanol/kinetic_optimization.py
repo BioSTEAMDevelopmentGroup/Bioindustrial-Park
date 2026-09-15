@@ -26,7 +26,7 @@ rows; 'ethanol_isobutanol' = scenario-B rows, i.e. plus the Ehrlich block
 and the isobutanol-inhibition coefficients; both start at the A baseline)
 and study_type ('metabolic' = capacity, product-inhibition, lethality and
 substrate-regulation roles; 'metabolic_protein' = plus affinity and
-product self-inhibition), with the rate constants on [1e-3x, 10x] and the
+product self-inhibition), with the rate constants on [1e-3x, 4x] and the
 inhibition coefficients / K_* terms on [0.1x, 10x] log bands; k_10 (the
 active-biomass decay capacity) is excluded from every preset by default
 (DEFAULT_EXCLUDED_PARAMETERS -- a lower decay rate is a free lunch, not an
@@ -211,8 +211,8 @@ def expand_grouped_values(values, parameter_groups, kinetic_baselines):
 #: named study presets (resolve_study_preset), assigned by nskinetics
 #: ROLE (kinetic_parameter_roles) since 2026-09-06:
 #:   1. RATE CONSTANTS (role capacity: k_1h, k_2, ..., k_13-k_16) --
-#:      DEFAULT_RATE_MULTIPLIER_BOUNDS, [1e-3×, 10×] (1e-5× until later
-#:      on 2026-09-06): an effective
+#:      DEFAULT_RATE_MULTIPLIER_BOUNDS, [1e-3×, 4×] (1e-5× until later
+#:      on 2026-09-06, high 10× until 2026-09-15): an effective
 #:      knock-out is reachable (still log-uniform below and above the
 #:      baseline).
 #:   2. INHIBITION COEFFICIENTS (roles product_inhibition and lethality:
@@ -231,7 +231,7 @@ def expand_grouped_values(values, parameter_groups, kinetic_baselines):
 #: and older-study resumes). The legacy single band of
 #: build_search_space's multiplier_bounds default, (0.1, 10.0), is
 #: unchanged.
-DEFAULT_RATE_MULTIPLIER_BOUNDS = (1e-3, 10.0)
+DEFAULT_RATE_MULTIPLIER_BOUNDS = (1e-3, 4.0)
 DEFAULT_SATURATION_MULTIPLIER_BOUNDS = (0.1, 10.0)
 
 #: Per-parameter multiplier bands of the study presets, {name: (m_lo,
@@ -1365,7 +1365,7 @@ METABOLIC_MINIMAL_SUBSET_GROUPS = {
 METABOLIC_14D_RATES = ('k_3', 'k_6', 'k_13', 'k_14', 'k_15', 'k_16')
 #: Its CAPACITY group (declared under the STUDY_TYPE_OPTIONS rate_parameter_
 #: groups key so resolve_study_preset validates the members as capacity rows,
-#: not inhibition coefficients): ONE log multiplier on (0.2, 5.0) x every
+#: not inhibition coefficients): ONE log multiplier on (0.2, 4.0) x every
 #: member's LIVE baseline (expand_grouped_values), preserving the glycolysis
 #: family's intra-ratio. Merged glycolysis-FIRST into parameter_groups, so the
 #: search-space / CSV column order after the individual rates is glycolysis,
@@ -1412,7 +1412,7 @@ STUDY_TYPE_OPTIONS = {
     # ethanol_only after the workbook intersection); no exclusions, spike
     # and stage_1_max_x pinned; every effector family takes the default
     # band (empty group_multiplier_bounds dict -> 0.75x-1.5x), default name
-    # kin_opt_ethanol_isobutanol_metabolic_minimal_subset_irr_rb0.001-10_ib0.75-1.5_burden
+    # kin_opt_ethanol_isobutanol_metabolic_minimal_subset_irr_rb0.001-4_ib0.75-1.5_burden
     # (no _x / _s1x tag). Its column set differs from every other study's,
     # so the CSV header guard refuses any cross-resume regardless.
     'metabolic_minimal_subset': dict(
@@ -1426,7 +1426,7 @@ STUDY_TYPE_OPTIONS = {
     # metabolic_14d = metabolic_minimal_subset with (a) the glycolysis rates
     # k_1l/k_1h/k_1e grouped as ONE capacity multiplier (rate_parameter_groups
     # -- validated as capacity rows and merged glycolysis-first into
-    # parameter_groups) on 0.2x-5x, and (b) stage_1_max_x SAMPLED
+    # parameter_groups) on 0.2x-4x, and (b) stage_1_max_x SAMPLED
     # (stage_1_max_x_bounds omitted -> the default (1.0, 50.0) g/L). 14
     # decision variables for ethanol_isobutanol (6 individual rates + 1
     # glycolysis + 3 inhibition groups + 3 feeding + stage_1_max_x), 9 for
@@ -1435,12 +1435,12 @@ STUDY_TYPE_OPTIONS = {
     # gains no glycolysis tag: the distinct glycolysis column already blocks any
     # cross-study CSV resume. The inhibition families take the default band
     # (0.75x-1.5x), so the inhibition tag collapses to _ib0.75-1.5. Default name
-    # kin_opt_ethanol_isobutanol_metabolic_14d_irr_rb0.001-10_ib0.75-1.5_s1x1-50_burden.
+    # kin_opt_ethanol_isobutanol_metabolic_14d_irr_rb0.001-4_ib0.75-1.5_s1x1-50_burden.
     'metabolic_14d': dict(
         rate_params=METABOLIC_14D_RATES,
         parameter_groups=METABOLIC_MINIMAL_SUBSET_GROUPS,
         rate_parameter_groups=METABOLIC_14D_RATE_GROUPS,
-        group_multiplier_bounds={'glycolysis': (0.2, 5.0)},
+        group_multiplier_bounds={'glycolysis': (0.2, 4.0)},
         exclude_params=(),
         spike_delta_bounds=None,
     ),
@@ -1872,7 +1872,7 @@ def default_study_name(objective, study_target_products, study_type,
     columns, so the CSV header guard could not catch the mix).
 
     `rate_multiplier_bounds` (the k_* band, (m_lo, m_hi) x baseline) tags
-    the name `_rb{m_lo:g}-{m_hi:g}` (e.g. `_rb0.001-10` at the presets'
+    the name `_rb{m_lo:g}-{m_hi:g}` (e.g. `_rb0.001-4` at the presets'
     own DEFAULT_RATE_MULTIPLIER_BOUNDS, `_rb0.1-10`) WHENEVER it is
     given: a different band samples a different space over the SAME
     columns, so without the tag a run would silently resume the study
@@ -1940,7 +1940,7 @@ def default_study_name(objective, study_target_products, study_type,
 
     `method` ('tpe', the default and every pre-2026-09-11 study; or
     'dual_annealing') inserts method_study_tag right after the objective
-    slug (`..._irr_da_rb0.001-10_...`): a dual-annealing study has the
+    slug (`..._irr_da_rb0.001-4_...`): a dual-annealing study has the
     same columns as the TPE study of the same objective, so the tag is
     the only thing keeping it off that study's CSV.
 
