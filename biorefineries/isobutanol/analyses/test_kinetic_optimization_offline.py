@@ -104,6 +104,10 @@ nsk = {'y_IBO_glu_added': 0.1, '[s_IBO]': 20.0, 'time': 40.0,
        '[s_acetate]': 1.6}
 handles = {'V406': SimpleNamespace(nsk_results_specific_tau_dict=nsk, tau=55.0),
            'tea': SimpleNamespace(TCI=350e6, NPV=35e6),
+           # 'Price-weighted yield' reads the model's static reference prices
+           # off V514/V513 (set once at load(), NOT the stream .price).
+           'f': SimpleNamespace(V514=SimpleNamespace(isobutanol_price=1.4),
+                                V513=SimpleNamespace(ethanol_price=0.8)),
            'latest_TEA_solution': {'IRR': 0.21,
                                    'MPSPs': {'ethanol': 0.4, 'isobutanol': 0.9}}}
 assert ko.OBJECTIVE_REGISTRY['IBO yield']['getter'](handles) == 0.1
@@ -111,6 +115,17 @@ assert ko.OBJECTIVE_REGISTRY['IBO productivity']['getter'](handles) == 0.5
 assert ko.OBJECTIVE_REGISTRY['IBO yield x titer']['getter'](handles) == 0.1*20.0
 assert ko.OBJECTIVE_REGISTRY['EtOH productivity']['getter'](handles) == 2.0
 assert ko.OBJECTIVE_REGISTRY['Cell density']['getter'](handles) == 30.0
+# 'Price-weighted yield': y_IBO_glu_added*isobutanol_price +
+# y_EtOH_glu_added*ethanol_price = 0.1*1.4 + 0.3*0.8 = 0.38 (revenue-per-
+# sugar proxy; static V514/V513 reference prices, glucose-added yields).
+assert abs(ko.OBJECTIVE_REGISTRY['Price-weighted yield']['getter'](handles)
+           - (0.1*1.4 + 0.3*0.8)) < 1e-12
+assert ko.OBJECTIVE_REGISTRY['Price-weighted yield']['direction'] == 'maximize'
+assert ko.OBJECTIVE_REGISTRY['Price-weighted yield']['level'] == 'kinetic'
+assert ko.OBJECTIVE_REGISTRY['Price-weighted yield']['energy_scale'] == 0.01
+assert 'Price-weighted yield' not in ko.TRACKED_METRICS   # objective-only
+# Its slug keeps the hyphen and carries no parentheses into a study name.
+assert ko.objective_slug('Price-weighted yield') == 'price-weighted_yield'
 assert ko.OBJECTIVE_REGISTRY['IRR']['getter'](handles) == 0.21
 assert ko.OBJECTIVE_REGISTRY['EtOH MPSP']['getter'](handles) == 0.4
 assert ko.OBJECTIVE_REGISTRY['IBO MPSP']['getter'](handles) == 0.9

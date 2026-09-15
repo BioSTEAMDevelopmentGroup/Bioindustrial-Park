@@ -434,6 +434,21 @@ OBJECTIVE_REGISTRY = {
         getter=lambda h: _nsk(h)['y_EtOH_IBO_glu_added'],
         direction='maximize', level='kinetic', units='g-EtOH-and-IBO/g-sugars',
         energy_scale=0.01),
+    # Price-weighted combined yield (a revenue-per-sugar proxy): each
+    # glucose-added product yield (as in 'IBO yield' / 'EtOH yield') times
+    # the model's STATIC, PRICE_YEAR-indexed reference price -- V514.
+    # isobutanol_price / V513.ethanol_price (the scalar per-kg reference
+    # prices set once at load() and indexed in place, NOT the fluctuating
+    # stream .price a TEA solve leaves behind). Kinetic level: it needs
+    # only the fermentation yields and the fixed prices, not the TEA
+    # solution (solve_TEA still runs every trial for the tracked TEA
+    # metrics). Unlike 'Combined yield' (unweighted sum), this weights the
+    # two products by revenue, so the optimizer trades IBO vs EtOH by value.
+    'Price-weighted yield': dict(
+        getter=lambda h: (_nsk(h)['y_IBO_glu_added']*h['f'].V514.isobutanol_price
+                          + _nsk(h)['y_EtOH_glu_added']*h['f'].V513.ethanol_price),
+        direction='maximize', level='kinetic',
+        units='($/kg-product)(g-product/g-sugars)', energy_scale=0.01),
     'Cell density': dict(
         getter=lambda h: _nsk(h)['[x]'],
         direction='maximize', level='kinetic', units='g-cell/L-water',
