@@ -468,9 +468,8 @@ def run(scenario=None,  # 'A' or 'B'; None = the preset's start scenario
         raise ValueError("pass burden=True/False to run(), not the engine's "
                          'burden_model (run() builds it so the reports can '
                          'be printed first).')
-    slug = (objective if isinstance(objective, str)
-            else engine_kwargs.get('objective_name', 'custom')
-            ).lower().replace(' ', '_')
+    slug = ko.objective_slug(objective if isinstance(objective, str)
+                             else engine_kwargs.get('objective_name', 'custom'))
     seed_from = [(donor, tuple(int(n) for n in trials))
                  for donor, trials in (seed_from or ())]
     n_seeds = sum(len(trials) for _, trials in seed_from)

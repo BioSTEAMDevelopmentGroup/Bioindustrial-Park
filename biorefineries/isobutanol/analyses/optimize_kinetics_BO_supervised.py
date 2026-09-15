@@ -211,7 +211,7 @@ def default_study_name(scenario, objective, kinetic_bounds_scenario,
                                      n_seeds=n_seeds,
                                      method=method)
     scenario = scenario or 'B'
-    slug = objective.lower().replace(' ', '_')
+    slug = ko.objective_slug(objective)
     tag = ko.method_study_tag(method)
     suffix = ko.seed_points_tag(n_seeds) + (ko.BURDEN_STUDY_SUFFIX if burden else '')
     if kinetic_bounds_scenario:

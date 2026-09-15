@@ -64,6 +64,7 @@ __all__ = ('OBJECTIVE_REGISTRY', 'TRACKED_METRICS',
            'DEFAULT_PARAMETER_MULTIPLIER_BOUNDS',
            'DEFAULT_SATURATION_MULTIPLIER_BOUNDS',
            'DEFAULT_EXCLUDED_PARAMETERS', 'excluded_parameters_tag',
+           'objective_slug',
            'OPERATING_VARIABLES', 'DEFAULT_STAGE_1_MAX_X_BOUNDS',
            'DEFAULT_SPIKE_DELTA_BOUNDS', 'DEFAULT_GROUP_MULTIPLIER_BOUNDS',
            'group_bounds_for', 'expand_grouped_values',
@@ -277,6 +278,17 @@ def excluded_parameters_tag(names):
         return ''
     return '_x' + '+'.join(name.replace('_', '') for name in names)
 
+def objective_slug(objective_name):
+    """Study-name slug of an objective name: lower-cased, spaces -> '_',
+    parentheses DROPPED ('IBO titer' -> 'ibo_titer'; the '(broth)' twins
+    'EtOH titer (broth)' -> 'etoh_titer_broth', never 'etoh_titer_(broth)',
+    which would put parentheses into a study / CSV / SQLite name). A name
+    without parentheses slugs exactly as before, so no existing study name
+    moves. The ONE slug rule: default_study_name, run_kinetic_optimization's
+    legacy name, the driver and the supervisor all call it."""
+    return (objective_name.lower().replace(' ', '_')
+            .replace('(', '').replace(')', ''))
+
 #: nskinetics roles (parameter_categories.ROLES) that make a parameter a
 #: RATE CONSTANT -- the only names the k_* rate band applies to under the
 #: study presets (rate_constant_names) -- and the roles of the
@@ -314,6 +326,31 @@ def _productivity(amount, time):
     which re-proposed the same point ~800 times."""
     return amount/time if time > 0 else 0.0
 
+def _effluent(handles):
+    """The V406 broth effluent stream (outs[1]; the vent is outs[0], see
+    system.py) -- its imass (kg/hr) over F_vol (m3/hr) is a g/L-BROTH
+    concentration, the per-broth-volume counterpart of the kinetic model's
+    g/L-water titers (nsk_results_specific_tau_dict). None when the (fake /
+    partial) handles of the offline tests carry no effluent stream, so
+    _broth_conc reads NaN there (mirrors the optional convergence getters
+    below)."""
+    outs = getattr(handles['V406'], 'outs', None)
+    if not outs or len(outs) < 2:
+        return None
+    return outs[1]
+
+def _broth_conc(handles, chemical_ID):
+    """g/L-broth of `chemical_ID` in the V406 effluent (imass/F_vol: kg/hr
+    over m3/hr = kg/m3 = g/L). NaN when the effluent is absent (offline
+    fakes) or has no volume (F_vol <= 0): an undefined concentration is
+    honestly NaN, and a 0/0 would be a FloatingPointError under flexsolve's
+    global np.seterr(invalid='raise') -- the _productivity lesson."""
+    effluent = _effluent(handles)
+    if effluent is None:
+        return np.nan
+    F_vol = effluent.F_vol
+    return float(effluent.imass[chemical_ID])/F_vol if F_vol > 0 else np.nan
+
 # 'level' ('kinetic' vs 'system') is metadata only: every trial runs the full
 # system simulation AND one TEA solve regardless (the system-level metrics
 # IRR/TCI/... in TRACKED_METRICS are always recorded), so a 'kinetic' objective
@@ -331,6 +368,13 @@ OBJECTIVE_REGISTRY = {
         getter=lambda h: _nsk(h)['[s_IBO]'],
         direction='maximize', level='kinetic', units='g-IBO/L-water',
         energy_scale=2.0),
+    # '(broth)' twins (2026-09-14): the same fermentation outcome read off
+    # the V406 effluent per BROTH volume (imass/F_vol, _broth_conc) instead
+    # of the kinetic model's per-WATER volume; energy_scale mirrors the twin.
+    'IBO titer (broth)': dict(
+        getter=lambda h: _broth_conc(h, 'Isobutanol'),
+        direction='maximize', level='kinetic', units='g-IBO/L-broth',
+        energy_scale=2.0),
     'IBO productivity': dict(
         getter=lambda h: _productivity(_nsk(h)['[s_IBO]'], _nsk(h)['time']),
         direction='maximize', level='kinetic', units='g-IBO/L-water/h',
@@ -347,6 +391,10 @@ OBJECTIVE_REGISTRY = {
         getter=lambda h: _nsk(h)['[s_EtOH]'],
         direction='maximize', level='kinetic', units='g-EtOH/L-water',
         energy_scale=2.0),
+    'EtOH titer (broth)': dict(
+        getter=lambda h: _broth_conc(h, 'Ethanol'),
+        direction='maximize', level='kinetic', units='g-EtOH/L-broth',
+        energy_scale=2.0),
     'EtOH productivity': dict(
         getter=lambda h: _nsk(h)['prod_EtOH'],
         direction='maximize', level='kinetic', units='g-EtOH/L-water/h',
@@ -358,6 +406,10 @@ OBJECTIVE_REGISTRY = {
     'Cell density': dict(
         getter=lambda h: _nsk(h)['[x]'],
         direction='maximize', level='kinetic', units='g-cell/L-water',
+        energy_scale=1.0),
+    'Cell density (broth)': dict(
+        getter=lambda h: _broth_conc(h, 'Yeast'),
+        direction='maximize', level='kinetic', units='g-cell/L-broth',
         energy_scale=1.0),
     'IRR': dict(
         getter=lambda h: h['latest_TEA_solution']['IRR'],
@@ -386,12 +438,23 @@ OBJECTIVE_REGISTRY = {
     }
 
 #: Metrics recorded for EVERY trial (spec trajectory (ii)-(vi) + extras).
+#: The '(broth)' twins and the two acetate titers (2026-09-14) are FIVE new
+#: trajectory-CSV columns, so the header guard REFUSES to resume any study
+#: started before them (start a fresh study name; old CSVs stay plottable).
 TRACKED_METRICS = {name: OBJECTIVE_REGISTRY[name]['getter'] for name in
-                   ('IBO yield', 'IBO titer', 'IBO productivity',
-                    'EtOH yield', 'EtOH titer', 'EtOH productivity',
-                    'Cell density', 'IRR', 'TCI', 'PI')}
+                   ('IBO yield', 'IBO titer', 'IBO titer (broth)',
+                    'IBO productivity',
+                    'EtOH yield', 'EtOH titer', 'EtOH titer (broth)',
+                    'EtOH productivity',
+                    'Cell density', 'Cell density (broth)',
+                    'IRR', 'TCI', 'PI')}
 TRACKED_METRICS['tau'] = lambda h: h['V406'].tau
 TRACKED_METRICS['n_glu_spikes'] = lambda h: _nsk(h)['curr_n_glu_spikes']
+# Acetate -- a byproduct, tracked but not an objective: the kinetic model's
+# g/L-water titer ('[s_acetate]') and the V406-effluent g/L-broth estimate
+# (chemical AceticAcid), the acetate counterparts of the titer pairs above.
+TRACKED_METRICS['Acetate titer'] = lambda h: _nsk(h)['[s_acetate]']
+TRACKED_METRICS['Acetate titer (broth)'] = lambda h: _broth_conc(h, 'AceticAcid')
 
 # Convergence diagnostics of the simulation behind each trial (2026-09-13;
 # nskinetics report docs/reports/fed-batch-spike-feed-reconciliation.md
@@ -1842,7 +1905,7 @@ def default_study_name(objective, study_target_products, study_type,
     other tag: a burden study (enzyme_burden.py; the driver's default)
     can never resume a burden-free study's CSV/SQLite, or vice versa.
     """
-    slug = objective.lower().replace(' ', '_')
+    slug = objective_slug(objective)
     name = (f'kin_opt_{study_target_products}_{study_type}_{slug}'
             + method_study_tag(method))
     if scenario is not None and scenario != 'A':
@@ -3561,7 +3624,7 @@ def _prepare_optimization(objective, *, direction, level, objective_units,
             os.path.dirname(os.path.abspath(__file__)),
             'analyses', 'results')
     os.makedirs(results_dir, exist_ok=True)
-    slug = objective_name.lower().replace(' ', '_')
+    slug = objective_slug(objective_name)
     if study_name is None:
         study_name = f'kin_opt_{scenario_label}_{slug}{method_tag}'
         if burden_on:

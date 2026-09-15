@@ -91,7 +91,8 @@ PASS('OBJECTIVE_REGISTRY: names, directions, levels, units')
 #%% 4. getters against fake handles
 nsk = {'y_IBO_glu_added': 0.1, '[s_IBO]': 20.0, 'time': 40.0,
        'y_EtOH_glu_added': 0.3, '[s_EtOH]': 90.0, 'prod_EtOH': 2.0,
-       'y_EtOH_IBO_glu_added': 0.4, '[x]': 30.0, 'curr_n_glu_spikes': 7}
+       'y_EtOH_IBO_glu_added': 0.4, '[x]': 30.0, 'curr_n_glu_spikes': 7,
+       '[s_acetate]': 1.6}
 handles = {'V406': SimpleNamespace(nsk_results_specific_tau_dict=nsk, tau=55.0),
            'tea': SimpleNamespace(TCI=350e6, NPV=35e6),
            'latest_TEA_solution': {'IRR': 0.21,
@@ -109,6 +110,55 @@ assert ko.OBJECTIVE_REGISTRY['PI']['getter'](handles) == 35e6/350e6   # NPV / TC
 assert ko.TRACKED_METRICS['PI'](handles) == 35e6/350e6
 assert ko.TRACKED_METRICS['tau'](handles) == 55.0
 assert ko.TRACKED_METRICS['n_glu_spikes'](handles) == 7
+# '(broth)' twins + acetate (2026-09-14): the kinetic g/L-water titers read
+# nsk_results_specific_tau_dict; the g/L-broth ones read the V406 effluent
+# (outs[1]) as imass/F_vol (kg/hr over m3/hr = g/L). Fake handles with NO
+# effluent -> NaN (never a raise), so every fake-handle engine run above
+# and below keeps working; the kinetic acetate titer needs only the dict.
+for _bname in ('EtOH titer (broth)', 'IBO titer (broth)',
+               'Cell density (broth)'):
+    assert ko.OBJECTIVE_REGISTRY[_bname]['direction'] == 'maximize'
+    assert ko.OBJECTIVE_REGISTRY[_bname]['level'] == 'kinetic'
+    assert ko.OBJECTIVE_REGISTRY[_bname]['units'].endswith('/L-broth')
+    assert _bname in ko.TRACKED_METRICS
+    assert np.isnan(ko.TRACKED_METRICS[_bname](handles))
+assert ko.OBJECTIVE_REGISTRY['EtOH titer (broth)']['energy_scale'] == 2.0
+assert ko.OBJECTIVE_REGISTRY['IBO titer (broth)']['energy_scale'] == 2.0
+assert ko.OBJECTIVE_REGISTRY['Cell density (broth)']['energy_scale'] == 1.0
+assert 'Acetate titer' not in ko.OBJECTIVE_REGISTRY          # tracked-only
+assert 'Acetate titer (broth)' not in ko.OBJECTIVE_REGISTRY
+assert ko.TRACKED_METRICS['Acetate titer'](handles) == 1.6
+assert np.isnan(ko.TRACKED_METRICS['Acetate titer (broth)'](handles))
+_effl = SimpleNamespace(imass={'Ethanol': 170.0, 'Isobutanol': 36.0,
+                               'Yeast': 56.0, 'AceticAcid': 3.0},
+                        F_vol=2.0)                            # kg/hr, m3/hr
+handles_effl = dict(handles, V406=SimpleNamespace(
+    nsk_results_specific_tau_dict=nsk, tau=55.0,
+    outs=[SimpleNamespace(), _effl]))                          # [vent, broth]
+assert ko.TRACKED_METRICS['EtOH titer (broth)'](handles_effl) == 85.0
+assert ko.TRACKED_METRICS['IBO titer (broth)'](handles_effl) == 18.0
+assert ko.TRACKED_METRICS['Cell density (broth)'](handles_effl) == 28.0
+assert ko.TRACKED_METRICS['Acetate titer (broth)'](handles_effl) == 1.5
+assert ko.TRACKED_METRICS['Acetate titer'](handles_effl) == 1.6   # unchanged
+assert ko.OBJECTIVE_REGISTRY['EtOH titer (broth)']['getter'](handles_effl) == 85.0
+# An empty effluent (F_vol 0) is NaN, never a 0/0 raise under flexsolve's
+# global seterr; a V406 with fewer than two outlets is "no effluent".
+handles_effl0 = dict(handles, V406=SimpleNamespace(
+    nsk_results_specific_tau_dict=nsk, tau=55.0,
+    outs=[SimpleNamespace(), SimpleNamespace(imass={'Ethanol': 0.0}, F_vol=0.0)]))
+handles_effl1 = dict(handles, V406=SimpleNamespace(
+    nsk_results_specific_tau_dict=nsk, tau=55.0, outs=[SimpleNamespace()]))
+with np.errstate(divide='raise', invalid='raise'):
+    assert np.isnan(ko.TRACKED_METRICS['EtOH titer (broth)'](handles_effl0))
+    assert np.isnan(ko.TRACKED_METRICS['EtOH titer (broth)'](handles_effl1))
+# The ONE slug rule (objective_slug): a '(broth)' objective must not put
+# parentheses into a study / CSV name; a name without them slugs as before.
+assert ko.objective_slug('IBO titer') == 'ibo_titer'
+assert ko.objective_slug('EtOH titer (broth)') == 'etoh_titer_broth'
+_name_broth = ko.default_study_name('EtOH titer (broth)', 'ethanol_only',
+                                    'metabolic')
+assert 'etoh_titer_broth' in _name_broth and '(' not in _name_broth
+assert 'objective_slug' in ko.__all__
 # A tau-row at time 0 -- a stalled culture (glucose never depleted) before
 # nskinetics' flat-trace tau fallback, or any degenerate row: 'IBO
 # productivity' is 0.0 (nothing produced), never a 0/0. flexsolve sets
@@ -137,10 +187,14 @@ handles_none = dict(handles_conv,
                     V406=SimpleNamespace(nsk_results_specific_tau_dict=nsk,
                                          tau=55.0, spike_feed_residual=None))
 assert np.isnan(ko.TRACKED_METRICS['spike_feed_residual'](handles_none))
-assert set(ko.TRACKED_METRICS) == {'IBO yield', 'IBO titer', 'IBO productivity',
-                                   'EtOH yield', 'EtOH titer', 'EtOH productivity',
-                                   'Cell density', 'IRR', 'TCI', 'PI',
+assert set(ko.TRACKED_METRICS) == {'IBO yield', 'IBO titer', 'IBO titer (broth)',
+                                   'IBO productivity',
+                                   'EtOH yield', 'EtOH titer', 'EtOH titer (broth)',
+                                   'EtOH productivity',
+                                   'Cell density', 'Cell density (broth)',
+                                   'IRR', 'TCI', 'PI',
                                    'tau', 'n_glu_spikes',
+                                   'Acetate titer', 'Acetate titer (broth)',
                                    'spike_feed_residual', 'n_sims_run',
                                    'final_drift'}
 assert list(ko.TRACKED_METRICS)[-3:] == ['spike_feed_residual', 'n_sims_run',
