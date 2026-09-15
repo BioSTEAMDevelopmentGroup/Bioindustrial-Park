@@ -25,7 +25,7 @@ study uses:
 * **inhib_ethanol multiplier (y-axis):** the same grouped decision variable
   the study uses (``METABOLIC_MINIMAL_SUBSET_GROUPS['inhib_ethanol']`` =
   k_1ie, k_4ie, k_7ie, k_10ie, k_16ie), which in ``metabolic_14d`` takes the
-  default group band **0.5x-2x**
+  default group band **0.75x-1.5x**
   (``kinetic_optimization.DEFAULT_GROUP_MULTIPLIER_BOUNDS``). Every member is
   set to its scenario-A baseline x the multiplier, so intra-family ratios are
   preserved (exactly ``kinetic_optimization.expand_grouped_values`` for a
@@ -236,8 +236,8 @@ spec_1 = nsk_k_1ees = np.linspace(K_1E_GLYCOLYSIS_MULTIPLIER_BOUNDS[0]*baseline_
                                   K_1E_GLYCOLYSIS_MULTIPLIER_BOUNDS[1]*baseline_k_1e,
                                   steps[0])
 
-# metabolic_14d inhibition-family band = the default group band (0.5x-2x).
-INHIB_ETHANOL_MULTIPLIER_BOUNDS = ko.DEFAULT_GROUP_MULTIPLIER_BOUNDS  # (0.5, 2.0)
+# metabolic_14d inhibition-family band = the default group band (0.75x-1.5x).
+INHIB_ETHANOL_MULTIPLIER_BOUNDS = ko.DEFAULT_GROUP_MULTIPLIER_BOUNDS  # (0.75, 1.5)
 spec_2 = inhib_ethanol_multipliers = np.linspace(INHIB_ETHANOL_MULTIPLIER_BOUNDS[0],
                                                  INHIB_ETHANOL_MULTIPLIER_BOUNDS[1],
                                                  steps[1])

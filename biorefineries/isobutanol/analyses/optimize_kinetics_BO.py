@@ -31,22 +31,22 @@ for resuming older studies.
 
 study_type='metabolic_minimal' (2026-09-07) is the compact preset: the
 capacities minus k_10, k_7 and k_8 (17 for ethanol_isobutanol, 13 for
-ethanol_only) on the rate band, ONE 0.5x-2x log multiplier per
+ethanol_only) on the rate band, ONE 0.75x-1.5x log multiplier per
 inhibition-effector family (inhib_ethanol / inhib_isobutanol /
 inhib_acetate, scaling every coefficient of that effector together;
 recorded as applied_<member> CSV columns), no K_* terms, and the four
 feeding/operating variables with the spike feed pinned at the baseline
 600 g/L (no spike_delta column) -- 24 / 19 decision variables. Every
 effector family takes the default band, so the inhibition tag is
-_ib0.5-2; name
-kin_opt_ethanol_isobutanol_metabolic_minimal_irr_rb0.001-10_ib0.5-2_xk10+k7+k8_s1x1-50_burden.
+_ib0.75-1.5; name
+kin_opt_ethanol_isobutanol_metabolic_minimal_irr_rb0.001-10_ib0.75-1.5_xk10+k7+k8_s1x1-50_burden.
 
 study_type='metabolic_minimal_subset' (2026-09-07) is a STANDALONE
 explicit set, not derived from metabolic_minimal: 9 listed rate
 constants (k_1l, k_1h, k_1e, k_3, k_6, k_13, k_14, k_15, k_16;
 ko.METABOLIC_MINIMAL_SUBSET_RATES) on the rate band, the three
 inhibition-effector multipliers (ko.METABOLIC_MINIMAL_SUBSET_GROUPS,
-every family on the default 0.5x-2x band) and the three
+every family on the default 0.75x-1.5x band) and the three
 feeding variables threshold_conc / target_delta / max_n_spikes, with
 BOTH the spike feed and stage_1_max_x pinned at the baseline (no
 spike_delta / stage_1_max_x column) -- 15 decision variables for
@@ -54,7 +54,7 @@ ethanol_isobutanol, 10 for ethanol_only (the listed set intersected
 with the A workbook: no k_13-k_16, no isobutanol coefficients); nothing
 excluded (the other rates and every K_* stay at the baseline with no
 probe); name
-kin_opt_ethanol_isobutanol_metabolic_minimal_subset_irr_rb0.001-10_ib0.5-2_burden
+kin_opt_ethanol_isobutanol_metabolic_minimal_subset_irr_rb0.001-10_ib0.75-1.5_burden
 (no _x / _s1x tag).
 
 The enzyme-burden (proteome-allocation) constraint of enzyme_burden.py
@@ -93,10 +93,10 @@ Runner pattern (fresh kernel, one process):
     result, csv_path = ns['run'](objective='IRR', study_type='metabolic',
                                  seed_from=[('<donor study name>', [1553, 1914]),
                                             ('<other donor>', [1162])])
-    # dual annealing instead of TPE (name ..._irr_da_rb0.001-10_ib0.5-2_burden)
+    # dual annealing instead of TPE (name ..._irr_da_rb0.001-10_ib0.75-1.5_burden)
     result, csv_path = ns['run'](objective='IRR', study_type='metabolic_minimal_subset', method='dual_annealing')
     # Gaussian-process sampler (feasibility-aware optuna GPSampler; <= 15
-    # variables; name ..._irr_gp_rb0.001-10_ib0.5-2_burden); learned
+    # variables; name ..._irr_gp_rb0.001-10_ib0.75-1.5_burden); learned
     # constraint GP on by default, off via gp_kwargs
     result, csv_path = ns['run'](objective='IRR', study_type='metabolic_minimal_subset', method='gp')
     result, csv_path = ns['run'](objective='IRR', study_type='metabolic_minimal_subset', method='gp',
@@ -443,7 +443,7 @@ def run(scenario=None,  # 'A' or 'B'; None = the preset's start scenario
     store) with the same preset / scenario / burden / volume set-up; the
     derived study name gains `_da` right after the objective slug on both
     naming paths (kin_opt_ethanol_isobutanol_metabolic_minimal_subset_irr_
-    da_rb0.001-10_ib0.5-2_burden). `annealing_kwargs` (dict) forwards the
+    da_rb0.001-10_ib0.75-1.5_burden). `annealing_kwargs` (dict) forwards the
     annealing knobs (initial_temp 5230, restart_temp_ratio 2e-5, visit 2.62,
     accept -5.0, no_local_search True, energy_scale None = the registry's,
     max_calls_factor 20). Under DA, enqueue_knockouts=True or a non-empty
@@ -457,7 +457,7 @@ def run(scenario=None,  # 'A' or 'B'; None = the preset's start scenario
     by default -- fit on COMPLETE (hence feasible, under the pre-sim
     INFEASIBLE prune) trials only; the derived name gains `_gp` right after the objective slug
     (kin_opt_ethanol_isobutanol_metabolic_minimal_subset_irr_gp_rb0.001-10_
-    ib0.5-2_burden); more than 15 decision variables raise before any study
+    ib0.75-1.5_burden); more than 15 decision variables raise before any study
     is touched, so use it with metabolic_minimal_subset / metabolic_14d.
     n_startup_trials=None means max(10, 2*d) under 'gp'; every enqueue /
     seed / sampler setting is honoured as under TPE. `gp_kwargs` (dict;
