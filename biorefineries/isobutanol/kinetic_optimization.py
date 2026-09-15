@@ -147,9 +147,9 @@ DEFAULT_SPIKE_DELTA_BOUNDS = (0.5, 595.0)
 #: Default log-scale band of a PARAMETER GROUP multiplier (x every
 #: member's baseline; build_search_space `group_multiplier_bounds`): the
 #: metabolic_minimal preset samples one multiplier per inhibition-effector
-#: family on it (0.2x-2x, baseline 1.0), so a family's intra-family
+#: family on it (0.5x-2x, baseline 1.0), so a family's intra-family
 #: ratios are preserved while its overall strength varies.
-DEFAULT_GROUP_MULTIPLIER_BOUNDS = (0.2, 2.0)
+DEFAULT_GROUP_MULTIPLIER_BOUNDS = (0.5, 2.0)
 
 def group_bounds_for(group, group_multiplier_bounds):
     """(lo, hi) log-scale multiplier band for ONE parameter group.
@@ -1390,35 +1390,35 @@ METABOLIC_14D_RATE_GROUPS = {'glycolysis': ('k_1l', 'k_1h', 'k_1e')}
 #: burden's phi_T stays at wild type); group_roles = the inhibition
 #: coefficients, grouped by the role table's effector into
 #: inhib_ethanol / inhib_isobutanol / inhib_acetate (EFFECTOR_ORDER),
-#: each ONE log multiplier on group_multiplier_bounds -- a per-group dict
-#: that floors ONLY inhib_ethanol at 0.3x (inhib_isobutanol / inhib_
-#: acetate keep the 0.2x default); and spike_delta_bounds = None, the
-#: spike feed pinned at the scenario baseline (600 g/L). The driver tags
-#: the per-group band as the inhibition band (`_ibe0.3-2`, the effector
-#: code of every group whose band differs from the default) and the
-#: exclusion set as `_xk10+k7+k8` (study_type_name_defaults); the group
-#: columns and the missing spike_delta column keep the header guard from
-#: any cross-resume, and the distinct `_ibe0.3-2` tag keeps a 0.3-floored
-#: study off an old 0.2 study's CSV.
+#: each ONE log multiplier on group_multiplier_bounds -- an empty dict
+#: {}, so every effector family takes the default band
+#: (DEFAULT_GROUP_MULTIPLIER_BOUNDS, 0.5x-2x); and spike_delta_bounds =
+#: None, the spike feed pinned at the scenario baseline (600 g/L). The
+#: driver tags the shared inhibition band as `_ib0.5-2` (the all-default
+#: dict collapses to `_ib{default}`) and the exclusion set as
+#: `_xk10+k7+k8` (study_type_name_defaults); the group columns and the
+#: missing spike_delta column keep the header guard from any cross-resume,
+#: and the distinct `_ib0.5-2` tag keeps this study off an old 0.2x /
+#: 0.3-floored study's CSV.
 STUDY_TYPE_OPTIONS = {
     'metabolic_minimal': dict(
         exclude_params=('k_10', 'k_7', 'k_8'),
         group_roles=('product_inhibition', 'lethality'),
-        group_multiplier_bounds={'inhib_ethanol': (0.3, 2.0)},
+        group_multiplier_bounds={},
         spike_delta_bounds=None,
     ),
     # The standalone explicit set (METABOLIC_MINIMAL_SUBSET_*): 9 rates +
     # 3 groups + 3 feeding variables = 15 for ethanol_isobutanol (10 for
     # ethanol_only after the workbook intersection); no exclusions, spike
-    # and stage_1_max_x pinned; the per-group band floors ONLY inhib_
-    # ethanol at 0.3x (others 0.2x), default name
-    # kin_opt_ethanol_isobutanol_metabolic_minimal_subset_irr_rb0.001-10_ibe0.3-2_burden
+    # and stage_1_max_x pinned; every effector family takes the default
+    # band (empty group_multiplier_bounds dict -> 0.5x-2x), default name
+    # kin_opt_ethanol_isobutanol_metabolic_minimal_subset_irr_rb0.001-10_ib0.5-2_burden
     # (no _x / _s1x tag). Its column set differs from every other study's,
     # so the CSV header guard refuses any cross-resume regardless.
     'metabolic_minimal_subset': dict(
         rate_params=METABOLIC_MINIMAL_SUBSET_RATES,
         parameter_groups=METABOLIC_MINIMAL_SUBSET_GROUPS,
-        group_multiplier_bounds={'inhib_ethanol': (0.3, 2.0)},
+        group_multiplier_bounds={},
         exclude_params=(),
         spike_delta_bounds=None,
         stage_1_max_x_bounds=None,
@@ -1433,13 +1433,14 @@ STUDY_TYPE_OPTIONS = {
     # ethanol_only. The glycolysis band rides in group_multiplier_bounds and is
     # ignored by the _ib name tag (only inhib_* keys are tagged), so the name
     # gains no glycolysis tag: the distinct glycolysis column already blocks any
-    # cross-study CSV resume. Default name
-    # kin_opt_ethanol_isobutanol_metabolic_14d_irr_rb0.001-10_ibe0.3-2_s1x1-50_burden.
+    # cross-study CSV resume. The inhibition families take the default band
+    # (0.5x-2x), so the inhibition tag collapses to _ib0.5-2. Default name
+    # kin_opt_ethanol_isobutanol_metabolic_14d_irr_rb0.001-10_ib0.5-2_s1x1-50_burden.
     'metabolic_14d': dict(
         rate_params=METABOLIC_14D_RATES,
         parameter_groups=METABOLIC_MINIMAL_SUBSET_GROUPS,
         rate_parameter_groups=METABOLIC_14D_RATE_GROUPS,
-        group_multiplier_bounds={'glycolysis': (0.2, 5.0), 'inhib_ethanol': (0.3, 2.0)},
+        group_multiplier_bounds={'glycolysis': (0.2, 5.0)},
         exclude_params=(),
         spike_delta_bounds=None,
     ),
@@ -1457,9 +1458,9 @@ def study_type_name_defaults(study_type):
     verbatim through _as_group_multiplier_bounds, so a per-group dict is
     preserved -- default_study_name's `_ib` tag understands both forms),
     exclude_params and stage_1_max_x_bounds when the type has them
-    (metabolic_minimal: {'inhib_ethanol': (0.3, 2.0)} and
+    (metabolic_minimal: {} -- every family at the default band -- and
     ('k_10', 'k_7', 'k_8'); metabolic_minimal_subset:
-    {'inhib_ethanol': (0.3, 2.0)}, () and None = pinned), else
+    {}, () and None = pinned), else
     DEFAULT_SATURATION_MULTIPLIER_BOUNDS, DEFAULT_EXCLUDED_PARAMETERS and
     DEFAULT_STAGE_1_MAX_X_BOUNDS. resolve_study_preset builds its
     multiplier_bounds / exclude_params / stage_1_max_x_bounds from here

@@ -62,19 +62,19 @@ sequentially) -- ask-first, like the unsupervised driver. Examples:
     python optimize_kinetics_BO_supervised.py --study-target-products \\
         ethanol_only --study-type metabolic
     # compact 24-variable space: rates minus k_10/k_7/k_8, one multiplier per
-    # inhibition effector (inhib_ethanol floored at 0.3x), spike pinned
-    # (name ..._ibe0.3-2_xk10+k7+k8_...):
+    # inhibition effector (all families on the default 0.5x-2x band), spike pinned
+    # (name ..._ib0.5-2_xk10+k7+k8_...):
     python optimize_kinetics_BO_supervised.py --objective IRR \\
         --study-type metabolic_minimal
     # standalone 15-variable set: 9 listed rates + 3 effector multipliers
     # + 3 feeding, spike and stage_1_max_x pinned (name
-    # ..._metabolic_minimal_subset_irr_rb0.001-10_ibe0.3-2_burden):
+    # ..._metabolic_minimal_subset_irr_rb0.001-10_ib0.5-2_burden):
     python optimize_kinetics_BO_supervised.py --objective IRR \\
         --study-type metabolic_minimal_subset
-    # scipy dual annealing instead of TPE (name ..._irr_da_rb0.001-10_ibe0.3-2_burden)
+    # scipy dual annealing instead of TPE (name ..._irr_da_rb0.001-10_ib0.5-2_burden)
     python optimize_kinetics_BO_supervised.py --objective IRR --study-type metabolic_minimal_subset --method dual_annealing
     # feasibility-aware Gaussian-process sampler (<= 15 variables; name
-    # ..._irr_gp_rb0.001-10_ibe0.3-2_burden); learned constraint GP off:
+    # ..._irr_gp_rb0.001-10_ib0.5-2_burden); learned constraint GP off:
     python optimize_kinetics_BO_supervised.py --objective IRR --study-type metabolic_minimal_subset --method gp
     python optimize_kinetics_BO_supervised.py --objective IRR --study-type metabolic_minimal_subset --method gp --gp-no-learned-constraints
     # resume a pre-2026-09-04 study under its old flags and name:
@@ -146,12 +146,12 @@ def default_study_name(scenario, objective, kinetic_bounds_scenario,
     to ko.default_study_name (ko._inhibition_bounds_tag): the saturation
     band `_ib{lo}-{hi}`, or -- for the grouped metabolic_minimal /
     metabolic_minimal_subset types -- the per-effector-family GROUP band,
-    which floors inhib_ethanol at 0.3x and leaves the others at 0.2x, so
-    the tag reads `_ibe0.3-2`. `group_multiplier_bounds` (None = that
+    which puts every family on the default band (0.5x-2x), so the tag
+    collapses to `_ib0.5-2`. `group_multiplier_bounds` (None = that
     preset band; an explicit (lo, hi) tuple = ONE shared band for every
     effector-family group, `--group-multiplier-bounds LO HI`, the
     driver's `group_multiplier_bounds` override) replaces the per-group
-    dict in the tag exactly as the driver does (an all-default (0.2, 2.0)
+    dict in the tag exactly as the driver does (an explicit (0.2, 2.0)
     therefore re-derives the pre-2026-09-11 `_ib0.2-2` name of the same
     objective -- pass --study-name for a fresh study): since 2026-09-06
     the presets assign bands by role, and the tag keeps a role-band or
@@ -181,8 +181,8 @@ def default_study_name(scenario, objective, kinetic_bounds_scenario,
     if study_target_products is not None:
         # The _ib / _x / _s1x tags of the preset's own values come from
         # the SAME table the driver's resolve_study_preset uses
-        # (metabolic_minimal tags its per-group band _ibe0.3-2 -- only
-        # inhib_ethanol floored at 0.3x -- and _xk10+k7+k8;
+        # (metabolic_minimal tags its group band _ib0.5-2 -- every family
+        # on the default band -- and _xk10+k7+k8;
         # metabolic_minimal_subset pins stage_1_max_x, so no _s1x tag),
         # so the name the stall watchdog polls is the name the child
         # writes.
@@ -295,7 +295,7 @@ def child_code(scenario, objective, n_trials, kinetic_bounds_scenario,
     forwarded only when non-empty; `gp_kwargs` (None/{} = the engine's
     GP defaults) likewise only when non-empty. `group_multiplier_bounds=None` leaves
     the effector-family group band to the preset (the kwarg is omitted;
-    the grouped presets' per-group dict floors inhib_ethanol at 0.3x); a
+    the grouped presets put every family on the default band, 0.5x-2x); a
     (lo, hi) tuple is forwarded as ONE shared band for every group."""
     seeds = [(str(donor), tuple(int(n) for n in trials))
              for donor, trials in (seed_from or ())]
@@ -617,16 +617,16 @@ if __name__ == '__main__':
                              'self-inhibition); metabolic_minimal = the '
                              'capacities minus k_10/k_7/k_8 + ONE '
                              'multiplier per inhibition-effector family '
-                             '(inhib_ethanol floored at 0.3x-2x, isobutanol/'
-                             'acetate 0.2x-2x), no K_* '
+                             '(every family on the default 0.5x-2x band), '
+                             'no K_* '
                              'terms, spike feed pinned at the baseline '
-                             '(24 variables; name tags _ibe0.3-2_xk10+k7+k8); '
+                             '(24 variables; name tags _ib0.5-2_xk10+k7+k8); '
                              'metabolic_minimal_subset = the standalone '
                              'explicit set: 9 listed rates (k_1l, k_1h, '
                              'k_1e, k_3, k_6, k_13-k_16) + the 3 effector '
                              'multipliers + 3 feeding variables, spike AND '
                              'stage_1_max_x pinned, nothing excluded (15 '
-                             'variables; 10 for ethanol_only; tags _ibe0.3-2 '
+                             'variables; 10 for ethanol_only; tags _ib0.5-2 '
                              'only)')
     parser.add_argument('--legacy-flags', action='store_true',
                         help='ignore the presets: --scenario (default B) / '
@@ -726,8 +726,8 @@ if __name__ == '__main__':
                              'by EVERY inhibition-effector-family group '
                              'multiplier of a grouped study type '
                              '(metabolic_minimal / metabolic_minimal_subset), '
-                             "overriding the preset's per-group dict that "
-                             'floors inhib_ethanol at 0.3 (others 0.2-2). '
+                             "overriding the preset's default per-family "
+                             'band (0.5-2). '
                              'Tagged into the derived study name like the '
                              'driver does (_ib{LO}-{HI}; 0.2 2 re-derives '
                              'the pre-2026-09-11 _ib0.2-2 name of the same '

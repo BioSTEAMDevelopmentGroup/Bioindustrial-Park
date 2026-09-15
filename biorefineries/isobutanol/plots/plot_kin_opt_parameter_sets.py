@@ -538,7 +538,9 @@ def campaign_band(campaign):
         elif v in GROUP_VARS:
             # fallback, in case a future preset groups differently and the
             # group itself doesn't end up as its own entry in `space`
-            band[v] = tuple(preset['group_multiplier_bounds'])
+            # (group_bounds_for resolves the per-group dict / shared tuple and
+            # falls back to the default band for a group absent from the dict)
+            band[v] = ko.group_bounds_for(v, preset['group_multiplier_bounds'])
     # feeding fallbacks (build_search_space always emits these, but be safe)
     band.setdefault('threshold_conc', (0.0, 300.0))
     band.setdefault('target_delta', (5.0, 500.0))
