@@ -359,6 +359,26 @@ def _broth_conc(handles, chemical_ID):
     F_vol = effluent.F_vol
     return float(effluent.imass[chemical_ID])/F_vol if F_vol > 0 else np.nan
 
+def _PI(h):
+    """Profitability index: NPV at the fixed 15 % hurdle (default prices)
+    per $ of TCI. Read AFTER solve_TEA (its exit state leaves tea.IRR at the
+    hurdle, so tea.NPV is the NPV at the hurdle rate)."""
+    return h['tea'].NPV/h['tea'].TCI
+
+def _pi_log_tail(h):
+    """PI reshaped to compress the loss tail: PI for PI >= 0, -log(1 - PI)
+    for PI < 0. Monotone in PI (same argmax as PI) and C1 at 0 (both pieces
+    give 0, both slope 1), so it only tames very-negative PI outliers for the
+    GP / annealing scale. np.isfinite guard first: PI is NaN on a failed TEA
+    and a numpy-scalar NaN comparison raises under flexsolve's global
+    np.seterr(invalid='raise') (the _productivity lesson) -- NaN/inf must
+    propagate unchanged. On the negative branch -pi > 0, so log1p has no
+    domain issue and stays accurate for small |PI|."""
+    pi = _PI(h)
+    if not np.isfinite(pi):
+        return pi
+    return pi if pi >= 0 else -np.log1p(-pi)
+
 # 'level' ('kinetic' vs 'system') is metadata only: every trial runs the full
 # system simulation AND one TEA solve regardless (the system-level metrics
 # IRR/TCI/... in TRACKED_METRICS are always recorded), so a 'kinetic' objective
@@ -444,7 +464,17 @@ OBJECTIVE_REGISTRY = {
     # small high-IRR plant over a large low-IRR one where plain NPV would
     # not. Net PI (break-even 0), not the gross PV(inflows)/investment form.
     'PI': dict(
-        getter=lambda h: h['tea'].NPV/h['tea'].TCI,
+        getter=_PI,
+        direction='maximize', level='system', units='', energy_scale=0.01),
+    # PI (log-tail) (2026-09-14): a monotone loss-compressing reshaping of PI
+    # -- PI for PI >= 0, -log(1 - PI) for PI < 0. C1-continuous at 0 and
+    # strictly increasing in PI, so its argmax is PI's (it selects the SAME
+    # best trial); its only effect is to keep one very-negative PI (a real
+    # loss point, or a garbage TEA-NaN-fallback row) from swamping the GP
+    # target standardization / the DA energy scale. A drop-in objective for
+    # GP / annealing runs. energy_scale mirrors PI (slope 1 near break-even).
+    'PI (log-tail)': dict(
+        getter=_pi_log_tail,
         direction='maximize', level='system', units='', energy_scale=0.01),
     }
 
@@ -458,7 +488,7 @@ TRACKED_METRICS = {name: OBJECTIVE_REGISTRY[name]['getter'] for name in
                     'EtOH yield', 'EtOH titer', 'EtOH titer (broth)',
                     'EtOH productivity',
                     'Cell density', 'Cell density (broth)',
-                    'IRR', 'TCI', 'PI')}
+                    'IRR', 'TCI', 'PI', 'PI (log-tail)')}
 TRACKED_METRICS['tau'] = lambda h: h['V406'].tau
 TRACKED_METRICS['n_glu_spikes'] = lambda h: _nsk(h)['curr_n_glu_spikes']
 # Acetate -- a byproduct, tracked but not an objective: the kinetic model's

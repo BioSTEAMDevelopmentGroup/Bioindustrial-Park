@@ -86,6 +86,15 @@ assert ko.OBJECTIVE_REGISTRY['PI']['direction'] == 'maximize'
 assert ko.OBJECTIVE_REGISTRY['PI']['level'] == 'system'
 assert ko.OBJECTIVE_REGISTRY['PI']['units'] == ''
 assert ko.OBJECTIVE_REGISTRY['PI']['energy_scale'] == 0.01
+# 'PI (log-tail)' (2026-09-14): a monotone loss-compressing reshaping of PI
+# (identity for PI >= 0, -log(1 - PI) for PI < 0); same argmax as PI, so it
+# is a drop-in objective that tames very-negative PI outliers for the GP /
+# annealing scale. Both an objective AND a tracked metric. Same metadata as
+# PI (maximize, system-level, dimensionless, DA energy scale 0.01).
+assert ko.OBJECTIVE_REGISTRY['PI (log-tail)']['direction'] == 'maximize'
+assert ko.OBJECTIVE_REGISTRY['PI (log-tail)']['level'] == 'system'
+assert ko.OBJECTIVE_REGISTRY['PI (log-tail)']['units'] == ''
+assert ko.OBJECTIVE_REGISTRY['PI (log-tail)']['energy_scale'] == 0.01
 PASS('OBJECTIVE_REGISTRY: names, directions, levels, units')
 
 #%% 4. getters against fake handles
@@ -108,6 +117,20 @@ assert ko.OBJECTIVE_REGISTRY['IBO MPSP']['getter'](handles) == 0.9
 assert ko.OBJECTIVE_REGISTRY['TCI']['getter'](handles) == 350.0
 assert ko.OBJECTIVE_REGISTRY['PI']['getter'](handles) == 35e6/350e6   # NPV / TCI
 assert ko.TRACKED_METRICS['PI'](handles) == 35e6/350e6
+# PI (log-tail): positive branch is the identity (PI = 0.1 >= 0), so it
+# equals PI here; both the objective getter and the tracked getter.
+assert ko.OBJECTIVE_REGISTRY['PI (log-tail)']['getter'](handles) == 35e6/350e6
+assert ko.TRACKED_METRICS['PI (log-tail)'](handles) == 35e6/350e6
+# Negative branch: NPV = -TCI -> PI = -1 -> -log1p(1) = -log(2).
+handles_pi_neg = dict(handles, tea=SimpleNamespace(TCI=350e6, NPV=-350e6))
+assert ko.OBJECTIVE_REGISTRY['PI (log-tail)']['getter'](handles_pi_neg) \
+    == -np.log1p(1.0)
+# NaN PI (failed TEA) propagates -- the np.isfinite guard, no raise under
+# flexsolve's global np.seterr(invalid='raise') (the _productivity lesson).
+handles_pi_nan = dict(handles, tea=SimpleNamespace(TCI=350e6, NPV=np.nan))
+with np.errstate(divide='raise', invalid='raise'):
+    assert np.isnan(ko.OBJECTIVE_REGISTRY['PI (log-tail)']['getter'](handles_pi_nan))
+    assert np.isnan(ko.TRACKED_METRICS['PI (log-tail)'](handles_pi_nan))
 assert ko.TRACKED_METRICS['tau'](handles) == 55.0
 assert ko.TRACKED_METRICS['n_glu_spikes'](handles) == 7
 # '(broth)' twins + acetate (2026-09-14): the kinetic g/L-water titers read
@@ -195,7 +218,7 @@ assert set(ko.TRACKED_METRICS) == {'IBO yield', 'IBO titer', 'IBO titer (broth)'
                                    'EtOH yield', 'EtOH titer', 'EtOH titer (broth)',
                                    'EtOH productivity',
                                    'Cell density', 'Cell density (broth)',
-                                   'IRR', 'TCI', 'PI',
+                                   'IRR', 'TCI', 'PI', 'PI (log-tail)',
                                    'tau', 'n_glu_spikes',
                                    'Acetate titer', 'Acetate titer (broth)',
                                    'spike_feed_residual', 'n_sims_run',
@@ -4504,6 +4527,8 @@ assert ko.OBJECTIVE_REGISTRY['IBO MPSP']['energy_scale'] == 0.02
 assert ko.OBJECTIVE_REGISTRY['IBO titer']['energy_scale'] == 2.0
 assert ko.OBJECTIVE_REGISTRY['EtOH titer']['energy_scale'] == 2.0
 assert ko.OBJECTIVE_REGISTRY['TCI']['energy_scale'] == 2.0
+assert ko.OBJECTIVE_REGISTRY['PI']['energy_scale'] == 0.01
+assert ko.OBJECTIVE_REGISTRY['PI (log-tail)']['energy_scale'] == 0.01
 assert ko.OBJECTIVE_REGISTRY['IBO yield']['energy_scale'] == 0.01
 assert ko.OBJECTIVE_REGISTRY['EtOH yield']['energy_scale'] == 0.01
 assert ko.OBJECTIVE_REGISTRY['Combined yield']['energy_scale'] == 0.01
