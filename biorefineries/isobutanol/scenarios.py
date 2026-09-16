@@ -173,37 +173,41 @@ SCENARIOS = {
     # 26.3 -> 26.30 g/L, tau 61.9 -> 66.67 h; ethanol-only / re-gated B
     # 1.6625 -> 1.6693. A is unaffected (k_13-k_16 = 0; k_17 inert; smoke 1
     # / 3 / 5 / 7 reproduced 0.86233 / 0.83855 to full precision).
-    # opt_*: see the entries below (moved by the split + the r17 burden).
+    # opt_* (split + the native r17 burden pool): IRR 0.19883 -> 0.19911, IBO
+    # titer 78.030 -> 78.034, IBO yield 0.25041 -> 0.25053, EtOH titer 258.54 ->
+    # 255.03, EtOH yield 0.33251 -> 0.30199; the near-zero-IBO isobutanol
+    # artifacts of opt_EtOH_titer / opt_EtOH_yield -9.99 -> -9.90 / 1736.0
+    # -> 2140.7.
     'opt_IRR': ScenarioSpec(
         name='opt_IRR',
         workbook='parameter-distributions_corn_IBO_EtOH_opt_IRR.xlsx',
         max_n_spikes=18, threshold_conc=286.7667298838977, target_conc=300.0,
-        expected={'ethanol': 0.5833567657359908, 'isobutanol': 1.3738337646938537},
-        objective_name='IRR', objective_value=0.19883197219016238),
+        expected={'ethanol': 0.5815555261941477, 'isobutanol': 1.3731250708041889},
+        objective_name='IRR', objective_value=0.19910748338816922),
     'opt_IBO_titer': ScenarioSpec(
         name='opt_IBO_titer',
         workbook='parameter-distributions_corn_IBO_EtOH_opt_IBO_titer.xlsx',
         max_n_spikes=39, threshold_conc=219.5386688951894, target_conc=300.0,
-        expected={'ethanol': 11.790246445479358, 'isobutanol': 1.949578209995902},
-        objective_name='IBO titer', objective_value=78.02972433254396),
+        expected={'ethanol': 11.788040905939782, 'isobutanol': 1.949384937430483},
+        objective_name='IBO titer', objective_value=78.03417538243622),
     'opt_IBO_yield': ScenarioSpec(
         name='opt_IBO_yield',
         workbook='parameter-distributions_corn_IBO_EtOH_opt_IBO_yield.xlsx',
         max_n_spikes=0, threshold_conc=270.0889834284513, target_conc=300.0,
-        expected={'ethanol': -0.31264213251225687, 'isobutanol': 1.3863174771658522},
-        objective_name='IBO yield', objective_value=0.2504124829470104),
+        expected={'ethanol': -0.31549204547073384, 'isobutanol': 1.3860284135972099},
+        objective_name='IBO yield', objective_value=0.25053456478899533),
     'opt_EtOH_titer': ScenarioSpec(
         name='opt_EtOH_titer',
         workbook='parameter-distributions_corn_IBO_EtOH_opt_EtOH_titer.xlsx',
         max_n_spikes=35, threshold_conc=253.62164932574294, target_conc=300.0,
-        expected={'ethanol': 0.8253953367021405, 'isobutanol': -9.991976723079743},
-        objective_name='EtOH titer', objective_value=258.54485489699516),
+        expected={'ethanol': 0.8247978899721023, 'isobutanol': -9.901342655763862},
+        objective_name='EtOH titer', objective_value=255.02940620280424),
     'opt_EtOH_yield': ScenarioSpec(
         name='opt_EtOH_yield',
         workbook='parameter-distributions_corn_IBO_EtOH_opt_EtOH_yield.xlsx',
         max_n_spikes=22, threshold_conc=295.08474402550377, target_conc=300.0,
-        expected={'ethanol': 1.0490744642447762, 'isobutanol': 1736.0469191469772},
-        objective_name='EtOH yield', objective_value=0.3325081955440208),
+        expected={'ethanol': 1.1150670623705758, 'isobutanol': 2140.702100928806},
+        objective_name='EtOH yield', objective_value=0.3019922423165841),
 }
 
 
