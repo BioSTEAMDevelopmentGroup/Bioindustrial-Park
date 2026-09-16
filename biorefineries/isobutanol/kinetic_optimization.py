@@ -1722,7 +1722,7 @@ def study_type_name_defaults(study_type):
                               else tuple(stage_1_max_x_bounds)))
 
 DEFAULT_STUDY_TARGET_PRODUCTS = 'ethanol_isobutanol'
-DEFAULT_STUDY_TYPE = 'metabolic_protein'
+DEFAULT_STUDY_TYPE = 'metabolic_split_14d'
 
 def resolve_study_preset(study_target_products, study_type, roles=None,
                          effectors=None):

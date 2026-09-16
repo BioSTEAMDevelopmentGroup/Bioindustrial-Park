@@ -834,7 +834,7 @@ PASS('kinetic_parameter_roles: role table loaded by file path, no heavy import i
 
 #%% 21. resolve_study_preset: set sizes by (target products x study type), roles, errors
 assert ko.DEFAULT_STUDY_TARGET_PRODUCTS == 'ethanol_isobutanol'
-assert ko.DEFAULT_STUDY_TYPE == 'metabolic_protein'
+assert ko.DEFAULT_STUDY_TYPE == 'metabolic_split_14d'
 assert set(ko.STUDY_TARGET_PRODUCTS) == {'ethanol_only', 'ethanol_isobutanol'}
 assert set(ko.STUDY_TYPE_ROLES) == {'metabolic', 'metabolic_protein', 'metabolic_minimal',
                                     'metabolic_minimal_subset', 'metabolic_14d', 'metabolic_split_14d',

@@ -52,12 +52,15 @@ shared numba cache when concurrent with the child's own load()).
 Long-running, one simulation at a time (children run strictly
 sequentially) -- ask-first, like the unsupervised driver. Examples:
 
-    # default preset (ethanol_isobutanol x metabolic_protein; start at A,
-    # B workbook's 56 rows minus k_10 (excluded by default), rate constants
-    # 1e-3x-4x, inhibition coefficients and K_* 0.1x-10x):
+    # default preset (ethanol_isobutanol x metabolic_split_14d since
+    # 2026-09-16; start at A: rates k_3, k_6, k_13-k_17 on 1e-3x-4x, the
+    # glycolysis capacity group 0.2x-4x, one multiplier per inhibition
+    # effector 0.75x-1.5x, 3 feeding vars; stage_1_max_x pinned; 14 vars):
     python optimize_kinetics_BO_supervised.py --objective IRR --n-trials 2000
-    # re-include k_10 (no _xk10 tag; it samples its 0.1x-10x band):
-    python optimize_kinetics_BO_supervised.py --objective IRR --exclude-params
+    # full metabolic_protein space (58 params, k_10 excluded by default);
+    # re-include k_10 on its 0.1x-10x band with --exclude-params (no _xk10 tag):
+    python optimize_kinetics_BO_supervised.py --objective IRR \\
+        --study-type metabolic_protein --exclude-params
     # ethanol-only strain, expression/tolerance engineering only (29):
     python optimize_kinetics_BO_supervised.py --study-target-products \\
         ethanol_only --study-type metabolic

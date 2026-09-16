@@ -16,18 +16,22 @@ run-without-asking list; rerunning with the same study name resumes a
 crashed/interrupted study and runs only the remaining trials.
 
 Search set and bands come from a named STUDY PRESET (default
-study_target_products='ethanol_isobutanol', study_type='metabolic_protein':
-start at the scenario-A baseline, the B workbook's 59 kinetic rows (2026-09-15); log
-bands by nskinetics ROLE since 2026-09-06 -- rate constants (capacity:
-k_1h, k_2, ..., k_13-k_16) on [1e-3x, 4x], inhibition coefficients
-(k_1ie, k_1ii, k_10ie, ...) and the regulation / affinity / self-
-inhibition terms K_* on [0.1x, 10x]; k_10 (active-biomass decay) is
-EXCLUDED by default -- a free lunch, not an engineering target -- so the
-sampled set is 58; see ko.resolve_study_preset and run()'s docstring; the
-derived study name carries the band tags `_rb0.001-4_ib0.1-10` and the
-exclusion tag `_xk10`). study_target_products=None is the legacy flag
-path (scenario / kinetic_bounds_scenario / single band, k_10 sampled)
-for resuming older studies.
+study_target_products='ethanol_isobutanol', study_type='metabolic_split_14d'
+since 2026-09-16: start at the scenario-A baseline; the individual rates
+k_3, k_6 (Adh1), k_13, k_14, k_15, k_16 and k_17 (Adh6) on the rate band
+[1e-3x, 4x], the glycolysis capacity group on [0.2x, 4x], one multiplier
+per inhibition effector (inhib_ethanol / inhib_isobutanol / inhib_acetate,
+on the LIVE k_17ie / k_17ia cross-product coefficients) on [0.75x, 1.5x],
+and the three feeding variables -- stage_1_max_x is PINNED, so the sampled
+set is 14 (8 for ethanol_only); see ko.resolve_study_preset and run()'s
+docstring; the derived study name carries the band tags
+`_rb0.001-4_ib0.75-1.5` (no `_xk10`, no `_s1x`)). study_type='metabolic_protein'
+is the full-workbook space (the B workbook's 59 rows minus k_10; log bands by
+nskinetics ROLE -- rate constants [1e-3x, 4x], inhibition + K_* terms
+[0.1x, 10x]; sampled set 58; tags `_rb0.001-4_ib0.1-10_xk10`).
+study_target_products=None is the legacy flag path (scenario /
+kinetic_bounds_scenario / single band, k_10 sampled) for resuming older
+studies.
 
 study_type='metabolic_minimal' (2026-09-07) is the compact preset: the
 capacities minus k_10, k_7 and k_8 (17 for ethanol_isobutanol, 13 for
@@ -98,11 +102,13 @@ before the study starts. burden=False is the legacy burden-free study
 Runner pattern (fresh kernel, one process):
     import runpy
     ns = runpy.run_path(r'<this file>')
-    # default preset: kin_opt_ethanol_isobutanol_metabolic_protein_irr
-    #   _rb0.001-4_ib0.1-10_xk10_burden
+    # default preset: kin_opt_ethanol_isobutanol_metabolic_split_14d_irr
+    #   _rb0.001-4_ib0.75-1.5_burden  (14 variables; Adh1 + Adh6 independent)
     result, csv_path = ns['run'](objective='IRR')
-    # re-include k_10 (its 0.1x-10x band; no _xk10 tag)
-    result, csv_path = ns['run'](objective='IRR', exclude_params=())
+    # full metabolic_protein space (58 params, k_10 excluded by default) --
+    # re-include k_10 on its 0.1x-10x band with exclude_params=() (no _xk10 tag)
+    result, csv_path = ns['run'](objective='IRR', study_type='metabolic_protein',
+                                 exclude_params=())
     # ethanol-only strain, expression/tolerance engineering only (29 params)
     result, csv_path = ns['run'](study_target_products='ethanol_only',
                                  study_type='metabolic')
