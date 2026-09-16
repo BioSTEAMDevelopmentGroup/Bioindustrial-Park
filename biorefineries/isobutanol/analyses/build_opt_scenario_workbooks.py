@@ -24,7 +24,8 @@ titer, IBO yield, EtOH titer, EtOH yield), it:
      study's trajectory CSV and re-verifies its trial number against the
      spec table.
   3. Reproduces the trial's exact model state (A snapshot + 9 sampled
-     rates + 16 applied_* inhibition coefficients; k_7/k_8 are left at
+     rates + 16 applied_* inhibition coefficients (the two Ehrlich
+     cross-product coefficients now named k_17ia / k_17ie); k_7/k_8 are left at
      their A-snapshot INTENDED values -- the active enzyme burden derates
      them to the trial's original operating point at simulate time),
      sets feeding (threshold, target=min(300,threshold+target_delta),
@@ -37,6 +38,15 @@ titer, IBO yield, EtOH titer, EtOH yield), it:
      with a Triangular +/-20% distribution, sets the isobutanol-price row
      to the scenario-A value (B's relative spread preserved), keeps all
      other B rows.
+
+     Since the 2026-09-15 nskinetics r16/r17 split the B workbook (and so
+     every copy) carries the six Adh6 rows k_17 / K_17 / k_17r / K_17e /
+     k_17ia / k_17ie: k_17ia / k_17ie are the repointed former k_16ia /
+     k_16ie (their applied_* trajectory columns, if a study sampled them),
+     and k_17 / K_17 / k_17r / K_17e take the A-snapshot values (= the
+     antimony defaults 44 / 0.0086 / 2.5e-4 / 0.020) unless a study
+     sampled them. No row template exists here -- copying B is the
+     template.
   5. Reloads the written workbook and re-simulates (still under the
      active burden) to confirm it reproduces (defends against openpyxl
      save issues).
