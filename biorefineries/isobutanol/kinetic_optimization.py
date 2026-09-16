@@ -2108,12 +2108,15 @@ def resolve_study_preset(study_target_products, study_type, roles=None,
     multiplier_bounds = (DEFAULT_GROUP_MULTIPLIER_BOUNDS
                          if isinstance(inhib_name_default, dict)
                          else inhib_name_default)
+    rate_params_list = rate_constant_names(workbook_rows, roles=roles)
+    param_bounds_override = scenario_A_ibo_pathway_rate_bounds(
+        include_params, rate_params_list) or None
     return dict(scenario=target['scenario'],
                 kinetic_bounds_scenario=set_scenario,
                 include_params=include_params,
                 multiplier_bounds=multiplier_bounds,
                 rate_multiplier_bounds=DEFAULT_RATE_MULTIPLIER_BOUNDS,
-                rate_params=rate_constant_names(workbook_rows, roles=roles),
+                rate_params=rate_params_list,
                 parameter_multiplier_bounds=dict(
                     DEFAULT_PARAMETER_MULTIPLIER_BOUNDS),
                 exclude_params=name_defaults['exclude_params'],
@@ -2124,7 +2127,8 @@ def resolve_study_preset(study_target_products, study_type, roles=None,
                                 DEFAULT_GROUP_MULTIPLIER_BOUNDS)),
                 spike_delta_bounds=options.get('spike_delta_bounds',
                                                DEFAULT_SPIKE_DELTA_BOUNDS),
-                group_references=group_references)
+                group_references=group_references,
+                param_bounds_override=param_bounds_override)
 
 #: Study-name suffix of a burden-enabled study (enzyme_burden.py): it
 #: records extra columns and a different physiology, so it must never

@@ -884,7 +884,8 @@ if os.path.isfile(wb_A) and os.path.isfile(wb_B):
                             'rate_params', 'parameter_multiplier_bounds',
                             'exclude_params', 'stage_1_max_x_bounds',
                             'parameter_groups', 'group_multiplier_bounds',
-                            'spike_delta_bounds', 'group_references'}
+                            'spike_delta_bounds', 'group_references',
+                            'param_bounds_override'}
         # The three 2026-09-07 keys are inert on every pre-existing preset.
         assert p21['parameter_groups'] is None
         assert p21['group_references'] is None
@@ -6237,7 +6238,8 @@ if os.path.isfile(wb_A) and os.path.isfile(wb_B):
     keys88 = {'scenario', 'kinetic_bounds_scenario', 'include_params', 'multiplier_bounds',
               'rate_multiplier_bounds', 'rate_params', 'parameter_multiplier_bounds',
               'exclude_params', 'stage_1_max_x_bounds', 'parameter_groups',
-              'group_multiplier_bounds', 'spike_delta_bounds', 'group_references'}
+              'group_multiplier_bounds', 'spike_delta_bounds', 'group_references',
+              'param_bounds_override'}
     assert set(p88) == keys88, set(p88) ^ keys88
     for st88 in ('metabolic_protein', 'metabolic_minimal', 'metabolic_minimal_subset',
                  'metabolic_14d', 'metabolic_split_14d'):
@@ -6434,5 +6436,31 @@ except KeyError:
     pass
 PASS('scenario_A_ibo_pathway_rate_bounds: k_13-k_15 absolute, k_16/k_17 anchored '
      'multiplier, natives/grouped/non-rate skipped, missing-table error')
+
+#%% 92. resolve_study_preset returns param_bounds_override (2026-09-16): the
+# scenario-A-anchored bands for the individually-sampled IBO-pathway rates.
+if os.path.isfile(wb_A) and os.path.isfile(wb_B):
+    anti92 = ko.antimony_rate_baselines()
+    # metabolic_protein (ethanol_isobutanol) samples k_13-k_17 individually:
+    p92 = ko.resolve_study_preset('ethanol_isobutanol', 'metabolic_protein')
+    ov92 = p92['param_bounds_override']
+    assert set(ov92) == {'k_13', 'k_14', 'k_15', 'k_16', 'k_17'}, set(ov92)
+    assert ov92['k_13'] == (1e-3, 4.0)
+    assert np.isclose(ov92['k_16'][1], 1e2*anti92['k_16'])
+    assert np.isclose(ov92['k_17'][1], 20.0*anti92['k_17'])
+    # ethanol_only has no k_13-k_17 rows -> None/empty.
+    assert not ko.resolve_study_preset('ethanol_only', 'metabolic_protein')['param_bounds_override']
+    # metabolic_split_12d groups k_14/k_15/k_16 -> only k_13/k_17 in the override.
+    ov92_12 = ko.resolve_study_preset('ethanol_isobutanol', 'metabolic_split_12d')['param_bounds_override']
+    assert set(ov92_12) == {'k_13', 'k_17'}, set(ov92_12)
+    # build_search_space places the five rates log-scale on the new bounds
+    # (low > 0 => log). Feed a fake baseline set so the space builds without a sim.
+    kb92 = {'k_13': 0.0, 'k_14': 0.0, 'k_15': 0.0, 'k_16': 0.0, 'k_17': 44.0}
+    ss92, _ = ko.build_search_space(kb92, param_bounds_override=ov92,
+                                    rate_params=('k_13', 'k_14', 'k_15', 'k_16', 'k_17'))
+    for n92 in ('k_13', 'k_14', 'k_15', 'k_16', 'k_17'):
+        assert ss92[n92]['log'] is True and ss92[n92]['low'] == ov92[n92][0]
+    PASS('resolve_study_preset: param_bounds_override anchors k_13-k_17 on scenario A; '
+         'ethanol_only empty; split_12d skips grouped k_14-k_16; log-scale in the space')
 
 print(f'\nALL {n_pass} CHECKS PASSED')
