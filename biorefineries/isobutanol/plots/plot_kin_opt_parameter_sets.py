@@ -131,7 +131,7 @@ REACTION_LABELS = {
     'k_13': 'k_13\nr13 ALS\n(Ilv2+Ilv6)',
     'k_14': 'k_14\nr14 KARI\n(Ilv5)',
     'k_15': 'k_15\nr15 DHAD\n(Ilv3)',
-    'k_16': 'k_16\nr16 KDC+ADH\n(Aro10+Adh6)',
+    'k_16': 'k_16\nr16 KDC\n(Aro10)',
 }
 GROUP_LABELS = {'inhib_ethanol': 'Ethanol\ninhibition',
                 'inhib_isobutanol': 'Isobutanol\ninhibition',
@@ -153,7 +153,7 @@ FEED_LABELS = {'threshold_conc': ('Thresh. sugar\nconc. [g·L$^{-1}$]', (0, 300)
 # against the eb tables so a table drift here raises at import
 STEP_ENZYME = {'r1': 'Glycolysis lump', 'r3': 'Pdc1', 'r6': 'Adh1',
                'r13': 'Ilv2+Ilv6', 'r14': 'Ilv5', 'r15': 'Ilv3',
-               'r16': 'Aro10+Adh6'}
+               'r16': 'Aro10'}   # Adh6 is the native step r17 since the 2026-09-15 split (not sampled by any campaign to date)
 STEP_PARAMS = {'r1': 'k_1l, k_1h, k_1e', 'r3': 'k_3', 'r6': 'k_6',
                'r13': 'k_13', 'r14': 'k_14', 'r15': 'k_15', 'r16': 'k_16'}
 for _s in STEP_ENZYME:
@@ -235,6 +235,12 @@ def baseline_set():
     k_ref = dict(A)
     for k in ('k_13', 'k_14', 'k_15', 'k_16'):
         k_ref.setdefault(k, 0.0)
+    # r17 (Adh6) is a NATIVE constitutive step, not an Ehrlich one: it is
+    # present in scenario A at its live rate (k_17 = 44.0 g/L/h, as in the B
+    # workbook), so it does NOT default to 0. The A workbook has no k_17 row;
+    # its native pool is self-referential (multiplier k_17/reference == 1), so
+    # the pool equals the wild-type value for any nonzero k_17.
+    k_ref.setdefault('k_17', 44.0)
     missing = [c for c in eb.BurdenModel.required_capacities()
                if c not in k_ref]
     if missing:
@@ -945,7 +951,11 @@ def draw_parameters(fig, gs_rows, sets, colors, band):
 
 
 _STUDY_STEPS = ['r1', 'r3', 'r6', 'r13', 'r14', 'r15', 'r16']
-_UNSAMPLED_STEPS = ['r2', 'r4', 'r5']   # never sampled; folded into "other"
+# never sampled by the campaigns plotted here; folded into "other". r17
+# (Adh6, k_17; nskinetics 2026-09-15 split) joins them until a
+# metabolic_split_14d campaign samples k_17 -- then move it to _STUDY_STEPS
+# and add it to STEP_ENZYME / STEP_PARAMS / REACTION_LABELS.
+_UNSAMPLED_STEPS = ['r2', 'r4', 'r5', 'r17']
 
 if set(_STUDY_STEPS) | set(_UNSAMPLED_STEPS) != set(eb.STEP_ORDER):
     raise AssertionError(
@@ -958,13 +968,15 @@ if set(_STUDY_STEPS) | set(_UNSAMPLED_STEPS) != set(eb.STEP_ORDER):
 # segments on every bar (a partition of the Phi_M pools). r2 is the PDH
 # complex (TCA cycle); r4 (Ald6) -> r5 (Acs2) is the acetate bypass that
 # regenerates cytosolic acetyl-CoA -- merged with the TCA category here.
+# r17 (Adh6, the isobutyraldehyde -> isobutanol reduction of the 2026-09-15
+# split) belongs to isobutanol production.
 # The partition is asserted against eb.STEP_ORDER so a table drift raises
 # at import.
 BURDEN_CATEGORIES = (
     ('Glycolysis', ['r1']),
     ('TCA cycle + acetate /\nacetyl-CoA production', ['r2', 'r4', 'r5']),
     ('Ethanol production', ['r3', 'r6']),
-    ('Isobutanol production', ['r13', 'r14', 'r15', 'r16']),
+    ('Isobutanol production', ['r13', 'r14', 'r15', 'r16', 'r17']),
 )
 _CAT_STEPS = [st for _, steps in BURDEN_CATEGORIES for st in steps]
 if sorted(_CAT_STEPS) != sorted(eb.STEP_ORDER) \
