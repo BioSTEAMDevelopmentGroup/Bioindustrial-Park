@@ -268,8 +268,8 @@ def run(scenario=None,  # 'A' or 'B'; None = the preset's start scenario
         # (initial_temp, restart_temp_ratio, visit, accept, no_local_search,
         # energy_scale, max_calls_factor); ignored under 'tpe' / 'gp'.
         gp_kwargs=None,  # dict of the GP sampler's knobs under method='gp'
-        # (ko.GP_KWARGS_DEFAULTS: learned_constraints True,
-        # deterministic_objective False, n_fallback_candidates 2048,
+        # (ko.GP_KWARGS_DEFAULTS: learned_constraints False,
+        # deterministic_objective True, n_fallback_candidates 2048,
         # max_fallback_batches 20); ValueError under any other method.
         **engine_kwargs,  # bounds/overrides/etc. -> run_kinetic_optimization
         ):
@@ -499,8 +499,8 @@ def run(scenario=None,  # 'A' or 'B'; None = the preset's start scenario
     is touched, so use it with metabolic_minimal_subset / metabolic_14d.
     n_startup_trials=None means max(10, 2*d) under 'gp'; every enqueue /
     seed / sampler setting is honoured as under TPE. `gp_kwargs` (dict;
-    ValueError under any other method) forwards learned_constraints (True),
-    deterministic_objective (False), n_fallback_candidates (2048),
+    ValueError under any other method) forwards learned_constraints (False),
+    deterministic_objective (True), n_fallback_candidates (2048),
     max_fallback_batches (20)."""
     if 'burden_model' in engine_kwargs:
         raise ValueError("pass burden=True/False to run(), not the engine's "

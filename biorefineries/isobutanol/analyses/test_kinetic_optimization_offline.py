@@ -5303,16 +5303,16 @@ except ValueError as e75:
 else:
     raise AssertionError('unknown method accepted by check_method_kwargs')
 assert ko.GP_MAX_DIMENSIONS == 15
-assert ko.GP_KWARGS_DEFAULTS == {'learned_constraints': True,
-                                 'deterministic_objective': False,
+assert ko.GP_KWARGS_DEFAULTS == {'learned_constraints': False,
+                                 'deterministic_objective': True,
                                  'n_fallback_candidates': 2048,
                                  'max_fallback_batches': 20}
 assert ko.resolve_gp_kwargs(None) == ko.GP_KWARGS_DEFAULTS
 assert ko.resolve_gp_kwargs({}) == ko.GP_KWARGS_DEFAULTS
 assert ko.resolve_gp_kwargs(None) is not ko.GP_KWARGS_DEFAULTS         # a copy
-assert ko.resolve_gp_kwargs({'learned_constraints': False,
+assert ko.resolve_gp_kwargs({'learned_constraints': True,
                              'n_fallback_candidates': 64}) == {
-    'learned_constraints': False, 'deterministic_objective': False,
+    'learned_constraints': True, 'deterministic_objective': True,
     'n_fallback_candidates': 64, 'max_fallback_batches': 20}
 for bad75 in ({'bogus': 1}, {'n_fallback_candidates': 0},
               {'max_fallback_batches': 2.5}, {'max_fallback_batches': True}):
@@ -5564,8 +5564,9 @@ else:
     assert len(ko.load_trajectory(csv79)) == 12
     assert all(t.state == TS33.COMPLETE for t in st79b.trials[8:])   # GP-phase trials simulated
     assert len(open(ko.seed_sidecar_path(csv79), encoding='utf-8').read().splitlines()) == 2
-    # ACTIVE cap (volume on, handles59 geometry): predicate installed, learned
-    # constraints wired by default, no INFEASIBLE row
+    # ACTIVE cap (volume on, handles59 geometry): predicate installed; the
+    # default gp_kwargs now wire learned constraints OFF + deterministic ON,
+    # so no constraint GP is fit and no 'constraints' system attr is recorded
     outdir79c = tempfile.mkdtemp()
     common79c = dict(objective='IRR', scenario_label='X', seed=1,
                      results_dir=outdir79c, handles=handles59,
@@ -5575,12 +5576,21 @@ else:
     st79c, csv79c, _ = ko.run_kinetic_optimization(method='gp', n_trials=4,
                                                    n_startup_trials=3, **common79c)
     assert callable(st79c.sampler._is_feasible)
-    assert st79c.sampler._constraints_func is not None
-    assert st79c.sampler._deterministic is False
+    assert st79c.sampler._constraints_func is None         # learned off by default
+    assert st79c.sampler._deterministic is True            # deterministic on by default
     assert st79c.sampler.n_fallback_candidates == 2048 and st79c.sampler.max_fallback_batches == 20
     assert ko.load_trajectory(csv79c)['state'].tolist() == ['COMPLETE']*4
-    assert all('constraints' in t.system_attrs for t in st79c.trials)
-    # learned_constraints=False -> plain log-EI; deterministic + fallback knobs forwarded
+    assert all('constraints' not in t.system_attrs for t in st79c.trials)
+    # explicit learned_constraints=True -> ConstrainedLogEI wired, constraint
+    # values recorded on every COMPLETE trial (fresh study, no prior trials)
+    st79cc, _, _ = ko.run_kinetic_optimization(
+        method='gp', n_trials=4, n_startup_trials=3,
+        gp_kwargs={'learned_constraints': True},
+        **dict(common79c, results_dir=tempfile.mkdtemp()))
+    assert st79cc.sampler._constraints_func is not None
+    assert st79cc.sampler._deterministic is True
+    assert all('constraints' in t.system_attrs for t in st79cc.trials)
+    # explicit learned_constraints=False -> plain log-EI; deterministic + fallback knobs forwarded
     st79d, _, _ = ko.run_kinetic_optimization(
         method='gp', n_trials=4, n_startup_trials=3,
         gp_kwargs={'learned_constraints': False, 'deterministic_objective': True,
@@ -5588,9 +5598,11 @@ else:
         **common79c)
     assert st79d.sampler._constraints_func is None and st79d.sampler._deterministic is True
     assert st79d.sampler.n_fallback_candidates == 64 and st79d.sampler.max_fallback_batches == 3
-    # feasible_sampling=False under an active cap: no predicate, LHS kept, learned still wired
+    # feasible_sampling=False under an active cap: no predicate, LHS kept;
+    # learned constraints still wire when explicitly requested
     st79e, _, _ = ko.run_kinetic_optimization(
         method='gp', n_trials=3, n_startup_trials=3, feasible_sampling=False,
+        gp_kwargs={'learned_constraints': True},
         **dict(common79c, results_dir=tempfile.mkdtemp()))
     assert st79e.sampler._is_feasible is None and st79e.sampler._lhs_design is not None
     assert st79e.sampler._constraints_func is not None
@@ -5601,8 +5613,9 @@ else:
                                 gp_kwargs={'learned_constraints': False}, **common79f)
     buf79f = _io.StringIO()
     with _contextlib.redirect_stdout(buf79f):
-        st79f, _, _ = ko.run_kinetic_optimization(method='gp', n_trials=5,
-                                                  n_startup_trials=3, **common79f)
+        st79f, _, _ = ko.run_kinetic_optimization(
+            method='gp', n_trials=5, n_startup_trials=3,
+            gp_kwargs={'learned_constraints': True}, **common79f)
     assert st79f.sampler._constraints_func is None
     assert 'continuing with learned_constraints=False' in buf79f.getvalue()
     assert len(st79f.trials) == 5 and all(t.state == TS33.COMPLETE for t in st79f.trials)

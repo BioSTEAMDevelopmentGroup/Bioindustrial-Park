@@ -2099,12 +2099,12 @@ GP_MAX_DIMENSIONS = 15
 #: Defaults of run_kinetic_optimization's `gp_kwargs` (resolve_gp_kwargs).
 #: learned_constraints: fit optuna's constraint GP on the burden / volume
 #: violations (ConstrainedLogEI) -- inert with no active cap; toggleable,
-#: default on. deterministic_objective: optuna's noise switch (default
-#: off). n_fallback_candidates / max_fallback_batches: the feasibility
+#: default off. deterministic_objective: optuna's noise switch (default
+#: on). n_fallback_candidates / max_fallback_batches: the feasibility
 #: fallback search of FeasibleGPSampler._optimize_acqf (QMC batch size and
 #: the number of batches tried before the raw proposal is returned).
-GP_KWARGS_DEFAULTS = {'learned_constraints': True,
-                      'deterministic_objective': False,
+GP_KWARGS_DEFAULTS = {'learned_constraints': False,
+                      'deterministic_objective': True,
                       'n_fallback_candidates': 2048,
                       'max_fallback_batches': 20}
 
@@ -4495,12 +4495,12 @@ def run_kinetic_optimization(objective='IRR',
     startup_sampling / resume) works as under TPE; FAIL / NAN / INFEASIBLE
     trials stay PRUNED and invisible to the GP. `gp_kwargs` (dict; only
     under 'gp', else ValueError; keys = GP_KWARGS_DEFAULTS):
-    learned_constraints (True: fit optuna's constraint GP on the burden /
-    volume violations, ConstrainedLogEI; False: plain log-EI; inert with no
-    active cap; it can be switched OFF on a resume but not back ON for a
-    study whose stored COMPLETE trials carry no constraint values -- the
-    engine then prints a note and continues with it off),
-    deterministic_objective (False), n_fallback_candidates (2048) and
+    learned_constraints (default False; True: fit optuna's constraint GP on
+    the burden / volume violations, ConstrainedLogEI; False: plain log-EI;
+    inert with no active cap; it can be switched OFF on a resume but not
+    back ON for a study whose stored COMPLETE trials carry no constraint
+    values -- the engine then prints a note and continues with it off),
+    deterministic_objective (default True), n_fallback_candidates (2048) and
     max_fallback_batches (20). Optuna's constraint GP (when
     learned_constraints is True) is fit on COMPLETE trials only -- every
     COMPLETE trial is feasible under the engine's pre-sim INFEASIBLE prune,
