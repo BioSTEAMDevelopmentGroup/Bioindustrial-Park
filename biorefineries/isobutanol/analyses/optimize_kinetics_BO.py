@@ -76,10 +76,12 @@ the three DOWNSTREAM Ehrlich rates k_14 (Ilv5) / k_15 (Ilv3) / k_16 (Aro10)
 collapsed into ONE log-scale capacity multiplier, ehrlich_downstream, with
 fixed STOICHIOMETRIC intra-ratios (ko.EHRLICH_DOWNSTREAM_WEIGHTS: k_14 the
 anchor at 1.0, k_15 1.015, k_16 1.015 x 0.866 from the antimony r14 / r15
-product coefficients) on 1e-3x-4x of its REFERENCES = the weights x the B
-workbook's k_14 (4.8 -> 4.800 / 4.872 / 4.219; the preset's
-group_references, which the engine samples as reference x multiplier
-because the live A-start k_14-k_16 are 0) -- the three were noise
+product coefficients) on the ABSOLUTE scenario-A anchor band
+ko.IBO_PATHWAY_ZERO_A_RATE_BOUNDS (1e-3-4.0 g/L/h on k_14, the band 14d
+gives it individually; its REFERENCES = the weights themselves, the
+preset's group_references, which the engine samples as weight x
+multiplier because the live A-start k_14-k_16 are 0 -- until 2026-09-16
+the weights were scaled by the B workbook's k_14 = 4.8) -- the three were noise
 dimensions carrying real burden in the 09-14 / 09-15 14d GP studies;
 k_13 stays a free individual rate (r13 runs far from saturation, so tying
 the trio to it would prune the profitable region). 12 decision variables
@@ -308,8 +310,9 @@ def run(scenario=None,  # 'A' or 'B'; None = the preset's start scenario
     `_s1x`).
     'metabolic_split_12d' the 12-variable set with k_14/k_15/k_16 as ONE
     REFERENCED capacity multiplier, ehrlich_downstream (the preset's
-    `group_references` = ko.EHRLICH_DOWNSTREAM_WEIGHTS x the B workbook's
-    k_14; setdefault-ed like the other preset keys, so
+    `group_references` = ko.EHRLICH_DOWNSTREAM_WEIGHTS themselves on the
+    absolute scenario-A band ko.IBO_PATHWAY_ZERO_A_RATE_BOUNDS, since
+    2026-09-16; setdefault-ed like the other preset keys, so
     run(group_references=...) overrides it; a referenced group is
     sampled as reference x multiplier, never live baseline x multiplier).
     Bands (log-scale, x baseline)

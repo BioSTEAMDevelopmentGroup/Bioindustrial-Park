@@ -6191,7 +6191,9 @@ PASS('group_references threaded: predicate expands with the references; engine s
 #%% 88. metabolic_split_12d preset (2026-09-15): metabolic_split_14d with the
 # three downstream Ehrlich rates k_14 / k_15 / k_16 collapsed into ONE
 # stoichiometrically weighted REFERENCED capacity group, ehrlich_downstream,
-# on 1e-3x-4x of EHRLICH_DOWNSTREAM_WEIGHTS x the B workbook's k_14 (4.8);
+# whose references ARE EHRLICH_DOWNSTREAM_WEIGHTS (since 2026-09-16; until
+# then x the B workbook's k_14 = 4.8) on the ABSOLUTE anchor band
+# IBO_PATHWAY_ZERO_A_RATE_BOUNDS (1e-3-4.0 g/L/h, 14d's individual k_14);
 # 12 variables for ethanol_isobutanol (4 rates + glycolysis +
 # ehrlich_downstream + 3 inhibition groups + 3 feeding), 8 for ethanol_only
 # (the Ehrlich group emptied by the A-workbook intersection, references
@@ -6252,9 +6254,11 @@ if os.path.isfile(wb_A) and os.path.isfile(wb_B):
     assert list(p88['group_references']) == ['ehrlich_downstream']
     refs88 = p88['group_references']['ehrlich_downstream']
     assert list(refs88) == ['k_14', 'k_15', 'k_16']
-    assert refs88['k_14'] == 4.8                                        # the anchor's B-workbook baseline x 1.0
-    assert np.isclose(refs88['k_15'], 4.8*1.015, rtol=1e-12, atol=0.0)
-    assert np.isclose(refs88['k_16'], 4.8*1.015*0.866, rtol=1e-12, atol=0.0)
+    assert refs88['k_14'] == 1.0                                        # the weights THEMSELVES (no B scaling)
+    assert np.isclose(refs88['k_15'], 1.015, rtol=1e-12, atol=0.0)
+    assert np.isclose(refs88['k_16'], 1.015*0.866, rtol=1e-12, atol=0.0)
+    assert refs88 == {m: float(w) for m, w in ko.EHRLICH_DOWNSTREAM_WEIGHTS.items()}
+    assert p88['group_multiplier_bounds']['ehrlich_downstream'] == ko.IBO_PATHWAY_ZERO_A_RATE_BOUNDS
     assert p88['exclude_params'] == () and p88['spike_delta_bounds'] is None
     assert p88['stage_1_max_x_bounds'] is None
     assert p88['rate_multiplier_bounds'] == ko.DEFAULT_RATE_MULTIPLIER_BOUNDS
@@ -6314,11 +6318,20 @@ if os.path.isfile(wb_A) and os.path.isfile(wb_B):
                                       group_references=p88['group_references'])
     assert pt88['ehrlich_downstream'] == 1e-3 and pt88['glycolysis'] == 1.0
     assert pt88['k_13'] == 1e-3*5.81 and pt88['k_17'] == 44.0
-    # The applied values at multiplier 1.0 = the references; the band at the anchor = k_14's individual band.
+    # The applied values at multiplier m = the weights x m, so the multiplier IS
+    # k_14 in g/L/h and the group band is the scenario-A ABSOLUTE band 14d gives
+    # k_14 individually (IBO_PATHWAY_ZERO_A_RATE_BOUNDS) -- NOT the B-workbook
+    # band (1e-3*4.8, 4.0*4.8) of override88['k_14'] the group used to ride.
     exp88 = ko.expand_grouped_values({'ehrlich_downstream': 1.0}, p88['parameter_groups'], kb88_live,
                                      group_references=p88['group_references'])
-    assert exp88['k_14'] == 4.8 and np.isclose(exp88['k_16'], 4.219, atol=5e-4)
-    assert (1e-3*4.8, 4.0*4.8) == override88['k_14']
+    assert exp88['k_14'] == 1.0 and np.isclose(exp88['k_16'], 1.015*0.866, rtol=1e-12, atol=0.0)
+    exp88_hi = ko.expand_grouped_values({'ehrlich_downstream': 4.0}, p88['parameter_groups'], kb88_live,
+                                        group_references=p88['group_references'])
+    assert exp88_hi['k_14'] == 4.0 and np.isclose(exp88_hi['k_15'], 4.0*1.015, rtol=1e-12, atol=0.0)
+    lo88, hi88 = ko.IBO_PATHWAY_ZERO_A_RATE_BOUNDS
+    assert space88['ehrlich_downstream'] == dict(low=lo88, high=hi88, log=True)
+    assert ko.scenario_A_ibo_pathway_rate_bounds(['k_14'], p88['rate_params'])['k_14'] == (lo88, hi88)
+    assert override88['k_14'] == (1e-3*4.8, 4.0*4.8) != (lo88, hi88)   # the B band is no longer the group's
     # ethanol_only: no k_13-k_17 in the A workbook -> the Ehrlich group is emptied, its references dropped.
     p88_eo = ko.resolve_study_preset('ethanol_only', 'metabolic_split_12d')
     assert p88_eo['include_params'] == ['k_3', 'k_6']
@@ -6376,7 +6389,8 @@ if os.path.isfile(wb_A) and os.path.isfile(wb_B):
 else:
     print('SKIP 88 (preset part): parameter-distribution workbooks not found')
 PASS('metabolic_split_12d preset: 12/8 vars (k_3, k_6, k_13, k_17 + glycolysis + REFERENCED '
-     'ehrlich_downstream on 1e-3-4x of 4.8 x weights + 3 inhibition groups + 3 feeding), '
+     'ehrlich_downstream = the weights on the absolute scenario-A band 1e-3-4.0 g/L/h + 3 '
+     'inhibition groups + 3 feeding), '
      'name _ib0.75-1.5 (78 chars, no Ehrlich tag), GP/DA tags, supervisor agrees, every '
      'preset returns group_references, weighted-group guards')
 

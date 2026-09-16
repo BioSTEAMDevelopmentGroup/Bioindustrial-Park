@@ -208,8 +208,8 @@ def expand_grouped_values(values, parameter_groups, kinetic_baselines,
     group whose members are ZERO on the live model (the Ehrlich rates at
     the scenario-A start) can still be sampled on an absolute band -- the
     metabolic_split_12d preset's ehrlich_downstream group (resolve_study_
-    preset builds the references from EHRLICH_DOWNSTREAM_WEIGHTS x the
-    anchor's bounds-workbook baseline). Pure: used by the engine's
+    preset uses EHRLICH_DOWNSTREAM_WEIGHTS themselves as the references, so
+    the band is an absolute one on the anchor). Pure: used by the engine's
     evaluation site (what reaches the model and the burden), by the
     feasibility predicate, by the `applied_<member>` trajectory columns
     and by the offline test. The inverse for the baseline point is
@@ -779,7 +779,7 @@ def build_search_space(kinetic_baselines,
     baseline (expand_grouped_values), so the members may have a ZERO live
     baseline (the Ehrlich rates at the scenario-A start -- the
     metabolic_split_12d preset's ehrlich_downstream group, references =
-    EHRLICH_DOWNSTREAM_WEIGHTS x the anchor's bounds-workbook baseline).
+    EHRLICH_DOWNSTREAM_WEIGHTS themselves on an absolute anchor band).
     A referenced member is EXEMPT from the positive-live-baseline check
     above (an un-referenced group's members still need one). ValueError:
     a referenced group that is not in `parameter_groups`; a reference for
@@ -1636,20 +1636,26 @@ METABOLIC_SPLIT_12D_RATES = ('k_3', 'k_6', 'k_13', 'k_17')
 #: balanced chain needs, per unit of r14 capacity, 1.015 units of r15
 #: capacity (g DHIV per g acetolactate) and 1.015 x 0.866 = 0.878990 units of
 #: r16 capacity (g KIV per g acetolactate). k_14 is the ANCHOR (the first
-#: key, weight exactly 1.0): resolve_study_preset scales the weights by the
-#: anchor's bounds-workbook baseline (B: k_14 = 4.8 -> references 4.800 /
-#: 4.872 / 4.219), so the group's band is identical to k_14's individual
-#: band today. The B workbook's own 4.8 / 4.8 / 2.82 ratio (r16 33 % below
-#: balance) is deliberately NOT used. The offline test re-derives these
-#: numbers from the antimony file by path (check 84).
+#: key, weight exactly 1.0): since 2026-09-16 resolve_study_preset uses the
+#: weights DIRECTLY as the group's references, so the group's multiplier
+#: band is an ABSOLUTE g/L/h band on k_14 -- IBO_PATHWAY_ZERO_A_RATE_BOUNDS,
+#: the band metabolic_split_14d gives k_14 individually, because k_14 is 0
+#: in the fitted scenario-A antimony (CLAUDE.md anchoring rule). Until then
+#: the weights were scaled by the anchor's bounds-workbook baseline (B:
+#: k_14 = 4.8 -> references 4.800 / 4.872 / 4.219), which anchored the
+#: group to the arbitrary scenario B. The B workbook's own 4.8 / 4.8 /
+#: 2.82 ratio (r16 33 % below balance) is deliberately NOT used. The
+#: offline test re-derives these numbers from the antimony file by path
+#: (check 84).
 EHRLICH_DOWNSTREAM_WEIGHTS = {'k_14': 1.0, 'k_15': 1.015, 'k_16': 1.015*0.866}
 #: Its two CAPACITY groups, in search-space / CSV column order (glycolysis,
 #: then ehrlich_downstream, both ahead of the inhibition groups): glycolysis
 #: on 0.2x-4x of every member's LIVE baseline (unchanged from metabolic_14d),
-#: ehrlich_downstream on 1e-3x-4x of the group's REFERENCES (group_references,
-#: built by resolve_study_preset from EHRLICH_DOWNSTREAM_WEIGHTS -- the live
-#: k_14-k_16 are 0 at the scenario-A start, so a live-baseline multiplier
-#: would be degenerate).
+#: ehrlich_downstream on the ABSOLUTE band IBO_PATHWAY_ZERO_A_RATE_BOUNDS
+#: (1e-3-4.0 g/L/h) applied to the group's REFERENCES = EHRLICH_DOWNSTREAM_
+#: WEIGHTS themselves (group_references; the anchor k_14 weighs 1.0, so the
+#: multiplier IS k_14 in g/L/h -- the live k_14-k_16 are 0 at the scenario-A
+#: start, so a live-baseline multiplier would be degenerate).
 METABOLIC_SPLIT_12D_RATE_GROUPS = {
     'glycolysis': ('k_1l', 'k_1h', 'k_1e'),
     'ehrlich_downstream': ('k_14', 'k_15', 'k_16'),
@@ -1671,10 +1677,13 @@ METABOLIC_SPLIT_12D_RATE_GROUPS = {
 #: 2026-09-15, metabolic_split_12d): the keys of each weights dict must be
 #: EXACTLY that rate_parameter_groups group's members in order, the first
 #: member the ANCHOR with weight 1.0, every weight > 0; resolve_study_preset
-#: turns it into group_references = {group: {member: weight x the anchor's
-#: bounds-workbook baseline}} after the workbook intersection (an emptied
-#: group gets no entry), so the group is sampled as reference x multiplier
-#: even where its members are 0 on the live model.
+#: turns it into group_references = {group: {member: weight}} after the
+#: workbook intersection (an emptied group gets no entry; since 2026-09-16
+#: the weights are the references themselves -- until then they were scaled
+#: by the anchor's bounds-workbook baseline, which anchored the group to
+#: scenario B), so the group is sampled as weight x multiplier on an
+#: ABSOLUTE band in the anchor's units even where its members are 0 on the
+#: live model.
 #: 'metabolic_minimal' = the compact, interpretable space (24 variables
 #: for ethanol_isobutanol, 19 for ethanol_only): exclude_params = k_10
 #: (decay, as everywhere) + k_7 and k_8 (the growth capacities, so the
@@ -1755,10 +1764,14 @@ STUDY_TYPE_OPTIONS = {
     ),
     # metabolic_split_12d (2026-09-15) = metabolic_split_14d with k_14 / k_15 /
     # k_16 collapsed into ONE REFERENCED capacity multiplier, ehrlich_downstream,
-    # with fixed STOICHIOMETRIC intra-ratios (EHRLICH_DOWNSTREAM_WEIGHTS x the B
-    # workbook's k_14 = 4.8 -> references 4.800 / 4.872 / 4.219) on 1e-3x-4x --
-    # k_14's individual band today; the group multiplier applies to the
-    # references, not the zero live A-start baselines (group_references). 4
+    # with fixed STOICHIOMETRIC intra-ratios: the references ARE
+    # EHRLICH_DOWNSTREAM_WEIGHTS (1.000 / 1.015 / 0.878990; since 2026-09-16 --
+    # until then they were scaled by the B workbook's k_14 = 4.8, anchoring
+    # the group to arbitrary scenario B), so the group multiplier band is an
+    # ABSOLUTE g/L/h band on the anchor k_14, IBO_PATHWAY_ZERO_A_RATE_BOUNDS
+    # (1e-3-4.0) -- the band metabolic_split_14d gives k_14 individually
+    # (a zero rate in the fitted scenario-A antimony); the multiplier applies
+    # to the references, not the zero live A-start baselines. 4
     # rates + glycolysis + ehrlich_downstream + 3 inhibition groups + 3 feeding
     # = 12 decision variables for ethanol_isobutanol, 2 + 1 + 2 + 3 = 8 for
     # ethanol_only (the Ehrlich group emptied by the A-workbook intersection,
@@ -1773,7 +1786,9 @@ STUDY_TYPE_OPTIONS = {
         rate_parameter_groups=METABOLIC_SPLIT_12D_RATE_GROUPS,
         rate_group_weights={'ehrlich_downstream': EHRLICH_DOWNSTREAM_WEIGHTS},
         group_multiplier_bounds={'glycolysis': (0.2, 4.0),
-                                 'ehrlich_downstream': (1e-3, 4.0)},
+                                 # ABSOLUTE g/L/h band on the anchor k_14
+                                 # (zero-A rate): the band 14d gives k_14.
+                                 'ehrlich_downstream': IBO_PATHWAY_ZERO_A_RATE_BOUNDS},
         exclude_params=(),
         spike_delta_bounds=None,        # spike feed pinned at 600 g/L
         stage_1_max_x_bounds=None,      # PINNED, as in metabolic_split_14d
@@ -1923,18 +1938,19 @@ def resolve_study_preset(study_target_products, study_type, roles=None,
 
     'metabolic_split_12d' (2026-09-15) is metabolic_split_14d with k_14 /
     k_15 / k_16 collapsed into ONE REFERENCED capacity group,
-    ehrlich_downstream (METABOLIC_SPLIT_12D_RATE_GROUPS), sampled on
-    1e-3x-4x of its REFERENCES: the STUDY_TYPE_OPTIONS key
-    rate_group_weights ({group: {member: weight}}, the anchor -- the
-    first member -- at weight 1.0) is converted, AFTER the workbook
-    intersection, into the returned `group_references` = {group:
-    {member: weight x workbook_kinetic_baselines(kinetic_bounds_scenario)
-    [anchor]}} (B's k_14 = 4.8 -> 4.800 / 4.872 / 4.219), so the engine
-    samples reference x multiplier even though the live A-start k_14-k_16
-    are 0. A group emptied by the intersection gets no entry; a group
-    whose anchor is missing from the workbook while other members survive
-    is a ValueError (cannot happen with the current workbooks). The
-    weights dict itself is validated (keys = the group's members in
+    ehrlich_downstream (METABOLIC_SPLIT_12D_RATE_GROUPS), sampled on the
+    ABSOLUTE anchor band IBO_PATHWAY_ZERO_A_RATE_BOUNDS (1e-3-4.0 g/L/h,
+    the band metabolic_split_14d gives k_14 individually -- a zero rate in
+    the fitted scenario-A antimony) applied to its REFERENCES: the
+    STUDY_TYPE_OPTIONS key rate_group_weights ({group: {member: weight}},
+    the anchor -- the first member -- at weight 1.0) is returned, AFTER
+    the workbook intersection, as `group_references` = {group: {member:
+    weight}} (1.000 / 1.015 / 0.878990; since 2026-09-16 -- until then the
+    weights were scaled by the anchor's scenario-B workbook baseline 4.8,
+    anchoring the group to arbitrary B), so the engine samples weight x
+    multiplier, i.e. the multiplier IS k_14 in g/L/h, even though the live
+    A-start k_14-k_16 are 0. A group emptied by the intersection gets no
+    entry. The weights dict itself is validated (keys = the group's members in
     order, anchor weight 1.0, every weight > 0, the group a
     rate_parameter_groups group; ValueError naming the preset). So
     ethanol_isobutanol samples 4 rates + glycolysis + ehrlich_downstream
@@ -2025,8 +2041,14 @@ def resolve_study_preset(study_target_products, study_type, roles=None,
                 parameter_groups[group] = kept
         # (4) rate_group_weights -> group_references (metabolic_split_12d):
         # validate the weights dict against the capacity-group definition,
-        # then scale by the ANCHOR's bounds-workbook baseline. A group
-        # emptied by the intersection gets no entry.
+        # then use the weights DIRECTLY as the references (since 2026-09-16;
+        # the anchor's weight is 1.0, so the group's multiplier band is an
+        # ABSOLUTE band on the anchor, IBO_PATHWAY_ZERO_A_RATE_BOUNDS -- the
+        # anchor k_14 is 0 in the fitted scenario-A antimony, exactly as
+        # metabolic_split_14d bands it individually). Until then the weights
+        # were scaled by the anchor's bounds-workbook (scenario-B) baseline,
+        # which anchored the group to arbitrary scenario B. A group emptied
+        # by the intersection gets no entry.
         rate_group_weights = dict(options.get('rate_group_weights', {}))
         for group, weights in rate_group_weights.items():
             weights = dict(weights)
@@ -2056,21 +2078,9 @@ def resolve_study_preset(study_target_products, study_type, roles=None,
             kept = parameter_groups.get(group)
             if not kept:
                 continue   # emptied by the workbook intersection (ethanol_only)
-            if anchor not in workbook_set:
-                raise ValueError(
-                    f'{study_type!r} preset: the anchor {anchor!r} of the '
-                    f'weighted group {group!r} is not a row of the '
-                    f'scenario-{set_scenario} workbook while other members '
-                    f'{kept} are; the group has no reference scale')
-            scale = float(workbook_baselines[anchor])
-            if not (scale > 0.0):
-                raise ValueError(
-                    f'{study_type!r} preset: the scenario-{set_scenario} '
-                    f'workbook baseline of the anchor {anchor!r} of the '
-                    f'weighted group {group!r} is nonpositive ({scale!r})')
             if group_references is None:
                 group_references = {}
-            group_references[group] = {member: weights[member]*scale
+            group_references[group] = {member: float(weights[member])
                                        for member in kept}
         parameter_groups = parameter_groups or None
     elif group_roles:
