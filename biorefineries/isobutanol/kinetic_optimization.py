@@ -75,6 +75,7 @@ __all__ = ('OBJECTIVE_REGISTRY', 'TRACKED_METRICS',
            'STUDY_TYPE_OPTIONS', 'EFFECTOR_ORDER',
            'METABOLIC_MINIMAL_SUBSET_RATES', 'METABOLIC_MINIMAL_SUBSET_GROUPS',
            'METABOLIC_14D_RATES', 'METABOLIC_14D_RATE_GROUPS',
+           'METABOLIC_SPLIT_14D_RATES', 'METABOLIC_SPLIT_14D_GROUPS',
            'kinetic_parameter_effectors', 'study_type_name_defaults',
            'DEFAULT_STUDY_TARGET_PRODUCTS', 'DEFAULT_STUDY_TYPE',
            'resolve_study_preset', 'default_study_name',
@@ -1355,6 +1356,13 @@ STUDY_TYPE_ROLES = {
     # (METABOLIC_14D_RATES + METABOLIC_14D_RATE_GROUPS + the shared inhibition
     # groups). The name encodes the ethanol_isobutanol decision-var count, 14.
     'metabolic_14d': (),
+    # 'metabolic_split_14d' (2026-09-15): NO role filter -- metabolic_14d
+    # with the two alcohol dehydrogenases as INDEPENDENT knobs (Adh1 k_6 and
+    # Adh6 k_17, new with the nskinetics r16/r17 split), the inhibition
+    # groups on the LIVE cross-product coefficients k_17ie / k_17ia, and
+    # stage_1_max_x PINNED so the ethanol_isobutanol count stays at 14
+    # (METABOLIC_SPLIT_14D_RATES / _GROUPS via STUDY_TYPE_OPTIONS).
+    'metabolic_split_14d': (),
 }
 
 #: The STANDALONE metabolic_minimal_subset preset (2026-09-07): its
@@ -1397,6 +1405,26 @@ METABOLIC_14D_RATES = ('k_3', 'k_6', 'k_13', 'k_14', 'k_15', 'k_16')
 #: search-space / CSV column order after the individual rates is glycolysis,
 #: then the three inhibition groups.
 METABOLIC_14D_RATE_GROUPS = {'glycolysis': ('k_1l', 'k_1h', 'k_1e')}
+
+#: metabolic_split_14d (2026-09-15): metabolic_14d with the two alcohol
+#: dehydrogenases as INDEPENDENT knobs -- Adh1 (r6, k_6, already present)
+#: and Adh6 (r17, k_17, new with the nskinetics r16/r17 split of the lumped
+#: KDC + ADH step; constitutive, antimony default 44 g/L/h, admitted by the
+#: workbook intersection through the B workbook's ._k_17 row) -- and
+#: stage_1_max_x PINNED, so the count stays at 14. Each rate on the rate
+#: band (DEFAULT_RATE_MULTIPLIER_BOUNDS), intersected with the target's
+#: workbook (ethanol_only lacks k_13-k_17).
+METABOLIC_SPLIT_14D_RATES = ('k_3', 'k_6', 'k_13', 'k_14', 'k_15', 'k_16', 'k_17')
+#: Its inhibition groups on the LIVE cross-product coefficients: k_17ie /
+#: k_17ia (r17, the alcohol-forming step) replace the k_16ie / k_16ia of the
+#: shared METABOLIC_MINIMAL_SUBSET_GROUPS, which the split left declared but
+#: inert (the repointed workbooks no longer carry those rows, so the older
+#: presets' workbook intersection drops them silently).
+METABOLIC_SPLIT_14D_GROUPS = {
+    'inhib_ethanol':    ('k_1ie', 'k_4ie', 'k_7ie', 'k_10ie', 'k_17ie'),
+    'inhib_isobutanol': ('k_1ii', 'k_4ii', 'k_6ii', 'k_7ii', 'k_10ii'),
+    'inhib_acetate':    ('k_1ia', 'k_4ia', 'k_6ia', 'k_7ia', 'k_10ia', 'k_17ia'),
+}
 
 #: Per-study_type options beyond the role filter (a type absent here
 #: takes the defaults: DEFAULT_EXCLUDED_PARAMETERS, no groups,
@@ -1470,6 +1498,24 @@ STUDY_TYPE_OPTIONS = {
         exclude_params=(),
         spike_delta_bounds=None,
     ),
+    # metabolic_split_14d (2026-09-15) = metabolic_14d with k_17 (Adh6, r17)
+    # as a seventh individual rate next to k_6 (Adh1, r6), the inhibition
+    # groups on k_17ie / k_17ia, and stage_1_max_x PINNED (None) instead of
+    # sampled -- 7 rates + 1 glycolysis + 3 inhibition groups + 3 feeding =
+    # 14 decision variables for ethanol_isobutanol, 2 + 1 + 2 + 3 = 8 for
+    # ethanol_only; within GP_MAX_DIMENSIONS, so every method applies. The
+    # glycolysis band rides untagged as for metabolic_14d; no _x / _s1x tag.
+    # Default name (78 characters)
+    # kin_opt_ethanol_isobutanol_metabolic_split_14d_irr_rb0.001-4_ib0.75-1.5_burden.
+    'metabolic_split_14d': dict(
+        rate_params=METABOLIC_SPLIT_14D_RATES,
+        parameter_groups=METABOLIC_SPLIT_14D_GROUPS,
+        rate_parameter_groups=METABOLIC_14D_RATE_GROUPS,     # glycolysis, shared
+        group_multiplier_bounds={'glycolysis': (0.2, 4.0)},
+        exclude_params=(),
+        spike_delta_bounds=None,        # spike feed pinned at 600 g/L
+        stage_1_max_x_bounds=None,      # PINNED (the difference from metabolic_14d)
+    ),
 }
 #: Order of the effector groups of a grouped preset (group name
 #: `inhib_{effector}`); effectors with no rows in the workbook set are
@@ -1486,7 +1532,8 @@ def study_type_name_defaults(study_type):
     exclude_params and stage_1_max_x_bounds when the type has them
     (metabolic_minimal: {} -- every family at the default band -- and
     ('k_10', 'k_7', 'k_8'); metabolic_minimal_subset:
-    {}, () and None = pinned), else
+    {}, () and None = pinned; metabolic_split_14d:
+    {'glycolysis': (0.2, 4.0)}, () and None = pinned), else
     DEFAULT_SATURATION_MULTIPLIER_BOUNDS, DEFAULT_EXCLUDED_PARAMETERS and
     DEFAULT_STAGE_1_MAX_X_BOUNDS. resolve_study_preset builds its
     multiplier_bounds / exclude_params / stage_1_max_x_bounds from here
@@ -1520,7 +1567,7 @@ def resolve_study_preset(study_target_products, study_type, roles=None,
     multiplier_bounds=DEFAULT_SATURATION_MULTIPLIER_BOUNDS,
     rate_multiplier_bounds=DEFAULT_RATE_MULTIPLIER_BOUNDS,
     rate_params=[the workbook's RATE CONSTANTS -- rate_constant_names,
-    role capacity; 16 in A's workbook, 20 in B's -- the only names the
+    role capacity; 16 in A's workbook, 21 in B's -- the only names the
     rate band applies to, so the inhibition coefficients k_*i* sample
     the saturation band like the K_* terms],
     parameter_multiplier_bounds=a COPY of
@@ -1539,7 +1586,9 @@ def resolve_study_preset(study_target_products, study_type, roles=None,
     (OPERATING_VARIABLES) applied via V406.stage_1_max_x; the driver
     tags a band `_s1x1-50` into the study name, nothing when pinned].
     Set sizes (include_params, the workbook rows): ethanol_only 29
-    (metabolic) / 40 (metabolic_protein); ethanol_isobutanol 40 / 56 --
+    (metabolic) / 40 (metabolic_protein); ethanol_isobutanol 41 / 59
+    (40 / 55 before the 2026-09-15 r16/r17 split added k_17, K_17, k_17r,
+    K_17e; 56 before the 2026-09-13 K_16i drop) --
     one fewer each in the sampled space after the exclusion. `roles` (default
     kinetic_parameter_roles()) is the {name: role} table; a workbook row
     absent from it raises KeyError(name) so a future workbook/model change
@@ -1552,15 +1601,17 @@ def resolve_study_preset(study_target_products, study_type, roles=None,
     = spike pinned at the baseline), and its `multiplier_bounds` /
     `exclude_params` come from study_type_name_defaults(study_type).
     'metabolic_minimal' (STUDY_TYPE_OPTIONS): include_params = the
-    capacity + product_inhibition + lethality rows (36 for the B
-    workbook, 25 for A's); exclude_params ('k_10', 'k_7', 'k_8'); the
+    capacity + product_inhibition + lethality rows (37 for the B
+    workbook since the 2026-09-15 split, 36 before; 25 for A's);
+    exclude_params ('k_10', 'k_7', 'k_8'); the
     inhibition rows grouped by the role table's effector (`effectors`,
     default kinetic_parameter_effectors(); a grouped row whose effector
     is None or not in EFFECTOR_ORDER raises KeyError) into
     inhib_ethanol / inhib_isobutanol / inhib_acetate in EFFECTOR_ORDER,
     members in workbook order, effectors without rows omitted; so the
-    sampled space is 17 rates + 3 multipliers (+ 4 feeding/operating)
-    for ethanol_isobutanol and 13 + 2 (+ 4) for ethanol_only.
+    sampled space is 18 rates + 3 multipliers (+ 4 feeding/operating)
+    for ethanol_isobutanol (17 before the 2026-09-15 split) and 13 + 2
+    (+ 4) for ethanol_only.
     Every group member is scaled from its LIVE baseline -- the model value
     at study start (for a row absent from the scenario-A workbook, the
     nskinetics model default), NOT the workbook value; the engine prints
@@ -1595,6 +1646,15 @@ def resolve_study_preset(study_target_products, study_type, roles=None,
     group's. So ethanol_isobutanol samples 6 rates + 1 glycolysis + 3
     inhibition multipliers + 3 feeding + stage_1_max_x = 14, and ethanol_only
     (no k_13-k_16, no isobutanol coefficients) 2 + 1 + 2 + 3 + 1 = 9.
+
+    'metabolic_split_14d' (2026-09-15) is metabolic_14d with the two
+    alcohol dehydrogenases as independent knobs -- k_6 (Adh1, r6) and the
+    new k_17 (Adh6, r17; nskinetics r16/r17 split) -- the inhibition groups
+    on the live cross-product coefficients k_17ie / k_17ia (the repointed
+    workbook rows; the older presets' k_16ie / k_16ia members are inert
+    names the intersection now drops) and stage_1_max_x PINNED: 7 rates +
+    1 glycolysis + 3 inhibition multipliers + 3 feeding = 14 for
+    ethanol_isobutanol, 2 + 1 + 2 + 3 = 8 for ethanol_only.
     """
     if study_target_products not in STUDY_TARGET_PRODUCTS:
         raise ValueError(

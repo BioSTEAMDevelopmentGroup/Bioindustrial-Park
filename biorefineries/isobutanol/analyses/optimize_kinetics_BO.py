@@ -17,13 +17,13 @@ crashed/interrupted study and runs only the remaining trials.
 
 Search set and bands come from a named STUDY PRESET (default
 study_target_products='ethanol_isobutanol', study_type='metabolic_protein':
-start at the scenario-A baseline, the B workbook's 56 kinetic rows; log
+start at the scenario-A baseline, the B workbook's 59 kinetic rows (2026-09-15); log
 bands by nskinetics ROLE since 2026-09-06 -- rate constants (capacity:
 k_1h, k_2, ..., k_13-k_16) on [1e-3x, 4x], inhibition coefficients
 (k_1ie, k_1ii, k_10ie, ...) and the regulation / affinity / self-
 inhibition terms K_* on [0.1x, 10x]; k_10 (active-biomass decay) is
 EXCLUDED by default -- a free lunch, not an engineering target -- so the
-sampled set is 55; see ko.resolve_study_preset and run()'s docstring; the
+sampled set is 58; see ko.resolve_study_preset and run()'s docstring; the
 derived study name carries the band tags `_rb0.001-4_ib0.1-10` and the
 exclusion tag `_xk10`). study_target_products=None is the legacy flag
 path (scenario / kinetic_bounds_scenario / single band, k_10 sampled)
@@ -57,6 +57,16 @@ probe); name
 kin_opt_ethanol_isobutanol_metabolic_minimal_subset_irr_rb0.001-4_ib0.75-1.5_burden
 (no _x / _s1x tag).
 
+study_type='metabolic_split_14d' (2026-09-15) is metabolic_14d (the
+6 metabolic_minimal_subset rates minus the grouped glycolysis family, ONE
+0.2x-4x glycolysis capacity multiplier, the three inhibition multipliers,
+the three feeding variables) with the two alcohol dehydrogenases as
+INDEPENDENT knobs -- k_6 (Adh1, r6) and the new k_17 (Adh6, r17, the
+nskinetics 2026-09-15 split of the lumped Ehrlich step), the inhibition
+groups on the live k_17ie / k_17ia, and stage_1_max_x PINNED -- 14
+decision variables for ethanol_isobutanol, 8 for ethanol_only; name
+kin_opt_ethanol_isobutanol_metabolic_split_14d_irr_rb0.001-4_ib0.75-1.5_burden.
+
 The enzyme-burden (proteome-allocation) constraint of enzyme_burden.py
 is ON by default (burden=True): sampled capacities are charged to the
 cell's flexible protein sector, growth (k_7/k_8) is derated linearly as
@@ -84,6 +94,8 @@ Runner pattern (fresh kernel, one process):
     # standalone 15-variable set (9 listed rates + 3 effector multipliers
     # + 3 feeding; spike AND stage_1_max_x pinned; no _x / _s1x tag)
     result, csv_path = ns['run'](objective='IRR', study_type='metabolic_minimal_subset')
+    # Adh1 + Adh6 independent (k_6, k_17), stage_1_max_x pinned; 14 variables
+    result, csv_path = ns['run'](objective='IRR', study_type='metabolic_split_14d', method='gp')
     # legacy: resume a pre-2026-09-04 study under its old name/space
     result, csv_path = ns['run'](scenario='A', kinetic_bounds_scenario='B',
                                  study_target_products=None)

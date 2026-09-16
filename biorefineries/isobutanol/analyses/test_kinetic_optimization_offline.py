@@ -517,17 +517,18 @@ assert wb_B.endswith('parameter-distributions_corn_IBO_EtOH_B.xlsx')
 if os.path.isfile(wb_A) and os.path.isfile(wb_B):
     names_A = ko.kinetic_param_names_from_scenario('A')
     names_B = ko.kinetic_param_names_from_scenario('B')
-    assert len(names_B) == 55 and len(names_A) == 40, (len(names_B), len(names_A))   # 55 since the 2026-09-13 K_16i drop (nskinetics b61360e)
+    assert len(names_B) == 59 and len(names_A) == 40, (len(names_B), len(names_A))   # 59 since the 2026-09-15 r16/r17 split (+ k_17, K_17, k_17r, K_17e); 55 after the 2026-09-13 K_16i drop
     assert all(n[:2].lower() == 'k_' for n in names_A + names_B)
     assert len(set(names_B)) == len(names_B) and len(set(names_A)) == len(names_A)
     assert names_B[:5] == ['k_1l', 'K_1l', 'k_1h', 'K_1h', 'k_1e']  # workbook order
-    for dropped in ('k_6r', 'k_16r', 'K_2', 'K_9', 'K_16i'):   # commit 1e4efee1; K_16i 2026-09-13
+    for dropped in ('k_6r', 'k_16r', 'K_2', 'K_9', 'K_16i', 'k_16ia', 'k_16ie'):   # commit 1e4efee1; K_16i 2026-09-13; k_16ia/k_16ie repointed to k_17ia/k_17ie 2026-09-15
         assert dropped not in names_B and dropped not in names_A, dropped
     assert 'k_13' in names_B and 'k_13' not in names_A  # IBO pathway: B only
+    assert 'k_17' in names_B and 'k_17ie' in names_B and 'k_17' not in names_A
     wb_baselines = ko.workbook_kinetic_baselines('B')
     assert list(wb_baselines) == names_B
     assert all(v > 0.0 for v in wb_baselines.values())
-    PASS('workbook readers: 55 B / 40 A kinetic names in workbook order; constrained params absent')
+    PASS('workbook readers: 59 B / 40 A kinetic names in workbook order; constrained params absent')
 else:
     print('SKIP 14: parameter-distribution workbooks not found')
 
@@ -815,12 +816,12 @@ _probe20 = (
 _out20 = _subprocess.run([_sys.executable, '-c', _probe20],
                          capture_output=True, text=True)
 assert _out20.returncode == 0, _out20.stderr
-assert _out20.stdout.strip() == '65 []', _out20.stdout + _out20.stderr
+assert _out20.stdout.strip() == '71 []', _out20.stdout + _out20.stderr   # 65 before the 2026-09-15 r16/r17 split (+ k_17, K_17, k_17r, K_17e, k_17ia, k_17ie)
 roles20 = ko.kinetic_parameter_roles()
 from collections import Counter as _Counter
 assert _Counter(roles20.values()) == {
-    'capacity': 20, 'affinity': 16, 'product_inhibition': 13,
-    'substrate_regulation': 4, 'product_self_inhibition': 4,
+    'capacity': 21, 'affinity': 17, 'product_inhibition': 15,
+    'substrate_regulation': 4, 'product_self_inhibition': 6,
     'lethality': 3, 'lethality_threshold': 3, 'initial_state': 2}
 assert roles20['k_7'] == 'capacity' and roles20['K_1i'] == 'substrate_regulation'
 assert roles20['K_6e'] == 'product_self_inhibition' and roles20['k_10ii'] == 'lethality'
@@ -836,7 +837,7 @@ assert ko.DEFAULT_STUDY_TARGET_PRODUCTS == 'ethanol_isobutanol'
 assert ko.DEFAULT_STUDY_TYPE == 'metabolic_protein'
 assert set(ko.STUDY_TARGET_PRODUCTS) == {'ethanol_only', 'ethanol_isobutanol'}
 assert set(ko.STUDY_TYPE_ROLES) == {'metabolic', 'metabolic_protein', 'metabolic_minimal',
-                                    'metabolic_minimal_subset', 'metabolic_14d'}
+                                    'metabolic_minimal_subset', 'metabolic_14d', 'metabolic_split_14d'}
 assert set(ko.STUDY_TYPE_ROLES['metabolic_minimal']) == {
     'capacity', 'product_inhibition', 'lethality'}
 assert set(ko.STUDY_TYPE_ROLES['metabolic']) == {
@@ -872,8 +873,8 @@ for bad21 in (('ethanol', 'metabolic'), ('ethanol_only', 'protein')):
 if os.path.isfile(wb_A) and os.path.isfile(wb_B):
     expected21 = {('ethanol_only', 'metabolic'): 29,
                   ('ethanol_only', 'metabolic_protein'): 40,
-                  ('ethanol_isobutanol', 'metabolic'): 40,
-                  ('ethanol_isobutanol', 'metabolic_protein'): 55}   # 56 before the 2026-09-13 K_16i drop
+                  ('ethanol_isobutanol', 'metabolic'): 41,
+                  ('ethanol_isobutanol', 'metabolic_protein'): 59}   # 40 / 55 before the 2026-09-15 r16/r17 split (k_17 capacity; K_17 affinity; k_17r, K_17e self-inhibition)
     roles21 = ko.kinetic_parameter_roles()
     for (stp21, st21), n21 in expected21.items():
         p21 = ko.resolve_study_preset(stp21, st21)
@@ -909,11 +910,11 @@ if os.path.isfile(wb_A) and os.path.isfile(wb_B):
         # rate_params: the RATE CONSTANTS (role capacity) of the set
         # scenario's workbook, workbook order -- the only names the k_*
         # band applies to (inhibition coefficients k_*i* share the K_*
-        # band since 2026-09-06). 16 in A's workbook, 20 in B's (+ the
-        # four Ehrlich capacities); every one is in every study type.
+        # band since 2026-09-06). 16 in A's workbook, 21 in B's (+ the
+        # five Ehrlich capacities k_13-k_17); every one is in every study type.
         rp21 = p21['rate_params']
         assert rp21 == [n for n in wb21 if roles21[n] == 'capacity']
-        assert len(rp21) == (16 if stp21 == 'ethanol_only' else 20)
+        assert len(rp21) == (16 if stp21 == 'ethanol_only' else 21)   # + k_17 since 2026-09-15
         assert all(n in inc21 for n in rp21)
         assert rp21 == ko.rate_constant_names(wb21, roles=roles21)
         assert not any(n in rp21 for n in ('k_1ie', 'k_1ia', 'k_7ie', 'k_10ie'))
@@ -923,7 +924,7 @@ if os.path.isfile(wb_A) and os.path.isfile(wb_B):
         else:
             assert inc21 == wb21                            # every workbook row
     p21_eo = ko.resolve_study_preset('ethanol_only', 'metabolic_protein')['include_params']
-    for ibo21 in ('k_13', 'K_16', 'k_1ii', 'k_7ii', 'k_10ii', 'k_16ie'):
+    for ibo21 in ('k_13', 'K_16', 'k_1ii', 'k_7ii', 'k_10ii', 'k_17ie', 'k_17', 'K_17'):
         assert ibo21 not in p21_eo, ibo21
     # A workbook row missing from the role table must raise, not leak.
     roles_missing21 = dict(roles21); del roles_missing21['k_7']
@@ -933,7 +934,7 @@ if os.path.isfile(wb_A) and os.path.isfile(wb_B):
         assert 'k_7' in str(e21)
     else:
         raise AssertionError('missing role-table entry did not raise KeyError')
-    PASS('resolve_study_preset: 29/40/40/55 sets, role filter, A start, workbook order, errors')
+    PASS('resolve_study_preset: 29/40/41/59 sets, role filter, A start, workbook order, errors')
 else:
     print('SKIP 21: parameter-distribution workbooks not found')
 
@@ -963,8 +964,8 @@ if os.path.isfile(wb_A) and os.path.isfile(wb_B):
         param_bounds_override=override22, include_params=p22['include_params'],
         exclude_params=p22['exclude_params'])
     # k_10 (active-biomass decay) is excluded by default (2026-09-06 pm):
-    # 55 sampled kinetic parameters, no k_10 column, no k_10 probe.
-    assert excl22 == ['k_10'] and len(space22) == 54 + 4   # 55 B rows minus k_10, + 4 feeding
+    # 58 sampled kinetic parameters, no k_10 column, no k_10 probe.
+    assert excl22 == ['k_10'] and len(space22) == 58 + 4   # 59 B rows minus k_10, + 4 feeding
     assert 'k_10' not in space22
     assert all(space22[n]['log'] for n in base22_B if n != 'k_10')
     # Bands by ROLE (2026-09-06): rate constants (capacity) 1e-3x-4x
@@ -977,9 +978,9 @@ if os.path.isfile(wb_A) and os.path.isfile(wb_B):
         assert space22[n22]['high'] == (4.0*b22 if n22 in p22['rate_params'] else 10.0*b22)
         assert space22[n22]['low'] == (1e-3*b22 if n22 in p22['rate_params']
                                        else 0.1*b22), n22
-    for inh22 in ('k_1ie', 'k_1ii', 'k_7ii', 'k_10ie', 'k_10ii', 'k_16ie'):
+    for inh22 in ('k_1ie', 'k_1ii', 'k_7ii', 'k_10ie', 'k_10ii', 'k_17ie'):
         assert space22[inh22]['low'] == 0.1*base22_B[inh22], inh22
-    for rate22 in ('k_1h', 'k_2', 'k_7', 'k_13'):
+    for rate22 in ('k_1h', 'k_2', 'k_7', 'k_13', 'k_17'):
         assert space22[rate22]['low'] == 1e-3*base22_B[rate22], rate22
     # The workbook bounds still carry k_10's per-parameter band (in force
     # only when a caller re-includes it with exclude_params=()).
@@ -991,7 +992,7 @@ if os.path.isfile(wb_A) and os.path.isfile(wb_B):
         parameter_multiplier_bounds=p22['parameter_multiplier_bounds'],
         param_bounds_override=override22, include_params=p22['include_params'],
         exclude_params=())
-    assert excl22_k10 == [] and len(space22_k10) == 55 + 4
+    assert excl22_k10 == [] and len(space22_k10) == 59 + 4
     assert space22_k10['k_10'] == dict(low=0.1*0.06, high=10.0*0.06, log=True)
     assert {n: v for n, v in space22_k10.items() if n != 'k_10'} == space22
     pt22 = ko.baseline_decision_point(
@@ -1009,8 +1010,8 @@ if os.path.isfile(wb_A) and os.path.isfile(wb_B):
                                                     rate_params=p22['rate_params'])
     assert 'k_10' not in probes22 and 'k_10' not in at_floor22
     assert set(at_floor22) == set(ehrlich22)
-    assert len(probes22) == 20 - 1 - len(ehrlich22)       # 20 rate constants - k_10 - 4 clipped
-    PASS('preset trial 0: role-based bands (capacity 1e-3x, inhibition/K_* 0.1x); k_10 excluded (55 sampled, no probe; re-included on 0.1x-10x with exclude_params=()); Ehrlich rates clipped to exactly 1e-3 x b_B, every other baseline unchanged')
+    assert len(probes22) == 21 - 1 - len(ehrlich22)       # 21 rate constants - k_10 - 4 clipped
+    PASS('preset trial 0: role-based bands (capacity 1e-3x, inhibition/K_* 0.1x); k_10 excluded (58 sampled, no probe; re-included on 0.1x-10x with exclude_params=()); Ehrlich rates clipped to exactly 1e-3 x b_B, every other baseline unchanged')
 else:
     print('SKIP 22: parameter-distribution workbooks not found')
 
@@ -1244,11 +1245,12 @@ else:
         k_4 = 4.8; k_5 = 0.0104; k_5e = 0.775; k_6 = 2.82
         k_7 = 1.203; k_8 = 0.589
         k_13 = 0.0; k_14 = 0.0; k_15 = 0.0; k_16 = 0.0
+        k_17 = 44.0            # Adh6 (r17): native/constitutive, ON in scenario A too (2026-09-15 split)
         K_1e = 0.12
         def getGlobalParameterIds(self):
             return ['k_1h', 'k_1l', 'k_1e', 'k_2', 'k_3', 'k_4', 'k_5',
                     'k_5e', 'k_6', 'k_7', 'k_8', 'k_13', 'k_14', 'k_15',
-                    'k_16', 'K_1e', 'not_kinetic']
+                    'k_16', 'k_17', 'K_1e', 'not_kinetic']
     te25 = _FakeTE25()
     seen_k7 = []          # k_7 on the fake model at each model_specification call
     def _model_specification25(**kw):
@@ -1312,11 +1314,12 @@ else:
     # offline no-load harness does not exercise. The burden columns
     # (k_7_eff etc.) are still recorded by the pre-sim evaluate.
     assert np.isclose(df25['k_7'][1], 9.0*1.203)
-    assert np.isclose(df25['burden_factor'][1], 0.17701, rtol=1e-3)   # 0.13276 at TRANSLATION_FRACTION_WT = 0.30
-    assert np.isclose(df25['k_7_eff'][1], 1.9165, rtol=1e-3)          # 1.4374 at 0.30
-    assert np.isclose(df25['k_8_eff'][1], 0.17701*0.589, rtol=1e-3)
-    # Phi_M,wt = the report's 0.0637 (at P = 0.45) x PROTEIN_CONTENT/0.45
-    assert np.isclose(df25['Phi_M'][1], 0.0637*eb.PROTEIN_CONTENT/eb.POOL_TABLE_PROTEIN_CONTENT)
+    assert np.isclose(df25['burden_factor'][1], 0.17634, rtol=1e-3)   # 0.17701 before the 2026-09-15 r17-native pool (Phi_M,wt rose); 0.13276 at TRANSLATION_FRACTION_WT = 0.30
+    assert np.isclose(df25['k_7_eff'][1], 1.9092, rtol=1e-3)          # 1.9165 before r17-native; 1.4374 at 0.30
+    assert np.isclose(df25['k_8_eff'][1], 0.17634*0.589, rtol=1e-3)
+    # Phi_M,wt = the sum of the native-step pools (now includes r17, the
+    # 2026-09-15 Adh6 native step; 0.0637 x PROTEIN_CONTENT/0.45 before it)
+    assert np.isclose(df25['Phi_M'][1], sum(pool for pool, _ in eb.NATIVE_STEPS.values()))
     assert np.isclose(df25['phi_T'][1], 9.0*eb.PHI_T_WT)
     assert df25['objective'][1] == 0.2
     # trial 2: the reference is inert
@@ -1752,7 +1755,7 @@ if os.path.isfile(wb_A) and os.path.isfile(wb_B):
     for sc28 in ('A', 'B'):
         base28_wb = ko.workbook_kinetic_baselines(sc28)
         rp28_wb = ko.rate_constant_names(base28_wb, roles=roles28_real)
-        assert len(rp28_wb) == (16 if sc28 == 'A' else 20)
+        assert len(rp28_wb) == (16 if sc28 == 'A' else 21)   # + k_17 since 2026-09-15
         wbb28 = ko.workbook_kinetic_bounds(
             sc28, multiplier_bounds=(0.1, 10.0),
             rate_multiplier_bounds=(1e-5, 10.0), rate_params=rp28_wb)
@@ -2362,11 +2365,12 @@ else:
         k_4 = 4.8; k_5 = 0.0104; k_5e = 0.775; k_6 = 2.82
         k_7 = 1.203; k_8 = 0.589
         k_13 = 0.0; k_14 = 0.0; k_15 = 0.0; k_16 = 0.0
+        k_17 = 44.0            # Adh6 (r17): native/constitutive, ON in scenario A too (2026-09-15 split)
         K_1e = 0.12
         def getGlobalParameterIds(self):
             return ['k_1h', 'k_1l', 'k_1e', 'k_2', 'k_3', 'k_4', 'k_5',
                     'k_5e', 'k_6', 'k_7', 'k_8', 'k_13', 'k_14', 'k_15',
-                    'k_16', 'K_1e', 'not_kinetic']
+                    'k_16', 'k_17', 'K_1e', 'not_kinetic']
     def _solve_TEA35(stream_IDs=None):
         return {'IRR': 0.2, 'MPSPs': {'ethanol': 0.5, 'isobutanol': 1.0}}
     handles35 = dict(handles17, r_te=_FakeTE35(),
@@ -3105,7 +3109,14 @@ assert ko.STUDY_TYPE_OPTIONS == {
                           rate_parameter_groups=ko.METABOLIC_14D_RATE_GROUPS,
                           group_multiplier_bounds={'glycolysis': (0.2, 4.0)},
                           exclude_params=(),
-                          spike_delta_bounds=None)}
+                          spike_delta_bounds=None),
+    'metabolic_split_14d': dict(rate_params=ko.METABOLIC_SPLIT_14D_RATES,
+                                parameter_groups=ko.METABOLIC_SPLIT_14D_GROUPS,
+                                rate_parameter_groups=ko.METABOLIC_14D_RATE_GROUPS,
+                                group_multiplier_bounds={'glycolysis': (0.2, 4.0)},
+                                exclude_params=(),
+                                spike_delta_bounds=None,
+                                stage_1_max_x_bounds=None)}
 assert {'STUDY_TYPE_OPTIONS', 'EFFECTOR_ORDER', 'kinetic_parameter_effectors',
         'study_type_name_defaults'} <= set(ko.__all__)
 # Naming defaults per study type (workbook-free): the minimal type's group
@@ -3181,7 +3192,8 @@ eff43 = ko.kinetic_parameter_effectors()
 assert eff43 is ko.kinetic_parameter_effectors()            # cached
 assert set(eff43) == set(ko.kinetic_parameter_roles())
 assert eff43['k_1ie'] == 'ethanol' and eff43['k_1ii'] == 'isobutanol' \
-    and eff43['k_16ia'] == 'acetate' and eff43['k_10ie'] == 'ethanol'
+    and eff43['k_16ia'] == 'acetate' and eff43['k_10ie'] == 'ethanol' \
+    and eff43['k_17ia'] == 'acetate' and eff43['k_17ie'] == 'ethanol'
 assert eff43['k_1e'] is None and eff43['k_7'] is None
 assert ko.kinetic_parameter_effectors(ko.kinetic_parameter_roles_path()) == eff43
 if os.path.isfile(wb_A) and os.path.isfile(wb_B):
@@ -3199,21 +3211,21 @@ if os.path.isfile(wb_A) and os.path.isfile(wb_B):
     assert p43['parameter_multiplier_bounds'] == {'k_10': (0.1, 10.0)}
     assert p43['stage_1_max_x_bounds'] == (1.0, 50.0)
     assert p43['parameter_groups'] == {
-        'inhib_ethanol': ['k_1ie', 'k_4ie', 'k_7ie', 'k_10ie', 'k_16ie'],
+        'inhib_ethanol': ['k_1ie', 'k_4ie', 'k_7ie', 'k_10ie', 'k_17ie'],
         'inhib_isobutanol': ['k_1ii', 'k_4ii', 'k_6ii', 'k_7ii', 'k_10ii'],
-        'inhib_acetate': ['k_1ia', 'k_4ia', 'k_6ia', 'k_7ia', 'k_10ia', 'k_16ia']}
+        'inhib_acetate': ['k_1ia', 'k_4ia', 'k_6ia', 'k_7ia', 'k_10ia', 'k_17ia']}
     assert list(p43['parameter_groups']) == ['inhib_ethanol', 'inhib_isobutanol', 'inhib_acetate']
     inc43 = p43['include_params']
-    assert len(inc43) == 36                                    # 20 capacities + 16 inhibition rows
+    assert len(inc43) == 37                                    # 21 capacities + 16 inhibition rows (k_17 since 2026-09-15)
     assert all(roles43[n] in ('capacity', 'product_inhibition', 'lethality') for n in inc43)
     assert not any(n.startswith('K_') for n in inc43)         # K_1i etc. are OUT
     grouped43 = {m for ms in p43['parameter_groups'].values() for m in ms}
     individual43 = [n for n in inc43 if n not in grouped43 and n not in p43['exclude_params']]
-    assert len(individual43) == 17 and all(roles43[n] == 'capacity' for n in individual43)
+    assert len(individual43) == 18 and all(roles43[n] == 'capacity' for n in individual43)
     assert not {'k_10', 'k_7', 'k_8'} & set(individual43)
-    assert len(p43['rate_params']) == 20                       # the workbook's capacities, as before
+    assert len(p43['rate_params']) == 21                       # the workbook's capacities (+ k_17)
     # The resulting space (live baselines = the B workbook values here):
-    # 17 + 3 + 4 = 24 decision variables, in the documented order.
+    # 18 + 3 + 4 = 25 decision variables, in the documented order.
     kb43 = ko.workbook_kinetic_baselines('B')
     space43, excl43 = ko.build_search_space(
         kb43, include_params=inc43, exclude_params=p43['exclude_params'],
@@ -3224,9 +3236,9 @@ if os.path.isfile(wb_A) and os.path.isfile(wb_B):
         group_multiplier_bounds=p43['group_multiplier_bounds'],
         spike_delta_bounds=p43['spike_delta_bounds'],
         stage_1_max_x_bounds=p43['stage_1_max_x_bounds'])
-    assert len(space43) == 24, len(space43)
-    assert list(space43)[:17] == individual43
-    assert list(space43)[17:] == ['inhib_ethanol', 'inhib_isobutanol', 'inhib_acetate',
+    assert len(space43) == 25, len(space43)
+    assert list(space43)[:18] == individual43
+    assert list(space43)[18:] == ['inhib_ethanol', 'inhib_isobutanol', 'inhib_acetate',
                                   'threshold_conc', 'target_delta', 'max_n_spikes',
                                   'stage_1_max_x']
     assert set(excl43) == set(kb43) - set(individual43) - grouped43
@@ -3714,8 +3726,10 @@ if os.path.isfile(wb_A) and os.path.isfile(wb_B):
     p45 = ko.resolve_study_preset('ethanol_isobutanol', 'metabolic_minimal_subset')
     assert p45['scenario'] == 'A' and p45['kinetic_bounds_scenario'] == 'B'
     assert p45['include_params'] == list(ko.METABOLIC_MINIMAL_SUBSET_RATES)
-    assert p45['parameter_groups'] == {
-        g: list(ms) for g, ms in ko.METABOLIC_MINIMAL_SUBSET_GROUPS.items()}
+    assert p45['parameter_groups'] == {   # k_16ie / k_16ia dropped by the intersection since the 2026-09-15 repoint (inert names)
+        'inhib_ethanol': ['k_1ie', 'k_4ie', 'k_7ie', 'k_10ie'],
+        'inhib_isobutanol': ['k_1ii', 'k_4ii', 'k_6ii', 'k_7ii', 'k_10ii'],
+        'inhib_acetate': ['k_1ia', 'k_4ia', 'k_6ia', 'k_7ia', 'k_10ia']}
     assert list(p45['parameter_groups']) == ['inhib_ethanol', 'inhib_isobutanol', 'inhib_acetate']
     assert p45['exclude_params'] == ()
     # multiplier_bounds is the inert default group-band tuple (all inhibition
@@ -3726,7 +3740,7 @@ if os.path.isfile(wb_A) and os.path.isfile(wb_B):
     assert p45['stage_1_max_x_bounds'] is None
     assert p45['rate_multiplier_bounds'] == ko.DEFAULT_RATE_MULTIPLIER_BOUNDS
     assert p45['parameter_multiplier_bounds'] == {'k_10': (0.1, 10.0)}
-    assert len(p45['rate_params']) == 20                       # the B workbook's capacities, as for every preset
+    assert len(p45['rate_params']) == 21                       # the B workbook's capacities (+ k_17 since 2026-09-15)
     assert set(p45['include_params']) <= set(p45['rate_params'])
     assert all(roles45[n] == 'capacity' for n in p45['include_params'])
     assert all(roles45[m] in ('product_inhibition', 'lethality')
@@ -3818,7 +3832,7 @@ if os.path.isfile(wb_A) and os.path.isfile(wb_B):
     assert ko.STUDY_TYPE_OPTIONS['metabolic_minimal_subset'] is good45
     # The role-filtered presets are untouched (same values as check 43).
     p45_mm = ko.resolve_study_preset('ethanol_isobutanol', 'metabolic_minimal')
-    assert len(p45_mm['include_params']) == 36 and p45_mm['exclude_params'] == ('k_10', 'k_7', 'k_8')
+    assert len(p45_mm['include_params']) == 37 and p45_mm['exclude_params'] == ('k_10', 'k_7', 'k_8')
     assert p45_mm['stage_1_max_x_bounds'] == (1.0, 50.0)
     # Driver name == supervisor name for the subset on both targets
     # (_driver_name43 mirrors the driver's inhibition-band choice).
@@ -5178,8 +5192,8 @@ if os.path.isfile(wb_A) and os.path.isfile(wb_B):
     assert list(p74['parameter_groups']) == ['glycolysis', 'inhib_ethanol',
                                              'inhib_isobutanol', 'inhib_acetate']
     assert p74['parameter_groups']['glycolysis'] == ['k_1l', 'k_1h', 'k_1e']
-    assert p74['parameter_groups']['inhib_ethanol'] == list(
-        ko.METABOLIC_MINIMAL_SUBSET_GROUPS['inhib_ethanol'])
+    assert p74['parameter_groups']['inhib_ethanol'] == ['k_1ie', 'k_4ie', 'k_7ie', 'k_10ie']   # k_16ie dropped by the workbook intersection since the 2026-09-15 repoint (inert name; metabolic_split_14d carries k_17ie)
+    assert p74['parameter_groups']['inhib_acetate'] == ['k_1ia', 'k_4ia', 'k_6ia', 'k_7ia', 'k_10ia']
     assert p74['exclude_params'] == ()
     assert p74['multiplier_bounds'] == (0.75, 1.5)                 # inert tuple (all inhib grouped)
     assert p74['group_multiplier_bounds'] == {'glycolysis': (0.2, 4.0)}
@@ -5718,5 +5732,152 @@ assert space82c['threshold_conc']['high'] == 120.0
 PASS('build_search_space: threshold-anchored feeding space feasible by '
      'construction (threshold_conc high < TARGET_CONC_MAX; worst corner '
      'keeps threshold < target < spike)')
+
+#%% 83. metabolic_split_14d preset (2026-09-15): metabolic_14d with the two
+# alcohol dehydrogenases as INDEPENDENT knobs -- Adh1 (r6, k_6) and Adh6 (r17,
+# k_17, new with the nskinetics r16/r17 split) -- the inhibition groups on the
+# LIVE cross-product coefficients k_17ie / k_17ia (the repointed workbook rows)
+# and stage_1_max_x PINNED, so the ethanol_isobutanol count stays at 14.
+assert ko.METABOLIC_SPLIT_14D_RATES == ('k_3', 'k_6', 'k_13', 'k_14', 'k_15', 'k_16', 'k_17')
+assert ko.METABOLIC_SPLIT_14D_GROUPS == {
+    'inhib_ethanol':    ('k_1ie', 'k_4ie', 'k_7ie', 'k_10ie', 'k_17ie'),
+    'inhib_isobutanol': ('k_1ii', 'k_4ii', 'k_6ii', 'k_7ii', 'k_10ii'),
+    'inhib_acetate':    ('k_1ia', 'k_4ia', 'k_6ia', 'k_7ia', 'k_10ia', 'k_17ia')}
+assert {'METABOLIC_SPLIT_14D_RATES', 'METABOLIC_SPLIT_14D_GROUPS'} <= set(ko.__all__)
+assert ko.STUDY_TYPE_ROLES['metabolic_split_14d'] == ()             # no role filter: explicit set
+opt83 = ko.STUDY_TYPE_OPTIONS['metabolic_split_14d']
+assert opt83 == dict(
+    rate_params=ko.METABOLIC_SPLIT_14D_RATES,
+    parameter_groups=ko.METABOLIC_SPLIT_14D_GROUPS,
+    rate_parameter_groups=ko.METABOLIC_14D_RATE_GROUPS,          # glycolysis, shared with metabolic_14d
+    group_multiplier_bounds={'glycolysis': (0.2, 4.0)},
+    exclude_params=(),
+    spike_delta_bounds=None,
+    stage_1_max_x_bounds=None)                                   # PINNED: the difference from metabolic_14d
+# metabolic_14d itself is untouched (still samples stage_1_max_x, still lists the inert k_16ie/k_16ia)
+assert 'stage_1_max_x_bounds' not in ko.STUDY_TYPE_OPTIONS['metabolic_14d']
+assert 'k_16ie' in ko.METABOLIC_MINIMAL_SUBSET_GROUPS['inhib_ethanol']
+# Name defaults: no _s1x tag (pinned), no _x tag, the group dict as the _ib band.
+assert ko.study_type_name_defaults('metabolic_split_14d') == dict(
+    inhibition_multiplier_bounds={'glycolysis': (0.2, 4.0)},
+    exclude_params=(), stage_1_max_x_bounds=None)
+NAME83 = 'kin_opt_ethanol_isobutanol_metabolic_split_14d_irr_rb0.001-4_ib0.75-1.5_burden'
+assert len(NAME83) == 78
+assert ko.default_study_name(
+    'IRR', 'ethanol_isobutanol', 'metabolic_split_14d',
+    rate_multiplier_bounds=(1e-3, 4.0),
+    inhibition_multiplier_bounds={'glycolysis': (0.2, 4.0)},
+    exclude_params=(), stage_1_max_x_bounds=None, burden=True) == NAME83
+assert ko.default_study_name(
+    'IRR', 'ethanol_isobutanol', 'metabolic_split_14d',
+    rate_multiplier_bounds=(1e-3, 4.0),
+    inhibition_multiplier_bounds={'glycolysis': (0.2, 4.0)},
+    exclude_params=(), stage_1_max_x_bounds=None, burden=True,
+    method='gp') == NAME83.replace('_irr_', '_irr_gp_')
+assert ko.default_study_name(
+    'IRR', 'ethanol_isobutanol', 'metabolic_split_14d',
+    rate_multiplier_bounds=(1e-3, 4.0),
+    inhibition_multiplier_bounds={'glycolysis': (0.2, 4.0)},
+    exclude_params=(), stage_1_max_x_bounds=None, burden=True,
+    method='dual_annealing') == NAME83.replace('_irr_', '_irr_da_')
+# The supervisor derives the SAME name from the study_type alone, and lists the type.
+sup83 = _runpy.run_path(os.path.join(
+    os.path.dirname(os.path.abspath(__file__)),
+    'optimize_kinetics_BO_supervised.py'))
+assert sup83['default_study_name'](None, 'IRR', None,
+                                   study_target_products='ethanol_isobutanol',
+                                   study_type='metabolic_split_14d', burden=True) == NAME83
+assert 'metabolic_split_14d' in ko.STUDY_TYPE_ROLES              # = the supervisor's --study-type choices
+# Typo guards (role table): every listed rate a capacity row, every group member an inhibition row.
+roles83 = ko.kinetic_parameter_roles()
+assert all(roles83[n] == 'capacity' for n in ko.METABOLIC_SPLIT_14D_RATES)
+assert roles83['k_17'] == 'capacity' and roles83['k_17ie'] == 'product_inhibition' \
+    and roles83['k_17ia'] == 'product_inhibition'
+assert all(roles83[m] in ('product_inhibition', 'lethality')
+           for ms in ko.METABOLIC_SPLIT_14D_GROUPS.values() for m in ms)
+ko.STUDY_TYPE_ROLES['_bad_rate_83'] = ()
+ko.STUDY_TYPE_OPTIONS['_bad_rate_83'] = dict(
+    rate_params=('k_3', 'k_17ie'), parameter_groups={},             # inhibition coeff listed as a rate
+    rate_parameter_groups={}, group_multiplier_bounds={}, exclude_params=(),
+    spike_delta_bounds=None, stage_1_max_x_bounds=None)
+try:
+    try:
+        ko.resolve_study_preset('ethanol_isobutanol', '_bad_rate_83')
+        raise AssertionError('rate typo guard did not fire')
+    except KeyError as e83:
+        assert 'k_17ie' in str(e83) and '_bad_rate_83' in str(e83), str(e83)
+finally:
+    del ko.STUDY_TYPE_ROLES['_bad_rate_83']
+    del ko.STUDY_TYPE_OPTIONS['_bad_rate_83']
+if os.path.isfile(wb_A) and os.path.isfile(wb_B):
+    # ethanol_isobutanol: 7 rates + glycolysis + 3 inhibition groups + 3 feeding = 14, no stage_1_max_x.
+    p83 = ko.resolve_study_preset('ethanol_isobutanol', 'metabolic_split_14d')
+    assert p83['scenario'] == 'A' and p83['kinetic_bounds_scenario'] == 'B'
+    assert p83['include_params'] == list(ko.METABOLIC_SPLIT_14D_RATES)   # k_17 admitted: the ._k_17 workbook row
+    assert list(p83['parameter_groups']) == ['glycolysis', 'inhib_ethanol',
+                                             'inhib_isobutanol', 'inhib_acetate']
+    assert p83['parameter_groups']['glycolysis'] == ['k_1l', 'k_1h', 'k_1e']
+    assert p83['parameter_groups']['inhib_ethanol'] == ['k_1ie', 'k_4ie', 'k_7ie', 'k_10ie', 'k_17ie']
+    assert p83['parameter_groups']['inhib_isobutanol'] == ['k_1ii', 'k_4ii', 'k_6ii', 'k_7ii', 'k_10ii']
+    assert p83['parameter_groups']['inhib_acetate'] == ['k_1ia', 'k_4ia', 'k_6ia', 'k_7ia', 'k_10ia', 'k_17ia']
+    assert p83['exclude_params'] == () and p83['spike_delta_bounds'] is None
+    assert p83['stage_1_max_x_bounds'] is None                    # pinned
+    assert p83['group_multiplier_bounds'] == {'glycolysis': (0.2, 4.0)}
+    assert p83['rate_multiplier_bounds'] == ko.DEFAULT_RATE_MULTIPLIER_BOUNDS
+    assert 'k_17' in p83['rate_params'] and len(p83['rate_params']) == 21
+    kb83 = ko.workbook_kinetic_baselines('B')
+    assert kb83['k_17'] == 44.0 and kb83['k_17ie'] == 0.02 and kb83['k_17ia'] == 0.06
+    space83, excl83 = ko.build_search_space(
+        kb83, include_params=p83['include_params'],
+        exclude_params=p83['exclude_params'],
+        rate_multiplier_bounds=p83['rate_multiplier_bounds'],
+        rate_params=p83['rate_params'],
+        parameter_multiplier_bounds=p83['parameter_multiplier_bounds'],
+        parameter_groups=p83['parameter_groups'],
+        group_multiplier_bounds=p83['group_multiplier_bounds'],
+        spike_delta_bounds=p83['spike_delta_bounds'],
+        stage_1_max_x_bounds=p83['stage_1_max_x_bounds'])
+    grouped83 = {m for ms in p83['parameter_groups'].values() for m in ms}
+    assert set(excl83) == set(kb83) - set(ko.METABOLIC_SPLIT_14D_RATES) - grouped83   # not in the set: at baseline (K_17, k_17r, K_17e, k_2, ...)
+    assert {'K_17', 'k_17r', 'K_17e', 'k_10', 'k_7'} <= set(excl83) and 'k_17' not in excl83
+    assert len(space83) == 14, list(space83)
+    assert list(space83) == ['k_3', 'k_6', 'k_13', 'k_14', 'k_15', 'k_16', 'k_17',
+                             'glycolysis', 'inhib_ethanol', 'inhib_isobutanol',
+                             'inhib_acetate', 'threshold_conc', 'target_delta',
+                             'max_n_spikes']
+    assert 'stage_1_max_x' not in space83 and 'spike_delta' not in space83
+    assert space83['k_17'] == dict(low=1e-3*44.0, high=4.0*44.0, log=True)
+    assert space83['k_6'] == dict(low=1e-3*kb83['k_6'], high=4.0*kb83['k_6'], log=True)
+    assert space83['glycolysis'] == dict(low=0.2, high=4.0, log=True)
+    for g83 in ('inhib_ethanol', 'inhib_isobutanol', 'inhib_acetate'):
+        assert space83[g83] == dict(low=0.75, high=1.5, log=True)
+    assert len(space83) <= ko.GP_MAX_DIMENSIONS                    # every method applies
+    # the expanded members: k_17ie / k_17ia scale with their families
+    exp83 = ko.expand_grouped_values(
+        {'inhib_ethanol': 2.0, 'inhib_isobutanol': 1.0, 'inhib_acetate': 0.5},
+        p83['parameter_groups'], kb83)
+    assert exp83['k_17ie'] == 2.0*0.02 and exp83['k_17ia'] == 0.5*0.06 and exp83['k_1ie'] == 2.0*kb83['k_1ie']
+    # ethanol_only: no k_13-k_17, no isobutanol / Adh6 coefficients in the A workbook -> 2 + 1 + 2 + 3 = 8.
+    p83_eo = ko.resolve_study_preset('ethanol_only', 'metabolic_split_14d')
+    assert p83_eo['include_params'] == ['k_3', 'k_6']
+    assert list(p83_eo['parameter_groups']) == ['glycolysis', 'inhib_ethanol', 'inhib_acetate']
+    assert p83_eo['parameter_groups']['inhib_ethanol'] == ['k_1ie', 'k_4ie', 'k_7ie', 'k_10ie']
+    kb83_eo = ko.workbook_kinetic_baselines('A')
+    space83_eo, _ = ko.build_search_space(
+        kb83_eo, include_params=p83_eo['include_params'],
+        exclude_params=p83_eo['exclude_params'],
+        rate_multiplier_bounds=p83_eo['rate_multiplier_bounds'],
+        rate_params=p83_eo['rate_params'],
+        parameter_multiplier_bounds=p83_eo['parameter_multiplier_bounds'],
+        parameter_groups=p83_eo['parameter_groups'],
+        group_multiplier_bounds=p83_eo['group_multiplier_bounds'],
+        spike_delta_bounds=p83_eo['spike_delta_bounds'],
+        stage_1_max_x_bounds=p83_eo['stage_1_max_x_bounds'])
+    assert len(space83_eo) == 8, list(space83_eo)
+    assert list(space83_eo) == ['k_3', 'k_6', 'glycolysis', 'inhib_ethanol', 'inhib_acetate',
+                                'threshold_conc', 'target_delta', 'max_n_spikes']
+else:
+    print('SKIP 83 (preset part): parameter-distribution workbooks not found')
+PASS('metabolic_split_14d preset: 14/8 vars (k_6 + k_17 independent, k_17ie/k_17ia grouped, glycolysis first, stage_1_max_x pinned), name _ib0.75-1.5 (no _s1x), GP/DA tags, typo guard, supervisor agrees')
 
 print(f'\nALL {n_pass} CHECKS PASSED')
