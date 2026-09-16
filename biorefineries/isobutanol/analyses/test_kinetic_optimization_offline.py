@@ -6403,4 +6403,36 @@ assert ko.antimony_rate_baselines(path=ko.antimony_file_path())['k_16'] == 0.021
 PASS('antimony_rate_baselines: k_13-k_15 = 0, k_16 = 0.02115, k_17 = 0.1077 by file path; '
      'constants exported')
 
+#%% 91. scenario_A_ibo_pathway_rate_bounds (2026-09-16): the param_bounds_override
+# for individually-sampled IBO-pathway capacity rates (absent from the A workbook).
+assert 'scenario_A_ibo_pathway_rate_bounds' in ko.__all__
+rate_params91 = ('k_1l', 'k_1h', 'k_3', 'k_6', 'k_13', 'k_14', 'k_15', 'k_16', 'k_17')
+# All five IBO-pathway rates sampled individually + two natives:
+ov91 = ko.scenario_A_ibo_pathway_rate_bounds(
+    ['k_1l', 'k_6', 'k_13', 'k_14', 'k_15', 'k_16', 'k_17'], rate_params91)
+assert set(ov91) == {'k_13', 'k_14', 'k_15', 'k_16', 'k_17'}   # natives untouched
+assert ov91['k_13'] == (1e-3, 4.0) and ov91['k_14'] == (1e-3, 4.0) and ov91['k_15'] == (1e-3, 4.0)
+assert np.isclose(ov91['k_16'][0], 1e-3*0.02115) and np.isclose(ov91['k_16'][1], 1e2*0.02115)
+assert np.isclose(ov91['k_17'][0], 1e-3*0.1077) and np.isclose(ov91['k_17'][1], 20.0*0.1077)
+# Grouped rates (not in include_params, e.g. metabolic_split_12d) are skipped:
+ov91b = ko.scenario_A_ibo_pathway_rate_bounds(['k_3', 'k_6', 'k_13', 'k_17'], rate_params91)
+assert set(ov91b) == {'k_13', 'k_17'}
+# A non-rate (inhibition coefficient) in include_params is ignored:
+ov91c = ko.scenario_A_ibo_pathway_rate_bounds(['k_13', 'k_1ie'], rate_params91)
+assert set(ov91c) == {'k_13'}
+# No IBO-pathway rate individually sampled (ethanol_only-like) -> empty:
+assert ko.scenario_A_ibo_pathway_rate_bounds(['k_1l', 'k_6'], rate_params91) == {}
+# A nonzero-A IBO-pathway rate with no multiplier-table entry is a hard error.
+# k_99 is absent from the (empty) A-workbook rows, is a rate, has a nonzero
+# antimony value and no SCENARIO_A_ANCHORED_RATE_MULTIPLIER_BOUNDS entry:
+try:
+    ko.scenario_A_ibo_pathway_rate_bounds(
+        ['k_99'], ('k_99',), scenario_A_workbook_rows=set(),
+        antimony={'k_99': 5.0})
+    raise AssertionError('missing table entry did not raise')
+except KeyError:
+    pass
+PASS('scenario_A_ibo_pathway_rate_bounds: k_13-k_15 absolute, k_16/k_17 anchored '
+     'multiplier, natives/grouped/non-rate skipped, missing-table error')
+
 print(f'\nALL {n_pass} CHECKS PASSED')

@@ -71,6 +71,7 @@ __all__ = ('OBJECTIVE_REGISTRY', 'TRACKED_METRICS',
            'RATE_CONSTANT_ROLES', 'INHIBITION_COEFFICIENT_ROLES',
            'kinetic_parameter_roles_path', 'kinetic_parameter_roles',
            'antimony_file_path', 'antimony_rate_baselines',
+           'scenario_A_ibo_pathway_rate_bounds',
            'SCENARIO_A_ANCHORED_RATE_MULTIPLIER_BOUNDS',
            'IBO_PATHWAY_ZERO_A_RATE_BOUNDS',
            'rate_constant_names',
@@ -1362,6 +1363,52 @@ def antimony_rate_baselines(path=None):
     if path is None:
         _antimony_rate_baselines_cache = baselines
     return baselines
+
+def scenario_A_ibo_pathway_rate_bounds(include_params, rate_params, *,
+                                       scenario_A_workbook_rows=None,
+                                       antimony=None):
+    """param_bounds_override entries for the isobutanol-pathway capacity rates
+    a preset samples INDIVIDUALLY. A rate qualifies iff it is a capacity rate
+    (in `rate_params`), individually sampled (in `include_params`), and ABSENT
+    from the scenario-A workbook (the natives are present in A -- and identical
+    in A, B and the antimony -- so their B-anchored bands already equal the A
+    ones and are left untouched). For each such rate the band is anchored on
+    the fitted scenario-A antimony value (CLAUDE.md anchoring rule):
+
+    * antimony value a > 0 -> (m_lo*a, m_hi*a), where (m_lo, m_hi) is the
+      per-parameter band from SCENARIO_A_ANCHORED_RATE_MULTIPLIER_BOUNDS
+      (k_16, k_17). A nonzero-A rate with no table entry is a KeyError (forces
+      an explicit decision; cannot happen with today's model).
+    * antimony value a == 0 (k_13, k_14, k_15) -> IBO_PATHWAY_ZERO_A_RATE_BOUNDS.
+
+    Grouped rates (not in `include_params`, e.g. k_14/k_15/k_16 under
+    metabolic_split_12d) are correctly skipped. Returns {} when the preset
+    samples no isobutanol-pathway rate individually (e.g. ethanol_only)."""
+    if scenario_A_workbook_rows is None:
+        scenario_A_workbook_rows = set(workbook_kinetic_baselines('A'))
+    else:
+        scenario_A_workbook_rows = set(scenario_A_workbook_rows)
+    if antimony is None:
+        antimony = antimony_rate_baselines()
+    rate_set = set(rate_params or ())
+    override = {}
+    for name in include_params:
+        if name not in rate_set or name in scenario_A_workbook_rows:
+            continue
+        a = antimony.get(name, 0.0)
+        if a > 0.0:
+            try:
+                m_lo, m_hi = SCENARIO_A_ANCHORED_RATE_MULTIPLIER_BOUNDS[name]
+            except KeyError:
+                raise KeyError(
+                    f'{name!r} is a nonzero scenario-A (antimony={a!r}) '
+                    'isobutanol-pathway rate with no entry in '
+                    'SCENARIO_A_ANCHORED_RATE_MULTIPLIER_BOUNDS; add a '
+                    'per-parameter multiplier band explicitly before sampling it.')
+            override[name] = (m_lo*a, m_hi*a)
+        else:
+            override[name] = IBO_PATHWAY_ZERO_A_RATE_BOUNDS
+    return override
 
 _kinetic_parameter_table_cache = None
 
