@@ -5880,4 +5880,49 @@ else:
     print('SKIP 83 (preset part): parameter-distribution workbooks not found')
 PASS('metabolic_split_14d preset: 14/8 vars (k_6 + k_17 independent, k_17ie/k_17ia grouped, glycolysis first, stage_1_max_x pinned), name _ib0.75-1.5 (no _s1x), GP/DA tags, typo guard, supervisor agrees')
 
+#%% 84. metabolic_split_12d constants (2026-09-15, spec 2026-09-15-metabolic-
+# split-12d-ehrlich-downstream-group-design.md): the STOICHIOMETRIC weights of
+# the ehrlich_downstream capacity group (k_14 the ANCHOR, weight 1.0, first
+# key; k_15 = 1.015 g DHIV per g acetolactate; k_16 = 1.015 x 0.866 g KIV per
+# g acetolactate), the 12d rate list and its two capacity groups, all exported.
+assert ko.EHRLICH_DOWNSTREAM_WEIGHTS == {'k_14': 1.0, 'k_15': 1.015, 'k_16': 1.015*0.866}
+assert list(ko.EHRLICH_DOWNSTREAM_WEIGHTS) == ['k_14', 'k_15', 'k_16']      # anchor first
+assert ko.EHRLICH_DOWNSTREAM_WEIGHTS['k_14'] == 1.0
+assert ko.METABOLIC_SPLIT_12D_RATES == ('k_3', 'k_6', 'k_13', 'k_17')
+assert ko.METABOLIC_SPLIT_12D_RATE_GROUPS == {
+    'glycolysis': ('k_1l', 'k_1h', 'k_1e'),
+    'ehrlich_downstream': ('k_14', 'k_15', 'k_16')}
+assert list(ko.METABOLIC_SPLIT_12D_RATE_GROUPS) == ['glycolysis', 'ehrlich_downstream']
+assert list(ko.METABOLIC_SPLIT_12D_RATE_GROUPS['ehrlich_downstream']) == list(ko.EHRLICH_DOWNSTREAM_WEIGHTS)
+assert {'EHRLICH_DOWNSTREAM_WEIGHTS', 'METABOLIC_SPLIT_12D_RATES',
+        'METABOLIC_SPLIT_12D_RATE_GROUPS'} <= set(ko.__all__)
+# Drift guard: re-derive the weights from the nskinetics antimony rate laws,
+# read BY FILE PATH next to the role table (never by importing nskinetics):
+#   r14: s_AL + 0.121 $Red => 1.015 s_DHI; ...
+#   r15: s_DHI => 0.866 s_KIV; ...
+# so w_15 = coeff(r14, s_DHI) and w_16 = w_15 x coeff(r15, s_KIV). A future
+# stoichiometry edit fails here instead of silently unbalancing the group.
+import re as _re84
+antimony84 = os.path.join(os.path.dirname(ko.kinetic_parameter_roles_path()),
+                          's_cerevisiae_ferm_fb_inhib_mod_ibo_antimony.txt')
+assert os.path.isfile(antimony84), antimony84
+with open(antimony84, encoding='utf-8') as _fh84:
+    text84 = _fh84.read()
+def _product_coeff84(reaction, product):
+    """The stoichiometric coefficient of `product` on the right-hand side of
+    the antimony reaction line `  <reaction>: <reactants> => <products>; <law>`."""
+    line = _re84.search(rf'^\s*{reaction}:\s*(.*?)\s*=>\s*(.*?);', text84, _re84.M)
+    assert line is not None, reaction
+    term = _re84.search(rf'(?:^|\+)\s*([0-9.]+)\s+{product}\b', line.group(2))
+    assert term is not None, (reaction, product, line.group(2))
+    return float(term.group(1))
+w15_84 = _product_coeff84('r14', 's_DHI')
+w16_84 = w15_84*_product_coeff84('r15', 's_KIV')
+assert abs(w15_84 - ko.EHRLICH_DOWNSTREAM_WEIGHTS['k_15']) < 1e-12, (w15_84, ko.EHRLICH_DOWNSTREAM_WEIGHTS)
+assert abs(w16_84 - ko.EHRLICH_DOWNSTREAM_WEIGHTS['k_16']) < 1e-12, (w16_84, ko.EHRLICH_DOWNSTREAM_WEIGHTS)
+assert w15_84 == 1.015 and abs(w16_84 - 0.878990) < 1e-6
+PASS('metabolic_split_12d constants: EHRLICH_DOWNSTREAM_WEIGHTS (anchor k_14 first, 1.0 / 1.015 / '
+     '1.015x0.866) re-derived from the antimony r14 / r15 product coefficients by file path; '
+     '12d rates and capacity groups exported')
+
 print(f'\nALL {n_pass} CHECKS PASSED')

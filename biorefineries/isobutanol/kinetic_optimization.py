@@ -76,6 +76,8 @@ __all__ = ('OBJECTIVE_REGISTRY', 'TRACKED_METRICS',
            'METABOLIC_MINIMAL_SUBSET_RATES', 'METABOLIC_MINIMAL_SUBSET_GROUPS',
            'METABOLIC_14D_RATES', 'METABOLIC_14D_RATE_GROUPS',
            'METABOLIC_SPLIT_14D_RATES', 'METABOLIC_SPLIT_14D_GROUPS',
+           'EHRLICH_DOWNSTREAM_WEIGHTS', 'METABOLIC_SPLIT_12D_RATES',
+           'METABOLIC_SPLIT_12D_RATE_GROUPS',
            'kinetic_parameter_effectors', 'study_type_name_defaults',
            'DEFAULT_STUDY_TARGET_PRODUCTS', 'DEFAULT_STUDY_TYPE',
            'resolve_study_preset', 'default_study_name',
@@ -1424,6 +1426,49 @@ METABOLIC_SPLIT_14D_GROUPS = {
     'inhib_ethanol':    ('k_1ie', 'k_4ie', 'k_7ie', 'k_10ie', 'k_17ie'),
     'inhib_isobutanol': ('k_1ii', 'k_4ii', 'k_6ii', 'k_7ii', 'k_10ii'),
     'inhib_acetate':    ('k_1ia', 'k_4ia', 'k_6ia', 'k_7ia', 'k_10ia', 'k_17ia'),
+}
+
+#: metabolic_split_12d (2026-09-15; spec docs/superpowers/specs/2026-09-15-
+#: metabolic-split-12d-ehrlich-downstream-group-design.md): metabolic_split_14d
+#: with the three Ehrlich rates DOWNSTREAM of the pyruvate split -- k_14
+#: (Ilv5), k_15 (Ilv3), k_16 (Aro10) -- collapsed into ONE log-scale capacity
+#: multiplier, `ehrlich_downstream`, with fixed STOICHIOMETRIC intra-ratios.
+#: r14 / r15 / r16 are irreversible Michaelis-Menten steps in their own
+#: substrate with no feedback and no effluent mapping of their intermediates,
+#: so the trio is one degree of freedom ("enough downstream capacity"): the
+#: 09-14 / 09-15 14d GP studies show the three values at ~0.3-0.5 x k_13 in
+#: every high-isobutanol cluster, Spearman ~0 with titer / PI, and their
+#: pools still ~45 % of Phi_M. The INDIVIDUAL rates: k_3 (Pdc), k_6 (Adh1),
+#: k_13 (Ilv2, the branch entry, kept free -- r13 runs far from saturation
+#: and tying the trio to it by stoichiometry would prune the profitable
+#: region) and k_17 (Adh6), each on the rate band, intersected with the
+#: target's workbook (ethanol_only lacks k_13-k_17).
+METABOLIC_SPLIT_12D_RATES = ('k_3', 'k_6', 'k_13', 'k_17')
+#: The STOICHIOMETRIC weights of the ehrlich_downstream group, from the
+#: nskinetics antimony rate laws (s_cerevisiae_ferm_fb_inhib_mod_ibo_antimony
+#: .txt: `r14: s_AL + 0.121 $Red => 1.015 s_DHI`, `r15: s_DHI => 0.866
+#: s_KIV`, `r16: s_KIV => 0.621 s_isobutald + 0.379 $CO2`): every k is a
+#: capacity in g of ITS OWN substrate per gDCW per h, so a saturation-
+#: balanced chain needs, per unit of r14 capacity, 1.015 units of r15
+#: capacity (g DHIV per g acetolactate) and 1.015 x 0.866 = 0.878990 units of
+#: r16 capacity (g KIV per g acetolactate). k_14 is the ANCHOR (the first
+#: key, weight exactly 1.0): resolve_study_preset scales the weights by the
+#: anchor's bounds-workbook baseline (B: k_14 = 4.8 -> references 4.800 /
+#: 4.872 / 4.219), so the group's band is identical to k_14's individual
+#: band today. The B workbook's own 4.8 / 4.8 / 2.82 ratio (r16 33 % below
+#: balance) is deliberately NOT used. The offline test re-derives these
+#: numbers from the antimony file by path (check 84).
+EHRLICH_DOWNSTREAM_WEIGHTS = {'k_14': 1.0, 'k_15': 1.015, 'k_16': 1.015*0.866}
+#: Its two CAPACITY groups, in search-space / CSV column order (glycolysis,
+#: then ehrlich_downstream, both ahead of the inhibition groups): glycolysis
+#: on 0.2x-4x of every member's LIVE baseline (unchanged from metabolic_14d),
+#: ehrlich_downstream on 1e-3x-4x of the group's REFERENCES (group_references,
+#: built by resolve_study_preset from EHRLICH_DOWNSTREAM_WEIGHTS -- the live
+#: k_14-k_16 are 0 at the scenario-A start, so a live-baseline multiplier
+#: would be degenerate).
+METABOLIC_SPLIT_12D_RATE_GROUPS = {
+    'glycolysis': ('k_1l', 'k_1h', 'k_1e'),
+    'ehrlich_downstream': ('k_14', 'k_15', 'k_16'),
 }
 
 #: Per-study_type options beyond the role filter (a type absent here
