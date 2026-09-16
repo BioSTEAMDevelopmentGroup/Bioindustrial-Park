@@ -6377,4 +6377,30 @@ assert 'choices=tuple(ko.STUDY_TYPE_ROLES)' in sup89   # the new type is a valid
 PASS('driver: group_references setdefault-ed from the preset and forwarded through engine_kwargs, '
      'referenced groups marked in the groups print, runner example + docstrings; supervisor example')
 
+#%% 90. Scenario-A antimony rate baselines (2026-09-16): read by file path,
+# the ONLY fitted source valid for anchoring (CLAUDE.md anchoring rule). Drift
+# guard on the five isobutanol-pathway capacity rates.
+assert {'antimony_file_path', 'antimony_rate_baselines',
+        'SCENARIO_A_ANCHORED_RATE_MULTIPLIER_BOUNDS',
+        'IBO_PATHWAY_ZERO_A_RATE_BOUNDS'} <= set(ko.__all__)
+anti90 = ko.antimony_rate_baselines()
+assert anti90['k_13'] == 0.0 and anti90['k_14'] == 0.0 and anti90['k_15'] == 0.0
+assert anti90['k_16'] == 0.02115, anti90['k_16']
+assert anti90['k_17'] == 0.1077, anti90['k_17']
+# Natives are present and positive (identical in A, B, antimony -- so anchoring
+# them on A vs B is a no-op; only k_13-k_17 depend on the anchor).
+assert anti90['k_6'] > 0.0 and anti90['k_3'] > 0.0
+# antimony_file_path sits beside the role table and exists.
+assert ko.antimony_file_path() == os.path.join(
+    os.path.dirname(ko.kinetic_parameter_roles_path()),
+    's_cerevisiae_ferm_fb_inhib_mod_ibo_antimony.txt')
+assert os.path.isfile(ko.antimony_file_path())
+# Constants.
+assert ko.SCENARIO_A_ANCHORED_RATE_MULTIPLIER_BOUNDS == {'k_16': (1e-3, 1e2), 'k_17': (1e-3, 20.0)}
+assert ko.IBO_PATHWAY_ZERO_A_RATE_BOUNDS == (1e-3, 4.0)
+# An explicit path is read afresh (not the cache).
+assert ko.antimony_rate_baselines(path=ko.antimony_file_path())['k_16'] == 0.02115
+PASS('antimony_rate_baselines: k_13-k_15 = 0, k_16 = 0.02115, k_17 = 0.1077 by file path; '
+     'constants exported')
+
 print(f'\nALL {n_pass} CHECKS PASSED')

@@ -70,6 +70,9 @@ __all__ = ('OBJECTIVE_REGISTRY', 'TRACKED_METRICS',
            'group_bounds_for', 'expand_grouped_values',
            'RATE_CONSTANT_ROLES', 'INHIBITION_COEFFICIENT_ROLES',
            'kinetic_parameter_roles_path', 'kinetic_parameter_roles',
+           'antimony_file_path', 'antimony_rate_baselines',
+           'SCENARIO_A_ANCHORED_RATE_MULTIPLIER_BOUNDS',
+           'IBO_PATHWAY_ZERO_A_RATE_BOUNDS',
            'rate_constant_names',
            'STUDY_TARGET_PRODUCTS', 'STUDY_TYPE_ROLES',
            'STUDY_TYPE_OPTIONS', 'EFFECTOR_ORDER',
@@ -253,6 +256,19 @@ def expand_grouped_values(values, parameter_groups, kinetic_baselines,
 #: unchanged.
 DEFAULT_RATE_MULTIPLIER_BOUNDS = (1e-3, 4.0)
 DEFAULT_SATURATION_MULTIPLIER_BOUNDS = (0.1, 10.0)
+
+#: Per-parameter multiplier bands for the nonzero-scenario-A isobutanol-pathway
+#: capacity rates, applied to their scenario-A (antimony) anchor value. Scenario A
+#: uses the antimony values as-is, so this honours the anchoring rule (only the
+#: fitted antimony -- never arbitrary scenario B -- anchors a kinetic value).
+SCENARIO_A_ANCHORED_RATE_MULTIPLIER_BOUNDS = {'k_16': (1e-3, 1e2), 'k_17': (1e-3, 20.0)}
+
+#: Absolute (low, high) g/L/h band for the isobutanol-pathway capacity rates whose
+#: scenario-A anchor is zero (k_13, k_14, k_15): no nonzero anchor to scale, so an
+#: absolute log-scale band. The low bound is 1e-3 (not 0) so the band stays
+#: log-scale and the trial-0 baseline (live A = 0) clips up to it, exactly as the
+#: old B-anchored floor (1e-3 x B_baseline) did.
+IBO_PATHWAY_ZERO_A_RATE_BOUNDS = (1e-3, 4.0)
 
 #: Per-parameter multiplier bands of the study presets, {name: (m_lo,
 #: m_hi)} x baseline, taking precedence over the ROLE band of that name
@@ -1310,6 +1326,42 @@ def kinetic_parameter_roles_path():
         raise ImportError('nskinetics is not installed (needed for the '
                           'kinetic-parameter role table).')
     return os.path.join(os.path.dirname(spec.origin), *_ROLE_TABLE_RELPATH)
+
+#: Antimony model file (the fitted kinetics; scenario A uses it as-is), beside
+#: the role table.
+_ANTIMONY_MODEL_FILENAME = 's_cerevisiae_ferm_fb_inhib_mod_ibo_antimony.txt'
+
+def antimony_file_path():
+    """Absolute path of the nskinetics antimony file for the shipped
+    S. cerevisiae ethanol/isobutanol model, beside the role table
+    (kinetic_parameter_roles_path). The antimony is the only kinetic source
+    fitted on experimental data, so it is the only valid anchor for a new
+    kinetic constant (CLAUDE.md anchoring rule)."""
+    return os.path.join(os.path.dirname(kinetic_parameter_roles_path()),
+                        _ANTIMONY_MODEL_FILENAME)
+
+_antimony_rate_baselines_cache = None
+#: Every `k_<name> = <number>;` assignment line of the antimony file.
+_ANTIMONY_RATE_ASSIGNMENT_RE = re.compile(
+    r'^\s*(k_[A-Za-z0-9]+)\s*=\s*([-+0-9.eE]+)\s*;', re.M)
+
+def antimony_rate_baselines(path=None):
+    """{k_<name>: float} for every rate-constant assignment in the antimony
+    file (regex on the text; no nskinetics import, so safe for the offline
+    test and sim-free preset resolution). Cached for the default path; an
+    explicit `path` (tests) is read afresh and never cached -- the same
+    discipline as _kinetic_parameter_table."""
+    global _antimony_rate_baselines_cache
+    if path is None and _antimony_rate_baselines_cache is not None:
+        return _antimony_rate_baselines_cache
+    file_path = antimony_file_path() if path is None else path
+    with open(file_path, encoding='utf-8') as fh:
+        text = fh.read()
+    baselines = {name: float(value)
+                 for name, value in _ANTIMONY_RATE_ASSIGNMENT_RE.findall(text)}
+    if path is None:
+        _antimony_rate_baselines_cache = baselines
+    return baselines
 
 _kinetic_parameter_table_cache = None
 
