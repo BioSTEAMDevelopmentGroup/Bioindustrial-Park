@@ -5925,4 +5925,33 @@ PASS('metabolic_split_12d constants: EHRLICH_DOWNSTREAM_WEIGHTS (anchor k_14 fir
      '1.015x0.866) re-derived from the antimony r14 / r15 product coefficients by file path; '
      '12d rates and capacity groups exported')
 
+#%% 85. expand_grouped_values(group_references=...) (2026-09-15): a REFERENCED
+# group applies reference x multiplier (its members' live baselines -- zero at
+# the scenario-A start -- are never consulted); an un-referenced group still
+# applies live baseline x multiplier; None / {} reproduce today's output
+# bit-for-bit; a group key is replaced in place by its members (order kept).
+kb85 = {'k_13': 0.0, 'k_14': 0.0, 'k_15': 0.0, 'k_16': 0.0, 'k_1e': 47.1, 'k_1ie': 0.02}
+groups85 = {'ehrlich_downstream': ['k_14', 'k_15', 'k_16'], 'inhib_ethanol': ['k_1ie']}
+refs85 = {'ehrlich_downstream': {'k_14': 4.8, 'k_15': 4.8*1.015, 'k_16': 4.8*1.015*0.866}}
+vals85 = {'k_13': 3.0, 'ehrlich_downstream': 0.5, 'inhib_ethanol': 2.0, 'threshold_conc': 100.0}
+out85 = ko.expand_grouped_values(vals85, groups85, kb85, group_references=refs85)
+assert out85 == {'k_13': 3.0, 'k_14': 0.5*4.8, 'k_15': 0.5*(4.8*1.015),
+                 'k_16': 0.5*(4.8*1.015*0.866), 'k_1ie': 2.0*0.02,
+                 'threshold_conc': 100.0}, out85
+assert list(out85) == ['k_13', 'k_14', 'k_15', 'k_16', 'k_1ie', 'threshold_conc']
+# un-referenced rule preserved: None / {} / omitted are the same call
+kb85b = {**kb85, 'k_14': 4.8, 'k_15': 4.8, 'k_16': 2.82}
+plain85 = ko.expand_grouped_values(vals85, groups85, kb85b)
+assert plain85 == ko.expand_grouped_values(vals85, groups85, kb85b, group_references=None)
+assert plain85 == ko.expand_grouped_values(vals85, groups85, kb85b, group_references={})
+assert plain85['k_16'] == 0.5*2.82 and plain85['k_1ie'] == 2.0*0.02
+# a referenced group ignores a NONZERO live baseline too (the reference is the basis)
+assert ko.expand_grouped_values(vals85, groups85, kb85b, group_references=refs85)['k_16'] == out85['k_16']
+# references for one group leave the other on its live baselines
+assert ko.expand_grouped_values(vals85, groups85, kb85b, group_references=refs85)['k_1ie'] == 2.0*0.02
+# no groups at all -> a plain copy, references ignored
+assert ko.expand_grouped_values(vals85, None, kb85, group_references=refs85) == vals85
+PASS('expand_grouped_values(group_references): reference x m for a referenced group, live '
+     'baseline x m otherwise, None/{} identical to today, order kept')
+
 print(f'\nALL {n_pass} CHECKS PASSED')

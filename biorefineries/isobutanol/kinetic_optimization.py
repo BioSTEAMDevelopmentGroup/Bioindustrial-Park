@@ -187,25 +187,42 @@ def _as_group_multiplier_bounds(value):
         return {group: tuple(band) for group, band in value.items()}
     return tuple(value)
 
-def expand_grouped_values(values, parameter_groups, kinetic_baselines):
+def expand_grouped_values(values, parameter_groups, kinetic_baselines,
+                          group_references=None):
     """Copy of the decision dict `values` with every PARAMETER-GROUP
-    multiplier replaced by its members' applied values (member baseline x
-    multiplier, from `kinetic_baselines`), the group key dropped and every
-    other entry (individual kinetics, feeding and operating variables)
-    passed through unchanged. `parameter_groups` is the
-    {group_name: [member names]} mapping given to build_search_space;
-    None / {} gives a plain copy. Pure: used by the engine's objective
-    (what reaches the model and the burden), by the `applied_<member>`
-    trajectory columns and by the offline test. The inverse for the
-    baseline point is trivial (every group multiplier = 1.0)."""
+    multiplier replaced by its members' applied values, the group key
+    dropped and every other entry (individual kinetics, feeding and
+    operating variables) passed through unchanged. `parameter_groups` is
+    the {group_name: [member names]} mapping given to build_search_space;
+    None / {} gives a plain copy.
+
+    The BASIS a member's multiplier is applied to: its LIVE baseline from
+    `kinetic_baselines` (member baseline x multiplier -- the glycolysis and
+    inhibition groups), OR, for a group listed in `group_references`
+    ({group_name: {member: reference_capacity}}; None / {} = none, since
+    2026-09-15), that member's REFERENCE (reference x multiplier), so a
+    group whose members are ZERO on the live model (the Ehrlich rates at
+    the scenario-A start) can still be sampled on an absolute band -- the
+    metabolic_split_12d preset's ehrlich_downstream group (resolve_study_
+    preset builds the references from EHRLICH_DOWNSTREAM_WEIGHTS x the
+    anchor's bounds-workbook baseline). Pure: used by the engine's
+    evaluation site (what reaches the model and the burden), by the
+    feasibility predicate, by the `applied_<member>` trajectory columns
+    and by the offline test. The inverse for the baseline point is
+    baseline_decision_point's (1.0 for an un-referenced group, live anchor
+    / reference for a referenced one)."""
     if not parameter_groups:
         return dict(values)
     groups = dict(parameter_groups)
+    references = dict(group_references or {})
     out = {}
     for name, value in values.items():
         if name in groups:
+            refs = references.get(name)
             for member in groups[name]:
-                out[member] = kinetic_baselines[member]*value
+                basis = (kinetic_baselines[member] if refs is None
+                         else refs[member])
+                out[member] = basis*value
         else:
             out[name] = value
     return out
