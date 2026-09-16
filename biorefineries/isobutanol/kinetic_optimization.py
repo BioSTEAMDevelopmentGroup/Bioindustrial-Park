@@ -3606,15 +3606,18 @@ def feasibility_constraints_func(*, burden_on, volume_on):
 def feasibility_predicate(*, burden_on, volume_on, burden_model,
                           parameter_groups, kinetic_baselines,
                           baseline_model_kwargs, baseline_max_n_spikes,
-                          volume_cap):
+                          volume_cap, group_references=None):
     """values (EXTERNAL repr) -> bool. AND of the enabled checks. The burden
     check evaluates the EXPANDED member values (baseline x the sampled group
-    multiplier); the volume check reads the feeding values directly. When
-    burden_on is False, burden_model may be None and is never dereferenced."""
+    multiplier, or reference x multiplier for a group in `group_references`
+    -- exactly what evaluate_decision_point hands the burden model); the
+    volume check reads the feeding values directly. When burden_on is
+    False, burden_model may be None and is never dereferenced."""
     def _feasible(values):
         if burden_on and not burden_model.evaluate(
                 expand_grouped_values(values, parameter_groups,
-                                      kinetic_baselines)).feasible:
+                                      kinetic_baselines,
+                                      group_references)).feasible:
             return False
         if volume_on:
             thr, tgt, spk = _resolve_feeding_concs(values, baseline_model_kwargs)
@@ -3636,7 +3639,10 @@ class OptimizationContext:
     simulation -- taken at set-up and refreshed by evaluate_decision_point
     after every COMPLETE / NAN trial, restored after every FAIL trial so a
     failed simulation leaves no trace for the next trial (None when the
-    handles carry no snapshot function, e.g. offline fakes)."""
+    handles carry no snapshot function, e.g. offline fakes). `group_references`
+    is the normalized {group: {member: reference}} of the referenced capacity
+    groups ({} when none; since 2026-09-15): evaluate_decision_point and the
+    sampler predicate expand the group multipliers with it."""
     handles: dict
     r_te: object
     fbs_spec: object
@@ -3653,6 +3659,7 @@ class OptimizationContext:
     search_space: dict
     excluded: list
     parameter_groups: dict
+    group_references: dict
     applied_columns: list
     baseline_model_kwargs: dict
     baseline_max_n_spikes: object
@@ -3694,7 +3701,7 @@ def _prepare_optimization(objective, *, direction, level, objective_units,
                           spike_conc_bounds, study_name, results_dir, handles,
                           burden_model, volume_feasibility, volume_cap,
                           seed_from, parameter_groups, group_multiplier_bounds,
-                          method_tag=''):
+                          group_references=None, method_tag=''):
     """Shared set-up of both engines (run_kinetic_optimization and
     run_kinetic_dual_annealing), in the order and with the prints the TPE
     engine always had: objective resolution -> kinetic baselines -> burden
@@ -3801,9 +3808,12 @@ def _prepare_optimization(objective, *, direction, level, objective_units,
         spike_conc_bounds=spike_conc_bounds,
         stage_1_max_x_bounds=stage_1_max_x_bounds,
         parameter_groups=parameter_groups,
-        group_multiplier_bounds=group_multiplier_bounds)
+        group_multiplier_bounds=group_multiplier_bounds,
+        group_references=group_references)
     parameter_groups = {str(group): list(members)
                         for group, members in dict(parameter_groups or {}).items()}
+    group_references = {str(group): dict(refs)
+                        for group, refs in dict(group_references or {}).items()}
     applied_columns = [f'applied_{member}'
                        for members in parameter_groups.values()
                        for member in members]
@@ -3819,15 +3829,32 @@ def _prepare_optimization(objective, *, direction, level, objective_units,
           f'{len(excluded)} kinetic parameters excluded: {excluded}')
     for group, members in parameter_groups.items():
         sp = search_space[group]
-        # Each member's LIVE baseline is printed next to its name: the
-        # multiplier is applied to it, so this line is the log's record of
-        # the basis of every applied_<member> column.
-        listed = ', '.join(f'{member} ({kinetic_baselines[member]:g})'
-                           for member in members)
-        print(f"Parameter group {group}: one log-scale multiplier on "
-              f"[{sp['low']:g}, {sp['high']:g}] x baseline applied to "
-              f"{len(members)} members {listed} (baseline 1.0; recorded as "
-              f"applied_<member> columns).")
+        refs = group_references.get(group)
+        if refs is None:
+            # Each member's LIVE baseline is printed next to its name: the
+            # multiplier is applied to it, so this line is the log's record
+            # of the basis of every applied_<member> column.
+            listed = ', '.join(f'{member} ({kinetic_baselines[member]:g})'
+                               for member in members)
+            print(f"Parameter group {group}: one log-scale multiplier on "
+                  f"[{sp['low']:g}, {sp['high']:g}] x baseline applied to "
+                  f"{len(members)} members {listed} (baseline 1.0; recorded "
+                  f"as applied_<member> columns).")
+        else:
+            # A REFERENCED group (group_references, since 2026-09-15): the
+            # multiplier applies to each member's reference, so the
+            # reference -- not the live baseline, which may be 0 -- is the
+            # basis of the applied_<member> columns and is what the log
+            # records (the live value alongside, for the record).
+            anchor = members[0]
+            listed = ', '.join(f'{member} (ref {refs[member]:g}; live '
+                               f'{kinetic_baselines[member]:g})'
+                               for member in members)
+            print(f"Parameter group {group}: one log-scale multiplier on "
+                  f"[{sp['low']:g}, {sp['high']:g}] x REFERENCE applied to "
+                  f"{len(members)} members {listed} (baseline multiplier = "
+                  f"live {anchor} / its reference, clipped into the band; "
+                  f"recorded as applied_<member> columns).")
     if 'stage_1_max_x' in search_space:
         sp = search_space['stage_1_max_x']
         print(f"Operating variable stage_1_max_x (aerobic stage-1 biomass "
@@ -3927,7 +3954,8 @@ def _prepare_optimization(objective, *, direction, level, objective_units,
         burden_model=burden_model, burden_on=burden_on,
         volume_on=volume_on, volume_cap=volume_cap,
         search_space=search_space, excluded=excluded,
-        parameter_groups=parameter_groups, applied_columns=applied_columns,
+        parameter_groups=parameter_groups, group_references=group_references,
+        applied_columns=applied_columns,
         baseline_model_kwargs=baseline_model_kwargs,
         baseline_max_n_spikes=baseline_max_n_spikes,
         baseline_stage_1_max_x=baseline_stage_1_max_x,
@@ -3980,12 +4008,14 @@ def evaluate_decision_point(ctx, values, trial_number):
     Returns an Evaluation."""
     handles, r_te, fbs_spec = ctx.handles, ctx.r_te, ctx.fbs_spec
     csv_path, columns = ctx.csv_path, ctx.columns
-    # Group multipliers -> individual member values (baseline x m):
+    # Group multipliers -> individual member values (baseline x m, or
+    # reference x m for a referenced group):
     # what the burden model evaluates and what reaches the model. The
     # CSV keeps the multipliers as the decision columns and records
     # the members as applied_<member>.
     applied_kinetics = expand_grouped_values(values, ctx.parameter_groups,
-                                             ctx.kinetic_baselines)
+                                             ctx.kinetic_baselines,
+                                             ctx.group_references)
     threshold, target, spike = _resolve_feeding_concs(
         values, ctx.baseline_model_kwargs)
     model_kwargs = dict(target_conc=target, threshold_conc=threshold,
@@ -4141,6 +4171,7 @@ def run_kinetic_optimization(objective='IRR',
                              seed_from=None,
                              parameter_groups=None,
                              group_multiplier_bounds=DEFAULT_GROUP_MULTIPLIER_BOUNDS,
+                             group_references=None,
                              method='tpe',
                              gp_kwargs=None,
                              ):
@@ -4321,6 +4352,14 @@ def run_kinetic_optimization(objective='IRR',
     concentration at the scenario-baseline snapshot (fbs_spec.spike_conc
     at study start; no spike_delta column). The metabolic_minimal preset
     passes all three (resolve_study_preset).
+    `group_references` ({group: {member: reference}}, None = none; since
+    2026-09-15) makes a group a REFERENCED capacity group: reference x
+    multiplier instead of live baseline x multiplier (build_search_space
+    validates it and exempts the members from the positive-live-baseline
+    check; baseline_decision_point starts it at live anchor / reference,
+    clipped) -- the metabolic_split_12d preset's ehrlich_downstream group,
+    whose members are zero on the scenario-A model. Same CSV structure:
+    the multiplier is the decision column, applied_<member> the products.
 
     `method` ('tpe', the default, or 'gp'; since 2026-09-11 pm; dual
     annealing has its own entry point, run_kinetic_dual_annealing) selects
@@ -4392,6 +4431,7 @@ def run_kinetic_optimization(objective='IRR',
         volume_cap=volume_cap, seed_from=seed_from,
         parameter_groups=parameter_groups,
         group_multiplier_bounds=group_multiplier_bounds,
+        group_references=group_references,
         method_tag=method_study_tag(method))
     # Local names for the sampler / enqueue / finally code below (unchanged).
     handles, r_te = ctx.handles, ctx.r_te
@@ -4400,6 +4440,7 @@ def run_kinetic_optimization(objective='IRR',
     burden_model, burden_on = ctx.burden_model, ctx.burden_on
     volume_on, volume_cap = ctx.volume_on, ctx.volume_cap
     search_space, parameter_groups = ctx.search_space, ctx.parameter_groups
+    group_references = ctx.group_references
     baseline_model_kwargs = ctx.baseline_model_kwargs
     baseline_max_n_spikes = ctx.baseline_max_n_spikes
     baseline_stage_1_max_x = ctx.baseline_stage_1_max_x
@@ -4499,6 +4540,7 @@ def run_kinetic_optimization(objective='IRR',
             burden_on=burden_on, volume_on=volume_on,
             burden_model=burden_model,
             parameter_groups=parameter_groups,
+            group_references=group_references,
             kinetic_baselines=kinetic_baselines,
             baseline_model_kwargs=baseline_model_kwargs,
             baseline_max_n_spikes=baseline_max_n_spikes,
@@ -4585,7 +4627,8 @@ def run_kinetic_optimization(objective='IRR',
             search_space, kinetic_baselines, baseline_model_kwargs,
             baseline_max_n_spikes,
             baseline_stage_1_max_x=baseline_stage_1_max_x,
-            parameter_groups=parameter_groups)
+            parameter_groups=parameter_groups,
+            group_references=group_references)
         if enqueue_baseline:
             study.enqueue_trial(baseline_point)
             print('Enqueued the scenario baseline configuration as trial 0.')
@@ -4765,6 +4808,7 @@ def run_kinetic_dual_annealing(objective='IRR',
                                volume_cap=None,
                                parameter_groups=None,
                                group_multiplier_bounds=DEFAULT_GROUP_MULTIPLIER_BOUNDS,
+                               group_references=None,
                                initial_temp=5230.0,
                                restart_temp_ratio=2e-5,
                                visit=2.62,
@@ -4778,7 +4822,7 @@ def run_kinetic_dual_annealing(objective='IRR',
     and in-flight sidecar as run_kinetic_optimization -- the alternative to
     the TPE sampler (spec docs/superpowers/specs/2026-09-11-dual-annealing-
     kinetic-optimization-design.md). The shared kwargs mean exactly what
-    they mean there (search space, bands, groups, burden_model 'auto'/None/
+    they mean there (search space, bands, groups and group_references, burden_model 'auto'/None/
     instance, volume_feasibility / volume_cap, enqueue_baseline, handles,
     results_dir); there are NO n_startup_trials / feasible_sampling /
     startup_sampling / enqueue_knockouts / seed_from (optuna sampler and
@@ -4861,6 +4905,7 @@ def run_kinetic_dual_annealing(objective='IRR',
         volume_cap=volume_cap, seed_from=None,
         parameter_groups=parameter_groups,
         group_multiplier_bounds=group_multiplier_bounds,
+        group_references=group_references,
         method_tag='_da')
     handles, r_te = ctx.handles, ctx.r_te
     search_space, direction = ctx.search_space, ctx.direction
@@ -4896,7 +4941,8 @@ def run_kinetic_dual_annealing(objective='IRR',
                 search_space, ctx.kinetic_baselines, ctx.baseline_model_kwargs,
                 ctx.baseline_max_n_spikes,
                 baseline_stage_1_max_x=ctx.baseline_stage_1_max_x,
-                parameter_groups=ctx.parameter_groups)
+                parameter_groups=ctx.parameter_groups,
+                group_references=ctx.group_references)
             x0 = external_to_unit(baseline_point, search_space)
             print('Fresh study: annealing starts at the scenario baseline '
                   '(trial 0 = the baseline configuration).')

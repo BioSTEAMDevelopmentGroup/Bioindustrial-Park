@@ -6031,4 +6031,117 @@ PASS('build_search_space(group_references): zero-live-baseline referenced member
      'nonpositive / non-member / partial / unknown-group references rejected, un-referenced '
      'nonpositive baseline still rejected; baseline_decision_point: live anchor / reference clipped')
 
+#%% 87. Engine threading of group_references (2026-09-15): the sampler
+# predicate hands the burden model the REFERENCED expansion; the engine
+# (check-44 fake-handle pattern, referenced group with ZERO live baselines)
+# sets reference x multiplier on r_te, records it as applied_<member>, starts
+# trial 0 at the clipped baseline multiplier (the band floor) and restores
+# the ZERO live baselines in its finally; the group multiplier stays the
+# decision column; the set-up print names the references.
+seen87p = []
+bm87 = SimpleNamespace(evaluate=lambda d: (seen87p.append(dict(d)),
+                                           SimpleNamespace(feasible=True))[1])
+p87 = ko.feasibility_predicate(
+    burden_on=True, volume_on=False, burden_model=bm87,
+    parameter_groups=groups86, kinetic_baselines=kb86,
+    baseline_model_kwargs=bmk86, baseline_max_n_spikes=16, volume_cap=20.0,
+    group_references=refs86)
+assert p87({'k_3': 10.0, 'k_13': 1.0, 'ehrlich_downstream': 2.0, 'inhib_ethanol': 1.0,
+            'threshold_conc': 100.0, 'target_delta': 50.0, 'max_n_spikes': 10}) is True
+assert seen87p[-1]['k_14'] == 2.0*4.8 and seen87p[-1]['k_16'] == 2.0*4.219
+assert seen87p[-1]['k_1ie'] == 0.02 and 'ehrlich_downstream' not in seen87p[-1]
+# the kwarg is optional: check 58's calls (no group_references) are unchanged
+p87_plain = ko.feasibility_predicate(
+    burden_on=True, volume_on=False, burden_model=bm87,
+    parameter_groups={}, kinetic_baselines={'k_1e': 47.1},
+    baseline_model_kwargs=bmk86, baseline_max_n_spikes=16, volume_cap=20.0)
+assert p87_plain({'k_1e': 1.0}) is True and seen87p[-1] == {'k_1e': 1.0}
+if _optuna is None:
+    print('SKIP 87 (engine part): optuna not installed')
+else:
+    import io as _io87, contextlib as _ctx87
+    outdir87 = tempfile.mkdtemp()
+    study87 = 'offline_referenced'
+
+    class _FakeTE87:
+        k_3 = 10.0
+        k_13 = 0.0
+        k_14 = 0.0
+        k_15 = 0.0
+        k_16 = 0.0
+        k_1ie = 0.02
+        def getGlobalParameterIds(self):
+            return ['k_3', 'k_13', 'k_14', 'k_15', 'k_16', 'k_1ie']
+    te87 = _FakeTE87()
+    fbs87 = SimpleNamespace(
+        current_specifications=dict(target_conc=221.25,
+                                    threshold_conc=217.125,
+                                    spike_conc=600.0),
+        max_n_spikes=16)
+    seen87 = []   # (k_14, k_15, k_16, k_1ie) on r_te at every model_specification call
+    def _model_specification87(**kw):
+        seen87.append((te87.k_14, te87.k_15, te87.k_16, te87.k_1ie))
+    handles87 = {
+        'r_te': te87, 'fbs_spec': fbs87,
+        'V406': SimpleNamespace(nsk_results_specific_tau_dict=nsk, tau=55.0),
+        'tea': SimpleNamespace(TCI=350e6, NPV=35e6), 'HXN': SimpleNamespace(),
+        'model_specification': _model_specification87,
+        'solve_TEA': lambda stream_IDs=None: {
+            'IRR': 0.2, 'MPSPs': {'ethanol': 0.5, 'isobutanol': 1.0}},
+        'latest_TEA_solution': {'IRR': np.nan,
+                                'MPSPs': {'ethanol': np.nan,
+                                          'isobutanol': np.nan}}}
+    _optuna.logging.set_verbosity(_optuna.logging.WARNING)
+    log87 = _io87.StringIO()
+    with _ctx87.redirect_stdout(log87):
+        # 3 trials: 0 = the baseline (referenced group clipped to its floor), 1-2 sampled.
+        study87_obj, csv87, kb87 = ko.run_kinetic_optimization(
+            enqueue_baseline=True, objective='IRR', scenario_label='X',
+            n_trials=3, seed=1, study_name=study87, results_dir=outdir87,
+            handles=handles87, print_status_every=1, burden_model=None,
+            volume_feasibility=False,
+            param_bounds_override={'k_13': (5.81e-3, 23.24)},
+            parameter_groups=groups86, group_multiplier_bounds=gmb86,
+            group_references=refs86, spike_delta_bounds=None)
+    print(log87.getvalue()[-600:])
+    assert kb87 == {'k_3': 10.0, 'k_13': 0.0, 'k_14': 0.0, 'k_15': 0.0, 'k_16': 0.0, 'k_1ie': 0.02}
+    # the set-up print records the REFERENCE (not the zero live baseline) of every member
+    assert 'Parameter group ehrlich_downstream' in log87.getvalue()
+    assert 'k_14 (ref 4.8' in log87.getvalue() and 'k_16 (ref 4.219' in log87.getvalue()
+    assert 'x REFERENCE' in log87.getvalue()
+    assert 'Parameter group inhib_ethanol' in log87.getvalue() and 'k_1ie (0.02)' in log87.getvalue()
+    df87 = ko.load_trajectory(csv87)
+    assert list(df87.columns) == ['trial_number', 'state', 'k_3', 'k_13', 'ehrlich_downstream',
+                                  'inhib_ethanol', 'threshold_conc', 'target_delta',
+                                  'max_n_spikes', 'objective', *ko.TRACKED_METRICS,
+                                  'applied_k_14', 'applied_k_15', 'applied_k_16',
+                                  'applied_k_1ie', 'error'], list(df87.columns)
+    assert df87['trial_number'].tolist() == [0, 1, 2]
+    assert df87['state'].tolist() == ['COMPLETE']*3
+    assert df87['ehrlich_downstream'][0] == 1e-3 and df87['inhib_ethanol'][0] == 1.0   # trial 0: clipped baseline
+    assert df87['k_13'][0] == 5.81e-3
+    assert len(seen87) == 4, seen87                        # 3 trials + restore_baseline
+    for i87 in range(3):
+        m87 = df87['ehrlich_downstream'][i87]
+        assert 1e-3 <= m87 <= 4.0
+        k14_87, k15_87, k16_87, k1ie_87 = seen87[i87]
+        assert np.isclose(k14_87, 4.8*m87, rtol=1e-12, atol=0.0)
+        assert np.isclose(k15_87, 4.872*m87, rtol=1e-12, atol=0.0)
+        assert np.isclose(k16_87, 4.219*m87, rtol=1e-12, atol=0.0)
+        assert np.isclose(k1ie_87, 0.02*df87['inhib_ethanol'][i87], rtol=1e-12, atol=0.0)
+        assert np.isclose(df87['applied_k_14'][i87], k14_87, rtol=1e-12, atol=0.0)
+        assert np.isclose(df87['applied_k_16'][i87], k16_87, rtol=1e-12, atol=0.0)
+        assert np.isclose(df87['applied_k_1ie'][i87], k1ie_87, rtol=1e-12, atol=0.0)
+    assert seen87[3] == (0.0, 0.0, 0.0, 0.02)              # restore_baseline: the LIVE (zero) baselines
+    assert te87.k_14 == 0.0 and te87.k_16 == 0.0 and te87.k_1ie == 0.02 and te87.k_13 == 0.0
+    # the dual-annealing engine takes the same kwarg (signature only; DA is exercised by checks 65-68)
+    import inspect as _inspect87
+    assert _inspect87.signature(ko.run_kinetic_dual_annealing).parameters['group_references'].default is None
+    assert _inspect87.signature(ko.run_kinetic_optimization).parameters['group_references'].default is None
+    assert 'group_references' in _inspect87.signature(ko._prepare_optimization).parameters
+    assert 'group_references' in {f.name for f in __import__('dataclasses').fields(ko.OptimizationContext)}
+PASS('group_references threaded: predicate expands with the references; engine sets reference x m '
+     'on r_te with zero live baselines, records applied_<member>, trial 0 at the clipped floor, '
+     'restores the zero baselines, set-up print names the references; DA / context / prepare accept it')
+
 print(f'\nALL {n_pass} CHECKS PASSED')
