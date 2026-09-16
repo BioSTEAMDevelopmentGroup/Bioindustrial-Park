@@ -71,6 +71,10 @@ sequentially) -- ask-first, like the unsupervised driver. Examples:
     # ..._metabolic_minimal_subset_irr_rb0.001-4_ib0.75-1.5_burden):
     python optimize_kinetics_BO_supervised.py --objective IRR \\
         --study-type metabolic_minimal_subset
+    # k_14/k_15/k_16 as ONE stoichiometric capacity multiplier (12 variables;
+    # name ..._metabolic_split_12d_irr_rb0.001-4_ib0.75-1.5_burden):
+    python optimize_kinetics_BO_supervised.py --objective IRR \\
+        --study-type metabolic_split_12d --method gp
     # scipy dual annealing instead of TPE (name ..._irr_da_rb0.001-4_ib0.75-1.5_burden)
     python optimize_kinetics_BO_supervised.py --objective IRR --study-type metabolic_minimal_subset --method dual_annealing
     # feasibility-aware Gaussian-process sampler (<= 15 variables; name

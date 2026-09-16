@@ -1990,7 +1990,7 @@ drv29 = open(os.path.join(os.path.dirname(os.path.abspath(__file__)),
 assert ("'rate_multiplier_bounds', 'rate_params',\n"
         "                    'parameter_multiplier_bounds', 'stage_1_max_x_bounds',\n"
         "                    'parameter_groups', 'group_multiplier_bounds',\n"
-        "                    'spike_delta_bounds'):") in drv29
+        "                    'spike_delta_bounds', 'group_references'):") in drv29
 assert "parameter_multiplier_bounds=engine_kwargs.get('parameter_multiplier_bounds')" in drv29
 assert "rate_multiplier_bounds=engine_kwargs['rate_multiplier_bounds']" in drv29
 assert 'explicit_rate_bounds' not in drv29
@@ -2733,7 +2733,7 @@ drv40 = open(os.path.join(os.path.dirname(os.path.abspath(__file__)),
                           'optimize_kinetics_BO.py')).read()
 assert ("'parameter_multiplier_bounds', 'stage_1_max_x_bounds',\n"
         "                    'parameter_groups', 'group_multiplier_bounds',\n"
-        "                    'spike_delta_bounds'):") in drv40
+        "                    'spike_delta_bounds', 'group_references'):") in drv40
 assert "stage_1_max_x_bounds=engine_kwargs['stage_1_max_x_bounds']," in drv40
 sup40 = _runpy.run_path(os.path.join(
     os.path.dirname(os.path.abspath(__file__)),
@@ -3162,7 +3162,7 @@ assert ko.default_study_name('IRR', 'ethanol_isobutanol', 'metabolic_minimal',
 drv43 = open(os.path.join(os.path.dirname(os.path.abspath(__file__)),
                           'optimize_kinetics_BO.py')).read()
 assert "'parameter_groups', 'group_multiplier_bounds'," in drv43
-assert "'spike_delta_bounds'):" in drv43
+assert "'spike_delta_bounds', 'group_references'):" in drv43
 assert 'engine_kwargs.setdefault(key, preset[key])' in drv43
 assert "Parameter groups" in drv43 and 'spike feed pinned at the baseline' in drv43
 # The _ib tag follows the band that actually SIZES the inhibition entries:
@@ -6339,5 +6339,29 @@ PASS('metabolic_split_12d preset: 12/8 vars (k_3, k_6, k_13, k_17 + glycolysis +
      'ehrlich_downstream on 1e-3-4x of 4.8 x weights + 3 inhibition groups + 3 feeding), '
      'name _ib0.75-1.5 (78 chars, no Ehrlich tag), GP/DA tags, supervisor agrees, every '
      'preset returns group_references, weighted-group guards')
+
+#%% 89. Driver + supervisor for metabolic_split_12d (2026-09-15): the driver
+# setdefault()s the preset's group_references like every other preset key (so
+# it reaches run_kinetic_optimization / run_kinetic_dual_annealing through
+# engine_kwargs), reports a referenced group in its groups print, and both
+# docstrings document the new type. Source-level (the driver load()s the
+# model at import); the supervisor's --study-type choices come from
+# ko.STUDY_TYPE_ROLES (check 88 covers its default_study_name).
+drv89 = open(os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                          'optimize_kinetics_BO.py')).read()
+body89 = drv89[drv89.index('def run('):]
+setdefault89 = body89[body89.index("for key in ('include_params',"):body89.index('engine_kwargs.setdefault(key, preset[key])')]
+assert "'group_references'" in setdefault89, setdefault89
+assert "'spike_delta_bounds'" in setdefault89 and "'parameter_groups'" in setdefault89
+assert "x REFERENCE" in body89                           # the groups print marks a referenced group
+assert "study_type='metabolic_split_12d'" in drv89       # runner example
+assert 'metabolic_split_12d' in drv89[:drv89.index('def run(')]   # module docstring paragraph
+assert 'ehrlich_downstream' in body89[:body89.index('engine_kwargs.setdefault(key, preset[key])')]   # run() docstring
+sup89 = open(os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                          'optimize_kinetics_BO_supervised.py')).read()
+assert '--study-type metabolic_split_12d' in sup89        # docstring example
+assert 'choices=tuple(ko.STUDY_TYPE_ROLES)' in sup89   # the new type is a valid --study-type automatically
+PASS('driver: group_references setdefault-ed from the preset and forwarded through engine_kwargs, '
+     'referenced groups marked in the groups print, runner example + docstrings; supervisor example')
 
 print(f'\nALL {n_pass} CHECKS PASSED')

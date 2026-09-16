@@ -67,6 +67,24 @@ groups on the live k_17ie / k_17ia, and stage_1_max_x PINNED -- 14
 decision variables for ethanol_isobutanol, 8 for ethanol_only; name
 kin_opt_ethanol_isobutanol_metabolic_split_14d_irr_rb0.001-4_ib0.75-1.5_burden.
 
+study_type='metabolic_split_12d' (2026-09-15) is metabolic_split_14d with
+the three DOWNSTREAM Ehrlich rates k_14 (Ilv5) / k_15 (Ilv3) / k_16 (Aro10)
+collapsed into ONE log-scale capacity multiplier, ehrlich_downstream, with
+fixed STOICHIOMETRIC intra-ratios (ko.EHRLICH_DOWNSTREAM_WEIGHTS: k_14 the
+anchor at 1.0, k_15 1.015, k_16 1.015 x 0.866 from the antimony r14 / r15
+product coefficients) on 1e-3x-4x of its REFERENCES = the weights x the B
+workbook's k_14 (4.8 -> 4.800 / 4.872 / 4.219; the preset's
+group_references, which the engine samples as reference x multiplier
+because the live A-start k_14-k_16 are 0) -- the three were noise
+dimensions carrying real burden in the 09-14 / 09-15 14d GP studies;
+k_13 stays a free individual rate (r13 runs far from saturation, so tying
+the trio to it would prune the profitable region). 12 decision variables
+for ethanol_isobutanol (k_3, k_6, k_13, k_17 + glycolysis +
+ehrlich_downstream + 3 inhibition multipliers + 3 feeding), 8 for
+ethanol_only (no Ehrlich group); the Ehrlich band is untagged (the
+distinct column blocks any cross-study resume); name
+kin_opt_ethanol_isobutanol_metabolic_split_12d_irr_rb0.001-4_ib0.75-1.5_burden.
+
 The enzyme-burden (proteome-allocation) constraint of enzyme_burden.py
 is ON by default (burden=True): sampled capacities are charged to the
 cell's flexible protein sector, growth (k_7/k_8) is derated linearly as
@@ -96,6 +114,8 @@ Runner pattern (fresh kernel, one process):
     result, csv_path = ns['run'](objective='IRR', study_type='metabolic_minimal_subset')
     # Adh1 + Adh6 independent (k_6, k_17), stage_1_max_x pinned; 14 variables
     result, csv_path = ns['run'](objective='IRR', study_type='metabolic_split_14d', method='gp')
+    # k_14/k_15/k_16 as ONE stoichiometric capacity multiplier (ehrlich_downstream); 12 variables
+    result, csv_path = ns['run'](objective='IRR', study_type='metabolic_split_12d', method='gp')
     # legacy: resume a pre-2026-09-04 study under its old name/space
     result, csv_path = ns['run'](scenario='A', kinetic_bounds_scenario='B',
                                  study_target_products=None)
@@ -280,6 +300,12 @@ def run(scenario=None,  # 'A' or 'B'; None = the preset's start scenario
     stage_1_max_x pinned (the preset's stage_1_max_x_bounds=None; an
     explicit run(stage_1_max_x_bounds=(lo, hi)) re-samples it and tags
     `_s1x`).
+    'metabolic_split_12d' the 12-variable set with k_14/k_15/k_16 as ONE
+    REFERENCED capacity multiplier, ehrlich_downstream (the preset's
+    `group_references` = ko.EHRLICH_DOWNSTREAM_WEIGHTS x the B workbook's
+    k_14; setdefault-ed like the other preset keys, so
+    run(group_references=...) overrides it; a referenced group is
+    sampled as reference x multiplier, never live baseline x multiplier).
     Bands (log-scale, x baseline)
     by nskinetics ROLE since 2026-09-06: rate constants (role capacity;
     the preset's `rate_params`, ko.rate_constant_names) [1e-3x, 4x]
@@ -510,7 +536,7 @@ def run(scenario=None,  # 'A' or 'B'; None = the preset's start scenario
                     'rate_multiplier_bounds', 'rate_params',
                     'parameter_multiplier_bounds', 'stage_1_max_x_bounds',
                     'parameter_groups', 'group_multiplier_bounds',
-                    'spike_delta_bounds'):
+                    'spike_delta_bounds', 'group_references'):
             engine_kwargs.setdefault(key, preset[key])
         if study_name is None:
             study_name = ko.default_study_name(
@@ -583,12 +609,17 @@ def run(scenario=None,  # 'A' or 'B'; None = the preset's start scenario
             # tuple or a {group: (lo, hi)} dict of per-group bands);
             # ko.group_bounds_for resolves each group's own band, so this
             # line reports the true per-group band and never chokes on a
-            # dict.
+            # dict. A REFERENCED group (group_references, since 2026-09-15:
+            # reference x multiplier instead of live baseline x multiplier)
+            # is marked; the engine's set-up print lists its references.
             gmb = engine_kwargs['group_multiplier_bounds']
+            refs = engine_kwargs.get('group_references') or {}
             print('Parameter groups (one log-scale multiplier each on its '
-                  'own band x baseline, preserving intra-group ratios): '
-                  + '; '.join(f'{g}[{len(m)}] on {ko.group_bounds_for(g, gmb)}: '
-                              f'{", ".join(m)}'
+                  'own band x baseline -- x REFERENCE for a referenced '
+                  'group -- preserving intra-group ratios): '
+                  + '; '.join(f'{g}[{len(m)}] on {ko.group_bounds_for(g, gmb)}'
+                              + (' x REFERENCE' if g in refs else '')
+                              + f': {", ".join(m)}'
                               for g, m in groups.items())
                   + '.')
     elif scenario is None:
