@@ -1443,6 +1443,13 @@ STUDY_TYPE_ROLES = {
     # stage_1_max_x PINNED so the ethanol_isobutanol count stays at 14
     # (METABOLIC_SPLIT_14D_RATES / _GROUPS via STUDY_TYPE_OPTIONS).
     'metabolic_split_14d': (),
+    # 'metabolic_split_12d' (2026-09-15): NO role filter -- metabolic_split_14d
+    # with the three DOWNSTREAM Ehrlich rates k_14 / k_15 / k_16 collapsed into
+    # ONE stoichiometrically weighted REFERENCED capacity multiplier,
+    # ehrlich_downstream (METABOLIC_SPLIT_12D_RATES / _RATE_GROUPS +
+    # EHRLICH_DOWNSTREAM_WEIGHTS via STUDY_TYPE_OPTIONS); the name encodes the
+    # ethanol_isobutanol decision-variable count, 12.
+    'metabolic_split_12d': (),
 }
 
 #: The STANDALONE metabolic_minimal_subset preset (2026-09-07): its
@@ -1561,6 +1568,14 @@ METABOLIC_SPLIT_12D_RATE_GROUPS = {
 #: group_roles absent), plus the optional rate_parameter_groups
 #: (metabolic_14d): CAPACITY groups whose members resolve_study_preset
 #: validates as capacity rows and merges FIRST into parameter_groups.
+#: Optional rate_group_weights ({capacity group: {member: weight}}; since
+#: 2026-09-15, metabolic_split_12d): the keys of each weights dict must be
+#: EXACTLY that rate_parameter_groups group's members in order, the first
+#: member the ANCHOR with weight 1.0, every weight > 0; resolve_study_preset
+#: turns it into group_references = {group: {member: weight x the anchor's
+#: bounds-workbook baseline}} after the workbook intersection (an emptied
+#: group gets no entry), so the group is sampled as reference x multiplier
+#: even where its members are 0 on the live model.
 #: 'metabolic_minimal' = the compact, interpretable space (24 variables
 #: for ethanol_isobutanol, 19 for ethanol_only): exclude_params = k_10
 #: (decay, as everywhere) + k_7 and k_8 (the growth capacities, so the
@@ -1639,6 +1654,31 @@ STUDY_TYPE_OPTIONS = {
         spike_delta_bounds=None,        # spike feed pinned at 600 g/L
         stage_1_max_x_bounds=None,      # PINNED (the difference from metabolic_14d)
     ),
+    # metabolic_split_12d (2026-09-15) = metabolic_split_14d with k_14 / k_15 /
+    # k_16 collapsed into ONE REFERENCED capacity multiplier, ehrlich_downstream,
+    # with fixed STOICHIOMETRIC intra-ratios (EHRLICH_DOWNSTREAM_WEIGHTS x the B
+    # workbook's k_14 = 4.8 -> references 4.800 / 4.872 / 4.219) on 1e-3x-4x --
+    # k_14's individual band today; the group multiplier applies to the
+    # references, not the zero live A-start baselines (group_references). 4
+    # rates + glycolysis + ehrlich_downstream + 3 inhibition groups + 3 feeding
+    # = 12 decision variables for ethanol_isobutanol, 2 + 1 + 2 + 3 = 8 for
+    # ethanol_only (the Ehrlich group emptied by the A-workbook intersection,
+    # its references dropped with it). Both capacity bands ride untagged in
+    # group_multiplier_bounds (only inhib_* keys are tagged); the distinct
+    # ehrlich_downstream column blocks any cross-study resume. No _x / _s1x
+    # tag. Default name (78 characters)
+    # kin_opt_ethanol_isobutanol_metabolic_split_12d_irr_rb0.001-4_ib0.75-1.5_burden.
+    'metabolic_split_12d': dict(
+        rate_params=METABOLIC_SPLIT_12D_RATES,
+        parameter_groups=METABOLIC_SPLIT_14D_GROUPS,          # inhibition groups, shared
+        rate_parameter_groups=METABOLIC_SPLIT_12D_RATE_GROUPS,
+        rate_group_weights={'ehrlich_downstream': EHRLICH_DOWNSTREAM_WEIGHTS},
+        group_multiplier_bounds={'glycolysis': (0.2, 4.0),
+                                 'ehrlich_downstream': (1e-3, 4.0)},
+        exclude_params=(),
+        spike_delta_bounds=None,        # spike feed pinned at 600 g/L
+        stage_1_max_x_bounds=None,      # PINNED, as in metabolic_split_14d
+    ),
 }
 #: Order of the effector groups of a grouped preset (group name
 #: `inhib_{effector}`); effectors with no rows in the workbook set are
@@ -1656,7 +1696,10 @@ def study_type_name_defaults(study_type):
     (metabolic_minimal: {} -- every family at the default band -- and
     ('k_10', 'k_7', 'k_8'); metabolic_minimal_subset:
     {}, () and None = pinned; metabolic_split_14d:
-    {'glycolysis': (0.2, 4.0)}, () and None = pinned), else
+    {'glycolysis': (0.2, 4.0)}, () and None = pinned; metabolic_split_12d:
+    {'glycolysis': (0.2, 4.0), 'ehrlich_downstream': (1e-3, 4.0)}, () and
+    None = pinned -- neither capacity band is tagged, only inhib_* keys
+    are), else
     DEFAULT_SATURATION_MULTIPLIER_BOUNDS, DEFAULT_EXCLUDED_PARAMETERS and
     DEFAULT_STAGE_1_MAX_X_BOUNDS. resolve_study_preset builds its
     multiplier_bounds / exclude_params / stage_1_max_x_bounds from here
@@ -1778,6 +1821,27 @@ def resolve_study_preset(study_target_products, study_type, roles=None,
     names the intersection now drops) and stage_1_max_x PINNED: 7 rates +
     1 glycolysis + 3 inhibition multipliers + 3 feeding = 14 for
     ethanol_isobutanol, 2 + 1 + 2 + 3 = 8 for ethanol_only.
+
+    'metabolic_split_12d' (2026-09-15) is metabolic_split_14d with k_14 /
+    k_15 / k_16 collapsed into ONE REFERENCED capacity group,
+    ehrlich_downstream (METABOLIC_SPLIT_12D_RATE_GROUPS), sampled on
+    1e-3x-4x of its REFERENCES: the STUDY_TYPE_OPTIONS key
+    rate_group_weights ({group: {member: weight}}, the anchor -- the
+    first member -- at weight 1.0) is converted, AFTER the workbook
+    intersection, into the returned `group_references` = {group:
+    {member: weight x workbook_kinetic_baselines(kinetic_bounds_scenario)
+    [anchor]}} (B's k_14 = 4.8 -> 4.800 / 4.872 / 4.219), so the engine
+    samples reference x multiplier even though the live A-start k_14-k_16
+    are 0. A group emptied by the intersection gets no entry; a group
+    whose anchor is missing from the workbook while other members survive
+    is a ValueError (cannot happen with the current workbooks). The
+    weights dict itself is validated (keys = the group's members in
+    order, anchor weight 1.0, every weight > 0, the group a
+    rate_parameter_groups group; ValueError naming the preset). So
+    ethanol_isobutanol samples 4 rates + glycolysis + ehrlich_downstream
+    + 3 inhibition multipliers + 3 feeding = 12, ethanol_only 2 + 1 + 2 +
+    3 = 8 with `group_references` None. EVERY preset returns the
+    `group_references` key (None for every other preset).
     """
     if study_target_products not in STUDY_TARGET_PRODUCTS:
         raise ValueError(
@@ -1792,7 +1856,8 @@ def resolve_study_preset(study_target_products, study_type, roles=None,
         roles = kinetic_parameter_roles()
     set_scenario = target['parameter_set_scenario']
     include_params = []
-    workbook_rows = list(workbook_kinetic_baselines(set_scenario))
+    workbook_baselines = workbook_kinetic_baselines(set_scenario)
+    workbook_rows = list(workbook_baselines)
     for name in workbook_rows:
         if name not in roles:
             raise KeyError(
@@ -1805,6 +1870,7 @@ def resolve_study_preset(study_target_products, study_type, roles=None,
     name_defaults = study_type_name_defaults(study_type)
     group_roles = set(options.get('group_roles', ()))
     parameter_groups = None
+    group_references = None
     if options.get('rate_params') is not None:
         # EXPLICIT preset (metabolic_minimal_subset, metabolic_14d): the set
         # is listed outright. (1) Typo guard against the role table FIRST --
@@ -1858,6 +1924,55 @@ def resolve_study_preset(study_target_products, study_type, roles=None,
             kept = [name for name in members if name in workbook_set]
             if kept:
                 parameter_groups[group] = kept
+        # (4) rate_group_weights -> group_references (metabolic_split_12d):
+        # validate the weights dict against the capacity-group definition,
+        # then scale by the ANCHOR's bounds-workbook baseline. A group
+        # emptied by the intersection gets no entry.
+        rate_group_weights = dict(options.get('rate_group_weights', {}))
+        for group, weights in rate_group_weights.items():
+            weights = dict(weights)
+            if group not in explicit_rate_groups:
+                raise ValueError(
+                    f'rate_group_weights of the {study_type!r} preset names '
+                    f'{group!r}, which is not a rate_parameter_groups '
+                    'capacity group of the preset')
+            members = tuple(explicit_rate_groups[group])
+            if tuple(weights) != members:
+                raise ValueError(
+                    f'rate_group_weights of the {study_type!r} preset for '
+                    f'group {group!r} must list exactly the group members in '
+                    f'order {members}; got {tuple(weights)}')
+            anchor = members[0]
+            if weights[anchor] != 1.0:
+                raise ValueError(
+                    f'rate_group_weights of the {study_type!r} preset for '
+                    f'group {group!r}: the anchor {anchor!r} (first member) '
+                    f'must have weight 1.0; got {weights[anchor]!r}')
+            for member, weight in weights.items():
+                if not (weight > 0.0):
+                    raise ValueError(
+                        f'rate_group_weights of the {study_type!r} preset '
+                        f'for group {group!r}: member {member!r} has a '
+                        f'nonpositive weight ({weight!r})')
+            kept = parameter_groups.get(group)
+            if not kept:
+                continue   # emptied by the workbook intersection (ethanol_only)
+            if anchor not in workbook_set:
+                raise ValueError(
+                    f'{study_type!r} preset: the anchor {anchor!r} of the '
+                    f'weighted group {group!r} is not a row of the '
+                    f'scenario-{set_scenario} workbook while other members '
+                    f'{kept} are; the group has no reference scale')
+            scale = float(workbook_baselines[anchor])
+            if not (scale > 0.0):
+                raise ValueError(
+                    f'{study_type!r} preset: the scenario-{set_scenario} '
+                    f'workbook baseline of the anchor {anchor!r} of the '
+                    f'weighted group {group!r} is nonpositive ({scale!r})')
+            if group_references is None:
+                group_references = {}
+            group_references[group] = {member: weights[member]*scale
+                                       for member in kept}
         parameter_groups = parameter_groups or None
     elif group_roles:
         if effectors is None:
@@ -1909,7 +2024,8 @@ def resolve_study_preset(study_target_products, study_type, roles=None,
                     options.get('group_multiplier_bounds',
                                 DEFAULT_GROUP_MULTIPLIER_BOUNDS)),
                 spike_delta_bounds=options.get('spike_delta_bounds',
-                                               DEFAULT_SPIKE_DELTA_BOUNDS))
+                                               DEFAULT_SPIKE_DELTA_BOUNDS),
+                group_references=group_references)
 
 #: Study-name suffix of a burden-enabled study (enzyme_burden.py): it
 #: records extra columns and a different physiology, so it must never

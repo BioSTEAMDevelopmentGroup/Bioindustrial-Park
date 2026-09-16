@@ -837,7 +837,8 @@ assert ko.DEFAULT_STUDY_TARGET_PRODUCTS == 'ethanol_isobutanol'
 assert ko.DEFAULT_STUDY_TYPE == 'metabolic_protein'
 assert set(ko.STUDY_TARGET_PRODUCTS) == {'ethanol_only', 'ethanol_isobutanol'}
 assert set(ko.STUDY_TYPE_ROLES) == {'metabolic', 'metabolic_protein', 'metabolic_minimal',
-                                    'metabolic_minimal_subset', 'metabolic_14d', 'metabolic_split_14d'}
+                                    'metabolic_minimal_subset', 'metabolic_14d', 'metabolic_split_14d',
+                                    'metabolic_split_12d'}
 assert set(ko.STUDY_TYPE_ROLES['metabolic_minimal']) == {
     'capacity', 'product_inhibition', 'lethality'}
 assert set(ko.STUDY_TYPE_ROLES['metabolic']) == {
@@ -883,9 +884,10 @@ if os.path.isfile(wb_A) and os.path.isfile(wb_B):
                             'rate_params', 'parameter_multiplier_bounds',
                             'exclude_params', 'stage_1_max_x_bounds',
                             'parameter_groups', 'group_multiplier_bounds',
-                            'spike_delta_bounds'}
+                            'spike_delta_bounds', 'group_references'}
         # The three 2026-09-07 keys are inert on every pre-existing preset.
         assert p21['parameter_groups'] is None
+        assert p21['group_references'] is None
         assert p21['group_multiplier_bounds'] == ko.DEFAULT_GROUP_MULTIPLIER_BOUNDS
         assert p21['spike_delta_bounds'] == ko.DEFAULT_SPIKE_DELTA_BOUNDS
         assert p21['scenario'] == 'A'                       # both start at the A baseline
@@ -3114,6 +3116,15 @@ assert ko.STUDY_TYPE_OPTIONS == {
                                 parameter_groups=ko.METABOLIC_SPLIT_14D_GROUPS,
                                 rate_parameter_groups=ko.METABOLIC_14D_RATE_GROUPS,
                                 group_multiplier_bounds={'glycolysis': (0.2, 4.0)},
+                                exclude_params=(),
+                                spike_delta_bounds=None,
+                                stage_1_max_x_bounds=None),
+    'metabolic_split_12d': dict(rate_params=ko.METABOLIC_SPLIT_12D_RATES,
+                                parameter_groups=ko.METABOLIC_SPLIT_14D_GROUPS,
+                                rate_parameter_groups=ko.METABOLIC_SPLIT_12D_RATE_GROUPS,
+                                rate_group_weights={'ehrlich_downstream': ko.EHRLICH_DOWNSTREAM_WEIGHTS},
+                                group_multiplier_bounds={'glycolysis': (0.2, 4.0),
+                                                         'ehrlich_downstream': (1e-3, 4.0)},
                                 exclude_params=(),
                                 spike_delta_bounds=None,
                                 stage_1_max_x_bounds=None)}
@@ -6143,5 +6154,190 @@ else:
 PASS('group_references threaded: predicate expands with the references; engine sets reference x m '
      'on r_te with zero live baselines, records applied_<member>, trial 0 at the clipped floor, '
      'restores the zero baselines, set-up print names the references; DA / context / prepare accept it')
+
+#%% 88. metabolic_split_12d preset (2026-09-15): metabolic_split_14d with the
+# three downstream Ehrlich rates k_14 / k_15 / k_16 collapsed into ONE
+# stoichiometrically weighted REFERENCED capacity group, ehrlich_downstream,
+# on 1e-3x-4x of EHRLICH_DOWNSTREAM_WEIGHTS x the B workbook's k_14 (4.8);
+# 12 variables for ethanol_isobutanol (4 rates + glycolysis +
+# ehrlich_downstream + 3 inhibition groups + 3 feeding), 8 for ethanol_only
+# (the Ehrlich group emptied by the A-workbook intersection, references
+# dropped with it); spike and stage_1_max_x pinned; name untagged for the
+# Ehrlich band (78 characters). Every other preset gains group_references=None.
+assert ko.STUDY_TYPE_ROLES['metabolic_split_12d'] == ()             # no role filter: explicit set
+opt88 = ko.STUDY_TYPE_OPTIONS['metabolic_split_12d']
+assert opt88 == dict(
+    rate_params=ko.METABOLIC_SPLIT_12D_RATES,
+    parameter_groups=ko.METABOLIC_SPLIT_14D_GROUPS,                  # inhibition groups, shared with split_14d
+    rate_parameter_groups=ko.METABOLIC_SPLIT_12D_RATE_GROUPS,
+    rate_group_weights={'ehrlich_downstream': ko.EHRLICH_DOWNSTREAM_WEIGHTS},
+    group_multiplier_bounds={'glycolysis': (0.2, 4.0), 'ehrlich_downstream': (1e-3, 4.0)},
+    exclude_params=(),
+    spike_delta_bounds=None,
+    stage_1_max_x_bounds=None)
+assert 'rate_group_weights' not in ko.STUDY_TYPE_OPTIONS['metabolic_split_14d']   # 14d untouched
+assert ko.study_type_name_defaults('metabolic_split_12d') == dict(
+    inhibition_multiplier_bounds={'glycolysis': (0.2, 4.0), 'ehrlich_downstream': (1e-3, 4.0)},
+    exclude_params=(), stage_1_max_x_bounds=None)
+NAME88 = 'kin_opt_ethanol_isobutanol_metabolic_split_12d_irr_rb0.001-4_ib0.75-1.5_burden'
+assert len(NAME88) == 78
+kw88 = dict(rate_multiplier_bounds=(1e-3, 4.0),
+            inhibition_multiplier_bounds={'glycolysis': (0.2, 4.0), 'ehrlich_downstream': (1e-3, 4.0)},
+            exclude_params=(), stage_1_max_x_bounds=None, burden=True)
+assert ko.default_study_name('IRR', 'ethanol_isobutanol', 'metabolic_split_12d', **kw88) == NAME88
+assert ko.default_study_name('IRR', 'ethanol_isobutanol', 'metabolic_split_12d', method='gp',
+                             **kw88) == NAME88.replace('_irr_', '_irr_gp_')
+assert ko.default_study_name('IRR', 'ethanol_isobutanol', 'metabolic_split_12d', method='dual_annealing',
+                             **kw88) == NAME88.replace('_irr_', '_irr_da_')
+sup88 = _runpy.run_path(os.path.join(
+    os.path.dirname(os.path.abspath(__file__)),
+    'optimize_kinetics_BO_supervised.py'))
+assert sup88['default_study_name'](None, 'IRR', None,
+                                   study_target_products='ethanol_isobutanol',
+                                   study_type='metabolic_split_12d', burden=True) == NAME88
+assert 'metabolic_split_12d' in ko.STUDY_TYPE_ROLES              # = the supervisor's --study-type choices
+roles88 = ko.kinetic_parameter_roles()
+assert all(roles88[n] == 'capacity' for n in ko.METABOLIC_SPLIT_12D_RATES)
+assert all(roles88[m] == 'capacity'
+           for ms in ko.METABOLIC_SPLIT_12D_RATE_GROUPS.values() for m in ms)
+if os.path.isfile(wb_A) and os.path.isfile(wb_B):
+    p88 = ko.resolve_study_preset('ethanol_isobutanol', 'metabolic_split_12d')
+    assert p88['scenario'] == 'A' and p88['kinetic_bounds_scenario'] == 'B'
+    assert p88['include_params'] == ['k_3', 'k_6', 'k_13', 'k_17']
+    assert list(p88['parameter_groups']) == ['glycolysis', 'ehrlich_downstream', 'inhib_ethanol',
+                                             'inhib_isobutanol', 'inhib_acetate']
+    assert p88['parameter_groups']['glycolysis'] == ['k_1l', 'k_1h', 'k_1e']
+    assert p88['parameter_groups']['ehrlich_downstream'] == ['k_14', 'k_15', 'k_16']
+    assert p88['parameter_groups']['inhib_ethanol'] == ['k_1ie', 'k_4ie', 'k_7ie', 'k_10ie', 'k_17ie']
+    assert p88['group_multiplier_bounds'] == {'glycolysis': (0.2, 4.0), 'ehrlich_downstream': (1e-3, 4.0)}
+    assert list(p88['group_references']) == ['ehrlich_downstream']
+    refs88 = p88['group_references']['ehrlich_downstream']
+    assert list(refs88) == ['k_14', 'k_15', 'k_16']
+    assert refs88['k_14'] == 4.8                                        # the anchor's B-workbook baseline x 1.0
+    assert np.isclose(refs88['k_15'], 4.8*1.015, rtol=1e-12, atol=0.0)
+    assert np.isclose(refs88['k_16'], 4.8*1.015*0.866, rtol=1e-12, atol=0.0)
+    assert p88['exclude_params'] == () and p88['spike_delta_bounds'] is None
+    assert p88['stage_1_max_x_bounds'] is None
+    assert p88['rate_multiplier_bounds'] == ko.DEFAULT_RATE_MULTIPLIER_BOUNDS
+    assert p88['multiplier_bounds'] == ko.DEFAULT_GROUP_MULTIPLIER_BOUNDS   # inert: no individual inhibition coefficient
+    # Every preset's dict has the same key set; the existing presets return group_references=None.
+    keys88 = {'scenario', 'kinetic_bounds_scenario', 'include_params', 'multiplier_bounds',
+              'rate_multiplier_bounds', 'rate_params', 'parameter_multiplier_bounds',
+              'exclude_params', 'stage_1_max_x_bounds', 'parameter_groups',
+              'group_multiplier_bounds', 'spike_delta_bounds', 'group_references'}
+    assert set(p88) == keys88, set(p88) ^ keys88
+    for st88 in ('metabolic_protein', 'metabolic_minimal', 'metabolic_minimal_subset',
+                 'metabolic_14d', 'metabolic_split_14d'):
+        p88_other = ko.resolve_study_preset('ethanol_isobutanol', st88)
+        assert set(p88_other) == keys88 and p88_other['group_references'] is None, st88
+    p88_14 = ko.resolve_study_preset('ethanol_isobutanol', 'metabolic_split_14d')
+    assert p88_14['include_params'] == list(ko.METABOLIC_SPLIT_14D_RATES)
+    assert list(p88_14['parameter_groups']) == ['glycolysis', 'inhib_ethanol', 'inhib_isobutanol', 'inhib_acetate']
+    # The search space as the driver builds it: LIVE scenario-A baselines (k_13-k_16 = 0,
+    # k_17 = 44 constitutive) + the B workbook's absolute bounds as param_bounds_override.
+    kb88 = ko.workbook_kinetic_baselines('B')
+    kb88_live = {**kb88, 'k_13': 0.0, 'k_14': 0.0, 'k_15': 0.0, 'k_16': 0.0}
+    override88 = ko.workbook_kinetic_bounds(
+        'B', multiplier_bounds=p88['multiplier_bounds'],
+        rate_multiplier_bounds=p88['rate_multiplier_bounds'],
+        rate_params=p88['rate_params'],
+        parameter_multiplier_bounds=p88['parameter_multiplier_bounds'])
+    space88, excl88 = ko.build_search_space(
+        kb88_live, include_params=p88['include_params'],
+        param_bounds_override=override88,
+        exclude_params=p88['exclude_params'],
+        rate_multiplier_bounds=p88['rate_multiplier_bounds'],
+        rate_params=p88['rate_params'],
+        parameter_multiplier_bounds=p88['parameter_multiplier_bounds'],
+        parameter_groups=p88['parameter_groups'],
+        group_multiplier_bounds=p88['group_multiplier_bounds'],
+        group_references=p88['group_references'],
+        spike_delta_bounds=p88['spike_delta_bounds'],
+        stage_1_max_x_bounds=p88['stage_1_max_x_bounds'])
+    assert len(space88) == 12, list(space88)
+    assert list(space88) == ['k_3', 'k_6', 'k_13', 'k_17', 'glycolysis', 'ehrlich_downstream',
+                             'inhib_ethanol', 'inhib_isobutanol', 'inhib_acetate',
+                             'threshold_conc', 'target_delta', 'max_n_spikes']
+    assert 'stage_1_max_x' not in space88 and 'spike_delta' not in space88
+    assert space88['ehrlich_downstream'] == dict(low=1e-3, high=4.0, log=True)
+    assert space88['glycolysis'] == dict(low=0.2, high=4.0, log=True)
+    assert space88['k_13'] == dict(low=1e-3*5.81, high=4.0*5.81, log=True)   # the B-workbook absolute band
+    assert space88['k_17'] == dict(low=1e-3*44.0, high=4.0*44.0, log=True)
+    for g88 in ('inhib_ethanol', 'inhib_isobutanol', 'inhib_acetate'):
+        assert space88[g88] == dict(low=0.75, high=1.5, log=True)
+    grouped88 = {m for ms in p88['parameter_groups'].values() for m in ms}
+    assert set(excl88) == set(kb88) - set(ko.METABOLIC_SPLIT_12D_RATES) - grouped88
+    assert len(space88) <= ko.GP_MAX_DIMENSIONS
+    # The baseline point in this space: the referenced group and k_13 at their floors.
+    pt88 = ko.baseline_decision_point(space88, kb88_live, bmk86, 16,
+                                      parameter_groups=p88['parameter_groups'],
+                                      group_references=p88['group_references'])
+    assert pt88['ehrlich_downstream'] == 1e-3 and pt88['glycolysis'] == 1.0
+    assert pt88['k_13'] == 1e-3*5.81 and pt88['k_17'] == 44.0
+    # The applied values at multiplier 1.0 = the references; the band at the anchor = k_14's individual band.
+    exp88 = ko.expand_grouped_values({'ehrlich_downstream': 1.0}, p88['parameter_groups'], kb88_live,
+                                     group_references=p88['group_references'])
+    assert exp88['k_14'] == 4.8 and np.isclose(exp88['k_16'], 4.219, atol=5e-4)
+    assert (1e-3*4.8, 4.0*4.8) == override88['k_14']
+    # ethanol_only: no k_13-k_17 in the A workbook -> the Ehrlich group is emptied, its references dropped.
+    p88_eo = ko.resolve_study_preset('ethanol_only', 'metabolic_split_12d')
+    assert p88_eo['include_params'] == ['k_3', 'k_6']
+    assert list(p88_eo['parameter_groups']) == ['glycolysis', 'inhib_ethanol', 'inhib_acetate']
+    assert p88_eo['group_references'] is None
+    kb88_eo = ko.workbook_kinetic_baselines('A')
+    space88_eo, _ = ko.build_search_space(
+        kb88_eo, include_params=p88_eo['include_params'],
+        exclude_params=p88_eo['exclude_params'],
+        rate_multiplier_bounds=p88_eo['rate_multiplier_bounds'],
+        rate_params=p88_eo['rate_params'],
+        parameter_multiplier_bounds=p88_eo['parameter_multiplier_bounds'],
+        parameter_groups=p88_eo['parameter_groups'],
+        group_multiplier_bounds=p88_eo['group_multiplier_bounds'],
+        group_references=p88_eo['group_references'],
+        spike_delta_bounds=p88_eo['spike_delta_bounds'],
+        stage_1_max_x_bounds=p88_eo['stage_1_max_x_bounds'])
+    assert len(space88_eo) == 8, list(space88_eo)
+    assert list(space88_eo) == ['k_3', 'k_6', 'glycolysis', 'inhib_ethanol', 'inhib_acetate',
+                                'threshold_conc', 'target_delta', 'max_n_spikes']
+    # Typo / consistency guards on a weighted group, each via a temporary preset entry.
+    def _bad_preset88(msg, exc, **options):
+        ko.STUDY_TYPE_ROLES['_bad_88'] = ()
+        ko.STUDY_TYPE_OPTIONS['_bad_88'] = dict(
+            rate_params=('k_3',), parameter_groups={}, group_multiplier_bounds={},
+            exclude_params=(), spike_delta_bounds=None, stage_1_max_x_bounds=None,
+            **options)
+        try:
+            try:
+                ko.resolve_study_preset('ethanol_isobutanol', '_bad_88')
+                raise AssertionError(f'guard did not fire for {options}')
+            except exc as e:
+                assert msg in str(e) and '_bad_88' in str(e), (msg, str(e))
+        finally:
+            del ko.STUDY_TYPE_ROLES['_bad_88']
+            del ko.STUDY_TYPE_OPTIONS['_bad_88']
+    _bad_preset88('k_17ie', KeyError,                                  # a non-capacity member of a weighted group
+                  rate_parameter_groups={'g': ('k_14', 'k_17ie')},
+                  rate_group_weights={'g': {'k_14': 1.0, 'k_17ie': 1.0}})
+    _bad_preset88('anchor', ValueError,                                # anchor weight != 1.0
+                  rate_parameter_groups={'g': ('k_14', 'k_15')},
+                  rate_group_weights={'g': {'k_14': 2.0, 'k_15': 1.0}})
+    _bad_preset88('exactly the group members', ValueError,             # weights keys != members (order matters)
+                  rate_parameter_groups={'g': ('k_14', 'k_15')},
+                  rate_group_weights={'g': {'k_15': 1.0, 'k_14': 1.0}})
+    _bad_preset88('exactly the group members', ValueError,             # a missing member
+                  rate_parameter_groups={'g': ('k_14', 'k_15', 'k_16')},
+                  rate_group_weights={'g': {'k_14': 1.0, 'k_15': 1.015}})
+    _bad_preset88('not a rate_parameter_groups', ValueError,           # weights for a group that is no capacity group
+                  rate_parameter_groups={'g': ('k_14', 'k_15')},
+                  rate_group_weights={'h': {'k_14': 1.0, 'k_15': 1.0}})
+    _bad_preset88('nonpositive weight', ValueError,                    # a zero weight
+                  rate_parameter_groups={'g': ('k_14', 'k_15')},
+                  rate_group_weights={'g': {'k_14': 1.0, 'k_15': 0.0}})
+else:
+    print('SKIP 88 (preset part): parameter-distribution workbooks not found')
+PASS('metabolic_split_12d preset: 12/8 vars (k_3, k_6, k_13, k_17 + glycolysis + REFERENCED '
+     'ehrlich_downstream on 1e-3-4x of 4.8 x weights + 3 inhibition groups + 3 feeding), '
+     'name _ib0.75-1.5 (78 chars, no Ehrlich tag), GP/DA tags, supervisor agrees, every '
+     'preset returns group_references, weighted-group guards')
 
 print(f'\nALL {n_pass} CHECKS PASSED')
