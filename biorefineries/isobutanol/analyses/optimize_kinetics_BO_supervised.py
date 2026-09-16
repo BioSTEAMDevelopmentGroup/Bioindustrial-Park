@@ -183,7 +183,10 @@ def default_study_name(scenario, objective, kinetic_bounds_scenario,
     seeded run off the unseeded study's store.
     `method` ('tpe' default; 'gp'; 'dual_annealing') inserts
     ko.method_study_tag (`_gp` / `_da`) right after the objective slug on
-    both paths, exactly as the driver does."""
+    both paths, exactly as the driver does.
+    Preset names now carry the scenario-A IBO-pathway anchoring tag `_aA`
+    (`ibo_pathway_anchoring='scenario_A'` is passed to ko.default_study_name),
+    mirroring the driver; the legacy path never anchors and gets no tag."""
     n_seeds = seed_count(seed_from)
     if study_target_products is not None:
         # The _ib / _x / _s1x tags of the preset's own values come from
@@ -216,7 +219,8 @@ def default_study_name(scenario, objective, kinetic_bounds_scenario,
                                          else (None if stage_1_max_x_bounds is None
                                                else tuple(stage_1_max_x_bounds))),
                                      n_seeds=n_seeds,
-                                     method=method)
+                                     method=method,
+                                     ibo_pathway_anchoring='scenario_A')
     scenario = scenario or 'B'
     slug = ko.objective_slug(objective)
     tag = ko.method_study_tag(method)

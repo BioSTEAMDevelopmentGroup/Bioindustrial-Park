@@ -1038,11 +1038,11 @@ sup23 = _runpy.run_path(os.path.join(
 assert sup23['default_study_name'](None, 'IRR', None,
                                    study_target_products='ethanol_isobutanol',
                                    study_type='metabolic_protein') \
-    == 'kin_opt_ethanol_isobutanol_metabolic_protein_irr_rb0.001-4_ib0.1-10_xk10_s1x1-50'
+    == 'kin_opt_ethanol_isobutanol_metabolic_protein_irr_rb0.001-4_ib0.1-10_xk10_aA_s1x1-50'
 assert sup23['default_study_name']('A', 'IBO titer', 'B',
                                    study_target_products='ethanol_only',
                                    study_type='metabolic') \
-    == 'kin_opt_ethanol_only_metabolic_ibo_titer_kbB_rb0.001-4_ib0.1-10_xk10_s1x1-50'
+    == 'kin_opt_ethanol_only_metabolic_ibo_titer_kbB_rb0.001-4_ib0.1-10_xk10_aA_s1x1-50'
     # ethanol_only's own kinetic_bounds_scenario is 'A' (STUDY_TARGET_PRODUCTS);
     # the explicit 'B' here differs, so it IS tagged (Finding 1 fix -- this
     # name used to silently drop the override and collide with the default).
@@ -1055,13 +1055,13 @@ assert sup23['default_study_name']('A', 'IRR', 'B') == 'kin_opt_A_kbB_irr'
 # is silent.
 assert sup23['default_study_name']('B', 'IRR', None,
                                    'ethanol_isobutanol', 'metabolic_protein') \
-    == 'kin_opt_ethanol_isobutanol_metabolic_protein_irr_scB_rb0.001-4_ib0.1-10_xk10_s1x1-50'
+    == 'kin_opt_ethanol_isobutanol_metabolic_protein_irr_scB_rb0.001-4_ib0.1-10_xk10_aA_s1x1-50'
 assert sup23['default_study_name'](None, 'IRR', 'A',
                                    'ethanol_isobutanol', 'metabolic_protein') \
-    == 'kin_opt_ethanol_isobutanol_metabolic_protein_irr_kbA_rb0.001-4_ib0.1-10_xk10_s1x1-50'
+    == 'kin_opt_ethanol_isobutanol_metabolic_protein_irr_kbA_rb0.001-4_ib0.1-10_xk10_aA_s1x1-50'
 assert sup23['default_study_name']('A', 'IRR', 'B',
                                    'ethanol_isobutanol', 'metabolic_protein') \
-    == 'kin_opt_ethanol_isobutanol_metabolic_protein_irr_rb0.001-4_ib0.1-10_xk10_s1x1-50'  # both match the preset: no sc/kb tag
+    == 'kin_opt_ethanol_isobutanol_metabolic_protein_irr_rb0.001-4_ib0.1-10_xk10_aA_s1x1-50'  # both match the preset: no sc/kb tag
 # child_code forwards both kwargs (and None under --legacy-flags).
 code23 = sup23['child_code'](None, 'IRR', 2000, None, False, 'x',
                              study_target_products='ethanol_only',
@@ -1483,11 +1483,11 @@ assert sup26['default_study_name'](None, 'IRR', None, burden=True) == 'kin_opt_B
 assert sup26['default_study_name'](None, 'IRR', None,
                                    study_target_products='ethanol_isobutanol',
                                    study_type='metabolic_protein', burden=True) \
-    == 'kin_opt_ethanol_isobutanol_metabolic_protein_irr_rb0.001-4_ib0.1-10_xk10_s1x1-50_burden'
+    == 'kin_opt_ethanol_isobutanol_metabolic_protein_irr_rb0.001-4_ib0.1-10_xk10_aA_s1x1-50_burden'
 assert sup26['default_study_name']('B', 'IRR', None,
                                    study_target_products='ethanol_isobutanol',
                                    study_type='metabolic_protein', burden=True) \
-    == 'kin_opt_ethanol_isobutanol_metabolic_protein_irr_scB_rb0.001-4_ib0.1-10_xk10_s1x1-50_burden'
+    == 'kin_opt_ethanol_isobutanol_metabolic_protein_irr_scB_rb0.001-4_ib0.1-10_xk10_aA_s1x1-50_burden'
 # child_code forwards the flag both ways; supervise()'s default is ON and it
 # derives the study name WITH the flag (so resume/stall-kill hit the store
 # the child writes).
@@ -1653,7 +1653,7 @@ assert sup27['default_study_name'](None, 'IRR', None,
                                    study_target_products='ethanol_isobutanol',
                                    study_type='metabolic', burden=True,
                                    rate_multiplier_bounds=(0.1, 10.0)) \
-    == 'kin_opt_ethanol_isobutanol_metabolic_irr_rb0.1-10_ib0.1-10_xk10_s1x1-50_burden'
+    == 'kin_opt_ethanol_isobutanol_metabolic_irr_rb0.1-10_ib0.1-10_xk10_aA_s1x1-50_burden'
 assert sup27['default_study_name']('A', 'IRR', 'B', rate_multiplier_bounds=(0.1, 10.0)) \
     == 'kin_opt_A_kbB_irr'                                    # legacy path: band not encoded
 code27 = sup27['child_code'](None, 'IRR', 200, None, False, 'x',
@@ -1973,12 +1973,12 @@ sup29 = _runpy.run_path(os.path.join(
 assert sup29['default_study_name'](None, 'IRR', None,
                                    study_target_products='ethanol_isobutanol',
                                    study_type='metabolic_protein', burden=True) \
-    == 'kin_opt_ethanol_isobutanol_metabolic_protein_irr_rb0.001-4_ib0.1-10_xk10_s1x1-50_burden'
+    == 'kin_opt_ethanol_isobutanol_metabolic_protein_irr_rb0.001-4_ib0.1-10_xk10_aA_s1x1-50_burden'
 assert sup29['default_study_name'](None, 'IRR', None,
                                    study_target_products='ethanol_isobutanol',
                                    study_type='metabolic_protein', burden=True,
                                    rate_multiplier_bounds=(1e-5, 10.0)) \
-    == 'kin_opt_ethanol_isobutanol_metabolic_protein_irr_rb1e-05-10_ib0.1-10_xk10_s1x1-50_burden'
+    == 'kin_opt_ethanol_isobutanol_metabolic_protein_irr_rb1e-05-10_ib0.1-10_xk10_aA_s1x1-50_burden'
 assert sup29['default_study_name']('A', 'IRR', 'B', burden=True) == 'kin_opt_A_kbB_irr_burden'
 src29_sup = open(os.path.join(os.path.dirname(os.path.abspath(__file__)),
                               'optimize_kinetics_BO_supervised.py')).read()
@@ -2561,12 +2561,12 @@ assert sup37['default_study_name'](None, 'IRR', None,
                                    study_target_products='ethanol_isobutanol',
                                    study_type='metabolic', burden=True,
                                    exclude_params=()) \
-    == 'kin_opt_ethanol_isobutanol_metabolic_irr_rb0.001-4_ib0.1-10_s1x1-50_burden'   # the production study's name + the _s1x tag (resume it with a bare --stage-1-max-x-bounds)
+    == 'kin_opt_ethanol_isobutanol_metabolic_irr_rb0.001-4_ib0.1-10_aA_s1x1-50_burden'   # the production study's name + the _s1x tag (resume it with a bare --stage-1-max-x-bounds)
 assert sup37['default_study_name'](None, 'IRR', None,
                                    study_target_products='ethanol_isobutanol',
                                    study_type='metabolic', burden=True,
                                    exclude_params=('k_10', 'k_7')) \
-    == 'kin_opt_ethanol_isobutanol_metabolic_irr_rb0.001-4_ib0.1-10_xk10+k7_s1x1-50_burden'
+    == 'kin_opt_ethanol_isobutanol_metabolic_irr_rb0.001-4_ib0.1-10_xk10+k7_aA_s1x1-50_burden'
 assert sup37['default_study_name']('A', 'IRR', 'B', exclude_params=('k_10',)) \
     == 'kin_opt_A_kbB_irr'                                             # legacy path: never tagged
 src37_sup = _inspect.getsource(sup37['supervise'])
@@ -2763,17 +2763,17 @@ assert 'stage_1_max_x_bounds=(2.0, 30.0),' in code40c
 assert sup40['default_study_name'](None, 'IRR', None,
                                    study_target_products='ethanol_isobutanol',
                                    study_type='metabolic_protein', burden=True) \
-    == 'kin_opt_ethanol_isobutanol_metabolic_protein_irr_rb0.001-4_ib0.1-10_xk10_s1x1-50_burden'
+    == 'kin_opt_ethanol_isobutanol_metabolic_protein_irr_rb0.001-4_ib0.1-10_xk10_aA_s1x1-50_burden'
 assert sup40['default_study_name'](None, 'IRR', None,
                                    study_target_products='ethanol_isobutanol',
                                    study_type='metabolic_protein', burden=True,
                                    stage_1_max_x_bounds=None) \
-    == 'kin_opt_ethanol_isobutanol_metabolic_protein_irr_rb0.001-4_ib0.1-10_xk10_burden'
+    == 'kin_opt_ethanol_isobutanol_metabolic_protein_irr_rb0.001-4_ib0.1-10_xk10_aA_burden'
 assert sup40['default_study_name'](None, 'IRR', None,
                                    study_target_products='ethanol_isobutanol',
                                    study_type='metabolic_protein', burden=True,
                                    stage_1_max_x_bounds=(2.0, 30.0)) \
-    == 'kin_opt_ethanol_isobutanol_metabolic_protein_irr_rb0.001-4_ib0.1-10_xk10_s1x2-30_burden'
+    == 'kin_opt_ethanol_isobutanol_metabolic_protein_irr_rb0.001-4_ib0.1-10_xk10_aA_s1x2-30_burden'
 assert sup40['default_study_name']('A', 'IRR', 'B', stage_1_max_x_bounds=(1.0, 50.0)) \
     == 'kin_opt_A_kbB_irr'
 src40_sup = _inspect.getsource(sup40['supervise'])
@@ -2932,7 +2932,7 @@ assert sup41['default_study_name'](None, 'IRR', None,
                                    study_target_products='ethanol_isobutanol',
                                    study_type='metabolic', burden=True,
                                    seed_from=seeds41_cli) \
-    == 'kin_opt_ethanol_isobutanol_metabolic_irr_rb0.001-4_ib0.1-10_xk10_s1x1-50_seed3_burden'
+    == 'kin_opt_ethanol_isobutanol_metabolic_irr_rb0.001-4_ib0.1-10_xk10_aA_s1x1-50_seed3_burden'
 assert sup41['default_study_name']('A', 'IRR', 'B', seed_from=seeds41_cli) \
     == 'kin_opt_A_kbB_irr_seed3'
 assert sup41['default_study_name']('A', 'IRR', 'B') == 'kin_opt_A_kbB_irr'
@@ -3154,6 +3154,11 @@ else:
     raise AssertionError('unknown study_type did not raise')
 NAME43 = ('kin_opt_ethanol_isobutanol_metabolic_minimal_irr'
           '_rb0.001-4_ib0.75-1.5_xk10+k7+k8_s1x1-50_burden')
+# Supervisor/driver preset names carry the scenario-A IBO-pathway
+# anchoring tag `_aA` (after the exclusion tag, before `_s1x`); the bare
+# NAME43 is still what a direct ko.default_study_name(...) call (no marker)
+# below produces.
+NAME43_aA = NAME43.replace('_s1x1-50', '_aA_s1x1-50')
 assert ko.default_study_name('IRR', 'ethanol_isobutanol', 'metabolic_minimal',
                              rate_multiplier_bounds=(1e-3, 4.0),
                              inhibition_multiplier_bounds={},
@@ -3186,16 +3191,16 @@ sup43 = _runpy.run_path(os.path.join(
     'optimize_kinetics_BO_supervised.py'))
 assert sup43['default_study_name'](None, 'IRR', None,
                                    study_target_products='ethanol_isobutanol',
-                                   study_type='metabolic_minimal', burden=True) == NAME43
+                                   study_type='metabolic_minimal', burden=True) == NAME43_aA
 assert sup43['default_study_name'](None, 'IRR', None,
                                    study_target_products='ethanol_isobutanol',
                                    study_type='metabolic_minimal', burden=True,
                                    exclude_params=('k_10',)) \
-    == 'kin_opt_ethanol_isobutanol_metabolic_minimal_irr_rb0.001-4_ib0.75-1.5_xk10_s1x1-50_burden'
+    == 'kin_opt_ethanol_isobutanol_metabolic_minimal_irr_rb0.001-4_ib0.75-1.5_xk10_aA_s1x1-50_burden'
 assert sup43['default_study_name'](None, 'IRR', None,
                                    study_target_products='ethanol_isobutanol',
                                    study_type='metabolic_protein', burden=True) \
-    == 'kin_opt_ethanol_isobutanol_metabolic_protein_irr_rb0.001-4_ib0.1-10_xk10_s1x1-50_burden'
+    == 'kin_opt_ethanol_isobutanol_metabolic_protein_irr_rb0.001-4_ib0.1-10_xk10_aA_s1x1-50_burden'
 src43_sup = open(os.path.join(os.path.dirname(os.path.abspath(__file__)),
                               'optimize_kinetics_BO_supervised.py')).read()
 assert 'ko.study_type_name_defaults(study_type)' in src43_sup
@@ -3327,7 +3332,8 @@ if os.path.isfile(wb_A) and os.path.isfile(wb_B):
                                           if kw['parameter_groups'] else
                                           kw['multiplier_bounds']),
             exclude_params=kw['exclude_params'],
-            stage_1_max_x_bounds=kw['stage_1_max_x_bounds'], n_seeds=0)
+            stage_1_max_x_bounds=kw['stage_1_max_x_bounds'], n_seeds=0,
+            ibo_pathway_anchoring='scenario_A')
     for stp43, st43 in ((a, b) for a in ko.STUDY_TARGET_PRODUCTS for b in ko.STUDY_TYPE_ROLES):
         driver_name43 = _driver_name43(stp43, st43)
         assert sup43['default_study_name'](None, 'IRR', None, study_target_products=stp43,
@@ -3335,10 +3341,10 @@ if os.path.isfile(wb_A) and os.path.isfile(wb_B):
     # An EXPLICIT group band must get its own study: it sizes the same
     # columns, and optuna accepts a changed numeric range on a resume, so
     # only the name keeps a 0.5x-3x run off the preset's 0.75x-1.5x store.
-    assert _driver_name43('ethanol_isobutanol', 'metabolic_minimal') == NAME43
+    assert _driver_name43('ethanol_isobutanol', 'metabolic_minimal') == NAME43_aA
     name43_wide = _driver_name43('ethanol_isobutanol', 'metabolic_minimal',
                                  group_multiplier_bounds=(0.5, 3.0))
-    assert '_ib0.5-3' in name43_wide and name43_wide != NAME43, name43_wide
+    assert '_ib0.5-3' in name43_wide and name43_wide != NAME43_aA, name43_wide
     # ... while an ungrouped preset ignores group_multiplier_bounds entirely.
     assert _driver_name43('ethanol_isobutanol', 'metabolic_protein',
                           group_multiplier_bounds=(0.5, 3.0)) \
@@ -3689,6 +3695,10 @@ for st45 in ('metabolic', 'metabolic_protein', 'metabolic_minimal'):
 # agree; an EXPLICIT --stage-1-max-x-bounds is still tagged; NAME43 and
 # the metabolic_protein default are untouched.
 NAME45 = 'kin_opt_ethanol_isobutanol_metabolic_minimal_subset_irr_rb0.001-4_ib0.75-1.5_burden'
+# The supervisor/driver preset name carries the `_aA` anchoring tag (no
+# _xk10 / _s1x here, so it lands right before `_burden`); the bare NAME45
+# is what a direct ko.default_study_name(...) call (no marker) produces.
+NAME45_aA = NAME45.replace('_burden', '_aA_burden')
 assert ko.default_study_name('IRR', 'ethanol_isobutanol', 'metabolic_minimal_subset',
                              rate_multiplier_bounds=(1e-3, 4.0),
                              inhibition_multiplier_bounds={},
@@ -3697,23 +3707,23 @@ assert ko.default_study_name('IRR', 'ethanol_isobutanol', 'metabolic_minimal_sub
 assert sup43['default_study_name'](None, 'IRR', None,
                                    study_target_products='ethanol_isobutanol',
                                    study_type='metabolic_minimal_subset',
-                                   burden=True) == NAME45
+                                   burden=True) == NAME45_aA
 assert sup43['default_study_name'](None, 'IRR', None,
                                    study_target_products='ethanol_isobutanol',
                                    study_type='metabolic_minimal_subset',
                                    burden=True, stage_1_max_x_bounds=(2.0, 30.0)) \
-    == NAME45.replace('_burden', '_s1x2-30_burden')
+    == NAME45_aA.replace('_burden', '_s1x2-30_burden')
 assert sup43['default_study_name'](None, 'IRR', None,
                                    study_target_products='ethanol_isobutanol',
                                    study_type='metabolic_minimal_subset',
-                                   burden=True, stage_1_max_x_bounds=None) == NAME45
+                                   burden=True, stage_1_max_x_bounds=None) == NAME45_aA
 assert sup43['default_study_name'](None, 'IRR', None,
                                    study_target_products='ethanol_isobutanol',
-                                   study_type='metabolic_minimal', burden=True) == NAME43
+                                   study_type='metabolic_minimal', burden=True) == NAME43_aA
 assert sup43['default_study_name'](None, 'IRR', None,
                                    study_target_products='ethanol_isobutanol',
                                    study_type='metabolic_protein', burden=True) \
-    == 'kin_opt_ethanol_isobutanol_metabolic_protein_irr_rb0.001-4_ib0.1-10_xk10_s1x1-50_burden'
+    == 'kin_opt_ethanol_isobutanol_metabolic_protein_irr_rb0.001-4_ib0.1-10_xk10_aA_s1x1-50_burden'
 # Source guard: the omitted-flag default reads the name-defaults table,
 # not ko.DEFAULT_STAGE_1_MAX_X_BOUNDS.
 src45_sup_name = _inspect.getsource(sup43['default_study_name'])
@@ -3855,7 +3865,7 @@ if os.path.isfile(wb_A) and os.path.isfile(wb_B):
         assert sup43['default_study_name'](None, 'IRR', None, study_target_products=stp45,
                                            study_type='metabolic_minimal_subset', burden=True) \
             == _driver_name43(stp45, 'metabolic_minimal_subset'), stp45
-    assert _driver_name43('ethanol_isobutanol', 'metabolic_minimal_subset') == NAME45
+    assert _driver_name43('ethanol_isobutanol', 'metabolic_minimal_subset') == NAME45_aA
 else:
     print('SKIP 45 (space part): parameter-distribution workbooks not found')
 # Driver: no logic change (every returned key is already setdefault'ed,
@@ -4917,7 +4927,7 @@ assert sup70['default_study_name'](None, 'IRR', None,
                                    study_target_products='ethanol_isobutanol',
                                    study_type='metabolic_minimal_subset',
                                    burden=True, method='dual_annealing') == \
-    'kin_opt_ethanol_isobutanol_metabolic_minimal_subset_irr_da_rb0.001-4_ib0.75-1.5_burden'
+    'kin_opt_ethanol_isobutanol_metabolic_minimal_subset_irr_da_rb0.001-4_ib0.75-1.5_aA_burden'
 assert sup70['default_study_name']('A', 'IRR', 'B', burden=True,
                                    method='dual_annealing') == 'kin_opt_A_kbB_irr_da_burden'
 assert sup70['default_study_name']('B', 'IBO titer', None,
@@ -5090,11 +5100,11 @@ for _fn73 in ('supervise', 'child_code', 'default_study_name'):
 _nm73 = lambda **kw: sup73['default_study_name'](
     None, 'IRR', None, study_target_products='ethanol_isobutanol',
     study_type='metabolic_minimal_subset', burden=True, **kw)
-assert _nm73() == 'kin_opt_ethanol_isobutanol_metabolic_minimal_subset_irr_rb0.001-4_ib0.75-1.5_burden'
+assert _nm73() == 'kin_opt_ethanol_isobutanol_metabolic_minimal_subset_irr_rb0.001-4_ib0.75-1.5_aA_burden'
 assert _nm73(group_multiplier_bounds=(0.2, 2.0)) \
-    == 'kin_opt_ethanol_isobutanol_metabolic_minimal_subset_irr_rb0.001-4_ib0.2-2_burden'
+    == 'kin_opt_ethanol_isobutanol_metabolic_minimal_subset_irr_rb0.001-4_ib0.2-2_aA_burden'
 assert _nm73(group_multiplier_bounds=(0.5, 3.0)) \
-    == 'kin_opt_ethanol_isobutanol_metabolic_minimal_subset_irr_rb0.001-4_ib0.5-3_burden'
+    == 'kin_opt_ethanol_isobutanol_metabolic_minimal_subset_irr_rb0.001-4_ib0.5-3_aA_burden'
 # legacy naming ignores it (no groups on that path)
 assert sup73['default_study_name']('A', 'IRR', 'B', group_multiplier_bounds=(0.2, 2.0)) == 'kin_opt_A_kbB_irr'
 _code73 = sup73['child_code'](None, 'IRR', 5, None, False, 'x',
@@ -5154,6 +5164,9 @@ assert ko.study_type_name_defaults('metabolic_14d') == dict(
 # The default name: rate band, _ib0.75-1.5 (every inhibition family at the 0.75
 # default; glycolysis is NOT tagged), no _x tag, _s1x1-50 (sampled), burden.
 NAME74 = 'kin_opt_ethanol_isobutanol_metabolic_14d_irr_rb0.001-4_ib0.75-1.5_s1x1-50_burden'
+# The supervisor derives the same name WITH the `_aA` anchoring tag (before
+# `_s1x`); bare NAME74 is the direct engine (no-marker) result below.
+NAME74_aA = NAME74.replace('_s1x1-50', '_aA_s1x1-50')
 assert ko.default_study_name(
     'IRR', 'ethanol_isobutanol', 'metabolic_14d',
     rate_multiplier_bounds=(1e-3, 4.0),
@@ -5165,7 +5178,7 @@ sup74 = _runpy.run_path(os.path.join(
     'optimize_kinetics_BO_supervised.py'))
 assert sup74['default_study_name'](None, 'IRR', None,
                                    study_target_products='ethanol_isobutanol',
-                                   study_type='metabolic_14d', burden=True) == NAME74
+                                   study_type='metabolic_14d', burden=True) == NAME74_aA
 # Typo guard: a rate_parameter_groups member that is NOT a capacity row is
 # rejected up front (KeyError naming the parameter and the preset), and the
 # inhibition-group guard is preserved for a parameter_groups member that is
@@ -5696,7 +5709,7 @@ assert sup81['default_study_name'](None, 'IRR', None,
                                    study_target_products='ethanol_isobutanol',
                                    study_type='metabolic_minimal_subset',
                                    burden=True, method='gp') == \
-    'kin_opt_ethanol_isobutanol_metabolic_minimal_subset_irr_gp_rb0.001-4_ib0.75-1.5_burden'
+    'kin_opt_ethanol_isobutanol_metabolic_minimal_subset_irr_gp_rb0.001-4_ib0.75-1.5_aA_burden'
 assert sup81['default_study_name']('A', 'IRR', 'B', burden=True,
                                    method='gp') == 'kin_opt_A_kbB_irr_gp_burden'
 assert sup81['default_study_name']('B', 'IBO titer', None, method='gp') == 'kin_opt_B_ibo_titer_gp'
@@ -5790,6 +5803,9 @@ assert ko.study_type_name_defaults('metabolic_split_14d') == dict(
     inhibition_multiplier_bounds={'glycolysis': (0.2, 4.0)},
     exclude_params=(), stage_1_max_x_bounds=None)
 NAME83 = 'kin_opt_ethanol_isobutanol_metabolic_split_14d_irr_rb0.001-4_ib0.75-1.5_burden'
+# Supervisor/driver preset name carries `_aA` (no _xk10 / _s1x, so before
+# `_burden`); bare NAME83 is the direct engine (no-marker) result below.
+NAME83_aA = NAME83.replace('_burden', '_aA_burden')
 assert len(NAME83) == 78
 assert ko.default_study_name(
     'IRR', 'ethanol_isobutanol', 'metabolic_split_14d',
@@ -5814,7 +5830,7 @@ sup83 = _runpy.run_path(os.path.join(
     'optimize_kinetics_BO_supervised.py'))
 assert sup83['default_study_name'](None, 'IRR', None,
                                    study_target_products='ethanol_isobutanol',
-                                   study_type='metabolic_split_14d', burden=True) == NAME83
+                                   study_type='metabolic_split_14d', burden=True) == NAME83_aA
 assert 'metabolic_split_14d' in ko.STUDY_TYPE_ROLES              # = the supervisor's --study-type choices
 # Typo guards (role table): every listed rate a capacity row, every group member an inhibition row.
 roles83 = ko.kinetic_parameter_roles()
@@ -6209,9 +6225,15 @@ assert ko.default_study_name('IRR', 'ethanol_isobutanol', 'metabolic_split_12d',
 sup88 = _runpy.run_path(os.path.join(
     os.path.dirname(os.path.abspath(__file__)),
     'optimize_kinetics_BO_supervised.py'))
+# The supervisor preset name carries the `_aA` anchoring tag (mirroring the
+# driver); the three direct ko.default_study_name(..., **kw88) assertions
+# above call the engine WITHOUT the marker, so bare NAME88 is still correct
+# for them.
+NAME88_aA = ko.default_study_name('IRR', 'ethanol_isobutanol', 'metabolic_split_12d',
+                                  ibo_pathway_anchoring='scenario_A', **kw88)
 assert sup88['default_study_name'](None, 'IRR', None,
                                    study_target_products='ethanol_isobutanol',
-                                   study_type='metabolic_split_12d', burden=True) == NAME88
+                                   study_type='metabolic_split_12d', burden=True) == NAME88_aA
 assert 'metabolic_split_12d' in ko.STUDY_TYPE_ROLES              # = the supervisor's --study-type choices
 roles88 = ko.kinetic_parameter_roles()
 assert all(roles88[n] == 'capacity' for n in ko.METABOLIC_SPLIT_12D_RATES)
@@ -6508,5 +6530,15 @@ assert "ibo_pathway_anchoring='scenario_A'" in call94, call94
 # The existing merge already prefers the preset/user override over the B bounds.
 assert "derived.update(engine_kwargs.get('param_bounds_override') or {})" in body94
 PASS('driver: param_bounds_override setdefault-ed and merged over the B bounds; _aA tag passed')
+
+#%% 95. Supervisor passes the anchoring marker on the preset path.
+sup95 = open(os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                          'optimize_kinetics_BO_supervised.py')).read()
+dsn95 = sup95[sup95.index('def default_study_name('):sup95.index('scenario = scenario or')]
+assert "ibo_pathway_anchoring='scenario_A'" in dsn95, dsn95
+# The legacy branch (below) must NOT carry the marker.
+legacy95 = sup95[sup95.index('scenario = scenario or'):sup95.index('def row_count(')]
+assert '_aA' not in legacy95 and 'ibo_pathway_anchoring' not in legacy95
+PASS('supervisor: _aA on the preset path only; legacy path unchanged')
 
 print(f'\nALL {n_pass} CHECKS PASSED')
