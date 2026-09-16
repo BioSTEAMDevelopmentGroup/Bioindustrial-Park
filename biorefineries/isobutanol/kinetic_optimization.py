@@ -2276,7 +2276,7 @@ def default_study_name(objective, study_target_products, study_type,
                        burden=False, rate_multiplier_bounds=None,
                        inhibition_multiplier_bounds=None,
                        exclude_params=None, stage_1_max_x_bounds=None,
-                       n_seeds=None, method='tpe'):
+                       n_seeds=None, method='tpe', ibo_pathway_anchoring=None):
     """Stable study name of a preset study:
     kin_opt_{study_target_products}_{study_type}_{objective slug}
     (slug = lower-cased, spaces -> '_'), e.g.
@@ -2372,6 +2372,14 @@ def default_study_name(objective, study_target_products, study_type,
     same columns as the TPE study of the same objective, so the tag is
     the only thing keeping it off that study's CSV.
 
+    `ibo_pathway_anchoring` ('scenario_A' on every preset name since
+    2026-09-16; None/'legacy' = nothing) tags the name `_aA` after the
+    exclusion tag and before `_s1x`. The IBO-pathway rate bands moved from
+    the arbitrary scenario-B workbook to the fitted scenario-A antimony
+    anchor without changing the trajectory-CSV columns, so the tag is the
+    only thing keeping a new-scheme study off an old B-anchored study's store
+    (the header guard cannot tell them apart -- same columns).
+
     `burden=True` appends BURDEN_STUDY_SUFFIX ('_burden') after every
     other tag: a burden study (enzyme_burden.py; the driver's default)
     can never resume a burden-free study's CSV/SQLite, or vice versa.
@@ -2392,6 +2400,8 @@ def default_study_name(objective, study_target_products, study_type,
     if inhibition_multiplier_bounds is not None:
         name += _inhibition_bounds_tag(inhibition_multiplier_bounds)
     name += excluded_parameters_tag(exclude_params)
+    if ibo_pathway_anchoring == 'scenario_A':
+        name += '_aA'
     if stage_1_max_x_bounds is not None:
         lo, hi = stage_1_max_x_bounds
         name += f'_s1x{lo:g}-{hi:g}'

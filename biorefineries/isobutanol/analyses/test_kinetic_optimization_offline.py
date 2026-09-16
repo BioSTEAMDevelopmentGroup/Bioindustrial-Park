@@ -6463,4 +6463,33 @@ if os.path.isfile(wb_A) and os.path.isfile(wb_B):
     PASS('resolve_study_preset: param_bounds_override anchors k_13-k_17 on scenario A; '
          'ethanol_only empty; split_12d skips grouped k_14-k_16; log-scale in the space')
 
+#%% 93. default_study_name: ibo_pathway_anchoring tag (2026-09-16). '_aA' after
+# the exclusion tag, before _s1x; default (None) unchanged.
+assert 'ibo_pathway_anchoring' in _inspect.signature(ko.default_study_name).parameters
+base93 = ko.default_study_name('IRR', 'ethanol_isobutanol', 'metabolic_protein',
+                               rate_multiplier_bounds=(1e-3, 4.0),
+                               inhibition_multiplier_bounds=(0.1, 10.0),
+                               exclude_params=('k_10',),
+                               stage_1_max_x_bounds=(1.0, 50.0), burden=True)
+aA93 = ko.default_study_name('IRR', 'ethanol_isobutanol', 'metabolic_protein',
+                             rate_multiplier_bounds=(1e-3, 4.0),
+                             inhibition_multiplier_bounds=(0.1, 10.0),
+                             exclude_params=('k_10',),
+                             stage_1_max_x_bounds=(1.0, 50.0), burden=True,
+                             ibo_pathway_anchoring='scenario_A')
+# The only difference is '_aA' inserted between the exclusion tag and _s1x.
+assert base93.replace('_xk10_', '_xk10_aA_') == aA93, (base93, aA93)
+assert '_xk10_aA_s1x1-50_burden' in aA93
+# None and 'legacy' add nothing.
+assert ko.default_study_name('IRR', 'ethanol_isobutanol', 'metabolic_protein',
+                             ibo_pathway_anchoring='legacy') \
+    == ko.default_study_name('IRR', 'ethanol_isobutanol', 'metabolic_protein')
+# With stage_1_max_x pinned (no _s1x), _aA sits before _burden.
+aA93b = ko.default_study_name('IRR', 'ethanol_isobutanol', 'metabolic_minimal_subset',
+                              rate_multiplier_bounds=(1e-3, 4.0),
+                              inhibition_multiplier_bounds=(0.2, 2.0), burden=True,
+                              ibo_pathway_anchoring='scenario_A')
+assert aA93b.endswith('_aA_burden'), aA93b
+PASS('default_study_name: _aA anchoring tag after exclusion, before _s1x; None/legacy inert')
+
 print(f'\nALL {n_pass} CHECKS PASSED')
