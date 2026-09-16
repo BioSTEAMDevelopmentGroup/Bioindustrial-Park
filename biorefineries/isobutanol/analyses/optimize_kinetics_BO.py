@@ -340,7 +340,10 @@ def run(scenario=None,  # 'A' or 'B'; None = the preset's start scenario
     `_rb{lo}-{hi}` (`_rb0.001-4` at the default), the inhibition band
     tag `_ib{lo}-{hi}` (`_ib0.1-10`) and the exclusion tag of the
     effective `exclude_params` (`_xk10` at the default, nothing for an
-    empty set; ko.default_study_name / ko.excluded_parameters_tag), so a
+    empty set; ko.default_study_name / ko.excluded_parameters_tag) and,
+    since 2026-09-16, the anchoring tag `_aA` (the IBO-pathway rate bands
+    for k_13-k_17 are anchored on scenario A / antimony via the preset's
+    param_bounds_override, a numeric-range change over the SAME columns), so a
     study under the current preset never resumes one started under the
     1e-5x rate band (e.g. kin_opt_ethanol_isobutanol_metabolic_irr_ib0.1-
     10_burden, untagged because only a differing band was tagged then),
@@ -542,7 +545,8 @@ def run(scenario=None,  # 'A' or 'B'; None = the preset's start scenario
                     'rate_multiplier_bounds', 'rate_params',
                     'parameter_multiplier_bounds', 'stage_1_max_x_bounds',
                     'parameter_groups', 'group_multiplier_bounds',
-                    'spike_delta_bounds', 'group_references'):
+                    'spike_delta_bounds', 'group_references',
+                    'param_bounds_override'):
             engine_kwargs.setdefault(key, preset[key])
         if study_name is None:
             study_name = ko.default_study_name(
@@ -579,7 +583,12 @@ def run(scenario=None,  # 'A' or 'B'; None = the preset's start scenario
                 # The seed count: same columns as the unseeded study, so
                 # the tag is what keeps a seeded run off its store.
                 n_seeds=n_seeds,
-                method=method)
+                method=method,
+                # Every preset name gains _aA: the IBO-pathway bands are now
+                # anchored on scenario A (antimony), a numeric-range change over
+                # the SAME columns, so only the name keeps a new study off an
+                # old B-anchored store.
+                ibo_pathway_anchoring='scenario_A')
         excluded = tuple(engine_kwargs['exclude_params'] or ())
         groups = dict(engine_kwargs['parameter_groups'] or {})
         grouped = {m for members in groups.values() for m in members}

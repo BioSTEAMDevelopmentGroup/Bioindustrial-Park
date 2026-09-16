@@ -1991,7 +1991,8 @@ drv29 = open(os.path.join(os.path.dirname(os.path.abspath(__file__)),
 assert ("'rate_multiplier_bounds', 'rate_params',\n"
         "                    'parameter_multiplier_bounds', 'stage_1_max_x_bounds',\n"
         "                    'parameter_groups', 'group_multiplier_bounds',\n"
-        "                    'spike_delta_bounds', 'group_references'):") in drv29
+        "                    'spike_delta_bounds', 'group_references',\n"
+        "                    'param_bounds_override'):") in drv29
 assert "parameter_multiplier_bounds=engine_kwargs.get('parameter_multiplier_bounds')" in drv29
 assert "rate_multiplier_bounds=engine_kwargs['rate_multiplier_bounds']" in drv29
 assert 'explicit_rate_bounds' not in drv29
@@ -2734,7 +2735,8 @@ drv40 = open(os.path.join(os.path.dirname(os.path.abspath(__file__)),
                           'optimize_kinetics_BO.py')).read()
 assert ("'parameter_multiplier_bounds', 'stage_1_max_x_bounds',\n"
         "                    'parameter_groups', 'group_multiplier_bounds',\n"
-        "                    'spike_delta_bounds', 'group_references'):") in drv40
+        "                    'spike_delta_bounds', 'group_references',\n"
+        "                    'param_bounds_override'):") in drv40
 assert "stage_1_max_x_bounds=engine_kwargs['stage_1_max_x_bounds']," in drv40
 sup40 = _runpy.run_path(os.path.join(
     os.path.dirname(os.path.abspath(__file__)),
@@ -3163,7 +3165,8 @@ assert ko.default_study_name('IRR', 'ethanol_isobutanol', 'metabolic_minimal',
 drv43 = open(os.path.join(os.path.dirname(os.path.abspath(__file__)),
                           'optimize_kinetics_BO.py')).read()
 assert "'parameter_groups', 'group_multiplier_bounds'," in drv43
-assert "'spike_delta_bounds', 'group_references'):" in drv43
+assert ("'spike_delta_bounds', 'group_references',\n"
+        "                    'param_bounds_override'):") in drv43
 assert 'engine_kwargs.setdefault(key, preset[key])' in drv43
 assert "Parameter groups" in drv43 and 'spike feed pinned at the baseline' in drv43
 # The _ib tag follows the band that actually SIZES the inhibition entries:
@@ -6491,5 +6494,19 @@ aA93b = ko.default_study_name('IRR', 'ethanol_isobutanol', 'metabolic_minimal_su
                               ibo_pathway_anchoring='scenario_A')
 assert aA93b.endswith('_aA_burden'), aA93b
 PASS('default_study_name: _aA anchoring tag after exclusion, before _s1x; None/legacy inert')
+
+#%% 94. Driver forwards the preset's param_bounds_override and tags _aA.
+drv94 = open(os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                          'optimize_kinetics_BO.py')).read()
+body94 = drv94[drv94.index('def run('):]
+setdefault94 = body94[body94.index("for key in ('include_params',")
+                      :body94.index('engine_kwargs.setdefault(key, preset[key])')]
+assert "'param_bounds_override'" in setdefault94, setdefault94
+# The driver passes the anchoring marker into default_study_name.
+call94 = body94[body94.index('ko.default_study_name('):body94.index('excluded = tuple(')]
+assert "ibo_pathway_anchoring='scenario_A'" in call94, call94
+# The existing merge already prefers the preset/user override over the B bounds.
+assert "derived.update(engine_kwargs.get('param_bounds_override') or {})" in body94
+PASS('driver: param_bounds_override setdefault-ed and merged over the B bounds; _aA tag passed')
 
 print(f'\nALL {n_pass} CHECKS PASSED')
