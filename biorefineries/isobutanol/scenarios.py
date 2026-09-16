@@ -161,8 +161,10 @@ SCENARIOS = {
     # superpowers/specs/2026-09-15-r16-r17-adh6-split-integration-design.md):
     # the lumped Ehrlich step r16 (Aro10 + Adh6) is now r16 (Aro10, a pure
     # decarboxylase: k_16 * s_KIV/(s_KIV + K_16), CO2 release) + r17 (Adh6,
-    # the NADPH aldehyde reduction with r6's structure: k_17 = 44 g/L/h
-    # constitutive, K_17 0.0086 g/L, k_17r 2.5e-4, K_17e 0.020, and the
+    # the NADPH aldehyde reduction with r6's structure: k_17 = 0.1077 g/L/h
+    # constitutive (44 g/L/h at the 2026-09-15 split; corrected 2026-09-16 to
+    # the abundance/kcat/MW transfer from k_6 -- see enzyme_burden.NATIVE_STEPS
+    # r17), K_17 0.0086 g/L, k_17r 2.5e-4, K_17e 0.020, and the
     # acetate / ethanol cross-product exponentials re-homed as k_17ia /
     # k_17ie; qO2 charges -0.222*r17). The six Ehrlich workbooks repoint
     # k_16ia / k_16ie -> k_17ia / k_17ie (values unchanged) and gain the four

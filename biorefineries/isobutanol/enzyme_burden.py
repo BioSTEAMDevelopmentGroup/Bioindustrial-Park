@@ -125,18 +125,30 @@ _NATIVE_STEPS_TABLE = {
     # isobutanol step r17 (the 2026-09-15 nskinetics split of the lumped
     # KDC + ADH step; the Aro10 decarboxylase stays r16, EHRLICH_STEPS). A
     # native, constitutively expressed yeast ADH with a measured abundance,
-    # so it is charged by the abundance-ratio route like Adh1 -- NOT by the
-    # kcat/MW route on k_17, which at 44 g/L/h would cost ~0.045 g/gDCW
-    # even in scenario A (~25x too much, and constant). Pool anchored to
-    # the r6 (Adh1) pool through the SGD quantitative-proteomics medians
-    # (yeastgenome.org loci S000005446 ADH1 103,727 and S000004937 ADH6
-    # 14,717 molecules per cell, ~7.05:1) and the UniProt subunit masses
-    # (Adh1 36,849 Da, Adh6 39,618 Da):
+    # so its expression is set by that (roughly constant) abundance rather
+    # than by flux demand -- hence the abundance-ratio route like Adh1, not
+    # the kcat/MW route (which would instead size the pool to just catalyze
+    # the current flux; at the reference k_17,ref = 0.1077 g/L/h it gives
+    # 0.1077 x 0.00103 ~ 0.00011 g/gDCW, i.e. ~6x LESS than the abundance
+    # estimate below, so it would UNDER-count a constitutive enzyme).
+    # Pool anchored to the r6 (Adh1) pool through the SGD quantitative-
+    # proteomics medians (yeastgenome.org loci S000005446 ADH1 103,727 and
+    # S000004937 ADH6 14,717 molecules per cell, ~7.05:1) and the UniProt
+    # subunit masses (Adh1 36,849 Da, Adh6 39,618 Da):
     #   0.0040 x (14,717/103,727) x (39,618/36,849) = 0.0040 x 0.1419 x 1.0751
     #   = 0.00061 g/gDCW at the table's 0.45 basis (~0.00066 at 0.49).
     # The r6 lump (Adh1 + Adh2-5) is treated as ~Adh1 (Adh1 dominates under
     # fermentation): a slight over-estimate, the simplest self-consistent
-    # anchor. pool ~ k_17, so the 4x rate-band ceiling costs ~0.0027.
+    # anchor. k_17,ref is read live from the scenario-A baseline, which
+    # inherits the nskinetics antimony default k_17 = 0.1077 g/L/h -- itself
+    # derived (2026-09-16, k_17 = k_6 x kcat_Adh6/kcat_Adh1 x [Adh6]/[Adh1]
+    # x MW_ibald/MW_acetald) from the SAME SGD [Adh6]/[Adh1] = 14,717/103,727
+    # ratio that anchors this pool, so the kinetics and the proteome cost now
+    # assume one Adh6 abundance instead of contradicting each other (an
+    # earlier k_17,ref = 44 g/L/h used Aro10's kcat against the scenario-B
+    # k_16 and was inconsistent with this anchor). pool ~ k_17, and the pool
+    # is exactly the abundance estimate at the reference (multiplier 1), so
+    # the 4x rate-band ceiling costs ~0.0027 regardless of k_17,ref.
     'r17': (0.00061, ('k_17',)),                # Adh6 (native abundance-ratio route)
 }
 
