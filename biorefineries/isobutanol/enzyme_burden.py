@@ -18,7 +18,7 @@ FLEXIBLE protein sector F_flex against Phi_M plus the translation sector
 phi_T (which scales with the sampled growth capacities k_7 / k_8), and
 derates growth linearly to zero as the flexible sector fills:
 
-    native steps (r1, r2, r3, r5, r6):
+    native steps (r1, r2, r3, r5, r6, r17):
         pool_i = pool_wt,i * max_j(k_ij / k_ij,ref)        (ratio route)
     r4: pool_r4 = pool_wt,r4                               (k_4 burden-free)
     Ehrlich steps (r13-r16):
@@ -121,12 +121,30 @@ _NATIVE_STEPS_TABLE = {
     'r4': (0.0032, ()),                         # Ald6 (AcDH pool; fixed)
     'r5': (0.0008, ('k_5', 'k_5e')),            # Acs2 (+Acs1)
     'r6': (0.0040, ('k_6',)),                   # Adh1 (+Adh2-5)
+    # Adh6 (Q04894), the NADPH aldehyde reductase of the isobutyraldehyde ->
+    # isobutanol step r17 (the 2026-09-15 nskinetics split of the lumped
+    # KDC + ADH step; the Aro10 decarboxylase stays r16, EHRLICH_STEPS). A
+    # native, constitutively expressed yeast ADH with a measured abundance,
+    # so it is charged by the abundance-ratio route like Adh1 -- NOT by the
+    # kcat/MW route on k_17, which at 44 g/L/h would cost ~0.045 g/gDCW
+    # even in scenario A (~25x too much, and constant). Pool anchored to
+    # the r6 (Adh1) pool through the SGD quantitative-proteomics medians
+    # (yeastgenome.org loci S000005446 ADH1 103,727 and S000004937 ADH6
+    # 14,717 molecules per cell, ~7.05:1) and the UniProt subunit masses
+    # (Adh1 36,849 Da, Adh6 39,618 Da):
+    #   0.0040 x (14,717/103,727) x (39,618/36,849) = 0.0040 x 0.1419 x 1.0751
+    #   = 0.00061 g/gDCW at the table's 0.45 basis (~0.00066 at 0.49).
+    # The r6 lump (Adh1 + Adh2-5) is treated as ~Adh1 (Adh1 dominates under
+    # fermentation): a slight over-estimate, the simplest self-consistent
+    # anchor. pool ~ k_17, so the 4x rate-band ceiling costs ~0.0027.
+    'r17': (0.00061, ('k_17',)),                # Adh6 (native abundance-ratio route)
 }
 
 #: The pool table at PROTEIN_CONTENT: pool_wt = tabulated pool x
 #: PROTEIN_CONTENT / POOL_TABLE_PROTEIN_CONTENT (the identity at 0.45;
 #: x 1.089 at 0.49 -- r1 0.0479, r2 0.00348, r3 0.00926, r4 0.00348,
-#: r5 0.000871, r6 0.00436 g/gDCW; Phi_M,wt 0.0694).
+#: r5 0.000871, r6 0.00436, r17 0.000664 g/gDCW; Phi_M,wt 0.0700 (0.0694
+#: before the 2026-09-15 Adh6 entry)).
 NATIVE_STEPS = {
     step: (pool*PROTEIN_CONTENT/POOL_TABLE_PROTEIN_CONTENT, capacities)
     for step, (pool, capacities) in _NATIVE_STEPS_TABLE.items()
@@ -165,13 +183,13 @@ EHRLICH_STEPS = {
             (('Ilv3', 62861.0, _kcat_from_specific_activity(18.0, 62861.0)),)),
     # KDC Aro10 (Q06408): kcat 19 s^-1, Km 8.5 mM on 2-ketoisovalerate,
     # pH 7.0, 30 C (Kneen et al. 2011, FEBS J 278:1842; BRENDA EC
-    # 4.1.1.43). ADH Adh6 (Q04894): 296 s^-1 on 2-methylpropanal + NADPH,
-    # pH 7.0, 25 C (Larroy et al. 2002, Biochem J 361:163; BRENDA EC
-    # 1.1.1.2). Both sized on the KIV molar flux, k_16 / 116.12, because
-    # the model writes k_16 in g KIV gDCW^-1 h^-1.
+    # 4.1.1.43), sized on the KIV molar flux, k_16 / 116.12, because the
+    # model writes k_16 in g KIV gDCW^-1 h^-1. The ADH Adh6 (Q04894, 296
+    # s^-1 on 2-methylpropanal + NADPH, Larroy et al. 2002, Biochem J
+    # 361:163) was a second enzyme of this entry until the 2026-09-15
+    # nskinetics split made it the native step r17 (_NATIVE_STEPS_TABLE).
     'r16': ('k_16', 116.12,
-            (('Aro10', 71384.0, 19.0),
-             ('Adh6', 39618.0, 296.0))),
+            (('Aro10', 71384.0, 19.0),)),
 }
 
 #: Native single-enzyme steps used as the sigma DIAGNOSTIC (spec 4.4):
