@@ -649,6 +649,7 @@ def build_search_space(kinetic_baselines,
                        stage_1_max_x_bounds=None,
                        parameter_groups=None,
                        group_multiplier_bounds=DEFAULT_GROUP_MULTIPLIER_BOUNDS,
+                       group_references=None,
                        ):
     """Build the decision-variable space: {name: {'low', 'high', 'log'}}
     (integer variables additionally carry 'int': True).
@@ -755,6 +756,22 @@ def build_search_space(kinetic_baselines,
     The metabolic_minimal preset groups the inhibition coefficients by
     effector (resolve_study_preset).
 
+    `group_references` ({group_name: {member: reference_capacity}}; None /
+    {} = none; since 2026-09-15) makes a group a REFERENCED capacity group:
+    its multiplier applies to each member's REFERENCE instead of its live
+    baseline (expand_grouped_values), so the members may have a ZERO live
+    baseline (the Ehrlich rates at the scenario-A start -- the
+    metabolic_split_12d preset's ehrlich_downstream group, references =
+    EHRLICH_DOWNSTREAM_WEIGHTS x the anchor's bounds-workbook baseline).
+    A referenced member is EXEMPT from the positive-live-baseline check
+    above (an un-referenced group's members still need one). ValueError:
+    a referenced group that is not in `parameter_groups`; a reference for
+    a name that is not a member of that group (a non-kinetic name
+    included); a reference dict that does not cover EVERY member of its
+    group (all-or-none per group); a nonpositive (or NaN) reference.
+    The band and the column are exactly those of an un-referenced group
+    (group_multiplier_bounds; one log-scale multiplier).
+
     Returns (space, excluded_parameter_names)."""
     param_bounds_override = dict(param_bounds_override or {})
     parameter_multiplier_bounds = dict(parameter_multiplier_bounds or {})
@@ -764,6 +781,32 @@ def build_search_space(kinetic_baselines,
     is_rate = _rate_predicate(rate_params)
     parameter_groups = {str(group): list(members)
                         for group, members in dict(parameter_groups or {}).items()}
+    group_references = {str(group): dict(refs)
+                        for group, refs in dict(group_references or {}).items()}
+    for group, refs in group_references.items():
+        # References are validated against the GROUP definition (membership,
+        # all-or-none, positivity) before the members themselves are checked
+        # below, where a referenced member is exempt from the positive-live-
+        # baseline requirement.
+        if group not in parameter_groups:
+            raise ValueError(f'group_references names group {group!r}, which '
+                             'is not in parameter_groups')
+        members = parameter_groups[group]
+        extra = [name for name in refs if name not in members]
+        if extra:
+            raise ValueError(f'group_references for group {group!r}: {extra} '
+                             'are not members of that group')
+        missing = [name for name in members if name not in refs]
+        if missing:
+            raise ValueError(f'group_references for group {group!r} must '
+                             'cover every member of the group (all-or-none); '
+                             f'missing {missing}')
+        for member, reference in refs.items():
+            if not (reference > 0.0):   # also catches NaN
+                raise ValueError(f'group_references for group {group!r}: '
+                                 f'member {member!r} has a nonpositive '
+                                 f'reference ({reference}); a reference '
+                                 'capacity must be positive')
     grouped = {}  # member name -> group name
     if parameter_groups:
         reserved = (set(kinetic_baselines) | set(FEEDING_VARIABLES)
@@ -779,6 +822,7 @@ def build_search_space(kinetic_baselines,
                                  'operating variable name')
             if not members:
                 raise ValueError(f'parameter group {group!r} is empty')
+            referenced = group in group_references
             for member in members:
                 if member not in kinetic_baselines:
                     raise ValueError(f'parameter group {group!r}: member '
@@ -792,11 +836,12 @@ def build_search_space(kinetic_baselines,
                     raise ValueError(f'kinetic parameter {member!r} is both in '
                                      f'parameter group {group!r} and in '
                                      'exclude_params')
-                if kinetic_baselines[member] <= 0.0:
+                if not referenced and kinetic_baselines[member] <= 0.0:
                     raise ValueError(f'parameter group {group!r}: member '
                                      f'{member!r} has a nonpositive baseline '
                                      f'({kinetic_baselines[member]}); a group '
-                                     'multiplier needs a positive one')
+                                     'multiplier needs a positive one (or a '
+                                     'group_references entry for the group)')
                 grouped[member] = group
     space, excluded = {}, []
     for name, baseline in kinetic_baselines.items():
@@ -878,7 +923,8 @@ def baseline_decision_point(search_space, kinetic_baselines,
                             baseline_model_kwargs,
                             baseline_max_n_spikes=None,
                             baseline_stage_1_max_x=None,
-                            parameter_groups=None):
+                            parameter_groups=None,
+                            group_references=None):
     """The scenario baseline expressed in decision-variable coordinates
     for `search_space` (either feeding parameterization) -- suitable for
     study.enqueue_trial, so a fresh study evaluates the baseline itself
@@ -895,13 +941,28 @@ def baseline_decision_point(search_space, kinetic_baselines,
     into its band like every other entry).
 
     `parameter_groups` (the build_search_space mapping; None = none)
-    gives every group in the space its baseline multiplier 1.0. A space
-    without spike_delta (spike_delta_bounds=None) gets no such entry."""
+    gives every group in the space its baseline multiplier: 1.0 for an
+    un-referenced group (member baseline x 1.0 = the baseline), and, for
+    a group in `group_references` ({group: {member: reference}}; None =
+    none; since 2026-09-15), the live ANCHOR baseline over its reference
+    -- kinetic_baselines[anchor] / references[anchor], anchor = the
+    group's FIRST member -- then clipped into the band like every other
+    entry (0 at the scenario-A start -> the band floor, exactly how an
+    individual zero-baseline Ehrlich rate is clipped up to its floor). A
+    space without spike_delta (spike_delta_bounds=None) gets no such
+    entry."""
     point = {name: kinetic_baselines[name]
              for name in search_space if name in kinetic_baselines}
-    for group in dict(parameter_groups or {}):
-        if group in search_space:
+    references = dict(group_references or {})
+    for group, members in dict(parameter_groups or {}).items():
+        if group not in search_space:
+            continue
+        refs = references.get(group)
+        if refs is None:
             point[group] = 1.0
+        else:
+            anchor = list(members)[0]
+            point[group] = kinetic_baselines[anchor]/refs[anchor]
     thr = baseline_model_kwargs['threshold_conc']
     tgt = baseline_model_kwargs['target_conc']
     spk = baseline_model_kwargs['spike_conc']

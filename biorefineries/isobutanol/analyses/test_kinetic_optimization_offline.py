@@ -5954,4 +5954,81 @@ assert ko.expand_grouped_values(vals85, None, kb85, group_references=refs85) == 
 PASS('expand_grouped_values(group_references): reference x m for a referenced group, live '
      'baseline x m otherwise, None/{} identical to today, order kept')
 
+#%% 86. build_search_space / baseline_decision_point with group_references
+# (2026-09-15): a referenced group builds with ZERO live baselines (the
+# scenario-A Ehrlich rates), on its own band; validation rejects a nonpositive
+# reference, a reference for a non-member, a partial (not all-or-none)
+# reference dict and a referenced group absent from parameter_groups; the
+# un-referenced nonpositive-baseline rejection is preserved. The baseline
+# point of a referenced group is live anchor / reference, clipped (0 -> the
+# floor); an un-referenced group stays at 1.0.
+kb86 = {'k_3': 10.0, 'k_13': 0.0, 'k_14': 0.0, 'k_15': 0.0, 'k_16': 0.0, 'k_1ie': 0.02}
+groups86 = {'ehrlich_downstream': ['k_14', 'k_15', 'k_16'], 'inhib_ethanol': ['k_1ie']}
+refs86 = {'ehrlich_downstream': {'k_14': 4.8, 'k_15': 4.872, 'k_16': 4.219}}
+gmb86 = {'ehrlich_downstream': (1e-3, 4.0)}
+space86, excl86 = ko.build_search_space(
+    kb86, parameter_groups=groups86, group_multiplier_bounds=gmb86,
+    group_references=refs86, param_bounds_override={'k_13': (5.81e-3, 23.24)},
+    spike_delta_bounds=None)
+assert list(space86) == ['k_3', 'k_13', 'ehrlich_downstream', 'inhib_ethanol',
+                         'threshold_conc', 'target_delta', 'max_n_spikes'], list(space86)
+assert space86['ehrlich_downstream'] == dict(low=1e-3, high=4.0, log=True)
+assert space86['inhib_ethanol'] == dict(low=0.75, high=1.5, log=True)   # default group band
+assert space86['k_13'] == dict(low=5.81e-3, high=23.24, log=True)
+assert excl86 == [], excl86
+# Validation ValueErrors, each naming the offender.
+def _raises86(msg, **kw):
+    try:
+        ko.build_search_space(kb86, parameter_groups=groups86,
+                              group_multiplier_bounds=gmb86, **kw)
+    except ValueError as e:
+        assert msg in str(e), (msg, str(e))
+    else:
+        raise AssertionError(f'no ValueError for {kw} (expected {msg!r})')
+_raises86('nonpositive baseline')                                          # no references: k_14 = 0 rejected as today
+_raises86('nonpositive reference',                                          # a zero reference
+          group_references={'ehrlich_downstream': {'k_14': 0.0, 'k_15': 4.872, 'k_16': 4.219}})
+_raises86('nonpositive reference',                                          # a negative reference
+          group_references={'ehrlich_downstream': {'k_14': 4.8, 'k_15': -1.0, 'k_16': 4.219}})
+_raises86('not members',                                                    # a reference for a non-member
+          group_references={'ehrlich_downstream': {**refs86['ehrlich_downstream'], 'k_1ie': 0.02}})
+_raises86('not members',                                                    # ... for a name that is no kinetic parameter at all
+          group_references={'ehrlich_downstream': {**refs86['ehrlich_downstream'], 'k_zz': 1.0}})
+_raises86('all-or-none',                                                    # a partial reference dict
+          group_references={'ehrlich_downstream': {'k_14': 4.8, 'k_15': 4.872}})
+_raises86('not in parameter_groups',                                        # a referenced group that is not a group
+          group_references={'ehrlich_upstream': {'k_13': 5.81}})
+try:                                                                        # references with NO groups at all
+    ko.build_search_space(kb86, group_references={'ehrlich_downstream': refs86['ehrlich_downstream']},
+                          param_bounds_override={'k_13': (5.81e-3, 23.24)})
+except ValueError as e86:
+    assert 'not in parameter_groups' in str(e86), str(e86)
+else:
+    raise AssertionError('group_references without parameter_groups did not raise')
+# baseline_decision_point: live anchor / reference, clipped into the band.
+bmk86 = dict(target_conc=221.25, threshold_conc=217.125, spike_conc=600.0)
+pt86 = ko.baseline_decision_point(space86, kb86, bmk86, 16,
+                                  parameter_groups=groups86, group_references=refs86)
+assert pt86['ehrlich_downstream'] == 1e-3          # live anchor 0 / 4.8 = 0 -> the band floor
+assert pt86['inhib_ethanol'] == 1.0                # un-referenced group: 1.0
+assert pt86['k_13'] == 5.81e-3                     # the individual zero-baseline rate clips up too
+assert pt86['k_3'] == 10.0 and pt86['max_n_spikes'] == 16
+kb86_live = {**kb86, 'k_14': 2.4, 'k_15': 2.4, 'k_16': 1.41}
+pt86b = ko.baseline_decision_point(space86, kb86_live, bmk86, 16,
+                                   parameter_groups=groups86, group_references=refs86)
+assert np.isclose(pt86b['ehrlich_downstream'], 2.4/4.8, rtol=1e-12, atol=0.0)   # the ANCHOR only (k_15 / k_16 not consulted)
+kb86_hi = {**kb86, 'k_14': 48.0, 'k_15': 48.0, 'k_16': 28.2}
+pt86c = ko.baseline_decision_point(space86, kb86_hi, bmk86, 16,
+                                   parameter_groups=groups86, group_references=refs86)
+assert pt86c['ehrlich_downstream'] == 4.0          # 48 / 4.8 = 10 -> the band ceiling
+# without references (positive live baselines) the multiplier is 1.0, as today
+space86d, _ = ko.build_search_space(
+    kb86_live, parameter_groups=groups86, group_multiplier_bounds=gmb86,
+    param_bounds_override={'k_13': (5.81e-3, 23.24)}, spike_delta_bounds=None)
+pt86d = ko.baseline_decision_point(space86d, kb86_live, bmk86, 16, parameter_groups=groups86)
+assert pt86d['ehrlich_downstream'] == 1.0 and pt86d['inhib_ethanol'] == 1.0
+PASS('build_search_space(group_references): zero-live-baseline referenced members admitted, '
+     'nonpositive / non-member / partial / unknown-group references rejected, un-referenced '
+     'nonpositive baseline still rejected; baseline_decision_point: live anchor / reference clipped')
+
 print(f'\nALL {n_pass} CHECKS PASSED')
