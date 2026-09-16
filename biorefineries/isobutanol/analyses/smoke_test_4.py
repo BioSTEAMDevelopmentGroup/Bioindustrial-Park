@@ -15,7 +15,9 @@ Smoke test 4 -- scenario B baseline with ONLY the IBO/EtOH separation train:
 EACH simulation. Gates (a violation exits non-zero exactly like a
 traceback):
 
-- purity-adjusted ethanol MPSP within 1% of 0.59698 (was 0.61216 before the
+- purity-adjusted ethanol MPSP within 1% of 0.60042 (was 0.59698 before the
+  2026-09-15 nskinetics r16/r17 Ehrlich split re-pin -- r16 Aro10-only + r17
+  Adh6 with the cross-product exponentials on r17 -- 0.61216 before the
   2026-09-13 P508 detach re-pin -- corn's orphaned rectifier-bottoms pump P508
   no longer feeds its stale build-time outlet (~14,160 kg/hr, essentially
   water) into MX5 -> M501 / WWT on every simulation -- 0.60727 before
@@ -30,7 +32,8 @@ traceback):
   2026-09-12 nskinetics anaerobic_growth_mult 1.0 -> 0.75 re-pin; the both-trains
   scenario-B baseline; dropping the pass-through gating splitter S201 must
   not move results beyond simulation tolerance)
-- purity-adjusted isobutanol MPSP within 1% of 1.2808 (was 1.2948 before the
+- purity-adjusted isobutanol MPSP within 1% of 1.2847 (was 1.2808 before the
+  2026-09-15 r16/r17 split re-pin, 1.2948 before the
   2026-09-13 P508 detach re-pin, 1.2864 before the
   2026-09-13 r14-r16 re-pin, 1.3018 before the
   2026-09-13 r13 rate-law re-pin, 1.2976 before the
@@ -69,7 +72,7 @@ def load_simulate_baseline(stream_IDs=('ethanol', 'isobutanol'),
                            n_sims=3,
                            ):
     # IBO_EtOH-only build reproduces the both-trains scenario-B baseline
-    # (0.59698 / 1.2808) to full precision; pins from the registry.
+    # (0.60042 / 1.2847) to full precision; pins from the registry.
     bundle = scenarios.load_scenario('B')
     model_specification = bundle['model_specification']
     solve_TEA = bundle['solve_TEA']

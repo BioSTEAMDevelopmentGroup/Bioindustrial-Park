@@ -77,7 +77,7 @@ SCENARIOS = {
         name='B',
         workbook='parameter-distributions_corn_IBO_EtOH_B.xlsx',
         max_n_spikes=0, threshold_conc=34.25, target_conc=140.0,
-        expected={'ethanol': 0.59698, 'isobutanol': 1.2808},
+        expected={'ethanol': 0.60042, 'isobutanol': 1.2847},
         burden_default=False),
     # opt_* scenarios reproduce the best-objective trial of the last five
     # metabolic_minimal_subset kinetic-optimization studies. The workbooks
@@ -157,6 +157,23 @@ SCENARIOS = {
     # trace-product artifacts more: opt_EtOH_titer isobutanol -2.89 ->
     # -9.99, opt_EtOH_yield 1801.3 -> 1736.0); opt_IRR's economic objective
     # 0.19294 -> 0.19883, the titer / yield objectives unchanged (kept).
+    # RE-PINNED 2026-09-15 for the nskinetics r16/r17 split (spec docs/
+    # superpowers/specs/2026-09-15-r16-r17-adh6-split-integration-design.md):
+    # the lumped Ehrlich step r16 (Aro10 + Adh6) is now r16 (Aro10, a pure
+    # decarboxylase: k_16 * s_KIV/(s_KIV + K_16), CO2 release) + r17 (Adh6,
+    # the NADPH aldehyde reduction with r6's structure: k_17 = 44 g/L/h
+    # constitutive, K_17 0.0086 g/L, k_17r 2.5e-4, K_17e 0.020, and the
+    # acetate / ethanol cross-product exponentials re-homed as k_17ia /
+    # k_17ie; qO2 charges -0.222*r17). The six Ehrlich workbooks repoint
+    # k_16ia / k_16ie -> k_17ia / k_17ie (values unchanged) and gain the four
+    # Adh6 rows (B set 55 -> 59); Adh6 is burdened as a NATIVE step (r17,
+    # 0.00061 g/gDCW at 0.45, SGD ADH6/ADH1 abundance ratio) and Aro10 alone
+    # is r16's kcat/MW cost. B: ethanol 0.59698 -> 0.60042, isobutanol
+    # 1.2808 -> 1.2847, IRR 0.2177 -> 0.2161, IBO 29.0 -> 29.06 g/L, EtOH
+    # 26.3 -> 26.30 g/L, tau 61.9 -> 66.67 h; ethanol-only / re-gated B
+    # 1.6625 -> 1.6693. A is unaffected (k_13-k_16 = 0; k_17 inert; smoke 1
+    # / 3 / 5 / 7 reproduced 0.86233 / 0.83855 to full precision).
+    # opt_*: see the entries below (moved by the split + the r17 burden).
     'opt_IRR': ScenarioSpec(
         name='opt_IRR',
         workbook='parameter-distributions_corn_IBO_EtOH_opt_IRR.xlsx',
