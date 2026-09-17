@@ -1573,12 +1573,12 @@ def plot(sets, band, out_stem, dpi=300, include_parameters=True):
         # absolute inch height, position and the a -> b gap (fractions rescaled
         # by 8.8/9.856; panel a's bottom edge is unchanged in inches).
         fig = plt.figure(figsize=(9.5, 9.856))
-        # panel a's bottom is lifted slightly to open a thin strip for the
-        # marker/line-style key below the grid, above the campaign legend
+        # panel a's bottom is lifted to widen the a -> b gap enough for the one
+        # framed box that now holds both the campaign key and the mark key
         a_gs = fig.add_gridspec(1, 1, left=LEFT, right=RIGHT,
-                                top=0.9330, bottom=0.6400)
+                                top=0.9330, bottom=0.6500)
         c_gs = fig.add_gridspec(1, 1, left=0.32, right=RIGHT,
-                                top=0.4598, bottom=0.1741)
+                                top=0.4470, bottom=0.1741)
         colors = set_colors(sets)
         a_axes = draw_outcomes(fig, a_gs[0], sets, colors)
         axc = draw_burden(fig, c_gs[0], sets, colors)
@@ -1593,17 +1593,17 @@ def plot(sets, band, out_stem, dpi=300, include_parameters=True):
         # widest being "Baseline (no optimization)"), so it wraps to at most four
         # columns -- two rows under the title.
         legend_loc = 'center'
-        legend_anchor, legend_ncol = (0.527, 0.5357), min(len(sets), 4)
-        # the marker/line-style key sits just below panel a, above the campaign
-        # legend that fills the panel-a -> b gap
-        style_anchor = (0.5, 0.6015)
+        # the campaign swatches sit a little high in the panel-a -> b gap so the
+        # mark key can share the same framed box just below them
+        legend_anchor, legend_ncol = (0.527, 0.5480), min(len(sets), 4)
+        style_anchor = (0.527, 0.5030)
     for y, letter, title in panels:
         fig.text(0.03, y, letter, fontsize=FONTS['panel'], fontweight='bold',
                  va='baseline')
         fig.text(0.055, y, title, fontsize=FONTS['panel'] - 1,
                  fontweight='bold', va='baseline')
     # small colour-free key for the marks in panel a: what the points and the
-    # solid vs dashed lines mean (the campaign legend below gives the colours).
+    # solid vs dashed lines mean (the campaign legend gives the colours).
     style_c = '0.30'
     style_handles = [
         Line2D([], [], linestyle='none', marker='o', markersize=5,
@@ -1613,20 +1613,40 @@ def plot(sets, band, out_stem, dpi=300, include_parameters=True):
                label='Incumbent (metric optimized by campaign)'),
         Line2D([], [], color=style_c, lw=1.4, linestyle=(0, (2, 1.5)),
                label='Incumbent (metric not optimized by campaign)')]
+    handles = [plt.Rectangle((0, 0), 1, 1, fc=colors[id(s)], label=s['label'])
+               for s in sets]
+    # three-panel: the mark key is a standalone strip under panel a and the
+    # campaign legend is its own framed box in panel b's empty columns.
+    # two-panel: both keys share ONE framed box in the panel-a -> b gap -- the
+    # campaign swatches on top, the mark key row below, a single manual frame.
     style_leg = fig.legend(handles=style_handles, loc='center',
                            bbox_to_anchor=style_anchor, ncol=3, frameon=False,
                            fontsize=FONTS['legend'], handlelength=2.2,
                            handletextpad=0.5, columnspacing=1.4)
     fig.add_artist(style_leg)
-    handles = [plt.Rectangle((0, 0), 1, 1, fc=colors[id(s)], label=s['label'])
-               for s in sets]
     leg = fig.legend(handles=handles, loc=legend_loc,
-                     bbox_to_anchor=legend_anchor, ncol=legend_ncol, frameon=True,
+                     bbox_to_anchor=legend_anchor, ncol=legend_ncol,
+                     frameon=include_parameters,
                      fontsize=FONTS['legend'] + 1, title='Optimization campaign',
                      labelspacing=0.5, handlelength=1.7, handleheight=1.1,
                      borderpad=0.6, edgecolor='0.6', fancybox=False)
     leg.get_title().set_fontweight('bold')
     leg.get_title().set_fontsize(FONTS['legend'] + 2)
+    if not include_parameters:
+        # draw one frame enclosing both frameless keys (union of their drawn
+        # extents), so the mark key reads as part of the campaign legend
+        fig.canvas.draw()
+        renderer = fig.canvas.get_renderer()
+        inv = fig.transFigure.inverted()
+        bbs = [a.get_window_extent(renderer).transformed(inv)
+               for a in (leg, style_leg)]
+        x0 = min(b.x0 for b in bbs); x1 = max(b.x1 for b in bbs)
+        y0 = min(b.y0 for b in bbs); y1 = max(b.y1 for b in bbs)
+        padx, pady = 0.014, 0.011
+        fig.add_artist(plt.Rectangle(
+            (x0 - padx, y0 - pady), (x1 - x0) + 2 * padx, (y1 - y0) + 2 * pady,
+            transform=fig.transFigure, facecolor='white', edgecolor='0.6',
+            linewidth=1.0, zorder=leg.get_zorder() - 1))
     for ext in ('png', 'pdf'):
         fig.savefig(f'{out_stem}.{ext}', dpi=dpi)
     plt.close(fig)
