@@ -1375,13 +1375,13 @@ def draw_burden(fig, gs_cell, sets, colors):
         ax.xaxis.set_minor_locator(AutoMinorLocator())
         # box the panel: the OUTER edges of the broken axis carry the left and
         # right spines (axL's left, axR's right), while the inner edges stay open
-        # to read as the axis break. The top border sits just above the bars at
-        # top_edge -- BELOW the sector-demand brackets, which hover in the
-        # headroom above it -- so the left/right spines are bounded to end there
-        # rather than run up through the bracket region. The categorical y axis
-        # carries no ticks.
-        ax.spines['top'].set_visible(True)
-        ax.spines['top'].set_position(('data', top_edge))
+        # to read as the axis break. The top border + its mirrored ticks are a
+        # secondary x-axis added below (at top_edge, just above the bars and
+        # BELOW the sector-demand brackets that hover in the headroom); the
+        # native top spine stays hidden and the left/right spines are bounded to
+        # end at top_edge rather than run up through the bracket region. The
+        # categorical y axis carries no ticks.
+        ax.spines['top'].set_visible(False)
     axL.spines['left'].set_visible(True)
     axL.spines['left'].set_bounds(0.4, top_edge)
     axL.spines['right'].set_visible(False)
@@ -1390,6 +1390,20 @@ def draw_burden(fig, gs_cell, sets, colors):
     axR.spines['left'].set_visible(False)
     axL.set_xlim(0, BREAK_L)
     axR.set_xlim(BREAK_R, xmax)
+    # mirror the bottom x-axis onto the top border: a secondary x-axis at
+    # top_edge gives a real spine + ticks there, and because each window keeps
+    # its own xlim the break gap is reproduced on top. Ticks point inward only
+    # (down), half-length like panels A/B; labels off.
+    y0, y1 = axL.get_ylim()
+    top_frac = (top_edge - y0) / (y1 - y0)
+    for ax in (axL, axR):
+        sax = ax.secondary_xaxis(top_frac)
+        sax.xaxis.set_major_locator(MultipleLocator(0.05))
+        sax.xaxis.set_minor_locator(AutoMinorLocator())
+        sax.tick_params(axis='x', which='major', direction='in', length=2.0,
+                        labeltop=False, labelbottom=False)
+        sax.tick_params(axis='x', which='minor', direction='in', length=1.1,
+                        labeltop=False, labelbottom=False)
     # if a break edge happens to land on a 0.05 major tick, its label would sit
     # right at the cut and crowd the break marks (or collide across the narrow
     # gap), so blank any label falling exactly on a break edge while the tick
@@ -1404,8 +1418,10 @@ def draw_burden(fig, gs_cell, sets, colors):
     # the unequal panel widths do not skew them
     mk = dict(marker=[(-1, -3.2), (1, 3.2)], markersize=7, linestyle='none',
               color='0.15', mec='0.15', mew=1.1, clip_on=False)
-    axL.plot([1], [0], transform=axL.transAxes, **mk)
+    axL.plot([1], [0], transform=axL.transAxes, **mk)          # bottom cut
     axR.plot([0], [0], transform=axR.transAxes, **mk)
+    axL.plot([1], [top_frac], transform=axL.transAxes, **mk)   # top cut (at top_edge)
+    axR.plot([0], [top_frac], transform=axR.transAxes, **mk)
 
     # one x-axis label and one sector legend, both centred over the whole
     # (broken) panel rather than either sub-panel
