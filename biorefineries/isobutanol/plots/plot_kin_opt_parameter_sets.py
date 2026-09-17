@@ -137,6 +137,11 @@ REACTION_LABELS = {
 GROUP_LABELS = {'inhib_ethanol': 'Ethanol\ninhibition',
                 'inhib_isobutanol': 'Isobutanol\ninhibition',
                 'inhib_acetate': 'Acetate\ninhibition'}
+# the three product-inhibition cells share one value-axis ceiling (the max
+# across all three, all campaigns) so their tick scales match and the bars are
+# directly comparable -- e.g. 0 / 0.75 / 1.5 on every one, not 0 / 0.5 / 1.0 on
+# the acetate cell just because its bars happen to stay below 1.0
+INHIB_GROUP_VARS = ('inhib_ethanol', 'inhib_isobutanol', 'inhib_acetate')
 # value-axis units. Rate constants: every sampled capacity carries the
 # Antimony unit g_per_l_per_h (gram/(litre*hour)) in the shipped model, so
 # g·L^-1·h^-1 for all nine. Effector multipliers are dimensionless fold-changes
@@ -973,12 +978,16 @@ def bar_cell(ax, sets, colors, var, kind, ylabel, subtitle=None, ylim=None,
     elif kind == 'group':
         # linear value axis from 0 to a nice ceiling just above the largest
         # bar (both edges on labeled ticks), baseline 1.0 dashed; no
-        # search-band shading -- one minor tick between majors like the rates
+        # search-band shading -- one minor tick between majors like the rates.
+        # the inhibition cells scan all three inhib_* vars so they share one
+        # ceiling (see INHIB_GROUP_VARS); every other group cell scans itself.
+        scan_vars = INHIB_GROUP_VARS if var in INHIB_GROUP_VARS else (var,)
         data_max = 0.0
-        for s in sets:
-            v = s.get(var)
-            if v is not None and np.isfinite(v):
-                data_max = max(data_max, float(v))
+        for sv in scan_vars:
+            for s in sets:
+                v = s.get(sv)
+                if v is not None and np.isfinite(v):
+                    data_max = max(data_max, float(v))
         data_max = max(data_max, 1.0)   # keep the baseline reference framed
         bottom = 0
         cap, _ = _linear_cap(data_max)
