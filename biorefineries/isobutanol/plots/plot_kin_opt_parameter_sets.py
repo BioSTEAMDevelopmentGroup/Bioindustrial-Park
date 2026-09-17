@@ -270,36 +270,18 @@ for _s in STEP_ENZYME:
     if _s not in eb.NATIVE_STEPS and _s not in eb.EHRLICH_STEPS:
         raise KeyError(f'STEP_ENZYME step {_s!r} not in eb tables')
 
-# Price-weighted combined yield (a revenue-per-sugar proxy), the objective of
-# the split_12d price-weighted-yield campaign: it is NOT a trajectory-CSV column
-# but a deterministic function of the two tracked glucose-added product yields,
-# IBO yield * p_IBO + EtOH yield * p_EtOH (see ko.OBJECTIVE_REGISTRY). p_IBO /
-# p_EtOH are the model's STATIC, PRICE_YEAR(2023)-indexed reference prices
-# (V514.isobutanol_price / V513.ethanol_price) -- recovered here EXACTLY (lstsq
-# residual ~1e-16) from that campaign's own 'objective' vs (IBO yield, EtOH
-# yield) columns, so the derived metric reproduces the campaign objective to
-# machine precision. Plot constants only (mirroring the model, read not set);
-# re-derive if the model prices move.
-PRICE_IBO_REF = 1.500213    # $/kg isobutanol (V514.isobutanol_price, 2023$)
-PRICE_ETOH_REF = 0.835      # $/kg ethanol   (V513.ethanol_price, 2023$)
-
-
-def price_weighted_yield(ibo_yield, etoh_yield):
-    """The price-weighted combined yield metric from the two product yields."""
-    return ibo_yield * PRICE_IBO_REF + etoh_yield * PRICE_ETOH_REF
-
-
 # outcomes panel: (CSV column, cell title, (y-low, y-high)), in draw order.
 # Titles are rotated y-axis labels in narrow cells -- keep each to <=2 lines
-# so the label stays out of the neighbouring cell's plot box. 'Price-weighted
-# yield' is a derived column (added in load_set / baseline_set), not a CSV one.
+# so the label stays out of the neighbouring cell's plot box.
 OUTCOMES = (('IRR', 'Financial attractiveness\nas IRR [%]', (0, 0.3)),
             ('IBO titer', 'Isobutanol titer\n[g·L$^{-1}$]', (0, 60)),
             ('IBO yield', 'Isobutanol yield\n[g·g$^{-1}$]', (0, 0.4)),
             ('EtOH titer', 'Ethanol titer\n[g·L$^{-1}$]', (0, 200)),
             ('EtOH yield', 'Ethanol yield\n[g·g$^{-1}$]', (0, 0.5)),
-            ('Price-weighted yield',
-             'Price-weighted yield\n[\\$·kg$^{-1}$·g·g$^{-1}$]', (0, 0.6)))
+            ('IBO productivity',
+             'Isobutanol productivity\n[g·L$^{-1}$·h$^{-1}$]', (0, 2)),
+            ('EtOH productivity',
+             'Ethanol productivity\n[g·L$^{-1}$·h$^{-1}$]', (0, 8)))
 
 # per-outcome override for the major-tick step (else _linear_cap's step).
 # IRR is stored as a fraction shown in percent, so 0.05 -> 0/5/.../30 %;
@@ -420,8 +402,10 @@ def baseline_set():
     for col in ('IRR', 'TCI', 'EtOH titer', 'IBO titer', 'EtOH yield',
                 'IBO yield', 'tau', 'n_glu_spikes'):
         rec[col] = BASELINE_A[col]
-    rec['Price-weighted yield'] = price_weighted_yield(BASELINE_A['IBO yield'],
-                                                       BASELINE_A['EtOH yield'])
+    # productivity = water-basis titer / batch time (the registry definition);
+    # baseline IBO titer is 0 so IBO productivity is 0
+    rec['IBO productivity'] = BASELINE_A['IBO titer'] / BASELINE_A['tau']
+    rec['EtOH productivity'] = BASELINE_A['EtOH titer'] / BASELINE_A['tau']
     for st, pool in res.pools.items():
         rec[f'pool_{st}'] = float(pool)
     rec['Phi_M'] = float(res.Phi_M)
@@ -556,10 +540,6 @@ def load_set(label, campaign, trial):
     """A campaign trial as a flat record (CSV row + metadata + the panel-a
     incumbent trajectory)."""
     df = ko.load_trajectory(resolve_campaign_csv(campaign))
-    # derived (not-a-CSV-column) price-weighted yield outcome, computed
-    # uniformly for every campaign from its two tracked product-yield columns
-    df['Price-weighted yield'] = price_weighted_yield(df['IBO yield'],
-                                                      df['EtOH yield'])
     missing = [c for c in DECISION_VARS if c not in df.columns]
     if missing:
         raise ValueError(
@@ -600,7 +580,6 @@ def load_set(label, campaign, trial):
                                   'error'}
     known |= set(eb.BURDEN_COLUMNS)
     known |= set(ko.TRACKED_METRICS)
-    known |= {'Price-weighted yield'}   # derived outcome, not a sampled column
     known |= {c for c in df.columns if c.startswith('applied_')}
     rec['extra_sampled'] = [c for c in df.columns if c not in known]
     sel_col, sel_dir = selection_spec(df, trial, campaign)
@@ -1138,10 +1117,9 @@ def draw_outcomes(fig, gs_cell, sets, colors):
         if tx is not None and len(tx):
             xmax = max(xmax, float(tx[-1]))
     # 3x4 grid: IRR (the headline outcome) fills the left 3x2 block and is the
-    # largest cell; the remaining outcomes fill the right two columns, one per
-    # cell top-to-bottom (IBO titer / IBO yield, EtOH titer / yield, then the
-    # price-weighted yield at cell 11). The last cell (row 3, col 4) is left
-    # blank for now.
+    # largest cell; the remaining six outcomes fill the right two columns, one
+    # per cell top-to-bottom (IBO titer / IBO yield, EtOH titer / yield, then
+    # IBO productivity / EtOH productivity in the bottom row).
     sub_gs = gs_cell.subgridspec(3, 4, wspace=0.62, hspace=0.62)
     axes = []
     big, rest = OUTCOMES[0], OUTCOMES[1:]
@@ -1151,7 +1129,7 @@ def draw_outcomes(fig, gs_cell, sets, colors):
     big_w = ax_big.get_position().width
     for (col, label, yl), (r, c) in zip(rest,
                                         ((0, 2), (0, 3), (1, 2), (1, 3),
-                                         (2, 2))):
+                                         (2, 2), (2, 3))):
         ax = fig.add_subplot(sub_gs[r, c])
         # these cells are ~0.38x the linear size of the IRR cell (1 of 4 columns
         # vs 2 columns + a wspace), so shrink the trial-cloud marker to match:
