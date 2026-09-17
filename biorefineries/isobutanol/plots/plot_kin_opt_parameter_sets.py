@@ -270,14 +270,36 @@ for _s in STEP_ENZYME:
     if _s not in eb.NATIVE_STEPS and _s not in eb.EHRLICH_STEPS:
         raise KeyError(f'STEP_ENZYME step {_s!r} not in eb tables')
 
+# Price-weighted combined yield (a revenue-per-sugar proxy), the objective of
+# the split_12d price-weighted-yield campaign: it is NOT a trajectory-CSV column
+# but a deterministic function of the two tracked glucose-added product yields,
+# IBO yield * p_IBO + EtOH yield * p_EtOH (see ko.OBJECTIVE_REGISTRY). p_IBO /
+# p_EtOH are the model's STATIC, PRICE_YEAR(2023)-indexed reference prices
+# (V514.isobutanol_price / V513.ethanol_price) -- recovered here EXACTLY (lstsq
+# residual ~1e-16) from that campaign's own 'objective' vs (IBO yield, EtOH
+# yield) columns, so the derived metric reproduces the campaign objective to
+# machine precision. Plot constants only (mirroring the model, read not set);
+# re-derive if the model prices move.
+PRICE_IBO_REF = 1.500213    # $/kg isobutanol (V514.isobutanol_price, 2023$)
+PRICE_ETOH_REF = 0.835      # $/kg ethanol   (V513.ethanol_price, 2023$)
+
+
+def price_weighted_yield(ibo_yield, etoh_yield):
+    """The price-weighted combined yield metric from the two product yields."""
+    return ibo_yield * PRICE_IBO_REF + etoh_yield * PRICE_ETOH_REF
+
+
 # outcomes panel: (CSV column, cell title, (y-low, y-high)), in draw order.
 # Titles are rotated y-axis labels in narrow cells -- keep each to <=2 lines
-# so the label stays out of the neighbouring cell's plot box.
+# so the label stays out of the neighbouring cell's plot box. 'Price-weighted
+# yield' is a derived column (added in load_set / baseline_set), not a CSV one.
 OUTCOMES = (('IRR', 'Financial attractiveness\nas IRR [%]', (0, 0.3)),
             ('IBO titer', 'Isobutanol titer\n[g·L$^{-1}$]', (0, 60)),
             ('IBO yield', 'Isobutanol yield\n[g·g$^{-1}$]', (0, 0.4)),
             ('EtOH titer', 'Ethanol titer\n[g·L$^{-1}$]', (0, 200)),
-            ('EtOH yield', 'Ethanol yield\n[g·g$^{-1}$]', (0, 0.5)))
+            ('EtOH yield', 'Ethanol yield\n[g·g$^{-1}$]', (0, 0.5)),
+            ('Price-weighted yield',
+             'Price-weighted yield\n[\\$·kg$^{-1}$·g·g$^{-1}$]', (0, 0.6)))
 
 # per-outcome override for the major-tick step (else _linear_cap's step).
 # IRR is stored as a fraction shown in percent, so 0.05 -> 0/5/.../30 %;
@@ -398,6 +420,8 @@ def baseline_set():
     for col in ('IRR', 'TCI', 'EtOH titer', 'IBO titer', 'EtOH yield',
                 'IBO yield', 'tau', 'n_glu_spikes'):
         rec[col] = BASELINE_A[col]
+    rec['Price-weighted yield'] = price_weighted_yield(BASELINE_A['IBO yield'],
+                                                       BASELINE_A['EtOH yield'])
     for st, pool in res.pools.items():
         rec[f'pool_{st}'] = float(pool)
     rec['Phi_M'] = float(res.Phi_M)
@@ -532,6 +556,10 @@ def load_set(label, campaign, trial):
     """A campaign trial as a flat record (CSV row + metadata + the panel-a
     incumbent trajectory)."""
     df = ko.load_trajectory(resolve_campaign_csv(campaign))
+    # derived (not-a-CSV-column) price-weighted yield outcome, computed
+    # uniformly for every campaign from its two tracked product-yield columns
+    df['Price-weighted yield'] = price_weighted_yield(df['IBO yield'],
+                                                      df['EtOH yield'])
     missing = [c for c in DECISION_VARS if c not in df.columns]
     if missing:
         raise ValueError(
@@ -572,6 +600,7 @@ def load_set(label, campaign, trial):
                                   'error'}
     known |= set(eb.BURDEN_COLUMNS)
     known |= set(ko.TRACKED_METRICS)
+    known |= {'Price-weighted yield'}   # derived outcome, not a sampled column
     known |= {c for c in df.columns if c.startswith('applied_')}
     rec['extra_sampled'] = [c for c in df.columns if c not in known]
     sel_col, sel_dir = selection_spec(df, trial, campaign)
@@ -1108,18 +1137,21 @@ def draw_outcomes(fig, gs_cell, sets, colors):
         tx = s.get('traj_x')
         if tx is not None and len(tx):
             xmax = max(xmax, float(tx[-1]))
-    # 2x4 grid: IRR (the headline outcome) fills the left 2x2 block and is the
-    # largest cell; the remaining four outcomes fill the right 2x2 block, one
-    # per cell (top row IBO titer / IBO yield, bottom row EtOH titer / yield).
-    sub_gs = gs_cell.subgridspec(2, 4, wspace=0.62, hspace=0.62)
+    # 3x4 grid: IRR (the headline outcome) fills the left 3x2 block and is the
+    # largest cell; the remaining outcomes fill the right two columns, one per
+    # cell top-to-bottom (IBO titer / IBO yield, EtOH titer / yield, then the
+    # price-weighted yield at cell 11). The last cell (row 3, col 4) is left
+    # blank for now.
+    sub_gs = gs_cell.subgridspec(3, 4, wspace=0.62, hspace=0.62)
     axes = []
     big, rest = OUTCOMES[0], OUTCOMES[1:]
-    ax_big = fig.add_subplot(sub_gs[0:2, 0:2])
+    ax_big = fig.add_subplot(sub_gs[0:3, 0:2])
     outcome_cell(ax_big, sets, colors, big[0], big[1], big[2], xmax)
     axes.append(ax_big)
     big_w = ax_big.get_position().width
     for (col, label, yl), (r, c) in zip(rest,
-                                        ((0, 2), (0, 3), (1, 2), (1, 3))):
+                                        ((0, 2), (0, 3), (1, 2), (1, 3),
+                                         (2, 2))):
         ax = fig.add_subplot(sub_gs[r, c])
         # these cells are ~0.38x the linear size of the IRR cell (1 of 4 columns
         # vs 2 columns + a wspace), so shrink the trial-cloud marker to match:
@@ -1488,26 +1520,29 @@ def plot(sets, band, out_stem, dpi=300, include_parameters=True):
     apply_fonts()
     LEFT, RIGHT = 0.083, 0.97
     if include_parameters:
-        fig = plt.figure(figsize=(9.5, 12.4))
-        # Top-anchored vertical layout, figure fractions. Panel a and the wide
+        fig = plt.figure(figsize=(9.5, 13.454))
+        # Top-anchored vertical layout, figure fractions. Panel a now holds a
+        # 3x4 grid (was 2x4), so its box is 1.5x taller; the canvas grew by that
+        # one extra row-height (12.4 -> 13.454 in) and panels b and c keep their
+        # absolute inch heights, positions and gaps (their fractions rescaled by
+        # 12.4/13.454). Panel a's bottom edge is unchanged in inches, so the wide
         # a -> b gap (which carries panel b's letter/title and the first band
-        # title) are unchanged. Panel b's four band cells are ~40% shorter than
-        # before (cell height ~0.0335 vs ~0.0558), so the band block ends
-        # higher; the band -> band gaps stay ~0.05 (hspace 1.49 x the shorter
-        # cell) to keep room for the rate-band titles. Panel c keeps its height
-        # and rides up just below the bands, freeing space at the bottom of the
-        # canvas. Each region is its own gridspec so the three vertical
-        # positions are set directly.
+        # title) is preserved. Panel b's four band cells are ~40% shorter than
+        # its single-cell height (~0.0335 vs ~0.0558 of the OLD canvas); the
+        # band -> band gaps stay ~0.05 (hspace 1.49 x the shorter cell) to keep
+        # room for the rate-band titles. Panel c rides up just below the bands.
+        # Each region is its own gridspec so the three vertical positions are
+        # set directly.
         a_gs = fig.add_gridspec(1, 1, left=LEFT, right=RIGHT,
-                                top=0.945, bottom=0.775)
-        band_gs = fig.add_gridspec(4, 1, left=LEFT, right=RIGHT, top=0.689,
-                                   bottom=0.405, hspace=1.49)
+                                top=0.9493, bottom=0.7143)
+        band_gs = fig.add_gridspec(4, 1, left=LEFT, right=RIGHT, top=0.6351,
+                                   bottom=0.3733, hspace=1.49)
         # panel c is narrowed on the left (left=0.32 vs LEFT) to clear a column
         # for its framed sector legend, which sits in that margin rather than
         # above the bars (wide enough for the box + the longest label, clear of
         # the 0.00 tick)
         c_gs = fig.add_gridspec(1, 1, left=0.32, right=RIGHT,
-                                top=0.359, bottom=0.134)
+                                top=0.3309, bottom=0.1235)
         colors = set_colors(sets)
         a_axes = draw_outcomes(fig, a_gs[0], sets, colors)
         b_axes = draw_parameters(fig, [band_gs[0], band_gs[1], band_gs[2],
@@ -1539,18 +1574,22 @@ def plot(sets, band, out_stem, dpi=300, include_parameters=True):
         # the campaign legend sits in the empty right columns of panel b's lower
         # bands and doubles as the row key for panel c (whose categorical y axis
         # is unlabelled).
-        legend_loc, legend_anchor, legend_ncol = 'center left', (0.635, 0.450), 1
+        legend_loc, legend_anchor, legend_ncol = 'center left', (0.635, 0.4147), 1
     else:
         # two-panel variant (panel B omitted): panel A on top, the proteome-
         # allocation panel below it -- relettered B. A shorter canvas keeps both
         # panels at ~their three-panel absolute heights; the freed middle band
         # becomes the a -> b gap that carries panel b's letter/title and the
         # campaign legend.
-        fig = plt.figure(figsize=(9.5, 8.8))
+        # panel a holds a 3x4 grid (was 2x4), 1.5x taller; the canvas grew by
+        # that one extra row-height (8.8 -> 9.856 in) and panel c keeps its
+        # absolute inch height, position and the a -> b gap (fractions rescaled
+        # by 8.8/9.856; panel a's bottom edge is unchanged in inches).
+        fig = plt.figure(figsize=(9.5, 9.856))
         a_gs = fig.add_gridspec(1, 1, left=LEFT, right=RIGHT,
-                                top=0.925, bottom=0.685)
+                                top=0.9330, bottom=0.6116)
         c_gs = fig.add_gridspec(1, 1, left=0.32, right=RIGHT,
-                                top=0.515, bottom=0.195)
+                                top=0.4598, bottom=0.1741)
         colors = set_colors(sets)
         a_axes = draw_outcomes(fig, a_gs[0], sets, colors)
         axc = draw_burden(fig, c_gs[0], sets, colors)
@@ -1558,12 +1597,14 @@ def plot(sets, band, out_stem, dpi=300, include_parameters=True):
                    'Optimization incumbent trajectories'),
                   (axc.get_position().y1 + 0.005, 'B',
                    'Final proteome allocation'))
-        # the campaign legend sits in the a -> b gap as two rows -- the title on
-        # its own row above a single row of all campaign items (ncol = one
-        # column per set) -- doubling as the row key for the proteome panel
-        # below. A single vertical column is too tall and clips panel a's lower
-        # cells.
-        legend_loc, legend_anchor, legend_ncol = 'center', (0.527, 0.600), len(sets)
+        # the campaign legend sits in the a -> b gap, doubling as the row key for
+        # the proteome panel below. A single vertical column is too tall and
+        # clips panel a's lower cells; a single horizontal row of all campaign
+        # items runs off the figure once there are 6 campaigns (7 sets, the
+        # widest being "Baseline (no optimization)"), so it wraps to at most four
+        # columns -- two rows under the title.
+        legend_loc = 'center'
+        legend_anchor, legend_ncol = (0.527, 0.5357), min(len(sets), 4)
     for y, letter, title in panels:
         fig.text(0.03, y, letter, fontsize=FONTS['panel'], fontweight='bold',
                  va='baseline')
