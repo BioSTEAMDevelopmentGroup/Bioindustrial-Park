@@ -274,15 +274,15 @@ for _s in STEP_ENZYME:
 # Titles are rotated y-axis labels in narrow cells -- keep each to <=2 lines
 # so the label stays out of the neighbouring cell's plot box.
 OUTCOMES = (('IRR', 'Financial attractiveness\nas IRR [%]', (0, 0.3)),
-            ('IBO titer', 'Isobutanol titer\n[g·L$^{-1}$]', (0, 100)),
+            ('IBO titer', 'Isobutanol titer\n[g·L$^{-1}$]', (0, 60)),
             ('IBO yield', 'Isobutanol yield\n[g·g$^{-1}$]', (0, 0.4)),
-            ('EtOH titer', 'Ethanol titer\n[g·L$^{-1}$]', (0, 300)),
+            ('EtOH titer', 'Ethanol titer\n[g·L$^{-1}$]', (0, 200)),
             ('EtOH yield', 'Ethanol yield\n[g·g$^{-1}$]', (0, 0.5)))
 
 # per-outcome override for the major-tick step (else _linear_cap's step).
 # IRR is stored as a fraction shown in percent, so 0.05 -> 0/5/.../30 %;
-# isobutanol titer reads cleaner on 0/40/80/120 than the default 0/20/.../120.
-OUTCOME_TICK_STEP = {'IRR': 0.05, 'IBO titer': 40.0}
+# isobutanol titer reads cleaner on 0/20/40/60 than the default 0/15/30/45/60.
+OUTCOME_TICK_STEP = {'IRR': 0.05, 'IBO titer': 20.0}
 
 # per-outcome value-axis ceiling override (fraction/native units), used in place
 # of the auto nice-ceiling. IRR tops out at 25 % rather than the auto 30 % so the
