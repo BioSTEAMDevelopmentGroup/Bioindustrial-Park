@@ -295,6 +295,21 @@ OUTCOME_TICK_CAP = {'IRR': 0.25}
 # non-finite and is omitted.
 CLAMP_NEG_TO_ZERO = {'IRR'}
 
+# which campaign "owns" each outcome panel -- its incumbent line is drawn thick
+# and its per-trial cloud appears there. By default a panel is owned by the
+# campaign whose objective slug equals the panel's own column. The financial-
+# attractiveness panel is plotted on the IRR axis but its owning campaign may
+# optimize a profitability-index objective instead (the split_12d campaigns
+# maximize PI / PI (log-tail), whose incumbent is shown against the same IRR
+# axis), so that panel is owned by any financial-attractiveness objective.
+OUTCOME_OWN_OBJECTIVES = {'IRR': frozenset({'IRR', 'PI', 'PI (log-tail)'})}
+
+
+def _owns_outcome(objective, col):
+    """True if a campaign with this objective slug owns the `col` outcome
+    panel (thick incumbent line + trial cloud)."""
+    return objective in OUTCOME_OWN_OBJECTIVES.get(col, frozenset({col}))
+
 # one color per set: baseline grey, campaigns from the hue palette. Fixed
 # 7-color palette (blue, orange, green, purple, red, grey, yellow); the baseline
 # takes the grey and the five campaigns take blue/orange/green/purple/yellow in
@@ -1004,7 +1019,7 @@ def outcome_cell(ax, sets, colors, col, title, ylim, xmax, point_size=9):
     # incumbent lines (zorder 1). Failed / unsolved trials (no finite value)
     # are drawn at the axis floor rather than omitted.
     for s in sets:
-        if s.get('scatter') is None or s.get('objective') != col:
+        if s.get('scatter') is None or not _owns_outcome(s.get('objective'), col):
             continue
         sx, sy, cc = s['scatter_x'], _yv(s['scatter'][col]), colors[id(s)]
         ax.scatter(sx, sy, s=point_size, color=cc, alpha=0.35, linewidths=0,
@@ -1015,7 +1030,7 @@ def outcome_cell(ax, sets, colors, col, title, ylim, xmax, point_size=9):
         # the campaign that optimized THIS metric gets a ~2.25x-thick line so
         # its own trajectory stands out among the cross-plotted campaigns; the
         # thinner lines are drawn on top of it so none is hidden underneath
-        own = s.get('objective') == col
+        own = _owns_outcome(s.get('objective'), col)
         ax.step(s['traj_x'], _yv(s['traj'][col]), where='post',
                 color=colors[id(s)], lw=3.15 if own else 1.4,
                 zorder=2 if own else 3)
