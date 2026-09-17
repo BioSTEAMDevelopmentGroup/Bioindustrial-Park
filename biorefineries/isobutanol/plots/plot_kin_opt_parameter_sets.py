@@ -1610,9 +1610,9 @@ def plot(sets, band, out_stem, dpi=300, include_parameters=True):
                markerfacecolor=style_c, markeredgecolor='none', alpha=0.5,
                label='Individual trials'),
         Line2D([], [], color=style_c, lw=2.4, linestyle='-',
-               label='Incumbent (metric optimized by campaign)'),
+               label='Incumbent (campaign optimizing the plotted metric)'),
         Line2D([], [], color=style_c, lw=1.4, linestyle=(0, (2, 1.5)),
-               label='Incumbent (metric not optimized by campaign)')]
+               label='Incumbent (other campaign)')]
     handles = [plt.Rectangle((0, 0), 1, 1, fc=colors[id(s)], label=s['label'])
                for s in sets]
     # three-panel: the mark key is a standalone strip under panel a and the
