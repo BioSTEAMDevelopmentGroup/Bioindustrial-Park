@@ -1063,7 +1063,7 @@ def outcome_cell(ax, sets, colors, col, title, ylim, xmax, point_size=9):
     ax.set_ylim(lo, cap)
     ax.set_xlim(0, xmax * 1.02)
     if base is not None and np.isfinite(base):
-        ax.axhline(base, color=BASELINE_COLOR, lw=0.9, ls='--', zorder=1)
+        ax.axhline(base, color=BASELINE_COLOR, lw=1.4, ls=(0, (2, 1.5)), zorder=1)
     # individual trial cloud from the ONE campaign that optimized THIS metric:
     # every trial as a translucent dot in the campaign's own color, behind the
     # incumbent lines (zorder 1). Failed / unsolved trials (no finite value)
@@ -1515,8 +1515,10 @@ def plot(sets, band, out_stem, dpi=300, include_parameters=True):
         # room for the rate-band titles. Panel c rides up just below the bands.
         # Each region is its own gridspec so the three vertical positions are
         # set directly.
+        # panel a's bottom is lifted slightly above the panel-b block to open a
+        # thin strip for the marker/line-style key below the grid
         a_gs = fig.add_gridspec(1, 1, left=LEFT, right=RIGHT,
-                                top=0.9493, bottom=0.7143)
+                                top=0.9493, bottom=0.7420)
         band_gs = fig.add_gridspec(4, 1, left=LEFT, right=RIGHT, top=0.6351,
                                    bottom=0.3733, hspace=1.49)
         # panel c is narrowed on the left (left=0.32 vs LEFT) to clear a column
@@ -1557,6 +1559,9 @@ def plot(sets, band, out_stem, dpi=300, include_parameters=True):
         # bands and doubles as the row key for panel c (whose categorical y axis
         # is unlabelled).
         legend_loc, legend_anchor, legend_ncol = 'center left', (0.635, 0.4147), 1
+        # the marker/line-style key sits in the thin gap between panel a and the
+        # panel-b block, centered under panel a
+        style_anchor = (0.5, 0.7015)
     else:
         # two-panel variant (panel B omitted): panel A on top, the proteome-
         # allocation panel below it -- relettered B. A shorter canvas keeps both
@@ -1568,8 +1573,10 @@ def plot(sets, band, out_stem, dpi=300, include_parameters=True):
         # absolute inch height, position and the a -> b gap (fractions rescaled
         # by 8.8/9.856; panel a's bottom edge is unchanged in inches).
         fig = plt.figure(figsize=(9.5, 9.856))
+        # panel a's bottom is lifted slightly to open a thin strip for the
+        # marker/line-style key below the grid, above the campaign legend
         a_gs = fig.add_gridspec(1, 1, left=LEFT, right=RIGHT,
-                                top=0.9330, bottom=0.6116)
+                                top=0.9330, bottom=0.6400)
         c_gs = fig.add_gridspec(1, 1, left=0.32, right=RIGHT,
                                 top=0.4598, bottom=0.1741)
         colors = set_colors(sets)
@@ -1587,11 +1594,30 @@ def plot(sets, band, out_stem, dpi=300, include_parameters=True):
         # columns -- two rows under the title.
         legend_loc = 'center'
         legend_anchor, legend_ncol = (0.527, 0.5357), min(len(sets), 4)
+        # the marker/line-style key sits just below panel a, above the campaign
+        # legend that fills the panel-a -> b gap
+        style_anchor = (0.5, 0.6015)
     for y, letter, title in panels:
         fig.text(0.03, y, letter, fontsize=FONTS['panel'], fontweight='bold',
                  va='baseline')
         fig.text(0.055, y, title, fontsize=FONTS['panel'] - 1,
                  fontweight='bold', va='baseline')
+    # small colour-free key for the marks in panel a: what the points and the
+    # solid vs dashed lines mean (the campaign legend below gives the colours).
+    style_c = '0.30'
+    style_handles = [
+        Line2D([], [], linestyle='none', marker='o', markersize=5,
+               markerfacecolor=style_c, markeredgecolor='none', alpha=0.5,
+               label='Individual trials'),
+        Line2D([], [], color=style_c, lw=2.4, linestyle='-',
+               label='Incumbent (metric optimized by campaign)'),
+        Line2D([], [], color=style_c, lw=1.4, linestyle=(0, (2, 1.5)),
+               label='Incumbent (metric not optimized by campaign)')]
+    style_leg = fig.legend(handles=style_handles, loc='center',
+                           bbox_to_anchor=style_anchor, ncol=3, frameon=False,
+                           fontsize=FONTS['legend'], handlelength=2.2,
+                           handletextpad=0.5, columnspacing=1.4)
+    fig.add_artist(style_leg)
     handles = [plt.Rectangle((0, 0), 1, 1, fc=colors[id(s)], label=s['label'])
                for s in sets]
     leg = fig.legend(handles=handles, loc=legend_loc,
