@@ -1632,8 +1632,8 @@ def plot(sets, band, out_stem, dpi=300, include_parameters=True):
         legend_sets = _legend_order(sets)
         # the campaign swatches sit a little high in the panel-a -> b gap so the
         # mark key can share the same framed box just below them
-        legend_anchor = (0.527, 0.5470)
-        style_anchor = (0.527, 0.4980)
+        legend_anchor = (0.527, 0.5660)
+        style_anchor = (0.527, 0.5170)
     for y, letter, title in panels:
         fig.text(0.03, y, letter, fontsize=FONTS['panel'], fontweight='bold',
                  va='baseline')
