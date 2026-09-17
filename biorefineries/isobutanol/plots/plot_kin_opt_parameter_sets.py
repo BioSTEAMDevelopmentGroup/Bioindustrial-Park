@@ -147,6 +147,25 @@ RATE_UNIT = 'g·L$^{-1}$·h$^{-1}$'
 # absolute-capacity bar standing for three rates -- a reaction-range symbol
 # instead of the mangled "$ehrlich_{downstream}$" _mathify would produce.
 RATE_CELL_LABEL = {}
+# derived "× baseline" fold-change cells: {display_var: raw_var}. A raw rate
+# with a nonzero scenario-A baseline can be drawn as a fold-change group cell
+# (value / baseline, baseline 1.0) instead of an absolute g/L/h bar. Empty for
+# the minimal_subset layout; the split_12d layout registers k_3 / k_6 (the
+# glycolysis-adjacent fermentation rates) and k_16 / k_17 (Aro10 / Adh6, whose
+# fitted scenario-A rates are small but nonzero). load_set / baseline_set fill
+# the display_var from the raw value divided by its scenario-A baseline.
+REL_RATE_VARS = {}
+# scenario-A "× baseline" divisors for REL_RATE_VARS raw rates that are NOT in
+# the A workbook. k_3 / k_6 come from ko.workbook_kinetic_baselines('A'); k_16
+# (Aro10) and k_17 (Adh6) are absent from the A workbook (it omits the Ehrlich
+# block and Adh6), so their fitted-antimony scenario-A values are pinned by the
+# split_12d layout (g/L/h). Empty for the minimal_subset layout.
+REL_RATE_BASELINES_A = {}
+# raw rates whose per-rate value lives in a CSV `applied_*` column rather than a
+# decision column: metabolic_split_12d samples k_14/k_15/k_16 as the single
+# ehrlich_downstream multiplier, so load_set copies applied_k_14/_k_15/_k_16 to
+# plain k_14/k_15/k_16 keys. Empty for the minimal_subset layout.
+APPLIED_RATE_COLS = {}
 # feeding cell: (title, (shaded-range low, high)) -- engine default bounds
 # target_conc shares the threshold cell's 0-300 g/L axis (it is clipped at
 # TARGET_CONC_MAX = 300, and always sits at or above the threshold), so the two
@@ -161,34 +180,53 @@ FEED_LABELS = {'threshold_conc': ('Thresh. sugar\nconc. [g·L$^{-1}$]', (0, 300)
 # capacity GROUPS -- glycolysis (0.2-4x of the live k_1l/k_1h/k_1e) and
 # ehrlich_downstream (an ABSOLUTE g/L/h band on the anchor k_14, stoichiometric
 # weights -> k_14/k_15/k_16); three inhibition-effector multipliers; and
-# feeding. Panel B draws these decision variables LITERALLY -- a group cell is a
-# multiplier bar (baseline 1.0), ehrlich_downstream an absolute-capacity bar in
-# g/L/h. Panels A (outcomes) and C (proteome allocation) are preset-agnostic.
-# use_split_12d_layout() swaps the panel-B layout globals in place; the default
-# minimal_subset layout is otherwise untouched.
+# feeding. Panel B draws the underlying rates, NOT the raw ehrlich_downstream
+# multiplier: k_13/k_14/k_15 (zero at the scenario-A baseline) as absolute g/L/h
+# bars, and k_3/k_6/k_16/k_17 (nonzero baseline) plus glycolysis and the three
+# inhibition families as × baseline fold-change bars (baseline 1.0). k_14/k_15/
+# k_16 come from the CSV applied_* columns. Panels A (outcomes) and C (proteome
+# allocation) are preset-agnostic. use_split_12d_layout() swaps the panel-B
+# layout globals in place; the default minimal_subset layout is untouched.
 SPLIT_12D_DECISION_VARS = ['k_3', 'k_6', 'k_13', 'k_17', 'glycolysis',
                            'ehrlich_downstream', 'inhib_ethanol',
                            'inhib_isobutanol', 'inhib_acetate',
                            'threshold_conc', 'target_delta', 'max_n_spikes']
-# rate-kind cells: the four free rates + ehrlich_downstream (an absolute
-# capacity in g/L/h). group-kind cells: glycolysis + the three inhibition
-# multipliers (dimensionless fold-changes, baseline 1.0).
-SPLIT_12D_RATE_VARS = ['k_3', 'k_6', 'k_13', 'k_17', 'ehrlich_downstream']
-# glycolysis is a group cell too (kind='group', drawn in band 1 beside k_3/k_6),
-# so it joins the inhibition families in GROUP_VARS for the draw-kind dispatch;
-# the inhibition BAND lists only the three effector multipliers.
+# rate-kind cells (absolute g/L/h): the Ehrlich rates that are ZERO at the
+# scenario-A baseline -- k_13 and the individually-plotted k_14 / k_15. The
+# preset samples k_14/k_15/k_16 as the single ehrlich_downstream multiplier;
+# their per-rate applied values live in the CSV applied_k_14 / _k_15 / _k_16
+# columns, exposed under plain keys by load_set (SPLIT_12D_APPLIED_RATES).
+SPLIT_12D_RATE_VARS = ['k_13', 'k_14', 'k_15']
+# × baseline fold-change cells {display: raw}: the fermentation rates k_3 / k_6
+# and the small-but-nonzero-baseline Ehrlich rates k_16 (Aro10) / k_17 (Adh6).
+SPLIT_12D_REL_RATE_VARS = {'k_3_rel': 'k_3', 'k_6_rel': 'k_6',
+                           'k_16_rel': 'k_16', 'k_17_rel': 'k_17'}
+# scenario-A divisors for the raw rates absent from the A workbook: the fitted
+# antimony values (g/L/h), confirmed in the nskinetics antimony 2026-09-16 --
+# k_16 the Aro10 decarboxylase leak, k_17 the Adh6 rate (corrected 44 ->
+# 0.1077). Re-pin if the antimony moves. (k_3 / k_6 come from the A workbook.)
+SPLIT_12D_REL_RATE_BASELINES_A = {'k_16': 0.02115, 'k_17': 0.1077}
+# k_14 / k_15 / k_16 are collapsed into the ehrlich_downstream decision column;
+# their per-rate applied values are the applied_* CSV columns. load_set copies
+# them to plain keys so the separated cells (and the k_16 fold-change) read them.
+SPLIT_12D_APPLIED_RATES = {'k_14': 'applied_k_14', 'k_15': 'applied_k_15',
+                           'k_16': 'applied_k_16'}
+# glycolysis and the k_3/k_6/k_16/k_17 fold-change cells are group-kind too
+# (multiplier bars, baseline 1.0), so they join the inhibition families in
+# GROUP_VARS for the draw-kind dispatch; the inhibition BAND lists only the
+# three multipliers.
 SPLIT_12D_INHIB_GROUPS = ['inhib_ethanol', 'inhib_isobutanol', 'inhib_acetate']
-SPLIT_12D_GROUP_VARS = ['glycolysis'] + SPLIT_12D_INHIB_GROUPS
+SPLIT_12D_GROUP_VARS = (['glycolysis', 'k_3_rel', 'k_6_rel',
+                         'k_16_rel', 'k_17_rel'] + SPLIT_12D_INHIB_GROUPS)
 # genuinely zero (branch off) at the scenario-A baseline -> suppress the "0"
-# baseline bar label (k_17's baseline is the nonzero antimony 44.0 g/L/h, and
-# k_3/k_6 are nonzero fermentation rates).
-SPLIT_12D_EHRLICH_RATE_VARS = ('k_13', 'ehrlich_downstream')
+# baseline bar label. k_3/k_6/k_16/k_17 are nonzero (drawn as × baseline group
+# cells, baseline 1.0), so only k_13/k_14/k_15 need the suppression.
+SPLIT_12D_EHRLICH_RATE_VARS = ('k_13', 'k_14', 'k_15')
 SPLIT_12D_BANDS = [
     ('Glycolysis capacity ($r_1$) + ethanol production ($r_3$, $r_6$)',
-     ['glycolysis', 'k_3', 'k_6']),
-    ('Isobutanol production (Ehrlich pathway, $r_{13}$; '
-     '$r_{14}$ → $r_{16}$; Adh6 $r_{17}$)',
-     ['k_13', 'ehrlich_downstream', 'k_17']),
+     ['glycolysis', 'k_3_rel', 'k_6_rel']),
+    ('Isobutanol production (Ehrlich pathway $r_{13}$–$r_{16}$; Adh6 $r_{17}$)',
+     ['k_13', 'k_14', 'k_15', 'k_16_rel', 'k_17_rel']),
     ('Product inhibition relative to baseline '
      '(applied to $r_1$, $r_4$, $r_6$, $r_7$, $r_{10}$, $r_{17}$)',
      SPLIT_12D_INHIB_GROUPS),
@@ -201,13 +239,20 @@ def use_split_12d_layout():
     Idempotent; called once from main() when the plotted campaigns are 12d.
     Panels A and C are preset-agnostic, so only the panel-B constants change."""
     global DECISION_VARS, RATE_VARS, GROUP_VARS, EHRLICH_RATE_VARS, BANDS
+    global REL_RATE_VARS, REL_RATE_BASELINES_A, APPLIED_RATE_COLS
     DECISION_VARS = SPLIT_12D_DECISION_VARS
     RATE_VARS = SPLIT_12D_RATE_VARS
     GROUP_VARS = SPLIT_12D_GROUP_VARS
     EHRLICH_RATE_VARS = SPLIT_12D_EHRLICH_RATE_VARS
     BANDS = SPLIT_12D_BANDS
+    REL_RATE_VARS = dict(SPLIT_12D_REL_RATE_VARS)
+    REL_RATE_BASELINES_A = dict(SPLIT_12D_REL_RATE_BASELINES_A)
+    APPLIED_RATE_COLS = dict(SPLIT_12D_APPLIED_RATES)
     GROUP_LABELS['glycolysis'] = '$k_{1e}$, $k_{1h}$, $k_{1l}$\n(× baseline)'
-    RATE_CELL_LABEL['ehrlich_downstream'] = r'$r_{14}$→$r_{16}$'
+    GROUP_LABELS['k_3_rel'] = '$k_3$\n(× baseline)'
+    GROUP_LABELS['k_6_rel'] = '$k_6$\n(× baseline)'
+    GROUP_LABELS['k_16_rel'] = '$k_{16}$\n(× baseline)'
+    GROUP_LABELS['k_17_rel'] = '$k_{17}$\n(× baseline)'
     # the minimal_subset figure hard-capped IRR at 25 % (its incumbents topped
     # out at 23.5 %); the 12d PI campaign reaches ~27 %, so let the IRR cell
     # auto-scale (to 30 % at the 0.05 step) instead of clipping the line.
@@ -492,6 +537,20 @@ def load_set(label, campaign, trial):
     # applied target sugar concentration (clip at TARGET_CONC_MAX), drawn
     # in place of the raw target_delta decision column
     rec['target_conc'] = float(ko._applied_feeding(rec)[0])
+    # metabolic_split_12d collapses k_14/k_15/k_16 into the ehrlich_downstream
+    # multiplier; expose each rate's applied value under a plain key so the
+    # separated panel-B cells (and the k_16 fold-change) read them uniformly.
+    for plain, applied in APPLIED_RATE_COLS.items():
+        if applied in rec:
+            rec[plain] = float(rec[applied])
+    # × baseline fold-change cells: raw value / scenario-A baseline. k_3/k_6 use
+    # the A workbook; k_16/k_17 use the pinned antimony divisors.
+    if REL_RATE_VARS:
+        A_ref = dict(ko.workbook_kinetic_baselines('A'))
+        A_ref.update(REL_RATE_BASELINES_A)
+        for disp, raw in REL_RATE_VARS.items():
+            b = A_ref.get(raw)
+            rec[disp] = float(rec[raw]) / b if b else np.nan
     # decision columns beyond the 15 (e.g. a metabolic_minimal campaign's
     # extra rates + stage_1_max_x); reported, not drawn
     known = set(DECISION_VARS) | {'trial_number', 'state', 'objective',
