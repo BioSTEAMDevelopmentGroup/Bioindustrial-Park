@@ -316,13 +316,15 @@ def _owns_outcome(objective, col):
     panel (thick incumbent line + trial cloud)."""
     return objective in OUTCOME_OWN_OBJECTIVES.get(col, frozenset({col}))
 
-# one color per set: baseline grey, campaigns from the hue palette. Fixed
-# 7-color palette (blue, orange, green, purple, red, grey, yellow); the baseline
-# takes the grey and the five campaigns take blue/orange/green/purple/yellow in
-# order (red is the spare sixth hue).
+# one color per set: baseline grey, campaigns from the hue palette. The seven
+# campaign hues are grouped to match panel A's outcome columns: cyan for the
+# financial campaign, then the three isobutanol campaigns (orange yield / green
+# titer / red productivity) and the three ethanol campaigns (purple yield /
+# yellow titer / brown productivity), assigned to the sets in that order.
 BASELINE_COLOR = '#90918e'
-HUE_COLORS = ['#18C4DC', '#f98f60', '#79bf82', '#a280b9', '#f3c354', '#ED586F']
-MAX_SETS = 1 + len(HUE_COLORS)   # 7
+HUE_COLORS = ['#18C4DC', '#f98f60', '#79bf82', '#ED586F',
+              '#a280b9', '#f3c354', '#8c6d4f']
+MAX_SETS = 1 + len(HUE_COLORS)   # 8
 
 FONTS = {'band': 12, 'cell': 10, 'tick': 9, 'callout': 9,
          'legend': 10, 'axis': 11, 'panel': 14}
@@ -769,7 +771,8 @@ def set_colors(sets):
                 n_campaign = len([x for x in sets if not x.get('is_baseline')])
                 raise ValueError(
                     f'too many campaign sets ({n_campaign}); at most '
-                    f'{len(HUE_COLORS)} plus the baseline (six total)')
+                    f'{len(HUE_COLORS)} plus the baseline '
+                    f'({len(HUE_COLORS) + 1} total)')
             colors[id(s)] = HUE_COLORS[hue]
             hue += 1
     return colors
