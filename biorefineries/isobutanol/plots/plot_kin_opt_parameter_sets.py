@@ -889,9 +889,17 @@ def _decade_ceil(hi):
 # drops the removed values outright.
 RATE_YTICKS = {
     'k_1h': [0.0, 0.5, 1.0],        # even 0.5 steps (drop 0.25, 0.75)
+    'k_13': [0.0, 2.0, 4.0],        # whole-even steps (minor at 1, 3)
     'k_14': [0.0, 1.0, 2.0],        # drop 0.5, 1.5
     'k_15': [0.0, 1.0, 2.0],        # drop 0.5, 1.5
     'k_16': [0.0, 1.0, 2.0, 3.0],   # re-cap 2.5 -> 3.0, whole-number steps
+}
+
+# same idea for feeding cells: an explicit major-tick list overrides the auto
+# _linear_cap ticks and sets the axis top to its largest tick (uniform list ->
+# half-step minors kept).
+FEED_YTICKS = {
+    'n_glu_spikes': [0.0, 4.0, 8.0],   # 0/4/8 (minor at 2, 6)
 }
 
 
@@ -974,12 +982,18 @@ def bar_cell(ax, sets, colors, var, kind, ylabel, subtitle=None, ylim=None,
                 data_max = max(data_max, float(v))
         if base is not None and np.isfinite(base):
             data_max = max(data_max, base)
-        cap, step = _linear_cap(data_max)
-        ax.set_ylim(lo, cap)
+        if var in FEED_YTICKS:
+            ticks = FEED_YTICKS[var]
+            ax.set_ylim(lo, ticks[-1])
+            ax.yaxis.set_major_locator(FixedLocator(ticks))
+            ax.yaxis.set_minor_locator(AutoMinorLocator(2))
+        else:
+            cap, step = _linear_cap(data_max)
+            ax.set_ylim(lo, cap)
+            ax.yaxis.set_major_locator(MultipleLocator(step))
+            ax.yaxis.set_minor_locator(AutoMinorLocator(2))
         if base is not None:
             ax.axhline(base, color='k', lw=0.8, ls='--', zorder=1)
-        ax.yaxis.set_major_locator(MultipleLocator(step))
-        ax.yaxis.set_minor_locator(AutoMinorLocator(2))
         bottom = 0
     ax.set_ylabel(ylabel, fontsize=FONTS['cell'], labelpad=3)
     if subtitle:
