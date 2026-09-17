@@ -765,15 +765,41 @@ def set_colors(sets):
     return colors
 
 
+def _inward_top_right_ticks(ax, do_x=True, do_y=True):
+    """Retarget the top/right tick lines to inward-only markers (bottom/left
+    keep their in+out markers). matplotlib's tick `direction` is per-axis, so
+    the secondary side (tick2: top for x, right for y) is given an inward
+    marker whose reach (half the tick length) matches the inner half of the
+    in+out ticks."""
+    if do_x:
+        for ticks, half in ((ax.xaxis.get_major_ticks(), 2.0),
+                            (ax.xaxis.get_minor_ticks(), 1.1)):
+            for t in ticks:
+                t.tick2line.set_marker(TICKDOWN)
+                t.tick2line.set_markersize(half)
+    if do_y:
+        for ticks, half in ((ax.yaxis.get_major_ticks(), 2.0),
+                            (ax.yaxis.get_minor_ticks(), 1.1)):
+            for t in ticks:
+                t.tick2line.set_marker(TICKLEFT)
+                t.tick2line.set_markersize(half)
+
+
 def style_cell_axes(ax):
-    ax.tick_params(axis='y', which='major', direction='inout', right=False,
-                   length=4)
-    ax.tick_params(axis='y', which='minor', direction='inout', right=False,
-                   length=2.2)
+    # value (y) axis: ticks in+out on the left, mirrored inward-only on the
+    # right; the box is closed on all four sides, matching panel A.
+    ax.tick_params(axis='y', which='major', direction='inout',
+                   left=True, right=True, labelright=False, length=4)
+    ax.tick_params(axis='y', which='minor', direction='inout',
+                   left=True, right=True, length=2.2)
+    # categorical x axis (one bar per campaign, keyed by the legend): no x
+    # ticks or labels on either the bottom or the mirrored top axis.
+    ax.xaxis.set_minor_locator(NullLocator())
     ax.tick_params(axis='x', which='both', top=False, bottom=False,
                    labelbottom=False)
     for sp in ('right', 'top'):
-        ax.spines[sp].set_visible(False)
+        ax.spines[sp].set_visible(True)
+    _inward_top_right_ticks(ax, do_x=False, do_y=True)
 
 
 def _baseline_value(sets, var):
@@ -1058,20 +1084,8 @@ def outcome_cell(ax, sets, colors, col, title, ylim, xmax, point_size=9):
                    direction='inout', length=2.2)
     for sp in ('right', 'top'):
         ax.spines[sp].set_visible(True)
-    # the mirrored top/right ticks point INWARD only (bottom/left stay in+out).
-    # matplotlib's tick `direction` is per-axis, so the secondary side (tick2:
-    # top for x, right for y) is retargeted to an inward marker whose reach
-    # (half the tick length) matches the inner half of the in+out ticks.
-    for ticks, half in ((ax.xaxis.get_major_ticks(), 2.0),
-                        (ax.xaxis.get_minor_ticks(), 1.1)):
-        for t in ticks:
-            t.tick2line.set_marker(TICKDOWN)
-            t.tick2line.set_markersize(half)
-    for ticks, half in ((ax.yaxis.get_major_ticks(), 2.0),
-                        (ax.yaxis.get_minor_ticks(), 1.1)):
-        for t in ticks:
-            t.tick2line.set_marker(TICKLEFT)
-            t.tick2line.set_markersize(half)
+    # the mirrored top/right ticks point INWARD only (bottom/left stay in+out)
+    _inward_top_right_ticks(ax, do_x=True, do_y=True)
 
 
 def draw_outcomes(fig, gs_cell, sets, colors):
