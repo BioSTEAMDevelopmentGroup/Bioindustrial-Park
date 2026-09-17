@@ -1525,7 +1525,7 @@ def _legend_order(sets):
     return sets
 
 
-def plot(sets, band, out_stem, dpi=300, include_parameters=True):
+def plot(sets, band, out_stem, dpi=300, include_parameters=False):
     apply_fonts()
     LEFT, RIGHT = 0.083, 0.97
     if include_parameters:
@@ -1739,9 +1739,14 @@ def main(argv=None):
                          'baseline. TRIAL is an int, "best", or "best:COL".')
     ap.add_argument('--no-baseline', action='store_true',
                     help='drop the scenario-A baseline row')
-    ap.add_argument('--no-panel-b', action='store_true',
-                    help='omit panel B (final kinetic and process parameters); '
-                         'the proteome-allocation panel then becomes panel B')
+    # the two-panel layout (panel A + proteome allocation) is the default;
+    # --panel-b adds the kinetic/process-parameter panel B, --no-panel-b is
+    # the explicit form of the default (kept so existing commands still work)
+    ap.add_argument('--panel-b', action=argparse.BooleanOptionalAction,
+                    default=False,
+                    help='include panel B (final kinetic and process '
+                         'parameters); omitted by default, in which case the '
+                         'proteome-allocation panel is panel B')
     ap.add_argument('--out-dir', default=RESULTS_DIR)
     ap.add_argument('--stem', default=None)
     ap.add_argument('--dpi', type=int, default=300)
@@ -1783,7 +1788,7 @@ def main(argv=None):
     stamp = datetime.now().strftime('%Y.%m.%d-%H.%M')
     out_stem = os.path.join(args.out_dir, f'{stem}_{stamp}')
     plot(sets, band, out_stem, dpi=args.dpi,
-         include_parameters=not args.no_panel_b)
+         include_parameters=args.panel_b)
     console_report(sets, band_campaign)
     print(f'wrote {out_stem}.png / .pdf')
     return out_stem
