@@ -275,15 +275,19 @@ for _s in STEP_ENZYME:
 # so the label stays out of the neighbouring cell's plot box. Order:
 # IRR (the big left cell), then the isobutanol metrics (yield, titer,
 # productivity) down one column, then the ethanol metrics down the next.
+# the six narrow-cell metric names are stacked one word per line so the rotated
+# y-label stays shorter than the short cell height -- a single-line
+# "Isobutanol productivity" overruns its box and collides with the titer cell's
+# label above it.
 OUTCOMES = (('IRR', 'Financial attractiveness\nas IRR [%]', (0, 0.3)),
-            ('IBO yield', 'Isobutanol yield\n[g·g$^{-1}$]', (0, 0.4)),
-            ('IBO titer', 'Isobutanol titer\n[g·L$^{-1}$]', (0, 60)),
+            ('IBO yield', 'Isobutanol\nyield\n[g·g$^{-1}$]', (0, 0.4)),
+            ('IBO titer', 'Isobutanol\ntiter\n[g·L$^{-1}$]', (0, 60)),
             ('IBO productivity',
-             'Isobutanol productivity\n[g·L$^{-1}$·h$^{-1}$]', (0, 2)),
-            ('EtOH yield', 'Ethanol yield\n[g·g$^{-1}$]', (0, 0.5)),
-            ('EtOH titer', 'Ethanol titer\n[g·L$^{-1}$]', (0, 200)),
+             'Isobutanol\nproductivity\n[g·L$^{-1}$·h$^{-1}$]', (0, 2)),
+            ('EtOH yield', 'Ethanol\nyield\n[g·g$^{-1}$]', (0, 0.5)),
+            ('EtOH titer', 'Ethanol\ntiter\n[g·L$^{-1}$]', (0, 200)),
             ('EtOH productivity',
-             'Ethanol productivity\n[g·L$^{-1}$·h$^{-1}$]', (0, 8)))
+             'Ethanol\nproductivity\n[g·L$^{-1}$·h$^{-1}$]', (0, 8)))
 
 # per-outcome override for the major-tick step (else _linear_cap's step).
 # IRR is stored as a fraction shown in percent, so 0.05 -> 0/5/.../30 %;
