@@ -1485,10 +1485,12 @@ def plot(sets, band, out_stem, dpi=300, include_parameters=True):
                    'Optimization incumbent trajectories'),
                   (axc.get_position().y1 + 0.005, 'B',
                    'Final proteome allocation'))
-        # the campaign legend is a compact two-column block centred in the
-        # a -> b gap (a single vertical column is too tall and clips panel a's
-        # lower cells), doubling as the row key for the proteome panel below.
-        legend_loc, legend_anchor, legend_ncol = 'center', (0.545, 0.600), 2
+        # the campaign legend sits in the a -> b gap as two rows -- the title on
+        # its own row above a single row of all campaign items (ncol = one
+        # column per set) -- doubling as the row key for the proteome panel
+        # below. A single vertical column is too tall and clips panel a's lower
+        # cells.
+        legend_loc, legend_anchor, legend_ncol = 'center', (0.527, 0.600), len(sets)
     for y, letter, title in panels:
         fig.text(0.03, y, letter, fontsize=FONTS['panel'], fontweight='bold',
                  va='baseline')
