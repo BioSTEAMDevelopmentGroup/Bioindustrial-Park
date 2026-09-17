@@ -1610,7 +1610,7 @@ def plot(sets, band, out_stem, dpi=300, include_parameters=True):
                markerfacecolor=style_c, markeredgecolor='none', alpha=0.5,
                label='Individual trials'),
         Line2D([], [], color=style_c, lw=2.4, linestyle='-',
-               label='Incumbent (campaign optimizing the plotted metric)'),
+               label='Incumbent (campaign optimizing the shown metric)'),
         Line2D([], [], color=style_c, lw=1.4, linestyle=(0, (2, 1.5)),
                label='Incumbent (other campaign)')]
     handles = [plt.Rectangle((0, 0), 1, 1, fc=colors[id(s)], label=s['label'])
