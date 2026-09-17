@@ -272,14 +272,16 @@ for _s in STEP_ENZYME:
 
 # outcomes panel: (CSV column, cell title, (y-low, y-high)), in draw order.
 # Titles are rotated y-axis labels in narrow cells -- keep each to <=2 lines
-# so the label stays out of the neighbouring cell's plot box.
+# so the label stays out of the neighbouring cell's plot box. Order:
+# IRR (the big left cell), then the isobutanol metrics (yield, titer,
+# productivity) down one column, then the ethanol metrics down the next.
 OUTCOMES = (('IRR', 'Financial attractiveness\nas IRR [%]', (0, 0.3)),
-            ('IBO titer', 'Isobutanol titer\n[g·L$^{-1}$]', (0, 60)),
             ('IBO yield', 'Isobutanol yield\n[g·g$^{-1}$]', (0, 0.4)),
-            ('EtOH titer', 'Ethanol titer\n[g·L$^{-1}$]', (0, 200)),
-            ('EtOH yield', 'Ethanol yield\n[g·g$^{-1}$]', (0, 0.5)),
+            ('IBO titer', 'Isobutanol titer\n[g·L$^{-1}$]', (0, 60)),
             ('IBO productivity',
              'Isobutanol productivity\n[g·L$^{-1}$·h$^{-1}$]', (0, 2)),
+            ('EtOH yield', 'Ethanol yield\n[g·g$^{-1}$]', (0, 0.5)),
+            ('EtOH titer', 'Ethanol titer\n[g·L$^{-1}$]', (0, 200)),
             ('EtOH productivity',
              'Ethanol productivity\n[g·L$^{-1}$·h$^{-1}$]', (0, 8)))
 
@@ -1117,9 +1119,9 @@ def draw_outcomes(fig, gs_cell, sets, colors):
         if tx is not None and len(tx):
             xmax = max(xmax, float(tx[-1]))
     # 3x4 grid: IRR (the headline outcome) fills the left 3x2 block and is the
-    # largest cell; the remaining six outcomes fill the right two columns, one
-    # per cell top-to-bottom (IBO titer / IBO yield, EtOH titer / yield, then
-    # IBO productivity / EtOH productivity in the bottom row).
+    # largest cell; the remaining six outcomes fill the right two columns
+    # product-by-product -- the isobutanol metrics (yield, titer, productivity)
+    # down column 3, the ethanol metrics down column 4, each top-to-bottom.
     sub_gs = gs_cell.subgridspec(3, 4, wspace=0.62, hspace=0.62)
     axes = []
     big, rest = OUTCOMES[0], OUTCOMES[1:]
@@ -1128,8 +1130,8 @@ def draw_outcomes(fig, gs_cell, sets, colors):
     axes.append(ax_big)
     big_w = ax_big.get_position().width
     for (col, label, yl), (r, c) in zip(rest,
-                                        ((0, 2), (0, 3), (1, 2), (1, 3),
-                                         (2, 2), (2, 3))):
+                                        ((0, 2), (1, 2), (2, 2),
+                                         (0, 3), (1, 3), (2, 3))):
         ax = fig.add_subplot(sub_gs[r, c])
         # these cells are ~0.38x the linear size of the IRR cell (1 of 4 columns
         # vs 2 columns + a wspace), so shrink the trial-cloud marker to match:
