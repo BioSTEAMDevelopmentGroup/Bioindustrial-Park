@@ -323,7 +323,7 @@ def _owns_outcome(objective, col):
 # yellow titer / blue productivity), assigned to the sets in that order.
 BASELINE_COLOR = '#90918e'
 HUE_COLORS = ['#18C4DC', '#f98f60', '#79bf82', '#ED586F',
-              '#a280b9', '#f3c354', '#4e5fc8']
+              '#a280b9', '#f3c354', '#5a6bcc']
 MAX_SETS = 1 + len(HUE_COLORS)   # 8
 
 FONTS = {'band': 12, 'cell': 10, 'tick': 9, 'callout': 9,
