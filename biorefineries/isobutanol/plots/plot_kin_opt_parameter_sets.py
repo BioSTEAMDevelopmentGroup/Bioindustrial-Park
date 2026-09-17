@@ -1703,9 +1703,9 @@ def plot(sets, band, out_stem, dpi=300, include_parameters=False,
 
 def _plot_parameters_only(sets, band, out_stem, dpi):
     """Standalone render of just the final-parameters panel (panel B of the
-    three-panel variant): the four kinetic/process-parameter bands on the grey
-    panel-B backing, a bold title, and the campaign colour legend. No panel a
-    marks key -- the bands carry no trial points or incumbent lines."""
+    three-panel variant): the four kinetic/process-parameter bands, a bold
+    title, and the campaign colour legend, on a plain white background. No
+    panel a marks key -- the bands carry no trial points or incumbent lines."""
     LEFT, RIGHT = 0.083, 0.97
     H = 6.2
     fig = plt.figure(figsize=(9.5, H))
@@ -1719,16 +1719,11 @@ def _plot_parameters_only(sets, band, out_stem, dpi):
     b_axes = draw_parameters(fig, [band_gs[0], band_gs[1], band_gs[2],
                                    band_gs[3]], sets, colors, band,
                              title_offset_scale=13.454 / H)
-    # grey backing behind the band block so the fill is seamless across the
-    # band -> band gaps (as in the three-panel panel B); spans the bands and the
-    # title above them, not the legend below
+    # standalone figure: no grey panel-B backing -- repaint the band cells white
+    # (draw_parameters fills them with PANEL_B_BG for the three-panel block)
+    for ax in b_axes:
+        ax.set_facecolor('white')
     b_top = b_axes[0].get_position().y1
-    b_bot = b_axes[-1].get_position().y0
-    fig.add_artist(plt.Rectangle(
-        (0.02, b_bot - 0.028), 0.985 - 0.02,
-        (b_top + 0.098) - (b_bot - 0.028),
-        transform=fig.transFigure, facecolor=PANEL_B_BG, edgecolor='none',
-        zorder=0))
     # bold heading above the bands (no panel letter -- this is one panel alone)
     fig.text(LEFT, b_top + 0.070, 'Final kinetic and process parameters',
              fontsize=FONTS['panel'] - 1, fontweight='bold', va='baseline')
