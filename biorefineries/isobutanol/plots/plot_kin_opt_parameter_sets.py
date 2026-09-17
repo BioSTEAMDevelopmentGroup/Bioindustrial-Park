@@ -206,7 +206,7 @@ def use_split_12d_layout():
     GROUP_VARS = SPLIT_12D_GROUP_VARS
     EHRLICH_RATE_VARS = SPLIT_12D_EHRLICH_RATE_VARS
     BANDS = SPLIT_12D_BANDS
-    GROUP_LABELS['glycolysis'] = 'Glycolysis\ncapacity\n(× baseline)'
+    GROUP_LABELS['glycolysis'] = '$k_{1e}$, $k_{1h}$, $k_{1l}$\n(× baseline)'
     RATE_CELL_LABEL['ehrlich_downstream'] = r'$r_{14}$→$r_{16}$'
     # the minimal_subset figure hard-capped IRR at 25 % (its incumbents topped
     # out at 23.5 %); the 12d PI campaign reaches ~27 %, so let the IRR cell
