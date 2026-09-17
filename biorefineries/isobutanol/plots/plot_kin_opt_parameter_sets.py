@@ -1343,7 +1343,7 @@ def draw_burden(fig, gs_cell, sets, colors):
     #    glycolysis (the origin) and only derates translation once it passes the
     #    un-derated demand line, so that span (F_flex - phi_T,demand) is free;
     #  * translation demand -- from the demand line to the housekeeping edge.
-    by = n + 0.55                          # clear of the top bar (top edge n+0.31)
+    by = n + 0.68                          # above the top border spine (n+0.50)
     cap = 0.10                             # end-cap half-height
 
     def bracket(ax, x0, x1, label):
@@ -1359,7 +1359,8 @@ def draw_burden(fig, gs_cell, sets, colors):
     bracket(axL, 0.0, demand_x, 'penalty-free metabolic budget')
     bracket(axL, demand_x, hk_start, 'translation demand')
 
-    axL.set_ylim(0.4, n + 0.9)                       # shared: sets both windows
+    top_edge = n + 0.50                              # top border, below the brackets
+    axL.set_ylim(0.4, n + 1.05)                      # shared: sets both windows
     for ax in (axL, axR):
         # rows are keyed by colour through the campaign legend, so the
         # categorical y axis carries no labels of its own
@@ -1372,14 +1373,20 @@ def draw_burden(fig, gs_cell, sets, colors):
         # equal scale, so one tick cadence matches physically across the break
         ax.xaxis.set_major_locator(MultipleLocator(0.05))
         ax.xaxis.set_minor_locator(AutoMinorLocator())
-        # box the panel on left/right/bottom (no top): the OUTER edges of the
-        # broken axis carry the left and right spines (axL's left, axR's right),
-        # while the inner edges stay open to read as the axis break. The y axis
-        # is categorical (rows keyed by colour), so left/right carry no ticks.
-        ax.spines['top'].set_visible(False)
+        # box the panel: the OUTER edges of the broken axis carry the left and
+        # right spines (axL's left, axR's right), while the inner edges stay open
+        # to read as the axis break. The top border sits just above the bars at
+        # top_edge -- BELOW the sector-demand brackets, which hover in the
+        # headroom above it -- so the left/right spines are bounded to end there
+        # rather than run up through the bracket region. The categorical y axis
+        # carries no ticks.
+        ax.spines['top'].set_visible(True)
+        ax.spines['top'].set_position(('data', top_edge))
     axL.spines['left'].set_visible(True)
+    axL.spines['left'].set_bounds(0.4, top_edge)
     axL.spines['right'].set_visible(False)
     axR.spines['right'].set_visible(True)
+    axR.spines['right'].set_bounds(0.4, top_edge)
     axR.spines['left'].set_visible(False)
     axL.set_xlim(0, BREAK_L)
     axR.set_xlim(BREAK_R, xmax)
