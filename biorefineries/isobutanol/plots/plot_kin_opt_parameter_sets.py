@@ -1505,6 +1505,26 @@ def draw_burden(fig, gs_cell, sets, colors):
     return axR
 
 
+def _legend_order(sets):
+    # reorder the campaign swatches into a 2-row x 4-col grid that mirrors panel
+    # a -- row 1 the isobutanol metrics, row 2 the ethanol metrics, columns
+    # yield -> titer -> productivity, baseline + financial leading column 1.
+    # fig.legend fills column-major, so the two rows are interleaved into the
+    # returned handle order. Returns the natural set order unchanged unless the
+    # eight expected labels are exactly present.
+    row1 = ('Baseline (no optimization)', 'Isobutanol yield',
+            'Isobutanol titer', 'Isobutanol productivity')
+    row2 = ('Financial attractiveness', 'Ethanol yield',
+            'Ethanol titer', 'Ethanol productivity')
+    by_label = {s['label']: s for s in sets}
+    if len(by_label) == len(sets) and set(by_label) == set(row1 + row2):
+        ordered = []
+        for top, bot in zip(row1, row2):
+            ordered += [by_label[top], by_label[bot]]
+        return ordered
+    return sets
+
+
 def plot(sets, band, out_stem, dpi=300, include_parameters=True):
     apply_fonts()
     LEFT, RIGHT = 0.083, 0.97
@@ -1566,6 +1586,8 @@ def plot(sets, band, out_stem, dpi=300, include_parameters=True):
         # bands and doubles as the row key for panel c (whose categorical y axis
         # is unlabelled).
         legend_loc, legend_anchor, legend_ncol = 'center left', (0.635, 0.4147), 1
+        # single vertical column: the swatches follow the set order top-to-bottom
+        legend_sets = sets
         # the marker/line-style key sits in the thin gap between panel a and the
         # panel-b block, centered under panel a
         style_anchor = (0.5, 0.7015)
@@ -1600,10 +1622,18 @@ def plot(sets, band, out_stem, dpi=300, include_parameters=True):
         # widest being "Baseline (no optimization)"), so it wraps to at most four
         # columns -- two rows under the title.
         legend_loc = 'center'
+        legend_ncol = min(len(sets), 4)
+        # arrange the swatches into a product-grouped grid that mirrors panel a:
+        # row 1 the isobutanol metrics, row 2 the ethanol metrics, columns reading
+        # yield -> titer -> productivity, with the baseline and the financial
+        # campaign leading column 1. fig.legend fills column-major, so the two
+        # rows are interleaved into the handle order; falls back to the natural
+        # set order whenever the expected labels aren't all present.
+        legend_sets = _legend_order(sets)
         # the campaign swatches sit a little high in the panel-a -> b gap so the
         # mark key can share the same framed box just below them
-        legend_anchor, legend_ncol = (0.527, 0.5480), min(len(sets), 4)
-        style_anchor = (0.527, 0.5030)
+        legend_anchor = (0.527, 0.5470)
+        style_anchor = (0.527, 0.4980)
     for y, letter, title in panels:
         fig.text(0.03, y, letter, fontsize=FONTS['panel'], fontweight='bold',
                  va='baseline')
@@ -1621,7 +1651,7 @@ def plot(sets, band, out_stem, dpi=300, include_parameters=True):
         Line2D([], [], color=style_c, lw=1.4, linestyle=(0, (2, 1.5)),
                label='Incumbent (other campaign)')]
     handles = [plt.Rectangle((0, 0), 1, 1, fc=colors[id(s)], label=s['label'])
-               for s in sets]
+               for s in legend_sets]
     # three-panel: the mark key is a standalone strip under panel a and the
     # campaign legend is its own framed box in panel b's empty columns.
     # two-panel: both keys share ONE framed box in the panel-a -> b gap -- the
@@ -1635,7 +1665,8 @@ def plot(sets, band, out_stem, dpi=300, include_parameters=True):
                      bbox_to_anchor=legend_anchor, ncol=legend_ncol,
                      frameon=include_parameters,
                      fontsize=FONTS['legend'] + 1, title='Optimization campaign',
-                     labelspacing=0.5, handlelength=1.7, handleheight=1.1,
+                     labelspacing=0.6, columnspacing=1.6,
+                     handlelength=1.7, handleheight=1.1, handletextpad=0.6,
                      borderpad=0.6, edgecolor='0.6', fancybox=False)
     leg.get_title().set_fontweight('bold')
     leg.get_title().set_fontsize(FONTS['legend'] + 2)
