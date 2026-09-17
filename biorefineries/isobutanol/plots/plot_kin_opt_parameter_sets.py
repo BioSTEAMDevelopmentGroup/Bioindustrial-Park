@@ -320,10 +320,10 @@ def _owns_outcome(objective, col):
 # campaign hues are grouped to match panel A's outcome columns: cyan for the
 # financial campaign, then the three isobutanol campaigns (orange yield / green
 # titer / red productivity) and the three ethanol campaigns (purple yield /
-# yellow titer / brown productivity), assigned to the sets in that order.
+# yellow titer / blue productivity), assigned to the sets in that order.
 BASELINE_COLOR = '#90918e'
 HUE_COLORS = ['#18C4DC', '#f98f60', '#79bf82', '#ED586F',
-              '#a280b9', '#f3c354', '#8c6d4f']
+              '#a280b9', '#f3c354', '#697ed3']
 MAX_SETS = 1 + len(HUE_COLORS)   # 8
 
 FONTS = {'band': 12, 'cell': 10, 'tick': 9, 'callout': 9,
