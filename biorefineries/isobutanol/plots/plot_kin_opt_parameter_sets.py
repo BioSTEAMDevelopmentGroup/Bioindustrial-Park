@@ -1153,7 +1153,11 @@ def draw_outcomes(fig, gs_cell, sets, colors):
     return axes
 
 
-def draw_parameters(fig, gs_rows, sets, colors, band):
+def draw_parameters(fig, gs_rows, sets, colors, band, title_offset_scale=1.0):
+    # title_offset_scale compensates the fixed figure-fraction band-title
+    # offsets for a canvas shorter than the three-panel one (the standalone
+    # params-only figure), so the titles keep the same ABSOLUTE clearance above
+    # their cells; 1.0 leaves the three-panel / two-panel figures untouched.
     axes = []
     for gs_row, (title, params) in zip(gs_rows, BANDS):
         sub_gs = gs_row.subgridspec(1, 5, wspace=0.75)
@@ -1185,9 +1189,9 @@ def draw_parameters(fig, gs_rows, sets, colors, band):
         # group cells have short ylabels and take the tight offset that pins
         # the title to its band.
         if any(p in FEED_DRAW_VARS for p in params):
-            offset = 0.022
+            offset = 0.022 * title_offset_scale
         else:
-            offset = 0.010
+            offset = 0.010 * title_offset_scale
         # left-aligned with the plot boxes (the gridspec left margin)
         fig.text(0.083, last_ax.get_position().y1 + offset, title,
                  fontsize=FONTS['band'], fontweight='bold', va='bottom')
@@ -1525,9 +1529,12 @@ def _legend_order(sets):
     return sets
 
 
-def plot(sets, band, out_stem, dpi=300, include_parameters=False):
+def plot(sets, band, out_stem, dpi=300, include_parameters=False,
+         params_only=False):
     apply_fonts()
     LEFT, RIGHT = 0.083, 0.97
+    if params_only:
+        return _plot_parameters_only(sets, band, out_stem, dpi)
     if include_parameters:
         fig = plt.figure(figsize=(9.5, 13.454))
         # Top-anchored vertical layout, figure fractions. Panel a now holds a
@@ -1694,6 +1701,55 @@ def plot(sets, band, out_stem, dpi=300, include_parameters=False):
     return out_stem
 
 
+def _plot_parameters_only(sets, band, out_stem, dpi):
+    """Standalone render of just the final-parameters panel (panel B of the
+    three-panel variant): the four kinetic/process-parameter bands on the grey
+    panel-B backing, a bold title, and the campaign colour legend. No panel a
+    marks key -- the bands carry no trial points or incumbent lines."""
+    LEFT, RIGHT = 0.083, 0.97
+    H = 6.2
+    fig = plt.figure(figsize=(9.5, H))
+    # the four bands keep the three-panel panel-B cell height and band gaps
+    band_gs = fig.add_gridspec(4, 1, left=LEFT, right=RIGHT, top=0.830,
+                               bottom=0.280, hspace=1.49)
+    colors = set_colors(sets)
+    # the band-title figure-fraction offsets were tuned on the 13.454-in
+    # three-panel canvas; rescale them to this shorter canvas for equal
+    # absolute clearance above the cells
+    b_axes = draw_parameters(fig, [band_gs[0], band_gs[1], band_gs[2],
+                                   band_gs[3]], sets, colors, band,
+                             title_offset_scale=13.454 / H)
+    # grey backing behind the band block so the fill is seamless across the
+    # band -> band gaps (as in the three-panel panel B); spans the bands and the
+    # title above them, not the legend below
+    b_top = b_axes[0].get_position().y1
+    b_bot = b_axes[-1].get_position().y0
+    fig.add_artist(plt.Rectangle(
+        (0.02, b_bot - 0.028), 0.985 - 0.02,
+        (b_top + 0.098) - (b_bot - 0.028),
+        transform=fig.transFigure, facecolor=PANEL_B_BG, edgecolor='none',
+        zorder=0))
+    # bold heading above the bands (no panel letter -- this is one panel alone)
+    fig.text(LEFT, b_top + 0.070, 'Final kinetic and process parameters',
+             fontsize=FONTS['panel'] - 1, fontweight='bold', va='baseline')
+    # campaign colour legend below the bands (product-grouped like the two-panel
+    # figure); no marks key, since the bands are bars
+    handles = [plt.Rectangle((0, 0), 1, 1, fc=colors[id(s)], label=s['label'])
+               for s in _legend_order(sets)]
+    leg = fig.legend(handles=handles, loc='center', bbox_to_anchor=(0.5, 0.115),
+                     ncol=min(len(sets), 4), frameon=True,
+                     fontsize=FONTS['legend'] + 1, title='Optimization campaign',
+                     labelspacing=0.6, columnspacing=1.6,
+                     handlelength=1.7, handleheight=1.1, handletextpad=0.6,
+                     borderpad=0.6, edgecolor='0.6', fancybox=False)
+    leg.get_title().set_fontweight('bold')
+    leg.get_title().set_fontsize(FONTS['legend'] + 2)
+    for ext in ('png', 'pdf'):
+        fig.savefig(f'{out_stem}.{ext}', dpi=dpi)
+    plt.close(fig)
+    return out_stem
+
+
 def console_report(sets, band_campaign):
     print(f'band source (campaign): {band_campaign}')
     rank = sorted(_STUDY_STEPS,
@@ -1747,6 +1803,9 @@ def main(argv=None):
                     help='include panel B (final kinetic and process '
                          'parameters); omitted by default, in which case the '
                          'proteome-allocation panel is panel B')
+    ap.add_argument('--params-only', action='store_true',
+                    help='render ONLY the final-parameters panel (panel B of '
+                         'the three-panel variant) as a standalone figure')
     ap.add_argument('--out-dir', default=RESULTS_DIR)
     ap.add_argument('--stem', default=None)
     ap.add_argument('--dpi', type=int, default=300)
@@ -1788,7 +1847,7 @@ def main(argv=None):
     stamp = datetime.now().strftime('%Y.%m.%d-%H.%M')
     out_stem = os.path.join(args.out_dir, f'{stem}_{stamp}')
     plot(sets, band, out_stem, dpi=args.dpi,
-         include_parameters=args.panel_b)
+         include_parameters=args.panel_b, params_only=args.params_only)
     console_report(sets, band_campaign)
     print(f'wrote {out_stem}.png / .pdf')
     return out_stem
