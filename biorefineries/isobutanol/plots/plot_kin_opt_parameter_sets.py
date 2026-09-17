@@ -1046,16 +1046,18 @@ def outcome_cell(ax, sets, colors, col, title, ylim, xmax, point_size=9):
         ax.yaxis.set_major_formatter(
             PercentFormatter(xmax=1.0, decimals=0, symbol=''))
     ax.yaxis.set_minor_locator(AutoMinorLocator())
-    ax.tick_params(axis='y', which='major', direction='inout', right=False,
-                   length=4)
-    ax.tick_params(axis='y', which='minor', direction='inout', right=False,
-                   length=2.2)
-    ax.tick_params(axis='x', which='major', top=False, bottom=True,
-                   labelbottom=True, direction='inout', length=4)
-    ax.tick_params(axis='x', which='minor', top=False, bottom=True,
+    # ticks mirrored on all four sides (top/right mirror bottom/left); the
+    # value/trial labels stay on the left/bottom only.
+    ax.tick_params(axis='y', which='major', direction='inout',
+                   left=True, right=True, labelright=False, length=4)
+    ax.tick_params(axis='y', which='minor', direction='inout',
+                   left=True, right=True, length=2.2)
+    ax.tick_params(axis='x', which='major', top=True, bottom=True,
+                   labeltop=False, labelbottom=True, direction='inout', length=4)
+    ax.tick_params(axis='x', which='minor', top=True, bottom=True,
                    direction='inout', length=2.2)
     for sp in ('right', 'top'):
-        ax.spines[sp].set_visible(False)
+        ax.spines[sp].set_visible(True)
 
 
 def draw_outcomes(fig, gs_cell, sets, colors):
