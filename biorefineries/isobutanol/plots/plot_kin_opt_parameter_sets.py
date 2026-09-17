@@ -49,10 +49,11 @@ while a campaign is in flight. Run:
         --set "Best ethanol titer" <campaign> "best:EtOH titer" \
         --set "Best isobutanol titer" <campaign> "best:IBO titer"
 
-With no --set arguments it plots the "best" trial of each of the five most
-recent minimal-subset campaigns -- one per objective (IRR / ethanol titer /
-isobutanol titer / ethanol yield / isobutanol yield) -- against the
-baseline. Writes <stem>_<stamp>.png and .pdf to --out-dir.
+With no --set arguments it plots the "best" trial of the most recent
+metabolic_split_12d campaign (>= 2000 trials) for each of seven objectives --
+PI (log-tail, drawn on the IRR axis) / isobutanol yield / titer / productivity
+/ ethanol yield / titer / productivity -- against the baseline (see
+default_split_12d_specs). Writes <stem>_<stamp>.png and .pdf to --out-dir.
 """
 import os
 import argparse
@@ -71,16 +72,25 @@ from matplotlib.ticker import (AutoMinorLocator, FixedLocator, FuncFormatter,
 # --- sim-safe module loads (by file path; never import the package) ----------
 PKG_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 RESULTS_DIR = os.path.join(PKG_DIR, 'analyses', 'results')
-# The three most recent minimal-subset studies share one search space
-# (rb0.001-10_ib0.2-2_burden) and differ only in the optimized objective,
-# so each set is that study's own "best" trial (max of its objective).
-_MINIMAL_SUBSET_STUDY = ('kin_opt_ethanol_isobutanol_metabolic_minimal_subset'
-                         '_%s_rb0.001-10_ib0.2-2_burden')
-DEFAULT_STUDY = _MINIMAL_SUBSET_STUDY % 'irr'          # financial (IRR) optimum
-ETOH_TITER_STUDY = _MINIMAL_SUBSET_STUDY % 'etoh_titer'  # ethanol-titer optimum
-IBO_TITER_STUDY = _MINIMAL_SUBSET_STUDY % 'ibo_titer'    # isobutanol-titer optimum
-IBO_YIELD_STUDY = _MINIMAL_SUBSET_STUDY % 'ibo_yield'    # isobutanol-yield optimum
-ETOH_YIELD_STUDY = _MINIMAL_SUBSET_STUDY % 'etoh_yield'  # ethanol-yield optimum
+# The no-argument default plots seven metabolic_split_12d campaigns -- one per
+# objective below, in this order (which also fixes the HUE_COLORS assignment:
+# cyan financial, then the three isobutanol campaigns, then the three ethanol
+# campaigns). Each is the MOST RECENT metabolic_split_12d campaign for that
+# objective with at least DEFAULT_MIN_TRIALS logged trials (see
+# default_split_12d_specs). The financial set optimizes PI (log-tail) but is
+# drawn on the IRR axis (OUTCOME_OWN_OBJECTIVES), hence the "Financial
+# attractiveness" label.
+DEFAULT_STUDY_TYPE = 'metabolic_split_12d'
+DEFAULT_MIN_TRIALS = 2000
+DEFAULT_OBJECTIVES = [
+    ('Financial attractiveness', 'PI (log-tail)'),
+    ('Isobutanol yield', 'IBO yield'),
+    ('Isobutanol titer', 'IBO titer'),
+    ('Isobutanol productivity', 'IBO productivity'),
+    ('Ethanol yield', 'EtOH yield'),
+    ('Ethanol titer', 'EtOH titer'),
+    ('Ethanol productivity', 'EtOH productivity'),
+]
 
 
 def _load(name, filename):
@@ -1790,6 +1800,71 @@ def build_sets(set_specs, include_baseline):
     return sets, band, band_campaign
 
 
+# --- default campaign selection (no --set): most recent split_12d per objective
+# tokens that legitimately follow the objective slug in a study name (the method
+# tag or the first band/scenario tag), used to end the slug exactly so a shorter
+# slug does not match a longer one (e.g. 'ibo_yield' must not match the
+# 'ibo_yield_x_titer' campaign, whose token continues '..._x_titer_')
+_SLUG_TERMINATORS = ('gp', 'da', 'tpe', 'rb', 'sc', 'kb')
+
+
+def _campaign_trial_count(csv_path):
+    """Number of logged trials (data rows) in a trajectory CSV, counted
+    cheaply (one line per trial) without a full pandas parse."""
+    with open(csv_path, 'r', newline='') as f:
+        n = sum(1 for _ in f)
+    return max(n - 1, 0)   # minus the header row
+
+
+def _name_has_objective(stem, slug):
+    """True if study-name `stem` optimizes the objective whose slug is `slug`,
+    for the default study type. The slug sits between the study type and the
+    method/band tag, so require '<type>_<slug>_' followed by a known
+    terminator token -- exact, and immune to the campaign_objective parens
+    quirk ('PI (log-tail)' -> the 'pi_log-tail' token, not 'pi')."""
+    key = f'{DEFAULT_STUDY_TYPE}_{slug}_'
+    i = stem.find(key)
+    if i < 0:
+        return False
+    nxt = stem[i + len(key):].split('_', 1)[0]
+    return nxt in _SLUG_TERMINATORS
+
+
+def default_split_12d_specs(objectives=DEFAULT_OBJECTIVES,
+                            min_trials=DEFAULT_MIN_TRIALS,
+                            results_dir=RESULTS_DIR):
+    """(label, study_name, 'best') per (label, objective): the MOST RECENT
+    metabolic_split_12d campaign for that objective with at least `min_trials`
+    logged trials.
+
+    "Most recent" is by trajectory-CSV modification time. A bare study name
+    (not a path) is returned so campaign_axes_from_name / campaign_objective /
+    the band builder resolve it exactly as an explicit --set argument would.
+    Raises with a helpful message if any objective has no qualifying campaign."""
+    files = [fn for fn in os.listdir(results_dir)
+             if fn.endswith('_trajectory.csv') and DEFAULT_STUDY_TYPE in fn]
+    specs = []
+    for label, objective in objectives:
+        slug = ko.objective_slug(objective)
+        cands = []
+        for fn in files:
+            stem = fn[:-len('_trajectory.csv')]
+            if not _name_has_objective(stem, slug):
+                continue
+            path = os.path.join(results_dir, fn)
+            n = _campaign_trial_count(path)
+            if n >= min_trials:
+                cands.append((os.path.getmtime(path), n, stem))
+        if not cands:
+            raise FileNotFoundError(
+                f'no {DEFAULT_STUDY_TYPE} campaign for objective '
+                f'{objective!r} (slug {slug!r}) with >= {min_trials} trials '
+                f'in {results_dir}')
+        cands.sort()                       # by mtime, then trial count
+        specs.append((label, cands[-1][2], 'best'))
+    return specs
+
+
 def main(argv=None):
     ap = argparse.ArgumentParser(description='Kinetic-optimization '
                                  'parameter-set comparison figure.')
@@ -1822,13 +1897,11 @@ def main(argv=None):
 
     if args.sets:
         specs = [(lab, camp, norm_trial(tr)) for lab, camp, tr in args.sets]
-    else:  # default: each optimum from the study that optimized it -- the
-        # five most recent minimal-subset campaigns, one per objective
-        specs = [('Financial attractiveness', DEFAULT_STUDY, 'best'),
-                 ('Isobutanol titer', IBO_TITER_STUDY, 'best'),
-                 ('Ethanol titer', ETOH_TITER_STUDY, 'best'),
-                 ('Isobutanol yield', IBO_YIELD_STUDY, 'best'),
-                 ('Ethanol yield', ETOH_YIELD_STUDY, 'best')]
+    else:  # default: each optimum from the study that optimized it -- the most
+        # recent metabolic_split_12d campaign per objective with >= 2000 trials
+        # (financial / IBO yield / titer / productivity / EtOH yield / titer /
+        # productivity), each drawn as its own "best" trial
+        specs = default_split_12d_specs()
 
     if len(specs) + (0 if args.no_baseline else 1) > MAX_SETS:
         raise ValueError(f'at most {MAX_SETS} sets (baseline + '
