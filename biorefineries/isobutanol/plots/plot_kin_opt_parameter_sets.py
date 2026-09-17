@@ -132,6 +132,7 @@ REACTION_LABELS = {
     'k_14': 'k_14\nr14 KARI\n(Ilv5)',
     'k_15': 'k_15\nr15 DHAD\n(Ilv3)',
     'k_16': 'k_16\nr16 KDC\n(Aro10)',
+    'k_17': 'k_17\nr17 ADH\n(Adh6)',
 }
 GROUP_LABELS = {'inhib_ethanol': 'Ethanol\ninhibition',
                 'inhib_isobutanol': 'Isobutanol\ninhibition',
@@ -141,6 +142,11 @@ GROUP_LABELS = {'inhib_ethanol': 'Ethanol\ninhibition',
 # g·L^-1·h^-1 for all nine. Effector multipliers are dimensionless fold-changes
 # relative to the per-family baseline (1 = baseline).
 RATE_UNIT = 'g·L$^{-1}$·h$^{-1}$'
+# per-rate-cell ylabel override (else the cell uses _mathify(var)). Empty for the
+# minimal_subset layout; the split_12d layout gives ehrlich_downstream -- an
+# absolute-capacity bar standing for three rates -- a reaction-range symbol
+# instead of the mangled "$ehrlich_{downstream}$" _mathify would produce.
+RATE_CELL_LABEL = {}
 # feeding cell: (title, (shaded-range low, high)) -- engine default bounds
 # target_conc shares the threshold cell's 0-300 g/L axis (it is clipped at
 # TARGET_CONC_MAX = 300, and always sits at or above the threshold), so the two
@@ -149,13 +155,72 @@ FEED_LABELS = {'threshold_conc': ('Thresh. sugar\nconc. [g·L$^{-1}$]', (0, 300)
                'target_conc': ('Target sugar\nconc. [g·L$^{-1}$]', (0, 300)),
                'n_glu_spikes': ('No. of spikes', (0, 50))}
 
+# --- metabolic_split_12d layout (the 12-variable Ehrlich-split preset) --------
+# The three newest campaigns (pi_log-tail / ibo_titer / ibo_yield, 2026-09-16)
+# sample metabolic_split_12d: individual rates k_3, k_6, k_13, k_17; two
+# capacity GROUPS -- glycolysis (0.2-4x of the live k_1l/k_1h/k_1e) and
+# ehrlich_downstream (an ABSOLUTE g/L/h band on the anchor k_14, stoichiometric
+# weights -> k_14/k_15/k_16); three inhibition-effector multipliers; and
+# feeding. Panel B draws these decision variables LITERALLY -- a group cell is a
+# multiplier bar (baseline 1.0), ehrlich_downstream an absolute-capacity bar in
+# g/L/h. Panels A (outcomes) and C (proteome allocation) are preset-agnostic.
+# use_split_12d_layout() swaps the panel-B layout globals in place; the default
+# minimal_subset layout is otherwise untouched.
+SPLIT_12D_DECISION_VARS = ['k_3', 'k_6', 'k_13', 'k_17', 'glycolysis',
+                           'ehrlich_downstream', 'inhib_ethanol',
+                           'inhib_isobutanol', 'inhib_acetate',
+                           'threshold_conc', 'target_delta', 'max_n_spikes']
+# rate-kind cells: the four free rates + ehrlich_downstream (an absolute
+# capacity in g/L/h). group-kind cells: glycolysis + the three inhibition
+# multipliers (dimensionless fold-changes, baseline 1.0).
+SPLIT_12D_RATE_VARS = ['k_3', 'k_6', 'k_13', 'k_17', 'ehrlich_downstream']
+# glycolysis is a group cell too (kind='group', drawn in band 1 beside k_3/k_6),
+# so it joins the inhibition families in GROUP_VARS for the draw-kind dispatch;
+# the inhibition BAND lists only the three effector multipliers.
+SPLIT_12D_INHIB_GROUPS = ['inhib_ethanol', 'inhib_isobutanol', 'inhib_acetate']
+SPLIT_12D_GROUP_VARS = ['glycolysis'] + SPLIT_12D_INHIB_GROUPS
+# genuinely zero (branch off) at the scenario-A baseline -> suppress the "0"
+# baseline bar label (k_17's baseline is the nonzero antimony 44.0 g/L/h, and
+# k_3/k_6 are nonzero fermentation rates).
+SPLIT_12D_EHRLICH_RATE_VARS = ('k_13', 'ehrlich_downstream')
+SPLIT_12D_BANDS = [
+    ('Glycolysis capacity ($r_1$) + ethanol production ($r_3$, $r_6$)',
+     ['glycolysis', 'k_3', 'k_6']),
+    ('Isobutanol production (Ehrlich pathway, $r_{13}$; '
+     '$r_{14}$ → $r_{16}$; Adh6 $r_{17}$)',
+     ['k_13', 'ehrlich_downstream', 'k_17']),
+    ('Product inhibition relative to baseline '
+     '(applied to $r_1$, $r_4$, $r_6$, $r_7$, $r_{10}$, $r_{17}$)',
+     SPLIT_12D_INHIB_GROUPS),
+    ('Feeding strategy', FEED_DRAW_VARS),
+]
+
+
+def use_split_12d_layout():
+    """Reassign the panel-B layout globals to the metabolic_split_12d preset.
+    Idempotent; called once from main() when the plotted campaigns are 12d.
+    Panels A and C are preset-agnostic, so only the panel-B constants change."""
+    global DECISION_VARS, RATE_VARS, GROUP_VARS, EHRLICH_RATE_VARS, BANDS
+    DECISION_VARS = SPLIT_12D_DECISION_VARS
+    RATE_VARS = SPLIT_12D_RATE_VARS
+    GROUP_VARS = SPLIT_12D_GROUP_VARS
+    EHRLICH_RATE_VARS = SPLIT_12D_EHRLICH_RATE_VARS
+    BANDS = SPLIT_12D_BANDS
+    GROUP_LABELS['glycolysis'] = 'Glycolysis\ncapacity\n(× baseline)'
+    RATE_CELL_LABEL['ehrlich_downstream'] = r'$r_{14}$→$r_{16}$'
+    # the minimal_subset figure hard-capped IRR at 25 % (its incumbents topped
+    # out at 23.5 %); the 12d PI campaign reaches ~27 %, so let the IRR cell
+    # auto-scale (to 30 % at the 0.05 step) instead of clipping the line.
+    OUTCOME_TICK_CAP.pop('IRR', None)
+
 # the seven study steps -> enzyme name and charging parameter(s); read
 # against the eb tables so a table drift here raises at import
 STEP_ENZYME = {'r1': 'Glycolysis lump', 'r3': 'Pdc1', 'r6': 'Adh1',
                'r13': 'Ilv2+Ilv6', 'r14': 'Ilv5', 'r15': 'Ilv3',
-               'r16': 'Aro10'}   # Adh6 is the native step r17 since the 2026-09-15 split (not sampled by any campaign to date)
+               'r16': 'Aro10', 'r17': 'Adh6'}   # r17 (Adh6) is the native step of the 2026-09-15 split; sampled by metabolic_split_12d/14d campaigns
 STEP_PARAMS = {'r1': 'k_1l, k_1h, k_1e', 'r3': 'k_3', 'r6': 'k_6',
-               'r13': 'k_13', 'r14': 'k_14', 'r15': 'k_15', 'r16': 'k_16'}
+               'r13': 'k_13', 'r14': 'k_14', 'r15': 'k_15', 'r16': 'k_16',
+               'r17': 'k_17'}
 for _s in STEP_ENZYME:
     if _s not in eb.NATIVE_STEPS and _s not in eb.EHRLICH_STEPS:
         raise KeyError(f'STEP_ENZYME step {_s!r} not in eb tables')
@@ -250,8 +315,12 @@ def baseline_set():
 
     rec = {'label': 'Baseline (no optimization)', 'campaign': None,
            'trial_number': None, 'is_baseline': True, 'extra_sampled': []}
+    # rate-kind cells read their live scenario-A value; a rate absent from the
+    # workbook is 0 in the live A model (the Ehrlich rates k_13..k_16, and the
+    # split_12d ehrlich_downstream capacity, which is off at baseline). Group
+    # multipliers (inhibition families, and split_12d glycolysis) are 1.0.
     for k in RATE_VARS:
-        rec[k] = float(k_ref[k])
+        rec[k] = float(k_ref.get(k, 0.0))
     for g in GROUP_VARS:
         rec[g] = 1.0
     rec['threshold_conc'] = BASELINE_A['threshold_conc']
@@ -446,6 +515,7 @@ def load_set(label, campaign, trial):
 _DEFAULT_AXES = ('ethanol_isobutanol', 'metabolic_minimal_subset')
 _TARGET_PRODUCTS = ('ethanol_isobutanol', 'ethanol_only')
 _STUDY_TYPES = ('metabolic_minimal_subset', 'metabolic_minimal',
+                'metabolic_split_12d', 'metabolic_split_14d',
                 'metabolic_protein', 'metabolic')   # longest-first
 
 
@@ -463,10 +533,37 @@ def campaign_axes_from_name(campaign):
     return tp, ty
 
 
+def _split_12d_band(campaign):
+    """{var: (lo, hi)} searched band for the 12 metabolic_split_12d decision
+    variables. Cosmetic: bar_cell does not shade the band, so this is used only
+    for the cross-campaign equality check in build_sets. Built deterministically
+    from the preset so the three 12d campaigns share one band (no spurious
+    warning). The individual rates and the glycolysis multiplier take their
+    multiplier bands; ehrlich_downstream is the absolute anchor band."""
+    tp, ty = campaign_axes_from_name(campaign)
+    preset = ko.resolve_study_preset(tp, ty)
+    rb = tuple(preset['rate_multiplier_bounds'])
+    band = {v: rb for v in ('k_3', 'k_6', 'k_13', 'k_17')}
+    band['ehrlich_downstream'] = tuple(ko.IBO_PATHWAY_ZERO_A_RATE_BOUNDS)
+    gmb = preset['group_multiplier_bounds']
+    for g in ('glycolysis', 'inhib_ethanol', 'inhib_isobutanol',
+              'inhib_acetate'):
+        try:
+            band[g] = ko.group_bounds_for(g, gmb)
+        except Exception:
+            band[g] = (0.2, 4.0) if g == 'glycolysis' else (0.75, 1.5)
+    band['threshold_conc'] = (0.0, 300.0)
+    band['target_delta'] = (5.0, 500.0)
+    band['max_n_spikes'] = (0, 50)
+    return band
+
+
 def campaign_band(campaign):
-    """{var: (lo, hi)} searched band for the 15 decision vars, exactly as
+    """{var: (lo, hi)} searched band for the decision vars, exactly as
     the driver built it: ko.resolve_study_preset -> ko.build_search_space
     on the scenario-A baselines. Feeding vars from the engine defaults.
+    A metabolic_split_12d campaign takes the dedicated _split_12d_band (its
+    ehrlich_downstream referenced capacity group is built differently).
 
     ko.build_search_space returns (space, excluded_parameter_names), and
     it needs a `kinetic_baselines` dict that already carries a value for
@@ -498,6 +595,8 @@ def campaign_band(campaign):
     changes nothing for those -- the shared-baseline rate band is exact.
     """
     tp, ty = campaign_axes_from_name(campaign)
+    if ty == 'metabolic_split_12d':
+        return _split_12d_band(campaign)
     preset = ko.resolve_study_preset(tp, ty)
     kb_scenario = preset['kinetic_bounds_scenario']
     A = ko.workbook_kinetic_baselines('A')
@@ -923,7 +1022,7 @@ def draw_parameters(fig, gs_rows, sets, colors, band):
                 # above each cell -- keep only the rate symbol on the ylabel
                 # (mathtext: italic base, subscript numbers upright / letters
                 # italic)
-                sym = _mathify(p)
+                sym = RATE_CELL_LABEL.get(p) or _mathify(p)
                 bar_cell(ax, sets, colors, p, 'rate', f'{sym}\n[{RATE_UNIT}]',
                          band=band)
             elif p in GROUP_VARS:
@@ -950,12 +1049,13 @@ def draw_parameters(fig, gs_rows, sets, colors, band):
     return axes
 
 
-_STUDY_STEPS = ['r1', 'r3', 'r6', 'r13', 'r14', 'r15', 'r16']
-# never sampled by the campaigns plotted here; folded into "other". r17
-# (Adh6, k_17; nskinetics 2026-09-15 split) joins them until a
-# metabolic_split_14d campaign samples k_17 -- then move it to _STUDY_STEPS
-# and add it to STEP_ENZYME / STEP_PARAMS / REACTION_LABELS.
-_UNSAMPLED_STEPS = ['r2', 'r4', 'r5', 'r17']
+# r17 (Adh6, k_17; nskinetics 2026-09-15 split) is now a sampled step -- the
+# metabolic_split_12d/14d campaigns optimize k_17 -- so it carries an enzyme
+# label (STEP_ENZYME / STEP_PARAMS / REACTION_LABELS) and enters the console
+# pool ranking. A minimal_subset campaign simply leaves it at its baseline.
+_STUDY_STEPS = ['r1', 'r3', 'r6', 'r13', 'r14', 'r15', 'r16', 'r17']
+# never sampled by any campaign; folded into "other".
+_UNSAMPLED_STEPS = ['r2', 'r4', 'r5']
 
 if set(_STUDY_STEPS) | set(_UNSAMPLED_STEPS) != set(eb.STEP_ORDER):
     raise AssertionError(
@@ -1367,6 +1467,17 @@ def main(argv=None):
     if len(specs) + (0 if args.no_baseline else 1) > MAX_SETS:
         raise ValueError(f'at most {MAX_SETS} sets (baseline + '
                          f'{len(HUE_COLORS)} campaign sets)')
+
+    # panel-B layout follows the plotted preset. The figure is homogeneous
+    # (one decision-variable set per figure), so the first --set campaign
+    # selects it; the default no-arg path stays on the minimal_subset layout.
+    stems = [os.path.basename(c) for _, c, _ in specs]
+    if any('metabolic_split_12d' in st for st in stems):
+        if not all('metabolic_split_12d' in st for st in stems):
+            raise ValueError('mixing metabolic_split_12d and other presets in '
+                             'one figure is not supported (decision variables '
+                             'differ); plot them separately')
+        use_split_12d_layout()
 
     sets, band, band_campaign = build_sets(specs, not args.no_baseline)
     stem = args.stem or f'{os.path.basename(specs[0][1]).replace(".csv", "")}' \
