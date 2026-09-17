@@ -1372,9 +1372,15 @@ def draw_burden(fig, gs_cell, sets, colors):
         # equal scale, so one tick cadence matches physically across the break
         ax.xaxis.set_major_locator(MultipleLocator(0.05))
         ax.xaxis.set_minor_locator(AutoMinorLocator())
+        # box the panel on left/right/bottom (no top): the OUTER edges of the
+        # broken axis carry the left and right spines (axL's left, axR's right),
+        # while the inner edges stay open to read as the axis break. The y axis
+        # is categorical (rows keyed by colour), so left/right carry no ticks.
         ax.spines['top'].set_visible(False)
-        ax.spines['left'].set_visible(False)
-        ax.spines['right'].set_visible(False)
+    axL.spines['left'].set_visible(True)
+    axL.spines['right'].set_visible(False)
+    axR.spines['right'].set_visible(True)
+    axR.spines['left'].set_visible(False)
     axL.set_xlim(0, BREAK_L)
     axR.set_xlim(BREAK_R, xmax)
     # if a break edge happens to land on a 0.05 major tick, its label would sit
