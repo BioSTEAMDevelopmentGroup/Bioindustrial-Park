@@ -63,7 +63,7 @@ import numpy as np
 import matplotlib
 matplotlib.use('Agg')
 from matplotlib import pyplot as plt
-from matplotlib.lines import Line2D
+from matplotlib.lines import Line2D, TICKDOWN, TICKLEFT
 from matplotlib.ticker import (AutoMinorLocator, FixedLocator, FuncFormatter,
                                LogLocator, MultipleLocator, NullFormatter,
                                NullLocator, PercentFormatter)
@@ -1058,6 +1058,20 @@ def outcome_cell(ax, sets, colors, col, title, ylim, xmax, point_size=9):
                    direction='inout', length=2.2)
     for sp in ('right', 'top'):
         ax.spines[sp].set_visible(True)
+    # the mirrored top/right ticks point INWARD only (bottom/left stay in+out).
+    # matplotlib's tick `direction` is per-axis, so the secondary side (tick2:
+    # top for x, right for y) is retargeted to an inward marker whose reach
+    # (half the tick length) matches the inner half of the in+out ticks.
+    for ticks, half in ((ax.xaxis.get_major_ticks(), 2.0),
+                        (ax.xaxis.get_minor_ticks(), 1.1)):
+        for t in ticks:
+            t.tick2line.set_marker(TICKDOWN)
+            t.tick2line.set_markersize(half)
+    for ticks, half in ((ax.yaxis.get_major_ticks(), 2.0),
+                        (ax.yaxis.get_minor_ticks(), 1.1)):
+        for t in ticks:
+            t.tick2line.set_marker(TICKLEFT)
+            t.tick2line.set_markersize(half)
 
 
 def draw_outcomes(fig, gs_cell, sets, colors):
