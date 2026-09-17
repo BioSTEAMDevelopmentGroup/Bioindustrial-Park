@@ -1070,7 +1070,7 @@ def outcome_cell(ax, sets, colors, col, title, ylim, xmax, point_size=9):
     ax.set_ylim(lo, cap)
     ax.set_xlim(0, xmax * 1.02)
     if base is not None and np.isfinite(base):
-        ax.axhline(base, color=BASELINE_COLOR, lw=1.4, ls=(0, (2, 1.5)), zorder=1)
+        ax.axhline(base, color=BASELINE_COLOR, lw=1.4, ls=(0, (1.5, 1.2)), zorder=1)
     # individual trial cloud from the ONE campaign that optimized THIS metric:
     # every trial as a translucent dot in the campaign's own color, behind the
     # incumbent lines (zorder 1). Failed / unsolved trials (no finite value)
@@ -1091,7 +1091,7 @@ def outcome_cell(ax, sets, colors, col, title, ylim, xmax, point_size=9):
         own = _owns_outcome(s.get('objective'), col)
         ax.step(s['traj_x'], _yv(s['traj'][col]), where='post',
                 color=colors[id(s)], lw=3.15 if own else 1.4,
-                ls='-' if own else (0, (2, 1.5)),
+                ls='-' if own else (0, (1.5, 1.2)),
                 zorder=2 if own else 3)
     # metric name next to the value axis itself (not a title above the cell)
     ax.set_ylabel(title, fontsize=FONTS['cell'], labelpad=3)
