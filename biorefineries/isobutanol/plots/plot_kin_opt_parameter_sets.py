@@ -301,11 +301,17 @@ def baseline_set():
     for k in ('k_13', 'k_14', 'k_15', 'k_16'):
         k_ref.setdefault(k, 0.0)
     # r17 (Adh6) is a NATIVE constitutive step, not an Ehrlich one: it is
-    # present in scenario A at its live rate (k_17 = 44.0 g/L/h, as in the B
-    # workbook), so it does NOT default to 0. The A workbook has no k_17 row;
-    # its native pool is self-referential (multiplier k_17/reference == 1), so
-    # the pool equals the wild-type value for any nonzero k_17.
-    k_ref.setdefault('k_17', 44.0)
+    # present in scenario A at its live rate, so it does NOT default to 0. The
+    # A workbook has no k_17 row; the live scenario-A value is the antimony
+    # default, corrected 44 -> 0.1077 g/L/h on 2026-09-16 (CLAUDE.md k_17,ref
+    # note; confirmed live off r_te 2026-09-16, matching the enzyme-burden
+    # reference). Its native pool is self-referential (multiplier
+    # k_17/reference == 1), so pool_r17 equals the wild-type value for any
+    # nonzero k_17 -- panel C is unaffected; only the panel-B baseline k_17 bar
+    # reads this value. NB the split_12d/14d campaigns' k_17 SEARCH band anchors
+    # on the B workbook's still-baked 44.0, so a plotted campaign's k_17 may sit
+    # far above this corrected baseline. Re-pin if the antimony k_17 moves.
+    k_ref.setdefault('k_17', 0.1077)
     missing = [c for c in eb.BurdenModel.required_capacities()
                if c not in k_ref]
     if missing:
