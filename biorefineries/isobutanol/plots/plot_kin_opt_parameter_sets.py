@@ -1411,50 +1411,84 @@ def draw_burden(fig, gs_cell, sets, colors):
     return axR
 
 
-def plot(sets, band, out_stem, dpi=300):
+def plot(sets, band, out_stem, dpi=300, include_parameters=True):
     apply_fonts()
-    fig = plt.figure(figsize=(9.5, 12.4))
-    # Top-anchored vertical layout, figure fractions. Panel a and the wide
-    # a -> b gap (which carries panel b's letter/title and the first band
-    # title) are unchanged. Panel b's four band cells are ~40% shorter than
-    # before (cell height ~0.0335 vs ~0.0558), so the band block ends higher;
-    # the band -> band gaps stay ~0.05 (hspace 1.49 x the shorter cell) to keep
-    # room for the rate-band titles. Panel c keeps its height and rides up just
-    # below the bands, freeing space at the bottom of the canvas. Each region
-    # is its own gridspec so the three vertical positions are set directly.
     LEFT, RIGHT = 0.083, 0.97
-    a_gs = fig.add_gridspec(1, 1, left=LEFT, right=RIGHT, top=0.945, bottom=0.775)
-    band_gs = fig.add_gridspec(4, 1, left=LEFT, right=RIGHT, top=0.689,
-                               bottom=0.405, hspace=1.49)
-    # panel c is narrowed on the left (left=0.32 vs LEFT) to clear a column for
-    # its framed sector legend, which sits in that margin rather than above the
-    # bars (wide enough for the box + the longest label, clear of the 0.00 tick)
-    c_gs = fig.add_gridspec(1, 1, left=0.32, right=RIGHT, top=0.359, bottom=0.134)
-    colors = set_colors(sets)
-    a_axes = draw_outcomes(fig, a_gs[0], sets, colors)
-    b_axes = draw_parameters(fig, [band_gs[0], band_gs[1], band_gs[2],
-                                   band_gs[3]], sets, colors, band)
-    # light-grey backing behind the whole of panel b (band cells, their titles,
-    # the panel-b letter/title and the campaign legend), so the panel reads as
-    # one block set off from the white panels a and c. Drawn at zorder 0 so the
-    # cells, bars, text and legend all sit on top; the band cells share its
-    # colour (set in draw_parameters) so the fill is seamless across the gaps.
-    b_top = b_axes[0].get_position().y1
-    b_bot = b_axes[-1].get_position().y0
-    fig.add_artist(plt.Rectangle(
-        (0.02, b_bot - 0.030), 0.985 - 0.02, (b_top + 0.058) - (b_bot - 0.030),
-        transform=fig.transFigure, facecolor=PANEL_B_BG, edgecolor='none',
-        zorder=0))
-    axc = draw_burden(fig, c_gs[0], sets, colors)
-    # each panel gets a bold letter and a descriptive title on the same
-    # baseline; the panel title (13 pt) outranks the band sub-titles (12 pt).
-    # Panel b's letter is lifted into the panel-a -> b gap so its title clears
-    # the first band title below it.
-    panels = ((a_axes[0].get_position().y1 + 0.012, 'A',
-               'Optimization incumbent trajectories'),
-              (b_axes[0].get_position().y1 + 0.035, 'B',
-               'Final kinetic and process parameters'),
-              (axc.get_position().y1 + 0.005, 'C', 'Final proteome allocation'))
+    if include_parameters:
+        fig = plt.figure(figsize=(9.5, 12.4))
+        # Top-anchored vertical layout, figure fractions. Panel a and the wide
+        # a -> b gap (which carries panel b's letter/title and the first band
+        # title) are unchanged. Panel b's four band cells are ~40% shorter than
+        # before (cell height ~0.0335 vs ~0.0558), so the band block ends
+        # higher; the band -> band gaps stay ~0.05 (hspace 1.49 x the shorter
+        # cell) to keep room for the rate-band titles. Panel c keeps its height
+        # and rides up just below the bands, freeing space at the bottom of the
+        # canvas. Each region is its own gridspec so the three vertical
+        # positions are set directly.
+        a_gs = fig.add_gridspec(1, 1, left=LEFT, right=RIGHT,
+                                top=0.945, bottom=0.775)
+        band_gs = fig.add_gridspec(4, 1, left=LEFT, right=RIGHT, top=0.689,
+                                   bottom=0.405, hspace=1.49)
+        # panel c is narrowed on the left (left=0.32 vs LEFT) to clear a column
+        # for its framed sector legend, which sits in that margin rather than
+        # above the bars (wide enough for the box + the longest label, clear of
+        # the 0.00 tick)
+        c_gs = fig.add_gridspec(1, 1, left=0.32, right=RIGHT,
+                                top=0.359, bottom=0.134)
+        colors = set_colors(sets)
+        a_axes = draw_outcomes(fig, a_gs[0], sets, colors)
+        b_axes = draw_parameters(fig, [band_gs[0], band_gs[1], band_gs[2],
+                                       band_gs[3]], sets, colors, band)
+        # light-grey backing behind the whole of panel b (band cells, their
+        # titles, the panel-b letter/title and the campaign legend), so the
+        # panel reads as one block set off from the white panels a and c. Drawn
+        # at zorder 0 so the cells, bars, text and legend all sit on top; the
+        # band cells share its colour (set in draw_parameters) so the fill is
+        # seamless across the gaps.
+        b_top = b_axes[0].get_position().y1
+        b_bot = b_axes[-1].get_position().y0
+        fig.add_artist(plt.Rectangle(
+            (0.02, b_bot - 0.030), 0.985 - 0.02,
+            (b_top + 0.058) - (b_bot - 0.030),
+            transform=fig.transFigure, facecolor=PANEL_B_BG, edgecolor='none',
+            zorder=0))
+        axc = draw_burden(fig, c_gs[0], sets, colors)
+        # each panel gets a bold letter and a descriptive title on the same
+        # baseline; the panel title (13 pt) outranks the band sub-titles
+        # (12 pt). Panel b's letter is lifted into the panel-a -> b gap so its
+        # title clears the first band title below it.
+        panels = ((a_axes[0].get_position().y1 + 0.012, 'A',
+                   'Optimization incumbent trajectories'),
+                  (b_axes[0].get_position().y1 + 0.035, 'B',
+                   'Final kinetic and process parameters'),
+                  (axc.get_position().y1 + 0.005, 'C',
+                   'Final proteome allocation'))
+        # the campaign legend sits in the empty right columns of panel b's lower
+        # bands and doubles as the row key for panel c (whose categorical y axis
+        # is unlabelled).
+        legend_loc, legend_anchor, legend_ncol = 'center left', (0.635, 0.450), 1
+    else:
+        # two-panel variant (panel B omitted): panel A on top, the proteome-
+        # allocation panel below it -- relettered B. A shorter canvas keeps both
+        # panels at ~their three-panel absolute heights; the freed middle band
+        # becomes the a -> b gap that carries panel b's letter/title and the
+        # campaign legend.
+        fig = plt.figure(figsize=(9.5, 8.8))
+        a_gs = fig.add_gridspec(1, 1, left=LEFT, right=RIGHT,
+                                top=0.925, bottom=0.685)
+        c_gs = fig.add_gridspec(1, 1, left=0.32, right=RIGHT,
+                                top=0.515, bottom=0.195)
+        colors = set_colors(sets)
+        a_axes = draw_outcomes(fig, a_gs[0], sets, colors)
+        axc = draw_burden(fig, c_gs[0], sets, colors)
+        panels = ((a_axes[0].get_position().y1 + 0.012, 'A',
+                   'Optimization incumbent trajectories'),
+                  (axc.get_position().y1 + 0.005, 'B',
+                   'Final proteome allocation'))
+        # the campaign legend is a compact two-column block centred in the
+        # a -> b gap (a single vertical column is too tall and clips panel a's
+        # lower cells), doubling as the row key for the proteome panel below.
+        legend_loc, legend_anchor, legend_ncol = 'center', (0.545, 0.600), 2
     for y, letter, title in panels:
         fig.text(0.03, y, letter, fontsize=FONTS['panel'], fontweight='bold',
                  va='baseline')
@@ -1462,12 +1496,8 @@ def plot(sets, band, out_stem, dpi=300):
                  fontweight='bold', va='baseline')
     handles = [plt.Rectangle((0, 0), 1, 1, fc=colors[id(s)], label=s['label'])
                for s in sets]
-    # the legend sits in the empty right columns of panel b's lower bands and
-    # doubles as the row key for panel c (whose categorical y axis is
-    # unlabelled). Raised above panel c -- which now rides higher after the
-    # bands were shortened -- so the two no longer overlap.
-    leg = fig.legend(handles=handles, loc='center left',
-                     bbox_to_anchor=(0.635, 0.450), ncol=1, frameon=True,
+    leg = fig.legend(handles=handles, loc=legend_loc,
+                     bbox_to_anchor=legend_anchor, ncol=legend_ncol, frameon=True,
                      fontsize=FONTS['legend'] + 1, title='Optimization campaign',
                      labelspacing=0.5, handlelength=1.7, handleheight=1.1,
                      borderpad=0.6, edgecolor='0.6', fancybox=False)
@@ -1524,6 +1554,9 @@ def main(argv=None):
                          'baseline. TRIAL is an int, "best", or "best:COL".')
     ap.add_argument('--no-baseline', action='store_true',
                     help='drop the scenario-A baseline row')
+    ap.add_argument('--no-panel-b', action='store_true',
+                    help='omit panel B (final kinetic and process parameters); '
+                         'the proteome-allocation panel then becomes panel B')
     ap.add_argument('--out-dir', default=RESULTS_DIR)
     ap.add_argument('--stem', default=None)
     ap.add_argument('--dpi', type=int, default=300)
@@ -1564,7 +1597,8 @@ def main(argv=None):
                         '_parameter_sets'
     stamp = datetime.now().strftime('%Y.%m.%d-%H.%M')
     out_stem = os.path.join(args.out_dir, f'{stem}_{stamp}')
-    plot(sets, band, out_stem, dpi=args.dpi)
+    plot(sets, band, out_stem, dpi=args.dpi,
+         include_parameters=not args.no_panel_b)
     console_report(sets, band_campaign)
     print(f'wrote {out_stem}.png / .pdf')
     return out_stem
