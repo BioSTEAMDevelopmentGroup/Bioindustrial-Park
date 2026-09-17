@@ -1577,7 +1577,7 @@ def plot(sets, band, out_stem, dpi=300, include_parameters=True):
         # (12 pt). Panel b's letter is lifted into the panel-a -> b gap so its
         # title clears the first band title below it.
         panels = ((a_axes[0].get_position().y1 + 0.012, 'A',
-                   'Optimization incumbent trajectories'),
+                   'Optimization trajectories'),
                   (b_axes[0].get_position().y1 + 0.035, 'B',
                    'Final kinetic and process parameters'),
                   (axc.get_position().y1 + 0.005, 'C',
@@ -1615,7 +1615,7 @@ def plot(sets, band, out_stem, dpi=300, include_parameters=True):
         a_axes = draw_outcomes(fig, a_gs[0], sets, colors)
         axc = draw_burden(fig, c_gs[0], sets, colors)
         panels = ((a_axes[0].get_position().y1 + 0.012, 'A',
-                   'Optimization incumbent trajectories'),
+                   'Optimization trajectories'),
                   (axc.get_position().y1 + 0.005, 'B',
                    'Final proteome allocation'))
         # the campaign legend sits in the a -> b gap, doubling as the row key for
