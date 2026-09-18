@@ -55,6 +55,10 @@ price:
     baseline: 0.35
     note: "fermentation medium, pH base"
     source: "no literature source cited in legacy scripts"
+  enzyme:
+    baseline: 6.16
+    note: "hydrolysis enzyme cocktail (cellulase + alginate lyase) dosed in EnzymaticPress, sabre/units/_preprocessing.py; same value biorefineries.HP uses for its own 'Enzyme' price, applied here to the whole blended cocktail since no separate published price exists for alginate lyase."
+    source: "$6.16/kg protein in 2016$, P25 of Davis et al. (2018), NREL/TP-5100-71949."
 
   # Waste streams, negative price to indicate as a cost
   disposal_solid:
