@@ -335,7 +335,7 @@ def _draw_ribbon(fig, gs, sets, cols, helpers):
                 continue
             ax.bar(j, v, width=0.7, color=cols[id(s)], zorder=2)
             if s.get('objective') in ('PI', 'PI (log-tail)'):
-                ax.text(j, v, '★', ha='center', va='bottom',
+                ax.text(j, v, '$\\bigstar$', ha='center', va='bottom',
                         fontsize=helpers['FONTS']['cell'], color='0.1')
         ax.set_ylim(0, vmax)
         ax.set_title(helpers['_bold_axis_title'](title),
@@ -369,7 +369,7 @@ def plot_pathway_lever_map(sets, colors, out_stem, *, ko, eb, helpers, dpi=300):
              ha='left', va='center', fontsize=helpers['FONTS']['panel'],
              fontweight='bold')
     handles = [Rectangle((0, 0), 1, 1, fc=colors[id(s)],
-                         label=s['label'] + (' ★'
+                         label=s['label'] + (' $\\bigstar$'
                          if s.get('objective') in ('PI', 'PI (log-tail)')
                          else '')) for s in sets]
     axT.legend(handles=handles, loc='lower left', ncol=len(sets), frameon=False,
