@@ -33,7 +33,26 @@ def _structural_solid(ID: str, formula: str, Hf_cal: float,
     return chemical
 
 
-def create_chemicals(set_thermo: bool = True):
+def create_chemicals(set_thermo: bool = True, include_hp3: bool = False):
+    """
+    Parameters
+    ----------
+    include_hp3 : bool
+        If True, also construct and include the chemicals used only by
+        the EnzymaticPress/3-HP-from-Sargassum pathway (Glucose,
+        AlginateMonomer, Enzyme, ...). False by default so every existing
+        system (biostimulant, Biomethane, VFA, Microbial oil)
+        keeps exactly the chemical roster -- and therefore the exact
+        floating-point behavior -- it always has. Adding chemicals to a
+        shared Chemicals object changes NumPy's pairwise-summation array
+        length for every mixture-property calculation package-wide, which
+        can nudge iterative solvers (recycle convergence, MSP root-finding)
+        by a small but nonzero amount even for chemicals with zero flow in
+        a given system -- confirmed by testing that this is insensitive to
+        *where* in the chemical list the new species are inserted. Keeping
+        the 3-HP-only chemicals out of the default roster avoids that
+        drift for every pathway that doesn't need them.
+    """
     Water = bst.Chemical("Water")
 
     # Sargassum components
@@ -75,6 +94,51 @@ def create_chemicals(set_thermo: bool = True):
     # generically Glucan-like (same MW/Cn/V/Hf), consistent with how
     # Mannan/Galactan already borrow Glucan's properties above.
     OtherSolids = Glucan.copy("OtherSolids")
+
+    # EnzymaticPress/3-HP-only chemicals (sabre/units/_preprocessing.py).
+    # Gated behind include_hp3 -- see create_chemicals()'s docstring for
+    # why these aren't unconditionally in the default roster.
+    hp3_chemicals = []
+    if include_hp3:
+        # Real database chemical -- soluble hydrolysis product of Glucan
+        # (Glucan + Water -> Glucose is atom-balanced against Glucan's
+        # C6H10O5 formula above).
+        Glucose = bst.Chemical("Glucose")
+
+        # Free monomer form of Alginate (mannuronic/guluronic acid, hydrated:
+        # Alginate's C6H8O6 repeat unit + H2O -> C6H10O7), formed by
+        # enzymatic hydrolysis in EnzymaticPress. No literature Hf found
+        # for the free monomer either, so Hf/Cp borrow the same generic
+        # structural-carbohydrate basis already used for Alginate above.
+        # Unlike Alginate, this is modeled as phase="l" (dissolved, not
+        # solid-locked) since it must follow the "solubles" split path
+        # once hydrolyzed, not the "solids" path -- see
+        # utils.get_solids_group_IDs(). Liquid density is a rough
+        # concentrated-sugar-acid-solution proxy (1200 kg/m3, vs. Glucan's
+        # solid-phase 1540 kg/m3), and viscosity borrows Water's model for
+        # the same NEGLECT_P-workaround reason as the nutrient salts below.
+        AlginateMonomer = bst.Chemical("AlginateMonomer", search_db=False, default=True,
+                                        phase="l", formula="C6H10O7", Hf=-233200 * _cal2joule)
+        AlginateMonomer.Cn.add_model(_Cp_structural * AlginateMonomer.MW, top_priority=True)
+        AlginateMonomer.V.add_model(tmo.functional.rho_to_V(1200, AlginateMonomer.MW), top_priority=True)
+        AlginateMonomer.copy_models_from(Water, ["mu"])
+
+        # Generic-protein proxy for the hydrolysis enzyme cocktail (cellulase +
+        # alginate lyase, dosed in EnzymaticPress) -- same formula/Hf
+        # convention biorefineries.cellulosic uses for its own 'Enzyme'
+        # chemical (CH1.59O0.42N0.24S0.01, Hf shared with Protein-like
+        # chemicals), also standing in for alginate lyase since no separate
+        # property data exists for it. Modeled as phase="l" (dosed as a dilute
+        # aqueous enzyme prep, not solid-locked), with Water-like density/
+        # viscosity as a dilute-solute proxy (same technique used for
+        # KH2PO4/MagnesiumSulfate below).
+        Enzyme = bst.Chemical("Enzyme", search_db=False, default=True, phase="l",
+                               formula="CH1.59O0.42N0.24S0.01", Hf=-17618 * _cal2joule)
+        Enzyme.Cn.add_model(1.25 * Enzyme.MW, top_priority=True)
+        Enzyme.V.add_model(tmo.functional.rho_to_V(1000, Enzyme.MW), top_priority=True)
+        Enzyme.copy_models_from(Water, ["mu"])
+
+        hp3_chemicals = [Glucose, AlginateMonomer, Enzyme]
 
     # Gases
     CH4 = bst.Chemical("Methane", phase="g")
@@ -149,6 +213,7 @@ def create_chemicals(set_thermo: bool = True):
         AceticAcid, PropionicAcid, ButyricAcid, ValericAcid, HexanoicAcid,
         MicrobialOil, CellMass,
         Ammonia, KH2PO4, NaOH, MagnesiumSulfate,
+        *hp3_chemicals,
     ])
     chems.compile()
 
