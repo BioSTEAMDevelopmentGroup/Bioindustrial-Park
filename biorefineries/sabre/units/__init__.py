@@ -31,18 +31,16 @@
 from . import _ad
 from . import _preprocessing
 from . import _biostimulant
-from . import _fermentation
 from . import _vfa
 from . import _microbial_oil
 
 from ._ad import *
 from ._preprocessing import *
 from ._biostimulant import *
-from ._fermentation import *
 from ._vfa import *
 from ._microbial_oil import *
 
 __all__ = (
     *_ad.__all__, *_preprocessing.__all__, *_biostimulant.__all__,
-    *_fermentation.__all__, *_vfa.__all__, *_microbial_oil.__all__,
+    *_vfa.__all__, *_microbial_oil.__all__,
 )
