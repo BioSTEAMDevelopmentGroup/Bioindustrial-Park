@@ -4,6 +4,74 @@
 # docs/superpowers/specs/2026-09-18-sabre-3hp-sargassum-design.md (secs. 7-8)
 # for the design this file backs.
 
+pressate_concentrator:
+  # Retargets sabre.units.PressateConcentrator (the same class
+  # biostimulant.yaml's own instance uses) at the EnzymaticPress pressate's
+  # fermentable sugars (Glucose, Mannitol, AlginateMonomer) instead of
+  # biostimulant's solute set -- a separate instance/yaml section per the
+  # design spec (sec. 6), not a shared one, since the two pathways retain
+  # different solutes.
+  enabled: true
+  retained_solute_IDs: [Glucose, Mannitol, AlginateMonomer]
+  water_recovery_to_permeate: 0.93  # same basis as biostimulant.yaml's own instance
+  retained_solute_recovery_to_concentrate: 0.95  # same basis as biostimulant.yaml's own instance
+  nontarget_solute_recovery_to_permeate: 0.70  # no reference; same placeholder as biostimulant.yaml
+  design_flux_L_m2_h: 35.0  # same basis as biostimulant.yaml's own instance
+  operating_pressure_bar: 5.0
+  electricity_kWh_per_m3_feed: 2.5
+  capex_usd_per_m2: 500.0
+  maintenance_frac_of_capex_per_yr: 0.035
+  F_BM: 1.0  # capex already installed
+
+  sources:
+    reused_from_biostimulant:
+      key: same_membrane_physics
+      note: "Flux/electricity/capex/maintenance bases are the same UF membrane literature already cited in data/biostimulant.yaml's pressate_concentrator section (Sievers et al. 2017, Diaz-Reinoso and Dominguez 2020, Sethi and Wiesner 2000, Nguyen and Yoshikawa 2020, Cheryan 1998) -- not re-derived here, since this is the same physical membrane-concentration operation applied to a different solute set."
+
+
+fermentation_feed_evaporator:
+  # Retargets sabre.units.BiostimulantEvaporator (same class, different
+  # yaml section) to hit the ~20 wt% dissolved-solids concentration this
+  # design spec (sec. 6) calls for as the fermentation medium target --
+  # analogous to biorefineries.HP's EnzymeHydrolysateMixer.solid_loading =
+  # 0.20.
+  target_solids_wt_frac: 0.20
+  boiling_temperature_K: 333.15  # mild vacuum evaporation ~60 C; same basis as biostimulant.yaml
+  condensing_temperature_K: 310.15  # ~37 C; same basis as biostimulant.yaml
+  nonwater_recovery_to_product: 1.0  # not 0.995 like biostimulant.yaml's own instance -- see sources.nonwater_recovery below
+  tau: 0.25  # hr; nominal vessel holdup time; no literature/prior-yaml grounding
+  vacuum_system_preference: "Liquid-ring pump"
+
+  sources:
+    target_concentration:
+      key: HP_precedent
+      note: "biorefineries.HP.units.EnzymeHydrolysateMixer targets solid_loading=0.20 for its own pre-fermentation hydrolysate; reused here as the 'concentration match' requested for this pathway's fermentation feed."
+    nonwater_recovery:
+      key: bugfix
+      note: "1.0 (not biostimulant.yaml's 0.995) so raw_vapor carries pure Water only. At 0.995, trace escaped solids (Ash/Protein/Glucan/Alginate/Fucoidan, which slip past EnzymaticPress's solids_capture_frac into the pressate) or Enzyme end up with nonzero flow in the vapor-phase raw_vapor stream, and thermosteam's Gas_Enthalpy_Ref_Solid fallback crashes (TypeError: unsupported operand types for +: float and NoneType) trying to compute their gas-phase enthalpy, since none of those chemicals were ever given a Hvap/gas-phase Cn model (they're not expected to vaporize). This path was never exercised in data/biostimulant.yaml's own instance, since that instance's target_solids_wt_frac is null (the unit is a bypass there) -- confirmed by direct testing. 1.0 is also the physically correct choice regardless: none of these dissolved solutes should meaningfully volatilize under vacuum evaporation."
+
+
+broth_evaporator:
+  # bst.units.MultiEffectEvaporator instantiation (F401 in the design
+  # spec), concentrating the cell-mass-free fermentation broth to the
+  # patent's crystallization threshold before CaHPCrystallizer -- not a
+  # new unit class, just the target concentration and effect pressures for
+  # whoever wires the system script (mirrors
+  # systems._microbial_oil_system._create_vfa_fermentation_system's own
+  # Ev607 bisection-on-V pattern for hitting a target concentration).
+  target_product_concentration_g_per_L: 450.0  # midpoint of the patent's 300-600 g/L crystallization threshold
+  P_Pa: [101325, 69682, 47057, 30953]  # same 4-effect pressure profile as systems._microbial_oil_system's Ev607
+  V: 0.90  # initial guess; overridden by the bisection specification at simulation time
+
+  sources:
+    target_concentration:
+      key: user_specified_patent
+      note: "Patent reports 300-600 g/L as the crystallization-feed 3-HP(salt) concentration range; 450 g/L (midpoint) selected as the target."
+    effect_pressures:
+      key: microbial_oil_precedent
+      note: "Reuses the same 4-effect pressure profile as systems._microbial_oil_system's Ev607, which has no independent literature grounding of its own either -- kept only for consistency of MultiEffectEvaporator staging across sabre systems."
+
+
 fermentation:
   product_ID: HP
   cellmass_ID: CellMass
@@ -116,11 +184,32 @@ crystallization:
       note: "tau and V are current scoping assumptions for process modeling and should be sensitivity-tested; no literature source for full-scale batch crystallizer sizing on this system."
 
 
+cell_mass_centrifuge:
+  # bst.units.SolidsCentrifuge instantiation (S401 in the design spec):
+  # separates CellMass (formed as a small side product in HPFermentation)
+  # from the clarified broth, before the broth_evaporator/CaHPCrystallizer
+  # chain -- not a new unit class.
+  cellmass_split_to_cake: 0.98  # fraction of CellMass captured to the solids-rich outlet; same basis as EnzymaticPress/Press's own solids_capture_frac
+  moisture_content: 0.65  # scoping placeholder for a wet cell-mass cake; no source found for this value
+
+  sources:
+    moisture_content:
+      key: scoping_placeholder
+      note: "No literature source found for this feedstock/organism combination; 0.65 selected as a plausible wet-cake moisture content, consistent with typical centrifuge cell-mass cakes (~60-80 wt% moisture)."
+
+
 crystal_separator:
   # Downstream bst.units.SolidsCentrifuge instantiation (S402 in the
   # design spec), same class already used for the cell-mass centrifuge
   # (S401) -- not a new unit class, just documented dosing/split targets
-  # for whoever wires the system script.
+  # for whoever wires the system script. The split fraction here (not the
+  # feed stream's own phase tags -- confirmed by direct testing that
+  # bst.units.SolidsCentrifuge collapses a multi-phase feed's per-chemical
+  # mol across phases before splitting, ignoring which phase it already
+  # arrived in) is what actually enforces crystallization.target_recovery
+  # downstream of CaHPCrystallizer; the crystallizer's own phase split is
+  # for internal reporting only (design_results), not a physical
+  # separation the centrifuge inherits automatically.
   moisture_content: 0.05  # crystal-cake moisture leaving the centrifuge
 
   sources:

@@ -169,10 +169,17 @@ def create_chemicals(set_thermo: bool = True, include_hp3: bool = False):
         # Hf(Ca3HP2) = 2*Hf(HP) + Hf(Ca(OH)2) - 2*Hf(Water). The database
         # entry also has no solid-phase molar volume model, so density
         # borrows the same generic structural-solid proxy (_rho_solids)
-        # used for Glucan/Alginate/etc. above.
+        # used for Glucan/Alginate/etc. above. Its database liquid-
+        # viscosity correlation ('NEGLECT_P') is invalid outside
+        # atmospheric pressure (confirmed by testing: a downstream Pump
+        # operating this stream under vacuum raised a RuntimeError even
+        # though this chemical is locked to phase="s") -- same NEGLECT_P
+        # issue this file already works around for KH2PO4/MagnesiumSulfate/
+        # NaOH/CalciumDihydroxide above, fixed the same way.
         Ca3HP2 = bst.Chemical("Ca3HP2", search_ID="Calcium lactate", phase="s")
         Ca3HP2.Hf = 2 * HP.Hf + CalciumDihydroxide.Hf - 2 * Water.Hf
         Ca3HP2.V.add_model(tmo.functional.rho_to_V(_rho_solids, Ca3HP2.MW), top_priority=True)
+        Ca3HP2.copy_models_from(Water, ["mu"])
 
         hp3_chemicals = [Glucose, AlginateMonomer, Enzyme, HP, CalciumDihydroxide, Ca3HP2]
 

@@ -218,18 +218,29 @@ class HPFermentation(BatchBioreactor):
 
 class CaHPCrystallizer(bst.BatchCrystallizer):
     """
-    Batch crystallizer for calcium 3-hydroxypropionate (Ca3HP2), splitting
-    a fixed recovery fraction of the dissolved product to the solid phase
-    of a single two-phase outlet stream, following the structural pattern
-    of biorefineries.succinic's SuccinicAcidCrystallizer /
-    biorefineries.TAL's TALCrystallizer (single 2-phase outlet, phase split
-    computed in `_run`), but using a constant `target_recovery` rather than
-    a temperature-solubility correlation: the patent reports fixed
-    recovery/purity at specified conditions (room temperature, ~300 rpm
-    stirring), not a solubility-vs-temperature curve, so a fixed-recovery
-    split is the fidelity level the design spec (sec. 8) calls for.
-    Inherits `bst.BatchCrystallizer`'s batch-vessel sizing/costing
-    unchanged.
+    Batch crystallizer for calcium 3-hydroxypropionate (Ca3HP2), following
+    the structural pattern of biorefineries.succinic's
+    SuccinicAcidCrystallizer / biorefineries.TAL's TALCrystallizer (a
+    single downstream `bst.units.SolidsCentrifuge` does the actual
+    solid/liquid mechanical separation), but using a constant
+    `target_recovery` rather than a temperature-solubility correlation:
+    the patent reports fixed recovery/purity at specified conditions (room
+    temperature, ~300 rpm stirring), not a solubility-vs-temperature
+    curve, so a fixed-recovery split is the fidelity level the design spec
+    (sec. 8) calls for. Inherits `bst.BatchCrystallizer`'s batch-vessel
+    sizing/costing unchanged.
+
+    Unlike those two references, this unit's outlet is NOT tagged as a
+    genuine 2-phase ('l', 's') MultiStream -- confirmed by direct testing
+    that doing so propagates badly through the downstream
+    `bst.units.SolidsCentrifuge` -> `bst.units.DrumDryer` chain (the
+    dryer's own internal 'g'-phase auxiliary streams raise
+    `UndefinedPhase` when fed a MultiStream upstream of them). The actual
+    separation is enforced entirely by the downstream centrifuge's own
+    `split` fraction (set to this unit's `target_recovery` by whoever
+    wires the system script -- see data/3hp.yaml `crystal_separator`'s
+    comment); `target_recovery` here only determines what this unit
+    reports in `design_results`.
 
     Parameters
     ----------
@@ -237,14 +248,13 @@ class CaHPCrystallizer(bst.BatchCrystallizer):
         Concentrated broth (product dissolved, from the upstream
         evaporator).
     outs : stream
-        Two-phase effluent: solid-phase crystal + liquid-phase mother
-        liquor. Separated into two streams downstream by a
-        `bst.units.SolidsCentrifuge` (not part of this unit).
+        Effluent (same composition as the feed; the split downstream is
+        not yet applied here -- see Notes above).
     product_ID : str
         Chemical ID of the crystallized product (Ca3HP2).
     target_recovery : float
         Fixed fraction of dissolved product mass recovered to the solid
-        phase.
+        phase, reported in `design_results` only (see Notes above).
     **kwargs
         Forwarded to `bst.BatchCrystallizer.__init__`.
 
@@ -275,19 +285,24 @@ class CaHPCrystallizer(bst.BatchCrystallizer):
         feed, = self.ins
         effluent, = self.outs
 
+        # Kept as a single-phase stream rather than a genuine 2-phase
+        # ('l', 's') MultiStream (unlike succinic/TAL's crystallizers,
+        # which this unit otherwise mirrors structurally): confirmed by
+        # direct testing that a 2-phase MultiStream leaving this unit
+        # propagates badly through the downstream
+        # bst.units.SolidsCentrifuge -> bst.units.DrumDryer chain (the
+        # dryer's own internal 'g'-phase auxiliary streams raise
+        # UndefinedPhase when fed a MultiStream upstream of them). The
+        # actual solid/liquid separation is enforced downstream by
+        # crystal_separator's own `split` fraction (see data/3hp.yaml
+        # crystal_separator's comment), not by phase tags on this stream,
+        # so nothing physical is lost by not tagging phases here --
+        # target_recovery is still reported below for documentation.
         effluent.copy_like(feed)
-        effluent.phases = ("l", "s")
+        effluent.T = self.T
 
         product_mol = float(feed.imol[self.product_ID])
         solid_mol = self.target_recovery * product_mol
-        liquid_mol = product_mol - solid_mol
-
-        effluent["l"].mol = feed.mol.copy()
-        effluent["l"].imol[self.product_ID] = liquid_mol
-        effluent["s"].empty()
-        effluent["s"].imol[self.product_ID] = solid_mol
-
-        effluent.T = self.T
 
         self.design_results["Product recovered to solids (kg/h)"] = (
             solid_mol * feed.chemicals[self.product_ID].MW
