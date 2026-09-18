@@ -23,13 +23,13 @@ from biorefineries.sabre.units import (
 from biorefineries.sabre.systems._biostimulant_system import create_biostimulant_system, BIOSTIMULANT_UNIT_IDS
 from biorefineries.sabre._tea import create_tea
 
-__all__ = ('create_ad_vfa_system', 'price_ad_vfa_system')
+__all__ = ('create_vfa_system', 'price_vfa_system')
 
-_VFA_PRODUCT_SPLITTER = load_assumptions("downstream_processing.yaml")["vfa_product_splitter"]
+_VFA_PRODUCT_SPLITTER = load_assumptions("vfa.yaml")["vfa_product_splitter"]
 _TEA_PRICE = load_assumptions("tea.yaml")["price"]
 
 
-def create_ad_vfa_system(
+def create_vfa_system(
     feedstock: str | bst.Stream = "pelagic",
     add_product_splitter: bool = True,
     biostimulant_price: float | None = None,
@@ -54,7 +54,7 @@ def create_ad_vfa_system(
         product stream, sending the remainder (unrecovered VFA + everything
         else) to a `vfa_disposal` stream. Set to False when this system is
         built as a component of a larger system (e.g.
-        systems._ad_fermentation_system, which needs the raw, unsplit
+        systems._microbial_oil_system, which needs the raw, unsplit
         `vfa_broth` as its own feed) so that system is unaffected.
     biostimulant_price : float, optional
         Forwarded to create_biostimulant_system() -- only used when
@@ -112,13 +112,13 @@ def create_ad_vfa_system(
     HXN = bst.HeatExchangerNetwork("HXN", units=tuple(path))
     path.append(HXN)
 
-    sys = bst.System("ad_vfa_sys", path=tuple(path))
+    sys = bst.System("vfa_sys", path=tuple(path))
     create_tea(sys)
 
     return sys
 
 
-def price_ad_vfa_system(credit_tipping_fee: bool = False) -> dict:
+def price_vfa_system(credit_tipping_fee: bool = False) -> dict:
     """
     Parameters
     ----------
@@ -153,7 +153,7 @@ def price_ad_vfa_system(credit_tipping_fee: bool = False) -> dict:
         biostimulant_price = _TEA_PRICE["biostimulant"]["baseline"]
 
         bst.main_flowsheet.clear()
-        sys = create_ad_vfa_system(feedstock="pelagic", biostimulant_price=biostimulant_price)
+        sys = create_vfa_system(feedstock="pelagic", biostimulant_price=biostimulant_price)
         sys.simulate()
 
         product = sys.flowsheet.stream.pure_vfa
@@ -167,7 +167,7 @@ def price_ad_vfa_system(credit_tipping_fee: bool = False) -> dict:
         biostimulant_price = price_biostimulant_system()["msp_usd_per_kg"]
 
         bst.main_flowsheet.clear()
-        sys = create_ad_vfa_system(feedstock="pelagic", biostimulant_price=biostimulant_price)
+        sys = create_vfa_system(feedstock="pelagic", biostimulant_price=biostimulant_price)
         sys.simulate()
 
         # AD-only TEA scope: same simulated units, minus the embedded
@@ -177,7 +177,7 @@ def price_ad_vfa_system(credit_tipping_fee: bool = False) -> dict:
         # PressateConcentrator/Evaporator, which biostimulant's own price
         # already covers in its own standalone system.
         ad_specific_units = [u for u in sys.units if u.ID not in BIOSTIMULANT_UNIT_IDS]
-        ad_specific_sys = bst.System.from_units("ad_vfa_specific_sys", units=ad_specific_units)
+        ad_specific_sys = bst.System.from_units("vfa_specific_sys", units=ad_specific_units)
         ad_specific_tea = create_tea(ad_specific_sys)
 
         product = sys.flowsheet.stream.pure_vfa
@@ -189,7 +189,7 @@ def price_ad_vfa_system(credit_tipping_fee: bool = False) -> dict:
         msp = apply_revenue_credit(msp, tipping_fee_usd_per_yr)
 
     return {
-        "label": "AD-VFA",
+        "label": "VFA",
         "product_desc": "VFA broth (total-VFA basis)",
         "msp_usd_per_kg": msp["usd_per_kg"],
         "annual_product_kg": msp["annual_product_kg"],
@@ -201,7 +201,7 @@ def price_ad_vfa_system(credit_tipping_fee: bool = False) -> dict:
 
 
 if __name__ == '__main__':
-    results = price_ad_vfa_system()
+    results = price_vfa_system()
     sys = results['sys']
 
     figures_dir = Path(__file__).resolve().parent.parent / "results" / "figures"

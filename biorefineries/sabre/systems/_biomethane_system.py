@@ -22,18 +22,18 @@ from biorefineries.sabre.units import (
 from biorefineries.sabre.systems._biostimulant_system import create_biostimulant_system, BIOSTIMULANT_UNIT_IDS
 from biorefineries.sabre._tea import create_tea, usd_per_mmbtu_to_usd_per_kg
 
-__all__ = ('create_ad_biomethane_system', 'price_ad_biomethane_system')
+__all__ = ('create_biomethane_system', 'price_biomethane_system')
 
 
 # Load assumptions
-_PRETREATMENT_AD = load_assumptions("pretreatment.yaml")["pretreatment_ad"]
 _AD_YAML = load_assumptions("ad.yaml")
+_PRETREATMENT_AD = _AD_YAML["pretreatment_ad"]
 _AD_SHARED = _AD_YAML["ad"]
 _AD_PERFORMANCE = _AD_YAML["ad_performance"]
 _TEA_PRICE = load_assumptions("tea.yaml")["price"]
 
 
-def create_ad_biomethane_system(
+def create_biomethane_system(
     feedstock: str | bst.Stream = "pelagic",
     pretreatment_case: str = 'press_mill_only',
     biostimulant_price: float | None = None,
@@ -146,13 +146,13 @@ def create_ad_biomethane_system(
     HXN = bst.HeatExchangerNetwork("HXN", units=tuple(path))
     path.append(HXN)
 
-    sys = bst.System("ad_biomethane_sys", path=path)
+    sys = bst.System("biomethane_sys", path=path)
     create_tea(sys)
 
     return sys
 
 
-def price_ad_biomethane_system(
+def price_biomethane_system(
     pretreatment_case: str = 'press_mill_only',
     credit_tipping_fee: bool = False,
 ) -> dict:
@@ -190,7 +190,7 @@ def price_ad_biomethane_system(
         biostimulant_price = _TEA_PRICE["biostimulant"]["baseline"]
 
         bst.main_flowsheet.clear()
-        sys = create_ad_biomethane_system(
+        sys = create_biomethane_system(
             feedstock="pelagic", pretreatment_case=pretreatment_case,
             biostimulant_price=biostimulant_price,
         )
@@ -210,7 +210,7 @@ def price_ad_biomethane_system(
         biostimulant_price = price_biostimulant_system()["msp_usd_per_kg"]
 
         bst.main_flowsheet.clear()
-        sys = create_ad_biomethane_system(
+        sys = create_biomethane_system(
             feedstock="pelagic", pretreatment_case=pretreatment_case,
             biostimulant_price=biostimulant_price,
         )
@@ -224,7 +224,7 @@ def price_ad_biomethane_system(
         # biostimulant's own price already covers in its own standalone
         # system.
         ad_specific_units = [u for u in sys.units if u.ID not in BIOSTIMULANT_UNIT_IDS]
-        ad_specific_sys = bst.System.from_units("ad_biomethane_specific_sys", units=ad_specific_units)
+        ad_specific_sys = bst.System.from_units("biomethane_specific_sys", units=ad_specific_units)
         ad_specific_tea = create_tea(ad_specific_sys)
 
         product = sys.flowsheet.stream.biomethane
@@ -239,7 +239,7 @@ def price_ad_biomethane_system(
         msp = apply_revenue_credit(msp, tipping_fee_usd_per_yr)
 
     return {
-        "label": "AD-biomethane",
+        "label": "Biomethane",
         "pretreatment_case": pretreatment_case,
         "product_desc": "biomethane (whole-stream basis)",
         "msp_usd_per_kg": msp["usd_per_kg"],
@@ -254,7 +254,7 @@ def price_ad_biomethane_system(
 
 
 if __name__ == '__main__':
-    results = price_ad_biomethane_system()
+    results = price_biomethane_system()
     sys = results['sys']
 
     figures_dir = Path(__file__).resolve().parent.parent / "results" / "figures"

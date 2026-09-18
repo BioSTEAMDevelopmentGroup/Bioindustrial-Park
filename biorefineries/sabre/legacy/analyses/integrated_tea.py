@@ -62,7 +62,7 @@ OIL_EXTRACTION_REAGENT_USD_PER_KG_OIL = 0.50
 # Covers fermentation wastewater plus evaporator condensate, mixed upstream
 # into the same stream
 FERM_WASTEWATER_DISPOSAL_USD_PER_KG = -0.005
-# VFA microfilter retentate: separate stream out of the AD-VFA subsystem;
+# VFA microfilter retentate: separate stream out of the VFA subsystem;
 # same wastewater-treatment basis applies.
 VFA_RETENTATE_DISPOSAL_USD_PER_KG    = -0.005
 SOLIDS_DISPOSAL_USD_PER_KG          = -0.04

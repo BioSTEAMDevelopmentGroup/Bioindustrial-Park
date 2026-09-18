@@ -32,7 +32,7 @@ if str(REPO_ROOT) not in sys.path:
 
 from biorefineries.sabre._chemicals import create_chemicals
 from biorefineries.sabre.utils import load_assumptions
-from biorefineries.sabre.systems import create_ad_biomethane_system
+from biorefineries.sabre.systems import create_biomethane_system
 
 ANNUAL_DAYS = 330.0
 ANNUAL_HOURS = ANNUAL_DAYS * 24.0
@@ -189,7 +189,7 @@ def set_widths(ws, widths: dict[int, float]):
         ws.column_dimensions[get_column_letter(idx)].width = width
 
 def build_case(feedstock_type: str, case_key: str):
-    sys = create_ad_biomethane_system(feedstock=feedstock_type, pretreatment_case=case_key)
+    sys = create_biomethane_system(feedstock=feedstock_type, pretreatment_case=case_key)
     sys.simulate()
     return sys, get_unit_map(sys)
 

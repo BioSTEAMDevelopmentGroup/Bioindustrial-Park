@@ -35,7 +35,7 @@ if str(REPO_ROOT) not in sys.path:
 
 from biorefineries.sabre._chemicals import create_chemicals
 from biorefineries.sabre.utils import load_assumptions
-from biorefineries.sabre.systems import create_ad_biomethane_system
+from biorefineries.sabre.systems import create_biomethane_system
 from biorefineries.sabre._tea import create_tea, solve_product_msp, CH4_MMBTU_PER_KG
 
 
@@ -107,7 +107,7 @@ def build_case(
     bst.main_flowsheet.clear()
     create_chemicals()
 
-    sys = create_ad_biomethane_system(
+    sys = create_biomethane_system(
         feedstock="pelagic",
         pretreatment_case=pretreatment_case,
     )
@@ -138,7 +138,8 @@ def build_case(
     return sys, tea, msp, ch4_kgph
 
 
-CASE_DEFS = load_assumptions("pretreatment.yaml")["pretreatment_ad"]
+# pretreatment_ad now lives in ad.yaml (pretreatment.yaml was merged into it).
+CASE_DEFS = load_assumptions("ad.yaml")["pretreatment_ad"]
 
 
 def get_case_yields(case: str):

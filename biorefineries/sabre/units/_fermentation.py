@@ -9,13 +9,12 @@
 from typing import Optional
 import biosteam as bst
 from biosteam.units.design_tools.tank_design import mix_tank_purchase_cost_algorithms
-
 from biorefineries.sabre.utils import load_assumptions
 
 __all__ = ('YarrowiaLipidFermenter', 'FermentationMediumTank')
 
 # Loaded yaml assumptions
-_FERMENTATION_YAML = load_assumptions("fermentation.yaml")
+_FERMENTATION_YAML = load_assumptions("microbial_oil.yaml")
 _VFA = _FERMENTATION_YAML["vfa"]
 _VFA_CASE = _VFA["cases"][_VFA["case"]]
 _FERMENTATION_MEDIUM_TANK = _FERMENTATION_YAML["fermentation_medium_tank"]

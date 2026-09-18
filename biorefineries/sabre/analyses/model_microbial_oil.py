@@ -5,14 +5,14 @@
 # github.com/BioSTEAMDevelopmentGroup/biosteam/blob/master/LICENSE.txt
 # for license details.
 """
-biosteam.evaluation.Model construction for the standalone ad_fermentation
-flowsheet (systems._ad_fermentation_system.create_ad_fermentation_system()).
+biosteam.evaluation.Model construction for the standalone microbial_oil
+flowsheet (systems._microbial_oil_system.create_microbial_oil_system()).
 
 Press/PressateConcentrator/Mill/AcidogenicAD/DigestateScrewPress/
 VFAMicrofilter parameters are all reused directly from model_biostimulant.py
-and model_ad_vfa.py -- ad_fermentation embeds create_ad_vfa_system()
+and model_vfa.py -- microbial_oil embeds create_vfa_system()
 internally (with add_product_splitter=False, see
-systems/_ad_fermentation_system.py), so those units are the exact same
+systems/_microbial_oil_system.py), so those units are the exact same
 objects, not redefined here. add_fermentation_medium_tank_parameters(),
 add_yarrowia_lipid_fermenter_parameters(), add_evaporator_parameters(),
 add_oil_extraction_parameters(), add_oil_centrifuge_parameters(), and
@@ -25,13 +25,13 @@ import biosteam as bst
 from biosteam.evaluation import Metric
 
 from biorefineries.sabre.utils import load_assumptions
-from biorefineries.sabre.systems._ad_fermentation_system import create_ad_fermentation_system
+from biorefineries.sabre.systems._microbial_oil_system import create_microbial_oil_system
 from biorefineries.sabre._tea import solve_product_msp
 from biorefineries.sabre.analyses.model_utils import distribution_from_yaml, add_tea_parameters
 from biorefineries.sabre.analyses.model_biostimulant import (
     add_press_parameters, add_pressate_concentrator_parameters,
 )
-from biorefineries.sabre.analyses.model_ad_vfa import (
+from biorefineries.sabre.analyses.model_vfa import (
     add_mill_parameters, add_acidogenic_ad_parameters,
     add_digestate_screw_press_parameters, add_vfa_microfilter_parameters,
 )
@@ -40,16 +40,16 @@ __all__ = (
     'add_fermentation_medium_tank_parameters', 'add_yarrowia_lipid_fermenter_parameters',
     'add_evaporator_parameters', 'add_oil_extraction_parameters',
     'add_oil_centrifuge_parameters', 'add_biomass_recycle_splitter_parameters',
-    'create_ad_fermentation_model',
+    'create_microbial_oil_model',
 )
 
-_FERMENTATION_YAML = load_assumptions("fermentation.yaml")
-_FERMENTATION_MEDIUM_TANK = _FERMENTATION_YAML["fermentation_medium_tank"]
-_VFA_FERM = _FERMENTATION_YAML["vfa"]
+# fermentation.yaml and downstream_processing.yaml were merged into
+# microbial_oil.yaml.
+_MICROBIAL_OIL_YAML = load_assumptions("microbial_oil.yaml")
+_FERMENTATION_MEDIUM_TANK = _MICROBIAL_OIL_YAML["fermentation_medium_tank"]
+_VFA_FERM = _MICROBIAL_OIL_YAML["vfa"]
 _VFA_CASE = _VFA_FERM["cases"][_VFA_FERM["case"]]
-
-_DOWNSTREAM_PROCESSING_YAML = load_assumptions("downstream_processing.yaml")
-_OIL_EXTRACTION = _DOWNSTREAM_PROCESSING_YAML["oil_extraction"]
+_OIL_EXTRACTION = _MICROBIAL_OIL_YAML["oil_extraction"]
 
 _TEA_PRICE = load_assumptions("tea.yaml")["price"]
 
@@ -143,7 +143,7 @@ def add_evaporator_parameters(model, Ev607):
     target concentration to `model` (data/downstream_processing.yaml
     `oil_extraction.target_oil_and_solids_content_g_per_L`) --
     `target_oil_and_solids_content` is set directly by
-    systems/_ad_fermentation_system.py, not a MultiEffectEvaporator
+    systems/_microbial_oil_system.py, not a MultiEffectEvaporator
     constructor argument, but it is a plain settable instance attribute.
     """
     param = model.parameter
@@ -170,7 +170,7 @@ def add_oil_extraction_parameters(model, OE):
     an instance attribute, so there is nothing on the unit itself to set;
     parameterizing it would require a code change to
     units/_downstream_processing.py, out of scope here (same category as
-    VFAMicrofilter's membrane_cost_usd_per_m2 in model_ad_vfa.py, which is
+    VFAMicrofilter's membrane_cost_usd_per_m2 in model_vfa.py, which is
     baked into a class-level `@cost` decorator instead).
     """
     param = model.parameter
@@ -237,12 +237,12 @@ def add_biomass_recycle_splitter_parameters(model, S602):
     return model
 
 
-def create_ad_fermentation_model(system=None):
+def create_microbial_oil_model(system=None):
     """
     Build the full biosteam.evaluation.Model for the standalone
-    ad_fermentation flowsheet: reused Press/PressateConcentrator/Mill/
+    microbial_oil flowsheet: reused Press/PressateConcentrator/Mill/
     AcidogenicAD/DigestateScrewPress/VFAMicrofilter parameters (from the
-    embedded ad_vfa subsystem, built with add_product_splitter=False),
+    embedded vfa subsystem, built with add_product_splitter=False),
     the fermentation train's own process parameters (medium tank,
     fermenter, evaporator, oil extraction, oil centrifuge, biomass
     recycle splitter), the shared TEA parameters, and this system's own
@@ -254,10 +254,10 @@ def create_ad_fermentation_model(system=None):
     Parameters
     ----------
     system : bst.System, optional
-        Defaults to a fresh `create_ad_fermentation_system()`.
+        Defaults to a fresh `create_microbial_oil_system()`.
     """
     if system is None:
-        system = create_ad_fermentation_system()
+        system = create_microbial_oil_system()
     system.simulate()
 
     flowsheet = system.flowsheet

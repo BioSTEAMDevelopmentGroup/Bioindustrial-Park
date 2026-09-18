@@ -11,8 +11,8 @@ uncertainty_comparison.py
 Compare MSP uncertainty (Monte Carlo, N=1000) and the top Spearman-correlated
 parameters across the four standalone SaBRe flowsheets, using the
 biorefineries/sabre/results/tables/model_*_N1000.xlsx files produced by
-analyses/model_biostimulant.py, model_ad_vfa.py, model_ad_biomethane.py, and
-model_ad_fermentation.py. The 'integrated' flowsheet is not covered (no
+analyses/model_biostimulant.py, model_vfa.py, model_biomethane.py, and
+model_microbial_oil.py. The 'integrated' flowsheet is not covered (no
 model file exists for it, per prior scope decision).
 
 Each system's 'MSP' metric is USD/kg of that system's own value-carrying
@@ -36,9 +36,9 @@ OUT.mkdir(parents=True, exist_ok=True)
 
 SYSTEMS = [
     ("Biostimulant", "model_biostimulant_N1000.xlsx"),
-    ("AD-VFA", "model_ad_vfa_N1000.xlsx"),
-    ("AD-biomethane", "model_ad_biomethane_N1000.xlsx"),
-    ("AD-fermentation", "model_ad_fermentation_N1000.xlsx"),
+    ("VFA", "model_ad_vfa_N1000.xlsx"),
+    ("Biomethane", "model_ad_biomethane_N1000.xlsx"),
+    ("Microbial oil", "model_ad_fermentation_N1000.xlsx"),
 ]
 
 # Fixed-order categorical palette, dataviz skill reference palette (validated
@@ -71,7 +71,7 @@ def load_data(filename: str) -> pd.DataFrame:
 
 
 def get_msp_series(df: pd.DataFrame) -> pd.Series:
-    # Metric columns are tagged Element == '-'; ad_biomethane also has an
+    # Metric columns are tagged Element == '-'; biomethane also has an
     # 'MSP (energy basis) [USD/mmbtu]' metric, excluded by requiring the
     # feature name to start with 'MSP [' (the $/kg one).
     col = next(c for c in df.columns if c[0] == '-' and c[1].startswith('MSP ['))

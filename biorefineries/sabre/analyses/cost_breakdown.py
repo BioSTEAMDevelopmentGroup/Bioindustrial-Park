@@ -13,15 +13,15 @@ SaBRe flowsheets (the 'integrated' flowsheet is excluded, same as
 `msp_comparison.py`):
 
     - Biostimulant
-    - AD-biomethane   (data/pretreatment.yaml `pretreatment_ad` case
+    - Biomethane   (data/pretreatment.yaml `pretreatment_ad` case
                         'combined_PE')
-    - AD-VFA
-    - AD-fermentation
+    - VFA
+    - Microbial oil
 
 Each pathway is built via its `price_*_system()` function (not `create_*_
 system()` directly) with `credit_tipping_fee=False` -- the default economic
-basis, also used by `msp_comparison.py`'s first pass -- where AD-biomethane/
-AD-VFA/AD-fermentation each embed their own copy of the biostimulant
+basis, also used by `msp_comparison.py`'s first pass -- where Biomethane/
+VFA/Microbial oil each embed their own copy of the biostimulant
 preprocessing subsystem (Press, PressateConcentrator, Evaporator, etc.) and
 price biostimulant_product as a co-product at its flat tea.yaml baseline, on
 one combined TEA. So FCI/AOC for those three pathways include a share of
@@ -71,9 +71,9 @@ if str(REPO_ROOT) not in sys.path:
 
 from biorefineries.sabre.systems import (
     price_biostimulant_system,
-    price_ad_biomethane_system,
-    price_ad_vfa_system,
-    price_ad_fermentation_system,
+    price_biomethane_system,
+    price_vfa_system,
+    price_microbial_oil_system,
 )
 
 TABLES_OUT = SCRIPT_DIR.parent / "results" / "tables"
@@ -91,9 +91,9 @@ GROUP_MAX_SLICES = 7
 
 SYSTEM_BUILDERS = {
     "Biostimulant": price_biostimulant_system,
-    "AD-biomethane": lambda: price_ad_biomethane_system(pretreatment_case="combined_PE"),
-    "AD-VFA": price_ad_vfa_system,
-    "AD-fermentation": price_ad_fermentation_system,
+    "Biomethane": lambda: price_biomethane_system(pretreatment_case="combined_PE"),
+    "VFA": price_vfa_system,
+    "Microbial oil": price_microbial_oil_system,
 }
 
 

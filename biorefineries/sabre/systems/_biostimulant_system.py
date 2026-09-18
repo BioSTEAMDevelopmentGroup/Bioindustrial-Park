@@ -40,8 +40,8 @@ __all__ = ('create_biostimulant_system', 'price_biostimulant_system', 'BIOSTIMUL
 _TEA_PRICE = load_assumptions("tea.yaml")["price"]
 
 # Unit IDs built by create_biostimulant_system(). Used by the AD pathway
-# systems (systems._ad_biomethane_system, systems._ad_vfa_system,
-# systems._ad_fermentation_system) to carve an AD-only TEA scope out of
+# systems (systems._biomethane_system, systems._vfa_system,
+# systems._microbial_oil_system) to carve an AD-only TEA scope out of
 # their combined system -- excluding these units' capital -- so their own
 # product's price recovers only that pathway's own capital, not
 # biostimulant's (which biostimulant's own standalone price already
@@ -73,8 +73,8 @@ def create_biostimulant_system(
         to data/tea.yaml `price.biostimulant.baseline` when not given -- pass
         this in (e.g. an IRR=0 cost-basis price solved from the standalone
         biostimulant system) when this subsystem is embedded as a byproduct
-        credit inside a larger pathway (see systems._ad_biomethane_system,
-        systems._ad_vfa_system).
+        credit inside a larger pathway (see systems._biomethane_system,
+        systems._vfa_system).
 
     Returns
     -------
@@ -93,6 +93,7 @@ def create_biostimulant_system(
     feed = make_sargassum_feed(
         fresh_feed_kgph=fresh_feed_kgph, moisture_frac=moisture_frac,
         ash_wt_frac_dry=params["ash_wt_frac_dry"],
+        dry_composition=params.get("dry_composition"),
     )
     feed.price = _TEA_PRICE["sargassum"]["baseline"]
 
@@ -239,7 +240,7 @@ def price_biostimulant_system(IRR: float | None = None) -> dict:
         10%) before solving biostimulant_product's price. Pass IRR=0.0 to
         get biostimulant's zero-return, cost-basis price -- e.g. for use as
         a byproduct credit in a larger pathway (see
-        systems._ad_biomethane_system.price_ad_biomethane_system(), which
+        systems._biomethane_system.price_biomethane_system(), which
         uses this to avoid crediting the other pathways with a return on
         the biostimulant subsystem's own capital on top of their own
         target-IRR product price).

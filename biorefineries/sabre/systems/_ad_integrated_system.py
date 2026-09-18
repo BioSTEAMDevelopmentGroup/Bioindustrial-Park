@@ -17,8 +17,8 @@ Edge cases handled cleanly:
   alpha=0.0 -> pure VFA-to-oil  (methanogenic pathway not built)
   alpha=1.0 -> pure biomethane  (VFA/fermentation pathway not built)
 
-Each pathway is built by calling create_ad_biomethane_system() /
-create_ad_fermentation_system() directly, passing the splitter-derived
+Each pathway is built by calling create_biomethane_system() /
+create_microbial_oil_system() directly, passing the splitter-derived
 stream as `feedstock` (so each skips its own create_biostimulant_system
 call and uses the shared preprocessing built here instead) -- so this
 integrated system and the standalone AD systems never drift apart.
@@ -31,8 +31,8 @@ import biosteam as bst
 from biorefineries.sabre._chemicals import create_chemicals
 from biorefineries.sabre.units import Mill
 from biorefineries.sabre.systems._biostimulant_system import create_biostimulant_system
-from biorefineries.sabre.systems._ad_biomethane_system import create_ad_biomethane_system
-from biorefineries.sabre.systems._ad_fermentation_system import create_ad_fermentation_system
+from biorefineries.sabre.systems._biomethane_system import create_biomethane_system
+from biorefineries.sabre.systems._microbial_oil_system import create_microbial_oil_system
 
 __all__ = ('create_ad_integrated_system', 'MassSplitter')
 
@@ -134,14 +134,14 @@ def create_ad_integrated_system(
     # =========================================================
     methane_units = []
     if build_methane:
-        methane_sys = create_ad_biomethane_system(
+        methane_sys = create_biomethane_system(
             feedstock=SPL - 0, pretreatment_case=pretreatment_case,
         )
         methane_units = list(methane_sys.units)
 
     vfa_units = []
     if build_vfa:
-        vfa_fer_sys = create_ad_fermentation_system(feedstock=SPL - 1)
+        vfa_fer_sys = create_microbial_oil_system(feedstock=SPL - 1)
         vfa_units = list(vfa_fer_sys.units)
 
     # =========================================================

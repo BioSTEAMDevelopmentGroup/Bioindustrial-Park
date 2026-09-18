@@ -15,12 +15,12 @@ tea.yaml `tea.IRR`), holding every product at its data/tea.yaml baseline
 selling price:
 
     - Biostimulant     -> biostimulant_product
-    - AD-biomethane    -> biomethane, data/pretreatment.yaml
+    - Biomethane    -> biomethane, data/pretreatment.yaml
                           `pretreatment_ad` case 'combined_PE' only (same
                           case cost_breakdown.py/disposal_price_breakeven.py
-                          use as their single AD-biomethane representative)
-    - AD-VFA           -> pure_vfa
-    - AD-fermentation  -> microbial_oil
+                          use as their single Biomethane representative)
+    - VFA           -> pure_vfa
+    - Microbial oil  -> microbial_oil
 
 This is the feedstock-side mirror of `msp_comparison.py`: there, product
 price is solved holding sargassum_feed's price fixed at its tea.yaml
@@ -66,9 +66,9 @@ if str(REPO_ROOT) not in sys.path:
 
 from biorefineries.sabre.systems import (
     create_biostimulant_system,
-    create_ad_biomethane_system,
-    create_ad_vfa_system,
-    create_ad_fermentation_system,
+    create_biomethane_system,
+    create_vfa_system,
+    create_microbial_oil_system,
 )
 from biorefineries.sabre.utils import load_assumptions
 from biorefineries.sabre._tea import usd_per_mmbtu_to_usd_per_kg, CH4_MMBTU_PER_KG
@@ -80,15 +80,15 @@ _TEA_PRICE = load_assumptions("tea.yaml")["price"]
 SARGASSUM_BASELINE = _TEA_PRICE["sargassum"]["baseline"]
 SARGASSUM_RANGE = _TEA_PRICE["sargassum"]["range"]
 
-# AD-biomethane pretreatment case (data/pretreatment.yaml `pretreatment_ad`),
+# Biomethane pretreatment case (data/pretreatment.yaml `pretreatment_ad`),
 # same single representative case cost_breakdown.py/disposal_price_breakeven.py use.
 BIOMETHANE_PRETREATMENT_CASE = "combined_PE"
 
 PRODUCT_STREAM_BY_LABEL = {
     "Biostimulant":     "biostimulant_product",
-    "AD-VFA":           "pure_vfa",
-    "AD-fermentation":  "microbial_oil",
-    "AD-biomethane":    "biomethane",
+    "VFA":           "pure_vfa",
+    "Microbial oil":  "microbial_oil",
+    "Biomethane":    "biomethane",
 }
 
 
@@ -132,19 +132,19 @@ def run_sargassum_price_breakeven() -> None:
     results.append(solve_sargassum_breakeven(sys, "Biostimulant"))
 
     bst.main_flowsheet.clear()
-    sys = create_ad_biomethane_system(pretreatment_case=BIOMETHANE_PRETREATMENT_CASE)
+    sys = create_biomethane_system(pretreatment_case=BIOMETHANE_PRETREATMENT_CASE)
     sys.simulate()
-    results.append(solve_sargassum_breakeven(sys, "AD-biomethane"))
+    results.append(solve_sargassum_breakeven(sys, "Biomethane"))
 
     bst.main_flowsheet.clear()
-    sys = create_ad_vfa_system()
+    sys = create_vfa_system()
     sys.simulate()
-    results.append(solve_sargassum_breakeven(sys, "AD-VFA"))
+    results.append(solve_sargassum_breakeven(sys, "VFA"))
 
     bst.main_flowsheet.clear()
-    sys = create_ad_fermentation_system()
+    sys = create_microbial_oil_system()
     sys.simulate()
-    results.append(solve_sargassum_breakeven(sys, "AD-fermentation"))
+    results.append(solve_sargassum_breakeven(sys, "Microbial oil"))
 
     for r in results:
         r["bar_label"] = r["label"]
@@ -175,7 +175,7 @@ def run_sargassum_price_breakeven() -> None:
     tick_labels = [r["bar_label"] for r in all_results]
     vals = [r["breakeven_usd_per_kg"] for r in all_results]
     colors = [
-        "#4C72B0" if r["label"] != "AD-biomethane" else "#C86E5A" for r in all_results
+        "#4C72B0" if r["label"] != "Biomethane" else "#C86E5A" for r in all_results
     ]
 
     bars = ax.bar(tick_labels, vals, edgecolor="black", linewidth=0.8, zorder=3, color=colors)
@@ -231,8 +231,8 @@ def run_sargassum_price_breakeven() -> None:
     print(header)
     for r in all_results:
         label = (
-            r["label"] if r["label"] != "AD-biomethane"
-            else f"AD-biomethane ({BIOMETHANE_PRETREATMENT_CASE})"
+            r["label"] if r["label"] != "Biomethane"
+            else f"Biomethane ({BIOMETHANE_PRETREATMENT_CASE})"
         )
         product_str = f"{r['product_stream_name']} @ ${r['product_price_usd_per_kg']:.3f}"
         headroom = r["breakeven_usd_per_kg"] - SARGASSUM_BASELINE
@@ -265,8 +265,8 @@ SWEEP_CONFIGS = (
         "to_usd_per_kg": None,
     },
     {
-        "label": "AD-VFA",
-        "build_fn": create_ad_vfa_system,
+        "label": "VFA",
+        "build_fn": create_vfa_system,
         "product_stream_name": "pure_vfa",
         "x_range": tuple(_TEA_PRICE["vfa"]["range"]),
         "x_baseline": _TEA_PRICE["vfa"]["baseline"],
@@ -274,8 +274,8 @@ SWEEP_CONFIGS = (
         "to_usd_per_kg": None,
     },
     {
-        "label": "AD-fermentation",
-        "build_fn": create_ad_fermentation_system,
+        "label": "Microbial oil",
+        "build_fn": create_microbial_oil_system,
         "product_stream_name": "microbial_oil",
         "x_range": tuple(_TEA_PRICE["microbial_oil"]["range"]),
         "x_baseline": _TEA_PRICE["microbial_oil"]["baseline"],
@@ -283,8 +283,8 @@ SWEEP_CONFIGS = (
         "to_usd_per_kg": None,
     },
     {
-        "label": "AD-biomethane",
-        "build_fn": lambda: create_ad_biomethane_system(pretreatment_case=BIOMETHANE_PRETREATMENT_CASE),
+        "label": "Biomethane",
+        "build_fn": lambda: create_biomethane_system(pretreatment_case=BIOMETHANE_PRETREATMENT_CASE),
         "product_stream_name": "biomethane",
         "x_range": tuple(_TEA_PRICE["biomethane_mmbtu"]["range"]),
         "x_baseline": _TEA_PRICE["biomethane_mmbtu"]["baseline"],
@@ -324,9 +324,9 @@ def sweep_sargassum_vs_product_price(cfg: dict, n_points: int) -> dict:
 
 PATHWAY_COLORS = {
     "Biostimulant":     "#4C72B0",
-    "AD-VFA":           "#55A868",
-    "AD-fermentation":  "#8172B2",
-    "AD-biomethane":    "#C86E5A",
+    "VFA":           "#55A868",
+    "Microbial oil":  "#8172B2",
+    "Biomethane":    "#C86E5A",
 }
 
 
@@ -350,7 +350,7 @@ def run_sargassum_vs_product_price_four_systems(n_points: int = 16) -> None:
     fig, ax = plt.subplots(figsize=(8.5, 6.5))
 
     for r in sweep_results:
-        unit = "/mmbtu" if r["label"] == "AD-biomethane" else "/kg"
+        unit = "/mmbtu" if r["label"] == "Biomethane" else "/kg"
         legend_label = f"{r['label']} (baseline ${r['x_baseline']:.2f}{unit})"
         ax.plot(
             r["x_pct"], r["breakevens"], marker="o", markersize=4, linewidth=1.5,

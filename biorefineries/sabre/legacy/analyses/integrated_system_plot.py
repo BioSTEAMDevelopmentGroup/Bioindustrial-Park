@@ -67,9 +67,9 @@ if __name__ == "__main__":
         vfa_sys.diagram(file=str(OUTDIR / "vfa_fermentation_pathway"))
         print(f"Saved: {OUTDIR / 'vfa_fermentation_pathway'}")
 
-    from biorefineries.sabre.systems import create_ad_vfa_system
+    from biorefineries.sabre.systems import create_vfa_system
 
-    sys = create_ad_vfa_system(feedstock="pelagic")
+    sys = create_vfa_system(feedstock="pelagic")
     sys.simulate()
     sys.diagram(file=str(OUTDIR / "vfa_subset"))
 

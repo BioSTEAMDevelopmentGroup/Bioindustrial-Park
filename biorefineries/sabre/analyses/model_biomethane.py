@@ -5,26 +5,26 @@
 # github.com/BioSTEAMDevelopmentGroup/biosteam/blob/master/LICENSE.txt
 # for license details.
 """
-biosteam.evaluation.Model construction for the standalone ad_biomethane
-flowsheet (systems._ad_biomethane_system.create_ad_biomethane_system()).
+biosteam.evaluation.Model construction for the standalone biomethane
+flowsheet (systems._biomethane_system.create_biomethane_system()).
 
 Press/PressateConcentrator parameters are reused directly from
 model_biostimulant.py, and Mill/DigestateScrewPress parameters are reused
-directly from model_ad_vfa.py (both embed create_biostimulant_system()/a
-Mill/a DigestateScrewPress the same way ad_biomethane does -- see
+directly from model_vfa.py (both embed create_biostimulant_system()/a
+Mill/a DigestateScrewPress the same way biomethane does -- see
 docs/superpowers/specs/2026-07-31-sabre-uncertainty-model-design.md).
 add_methanogenic_ad_parameters(), add_h2s_removal_parameters(),
 add_biogas_upgrading_parameters(), add_peroxide_pretreatment_parameters(),
 add_heating_pretreatment_parameters(), and
 add_enzymatic_pretreatment_parameters() are new here and add only
-process/cost parameters (no stream prices), so ad_fermentation's (future)
+process/cost parameters (no stream prices), so microbial_oil's (future)
 model file or any other future flowsheet reusing these same units can
 import them too.
 
 pretreatment_case selects which of PeroxidePretreatment (PX),
 HeatingPretreatment (HT), and EnzymaticPretreatment (EZ) actually exist in
-the built system (see systems/_ad_biomethane_system.py) --
-create_ad_biomethane_model() detects which of these units are present via
+the built system (see systems/_biomethane_system.py) --
+create_biomethane_model() detects which of these units are present via
 `unit_id in flowsheet.unit` and only adds parameters for the ones that
 exist, so it works unmodified for all five pretreatment_case options.
 """
@@ -32,13 +32,13 @@ import biosteam as bst
 from biosteam.evaluation import Metric
 
 from biorefineries.sabre.utils import load_assumptions
-from biorefineries.sabre.systems._ad_biomethane_system import create_ad_biomethane_system
+from biorefineries.sabre.systems._biomethane_system import create_biomethane_system
 from biorefineries.sabre._tea import solve_product_msp, usd_per_mmbtu_to_usd_per_kg, CH4_MMBTU_PER_KG
 from biorefineries.sabre.analyses.model_utils import distribution_from_yaml, add_tea_parameters
 from biorefineries.sabre.analyses.model_biostimulant import (
     add_press_parameters, add_pressate_concentrator_parameters,
 )
-from biorefineries.sabre.analyses.model_ad_vfa import (
+from biorefineries.sabre.analyses.model_vfa import (
     add_mill_parameters, add_digestate_screw_press_parameters,
 )
 
@@ -46,7 +46,7 @@ __all__ = (
     'add_methanogenic_ad_parameters', 'add_h2s_removal_parameters',
     'add_biogas_upgrading_parameters', 'add_peroxide_pretreatment_parameters',
     'add_heating_pretreatment_parameters', 'add_enzymatic_pretreatment_parameters',
-    'create_ad_biomethane_model',
+    'create_biomethane_model',
 )
 
 _AD_YAML = load_assumptions("ad.yaml")
@@ -58,7 +58,8 @@ _AD_COST = _AD_SHARED["cost"]
 _H2S_REMOVAL = _AD_YAML["h2s_removal"]
 _BIOGAS_UPGRADING = _AD_YAML["biogas_upgrading"]
 
-_PRETREATMENT_AD = load_assumptions("pretreatment.yaml")["pretreatment_ad"]
+# pretreatment_ad now lives in ad.yaml (pretreatment.yaml was merged into it).
+_PRETREATMENT_AD = _AD_YAML["pretreatment_ad"]
 _PEROXIDE = _PRETREATMENT_AD["peroxide"]["peroxide"]
 _HEATING = _PRETREATMENT_AD["combined_PTE"]["heating"]
 _ENZYMATIC = _PRETREATMENT_AD["enzymatic"]["enzymatic"]
@@ -79,7 +80,7 @@ def add_methanogenic_ad_parameters(model, AD):
     (categorical), biodegradability (a per-chemical dict with no yaml
     range/distribution of its own -- same treatment as vfa_split),
     target_feed_moisture_frac (null in the current baseline), and
-    target_temperature_K (fixed at baseline -- see model_ad_vfa.py's
+    target_temperature_K (fixed at baseline -- see model_vfa.py's
     add_acidogenic_ad_parameters docstring for why).
 
     Reusable by any future sabre flowsheet that embeds a MethanogenicAD.
@@ -217,7 +218,7 @@ def add_heating_pretreatment_parameters(model, HT):
     (data/pretreatment.yaml `pretreatment_ad.combined_PTE.heating`):
     residence_time_hr, capex_usd, maintenance_frac_of_capex_per_yr.
     Excludes target_temperature_K (fixed at baseline -- see
-    model_ad_vfa.py's add_acidogenic_ad_parameters docstring) and F_BM.
+    model_vfa.py's add_acidogenic_ad_parameters docstring) and F_BM.
     Only present when `pretreatment_case` is 'combined_PTE'.
     """
     param = model.parameter
@@ -270,10 +271,10 @@ def add_enzymatic_pretreatment_parameters(model, EZ):
     return model
 
 
-def create_ad_biomethane_model(system=None, pretreatment_case: str = 'press_mill_only'):
+def create_biomethane_model(system=None, pretreatment_case: str = 'press_mill_only'):
     """
     Build the full biosteam.evaluation.Model for the standalone
-    ad_biomethane flowsheet: reused Press/PressateConcentrator parameters
+    biomethane flowsheet: reused Press/PressateConcentrator parameters
     (from the embedded biostimulant subsystem), reused Mill/
     DigestateScrewPress parameters, MethanogenicAD/H2SRemoval/
     BiogasUpgrading process parameters, whichever pretreatment unit(s)
@@ -287,18 +288,18 @@ def create_ad_biomethane_model(system=None, pretreatment_case: str = 'press_mill
     Parameters
     ----------
     system : bst.System, optional
-        Defaults to a fresh `create_ad_biomethane_system(pretreatment_case=
+        Defaults to a fresh `create_biomethane_system(pretreatment_case=
         pretreatment_case)`. If a system is passed in directly, this
         argument is ignored -- the pretreatment units actually present in
         `system` are auto-detected instead.
     pretreatment_case : str
-        Forwarded to `create_ad_biomethane_system()` when `system` is not
+        Forwarded to `create_biomethane_system()` when `system` is not
         given. One of 'press_mill_only', 'enzymatic', 'peroxide',
         'combined_PE', 'combined_PTE' (data/pretreatment.yaml
         `pretreatment_ad`).
     """
     if system is None:
-        system = create_ad_biomethane_system(pretreatment_case=pretreatment_case)
+        system = create_biomethane_system(pretreatment_case=pretreatment_case)
     system.simulate()
 
     flowsheet = system.flowsheet

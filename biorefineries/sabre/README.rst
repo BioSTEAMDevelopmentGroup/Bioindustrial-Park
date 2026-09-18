@@ -25,14 +25,14 @@ The five flowsheets currently available (see ``load()`` in
   product at a tunable target solids content (the evaporator dilutes
   with permeate/fresh water or concentrates by evaporation as needed)
   and treating the pressed cake as a disposal liability.
-- **AD-biomethane** (``'ad_biomethane'``): press -> mill -> optional
+- **Biomethane** (``'biomethane'``): press -> mill -> optional
   pretreatment (heating, enzymatic, peroxide, or combined) -> anaerobic
   digestion -> H2S removal -> biogas upgrading -> digestate dewatering,
   producing biomethane and a soil-amendment digestate.
-- **AD-VFA** (``'ad_vfa'``): the same preprocessing train feeding an
+- **VFA** (``'vfa'``): the same preprocessing train feeding an
   acidogenic (arrested) digester tuned to produce volatile fatty acids
   (VFAs) rather than methane.
-- **AD-fermentation** (``'ad_fermentation'``): the AD-VFA pathway above,
+- **Microbial oil** (``'microbial_oil'``): the VFA pathway above,
   followed by VFA-rich broth fermented by *Yarrowia lipolytica* into
   microbial oil, with cell disruption, extraction, and biomass recycle —
   simulated together as one ``bst.System`` from feedstock straight
@@ -47,7 +47,7 @@ Getting started
 .. code-block:: python
 
     from biorefineries import sabre
-    sabre.load('ad_biomethane')
+    sabre.load('biomethane')
     sabre.sys.diagram()
     print(sabre.tea.sales)
 

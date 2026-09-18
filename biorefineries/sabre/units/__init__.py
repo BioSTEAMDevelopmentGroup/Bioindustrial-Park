@@ -12,6 +12,7 @@
 .. autoclass:: biorefineries.sabre.units.MethanogenicAD
 .. autoclass:: biorefineries.sabre.units.AcidogenicAD
 .. autoclass:: biorefineries.sabre.units.Press
+.. autoclass:: biorefineries.sabre.units.EnzymaticPress
 .. autoclass:: biorefineries.sabre.units.Mill
 .. autoclass:: biorefineries.sabre.units.DigestateScrewPress
 .. autoclass:: biorefineries.sabre.units.DigestateDecanterCentrifuge
@@ -30,19 +31,18 @@
 from . import _ad
 from . import _preprocessing
 from . import _biostimulant
-from . import _pretreatment
 from . import _fermentation
-from . import _downstream_processing
+from . import _vfa
+from . import _microbial_oil
 
 from ._ad import *
 from ._preprocessing import *
 from ._biostimulant import *
-from ._pretreatment import *
 from ._fermentation import *
-from ._downstream_processing import *
+from ._vfa import *
+from ._microbial_oil import *
 
 __all__ = (
     *_ad.__all__, *_preprocessing.__all__, *_biostimulant.__all__,
-    *_pretreatment.__all__, *_fermentation.__all__,
-    *_downstream_processing.__all__,
+    *_fermentation.__all__, *_vfa.__all__, *_microbial_oil.__all__,
 )

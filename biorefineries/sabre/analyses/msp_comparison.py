@@ -13,11 +13,11 @@ flowsheets. The 'integrated' flowsheet (alpha-split between the
 methanogenic and VFA-to-oil pathways) is intentionally excluded.
 
     - Biostimulant     -> biostimulant liquid product, $/kg product
-    - AD-biomethane    -> biomethane, $/mmbtu, one bar per data/pretreatment.yaml
+    - Biomethane    -> biomethane, $/mmbtu, one bar per data/pretreatment.yaml
                           `pretreatment_ad` case (press_mill_only, enzymatic,
                           peroxide, combined_PE, combined_PTE)
-    - AD-VFA           -> VFA broth, $/kg total VFA
-    - AD-fermentation  -> crude microbial oil, $/kg MicrobialOil
+    - VFA           -> VFA broth, $/kg total VFA
+    - Microbial oil  -> crude microbial oil, $/kg MicrobialOil
 
 The product of each pathway is different, MSP of each pathway is the price
 per kg (or, for biomethane, per mmbtu) of the pathway's own value-carrying
@@ -44,9 +44,9 @@ if str(REPO_ROOT) not in sys.path:
 
 from biorefineries.sabre.systems import (
     price_biostimulant_system,
-    price_ad_biomethane_system,
-    price_ad_vfa_system,
-    price_ad_fermentation_system,
+    price_biomethane_system,
+    price_vfa_system,
+    price_microbial_oil_system,
 )
 
 OUT = SCRIPT_DIR.parent / "results" / "figures"
@@ -56,11 +56,11 @@ OUT.mkdir(parents=True, exist_ok=True)
 # System builders for the single-case, $/kg pathways
 KG_BUILDERS = (
     price_biostimulant_system,
-    price_ad_vfa_system,
-    price_ad_fermentation_system,
+    price_vfa_system,
+    price_microbial_oil_system,
 )
 
-# AD-biomethane pretreatment cases (data/pretreatment.yaml `pretreatment_ad`),
+# Biomethane pretreatment cases (data/pretreatment.yaml `pretreatment_ad`),
 # priced on a $/mmbtu basis
 PRETREATMENT_CASES = (
     "press_mill_only",
@@ -82,9 +82,9 @@ PRETREATMENT_LABELS = {
 # excluded -- its own product IS the biostimulant_product stream, already
 # covered by the nonwater-fraction/wet-yield summary.
 PRODUCT_STREAM_BY_LABEL = {
-    "AD-biomethane":   "biomethane",
-    "AD-VFA":          "pure_vfa",
-    "AD-fermentation": "microbial_oil",
+    "Biomethane":   "biomethane",
+    "VFA":          "pure_vfa",
+    "Microbial oil": "microbial_oil",
 }
 
 
@@ -94,10 +94,10 @@ def compute_product_purity(sys: bst.System, label: str) -> float:
     product stream:
       - Biostimulant:     non-water mass frac of biostimulant_product
         (i.e. its solids content)
-      - AD-VFA:           total-VFA mass frac of pure_vfa (VFA_IDs per the
+      - VFA:           total-VFA mass frac of pure_vfa (VFA_IDs per the
         MF (VFAMicrofilter) unit)
-      - AD-biomethane:    Methane mass frac of the biomethane stream
-      - AD-fermentation:  microbial-oil-chemical mass frac of the
+      - Biomethane:    Methane mass frac of the biomethane stream
+      - Microbial oil:  microbial-oil-chemical mass frac of the
         microbial_oil stream (product_ID per the OE (OilExtraction) unit)
     """
     fw = sys.flowsheet.stream
@@ -107,16 +107,16 @@ def compute_product_purity(sys: bst.System, label: str) -> float:
         product = fw.biostimulant_product
         water = float(product.imass["Water"]) if "Water" in product.chemicals.IDs else 0.0
         value_mass = float(product.F_mass) - water
-    elif label == "AD-VFA":
+    elif label == "VFA":
         product = fw.pure_vfa
         vfa_ids = un.MF.vfa_IDs
         value_mass = sum(
             float(product.imass[cid]) for cid in vfa_ids if cid in product.chemicals.IDs
         )
-    elif label == "AD-biomethane":
+    elif label == "Biomethane":
         product = fw.biomethane
         value_mass = float(product.imass["Methane"]) if "Methane" in product.chemicals.IDs else 0.0
-    elif label == "AD-fermentation":
+    elif label == "Microbial oil":
         product = fw.microbial_oil
         product_id = un.OE.product_ID
         value_mass = float(product.imass[product_id]) if product_id in product.chemicals.IDs else 0.0
@@ -172,15 +172,15 @@ def summarize_mass_fractions(sys: bst.System, label: str) -> dict:
 
 def run_msp_comparison(credit_tipping_fee: bool) -> None:
     """
-    Build both the $/kg (Biostimulant/AD-VFA/AD-fermentation) and $/mmbtu
-    (AD-biomethane by pretreatment case) comparisons, save one figure, and
+    Build both the $/kg (Biostimulant/VFA/Microbial oil) and $/mmbtu
+    (Biomethane by pretreatment case) comparisons, save one figure, and
     print the mass-yield summary table.
 
     Parameters
     ----------
     credit_tipping_fee : bool
-        Forwarded to price_ad_vfa_system()/price_ad_fermentation_system()/
-        price_ad_biomethane_system(). If False, each AD pathway's product
+        Forwarded to price_vfa_system()/price_microbial_oil_system()/
+        price_biomethane_system(). If False, each AD pathway's product
         price is solved on the fixed data/tea.yaml assumption basis
         (pressed_cake arrives free, no disposal-cost interaction with
         biostimulant). If True, each AD pathway is additionally credited a
@@ -195,8 +195,8 @@ def run_msp_comparison(credit_tipping_fee: bool) -> None:
     # has already cleared it out from under us.
     kg_builders = (
         price_biostimulant_system,
-        lambda: price_ad_vfa_system(credit_tipping_fee=credit_tipping_fee),
-        lambda: price_ad_fermentation_system(credit_tipping_fee=credit_tipping_fee),
+        lambda: price_vfa_system(credit_tipping_fee=credit_tipping_fee),
+        lambda: price_microbial_oil_system(credit_tipping_fee=credit_tipping_fee),
     )
     kg_results = []
     summary_rows = []
@@ -207,10 +207,10 @@ def run_msp_comparison(credit_tipping_fee: bool) -> None:
 
     biomethane_results = []
     for case in PRETREATMENT_CASES:
-        r = price_ad_biomethane_system(pretreatment_case=case, credit_tipping_fee=credit_tipping_fee)
+        r = price_biomethane_system(pretreatment_case=case, credit_tipping_fee=credit_tipping_fee)
         biomethane_results.append(r)
         row = summarize_mass_fractions(r["sys"], r["label"])
-        row["label"] = f"AD-biomethane ({PRETREATMENT_LABELS[case]})"
+        row["label"] = f"Biomethane ({PRETREATMENT_LABELS[case]})"
         summary_rows.append(row)
 
     scenario_tag = "tipping_fee" if credit_tipping_fee else "fixed"
@@ -240,8 +240,8 @@ def run_msp_comparison(credit_tipping_fee: bool) -> None:
 
     UNIT_SUBLABELS = {
         "Biostimulant":     "$/kg product",
-        "AD-VFA":           "$/kg total VFA",
-        "AD-fermentation":  "$/kg crude oil",
+        "VFA":           "$/kg total VFA",
+        "Microbial oil":  "$/kg crude oil",
     }
 
     fig, (ax_kg, ax_biomethane) = plt.subplots(1, 2, figsize=(11.5, 5.2))
@@ -285,7 +285,7 @@ def run_msp_comparison(credit_tipping_fee: bool) -> None:
     _label_bars(ax_kg, bars, kg_vals, kg_sales)
 
     ax_kg.set_ylabel("Minimum selling price ($/kg product)")
-    ax_kg.set_title("Biostimulant, AD-VFA, AD-fermentation", fontsize=10)
+    ax_kg.set_title("Biostimulant, VFA, Microbial oil", fontsize=10)
     ax_kg.yaxis.set_major_formatter(mticker.FormatStrFormatter("$%.2f"))
     ax_kg.grid(axis="y", linewidth=0.4, color="#D3D1C7", zorder=0)
     ax_kg.axhline(0, color="black", linewidth=0.8, zorder=3)
@@ -293,7 +293,7 @@ def run_msp_comparison(credit_tipping_fee: bool) -> None:
     pad = (kg_hi - kg_lo) * 0.22 or 1
     ax_kg.set_ylim(kg_lo - pad, kg_hi + pad)
 
-    # -- Right panel: AD-biomethane by pretreatment case, $/mmbtu ------------
+    # -- Right panel: Biomethane by pretreatment case, $/mmbtu ------------
     pt_tick_labels = [
         PRETREATMENT_LABELS[r["pretreatment_case"]] for r in biomethane_results
     ]
@@ -309,7 +309,7 @@ def run_msp_comparison(credit_tipping_fee: bool) -> None:
     _label_bars(ax_biomethane, bars, mmbtu_vals, mmbtu_sales)
 
     ax_biomethane.set_ylabel("Minimum selling price ($/mmbtu biomethane)")
-    ax_biomethane.set_title("AD-biomethane, by pretreatment case", fontsize=10)
+    ax_biomethane.set_title("Biomethane, by pretreatment case", fontsize=10)
     ax_biomethane.yaxis.set_major_formatter(mticker.FormatStrFormatter("$%.2f"))
     ax_biomethane.grid(axis="y", linewidth=0.4, color="#D3D1C7", zorder=0)
     ax_biomethane.axhline(0, color="black", linewidth=0.8, zorder=3)

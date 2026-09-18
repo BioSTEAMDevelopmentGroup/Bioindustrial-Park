@@ -1,4 +1,4 @@
-# Model Assumptions: Fermentation
+# Model Assumptions: Microbial Oil Fermentation and DSP
 
 vfa:
   case: yarrowia_vfa_base
@@ -77,3 +77,31 @@ fermentation_medium_tank:
     notes:
       - "Base case reports crude microbial oil only."
       - "DHA and squalene can be added later as fractions of recovered oil in a higher-value variant."
+
+
+
+oil_extraction:
+  product_ID: MicrobialOil
+  cellmass_ID: CellMass
+
+  target_oil_and_solids_content_g_per_L: 70.0  # matches sabre_ad legacy behavior (vfa_fermentation_tea.py fallback); no source found for this value
+
+  oil_recovery: 0.99
+  oil_water_split: 0.0001
+
+  recycle_total_fraction: 0.10
+  recycle_cellmass_wt_frac: 0.10
+
+  ref_dry_biomass_tph: 10.0
+  ref_installed_cost_usd: 7848000.0
+  homogenization_kWh_per_kg_dry_biomass: 0.203
+  scale_exponent: 0.6
+  F_BM: 1.0 # capex already installed
+
+  oil_extraction_reagent_usd_per_kg_oil: 0.50
+
+  notes:
+    - "Oil extraction placeholder carries disruption + wet extraction burden."
+    - "Installed cost basis back-calculated from NREL 55431 cell-disruption plus extraction/separation cost bases."
+    - "Homogenization electricity aligned to the harmonized NREL algal-lipid basis."
+    - "No literature source cited in legacy scripts for reagent cost."

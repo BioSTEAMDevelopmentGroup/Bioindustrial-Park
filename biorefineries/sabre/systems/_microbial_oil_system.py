@@ -20,18 +20,17 @@ from biorefineries.sabre.units import (
     OilExtraction,
     FermentationMediumTank,
 )
-from biorefineries.sabre.systems._ad_vfa_system import create_ad_vfa_system
+from biorefineries.sabre.systems._vfa_system import create_vfa_system
 from biorefineries.sabre.systems._biostimulant_system import BIOSTIMULANT_UNIT_IDS
 from biorefineries.sabre._tea import create_tea
 
-__all__ = ('create_ad_fermentation_system', 'price_ad_fermentation_system')
+__all__ = ('create_microbial_oil_system', 'price_microbial_oil_system')
 
 # Load assumptions
-_FERMENTATION_YAML = load_assumptions("fermentation.yaml")
-_VFA_FERM = _FERMENTATION_YAML["vfa"]
+_MICROBIAL_OIL_YAML = load_assumptions("microbial_oil.yaml")
+_VFA_FERM = _MICROBIAL_OIL_YAML["vfa"]
 _VFA_CASE = _VFA_FERM["cases"][_VFA_FERM["case"]]
-_DOWNSTREAM_PROCESSING_YAML = load_assumptions("downstream_processing.yaml")
-_VFA_DOWNSTREAM = _DOWNSTREAM_PROCESSING_YAML["oil_extraction"]
+_VFA_DOWNSTREAM = _MICROBIAL_OIL_YAML["oil_extraction"]
 _TEA_PRICE = load_assumptions("tea.yaml")["price"]
 
 
@@ -242,7 +241,7 @@ def _create_vfa_fermentation_system(vfa_broth):
     return sys, key_streams, units
 
 
-def create_ad_fermentation_system(
+def create_microbial_oil_system(
     feedstock: str | bst.Stream = "pelagic",
     biostimulant_price: float | None = None,
 ):
@@ -254,17 +253,17 @@ def create_ad_fermentation_system(
     Parameters
     ----------
     feedstock : str or stream
-        Forwarded to create_ad_vfa_system() -- see its docstring for the
+        Forwarded to create_vfa_system() -- see its docstring for the
         str-vs-stream distinction.
     biostimulant_price : float, optional
-        Forwarded to create_ad_vfa_system() -> create_biostimulant_system()
+        Forwarded to create_vfa_system() -> create_biostimulant_system()
         -- only used when feedstock is a str.
 
     Returns
     -------
     sys : bst.System
         The full feedstock -> fermentation-product system. Key streams
-        are accessible via `sys.flowsheet.stream`, including the AD-VFA
+        are accessible via `sys.flowsheet.stream`, including the VFA
         subsystem's 'vfa_broth' (post-microfiltration permeate),
         'vfa_cake', 'acidogenic_solid_digestate', and the final product
         'microbial_oil'.
@@ -272,16 +271,16 @@ def create_ad_fermentation_system(
     try: bst.settings.get_chemicals()
     except Exception: create_chemicals()
     # add_product_splitter=False: this system needs the raw, unsplit
-    # vfa_broth as its own fermentation feed, not ad_vfa_sys's standalone
+    # vfa_broth as its own fermentation feed, not vfa_sys's standalone
     # pure_vfa/vfa_disposal split.
-    ad_vfa_sys = create_ad_vfa_system(
+    vfa_sys = create_vfa_system(
         feedstock=feedstock, add_product_splitter=False,
         biostimulant_price=biostimulant_price,
     )
-    feed = feedstock if not isinstance(feedstock, str) else ad_vfa_sys.feeds[0]
-    vfa_broth = ad_vfa_sys.flowsheet.stream.vfa_broth
-    vfa_cake = ad_vfa_sys.flowsheet.stream.vfa_cake
-    acidogenic_solid_digestate = ad_vfa_sys.flowsheet.stream.acidogenic_solid_digestate
+    feed = feedstock if not isinstance(feedstock, str) else vfa_sys.feeds[0]
+    vfa_broth = vfa_sys.flowsheet.stream.vfa_broth
+    vfa_cake = vfa_sys.flowsheet.stream.vfa_cake
+    acidogenic_solid_digestate = vfa_sys.flowsheet.stream.acidogenic_solid_digestate
 
     fer_sys, fer_streams, fer_units = _create_vfa_fermentation_system(vfa_broth=vfa_broth)
 
@@ -289,14 +288,14 @@ def create_ad_fermentation_system(
     # system gets its own HXN below, scoped to all units visible here, so nesting
     # either subsystem's narrower one would double-count already-optimized utilities.
     combined_units = [
-        u for u in (*ad_vfa_sys.units, *fer_sys.units)
+        u for u in (*vfa_sys.units, *fer_sys.units)
         if not isinstance(u, bst.HeatExchangerNetwork)
     ]
     HXN = bst.HeatExchangerNetwork("HXN", units=tuple(combined_units))
     combined_units.append(HXN)
 
     sys = bst.System.from_units(
-        "ad_fermentation_sys",
+        "microbial_oil_sys",
         units=combined_units,
     )
     create_tea(sys)
@@ -327,7 +326,7 @@ def create_ad_fermentation_system(
 #     ev607.heat_utilities.clear()
 
 
-def price_ad_fermentation_system(credit_tipping_fee: bool = False) -> dict:
+def price_microbial_oil_system(credit_tipping_fee: bool = False) -> dict:
     """
     Parameters
     ----------
@@ -362,7 +361,7 @@ def price_ad_fermentation_system(credit_tipping_fee: bool = False) -> dict:
         biostimulant_price = _TEA_PRICE["biostimulant"]["baseline"]
 
         bst.main_flowsheet.clear()
-        sys = create_ad_fermentation_system(feedstock="pelagic", biostimulant_price=biostimulant_price)
+        sys = create_microbial_oil_system(feedstock="pelagic", biostimulant_price=biostimulant_price)
         sys.simulate()
         # _patch_ev607() not used now, kept as a reference
 
@@ -377,7 +376,7 @@ def price_ad_fermentation_system(credit_tipping_fee: bool = False) -> dict:
         biostimulant_price = price_biostimulant_system()["msp_usd_per_kg"]
 
         bst.main_flowsheet.clear()
-        sys = create_ad_fermentation_system(feedstock="pelagic", biostimulant_price=biostimulant_price)
+        sys = create_microbial_oil_system(feedstock="pelagic", biostimulant_price=biostimulant_price)
         sys.simulate()
         # _patch_ev607() not used now, kept as a reference
 
@@ -389,7 +388,7 @@ def price_ad_fermentation_system(credit_tipping_fee: bool = False) -> dict:
         # biostimulant's own price already covers in its own standalone
         # system.
         ad_specific_units = [u for u in sys.units if u.ID not in BIOSTIMULANT_UNIT_IDS]
-        ad_specific_sys = bst.System.from_units("ad_fermentation_specific_sys", units=ad_specific_units)
+        ad_specific_sys = bst.System.from_units("microbial_oil_specific_sys", units=ad_specific_units)
         ad_specific_tea = create_tea(ad_specific_sys)
 
         product = sys.flowsheet.stream.microbial_oil
@@ -401,7 +400,7 @@ def price_ad_fermentation_system(credit_tipping_fee: bool = False) -> dict:
         msp = apply_revenue_credit(msp, tipping_fee_usd_per_yr)
 
     return {
-        "label": "AD-fermentation",
+        "label": "Microbial oil",
         "product_desc": "crude microbial oil",
         "msp_usd_per_kg": msp["usd_per_kg"],
         "annual_product_kg": msp["annual_product_kg"],
@@ -413,7 +412,7 @@ def price_ad_fermentation_system(credit_tipping_fee: bool = False) -> dict:
 
 
 if __name__ == '__main__':
-    results = price_ad_fermentation_system()
+    results = price_microbial_oil_system()
     sys = results['sys']
 
     figures_dir = Path(__file__).resolve().parent.parent / "results" / "figures"

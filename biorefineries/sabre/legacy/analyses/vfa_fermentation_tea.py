@@ -17,7 +17,7 @@ if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
 from biorefineries.sabre._chemicals import create_chemicals
-from biorefineries.sabre.systems import create_ad_fermentation_system
+from biorefineries.sabre.systems import create_microbial_oil_system
 from biorefineries.sabre._tea import create_tea, solve_product_msp
 
 # -------------------------
@@ -36,7 +36,7 @@ PRICE_NAOH_USD_PER_KG      = 0.35  # NaOH (pH base)
 #   Basis: biological wastewater treatment $3-8/m3 ≈ $0.003-0.008/kg
 FERM_WASTEWATER_DISPOSAL_USD_PER_KG = -0.005
 
-# VFA microfilter retentate: now a separate stream out of the AD-VFA
+# VFA microfilter retentate: now a separate stream out of the VFA
 # subsystem (upstream of fermentation) rather than mixed into wastewater.
 # Same wastewater-treatment basis applies.
 VFA_RETENTATE_DISPOSAL_USD_PER_KG = -0.005
@@ -160,7 +160,7 @@ def build_and_simulate(feed_price_per_kg_wet: float):
     bst.main_flowsheet.clear()
     create_chemicals()
 
-    full_sys = create_ad_fermentation_system()
+    full_sys = create_microbial_oil_system()
     fs = full_sys.flowsheet
     streams = {
         "feed": fs.stream.sargassum_feed,
@@ -474,7 +474,7 @@ def _apply_biostimulant_credit(
 # different yield, residence time, extraction cost, and market price.
 #
 # Modeling scope:
-#   - Yield and residence time are passed directly into create_ad_fermentation_system()
+#   - Yield and residence time are passed directly into create_microbial_oil_system()
 #     so the fermenter (R601) auto-scales its volume and CAPEX correctly.
 #   - Extraction cost replaces the oil reagent in OE.add_OPEX ($/kg product).
 #   - Downstream purification (HPLC for astaxanthin, winterization for EPA)
@@ -531,14 +531,14 @@ def build_and_simulate_scenario(
     residence_time_h: float,
 ):
     """
-    Build and simulate the AD-fermentation system with custom
+    Build and simulate the Microbial oil system with custom
     yield and residence time parameters.
     Returns (streams, units, full_sys).
     """
     bst.main_flowsheet.clear()
     create_chemicals()
 
-    full_sys = create_ad_fermentation_system()
+    full_sys = create_microbial_oil_system()
     fs = full_sys.flowsheet
     streams = {
         "feed": fs.stream.sargassum_feed,

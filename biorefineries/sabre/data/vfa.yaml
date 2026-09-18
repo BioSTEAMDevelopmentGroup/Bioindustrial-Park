@@ -1,0 +1,33 @@
+# Model Assumptions: VFA DSP
+
+vfa_microfilter:
+  vfa_IDs:
+    - AceticAcid
+    - PropionicAcid
+    - ButyricAcid
+    - ValericAcid
+    - HexanoicAcid
+
+  vfa_to_permeate_frac: 0.98
+  water_to_permeate_frac: 0.97
+  solids_to_permeate_frac: 0.05
+  dissolved_other_to_permeate_frac: 0.90
+
+  SEC_kWh_per_m3_feed: 0.08
+
+  # Area-based membrane costing
+  design_flux_L_m2_h: 20.0
+  membrane_cost_usd_per_m2: 200.0
+  F_BM: 1.0 # capex already installed
+
+  notes:
+    - "Area basis uses A = Q_feed * 1000 / flux, where flux is in L/m2/h."
+    - "20 LMH selected as a conservative design flux for low-pressure clarification."
+    - "$200/m2 selected as an upper-end polymeric membrane cost proxy."
+
+
+vfa_product_splitter:
+  # Fraction of VFA mass (the vfa_microfilter.vfa_IDs set) recovered to the
+  # pure_vfa product stream; the rest (unrecovered VFA + everything else --
+  # water, residual dissolved solids, etc.) goes to the vfa_disposal stream.
+  vfa_recovery_frac: 0.98

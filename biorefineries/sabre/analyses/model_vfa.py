@@ -5,18 +5,18 @@
 # github.com/BioSTEAMDevelopmentGroup/biosteam/blob/master/LICENSE.txt
 # for license details.
 """
-biosteam.evaluation.Model construction for the standalone ad_vfa flowsheet
-(systems._ad_vfa_system.create_ad_vfa_system()).
+biosteam.evaluation.Model construction for the standalone vfa flowsheet
+(systems._vfa_system.create_vfa_system()).
 
 add_mill_parameters(), add_acidogenic_ad_parameters(),
 add_digestate_screw_press_parameters(), and add_vfa_microfilter_parameters()
-add only process/cost parameters (no stream prices), so ad_biomethane's
+add only process/cost parameters (no stream prices), so biomethane's
 (future) model file can reuse add_mill_parameters()/
 add_digestate_screw_press_parameters() against its own embedded Mill/
-DigestateScrewPress instances, and ad_fermentation's (future) model file can
-reuse all four against the ad_vfa subsystem it embeds -- see
+DigestateScrewPress instances, and microbial_oil's (future) model file can
+reuse all four against the vfa subsystem it embeds -- see
 docs/superpowers/specs/2026-07-31-sabre-uncertainty-model-design.md for the
-general design and biorefineries/sabre/systems/_ad_vfa_system.py for how
+general design and biorefineries/sabre/systems/_vfa_system.py for how
 this flowsheet is built (it embeds create_biostimulant_system() internally,
 so Press/PressateConcentrator parameters are reused directly from
 model_biostimulant.py, not redefined here).
@@ -25,7 +25,7 @@ import biosteam as bst
 from biosteam.evaluation import Metric
 
 from biorefineries.sabre.utils import load_assumptions
-from biorefineries.sabre.systems._ad_vfa_system import create_ad_vfa_system
+from biorefineries.sabre.systems._vfa_system import create_vfa_system
 from biorefineries.sabre._tea import solve_product_msp
 from biorefineries.sabre.analyses.model_utils import distribution_from_yaml, add_tea_parameters
 from biorefineries.sabre.analyses.model_biostimulant import (
@@ -35,7 +35,7 @@ from biorefineries.sabre.analyses.model_biostimulant import (
 __all__ = (
     'add_mill_parameters', 'add_acidogenic_ad_parameters',
     'add_digestate_screw_press_parameters', 'add_vfa_microfilter_parameters',
-    'create_ad_vfa_model',
+    'create_vfa_model',
 )
 
 # GAL_TO_M3 matches units/_ad.py's own conversion constant -- AnaerobicDigester
@@ -55,9 +55,10 @@ _ADP_ACIDOGENIC = _AD_PERFORMANCE["acidogenic"]
 _ADP_ACIDOGENIC_CASE = _ADP_ACIDOGENIC["cases"][_ADP_ACIDOGENIC["case"]]
 _DIGESTATE_SCREW_PRESS = _AD_YAML["digestate_screw_press"]
 
-_DOWNSTREAM_PROCESSING_YAML = load_assumptions("downstream_processing.yaml")
-_VFA_MICROFILTER = _DOWNSTREAM_PROCESSING_YAML["vfa_microfilter"]
-_VFA_PRODUCT_SPLITTER = _DOWNSTREAM_PROCESSING_YAML["vfa_product_splitter"]
+# downstream_processing.yaml was split up; both keys now live in vfa.yaml.
+_VFA_YAML = load_assumptions("vfa.yaml")
+_VFA_MICROFILTER = _VFA_YAML["vfa_microfilter"]
+_VFA_PRODUCT_SPLITTER = _VFA_YAML["vfa_product_splitter"]
 
 _TEA_PRICE = load_assumptions("tea.yaml")["price"]
 
@@ -68,7 +69,7 @@ def add_mill_parameters(model, ML):
     `mill`): loss_frac, power_kWh_per_dry_ton_dry. Excludes capex_model
     (categorical) and the ref_capacity_dry_ton_per_hr/purchase_cost_ref_usd/
     scale_exponent CAPEX anchor set, and F_BM. Reusable by any sabre
-    flowsheet that embeds a Mill (ad_vfa, ad_biomethane, ad_fermentation).
+    flowsheet that embeds a Mill (vfa, biomethane, microbial_oil).
     """
     param = model.parameter
 
@@ -111,10 +112,10 @@ def add_acidogenic_ad_parameters(model, AD):
     simulation ("no cooling agent that can cool under 157 K"). Every
     other Kelvin temperature parameter in this package
     (EnzymaticPretreatment.temperature_K, HeatingPretreatment.
-    target_temperature_K, used by ad_biomethane) is excluded for the same
+    target_temperature_K, used by biomethane) is excluded for the same
     reason.
 
-    Reusable by ad_fermentation's (future) model file, which embeds ad_vfa's
+    Reusable by microbial_oil's (future) model file, which embeds vfa's
     own system.
     """
     param = model.parameter
@@ -157,9 +158,9 @@ def add_digestate_screw_press_parameters(model, SP):
     cake_moisture_frac, capacity_tph_each, kWh_per_m3. Excludes
     include_polymer_dosing (bool; False in the current baseline, so
     polymer_dosing_cost_usd_each is dead code) and F_BM. Reusable by
-    ad_biomethane's (future) model file (its own DigestateScrewPress on
-    the methanogenic-digestate side) and by ad_fermentation's (future)
-    model file (via ad_vfa reuse).
+    biomethane's (future) model file (its own DigestateScrewPress on
+    the methanogenic-digestate side) and by microbial_oil's (future)
+    model file (via vfa reuse).
     """
     param = model.parameter
 
@@ -189,7 +190,7 @@ def add_vfa_microfilter_parameters(model, MF):
     design_flux_L_m2_h. Excludes vfa_IDs (categorical) and
     membrane_cost_usd_per_m2/F_BM (baked into the class-level `@cost`
     decorator at class-definition time, not a settable instance attribute).
-    Reusable by ad_fermentation's (future) model file, via ad_vfa reuse.
+    Reusable by microbial_oil's (future) model file, via vfa reuse.
     """
     param = model.parameter
 
@@ -212,9 +213,9 @@ def add_vfa_microfilter_parameters(model, MF):
     return model
 
 
-def create_ad_vfa_model(system=None):
+def create_vfa_model(system=None):
     """
-    Build the full biosteam.evaluation.Model for the standalone ad_vfa
+    Build the full biosteam.evaluation.Model for the standalone vfa
     flowsheet: reused Press/PressateConcentrator parameters (from the
     embedded biostimulant subsystem), Mill/AcidogenicAD/
     DigestateScrewPress/VFAMicrofilter process parameters, the product
@@ -226,7 +227,7 @@ def create_ad_vfa_model(system=None):
     Parameters
     ----------
     system : bst.System, optional
-        Defaults to a fresh `create_ad_vfa_system()` (standalone, with the
+        Defaults to a fresh `create_vfa_system()` (standalone, with the
         product splitter enabled -- `pressed_cake`'s disposal price is
         NOT parameterized here: once embedded in this system it feeds the
         Mill instead of leaving as a leaf stream, so BioSTEAM's TEA no
@@ -234,7 +235,7 @@ def create_ad_vfa_model(system=None):
         `system.products`, which do not include `pressed_cake`).
     """
     if system is None:
-        system = create_ad_vfa_system()
+        system = create_vfa_system()
     system.simulate()
 
     flowsheet = system.flowsheet
@@ -289,7 +290,7 @@ def create_ad_vfa_model(system=None):
 
     # SP_PRODUCT's split dict is built at system-construction time as
     # {cid: vfa_recovery_frac for cid in MF.vfa_IDs} (see
-    # systems/_ad_vfa_system.py) -- one uniform recovery fraction applied
+    # systems/_vfa_system.py) -- one uniform recovery fraction applied
     # to every VFA chemical ID, so a single Parameter sets all of them
     # together via SP_PRODUCT.isplit[cid], not one Parameter per chemical.
     vfa_ids = tuple(MF.vfa_IDs)

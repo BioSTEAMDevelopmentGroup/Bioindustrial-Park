@@ -11,10 +11,10 @@ SaBRe (Sargassum Biorefinery) flowsheets.
 Five flowsheets are available, selected via `load(flowsheet_name=...)`:
     - 'biostimulant' (default): press -> pressate concentrator -> biostimulant
       evaporator -> biostimulant product (pressed cake is a disposal liability)
-    - 'ad_biomethane': press -> mill -> [pretreatment] -> AD -> H2S
+    - 'biomethane': press -> mill -> [pretreatment] -> AD -> H2S
       removal -> biogas upgrading -> digestate screw press -> biomethane
-    - 'ad_vfa': press -> mill -> acidogenic AD -> digestate screw press -> VFA broth
-    - 'ad_fermentation': press -> mill -> acidogenic AD -> VFA broth ->
+    - 'vfa': press -> mill -> acidogenic AD -> digestate screw press -> VFA broth
+    - 'microbial_oil': press -> mill -> acidogenic AD -> VFA broth ->
       Yarrowia lipolytica fermentation -> microbial oil
     - 'integrated': shared preprocessing, alpha-split between the
       methanogenic AD pathway and the VFA-to-oil pathway
@@ -60,7 +60,7 @@ def load(flowsheet_name: str = 'biostimulant', **kwargs):
     Parameters
     ----------
     flowsheet_name : str
-        One of 'biostimulant', 'ad_biomethane', 'ad_vfa', 'ad_fermentation',
+        One of 'biostimulant', 'biomethane', 'vfa', 'microbial_oil',
         'integrated'.
     **kwargs
         Forwarded to the corresponding `create_*` system builder.
@@ -79,14 +79,14 @@ def load(flowsheet_name: str = 'biostimulant', **kwargs):
     if flowsheet_name == 'biostimulant':
         sys = create_biostimulant_system(**kwargs)
         sys.simulate()
-    elif flowsheet_name == 'ad_biomethane':
-        sys = create_ad_biomethane_system(**kwargs)
+    elif flowsheet_name == 'biomethane':
+        sys = create_biomethane_system(**kwargs)
         sys.simulate()
-    elif flowsheet_name == 'ad_vfa':
-        sys = create_ad_vfa_system(**kwargs)
+    elif flowsheet_name == 'vfa':
+        sys = create_vfa_system(**kwargs)
         sys.simulate()
-    elif flowsheet_name == 'ad_fermentation':
-        sys = create_ad_fermentation_system(**kwargs)
+    elif flowsheet_name == 'microbial_oil':
+        sys = create_microbial_oil_system(**kwargs)
         sys.simulate()
     elif flowsheet_name == 'integrated':
         sys = create_ad_integrated_system(**kwargs)
@@ -94,7 +94,7 @@ def load(flowsheet_name: str = 'biostimulant', **kwargs):
     else:
         raise ValueError(
             f"Unknown flowsheet_name {flowsheet_name!r}. "
-            "Choose from 'biostimulant', 'ad_biomethane', 'ad_vfa', 'ad_fermentation', 'integrated'."
+            "Choose from 'biostimulant', 'biomethane', 'vfa', 'microbial_oil', 'integrated'."
         )
 
     _loaded_flowsheet_name = flowsheet_name

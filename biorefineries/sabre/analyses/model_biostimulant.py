@@ -9,7 +9,7 @@ biosteam.evaluation.Model construction for the standalone biostimulant
 flowsheet (systems._biostimulant_system.create_biostimulant_system()).
 
 add_press_parameters() and add_pressate_concentrator_parameters() add only
-process/cost parameters (no stream prices), so ad_biomethane/ad_vfa's own
+process/cost parameters (no stream prices), so biomethane/vfa's own
 (future) model files can import and reuse them against their own embedded
 PR/PC instances -- see
 docs/superpowers/specs/2026-07-31-sabre-uncertainty-model-design.md.
