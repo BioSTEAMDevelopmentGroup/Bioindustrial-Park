@@ -1,0 +1,140 @@
+# Model Assumptions: 3-HP Fermentation and Crystallization
+#
+# See sabre/units/_3hp.py (HPFermentation, CaHPCrystallizer) and
+# docs/superpowers/specs/2026-09-18-sabre-3hp-sargassum-design.md (secs. 7-8)
+# for the design this file backs.
+
+fermentation:
+  product_ID: HP
+  cellmass_ID: CellMass
+  lime_ID: CalciumDihydroxide
+  product_salt_ID: Ca3HP2
+
+  # Substrate -> HP conversion (X) and the mass-yield coefficient applied to
+  # the resulting consumed mass (kg HP formed per kg substrate consumed by
+  # *this* reaction only). Each substrate also has an independent, much
+  # smaller cell-mass-forming conversion (see biomass_conversion /
+  # biomass_yield_kg_per_kg_consumed below) drawn from the same original
+  # available pool -- mirroring biorefineries.HP's BatchCoFermentation,
+  # which runs "Glucose -> 2 HP" (X=.49) and "Glucose -> 6 FermMicrobe +
+  # 2.4 H2O" (X=.05) as two independent reactions on the same Glucose pool
+  # via a ParallelReaction, not a sequential depletion of one by the other.
+  #
+  # Glucose -> 2 HP is exactly mass-balanced (2 * HP's MW == Glucose's MW,
+  # both 180.15588), so its hp_yield_kg_per_kg_consumed is exactly 1.0.
+  # Mannitol and AlginateMonomer are NOT exact multiples of HP's MW, and
+  # thermosteam.Reaction does not enforce or warn on an unbalanced
+  # reaction -- confirmed by direct testing that running an unbalanced
+  # Reaction (e.g. "Mannitol -> 2 HP") silently destroys real mass. To
+  # avoid that, HPFermentation computes these two substrates' HP
+  # formation imperatively (consumed * mass yield, mirroring sabre's own
+  # YarrowiaLipidFermenter._run_reactions pattern) using the MW-derived
+  # mass yield below, rather than a thermosteam Reaction object. This is
+  # the "mass-yield scaling against MW" simplification flagged in the
+  # design spec sec. 7/12, since neither chemical carries an exact atomic
+  # formula in this preliminary chemical set.
+  substrates:
+    Glucose:
+      hp_conversion: 0.49
+      hp_yield_kg_per_kg_consumed: 1.0
+      biomass_conversion: 0.05
+      biomass_yield_kg_per_kg_consumed: 0.8270910524818841
+    Mannitol:
+      hp_conversion: 0.40
+      hp_yield_kg_per_kg_consumed: 0.9889341794798491
+      biomass_conversion: 0.05
+      biomass_yield_kg_per_kg_consumed: 0.8179386113412968
+    AlginateMonomer:
+      hp_conversion: 0.40
+      hp_yield_kg_per_kg_consumed: 0.9279717563771187
+      biomass_conversion: 0.05
+      biomass_yield_kg_per_kg_consumed: 0.7675171366554135
+
+  # tau = titer / productivity [hr], computed by HPFermentation itself
+  # (a self-contained simplification of HP's external
+  # TiterAndInhibitorsSpecification / ProcessSpecification pattern -- no
+  # inhibitor-concentration cap logic carried over, flagged in the design
+  # spec sec. 7/12).
+  titer_g_per_L: 62.5
+  productivity_g_per_L_per_h: 0.76
+
+  # In-situ neutralization with Ca(OH)2 (not NaOH), consistent with the
+  # patent's Example 1 -- this is what supplies the calcium the
+  # crystallization step needs. Dosed to the exact stoichiometric demand of
+  # the HP formed (2 HP : 1 CalciumDihydroxide), plus a small excess,
+  # mirroring EnzymaticPress's own enzyme-excess pattern rather than HP's
+  # fixed per-volume lime loading (which is decoupled from the acid
+  # actually formed).
+  neutralization_conversion: 0.999999999  # 1 - 1e-9, matches HP's own Rxn(..., 'HP', 1-1e-9)
+  lime_excess_frac: 0.02
+
+  T_K: 301.15  # 28 degC, matches HP's BatchCoFermentation operating temperature
+  P_Pa: 101325.0
+  V_m3: 3785.0  # matches HP's BatchCoFermentation default reactor volume
+
+  sources:
+    conversions_and_titer:
+      key: user_specified
+      note: "Substrate conversions (Glucose/Xylose 0.49, Mannitol/Alginate 0.40), titer (62.5 g/L), and productivity (0.76 g/L/hr) given directly by the user, following the values reported in a 3-HP process flowsheet; not independently derived here."
+      note_2: "biorefineries.HP itself uses 0.49 for its own Glucose/Xylose -> HP conversions and 0.76 g/L/hr as its default BatchCoFermentation.productivity, confirming these are shared literature/flowsheet values, not novel to this feedstock."
+    biomass_yield:
+      key: analogous_to_HP
+      note: "Biomass-forming side reaction retained per the design spec (sec. 7), analogous to HP's 'Glucose -> 6 FermMicrobe + 2.4 H2O' (X=0.05). Coefficient here (6 mol CellMass per mol substrate, since both FermMicrobe and CellMass formulas carry exactly 1 carbon per formula unit like Glucose's 6) is scaled to sabre's own CellMass MW (24.8342 g/mol) rather than HP's FermMicrobe MW (24.2062 g/mol); no independent literature source for Sargassum-derived substrates specifically."
+    neutralization:
+      key: HP_precedent
+      note: "biorefineries.HP.units.BatchCoFermentation neutralizes lactic-acid-family products with Ca(OH)2 via Rxn('2 HP + CalciumDihydroxide -> CalciumLactate + 2 H2O', 'HP', 1-1e-9); reused here verbatim (X and reactant choice) but forming Ca3HP2 instead of CalciumLactate, and dosed to exact stoichiometric demand instead of HP's fixed lime_mol_per_L_loading, since this preliminary model has no other use for excess lime."
+    reactor_T_V:
+      key: HP_precedent
+      note: "T=28 degC and V=3785 m3 (1,000,000 gal) match biorefineries.HP.units.BatchCoFermentation's own defaults; not re-derived for Sargassum substrates."
+
+
+crystallization:
+  product_ID: Ca3HP2
+
+  # Fixed recovery fraction (not a temperature-solubility correlation): the
+  # patent reports fixed recovery/purity at specified conditions (room
+  # temperature, ~300 rpm stirring) rather than a solubility-vs-temperature
+  # curve, so a fixed-recovery split is the fidelity level the design spec
+  # (sec. 8) calls for -- same simplification level as
+  # biorefineries.succinic's SuccinicAcidCrystallizer /
+  # biorefineries.TAL's TALCrystallizer structurally (single two-phase
+  # outlet, phase split done in CaHPCrystallizer._run), but those two use a
+  # solubility-vs-T correlation for the split fraction where this uses a
+  # constant.
+  target_recovery: 0.91  # midpoint of the patent's reported ~90-92% range
+
+  T_K: 298.15  # room temperature, per the patent's Examples 1/2
+  tau: 4.0  # batch crystallization time [hr]; no source found for this value, scoping placeholder
+  V_m3: 200.0
+
+  sources:
+    recovery:
+      key: user_specified_patent
+      note: "Patent Examples 1/2 and Table 1 report ~90-92% Ca(3HP)2 recovery at room temperature with ~300 rpm stirring; 91% (midpoint) selected as the fixed recovery fraction."
+    reactor_sizing:
+      key: scoping_placeholder
+      note: "tau and V are current scoping assumptions for process modeling and should be sensitivity-tested; no literature source for full-scale batch crystallizer sizing on this system."
+
+
+crystal_separator:
+  # Downstream bst.units.SolidsCentrifuge instantiation (S402 in the
+  # design spec), same class already used for the cell-mass centrifuge
+  # (S401) -- not a new unit class, just documented dosing/split targets
+  # for whoever wires the system script.
+  moisture_content: 0.05  # crystal-cake moisture leaving the centrifuge
+
+  sources:
+    purity:
+      key: user_specified_patent
+      note: "Patent reports ~93-99% crystal purity after this separation step; moisture_content selected to be consistent with the low end of that range for a preliminary model."
+
+
+dryer:
+  # Downstream bst.units.DrumDryer instantiation (F402 in the design
+  # spec) -- not a new unit class.
+  target_moisture_content: 0.0005  # 500 ppm, mid-range of the patent's ~200-5000 ppm dried product
+
+  sources:
+    target_moisture:
+      key: user_specified_patent
+      note: "Patent's oven-drying step (Examples 1/2) reports final moisture in the ~200-5000 ppm range; 500 ppm selected as a representative mid-range target."

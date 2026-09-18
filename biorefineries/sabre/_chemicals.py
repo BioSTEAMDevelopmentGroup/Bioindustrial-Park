@@ -138,7 +138,43 @@ def create_chemicals(set_thermo: bool = True, include_hp3: bool = False):
         Enzyme.V.add_model(tmo.functional.rho_to_V(1000, Enzyme.MW), top_priority=True)
         Enzyme.copy_models_from(Water, ["mu"])
 
-        hp3_chemicals = [Glucose, AlginateMonomer, Enzyme]
+        # Real database chemical: 3-hydroxypropionic acid, the fermentation
+        # product (HPFermentation, sabre/units/_3hp.py).
+        HP = bst.Chemical("HP", search_ID="3-Hydroxypropionic acid")
+
+        # Real database chemical: fermentation neutralization base, forming
+        # Ca3HP2 in situ (HPFermentation). Dosed into a liquid-phase
+        # broth, but its database liquid-volume/viscosity correlations
+        # ('NEGLECT_P') are invalid at process T/P -- same issue this file
+        # already works around for KH2PO4/MagnesiumSulfate/NaOH below, fixed
+        # the same way (dilute-solute density/viscosity proxy).
+        CalciumDihydroxide = bst.Chemical("CalciumDihydroxide", search_ID="Calcium hydroxide")
+        CalciumDihydroxide.V.l.add_model(
+            tmo.functional.rho_to_V(1e5, CalciumDihydroxide.MW), top_priority=True
+        )
+        CalciumDihydroxide.copy_models_from(Water, ["mu"])
+
+        # Calcium 3-hydroxypropionate, the crystallized final product
+        # (CaHPCrystallizer, sabre/units/_3hp.py). 3-HP and lactic acid are
+        # structural isomers (both C3H6O3), so their calcium salts share the
+        # exact same molecular formula (CaC6H10O6) -- properties borrowed
+        # from the database's real "Calcium lactate" entry as the best
+        # available proxy (same borrowing technique used for Alginate/
+        # Fucoidan above, but via a formula-identical real analog here
+        # rather than an approximate one). Locked to phase="s" (the
+        # crystallized/dried state this chemical is always tracked in);
+        # the database entry has no Hf, so one is estimated assuming the
+        # neutralization reaction (2 HP + Ca(OH)2 -> Ca3HP2 + 2 H2O) is
+        # thermoneutral (no literature heat of reaction found):
+        # Hf(Ca3HP2) = 2*Hf(HP) + Hf(Ca(OH)2) - 2*Hf(Water). The database
+        # entry also has no solid-phase molar volume model, so density
+        # borrows the same generic structural-solid proxy (_rho_solids)
+        # used for Glucan/Alginate/etc. above.
+        Ca3HP2 = bst.Chemical("Ca3HP2", search_ID="Calcium lactate", phase="s")
+        Ca3HP2.Hf = 2 * HP.Hf + CalciumDihydroxide.Hf - 2 * Water.Hf
+        Ca3HP2.V.add_model(tmo.functional.rho_to_V(_rho_solids, Ca3HP2.MW), top_priority=True)
+
+        hp3_chemicals = [Glucose, AlginateMonomer, Enzyme, HP, CalciumDihydroxide, Ca3HP2]
 
     # Gases
     CH4 = bst.Chemical("Methane", phase="g")

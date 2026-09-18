@@ -1,0 +1,294 @@
+# Bioindustrial-Park: BioSTEAM's Premier Biorefinery Models and Results
+# Copyright (C) 2026-, Yalin Li <mailto.yalin.li@gmail.com>
+#
+# This module is under the UIUC open-source license. See
+# github.com/BioSTEAMDevelopmentGroup/biosteam/blob/master/LICENSE.txt
+# for license details.
+
+import biosteam as bst
+import thermosteam as tmo
+from biosteam.units import BatchBioreactor
+
+from biorefineries.sabre.utils import load_assumptions
+
+__all__ = ('HPFermentation', 'CaHPCrystallizer')
+
+# Loaded assumptions
+_3HP_YAML = load_assumptions("3hp.yaml")
+_FERMENTATION = _3HP_YAML["fermentation"]
+_SUBSTRATES = _FERMENTATION["substrates"]
+_CRYSTALLIZATION = _3HP_YAML["crystallization"]
+
+
+class HPFermentation(BatchBioreactor):
+    """
+    Sargassum-derived-sugar fermentation to 3-hydroxypropionic acid (HP),
+    neutralized in situ with Ca(OH)2 to calcium 3-hydroxypropionate
+    (Ca3HP2). A sabre-local adaptation of biorefineries.HP's
+    BatchCoFermentation (`biorefineries/HP/units.py`), re-implemented here
+    rather than imported, to keep sabre's dependency boundary clean.
+
+    For each substrate in `substrates`, two independent reactions draw from
+    the same original available pool (mirroring how HP's own
+    ParallelReaction handles "Glucose -> 2 HP" and "Glucose -> 6 FermMicrobe
+    + 2.4 H2O" as two separate reactions sharing the Glucose reactant):
+
+    - HP formation: `hp_conversion` fraction of available substrate is
+      consumed, forming HP at `hp_yield_kg_per_kg_consumed` (mass HP per
+      mass substrate consumed by this reaction).
+    - Biomass formation: `biomass_conversion` fraction of available
+      substrate is independently consumed, forming CellMass at
+      `biomass_yield_kg_per_kg_consumed`.
+
+    Glucose -> 2 HP is exactly mass-balanced (2x HP's MW == Glucose's MW),
+    but Mannitol and AlginateMonomer are not exact multiples of HP's MW.
+    thermosteam.Reaction does not enforce or warn on an unbalanced
+    reaction -- confirmed by direct testing that it silently destroys real
+    mass -- so all three substrates are handled with the same imperative,
+    mass-conserving-by-construction arithmetic (consumed * yield) instead
+    of thermosteam Reaction objects, mirroring sabre's own
+    YarrowiaLipidFermenter._run_reactions pattern. This is the "mass-yield
+    scaling against MW" simplification flagged in the design spec (secs.
+    7, 12).
+
+    Neutralization (`2 HP + CalciumDihydroxide -> Ca3HP2 + 2 Water`) IS an
+    exactly atom-balanced reaction (LHS/RHS MW both 254.24856), so it is
+    implemented as a real `tmo.Reaction`, dosed to the exact stoichiometric
+    demand of the HP formed plus a small excess.
+
+    Parameters
+    ----------
+    ins : stream
+        Substrate feed, and lime (Ca(OH)2, dosed automatically -- pass an
+        empty placeholder stream).
+    outs : tuple[stream, stream]
+        Vent and fermentation broth (Ca3HP2 already formed in situ).
+    substrates : dict[str, dict]
+        Per-substrate `hp_conversion`, `hp_yield_kg_per_kg_consumed`,
+        `biomass_conversion`, `biomass_yield_kg_per_kg_consumed`.
+    product_ID : str
+        Chemical ID of the free-acid fermentation product (HP) -- exists
+        only transiently within `_run`, since neutralization converts
+        (almost) all of it to `product_salt_ID` before `_run` returns.
+    cellmass_ID : str
+        Chemical ID of cell mass.
+    lime_ID : str
+        Chemical ID of the neutralization base (Ca(OH)2).
+    product_salt_ID : str
+        Chemical ID of the neutralized product (Ca3HP2).
+    neutralization_conversion : float
+        Fraction of HP neutralized to the calcium salt (bounded < 1, since
+        `tmo.Reaction` requires X < 1).
+    lime_excess_frac : float
+        Excess lime dosed beyond the exact stoichiometric demand.
+    titer_g_per_L : float
+        Target product titer; used only to compute `tau`.
+    productivity_g_per_L_per_h : float
+        Target volumetric productivity; used only to compute `tau`.
+    T : float
+        Operating temperature [K] (`BatchBioreactor`'s own attribute name).
+    P : float
+        Operating pressure [Pa] (`BatchBioreactor`'s own attribute name).
+    V : float
+        Target reactor volume [m3] (`BatchBioreactor`'s own attribute
+        name).
+    **kwargs
+        Forwarded to `biosteam.units.BatchBioreactor.__init__`.
+
+    See Also
+    --------
+    Refer to data/3hp.yaml for the default values and references.
+    """
+
+    _N_ins = 2
+    _N_outs = 2
+
+    def __init__(
+        self,
+        ID: str = "",
+        ins=None,
+        outs=(),
+        *,
+        substrates: dict = _SUBSTRATES,
+        product_ID: str = _FERMENTATION["product_ID"],
+        cellmass_ID: str = _FERMENTATION["cellmass_ID"],
+        lime_ID: str = _FERMENTATION["lime_ID"],
+        product_salt_ID: str = _FERMENTATION["product_salt_ID"],
+        neutralization_conversion: float = _FERMENTATION["neutralization_conversion"],
+        lime_excess_frac: float = _FERMENTATION["lime_excess_frac"],
+        titer_g_per_L: float = _FERMENTATION["titer_g_per_L"],
+        productivity_g_per_L_per_h: float = _FERMENTATION["productivity_g_per_L_per_h"],
+        T: float = _FERMENTATION["T_K"],
+        P: float = _FERMENTATION["P_Pa"],
+        V: float = _FERMENTATION["V_m3"],
+        **kwargs,
+    ):
+        kwargs.setdefault("V", V)
+        super().__init__(ID, ins, outs, T=T, P=P, tau=None, **kwargs)
+
+        self.substrates = {k: dict(v) for k, v in substrates.items()}
+        self.product_ID = product_ID
+        self.cellmass_ID = cellmass_ID
+        self.lime_ID = lime_ID
+        self.product_salt_ID = product_salt_ID
+        self.neutralization_conversion = float(neutralization_conversion)
+        self.lime_excess_frac = float(lime_excess_frac)
+        self.titer_g_per_L = float(titer_g_per_L)
+        self.productivity_g_per_L_per_h = float(productivity_g_per_L_per_h)
+        self.tau = self.titer_g_per_L / self.productivity_g_per_L_per_h
+
+        self.neutralization_rxn = tmo.Reaction(
+            f"2 {product_ID} + {lime_ID} -> {product_salt_ID} + 2 Water",
+            reactant=product_ID,
+            X=self.neutralization_conversion,
+        )
+
+    def _run(self):
+        feed, lime = self.ins
+        vent, effluent = self.outs
+
+        lime.empty()
+        vent.empty()
+
+        effluent.copy_like(feed)
+        effluent.phase = "l"
+
+        self._run_reactions(effluent)
+        self._run_neutralization(effluent, lime)
+
+        effluent.T = vent.T = self.T
+        effluent.P = vent.P = self.P
+
+    def _run_reactions(self, effluent):
+        ids = set(self.chemicals.IDs)
+        required = (self.product_ID, self.cellmass_ID)
+        missing = [i for i in required if i not in ids]
+        if missing:
+            raise RuntimeError(f"Missing required chemicals in thermo: {missing}")
+
+        hp_formed_total = 0.0
+        biomass_formed_total = 0.0
+        substrate_available_total = 0.0
+
+        for substrate_ID, params in self.substrates.items():
+            if substrate_ID not in ids:
+                continue
+            available = float(effluent.imass[substrate_ID])
+            if available <= 1e-12:
+                continue
+            substrate_available_total += available
+
+            hp_consumed = params["hp_conversion"] * available
+            hp_formed = params["hp_yield_kg_per_kg_consumed"] * hp_consumed
+
+            biomass_consumed = params["biomass_conversion"] * available
+            biomass_formed = params["biomass_yield_kg_per_kg_consumed"] * biomass_consumed
+
+            # Mass-conserving by construction (mirrors sabre's own
+            # YarrowiaLipidFermenter._run_reactions "yields don't sum to 1"
+            # pattern): only the mass actually formed (hp_formed +
+            # biomass_formed) is removed from the substrate pool, not the
+            # nominal *_consumed amounts -- the gap between "consumed" (via
+            # conversion X) and "accounted" (via the <1 mass yield) simply
+            # stays as unreacted substrate rather than vanishing.
+            accounted = hp_formed + biomass_formed
+            effluent.imass[substrate_ID] -= accounted
+
+            hp_formed_total += hp_formed
+            biomass_formed_total += biomass_formed
+
+        effluent.imass[self.product_ID] += hp_formed_total
+        effluent.imass[self.cellmass_ID] += biomass_formed_total
+
+        self.design_results["Substrate available (kg/h)"] = substrate_available_total
+        self.design_results["HP formed (kg/h)"] = hp_formed_total
+        self.design_results["Biomass formed (kg/h)"] = biomass_formed_total
+
+    def _run_neutralization(self, effluent, lime):
+        rxn = self.neutralization_rxn
+        hp_mol = float(effluent.imol[self.product_ID])
+        lime_mol_needed = 0.5 * hp_mol * (1.0 + self.lime_excess_frac)
+        lime.imol[self.lime_ID] = lime_mol_needed
+        effluent.mol += lime.mol
+
+        rxn(effluent)
+
+        self.design_results["Lime dosed (kg/h)"] = lime.F_mass
+
+
+class CaHPCrystallizer(bst.BatchCrystallizer):
+    """
+    Batch crystallizer for calcium 3-hydroxypropionate (Ca3HP2), splitting
+    a fixed recovery fraction of the dissolved product to the solid phase
+    of a single two-phase outlet stream, following the structural pattern
+    of biorefineries.succinic's SuccinicAcidCrystallizer /
+    biorefineries.TAL's TALCrystallizer (single 2-phase outlet, phase split
+    computed in `_run`), but using a constant `target_recovery` rather than
+    a temperature-solubility correlation: the patent reports fixed
+    recovery/purity at specified conditions (room temperature, ~300 rpm
+    stirring), not a solubility-vs-temperature curve, so a fixed-recovery
+    split is the fidelity level the design spec (sec. 8) calls for.
+    Inherits `bst.BatchCrystallizer`'s batch-vessel sizing/costing
+    unchanged.
+
+    Parameters
+    ----------
+    ins : stream
+        Concentrated broth (product dissolved, from the upstream
+        evaporator).
+    outs : stream
+        Two-phase effluent: solid-phase crystal + liquid-phase mother
+        liquor. Separated into two streams downstream by a
+        `bst.units.SolidsCentrifuge` (not part of this unit).
+    product_ID : str
+        Chemical ID of the crystallized product (Ca3HP2).
+    target_recovery : float
+        Fixed fraction of dissolved product mass recovered to the solid
+        phase.
+    **kwargs
+        Forwarded to `bst.BatchCrystallizer.__init__`.
+
+    See Also
+    --------
+    Refer to data/3hp.yaml for the default values and references.
+    """
+
+    def __init__(
+        self,
+        ID: str = "",
+        ins=None,
+        outs=(),
+        *,
+        product_ID: str = _CRYSTALLIZATION["product_ID"],
+        target_recovery: float = _CRYSTALLIZATION["target_recovery"],
+        T: float = _CRYSTALLIZATION["T_K"],
+        tau: float = _CRYSTALLIZATION["tau"],
+        V: float = _CRYSTALLIZATION["V_m3"],
+        **kwargs,
+    ):
+        kwargs.setdefault("V", V)
+        super().__init__(ID, ins, outs, T=T, tau=tau, **kwargs)
+        self.product_ID = product_ID
+        self.target_recovery = float(target_recovery)
+
+    def _run(self):
+        feed, = self.ins
+        effluent, = self.outs
+
+        effluent.copy_like(feed)
+        effluent.phases = ("l", "s")
+
+        product_mol = float(feed.imol[self.product_ID])
+        solid_mol = self.target_recovery * product_mol
+        liquid_mol = product_mol - solid_mol
+
+        effluent["l"].mol = feed.mol.copy()
+        effluent["l"].imol[self.product_ID] = liquid_mol
+        effluent["s"].empty()
+        effluent["s"].imol[self.product_ID] = solid_mol
+
+        effluent.T = self.T
+
+        self.design_results["Product recovered to solids (kg/h)"] = (
+            solid_mol * feed.chemicals[self.product_ID].MW
+        )
