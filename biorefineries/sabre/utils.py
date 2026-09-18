@@ -97,25 +97,33 @@ def get_ad_temperature_K(ad_assumptions: dict, temperature_regime: str) -> float
 DRY_COMPOSITION = load_assumptions("feedstock.yaml")["dry_composition"]
 
 
-def make_sargassum_feed(fresh_feed_kgph: float, moisture_frac: float, ash_wt_frac_dry: float):
+def make_sargassum_feed(fresh_feed_kgph: float, moisture_frac: float, ash_wt_frac_dry: float,
+                         dry_composition: dict | None = None):
     water_kgph = fresh_feed_kgph * moisture_frac
     dry_kgph   = fresh_feed_kgph * (1 - moisture_frac)
 
-    base_ash = DRY_COMPOSITION["Ash"]
-    base_nonash_sum = 1.0 - base_ash
-    target_nonash_sum = 1.0 - ash_wt_frac_dry
+    if dry_composition is not None:
+        # Full per-feedstock-type override (data/feedstock.yaml
+        # feedstock_type.<name>.dry_composition, e.g. natansVII) -- used
+        # as-is instead of proportionally rescaling the global baseline,
+        # since components can move by different factors relative to it.
+        dry_fracs = dict(dry_composition)
+    else:
+        base_ash = DRY_COMPOSITION["Ash"]
+        base_nonash_sum = 1.0 - base_ash
+        target_nonash_sum = 1.0 - ash_wt_frac_dry
 
-    if base_nonash_sum <= 1e-12:
-        raise RuntimeError("Base non-ash fraction is ~0; cannot scale.")
-    scale = target_nonash_sum / base_nonash_sum
+        if base_nonash_sum <= 1e-12:
+            raise RuntimeError("Base non-ash fraction is ~0; cannot scale.")
+        scale = target_nonash_sum / base_nonash_sum
 
-    # Build final dry-basis fractions with ash overridden, other components
-    # rescaled to fill the remaining dry mass proportionally.
-    dry_fracs = {"Ash": ash_wt_frac_dry}
-    for k, v in DRY_COMPOSITION.items():
-        if k == "Ash":
-            continue
-        dry_fracs[k] = v * scale
+        # Build final dry-basis fractions with ash overridden, other components
+        # rescaled to fill the remaining dry mass proportionally.
+        dry_fracs = {"Ash": ash_wt_frac_dry}
+        for k, v in DRY_COMPOSITION.items():
+            if k == "Ash":
+                continue
+            dry_fracs[k] = v * scale
 
     # Normalize for numerical safety
     s = sum(dry_fracs.values())

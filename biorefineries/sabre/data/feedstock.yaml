@@ -30,6 +30,32 @@ feedstock_type:
       key: milledge2020
       note: "Energies 2020 paper (Mixed Sargassum inundation), Table 1."
 
+  natansVII:
+    moisture_frac: 0.8673   # ASSUMED: reused from `pelagic` pending a literature source
+    ash_wt_frac_dry: 0.2903 # balances dry_composition below to sum to 1
+    vs_ts: 0.7097           # = 1 - ash_wt_frac_dry (not independently sourced)
+    # Full per-type composition override -- NOT proportionally rescaled from
+    # the global dry_composition above. Mannitol/Glucan/Alginate move by
+    # different factors relative to the baseline (Mannitol up ~6.5x, Glucan
+    # down ~0.64x, Alginate down ~0.86x), so a single ash-driven rescale
+    # factor can't produce these targets; make_sargassum_feed() uses this
+    # block directly when present instead (see utils.py).
+    dry_composition:
+      Ash: 0.2903
+      OtherSolids: 0.2941  # unchanged from baseline
+      Glucan: 0.0700       # 7.00% dry (user-specified)
+      Alginate: 0.0900     # 9.00% dry (user-specified)
+      Protein: 0.0756      # unchanged from baseline
+      Mannitol: 0.1300     # 13.00% dry (user-specified)
+      Fucoidan: 0.0500     # unchanged from baseline
+    source:
+      key: user_specified
+      note: >
+        Mannitol/Glucan/Alginate targets specified directly; Ash reduced to
+        balance dry_composition to sum to 1; OtherSolids/Protein/Fucoidan
+        held at the global baseline; moisture_frac assumed equal to pelagic
+        pending a literature source.
+
 policies:
   solids_loading_target_ts_wt_frac: 0.15
   solids_loading_target_ts_wt_frac_max: 0.20
