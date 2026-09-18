@@ -56,6 +56,7 @@ PI (log-tail, drawn on the IRR axis) / isobutanol yield / titer / productivity
 default_split_12d_specs). Writes <stem>_<stamp>.png and .pdf to --out-dir.
 """
 import os
+import re
 import argparse
 import importlib.util
 from datetime import datetime
@@ -950,6 +951,72 @@ def _mathify(token):
     return f'${base}_{{{sub}}}$'
 
 
+# --- bold axis titles, leaving unit annotations at regular weight ------------
+# matplotlib cannot mix weights within one Text except through mathtext, so the
+# title text (and any parameter symbol) is re-emitted as bold mathtext
+# (\mathbf), while every unit annotation -- any [...] or (...) group, e.g.
+# '[g·L$^{-1}$]' or '(× baseline)' -- is left exactly as written (regular).
+# mathtext specials that can appear in a plain-text title run, escaped so
+# \mathbf{...} stays well-formed (spaces become '\ ' separately).
+_MATHTEXT_ESCAPE = {'%': r'\%', '&': r'\&', '#': r'\#', '_': r'\_',
+                    '{': r'\{', '}': r'\}'}
+
+
+def _bold_run(run):
+    """A title text run -> one bold mathtext expression. Plain text is set with
+    \\mathbf (spaces -> '\\ '); an embedded $math$ segment has its inner content
+    wrapped in \\mathbf too. A whitespace-only / empty run is returned
+    unchanged (never an empty \\mathbf{})."""
+    if not run.strip():
+        return run
+    parts = []
+    for seg in re.split(r'(\$[^$]*\$)', run):
+        if not seg:
+            continue
+        if seg.startswith('$') and seg.endswith('$'):
+            inner = seg[1:-1]
+            if inner:
+                parts.append(r'\mathbf{' + inner + '}')
+        else:
+            esc = ''.join(_MATHTEXT_ESCAPE.get(c, c) for c in seg)
+            parts.append(r'\mathbf{' + esc.replace(' ', r'\ ') + '}')
+    return '$' + ''.join(parts) + '$'
+
+
+def _split_units(line):
+    """Split a single title line into (is_unit, text) segments: a bracketed
+    [...] or parenthesized (...) group is a unit (kept verbatim, regular
+    weight); everything else is title text (to be bolded). Nested brackets
+    inside an outer group stay inside it (e.g. the (g DCW) inside a [...] unit)."""
+    segs, buf, close = [], '', None
+    for c in line:
+        if close is None and c in '[(':
+            if buf:
+                segs.append((False, buf))
+            buf, close = c, (']' if c == '[' else ')')
+        elif close is not None:
+            buf += c
+            if c == close:
+                segs.append((True, buf))
+                buf, close = '', None
+        else:
+            buf += c
+    if buf:
+        segs.append((close is not None, buf))   # unterminated -> leave as-is
+    return segs
+
+
+def _bold_axis_title(label):
+    """Return `label` with its descriptive text and parameter symbols bold,
+    while unit annotations ([...] / (...) groups) stay at regular weight.
+    Multi-line safe; the exact unit text is preserved."""
+    out = []
+    for line in label.split('\n'):
+        out.append(''.join(seg if is_unit else _bold_run(seg)
+                           for is_unit, seg in _split_units(line)))
+    return '\n'.join(out)
+
+
 def bar_cell(ax, sets, colors, var, kind, ylabel, subtitle=None, ylim=None,
              band=None):
     """One parameter cell: colored bars per set with the searched band
@@ -1031,7 +1098,7 @@ def bar_cell(ax, sets, colors, var, kind, ylabel, subtitle=None, ylim=None,
         if base is not None:
             ax.axhline(base, color='k', lw=0.8, ls='--', zorder=1)
         bottom = 0
-    ax.set_ylabel(ylabel, fontsize=FONTS['cell'], labelpad=3)
+    ax.set_ylabel(_bold_axis_title(ylabel), fontsize=FONTS['cell'], labelpad=3)
     if subtitle:
         ax.set_title(subtitle, fontsize=FONTS['tick'], pad=4)
     for j, s in enumerate(sets):
@@ -1113,8 +1180,8 @@ def outcome_cell(ax, sets, colors, col, title, ylim, xmax, point_size=9):
                 ls='-' if own else (0, (1.5, 1.2)),
                 zorder=2 if own else 3)
     # metric name next to the value axis itself (not a title above the cell)
-    ax.set_ylabel(title, fontsize=FONTS['cell'], labelpad=3)
-    ax.set_xlabel('Trial', fontsize=FONTS['tick'], labelpad=2)
+    ax.set_ylabel(_bold_axis_title(title), fontsize=FONTS['cell'], labelpad=3)
+    ax.set_xlabel(_bold_axis_title('Trial'), fontsize=FONTS['tick'], labelpad=2)
     # the wide IRR cell fits five majors (0..2000 by 500); the narrow cells
     # take three (0, 1000, 2000). Four minor ticks sit between each major pair.
     ax.xaxis.set_major_locator(MultipleLocator(500 if col == 'IRR' else 1000))
@@ -1472,7 +1539,7 @@ def draw_burden(fig, gs_cell, sets, colors):
     box_l = axL.get_position(); box_r = axR.get_position()
     mid = 0.5 * (box_l.x0 + box_r.x1)
     fig.text(mid, box_l.y0 - 0.030,
-             'Proteome allocation [g protein·(g DCW)$^{-1}$]',
+             _bold_axis_title('Proteome allocation [g protein·(g DCW)$^{-1}$]'),
              ha='center', va='top', fontsize=FONTS['axis'])
 
     # sector key, in the margin to the left of the narrowed panel: neutral
