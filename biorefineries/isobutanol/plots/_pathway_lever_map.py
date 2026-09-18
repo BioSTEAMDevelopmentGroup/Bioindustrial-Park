@@ -118,19 +118,21 @@ _NODE_POS = {
     'r16': (0.72, 0.30),   # Aro10
     'r17': (0.72, 0.14),   # Adh6
 }
-# metabolite marker positions (label, x, y, emphasise)
+# metabolite marker positions (label, x, y, emphasise). The isobutanol-arm
+# intermediates sit in the gap BELOW each enzyme's glyph cluster and ABOVE the
+# next box, clear of the upward-growing absolute bars.
 _METABOLITES = [
     ('Glucose',            0.30, 0.99, False),
-    ('Pyruvate',           0.51, 0.78, False),
+    ('Pyruvate',           0.51, 0.79, False),
     ('Acetaldehyde',       0.30, 0.54, False),
-    ('ETHANOL',            0.30, 0.20, True),
-    ('2-acetolactate',     0.72, 0.70, False),
-    ('2,3-dihydroxy-\nisovalerate', 0.72, 0.54, False),
-    ('KIV',                0.72, 0.38, False),
-    ('Isobutyraldehyde',   0.72, 0.22, False),
+    ('ETHANOL',            0.30, 0.19, True),
+    ('2-acetolactate',     0.72, 0.685, False),
+    ('2,3-dihydroxy-\nisovalerate', 0.72, 0.520, False),
+    ('KIV',                0.72, 0.360, False),
+    ('Isobutyraldehyde',   0.72, 0.200, False),
     ('ISOBUTANOL',         0.72, 0.03, True),
 ]
-_NODE_W, _NODE_H = 0.20, 0.075   # enzyme box size in pathway-axis data coords
+_NODE_W, _NODE_H = 0.19, 0.066   # enzyme box size in pathway-axis data coords
 
 
 def _cluster(ax, cx, cy, w, h, values, cols, kind, off_mask=None):
@@ -241,9 +243,9 @@ def _draw_process_box(ax, sets, cols, helpers):
     rows = [('threshold_conc', 300.0), ('target_conc', 300.0),
             ('n_glu_spikes', 50.0)]
     for r, (key, vmax) in enumerate(rows):
-        y = 0.72 - r * 0.22
+        y = 0.63 - r * 0.25
         title = helpers['FEED_LABELS'][key][0].replace('\n', ' ')
-        ax.text(0.10, y + 0.08, title, ha='left', va='bottom',
+        ax.text(0.10, y + 0.155, title, ha='left', va='bottom',
                 fontsize=helpers['FONTS']['tick'] - 1, color='0.2')
         vals = [lever_value(s, key) for s in sets]
         n = len(sets)
@@ -252,7 +254,7 @@ def _draw_process_box(ax, sets, cols, helpers):
         for x, v, s in zip(xs, vals, sets):
             if not np.isfinite(v) or v <= 0:
                 continue
-            ax.add_patch(Rectangle((x - bw / 2, y), bw, (v / vmax) * 0.14,
+            ax.add_patch(Rectangle((x - bw / 2, y), bw, (v / vmax) * 0.13,
                                    facecolor=cols[id(s)], edgecolor='none'))
 
 
@@ -356,10 +358,10 @@ def plot_pathway_lever_map(sets, colors, out_stem, *, ko, eb, helpers, dpi=300):
     is accepted for symmetry with the other companions (unused here). Returns
     out_stem."""
     helpers['apply_fonts']()
-    fig = plt.figure(figsize=(12.0, 11.0))
+    fig = plt.figure(figsize=(12.0, 12.0))
     gs = fig.add_gridspec(
-        4, 2, height_ratios=[0.9, 4.2, 1.3, 1.7], width_ratios=[1.0, 2.1],
-        left=0.05, right=0.97, top=0.93, bottom=0.07, hspace=0.35, wspace=0.12)
+        4, 2, height_ratios=[0.8, 4.9, 1.3, 1.7], width_ratios=[1.0, 2.1],
+        left=0.05, right=0.97, top=0.94, bottom=0.06, hspace=0.35, wspace=0.12)
     # title + design legend (top strip spanning both columns)
     axT = fig.add_subplot(gs[0, :]); axT.axis('off')
     axT.text(0.0, 0.7, 'Levers for isobutanol co-production: strain, process, '
