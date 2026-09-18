@@ -1998,6 +1998,9 @@ def main(argv=None):
     ap.add_argument('--params-only', action='store_true',
                     help='render ONLY the final-parameters panel (panel B of '
                          'the three-panel variant) as a standalone figure')
+    ap.add_argument('--pathway', action='store_true',
+                    help='render the enzyme lever-map figure (metabolic_split_12d '
+                         'campaigns only); overrides --panel-b / --params-only')
     ap.add_argument('--out-dir', default=RESULTS_DIR)
     ap.add_argument('--stem', default=None)
     ap.add_argument('--dpi', type=int, default=300)
@@ -2010,6 +2013,8 @@ def main(argv=None):
 
     if args.sets:
         specs = [(lab, camp, norm_trial(tr)) for lab, camp, tr in args.sets]
+    elif args.pathway:  # the lever map's three-objective story set
+        specs = default_split_12d_specs(objectives=PATHWAY_OBJECTIVES)
     else:  # default: each optimum from the study that optimized it -- the most
         # recent metabolic_split_12d campaign per objective with >= 2000 trials
         # (financial / IBO yield / titer / productivity / EtOH yield / titer /
@@ -2031,10 +2036,26 @@ def main(argv=None):
                              'differ); plot them separately')
         use_split_12d_layout()
 
+    if args.pathway and not all('metabolic_split_12d' in st for st in stems):
+        raise ValueError('--pathway requires metabolic_split_12d campaigns '
+                         '(the pathway layout needs the glycolysis / '
+                         'ehrlich_downstream decomposition)')
     sets, band, band_campaign = build_sets(specs, not args.no_baseline)
+    stamp = datetime.now().strftime('%Y.%m.%d-%H.%M')
+    if args.pathway:
+        colors = pathway_colors(sets)
+        plm = _load('_pathway_lever_map',
+                    os.path.join('plots', '_pathway_lever_map.py'))
+        stem = args.stem or (f'{os.path.basename(specs[0][1]).replace(".csv", "")}'
+                             '_enzyme_lever_map')
+        out_stem = os.path.join(args.out_dir, f'{stem}_{stamp}')
+        plm.plot_pathway_lever_map(sets, colors, out_stem, ko=ko, eb=eb,
+                                   helpers=pathway_helpers(), dpi=args.dpi)
+        console_report(sets, band_campaign)
+        print(f'wrote {out_stem}.png / .pdf')
+        return out_stem
     stem = args.stem or f'{os.path.basename(specs[0][1]).replace(".csv", "")}' \
                         '_parameter_sets'
-    stamp = datetime.now().strftime('%Y.%m.%d-%H.%M')
     out_stem = os.path.join(args.out_dir, f'{stem}_{stamp}')
     plot(sets, band, out_stem, dpi=args.dpi,
          include_parameters=args.panel_b, params_only=args.params_only)
