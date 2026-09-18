@@ -4,6 +4,29 @@
 # docs/superpowers/specs/2026-09-18-sabre-3hp-sargassum-design.md (secs. 7-8)
 # for the design this file backs.
 
+# Overrides sabre.units._preprocessing's EnzymaticPress instance in
+# systems/_3hp_system.py only -- data/preprocessing.yaml's own
+# cake_solids_wt_frac (0.15, shared by every other sabre system's Press)
+# is left unchanged there, since fixing it package-wide would shift
+# TCI/MSP for all 5 other systems too and require recomputing their
+# tests.py golden-value baselines; user decision 2026-09-18 was to scope
+# this fix to 3hp only.
+press_cake_solids_wt_frac_override: 0.27  # see sources below
+
+sources:
+  press_cake_solids_wt_frac:
+    key: preprocessing_yaml_own_citation
+    note: >
+      data/preprocessing.yaml's own press.sources.performance citation
+      (Vincent Corporation seaweed pressing notes) says "Sargassum-specific
+      pressing data indicate cake solids around 26-29 wt% TS; 27 wt% TS
+      selected as central baseline" -- but the coded
+      press.cake_solids_wt_frac value (0.15) doesn't match that citation
+      at all (not even within the cited 18-29% range). 0.27 is that
+      citation's own "central baseline" pick, applied here as an override
+      rather than fixing the shared default.
+
+
 pressate_concentrator:
   # Retargets sabre.units.PressateConcentrator (the same class
   # biostimulant.yaml's own instance uses) at the EnzymaticPress pressate's

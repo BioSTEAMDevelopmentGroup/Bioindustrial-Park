@@ -61,7 +61,29 @@ def create_chemicals(set_thermo: bool = True, include_hp3: bool = False):
     # ('NEGLECT_P') is invalid at process T/P, the same issue this file
     # already works around for KH2PO4/MagnesiumSulfate below,
     # approximated with Water's viscosity for the same reason.
+    #
+    # HHV=0/LHV=0 passed to the constructor do NOT actually take effect
+    # for a real database chemical -- CaO.Hf/HHV/LHV all still come back
+    # as its real (nonzero) database value of -634900 J/mol (confirmed by
+    # direct testing). This was dormant/harmless everywhere Ash's moles
+    # are only ever split/mixed, never reacted (every non-3hp sabre
+    # pathway), since Hf cancels out across any non-reactive step
+    # regardless of its value. It stopped being harmless once
+    # sabre/systems/_3hp_system.py added a real BoilerTurbogenerator:
+    # thermosteam auto-generates a combustion "reaction" for every
+    # chemical (even non-combustible ones), and for CaO that comes out as
+    # the nonsensical `Ash -> 0.5 Oxygen` (thermosteam's default
+    # combustion-reaction heuristic assumes any formula oxygen in excess
+    # of what's needed to oxidize C/H/S/N is released as O2, which isn't
+    # physically real for a metal oxide) -- with CaO's real, large
+    # negative Hf, BT's simulated energy balance saw this as a
+    # substantial *endothermic* heat sink (~318 GJ/h at this pathway's
+    # scale) that isn't physically real. Explicitly zeroing Hf (not just
+    # the ineffective HHV/LHV kwargs) fixes both: Ash becomes a true
+    # energy-inert pass-through regardless of what nonsense reaction
+    # thermosteam invents for it.
     CaO = bst.Chemical("CaO", phase="s", HHV=0, LHV=0)
+    CaO.Hf = 0.0
     CaO.copy_models_from(Water, ["mu"])
     Ash = CaO.copy(ID="Ash")
 
@@ -181,7 +203,50 @@ def create_chemicals(set_thermo: bool = True, include_hp3: bool = False):
         Ca3HP2.V.add_model(tmo.functional.rho_to_V(_rho_solids, Ca3HP2.MW), top_priority=True)
         Ca3HP2.copy_models_from(Water, ["mu"])
 
-        hp3_chemicals = [Glucose, AlginateMonomer, Enzyme, HP, CalciumDihydroxide, Ca3HP2]
+        # Combustion product of the sulfur atoms in Protein/Enzyme's
+        # formulas (both already S-bearing), needed only because
+        # bst.BoilerTurbogenerator (sabre/systems/_3hp_system.py's BT,
+        # burning pressed_cake/milling_losses/cell_mass) calls
+        # chemicals.get_combustion_reactions() at simulation time, which
+        # raises UndefinedChemicalAlias('SO2') without this -- confirmed
+        # by direct testing. Gated behind include_hp3 like the rest of
+        # this block (not the default roster) even though Protein/Enzyme's
+        # sulfur isn't itself 3-HP-specific, since no other sabre system
+        # has a BT yet and adding any chemical to the default roster
+        # drifts the other pathways' regression tests (see this function's
+        # own docstring).
+        SO2 = bst.Chemical("SO2", phase="g")
+
+        # Same issue, for the phosphorus in KH2PO4's formula (KH2PO4 is
+        # already in the default roster below, for nutrient dosing, but
+        # this combustion byproduct is only ever needed by BT, so it's
+        # gated here rather than added alongside KH2PO4 itself). Never
+        # actually flows in this pathway (HPFermentation doesn't dose
+        # KH2PO4 at all -- only biorefineries.sabre's microbial_oil
+        # pathway does), but get_combustion_reactions() builds a reaction
+        # for every chemical in the compiled roster regardless of whether
+        # it's ever present in a real stream, and the database's real
+        # entry is missing Psat/Tb/Hvap (confirmed by testing) -- since
+        # the exact values are irrelevant for a chemical that never flows,
+        # Water's own models are borrowed as a placeholder rather than
+        # sourcing real P4O10 property data.
+        P4O10 = bst.Chemical("P4O10", phase="s")
+        P4O10.copy_models_from(Water, ["Psat", "Hvap", "V", "mu"])
+        P4O10.Tb = Water.Tb
+
+        # BT's flue-gas desulfurization reaction
+        # (SO2 + Ca(OH)2 + 0.5 O2 -> CaSO4 + H2O) needs gypsum (CaSO4) as
+        # a product chemical too; same missing-property gaps as P4O10,
+        # fixed the same way (never flows in bulk, so the borrowed values
+        # are inconsequential).
+        CaSO4 = bst.Chemical("CaSO4", phase="s")
+        CaSO4.copy_models_from(Water, ["Psat", "Hvap", "mu"])
+        CaSO4.Tb = Water.Tb
+
+        hp3_chemicals = [
+            Glucose, AlginateMonomer, Enzyme, HP, CalciumDihydroxide, Ca3HP2,
+            SO2, P4O10, CaSO4,
+        ]
 
     # Gases
     CH4 = bst.Chemical("Methane", phase="g")

@@ -125,6 +125,26 @@ class Press(bst.Unit):
         that `EnzymaticPress` can apply it to a hydrolyzed feed stream
         instead of `self.ins[0]` directly, without duplicating the split
         rules.
+
+        The by-component split (everything except water) delegates to
+        `Stream.split_to` -- the same native primitive
+        `bst.units.Splitter`/`SolidsSeparator`/`ScrewPress` themselves use
+        internally -- instead of a hand-rolled per-chemical loop.
+        `energy_balance=False` keeps this an exact behavioral match for
+        the original hand-rolled version (which built `cake`/`pressate`
+        via bare `.imass[...]` assignment after `.empty()`, so it never
+        copied `feed`'s T/P/phase either); using the default
+        `energy_balance=True` would additionally copy `feed`'s T/P/phase
+        onto both outlets, a real behavior change out of scope here.
+
+        Water is NOT delegated to `bst.separations.adjust_moisture_content`
+        (the native utility `SolidsSeparator` itself uses for this exact
+        step): confirmed by direct testing that its `strict=False`
+        fallback can manufacture water out of nothing when the feed
+        doesn't have enough to hit the target moisture content (e.g. 5 kg
+        available -> 35 kg assigned) -- a real mass-balance bug in that
+        utility for the under-supply case. This keeps the original
+        clamp-to-what's-available arithmetic instead.
         """
         cake.empty()
         pressate.empty()
@@ -133,30 +153,29 @@ class Press(bst.Unit):
         pressate.phase = "l"
 
         solids = self._available_solids(feed)
+        solids_set = set(solids)
 
-        # Split defined solids by capture
         cap = min(max(self.solids_capture_frac, 0.0), 1.0)
-        for sid in solids:
-            m = self._get_mass(feed, sid)
-            m_cake = cap * m
-            cake.imass[sid] = m_cake
-            pressate.imass[sid] = m - m_cake
-
-        # Partition everything else except water
         sol_to_p = min(max(self.solubles_to_pressate_frac, 0.0), 1.0)
+
+        # Fraction of each chemical routed to `cake` (the 1st split_to
+        # argument); everything not listed here (i.e. Water) defaults to
+        # 0 -- routed to cake below via the moisture-content target
+        # instead.
+        split = {sid: cap for sid in solids}
         for chem_id in feed.chemicals.IDs:
-            if chem_id in solids or chem_id == "Water":
+            if chem_id in solids_set or chem_id == "Water":
                 continue
-            m = self._get_mass(feed, chem_id)
-            m_p = sol_to_p * m
-            pressate.imass[chem_id] += m_p
-            cake.imass[chem_id] += (m - m_p)
+            split[chem_id] = 1.0 - sol_to_p
+
+        isplit = feed.chemicals.isplit(split)
+        feed.split_to(cake, pressate, isplit.data, energy_balance=False)
 
         # Allocate water to hit cake solids wt% target
         TS_cake = sum(self._get_mass(cake, sid) for sid in solids)
         other_nonwater_cake = sum(
             self._get_mass(cake, i) for i in feed.chemicals.IDs
-            if i not in solids and i != "Water"
+            if i not in solids_set and i != "Water"
         )
 
         f = self.cake_solids_wt_frac
@@ -169,8 +188,8 @@ class Press(bst.Unit):
         water_avail = self._get_mass(feed, "Water")
         water_to_cake = min(water_needed, water_avail)
 
-        cake.imass["Water"] += water_to_cake
-        pressate.imass["Water"] += (water_avail - water_to_cake)
+        cake.imass["Water"] = water_to_cake
+        pressate.imass["Water"] = water_avail - water_to_cake
 
     def _design(self):
         feed = self.ins[0]
@@ -372,12 +391,14 @@ class Mill(bst.Unit):
         milled.phase = feed.phase
         losses.phase = feed.phase
 
+        # Same fraction lost across every chemical, i.e. a plain scalar
+        # split -- delegated to the native Stream.split_to primitive
+        # (same one bst.units.Splitter uses internally) instead of a
+        # hand-rolled per-chemical loop. energy_balance=False matches the
+        # original's behavior exactly (T/P were never copied from feed
+        # here, only phase, set explicitly above).
         lf = min(max(self.loss_frac, 0.0), 1.0)
-        for chem_id in feed.chemicals.IDs:
-            m = float(feed.imass[chem_id])
-            m_loss = lf * m
-            losses.imass[chem_id] = m_loss
-            milled.imass[chem_id] = m - m_loss
+        feed.split_to(milled, losses, 1.0 - lf, energy_balance=False)
 
     def _design(self):
         feed = self.ins[0]

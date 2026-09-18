@@ -11,11 +11,6 @@ Pathway:
     raw Sargassum
       -> Mill (milled_biomass, milling_losses)
       -> EnzymaticPress (pressed_cake, pressate)
-         pressed_cake -> disposal_solid (no BoilerTurbogenerator/WWT unit
-         exists anywhere in sabre yet -- every other sabre system prices
-         solid/liquid waste streams directly rather than modeling a real
-         BT/WWT facility, so this system follows that same established
-         convention rather than introducing one on its own)
       -> PFS (splits pressate into only the fraction that needs
          concentrating) -> PressateConcentrator -> DIL (blends concentrate
          + bypass pressate + fresh water) -> fermentation_feed_evaporator
@@ -23,12 +18,21 @@ Pathway:
          biorefineries.HP's EnzymeHydrolysateMixer.solid_loading)
       -> HPFermentation (Ca(OH)2 dosed in situ; Ca3HP2 already formed by
          the time broth leaves this unit)
-      -> S401 (SolidsCentrifuge: removes CellMass to disposal_solid)
+      -> S401 (SolidsCentrifuge: removes CellMass)
       -> broth_evaporator (MultiEffectEvaporator: concentrates to the
          patent's ~300-600 g/L crystallization threshold)
       -> CaHPCrystallizer -> S402 (SolidsCentrifuge: separates crystal
          cake from mother liquor; mother liquor -> disposal_wastewater)
       -> DrumDryer -> dried Ca(3HP)2 product
+
+    milling_losses, pressed_cake, cell_mass (all combustible biomass) --
+    mixed together (M_BT) -> BoilerTurbogenerator (BT, a facility, not in
+    the main path above) for steam/electricity credit -- NOT priced as
+    disposal. This is the one place this system departs from every other
+    sabre system's own convention of pricing solid/liquid waste directly
+    rather than modeling a real BT/WWT facility (no other sabre system has
+    a BT), per explicit user instruction to route both press cake and
+    cell mass to the boiler.
 
 Chemical-set note: this pathway needs sabre._chemicals.create_chemicals's
 include_hp3=True chemical superset (Glucose, AlginateMonomer, Enzyme, HP,
@@ -61,6 +65,7 @@ __all__ = ('create_3hp_system', 'price_3hp_system')
 
 _TEA_PRICE = load_assumptions("tea.yaml")["price"]
 _3HP_YAML = load_assumptions("3hp.yaml")
+_PRESS_CAKE_SOLIDS_WT_FRAC_OVERRIDE = _3HP_YAML["press_cake_solids_wt_frac_override"]
 _PRESSATE_CONCENTRATOR = _3HP_YAML["pressate_concentrator"]
 _FEED_EVAPORATOR = _3HP_YAML["fermentation_feed_evaporator"]
 _BROTH_EVAPORATOR = _3HP_YAML["broth_evaporator"]
@@ -119,17 +124,23 @@ def create_3hp_system(
     # Preprocessing: Mill -> EnzymaticPress
     # -------------------------------------------------
     MI = Mill("MI", ins=feed, outs=("milled_biomass", "milling_losses"))
-    MI.outs[1].price = _TEA_PRICE["disposal_solid"]["baseline"]
+    # milling_losses is combustible biomass, same as pressed_cake -- routed
+    # to BT below instead of priced as disposal.
 
     enzyme = bst.Stream("enzyme_cocktail")
     enzyme.price = _TEA_PRICE["enzyme"]["baseline"]
 
-    PR = EnzymaticPress("PR", ins=(MI - 0, enzyme), outs=("pressed_cake", "pressate"))
-    # No BoilerTurbogenerator exists in sabre yet -- see module docstring.
-    # Every other sabre system prices its own solid leaf-stream waste the
-    # same way (disposal_solid), so this pathway follows suit rather than
-    # introducing a real BT facility on its own.
-    PR.outs[0].price = _TEA_PRICE["disposal_solid"]["baseline"]
+    PR = EnzymaticPress(
+        "PR", ins=(MI - 0, enzyme), outs=("pressed_cake", "pressate"),
+        # Overrides preprocessing.yaml's own cake_solids_wt_frac (0.15) --
+        # see data/3hp.yaml press_cake_solids_wt_frac_override's own
+        # sources note for why.
+        cake_solids_wt_frac=_PRESS_CAKE_SOLIDS_WT_FRAC_OVERRIDE,
+    )
+    # pressed_cake (unconverted Glucan/Alginate, Ash, Protein, Fucoidan,
+    # OtherSolids) is NOT priced as disposal -- it's routed to BT (the
+    # BoilerTurbogenerator facility, wired near the end of this function)
+    # for steam/electricity credit, per the design spec sec. 5.
 
     # -------------------------------------------------
     # Pressate concentration: PFS (splits raw pressate) -> PC -> DIL ->
@@ -261,7 +272,9 @@ def create_3hp_system(
         split=dict(CellMass=_CELL_MASS_CENTRIFUGE["cellmass_split_to_cake"], Ca3HP2=0.0),
         moisture_content=_CELL_MASS_CENTRIFUGE["moisture_content"],
     )
-    S401.outs[0].price = _TEA_PRICE["disposal_solid"]["baseline"]
+    # cell_mass is combustible biomass, same as pressed_cake/milling_losses
+    # -- routed to BT below instead of priced as disposal, per the user's
+    # explicit instruction to route cell mass to the boiler.
 
     # -------------------------------------------------
     # Broth concentration ahead of crystallization
@@ -370,7 +383,40 @@ def create_3hp_system(
     HXN = bst.HeatExchangerNetwork("HXN", units=tuple(path))
     path.append(HXN)
 
-    sys = bst.System("hp3_sys", path=path)
+    # -------------------------------------------------
+    # Boiler/turbogenerator: combusts the three combustible solid streams
+    # (pressed_cake, milling_losses, cell_mass) for steam/electricity
+    # credit, per the design spec sec. 5 and the user's explicit
+    # instruction to route both press cake and cell mass to the boiler --
+    # not priced as disposal (see the comments at PR/MI/S401 above).
+    # Minimal standalone bst.BoilerTurbogenerator usage (no CoolingTower/
+    # ProcessWaterCenter/etc.), matching the class's own docstring example
+    # rather than biorefineries.cellulosic's create_facilities wrapper
+    # (which also builds four *other* facilities sabre has no use for --
+    # ChilledWaterPackage, CIPpackage, AirDistributionPackage,
+    # FireWaterTank -- none of which exist anywhere else in sabre either).
+    # bst defaults (boiler_efficiency=0.80, turbogenerator_efficiency=0.85,
+    # ash_disposal_price=-0.0318, fuel_price=0.218) are used as-is; these
+    # are standard literature baseline values already, not sabre-specific
+    # assumptions, so they're not threaded through data/3hp.yaml.
+    M_BT = bst.Mixer(
+        "M_BT",
+        ins=(PR - 0, MI - 1, S401 - 0),
+        outs=("solids_to_boiler",),
+    )
+    path.append(M_BT)
+
+    BT = bst.BoilerTurbogenerator("BT", ins=(M_BT - 0,))
+    # BT.outs: [0] emissions (gas, vents to atmosphere -- unpriced, same
+    # convention as every other sabre vent/off-gas stream); [1] blowdown
+    # water (genuine liquid waste, priced as disposal_wastewater, same as
+    # every other sabre liquid waste stream); [2] ash_disposal (its cost
+    # is already handled internally via BT's own `ash_disposal_price` ->
+    # define_utility('Ash disposal', ...) mechanism, so it is NOT also
+    # priced here -- doing so would double-count the same cost).
+    BT.outs[1].price = _TEA_PRICE["disposal_wastewater"]["baseline"]
+
+    sys = bst.System("hp3_sys", path=path, facilities=(BT,))
     create_tea(sys)
 
     return sys
