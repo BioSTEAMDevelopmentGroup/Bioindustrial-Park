@@ -103,14 +103,17 @@ sets = [base,
         _campaign('EtOH titer', objective='EtOH titer',
                   k_6_rel=2.1, glycolysis=1.8,
                   **{'IBO titer': 1.0, 'EtOH titer': 190.0, 'IRR': 0.05}),
-        _campaign('Financial', objective='PI (log-tail)',
+        _campaign('Financial', objective='PI',
                   k_13=1.0, k_16_rel=1.2, glycolysis=1.3,
                   **{'IBO titer': 33.0, 'EtOH titer': 63.0, 'IRR': 0.27})]
 
 # --- objective-keyed colour map --------------------------------------------
 cmap = ps.pathway_colors(sets)
 check('baseline is grey', cmap[id(base)] == ps.BASELINE_COLOR)
-check('financial campaign is HUE_COLORS[0] (cyan)',
+# A real financial record carries objective 'PI' (campaign_objective's value),
+# which must map to the financial hue via the OUTCOME_OWN_OBJECTIVES alias, not
+# by set order.
+check('financial campaign (objective=PI) is HUE_COLORS[0] (cyan) via alias',
       cmap[id(sets[3])] == ps.HUE_COLORS[0])
 check('IBO-titer campaign is HUE_COLORS[2] (green)',
       cmap[id(sets[1])] == ps.HUE_COLORS[2])

@@ -817,6 +817,16 @@ def pathway_colors(sets):
     sequential set_colors order for a --set campaign whose objective is not in
     DEFAULT_OBJECTIVES."""
     obj_index = {obj: i for i, (_lab, obj) in enumerate(DEFAULT_OBJECTIVES)}
+    # A real record carries campaign_objective()'s value, which reconstructs the
+    # slug WITH parentheses and so resolves 'PI (log-tail)' to the shorter 'PI'.
+    # Alias each outcome-owned synonym to the index of whichever family member is
+    # actually in DEFAULT_OBJECTIVES, so the campaign is keyed by objective (not by
+    # set order).
+    for family in OUTCOME_OWN_OBJECTIVES.values():
+        idx = next((obj_index[o] for o in family if o in obj_index), None)
+        if idx is not None:
+            for syn in family:
+                obj_index.setdefault(syn, idx)
     seq = set_colors(sets)   # sequential fallback + baseline grey + count guard
     colors = {}
     for s in sets:
