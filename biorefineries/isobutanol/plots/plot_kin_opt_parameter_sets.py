@@ -798,6 +798,52 @@ def set_colors(sets):
     return colors
 
 
+# --- enzyme lever-map variant (the fourth figure; see plots/_pathway_lever_map.py)
+# the three campaign objectives that carry the "max-product != max-profit" story,
+# restricted from DEFAULT_OBJECTIVES: financial optimum (PI, drawn on the IRR
+# axis), isobutanol-titer max, ethanol-titer max.
+PATHWAY_OBJECTIVES = [
+    ('Financial attractiveness', 'PI (log-tail)'),
+    ('Isobutanol titer', 'IBO titer'),
+    ('Ethanol titer', 'EtOH titer'),
+]
+
+
+def pathway_colors(sets):
+    """Objective-keyed colour map for the lever-map figure: baseline grey; each
+    campaign coloured by HUE_COLORS at the index its objective occupies in
+    DEFAULT_OBJECTIVES (financial 0 / IBO titer 2 / EtOH titer 5), so a campaign
+    reads the same colour here as in the other figures. Falls back to the
+    sequential set_colors order for a --set campaign whose objective is not in
+    DEFAULT_OBJECTIVES."""
+    obj_index = {obj: i for i, (_lab, obj) in enumerate(DEFAULT_OBJECTIVES)}
+    seq = set_colors(sets)   # sequential fallback + baseline grey + count guard
+    colors = {}
+    for s in sets:
+        if s.get('is_baseline'):
+            colors[id(s)] = BASELINE_COLOR
+            continue
+        obj = s.get('objective') or campaign_objective(s.get('campaign'))
+        i = obj_index.get(obj)
+        colors[id(s)] = HUE_COLORS[i] if i is not None else seq[id(s)]
+    return colors
+
+
+def pathway_helpers():
+    """The parent callables/tables the companion _pathway_lever_map reuses, so
+    main() and the offline test bundle them identically."""
+    return dict(
+        _mathify=_mathify, _bold_axis_title=_bold_axis_title,
+        _inward_top_right_ticks=_inward_top_right_ticks,
+        apply_fonts=apply_fonts, FONTS=FONTS,
+        STEP_ENZYME=STEP_ENZYME, STEP_PARAMS=STEP_PARAMS,
+        REACTION_LABELS=REACTION_LABELS, FEED_LABELS=FEED_LABELS,
+        FEED_DRAW_VARS=FEED_DRAW_VARS, BURDEN_CATEGORIES=BURDEN_CATEGORIES,
+        BASELINE_COLOR=BASELINE_COLOR, HUE_COLORS=HUE_COLORS,
+        CLAMP_NEG_TO_ZERO=CLAMP_NEG_TO_ZERO, BASELINE_A=BASELINE_A,
+    )
+
+
 def _inward_top_right_ticks(ax, do_x=True, do_y=True):
     """Retarget the top/right tick lines to inward-only markers (bottom/left
     keep their in+out markers). matplotlib's tick `direction` is per-axis, so

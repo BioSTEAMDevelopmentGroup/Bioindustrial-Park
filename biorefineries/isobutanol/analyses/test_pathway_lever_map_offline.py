@@ -94,9 +94,7 @@ check('baseline isobutanol segment == native Adh6 pool r17 (Ehrlich off)',
 check('baseline isobutanol + rest == Phi_M',
       abs(seg['isobutanol'] + seg['rest'] - float(base['Phi_M'])) < 1e-9)
 
-# --- renders to a temp PNG/PDF without error -------------------------------
-import tempfile
-
+# --- the set list (used by the colour-map checks and the render block) ------
 sets = [base,
         _campaign('IBO titer', objective='IBO titer',
                   k_13=3.2, k_14=1.4, k_15=1.2, k_16_rel=1.5, glycolysis=1.6,
@@ -108,18 +106,25 @@ sets = [base,
         _campaign('Financial', objective='PI (log-tail)',
                   k_13=1.0, k_16_rel=1.2, glycolysis=1.3,
                   **{'IBO titer': 33.0, 'EtOH titer': 63.0, 'IRR': 0.27})]
-# Task-2-local fallbacks (replaced by ps.pathway_colors / ps.pathway_helpers in Task 4):
-colors = {id(s): (ps.BASELINE_COLOR if s.get('is_baseline') else ps.HUE_COLORS[i])
-          for i, s in enumerate(sets)}
-helpers = dict(_mathify=ps._mathify, _bold_axis_title=ps._bold_axis_title,
-               _inward_top_right_ticks=ps._inward_top_right_ticks,
-               apply_fonts=ps.apply_fonts, FONTS=ps.FONTS,
-               STEP_ENZYME=ps.STEP_ENZYME, STEP_PARAMS=ps.STEP_PARAMS,
-               REACTION_LABELS=ps.REACTION_LABELS, FEED_LABELS=ps.FEED_LABELS,
-               FEED_DRAW_VARS=ps.FEED_DRAW_VARS,
-               BURDEN_CATEGORIES=ps.BURDEN_CATEGORIES,
-               BASELINE_COLOR=ps.BASELINE_COLOR, HUE_COLORS=ps.HUE_COLORS,
-               CLAMP_NEG_TO_ZERO=ps.CLAMP_NEG_TO_ZERO, BASELINE_A=ps.BASELINE_A)
+
+# --- objective-keyed colour map --------------------------------------------
+cmap = ps.pathway_colors(sets)
+check('baseline is grey', cmap[id(base)] == ps.BASELINE_COLOR)
+check('financial campaign is HUE_COLORS[0] (cyan)',
+      cmap[id(sets[3])] == ps.HUE_COLORS[0])
+check('IBO-titer campaign is HUE_COLORS[2] (green)',
+      cmap[id(sets[1])] == ps.HUE_COLORS[2])
+check('EtOH-titer campaign is HUE_COLORS[5] (yellow)',
+      cmap[id(sets[2])] == ps.HUE_COLORS[5])
+check('PATHWAY_OBJECTIVES has the three story objectives',
+      [o for _l, o in ps.PATHWAY_OBJECTIVES]
+      == ['PI (log-tail)', 'IBO titer', 'EtOH titer'])
+
+# --- renders to a temp PNG/PDF without error -------------------------------
+import tempfile
+
+colors = ps.pathway_colors(sets)
+helpers = ps.pathway_helpers()
 with tempfile.TemporaryDirectory() as td:
     stem = os.path.join(td, 'lever_map')
     out = plm.plot_pathway_lever_map(sets, colors, stem, ko=ps.ko, eb=eb,
