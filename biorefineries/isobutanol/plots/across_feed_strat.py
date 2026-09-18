@@ -49,18 +49,18 @@ metrics_units = {"MPSP":  r"$\mathrm{\$}\cdot\mathrm{kg}^{-1}$",
                 "AOC": "MM$/y",
                 "TCI": "MM$",
                 "Combined Yield": "g-EtOH-and-IBO/g-sugars",
-                "EtOH Titer": "g-EtOH/L-broth",
-                "EtOH Productivity": "g-EtOH/L-broth/h",
+                "EtOH Titer": "g-EtOH/L-water",
+                "EtOH Productivity": "g-EtOH/L-water/h",
                 "Number of glucose spikes": "",
                 "Fermentation time": "h",
                 "Total Q sugar evap": "kJ/h",
-                "Target sugars concentration": "g-sugars/L-broth",
-                "Cell loading": "g-cell/L-broth",
-                "Active cell loading": "g-cell/L-broth",
+                "Target sugars concentration": "g-sugars/L-water",
+                "Cell loading": "g-cell/L-water",
+                "Active cell loading": "g-cell/L-water",
                 "EtOH Yield":"g-EtOH/g-sugars",
                 "IBO Yield": "g-IBO/g-sugars",
-                "IBO Titer": "g-IBO/L-broth",
-                "IBO Productivity": "g-IBO/L-broth/h",
+                "IBO Titer": "g-IBO/L-water",
+                "IBO Productivity": "g-IBO/L-water/h",
                 'Actual aeration required': 'kmol-O2/h',
                 }
 
@@ -100,9 +100,9 @@ s1t = 15.0
 steps = (25, 25, 1)
 
 #
-spec_1 = threshold_conc_sugarses = np.linspace(1., 400., steps[0])
+spec_1 = threshold_conces = np.linspace(1., 400., steps[0])
 
-spec_2 = target_conc_sugarses = np.linspace(10., 400., steps[1])
+spec_2 = target_conces = np.linspace(10., 400., steps[1])
 
 # spec_3 = max_n_glu_spikes = np.linspace(0, 20, steps[2])
 spec_3 = max_n_glu_spikes = [20]

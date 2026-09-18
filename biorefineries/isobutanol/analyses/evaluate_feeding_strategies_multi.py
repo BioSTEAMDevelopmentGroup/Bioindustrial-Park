@@ -9,6 +9,7 @@
 
 import numpy as np
 from biorefineries import isobutanol
+isobutanol.load()
 
 from matplotlib import pyplot as plt
 
@@ -39,6 +40,7 @@ model = isobutanol.models.models_EtOH_IBO_corn.model
 fbs_spec = isobutanol.models.models_EtOH_IBO_corn.fbs_spec
 namespace_dict = isobutanol.models.namespace_dict
 plot_kinetic_results = isobutanol.models.plot_kinetic_results
+solve_TEA = isobutanol.system.solve_TEA
 model_specification = model.specification
 system = model.system
 tea = model.system.TEA
@@ -53,7 +55,7 @@ dateTimeObj = datetime.now()
 ig = np.seterr(invalid='ignore')
 
 ferm_reactor = f.V406
-r = ferm_reactor.kinetic_reaction_system._te
+r = ferm_reactor.nsk_kinetic_model._te
 
 sugar_sol_evaporators = [f.F301, f.F302]
 
@@ -61,6 +63,10 @@ HXN = f.HXN1001
 
 product = f.ethanol
 broth = ferm_reactor.outs[1]
+# Vent EtOH/IBO (stripped by the fermentation CO2) is captured by the
+# scrubber V409 and recycled to the separation feed via MX8, so it is
+# part of the recoverable product (a broth-only denominator reads >100 %).
+vent = ferm_reactor.outs[0]
 
 EtOH_market_range=np.array([
     0.52,
@@ -89,8 +95,7 @@ baseline_initial = model.metrics_at_baseline()
 #%% Baseline -- simulate and solve TEA
 
 #!!!
-# ferm_reactor.kinetic_reaction_system._te.max_n_glu_spikes = 0 # initial val, changed during optimization
-# ferm_reactor.kinetic_reaction_system.default_max_n_glu_spikes = 0 # initial val, changed during optimization
+# fbs_spec.max_n_spikes = 0 # initial val, changed during optimization
 
 # ferm_reactor.stage_1_time = 5.0
 # ferm_reactor.stage_1_time = 10.0
@@ -100,21 +105,33 @@ ferm_reactor.stage_1_time = 25.0
 
 model_specification(
     n_sims=3,
-    n_tea_solves=3,
     plot=True,
     )
 
 #%% Parameter load functions
 def load_max_n_glu_spikes(val):
-    ferm_reactor.kinetic_reaction_system._te.max_n_glu_spikes = val 
-    ferm_reactor.kinetic_reaction_system.default_max_n_glu_spikes = val
+    fbs_spec.max_n_spikes = val
 
 #%%  Metrics
 product_chemical_IDs = ['Ethanol',]
-get_product_MPSP = lambda: tea.solve_price(product) / get_product_purity() # USD / pure-kg
+IBO_product = f.isobutanol
+
+# One side-effect-free TEA solve per simulated point, shared by the MPSP and
+# IRR metrics below: ethanol MPSP and isobutanol MPSP (each purity-adjusted
+# USD / pure-kg at the default 15% IRR, with the other product at its default
+# price; NaN when the product stream is empty) and the IRR at both products'
+# default prices. `latest_TEA_solution` is refreshed right after each
+# successful simulation in the sweep loop.
+latest_TEA_solution = {'IRR': np.nan, 'MPSPs': {product.ID: np.nan, IBO_product.ID: np.nan}}
+def refresh_TEA_solution():
+    latest_TEA_solution.update(solve_TEA(stream_IDs=(product.ID, IBO_product.ID)))
+    return latest_TEA_solution
+get_product_MPSP = lambda: latest_TEA_solution['MPSPs'][product.ID]
+get_IBO_MPSP = lambda: latest_TEA_solution['MPSPs'][IBO_product.ID]
+get_IRR = lambda: latest_TEA_solution['IRR']
 get_product_purity = lambda: sum([product.imass[i] for i in product_chemical_IDs])/product.F_mass
 get_production = lambda: sum([product.imass[i] for i in product_chemical_IDs])
-get_product_recovery = lambda: sum([product.imol[i] for i in product_chemical_IDs])/sum([broth.imol[i] for i in product_chemical_IDs])
+get_product_recovery = lambda: sum([product.imol[i] for i in product_chemical_IDs])/sum([broth.imol[i] + vent.imol[i] for i in product_chemical_IDs])
 get_AOC = lambda: tea.AOC / 1e6 # million USD / y
 get_TCI = lambda: tea.TCI / 1e6 # million USD
 
@@ -139,18 +156,20 @@ get_active_cell_loading = lambda: ferm_reactor.nsk_results_specific_tau_dict['cu
 #             get_prod_nsk,
 #             get_curr_n_glu_spikes,]
 
-metrics = {'MPSP': {'f': get_product_MPSP, 'units': '$/kg'},
+metrics = {'MPSP': {'f': get_product_MPSP, 'units': '$/kg'}, # ethanol MPSP
+            'IBO MPSP': {'f': get_IBO_MPSP, 'units': '$/kg'},
+            'IRR': {'f': get_IRR, 'units': ''},
             'AOC': {'f': get_AOC, 'units': 'MM$/y'},
             'TCI': {'f': get_TCI, 'units': 'MM$'},
             'Combined Yield': {'f': get_yield_nsk, 'units': 'g-EtOH-and-IBO/g-sugars'},
-            'EtOH Titer': {'f': get_titer_nsk, 'units': 'g-EtOH/L-broth'},
-            'EtOH Productivity': {'f': get_prod_nsk, 'units': 'g-EtOH/L-broth/h'},
-            'Number of glucose spikes': {'f': get_curr_n_glu_spikes, 'units': 'g-EtOH/L-broth/h'},
+            'EtOH Titer': {'f': get_titer_nsk, 'units': 'g-EtOH/L-water'},
+            'EtOH Productivity': {'f': get_prod_nsk, 'units': 'g-EtOH/L-water/h'},
+            'Number of glucose spikes': {'f': get_curr_n_glu_spikes, 'units': 'g-EtOH/L-water/h'},
             'Fermentation time': {'f': get_tau, 'units': 'h'},
             'Total Q sugar evap': {'f': get_sugar_sol_evap_duty, 'units': 'kJ/h'},
-            'Target sugars concentration': {'f': lambda: fbs_spec.target_conc_sugars, 'units': 'g-sugars/L-broth'},
-            'Cell loading': {'f': get_cell_loading, 'units': 'g-cell/L-broth'},
-            'Active cell loading': {'f': get_active_cell_loading, 'units': 'g-cell/L-broth'},
+            'Target sugars concentration': {'f': lambda: fbs_spec.target_conc, 'units': 'g-sugars/L-water'},
+            'Cell loading': {'f': get_cell_loading, 'units': 'g-cell/L-water'},
+            'Active cell loading': {'f': get_active_cell_loading, 'units': 'g-cell/L-water'},
             'Actual aeration required': {'f': lambda: ferm_reactor.compressed_air.imol['O2'], 'units': 'kmol-O2/h'},
             }
 
@@ -162,9 +181,9 @@ results = {i: [] for i in metrics.keys()}
 
 steps = (25, 25, 5)
 
-spec_1 = threshold_conc_sugarses = np.linspace(1., 400., steps[0])
+spec_1 = threshold_conces = np.linspace(1., 400., steps[0])
 
-spec_2 = target_conc_sugarses = np.linspace(10., 400., steps[1])
+spec_2 = target_conces = np.linspace(10., 400., steps[1])
 
 spec_3 = max_n_glu_spikes = np.linspace(0, 20, steps[2])
     
@@ -192,24 +211,24 @@ z_units =r"$\mathrm{g} \cdot \mathrm{L}^{-1}$"
 z_ticks = [0, 5, 10, 15, 20]
 
 # Metrics
-MPSP_w_label = r"$\bfMPSP$" # title of the color axis
+MPSP_w_label = r"$\mathbf{MPSP}$" # title of the color axis
 MPSP_units = r"$\mathrm{\$}\cdot\mathrm{kg}^{-1}$"
 # MPSP_units = r"$\mathrm{\$/kg}$"
 
-AOC_w_label = r"$\bfAOC$" # title of the color axis
+AOC_w_label = r"$\mathbf{AOC}$" # title of the color axis
 AOC_units = r"$\mathrm{MM\$}\cdot\mathrm{y}^{-1}$"
 # AOC_units = r"$\mathrm{MM\$/y}$"
 
-TCI_w_label = r"$\bfTCI$" # title of the color axis
+TCI_w_label = r"$\mathbf{TCI}$" # title of the color axis
 TCI_units = r"$\mathrm{MM\$}$"
 
-Yield_w_label = r"$\bfYield$" # title of the color axis
+Yield_w_label = r"$\mathbf{Yield}$" # title of the color axis
 Yield_units = r"$\mathrm{g}\cdot\mathrm{g}^{-1}$"
 
-Titer_w_label = r"$\bfTiter$" # title of the color axis
+Titer_w_label = r"$\mathbf{Titer}$" # title of the color axis
 Titer_units = r"$\mathrm{g}\cdot\mathrm{L}^{-1}$"
 
-Productivity_w_label = r"$\bfProductivity$" # title of the color axis
+Productivity_w_label = r"$\mathbf{Productivity}$" # title of the color axis
 Productivity_units = r"$\mathrm{g}\cdot\mathrm{L}^{-1}\cdot\mathrm{h}^{-1}$"
 
 #%% Colors
@@ -284,12 +303,11 @@ chdir(isobutanol_results_filepath)
 
 print('\n\nSimulating the initial point to avoid bugs ...')
 curr_spec = {}
-curr_spec.update({'threshold_conc_sugars':threshold_conc_sugarses[0],})
-curr_spec.update({'target_conc_sugars':target_conc_sugarses[0],})
+curr_spec.update({'threshold_conc':threshold_conces[0],})
+curr_spec.update({'target_conc':target_conces[0],})
 
 model_specification(**curr_spec,
     n_sims=3,
-    n_tea_solves=3,
     plot=True,
     )
 
@@ -329,9 +347,9 @@ for s3 in spec_3:
                 # if round(s1,2)==round(spec_1[1],2) and round(s2,2)==round(spec_2[4],2):
                 #     breakpoint()
                 curr_spec = {k: v for k,v in fbs_spec.current_specifications.items()}
-                curr_spec.update({'threshold_conc_sugars':s1,})
-                curr_spec.update({'target_conc_sugars':s2,})
-                # curr_spec.update({'conc_sugars_feed_spike':s3,})
+                curr_spec.update({'threshold_conc':s1,})
+                curr_spec.update({'target_conc':s2,})
+                # curr_spec.update({'spike_conc':s3,})
                 load_max_n_glu_spikes(s3)
                 
                 
@@ -344,10 +362,10 @@ for s3 in spec_3:
                 
                 model_specification(**curr_spec,
                     n_sims=3,
-                    n_tea_solves=3,
                     plot=False,
                     )
                 
+                refresh_TEA_solution()
                 for k, v in list(results.items()): 
                     v[-1][-1].append(metrics[k]['f']())
                 
@@ -389,8 +407,8 @@ for s3 in spec_3:
     # Save generated data
     for k, v in results.items():
         
-        max_n = ferm_reactor.kinetic_reaction_system._te.max_n_glu_spikes
-        s1t = ferm_reactor.kinetic_reaction_system._te.stage_1_time
+        max_n = ferm_reactor.nsk_kinetic_model._te.max_n_glu_spikes
+        s1t = ferm_reactor.nsk_kinetic_model._te.stage_1_time
         
         csv_file_to_save = file_to_save + f's1t={s1t}_' + f'max_n={max_n}_' + f'_{k}'
         pd.DataFrame(v[-1]).to_csv(isobutanol_results_filepath+csv_file_to_save+'.csv')
@@ -411,7 +429,7 @@ print(f'Max HXN Q bal error was {round(max_HXN_qbal_percent_error, 3)} %.')
     
 #     if len(frames)>1:
 #         try:
-#             imageio.mimsave(f'animated_threshold_conc_sugars_{i}' + '.gif',
+#             imageio.mimsave(f'animated_threshold_conc_{i}' + '.gif',
 #                             frames,
 #                             fps=1,
 #                             loop=20,
@@ -427,7 +445,7 @@ print(f'Max HXN Q bal error was {round(max_HXN_qbal_percent_error, 3)} %.')
 #             frames.append(image)
 #     if len(frames)>1:
 #         try:
-#             imageio.mimsave(f'animated_target_conc_sugars_{j}' + '.gif',
+#             imageio.mimsave(f'animated_target_conc_{j}' + '.gif',
 #                             frames,
 #                             fps=1,
 #                             loop=20,
@@ -763,15 +781,17 @@ if plot:
     
     #%% All metrics
     for curr_metric, val in metrics.items():
+        extend_cmap = 'max'
+        cmap_under_color = None
         lccm = curr_metric.lower()
         # if 'spike' in lccm or 'duty' in lccm or 'target sugars' in lccm:
         #     # else: 
         #     if 'spike' in lccm:
-        #         if ferm_reactor.kinetic_reaction_system.default_max_n_glu_spikes == 0.:
+        #         if ferm_reactor.nsk_kinetic_model.default_max_n_glu_spikes == 0.:
         #             continue
         #     else:
         #         pass
-        if 'yield' in lccm or 'titer' in lccm or 'productivity' in lccm or 'loading' in lccm:
+        if 'yield' in lccm or 'titer' in lccm or 'productivity' in lccm or 'loading' in lccm or 'irr' in lccm:
             cmap = JBEI_UCB_colormap(reverse=True)
             cmap_over_color = colors.yellow_tint.RGBn
         
@@ -779,11 +799,16 @@ if plot:
             cmap = JBEI_UCB_colormap(reverse=False)
             cmap_over_color = colors.grey_dark.shade(8).RGBn
         
-        if 'mpsp' in lccm:
+        if lccm == 'mpsp': # ethanol MPSP has its dedicated plot above; IBO MPSP is plotted here
             continue
         
         # curr_metric_w_levels, curr_metric_w_ticks, curr_metric_cbar_ticks = get_contour_info_from_metric_data(results_metric_1, lb=3)
         curr_metric_non_nans = np.array(results[curr_metric])[np.where(~np.isnan(np.array(results[curr_metric])))]
+        if curr_metric_non_nans.size == 0 or curr_metric_non_nans.min() == curr_metric_non_nans.max():
+            # e.g. IBO MPSP (all NaN) or IBO yield/titer (all zero) in a
+            # scenario that makes no isobutanol: no range to contour
+            print(f'Skipping contour plot for {curr_metric}: all values are NaN or identical.')
+            continue
         curr_metric_non_nans = np.round(curr_metric_non_nans, 2)
         
         curr_metric_w_levels = np.arange(curr_metric_non_nans.min(), 
@@ -803,6 +828,14 @@ if plot:
                             np.percentile(curr_metric_non_nans, 75),
                             curr_metric_non_nans.max()]))
         curr_metric_w_ticks.sort(reverse=False)
+        if 'irr' in lccm:
+            curr_metric_w_levels = np.arange(-0.1, 0.5001, 0.01)
+            curr_metric_cbar_ticks = np.arange(-0.1, 0.5001, 0.05)
+            curr_metric_w_ticks = [0.0, 0.10, 0.15, 0.20, 0.30]
+            # IRR can fall far below the lowest level (money-losing corners);
+            # fill those cells rather than leaving them blank
+            extend_cmap = 'both'
+            cmap_under_color = colors.grey_dark.shade(40).RGBn
         curr_metric_w_ticks = np.round(np.array(curr_metric_w_ticks), 2)
         # curr_metric_w_levels = np.arange(0., 15.5, 0.5)
         
@@ -830,7 +863,8 @@ if plot:
                                         cmap=cmap, # can use 'viridis' or other default matplotlib colormaps
                                         # cmap_over_color = colors.grey_dark.shade(8).RGBn,
                                         cmap_over_color=cmap_over_color,
-                                        extend_cmap='max',
+                                        cmap_under_color=cmap_under_color,
+                                        extend_cmap=extend_cmap,
                                         cbar_ticks=curr_metric_cbar_ticks,
                                         z_marker_color='g', # default matplotlib color names
                                         fps=fps, # animation frames (z values traversed) per second

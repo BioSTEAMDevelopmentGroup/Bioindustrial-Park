@@ -9,6 +9,7 @@
 
 import numpy as np
 from biorefineries import isobutanol
+isobutanol.load()
 
 from matplotlib import pyplot as plt
 
@@ -39,6 +40,7 @@ fbs_spec = isobutanol.models.models_EtOH_IBO_corn.fbs_spec
 namespace_dict = isobutanol.models.namespace_dict
 optimize_1D_feeding_strategy_for_MPSP = isobutanol.models.optimize_1D_feeding_strategy_for_MPSP
 plot_kinetic_results = isobutanol.models.plot_kinetic_results
+solve_TEA = isobutanol.system.solve_TEA
 model_specification = model.specification
 system = model.system
 tea = model.system.TEA
@@ -52,7 +54,7 @@ dateTimeObj = datetime.now()
 ig = np.seterr(invalid='ignore')
 
 ferm_reactor = f.V406
-r = ferm_reactor.kinetic_reaction_system._te
+r = ferm_reactor.nsk_kinetic_model._te
 
 sugar_sol_evaporators = [f.F301, f.F302]
 
@@ -60,6 +62,10 @@ HXN = f.HXN1001
 
 product = f.ethanol
 broth = ferm_reactor.outs[1]
+# Vent EtOH/IBO (stripped by the fermentation CO2) is captured by the
+# scrubber V409 and recycled to the separation feed via MX8, so it is
+# part of the recoverable product (a broth-only denominator reads >100 %).
+vent = ferm_reactor.outs[0]
 
 EtOH_market_range=np.array([0.7, 1.0]) 
                 
@@ -72,14 +78,25 @@ isobutanol_filepath = isobutanol.__file__.replace('\\__init__.py', '')
 isobutanol_results_filepath = isobutanol_filepath + '\\analyses\\results\\'
 
 
-#%% Load parameter distributions
-parameter_distributions_filename = isobutanol_filepath+\
-    '\\analyses\\full\\parameter_distributions\\'+\
-    'parameter-distributions_corn_IBO_EtOH_B.xlsx'
-        
-model.parameters = ()
-model.load_parameter_distributions(parameter_distributions_filename, namespace_dict)
-baseline_initial = model.metrics_at_baseline()
+#%% Load scenario (kinetics workbook + baseline feeding strategy)
+# This sweep defaults to the opt_IRR scenario in full: its kinetics workbook
+# sets the baseline for every kinetic parameter NOT swept here (k_13, k_7ii),
+# and its feeding strategy is applied too. scenarios.load_scenario is the
+# single source of truth (scenarios.SCENARIOS['opt_IRR']) -- it loads the
+# workbook, sets the kinetics via metrics_at_baseline(), sets
+# fbs_spec.max_n_spikes, and runs one baseline model_specification with the
+# scenario's threshold/target. Change the `scenario` string below to re-point
+# BOTH kinetics and feeding.
+from biorefineries.isobutanol import scenarios
+
+scenario = 'opt_IRR'
+_scenario_bundle = scenarios.load_scenario(scenario)
+
+# Capture the scenario baseline's (k_13, k_7ii) -- the swept axes -- right here,
+# before the initial-simulation block and the sweep loop overwrite r.k_13 /
+# r.k_7ii. Marked on every contour below (auto-tracks the selected scenario).
+baseline_k_13 = r.k_13
+baseline_k_7ii = r.k_7ii
 
 # f.V406.aeration_safety_factor = 0.0
 
@@ -87,36 +104,49 @@ baseline_initial = model.metrics_at_baseline()
 
 # !!!
 V406 = f.V406
-f.M401.bypass_IBO_separation_conditions[0] = lambda: V406.outs[1].imass['Isobutanol']/V406.outs[1].F_vol < 10.0
+# The former M401 bypass-threshold override (skip IBO recovery below 10 g/L)
+# is gone with the solvent-extraction train: the integrated separation train
+# adapts to any feed titer (0-200 g/L) natively, shutting the IBO side off
+# when the broth carries no isobutanol.
 
-scenario = 'B'
-
-if scenario=='A':
-    ferm_reactor.kinetic_reaction_system._te.max_n_glu_spikes = 16
-    ferm_reactor.kinetic_reaction_system.default_max_n_glu_spikes = 16 
-    model_specification(threshold_conc_sugars=217.125, target_conc_sugars=221.25)
-elif scenario=='B':
-    ferm_reactor.kinetic_reaction_system._te.max_n_glu_spikes = 13
-    ferm_reactor.kinetic_reaction_system.default_max_n_glu_spikes = 13  
-    model_specification(threshold_conc_sugars=216.3, target_conc_sugars=226.3)
+# The scenario's kinetics workbook AND feeding strategy were both applied by
+# scenarios.load_scenario(scenario) above (opt_IRR -> workbook +
+# max_n_spikes=18, threshold_conc=286.767..., target_conc=300.0), which also
+# ran one baseline model_specification. No manual per-scenario feeding block is
+# needed here anymore -- edit the `scenario` string above to switch scenarios.
+# `file_to_save` picks up max_n=18 (from fbs_spec.max_n_spikes), keeping this
+# run's outputs distinct from the earlier scenario-A (max_n=16) / scenario-B
+# (max_n=0) runs.
     
 # !!!
-ferm_reactor.kinetic_reaction_system._te.max_n_glu_spikes = 0
-ferm_reactor.kinetic_reaction_system.default_max_n_glu_spikes = 0  
+# fbs_spec.max_n_spikes = 0
 perform_feeding_strategy_opt = False
 
 model_specification(
     n_sims=3,
-    n_tea_solves=3,
     plot=True,
     )
 
 #%%  Metrics
 product_chemical_IDs = ['Ethanol',]
-get_product_MPSP = lambda: tea.solve_price(product) / get_product_purity() # USD / pure-kg
+IBO_product = f.isobutanol
+
+# One side-effect-free TEA solve per simulated point, shared by the MPSP and
+# IRR metrics below: ethanol MPSP and isobutanol MPSP (each purity-adjusted
+# USD / pure-kg at the default 15% IRR, with the other product at its default
+# price; NaN when the product stream is empty) and the IRR at both products'
+# default prices. `latest_TEA_solution` is refreshed right after each
+# successful model_specification call in the sweep loop.
+latest_TEA_solution = {'IRR': np.nan, 'MPSPs': {product.ID: np.nan, IBO_product.ID: np.nan}}
+def refresh_TEA_solution():
+    latest_TEA_solution.update(solve_TEA(stream_IDs=(product.ID, IBO_product.ID)))
+    return latest_TEA_solution
+get_product_MPSP = lambda: latest_TEA_solution['MPSPs'][product.ID]
+get_IBO_MPSP = lambda: latest_TEA_solution['MPSPs'][IBO_product.ID]
+get_IRR = lambda: latest_TEA_solution['IRR']
 get_product_purity = lambda: sum([product.imass[i] for i in product_chemical_IDs])/product.F_mass
 get_production = lambda: sum([product.imass[i] for i in product_chemical_IDs])
-get_product_recovery = lambda: sum([product.imol[i] for i in product_chemical_IDs])/sum([broth.imol[i] for i in product_chemical_IDs])
+get_product_recovery = lambda: sum([product.imol[i] for i in product_chemical_IDs])/sum([broth.imol[i] + vent.imol[i] for i in product_chemical_IDs])
 get_AOC = lambda: tea.AOC / 1e6 # million USD / y
 get_TCI = lambda: tea.TCI / 1e6 # million USD
 
@@ -140,22 +170,24 @@ get_active_cell_loading = lambda: ferm_reactor.nsk_results_specific_tau_dict['cu
 #             get_prod_nsk,
 #             get_curr_n_glu_spikes,]
 
-metrics = {'MPSP': {'f': get_product_MPSP, 'units': '$/kg'},
+metrics = {'MPSP': {'f': get_product_MPSP, 'units': '$/kg'}, # ethanol MPSP
+            'IBO MPSP': {'f': get_IBO_MPSP, 'units': '$/kg'},
+            'IRR': {'f': get_IRR, 'units': ''},
             'AOC': {'f': get_AOC, 'units': 'MM$/y'},
             'TCI': {'f': get_TCI, 'units': 'MM$'},
             'Combined Yield': {'f': get_yield_nsk, 'units': 'g-EtOH-and-IBO/g-sugars'},
-            'EtOH Titer': {'f': get_titer_nsk, 'units': 'g-EtOH/L-broth'},
-            'EtOH Productivity': {'f': get_prod_nsk, 'units': 'g-EtOH/L-broth/h'},
+            'EtOH Titer': {'f': get_titer_nsk, 'units': 'g-EtOH/L-water'},
+            'EtOH Productivity': {'f': get_prod_nsk, 'units': 'g-EtOH/L-water/h'},
             'Number of glucose spikes': {'f': get_curr_n_glu_spikes, 'units': ''},
             'Fermentation time': {'f': get_tau, 'units': 'h'},
             'Total Q sugar evap': {'f': get_sugar_sol_evap_duty, 'units': 'kJ/h'},
-            'Target sugars concentration': {'f': lambda: fbs_spec.target_conc_sugars, 'units': 'g-sugars/L-broth'},
-            'Cell loading': {'f': get_cell_loading, 'units': 'g-cell/L-broth'},
-            'Active cell loading': {'f': get_active_cell_loading, 'units': 'g-cell/L-broth'},
+            'Target sugars concentration': {'f': lambda: fbs_spec.target_conc, 'units': 'g-sugars/L-water'},
+            'Cell loading': {'f': get_cell_loading, 'units': 'g-cell/L-water'},
+            'Active cell loading': {'f': get_active_cell_loading, 'units': 'g-cell/L-water'},
             'EtOH Yield': {'f': lambda: ferm_reactor.nsk_results_specific_tau_dict['y_EtOH_glu_added'], 'units': 'g-EtOH/g-sugars'},
             'IBO Yield': {'f': lambda: ferm_reactor.nsk_results_specific_tau_dict['y_IBO_glu_added'], 'units': 'g-IBO/g-sugars'},
-            'IBO Titer': {'f': lambda: ferm_reactor.nsk_results_specific_tau_dict['[s_IBO]'], 'units': 'g-IBO/L-broth'},
-            'IBO Productivity': {'f': lambda: ferm_reactor.nsk_results_specific_tau_dict['[s_IBO]']/ferm_reactor.nsk_results_specific_tau_dict['time'], 'units': 'g-IBO/L-broth/h'},
+            'IBO Titer': {'f': lambda: ferm_reactor.nsk_results_specific_tau_dict['[s_IBO]'], 'units': 'g-IBO/L-water'},
+            'IBO Productivity': {'f': lambda: ferm_reactor.nsk_results_specific_tau_dict['[s_IBO]']/ferm_reactor.nsk_results_specific_tau_dict['time'], 'units': 'g-IBO/L-water/h'},
             'Actual aeration required': {'f': lambda: ferm_reactor.compressed_air.imol['O2'], 'units': 'kmol-O2/h'},
             }
 
@@ -163,17 +195,17 @@ metrics = {'MPSP': {'f': get_product_MPSP, 'units': '$/kg'},
 # results = {i: [] for i in range(len(metrics.values()))}
 results = {i: [] for i in metrics.keys()}
 
-steps = (25, 25, 1)
+steps = (20, 20, 1)
 
-spec_1 = nsk_k_13es = np.linspace(0.0, 40.0, steps[0])
+spec_1 = nsk_k_13es = np.linspace(0.0, 6.0, steps[0])
 
-spec_2 = nsk_k_7iies = np.linspace(0.0001, 0.5, steps[1])
+spec_2 = nsk_k_7iies = np.linspace(0.0001, 0.12, steps[1])
 
 
-spec_3 = conc_sugars_feed_spikes =\
+spec_3 = spike_concs =\
     np.array([
-              # 1.*baseline_spec['conc_sugars_feed_spike'],
-              fbs_spec.conc_sugars_feed_spike,
+              # 1.*baseline_spec['spike_conc'],
+              fbs_spec.spike_conc,
               ])
 
 #%% Plot stuff
@@ -182,35 +214,35 @@ spec_3 = conc_sugars_feed_spikes =\
 
 x_label = "k_13" # title of the x axis
 x_units = r"$\mathrm{g} \cdot \mathrm{L}^{-1} \cdot \mathrm{h}^{-1}$"
-x_ticks = [0, 10, 20, 30, 40]
+x_ticks = [0, 1, 2, 3, 4, 5, 6]
 
 y_label = "k_7ii" # title of the y axis
 y_units = r"$\mathrm{g} \cdot \mathrm{L}^{-1} \cdot \mathrm{h}^{-1}$"
-y_ticks = [0.0, 0.1, 0.2, 0.3, 0.4, 0.5]
+y_ticks = [0.0, 0.03, 0.06, 0.09, 0.12]
 
 z_label = "Spike feed glucose concentration" # title of the x axis
 z_units =r"$\mathrm{g} \cdot \mathrm{L}^{-1}$"
 z_ticks = [0, 200, 400, 600, 800]
 
 # Metrics
-MPSP_w_label = r"$\bfMPSP$" # title of the color axis
+MPSP_w_label = r"$\mathbf{MPSP}$" # title of the color axis
 MPSP_units = r"$\mathrm{\$}\cdot\mathrm{kg}^{-1}$"
 # MPSP_units = r"$\mathrm{\$/kg}$"
 
-AOC_w_label = r"$\bfAOC$" # title of the color axis
+AOC_w_label = r"$\mathbf{AOC}$" # title of the color axis
 AOC_units = r"$\mathrm{MM\$}\cdot\mathrm{y}^{-1}$"
 # AOC_units = r"$\mathrm{MM\$/y}$"
 
-TCI_w_label = r"$\bfTCI$" # title of the color axis
+TCI_w_label = r"$\mathbf{TCI}$" # title of the color axis
 TCI_units = r"$\mathrm{MM\$}$"
 
-Yield_w_label = r"$\bfYield$" # title of the color axis
+Yield_w_label = r"$\mathbf{Yield}$" # title of the color axis
 Yield_units = r"$\mathrm{g}\cdot\mathrm{g}^{-1}$"
 
-Titer_w_label = r"$\bfTiter$" # title of the color axis
+Titer_w_label = r"$\mathbf{Titer}$" # title of the color axis
 Titer_units = r"$\mathrm{g}\cdot\mathrm{L}^{-1}$"
 
-Productivity_w_label = r"$\bfProductivity$" # title of the color axis
+Productivity_w_label = r"$\mathbf{Productivity}$" # title of the color axis
 Productivity_units = r"$\mathrm{g}\cdot\mathrm{L}^{-1}\cdot\mathrm{h}^{-1}$"
 
 #%% Colors
@@ -273,19 +305,25 @@ def tickmarks(dmin, dmax, accuracy=50, N_points=5):
 minute = '0' + str(dateTimeObj.minute) if len(str(dateTimeObj.minute))==1 else str(dateTimeObj.minute)
 # file_to_save = f'_{steps}_steps_'+'etoh_fbs_%s.%s.%s-%s.%s'%(dateTimeObj.year, dateTimeObj.month, dateTimeObj.day, dateTimeObj.hour, minute)
 
-file_to_save = f'ibo_{steps}_{x_label[:5]}_{y_label[:5]}_{z_label[:5]}_opt={perform_feeding_strategy_opt}_max_n={ferm_reactor.kinetic_reaction_system.default_max_n_glu_spikes}_'
+file_to_save = f'ibo_{steps}_{x_label[:5]}_{y_label[:5]}_{z_label[:5]}_opt={perform_feeding_strategy_opt}_max_n={ferm_reactor.nsk_kinetic_model.default_max_n_glu_spikes}_'
+
+# Set IBO_SWEEP_REPLOT_FROM_CSV=1 to skip the grid simulations and rebuild
+# the contour plots from the per-metric CSVs a previous run of this script
+# (same steps / scenario / feeding settings, i.e. same `file_to_save` prefix)
+# saved under analyses/results/. Only the plot styling below then matters.
+replot_from_csv = os.environ.get('IBO_SWEEP_REPLOT_FROM_CSV', '') == '1'
 
 #%% Initial simulation
 
-print('\n\nSimulating the initial point to avoid bugs ...')
-curr_spec = fbs_spec.current_specifications
-r.k_13 = nsk_k_13es[1]
-r.k_7ii = nsk_k_7iies[0]
-model_specification(**curr_spec,
-    n_sims=3,
-    n_tea_solves=3,
-    plot=True,
-    )
+if not replot_from_csv:
+    print('\n\nSimulating the initial point to avoid bugs ...')
+    curr_spec = fbs_spec.current_specifications
+    r.k_13 = nsk_k_13es[1]
+    r.k_7ii = nsk_k_7iies[0]
+    model_specification(**curr_spec,
+        n_sims=3,
+        plot=True,
+        )
 
 # %% Run analysis 
 
@@ -310,7 +348,16 @@ print_status_every_n_simulations = 1
 
 errors_dict = {}
 
-for s3 in spec_3:
+if replot_from_csv:
+    print(f'\nReplotting from saved CSVs: {isobutanol_results_filepath}{file_to_save}_<metric>.csv')
+    for k in results.keys():
+        results[k] = [pd.read_csv(isobutanol_results_filepath+file_to_save+f'_{k}.csv',
+                                  index_col=0).to_numpy()]
+    spec_3_to_run = []
+else:
+    spec_3_to_run = spec_3
+
+for s3 in spec_3_to_run:
     for v in list(results.values()): v.append([])
     
     for s2 in spec_2:
@@ -324,13 +371,14 @@ for s3 in spec_3:
                 curr_spec = {k: v for k,v in fbs_spec.current_specifications.items()}
                 r.k_13 = s1
                 r.k_7ii = s2
-                curr_spec.update({'conc_sugars_feed_spike':s3,})
+                curr_spec.update({'spike_conc':s3,})
                 
                 if perform_feeding_strategy_opt:
                     optimize_1D_feeding_strategy_for_MPSP(Ns=20, model_kwargs=curr_spec)
                 else:
                     model_specification(**curr_spec)
                 # plot_kinetic_results()
+                refresh_TEA_solution()
                 
                 
                 for k, v in list(results.items()): 
@@ -494,14 +542,26 @@ if smoothing:
 #%% Plots
 plot = True
 
-if plot: 
+# Marker for the selected scenario's baseline in the swept (k_13, k_7ii) plane,
+# passed to every animated_contourplot below via `additional_points`
+# ({(x, y): (markershape, markerfacecolor, markersize)}; drawn with a black
+# edge at zorder 500). White star for contrast against every colormap here.
+baseline_marker_points = {
+    (baseline_k_13, baseline_k_7ii): ('*', 'white', 13),
+    }
+
+if plot:
     
     #%% MPSP
     
     # MPSP_w_levels, MPSP_w_ticks, MPSP_cbar_ticks = get_contour_info_from_metric_data(results_metric_1, lb=3)
-    MPSP_w_levels = np.arange(0.6, 1.4001, 0.01)
-    MPSP_cbar_ticks = np.arange(0.6, 1.4001, 0.05)
-    MPSP_w_ticks = [0.4, 0.6, 0.8]
+    # opt_IRR: ethanol is a trace co-product across this k_13 x k_7ii grid
+    # (EtOH titer median ~0.1 g/L), so its purity-adjusted MPSP is astronomically
+    # high (median ~365, max ~8552 $/kg) almost everywhere; focus the color scale
+    # on the EtOH-producing low corner (min ~0.55) and let the rest over-color.
+    MPSP_w_levels = np.arange(0.5, 3.0001, 0.05)
+    MPSP_cbar_ticks = np.arange(0.5, 3.0001, 0.5)
+    MPSP_w_ticks = [0.75, 1.0, 1.5, 2.0, 2.5]
     # MPSP_w_levels = np.arange(0., 15.5, 0.5)
     
     
@@ -541,6 +601,8 @@ if plot:
                                     # comparison_range=EtOH_market_range,
                                     n_minor_ticks = 1,
                                     cbar_n_minor_ticks = 4,
+                                    additional_points = baseline_marker_points,
+                                    round_yticks_to = 2,
                                     units_on_newline = (False, False, False, False), # x,y,z,w
                                     units_opening_brackets = [" (",] * 4,
                                     units_closing_brackets = [")",] * 4,
@@ -702,17 +764,23 @@ if plot:
     #%% All metrics
     for curr_metric, val in metrics.items():
         cbar_n_minor_ticks = 3
+        extend_cmap = 'max'
+        cmap_under_color = None
+        white_comparison_lines = []  # white, labeled contour line(s); IRR only
+        w_scale = 1.0            # multiply metric data + levels/ticks (IRR -> %)
+        curr_w_units = val['units']
+        curr_fmt_clabel = lambda cvalue: get_rounded_str(cvalue, 3)
         lccm = curr_metric.lower()
         if 'spike' in lccm or 'q sugar' in lccm or 'target sugars' in lccm:
             if not perform_feeding_strategy_opt: 
                 continue
             else: 
                 if 'spike' in lccm:
-                    if ferm_reactor.kinetic_reaction_system.default_max_n_glu_spikes == 0.:
+                    if ferm_reactor.nsk_kinetic_model.default_max_n_glu_spikes == 0.:
                         continue
                 else:
                     pass
-        elif 'yield' in lccm or 'titer' in lccm or 'productivity' in lccm or 'loading' in lccm:
+        elif 'yield' in lccm or 'titer' in lccm or 'productivity' in lccm or 'loading' in lccm or 'irr' in lccm:
             cmap = JBEI_UCB_colormap(reverse=True)
             cmap_over_color = colors.yellow_tint.RGBn
         
@@ -721,7 +789,16 @@ if plot:
             cmap_over_color = colors.grey_dark.shade(8).RGBn
             
         # curr_metric_w_levels, curr_metric_w_ticks, curr_metric_cbar_ticks = get_contour_info_from_metric_data(results_metric_1, lb=3)
-        curr_metric_non_nans = np.array(results[curr_metric])[np.where(~np.isnan(np.array(results[curr_metric])))]
+        # Use only FINITE values to derive levels/ticks: solve_TEA reports an
+        # unsolvable (money-losing) IRR as -inf, and np.isnan does NOT catch
+        # +/-inf -- an -inf leaking into np.arange(min, ...) below raises
+        # "arange: cannot compute length" and aborts all remaining plots.
+        curr_metric_non_nans = np.array(results[curr_metric])[np.isfinite(np.array(results[curr_metric]))]
+        if curr_metric_non_nans.size == 0 or curr_metric_non_nans.min() == curr_metric_non_nans.max():
+            # e.g. IBO MPSP (all NaN) or IBO yield/titer (all zero) in a
+            # scenario that makes no isobutanol: no range to contour
+            print(f'Skipping contour plot for {curr_metric}: all values are NaN or identical.')
+            continue
         
         curr_metric_w_levels = np.arange(curr_metric_non_nans.min(), 
                                       curr_metric_non_nans.max()*1.001, 
@@ -740,14 +817,59 @@ if plot:
         # curr_metric_w_levels = np.arange(0., 15.5, 0.5)
         
         if 'mpsp' in lccm:
-            curr_metric_w_levels = np.arange(0.25, 5.001, 0.1)
-            curr_metric_cbar_ticks = np.arange(0.25, 5.001, 0.25)
-            curr_metric_w_ticks = [0.4, 0.9, 2.5, 5.0]
+            # opt_IRR 20x20 k_13 x k_7ii grid: IBO MPSP spans 1.41-2.92 $/kg
+            # (isobutanol is the primary product here); ethanol MPSP spans
+            # 0.55-8552 (ethanol is a trace co-product, MPSP median ~365).
+            # Give each its own scale rather than a shared one.
+            if 'ibo' in lccm:
+                curr_metric_w_levels = np.arange(1.4, 3.0001, 0.02)
+                curr_metric_cbar_ticks = np.arange(1.4, 3.0001, 0.2)
+                curr_metric_w_ticks = [1.5, 1.8, 2.1, 2.4, 2.7]
+            else: # ethanol: focus on the EtOH-producing low corner, rest over-colors
+                curr_metric_w_levels = np.arange(0.5, 3.0001, 0.05)
+                curr_metric_cbar_ticks = np.arange(0.5, 3.0001, 0.5)
+                curr_metric_w_ticks = [0.75, 1.0, 1.5, 2.0, 2.5]
             cbar_n_minor_ticks = 4
+        elif 'irr' in lccm:
+            # opt_IRR grid: plot IRR as a PERCENTAGE (e.g. 20%, not 0.20) --
+            # scale the fractional data + all levels/ticks by 100, label the
+            # colorbar in % and give the contour labels a % sign. Color bar
+            # 0-25%. Everything below 0% (money-losing finite IRRs AND the
+            # unsolvable -inf cells) collapses into the gray under-color; the
+            # scale is capped at 25% (no over-color).
+            w_scale = 100.0
+            curr_w_units = '%'
+            curr_fmt_clabel = lambda cvalue: f'{cvalue:.0f}%'
+            curr_metric_w_levels = np.arange(0.0, 25.001, 0.5)
+            curr_metric_cbar_ticks = np.arange(0.0, 25.001, 5.0)
+            curr_metric_w_ticks = [5.0, 10.0, 15.0, 20.0]
+            cbar_n_minor_ticks = 4
+            # Keep the under-color (IRR < 0, incl. -inf money-losing corners);
+            # cap at 25% with no over-color.
+            extend_cmap = 'min'
+            cmap_under_color = colors.grey_dark.shade(40).RGBn
+            cmap_over_color = None
+            # White break-even contour + label at IRR = 0% (boundary between
+            # the profitable colored region and the gray under-color).
+            white_comparison_lines = [0.0]
         # else:
         #     break
-        
-        contourplots.animated_contourplot(w_data_vs_x_y_at_multiple_z=results[curr_metric], # shape = z * x * y # values of the metric you want to plot on the color axis; e.g., curr_metric
+
+        # contourf masks non-finite cells (they render blank). For a metric
+        # drawn with an under-color extend (IRR), push -inf (unsolvable,
+        # money-losing points) to just below the lowest level so those cells
+        # fill with cmap_under_color instead of vanishing.
+        plot_data = results[curr_metric]
+        if w_scale != 1.0:  # e.g. IRR fraction -> percent (levels/ticks already scaled)
+            plot_data = np.array(plot_data, dtype=float) * w_scale
+        if cmap_under_color is not None:
+            _pd = np.array(plot_data, dtype=float)
+            if np.isneginf(_pd).any():
+                _step = curr_metric_w_levels[1] - curr_metric_w_levels[0]
+                _pd[np.isneginf(_pd)] = curr_metric_w_levels[0] - _step
+                plot_data = _pd
+
+        contourplots.animated_contourplot(w_data_vs_x_y_at_multiple_z=plot_data, # shape = z * x * y # values of the metric you want to plot on the color axis; e.g., curr_metric
                                         x_data=spec_1, # x axis values
                                         # x_data = curr_metrics/theoretical_max_g_HP_acid_per_g_glucose,
                                         y_data=spec_2, # y axis values
@@ -764,13 +886,14 @@ if plot:
                                         x_units=x_units,
                                         y_units=y_units,
                                         z_units=z_units,
-                                        w_units=val['units'],
+                                        w_units=curr_w_units,
                                         # fmt_clabel=lambda cvalue: r"$\mathrm{\$}$"+" {:.1f} ".format(cvalue)+r"$\cdot\mathrm{kg}^{-1}$", # format of contour labels
-                                        fmt_clabel = lambda cvalue: get_rounded_str(cvalue, 3),
+                                        fmt_clabel = curr_fmt_clabel,
                                         cmap=cmap, # can use 'viridis' or other default matplotlib colormaps
                                         # cmap_over_color = colors.grey_dark.shade(8).RGBn,
                                         cmap_over_color=cmap_over_color,
-                                        extend_cmap='max',
+                                        cmap_under_color=cmap_under_color,
+                                        extend_cmap=extend_cmap,
                                         cbar_ticks=curr_metric_cbar_ticks,
                                         z_marker_color='g', # default matplotlib color names
                                         fps=fps, # animation frames (z values traversed) per second
@@ -784,6 +907,10 @@ if plot:
                                         # comparison_range=EtOH_market_range,
                                         n_minor_ticks = 1,
                                         cbar_n_minor_ticks = cbar_n_minor_ticks,
+                                        additional_points = baseline_marker_points,
+                                        comparison_lines = white_comparison_lines,
+                                        comparison_lines_colors = 'white',
+                                        round_yticks_to = 2,
                                         units_on_newline = (False, False, False, False), # x,y,z,w
                                         units_opening_brackets = [" (",] * 4,
                                         units_closing_brackets = [")",] * 4,

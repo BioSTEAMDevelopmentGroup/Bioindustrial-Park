@@ -29,6 +29,7 @@ import os
 import biosteam as bst
 
 from biorefineries import isobutanol
+isobutanol.load()
 
 fbs_spec = isobutanol.models.fbs_spec
 
@@ -48,18 +49,18 @@ metrics_units = {"MPSP":  r"$\mathrm{\$}\cdot\mathrm{kg}^{-1}$",
                 "AOC": "MM\$/y",
                 "TCI": "MM\$",
                 "Combined Yield": "g-EtOH-and-IBO/g-sugars",
-                "EtOH Titer": "g-EtOH/L-broth",
-                "EtOH Productivity": "g-EtOH/L-broth/h",
+                "EtOH Titer": "g-EtOH/L-water",
+                "EtOH Productivity": "g-EtOH/L-water/h",
                 "Number of glucose spikes": "",
                 "Fermentation time": "h",
                 "Total Q sugar evap": "kJ/h",
-                "Target sugars concentration": "g-sugars/L-broth",
-                "Cell loading": "g-cell/L-broth",
-                "Active cell loading": "g-cell/L-broth",
+                "Target sugars concentration": "g-sugars/L-water",
+                "Cell loading": "g-cell/L-water",
+                "Active cell loading": "g-cell/L-water",
                 "EtOH Yield":"g-EtOH/g-sugars",
                 "IBO Yield": "g-IBO/g-sugars",
-                "IBO Titer": "g-IBO/L-broth",
-                "IBO Productivity": "g-IBO/L-broth/h",
+                "IBO Titer": "g-IBO/L-water",
+                "IBO Productivity": "g-IBO/L-water/h",
                 "Actual aeration required": "kmol-O2/h",
                 }
 
@@ -106,9 +107,9 @@ if y_label in ('k_1ie', 'k_1ii', 'k_7ie', 'k_7ii',):
 
 # spec_3
 if z_label in ('Spike feed glucose concentration',):
-    spec_3 = conc_sugars_feed_spikes =\
+    spec_3 = spike_concs =\
         np.array([
-                  fbs_spec.conc_sugars_feed_spike,
+                  fbs_spec.spike_conc,
                   ])
     z_units = r"$\mathrm{g} \cdot \mathrm{L}^{-1}$"
     z_ticks = [0, 200, 400, 600, 800]

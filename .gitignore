@@ -32,6 +32,12 @@ docs/_static/*
 docs/_templates/*
 docs/superpowers
 
+# Claude code #
+###############
+CLAUDE.md
+.claude
+docs
+
 # Data/results #
 ################
 *.xlsx

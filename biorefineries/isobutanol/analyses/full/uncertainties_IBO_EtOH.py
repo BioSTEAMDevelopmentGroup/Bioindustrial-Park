@@ -29,13 +29,14 @@ print('\n\nLoading system ...')
 # from biorefineries
 # from biorefineries import isobutanol
 from biorefineries import isobutanol
+isobutanol.load()
 from biorefineries.isobutanol.models import models_EtOH_IBO_corn as models
 # models = isobutanol.models
 # from . import models
 
 print('\nLoaded system.')
 from datetime import datetime
-from biosteam.utils import TicToc
+from biosteam.utils import Timer # biosteam 2.53 renamed TicToc -> Timer (tic() -> start())
 import os
 
 dateTimeObj = datetime.now()
@@ -49,7 +50,10 @@ system = IBO_sys = models.IBO_sys
 unit_groups = models.unit_groups
 
 tea = models.IBO_tea
-get_adjusted_MSP = models.get_adjusted_MSP
+# (element, 'name [units]') keys of the shared-solve TEA metrics (baseline
+# Series / model.table columns). The reported "MPSP" is the purity-adjusted
+# ethanol MPSP, solved at the baseline IRR (0.15) via solve_TEA_at_IRR.
+adjusted_ethanol_MPSP_key = ('Biorefinery', 'Purity-adjusted ethanol MPSP [$/kg]')
 # per_kg_KSA_to_per_kg_SA = models.per_kg_KSA_to_per_kg_SA
 
 f = bst.main_flowsheet
@@ -63,15 +67,15 @@ plot_spearman_matrix = isobutanol.plots.spearman_matrix.plot_spearman_matrix
 
 #%%
 
-scenario = 'A'
+scenario = 'B'
 
 modes=[
        scenario, 
         # 'B', 
         # 'C', 'D',
        ]
-N_simulations_per_mode=6000
-notification_interval=200
+N_simulations_per_mode=200
+notification_interval=50
 plot_TOC_fig=False
 
 percentiles = [0, 0.05, 0.1, 0.25, 0.5, 0.75, 0.9, 0.95, 1]
@@ -93,18 +97,16 @@ parameter_distributions_filenames = {i: 'parameter-distributions_corn_IBO_EtOH_'
 #%%
 V406 = f.V406
 if scenario=='A':
-    V406.kinetic_reaction_system._te.max_n_glu_spikes = 16
-    V406.kinetic_reaction_system.default_max_n_glu_spikes = 16  
-    model.specification(threshold_conc_sugars=217.125, target_conc_sugars=221.25)
+    V406.fbs_spec.max_n_spikes = 16
+    model.specification(threshold_conc=217.125, target_conc=221.25)
 elif scenario=='B':
-    V406.kinetic_reaction_system._te.max_n_glu_spikes = 13
-    V406.kinetic_reaction_system.default_max_n_glu_spikes = 13  
-    model.specification(threshold_conc_sugars=216.3, target_conc_sugars=226.3)
+    V406.fbs_spec.max_n_spikes = 0  # batch: no glucose spikes
+    model.specification(threshold_conc=34.25, target_conc=140.0)
     
 #%%
 
-timer = TicToc('timer')
-timer.tic()
+timer = Timer('timer')
+timer.start()
 
 # Set seed to make sure each time the same set of random numbers will be used
 np.random.seed(3221) # 3221
@@ -121,7 +123,16 @@ for i in range(len(modes)):
     print(f'\n\nLoading parameter distributions ({mode}) ...')
     model.parameters = ()
     model.load_parameter_distributions(parameter_distributions_filename, models.namespace_dict)
-    
+
+    # IRR is deliberately NOT an independent uncertain parameter: drop it if
+    # the distributions workbook still carries a row for it. tea.IRR then
+    # stays at its baseline (0.15, set in system.py) throughout; every MPSP
+    # metric is solved at that baseline IRR, and IRR is itself reported as a
+    # metric (solved at default product prices) by the shared
+    # solve_TEA_at_IRR metrics in models_EtOH_IBO_corn.py.
+    model.parameters = tuple(p for p in model.get_parameters()
+                             if p.name != 'Internal rate of return')
+
     # load_additional_params()
     print(f'\nLoaded parameter distributions ({mode}).')
     
@@ -146,13 +157,28 @@ for i in range(len(modes)):
     baseline = pd.DataFrame(data=np.array([[i for i in baseline_initial.values],]), 
                             columns=baseline_initial.keys())
     
-    results_dict['Baseline']['MPSP'][mode] = get_adjusted_MSP()
-        
+    results_dict['Baseline']['MPSP'][mode] = baseline_initial[adjusted_ethanol_MPSP_key]
+
     print(f"\nSimulated baseline. MPSP = ${round(results_dict['Baseline']['MPSP'][mode],2)}/kg.")
     
     #%%
     print('\n\nEvaluating ...')
-    model.evaluate(notify=notification_interval, autoload=None, autosave=None, file=None)
+    # Autosave/resume: the fermentation-coupled system intermittently dies
+    # inside native integrator code (nondeterministic segfault, exit 139 --
+    # not a model regression). Checkpoint the evaluation state every
+    # `notification_interval` samples and resume from the pickle on relaunch
+    # (np.random.seed above makes the samples identical across launches, so
+    # resuming is valid; a table-layout mismatch makes autoload start fresh).
+    # The checkpoint is deleted after the raw results are saved below.
+    autosave_file = IBO_results_filepath + f'uncertainties_{mode}_autosave.pickle'
+    # autosave interval kept small (and decoupled from the notify interval):
+    # the segfault often recurs within a single notify window, so a coarse
+    # checkpoint can get stuck and never ratchet forward. 10 preserves
+    # progress every 10 sims across relaunches.
+    model.evaluate(notify=notification_interval,
+                   autoload=True,
+                   autosave=10,
+                   file=autosave_file)
     print('\nFinished evaluation.')
     
     # Baseline results
@@ -162,7 +188,7 @@ for i in range(len(modes)):
     model.specification()
     baseline_end = model.metrics_at_baseline()
     
-    print(f"\nRe-simulated baseline. MPSP = ${round(get_adjusted_MSP(),2)}/kg.")
+    print(f"\nRe-simulated baseline. MPSP = ${round(baseline_end[adjusted_ethanol_MPSP_key],2)}/kg.")
     
     minute = '0' + str(dateTimeObj.minute) if len(str(dateTimeObj.minute))==1 else str(dateTimeObj.minute)
     file_to_save = IBO_results_filepath+\
@@ -192,7 +218,20 @@ for i in range(len(modes)):
  
     table = model.table
     
-    model.table = model.table.dropna()
+    # Drop failed simulations (NaN metric rows) -- but never on the five
+    # shared-solve TEA metric columns, which can be legitimately NaN on an
+    # otherwise valid simulation: the isobutanol MPSPs in every row of a
+    # scenario with no isobutanol product (scenario A), and IRR when the
+    # NPV has no real root at any discount rate (deep money-losing
+    # samples). Genuinely failed simulations still drop -- they are NaN in
+    # every column.
+    model.table = model.table.dropna(
+        subset=[c for c in model.table.columns
+                if c[1] not in ('IRR [-]',
+                                'Ethanol MPSP [$/kg]',
+                                'Purity-adjusted ethanol MPSP [$/kg]',
+                                'Isobutanol MPSP [$/kg]',
+                                'Purity-adjusted isobutanol MPSP [$/kg]')])
     
     spearman_results, spearman_p_values = model.spearman_r()
     
@@ -229,12 +268,12 @@ for i in range(len(modes)):
         model.table.to_excel(writer, sheet_name='Raw data')
     
     
-    results_dict['Uncertainty']['MPSP'][mode] = model.table.Biorefinery['Adjusted minimum selling price [$/kg IBO]']
-    
+    results_dict['Uncertainty']['MPSP'][mode] = model.table.Biorefinery[adjusted_ethanol_MPSP_key[1]]
+
     df_rho, df_p = model.spearman_r()
-    
-    results_dict['Sensitivity']['Spearman']['MPSP'][mode] = df_rho['Biorefinery', 'Adjusted minimum selling price [$/kg IBO]']
-    results_dict['Sensitivity']['p-val Spearman']['MPSP'][mode] = df_p['Biorefinery', 'Adjusted minimum selling price [$/kg IBO]']
+
+    results_dict['Sensitivity']['Spearman']['MPSP'][mode] = df_rho[adjusted_ethanol_MPSP_key]
+    results_dict['Sensitivity']['p-val Spearman']['MPSP'][mode] = df_p[adjusted_ethanol_MPSP_key]
     
     
     results_dict['Sensitivity']['Spearman']['EtOH Yield'] = {}
@@ -253,6 +292,9 @@ for i in range(len(modes)):
     results_dict['Sensitivity']['p-val Spearman']['EtOH Productivity'][mode] = df_p['Fermentation', 'Et OH productivity [g-EtOH/L-water/h]']
     
     print('\n\nSaved raw results.')
+    # Raw results are on disk -- drop the crash-recovery checkpoint so a
+    # future fresh evaluation cannot silently resume from a completed one.
+    if os.path.exists(autosave_file): os.remove(autosave_file)
     print('---------------------------------\n\n')
     
 #%% Clean up NaN values for plotting
@@ -272,6 +314,19 @@ for mode in modes:
 
 # %% Plots
 print('\n\nCreating and saving plots ...')
+
+def df_from_groups_positive_fraction(unit_groups):
+    """Local stand-in for bst.UnitGroup.df_from_groups(fraction=True,
+    scale_fractions_to_positive_values=True). biosteam 2.53's classmethod does
+    the scaling in place as `df.values *= ...`, but under numpy 2.x df.values is
+    a read-only view, so that raises 'output array is read-only'. Same math on a
+    writable copy; biosteam is read-only, so the fix lives here."""
+    data = [ug.to_series(False) for ug in unit_groups]
+    df = pd.DataFrame(data)
+    values = np.array(df.values, dtype=float)  # writable copy of the view
+    positive_values = np.where(values > 0., values, 0.)
+    values *= 100 / positive_values.sum(axis=0, keepdims=True)
+    return pd.DataFrame(values, index=df.index, columns=df.columns)
 
 MPSP_units = r"$\mathrm{\$}\cdot\mathrm{kg}^{-1}$"
 GWP_units = r"$\mathrm{kg}$"+" "+ r"$\mathrm{CO}_{2}\mathrm{-eq.}\cdot\mathrm{kg}^{-1}$"
@@ -328,7 +383,7 @@ fig, axs = contourplots.box_and_whiskers_plot(uncertainty_data=MPSP_uncertainty,
                           show_x_ticks=True,
                           x_tick_labels=[scenario_names[i] for i in modes],
                           x_tick_wrap_width=14,
-                          y_label=r"$\bfMPSP$",
+                          y_label=r"$\mathbf{MPSP}$", # matplotlib 3.11 dropped legacy mathtext \bf
                           y_units=MPSP_units,
                           y_ticks=np.arange(0., 1.26, 0.25),
                           save_file=False,
@@ -363,10 +418,7 @@ if len(modes)==1:
             i.name='natural gas\n(for product drying)'
     ######
     
-    df_TEA_breakdown = bst.UnitGroup.df_from_groups(
-        unit_groups, fraction=True,
-        scale_fractions_to_positive_values=True,
-    )
+    df_TEA_breakdown = df_from_groups_positive_fraction(unit_groups)
     
     # totals=[sum([ui.metrics[i]() for ui in unit_groups])
     #         for i in range(len(unit_groups[0].metrics))]
@@ -388,7 +440,7 @@ if len(modes)==1:
     
     contourplots.stacked_bar_plot(dataframe=df_TEA_breakdown, 
                      y_ticks = [-25, 0, 25, 50, 75, 100],
-                     y_label=r"$\bfCost$" + " " + r"$\bfand$" + " " +  r"$\bfUtility$" + " " +  r"$\bfBreakdown$", 
+                     y_label=r"$\mathbf{Cost}$" + " " + r"$\mathbf{and}$" + " " +  r"$\mathbf{Utility}$" + " " +  r"$\mathbf{Breakdown}$",
                      y_units = "%", 
                      colors=['#7BBD84', 
                              '#E58835', 
@@ -422,7 +474,7 @@ if len(modes)==1:
                      totals=totals,
                      sig_figs_for_totals=3,
                      units_list=[i.units for i in unit_groups[0].metrics],
-                     totals_label_text=r"$\bfsum:$",
+                     totals_label_text=r"$\mathbf{sum:}$",
                      xticks_fontsize = 17,
                      ylabel_fontsize = 18,
                      yticks_fontsize = 17,
@@ -641,7 +693,7 @@ if len(modes)==1:
     
     for i in metrics:
         str_i_lower = str(i).lower()
-        if 'total' in str_i_lower or 'adjusted minimum selling price' in str_i_lower:
+        if 'total' in str_i_lower or 'purity-adjusted' in str_i_lower:
             print(f"\n\nThe parameters to which the metric {i[1]} is most significantly sensitive (i.e., p-value < {cutoff_p_value} and Spearman's rho >= {cutoff_rho_value}) are as follows:")
             print("Parameter\t\t\t\t\t\t\t\tSpearman's rho\t\t\t\t\t\t\t\tp-value")
             sig_sens_parameters[i] = []

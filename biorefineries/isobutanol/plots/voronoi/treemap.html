@@ -1,0 +1,330 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<style>
+  :root { --fg: #1a1a1a; }
+  html, body { margin: 0; background: #ffffff; color: var(--fg);
+    font-family: Arial, "DejaVu Sans", sans-serif; }
+  /* size to content so the rendered boundingBox spans the full figure (the
+     tile grid + the common legend); a plain block would stay viewport-wide
+     and clip on capture. */
+  #figure { padding: 16px; width: max-content; display: flex;
+    flex-direction: row; align-items: center; gap: 28px; }
+  #grid { display: grid; gap: 14px; }
+  .cell { display: flex; flex-direction: column; align-items: center; }
+  .cell .title { font-size: 13px; font-weight: bold; margin: 2px 0 0; }
+  .cell .subtitle { font-size: 11px; color: #444; margin: 0 0 4px; }
+  .chart { width: 300px; height: 300px; }
+  /* the one common sector key (panel-C style) beside the grid: its own
+     amCharts root, so the swatches carry the very same fillPatterns as the
+     cells. Sized generously; the framed box inside fits its content. */
+  #legend { width: 250px; height: 320px; }
+</style>
+</head>
+<body>
+<div id="figure">
+  <div id="grid"></div>
+  <div id="legend"></div>
+</div>
+<script src="./vendor/am5.bundle.js"></script>
+<script>
+/* eslint-disable */
+(async function () {
+  const CHART = 300;      // tessellation square (px)
+
+  // Colour + pattern scheme, mirroring parameter-sets panel C: each tile is
+  // a single base colour (its campaign colour, from Stage 1) and pieces are
+  // told apart by HATCH, not lightness. Three tiers, exactly as panel C:
+  //  * the four metabolic categories are drawn SOLID in the set colour with a
+  //    dark hatch (glycolysis diagonal lines / TCA+acetate fill-only /
+  //    ethanol dots / isobutanol crosshatch);
+  //  * translation and housekeeping are drawn HOLLOW -- white body, set-colour
+  //    hatch (circles / plus-grid) and set-colour outline -- the fixed
+  //    non-metabolic anchors;
+  //  * unallocated slack is empty room (white, faint-grey outline, no hatch).
+  // Patterns are amCharts fillPattern objects (LinePattern / CirclePattern /
+  // PathPattern) so they render into the canvas that the PNG/PDF capture.
+  const DARK = 0x262626;   // panel C's '0.15' hatch/outline on filled cells
+  const GREY = 0x999999;   // panel C's '0.6' faint outline on empty slack
+
+  // piece -> {body, hatch, outline}
+  //   body    'set'   fill the cell in the set's base colour
+  //           'white' hollow cell (white body)
+  //   hatch   null | {type, color}  overlaid pattern; color 'dark' (metabolic,
+  //           on the coloured fill) or 'set' (translation / housekeeping, on
+  //           the white hollow body)
+  //   outline 'dark' | 'set' | 'grey'  polygon edge colour
+  const PIECE_STYLE = {
+    cat_glycolysis:  { body: "set",   hatch: { type: "lines",   color: "dark" }, outline: "dark" },
+    cat_tca_acetate: { body: "set",   hatch: null,                               outline: "dark" },
+    cat_ethanol:     { body: "set",   hatch: { type: "dots",    color: "dark" }, outline: "dark" },
+    cat_isobutanol:  { body: "set",   hatch: { type: "cross",   color: "dark" }, outline: "dark" },
+    translation:     { body: "white", hatch: { type: "circles", color: "set"  }, outline: "set"  },
+    housekeeping:    { body: "white", hatch: { type: "plus",    color: "set"  }, outline: "set", opacity: 0.5 },
+    slack:           { body: "white", hatch: null,                               outline: "grey" },
+  };
+
+  // per-piece opacity for the hatch shapes AND the outline (the white body
+  // stays opaque); housekeeping's '++' grid + outline are drawn at 50 % so the
+  // large invariant sector reads more lightly than the metabolic pieces.
+  function pieceOpacity(st) { return st.opacity == null ? 1 : st.opacity; }
+
+  function outlineColor(which, setColor) {
+    return which === "set" ? setColor
+      : am5.color(which === "grey" ? GREY : DARK);
+  }
+
+  // Build one amCharts fillPattern for a hatch spec. `body` fills the gaps
+  // (so a hollow white piece stays white), `color` draws the hatch shapes
+  // (dark on metabolic fills, the set colour on the hollow anchors). Dots
+  // and circles are filled CirclePatterns (the practical stand-in for
+  // matplotlib's '.' / 'o'). Lines, cross and plus are all PathPattern motifs
+  // tiled at gap 0 so adjacent motifs meet and read as continuous diagonal /
+  // crossed / grid hatching, like matplotlib's '/' / 'x' / '+'. NB PathPattern
+  // *fills* its svgPath (ctx.fill, never stroke), so the motifs are closed
+  // FILLED bars, not open strokes -- an open line path would have zero area and
+  // render nothing. One diagonal bar (a thin quad corner-to-corner) makes the
+  // '/', two crossed bars the 'x', a filled plus polygon the '+'.
+  //
+  // The '/' lines are PathPattern, NOT LinePattern, on purpose: a rotated
+  // LinePattern tile does not translate-tile seamlessly -- its line phase jumps
+  // at each 100x100 tile edge, so one sector's fill reads as a patchwork of
+  // rectangular tiles instead of continuous diagonals. Each bar overshoots the
+  // tile corners (-0.5 .. 10.5) so it joins its diagonal neighbours, exactly as
+  // the 'x' bars do (which is why the crosshatch already renders continuous).
+  const LINES_PATH = "M0.5 10.5 L10.5 0.5 L9.5 -0.5 L-0.5 9.5 Z";
+  const CROSS_PATH = "M0.5 -0.5 L10.5 9.5 L9.5 10.5 L-0.5 0.5 Z"
+    + " " + LINES_PATH;
+  const PLUS_PATH = "M4.1 0 H5.9 V4.1 H10 V5.9 H5.9 V10 H4.1 V5.9 H0 V4.1 H4.1 Z";
+
+  function makePattern(root, hatch, body, setColor, opacity) {
+    if (!hatch) return undefined;
+    const color = hatch.color === "set" ? setColor : am5.color(DARK);
+    const op = opacity == null ? 1 : opacity;
+    const common = { color: color, colorOpacity: op, fill: body, fillOpacity: 1 };
+    switch (hatch.type) {
+      case "lines":                                   // '///' diagonal lines
+        return am5.PathPattern.new(root, Object.assign({}, common,
+          { svgPath: LINES_PATH, gap: 0, maxWidth: 10, maxHeight: 10,
+            centered: true }));
+      case "dots":                                    // '...' fine dots
+        return am5.CirclePattern.new(root, Object.assign({}, common,
+          { gap: 4, radius: 1.2 }));
+      case "circles":                                 // 'oo' circles
+        return am5.CirclePattern.new(root, Object.assign({}, common,
+          { gap: 5, radius: 2.2 }));
+      case "cross":                                   // 'xxx' crosshatch
+        return am5.PathPattern.new(root, Object.assign({}, common,
+          { svgPath: CROSS_PATH, gap: 0, maxWidth: 10, maxHeight: 10,
+            centered: true }));
+      case "plus":                                    // '++' plus grid
+        return am5.PathPattern.new(root, Object.assign({}, common,
+          { svgPath: PLUS_PATH, gap: 0, maxWidth: 10, maxHeight: 10,
+            centered: true }));
+    }
+    return undefined;
+  }
+
+  // Drop empty (value ~0) leaves before tessellation: a zero-value site
+  // still claims a thin sliver cell in the Voronoi power diagram, so a pool
+  // that is genuinely off (e.g. the baseline's Ehrlich isobutanol pools, or
+  // zero slack on a derated tile) would otherwise show as a leaf. Parent
+  // grouping nodes ("Metabolic") are kept and pruned recursively.
+  function pruneZeros(nodes) {
+    const out = [];
+    for (const n of nodes) {
+      if (n.children && n.children.length) {
+        out.push(Object.assign({}, n, { children: pruneZeros(n.children) }));
+      } else if (!(typeof n.value === "number" && n.value <= 1e-9)) {
+        out.push(n);
+      }
+    }
+    return out;
+  }
+
+  // --- the common sector key ---------------------------------------------
+  // ONE legend for the whole grid, mirroring parameter-sets panel C, in place
+  // of per-cell labels / leader-line callouts: neutral swatches (metabolic
+  // grey-filled with the dark hatch; the hollow translation / housekeeping
+  // white with a dark outline + hatch; unallocated white with a grey outline)
+  // so the hatches read independent of the campaign colours, grouped under a
+  // bold 'Metabolic' header with the reaction steps, then Unallocated,
+  // Translation, Housekeeping. Rows come from Stage 1 (doc.meta.legend, built
+  // from ps.BURDEN_CATEGORIES). Drawn as its own amCharts root so every swatch
+  // is built by the SAME makePattern as the cells (one pattern source).
+  const SUBSCRIPT = "₀₁₂₃₄₅₆₇₈₉";
+  function stepLabel(st) {          // 'r13' -> italic r, subscript 13
+    const sub = st.replace(/^r/, "").split("")
+      .map(function (d) { return SUBSCRIPT[+d]; }).join("");
+    return "[fontStyle: italic]r[/]" + sub;
+  }
+  // panel C's wrap rule: the step ids sit on the name's last line when that
+  // still fits in ~28 characters, else on a line of their own
+  function legendText(e) {
+    if (!e.steps) return e.name;
+    const plain = "(" + e.steps.join(", ") + ")";
+    const ids = "(" + e.steps.map(stepLabel).join(", ") + ")";
+    const lines = e.name.split("\n");
+    if (lines[lines.length - 1].length + 1 + plain.length <= 28) {
+      lines[lines.length - 1] += " " + ids;
+    } else {
+      lines.push(ids);
+    }
+    return lines.join("\n");
+  }
+  function buildLegend(entries) {
+    const root = am5.Root.new("legend");
+    root._logo && root._logo.dispose();
+    const dark = am5.color(DARK);
+    const box = root.container.children.push(am5.Container.new(root, {
+      layout: root.verticalLayout,
+      paddingTop: 8, paddingBottom: 8, paddingLeft: 10, paddingRight: 14,
+      background: am5.Rectangle.new(root, {
+        fill: am5.color(0xffffff), stroke: am5.color(GREY), strokeWidth: 1,
+      }),
+    }));
+    function text(s, fs, bold, padLeft) {
+      return am5.Label.new(root, {
+        text: s, fontSize: fs, fontFamily: "Arial",
+        fontWeight: bold ? "bold" : "normal", fill: dark,
+        paddingLeft: padLeft || 0, paddingTop: 2, paddingBottom: 2,
+      });
+    }
+    box.children.push(text("Sectors", 13, true));
+    box.children.push(text("Metabolic", 12, true));
+    entries.forEach(function (e) {
+      const st = PIECE_STYLE[e.piece];
+      // neutral swatch body: metabolic grey ('0.72'), the rest white
+      const body = am5.color(st.body === "white" ? 0xffffff : 0xb8b8b8);
+      const row = am5.Container.new(root, {
+        layout: root.horizontalLayout,
+        paddingLeft: e.steps ? 10 : 0, paddingTop: 2, paddingBottom: 2,
+      });
+      row.children.push(am5.Rectangle.new(root, {
+        width: 32, height: 18, fill: body,
+        fillPattern: makePattern(root, st.hatch, body, dark,     // 'set' -> dark
+                                 pieceOpacity(st)),
+        stroke: st.outline === "grey" ? am5.color(GREY) : dark,
+        strokeWidth: 0.8, strokeOpacity: pieceOpacity(st),
+      }));
+      row.children.push(text(legendText(e), 11, false, 7));
+      box.children.push(row);
+    });
+    return root;
+  }
+
+  let doc = window.TREEMAP_DOC;
+  if (!doc) { doc = await (await fetch("./doc.json")).json(); }
+
+  const tiles = doc.tiles;
+  const nCols = window.__COLS__ ||
+    (tiles.length <= 3 ? tiles.length : Math.ceil(Math.sqrt(tiles.length)));
+  const grid = document.getElementById("grid");
+  grid.style.gridTemplateColumns = "repeat(" + nCols + ", auto)";
+
+  const roots = [buildLegend(doc.meta.legend)];
+  let pending = tiles.length;
+
+  tiles.forEach(function (tile, i) {
+    const cell = document.createElement("div");
+    cell.className = "cell";
+    const title = document.createElement("div");
+    title.className = "title";
+    title.textContent = tile.label;
+    const sub = document.createElement("div");
+    sub.className = "subtitle";
+    sub.textContent = "Φₘ = " + tile.Phi_M.toFixed(3)
+      + " g·gDCW⁻¹,  d = " + tile.burden_factor.toFixed(2);
+    const chartDiv = document.createElement("div");
+    chartDiv.className = "chart";
+    chartDiv.id = "chart" + i;
+    cell.appendChild(title);
+    cell.appendChild(sub);
+    cell.appendChild(chartDiv);
+    grid.appendChild(cell);
+
+    const root = am5.Root.new(chartDiv.id);
+    root._logo && root._logo.dispose();
+    roots.push(root);
+
+    const series = root.container.children.push(
+      am5hierarchy.VoronoiTreemap.new(root, {
+        shapeType: "polygon",
+        valueField: "value",
+        categoryField: "name",
+        childDataField: "children",
+        topDepth: 1,        // the four top-level pieces tessellate the area
+        initialDepth: 2,    // ... and Metabolic is subdivided into its four
+      })
+    );
+
+    // one base colour per tile; each piece is that colour + a hatch (panel C
+    // scheme). Precompute the body colour, fillPattern and outline for every
+    // piece once per tile (7 entries) so the polygon adapters just look them
+    // up rather than rebuilding a Pattern on each redraw.
+    const setColor = am5.color(tile.base_color);
+    const bodyFor = {}, patternFor = {}, outlineFor = {}, outlineOpacityFor = {};
+    for (const piece in PIECE_STYLE) {
+      const st = PIECE_STYLE[piece];
+      const body = st.body === "white" ? am5.color(0xffffff) : setColor;
+      bodyFor[piece] = body;
+      patternFor[piece] = makePattern(root, st.hatch, body, setColor,
+                                      pieceOpacity(st));
+      outlineFor[piece] = outlineColor(st.outline, setColor);
+      outlineOpacityFor[piece] = pieceOpacity(st);
+    }
+    series.polygons.template.adapters.add("fill", function (fill, target) {
+      const dc = target.dataItem && target.dataItem.dataContext;
+      return (dc && dc.piece && dc.piece in bodyFor) ? bodyFor[dc.piece] : fill;
+    });
+    series.polygons.template.adapters.add("fillPattern", function (pat, target) {
+      const dc = target.dataItem && target.dataItem.dataContext;
+      // a piece with no hatch (TCA+acetate, slack) maps to undefined -> the
+      // plain body fill shows through
+      return (dc && dc.piece && dc.piece in patternFor)
+        ? patternFor[dc.piece] : pat;
+    });
+    series.polygons.template.adapters.add("stroke", function (stroke, target) {
+      const dc = target.dataItem && target.dataItem.dataContext;
+      return (dc && dc.piece && dc.piece in outlineFor)
+        ? outlineFor[dc.piece] : stroke;
+    });
+    series.polygons.template.adapters.add("strokeOpacity", function (op, target) {
+      const dc = target.dataItem && target.dataItem.dataContext;
+      return (dc && dc.piece && dc.piece in outlineOpacityFor)
+        ? outlineOpacityFor[dc.piece] : op;
+    });
+    series.polygons.template.setAll({ strokeWidth: 0.9, strokeOpacity: 1 });
+
+    // pieces are identified by the common legend (hatch), not per-cell text:
+    // no in-cell labels at all
+    series.labels.template.setAll({ forceHidden: true });
+
+    series.events.on("datavalidated", function () {
+      pending -= 1;
+      if (pending === 0) {
+        // one settle frame so the tessellation and the legend are final
+        requestAnimationFrame(function () {
+          requestAnimationFrame(function () {
+            window.__RENDER_DONE__ = true;
+          });
+        });
+      }
+    });
+
+    series.data.setAll([{
+      name: tile.label,
+      children: pruneZeros(tile.children),
+    }]);
+  });
+
+  // base colour = campaign (per-tile title), hatch = sector (the common
+  // legend); see PIECE_STYLE
+
+  // safety net: if no series fired (e.g. empty doc), still resolve
+  if (tiles.length === 0) { window.__RENDER_DONE__ = true; }
+})();
+</script>
+</body>
+</html>
